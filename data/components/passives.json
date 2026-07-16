@@ -11,6 +11,7 @@
       "values": [{"kind": "resistance", "min": "0", "max": "10M", "unit": "ohm"}],
       "ratings": [{"kind": "power", "typ": "0.1", "unit": "W"}],
       "simulation_models": [
+        {"model_id": "mna_resistor_v1"},
         {"model_id": "rc_lowpass_ac_v1"},
         {"model_id": "resistor_divider_dc_v1"}
       ],
@@ -45,6 +46,7 @@
       "values": [{"kind": "resistance", "min": "0", "max": "10M", "unit": "ohm"}],
       "ratings": [{"kind": "power", "typ": "0.125", "unit": "W"}],
       "simulation_models": [
+        {"model_id": "mna_resistor_v1"},
         {"model_id": "rc_lowpass_ac_v1"},
         {"model_id": "resistor_divider_dc_v1"}
       ],
@@ -80,7 +82,10 @@
       "values": [{"kind": "capacitance", "min": "1p", "max": "10u", "unit": "F"}],
       "ratings": [{"kind": "voltage", "max": "25", "unit": "V"}],
       "tolerances": [{"kind": "capacitance", "max": "20", "unit": "%"}],
-      "simulation_models": [{"model_id": "rc_lowpass_ac_v1"}],
+      "simulation_models": [
+        {"model_id": "mna_capacitor_v1"},
+        {"model_id": "rc_lowpass_ac_v1"}
+      ],
       "symbols": [{
         "symbol_id": "Device:C",
         "function_pins": [
@@ -114,7 +119,10 @@
       "values": [{"kind": "capacitance", "min": "1p", "max": "100u", "unit": "F"}],
       "ratings": [{"kind": "voltage", "max": "25", "unit": "V"}],
       "tolerances": [{"kind": "capacitance", "max": "20", "unit": "%"}],
-      "simulation_models": [{"model_id": "rc_lowpass_ac_v1"}],
+      "simulation_models": [
+        {"model_id": "mna_capacitor_v1"},
+        {"model_id": "rc_lowpass_ac_v1"}
+      ],
       "capacitor_evidence": {
         "dielectric": "unknown",
         "dc_bias_review": "unknown",

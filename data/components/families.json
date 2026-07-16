@@ -4,6 +4,7 @@
     {"id": "bjt", "name": "Bipolar Junction Transistor", "description": "Small-signal and power BJT devices."},
     {"id": "capacitor", "name": "Capacitor", "description": "Charge storage and decoupling components."},
     {"id": "connector", "name": "Connector", "description": "Board interconnects and headers."},
+    {"id": "current_source", "name": "Independent Current Source Port", "description": "Board input port with trusted independent-current analysis semantics."},
     {"id": "crystal", "name": "Crystal", "description": "Quartz crystals and resonators for timing circuits."},
     {"id": "diode", "name": "Diode", "description": "Signal, rectifier, Schottky, and TVS diode families."},
     {"id": "fuse", "name": "Fuse", "description": "Resettable and one-time overcurrent protection devices."},
@@ -14,6 +15,7 @@
     {"id": "regulator", "name": "Voltage Regulator", "description": "Linear and switching voltage regulator devices."},
     {"id": "resistor", "name": "Resistor", "description": "Fixed resistors and pull-up/down components."},
     {"id": "sensor", "name": "Sensor", "description": "Digital and analog sensors."},
-    {"id": "usb_c", "name": "USB-C Connector", "description": "USB Type-C receptacles and related power-only connector records."}
+    {"id": "usb_c", "name": "USB-C Connector", "description": "USB Type-C receptacles and related power-only connector records."},
+    {"id": "voltage_source", "name": "Independent Voltage Source Port", "description": "Board input port with trusted independent-voltage analysis semantics."}
   ]
 }

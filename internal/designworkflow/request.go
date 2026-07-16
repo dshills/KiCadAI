@@ -834,6 +834,11 @@ func validateExplicitCircuit(circuit ExplicitCircuitSpec) []reports.Issue {
 				issues = append(issues, issue("explicit_circuit.simulation.bindings", "simulation binding references missing explicit component "+binding.Component))
 			}
 		}
+		for _, device := range circuit.Simulation.Devices {
+			if _, exists := componentsByID[device.Component]; !exists {
+				issues = append(issues, issue("explicit_circuit.simulation.devices", "simulation device references missing explicit component "+device.Component))
+			}
+		}
 	}
 	return issues
 }

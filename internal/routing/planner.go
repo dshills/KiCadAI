@@ -9,6 +9,15 @@ import (
 	"kicadai/internal/reports"
 )
 
+const (
+	// A fourfold adjacent tree-distance jump separates a local escape cluster
+	// from board-spanning work without depending on board units or coordinates.
+	// The prefix cap bounds how much copper can be committed before established
+	// power/ground ordering resumes.
+	localEscapeGapRatio     = 4.0
+	maxLocalRoutePrefixNets = 4
+)
+
 type PlannedNet struct {
 	Net   Net
 	Pairs []EndpointPair
@@ -65,7 +74,101 @@ func PlanRoutes(request Request, access PadAccess) ([]PlannedNet, []reports.Issu
 		}
 		plans = append(plans, PlannedNet{Net: net, Pairs: pairs})
 	}
+	// Within each explicit priority, reserve a compact local escape cluster
+	// before board-spanning nets add copper obstacles around it. A cluster is
+	// recognized only when canonical endpoint-tree distances contain a clear
+	// multiplicative gap; otherwise the established role/endpoint order is
+	// preserved. This keeps the rule bounded, generic, and deterministic.
+	escapeNets, distances := compactEscapeNets(plans, access)
+	sort.SliceStable(plans, func(i, j int) bool {
+		if plans[i].Net.Priority != plans[j].Net.Priority {
+			return plans[i].Net.Priority > plans[j].Net.Priority
+		}
+		leftEscape := escapeNets[plans[i].Net.Priority][plans[i].Net.Name]
+		rightEscape := escapeNets[plans[j].Net.Priority][plans[j].Net.Name]
+		if leftEscape != rightEscape {
+			return leftEscape
+		}
+		if leftEscape && !distanceEqual(distances[plans[i].Net.Name], distances[plans[j].Net.Name]) {
+			return distanceLess(distances[plans[i].Net.Name], distances[plans[j].Net.Name])
+		}
+		return netLess(plans[i].Net, plans[j].Net)
+	})
 	return plans, issues
+}
+
+func compactEscapeNets(plans []PlannedNet, access PadAccess) (map[int]map[string]bool, map[string]float64) {
+	type candidate struct {
+		name     string
+		role     NetRole
+		distance float64
+	}
+	byPriority := map[int][]candidate{}
+	distances := map[string]float64{}
+	for _, plan := range plans {
+		distance := plannedNetDistance(plan, access)
+		distances[plan.Net.Name] = distance
+		byPriority[plan.Net.Priority] = append(byPriority[plan.Net.Priority], candidate{name: plan.Net.Name, role: plan.Net.Role, distance: distance})
+	}
+	escape := map[int]map[string]bool{}
+	for priority, candidates := range byPriority {
+		sort.SliceStable(candidates, func(i, j int) bool {
+			if !distanceEqual(candidates[i].distance, candidates[j].distance) {
+				return distanceLess(candidates[i].distance, candidates[j].distance)
+			}
+			return candidates[i].name < candidates[j].name
+		})
+		bestGap := localEscapeGapRatio
+		split := -1
+		for index := 0; index+1 < len(candidates); index++ {
+			left := candidates[index].distance
+			right := candidates[index+1].distance
+			ratio := math.Inf(1)
+			if left > distanceEpsilon {
+				ratio = right / left
+			}
+			if ratio > bestGap {
+				bestGap = ratio
+				split = index
+			}
+		}
+		if split < 0 {
+			continue
+		}
+		escape[priority] = map[string]bool{}
+		powerNets := 0
+		for index := 0; index <= split; index++ {
+			if candidates[index].role == NetPower {
+				powerNets++
+			}
+		}
+		escapeBudget := maxLocalRoutePrefixNets - powerNets
+		if escapeBudget < 0 {
+			escapeBudget = 0
+		}
+		count := 0
+		for index := 0; index <= split && count < escapeBudget; index++ {
+			if candidates[index].role == NetPower || candidates[index].role == NetGround {
+				continue
+			}
+			escape[priority][candidates[index].name] = true
+			count++
+		}
+	}
+	return escape, distances
+}
+
+func plannedNetDistance(plan PlannedNet, access PadAccess) float64 {
+	distance := 0.0
+	for _, pair := range plan.Pairs {
+		from, fromOK := AccessPointsForEndpoint(access, pair.From)
+		to, toOK := AccessPointsForEndpoint(access, pair.To)
+		if !fromOK || !toOK {
+			return math.Inf(1)
+		}
+		distance += endpointDistance(from, to)
+	}
+	return distance
 }
 
 func netLess(left Net, right Net) bool {

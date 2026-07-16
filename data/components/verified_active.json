@@ -13,6 +13,17 @@
       "ratings": [{"kind": "supply_voltage", "min": "2.7", "max": "5.5", "unit": "V"}],
       "temperature": {"min": "-40", "max": "125", "unit": "C"},
       "companions": [{"id": "opamp.decoupling_capacitor", "family": "capacitor", "role": "decoupling_capacitor", "required": true, "description": "Place supply decoupling capacitor close to V+ and V- pins."}],
+      "simulation_models": [{
+        "model_id": "mna_opamp_single_pole_v1",
+        "parameters": [
+          {"name": "dc_open_loop_gain", "value": 100000},
+          {"name": "gain_bandwidth_hz", "value": 1000000},
+          {"name": "output_high_margin_v", "value": 0.1},
+          {"name": "output_low_margin_v", "value": 0.1},
+          {"name": "supply_max_v", "value": 5.5},
+          {"name": "supply_min_v", "value": 2.7}
+        ]
+      }],
       "opamp_evidence": {
         "intended_roles": ["input_buffer", "gain_stage", "small_signal_driver"],
         "supply_mode": "rail_to_rail_single_supply",
@@ -71,6 +82,17 @@
       "ratings": [{"kind": "supply_voltage", "min": "3", "max": "30", "unit": "V"}],
       "temperature": {"min": "0", "max": "70", "unit": "C"},
       "companions": [{"id": "opamp.decoupling_capacitor", "family": "capacitor", "role": "decoupling_capacitor", "required": true, "description": "Place package supply decoupling close to pins 8 and 4."}],
+      "simulation_models": [{
+        "model_id": "mna_opamp_single_pole_v1",
+        "parameters": [
+          {"name": "dc_open_loop_gain", "value": 100000},
+          {"name": "gain_bandwidth_hz", "value": 1000000},
+          {"name": "output_high_margin_v", "value": 1.5},
+          {"name": "output_low_margin_v", "value": 0.02},
+          {"name": "supply_max_v", "value": 30},
+          {"name": "supply_min_v", "value": 3}
+        ]
+      }],
       "opamp_evidence": {
         "intended_roles": ["input_buffer", "gain_stage"],
         "supply_mode": "single_supply",

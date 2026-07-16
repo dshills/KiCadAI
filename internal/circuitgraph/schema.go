@@ -1,6 +1,10 @@
 package circuitgraph
 
-import "slices"
+import (
+	"slices"
+
+	"kicadai/internal/simmodel"
+)
 
 func ProviderGraphSchema() map[string]any {
 	identifier := map[string]any{"type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_-]{0,62}$"}
@@ -122,13 +126,46 @@ func ProviderGraphSchema() map[string]any {
 	zone := strictObject(map[string]any{"net": stringValue, "layers": stringArray(32), "clearance_mm": numberValue})
 	simulationBinding := strictObject(map[string]any{"role": identifier, "component": identifier})
 	simulationValue := strictObject(map[string]any{"name": identifier, "value": numberValue})
-	simulationAssertion := strictObject(map[string]any{"metric": identifier, "min": numberValue, "max": numberValue})
-	simulation := strictObject(map[string]any{
+	legacySimulationAssertion := strictObject(map[string]any{"metric": identifier, "min": numberValue, "max": numberValue})
+	legacySimulation := strictObject(map[string]any{
 		"model_id":   identifier,
 		"bindings":   map[string]any{"type": "array", "minItems": 1, "maxItems": 16, "items": simulationBinding},
 		"inputs":     map[string]any{"type": "array", "minItems": 1, "maxItems": 16, "items": simulationValue},
-		"assertions": map[string]any{"type": "array", "minItems": 1, "maxItems": 16, "items": simulationAssertion},
+		"assertions": map[string]any{"type": "array", "minItems": 1, "maxItems": 16, "items": legacySimulationAssertion},
 	})
+	mnaExcitation := strictObject(map[string]any{
+		"component": identifier, "dc_value": numberValue, "ac_magnitude": numberValue, "ac_phase_deg": numberValue,
+	})
+	mnaAnalysis := strictObject(map[string]any{
+		"id": identifier, "kind": map[string]any{"type": "string", "enum": []string{simmodel.AnalysisDCOperatingPoint, simmodel.AnalysisACSweep}},
+		"start_frequency_hz": numberValue, "stop_frequency_hz": numberValue, "points": map[string]any{"type": "integer", "minimum": 0, "maximum": 64},
+		"excitations": map[string]any{"type": "array", "minItems": 1, "maxItems": 16, "items": mnaExcitation},
+	})
+	mnaAnalysis["allOf"] = []any{
+		map[string]any{
+			"if":   map[string]any{"properties": map[string]any{"kind": map[string]any{"const": simmodel.AnalysisACSweep}}},
+			"then": map[string]any{"properties": map[string]any{"points": map[string]any{"minimum": 2}}},
+		},
+		map[string]any{
+			"if": map[string]any{"properties": map[string]any{"kind": map[string]any{"const": simmodel.AnalysisDCOperatingPoint}}},
+			"then": map[string]any{"properties": map[string]any{
+				"start_frequency_hz": map[string]any{"const": 0}, "stop_frequency_hz": map[string]any{"const": 0}, "points": map[string]any{"const": 0},
+			}},
+		},
+	}
+	mnaAssertion := strictObject(map[string]any{
+		"analysis_id": identifier, "node": stringValue,
+		"quantity":     map[string]any{"type": "string", "enum": []string{simmodel.QuantityVoltageV, simmodel.QuantityVoltageMagnitudeV, simmodel.QuantityVoltagePhaseDeg, simmodel.QuantityVoltageDBV}},
+		"frequency_hz": numberValue, "min": numberValue, "max": numberValue,
+	})
+	mnaSimulation := strictObject(map[string]any{
+		"model_id":   map[string]any{"type": "string", "const": simmodel.ModelLinearCircuitMNAV1},
+		"bindings":   map[string]any{"type": "array", "maxItems": 0, "items": simulationBinding},
+		"inputs":     map[string]any{"type": "array", "maxItems": 0, "items": simulationValue},
+		"analyses":   map[string]any{"type": "array", "minItems": 1, "maxItems": 8, "items": mnaAnalysis},
+		"assertions": map[string]any{"type": "array", "minItems": 1, "maxItems": 64, "items": mnaAssertion},
+	})
+	simulation := map[string]any{"oneOf": []any{legacySimulation, mnaSimulation}}
 
 	return strictObject(map[string]any{
 		"schema":  map[string]any{"type": "string", "const": SchemaID},

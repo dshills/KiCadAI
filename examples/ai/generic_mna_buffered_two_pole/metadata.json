@@ -1,0 +1,12 @@
+{
+  "schema": "kicadai.ai.promotion-fixture.v1",
+  "id": "generic_mna_buffered_two_pole",
+  "profile": "generic-circuit-v1",
+  "prompt": "prompt.txt",
+  "recorded_response": "recorded-response.json",
+  "readiness": "pass",
+  "require_erc": true,
+  "require_drc": true,
+  "require_round_trip": true,
+  "strict_diffs": true
+}

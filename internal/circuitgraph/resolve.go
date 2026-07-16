@@ -155,15 +155,25 @@ func (resolver *Resolver) Resolve(ctx context.Context, document Document) (Resol
 }
 
 func resolveSimulation(intent simmodel.Intent, resolved ResolvedDocument) (simmodel.Plan, []reports.Issue) {
+	connections := make(map[string][]simmodel.ConnectionEvidence, len(resolved.Components))
+	nodes := make([]simmodel.NodeEvidence, 0, len(resolved.Nets))
+	for _, net := range resolved.Nets {
+		nodes = append(nodes, simmodel.NodeEvidence{Name: net.Intent.Name, Role: string(net.Intent.Role), VoltageDomain: net.Intent.VoltageDomain})
+		for _, endpoint := range net.Endpoints {
+			connections[endpoint.Intent.Component] = append(connections[endpoint.Intent.Component], simmodel.ConnectionEvidence{
+				Function: endpoint.Function, UnitID: endpoint.Intent.Unit, Net: net.Intent.Name,
+			})
+		}
+	}
 	evidence := make([]simmodel.ComponentEvidence, 0, len(resolved.Components))
 	for _, component := range resolved.Components {
 		value, hasValue := components.ParseEngineeringValue(component.Instance.Value)
 		evidence = append(evidence, simmodel.ComponentEvidence{
 			InstanceID: component.Instance.ID, CatalogID: component.ComponentID, Family: component.Family,
-			ValueSI: value, HasValueSI: hasValue, ModelClaims: component.Record.SimulationModels,
+			ValueSI: value, HasValueSI: hasValue, ModelClaims: component.Record.SimulationModels, Connections: connections[component.Instance.ID],
 		})
 	}
-	plan, diagnostics := simmodel.Resolve(intent, resolved.CatalogID, resolved.CatalogHash, evidence)
+	plan, diagnostics := simmodel.ResolveWithTopology(intent, resolved.CatalogID, resolved.CatalogHash, evidence, nodes)
 	issues := make([]reports.Issue, 0, len(diagnostics))
 	for _, diagnostic := range diagnostics {
 		issue := graphIssue(CodeSimulationInvalid, "simulation."+diagnostic.Path, diagnostic.Message)

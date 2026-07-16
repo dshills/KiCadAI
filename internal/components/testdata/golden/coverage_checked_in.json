@@ -1,16 +1,16 @@
 {
-  "record_count": 53,
-  "family_count": 14,
+  "record_count": 55,
+  "family_count": 16,
   "confidence_counts": {
     "blocked": 1,
     "library_derived": 0,
     "placeholder": 4,
     "rule_inferred": 5,
-    "verified": 43
+    "verified": 45
   },
   "alternative_coverage": {
     "concrete_records": 31,
-    "generic_fallback_records": 22,
+    "generic_fallback_records": 24,
     "equivalence_groups": 19
   },
   "families": [
@@ -123,6 +123,25 @@
       "record_ids": [
         "crystal.abracon.abm3_16mhz.5032_2pin",
         "crystal.generic.5032_2pin"
+      ]
+    },
+    {
+      "family": "current_source",
+      "defined": true,
+      "record_count": 1,
+      "concrete_records": 0,
+      "generic_fallback_records": 1,
+      "equivalence_groups": 0,
+      "verified_records": 1,
+      "library_derived_records": 0,
+      "rule_inferred_records": 0,
+      "placeholder_records": 0,
+      "blocked_records": 0,
+      "missing_resolver_evidence": [
+        "source.current.connector.1x02"
+      ],
+      "record_ids": [
+        "source.current.connector.1x02"
       ]
     },
     {
@@ -355,6 +374,25 @@
       ],
       "record_ids": [
         "usb_c.gct.usb4125_power_only_6p"
+      ]
+    },
+    {
+      "family": "voltage_source",
+      "defined": true,
+      "record_count": 1,
+      "concrete_records": 0,
+      "generic_fallback_records": 1,
+      "equivalence_groups": 0,
+      "verified_records": 1,
+      "library_derived_records": 0,
+      "rule_inferred_records": 0,
+      "placeholder_records": 0,
+      "blocked_records": 0,
+      "missing_resolver_evidence": [
+        "source.voltage.connector.1x02"
+      ],
+      "record_ids": [
+        "source.voltage.connector.1x02"
       ]
     }
   ]

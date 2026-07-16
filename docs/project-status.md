@@ -125,14 +125,21 @@ primary generation mechanism, so KiCadAI writes native project files and uses
 
 ## Generic Functional Evidence
 
-Generic graphs can now resolve ideal fixed-regulator, resistor-divider DC, and
-RC low-pass AC models through a deterministic trusted registry. Compatibility,
-component values, and regulator limits come from the immutable component
-catalog; provider input cannot contain model code or files. The held-out
-filtered-divider fixture combines this evidence with automatic hierarchy,
-clean KiCad ERC/DRC, strict writer/round-trip gates, and byte-identical recorded
-replay. These analytic models are functional checks, not fabrication or analog
-corner signoff.
+Generic graphs can resolve ideal fixed-regulator, resistor-divider DC, and RC
+low-pass AC models through a deterministic trusted registry. They can also use
+graph-derived Modified Nodal Analysis assembled from resolved connectivity and
+catalog-backed resistor, capacitor, independent voltage/current source, and
+finite-gain single-pole op-amp primitives. Providers request bounded DC/AC
+analyses and node assertions; they cannot supply topology labels, equations,
+matrices, executable code, or model files.
+
+The held-out LMV321 buffered two-pole fixture uses automatic hierarchy and two
+analyses without a known block/topology model. It passes catalog resolution,
+simulation assertions, routing/connectivity, clean KiCad ERC and strict DRC,
+writer correctness, zero root/child/PCB round-trip diffs, and byte-identical
+recorded replay. Singular, unstable, nonlinear, incompatible, and numerically
+unbounded requests fail closed. This is deterministic linear functional
+evidence, not parasitic, tolerance, thermal, transient, or fabrication signoff.
 
 ## Amplifier Coverage
 
@@ -157,10 +164,11 @@ treated as autonomous or fabrication-ready.
 
 ## Remaining Direction
 
-The next work should extend the same catalog-backed trust boundary to a
-materially different behavior such as a bounded op-amp transfer/stability
-contract, then prove it on another held-out graph. Continue to broaden catalog
-and pin/function evidence only when a target exposes a concrete gap.
+The next materially different capability should be bounded catalog-backed
+nonlinear DC operating-point analysis for reviewed diode and transistor
+primitives, with deterministic convergence limits and a held-out active switch
+or bias circuit. Continue to broaden catalog and pin/function evidence only
+when that target exposes a concrete gap.
 
 See the [Roadmap](../specs/ROADMAP.md) for prioritized work and the
 [Development Reference](development.md) for repository-level limitations and

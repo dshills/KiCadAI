@@ -1,6 +1,6 @@
 # KiCadAI Roadmap
 
-Date: 2026-07-14
+Date: 2026-07-16
 
 This roadmap replaces the older roadmap and gap analysis now archived as
 `specs/OLD_ROADMAP.md` and `specs/OLD_ROADMAP_GAP.md`.
@@ -69,6 +69,14 @@ from validation feedback to safe automatic repair.
   diagnostics, via/layer policy diagnostics, length policy evidence, explicit
   zone policy behavior, coupled-net intent reporting, workflow integration, and
   golden corpus coverage.
+- Catalog-backed graph-derived Modified Nodal Analysis with trusted resistor,
+  capacitor, independent voltage/current source, and finite-gain single-pole
+  op-amp primitives; deterministic bounded DC/AC solving; canonical topology
+  and report artifacts; provider equation/matrix/code rejection; and
+  fail-closed singular, unstable, nonlinear, incompatible, and numerical-limit
+  diagnostics. A held-out automatic-hierarchy LMV321 conditioner passes clean
+  ERC, strict DRC, routing/connectivity, writer correctness, zero root/child/PCB
+  round-trip diffs, and byte-identical recorded replay.
 - Bounded placement-routing retry foundation with routing diagnostic to
   placement hint mapping, explicit retry policy, deterministic adjustment
   builder, best-attempt selection, repeated-state detection, and workflow retry
@@ -1093,9 +1101,12 @@ reaches the same KiCad-backed pass gates.
 1. Add a materially different generic graph only when it exposes a concrete
    catalog, lowering, hierarchy, placement, routing, simulation, or validation
    gap; do not extend stage count merely to accumulate fixtures.
-2. Generalize bounded placement-routing correction from those observed
+2. Add bounded catalog-backed nonlinear DC operating-point primitives and
+   deterministic convergence diagnostics, then prove them on a held-out diode
+   or transistor circuit without provider-supplied models or topology labels.
+3. Generalize bounded placement-routing correction from those observed
    failures without introducing fixture-identity logic.
-3. Expand calculated rating and fabrication evidence before claiming broader
+4. Expand calculated rating and fabrication evidence before claiming broader
    autonomous or fabrication-ready coverage.
 
 ## Definition Of Autonomous Ready

@@ -30,6 +30,7 @@ type definition struct {
 	Inputs      []valueRule      `json:"inputs"`
 	Metrics     []string         `json:"metrics"`
 	Description string           `json:"description"`
+	GraphMNA    bool             `json:"graph_mna,omitempty"`
 }
 
 var registry = []definition{
@@ -55,10 +56,17 @@ var registry = []definition{
 		Inputs:  []valueRule{{Name: "frequency_hz", Positive: true, Maximum: 1e12}},
 		Metrics: []string{"cutoff_frequency_hz", "gain_ratio"}, Description: "Ideal first-order unloaded RC low-pass AC magnitude model.",
 	},
+	{
+		ID: ModelLinearCircuitMNAV1, GraphMNA: true,
+		Description: "Graph-derived deterministic modified nodal analysis using trusted catalog primitive models.",
+	},
 }
 
 func RegistryHash() string {
-	data, err := json.Marshal(registry)
+	data, err := json.Marshal(struct {
+		Models     []definition          `json:"models"`
+		Primitives []primitiveDefinition `json:"primitives"`
+	}{Models: registry, Primitives: primitiveRegistry})
 	if err != nil {
 		panic("trusted simulation registry is not serializable: " + err.Error())
 	}
@@ -80,8 +88,9 @@ func ValidateCatalogEvidence(family string, evidence []CatalogEvidence) []Diagno
 	for index, claim := range evidence {
 		path := fmt.Sprintf("simulation_models[%d]", index)
 		modelID := strings.TrimSpace(claim.ModelID)
-		model, ok := definitionByID(modelID)
-		if !ok {
+		model, workflowModel := definitionByID(modelID)
+		primitive, primitiveModel := primitiveByID(modelID)
+		if !workflowModel && !primitiveModel {
 			diagnostics = append(diagnostics, Diagnostic{Path: path + ".model_id", Message: "simulation model is not present in the trusted registry", Suggestion: "use one of: " + strings.Join(ModelIDs(), ", ")})
 			continue
 		}
@@ -89,11 +98,23 @@ func ValidateCatalogEvidence(family string, evidence []CatalogEvidence) []Diagno
 			diagnostics = append(diagnostics, Diagnostic{Path: path + ".model_id", Message: "simulation model id must use canonical trimmed spelling " + modelID})
 			continue
 		}
-		if _, duplicate := seen[model.ID]; duplicate {
+		if _, duplicate := seen[modelID]; duplicate {
 			diagnostics = append(diagnostics, Diagnostic{Path: path + ".model_id", Message: "duplicate simulation model evidence"})
 			continue
 		}
-		seen[model.ID] = struct{}{}
+		seen[modelID] = struct{}{}
+		if primitiveModel {
+			if primitive.Family != family {
+				diagnostics = append(diagnostics, Diagnostic{Path: path + ".model_id", Message: fmt.Sprintf("trusted primitive %s requires component family %s, got %s", primitive.ID, primitive.Family, family)})
+				continue
+			}
+			diagnostics = append(diagnostics, validatePrimitiveParameters(path+".parameters", primitive, claim.Parameters)...)
+			continue
+		}
+		if model.GraphMNA {
+			diagnostics = append(diagnostics, Diagnostic{Path: path + ".model_id", Message: "graph analysis models cannot be attached to component catalog records", Suggestion: "attach a trusted primitive model instead"})
+			continue
+		}
 		roles := rolesForFamily(model, family)
 		if len(roles) == 0 {
 			diagnostics = append(diagnostics, Diagnostic{Path: path + ".model_id", Message: fmt.Sprintf("trusted model %s has no role compatible with component family %s", model.ID, family)})
@@ -119,6 +140,9 @@ func ValidateIntent(intent Intent, components map[string]string) []Diagnostic {
 	model, ok := definitionByID(strings.TrimSpace(intent.ModelID))
 	if !ok {
 		return []Diagnostic{{Path: "model_id", Message: "simulation model is not present in the trusted registry", Suggestion: "use one of: " + strings.Join(ModelIDs(), ", ")}}
+	}
+	if model.GraphMNA {
+		return validateMNAIntent(intent, components)
 	}
 	var diagnostics []Diagnostic
 	roles := map[string]roleDefinition{}
@@ -192,6 +216,9 @@ func Resolve(intent Intent, catalogID, catalogHash string, components []Componen
 		return Plan{}, diagnostics
 	}
 	model, _ := definitionByID(intent.ModelID)
+	if model.GraphMNA {
+		return resolveMNA(intent, catalogID, catalogHash, components)
+	}
 	plan := Plan{RegistryVersion: RegistryVersion, RegistryHash: RegistryHash(), CatalogID: catalogID, CatalogHash: catalogHash, ModelID: model.ID}
 	var diagnostics []Diagnostic
 	for _, binding := range intent.Bindings {
@@ -223,16 +250,19 @@ func Resolve(intent Intent, catalogID, catalogHash string, components []Componen
 	plan.Inputs = normalizeNamedValues(intent.Inputs)
 	plan.Assertions = append([]Assertion(nil), intent.Assertions...)
 	slices.SortStableFunc(plan.Bindings, func(a, b ResolvedBinding) int { return strings.Compare(a.Role, b.Role) })
-	slices.SortStableFunc(plan.Assertions, func(a, b Assertion) int { return strings.Compare(a.Metric, b.Metric) })
+	slices.SortStableFunc(plan.Assertions, func(a, b Assertion) int { return strings.Compare(assertionKey(a), assertionKey(b)) })
 	return plan, nil
 }
 
 func Evaluate(plan Plan) (Report, []Diagnostic) {
-	report := Report{Schema: ReportSchema, RegistryVersion: plan.RegistryVersion, RegistryHash: plan.RegistryHash, CatalogID: plan.CatalogID, CatalogHash: plan.CatalogHash, ModelID: plan.ModelID, Bindings: append([]ResolvedBinding(nil), plan.Bindings...), Inputs: append([]NamedValue(nil), plan.Inputs...), Status: "blocked"}
+	report := Report{Schema: ReportSchema, RegistryVersion: plan.RegistryVersion, RegistryHash: plan.RegistryHash, CatalogID: plan.CatalogID, CatalogHash: plan.CatalogHash, ModelID: plan.ModelID, Bindings: append([]ResolvedBinding(nil), plan.Bindings...), Inputs: append([]NamedValue(nil), plan.Inputs...), GroundNode: plan.GroundNode, Nodes: append([]string(nil), plan.Nodes...), Devices: cloneDevices(plan.Devices), TopologyHash: plan.TopologyHash, Status: "blocked"}
 	if diagnostics := ValidatePlan(plan); len(diagnostics) != 0 {
 		return report, diagnostics
 	}
 	model, _ := definitionByID(plan.ModelID)
+	if model.GraphMNA {
+		return evaluateMNA(plan, report)
+	}
 	measurements, diagnostics := evaluateModel(model, plan)
 	if len(diagnostics) != 0 {
 		return report, diagnostics
@@ -266,6 +296,9 @@ func ValidatePlan(plan Plan) []Diagnostic {
 	model, ok := definitionByID(plan.ModelID)
 	if !ok {
 		return []Diagnostic{{Path: "model_id", Message: "resolved simulation plan references an unknown model"}}
+	}
+	if model.GraphMNA {
+		return validateMNAPlan(plan)
 	}
 	if strings.TrimSpace(plan.CatalogID) == "" || strings.TrimSpace(plan.CatalogHash) == "" {
 		return []Diagnostic{{Path: "catalog", Message: "resolved simulation plan is missing catalog identity evidence", Suggestion: "resolve the circuit against an immutable catalog snapshot"}}

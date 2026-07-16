@@ -151,8 +151,8 @@ func TestAIProviderOptionalKiCadPromotion(t *testing.T) {
 				if !promotion.MatchesExpectation {
 					t.Fatal("promotion does not match declared pass readiness")
 				}
-				if id == "generic_filtered_divider_hierarchy" {
-					assertTrustedHierarchyReplay(t, output, cliPath, repoRoot, metadata)
+				if id == "generic_filtered_divider_hierarchy" || id == "generic_mna_buffered_two_pole" {
+					assertTrustedHierarchyReplay(t, output, cliPath, repoRoot, metadata, id)
 				}
 				return
 			}
@@ -163,7 +163,7 @@ func TestAIProviderOptionalKiCadPromotion(t *testing.T) {
 	}
 }
 
-func assertTrustedHierarchyReplay(t *testing.T, output, cliPath, repoRoot string, metadata aiPromotionFixtureMetadata) {
+func assertTrustedHierarchyReplay(t *testing.T, output, cliPath, repoRoot string, metadata aiPromotionFixtureMetadata, fixtureID string) {
 	t.Helper()
 	var promotion designworkflow.PromotionReport
 	readJSONFile(t, filepath.Join(output, designworkflow.PromotionReportArtifactPath), &promotion)
@@ -178,8 +178,22 @@ func assertTrustedHierarchyReplay(t *testing.T, output, cliPath, repoRoot string
 	}
 	var simulation simmodel.Report
 	readJSONFile(t, filepath.Join(output, designworkflow.ExplicitSimulationArtifactPath), &simulation)
-	if simulation.Status != "pass" || simulation.ModelID != simmodel.ModelResistorDividerDCV1 || simulation.RegistryHash != simmodel.RegistryHash() || simulation.CatalogHash == "" {
+	expectedModel := simmodel.ModelResistorDividerDCV1
+	if fixtureID == "generic_mna_buffered_two_pole" {
+		expectedModel = simmodel.ModelLinearCircuitMNAV1
+	}
+	if simulation.Status != "pass" || simulation.ModelID != expectedModel || simulation.RegistryHash != simmodel.RegistryHash() || simulation.CatalogHash == "" {
 		t.Fatalf("trusted simulation evidence = %#v", simulation)
+	}
+	if expectedModel == simmodel.ModelLinearCircuitMNAV1 {
+		if simulation.TopologyHash == "" || len(simulation.Devices) < 7 || len(simulation.Analyses) != 2 || len(simulation.Assertions) < 4 {
+			t.Fatalf("graph MNA evidence is incomplete: %#v", simulation)
+		}
+		for _, assertion := range simulation.Assertions {
+			if !assertion.Pass {
+				t.Fatalf("graph MNA assertion did not pass: %#v", assertion)
+			}
+		}
 	}
 	files := generatedKiCadFiles(t, output)
 	childCount := 0
@@ -279,6 +293,7 @@ func aiPromotionFixtureIDs() []string {
 		"generic_filtered_divider_hierarchy",
 		"generic_lm358_buffered_signal_conditioner",
 		"generic_lmv321_ac_gain_stage",
+		"generic_mna_buffered_two_pole",
 		"generic_rc_filter",
 		"generic_usb_c_bmp280_breakout",
 		"generic_usb_c_led_indicator_protected",

@@ -398,10 +398,13 @@ SOA, thermal, and protection evidence.
 
 Explicit `generic-circuit-v1` graphs use a separate always-deterministic trusted
 model registry. Model compatibility and parameters resolve from the immutable
-component catalog; the provider supplies only model ID, component-role
-bindings, bounded scalar inputs, and metric bounds. Supported ideal families
-are fixed linear regulators, resistor dividers, and RC low-pass filters.
-Unsupported models and missing or incompatible catalog evidence fail closed.
+component catalog. Legacy analytic models accept only model ID, component-role
+bindings, bounded scalar inputs, and metric bounds. Graph-derived MNA accepts
+only bounded DC/AC analyses, source conditions, and structured node assertions;
+it compiles topology from resolved nets and trusted resistor, capacitor,
+independent-source, and op-amp primitive claims. Provider equations, matrices,
+code, model files, and topology labels are rejected. Unsupported nonlinear,
+unstable, singular, incompatible, or unbounded systems fail closed.
 
 Current gaps for autonomous one-shot schematic + PCB generation:
 

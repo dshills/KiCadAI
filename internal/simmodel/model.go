@@ -7,6 +7,21 @@ const (
 	ModelLinearRegulatorIdealV1 = "linear_regulator_ideal_v1"
 	ModelResistorDividerDCV1    = "resistor_divider_dc_v1"
 	ModelRCLowpassACV1          = "rc_lowpass_ac_v1"
+	ModelLinearCircuitMNAV1     = "linear_circuit_mna_v1"
+
+	PrimitiveResistorV1      = "mna_resistor_v1"
+	PrimitiveCapacitorV1     = "mna_capacitor_v1"
+	PrimitiveVoltageSourceV1 = "mna_voltage_source_v1"
+	PrimitiveCurrentSourceV1 = "mna_current_source_v1"
+	PrimitiveOpAmpV1         = "mna_opamp_single_pole_v1"
+
+	AnalysisDCOperatingPoint = "dc_operating_point"
+	AnalysisACSweep          = "ac_sweep"
+
+	QuantityVoltageV          = "voltage_v"
+	QuantityVoltageMagnitudeV = "voltage_magnitude_v"
+	QuantityVoltagePhaseDeg   = "voltage_phase_deg"
+	QuantityVoltageDBV        = "voltage_dbv"
 )
 
 type NamedValue struct {
@@ -25,9 +40,34 @@ type Binding struct {
 }
 
 type Assertion struct {
-	Metric string  `json:"metric"`
-	Min    float64 `json:"min"`
-	Max    float64 `json:"max"`
+	Metric      string  `json:"metric,omitempty"`
+	AnalysisID  string  `json:"analysis_id,omitempty"`
+	Node        string  `json:"node,omitempty"`
+	Quantity    string  `json:"quantity,omitempty"`
+	FrequencyHz float64 `json:"frequency_hz,omitempty"`
+	Min         float64 `json:"min"`
+	Max         float64 `json:"max"`
+}
+
+// SourceExcitation is a bounded operating condition for a catalog-resolved
+// independent source. Primitive kind and terminal orientation remain trusted
+// catalog/registry data rather than provider input.
+type SourceExcitation struct {
+	Component   string  `json:"component"`
+	DCValue     float64 `json:"dc_value,omitempty"`
+	ACMagnitude float64 `json:"ac_magnitude,omitempty"`
+	ACPhaseDeg  float64 `json:"ac_phase_deg,omitempty"`
+}
+
+// Analysis requests a trusted analysis algorithm. It contains no equation,
+// matrix, expression, executable, include, path, or topology field.
+type Analysis struct {
+	ID               string             `json:"id"`
+	Kind             string             `json:"kind"`
+	StartFrequencyHz float64            `json:"start_frequency_hz,omitempty"`
+	StopFrequencyHz  float64            `json:"stop_frequency_hz,omitempty"`
+	Points           int                `json:"points,omitempty"`
+	Excitations      []SourceExcitation `json:"excitations"`
 }
 
 // Intent contains only trusted model selection, component bindings, bounded
@@ -37,7 +77,14 @@ type Intent struct {
 	ModelID    string       `json:"model_id"`
 	Bindings   []Binding    `json:"bindings"`
 	Inputs     []NamedValue `json:"inputs"`
+	Analyses   []Analysis   `json:"analyses,omitempty"`
 	Assertions []Assertion  `json:"assertions"`
+}
+
+type ConnectionEvidence struct {
+	Function string
+	UnitID   string
+	Net      string
 }
 
 type ComponentEvidence struct {
@@ -47,6 +94,7 @@ type ComponentEvidence struct {
 	ValueSI     float64
 	HasValueSI  bool
 	ModelClaims []CatalogEvidence
+	Connections []ConnectionEvidence
 }
 
 type ResolvedBinding struct {
@@ -58,6 +106,21 @@ type ResolvedBinding struct {
 	ModelParameters []NamedValue `json:"model_parameters,omitempty"`
 }
 
+type TerminalBinding struct {
+	Terminal string `json:"terminal"`
+	Net      string `json:"net"`
+}
+
+type ResolvedDevice struct {
+	Component       string            `json:"component"`
+	CatalogID       string            `json:"catalog_id"`
+	Family          string            `json:"family"`
+	PrimitiveModel  string            `json:"primitive_model"`
+	ValueSI         *float64          `json:"value_si,omitempty"`
+	ModelParameters []NamedValue      `json:"model_parameters,omitempty"`
+	Terminals       []TerminalBinding `json:"terminals"`
+}
+
 type Plan struct {
 	RegistryVersion string            `json:"registry_version"`
 	RegistryHash    string            `json:"registry_hash"`
@@ -66,6 +129,11 @@ type Plan struct {
 	ModelID         string            `json:"model_id"`
 	Bindings        []ResolvedBinding `json:"bindings"`
 	Inputs          []NamedValue      `json:"inputs"`
+	GroundNode      string            `json:"ground_node,omitempty"`
+	Nodes           []string          `json:"nodes,omitempty"`
+	Devices         []ResolvedDevice  `json:"devices,omitempty"`
+	TopologyHash    string            `json:"topology_hash,omitempty"`
+	Analyses        []Analysis        `json:"analyses,omitempty"`
 	Assertions      []Assertion       `json:"assertions"`
 }
 
@@ -80,7 +148,26 @@ func ClonePlan(source Plan) Plan {
 		}
 	}
 	clone.Inputs = append([]NamedValue(nil), source.Inputs...)
+	clone.Nodes = append([]string(nil), source.Nodes...)
+	clone.Devices = append([]ResolvedDevice(nil), source.Devices...)
+	for index := range clone.Devices {
+		clone.Devices[index].ModelParameters = append([]NamedValue(nil), source.Devices[index].ModelParameters...)
+		clone.Devices[index].Terminals = append([]TerminalBinding(nil), source.Devices[index].Terminals...)
+		if source.Devices[index].ValueSI != nil {
+			value := *source.Devices[index].ValueSI
+			clone.Devices[index].ValueSI = &value
+		}
+	}
+	clone.Analyses = cloneAnalyses(source.Analyses)
 	clone.Assertions = append([]Assertion(nil), source.Assertions...)
+	return clone
+}
+
+func cloneAnalyses(source []Analysis) []Analysis {
+	clone := append([]Analysis(nil), source...)
+	for index := range clone {
+		clone[index].Excitations = append([]SourceExcitation(nil), source[index].Excitations...)
+	}
 	return clone
 }
 
@@ -96,11 +183,34 @@ type Measurement struct {
 }
 
 type AssertionResult struct {
-	Metric string  `json:"metric"`
-	Min    float64 `json:"min"`
-	Max    float64 `json:"max"`
-	Actual float64 `json:"actual"`
-	Pass   bool    `json:"pass"`
+	Metric      string  `json:"metric,omitempty"`
+	AnalysisID  string  `json:"analysis_id,omitempty"`
+	Node        string  `json:"node,omitempty"`
+	Quantity    string  `json:"quantity,omitempty"`
+	FrequencyHz float64 `json:"frequency_hz,omitempty"`
+	Min         float64 `json:"min"`
+	Max         float64 `json:"max"`
+	Actual      float64 `json:"actual"`
+	Pass        bool    `json:"pass"`
+}
+
+type NodeResult struct {
+	Node      string  `json:"node"`
+	Real      float64 `json:"real"`
+	Imaginary float64 `json:"imaginary"`
+	Magnitude float64 `json:"magnitude"`
+	PhaseDeg  float64 `json:"phase_deg"`
+}
+
+type AnalysisPoint struct {
+	FrequencyHz float64      `json:"frequency_hz,omitempty"`
+	Nodes       []NodeResult `json:"nodes"`
+}
+
+type AnalysisResult struct {
+	ID     string          `json:"id"`
+	Kind   string          `json:"kind"`
+	Points []AnalysisPoint `json:"points"`
 }
 
 type Report struct {
@@ -112,6 +222,11 @@ type Report struct {
 	ModelID         string            `json:"model_id"`
 	Bindings        []ResolvedBinding `json:"bindings"`
 	Inputs          []NamedValue      `json:"inputs"`
+	GroundNode      string            `json:"ground_node,omitempty"`
+	Nodes           []string          `json:"nodes,omitempty"`
+	Devices         []ResolvedDevice  `json:"devices,omitempty"`
+	TopologyHash    string            `json:"topology_hash,omitempty"`
+	Analyses        []AnalysisResult  `json:"analyses,omitempty"`
 	Measurements    []Measurement     `json:"measurements"`
 	Assertions      []AssertionResult `json:"assertions"`
 	Status          string            `json:"status"`

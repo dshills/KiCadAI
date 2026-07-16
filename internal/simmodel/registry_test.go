@@ -80,6 +80,20 @@ func TestRegistryRejectsIncompleteCatalogModelParameters(t *testing.T) {
 	}
 }
 
+func TestRegistryRejectsInconsistentOpAmpCatalogParameters(t *testing.T) {
+	parameters := []NamedValue{
+		{Name: "dc_open_loop_gain", Value: 100000},
+		{Name: "gain_bandwidth_hz", Value: 1e6},
+		{Name: "supply_min_v", Value: 5.5},
+		{Name: "supply_max_v", Value: 2.7},
+		{Name: "output_low_margin_v", Value: 3},
+		{Name: "output_high_margin_v", Value: 3},
+	}
+	if diagnostics := ValidateCatalogEvidence("opamp", []CatalogEvidence{{ModelID: PrimitiveOpAmpV1, Parameters: parameters}}); len(diagnostics) < 2 {
+		t.Fatalf("inconsistent op-amp catalog model evidence was accepted: %#v", diagnostics)
+	}
+}
+
 func TestResolveCanonicalizesProviderModelID(t *testing.T) {
 	intent := Intent{ModelID: "  " + ModelResistorDividerDCV1 + "  ",
 		Bindings: []Binding{{Role: "upper_resistor", Component: "r1"}, {Role: "lower_resistor", Component: "r2"}},

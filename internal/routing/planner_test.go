@@ -19,6 +19,47 @@ func TestPlanRoutesOrdersNetsDeterministically(t *testing.T) {
 	}
 }
 
+func TestPlanRoutesReservesCompactLocalEscapeBeforeBroadNet(t *testing.T) {
+	request := singleLayerSearchRequest()
+	request.Components = append(request.Components,
+		testComponent("J3", "1", "LOCAL", 10, 10),
+		testComponent("J4", "1", "LOCAL", 11, 10),
+	)
+	request.Nets = []Net{
+		{Name: "BROAD_POWER", Role: NetPower, Priority: 1, Endpoints: request.Nets[0].Endpoints},
+		{Name: "LOCAL", Role: NetSignal, Priority: 1, Endpoints: []Endpoint{{Ref: "J3", Pin: "1"}, {Ref: "J4", Pin: "1"}}},
+	}
+	plans, issues := PlanRoutes(request, BuildPadAccess(request))
+	if len(issues) != 0 {
+		t.Fatalf("issues = %#v", issues)
+	}
+	if len(plans) != 2 || plans[0].Net.Name != "LOCAL" {
+		t.Fatalf("plan order = %#v", plans)
+	}
+}
+
+func TestPlanRoutesPromotesCompactClusterThenPreservesRoleOrder(t *testing.T) {
+	request := singleLayerSearchRequest()
+	request.Components = append(request.Components,
+		testComponent("J3", "1", "LOCAL", 10, 10),
+		testComponent("J4", "1", "LOCAL", 11, 10),
+		testComponent("J5", "1", "SECOND", 10, 12),
+		testComponent("J6", "1", "SECOND", 12, 12),
+	)
+	request.Nets = []Net{
+		{Name: "GND", Role: NetGround, Priority: 1, Endpoints: request.Nets[0].Endpoints},
+		{Name: "LOCAL", Role: NetSignal, Priority: 1, Endpoints: []Endpoint{{Ref: "J3", Pin: "1"}, {Ref: "J4", Pin: "1"}}},
+		{Name: "SECOND", Role: NetSignal, Priority: 1, Endpoints: []Endpoint{{Ref: "J5", Pin: "1"}, {Ref: "J6", Pin: "1"}}},
+	}
+	plans, issues := PlanRoutes(request, BuildPadAccess(request))
+	if len(issues) != 0 {
+		t.Fatalf("issues = %#v", issues)
+	}
+	if len(plans) != 3 || plans[0].Net.Name != "LOCAL" || plans[1].Net.Name != "SECOND" || plans[2].Net.Name != "GND" {
+		t.Fatalf("plan order = %#v", plans)
+	}
+}
+
 func TestPlanRoutesSkipsOneEndpointAndFixedNets(t *testing.T) {
 	request := minimalRequest()
 	request.Nets = []Net{

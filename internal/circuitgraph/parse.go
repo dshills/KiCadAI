@@ -2,6 +2,7 @@ package circuitgraph
 
 import (
 	"bytes"
+	"cmp"
 	"encoding/json"
 	"io"
 	"slices"
@@ -94,8 +95,28 @@ func Normalize(document Document) Document {
 		slices.SortStableFunc(normalized.Simulation.Inputs, func(left, right simmodel.NamedValue) int {
 			return strings.Compare(left.Name, right.Name)
 		})
+		for index := range normalized.Simulation.Analyses {
+			slices.SortStableFunc(normalized.Simulation.Analyses[index].Excitations, func(left, right simmodel.SourceExcitation) int {
+				return strings.Compare(left.Component, right.Component)
+			})
+		}
+		slices.SortStableFunc(normalized.Simulation.Analyses, func(left, right simmodel.Analysis) int {
+			return strings.Compare(left.ID, right.ID)
+		})
 		slices.SortStableFunc(normalized.Simulation.Assertions, func(left, right simmodel.Assertion) int {
-			return strings.Compare(left.Metric, right.Metric)
+			if order := strings.Compare(left.Metric, right.Metric); order != 0 {
+				return order
+			}
+			if order := strings.Compare(left.AnalysisID, right.AnalysisID); order != 0 {
+				return order
+			}
+			if order := strings.Compare(left.Node, right.Node); order != 0 {
+				return order
+			}
+			if order := strings.Compare(left.Quantity, right.Quantity); order != 0 {
+				return order
+			}
+			return cmp.Compare(left.FrequencyHz, right.FrequencyHz)
 		})
 	}
 	slices.SortStableFunc(normalized.Components, func(left, right Component) int {
@@ -218,6 +239,10 @@ func cloneDocument(document Document) Document {
 		simulation := *document.Simulation
 		simulation.Bindings = append([]simmodel.Binding(nil), document.Simulation.Bindings...)
 		simulation.Inputs = append([]simmodel.NamedValue(nil), document.Simulation.Inputs...)
+		simulation.Analyses = append([]simmodel.Analysis(nil), document.Simulation.Analyses...)
+		for index := range simulation.Analyses {
+			simulation.Analyses[index].Excitations = append([]simmodel.SourceExcitation(nil), document.Simulation.Analyses[index].Excitations...)
+		}
 		simulation.Assertions = append([]simmodel.Assertion(nil), document.Simulation.Assertions...)
 		cloned.Simulation = &simulation
 	}

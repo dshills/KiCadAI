@@ -170,6 +170,68 @@
         "verification": {"confidence": "verified", "sources": ["builtin_pinmap:Connector_Generic:Conn_01x06"], "pinmap_checked": true}
       }],
       "verification": {"confidence": "verified", "sources": ["curated_seed_catalog", "builtin_pinmap:Connector_Generic:Conn_01x06"], "pinmap_checked": true}
+    },
+    {
+      "id": "source.voltage.connector.1x02",
+      "family": "voltage_source",
+      "name": "Independent voltage source input port",
+      "description": "Physical two-pin input port with trusted independent-voltage source semantics for bounded analyses.",
+      "generic": true,
+      "lifecycle": "active",
+      "tags": ["connector", "simulation_source", "voltage", "2.54mm"],
+      "simulation_models": [{"model_id": "mna_voltage_source_v1"}],
+      "symbols": [{
+        "symbol_id": "Connector_Generic:Conn_01x02",
+        "function_pins": [
+          {"function": "POSITIVE", "symbol_pin": "1", "polarity": "positive", "required": true},
+          {"function": "NEGATIVE", "symbol_pin": "2", "polarity": "negative", "required": true}
+        ],
+        "verification": {"confidence": "verified", "sources": ["builtin_pinmap:Connector_Generic:Conn_01x02"], "pinmap_checked": true}
+      }],
+      "packages": [{
+        "id": "vertical",
+        "name": "Vertical",
+        "footprint_id": "Connector_PinHeader_2.54mm:PinHeader_1x02_P2.54mm_Vertical",
+        "package_type": "pin_header_1x02",
+        "pinmap_id": "Connector_Generic:Conn_01x02|Connector_PinHeader_2.54mm:PinHeader_1x02_P2.54mm_Vertical",
+        "pad_functions": [
+          {"function": "POSITIVE", "pad": "1", "polarity": "positive"},
+          {"function": "NEGATIVE", "pad": "2", "polarity": "negative"}
+        ],
+        "verification": {"confidence": "verified", "sources": ["builtin_pinmap:Connector_Generic:Conn_01x02"], "pinmap_checked": true}
+      }],
+      "verification": {"confidence": "verified", "sources": ["curated_seed_catalog", "builtin_pinmap:Connector_Generic:Conn_01x02"], "pinmap_checked": true}
+    },
+    {
+      "id": "source.current.connector.1x02",
+      "family": "current_source",
+      "name": "Independent current source input port",
+      "description": "Physical two-pin input port with trusted independent-current source semantics for bounded analyses.",
+      "generic": true,
+      "lifecycle": "active",
+      "tags": ["connector", "simulation_source", "current", "2.54mm"],
+      "simulation_models": [{"model_id": "mna_current_source_v1"}],
+      "symbols": [{
+        "symbol_id": "Connector_Generic:Conn_01x02",
+        "function_pins": [
+          {"function": "POSITIVE", "symbol_pin": "1", "polarity": "positive", "required": true},
+          {"function": "NEGATIVE", "symbol_pin": "2", "polarity": "negative", "required": true}
+        ],
+        "verification": {"confidence": "verified", "sources": ["builtin_pinmap:Connector_Generic:Conn_01x02"], "pinmap_checked": true}
+      }],
+      "packages": [{
+        "id": "vertical",
+        "name": "Vertical",
+        "footprint_id": "Connector_PinHeader_2.54mm:PinHeader_1x02_P2.54mm_Vertical",
+        "package_type": "pin_header_1x02",
+        "pinmap_id": "Connector_Generic:Conn_01x02|Connector_PinHeader_2.54mm:PinHeader_1x02_P2.54mm_Vertical",
+        "pad_functions": [
+          {"function": "POSITIVE", "pad": "1", "polarity": "positive"},
+          {"function": "NEGATIVE", "pad": "2", "polarity": "negative"}
+        ],
+        "verification": {"confidence": "verified", "sources": ["builtin_pinmap:Connector_Generic:Conn_01x02"], "pinmap_checked": true}
+      }],
+      "verification": {"confidence": "verified", "sources": ["curated_seed_catalog", "builtin_pinmap:Connector_Generic:Conn_01x02"], "pinmap_checked": true}
     }
   ]
 }

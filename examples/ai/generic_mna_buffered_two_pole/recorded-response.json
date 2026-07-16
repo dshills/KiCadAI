@@ -1,0 +1,132 @@
+{
+  "schema": "kicadai.ai.intent.v1",
+  "intent": {
+    "schema": "kicadai.circuit-graph.v1",
+    "version": 1,
+    "project": {
+      "name": "generic_mna_buffered_two_pole",
+      "title": "Graph-Derived Active Analog Conditioner",
+      "description": "Catalog-resolved two-section analog conditioner with an LMV321 output buffer and graph-derived MNA evidence.",
+      "acceptance": "erc-drc",
+      "board": {"width_mm": 60, "height_mm": 35, "layers": 2, "edge_clearance_mm": 0.5}
+    },
+    "components": [
+      {"id": "supply_source", "reference": "J1", "role": "input_connector", "component_id": "source.voltage.connector.1x02", "variant_id": "vertical", "value": "5V SUPPLY", "required_functions": ["POSITIVE", "NEGATIVE"], "population": "populate"},
+      {"id": "signal_source", "reference": "J2", "role": "input_connector", "component_id": "source.voltage.connector.1x02", "variant_id": "vertical", "value": "SIGNAL SOURCE", "required_functions": ["POSITIVE", "NEGATIVE"], "population": "populate"},
+      {"id": "section_1_resistor", "reference": "R1", "role": "resistor", "component_id": "resistor.generic.0603", "variant_id": "0603", "value": "10k", "required_functions": ["A", "B"], "population": "populate"},
+      {"id": "section_1_capacitor", "reference": "C1", "role": "capacitor", "component_id": "capacitor.ceramic.0603", "variant_id": "0603", "value": "10nF", "required_functions": ["A", "B"], "population": "populate"},
+      {"id": "section_2_resistor", "reference": "R2", "role": "resistor", "component_id": "resistor.generic.0603", "variant_id": "0603", "value": "10k", "required_functions": ["A", "B"], "population": "populate"},
+      {"id": "section_2_capacitor", "reference": "C2", "role": "capacitor", "component_id": "capacitor.ceramic.0603", "variant_id": "0603", "value": "10nF", "required_functions": ["A", "B"], "population": "populate"},
+      {"id": "buffer", "reference": "U1", "role": "ic", "component_id": "opamp.ti.lmv321.sot23_5", "variant_id": "sot23_5", "value": "LMV321", "required_functions": ["IN_PLUS", "IN_MINUS", "OUT", "V_PLUS", "V_MINUS"], "manufacturer": "Texas Instruments", "mpn": "LMV321IDBVR", "population": "populate", "properties": [{"name": "analysis_role", "value": "catalog_linear_buffer"}]},
+      {"id": "supply_decoupling", "reference": "C3", "role": "decoupling_capacitor", "component_id": "capacitor.ceramic.0603", "variant_id": "0603", "value": "100nF", "required_functions": ["A", "B"], "population": "populate"},
+      {"id": "output", "reference": "J3", "role": "output_connector", "component_id": "connector.pinheader.1x02.2_54mm", "variant_id": "vertical", "value": "CONDITIONED OUT", "required_functions": ["PIN_1", "PIN_2"], "population": "populate"}
+    ],
+    "nets": [
+      {"name": "5V", "role": "power_pos", "required": true, "voltage_domain": "5V", "net_class": "power", "width_mm": 0.5, "clearance_mm": 0.2, "endpoints": [
+        {"component": "supply_source", "selector_kind": "function", "selector": "POSITIVE"},
+        {"component": "buffer", "selector_kind": "function", "selector": "V_PLUS"},
+        {"component": "supply_decoupling", "selector_kind": "function", "selector": "A"}
+      ]},
+      {"name": "GND", "role": "ground", "required": true, "voltage_domain": "0V", "net_class": "ground", "width_mm": 0.5, "clearance_mm": 0.2, "endpoints": [
+        {"component": "supply_source", "selector_kind": "function", "selector": "NEGATIVE"},
+        {"component": "signal_source", "selector_kind": "function", "selector": "NEGATIVE"},
+        {"component": "section_1_capacitor", "selector_kind": "function", "selector": "B"},
+        {"component": "section_2_capacitor", "selector_kind": "function", "selector": "B"},
+        {"component": "buffer", "selector_kind": "function", "selector": "V_MINUS"},
+        {"component": "supply_decoupling", "selector_kind": "function", "selector": "B"},
+        {"component": "output", "selector_kind": "function", "selector": "PIN_2"}
+      ]},
+      {"name": "SIGNAL_IN", "role": "signal", "required": true, "net_class": "analog", "width_mm": 0.25, "clearance_mm": 0.2, "endpoints": [
+        {"component": "signal_source", "selector_kind": "function", "selector": "POSITIVE"},
+        {"component": "section_1_resistor", "selector_kind": "function", "selector": "A"}
+      ]},
+      {"name": "FILTER_1", "role": "signal", "required": true, "net_class": "analog", "width_mm": 0.25, "clearance_mm": 0.2, "endpoints": [
+        {"component": "section_1_resistor", "selector_kind": "function", "selector": "B"},
+        {"component": "section_1_capacitor", "selector_kind": "function", "selector": "A"},
+        {"component": "section_2_resistor", "selector_kind": "function", "selector": "A"}
+      ]},
+      {"name": "FILTER_2", "role": "signal", "required": true, "net_class": "analog", "width_mm": 0.25, "clearance_mm": 0.2, "endpoints": [
+        {"component": "section_2_resistor", "selector_kind": "function", "selector": "B"},
+        {"component": "section_2_capacitor", "selector_kind": "function", "selector": "A"},
+        {"component": "buffer", "selector_kind": "function", "selector": "IN_PLUS"}
+      ]},
+      {"name": "CONDITIONED_OUT", "role": "signal", "required": true, "net_class": "analog", "width_mm": 0.25, "clearance_mm": 0.2, "endpoints": [
+        {"component": "buffer", "selector_kind": "function", "selector": "IN_MINUS"},
+        {"component": "buffer", "selector_kind": "function", "selector": "OUT"},
+        {"component": "output", "selector_kind": "function", "selector": "PIN_1"}
+      ]}
+    ],
+    "no_connects": [],
+    "power_flags": [{"net": "5V"}, {"net": "GND"}],
+    "buses": [],
+    "schematic": {
+      "flow": "left_to_right",
+      "origin": "centered",
+      "groups": [
+        {"id": "sources", "label": "Applied Sources", "role": "input", "members": ["supply_source", "signal_source"], "rank": 0, "side": "left"},
+        {"id": "section_1", "label": "Conditioning Section 1", "role": "processing", "members": ["section_1_resistor", "section_1_capacitor"], "rank": 1},
+        {"id": "section_2", "label": "Conditioning Section 2", "role": "processing", "members": ["section_2_resistor", "section_2_capacitor"], "rank": 2},
+        {"id": "buffer_stage", "label": "Catalog Buffer", "role": "processing", "members": ["buffer", "supply_decoupling"], "rank": 3},
+        {"id": "output_stage", "label": "Output", "role": "output", "members": ["output"], "rank": 4, "side": "right"}
+      ],
+      "lanes": {"power": "top", "power_negative": null, "signals": "middle", "ground": "bottom"},
+      "placements": [
+        {"component": "supply_source", "unit": "", "group": "sources", "near": "", "near_unit": "", "above": "signal_source", "above_unit": "", "right_of": "", "right_of_unit": "", "orientation": "normal", "mirror": "none"},
+        {"component": "signal_source", "unit": "", "group": "sources", "near": "", "near_unit": "", "above": "", "above_unit": "", "right_of": "", "right_of_unit": "", "orientation": "normal", "mirror": "none"},
+        {"component": "section_1_resistor", "unit": "", "group": "section_1", "near": "", "near_unit": "", "above": "", "above_unit": "", "right_of": "signal_source", "right_of_unit": "", "orientation": "normal", "mirror": "none"},
+        {"component": "section_1_capacitor", "unit": "", "group": "section_1", "near": "section_1_resistor", "near_unit": "", "above": "", "above_unit": "", "right_of": "", "right_of_unit": "", "orientation": "rotated_90", "mirror": "none"},
+        {"component": "section_2_resistor", "unit": "", "group": "section_2", "near": "", "near_unit": "", "above": "", "above_unit": "", "right_of": "section_1_resistor", "right_of_unit": "", "orientation": "normal", "mirror": "none"},
+        {"component": "section_2_capacitor", "unit": "", "group": "section_2", "near": "section_2_resistor", "near_unit": "", "above": "", "above_unit": "", "right_of": "", "right_of_unit": "", "orientation": "rotated_90", "mirror": "none"},
+        {"component": "buffer", "unit": "", "group": "buffer_stage", "near": "", "near_unit": "", "above": "", "above_unit": "", "right_of": "section_2_resistor", "right_of_unit": "", "orientation": "normal", "mirror": "none"},
+        {"component": "supply_decoupling", "unit": "", "group": "buffer_stage", "near": "buffer", "near_unit": "", "above": "buffer", "above_unit": "", "right_of": "", "right_of_unit": "", "orientation": "rotated_90", "mirror": "none"},
+        {"component": "output", "unit": "", "group": "output_stage", "near": "", "near_unit": "", "above": "", "above_unit": "", "right_of": "buffer", "right_of_unit": "", "orientation": "normal", "mirror": "none"}
+      ],
+      "rules": {"positive_power_top": true, "ground_bottom": true, "center_on_page": true, "prefer_labels_for_long_nets": true, "avoid_wire_crossings": true, "min_group_spacing_mm": 12.7, "min_component_spacing_mm": 5.08},
+      "hierarchy": {"mode": "auto", "max_components_per_sheet": 3}
+    },
+    "pcb": {
+      "regions": [
+        {"id": "input", "role": "source ports", "bounds": {"x_mm": 0, "y_mm": 0, "width_mm": 14, "height_mm": 35}},
+        {"id": "conditioner", "role": "analog conditioner", "bounds": {"x_mm": 14, "y_mm": 0, "width_mm": 34, "height_mm": 35}},
+        {"id": "output", "role": "output port", "bounds": {"x_mm": 48, "y_mm": 0, "width_mm": 12, "height_mm": 35}}
+      ],
+      "placements": [
+        {"component": "supply_source", "region": "input", "near": "", "edge": "left", "priority": 100, "max_distance_mm": 0},
+        {"component": "signal_source", "region": "input", "near": "supply_source", "edge": "left", "priority": 95, "max_distance_mm": 10},
+        {"component": "section_1_resistor", "region": "conditioner", "near": "signal_source", "edge": "", "priority": 90, "max_distance_mm": 12},
+        {"component": "section_1_capacitor", "region": "conditioner", "near": "section_1_resistor", "edge": "", "priority": 90, "max_distance_mm": 4},
+        {"component": "section_2_resistor", "region": "conditioner", "near": "section_1_resistor", "edge": "", "priority": 90, "max_distance_mm": 8},
+        {"component": "section_2_capacitor", "region": "conditioner", "near": "section_2_resistor", "edge": "", "priority": 90, "max_distance_mm": 4},
+        {"component": "buffer", "region": "conditioner", "near": "section_2_resistor", "edge": "", "priority": 100, "max_distance_mm": 8},
+        {"component": "supply_decoupling", "region": "conditioner", "near": "buffer", "edge": "", "priority": 100, "max_distance_mm": 3},
+        {"component": "output", "region": "output", "near": "buffer", "edge": "right", "priority": 100, "max_distance_mm": 12}
+      ],
+      "keepouts": [],
+      "zones": []
+    },
+    "simulation": {
+      "model_id": "linear_circuit_mna_v1",
+      "bindings": [],
+      "inputs": [],
+      "analyses": [
+        {"id": "frequency_response", "kind": "ac_sweep", "start_frequency_hz": 100, "stop_frequency_hz": 10000, "points": 3, "excitations": [
+          {"component": "signal_source", "dc_value": 0, "ac_magnitude": 1, "ac_phase_deg": 0},
+          {"component": "supply_source", "dc_value": 0, "ac_magnitude": 0, "ac_phase_deg": 0}
+        ]},
+        {"id": "operating_point", "kind": "dc_operating_point", "start_frequency_hz": 0, "stop_frequency_hz": 0, "points": 0, "excitations": [
+          {"component": "signal_source", "dc_value": 2, "ac_magnitude": 0, "ac_phase_deg": 0},
+          {"component": "supply_source", "dc_value": 5, "ac_magnitude": 0, "ac_phase_deg": 0}
+        ]}
+      ],
+      "assertions": [
+        {"analysis_id": "frequency_response", "node": "CONDITIONED_OUT", "quantity": "voltage_magnitude_v", "frequency_hz": 100, "min": 0.97, "max": 1.0},
+        {"analysis_id": "frequency_response", "node": "CONDITIONED_OUT", "quantity": "voltage_magnitude_v", "frequency_hz": 1000, "min": 0.49, "max": 0.52},
+        {"analysis_id": "frequency_response", "node": "CONDITIONED_OUT", "quantity": "voltage_magnitude_v", "frequency_hz": 10000, "min": 0.02, "max": 0.03},
+        {"analysis_id": "operating_point", "node": "5V", "quantity": "voltage_v", "frequency_hz": 0, "min": 4.99, "max": 5.01},
+        {"analysis_id": "operating_point", "node": "CONDITIONED_OUT", "quantity": "voltage_v", "frequency_hz": 0, "min": 1.99, "max": 2.01}
+      ]
+    },
+    "policy": {"allow_reference_assignment": true, "allow_value_normalization": true, "allow_layout_inference": true, "allow_spacing_adjustment": true, "allow_label_insertion": true, "allow_placement_adjustment": true, "allow_route_retry": true},
+    "extensions": null
+  }
+}
