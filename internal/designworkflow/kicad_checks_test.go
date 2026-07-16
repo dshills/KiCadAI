@@ -36,7 +36,7 @@ func TestRunKiCadChecksLeavesRequestEvidencePendingWhenCLIUnavailable(t *testing
 	write := ProjectWriteResult{}
 
 	result := RunKiCadChecks(context.Background(), &request, &write, KiCadCheckOptions{KiCadCLI: filepath.Join(t.TempDir(), "missing-kicad-cli")})
-	if result.Stage.Status != StageStatusWarning || len(result.Stage.Issues) != 1 || result.Stage.Issues[0].Severity != reports.SeverityWarning {
+	if result.Stage.Status != StageStatusSkipped || len(result.Stage.Issues) != 1 || result.Stage.Issues[0].Severity != reports.SeverityWarning {
 		t.Fatalf("stage = %#v", result.Stage)
 	}
 }

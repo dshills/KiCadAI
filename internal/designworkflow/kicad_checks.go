@@ -66,13 +66,18 @@ func RunKiCadChecks(ctx context.Context, request *Request, write *ProjectWriteRe
 		if opts.EnforceRequirements {
 			severity = reports.SeverityBlocked
 		}
-		return KiCadCheckStageResult{Stage: NewStageResult(StageKiCadChecks, []reports.Issue{{
+		stage := NewStageResult(StageKiCadChecks, []reports.Issue{{
 			Code:       reports.CodeSkippedExternalTool,
 			Severity:   severity,
 			Path:       "kicad_cli",
 			Message:    err.Error(),
 			Suggestion: "set --kicad-cli or KICADAI_KICAD_CLI to run KiCad ERC/DRC checks",
-		}})}
+		}})
+		stage.Summary = map[string]any{"reason": "kicad-cli unavailable"}
+		if !opts.EnforceRequirements {
+			stage.Status = StageStatusSkipped
+		}
+		return KiCadCheckStageResult{Stage: stage}
 	}
 
 	checkOpts := checks.Options{
