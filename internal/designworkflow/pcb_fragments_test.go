@@ -45,6 +45,11 @@ func TestFragmentColumnCountUsesAvailableWideBoardFlow(t *testing.T) {
 	if columns := fragmentColumnCount(narrow); columns != 1 {
 		t.Fatalf("columns = %d, want one column when the board cannot fit another fragment", columns)
 	}
+
+	wideSixBlock := Request{Board: BoardSpec{WidthMM: 160}, Blocks: []BlockInstanceSpec{{}, {}, {}, {}, {}, {}}}
+	if columns := fragmentColumnCount(wideSixBlock); columns != maxFragmentColumns {
+		t.Fatalf("columns = %d, want bounded horizontal flow of %d columns", columns, maxFragmentColumns)
+	}
 }
 
 func TestRealizePCBFragmentsAppliesConnectionAliasesToLocalRoutes(t *testing.T) {

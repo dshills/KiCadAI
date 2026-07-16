@@ -15,6 +15,7 @@ const (
 	defaultFragmentSpacingXMM = 25.0
 	defaultFragmentSpacingYMM = 18.0
 	defaultFragmentMarginMM   = 8.0
+	maxFragmentColumns        = 4
 )
 
 type PCBFragmentResult struct {
@@ -256,7 +257,7 @@ func fragmentColumnCount(request Request) int {
 	columns := int(math.Ceil(math.Sqrt(float64(count))))
 	if request.Board.WidthMM > 0 {
 		maxColumns := int(math.Max(1, math.Floor((request.Board.WidthMM-defaultFragmentMarginMM*2)/defaultFragmentSpacingXMM)+1))
-		columns = min(count, maxColumns)
+		columns = min(count, maxColumns, maxFragmentColumns)
 	}
 	if columns < 1 {
 		return 1
