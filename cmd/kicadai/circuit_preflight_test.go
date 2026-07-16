@@ -116,9 +116,10 @@ func TestCircuitPreflightFailsClosedForInvalidMultiUnitAssignment(t *testing.T) 
 func TestCircuitCreateWritesPreflightReadyRCGraph(t *testing.T) {
 	graph := writeCircuitCreateRCGraph(t)
 	symbolsRoot, footprintsRoot := writeCircuitCreateLibraryFixture(t)
+	cli := fakeWorkflowKiCadCLI(t, 0, passingWorkflowKiCadReport)
 	output := filepath.Join(t.TempDir(), "project")
 	result, err := runCircuitCreateCLI(t, []string{
-		"--symbols-root", symbolsRoot, "--footprints-root", footprintsRoot,
+		"--kicad-cli", cli, "--symbols-root", symbolsRoot, "--footprints-root", footprintsRoot,
 		"circuit", "create", "--request", graph, "--output", output, "--overwrite",
 	})
 	if err != nil || !result.OK {
@@ -154,11 +155,12 @@ func TestCircuitCreateFailsClosedBeforeWrite(t *testing.T) {
 func TestCircuitCreateRCGraphIsDeterministic(t *testing.T) {
 	graph := writeCircuitCreateRCGraph(t)
 	symbolsRoot, footprintsRoot := writeCircuitCreateLibraryFixture(t)
+	cli := fakeWorkflowKiCadCLI(t, 0, passingWorkflowKiCadReport)
 	create := func(name string) (circuitCreateData, string) {
 		t.Helper()
 		output := filepath.Join(t.TempDir(), name)
 		result, err := runCircuitCreateCLI(t, []string{
-			"--symbols-root", symbolsRoot, "--footprints-root", footprintsRoot,
+			"--kicad-cli", cli, "--symbols-root", symbolsRoot, "--footprints-root", footprintsRoot,
 			"circuit", "create", "--request", graph, "--output", output, "--overwrite",
 		})
 		if err != nil || !result.OK {
@@ -242,9 +244,10 @@ func TestCircuitPatchRepairsThenPreflights(t *testing.T) {
 		t.Fatalf("corrected preflight=%#v", preflight)
 	}
 	symbolsRoot, footprintsRoot := writeCircuitCreateLibraryFixture(t)
+	cli := fakeWorkflowKiCadCLI(t, 0, passingWorkflowKiCadReport)
 	project := filepath.Join(t.TempDir(), "project")
 	created, createErr := runCircuitCreateCLI(t, []string{
-		"--symbols-root", symbolsRoot, "--footprints-root", footprintsRoot,
+		"--kicad-cli", cli, "--symbols-root", symbolsRoot, "--footprints-root", footprintsRoot,
 		"circuit", "create", "--request", corrected, "--output", project, "--overwrite",
 	})
 	if createErr != nil || !created.OK {
@@ -463,8 +466,9 @@ func TestCircuitRepairPlanConvergesRCGraphToDirectCreate(t *testing.T) {
 		t.Fatalf("apply plan err=%v result=%#v", patchErr, patchResult)
 	}
 	symbolsRoot, footprintsRoot := writeCircuitCreateLibraryFixture(t)
+	cli := fakeWorkflowKiCadCLI(t, 0, passingWorkflowKiCadReport)
 	project := filepath.Join(tmpDir, "project")
-	created, createErr := runCircuitCreateCLI(t, []string{"--symbols-root", symbolsRoot, "--footprints-root", footprintsRoot, "circuit", "create", "--request", corrected, "--output", project, "--overwrite"})
+	created, createErr := runCircuitCreateCLI(t, []string{"--kicad-cli", cli, "--symbols-root", symbolsRoot, "--footprints-root", footprintsRoot, "circuit", "create", "--request", corrected, "--output", project, "--overwrite"})
 	if createErr != nil || !created.OK {
 		t.Fatalf("create corrected graph err=%v result=%#v", createErr, created)
 	}
