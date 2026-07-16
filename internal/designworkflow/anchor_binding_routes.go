@@ -33,13 +33,6 @@ func AddAnchorBindingRoutes(summary AnchorBindingSummary, opts AnchorBindingRout
 		if binding.Status != AnchorBindingStatusBound {
 			continue
 		}
-		// Optional anchors describe placement and topology intent. They must not
-		// materialize a copper spur unless a required electrical contract needs
-		// that connection, because their logical point may not be physical copper.
-		if !binding.Required {
-			binding.RouteStatus = AnchorRouteStatusSkipped
-			continue
-		}
 		if binding.RouteStatus == AnchorRouteStatusRouted {
 			continue
 		}
