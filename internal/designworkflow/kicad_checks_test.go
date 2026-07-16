@@ -25,8 +25,18 @@ func TestRunKiCadChecksBlocksWhenRequiredCLIMissing(t *testing.T) {
 	request := Request{Validation: ValidationSpec{RequireDRC: true}}
 	write := ProjectWriteResult{}
 
-	result := RunKiCadChecks(context.Background(), &request, &write, KiCadCheckOptions{KiCadCLI: filepath.Join(t.TempDir(), "missing-kicad-cli")})
+	result := RunKiCadChecks(context.Background(), &request, &write, KiCadCheckOptions{KiCadCLI: filepath.Join(t.TempDir(), "missing-kicad-cli"), EnforceRequirements: true})
 	if result.Stage.Status != StageStatusBlocked {
+		t.Fatalf("stage = %#v", result.Stage)
+	}
+}
+
+func TestRunKiCadChecksLeavesRequestEvidencePendingWhenCLIUnavailable(t *testing.T) {
+	request := Request{Validation: ValidationSpec{RequireDRC: true}}
+	write := ProjectWriteResult{}
+
+	result := RunKiCadChecks(context.Background(), &request, &write, KiCadCheckOptions{KiCadCLI: filepath.Join(t.TempDir(), "missing-kicad-cli")})
+	if result.Stage.Status != StageStatusWarning || len(result.Stage.Issues) != 1 || result.Stage.Issues[0].Severity != reports.SeverityWarning {
 		t.Fatalf("stage = %#v", result.Stage)
 	}
 }

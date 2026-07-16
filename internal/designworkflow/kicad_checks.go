@@ -13,13 +13,16 @@ import (
 )
 
 type KiCadCheckOptions struct {
-	KiCadCLI      string
-	Timeout       time.Duration
-	RequireERC    bool
-	RequireDRC    bool
-	KeepArtifacts bool
-	ArtifactDir   string
-	Allowlist     []checks.AllowlistEntry
+	KiCadCLI   string
+	Timeout    time.Duration
+	RequireERC bool
+	RequireDRC bool
+	// EnforceRequirements makes a missing KiCad CLI fatal. When false, a
+	// request-level ERC/DRC requirement remains pending external evidence.
+	EnforceRequirements bool
+	KeepArtifacts       bool
+	ArtifactDir         string
+	Allowlist           []checks.AllowlistEntry
 }
 
 type KiCadCheckStageResult struct {
@@ -59,9 +62,13 @@ func RunKiCadChecks(ctx context.Context, request *Request, write *ProjectWriteRe
 	}
 	cli, err := checks.DiscoverCLI(opts.KiCadCLI)
 	if err != nil {
+		severity := reports.SeverityWarning
+		if opts.EnforceRequirements {
+			severity = reports.SeverityBlocked
+		}
 		return KiCadCheckStageResult{Stage: NewStageResult(StageKiCadChecks, []reports.Issue{{
 			Code:       reports.CodeSkippedExternalTool,
-			Severity:   reports.SeverityBlocked,
+			Severity:   severity,
 			Path:       "kicad_cli",
 			Message:    err.Error(),
 			Suggestion: "set --kicad-cli or KICADAI_KICAD_CLI to run KiCad ERC/DRC checks",
