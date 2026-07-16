@@ -167,6 +167,21 @@ func TestSchematicElectricalWireAvoidsUnrelatedNoConnectAnchor(t *testing.T) {
 	}
 }
 
+func TestSchematicElectricalSafeWiresDoNotInventCrossNetShort(t *testing.T) {
+	candidates := []schematicElectricalWireCandidate{
+		{NetName: "NET_A", From: kicadfiles.Point{X: kicadfiles.MM(0), Y: kicadfiles.MM(10)}, To: kicadfiles.Point{X: kicadfiles.MM(20), Y: kicadfiles.MM(10)}},
+		{NetName: "NET_B", From: kicadfiles.Point{X: kicadfiles.MM(10), Y: kicadfiles.MM(0)}, To: kicadfiles.Point{X: kicadfiles.MM(10), Y: kicadfiles.MM(20)}},
+	}
+	obstacles := []kicadfiles.Point{candidates[0].From, candidates[0].To, candidates[1].From, candidates[1].To}
+	wires := schematicElectricalSafeWires(candidates, nil, obstacles)
+	if len(wires) != 1 {
+		t.Fatalf("safe wires = %#v, want only the first collision-free representative", wires)
+	}
+	if wires[0].Points[0] != candidates[0].From || wires[0].Points[len(wires[0].Points)-1] != candidates[0].To {
+		t.Fatalf("retained wire = %#v, want NET_A endpoints", wires[0].Points)
+	}
+}
+
 func TestSchematicElectricalInputsRespectLabelOnlyConnections(t *testing.T) {
 	addA := transactions.NewOperation(transactions.OpAddSymbol, []byte(`{"op":"add_symbol","ref":"A1","value":"A","library_id":"Connector:Test","at":{"x_mm":10,"y_mm":10},"pins":[{"number":"1"}]}`))
 	addB := transactions.NewOperation(transactions.OpAddSymbol, []byte(`{"op":"add_symbol","ref":"B1","value":"B","library_id":"Connector:Test","at":{"x_mm":20,"y_mm":20},"pins":[{"number":"1"}]}`))

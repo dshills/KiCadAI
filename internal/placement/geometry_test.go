@@ -174,6 +174,16 @@ func TestValidateGeometryRejectsKeepoutOverlap(t *testing.T) {
 	assertIssueContains(t, issues, "placement conflicts with keepout mounting")
 }
 
+func TestKeepoutAllCopperWildcardAppliesToCopperLayers(t *testing.T) {
+	keepout := Keepout{Layers: []string{"*.Cu"}}
+	if !keepoutAppliesToLayer(keepout, "F.Cu") || !keepoutAppliesToLayer(keepout, "B.Cu") {
+		t.Fatal("all-copper keepout did not apply to both copper layers")
+	}
+	if keepoutAppliesToLayer(keepout, "F.SilkS") {
+		t.Fatal("all-copper keepout unexpectedly applied to silkscreen")
+	}
+}
+
 func TestValidateGeometryAllowsKeepoutExemptRefOverlap(t *testing.T) {
 	req := minimalRequest()
 	req.Keepouts = []Keepout{{

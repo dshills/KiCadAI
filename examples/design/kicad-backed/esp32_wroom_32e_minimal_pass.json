@@ -1,0 +1,60 @@
+{
+  "version": "0.1.0",
+  "name": "esp32_wroom_32e_minimal_pass",
+  "intent": {
+    "summary": "Externally powered ESP32-WROOM-32E-N4 controller with deterministic peripheral header, UART programming, boot/reset controls, and PCB-antenna keepout.",
+    "category": "controller"
+  },
+  "board": {
+    "width_mm": 120,
+    "height_mm": 80,
+    "layers": 2
+  },
+  "component_policy": {
+    "minimum_confidence": "rule_inferred",
+    "acceptance": "structural",
+    "procurement_policy": {}
+  },
+  "blocks": [
+    {
+      "id": "power_input",
+      "block_id": "connector_breakout",
+      "params": {
+        "pin_count": 2,
+        "pin_names": ["VCC", "GND"],
+        "edge_facing": true,
+        "edge_side": "right"
+      }
+    },
+    {
+      "id": "controller",
+      "block_id": "esp32_wroom_32e_minimal",
+      "params": {
+        "supply_voltage": "3.3V",
+        "bulk_capacitance": "10uF",
+        "decoupling_value": "100nF",
+        "enable_pullup_value": "10k",
+        "enable_capacitance": "1uF",
+        "boot_pullup_value": "10k"
+      }
+    }
+  ],
+  "connections": [
+    {"from": "power_input.VCC", "to": "controller.VCC", "net_alias": "VCC_3v3"},
+    {"from": "power_input.GND", "to": "controller.GND", "net_alias": "GND"}
+  ],
+  "constraints": {
+    "allow_back_layer": true,
+    "treat_local_power_routes_as_obstacles": true
+  },
+  "routing_retry": {
+    "enabled": true,
+    "max_attempts": 3,
+    "allowed_hint_categories": ["reduce_distance", "increase_spacing", "improve_fanout", "move_from_edge"]
+  },
+  "validation": {
+    "acceptance": "erc-drc",
+    "require_erc": true,
+    "require_drc": true
+  }
+}

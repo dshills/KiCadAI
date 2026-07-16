@@ -158,6 +158,7 @@ type Group struct {
 	Role            string
 	Components      []string
 	Anchor          GroupAnchor
+	Bounds          *Rect
 	KeepTogether    bool
 	MaxSpreadMM     float64
 	TranslateAsUnit bool
@@ -170,7 +171,9 @@ type GroupAnchor struct {
 }
 
 type Keepout struct {
-	ID         string
+	ID string
+	// GroupID moves a block-owned keepout with a translated placement group.
+	GroupID    string
 	Bounds     Rect
 	Layers     []string
 	ExemptRefs []string
@@ -672,6 +675,10 @@ func NormalizeRequest(request Request) Request {
 	}
 	for i := range request.Groups {
 		request.Groups[i].Components = slices.Clone(request.Groups[i].Components)
+		if request.Groups[i].Bounds != nil {
+			bounds := *request.Groups[i].Bounds
+			request.Groups[i].Bounds = &bounds
+		}
 		if request.Groups[i].Anchor.At != nil {
 			at := *request.Groups[i].Anchor.At
 			request.Groups[i].Anchor.At = &at
@@ -696,6 +703,7 @@ func NormalizeRequest(request Request) Request {
 			keepout.BlocksRoute = &value
 		}
 		keepout.ID = strings.TrimSpace(keepout.ID)
+		keepout.GroupID = strings.TrimSpace(keepout.GroupID)
 		keepouts = append(keepouts, keepout)
 	}
 	request.Keepouts = keepouts
@@ -1120,6 +1128,9 @@ func Validate(request Request) []reports.Issue {
 			if _, ok := refs[strings.ToUpper(trimmedRef)]; !ok {
 				issues = append(issues, issue(path+".anchor.ref", "group anchor references unknown component "+trimmedRef))
 			}
+		}
+		if group.Bounds != nil && (group.Bounds.Min.XMM > group.Bounds.Max.XMM || group.Bounds.Min.YMM > group.Bounds.Max.YMM) {
+			issues = append(issues, issue(path+".bounds", "group bounds min must not exceed max"))
 		}
 		if group.TranslateAsUnit {
 			anchorRef := normalizeRef(group.Anchor.Ref)

@@ -2,6 +2,7 @@ package designworkflow
 
 import (
 	"reflect"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -190,6 +191,19 @@ func TestVerifiedBMP280PadTemplateMatchesKiCadFootprint(t *testing.T) {
 	}
 }
 
+func TestVerifiedB3UControlSwitchTemplateHasOnePadPerTerminal(t *testing.T) {
+	template, ok := verifiedPadTemplate("Button_Switch_SMD:SW_SPST_B3U-1000P")
+	if !ok {
+		t.Fatal("missing B3U-1000P template")
+	}
+	if got := padTemplateNames(template.Pads); !reflect.DeepEqual(got, []string{"1", "2"}) {
+		t.Fatalf("B3U-1000P pad order = %#v", got)
+	}
+	if template.Pads[0].XMM != -1.7 || template.Pads[1].XMM != 1.7 || template.Pads[0].WidthMM != 0.9 || template.Pads[0].HeightMM != 1.7 {
+		t.Fatalf("B3U-1000P geometry does not match KiCad library: %#v", template.Pads)
+	}
+}
+
 func TestVerifiedTwoPadTemplatesDoNotOverlap(t *testing.T) {
 	for _, footprintID := range []string{
 		"Resistor_SMD:R_0603_1608Metric",
@@ -217,6 +231,7 @@ func TestVerifiedTwoPadTemplatesDoNotOverlap(t *testing.T) {
 func TestVerifiedPadTemplateBoundsAreCenteredOnPads(t *testing.T) {
 	for _, footprintID := range []string{
 		"Connector_PinHeader_2.54mm:PinHeader_1x03_P2.54mm_Vertical",
+		"Connector_PinHeader_2.54mm:PinHeader_1x06_P2.54mm_Vertical",
 		"Resistor_SMD:R_0805_2012Metric",
 		"Package_SO:SOIC-8_3.9x4.9mm_P1.27mm",
 		"Package_TO_SOT_SMD:SOT-223-3_TabPin2",
@@ -239,6 +254,19 @@ func TestVerifiedPadTemplateBoundsAreCenteredOnPads(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestVerifiedPinHeaderTemplateSupportsArbitraryOneRowCount(t *testing.T) {
+	template, ok := verifiedPadTemplate("Connector_PinHeader_2.54mm:PinHeader_1x06_P2.54mm_Vertical")
+	if !ok || len(template.Pads) != 6 {
+		t.Fatalf("template = %#v, ok = %v", template, ok)
+	}
+	for index, pad := range template.Pads {
+		wantY := (float64(index) - 2.5) * 2.54
+		if pad.Name != strconv.Itoa(index+1) || pad.YMM != wantY {
+			t.Fatalf("pad[%d] = %#v", index, pad)
+		}
 	}
 }
 
@@ -347,6 +375,14 @@ func TestUSBShieldPadMatcherRequiresNumericSuffix(t *testing.T) {
 	got = matchingPadIndexesForPin(padByName, "SHIELD")
 	if !reflect.DeepEqual(got, []int{1, 2, 3, 4}) {
 		t.Fatalf("shield alias pad matches = %#v, want SH/SH2/SHIELD only", got)
+	}
+}
+
+func TestMatchingPadIndexesForPinExpandsGroupedSymbolPin(t *testing.T) {
+	padByName := map[string][]int{"1": {0}, "15": {1}, "38": {2}, "39": {3}}
+	got := matchingPadIndexesForPin(padByName, "[1,15,38,39]")
+	if !reflect.DeepEqual(got, []int{0, 1, 2, 3}) {
+		t.Fatalf("grouped pin matches = %#v", got)
 	}
 }
 

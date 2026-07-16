@@ -59,6 +59,7 @@ func NewBuiltinRegistryChecked() (BuiltinRegistry, []reports.Issue) {
 		"i2c_sensor":                  instantiateI2CSensor,
 		"led_indicator":               instantiateLEDIndicator,
 		"mcu_minimal":                 instantiateMCUMinimal,
+		"esp32_wroom_32e_minimal":     instantiateESP32WROOM32EMinimal,
 		"opamp_gain_stage":            instantiateOpAmpGainStage,
 		"reset_programming_header":    instantiateResetProgrammingHeader,
 		"reverse_polarity_protection": instantiateReversePolarityProtection,

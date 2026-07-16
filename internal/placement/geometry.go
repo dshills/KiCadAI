@@ -303,7 +303,8 @@ func keepoutAppliesToLayer(keepout Keepout, layer string) bool {
 	}
 	layer = normalizeLayer(layer)
 	for _, keepoutLayer := range keepout.Layers {
-		if strings.EqualFold(strings.TrimSpace(keepoutLayer), layer) {
+		keepoutLayer = strings.TrimSpace(keepoutLayer)
+		if strings.EqualFold(keepoutLayer, layer) || (strings.EqualFold(keepoutLayer, "*.Cu") && strings.HasSuffix(strings.ToUpper(layer), ".CU")) {
 			return true
 		}
 	}

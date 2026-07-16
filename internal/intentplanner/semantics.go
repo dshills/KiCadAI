@@ -216,7 +216,7 @@ func semanticRole(role string, blockID string) string {
 		}
 	}
 	switch blockID {
-	case "mcu_minimal":
+	case "mcu_minimal", "esp32_wroom_32e_minimal":
 		return "mcu"
 	case "i2c_sensor":
 		return "sensor"
@@ -249,7 +249,7 @@ func semanticSupplyVoltage(params map[string]any, definition blocks.BlockDefinit
 
 func semanticPortsForBlock(blockID string, params map[string]any, definition blocks.BlockDefinition) []semanticPort {
 	switch blockID {
-	case "mcu_minimal":
+	case "mcu_minimal", "esp32_wroom_32e_minimal":
 		return mcuSemanticPorts(params, definition)
 	case "i2c_sensor":
 		return i2cSemanticPorts(definition)

@@ -1,0 +1,26 @@
+{
+  "id": "esp32_wroom_32e_minimal_pass",
+  "request": "esp32_wroom_32e_minimal_pass.json",
+  "tier": "block-composition",
+  "readiness": "pass",
+  "acceptance": "erc-drc",
+  "require_erc": true,
+  "require_drc": true,
+  "allowlists": [],
+  "expected_artifacts": [".kicadai/design-promotion.json"],
+  "expected_stages": [
+    "block_planning",
+    "component_selection",
+    "schematic",
+    "schematic_electrical",
+    "pcb_realization",
+    "placement",
+    "routing",
+    "project_write",
+    "writer_correctness",
+    "validation",
+    "kicad_checks"
+  ],
+  "known_gaps": [],
+  "notes": "KiCad-backed externally powered ESP32-WROOM-32E-N4 minimal-system pass fixture. Requires clean strict ERC/DRC, complete physical contact proof for local routes, writer correctness, and zero normalized schematic/PCB round-trip diffs. The PCB antenna exclusion is a hard all-copper-layer routing keepout aligned with the module's native KiCad footprint keepout."
+}

@@ -97,6 +97,7 @@ func PlaceContext(ctx context.Context, request Request) Result {
 	}
 	rigidIssues := preserveRelativeGroupPlacements(request, result.Placements)
 	result.Issues = append(result.Issues, rigidIssues...)
+	request.Keepouts = TranslatedKeepoutsForPlacements(request, result.Placements)
 	if len(rigidIssues) > 0 && result.Status == StatusPlaced {
 		result.Status = StatusPartial
 	}

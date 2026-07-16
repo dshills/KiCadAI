@@ -18,6 +18,7 @@ func BuiltinDefinitions() []BlockDefinition {
 		ledIndicatorDefinition(),
 		voltageRegulatorDefinition(),
 		mcuMinimalDefinition(),
+		esp32WROOM32EMinimalDefinition(),
 		crystalOscillatorDefinition(),
 		cannedOscillatorDefinition(),
 		resetProgrammingHeaderDefinition(),

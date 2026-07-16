@@ -8,6 +8,7 @@ import (
 
 	"kicadai/internal/kicadfiles"
 	"kicadai/internal/reports"
+	"kicadai/internal/transactions"
 )
 
 var realizationPathSegmentReplacer = strings.NewReplacer(".", "_", " ", "_", "/", "_", "\\", "_", ":", "_")
@@ -40,13 +41,14 @@ type PCBRealization struct {
 }
 
 type PCBComponentRealization struct {
-	ComponentRole  string            `json:"component_role"`
-	FootprintParam string            `json:"footprint_param,omitempty"`
-	FootprintID    string            `json:"footprint_id,omitempty"`
-	Placement      RelativePlacement `json:"placement"`
-	Side           string            `json:"side,omitempty"`
-	Properties     map[string]string `json:"properties,omitempty"`
-	When           RealizationWhen   `json:"when,omitempty"`
+	ComponentRole  string                 `json:"component_role"`
+	FootprintParam string                 `json:"footprint_param,omitempty"`
+	FootprintID    string                 `json:"footprint_id,omitempty"`
+	PhysicalPins   []transactions.PinSpec `json:"physical_pins,omitempty"`
+	Placement      RelativePlacement      `json:"placement"`
+	Side           string                 `json:"side,omitempty"`
+	Properties     map[string]string      `json:"properties,omitempty"`
+	When           RealizationWhen        `json:"when,omitempty"`
 }
 
 type RealizationWhen struct {
@@ -207,12 +209,13 @@ type PCBZoneRealization struct {
 }
 
 type PCBKeepout struct {
-	ID          string         `json:"id"`
-	Layer       string         `json:"layer"`
-	Bounds      RelativeBounds `json:"bounds"`
-	AppliesTo   []string       `json:"applies_to,omitempty"`
-	BlocksRoute *bool          `json:"blocks_route,omitempty"`
-	Description string         `json:"description,omitempty"`
+	ID               string         `json:"id"`
+	Layer            string         `json:"layer"`
+	Bounds           RelativeBounds `json:"bounds"`
+	PlacementGroupID string         `json:"placement_group_id,omitempty"`
+	AppliesTo        []string       `json:"applies_to,omitempty"`
+	BlocksRoute      *bool          `json:"blocks_route,omitempty"`
+	Description      string         `json:"description,omitempty"`
 }
 
 type PCBConstraint struct {
@@ -552,6 +555,13 @@ func ValidatePCBRealization(definition BlockDefinition) []reports.Issue {
 		keepoutIDs[id] = struct{}{}
 		issues = append(issues, validateLayer(keepoutPath+".layer", keepout.Layer, false)...)
 		issues = append(issues, validateBounds(keepoutPath+".bounds", keepout.Bounds)...)
+		if groupID := strings.TrimSpace(keepout.PlacementGroupID); groupID != "" {
+			if groupID != keepout.PlacementGroupID {
+				issues = append(issues, blockIssue(keepoutPath+".placement_group_id", "placement group ID must not contain leading or trailing whitespace"))
+			} else if _, exists := groupIDs[groupID]; !exists {
+				issues = append(issues, blockIssue(keepoutPath+".placement_group_id", "unknown placement group "+groupID))
+			}
+		}
 		for appliesIndex, target := range keepout.AppliesTo {
 			issues = append(issues, validateKnownKeepoutTarget(fmt.Sprintf("%s.applies_to.%d", keepoutPath, appliesIndex), target, roles)...)
 		}
@@ -854,6 +864,7 @@ func clonePCBRealization(realization *PCBRealization) *PCBRealization {
 	clone := *realization
 	clone.Components = append([]PCBComponentRealization(nil), realization.Components...)
 	for i := range clone.Components {
+		clone.Components[i].PhysicalPins = append([]transactions.PinSpec(nil), realization.Components[i].PhysicalPins...)
 		clone.Components[i].Properties = cloneStringMap(realization.Components[i].Properties)
 		clone.Components[i].When = cloneRealizationWhen(realization.Components[i].When)
 	}

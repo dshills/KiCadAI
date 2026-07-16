@@ -34,6 +34,9 @@ func SelectDefinitionComponents(ctx context.Context, definition BlockDefinition,
 		if !ComponentActiveForParams(component, params) {
 			continue
 		}
+		if component.SchematicOnly {
+			continue
+		}
 		request, ok := SelectionRequestForComponentWithParams(component, acceptance, params)
 		if !ok {
 			if component.ComponentIDParam != "" && stringParam(params, component.ComponentIDParam) == "" {

@@ -36,6 +36,101 @@ func TestPreserveRelativeGroupPlacementTranslatesClusterAroundObstacle(t *testin
 	}
 }
 
+func TestPreserveRelativeGroupPlacementKeepsEdgeConstrainedAnchorAtEdge(t *testing.T) {
+	rules := DefaultRules()
+	rules.GridMM = 1
+	rules.ComponentSpacingMM = 0
+	request := Request{
+		Board: BoardPlacementArea{WidthMM: 30, HeightMM: 20},
+		Rules: rules,
+		Components: []Component{
+			{Ref: "U1", FootprintID: "Test:U", Bounds: Bounds{WidthMM: 4, HeightMM: 4, AnchorOffset: Point{XMM: 2, YMM: 2}, Source: BoundsExplicit}, Position: &Placement{XMM: 2, YMM: 10, Layer: "F.Cu"}, Rotation: RotationConstraint{FixedDeg: float64Pointer(0)}, Edge: EdgeLeft},
+			{Ref: "C1", FootprintID: "Test:C", Bounds: Bounds{WidthMM: 2, HeightMM: 2, AnchorOffset: Point{XMM: 1, YMM: 1}, Source: BoundsExplicit}, Position: &Placement{XMM: 7, YMM: 10, Layer: "F.Cu"}, Rotation: RotationConstraint{FixedDeg: float64Pointer(0)}},
+		},
+		Groups: []Group{{ID: "radio", Components: []string{"U1", "C1"}, Anchor: GroupAnchor{Ref: "U1"}, KeepTogether: true, TranslateAsUnit: true}},
+	}
+
+	result := Place(request)
+	if result.Status != StatusPlaced {
+		t.Fatalf("placement = %#v", result)
+	}
+	for _, placed := range result.Placements {
+		if placed.Ref == "U1" && !edgeConstraintSatisfied(request.Board, request.Components[0], placed.Position, EdgeLeft, edgeConstraintTolerance(request.Board, rules)) {
+			t.Fatalf("translated anchor left edge: %#v", placed.Position)
+		}
+	}
+}
+
+func TestPreserveRelativeGroupPlacementKeepsGroupBoundsInsideUsableBoard(t *testing.T) {
+	rules := DefaultRules()
+	rules.GridMM = 1
+	rules.ComponentSpacingMM = 0
+	bounds := Rect{Min: Point{XMM: 0, YMM: 0}, Max: Point{XMM: 5, YMM: 5}}
+	request := Request{
+		Board: BoardPlacementArea{WidthMM: 20, HeightMM: 20},
+		Rules: rules,
+		Components: []Component{{
+			Ref: "U1", FootprintID: "Test:U", Bounds: Bounds{WidthMM: 2, HeightMM: 2, AnchorOffset: Point{XMM: 1, YMM: 1}, Source: BoundsExplicit},
+			Position: &Placement{XMM: 2, YMM: 2, Layer: "F.Cu"}, Rotation: RotationConstraint{FixedDeg: float64Pointer(0)},
+		}},
+		Groups: []Group{{ID: "core", Components: []string{"U1"}, Anchor: GroupAnchor{Ref: "U1"}, Bounds: &bounds, TranslateAsUnit: true}},
+	}
+
+	result := Place(request)
+	if result.Status != StatusPlaced {
+		t.Fatalf("placement = %#v", result)
+	}
+	placed := result.Placements[0].Position
+	if !BoardUsableRect(request.Board, rules).Contains(translatedGroupBounds(bounds, *request.Components[0].Position, placed)) {
+		t.Fatalf("translated group bounds escape usable board: placement=%#v bounds=%#v", placed, translatedGroupBounds(bounds, *request.Components[0].Position, placed))
+	}
+}
+
+func TestTranslatedKeepoutFollowsRigidGroupAnchor(t *testing.T) {
+	request := Request{
+		Components: []Component{{Ref: "U1", Position: &Placement{XMM: 5, YMM: 6}}},
+		Groups:     []Group{{ID: "radio", Anchor: GroupAnchor{Ref: "U1"}}},
+		Keepouts:   []Keepout{{ID: "antenna", GroupID: "radio", Bounds: Rect{Min: Point{XMM: 1, YMM: 2}, Max: Point{XMM: 3, YMM: 4}}}},
+	}
+	placements := []PlacementResult{{Ref: "U1", Position: Placement{XMM: 15, YMM: 26}}}
+
+	keepouts := TranslatedKeepoutsForPlacements(request, placements)
+	if len(keepouts) != 1 || keepouts[0].Bounds.Min.XMM != 11 || keepouts[0].Bounds.Min.YMM != 22 || keepouts[0].Bounds.Max.XMM != 13 || keepouts[0].Bounds.Max.YMM != 24 {
+		t.Fatalf("translated keepout = %#v", keepouts)
+	}
+}
+
+func TestRigidGroupTranslationKeepsOwnedKeepoutClearOfExistingComponent(t *testing.T) {
+	rules := DefaultRules()
+	rules.GridMM = 1
+	rules.ComponentSpacingMM = 0
+	request := Request{
+		Board: BoardPlacementArea{WidthMM: 30, HeightMM: 20},
+		Rules: rules,
+		Components: []Component{
+			{Ref: "U1", FootprintID: "Test:U", Bounds: Bounds{WidthMM: 2, HeightMM: 2, AnchorOffset: Point{XMM: 1, YMM: 1}, Source: BoundsExplicit}, Position: &Placement{XMM: 5, YMM: 10, Layer: "F.Cu"}, Rotation: RotationConstraint{FixedDeg: float64Pointer(0)}},
+			{Ref: "X1", FootprintID: "Test:X", Bounds: Bounds{WidthMM: 2, HeightMM: 2, AnchorOffset: Point{XMM: 1, YMM: 1}, Source: BoundsExplicit}, Fixed: true, Position: &Placement{XMM: 9, YMM: 10, Layer: "F.Cu"}, Rotation: RotationConstraint{FixedDeg: float64Pointer(0)}},
+		},
+		Groups:   []Group{{ID: "radio", Components: []string{"U1"}, Anchor: GroupAnchor{Ref: "U1"}, TranslateAsUnit: true}},
+		Keepouts: []Keepout{{ID: "antenna", GroupID: "radio", Bounds: Rect{Min: Point{XMM: 11, YMM: 17}, Max: Point{XMM: 13, YMM: 19}}, ExemptRefs: []string{"U1"}}},
+	}
+
+	result := Place(request)
+	if result.Status != StatusPlaced {
+		t.Fatalf("placement = %#v", result)
+	}
+	keepouts := TranslatedKeepoutsForPlacements(request, result.Placements)
+	var existing PlacementResult
+	for _, placed := range result.Placements {
+		if placed.Ref == "X1" {
+			existing = placed
+		}
+	}
+	if keepouts[0].Bounds.Intersects(existing.Bounds) {
+		t.Fatalf("translated keepout %#v intersects existing component %#v", keepouts[0], existing)
+	}
+}
+
 func TestValidateRelativeGroupRequiresAuthoredPositions(t *testing.T) {
 	request := Request{
 		Board:      BoardPlacementArea{WidthMM: 20, HeightMM: 20},

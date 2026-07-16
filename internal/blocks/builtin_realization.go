@@ -58,7 +58,7 @@ func ledIndicatorPCBRealization() *PCBRealization {
 			{ComponentRole: "resistor", FootprintParam: "resistor_footprint", Placement: RelativePlacement{XMM: 0, YMM: 0, Layer: "F.Cu"}},
 			{ComponentRole: "led", FootprintParam: "led_footprint", Placement: RelativePlacement{XMM: 5, YMM: 0, RotationDeg: 180, Layer: "F.Cu"}},
 		},
-		PlacementGroups: []PCBPlacementGroup{{ID: "inline_indicator", ComponentRoles: []string{"resistor", "led"}, AnchorRole: "resistor", Bounds: &RelativeBounds{MinXMM: -2, MinYMM: -2, MaxXMM: 8, MaxYMM: 2}}},
+		PlacementGroups: []PCBPlacementGroup{{ID: "inline_indicator", ComponentRoles: []string{"resistor", "led"}, AnchorRole: "resistor", Bounds: &RelativeBounds{MinXMM: -2, MinYMM: -2, MaxXMM: 8, MaxYMM: 2}, TranslateAsUnit: true}},
 		LocalRoutes:     []PCBLocalRoute{{ID: "series", NetTemplate: "led_series", From: RouteEndpoint{ComponentRole: "resistor", Pin: "2"}, To: RouteEndpoint{ComponentRole: "led", Pin: "2"}, Waypoints: []RelativePoint{{XMM: 5.08, YMM: -2}, {XMM: -0.08, YMM: -2}}, Layer: "B.Cu", WidthMM: 0.25, Required: true}},
 		Validation:      PCBValidationExpectations{RequiredNets: []string{"in", "led_series", "gnd"}, RequiredRoutes: []string{"series"}},
 	}
@@ -223,7 +223,7 @@ func i2cSensorPCBRealization() *PCBRealization {
 			{ComponentRole: "sda_pullup", FootprintParam: "pullup_footprint", Placement: RelativePlacement{XMM: 20, YMM: 11, Layer: "F.Cu", Fixed: true}, When: combinedRealizationWhen(fixedLayout, pullupsEnabled)},
 			{ComponentRole: "scl_pullup", FootprintParam: "pullup_footprint", Placement: RelativePlacement{XMM: 20, YMM: 20, Layer: "F.Cu", Fixed: true}, When: combinedRealizationWhen(fixedLayout, pullupsEnabled)},
 		},
-		PlacementGroups: []PCBPlacementGroup{{ID: "sensor_core", ComponentRoles: []string{"sensor", "decoupling_capacitor", "sda_pullup", "scl_pullup"}, AnchorRole: "sensor", Bounds: &RelativeBounds{MinXMM: -14, MinYMM: -6, MaxXMM: 3, MaxYMM: 7}}},
+		PlacementGroups: []PCBPlacementGroup{{ID: "sensor_core", ComponentRoles: []string{"sensor", "decoupling_capacitor", "sda_pullup", "scl_pullup"}, AnchorRole: "sensor", Bounds: &RelativeBounds{MinXMM: -14, MinYMM: -6, MaxXMM: 3, MaxYMM: 7}, TranslateAsUnit: true}},
 		LocalRoutes: []PCBLocalRoute{
 			{ID: "vcc_decoupling", NetTemplate: "vcc", From: RouteEndpoint{ComponentRole: "decoupling_capacitor", Pin: "1"}, To: RouteEndpoint{ComponentRole: "sensor", Pin: genericI2CSensorPins.VCC}, Waypoints: []RelativePoint{{XMM: i2cVCCSourceXMM, YMM: 13.095}, {XMM: 25.05, YMM: 13.095}}, WaypointVariants: bmp280VCCTrunk, Layer: "F.Cu", WidthMM: 0.3, Required: true},
 			{ID: "gnd_decoupling", NetTemplate: "gnd", From: RouteEndpoint{ComponentRole: "decoupling_capacitor", Pin: "2"}, To: RouteEndpoint{ComponentRole: "sensor", Pin: genericI2CSensorPins.GND}, Waypoints: []RelativePoint{{XMM: 25.05, YMM: 14.365}}, Layer: "B.Cu", WidthMM: 0.3, Required: true},
@@ -459,10 +459,10 @@ func usbCPowerPCBRealization() *PCBRealization {
 			{ComponentRole: "vbus_tvs", FootprintID: "Diode_SMD:D_SOD-323", Placement: RelativePlacement{XMM: 18, YMM: 4, Layer: "F.Cu", Fixed: true}},
 			{ComponentRole: "bulk_capacitor", FootprintID: "Capacitor_SMD:C_0805_2012Metric", Placement: RelativePlacement{XMM: 18, YMM: -1, Layer: "F.Cu", Fixed: true}},
 		},
-		PlacementGroups: []PCBPlacementGroup{{ID: "usb_c_power_entry", ComponentRoles: append([]string(nil), usbPowerRoles...), AnchorRole: "usb_c_receptacle", Bounds: &RelativeBounds{MinXMM: -5, MinYMM: -8, MaxXMM: 22, MaxYMM: 10}}},
+		PlacementGroups: []PCBPlacementGroup{{ID: "usb_c_power_entry", ComponentRoles: append([]string(nil), usbPowerRoles...), AnchorRole: "usb_c_receptacle", Bounds: &RelativeBounds{MinXMM: -5, MinYMM: -8, MaxXMM: 22, MaxYMM: 10}, TranslateAsUnit: true}},
 		Keepouts: []PCBKeepout{
-			{ID: "usb_c_edge_keepout", Layer: "F.Cu", Bounds: RelativeBounds{MinXMM: -5, MinYMM: -8, MaxXMM: 3, MaxYMM: 8}, AppliesTo: []string{"usb_c_receptacle"}, BlocksRoute: boolPtr(false), Description: "Reserve board-edge clearance around the USB-C receptacle."},
-			{ID: "usb_c_power_entry_placement", Layer: "F.Cu", Bounds: RelativeBounds{MinXMM: -5, MinYMM: -8, MaxXMM: 23, MaxYMM: 12}, AppliesTo: append([]string(nil), usbPowerRoles...), BlocksRoute: boolPtr(false), Description: "Reserve placement area for USB-C power-entry companions."},
+			{ID: "usb_c_edge_keepout", PlacementGroupID: "usb_c_power_entry", Layer: "F.Cu", Bounds: RelativeBounds{MinXMM: -5, MinYMM: -8, MaxXMM: 3, MaxYMM: 8}, AppliesTo: []string{"usb_c_receptacle"}, BlocksRoute: boolPtr(false), Description: "Reserve board-edge clearance around the USB-C receptacle."},
+			{ID: "usb_c_power_entry_placement", PlacementGroupID: "usb_c_power_entry", Layer: "F.Cu", Bounds: RelativeBounds{MinXMM: -5, MinYMM: -8, MaxXMM: 23, MaxYMM: 12}, AppliesTo: append([]string(nil), usbPowerRoles...), BlocksRoute: boolPtr(false), Description: "Reserve placement area for USB-C power-entry companions."},
 		},
 		LocalRoutes: []PCBLocalRoute{
 			{ID: "cc1_pull_down", NetTemplate: "cc1", From: RouteEndpoint{ComponentRole: "usb_c_receptacle", Pin: usbCPowerPins.CC1}, To: RouteEndpoint{ComponentRole: "cc1_rd", Pin: "1"}, Waypoints: []RelativePoint{{XMM: -0.5, YMM: -0.4}, {XMM: 2.4, YMM: -0.4}, {XMM: 2.4, YMM: 3.5}}, Layer: "B.Cu", WidthMM: 0.25, Required: true},

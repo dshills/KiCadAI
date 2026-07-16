@@ -435,7 +435,13 @@ func (builder *planBuilder) mapFunctions() {
 				builder.recordI2CBus(id, function.Bus)
 				builder.recordInstanceSupply(id, function.Supply)
 			case "mcu":
-				id := builder.addBlock(reqID, "mcu", "mcu_minimal", function.Params, "MCU minimal system implements requested controller")
+				blockID := "mcu_minimal"
+				evidence := "MCU minimal system implements requested controller"
+				if normalizeToken(function.Family) == "esp32" {
+					blockID = "esp32_wroom_32e_minimal"
+					evidence = "Reviewed ESP32-WROOM-32E minimal system implements requested ESP32 controller"
+				}
+				id := builder.addBlock(reqID, "mcu", blockID, function.Params, evidence)
 				builder.mcuIDs = appendIfNotEmpty(builder.mcuIDs, id)
 				builder.recordInstanceSupply(id, function.Supply)
 			case "amplifier":

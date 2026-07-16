@@ -107,7 +107,9 @@ func PlaceFragments(ctx context.Context, request Request, fragments PCBFragmentR
 	placementRequest, padEntries, padIssues := hydratePlacementRequestPads(placementRequest, opts.LibraryIndex)
 	issues = append(issues, padIssues...)
 	placementRequest = placement.NormalizeRequest(placementRequest)
+	placementRequest = preserveAuthoredTranslatedGroupSpread(placementRequest)
 	result := placement.PlaceContext(ctx, placementRequest)
+	placementRequest.Keepouts = placement.TranslatedKeepoutsForPlacements(placementRequest, result.Placements)
 	issues = append(issues, result.Issues...)
 	stage := NewStageResult(StagePlacement, issues)
 	mobilitySummary := placement.MobilitySummaryForComponents(placementRequest.Components)
@@ -133,6 +135,39 @@ func PlaceFragments(ctx context.Context, request Request, fragments PCBFragmentR
 		stage.Status = StageStatusWarning
 	}
 	return PlacementStageResult{Request: placementRequest, Result: result, Stage: stage}
+}
+
+func preserveAuthoredTranslatedGroupSpread(request placement.Request) placement.Request {
+	components := make(map[string]placement.Component, len(request.Components))
+	for _, component := range request.Components {
+		components[strings.ToUpper(strings.TrimSpace(component.Ref))] = component
+	}
+	for groupIndex := range request.Groups {
+		group := &request.Groups[groupIndex]
+		if !group.TranslateAsUnit {
+			continue
+		}
+		centers := make([]placement.Point, 0, len(group.Components))
+		for _, ref := range group.Components {
+			component, ok := components[strings.ToUpper(strings.TrimSpace(ref))]
+			if !ok || component.Position == nil {
+				continue
+			}
+			bounds, ok := placement.ComponentPhysicalBounds(component, *component.Position)
+			if ok {
+				centers = append(centers, bounds.Center())
+			}
+		}
+		for left := 0; left < len(centers); left++ {
+			for right := left + 1; right < len(centers); right++ {
+				distance := math.Hypot(centers[left].XMM-centers[right].XMM, centers[left].YMM-centers[right].YMM)
+				if distance > group.MaxSpreadMM {
+					group.MaxSpreadMM = distance
+				}
+			}
+		}
+	}
+	return request
 }
 
 type PlacementCandidateScoringSummary struct {
@@ -309,6 +344,7 @@ func hydratePlacementRequestPads(request placement.Request, index *libraryresolv
 		issues = append(issues, hydrated.Issues...)
 		issues = append(issues, netIssues...)
 	}
+	request = expandGroupedPlacementPins(request)
 	return request, entries, issues
 }
 
@@ -327,8 +363,7 @@ func preferredPhysicalPadHydration(resolver *padHydrationResolver, index *librar
 func hasPackageOnlyPads(ref string, pads []placement.PadSummary, assignments padNetAssignmentIndex) bool {
 	assignedPins := map[string]struct{}{}
 	for _, assignment := range assignments[strings.ToUpper(strings.TrimSpace(ref))] {
-		pin := strings.TrimSpace(assignment.Pin)
-		if pin != "" {
+		for _, pin := range groupedPinMembers(assignment.Pin) {
 			assignedPins[pin] = struct{}{}
 		}
 	}
@@ -342,6 +377,39 @@ func hasPackageOnlyPads(ref string, pads []placement.PadSummary, assignments pad
 		}
 	}
 	return false
+}
+
+func expandGroupedPlacementPins(request placement.Request) placement.Request {
+	for netIndex := range request.Nets {
+		expanded := make([]placement.Endpoint, 0, len(request.Nets[netIndex].Endpoints))
+		for _, endpoint := range request.Nets[netIndex].Endpoints {
+			for _, member := range groupedPinMembers(endpoint.Pin) {
+				expanded = appendUniquePlacementEndpoints(expanded, placement.Endpoint{Ref: endpoint.Ref, Pin: member})
+			}
+		}
+		request.Nets[netIndex].Endpoints = expanded
+	}
+	for ruleIndex := range request.ProximityRules {
+		request.ProximityRules[ruleIndex].AnchorPins = expandGroupedPinList(request.ProximityRules[ruleIndex].AnchorPins)
+		request.ProximityRules[ruleIndex].TargetPins = expandGroupedPinList(request.ProximityRules[ruleIndex].TargetPins)
+	}
+	return request
+}
+
+func expandGroupedPinList(pins []string) []string {
+	expanded := []string{}
+	seen := map[string]struct{}{}
+	for _, pin := range pins {
+		for _, member := range groupedPinMembers(pin) {
+			if _, exists := seen[member]; exists {
+				continue
+			}
+			seen[member] = struct{}{}
+			expanded = append(expanded, member)
+		}
+	}
+	slices.Sort(expanded)
+	return expanded
 }
 
 func addPlacementRouteNet(request *placement.Request, indexes map[string]int, route blocks.RealizedPCBLocalRoute) {
@@ -541,7 +609,10 @@ func placementLocalRouteRefs(fragment BlockFragment) map[string]bool {
 func generatedPlacementMobility(request Request, fragment BlockFragment, component blocks.RealizedPCBComponent, groupID string, edge placement.EdgeConstraint, hasLocalRoute bool) (placement.MobilityPolicy, bool) {
 	ownerScope := "block:" + fragment.BlockID + "/" + fragment.InstanceID
 	constraints := []string{"generated", "block:" + fragment.BlockID}
-	hardEdge := edge != placement.EdgeNone && hasLocalRoute
+	// A translated block group preserves its authored local copper, so an
+	// edge-constrained member can move safely with the rest of the group. Only
+	// standalone edge components need to remain fixed to protect local routes.
+	hardEdge := edge != placement.EdgeNone && hasLocalRoute && groupID == ""
 	hardFixed := component.Placement.Fixed || request.RoutingRetry.PreserveFixed || hardEdge
 	if !request.RoutingRetry.Enabled {
 		hardFixed = true
@@ -635,6 +706,8 @@ func placementGroupsFromFragment(fragment BlockFragment) []placement.Group {
 		}
 		if group.Bounds != nil {
 			converted.MaxSpreadMM = boundsDiagonal(*group.Bounds)
+			bounds := placementGroupBoundsRect(fragment, converted.Anchor.Ref, *group.Bounds)
+			converted.Bounds = &bounds
 		}
 		if len(converted.Components) > 0 {
 			groups = append(groups, converted)
@@ -643,11 +716,28 @@ func placementGroupsFromFragment(fragment BlockFragment) []placement.Group {
 	return groups
 }
 
+func placementGroupBoundsRect(fragment BlockFragment, anchorRef string, bounds blocks.RelativeBounds) placement.Rect {
+	anchorX := fragment.OriginXMM
+	anchorY := fragment.OriginYMM
+	for _, component := range fragment.Realization.Components {
+		if strings.EqualFold(strings.TrimSpace(component.Ref), strings.TrimSpace(anchorRef)) {
+			anchorX = component.Placement.XMM
+			anchorY = component.Placement.YMM
+			break
+		}
+	}
+	return placement.Rect{
+		Min: placement.Point{XMM: anchorX + bounds.MinXMM, YMM: anchorY + bounds.MinYMM},
+		Max: placement.Point{XMM: anchorX + bounds.MaxXMM, YMM: anchorY + bounds.MaxYMM},
+	}
+}
+
 func placementKeepoutsFromFragment(fragment BlockFragment) []placement.Keepout {
 	keepouts := make([]placement.Keepout, 0, len(fragment.Keepouts))
 	for _, keepout := range fragment.Keepouts {
 		keepouts = append(keepouts, placement.Keepout{
 			ID:          blockPlacementGroupID(fragment, keepout.ID),
+			GroupID:     placementKeepoutGroupID(fragment, keepout),
 			Bounds:      relativeBoundsToPlacementRect(fragment, keepout.Bounds),
 			Layers:      []string{keepout.Layer},
 			ExemptRefs:  keepoutExemptRefsFromFragment(fragment, keepout),
@@ -656,6 +746,14 @@ func placementKeepoutsFromFragment(fragment BlockFragment) []placement.Keepout {
 		})
 	}
 	return keepouts
+}
+
+func placementKeepoutGroupID(fragment BlockFragment, keepout blocks.PCBKeepout) string {
+	groupID := strings.TrimSpace(keepout.PlacementGroupID)
+	if groupID == "" {
+		return ""
+	}
+	return blockPlacementGroupID(fragment, groupID)
 }
 
 func cloneBoolPtr(value *bool) *bool {

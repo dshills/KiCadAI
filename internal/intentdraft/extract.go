@@ -128,10 +128,10 @@ func poweredOnlyIndicatorRequest(normalized string, hasPowerInput bool) bool {
 }
 
 func extractFunctions(source string, normalized string, request *intentplanner.Request, extraction *ExtractionReport) {
-	if containsAny(normalized, "mcu", "microcontroller", "atmega", "arduino") {
+	if containsAny(normalized, "mcu", "microcontroller", "atmega", "arduino", "esp32") {
 		function := intentplanner.FunctionIntent{Kind: "mcu", Family: detectMCUFamily(normalized)}
 		request.Functions = append(request.Functions, function)
-		addField(extraction, fmt.Sprintf("functions[%d].kind", len(request.Functions)-1), function.Kind, source, findFirstPhrase(source, []string{"mcu", "microcontroller", "atmega", "arduino"}), confidenceRegexHigh, "keyword.function")
+		addField(extraction, fmt.Sprintf("functions[%d].kind", len(request.Functions)-1), function.Kind, source, findFirstPhrase(source, []string{"mcu", "microcontroller", "atmega", "arduino", "esp32"}), confidenceRegexHigh, "keyword.function")
 	}
 	if containsAny(normalized, "sensor", "temperature", "humidity", "pressure") {
 		function := intentplanner.FunctionIntent{Kind: "sensor", Family: "i2c_sensor", Interface: maybeI2C(normalized), Bus: maybeBus(normalized), Supply: firstRailAlias(request)}
@@ -278,7 +278,7 @@ func deriveKind(normalized string) intentplanner.IntentKind {
 		return intentplanner.IntentAmplifier
 	case containsAny(normalized, "power module", "power supply", "regulator", "ldo", "buck"):
 		return intentplanner.IntentPowerModule
-	case containsAny(normalized, "mcu", "microcontroller", "atmega", "arduino", "programmer", "programming"):
+	case containsAny(normalized, "mcu", "microcontroller", "atmega", "arduino", "esp32", "programmer", "programming"):
 		return intentplanner.IntentMCUMinimal
 	case containsAny(normalized, "sensor", "temperature", "humidity", "pressure"):
 		return intentplanner.IntentSensorNode

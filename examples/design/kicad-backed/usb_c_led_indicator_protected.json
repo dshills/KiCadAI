@@ -81,6 +81,9 @@
       "move_from_edge"
     ]
   },
+  "constraints": {
+    "treat_local_power_routes_as_obstacles": true
+  },
   "validation": {
     "acceptance": "erc-drc",
     "require_erc": true,

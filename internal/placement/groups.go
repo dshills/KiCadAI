@@ -17,6 +17,10 @@ func ValidateGroups(request Request, placements []PlacementResult) []reports.Iss
 		}
 	}
 	var issues []reports.Issue
+	spreadToleranceMM := request.Rules.GridMM
+	if spreadToleranceMM <= 0 {
+		spreadToleranceMM = DefaultRules().GridMM
+	}
 	for groupIndex, group := range request.Groups {
 		if group.MaxSpreadMM <= 0 {
 			continue
@@ -35,7 +39,8 @@ func ValidateGroups(request Request, placements []PlacementResult) []reports.Iss
 				dx := centers[i].XMM - centers[j].XMM
 				dy := centers[i].YMM - centers[j].YMM
 				distanceSquared := dx*dx + dy*dy
-				maxSpreadSquared := group.MaxSpreadMM * group.MaxSpreadMM
+				maxSpreadWithGridTolerance := group.MaxSpreadMM + spreadToleranceMM
+				maxSpreadSquared := maxSpreadWithGridTolerance * maxSpreadWithGridTolerance
 				if distanceSquared > maxSpreadSquared {
 					issues = append(issues, reports.Issue{
 						Code:     reports.CodeValidationFailed,

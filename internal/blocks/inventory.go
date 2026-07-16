@@ -47,6 +47,7 @@ var roadmapBlockFamilies = []roadmapBlockFamily{
 	{ID: "led_indicator", Name: "LED Indicator", Category: "indicator"},
 	{ID: "voltage_regulator", Name: "Voltage Regulator", Category: "power"},
 	{ID: "mcu_minimal", Name: "MCU Minimal System", Category: "digital"},
+	{ID: "esp32_wroom_32e_minimal", Name: "ESP32-WROOM-32E Minimal System", Category: "digital"},
 	{ID: "usb_c_power", Name: "USB-C Power Input", Category: "power"},
 	{ID: "i2c_sensor", Name: "I2C Sensor", Category: "sensor"},
 	{ID: "opamp_gain_stage", Name: "Op-Amp Gain Stage", Category: "analog", Tags: []string{"amplifier"}},

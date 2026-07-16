@@ -1,15 +1,15 @@
 {
-  "record_count": 55,
-  "family_count": 16,
+  "record_count": 57,
+  "family_count": 17,
   "confidence_counts": {
     "blocked": 1,
     "library_derived": 0,
     "placeholder": 4,
     "rule_inferred": 5,
-    "verified": 45
+    "verified": 47
   },
   "alternative_coverage": {
-    "concrete_records": 31,
+    "concrete_records": 33,
     "generic_fallback_records": 24,
     "equivalence_groups": 19
   },
@@ -220,11 +220,11 @@
     {
       "family": "mcu",
       "defined": true,
-      "record_count": 2,
-      "concrete_records": 1,
+      "record_count": 3,
+      "concrete_records": 2,
       "generic_fallback_records": 1,
       "equivalence_groups": 0,
-      "verified_records": 1,
+      "verified_records": 2,
       "library_derived_records": 0,
       "rule_inferred_records": 0,
       "placeholder_records": 1,
@@ -234,6 +234,7 @@
         "mcu.placeholder.avr_minimal_tqfp32"
       ],
       "record_ids": [
+        "mcu.espressif.esp32_wroom_32e",
         "mcu.microchip.atmega328p_a.tqfp32",
         "mcu.placeholder.avr_minimal_tqfp32"
       ]
@@ -355,6 +356,25 @@
         "sensor.bosch.bmp280.lga8",
         "sensor.i2c.interface_header.5pin",
         "sensor.sensirion.sht31_dis.dfn8"
+      ]
+    },
+    {
+      "family": "switch",
+      "defined": true,
+      "record_count": 1,
+      "concrete_records": 1,
+      "generic_fallback_records": 0,
+      "equivalence_groups": 0,
+      "verified_records": 1,
+      "library_derived_records": 0,
+      "rule_inferred_records": 0,
+      "placeholder_records": 0,
+      "blocked_records": 0,
+      "missing_resolver_evidence": [
+        "switch.omron.b3u_1000p"
+      ],
+      "record_ids": [
+        "switch.omron.b3u_1000p"
       ]
     },
     {

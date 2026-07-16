@@ -7,6 +7,29 @@ import (
 	"kicadai/internal/reports"
 )
 
+func TestRoutePinNumbersEquivalent(t *testing.T) {
+	tests := []struct {
+		name   string
+		first  string
+		second string
+		want   bool
+	}{
+		{name: "exact", first: "1", second: "1", want: true},
+		{name: "group member", first: "[1, 2]", second: "2", want: true},
+		{name: "trimmed group", first: " [1, 2] ", second: " 1 ", want: true},
+		{name: "empty group", first: "[]", second: "", want: false},
+		{name: "malformed group", first: "1, 2", second: "2", want: false},
+		{name: "different", first: "[1, 2]", second: "3", want: false},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if got := routePinNumbersEquivalent(test.first, test.second); got != test.want {
+				t.Fatalf("routePinNumbersEquivalent(%q, %q) = %t, want %t", test.first, test.second, got, test.want)
+			}
+		})
+	}
+}
+
 func TestValidatePCBRealizationAcceptsValidRealization(t *testing.T) {
 	definition := minimalRealizationDefinition()
 	issues := ValidatePCBRealization(definition)

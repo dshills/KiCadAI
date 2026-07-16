@@ -2,6 +2,7 @@ package designworkflow
 
 import (
 	"context"
+	"math"
 	"slices"
 	"strings"
 	"testing"
@@ -71,6 +72,46 @@ func TestPlacementKeepoutsPreserveAppliedRoleAsExemptRef(t *testing.T) {
 	}
 }
 
+func TestPlacementKeepoutFollowsAppliedRoleTranslatedGroup(t *testing.T) {
+	fragment := BlockFragment{
+		InstanceID:      "controller",
+		Realization:     blocks.BlockPCBRealizationResult{RoleRefs: map[string]string{"module": "U1"}},
+		PlacementGroups: []blocks.PCBPlacementGroup{{ID: "module_system", ComponentRoles: []string{"module"}, AnchorRole: "module", TranslateAsUnit: true}},
+		Keepouts:        []blocks.PCBKeepout{{ID: "antenna", PlacementGroupID: "module_system", AppliesTo: []string{"module"}}},
+	}
+
+	keepouts := placementKeepoutsFromFragment(fragment)
+	if len(keepouts) != 1 || keepouts[0].GroupID != "controller.module_system" {
+		t.Fatalf("keepouts = %#v", keepouts)
+	}
+}
+
+func TestPlacementGroupBoundsAreRelativeToAuthoredAnchor(t *testing.T) {
+	fragment := BlockFragment{
+		OriginXMM: 3,
+		OriginYMM: 4,
+		Realization: blocks.BlockPCBRealizationResult{
+			RoleRefs: map[string]string{"module": "U1"},
+			Components: []blocks.RealizedPCBComponent{{
+				Ref: "U1", Placement: blocks.RelativePlacement{XMM: 20, YMM: 15},
+			}},
+		},
+		PlacementGroups: []blocks.PCBPlacementGroup{{
+			ID: "module_system", ComponentRoles: []string{"module"}, AnchorRole: "module",
+			Bounds: &blocks.RelativeBounds{MinXMM: -5, MinYMM: -2, MaxXMM: 3, MaxYMM: 4},
+		}},
+	}
+
+	groups := placementGroupsFromFragment(fragment)
+	if len(groups) != 1 || groups[0].Bounds == nil {
+		t.Fatalf("groups = %#v", groups)
+	}
+	want := placement.Rect{Min: placement.Point{XMM: 15, YMM: 13}, Max: placement.Point{XMM: 23, YMM: 19}}
+	if *groups[0].Bounds != want {
+		t.Fatalf("bounds = %#v, want %#v", *groups[0].Bounds, want)
+	}
+}
+
 func TestPlacementKeepoutsPreserveRoutingPolicy(t *testing.T) {
 	blocksRoute := false
 	fragment := BlockFragment{
@@ -136,6 +177,36 @@ func TestPlaceFragmentsHydratesGeneratedMobilityWhenRetryEnabled(t *testing.T) {
 	}
 	if summary.GroupTransformCount != 2 || summary.EligibleCount != 2 {
 		t.Fatalf("mobility summary = %#v", summary)
+	}
+}
+
+func TestGeneratedPlacementMobilityAllowsEdgeConstrainedGroupTransform(t *testing.T) {
+	request := Request{RoutingRetry: RoutingRetryPolicySpec{Enabled: true}}
+	component := blocks.RealizedPCBComponent{Ref: "U1"}
+
+	policy, fixed := generatedPlacementMobility(request, BlockFragment{BlockID: "radio", InstanceID: "controller"}, component, "controller.module", placement.EdgeAny, true)
+
+	if fixed {
+		t.Fatal("edge-constrained translated group member unexpectedly fixed")
+	}
+	if policy.Class != placement.MobilityGroupTransform || policy.RouteHandling != placement.RouteHandlingTransformWithGroup {
+		t.Fatalf("mobility = %#v, want group transform with group route handling", policy)
+	}
+}
+
+func TestPreserveAuthoredTranslatedGroupSpreadAccountsForAsymmetricOrigins(t *testing.T) {
+	request := placement.Request{
+		Components: []placement.Component{
+			{Ref: "J1", Position: &placement.Placement{XMM: 0, YMM: 0}, Bounds: placement.Bounds{WidthMM: 10, HeightMM: 8, AnchorOffset: placement.Point{XMM: 2, YMM: 4}, Source: placement.BoundsExplicit}},
+			{Ref: "C1", Position: &placement.Placement{XMM: 18, YMM: -1}, Bounds: placement.Bounds{WidthMM: 2, HeightMM: 1, AnchorOffset: placement.Point{XMM: 1, YMM: 0.5}, Source: placement.BoundsExplicit}},
+		},
+		Groups: []placement.Group{{ID: "entry", Components: []string{"J1", "C1"}, TranslateAsUnit: true, MaxSpreadMM: 10}},
+	}
+
+	result := preserveAuthoredTranslatedGroupSpread(request)
+	want := math.Hypot(15, 1)
+	if math.Abs(result.Groups[0].MaxSpreadMM-want) > 1e-9 {
+		t.Fatalf("max spread = %v, want %v", result.Groups[0].MaxSpreadMM, want)
 	}
 }
 

@@ -105,6 +105,10 @@ func TestEmbeddedSymbolPinOffsets(t *testing.T) {
 	if !ok || len(capacitorPins) != 2 || capacitorPins[0].Offset.X != 0 || capacitorPins[0].Offset.Y != kicadfiles.MM(3.81) || capacitorPins[1].Offset.X != 0 || capacitorPins[1].Offset.Y != kicadfiles.MM(-3.81) {
 		t.Fatalf("unexpected capacitor offsets: %#v ok=%v", capacitorPins, ok)
 	}
+	capacitorConnectionPins, ok := EmbeddedSymbolConnectionPinOffsets("Device:C")
+	if !ok || len(capacitorConnectionPins) != 2 || capacitorConnectionPins[0].Offset.Y != kicadfiles.MM(-3.81) || capacitorConnectionPins[1].Offset.Y != kicadfiles.MM(3.81) {
+		t.Fatalf("unexpected capacitor connection offsets: %#v ok=%v", capacitorConnectionPins, ok)
+	}
 	connectorPins, ok := EmbeddedSymbolPinOffsets("Connector_Generic:Conn_01x02")
 	if !ok || len(connectorPins) != 2 || connectorPins[0].Offset.Y != 0 || connectorPins[1].Offset.Y != kicadfiles.MM(-2.54) {
 		t.Fatalf("unexpected connector offsets: %#v ok=%v", connectorPins, ok)

@@ -17,13 +17,17 @@ path.
   tested.
 - Structured intent can generate supported designs through planning, component
   selection, schematic/PCB realization, placement, routing, and validation.
+- Exact `ESP32-WROOM-32E-N4` minimal-system generation is supported through the
+  built-in `esp32_wroom_32e_minimal` block, with power conditioning, EN/BOOT
+  straps and buttons, UART/I2C/SPI/GPIO headers, and an antenna copper keepout.
 - The provider-backed natural-language lane retains two promoted bounded
   profiles and now adds an explicit catalog-resolved circuit graph contract.
 - Generated `generic-circuit-v1` designs now have a deterministic correction
   loop with at most three placement/routing attempts, protected-invariant
   checks, stable retry evidence, and fail-closed unsupported actions.
-- The bounded USB-C BMP280 and protected LED profiles remain KiCad-backed
-  `pass`. Six generic fixtures use the shared catalog-resolved graph contract:
+- The ESP32-WROOM-32E minimal-system fixture and the bounded USB-C BMP280 and
+  protected LED profiles are KiCad-backed `pass`. Six generic fixtures use the
+  shared catalog-resolved graph contract:
   RC filter, protected USB-C LED, protected USB-C BMP280, single-stage LMV321,
   dual LMV321, and multi-unit LM358. Their recorded/live evidence varies by
   fixture, while each checked-in optional KiCad promotion lane is `pass`. None
@@ -32,6 +36,8 @@ path.
   identity.
 - Arbitrary electronics generation is not yet guaranteed. Generic graphs fail
   closed on unknown parts, pins, ratings, placement, or routing capability.
+- ESP32 support currently covers the exact WROOM-32E-N4 module profile, not the
+  full ESP32 module, SoC, flash-size, RF, or pin-remapping family.
 - Generated `pass` evidence is not automatically a fabrication-release claim.
 
 See [Project Status](docs/project-status.md) for capability boundaries and

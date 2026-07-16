@@ -89,14 +89,19 @@ func ComponentOperations(component BlockComponent, ref string, at transactions.P
 	if len(issues) != 0 {
 		return nil, issues
 	}
+	symbolRole := component.Role
+	if component.SchematicOnly {
+		symbolRole = "generated_terminal"
+	}
 	addSymbol, err := wrapOperation(transactions.OpAddSymbol, transactions.AddSymbolOperation{
-		Op:        transactions.OpAddSymbol,
-		Ref:       ref,
-		Role:      component.Role,
-		Value:     component.Value,
-		LibraryID: component.SymbolID,
-		At:        at,
-		Pins:      append([]transactions.PinSpec(nil), component.Pins...),
+		Op:                   transactions.OpAddSymbol,
+		Ref:                  ref,
+		Role:                 symbolRole,
+		Value:                component.Value,
+		LibraryID:            component.SymbolID,
+		At:                   at,
+		Pins:                 append([]transactions.PinSpec(nil), component.Pins...),
+		PreferResolverSymbol: component.PreferResolverSymbol,
 	})
 	if err != nil {
 		return nil, []reports.Issue{blockIssue("component."+component.Role, err.Error())}

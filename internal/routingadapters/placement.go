@@ -100,10 +100,7 @@ func RequestFromPlacement(placementRequest placement.Request, placementResult pl
 		if keepout.BlocksRoute != nil && !*keepout.BlocksRoute {
 			continue
 		}
-		layers := keepout.Layers
-		if len(layers) == 0 {
-			layers = []string{"F.Cu", "B.Cu"}
-		}
+		layers := routingKeepoutLayers(keepout.Layers, request.Board.Layers)
 		for _, layer := range layers {
 			rect := routing.Rect{
 				Min: routing.Point{XMM: keepout.Bounds.Min.XMM, YMM: keepout.Bounds.Min.YMM},
@@ -118,6 +115,37 @@ func RequestFromPlacement(placementRequest placement.Request, placementResult pl
 		}
 	}
 	return request, issues
+}
+
+func routingKeepoutLayers(layers []string, boardLayers []routing.Layer) []string {
+	if len(layers) == 0 {
+		layers = []string{"*.Cu"}
+	}
+	seen := map[string]struct{}{}
+	result := []string{}
+	appendLayer := func(layer string) {
+		key := strings.ToUpper(strings.TrimSpace(layer))
+		if key == "" {
+			return
+		}
+		if _, exists := seen[key]; exists {
+			return
+		}
+		seen[key] = struct{}{}
+		result = append(result, strings.TrimSpace(layer))
+	}
+	for _, layer := range layers {
+		if strings.EqualFold(strings.TrimSpace(layer), "*.Cu") {
+			for _, boardLayer := range boardLayers {
+				if boardLayer.Kind == routing.LayerCopper && boardLayer.Routable {
+					appendLayer(boardLayer.Name)
+				}
+			}
+			continue
+		}
+		appendLayer(layer)
+	}
+	return result
 }
 
 func defaultRoutingNetClasses() map[string]routing.NetClass {

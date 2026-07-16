@@ -27,6 +27,7 @@ func TestLoadSuiteDiscoversBuiltInCorpus(t *testing.T) {
 		"crystal_oscillator_default",
 		"dc_blocking_capacitor_220uf",
 		"esd_protection_5v",
+		"esp32_wroom_32e_minimal_default",
 		"headphone_output_connector_mono_trs",
 		"headphone_output_protection_32ohm",
 		"i2c_sensor_pullups",

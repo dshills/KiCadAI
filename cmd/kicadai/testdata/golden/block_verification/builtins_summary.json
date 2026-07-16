@@ -2,7 +2,7 @@
   "ok": true,
   "command": "block",
   "data": {
-    "count": 20,
+    "count": 21,
     "results": [
       {
         "case_id": "amplifier_bias_network_headphone",
@@ -211,6 +211,38 @@
       {
         "case_id": "esd_protection_5v",
         "block_id": "esd_protection",
+        "evidence_level": "schematic_verified",
+        "status": "pass",
+        "stages": [
+          {
+            "name": "manifest",
+            "status": "pass"
+          },
+          {
+            "name": "instantiate",
+            "status": "pass"
+          },
+          {
+            "name": "semantic_assertions",
+            "status": "pass"
+          },
+          {
+            "name": "pcb_realization",
+            "status": "pass"
+          },
+          {
+            "name": "pcb_assertions",
+            "status": "pass"
+          },
+          {
+            "name": "erc_drc",
+            "status": "skipped"
+          }
+        ]
+      },
+      {
+        "case_id": "esp32_wroom_32e_minimal_default",
+        "block_id": "esp32_wroom_32e_minimal",
         "evidence_level": "schematic_verified",
         "status": "pass",
         "stages": [

@@ -27,6 +27,10 @@ func CloneRequest(request Request) Request {
 	out.Groups = slices.Clone(request.Groups)
 	for index := range out.Groups {
 		out.Groups[index].Components = slices.Clone(out.Groups[index].Components)
+		if out.Groups[index].Bounds != nil {
+			bounds := *out.Groups[index].Bounds
+			out.Groups[index].Bounds = &bounds
+		}
 		if out.Groups[index].Anchor.At != nil {
 			at := *out.Groups[index].Anchor.At
 			out.Groups[index].Anchor.At = &at

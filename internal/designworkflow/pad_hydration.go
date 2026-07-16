@@ -190,7 +190,16 @@ type verifiedPadTemplateRecord struct {
 }
 
 func verifiedPadTemplate(footprintID string) (verifiedPadTemplateRecord, bool) {
-	switch strings.TrimSpace(footprintID) {
+	footprintID = strings.TrimSpace(footprintID)
+	const pinHeaderPrefix = "Connector_PinHeader_2.54mm:PinHeader_1x"
+	const pinHeaderSuffix = "_P2.54mm_Vertical"
+	if strings.HasPrefix(footprintID, pinHeaderPrefix) && strings.HasSuffix(footprintID, pinHeaderSuffix) {
+		countText := strings.TrimSuffix(strings.TrimPrefix(footprintID, pinHeaderPrefix), pinHeaderSuffix)
+		if count, err := strconv.Atoi(countText); err == nil && count > 0 {
+			return pinHeaderTemplate(count), true
+		}
+	}
+	switch footprintID {
 	case "Resistor_SMD:R_0603_1608Metric":
 		return twoPadTemplate(1.6, 0.8, 0.6, 0.6, 1.0), true
 	case "Resistor_SMD:R_0805_2012Metric",
@@ -214,6 +223,26 @@ func verifiedPadTemplate(footprintID string) (verifiedPadTemplateRecord, bool) {
 		return usbCGCTUSB4125PowerOnlyTemplate(), true
 	case "Connector_USB:USB_C_Receptacle_HRO_TYPE-C-31-M-12":
 		return usbCHROTypeC31M12Template(), true
+	case "RF_Module:ESP32-WROOM-32E":
+		return esp32WROOM32ETemplate(), true
+	case "Button_Switch_SMD:SW_SPST_SKQG_WithStem":
+		return verifiedPadTemplateRecord{
+			Bounds: centeredEstimatedBounds(8.0, 6.2),
+			Pads: []placement.PadSummary{
+				{Name: "1", XMM: -3.1, YMM: -1.85, WidthMM: 1.8, HeightMM: 1.1},
+				{Name: "1", XMM: 3.1, YMM: -1.85, WidthMM: 1.8, HeightMM: 1.1},
+				{Name: "2", XMM: -3.1, YMM: 1.85, WidthMM: 1.8, HeightMM: 1.1},
+				{Name: "2", XMM: 3.1, YMM: 1.85, WidthMM: 1.8, HeightMM: 1.1},
+			},
+		}, true
+	case "Button_Switch_SMD:SW_SPST_B3U-1000P":
+		return verifiedPadTemplateRecord{
+			Bounds: centeredEstimatedBounds(4.3, 3.2),
+			Pads: []placement.PadSummary{
+				{Name: "1", XMM: -1.7, WidthMM: 0.9, HeightMM: 1.7},
+				{Name: "2", XMM: 1.7, WidthMM: 0.9, HeightMM: 1.7},
+			},
+		}, true
 	case "Package_TO_SOT_SMD:SOT-23-5":
 		return verifiedPadTemplateRecord{
 			Bounds: centeredEstimatedBounds(3.7, 3.0),
@@ -256,16 +285,6 @@ func verifiedPadTemplate(footprintID string) (verifiedPadTemplateRecord, bool) {
 			{Name: "8", XMM: -0.975, YMM: 0.8, WidthMM: 0.35, HeightMM: 0.5},
 		}
 		return verifiedPadTemplateRecord{Bounds: padEnvelopeBounds(pads, 2.0, 2.5), Pads: pads}, true
-	case "Connector_PinHeader_2.54mm:PinHeader_1x01_P2.54mm_Vertical":
-		return pinHeaderTemplate(1), true
-	case "Connector_PinHeader_2.54mm:PinHeader_1x02_P2.54mm_Vertical":
-		return pinHeaderTemplate(2), true
-	case "Connector_PinHeader_2.54mm:PinHeader_1x03_P2.54mm_Vertical":
-		return pinHeaderTemplate(3), true
-	case "Connector_PinHeader_2.54mm:PinHeader_1x04_P2.54mm_Vertical":
-		return pinHeaderTemplate(4), true
-	case "Connector_PinHeader_2.54mm:PinHeader_1x05_P2.54mm_Vertical":
-		return pinHeaderTemplate(5), true
 	case "TestPoint:TestPoint_Pad_D1.0mm":
 		return verifiedPadTemplateRecord{
 			Bounds: centeredEstimatedBounds(1.6, 1.6),
@@ -276,6 +295,21 @@ func verifiedPadTemplate(footprintID string) (verifiedPadTemplateRecord, bool) {
 	default:
 		return verifiedPadTemplateRecord{}, false
 	}
+}
+
+func esp32WROOM32ETemplate() verifiedPadTemplateRecord {
+	pads := make([]placement.PadSummary, 0, 39)
+	for number := 1; number <= 14; number++ {
+		pads = append(pads, placement.PadSummary{Name: strconv.Itoa(number), XMM: -8.75, YMM: -5.26 + float64(number-1)*1.27, WidthMM: 1.5, HeightMM: 0.9})
+	}
+	for number := 15; number <= 24; number++ {
+		pads = append(pads, placement.PadSummary{Name: strconv.Itoa(number), XMM: -5.715 + float64(number-15)*1.27, YMM: 12.5, WidthMM: 0.9, HeightMM: 1.5})
+	}
+	for number := 25; number <= 38; number++ {
+		pads = append(pads, placement.PadSummary{Name: strconv.Itoa(number), XMM: 8.75, YMM: 11.25 - float64(number-25)*1.27, WidthMM: 1.5, HeightMM: 0.9})
+	}
+	pads = append(pads, placement.PadSummary{Name: "39", XMM: -0.1, YMM: 2.46, WidthMM: 5.8, HeightMM: 5.8})
+	return verifiedPadTemplateRecord{Bounds: centeredEstimatedBounds(18.0, 25.5), Pads: pads}
 }
 
 func usbCHROTypeC31M12Template() verifiedPadTemplateRecord {
@@ -462,6 +496,15 @@ func assignPadNetsFromIndex(ref string, pads []placement.PadSummary, assignments
 
 func matchingPadIndexesForPin(padByName map[string][]int, pin string) []int {
 	normalizedPin := strings.ToUpper(strings.TrimSpace(pin))
+	members := groupedPinMembers(normalizedPin)
+	if len(members) > 1 {
+		matches := []int{}
+		for _, member := range members {
+			matches = append(matches, padByName[member]...)
+		}
+		sort.Ints(matches)
+		return matches
+	}
 	if normalizedPin != "SH" && normalizedPin != "SHIELD" {
 		return padByName[normalizedPin]
 	}
@@ -473,6 +516,31 @@ func matchingPadIndexesForPin(padByName map[string][]int, pin string) []int {
 	}
 	sort.Ints(matches)
 	return matches
+}
+
+func groupedPinMembers(pin string) []string {
+	pin = strings.ToUpper(strings.TrimSpace(pin))
+	if len(pin) < 3 || pin[0] != '[' || pin[len(pin)-1] != ']' {
+		if pin == "" {
+			return nil
+		}
+		return []string{pin}
+	}
+	parts := strings.Split(pin[1:len(pin)-1], ",")
+	members := make([]string, 0, len(parts))
+	seen := map[string]struct{}{}
+	for _, part := range parts {
+		part = strings.TrimSpace(part)
+		if part == "" {
+			continue
+		}
+		if _, exists := seen[part]; exists {
+			continue
+		}
+		seen[part] = struct{}{}
+		members = append(members, part)
+	}
+	return members
 }
 
 func isUSBShieldPadName(name string) bool {

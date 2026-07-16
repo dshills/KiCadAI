@@ -58,6 +58,7 @@ kicadai \
 | `usb_c_led_indicator_pass` | `pass` | Tracks a USB-C powered LED indicator generated from natural-language intent using `usb_c_power` plus `led_indicator`, project-local USB-C symbol export, verified USB4125 pad transfer, routed VBUS/GND connectivity, and clean required KiCad ERC/DRC evidence. |
 | `usb_c_led_indicator_protected` | `pass` | Tracks the protected USB-C LED variant with fuse, TVS, and bulk capacitance enabled. Its schematic layout is inferred from component roles and non-ground topology, with no hand-authored layout coordinates. The checked-in metadata promotes it through the optional KiCad-backed fixture lane; the latest reproduced run is documented below. |
 | `usb_c_i2c_sensor_3v3_protected` | `pass` | Tracks the medium-complexity protected USB-C, AMS1117, and I2C sensor composition with complete physical VCC_3v3 route-tree contact proof, clean strict KiCad ERC/DRC, writer correctness, and normalized round-trip evidence. |
+| `esp32_wroom_32e_minimal_pass` | `pass` | Tracks the exact ESP32-WROOM-32E-N4 minimal-system block with 3.3 V power conditioning, EN/BOOT straps and buttons, UART/I2C/SPI/GPIO headers, a hard all-copper antenna keepout, complete local/inter-block route contact proof, clean strict KiCad ERC/DRC, writer correctness, and zero normalized round-trip diffs. |
 | `class_ab_headphone_protected` | `expected_fail` | Tracks the protected Class AB headphone amplifier path with verified LMV321/op-amp and output transistor selections plus `headphone_output_protection`; schematic electrical validation, PCB realization, placement, endpoint binding, project write, and writer-correctness evidence now run. The current blocker is structural validation evidence for schematic label/connectivity issues and unrouted or partially routed PCB nets before KiCad ERC/DRC promotion. Fabrication promotion still also requires active output fault protection, speaker/bridge/power-amplifier load safety, LOAD_REF/GND net-tie evidence, promoted thermal/SOA evidence, and analog stability/layout proof. |
 | `opamp_headphone_buffer_kicad_candidate` | `expected_fail` | Tracks the draft op-amp headphone-buffer seed when promoted to fabrication-candidate requirements; current blockers are missing verified amplifier component evidence, migration to the protected Class AB headphone output path, active fault-protection proof, analog layout proof, and KiCad ERC/DRC promotion evidence. |
 
@@ -106,6 +107,24 @@ checked-in request opts into `auto_schematic_layout`; inference places the
 USB-C connector, fuse, indicator resistor, and LED in left-to-right power-flow
 order while keeping CC pull-downs, TVS protection, and bulk capacitance below
 and near their owning power stages.
+
+## ESP32-WROOM-32E Minimal-System Pass Evidence
+
+The exact ESP32-WROOM-32E-N4 profile is a checked-in KiCad-backed `pass`
+fixture. Reproduce its strict ERC, DRC, connectivity, writer, route-completion,
+and round-trip gates with:
+
+```sh
+KICADAI_KICAD_CLI=/path/to/kicad-cli \
+go test -v ./internal/designworkflow \
+  -run 'TestDesignExamplesOptionalKiCadBackedTier/esp32_wroom_32e_minimal_pass$' \
+  -count=1
+```
+
+The block uses the native `RF_Module:ESP32-WROOM-32E` symbol and footprint and
+the cataloged `ESP32-WROOM-32E-N4` identity. Support is intentionally exact;
+other ESP32 modules, package variants, flash sizes, RF layouts, and arbitrary
+GPIO remapping remain unsupported until separately cataloged and verified.
 
 ## Protected USB-C I2C 3.3 V Pass Evidence
 

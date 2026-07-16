@@ -30,6 +30,7 @@ func TestBuiltinRegistryListsInitialBlocksSorted(t *testing.T) {
 		"crystal_oscillator",
 		"dc_blocking_capacitor",
 		"esd_protection",
+		"esp32_wroom_32e_minimal",
 		"headphone_output_connector",
 		"headphone_output_protection",
 		"i2c_sensor",
@@ -131,14 +132,18 @@ func TestBuiltinPlaceholdersHaveMetadata(t *testing.T) {
 			"usb_c_power":                 true,
 			"voltage_regulator":           true,
 		}
-		if structuralBlocks[definition.ID] {
+		if definition.ID == "esp32_wroom_32e_minimal" {
+			if definition.Verification.Level != VerificationERCDRCVerified {
+				t.Fatalf("%s verification = %q", definition.ID, definition.Verification.Level)
+			}
+		} else if structuralBlocks[definition.ID] {
 			if definition.Verification.Level != VerificationStructural {
 				t.Fatalf("%s verification = %q", definition.ID, definition.Verification.Level)
 			}
 		} else if definition.Verification.Level != VerificationExperimental {
 			t.Fatalf("%s verification = %q", definition.ID, definition.Verification.Level)
 		}
-		if definition.Verification.Level.AllowsFabricationReadinessClaim() {
+		if definition.ID != "esp32_wroom_32e_minimal" && definition.Verification.Level.AllowsFabricationReadinessClaim() {
 			t.Errorf("%s unexpectedly allows fabrication readiness claims at level %q", definition.ID, definition.Verification.Level)
 		}
 		if issues := NewRegistry(nil).ValidateDefinition(definition); len(issues) != 0 {

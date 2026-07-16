@@ -714,7 +714,7 @@ func (builder *Builder) ConnectWithOptions(from, to Endpoint, netName string, op
 		builder.addSchematicWirePointsWithOptions(netName, from, to, options.Waypoints, options.SuppressBendLabels)
 	} else if options.UseLabels != nil {
 		builder.addSchematicWireWithOptions(netName, from, to, start, end, options.SuppressBendLabels)
-	} else if builder.schematicConnectionShouldUseDirectLabels(from, to) {
+	} else if builder.schematicConnectionShouldUseDirectLabels(from, to, start, end) {
 		if err := builder.AddLabel(netName, start, schematic.LabelLocal); err != nil {
 			return err
 		}
@@ -725,7 +725,13 @@ func (builder *Builder) ConnectWithOptions(from, to Endpoint, netName string, op
 		builder.addSchematicLabelStub(netName, from, start, builder.labelStubOffset(from, start, end))
 		builder.addSchematicLabelStub(netName, to, end, builder.labelStubOffset(to, end, start))
 	} else {
-		builder.addSchematicWire(netName, from, to, start, end)
+		points := builder.orthogonalSchematicWirePoints(start, end)
+		if builder.schematicPathTouchesForeignWire(netName, points) {
+			builder.addSchematicLabelStub(netName, from, start, builder.labelStubOffset(from, start, end))
+			builder.addSchematicLabelStub(netName, to, end, builder.labelStubOffset(to, end, start))
+		} else {
+			builder.addSchematicWirePoints(netName, from, to, points)
+		}
 	}
 	builder.syncPCBNets()
 	return nil
@@ -783,6 +789,18 @@ func (builder *Builder) schematicStubTouchesForeignWire(netName string, anchor, 
 			if existingNet == "" || existingNet != targetNet {
 				return true
 			}
+		}
+	}
+	return false
+}
+
+func (builder *Builder) schematicPathTouchesForeignWire(netName string, points []kicadfiles.Point) bool {
+	if builder == nil {
+		return false
+	}
+	for index := 1; index < len(points); index++ {
+		if builder.schematicStubTouchesForeignWire(netName, points[index-1], points[index]) {
+			return true
 		}
 	}
 	return false
@@ -868,8 +886,21 @@ func (builder *Builder) schematicSegmentTouchesForeignPinAnchor(netName string, 
 	return false
 }
 
-func (builder *Builder) schematicConnectionShouldUseDirectLabels(from, to Endpoint) bool {
-	return builder.endpointIsUSBCPowerOnlyCC(from) || builder.endpointIsUSBCPowerOnlyCC(to)
+func (builder *Builder) schematicConnectionShouldUseDirectLabels(from, to Endpoint, start, end kicadfiles.Point) bool {
+	if builder.endpointIsUSBCPowerOnlyCC(from) || builder.endpointIsUSBCPowerOnlyCC(to) {
+		return true
+	}
+	if start.Y != end.Y {
+		return false
+	}
+	fromOffset, fromOK := builder.pinAnchorOffset(from)
+	toOffset, toOK := builder.pinAnchorOffset(to)
+	// An aligned connection between two vertical pin anchors is clearer and
+	// more robust as a pair of same-net labels. A horizontal wire at the pin
+	// extremities can be interpreted by KiCad as an unattached wire for some
+	// otherwise valid embedded passive symbols, while labels bind directly to
+	// the authoritative physical anchors and survive round trips unchanged.
+	return fromOK && toOK && fromOffset.X == 0 && fromOffset.Y != 0 && toOffset.X == 0 && toOffset.Y != 0
 }
 
 func (builder *Builder) endpointIsUSBCPowerOnlyCC(endpoint Endpoint) bool {
@@ -1969,6 +2000,7 @@ func ensureResolverLocalSymbolLibraries(design *kicaddesign.Design, index *libra
 		libraryIDs = append(libraryIDs, libraryID)
 	}
 	sort.Strings(libraryIDs)
+	resolverNicknames := map[string]struct{}{}
 	for _, libraryID := range libraryIDs {
 		record, ok := libraryresolver.ResolveSymbolPtr(index, libraryID)
 		if !ok {
@@ -1983,6 +2015,32 @@ func ensureResolverLocalSymbolLibraries(design *kicaddesign.Design, index *libra
 		}
 		if nickname == "" {
 			return fmt.Errorf("resolver symbol %s has no library nickname", libraryID)
+		}
+		resolverNicknames[strings.ToLower(nickname)] = struct{}{}
+	}
+	// A project-local table entry shadows the global library with the same
+	// nickname. Materialize every symbol used from that nickname so resolving
+	// one native symbol cannot make its siblings disappear from the project.
+	for _, symbol := range design.Schematic.Symbols {
+		libraryID := strings.TrimSpace(symbol.LibraryID)
+		record, ok := libraryresolver.ResolveSymbolPtr(index, libraryID)
+		if !ok || strings.TrimSpace(record.Raw) == "" {
+			continue
+		}
+		nickname := strings.TrimSpace(record.LibraryNickname)
+		if nickname == "" {
+			nickname = libraryNickname(libraryID)
+		}
+		if _, shadowed := resolverNicknames[strings.ToLower(nickname)]; shadowed {
+			libraryIDs = appendUnique(libraryIDs, libraryID)
+		}
+	}
+	sort.Strings(libraryIDs)
+	for _, libraryID := range libraryIDs {
+		record, _ := libraryresolver.ResolveSymbolPtr(index, libraryID)
+		nickname := strings.TrimSpace(record.LibraryNickname)
+		if nickname == "" {
+			nickname = libraryNickname(libraryID)
 		}
 		nicknameKey := strings.ToLower(nickname)
 		if _, ok := rawByNickname[nicknameKey]; !ok {
@@ -2001,10 +2059,21 @@ func ensureResolverLocalSymbolLibraries(design *kicaddesign.Design, index *libra
 			return fmt.Errorf("invalid resolver symbol library nickname %q", nickname)
 		}
 		assetPath := "lib/kicadai_resolved_" + safeNickname + ".kicad_sym"
+		replaceGeneratedAsset := false
 		if existing, exists := seenLibraries[nicknameKey]; exists {
 			wantURI := "${KIPRJMOD}/" + assetPath
 			if strings.TrimSpace(existing.URI) != wantURI {
-				return fmt.Errorf("resolver symbol library %s conflicts with existing project table URI %q", nickname, existing.URI)
+				generatedAssetPath := "lib/kicadai_" + strings.ToLower(nickname) + ".kicad_sym"
+				generatedURI := "${KIPRJMOD}/" + generatedAssetPath
+				if strings.TrimSpace(existing.URI) != generatedURI {
+					return fmt.Errorf("resolver symbol library %s conflicts with existing project table URI %q", nickname, existing.URI)
+				}
+				// A resolver-backed sibling can be discovered after a bundled
+				// symbol already selected KiCadAI's generated library for this
+				// nickname. Upgrade that writer-owned asset in place so the table
+				// keeps a single deterministic source for every used sibling.
+				assetPath = generatedAssetPath
+				replaceGeneratedAsset = true
 			}
 		} else {
 			design.SymbolTables = append(design.SymbolTables, library.TableEntry{
@@ -2018,7 +2087,21 @@ func ensureResolverLocalSymbolLibraries(design *kicaddesign.Design, index *libra
 		assetKey := strings.ToLower(assetPath)
 		if existing, found := existingAssets[assetKey]; found {
 			if !bytes.Equal(existing, contents) {
-				return fmt.Errorf("resolver symbol library asset %s already exists with different contents", assetPath)
+				if !replaceGeneratedAsset {
+					return fmt.Errorf("resolver symbol library asset %s already exists with different contents", assetPath)
+				}
+				replaced := false
+				for index := range design.AssetFiles {
+					if strings.EqualFold(strings.TrimSpace(design.AssetFiles[index].Path), assetPath) {
+						design.AssetFiles[index].Contents = contents
+						replaced = true
+						break
+					}
+				}
+				if !replaced {
+					return fmt.Errorf("generated symbol library asset %s is indexed but missing", assetPath)
+				}
+				existingAssets[assetKey] = contents
 			}
 		} else {
 			design.AssetFiles = append(design.AssetFiles, kicaddesign.TextArtifact{Path: assetPath, Contents: contents})
@@ -2311,16 +2394,58 @@ func (builder *Builder) validatePadSpecs(reference string, state *symbolState, p
 		}
 		seen[name] = struct{}{}
 		netted := strings.TrimSpace(padSpec.Net) != ""
-		if _, ok := state.pins[name]; !ok && (netted || !allowUnmatchedUnconnected) {
+		if _, ok := symbolPinForPhysicalPad(state, name); !ok && (netted || !allowUnmatchedUnconnected) {
 			return fmt.Errorf("pad %s on %s does not match a symbol pin", name, reference)
 		}
 	}
 	for _, pin := range state.pinOrder {
+		members := groupedSymbolPinMembers(pin)
+		if len(members) > 1 {
+			for _, member := range members {
+				if _, ok := seen[member]; !ok {
+					return fmt.Errorf("footprint %s missing pad %s for grouped symbol pin %s", reference, member, pin)
+				}
+			}
+			continue
+		}
 		if _, ok := seen[pin]; !ok {
 			return fmt.Errorf("footprint %s missing pad for symbol pin %s", reference, pin)
 		}
 	}
 	return nil
+}
+
+func symbolPinForPhysicalPad(state *symbolState, pad string) (string, bool) {
+	pad = strings.TrimSpace(pad)
+	if state == nil || pad == "" {
+		return "", false
+	}
+	if _, ok := state.pins[pad]; ok {
+		return pad, true
+	}
+	for _, pin := range state.pinOrder {
+		for _, member := range groupedSymbolPinMembers(pin) {
+			if strings.EqualFold(member, pad) {
+				return pin, true
+			}
+		}
+	}
+	return "", false
+}
+
+func groupedSymbolPinMembers(pin string) []string {
+	pin = strings.TrimSpace(pin)
+	if len(pin) < 3 || pin[0] != '[' || pin[len(pin)-1] != ']' {
+		return []string{pin}
+	}
+	parts := strings.Split(pin[1:len(pin)-1], ",")
+	members := make([]string, 0, len(parts))
+	for _, part := range parts {
+		if part = strings.TrimSpace(part); part != "" {
+			members = append(members, part)
+		}
+	}
+	return members
 }
 
 func (builder *Builder) padFromSpec(reference string, occurrence int, spec PadSpec, defaultType string, footprintLayer kicadfiles.BoardLayer) (pcb.Pad, error) {

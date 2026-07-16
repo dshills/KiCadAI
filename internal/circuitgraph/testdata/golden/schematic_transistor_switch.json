@@ -5,7 +5,7 @@
     "name": "generic_transistor_switch",
     "title": "NPN Low-Side Switch",
     "description": "Catalog-only connector, base resistor, and NPN transistor switch graph.",
-    "seed": "8cc09b5440c7e997fc5e85ac9d156ca4b76f36a1cf01116ff1d3f39884ff1d1e",
+    "seed": "0d22452e5728a71d1651fb4867b760a15c618752dc8e1adcfb27bc8fe6358b7c",
     "paper": "A4"
   },
   "circuit": {
@@ -31,9 +31,9 @@
         ],
         "properties": {
           "KiCadAI Catalog": "checked-in",
-          "KiCadAI Catalog Hash": "5405275ac02e8815d76240c09e15d9924eaacd3951432dc3b04a4d743d067ce1",
+          "KiCadAI Catalog Hash": "75caa2aa82bf7f13904ef4042eda734da315c3221e6bed1c7b74b2cce7832665",
           "KiCadAI Component ID": "resistor.yageo.rc0805fr_074k7l.0805",
-          "KiCadAI Resolution Hash": "8cc09b5440c7e997fc5e85ac9d156ca4b76f36a1cf01116ff1d3f39884ff1d1e",
+          "KiCadAI Resolution Hash": "0d22452e5728a71d1651fb4867b760a15c618752dc8e1adcfb27bc8fe6358b7c",
           "KiCadAI Variant ID": "0805",
           "MPN": "RC0805FR-074K7L",
           "Manufacturer": "Yageo"
@@ -65,9 +65,9 @@
         ],
         "properties": {
           "KiCadAI Catalog": "checked-in",
-          "KiCadAI Catalog Hash": "5405275ac02e8815d76240c09e15d9924eaacd3951432dc3b04a4d743d067ce1",
+          "KiCadAI Catalog Hash": "75caa2aa82bf7f13904ef4042eda734da315c3221e6bed1c7b74b2cce7832665",
           "KiCadAI Component ID": "connector.pinheader.1x03.2_54mm",
-          "KiCadAI Resolution Hash": "8cc09b5440c7e997fc5e85ac9d156ca4b76f36a1cf01116ff1d3f39884ff1d1e",
+          "KiCadAI Resolution Hash": "0d22452e5728a71d1651fb4867b760a15c618752dc8e1adcfb27bc8fe6358b7c",
           "KiCadAI Variant ID": "vertical"
         }
       },
@@ -92,9 +92,9 @@
         ],
         "properties": {
           "KiCadAI Catalog": "checked-in",
-          "KiCadAI Catalog Hash": "5405275ac02e8815d76240c09e15d9924eaacd3951432dc3b04a4d743d067ce1",
+          "KiCadAI Catalog Hash": "75caa2aa82bf7f13904ef4042eda734da315c3221e6bed1c7b74b2cce7832665",
           "KiCadAI Component ID": "connector.pinheader.1x02.2_54mm",
-          "KiCadAI Resolution Hash": "8cc09b5440c7e997fc5e85ac9d156ca4b76f36a1cf01116ff1d3f39884ff1d1e",
+          "KiCadAI Resolution Hash": "0d22452e5728a71d1651fb4867b760a15c618752dc8e1adcfb27bc8fe6358b7c",
           "KiCadAI Variant ID": "vertical"
         }
       },
@@ -124,9 +124,9 @@
         ],
         "properties": {
           "KiCadAI Catalog": "checked-in",
-          "KiCadAI Catalog Hash": "5405275ac02e8815d76240c09e15d9924eaacd3951432dc3b04a4d743d067ce1",
+          "KiCadAI Catalog Hash": "75caa2aa82bf7f13904ef4042eda734da315c3221e6bed1c7b74b2cce7832665",
           "KiCadAI Component ID": "bjt.onsemi.mmbt3904.sot23",
-          "KiCadAI Resolution Hash": "8cc09b5440c7e997fc5e85ac9d156ca4b76f36a1cf01116ff1d3f39884ff1d1e",
+          "KiCadAI Resolution Hash": "0d22452e5728a71d1651fb4867b760a15c618752dc8e1adcfb27bc8fe6358b7c",
           "KiCadAI Variant ID": "sot23",
           "MPN": "MMBT3904LT1G",
           "Manufacturer": "onsemi"

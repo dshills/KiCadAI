@@ -100,7 +100,7 @@ func TestExistingCopperFromRouteOperationsIncludesSignalLocalRouteVias(t *testin
 	}
 }
 
-func TestMultiEndpointPowerRouteObstacleNets(t *testing.T) {
+func TestMultiEndpointGroundRouteObstacleNets(t *testing.T) {
 	candidates := []InterBlockRouteCandidate{
 		{NetName: "GND", Endpoints: make([]InterBlockRouteEndpoint, 3)},
 		{NetName: " VCC_MAIN ", Endpoints: make([]InterBlockRouteEndpoint, 4)},
@@ -109,12 +109,12 @@ func TestMultiEndpointPowerRouteObstacleNets(t *testing.T) {
 	}
 
 	nets := map[string]struct{}{}
-	addMultiEndpointPowerRouteObstacleNets(nets, candidates)
+	addMultiEndpointGroundRouteObstacleNets(nets, candidates)
 	if _, ok := nets["GND"]; !ok {
 		t.Fatal("multi-endpoint ground net was not selected")
 	}
-	if _, ok := nets["VCC_MAIN"]; !ok {
-		t.Fatal("multi-endpoint power net was not selected")
+	if _, ok := nets["VCC_MAIN"]; ok {
+		t.Fatal("multi-endpoint power net was selected for ground-only obstacle protection")
 	}
 	if _, ok := nets["GND_AUX"]; ok {
 		t.Fatal("two-endpoint ground net was selected")

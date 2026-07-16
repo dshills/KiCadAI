@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"kicadai/internal/intentplanner"
+	"kicadai/internal/reports"
 )
 
 func TestDraftExtractsI2CSensorBreakout(t *testing.T) {
@@ -59,6 +60,35 @@ func TestDraftExtractsMCUProgrammerClock(t *testing.T) {
 	}
 	if result.Request.Functions[2].Kind != "clock" || result.Request.Functions[2].Family != "crystal_oscillator" {
 		t.Fatalf("clock function = %#v", result.Request.Functions)
+	}
+}
+
+func TestDraftExtractsESP32Family(t *testing.T) {
+	result := Draft("ESP32 module with 3.3V power and I2C", Options{})
+	if len(result.Issues) != 0 {
+		t.Fatalf("issues = %#v", result.Issues)
+	}
+	if result.Request.Kind != intentplanner.IntentMCUMinimal {
+		t.Fatalf("kind = %q", result.Request.Kind)
+	}
+	if len(result.Request.Functions) == 0 || result.Request.Functions[0].Kind != "mcu" || result.Request.Functions[0].Family != "esp32" {
+		t.Fatalf("functions = %#v", result.Request.Functions)
+	}
+	plan := intentplanner.Plan(result.Request)
+	if reports.HasBlockingIssue(plan.Issues) {
+		t.Fatalf("plan issues = %#v", plan.Issues)
+	}
+	found := false
+	if plan.GeneratedRequest == nil {
+		t.Fatalf("missing generated request: %#v", plan)
+	}
+	for _, block := range plan.GeneratedRequest.Blocks {
+		if block.BlockID == "esp32_wroom_32e_minimal" {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("planned blocks = %#v", plan.GeneratedRequest.Blocks)
 	}
 }
 

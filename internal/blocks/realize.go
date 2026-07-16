@@ -256,6 +256,18 @@ func RealizeBlockPCB(definition BlockDefinition, output BlockOutput, opts PCBRea
 	anchorsByPort := realizedAnchorsByPort(result.EntryAnchors)
 	componentByRole := blockComponentByRole(definition.Components)
 	componentByRole = componentRolesWithEmittedPins(componentByRole, roleRefs, output.Operations)
+	for _, component := range definition.PCBRealization.Components {
+		if len(component.PhysicalPins) == 0 || !realizationWhenMatches(component.When, output.Instance.Params) {
+			continue
+		}
+		role := strings.TrimSpace(component.ComponentRole)
+		blockComponent, ok := componentByRole[role]
+		if !ok {
+			continue
+		}
+		blockComponent.Pins = append([]transactions.PinSpec(nil), component.PhysicalPins...)
+		componentByRole[role] = blockComponent
+	}
 	activeRouteIDs := map[string]struct{}{}
 	for _, route := range definition.PCBRealization.LocalRoutes {
 		if !realizationWhenMatches(route.When, output.Instance.Params) {
@@ -391,7 +403,7 @@ func routeEndpointFromEmittedPort(endpoint RouteEndpoint, netTemplate string, ou
 		}
 	}
 	for _, pin := range physicalPins {
-		if strings.EqualFold(strings.TrimSpace(endpoint.Pin), pin) {
+		if routePinNumbersEquivalent(endpoint.Pin, pin) {
 			return endpoint
 		}
 	}
@@ -399,6 +411,32 @@ func routeEndpointFromEmittedPort(endpoint RouteEndpoint, netTemplate string, ou
 		endpoint.Pin = physicalPins[0]
 	}
 	return endpoint
+}
+
+func routePinNumbersEquivalent(first string, second string) bool {
+	first = strings.TrimSpace(first)
+	second = strings.TrimSpace(second)
+	if strings.EqualFold(first, second) {
+		return true
+	}
+	contains := func(grouped string, member string) bool {
+		grouped = strings.TrimSpace(grouped)
+		member = strings.TrimSpace(member)
+		if member == "" || len(grouped) < 2 || grouped[0] != '[' || grouped[len(grouped)-1] != ']' {
+			return false
+		}
+		members := strings.TrimSpace(grouped[1 : len(grouped)-1])
+		if members == "" {
+			return false
+		}
+		for _, candidate := range strings.Split(members, ",") {
+			if strings.EqualFold(strings.TrimSpace(candidate), member) {
+				return true
+			}
+		}
+		return false
+	}
+	return contains(first, second) || contains(second, first)
 }
 
 func emittedEndpointOnInstanceNet(endpoint RouteEndpoint, ref string, netName string, operations []transactions.Operation) bool {

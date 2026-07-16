@@ -124,6 +124,8 @@ type BlockComponent struct {
 	SymbolID                 string                     `json:"symbol_id"`
 	FootprintID              string                     `json:"footprint_id,omitempty"`
 	Pins                     []transactions.PinSpec     `json:"pins,omitempty"`
+	PreferResolverSymbol     bool                       `json:"prefer_resolver_symbol,omitempty"`
+	SchematicOnly            bool                       `json:"schematic_only,omitempty"`
 	Properties               map[string]string          `json:"properties,omitempty"`
 	PinmapRequired           bool                       `json:"pinmap_required,omitempty"`
 	PlacementGroup           string                     `json:"placement_group,omitempty"`

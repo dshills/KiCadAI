@@ -1,0 +1,72 @@
+{
+  "id": "esp32_wroom_32e_minimal_default",
+  "block_id": "esp32_wroom_32e_minimal",
+  "description": "Reviewed ESP32-WROOM-32E-N4 module system with power bypass, EN timing, IO0 boot control, UART programming, deterministic peripheral roles, and antenna exclusion.",
+  "acceptance": "connectivity",
+  "request": {
+    "instance_id": "controller",
+    "params": {
+      "supply_voltage": "3.3V",
+      "bulk_capacitance": "10uF",
+      "decoupling_value": "100nF",
+      "enable_pullup_value": "10k",
+      "enable_capacitance": "1uF",
+      "boot_pullup_value": "10k"
+    }
+  },
+  "expected": {
+    "evidence_level": "schematic_verified",
+    "components": [
+      {"role": "module", "ref_prefix": "U", "symbol_id": "RF_Module:ESP32-WROOM-32E", "footprint_id": "RF_Module:ESP32-WROOM-32E", "value": "ESP32-WROOM-32E"},
+      {"role": "decoupling_capacitor", "ref_prefix": "C", "symbol_id": "Device:C", "footprint_id": "Capacitor_SMD:C_0805_2012Metric", "value": "100nF"},
+      {"role": "bulk_capacitor", "ref_prefix": "C", "symbol_id": "Device:C", "footprint_id": "Capacitor_SMD:C_0805_2012Metric", "value": "10uF"},
+      {"role": "enable_pullup", "ref_prefix": "R", "symbol_id": "Device:R", "footprint_id": "Resistor_SMD:R_0805_2012Metric", "value": "10k"},
+      {"role": "enable_capacitor", "ref_prefix": "C", "symbol_id": "Device:C", "footprint_id": "Capacitor_SMD:C_0805_2012Metric", "value": "1uF"},
+      {"role": "boot_pullup", "ref_prefix": "R", "symbol_id": "Device:R", "footprint_id": "Resistor_SMD:R_0805_2012Metric", "value": "10k"},
+      {"role": "reset_switch", "ref_prefix": "SW", "symbol_id": "Switch:SW_Push", "footprint_id": "Button_Switch_SMD:SW_SPST_B3U-1000P", "value": "RESET"},
+      {"role": "boot_switch", "ref_prefix": "SW", "symbol_id": "Switch:SW_Push", "footprint_id": "Button_Switch_SMD:SW_SPST_B3U-1000P", "value": "BOOT"},
+      {"role": "programming_header", "ref_prefix": "J", "symbol_id": "Connector_Generic:Conn_01x04", "footprint_id": "Connector_PinHeader_2.54mm:PinHeader_1x04_P2.54mm_Vertical", "value": "UART PROG"}
+    ],
+    "ports": [
+      {"name": "VCC", "direction": "power", "net": "controller_vcc"},
+      {"name": "GND", "direction": "power", "net": "controller_gnd"},
+      {"name": "GPIO", "direction": "bidirectional", "net": "controller_gpio"},
+      {"name": "SDA", "direction": "bidirectional", "net": "controller_sda"},
+      {"name": "SCL", "direction": "bidirectional", "net": "controller_scl"},
+      {"name": "MOSI", "direction": "output", "net": "controller_mosi"},
+      {"name": "MISO", "direction": "input", "net": "controller_miso"},
+      {"name": "SCK", "direction": "output", "net": "controller_sck"}
+    ],
+    "nets": [
+      {"name": "controller_vcc", "visibility": "power", "pins": [{"role": "module", "pin": "2"}, {"role": "decoupling_capacitor", "pin": "1"}, {"role": "bulk_capacitor", "pin": "1"}, {"role": "enable_pullup", "pin": "1"}, {"role": "boot_pullup", "pin": "1"}, {"role": "programming_header", "pin": "1"}]},
+      {"name": "controller_gnd", "visibility": "power", "pins": [{"role": "module", "pin": "[1,15,38,39]"}, {"role": "decoupling_capacitor", "pin": "2"}, {"role": "bulk_capacitor", "pin": "2"}, {"role": "enable_capacitor", "pin": "2"}, {"role": "reset_switch", "pin": "2"}, {"role": "boot_switch", "pin": "2"}, {"role": "programming_header", "pin": "2"}]},
+      {"name": "controller_enable", "visibility": "local", "pins": [{"role": "module", "pin": "3"}, {"role": "enable_pullup", "pin": "2"}, {"role": "enable_capacitor", "pin": "1"}, {"role": "reset_switch", "pin": "1"}]},
+      {"name": "controller_boot", "visibility": "local", "pins": [{"role": "module", "pin": "25"}, {"role": "boot_pullup", "pin": "2"}, {"role": "boot_switch", "pin": "1"}]},
+      {"name": "controller_gpio", "visibility": "exported", "pins": [{"role": "module", "pin": "28"}]},
+      {"name": "controller_sda", "visibility": "exported", "pins": [{"role": "module", "pin": "33"}]},
+      {"name": "controller_scl", "visibility": "exported", "pins": [{"role": "module", "pin": "36"}]},
+      {"name": "controller_mosi", "visibility": "exported", "pins": [{"role": "module", "pin": "37"}]},
+      {"name": "controller_miso", "visibility": "exported", "pins": [{"role": "module", "pin": "31"}]},
+      {"name": "controller_sck", "visibility": "exported", "pins": [{"role": "module", "pin": "30"}]},
+      {"name": "controller_uart_rx", "visibility": "local", "pins": [{"role": "module", "pin": "34"}, {"role": "programming_header", "pin": "3"}]},
+      {"name": "controller_uart_tx", "visibility": "local", "pins": [{"role": "module", "pin": "35"}, {"role": "programming_header", "pin": "4"}]}
+    ],
+    "pcb": {
+      "placements": [
+        {"role": "module", "footprint_id": "RF_Module:ESP32-WROOM-32E"},
+        {"role": "decoupling_capacitor", "footprint_id": "Capacitor_SMD:C_0805_2012Metric"},
+        {"role": "bulk_capacitor", "footprint_id": "Capacitor_SMD:C_0805_2012Metric"},
+        {"role": "enable_pullup", "footprint_id": "Resistor_SMD:R_0805_2012Metric"},
+        {"role": "enable_capacitor", "footprint_id": "Capacitor_SMD:C_0805_2012Metric"},
+        {"role": "boot_pullup", "footprint_id": "Resistor_SMD:R_0805_2012Metric"},
+        {"role": "reset_switch", "footprint_id": "Button_Switch_SMD:SW_SPST_B3U-1000P"},
+        {"role": "boot_switch", "footprint_id": "Button_Switch_SMD:SW_SPST_B3U-1000P"},
+        {"role": "programming_header", "footprint_id": "Connector_PinHeader_2.54mm:PinHeader_1x04_P2.54mm_Vertical"}
+      ],
+      "required_local_routes": ["vcc_bypass", "vcc_bulk", "vcc_enable", "vcc_boot", "vcc_programming", "gnd_bypass", "gnd_bulk", "gnd_enable", "gnd_reset", "gnd_module_left_to_exposed", "gnd_module_bottom_to_exposed", "gnd_module_right_to_exposed", "gnd_boot", "gnd_programming", "enable_pullup", "enable_capacitor", "enable_reset", "boot_pullup", "boot_switch", "uart_rx_programming", "uart_tx_programming"],
+      "require_realization": true,
+      "allow_unrouted": true
+    },
+    "erc_drc": {"runner": "optional"}
+  }
+}

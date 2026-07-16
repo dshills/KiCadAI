@@ -72,6 +72,15 @@ The generic contract is deliberately strict. It expands topology expression,
 but does not bypass catalog, pinmap, placement, routing, ERC/DRC, writer, or
 round-trip gates.
 
+An exact block-composition lane now supports `ESP32-WROOM-32E-N4` through the
+built-in `esp32_wroom_32e_minimal` block. It emits the module, local power
+conditioning, EN/BOOT networks and buttons, UART and peripheral headers, and a
+hard antenna copper keepout. Its checked-in fixture reaches KiCad-backed
+`pass` with clean strict ERC/DRC, complete route/contact evidence, writer
+correctness, and zero normalized schematic/PCB round-trip diffs. This is not
+yet general ESP32-family support: alternate modules, SoCs, flash variants,
+pin assignments, and RF layouts fail closed unless explicitly cataloged.
+
 ### Schematic Readability
 
 Generated schematics use deterministic role, stage, and lane classification;

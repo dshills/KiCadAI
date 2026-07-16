@@ -179,19 +179,17 @@ func RoutePlacement(ctx context.Context, request Request, fragments PCBFragmentR
 	}
 	selectiveLocalRouteObstacles := []routing.ExistingCopper(nil)
 	selectiveLocalRouteObstacleNets := map[string]struct{}{}
-	if localRouteConnectivity.IssueCount == 0 && !normalized.Constraints.TreatLocalPowerRoutesAsObstacles {
-		addMultiEndpointPowerRouteObstacleNets(selectiveLocalRouteObstacleNets, interBlockCandidates)
+	if localRouteConnectivity.IssueCount == 0 {
+		addMultiEndpointGroundRouteObstacleNets(selectiveLocalRouteObstacleNets, interBlockCandidates)
 		for _, netName := range normalized.Constraints.LocalRouteObstacleNets {
 			selectiveLocalRouteObstacleNets[strings.TrimSpace(netName)] = struct{}{}
 		}
 		if len(selectiveLocalRouteObstacleNets) != 0 {
-			if len(normalized.Constraints.LocalRouteObstacleNets) != 0 {
-				// Explicit selective nets opt into every local route as an obstacle.
-				selectiveLocalRouteObstacles = existingCopperFromAllRouteOperations(localOperations, routeBranchDefaultLayer(routingRequest.Board), routingRequest.Rules)
-			} else {
-				// Automatic power protection only needs fixed power and configuration copper.
-				selectiveLocalRouteObstacles = existingCopperFromRouteOperations(localOperations, routeBranchDefaultLayer(routingRequest.Board), routingRequest.Rules)
-			}
+			// Explicit selective nets and automatic multi-endpoint ground trees
+			// route after block-local copper is committed, so they must avoid every
+			// foreign-net local trace. Existing copper keeps its net identity,
+			// preserving legal same-net merges.
+			selectiveLocalRouteObstacles = existingCopperFromAllRouteOperations(localOperations, routeBranchDefaultLayer(routingRequest.Board), routingRequest.Rules)
 		}
 	}
 	targetEvidence := BuildInterBlockContactTargets(interBlockCandidates, &placed)
@@ -260,14 +258,14 @@ func RoutePlacement(ctx context.Context, request Request, fragments PCBFragmentR
 	return RoutingStageResult{Request: routingRequest, Result: result, Operations: operations, Stage: stage}
 }
 
-func addMultiEndpointPowerRouteObstacleNets(nets map[string]struct{}, candidates []InterBlockRouteCandidate) {
+func addMultiEndpointGroundRouteObstacleNets(nets map[string]struct{}, candidates []InterBlockRouteCandidate) {
 	for _, candidate := range candidates {
 		if len(candidate.Endpoints) < 3 {
 			continue
 		}
 		netName := strings.TrimSpace(candidate.NetName)
 		switch netRoleFromName(netName) {
-		case placement.NetPower, placement.NetGround:
+		case placement.NetGround:
 			nets[netName] = struct{}{}
 		}
 	}
@@ -1365,15 +1363,15 @@ func placedLocalRoutePoints(points []transactions.Point, from transactions.Point
 	if len(points) < 3 {
 		return nil, false
 	}
+	if transformed, ok := transformedLocalRouteShape(points, from, to); ok {
+		return compactRoutePoints(transformed), true
+	}
 	if authoredRoutePointsNearPlacedEndpoints(points, from, to) {
 		routed := make([]transactions.Point, 0, len(points))
 		routed = append(routed, from)
 		routed = append(routed, points[1:len(points)-1]...)
 		routed = append(routed, to)
 		return compactRoutePoints(routed), true
-	}
-	if transformed, ok := transformedLocalRouteShape(points, from, to); ok {
-		return compactRoutePoints(transformed), true
 	}
 	return compactRoutePoints([]transactions.Point{from, to}), true
 }
@@ -1445,6 +1443,9 @@ func transformedLocalRouteShape(points []transactions.Point, from transactions.P
 	}
 	first := points[0]
 	last := points[len(points)-1]
+	if !authoredRoutePointsNearPlacedEndpoints(points, first, last) {
+		return nil, false
+	}
 	fromDelta := transactions.Point{XMM: from.XMM - first.XMM, YMM: from.YMM - first.YMM}
 	toDelta := transactions.Point{XMM: to.XMM - last.XMM, YMM: to.YMM - last.YMM}
 	if math.Hypot(fromDelta.XMM-toDelta.XMM, fromDelta.YMM-toDelta.YMM) > localRouteShapeEndpointDeltaMismatchMaxMM {

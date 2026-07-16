@@ -105,3 +105,17 @@ func TestValidateGroupsUsesEuclideanSpread(t *testing.T) {
 		t.Fatalf("ValidateGroups returned issues for 3-4-5 spread: %#v", issues)
 	}
 }
+
+func TestValidateGroupsAllowsOnePlacementGridOfSpreadTolerance(t *testing.T) {
+	req := twoComponentRequest()
+	req.Rules.GridMM = 0.5
+	req.Groups = []Group{{ID: "entry", Components: []string{"R1", "R2"}, MaxSpreadMM: 5}}
+	placements := []PlacementResult{
+		{Ref: "R1", Bounds: Rect{Min: Point{}, Max: Point{}}},
+		{Ref: "R2", Bounds: Rect{Min: Point{XMM: 5.4}, Max: Point{XMM: 5.4}}},
+	}
+
+	if issues := ValidateGroups(req, placements); len(issues) != 0 {
+		t.Fatalf("grid-tolerant spread issues = %#v", issues)
+	}
+}

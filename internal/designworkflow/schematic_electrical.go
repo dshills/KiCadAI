@@ -169,6 +169,11 @@ type schematicElectricalWireCandidate struct {
 	To      kicadfiles.Point
 }
 
+type schematicElectricalRoutedWire struct {
+	NetName string
+	Wire    schematic.Wire
+}
+
 func schematicElectricalAppendLabel(existing []schematic.Label, labels map[string]struct{}, netName string, point kicadfiles.Point) []schematic.Label {
 	labelKey := schematicElectricalLabelKey(netName, point)
 	if _, exists := labels[labelKey]; exists {
@@ -180,16 +185,30 @@ func schematicElectricalAppendLabel(existing []schematic.Label, labels map[strin
 
 func schematicElectricalSafeWires(candidates []schematicElectricalWireCandidate, labels []schematic.Label, obstacles []kicadfiles.Point) []schematic.Wire {
 	wires := make([]schematic.Wire, 0, len(candidates))
+	routed := make([]schematicElectricalRoutedWire, 0, len(candidates))
 	for _, candidate := range candidates {
-		wires = append(wires, schematicElectricalWireForCandidate(candidate, labels, obstacles))
+		wire, ok := schematicElectricalWireForCandidateWithExisting(candidate, labels, obstacles, routed)
+		if !ok {
+			// Named transaction connections already have labels at their endpoints.
+			// When no collision-free representative wire exists, keep that label
+			// connectivity instead of inventing a cross-net schematic short.
+			continue
+		}
+		wires = append(wires, wire)
+		routed = append(routed, schematicElectricalRoutedWire{NetName: candidate.NetName, Wire: wire})
 	}
 	return wires
 }
 
 func schematicElectricalWireForCandidate(candidate schematicElectricalWireCandidate, labels []schematic.Label, obstacles []kicadfiles.Point) schematic.Wire {
+	wire, _ := schematicElectricalWireForCandidateWithExisting(candidate, labels, obstacles, nil)
+	return wire
+}
+
+func schematicElectricalWireForCandidateWithExisting(candidate schematicElectricalWireCandidate, labels []schematic.Label, obstacles []kicadfiles.Point, existing []schematicElectricalRoutedWire) (schematic.Wire, bool) {
 	direct := []kicadfiles.Point{candidate.From, candidate.To}
-	if !schematicElectricalPolylineBlocked(candidate, direct, labels, obstacles) {
-		return schematic.Wire{Points: direct}
+	if !schematicElectricalPolylineBlocked(candidate, direct, labels, obstacles, existing) {
+		return schematic.Wire{Points: direct}, true
 	}
 	for _, offset := range []kicadfiles.IU{kicadfiles.MM(2.54), -kicadfiles.MM(2.54), kicadfiles.MM(5.08), -kicadfiles.MM(5.08), kicadfiles.MM(7.62), -kicadfiles.MM(7.62)} {
 		yDogleg := []kicadfiles.Point{
@@ -198,8 +217,8 @@ func schematicElectricalWireForCandidate(candidate schematicElectricalWireCandid
 			{X: candidate.To.X, Y: candidate.From.Y + offset},
 			candidate.To,
 		}
-		if !schematicElectricalPolylineBlocked(candidate, yDogleg, labels, obstacles) {
-			return schematic.Wire{Points: yDogleg}
+		if !schematicElectricalPolylineBlocked(candidate, yDogleg, labels, obstacles, existing) {
+			return schematic.Wire{Points: yDogleg}, true
 		}
 		xDogleg := []kicadfiles.Point{
 			candidate.From,
@@ -207,11 +226,11 @@ func schematicElectricalWireForCandidate(candidate schematicElectricalWireCandid
 			{X: candidate.From.X + offset, Y: candidate.To.Y},
 			candidate.To,
 		}
-		if !schematicElectricalPolylineBlocked(candidate, xDogleg, labels, obstacles) {
-			return schematic.Wire{Points: xDogleg}
+		if !schematicElectricalPolylineBlocked(candidate, xDogleg, labels, obstacles, existing) {
+			return schematic.Wire{Points: xDogleg}, true
 		}
 	}
-	return schematic.Wire{Points: direct}
+	return schematic.Wire{}, false
 }
 
 func schematicElectricalObstacles(file schematic.SchematicFile) []kicadfiles.Point {
@@ -231,9 +250,21 @@ func schematicElectricalObstacles(file schematic.SchematicFile) []kicadfiles.Poi
 	return obstacles
 }
 
-func schematicElectricalPolylineBlocked(candidate schematicElectricalWireCandidate, points []kicadfiles.Point, labels []schematic.Label, obstacles []kicadfiles.Point) bool {
+func schematicElectricalPolylineBlocked(candidate schematicElectricalWireCandidate, points []kicadfiles.Point, labels []schematic.Label, obstacles []kicadfiles.Point, existing []schematicElectricalRoutedWire) bool {
 	if schematicElectricalPolylineCrossesOtherNetLabel(candidate.NetName, points, labels) {
 		return true
+	}
+	for _, routed := range existing {
+		if routed.NetName == candidate.NetName {
+			continue
+		}
+		for candidateIndex := 1; candidateIndex < len(points); candidateIndex++ {
+			for routedIndex := 1; routedIndex < len(routed.Wire.Points); routedIndex++ {
+				if schematicElectricalSegmentsIntersect(points[candidateIndex-1], points[candidateIndex], routed.Wire.Points[routedIndex-1], routed.Wire.Points[routedIndex]) {
+					return true
+				}
+			}
+		}
 	}
 	for index := 1; index < len(points); index++ {
 		for _, obstacle := range obstacles {
@@ -246,6 +277,24 @@ func schematicElectricalPolylineBlocked(candidate schematicElectricalWireCandida
 		}
 	}
 	return false
+}
+
+func schematicElectricalSegmentsIntersect(a, b, c, d kicadfiles.Point) bool {
+	if schematicElectricalPointOnSegment(a, c, d) || schematicElectricalPointOnSegment(b, c, d) ||
+		schematicElectricalPointOnSegment(c, a, b) || schematicElectricalPointOnSegment(d, a, b) {
+		return true
+	}
+	abc := schematicElectricalOrientationSign(a, b, c)
+	abd := schematicElectricalOrientationSign(a, b, d)
+	cda := schematicElectricalOrientationSign(c, d, a)
+	cdb := schematicElectricalOrientationSign(c, d, b)
+	return ((abc > 0 && abd < 0) || (abc < 0 && abd > 0)) &&
+		((cda > 0 && cdb < 0) || (cda < 0 && cdb > 0))
+}
+
+func schematicElectricalOrientationSign(a, b, c kicadfiles.Point) int64 {
+	return (int64(b.X)-int64(a.X))*(int64(c.Y)-int64(a.Y)) -
+		(int64(b.Y)-int64(a.Y))*(int64(c.X)-int64(a.X))
 }
 
 func schematicElectricalPolylineCrossesOtherNetLabel(netName string, points []kicadfiles.Point, labels []schematic.Label) bool {

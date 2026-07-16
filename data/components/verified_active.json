@@ -559,6 +559,144 @@
       "verification": {"confidence": "verified", "sources": ["curated_part:Sensirion:SHT3x-DIS-v7", "builtin_pinmap:Sensor_Humidity:SHT31-DIS"], "pinmap_checked": true, "notes": ["Connectivity profile is limited to I2C mode at address 0x44 or 0x45."]}
     },
     {
+      "id": "switch.omron.b3u_1000p",
+      "family": "switch",
+      "name": "Omron B3U-1000P tactile switch",
+      "description": "Two-terminal normally-open SMD tactile switch with a one-pad-per-terminal KiCad land pattern.",
+      "generic": false,
+      "manufacturer": "Omron",
+      "mpn": "B3U-1000P",
+      "tags": ["switch", "tactile", "momentary", "normally_open", "smd"],
+      "symbols": [{
+        "symbol_id": "Switch:SW_Push",
+        "function_pins": [
+          {"function": "TERMINAL_1", "symbol_pin": "1", "electrical": "passive", "required": true},
+          {"function": "TERMINAL_2", "symbol_pin": "2", "electrical": "passive", "required": true}
+        ],
+        "verification": {"confidence": "verified", "sources": ["builtin_pinmap:Switch:SW_Push", "kicad-footprint:Button_Switch_SMD:SW_SPST_B3U-1000P"], "pinmap_checked": true}
+      }],
+      "packages": [{
+        "id": "smd_2pad",
+        "name": "B3U-1000P SMD",
+        "footprint_id": "Button_Switch_SMD:SW_SPST_B3U-1000P",
+        "package_type": "tactile_switch_smd_2pad",
+        "mpn": "B3U-1000P",
+        "pinmap_id": "Switch:SW_Push|Button_Switch_SMD:SW_SPST_B3U-1000P",
+        "pad_functions": [
+          {"function": "TERMINAL_1", "pad": "1"},
+          {"function": "TERMINAL_2", "pad": "2"}
+        ],
+        "verification": {"confidence": "verified", "sources": ["builtin_pinmap:Switch:SW_Push", "kicad-footprint:Button_Switch_SMD:SW_SPST_B3U-1000P"], "pinmap_checked": true}
+      }],
+      "verification": {"confidence": "verified", "sources": ["builtin_pinmap:Switch:SW_Push", "kicad-footprint:Button_Switch_SMD:SW_SPST_B3U-1000P"], "pinmap_checked": true, "notes": ["Exact procurement lifecycle and ratings remain a fabrication-time selection responsibility."]}
+    },
+    {
+      "id": "mcu.espressif.esp32_wroom_32e",
+      "family": "mcu",
+      "name": "Espressif ESP32-WROOM-32E-N4 module",
+      "description": "Concrete 4 MB flash ESP32-WROOM-32E module with reviewed power, boot-strap, UART, peripheral-role, land-pattern, and PCB-antenna constraints.",
+      "generic": false,
+      "manufacturer": "Espressif Systems",
+      "mpn": "ESP32-WROOM-32E-N4",
+      "lifecycle": "active",
+      "tags": ["mcu", "esp32", "wifi", "bluetooth", "module", "4mb_flash", "pcb_antenna", "minimal_system"],
+      "ratings": [
+        {"kind": "supply_voltage", "min": "3.0", "typ": "3.3", "max": "3.6", "unit": "V"},
+        {"kind": "supply_current_minimum", "min": "0.5", "unit": "A"}
+      ],
+      "temperature": {"min": "-40", "max": "85", "unit": "C"},
+      "companions": [
+        {"id": "esp32.power_bypass", "family": "capacitor", "role": "decoupling_capacitor", "required": true, "description": "Place local high-frequency bypass capacitance at module pin 2."},
+        {"id": "esp32.power_bulk", "family": "capacitor", "role": "bulk_capacitor", "required": true, "description": "Provide local bulk energy storage for radio current transients."},
+        {"id": "esp32.enable_rc", "family": "resistor", "role": "enable_pullup", "required": true, "description": "EN requires the reviewed 10 kΩ pull-up and 1 µF delay capacitor."},
+        {"id": "esp32.boot_pullup", "family": "resistor", "role": "boot_pullup", "required": true, "description": "GPIO0 requires a normal-boot pull-up and a controlled download-mode path."},
+        {"id": "esp32.uart_programming", "family": "connector", "role": "programming_header", "required": true, "description": "Expose 3.3 V, GND, U0RXD, and U0TXD for firmware loading."}
+      ],
+      "selection_rules": [
+        {"kind": "fixed_peripheral_map", "expression": "I2C_SDA=GPIO21;I2C_SCL=GPIO22;SPI_MOSI=GPIO23;SPI_MISO=GPIO19;SPI_SCK=GPIO18;GPIO=GPIO17", "description": "Deterministic default roles use non-flash pins and avoid boot straps."},
+        {"kind": "input_only", "expression": "GPIO34,GPIO35,SENSOR_VP,SENSOR_VN", "description": "These module pins cannot be assigned output roles."},
+        {"kind": "strapping", "expression": "GPIO0,GPIO2,GPIO5,GPIO12,GPIO15", "description": "Loads on these pins must preserve the reviewed reset-time strap levels."},
+        {"kind": "flash_reserved", "expression": "GPIO6..GPIO11 not exposed", "description": "Integrated-flash signals are unavailable to the generated design."}
+      ],
+      "symbols": [{
+        "symbol_id": "RF_Module:ESP32-WROOM-32E",
+        "function_pins": [
+          {"function": "GND", "symbol_pin": "1", "electrical": "power_in", "required": true},
+          {"function": "VDD", "symbol_pin": "2", "electrical": "power_in", "required": true, "aliases": ["3V3"]},
+          {"function": "EN", "symbol_pin": "3", "electrical": "input", "required": true, "aliases": ["CHIP_PU"]},
+          {"function": "SENSOR_VP", "symbol_pin": "4", "electrical": "input"},
+          {"function": "SENSOR_VN", "symbol_pin": "5", "electrical": "input"},
+          {"function": "GPIO34", "symbol_pin": "6", "electrical": "input"},
+          {"function": "GPIO35", "symbol_pin": "7", "electrical": "input"},
+          {"function": "GPIO32", "symbol_pin": "8", "electrical": "bidirectional"},
+          {"function": "GPIO33", "symbol_pin": "9", "electrical": "bidirectional"},
+          {"function": "GPIO25", "symbol_pin": "10", "electrical": "bidirectional"},
+          {"function": "GPIO26", "symbol_pin": "11", "electrical": "bidirectional"},
+          {"function": "GPIO27", "symbol_pin": "12", "electrical": "bidirectional", "aliases": ["GPIO"]},
+          {"function": "GPIO14", "symbol_pin": "13", "electrical": "bidirectional"},
+          {"function": "GPIO12", "symbol_pin": "14", "electrical": "bidirectional", "aliases": ["MTDI", "STRAP"]},
+          {"function": "GND", "symbol_pin": "15", "electrical": "power_in", "required": true},
+          {"function": "GPIO13", "symbol_pin": "16", "electrical": "bidirectional"},
+          {"function": "NC17", "symbol_pin": "17", "electrical": "no_connect"},
+          {"function": "NC18", "symbol_pin": "18", "electrical": "no_connect"},
+          {"function": "NC19", "symbol_pin": "19", "electrical": "no_connect"},
+          {"function": "NC20", "symbol_pin": "20", "electrical": "no_connect"},
+          {"function": "NC21", "symbol_pin": "21", "electrical": "no_connect"},
+          {"function": "NC22", "symbol_pin": "22", "electrical": "no_connect"},
+          {"function": "GPIO15", "symbol_pin": "23", "electrical": "bidirectional", "aliases": ["MTDO", "STRAP"]},
+          {"function": "GPIO2", "symbol_pin": "24", "electrical": "bidirectional", "aliases": ["STRAP"]},
+          {"function": "GPIO0", "symbol_pin": "25", "electrical": "bidirectional", "required": true, "aliases": ["BOOT", "STRAP"]},
+          {"function": "GPIO4", "symbol_pin": "26", "electrical": "bidirectional"},
+          {"function": "GPIO16", "symbol_pin": "27", "electrical": "bidirectional"},
+          {"function": "GPIO17", "symbol_pin": "28", "electrical": "bidirectional"},
+          {"function": "GPIO5", "symbol_pin": "29", "electrical": "bidirectional", "aliases": ["STRAP"]},
+          {"function": "GPIO18", "symbol_pin": "30", "electrical": "bidirectional", "aliases": ["SPI_SCK"]},
+          {"function": "GPIO19", "symbol_pin": "31", "electrical": "bidirectional", "aliases": ["SPI_MISO"]},
+          {"function": "NC32", "symbol_pin": "32", "electrical": "no_connect"},
+          {"function": "GPIO21", "symbol_pin": "33", "electrical": "bidirectional", "aliases": ["I2C_SDA"]},
+          {"function": "GPIO3", "symbol_pin": "34", "electrical": "bidirectional", "required": true, "aliases": ["U0RXD", "UART_RX"]},
+          {"function": "GPIO1", "symbol_pin": "35", "electrical": "bidirectional", "required": true, "aliases": ["U0TXD", "UART_TX"]},
+          {"function": "GPIO22", "symbol_pin": "36", "electrical": "bidirectional", "aliases": ["I2C_SCL"]},
+          {"function": "GPIO23", "symbol_pin": "37", "electrical": "bidirectional", "aliases": ["SPI_MOSI"]},
+          {"function": "GND", "symbol_pin": "38", "electrical": "power_in", "required": true},
+          {"function": "GND", "symbol_pin": "39", "electrical": "power_in", "required": true, "aliases": ["EXPOSED_PAD"]}
+        ],
+        "verification": {"confidence": "verified", "sources": ["kicad-symbols:RF_Module:ESP32-WROOM-32E", "datasheet:Espressif:ESP32-WROOM-32E-32UE:v2.0", "builtin_pinmap:RF_Module:ESP32-WROOM-32E"], "pinmap_checked": true}
+      }],
+      "packages": [{
+        "id": "module",
+        "name": "ESP32-WROOM-32E 18.0 x 25.5 mm PCB-antenna module",
+        "footprint_id": "RF_Module:ESP32-WROOM-32E",
+        "package_type": "esp32_wroom_32e_module",
+        "mpn": "ESP32-WROOM-32E-N4",
+        "lifecycle": "active",
+        "pinmap_id": "RF_Module:ESP32-WROOM-32E|RF_Module:ESP32-WROOM-32E",
+        "dimensions_mm": {"width": 18.0, "height": 25.5},
+        "height_mm": 3.1,
+        "constraints": [
+          {"kind": "antenna_keepout", "value": "48x21.44", "unit": "mm", "description": "KiCad footprint and block realization preserve the Espressif base-board antenna exclusion."},
+          {"kind": "board_edge", "description": "PCB antenna faces an unobstructed board edge."}
+        ],
+        "pad_functions": [
+          {"function": "GND", "pad": "1"}, {"function": "VDD", "pad": "2", "aliases": ["3V3"]}, {"function": "EN", "pad": "3", "aliases": ["CHIP_PU"]},
+          {"function": "SENSOR_VP", "pad": "4"}, {"function": "SENSOR_VN", "pad": "5"}, {"function": "GPIO34", "pad": "6"}, {"function": "GPIO35", "pad": "7"},
+          {"function": "GPIO32", "pad": "8"}, {"function": "GPIO33", "pad": "9"}, {"function": "GPIO25", "pad": "10"}, {"function": "GPIO26", "pad": "11"},
+          {"function": "GPIO27", "pad": "12", "aliases": ["GPIO"]}, {"function": "GPIO14", "pad": "13"}, {"function": "GPIO12", "pad": "14", "aliases": ["MTDI", "STRAP"]},
+          {"function": "GND", "pad": "15"}, {"function": "GPIO13", "pad": "16"}, {"function": "NC17", "pad": "17"}, {"function": "NC18", "pad": "18"},
+          {"function": "NC19", "pad": "19"}, {"function": "NC20", "pad": "20"}, {"function": "NC21", "pad": "21"}, {"function": "NC22", "pad": "22"},
+          {"function": "GPIO15", "pad": "23", "aliases": ["MTDO", "STRAP"]}, {"function": "GPIO2", "pad": "24", "aliases": ["STRAP"]},
+          {"function": "GPIO0", "pad": "25", "aliases": ["BOOT", "STRAP"]}, {"function": "GPIO4", "pad": "26"}, {"function": "GPIO16", "pad": "27"},
+          {"function": "GPIO17", "pad": "28"}, {"function": "GPIO5", "pad": "29", "aliases": ["STRAP"]}, {"function": "GPIO18", "pad": "30", "aliases": ["SPI_SCK"]},
+          {"function": "GPIO19", "pad": "31", "aliases": ["SPI_MISO"]}, {"function": "NC32", "pad": "32"}, {"function": "GPIO21", "pad": "33", "aliases": ["I2C_SDA"]},
+          {"function": "GPIO3", "pad": "34", "aliases": ["U0RXD", "UART_RX"]}, {"function": "GPIO1", "pad": "35", "aliases": ["U0TXD", "UART_TX"]},
+          {"function": "GPIO22", "pad": "36", "aliases": ["I2C_SCL"]}, {"function": "GPIO23", "pad": "37", "aliases": ["SPI_MOSI"]},
+          {"function": "GND", "pad": "38"}, {"function": "GND", "pad": "39", "aliases": ["EXPOSED_PAD"]}
+        ],
+        "verification": {"confidence": "verified", "sources": ["kicad-footprints:RF_Module:ESP32-WROOM-32E", "datasheet:Espressif:ESP32-WROOM-32E-32UE:v2.0"], "pinmap_checked": true}
+      }],
+      "verification": {"confidence": "verified", "sources": ["curated_part:Espressif:ESP32-WROOM-32E-N4", "datasheet:Espressif:ESP32-WROOM-32E-32UE:v2.0", "kicad-symbols:RF_Module:ESP32-WROOM-32E", "kicad-footprints:RF_Module:ESP32-WROOM-32E"], "resolver_checked": true, "pinmap_checked": true, "notes": ["Only the N4 PCB-antenna module and the encoded deterministic peripheral assignments are promoted; other ESP32 modules remain unsupported."]}
+    },
+    {
       "id": "mcu.microchip.atmega328p_a.tqfp32",
       "family": "mcu",
       "name": "Microchip ATmega328P-A TQFP-32",

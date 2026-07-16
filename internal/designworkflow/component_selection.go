@@ -114,6 +114,9 @@ func SelectWorkflowComponents(ctx context.Context, registry blocks.Registry, pla
 			if !blocks.ComponentActiveForParams(blockComponent, params) {
 				continue
 			}
+			if blockComponent.SchematicOnly {
+				continue
+			}
 			request, ok := blocks.SelectionRequestForComponentWithParams(blockComponent, acceptance, params)
 			if !ok {
 				issues = append(issues, reports.Issue{

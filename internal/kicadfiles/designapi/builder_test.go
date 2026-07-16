@@ -381,6 +381,43 @@ func TestBuilderConnectRejectsNonUniformDriftedWaypoints(t *testing.T) {
 	}
 }
 
+func TestBuilderConnectUsesLabelStubsInsteadOfCrossingForeignWire(t *testing.T) {
+	builder := newTestBuilder(t)
+	addTwoPinSymbol(t, builder, "R1", "Device:R", "1k", kicadfiles.Point{X: kicadfiles.MM(20.32), Y: kicadfiles.MM(20.32)})
+	addTwoPinSymbol(t, builder, "R2", "Device:R", "10k", kicadfiles.Point{X: kicadfiles.MM(40.64), Y: kicadfiles.MM(20.32)})
+	addTwoPinSymbol(t, builder, "R3", "Device:R", "2k", kicadfiles.Point{X: kicadfiles.MM(25.4), Y: kicadfiles.MM(10.16)})
+	addTwoPinSymbol(t, builder, "R4", "Device:R", "20k", kicadfiles.Point{X: kicadfiles.MM(35.56), Y: kicadfiles.MM(30.48)})
+
+	if err := builder.Connect(Endpoint{Reference: "R1", Pin: "2"}, Endpoint{Reference: "R2", Pin: "1"}, "NET_A"); err != nil {
+		t.Fatalf("connect first net: %v", err)
+	}
+	if err := builder.Connect(Endpoint{Reference: "R3", Pin: "2"}, Endpoint{Reference: "R4", Pin: "1"}, "NET_B"); err != nil {
+		t.Fatalf("connect crossing net: %v", err)
+	}
+
+	labels := 0
+	for _, label := range builder.design.Schematic.Labels {
+		if label.Text == "NET_B" {
+			labels++
+		}
+	}
+	if labels != 2 {
+		t.Fatalf("NET_B labels = %d, want two safe endpoint stubs; labels=%#v", labels, builder.design.Schematic.Labels)
+	}
+	for _, wire := range builder.design.Schematic.Wires {
+		if builder.canonicalNet(builder.schematicWireNets[wire.UUID]) != "NET_B" {
+			continue
+		}
+		if schematicSegmentsIntersect(
+			wire.Points[0], wire.Points[1],
+			kicadfiles.Point{X: kicadfiles.MM(25.4), Y: kicadfiles.MM(20.32)},
+			kicadfiles.Point{X: kicadfiles.MM(35.56), Y: kicadfiles.MM(20.32)},
+		) {
+			t.Fatalf("NET_B wire still crosses NET_A: %#v", wire.Points)
+		}
+	}
+}
+
 func TestBuilderConnectUsesExplicitLabelStubPositions(t *testing.T) {
 	builder := newTestBuilder(t)
 	addTwoPinSymbol(t, builder, "R1", "Device:R", "1k", kicadfiles.Point{X: kicadfiles.MM(20.32), Y: kicadfiles.MM(20.32)})
@@ -782,6 +819,25 @@ func TestBuilderRejectsNettedCustomPadWithoutSymbolPin(t *testing.T) {
 	}
 }
 
+func TestBuilderAcceptsPhysicalPadsForGroupedSymbolPin(t *testing.T) {
+	builder := newTestBuilder(t)
+	if _, err := builder.AddSymbol(SymbolOptions{
+		LibraryID: "RF_Module:Grouped",
+		Reference: "U1",
+		Value:     "Grouped",
+		Position:  kicadfiles.Point{X: kicadfiles.MM(20), Y: kicadfiles.MM(20)},
+		Pins:      []PinSpec{{Number: "[1,15,38,39]"}},
+	}); err != nil {
+		t.Fatalf("AddSymbol: %v", err)
+	}
+	if err := builder.AssignFootprint("U1", "RF_Module:Grouped"); err != nil {
+		t.Fatalf("AssignFootprint: %v", err)
+	}
+	if _, err := builder.PlaceFootprint("U1", PlaceFootprintOptions{Pads: []PadSpec{{Name: "1"}, {Name: "15"}, {Name: "38"}, {Name: "39"}}}); err != nil {
+		t.Fatalf("PlaceFootprint rejected grouped physical pads: %v", err)
+	}
+}
+
 func TestBuilderAllowsDuplicateCustomPadsForOneSymbolPin(t *testing.T) {
 	builder := newTestBuilder(t)
 	addTwoPinSymbol(t, builder, "R1", "Device:R", "1k", kicadfiles.Point{X: kicadfiles.MM(20), Y: kicadfiles.MM(20)})
@@ -1131,6 +1187,88 @@ func TestBuilderPreferredResolverBodyUsesResolverPinAnchors(t *testing.T) {
 	}
 }
 
+func TestBuilderResolverLibraryMaterializesUsedSiblingSymbols(t *testing.T) {
+	index := libraryresolver.LibraryIndex{Symbols: map[string]libraryresolver.SymbolRecord{
+		"Connector_Generic:Conn_01x04": {
+			LibraryID:       "Connector_Generic:Conn_01x04",
+			LibraryNickname: "Connector_Generic",
+			Raw:             `(symbol "Conn_01x04" (property "Value" "Conn_01x04"))`,
+		},
+		"Connector_Generic:Conn_01x06": {
+			LibraryID:       "Connector_Generic:Conn_01x06",
+			LibraryNickname: "Connector_Generic",
+			Raw:             `(symbol "Conn_01x06" (property "Value" "Conn_01x06"))`,
+		},
+	}}
+	builder, err := New(Options{Name: "resolver_siblings", DesignID: kicadfiles.UUID("12345678-1234-5678-9234-123456789abc"), LibraryIndex: &index})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for index, options := range []SymbolOptions{
+		{Reference: "J1", LibraryID: "Connector_Generic:Conn_01x04", Value: "UART", Pins: []PinSpec{{Number: "1"}}},
+		{Reference: "J2", LibraryID: "Connector_Generic:Conn_01x06", Value: "GPIO", Pins: []PinSpec{{Number: "1"}}, PreferResolverSymbol: true},
+	} {
+		options.Position = kicadfiles.Point{X: kicadfiles.MM(20 + float64(index)*20), Y: kicadfiles.MM(20)}
+		if _, err := builder.AddSymbol(options); err != nil {
+			t.Fatal(err)
+		}
+	}
+	result, err := builder.WriteSchematicProject(filepath.Join(t.TempDir(), "resolver_siblings"), kicaddesign.WriteOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	contents, err := os.ReadFile(filepath.Join(result.ProjectDir, "lib", "kicadai_resolved_Connector_Generic.kicad_sym"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{`"Conn_01x04"`, `"Conn_01x06"`} {
+		if !strings.Contains(string(contents), name) {
+			t.Fatalf("resolver library missing used sibling %s:\n%s", name, contents)
+		}
+	}
+}
+
+func TestBuilderResolverLibraryUpgradesWriterOwnedGeneratedSiblingLibrary(t *testing.T) {
+	index := libraryresolver.LibraryIndex{Symbols: map[string]libraryresolver.SymbolRecord{
+		"Connector_Generic:Conn_01x02": {
+			LibraryID:       "Connector_Generic:Conn_01x02",
+			LibraryNickname: "Connector_Generic",
+			Raw:             `(symbol "Conn_01x02" (property "Value" "Conn_01x02"))`,
+		},
+		"Connector_Generic:Conn_01x06": {
+			LibraryID:       "Connector_Generic:Conn_01x06",
+			LibraryNickname: "Connector_Generic",
+			Raw:             `(symbol "Conn_01x06" (property "Value" "Conn_01x06"))`,
+		},
+	}}
+	builder, err := New(Options{Name: "resolver_generated_siblings", DesignID: kicadfiles.UUID("12345678-1234-5678-9234-123456789abc"), LibraryIndex: &index})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for index, options := range []SymbolOptions{
+		{Reference: "J1", LibraryID: "Connector_Generic:Conn_01x02", Value: "POWER", Pins: []PinSpec{{Number: "1"}, {Number: "2"}}},
+		{Reference: "J2", LibraryID: "Connector_Generic:Conn_01x06", Value: "GPIO", Pins: []PinSpec{{Number: "1"}}, PreferResolverSymbol: true},
+	} {
+		options.Position = kicadfiles.Point{X: kicadfiles.MM(20 + float64(index)*20), Y: kicadfiles.MM(20)}
+		if _, err := builder.AddSymbol(options); err != nil {
+			t.Fatal(err)
+		}
+	}
+	result, err := builder.WriteSchematicProject(filepath.Join(t.TempDir(), "resolver_generated_siblings"), kicaddesign.WriteOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	contents, err := os.ReadFile(filepath.Join(result.ProjectDir, "lib", "kicadai_connector_generic.kicad_sym"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{`"Conn_01x02"`, `"Conn_01x06"`} {
+		if !strings.Contains(string(contents), name) {
+			t.Fatalf("upgraded writer-owned library missing used sibling %s:\n%s", name, contents)
+		}
+	}
+}
+
 func TestBuilderAddSymbolDerivesPinsFromEmbeddedTemplate(t *testing.T) {
 	builder := newTestBuilder(t)
 	if _, err := builder.AddSymbol(SymbolOptions{
@@ -1157,17 +1295,43 @@ func TestBuilderAddSymbolDerivesPinsFromEmbeddedTemplate(t *testing.T) {
 	if len(design.Schematic.Symbols[0].Pins) != 2 || len(design.Schematic.Symbols[1].Pins) != 2 {
 		t.Fatalf("template pins not rendered: %#v", design.Schematic.Symbols)
 	}
-	if len(design.Schematic.Wires) != 1 {
-		t.Fatalf("wires = %d, want one direct physical-pin wire", len(design.Schematic.Wires))
+	if len(design.Schematic.Wires) != 3 {
+		t.Fatalf("wires = %d, want orthogonal physical-pin connection", len(design.Schematic.Wires))
 	}
-	if len(design.Schematic.Labels) != 0 {
-		t.Fatalf("labels = %d, want no label for aligned direct pins", len(design.Schematic.Labels))
+	if len(design.Schematic.Labels) != 2 || design.Schematic.Labels[0].Text != "FILTER" || design.Schematic.Labels[1].Text != "FILTER" {
+		t.Fatalf("labels = %#v, want FILTER labels at the orthogonal bends", design.Schematic.Labels)
 	}
-	if len(design.Schematic.Junctions) != 0 {
-		t.Fatalf("junctions = %d, want no junction for a direct wire", len(design.Schematic.Junctions))
+	if len(design.Schematic.Junctions) != 2 {
+		t.Fatalf("junctions = %d, want junctions at both orthogonal bends", len(design.Schematic.Junctions))
 	}
 	assertSchematicPinNet(t, builder, Endpoint{Reference: "R1", Pin: "2"}, "FILTER")
 	assertSchematicPinNet(t, builder, Endpoint{Reference: "C1", Pin: "1"}, "FILTER")
+}
+
+func TestBuilderUsesDirectLabelsForAlignedVerticalPinAnchors(t *testing.T) {
+	builder := newTestBuilder(t)
+	for _, symbol := range []SymbolOptions{
+		{Reference: "C1", LibraryID: "Device:C", Value: "100n", Position: kicadfiles.Point{X: kicadfiles.MM(20), Y: kicadfiles.MM(20)}},
+		{Reference: "C2", LibraryID: "Device:C", Value: "10u", Position: kicadfiles.Point{X: kicadfiles.MM(35), Y: kicadfiles.MM(20)}},
+	} {
+		if _, err := builder.AddSymbol(symbol); err != nil {
+			t.Fatalf("AddSymbol %s returned error: %v", symbol.Reference, err)
+		}
+	}
+
+	if err := builder.Connect(Endpoint{Reference: "C1", Pin: "2"}, Endpoint{Reference: "C2", Pin: "2"}, "GND"); err != nil {
+		t.Fatalf("Connect returned error: %v", err)
+	}
+
+	design := builder.Design()
+	if len(design.Schematic.Wires) != 0 {
+		t.Fatalf("wires = %d, want aligned vertical pins connected by direct labels", len(design.Schematic.Wires))
+	}
+	if len(design.Schematic.Labels) != 2 || design.Schematic.Labels[0].Text != "GND" || design.Schematic.Labels[1].Text != "GND" {
+		t.Fatalf("labels = %#v, want GND labels on both physical pin anchors", design.Schematic.Labels)
+	}
+	assertSchematicPinNet(t, builder, Endpoint{Reference: "C1", Pin: "2"}, "GND")
+	assertSchematicPinNet(t, builder, Endpoint{Reference: "C2", Pin: "2"}, "GND")
 }
 
 func TestBuilderConn01x04Pin4UsesKiCadERCConnectionAnchor(t *testing.T) {

@@ -133,7 +133,10 @@ var embeddedSymbolTemplates = map[string]embeddedTemplate{
 			{Number: "SH", Offset: kicadfiles.Point{X: kicadfiles.MM(-7.62), Y: kicadfiles.MM(-20.32)}},
 		},
 	},
-	"device:c":           {bodyName: "C", pinType: "passive", pins: deviceCTemplatePins(), rawBody: rawDeviceCSymbol},
+	"device:c": {bodyName: "C", pinType: "passive", pins: deviceCTemplatePins(), rawBody: rawDeviceCSymbol, connectionPinOverride: map[string]kicadfiles.Point{
+		"1": {Y: kicadfiles.MM(-3.81)},
+		"2": {Y: kicadfiles.MM(3.81)},
+	}},
 	"device:c_polarized": {bodyName: "C_Polarized", pinType: "passive", pins: []TemplatePin{{Number: "1", Offset: kicadfiles.Point{Y: kicadfiles.MM(-5.08)}}, {Number: "2", Offset: kicadfiles.Point{Y: kicadfiles.MM(5.08)}}}},
 	"device:d":           {bodyName: "D", pinType: "passive", pins: twoPinTemplatePins()},
 	"device:d_tvs":       {bodyName: "D_TVS", pinType: "passive", pins: []TemplatePin{{Number: "1", Offset: kicadfiles.Point{X: kicadfiles.MM(-3.81)}}, {Number: "2", Offset: kicadfiles.Point{X: kicadfiles.MM(3.81)}}}, rawBody: rawDeviceDTVSSymbol},

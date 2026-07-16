@@ -39,6 +39,12 @@ func Create(ctx context.Context, request Request, opts CreateOptions) WorkflowRe
 	if opts.BlockRegistry == nil {
 		opts.BlockRegistry = blocks.NewBuiltinRegistry()
 	}
+	// A writer correctness index is also the authoritative source needed while
+	// materializing resolver-backed symbols. Keep project emission and readback
+	// on the same library snapshot when callers provide it through Writer.
+	if opts.LibraryIndex == nil && opts.Writer.HasLibraryIndex {
+		opts.LibraryIndex = &opts.Writer.LibraryIndex
+	}
 	normalized := NormalizeRequest(request)
 	if normalized.ExplicitCircuit != nil {
 		return createExplicitCircuit(ctx, normalized, opts)

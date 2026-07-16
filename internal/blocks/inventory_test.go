@@ -27,6 +27,7 @@ func TestBuiltinInventoryIncludesRoadmapFamilies(t *testing.T) {
 		"connector_breakout",
 		"crystal_oscillator",
 		"esd_protection",
+		"esp32_wroom_32e_minimal",
 		"headphone_output_connector",
 		"i2c_sensor",
 		"led_indicator",

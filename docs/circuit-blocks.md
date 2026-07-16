@@ -7,7 +7,8 @@ Reusable verified block workflows and block-library CLI behavior.
 The block library contains reusable schematic templates for LED indicators,
 connector breakouts, voltage regulators, I2C sensors, op-amp gain stages,
 USB-C power input, a minimal ATmega328P-A system, crystal and canned
-oscillators, reset/programming headers, 5 V ESD shunts, and series-diode
+oscillators, an exact ESP32-WROOM-32E-N4 minimal system,
+reset/programming headers, 5 V ESD shunts, and series-diode
 reverse-polarity input protection. Blocks can be listed, inspected, validated,
 instantiated, composed, and now realized as PCB fragments.
 
@@ -33,6 +34,18 @@ where the profile permits them. External ports and strap nets use local labels
 to avoid rail crossings through the sensor body. Unknown component IDs and
 mismatched symbol, footprint, address, or interrupt requests fail closed. SPI
 and inferred pin-role mappings remain unsupported.
+
+### Exact ESP32-WROOM-32E Profile
+
+`esp32_wroom_32e_minimal` supports the cataloged
+`ESP32-WROOM-32E-N4` module with the native
+`RF_Module:ESP32-WROOM-32E` symbol and footprint. The block emits 3.3 V bulk
+and ceramic decoupling, EN pull-up/capacitor/reset, GPIO0 boot strapping and
+button, UART and peripheral headers, deterministic local routes, and a hard
+all-copper antenna exclusion. Its checked-in design fixture has clean strict
+KiCad ERC/DRC, route/contact completion, writer correctness, and zero
+round-trip diffs. Requests for other ESP32 modules, package/flash variants,
+arbitrary pin remapping, or unverified RF layouts fail closed.
 
 Amplifier inventory is intentionally broader than the currently implemented
 amplifier blocks. The roadmap-backed family now names input buffer, gain stage,

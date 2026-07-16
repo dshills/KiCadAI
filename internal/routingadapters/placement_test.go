@@ -190,6 +190,24 @@ func TestRequestFromPlacementConvertsKeepouts(t *testing.T) {
 	}
 }
 
+func TestRequestFromPlacementExpandsAllCopperKeepoutLayer(t *testing.T) {
+	placementRequest := placementAdapterRequest()
+	placementRequest.Keepouts = []placement.Keepout{{
+		ID: "antenna", Bounds: placement.Rect{Min: placement.Point{XMM: 1, YMM: 2}, Max: placement.Point{XMM: 3, YMM: 4}}, Layers: []string{"*.Cu"},
+	}}
+
+	request, issues := RequestFromPlacement(placementRequest, placement.Result{Placements: []placement.PlacementResult{
+		{Ref: "J1", Position: placement.Placement{XMM: 5, YMM: 5, Layer: "F.Cu"}},
+		{Ref: "J2", Position: placement.Placement{XMM: 15, YMM: 5, Layer: "F.Cu"}},
+	}})
+	if len(issues) != 0 {
+		t.Fatalf("issues = %#v", issues)
+	}
+	if len(request.Obstacles) != 2 || request.Obstacles[0].Layer != "F.Cu" || request.Obstacles[1].Layer != "B.Cu" {
+		t.Fatalf("obstacles = %#v", request.Obstacles)
+	}
+}
+
 func TestRequestFromPlacementSkipsNonRoutingKeepouts(t *testing.T) {
 	blocksRoute := false
 	placementRequest := placementAdapterRequest()
