@@ -53,6 +53,8 @@ type placementRoutingRetryAttemptSummary struct {
 	RouteTreePartialGroups    int                 `json:"route_tree_partial_groups,omitempty"`
 	RouteTreeBlockedGroups    int                 `json:"route_tree_blocked_groups,omitempty"`
 	RouteTreeProvenEndpoints  int                 `json:"route_tree_proven_endpoints,omitempty"`
+	RouteTreeGraphComponents  int                 `json:"route_tree_graph_components,omitempty"`
+	RouteTreeIncompleteNets   []string            `json:"route_tree_incomplete_nets,omitempty"`
 	RouteTreeBranchesRouted   int                 `json:"route_tree_branches_routed,omitempty"`
 	RouteTreeContactMisses    int                 `json:"route_tree_contact_misses,omitempty"`
 	RouteTreeIssueCount       int                 `json:"route_tree_issue_count,omitempty"`
@@ -371,10 +373,13 @@ func placementRoutingAttemptSummaryForResult(attempt int, baseline *RoutingStage
 	treeSummary := retryRouteTreeSummary(routed.Stage)
 	contactSummary := retryInterBlockContactSummary(routed.Stage)
 	repairSummary := retryRouteTreeRepairSummary(routed.Stage)
+	contactGraph := retryRouteTreeContactGraphSummary(routed.Stage)
 	summary.RouteTreeCompleteGroups = routeSummary.CompleteGroups
 	summary.RouteTreePartialGroups = routeSummary.PartialGroups
 	summary.RouteTreeBlockedGroups = routeSummary.BlockedGroups
 	summary.RouteTreeProvenEndpoints = routeSummary.ProvenEndpoints
+	summary.RouteTreeGraphComponents = contactGraph.Components
+	summary.RouteTreeIncompleteNets = routeTreeIncompleteNets(contactGraph)
 	summary.RouteTreeBranchesRouted = treeSummary.BranchesRouted
 	summary.RouteTreeContactMisses = contactSummary.ContactMisses
 	summary.RouteTreeIssueCount = repairSummary.BranchFailures
@@ -511,6 +516,64 @@ func retryRouteTreeSummary(stage StageResult) InterBlockRouteTreeExecutionSummar
 	}
 }
 
+func retryRouteTreeContactGraphSummary(stage StageResult) RouteTreeContactGraphSummary {
+	value, ok := retrySummaryMapValue(stage, "route_tree_contact_graph")
+	if !ok {
+		return RouteTreeContactGraphSummary{}
+	}
+	if summary, ok := value.(RouteTreeContactGraphSummary); ok {
+		return summary
+	}
+	fields, ok := value.(map[string]any)
+	if !ok {
+		return RouteTreeContactGraphSummary{}
+	}
+	summary := RouteTreeContactGraphSummary{Components: intFromSummaryValue(fields["components"])}
+	for _, raw := range summarySliceValue(fields["groups"]) {
+		group, ok := raw.(map[string]any)
+		if !ok {
+			continue
+		}
+		name, _ := group["net_name"].(string)
+		status, _ := group["status"].(string)
+		if name == "" || status == "" {
+			continue
+		}
+		summary.Groups = append(summary.Groups, RouteTreeContactGraphGroupSummary{
+			NetName: name,
+			Status:  RouteTreeContactGraphGroupStatus(status),
+		})
+	}
+	return summary
+}
+
+func summarySliceValue(value any) []any {
+	switch values := value.(type) {
+	case []any:
+		return values
+	case []RouteTreeContactGraphGroupSummary:
+		out := make([]any, len(values))
+		for index := range values {
+			out[index] = values[index]
+		}
+		return out
+	default:
+		return nil
+	}
+}
+
+func routeTreeIncompleteNets(summary RouteTreeContactGraphSummary) []string {
+	var nets []string
+	for _, group := range summary.Groups {
+		if group.NetName == "" || group.Status == RouteTreeContactGraphGroupComplete {
+			continue
+		}
+		nets = append(nets, group.NetName)
+	}
+	slices.Sort(nets)
+	return slices.Compact(nets)
+}
+
 func retryInterBlockContactSummary(stage StageResult) InterBlockContactSummary {
 	value, ok := retrySummaryMapValue(stage, "inter_block_contacts")
 	if !ok {
@@ -588,6 +651,9 @@ func comparePlacementRoutingAttempts(candidate, current placementRoutingRetryAtt
 }
 
 func placementRoutingAttemptComparison(candidate, current placementRoutingRetryAttemptSummary, policy RoutingRetryPolicySpec) (int, string) {
+	if routeTreeRegressesCompleteNet(candidate.RouteTreeIncompleteNets, current.RouteTreeIncompleteNets) {
+		return -1, "regresses_route_tree_complete_net"
+	}
 	if policy.DRCPolicy == RetryDRCPolicyRequired {
 		candidateDRCOK := candidate.DRCBlockingCount == 0 && candidate.DRCStatus != retryEvidenceFail
 		currentDRCOK := current.DRCBlockingCount == 0 && current.DRCStatus != retryEvidenceFail
@@ -613,6 +679,12 @@ func placementRoutingAttemptComparison(candidate, current placementRoutingRetryA
 	if candidate.RouteTreeProvenEndpoints != current.RouteTreeProvenEndpoints {
 		return higherIsBetter(candidate.RouteTreeProvenEndpoints, current.RouteTreeProvenEndpoints), "more_route_tree_proven_endpoints"
 	}
+	if candidate.RouteTreeGraphComponents != current.RouteTreeGraphComponents {
+		return lowerIsBetter(candidate.RouteTreeGraphComponents, current.RouteTreeGraphComponents), "fewer_route_tree_graph_components"
+	}
+	if len(candidate.RouteTreeIncompleteNets) != len(current.RouteTreeIncompleteNets) {
+		return lowerIsBetter(len(candidate.RouteTreeIncompleteNets), len(current.RouteTreeIncompleteNets)), "fewer_route_tree_incomplete_nets"
+	}
 	if candidate.RouteTreeBranchesRouted != current.RouteTreeBranchesRouted {
 		return higherIsBetter(candidate.RouteTreeBranchesRouted, current.RouteTreeBranchesRouted), "more_route_tree_routed_branches"
 	}
@@ -635,6 +707,23 @@ func placementRoutingAttemptComparison(candidate, current placementRoutingRetryA
 		return compare, "higher_route_quality"
 	}
 	return lowerIsBetter(candidate.Attempt, current.Attempt), "best_ranked_attempt"
+}
+
+func routeTreeRegressesCompleteNet(candidateIncomplete []string, currentIncomplete []string) bool {
+	candidateSet := make(map[string]struct{}, len(candidateIncomplete))
+	for _, netName := range candidateIncomplete {
+		candidateSet[netName] = struct{}{}
+	}
+	currentSet := make(map[string]struct{}, len(currentIncomplete))
+	for _, netName := range currentIncomplete {
+		currentSet[netName] = struct{}{}
+	}
+	for netName := range candidateSet {
+		if _, alreadyIncomplete := currentSet[netName]; !alreadyIncomplete {
+			return true
+		}
+	}
+	return false
 }
 
 func compareRouteScoreWithPolicy(candidate float64, current float64, policy RoutingRetryPolicySpec) int {

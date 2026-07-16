@@ -88,6 +88,32 @@ func TestPlacementRoutingAttemptRankingRequiresCleanDRCWhenRequired(t *testing.T
 	}
 }
 
+func TestPlacementRoutingAttemptRankingRejectsRequiredNetRegression(t *testing.T) {
+	current := placementRoutingRetryAttemptSummary{
+		Attempt:                 1,
+		RouteTreeCompleteGroups: 4,
+		RouteTreeIncompleteNets: []string{"VCC_3v3"},
+	}
+	candidate := placementRoutingRetryAttemptSummary{
+		Attempt:                 2,
+		RouteTreeCompleteGroups: 4,
+		RouteTreeIncompleteNets: []string{"GND"},
+	}
+	if placementRoutingAttemptBetter(candidate, current, RoutingRetryPolicySpec{}) {
+		t.Fatalf("candidate that replaces incomplete VCC_3v3 with incomplete GND must not win")
+	}
+}
+
+func TestPlacementRoutingAttemptRankingPrefersFewerContactGraphComponents(t *testing.T) {
+	current := placementRoutingRetryAttemptSummary{Attempt: 1, RouteTreeCompleteGroups: 4, RouteTreeProvenEndpoints: 12, RouteTreeGraphComponents: 2, RouteTreeIncompleteNets: []string{"VCC_3v3"}}
+	candidate := current
+	candidate.Attempt = 2
+	candidate.RouteTreeGraphComponents = 1
+	if !placementRoutingAttemptBetter(candidate, current, RoutingRetryPolicySpec{}) {
+		t.Fatalf("candidate with fewer route-contact graph components should win")
+	}
+}
+
 func TestPlacementRoutingAttemptRankingUsesScoresAndAttemptTieBreak(t *testing.T) {
 	current := placementRoutingRetryAttemptSummary{Attempt: 1, RoutingStatus: routing.StatusPartial, RoutedNets: 2, RouteScore: 0.5, PlacementScore: 0.5}
 	candidate := placementRoutingRetryAttemptSummary{Attempt: 2, RoutingStatus: routing.StatusPartial, RoutedNets: 2, RouteScore: 0.7, PlacementScore: 0.5}
@@ -227,6 +253,13 @@ func TestRetrySummaryAccessorsDecodeJSONMaps(t *testing.T) {
 			"hint_count":          3,
 			"nets":                []any{"GND", "SDA"},
 		},
+		"route_tree_contact_graph": map[string]any{
+			"components": 3,
+			"groups": []any{
+				map[string]any{"net_name": "GND", "status": "complete"},
+				map[string]any{"net_name": "VCC", "status": "partial"},
+			},
+		},
 	}}
 
 	interBlock := retryInterBlockSummary(stage)
@@ -244,6 +277,10 @@ func TestRetrySummaryAccessorsDecodeJSONMaps(t *testing.T) {
 	repair := retryRouteTreeRepairSummary(stage)
 	if repair.BranchFailures != 4 || repair.RepairableFailures != 3 || repair.HintCount != 3 || len(repair.Nets) != 2 {
 		t.Fatalf("repair summary = %#v", repair)
+	}
+	graph := retryRouteTreeContactGraphSummary(stage)
+	if graph.Components != 3 || len(routeTreeIncompleteNets(graph)) != 1 || routeTreeIncompleteNets(graph)[0] != "VCC" {
+		t.Fatalf("contact graph summary = %#v", graph)
 	}
 }
 
