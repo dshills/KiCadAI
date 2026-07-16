@@ -3,6 +3,7 @@ package designworkflow
 import (
 	"fmt"
 	"slices"
+	"strconv"
 	"strings"
 
 	"kicadai/internal/reports"
@@ -148,7 +149,23 @@ func routeGroupEndpointKey(endpoint InterBlockRouteGroupEndpoint) string {
 }
 
 func normalizedRouteGroupEndpointKey(ref string, pin string) string {
-	return strings.ToUpper(strings.TrimSpace(ref)) + "." + strings.ToUpper(strings.TrimSpace(pin))
+	return strings.ToUpper(strings.TrimSpace(ref)) + "." + strings.ToUpper(logicalRoutingPadName(pin))
+}
+
+// logicalRoutingPadName folds the deterministic #N suffix used internally to
+// distinguish duplicate footprint-pad shapes back to KiCad's pad number. Pads
+// with the same number on one footprint are one logical electrical endpoint.
+func logicalRoutingPadName(pin string) string {
+	trimmed := strings.TrimSpace(pin)
+	base, suffix, ok := strings.Cut(trimmed, "#")
+	if !ok || strings.TrimSpace(base) == "" {
+		return trimmed
+	}
+	index, err := strconv.Atoi(suffix)
+	if err != nil || index < 2 {
+		return trimmed
+	}
+	return base
 }
 
 func sortInterBlockRouteGroup(group *InterBlockRouteGroup) {

@@ -82,6 +82,24 @@ func TestBuildInterBlockRouteGroupsDeduplicatesTargetsAndPreservesCandidateProve
 	}
 }
 
+func TestBuildInterBlockRouteGroupsCollapsesSyntheticDuplicatePadAliases(t *testing.T) {
+	groups, issues := BuildInterBlockRouteGroups([]InterBlockRouteCandidate{{
+		NetName: "VCC",
+		Status:  InterBlockRouteCandidateRoutable,
+		Endpoints: []InterBlockRouteEndpoint{
+			{Ref: "U1", Pin: "2"},
+			{Ref: "U1", Pin: "2#2"},
+			{Ref: "J1", Pin: "1"},
+		},
+	}})
+	if len(issues) != 0 || len(groups) != 1 {
+		t.Fatalf("groups=%#v issues=%#v", groups, issues)
+	}
+	if len(groups[0].RequiredEndpoints) != 2 || groups[0].ExpectedRequired != 2 {
+		t.Fatalf("group=%#v, want duplicate pad aliases counted once", groups[0])
+	}
+}
+
 func TestBuildInterBlockRouteGroupsReportsUnresolvedRequiredEndpoints(t *testing.T) {
 	groups, issues := BuildInterBlockRouteGroups([]InterBlockRouteCandidate{
 		{
