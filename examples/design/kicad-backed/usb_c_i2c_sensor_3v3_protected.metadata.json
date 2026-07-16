@@ -2,7 +2,7 @@
   "id": "usb_c_i2c_sensor_3v3_protected",
   "request": "usb_c_i2c_sensor_3v3_protected.json",
   "tier": "block-composition",
-  "readiness": "pass",
+  "readiness": "expected_fail",
   "acceptance": "erc-drc",
   "require_erc": true,
   "require_drc": true,
@@ -23,6 +23,10 @@
     "validation",
     "kicad_checks"
   ],
-  "known_gaps": [],
-  "notes": "Medium-complexity AI-generated KiCad-backed pass fixture combining USB-C power, protected 5 V input, an AMS1117 3.3 V regulator rail, I2C sensor, pull-ups, decoupling, and a header. It has clean required KiCad ERC/DRC, route-completion, writer-correctness, and zero-diff round-trip evidence for erc-drc acceptance. This pass does not claim fabrication readiness; AMS1117 manufacturer-specific ESR, effective-capacitance, and thermal review remain required for fabrication-candidate use."
+  "known_gaps": [
+    "Current deterministic generation blocks before project write because the VCC_3v3 route tree cannot complete all required contacts after placement.",
+    "The rail3v3 VOUT anchor has no resolved physical endpoint, and VCC_3v3 contacts for the I2C header and regulator remain in separate same-net route graph components.",
+    "KiCad ERC/DRC and normalized round-trip pass claims are not current evidence until the VCC_3v3 routing blocker is resolved and the fixture is rerun."
+  ],
+  "notes": "Medium-complexity protected USB-C I2C fixture retained as an expected-fail route-tree regression. It combines USB-C power, an AMS1117 3.3 V regulator rail, I2C sensor, pull-ups, decoupling, and a header. Fabrication-candidate work also requires manufacturer-specific AMS1117 ESR, effective-capacitance, and thermal review."
 }
