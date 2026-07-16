@@ -30,7 +30,10 @@ import (
 	"kicadai/internal/writercorrectness"
 )
 
-const designExamplePlanningTimeout = 15 * time.Second
+const (
+	designExamplePlanningTimeout       = 15 * time.Second
+	designExampleReadinessExpectedFail = "expected_fail"
+)
 
 type designExampleMetadata struct {
 	ID                string          `json:"id"`
@@ -55,10 +58,10 @@ var designExampleMetadataTiers = map[string]struct{}{
 }
 
 var designExampleMetadataReadiness = map[string]struct{}{
-	"candidate":     {},
-	"pass":          {},
-	"expected_fail": {},
-	"blocked":       {},
+	"candidate":                        {},
+	"pass":                             {},
+	designExampleReadinessExpectedFail: {},
+	"blocked":                          {},
 }
 
 var designExampleMetadataAcceptance = map[AcceptanceLevel]struct{}{
@@ -522,7 +525,7 @@ func TestI2CDesignExampleStructuralLaneReachesCandidate(t *testing.T) {
 		if !ok {
 			t.Fatalf("%s missing stage %q:\n%s", metadata.ID, stageName, formatDesignExampleRun(metadata, outputDir, result))
 		}
-		if stage.Status == StageStatusBlocked || stage.Status == StageStatusSkipped {
+		if stage.Status == StageStatusBlocked || (stage.Status == StageStatusSkipped && !designExampleStageMaySkipWithoutKiCad(stageName)) {
 			t.Fatalf("%s stage %q status = %q, want progressed candidate evidence:\n%s", metadata.ID, stageName, stage.Status, formatDesignExampleRun(metadata, outputDir, result))
 		}
 	}
@@ -787,8 +790,17 @@ func assertDesignExampleProtectedAmplifierEvidence(t *testing.T, metadata design
 			t.Fatalf("%s generated schematic is not readable for label/connectivity diagnostics: %v", metadata.ID, err)
 		}
 		connectivityReport := schematic.InspectGeneratedConnectivity(schematicFile)
-		if len(connectivityReport.FloatingLabels) != 0 || len(connectivityReport.OffGridObjects) != 0 || len(connectivityReport.DanglingWireEndpoints) != 0 {
+		// The expected failure is a specific dangling-endpoint diagnostic.
+		// Floating labels and off-grid objects remain unrelated readability regressions.
+		if len(connectivityReport.FloatingLabels) != 0 || len(connectivityReport.OffGridObjects) != 0 {
 			t.Fatalf("%s generated schematic label/connectivity diagnostics are not clean:\n%s", metadata.ID, formatGeneratedConnectivityDiagnostics(connectivityReport))
+		}
+		if metadata.Readiness == designExampleReadinessExpectedFail {
+			if len(connectivityReport.DanglingWireEndpoints) == 0 {
+				t.Fatalf("%s expected dangling schematic endpoint evidence:\n%s", metadata.ID, formatGeneratedConnectivityDiagnostics(connectivityReport))
+			}
+		} else if len(connectivityReport.DanglingWireEndpoints) != 0 {
+			t.Fatalf("%s generated schematic has dangling wire endpoints:\n%s", metadata.ID, formatGeneratedConnectivityDiagnostics(connectivityReport))
 		}
 	} else if errors.Is(err, os.ErrNotExist) {
 		projectWrite, ok := designExampleStageByName(result, StageProjectWrite)
@@ -1912,6 +1924,10 @@ func optionalDesignExampleMetadataFiles(t *testing.T, repoRoot string) []string 
 	}
 	sort.Strings(matches)
 	return matches
+}
+
+func designExampleStageMaySkipWithoutKiCad(stage StageName) bool {
+	return stage == StageKiCadChecks
 }
 
 func designExampleRequestPathForMetadata(metadataPath string, metadata designExampleMetadata) (string, error) {
