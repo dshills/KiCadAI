@@ -435,23 +435,30 @@ explicit prompt/profile as shown in the fixture commands above.
 
 `generic-circuit-v1` simulation requests select a KiCadAI-owned trusted model
 ID. Legacy analytic models bind named roles and bounded scalar inputs. The
-graph-derived MNA model instead accepts bounded DC/AC analyses, independent
-source conditions, and structured node assertions; topology is compiled only
-from resolved circuit connectivity and catalog evidence. The provider cannot
-supply topology classifications, equations, matrices, stamps, executable code,
-model files, include paths, commands, or expressions. Strict decoding and
+graph-derived linear MNA model accepts bounded DC/AC analyses. A distinct
+nonlinear workflow accepts bounded DC operating points for reviewed Shockley
+diode and NPN/PNP Ebers-Moll primitives. Both accept independent source
+conditions and structured node assertions; topology is compiled only from
+resolved circuit connectivity and catalog evidence. The provider cannot supply
+topology classifications, device parameters, equations, matrices, stamps,
+solver settings, executable code, model files, include paths, commands, or
+expressions. Strict decoding and
 registry validation reject unknown fields and unsupported or incompatible
 requests.
 
 The registry supports catalog-parameterized ideal fixed linear regulators,
 unloaded resistor-divider DC behavior, ideal first-order RC low-pass AC
-magnitude, and graph-derived linear MNA. Trusted MNA primitives cover resistors,
-capacitors, independent voltage/current sources, and a finite-gain single-pole
-op-amp with catalog supply/output limits. The deterministic
+magnitude, graph-derived linear MNA, and bounded nonlinear DC. Trusted MNA
+primitives cover resistors, capacitors, independent voltage/current sources, a
+finite-gain single-pole op-amp with catalog supply/output limits, reviewed
+signal diodes, and reviewed NPN/PNP small-signal BJTs. Nonlinear analysis uses a
+fixed source/gmin continuation schedule, bounded Newton iterations and voltage
+updates, bounded exponential evaluation, deterministic convergence evidence,
+and catalog-backed current/voltage operating limits. The deterministic
 `.kicadai/simulation.json` report records registry/catalog provenance, canonical
 topology hash and devices, every analysis point and solved node, assertions,
-and status. Singular, unstable, unsupported nonlinear, incompatible, and
-numerically unbounded systems fail closed. This remains functional evidence,
+and status. Singular, unstable, unsupported, nonconvergent, operating-limit,
+incompatible, and numerically unbounded systems fail closed. This remains functional evidence,
 not parasitic, thermal, tolerance, transient, or fabrication signoff.
 
 ## Generic Placement And Routing Correction

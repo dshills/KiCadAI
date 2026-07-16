@@ -151,7 +151,7 @@ func TestAIProviderOptionalKiCadPromotion(t *testing.T) {
 				if !promotion.MatchesExpectation {
 					t.Fatal("promotion does not match declared pass readiness")
 				}
-				if id == "generic_filtered_divider_hierarchy" || id == "generic_mna_buffered_two_pole" {
+				if id == "generic_filtered_divider_hierarchy" || id == "generic_mna_buffered_two_pole" || id == "generic_nonlinear_npn_bias" {
 					assertTrustedHierarchyReplay(t, output, cliPath, repoRoot, metadata, id)
 				}
 				return
@@ -181,18 +181,27 @@ func assertTrustedHierarchyReplay(t *testing.T, output, cliPath, repoRoot string
 	expectedModel := simmodel.ModelResistorDividerDCV1
 	if fixtureID == "generic_mna_buffered_two_pole" {
 		expectedModel = simmodel.ModelLinearCircuitMNAV1
+	} else if fixtureID == "generic_nonlinear_npn_bias" {
+		expectedModel = simmodel.ModelNonlinearCircuitDCV1
 	}
 	if simulation.Status != "pass" || simulation.ModelID != expectedModel || simulation.RegistryHash != simmodel.RegistryHash() || simulation.CatalogHash == "" {
 		t.Fatalf("trusted simulation evidence = %#v", simulation)
 	}
-	if expectedModel == simmodel.ModelLinearCircuitMNAV1 {
-		if simulation.TopologyHash == "" || len(simulation.Devices) < 7 || len(simulation.Analyses) != 2 || len(simulation.Assertions) < 4 {
+	if expectedModel == simmodel.ModelLinearCircuitMNAV1 || expectedModel == simmodel.ModelNonlinearCircuitDCV1 {
+		minimumDevices, expectedAnalyses := 7, 2
+		if expectedModel == simmodel.ModelNonlinearCircuitDCV1 {
+			minimumDevices, expectedAnalyses = 6, 1
+		}
+		if simulation.TopologyHash == "" || len(simulation.Devices) < minimumDevices || len(simulation.Analyses) != expectedAnalyses || len(simulation.Assertions) < 4 {
 			t.Fatalf("graph MNA evidence is incomplete: %#v", simulation)
 		}
 		for _, assertion := range simulation.Assertions {
 			if !assertion.Pass {
 				t.Fatalf("graph MNA assertion did not pass: %#v", assertion)
 			}
+		}
+		if expectedModel == simmodel.ModelNonlinearCircuitDCV1 && (len(simulation.Analyses) != 1 || len(simulation.Analyses[0].Points) != 1 || simulation.Analyses[0].Points[0].Solver == nil) {
+			t.Fatalf("nonlinear convergence evidence is incomplete: %#v", simulation)
 		}
 	}
 	files := generatedKiCadFiles(t, output)
@@ -202,7 +211,7 @@ func assertTrustedHierarchyReplay(t *testing.T, output, cliPath, repoRoot string
 			childCount++
 		}
 	}
-	if childCount < 2 {
+	if fixtureID != "generic_nonlinear_npn_bias" && childCount < 2 {
 		t.Fatalf("automatic hierarchy child count = %d, files=%v", childCount, files)
 	}
 	replayPath := filepath.Join(output, filepath.FromSlash(aiReplayArtifactRelativePath))
@@ -294,6 +303,7 @@ func aiPromotionFixtureIDs() []string {
 		"generic_lm358_buffered_signal_conditioner",
 		"generic_lmv321_ac_gain_stage",
 		"generic_mna_buffered_two_pole",
+		"generic_nonlinear_npn_bias",
 		"generic_rc_filter",
 		"generic_usb_c_bmp280_breakout",
 		"generic_usb_c_led_indicator_protected",

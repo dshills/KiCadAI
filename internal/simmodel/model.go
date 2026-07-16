@@ -8,12 +8,16 @@ const (
 	ModelResistorDividerDCV1    = "resistor_divider_dc_v1"
 	ModelRCLowpassACV1          = "rc_lowpass_ac_v1"
 	ModelLinearCircuitMNAV1     = "linear_circuit_mna_v1"
+	ModelNonlinearCircuitDCV1   = "nonlinear_circuit_dc_v1"
 
 	PrimitiveResistorV1      = "mna_resistor_v1"
 	PrimitiveCapacitorV1     = "mna_capacitor_v1"
 	PrimitiveVoltageSourceV1 = "mna_voltage_source_v1"
 	PrimitiveCurrentSourceV1 = "mna_current_source_v1"
 	PrimitiveOpAmpV1         = "mna_opamp_single_pole_v1"
+	PrimitiveDiodeShockleyV1 = "mna_diode_shockley_v1"
+	PrimitiveBJTNPNV1        = "mna_bjt_npn_ebers_moll_v1"
+	PrimitiveBJTPNPV1        = "mna_bjt_pnp_ebers_moll_v1"
 
 	AnalysisDCOperatingPoint = "dc_operating_point"
 	AnalysisACSweep          = "ac_sweep"
@@ -203,8 +207,19 @@ type NodeResult struct {
 }
 
 type AnalysisPoint struct {
-	FrequencyHz float64      `json:"frequency_hz,omitempty"`
-	Nodes       []NodeResult `json:"nodes"`
+	FrequencyHz float64         `json:"frequency_hz,omitempty"`
+	Nodes       []NodeResult    `json:"nodes"`
+	Solver      *SolverEvidence `json:"solver,omitempty"`
+}
+
+// SolverEvidence records bounded deterministic nonlinear work without
+// exposing or accepting solver controls in provider-authored intent.
+type SolverEvidence struct {
+	Method           string  `json:"method"`
+	Iterations       int     `json:"iterations"`
+	SourceStages     int     `json:"source_stages"`
+	FinalMaxUpdateV  float64 `json:"final_max_update_v"`
+	FinalMaxResidual float64 `json:"final_max_residual"`
 }
 
 type AnalysisResult struct {

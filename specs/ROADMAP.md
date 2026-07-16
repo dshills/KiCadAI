@@ -77,6 +77,13 @@ from validation feedback to safe automatic repair.
   diagnostics. A held-out automatic-hierarchy LMV321 conditioner passes clean
   ERC, strict DRC, routing/connectivity, writer correctness, zero root/child/PCB
   round-trip diffs, and byte-identical recorded replay.
+- Bounded catalog-backed nonlinear DC operating-point analysis with reviewed
+  Shockley diode and NPN/PNP Ebers-Moll primitives, unique claim-driven model
+  selection, fixed source/gmin continuation, bounded Newton work, actionable
+  convergence and operating-limit diagnostics, and deterministic solver
+  evidence. A held-out MMBT3904 bias fixture supplies no models or topology
+  classification and passes simulation, routing/connectivity, clean ERC,
+  strict DRC, writer correctness, zero round-trip diffs, and recorded replay.
 - Bounded placement-routing retry foundation with routing diagnostic to
   placement hint mapping, explicit retry policy, deterministic adjustment
   builder, best-attempt selection, repeated-state detection, and workflow retry
@@ -1101,9 +1108,9 @@ reaches the same KiCad-backed pass gates.
 1. Add a materially different generic graph only when it exposes a concrete
    catalog, lowering, hierarchy, placement, routing, simulation, or validation
    gap; do not extend stage count merely to accumulate fixtures.
-2. Add bounded catalog-backed nonlinear DC operating-point primitives and
-   deterministic convergence diagnostics, then prove them on a held-out diode
-   or transistor circuit without provider-supplied models or topology labels.
+2. Add deterministic bounded transient analysis for a reviewed capacitor and
+   diode/transistor switching subset, with fixed time-step/work limits and a
+   held-out waveform fixture that supplies no provider models or topology labels.
 3. Generalize bounded placement-routing correction from those observed
    failures without introducing fixture-identity logic.
 4. Expand calculated rating and fabrication evidence before claiming broader

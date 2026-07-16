@@ -74,6 +74,46 @@ func TestGraphDerivedMNAFixtureResolvesConnectivityAndEvaluates(t *testing.T) {
 	}
 }
 
+func TestCatalogBackedNonlinearFixtureResolvesAndEvaluates(t *testing.T) {
+	data, err := os.ReadFile(filepath.Join("..", "..", "examples", "ai", "generic_nonlinear_npn_bias", "recorded-response.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var envelope struct {
+		Intent Document `json:"intent"`
+	}
+	if err := json.Unmarshal(data, &envelope); err != nil {
+		t.Fatal(err)
+	}
+	resolved, issues := NewResolver(ResolveOptions{Catalog: loadGraphCatalog(t), CatalogID: "checked-in"}).Resolve(context.Background(), envelope.Intent)
+	if reports.HasBlockingIssue(issues) || resolved.Simulation == nil {
+		t.Fatalf("nonlinear simulation resolution = %#v issues %#v", resolved.Simulation, issues)
+	}
+	plan := resolved.Simulation
+	if plan.ModelID != simmodel.ModelNonlinearCircuitDCV1 || plan.TopologyHash == "" || len(plan.Devices) != 6 || len(plan.Analyses) != 1 {
+		t.Fatalf("resolved nonlinear plan = %#v", plan)
+	}
+	report, diagnostics := simmodel.Evaluate(*plan)
+	if len(diagnostics) != 0 || report.Status != "pass" || len(report.Assertions) != 4 || report.Analyses[0].Points[0].Solver == nil {
+		t.Fatalf("nonlinear report = %#v diagnostics %#v", report, diagnostics)
+	}
+	first, err := json.Marshal(report)
+	if err != nil {
+		t.Fatal(err)
+	}
+	replayed, diagnostics := simmodel.Evaluate(simmodel.ClonePlan(*plan))
+	if len(diagnostics) != 0 {
+		t.Fatalf("replay diagnostics = %#v", diagnostics)
+	}
+	second, err := json.Marshal(replayed)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(first, second) {
+		t.Fatalf("nonlinear report replay differs\n%s\n%s", first, second)
+	}
+}
+
 func TestTrustedSimulationFailsClosedWithoutCatalogModelEvidence(t *testing.T) {
 	graph := loadGraphExample(t, "rc_filter.json")
 	graph.Simulation = &SimulationIntent{
@@ -149,4 +189,41 @@ func TestGraphDerivedMNASchemaRejectsProviderSolverContent(t *testing.T) {
 			t.Fatalf("undersized AC sweep was accepted: %#v", issues)
 		}
 	})
+}
+
+func TestNonlinearSchemaRejectsProviderModelsTopologyAndAC(t *testing.T) {
+	data, err := os.ReadFile(filepath.Join("..", "..", "examples", "ai", "generic_nonlinear_npn_bias", "recorded-response.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var envelope struct {
+		Intent Document `json:"intent"`
+	}
+	if err := json.Unmarshal(data, &envelope); err != nil {
+		t.Fatal(err)
+	}
+	data, err = json.Marshal(envelope.Intent)
+	if err != nil {
+		t.Fatal(err)
+	}
+	needle := []byte(`"model_id":"nonlinear_circuit_dc_v1"`)
+	for name, field := range map[string]string{
+		"device_model":            `"device_model":"provider-controlled"`,
+		"parameters":              `"parameters":{"beta":999}`,
+		"solver_settings":         `"solver_settings":{"iterations":999999}`,
+		"equations":               `"equations":["provider-controlled"]`,
+		"matrix":                  `"matrix":[[1]]`,
+		"topology_classification": `"topology_classification":"transistor_bias"`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			injected := bytes.Replace(data, needle, []byte(string(needle)+","+field), 1)
+			if _, issues := DecodeStrict(bytes.NewReader(injected)); len(issues) == 0 || !reports.HasBlockingIssue(issues) {
+				t.Fatalf("provider %s content was accepted: %#v", name, issues)
+			}
+		})
+	}
+	ac := bytes.Replace(data, []byte(`"kind":"dc_operating_point"`), []byte(`"kind":"ac_sweep"`), 1)
+	if _, issues := DecodeStrict(bytes.NewReader(ac)); len(issues) == 0 || !reports.HasBlockingIssue(issues) {
+		t.Fatalf("nonlinear AC request was accepted: %#v", issues)
+	}
 }

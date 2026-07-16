@@ -656,6 +656,16 @@
       "manufacturer": "onsemi",
       "mpn": "1N4148W",
       "lifecycle": "active",
+      "simulation_models": [{
+        "model_id": "mna_diode_shockley_v1",
+        "parameters": [
+          {"name": "saturation_current_a", "value": 4e-9},
+          {"name": "emission_coefficient", "value": 1.9},
+          {"name": "junction_temperature_k", "value": 300.15},
+          {"name": "max_forward_current_a", "value": 0.2},
+          {"name": "max_reverse_voltage_v", "value": 100}
+        ]
+      }],
       "equivalence": {"group": "diode.signal.generic", "role": "preferred"},
       "tags": ["diode", "signal", "switching", "sod_123"],
       "ratings": [{"kind": "current", "max": "200", "unit": "mA"}],

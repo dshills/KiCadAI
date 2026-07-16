@@ -165,7 +165,21 @@ func ProviderGraphSchema() map[string]any {
 		"analyses":   map[string]any{"type": "array", "minItems": 1, "maxItems": 8, "items": mnaAnalysis},
 		"assertions": map[string]any{"type": "array", "minItems": 1, "maxItems": 64, "items": mnaAssertion},
 	})
-	simulation := map[string]any{"oneOf": []any{legacySimulation, mnaSimulation}}
+	nonlinearAnalysis := strictObject(map[string]any{
+		"id": identifier, "kind": map[string]any{"type": "string", "const": simmodel.AnalysisDCOperatingPoint},
+		"start_frequency_hz": map[string]any{"type": "number", "const": 0},
+		"stop_frequency_hz":  map[string]any{"type": "number", "const": 0},
+		"points":             map[string]any{"type": "integer", "const": 0},
+		"excitations":        map[string]any{"type": "array", "minItems": 1, "maxItems": 16, "items": mnaExcitation},
+	})
+	nonlinearSimulation := strictObject(map[string]any{
+		"model_id":   map[string]any{"type": "string", "const": simmodel.ModelNonlinearCircuitDCV1},
+		"bindings":   map[string]any{"type": "array", "maxItems": 0, "items": simulationBinding},
+		"inputs":     map[string]any{"type": "array", "maxItems": 0, "items": simulationValue},
+		"analyses":   map[string]any{"type": "array", "minItems": 1, "maxItems": 8, "items": nonlinearAnalysis},
+		"assertions": map[string]any{"type": "array", "minItems": 1, "maxItems": 64, "items": mnaAssertion},
+	})
+	simulation := map[string]any{"oneOf": []any{legacySimulation, mnaSimulation, nonlinearSimulation}}
 
 	return strictObject(map[string]any{
 		"schema":  map[string]any{"type": "string", "const": SchemaID},

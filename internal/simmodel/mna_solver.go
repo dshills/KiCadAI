@@ -24,8 +24,11 @@ type mnaSystem struct {
 }
 
 func evaluateMNA(plan Plan, report Report) (Report, []Diagnostic) {
-	if diagnostics := validateOpAmpStability(plan); len(diagnostics) != 0 {
-		return report, diagnostics
+	model, _ := definitionByID(plan.ModelID)
+	if !model.NonlinearDC {
+		if diagnostics := validateOpAmpStability(plan); len(diagnostics) != 0 {
+			return report, diagnostics
+		}
 	}
 	analysisResults := make([]AnalysisResult, 0, len(plan.Analyses))
 	for _, analysis := range plan.Analyses {
@@ -35,6 +38,19 @@ func evaluateMNA(plan Plan, report Report) (Report, []Diagnostic) {
 		}
 		result := AnalysisResult{ID: analysis.ID, Kind: analysis.Kind, Points: make([]AnalysisPoint, 0, len(frequencies))}
 		for _, frequency := range frequencies {
+			if model.NonlinearDC {
+				system, solution, evidence, diagnostic := solveNonlinearDC(plan, analysis)
+				if diagnostic != nil {
+					diagnostic.Path = "analyses." + analysis.ID + "." + diagnostic.Path
+					return report, []Diagnostic{*diagnostic}
+				}
+				point := AnalysisPoint{Nodes: nodeResults(plan, system, solution), Solver: &evidence}
+				if diagnostics := validateNonlinearOperatingLimits(plan, system, solution); len(diagnostics) != 0 {
+					return report, diagnostics
+				}
+				result.Points = append(result.Points, point)
+				continue
+			}
 			system, diagnostics := buildMNASystem(plan, analysis, frequency)
 			if len(diagnostics) != 0 {
 				return report, diagnostics
@@ -138,21 +154,30 @@ func buildMNASystemWithForcedOpAmp(plan Plan, analysis Analysis, frequency float
 				gain /= complex(1, frequency/pole)
 			}
 			stampOpAmp(&system, device.Component, terminals, gain)
+		case PrimitiveDiodeShockleyV1, PrimitiveBJTNPNV1, PrimitiveBJTPNPV1:
+			// Nonlinear devices are stamped by the bounded DC Newton solver.
 		default:
 			return mnaSystem{}, []Diagnostic{{Path: "devices." + device.Component, Message: "resolved primitive has no trusted MNA stamp"}}
 		}
 	}
+	if diagnostic := validateMNASystemBounds(system); diagnostic != nil {
+		return mnaSystem{}, []Diagnostic{*diagnostic}
+	}
+	return system, nil
+}
+
+func validateMNASystemBounds(system mnaSystem) *Diagnostic {
 	for row := range system.matrix {
 		for column := range system.matrix[row] {
 			if !boundedComplex(system.matrix[row][column], maxMNAMatrixValue) {
-				return mnaSystem{}, []Diagnostic{{Path: fmt.Sprintf("matrix[%d][%d]", row, column), Message: "trusted MNA stamp produced a non-finite or unbounded matrix coefficient"}}
+				return &Diagnostic{Path: fmt.Sprintf("matrix[%d][%d]", row, column), Message: "trusted MNA stamp produced a non-finite or unbounded matrix coefficient", Suggestion: "reduce source or component dynamic range, or select catalog models appropriate for the operating range"}
 			}
 		}
 		if !boundedComplex(system.rhs[row], maxMNAMatrixValue) {
-			return mnaSystem{}, []Diagnostic{{Path: fmt.Sprintf("rhs[%d]", row), Message: "trusted source produced a non-finite or unbounded right-hand side"}}
+			return &Diagnostic{Path: fmt.Sprintf("rhs[%d]", row), Message: "trusted stamp produced a non-finite or unbounded right-hand side", Suggestion: "reduce source or component dynamic range, or select catalog models appropriate for the operating range"}
 		}
 	}
-	return system, nil
+	return nil
 }
 
 // validateOpAmpStability derives each low-frequency feedback factor from the

@@ -177,6 +177,18 @@
       "manufacturer": "onsemi",
       "mpn": "MMBT3904LT1G",
       "lifecycle": "active",
+      "simulation_models": [{
+        "model_id": "mna_bjt_npn_ebers_moll_v1",
+        "parameters": [
+          {"name": "saturation_current_a", "value": 1e-14},
+          {"name": "forward_beta", "value": 100},
+          {"name": "reverse_beta", "value": 1},
+          {"name": "emission_coefficient", "value": 1},
+          {"name": "junction_temperature_k", "value": 300.15},
+          {"name": "max_collector_current_a", "value": 0.2},
+          {"name": "max_collector_emitter_voltage_v", "value": 40}
+        ]
+      }],
       "equivalence": {"group": "bjt.npn.small_signal.sot23", "role": "preferred"},
       "tags": ["bjt", "npn", "small_signal", "sot23", "amplifier_seed"],
       "ratings": [
@@ -240,6 +252,18 @@
       "manufacturer": "onsemi",
       "mpn": "MMBT3906LT1G",
       "lifecycle": "active",
+      "simulation_models": [{
+        "model_id": "mna_bjt_pnp_ebers_moll_v1",
+        "parameters": [
+          {"name": "saturation_current_a", "value": 1e-14},
+          {"name": "forward_beta", "value": 100},
+          {"name": "reverse_beta", "value": 1},
+          {"name": "emission_coefficient", "value": 1},
+          {"name": "junction_temperature_k", "value": 300.15},
+          {"name": "max_collector_current_a", "value": 0.2},
+          {"name": "max_collector_emitter_voltage_v", "value": 40}
+        ]
+      }],
       "equivalence": {"group": "bjt.pnp.small_signal.sot23", "role": "preferred"},
       "tags": ["bjt", "pnp", "small_signal", "sot23", "amplifier_seed"],
       "ratings": [

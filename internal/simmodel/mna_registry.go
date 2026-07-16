@@ -26,6 +26,7 @@ type primitiveDefinition struct {
 	CatalogParameters []valueRule `json:"catalog_parameters,omitempty"`
 	Source            bool        `json:"source,omitempty"`
 	OpAmp             bool        `json:"op_amp,omitempty"`
+	Nonlinear         bool        `json:"nonlinear,omitempty"`
 }
 
 var primitiveRegistry = []primitiveDefinition{
@@ -44,6 +45,30 @@ var primitiveRegistry = []primitiveDefinition{
 			{Name: "output_high_margin_v", Nonnegative: true, Maximum: 100},
 		},
 	},
+	{
+		ID: PrimitiveDiodeShockleyV1, Family: "diode", Terminals: []string{"ANODE", "CATHODE"}, Nonlinear: true,
+		CatalogParameters: []valueRule{
+			{Name: "saturation_current_a", Positive: true, Minimum: 1e-30, Maximum: 1e-3},
+			{Name: "emission_coefficient", Positive: true, Minimum: .5, Maximum: 10},
+			{Name: "junction_temperature_k", Positive: true, Minimum: 200, Maximum: 1000},
+			{Name: "max_forward_current_a", Positive: true, Minimum: 1e-9, Maximum: 1e4},
+			{Name: "max_reverse_voltage_v", Positive: true, Minimum: .01, Maximum: 1e6},
+		},
+	},
+	{ID: PrimitiveBJTNPNV1, Family: "bjt", Terminals: []string{"BASE", "COLLECTOR", "EMITTER"}, Nonlinear: true, CatalogParameters: bjtParameterRules()},
+	{ID: PrimitiveBJTPNPV1, Family: "bjt", Terminals: []string{"BASE", "COLLECTOR", "EMITTER"}, Nonlinear: true, CatalogParameters: bjtParameterRules()},
+}
+
+func bjtParameterRules() []valueRule {
+	return []valueRule{
+		{Name: "saturation_current_a", Positive: true, Minimum: 1e-30, Maximum: 1e-3},
+		{Name: "forward_beta", Positive: true, Minimum: 1, Maximum: 1e6},
+		{Name: "reverse_beta", Positive: true, Minimum: .01, Maximum: 1e6},
+		{Name: "emission_coefficient", Positive: true, Minimum: .5, Maximum: 10},
+		{Name: "junction_temperature_k", Positive: true, Minimum: 200, Maximum: 1000},
+		{Name: "max_collector_current_a", Positive: true, Minimum: 1e-9, Maximum: 1e4},
+		{Name: "max_collector_emitter_voltage_v", Positive: true, Minimum: .01, Maximum: 1e6},
+	}
 }
 
 type NodeEvidence struct {
@@ -61,17 +86,26 @@ func primitiveByID(id string) (primitiveDefinition, bool) {
 	return primitiveDefinition{}, false
 }
 
-func primitiveForFamily(family string) (primitiveDefinition, bool) {
-	for _, primitive := range primitiveRegistry {
-		if primitive.Family == family {
-			return primitive, true
+type primitiveClaim struct {
+	primitive primitiveDefinition
+	claim     CatalogEvidence
+}
+
+func compatiblePrimitiveClaims(component ComponentEvidence, model definition) []primitiveClaim {
+	var matches []primitiveClaim
+	for _, claim := range component.ModelClaims {
+		primitive, exists := primitiveByID(strings.TrimSpace(claim.ModelID))
+		if !exists || primitive.Family != component.Family || (primitive.Nonlinear && !model.NonlinearDC) || (model.NonlinearDC && primitive.OpAmp) {
+			continue
 		}
+		matches = append(matches, primitiveClaim{primitive: primitive, claim: claim})
 	}
-	return primitiveDefinition{}, false
+	return matches
 }
 
 func validateMNAIntent(intent Intent, components map[string]string) []Diagnostic {
 	var diagnostics []Diagnostic
+	model, _ := definitionByID(strings.TrimSpace(intent.ModelID))
 	if len(intent.Bindings) != 0 {
 		diagnostics = append(diagnostics, Diagnostic{Path: "bindings", Message: "graph MNA derives devices from resolved connectivity and does not accept topology bindings"})
 	}
@@ -97,6 +131,9 @@ func validateMNAIntent(intent Intent, components map[string]string) []Diagnostic
 				diagnostics = append(diagnostics, Diagnostic{Path: path, Message: "DC operating-point analysis cannot contain AC sweep fields"})
 			}
 		case AnalysisACSweep:
+			if model.NonlinearDC {
+				diagnostics = append(diagnostics, Diagnostic{Path: path + ".kind", Message: "nonlinear circuit analysis supports DC operating points only", Suggestion: "use dc_operating_point or select the linear MNA workflow for AC analysis"})
+			}
 			if !finite(analysis.StartFrequencyHz) || !finite(analysis.StopFrequencyHz) || analysis.StartFrequencyHz <= 0 || analysis.StopFrequencyHz < analysis.StartFrequencyHz || analysis.StopFrequencyHz > 1e12 || analysis.Points < 2 || analysis.Points > maxMNASweepPoints {
 				diagnostics = append(diagnostics, Diagnostic{Path: path, Message: fmt.Sprintf("AC sweep requires finite 0 < start <= stop <= 1e12 Hz and 2..%d points", maxMNASweepPoints)})
 			}
@@ -209,27 +246,32 @@ func resolveMNA(intent Intent, catalogID, catalogHash string, components []Compo
 	sortedComponents := append([]ComponentEvidence(nil), components...)
 	slices.SortStableFunc(sortedComponents, func(a, b ComponentEvidence) int { return strings.Compare(a.InstanceID, b.InstanceID) })
 	devices := make([]ResolvedDevice, 0, len(sortedComponents))
+	model, _ := definitionByID(intent.ModelID)
 	for _, component := range sortedComponents {
-		primitive, supported := primitiveForFamily(component.Family)
+		matches := compatiblePrimitiveClaims(component, model)
 		_, sourceReferenced := referencedSources[component.InstanceID]
-		if !supported {
+		if len(matches) == 0 {
 			if sourceReferenced {
 				diagnostics = append(diagnostics, Diagnostic{Path: "analyses.excitations." + component.InstanceID, Message: "source component family has no trusted MNA primitive"})
 			} else if len(component.Connections) != 0 && !mnaBoundaryFamily(component.Family) {
-				diagnostics = append(diagnostics, Diagnostic{Path: "topology.devices." + component.InstanceID, Message: fmt.Sprintf("connected component family %s has no trusted linear MNA primitive", component.Family), Suggestion: "remove the unsupported/nonlinear device or add reviewed catalog primitive evidence"})
+				kind := "linear MNA"
+				if model.NonlinearDC {
+					kind = "nonlinear DC"
+				}
+				diagnostics = append(diagnostics, Diagnostic{Path: "topology.devices." + component.InstanceID, Message: fmt.Sprintf("connected component family %s has no trusted %s primitive claim", component.Family, kind), Suggestion: "select a component with a unique reviewed catalog primitive claim"})
 			}
 			continue
 		}
+		if len(matches) != 1 {
+			diagnostics = append(diagnostics, Diagnostic{Path: "topology.devices." + component.InstanceID, Message: "catalog component declares ambiguous trusted primitive claims", Suggestion: "retain exactly one reviewed primitive claim compatible with this workflow"})
+			continue
+		}
+		primitive, claim := matches[0].primitive, matches[0].claim
 		if sourceReferenced && !primitive.Source {
 			diagnostics = append(diagnostics, Diagnostic{Path: "analyses.excitations." + component.InstanceID, Message: fmt.Sprintf("catalog component family %s is not a trusted independent source", component.Family)})
 			continue
 		}
 		if primitive.Source && !sourceReferenced {
-			continue
-		}
-		claim, claimed := claimByID(component.ModelClaims, primitive.ID)
-		if !claimed {
-			diagnostics = append(diagnostics, Diagnostic{Path: "topology.devices." + component.InstanceID, Message: fmt.Sprintf("catalog component %s does not declare trusted primitive %s", component.CatalogID, primitive.ID), Suggestion: "select a catalog component with verified MNA primitive evidence"})
 			continue
 		}
 		if parameterDiagnostics := validatePrimitiveParameters("topology.devices."+component.InstanceID+".model_parameters", primitive, claim.Parameters); len(parameterDiagnostics) != 0 {
@@ -262,7 +304,7 @@ func resolveMNA(intent Intent, catalogID, catalogHash string, components []Compo
 	}
 	plan := Plan{
 		RegistryVersion: RegistryVersion, RegistryHash: RegistryHash(), CatalogID: catalogID, CatalogHash: catalogHash,
-		ModelID: ModelLinearCircuitMNAV1, GroundNode: ground, Nodes: nodeNames, Devices: devices,
+		ModelID: intent.ModelID, GroundNode: ground, Nodes: nodeNames, Devices: devices,
 		Analyses: canonicalAnalyses(intent.Analyses), Assertions: append([]Assertion(nil), intent.Assertions...),
 	}
 	slices.SortStableFunc(plan.Assertions, func(a, b Assertion) int { return strings.Compare(assertionKey(a), assertionKey(b)) })
@@ -309,6 +351,10 @@ func validateMNAPlan(plan Plan) []Diagnostic {
 		return []Diagnostic{{Path: "topology", Message: "resolved MNA plan contains legacy topology bindings or inputs"}}
 	}
 	var diagnostics []Diagnostic
+	model, modelExists := definitionByID(plan.ModelID)
+	if !modelExists || !model.GraphMNA {
+		diagnostics = append(diagnostics, Diagnostic{Path: "model_id", Message: "resolved MNA plan references an unsupported workflow model"})
+	}
 	if plan.GroundNode == "" || !slices.Contains(plan.Nodes, plan.GroundNode) {
 		diagnostics = append(diagnostics, Diagnostic{Path: "ground_node", Message: "resolved MNA plan is missing its reference node"})
 	}
@@ -319,6 +365,7 @@ func validateMNAPlan(plan Plan) []Diagnostic {
 	}
 	deviceFamilies := make(map[string]string, len(plan.Devices))
 	devicePrimitives := make(map[string]string, len(plan.Devices))
+	nonlinearDevices := 0
 	for index, device := range plan.Devices {
 		path := fmt.Sprintf("devices[%d]", index)
 		if index > 0 && plan.Devices[index-1].Component >= device.Component {
@@ -331,6 +378,15 @@ func validateMNAPlan(plan Plan) []Diagnostic {
 		}
 		deviceFamilies[device.Component] = device.Family
 		devicePrimitives[device.Component] = primitive.ID
+		if primitive.Nonlinear {
+			nonlinearDevices++
+		}
+		if primitive.Nonlinear && !model.NonlinearDC {
+			diagnostics = append(diagnostics, Diagnostic{Path: path + ".primitive_model", Message: "linear MNA plan contains a nonlinear primitive"})
+		}
+		if model.NonlinearDC && primitive.OpAmp {
+			diagnostics = append(diagnostics, Diagnostic{Path: path + ".primitive_model", Message: "nonlinear DC v1 does not combine nonlinear devices with op-amp dependent sources"})
+		}
 		if primitive.RequiresValueSI && (device.ValueSI == nil || !finite(*device.ValueSI) || *device.ValueSI <= 0) {
 			diagnostics = append(diagnostics, Diagnostic{Path: path + ".value_si", Message: "resolved primitive requires a finite positive value"})
 		}
@@ -345,7 +401,10 @@ func validateMNAPlan(plan Plan) []Diagnostic {
 			}
 		}
 	}
-	intent := Intent{ModelID: ModelLinearCircuitMNAV1, Analyses: cloneAnalyses(plan.Analyses), Assertions: append([]Assertion(nil), plan.Assertions...)}
+	if model.NonlinearDC && nonlinearDevices == 0 {
+		diagnostics = append(diagnostics, Diagnostic{Path: "devices", Message: "nonlinear DC workflow requires at least one reviewed nonlinear device"})
+	}
+	intent := Intent{ModelID: plan.ModelID, Analyses: cloneAnalyses(plan.Analyses), Assertions: append([]Assertion(nil), plan.Assertions...)}
 	diagnostics = append(diagnostics, validateMNAIntent(intent, deviceFamilies)...)
 	for analysisIndex, analysis := range plan.Analyses {
 		if analysisIndex > 0 && plan.Analyses[analysisIndex-1].ID >= analysis.ID {

@@ -14,6 +14,7 @@ type valueRule struct {
 	Name        string  `json:"name"`
 	Positive    bool    `json:"positive,omitempty"`
 	Nonnegative bool    `json:"nonnegative,omitempty"`
+	Minimum     float64 `json:"minimum,omitempty"`
 	Maximum     float64 `json:"maximum,omitempty"`
 }
 
@@ -31,6 +32,7 @@ type definition struct {
 	Metrics     []string         `json:"metrics"`
 	Description string           `json:"description"`
 	GraphMNA    bool             `json:"graph_mna,omitempty"`
+	NonlinearDC bool             `json:"nonlinear_dc,omitempty"`
 }
 
 var registry = []definition{
@@ -59,6 +61,10 @@ var registry = []definition{
 	{
 		ID: ModelLinearCircuitMNAV1, GraphMNA: true,
 		Description: "Graph-derived deterministic modified nodal analysis using trusted catalog primitive models.",
+	},
+	{
+		ID: ModelNonlinearCircuitDCV1, GraphMNA: true, NonlinearDC: true,
+		Description: "Graph-derived bounded nonlinear DC operating-point analysis using trusted catalog primitive models.",
 	},
 }
 
@@ -407,7 +413,7 @@ func validateNamedValues(path string, values []NamedValue, rules []valueRule) []
 			diagnostics = append(diagnostics, Diagnostic{Path: valuePath + ".name", Message: "parameter is duplicated"})
 		}
 		seen[rule.Name] = struct{}{}
-		if !finite(value.Value) || (rule.Positive && value.Value <= 0) || (rule.Nonnegative && value.Value < 0) || (rule.Maximum > 0 && value.Value > rule.Maximum) {
+		if !finite(value.Value) || (rule.Positive && value.Value <= 0) || (rule.Nonnegative && value.Value < 0) || (rule.Minimum > 0 && value.Value < rule.Minimum) || (rule.Maximum > 0 && value.Value > rule.Maximum) {
 			diagnostics = append(diagnostics, Diagnostic{Path: valuePath + ".value", Message: "parameter is outside the trusted finite range"})
 		}
 	}
