@@ -203,6 +203,13 @@ func (builder *promotionReportBuilder) addKiCadGate() {
 		return
 	}
 	status := promotionGateStatusForKiCadStage(stage)
+	// An optional workflow may deliberately skip KiCad when no CLI is available.
+	// That leaves the fixture eligible for candidate evidence, while a pass still
+	// requires the externally verified ERC/DRC stage. Explicit required checks use
+	// a blocked stage instead and remain candidate blockers.
+	if stage.Status == StageStatusSkipped {
+		required = []PromotionReadiness{PromotionReadinessPass}
+	}
 	issueCodes := builder.issueCodesForStage(StageKiCadChecks)
 	if status != PromotionGateStatusSkipped {
 		missingCodes := builder.missingRequiredKiCadCheckIssueCodes(stage)
