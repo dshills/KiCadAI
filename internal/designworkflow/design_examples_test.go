@@ -1467,6 +1467,37 @@ func TestUSBCI2CSensorProtectedSchematicElectricalGate(t *testing.T) {
 	}
 }
 
+func TestUSBCI2CSensorProtectedVOUTAnchorHasPhysicalEndpoint(t *testing.T) {
+	repoRoot := designExampleRepoRoot(t)
+	requestName := "kicad-backed/usb_c_i2c_sensor_3v3_protected.json"
+	request, issues := loadDesignExampleRequest(t, repoRoot, requestName)
+	if len(issues) != 0 {
+		t.Fatalf("decode %s issues:\n%s", requestName, formatDesignExampleIssues(issues))
+	}
+	registry := blocks.NewBuiltinRegistry()
+	plan := PlanBlocks(context.Background(), registry, request)
+	selections := SelectWorkflowComponents(context.Background(), registry, plan, ComponentSelectionOptions{})
+	if workflowStageBlocked(selections.Stage) {
+		t.Fatalf("component selections:\n%s", formatDesignExampleIssues(selections.Stage.Issues))
+	}
+	if issues := ApplyComponentSelectionsToPlan(&plan, registry, selections.Selections); len(issues) != 0 {
+		t.Fatalf("apply component selections:\n%s", formatDesignExampleIssues(issues))
+	}
+	fragments := RealizePCBFragments(context.Background(), registry, plan)
+	placed := PlaceFragments(context.Background(), request, fragments, PlacementOptions{ComponentSelections: selections.Selections})
+	endpoints, endpointIssues := DiscoverPhysicalEndpoints(placed)
+	if len(endpointIssues) != 0 {
+		t.Fatalf("endpoint discovery issues:\n%s", formatDesignExampleIssues(endpointIssues))
+	}
+	bindings := ResolveAnchorBindings(fragments, endpoints, AnchorBindingOptions{Placed: &placed})
+	for _, binding := range bindings.Bindings {
+		if binding.ID == "rail3v3.vout" && binding.Status == AnchorBindingStatusBound {
+			return
+		}
+	}
+	t.Fatalf("rail3v3.vout was not bound after placement: %#v", bindings.Bindings)
+}
+
 func formatConnectOperationsForTest(t *testing.T, projectName string, plan BlockPlanResult) string {
 	t.Helper()
 	tx, err := blocks.ProjectTransactionForCompositionOutput(projectName, plan.Output, false)

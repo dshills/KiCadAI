@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"kicadai/internal/blocks"
+	"kicadai/internal/placement"
 	"kicadai/internal/reports"
 	"kicadai/internal/transactions"
 )
@@ -15,6 +16,7 @@ type AnchorBindingOptions struct {
 	MaxProximityMM           float64
 	RequiredBlockIDs         map[string]bool
 	ExternalEndpointBlockIDs map[string]bool
+	Placed                   *PlacementStageResult
 }
 
 type collectedEntryAnchor struct {
@@ -31,6 +33,7 @@ type collectedEntryAnchor struct {
 
 const defaultAnchorBindingMaxProximityMM = 10
 const anchorBindingDistanceEpsilonMM = 1e-9
+const defaultAnchorPlacementOwnerDistanceMM = 3.0
 
 var defaultRequiredAnchorBindingBlockIDs = map[string]bool{"esd_protection": true, "reverse_polarity_protection": true}
 var defaultExternalEndpointBlockIDs = map[string]bool{"esd_protection": true, "reverse_polarity_protection": true}
@@ -56,9 +59,11 @@ func ResolveAnchorBindings(fragments PCBFragmentResult, endpoints []PhysicalEndp
 
 func collectEntryAnchors(fragments PCBFragmentResult, opts AnchorBindingOptions) []collectedEntryAnchor {
 	anchors := []collectedEntryAnchor{}
+	positions := placementPositions(opts.Placed)
 	for _, fragment := range fragments.Fragments {
 		for _, anchor := range fragment.Realization.EntryAnchors {
 			point := transactions.Point{XMM: anchor.Placement.XMM, YMM: anchor.Placement.YMM}
+			point = placedAnchorPoint(fragment, point, positions)
 			layers := []string{firstNonEmpty(anchor.Placement.Layer, "F.Cu")}
 			blockID := strings.TrimSpace(fragment.BlockID)
 			anchors = append(anchors, collectedEntryAnchor{
@@ -81,6 +86,35 @@ func collectEntryAnchors(fragments PCBFragmentResult, opts AnchorBindingOptions)
 		return anchors[i].ID < anchors[j].ID
 	})
 	return anchors
+}
+
+// placedAnchorPoint keeps an entry anchor attached to the local realization
+// component it was defined beside when placement translates or rotates it.
+func placedAnchorPoint(fragment BlockFragment, anchor transactions.Point, positions map[string]placement.Placement) transactions.Point {
+	var owner *blocks.RealizedPCBComponent
+	ownerDistance := math.Inf(1)
+	for index := range fragment.Realization.Components {
+		component := &fragment.Realization.Components[index]
+		distance := pointDistanceMM(anchor, transactions.Point{XMM: component.Placement.XMM, YMM: component.Placement.YMM})
+		if distance < ownerDistance {
+			owner = component
+			ownerDistance = distance
+		}
+	}
+	if owner == nil || ownerDistance > defaultAnchorPlacementOwnerDistanceMM {
+		return anchor
+	}
+	placed, ok := positions[strings.ToUpper(strings.TrimSpace(owner.Ref))]
+	if !ok {
+		return anchor
+	}
+	rotation := (placed.RotationDeg - owner.Placement.RotationDeg) * math.Pi / 180
+	dx := anchor.XMM - owner.Placement.XMM
+	dy := anchor.YMM - owner.Placement.YMM
+	return transactions.Point{
+		XMM: placed.XMM + math.Cos(rotation)*dx - math.Sin(rotation)*dy,
+		YMM: placed.YMM + math.Sin(rotation)*dx + math.Cos(rotation)*dy,
+	}
 }
 
 func defaultAnchorBindingPolicy(fragment BlockFragment, anchor blocks.RealizedPCBEntryAnchor, opts AnchorBindingOptions) AnchorBindingPolicy {

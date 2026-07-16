@@ -300,7 +300,7 @@ func anchorBindingDiagnostics(request Request, fragments PCBFragmentResult, plac
 		ExternalEndpoints: request.ExternalEndpoints,
 		Board:             request.Board,
 	})
-	summary := ResolveAnchorBindings(fragments, endpoints, AnchorBindingOptions{})
+	summary := ResolveAnchorBindings(fragments, endpoints, AnchorBindingOptions{Placed: &placed})
 	var operations []transactions.Operation
 	if route {
 		summary, operations = AddAnchorBindingRoutes(summary, AnchorBindingRouteOptions{WidthMM: opts.TraceWidthMM})
