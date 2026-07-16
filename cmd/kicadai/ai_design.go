@@ -153,7 +153,11 @@ func runAIDesignCreateAttempt(ctx context.Context, opts cliOptions, stdout io.Wr
 	if err := replayCapture.Restore(); err != nil {
 		return writeAIProviderFailure(stdout, aiProviderIssue(err), replayCapture)
 	}
-	promotion := designworkflow.BuildInternalPromotionReport(designPromotionFixture(opts, request, workflow), workflow)
+	promotionFixture, err := designPromotionFixture(opts, request, workflow)
+	if err != nil {
+		return writeDesignFailure(stdout, reports.Issue{Code: reports.CodeValidationFailed, Severity: reports.SeverityError, Path: opts.requestPath, Message: err.Error()})
+	}
+	promotion := designworkflow.BuildInternalPromotionReport(promotionFixture, workflow)
 	workflow.Promotion = promotionSummaryPointer(designworkflow.PromotionSummaryFromReport(promotion, designworkflow.PromotionReportArtifactPath))
 	promotionArtifact, promotionIssue := designworkflow.WritePromotionReportArtifact(opts.output, promotion, opts.overwrite)
 	var artifactIssues []reports.Issue

@@ -3611,7 +3611,11 @@ func runIntentCreate(ctx context.Context, opts cliOptions, stdout io.Writer) err
 	}
 	request := *plan.GeneratedRequest
 	workflow := designworkflow.Create(ctx, request, createOpts)
-	promotion := designworkflow.BuildInternalPromotionReport(designPromotionFixture(opts, request, workflow), workflow)
+	promotionFixture, err := designPromotionFixture(opts, request, workflow)
+	if err != nil {
+		return writeDesignFailure(stdout, reports.Issue{Code: reports.CodeValidationFailed, Severity: reports.SeverityError, Path: opts.requestPath, Message: err.Error()})
+	}
+	promotion := designworkflow.BuildInternalPromotionReport(promotionFixture, workflow)
 	workflow.Promotion = promotionSummaryPointer(designworkflow.PromotionSummaryFromReport(promotion, designworkflow.PromotionReportArtifactPath))
 	promotionArtifact, promotionIssue := designworkflow.WritePromotionReportArtifact(opts.output, promotion, opts.overwrite)
 	var promotionArtifacts []reports.Artifact
@@ -3862,7 +3866,11 @@ func runDesignCreate(ctx context.Context, opts cliOptions, stdout io.Writer) err
 		return writeDesignFailure(stdout, reports.Issue{Code: reports.CodeInvalidArgument, Severity: reports.SeverityError, Path: "mode", Message: err.Error()})
 	}
 	workflow := designworkflow.Create(ctx, request, createOpts)
-	promotion := designworkflow.BuildInternalPromotionReport(designPromotionFixture(opts, request, workflow), workflow)
+	promotionFixture, err := designPromotionFixture(opts, request, workflow)
+	if err != nil {
+		return writeDesignFailure(stdout, reports.Issue{Code: reports.CodeValidationFailed, Severity: reports.SeverityError, Path: opts.requestPath, Message: err.Error()})
+	}
+	promotion := designworkflow.BuildInternalPromotionReport(promotionFixture, workflow)
 	promotionArtifact, promotionIssue := designworkflow.WritePromotionReportArtifact(opts.output, promotion, opts.overwrite)
 	var artifactIssues []reports.Issue
 	var promotionArtifacts []reports.Artifact
@@ -3911,7 +3919,7 @@ func designWorkflowReport(workflow designworkflow.WorkflowResult, extraIssues []
 }
 
 // designPromotionFixture converts a completed CLI workflow into promotion gates.
-func designPromotionFixture(opts cliOptions, request designworkflow.Request, workflow designworkflow.WorkflowResult) designworkflow.PromotionFixture {
+func designPromotionFixture(opts cliOptions, request designworkflow.Request, workflow designworkflow.WorkflowResult) (designworkflow.PromotionFixture, error) {
 	requestName := filepath.Base(opts.requestPath)
 	if strings.TrimSpace(opts.requestPath) == "" && hasAIPromptSource(opts) {
 		requestName = "ai-prompt"
@@ -3919,6 +3927,11 @@ func designPromotionFixture(opts cliOptions, request designworkflow.Request, wor
 	readiness := designworkflow.PromotionReadinessCandidate
 	if designworkflow.AcceptanceSatisfied(request.Validation.Acceptance, workflow.Acceptance.Achieved) && designworkflow.AcceptanceSatisfied(designworkflow.AcceptanceFabricationCandidate, workflow.Acceptance.Achieved) {
 		readiness = designworkflow.PromotionReadinessPass
+	}
+	if metadataReadiness, ok, err := designPromotionReadinessFromRequestMetadata(opts.requestPath); err != nil {
+		return designworkflow.PromotionFixture{}, err
+	} else if ok {
+		readiness = metadataReadiness
 	}
 	return designworkflow.PromotionFixture{
 		ID:                designworkflow.NormalizeProjectName(request.Name),
@@ -3930,6 +3943,35 @@ func designPromotionFixture(opts cliOptions, request designworkflow.Request, wor
 		RequireDRC:        opts.requireDRC || request.Validation.RequireDRC,
 		ExpectedArtifacts: []string{".kicadai/transaction.json", ".kicadai/manifest.json"},
 		ExpectedStages:    designPromotionExpectedStages(workflow),
+	}, nil
+}
+
+type designPromotionRequestMetadata struct {
+	Readiness designworkflow.PromotionReadiness `json:"readiness"`
+}
+
+func designPromotionReadinessFromRequestMetadata(requestPath string) (designworkflow.PromotionReadiness, bool, error) {
+	requestPath = strings.TrimSpace(requestPath)
+	if requestPath == "" || !strings.EqualFold(filepath.Ext(requestPath), ".json") {
+		return "", false, nil
+	}
+	metadataPath := strings.TrimSuffix(requestPath, filepath.Ext(requestPath)) + ".metadata.json"
+	data, err := os.ReadFile(metadataPath)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return "", false, nil
+		}
+		return "", false, fmt.Errorf("read promotion metadata %q: %w", metadataPath, err)
+	}
+	var metadata designPromotionRequestMetadata
+	if err := json.Unmarshal(data, &metadata); err != nil {
+		return "", false, fmt.Errorf("decode promotion metadata %q: %w", metadataPath, err)
+	}
+	switch metadata.Readiness {
+	case designworkflow.PromotionReadinessExpectedFail, designworkflow.PromotionReadinessCandidate, designworkflow.PromotionReadinessPass, designworkflow.PromotionReadinessBlocked:
+		return metadata.Readiness, true, nil
+	default:
+		return "", false, fmt.Errorf("promotion metadata %q has unsupported readiness %q", metadataPath, metadata.Readiness)
 	}
 }
 

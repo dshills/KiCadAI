@@ -1396,6 +1396,26 @@ func TestRunDesignCreateFullBoardRetryEvidenceSnapshot(t *testing.T) {
 	}
 }
 
+func TestDesignPromotionReadinessFromRequestMetadata(t *testing.T) {
+	requestPath := filepath.Join(t.TempDir(), "protected.json")
+	metadataPath := strings.TrimSuffix(requestPath, ".json") + ".metadata.json"
+	if err := os.WriteFile(metadataPath, []byte(fmt.Sprintf(`{"readiness":%q}`, designworkflow.PromotionReadinessPass)), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if readiness, ok, err := designPromotionReadinessFromRequestMetadata(requestPath); err != nil || !ok || readiness != designworkflow.PromotionReadinessPass {
+		t.Fatalf("metadata readiness = %q, %v, %v; want pass, true, nil", readiness, ok, err)
+	}
+	if _, ok, err := designPromotionReadinessFromRequestMetadata(filepath.Join(t.TempDir(), "ordinary.json")); err != nil || ok {
+		t.Fatal("missing metadata unexpectedly supplied readiness")
+	}
+	if err := os.WriteFile(metadataPath, []byte(`{`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := designPromotionReadinessFromRequestMetadata(requestPath); err == nil {
+		t.Fatal("malformed metadata did not return an error")
+	}
+}
+
 func TestRunDesignCreateWritesPromotionReport(t *testing.T) {
 	requestPath := filepath.Join("..", "..", "internal", "designworkflow", "testdata", "retry", "disabled", "request.json")
 	output := filepath.Join(t.TempDir(), "promotion")
