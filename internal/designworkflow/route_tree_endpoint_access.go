@@ -42,7 +42,7 @@ type RouteTreeEndpointAccessSummary struct {
 	Refs              []string `json:"refs,omitempty"`
 }
 
-const routeTreeBranchAccessPairLimit = 8
+const routeTreeBranchAccessPairLimit = 32
 
 const (
 	routeTreeAccessExactEndpointRank    int = 0
