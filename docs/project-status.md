@@ -129,10 +129,13 @@ Generic graphs can resolve ideal fixed-regulator, resistor-divider DC, and RC
 low-pass AC models through a deterministic trusted registry. They can also use
 graph-derived Modified Nodal Analysis assembled from resolved connectivity and
 catalog-backed linear primitives, or bounded nonlinear DC operating-point
-analysis for reviewed signal-diode and NPN/PNP BJT primitives. Providers request
+analysis for reviewed signal-diode and NPN/PNP BJT primitives. A separate
+transient workflow covers reviewed capacitors, diodes, and NPN/PNP BJTs with
+fixed backward Euler, exact bounded grids, deterministic DC initialization,
+and trusted 10%-90% edge measurements. Providers request
 bounded analyses and node assertions; they cannot supply topology labels,
-device parameters, equations, matrices, solver settings, executable code, or
-model files.
+device parameters, equations, matrices, integration methods, initial states,
+solver settings, executable code, or model files.
 
 The held-out LMV321 buffered two-pole fixture uses automatic hierarchy and two
 analyses without a known block/topology model. It passes catalog resolution,
@@ -141,10 +144,13 @@ writer correctness, zero root/child/PCB round-trip diffs, and byte-identical
 recorded replay. The held-out MMBT3904 emitter-degenerated bias fixture adds
 deterministic source/gmin continuation evidence and passes the same simulation,
 routing, connectivity, KiCad ERC/DRC, writer, round-trip, and recorded-replay
-gates without a provider topology classification. Singular, unstable,
+gates without a provider topology classification. The held-out MMBT3904 switch
+adds 301 deterministic waveform points plus voltage, rise-time, and fall-time
+assertions and passes those same gates. Singular, unstable,
 unsupported, nonconvergent, operating-limit, incompatible, and numerically
-unbounded requests fail closed. This is deterministic functional evidence, not
-parasitic, tolerance, thermal, transient, SOA, or fabrication signoff.
+unbounded requests fail closed. This is bounded deterministic functional
+evidence, not arbitrary SPICE compatibility, parasitic, tolerance, thermal,
+SOA, or fabrication signoff.
 
 ## Amplifier Coverage
 
@@ -169,10 +175,9 @@ treated as autonomous or fabrication-ready.
 
 ## Remaining Direction
 
-The next materially different capability should be deterministic transient
-analysis for a tightly bounded reviewed subset, starting with capacitor state
-and diode/transistor switching behavior, fixed time-step/work limits, and a
-held-out switching waveform fixture. Continue to broaden catalog and
+The next materially different capability should be chosen from a concrete
+held-out failure, with likely candidates including bounded tolerance/sensitivity
+evidence or a new reviewed dynamic primitive. Continue to broaden catalog and
 pin/function evidence only when that target exposes a concrete gap.
 
 See the [Roadmap](../specs/ROADMAP.md) for prioritized work and the

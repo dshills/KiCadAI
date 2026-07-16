@@ -7,13 +7,15 @@ import (
 )
 
 const (
-	boltzmannConstant          = 1.380649e-23
-	electronCharge             = 1.602176634e-19
-	nonlinearMaxIterations     = 60
-	nonlinearMaxNodeUpdateV    = 0.25
-	nonlinearUpdateTolerance   = 1e-8
-	nonlinearResidualTolerance = 1e-12
-	nonlinearExpLimit          = 40.0
+	boltzmannConstant               = 1.380649e-23
+	electronCharge                  = 1.602176634e-19
+	nonlinearMaxIterations          = 60
+	nonlinearMaxNodeUpdateV         = 0.25
+	nonlinearUpdateTolerance        = 1e-8
+	nonlinearCurrentUpdateTolerance = 1e-10
+	nonlinearResidualTolerance      = 1e-12
+	nonlinearExpLimit               = 40.0
+	nonlinearFinalGmin              = 1e-12
 )
 
 type continuationStage struct {
@@ -34,7 +36,7 @@ var nonlinearContinuation = []continuationStage{
 	{sourceScale: .5, gmin: 1e-6},
 	{sourceScale: .8, gmin: 1e-8},
 	{sourceScale: 1, gmin: 1e-10},
-	{sourceScale: 1, gmin: 1e-12},
+	{sourceScale: 1, gmin: nonlinearFinalGmin},
 }
 
 func solveNonlinearDC(plan Plan, analysis Analysis) (mnaSystem, []complex128, SolverEvidence, *Diagnostic) {
@@ -53,6 +55,7 @@ func solveNonlinearDC(plan Plan, analysis Analysis) (mnaSystem, []complex128, So
 		system := cloneMNASystem(baseSystem)
 		converged := false
 		largestUpdateLabel := "unknown"
+		largestCurrentUpdateLabel := "unknown"
 		largestResidualLabel := "unknown"
 		for iteration := 1; iteration <= nonlinearMaxIterations; iteration++ {
 			resetMNASystem(&system, baseSystem)
@@ -75,7 +78,7 @@ func solveNonlinearDC(plan Plan, analysis Analysis) (mnaSystem, []complex128, So
 					}
 				}
 			}
-			maxNodeUpdate := 0.0
+			maxNodeUpdate, maxCurrentUpdate := 0.0, 0.0
 			for index := range candidate {
 				if strings.HasPrefix(system.unknownLabels[index], "node:") {
 					update := math.Abs(real(candidate[index] - guess[index]))
@@ -83,18 +86,26 @@ func solveNonlinearDC(plan Plan, analysis Analysis) (mnaSystem, []complex128, So
 						maxNodeUpdate = update
 						largestUpdateLabel = system.unknownLabels[index]
 					}
+				} else {
+					update := math.Abs(real(candidate[index] - guess[index]))
+					if update > maxCurrentUpdate {
+						maxCurrentUpdate = update
+						largestCurrentUpdateLabel = system.unknownLabels[index]
+					}
 				}
 			}
 			damping := 1.0
 			if maxNodeUpdate > nonlinearMaxNodeUpdateV {
 				damping = nonlinearMaxNodeUpdateV / maxNodeUpdate
 			}
-			maxAppliedUpdate := 0.0
+			maxAppliedUpdate, maxAppliedCurrentUpdate := 0.0, 0.0
 			for index := range guess {
 				applied := (candidate[index] - guess[index]) * complex(damping, 0)
 				guess[index] += applied
 				if strings.HasPrefix(system.unknownLabels[index], "node:") {
 					maxAppliedUpdate = math.Max(maxAppliedUpdate, math.Abs(real(applied)))
+				} else {
+					maxAppliedCurrentUpdate = math.Max(maxAppliedCurrentUpdate, math.Abs(real(applied)))
 				}
 			}
 			// Check the accepted damped state against the original nonlinear
@@ -104,9 +115,10 @@ func solveNonlinearDC(plan Plan, analysis Analysis) (mnaSystem, []complex128, So
 			largestResidualLabel = residualLabel
 			evidence.Iterations++
 			evidence.FinalMaxUpdateV = normalizedMNAFloat(maxAppliedUpdate)
+			evidence.FinalMaxCurrentUpdateA = normalizedMNAFloat(maxAppliedCurrentUpdate)
 			evidence.FinalMaxResidual = normalizedMNAFloat(maxResidual)
 			finalSystem = system
-			if maxAppliedUpdate <= nonlinearUpdateTolerance && maxResidual <= nonlinearResidualTolerance {
+			if maxAppliedUpdate <= nonlinearUpdateTolerance && maxAppliedCurrentUpdate <= nonlinearCurrentUpdateTolerance && maxResidual <= nonlinearResidualTolerance {
 				converged = true
 				break
 			}
@@ -114,7 +126,7 @@ func solveNonlinearDC(plan Plan, analysis Analysis) (mnaSystem, []complex128, So
 		if !converged {
 			return mnaSystem{}, nil, evidence, &Diagnostic{
 				Path:       "convergence",
-				Message:    fmt.Sprintf("nonlinear DC did not converge within %d iterations at continuation stage %d/%d; largest update %s, largest residual %s", nonlinearMaxIterations, stageIndex+1, len(nonlinearContinuation), largestUpdateLabel, largestResidualLabel),
+				Message:    fmt.Sprintf("nonlinear DC did not converge within %d iterations at continuation stage %d/%d; largest voltage update %s, largest current update %s, largest residual %s", nonlinearMaxIterations, stageIndex+1, len(nonlinearContinuation), largestUpdateLabel, largestCurrentUpdateLabel, largestResidualLabel),
 				Suggestion: "add or correct catalog-backed DC bias paths, reduce conflicting source conditions, or select nonlinear models appropriate for the operating range",
 			}
 		}

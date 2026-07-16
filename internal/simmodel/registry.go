@@ -33,6 +33,7 @@ type definition struct {
 	Description string           `json:"description"`
 	GraphMNA    bool             `json:"graph_mna,omitempty"`
 	NonlinearDC bool             `json:"nonlinear_dc,omitempty"`
+	Transient   bool             `json:"transient,omitempty"`
 }
 
 var registry = []definition{
@@ -65,6 +66,10 @@ var registry = []definition{
 	{
 		ID: ModelNonlinearCircuitDCV1, GraphMNA: true, NonlinearDC: true,
 		Description: "Graph-derived bounded nonlinear DC operating-point analysis using trusted catalog primitive models.",
+	},
+	{
+		ID: ModelTransientCircuitV1, GraphMNA: true, NonlinearDC: true, Transient: true,
+		Description: "Graph-derived fixed-step transient analysis using trusted catalog primitive models.",
 	},
 }
 

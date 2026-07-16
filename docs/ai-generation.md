@@ -437,29 +437,37 @@ explicit prompt/profile as shown in the fixture commands above.
 ID. Legacy analytic models bind named roles and bounded scalar inputs. The
 graph-derived linear MNA model accepts bounded DC/AC analyses. A distinct
 nonlinear workflow accepts bounded DC operating points for reviewed Shockley
-diode and NPN/PNP Ebers-Moll primitives. Both accept independent source
+diode and NPN/PNP Ebers-Moll primitives. A separate transient workflow accepts
+one exact bounded observation grid, constant or bounded pulse sources, and
+voltage or trusted 10%-90% edge assertions for reviewed capacitors, diodes, and
+BJTs. These workflows accept independent source
 conditions and structured node assertions; topology is compiled only from
 resolved circuit connectivity and catalog evidence. The provider cannot supply
 topology classifications, device parameters, equations, matrices, stamps,
-solver settings, executable code, model files, include paths, commands, or
-expressions. Strict decoding and
+integration methods, initial states, solver settings, executable code, model
+files, include paths, commands, or expressions. Strict decoding and
 registry validation reject unknown fields and unsupported or incompatible
 requests.
 
 The registry supports catalog-parameterized ideal fixed linear regulators,
 unloaded resistor-divider DC behavior, ideal first-order RC low-pass AC
-magnitude, graph-derived linear MNA, and bounded nonlinear DC. Trusted MNA
-primitives cover resistors, capacitors, independent voltage/current sources, a
+magnitude, graph-derived linear MNA, bounded nonlinear DC, and fixed-step
+transient analysis. Trusted MNA primitives cover resistors, capacitors,
+independent voltage/current sources, a
 finite-gain single-pole op-amp with catalog supply/output limits, reviewed
 signal diodes, and reviewed NPN/PNP small-signal BJTs. Nonlinear analysis uses a
 fixed source/gmin continuation schedule, bounded Newton iterations and voltage
 updates, bounded exponential evaluation, deterministic convergence evidence,
 and catalog-backed current/voltage operating limits. The deterministic
+transient path uses backward Euler, a bounded nonlinear DC initial condition,
+the previous accepted state as each Newton seed, a catalog-rated capacitor
+companion model, and per-point capacitor/diode/BJT operating-limit checks.
 `.kicadai/simulation.json` report records registry/catalog provenance, canonical
 topology hash and devices, every analysis point and solved node, assertions,
 and status. Singular, unstable, unsupported, nonconvergent, operating-limit,
-incompatible, and numerically unbounded systems fail closed. This remains functional evidence,
-not parasitic, thermal, tolerance, transient, or fabrication signoff.
+incompatible, and numerically unbounded systems fail closed. This remains
+bounded functional evidence, not arbitrary SPICE compatibility, parasitic,
+thermal, tolerance, SOA, or fabrication signoff.
 
 ## Generic Placement And Routing Correction
 

@@ -179,7 +179,29 @@ func ProviderGraphSchema() map[string]any {
 		"analyses":   map[string]any{"type": "array", "minItems": 1, "maxItems": 8, "items": nonlinearAnalysis},
 		"assertions": map[string]any{"type": "array", "minItems": 1, "maxItems": 64, "items": mnaAssertion},
 	})
-	simulation := map[string]any{"oneOf": []any{legacySimulation, mnaSimulation, nonlinearSimulation}}
+	transientExcitation := strictObject(map[string]any{
+		"component": identifier, "dc_value": numberValue,
+		"pulse_initial_value": numberValue, "pulse_value": numberValue,
+		"pulse_delay_s": numberValue, "pulse_width_s": numberValue, "pulse_period_s": numberValue,
+	})
+	transientAnalysis := strictObject(map[string]any{
+		"id": identifier, "kind": map[string]any{"type": "string", "const": simmodel.AnalysisTransient},
+		"duration_s": numberValue, "time_step_s": numberValue,
+		"excitations": map[string]any{"type": "array", "minItems": 1, "maxItems": 16, "items": transientExcitation},
+	})
+	transientAssertion := strictObject(map[string]any{
+		"analysis_id": identifier, "node": stringValue,
+		"quantity": map[string]any{"type": "string", "enum": []string{simmodel.QuantityVoltageV, simmodel.QuantityRiseTimeS, simmodel.QuantityFallTimeS}},
+		"time_s":   numberValue, "min": numberValue, "max": numberValue,
+	})
+	transientSimulation := strictObject(map[string]any{
+		"model_id":   map[string]any{"type": "string", "const": simmodel.ModelTransientCircuitV1},
+		"bindings":   map[string]any{"type": "array", "maxItems": 0, "items": simulationBinding},
+		"inputs":     map[string]any{"type": "array", "maxItems": 0, "items": simulationValue},
+		"analyses":   map[string]any{"type": "array", "minItems": 1, "maxItems": 1, "items": transientAnalysis},
+		"assertions": map[string]any{"type": "array", "minItems": 1, "maxItems": 64, "items": transientAssertion},
+	})
+	simulation := map[string]any{"oneOf": []any{legacySimulation, mnaSimulation, nonlinearSimulation, transientSimulation}}
 
 	return strictObject(map[string]any{
 		"schema":  map[string]any{"type": "string", "const": SchemaID},

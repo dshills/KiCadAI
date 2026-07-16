@@ -84,6 +84,14 @@ from validation feedback to safe automatic repair.
   evidence. A held-out MMBT3904 bias fixture supplies no models or topology
   classification and passes simulation, routing/connectivity, clean ERC,
   strict DRC, writer correctness, zero round-trip diffs, and recorded replay.
+- Deterministic catalog-backed transient analysis for reviewed capacitors,
+  Shockley diodes, and NPN/PNP BJTs, using fixed backward Euler, exact bounded
+  observation grids, deterministic nonlinear DC initialization, bounded Newton
+  work, catalog operating limits, and trusted 10%-90% edge measurements. A
+  held-out MMBT3904 switching fixture supplies no models, equations, solver
+  controls, or topology classification and passes waveform assertions,
+  routing/connectivity, clean ERC, strict DRC, writer correctness, zero
+  round-trip diffs, and byte-identical replay.
 - Bounded placement-routing retry foundation with routing diagnostic to
   placement hint mapping, explicit retry policy, deterministic adjustment
   builder, best-attempt selection, repeated-state detection, and workflow retry
@@ -1108,10 +1116,10 @@ reaches the same KiCad-backed pass gates.
 1. Add a materially different generic graph only when it exposes a concrete
    catalog, lowering, hierarchy, placement, routing, simulation, or validation
    gap; do not extend stage count merely to accumulate fixtures.
-2. Add deterministic bounded transient analysis for a reviewed capacitor and
-   diode/transistor switching subset, with fixed time-step/work limits and a
-   held-out waveform fixture that supplies no provider models or topology labels.
-3. Generalize bounded placement-routing correction from those observed
+2. Add a materially different analog or mixed-signal fixture only when it
+   exposes a concrete trusted-model, operating-limit, or validation gap; do not
+   broaden transient support by accepting provider models or solver controls.
+3. Generalize bounded placement-routing correction from observed
    failures without introducing fixture-identity logic.
 4. Expand calculated rating and fabrication evidence before claiming broader
    autonomous or fabrication-ready coverage.

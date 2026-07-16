@@ -16,6 +16,10 @@ const (
 	maxMNASweepPoints     = 64
 	maxMNAExcitations     = 16
 	maxMNASourceMagnitude = 1e6
+	maxTransientSteps     = 2048
+	maxTransientWork      = (maxTransientSteps + 6) * nonlinearMaxIterations
+	minTransientTimeStepS = 1e-9
+	maxTransientDurationS = 10
 )
 
 type primitiveDefinition struct {
@@ -27,11 +31,14 @@ type primitiveDefinition struct {
 	Source            bool        `json:"source,omitempty"`
 	OpAmp             bool        `json:"op_amp,omitempty"`
 	Nonlinear         bool        `json:"nonlinear,omitempty"`
+	Transient         bool        `json:"transient,omitempty"`
 }
 
 var primitiveRegistry = []primitiveDefinition{
 	{ID: PrimitiveResistorV1, Family: "resistor", Terminals: []string{"A", "B"}, RequiresValueSI: true},
 	{ID: PrimitiveCapacitorV1, Family: "capacitor", Terminals: []string{"A", "B"}, RequiresValueSI: true},
+	{ID: PrimitiveCapacitorTransientV1, Family: "capacitor", Terminals: []string{"A", "B"}, RequiresValueSI: true, Transient: true,
+		CatalogParameters: []valueRule{{Name: "max_voltage_v", Positive: true, Minimum: .01, Maximum: 1e6}}},
 	{ID: PrimitiveVoltageSourceV1, Family: "voltage_source", Terminals: []string{"POSITIVE", "NEGATIVE"}, Source: true},
 	{ID: PrimitiveCurrentSourceV1, Family: "current_source", Terminals: []string{"POSITIVE", "NEGATIVE"}, Source: true},
 	{
@@ -95,7 +102,7 @@ func compatiblePrimitiveClaims(component ComponentEvidence, model definition) []
 	var matches []primitiveClaim
 	for _, claim := range component.ModelClaims {
 		primitive, exists := primitiveByID(strings.TrimSpace(claim.ModelID))
-		if !exists || primitive.Family != component.Family || (primitive.Nonlinear && !model.NonlinearDC) || (model.NonlinearDC && primitive.OpAmp) {
+		if !exists || primitive.Family != component.Family || (primitive.Nonlinear && !model.NonlinearDC) || (model.NonlinearDC && primitive.OpAmp) || (primitive.Transient && !model.Transient) || (model.Transient && primitive.Family == "capacitor" && !primitive.Transient) {
 			continue
 		}
 		matches = append(matches, primitiveClaim{primitive: primitive, claim: claim})
@@ -115,6 +122,9 @@ func validateMNAIntent(intent Intent, components map[string]string) []Diagnostic
 	if len(intent.Analyses) == 0 || len(intent.Analyses) > maxMNAAnalyses {
 		diagnostics = append(diagnostics, Diagnostic{Path: "analyses", Message: fmt.Sprintf("graph MNA requires 1..%d bounded analyses", maxMNAAnalyses)})
 	}
+	if model.Transient && len(intent.Analyses) != 1 {
+		diagnostics = append(diagnostics, Diagnostic{Path: "analyses", Message: "transient v1 requires exactly one bounded analysis grid"})
+	}
 	analysisKinds := make(map[string]string, len(intent.Analyses))
 	for index, analysis := range intent.Analyses {
 		path := fmt.Sprintf("analyses[%d]", index)
@@ -127,7 +137,10 @@ func validateMNAIntent(intent Intent, components map[string]string) []Diagnostic
 		analysisKinds[id] = analysis.Kind
 		switch analysis.Kind {
 		case AnalysisDCOperatingPoint:
-			if analysis.StartFrequencyHz != 0 || analysis.StopFrequencyHz != 0 || analysis.Points != 0 {
+			if model.Transient {
+				diagnostics = append(diagnostics, Diagnostic{Path: path + ".kind", Message: "transient circuit workflow supports transient analysis only"})
+			}
+			if analysis.StartFrequencyHz != 0 || analysis.StopFrequencyHz != 0 || analysis.Points != 0 || analysis.DurationS != 0 || analysis.TimeStepS != 0 {
 				diagnostics = append(diagnostics, Diagnostic{Path: path, Message: "DC operating-point analysis cannot contain AC sweep fields"})
 			}
 		case AnalysisACSweep:
@@ -137,8 +150,18 @@ func validateMNAIntent(intent Intent, components map[string]string) []Diagnostic
 			if !finite(analysis.StartFrequencyHz) || !finite(analysis.StopFrequencyHz) || analysis.StartFrequencyHz <= 0 || analysis.StopFrequencyHz < analysis.StartFrequencyHz || analysis.StopFrequencyHz > 1e12 || analysis.Points < 2 || analysis.Points > maxMNASweepPoints {
 				diagnostics = append(diagnostics, Diagnostic{Path: path, Message: fmt.Sprintf("AC sweep requires finite 0 < start <= stop <= 1e12 Hz and 2..%d points", maxMNASweepPoints)})
 			}
+			if analysis.DurationS != 0 || analysis.TimeStepS != 0 {
+				diagnostics = append(diagnostics, Diagnostic{Path: path, Message: "AC sweep cannot contain transient grid fields"})
+			}
+		case AnalysisTransient:
+			if !model.Transient {
+				diagnostics = append(diagnostics, Diagnostic{Path: path + ".kind", Message: "transient analysis requires transient_circuit_v1"})
+			}
+			if analysis.StartFrequencyHz != 0 || analysis.StopFrequencyHz != 0 || analysis.Points != 0 || !validTransientGrid(analysis.DurationS, analysis.TimeStepS) || transientWork(analysis) > maxTransientWork {
+				diagnostics = append(diagnostics, Diagnostic{Path: path, Message: fmt.Sprintf("transient analysis requires finite %.0e <= time_step_s, duration_s <= %d, an exact integer grid, and at most %d steps", minTransientTimeStepS, maxTransientDurationS, maxTransientSteps)})
+			}
 		default:
-			diagnostics = append(diagnostics, Diagnostic{Path: path + ".kind", Message: "analysis kind is not supported by graph MNA", Suggestion: "use dc_operating_point or ac_sweep"})
+			diagnostics = append(diagnostics, Diagnostic{Path: path + ".kind", Message: "analysis kind is not supported by graph MNA", Suggestion: "use dc_operating_point, ac_sweep, or transient in its dedicated workflow"})
 		}
 		if len(analysis.Excitations) == 0 || len(analysis.Excitations) > maxMNAExcitations {
 			diagnostics = append(diagnostics, Diagnostic{Path: path + ".excitations", Message: fmt.Sprintf("analysis requires 1..%d catalog source excitations", maxMNAExcitations)})
@@ -155,11 +178,29 @@ func validateMNAIntent(intent Intent, components map[string]string) []Diagnostic
 				diagnostics = append(diagnostics, Diagnostic{Path: sourcePath + ".component", Message: "source component is duplicated within the analysis"})
 			}
 			seenSources[component] = struct{}{}
-			if !boundedMagnitude(excitation.DCValue) || !boundedMagnitude(excitation.ACMagnitude) || excitation.ACMagnitude < 0 || !finite(excitation.ACPhaseDeg) || excitation.ACPhaseDeg < -360 || excitation.ACPhaseDeg > 360 {
+			if !boundedMagnitude(excitation.DCValue) || !boundedMagnitude(excitation.ACMagnitude) || excitation.ACMagnitude < 0 || !finite(excitation.ACPhaseDeg) || excitation.ACPhaseDeg < -360 || excitation.ACPhaseDeg > 360 || !boundedMagnitude(excitation.PulseInitialValue) || !boundedMagnitude(excitation.PulseValue) {
 				diagnostics = append(diagnostics, Diagnostic{Path: sourcePath, Message: "source conditions must be finite and bounded; AC magnitude must be nonnegative and phase within -360..360 degrees"})
 			}
 			if analysis.Kind == AnalysisDCOperatingPoint && (excitation.ACMagnitude != 0 || excitation.ACPhaseDeg != 0) {
 				diagnostics = append(diagnostics, Diagnostic{Path: sourcePath, Message: "DC operating-point excitation cannot contain AC magnitude or phase"})
+			}
+			if analysis.Kind != AnalysisTransient && hasPulse(excitation) {
+				diagnostics = append(diagnostics, Diagnostic{Path: sourcePath, Message: "pulse conditions are accepted only by transient analysis"})
+			}
+			if analysis.Kind == AnalysisTransient {
+				if excitation.ACMagnitude != 0 || excitation.ACPhaseDeg != 0 {
+					diagnostics = append(diagnostics, Diagnostic{Path: sourcePath, Message: "transient excitation cannot contain AC magnitude or phase"})
+				}
+				if excitation.PulsePeriodS != 0 {
+					// PulseInitialValue and PulseValue are absolute source levels,
+					// not offsets from DCValue. Requiring zero DCValue keeps one
+					// canonical representation and prevents an ambiguous double bias.
+					if excitation.DCValue != 0 || !finite(excitation.PulseDelayS) || !finite(excitation.PulseWidthS) || !finite(excitation.PulsePeriodS) || excitation.PulseDelayS < 0 || excitation.PulseWidthS <= 0 || excitation.PulsePeriodS <= excitation.PulseWidthS || excitation.PulseDelayS+excitation.PulseWidthS > analysis.DurationS || !onTransientGrid(excitation.PulseDelayS, analysis.TimeStepS) || !onTransientGrid(excitation.PulseWidthS, analysis.TimeStepS) || !onTransientGrid(excitation.PulsePeriodS, analysis.TimeStepS) {
+						diagnostics = append(diagnostics, Diagnostic{Path: sourcePath, Message: "transient pulse uses absolute initial/pulsed levels and requires zero dc_value, 0 <= delay, 0 < width < period, a falling edge within duration, and all times exactly on the observation grid"})
+					}
+				} else if excitation.PulseDelayS != 0 || excitation.PulseWidthS != 0 || excitation.PulseInitialValue != 0 || excitation.PulseValue != 0 {
+					diagnostics = append(diagnostics, Diagnostic{Path: sourcePath, Message: "transient pulse fields require a positive pulse_period_s"})
+				}
 			}
 		}
 	}
@@ -188,6 +229,10 @@ func validateMNAIntent(intent Intent, components map[string]string) []Diagnostic
 			if kind == AnalysisDCOperatingPoint {
 				diagnostics = append(diagnostics, Diagnostic{Path: path + ".quantity", Message: "DC assertions must use voltage_v"})
 			}
+		case QuantityRiseTimeS, QuantityFallTimeS:
+			if kind != AnalysisTransient {
+				diagnostics = append(diagnostics, Diagnostic{Path: path + ".quantity", Message: "edge-time assertions require transient analysis"})
+			}
 		default:
 			diagnostics = append(diagnostics, Diagnostic{Path: path + ".quantity", Message: "assertion quantity is not supported"})
 		}
@@ -196,6 +241,20 @@ func validateMNAIntent(intent Intent, components map[string]string) []Diagnostic
 		}
 		if kind == AnalysisDCOperatingPoint && assertion.FrequencyHz != 0 {
 			diagnostics = append(diagnostics, Diagnostic{Path: path + ".frequency_hz", Message: "DC assertion cannot specify a frequency"})
+		}
+		if kind == AnalysisTransient {
+			if assertion.FrequencyHz != 0 {
+				diagnostics = append(diagnostics, Diagnostic{Path: path + ".frequency_hz", Message: "transient assertion cannot specify a frequency"})
+			}
+			analysis, _ := analysisByID(intent.Analyses, assertion.AnalysisID)
+			if assertion.Quantity == QuantityVoltageV && (!finite(assertion.TimeS) || assertion.TimeS < 0 || assertion.TimeS > analysis.DurationS || !onTransientGrid(assertion.TimeS, analysis.TimeStepS)) {
+				diagnostics = append(diagnostics, Diagnostic{Path: path + ".time_s", Message: "transient voltage assertion time must be an exact observation point"})
+			}
+			if assertion.Quantity != QuantityVoltageV && assertion.TimeS != 0 {
+				diagnostics = append(diagnostics, Diagnostic{Path: path + ".time_s", Message: "edge-time assertion derives its interval and cannot specify time_s"})
+			}
+		} else if assertion.TimeS != 0 {
+			diagnostics = append(diagnostics, Diagnostic{Path: path + ".time_s", Message: "non-transient assertion cannot specify time_s"})
 		}
 		if !finite(assertion.Min) || !finite(assertion.Max) || assertion.Min > assertion.Max {
 			diagnostics = append(diagnostics, Diagnostic{Path: path, Message: "assertion bounds must be finite and minimum must not exceed maximum"})
@@ -257,6 +316,9 @@ func resolveMNA(intent Intent, catalogID, catalogHash string, components []Compo
 				kind := "linear MNA"
 				if model.NonlinearDC {
 					kind = "nonlinear DC"
+				}
+				if model.Transient {
+					kind = "transient"
 				}
 				diagnostics = append(diagnostics, Diagnostic{Path: "topology.devices." + component.InstanceID, Message: fmt.Sprintf("connected component family %s has no trusted %s primitive claim", component.Family, kind), Suggestion: "select a component with a unique reviewed catalog primitive claim"})
 			}
@@ -366,6 +428,7 @@ func validateMNAPlan(plan Plan) []Diagnostic {
 	deviceFamilies := make(map[string]string, len(plan.Devices))
 	devicePrimitives := make(map[string]string, len(plan.Devices))
 	nonlinearDevices := 0
+	transientCapacitors := 0
 	for index, device := range plan.Devices {
 		path := fmt.Sprintf("devices[%d]", index)
 		if index > 0 && plan.Devices[index-1].Component >= device.Component {
@@ -381,8 +444,14 @@ func validateMNAPlan(plan Plan) []Diagnostic {
 		if primitive.Nonlinear {
 			nonlinearDevices++
 		}
+		if primitive.ID == PrimitiveCapacitorTransientV1 {
+			transientCapacitors++
+		}
 		if primitive.Nonlinear && !model.NonlinearDC {
 			diagnostics = append(diagnostics, Diagnostic{Path: path + ".primitive_model", Message: "linear MNA plan contains a nonlinear primitive"})
+		}
+		if primitive.Transient && !model.Transient {
+			diagnostics = append(diagnostics, Diagnostic{Path: path + ".primitive_model", Message: "non-transient plan contains a transient-only primitive"})
 		}
 		if model.NonlinearDC && primitive.OpAmp {
 			diagnostics = append(diagnostics, Diagnostic{Path: path + ".primitive_model", Message: "nonlinear DC v1 does not combine nonlinear devices with op-amp dependent sources"})
@@ -403,6 +472,9 @@ func validateMNAPlan(plan Plan) []Diagnostic {
 	}
 	if model.NonlinearDC && nonlinearDevices == 0 {
 		diagnostics = append(diagnostics, Diagnostic{Path: "devices", Message: "nonlinear DC workflow requires at least one reviewed nonlinear device"})
+	}
+	if model.Transient && transientCapacitors == 0 {
+		diagnostics = append(diagnostics, Diagnostic{Path: "devices", Message: "transient workflow requires at least one reviewed transient capacitor"})
 	}
 	intent := Intent{ModelID: plan.ModelID, Analyses: cloneAnalyses(plan.Analyses), Assertions: append([]Assertion(nil), plan.Assertions...)}
 	diagnostics = append(diagnostics, validateMNAIntent(intent, deviceFamilies)...)
@@ -427,6 +499,9 @@ func validateMNAPlan(plan Plan) []Diagnostic {
 		analysis, exists := analysisByID(plan.Analyses, assertion.AnalysisID)
 		if exists && analysis.Kind == AnalysisACSweep && !frequencyInSweep(analysis, assertion.FrequencyHz) {
 			diagnostics = append(diagnostics, Diagnostic{Path: fmt.Sprintf("assertions[%d].frequency_hz", index), Message: "assertion frequency is not an exact point in the deterministic AC sweep", Suggestion: "choose one of the frequencies generated by start, stop, and point count"})
+		}
+		if exists && analysis.Kind == AnalysisTransient && assertion.Quantity == QuantityVoltageV && !onTransientGrid(assertion.TimeS, analysis.TimeStepS) {
+			diagnostics = append(diagnostics, Diagnostic{Path: fmt.Sprintf("assertions[%d].time_s", index), Message: "assertion time is not an exact point in the deterministic transient grid"})
 		}
 		if index > 0 && assertionKey(plan.Assertions[index-1]) >= assertionKey(assertion) {
 			diagnostics = append(diagnostics, Diagnostic{Path: fmt.Sprintf("assertions[%d]", index), Message: "resolved assertions must be unique and canonically ordered"})
@@ -529,7 +604,7 @@ func assertionKey(assertion Assertion) string {
 	if assertion.Metric != "" {
 		return "legacy\x00" + assertion.Metric
 	}
-	return fmt.Sprintf("mna\x00%s\x00%s\x00%s\x00%024.12e", assertion.AnalysisID, assertion.Node, assertion.Quantity, assertion.FrequencyHz)
+	return fmt.Sprintf("mna\x00%s\x00%s\x00%s\x00%024.12e\x00%024.12e", assertion.AnalysisID, assertion.Node, assertion.Quantity, assertion.FrequencyHz, assertion.TimeS)
 }
 
 func analysisByID(analyses []Analysis, id string) (Analysis, bool) {
@@ -555,6 +630,33 @@ func validAnalysisID(value string) bool {
 
 func boundedMagnitude(value float64) bool {
 	return finite(value) && math.Abs(value) <= maxMNASourceMagnitude
+}
+
+func hasPulse(excitation SourceExcitation) bool {
+	return excitation.PulseInitialValue != 0 || excitation.PulseValue != 0 || excitation.PulseDelayS != 0 || excitation.PulseWidthS != 0 || excitation.PulsePeriodS != 0
+}
+
+func validTransientGrid(duration, step float64) bool {
+	if !finite(duration) || !finite(step) || step < minTransientTimeStepS || duration < step || duration > maxTransientDurationS {
+		return false
+	}
+	steps := math.Round(duration / step)
+	return steps >= 1 && steps <= maxTransientSteps && math.Abs(duration-steps*step) <= math.Max(duration, step)*1e-12
+}
+
+func transientWork(analysis Analysis) int {
+	if !finite(analysis.DurationS) || !finite(analysis.TimeStepS) || analysis.TimeStepS <= 0 {
+		return maxTransientWork + 1
+	}
+	return (int(math.Round(analysis.DurationS/analysis.TimeStepS)) + len(nonlinearContinuation)) * nonlinearMaxIterations
+}
+
+func onTransientGrid(value, step float64) bool {
+	if !finite(value) || !finite(step) || step <= 0 || value < 0 {
+		return false
+	}
+	index := math.Round(value / step)
+	return math.Abs(value-index*step) <= math.Max(step, math.Abs(value))*1e-12
 }
 
 func frequencyInSweep(analysis Analysis, frequency float64) bool {

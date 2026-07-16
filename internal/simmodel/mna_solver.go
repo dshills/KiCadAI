@@ -31,6 +31,17 @@ func evaluateMNA(plan Plan, report Report) (Report, []Diagnostic) {
 		}
 	}
 	analysisResults := make([]AnalysisResult, 0, len(plan.Analyses))
+	if model.Transient {
+		for _, analysis := range plan.Analyses {
+			result, diagnostics := solveTransientAnalysis(plan, analysis)
+			if len(diagnostics) != 0 {
+				return report, diagnostics
+			}
+			analysisResults = append(analysisResults, result)
+		}
+		report.Analyses = analysisResults
+		return evaluateMNAAssertions(plan, report)
+	}
 	for _, analysis := range plan.Analyses {
 		frequencies := []float64{0}
 		if analysis.Kind == AnalysisACSweep {
@@ -71,6 +82,10 @@ func evaluateMNA(plan Plan, report Report) (Report, []Diagnostic) {
 		analysisResults = append(analysisResults, result)
 	}
 	report.Analyses = analysisResults
+	return evaluateMNAAssertions(plan, report)
+}
+
+func evaluateMNAAssertions(plan Plan, report Report) (Report, []Diagnostic) {
 	var diagnostics []Diagnostic
 	for _, assertion := range plan.Assertions {
 		actual, diagnostic := assertionValue(report.Analyses, assertion)
@@ -80,7 +95,7 @@ func evaluateMNA(plan Plan, report Report) (Report, []Diagnostic) {
 		}
 		pass := actual >= assertion.Min && actual <= assertion.Max
 		report.Assertions = append(report.Assertions, AssertionResult{
-			AnalysisID: assertion.AnalysisID, Node: assertion.Node, Quantity: assertion.Quantity, FrequencyHz: assertion.FrequencyHz,
+			AnalysisID: assertion.AnalysisID, Node: assertion.Node, Quantity: assertion.Quantity, FrequencyHz: assertion.FrequencyHz, TimeS: assertion.TimeS,
 			Min: assertion.Min, Max: assertion.Max, Actual: actual, Pass: pass,
 		})
 		if !pass {
@@ -136,6 +151,8 @@ func buildMNASystemWithForcedOpAmp(plan Plan, analysis Analysis, frequency float
 			if analysis.Kind == AnalysisACSweep {
 				stampAdmittance(&system, terminals["A"], terminals["B"], complex(0, 2*math.Pi*frequency**device.ValueSI))
 			}
+		case PrimitiveCapacitorTransientV1:
+			// The trusted transient solver stamps the fixed backward-Euler companion.
 		case PrimitiveVoltageSourceV1:
 			value := excitationValue(analysis, device.Component)
 			stampVoltageSource(&system, device.Component, terminals["POSITIVE"], terminals["NEGATIVE"], value)
@@ -453,8 +470,14 @@ func assertionValue(results []AnalysisResult, assertion Assertion) (float64, *Di
 		if result.ID != assertion.AnalysisID {
 			continue
 		}
+		if result.Kind == AnalysisTransient && (assertion.Quantity == QuantityRiseTimeS || assertion.Quantity == QuantityFallTimeS) {
+			return transientEdgeTime(result, assertion)
+		}
 		for _, point := range result.Points {
 			if result.Kind == AnalysisACSweep && math.Abs(point.FrequencyHz-assertion.FrequencyHz) > math.Max(1, math.Abs(point.FrequencyHz))*1e-12 {
+				continue
+			}
+			if result.Kind == AnalysisTransient && math.Abs(point.TimeS-assertion.TimeS) > math.Max(1, math.Abs(point.TimeS))*1e-12 {
 				continue
 			}
 			for _, node := range point.Nodes {
@@ -478,6 +501,63 @@ func assertionValue(results []AnalysisResult, assertion Assertion) (float64, *Di
 		}
 	}
 	return 0, &Diagnostic{Path: "assertions." + assertion.AnalysisID + "." + assertion.Node, Message: "structured assertion did not resolve to a solved analysis point"}
+}
+
+func transientEdgeTime(result AnalysisResult, assertion Assertion) (float64, *Diagnostic) {
+	times := make([]float64, 0, len(result.Points))
+	values := make([]float64, 0, len(result.Points))
+	minimum, maximum := math.Inf(1), math.Inf(-1)
+	for _, point := range result.Points {
+		for _, node := range point.Nodes {
+			if node.Node == assertion.Node {
+				times = append(times, point.TimeS)
+				values = append(values, node.Real)
+				minimum = math.Min(minimum, node.Real)
+				maximum = math.Max(maximum, node.Real)
+				break
+			}
+		}
+	}
+	if len(values) < 2 || !finite(minimum) || !finite(maximum) || maximum-minimum <= 1e-12 {
+		return 0, &Diagnostic{Path: "assertions." + assertion.AnalysisID + "." + assertion.Node, Message: "trusted edge-time assertion requires a nonconstant solved waveform"}
+	}
+	// V1 intentionally defines thresholds from the global extrema of the
+	// complete bounded analysis duration, making multi-pulse behavior explicit
+	// and deterministic without provider-selected transition windows.
+	low, high := minimum+.1*(maximum-minimum), minimum+.9*(maximum-minimum)
+	first, second := low, high
+	rising := assertion.Quantity == QuantityRiseTimeS
+	if !rising {
+		first, second = high, low
+	}
+	firstTime, foundFirst := 0.0, false
+	for index := 1; index < len(values); index++ {
+		if !foundFirst && crosses(values[index-1], values[index], first, rising) {
+			firstTime = interpolateCrossing(times[index-1], times[index], values[index-1], values[index], first)
+			foundFirst = true
+		}
+		if foundFirst && crosses(values[index-1], values[index], second, rising) {
+			secondTime := interpolateCrossing(times[index-1], times[index], values[index-1], values[index], second)
+			if secondTime >= firstTime {
+				return normalizedMNAFloat(secondTime - firstTime), nil
+			}
+		}
+	}
+	return 0, &Diagnostic{Path: "assertions." + assertion.AnalysisID + "." + assertion.Node, Message: "trusted waveform does not contain a complete 10%-90% " + assertion.Quantity, Suggestion: "extend the bounded duration or correct the catalog-backed switching circuit"}
+}
+
+func crosses(a, b, threshold float64, rising bool) bool {
+	if rising {
+		return (a < threshold && b >= threshold) || (a == threshold && b > threshold)
+	}
+	return (a > threshold && b <= threshold) || (a == threshold && b < threshold)
+}
+
+func interpolateCrossing(t0, t1, v0, v1, threshold float64) float64 {
+	if math.Abs(v1-v0) < 1e-15 {
+		return t1
+	}
+	return t0 + (threshold-v0)*(t1-t0)/(v1-v0)
 }
 
 func sweepFrequencies(analysis Analysis) []float64 {

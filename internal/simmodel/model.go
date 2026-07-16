@@ -9,23 +9,28 @@ const (
 	ModelRCLowpassACV1          = "rc_lowpass_ac_v1"
 	ModelLinearCircuitMNAV1     = "linear_circuit_mna_v1"
 	ModelNonlinearCircuitDCV1   = "nonlinear_circuit_dc_v1"
+	ModelTransientCircuitV1     = "transient_circuit_v1"
 
-	PrimitiveResistorV1      = "mna_resistor_v1"
-	PrimitiveCapacitorV1     = "mna_capacitor_v1"
-	PrimitiveVoltageSourceV1 = "mna_voltage_source_v1"
-	PrimitiveCurrentSourceV1 = "mna_current_source_v1"
-	PrimitiveOpAmpV1         = "mna_opamp_single_pole_v1"
-	PrimitiveDiodeShockleyV1 = "mna_diode_shockley_v1"
-	PrimitiveBJTNPNV1        = "mna_bjt_npn_ebers_moll_v1"
-	PrimitiveBJTPNPV1        = "mna_bjt_pnp_ebers_moll_v1"
+	PrimitiveResistorV1           = "mna_resistor_v1"
+	PrimitiveCapacitorV1          = "mna_capacitor_v1"
+	PrimitiveCapacitorTransientV1 = "mna_capacitor_transient_be_v1"
+	PrimitiveVoltageSourceV1      = "mna_voltage_source_v1"
+	PrimitiveCurrentSourceV1      = "mna_current_source_v1"
+	PrimitiveOpAmpV1              = "mna_opamp_single_pole_v1"
+	PrimitiveDiodeShockleyV1      = "mna_diode_shockley_v1"
+	PrimitiveBJTNPNV1             = "mna_bjt_npn_ebers_moll_v1"
+	PrimitiveBJTPNPV1             = "mna_bjt_pnp_ebers_moll_v1"
 
 	AnalysisDCOperatingPoint = "dc_operating_point"
 	AnalysisACSweep          = "ac_sweep"
+	AnalysisTransient        = "transient"
 
 	QuantityVoltageV          = "voltage_v"
 	QuantityVoltageMagnitudeV = "voltage_magnitude_v"
 	QuantityVoltagePhaseDeg   = "voltage_phase_deg"
 	QuantityVoltageDBV        = "voltage_dbv"
+	QuantityRiseTimeS         = "rise_time_s"
+	QuantityFallTimeS         = "fall_time_s"
 )
 
 type NamedValue struct {
@@ -49,6 +54,7 @@ type Assertion struct {
 	Node        string  `json:"node,omitempty"`
 	Quantity    string  `json:"quantity,omitempty"`
 	FrequencyHz float64 `json:"frequency_hz,omitempty"`
+	TimeS       float64 `json:"time_s,omitempty"`
 	Min         float64 `json:"min"`
 	Max         float64 `json:"max"`
 }
@@ -57,10 +63,15 @@ type Assertion struct {
 // independent source. Primitive kind and terminal orientation remain trusted
 // catalog/registry data rather than provider input.
 type SourceExcitation struct {
-	Component   string  `json:"component"`
-	DCValue     float64 `json:"dc_value,omitempty"`
-	ACMagnitude float64 `json:"ac_magnitude,omitempty"`
-	ACPhaseDeg  float64 `json:"ac_phase_deg,omitempty"`
+	Component         string  `json:"component"`
+	DCValue           float64 `json:"dc_value,omitempty"`
+	ACMagnitude       float64 `json:"ac_magnitude,omitempty"`
+	ACPhaseDeg        float64 `json:"ac_phase_deg,omitempty"`
+	PulseInitialValue float64 `json:"pulse_initial_value,omitempty"`
+	PulseValue        float64 `json:"pulse_value,omitempty"`
+	PulseDelayS       float64 `json:"pulse_delay_s,omitempty"`
+	PulseWidthS       float64 `json:"pulse_width_s,omitempty"`
+	PulsePeriodS      float64 `json:"pulse_period_s,omitempty"`
 }
 
 // Analysis requests a trusted analysis algorithm. It contains no equation,
@@ -71,6 +82,8 @@ type Analysis struct {
 	StartFrequencyHz float64            `json:"start_frequency_hz,omitempty"`
 	StopFrequencyHz  float64            `json:"stop_frequency_hz,omitempty"`
 	Points           int                `json:"points,omitempty"`
+	DurationS        float64            `json:"duration_s,omitempty"`
+	TimeStepS        float64            `json:"time_step_s,omitempty"`
 	Excitations      []SourceExcitation `json:"excitations"`
 }
 
@@ -192,6 +205,7 @@ type AssertionResult struct {
 	Node        string  `json:"node,omitempty"`
 	Quantity    string  `json:"quantity,omitempty"`
 	FrequencyHz float64 `json:"frequency_hz,omitempty"`
+	TimeS       float64 `json:"time_s,omitempty"`
 	Min         float64 `json:"min"`
 	Max         float64 `json:"max"`
 	Actual      float64 `json:"actual"`
@@ -208,6 +222,7 @@ type NodeResult struct {
 
 type AnalysisPoint struct {
 	FrequencyHz float64         `json:"frequency_hz,omitempty"`
+	TimeS       float64         `json:"time_s,omitempty"`
 	Nodes       []NodeResult    `json:"nodes"`
 	Solver      *SolverEvidence `json:"solver,omitempty"`
 }
@@ -215,11 +230,17 @@ type AnalysisPoint struct {
 // SolverEvidence records bounded deterministic nonlinear work without
 // exposing or accepting solver controls in provider-authored intent.
 type SolverEvidence struct {
-	Method           string  `json:"method"`
-	Iterations       int     `json:"iterations"`
-	SourceStages     int     `json:"source_stages"`
-	FinalMaxUpdateV  float64 `json:"final_max_update_v"`
-	FinalMaxResidual float64 `json:"final_max_residual"`
+	Method                 string  `json:"method"`
+	Iterations             int     `json:"iterations"`
+	SourceStages           int     `json:"source_stages"`
+	FinalMaxUpdateV        float64 `json:"final_max_update_v"`
+	FinalMaxCurrentUpdateA float64 `json:"final_max_current_update_a,omitempty"`
+	FinalMaxResidual       float64 `json:"final_max_residual"`
+	InitialCondition       string  `json:"initial_condition,omitempty"`
+	TimeSteps              int     `json:"time_steps,omitempty"`
+	TotalIterations        int     `json:"total_iterations,omitempty"`
+	MaxIterationsPerStep   int     `json:"max_iterations_per_step,omitempty"`
+	MaxTotalIterations     int     `json:"max_total_iterations,omitempty"`
 }
 
 type AnalysisResult struct {

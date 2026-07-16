@@ -84,6 +84,7 @@
       "tolerances": [{"kind": "capacitance", "max": "20", "unit": "%"}],
       "simulation_models": [
         {"model_id": "mna_capacitor_v1"},
+        {"model_id": "mna_capacitor_transient_be_v1", "parameters": [{"name": "max_voltage_v", "value": 25}]},
         {"model_id": "rc_lowpass_ac_v1"}
       ],
       "symbols": [{
@@ -121,6 +122,7 @@
       "tolerances": [{"kind": "capacitance", "max": "20", "unit": "%"}],
       "simulation_models": [
         {"model_id": "mna_capacitor_v1"},
+        {"model_id": "mna_capacitor_transient_be_v1", "parameters": [{"name": "max_voltage_v", "value": 25}]},
         {"model_id": "rc_lowpass_ac_v1"}
       ],
       "capacitor_evidence": {

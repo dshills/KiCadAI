@@ -1,9 +1,13 @@
 package circuitgraph
 
 import (
+	"encoding/json"
 	"reflect"
 	"sort"
+	"strings"
 	"testing"
+
+	"kicadai/internal/simmodel"
 )
 
 func TestProviderGraphSchemaIsStrictAndFullyRequired(t *testing.T) {
@@ -56,6 +60,50 @@ func TestProviderGraphSchemaTopLevelMatchesDocument(t *testing.T) {
 	for name := range properties {
 		if !fields[name] {
 			t.Fatalf("schema property %q has no Document field", name)
+		}
+	}
+}
+
+func TestProviderGraphSchemaTransientTrustBoundary(t *testing.T) {
+	properties := ProviderGraphSchema()["properties"].(map[string]any)
+	nullableSimulation := properties["simulation"].(map[string]any)
+	var simulation map[string]any
+	for _, option := range nullableSimulation["anyOf"].([]any) {
+		candidate := option.(map[string]any)
+		if _, exists := candidate["oneOf"]; exists {
+			simulation = candidate
+			break
+		}
+	}
+	if simulation == nil {
+		t.Fatal("nullable simulation schema lacks its non-null oneOf branch")
+	}
+	branches := simulation["oneOf"].([]any)
+	var transient map[string]any
+	for _, branch := range branches {
+		candidate := branch.(map[string]any)
+		model := candidate["properties"].(map[string]any)["model_id"].(map[string]any)
+		if model["const"] == simmodel.ModelTransientCircuitV1 {
+			transient = candidate
+			break
+		}
+	}
+	if transient == nil {
+		t.Fatal("transient simulation schema branch is missing")
+	}
+	data, err := json.Marshal(transient)
+	if err != nil {
+		t.Fatal(err)
+	}
+	encoded := string(data)
+	for _, required := range []string{"duration_s", "time_step_s", "pulse_initial_value", "pulse_value", "rise_time_s", "fall_time_s"} {
+		if !strings.Contains(encoded, required) {
+			t.Fatalf("transient schema lacks %q", required)
+		}
+	}
+	for _, forbidden := range []string{"equation", "matrix", "integration_method", "initial_conditions", "topology", "model_file", "max_iterations"} {
+		if strings.Contains(encoded, forbidden) {
+			t.Fatalf("transient provider schema exposes forbidden field %q", forbidden)
 		}
 	}
 }
