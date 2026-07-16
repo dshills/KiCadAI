@@ -1,7 +1,7 @@
 # Generic Circuit Agent Repair Harness
 
 Date: 2026-07-15
-Status: Proposed
+Status: Implemented
 
 ## Goal
 
@@ -27,8 +27,9 @@ States are `ready`, `repair_available`, `needs_review`, and `blocked`.
 ## Selection Policy
 
 - `ready`: preflight is `ready_for_write`; no patch is produced.
-- `repair_available`: exactly one `agent_selectable` option exists and all of
-  its required values are derivable from its graph/catalog `allowed_values`.
+- `repair_available`: exactly one `agent_selectable` option exists and its
+  patch is fully populated from trusted graph/catalog evidence. Any option
+  requiring an agent-supplied value remains review-only.
 - `needs_review`: zero executable repairs exist, or more than one safe repair
   exists. The result preserves the upstream stage/retry scope and any
   review-required metadata; electrical, thermal, safety, fabrication, and
@@ -59,6 +60,9 @@ an electrical, ERC/DRC, round-trip, KiCad-backed, or fabrication claim.
 ## Test Strategy
 
 Cover RC selector repair through patch/re-preflight/create, LM358 unit repair,
-ready valid graphs, ambiguous multiple-option cases, review-only cases,
-repeated hashes, no-write behavior, deterministic output, and existing generic
-and provider fixtures. Optional KiCad checks remain environment-gated.
+bounded region repair, ready recorded generic graphs, ambiguous multiple-option
+cases, review-only routing/external cases, repeated hashes, no-write behavior,
+deterministic output, and existing generic/provider fixtures. The current
+generic protected USB-C LED graph has unresolved CC routing and therefore
+correctly returns `needs_review`, rather than receiving an unsafe patch.
+Optional KiCad checks remain environment-gated.

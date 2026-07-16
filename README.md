@@ -126,9 +126,9 @@ kicadai --symbols-root /path/to/kicad-symbols \
   circuit create --request ./graph.json --output ./out/project --overwrite
 ```
 
-For rejected generic graphs, inspect `data.repair_options` from preflight, use
-one operation template to construct `changes.json`, then run `circuit
-patch` and re-preflight. See the [CLI reference](docs/cli-reference.md#generic-circuit-patch)
+For rejected generic graphs, run `circuit repair-plan` first. It selects an
+executable patch only when one safe correction is fully derived; otherwise it
+stops for review. See the [CLI reference](docs/cli-reference.md#generic-circuit-repair-plan)
 for the strict patch contract and evidence boundary.
 
 See [AI Generation](docs/ai-generation.md) for bounded and generic modes, live

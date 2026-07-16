@@ -342,6 +342,59 @@ func TestCircuitRepairPlanReadyAndRepeatedHash(t *testing.T) {
 	}
 }
 
+func TestCircuitRepairPlanRecordedGenericCorpusAndReviewStop(t *testing.T) {
+	for _, name := range []string{
+		"generic_usb_c_bmp280_breakout",
+		"generic_lmv321_ac_gain_stage",
+		"generic_dual_lmv321_signal_conditioner",
+		"generic_lm358_buffered_signal_conditioner",
+	} {
+		t.Run(name, func(t *testing.T) {
+			graph := recordedGenericCircuitGraph(t, name)
+			result := runCircuitPreflightCLI(t, []string{"circuit", "repair-plan", "--request", graph})
+			plan := circuitRepairPlanResultData(t, result).Plan
+			if !result.OK || plan.State != circuitgraph.RepairPlanReady || plan.Patch != nil {
+				t.Fatalf("ready recorded graph result=%#v plan=%#v", result, plan)
+			}
+		})
+	}
+	t.Run("protected_led_routing_needs_review", func(t *testing.T) {
+		graph := recordedGenericCircuitGraph(t, "generic_usb_c_led_indicator_protected")
+		result := runCircuitPreflightCLI(t, []string{"circuit", "repair-plan", "--request", graph})
+		plan := circuitRepairPlanResultData(t, result).Plan
+		if result.OK || plan.State != circuitgraph.RepairPlanNeedsReview || plan.StopReason != "no_fully_derived_repair" || plan.Patch != nil {
+			t.Fatalf("routing review plan result=%#v plan=%#v", result, plan)
+		}
+	})
+}
+
+func TestCircuitRepairPlanDoesNotWriteFiles(t *testing.T) {
+	tmpDir := t.TempDir()
+	graph := filepath.Join(tmpDir, "graph.json")
+	contents, err := os.ReadFile(filepath.Join("..", "..", "examples", "circuit-graph", "rc_filter.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(graph, contents, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	before, err := os.ReadDir(tmpDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	result := runCircuitPreflightCLI(t, []string{"circuit", "repair-plan", "--request", graph})
+	if !result.OK || circuitRepairPlanResultData(t, result).Plan.State != circuitgraph.RepairPlanReady {
+		t.Fatalf("read-only repair plan=%#v", result)
+	}
+	after, err := os.ReadDir(tmpDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(before) != 1 || len(after) != 1 || before[0].Name() != "graph.json" || after[0].Name() != "graph.json" {
+		t.Fatalf("repair-plan wrote files: before=%#v after=%#v", before, after)
+	}
+}
+
 func TestCircuitRepairPlanDerivesUniqueSelectorPatch(t *testing.T) {
 	base, err := os.ReadFile(filepath.Join("..", "..", "examples", "circuit-graph", "rc_filter.json"))
 	if err != nil {
@@ -569,6 +622,28 @@ func circuitRepairPlanResultData(t *testing.T, result reports.Result) circuitRep
 		t.Fatal(err)
 	}
 	return plan
+}
+
+func recordedGenericCircuitGraph(t *testing.T, name string) string {
+	t.Helper()
+	recorded, err := os.ReadFile(filepath.Join("..", "..", "examples", "ai", name, "recorded-response.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var envelope struct {
+		Intent json.RawMessage `json:"intent"`
+	}
+	if err := json.Unmarshal(recorded, &envelope); err != nil {
+		t.Fatal(err)
+	}
+	if len(envelope.Intent) == 0 {
+		t.Fatal("recorded response omitted generic circuit intent")
+	}
+	path := filepath.Join(t.TempDir(), "graph.json")
+	if err := os.WriteFile(path, envelope.Intent, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	return path
 }
 
 func runCircuitCreateCLI(t *testing.T, args []string) (reports.Result, error) {
