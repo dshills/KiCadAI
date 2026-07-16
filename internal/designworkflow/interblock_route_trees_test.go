@@ -162,6 +162,26 @@ func TestBuildInterBlockRouteTreesSelectsDuplicateTargetsDeterministically(t *te
 	}
 }
 
+func TestBuildInterBlockRouteTreesPreservesSyntheticDuplicatePadIdentity(t *testing.T) {
+	group := routeTreeTestGroup("VCC",
+		InterBlockRouteEndpoint{Ref: "U1", Pin: "2"},
+		InterBlockRouteEndpoint{Ref: "U1", Pin: "2#2"},
+	)
+	tree := BuildInterBlockRouteTrees([]InterBlockRouteGroup{group}, InterBlockContactEvidence{Targets: []InterBlockContactTarget{
+		{
+			NetName: "VCC", EndpointID: "U1.2", Kind: InterBlockContactTargetPad,
+			Ref: "U1", Pad: "2", Point: transactions.Point{XMM: 0, YMM: 0}, Layer: "F.Cu", Confidence: InterBlockContactConfidenceHigh,
+		},
+		{
+			NetName: "VCC", EndpointID: "U1.2#2", Kind: InterBlockContactTargetPad,
+			Ref: "U1", Pad: "2", Point: transactions.Point{XMM: 5, YMM: 0}, Layer: "F.Cu", Confidence: InterBlockContactConfidenceHigh,
+		},
+	}})[0]
+	if len(tree.MissingEndpointIDs) != 0 || tree.TargetCount != 2 || len(tree.Branches) != 1 {
+		t.Fatalf("tree = %#v, want both synthetic duplicate-pad targets", tree)
+	}
+}
+
 func TestBuildInterBlockRouteTreesI2CSensorBreakoutPrunesLocallyRoutedPassives(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()

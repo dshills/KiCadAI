@@ -259,7 +259,7 @@ func routeTreeTargetEntries(targets []InterBlockContactTarget) []routeTreeTarget
 		entries = append(entries, routeTreeTargetEntry{
 			Target:         target,
 			NetKey:         routeTreeNetKey(target.NetName),
-			EndpointKey:    routeTreeEndpointKey(target.Ref, target.Pad),
+			EndpointKey:    routeTreeTargetEndpointKey(target),
 			ConfidenceRank: interBlockContactConfidenceRank(target.Confidence),
 			Layer:          target.Layer,
 			XMicron:        routeTreeCoordinateMicron(target.Point.XMM),
@@ -268,6 +268,13 @@ func routeTreeTargetEntries(targets []InterBlockContactTarget) []routeTreeTarget
 		})
 	}
 	return entries
+}
+
+func routeTreeTargetEndpointKey(target InterBlockContactTarget) string {
+	if endpointID := strings.TrimSpace(target.EndpointID); endpointID != "" {
+		return endpointID
+	}
+	return routeTreeEndpointKey(target.Ref, target.Pad)
 }
 
 func compareRouteTreeTargetEntry(left, right routeTreeTargetEntry) int {

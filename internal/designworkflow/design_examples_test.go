@@ -1490,12 +1490,49 @@ func TestUSBCI2CSensorProtectedVOUTAnchorHasPhysicalEndpoint(t *testing.T) {
 		t.Fatalf("endpoint discovery issues:\n%s", formatDesignExampleIssues(endpointIssues))
 	}
 	bindings := ResolveAnchorBindings(fragments, endpoints, AnchorBindingOptions{Placed: &placed})
+	voutBound := false
 	for _, binding := range bindings.Bindings {
 		if binding.ID == "rail3v3.vout" && binding.Status == AnchorBindingStatusBound {
-			return
+			voutBound = true
+			break
 		}
 	}
-	t.Fatalf("rail3v3.vout was not bound after placement: %#v", bindings.Bindings)
+	if !voutBound {
+		t.Fatalf("rail3v3.vout was not bound after placement: %#v", bindings.Bindings)
+	}
+	candidates, candidateIssues := BuildInterBlockRouteCandidates(fragments, placed)
+	if len(candidateIssues) != 0 {
+		t.Fatalf("inter-block candidates:\n%s", formatDesignExampleIssues(candidateIssues))
+	}
+	groups, groupIssues := BuildInterBlockRouteGroups(candidates)
+	if len(groupIssues) != 0 {
+		t.Fatalf("inter-block route groups:\n%s", formatDesignExampleIssues(groupIssues))
+	}
+	var vcc3Group *InterBlockRouteGroup
+	for index := range groups {
+		if groups[index].NetName == "VCC_3v3" {
+			vcc3Group = &groups[index]
+			break
+		}
+	}
+	if vcc3Group == nil || vcc3Group.Status != InterBlockRouteCandidateRoutable {
+		t.Fatalf("VCC_3v3 route group is not routable: %#v", groups)
+	}
+	targets := BuildInterBlockContactTargets(candidates, &placed)
+	trees := BuildInterBlockRouteTrees(groups, targets)
+	for _, tree := range trees {
+		if tree.NetName != "VCC_3v3" {
+			continue
+		}
+		if len(tree.MissingEndpointIDs) != 0 {
+			t.Fatalf("VCC_3v3 route tree has missing physical targets: tree=%#v group=%#v", tree, *vcc3Group)
+		}
+		if len(tree.Branches) == 0 {
+			t.Fatalf("VCC_3v3 route tree has no branches: %#v", tree)
+		}
+		return
+	}
+	t.Fatalf("VCC_3v3 route tree missing from %#v", trees)
 }
 
 func formatConnectOperationsForTest(t *testing.T, projectName string, plan BlockPlanResult) string {

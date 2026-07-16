@@ -71,6 +71,9 @@ func TestBuildInterBlockRouteGroupsDeduplicatesTargetsAndPreservesCandidateProve
 	if len(group.RequiredEndpoints) != 3 {
 		t.Fatalf("required endpoints = %#v, want duplicate U1.VCC removed", group.RequiredEndpoints)
 	}
+	if group.ExpectedRequired != 3 || group.UnresolvedRequired != 0 {
+		t.Fatalf("endpoint counts = %#v, want duplicate U1.VCC counted once", group)
+	}
 	if len(group.SourceCandidateIndices) != 2 || group.SourceCandidateIndices[0] != 0 || group.SourceCandidateIndices[1] != 1 {
 		t.Fatalf("source candidate indices = %#v, want [0 1]", group.SourceCandidateIndices)
 	}

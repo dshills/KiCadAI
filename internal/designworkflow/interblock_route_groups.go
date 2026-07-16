@@ -68,7 +68,7 @@ func BuildInterBlockRouteGroups(candidates []InterBlockRouteCandidate) ([]InterB
 		group.SourceCandidateIndices = append(group.SourceCandidateIndices, candidateIndex)
 		group.InstanceIDs = append(group.InstanceIDs, candidate.InstanceIDs...)
 		group.BlockIDs = append(group.BlockIDs, candidate.BlockIDs...)
-		if expected := len(candidate.Endpoints) + candidate.Unresolved; expected > group.ExpectedRequired {
+		if expected := uniqueCandidateEndpointCount(candidate.Endpoints) + candidate.Unresolved; expected > group.ExpectedRequired {
 			group.ExpectedRequired = expected
 		}
 		for _, endpoint := range candidate.Endpoints {
@@ -86,6 +86,9 @@ func BuildInterBlockRouteGroups(candidates []InterBlockRouteCandidate) ([]InterB
 	}
 	for index := range groups {
 		sortInterBlockRouteGroup(&groups[index])
+		if resolved := len(groups[index].RequiredEndpoints); resolved > groups[index].ExpectedRequired {
+			groups[index].ExpectedRequired = resolved
+		}
 		groups[index].UnresolvedRequired = max(0, groups[index].ExpectedRequired-len(groups[index].RequiredEndpoints))
 	}
 	slices.SortFunc(groups, func(left, right InterBlockRouteGroup) int {
@@ -104,6 +107,21 @@ func BuildInterBlockRouteGroups(candidates []InterBlockRouteCandidate) ([]InterB
 		}
 	}
 	return groups, issues
+}
+
+// uniqueCandidateEndpointCount uses the same physical-pad identity as the
+// merged route group. A repeated endpoint cannot require an additional route
+// tree contact target.
+func uniqueCandidateEndpointCount(endpoints []InterBlockRouteEndpoint) int {
+	seen := make(map[string]struct{}, len(endpoints))
+	for _, endpoint := range endpoints {
+		groupEndpoint := interBlockRouteGroupEndpoint(endpoint, InterBlockRouteEndpointRequired)
+		if groupEndpoint.Ref == "" || groupEndpoint.Pin == "" {
+			continue
+		}
+		seen[routeGroupEndpointKey(groupEndpoint)] = struct{}{}
+	}
+	return len(seen)
 }
 
 func interBlockRouteGroupEndpoint(endpoint InterBlockRouteEndpoint, requirement InterBlockRouteEndpointRequirement) InterBlockRouteGroupEndpoint {
