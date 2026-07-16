@@ -23,6 +23,8 @@ import (
 	"kicadai/internal/reports"
 )
 
+const passingWorkflowKiCadReport = `{"coordinate_units":"mm","violations":[],"sheets":[]}`
+
 func TestParseAIDesignFlags(t *testing.T) {
 	opts, command, err := parse([]string{
 		"--prompt", "build bmp280",
@@ -427,10 +429,12 @@ func TestRunAIDesignPostWriteFailurePreservesManagedProject(t *testing.T) {
 	root := t.TempDir()
 	output := filepath.Join(root, "project")
 	fixtureDir := filepath.Join("..", "..", "examples", "ai", "usb_c_bmp280_breakout")
+	cli := fakeWorkflowKiCadCLI(t, 0, passingWorkflowKiCadReport)
 	baseArgs := []string{
 		"--prompt-file", filepath.Join(fixtureDir, "prompt.txt"),
 		"--provider", "recorded",
 		"--provider-record", filepath.Join(fixtureDir, "recorded-response.json"),
+		"--kicad-cli", cli,
 		"--output", output, "--overwrite",
 	}
 	var first bytes.Buffer
@@ -617,11 +621,13 @@ func TestRunAIDesignRecordedReferencePersistsSanitizedEvidence(t *testing.T) {
 	output := filepath.Join(t.TempDir(), "project")
 	promptPath := filepath.Join("..", "..", "examples", "ai", "usb_c_bmp280_breakout", "prompt.txt")
 	recordPath := filepath.Join("..", "..", "examples", "ai", "usb_c_bmp280_breakout", "recorded-response.json")
+	cli := fakeWorkflowKiCadCLI(t, 0, passingWorkflowKiCadReport)
 	var stdout bytes.Buffer
 	err := run([]string{
 		"--prompt-file", promptPath,
 		"--provider", "recorded",
 		"--provider-record", recordPath,
+		"--kicad-cli", cli,
 		"--output", output,
 		"--overwrite",
 		"design", "create",
@@ -638,7 +644,7 @@ func TestRunAIDesignRecordedReferencePersistsSanitizedEvidence(t *testing.T) {
 	if payload.Data.Provider.Name != "recorded" || !payload.Data.Provider.Recorded || payload.Data.Intent.Name != "usb_c_bmp280_breakout" {
 		t.Fatalf("provider/intent = %#v / %#v", payload.Data.Provider, payload.Data.Intent)
 	}
-	if payload.Data.AIStatus == nil || payload.Data.AIStatus.Status != "candidate" {
+	if payload.Data.AIStatus == nil || payload.Data.AIStatus.Status != aiLaneStatusReady {
 		t.Fatalf("AI status = %#v", payload.Data.AIStatus)
 	}
 	for _, name := range []string{
@@ -687,6 +693,7 @@ func TestRunAIDesignRecordedReferencePersistsSanitizedEvidence(t *testing.T) {
 
 func TestRunAIDesignRecordedProtectedLEDEndToEnd(t *testing.T) {
 	fixtureDir := filepath.Join("..", "..", "examples", "ai", "usb_c_led_indicator_protected")
+	cli := fakeWorkflowKiCadCLI(t, 0, passingWorkflowKiCadReport)
 	var generated [][]byte
 	for runIndex := 0; runIndex < 2; runIndex++ {
 		output := filepath.Join(t.TempDir(), "project")
@@ -695,6 +702,7 @@ func TestRunAIDesignRecordedProtectedLEDEndToEnd(t *testing.T) {
 			"--prompt-file", filepath.Join(fixtureDir, "prompt.txt"),
 			"--provider", "recorded",
 			"--provider-record", filepath.Join(fixtureDir, "recorded-response.json"),
+			"--kicad-cli", cli,
 			"--output", output,
 			"--overwrite",
 			"design", "create",
@@ -708,8 +716,17 @@ func TestRunAIDesignRecordedProtectedLEDEndToEnd(t *testing.T) {
 		if err := json.Unmarshal(stdout.Bytes(), &payload); err != nil {
 			t.Fatal(err)
 		}
-		if payload.Data.AIStatus == nil || payload.Data.AIStatus.Status != aiLaneStatusCandidate || payload.Data.Plan.Status != intentplanner.PlanStatusReady || payload.Data.Plan.GeneratedRequest == nil {
-			t.Fatalf("AI result = %#v", payload.Data)
+		if payload.Data.AIStatus == nil {
+			t.Fatalf("AI status is missing")
+		}
+		if payload.Data.AIStatus.Status != aiLaneStatusReady {
+			t.Fatalf("AI status = %#v, want %q", payload.Data.AIStatus, aiLaneStatusReady)
+		}
+		if payload.Data.Plan.Status != intentplanner.PlanStatusReady {
+			t.Fatalf("plan status = %q, want %q", payload.Data.Plan.Status, intentplanner.PlanStatusReady)
+		}
+		if payload.Data.Plan.GeneratedRequest == nil {
+			t.Fatal("generated request is missing")
 		}
 		request := payload.Data.Plan.GeneratedRequest
 		usb := designRequestBlock(*request, "usb_power")
