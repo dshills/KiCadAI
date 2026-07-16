@@ -179,10 +179,19 @@ func RoutePlacement(ctx context.Context, request Request, fragments PCBFragmentR
 	}
 	selectiveLocalRouteObstacles := []routing.ExistingCopper(nil)
 	selectiveLocalRouteObstacleNets := map[string]struct{}{}
-	if localRouteConnectivity.IssueCount == 0 && !normalized.Constraints.TreatLocalPowerRoutesAsObstacles && len(normalized.Constraints.LocalRouteObstacleNets) != 0 {
-		selectiveLocalRouteObstacles = existingCopperFromAllRouteOperations(localOperations, routeBranchDefaultLayer(routingRequest.Board), routingRequest.Rules)
+	if localRouteConnectivity.IssueCount == 0 && !normalized.Constraints.TreatLocalPowerRoutesAsObstacles {
+		addMultiEndpointPowerRouteObstacleNets(selectiveLocalRouteObstacleNets, interBlockCandidates)
 		for _, netName := range normalized.Constraints.LocalRouteObstacleNets {
 			selectiveLocalRouteObstacleNets[strings.TrimSpace(netName)] = struct{}{}
+		}
+		if len(selectiveLocalRouteObstacleNets) != 0 {
+			if len(normalized.Constraints.LocalRouteObstacleNets) != 0 {
+				// Explicit selective nets opt into every local route as an obstacle.
+				selectiveLocalRouteObstacles = existingCopperFromAllRouteOperations(localOperations, routeBranchDefaultLayer(routingRequest.Board), routingRequest.Rules)
+			} else {
+				// Automatic power protection only needs fixed power and configuration copper.
+				selectiveLocalRouteObstacles = existingCopperFromRouteOperations(localOperations, routeBranchDefaultLayer(routingRequest.Board), routingRequest.Rules)
+			}
 		}
 	}
 	targetEvidence := BuildInterBlockContactTargets(interBlockCandidates, &placed)
@@ -249,6 +258,19 @@ func RoutePlacement(ctx context.Context, request Request, fragments PCBFragmentR
 		stage.Summary["route_reports"] = len(result.Quality.NetReports)
 	}
 	return RoutingStageResult{Request: routingRequest, Result: result, Operations: operations, Stage: stage}
+}
+
+func addMultiEndpointPowerRouteObstacleNets(nets map[string]struct{}, candidates []InterBlockRouteCandidate) {
+	for _, candidate := range candidates {
+		if len(candidate.Endpoints) < 3 {
+			continue
+		}
+		netName := strings.TrimSpace(candidate.NetName)
+		switch netRoleFromName(netName) {
+		case placement.NetPower, placement.NetGround:
+			nets[netName] = struct{}{}
+		}
+	}
 }
 
 func compactRouteOperationGeometry(operations []transactions.Operation) []transactions.Operation {
