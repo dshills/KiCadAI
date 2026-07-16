@@ -30,11 +30,30 @@ func TestBuildPlacementRetryAdjustmentPreservesFixedGroupGeometry(t *testing.T) 
 		Category:      PlacementRetryIncreaseSpacing,
 		RetryEligible: true,
 	}}, 1)
-	if !adjustment.Applied || adjusted.Rules.ComponentSpacingMM != req.Rules.ComponentSpacingMM {
+	if !adjustment.Applied || adjusted.Rules.ComponentSpacingMM != req.Rules.ComponentSpacingMM+1 {
 		t.Fatalf("fixed-group adjustment = %#v request=%#v", adjustment, adjusted.Rules)
 	}
 	if adjusted.Rules.GroupSpacingMM != req.Rules.GroupSpacingMM+1 {
 		t.Fatalf("group spacing = %.2f", adjusted.Rules.GroupSpacingMM)
+	}
+}
+
+func TestBuildPlacementRetryAdjustmentPreservesFixedSpacingClearance(t *testing.T) {
+	req := retryPlacementRequest()
+	req.Components[0].Fixed = true
+	req.Components[0].Position = &placement.Placement{XMM: 5, YMM: 8, Layer: "F.Cu"}
+	req.Components[1].Fixed = true
+	req.Components[1].Position = &placement.Placement{XMM: 8.5, YMM: 8, Layer: "F.Cu"}
+	req = placement.NormalizeRequest(req)
+
+	adjusted, adjustment := BuildPlacementRetryAdjustment(req, []PlacementRetryHint{{
+		Category: PlacementRetryIncreaseSpacing, RetryEligible: true,
+	}}, 1)
+	if !adjustment.Applied || adjusted.Rules.ComponentSpacingMM != req.Rules.ComponentSpacingMM {
+		t.Fatalf("fixed-clearance adjustment = %#v request=%#v", adjustment, adjusted.Rules)
+	}
+	if len(adjustment.SkippedReasons) != 1 || adjustment.SkippedReasons[0] != "fixed:spacing_clearance" {
+		t.Fatalf("skipped reasons = %#v", adjustment.SkippedReasons)
 	}
 }
 

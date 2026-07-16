@@ -4,6 +4,7 @@ import (
 	"cmp"
 	"fmt"
 	"slices"
+	"strings"
 
 	"kicadai/internal/placement"
 )
@@ -82,8 +83,13 @@ func BuildPlacementRetryAdjustment(request placement.Request, hints []PlacementR
 		}
 	}
 	if adjustment.SpacingDeltaMM > 0 {
-		if !placementRetryHasFixedComponents(adjusted.Components) {
+		// Fixed components retain their positions; eligible components still need
+		// a wider placement constraint to make a retry materially different. Do
+		// not apply a constraint that makes immutable fixed geometry collide.
+		if placementRetryFixedGeometryAllowsSpacing(adjusted.Components, adjusted.Rules, adjustment.SpacingDeltaMM) {
 			adjusted.Rules.ComponentSpacingMM += adjustment.SpacingDeltaMM
+		} else {
+			addPlacementRetrySkippedReason(&adjustment, "fixed:spacing_clearance")
 		}
 		adjusted.Rules.GroupSpacingMM += adjustment.SpacingDeltaMM
 		adjustment.Applied = true
@@ -96,13 +102,45 @@ func BuildPlacementRetryAdjustment(request placement.Request, hints []PlacementR
 	return adjusted, adjustment
 }
 
-func placementRetryHasFixedComponents(components []placement.Component) bool {
-	for _, component := range components {
-		if component.Fixed || component.Mobility.Class == placement.MobilityFixed {
-			return true
+func placementRetryFixedGeometryAllowsSpacing(components []placement.Component, rules placement.Rules, deltaMM float64) bool {
+	if deltaMM <= 0 {
+		return true
+	}
+	adjustedRules := rules
+	adjustedRules.ComponentSpacingMM += deltaMM
+	for firstIndex := range components {
+		first := components[firstIndex]
+		if !first.Fixed || first.Position == nil {
+			continue
+		}
+		firstBounds, ok := placement.ComponentPlacementBounds(first, *first.Position, adjustedRules)
+		if !ok {
+			return false
+		}
+		for secondIndex := firstIndex + 1; secondIndex < len(components); secondIndex++ {
+			second := components[secondIndex]
+			if !second.Fixed || second.Position == nil || !placementRetrySameLayer(*first.Position, *second.Position) {
+				continue
+			}
+			secondBounds, ok := placement.ComponentPlacementBounds(second, *second.Position, adjustedRules)
+			if !ok || firstBounds.Intersects(secondBounds) {
+				return false
+			}
 		}
 	}
-	return false
+	return true
+}
+
+func placementRetrySameLayer(first, second placement.Placement) bool {
+	firstLayer := strings.TrimSpace(first.Layer)
+	if firstLayer == "" {
+		firstLayer = "F.Cu"
+	}
+	secondLayer := strings.TrimSpace(second.Layer)
+	if secondLayer == "" {
+		secondLayer = "F.Cu"
+	}
+	return strings.EqualFold(firstLayer, secondLayer)
 }
 
 func addRetryProximityRules(request *placement.Request, hint PlacementRetryHint, refsByNet map[string][]string, complexityByRef map[string]float64, movableRefs map[string]struct{}, existingRuleIDs map[string]struct{}) []string {
