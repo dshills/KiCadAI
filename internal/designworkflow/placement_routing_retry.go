@@ -179,6 +179,15 @@ func maybeRetryPlacementRoutingWithRouter(ctx context.Context, request Request, 
 		preserveRetryPlacementEvidence(&nextPlaced.Stage, currentPlaced.Stage)
 		if workflowStageBlocked(nextPlaced.Stage) {
 			summary.StopReason = "placement_blocked"
+			failedAttempt := placementRoutingRetryAttemptSummary{
+				Attempt:         attempt,
+				Placement:       nextPlaced.Stage.Summary,
+				RetryAdjustment: PlacementRetryAdjustmentSummary(adjustment),
+				RegressionFlags: retryPlacementIssueFlags(nextPlaced.Stage.Issues),
+			}
+			failedAttempt.EligibleRefCount = adjustment.EligibleRefs
+			failedAttempt.BlockedRefCount = adjustment.BlockedRefs
+			summary.AttemptHistory = append(summary.AttemptHistory, normalizePlacementRoutingRetryAttempt(failedAttempt))
 			if correctionReport != nil {
 				correctionReport.AttemptHistory = append(correctionReport.AttemptHistory, autonomousCorrectionAttemptForResult(attempt, correctionPlan, correctionApplication, nextPlaced, RoutingStageResult{}))
 			}
@@ -239,6 +248,22 @@ func maybeRetryPlacementRoutingWithRouter(ctx context.Context, request Request, 
 	finalizeAutonomousCorrectionReport(correctionReport, request, summary)
 	attachAutonomousCorrectionReport(&bestRouted.Stage, correctionReport)
 	return bestPlaced, bestRouted, summary
+}
+
+func retryPlacementIssueFlags(issues []reports.Issue) []string {
+	flags := make([]string, 0, len(issues))
+	for _, issue := range issues {
+		if !issue.Blocking() {
+			continue
+		}
+		flag := string(issue.Code)
+		if issue.Path != "" {
+			flag += ":" + issue.Path
+		}
+		flags = append(flags, flag)
+	}
+	slices.Sort(flags)
+	return slices.Compact(flags)
 }
 
 func attachAutonomousCorrectionReport(stage *StageResult, report *AutonomousCorrectionReport) {

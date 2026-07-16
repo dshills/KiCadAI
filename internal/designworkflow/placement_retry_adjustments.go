@@ -82,7 +82,9 @@ func BuildPlacementRetryAdjustment(request placement.Request, hints []PlacementR
 		}
 	}
 	if adjustment.SpacingDeltaMM > 0 {
-		adjusted.Rules.ComponentSpacingMM += adjustment.SpacingDeltaMM
+		if !placementRetryHasFixedComponents(adjusted.Components) {
+			adjusted.Rules.ComponentSpacingMM += adjustment.SpacingDeltaMM
+		}
 		adjusted.Rules.GroupSpacingMM += adjustment.SpacingDeltaMM
 		adjustment.Applied = true
 	}
@@ -92,6 +94,15 @@ func BuildPlacementRetryAdjustment(request placement.Request, hints []PlacementR
 	}
 	slices.Sort(adjustment.SkippedReasons)
 	return adjusted, adjustment
+}
+
+func placementRetryHasFixedComponents(components []placement.Component) bool {
+	for _, component := range components {
+		if component.Fixed || component.Mobility.Class == placement.MobilityFixed {
+			return true
+		}
+	}
+	return false
 }
 
 func addRetryProximityRules(request *placement.Request, hint PlacementRetryHint, refsByNet map[string][]string, complexityByRef map[string]float64, movableRefs map[string]struct{}, existingRuleIDs map[string]struct{}) []string {

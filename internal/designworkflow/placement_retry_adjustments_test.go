@@ -21,6 +21,23 @@ func TestBuildPlacementRetryAdjustmentIncreasesSpacing(t *testing.T) {
 	}
 }
 
+func TestBuildPlacementRetryAdjustmentPreservesFixedGroupGeometry(t *testing.T) {
+	req := retryPlacementRequest()
+	req.Components[0].Fixed = true
+	req.Components[0].Mobility = placement.MobilityPolicy{Class: placement.MobilityFixed, RouteHandling: placement.RouteHandlingPreserveFixed}
+	req = placement.NormalizeRequest(req)
+	adjusted, adjustment := BuildPlacementRetryAdjustment(req, []PlacementRetryHint{{
+		Category:      PlacementRetryIncreaseSpacing,
+		RetryEligible: true,
+	}}, 1)
+	if !adjustment.Applied || adjusted.Rules.ComponentSpacingMM != req.Rules.ComponentSpacingMM {
+		t.Fatalf("fixed-group adjustment = %#v request=%#v", adjustment, adjusted.Rules)
+	}
+	if adjusted.Rules.GroupSpacingMM != req.Rules.GroupSpacingMM+1 {
+		t.Fatalf("group spacing = %.2f", adjusted.Rules.GroupSpacingMM)
+	}
+}
+
 func TestBuildPlacementRetryAdjustmentAddsReduceDistanceRule(t *testing.T) {
 	req := retryPlacementRequest()
 	adjusted, adjustment := BuildPlacementRetryAdjustment(req, []PlacementRetryHint{{
