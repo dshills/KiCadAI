@@ -384,11 +384,16 @@ func routeTreeEndpointScopedOperationAnchors(targetsByNet map[string][]InterBloc
 		return nil
 	}
 	out := make([]RouteTreeEndpointAccess, 0, len(anchors))
-	// When a generated local route touches exactly one route-tree endpoint, the
-	// far end of that continuous same-net route is a valid access point for the
-	// endpoint. Routes touching multiple route-tree endpoints remain unscoped to
-	// avoid assigning one endpoint's pad coordinate to another endpoint.
+	// When a generated local route touches exactly one route-tree endpoint, only
+	// its far end is a valid access point for the endpoint. Including the pad-end
+	// as an equally ranked anchor lets a tree select the pad itself and leaves
+	// the generated spur electrically dangling. Routes touching multiple
+	// route-tree endpoints remain unscoped to avoid assigning one endpoint's pad
+	// coordinate to another endpoint.
 	for _, anchor := range anchors {
+		if routeTreeSamePoint(anchor, target.Point) {
+			continue
+		}
 		out = append(out, RouteTreeEndpointAccess{
 			EndpointID: target.EndpointID,
 			Role:       RouteTreeAccessLocalRouteAnchor,

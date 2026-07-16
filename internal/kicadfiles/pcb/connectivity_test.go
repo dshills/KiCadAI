@@ -209,6 +209,33 @@ func TestValidateGeneratedConnectivityAcceptsOverlappingPads(t *testing.T) {
 	}
 }
 
+func TestValidateGeneratedConnectivityAcceptsSeparatedDuplicatePadAlias(t *testing.T) {
+	board := minimalPCB()
+	board.Nets = []Net{{Code: 1, Name: "A"}}
+	output := connectivityFootprint("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", "J3", point(10, 10),
+		Pad{UUID: kicadfiles.UUID("bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"), Name: "2", NetCode: 1, Shape: "rect", Size: point(1, 1), Layers: []kicadfiles.BoardLayer{kicadfiles.LayerFCu}},
+	)
+	output.Pads = append(output.Pads, Pad{UUID: kicadfiles.UUID("cccccccc-cccc-4ccc-8ccc-cccccccccccc"), Name: "2", NetCode: 1, Shape: "rect", Position: point(4, 0), Size: point(1, 1), Layers: []kicadfiles.BoardLayer{kicadfiles.LayerFCu}})
+	board.Footprints = []Footprint{
+		output,
+		connectivityFootprint("dddddddd-dddd-4ddd-8ddd-dddddddddddd", "J1", point(20, 10),
+			Pad{UUID: kicadfiles.UUID("eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee"), Name: "1", NetCode: 1, Shape: "rect", Size: point(1, 1), Layers: []kicadfiles.BoardLayer{kicadfiles.LayerFCu}},
+		),
+	}
+	board.Tracks = []Track{{
+		UUID:    kicadfiles.UUID("ffffffff-ffff-4fff-8fff-ffffffffffff"),
+		Start:   point(10, 10),
+		End:     point(20, 10),
+		Width:   kicadfiles.MM(0.25),
+		Layer:   kicadfiles.LayerFCu,
+		NetCode: 1,
+	}}
+
+	if err := ValidateGeneratedConnectivity(board); err != nil {
+		t.Fatalf("ValidateGeneratedConnectivity returned error: %v", err)
+	}
+}
+
 func TestValidateGeneratedConnectivityAcceptsViaPadEdgeOverlap(t *testing.T) {
 	board := minimalPCB()
 	board.Nets = []Net{{Code: 1, Name: "A"}}

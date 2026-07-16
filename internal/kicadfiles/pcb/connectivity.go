@@ -14,28 +14,29 @@ const (
 )
 
 type connectivityAnchor struct {
-	id            int
-	itemKey       string
-	field         string
-	kind          string
-	netCode       int
-	point         kicadfiles.Point
-	layers        []kicadfiles.BoardLayer
-	allCopper     bool
-	radius        kicadfiles.IU
-	padShape      string
-	padSize       kicadfiles.Point
-	padRotation   kicadfiles.Angle
-	routeEndpoint bool
-	hasSegment    bool
-	segmentStart  kicadfiles.Point
-	segmentEnd    kicadfiles.Point
-	segmentWidth  kicadfiles.IU
-	hasArc        bool
-	arcStart      kicadfiles.Point
-	arcMid        kicadfiles.Point
-	arcEnd        kicadfiles.Point
-	arcWidth      kicadfiles.IU
+	id               int
+	itemKey          string
+	electricalPadKey string
+	field            string
+	kind             string
+	netCode          int
+	point            kicadfiles.Point
+	layers           []kicadfiles.BoardLayer
+	allCopper        bool
+	radius           kicadfiles.IU
+	padShape         string
+	padSize          kicadfiles.Point
+	padRotation      kicadfiles.Angle
+	routeEndpoint    bool
+	hasSegment       bool
+	segmentStart     kicadfiles.Point
+	segmentEnd       kicadfiles.Point
+	segmentWidth     kicadfiles.IU
+	hasArc           bool
+	arcStart         kicadfiles.Point
+	arcMid           kicadfiles.Point
+	arcEnd           kicadfiles.Point
+	arcWidth         kicadfiles.IU
 }
 
 // ValidateGeneratedConnectivity checks that generated board routing is
@@ -54,6 +55,7 @@ func ValidateGeneratedConnectivity(board PCBFile) error {
 	spatialIndex := buildConnectivitySpatialIndex(anchors)
 	segmentIndex := buildConnectivitySegmentIndex(anchors)
 	uf := newConnectivityUnion(len(anchors))
+	unionEquivalentFootprintPads(anchors, uf)
 	unionRoutedCopperEndpoints(anchors, uf)
 	seenIndexes := map[int]struct{}{}
 	for i := range anchors {
@@ -89,16 +91,17 @@ func collectConnectivityAnchors(board PCBFile) []connectivityAnchor {
 			}
 			field := indexed(indexedValue("footprints", footprintIndex)+".pads", padIndex, "connectivity")
 			anchors = append(anchors, connectivityAnchor{
-				id:        len(anchors),
-				itemKey:   "pad:" + string(pad.UUID),
-				field:     field,
-				kind:      "pad",
-				netCode:   pad.NetCode,
-				point:     absolutePadPosition(footprint, pad),
-				layers:    layers,
-				allCopper: allCopper,
-				padShape:  pad.Shape,
-				padSize:   pad.Size,
+				id:               len(anchors),
+				itemKey:          "pad:" + string(pad.UUID),
+				electricalPadKey: fmt.Sprintf("%s:%s:%d", footprint.UUID, pad.Name, pad.NetCode),
+				field:            field,
+				kind:             "pad",
+				netCode:          pad.NetCode,
+				point:            absolutePadPosition(footprint, pad),
+				layers:           layers,
+				allCopper:        allCopper,
+				padShape:         pad.Shape,
+				padSize:          pad.Size,
 				// KiCad applies the footprint rotation to the pad's local rotation.
 				padRotation: footprint.Rotation + pad.Rotation,
 			})
@@ -143,6 +146,23 @@ func collectConnectivityAnchors(board PCBFile) []connectivityAnchor {
 		})
 	}
 	return anchors
+}
+
+// unionEquivalentFootprintPads models KiCad's duplicate pad-name convention:
+// physically separate pads with the same footprint, pad number, and net are
+// one electrical package pin (for example an SOT-223 output tab and pin 2).
+func unionEquivalentFootprintPads(anchors []connectivityAnchor, uf connectivityUnion) {
+	firstByKey := map[string]int{}
+	for index, anchor := range anchors {
+		if anchor.kind != "pad" || anchor.electricalPadKey == "" {
+			continue
+		}
+		if first, ok := firstByKey[anchor.electricalPadKey]; ok {
+			uf.union(first, index)
+			continue
+		}
+		firstByKey[anchor.electricalPadKey] = index
+	}
 }
 
 func unionRoutedCopperEndpoints(anchors []connectivityAnchor, uf connectivityUnion) {

@@ -262,6 +262,7 @@ func buildBoardConnectivity(board *pcbfiles.PCBFile) boardConnectivity {
 	for _, net := range board.Nets {
 		graph.netNames[net.Code] = net.Name
 	}
+	seenElectricalPads := map[string]struct{}{}
 	for footprintIndex := range board.Footprints {
 		footprint := &board.Footprints[footprintIndex]
 		ref := firstNonEmpty(footprint.Reference, footprint.LibraryID)
@@ -271,12 +272,16 @@ func buildBoardConnectivity(board *pcbfiles.PCBFile) boardConnectivity {
 			}
 			padPoint := absolutePadPosition(footprint, pad)
 			layers := padConnectivityLayers(pad.Layers, boardCopperLayers)
-			graph.netPads[pad.NetCode] = append(graph.netPads[pad.NetCode], connectivityPad{
-				ref:    ref,
-				name:   pad.Name,
-				point:  padPoint,
-				layers: layers,
-			})
+			electricalPadKey := fmt.Sprintf("%d:%s:%d", footprintIndex, pad.Name, pad.NetCode)
+			if _, seen := seenElectricalPads[electricalPadKey]; !seen {
+				seenElectricalPads[electricalPadKey] = struct{}{}
+				graph.netPads[pad.NetCode] = append(graph.netPads[pad.NetCode], connectivityPad{
+					ref:    ref,
+					name:   pad.Name,
+					point:  padPoint,
+					layers: layers,
+				})
+			}
 			for _, layer := range layers {
 				graph.addRouteAnchor(pad.NetCode, padPoint, layer, "pad")
 			}

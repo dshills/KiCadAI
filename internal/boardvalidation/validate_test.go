@@ -57,12 +57,15 @@ func TestValidateBoardAllowsSameNetDuplicatePadAlias(t *testing.T) {
 	board := twoPadBoard(t)
 	duplicate := board.Footprints[0].Pads[0]
 	duplicate.UUID = testUUID("U1-pad-alias")
-	duplicate.Position = kicadfiles.Point{X: kicadfiles.MM(0.5), Y: 0}
+	duplicate.Position = kicadfiles.Point{X: kicadfiles.MM(4), Y: 0}
 	board.Footprints[0].Pads = append(board.Footprints[0].Pads, duplicate)
 
 	result := ValidateBoard(context.Background(), &board, testTarget(), Options{})
 	if hasIssueMessage(result.Issues, "duplicate pad name") {
 		t.Fatalf("unexpected duplicate pad alias issue: %#v", result.Issues)
+	}
+	if result.Status != StatusPass || findNetStatus(t, result, "SIGNAL").Status != NetStatusFullyRouted {
+		t.Fatalf("duplicate package pad alias should not require a second route: %#v", result)
 	}
 }
 

@@ -49,6 +49,31 @@ func TestAddAnchorBindingRoutesCreatesRouteOperation(t *testing.T) {
 	}
 }
 
+func TestAddAnchorBindingRoutesKeepsOptionalBindingAsEvidenceOnly(t *testing.T) {
+	anchor := transactions.Point{XMM: 1, YMM: 2}
+	endpoint := transactions.Point{XMM: 3, YMM: 2}
+	summary := SummarizeAnchorBindings([]AnchorBinding{{
+		ID:              "inst1.optional_entry",
+		BlockInstanceID: "inst1",
+		AnchorID:        "optional_entry",
+		AnchorNetName:   "SIG",
+		AnchorPoint:     &anchor,
+		EndpointID:      "footprint_pad:J1:1:abcd1234",
+		EndpointRef:     "J1",
+		EndpointPad:     "1",
+		EndpointNetName: "SIG",
+		EndpointPoint:   &endpoint,
+		Status:          AnchorBindingStatusBound,
+		Policy:          AnchorBindingPolicyOptional,
+		RouteStatus:     AnchorRouteStatusSkipped,
+	}}, nil)
+
+	routed, operations := AddAnchorBindingRoutes(summary, AnchorBindingRouteOptions{})
+	if len(operations) != 0 || routed.Routed != 0 || routed.Bindings[0].RouteStatus != AnchorRouteStatusSkipped {
+		t.Fatalf("optional binding materialized copper: summary=%#v operations=%#v", routed, operations)
+	}
+}
+
 func TestAddAnchorBindingRoutesCreatesBoardEdgeRouteOperation(t *testing.T) {
 	anchor := transactions.Point{XMM: 1, YMM: 2}
 	endpoint := transactions.Point{XMM: 0, YMM: 2}
@@ -153,6 +178,8 @@ func TestAddAnchorBindingRoutesSkipsAlreadyRoutedBinding(t *testing.T) {
 		EndpointNetName: "SIG",
 		EndpointPoint:   &endpoint,
 		Status:          AnchorBindingStatusBound,
+		Required:        true,
+		Policy:          AnchorBindingPolicyRequired,
 		RouteStatus:     AnchorRouteStatusRouted,
 	}}, nil)
 

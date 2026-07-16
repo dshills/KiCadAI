@@ -186,7 +186,10 @@ func RoutePlacement(ctx context.Context, request Request, fragments PCBFragmentR
 		}
 	}
 	targetEvidence := BuildInterBlockContactTargets(interBlockCandidates, &placed)
-	routeTreeAccess, routeTreeAccessIssues := BuildRouteTreeEndpointAccessWithIssues(targetEvidence, localOperations)
+	accessOperations := make([]transactions.Operation, 0, len(localOperations)+len(anchorOperations))
+	accessOperations = append(accessOperations, localOperations...)
+	accessOperations = append(accessOperations, anchorOperations...)
+	routeTreeAccess, routeTreeAccessIssues := BuildRouteTreeEndpointAccessWithIssues(targetEvidence, accessOperations)
 	issues = append(issues, routeTreeAccessIssues...)
 	routeTreeExecution := executeInterBlockRouteTrees(ctx, routingRequest, interBlockCandidates, targetEvidence, routeTreeAccess, selectiveLocalRouteObstacles, selectiveLocalRouteObstacleNets)
 	routingRequest.Nets = excludeManagedInterBlockNets(routingRequest.Nets, routeTreeExecution.Summary.ManagedNets)
@@ -201,9 +204,10 @@ func RoutePlacement(ctx context.Context, request Request, fragments PCBFragmentR
 	routeOperations = append(routeOperations, routeTreeExecution.Operations...)
 	routeOperations, snapIssues := snapInterBlockRouteEndpoints(interBlockCandidates, routeOperations, &placed)
 	issues = append(issues, snapIssues...)
-	contactGraphOperations := make([]transactions.Operation, 0, len(routeOperations)+len(localOperations))
+	contactGraphOperations := make([]transactions.Operation, 0, len(routeOperations)+len(localOperations)+len(anchorOperations))
 	contactGraphOperations = append(contactGraphOperations, routeOperations...)
 	contactGraphOperations = append(contactGraphOperations, localOperations...)
+	contactGraphOperations = append(contactGraphOperations, anchorOperations...)
 	interBlockContactEvidence := ValidateInterBlockRouteEndpointContacts(interBlockCandidates, contactGraphOperations, &placed)
 	issues = append(issues, interBlockContactEvidence.Issues...)
 	issues = suppressProvenRouteDisconnectedIssues(issues, interBlockContactEvidence, routeOperations, localOperations, localRouteConnectivity)

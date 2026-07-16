@@ -23,8 +23,17 @@ func TestBuildRouteTreeEndpointAccessIncludesPadAndLocalRouteAnchors(t *testing.
 
 	access := BuildRouteTreeEndpointAccess(targets, []transactions.Operation{localRoute})
 	summary := SummarizeRouteTreeEndpointAccess(access)
-	if summary.PadAccess != 1 || summary.LocalRouteAnchors != 2 || summary.AccessPoints != 3 {
+	if summary.PadAccess != 1 || summary.LocalRouteAnchors != 1 || summary.AccessPoints != 2 {
 		t.Fatalf("summary = %#v, access=%#v", summary, access)
+	}
+	farEndFound := false
+	for _, item := range access {
+		if item.Role == RouteTreeAccessLocalRouteAnchor && item.XMM == 12 && item.YMM == 5 {
+			farEndFound = true
+		}
+	}
+	if !farEndFound {
+		t.Fatalf("access = %#v, want only the far-end local route anchor", access)
 	}
 	if !stringSliceContains(summary.Nets, "SDA") || !stringSliceContains(summary.Refs, "U1") {
 		t.Fatalf("summary = %#v, want SDA/U1 evidence", summary)
