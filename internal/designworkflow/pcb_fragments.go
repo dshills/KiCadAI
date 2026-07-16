@@ -256,9 +256,7 @@ func fragmentColumnCount(request Request) int {
 	columns := int(math.Ceil(math.Sqrt(float64(count))))
 	if request.Board.WidthMM > 0 {
 		maxColumns := int(math.Max(1, math.Floor((request.Board.WidthMM-defaultFragmentMarginMM*2)/defaultFragmentSpacingXMM)+1))
-		if maxColumns < columns {
-			columns = maxColumns
-		}
+		columns = min(count, maxColumns)
 	}
 	if columns < 1 {
 		return 1

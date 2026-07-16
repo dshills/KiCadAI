@@ -88,13 +88,6 @@ func TestVoltageRegulatorDefinitionDeclaresPowerRules(t *testing.T) {
 	} else if route.Description == "" {
 		t.Errorf("regulator gnd_bypass should document its intentional bottom-layer via transition")
 	}
-	if route, ok := routes["gnd_entry"]; !ok {
-		t.Errorf("regulator PCB routes = %#v, missing gnd_entry", routes)
-	} else if route.Layer != "B.Cu" || route.WidthMM < 0.5 {
-		t.Errorf("regulator gnd_entry = %#v, want direct >=0.5mm B.Cu entry", route)
-	} else if route.Description == "" {
-		t.Errorf("regulator gnd_entry should document its intentional bottom-layer via transition")
-	}
 	const (
 		originalRegulatorVINBypassXMM = -2.7
 		floatCompareToleranceMM       = 1e-9
@@ -108,13 +101,10 @@ func TestVoltageRegulatorDefinitionDeclaresPowerRules(t *testing.T) {
 	} else if math.Abs(vinBypass.Waypoints[1].XMM-vinBypass.Waypoints[2].XMM) > floatCompareToleranceMM || vinBypass.Waypoints[1].XMM <= originalRegulatorVINBypassXMM || vinBypass.Description == "" {
 		t.Errorf("regulator vin_bypass = %#v, want documented outward dogleg before VIN pad", vinBypass)
 	}
-	vinEntry, ok := routes["vin_entry"]
-	if !ok {
-		t.Errorf("regulator PCB routes = %#v, missing vin_entry", routes)
-	} else if len(vinEntry.Waypoints) != 2 || math.Abs(vinEntry.Waypoints[0].XMM-regulatorVINEntryCorridorXMM) > floatCompareToleranceMM || math.Abs(vinEntry.Waypoints[1].XMM-regulatorVINEntryCorridorXMM) > floatCompareToleranceMM {
-		t.Errorf("regulator vin_entry = %#v, want outward vertical corridor with input-return clearance", vinEntry)
-	} else if !vinBypassOK || len(vinBypass.Waypoints) == 0 || math.Abs(vinBypass.Waypoints[0].XMM-vinEntry.Waypoints[0].XMM) > floatCompareToleranceMM {
-		t.Errorf("regulator VIN routes do not share entry corridor: entry=%#v bypass=%#v", vinEntry, vinBypass)
+	for _, id := range []string{"vin_entry", "vout_entry", "gnd_entry"} {
+		if _, exists := routes[id]; exists {
+			t.Errorf("regulator PCB routes = %#v, virtual anchor route %s must not emit copper", routes, id)
+		}
 	}
 }
 

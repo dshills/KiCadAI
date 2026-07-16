@@ -35,6 +35,18 @@ func TestRealizePCBFragmentsCreatesLEDFragment(t *testing.T) {
 	}
 }
 
+func TestFragmentColumnCountUsesAvailableWideBoardFlow(t *testing.T) {
+	request := Request{Board: BoardSpec{WidthMM: 100}, Blocks: []BlockInstanceSpec{{}, {}, {}, {}}}
+	if columns := fragmentColumnCount(request); columns != 4 {
+		t.Fatalf("columns = %d, want four left-to-right fragments on a 100mm board", columns)
+	}
+
+	narrow := Request{Board: BoardSpec{WidthMM: 40}, Blocks: []BlockInstanceSpec{{}, {}, {}, {}}}
+	if columns := fragmentColumnCount(narrow); columns != 1 {
+		t.Fatalf("columns = %d, want one column when the board cannot fit another fragment", columns)
+	}
+}
+
 func TestRealizePCBFragmentsAppliesConnectionAliasesToLocalRoutes(t *testing.T) {
 	request := Request{
 		Version: RequestVersion,

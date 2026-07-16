@@ -149,9 +149,6 @@ func voltageRegulatorComponents(defaults voltageRegulatorComponentDefaults) []Bl
 func voltageRegulatorPCBRealization() *PCBRealization {
 	ap2112 := RealizationWhen{Params: map[string]any{"regulator_symbol": ap2112RegulatorSymbol}}
 	ap2112VINAnchor := []PCBAnchorPlacementVariant{{Placement: RelativePlacement{XMM: -7, YMM: -4, Layer: "F.Cu"}, When: ap2112}}
-	ap2112VINEntry := []PCBRouteGeometryVariant{{DisableRoute: true, When: ap2112}}
-	ap2112VOUTEntry := []PCBRouteGeometryVariant{{DisableRoute: true, When: ap2112}}
-	ap2112GNDEntry := []PCBRouteGeometryVariant{{DisableRoute: true, When: ap2112}}
 	ap2112VINBypass := []PCBRouteGeometryVariant{{DisableRoute: true, When: ap2112}}
 	ap2112VOUTBypass := []PCBRouteGeometryVariant{{ClearWaypoints: true, Layer: "B.Cu", When: ap2112}}
 	ap2112DisableGenericGround := []PCBRouteGeometryVariant{{DisableRoute: true, When: ap2112}}
@@ -172,9 +169,6 @@ func voltageRegulatorPCBRealization() *PCBRealization {
 		},
 		PlacementGroups: []PCBPlacementGroup{{ID: "regulator_core", ComponentRoles: []string{"regulator", "input_capacitor", "output_capacitor"}, AnchorRole: "regulator", Bounds: &RelativeBounds{MinXMM: -9, MinYMM: -7, MaxXMM: 9, MaxYMM: 5}, TranslateAsUnit: true}},
 		LocalRoutes: []PCBLocalRoute{
-			{ID: "vin_entry", NetTemplate: "vin", From: RouteEndpoint{Port: "VIN"}, To: RouteEndpoint{ComponentRole: "input_capacitor", Pin: "1"}, Waypoints: []RelativePoint{{XMM: regulatorVINEntryCorridorXMM, YMM: -4}, {XMM: regulatorVINEntryCorridorXMM, YMM: 13}}, GeometryVariants: ap2112VINEntry, Layer: "F.Cu", WidthMM: 0.5, Required: true, EntryAnchorDogbone: &PCBEntryAnchorDogbone{TieOffset: RelativePoint{XMM: -1, YMM: 0}, Description: "Tie the virtual top-edge VIN entry anchor via to copper on both layers for KiCad DRC."}},
-			{ID: "vout_entry", NetTemplate: "vout", From: RouteEndpoint{Port: "VOUT"}, To: RouteEndpoint{ComponentRole: "output_capacitor", Pin: "1"}, Waypoints: []RelativePoint{{XMM: 5.4, YMM: 22.5}, {XMM: -5.6, YMM: 22.5}}, GeometryVariants: ap2112VOUTEntry, Layer: "F.Cu", WidthMM: 0.5, Required: true, EntryAnchorDogbone: &PCBEntryAnchorDogbone{TieOffset: RelativePoint{XMM: -1, YMM: 0}, Description: "Tie the virtual top-edge VOUT entry anchor via to copper on both layers for KiCad DRC."}},
-			{ID: "gnd_entry", NetTemplate: "gnd", From: RouteEndpoint{Port: "GND"}, To: RouteEndpoint{ComponentRole: "input_capacitor", Pin: "2"}, Waypoints: []RelativePoint{{XMM: -1, YMM: -4}, {XMM: -1, YMM: 13}, {XMM: -9.9, YMM: 13}}, GeometryVariants: ap2112GNDEntry, Layer: "B.Cu", WidthMM: 0.5, Required: true, Description: "Bottom-layer ground entry avoids top-layer VIN crossing and ties into the regulator ground bypass through endpoint vias."},
 			{ID: "vin_bypass", NetTemplate: "vin", From: RouteEndpoint{ComponentRole: "input_capacitor", Pin: "1"}, To: RouteEndpoint{ComponentRole: "regulator", Pin: "3"}, Waypoints: []RelativePoint{{XMM: regulatorVINEntryCorridorXMM, YMM: 11.5}, {XMM: -2.45, YMM: 11.5}, {XMM: -2.45, YMM: 18.9}}, GeometryVariants: ap2112VINBypass, Layer: "F.Cu", WidthMM: 0.5, Required: true, Description: "Input bypass doglegs outside the AMS1117 VOUT tab clearance before returning to VIN pad 3."},
 			{ID: "vout_bypass", NetTemplate: "vout", From: RouteEndpoint{ComponentRole: "output_capacitor", Pin: "1"}, To: RouteEndpoint{ComponentRole: "regulator", Pin: "2"}, GeometryVariants: ap2112VOUTBypass, Layer: "F.Cu", WidthMM: 0.5, Required: true, Description: "Output capacitor bypass to the regulator output pin; component pinmap resolution selects AP2112 pin 5."},
 			{ID: "gnd_bypass", NetTemplate: "gnd", From: RouteEndpoint{ComponentRole: "input_capacitor", Pin: "2"}, To: RouteEndpoint{ComponentRole: "output_capacitor", Pin: "2"}, GeometryVariants: ap2112DisableGenericGround, Layer: "B.Cu", WidthMM: 0.5, Required: true, Description: "Bottom-layer ground bypass keeps regulator return connected while avoiding top-layer VOUT/VIN crossings; local-route emission adds endpoint vias for SMD pad access."},
@@ -189,7 +183,7 @@ func voltageRegulatorPCBRealization() *PCBRealization {
 			{ID: "regulator_input_capacitor_proximity", Kind: "proximity", NetTemplate: "vin", AppliesTo: []string{"regulator", "input_capacitor"}, MaxLengthMM: 8, Description: "Input capacitor should remain close to the regulator input pin."},
 			{ID: "regulator_output_capacitor_proximity", Kind: "proximity", NetTemplate: "vout", AppliesTo: []string{"regulator", "output_capacitor"}, MaxLengthMM: 8, Description: "Output capacitor should remain close to the regulator output pin."},
 		},
-		Validation: PCBValidationExpectations{RequiredNets: []string{"vin", "vout", "gnd"}, RequiredRoutes: []string{"vin_entry", "vout_entry", "gnd_entry", "vin_bypass", "vout_bypass", "gnd_bypass"}},
+		Validation: PCBValidationExpectations{RequiredNets: []string{"vin", "vout", "gnd"}, RequiredRoutes: []string{"vin_bypass", "vout_bypass", "gnd_bypass"}},
 	}
 }
 
