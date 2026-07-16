@@ -51,6 +51,9 @@
       }
     }
   },
+  "constraints": {
+    "allow_back_layer": true
+  },
   "blocks": [
     {
       "id": "usb_power",

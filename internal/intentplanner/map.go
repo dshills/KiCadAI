@@ -180,6 +180,11 @@ func (builder *planBuilder) applyPolicyDefaults() {
 	if builder.request.Constraints.ClearanceMM > 0 {
 		builder.workflow.Constraints.ClearanceMM = builder.request.Constraints.ClearanceMM
 	}
+	if builder.request.Constraints.AllowBackLayer != nil {
+		builder.workflow.Constraints.AllowBackLayer = *builder.request.Constraints.AllowBackLayer
+	} else if builder.workflow.Board.Layers > 1 {
+		builder.workflow.Constraints.AllowBackLayer = true
+	}
 	builder.workflow.Validation = validationForIntent(acceptance, builder.request.Constraints.SkipRouting)
 	builder.workflow.RoutingRetry = routingRetryForIntent(acceptance)
 	builder.recordComponentPolicy(acceptance)

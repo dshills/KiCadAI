@@ -150,6 +150,9 @@ func TestBMP280IntentClearsSchematicElectrical(t *testing.T) {
 	if !hasConnectionWithNet(*intentPlan.GeneratedRequest, "regulator.VOUT", "i2c_connector.VCC", "VCC_3v3") {
 		t.Fatalf("BMP280 connector VCC connection missing: %#v", intentPlan.GeneratedRequest.Connections)
 	}
+	if !intentPlan.GeneratedRequest.Constraints.AllowBackLayer {
+		t.Fatalf("two-layer BMP280 workflow must allow B.Cu routing: %#v", intentPlan.GeneratedRequest.Constraints)
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	registry := blocks.NewBuiltinRegistry()
@@ -219,6 +222,26 @@ func TestBMP280IntentClearsSchematicElectrical(t *testing.T) {
 			}
 		}
 		t.Fatalf("transaction validation = %#v; suspect operations = %#v", validation.Issues, bad)
+	}
+}
+
+func TestPlanPreservesExplicitBackLayerConstraint(t *testing.T) {
+	disabled := false
+	plan := Plan(Request{
+		Version:    RequestVersion,
+		Name:       "single_sided_breakout",
+		Kind:       IntentBreakout,
+		Acceptance: designworkflow.AcceptanceConnectivity,
+		Board:      BoardIntent{Layers: 2},
+		Constraints: ConstraintIntent{
+			AllowBackLayer: &disabled,
+		},
+	})
+	if plan.GeneratedRequest == nil {
+		t.Fatalf("generated request missing: %#v", plan)
+	}
+	if plan.GeneratedRequest.Constraints.AllowBackLayer {
+		t.Fatalf("explicit false allow_back_layer was not preserved: %#v", plan.GeneratedRequest.Constraints)
 	}
 }
 

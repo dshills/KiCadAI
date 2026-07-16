@@ -131,6 +131,7 @@ type ManufacturingIntent struct {
 type ConstraintIntent struct {
 	PreferSMD          bool              `json:"prefer_smd,omitempty"`
 	AllowPlaceholders  bool              `json:"allow_placeholders,omitempty"`
+	AllowBackLayer     *bool             `json:"allow_back_layer,omitempty"`
 	PackagePreferences map[string]string `json:"package_preferences,omitempty"`
 	RouteWidthMM       float64           `json:"route_width_mm,omitempty"`
 	ClearanceMM        float64           `json:"clearance_mm,omitempty"`
@@ -277,6 +278,9 @@ func ValidateRequest(request Request) []reports.Issue {
 	}
 	if request.Board.Layers != 1 && request.Board.Layers != 2 {
 		issues = append(issues, issue("board.layers", "board layers must be 1 or 2"))
+	}
+	if request.Constraints.AllowBackLayer != nil && *request.Constraints.AllowBackLayer && request.Board.Layers <= 1 {
+		issues = append(issues, issue("constraints.allow_back_layer", "back-layer routing requires a two-layer board"))
 	}
 	if !validAcceptance(request.Acceptance) {
 		issues = append(issues, issue("acceptance", "unsupported acceptance level "+string(request.Acceptance)))
