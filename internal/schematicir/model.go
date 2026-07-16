@@ -209,13 +209,14 @@ const (
 )
 
 type Layout struct {
-	Flow       Flow        `json:"flow"`
-	Origin     Origin      `json:"origin"`
-	Groups     []Group     `json:"groups,omitempty"`
-	Lanes      Lanes       `json:"lanes"`
-	Rules      LayoutRules `json:"rules"`
-	Placements []Placement `json:"placements,omitempty"`
-	Buses      []BusLayout `json:"buses,omitempty"`
+	Flow                  Flow        `json:"flow"`
+	Origin                Origin      `json:"origin"`
+	Groups                []Group     `json:"groups,omitempty"`
+	Lanes                 Lanes       `json:"lanes"`
+	Rules                 LayoutRules `json:"rules"`
+	MaxComponentsPerSheet int         `json:"max_components_per_sheet,omitempty"`
+	Placements            []Placement `json:"placements,omitempty"`
+	Buses                 []BusLayout `json:"buses,omitempty"`
 }
 
 type Flow string

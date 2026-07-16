@@ -33,7 +33,7 @@ func Read(data []byte) (SchematicFile, error) {
 	if root.Head() != "kicad_sch" {
 		return SchematicFile{}, fmt.Errorf("expected kicad_sch root, got %q", root.Head())
 	}
-	file := SchematicFile{}
+	file := SchematicFile{OmitRootSheetInstances: true}
 	if node, ok := root.Child("version"); ok {
 		file.Version = kicadfiles.KiCadFormatVersion(node.ListValue(1))
 	}
@@ -78,6 +78,7 @@ func Read(data []byte) (SchematicFile, error) {
 			file.LibSymbols = readLibSymbols(child)
 		case "sheet_instances":
 			file.SheetInstances = readRootSheetInstances(child)
+			file.OmitRootSheetInstances = false
 		case "version", "generator", "generator_version", "uuid", "paper", "title_block":
 		default:
 			if child.Head() != "" {
@@ -471,6 +472,19 @@ func readLabel(node sexpr.ParsedNode, kind LabelKind) Label {
 	}
 	if fieldsAutoplaced, ok := readYesNoChild(node, "fields_autoplaced"); ok {
 		label.FieldsAutoplaced = fieldsAutoplaced
+	}
+	for _, child := range node.Children {
+		if child.Head() != "property" {
+			continue
+		}
+		property := readProperty(child)
+		label.Fields = append(label.Fields, Field{
+			Name:     property.Name,
+			Value:    property.Value,
+			Hidden:   property.Hidden,
+			Position: property.Position,
+			Rotation: property.Rotation,
+		})
 	}
 	return label
 }

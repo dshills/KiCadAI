@@ -164,7 +164,7 @@ func TestAutonomousCorrectionStressOptionalKiCad(t *testing.T) {
 	if reports.HasBlockingIssue(schematicIssues) {
 		t.Fatalf("stress schematic transaction issues = %#v", schematicIssues)
 	}
-	tx, transactionIssues := explicitCircuitTransaction(request, schematicTx, stress.SelectedPlaced, stress.SelectedRouted, true)
+	tx, transactionIssues := explicitCircuitTransaction(request, schematicTx, stress.SelectedPlaced, stress.SelectedRouted, true, nil)
 	if reports.HasBlockingIssue(transactionIssues) {
 		t.Fatalf("stress project transaction issues = %#v", transactionIssues)
 	}

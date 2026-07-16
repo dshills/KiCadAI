@@ -81,7 +81,9 @@ func createExplicitCircuit(ctx context.Context, request Request, opts CreateOpti
 		stages = append(stages, skippedWorkflowStages("explicit routing did not complete", StageProjectWrite, StageWriterCorrect, StageValidation, StageKiCadChecks)...)
 		return BuildWorkflowResult(project, request.Validation.Acceptance, stages)
 	}
-	tx, projectTxIssues := explicitCircuitTransaction(request, schematicTx, placed, routed, opts.Overwrite)
+	hierarchy, hierarchyIssues := explicitCircuitHierarchy(request, opts.LibraryIndex)
+	tx, projectTxIssues := explicitCircuitTransaction(request, schematicTx, placed, routed, opts.Overwrite, hierarchy)
+	projectTxIssues = append(projectTxIssues, hierarchyIssues...)
 	if reports.HasBlockingIssue(projectTxIssues) {
 		writeStage := NewStageResult(StageProjectWrite, projectTxIssues)
 		stages = append(stages, writeStage)
@@ -108,6 +110,7 @@ func createExplicitCircuit(ctx context.Context, request Request, opts CreateOpti
 	kicadOpts.RequireDRC = kicadOpts.RequireDRC || request.Validation.RequireDRC
 	checked := RunKiCadChecks(ctx, &request, &written, kicadOpts)
 	stages = append(stages, checked.Stage)
+	stages = append(stages, runExplicitSimulation(request, opts.OutputDir, opts.Overwrite))
 	return BuildWorkflowResult(project, request.Validation.Acceptance, stages)
 }
 
@@ -152,7 +155,14 @@ func explicitSchematicTransaction(request Request, index *libraryresolver.Librar
 	return tx, issues
 }
 
-func explicitCircuitTransaction(request Request, schematicTx transactions.Transaction, placed PlacementStageResult, routed RoutingStageResult, overwrite bool) (transactions.Transaction, []reports.Issue) {
+func explicitCircuitHierarchy(request Request, index *libraryresolver.LibraryIndex) (*transactions.SchematicHierarchy, []reports.Issue) {
+	if request.ExplicitCircuit == nil || !request.ExplicitCircuit.AutoHierarchy {
+		return nil, nil
+	}
+	return schematicir.HierarchyForProject(request.ExplicitCircuit.Schematic, index)
+}
+
+func explicitCircuitTransaction(request Request, schematicTx transactions.Transaction, placed PlacementStageResult, routed RoutingStageResult, overwrite bool, hierarchy *transactions.SchematicHierarchy) (transactions.Transaction, []reports.Issue) {
 	tx := schematicTx
 	var issues []reports.Issue
 	boardOps, boardIssues := boardOperations(&request)
@@ -168,6 +178,7 @@ func explicitCircuitTransaction(request Request, schematicTx transactions.Transa
 	appendExplicitOperation(&tx, transactions.OpWriteProject, transactions.WriteProjectOperation{
 		Op: transactions.OpWriteProject, Overwrite: overwrite,
 		RequireSchematicReadability: request.ExplicitCircuit.Schematic.Policy.Acceptance == schematicir.AcceptanceReadable,
+		Hierarchy:                   hierarchy,
 	}, &issues)
 	return tx, issues
 }

@@ -2,6 +2,7 @@ package designapi
 
 import (
 	"path/filepath"
+	"strconv"
 	"testing"
 
 	"kicadai/internal/kicadfiles"
@@ -74,9 +75,36 @@ func TestBuilderWritesGeneratedSchematicHierarchy(t *testing.T) {
 	if len(read.SheetFiles) != 2 {
 		t.Fatalf("child sheets = %#v", read.SheetFiles)
 	}
+	if len(read.Schematic.SheetInstances) != 1 || read.Schematic.SheetInstances[0].Path != "/" {
+		t.Fatalf("root sheet instances = %#v, want only the root path", read.Schematic.SheetInstances)
+	}
+	sheetUUIDByFilename := make(map[string]kicadfiles.UUID, len(read.Schematic.Sheets))
+	for index, sheet := range read.Schematic.Sheets {
+		wantPath := "/" + string(read.Schematic.UUID)
+		wantPage := strconv.Itoa(index + 2)
+		if len(sheet.Instances) != 1 || sheet.Instances[0].Project != "" || sheet.Instances[0].Path != wantPath || sheet.Instances[0].Page != wantPage {
+			t.Fatalf("root sheet %s instances = %#v, want empty project path %s page %s", sheet.Filename, sheet.Instances, wantPath, wantPage)
+		}
+		sheetUUIDByFilename[sheet.Filename] = sheet.UUID
+	}
 	for _, child := range read.SheetFiles {
 		if len(child.Symbols) != 1 {
 			t.Fatalf("child %s symbols = %#v", child.Filename, child.Symbols)
+		}
+		if child.SheetInstances != nil {
+			t.Fatalf("child %s sheet instances = %#v, want none", child.Filename, child.SheetInstances)
+		}
+		if !child.OmitRootSheetInstances {
+			t.Fatalf("child %s did not preserve root sheet instance omission", child.Filename)
+		}
+		sheetUUID, ok := sheetUUIDByFilename[child.Filename]
+		if !ok {
+			t.Fatalf("child %s has no matching root sheet", child.Filename)
+		}
+		instance := child.Symbols[0].Instances
+		wantInstancePath := "/" + string(read.Schematic.UUID) + "/" + string(sheetUUID)
+		if len(instance) != 1 || instance[0].Project != "hierarchy_demo" || instance[0].Path != wantInstancePath {
+			t.Fatalf("child %s symbol instances = %#v, want path %s", child.Filename, instance, wantInstancePath)
 		}
 		globalLabels := 0
 		connectedGlobalLabel := false
@@ -93,6 +121,14 @@ func TestBuilderWritesGeneratedSchematicHierarchy(t *testing.T) {
 		}
 		if globalLabels != 1 {
 			t.Fatalf("child %s labels = %#v", child.Filename, child.Labels)
+		}
+		for _, label := range child.Labels {
+			if label.Kind != schematic.LabelGlobal {
+				continue
+			}
+			if len(label.Fields) != 1 || label.Fields[0].Name != "Intersheetrefs" || label.Fields[0].Value != "${INTERSHEET_REFS}" || !label.Fields[0].Hidden || label.Fields[0].Position != label.Position {
+				t.Fatalf("child %s global label %s intersheet field = %#v", child.Filename, label.Text, label.Fields)
+			}
 		}
 		if !connectedGlobalLabel {
 			t.Fatalf("child %s global label was not moved onto a connecting wire: labels=%#v wires=%#v", child.Filename, child.Labels, child.Wires)

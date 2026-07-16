@@ -98,7 +98,6 @@ func (builder *Builder) applySchematicHierarchy(design *kicaddesign.Design) erro
 	// intentionally converted into child-local endpoint labels and cross-sheet
 	// global labels below; free graphics are rejected above instead of dropped.
 	usedItems := map[kicadfiles.UUID]struct{}{}
-	anchorToSheet := hierarchyAnchorSheets(original.Symbols, refToSheet)
 	columns := int(math.Ceil(math.Sqrt(float64(len(builder.hierarchy.Sheets)))))
 	if columns < 1 {
 		columns = 1
@@ -115,12 +114,24 @@ func (builder *Builder) applySchematicHierarchy(design *kicaddesign.Design) erro
 		child.Filename = filename
 		child.UUID = childUUID
 		child.Symbols = append([]schematic.SchematicSymbol(nil), symbolsBySheet[spec.ID]...)
-		child.Wires = wiresForSheet(original.Wires, child.Symbols, usedItems, spec.ID, anchorToSheet)
+		for symbolIndex := range child.Symbols {
+			symbol := &child.Symbols[symbolIndex]
+			symbol.Instances = []schematic.SymbolInstance{{
+				Project:   design.Project.Name,
+				Path:      "/" + string(root.UUID) + "/" + string(sheetUUID),
+				Reference: symbol.Reference,
+				Unit:      symbol.Unit,
+				Value:     symbol.Value,
+			}}
+		}
 		child.Labels = labelsForSheet(original.Labels, child.Symbols, usedItems)
-		child.Junctions = junctionsForSheet(original.Junctions, child.Symbols, usedItems)
 		child.NoConnects = noConnectsForSheet(original.NoConnects, child.Symbols, usedItems)
 		child.Sheets = nil
-		child.SheetInstances = []schematic.SheetInstance{{Project: design.Project.Name, Path: "/" + string(sheetUUID) + "/", Page: strconv.Itoa(index + 2)}}
+		// In the current KiCad hierarchy format, a child sheet's placement is
+		// owned by the parent sheet symbol.  Child schematics therefore carry
+		// symbol instance paths, but no top-level sheet_instances entry.
+		child.SheetInstances = nil
+		child.OmitRootSheetInstances = true
 		// Parent-sheet wires and junctions are writer-owned routing artifacts;
 		// child connectivity is rebuilt from the builder's net assignments.
 		child.Wires = nil
@@ -131,6 +142,7 @@ func (builder *Builder) applySchematicHierarchy(design *kicaddesign.Design) erro
 		if err := applyHierarchyBuses(builder, child, spec.ID, hierarchyCrossSheetNetSet(builder)); err != nil {
 			return err
 		}
+		addHierarchyIntersheetReferences(child)
 		if err := fitHierarchyChild(child); err != nil {
 			return err
 		}
@@ -140,16 +152,53 @@ func (builder *Builder) applySchematicHierarchy(design *kicaddesign.Design) erro
 			X: kicadfiles.MM(hierarchySheetOrigin + float64(index%columns)*hierarchySheetStepX),
 			Y: kicadfiles.MM(hierarchySheetOrigin + float64(index/columns)*hierarchySheetStepY),
 		}
-		root.Sheets = append(root.Sheets, schematic.NewSheet(
+		sheet := schematic.NewSheet(
 			sheetUUID,
 			spec.Name,
 			filename,
 			position,
 			kicadfiles.Point{X: kicadfiles.MM(hierarchySheetWidth), Y: kicadfiles.MM(hierarchySheetHeight)},
-		))
+		)
+		sheet.Instances = []schematic.SheetInstance{{
+			// KiCad owns the active project association for a hierarchical sheet
+			// and writes an empty project name when the schematic is upgraded in
+			// isolation, as the strict round-trip harness does.
+			Project: "",
+			Path:    "/" + string(root.UUID),
+			Page:    strconv.Itoa(index + 2),
+		}}
+		root.Sheets = append(root.Sheets, sheet)
 	}
 	design.SheetFiles = children
 	return nil
+}
+
+func addHierarchyIntersheetReferences(child *schematic.SchematicFile) {
+	if child == nil {
+		return
+	}
+	for index := range child.Labels {
+		label := &child.Labels[index]
+		if label.Kind != schematic.LabelGlobal {
+			continue
+		}
+		found := false
+		for _, field := range label.Fields {
+			if strings.EqualFold(strings.TrimSpace(field.Name), "Intersheetrefs") {
+				found = true
+				break
+			}
+		}
+		if found {
+			continue
+		}
+		label.Fields = append(label.Fields, schematic.Field{
+			Name:     "Intersheetrefs",
+			Value:    "${INTERSHEET_REFS}",
+			Hidden:   true,
+			Position: label.Position,
+		})
+	}
 }
 
 func hierarchyCrossSheetNetSet(builder *Builder) map[string]struct{} {
@@ -211,7 +260,7 @@ func applyHierarchyBuses(builder *Builder, child *schematic.SchematicFile, sheet
 		if strings.TrimSpace(bus.Name) != "" {
 			child.Labels = append(child.Labels, schematic.NewLabel(
 				builder.generator.New("hierarchy.bus.label", sheetID, bus.ID),
-				bus.Name,
+				hierarchyBusLabel(bus.Name, entries),
 				schematic.LabelLocal,
 				kicadfiles.Point{X: xStart, Y: busY},
 			))
@@ -235,7 +284,11 @@ func applyHierarchyBuses(builder *Builder, child *schematic.SchematicFile, sheet
 				return fmt.Errorf("hierarchy child %s bus entry %s.%s has no symbol anchor", sheetID, entry.Endpoint.Reference, entry.Endpoint.Pin)
 			}
 			pinStub := hierarchyBusPinStub(symbol, anchor)
-			entryStub := kicadfiles.Point{X: entryPoint.X + kicadfiles.MM(5.08), Y: entryPoint.Y}
+			stubDirection := kicadfiles.MM(5.08)
+			if size.Y < 0 {
+				stubDirection = -stubDirection
+			}
+			entryStub := kicadfiles.Point{X: entryPoint.X, Y: entryPoint.Y + stubDirection}
 			child.Wires = append(child.Wires,
 				schematic.NewWire(builder.generator.New("hierarchy.bus.pin_wire", sheetID, bus.ID, entry.Member, entry.Endpoint.Reference, strconv.Itoa(entry.Endpoint.Unit), entry.Endpoint.Pin), anchor, pinStub),
 				schematic.NewWire(builder.generator.New("hierarchy.bus.entry_wire", sheetID, bus.ID, entry.Member, entry.Endpoint.Reference, strconv.Itoa(entry.Endpoint.Unit), entry.Endpoint.Pin), entryPoint, entryStub),
@@ -255,6 +308,30 @@ func applyHierarchyBuses(builder *Builder, child *schematic.SchematicFile, sheet
 		}
 	}
 	return nil
+}
+
+func hierarchyBusLabel(name string, entries []SchematicBusEntry) string {
+	members := make([]string, 0, len(entries))
+	seen := make(map[string]struct{}, len(entries))
+	for _, entry := range entries {
+		member := strings.TrimSpace(entry.Member)
+		if member == "" {
+			continue
+		}
+		if _, ok := seen[member]; ok {
+			continue
+		}
+		seen[member] = struct{}{}
+		members = append(members, member)
+	}
+	sort.Strings(members)
+	if len(members) == 0 {
+		return strings.TrimSpace(name)
+	}
+	// An anonymous group keeps the member net names unchanged.  Prefixing the
+	// braces with the display name would rename SCL to I2C.SCL in KiCad and make
+	// existing member labels invalid.
+	return "{" + strings.Join(members, " ") + "}"
 }
 
 func hierarchyBusPinStub(symbol *schematic.SchematicSymbol, anchor kicadfiles.Point) kicadfiles.Point {

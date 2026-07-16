@@ -36,8 +36,16 @@ func ToDesignRequest(resolved ResolvedDocument) (designworkflow.Request, []repor
 	explicit := designworkflow.ExplicitCircuitSpec{
 		ResolutionHash: resolved.ResolutionHash, CatalogID: resolved.CatalogID,
 		CatalogHash: resolved.CatalogHash, Schematic: schematic,
-		Components: make([]designworkflow.ExplicitComponentSpec, 0, len(resolved.Components)),
-		Nets:       make([]designworkflow.ExplicitNetSpec, 0, len(resolved.Nets)),
+		AutoHierarchy: resolved.Source.Schematic.Hierarchy.Mode == "auto",
+		Components:    make([]designworkflow.ExplicitComponentSpec, 0, len(resolved.Components)),
+		Nets:          make([]designworkflow.ExplicitNetSpec, 0, len(resolved.Nets)),
+	}
+	if simulation := resolved.Source.Simulation; simulation != nil {
+		explicit.Simulation = &designworkflow.ExplicitSimulationSpec{
+			ModelID: simulation.ModelID, Component: simulation.Component,
+			InputVoltageV: simulation.InputVoltageV, LoadCurrentMA: simulation.LoadCurrentMA, OutputNominalV: simulation.OutputNominalV,
+			OutputMinV: simulation.OutputMinV, OutputMaxV: simulation.OutputMaxV,
+		}
 	}
 	for _, flag := range resolved.Source.PowerFlags {
 		explicit.SchematicSupport = append(explicit.SchematicSupport, designworkflow.ExplicitSchematicSupportSpec{

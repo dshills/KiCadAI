@@ -145,6 +145,15 @@ func TestRouteEmitsLabelForSingleEndpointNet(t *testing.T) {
 	}
 }
 
+func TestLabelPlacementRejectsDifferentNetEndpointContact(t *testing.T) {
+	stub := WireSegment{NetName: "RIGHT", From: kicadfiles.Point{X: kicadfiles.MM(20)}, To: kicadfiles.Point{X: kicadfiles.MM(30)}}
+	existing := WireSegment{NetName: "LEFT", From: kicadfiles.Point{X: kicadfiles.MM(10)}, To: stub.From}
+	box := TextEstimate("RIGHT", stub.To, 0, 0)
+	if !labelPlacementCollides(box, stub, Endpoint{}, Result{Wires: []WireSegment{existing}}, Request{}) {
+		t.Fatalf("different-net stubs sharing an endpoint were accepted: new=%#v existing=%#v", stub, existing)
+	}
+}
+
 func TestRouteRespectsDisabledLabelFallback(t *testing.T) {
 	result := Route(Request{
 		Sheet: testSheet(),

@@ -391,7 +391,8 @@ func schematicLayoutIntent(resolved ResolvedDocument, unitIDs map[schematicUnitK
 	source := resolved.Source
 	layout := schematicir.Layout{
 		Flow: schematicir.FlowLeftToRight, Origin: schematicir.OriginCentered,
-		Lanes: schematicir.Lanes{Power: schematicir.LanePositionTop, Signals: schematicir.LanePositionMiddle, Ground: schematicir.LanePositionBottom},
+		MaxComponentsPerSheet: source.Schematic.Hierarchy.MaxComponentsPerSheet,
+		Lanes:                 schematicir.Lanes{Power: schematicir.LanePositionTop, Signals: schematicir.LanePositionMiddle, Ground: schematicir.LanePositionBottom},
 		Rules: schematicir.LayoutRules{
 			PositivePowerTop: source.Schematic.Rules.PositivePowerTop, GroundBottom: source.Schematic.Rules.GroundBottom,
 			CenterOnPage: source.Schematic.Rules.CenterOnPage, PreferLabelsForLongNets: source.Schematic.Rules.PreferLabelsForLongNets,

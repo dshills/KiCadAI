@@ -38,6 +38,9 @@ type SchematicFile struct {
 	Instances []SymbolInstance
 	// SheetInstances renders the root sheet_instances block.
 	SheetInstances []SheetInstance
+	// OmitRootSheetInstances is true for hierarchy child files, whose placement
+	// is owned by the parent sheet symbol rather than a root sheet instance.
+	OmitRootSheetInstances bool
 }
 
 type EmbeddedSymbol struct {
@@ -1136,7 +1139,12 @@ func render(schematic SchematicFile) (sexpr.List, error) {
 	for _, item := range items {
 		nodes = append(nodes, item.node)
 	}
-	nodes = append(nodes, renderRootSheetInstances(schematic.SheetInstances))
+	// Only root schematic files own a root sheet instance.  Child hierarchy
+	// files leave it out so the parent sheet symbol remains the single owner of
+	// their project/path/page placement.
+	if !schematic.OmitRootSheetInstances {
+		nodes = append(nodes, renderRootSheetInstances(schematic.SheetInstances))
+	}
 	return sexpr.L(nodes...), nil
 }
 
@@ -2120,7 +2128,9 @@ func renderNoConnect(noConnect NoConnect) sexpr.List {
 func renderSheet(sheet Sheet) sexpr.List {
 	nodes := []sexpr.Node{
 		sexpr.A("sheet"),
-		renderAt(sheet.Position, 0),
+		// KiCad sheet symbols require the two-coordinate form. A zero rotation
+		// here makes current KiCad reject the root schematic.
+		sexpr.L(sexpr.A("at"), schematicFixed(sheet.Position.X), schematicFixed(sheet.Position.Y)),
 		sexpr.L(sexpr.A("size"), schematicFixed(sheet.Size.X), schematicFixed(sheet.Size.Y)),
 		sexpr.L(sexpr.A("exclude_from_sim"), yesNo(sheet.ExcludeFromSim)),
 		sexpr.L(sexpr.A("in_bom"), yesNo(defaultBool(sheet.InBOM, true))),
@@ -2129,7 +2139,7 @@ func renderSheet(sheet Sheet) sexpr.List {
 		sexpr.OmitIf(!sheet.Locked, sexpr.L(sexpr.A("locked"), sexpr.A("yes"))),
 		sexpr.OmitIf(!sheet.FieldsAutoplaced, sexpr.L(sexpr.A("fields_autoplaced"), sexpr.A("yes"))),
 		renderStroke(0.1524, "solid"),
-		sexpr.L(sexpr.A("fill"), sexpr.L(sexpr.A("color"), sexpr.I(0), sexpr.I(0), sexpr.I(0), sexpr.X("0.0000"))),
+		sexpr.L(sexpr.A("fill"), sexpr.L(sexpr.A("color"), sexpr.I(0), sexpr.I(0), sexpr.I(0), sexpr.I(0))),
 		sexpr.L(sexpr.A("uuid"), sexpr.S(string(sheet.UUID))),
 	}
 	for _, property := range sheetProperties(sheet) {
@@ -2194,9 +2204,6 @@ func renderSheetInstances(instances []SheetInstance) sexpr.List {
 	projects := make([]string, 0)
 	for _, instance := range instances {
 		project := strings.TrimSpace(instance.Project)
-		if project == "" {
-			project = "project"
-		}
 		if _, ok := grouped[project]; !ok {
 			projects = append(projects, project)
 		}

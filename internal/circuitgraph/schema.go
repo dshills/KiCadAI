@@ -7,6 +7,7 @@ func ProviderGraphSchema() map[string]any {
 	stringValue := map[string]any{"type": "string", "maxLength": MaxStringBytes}
 	boolValue := map[string]any{"type": "boolean"}
 	numberValue := map[string]any{"type": "number"}
+	nonnegativeNumber := map[string]any{"type": "number", "minimum": 0}
 	// Circuit-graph PCB regions use board-local coordinates in the positive quadrant.
 	positiveMM := map[string]any{"type": "number", "exclusiveMinimum": 0, "maximum": MaxBoardDimensionMM}
 	nonnegativeMM := map[string]any{"type": "number", "minimum": 0, "maximum": MaxBoardDimensionMM}
@@ -120,6 +121,11 @@ func ProviderGraphSchema() map[string]any {
 	})
 	keepout := strictObject(map[string]any{"id": identifier, "bounds": bounds, "layers": stringArray(32)})
 	zone := strictObject(map[string]any{"net": stringValue, "layers": stringArray(32), "clearance_mm": numberValue})
+	simulation := strictObject(map[string]any{
+		"model_id": identifier, "component": identifier,
+		"input_voltage_v": numberValue, "load_current_ma": nonnegativeNumber,
+		"output_nominal_v": numberValue, "output_min_v": numberValue, "output_max_v": numberValue,
+	})
 
 	return strictObject(map[string]any{
 		"schema":  map[string]any{"type": "string", "const": SchemaID},
@@ -167,6 +173,7 @@ func ProviderGraphSchema() map[string]any {
 			"keepouts":   map[string]any{"type": "array", "items": keepout},
 			"zones":      map[string]any{"type": "array", "items": zone},
 		}),
+		"simulation": nullable(simulation),
 		"policy": strictObject(map[string]any{
 			"allow_reference_assignment": boolValue,
 			"allow_value_normalization":  boolValue,

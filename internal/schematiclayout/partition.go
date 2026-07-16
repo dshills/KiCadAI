@@ -73,6 +73,7 @@ func partition(request Request, placedComponents []PlacedComponent) PartitionRes
 	}
 	oversizedGroups := oversizedPartitionGroups(groupByRef, usable, bodyByRef)
 	assignments := partitionAssignments(placed.Components, groupByRef, oversizedGroups, usable, bodyByRef)
+	assignments = limitPartitionAssignments(placed.Components, assignments, request.MaxComponentsPerSheet)
 	partitions := map[string]*PartitionSheet{}
 	for _, component := range placed.Components {
 		id := assignments[component.Ref]
@@ -127,6 +128,39 @@ func partition(request Request, placedComponents []PlacedComponent) PartitionRes
 		}
 	}
 	return result
+}
+
+// limitPartitionAssignments applies an explicit sheet-capacity contract after
+// geometry-based partitioning. It is deterministic and leaves the default
+// zero-value behavior unchanged.
+func limitPartitionAssignments(components []PlacedComponent, assignments map[string]string, maximum int) map[string]string {
+	if maximum <= 0 || len(components) <= maximum {
+		return assignments
+	}
+	byPartition := map[string][]PlacedComponent{}
+	for _, component := range components {
+		byPartition[assignments[component.Ref]] = append(byPartition[assignments[component.Ref]], component)
+	}
+	limited := make(map[string]string, len(assignments))
+	partitionIDs := make([]string, 0, len(byPartition))
+	for partitionID := range byPartition {
+		partitionIDs = append(partitionIDs, partitionID)
+	}
+	sort.Strings(partitionIDs)
+	for _, partitionID := range partitionIDs {
+		members := byPartition[partitionID]
+		sort.SliceStable(members, func(i, j int) bool { return members[i].Ref < members[j].Ref })
+		if len(members) <= maximum {
+			for _, member := range members {
+				limited[member.Ref] = partitionID
+			}
+			continue
+		}
+		for index, member := range members {
+			limited[member.Ref] = fmt.Sprintf("%s-%d", partitionID, index/maximum)
+		}
+	}
+	return limited
 }
 
 func oversizedPartitionGroups(groupByRef map[string]string, usable Rect, bodyByRef map[string]Rect) map[string]struct{} {

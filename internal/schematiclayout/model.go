@@ -34,11 +34,12 @@ type Sheet struct {
 }
 
 type Request struct {
-	Sheet      Sheet
-	Components []Component
-	Nets       []Net
-	Groups     []Group
-	Rules      Rules
+	Sheet                 Sheet
+	Components            []Component
+	Nets                  []Net
+	Groups                []Group
+	Rules                 Rules
+	MaxComponentsPerSheet int
 }
 
 type Rules struct {

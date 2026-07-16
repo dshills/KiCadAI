@@ -40,8 +40,24 @@ type Document struct {
 	Buses      []Bus                      `json:"buses"`
 	Schematic  SchematicIntent            `json:"schematic"`
 	PCB        PCBIntent                  `json:"pcb"`
+	Simulation *SimulationIntent          `json:"simulation,omitempty"`
 	Policy     Policy                     `json:"policy"`
 	Extensions map[string]json.RawMessage `json:"extensions,omitempty"`
+}
+
+// SimulationIntent declares a catalog-resolved functional model. It is
+// intentionally graph-level so providers cannot smuggle simulator-specific
+// geometry or untrusted model files into the project writer.
+const SimulationModelLinearRegulatorIdealV1 = "linear_regulator_ideal_v1"
+
+type SimulationIntent struct {
+	ModelID        string  `json:"model_id"`
+	Component      string  `json:"component"`
+	InputVoltageV  float64 `json:"input_voltage_v"`
+	LoadCurrentMA  float64 `json:"load_current_ma"`
+	OutputNominalV float64 `json:"output_nominal_v"`
+	OutputMinV     float64 `json:"output_min_v"`
+	OutputMaxV     float64 `json:"output_max_v"`
 }
 
 // PowerFlag declares that an existing power or return net is driven by a

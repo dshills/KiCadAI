@@ -302,6 +302,7 @@ func cloneSchematicFile(file *schematic.SchematicFile) *schematic.SchematicFile 
 	clone.RawItems = append([]schematic.RawSchematicItem(nil), file.RawItems...)
 	clone.Instances = append([]schematic.SymbolInstance(nil), file.Instances...)
 	clone.SheetInstances = append([]schematic.SheetInstance(nil), file.SheetInstances...)
+	clone.OmitRootSheetInstances = file.OmitRootSheetInstances
 	return &clone
 }
 

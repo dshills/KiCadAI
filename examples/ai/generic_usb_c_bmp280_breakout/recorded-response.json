@@ -706,8 +706,8 @@
         "min_component_spacing_mm": 2.54
       },
       "hierarchy": {
-        "mode": "flat",
-        "max_components_per_sheet": 50
+        "mode": "auto",
+        "max_components_per_sheet": 8
       }
     },
     "pcb": {
@@ -870,6 +870,15 @@
       ],
       "keepouts": null,
       "zones": null
+    },
+    "simulation": {
+      "model_id": "linear_regulator_ideal_v1",
+      "component": "regulator_3v3",
+      "input_voltage_v": 5,
+      "load_current_ma": 20,
+      "output_nominal_v": 3.3,
+      "output_min_v": 3.2,
+      "output_max_v": 3.4
     },
     "policy": {
       "allow_reference_assignment": true,

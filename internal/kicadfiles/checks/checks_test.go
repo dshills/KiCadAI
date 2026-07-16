@@ -156,6 +156,37 @@ func TestRunDRCProjectCopiesContext(t *testing.T) {
 	}
 }
 
+func TestDiscoverProjectERCUsesProjectRootSchematic(t *testing.T) {
+	dir := t.TempDir()
+	writeCheckTestFile(t, filepath.Join(dir, "usb_sensor.kicad_pro"), "{}")
+	root := filepath.Join(dir, "usb_sensor.kicad_sch")
+	writeCheckTestFile(t, root, "(kicad_sch)")
+	writeCheckTestFile(t, filepath.Join(dir, "sch", "0-0-0.kicad_sch"), "(kicad_sch)")
+
+	got, err := discoverProjectCheckFile(dir, CheckKindERC)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != root {
+		t.Fatalf("ERC schematic = %q, want project-paired root %q", got, root)
+	}
+}
+
+func TestDiscoverProjectERCPrefersTopLevelWithoutProjectFile(t *testing.T) {
+	dir := t.TempDir()
+	root := filepath.Join(dir, "root.kicad_sch")
+	writeCheckTestFile(t, root, "(kicad_sch)")
+	writeCheckTestFile(t, filepath.Join(dir, "sch", "child.kicad_sch"), "(kicad_sch)")
+
+	got, err := discoverProjectCheckFile(dir, CheckKindERC)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != root {
+		t.Fatalf("ERC schematic = %q, want top-level root %q", got, root)
+	}
+}
+
 func testArgsContain(values []string, target string) bool {
 	for _, value := range values {
 		if value == target {

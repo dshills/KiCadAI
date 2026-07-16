@@ -130,3 +130,45 @@ func TestToDesignRequestPreservesPCBIntent(t *testing.T) {
 		}
 	}
 }
+
+func TestToDesignRequestCarriesAutomaticHierarchyPolicy(t *testing.T) {
+	graph := loadGraphExample(t, "rc_filter.json")
+	graph.Schematic.Hierarchy = HierarchyPolicy{Mode: "auto", MaxComponentsPerSheet: 12}
+	resolved, issues := NewResolver(ResolveOptions{Catalog: loadGraphCatalog(t), CatalogID: "checked-in"}).Resolve(context.Background(), graph)
+	if reports.HasBlockingIssue(issues) {
+		t.Fatalf("resolve issues = %#v", issues)
+	}
+	request, issues := ToDesignRequest(resolved)
+	if reports.HasBlockingIssue(issues) {
+		t.Fatalf("request issues = %#v", issues)
+	}
+	if request.ExplicitCircuit == nil || !request.ExplicitCircuit.AutoHierarchy {
+		t.Fatalf("automatic hierarchy policy was not lowered: %#v", request.ExplicitCircuit)
+	}
+
+	graph.Schematic.Hierarchy = HierarchyPolicy{Mode: "flat"}
+	resolved, issues = NewResolver(ResolveOptions{Catalog: loadGraphCatalog(t), CatalogID: "checked-in"}).Resolve(context.Background(), graph)
+	if reports.HasBlockingIssue(issues) {
+		t.Fatalf("flat resolve issues = %#v", issues)
+	}
+	request, issues = ToDesignRequest(resolved)
+	if reports.HasBlockingIssue(issues) || request.ExplicitCircuit.AutoHierarchy {
+		t.Fatalf("flat hierarchy policy = request %#v issues %#v", request.ExplicitCircuit, issues)
+	}
+}
+
+func TestToDesignRequestLowersSimulationContract(t *testing.T) {
+	graph := loadGraphExample(t, "usb_c_bmp280_breakout.json")
+	graph.Simulation = &SimulationIntent{ModelID: "linear_regulator_ideal_v1", Component: "regulator", InputVoltageV: 5, LoadCurrentMA: 20, OutputNominalV: 3.3, OutputMinV: 3.2, OutputMaxV: 3.4}
+	resolved, issues := NewResolver(ResolveOptions{Catalog: loadGraphCatalog(t), CatalogID: "checked-in"}).Resolve(context.Background(), graph)
+	if reports.HasBlockingIssue(issues) {
+		t.Fatalf("resolve issues = %#v", issues)
+	}
+	request, issues := ToDesignRequest(resolved)
+	if reports.HasBlockingIssue(issues) || request.ExplicitCircuit.Simulation == nil {
+		t.Fatalf("simulation lowering = %#v issues %#v", request.ExplicitCircuit, issues)
+	}
+	if got := request.ExplicitCircuit.Simulation; got.ModelID != graph.Simulation.ModelID || got.Component != graph.Simulation.Component {
+		t.Fatalf("simulation = %#v", got)
+	}
+}

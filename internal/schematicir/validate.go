@@ -557,6 +557,9 @@ func validateLayout(document Document, componentPins map[string]map[string]struc
 	if document.Layout.Rules.MinComponentSpacingMM != nil && *document.Layout.Rules.MinComponentSpacingMM < 0 {
 		add("layout.rules.min_component_spacing_mm", "component spacing must be non-negative")
 	}
+	if document.Layout.MaxComponentsPerSheet < 0 {
+		add("layout.max_components_per_sheet", "maximum components per sheet must be non-negative")
+	}
 	groups := map[string]struct{}{}
 	for _, group := range document.Layout.Groups {
 		groups[group.ID] = struct{}{}

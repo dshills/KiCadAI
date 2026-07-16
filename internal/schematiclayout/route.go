@@ -132,7 +132,7 @@ func labelStubPoint(netName string, endpoint Endpoint, anchor kicadfiles.Point, 
 		}
 	}
 	usable := UsableSheet(request.Sheet)
-	for _, scale := range []kicadfiles.IU{2, 4, 6, 8, 12} {
+	for _, scale := range []kicadfiles.IU{1, 2, 3, 4, 6, 8, 12, 16} {
 		for _, direction := range directions {
 			position := kicadfiles.Point{X: anchor.X + direction.X*scale, Y: anchor.Y + direction.Y*scale}
 			segment := WireSegment{NetName: netName, From: anchor, To: position}
@@ -221,7 +221,10 @@ func labelPlacementCollides(labelBox Rect, stub WireSegment, endpoint Endpoint, 
 		}
 	}
 	for _, wire := range result.Wires {
-		if wire.NetName != stub.NetName && wireSegmentsCross(stub, wire) {
+		// Different nets may not touch at endpoints or overlap collinearly.  KiCad
+		// treats either case as an electrical connection, even though the visual
+		// crossing helper intentionally ignores shared endpoints.
+		if wire.NetName != stub.NetName && segmentsIntersect(stub.From, stub.To, wire.From, wire.To) {
 			return true
 		}
 	}
@@ -580,6 +583,21 @@ func Layout(request Request) Result {
 	}
 	if selectedFound {
 		selected = finalizeLayoutCandidate(selected, selectedRequest)
+		if request.MaxComponentsPerSheet > 0 && len(request.Components) > request.MaxComponentsPerSheet {
+			partition := PartitionPlaced(request, selected.Components)
+			if len(partition.Sheets) > 1 {
+				selected.Partition = &partition
+				selected.Report.PartitionCount = len(partition.Sheets)
+				selected.Report.PartitionSplitGroupCount = len(partition.SplitGroups)
+				selected.Report.CrossSheetNetCount = len(partition.CrossSheetNets)
+				selected.Diagnostics = append(selected.Diagnostics, Diagnostic{
+					Severity: SeverityInfo,
+					Code:     "hierarchy_partition_requested",
+					Message:  "the graph was partitioned to satisfy the requested sheet component limit",
+					Repair:   "emit KiCad hierarchical sheets and cross-sheet labels",
+				})
+			}
+		}
 		return NormalizeResult(selected, selectedRequest.Rules)
 	}
 	last = finalizeLayoutCandidate(last, lastRequest)

@@ -58,12 +58,24 @@ type ExplicitCircuitSpec struct {
 	CatalogID        string                         `json:"catalog_id"`
 	CatalogHash      string                         `json:"catalog_hash"`
 	Schematic        schematicir.Document           `json:"schematic"`
+	AutoHierarchy    bool                           `json:"auto_hierarchy,omitempty"`
+	Simulation       *ExplicitSimulationSpec        `json:"simulation,omitempty"`
 	SchematicSupport []ExplicitSchematicSupportSpec `json:"schematic_support,omitempty"`
 	Components       []ExplicitComponentSpec        `json:"components"`
 	Nets             []ExplicitNetSpec              `json:"nets"`
 	Regions          []ExplicitRegionSpec           `json:"regions,omitempty"`
 	Keepouts         []ExplicitKeepoutSpec          `json:"keepouts,omitempty"`
 	Zones            []ExplicitZoneSpec             `json:"zones,omitempty"`
+}
+
+type ExplicitSimulationSpec struct {
+	ModelID        string  `json:"model_id"`
+	Component      string  `json:"component"`
+	InputVoltageV  float64 `json:"input_voltage_v"`
+	LoadCurrentMA  float64 `json:"load_current_ma"`
+	OutputNominalV float64 `json:"output_nominal_v"`
+	OutputMinV     float64 `json:"output_min_v"`
+	OutputMaxV     float64 `json:"output_max_v"`
 }
 
 const ExplicitSchematicSupportPowerFlag = "power_flag"
@@ -557,6 +569,10 @@ func cloneExplicitCircuit(source *ExplicitCircuitSpec) *ExplicitCircuitSpec {
 	clone := *source
 	clone.Schematic = schematicir.Normalize(source.Schematic)
 	clone.SchematicSupport = append([]ExplicitSchematicSupportSpec(nil), source.SchematicSupport...)
+	if source.Simulation != nil {
+		simulation := *source.Simulation
+		clone.Simulation = &simulation
+	}
 	clone.Components = append([]ExplicitComponentSpec(nil), source.Components...)
 	for index := range clone.Components {
 		clone.Components[index].SchematicUnits = append([]string(nil), source.Components[index].SchematicUnits...)

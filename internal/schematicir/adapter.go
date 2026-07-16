@@ -78,6 +78,17 @@ func ToProjectTransactionWithLibraryIndex(document Document, index *libraryresol
 	return toProjectTransaction(document, index)
 }
 
+// HierarchyForProject returns the deterministic child-sheet plan that would be
+// used when writing an oversized schematic. Callers that own their project
+// write operation can use it without adding a second write_project operation.
+func HierarchyForProject(document Document, index *libraryresolver.LibraryIndex) (*transactions.SchematicHierarchy, []reports.Issue) {
+	document = NormalizeLayoutIntent(document)
+	if issues := validateDefaulted(document); len(issues) != 0 {
+		return nil, issues
+	}
+	return schematicHierarchy(document, index)
+}
+
 func toProjectTransaction(document Document, index *libraryresolver.LibraryIndex) (transactions.Transaction, []reports.Issue) {
 	document = NormalizeLayoutIntent(document)
 	tx, issues := toTransaction(document, index)
@@ -1679,8 +1690,9 @@ func schematicLayoutWithLibraryIndexAndPreferences(document Document, index *lib
 		rules.LabelFallbackConfigured = true
 	}
 	request := schematiclayout.Request{
-		Sheet: schematiclayout.SheetForPaper(document.Metadata.Paper),
-		Rules: rules,
+		Sheet:                 schematiclayout.SheetForPaper(document.Metadata.Paper),
+		Rules:                 rules,
+		MaxComponentsPerSheet: document.Layout.MaxComponentsPerSheet,
 	}
 	for _, component := range document.Circuit.Components {
 		placement := placementsByID[component.ID]

@@ -107,6 +107,33 @@ func TestResolvedGraphPlacementIsDeterministicAcrossProjectNames(t *testing.T) {
 	}
 }
 
+func TestResolvedGraphWritesRequestedHierarchy(t *testing.T) {
+	graph := loadGraphExample(t, "rc_filter.json")
+	graph.Schematic.Hierarchy = HierarchyPolicy{Mode: "auto", MaxComponentsPerSheet: 2}
+	resolved, issues := NewResolver(ResolveOptions{Catalog: loadGraphCatalog(t), CatalogID: "checked-in"}).Resolve(context.Background(), graph)
+	if reports.HasBlockingIssue(issues) {
+		t.Fatalf("resolve issues = %#v", issues)
+	}
+	request, issues := ToDesignRequest(resolved)
+	if reports.HasBlockingIssue(issues) {
+		t.Fatalf("request issues = %#v", issues)
+	}
+	index := schematicTestLibraryIndex(resolved)
+	output := filepath.Join(t.TempDir(), request.Name)
+	result := designworkflow.Create(context.Background(), request, designworkflow.CreateOptions{OutputDir: output, Overwrite: true, LibraryIndex: &index})
+	write := graphWorkflowStage(result, designworkflow.StageProjectWrite)
+	if write == nil || write.Status == designworkflow.StageStatusBlocked {
+		t.Fatalf("project write stage = %#v; workflow issues = %#v", write, designworkflow.WorkflowIssues(result))
+	}
+	written, err := design.ReadProjectDirectory(output)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if written.Schematic == nil || len(written.Schematic.Sheets) < 2 || len(written.SheetFiles) < 2 {
+		t.Fatalf("requested hierarchy was not written: root=%#v child_files=%d", written.Schematic, len(written.SheetFiles))
+	}
+}
+
 func TestGenericUSBCBMP280RoutesWithInstalledLibraries(t *testing.T) {
 	symbolsRoot := os.Getenv(libraryresolver.EnvSymbolsRoot)
 	footprintsRoot := os.Getenv(libraryresolver.EnvFootprintsRoot)

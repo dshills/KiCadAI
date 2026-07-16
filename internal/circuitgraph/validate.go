@@ -42,8 +42,47 @@ func Validate(document Document) []reports.Issue {
 	validator.buses(netsByName)
 	validator.schematic(componentsByID)
 	validator.pcb(componentsByID, netsByName)
+	validator.simulation(componentsByID)
 	validator.policy()
 	return finalizeGraphIssues(validator.issues)
+}
+
+func (validator *graphValidator) simulation(componentsByID map[string]Component) {
+	simulation := validator.document.Simulation
+	if simulation == nil {
+		return
+	}
+	if simulation.ModelID != SimulationModelLinearRegulatorIdealV1 {
+		validator.add(CodeSchemaInvalid, "simulation.model_id", "simulation model_id is not trusted")
+	}
+	component, ok := componentsByID[simulation.Component]
+	if !ok || component.Role != RoleRegulator {
+		validator.add(CodeSchemaInvalid, "simulation.component", "simulation requires a declared regulator component")
+	}
+	if !finitePositive(simulation.InputVoltageV) {
+		validator.add(CodeSchemaInvalid, "simulation.input_voltage_v", "simulation input voltage must be finite and positive")
+	}
+	if !finiteNonnegative(simulation.LoadCurrentMA) {
+		validator.add(CodeSchemaInvalid, "simulation.load_current_ma", "simulation load current must be finite and non-negative")
+	}
+	if !finitePositive(simulation.OutputNominalV) {
+		validator.add(CodeSchemaInvalid, "simulation.output_nominal_v", "simulation nominal output voltage must be finite and positive")
+	}
+	if !finitePositive(simulation.OutputMinV) || !finitePositive(simulation.OutputMaxV) {
+		validator.add(CodeSchemaInvalid, "simulation.output_bounds", "simulation output voltage bounds must be finite and positive")
+	} else if simulation.OutputMinV > simulation.OutputMaxV {
+		validator.add(CodeSchemaInvalid, "simulation.output_bounds", "simulation minimum output voltage must not exceed the maximum")
+	} else if simulation.OutputNominalV < simulation.OutputMinV || simulation.OutputNominalV > simulation.OutputMaxV {
+		validator.add(CodeSchemaInvalid, "simulation.output_nominal_v", "simulation nominal output voltage must be within the declared bounds")
+	}
+}
+
+func finitePositive(value float64) bool {
+	return !math.IsNaN(value) && !math.IsInf(value, 0) && value > 0
+}
+
+func finiteNonnegative(value float64) bool {
+	return !math.IsNaN(value) && !math.IsInf(value, 0) && value >= 0
 }
 
 type graphValidator struct {

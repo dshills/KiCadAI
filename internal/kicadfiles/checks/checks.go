@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 	"unicode"
@@ -275,6 +276,28 @@ func discoverProjectCheckFile(projectDir string, kind CheckKind) (string, error)
 	}
 	if len(matches) == 0 {
 		return "", fmt.Errorf("no %s file found in %s", ext, projectDir)
+	}
+	sort.Strings(matches)
+	if kind == CheckKindERC {
+		projectFiles, err := filepath.Glob(filepath.Join(projectDir, "*.kicad_pro"))
+		if err != nil {
+			return "", err
+		}
+		sort.Strings(projectFiles)
+		for _, projectFile := range projectFiles {
+			projectName := strings.TrimSuffix(filepath.Base(projectFile), ".kicad_pro")
+			candidate := filepath.Join(projectDir, projectName+ext)
+			for _, match := range matches {
+				if match == candidate {
+					return match, nil
+				}
+			}
+		}
+		for _, match := range matches {
+			if filepath.Dir(match) == filepath.Clean(projectDir) {
+				return match, nil
+			}
+		}
 	}
 	base := filepath.Base(filepath.Clean(projectDir))
 	for _, match := range matches {
