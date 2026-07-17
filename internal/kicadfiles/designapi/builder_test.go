@@ -1269,6 +1269,57 @@ func TestBuilderResolverLibraryUpgradesWriterOwnedGeneratedSiblingLibrary(t *tes
 	}
 }
 
+func TestBuilderPreferResolverEmbedsExplicitPinFallbackWhenResolverUnavailable(t *testing.T) {
+	emptyIndex := &libraryresolver.LibraryIndex{Symbols: map[string]libraryresolver.SymbolRecord{}}
+	for _, test := range []struct {
+		name  string
+		index *libraryresolver.LibraryIndex
+	}{
+		{name: "no index"},
+		{name: "partial index", index: emptyIndex},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			builder, err := New(Options{
+				Name: "intent_demo", DesignID: kicadfiles.UUID("12345678-1234-5678-9234-123456789abc"),
+				Seed: "intent-test", LibraryIndex: test.index,
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			position := kicadfiles.Point{X: kicadfiles.MM(40), Y: kicadfiles.MM(30)}
+			pins := []PinSpec{
+				{Number: "1", Offset: kicadfiles.Point{X: kicadfiles.MM(-7.62), Y: kicadfiles.MM(-5.08)}},
+				{Number: "2", Offset: kicadfiles.Point{X: kicadfiles.MM(7.62), Y: kicadfiles.MM(5.08)}},
+			}
+			if _, err := builder.AddSymbol(SymbolOptions{
+				Reference: "U1", LibraryID: "Vendor:Unresolved_Module", Value: "MODULE",
+				Position: position, Pins: pins, PreferResolverSymbol: true,
+			}); err != nil {
+				t.Fatal(err)
+			}
+			for _, pin := range pins {
+				if err := builder.AddNoConnect(Endpoint{Reference: "U1", Pin: pin.Number}); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if !schematic.EmbeddedSymbolPresent(builder.Design().Schematic, "Vendor:Unresolved_Module") {
+				t.Fatal("unresolved preferred symbol is missing its embedded fallback body")
+			}
+			root := filepath.Join(t.TempDir(), "fallback_symbol")
+			if _, err := builder.WriteSchematicProject(root, kicaddesign.WriteOptions{}); err != nil {
+				t.Fatal(err)
+			}
+			read, err := schematic.ReadFile(filepath.Join(root, "intent_demo.kicad_sch"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := schematic.ValidateGeneratedConnectivity(read); err != nil {
+				t.Fatalf("fallback symbol connectivity validation failed: %v", err)
+			}
+		})
+	}
+}
+
 func TestBuilderAddSymbolDerivesPinsFromEmbeddedTemplate(t *testing.T) {
 	builder := newTestBuilder(t)
 	if _, err := builder.AddSymbol(SymbolOptions{

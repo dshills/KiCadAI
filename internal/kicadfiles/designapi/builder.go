@@ -365,7 +365,7 @@ func (builder *Builder) AddSymbol(options SymbolOptions) (SymbolHandle, error) {
 		return SymbolHandle{}, fmt.Errorf("library id required")
 	}
 	libraryID = schematic.CanonicalEmbeddedSymbolLibraryID(libraryID)
-	if err := builder.ensureSchematicLibrarySymbol(libraryID, options.PreferResolverSymbol); err != nil {
+	if err := builder.ensureSchematicLibrarySymbol(libraryID, options.PreferResolverSymbol, options.Pins); err != nil {
 		return SymbolHandle{}, err
 	}
 	_, resolverOwned := builder.resolverSymbolIDs[libraryID]
@@ -480,30 +480,48 @@ func (builder *Builder) AddSymbol(options SymbolOptions) (SymbolHandle, error) {
 	return SymbolHandle{Reference: reference}, nil
 }
 
-func (builder *Builder) ensureSchematicLibrarySymbol(libraryID string, preferResolver bool) error {
+func (builder *Builder) ensureSchematicLibrarySymbol(libraryID string, preferResolver bool, fallbackPins []PinSpec) error {
 	if schematic.EmbeddedSymbolPresent(builder.design.Schematic, libraryID) {
 		return nil
 	}
-	if preferResolver && builder.libraryIndex != nil {
-		if record, ok := libraryresolver.ResolveSymbolPtr(builder.libraryIndex, libraryID); ok && strings.TrimSpace(record.Raw) != "" {
-			if !schematic.EnsureEmbeddedSymbolFromRaw(builder.design.Schematic, libraryID, record.Raw) {
-				return fmt.Errorf("symbol library record has malformed KiCad body: %s", libraryID)
-			}
-			builder.resolverSymbolIDs[libraryID] = struct{}{}
-			return nil
+	resolverFound := false
+	resolverRaw := ""
+	if builder.libraryIndex != nil {
+		if record, ok := libraryresolver.ResolveSymbolPtr(builder.libraryIndex, libraryID); ok {
+			resolverFound = true
+			resolverRaw = strings.TrimSpace(record.Raw)
 		}
 	}
-	if schematic.EnsureEmbeddedSymbol(builder.design.Schematic, libraryID) || builder.libraryIndex == nil {
+	if preferResolver && resolverFound && resolverRaw != "" {
+		if !schematic.EnsureEmbeddedSymbolFromRaw(builder.design.Schematic, libraryID, resolverRaw) {
+			return fmt.Errorf("symbol library record has malformed KiCad body: %s", libraryID)
+		}
+		builder.resolverSymbolIDs[libraryID] = struct{}{}
 		return nil
 	}
-	record, ok := libraryresolver.ResolveSymbolPtr(builder.libraryIndex, libraryID)
-	if !ok {
+	if schematic.EnsureEmbeddedSymbol(builder.design.Schematic, libraryID) {
+		return nil
+	}
+	if preferResolver && len(fallbackPins) > 0 {
+		pins := make([]schematic.TemplatePin, 0, len(fallbackPins))
+		for _, pin := range fallbackPins {
+			pins = append(pins, schematic.TemplatePin{Number: pin.Number, Offset: pin.Offset})
+		}
+		if !schematic.EnsureEmbeddedFallbackSymbol(builder.design.Schematic, libraryID, pins) {
+			return fmt.Errorf("failed to create fallback symbol body: %s", libraryID)
+		}
+		return nil
+	}
+	if builder.libraryIndex == nil {
+		return nil
+	}
+	if !resolverFound {
 		return fmt.Errorf("symbol library record not found: %s", libraryID)
 	}
-	if !schematic.EnsureEmbeddedSymbolFromRaw(builder.design.Schematic, libraryID, record.Raw) {
+	if !schematic.EnsureEmbeddedSymbolFromRaw(builder.design.Schematic, libraryID, resolverRaw) {
 		// Pin-only resolver records intentionally rely on the qualified library
 		// reference when no bundled template exists.
-		if strings.TrimSpace(record.Raw) == "" {
+		if resolverRaw == "" {
 			return nil
 		}
 		return fmt.Errorf("symbol library record has malformed KiCad body: %s", libraryID)

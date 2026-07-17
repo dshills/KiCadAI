@@ -883,6 +883,38 @@ func EnsureEmbeddedPowerSymbol(file *SchematicFile, libraryID, bodyName, pinType
 	return ensureEmbeddedSymbolBody(file, libraryID, powerSymbolBody(libraryID, bodyName, pinType, pinX))
 }
 
+// EnsureEmbeddedFallbackSymbol adds a deterministic passive symbol body for
+// an unresolved library symbol whose connection anchors are already known.
+// The provided offsets use schematic coordinates; the generated library body
+// stores the inverse Y transform expected by KiCad's symbol parser.
+func EnsureEmbeddedFallbackSymbol(file *SchematicFile, libraryID string, pins []TemplatePin) bool {
+	libraryID = strings.TrimSpace(libraryID)
+	if file == nil || libraryID == "" || len(pins) == 0 {
+		return false
+	}
+	bodyName := libraryID
+	if separator := strings.LastIndex(bodyName, ":"); separator >= 0 {
+		bodyName = bodyName[separator+1:]
+	}
+	bodyName = strings.TrimSpace(bodyName)
+	if bodyName == "" {
+		return false
+	}
+	rawPins := make([]TemplatePin, 0, len(pins))
+	for _, pin := range pins {
+		number := strings.TrimSpace(pin.Number)
+		if number == "" {
+			return false
+		}
+		rawPins = append(rawPins, TemplatePin{
+			Number:    number,
+			Offset:    kicadfiles.SchematicLibraryPoint(pin.Offset),
+			Direction: pin.Direction,
+		})
+	}
+	return ensureEmbeddedSymbolBody(file, libraryID, symbolBodyFromTemplatePins(libraryID, bodyName, "passive", rawPins))
+}
+
 func ensureEmbeddedSymbolBody(file *SchematicFile, libraryID string, body sexpr.List) bool {
 	if file == nil {
 		return false
