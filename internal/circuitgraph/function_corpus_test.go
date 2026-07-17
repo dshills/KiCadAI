@@ -118,6 +118,11 @@ func TestFrozenFunctionLevelCorpusOfflineWorkflowAndReplay(t *testing.T) {
 }
 
 func TestFrozenFunctionLevelCorpusOptionalKiCadPromotion(t *testing.T) {
+	runFunctionLevelCorpusKiCadPromotion(t, nil)
+}
+
+func runFunctionLevelCorpusKiCadPromotion(t *testing.T, only map[string]bool) {
+	t.Helper()
 	cliPath := strings.TrimSpace(os.Getenv(checks.EnvKiCadCLI))
 	symbolsRoot := strings.TrimSpace(os.Getenv(libraryresolver.EnvSymbolsRoot))
 	footprintsRoot := strings.TrimSpace(os.Getenv(libraryresolver.EnvFootprintsRoot))
@@ -141,7 +146,13 @@ func TestFrozenFunctionLevelCorpusOptionalKiCadPromotion(t *testing.T) {
 		t.Fatal(err)
 	}
 	resolver := NewResolver(ResolveOptions{Catalog: loadGraphCatalog(t), CatalogID: "function-corpus"})
+	seen := map[string]bool{}
 	for _, fixture := range manifest.Fixtures {
+		if only != nil && !only[fixture.ID] {
+			continue
+		}
+		fixture := fixture
+		seen[fixture.ID] = true
 		t.Run(fixture.ID, func(t *testing.T) {
 			contents, err := os.ReadFile(filepath.Join(root, fixture.File))
 			if err != nil {
@@ -209,6 +220,16 @@ func TestFrozenFunctionLevelCorpusOptionalKiCadPromotion(t *testing.T) {
 				}
 			}
 		})
+	}
+	if only != nil && len(seen) != len(only) {
+		missing := make([]string, 0, len(only)-len(seen))
+		for id := range only {
+			if !seen[id] {
+				missing = append(missing, id)
+			}
+		}
+		slices.Sort(missing)
+		t.Fatalf("requested function-corpus promotion fixtures are missing: %v", missing)
 	}
 }
 
