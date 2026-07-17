@@ -180,7 +180,7 @@ func resolveSimulation(intent simmodel.Intent, resolved ResolvedDocument) (simmo
 		value, hasValue := components.ParseEngineeringValue(component.Instance.Value)
 		evidence = append(evidence, componentSimulationEvidence(
 			component.Instance.ID, component.ComponentID, component.Family, value, hasValue,
-			configuredSimulationModels(component), connections[component.Instance.ID], component.Units,
+			configuredSimulationModels(component), connections[component.Instance.ID], component.Units, component.Record,
 		)...)
 	}
 	plan, diagnostics := simmodel.ResolveWithTopology(intent, resolved.CatalogID, resolved.CatalogHash, evidence, nodes)

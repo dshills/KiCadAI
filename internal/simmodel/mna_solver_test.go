@@ -77,6 +77,25 @@ func TestMNACurrentSourceStamp(t *testing.T) {
 	}
 }
 
+func TestMNAWorstCaseRehashesAlteredCorners(t *testing.T) {
+	intent := Intent{ModelID: ModelLinearCircuitMNAV1, WorstCase: true,
+		Analyses:   []Analysis{{ID: "operating_point", Kind: AnalysisDCOperatingPoint, Excitations: []SourceExcitation{{Component: "source", DCValue: .001}}}},
+		Assertions: []Assertion{{AnalysisID: "operating_point", Node: "OUT", Quantity: QuantityVoltageV, Min: .79, Max: 1.22}},
+	}
+	components := []ComponentEvidence{
+		{InstanceID: "load.unit_a", CatalogID: "r", Family: "resistor", HasValueSI: true, ValueSI: 1000, ModelClaims: []CatalogEvidence{{ModelID: PrimitiveResistorV1}}, Connections: []ConnectionEvidence{{Function: "A", Net: "OUT"}, {Function: "B", Net: "GND"}}, Uncertainties: []Uncertainty{{Target: "value_si", Source: "catalog:r:resistance_tolerance", Nominal: 1000, Minimum: 900, Maximum: 1100}}},
+		{InstanceID: "source", CatalogID: "i", Family: "current_source", ModelClaims: []CatalogEvidence{{ModelID: PrimitiveCurrentSourceV1}}, Connections: []ConnectionEvidence{{Function: "POSITIVE", Net: "GND"}, {Function: "NEGATIVE", Net: "OUT"}}, Uncertainties: []Uncertainty{{Target: "excitation_dc_value", Source: "reviewed-system-supply", Nominal: .001, Minimum: .0009, Maximum: .0011}}},
+	}
+	plan, diagnostics := ResolveWithTopology(intent, "test", "hash", components, []NodeEvidence{{Name: "GND", Role: "ground"}, {Name: "OUT", Role: "signal"}})
+	if len(diagnostics) != 0 {
+		t.Fatalf("resolve diagnostics = %+v", diagnostics)
+	}
+	report, diagnostics := Evaluate(plan)
+	if len(diagnostics) != 0 || report.Status != "pass" || len(report.Corners) != 9 {
+		t.Fatalf("report=%+v diagnostics=%+v", report, diagnostics)
+	}
+}
+
 func TestMNAOpAmpTransferIsGroundReferencedWithSplitSupply(t *testing.T) {
 	intent := Intent{
 		ModelID: ModelLinearCircuitMNAV1,

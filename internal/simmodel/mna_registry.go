@@ -386,6 +386,7 @@ func resolveMNA(intent Intent, catalogID, catalogHash string, components []Compo
 	sortedComponents := append([]ComponentEvidence(nil), components...)
 	slices.SortStableFunc(sortedComponents, func(a, b ComponentEvidence) int { return strings.Compare(a.InstanceID, b.InstanceID) })
 	devices := make([]ResolvedDevice, 0, len(sortedComponents))
+	uncertainties := []Uncertainty{}
 	model, _ := definitionByID(intent.ModelID)
 	for _, component := range sortedComponents {
 		matches := compatiblePrimitiveClaims(component, model)
@@ -444,6 +445,39 @@ func resolveMNA(intent Intent, catalogID, catalogHash string, components []Compo
 		}
 		if len(device.Terminals) == len(primitive.Terminals) {
 			devices = append(devices, device)
+			for _, uncertainty := range component.Uncertainties {
+				if !intent.WorstCase {
+					break
+				}
+				if uncertainty.Target == "excitation_dc_value" {
+					matched := false
+					for _, analysis := range intent.Analyses {
+						for _, excitation := range analysis.Excitations {
+							if excitation.Component != component.InstanceID {
+								continue
+							}
+							if !sameUncertaintyValue(excitation.DCValue, uncertainty.Nominal) {
+								diagnostics = append(diagnostics, Diagnostic{Path: "analyses." + analysis.ID + ".excitations." + component.InstanceID, Message: "reviewed source uncertainty nominal does not match the bounded operating condition"})
+								continue
+							}
+							bound := uncertainty
+							bound.Target = "analyses." + analysis.ID + ".excitations." + component.InstanceID + ".dc_value"
+							uncertainties = append(uncertainties, bound)
+							matched = true
+						}
+					}
+					if !matched {
+						diagnostics = append(diagnostics, Diagnostic{Path: "topology.devices." + component.InstanceID + ".uncertainties", Message: "reviewed source uncertainty has no matching bounded DC excitation"})
+					}
+					continue
+				}
+				if uncertainty.Target != "value_si" && !strings.HasPrefix(uncertainty.Target, "model_parameters.") {
+					diagnostics = append(diagnostics, Diagnostic{Path: "topology.devices." + component.InstanceID + ".uncertainties", Message: "catalog uncertainty target is incompatible with the trusted MNA primitive"})
+					continue
+				}
+				uncertainty.Target = "devices." + component.InstanceID + "." + uncertainty.Target
+				uncertainties = append(uncertainties, uncertainty)
+			}
 		}
 	}
 	if len(diagnostics) != 0 {
@@ -452,8 +486,10 @@ func resolveMNA(intent Intent, catalogID, catalogHash string, components []Compo
 	plan := Plan{
 		RegistryVersion: RegistryVersion, RegistryHash: RegistryHash(), CatalogID: catalogID, CatalogHash: catalogHash,
 		ModelID: intent.ModelID, GroundNode: ground, Nodes: nodeNames, Devices: devices,
-		Analyses: canonicalAnalyses(intent.Analyses), Assertions: append([]Assertion(nil), intent.Assertions...),
+		Analyses: canonicalAnalyses(intent.Analyses), Assertions: append([]Assertion(nil), intent.Assertions...), WorstCase: intent.WorstCase,
+		Uncertainties: append([]Uncertainty(nil), uncertainties...),
 	}
+	slices.SortStableFunc(plan.Uncertainties, func(a, b Uncertainty) int { return strings.Compare(a.Target, b.Target) })
 	slices.SortStableFunc(plan.Assertions, func(a, b Assertion) int { return strings.Compare(assertionKey(a), assertionKey(b)) })
 	plan.TopologyHash = topologyHash(plan.GroundNode, plan.Nodes, plan.Devices)
 	if diagnostics := validateMNAPlan(plan); len(diagnostics) != 0 {

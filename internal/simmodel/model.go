@@ -2,7 +2,7 @@ package simmodel
 
 const (
 	RegistryVersion = "kicadai.trusted-simulation-registry.v1"
-	ReportSchema    = "kicadai.trusted-simulation-report.v1"
+	ReportSchema    = "kicadai.trusted-simulation-report.v2"
 
 	ModelLinearRegulatorIdealV1 = "linear_regulator_ideal_v1"
 	ModelResistorDividerDCV1    = "resistor_divider_dc_v1"
@@ -39,9 +39,21 @@ type NamedValue struct {
 	Value float64 `json:"value"`
 }
 
+// Uncertainty is immutable catalog-backed evidence for one bounded scalar in
+// a resolved plan. Target is a canonical resolver-owned path; providers never
+// provide expressions, sampling policy, or solver controls.
+type Uncertainty struct {
+	Target  string  `json:"target"`
+	Source  string  `json:"source"`
+	Nominal float64 `json:"nominal"`
+	Minimum float64 `json:"minimum"`
+	Maximum float64 `json:"maximum"`
+}
+
 type CatalogEvidence struct {
-	ModelID    string       `json:"model_id"`
-	Parameters []NamedValue `json:"parameters,omitempty"`
+	ModelID       string        `json:"model_id"`
+	Parameters    []NamedValue  `json:"parameters,omitempty"`
+	Uncertainties []Uncertainty `json:"uncertainties,omitempty"`
 }
 
 type Binding struct {
@@ -97,6 +109,7 @@ type Intent struct {
 	Inputs     []NamedValue `json:"inputs"`
 	Analyses   []Analysis   `json:"analyses,omitempty"`
 	Assertions []Assertion  `json:"assertions"`
+	WorstCase  bool         `json:"worst_case,omitempty"`
 }
 
 type ConnectionEvidence struct {
@@ -114,6 +127,7 @@ type ComponentEvidence struct {
 	HasValueSI        bool
 	ModelClaims       []CatalogEvidence
 	Connections       []ConnectionEvidence
+	Uncertainties     []Uncertainty
 }
 
 type ResolvedBinding struct {
@@ -155,6 +169,8 @@ type Plan struct {
 	TopologyHash    string            `json:"topology_hash,omitempty"`
 	Analyses        []Analysis        `json:"analyses,omitempty"`
 	Assertions      []Assertion       `json:"assertions"`
+	Uncertainties   []Uncertainty     `json:"uncertainties,omitempty"`
+	WorstCase       bool              `json:"worst_case,omitempty"`
 }
 
 func ClonePlan(source Plan) Plan {
@@ -180,6 +196,7 @@ func ClonePlan(source Plan) Plan {
 	}
 	clone.Analyses = cloneAnalyses(source.Analyses)
 	clone.Assertions = append([]Assertion(nil), source.Assertions...)
+	clone.Uncertainties = append([]Uncertainty(nil), source.Uncertainties...)
 	return clone
 }
 
@@ -252,21 +269,37 @@ type AnalysisResult struct {
 	Points []AnalysisPoint `json:"points"`
 }
 
+type CornerResult struct {
+	ID          string            `json:"id"`
+	Assignments []NamedValue      `json:"assignments"`
+	Assertions  []AssertionResult `json:"assertions"`
+	Status      string            `json:"status"`
+}
+
+type SensitivityResult struct {
+	Assertion string  `json:"assertion"`
+	Target    string  `json:"target"`
+	Corner    string  `json:"corner"`
+	Margin    float64 `json:"margin"`
+}
+
 type Report struct {
-	Schema          string            `json:"schema"`
-	RegistryVersion string            `json:"registry_version"`
-	RegistryHash    string            `json:"registry_hash"`
-	CatalogID       string            `json:"catalog_id"`
-	CatalogHash     string            `json:"catalog_hash"`
-	ModelID         string            `json:"model_id"`
-	Bindings        []ResolvedBinding `json:"bindings"`
-	Inputs          []NamedValue      `json:"inputs"`
-	GroundNode      string            `json:"ground_node,omitempty"`
-	Nodes           []string          `json:"nodes,omitempty"`
-	Devices         []ResolvedDevice  `json:"devices,omitempty"`
-	TopologyHash    string            `json:"topology_hash,omitempty"`
-	Analyses        []AnalysisResult  `json:"analyses,omitempty"`
-	Measurements    []Measurement     `json:"measurements"`
-	Assertions      []AssertionResult `json:"assertions"`
-	Status          string            `json:"status"`
+	Schema          string              `json:"schema"`
+	RegistryVersion string              `json:"registry_version"`
+	RegistryHash    string              `json:"registry_hash"`
+	CatalogID       string              `json:"catalog_id"`
+	CatalogHash     string              `json:"catalog_hash"`
+	ModelID         string              `json:"model_id"`
+	Bindings        []ResolvedBinding   `json:"bindings"`
+	Inputs          []NamedValue        `json:"inputs"`
+	GroundNode      string              `json:"ground_node,omitempty"`
+	Nodes           []string            `json:"nodes,omitempty"`
+	Devices         []ResolvedDevice    `json:"devices,omitempty"`
+	TopologyHash    string              `json:"topology_hash,omitempty"`
+	Analyses        []AnalysisResult    `json:"analyses,omitempty"`
+	Measurements    []Measurement       `json:"measurements"`
+	Assertions      []AssertionResult   `json:"assertions"`
+	Corners         []CornerResult      `json:"corners,omitempty"`
+	Sensitivity     []SensitivityResult `json:"sensitivity,omitempty"`
+	Status          string              `json:"status"`
 }

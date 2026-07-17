@@ -16,6 +16,7 @@ const (
 	synthesisACStopFrequencyHz      = 10000.0
 	synthesisACSweepPoints          = 21
 	synthesisMaxIndependentACInputs = 7
+	celsiusToKelvin                 = 273.15
 )
 
 type synthesisSourceCondition struct {
@@ -57,7 +58,7 @@ func deriveSynthesisSimulation(document Document, intent FunctionIntent, selecte
 		value, hasValue := components.ParseEngineeringValue(selection.Instance.Value)
 		evidence = append(evidence, componentSimulationEvidence(
 			selection.Instance.ID, selection.ComponentID, selection.Record.Family, value, hasValue,
-			configuredSimulationModels(selection), connections[selection.Instance.ID], selection.Units,
+			configuredSimulationModels(selection), connections[selection.Instance.ID], selection.Units, selection.Record,
 		)...)
 	}
 	// Applicability is model completeness, not numerical optimism. Resolution
@@ -208,7 +209,7 @@ func deriveSynthesisSimulation(document Document, intent FunctionIntent, selecte
 func configuredSimulationModels(selection ResolvedComponent) []simmodel.CatalogEvidence {
 	models := make([]simmodel.CatalogEvidence, len(selection.Record.SimulationModels))
 	for index, model := range selection.Record.SimulationModels {
-		models[index] = simmodel.CatalogEvidence{ModelID: model.ModelID, Parameters: append([]simmodel.NamedValue(nil), model.Parameters...)}
+		models[index] = simmodel.CatalogEvidence{ModelID: model.ModelID, Parameters: append([]simmodel.NamedValue(nil), model.Parameters...), Uncertainties: append([]simmodel.Uncertainty(nil), model.Uncertainties...)}
 		for parameterIndex := range models[index].Parameters {
 			name := models[index].Parameters[parameterIndex].Name
 			configured := synthesisParameterString(selection.Instance.Parameters, name)
@@ -221,7 +222,8 @@ func configuredSimulationModels(selection ResolvedComponent) []simmodel.CatalogE
 	return models
 }
 
-func componentSimulationEvidence(instanceID, catalogID, family string, value float64, hasValue bool, models []simmodel.CatalogEvidence, connections []simmodel.ConnectionEvidence, units []ResolvedUnit) []simmodel.ComponentEvidence {
+func componentSimulationEvidence(instanceID, catalogID, family string, value float64, hasValue bool, models []simmodel.CatalogEvidence, connections []simmodel.ConnectionEvidence, units []ResolvedUnit, record components.ComponentRecord) []simmodel.ComponentEvidence {
+	uncertainties := append(catalogValueUncertainties(value, hasValue, record), catalogModelUncertainties(models, record)...)
 	functionalUnits := []ResolvedUnit{}
 	sharedUnits := map[string]bool{}
 	for _, unit := range units {
@@ -234,7 +236,7 @@ func componentSimulationEvidence(instanceID, catalogID, family string, value flo
 	if len(functionalUnits) <= 1 || !synthesisRecordHasModel(models, simmodel.PrimitiveOpAmpV1) {
 		return []simmodel.ComponentEvidence{{
 			InstanceID: instanceID, CatalogID: catalogID, Family: family, ValueSI: value, HasValueSI: hasValue,
-			ModelClaims: models, Connections: connections,
+			ModelClaims: models, Connections: connections, Uncertainties: uncertainties,
 		}}
 	}
 	evidence := make([]simmodel.ComponentEvidence, 0, len(functionalUnits))
@@ -248,10 +250,84 @@ func componentSimulationEvidence(instanceID, catalogID, family string, value flo
 		evidence = append(evidence, simmodel.ComponentEvidence{
 			InstanceID: instanceID + "." + unit.ID, PhysicalComponent: instanceID,
 			CatalogID: catalogID, Family: family, ValueSI: value, HasValueSI: hasValue,
-			ModelClaims: models, Connections: unitConnections,
+			ModelClaims: models, Connections: unitConnections, Uncertainties: uncertainties,
 		})
 	}
 	return evidence
+}
+
+func catalogModelUncertainties(models []simmodel.CatalogEvidence, record components.ComponentRecord) []simmodel.Uncertainty {
+	var result []simmodel.Uncertainty
+	for _, model := range models {
+		hasTemperatureEvidence := false
+		for _, uncertainty := range model.Uncertainties {
+			if strings.HasPrefix(uncertainty.Target, "model_parameters.") || uncertainty.Target == "excitation_dc_value" {
+				result = append(result, uncertainty)
+			}
+			hasTemperatureEvidence = hasTemperatureEvidence || uncertainty.Target == "model_parameters.junction_temperature_k"
+		}
+		if temperatureUncertainty, ok := catalogTemperatureUncertainty(model, record); ok && !hasTemperatureEvidence {
+			result = append(result, temperatureUncertainty)
+		}
+	}
+	slices.SortStableFunc(result, func(a, b simmodel.Uncertainty) int { return strings.Compare(a.Target, b.Target) })
+	return result
+}
+
+func catalogTemperatureUncertainty(model simmodel.CatalogEvidence, record components.ComponentRecord) (simmodel.Uncertainty, bool) {
+	if record.Temperature == nil || (record.Temperature.Unit != "C" && record.Temperature.Unit != "K") || len(record.Verification.Sources) == 0 {
+		return simmodel.Uncertainty{}, false
+	}
+	nominal, found := 0.0, false
+	for _, parameter := range model.Parameters {
+		if parameter.Name == "junction_temperature_k" {
+			nominal, found = parameter.Value, true
+			break
+		}
+	}
+	if !found {
+		return simmodel.Uncertainty{}, false
+	}
+	minimum, minimumOK := components.ParseEngineeringValue(record.Temperature.Min)
+	maximum, maximumOK := components.ParseEngineeringValue(record.Temperature.Max)
+	if !minimumOK || !maximumOK || minimum > maximum {
+		return simmodel.Uncertainty{}, false
+	}
+	if record.Temperature.Unit == "C" {
+		minimum += celsiusToKelvin
+		maximum += celsiusToKelvin
+	}
+	if nominal < minimum || nominal > maximum {
+		return simmodel.Uncertainty{}, false
+	}
+	return simmodel.Uncertainty{Target: "model_parameters.junction_temperature_k", Source: "catalog:" + record.ID + ":temperature", Nominal: nominal, Minimum: minimum, Maximum: maximum}, true
+}
+
+func catalogValueUncertainties(value float64, hasValue bool, record components.ComponentRecord) []simmodel.Uncertainty {
+	if !hasValue || value <= 0 || len(record.Verification.Sources) == 0 {
+		return nil
+	}
+	kind := ""
+	switch record.Family {
+	case "resistor":
+		kind = "resistance"
+	case "capacitor":
+		kind = "capacitance"
+	default:
+		return nil
+	}
+	for _, tolerance := range record.Tolerances {
+		if tolerance.Kind != kind || tolerance.Unit != "%" {
+			continue
+		}
+		amount, ok := components.ParseEngineeringValue(tolerance.Max)
+		if !ok || amount <= 0 || amount >= 100 {
+			continue
+		}
+		fraction := amount / 100
+		return []simmodel.Uncertainty{{Target: "value_si", Source: "catalog:" + record.ID + ":" + kind + "_tolerance", Nominal: value, Minimum: value * (1 - fraction), Maximum: value * (1 + fraction)}}
+	}
+	return nil
 }
 
 func deriveSynthesisTransient(modelID string, sources []synthesisSourceCondition, condition synthesisTransientCondition) (*SimulationIntent, SynthesisSimulationEvidence) {

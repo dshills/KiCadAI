@@ -120,6 +120,7 @@ func ValidateCatalogEvidence(family string, evidence []CatalogEvidence) []Diagno
 				continue
 			}
 			diagnostics = append(diagnostics, validatePrimitiveParameters(path+".parameters", primitive, claim.Parameters)...)
+			diagnostics = append(diagnostics, validateCatalogUncertainties(path+".uncertainties", claim, primitive.CatalogParameters, primitive.Source)...)
 			continue
 		}
 		if model.GraphMNA {
@@ -143,6 +144,49 @@ func ValidateCatalogEvidence(family string, evidence []CatalogEvidence) []Diagno
 			}
 		}
 		diagnostics = append(diagnostics, shortest...)
+		parameterRules := []valueRule{}
+		for _, role := range roles {
+			parameterRules = append(parameterRules, role.CatalogParameters...)
+		}
+		diagnostics = append(diagnostics, validateCatalogUncertainties(path+".uncertainties", claim, parameterRules, false)...)
+	}
+	return diagnostics
+}
+
+func validateCatalogUncertainties(path string, claim CatalogEvidence, rules []valueRule, source bool) []Diagnostic {
+	parameters := namedValueMap(claim.Parameters)
+	allowed := map[string]struct{}{}
+	for _, rule := range rules {
+		allowed[rule.Name] = struct{}{}
+	}
+	previous := ""
+	var diagnostics []Diagnostic
+	for index, uncertainty := range claim.Uncertainties {
+		entry := fmt.Sprintf("%s[%d]", path, index)
+		if source && uncertainty.Target == "excitation_dc_value" {
+			if strings.TrimSpace(uncertainty.Source) == "" || !finite(uncertainty.Nominal) || !finite(uncertainty.Minimum) || !finite(uncertainty.Maximum) || uncertainty.Minimum > uncertainty.Nominal || uncertainty.Nominal > uncertainty.Maximum || uncertainty.Minimum == uncertainty.Maximum {
+				diagnostics = append(diagnostics, Diagnostic{Path: entry, Message: "catalog source uncertainty requires reviewed source and finite nonzero bounds"})
+			}
+			continue
+		}
+		if !strings.HasPrefix(uncertainty.Target, "model_parameters.") || strings.TrimPrefix(uncertainty.Target, "model_parameters.") == "" {
+			diagnostics = append(diagnostics, Diagnostic{Path: entry + ".target", Message: "catalog model uncertainty must target a declared model_parameters scalar"})
+			continue
+		}
+		parameter := strings.TrimPrefix(uncertainty.Target, "model_parameters.")
+		if _, exists := allowed[parameter]; !exists {
+			diagnostics = append(diagnostics, Diagnostic{Path: entry + ".target", Message: "catalog model uncertainty targets an unsupported trusted parameter"})
+		}
+		if uncertainty.Target <= previous {
+			diagnostics = append(diagnostics, Diagnostic{Path: entry + ".target", Message: "catalog model uncertainties must be unique and canonically ordered"})
+		}
+		previous = uncertainty.Target
+		if strings.TrimSpace(uncertainty.Source) == "" || !finite(uncertainty.Nominal) || !finite(uncertainty.Minimum) || !finite(uncertainty.Maximum) || uncertainty.Minimum > uncertainty.Nominal || uncertainty.Nominal > uncertainty.Maximum || uncertainty.Minimum == uncertainty.Maximum {
+			diagnostics = append(diagnostics, Diagnostic{Path: entry, Message: "catalog model uncertainty requires reviewed source and finite nonzero bounds"})
+		}
+		if nominal, exists := parameters[parameter]; !exists || nominal != uncertainty.Nominal {
+			diagnostics = append(diagnostics, Diagnostic{Path: entry + ".nominal", Message: "catalog model uncertainty nominal must equal the reviewed parameter value"})
+		}
 	}
 	return diagnostics
 }
@@ -254,18 +298,42 @@ func Resolve(intent Intent, catalogID, catalogHash string, components []Componen
 			resolved.ValueSI = &value
 		}
 		plan.Bindings = append(plan.Bindings, resolved)
+		for _, uncertainty := range component.Uncertainties {
+			if !intent.WorstCase {
+				break
+			}
+			if uncertainty.Target != "value_si" && !strings.HasPrefix(uncertainty.Target, "model_parameters.") {
+				diagnostics = append(diagnostics, Diagnostic{Path: "bindings." + role.Role + ".uncertainties", Message: "catalog uncertainty target is incompatible with the trusted model binding"})
+				continue
+			}
+			uncertainty.Target = "bindings." + role.Role + "." + uncertainty.Target
+			plan.Uncertainties = append(plan.Uncertainties, uncertainty)
+		}
 	}
 	if len(diagnostics) != 0 {
 		return Plan{}, diagnostics
 	}
 	plan.Inputs = normalizeNamedValues(intent.Inputs)
 	plan.Assertions = append([]Assertion(nil), intent.Assertions...)
+	plan.WorstCase = intent.WorstCase
 	slices.SortStableFunc(plan.Bindings, func(a, b ResolvedBinding) int { return strings.Compare(a.Role, b.Role) })
 	slices.SortStableFunc(plan.Assertions, func(a, b Assertion) int { return strings.Compare(assertionKey(a), assertionKey(b)) })
+	slices.SortStableFunc(plan.Uncertainties, func(a, b Uncertainty) int { return strings.Compare(a.Target, b.Target) })
 	return plan, nil
 }
 
 func Evaluate(plan Plan) (Report, []Diagnostic) {
+	if plan.WorstCase && len(plan.Uncertainties) == 0 {
+		report, _ := evaluateNominal(plan)
+		return report, []Diagnostic{{Path: "uncertainties", Message: "worst-case proof requires reviewed bounded catalog uncertainty evidence", Suggestion: "select catalog components and source conditions with compatible tolerance evidence"}}
+	}
+	if plan.WorstCase {
+		return EvaluateWorstCase(plan)
+	}
+	return evaluateNominal(plan)
+}
+
+func evaluateNominal(plan Plan) (Report, []Diagnostic) {
 	report := Report{Schema: ReportSchema, RegistryVersion: plan.RegistryVersion, RegistryHash: plan.RegistryHash, CatalogID: plan.CatalogID, CatalogHash: plan.CatalogHash, ModelID: plan.ModelID, Bindings: append([]ResolvedBinding(nil), plan.Bindings...), Inputs: append([]NamedValue(nil), plan.Inputs...), GroundNode: plan.GroundNode, Nodes: append([]string(nil), plan.Nodes...), Devices: cloneDevices(plan.Devices), TopologyHash: plan.TopologyHash, Status: "blocked"}
 	if diagnostics := ValidatePlan(plan); len(diagnostics) != 0 {
 		return report, diagnostics

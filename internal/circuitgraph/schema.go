@@ -133,6 +133,7 @@ func ProviderGraphSchema() map[string]any {
 		"bindings":   map[string]any{"type": "array", "minItems": 1, "maxItems": 16, "items": simulationBinding},
 		"inputs":     map[string]any{"type": "array", "minItems": 1, "maxItems": 16, "items": simulationValue},
 		"assertions": map[string]any{"type": "array", "minItems": 1, "maxItems": 16, "items": legacySimulationAssertion},
+		"worst_case": boolValue,
 	})
 	mnaExcitation := strictObject(map[string]any{
 		"component": identifier, "dc_value": numberValue, "ac_magnitude": numberValue, "ac_phase_deg": numberValue,
@@ -165,6 +166,7 @@ func ProviderGraphSchema() map[string]any {
 		"inputs":     map[string]any{"type": "array", "maxItems": 0, "items": simulationValue},
 		"analyses":   map[string]any{"type": "array", "minItems": 1, "maxItems": 8, "items": mnaAnalysis},
 		"assertions": map[string]any{"type": "array", "minItems": 1, "maxItems": 64, "items": mnaAssertion},
+		"worst_case": boolValue,
 	})
 	nonlinearAnalysis := strictObject(map[string]any{
 		"id": identifier, "kind": map[string]any{"type": "string", "const": simmodel.AnalysisDCOperatingPoint},
@@ -179,6 +181,7 @@ func ProviderGraphSchema() map[string]any {
 		"inputs":     map[string]any{"type": "array", "maxItems": 0, "items": simulationValue},
 		"analyses":   map[string]any{"type": "array", "minItems": 1, "maxItems": 8, "items": nonlinearAnalysis},
 		"assertions": map[string]any{"type": "array", "minItems": 1, "maxItems": 64, "items": mnaAssertion},
+		"worst_case": boolValue,
 	})
 	transientExcitation := strictObject(map[string]any{
 		"component": identifier, "dc_value": numberValue,
@@ -201,6 +204,7 @@ func ProviderGraphSchema() map[string]any {
 		"inputs":     map[string]any{"type": "array", "maxItems": 0, "items": simulationValue},
 		"analyses":   map[string]any{"type": "array", "minItems": 1, "maxItems": 1, "items": transientAnalysis},
 		"assertions": map[string]any{"type": "array", "minItems": 1, "maxItems": 64, "items": transientAssertion},
+		"worst_case": boolValue,
 	})
 	simulation := map[string]any{"oneOf": []any{legacySimulation, mnaSimulation, nonlinearSimulation, transientSimulation}}
 	policy := strictObject(map[string]any{
