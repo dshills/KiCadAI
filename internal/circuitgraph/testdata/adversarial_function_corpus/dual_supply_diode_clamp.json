@@ -1,0 +1,35 @@
+{
+  "schema": "kicadai.circuit-graph.v1",
+  "version": 1,
+  "project": {"name": "dual_supply_diode_clamp", "title": "Dual-supply buffered diode clamp", "description": "Series-limited analog input clamped to bipolar rails and buffered by an op-amp.", "acceptance": "erc-drc"},
+  "synthesis": {
+    "functions": [
+      {"id": "buffer", "role": "ic", "query": {"text": "TI LMV321", "family": "opamp", "minimum_confidence": "verified"}, "required_functions": ["IN_MINUS", "IN_PLUS", "OUT", "V_MINUS", "V_PLUS"], "usage": "voltage_follower"},
+      {"id": "series_resistor", "role": "resistor", "query": {"family": "resistor", "package": "0603", "value_kind": "resistance", "value": "10k", "minimum_confidence": "rule_inferred"}, "value": "10k", "usage": "clamp_current_limit"},
+      {"id": "upper_clamp", "role": "diode", "query": {"text": "1N4148W", "family": "diode", "minimum_confidence": "verified"}, "required_functions": ["ANODE", "CATHODE"], "usage": "positive_clamp"},
+      {"id": "lower_clamp", "role": "diode", "query": {"text": "1N4148W", "family": "diode", "minimum_confidence": "verified"}, "required_functions": ["ANODE", "CATHODE"], "usage": "negative_clamp"}
+    ],
+    "interfaces": [
+      {"id": "positive_power", "role": "power_input", "signals": [{"name": "VPOS", "role": "power_pos"}, {"name": "GND", "role": "ground"}]},
+      {"id": "negative_power", "role": "power_input", "signals": [{"name": "GND", "role": "ground"}, {"name": "VNEG", "role": "power_neg"}]},
+      {"id": "input", "role": "analog_input", "signals": [{"name": "SIGNAL", "role": "signal"}, {"name": "GND", "role": "ground"}]},
+      {"id": "output", "role": "analog_output", "signals": [{"name": "SIGNAL", "role": "signal"}, {"name": "GND", "role": "ground"}]}
+    ],
+    "power_domains": [
+      {"name": "VPOS", "role": "power_pos", "voltage_v": 5, "max_current_ma": 25, "source": "external"},
+      {"name": "VNEG", "role": "power_neg", "voltage_v": -5, "max_current_ma": 25, "source": "external"},
+      {"name": "GND", "role": "ground", "voltage_v": 0, "source": "external"}
+    ],
+    "connections": [
+      {"name": "VPOS", "role": "power_pos", "voltage_domain": "VPOS", "endpoints": [{"interface": "positive_power", "signal": "VPOS"}, {"function": "buffer", "port": "V_PLUS"}, {"function": "upper_clamp", "port": "CATHODE"}]},
+      {"name": "VNEG", "role": "power_neg", "voltage_domain": "VNEG", "endpoints": [{"interface": "negative_power", "signal": "VNEG"}, {"function": "buffer", "port": "V_MINUS"}, {"function": "lower_clamp", "port": "ANODE"}]},
+      {"name": "GND", "role": "ground", "voltage_domain": "GND", "endpoints": [{"interface": "positive_power", "signal": "GND"}, {"interface": "negative_power", "signal": "GND"}, {"interface": "input", "signal": "GND"}, {"interface": "output", "signal": "GND"}]},
+      {"name": "RAW_INPUT", "role": "signal", "endpoints": [{"interface": "input", "signal": "SIGNAL"}, {"function": "series_resistor", "port": "A"}]},
+      {"name": "CLAMPED_INPUT", "role": "signal", "endpoints": [{"function": "series_resistor", "port": "B"}, {"function": "upper_clamp", "port": "ANODE"}, {"function": "lower_clamp", "port": "CATHODE"}, {"function": "buffer", "port": "IN_PLUS"}]},
+      {"name": "BUFFERED_OUTPUT", "role": "signal", "endpoints": [{"function": "buffer", "port": "OUT"}, {"function": "buffer", "port": "IN_MINUS"}, {"interface": "output", "signal": "SIGNAL"}]}
+    ],
+    "constraints": {"max_width_mm": 58, "max_height_mm": 36, "preferred_component_spacing_mm": 1.3}
+  },
+  "policy": {"allow_reference_assignment": true, "allow_value_normalization": true, "allow_layout_inference": true, "allow_spacing_adjustment": true, "allow_label_insertion": true, "allow_placement_adjustment": true, "allow_route_retry": true},
+  "extensions": {}
+}

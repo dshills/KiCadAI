@@ -1,0 +1,27 @@
+{
+  "schema": "kicadai.adversarial-function-corpus.v1",
+  "version": 1,
+  "frozen_at": "2026-07-17",
+  "base_commit": "9fead2eccc576f1833a68f07328417d6ee55c87d",
+  "policy_version": "function-synthesis-policy-v1",
+  "fixtures": [
+    {"id": "atmega_uart_gpio_controller", "file": "atmega_uart_gpio_controller.json", "domains": ["interface", "mcu"], "pressures": ["dense_routing", "gpio", "uart", "wide_connector"], "sha256": "5a24981df5fafba7958f707fa854d85f720e464a31db02339a14163b91a8ee25"},
+    {"id": "bipolar_lmv321_inverting_amplifier", "file": "bipolar_lmv321_inverting_amplifier.json", "domains": ["analog"], "pressures": ["bipolar_supply", "negative_supply", "simulation"], "sha256": "b52a17740ce7126e0a4c772e95d1347a91b41d138b955775ee512fed3b4a6b12"},
+    {"id": "bmp280_spi_breakout", "file": "bmp280_spi_breakout.json", "domains": ["interface", "sensor"], "pressures": ["spi", "support_policy", "wide_connector"], "sha256": "5cee89d2d323850a89c5317cdbfad47b91f1a7059258e01eac81ce2de2514d67"},
+    {"id": "dense_mixed_signal_controller", "file": "dense_mixed_signal_controller.json", "domains": ["interface", "mcu", "sensor"], "pressures": ["dense_routing", "gpio", "high_fanout", "i2c", "routing_repair", "spi"], "sha256": "1a8872cb9ae070473fe92c647fa6596589ba6fbd226f69ead400be125338d589"},
+    {"id": "diode_rc_pulse_clamp", "file": "diode_rc_pulse_clamp.json", "domains": ["analog", "transient"], "pressures": ["diode_transient", "dynamic_primitive", "simulation"], "sha256": "4b3fc431d7f6e47ca1a159da51c5786640bc0ff3cd38b7c8cd6a8404606303a3"},
+    {"id": "dual_sensor_level_shift_gateway", "file": "dual_sensor_level_shift_gateway.json", "domains": ["interface", "mcu", "sensor"], "pressures": ["dense_routing", "high_fanout", "i2c", "level_translation", "multiple_voltage_domains"], "sha256": "1b027ff0561ac7b08674499ca0bb0487181b22f9b9007fbdb991297304d13f6d"},
+    {"id": "dual_supply_diode_clamp", "file": "dual_supply_diode_clamp.json", "domains": ["analog", "transistor"], "pressures": ["bipolar_supply", "mixed_nonlinear", "negative_supply", "simulation"], "sha256": "78f48b27f76c9599877a1d6503312683ad5549ab42627831a9b9c16d40610c78"},
+    {"id": "esp32_dual_i2c_gpio_hub", "file": "esp32_dual_i2c_gpio_hub.json", "domains": ["interface", "mcu", "sensor"], "pressures": ["dense_routing", "gpio", "high_fanout", "i2c", "wide_connector"], "sha256": "719ad57f0653b74b0d156e15d1e95f7c41388eef71e0bbb86c24bbcefef36dfe"},
+    {"id": "esp32_spi_uart_gateway", "file": "esp32_spi_uart_gateway.json", "domains": ["interface", "mcu"], "pressures": ["dense_routing", "spi", "uart", "wide_connector"], "sha256": "75b606460fd30b01d0745f1bbbd322dc2d1c8706b13bc7d2dde00fdf025ecd50"},
+    {"id": "i2c_5v_3v3_level_bridge", "file": "i2c_5v_3v3_level_bridge.json", "domains": ["interface"], "pressures": ["i2c", "level_translation", "multiple_voltage_domains"], "sha256": "c43dfb2a8c040f81b7043c85a6f60b6d53f893c8ef3bf40a5f7888532547e47f"},
+    {"id": "lm358_dual_channel_conditioner", "file": "lm358_dual_channel_conditioner.json", "domains": ["analog"], "pressures": ["multi_input_simulation", "multi_unit_analog", "wide_connector"], "sha256": "7c932945d194cf7a263ddfcd28ce0dcee93908464aeccf45e02e011484ab4c5c"},
+    {"id": "lm358_window_comparator", "file": "lm358_window_comparator.json", "domains": ["analog"], "pressures": ["multi_unit_analog", "shared_bias", "simulation"], "sha256": "cb79d0b6aad06185379d5fc21604fd720a24daa95aa7968754b92490240b6391"},
+    {"id": "negative_rail_npn_indicator", "file": "negative_rail_npn_indicator.json", "domains": ["transistor"], "pressures": ["negative_supply", "signed_stimulus", "simulation"], "sha256": "22d6b80749dafa77aae777576290f7c27c91e667c366f33e0afea6d42bf5348c"},
+    {"id": "npn_rc_edge_shaper", "file": "npn_rc_edge_shaper.json", "domains": ["transient", "transistor"], "pressures": ["bjt_transient", "dynamic_primitive", "simulation"], "sha256": "06f24b82e05c5f9e0c997053be6059d82be1f5e8104252021fdc77b378b3f29a"},
+    {"id": "pnp_high_side_pulse_driver", "file": "pnp_high_side_pulse_driver.json", "domains": ["transient", "transistor"], "pressures": ["active_low_stimulus", "bjt_transient", "simulation"], "sha256": "89a69c2147353b2ecb85d7f86948d375efac58fcd056ed065ffd212efd133ce2"},
+    {"id": "regulated_sensor_uart_node", "file": "regulated_sensor_uart_node.json", "domains": ["interface", "mcu", "power", "sensor"], "pressures": ["dense_routing", "generated_voltage_domain", "i2c", "uart"], "sha256": "8b5ecc10e8dc13caaedb4e482b4545672ef58792aa0dbb041f4d959510197c4c"},
+    {"id": "uart_5v_3v3_level_bridge", "file": "uart_5v_3v3_level_bridge.json", "domains": ["interface"], "pressures": ["level_translation", "multiple_voltage_domains", "uart"], "sha256": "d7d5c6ce1b5cecf2686a761a0135cb6aff2441fd73669e3f84c9c6f7045b0173"},
+    {"id": "usb_c_adjustable_regulator", "file": "usb_c_adjustable_regulator.json", "domains": ["power", "protection"], "pressures": ["adjustable_regulator", "calculated_support", "protection"], "sha256": "32ad3e842ebbf1ecbc891de91d38faa4a2cd433e88a821ed22cdf6ebcdf2400b"}
+  ]
+}

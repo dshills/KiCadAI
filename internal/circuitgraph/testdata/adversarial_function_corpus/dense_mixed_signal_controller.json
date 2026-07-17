@@ -1,0 +1,37 @@
+{
+  "schema": "kicadai.circuit-graph.v1",
+  "version": 1,
+  "project": {"name": "dense_mixed_signal_controller", "title": "Dense mixed-signal ESP32 controller", "description": "ESP32 module combines an SPI pressure sensor, I2C humidity sensor, and wide GPIO interface in a bounded board.", "acceptance": "erc-drc"},
+  "synthesis": {
+    "functions": [
+      {"id": "controller", "role": "ic", "query": {"text": "ESP32-WROOM-32E-N4", "family": "mcu", "minimum_confidence": "verified"}, "required_functions": ["VDD", "GND", "EN", "GPIO0", "GPIO1", "GPIO3", "GPIO5", "GPIO16", "GPIO17", "GPIO18", "GPIO19", "GPIO21", "GPIO22", "GPIO23", "GPIO25", "GPIO26"], "usage": "microcontroller"},
+      {"id": "pressure", "role": "sensor", "query": {"text": "BMP280", "family": "sensor", "minimum_confidence": "verified"}, "required_functions": ["VDD", "VDDIO", "GND", "SDA", "SCL", "CSB", "SDO"], "usage": "spi_peripheral"},
+      {"id": "humidity", "role": "sensor", "query": {"text": "SHT31-DIS", "family": "sensor", "minimum_confidence": "verified"}, "required_functions": ["VDD", "VSS", "SDA", "SCL", "ADDR", "R"], "usage": "i2c_peripheral", "parameters": [{"name": "i2c_address", "value": "0x44"}]}
+    ],
+    "interfaces": [
+      {"id": "power", "role": "power_input", "signals": [{"name": "VDD", "role": "power"}, {"name": "GND", "role": "ground"}]},
+      {"id": "gpio", "role": "gpio", "signals": [{"name": "GPIO_1", "role": "signal"}, {"name": "GPIO_2", "role": "signal"}, {"name": "GPIO_3", "role": "signal"}, {"name": "GPIO_4", "role": "signal"}, {"name": "VDD", "role": "power"}, {"name": "GND", "role": "ground"}]}
+    ],
+    "power_domains": [
+      {"name": "VDD", "role": "power", "voltage_v": 3.3, "max_current_ma": 700, "source": "external"},
+      {"name": "GND", "role": "ground", "voltage_v": 0, "source": "external"}
+    ],
+    "connections": [
+      {"name": "VDD", "role": "power", "voltage_domain": "VDD", "current_ma": 700, "endpoints": [{"interface": "power", "signal": "VDD"}, {"interface": "gpio", "signal": "VDD"}, {"function": "controller", "port": "VDD"}, {"function": "pressure", "port": "VDD"}, {"function": "pressure", "port": "VDDIO"}, {"function": "humidity", "port": "VDD"}]},
+      {"name": "GND", "role": "ground", "voltage_domain": "GND", "endpoints": [{"interface": "power", "signal": "GND"}, {"interface": "gpio", "signal": "GND"}, {"function": "controller", "port": "GND"}, {"function": "pressure", "port": "GND"}, {"function": "humidity", "port": "VSS"}]},
+      {"name": "SPI_MOSI", "role": "signal", "voltage_domain": "VDD", "endpoints": [{"function": "controller", "port": "GPIO23"}, {"function": "pressure", "port": "SDA"}]},
+      {"name": "SPI_MISO", "role": "signal", "voltage_domain": "VDD", "endpoints": [{"function": "pressure", "port": "SDO"}, {"function": "controller", "port": "GPIO19"}]},
+      {"name": "SPI_SCK", "role": "signal", "voltage_domain": "VDD", "endpoints": [{"function": "controller", "port": "GPIO18"}, {"function": "pressure", "port": "SCL"}]},
+      {"name": "SPI_CS", "role": "signal", "voltage_domain": "VDD", "endpoints": [{"function": "controller", "port": "GPIO5"}, {"function": "pressure", "port": "CSB"}]},
+      {"name": "I2C_SDA", "role": "signal", "voltage_domain": "VDD", "endpoints": [{"function": "controller", "port": "GPIO21"}, {"function": "humidity", "port": "SDA"}]},
+      {"name": "I2C_SCL", "role": "signal", "voltage_domain": "VDD", "endpoints": [{"function": "controller", "port": "GPIO22"}, {"function": "humidity", "port": "SCL"}]},
+      {"name": "GPIO_1", "role": "signal", "voltage_domain": "VDD", "endpoints": [{"function": "controller", "port": "GPIO16"}, {"interface": "gpio", "signal": "GPIO_1"}]},
+      {"name": "GPIO_2", "role": "signal", "voltage_domain": "VDD", "endpoints": [{"function": "controller", "port": "GPIO17"}, {"interface": "gpio", "signal": "GPIO_2"}]},
+      {"name": "GPIO_3", "role": "signal", "voltage_domain": "VDD", "endpoints": [{"function": "controller", "port": "GPIO25"}, {"interface": "gpio", "signal": "GPIO_3"}]},
+      {"name": "GPIO_4", "role": "signal", "voltage_domain": "VDD", "endpoints": [{"function": "controller", "port": "GPIO26"}, {"interface": "gpio", "signal": "GPIO_4"}]}
+    ],
+    "constraints": {"max_width_mm": 86, "max_height_mm": 60, "preferred_component_spacing_mm": 1.1}
+  },
+  "policy": {"allow_reference_assignment": true, "allow_value_normalization": true, "allow_layout_inference": true, "allow_spacing_adjustment": true, "allow_label_insertion": true, "allow_placement_adjustment": true, "allow_route_retry": true},
+  "extensions": {}
+}

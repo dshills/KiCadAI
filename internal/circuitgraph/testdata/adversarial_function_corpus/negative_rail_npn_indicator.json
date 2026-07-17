@@ -1,0 +1,32 @@
+{
+  "schema": "kicadai.circuit-graph.v1",
+  "version": 1,
+  "project": {"name": "negative_rail_npn_indicator", "title": "Negative-rail NPN indicator", "description": "Ground-referenced indicator switched toward a negative supply rail.", "acceptance": "erc-drc"},
+  "synthesis": {
+    "functions": [
+      {"id": "switch", "role": "bjt", "query": {"text": "MMBT3904", "family": "bjt", "minimum_confidence": "verified"}, "required_functions": ["BASE", "COLLECTOR", "EMITTER"], "usage": "negative_rail_low_side_switch"},
+      {"id": "base_resistor", "role": "resistor", "query": {"family": "resistor", "package": "0603", "value_kind": "resistance", "value": "10k", "minimum_confidence": "rule_inferred"}, "value": "10k", "usage": "base_bias"},
+      {"id": "indicator", "role": "indicator_led", "query": {"text": "red 0805 LED", "family": "led", "minimum_confidence": "verified"}, "required_functions": ["ANODE", "CATHODE"], "usage": "status_indicator"},
+      {"id": "current_limit", "role": "current_limiter", "query": {"family": "resistor", "package": "0603", "value_kind": "resistance", "value": "330", "minimum_confidence": "rule_inferred"}, "value": "330", "usage": "indicator_current_limit"}
+    ],
+    "interfaces": [
+      {"id": "negative_power", "role": "power_input", "signals": [{"name": "GND", "role": "ground"}, {"name": "VEE", "role": "power_neg"}]},
+      {"id": "control", "role": "digital_input", "signals": [{"name": "CONTROL", "role": "signal"}, {"name": "GND", "role": "ground"}]}
+    ],
+    "power_domains": [
+      {"name": "VEE", "role": "power_neg", "voltage_v": -5, "max_current_ma": 30, "source": "external"},
+      {"name": "GND", "role": "ground", "voltage_v": 0, "source": "external"}
+    ],
+    "connections": [
+      {"name": "GND", "role": "ground", "voltage_domain": "GND", "endpoints": [{"interface": "negative_power", "signal": "GND"}, {"interface": "control", "signal": "GND"}, {"function": "current_limit", "port": "A"}]},
+      {"name": "VEE", "role": "power_neg", "voltage_domain": "VEE", "endpoints": [{"interface": "negative_power", "signal": "VEE"}, {"function": "switch", "port": "EMITTER"}]},
+      {"name": "CONTROL", "role": "signal", "voltage_domain": "VEE", "endpoints": [{"interface": "control", "signal": "CONTROL"}, {"function": "base_resistor", "port": "A"}]},
+      {"name": "BASE_DRIVE", "role": "bias", "voltage_domain": "VEE", "endpoints": [{"function": "base_resistor", "port": "B"}, {"function": "switch", "port": "BASE"}]},
+      {"name": "LED_ANODE", "role": "signal", "endpoints": [{"function": "current_limit", "port": "B"}, {"function": "indicator", "port": "ANODE"}]},
+      {"name": "SWITCHED_NEGATIVE", "role": "signal", "voltage_domain": "VEE", "endpoints": [{"function": "indicator", "port": "CATHODE"}, {"function": "switch", "port": "COLLECTOR"}]}
+    ],
+    "constraints": {"max_width_mm": 42, "max_height_mm": 28, "preferred_component_spacing_mm": 1.2}
+  },
+  "policy": {"allow_reference_assignment": true, "allow_value_normalization": true, "allow_layout_inference": true, "allow_spacing_adjustment": true, "allow_label_insertion": true, "allow_placement_adjustment": true, "allow_route_retry": true},
+  "extensions": {}
+}

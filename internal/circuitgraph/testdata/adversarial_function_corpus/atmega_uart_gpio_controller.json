@@ -1,0 +1,32 @@
+{
+  "schema": "kicadai.circuit-graph.v1",
+  "version": 1,
+  "project": {"name": "atmega_uart_gpio_controller", "title": "ATmega UART and GPIO controller", "description": "ATmega minimum system with ISP companions, UART, and a six-position GPIO interface.", "acceptance": "erc-drc"},
+  "synthesis": {
+    "functions": [
+      {"id": "controller", "role": "ic", "query": {"text": "ATmega328P-A TQFP-32", "family": "mcu", "minimum_confidence": "verified"}, "required_functions": ["VCC", "AVCC", "GND", "AGND", "RESET", "MOSI", "MISO", "SCK", "GPIO_22", "GPIO_23", "GPIO_24", "GPIO_25", "GPIO_30", "GPIO_31"], "usage": "microcontroller"}
+    ],
+    "interfaces": [
+      {"id": "power", "role": "power_input", "signals": [{"name": "VCC", "role": "power"}, {"name": "GND", "role": "ground"}]},
+      {"id": "uart", "role": "uart", "signals": [{"name": "VCC", "role": "power"}, {"name": "GND", "role": "ground"}, {"name": "TX", "role": "signal"}, {"name": "RX", "role": "signal"}]},
+      {"id": "gpio", "role": "gpio", "signals": [{"name": "GPIO_1", "role": "signal"}, {"name": "GPIO_2", "role": "signal"}, {"name": "GPIO_3", "role": "signal"}, {"name": "GPIO_4", "role": "signal"}, {"name": "VCC", "role": "power"}, {"name": "GND", "role": "ground"}]}
+    ],
+    "power_domains": [
+      {"name": "VCC", "role": "power", "voltage_v": 5, "max_current_ma": 180, "source": "external"},
+      {"name": "GND", "role": "ground", "voltage_v": 0, "source": "external"}
+    ],
+    "connections": [
+      {"name": "VCC", "role": "power", "voltage_domain": "VCC", "endpoints": [{"interface": "power", "signal": "VCC"}, {"interface": "uart", "signal": "VCC"}, {"interface": "gpio", "signal": "VCC"}, {"function": "controller", "port": "VCC"}, {"function": "controller", "port": "AVCC"}]},
+      {"name": "GND", "role": "ground", "voltage_domain": "GND", "endpoints": [{"interface": "power", "signal": "GND"}, {"interface": "uart", "signal": "GND"}, {"interface": "gpio", "signal": "GND"}, {"function": "controller", "port": "GND"}, {"function": "controller", "port": "AGND"}]},
+      {"name": "UART_TX", "role": "signal", "voltage_domain": "VCC", "endpoints": [{"function": "controller", "port": "GPIO_30"}, {"interface": "uart", "signal": "TX"}]},
+      {"name": "UART_RX", "role": "signal", "voltage_domain": "VCC", "endpoints": [{"interface": "uart", "signal": "RX"}, {"function": "controller", "port": "GPIO_31"}]},
+      {"name": "GPIO_1", "role": "signal", "voltage_domain": "VCC", "endpoints": [{"function": "controller", "port": "GPIO_22"}, {"interface": "gpio", "signal": "GPIO_1"}]},
+      {"name": "GPIO_2", "role": "signal", "voltage_domain": "VCC", "endpoints": [{"function": "controller", "port": "GPIO_23"}, {"interface": "gpio", "signal": "GPIO_2"}]},
+      {"name": "GPIO_3", "role": "signal", "voltage_domain": "VCC", "endpoints": [{"function": "controller", "port": "GPIO_24"}, {"interface": "gpio", "signal": "GPIO_3"}]},
+      {"name": "GPIO_4", "role": "signal", "voltage_domain": "VCC", "endpoints": [{"function": "controller", "port": "GPIO_25"}, {"interface": "gpio", "signal": "GPIO_4"}]}
+    ],
+    "constraints": {"max_width_mm": 82, "max_height_mm": 58, "preferred_component_spacing_mm": 1.4}
+  },
+  "policy": {"allow_reference_assignment": true, "allow_value_normalization": true, "allow_layout_inference": true, "allow_spacing_adjustment": true, "allow_label_insertion": true, "allow_placement_adjustment": true, "allow_route_retry": true},
+  "extensions": {}
+}

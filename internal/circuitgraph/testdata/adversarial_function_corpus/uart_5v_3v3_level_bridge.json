@@ -1,0 +1,33 @@
+{
+  "schema": "kicadai.circuit-graph.v1",
+  "version": 1,
+  "project": {"name": "uart_5v_3v3_level_bridge", "title": "5 V to 3.3 V UART bridge", "description": "Two-channel direction-controlled UART translation between independent logic domains.", "acceptance": "erc-drc"},
+  "synthesis": {
+    "functions": [
+      {"id": "translator", "role": "generic", "query": {"family": "level_translator", "minimum_confidence": "verified"}, "required_functions": ["VCCA", "VCCB", "GND", "OE", "A_TX", "B_TX", "A_RX", "B_RX"], "usage": "uart_dual_domain_translation"}
+    ],
+    "interfaces": [
+      {"id": "power_3v3", "role": "power_input", "signals": [{"name": "VCC_3V3", "role": "power"}, {"name": "GND", "role": "ground"}]},
+      {"id": "power_5v", "role": "power_input", "signals": [{"name": "VCC_5V", "role": "power"}, {"name": "GND", "role": "ground"}]},
+      {"id": "uart_3v3", "role": "uart", "signals": [{"name": "TX", "role": "signal"}, {"name": "RX", "role": "signal"}, {"name": "GND", "role": "ground"}]},
+      {"id": "uart_5v", "role": "uart", "signals": [{"name": "TX", "role": "signal"}, {"name": "RX", "role": "signal"}, {"name": "GND", "role": "ground"}]}
+    ],
+    "power_domains": [
+      {"name": "VCC_3V3", "role": "power", "voltage_v": 3.3, "max_current_ma": 30, "source": "external"},
+      {"name": "VCC_5V", "role": "power", "voltage_v": 5, "max_current_ma": 30, "source": "external"},
+      {"name": "GND", "role": "ground", "voltage_v": 0, "source": "external"}
+    ],
+    "connections": [
+      {"name": "VCC_3V3", "role": "power", "voltage_domain": "VCC_3V3", "endpoints": [{"interface": "power_3v3", "signal": "VCC_3V3"}, {"function": "translator", "port": "VCCA"}, {"function": "translator", "port": "OE"}]},
+      {"name": "VCC_5V", "role": "power", "voltage_domain": "VCC_5V", "endpoints": [{"interface": "power_5v", "signal": "VCC_5V"}, {"function": "translator", "port": "VCCB"}]},
+      {"name": "GND", "role": "ground", "voltage_domain": "GND", "endpoints": [{"interface": "power_3v3", "signal": "GND"}, {"interface": "power_5v", "signal": "GND"}, {"interface": "uart_3v3", "signal": "GND"}, {"interface": "uart_5v", "signal": "GND"}, {"function": "translator", "port": "GND"}]},
+      {"name": "UART_3V3_TX", "role": "signal", "voltage_domain": "VCC_3V3", "endpoints": [{"interface": "uart_3v3", "signal": "TX"}, {"function": "translator", "port": "A_TX"}]},
+      {"name": "UART_5V_RX", "role": "signal", "voltage_domain": "VCC_5V", "endpoints": [{"function": "translator", "port": "B_TX"}, {"interface": "uart_5v", "signal": "RX"}]},
+      {"name": "UART_5V_TX", "role": "signal", "voltage_domain": "VCC_5V", "endpoints": [{"interface": "uart_5v", "signal": "TX"}, {"function": "translator", "port": "B_RX"}]},
+      {"name": "UART_3V3_RX", "role": "signal", "voltage_domain": "VCC_3V3", "endpoints": [{"function": "translator", "port": "A_RX"}, {"interface": "uart_3v3", "signal": "RX"}]}
+    ],
+    "constraints": {"max_width_mm": 48, "max_height_mm": 34, "preferred_component_spacing_mm": 1.3}
+  },
+  "policy": {"allow_reference_assignment": true, "allow_value_normalization": true, "allow_layout_inference": true, "allow_spacing_adjustment": true, "allow_label_insertion": true, "allow_placement_adjustment": true, "allow_route_retry": true},
+  "extensions": {}
+}

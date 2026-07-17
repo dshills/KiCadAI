@@ -1,0 +1,32 @@
+{
+  "schema": "kicadai.circuit-graph.v1",
+  "version": 1,
+  "project": {"name": "npn_rc_edge_shaper", "title": "NPN RC edge shaper", "description": "Pulse-driven NPN inverter with a bounded base RC network and collector output.", "acceptance": "erc-drc"},
+  "synthesis": {
+    "functions": [
+      {"id": "switch", "role": "bjt", "query": {"text": "MMBT3904", "family": "bjt", "minimum_confidence": "verified"}, "required_functions": ["BASE", "COLLECTOR", "EMITTER"], "usage": "transient_low_side_switch", "parameters": [{"name": "pulse_initial_value_v", "value": "0"}, {"name": "pulse_value_v", "value": "5"}, {"name": "pulse_delay_s", "value": "0.0002"}, {"name": "pulse_width_s", "value": "0.001"}, {"name": "pulse_period_s", "value": "0.002"}, {"name": "analysis_duration_s", "value": "0.0015"}, {"name": "analysis_time_step_s", "value": "0.00001"}]},
+      {"id": "base_resistor", "role": "resistor", "query": {"family": "resistor", "package": "0603", "value_kind": "resistance", "value": "10k", "minimum_confidence": "rule_inferred"}, "value": "10k", "usage": "base_bias"},
+      {"id": "base_capacitor", "role": "capacitor", "query": {"family": "capacitor", "package": "0603", "value_kind": "capacitance", "value": "10n", "min_voltage_v": 6.3, "minimum_confidence": "rule_inferred"}, "value": "10n", "usage": "edge_timing"},
+      {"id": "collector_resistor", "role": "resistor", "query": {"family": "resistor", "package": "0603", "value_kind": "resistance", "value": "4.7k", "minimum_confidence": "rule_inferred"}, "value": "4.7k", "usage": "collector_pullup"}
+    ],
+    "interfaces": [
+      {"id": "power", "role": "power_input", "signals": [{"name": "VCC", "role": "power"}, {"name": "GND", "role": "ground"}]},
+      {"id": "input", "role": "digital_input", "signals": [{"name": "SIGNAL", "role": "signal"}, {"name": "GND", "role": "ground"}]},
+      {"id": "output", "role": "digital_output", "signals": [{"name": "SIGNAL", "role": "signal"}, {"name": "GND", "role": "ground"}]}
+    ],
+    "power_domains": [
+      {"name": "VCC", "role": "power", "voltage_v": 5, "max_current_ma": 20, "source": "external"},
+      {"name": "GND", "role": "ground", "voltage_v": 0, "source": "external"}
+    ],
+    "connections": [
+      {"name": "VCC", "role": "power", "voltage_domain": "VCC", "endpoints": [{"interface": "power", "signal": "VCC"}, {"function": "collector_resistor", "port": "A"}]},
+      {"name": "GND", "role": "ground", "voltage_domain": "GND", "endpoints": [{"interface": "power", "signal": "GND"}, {"interface": "input", "signal": "GND"}, {"interface": "output", "signal": "GND"}, {"function": "switch", "port": "EMITTER"}, {"function": "base_capacitor", "port": "B"}]},
+      {"name": "PULSE_INPUT", "role": "signal", "voltage_domain": "VCC", "endpoints": [{"interface": "input", "signal": "SIGNAL"}, {"function": "base_resistor", "port": "A"}]},
+      {"name": "BASE_RC", "role": "bias", "voltage_domain": "VCC", "endpoints": [{"function": "base_resistor", "port": "B"}, {"function": "base_capacitor", "port": "A"}, {"function": "switch", "port": "BASE"}]},
+      {"name": "INVERTED_OUTPUT", "role": "signal", "voltage_domain": "VCC", "endpoints": [{"function": "collector_resistor", "port": "B"}, {"function": "switch", "port": "COLLECTOR"}, {"interface": "output", "signal": "SIGNAL"}]}
+    ],
+    "constraints": {"max_width_mm": 48, "max_height_mm": 32, "preferred_component_spacing_mm": 1.2}
+  },
+  "policy": {"allow_reference_assignment": true, "allow_value_normalization": true, "allow_layout_inference": true, "allow_spacing_adjustment": true, "allow_label_insertion": true, "allow_placement_adjustment": true, "allow_route_retry": true},
+  "extensions": {}
+}

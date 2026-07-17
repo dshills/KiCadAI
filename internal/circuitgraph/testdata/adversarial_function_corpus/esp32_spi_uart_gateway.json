@@ -1,0 +1,32 @@
+{
+  "schema": "kicadai.circuit-graph.v1",
+  "version": 1,
+  "project": {"name": "esp32_spi_uart_gateway", "title": "ESP32 SPI and UART gateway", "description": "ESP32 module exposing simultaneous six-signal SPI and application UART interfaces.", "acceptance": "erc-drc"},
+  "synthesis": {
+    "functions": [
+      {"id": "controller", "role": "ic", "query": {"text": "ESP32-WROOM-32E-N4", "family": "mcu", "minimum_confidence": "verified"}, "required_functions": ["VDD", "GND", "EN", "GPIO0", "GPIO1", "GPIO3", "GPIO5", "GPIO18", "GPIO19", "GPIO23"], "usage": "microcontroller"}
+    ],
+    "interfaces": [
+      {"id": "power", "role": "power_input", "signals": [{"name": "VDD", "role": "power"}, {"name": "GND", "role": "ground"}]},
+      {"id": "spi", "role": "spi", "signals": [{"name": "VDD", "role": "power"}, {"name": "GND", "role": "ground"}, {"name": "MOSI", "role": "signal"}, {"name": "MISO", "role": "signal"}, {"name": "SCK", "role": "signal"}, {"name": "CS", "role": "signal"}]},
+      {"id": "uart", "role": "uart", "signals": [{"name": "TX", "role": "signal"}, {"name": "RX", "role": "signal"}, {"name": "GND", "role": "ground"}]}
+    ],
+    "power_domains": [
+      {"name": "VDD", "role": "power", "voltage_v": 3.3, "max_current_ma": 600, "source": "external"},
+      {"name": "GND", "role": "ground", "voltage_v": 0, "source": "external"}
+    ],
+    "connections": [
+      {"name": "VDD", "role": "power", "voltage_domain": "VDD", "current_ma": 600, "endpoints": [{"interface": "power", "signal": "VDD"}, {"interface": "spi", "signal": "VDD"}, {"function": "controller", "port": "VDD"}]},
+      {"name": "GND", "role": "ground", "voltage_domain": "GND", "endpoints": [{"interface": "power", "signal": "GND"}, {"interface": "spi", "signal": "GND"}, {"interface": "uart", "signal": "GND"}, {"function": "controller", "port": "GND"}]},
+      {"name": "SPI_MOSI", "role": "signal", "voltage_domain": "VDD", "endpoints": [{"function": "controller", "port": "GPIO23"}, {"interface": "spi", "signal": "MOSI"}]},
+      {"name": "SPI_MISO", "role": "signal", "voltage_domain": "VDD", "endpoints": [{"interface": "spi", "signal": "MISO"}, {"function": "controller", "port": "GPIO19"}]},
+      {"name": "SPI_SCK", "role": "signal", "voltage_domain": "VDD", "endpoints": [{"function": "controller", "port": "GPIO18"}, {"interface": "spi", "signal": "SCK"}]},
+      {"name": "SPI_CS", "role": "signal", "voltage_domain": "VDD", "endpoints": [{"function": "controller", "port": "GPIO5"}, {"interface": "spi", "signal": "CS"}]},
+      {"name": "UART_TX", "role": "signal", "voltage_domain": "VDD", "endpoints": [{"function": "controller", "port": "GPIO1"}, {"interface": "uart", "signal": "TX"}]},
+      {"name": "UART_RX", "role": "signal", "voltage_domain": "VDD", "endpoints": [{"interface": "uart", "signal": "RX"}, {"function": "controller", "port": "GPIO3"}]}
+    ],
+    "constraints": {"max_width_mm": 78, "max_height_mm": 54, "preferred_component_spacing_mm": 1.4}
+  },
+  "policy": {"allow_reference_assignment": true, "allow_value_normalization": true, "allow_layout_inference": true, "allow_spacing_adjustment": true, "allow_label_insertion": true, "allow_placement_adjustment": true, "allow_route_retry": true},
+  "extensions": {}
+}

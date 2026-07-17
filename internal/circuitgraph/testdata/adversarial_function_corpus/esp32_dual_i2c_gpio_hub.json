@@ -1,0 +1,33 @@
+{
+  "schema": "kicadai.circuit-graph.v1",
+  "version": 1,
+  "project": {"name": "esp32_dual_i2c_gpio_hub", "title": "ESP32 dual-I2C GPIO hub", "description": "ESP32 module with two different sensors sharing I2C and a six-position GPIO interface.", "acceptance": "erc-drc"},
+  "synthesis": {
+    "functions": [
+      {"id": "controller", "role": "ic", "query": {"text": "ESP32-WROOM-32E-N4", "family": "mcu", "minimum_confidence": "verified"}, "required_functions": ["VDD", "GND", "EN", "GPIO0", "GPIO1", "GPIO3", "GPIO16", "GPIO17", "GPIO21", "GPIO22", "GPIO25", "GPIO26"], "usage": "microcontroller"},
+      {"id": "environment", "role": "sensor", "query": {"text": "BME280", "family": "sensor", "minimum_confidence": "verified"}, "required_functions": ["VDD", "VDDIO", "GND", "SDA", "SCL", "CSB", "SDO"], "usage": "i2c_peripheral", "parameters": [{"name": "i2c_address", "value": "0x76"}]},
+      {"id": "humidity", "role": "sensor", "query": {"text": "SHT31-DIS", "family": "sensor", "minimum_confidence": "verified"}, "required_functions": ["VDD", "VSS", "SDA", "SCL", "ADDR", "R"], "usage": "i2c_peripheral", "parameters": [{"name": "i2c_address", "value": "0x44"}]}
+    ],
+    "interfaces": [
+      {"id": "power", "role": "power_input", "signals": [{"name": "VDD", "role": "power"}, {"name": "GND", "role": "ground"}]},
+      {"id": "gpio", "role": "gpio", "signals": [{"name": "GPIO_1", "role": "signal"}, {"name": "GPIO_2", "role": "signal"}, {"name": "GPIO_3", "role": "signal"}, {"name": "GPIO_4", "role": "signal"}, {"name": "VDD", "role": "power"}, {"name": "GND", "role": "ground"}]}
+    ],
+    "power_domains": [
+      {"name": "VDD", "role": "power", "voltage_v": 3.3, "max_current_ma": 650, "source": "external"},
+      {"name": "GND", "role": "ground", "voltage_v": 0, "source": "external"}
+    ],
+    "connections": [
+      {"name": "VDD", "role": "power", "voltage_domain": "VDD", "current_ma": 650, "endpoints": [{"interface": "power", "signal": "VDD"}, {"interface": "gpio", "signal": "VDD"}, {"function": "controller", "port": "VDD"}, {"function": "environment", "port": "VDD"}, {"function": "environment", "port": "VDDIO"}, {"function": "humidity", "port": "VDD"}]},
+      {"name": "GND", "role": "ground", "voltage_domain": "GND", "endpoints": [{"interface": "power", "signal": "GND"}, {"interface": "gpio", "signal": "GND"}, {"function": "controller", "port": "GND"}, {"function": "environment", "port": "GND"}, {"function": "humidity", "port": "VSS"}]},
+      {"name": "SDA", "role": "signal", "voltage_domain": "VDD", "endpoints": [{"function": "controller", "port": "GPIO21"}, {"function": "environment", "port": "SDA"}, {"function": "humidity", "port": "SDA"}]},
+      {"name": "SCL", "role": "signal", "voltage_domain": "VDD", "endpoints": [{"function": "controller", "port": "GPIO22"}, {"function": "environment", "port": "SCL"}, {"function": "humidity", "port": "SCL"}]},
+      {"name": "GPIO_1", "role": "signal", "voltage_domain": "VDD", "endpoints": [{"function": "controller", "port": "GPIO16"}, {"interface": "gpio", "signal": "GPIO_1"}]},
+      {"name": "GPIO_2", "role": "signal", "voltage_domain": "VDD", "endpoints": [{"function": "controller", "port": "GPIO17"}, {"interface": "gpio", "signal": "GPIO_2"}]},
+      {"name": "GPIO_3", "role": "signal", "voltage_domain": "VDD", "endpoints": [{"function": "controller", "port": "GPIO25"}, {"interface": "gpio", "signal": "GPIO_3"}]},
+      {"name": "GPIO_4", "role": "signal", "voltage_domain": "VDD", "endpoints": [{"function": "controller", "port": "GPIO26"}, {"interface": "gpio", "signal": "GPIO_4"}]}
+    ],
+    "constraints": {"max_width_mm": 92, "max_height_mm": 64, "preferred_component_spacing_mm": 1.3}
+  },
+  "policy": {"allow_reference_assignment": true, "allow_value_normalization": true, "allow_layout_inference": true, "allow_spacing_adjustment": true, "allow_label_insertion": true, "allow_placement_adjustment": true, "allow_route_retry": true},
+  "extensions": {}
+}

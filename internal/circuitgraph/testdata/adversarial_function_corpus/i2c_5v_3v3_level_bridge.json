@@ -1,0 +1,31 @@
+{
+  "schema": "kicadai.circuit-graph.v1",
+  "version": 1,
+  "project": {"name": "i2c_5v_3v3_level_bridge", "title": "5 V to 3.3 V I2C bridge", "description": "Bidirectional open-drain bus translation with independent pull-up domains.", "acceptance": "erc-drc"},
+  "synthesis": {
+    "functions": [
+      {"id": "translator", "role": "generic", "query": {"family": "level_translator", "minimum_confidence": "verified"}, "required_functions": ["VREF1", "VREF2", "GND", "EN", "SDA1", "SCL1", "SDA2", "SCL2"], "usage": "i2c_bidirectional_translation"}
+    ],
+    "interfaces": [
+      {"id": "host_3v3", "role": "i2c", "signals": [{"name": "VCC", "role": "power"}, {"name": "GND", "role": "ground"}, {"name": "SDA", "role": "signal"}, {"name": "SCL", "role": "signal"}]},
+      {"id": "device_5v", "role": "i2c", "signals": [{"name": "VCC", "role": "power"}, {"name": "GND", "role": "ground"}, {"name": "SDA", "role": "signal"}, {"name": "SCL", "role": "signal"}]}
+    ],
+    "power_domains": [
+      {"name": "VCC_3V3", "role": "power", "voltage_v": 3.3, "max_current_ma": 25, "source": "external"},
+      {"name": "VCC_5V", "role": "power", "voltage_v": 5, "max_current_ma": 25, "source": "external"},
+      {"name": "GND", "role": "ground", "voltage_v": 0, "source": "external"}
+    ],
+    "connections": [
+      {"name": "VCC_3V3", "role": "power", "voltage_domain": "VCC_3V3", "endpoints": [{"interface": "host_3v3", "signal": "VCC"}, {"function": "translator", "port": "VREF1"}, {"function": "translator", "port": "EN"}]},
+      {"name": "VCC_5V", "role": "power", "voltage_domain": "VCC_5V", "endpoints": [{"interface": "device_5v", "signal": "VCC"}, {"function": "translator", "port": "VREF2"}]},
+      {"name": "GND", "role": "ground", "voltage_domain": "GND", "endpoints": [{"interface": "host_3v3", "signal": "GND"}, {"interface": "device_5v", "signal": "GND"}, {"function": "translator", "port": "GND"}]},
+      {"name": "SDA_3V3", "role": "signal", "voltage_domain": "VCC_3V3", "endpoints": [{"interface": "host_3v3", "signal": "SDA"}, {"function": "translator", "port": "SDA1"}]},
+      {"name": "SCL_3V3", "role": "signal", "voltage_domain": "VCC_3V3", "endpoints": [{"interface": "host_3v3", "signal": "SCL"}, {"function": "translator", "port": "SCL1"}]},
+      {"name": "SDA_5V", "role": "signal", "voltage_domain": "VCC_5V", "endpoints": [{"function": "translator", "port": "SDA2"}, {"interface": "device_5v", "signal": "SDA"}]},
+      {"name": "SCL_5V", "role": "signal", "voltage_domain": "VCC_5V", "endpoints": [{"function": "translator", "port": "SCL2"}, {"interface": "device_5v", "signal": "SCL"}]}
+    ],
+    "constraints": {"max_width_mm": 46, "max_height_mm": 34, "preferred_component_spacing_mm": 1.2}
+  },
+  "policy": {"allow_reference_assignment": true, "allow_value_normalization": true, "allow_layout_inference": true, "allow_spacing_adjustment": true, "allow_label_insertion": true, "allow_placement_adjustment": true, "allow_route_retry": true},
+  "extensions": {}
+}

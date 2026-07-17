@@ -1,0 +1,34 @@
+{
+  "schema": "kicadai.circuit-graph.v1",
+  "version": 1,
+  "project": {"name": "dual_sensor_level_shift_gateway", "title": "Dual-sensor level-shift gateway", "description": "ESP32 and two 3.3 V sensors share I2C behind a bidirectional translator to a 5 V host.", "acceptance": "erc-drc"},
+  "synthesis": {
+    "functions": [
+      {"id": "controller", "role": "ic", "query": {"text": "ESP32-WROOM-32E-N4", "family": "mcu", "minimum_confidence": "verified"}, "required_functions": ["VDD", "GND", "EN", "GPIO0", "GPIO1", "GPIO3", "GPIO21", "GPIO22"], "usage": "microcontroller"},
+      {"id": "environment", "role": "sensor", "query": {"text": "BME280", "family": "sensor", "minimum_confidence": "verified"}, "required_functions": ["VDD", "VDDIO", "GND", "SDA", "SCL", "CSB", "SDO"], "usage": "i2c_peripheral", "parameters": [{"name": "i2c_address", "value": "0x76"}]},
+      {"id": "humidity", "role": "sensor", "query": {"text": "SHT31-DIS", "family": "sensor", "minimum_confidence": "verified"}, "required_functions": ["VDD", "VSS", "SDA", "SCL", "ADDR", "R"], "usage": "i2c_peripheral", "parameters": [{"name": "i2c_address", "value": "0x44"}]},
+      {"id": "translator", "role": "generic", "query": {"family": "level_translator", "minimum_confidence": "verified"}, "required_functions": ["VREF1", "VREF2", "GND", "EN", "SDA1", "SCL1", "SDA2", "SCL2"], "usage": "i2c_bidirectional_translation"}
+    ],
+    "interfaces": [
+      {"id": "power_3v3", "role": "power_input", "signals": [{"name": "VCC_3V3", "role": "power"}, {"name": "GND", "role": "ground"}]},
+      {"id": "host_5v", "role": "i2c", "signals": [{"name": "VCC_5V", "role": "power"}, {"name": "GND", "role": "ground"}, {"name": "SDA", "role": "signal"}, {"name": "SCL", "role": "signal"}]}
+    ],
+    "power_domains": [
+      {"name": "VCC_3V3", "role": "power", "voltage_v": 3.3, "max_current_ma": 650, "source": "external"},
+      {"name": "VCC_5V", "role": "power", "voltage_v": 5, "max_current_ma": 40, "source": "external"},
+      {"name": "GND", "role": "ground", "voltage_v": 0, "source": "external"}
+    ],
+    "connections": [
+      {"name": "VCC_3V3", "role": "power", "voltage_domain": "VCC_3V3", "current_ma": 650, "endpoints": [{"interface": "power_3v3", "signal": "VCC_3V3"}, {"function": "controller", "port": "VDD"}, {"function": "environment", "port": "VDD"}, {"function": "environment", "port": "VDDIO"}, {"function": "humidity", "port": "VDD"}, {"function": "translator", "port": "VREF1"}, {"function": "translator", "port": "EN"}]},
+      {"name": "VCC_5V", "role": "power", "voltage_domain": "VCC_5V", "endpoints": [{"interface": "host_5v", "signal": "VCC_5V"}, {"function": "translator", "port": "VREF2"}]},
+      {"name": "GND", "role": "ground", "voltage_domain": "GND", "endpoints": [{"interface": "power_3v3", "signal": "GND"}, {"interface": "host_5v", "signal": "GND"}, {"function": "controller", "port": "GND"}, {"function": "environment", "port": "GND"}, {"function": "humidity", "port": "VSS"}, {"function": "translator", "port": "GND"}]},
+      {"name": "SDA_3V3", "role": "signal", "voltage_domain": "VCC_3V3", "endpoints": [{"function": "controller", "port": "GPIO21"}, {"function": "environment", "port": "SDA"}, {"function": "humidity", "port": "SDA"}, {"function": "translator", "port": "SDA1"}]},
+      {"name": "SCL_3V3", "role": "signal", "voltage_domain": "VCC_3V3", "endpoints": [{"function": "controller", "port": "GPIO22"}, {"function": "environment", "port": "SCL"}, {"function": "humidity", "port": "SCL"}, {"function": "translator", "port": "SCL1"}]},
+      {"name": "SDA_5V", "role": "signal", "voltage_domain": "VCC_5V", "endpoints": [{"function": "translator", "port": "SDA2"}, {"interface": "host_5v", "signal": "SDA"}]},
+      {"name": "SCL_5V", "role": "signal", "voltage_domain": "VCC_5V", "endpoints": [{"function": "translator", "port": "SCL2"}, {"interface": "host_5v", "signal": "SCL"}]}
+    ],
+    "constraints": {"max_width_mm": 96, "max_height_mm": 66, "preferred_component_spacing_mm": 1.1}
+  },
+  "policy": {"allow_reference_assignment": true, "allow_value_normalization": true, "allow_layout_inference": true, "allow_spacing_adjustment": true, "allow_label_insertion": true, "allow_placement_adjustment": true, "allow_route_retry": true},
+  "extensions": {}
+}

@@ -1,0 +1,34 @@
+{
+  "schema": "kicadai.circuit-graph.v1",
+  "version": 1,
+  "project": {"name": "bipolar_lmv321_inverting_amplifier", "title": "Bipolar-supply inverting amplifier", "description": "Single op-amp inverting stage powered from symmetric positive and negative rails.", "acceptance": "erc-drc"},
+  "synthesis": {
+    "functions": [
+      {"id": "amplifier", "role": "ic", "query": {"text": "TI LMV321", "family": "opamp", "minimum_confidence": "verified"}, "required_functions": ["IN_MINUS", "IN_PLUS", "OUT", "V_MINUS", "V_PLUS"], "usage": "inverting_amplifier"},
+      {"id": "input_resistor", "role": "resistor", "query": {"family": "resistor", "package": "0603", "value_kind": "resistance", "value": "10k", "minimum_confidence": "rule_inferred"}, "value": "10k", "usage": "input_gain"},
+      {"id": "feedback", "role": "resistor", "query": {"family": "resistor", "package": "0603", "value_kind": "resistance", "value": "20k", "minimum_confidence": "rule_inferred"}, "value": "20k", "usage": "feedback_gain"}
+    ],
+    "interfaces": [
+      {"id": "positive_power", "role": "power_input", "signals": [{"name": "VPOS", "role": "power_pos"}, {"name": "GND", "role": "ground"}]},
+      {"id": "negative_power", "role": "power_input", "signals": [{"name": "GND", "role": "ground"}, {"name": "VNEG", "role": "power_neg"}]},
+      {"id": "input", "role": "analog_input", "signals": [{"name": "SIGNAL", "role": "signal"}, {"name": "GND", "role": "ground"}]},
+      {"id": "output", "role": "analog_output", "signals": [{"name": "SIGNAL", "role": "signal"}, {"name": "GND", "role": "ground"}]}
+    ],
+    "power_domains": [
+      {"name": "VPOS", "role": "power_pos", "voltage_v": 5, "max_current_ma": 20, "source": "external"},
+      {"name": "VNEG", "role": "power_neg", "voltage_v": -5, "max_current_ma": 20, "source": "external"},
+      {"name": "GND", "role": "ground", "voltage_v": 0, "source": "external"}
+    ],
+    "connections": [
+      {"name": "VPOS", "role": "power_pos", "voltage_domain": "VPOS", "endpoints": [{"interface": "positive_power", "signal": "VPOS"}, {"function": "amplifier", "port": "V_PLUS"}]},
+      {"name": "VNEG", "role": "power_neg", "voltage_domain": "VNEG", "endpoints": [{"interface": "negative_power", "signal": "VNEG"}, {"function": "amplifier", "port": "V_MINUS"}]},
+      {"name": "GND", "role": "ground", "voltage_domain": "GND", "endpoints": [{"interface": "positive_power", "signal": "GND"}, {"interface": "negative_power", "signal": "GND"}, {"interface": "input", "signal": "GND"}, {"interface": "output", "signal": "GND"}, {"function": "amplifier", "port": "IN_PLUS"}]},
+      {"name": "ANALOG_IN", "role": "signal", "endpoints": [{"interface": "input", "signal": "SIGNAL"}, {"function": "input_resistor", "port": "A"}]},
+      {"name": "SUMMING_NODE", "role": "feedback", "endpoints": [{"function": "input_resistor", "port": "B"}, {"function": "feedback", "port": "B"}, {"function": "amplifier", "port": "IN_MINUS"}]},
+      {"name": "ANALOG_OUT", "role": "signal", "endpoints": [{"function": "feedback", "port": "A"}, {"function": "amplifier", "port": "OUT"}, {"interface": "output", "signal": "SIGNAL"}]}
+    ],
+    "constraints": {"max_width_mm": 52, "max_height_mm": 34, "preferred_component_spacing_mm": 1.4}
+  },
+  "policy": {"allow_reference_assignment": true, "allow_value_normalization": true, "allow_layout_inference": true, "allow_spacing_adjustment": true, "allow_label_insertion": true, "allow_placement_adjustment": true, "allow_route_retry": true},
+  "extensions": {}
+}
