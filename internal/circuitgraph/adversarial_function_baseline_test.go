@@ -39,13 +39,16 @@ type adversarialCapabilityIssue struct {
 }
 
 type adversarialCapabilityCircuit struct {
-	ID         string                      `json:"id"`
-	Status     string                      `json:"status"`
-	Category   string                      `json:"category,omitempty"`
-	RootKey    string                      `json:"root_key,omitempty"`
-	RootIssue  *adversarialCapabilityIssue `json:"root_issue,omitempty"`
-	Simulation string                      `json:"simulation"`
-	Hashes     map[string]string           `json:"hashes"`
+	ID             string                      `json:"id"`
+	Status         string                      `json:"status"`
+	Category       string                      `json:"category,omitempty"`
+	RootKey        string                      `json:"root_key,omitempty"`
+	RootIssue      *adversarialCapabilityIssue `json:"root_issue,omitempty"`
+	Simulation     string                      `json:"simulation"`
+	ComponentCount int                         `json:"component_count,omitempty"`
+	BoardMM        string                      `json:"board_mm,omitempty"`
+	FailureSummary map[string]any              `json:"failure_summary,omitempty"`
+	Hashes         map[string]string           `json:"hashes"`
 }
 
 type adversarialCapabilityAggregate struct {
@@ -140,7 +143,10 @@ func TestAdversarialFunctionCorpusOptionalKiCadPromotion(t *testing.T) {
 			t.Logf("%s: pass", circuit.ID)
 			continue
 		}
-		t.Logf("%s: blocked root=%s stage=%s path=%s message=%s", circuit.ID, circuit.RootKey, circuit.RootIssue.Stage, circuit.RootIssue.Path, circuit.RootIssue.Message)
+		t.Logf("%s: blocked root=%s stage=%s path=%s components=%d board_mm=%s message=%s", circuit.ID, circuit.RootKey, circuit.RootIssue.Stage, circuit.RootIssue.Path, circuit.ComponentCount, circuit.BoardMM, circuit.RootIssue.Message)
+		if circuit.FailureSummary != nil {
+			t.Logf("%s: failure_summary=%#v", circuit.ID, circuit.FailureSummary)
+		}
 	}
 	if mode == "require-pass" && report.Aggregate.Blocked != 0 {
 		t.Fatalf("adversarial promotion blocked: %#v", report.Aggregate)
@@ -316,6 +322,8 @@ func evaluateAdversarialCircuit(t *testing.T, ctx context.Context, root string, 
 	request.Validation.RequireERC = true
 	request.Validation.RequireDRC = true
 	request.Validation.StrictUnrouted = true
+	circuit.ComponentCount = len(request.ExplicitCircuit.Components)
+	circuit.BoardMM = strconv.FormatFloat(request.Board.WidthMM, 'f', -1, 64) + "x" + strconv.FormatFloat(request.Board.HeightMM, 'f', -1, 64)
 	circuit.Hashes["request"] = hashGraphValue(request)
 	if !requireKiCad {
 		return adversarialBlockedCircuit(circuit, "writer", reports.Issue{Code: reports.CodeSkippedExternalTool, Severity: reports.SeverityBlocked, Stage: "kicad_checks", Path: "kicad_cli", Message: "complete baseline requires KiCad-backed promotion"})
@@ -324,7 +332,15 @@ func evaluateAdversarialCircuit(t *testing.T, ctx context.Context, root string, 
 	firstOutput := filepath.Join(t.TempDir(), "first")
 	first := designworkflow.Create(ctx, request, adversarialCreateOptions(firstOutput, index, cliPath))
 	if category, issue, failed := adversarialWorkflowFailure(first); failed {
-		return adversarialBlockedCircuit(circuit, category, issue)
+		blocked := adversarialBlockedCircuit(circuit, category, issue)
+		stageName := designworkflow.StageName(issue.Stage)
+		if category == "placement" {
+			stageName = designworkflow.StagePlacement
+		}
+		if stage := graphWorkflowStage(first, stageName); stage != nil {
+			blocked.FailureSummary = stage.Summary
+		}
+		return blocked
 	}
 	circuit.Hashes["generated_files"] = hashFunctionGeneratedFiles(t, firstOutput)
 

@@ -42,6 +42,38 @@ func TestDeriveFunctionLayoutAddsNegativePowerLaneOnlyForNegativeRails(t *testin
 	}
 }
 
+func TestDeriveFunctionLayoutReservesPackingBandsAroundLargestEnvelope(t *testing.T) {
+	componentsInLayout := make([]Component, 16)
+	for index := range componentsInLayout {
+		componentsInLayout[index] = Component{ID: "component_" + string(rune('a'+index)), ComponentID: "small", VariantID: "default"}
+	}
+	componentsInLayout[0].ComponentID = "module"
+	componentsInLayout[0].VariantID = "module"
+	records := map[string]components.ComponentRecord{
+		"module": {ID: "module", Packages: []components.PackageVariant{{
+			ID: "module", DimensionsMM: &components.Bounds{Width: 18, Height: 25.5},
+			Constraints: []components.PhysicalConstraint{{Kind: "antenna_keepout", Value: "48x21.44", Unit: "mm"}},
+		}}},
+	}
+	document := Document{Components: componentsInLayout}
+	intent := FunctionIntent{Constraints: SynthesisConstraints{MaxWidthMM: 100, MaxHeightMM: 100, PreferredComponentSpacingMM: 1.5}}
+	if issues := deriveFunctionLayout(&document, intent, nil, records); len(issues) != 0 {
+		t.Fatalf("derive dense module layout: %#v", issues)
+	}
+	if document.Project.Board.WidthMM != 71 || document.Project.Board.HeightMM != 48.5 {
+		t.Fatalf("dense module board = %.1fx%.1f, want 71x48.5", document.Project.Board.WidthMM, document.Project.Board.HeightMM)
+	}
+
+	document = Document{Components: componentsInLayout}
+	intent.Constraints.MaxHeightMM = 48
+	if issues := deriveFunctionLayout(&document, intent, nil, records); len(issues) != 0 {
+		t.Fatalf("derive bounded dense module layout: %#v", issues)
+	}
+	if document.Project.Board.HeightMM != 48 {
+		t.Fatalf("bounded dense module height = %.1f, want 48", document.Project.Board.HeightMM)
+	}
+}
+
 func TestPhysicalConstraintDimensionsMMRejectsNonDimensionalEvidence(t *testing.T) {
 	if _, _, ok := physicalConstraintDimensionsMM(components.PhysicalConstraint{Value: "48x21.44", Unit: "mil"}); ok {
 		t.Fatal("non-mm physical evidence was interpreted as millimetres")

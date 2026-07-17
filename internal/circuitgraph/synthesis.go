@@ -12,7 +12,10 @@ import (
 	"kicadai/internal/reports"
 )
 
-const SynthesisReportSchema = "kicadai.function-synthesis-report.v1"
+const (
+	SynthesisReportSchema              = "kicadai.function-synthesis-report.v1"
+	synthesisEstimatedComponentPitchMM = 5.0
+)
 
 type SynthesisReport struct {
 	Schema             string                        `json:"schema"`
@@ -676,12 +679,23 @@ func deriveFunctionLayout(document *Document, intent FunctionIntent, selections 
 	// non-zero deterministic candidate interval after the synthesized region is
 	// inset from the board outline.
 	envelopeMargin := 2 * (1 + 2*spacing)
-	width := math.Max(math.Max(20, 15+5*float64(columns)), maxEnvelopeWidth+envelopeMargin)
-	height := math.Max(math.Max(15, 12+5*float64(rows)), maxEnvelopeHeight+envelopeMargin)
-	if width > intent.Constraints.MaxWidthMM || height > intent.Constraints.MaxHeightMM {
-		issue := synthesisIssue(CodeSynthesisLayoutConstraintUnsupported, "synthesis.constraints", fmt.Sprintf("derived %.1fx%.1f mm board exceeds %.1fx%.1f mm function-intent bounds", width, height, intent.Constraints.MaxWidthMM, intent.Constraints.MaxHeightMM), "increase bounded board dimensions or reduce circuit complexity")
+	// A single large physical envelope (for example a module keepout) must
+	// not consume the packing bands implied by the remaining grid columns and
+	// rows. Add those deterministic bands around the largest envelope instead
+	// of treating the envelope and component-count estimates as alternatives.
+	minimumWidth := math.Max(20, maxEnvelopeWidth+envelopeMargin)
+	minimumHeight := math.Max(15, maxEnvelopeHeight+envelopeMargin)
+	if minimumWidth > intent.Constraints.MaxWidthMM || minimumHeight > intent.Constraints.MaxHeightMM {
+		issue := synthesisIssue(CodeSynthesisLayoutConstraintUnsupported, "synthesis.constraints", fmt.Sprintf("minimum %.1fx%.1f mm physical envelope exceeds %.1fx%.1f mm function-intent bounds", minimumWidth, minimumHeight, intent.Constraints.MaxWidthMM, intent.Constraints.MaxHeightMM), "increase bounded board dimensions or reduce physical-envelope constraints")
 		return []reports.Issue{issue}
 	}
+	packingWidth := math.Max(math.Max(20, 15+synthesisEstimatedComponentPitchMM*float64(columns)), maxEnvelopeWidth+envelopeMargin+synthesisEstimatedComponentPitchMM*math.Max(float64(columns-1), 0))
+	packingHeight := math.Max(math.Max(15, 12+synthesisEstimatedComponentPitchMM*float64(rows)), maxEnvelopeHeight+envelopeMargin+synthesisEstimatedComponentPitchMM*math.Max(float64(rows-1), 0))
+	// The packing estimate is conservative, not a physical minimum. Respect a
+	// tighter provider bound when the largest reviewed envelope still fits and
+	// let the deterministic placer prove or reject the denser arrangement.
+	width := math.Min(packingWidth, intent.Constraints.MaxWidthMM)
+	height := math.Min(packingHeight, intent.Constraints.MaxHeightMM)
 	layers := 2
 	if count > 20 {
 		layers = 4
