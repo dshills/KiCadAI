@@ -101,6 +101,7 @@ type BoardPlacementArea struct {
 	HeightMM float64
 	Origin   Point
 	MarginMM float64
+	Layers   int
 }
 
 type Component struct {

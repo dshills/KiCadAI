@@ -42,6 +42,20 @@ func TestDeriveFunctionLayoutAddsNegativePowerLaneOnlyForNegativeRails(t *testin
 	}
 }
 
+func TestSynthesisCopperLayerCountUsesRoutingBranchPressure(t *testing.T) {
+	sparse := []Net{
+		{Name: "A", Endpoints: []Endpoint{{Component: "u1"}, {Component: "u2"}}},
+		{Name: "B", Endpoints: []Endpoint{{Component: "u2"}, {Component: "u3"}}},
+	}
+	if got := synthesisCopperLayerCount(3, sparse); got != 2 {
+		t.Fatalf("sparse layer count = %d, want 2", got)
+	}
+	dense := append(sparse, Net{Name: "C", Endpoints: []Endpoint{{Component: "u1"}, {Component: "u2"}, {Component: "u3"}, {Component: "u4"}, {Component: "u5"}}})
+	if got := synthesisCopperLayerCount(3, dense); got != 4 {
+		t.Fatalf("dense layer count = %d, want 4", got)
+	}
+}
+
 func TestDeriveFunctionLayoutReservesPackingBandsAroundLargestEnvelope(t *testing.T) {
 	componentsInLayout := make([]Component, 16)
 	for index := range componentsInLayout {

@@ -696,10 +696,7 @@ func deriveFunctionLayout(document *Document, intent FunctionIntent, selections 
 	// let the deterministic placer prove or reject the denser arrangement.
 	width := math.Min(packingWidth, intent.Constraints.MaxWidthMM)
 	height := math.Min(packingHeight, intent.Constraints.MaxHeightMM)
-	layers := 2
-	if count > 20 {
-		layers = 4
-	}
+	layers := synthesisCopperLayerCount(count, document.Nets)
 	document.Project.Board = Board{WidthMM: width, HeightMM: height, Layers: layers, EdgeClearanceMM: 1}
 	members := make([]string, 0, len(document.Components))
 	for _, component := range document.Components {
@@ -732,6 +729,22 @@ func deriveFunctionLayout(document *Document, intent FunctionIntent, selections 
 	document.PCB.Keepouts = []PCBKeepout{}
 	document.PCB.Zones = []PCBZone{}
 	return nil
+}
+
+func synthesisCopperLayerCount(componentCount int, nets []Net) int {
+	routingBranches := 0
+	for _, net := range nets {
+		if len(net.Endpoints) > 1 {
+			routingBranches += len(net.Endpoints) - 1
+		}
+	}
+	// Two copper layers are sufficient while the connection forest remains
+	// sparse. Once there are at least two independent tree branches per placed
+	// component, reserve two internal routing planes deterministically.
+	if componentCount > 0 && routingBranches >= 2*componentCount {
+		return 4
+	}
+	return 2
 }
 
 func synthesisPhysicalEnvelope(instances []Component, recordsByID map[string]components.ComponentRecord) (float64, float64) {

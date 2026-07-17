@@ -110,8 +110,45 @@ func TestPlanRoutesPrioritizesConstrainedSignalBeforeConstrainedSupportPower(t *
 	}
 }
 
-func TestPlanRoutesPrioritizesDenseConstrainedFanout(t *testing.T) {
+func TestPlanRoutesPrioritizesBoundedConstrainedSignalFanoutBeforeGroundTree(t *testing.T) {
 	request := singleLayerSearchRequest()
+	request.Board.Layers = []Layer{
+		{Name: "F.Cu", Kind: LayerCopper, Routable: true},
+		{Name: "In1.Cu", Kind: LayerCopper, Routable: true},
+		{Name: "In2.Cu", Kind: LayerCopper, Routable: true},
+		{Name: "B.Cu", Kind: LayerCopper, Routable: true},
+	}
+	request.Strategy.NetOrder = NetOrderConstrainedEndpointAccessV1
+	request.Rules.GridMM = 0.25
+	request.Rules.TraceWidthMM = 0.25
+	endpoints := make([]Endpoint, 0, 6)
+	for index := 0; index < 6; index++ {
+		ref := "S" + string(rune('1'+index))
+		request.Components = append(request.Components, testComponent(ref, "1", "BUS", 10+20*float64(index), 12))
+		request.Components[len(request.Components)-1].Pads[0].Size = Size{WidthMM: 0.25, HeightMM: 0.6}
+		endpoints = append(endpoints, Endpoint{Ref: ref, Pin: "1"})
+	}
+	request.Nets = []Net{
+		{Name: "GND", Role: NetGround, Priority: 1, Endpoints: request.Nets[0].Endpoints},
+		{Name: "BUS", Role: NetSignal, Priority: 1, Endpoints: endpoints},
+	}
+	plans, issues := PlanRoutes(request, BuildPadAccess(request))
+	if len(issues) != 0 {
+		t.Fatalf("issues = %#v", issues)
+	}
+	if len(plans) != 2 || plans[0].Net.Name != "BUS" {
+		t.Fatalf("plan order = %#v, want bounded constrained signal fanout first", plans)
+	}
+}
+
+func TestPlanRoutesReservesSmallEscapeBeforeDenseConstrainedFanout(t *testing.T) {
+	request := singleLayerSearchRequest()
+	request.Board.Layers = []Layer{
+		{Name: "F.Cu", Kind: LayerCopper, Routable: true},
+		{Name: "In1.Cu", Kind: LayerCopper, Routable: true},
+		{Name: "In2.Cu", Kind: LayerCopper, Routable: true},
+		{Name: "B.Cu", Kind: LayerCopper, Routable: true},
+	}
 	request.Strategy.NetOrder = NetOrderConstrainedEndpointAccessV1
 	request.Rules.GridMM = 0.25
 	request.Rules.TraceWidthMM = 0.2
@@ -123,16 +160,17 @@ func TestPlanRoutesPrioritizesDenseConstrainedFanout(t *testing.T) {
 	)
 	request.Components[2].Pads[0].Size = Size{WidthMM: 0.35, HeightMM: 0.7}
 	request.Components[3].Pads[0].Size = Size{WidthMM: 0.35, HeightMM: 0.7}
+	request.Components[len(request.Components)-1].Pads[0].Size = Size{WidthMM: 0.35, HeightMM: 0.7}
 	request.Nets = []Net{
 		{Name: "SIGNAL", Role: NetSignal, Priority: 1, Endpoints: []Endpoint{{Ref: "J2", Pin: "1"}, {Ref: "J4", Pin: "1"}}},
-		{Name: "POWER", Role: NetPower, Priority: 1, Endpoints: []Endpoint{{Ref: "J1", Pin: "1"}, {Ref: "U1", Pin: "1"}, {Ref: "U1", Pin: "2"}, {Ref: "J3", Pin: "1"}}},
+		{Name: "POWER", Role: NetSignal, Priority: 1, Endpoints: []Endpoint{{Ref: "J1", Pin: "1"}, {Ref: "U1", Pin: "1"}, {Ref: "U1", Pin: "2"}, {Ref: "J3", Pin: "1"}}},
 	}
 	plans, issues := PlanRoutes(request, BuildPadAccess(request))
 	if len(issues) != 0 {
 		t.Fatalf("issues = %#v", issues)
 	}
-	if len(plans) != 2 || plans[0].Net.Name != "POWER" {
-		t.Fatalf("plan order = %#v, want dense constrained fanout first", plans)
+	if len(plans) != 2 || plans[0].Net.Name != "SIGNAL" {
+		t.Fatalf("plan order = %#v, want small constrained escape before dense fanout", plans)
 	}
 }
 
@@ -182,6 +220,35 @@ func TestPlanEndpointPairsUsesNearestNeighborTree(t *testing.T) {
 	}
 }
 
+func TestPlanEndpointPairsKeepsConstrainedEndpointAsLeaf(t *testing.T) {
+	request := singleLayerSearchRequest()
+	request.Rules.GridMM = 0.25
+	request.Rules.TraceWidthMM = 0.25
+	request.Components = []Component{
+		testComponent("W1", "1", "SIG", 10, 10),
+		testComponent("N", "1", "SIG", 11, 10),
+		testComponent("W2", "1", "SIG", 12, 10),
+		testComponent("W3", "1", "SIG", 13, 10),
+	}
+	request.Components[0].Pads[0].Size = Size{WidthMM: 1, HeightMM: 1}
+	request.Components[1].Pads[0].Size = Size{WidthMM: 0.5, HeightMM: 0.25}
+	request.Components[2].Pads[0].Size = Size{WidthMM: 1, HeightMM: 1}
+	request.Components[3].Pads[0].Size = Size{WidthMM: 1, HeightMM: 1}
+	access := BuildPadAccess(request)
+	pairs, issues := planEndpointPairs("SIG", NetSignal, []Endpoint{{Ref: "W1", Pin: "1"}, {Ref: "N", Pin: "1"}, {Ref: "W2", Pin: "1"}, {Ref: "W3", Pin: "1"}}, access, request.Rules, true)
+	if len(issues) != 0 {
+		t.Fatalf("issues = %#v", issues)
+	}
+	if len(pairs) != 3 {
+		t.Fatalf("pairs = %#v", pairs)
+	}
+	for _, pair := range pairs {
+		if pair.From.Ref == "N" {
+			t.Fatalf("pairs = %#v, constrained endpoint became an internal branch", pairs)
+		}
+	}
+}
+
 func TestPlanEndpointPairsIsDeterministicOnTies(t *testing.T) {
 	endpoints := []Endpoint{{Ref: "B", Pin: "1"}, {Ref: "A", Pin: "1"}, {Ref: "C", Pin: "1"}}
 	access := PadAccess{AccessPoints: map[endpointID][]AccessPoint{
@@ -189,8 +256,8 @@ func TestPlanEndpointPairsIsDeterministicOnTies(t *testing.T) {
 		endpointKey("B", "1"): {{Endpoint: Endpoint{Ref: "B", Pin: "1"}, Point: Point{XMM: 1, YMM: 0}, Layer: "F.CU"}},
 		endpointKey("C", "1"): {{Endpoint: Endpoint{Ref: "C", Pin: "1"}, Point: Point{XMM: -1, YMM: 0}, Layer: "F.CU"}},
 	}}
-	first, firstIssues := planEndpointPairs("SIG", endpoints, access)
-	second, secondIssues := planEndpointPairs("SIG", endpoints, access)
+	first, firstIssues := planEndpointPairs("SIG", NetSignal, endpoints, access, Rules{}, false)
+	second, secondIssues := planEndpointPairs("SIG", NetSignal, endpoints, access, Rules{}, false)
 	if len(firstIssues) != 0 || len(secondIssues) != 0 {
 		t.Fatalf("issues = %#v %#v", firstIssues, secondIssues)
 	}

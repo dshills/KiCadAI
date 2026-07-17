@@ -215,6 +215,28 @@ func IsValidBoardLayer(layer BoardLayer) bool {
 	}
 }
 
+// CanonicalCopperLayer normalizes case-insensitive copper layer input to the
+// spelling required by KiCad while preserving unknown values for validation.
+func CanonicalCopperLayer(value string) BoardLayer {
+	trimmed := strings.TrimSpace(value)
+	upper := strings.ToUpper(trimmed)
+	switch upper {
+	case "F.CU":
+		return LayerFCu
+	case "B.CU":
+		return LayerBCu
+	case "*.CU":
+		return LayerAllCu
+	}
+	if strings.HasPrefix(upper, "IN") && strings.HasSuffix(upper, ".CU") {
+		number, err := strconv.Atoi(upper[2 : len(upper)-3])
+		if err == nil && number >= 1 && number <= 30 {
+			return BoardLayer("In" + strconv.Itoa(number) + ".Cu")
+		}
+	}
+	return BoardLayer(trimmed)
+}
+
 type ValidationError struct {
 	File    string
 	Section string

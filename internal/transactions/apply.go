@@ -30,6 +30,7 @@ type ApplyOptions struct {
 	OutputDir                       string
 	Overwrite                       bool
 	Seed                            string
+	CopperLayers                    int
 	AllowImportedMutation           bool
 	SuppressPinmapWarnings          bool
 	SuppressExplicitPinSymbolErrors bool
@@ -553,6 +554,7 @@ func builderFromTransaction(tx Transaction, opts ApplyOptions) (*designapi.Build
 			Seed:         firstNonEmpty(opts.Seed, payload.Name),
 			DesignID:     deterministicDesignUUID(payload.Name, opts.Seed),
 			Paper:        paper,
+			CopperLayers: opts.CopperLayers,
 			LibraryIndex: opts.LibraryIndex,
 		})
 	}
@@ -1579,7 +1581,11 @@ func pointsSeed(points []Point) string {
 }
 
 func boardLayer(value string) kicadfiles.BoardLayer {
-	switch strings.TrimSpace(value) {
+	trimmed := strings.TrimSpace(value)
+	if canonical := kicadfiles.CanonicalCopperLayer(trimmed); canonical != kicadfiles.BoardLayer(trimmed) || kicadfiles.IsValidBoardLayer(canonical) && strings.HasSuffix(string(canonical), ".Cu") {
+		return canonical
+	}
+	switch trimmed {
 	case "", "F.Cu":
 		return kicadfiles.LayerFCu
 	case "B.Cu":

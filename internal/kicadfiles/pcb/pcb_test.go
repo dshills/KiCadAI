@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 	"testing"
 
@@ -1302,6 +1303,25 @@ func TestValidateAcceptsInternalCopperLayers(t *testing.T) {
 
 	if err := Validate(board); err != nil {
 		t.Fatalf("Validate returned error: %v", err)
+	}
+}
+
+func TestDefaultFourLayerStackDefinesDeterministicCopperOrder(t *testing.T) {
+	stack := DefaultFourLayerStack()
+	var copper []kicadfiles.BoardLayer
+	for _, layer := range stack {
+		if layer.Kind == "signal" {
+			copper = append(copper, layer.Name)
+		}
+	}
+	want := []kicadfiles.BoardLayer{
+		kicadfiles.LayerFCu,
+		kicadfiles.BoardLayer("In1.Cu"),
+		kicadfiles.BoardLayer("In2.Cu"),
+		kicadfiles.LayerBCu,
+	}
+	if !slices.Equal(copper, want) {
+		t.Fatalf("copper layers = %#v, want %#v", copper, want)
 	}
 }
 

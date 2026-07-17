@@ -17,7 +17,10 @@ type PadAccess struct {
 type AccessPoint struct {
 	Endpoint Endpoint `json:"endpoint"`
 	Point    Point    `json:"point"`
-	Layer    string   `json:"layer"`
+	// SearchPoint may place the grid anchor at the pad perimeter while Point
+	// remains strictly inside physical copper for emitted connectivity.
+	SearchPoint *Point `json:"search_point,omitempty"`
+	Layer       string `json:"layer"`
 }
 
 func samePadNet(first, second string) bool {

@@ -77,6 +77,7 @@ func routeEndpointsConnected(request Request, route Route, access PadAccess) boo
 	if len(net.Endpoints) < 2 {
 		return true
 	}
+	access = expandSMDPadEdgeAccess(access, request, net.Endpoints)
 	graph := newRouteConnectivity(route)
 	if len(graph.parent) == 0 {
 		return false

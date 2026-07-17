@@ -129,6 +129,21 @@ func TestBoardLayerValidation(t *testing.T) {
 	}
 }
 
+func TestCanonicalCopperLayer(t *testing.T) {
+	tests := map[string]BoardLayer{
+		"f.cu":    LayerFCu,
+		" B.CU ":  LayerBCu,
+		"IN1.CU":  BoardLayer("In1.Cu"),
+		"in30.cu": BoardLayer("In30.Cu"),
+		"In31.Cu": BoardLayer("In31.Cu"),
+	}
+	for input, want := range tests {
+		if got := CanonicalCopperLayer(input); got != want {
+			t.Errorf("CanonicalCopperLayer(%q) = %q, want %q", input, got, want)
+		}
+	}
+}
+
 func TestValidationErrors(t *testing.T) {
 	errs := ValidationErrors{
 		{File: "board.kicad_pcb", Section: "footprint", Field: "reference", Message: "required"},

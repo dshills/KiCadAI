@@ -13,6 +13,8 @@ const (
 	kicad10LayerFMask    = 1
 	kicad10LayerBCu      = 2
 	kicad10LayerBMask    = 3
+	kicad10LayerIn1Cu    = 4
+	kicad10LayerIn2Cu    = 6
 	kicad10LayerFSilkS   = 5
 	kicad10LayerBSilkS   = 7
 	kicad10LayerFAdhes   = 9
@@ -45,8 +47,24 @@ const (
 const DefaultFootprintGraphicStrokeWidth = kicadfiles.IU(120000)
 
 func DefaultTwoLayerStack() []LayerDefinition {
+	return defaultLayerStack(nil)
+}
+
+// DefaultFourLayerStack returns the deterministic four-copper-layer stack
+// used by generated boards that need additional routing capacity.
+func DefaultFourLayerStack() []LayerDefinition {
+	return defaultLayerStack([]LayerDefinition{
+		{Number: kicad10LayerIn1Cu, Name: kicadfiles.BoardLayer("In1.Cu"), Kind: "signal"},
+		{Number: kicad10LayerIn2Cu, Name: kicadfiles.BoardLayer("In2.Cu"), Kind: "signal"},
+	})
+}
+
+func defaultLayerStack(innerCopper []LayerDefinition) []LayerDefinition {
 	layers := []LayerDefinition{
 		{Number: kicad10LayerFCu, Name: kicadfiles.LayerFCu, Kind: "signal"},
+	}
+	layers = append(layers, innerCopper...)
+	layers = append(layers, []LayerDefinition{
 		{Number: kicad10LayerBCu, Name: kicadfiles.LayerBCu, Kind: "signal"},
 		{Number: kicad10LayerFAdhes, Name: kicadfiles.LayerFAdhes, Kind: "user", DisplayName: "F.Adhesive"},
 		{Number: kicad10LayerBAdhes, Name: kicadfiles.LayerBAdhes, Kind: "user", DisplayName: "B.Adhesive"},
@@ -66,7 +84,7 @@ func DefaultTwoLayerStack() []LayerDefinition {
 		{Number: kicad10LayerBCrtYd, Name: kicadfiles.LayerBCrtYd, Kind: "user", DisplayName: "B.Courtyard"},
 		{Number: kicad10LayerFFab, Name: kicadfiles.LayerFFab, Kind: "user"},
 		{Number: kicad10LayerBFab, Name: kicadfiles.LayerBFab, Kind: "user"},
-	}
+	}...)
 	for i := 1; i <= 45; i++ {
 		layers = append(layers, LayerDefinition{Number: kicad10LayerUserBase + (i-1)*2, Name: kicadfiles.BoardLayer("User." + strconv.Itoa(i)), Kind: "user"})
 	}

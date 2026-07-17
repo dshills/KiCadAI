@@ -601,7 +601,7 @@ func validateTrack(index int, track Track, netCodes map[int]struct{}, netNames m
 		errs = append(errs, fieldError(prefix("width"), "must be positive"))
 	}
 	if !isCopperLayer(track.Layer) {
-		errs = append(errs, fieldError(prefix("layer"), "must be copper"))
+		errs = append(errs, fieldError(prefix("layer"), "must be copper, got "+strconv.Quote(string(track.Layer))))
 	}
 	errs = append(errs, validateRoutedNet(prefix, track.NetCode, track.NetName, netCodes, netNames)...)
 	return errs
@@ -662,7 +662,7 @@ func validateVia(index int, via Via, netCodes map[int]struct{}, netNames map[int
 			}
 		}
 		if !isCopperLayer(layer) {
-			errs = append(errs, fieldError(indexedValue(prefix("layers"), layerIndex), "must be copper"))
+			errs = append(errs, fieldError(indexedValue(prefix("layers"), layerIndex), "must be copper, got "+strconv.Quote(string(layer))))
 		} else if !duplicateLayer {
 			copperLayerCount++
 		}

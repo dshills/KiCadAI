@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -69,6 +70,44 @@ func TestApplyBuildsSimpleProject(t *testing.T) {
 	}
 	if readProvenance.OperationCount != len(tx.Operations) {
 		t.Fatalf("operation count = %d, want %d", readProvenance.OperationCount, len(tx.Operations))
+	}
+}
+
+func TestApplyWritesRequestedFourLayerStack(t *testing.T) {
+	output := filepath.Join(t.TempDir(), "four-layer")
+	tx := mustParse(t, `{"operations":[
+	  {"op":"create_project","name":"four-layer"},
+	  {"op":"route","net_name":"SIG","layer":"In1.Cu","points":[{"x_mm":5,"y_mm":5},{"x_mm":8,"y_mm":5}],"vias":[{"at":{"x_mm":8,"y_mm":5},"diameter_mm":0.6,"drill_mm":0.3,"layers":["In1.Cu","In2.Cu"]}]},
+	  {"op":"write_project"}
+	]}`)
+	result := Apply(tx, ApplyOptions{OutputDir: output, CopperLayers: 4})
+	if len(result.Issues) != 0 {
+		t.Fatalf("unexpected issues: %#v", result.Issues)
+	}
+	board, err := pcb.ReadFile(filepath.Join(output, "four-layer.kicad_pcb"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var copper []kicadfiles.BoardLayer
+	for _, layer := range board.Layers {
+		if layer.Kind == "signal" {
+			copper = append(copper, layer.Name)
+		}
+	}
+	want := []kicadfiles.BoardLayer{
+		kicadfiles.LayerFCu,
+		kicadfiles.BoardLayer("In1.Cu"),
+		kicadfiles.BoardLayer("In2.Cu"),
+		kicadfiles.LayerBCu,
+	}
+	if !slices.Equal(copper, want) {
+		t.Fatalf("copper layers = %#v, want %#v", copper, want)
+	}
+	if len(board.Tracks) != 1 || board.Tracks[0].Layer != kicadfiles.BoardLayer("In1.Cu") {
+		t.Fatalf("inner-layer tracks = %#v", board.Tracks)
+	}
+	if len(board.Vias) != 1 || !slices.Equal(board.Vias[0].Layers, []kicadfiles.BoardLayer{kicadfiles.LayerFCu, kicadfiles.LayerBCu}) {
+		t.Fatalf("inner-layer vias = %#v", board.Vias)
 	}
 }
 

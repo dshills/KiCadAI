@@ -11,6 +11,10 @@ import (
 
 const routePairContextCheckInterval = 16
 
+// Keep fallback access strictly inside SMD copper so the emitted endpoint is
+// recognized as connected after integer-unit KiCad serialization.
+const smdEdgeAccessInsetRatio = 0.9
+
 func RouteRequest(request Request) Result {
 	return RouteRequestContext(context.Background(), request)
 }
@@ -134,10 +138,28 @@ func RouteRequestContext(ctx context.Context, request Request) Result {
 				route.SearchLimitHit = true
 				result.Metrics.MaxSearchNodesHit = true
 			}
+			if len(routeIssues) != 0 && len(routableLayerNames(searchRequest.Board.Layers)) > 2 {
+				edgeAccess := expandSMDPadEdgeAccess(netAccess, searchRequest, []Endpoint{pair.From, pair.To})
+				edgePath, edgeIssues := routePairPath(ctx, searchRequest, edgeAccess, occupancy, viaOccupancy, plan.Net.Name, pair)
+				route.SearchNodes += edgePath.SearchNodes
+				result.Metrics.SearchNodes += edgePath.SearchNodes
+				if edgePath.SearchLimitHit {
+					route.SearchLimitHit = true
+					result.Metrics.MaxSearchNodesHit = true
+				}
+				// Keep the expanded access for the neckdown retry as well. Once a
+				// route succeeds, endpoint validation narrows each endpoint back to
+				// the single physical access point actually used.
+				netAccess = edgeAccess
+				if len(edgeIssues) == 0 {
+					path = edgePath
+					routeIssues = nil
+				}
+			}
 			neckdownWidthMM := netRequest.Rules.NeckdownWidthMM
 			neckdownLengthMM := netRequest.Rules.NeckdownLengthMM
 			if len(routeIssues) != 0 && neckdownWidthMM == 0 {
-				candidate, ok := endpointNeckdownFallbackRequest(netRequest, netRequest.Rules, plan.Net.Role)
+				candidate, ok := endpointNeckdownFallbackRequest(netRequest, netRequest.Rules, plan.Net.Role, len(routableLayerNames(netRequest.Board.Layers)) > 2)
 				if ok && ctx.Err() == nil {
 					if !fallbackReady {
 						fallbackRequest = candidate
@@ -170,6 +192,10 @@ func RouteRequestContext(ctx context.Context, request Request) Result {
 				}
 				if len(routeIssues) == 0 && (!pinPathEndpointAccess(&netAccess, path, pair.From, 0) || !pinPathEndpointAccess(&netAccess, path, pair.To, len(path.Points)-1)) {
 					routeIssues = []reports.Issue{routeEndpointAccessIssue(plan.Net.Name, pairIndex, pair)}
+				}
+				if len(routeIssues) == 0 {
+					segments = connectFallbackSMDEndpointsToCenters(segments, netAccess, pair)
+					metrics.TotalLengthMM = segmentLengthTotal(segments)
 				}
 			}
 			if len(routeIssues) != 0 {
@@ -252,6 +278,38 @@ func RouteRequestContext(ctx context.Context, request Request) Result {
 	return result
 }
 
+func connectFallbackSMDEndpointsToCenters(segments []Segment, access PadAccess, pair EndpointPair) []Segment {
+	if len(segments) == 0 {
+		return segments
+	}
+	connect := func(endpoint Endpoint, segmentIndex int, start bool) {
+		points, ok := AccessPointsForEndpoint(access, endpoint)
+		if !ok || len(points) != 1 || points[0].SearchPoint == nil {
+			return
+		}
+		pad, ok := access.Pads[endpointKey(endpoint.Ref, endpoint.Pin)]
+		if !ok || pad.Type != PadSMD {
+			return
+		}
+		if start {
+			segments[segmentIndex].Start = pad.Position
+		} else {
+			segments[segmentIndex].End = pad.Position
+		}
+	}
+	connect(pair.From, 0, true)
+	connect(pair.To, len(segments)-1, false)
+	return segments
+}
+
+func segmentLengthTotal(segments []Segment) float64 {
+	total := 0.0
+	for _, segment := range segments {
+		total += pointDistance(segment.Start, segment.End)
+	}
+	return roundMM(total)
+}
+
 func clonePadAccessPoints(access PadAccess) PadAccess {
 	cloned := access
 	cloned.AccessPoints = make(map[endpointID][]AccessPoint, len(access.AccessPoints))
@@ -259,6 +317,58 @@ func clonePadAccessPoints(access PadAccess) PadAccess {
 		cloned.AccessPoints[endpoint] = append([]AccessPoint(nil), points...)
 	}
 	return cloned
+}
+
+func expandSMDPadEdgeAccess(access PadAccess, request Request, endpoints []Endpoint) PadAccess {
+	expanded := clonePadAccessPoints(access)
+	wanted := make(map[endpointID]struct{}, len(endpoints))
+	for _, endpoint := range endpoints {
+		wanted[endpointKey(endpoint.Ref, endpoint.Pin)] = struct{}{}
+	}
+	routableLayers := routableLayerNames(request.Board.Layers)
+	for _, component := range request.Components {
+		rotation := component.Position.RotationDeg * math.Pi / 180
+		cos := math.Cos(rotation)
+		sin := math.Sin(rotation)
+		for _, pad := range component.Pads {
+			key := endpointKey(component.Ref, pad.Name)
+			if _, ok := wanted[key]; !ok || pad.Type != PadSMD {
+				continue
+			}
+			center := absolutePadPoint(component, pad.Position)
+			physicalOffsets := []Point{
+				{XMM: -pad.Size.WidthMM * smdEdgeAccessInsetRatio / 2},
+				{XMM: pad.Size.WidthMM * smdEdgeAccessInsetRatio / 2},
+				{YMM: -pad.Size.HeightMM * smdEdgeAccessInsetRatio / 2},
+				{YMM: pad.Size.HeightMM * smdEdgeAccessInsetRatio / 2},
+			}
+			searchOffsets := []Point{
+				{XMM: -pad.Size.WidthMM / 2},
+				{XMM: pad.Size.WidthMM / 2},
+				{YMM: -pad.Size.HeightMM / 2},
+				{YMM: pad.Size.HeightMM / 2},
+			}
+			for _, layer := range padAccessLayers(pad, routableLayers) {
+				for index, offset := range physicalOffsets {
+					searchOffset := searchOffsets[index]
+					searchPoint := Point{
+						XMM: center.XMM + searchOffset.XMM*cos - searchOffset.YMM*sin,
+						YMM: center.YMM + searchOffset.XMM*sin + searchOffset.YMM*cos,
+					}
+					expanded.AccessPoints[key] = append(expanded.AccessPoints[key], AccessPoint{
+						Endpoint: Endpoint{Ref: component.Ref, Pin: pad.Name},
+						Point: Point{
+							XMM: center.XMM + offset.XMM*cos - offset.YMM*sin,
+							YMM: center.YMM + offset.XMM*sin + offset.YMM*cos,
+						},
+						SearchPoint: &searchPoint,
+						Layer:       layer,
+					})
+				}
+			}
+		}
+	}
+	return expanded
 }
 
 func pinPathEndpointAccess(access *PadAccess, path GridPath, endpoint Endpoint, pointIndex int) bool {
@@ -380,8 +490,8 @@ func routingSearchRequest(request Request) Request {
 	return request
 }
 
-func endpointNeckdownFallbackRequest(request Request, rules Rules, role NetRole) (Request, bool) {
-	if role != NetPower && role != NetGround {
+func endpointNeckdownFallbackRequest(request Request, rules Rules, role NetRole, allowSignal bool) (Request, bool) {
+	if !allowSignal && role != NetPower && role != NetGround {
 		return Request{}, false
 	}
 	widthMM := max(pcbrules.DefaultPowerNeckdownWidthMM, rules.MinNeckdownWidthMM)

@@ -28,7 +28,7 @@ func PlaceExplicitCircuit(ctx context.Context, request Request, opts PlacementOp
 		return PlacementStageResult{Stage: NewStageResult(StagePlacement, issues)}
 	}
 	placementRequest := placement.Request{
-		Board: placement.BoardPlacementArea{WidthMM: request.Board.WidthMM, HeightMM: request.Board.HeightMM, MarginMM: request.Board.EdgeClearanceMM},
+		Board: placement.BoardPlacementArea{WidthMM: request.Board.WidthMM, HeightMM: request.Board.HeightMM, MarginMM: request.Board.EdgeClearanceMM, Layers: request.Board.Layers},
 		Rules: mergePlacementRules(opts.Rules), Seed: request.ExplicitCircuit.ResolutionHash,
 	}
 	if placementRequest.Board.MarginMM == 0 {
@@ -234,7 +234,7 @@ func explicitRequiredRouteIssues(nets []ExplicitNetSpec, result routing.Result) 
 	var issues []reports.Issue
 	for _, net := range nets {
 		if net.Required && !routed[net.Name] {
-			issues = append(issues, reports.Issue{Code: reports.CodeValidationFailed, Severity: reports.SeverityError, Path: "explicit_circuit.nets." + net.Name, Message: "required explicit net was not completely routed", Nets: []string{net.Name}})
+			issues = append(issues, reports.Issue{Code: reports.CodeValidationFailed, Severity: reports.SeverityError, Stage: string(StageRouting), Path: "explicit_circuit.nets." + net.Name, Message: "required explicit net was not completely routed", Nets: []string{net.Name}})
 		}
 	}
 	return issues

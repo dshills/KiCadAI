@@ -5,6 +5,7 @@ import (
 	"context"
 	"math"
 	"sort"
+	"strings"
 
 	"kicadai/internal/reports"
 )
@@ -43,6 +44,7 @@ const (
 )
 
 const astarContextCheckInterval = 1024
+const innerLayerMovementCostRatio = 0.85
 
 func routeSingleLayerPath(ctx context.Context, request Request, access PadAccess, occupancy Occupancy, netName string, pair EndpointPair, layerName string) (GridPath, []reports.Issue) {
 	layers := normalizedSearchLayers(request.Board.Layers)
@@ -149,7 +151,14 @@ func routeTwoLayerPath(ctx context.Context, request Request, access PadAccess, o
 	if len(layerIDs) == 0 || len(starts) == 0 || len(targets) == 0 {
 		return GridPath{}, []reports.Issue{routeFailureIssue(netName, pair, "endpoint pair has no two-layer routing access")}
 	}
-	path, searchNodes, found, canceled := astarSearchMultiLayer(ctx, occupancy, viaOccupancy, starts, targets, rules, layerIDs, true)
+	innerLayers := map[int]bool{}
+	for layerID, layerName := range layerNames {
+		normalizedName := strings.ToUpper(strings.TrimSpace(layerName))
+		if strings.HasPrefix(normalizedName, "IN") && strings.HasSuffix(normalizedName, ".CU") {
+			innerLayers[layerID] = true
+		}
+	}
+	path, searchNodes, found, canceled := astarSearchMultiLayer(ctx, occupancy, viaOccupancy, starts, targets, rules, layerIDs, true, innerLayers)
 	if canceled {
 		return GridPath{}, []reports.Issue{routeCanceledIssue(ctx.Err())}
 	}
@@ -233,7 +242,7 @@ func accessPointForPathCoord(access PadAccess, grid Grid, endpoint Endpoint, coo
 	bestDistance := math.Inf(1)
 	found := false
 	for _, candidate := range points {
-		if grid.ToGrid(candidate.Point, coord.Layer) == coord {
+		if grid.ToGrid(accessSearchPoint(candidate), coord.Layer) == coord {
 			distance := pointDistance(candidate.Point, preferred)
 			if !found || distance < bestDistance {
 				best = candidate.Point
@@ -246,10 +255,10 @@ func accessPointForPathCoord(access PadAccess, grid Grid, endpoint Endpoint, coo
 }
 
 func astarSearch(ctx context.Context, occupancy Occupancy, layerIndex int, starts []GridCoord, targets []GridCoord, rules Rules) ([]GridCoord, int, bool, bool) {
-	return astarSearchMultiLayer(ctx, occupancy, occupancy, starts, targets, rules, []int{layerIndex}, false)
+	return astarSearchMultiLayer(ctx, occupancy, occupancy, starts, targets, rules, []int{layerIndex}, false, nil)
 }
 
-func astarSearchMultiLayer(ctx context.Context, occupancy Occupancy, viaOccupancy Occupancy, starts []GridCoord, targets []GridCoord, rules Rules, layerIndexes []int, allowVias bool) ([]GridCoord, int, bool, bool) {
+func astarSearchMultiLayer(ctx context.Context, occupancy Occupancy, viaOccupancy Occupancy, starts []GridCoord, targets []GridCoord, rules Rules, layerIndexes []int, allowVias bool, innerLayers map[int]bool) ([]GridCoord, int, bool, bool) {
 	targetSet := make(map[GridCoord]struct{}, len(targets))
 	allowedBlocked := make(map[GridCoord]struct{}, len(starts)+len(targets))
 	for _, target := range targets {
@@ -265,7 +274,11 @@ func astarSearchMultiLayer(ctx context.Context, occupancy Occupancy, viaOccupanc
 	if viaCostMM <= 0 || math.IsNaN(viaCostMM) || math.IsInf(viaCostMM, 0) {
 		viaCostMM = DefaultRules().ViaDiameterMM + gridStepMM
 	}
-	heuristic := newTargetHeuristic(targets, gridStepMM)
+	minimumMovementRatio := 1.0
+	if len(innerLayers) != 0 {
+		minimumMovementRatio = innerLayerMovementCostRatio
+	}
+	heuristic := newTargetHeuristic(targets, gridStepMM*minimumMovementRatio)
 	open := astarQueue{}
 	heap.Init(&open)
 	cameFrom := map[astarState]astarState{}
@@ -307,7 +320,11 @@ func astarSearchMultiLayer(ctx context.Context, occupancy Occupancy, viaOccupanc
 			if !routableCell(occupancy, neighbor.Coord, allowedBlocked) {
 				continue
 			}
-			tentative := currentNode.G + movementCost(current.Dir, neighbor.Dir, gridStepMM, turnPenaltyMM)
+			stepCost := movementCost(current.Dir, neighbor.Dir, gridStepMM, turnPenaltyMM)
+			if innerLayers[neighbor.Coord.Layer] {
+				stepCost *= innerLayerMovementCostRatio
+			}
+			tentative := currentNode.G + stepCost
 			if existing, ok := bestCost[neighbor]; ok && !distanceLess(tentative, existing) {
 				continue
 			}
@@ -367,7 +384,7 @@ func accessCoordsOnLayer(access PadAccess, grid Grid, endpoint Endpoint, layerNa
 		if normalizeLayer(point.Layer) != layerName {
 			continue
 		}
-		coord := grid.ToGrid(point.Point, layerIndex)
+		coord := grid.ToGrid(accessSearchPoint(point), layerIndex)
 		if _, exists := seen[coord]; exists {
 			continue
 		}
@@ -393,7 +410,7 @@ func accessCoordsOnLayers(access PadAccess, grid Grid, endpoint Endpoint, layerI
 		if _, allowed := layerNames[layerIndex]; !allowed {
 			continue
 		}
-		coord := grid.ToGrid(point.Point, layerIndex)
+		coord := grid.ToGrid(accessSearchPoint(point), layerIndex)
 		if _, exists := seen[coord]; exists {
 			continue
 		}
@@ -402,6 +419,13 @@ func accessCoordsOnLayers(access PadAccess, grid Grid, endpoint Endpoint, layerI
 	}
 	sortGridCoords(coords)
 	return coords
+}
+
+func accessSearchPoint(access AccessPoint) Point {
+	if access.SearchPoint != nil {
+		return *access.SearchPoint
+	}
+	return access.Point
 }
 
 func sortGridCoords(coords []GridCoord) {

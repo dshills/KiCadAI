@@ -276,8 +276,8 @@ func ValidateRequest(request Request) []reports.Issue {
 	if request.Board.EdgeClearanceMM < 0 || math.IsNaN(request.Board.EdgeClearanceMM) || math.IsInf(request.Board.EdgeClearanceMM, 0) {
 		issues = append(issues, issue("board.edge_clearance_mm", "board edge clearance must be non-negative and finite"))
 	}
-	if request.Board.Layers != 1 && request.Board.Layers != 2 {
-		issues = append(issues, issue("board.layers", "board layers must be 1 or 2"))
+	if request.Board.Layers != 1 && request.Board.Layers != 2 && request.Board.Layers != 4 {
+		issues = append(issues, issue("board.layers", "board layers must be 1, 2, or 4"))
 	}
 	if request.Constraints.AllowBackLayer != nil && *request.Constraints.AllowBackLayer && request.Board.Layers <= 1 {
 		issues = append(issues, issue("constraints.allow_back_layer", "back-layer routing requires a two-layer board"))

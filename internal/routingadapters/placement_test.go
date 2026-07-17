@@ -35,6 +35,39 @@ func TestRequestFromPlacementBuildsRoutingRequest(t *testing.T) {
 	}
 }
 
+func TestRequestFromPlacementBuildsFourLayerRoutingBoard(t *testing.T) {
+	placementRequest := placementAdapterRequest()
+	placementRequest.Board.Layers = 4
+	placementRequest.Keepouts = []placement.Keepout{{
+		ID: "all-copper",
+		Bounds: placement.Rect{
+			Min: placement.Point{XMM: 1, YMM: 1},
+			Max: placement.Point{XMM: 2, YMM: 2},
+		},
+	}}
+	placementResult := placement.Result{Placements: []placement.PlacementResult{
+		{Ref: "J1", Position: placement.Placement{XMM: 5, YMM: 5, Layer: "F.Cu"}},
+		{Ref: "J2", Position: placement.Placement{XMM: 15, YMM: 5, Layer: "F.Cu"}},
+	}}
+
+	request, issues := RequestFromPlacement(placementRequest, placementResult)
+	if len(issues) != 0 {
+		t.Fatalf("issues = %#v", issues)
+	}
+	wantLayers := []string{"F.Cu", "In1.Cu", "In2.Cu", "B.Cu"}
+	if len(request.Board.Layers) != len(wantLayers) {
+		t.Fatalf("board layers = %#v, want %#v", request.Board.Layers, wantLayers)
+	}
+	for index, want := range wantLayers {
+		if request.Board.Layers[index].Name != want {
+			t.Fatalf("board layer %d = %q, want %q", index, request.Board.Layers[index].Name, want)
+		}
+	}
+	if len(request.Obstacles) != len(wantLayers) {
+		t.Fatalf("wildcard keepout obstacles = %#v, want one per copper layer", request.Obstacles)
+	}
+}
+
 func TestRequestFromPlacementAssignsRoleBasedNetClasses(t *testing.T) {
 	placementRequest := placementAdapterRequest()
 	placementRequest.Nets = []placement.Net{

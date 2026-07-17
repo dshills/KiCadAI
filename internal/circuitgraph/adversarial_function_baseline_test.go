@@ -414,8 +414,8 @@ func adversarialRootIssue(issues []reports.Issue) reports.Issue {
 		return reports.Issue{Code: reports.CodeValidationFailed, Severity: reports.SeverityError, Stage: "unknown", Message: "blocking stage has no structured root issue"}
 	}
 	slices.SortStableFunc(candidates, func(left, right reports.Issue) int {
-		leftPriority := adversarialIssuePriority(left.Code)
-		rightPriority := adversarialIssuePriority(right.Code)
+		leftPriority := adversarialIssuePriority(left)
+		rightPriority := adversarialIssuePriority(right)
 		if leftPriority != rightPriority {
 			return leftPriority - rightPriority
 		}
@@ -427,8 +427,13 @@ func adversarialRootIssue(issues []reports.Issue) reports.Issue {
 	return candidates[0]
 }
 
-func adversarialIssuePriority(code reports.Code) int {
-	switch code {
+func adversarialIssuePriority(issue reports.Issue) int {
+	if strings.HasPrefix(issue.Path, "explicit_circuit.nets.") {
+		// Route-completion enforcement is a downstream wrapper. Prefer the
+		// router's endpoint/search diagnostic when both are present.
+		return 5
+	}
+	switch issue.Code {
 	case CodeSynthesisComponentUnresolved, CodeComponentUnresolved:
 		return 0
 	case CodeSynthesisInterfaceUnsupported, CodeSynthesisSupportRecipeMissing, CodeSynthesisSupportRecipeAmbiguous:

@@ -34,6 +34,20 @@ func PlanRoutes(request Request, access PadAccess) ([]PlannedNet, []reports.Issu
 	request = cloneRequest(request)
 	NormalizeRequest(&request)
 	issues := []reports.Issue{}
+	hasInternalRoutingLayers := len(routableLayerNames(request.Board.Layers)) > 2
+	usesFanoutPressureOrder := false
+	if hasInternalRoutingLayers {
+		powerNets := 0
+		for _, net := range request.Nets {
+			if net.Role == NetPower {
+				powerNets++
+			}
+			if net.Role == NetSignal && len(net.Endpoints) > 3 {
+				usesFanoutPressureOrder = true
+			}
+		}
+		usesFanoutPressureOrder = usesFanoutPressureOrder || powerNets > 1
+	}
 	nets := append([]Net(nil), request.Nets...)
 	sort.SliceStable(nets, func(i int, j int) bool {
 		return netLess(nets[i], nets[j])
@@ -69,7 +83,7 @@ func PlanRoutes(request Request, access PadAccess) ([]PlannedNet, []reports.Issu
 			})
 			continue
 		}
-		pairs, pairIssues := planEndpointPairs(net.Name, net.Endpoints, access)
+		pairs, pairIssues := planEndpointPairs(net.Name, net.Role, net.Endpoints, access, request.Rules, usesFanoutPressureOrder)
 		issues = append(issues, pairIssues...)
 		if len(pairIssues) != 0 {
 			continue
@@ -85,6 +99,7 @@ func PlanRoutes(request Request, access PadAccess) ([]PlannedNet, []reports.Issu
 	escapeNets, distances, accessSpans := compactEscapeNets(plans, access, advancedOrder)
 	distanceFloors := plannedDistanceFloors(plans, distances)
 	meanDistanceFloors := plannedMeanDistanceFloors(plans, distances)
+	edgeDistances := plannedConstrainedEndpointEdgeDistances(plans, access, request.Board, request.Rules)
 	sort.SliceStable(plans, func(i, j int) bool {
 		if plans[i].Net.Priority != plans[j].Net.Priority {
 			return plans[i].Net.Priority > plans[j].Net.Priority
@@ -92,23 +107,34 @@ func PlanRoutes(request Request, access PadAccess) ([]PlannedNet, []reports.Issu
 		if advancedOrder {
 			leftDenseFanout := denseConstrainedFanout(plans[i], access, request.Rules, distances, distanceFloors, meanDistanceFloors)
 			rightDenseFanout := denseConstrainedFanout(plans[j], access, request.Rules, distances, distanceFloors, meanDistanceFloors)
-			if leftDenseFanout != rightDenseFanout {
+			if !usesFanoutPressureOrder && leftDenseFanout != rightDenseFanout {
 				return leftDenseFanout
 			}
-			if leftDenseFanout {
+			if !usesFanoutPressureOrder && leftDenseFanout {
 				return netLess(plans[i].Net, plans[j].Net)
 			}
-			leftSpan := accessSpans[plans[i].Net.Name]
-			rightSpan := accessSpans[plans[j].Net.Name]
-			if !distanceEqual(leftSpan, rightSpan) {
-				return distanceLess(leftSpan, rightSpan)
+			if !usesFanoutPressureOrder {
+				leftSpan := accessSpans[plans[i].Net.Name]
+				rightSpan := accessSpans[plans[j].Net.Name]
+				if !distanceEqual(leftSpan, rightSpan) {
+					return distanceLess(leftSpan, rightSpan)
+				}
 			}
-			leftConstrained := endpointAccessConstrained(plans[i], accessSpans, request.Rules)
-			rightConstrained := endpointAccessConstrained(plans[j], accessSpans, request.Rules)
+			leftConstrained := endpointAccessConstrained(plans[i], accessSpans, request.Rules, usesFanoutPressureOrder)
+			rightConstrained := endpointAccessConstrained(plans[j], accessSpans, request.Rules, usesFanoutPressureOrder)
 			leftScheduleRank := routingScheduleRank(plans[i], leftConstrained)
 			rightScheduleRank := routingScheduleRank(plans[j], rightConstrained)
 			if leftScheduleRank != rightScheduleRank {
 				return leftScheduleRank < rightScheduleRank
+			}
+			if usesFanoutPressureOrder && leftDenseFanout != rightDenseFanout {
+				// Reserve a small escape before a dense peer, without allowing
+				// unrelated broad power or ground work to outrank constrained
+				// signal fanout merely because it is not dense.
+				return !leftDenseFanout
+			}
+			if usesFanoutPressureOrder && leftDenseFanout {
+				return netLess(plans[i].Net, plans[j].Net)
 			}
 			if leftConstrained {
 				if constrainedRoleRank(plans[i].Net.Role) != constrainedRoleRank(plans[j].Net.Role) {
@@ -116,6 +142,24 @@ func PlanRoutes(request Request, access PadAccess) ([]PlannedNet, []reports.Issu
 				}
 				if len(plans[i].Net.Endpoints) != len(plans[j].Net.Endpoints) {
 					return len(plans[i].Net.Endpoints) < len(plans[j].Net.Endpoints)
+				}
+				if usesFanoutPressureOrder && len(plans[i].Net.Endpoints) > 3 && !distanceEqual(distances[plans[i].Net.Name], distances[plans[j].Net.Name]) {
+					// For comparable fanout trees, commit the compact tree first;
+					// its shared local corridors are easier for a longer peer to
+					// route around than the reverse ordering.
+					return distanceLess(distances[plans[i].Net.Name], distances[plans[j].Net.Name])
+				}
+				if usesFanoutPressureOrder {
+					leftEdgeDistance := edgeDistances[plans[i].Net.Name]
+					rightEdgeDistance := edgeDistances[plans[j].Net.Name]
+					if !distanceEqual(leftEdgeDistance, rightEdgeDistance) {
+						return distanceLess(leftEdgeDistance, rightEdgeDistance)
+					}
+					leftSpan := accessSpans[plans[i].Net.Name]
+					rightSpan := accessSpans[plans[j].Net.Name]
+					if !distanceEqual(leftSpan, rightSpan) {
+						return distanceLess(leftSpan, rightSpan)
+					}
 				}
 				if !distanceEqual(distances[plans[i].Net.Name], distances[plans[j].Net.Name]) {
 					return distanceLess(distances[plans[j].Net.Name], distances[plans[i].Net.Name])
@@ -142,6 +186,34 @@ func PlanRoutes(request Request, access PadAccess) ([]PlannedNet, []reports.Issu
 		return netLess(plans[i].Net, plans[j].Net)
 	})
 	return plans, issues
+}
+
+func plannedConstrainedEndpointEdgeDistances(plans []PlannedNet, access PadAccess, board Board, rules Rules) map[string]float64 {
+	distances := make(map[string]float64, len(plans))
+	usable := UsableBoardRect(board, rules)
+	accessPitch := 2*rules.GridMM + rules.TraceWidthMM
+	for _, plan := range plans {
+		best := math.Inf(1)
+		for _, endpoint := range plan.Net.Endpoints {
+			pad, ok := access.Pads[endpointKey(endpoint.Ref, endpoint.Pin)]
+			if !ok {
+				continue
+			}
+			span := math.Min(pad.Size.WidthMM, pad.Size.HeightMM)
+			if span <= 0 || span > accessPitch+distanceEpsilon {
+				continue
+			}
+			edgeDistance := min(
+				math.Abs(pad.Position.XMM-usable.Min.XMM),
+				math.Abs(usable.Max.XMM-pad.Position.XMM),
+				math.Abs(pad.Position.YMM-usable.Min.YMM),
+				math.Abs(usable.Max.YMM-pad.Position.YMM),
+			)
+			best = math.Min(best, edgeDistance)
+		}
+		distances[plan.Net.Name] = best
+	}
+	return distances
 }
 
 func routingScheduleRank(plan PlannedNet, constrained bool) int {
@@ -217,10 +289,15 @@ func plannedMeanDistance(plan PlannedNet, distances map[string]float64) float64 
 	return distance / float64(len(plan.Pairs))
 }
 
-func endpointAccessConstrained(plan PlannedNet, accessSpans map[string]float64, rules Rules) bool {
-	// Bound the escape promotion to small fanout nets. This includes a signal
-	// with one local bias component while excluding broad power/ground trees.
-	if len(plan.Net.Endpoints) < 2 || len(plan.Net.Endpoints) > 3 || rules.GridMM <= 0 {
+func endpointAccessConstrained(plan PlannedNet, accessSpans map[string]float64, rules Rules, allowBoundedSignalFanout bool) bool {
+	// Bound escape promotion by the number of tree branches. Signals may have
+	// several receivers that share one narrow-pitch controller pad, while broad
+	// power and ground trees remain limited to a small local fanout.
+	maxEndpoints := 3
+	if allowBoundedSignalFanout && plan.Net.Role == NetSignal {
+		maxEndpoints = maxDenseFanoutBranches + 1
+	}
+	if len(plan.Net.Endpoints) < 2 || len(plan.Net.Endpoints) > maxEndpoints || rules.GridMM <= 0 {
 		return false
 	}
 	span := accessSpans[plan.Net.Name]
@@ -367,7 +444,7 @@ func roleRank(role NetRole) int {
 	}
 }
 
-func planEndpointPairs(netName string, endpoints []Endpoint, access PadAccess) ([]EndpointPair, []reports.Issue) {
+func planEndpointPairs(netName string, role NetRole, endpoints []Endpoint, access PadAccess, rules Rules, preserveConstrainedTerminals bool) ([]EndpointPair, []reports.Issue) {
 	ordered := append([]Endpoint(nil), endpoints...)
 	sort.SliceStable(ordered, func(i int, j int) bool {
 		return endpointLess(ordered[i], ordered[j])
@@ -389,16 +466,31 @@ func planEndpointPairs(netName string, endpoints []Endpoint, access PadAccess) (
 		sortIssues(issues)
 		return nil, issues
 	}
+	preserveConstrainedLeaves :=
+		preserveConstrainedTerminals && ((role == NetSignal && len(ordered) > 3 && len(ordered) <= maxDenseFanoutBranches+1) ||
+			(role == NetPower && len(ordered) > maxDenseFanoutBranches+maxLocalRoutePrefixNets))
+	rootIndex := 0
+	if preserveConstrainedLeaves {
+		for index, endpoint := range ordered {
+			if !endpointBranchConstrained(endpoint, access, rules) {
+				rootIndex = index
+				break
+			}
+		}
+	}
 	inTree := make([]bool, len(ordered))
 	bestFrom := make([]int, len(ordered))
 	bestDistances := make([]float64, len(ordered))
 	for index := range bestDistances {
-		bestFrom[index] = 0
+		bestFrom[index] = rootIndex
 		bestDistances[index] = math.Inf(1)
 	}
-	inTree[0] = true
-	for index := 1; index < len(ordered); index++ {
-		bestDistances[index] = endpointDistance(accessPoints[0], accessPoints[index])
+	inTree[rootIndex] = true
+	for index := range ordered {
+		if index == rootIndex {
+			continue
+		}
+		bestDistances[index] = endpointDistance(accessPoints[rootIndex], accessPoints[index])
 	}
 	pairs := make([]EndpointPair, 0, len(ordered)-1)
 	for len(pairs) < len(ordered)-1 {
@@ -419,6 +511,9 @@ func planEndpointPairs(netName string, endpoints []Endpoint, access PadAccess) (
 		pair := EndpointPair{From: ordered[bestFrom[bestIndex]], To: ordered[bestIndex]}
 		pairs = append(pairs, pair)
 		inTree[bestIndex] = true
+		if preserveConstrainedLeaves && endpointBranchConstrained(ordered[bestIndex], access, rules) {
+			continue
+		}
 		for index := range ordered {
 			if inTree[index] {
 				continue
@@ -433,6 +528,15 @@ func planEndpointPairs(netName string, endpoints []Endpoint, access PadAccess) (
 		}
 	}
 	return pairs, nil
+}
+
+func endpointBranchConstrained(endpoint Endpoint, access PadAccess, rules Rules) bool {
+	if rules.GridMM <= 0 {
+		return false
+	}
+	span := endpointPadSpan(endpoint, access)
+	accessPitch := 2*rules.GridMM + rules.TraceWidthMM
+	return span > 0 && !math.IsInf(span, 0) && span <= accessPitch+distanceEpsilon
 }
 
 func endpointPadSpan(endpoint Endpoint, access PadAccess) float64 {

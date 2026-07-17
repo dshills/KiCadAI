@@ -53,6 +53,7 @@ type Options struct {
 	DesignID     kicadfiles.UUID
 	Seed         string
 	Paper        kicadfiles.Paper
+	CopperLayers int
 	LibraryIndex *libraryresolver.LibraryIndex
 }
 
@@ -278,6 +279,14 @@ func New(options Options) (*Builder, error) {
 	if strings.TrimSpace(paper.Name) == "" {
 		paper.Name = "A4"
 	}
+	boardLayers := pcb.DefaultTwoLayerStack()
+	switch options.CopperLayers {
+	case 0, 1, 2:
+	case 4:
+		boardLayers = pcb.DefaultFourLayerStack()
+	default:
+		return nil, fmt.Errorf("copper layer count must be 1, 2, or 4")
+	}
 	builder := &Builder{
 		name:                 name,
 		generator:            generator,
@@ -329,7 +338,7 @@ func New(options Options) (*Builder, error) {
 			GeneratorVersion: "10.0",
 			General:          pcb.DefaultGeneral(),
 			Paper:            paper,
-			Layers:           pcb.DefaultTwoLayerStack(),
+			Layers:           boardLayers,
 			Setup:            pcb.DefaultSetup(),
 			Nets:             builder.nets.Nets(),
 			TitleBlock:       kicadfiles.TitleBlock{Title: name},
@@ -1810,14 +1819,7 @@ func pointFromRoutingPoint(point routing.Point) kicadfiles.Point {
 }
 
 func boardLayerFromRouting(layer string) kicadfiles.BoardLayer {
-	switch strings.ToUpper(strings.TrimSpace(layer)) {
-	case "F.CU":
-		return kicadfiles.LayerFCu
-	case "B.CU":
-		return kicadfiles.LayerBCu
-	default:
-		return kicadfiles.BoardLayer(strings.TrimSpace(layer))
-	}
+	return kicadfiles.CanonicalCopperLayer(layer)
 }
 
 func (builder *Builder) AddZone(netName string, polygon []kicadfiles.Point, options ZoneOptions) (ZoneHandle, error) {
@@ -2868,28 +2870,11 @@ func canonicalRouteViaLayers(layers []kicadfiles.BoardLayer) []kicadfiles.BoardL
 	if len(layers) < 2 {
 		return layers
 	}
-	ordered := append([]kicadfiles.BoardLayer(nil), layers...)
-	sort.SliceStable(ordered, func(left, right int) bool {
-		return routeViaLayerRank(ordered[left]) < routeViaLayerRank(ordered[right])
-	})
-	return ordered
-}
-
-func routeViaLayerRank(layer kicadfiles.BoardLayer) int {
-	switch layer {
-	case kicadfiles.LayerFCu:
-		return 0
-	case kicadfiles.LayerBCu:
-		return 1000
-	}
-	name := string(layer)
-	if strings.HasPrefix(name, "In") && strings.HasSuffix(name, ".Cu") {
-		index, err := strconv.Atoi(strings.TrimSuffix(strings.TrimPrefix(name, "In"), ".Cu"))
-		if err == nil {
-			return index
-		}
-	}
-	return 2000
+	// RouteViaSpec models an ordinary plated through via, not a blind or
+	// buried via. KiCad therefore requires its physical span to cover the
+	// outer copper layers even when the router used it to transition between
+	// an outer and an inner layer.
+	return []kicadfiles.BoardLayer{kicadfiles.LayerFCu, kicadfiles.LayerBCu}
 }
 
 func cloneDesign(source kicaddesign.Design) kicaddesign.Design {

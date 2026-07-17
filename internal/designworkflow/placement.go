@@ -47,6 +47,7 @@ func PlaceFragments(ctx context.Context, request Request, fragments PCBFragmentR
 			WidthMM:  normalized.Board.WidthMM,
 			HeightMM: normalized.Board.HeightMM,
 			MarginMM: normalized.Board.EdgeClearanceMM,
+			Layers:   normalized.Board.Layers,
 		},
 		Rules: mergePlacementRules(opts.Rules),
 		Seed:  normalized.Name,

@@ -461,8 +461,8 @@ func ValidateRequest(request Request) []reports.Issue {
 	if request.Board.HeightMM <= 0 {
 		issues = append(issues, issue("board.height_mm", "board height must be positive"))
 	}
-	if request.Board.Layers != 1 && request.Board.Layers != 2 {
-		issues = append(issues, issue("board.layers", "board layers must be 1 or 2"))
+	if request.Board.Layers != 1 && request.Board.Layers != 2 && request.Board.Layers != 4 {
+		issues = append(issues, issue("board.layers", "board layers must be 1, 2, or 4"))
 	}
 	if request.Board.EdgeClearanceMM < 0 {
 		issues = append(issues, issue("board.edge_clearance_mm", "board edge clearance must be non-negative"))

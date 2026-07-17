@@ -201,7 +201,7 @@ func writeExplicitCircuitProject(ctx context.Context, request Request, tx transa
 		return ProjectWriteResult{Transaction: tx, Validation: validation, Stage: NewStageResult(StageProjectWrite, issues)}
 	}
 	applyResult := transactions.Apply(tx, transactions.ApplyOptions{
-		OutputDir: outputDir, Overwrite: opts.Overwrite, Seed: opts.Seed, LibraryIndex: opts.LibraryIndex,
+		OutputDir: outputDir, Overwrite: opts.Overwrite, Seed: opts.Seed, CopperLayers: request.Board.Layers, LibraryIndex: opts.LibraryIndex,
 		SuppressPinmapWarnings: opts.LibraryIndex != nil, SuppressExplicitPinSymbolErrors: opts.LibraryIndex != nil,
 	})
 	issues = append(issues, applyResult.Issues...)

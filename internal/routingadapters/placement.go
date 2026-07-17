@@ -21,6 +21,7 @@ const (
 
 func RequestFromPlacement(placementRequest placement.Request, placementResult placement.Result) (routing.Request, []reports.Issue) {
 	issues := []reports.Issue{}
+	boardLayers := routingCopperLayers(placementRequest.Board.Layers)
 	placements := map[string]placement.PlacementResult{}
 	for _, placed := range placementResult.Placements {
 		if placed.Ref != "" && placed.Reason == "" {
@@ -33,10 +34,7 @@ func RequestFromPlacement(placementRequest placement.Request, placementResult pl
 			WidthMM:  placementRequest.Board.WidthMM,
 			HeightMM: placementRequest.Board.HeightMM,
 			MarginMM: placementRequest.Board.MarginMM,
-			Layers: []routing.Layer{
-				{Name: "F.Cu", Kind: routing.LayerCopper, Routable: true},
-				{Name: "B.Cu", Kind: routing.LayerCopper, Routable: true},
-			},
+			Layers:   boardLayers,
 		},
 		Rules:    routing.DefaultRules(),
 		Strategy: routing.Strategy{Mode: routing.ModeTwoLayer, TreatZonesAs: routing.ZoneObstacle, AllowPartial: true},
@@ -115,6 +113,17 @@ func RequestFromPlacement(placementRequest placement.Request, placementResult pl
 		}
 	}
 	return request, issues
+}
+
+func routingCopperLayers(count int) []routing.Layer {
+	layers := []routing.Layer{{Name: "F.Cu", Kind: routing.LayerCopper, Routable: true}}
+	if count == 4 {
+		layers = append(layers,
+			routing.Layer{Name: "In1.Cu", Kind: routing.LayerCopper, Routable: true},
+			routing.Layer{Name: "In2.Cu", Kind: routing.LayerCopper, Routable: true},
+		)
+	}
+	return append(layers, routing.Layer{Name: "B.Cu", Kind: routing.LayerCopper, Routable: true})
 }
 
 func routingKeepoutLayers(layers []string, boardLayers []routing.Layer) []string {

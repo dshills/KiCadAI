@@ -55,7 +55,7 @@ func TestValidateRequestReportsInvalidFields(t *testing.T) {
 		Name:       "bad",
 		Kind:       IntentKind("unsupported"),
 		Acceptance: designworkflow.AcceptanceLevel("magic"),
-		Board:      BoardIntent{WidthMM: -1, HeightMM: 10, EdgeClearanceMM: -0.1, Layers: 4, MountingHoles: Strength("maybe")},
+		Board:      BoardIntent{WidthMM: -1, HeightMM: 10, EdgeClearanceMM: -0.1, Layers: 3, MountingHoles: Strength("maybe")},
 		Power: PowerIntent{
 			Inputs: []PowerInputIntent{{Kind: "mains", Voltage: "five"}},
 			Rails:  []PowerRailIntent{{Voltage: ""}},
