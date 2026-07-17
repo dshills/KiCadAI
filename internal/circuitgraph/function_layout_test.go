@@ -23,6 +23,25 @@ func TestSynthesisPhysicalEnvelopeIncludesPackageConstraints(t *testing.T) {
 	}
 }
 
+func TestDeriveFunctionLayoutAddsNegativePowerLaneOnlyForNegativeRails(t *testing.T) {
+	constraints := SynthesisConstraints{MaxWidthMM: 100, MaxHeightMM: 100}
+	withNegative := Document{Nets: []Net{{Name: "VEE", Role: NetRolePowerNeg}}}
+	if issues := deriveFunctionLayout(&withNegative, FunctionIntent{Constraints: constraints}, nil, nil); len(issues) != 0 {
+		t.Fatalf("derive split-supply layout: %#v", issues)
+	}
+	if withNegative.Schematic.Lanes.PowerNegative == nil || *withNegative.Schematic.Lanes.PowerNegative != LaneLower {
+		t.Fatalf("negative power lane = %#v, want lower", withNegative.Schematic.Lanes.PowerNegative)
+	}
+
+	withoutNegative := Document{Nets: []Net{{Name: "VCC", Role: NetRolePowerPos}}}
+	if issues := deriveFunctionLayout(&withoutNegative, FunctionIntent{Constraints: constraints}, nil, nil); len(issues) != 0 {
+		t.Fatalf("derive single-supply layout: %#v", issues)
+	}
+	if withoutNegative.Schematic.Lanes.PowerNegative != nil {
+		t.Fatalf("single-supply negative power lane = %#v, want omitted", withoutNegative.Schematic.Lanes.PowerNegative)
+	}
+}
+
 func TestPhysicalConstraintDimensionsMMRejectsNonDimensionalEvidence(t *testing.T) {
 	if _, _, ok := physicalConstraintDimensionsMM(components.PhysicalConstraint{Value: "48x21.44", Unit: "mil"}); ok {
 		t.Fatal("non-mm physical evidence was interpreted as millimetres")

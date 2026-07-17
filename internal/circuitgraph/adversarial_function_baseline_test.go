@@ -26,6 +26,7 @@ const (
 	adversarialBaselineEvaluator       = "adversarial-promotion-v1"
 	adversarialBaselineEvaluatedCommit = "93063343e99d2ec1d7390396ddbd7b94e5983a77"
 	adversarialBaselineReportSHA256    = "33285964855f9b2dc41b8d5f44f851cd36877b48cb5b595da78546dfdde46f3e"
+	adversarialPromotionModeEnv        = "KICADAI_ADVERSARIAL_PROMOTION"
 )
 
 type adversarialCapabilityIssue struct {
@@ -131,6 +132,27 @@ func TestAdversarialFunctionCorpusBaselineReportIsFrozen(t *testing.T) {
 		if circuit.Status != "blocked" || circuit.Category == "" || circuit.RootKey == "" || circuit.RootIssue == nil || circuit.RootIssue.Code == "" || circuit.RootIssue.Stage == "" || circuit.RootIssue.Message == "" {
 			t.Fatalf("baseline blocker %s is unclassified: %#v", circuit.ID, circuit)
 		}
+	}
+}
+
+func TestAdversarialFunctionCorpusOptionalKiCadPromotion(t *testing.T) {
+	mode := strings.TrimSpace(os.Getenv(adversarialPromotionModeEnv))
+	if mode == "" {
+		t.Skipf("set %s=probe or %s=require-pass to run the adversarial KiCad promotion", adversarialPromotionModeEnv, adversarialPromotionModeEnv)
+	}
+	if mode != "probe" && mode != "require-pass" {
+		t.Fatalf("%s must be probe or require-pass, got %q", adversarialPromotionModeEnv, mode)
+	}
+	report := evaluateAdversarialCorpus(t, true)
+	for _, circuit := range report.Circuits {
+		if circuit.Status == "pass" {
+			t.Logf("%s: pass", circuit.ID)
+			continue
+		}
+		t.Logf("%s: blocked root=%s stage=%s path=%s", circuit.ID, circuit.RootKey, circuit.RootIssue.Stage, circuit.RootIssue.Path)
+	}
+	if mode == "require-pass" && report.Aggregate.Blocked != 0 {
+		t.Fatalf("adversarial promotion blocked: %#v", report.Aggregate)
 	}
 }
 

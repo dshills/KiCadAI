@@ -690,6 +690,10 @@ func deriveFunctionLayout(document *Document, intent FunctionIntent, selections 
 	document.Schematic.Origin = OriginCentered
 	document.Schematic.Groups = []SchematicGroup{{ID: "synthesized", Label: "Synthesized circuit", Role: "functional", Members: members, Rank: 0}}
 	document.Schematic.Lanes = SchematicLanes{Power: LaneTop, Signals: LaneMiddle, Ground: LaneBottom}
+	if slices.ContainsFunc(document.Nets, func(net Net) bool { return net.Role == NetRolePowerNeg }) {
+		lower := LaneLower
+		document.Schematic.Lanes.PowerNegative = &lower
+	}
 	document.Schematic.Rules = SchematicRules{
 		PositivePowerTop: synthesisBool(true), GroundBottom: synthesisBool(true), CenterOnPage: synthesisBool(true),
 		PreferLabelsForLongNets: synthesisBool(true), AvoidWireCrossings: synthesisBool(true),
