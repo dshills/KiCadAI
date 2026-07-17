@@ -156,11 +156,17 @@ func (resolver *Resolver) Synthesize(ctx context.Context, document Document) (Do
 		}
 		for _, endpoint := range connection.Endpoints {
 			if endpoint.Function != "" {
-				if _, exists := selectedByIntent[endpoint.Function]; !exists {
+				selection, exists := selectedByIntent[endpoint.Function]
+				if !exists {
 					continue
 				}
-				net.Endpoints = append(net.Endpoints, Endpoint{Component: endpoint.Function, SelectorKind: SelectorFunction, Selector: endpoint.Port})
-				connected[endpoint.Function+"\x00"+normalizedFunctionKey(endpoint.Port)] = true
+				function, ok := canonicalFunction(selection.Functions, endpoint.Port)
+				if !ok {
+					issues = append(issues, synthesisIssue(CodeSynthesisConnectionUnresolved, "synthesis.connections."+connection.Name+"."+endpoint.Function+"."+endpoint.Port, "connection references an unavailable semantic function or alias", "correct the function port or catalog alias evidence"))
+					continue
+				}
+				net.Endpoints = append(net.Endpoints, Endpoint{Component: endpoint.Function, SelectorKind: SelectorFunction, Selector: function})
+				connected[endpoint.Function+"\x00"+normalizedFunctionKey(function)] = true
 				continue
 			}
 			componentID := interfaceComponents[endpoint.Interface]
@@ -231,7 +237,8 @@ func (resolver *Resolver) Synthesize(ctx context.Context, document Document) (Do
 				continue
 			}
 			if function.Required || slices.ContainsFunc(selection.Instance.RequiredFunctions, func(required string) bool {
-				return normalizedFunctionKey(required) == normalizedFunctionKey(function.Function)
+				canonical, ok := canonicalFunction(selection.Functions, required)
+				return ok && normalizedFunctionKey(canonical) == normalizedFunctionKey(function.Function)
 			}) {
 				issues = append(issues, synthesisIssue(CodeSynthesisUnusedPinPolicyMissing, "synthesis.functions."+selection.Instance.ID+"."+function.Function, "required semantic function is not connected and has no generated support or unused-pin policy", "add reviewed catalog support or unused-pin policy evidence"))
 				continue
@@ -506,8 +513,8 @@ func applyCatalogNoConnectPolicies(document *Document, selected map[string]Resol
 			if !strings.EqualFold(strings.TrimSpace(hint.Kind), "no_connect") {
 				continue
 			}
-			function := strings.TrimSpace(hint.NetRole)
-			if function == "" || !resolvedComponentHasFunction(component, function) {
+			function, ok := canonicalFunction(component.Functions, strings.TrimSpace(hint.NetRole))
+			if !ok {
 				issues = append(issues, synthesisIssue(CodeSynthesisUnusedPinPolicyMissing, "synthesis.functions."+id+".routing_hints.no_connect", "catalog no-connect hint does not identify an available semantic function", "set net_role to the reviewed semantic function name"))
 				continue
 			}

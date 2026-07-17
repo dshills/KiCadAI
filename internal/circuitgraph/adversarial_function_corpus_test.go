@@ -1,6 +1,7 @@
 package circuitgraph
 
 import (
+	"context"
 	"encoding/json"
 	"io/fs"
 	"os"
@@ -12,6 +13,41 @@ import (
 
 	"kicadai/internal/reports"
 )
+
+func TestAdversarialLevelTranslationCasesSynthesizeThroughCanonicalAliases(t *testing.T) {
+	root := adversarialFunctionCorpusRoot(t)
+	manifestBytes, err := os.ReadFile(filepath.Join(root, "manifest.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var manifest adversarialCorpusManifest
+	if err := json.Unmarshal(manifestBytes, &manifest); err != nil {
+		t.Fatal(err)
+	}
+	resolver := NewResolver(ResolveOptions{Catalog: loadGraphCatalog(t), CatalogID: "adversarial-level-translation"})
+	covered := 0
+	for _, fixture := range manifest.Fixtures {
+		if !slices.Contains(fixture.Pressures, "level_translation") {
+			continue
+		}
+		covered++
+		contents, err := os.ReadFile(filepath.Join(root, fixture.File))
+		if err != nil {
+			t.Fatal(err)
+		}
+		document, issues := DecodeStrict(strings.NewReader(string(contents)))
+		if reports.HasBlockingIssue(issues) {
+			t.Fatalf("%s decode issues = %#v", fixture.ID, issues)
+		}
+		_, _, issues = resolver.Synthesize(context.Background(), document)
+		if reports.HasBlockingIssue(issues) {
+			t.Fatalf("%s synthesis issues = %#v", fixture.ID, issues)
+		}
+	}
+	if covered != 3 {
+		t.Fatalf("level-translation coverage = %d, want 3 frozen cases", covered)
+	}
+}
 
 const (
 	frozenAdversarialCorpusManifestSHA256 = "e40a02f2ee89aa6ef3c5a98628c2712cf633ac67b2fbaba487e84d52c607ce32"

@@ -9,6 +9,7 @@
     {"id": "diode", "name": "Diode", "description": "Signal, rectifier, Schottky, and TVS diode families."},
     {"id": "fuse", "name": "Fuse", "description": "Resettable and one-time overcurrent protection devices."},
     {"id": "led", "name": "LED", "description": "Indicator light-emitting diodes."},
+    {"id": "level_translator", "name": "Logic Level Translator", "description": "Multi-domain digital level translators and bidirectional bus translators."},
     {"id": "mcu", "name": "Microcontroller", "description": "Microcontrollers and minimal support-system selections."},
     {"id": "opamp", "name": "Operational Amplifier", "description": "Op-amp devices for analog gain and buffering."},
     {"id": "protection", "name": "Protection Device", "description": "ESD, TVS, reverse-polarity, and other protection components."},

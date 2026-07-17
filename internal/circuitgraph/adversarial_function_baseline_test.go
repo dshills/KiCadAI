@@ -71,16 +71,6 @@ type adversarialCapabilityReport struct {
 
 func TestAdversarialFunctionCorpusBaselineReportIsFrozen(t *testing.T) {
 	path := adversarialCapabilityReportPath(t, "BASELINE_REPORT.json")
-	if *updateCircuitGraphGolden {
-		report := evaluateAdversarialCorpus(t, true, nil)
-		contents, err := json.MarshalIndent(report, "", "  ")
-		if err != nil {
-			t.Fatal(err)
-		}
-		if err := os.WriteFile(path, append(contents, '\n'), 0o644); err != nil {
-			t.Fatal(err)
-		}
-	}
 	contents, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatal(err)

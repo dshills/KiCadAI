@@ -1,15 +1,15 @@
 {
-  "record_count": 57,
-  "family_count": 17,
+  "record_count": 58,
+  "family_count": 18,
   "confidence_counts": {
     "blocked": 1,
     "library_derived": 0,
     "placeholder": 4,
     "rule_inferred": 5,
-    "verified": 47
+    "verified": 48
   },
   "alternative_coverage": {
-    "concrete_records": 33,
+    "concrete_records": 34,
     "generic_fallback_records": 24,
     "equivalence_groups": 19
   },
@@ -215,6 +215,25 @@
         "led.liteon.ltst_c170kgkt.0805",
         "led.liteon.ltst_c170krkt.0805",
         "led.liteon.ltst_c190tbkt.0603"
+      ]
+    },
+    {
+      "family": "level_translator",
+      "defined": true,
+      "record_count": 1,
+      "concrete_records": 1,
+      "generic_fallback_records": 0,
+      "equivalence_groups": 0,
+      "verified_records": 1,
+      "library_derived_records": 0,
+      "rule_inferred_records": 0,
+      "placeholder_records": 0,
+      "blocked_records": 0,
+      "missing_resolver_evidence": [
+        "level_translator.ti.txs0104epw.tssop14"
+      ],
+      "record_ids": [
+        "level_translator.ti.txs0104epw.tssop14"
       ]
     },
     {

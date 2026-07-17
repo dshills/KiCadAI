@@ -848,6 +848,73 @@
       "verification": {"confidence": "verified", "sources": ["curated_seed_catalog", "datasheet:Abracon ABM3 series", "builtin_pinmap:Device:Crystal"], "pinmap_checked": true, "notes": ["Oscillator startup margin and exact load-capacitor calculation remain design-specific."]}
     },
     {
+      "id": "level_translator.ti.txs0104epw.tssop14",
+      "family": "level_translator",
+      "name": "TI TXS0104EPW four-bit bidirectional level translator",
+      "description": "Four-channel auto-direction bidirectional translator for open-drain and push-pull digital signals across two reviewed supply domains.",
+      "generic": false,
+      "manufacturer": "Texas Instruments",
+      "mpn": "TXS0104EPWR",
+      "lifecycle": "active",
+      "tags": ["level_translator", "bidirectional", "i2c", "uart", "four_channel", "tssop14"],
+      "ratings": [
+        {"kind": "vcca_supply_voltage", "min": "1.65", "max": "3.6", "unit": "V"},
+        {"kind": "vccb_supply_voltage", "min": "2.3", "max": "5.5", "unit": "V"}
+      ],
+      "temperature": {"min": "-40", "max": "85", "unit": "C"},
+      "companions": [
+        {"id": "level_translator.vcca_bypass", "family": "capacitor", "role": "decoupling_capacitor", "required": true, "recipes": [{"id": "vcca_bypass", "family": "capacitor", "role": "decoupling_capacitor", "package": "0603", "value_kind": "capacitance", "value": "100n", "min_voltage_v": 6.3, "minimum_confidence": "rule_inferred", "required_functions": ["A", "B"], "connections": [{"function": "A", "parent_function": "VCCA"}, {"function": "B", "parent_function": "GND"}]}], "description": "Place a 100 nF bypass capacitor close to VCCA and GND."},
+        {"id": "level_translator.vccb_bypass", "family": "capacitor", "role": "decoupling_capacitor", "required": true, "recipes": [{"id": "vccb_bypass", "family": "capacitor", "role": "decoupling_capacitor", "package": "0603", "value_kind": "capacitance", "value": "100n", "min_voltage_v": 6.3, "minimum_confidence": "rule_inferred", "required_functions": ["A", "B"], "connections": [{"function": "A", "parent_function": "VCCB"}, {"function": "B", "parent_function": "GND"}]}], "description": "Place a 100 nF bypass capacitor close to VCCB and GND."}
+      ],
+      "symbols": [{
+        "symbol_id": "Logic_LevelTranslator:TXS0104EPW",
+        "function_pins": [
+          {"function": "VCCA", "symbol_pin": "1", "electrical": "power_in", "required": true, "aliases": ["VREF1"]},
+          {"function": "A1", "symbol_pin": "2", "electrical": "bidirectional", "aliases": ["SDA1", "A_TX"]},
+          {"function": "A2", "symbol_pin": "3", "electrical": "bidirectional", "aliases": ["SCL1", "A_RX"]},
+          {"function": "A3", "symbol_pin": "4", "electrical": "bidirectional"},
+          {"function": "A4", "symbol_pin": "5", "electrical": "bidirectional"},
+          {"function": "NC6", "symbol_pin": "6", "electrical": "no_connect"},
+          {"function": "GND", "symbol_pin": "7", "electrical": "power_in", "required": true},
+          {"function": "OE", "symbol_pin": "8", "electrical": "input", "required": true, "aliases": ["EN"]},
+          {"function": "NC9", "symbol_pin": "9", "electrical": "no_connect"},
+          {"function": "B4", "symbol_pin": "10", "electrical": "bidirectional"},
+          {"function": "B3", "symbol_pin": "11", "electrical": "bidirectional"},
+          {"function": "B2", "symbol_pin": "12", "electrical": "bidirectional", "aliases": ["SCL2", "B_RX"]},
+          {"function": "B1", "symbol_pin": "13", "electrical": "bidirectional", "aliases": ["SDA2", "B_TX"]},
+          {"function": "VCCB", "symbol_pin": "14", "electrical": "power_in", "required": true, "aliases": ["VREF2"]}
+        ],
+        "verification": {"confidence": "verified", "sources": ["datasheet:TI:TXS0104E", "builtin_pinmap:Logic_LevelTranslator:TXS0104EPW"], "pinmap_checked": true}
+      }],
+      "packages": [{
+        "id": "tssop14",
+        "name": "TSSOP-14 4.4x5 mm 0.65 mm pitch",
+        "footprint_id": "Package_SO:TSSOP-14_4.4x5mm_P0.65mm",
+        "package_type": "tssop14",
+        "mpn": "TXS0104EPWR",
+        "lifecycle": "active",
+        "pinmap_id": "Logic_LevelTranslator:TXS0104EPW|Package_SO:TSSOP-14_4.4x5mm_P0.65mm",
+        "pad_functions": [
+          {"function": "VCCA", "pad": "1", "aliases": ["VREF1"]},
+          {"function": "A1", "pad": "2", "aliases": ["SDA1", "A_TX"]},
+          {"function": "A2", "pad": "3", "aliases": ["SCL1", "A_RX"]},
+          {"function": "A3", "pad": "4"},
+          {"function": "A4", "pad": "5"},
+          {"function": "NC6", "pad": "6"},
+          {"function": "GND", "pad": "7"},
+          {"function": "OE", "pad": "8", "aliases": ["EN"]},
+          {"function": "NC9", "pad": "9"},
+          {"function": "B4", "pad": "10"},
+          {"function": "B3", "pad": "11"},
+          {"function": "B2", "pad": "12", "aliases": ["SCL2", "B_RX"]},
+          {"function": "B1", "pad": "13", "aliases": ["SDA2", "B_TX"]},
+          {"function": "VCCB", "pad": "14", "aliases": ["VREF2"]}
+        ],
+        "verification": {"confidence": "verified", "sources": ["datasheet:TI:TXS0104E", "kicad-footprint:Package_SO:TSSOP-14_4.4x5mm_P0.65mm"], "pinmap_checked": true}
+      }],
+      "verification": {"confidence": "verified", "sources": ["datasheet:TI:TXS0104E", "builtin_pinmap:Logic_LevelTranslator:TXS0104EPW", "kicad-footprint:Package_SO:TSSOP-14_4.4x5mm_P0.65mm"], "pinmap_checked": true, "notes": ["VCCA must remain less than or equal to VCCB; supply sequencing remains a fabrication-stage constraint.", "OE is referenced to VCCA; power-up sequencing or a reviewed pull-down network must keep outputs high-impedance until both rails are stable.", "External pull-up loading, edge-rate, and bus-capacitance limits remain design-specific fabrication checks."]}
+    },
+    {
       "id": "usb_c.gct.usb4125_power_only_6p",
       "family": "usb_c",
       "name": "GCT USB4125 power-only USB-C receptacle",
