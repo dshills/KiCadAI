@@ -106,13 +106,14 @@ type ConnectionEvidence struct {
 }
 
 type ComponentEvidence struct {
-	InstanceID  string
-	CatalogID   string
-	Family      string
-	ValueSI     float64
-	HasValueSI  bool
-	ModelClaims []CatalogEvidence
-	Connections []ConnectionEvidence
+	InstanceID        string
+	PhysicalComponent string
+	CatalogID         string
+	Family            string
+	ValueSI           float64
+	HasValueSI        bool
+	ModelClaims       []CatalogEvidence
+	Connections       []ConnectionEvidence
 }
 
 type ResolvedBinding struct {
@@ -130,13 +131,14 @@ type TerminalBinding struct {
 }
 
 type ResolvedDevice struct {
-	Component       string            `json:"component"`
-	CatalogID       string            `json:"catalog_id"`
-	Family          string            `json:"family"`
-	PrimitiveModel  string            `json:"primitive_model"`
-	ValueSI         *float64          `json:"value_si,omitempty"`
-	ModelParameters []NamedValue      `json:"model_parameters,omitempty"`
-	Terminals       []TerminalBinding `json:"terminals"`
+	Component         string            `json:"component"`
+	PhysicalComponent string            `json:"physical_component,omitempty"`
+	CatalogID         string            `json:"catalog_id"`
+	Family            string            `json:"family"`
+	PrimitiveModel    string            `json:"primitive_model"`
+	ValueSI           *float64          `json:"value_si,omitempty"`
+	ModelParameters   []NamedValue      `json:"model_parameters,omitempty"`
+	Terminals         []TerminalBinding `json:"terminals"`
 }
 
 type Plan struct {

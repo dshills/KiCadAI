@@ -9,6 +9,7 @@ import (
 	"kicadai/internal/reports"
 	"kicadai/internal/routing"
 	"kicadai/internal/schematicir"
+	"kicadai/internal/simmodel"
 	"kicadai/internal/transactions"
 )
 
@@ -199,6 +200,48 @@ func TestValidateRequestAcceptsMultipleSchematicUnitsOwnedByOnePhysicalComponent
 	conflict.ExplicitCircuit.Components = append(conflict.ExplicitCircuit.Components, duplicate)
 	if issues := ValidateRequest(conflict); !hasDesignWorkflowIssuePath(issues, "explicit_circuit.components") {
 		t.Fatalf("conflicting ownership issues = %#v", issues)
+	}
+}
+
+func TestValidateRequestAcceptsLogicalSimulationDeviceOwnedByPhysicalComponent(t *testing.T) {
+	request := validExplicitCircuitRequest()
+	intent := simmodel.Intent{
+		ModelID: simmodel.ModelLinearCircuitMNAV1,
+		Analyses: []simmodel.Analysis{{
+			ID: "operating_point", Kind: simmodel.AnalysisDCOperatingPoint,
+			Excitations: []simmodel.SourceExcitation{{Component: "r2.source", DCValue: .001}},
+		}},
+		Assertions: []simmodel.Assertion{{
+			AnalysisID: "operating_point", Node: "SIG", Quantity: simmodel.QuantityVoltageV, Min: .999, Max: 1.001,
+		}},
+	}
+	components := []simmodel.ComponentEvidence{
+		{
+			InstanceID: "r1.channel_a", PhysicalComponent: "r1", CatalogID: "test.r1", Family: "resistor",
+			ValueSI: 1_000, HasValueSI: true, ModelClaims: []simmodel.CatalogEvidence{{ModelID: simmodel.PrimitiveResistorV1}},
+			Connections: []simmodel.ConnectionEvidence{{Function: "A", Net: "SIG"}, {Function: "B", Net: "GND"}},
+		},
+		{
+			InstanceID: "r2.source", PhysicalComponent: "r2", CatalogID: "test.r2", Family: "current_source",
+			ModelClaims: []simmodel.CatalogEvidence{{ModelID: simmodel.PrimitiveCurrentSourceV1}},
+			Connections: []simmodel.ConnectionEvidence{{Function: "POSITIVE", Net: "GND"}, {Function: "NEGATIVE", Net: "SIG"}},
+		},
+	}
+	plan, diagnostics := simmodel.ResolveWithTopology(intent, request.ExplicitCircuit.CatalogID, request.ExplicitCircuit.CatalogHash, components, []simmodel.NodeEvidence{{Name: "GND", Role: "ground"}, {Name: "SIG", Role: "signal"}})
+	if len(diagnostics) != 0 {
+		t.Fatalf("simulation resolve diagnostics = %#v", diagnostics)
+	}
+	request.ExplicitCircuit.Simulation = &plan
+
+	if issues := ValidateRequest(request); len(issues) != 0 {
+		t.Fatalf("logical simulation ownership issues = %#v", issues)
+	}
+
+	for index := range request.ExplicitCircuit.Simulation.Devices {
+		request.ExplicitCircuit.Simulation.Devices[index].PhysicalComponent = "missing"
+	}
+	if issues := ValidateRequest(request); !hasDesignWorkflowIssuePath(issues, "explicit_circuit.simulation.devices") {
+		t.Fatalf("missing physical simulation ownership issues = %#v", issues)
 	}
 }
 

@@ -502,6 +502,20 @@ func validateCompanions(path string, record *ComponentRecord, companions []Compa
 			if recipe.MinVoltageV < 0 {
 				issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, recipePath+".min_voltage_v", "companion recipe minimum voltage cannot be negative"))
 			}
+			if recipe.Value != "" && recipe.ValueFormula != nil {
+				issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, recipePath+".value_formula", "companion recipe value and value formula are mutually exclusive"))
+			}
+			if formula := recipe.ValueFormula; formula != nil {
+				if formula.Kind != "divider_upper_from_output_v1" {
+					issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, recipePath+".value_formula.kind", "unsupported companion value formula kind"))
+				}
+				if strings.TrimSpace(formula.Parameter) == "" || formula.ReferenceVoltageV <= 0 || formula.LowerResistanceOhm <= 0 {
+					issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, recipePath+".value_formula", "divider formula requires a parameter and positive reference voltage and lower resistance"))
+				}
+				if formula.PreferredSeries != "E96" {
+					issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, recipePath+".value_formula.preferred_series", "divider formula requires the deterministic E96 preferred series"))
+				}
+			}
 			if len(recipe.Connections) < 2 {
 				issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, recipePath+".connections", "companion recipe requires at least two semantic connections"))
 			}
@@ -656,7 +670,7 @@ func validateOpAmpEvidence(path string, evidence *OpAmpEvidence) []reports.Issue
 			continue
 		}
 		switch role {
-		case "input_buffer", "gain_stage", "headphone_driver", "small_signal_driver":
+		case "input_buffer", "gain_stage", "voltage_follower", "comparator", "headphone_driver", "small_signal_driver":
 		default:
 			issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, rolePath, "invalid op-amp intended role: "+role))
 		}

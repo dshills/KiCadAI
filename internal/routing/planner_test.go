@@ -110,6 +110,67 @@ func TestPlanRoutesPrioritizesConstrainedSignalBeforeConstrainedSupportPower(t *
 	}
 }
 
+func TestPlanRoutesReservesShortDenseBundleEscapeBeforeLongerPeers(t *testing.T) {
+	request := singleLayerSearchRequest()
+	request.Strategy.NetOrder = NetOrderConstrainedEndpointAccessV1
+	request.Rules.GridMM = 0.25
+	request.Rules.TraceWidthMM = 0.2
+	sensor := testComponent("U1", "1", "LONG", 10, 10)
+	sensor.Pads[0].Size = Size{WidthMM: 0.35, HeightMM: 0.5}
+	sensor.Pads = append(sensor.Pads,
+		Pad{Ref: "U1", Name: "2", Net: "SHORT", Position: Point{XMM: 0, YMM: 1}, Size: Size{WidthMM: 0.35, HeightMM: 0.5}, Type: PadSMD, Layers: []string{"F.Cu"}},
+		Pad{Ref: "U1", Name: "3", Net: "MIDDLE", Position: Point{XMM: 0, YMM: 2}, Size: Size{WidthMM: 0.35, HeightMM: 0.5}, Type: PadSMD, Layers: []string{"F.Cu"}},
+	)
+	request.Components = append(request.Components, sensor,
+		testComponent("J3", "1", "LONG", 16, 10),
+		testComponent("J4", "1", "SHORT", 13, 11),
+		testComponent("J5", "1", "MIDDLE", 15, 12),
+	)
+	request.Nets = []Net{
+		{Name: "LONG", Role: NetSignal, Priority: 1, Endpoints: []Endpoint{{Ref: "U1", Pin: "1"}, {Ref: "J3", Pin: "1"}}},
+		{Name: "SHORT", Role: NetSignal, Priority: 1, Endpoints: []Endpoint{{Ref: "U1", Pin: "2"}, {Ref: "J4", Pin: "1"}}},
+		{Name: "MIDDLE", Role: NetSignal, Priority: 1, Endpoints: []Endpoint{{Ref: "U1", Pin: "3"}, {Ref: "J5", Pin: "1"}}},
+		{Name: "POWER", Role: NetPower, Priority: 1, Endpoints: request.Nets[0].Endpoints},
+	}
+	plans, issues := PlanRoutes(request, BuildPadAccess(request))
+	if len(issues) != 0 {
+		t.Fatalf("issues = %#v", issues)
+	}
+	if got := []string{plans[0].Net.Name, plans[1].Net.Name, plans[2].Net.Name}; got[0] != "SHORT" || got[1] != "MIDDLE" || got[2] != "LONG" {
+		t.Fatalf("dense bundle order = %#v", got)
+	}
+}
+
+func TestPlanRoutesPreservesLongEscapeOrderForSpatiallyDispersedBundle(t *testing.T) {
+	request := singleLayerSearchRequest()
+	request.Strategy.NetOrder = NetOrderConstrainedEndpointAccessV1
+	request.Rules.GridMM = 0.25
+	request.Rules.TraceWidthMM = 0.2
+	device := testComponent("U1", "1", "SHORT", 10, 10)
+	device.Pads[0].Size = Size{WidthMM: 0.35, HeightMM: 0.5}
+	device.Pads = append(device.Pads,
+		Pad{Ref: "U1", Name: "2", Net: "MIDDLE", Position: Point{XMM: 10, YMM: 11}, Size: Size{WidthMM: 0.35, HeightMM: 0.5}, Type: PadSMD, Layers: []string{"F.Cu"}},
+		Pad{Ref: "U1", Name: "3", Net: "LONG", Position: Point{XMM: 10, YMM: 12}, Size: Size{WidthMM: 0.35, HeightMM: 0.5}, Type: PadSMD, Layers: []string{"F.Cu"}},
+	)
+	request.Components = append(request.Components, device,
+		testComponent("J1", "1", "SHORT", 12, 10),
+		testComponent("J2", "1", "MIDDLE", 16, 11),
+		testComponent("J3", "1", "LONG", 24, 12),
+	)
+	request.Nets = []Net{
+		{Name: "SHORT", Role: NetSignal, Priority: 1, Endpoints: []Endpoint{{Ref: "U1", Pin: "1"}, {Ref: "J1", Pin: "1"}}},
+		{Name: "MIDDLE", Role: NetSignal, Priority: 1, Endpoints: []Endpoint{{Ref: "U1", Pin: "2"}, {Ref: "J2", Pin: "1"}}},
+		{Name: "LONG", Role: NetSignal, Priority: 1, Endpoints: []Endpoint{{Ref: "U1", Pin: "3"}, {Ref: "J3", Pin: "1"}}},
+	}
+	plans, issues := PlanRoutes(request, BuildPadAccess(request))
+	if len(issues) != 0 {
+		t.Fatalf("issues = %#v", issues)
+	}
+	if got := []string{plans[0].Net.Name, plans[1].Net.Name, plans[2].Net.Name}; got[0] != "MIDDLE" || got[1] != "LONG" || got[2] != "SHORT" {
+		t.Fatalf("dispersed bundle order = %#v", got)
+	}
+}
+
 func TestPlanRoutesPrioritizesBoundedConstrainedSignalFanoutBeforeGroundTree(t *testing.T) {
 	request := singleLayerSearchRequest()
 	request.Board.Layers = []Layer{

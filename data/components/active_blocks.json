@@ -176,6 +176,97 @@
       "verification": {"confidence": "verified", "sources": ["curated_seed_catalog", "kicad-symbols:Regulator_Linear:AP2112K-3.3", "builtin_pinmap:Regulator_Linear:AP2112K-3.3"], "pinmap_checked": true, "notes": ["Thermal dissipation, EN transient margin, output-capacitor ESR, and ceramic DC-bias derating remain explicit review requirements before fabrication readiness."]}
     },
     {
+      "id": "regulator.linear.ap2127k_adj.sot23_5",
+      "family": "regulator",
+      "name": "Diodes AP2127K-ADJ SOT-23-5 adjustable linear regulator",
+      "description": "Concrete 300 mA adjustable low-dropout linear regulator with a catalog-calculated feedback divider for 0.8 V to 5.5 V outputs.",
+      "generic": false,
+      "manufacturer": "Diodes Incorporated",
+      "mpn": "AP2127K-ADJ",
+      "lifecycle": "active",
+      "tags": ["power", "adjustable", "linear_regulator", "ldo", "sot23_5", "enable"],
+      "values": [
+        {"kind": "output_voltage", "min": "0.8", "max": "5.5", "unit": "V"},
+        {"kind": "reference_voltage", "typ": "0.8", "unit": "V"},
+        {"kind": "dropout_voltage", "max": "300", "unit": "mV"}
+      ],
+      "ratings": [
+        {"kind": "input_voltage", "min": "2.5", "max": "6", "unit": "V"},
+        {"kind": "output_current", "max": "300", "unit": "mA"},
+        {"kind": "enable_voltage", "max": "6", "unit": "V"}
+      ],
+      "simulation_models": [{
+        "model_id": "linear_regulator_ideal_v1",
+        "parameters": [
+          {"name": "output_voltage_v", "value": 0.8},
+          {"name": "min_headroom_v", "value": 0.3},
+          {"name": "max_load_current_ma", "value": 300}
+        ]
+      }],
+      "temperature": {"min": "-40", "max": "85", "unit": "C"},
+      "companions": [
+        {"id": "regulator.input_capacitor", "family": "capacitor", "role": "input_capacitor", "required": true, "recipes": [{"id": "input_bypass", "family": "capacitor", "role": "decoupling_capacitor", "package": "0603", "value_kind": "capacitance", "value": "1u", "min_voltage_v": 6.3, "minimum_confidence": "rule_inferred", "required_functions": ["A", "B"], "connections": [{"function": "A", "parent_function": "VIN"}, {"function": "B", "parent_function": "GND"}]}], "description": "Datasheet input bypass capacitor."},
+        {"id": "regulator.output_capacitor", "family": "capacitor", "role": "output_capacitor", "required": true, "recipes": [{"id": "output_stability", "family": "capacitor", "role": "decoupling_capacitor", "package": "0603", "value_kind": "capacitance", "value": "1u", "min_voltage_v": 6.3, "minimum_confidence": "rule_inferred", "required_functions": ["A", "B"], "connections": [{"function": "A", "parent_function": "VOUT"}, {"function": "B", "parent_function": "GND"}]}], "description": "Datasheet output capacitor."},
+        {"id": "regulator.enable", "family": "net_tie", "role": "enable_tie", "required": true, "ties": [{"function": "EN", "level": "high", "parent_function": "VIN"}], "description": "Enable the regulator by tying EN to its validated input rail."},
+        {"id": "regulator.feedback_divider", "family": "resistor", "role": "feedback_divider", "required": true, "applies_to": ["adjustable_linear_regulator"], "recipes": [
+          {"id": "feedback_lower", "family": "resistor", "role": "resistor", "package": "0603", "value_kind": "resistance", "value": "10k", "minimum_confidence": "rule_inferred", "required_functions": ["A", "B"], "connections": [{"function": "A", "parent_function": "ADJ"}, {"function": "B", "parent_function": "GND"}]},
+          {"id": "feedback_upper", "family": "resistor", "role": "resistor", "package": "0603", "value_kind": "resistance", "value_formula": {"kind": "divider_upper_from_output_v1", "parameter": "output_voltage_v", "reference_voltage_v": 0.8, "lower_resistance_ohm": 10000, "preferred_series": "E96"}, "minimum_confidence": "rule_inferred", "required_functions": ["A", "B"], "connections": [{"function": "A", "parent_function": "VOUT"}, {"function": "B", "parent_function": "ADJ"}]}
+        ], "description": "Derive an E96 feedback divider from the requested output voltage and the catalog-backed 0.8 V reference."}
+      ],
+      "derating_rules": [
+        {"kind": "thermal", "description": "Check (VIN-VOUT)*IOUT against the SOT-23-5 thermal environment before fabrication."},
+        {"kind": "feedback_tolerance", "description": "Fabrication readiness requires bounded reference and resistor-tolerance analysis around the nominal E96 divider."}
+      ],
+      "regulator_evidence": {
+        "thermal_review": "review_required",
+        "output_capacitor": {
+          "kind": "ceramic_stable",
+          "min_capacitance": "1u",
+          "capacitance_unit": "F",
+          "accepted_dielectrics": ["X5R", "X7R"],
+          "proof_status": "review_required",
+          "fabrication_candidate_blocks": true,
+          "review_note": "The datasheet specifies 1 uF input and output capacitors; a concrete MLCC still requires DC-bias and effective-capacitance review."
+        },
+        "notes": ["The 0.8 V reference and VOUT=0.8*(1+Rupper/Rlower) equation are from Diodes AP2127 DS36478 Rev. 7-2.", "Nominal divider synthesis is allowed at ERC/DRC acceptance; tolerance and thermal proof remain fabrication blockers."]
+      },
+      "placement_hints": [
+        {"kind": "near", "target": "input_capacitor", "value": "2", "unit": "mm"},
+        {"kind": "near", "target": "output_capacitor", "value": "2", "unit": "mm"},
+        {"kind": "near", "target": "feedback_divider", "value": "2", "unit": "mm"}
+      ],
+      "routing_hints": [{"kind": "net_class", "net_role": "power", "value": "0.3", "unit": "mm"}],
+      "symbols": [{
+        "symbol_id": "Regulator_Linear:AP2127K-ADJ",
+        "function_pins": [
+          {"function": "VIN", "symbol_pin": "1", "electrical": "power_in", "required": true},
+          {"function": "GND", "symbol_pin": "2", "electrical": "power_in", "required": true},
+          {"function": "EN", "symbol_pin": "3", "electrical": "input", "required": true},
+          {"function": "ADJ", "symbol_pin": "4", "electrical": "input", "required": true},
+          {"function": "VOUT", "symbol_pin": "5", "electrical": "power_out", "required": true}
+        ],
+        "verification": {"confidence": "verified", "sources": ["diodes:AP2127:DS36478-rev7-2", "kicad-symbols:Regulator_Linear:AP2127K-ADJ", "builtin_pinmap:Regulator_Linear:AP2127K-ADJ"], "pinmap_checked": true}
+      }],
+      "packages": [{
+        "id": "sot23_5",
+        "name": "SOT-23-5",
+        "footprint_id": "Package_TO_SOT_SMD:SOT-23-5",
+        "package_type": "sot23_5",
+        "mpn": "AP2127K-ADJ",
+        "lifecycle": "active",
+        "pinmap_id": "Regulator_Linear:AP2127K-ADJ|Package_TO_SOT_SMD:SOT-23-5",
+        "pad_functions": [
+          {"function": "VIN", "pad": "1"},
+          {"function": "GND", "pad": "2"},
+          {"function": "EN", "pad": "3"},
+          {"function": "ADJ", "pad": "4"},
+          {"function": "VOUT", "pad": "5"}
+        ],
+        "verification": {"confidence": "verified", "sources": ["diodes:AP2127:DS36478-rev7-2", "builtin_pinmap:Regulator_Linear:AP2127K-ADJ"], "pinmap_checked": true}
+      }],
+      "verification": {"confidence": "verified", "sources": ["diodes:AP2127:DS36478-rev7-2", "kicad-symbols:Regulator_Linear:AP2127K-ADJ", "builtin_pinmap:Regulator_Linear:AP2127K-ADJ"], "pinmap_checked": true, "notes": ["Recommended operating range is 2.5 V to 6 V; output current is 300 mA; adjustable output uses the reviewed 0.8 V divider equation."]}
+    },
+    {
       "id": "opamp.generic.single.lmv321",
       "family": "opamp",
       "name": "Generic single op-amp LMV321-style",

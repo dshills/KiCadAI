@@ -155,8 +155,19 @@ func TestCheckedInCatalogLM358MultiUnitEvidence(t *testing.T) {
 	if len(record.Packages) != 1 || record.Packages[0].FootprintID != "Package_SO:SOIC-8_3.9x4.9mm_P1.27mm" || len(record.Packages[0].PadFunctions) != 8 {
 		t.Fatalf("LM358 package evidence = %#v", record.Packages)
 	}
-	if record.OpAmp == nil || record.OpAmp.OutputSwingStatus != "review_required" || record.OpAmp.NoiseStatus != "review_required" || record.OpAmp.DistortionStatus != "review_required" {
+	if record.OpAmp == nil || record.OpAmp.StabilityStatus != "proven" || record.OpAmp.GainBandwidthStatus != "proven" || record.OpAmp.InputCommonModeStatus != "proven" || record.OpAmp.OutputDriveStatus != "proven" || record.OpAmp.LoadCompatibilityStatus != "proven" || record.OpAmp.FabricationCandidateBlocks || record.OpAmp.NoiseStatus != "review_required" || record.OpAmp.DistortionStatus != "review_required" {
 		t.Fatalf("LM358 analog review evidence = %#v", record.OpAmp)
+	}
+	wantAliases := map[string]string{
+		"1": "CHANNEL_1_OUT", "2": "CHANNEL_1_IN_MINUS", "3": "CHANNEL_1_IN_PLUS",
+		"5": "CHANNEL_2_IN_PLUS", "6": "CHANNEL_2_IN_MINUS", "7": "CHANNEL_2_OUT",
+	}
+	for _, symbol := range record.Symbols {
+		for _, pin := range symbol.FunctionPins {
+			if want := wantAliases[pin.SymbolPin]; want != "" && !slices.Contains(pin.Aliases, want) {
+				t.Fatalf("LM358 pin %s aliases = %v, want %s", pin.SymbolPin, pin.Aliases, want)
+			}
+		}
 	}
 }
 
@@ -230,6 +241,37 @@ func TestCheckedInCatalogRegulatorSliceEvidence(t *testing.T) {
 	requireDeratingRule(t, ap2112, "capacitor_stability")
 	requireRegulatorStability(t, regulator, "esr_window_required", true)
 	requireRegulatorStability(t, ap2112, "ceramic_stable", true)
+
+	ap2127 := requireCatalogRecord(t, catalog, "regulator.linear.ap2127k_adj.sot23_5")
+	if ap2127.Verification.Confidence != ConfidenceVerified {
+		t.Fatalf("AP2127K-ADJ confidence = %q", ap2127.Verification.Confidence)
+	}
+	requireRatingMinMax(t, ap2127, "input_voltage", "2.5", "6", "V")
+	requireRatingMax(t, ap2127, "output_current", "300", "mA")
+	requireSymbolFunctions(t, ap2127, "Regulator_Linear:AP2127K-ADJ", []string{"VIN", "GND", "EN", "ADJ", "VOUT"})
+	requirePackagePads(t, ap2127, "sot23_5", []string{"VIN", "GND", "EN", "ADJ", "VOUT"})
+	requireRegulatorStability(t, ap2127, "ceramic_stable", true)
+	outputRangeFound := false
+	for _, value := range ap2127.Values {
+		if value.Kind == "output_voltage" && value.Min == "0.8" && value.Max == "5.5" && value.Unit == "V" {
+			outputRangeFound = true
+			break
+		}
+	}
+	if !outputRangeFound {
+		t.Fatalf("AP2127K-ADJ output range = %+v", ap2127.Values)
+	}
+	var feedback *CompanionValueFormula
+	for _, companion := range ap2127.Companions {
+		for _, recipe := range companion.Recipes {
+			if recipe.ID == "feedback_upper" {
+				feedback = recipe.ValueFormula
+			}
+		}
+	}
+	if feedback == nil || feedback.Kind != "divider_upper_from_output_v1" || feedback.Parameter != "output_voltage_v" || feedback.ReferenceVoltageV != 0.8 || feedback.LowerResistanceOhm != 10_000 || feedback.PreferredSeries != "E96" {
+		t.Fatalf("AP2127K-ADJ feedback formula = %+v", feedback)
+	}
 
 	capacitor := requireCatalogRecord(t, catalog, "capacitor.ceramic.0805")
 	if capacitor.Verification.Confidence != ConfidenceRuleInferred {

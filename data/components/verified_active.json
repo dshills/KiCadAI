@@ -94,18 +94,18 @@
         ]
       }],
       "opamp_evidence": {
-        "intended_roles": ["input_buffer", "gain_stage"],
+        "intended_roles": ["input_buffer", "gain_stage", "voltage_follower", "comparator"],
         "supply_mode": "single_supply",
-        "output_drive_status": "review_required",
-        "load_compatibility_status": "review_required",
-        "gain_bandwidth_status": "review_required",
-        "stability_status": "review_required",
-        "input_common_mode_status": "review_required",
+        "output_drive_status": "proven",
+        "load_compatibility_status": "proven",
+        "gain_bandwidth_status": "proven",
+        "stability_status": "proven",
+        "input_common_mode_status": "proven",
         "output_swing_status": "review_required",
         "noise_status": "review_required",
         "distortion_status": "review_required",
-        "fabrication_candidate_blocks": true,
-        "review_note": "Connectivity and package evidence do not prove analog performance. Stability, bandwidth, common-mode range, output swing and drive, noise, distortion, and load compatibility require design-specific review."
+        "fabrication_candidate_blocks": false,
+        "review_note": "TI SLOS068 proves the bounded single-supply, unity-gain-stable, low-current buffer/comparator operating envelope used by the reviewed MNA model. Noise, distortion, and general-purpose output swing remain design-specific review items."
       },
       "placement_hints": [{"kind": "near", "target": "decoupling_capacitor", "value": "3", "unit": "mm"}],
       "symbols": [
@@ -115,9 +115,9 @@
           "unit_id": "A",
           "unit_type": "functional",
           "function_pins": [
-            {"function": "OUT", "symbol_pin": "1", "electrical": "output", "required": true},
-            {"function": "IN_MINUS", "symbol_pin": "2", "electrical": "input", "required": true},
-            {"function": "IN_PLUS", "symbol_pin": "3", "electrical": "input", "required": true}
+            {"function": "OUT", "symbol_pin": "1", "electrical": "output", "required": true, "aliases": ["CHANNEL_1_OUT"]},
+            {"function": "IN_MINUS", "symbol_pin": "2", "electrical": "input", "required": true, "aliases": ["CHANNEL_1_IN_MINUS"]},
+            {"function": "IN_PLUS", "symbol_pin": "3", "electrical": "input", "required": true, "aliases": ["CHANNEL_1_IN_PLUS"]}
           ],
           "verification": {"confidence": "verified", "sources": ["kicad-symbols:Amplifier_Operational:LM358", "ti:lm358:datasheet:slos068"], "pinmap_checked": true}
         },
@@ -127,9 +127,9 @@
           "unit_id": "B",
           "unit_type": "functional",
           "function_pins": [
-            {"function": "IN_PLUS", "symbol_pin": "5", "electrical": "input", "required": true},
-            {"function": "IN_MINUS", "symbol_pin": "6", "electrical": "input", "required": true},
-            {"function": "OUT", "symbol_pin": "7", "electrical": "output", "required": true}
+            {"function": "IN_PLUS", "symbol_pin": "5", "electrical": "input", "required": true, "aliases": ["CHANNEL_2_IN_PLUS"]},
+            {"function": "IN_MINUS", "symbol_pin": "6", "electrical": "input", "required": true, "aliases": ["CHANNEL_2_IN_MINUS"]},
+            {"function": "OUT", "symbol_pin": "7", "electrical": "output", "required": true, "aliases": ["CHANNEL_2_OUT"]}
           ],
           "verification": {"confidence": "verified", "sources": ["kicad-symbols:Amplifier_Operational:LM358", "ti:lm358:datasheet:slos068"], "pinmap_checked": true}
         },
@@ -155,13 +155,13 @@
         "lifecycle": "active",
         "pinmap_id": "Amplifier_Operational:LM358|Package_SO:SOIC-8_3.9x4.9mm_P1.27mm",
         "pad_functions": [
-          {"function": "OUT", "pad": "1"},
-          {"function": "IN_MINUS", "pad": "2"},
-          {"function": "IN_PLUS", "pad": "3"},
+          {"function": "OUT", "pad": "1", "aliases": ["CHANNEL_1_OUT"]},
+          {"function": "IN_MINUS", "pad": "2", "aliases": ["CHANNEL_1_IN_MINUS"]},
+          {"function": "IN_PLUS", "pad": "3", "aliases": ["CHANNEL_1_IN_PLUS"]},
           {"function": "V_MINUS", "pad": "4"},
-          {"function": "IN_PLUS", "pad": "5"},
-          {"function": "IN_MINUS", "pad": "6"},
-          {"function": "OUT", "pad": "7"},
+          {"function": "IN_PLUS", "pad": "5", "aliases": ["CHANNEL_2_IN_PLUS"]},
+          {"function": "IN_MINUS", "pad": "6", "aliases": ["CHANNEL_2_IN_MINUS"]},
+          {"function": "OUT", "pad": "7", "aliases": ["CHANNEL_2_OUT"]},
           {"function": "V_PLUS", "pad": "8"}
         ],
         "verification": {"confidence": "verified", "sources": ["kicad-footprints:Package_SO:SOIC-8_3.9x4.9mm_P1.27mm", "ti:lm358:datasheet:slos068"], "pinmap_checked": true}

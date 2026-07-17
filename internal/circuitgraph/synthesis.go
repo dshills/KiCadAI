@@ -7,6 +7,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"unicode"
 
 	"kicadai/internal/components"
 	"kicadai/internal/reports"
@@ -103,13 +104,15 @@ func (resolver *Resolver) Synthesize(ctx context.Context, document Document) (Do
 	selectedByIntent := map[string]ResolvedComponent{}
 	var issues []reports.Issue
 	for index, requirement := range intent.Functions {
+		query := cloneComponentQuery(requirement.Query)
 		instance := Component{
 			ID: requirement.ID, Role: requirement.Role, ComponentID: requirement.ComponentID,
-			Query: requirement.Query, Value: requirement.Value, Parameters: append([]Parameter(nil), requirement.Parameters...),
+			Query: query, Value: requirement.Value, Parameters: append([]Parameter(nil), requirement.Parameters...),
 			RequiredRatings:   append([]RequiredRating(nil), requirement.RequiredRatings...),
 			RequiredFunctions: append([]string(nil), requirement.RequiredFunctions...),
 			Population:        PopulationPopulate, Extensions: cloneRawMessages(requirement.Extensions),
 		}
+		applyRegulatorParameterConstraints(&instance)
 		selected, selectionIssues := resolveComponent(ctx, instance, resolver.options, resolver.recordsByID, normalized.Project.Acceptance, index)
 		if reports.HasBlockingIssue(selectionIssues) {
 			issues = append(issues, synthesisSelectionIssues(requirement.ID, selectionIssues)...)
@@ -117,6 +120,7 @@ func (resolver *Resolver) Synthesize(ctx context.Context, document Document) (Do
 		}
 		instance.ComponentID = selected.ComponentID
 		instance.VariantID = selected.VariantID
+		instance.Units = append([]ComponentUnit(nil), selected.Instance.Units...)
 		instance.Query = nil
 		lowered.Components = append(lowered.Components, instance)
 		selected.Instance = instance
@@ -163,13 +167,13 @@ func (resolver *Resolver) Synthesize(ctx context.Context, document Document) (Do
 				if !exists {
 					continue
 				}
-				function, ok := canonicalFunction(selection.Functions, endpoint.Port)
+				binding, ok := uniqueResolvedFunction(selection.Functions, endpoint.Port)
 				if !ok {
 					issues = append(issues, synthesisIssue(CodeSynthesisConnectionUnresolved, "synthesis.connections."+connection.Name+"."+endpoint.Function+"."+endpoint.Port, "connection references an unavailable semantic function or alias", "correct the function port or catalog alias evidence"))
 					continue
 				}
-				net.Endpoints = append(net.Endpoints, Endpoint{Component: endpoint.Function, SelectorKind: SelectorFunction, Selector: function})
-				connected[endpoint.Function+"\x00"+normalizedFunctionKey(function)] = true
+				net.Endpoints = append(net.Endpoints, Endpoint{Component: endpoint.Function, Unit: binding.UnitID, SelectorKind: SelectorFunction, Selector: binding.Function})
+				connected[endpoint.Function+"\x00"+normalizedFunctionKey(binding.Function)] = true
 				continue
 			}
 			componentID := interfaceComponents[endpoint.Interface]
@@ -302,6 +306,55 @@ func (resolver *Resolver) Synthesize(ctx context.Context, document Document) (Do
 	return lowered, report, report.Issues
 }
 
+func cloneComponentQuery(query *ComponentQuery) *ComponentQuery {
+	if query == nil {
+		return nil
+	}
+	return &ComponentQuery{
+		Text: query.Text, Family: query.Family, Package: query.Package,
+		ValueKind: query.ValueKind, Value: query.Value, MinVoltageV: query.MinVoltageV,
+		MinimumConfidence: query.MinimumConfidence,
+	}
+}
+
+func applyRegulatorParameterConstraints(instance *Component) {
+	if instance == nil || instance.Role != RoleRegulator || instance.Query == nil {
+		return
+	}
+	if outputVoltage := synthesisParameterString(instance.Parameters, "output_voltage_v"); outputVoltage != "" && instance.Query.ValueKind == "" {
+		instance.Query.ValueKind = "output_voltage"
+		instance.Query.Value = outputVoltage
+	}
+	if outputCurrent := synthesisParameterString(instance.Parameters, "maximum_output_current_ma"); outputCurrent != "" {
+		upsertRequiredRating(instance, RequiredRating{Kind: "output_current", Value: outputCurrent, Unit: "mA"})
+	}
+}
+
+func upsertRequiredRating(instance *Component, required RequiredRating) {
+	requiredValue, requiredOK := parseRatingValue(required)
+	for index, existing := range instance.RequiredRatings {
+		if !strings.EqualFold(existing.Kind, required.Kind) {
+			continue
+		}
+		existingValue, existingOK := parseRatingValue(existing)
+		if requiredOK && existingOK && requiredValue > existingValue {
+			instance.RequiredRatings[index] = required
+		}
+		return
+	}
+	instance.RequiredRatings = append(instance.RequiredRatings, required)
+}
+
+func parseRatingValue(rating RequiredRating) (float64, bool) {
+	value := strings.TrimSpace(rating.Value)
+	if strings.IndexFunc(value, func(character rune) bool {
+		return unicode.IsLetter(character) || character == '%' || character == 'Ω'
+	}) >= 0 {
+		return components.ParseEngineeringValue(value)
+	}
+	return components.ParseEngineeringValue(value + strings.TrimSpace(rating.Unit))
+}
+
 func (resolver *Resolver) synthesizeInterface(ctx context.Context, requirement InterfaceRequirement, acceptance AcceptanceLevel, index int) (Component, ResolvedComponent, []SynthesisInterfaceBinding, []reports.Issue) {
 	type candidate struct {
 		record components.ComponentRecord
@@ -409,12 +462,18 @@ func (resolver *Resolver) expandCompanionRecipes(ctx context.Context, document *
 			}
 			for _, recipe := range companion.Recipes {
 				supportID := stableGeneratedID("support", requirement.ID+"_"+companion.ID+"_"+recipe.ID)
+				value, valueIssue := deriveCompanionRecipeValue(recipe, requirement.Parameters)
+				if valueIssue != nil {
+					valueIssue.Path = path + ".recipes." + recipe.ID + ".value_formula"
+					issues = append(issues, *valueIssue)
+					continue
+				}
 				query := &ComponentQuery{
 					Family: recipe.Family, Package: recipe.Package, ValueKind: recipe.ValueKind,
-					Value: recipe.Value, MinVoltageV: recipe.MinVoltageV, MinimumConfidence: recipe.MinimumConfidence,
+					Value: value, MinVoltageV: recipe.MinVoltageV, MinimumConfidence: recipe.MinimumConfidence,
 				}
 				instance := Component{
-					ID: supportID, Role: recipe.Role, Query: query, Value: recipe.Value,
+					ID: supportID, Role: recipe.Role, Query: query, Value: value,
 					RequiredFunctions: append([]string(nil), recipe.RequiredFunctions...), Population: PopulationPopulate,
 				}
 				resolved, selectionIssues := resolveComponent(ctx, instance, resolver.options, resolver.recordsByID, document.Project.Acceptance, len(document.Components))
@@ -432,6 +491,12 @@ func (resolver *Resolver) expandCompanionRecipes(ctx context.Context, document *
 					IntentID: supportID, ParentID: requirement.ID, Kind: "support", ComponentID: resolved.ComponentID, VariantID: resolved.VariantID,
 					Reason: "selected from a reviewed catalog companion component/network recipe",
 				})
+				if recipe.ValueFormula != nil {
+					report.DerivedConstraints = append(report.DerivedConstraints, SynthesisConstraintEvidence{
+						Kind: "calculated_support_value", Subject: supportID, Value: value,
+						Source: "reviewed catalog " + recipe.ValueFormula.Kind + " using function parameter " + recipe.ValueFormula.Parameter,
+					})
+				}
 				for _, connection := range recipe.Connections {
 					if !resolvedComponentHasFunction(parent, connection.ParentFunction) {
 						issues = append(issues, synthesisIssue(CodeSynthesisConnectionUnresolved, path+".recipes."+recipe.ID+"."+connection.ParentFunction, "companion recipe references an unavailable parent function", "correct the reviewed catalog companion recipe"))
@@ -449,6 +514,96 @@ func (resolver *Resolver) expandCompanionRecipes(ctx context.Context, document *
 		}
 	}
 	return issues
+}
+
+var e96PreferredValues = []float64{
+	100, 102, 105, 107, 110, 113, 115, 118, 121, 124, 127, 130, 133, 137, 140, 143,
+	147, 150, 154, 158, 162, 165, 169, 174, 178, 182, 187, 191, 196, 200, 205, 210,
+	215, 221, 226, 232, 237, 243, 249, 255, 261, 267, 274, 280, 287, 294, 301, 309,
+	316, 324, 332, 340, 348, 357, 365, 374, 383, 392, 402, 412, 422, 432, 442, 453,
+	464, 475, 487, 499, 511, 523, 536, 549, 562, 576, 590, 604, 619, 634, 649, 665,
+	681, 698, 715, 732, 750, 768, 787, 806, 825, 845, 866, 887, 909, 931, 953, 976,
+}
+
+// Keep catalog-derived feedback parts inside the checked-in generic resistor
+// envelope; higher-impedance networks require reviewed leakage/noise evidence.
+const maxDerivedResistanceOhm = 10_000_000
+
+func deriveCompanionRecipeValue(recipe components.CompanionPartRecipe, parameters []Parameter) (string, *reports.Issue) {
+	// The caller has already selected one catalog recipe; this function derives
+	// that recipe's value and performs no candidate or order-based tie-breaking.
+	if recipe.ValueFormula == nil {
+		return recipe.Value, nil
+	}
+	formula := recipe.ValueFormula
+	if formula.Kind != "divider_upper_from_output_v1" || formula.PreferredSeries != "E96" {
+		issue := synthesisIssue(CodeSynthesisSupportRecipeMissing, "", "companion value formula is unsupported", "select a catalog component with a supported deterministic value formula")
+		return "", &issue
+	}
+	parameter := synthesisParameterString(parameters, formula.Parameter)
+	outputVoltage, parsed := components.ParseEngineeringValue(parameter)
+	referenceTolerance := 1e-12 * math.Max(1, math.Abs(formula.ReferenceVoltageV))
+	if !parsed || math.IsNaN(outputVoltage) || math.IsInf(outputVoltage, 0) || outputVoltage < formula.ReferenceVoltageV-referenceTolerance {
+		issue := synthesisIssue(CodeSynthesisSupportRecipeMissing, "", "divider output parameter must be a finite voltage at or above the catalog reference voltage", "provide a supported output voltage or select a compatible fixed regulator")
+		return "", &issue
+	}
+	if math.Abs(outputVoltage-formula.ReferenceVoltageV) <= referenceTolerance {
+		// Preserve the reviewed two-part feedback topology with a catalog-backed
+		// 0-ohm link. Rewriting it as a direct net would change the BOM and graph
+		// shape only at this boundary and make replay topology parameter-dependent.
+		return "0", nil
+	}
+	target := formula.LowerResistanceOhm * (outputVoltage/formula.ReferenceVoltageV - 1)
+	value := nearestE96Value(target)
+	if value <= 0 || value > maxDerivedResistanceOhm {
+		issue := synthesisIssue(CodeSynthesisSupportRecipeMissing, "", "derived divider resistance is outside the supported 0..10 Mohm passive range", "select a compatible reference voltage or divider base resistance")
+		return "", &issue
+	}
+	return formatResistanceValue(value), nil
+}
+
+func nearestE96Value(target float64) float64 {
+	best := 0.0
+	bestDelta := math.Inf(1)
+	bestOrdinal := -1
+	for exponent := -4; exponent <= 7; exponent++ {
+		scale := math.Pow10(exponent)
+		for index, preferred := range e96PreferredValues {
+			candidate := preferred * scale
+			delta := math.Abs(candidate - target)
+			ordinal := (exponent+4)*len(e96PreferredValues) + index
+			tieTolerance := 1e-12 * math.Max(1, math.Max(delta, bestDelta))
+			if bestOrdinal < 0 || delta < bestDelta-tieTolerance || (math.Abs(delta-bestDelta) <= tieTolerance && e96TieCandidatePreferred(candidate, ordinal, best, bestOrdinal)) {
+				best, bestDelta, bestOrdinal = candidate, delta, ordinal
+			}
+		}
+	}
+	return best
+}
+
+func e96TieCandidatePreferred(candidate float64, ordinal int, current float64, currentOrdinal int) bool {
+	if currentOrdinal < 0 {
+		return true
+	}
+	candidateEven := ordinal%2 == 0
+	currentEven := currentOrdinal%2 == 0
+	if candidateEven != currentEven {
+		return candidateEven
+	}
+	return candidate < current
+}
+
+func formatResistanceValue(value float64) string {
+	switch {
+	case value >= 1_000_000:
+		return strconv.FormatFloat(value/1_000_000, 'g', -1, 64) + "M"
+	case value >= 1_000:
+		return strconv.FormatFloat(value/1_000, 'g', -1, 64) + "k"
+	case value >= .001 && value < 1:
+		return strconv.FormatFloat(value*1_000, 'g', -1, 64) + "m"
+	default:
+		return strconv.FormatFloat(value, 'g', -1, 64)
+	}
 }
 
 func applySensorFunctionPolicies(document *Document, intent FunctionIntent, selected map[string]ResolvedComponent, connected map[string]bool) []reports.Issue {
@@ -745,6 +900,28 @@ func synthesisCopperLayerCount(componentCount int, nets []Net) int {
 		return 4
 	}
 	return 2
+}
+
+func uniqueResolvedFunction(functions []ResolvedFunction, requested string) (ResolvedFunction, bool) {
+	matches := []ResolvedFunction{}
+	for _, function := range functions {
+		matched := strings.EqualFold(function.Function, requested) || slices.ContainsFunc(function.Aliases, func(alias string) bool {
+			return strings.EqualFold(alias, requested)
+		})
+		if matched {
+			matches = append(matches, function)
+		}
+	}
+	if len(matches) == 0 {
+		return ResolvedFunction{}, false
+	}
+	canonical := normalizedFunctionKey(matches[0].Function)
+	for _, match := range matches[1:] {
+		if normalizedFunctionKey(match.Function) != canonical || match.Unit != matches[0].Unit || match.UnitID != matches[0].UnitID {
+			return ResolvedFunction{}, false
+		}
+	}
+	return matches[0], true
 }
 
 func synthesisPhysicalEnvelope(instances []Component, recordsByID map[string]components.ComponentRecord) (float64, float64) {

@@ -1,15 +1,15 @@
 {
-  "record_count": 58,
+  "record_count": 59,
   "family_count": 18,
   "confidence_counts": {
     "blocked": 1,
     "library_derived": 0,
     "placeholder": 4,
     "rule_inferred": 5,
-    "verified": 48
+    "verified": 49
   },
   "alternative_coverage": {
-    "concrete_records": 34,
+    "concrete_records": 35,
     "generic_fallback_records": 24,
     "equivalence_groups": 19
   },
@@ -305,22 +305,24 @@
     {
       "family": "regulator",
       "defined": true,
-      "record_count": 2,
-      "concrete_records": 2,
+      "record_count": 3,
+      "concrete_records": 3,
       "generic_fallback_records": 0,
       "equivalence_groups": 0,
-      "verified_records": 2,
+      "verified_records": 3,
       "library_derived_records": 0,
       "rule_inferred_records": 0,
       "placeholder_records": 0,
       "blocked_records": 0,
       "missing_resolver_evidence": [
         "regulator.linear.ams1117_3v3.sot223",
-        "regulator.linear.ap2112k_3v3.sot23_5"
+        "regulator.linear.ap2112k_3v3.sot23_5",
+        "regulator.linear.ap2127k_adj.sot23_5"
       ],
       "record_ids": [
         "regulator.linear.ams1117_3v3.sot223",
-        "regulator.linear.ap2112k_3v3.sot23_5"
+        "regulator.linear.ap2112k_3v3.sot23_5",
+        "regulator.linear.ap2127k_adj.sot23_5"
       ]
     },
     {

@@ -99,6 +99,7 @@ type Candidate struct {
 	EquivalenceGroup string          `json:"equivalence_group,omitempty"`
 	EquivalenceRole  EquivalenceRole `json:"equivalence_role,omitempty"`
 	Reasons          []string        `json:"reasons,omitempty"`
+	valueSpecificity int             `json:"-"`
 }
 
 type Selection struct {
@@ -209,6 +210,7 @@ func Find(ctx context.Context, catalog *Catalog, query Query) ([]Candidate, repo
 				EquivalenceGroup: group,
 				EquivalenceRole:  role,
 				Reasons:          candidateReasons(record, variant, query),
+				valueSpecificity: recordValueSpecificity(record, query),
 			})
 		}
 	}
@@ -296,6 +298,9 @@ func acceptedCandidateLess(leftAccepted acceptedCandidate, rightAccepted accepte
 	if left.Confidence != right.Confidence {
 		return confidenceRank(left.Confidence) > confidenceRank(right.Confidence)
 	}
+	if left.valueSpecificity != right.valueSpecificity {
+		return left.valueSpecificity > right.valueSpecificity
+	}
 	if left.Generic != right.Generic {
 		if strongAcceptance {
 			return !left.Generic
@@ -318,7 +323,7 @@ func ambiguousTopTie(candidates []acceptedCandidate) (bool, []Candidate) {
 	selected := candidates[0].Candidate
 	for _, candidate := range candidates[1:] {
 		current := candidate.Candidate
-		if current.Score != selected.Score || current.Confidence != selected.Confidence {
+		if current.Score != selected.Score || current.Confidence != selected.Confidence || current.valueSpecificity != selected.valueSpecificity {
 			break
 		}
 		if equivalentCandidate(selected, current) || hasExplicitSelectionPreference(selected, current) {
@@ -756,6 +761,22 @@ func recordHasValue(record ComponentRecord, kind string, value string) bool {
 	return false
 }
 
+func recordValueSpecificity(record ComponentRecord, query Query) int {
+	if query.ValueKind == "" || query.Value == "" {
+		return 0
+	}
+	for _, constraint := range record.Values {
+		if constraint.Kind != query.ValueKind {
+			continue
+		}
+		if constraint.Typ != "" {
+			return 2
+		}
+		return 1
+	}
+	return 0
+}
+
 func scoreCandidate(record ComponentRecord, variant PackageVariant, query Query) int {
 	score := confidenceRank(weakerConfidence(record.Verification.Confidence, variant.Verification.Confidence)) * 100
 	if query.Family != "" && record.Family == query.Family {
@@ -791,6 +812,9 @@ func sortCandidates(candidates []Candidate) {
 		}
 		if candidates[i].Confidence != candidates[j].Confidence {
 			return confidenceRank(candidates[i].Confidence) > confidenceRank(candidates[j].Confidence)
+		}
+		if candidates[i].valueSpecificity != candidates[j].valueSpecificity {
+			return candidates[i].valueSpecificity > candidates[j].valueSpecificity
 		}
 		if candidates[i].ComponentID != candidates[j].ComponentID {
 			return candidates[i].ComponentID < candidates[j].ComponentID

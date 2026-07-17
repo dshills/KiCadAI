@@ -28,6 +28,7 @@ const (
 	adversarialBaselineReportSHA256    = "33285964855f9b2dc41b8d5f44f851cd36877b48cb5b595da78546dfdde46f3e"
 	adversarialPromotionModeEnv        = "KICADAI_ADVERSARIAL_PROMOTION"
 	adversarialPromotionCasesEnv       = "KICADAI_ADVERSARIAL_CASES"
+	adversarialPromotionArtifactDirEnv = "KICADAI_ADVERSARIAL_ARTIFACT_DIR"
 )
 
 type adversarialCapabilityIssue struct {
@@ -329,7 +330,16 @@ func evaluateAdversarialCircuit(t *testing.T, ctx context.Context, root string, 
 		return adversarialBlockedCircuit(circuit, "writer", reports.Issue{Code: reports.CodeSkippedExternalTool, Severity: reports.SeverityBlocked, Stage: "kicad_checks", Path: "kicad_cli", Message: "complete baseline requires KiCad-backed promotion"})
 	}
 
+	artifactRoot := strings.TrimSpace(os.Getenv(adversarialPromotionArtifactDirEnv))
+	if artifactRoot != "" {
+		if err := os.MkdirAll(artifactRoot, 0o755); err != nil {
+			t.Fatalf("create adversarial artifact root: %v", err)
+		}
+	}
 	firstOutput := filepath.Join(t.TempDir(), "first")
+	if artifactRoot != "" {
+		firstOutput = filepath.Join(artifactRoot, fixture.ID, "first")
+	}
 	first := designworkflow.Create(ctx, request, adversarialCreateOptions(firstOutput, index, cliPath))
 	if category, issue, failed := adversarialWorkflowFailure(first); failed {
 		blocked := adversarialBlockedCircuit(circuit, category, issue)
@@ -345,6 +355,9 @@ func evaluateAdversarialCircuit(t *testing.T, ctx context.Context, root string, 
 	circuit.Hashes["generated_files"] = hashFunctionGeneratedFiles(t, firstOutput)
 
 	secondOutput := filepath.Join(t.TempDir(), "second")
+	if artifactRoot != "" {
+		secondOutput = filepath.Join(artifactRoot, fixture.ID, "second")
+	}
 	second := designworkflow.Create(ctx, request, adversarialCreateOptions(secondOutput, index, cliPath))
 	if category, issue, failed := adversarialWorkflowFailure(second); failed {
 		return adversarialBlockedCircuit(circuit, category, issue)

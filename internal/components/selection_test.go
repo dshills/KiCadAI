@@ -76,7 +76,7 @@ func TestSelectBlocksStaleLifecycleForFabricationCandidate(t *testing.T) {
 		t.Fatal(err)
 	}
 	_, result := Select(context.Background(), catalog, SelectionRequest{
-		Query:       Query{Family: "regulator", Package: "sot23_5", ValueKind: "output_voltage", Value: "3.3"},
+		Query:       Query{Text: "AP2112K", Family: "regulator", Package: "sot23_5", ValueKind: "output_voltage", Value: "3.3"},
 		Acceptance:  AcceptanceFabricationCandidate,
 		Sources:     sources,
 		Procurement: ProcurementPolicy{Now: &now},
@@ -95,7 +95,7 @@ func TestSelectBlocksRequiredUnavailableAvailability(t *testing.T) {
 		Availability: &AvailabilityEvidence{Status: AvailabilityUnavailable, Source: "manual", SourceDate: "2026-06-26", Confidence: SourceConfidenceManualReview},
 	})
 	_, result := Select(context.Background(), catalog, SelectionRequest{
-		Query:       Query{Family: "regulator", Package: "sot23_5", ValueKind: "output_voltage", Value: "3.3"},
+		Query:       Query{Text: "AP2112K", Family: "regulator", Package: "sot23_5", ValueKind: "output_voltage", Value: "3.3"},
 		Acceptance:  AcceptanceConnectivity,
 		Sources:     sources,
 		Procurement: ProcurementPolicy{RequireAvailability: true, Now: &now},
@@ -121,6 +121,17 @@ func TestSelectRejectsCapacitorBelowVoltageRating(t *testing.T) {
 		t.Fatal("expected voltage rating rejection")
 	}
 	assertIssueCode(t, result.Issues, CodeComponentRatingTooLow)
+}
+
+func TestSelectZeroOhm0603ResistorForCatalogDerivedLink(t *testing.T) {
+	catalog := loadCheckedInCatalog(t)
+	selection, result := Select(context.Background(), catalog, SelectionRequest{
+		Query:      Query{Family: "resistor", Package: "0603", ValueKind: "resistance", Value: "0", MinimumConfidence: ConfidenceRuleInferred},
+		Acceptance: AcceptanceConnectivity,
+	})
+	if !result.OK || selection.Component.ID != "resistor.generic.0603" {
+		t.Fatalf("zero-ohm 0603 selection = %#v result=%#v", selection, result)
+	}
 }
 
 func TestSelectConcrete0603CapacitorByPackage(t *testing.T) {
@@ -456,7 +467,7 @@ func TestSelectAP2112KRegulatorVariant(t *testing.T) {
 func TestSelectAP2112KRejectsInsufficientInputHeadroom(t *testing.T) {
 	catalog := loadCheckedInCatalog(t)
 	_, result := Select(context.Background(), catalog, SelectionRequest{
-		Query:      Query{Family: "regulator", Package: "sot23_5", ValueKind: "output_voltage", Value: "3.3"},
+		Query:      Query{Text: "AP2112K", Family: "regulator", Package: "sot23_5", ValueKind: "output_voltage", Value: "3.3"},
 		Acceptance: AcceptanceConnectivity,
 		RequiredRatings: []RequiredRating{
 			{Kind: "input_voltage", Value: "3.6", Unit: "V"},
@@ -488,7 +499,7 @@ func TestSelectAP2112KRejectsOverCurrent(t *testing.T) {
 func TestSelectRegulatorRejectsUnsupportedOutputVoltage(t *testing.T) {
 	catalog := loadCheckedInCatalog(t)
 	_, result := Select(context.Background(), catalog, SelectionRequest{
-		Query:      Query{Family: "regulator", ValueKind: "output_voltage", Value: "5"},
+		Query:      Query{Family: "regulator", ValueKind: "output_voltage", Value: "5.6"},
 		Acceptance: AcceptanceConnectivity,
 	})
 	assertIssueCode(t, result.Issues, CodeComponentNotFound)

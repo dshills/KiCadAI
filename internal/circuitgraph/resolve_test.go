@@ -192,6 +192,34 @@ func TestResolveComponentUnitsDefensivelyRejectsDuplicateDeclarations(t *testing
 	assertGraphIssueCode(t, issues, CodeUnitInvalid)
 }
 
+func TestResolveComponentUnitsInfersOnlyRequiredAndPowerUnits(t *testing.T) {
+	symbols := []components.SymbolBinding{
+		{SymbolID: "Test:Multi", UnitID: "A", Unit: 1, FunctionPins: []components.FunctionPin{{Function: "CHANNEL_1_OUT", SymbolPin: "1"}}},
+		{SymbolID: "Test:Multi", UnitID: "B", Unit: 2, FunctionPins: []components.FunctionPin{{Function: "CHANNEL_2_OUT", SymbolPin: "2"}}},
+		{SymbolID: "Test:Multi", UnitID: "P", Unit: 3, RequiredUnit: true, FunctionPins: []components.FunctionPin{{Function: "V_PLUS", SymbolPin: "3"}}},
+	}
+	instance := Component{Query: &ComponentQuery{Family: "opamp"}, RequiredFunctions: []string{"CHANNEL_1_OUT"}}
+	selectedSymbols, selectedUnits, issues := resolveComponentUnits("components[0]", instance, symbols)
+	if len(issues) != 0 {
+		t.Fatalf("issues = %#v", issues)
+	}
+	if len(selectedSymbols) != 2 || len(selectedUnits) != 2 || selectedUnits[0].ID != "A" || selectedUnits[1].ID != "P" {
+		t.Fatalf("selected symbols/units = %#v / %#v", selectedSymbols, selectedUnits)
+	}
+}
+
+func TestResolveComponentUnitsAllowsSharedFunctionAcrossRequiredPowerUnits(t *testing.T) {
+	symbols := []components.SymbolBinding{
+		{SymbolID: "Test:Power", UnitID: "P1", Unit: 1, UnitType: components.SymbolUnitPower, RequiredUnit: true, FunctionPins: []components.FunctionPin{{Function: "GND", SymbolPin: "1"}}},
+		{SymbolID: "Test:Power", UnitID: "P2", Unit: 2, UnitType: components.SymbolUnitPower, RequiredUnit: true, FunctionPins: []components.FunctionPin{{Function: "GND", SymbolPin: "2"}}},
+	}
+	instance := Component{Query: &ComponentQuery{Family: "power"}, RequiredFunctions: []string{"GND"}}
+	_, selectedUnits, issues := resolveComponentUnits("components[0]", instance, symbols)
+	if len(issues) != 0 || len(selectedUnits) != 2 || selectedUnits[0].ID != "P1" || selectedUnits[1].ID != "P2" {
+		t.Fatalf("selected shared power units = %#v issues=%#v", selectedUnits, issues)
+	}
+}
+
 func TestResolveFailsClosedForUntrustedConstraints(t *testing.T) {
 	base := minimalResolvedDocument()
 	catalog := minimalResolvedCatalog()

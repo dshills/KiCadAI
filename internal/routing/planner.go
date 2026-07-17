@@ -100,11 +100,23 @@ func PlanRoutes(request Request, access PadAccess) ([]PlannedNet, []reports.Issu
 	distanceFloors := plannedDistanceFloors(plans, distances)
 	meanDistanceFloors := plannedMeanDistanceFloors(plans, distances)
 	edgeDistances := plannedConstrainedEndpointEdgeDistances(plans, access, request.Board, request.Rules)
+	denseBundleRefs := plannedDenseSignalBundleRefs(plans, access, request.Rules)
 	sort.SliceStable(plans, func(i, j int) bool {
 		if plans[i].Net.Priority != plans[j].Net.Priority {
 			return plans[i].Net.Priority > plans[j].Net.Priority
 		}
 		if advancedOrder {
+			leftDenseBundle := denseSignalBundle(plans[i], denseBundleRefs)
+			rightDenseBundle := denseSignalBundle(plans[j], denseBundleRefs)
+			if leftDenseBundle != rightDenseBundle {
+				return leftDenseBundle
+			}
+			if leftDenseBundle && !distanceEqual(distances[plans[i].Net.Name], distances[plans[j].Net.Name]) {
+				// In a narrow-pitch bundle, commit the compact escape first.
+				// Longer peers have more free-space alternatives, while a short
+				// central escape can be sealed by either adjacent route.
+				return distanceLess(distances[plans[i].Net.Name], distances[plans[j].Net.Name])
+			}
 			leftDenseFanout := denseConstrainedFanout(plans[i], access, request.Rules, distances, distanceFloors, meanDistanceFloors)
 			rightDenseFanout := denseConstrainedFanout(plans[j], access, request.Rules, distances, distanceFloors, meanDistanceFloors)
 			if !usesFanoutPressureOrder && leftDenseFanout != rightDenseFanout {
@@ -186,6 +198,69 @@ func PlanRoutes(request Request, access PadAccess) ([]PlannedNet, []reports.Issu
 		return netLess(plans[i].Net, plans[j].Net)
 	})
 	return plans, issues
+}
+
+func plannedDenseSignalBundleRefs(plans []PlannedNet, access PadAccess, rules Rules) map[string]bool {
+	netsByRef := map[string]map[string]bool{}
+	distanceByNet := map[string]float64{}
+	accessPitch := 2*rules.GridMM + rules.TraceWidthMM
+	if rules.GridMM <= 0 {
+		return nil
+	}
+	for _, plan := range plans {
+		if plan.Net.Role != NetSignal {
+			continue
+		}
+		distanceByNet[plan.Net.Name] = plannedNetDistance(plan, access)
+		for _, endpoint := range plan.Net.Endpoints {
+			pad, ok := access.Pads[endpointKey(normalizeKey(endpoint.Ref), normalizeKey(endpoint.Pin))]
+			if !ok {
+				continue
+			}
+			span := math.Min(pad.Size.WidthMM, pad.Size.HeightMM)
+			if span <= 0 || span > accessPitch+distanceEpsilon {
+				continue
+			}
+			ref := normalizeKey(endpoint.Ref)
+			if netsByRef[ref] == nil {
+				netsByRef[ref] = map[string]bool{}
+			}
+			netsByRef[ref][plan.Net.Name] = true
+		}
+	}
+	dense := map[string]bool{}
+	for ref, nets := range netsByRef {
+		if len(nets) < 3 {
+			continue
+		}
+		shortest := math.Inf(1)
+		longest := 0.0
+		for net := range nets {
+			distance := distanceByNet[net]
+			shortest = math.Min(shortest, distance)
+			longest = math.Max(longest, distance)
+		}
+		// Short-first scheduling is appropriate only for a spatially compact
+		// bundle. When peers span widely different distances or board regions,
+		// preserve the established constrained-net order so a long escape is not
+		// sealed by several unrelated local routes.
+		if shortest > distanceEpsilon && !math.IsInf(shortest, 0) && longest <= localEscapeGapRatio*shortest+distanceEpsilon {
+			dense[ref] = true
+		}
+	}
+	return dense
+}
+
+func denseSignalBundle(plan PlannedNet, denseRefs map[string]bool) bool {
+	if plan.Net.Role != NetSignal || len(denseRefs) == 0 {
+		return false
+	}
+	for _, endpoint := range plan.Net.Endpoints {
+		if denseRefs[normalizeKey(endpoint.Ref)] {
+			return true
+		}
+	}
+	return false
 }
 
 func plannedConstrainedEndpointEdgeDistances(plans []PlannedNet, access PadAccess, board Board, rules Rules) map[string]float64 {

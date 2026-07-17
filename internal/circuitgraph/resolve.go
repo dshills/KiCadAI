@@ -178,10 +178,10 @@ func resolveSimulation(intent simmodel.Intent, resolved ResolvedDocument) (simmo
 	evidence := make([]simmodel.ComponentEvidence, 0, len(resolved.Components))
 	for _, component := range resolved.Components {
 		value, hasValue := components.ParseEngineeringValue(component.Instance.Value)
-		evidence = append(evidence, simmodel.ComponentEvidence{
-			InstanceID: component.Instance.ID, CatalogID: component.ComponentID, Family: component.Family,
-			ValueSI: value, HasValueSI: hasValue, ModelClaims: component.Record.SimulationModels, Connections: connections[component.Instance.ID],
-		})
+		evidence = append(evidence, componentSimulationEvidence(
+			component.Instance.ID, component.ComponentID, component.Family, value, hasValue,
+			configuredSimulationModels(component), connections[component.Instance.ID], component.Units,
+		)...)
 	}
 	plan, diagnostics := simmodel.ResolveWithTopology(intent, resolved.CatalogID, resolved.CatalogHash, evidence, nodes)
 	issues := make([]reports.Issue, 0, len(diagnostics))
@@ -309,9 +309,17 @@ func resolveComponent(ctx context.Context, instance Component, options ResolveOp
 	if issue := componentConstraintIssue(path, instance, resolved); issue != nil {
 		return ResolvedComponent{}, []reports.Issue{*issue}
 	}
-	selectedSymbols, resolvedUnits, unitIssues := resolveComponentUnits(path, instance, resolved.Component.Symbols)
+	selectedSymbols, selectedUnits, unitIssues := resolveComponentUnits(path, instance, resolved.Component.Symbols)
 	if reports.HasBlockingIssue(unitIssues) {
 		return ResolvedComponent{}, unitIssues
+	}
+	resolvedInstance := instance
+	resolvedInstance.Units = append([]ComponentUnit(nil), instance.Units...)
+	if len(resolvedInstance.Units) == 0 && resolvedInstance.Query != nil {
+		resolvedInstance.Units = make([]ComponentUnit, 0, len(selectedUnits))
+		for _, unit := range selectedUnits {
+			resolvedInstance.Units = append(resolvedInstance.Units, ComponentUnit{ID: unit.ID, Role: unit.Role})
+		}
 	}
 	functions, functionIssues := resolveFunctions(path, selectedSymbols, resolved.Variant)
 	resolutionIssues := append(append([]reports.Issue(nil), unitIssues...), functionIssues...)
@@ -327,11 +335,11 @@ func resolveComponent(ctx context.Context, instance Component, options ResolveOp
 		symbolID = resolved.Component.Symbols[0].SymbolID
 	}
 	component := ResolvedComponent{
-		Instance: instance, ComponentID: resolved.Component.ID, VariantID: resolved.Variant.ID,
+		Instance: resolvedInstance, ComponentID: resolved.Component.ID, VariantID: resolved.Variant.ID,
 		Family: resolved.Component.Family, Manufacturer: resolved.Component.Manufacturer,
 		MPN: firstNonEmpty(resolved.Variant.MPN, resolved.Component.MPN), Confidence: confidence,
 		SymbolID: symbolID, FootprintID: resolved.Variant.FootprintID, PinMapID: resolved.Variant.PinMapID,
-		Functions: functions, Units: resolvedUnits, CatalogSources: append([]string(nil), resolved.Component.Verification.Sources...),
+		Functions: functions, Units: selectedUnits, CatalogSources: append([]string(nil), resolved.Component.Verification.Sources...),
 		Warnings: warnings, Record: resolved.Component, Variant: resolved.Variant,
 		Symbols: append([]components.SymbolBinding(nil), selectedSymbols...),
 	}
@@ -371,11 +379,60 @@ func resolveComponentUnits(path string, instance Component, symbols []components
 	if anonymous {
 		return nil, nil, []reports.Issue{graphIssue(CodeUnitInvalid, path+".catalog_symbols", "catalog must not mix named and anonymous symbol units")}
 	}
-	if len(instance.Units) == 0 {
-		return nil, nil, []reports.Issue{graphIssue(CodeUnitInvalid, path+".units", "named multi-unit catalog component requires explicit unit declarations")}
+	declaredUnits := append([]ComponentUnit(nil), instance.Units...)
+	if len(declaredUnits) == 0 {
+		if instance.Query == nil {
+			return nil, nil, []reports.Issue{graphIssue(CodeUnitInvalid, path+".units", "named multi-unit catalog component requires explicit unit declarations")}
+		}
+		inferred := map[string]ComponentUnit{}
+		for _, function := range instance.RequiredFunctions {
+			matchingUnits := []string{}
+			for unitID, symbol := range named {
+				if slices.ContainsFunc(symbol.FunctionPins, func(pin components.FunctionPin) bool {
+					if strings.EqualFold(pin.Function, function) {
+						return true
+					}
+					return slices.ContainsFunc(pin.Aliases, func(alias string) bool { return strings.EqualFold(alias, function) })
+				}) {
+					matchingUnits = append(matchingUnits, unitID)
+				}
+			}
+			slices.Sort(matchingUnits)
+			if len(matchingUnits) == 0 {
+				return nil, nil, []reports.Issue{graphIssue(CodeUnitInvalid, path+".units", "required function "+function+" does not identify exactly one named catalog unit")}
+			}
+			if len(matchingUnits) > 1 {
+				for _, unitID := range matchingUnits {
+					symbol := named[unitID]
+					if !symbol.RequiredUnit && symbol.UnitType != components.SymbolUnitPower {
+						return nil, nil, []reports.Issue{graphIssue(CodeUnitInvalid, path+".units", "required function "+function+" is ambiguous across named functional units")}
+					}
+				}
+			}
+			for _, unitID := range matchingUnits {
+				role := "synthesized"
+				if named[unitID].RequiredUnit || named[unitID].UnitType == components.SymbolUnitPower {
+					role = "power"
+				}
+				inferred[unitID] = ComponentUnit{ID: unitID, Role: role}
+			}
+		}
+		for unitID, symbol := range named {
+			if symbol.RequiredUnit {
+				inferred[unitID] = ComponentUnit{ID: unitID, Role: "power"}
+			}
+		}
+		unitIDs := make([]string, 0, len(inferred))
+		for unitID := range inferred {
+			unitIDs = append(unitIDs, unitID)
+		}
+		slices.Sort(unitIDs)
+		for _, unitID := range unitIDs {
+			declaredUnits = append(declaredUnits, inferred[unitID])
+		}
 	}
-	declared := make(map[string]ComponentUnit, len(instance.Units))
-	for index, unit := range instance.Units {
+	declared := make(map[string]ComponentUnit, len(declaredUnits))
+	for index, unit := range declaredUnits {
 		unitID := canonicalUnitID(unit.ID)
 		if _, exists := named[unitID]; !exists {
 			return nil, nil, []reports.Issue{graphIssue(CodeUnitInvalid, fmt.Sprintf("%s.units[%d].id", path, index), "declared unit is absent from catalog evidence")}

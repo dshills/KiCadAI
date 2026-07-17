@@ -236,16 +236,28 @@ type CompanionRequirement struct {
 // component relative to semantic functions on its parent component. It has no
 // fixture identity, KiCad pin/pad, coordinate, route, or executable field.
 type CompanionPartRecipe struct {
-	ID                string                `json:"id"`
-	Family            string                `json:"family"`
-	Role              domain.ComponentRole  `json:"role"`
-	Package           string                `json:"package,omitempty"`
-	ValueKind         string                `json:"value_kind,omitempty"`
-	Value             string                `json:"value,omitempty"`
-	MinVoltageV       float64               `json:"min_voltage_v,omitempty"`
-	MinimumConfidence ConfidenceLevel       `json:"minimum_confidence,omitempty"`
-	RequiredFunctions []string              `json:"required_functions,omitempty"`
-	Connections       []CompanionConnection `json:"connections"`
+	ID                string                 `json:"id"`
+	Family            string                 `json:"family"`
+	Role              domain.ComponentRole   `json:"role"`
+	Package           string                 `json:"package,omitempty"`
+	ValueKind         string                 `json:"value_kind,omitempty"`
+	Value             string                 `json:"value,omitempty"`
+	ValueFormula      *CompanionValueFormula `json:"value_formula,omitempty"`
+	MinVoltageV       float64                `json:"min_voltage_v,omitempty"`
+	MinimumConfidence ConfidenceLevel        `json:"minimum_confidence,omitempty"`
+	RequiredFunctions []string               `json:"required_functions,omitempty"`
+	Connections       []CompanionConnection  `json:"connections"`
+}
+
+// CompanionValueFormula derives a support-part value from a named function
+// parameter and catalog-backed electrical constants. It deliberately carries
+// no component, fixture, pin, pad, net, or layout identity.
+type CompanionValueFormula struct {
+	Kind               string  `json:"kind"`
+	Parameter          string  `json:"parameter"`
+	ReferenceVoltageV  float64 `json:"reference_voltage_v"`
+	LowerResistanceOhm float64 `json:"lower_resistance_ohm"`
+	PreferredSeries    string  `json:"preferred_series"`
 }
 
 type CompanionConnection struct {
@@ -272,17 +284,19 @@ type RegulatorEvidence struct {
 }
 
 type RegulatorCapacitorStability struct {
-	Kind                       string   `json:"kind"`
-	MinCapacitance             string   `json:"min_capacitance,omitempty"`
-	MaxCapacitance             string   `json:"max_capacitance,omitempty"`
-	CapacitanceUnit            string   `json:"capacitance_unit,omitempty"`
-	AcceptedDielectrics        []string `json:"accepted_dielectrics,omitempty"`
-	ESRMin                     string   `json:"esr_min,omitempty"`
-	ESRMax                     string   `json:"esr_max,omitempty"`
-	ESRUnit                    string   `json:"esr_unit,omitempty"`
-	ProofStatus                string   `json:"proof_status,omitempty"`
-	FabricationCandidateBlocks bool     `json:"fabrication_candidate_blocks,omitempty"`
-	ReviewNote                 string   `json:"review_note,omitempty"`
+	Kind                string   `json:"kind"`
+	MinCapacitance      string   `json:"min_capacitance,omitempty"`
+	MaxCapacitance      string   `json:"max_capacitance,omitempty"`
+	CapacitanceUnit     string   `json:"capacitance_unit,omitempty"`
+	AcceptedDielectrics []string `json:"accepted_dielectrics,omitempty"`
+	ESRMin              string   `json:"esr_min,omitempty"`
+	ESRMax              string   `json:"esr_max,omitempty"`
+	ESRUnit             string   `json:"esr_unit,omitempty"`
+	ProofStatus         string   `json:"proof_status,omitempty"`
+	// FabricationCandidateBlocks is an explicit block flag, not a readiness
+	// flag. A false value does not override per-capability review statuses.
+	FabricationCandidateBlocks bool   `json:"fabrication_candidate_blocks,omitempty"`
+	ReviewNote                 string `json:"review_note,omitempty"`
 }
 
 type CapacitorEvidence struct {
@@ -300,18 +314,20 @@ type CapacitorEvidence struct {
 }
 
 type OpAmpEvidence struct {
-	IntendedRoles              []string `json:"intended_roles,omitempty"`
-	SupplyMode                 string   `json:"supply_mode,omitempty"`
-	OutputDriveStatus          string   `json:"output_drive_status,omitempty"`
-	LoadCompatibilityStatus    string   `json:"load_compatibility_status,omitempty"`
-	GainBandwidthStatus        string   `json:"gain_bandwidth_status,omitempty"`
-	StabilityStatus            string   `json:"stability_status,omitempty"`
-	InputCommonModeStatus      string   `json:"input_common_mode_status,omitempty"`
-	OutputSwingStatus          string   `json:"output_swing_status,omitempty"`
-	NoiseStatus                string   `json:"noise_status,omitempty"`
-	DistortionStatus           string   `json:"distortion_status,omitempty"`
-	FabricationCandidateBlocks bool     `json:"fabrication_candidate_blocks,omitempty"`
-	ReviewNote                 string   `json:"review_note,omitempty"`
+	IntendedRoles           []string `json:"intended_roles,omitempty"`
+	SupplyMode              string   `json:"supply_mode,omitempty"`
+	OutputDriveStatus       string   `json:"output_drive_status,omitempty"`
+	LoadCompatibilityStatus string   `json:"load_compatibility_status,omitempty"`
+	GainBandwidthStatus     string   `json:"gain_bandwidth_status,omitempty"`
+	StabilityStatus         string   `json:"stability_status,omitempty"`
+	InputCommonModeStatus   string   `json:"input_common_mode_status,omitempty"`
+	OutputSwingStatus       string   `json:"output_swing_status,omitempty"`
+	NoiseStatus             string   `json:"noise_status,omitempty"`
+	DistortionStatus        string   `json:"distortion_status,omitempty"`
+	// FabricationCandidateBlocks is an explicit block flag, not a readiness
+	// flag. A false value does not override per-capability review statuses.
+	FabricationCandidateBlocks bool   `json:"fabrication_candidate_blocks,omitempty"`
+	ReviewNote                 string `json:"review_note,omitempty"`
 }
 
 type SensorEvidence struct {

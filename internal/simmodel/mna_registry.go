@@ -421,7 +421,11 @@ func resolveMNA(intent Intent, catalogID, catalogHash string, components []Compo
 			diagnostics = append(diagnostics, parameterDiagnostics...)
 			continue
 		}
-		device := ResolvedDevice{Component: component.InstanceID, CatalogID: component.CatalogID, Family: component.Family, PrimitiveModel: primitive.ID, ModelParameters: normalizeNamedValues(claim.Parameters)}
+		device := ResolvedDevice{
+			Component: component.InstanceID, PhysicalComponent: component.PhysicalComponent,
+			CatalogID: component.CatalogID, Family: component.Family, PrimitiveModel: primitive.ID,
+			ModelParameters: normalizeNamedValues(claim.Parameters),
+		}
 		if primitive.RequiresValueSI {
 			if !component.HasValueSI || !finite(component.ValueSI) || component.ValueSI <= 0 {
 				diagnostics = append(diagnostics, Diagnostic{Path: "topology.devices." + component.InstanceID + ".value_si", Message: "trusted primitive requires a finite positive catalog-validated component value"})

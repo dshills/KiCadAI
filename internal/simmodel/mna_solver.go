@@ -5,14 +5,16 @@ import (
 	"math"
 	"math/cmplx"
 	"slices"
+	"strings"
 )
 
 const (
-	maxMNAUnknowns       = 256
-	maxMNAMatrixValue    = 1e15
-	maxMNASolutionValue  = 1e12
-	mnaPivotTolerance    = 1e-12
-	mnaResidualTolerance = 1e-8
+	maxMNAUnknowns              = 256
+	maxOpAmpActiveSetIterations = 32
+	maxMNAMatrixValue           = 1e15
+	maxMNASolutionValue         = 1e12
+	mnaPivotTolerance           = 1e-12
+	mnaResidualTolerance        = 1e-8
 )
 
 type mnaSystem struct {
@@ -73,9 +75,11 @@ func evaluateMNA(plan Plan, report Report) (Report, []Diagnostic) {
 			}
 			point := AnalysisPoint{FrequencyHz: frequency, Nodes: nodeResults(plan, system, solution)}
 			if analysis.Kind == AnalysisDCOperatingPoint {
-				if diagnostics := validateOpAmpOperatingPoints(plan, point); len(diagnostics) != 0 {
+				system, solution, diagnostics = solveBoundedOpAmpDC(plan, analysis, system, solution)
+				if len(diagnostics) != 0 {
 					return report, diagnostics
 				}
+				point.Nodes = nodeResults(plan, system, solution)
 			}
 			result.Points = append(result.Points, point)
 		}
@@ -113,10 +117,18 @@ func evaluateMNAAssertions(plan Plan, report Report) (Report, []Diagnostic) {
 }
 
 func buildMNASystem(plan Plan, analysis Analysis, frequency float64) (mnaSystem, []Diagnostic) {
-	return buildMNASystemWithForcedOpAmp(plan, analysis, frequency, "")
+	return buildMNASystemWithOpAmpClamps(plan, analysis, frequency, nil)
 }
 
 func buildMNASystemWithForcedOpAmp(plan Plan, analysis Analysis, frequency float64, forcedOpAmp string) (mnaSystem, []Diagnostic) {
+	clamps := map[string]float64{}
+	if forcedOpAmp != "" {
+		clamps[forcedOpAmp] = 1
+	}
+	return buildMNASystemWithOpAmpClamps(plan, analysis, frequency, clamps)
+}
+
+func buildMNASystemWithOpAmpClamps(plan Plan, analysis Analysis, frequency float64, opAmpClamps map[string]float64) (mnaSystem, []Diagnostic) {
 	nodeIndex := make(map[string]int, len(plan.Nodes)-1)
 	labels := make([]string, 0, len(plan.Nodes)+len(plan.Devices))
 	for _, node := range plan.Nodes {
@@ -163,8 +175,8 @@ func buildMNASystemWithForcedOpAmp(plan Plan, analysis Analysis, frequency float
 			value := excitationValue(analysis, device.Component)
 			stampCurrentSource(&system, terminals["POSITIVE"], terminals["NEGATIVE"], value)
 		case PrimitiveOpAmpV1:
-			if device.Component == forcedOpAmp {
-				stampVoltageSource(&system, device.Component, terminals["OUT"], plan.GroundNode, 1)
+			if value, clamped := opAmpClamps[device.Component]; clamped {
+				stampVoltageSource(&system, device.Component, terminals["OUT"], plan.GroundNode, complex(value, 0))
 				continue
 			}
 			parameters := namedValueMap(device.ModelParameters)
@@ -439,33 +451,106 @@ func nodeResults(plan Plan, system mnaSystem, solution []complex128) []NodeResul
 	return results
 }
 
-func validateOpAmpOperatingPoints(plan Plan, point AnalysisPoint) []Diagnostic {
-	values := make(map[string]float64, len(point.Nodes))
-	for _, node := range point.Nodes {
-		values[node.Node] = node.Real
-	}
-	var diagnostics []Diagnostic
+// solveBoundedOpAmpDC is a fail-closed active-set proof, not a general
+// nonlinear approximation. Positive feedback is rejected by the preceding
+// stability proof; repeated states, cycles, and iteration exhaustion return a
+// structured diagnostic and can never be reported as a suboptimal solution.
+func solveBoundedOpAmpDC(plan Plan, analysis Analysis, system mnaSystem, solution []complex128) (mnaSystem, []complex128, []Diagnostic) {
+	opAmpCount := 0
 	for _, device := range plan.Devices {
-		if device.PrimitiveModel != PrimitiveOpAmpV1 {
-			continue
-		}
-		terminals := terminalMap(device)
-		parameters := namedValueMap(device.ModelParameters)
-		negative := values[terminals["V_MINUS"]]
-		positive := values[terminals["V_PLUS"]]
-		output := values[terminals["OUT"]]
-		supply := positive - negative
-		if supply < parameters["supply_min_v"] || supply > parameters["supply_max_v"] {
-			diagnostics = append(diagnostics, Diagnostic{Path: "devices." + device.Component + ".supply", Message: fmt.Sprintf("DC supply %.12g V is outside catalog-backed range %.12g..%.12g V", supply, parameters["supply_min_v"], parameters["supply_max_v"]), Suggestion: "adjust source conditions or select a compatible catalog op-amp"})
-			continue
-		}
-		minimum := negative + parameters["output_low_margin_v"]
-		maximum := positive - parameters["output_high_margin_v"]
-		if output < minimum || output > maximum {
-			diagnostics = append(diagnostics, Diagnostic{Path: "devices." + device.Component + ".output", Message: fmt.Sprintf("DC output %.12g V is outside catalog-backed linear range %.12g..%.12g V", output, minimum, maximum), Suggestion: "correct bias/feedback, reduce requested operating level, or select a compatible op-amp"})
+		if device.PrimitiveModel == PrimitiveOpAmpV1 {
+			opAmpCount++
 		}
 	}
-	return diagnostics
+	if opAmpCount == 0 {
+		return system, solution, nil
+	}
+
+	clamps := map[string]float64{}
+	seen := map[string]bool{}
+	previousStates := ""
+	iterationLimit := min(opAmpCount*6+2, maxOpAmpActiveSetIterations)
+	for iteration := 0; iteration < iterationLimit; iteration++ {
+		next := map[string]float64{}
+		var statesBuilder strings.Builder
+		statesBuilder.Grow(opAmpCount * 16)
+		var diagnostics []Diagnostic
+		for _, device := range plan.Devices {
+			if device.PrimitiveModel != PrimitiveOpAmpV1 {
+				continue
+			}
+			terminals := terminalMap(device)
+			parameters := namedValueMap(device.ModelParameters)
+			negative := real(solvedNodeVoltage(system, solution, terminals["V_MINUS"]))
+			positive := real(solvedNodeVoltage(system, solution, terminals["V_PLUS"]))
+			supply := positive - negative
+			if supply < parameters["supply_min_v"] || supply > parameters["supply_max_v"] {
+				diagnostics = append(diagnostics, Diagnostic{Path: "devices." + device.Component + ".supply", Message: fmt.Sprintf("DC supply %.12g V is outside catalog-backed range %.12g..%.12g V", supply, parameters["supply_min_v"], parameters["supply_max_v"]), Suggestion: "adjust source conditions or select a compatible catalog op-amp"})
+				continue
+			}
+			minimum := negative + parameters["output_low_margin_v"]
+			maximum := positive - parameters["output_high_margin_v"]
+			differential := real(solvedNodeVoltage(system, solution, terminals["IN_PLUS"]) - solvedNodeVoltage(system, solution, terminals["IN_MINUS"]))
+			desired := parameters["dc_open_loop_gain"] * differential
+			tolerance := mnaPivotTolerance * math.Max(1, math.Max(math.Abs(minimum), math.Abs(maximum)))
+			switch {
+			case desired < minimum-tolerance:
+				next[device.Component] = minimum
+				statesBuilder.WriteString(device.Component)
+				statesBuilder.WriteString(":low;")
+			case desired > maximum+tolerance:
+				next[device.Component] = maximum
+				statesBuilder.WriteString(device.Component)
+				statesBuilder.WriteString(":high;")
+			default:
+				statesBuilder.WriteString(device.Component)
+				statesBuilder.WriteString(":linear;")
+			}
+		}
+		states := statesBuilder.String()
+		if len(diagnostics) != 0 {
+			return system, solution, diagnostics
+		}
+		if sameOpAmpClamps(clamps, next) {
+			return system, solution, nil
+		}
+		if states != previousStates && seen[states] {
+			return system, solution, []Diagnostic{{Path: "devices", Message: "bounded op-amp operating-point states did not converge", Suggestion: "correct ambiguous positive feedback or add catalog-backed hysteresis and loading"}}
+		}
+		seen[states] = true
+		previousStates = states
+		clamps = next
+		// Every active-set state changes dependent-source stamps and sometimes
+		// the branch equations themselves, so the MNA system must be rebuilt.
+		// The state search and full-system rebuild cost are deterministically
+		// bounded by maxOpAmpActiveSetIterations and maxMNAUnknowns.
+		var systemDiagnostics []Diagnostic
+		system, systemDiagnostics = buildMNASystemWithOpAmpClamps(plan, analysis, 0, clamps)
+		if len(systemDiagnostics) != 0 {
+			return system, nil, systemDiagnostics
+		}
+		var diagnostic *Diagnostic
+		solution, diagnostic = solveMNA(system)
+		if diagnostic != nil {
+			diagnostic.Path = "analyses." + analysis.ID + "." + diagnostic.Path
+			return system, nil, []Diagnostic{*diagnostic}
+		}
+	}
+	return system, solution, []Diagnostic{{Path: "devices", Message: "bounded op-amp operating-point iteration exceeded its deterministic limit", Suggestion: "correct ambiguous positive feedback or reduce coupled comparator stages"}}
+}
+
+func sameOpAmpClamps(left, right map[string]float64) bool {
+	if len(left) != len(right) {
+		return false
+	}
+	for component, value := range left {
+		rightValue := right[component]
+		tolerance := 1e-9 * math.Max(1, math.Max(math.Abs(value), math.Abs(rightValue)))
+		if math.Abs(rightValue-value) > tolerance {
+			return false
+		}
+	}
+	return true
 }
 
 func assertionValue(results []AnalysisResult, assertion Assertion) (float64, *Diagnostic) {

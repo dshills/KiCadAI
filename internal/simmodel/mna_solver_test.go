@@ -106,6 +106,51 @@ func TestMNAOpAmpTransferIsGroundReferencedWithSplitSupply(t *testing.T) {
 	}
 }
 
+func TestMNAOpAmpDCClampsOpenLoopComparatorToCatalogOutputRange(t *testing.T) {
+	intent := Intent{
+		ModelID: ModelLinearCircuitMNAV1,
+		Analyses: []Analysis{
+			{ID: "input_high", Kind: AnalysisDCOperatingPoint, Excitations: []SourceExcitation{{Component: "supply", DCValue: 5}, {Component: "threshold", DCValue: 2.5}, {Component: "signal", DCValue: 3}}},
+			{ID: "input_low", Kind: AnalysisDCOperatingPoint, Excitations: []SourceExcitation{{Component: "supply", DCValue: 5}, {Component: "threshold", DCValue: 2.5}, {Component: "signal", DCValue: 2}}},
+		},
+		Assertions: []Assertion{
+			{AnalysisID: "input_high", Node: "OUT", Quantity: QuantityVoltageV, Min: 4.899, Max: 4.901},
+			{AnalysisID: "input_low", Node: "OUT", Quantity: QuantityVoltageV, Min: .099, Max: .101},
+		},
+	}
+	opAmpParameters := []NamedValue{
+		{Name: "dc_open_loop_gain", Value: 100000}, {Name: "gain_bandwidth_hz", Value: 1000000},
+		{Name: "output_high_margin_v", Value: .1}, {Name: "output_low_margin_v", Value: .1},
+		{Name: "supply_max_v", Value: 30}, {Name: "supply_min_v", Value: 3},
+	}
+	components := []ComponentEvidence{
+		{InstanceID: "supply", CatalogID: "source.v", Family: "voltage_source", ModelClaims: []CatalogEvidence{{ModelID: PrimitiveVoltageSourceV1}}, Connections: []ConnectionEvidence{{Function: "POSITIVE", Net: "VP"}, {Function: "NEGATIVE", Net: "GND"}}},
+		{InstanceID: "threshold", CatalogID: "source.v", Family: "voltage_source", ModelClaims: []CatalogEvidence{{ModelID: PrimitiveVoltageSourceV1}}, Connections: []ConnectionEvidence{{Function: "POSITIVE", Net: "THRESH"}, {Function: "NEGATIVE", Net: "GND"}}},
+		{InstanceID: "signal", CatalogID: "source.v", Family: "voltage_source", ModelClaims: []CatalogEvidence{{ModelID: PrimitiveVoltageSourceV1}}, Connections: []ConnectionEvidence{{Function: "POSITIVE", Net: "IN"}, {Function: "NEGATIVE", Net: "GND"}}},
+		{InstanceID: "comparator", CatalogID: "opamp", Family: "opamp", ModelClaims: []CatalogEvidence{{ModelID: PrimitiveOpAmpV1, Parameters: opAmpParameters}}, Connections: []ConnectionEvidence{{Function: "IN_PLUS", Net: "IN"}, {Function: "IN_MINUS", Net: "THRESH"}, {Function: "OUT", Net: "OUT"}, {Function: "V_PLUS", Net: "VP"}, {Function: "V_MINUS", Net: "GND"}}},
+	}
+	plan, diagnostics := ResolveWithTopology(intent, "test", "hash", components, []NodeEvidence{{Name: "GND", Role: "ground"}, {Name: "IN"}, {Name: "OUT"}, {Name: "THRESH"}, {Name: "VP"}})
+	if len(diagnostics) != 0 {
+		t.Fatalf("resolve diagnostics = %+v", diagnostics)
+	}
+	report, diagnostics := Evaluate(plan)
+	if len(diagnostics) != 0 || report.Status != "pass" {
+		t.Fatalf("report=%+v diagnostics=%+v", report, diagnostics)
+	}
+}
+
+func TestSameOpAmpClampsToleratesMinorRailSolveNoise(t *testing.T) {
+	left := map[string]float64{"U1": 4.0000000001, "U2": -3.0000000001}
+	right := map[string]float64{"U1": 4.0000000002, "U2": -3.0000000002}
+	if !sameOpAmpClamps(left, right) {
+		t.Fatal("minor rail solve noise should not prevent active-set convergence")
+	}
+	right["U1"] = 4.01
+	if sameOpAmpClamps(left, right) {
+		t.Fatal("material clamp movement must require another active-set iteration")
+	}
+}
+
 func TestMNAFailsClosedOnSingularFloatingNode(t *testing.T) {
 	intent := Intent{
 		ModelID:    ModelLinearCircuitMNAV1,

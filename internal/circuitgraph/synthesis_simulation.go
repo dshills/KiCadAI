@@ -55,11 +55,10 @@ func deriveSynthesisSimulation(document Document, intent FunctionIntent, selecte
 	for _, id := range ids {
 		selection := selected[id]
 		value, hasValue := components.ParseEngineeringValue(selection.Instance.Value)
-		evidence = append(evidence, simmodel.ComponentEvidence{
-			InstanceID: selection.Instance.ID, CatalogID: selection.ComponentID, Family: selection.Record.Family,
-			ValueSI: value, HasValueSI: hasValue, ModelClaims: selection.Record.SimulationModels,
-			Connections: connections[selection.Instance.ID],
-		})
+		evidence = append(evidence, componentSimulationEvidence(
+			selection.Instance.ID, selection.ComponentID, selection.Record.Family, value, hasValue,
+			configuredSimulationModels(selection), connections[selection.Instance.ID], selection.Units,
+		)...)
 	}
 	// Applicability is model completeness, not numerical optimism. Resolution
 	// validates the full terminal topology, and evaluation's pivoted MNA solver
@@ -204,6 +203,55 @@ func deriveSynthesisSimulation(document Document, intent FunctionIntent, selecte
 	return &SimulationIntent{ModelID: modelID, Analyses: analyses, Assertions: assertions}, SynthesisSimulationEvidence{
 		Status: "derived", ModelID: modelID, Reason: "complete_registered_graph_model_and_bounded_interface_conditions",
 	}
+}
+
+func configuredSimulationModels(selection ResolvedComponent) []simmodel.CatalogEvidence {
+	models := make([]simmodel.CatalogEvidence, len(selection.Record.SimulationModels))
+	for index, model := range selection.Record.SimulationModels {
+		models[index] = simmodel.CatalogEvidence{ModelID: model.ModelID, Parameters: append([]simmodel.NamedValue(nil), model.Parameters...)}
+		for parameterIndex := range models[index].Parameters {
+			name := models[index].Parameters[parameterIndex].Name
+			configured := synthesisParameterString(selection.Instance.Parameters, name)
+			value, parsed := components.ParseEngineeringValue(configured)
+			if configured != "" && parsed && !math.IsNaN(value) && !math.IsInf(value, 0) {
+				models[index].Parameters[parameterIndex].Value = value
+			}
+		}
+	}
+	return models
+}
+
+func componentSimulationEvidence(instanceID, catalogID, family string, value float64, hasValue bool, models []simmodel.CatalogEvidence, connections []simmodel.ConnectionEvidence, units []ResolvedUnit) []simmodel.ComponentEvidence {
+	functionalUnits := []ResolvedUnit{}
+	sharedUnits := map[string]bool{}
+	for _, unit := range units {
+		if unit.Type == components.SymbolUnitFunctional {
+			functionalUnits = append(functionalUnits, unit)
+		} else if unit.Required || unit.Type == components.SymbolUnitPower {
+			sharedUnits[unit.ID] = true
+		}
+	}
+	if len(functionalUnits) <= 1 || !synthesisRecordHasModel(models, simmodel.PrimitiveOpAmpV1) {
+		return []simmodel.ComponentEvidence{{
+			InstanceID: instanceID, CatalogID: catalogID, Family: family, ValueSI: value, HasValueSI: hasValue,
+			ModelClaims: models, Connections: connections,
+		}}
+	}
+	evidence := make([]simmodel.ComponentEvidence, 0, len(functionalUnits))
+	for _, unit := range functionalUnits {
+		unitConnections := []simmodel.ConnectionEvidence{}
+		for _, connection := range connections {
+			if connection.UnitID == unit.ID || sharedUnits[connection.UnitID] {
+				unitConnections = append(unitConnections, connection)
+			}
+		}
+		evidence = append(evidence, simmodel.ComponentEvidence{
+			InstanceID: instanceID + "." + unit.ID, PhysicalComponent: instanceID,
+			CatalogID: catalogID, Family: family, ValueSI: value, HasValueSI: hasValue,
+			ModelClaims: models, Connections: unitConnections,
+		})
+	}
+	return evidence
 }
 
 func deriveSynthesisTransient(modelID string, sources []synthesisSourceCondition, condition synthesisTransientCondition) (*SimulationIntent, SynthesisSimulationEvidence) {
