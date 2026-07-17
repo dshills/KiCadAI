@@ -1,0 +1,359 @@
+{
+  "schema": "kicadai.adversarial-function-corpus-baseline.v1",
+  "generated_at": "2026-07-17",
+  "corpus_manifest_sha256": "e40a02f2ee89aa6ef3c5a98628c2712cf633ac67b2fbaba487e84d52c607ce32",
+  "base_commit": "9fead2eccc576f1833a68f07328417d6ee55c87d",
+  "evaluated_commit": "93063343e99d2ec1d7390396ddbd7b94e5983a77",
+  "evaluator": "adversarial-promotion-v1",
+  "gate_profile": {
+    "byte_identical_replay": "required",
+    "connectivity_and_route_completion": "required",
+    "deterministic_lowering": "required",
+    "kicad_erc": "required",
+    "simulation_where_applicable": "required",
+    "strict_kicad_drc": "required",
+    "verified_resolution": "required",
+    "writer_correctness": "required",
+    "zero_round_trip_diffs": "required"
+  },
+  "circuits": [
+    {
+      "id": "atmega_uart_gpio_controller",
+      "status": "pass",
+      "simulation": "not_applicable:component_controller_has_no_unique_compatible_primitive",
+      "hashes": {
+        "generated_files": "f458e0153a7e24af19ff6b1b9b98931f74ce3e212fdeff0978062bd14e7c4253",
+        "input": "5a24981df5fafba7958f707fa854d85f720e464a31db02339a14163b91a8ee25",
+        "lowered_graph": "39e72af28b152fc98e0b7b74a1f58d3e1884b789fa129485dfa4c92a32486f2b",
+        "request": "19bde43e6847805df2bda99ba85e3f6d3388c406ca0481f445e623d136f0093a",
+        "resolution": "9216c85ac3dfeb80fc98878930fb3a1d964dc240a732b327f40996d2062e1bdc"
+      }
+    },
+    {
+      "id": "bipolar_lmv321_inverting_amplifier",
+      "status": "blocked",
+      "category": "synthesis",
+      "root_key": "synthesis.SYNTHESIS_INTENT_INVALID.synthesis.lowered_graph.schematic.lanes.power_negative",
+      "root_issue": {
+        "code": "SYNTHESIS_INTENT_INVALID",
+        "stage": "synthesis",
+        "path": "synthesis.lowered_graph.schematic.lanes.power_negative",
+        "message": "power_negative must be lower when the graph has a power_neg net",
+        "suggestion": "correct the deterministic synthesis policy or reviewed catalog recipe"
+      },
+      "simulation": "not_evaluated",
+      "hashes": {
+        "input": "b52a17740ce7126e0a4c772e95d1347a91b41d138b955775ee512fed3b4a6b12",
+        "lowered_graph": "ac4365fd1617471d102e00526d9d9b8fce27d691f1e2591bddd6ddda45c07d0b"
+      }
+    },
+    {
+      "id": "bmp280_spi_breakout",
+      "status": "pass",
+      "simulation": "not_applicable:missing_trusted_source_or_device",
+      "hashes": {
+        "generated_files": "571715314e7eb90ceddc135964c4758186bd3598659e0ba083b460bf573f158c",
+        "input": "5cee89d2d323850a89c5317cdbfad47b91f1a7059258e01eac81ce2de2514d67",
+        "lowered_graph": "f9d04df2564edb26d7f6bf24755b5ff20daf08794bf3ef4aa6999362996fe35e",
+        "request": "d5c9cc48e3abe781bbaf48d42a12ee0ac32c6202c7b5041b378a4a23bf1b66e5",
+        "resolution": "208baf2276fa7ad718ad6de52b05e62171bb01dad19ba30b6301f7afe0451687"
+      }
+    },
+    {
+      "id": "dense_mixed_signal_controller",
+      "status": "blocked",
+      "category": "placement",
+      "root_key": "placement.VALIDATION_FAILED.components",
+      "root_issue": {
+        "code": "VALIDATION_FAILED",
+        "stage": "placement",
+        "path": "components.J1",
+        "message": "no legal placement found for component J1"
+      },
+      "simulation": "not_applicable:component_controller_has_no_unique_compatible_primitive",
+      "hashes": {
+        "input": "1a8872cb9ae070473fe92c647fa6596589ba6fbd226f69ead400be125338d589",
+        "lowered_graph": "066895e7d0202cfeec27a831599f44b6ddecd349cea1dc2b38d49bcd236576f6",
+        "request": "f80de3bd4b33590d3dae84c91a55f335013817c28be9cddcdbb49a19372ca93e",
+        "resolution": "17908295e60e358a07b81734d88df9a736d6e52890fc6ca1a8b43943305322f6"
+      }
+    },
+    {
+      "id": "diode_rc_pulse_clamp",
+      "status": "blocked",
+      "category": "simulation",
+      "root_key": "simulation.VALIDATION_FAILED.simulation.model_id",
+      "root_issue": {
+        "code": "VALIDATION_FAILED",
+        "stage": "simulation",
+        "path": "simulation.model_id",
+        "message": "transient operating case resolved only nonlinear_circuit_dc_v1 instead of a trusted transient analysis",
+        "suggestion": "derive the bounded transient grid and pulse excitation from function intent without provider-controlled solver policy"
+      },
+      "simulation": "not_evaluated",
+      "hashes": {
+        "input": "4b3fc431d7f6e47ca1a159da51c5786640bc0ff3cd38b7c8cd6a8404606303a3",
+        "lowered_graph": "db7fe243ef2e1498347ebdf5b15ba0e3159594ccbb234057bf771ed7b15c49df",
+        "resolution": "c5dff0a02c7fc4a6799efa8e5bf8cdaa61ab730407c25403a061836034f7c133"
+      }
+    },
+    {
+      "id": "dual_sensor_level_shift_gateway",
+      "status": "blocked",
+      "category": "catalog",
+      "root_key": "catalog.level_translator.component_unresolved",
+      "root_issue": {
+        "code": "SYNTHESIS_COMPONENT_UNRESOLVED",
+        "stage": "synthesis",
+        "path": "synthesis.functions.translator",
+        "message": "no components matched query",
+        "suggestion": "correct the catalog query, rating, function, package, or confidence requirement"
+      },
+      "simulation": "not_evaluated",
+      "hashes": {
+        "input": "1b027ff0561ac7b08674499ca0bb0487181b22f9b9007fbdb991297304d13f6d",
+        "lowered_graph": "40541236308a8f4317f7b170688163b00ba44fe4c26cc4dc6c1971463ab5b340"
+      }
+    },
+    {
+      "id": "dual_supply_diode_clamp",
+      "status": "blocked",
+      "category": "synthesis",
+      "root_key": "synthesis.SYNTHESIS_INTENT_INVALID.synthesis.lowered_graph.schematic.lanes.power_negative",
+      "root_issue": {
+        "code": "SYNTHESIS_INTENT_INVALID",
+        "stage": "synthesis",
+        "path": "synthesis.lowered_graph.schematic.lanes.power_negative",
+        "message": "power_negative must be lower when the graph has a power_neg net",
+        "suggestion": "correct the deterministic synthesis policy or reviewed catalog recipe"
+      },
+      "simulation": "not_evaluated",
+      "hashes": {
+        "input": "78f48b27f76c9599877a1d6503312683ad5549ab42627831a9b9c16d40610c78",
+        "lowered_graph": "6c4f3370752f4317b86d8f2638e54b47959a18d910c056a2fcde1e58b5e3230c"
+      }
+    },
+    {
+      "id": "esp32_dual_i2c_gpio_hub",
+      "status": "blocked",
+      "category": "placement",
+      "root_key": "placement.VALIDATION_FAILED.components",
+      "root_issue": {
+        "code": "VALIDATION_FAILED",
+        "stage": "placement",
+        "path": "components.J1",
+        "message": "no legal placement found for component J1"
+      },
+      "simulation": "not_applicable:component_controller_has_no_unique_compatible_primitive",
+      "hashes": {
+        "input": "719ad57f0653b74b0d156e15d1e95f7c41388eef71e0bbb86c24bbcefef36dfe",
+        "lowered_graph": "51a451b4ad54f8fc3ab2496bed97a0cc94646a2035be0f9eca32a2a9bc4a53e9",
+        "request": "3c72c60faeb5b12f174034b490c05d5ffe6b475824f8eef965242d076665a6c3",
+        "resolution": "deb7a172d176c421b7e43285ecbc83d6695c86174fc846072d1a14051a005fbe"
+      }
+    },
+    {
+      "id": "esp32_spi_uart_gateway",
+      "status": "blocked",
+      "category": "routing",
+      "root_key": "routing.VALIDATION_FAILED.explicit_circuit.nets",
+      "root_issue": {
+        "code": "VALIDATION_FAILED",
+        "stage": "routing",
+        "path": "explicit_circuit.nets.SPI_MOSI",
+        "message": "required explicit net was not completely routed"
+      },
+      "simulation": "not_applicable:component_controller_has_no_unique_compatible_primitive",
+      "hashes": {
+        "input": "75b606460fd30b01d0745f1bbbd322dc2d1c8706b13bc7d2dde00fdf025ecd50",
+        "lowered_graph": "9fefe8fec9ceaccd67055fd95d301e6ff96803c4378e2d913d2f9c357b058f6c",
+        "request": "2a235d8a4f45aaff069d89e5ae23f956f7e4f43b53ea095d8656a58ea18292e7",
+        "resolution": "bacd9cf4ce70ce3a37469a2c6cf34d72018f52bc7f24dad9d0fe6f9fdb8ac825"
+      }
+    },
+    {
+      "id": "i2c_5v_3v3_level_bridge",
+      "status": "blocked",
+      "category": "catalog",
+      "root_key": "catalog.level_translator.component_unresolved",
+      "root_issue": {
+        "code": "SYNTHESIS_COMPONENT_UNRESOLVED",
+        "stage": "synthesis",
+        "path": "synthesis.functions.translator",
+        "message": "no components matched query",
+        "suggestion": "correct the catalog query, rating, function, package, or confidence requirement"
+      },
+      "simulation": "not_evaluated",
+      "hashes": {
+        "input": "c43dfb2a8c040f81b7043c85a6f60b6d53f893c8ef3bf40a5f7888532547e47f",
+        "lowered_graph": "eb0de61834929a7b1457fc9daccf2b09fbcd1be74f19c7a76994a35eeccdcfc4"
+      }
+    },
+    {
+      "id": "lm358_dual_channel_conditioner",
+      "status": "blocked",
+      "category": "catalog",
+      "root_key": "catalog.opamp.component_unresolved",
+      "root_issue": {
+        "code": "SYNTHESIS_COMPONENT_UNRESOLVED",
+        "stage": "synthesis",
+        "path": "synthesis.functions.amplifier",
+        "message": "component is missing required function CHANNEL_1_IN_MINUS; component is missing required function CHANNEL_1_IN_PLUS; component is missing required function CHANNEL_1_OUT; component is missing required function CHANNEL_2_IN_MINUS; component is missing required function CHANNEL_2_IN_PLUS; component is missing required function CHANNEL_2_OUT; op-amp evidence blocks fabrication-candidate use until review is complete; op-amp gain-bandwidth evidence is not proven: review_required; op-amp input-common-mode evidence is not proven: review_required; op-amp load-compatibility evidence is not proven: review_required; op-amp output-drive evidence is not proven: review_required; op-amp stability evidence is not proven: review_required",
+        "suggestion": "correct the catalog query, rating, function, package, or confidence requirement"
+      },
+      "simulation": "not_evaluated",
+      "hashes": {
+        "input": "7c932945d194cf7a263ddfcd28ce0dcee93908464aeccf45e02e011484ab4c5c",
+        "lowered_graph": "c37cebcd43114a2f7ba3e945cb08ecb3cb1cbc18aa79306646e71f3f064ebbdf"
+      }
+    },
+    {
+      "id": "lm358_window_comparator",
+      "status": "blocked",
+      "category": "catalog",
+      "root_key": "catalog.opamp.component_unresolved",
+      "root_issue": {
+        "code": "SYNTHESIS_COMPONENT_UNRESOLVED",
+        "stage": "synthesis",
+        "path": "synthesis.functions.comparator",
+        "message": "component is missing required function CHANNEL_1_IN_MINUS; component is missing required function CHANNEL_1_IN_PLUS; component is missing required function CHANNEL_1_OUT; component is missing required function CHANNEL_2_IN_MINUS; component is missing required function CHANNEL_2_IN_PLUS; component is missing required function CHANNEL_2_OUT; op-amp evidence blocks fabrication-candidate use until review is complete; op-amp gain-bandwidth evidence is not proven: review_required; op-amp input-common-mode evidence is not proven: review_required; op-amp load-compatibility evidence is not proven: review_required; op-amp output-drive evidence is not proven: review_required; op-amp stability evidence is not proven: review_required",
+        "suggestion": "correct the catalog query, rating, function, package, or confidence requirement"
+      },
+      "simulation": "not_evaluated",
+      "hashes": {
+        "input": "cb79d0b6aad06185379d5fc21604fd720a24daa95aa7968754b92490240b6391",
+        "lowered_graph": "44307fc4d0c316f2be5d6f90912af53d805bf3a498366d4f62daf85a167979ec"
+      }
+    },
+    {
+      "id": "negative_rail_npn_indicator",
+      "status": "blocked",
+      "category": "synthesis",
+      "root_key": "synthesis.SYNTHESIS_INTENT_INVALID.synthesis.lowered_graph.schematic.lanes.power_negative",
+      "root_issue": {
+        "code": "SYNTHESIS_INTENT_INVALID",
+        "stage": "synthesis",
+        "path": "synthesis.lowered_graph.schematic.lanes.power_negative",
+        "message": "power_negative must be lower when the graph has a power_neg net",
+        "suggestion": "correct the deterministic synthesis policy or reviewed catalog recipe"
+      },
+      "simulation": "not_evaluated",
+      "hashes": {
+        "input": "22d6b80749dafa77aae777576290f7c27c91e667c366f33e0afea6d42bf5348c",
+        "lowered_graph": "aaaccdf1cccba7b219f92895fe818916d1fc67878e307490771b0fe0b2fa0715"
+      }
+    },
+    {
+      "id": "npn_rc_edge_shaper",
+      "status": "blocked",
+      "category": "simulation",
+      "root_key": "simulation.VALIDATION_FAILED.simulation.model_id",
+      "root_issue": {
+        "code": "VALIDATION_FAILED",
+        "stage": "simulation",
+        "path": "simulation.model_id",
+        "message": "transient operating case resolved only nonlinear_circuit_dc_v1 instead of a trusted transient analysis",
+        "suggestion": "derive the bounded transient grid and pulse excitation from function intent without provider-controlled solver policy"
+      },
+      "simulation": "not_evaluated",
+      "hashes": {
+        "input": "06f24b82e05c5f9e0c997053be6059d82be1f5e8104252021fdc77b378b3f29a",
+        "lowered_graph": "12b3acc8b70360f39d29d5588edb234fdf77a040d9fec1f4eb936321998ca831",
+        "resolution": "d959cc51f39053b8723b31845c2ba179725c1ae9b949f65d58376b3b7633574d"
+      }
+    },
+    {
+      "id": "pnp_high_side_pulse_driver",
+      "status": "blocked",
+      "category": "simulation",
+      "root_key": "simulation.VALIDATION_FAILED.simulation.model_id",
+      "root_issue": {
+        "code": "VALIDATION_FAILED",
+        "stage": "simulation",
+        "path": "simulation.model_id",
+        "message": "transient operating case resolved only nonlinear_circuit_dc_v1 instead of a trusted transient analysis",
+        "suggestion": "derive the bounded transient grid and pulse excitation from function intent without provider-controlled solver policy"
+      },
+      "simulation": "not_evaluated",
+      "hashes": {
+        "input": "89a69c2147353b2ecb85d7f86948d375efac58fcd056ed065ffd212efd133ce2",
+        "lowered_graph": "740e73bbe260b39e3be54190ebf8345e7a6746c56523a15d3954b634091fcc51",
+        "resolution": "34366aae0f99b0249046ee5d2a2414277730b091128aca70ebdbe97f7ae0a78b"
+      }
+    },
+    {
+      "id": "regulated_sensor_uart_node",
+      "status": "pass",
+      "simulation": "not_applicable:component_controller_has_no_unique_compatible_primitive",
+      "hashes": {
+        "generated_files": "bbd1e2cf7acede03277d505c09d5ee72bec32b224d8f54c6ea4562af7d06c54c",
+        "input": "8b5ecc10e8dc13caaedb4e482b4545672ef58792aa0dbb041f4d959510197c4c",
+        "lowered_graph": "5e71d28fa169ce3670d9758b5342a899d2b9587ec3682c99a0807a4ee856a0e3",
+        "request": "f0da9f071f2df2f8c04d50c3542b0527deede102c4c82d788f10ec35937ef559",
+        "resolution": "3d375e50985cf3e5402c4d35b83ab1b60ce932a84a7dc570425fcde197b99162"
+      }
+    },
+    {
+      "id": "uart_5v_3v3_level_bridge",
+      "status": "blocked",
+      "category": "catalog",
+      "root_key": "catalog.level_translator.component_unresolved",
+      "root_issue": {
+        "code": "SYNTHESIS_COMPONENT_UNRESOLVED",
+        "stage": "synthesis",
+        "path": "synthesis.functions.translator",
+        "message": "no components matched query",
+        "suggestion": "correct the catalog query, rating, function, package, or confidence requirement"
+      },
+      "simulation": "not_evaluated",
+      "hashes": {
+        "input": "d7d5c6ce1b5cecf2686a761a0135cb6aff2441fd73669e3f84c9c6f7045b0173",
+        "lowered_graph": "c19594bb14fbfb3fe923d2d900ad4be4dad06f15c341dbfd4f6a983d92e7019a"
+      }
+    },
+    {
+      "id": "usb_c_adjustable_regulator",
+      "status": "blocked",
+      "category": "catalog",
+      "root_key": "catalog.regulator.component_unresolved",
+      "root_issue": {
+        "code": "SYNTHESIS_COMPONENT_UNRESOLVED",
+        "stage": "synthesis",
+        "path": "synthesis.functions.regulator",
+        "message": "no components matched query",
+        "suggestion": "correct the catalog query, rating, function, package, or confidence requirement"
+      },
+      "simulation": "not_evaluated",
+      "hashes": {
+        "input": "32ad3e842ebbf1ecbc891de91d38faa4a2cd433e88a821ed22cdf6ebcdf2400b",
+        "lowered_graph": "5847ad4ee3f39d8a54481b20fad7083a7cc3bd13a4669ddea55936ab7b0ec9ed"
+      }
+    }
+  ],
+  "aggregate": {
+    "circuits": 18,
+    "passed": 3,
+    "blocked": 15,
+    "by_category": {
+      "catalog": 6,
+      "placement": 2,
+      "routing": 1,
+      "simulation": 3,
+      "synthesis": 3
+    },
+    "by_code": {
+      "SYNTHESIS_COMPONENT_UNRESOLVED": 6,
+      "SYNTHESIS_INTENT_INVALID": 3,
+      "VALIDATION_FAILED": 6
+    },
+    "by_root_key": {
+      "catalog.level_translator.component_unresolved": 3,
+      "catalog.opamp.component_unresolved": 2,
+      "catalog.regulator.component_unresolved": 1,
+      "placement.VALIDATION_FAILED.components": 2,
+      "routing.VALIDATION_FAILED.explicit_circuit.nets": 1,
+      "simulation.VALIDATION_FAILED.simulation.model_id": 3,
+      "synthesis.SYNTHESIS_INTENT_INVALID.synthesis.lowered_graph.schematic.lanes.power_negative": 3
+    }
+  }
+}
