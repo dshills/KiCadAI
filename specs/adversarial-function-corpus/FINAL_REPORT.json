@@ -1,0 +1,321 @@
+{
+  "schema": "kicadai.adversarial-function-corpus-capability.v1",
+  "generated_at": "2026-07-17T00:00:00Z",
+  "corpus_manifest_sha256": "e40a02f2ee89aa6ef3c5a98628c2712cf633ac67b2fbaba487e84d52c607ce32",
+  "frozen_baseline_sha256": "33285964855f9b2dc41b8d5f44f851cd36877b48cb5b595da78546dfdde46f3e",
+  "closure_history_sha256": "46d52e83cf0676039b8ee30ab8b459ef172dea838ccc40648eb0fc970fe2deca",
+  "base_commit": "9fead2eccc576f1833a68f07328417d6ee55c87d",
+  "evaluated_commit": "e4455ea527fe584856c8ae228a5091fbf9a9c2ce",
+  "evaluator": "adversarial-promotion-v2",
+  "gate_profile": {
+    "byte_identical_replay": "required",
+    "connectivity_and_route_completion": "required",
+    "deterministic_lowering": "required",
+    "kicad_erc": "required",
+    "simulation_where_applicable": "required",
+    "strict_kicad_drc": "required",
+    "verified_resolution": "required",
+    "writer_correctness": "required",
+    "zero_round_trip_diffs": "required"
+  },
+  "delta_from_frozen_baseline": {
+    "passed": 14,
+    "blocked": -14,
+    "by_category": {
+      "catalog": -6,
+      "placement": -2,
+      "routing": -1,
+      "simulation": -2,
+      "synthesis": -3
+    },
+    "by_code": {
+      "SYNTHESIS_COMPONENT_UNRESOLVED": -6,
+      "SYNTHESIS_INTENT_INVALID": -3,
+      "VALIDATION_FAILED": -5
+    },
+    "by_root_key": {
+      "catalog.level_translator.component_unresolved": -3,
+      "catalog.opamp.component_unresolved": -2,
+      "catalog.regulator.component_unresolved": -1,
+      "placement.VALIDATION_FAILED.components": -2,
+      "routing.VALIDATION_FAILED.explicit_circuit.nets": -1,
+      "simulation.VALIDATION_FAILED.devices.amplifier.supply": 1,
+      "simulation.VALIDATION_FAILED.simulation.model_id": -3,
+      "synthesis.SYNTHESIS_INTENT_INVALID.synthesis.lowered_graph.schematic.lanes.power_negative": -3
+    }
+  },
+  "circuits": [
+    {
+      "id": "atmega_uart_gpio_controller",
+      "status": "pass",
+      "simulation": "not_applicable:component_controller_has_no_unique_compatible_primitive",
+      "component_count": 8,
+      "board_mm": "30x27",
+      "hashes": {
+        "generated_files": "918ea5a1dbedae60cd0e6091ffc86799cfed812260042ea3aecbb31d6bab3358",
+        "input": "5a24981df5fafba7958f707fa854d85f720e464a31db02339a14163b91a8ee25",
+        "lowered_graph": "ca1c37acccf8609267ef460f59990ae11ba4a345b8be4effd0a3f91364509282",
+        "request": "0c97602239236ad9e0e7719e8040c8383a7f6b2b14980dfdf9e8cd228bcacb0f",
+        "resolution": "2777af29fa8e8f2f5650c3746402119b321cf930243c4653aaa49e88299ee484"
+      }
+    },
+    {
+      "id": "bipolar_lmv321_inverting_amplifier",
+      "status": "blocked",
+      "category": "simulation",
+      "root_key": "simulation.VALIDATION_FAILED.devices.amplifier.supply",
+      "root_issue": {
+        "code": "VALIDATION_FAILED",
+        "stage": "simulation",
+        "path": "devices.amplifier.supply",
+        "message": "DC supply 10 V is outside catalog-backed range 2.7..5.5 V",
+        "suggestion": "adjust source conditions or select a compatible catalog op-amp"
+      },
+      "simulation": "not_evaluated",
+      "hashes": {
+        "input": "b52a17740ce7126e0a4c772e95d1347a91b41d138b955775ee512fed3b4a6b12",
+        "lowered_graph": "80d6134b0562befa7553af669d4d88559a32e100db49542703ee6f6e4e5bacf5",
+        "resolution": "ee0184dc0066b9db2ab102e1f52f67d44542598cbe4371f9ef98fc84db0e0def"
+      }
+    },
+    {
+      "id": "bmp280_spi_breakout",
+      "status": "pass",
+      "simulation": "not_applicable:missing_trusted_source_or_device",
+      "component_count": 3,
+      "board_mm": "25x22",
+      "hashes": {
+        "generated_files": "a0c1b43b6510a0bd4658a078ecdfc7f99708c32e88907e7c022400ca5aae8e94",
+        "input": "5cee89d2d323850a89c5317cdbfad47b91f1a7059258e01eac81ce2de2514d67",
+        "lowered_graph": "38c2a7d1116f6e8663a31a01de0286a288c9a0196d90ea5abb1947ffcbeeaed4",
+        "request": "83ec7b191e3aa86972e6dc16866e1e5e172387b0d26320c130963acf78c163ac",
+        "resolution": "a0b9d60fb1999cce6f6f95656c634a206abf1dcfb25ee82feaa0fb61631fc9af"
+      }
+    },
+    {
+      "id": "dense_mixed_signal_controller",
+      "status": "pass",
+      "simulation": "not_applicable:component_controller_has_no_unique_compatible_primitive",
+      "component_count": 15,
+      "board_mm": "69.9x60",
+      "hashes": {
+        "generated_files": "efa519a9edeb4fb2f1d4e79f0eb97588ffc4bcc0520fb8f3b91c8d69cdf8161c",
+        "input": "1a8872cb9ae070473fe92c647fa6596589ba6fbd226f69ead400be125338d589",
+        "lowered_graph": "bdf19e49937fbab259b100b857ab453e5c37f14eebb4e95714ab3f04da8db7cb",
+        "request": "3ddb77ff499fe2fb8582284b8db87cf7c115f194033cedbf50d89b71770e3f48",
+        "resolution": "630c84442c18139944799ddc3b79822366f8767df3cc415acab43a9e70f1d9cb"
+      }
+    },
+    {
+      "id": "diode_rc_pulse_clamp",
+      "status": "pass",
+      "simulation": "pass:transient_circuit_v1",
+      "component_count": 6,
+      "board_mm": "30x22",
+      "hashes": {
+        "generated_files": "f9390fde31e9bd2d59fc485c2c6ea021b6bcd600b2bd4d37c65bbb9e561d130a",
+        "input": "4b3fc431d7f6e47ca1a159da51c5786640bc0ff3cd38b7c8cd6a8404606303a3",
+        "lowered_graph": "011af53b7fa649f6bb4bb86fd2ba5288aca6ed1e1de370451ee447f188a5d061",
+        "request": "c0f8f03d716eddb3ea1ad16ffc50573052103d2cf61c98344d1749d647aeb0b1",
+        "resolution": "88ddb51219fd6a391413c7851476ead3df539efd27a29db9d85b2c8fd82adcc5"
+      }
+    },
+    {
+      "id": "dual_sensor_level_shift_gateway",
+      "status": "pass",
+      "simulation": "not_applicable:component_controller_has_no_unique_compatible_primitive",
+      "component_count": 20,
+      "board_mm": "74.9x62.94",
+      "hashes": {
+        "generated_files": "517044a3a73f670231f1911028a5d435b5980d6053a5e342b654bce97276bdcf",
+        "input": "1b027ff0561ac7b08674499ca0bb0487181b22f9b9007fbdb991297304d13f6d",
+        "lowered_graph": "4750c34f8fc0b62720a27cc8d3cf30a1d37cbaa37123c788788382ff0cd4a12c",
+        "request": "88210844f7d4ee90e4d0d6e54e1a17575d5cd0121d081877e0b3e9d4e947ba1a",
+        "resolution": "894b3eb8a613a6b8457940b62e3205231b55955e5a1367a9470bd429cf7ccd47"
+      }
+    },
+    {
+      "id": "dual_supply_diode_clamp",
+      "status": "pass",
+      "simulation": "pass:nonlinear_circuit_dc_v1",
+      "component_count": 9,
+      "board_mm": "30x27",
+      "hashes": {
+        "generated_files": "985dd02e5abcdebcb308e27ddb91b80baea232add29be07524f973ea621ebac9",
+        "input": "78f48b27f76c9599877a1d6503312683ad5549ab42627831a9b9c16d40610c78",
+        "lowered_graph": "746e360e1e46c544fe7a035e188c43f28cd37cf150c87788482768ab89ed688d",
+        "request": "b5969f347cb03c56a2ed32212d377c977f59d051cda1521686a20e807b4fbe62",
+        "resolution": "305efe961630809ee8807fc1f9511ce0e9188b22865ecab08fc0b62d70142850"
+      }
+    },
+    {
+      "id": "esp32_dual_i2c_gpio_hub",
+      "status": "pass",
+      "simulation": "not_applicable:component_controller_has_no_unique_compatible_primitive",
+      "component_count": 17,
+      "board_mm": "75.7x63.74",
+      "hashes": {
+        "generated_files": "333f4b7571c7a21ca14519e40e33d4fb2f0d492b738516ea9d5d776bdb263c4a",
+        "input": "719ad57f0653b74b0d156e15d1e95f7c41388eef71e0bbb86c24bbcefef36dfe",
+        "lowered_graph": "960e6862c324c732412124ab722dc74d06c4c8ea6cb53e6b6d8427f66ccff7a4",
+        "request": "388cc9b7d2aea26e739d9d6ab3c0f72ed4e5c70bdfd3a6ecdff961f8b94f2135",
+        "resolution": "66d2985ae3f7404adf5a126032def0f04605f8ef16dec71dfb980f3dac6550ee"
+      }
+    },
+    {
+      "id": "esp32_spi_uart_gateway",
+      "status": "pass",
+      "simulation": "not_applicable:component_controller_has_no_unique_compatible_primitive",
+      "component_count": 10,
+      "board_mm": "71.1x54",
+      "hashes": {
+        "generated_files": "a3f7b65892b8cab70d147444b986bc95c0e480deac245f5743b058f04ddd0a2a",
+        "input": "75b606460fd30b01d0745f1bbbd322dc2d1c8706b13bc7d2dde00fdf025ecd50",
+        "lowered_graph": "85b404c12b73703f779a4c7f54aa6e1948f319531ea302fa78f8c2a82c384b75",
+        "request": "6421d9eb486682bd44d9229d1aad5637847a9c64ae1d3b4bb4c3d6956815ab42",
+        "resolution": "2ad2f0dcb308cfae3a05b4270d485e79c66956e0aef64662ecfec1e7f235f7d2"
+      }
+    },
+    {
+      "id": "i2c_5v_3v3_level_bridge",
+      "status": "pass",
+      "simulation": "not_applicable:missing_trusted_source_or_device",
+      "component_count": 5,
+      "board_mm": "30x22",
+      "hashes": {
+        "generated_files": "ea4c02c08bed56a02f8b07170e487ca721524c627451ea96baa62a29da6e3ee4",
+        "input": "c43dfb2a8c040f81b7043c85a6f60b6d53f893c8ef3bf40a5f7888532547e47f",
+        "lowered_graph": "d52340c4b74945c6adaff009e731668b54824dd361018cf2b1ae8d7934179928",
+        "request": "2169c7a9f12d2b7cdf323b884988a0dcc5ad15001ef44663bfa03a8fd0a27da1",
+        "resolution": "5959312e483a4a9bc488c7f3dd4454f6ad0e32ee255715e428557133353090e5"
+      }
+    },
+    {
+      "id": "lm358_dual_channel_conditioner",
+      "status": "pass",
+      "simulation": "pass:linear_circuit_mna_v1",
+      "component_count": 11,
+      "board_mm": "35x27",
+      "hashes": {
+        "generated_files": "dad9d0d94e0c25e58740666d6387947f2afa565ff7e5e2da3bd37720b7c31d43",
+        "input": "7c932945d194cf7a263ddfcd28ce0dcee93908464aeccf45e02e011484ab4c5c",
+        "lowered_graph": "e70ef3f28acbc97351c9ea8bd9a505e93cce55dda62c01e9677c30d6a6c79649",
+        "request": "30e8b52ed778a98b82aba01c9627faaad8fe8f629b3a56c8e102afe2041a75e9",
+        "resolution": "90270ffcabfd3a025ace9fe613ba8edd459dfe9b485f4d290091312a5791cf06"
+      }
+    },
+    {
+      "id": "lm358_window_comparator",
+      "status": "pass",
+      "simulation": "pass:linear_circuit_mna_v1",
+      "component_count": 7,
+      "board_mm": "30x27",
+      "hashes": {
+        "generated_files": "036fb8655f89e6e2db1c1631e4c1edf6c04899adc9917bcd5871050362822129",
+        "input": "cb79d0b6aad06185379d5fc21604fd720a24daa95aa7968754b92490240b6391",
+        "lowered_graph": "8aba801033fd5591aa3161a98b4deab4b7699747f32610c4ab7cb12585f17f31",
+        "request": "9e937f8f3d4e8f82b21f8876fb1bf7a5b2b4b30ecb6e9c914594596cc379812a",
+        "resolution": "10efd47948171ab868a02283c593190e159ead7538cc89756b46634a5c5f39a1"
+      }
+    },
+    {
+      "id": "negative_rail_npn_indicator",
+      "status": "pass",
+      "simulation": "pass:nonlinear_circuit_dc_v1",
+      "component_count": 6,
+      "board_mm": "30x22",
+      "hashes": {
+        "generated_files": "8bac4abc63717d22cad787a3f1403e5b1300407942db95ac606367239a273d17",
+        "input": "22d6b80749dafa77aae777576290f7c27c91e667c366f33e0afea6d42bf5348c",
+        "lowered_graph": "7cdf70d98d970b84006bd66474a81989ffd186667b423eb33e7feb758360e66c",
+        "request": "d62887692bbc961084bd36ae38cfcc29177627158a105f7c3832cd2257a3bc58",
+        "resolution": "3cb0fbe84e9146034240e42a19a5edbe64d8dbb129262dcce8079dbda85a15df"
+      }
+    },
+    {
+      "id": "npn_rc_edge_shaper",
+      "status": "pass",
+      "simulation": "pass:transient_circuit_v1",
+      "component_count": 7,
+      "board_mm": "30x27",
+      "hashes": {
+        "generated_files": "8ca5bc9ae21917dc8716fc1d75fc986f5c2eee9bb058a9d8d1437565abc45b15",
+        "input": "06f24b82e05c5f9e0c997053be6059d82be1f5e8104252021fdc77b378b3f29a",
+        "lowered_graph": "31e77fc902da86a6bf2d0b4be508b99a8309c1fa0ab222f0c19fc666536fe403",
+        "request": "96b208e0bfda5699d7354e22cb9ebc8d3675871f9e4ffc6b5f7970a4e867b5ee",
+        "resolution": "1053c6a3c923d7c0364c99ef8786343c5d61b763ebf5df2dde4deeadd56d4a7d"
+      }
+    },
+    {
+      "id": "pnp_high_side_pulse_driver",
+      "status": "pass",
+      "simulation": "pass:transient_circuit_v1",
+      "component_count": 6,
+      "board_mm": "30x22",
+      "hashes": {
+        "generated_files": "ab6acf3362fa2791c85c7d45807d670d2f148b9f2a75b72861b21568c9926648",
+        "input": "89a69c2147353b2ecb85d7f86948d375efac58fcd056ed065ffd212efd133ce2",
+        "lowered_graph": "9ca0afd8c091ffec0df34947c1e58358c34c75556151bde48c6d5bc233ad2d35",
+        "request": "aa56438fea4cfd60dc9c50bdf5433db7ace3256f9ac6c9c2c892b56327525c31",
+        "resolution": "e92a8815c3494cec8fd1b10f63741a3ce8293ff97746db1a880f4f294fd402e9"
+      }
+    },
+    {
+      "id": "regulated_sensor_uart_node",
+      "status": "pass",
+      "simulation": "not_applicable:component_controller_has_no_unique_compatible_primitive",
+      "component_count": 14,
+      "board_mm": "35x32",
+      "hashes": {
+        "generated_files": "30d17b9d102d726d1f9396165402a5183f65d031d8383b00ab793eae55b8604c",
+        "input": "8b5ecc10e8dc13caaedb4e482b4545672ef58792aa0dbb041f4d959510197c4c",
+        "lowered_graph": "295105b44b7b2b8c86389229e4de4d2ab8043870f9b39ab39155eb625b811e6c",
+        "request": "1b1f9a0bbf1018e1743b90817206ba88fa2fd9a3507042a7c48d729a7d025b41",
+        "resolution": "baa6467c789cd29f3a6afa0192df01f7eac01572045d8f17aaea88456c27282d"
+      }
+    },
+    {
+      "id": "uart_5v_3v3_level_bridge",
+      "status": "pass",
+      "simulation": "not_applicable:component_translator_has_no_unique_compatible_primitive",
+      "component_count": 7,
+      "board_mm": "30x27",
+      "hashes": {
+        "generated_files": "496b7d3f085a420e41b447509edb69ea6e01ece6b56bfc4e9bdbb0f9331902cf",
+        "input": "d7d5c6ce1b5cecf2686a761a0135cb6aff2441fd73669e3f84c9c6f7045b0173",
+        "lowered_graph": "231fb87090298862736ea40ac7e2cc3acf820629fae003dcf5351c655b5958f4",
+        "request": "36a2d06b312cf98b618065527cd8207f04069e4ec3faea24ddbf3bf2fa75a2ec",
+        "resolution": "458cea51d9b8634a2b3fd02d6f92305d6f1d523f8317b35ac98c9642c5fb819d"
+      }
+    },
+    {
+      "id": "usb_c_adjustable_regulator",
+      "status": "pass",
+      "simulation": "not_applicable:component_regulator_has_no_unique_compatible_primitive",
+      "component_count": 10,
+      "board_mm": "35x27",
+      "hashes": {
+        "generated_files": "ed1267ecc60f72320425719a0cd9698a73521be8132a362dac2aec7774695300",
+        "input": "32ad3e842ebbf1ecbc891de91d38faa4a2cd433e88a821ed22cdf6ebcdf2400b",
+        "lowered_graph": "50255fcd4047ea3bbd2906cfd9c437e4f112e85a7f8865348468add62a13846f",
+        "request": "38414690bd4c8f6cca20fcc866e517acb8873e38edc0a916d03c0303ab1b0adf",
+        "resolution": "5c79417ec090809532fd5ba8c7e09964e0d650cb158761d4762c991430692cef"
+      }
+    }
+  ],
+  "aggregate": {
+    "circuits": 18,
+    "passed": 17,
+    "blocked": 1,
+    "pass_rate_percent": 94.44,
+    "by_category": {
+      "simulation": 1
+    },
+    "by_code": {
+      "VALIDATION_FAILED": 1
+    },
+    "by_root_key": {
+      "simulation.VALIDATION_FAILED.devices.amplifier.supply": 1
+    }
+  }
+}
