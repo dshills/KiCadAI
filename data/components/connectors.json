@@ -9,6 +9,7 @@
       "lifecycle": "active",
       "tags": ["connector", "pin_header", "2.54mm", "1x02"],
       "values": [{"kind": "pin_count", "typ": "2", "unit": "pins"}],
+      "simulation_models": [{"model_id": "mna_connector_1x02_voltage_source_pin1_positive_v1"}],
       "symbols": [{
         "symbol_id": "Connector_Generic:Conn_01x02",
         "function_pins": [

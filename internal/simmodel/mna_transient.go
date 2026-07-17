@@ -134,7 +134,7 @@ func prepareTransientBase(base *mnaSystem, template mnaSystem, plan Plan, analys
 	for _, device := range plan.Devices {
 		terminals := terminalMap(device)
 		switch device.PrimitiveModel {
-		case PrimitiveVoltageSourceV1:
+		case PrimitiveVoltageSourceV1, PrimitiveConnectorVoltageSourceV1:
 			base.rhs[base.branchIndex[device.Component]] += complex(transientExcitationValue(analysis, device.Component, timeS), 0)
 		case PrimitiveCurrentSourceV1:
 			stampCurrentSource(base, terminals["POSITIVE"], terminals["NEGATIVE"], complex(transientExcitationValue(analysis, device.Component, timeS), 0))

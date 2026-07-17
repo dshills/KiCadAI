@@ -40,6 +40,7 @@ var primitiveRegistry = []primitiveDefinition{
 	{ID: PrimitiveCapacitorTransientV1, Family: "capacitor", Terminals: []string{"A", "B"}, RequiresValueSI: true, Transient: true,
 		CatalogParameters: []valueRule{{Name: "max_voltage_v", Positive: true, Minimum: .01, Maximum: 1e6}}},
 	{ID: PrimitiveVoltageSourceV1, Family: "voltage_source", Terminals: []string{"POSITIVE", "NEGATIVE"}, Source: true},
+	{ID: PrimitiveConnectorVoltageSourceV1, Family: "connector", Terminals: []string{"PIN_1", "PIN_2"}, Source: true},
 	{ID: PrimitiveCurrentSourceV1, Family: "current_source", Terminals: []string{"POSITIVE", "NEGATIVE"}, Source: true},
 	{
 		ID: PrimitiveOpAmpV1, Family: "opamp", Terminals: []string{"IN_PLUS", "IN_MINUS", "OUT", "V_PLUS", "V_MINUS"}, OpAmp: true,
@@ -62,6 +63,8 @@ var primitiveRegistry = []primitiveDefinition{
 			{Name: "max_reverse_voltage_v", Positive: true, Minimum: .01, Maximum: 1e6},
 		},
 	},
+	// NPN and PNP are distinct primitive equations under the catalog's
+	// shared bjt family; polarity is selected by the trusted primitive ID.
 	{ID: PrimitiveBJTNPNV1, Family: "bjt", Terminals: []string{"BASE", "COLLECTOR", "EMITTER"}, Nonlinear: true, CatalogParameters: bjtParameterRules()},
 	{ID: PrimitiveBJTPNPV1, Family: "bjt", Terminals: []string{"BASE", "COLLECTOR", "EMITTER"}, Nonlinear: true, CatalogParameters: bjtParameterRules()},
 }
@@ -93,6 +96,20 @@ func primitiveByID(id string) (primitiveDefinition, bool) {
 	return primitiveDefinition{}, false
 }
 
+func primitiveFamilyCompatible(primitiveFamily, componentFamily string) bool {
+	return primitiveFamily == componentFamily || (primitiveFamily == "diode" && componentFamily == "led")
+}
+
+func componentHasSourceClaim(component ComponentEvidence) bool {
+	for _, claim := range component.ModelClaims {
+		primitive, exists := primitiveByID(strings.TrimSpace(claim.ModelID))
+		if exists && primitive.Source && primitiveFamilyCompatible(primitive.Family, component.Family) {
+			return true
+		}
+	}
+	return false
+}
+
 type primitiveClaim struct {
 	primitive primitiveDefinition
 	claim     CatalogEvidence
@@ -102,12 +119,58 @@ func compatiblePrimitiveClaims(component ComponentEvidence, model definition) []
 	var matches []primitiveClaim
 	for _, claim := range component.ModelClaims {
 		primitive, exists := primitiveByID(strings.TrimSpace(claim.ModelID))
-		if !exists || primitive.Family != component.Family || (primitive.Nonlinear && !model.NonlinearDC) || (model.NonlinearDC && primitive.OpAmp) || (primitive.Transient && !model.Transient) || (model.Transient && primitive.Family == "capacitor" && !primitive.Transient) {
+		if !exists || !primitiveFamilyCompatible(primitive.Family, component.Family) || (primitive.Nonlinear && !model.NonlinearDC) || (primitive.Transient && !model.Transient) || (model.Transient && primitive.Family == "capacitor" && !primitive.Transient) {
 			continue
 		}
 		matches = append(matches, primitiveClaim{primitive: primitive, claim: claim})
 	}
 	return matches
+}
+
+// ApplicableGraphModel returns a graph workflow only when every connected
+// non-boundary component has exactly one compatible trusted primitive. This
+// keeps synthesis fail-closed: an incomplete catalog model never produces a
+// partial or optimistic simulation.
+func ApplicableGraphModel(components []ComponentEvidence) (string, bool, string) {
+	hasSource := false
+	hasDevice := false
+	hasNonlinear := false
+	for _, component := range components {
+		if len(component.Connections) == 0 || (mnaBoundaryFamily(component.Family) && !componentHasSourceClaim(component)) {
+			continue
+		}
+		for _, claim := range component.ModelClaims {
+			primitive, exists := primitiveByID(strings.TrimSpace(claim.ModelID))
+			if !exists || !primitiveFamilyCompatible(primitive.Family, component.Family) {
+				continue
+			}
+			hasSource = hasSource || primitive.Source
+			hasDevice = hasDevice || !primitive.Source
+			hasNonlinear = hasNonlinear || primitive.Nonlinear
+		}
+	}
+	if !hasSource || !hasDevice {
+		return "", false, "missing_trusted_source_or_device"
+	}
+	modelID := ModelLinearCircuitMNAV1
+	if hasNonlinear {
+		modelID = ModelNonlinearCircuitDCV1
+	}
+	model, exists := definitionByID(modelID)
+	if !exists {
+		return "", false, "registered_graph_model_missing"
+	}
+	for _, component := range components {
+		if len(component.Connections) == 0 || (mnaBoundaryFamily(component.Family) && !componentHasSourceClaim(component)) {
+			continue
+		}
+		// compatiblePrimitiveClaims admits trusted primitive IDs only; legacy
+		// component/workflow claims never participate in this uniqueness rule.
+		if len(compatiblePrimitiveClaims(component, model)) != 1 {
+			return "", false, "component_" + component.InstanceID + "_has_no_unique_compatible_primitive"
+		}
+	}
+	return modelID, true, "complete_registered_graph_model"
 }
 
 func validateMNAIntent(intent Intent, components map[string]string) []Diagnostic {
@@ -435,7 +498,7 @@ func validateMNAPlan(plan Plan) []Diagnostic {
 			diagnostics = append(diagnostics, Diagnostic{Path: path + ".component", Message: "resolved devices must be unique and canonically ordered"})
 		}
 		primitive, exists := primitiveByID(device.PrimitiveModel)
-		if !exists || device.Component == "" || device.CatalogID == "" || primitive.Family != device.Family {
+		if !exists || device.Component == "" || device.CatalogID == "" || !primitiveFamilyCompatible(primitive.Family, device.Family) {
 			diagnostics = append(diagnostics, Diagnostic{Path: path, Message: "resolved device is missing compatible primitive/catalog evidence"})
 			continue
 		}
@@ -452,9 +515,6 @@ func validateMNAPlan(plan Plan) []Diagnostic {
 		}
 		if primitive.Transient && !model.Transient {
 			diagnostics = append(diagnostics, Diagnostic{Path: path + ".primitive_model", Message: "non-transient plan contains a transient-only primitive"})
-		}
-		if model.NonlinearDC && primitive.OpAmp {
-			diagnostics = append(diagnostics, Diagnostic{Path: path + ".primitive_model", Message: "nonlinear DC v1 does not combine nonlinear devices with op-amp dependent sources"})
 		}
 		if primitive.RequiresValueSI && (device.ValueSI == nil || !finite(*device.ValueSI) || *device.ValueSI <= 0) {
 			diagnostics = append(diagnostics, Diagnostic{Path: path + ".value_si", Message: "resolved primitive requires a finite positive value"})

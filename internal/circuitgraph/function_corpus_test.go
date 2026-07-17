@@ -22,6 +22,7 @@ import (
 	"kicadai/internal/kicadfiles/roundtrip"
 	"kicadai/internal/libraryresolver"
 	"kicadai/internal/reports"
+	"kicadai/internal/simmodel"
 	"kicadai/internal/writercorrectness"
 )
 
@@ -399,6 +400,7 @@ type functionCorpusFixture struct {
 
 type functionCapabilityReport struct {
 	Schema               string                            `json:"schema"`
+	GeneratedAt          string                            `json:"generated_at"`
 	CorpusManifestSHA256 string                            `json:"corpus_manifest_sha256"`
 	PolicyVersion        string                            `json:"synthesis_policy_version"`
 	CatalogSHA256        string                            `json:"catalog_sha256"`
@@ -419,14 +421,17 @@ type functionCapabilityCircuit struct {
 	InterfaceComponents    []string          `json:"interface_components"`
 	UnusedPinDecisionCount int               `json:"unused_pin_decision_count"`
 	GateProfile            string            `json:"gate_profile"`
+	Simulation             string            `json:"simulation"`
+	DerivedConstraints     map[string]bool   `json:"derived_constraints"`
 }
 
 type functionCapabilityReportAggregate struct {
-	Circuits             int            `json:"circuits"`
-	Passed               int            `json:"passed"`
-	Failed               int            `json:"failed"`
-	UnclassifiedFailures int            `json:"unclassified_failures"`
-	FailureCategories    map[string]int `json:"failure_categories"`
+	Circuits             int                       `json:"circuits"`
+	Passed               int                       `json:"passed"`
+	Failed               int                       `json:"failed"`
+	UnclassifiedFailures int                       `json:"unclassified_failures"`
+	FailureCategories    map[string]int            `json:"failure_categories"`
+	ByDomain             map[string]map[string]int `json:"by_domain"`
 }
 
 func TestFunctionLevelCorpusCapabilityReportMatchesAuthoritativeEvidence(t *testing.T) {
@@ -450,6 +455,17 @@ func TestFunctionLevelCorpusCapabilityReportMatchesAuthoritativeEvidence(t *test
 	var capability functionCapabilityReport
 	if err := json.Unmarshal(reportBytes, &capability); err != nil {
 		t.Fatal(err)
+	}
+	if *updateCircuitGraphGolden {
+		capability = regenerateFunctionCapabilityReport(t, capability, manifest)
+		path := filepath.Join(filepath.Dir(sourcePath), "..", "..", "specs", "function-level-circuit-synthesis", "CAPABILITY_REPORT.json")
+		data, err := json.MarshalIndent(capability, "", "  ")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, append(data, '\n'), 0o644); err != nil {
+			t.Fatal(err)
+		}
 	}
 	if capability.Schema != "kicadai.function-corpus-capability.v1" || capability.CorpusManifestSHA256 != frozenFunctionCorpusManifestSHA256 || capability.PolicyVersion != SynthesisPolicyVersion {
 		t.Fatalf("capability report header = %#v", capability)
@@ -501,7 +517,10 @@ func TestFunctionLevelCorpusCapabilityReportMatchesAuthoritativeEvidence(t *test
 		request.Validation.RequireERC = false
 		request.Validation.RequireDRC = false
 		output := filepath.Join(t.TempDir(), "project")
-		designworkflow.Create(context.Background(), request, designworkflow.CreateOptions{OutputDir: output, Overwrite: true, LibraryIndex: &index})
+		result := designworkflow.Create(context.Background(), request, designworkflow.CreateOptions{OutputDir: output, Overwrite: true, LibraryIndex: &index})
+		if _, err := os.Stat(output); err != nil {
+			t.Fatalf("%s did not write generated project: %v issues=%#v", fixture.ID, err, designworkflow.WorkflowIssues(result))
+		}
 		generatedHash := hashFunctionGeneratedFiles(t, output)
 		if circuit.Hashes["input"] != synthesis.InputHash || circuit.Hashes["lowered_graph"] != hashGraphValue(lowered) || circuit.Hashes["resolution"] != resolved.ResolutionHash || circuit.Hashes["request"] != hashGraphValue(request) || circuit.Hashes["generated_files"] != generatedHash || circuit.UnusedPinDecisionCount != len(synthesis.UnusedPinDecisions) {
 			t.Fatalf("capability hashes or unused-pin evidence are stale for %s: resolution=%s request=%s generated_files=%s", fixture.ID, resolved.ResolutionHash, hashGraphValue(request), generatedHash)
@@ -509,10 +528,166 @@ func TestFunctionLevelCorpusCapabilityReportMatchesAuthoritativeEvidence(t *test
 		if len(circuit.PrimaryComponents)+len(circuit.SupportComponents)+len(circuit.InterfaceComponents) == 0 {
 			t.Fatalf("capability circuit %s has no selection evidence", fixture.ID)
 		}
+		wantSimulation := "not_applicable_no_complete_registered_model"
+		if resolved.Simulation != nil {
+			report, diagnostics := simmodel.Evaluate(*resolved.Simulation)
+			if len(diagnostics) != 0 || report.Status != "pass" {
+				t.Fatalf("capability circuit %s simulation failed: report=%#v diagnostics=%#v", fixture.ID, report, diagnostics)
+			}
+			wantSimulation = "pass"
+		}
+		if circuit.Simulation != wantSimulation {
+			t.Fatalf("capability circuit %s simulation=%q, want %q", fixture.ID, circuit.Simulation, wantSimulation)
+		}
 	}
 	for gate, status := range capability.GateProfile {
-		if status != "pass" && status != "not_applicable_no_simulation_request" {
+		if status != "pass" {
 			t.Fatalf("gate %s has unsupported status %s", gate, status)
+		}
+	}
+}
+
+func regenerateFunctionCapabilityReport(t *testing.T, capability functionCapabilityReport, manifest functionCorpusManifest) functionCapabilityReport {
+	t.Helper()
+	catalog := loadGraphCatalog(t)
+	capability.GeneratedAt = manifest.FrozenAt
+	capability.CatalogSHA256 = hashGraphValue(struct {
+		Version  string                        `json:"version"`
+		Records  []components.ComponentRecord  `json:"records"`
+		Families []components.FamilyDefinition `json:"families"`
+	}{Version: catalog.Version, Records: catalog.Records, Families: catalog.Families})
+	capability.GateProfile["simulation"] = "pass"
+	capability.Circuits = nil
+	capability.Aggregate = functionCapabilityReportAggregate{
+		Circuits: len(manifest.Fixtures), Passed: len(manifest.Fixtures),
+		FailureCategories: map[string]int{}, ByDomain: map[string]map[string]int{},
+	}
+	resolver := NewResolver(ResolveOptions{Catalog: catalog, CatalogID: "function-corpus"})
+	root := functionCorpusRoot(t)
+	for _, fixture := range manifest.Fixtures {
+		contents, err := os.ReadFile(filepath.Join(root, fixture.File))
+		if err != nil {
+			t.Fatal(err)
+		}
+		document, issues := DecodeStrict(strings.NewReader(string(contents)))
+		if reports.HasBlockingIssue(issues) {
+			t.Fatalf("%s decode issues = %#v", fixture.ID, issues)
+		}
+		lowered, synthesis, issues := resolver.Synthesize(context.Background(), document)
+		if reports.HasBlockingIssue(issues) {
+			t.Fatalf("%s synthesis issues = %#v", fixture.ID, issues)
+		}
+		resolved, issues := resolver.Resolve(context.Background(), document)
+		if reports.HasBlockingIssue(issues) {
+			t.Fatalf("%s resolution issues = %#v", fixture.ID, issues)
+		}
+		request, issues := ToDesignRequest(resolved)
+		if reports.HasBlockingIssue(issues) {
+			t.Fatalf("%s request issues = %#v", fixture.ID, issues)
+		}
+		index := schematicTestLibraryIndex(resolved)
+		request.Validation.Acceptance = designworkflow.AcceptanceDraft
+		request.Validation.RequireERC = false
+		request.Validation.RequireDRC = false
+		output := filepath.Join(t.TempDir(), "project")
+		result := designworkflow.Create(context.Background(), request, designworkflow.CreateOptions{OutputDir: output, Overwrite: true, LibraryIndex: &index})
+		if _, err := os.Stat(output); err != nil {
+			t.Fatalf("%s did not write generated project: %v issues=%#v", fixture.ID, err, designworkflow.WorkflowIssues(result))
+		}
+		circuit := functionCapabilityCircuit{
+			ID: fixture.ID, Domains: append([]string(nil), fixture.Domains...), Status: "pass", GateProfile: "all_applicable_passed",
+			Hashes: map[string]string{
+				"input": synthesis.InputHash, "lowered_graph": hashGraphValue(lowered), "resolution": resolved.ResolutionHash,
+				"request": hashGraphValue(request), "generated_files": hashFunctionGeneratedFiles(t, output),
+			},
+			UnusedPinDecisionCount: len(synthesis.UnusedPinDecisions),
+			Simulation:             "not_applicable_no_complete_registered_model",
+			DerivedConstraints:     map[string]bool{"board_envelope": true, "layer_policy": true, "net_classes": true},
+		}
+		if resolved.Simulation != nil {
+			report, diagnostics := simmodel.Evaluate(*resolved.Simulation)
+			if len(diagnostics) != 0 || report.Status != "pass" {
+				t.Fatalf("%s simulation report=%#v diagnostics=%#v", fixture.ID, report, diagnostics)
+			}
+			circuit.Simulation = "pass"
+		}
+		for _, selection := range synthesis.Selections {
+			switch selection.Kind {
+			case "primary":
+				circuit.PrimaryComponents = appendUniqueString(circuit.PrimaryComponents, selection.ComponentID)
+			case "support":
+				circuit.SupportComponents = appendUniqueString(circuit.SupportComponents, selection.ComponentID)
+			case "interface":
+				circuit.InterfaceComponents = appendUniqueString(circuit.InterfaceComponents, selection.ComponentID)
+			}
+		}
+		slices.Sort(circuit.PrimaryComponents)
+		slices.Sort(circuit.SupportComponents)
+		slices.Sort(circuit.InterfaceComponents)
+		capability.Circuits = append(capability.Circuits, circuit)
+		for _, domain := range fixture.Domains {
+			if capability.Aggregate.ByDomain[domain] == nil {
+				capability.Aggregate.ByDomain[domain] = map[string]int{}
+			}
+			capability.Aggregate.ByDomain[domain]["passed"]++
+		}
+	}
+	return capability
+}
+
+func appendUniqueString(values []string, value string) []string {
+	if slices.Contains(values, value) {
+		return values
+	}
+	return append(values, value)
+}
+
+func TestFrozenFunctionLevelCorpusRunsEveryApplicableTrustedSimulation(t *testing.T) {
+	expectedModels := map[string]string{
+		"buffered_thermistor_frontend": simmodel.ModelLinearCircuitMNAV1,
+		"dual_stage_active_lowpass":    simmodel.ModelLinearCircuitMNAV1,
+		"npn_low_side_status_driver":   simmodel.ModelNonlinearCircuitDCV1,
+	}
+	root := functionCorpusRoot(t)
+	manifestBytes, err := os.ReadFile(filepath.Join(root, "manifest.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var manifest functionCorpusManifest
+	if err := json.Unmarshal(manifestBytes, &manifest); err != nil {
+		t.Fatal(err)
+	}
+	resolver := NewResolver(ResolveOptions{Catalog: loadGraphCatalog(t), CatalogID: "function-corpus"})
+	for _, fixture := range manifest.Fixtures {
+		contents, err := os.ReadFile(filepath.Join(root, fixture.File))
+		if err != nil {
+			t.Fatal(err)
+		}
+		document, issues := DecodeStrict(strings.NewReader(string(contents)))
+		if reports.HasBlockingIssue(issues) {
+			t.Fatalf("%s decode issues = %#v", fixture.ID, issues)
+		}
+		_, synthesis, synthesisIssues := resolver.Synthesize(context.Background(), document)
+		if reports.HasBlockingIssue(synthesisIssues) {
+			t.Fatalf("%s synthesis issues = %#v", fixture.ID, synthesisIssues)
+		}
+		resolved, issues := resolver.Resolve(context.Background(), document)
+		if reports.HasBlockingIssue(issues) {
+			t.Fatalf("%s resolution issues = %#v", fixture.ID, issues)
+		}
+		wantModel := expectedModels[fixture.ID]
+		if wantModel == "" {
+			if resolved.Simulation != nil {
+				t.Fatalf("%s unexpectedly produced partial simulation %#v", fixture.ID, resolved.Simulation)
+			}
+			continue
+		}
+		if resolved.Simulation == nil || resolved.Simulation.ModelID != wantModel {
+			t.Fatalf("%s simulation = %#v, synthesis evidence=%#v selections=%#v, want model %s", fixture.ID, resolved.Simulation, synthesis.Simulation, synthesis.Selections, wantModel)
+		}
+		report, diagnostics := simmodel.Evaluate(*resolved.Simulation)
+		if len(diagnostics) != 0 || report.Status != "pass" {
+			t.Fatalf("%s trusted simulation failed: report=%#v diagnostics=%#v", fixture.ID, report, diagnostics)
 		}
 	}
 }

@@ -128,7 +128,7 @@ func buildMNASystemWithForcedOpAmp(plan Plan, analysis Analysis, frequency float
 	}
 	branchIndex := map[string]int{}
 	for _, device := range plan.Devices {
-		if device.PrimitiveModel == PrimitiveVoltageSourceV1 || device.PrimitiveModel == PrimitiveOpAmpV1 {
+		if device.PrimitiveModel == PrimitiveVoltageSourceV1 || device.PrimitiveModel == PrimitiveConnectorVoltageSourceV1 || device.PrimitiveModel == PrimitiveOpAmpV1 {
 			branchIndex[device.Component] = len(labels)
 			labels = append(labels, "branch_current:"+device.Component)
 		}
@@ -156,6 +156,9 @@ func buildMNASystemWithForcedOpAmp(plan Plan, analysis Analysis, frequency float
 		case PrimitiveVoltageSourceV1:
 			value := excitationValue(analysis, device.Component)
 			stampVoltageSource(&system, device.Component, terminals["POSITIVE"], terminals["NEGATIVE"], value)
+		case PrimitiveConnectorVoltageSourceV1:
+			value := excitationValue(analysis, device.Component)
+			stampVoltageSource(&system, device.Component, terminals["PIN_1"], terminals["PIN_2"], value)
 		case PrimitiveCurrentSourceV1:
 			value := excitationValue(analysis, device.Component)
 			stampCurrentSource(&system, terminals["POSITIVE"], terminals["NEGATIVE"], value)

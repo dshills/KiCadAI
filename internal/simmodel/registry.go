@@ -115,7 +115,7 @@ func ValidateCatalogEvidence(family string, evidence []CatalogEvidence) []Diagno
 		}
 		seen[modelID] = struct{}{}
 		if primitiveModel {
-			if primitive.Family != family {
+			if !primitiveFamilyCompatible(primitive.Family, family) {
 				diagnostics = append(diagnostics, Diagnostic{Path: path + ".model_id", Message: fmt.Sprintf("trusted primitive %s requires component family %s, got %s", primitive.ID, primitive.Family, family)})
 				continue
 			}

@@ -24,7 +24,14 @@ type SynthesisReport struct {
 	InterfaceBindings  []SynthesisInterfaceBinding   `json:"interface_bindings"`
 	DerivedConstraints []SynthesisConstraintEvidence `json:"derived_constraints"`
 	UnusedPinDecisions []SynthesisUnusedPinDecision  `json:"unused_pin_decisions"`
+	Simulation         SynthesisSimulationEvidence   `json:"simulation"`
 	Issues             []reports.Issue               `json:"issues"`
+}
+
+type SynthesisSimulationEvidence struct {
+	Status  string `json:"status"`
+	ModelID string `json:"model_id,omitempty"`
+	Reason  string `json:"reason"`
 }
 
 type SynthesisUnusedPinDecision struct {
@@ -65,7 +72,8 @@ func (resolver *Resolver) Synthesize(ctx context.Context, document Document) (Do
 	report := SynthesisReport{
 		Schema: SynthesisReportSchema, Status: "blocked", PolicyVersion: SynthesisPolicyVersion,
 		InputHash: hashGraphValue(normalized), Selections: []SynthesisSelection{},
-		InterfaceBindings: []SynthesisInterfaceBinding{}, DerivedConstraints: []SynthesisConstraintEvidence{}, UnusedPinDecisions: []SynthesisUnusedPinDecision{}, Issues: []reports.Issue{},
+		InterfaceBindings: []SynthesisInterfaceBinding{}, DerivedConstraints: []SynthesisConstraintEvidence{}, UnusedPinDecisions: []SynthesisUnusedPinDecision{},
+		Simulation: SynthesisSimulationEvidence{Status: "not_applicable", Reason: "no_complete_registered_graph_model"}, Issues: []reports.Issue{},
 	}
 	if normalized.Synthesis == nil {
 		issue := synthesisIssue(CodeSynthesisIntentInvalid, "synthesis", "function-level synthesis intent is required", "provide the strict function-level intent form")
@@ -206,6 +214,9 @@ func (resolver *Resolver) Synthesize(ctx context.Context, document Document) (Do
 	issues = append(issues, applySensorFunctionPolicies(&lowered, intent, selectedByIntent, connected)...)
 	issues = append(issues, resolver.expandCompanionRecipes(ctx, &lowered, intent, selectedByIntent, connected, &report)...)
 	issues = append(issues, applyCatalogNoConnectPolicies(&lowered, selectedByIntent, connected)...)
+	if !reports.HasBlockingIssue(issues) {
+		lowered.Simulation, report.Simulation = deriveSynthesisSimulation(lowered, intent, selectedByIntent)
+	}
 
 	selectedIDs := make([]string, 0, len(selectedByIntent))
 	for id := range selectedByIntent {
