@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
+	"math"
 	"reflect"
 	"slices"
 	"strconv"
@@ -49,6 +50,26 @@ func TestFrozenToleranceCorpusNominalWorstCaseAndReordering(t *testing.T) {
 				t.Fatalf("unknown expectation %q", fixture.Expected)
 			}
 		})
+	}
+}
+
+func TestCanonicalReportHashBoundsNumericalNoiseWithoutWeakeningPlanIdentity(t *testing.T) {
+	baseValue := 3.8914041485234137
+	platformNoise := 3.8914041485234101
+	meaningfulChange := 3.8914042
+	baseReport := Report{Measurements: []Measurement{{Metric: "collector_voltage_v", Value: baseValue}}}
+	noiseReport := Report{Measurements: []Measurement{{Metric: "collector_voltage_v", Value: platformNoise}}}
+	changedReport := Report{Measurements: []Measurement{{Metric: "collector_voltage_v", Value: meaningfulChange}}}
+	if canonicalReportHash(t, baseReport) != canonicalReportHash(t, noiseReport) {
+		t.Fatal("report hash did not bound insignificant cross-platform solver noise")
+	}
+	if canonicalReportHash(t, baseReport) == canonicalReportHash(t, changedReport) {
+		t.Fatal("report hash hid an electrically meaningful value change")
+	}
+	basePlan := Plan{Inputs: []NamedValue{{Name: "collector_voltage_v", Value: baseValue}}}
+	noisePlan := Plan{Inputs: []NamedValue{{Name: "collector_voltage_v", Value: platformNoise}}}
+	if canonicalPlanHash(t, basePlan) == canonicalPlanHash(t, noisePlan) {
+		t.Fatal("exact plan identity was weakened by report-only quantization")
 	}
 }
 
@@ -252,9 +273,17 @@ func canonicalPlanHash(t testing.TB, plan Plan) string {
 }
 
 func canonicalValueHash(t testing.TB, value any) string {
+	return canonicalValueHashWithFloatPrecision(t, value, -1)
+}
+
+func canonicalReportHash(t testing.TB, report Report) string {
+	return canonicalValueHashWithFloatPrecision(t, report, 12)
+}
+
+func canonicalValueHashWithFloatPrecision(t testing.TB, value any, floatPrecision int) string {
 	t.Helper()
 	var encoded bytes.Buffer
-	writeCanonicalHashValue(t, &encoded, reflect.ValueOf(value), map[canonicalHashVisit]bool{})
+	writeCanonicalHashValue(t, &encoded, reflect.ValueOf(value), map[canonicalHashVisit]bool{}, floatPrecision)
 	digest := sha256.Sum256(encoded.Bytes())
 	return hex.EncodeToString(digest[:])
 }
@@ -264,38 +293,33 @@ type canonicalHashVisit struct {
 	Pointer uintptr
 }
 
-func writeCanonicalHashValue(t testing.TB, target *bytes.Buffer, value reflect.Value, visiting map[canonicalHashVisit]bool) {
+func writeCanonicalHashValue(t testing.TB, target *bytes.Buffer, value reflect.Value, visiting map[canonicalHashVisit]bool, floatPrecision int) {
 	t.Helper()
 	if !value.IsValid() {
 		target.WriteString("nil;")
 		return
+	}
+	switch value.Kind() {
+	case reflect.Pointer, reflect.Slice, reflect.Map:
+		if !value.IsNil() {
+			visit := canonicalHashVisit{Type: value.Type(), Pointer: value.Pointer()}
+			if visiting[visit] {
+				t.Fatalf("canonical tolerance hash encountered a %s cycle at %s", value.Kind(), value.Type())
+			}
+			visiting[visit] = true
+			defer delete(visiting, visit)
+		}
 	}
 	if value.Kind() == reflect.Interface || value.Kind() == reflect.Pointer {
 		if value.IsNil() {
 			target.WriteString("nil;")
 			return
 		}
-		if value.Kind() == reflect.Pointer {
-			visit := canonicalHashVisit{Type: value.Type(), Pointer: value.Pointer()}
-			if visiting[visit] {
-				t.Fatalf("canonical tolerance hash encountered a pointer cycle at %s", value.Type())
-			}
-			visiting[visit] = true
-			defer delete(visiting, visit)
-		}
 		target.WriteString(value.Kind().String())
 		target.WriteByte('{')
-		writeCanonicalHashValue(t, target, value.Elem(), visiting)
+		writeCanonicalHashValue(t, target, value.Elem(), visiting, floatPrecision)
 		target.WriteString("};")
 		return
-	}
-	if (value.Kind() == reflect.Slice || value.Kind() == reflect.Map) && !value.IsNil() {
-		visit := canonicalHashVisit{Type: value.Type(), Pointer: value.Pointer()}
-		if visiting[visit] {
-			t.Fatalf("canonical tolerance hash encountered a %s cycle at %s", value.Kind(), value.Type())
-		}
-		visiting[visit] = true
-		defer delete(visiting, visit)
 	}
 	target.WriteString(value.Kind().String())
 	target.WriteByte(':')
@@ -312,7 +336,19 @@ func writeCanonicalHashValue(t testing.TB, target *bytes.Buffer, value reflect.V
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
 		target.WriteString(strconv.FormatUint(value.Uint(), 10))
 	case reflect.Float32, reflect.Float64:
-		target.WriteString(strconv.FormatFloat(value.Float(), 'x', -1, value.Type().Bits()))
+		number := value.Float()
+		if math.IsNaN(number) || math.IsInf(number, 0) {
+			t.Fatalf("canonical tolerance hash rejects non-finite %s value %g", value.Type(), number)
+		}
+		if floatPrecision > 0 {
+			if number == 0 {
+				target.WriteByte('0')
+			} else {
+				target.WriteString(strconv.FormatFloat(number, 'g', floatPrecision, value.Type().Bits()))
+			}
+		} else {
+			target.WriteString(strconv.FormatFloat(number, 'x', -1, value.Type().Bits()))
+		}
 	case reflect.Struct:
 		target.WriteString(value.Type().PkgPath())
 		target.WriteByte('.')
@@ -325,30 +361,42 @@ func writeCanonicalHashValue(t testing.TB, target *bytes.Buffer, value reflect.V
 			}
 			target.WriteString(field.Name)
 			target.WriteByte('=')
-			writeCanonicalHashValue(t, target, value.Field(index), visiting)
+			writeCanonicalHashValue(t, target, value.Field(index), visiting, floatPrecision)
 		}
 		target.WriteByte('}')
 	case reflect.Slice, reflect.Array:
 		target.WriteString(strconv.Itoa(value.Len()))
 		target.WriteByte('[')
 		for index := 0; index < value.Len(); index++ {
-			writeCanonicalHashValue(t, target, value.Index(index), visiting)
+			writeCanonicalHashValue(t, target, value.Index(index), visiting, floatPrecision)
 		}
 		target.WriteByte(']')
 	case reflect.Map:
 		if value.Type().Key().Kind() != reflect.String {
 			t.Fatalf("canonical tolerance hash does not support map key type %s", value.Type().Key())
 		}
-		keys := make([]string, 0, value.Len())
-		for _, key := range value.MapKeys() {
-			keys = append(keys, key.String())
+		type mapKey struct {
+			text  string
+			value reflect.Value
 		}
-		slices.Sort(keys)
+		keys := make([]mapKey, 0, value.Len())
+		for _, key := range value.MapKeys() {
+			keys = append(keys, mapKey{text: key.String(), value: key})
+		}
+		slices.SortFunc(keys, func(left, right mapKey) int {
+			if left.text < right.text {
+				return -1
+			}
+			if left.text > right.text {
+				return 1
+			}
+			return 0
+		})
 		target.WriteString(strconv.Itoa(len(keys)))
 		target.WriteByte('{')
 		for _, key := range keys {
-			writeCanonicalHashValue(t, target, reflect.ValueOf(key), visiting)
-			writeCanonicalHashValue(t, target, value.MapIndex(reflect.ValueOf(key)), visiting)
+			writeCanonicalHashValue(t, target, key.value, visiting, floatPrecision)
+			writeCanonicalHashValue(t, target, value.MapIndex(key.value), visiting, floatPrecision)
 		}
 		target.WriteByte('}')
 	default:

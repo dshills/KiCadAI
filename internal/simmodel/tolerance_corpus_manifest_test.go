@@ -158,7 +158,7 @@ func buildToleranceCapabilityReport(t *testing.T, manifest toleranceCorpusManife
 		item := toleranceCapabilityCase{
 			ID: entry.ID, Category: entry.Category, NominalStatus: nominal.Status, WorstCaseStatus: worst.Status,
 			PlanSHA256: entry.PlanSHA256, CatalogEvidenceSHA256: entry.CatalogEvidenceSHA256,
-			NominalReportSHA256: canonicalValueHash(t, nominal), WorstReportSHA256: canonicalValueHash(t, worst),
+			NominalReportSHA256: canonicalReportHash(t, nominal), WorstReportSHA256: canonicalReportHash(t, worst),
 			PromotionCorpus: entry.PromotionCorpus, PromotionFixture: entry.PromotionFixture,
 		}
 		if dominant, ok := dominantToleranceSensitivity(worst.Sensitivity); ok {
