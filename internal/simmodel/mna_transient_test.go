@@ -53,6 +53,29 @@ func TestTransientDiodeAndPNPSwitching(t *testing.T) {
 	}
 }
 
+func TestTransientPNPResistiveSwitchDoesNotRequireCapacitiveState(t *testing.T) {
+	components := transientPNPComponents()
+	for index, component := range components {
+		if component.InstanceID == "load" {
+			components = append(components[:index], components[index+1:]...)
+			break
+		}
+	}
+	intent := transientPNPIntent()
+	intent.Assertions = []Assertion{
+		{AnalysisID: "switch", Node: "VCC", Quantity: QuantityVoltageV, TimeS: 0, Min: 4.99, Max: 5.01},
+		{AnalysisID: "switch", Node: "DRIVE", Quantity: QuantityVoltageV, TimeS: .0002, Min: -.01, Max: .01},
+	}
+	plan, diagnostics := ResolveWithTopology(intent, "test", "catalog-hash", components, transientSwitchNodes())
+	if len(diagnostics) != 0 {
+		t.Fatalf("resolve diagnostics=%+v", diagnostics)
+	}
+	report, diagnostics := Evaluate(plan)
+	if len(diagnostics) != 0 || report.Status != "pass" {
+		t.Fatalf("report=%+v diagnostics=%+v", report, diagnostics)
+	}
+}
+
 func TestTransientBoundsClaimsAndOperatingLimitsFailClosed(t *testing.T) {
 	plan := resolveTransientSwitchPlan(t, 25)
 	badGrid := transientSwitchIntent()

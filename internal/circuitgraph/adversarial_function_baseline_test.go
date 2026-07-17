@@ -27,6 +27,7 @@ const (
 	adversarialBaselineEvaluatedCommit = "93063343e99d2ec1d7390396ddbd7b94e5983a77"
 	adversarialBaselineReportSHA256    = "33285964855f9b2dc41b8d5f44f851cd36877b48cb5b595da78546dfdde46f3e"
 	adversarialPromotionModeEnv        = "KICADAI_ADVERSARIAL_PROMOTION"
+	adversarialPromotionCasesEnv       = "KICADAI_ADVERSARIAL_CASES"
 )
 
 type adversarialCapabilityIssue struct {
@@ -71,7 +72,7 @@ type adversarialCapabilityReport struct {
 func TestAdversarialFunctionCorpusBaselineReportIsFrozen(t *testing.T) {
 	path := adversarialCapabilityReportPath(t, "BASELINE_REPORT.json")
 	if *updateCircuitGraphGolden {
-		report := evaluateAdversarialCorpus(t, true)
+		report := evaluateAdversarialCorpus(t, true, nil)
 		contents, err := json.MarshalIndent(report, "", "  ")
 		if err != nil {
 			t.Fatal(err)
@@ -143,20 +144,20 @@ func TestAdversarialFunctionCorpusOptionalKiCadPromotion(t *testing.T) {
 	if mode != "probe" && mode != "require-pass" {
 		t.Fatalf("%s must be probe or require-pass, got %q", adversarialPromotionModeEnv, mode)
 	}
-	report := evaluateAdversarialCorpus(t, true)
+	report := evaluateAdversarialCorpus(t, true, adversarialFixtureFilter(t))
 	for _, circuit := range report.Circuits {
 		if circuit.Status == "pass" {
 			t.Logf("%s: pass", circuit.ID)
 			continue
 		}
-		t.Logf("%s: blocked root=%s stage=%s path=%s", circuit.ID, circuit.RootKey, circuit.RootIssue.Stage, circuit.RootIssue.Path)
+		t.Logf("%s: blocked root=%s stage=%s path=%s message=%s", circuit.ID, circuit.RootKey, circuit.RootIssue.Stage, circuit.RootIssue.Path, circuit.RootIssue.Message)
 	}
 	if mode == "require-pass" && report.Aggregate.Blocked != 0 {
 		t.Fatalf("adversarial promotion blocked: %#v", report.Aggregate)
 	}
 }
 
-func evaluateAdversarialCorpus(t *testing.T, requireKiCad bool) adversarialCapabilityReport {
+func evaluateAdversarialCorpus(t *testing.T, requireKiCad bool, only map[string]bool) adversarialCapabilityReport {
 	t.Helper()
 	root := adversarialFunctionCorpusRoot(t)
 	manifestBytes, err := os.ReadFile(filepath.Join(root, "manifest.json"))
@@ -196,11 +197,15 @@ func evaluateAdversarialCorpus(t *testing.T, requireKiCad bool) adversarialCapab
 			"writer_correctness": "required", "zero_round_trip_diffs": "required",
 		},
 		Aggregate: adversarialCapabilityAggregate{
-			Circuits: len(manifest.Fixtures), ByCategory: map[string]int{}, ByCode: map[string]int{}, ByRootKey: map[string]int{},
+			ByCategory: map[string]int{}, ByCode: map[string]int{}, ByRootKey: map[string]int{},
 		},
 	}
 	resolver := NewResolver(ResolveOptions{Catalog: loadGraphCatalog(t), CatalogID: "adversarial-function-corpus"})
 	for _, fixture := range manifest.Fixtures {
+		if only != nil && !only[fixture.ID] {
+			continue
+		}
+		report.Aggregate.Circuits++
 		circuit := evaluateAdversarialCircuit(t, ctx, root, fixture, resolver, index, cliPath, requireKiCad)
 		report.Circuits = append(report.Circuits, circuit)
 		if circuit.Status == "pass" {
@@ -216,6 +221,41 @@ func evaluateAdversarialCorpus(t *testing.T, requireKiCad bool) adversarialCapab
 		return strings.Compare(left.ID, right.ID)
 	})
 	return report
+}
+
+func adversarialFixtureFilter(t *testing.T) map[string]bool {
+	t.Helper()
+	raw := strings.TrimSpace(os.Getenv(adversarialPromotionCasesEnv))
+	if raw == "" {
+		return nil
+	}
+	wanted := map[string]bool{}
+	for _, id := range strings.Split(raw, ",") {
+		id = strings.TrimSpace(id)
+		if id == "" {
+			t.Fatalf("%s contains an empty circuit ID", adversarialPromotionCasesEnv)
+		}
+		wanted[id] = true
+	}
+	manifestBytes, err := os.ReadFile(filepath.Join(adversarialFunctionCorpusRoot(t), "manifest.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var manifest adversarialCorpusManifest
+	if err := json.Unmarshal(manifestBytes, &manifest); err != nil {
+		t.Fatal(err)
+	}
+	for _, fixture := range manifest.Fixtures {
+		delete(wanted, fixture.ID)
+	}
+	if len(wanted) != 0 {
+		t.Fatalf("%s contains unknown circuit IDs: %#v", adversarialPromotionCasesEnv, wanted)
+	}
+	selected := map[string]bool{}
+	for _, id := range strings.Split(raw, ",") {
+		selected[strings.TrimSpace(id)] = true
+	}
+	return selected
 }
 
 func evaluateAdversarialCircuit(t *testing.T, ctx context.Context, root string, fixture adversarialCorpusFixture, resolver *Resolver, index libraryresolver.LibraryIndex, cliPath string, requireKiCad bool) adversarialCapabilityCircuit {

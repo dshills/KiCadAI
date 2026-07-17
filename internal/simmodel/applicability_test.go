@@ -29,6 +29,26 @@ func TestApplicableGraphModelRequiresCompleteTrustedTopology(t *testing.T) {
 	}
 }
 
+func TestApplicableGraphModelForTransientRequiresTransientCapacitorEvidence(t *testing.T) {
+	base := []ComponentEvidence{
+		{InstanceID: "supply", Family: "connector", ModelClaims: []CatalogEvidence{{ModelID: PrimitiveConnectorVoltageSourceV1}}, Connections: []ConnectionEvidence{{Function: "PIN_1", Net: "GND"}, {Function: "PIN_2", Net: "VCC"}}},
+		{InstanceID: "resistor", Family: "resistor", ModelClaims: []CatalogEvidence{{ModelID: PrimitiveResistorV1}}, Connections: []ConnectionEvidence{{Function: "A", Net: "VCC"}}},
+	}
+	transient := append([]ComponentEvidence(nil), base...)
+	transient = append(transient, ComponentEvidence{InstanceID: "capacitor", Family: "capacitor", ModelClaims: []CatalogEvidence{
+		{ModelID: PrimitiveCapacitorV1}, {ModelID: PrimitiveCapacitorTransientV1},
+	}, Connections: []ConnectionEvidence{{Function: "A", Net: "VCC"}}})
+	if model, ok, _ := ApplicableGraphModelForAnalysis(transient, AnalysisTransient); !ok || model != ModelTransientCircuitV1 {
+		t.Fatalf("transient applicability = %q, %t", model, ok)
+	}
+
+	dcOnly := append([]ComponentEvidence(nil), base...)
+	dcOnly = append(dcOnly, ComponentEvidence{InstanceID: "capacitor", Family: "capacitor", ModelClaims: []CatalogEvidence{{ModelID: PrimitiveCapacitorV1}}, Connections: []ConnectionEvidence{{Function: "A", Net: "VCC"}}})
+	if model, ok, _ := ApplicableGraphModelForAnalysis(dcOnly, AnalysisTransient); ok || model != "" {
+		t.Fatalf("DC-only capacitor transient applicability = %q, %t", model, ok)
+	}
+}
+
 func TestBJTPolarityPrimitivesShareCatalogFamily(t *testing.T) {
 	for _, primitive := range []string{PrimitiveBJTNPNV1, PrimitiveBJTPNPV1} {
 		if diagnostics := ValidateCatalogEvidence("bjt", []CatalogEvidence{{ModelID: primitive, Parameters: bjtParameters(.2, 40)}}); len(diagnostics) != 0 {

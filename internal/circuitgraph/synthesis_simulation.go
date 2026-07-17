@@ -4,6 +4,7 @@ import (
 	"math"
 	"slices"
 	"strconv"
+	"strings"
 
 	"kicadai/internal/components"
 	"kicadai/internal/simmodel"
@@ -23,6 +24,17 @@ type synthesisSourceCondition struct {
 	dcValue        float64
 	sourcePolarity float64
 	acInput        bool
+	pulseInput     bool
+}
+
+type synthesisTransientCondition struct {
+	initialValueV float64
+	pulseValueV   float64
+	delayS        float64
+	widthS        float64
+	periodS       float64
+	durationS     float64
+	timeStepS     float64
 }
 
 func deriveSynthesisSimulation(document Document, intent FunctionIntent, selected map[string]ResolvedComponent) (*SimulationIntent, SynthesisSimulationEvidence) {
@@ -52,7 +64,18 @@ func deriveSynthesisSimulation(document Document, intent FunctionIntent, selecte
 	// Applicability is model completeness, not numerical optimism. Resolution
 	// validates the full terminal topology, and evaluation's pivoted MNA solver
 	// returns a singular/floating-node diagnostic instead of a partial result.
-	modelID, applicable, applicabilityReason := simmodel.ApplicableGraphModel(evidence)
+	transient, transientRequested, transientReason := synthesisTransientOperatingCase(intent.Functions)
+	if transientReason != "" {
+		return nil, SynthesisSimulationEvidence{Status: "not_applicable", Reason: transientReason}
+	}
+	var modelID string
+	var applicable bool
+	var applicabilityReason string
+	if transientRequested {
+		modelID, applicable, applicabilityReason = simmodel.ApplicableGraphModelForAnalysis(evidence, simmodel.AnalysisTransient)
+	} else {
+		modelID, applicable, applicabilityReason = simmodel.ApplicableGraphModel(evidence)
+	}
 	if !applicable {
 		return nil, SynthesisSimulationEvidence{Status: "not_applicable", Reason: applicabilityReason}
 	}
@@ -97,11 +120,13 @@ func deriveSynthesisSimulation(document Document, intent FunctionIntent, selecte
 			// equations or provider-controlled operating points.
 			condition.dcValue = operatingRail * synthesisAnalogBiasRailFraction
 			condition.acInput = true
+			condition.pulseInput = true
 		case InterfaceDigitalIn:
 			if operatingRail == 0 {
 				return nil, SynthesisSimulationEvidence{Status: "not_applicable", Reason: "no_bounded_interface_operating_condition"}
 			}
 			condition.dcValue = operatingRail
+			condition.pulseInput = true
 		default:
 			continue
 		}
@@ -119,6 +144,9 @@ func deriveSynthesisSimulation(document Document, intent FunctionIntent, selecte
 		}
 		return 0
 	})
+	if transientRequested {
+		return deriveSynthesisTransient(modelID, sources, transient)
+	}
 
 	dc := simmodel.Analysis{ID: "dc_operating_point", Kind: simmodel.AnalysisDCOperatingPoint, Excitations: []simmodel.SourceExcitation{}}
 	assertions := make([]simmodel.Assertion, 0, len(sources)*2)
@@ -176,6 +204,121 @@ func deriveSynthesisSimulation(document Document, intent FunctionIntent, selecte
 	return &SimulationIntent{ModelID: modelID, Analyses: analyses, Assertions: assertions}, SynthesisSimulationEvidence{
 		Status: "derived", ModelID: modelID, Reason: "complete_registered_graph_model_and_bounded_interface_conditions",
 	}
+}
+
+func deriveSynthesisTransient(modelID string, sources []synthesisSourceCondition, condition synthesisTransientCondition) (*SimulationIntent, SynthesisSimulationEvidence) {
+	pulseInputs := 0
+	for _, source := range sources {
+		if source.pulseInput {
+			pulseInputs++
+		}
+	}
+	if pulseInputs != 1 {
+		// A single operating-case parameter set cannot identify which of
+		// multiple independent inputs should be pulsed. Fail closed instead of
+		// silently choosing one or exciting unrelated inputs together.
+		return nil, SynthesisSimulationEvidence{Status: "not_applicable", Reason: "transient_requires_exactly_one_input_source"}
+	}
+	analysis := simmodel.Analysis{
+		ID: "transient_operating_case", Kind: simmodel.AnalysisTransient,
+		DurationS: condition.durationS, TimeStepS: condition.timeStepS,
+		Excitations: []simmodel.SourceExcitation{},
+	}
+	assertions := make([]simmodel.Assertion, 0, len(sources))
+	for _, source := range sources {
+		excitation := simmodel.SourceExcitation{Component: source.component}
+		expected := source.dcValue
+		timeS := 0.0
+		if source.pulseInput {
+			// Polarity corrects the trusted connector primitive's pin equation;
+			// expected remains the physical voltage at source.node. For example,
+			// a signal on pin 2 requires a negative source value to produce a
+			// positive node voltage relative to grounded pin 1.
+			excitation.PulseInitialValue = condition.initialValueV * source.sourcePolarity
+			excitation.PulseValue = condition.pulseValueV * source.sourcePolarity
+			excitation.PulseDelayS = condition.delayS
+			excitation.PulseWidthS = condition.widthS
+			excitation.PulsePeriodS = condition.periodS
+			expected = condition.pulseValueV
+			// The trusted pulse contract changes an ideal source at delayS:
+			// transientSourceValue uses the initial value only for time < delay.
+			// Equality is therefore the first exact-grid pulsed sample. A
+			// midpoint could fall between grid points when width spans odd steps.
+			timeS = condition.delayS
+		} else {
+			excitation.DCValue = source.dcValue * source.sourcePolarity
+		}
+		analysis.Excitations = append(analysis.Excitations, excitation)
+		tolerance := math.Max(1e-3, math.Abs(expected)*0.01)
+		assertions = append(assertions, simmodel.Assertion{
+			AnalysisID: analysis.ID, Node: source.node, Quantity: simmodel.QuantityVoltageV,
+			TimeS: timeS, Min: expected - tolerance, Max: expected + tolerance,
+		})
+	}
+	return &SimulationIntent{ModelID: modelID, Analyses: []simmodel.Analysis{analysis}, Assertions: assertions}, SynthesisSimulationEvidence{
+		Status: "derived", ModelID: modelID, Reason: "complete_registered_graph_model_and_bounded_transient_operating_case",
+	}
+}
+
+func synthesisTransientOperatingCase(functions []FunctionRequirement) (synthesisTransientCondition, bool, string) {
+	names := []string{
+		"pulse_initial_value_v", "pulse_value_v", "pulse_delay_s", "pulse_width_s", "pulse_period_s",
+		"analysis_duration_s", "analysis_time_step_s",
+	}
+	var result synthesisTransientCondition
+	found := false
+	for _, function := range functions {
+		values := make(map[string]float64, len(names))
+		present := 0
+		for _, name := range names {
+			value, exists, valid := synthesisParameterFloat(function.Parameters, name)
+			if exists {
+				present++
+				if !valid {
+					return synthesisTransientCondition{}, true, "invalid_bounded_transient_operating_parameter"
+				}
+				values[name] = value
+			}
+		}
+		if present == 0 {
+			continue
+		}
+		if present != len(names) {
+			return synthesisTransientCondition{}, true, "incomplete_bounded_transient_operating_case"
+		}
+		if found {
+			return synthesisTransientCondition{}, true, "ambiguous_bounded_transient_operating_case"
+		}
+		found = true
+		result = synthesisTransientCondition{
+			initialValueV: values["pulse_initial_value_v"], pulseValueV: values["pulse_value_v"],
+			delayS: values["pulse_delay_s"], widthS: values["pulse_width_s"], periodS: values["pulse_period_s"],
+			durationS: values["analysis_duration_s"], timeStepS: values["analysis_time_step_s"],
+		}
+	}
+	return result, found, ""
+}
+
+func synthesisParameterFloat(parameters []Parameter, name string) (float64, bool, bool) {
+	for _, parameter := range parameters {
+		if !strings.EqualFold(parameter.Name, name) {
+			continue
+		}
+		var value float64
+		if parameter.Value.Number != nil {
+			value = *parameter.Value.Number
+		} else if parameter.Value.String != nil {
+			parsed, err := strconv.ParseFloat(strings.TrimSpace(*parameter.Value.String), 64)
+			if err != nil {
+				return 0, true, false
+			}
+			value = parsed
+		} else {
+			return 0, true, false
+		}
+		return value, true, !math.IsNaN(value) && !math.IsInf(value, 0)
+	}
+	return 0, false, false
 }
 
 func synthesisOperatingRail(domains []PowerDomainIntent) float64 {

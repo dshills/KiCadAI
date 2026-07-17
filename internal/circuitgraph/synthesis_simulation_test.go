@@ -83,3 +83,80 @@ func TestSynthesisOperatingRailSupportsSignedSupplies(t *testing.T) {
 		})
 	}
 }
+
+func TestDerivedSynthesisTransientUsesCompleteBoundedOperatingCase(t *testing.T) {
+	sourceRecord := components.ComponentRecord{Family: "connector", SimulationModels: []simmodel.CatalogEvidence{{ModelID: simmodel.PrimitiveConnectorVoltageSourceV1}}}
+	selected := map[string]ResolvedComponent{
+		"iface_power": {Instance: Component{ID: "iface_power"}, ComponentID: "power", Record: sourceRecord},
+		"iface_input": {Instance: Component{ID: "iface_input"}, ComponentID: "input", Record: sourceRecord},
+		"resistor": {Instance: Component{ID: "resistor", Value: "1k"}, ComponentID: "resistor", Record: components.ComponentRecord{
+			Family: "resistor", SimulationModels: []simmodel.CatalogEvidence{{ModelID: simmodel.PrimitiveResistorV1}},
+		}},
+		"capacitor": {Instance: Component{ID: "capacitor", Value: "10n"}, ComponentID: "capacitor", Record: components.ComponentRecord{
+			Family: "capacitor", SimulationModels: []simmodel.CatalogEvidence{{ModelID: simmodel.PrimitiveCapacitorV1}, {ModelID: simmodel.PrimitiveCapacitorTransientV1}},
+		}},
+	}
+	document := Document{Nets: []Net{
+		{Name: "GND", Role: NetRoleGround, Endpoints: []Endpoint{{Component: "iface_power", Selector: "PIN_2"}, {Component: "iface_input", Selector: "PIN_2"}, {Component: "capacitor", Selector: "B"}}},
+		{Name: "VCC", Role: NetRolePower, Endpoints: []Endpoint{{Component: "iface_power", Selector: "PIN_1"}}},
+		{Name: "INPUT", Role: NetRoleSignal, Endpoints: []Endpoint{{Component: "iface_input", Selector: "PIN_1"}, {Component: "resistor", Selector: "A"}}},
+		{Name: "OUTPUT", Role: NetRoleSignal, Endpoints: []Endpoint{{Component: "resistor", Selector: "B"}, {Component: "capacitor", Selector: "A"}}},
+	}}
+	parameters := []Parameter{
+		synthesisNumberParameter("pulse_initial_value_v", 0), synthesisNumberParameter("pulse_value_v", 5),
+		synthesisNumberParameter("pulse_delay_s", .0001), synthesisNumberParameter("pulse_width_s", .0005),
+		synthesisNumberParameter("pulse_period_s", .001), synthesisNumberParameter("analysis_duration_s", .0008),
+		synthesisNumberParameter("analysis_time_step_s", .00001),
+	}
+	intent := FunctionIntent{
+		Functions: []FunctionRequirement{{ID: "filter", Parameters: parameters}},
+		Interfaces: []InterfaceRequirement{
+			{ID: "power", Role: InterfacePowerInput, Signals: []InterfaceSignal{{Name: "VCC", Role: NetRolePower}, {Name: "GND", Role: NetRoleGround}}},
+			{ID: "input", Role: InterfaceDigitalIn, Signals: []InterfaceSignal{{Name: "SIGNAL", Role: NetRoleSignal}, {Name: "GND", Role: NetRoleGround}}},
+		},
+		PowerDomains: []PowerDomainIntent{{Name: "VCC", Role: NetRolePower, VoltageV: 5}},
+		Connections: []FunctionConnection{
+			{Name: "VCC", VoltageDomain: "VCC", Endpoints: []FunctionalEndpoint{{Interface: "power", Signal: "VCC"}}},
+			{Name: "INPUT", Endpoints: []FunctionalEndpoint{{Interface: "input", Signal: "SIGNAL"}}},
+		},
+	}
+	simulation, evidence := deriveSynthesisSimulation(document, intent, selected)
+	if simulation == nil || evidence.Status != "derived" || simulation.ModelID != simmodel.ModelTransientCircuitV1 || len(simulation.Analyses) != 1 {
+		t.Fatalf("derived transient = %#v evidence=%#v", simulation, evidence)
+	}
+	analysis := simulation.Analyses[0]
+	if analysis.Kind != simmodel.AnalysisTransient || analysis.DurationS != .0008 || analysis.TimeStepS != .00001 {
+		t.Fatalf("transient grid = %#v", analysis)
+	}
+	for _, excitation := range analysis.Excitations {
+		if excitation.Component == "iface_input" && (excitation.PulseValue != 5 || excitation.PulsePeriodS != .001) {
+			t.Fatalf("pulse excitation = %#v", excitation)
+		}
+	}
+
+	intent.Functions[0].Parameters = parameters[:len(parameters)-1]
+	if incomplete, incompleteEvidence := deriveSynthesisSimulation(document, intent, selected); incomplete != nil || incompleteEvidence.Reason != "incomplete_bounded_transient_operating_case" {
+		t.Fatalf("incomplete transient = %#v evidence=%#v", incomplete, incompleteEvidence)
+	}
+}
+
+func TestDerivedSynthesisTransientPolarityChangesSourceEquationNotNodeAssertion(t *testing.T) {
+	condition := synthesisTransientCondition{pulseValueV: 5, widthS: .0005, periodS: .001, durationS: .0008, timeStepS: .00001}
+	simulation, evidence := deriveSynthesisTransient(simmodel.ModelTransientCircuitV1, []synthesisSourceCondition{{
+		component: "reversed_input", node: "INPUT", sourcePolarity: -1, pulseInput: true,
+	}}, condition)
+	if simulation == nil || evidence.Status != "derived" {
+		t.Fatalf("derived reversed-source transient = %#v evidence=%#v", simulation, evidence)
+	}
+	if got := simulation.Analyses[0].Excitations[0].PulseValue; got != -5 {
+		t.Fatalf("trusted source equation pulse = %v, want -5", got)
+	}
+	assertion := simulation.Assertions[0]
+	if assertion.Node != "INPUT" || assertion.Min >= 5 || assertion.Max <= 5 {
+		t.Fatalf("physical node assertion = %#v, want bounds around +5 V", assertion)
+	}
+}
+
+func synthesisNumberParameter(name string, value float64) Parameter {
+	return Parameter{Name: name, Value: ParameterValue{Number: &value}}
+}

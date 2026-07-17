@@ -132,6 +132,21 @@ func compatiblePrimitiveClaims(component ComponentEvidence, model definition) []
 // keeps synthesis fail-closed: an incomplete catalog model never produces a
 // partial or optimistic simulation.
 func ApplicableGraphModel(components []ComponentEvidence) (string, bool, string) {
+	return applicableGraphModel(components, "")
+}
+
+// ApplicableGraphModelForAnalysis selects a registered graph workflow for an
+// explicitly requested trusted analysis kind. It does not accept provider
+// model IDs and still requires every connected component to have exactly one
+// compatible reviewed primitive.
+func ApplicableGraphModelForAnalysis(components []ComponentEvidence, analysisKind string) (string, bool, string) {
+	if analysisKind != AnalysisTransient {
+		return "", false, "unsupported_graph_analysis"
+	}
+	return applicableGraphModel(components, ModelTransientCircuitV1)
+}
+
+func applicableGraphModel(components []ComponentEvidence, requestedModelID string) (string, bool, string) {
 	hasSource := false
 	hasDevice := false
 	hasNonlinear := false
@@ -152,9 +167,12 @@ func ApplicableGraphModel(components []ComponentEvidence) (string, bool, string)
 	if !hasSource || !hasDevice {
 		return "", false, "missing_trusted_source_or_device"
 	}
-	modelID := ModelLinearCircuitMNAV1
-	if hasNonlinear {
-		modelID = ModelNonlinearCircuitDCV1
+	modelID := requestedModelID
+	if modelID == "" {
+		modelID = ModelLinearCircuitMNAV1
+		if hasNonlinear {
+			modelID = ModelNonlinearCircuitDCV1
+		}
 	}
 	model, exists := definitionByID(modelID)
 	if !exists {
@@ -491,7 +509,6 @@ func validateMNAPlan(plan Plan) []Diagnostic {
 	deviceFamilies := make(map[string]string, len(plan.Devices))
 	devicePrimitives := make(map[string]string, len(plan.Devices))
 	nonlinearDevices := 0
-	transientCapacitors := 0
 	for index, device := range plan.Devices {
 		path := fmt.Sprintf("devices[%d]", index)
 		if index > 0 && plan.Devices[index-1].Component >= device.Component {
@@ -507,14 +524,14 @@ func validateMNAPlan(plan Plan) []Diagnostic {
 		if primitive.Nonlinear {
 			nonlinearDevices++
 		}
-		if primitive.ID == PrimitiveCapacitorTransientV1 {
-			transientCapacitors++
-		}
 		if primitive.Nonlinear && !model.NonlinearDC {
 			diagnostics = append(diagnostics, Diagnostic{Path: path + ".primitive_model", Message: "linear MNA plan contains a nonlinear primitive"})
 		}
 		if primitive.Transient && !model.Transient {
 			diagnostics = append(diagnostics, Diagnostic{Path: path + ".primitive_model", Message: "non-transient plan contains a transient-only primitive"})
+		}
+		if model.Transient && primitive.Family == "capacitor" && !primitive.Transient {
+			diagnostics = append(diagnostics, Diagnostic{Path: path + ".primitive_model", Message: "transient plan capacitor requires a reviewed transient capacitor primitive"})
 		}
 		if primitive.RequiresValueSI && (device.ValueSI == nil || !finite(*device.ValueSI) || *device.ValueSI <= 0) {
 			diagnostics = append(diagnostics, Diagnostic{Path: path + ".value_si", Message: "resolved primitive requires a finite positive value"})
@@ -532,9 +549,6 @@ func validateMNAPlan(plan Plan) []Diagnostic {
 	}
 	if model.NonlinearDC && nonlinearDevices == 0 {
 		diagnostics = append(diagnostics, Diagnostic{Path: "devices", Message: "nonlinear DC workflow requires at least one reviewed nonlinear device"})
-	}
-	if model.Transient && transientCapacitors == 0 {
-		diagnostics = append(diagnostics, Diagnostic{Path: "devices", Message: "transient workflow requires at least one reviewed transient capacitor"})
 	}
 	intent := Intent{ModelID: plan.ModelID, Analyses: cloneAnalyses(plan.Analyses), Assertions: append([]Assertion(nil), plan.Assertions...)}
 	diagnostics = append(diagnostics, validateMNAIntent(intent, deviceFamilies)...)
