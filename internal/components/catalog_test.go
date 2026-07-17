@@ -309,6 +309,7 @@ func TestValidateCatalogSensorEvidenceRejectsMalformedMetadata(t *testing.T) {
 		{name: "reserved address", mutate: func(e *SensorEvidence) { e.I2CAddresses[0].Address = "0x02" }, path: "records[0].sensor_evidence.i2c_addresses[0].address"},
 		{name: "missing default", mutate: func(e *SensorEvidence) { e.I2CAddresses[0].Default = false }, path: "records[0].sensor_evidence.i2c_addresses"},
 		{name: "unknown select function", mutate: func(e *SensorEvidence) { e.I2CAddresses[0].SelectFunction = "MAGIC" }, path: "records[0].sensor_evidence.i2c_addresses[0].function"},
+		{name: "unknown parent function", mutate: func(e *SensorEvidence) { e.I2CAddresses[0].ParentFunction = "MAGIC" }, path: "records[0].sensor_evidence.i2c_addresses[0].parent_function"},
 		{name: "invalid pin level", mutate: func(e *SensorEvidence) { e.I2CModeConnections[0].Level = "floating" }, path: "records[0].sensor_evidence.i2c_mode_connections[0].level"},
 		{name: "unknown interrupt", mutate: func(e *SensorEvidence) { e.OptionalInterruptFunction = "IRQ" }, path: "records[0].sensor_evidence.optional_interrupt_function"},
 	}

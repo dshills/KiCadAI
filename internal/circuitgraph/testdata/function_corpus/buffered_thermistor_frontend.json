@@ -1,0 +1,60 @@
+{
+  "schema": "kicadai.circuit-graph.v1",
+  "version": 1,
+  "project": {
+    "name": "buffered_thermistor_frontend",
+    "title": "Buffered thermistor frontend",
+    "description": "Non-inverting analog sensor conditioner with external input and output interfaces.",
+    "acceptance": "erc-drc"
+  },
+  "synthesis": {
+    "functions": [
+      {
+        "id": "amplifier",
+        "role": "ic",
+        "query": {"text": "TI LMV321", "family": "opamp", "minimum_confidence": "verified"},
+        "required_functions": ["IN_MINUS", "IN_PLUS", "OUT", "V_MINUS", "V_PLUS"],
+        "usage": "noninverting_amplifier"
+      },
+      {
+        "id": "feedback",
+        "role": "resistor",
+        "query": {"family": "resistor", "package": "0603", "value_kind": "resistance", "value": "20k", "minimum_confidence": "rule_inferred"},
+        "value": "20k"
+      },
+      {
+        "id": "gain_ground",
+        "role": "resistor",
+        "query": {"family": "resistor", "package": "0603", "value_kind": "resistance", "value": "10k", "minimum_confidence": "rule_inferred"},
+        "value": "10k"
+      }
+    ],
+    "interfaces": [
+      {"id": "power", "role": "power_input", "signals": [{"name": "VCC", "role": "power"}, {"name": "GND", "role": "ground"}]},
+      {"id": "sensor", "role": "analog_input", "signals": [{"name": "SIGNAL", "role": "signal"}, {"name": "GND", "role": "ground"}]},
+      {"id": "output", "role": "analog_output", "signals": [{"name": "SIGNAL", "role": "signal"}, {"name": "GND", "role": "ground"}]}
+    ],
+    "power_domains": [
+      {"name": "VCC", "role": "power", "voltage_v": 3.3, "max_current_ma": 25, "source": "external"},
+      {"name": "GND", "role": "ground", "voltage_v": 0, "source": "external"}
+    ],
+    "connections": [
+      {"name": "VCC", "role": "power", "voltage_domain": "VCC", "endpoints": [{"interface": "power", "signal": "VCC"}, {"function": "amplifier", "port": "V_PLUS"}]},
+      {"name": "GND", "role": "ground", "voltage_domain": "GND", "endpoints": [{"interface": "power", "signal": "GND"}, {"interface": "sensor", "signal": "GND"}, {"interface": "output", "signal": "GND"}, {"function": "amplifier", "port": "V_MINUS"}, {"function": "gain_ground", "port": "B"}]},
+      {"name": "SENSOR_IN", "role": "signal", "endpoints": [{"interface": "sensor", "signal": "SIGNAL"}, {"function": "amplifier", "port": "IN_PLUS"}]},
+      {"name": "GAIN_FB", "role": "feedback", "endpoints": [{"function": "amplifier", "port": "IN_MINUS"}, {"function": "feedback", "port": "B"}, {"function": "gain_ground", "port": "A"}]},
+      {"name": "ANALOG_OUT", "role": "signal", "endpoints": [{"function": "amplifier", "port": "OUT"}, {"function": "feedback", "port": "A"}, {"interface": "output", "signal": "SIGNAL"}]}
+    ],
+    "constraints": {"max_width_mm": 45, "max_height_mm": 30, "preferred_component_spacing_mm": 1.5}
+  },
+  "policy": {
+    "allow_reference_assignment": true,
+    "allow_value_normalization": true,
+    "allow_layout_inference": true,
+    "allow_spacing_adjustment": true,
+    "allow_label_insertion": true,
+    "allow_placement_adjustment": true,
+    "allow_route_retry": true
+  },
+  "extensions": {}
+}

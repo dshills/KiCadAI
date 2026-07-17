@@ -67,7 +67,10 @@ type ExplicitCircuitSpec struct {
 	Regions          []ExplicitRegionSpec           `json:"regions,omitempty"`
 	Keepouts         []ExplicitKeepoutSpec          `json:"keepouts,omitempty"`
 	Zones            []ExplicitZoneSpec             `json:"zones,omitempty"`
+	RoutingPolicy    string                         `json:"routing_policy,omitempty"`
 }
+
+const ExplicitRoutingPolicyConstrainedEndpointAccessV1 = "constrained_endpoint_access_v1"
 
 const ExplicitSchematicSupportPowerFlag = "power_flag"
 
@@ -592,6 +595,9 @@ func validateExplicitCircuit(circuit ExplicitCircuitSpec) []reports.Issue {
 	}
 	if strings.TrimSpace(circuit.CatalogID) == "" || !validSHA256(circuit.CatalogHash) {
 		issues = append(issues, issue("explicit_circuit.catalog", "catalog id and lowercase SHA-256 hash are required"))
+	}
+	if circuit.RoutingPolicy != "" && circuit.RoutingPolicy != ExplicitRoutingPolicyConstrainedEndpointAccessV1 {
+		issues = append(issues, issue("explicit_circuit.routing_policy", "unsupported explicit routing policy"))
 	}
 	issues = append(issues, schematicir.Validate(circuit.Schematic)...)
 	if len(circuit.Components) == 0 {

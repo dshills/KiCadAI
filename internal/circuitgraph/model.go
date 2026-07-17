@@ -16,24 +16,27 @@ const (
 )
 
 const (
-	MaxDocumentBytes     = 4 << 20
-	MaxComponents        = 512
-	MaxUnitsPerComponent = 32
-	MaxNets              = 1024
-	MaxEndpointsPerNet   = 512
-	MaxTotalEndpoints    = 32768
-	MaxNoConnects        = 16384
-	MaxBuses             = 128
-	MaxPowerFlags        = 64
-	MaxStringBytes       = 256
-	MaxDescriptionBytes  = 2048
-	MaxBoardDimensionMM  = 1000
+	MaxDocumentBytes            = 4 << 20
+	MaxComponents               = 512
+	MaxUnitsPerComponent        = 32
+	MaxNets                     = 1024
+	MaxEndpointsPerNet          = 512
+	MaxTotalEndpoints           = 32768
+	MaxNoConnects               = 16384
+	MaxBuses                    = 128
+	MaxPowerFlags               = 64
+	MaxStringBytes              = 256
+	MaxDescriptionBytes         = 2048
+	MaxBoardDimensionMM         = 1000
+	MaxFunctionInterfaceSignals = 64
+	MaxSynthesisVoltageV        = 1000
 )
 
 type Document struct {
 	Schema     string                     `json:"schema"`
 	Version    int                        `json:"version"`
 	Project    Project                    `json:"project"`
+	Synthesis  *FunctionIntent            `json:"synthesis,omitempty"`
 	Components []Component                `json:"components"`
 	Nets       []Net                      `json:"nets"`
 	NoConnects []Endpoint                 `json:"no_connects"`

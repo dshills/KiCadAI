@@ -184,7 +184,7 @@ func ValidateCatalog(catalog *Catalog) reports.Result {
 		issues = append(issues, validateConstraints(path+".ratings", ratingConstraintsAsGeneric(record.Ratings))...)
 		issues = append(issues, validateConstraints(path+".tolerances", toleranceConstraintsAsGeneric(record.Tolerances))...)
 		issues = append(issues, validateTemperatureRange(path+".temperature", record.Temperature)...)
-		issues = append(issues, validateCompanions(path+".companions", record.Companions)...)
+		issues = append(issues, validateCompanions(path+".companions", record, record.Companions)...)
 		issues = append(issues, validateDeratingRules(path+".derating_rules", record.DeratingRules)...)
 		issues = append(issues, validateRegulatorEvidence(path+".regulator_evidence", record.Regulator)...)
 		issues = append(issues, validateCapacitorEvidence(path+".capacitor_evidence", record.Generic, record.Capacitor)...)
@@ -453,7 +453,7 @@ func validateLifecycle(path string, lifecycle string) []reports.Issue {
 	}
 }
 
-func validateCompanions(path string, companions []CompanionRequirement) []reports.Issue {
+func validateCompanions(path string, record *ComponentRecord, companions []CompanionRequirement) []reports.Issue {
 	var issues []reports.Issue
 	type companionKey struct {
 		ID   string
@@ -485,6 +485,51 @@ func validateCompanions(path string, companions []CompanionRequirement) []report
 			issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, companionPath, fmt.Sprintf("duplicate companion requirement duplicates %s[%d]", path, first)))
 		} else {
 			seen[key] = i
+		}
+		recipeIDs := map[string]int{}
+		for recipeIndex, recipe := range companion.Recipes {
+			recipePath := fmt.Sprintf("%s.recipes[%d]", companionPath, recipeIndex)
+			if strings.TrimSpace(recipe.ID) == "" || strings.TrimSpace(recipe.Family) == "" || strings.TrimSpace(string(recipe.Role)) == "" {
+				issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, recipePath, "companion recipe id, family, and component role are required"))
+			}
+			if previous, duplicate := recipeIDs[recipe.ID]; duplicate {
+				issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, recipePath+".id", fmt.Sprintf("duplicate companion recipe duplicates %s.recipes[%d]", companionPath, previous)))
+			}
+			recipeIDs[recipe.ID] = recipeIndex
+			if recipe.MinimumConfidence != "" && !ValidConfidence(recipe.MinimumConfidence) {
+				issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, recipePath+".minimum_confidence", "invalid companion recipe confidence"))
+			}
+			if recipe.MinVoltageV < 0 {
+				issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, recipePath+".min_voltage_v", "companion recipe minimum voltage cannot be negative"))
+			}
+			if len(recipe.Connections) < 2 {
+				issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, recipePath+".connections", "companion recipe requires at least two semantic connections"))
+			}
+			connectedFunctions := map[string]bool{}
+			for connectionIndex, connection := range recipe.Connections {
+				connectionPath := fmt.Sprintf("%s.connections[%d]", recipePath, connectionIndex)
+				if strings.TrimSpace(connection.Function) == "" || strings.TrimSpace(connection.ParentFunction) == "" {
+					issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, connectionPath, "companion and parent semantic functions are required"))
+				}
+				if connectedFunctions[connection.Function] {
+					issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, connectionPath+".function", "companion semantic function is connected more than once"))
+				}
+				connectedFunctions[connection.Function] = true
+			}
+		}
+		for tieIndex, tie := range companion.Ties {
+			tiePath := fmt.Sprintf("%s.ties[%d]", companionPath, tieIndex)
+			if strings.TrimSpace(tie.Function) == "" || (tie.Level != "high" && tie.Level != "low") {
+				issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, tiePath, "companion tie requires a semantic function and high or low level"))
+			}
+			if tie.ParentFunction != "" && !recordHasFunction(*record, tie.ParentFunction) {
+				issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, tiePath+".parent_function", "companion tie parent function is not present in the symbol bindings"))
+			}
+		}
+		for noConnectIndex, function := range companion.NoConnects {
+			if strings.TrimSpace(function) == "" {
+				issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, fmt.Sprintf("%s.no_connects[%d]", companionPath, noConnectIndex), "companion no-connect function is required"))
+			}
 		}
 	}
 	return issues
@@ -676,7 +721,7 @@ func validateSensorEvidence(path string, record *ComponentRecord) []reports.Issu
 			defaultCount++
 		}
 		if len(evidence.I2CAddresses) > 1 || option.SelectFunction != "" || option.Level != "" {
-			issues = append(issues, validateSensorFunctionLevel(record, optionPath, option.SelectFunction, option.Level)...)
+			issues = append(issues, validateSensorFunctionLevel(record, optionPath, option.SelectFunction, option.Level, option.ParentFunction)...)
 		}
 	}
 	if len(evidence.I2CAddresses) > 0 && defaultCount != 1 {
@@ -684,7 +729,7 @@ func validateSensorEvidence(path string, record *ComponentRecord) []reports.Issu
 	}
 	for i, connection := range evidence.I2CModeConnections {
 		connectionPath := fmt.Sprintf("%s.i2c_mode_connections[%d]", path, i)
-		issues = append(issues, validateSensorFunctionLevel(record, connectionPath, connection.Function, connection.Level)...)
+		issues = append(issues, validateSensorFunctionLevel(record, connectionPath, connection.Function, connection.Level, connection.ParentFunction)...)
 	}
 	if evidence.OptionalInterruptFunction != "" && !recordHasFunction(*record, evidence.OptionalInterruptFunction) {
 		issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, path+".optional_interrupt_function", "sensor interrupt function is not present in the symbol bindings"))
@@ -703,7 +748,7 @@ func validateSensorEvidence(path string, record *ComponentRecord) []reports.Issu
 	return issues
 }
 
-func validateSensorFunctionLevel(record *ComponentRecord, path string, function string, level string) []reports.Issue {
+func validateSensorFunctionLevel(record *ComponentRecord, path string, function string, level string, parentFunction string) []reports.Issue {
 	var issues []reports.Issue
 	if !recordHasFunction(*record, function) {
 		issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, path+".function", "sensor function is not present in the symbol bindings"))
@@ -712,6 +757,9 @@ func validateSensorFunctionLevel(record *ComponentRecord, path string, function 
 	case "high", "low":
 	default:
 		issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, path+".level", "sensor pin level must be high or low"))
+	}
+	if parentFunction != "" && !recordHasFunction(*record, parentFunction) {
+		issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, path+".parent_function", "sensor parent function is not present in the symbol bindings"))
 	}
 	return issues
 }

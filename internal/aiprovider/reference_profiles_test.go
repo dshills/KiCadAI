@@ -43,8 +43,14 @@ func TestGenericCircuitProfileUsesStrictGraphSchema(t *testing.T) {
 	}
 	properties := profile.IntentEnvelopeSchema()["properties"].(map[string]any)
 	intent := properties["intent"].(map[string]any)
-	if intent["additionalProperties"] != false || properties["schema"].(map[string]any)["const"] != EnvelopeSchemaV1 {
+	branches, ok := intent["oneOf"].([]any)
+	if !ok || len(branches) != 2 || properties["schema"].(map[string]any)["const"] != EnvelopeSchemaV1 {
 		t.Fatalf("generic envelope is not strict: %#v", profile.IntentEnvelopeSchema())
+	}
+	for _, raw := range branches {
+		if raw.(map[string]any)["additionalProperties"] != false {
+			t.Fatalf("generic intent branch is not strict: %#v", raw)
+		}
 	}
 }
 

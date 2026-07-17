@@ -6,6 +6,7 @@ import (
 	"sort"
 	"strings"
 	"time"
+	"unicode"
 
 	"kicadai/internal/reports"
 )
@@ -173,6 +174,7 @@ func Find(ctx context.Context, catalog *Catalog, query Query) ([]Candidate, repo
 	}
 	query.Text = strings.ToLower(query.Text)
 	query.Package = strings.ToLower(query.Package)
+	normalizedQueryText := normalizeComponentSearchText(query.Text)
 	var candidates []Candidate
 	var issues []reports.Issue
 	catalog.mu.RLock()
@@ -182,7 +184,7 @@ func Find(ctx context.Context, catalog *Catalog, query Query) ([]Candidate, repo
 			issue := reports.Issue{Code: reports.CodeOperationCanceled, Severity: reports.SeverityBlocked, Message: err.Error()}
 			return nil, reports.ErrorResult("component find", issue)
 		}
-		if !recordMatchesQuery(record, query) {
+		if !recordMatchesQuery(record, query, normalizedQueryText) {
 			continue
 		}
 		group, role := candidateEquivalence(record)
@@ -226,7 +228,13 @@ func Select(ctx context.Context, catalog *Catalog, request SelectionRequest) (Se
 	}
 	candidates, findResult := Find(ctx, catalog, request.Query)
 	if !findResult.OK || len(candidates) == 0 {
-		return Selection{}, reports.ResultWithIssues("component select", map[string]any{"candidates": candidates}, findResult.Issues, nil)
+		issues := append([]reports.Issue(nil), findResult.Issues...)
+		for index := range issues {
+			if issues[index].Code == CodeComponentNotFound {
+				issues[index].Severity = reports.SeverityBlocked
+			}
+		}
+		return Selection{}, reports.ResultWithIssues("component select", map[string]any{"candidates": candidates}, issues, nil)
 	}
 	var issues []reports.Issue
 	filtered := make([]acceptedCandidate, 0, len(candidates))
@@ -688,7 +696,7 @@ func ResolveBinding(ctx context.Context, catalog *Catalog, id string, variantID 
 	return resolved, reports.OKResult("component resolve", resolved, nil)
 }
 
-func recordMatchesQuery(record ComponentRecord, query Query) bool {
+func recordMatchesQuery(record ComponentRecord, query Query, normalizedQueryText string) bool {
 	if query.Family != "" && record.Family != query.Family {
 		return false
 	}
@@ -697,7 +705,7 @@ func recordMatchesQuery(record ComponentRecord, query Query) bool {
 		if text == "" {
 			text = strings.ToLower(record.ID + " " + record.Name + " " + record.Description + " " + strings.Join(record.Tags, " "))
 		}
-		if !strings.Contains(text, query.Text) {
+		if !strings.Contains(text, query.Text) && !strings.Contains(normalizeComponentSearchText(text), normalizedQueryText) {
 			return false
 		}
 	}
@@ -705,6 +713,13 @@ func recordMatchesQuery(record ComponentRecord, query Query) bool {
 		return false
 	}
 	return true
+}
+
+func normalizeComponentSearchText(value string) string {
+	fields := strings.FieldsFunc(strings.ToLower(value), func(character rune) bool {
+		return !unicode.IsLetter(character) && !unicode.IsDigit(character)
+	})
+	return strings.Join(fields, " ")
 }
 
 func variantMatchesQuery(variant PackageVariant, query Query) bool {

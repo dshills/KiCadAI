@@ -273,6 +273,8 @@ func verifiedPadTemplate(footprintID string) (verifiedPadTemplateRecord, bool) {
 		return verifiedPadTemplateRecord{Bounds: padEnvelopeBounds(pads, 6.7, 7.0), Pads: pads}, true
 	case "Package_SO:SOIC-8_3.9x4.9mm_P1.27mm":
 		return rowPadTemplate(5.9, 4.9, 1.27, 0.7, 0.9, []string{"1", "2", "3", "4"}, []string{"8", "7", "6", "5"}), true
+	case "Package_QFP:TQFP-32_7x7mm_P0.8mm":
+		return tqfp32Template(), true
 	case "Package_LGA:Bosch_LGA-8_2x2.5mm_P0.65mm_ClockwisePinNumbering":
 		pads := []placement.PadSummary{
 			{Name: "1", XMM: -0.975, YMM: -0.8, WidthMM: 0.35, HeightMM: 0.5},
@@ -285,6 +287,10 @@ func verifiedPadTemplate(footprintID string) (verifiedPadTemplateRecord, bool) {
 			{Name: "8", XMM: -0.975, YMM: 0.8, WidthMM: 0.35, HeightMM: 0.5},
 		}
 		return verifiedPadTemplateRecord{Bounds: padEnvelopeBounds(pads, 2.0, 2.5), Pads: pads}, true
+	case "Package_LGA:Bosch_LGA-8_2.5x2.5mm_P0.65mm_ClockwisePinNumbering":
+		return boschLGA8_2_5Template(), true
+	case "Sensor_Humidity:Sensirion_DFN-8-1EP_2.5x2.5mm_P0.5mm_EP1.1x1.7mm":
+		return sensirionDFN8Template(), true
 	case "TestPoint:TestPoint_Pad_D1.0mm":
 		return verifiedPadTemplateRecord{
 			Bounds: centeredEstimatedBounds(1.6, 1.6),
@@ -312,6 +318,52 @@ func esp32WROOM32ETemplate() verifiedPadTemplateRecord {
 	return verifiedPadTemplateRecord{Bounds: centeredEstimatedBounds(18.0, 25.5), Pads: pads}
 }
 
+func tqfp32Template() verifiedPadTemplateRecord {
+	pads := make([]placement.PadSummary, 0, 32)
+	for number := 1; number <= 8; number++ {
+		pads = append(pads, placement.PadSummary{Name: strconv.Itoa(number), XMM: -4.1625, YMM: -2.8 + float64(number-1)*0.8, WidthMM: 1.475, HeightMM: 0.55})
+	}
+	for number := 9; number <= 16; number++ {
+		pads = append(pads, placement.PadSummary{Name: strconv.Itoa(number), XMM: -2.8 + float64(number-9)*0.8, YMM: 4.1625, WidthMM: 0.55, HeightMM: 1.475})
+	}
+	for number := 17; number <= 24; number++ {
+		pads = append(pads, placement.PadSummary{Name: strconv.Itoa(number), XMM: 4.1625, YMM: 2.8 - float64(number-17)*0.8, WidthMM: 1.475, HeightMM: 0.55})
+	}
+	for number := 25; number <= 32; number++ {
+		pads = append(pads, placement.PadSummary{Name: strconv.Itoa(number), XMM: 2.8 - float64(number-25)*0.8, YMM: -4.1625, WidthMM: 0.55, HeightMM: 1.475})
+	}
+	return verifiedPadTemplateRecord{Bounds: padEnvelopeBounds(pads, 10.3, 10.3), Pads: pads}
+}
+
+func boschLGA8_2_5Template() verifiedPadTemplateRecord {
+	pads := []placement.PadSummary{
+		{Name: "1", XMM: -0.975, YMM: -1.025, WidthMM: 0.35, HeightMM: 0.5},
+		{Name: "2", XMM: -0.325, YMM: -1.025, WidthMM: 0.35, HeightMM: 0.5},
+		{Name: "3", XMM: 0.325, YMM: -1.025, WidthMM: 0.35, HeightMM: 0.5},
+		{Name: "4", XMM: 0.975, YMM: -1.025, WidthMM: 0.35, HeightMM: 0.5},
+		{Name: "5", XMM: 0.975, YMM: 1.025, WidthMM: 0.35, HeightMM: 0.5},
+		{Name: "6", XMM: 0.325, YMM: 1.025, WidthMM: 0.35, HeightMM: 0.5},
+		{Name: "7", XMM: -0.325, YMM: 1.025, WidthMM: 0.35, HeightMM: 0.5},
+		{Name: "8", XMM: -0.975, YMM: 1.025, WidthMM: 0.35, HeightMM: 0.5},
+	}
+	return verifiedPadTemplateRecord{Bounds: padEnvelopeBounds(pads, 2.5, 2.5), Pads: pads}
+}
+
+func sensirionDFN8Template() verifiedPadTemplateRecord {
+	pads := []placement.PadSummary{
+		{Name: "1", XMM: -1.175, YMM: -0.75, WidthMM: 0.55, HeightMM: 0.25},
+		{Name: "2", XMM: -1.175, YMM: -0.25, WidthMM: 0.55, HeightMM: 0.25},
+		{Name: "3", XMM: -1.175, YMM: 0.25, WidthMM: 0.55, HeightMM: 0.25},
+		{Name: "4", XMM: -1.175, YMM: 0.75, WidthMM: 0.55, HeightMM: 0.25},
+		{Name: "5", XMM: 1.175, YMM: 0.75, WidthMM: 0.55, HeightMM: 0.25},
+		{Name: "6", XMM: 1.175, YMM: 0.25, WidthMM: 0.55, HeightMM: 0.25},
+		{Name: "7", XMM: 1.175, YMM: -0.25, WidthMM: 0.55, HeightMM: 0.25},
+		{Name: "8", XMM: 1.175, YMM: -0.75, WidthMM: 0.55, HeightMM: 0.25},
+		{Name: "9", WidthMM: 1.0, HeightMM: 1.7},
+	}
+	return verifiedPadTemplateRecord{Bounds: padEnvelopeBounds(pads, 2.5, 2.5), Pads: pads}
+}
+
 func usbCHROTypeC31M12Template() verifiedPadTemplateRecord {
 	pads := []placement.PadSummary{
 		{Name: "A1", XMM: -3.25, YMM: -4.045, WidthMM: 0.6, HeightMM: 1.45},
@@ -331,9 +383,9 @@ func usbCHROTypeC31M12Template() verifiedPadTemplateRecord {
 		{Name: "B9", XMM: -2.45, YMM: -4.045, WidthMM: 0.6, HeightMM: 1.45},
 		{Name: "B12", XMM: -3.25, YMM: -4.045, WidthMM: 0.6, HeightMM: 1.45},
 		{Name: "SH", XMM: -4.32, YMM: -3.13, WidthMM: 1.0, HeightMM: 2.1},
-		{Name: "SH2", XMM: -4.32, YMM: 1.05, WidthMM: 1.0, HeightMM: 1.6},
-		{Name: "SH3", XMM: 4.32, YMM: -3.13, WidthMM: 1.0, HeightMM: 2.1},
-		{Name: "SH4", XMM: 4.32, YMM: 1.05, WidthMM: 1.0, HeightMM: 1.6},
+		{Name: "SH", XMM: -4.32, YMM: 1.05, WidthMM: 1.0, HeightMM: 1.6},
+		{Name: "SH", XMM: 4.32, YMM: -3.13, WidthMM: 1.0, HeightMM: 2.1},
+		{Name: "SH", XMM: 4.32, YMM: 1.05, WidthMM: 1.0, HeightMM: 1.6},
 	}
 	return verifiedPadTemplateRecord{Bounds: padEnvelopeBounds(pads, 10.0, 7.5), Pads: pads}
 }
@@ -347,9 +399,9 @@ func usbCGCTUSB4125PowerOnlyTemplate() verifiedPadTemplateRecord {
 		{Name: "B9", XMM: -1.52, YMM: -3.08, WidthMM: 0.76, HeightMM: 1.2},
 		{Name: "B12", XMM: -2.75, YMM: -3.08, WidthMM: 0.8, HeightMM: 1.2},
 		{Name: "SH", XMM: -4.32, YMM: -3.0, WidthMM: 1.1, HeightMM: 1.7},
-		{Name: "SH2", XMM: -4.32, YMM: 0.8, WidthMM: 1.1, HeightMM: 1.7},
-		{Name: "SH3", XMM: 4.32, YMM: -3.0, WidthMM: 1.1, HeightMM: 1.7},
-		{Name: "SH4", XMM: 4.32, YMM: 0.8, WidthMM: 1.1, HeightMM: 1.7},
+		{Name: "SH", XMM: -4.32, YMM: 0.8, WidthMM: 1.1, HeightMM: 1.7},
+		{Name: "SH", XMM: 4.32, YMM: -3.0, WidthMM: 1.1, HeightMM: 1.7},
+		{Name: "SH", XMM: 4.32, YMM: 0.8, WidthMM: 1.1, HeightMM: 1.7},
 	}
 	return verifiedPadTemplateRecord{Bounds: padEnvelopeBounds(pads, 10.0, 6.9), Pads: pads}
 }
@@ -393,6 +445,9 @@ func pinHeaderTemplate(count int) verifiedPadTemplateRecord {
 			YMM:      (float64(index) - float64(count-1)/2) * 2.54,
 			WidthMM:  1.7,
 			HeightMM: 1.7,
+			Type:     "thru_hole",
+			DrillMM:  1.0,
+			Layers:   []string{"*.Cu"},
 		})
 	}
 	return verifiedPadTemplateRecord{Bounds: padEnvelopeBounds(pads, 2.54, height), Pads: pads}
@@ -519,28 +574,7 @@ func matchingPadIndexesForPin(padByName map[string][]int, pin string) []int {
 }
 
 func groupedPinMembers(pin string) []string {
-	pin = strings.ToUpper(strings.TrimSpace(pin))
-	if len(pin) < 3 || pin[0] != '[' || pin[len(pin)-1] != ']' {
-		if pin == "" {
-			return nil
-		}
-		return []string{pin}
-	}
-	parts := strings.Split(pin[1:len(pin)-1], ",")
-	members := make([]string, 0, len(parts))
-	seen := map[string]struct{}{}
-	for _, part := range parts {
-		part = strings.TrimSpace(part)
-		if part == "" {
-			continue
-		}
-		if _, exists := seen[part]; exists {
-			continue
-		}
-		seen[part] = struct{}{}
-		members = append(members, part)
-	}
-	return members
+	return libraryresolver.GroupedPinMembers(strings.ToUpper(strings.TrimSpace(pin)))
 }
 
 func isUSBShieldPadName(name string) bool {

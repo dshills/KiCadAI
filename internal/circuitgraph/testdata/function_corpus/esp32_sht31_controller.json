@@ -1,0 +1,29 @@
+{
+  "schema": "kicadai.circuit-graph.v1",
+  "version": 1,
+  "project": {"name": "esp32_sht31_controller", "title": "ESP32 SHT31 controller", "description": "ESP32 module controlling a local SHT31 over I2C with host power and GPIO interfaces.", "acceptance": "erc-drc"},
+  "synthesis": {
+    "functions": [
+      {"id": "controller", "role": "ic", "query": {"text": "ESP32-WROOM-32E-N4", "family": "mcu", "minimum_confidence": "verified"}, "required_functions": ["VDD", "GND", "EN", "GPIO0", "GPIO1", "GPIO3", "GPIO21", "GPIO22"], "usage": "microcontroller"},
+      {"id": "sensor", "role": "sensor", "query": {"text": "SHT31-DIS", "family": "sensor", "minimum_confidence": "verified"}, "required_functions": ["VDD", "VSS", "SDA", "SCL", "ADDR", "R"], "usage": "i2c_peripheral", "parameters": [{"name": "i2c_address", "value": "0x44"}]}
+    ],
+    "interfaces": [
+      {"id": "power", "role": "power_input", "signals": [{"name": "3V3", "role": "power"}, {"name": "GND", "role": "ground"}]},
+      {"id": "application", "role": "gpio", "signals": [{"name": "GPIO_OUT", "role": "signal"}, {"name": "3V3", "role": "power"}, {"name": "GND", "role": "ground"}]}
+    ],
+    "power_domains": [
+      {"name": "3V3", "role": "power", "voltage_v": 3.3, "max_current_ma": 500, "source": "external"},
+      {"name": "GND", "role": "ground", "voltage_v": 0, "source": "external"}
+    ],
+    "connections": [
+      {"name": "3V3", "role": "power", "voltage_domain": "3V3", "current_ma": 500, "endpoints": [{"interface": "power", "signal": "3V3"}, {"interface": "application", "signal": "3V3"}, {"function": "controller", "port": "VDD"}, {"function": "sensor", "port": "VDD"}]},
+      {"name": "GND", "role": "ground", "voltage_domain": "GND", "endpoints": [{"interface": "power", "signal": "GND"}, {"interface": "application", "signal": "GND"}, {"function": "controller", "port": "GND"}, {"function": "sensor", "port": "VSS"}]},
+      {"name": "SDA", "role": "signal", "voltage_domain": "3V3", "endpoints": [{"function": "controller", "port": "GPIO21"}, {"function": "sensor", "port": "SDA"}]},
+      {"name": "SCL", "role": "signal", "voltage_domain": "3V3", "endpoints": [{"function": "controller", "port": "GPIO22"}, {"function": "sensor", "port": "SCL"}]},
+      {"name": "GPIO_OUT", "role": "signal", "voltage_domain": "3V3", "endpoints": [{"interface": "application", "signal": "GPIO_OUT"}, {"function": "controller", "port": "GPIO4"}]}
+    ],
+    "constraints": {"max_width_mm": 70, "max_height_mm": 50, "preferred_component_spacing_mm": 1.5}
+  },
+  "policy": {"allow_reference_assignment": true, "allow_value_normalization": true, "allow_layout_inference": true, "allow_spacing_adjustment": true, "allow_label_insertion": true, "allow_placement_adjustment": true, "allow_route_retry": true},
+  "extensions": {}
+}

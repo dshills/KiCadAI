@@ -218,7 +218,7 @@ func TestProviderSchemaContainsNamedUnitContract(t *testing.T) {
 		}
 	}
 
-	properties := requireSchemaMap(t, schema, "properties")
+	properties := requireSchemaMap(t, providerGraphSchemaBranches(t)["explicit"], "properties")
 	schematic := requireSchemaMap(t, requireSchemaMap(t, properties, "schematic"), "properties")
 	placements := requireSchemaMap(t, schematic, "placements")
 	placement := requireSchemaMap(t, requireSchemaMap(t, placements, "items"), "properties")
@@ -240,8 +240,7 @@ func TestProviderSchemaContainsNamedUnitContract(t *testing.T) {
 }
 
 func TestProviderSchemaRequiresNullableNegativePowerLane(t *testing.T) {
-	schema := ProviderGraphSchema()
-	properties := requireSchemaMap(t, schema, "properties")
+	properties := requireSchemaMap(t, providerGraphSchemaBranches(t)["explicit"], "properties")
 	schematic := requireSchemaMap(t, requireSchemaMap(t, properties, "schematic"), "properties")
 	lanes := requireSchemaMap(t, requireSchemaMap(t, schematic, "lanes"), "properties")
 	powerNegative := requireSchemaMap(t, lanes, "power_negative")

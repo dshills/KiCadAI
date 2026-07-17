@@ -156,6 +156,38 @@ func TestResolverPinGeometryOverridesEmbeddedFallback(t *testing.T) {
 	}
 }
 
+func TestTransactionPinsExpandGroupedResolverGeometry(t *testing.T) {
+	component := Component{
+		Symbol: "RF_Module:Grouped",
+		Pins: []Pin{
+			{Number: "1"},
+			{Number: "15"},
+			{Number: "38"},
+			{Number: "39"},
+		},
+	}
+	index := libraryresolver.LibraryIndex{Symbols: map[string]libraryresolver.SymbolRecord{
+		"RF_Module:Grouped": {
+			LibraryID: "RF_Module:Grouped",
+			Raw:       `(symbol "Grouped")`,
+			Pins: []libraryresolver.SymbolPin{{
+				Number:   "[1,15,38,39]",
+				Position: kicadfiles.Point{X: kicadfiles.MM(2.54), Y: kicadfiles.MM(35.56)},
+			}},
+		},
+	}}
+
+	pins := transactionPinsWithLibraryIndex(component, &index)
+	if len(pins) != 4 {
+		t.Fatalf("pins = %#v, want four grouped members", pins)
+	}
+	for _, pin := range pins {
+		if !vectorBusMMEqual(pin.XMM, 2.54) || !vectorBusMMEqual(pin.YMM, 35.56) {
+			t.Fatalf("pin %s offset = (%v, %v), want grouped resolver offset (2.54, 35.56)", pin.Number, pin.XMM, pin.YMM)
+		}
+	}
+}
+
 func TestToTransactionRejectsConflictingKiCadConnectionAnchor(t *testing.T) {
 	document := validLEDDocument()
 	document.Circuit.Components[0].ID = "vin"

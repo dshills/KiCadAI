@@ -99,13 +99,21 @@ func TestVerifiedTransferUSB4125PowerOnlyPads(t *testing.T) {
 	if len(pads) != 10 {
 		t.Fatalf("pad count = %d, want 10", len(pads))
 	}
-	want := map[string]string{"A5": "CC1", "SH": "SHIELD", "SH2": "SHIELD", "SH3": "SHIELD", "SH4": "SHIELD"}
+	want := map[string]int{"A5": 1, "SH": 4}
 	for _, pad := range pads {
-		if net, ok := want[pad.Name]; ok {
+		if count, ok := want[pad.Name]; ok {
+			net := "SHIELD"
+			if pad.Name == "A5" {
+				net = "CC1"
+			}
 			if pad.Net == nil || *pad.Net != net {
 				t.Fatalf("pad %s net = %#v, want %s in %#v", pad.Name, pad.Net, net, pads)
 			}
-			delete(want, pad.Name)
+			if count == 1 {
+				delete(want, pad.Name)
+			} else {
+				want[pad.Name] = count - 1
+			}
 		}
 	}
 	if len(want) != 0 {

@@ -238,6 +238,14 @@ func TestFindConnectorByPinCountAndPackage(t *testing.T) {
 	}
 }
 
+func TestFindNormalizesPunctuatedQueryOnceWithoutChangingMatchSemantics(t *testing.T) {
+	catalog := loadCheckedInCatalog(t)
+	candidates, result := Find(context.Background(), catalog, Query{Text: "ESP32-WROOM-32E"})
+	if !result.OK || len(candidates) == 0 || candidates[0].ComponentID != "mcu.espressif.esp32_wroom_32e" {
+		t.Fatalf("punctuated query candidates = %#v, issues = %#v", candidates, result.Issues)
+	}
+}
+
 func TestFindConnectorByThreePinCount(t *testing.T) {
 	catalog := loadCheckedInCatalog(t)
 	candidates, result := Find(context.Background(), catalog, Query{

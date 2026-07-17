@@ -322,8 +322,8 @@ func TestUSBCHROTemplateHydratesPowerOnlyPads(t *testing.T) {
 	if shieldCount != 4 {
 		t.Fatalf("shield pads assigned = %d, pads=%#v", shieldCount, pads)
 	}
-	if duplicated := duplicatePadTemplateNames(template.Pads); len(duplicated) != 0 {
-		t.Fatalf("routing template contains duplicate pad names: %#v", duplicated)
+	if duplicated := duplicatePadTemplateNames(template.Pads); !reflect.DeepEqual(duplicated, []string{"SH", "SH", "SH"}) {
+		t.Fatalf("routing template duplicate pad names = %#v, want three physical SH duplicates", duplicated)
 	}
 }
 
@@ -335,13 +335,13 @@ func TestUSBCGCTPowerOnlyTemplateHydratesVerifiedPads(t *testing.T) {
 	if len(template.Pads) != 10 {
 		t.Fatalf("pad count = %d, want 10", len(template.Pads))
 	}
-	for _, name := range []string{"A5", "A9", "A12", "B5", "B9", "B12", "SH", "SH2", "SH3", "SH4"} {
+	for _, name := range []string{"A5", "A9", "A12", "B5", "B9", "B12", "SH"} {
 		if !padTemplateHasName(template.Pads, name) {
 			t.Fatalf("missing USB-C GCT pad %s in %#v", name, padTemplateNames(template.Pads))
 		}
 	}
-	if duplicated := duplicatePadTemplateNames(template.Pads); len(duplicated) != 0 {
-		t.Fatalf("routing template contains duplicate pad names: %#v", duplicated)
+	if duplicated := duplicatePadTemplateNames(template.Pads); !reflect.DeepEqual(duplicated, []string{"SH", "SH", "SH"}) {
+		t.Fatalf("routing template duplicate pad names = %#v, want three physical SH duplicates", duplicated)
 	}
 
 	index := buildPadNetAssignmentIndex([]placement.Net{{Name: "SHIELD", Endpoints: []placement.Endpoint{{Ref: "J1", Pin: "SH"}}}})
@@ -357,6 +357,28 @@ func TestUSBCGCTPowerOnlyTemplateHydratesVerifiedPads(t *testing.T) {
 	}
 	if shieldCount != 4 {
 		t.Fatalf("shield pads assigned = %d, pads=%#v", shieldCount, pads)
+	}
+}
+
+func TestPinHeaderTemplatePreservesThroughHoleLayerAccess(t *testing.T) {
+	template, ok := verifiedPadTemplate("Connector_PinHeader_2.54mm:PinHeader_1x04_P2.54mm_Vertical")
+	if !ok || len(template.Pads) != 4 {
+		t.Fatalf("template = %#v, ok=%t", template, ok)
+	}
+	for _, pad := range template.Pads {
+		if pad.Type != "thru_hole" || pad.DrillMM <= 0 || !reflect.DeepEqual(pad.Layers, []string{"*.Cu"}) {
+			t.Fatalf("pin-header pad lost through-hole access: %#v", pad)
+		}
+	}
+}
+
+func TestTQFP32TemplatePreservesCourtyardEscapeMargin(t *testing.T) {
+	template, ok := verifiedPadTemplate("Package_QFP:TQFP-32_7x7mm_P0.8mm")
+	if !ok || len(template.Pads) != 32 {
+		t.Fatalf("template = %#v, ok=%t", template, ok)
+	}
+	if template.Bounds.WidthMM != 10.3 || template.Bounds.HeightMM != 10.3 {
+		t.Fatalf("courtyard bounds = %#v, want 10.3 mm square", template.Bounds)
 	}
 }
 

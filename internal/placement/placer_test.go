@@ -451,3 +451,27 @@ func TestSeedTieBreakInfluencesEquivalentPlacements(t *testing.T) {
 		t.Fatalf("different seeds did not choose a different equivalent placement from %#v", first.Placements[0].Position)
 	}
 }
+
+func TestSlicesForPlacementPreservesLegacyReferenceOrderByDefault(t *testing.T) {
+	components := []Component{
+		{Ref: "A1", Bounds: Bounds{WidthMM: 2, HeightMM: 2}},
+		{Ref: "Z1", Bounds: Bounds{WidthMM: 20, HeightMM: 10}},
+		{Ref: "P1", Priority: 1, Bounds: Bounds{WidthMM: 1, HeightMM: 1}},
+	}
+	ordered := slicesForPlacement(components)
+	if got := []string{ordered[0].Ref, ordered[1].Ref, ordered[2].Ref}; !reflect.DeepEqual(got, []string{"P1", "A1", "Z1"}) {
+		t.Fatalf("placement order = %#v, want explicit priority then reference order", got)
+	}
+}
+
+func TestSlicesForPlacementCanPrioritizeLargeFootprints(t *testing.T) {
+	components := []Component{
+		{Ref: "A1", Bounds: Bounds{WidthMM: 2, HeightMM: 2}},
+		{Ref: "Z1", Bounds: Bounds{WidthMM: 20, HeightMM: 10}},
+		{Ref: "P1", Priority: 1, Bounds: Bounds{WidthMM: 1, HeightMM: 1}},
+	}
+	ordered := slicesForPlacementWithOrder(components, ComponentOrderLargestFootprintFirstV1)
+	if got := []string{ordered[0].Ref, ordered[1].Ref, ordered[2].Ref}; !reflect.DeepEqual(got, []string{"P1", "Z1", "A1"}) {
+		t.Fatalf("placement order = %#v, want explicit priority then descending envelope area", got)
+	}
+}

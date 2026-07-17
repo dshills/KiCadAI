@@ -1,0 +1,27 @@
+{
+  "schema": "kicadai.circuit-graph.v1",
+  "version": 1,
+  "project": {"name": "usb_c_ap2112_3v3_supply", "title": "Protected USB-C 3.3 V supply", "description": "USB-C sink feeding a protected AP2112K 3.3 V supply output.", "acceptance": "erc-drc"},
+  "synthesis": {
+    "functions": [
+      {"id": "usb_input", "role": "connector", "query": {"text": "USB4125 power only", "family": "usb_c", "minimum_confidence": "verified"}, "required_functions": ["VBUS", "GND", "SHIELD", "CC1", "CC2"], "usage": "usb_c_power_sink"},
+      {"id": "regulator", "role": "regulator", "query": {"text": "AP2112K 3.3", "family": "regulator", "minimum_confidence": "verified"}, "required_functions": ["VIN", "VOUT", "GND", "EN", "NC"], "usage": "fixed_linear_regulator"}
+    ],
+    "interfaces": [
+      {"id": "output", "role": "power_output", "signals": [{"name": "3V3", "role": "power"}, {"name": "GND", "role": "ground"}]}
+    ],
+    "power_domains": [
+      {"name": "VBUS", "role": "power", "voltage_v": 5, "max_current_ma": 500, "source": "external"},
+      {"name": "3V3", "role": "power", "voltage_v": 3.3, "max_current_ma": 300, "source": "generated"},
+      {"name": "GND", "role": "ground", "voltage_v": 0, "source": "external"}
+    ],
+    "connections": [
+      {"name": "VBUS", "role": "power", "voltage_domain": "VBUS", "current_ma": 500, "endpoints": [{"function": "usb_input", "port": "VBUS"}, {"function": "regulator", "port": "VIN"}, {"function": "regulator", "port": "EN"}]},
+      {"name": "3V3", "role": "power", "voltage_domain": "3V3", "current_ma": 300, "endpoints": [{"function": "regulator", "port": "VOUT"}, {"interface": "output", "signal": "3V3"}]},
+      {"name": "GND", "role": "ground", "voltage_domain": "GND", "endpoints": [{"function": "usb_input", "port": "GND"}, {"function": "usb_input", "port": "SHIELD"}, {"function": "regulator", "port": "GND"}, {"interface": "output", "signal": "GND"}]}
+    ],
+    "constraints": {"max_width_mm": 45, "max_height_mm": 30, "preferred_component_spacing_mm": 1.5, "protection": "required"}
+  },
+  "policy": {"allow_reference_assignment": true, "allow_value_normalization": true, "allow_layout_inference": true, "allow_spacing_adjustment": true, "allow_label_insertion": true, "allow_placement_adjustment": true, "allow_route_retry": true},
+  "extensions": {}
+}

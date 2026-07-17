@@ -255,6 +255,8 @@ type Strategy struct {
 	TreatZonesAs     ZoneRoutingPolicy `json:"treat_zones_as,omitempty"`
 }
 
+const NetOrderConstrainedEndpointAccessV1 = "constrained_endpoint_access_v1"
+
 type Result struct {
 	Status     Status          `json:"status"`
 	Routes     []Route         `json:"routes,omitempty"`

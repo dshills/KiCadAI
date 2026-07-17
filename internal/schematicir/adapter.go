@@ -2012,11 +2012,15 @@ func resolverPinOffsets(record libraryresolver.SymbolRecord, component Component
 			continue
 		}
 		if pin.Unit == unit {
-			offsets[number] = pin.Position
+			for _, member := range libraryresolver.GroupedPinMembers(number) {
+				offsets[member] = pin.Position
+			}
 			continue
 		}
 		if pin.Unit == 0 {
-			common[number] = pin.Position
+			for _, member := range libraryresolver.GroupedPinMembers(number) {
+				common[member] = pin.Position
+			}
 		}
 	}
 	for number, offset := range common {
@@ -2073,7 +2077,9 @@ func knownSchematicPinNumbers(component Component, index *libraryresolver.Librar
 		if pin.Unit != 0 && pin.Unit != maxUnit(unit) {
 			continue
 		}
-		known[strings.TrimSpace(pin.Number)] = struct{}{}
+		for _, member := range libraryresolver.GroupedPinMembers(pin.Number) {
+			known[member] = struct{}{}
+		}
 	}
 	return known
 }
@@ -2128,13 +2134,8 @@ func schematicLayoutPins(component Component, index *libraryresolver.LibraryInde
 	directions := schematicLayoutPinDirections(component, index)
 	if index != nil {
 		if record, ok := libraryresolver.ResolveSymbol(*index, component.Symbol); ok && resolverGeometryAuthoritative(record, component.Symbol) {
-			unit := componentUnitOrZero(component)
-			for _, pin := range record.Pins {
-				if pin.Unit != 0 && pin.Unit != maxUnit(unit) {
-					continue
-				}
-				pinNumber := strings.TrimSpace(pin.Number)
-				offsets[pinNumber] = pin.Position
+			for number, position := range resolverPinOffsets(record, component) {
+				offsets[number] = position
 			}
 		}
 	}
@@ -2336,13 +2337,8 @@ func transactionPinsWithLibraryIndex(component Component, index *libraryresolver
 	}
 	if index != nil {
 		if record, ok := libraryresolver.ResolveSymbol(*index, component.Symbol); ok && resolverGeometryAuthoritative(record, component.Symbol) {
-			unit := componentUnitOrZero(component)
-			for _, pin := range record.Pins {
-				if pin.Unit != 0 && pin.Unit != maxUnit(unit) {
-					continue
-				}
-				pinNumber := strings.TrimSpace(pin.Number)
-				offsets[pinNumber] = pin.Position
+			for number, position := range resolverPinOffsets(record, component) {
+				offsets[number] = position
 			}
 		}
 	}

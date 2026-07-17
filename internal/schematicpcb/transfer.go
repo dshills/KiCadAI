@@ -541,12 +541,18 @@ func verifiedTransferPadSpecs(footprintID string, hints map[string]string) ([]tr
 		return usbCGCTUSB4125TransferPads(hints), true
 	case "Package_SO:SOIC-8_3.9x4.9mm_P1.27mm":
 		return soic8NarrowTransferTemplate.pads(hints), true
+	case "Package_QFP:TQFP-32_7x7mm_P0.8mm":
+		return tqfp32TransferPads(hints), true
 	case "Package_TO_SOT_SMD:SOT-23-5":
 		return sot23_5TransferPads(hints), true
 	case "Package_TO_SOT_SMD:SOT-223-3_TabPin2":
 		return sot223_3TransferPads(hints), true
 	case "Package_LGA:Bosch_LGA-8_2x2.5mm_P0.65mm_ClockwisePinNumbering":
 		return boschLGA8TransferPads(hints), true
+	case "Package_LGA:Bosch_LGA-8_2.5x2.5mm_P0.65mm_ClockwisePinNumbering":
+		return boschLGA8_2_5TransferPads(hints), true
+	case "Sensor_Humidity:Sensirion_DFN-8-1EP_2.5x2.5mm_P0.5mm_EP1.1x1.7mm":
+		return sensirionDFN8TransferPads(hints), true
 	case "Connector_PinHeader_2.54mm:PinHeader_1x01_P2.54mm_Vertical":
 		return pinHeaderTransferPads(1, hints), true
 	case "Connector_PinHeader_2.54mm:PinHeader_1x02_P2.54mm_Vertical":
@@ -594,6 +600,50 @@ func boschLGA8TransferPads(hints map[string]string) []transactions.PadSpec {
 	}
 }
 
+func boschLGA8_2_5TransferPads(hints map[string]string) []transactions.PadSpec {
+	return []transactions.PadSpec{
+		transferPadSpec("1", -0.975, -1.025, 0.35, 0.5, hints),
+		transferPadSpec("2", -0.325, -1.025, 0.35, 0.5, hints),
+		transferPadSpec("3", 0.325, -1.025, 0.35, 0.5, hints),
+		transferPadSpec("4", 0.975, -1.025, 0.35, 0.5, hints),
+		transferPadSpec("5", 0.975, 1.025, 0.35, 0.5, hints),
+		transferPadSpec("6", 0.325, 1.025, 0.35, 0.5, hints),
+		transferPadSpec("7", -0.325, 1.025, 0.35, 0.5, hints),
+		transferPadSpec("8", -0.975, 1.025, 0.35, 0.5, hints),
+	}
+}
+
+func sensirionDFN8TransferPads(hints map[string]string) []transactions.PadSpec {
+	return []transactions.PadSpec{
+		transferPadSpec("1", -1.175, -0.75, 0.55, 0.25, hints),
+		transferPadSpec("2", -1.175, -0.25, 0.55, 0.25, hints),
+		transferPadSpec("3", -1.175, 0.25, 0.55, 0.25, hints),
+		transferPadSpec("4", -1.175, 0.75, 0.55, 0.25, hints),
+		transferPadSpec("5", 1.175, 0.75, 0.55, 0.25, hints),
+		transferPadSpec("6", 1.175, 0.25, 0.55, 0.25, hints),
+		transferPadSpec("7", 1.175, -0.25, 0.55, 0.25, hints),
+		transferPadSpec("8", 1.175, -0.75, 0.55, 0.25, hints),
+		transferPadSpec("9", 0, 0, 1.0, 1.7, hints),
+	}
+}
+
+func tqfp32TransferPads(hints map[string]string) []transactions.PadSpec {
+	pads := make([]transactions.PadSpec, 0, 32)
+	for number := 1; number <= 8; number++ {
+		pads = append(pads, transferPadSpec(strconv.Itoa(number), -4.1625, -2.8+float64(number-1)*0.8, 1.475, 0.55, hints))
+	}
+	for number := 9; number <= 16; number++ {
+		pads = append(pads, transferPadSpec(strconv.Itoa(number), -2.8+float64(number-9)*0.8, 4.1625, 0.55, 1.475, hints))
+	}
+	for number := 17; number <= 24; number++ {
+		pads = append(pads, transferPadSpec(strconv.Itoa(number), 4.1625, 2.8-float64(number-17)*0.8, 1.475, 0.55, hints))
+	}
+	for number := 25; number <= 32; number++ {
+		pads = append(pads, transferPadSpec(strconv.Itoa(number), 2.8-float64(number-25)*0.8, -4.1625, 0.55, 1.475, hints))
+	}
+	return pads
+}
+
 func usbCGCTUSB4125TransferPads(hints map[string]string) []transactions.PadSpec {
 	pads := []transactions.PadSpec{
 		transferPadSpec("A5", -0.5, -3.08, 0.7, 1.2, hints),
@@ -603,9 +653,9 @@ func usbCGCTUSB4125TransferPads(hints map[string]string) []transactions.PadSpec 
 		transferPadSpec("B9", -1.52, -3.08, 0.76, 1.2, hints),
 		transferPadSpec("B12", -2.75, -3.08, 0.8, 1.2, hints),
 		transferPadSpec("SH", -4.32, -3.0, 1.1, 1.7, hints),
-		transferPadSpec("SH2", -4.32, 0.8, 1.1, 1.7, hints),
-		transferPadSpec("SH3", 4.32, -3.0, 1.1, 1.7, hints),
-		transferPadSpec("SH4", 4.32, 0.8, 1.1, 1.7, hints),
+		transferPadSpec("SH", -4.32, 0.8, 1.1, 1.7, hints),
+		transferPadSpec("SH", 4.32, -3.0, 1.1, 1.7, hints),
+		transferPadSpec("SH", 4.32, 0.8, 1.1, 1.7, hints),
 	}
 	if hints == nil {
 		return pads

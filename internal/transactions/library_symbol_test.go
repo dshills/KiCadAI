@@ -87,6 +87,31 @@ func TestResolvePreferredSymbolPinsUsesResolverBeforeEmbeddedTemplate(t *testing
 	}
 }
 
+func TestResolvePreferredSymbolPinsAcceptsGroupedResolverMembers(t *testing.T) {
+	index := libraryresolver.LibraryIndex{Symbols: map[string]libraryresolver.SymbolRecord{
+		"Custom:Grouped": {
+			LibraryID: "Custom:Grouped",
+			Raw:       `(symbol "Grouped")`,
+			Pins: []libraryresolver.SymbolPin{{
+				Number:   "[1,15,38,39]",
+				Position: kicadfiles.Point{X: kicadfiles.MM(2.54), Y: kicadfiles.MM(-1.27)},
+			}},
+		},
+	}}
+	pins, err := resolvePreferredSymbolPinsForUnit([]PinSpec{{Number: "1"}, {Number: "15"}, {Number: "38"}, {Number: "39"}}, &index, "Custom:Grouped", 1, true)
+	if err != nil {
+		t.Fatalf("resolvePreferredSymbolPinsForUnit returned error: %v", err)
+	}
+	if len(pins) != 4 {
+		t.Fatalf("pins = %#v, want only the four requested grouped members", pins)
+	}
+	for _, pin := range pins {
+		if pin.XMM != 2.54 || pin.YMM != -1.27 {
+			t.Fatalf("grouped member pin = %#v, want shared resolver geometry", pin)
+		}
+	}
+}
+
 func TestResolvePreferredSymbolPinsKeepsTemplateDefault(t *testing.T) {
 	index := libraryresolver.LibraryIndex{Symbols: map[string]libraryresolver.SymbolRecord{
 		"Device:R": {

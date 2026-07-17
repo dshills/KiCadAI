@@ -549,6 +549,7 @@ func renderPad(pad Pad, netName string) sexpr.List {
 	if pad.Drill > 0 {
 		nodes = append(nodes, renderPadDrill(pad))
 	}
+	nodes = append(nodes, preservedPadChildrenWithHead(pad, "property")...)
 	nodes = append(nodes, renderLayerList("layers", pad.Layers))
 	if pad.RemoveUnusedLayers != nil {
 		nodes = append(nodes, sexpr.L(sexpr.A("remove_unused_layers"), yesNo(*pad.RemoveUnusedLayers)))
@@ -570,6 +571,7 @@ func renderPad(pad Pad, netName string) sexpr.List {
 	if pad.NetCode > 0 || strings.TrimSpace(pad.NetName) != "" {
 		nodes = append(nodes, sexpr.L(sexpr.A("net"), sexpr.I(int64(pad.NetCode)), sexpr.S(netName)))
 	}
+	nodes = append(nodes, preservedPadChildren(pad)...)
 	if pad.UUID.Valid() {
 		nodes = append(nodes, sexpr.L(sexpr.A("uuid"), sexpr.S(string(pad.UUID))))
 	}
@@ -577,6 +579,44 @@ func renderPad(pad Pad, netName string) sexpr.List {
 		nodes = append(nodes, renderTeardrops(*pad.Teardrops))
 	}
 	return sexpr.L(nodes...)
+}
+
+func preservedPadChildren(pad Pad) []sexpr.Node {
+	raw := strings.TrimSpace(pad.Raw)
+	if raw == "" {
+		return nil
+	}
+	parsed, err := sexpr.Parse([]byte(raw))
+	if err != nil || parsed.Head() != "pad" || len(parsed.Children) <= 4 {
+		return nil
+	}
+	result := make([]sexpr.Node, 0, len(parsed.Children)-4)
+	for _, child := range parsed.Children[4:] {
+		switch child.Head() {
+		case "at", "size", "drill", "property", "layers", "remove_unused_layers", "pinfunction", "pintype", "roundrect_rratio", "net", "uuid", "teardrops":
+			continue
+		case "thermal_bridge_angle":
+			if pad.ThermalBridgeAngle != nil {
+				continue
+			}
+		}
+		result = append(result, child.Node())
+	}
+	return result
+}
+
+func preservedPadChildrenWithHead(pad Pad, head string) []sexpr.Node {
+	parsed, err := sexpr.Parse([]byte(strings.TrimSpace(pad.Raw)))
+	if err != nil || parsed.Head() != "pad" || len(parsed.Children) <= 4 {
+		return nil
+	}
+	var result []sexpr.Node
+	for _, child := range parsed.Children[4:] {
+		if child.Head() == head {
+			result = append(result, child.Node())
+		}
+	}
+	return result
 }
 
 func renderPadDrill(pad Pad) sexpr.List {

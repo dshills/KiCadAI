@@ -1,0 +1,41 @@
+{
+  "schema": "kicadai.circuit-graph.v1",
+  "version": 1,
+  "project": {
+    "name": "dual_stage_active_lowpass",
+    "title": "Dual-stage active low-pass filter",
+    "description": "Two catalog-resolved unity-gain active low-pass stages.",
+    "acceptance": "erc-drc"
+  },
+  "synthesis": {
+    "functions": [
+      {"id": "amp_a", "role": "ic", "query": {"text": "TI LMV321", "family": "opamp", "minimum_confidence": "verified"}, "required_functions": ["IN_MINUS", "IN_PLUS", "OUT", "V_MINUS", "V_PLUS"], "usage": "voltage_follower"},
+      {"id": "amp_b", "role": "ic", "query": {"text": "TI LMV321", "family": "opamp", "minimum_confidence": "verified"}, "required_functions": ["IN_MINUS", "IN_PLUS", "OUT", "V_MINUS", "V_PLUS"], "usage": "voltage_follower"},
+      {"id": "r_a", "role": "resistor", "query": {"family": "resistor", "package": "0603", "value_kind": "resistance", "value": "10k", "minimum_confidence": "rule_inferred"}, "value": "10k"},
+      {"id": "r_b", "role": "resistor", "query": {"family": "resistor", "package": "0603", "value_kind": "resistance", "value": "10k", "minimum_confidence": "rule_inferred"}, "value": "10k"},
+      {"id": "c_a", "role": "capacitor", "query": {"family": "capacitor", "package": "0603", "value_kind": "capacitance", "value": "10n", "min_voltage_v": 6.3, "minimum_confidence": "rule_inferred"}, "value": "10n"},
+      {"id": "c_b", "role": "capacitor", "query": {"family": "capacitor", "package": "0603", "value_kind": "capacitance", "value": "10n", "min_voltage_v": 6.3, "minimum_confidence": "rule_inferred"}, "value": "10n"}
+    ],
+    "interfaces": [
+      {"id": "power", "role": "power_input", "signals": [{"name": "VCC", "role": "power"}, {"name": "GND", "role": "ground"}]},
+      {"id": "input", "role": "analog_input", "signals": [{"name": "SIGNAL", "role": "signal"}, {"name": "GND", "role": "ground"}]},
+      {"id": "output", "role": "analog_output", "signals": [{"name": "SIGNAL", "role": "signal"}, {"name": "GND", "role": "ground"}]}
+    ],
+    "power_domains": [
+      {"name": "VCC", "role": "power", "voltage_v": 3.3, "max_current_ma": 30, "source": "external"},
+      {"name": "GND", "role": "ground", "voltage_v": 0, "source": "external"}
+    ],
+    "connections": [
+      {"name": "VCC", "role": "power", "voltage_domain": "VCC", "endpoints": [{"interface": "power", "signal": "VCC"}, {"function": "amp_a", "port": "V_PLUS"}, {"function": "amp_b", "port": "V_PLUS"}]},
+      {"name": "GND", "role": "ground", "voltage_domain": "GND", "endpoints": [{"interface": "power", "signal": "GND"}, {"interface": "input", "signal": "GND"}, {"interface": "output", "signal": "GND"}, {"function": "amp_a", "port": "V_MINUS"}, {"function": "amp_b", "port": "V_MINUS"}, {"function": "c_a", "port": "B"}, {"function": "c_b", "port": "B"}]},
+      {"name": "FILTER_IN", "role": "signal", "endpoints": [{"interface": "input", "signal": "SIGNAL"}, {"function": "r_a", "port": "A"}]},
+      {"name": "STAGE_A_IN", "role": "signal", "endpoints": [{"function": "r_a", "port": "B"}, {"function": "c_a", "port": "A"}, {"function": "amp_a", "port": "IN_PLUS"}]},
+      {"name": "STAGE_A_OUT", "role": "signal", "endpoints": [{"function": "amp_a", "port": "OUT"}, {"function": "amp_a", "port": "IN_MINUS"}, {"function": "r_b", "port": "A"}]},
+      {"name": "STAGE_B_IN", "role": "signal", "endpoints": [{"function": "r_b", "port": "B"}, {"function": "c_b", "port": "A"}, {"function": "amp_b", "port": "IN_PLUS"}]},
+      {"name": "FILTER_OUT", "role": "signal", "endpoints": [{"function": "amp_b", "port": "OUT"}, {"function": "amp_b", "port": "IN_MINUS"}, {"interface": "output", "signal": "SIGNAL"}]}
+    ],
+    "constraints": {"max_width_mm": 55, "max_height_mm": 35, "preferred_component_spacing_mm": 1.5}
+  },
+  "policy": {"allow_reference_assignment": true, "allow_value_normalization": true, "allow_layout_inference": true, "allow_spacing_adjustment": true, "allow_label_insertion": true, "allow_placement_adjustment": true, "allow_route_retry": true},
+  "extensions": {}
+}

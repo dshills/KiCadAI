@@ -38,8 +38,9 @@ func TestPlanRoutesReservesCompactLocalEscapeBeforeBroadNet(t *testing.T) {
 	}
 }
 
-func TestPlanRoutesPromotesCompactClusterThenPreservesRoleOrder(t *testing.T) {
+func TestPlanRoutesPromotesHarderConstrainedEscapeFirst(t *testing.T) {
 	request := singleLayerSearchRequest()
+	request.Strategy.NetOrder = NetOrderConstrainedEndpointAccessV1
 	request.Components = append(request.Components,
 		testComponent("J3", "1", "LOCAL", 10, 10),
 		testComponent("J4", "1", "LOCAL", 11, 10),
@@ -55,8 +56,83 @@ func TestPlanRoutesPromotesCompactClusterThenPreservesRoleOrder(t *testing.T) {
 	if len(issues) != 0 {
 		t.Fatalf("issues = %#v", issues)
 	}
-	if len(plans) != 3 || plans[0].Net.Name != "LOCAL" || plans[1].Net.Name != "SECOND" || plans[2].Net.Name != "GND" {
+	if len(plans) != 3 || plans[0].Net.Name != "SECOND" || plans[1].Net.Name != "LOCAL" || plans[2].Net.Name != "GND" {
 		t.Fatalf("plan order = %#v", plans)
+	}
+}
+
+func TestPlanRoutesEscapesConstrainedSmallFanoutPadBeforePowerTree(t *testing.T) {
+	request := singleLayerSearchRequest()
+	request.Strategy.NetOrder = NetOrderConstrainedEndpointAccessV1
+	request.Components = append(request.Components,
+		testComponent("J3", "1", "NARROW", 10, 10),
+		testComponent("J4", "1", "NARROW", 20, 10),
+	)
+	request.Components[2].Pads[0].Size = Size{WidthMM: 0.5, HeightMM: 0.25}
+	request.Components[3].Pads[0].Size = Size{WidthMM: 0.5, HeightMM: 0.25}
+	request.Nets = []Net{
+		{Name: "POWER", Role: NetPower, Priority: 1, Endpoints: request.Nets[0].Endpoints},
+		{Name: "NARROW", Role: NetSignal, Priority: 1, Endpoints: []Endpoint{{Ref: "J3", Pin: "1"}, {Ref: "J4", Pin: "1"}}},
+	}
+	plans, issues := PlanRoutes(request, BuildPadAccess(request))
+	if len(issues) != 0 {
+		t.Fatalf("issues = %#v", issues)
+	}
+	if len(plans) != 2 || plans[0].Net.Name != "NARROW" {
+		t.Fatalf("plan order = %#v, want constrained small-fanout escape first", plans)
+	}
+}
+
+func TestPlanRoutesPrioritizesConstrainedSignalBeforeConstrainedSupportPower(t *testing.T) {
+	request := singleLayerSearchRequest()
+	request.Strategy.NetOrder = NetOrderConstrainedEndpointAccessV1
+	request.Rules.GridMM = 0.25
+	request.Rules.TraceWidthMM = 0.25
+	request.Components = append(request.Components,
+		testComponent("J3", "1", "GPIO", 10, 10),
+		testComponent("J4", "1", "GPIO", 20, 10),
+		testComponent("J5", "1", "SUPPORT", 10, 12),
+		testComponent("J6", "1", "SUPPORT", 20, 12),
+	)
+	for index := 2; index < len(request.Components); index++ {
+		request.Components[index].Pads[0].Size = Size{WidthMM: 0.55, HeightMM: 1.6}
+	}
+	request.Nets = []Net{
+		{Name: "SUPPORT", Role: NetPower, Priority: 1, Endpoints: []Endpoint{{Ref: "J5", Pin: "1"}, {Ref: "J6", Pin: "1"}}},
+		{Name: "GPIO", Role: NetSignal, Priority: 1, Endpoints: []Endpoint{{Ref: "J3", Pin: "1"}, {Ref: "J4", Pin: "1"}}},
+	}
+	plans, issues := PlanRoutes(request, BuildPadAccess(request))
+	if len(issues) != 0 {
+		t.Fatalf("issues = %#v", issues)
+	}
+	if len(plans) != 2 || plans[0].Net.Name != "GPIO" {
+		t.Fatalf("plan order = %#v, want constrained signal before support power", plans)
+	}
+}
+
+func TestPlanRoutesPrioritizesDenseConstrainedFanout(t *testing.T) {
+	request := singleLayerSearchRequest()
+	request.Strategy.NetOrder = NetOrderConstrainedEndpointAccessV1
+	request.Rules.GridMM = 0.25
+	request.Rules.TraceWidthMM = 0.2
+	request.Components = append(request.Components,
+		testComponent("U1", "1", "POWER", 10, 10),
+		testComponent("U1", "2", "POWER", 11, 10),
+		testComponent("J3", "1", "POWER", 14, 10),
+		testComponent("J4", "1", "SIGNAL", 16, 10),
+	)
+	request.Components[2].Pads[0].Size = Size{WidthMM: 0.35, HeightMM: 0.7}
+	request.Components[3].Pads[0].Size = Size{WidthMM: 0.35, HeightMM: 0.7}
+	request.Nets = []Net{
+		{Name: "SIGNAL", Role: NetSignal, Priority: 1, Endpoints: []Endpoint{{Ref: "J2", Pin: "1"}, {Ref: "J4", Pin: "1"}}},
+		{Name: "POWER", Role: NetPower, Priority: 1, Endpoints: []Endpoint{{Ref: "J1", Pin: "1"}, {Ref: "U1", Pin: "1"}, {Ref: "U1", Pin: "2"}, {Ref: "J3", Pin: "1"}}},
+	}
+	plans, issues := PlanRoutes(request, BuildPadAccess(request))
+	if len(issues) != 0 {
+		t.Fatalf("issues = %#v", issues)
+	}
+	if len(plans) != 2 || plans[0].Net.Name != "POWER" {
+		t.Fatalf("plan order = %#v, want dense constrained fanout first", plans)
 	}
 }
 

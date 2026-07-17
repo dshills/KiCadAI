@@ -774,6 +774,43 @@ func TestBuilderAllowsUnconnectedCustomPadWithoutSymbolPin(t *testing.T) {
 	}
 }
 
+func TestBuilderAllowsUnnamedPasteOnlyPad(t *testing.T) {
+	builder := newTestBuilder(t)
+	addTwoPinSymbol(t, builder, "R1", "Device:R", "1k", kicadfiles.Point{X: kicadfiles.MM(20), Y: kicadfiles.MM(20)})
+	if err := builder.AssignFootprint("R1", "Resistor_SMD:R_0805_2012Metric"); err != nil {
+		t.Fatalf("AssignFootprint returned error: %v", err)
+	}
+	if _, err := builder.PlaceFootprint("R1", PlaceFootprintOptions{
+		Pads: []PadSpec{
+			{Name: "1"},
+			{Name: "2"},
+			{Type: "smd", Shape: "custom", Size: kicadfiles.Point{X: kicadfiles.MM(1), Y: kicadfiles.MM(1)}, Layers: []kicadfiles.BoardLayer{kicadfiles.LayerFPaste}},
+		},
+		AllowUnmatchedUnconnectedPads: true,
+	}); err != nil {
+		t.Fatalf("PlaceFootprint returned error for unnamed paste-only pad: %v", err)
+	}
+	footprint := builder.Design().PCB.Footprints[0]
+	if len(footprint.Pads) != 3 || footprint.Pads[2].Name != "" {
+		t.Fatalf("unnamed paste-only pad not preserved: %#v", footprint.Pads)
+	}
+}
+
+func TestBuilderRejectsUnnamedCopperPad(t *testing.T) {
+	builder := newTestBuilder(t)
+	addTwoPinSymbol(t, builder, "R1", "Device:R", "1k", kicadfiles.Point{X: kicadfiles.MM(20), Y: kicadfiles.MM(20)})
+	if err := builder.AssignFootprint("R1", "Resistor_SMD:R_0805_2012Metric"); err != nil {
+		t.Fatalf("AssignFootprint returned error: %v", err)
+	}
+	_, err := builder.PlaceFootprint("R1", PlaceFootprintOptions{
+		Pads:                          []PadSpec{{Name: "1"}, {Name: "2"}, {Layers: []kicadfiles.BoardLayer{kicadfiles.LayerFCu}}},
+		AllowUnmatchedUnconnectedPads: true,
+	})
+	if err == nil || !strings.Contains(err.Error(), "pad name required") {
+		t.Fatalf("unnamed copper pad error = %v", err)
+	}
+}
+
 func TestBuilderRejectsUnconnectedCustomPadWithoutSymbolPinByDefault(t *testing.T) {
 	builder := newTestBuilder(t)
 	addTwoPinSymbol(t, builder, "R1", "Device:R", "1k", kicadfiles.Point{X: kicadfiles.MM(20), Y: kicadfiles.MM(20)})
@@ -1118,6 +1155,40 @@ func TestBuilderAddSymbolKeepsCanonicalTemplateOverResolverBody(t *testing.T) {
 	design := builder.Design()
 	if len(design.Schematic.LibSymbols) != 1 || strings.Contains(fmt.Sprint(design.Schematic.LibSymbols[0].Body), "resolver marker") {
 		t.Fatalf("canonical body was replaced: %#v", design.Schematic.LibSymbols)
+	}
+}
+
+func TestBuilderSerializesGroupedResolverPinOnceWhileKeepingMemberAccess(t *testing.T) {
+	index := libraryresolver.LibraryIndex{Symbols: map[string]libraryresolver.SymbolRecord{
+		"RF_Module:Grouped": {
+			LibraryID: "RF_Module:Grouped",
+			Raw:       `(symbol "Grouped")`,
+			Pins: []libraryresolver.SymbolPin{{
+				Number:   "[1,15,38,39]",
+				Position: kicadfiles.Point{Y: kicadfiles.MM(5.08)},
+			}},
+		},
+	}}
+	builder, err := New(Options{Name: "grouped_resolver", DesignID: kicadfiles.UUID("12345678-1234-5678-9234-123456789abc"), LibraryIndex: &index})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := builder.AddSymbol(SymbolOptions{
+		Reference: "U1", LibraryID: "RF_Module:Grouped", Value: "Grouped",
+		Position:             kicadfiles.Point{X: kicadfiles.MM(20), Y: kicadfiles.MM(20)},
+		Pins:                 []PinSpec{{Number: "1", Offset: kicadfiles.Point{Y: kicadfiles.MM(5.08)}}, {Number: "15", Offset: kicadfiles.Point{Y: kicadfiles.MM(5.08)}}, {Number: "38", Offset: kicadfiles.Point{Y: kicadfiles.MM(5.08)}}, {Number: "39", Offset: kicadfiles.Point{Y: kicadfiles.MM(5.08)}}},
+		PreferResolverSymbol: true,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	for _, pin := range []string{"1", "15", "38", "39"} {
+		if _, err := builder.pinAnchor(Endpoint{Reference: "U1", Pin: pin}); err != nil {
+			t.Fatalf("member pin %s is not addressable: %v", pin, err)
+		}
+	}
+	symbol := builder.Design().Schematic.Symbols[0]
+	if len(symbol.Pins) != 1 || symbol.Pins[0].Number != "[1,15,38,39]" || len(symbol.PinAnchors) != 1 {
+		t.Fatalf("serialized grouped pins = %#v anchors=%#v", symbol.Pins, symbol.PinAnchors)
 	}
 }
 

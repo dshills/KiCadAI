@@ -186,6 +186,7 @@ type FootprintProperty struct {
 }
 
 type FootprintPad struct {
+	Raw         string                  `json:"raw,omitempty"`
 	Name        string                  `json:"name"`
 	Type        string                  `json:"type,omitempty"`
 	Shape       string                  `json:"shape,omitempty"`

@@ -13,27 +13,40 @@ import (
 )
 
 const (
-	CodeSchemaInvalid             reports.Code = "GRAPH_SCHEMA_INVALID"
-	CodeLimitExceeded             reports.Code = "GRAPH_LIMIT_EXCEEDED"
-	CodeComponentDuplicate        reports.Code = "GRAPH_COMPONENT_DUPLICATE"
-	CodeComponentSelectionInvalid reports.Code = "GRAPH_COMPONENT_SELECTION_INVALID"
-	CodeUnitInvalid               reports.Code = "GRAPH_UNIT_INVALID"
-	CodeNetInvalid                reports.Code = "GRAPH_NET_INVALID"
-	CodePowerFlagInvalid          reports.Code = "GRAPH_POWER_FLAG_INVALID"
-	CodeEndpointDuplicate         reports.Code = "GRAPH_ENDPOINT_DUPLICATE"
-	CodeLayoutUnsupported         reports.Code = "GRAPH_LAYOUT_UNSUPPORTED"
-	CodePCBConstraintInvalid      reports.Code = "GRAPH_PCB_CONSTRAINT_INVALID"
-	CodeRepairForbidden           reports.Code = "GRAPH_REPAIR_FORBIDDEN"
-	CodeLegacyLaneInferred        reports.Code = "GRAPH_LEGACY_LANE_INFERRED"
+	CodeSchemaInvalid                        reports.Code = "GRAPH_SCHEMA_INVALID"
+	CodeLimitExceeded                        reports.Code = "GRAPH_LIMIT_EXCEEDED"
+	CodeComponentDuplicate                   reports.Code = "GRAPH_COMPONENT_DUPLICATE"
+	CodeComponentSelectionInvalid            reports.Code = "GRAPH_COMPONENT_SELECTION_INVALID"
+	CodeUnitInvalid                          reports.Code = "GRAPH_UNIT_INVALID"
+	CodeNetInvalid                           reports.Code = "GRAPH_NET_INVALID"
+	CodePowerFlagInvalid                     reports.Code = "GRAPH_POWER_FLAG_INVALID"
+	CodeEndpointDuplicate                    reports.Code = "GRAPH_ENDPOINT_DUPLICATE"
+	CodeLayoutUnsupported                    reports.Code = "GRAPH_LAYOUT_UNSUPPORTED"
+	CodePCBConstraintInvalid                 reports.Code = "GRAPH_PCB_CONSTRAINT_INVALID"
+	CodeRepairForbidden                      reports.Code = "GRAPH_REPAIR_FORBIDDEN"
+	CodeLegacyLaneInferred                   reports.Code = "GRAPH_LEGACY_LANE_INFERRED"
+	CodeSynthesisIntentInvalid               reports.Code = "SYNTHESIS_INTENT_INVALID"
+	CodeSynthesisComponentUnresolved         reports.Code = "SYNTHESIS_COMPONENT_UNRESOLVED"
+	CodeSynthesisInterfaceUnsupported        reports.Code = "SYNTHESIS_INTERFACE_UNSUPPORTED"
+	CodeSynthesisPowerDomainInvalid          reports.Code = "SYNTHESIS_POWER_DOMAIN_INVALID"
+	CodeSynthesisConnectionUnresolved        reports.Code = "SYNTHESIS_CONNECTION_UNRESOLVED"
+	CodeSynthesisSupportRecipeMissing        reports.Code = "SYNTHESIS_SUPPORT_RECIPE_MISSING"
+	CodeSynthesisSupportRecipeAmbiguous      reports.Code = "SYNTHESIS_SUPPORT_RECIPE_AMBIGUOUS"
+	CodeSynthesisUnusedPinPolicyMissing      reports.Code = "SYNTHESIS_UNUSED_PIN_POLICY_MISSING"
+	CodeSynthesisLayoutConstraintUnsupported reports.Code = "SYNTHESIS_LAYOUT_CONSTRAINT_UNSUPPORTED"
 )
 
 var (
 	graphIDPattern     = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9_-]{0,62}$`)
+	semanticIDPattern  = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_-]{0,62}$`)
 	projectNamePattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$`)
 	referencePattern   = regexp.MustCompile(`^[A-Za-z#][A-Za-z0-9_#-]*[0-9][A-Za-z0-9_-]*$`)
 )
 
 func Validate(document Document) []reports.Issue {
+	if document.Synthesis != nil {
+		return validateFunctionDocument(document)
+	}
 	validator := graphValidator{document: document}
 	validator.header()
 	componentsByID := validator.components()

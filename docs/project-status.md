@@ -72,6 +72,22 @@ The generic contract is deliberately strict. It expands topology expression,
 but does not bypass catalog, pinmap, placement, routing, ERC/DRC, writer, or
 round-trip gates.
 
+The same `generic-circuit-v1` contract now accepts strict function-level intent
+as an alternative to an explicit graph. An AI can state primary functions,
+external interfaces, operating domains, semantic connections, and bounded
+constraints without supplying pins, pads, support components, coordinates,
+layers, or routes. Deterministic catalog-driven synthesis produces the explicit
+graph, companion networks, unused-pin decisions, physical defaults, and
+resolution evidence before the existing validation pipeline runs.
+
+A frozen eight-circuit held-out corpus covers analog, power/protection,
+transistor, sensor/interface, ATmega328P, and combined ESP32/SHT31 designs. All
+eight pass the optional KiCad-backed promotion gate with clean ERC and strict
+DRC, complete routing/connectivity, writer correctness, zero round-trip
+differences, and byte-identical replay. See the
+[function-level synthesis specification](../specs/function-level-circuit-synthesis/SPEC.md)
+and [capability report](../specs/function-level-circuit-synthesis/CAPABILITY_REPORT.json).
+
 An exact block-composition lane now supports `ESP32-WROOM-32E-N4` through the
 built-in `esp32_wroom_32e_minimal` block. It emits the module, local power
 conditioning, EN/BOOT networks and buttons, UART and peripheral headers, and a
@@ -105,8 +121,9 @@ This is not yet a general-purpose autorouter for arbitrary dense boards. See
 ### Components And Circuit Blocks
 
 The checked-in catalogs and resolvers cover the promoted designs plus a growing
-set of passives, connectors, regulators, I2C sensors, protection parts, and
-low-voltage amplifier components. Generated schematic symbols can carry
+set of passives, connectors, regulators, I2C sensors, protection parts,
+low-voltage amplifier components, the ATmega328P-A, and the ESP32-WROOM-32E.
+Generated schematic symbols can carry
 component identity, manufacturer, MPN, confidence, lifecycle, rating, and
 pinmap evidence.
 

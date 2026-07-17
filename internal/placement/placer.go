@@ -47,7 +47,7 @@ func PlaceContext(ctx context.Context, request Request) Result {
 	}
 
 	occupancy := newOccupancy(request)
-	components := slicesForPlacement(request.Components)
+	components := slicesForPlacementWithOrder(request.Components, request.ComponentOrder)
 	padsByRef := componentPadMaps(components)
 	rotatedPadsByRef := componentRotatedPadMaps(components, padsByRef)
 	netsByRef := netsByComponent(request.Nets)
@@ -163,6 +163,10 @@ func successfulPlacementResults(placements []PlacementResult) []PlacementResult 
 }
 
 func slicesForPlacement(components []Component) []Component {
+	return slicesForPlacementWithOrder(components, "")
+}
+
+func slicesForPlacementWithOrder(components []Component, componentOrder string) []Component {
 	ordered := append([]Component(nil), components...)
 	sort.SliceStable(ordered, func(i int, j int) bool {
 		if ordered[i].Fixed != ordered[j].Fixed {
@@ -170,6 +174,13 @@ func slicesForPlacement(components []Component) []Component {
 		}
 		if ordered[i].Priority != ordered[j].Priority {
 			return ordered[i].Priority > ordered[j].Priority
+		}
+		if componentOrder == ComponentOrderLargestFootprintFirstV1 {
+			leftArea := ordered[i].Bounds.WidthMM * ordered[i].Bounds.HeightMM
+			rightArea := ordered[j].Bounds.WidthMM * ordered[j].Bounds.HeightMM
+			if comparison := compareFloat64(leftArea, rightArea); comparison != 0 {
+				return comparison > 0
+			}
 		}
 		return ordered[i].Ref < ordered[j].Ref
 	})

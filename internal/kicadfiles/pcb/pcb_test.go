@@ -1083,6 +1083,52 @@ func TestValidateRejectsInvalidSMDPadLayers(t *testing.T) {
 	}
 }
 
+func TestValidateAndWriteAllowUnnamedPasteOnlyAperture(t *testing.T) {
+	board := minimalPCB()
+	board.Nets = []Net{{Code: 0}, {Code: 1, Name: "A"}}
+	footprint := minimalFootprint("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", "U1")
+	footprint.Pads = append(footprint.Pads, Pad{
+		Raw:    `(pad "" smd custom (at 0 0) (size 1 1) (layers "F.Paste") (zone_connect 0) (options (clearance outline) (anchor rect)) (primitives (gr_poly (pts (xy 0.5 0.5) (xy -0.5 0.5) (xy -0.5 -0.5)) (width 0) (fill yes))) (uuid "cccccccc-cccc-4ccc-8ccc-cccccccccccc"))`,
+		UUID:   kicadfiles.UUID("bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"),
+		Type:   "smd",
+		Shape:  "custom",
+		Size:   kicadfiles.Point{X: kicadfiles.MM(1), Y: kicadfiles.MM(1)},
+		Layers: []kicadfiles.BoardLayer{kicadfiles.LayerFPaste},
+	})
+	board.Footprints = []Footprint{footprint}
+	if err := Validate(board); err != nil {
+		t.Fatalf("Validate rejected unnamed paste aperture: %v", err)
+	}
+	var output bytes.Buffer
+	if err := Write(&output, board); err != nil {
+		t.Fatalf("Write rejected unnamed paste aperture: %v", err)
+	}
+	if !strings.Contains(output.String(), "(pad\n      \"\"\n      smd\n      custom") {
+		t.Fatalf("unnamed paste aperture not rendered:\n%s", output.String())
+	}
+	if !strings.Contains(output.String(), "(zone_connect 0)") || !strings.Contains(output.String(), "(primitives") || strings.Contains(output.String(), "cccccccc-cccc-4ccc-8ccc-cccccccccccc") {
+		t.Fatalf("custom aperture children or generated UUID were not preserved correctly:\n%s", output.String())
+	}
+}
+
+func TestWritePreservesPadPropertyInKiCadCanonicalOrder(t *testing.T) {
+	board := minimalPCB()
+	board.Nets = []Net{{Code: 0}, {Code: 1, Name: "GND"}}
+	footprint := minimalFootprint("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", "U1")
+	footprint.Pads[0].Raw = `(pad "1" smd rect (at 0 0) (size 1 1) (property pad_prop_heatsink) (layers "F.Cu" "F.Mask") (net 1 "GND"))`
+	board.Footprints = []Footprint{footprint}
+	var output bytes.Buffer
+	if err := Write(&output, board); err != nil {
+		t.Fatal(err)
+	}
+	rendered := output.String()
+	propertyAt := strings.Index(rendered, "(property pad_prop_heatsink)")
+	layersAt := strings.LastIndex(rendered, "(layers ")
+	if propertyAt < 0 || layersAt < 0 || propertyAt > layersAt {
+		t.Fatalf("pad property was not rendered before layers:\n%s", rendered)
+	}
+}
+
 func TestValidateRejectsDrilledPadWithoutThroughHoleLayers(t *testing.T) {
 	board := minimalPCB()
 	board.Nets = []Net{{Code: 1, Name: "A"}}

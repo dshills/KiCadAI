@@ -341,7 +341,7 @@ func TestDiscoverPhysicalEndpointsDerivedBoardEdgePreservesBottomLayer(t *testin
 	}
 }
 
-func TestDiscoverPhysicalEndpointsSkipsDuplicatePadNamesForDerivedEdges(t *testing.T) {
+func TestDiscoverPhysicalEndpointsDisambiguatesDuplicatePadNamesForDerivedEdges(t *testing.T) {
 	placed := PlacementStageResult{
 		Request: placement.Request{
 			Board: placement.BoardPlacementArea{WidthMM: 20, HeightMM: 10},
@@ -364,9 +364,10 @@ func TestDiscoverPhysicalEndpointsSkipsDuplicatePadNamesForDerivedEdges(t *testi
 	endpoints, issues := DiscoverPhysicalEndpointsWithOptions(placed, PhysicalEndpointDiscoveryOptions{})
 
 	padEndpointIDs := map[string]struct{}{}
+	edgeEndpointIDs := map[string]struct{}{}
 	for _, endpoint := range endpoints {
 		if endpoint.Kind == PhysicalEndpointBoardEdgePoint {
-			t.Fatalf("unexpected derived endpoint for duplicate pad name = %#v", endpoint)
+			edgeEndpointIDs[endpoint.ID] = struct{}{}
 		}
 		if endpoint.Kind == PhysicalEndpointFootprintPad {
 			padEndpointIDs[endpoint.ID] = struct{}{}
@@ -375,8 +376,11 @@ func TestDiscoverPhysicalEndpointsSkipsDuplicatePadNamesForDerivedEdges(t *testi
 	if len(padEndpointIDs) != 2 {
 		t.Fatalf("duplicate same-net physical pad endpoints = %#v, want two durable IDs", endpoints)
 	}
-	if len(issues) != 1 {
-		t.Fatalf("duplicate pad issues = %#v", issues)
+	if len(edgeEndpointIDs) != 2 {
+		t.Fatalf("duplicate same-net derived edge endpoints = %#v, want two durable IDs", endpoints)
+	}
+	if len(issues) != 0 {
+		t.Fatalf("duplicate pad issues = %#v, want none", issues)
 	}
 }
 

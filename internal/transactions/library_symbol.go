@@ -147,9 +147,18 @@ func mergeSymbolRecordPinsForUnit(pins []PinSpec, record libraryresolver.SymbolR
 		}
 		return nil, err
 	}
-	resolvedByNumber := make(map[string]PinSpec, len(resolved))
+	type resolvedPinMatch struct {
+		pin       PinSpec
+		canonical string
+	}
+	resolvedByNumber := make(map[string]resolvedPinMatch, len(resolved))
 	for _, pin := range resolved {
-		resolvedByNumber[strings.TrimSpace(pin.Number)] = pin
+		canonical := strings.TrimSpace(pin.Number)
+		for _, member := range libraryresolver.GroupedPinMembers(canonical) {
+			memberPin := pin
+			memberPin.Number = member
+			resolvedByNumber[member] = resolvedPinMatch{pin: memberPin, canonical: canonical}
+		}
 	}
 	if len(pins) > 0 {
 		provided := make(map[string]struct{}, len(pins))
@@ -159,10 +168,11 @@ func mergeSymbolRecordPinsForUnit(pins []PinSpec, record libraryresolver.SymbolR
 				provided[number] = struct{}{}
 				continue
 			}
-			if pin, ok := resolvedByNumber[number]; ok {
-				pins[i].XMM = pin.XMM
-				pins[i].YMM = pin.YMM
+			if match, ok := resolvedByNumber[number]; ok {
+				pins[i].XMM = match.pin.XMM
+				pins[i].YMM = match.pin.YMM
 				provided[number] = struct{}{}
+				provided[match.canonical] = struct{}{}
 			} else {
 				return nil, fmt.Errorf("symbol %s has no resolver pin %s for unit %d", record.LibraryID, number, unit)
 			}

@@ -50,11 +50,20 @@ func (resolver *Resolver) Resolve(ctx context.Context, document Document) (Resol
 	if issues := Validate(normalized); len(issues) != 0 {
 		return ResolvedDocument{Schema: SchemaID, Version: Version, Source: normalized}, issues
 	}
+	var synthesis *SynthesisReport
+	if normalized.Synthesis != nil {
+		lowered, report, issues := resolver.Synthesize(ctx, normalized)
+		synthesis = &report
+		if reports.HasBlockingIssue(issues) {
+			return ResolvedDocument{Schema: SchemaID, Version: Version, Source: lowered, Synthesis: synthesis}, issues
+		}
+		normalized = lowered
+	}
 	if resolver == nil {
-		return ResolvedDocument{Schema: SchemaID, Version: Version, Source: normalized}, []reports.Issue{graphIssue(CodeComponentUnresolved, "resolver", "component resolver is required")}
+		return ResolvedDocument{Schema: SchemaID, Version: Version, Source: normalized, Synthesis: synthesis}, []reports.Issue{graphIssue(CodeComponentUnresolved, "resolver", "component resolver is required")}
 	}
 	if resolver.options.Catalog == nil {
-		return ResolvedDocument{Schema: SchemaID, Version: Version, Source: normalized}, []reports.Issue{graphIssue(CodeComponentUnresolved, "catalog", "component catalog is required")}
+		return ResolvedDocument{Schema: SchemaID, Version: Version, Source: normalized, Synthesis: synthesis}, []reports.Issue{graphIssue(CodeComponentUnresolved, "catalog", "component catalog is required")}
 	}
 	options := resolver.options
 	result := ResolvedDocument{
@@ -62,6 +71,7 @@ func (resolver *Resolver) Resolve(ctx context.Context, document Document) (Resol
 		CatalogID:   strings.TrimSpace(options.CatalogID),
 		CatalogHash: resolver.catalogHash,
 		LibraryHash: resolver.libraryHash,
+		Synthesis:   synthesis,
 	}
 	if result.CatalogID == "" {
 		result.CatalogID = "catalog"
@@ -285,6 +295,9 @@ func resolveComponent(ctx context.Context, instance Component, options ResolveOp
 				}
 			}
 			return ResolvedComponent{}, []reports.Issue{graphIssue(code, path+".query", summarizeIssues(report.Issues))}
+		}
+		if selection.Component.ID == "" || selection.Variant.ID == "" {
+			return ResolvedComponent{}, []reports.Issue{graphIssue(CodeComponentUnresolved, path+".query", "component query did not select a catalog component and package")}
 		}
 		resolved = components.ResolvedComponent{Component: selection.Component, Variant: selection.Variant}
 		if len(selection.Component.Symbols) != 0 {

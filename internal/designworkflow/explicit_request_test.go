@@ -19,6 +19,15 @@ func TestValidateRequestAcceptsExplicitCircuitMode(t *testing.T) {
 	}
 }
 
+func TestValidateRequestRejectsUnknownExplicitRoutingPolicy(t *testing.T) {
+	request := validExplicitCircuitRequest()
+	request.ExplicitCircuit.RoutingPolicy = "unknown"
+	issues := ValidateRequest(request)
+	if !reports.HasBlockingIssue(issues) || !hasDesignWorkflowIssuePath(issues, "explicit_circuit.routing_policy") {
+		t.Fatalf("routing policy validation issues = %#v", issues)
+	}
+}
+
 func TestExplicitSchematicTransactionPrefersResolverSymbols(t *testing.T) {
 	tx, issues := explicitSchematicTransaction(validExplicitCircuitRequest(), nil)
 	if reports.HasBlockingIssue(issues) {

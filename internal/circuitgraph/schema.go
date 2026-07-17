@@ -8,6 +8,7 @@ import (
 
 func ProviderGraphSchema() map[string]any {
 	identifier := map[string]any{"type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_-]{0,62}$"}
+	semanticIdentifier := map[string]any{"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,62}$"}
 	stringValue := map[string]any{"type": "string", "maxLength": MaxStringBytes}
 	boolValue := map[string]any{"type": "boolean"}
 	numberValue := map[string]any{"type": "number"}
@@ -202,8 +203,17 @@ func ProviderGraphSchema() map[string]any {
 		"assertions": map[string]any{"type": "array", "minItems": 1, "maxItems": 64, "items": transientAssertion},
 	})
 	simulation := map[string]any{"oneOf": []any{legacySimulation, mnaSimulation, nonlinearSimulation, transientSimulation}}
+	policy := strictObject(map[string]any{
+		"allow_reference_assignment": boolValue,
+		"allow_value_normalization":  boolValue,
+		"allow_layout_inference":     boolValue,
+		"allow_spacing_adjustment":   boolValue,
+		"allow_label_insertion":      boolValue,
+		"allow_placement_adjustment": boolValue,
+		"allow_route_retry":          boolValue,
+	})
 
-	return strictObject(map[string]any{
+	explicitGraph := strictObject(map[string]any{
 		"schema":  map[string]any{"type": "string", "const": SchemaID},
 		"version": map[string]any{"type": "integer", "const": Version},
 		"project": strictObject(map[string]any{
@@ -250,17 +260,90 @@ func ProviderGraphSchema() map[string]any {
 			"zones":      map[string]any{"type": "array", "items": zone},
 		}),
 		"simulation": nullable(simulation),
-		"policy": strictObject(map[string]any{
-			"allow_reference_assignment": boolValue,
-			"allow_value_normalization":  boolValue,
-			"allow_layout_inference":     boolValue,
-			"allow_spacing_adjustment":   boolValue,
-			"allow_label_insertion":      boolValue,
-			"allow_placement_adjustment": boolValue,
-			"allow_route_retry":          boolValue,
-		}),
+		"policy":     policy,
 		"extensions": emptyExtensions,
 	})
+
+	functionRequirement := strictObject(map[string]any{
+		"id":           identifier,
+		"role":         map[string]any{"type": "string", "enum": componentRoleValues()},
+		"component_id": stringValue,
+		"query":        nullable(query),
+		"value":        stringValue,
+		"parameters":   map[string]any{"type": "array", "items": parameter},
+		"required_ratings": map[string]any{
+			"type": "array", "items": rating,
+		},
+		"required_functions": stringArray(256),
+		"usage":              stringValue,
+		"extensions":         emptyExtensions,
+	})
+	interfaceSignal := strictObject(map[string]any{
+		"name": semanticIdentifier,
+		"role": map[string]any{"type": "string", "enum": netRoleValues()},
+	})
+	interfaceRequirement := strictObject(map[string]any{
+		"id":   identifier,
+		"role": map[string]any{"type": "string", "enum": interfaceRoleValues()},
+		"signals": map[string]any{
+			"type": "array", "minItems": 1, "maxItems": MaxFunctionInterfaceSignals, "items": interfaceSignal,
+		},
+	})
+	powerDomain := strictObject(map[string]any{
+		"name":           semanticIdentifier,
+		"role":           map[string]any{"type": "string", "enum": synthesisPowerRoleValues()},
+		"voltage_v":      numberValue,
+		"max_current_ma": numberValue,
+		"source":         map[string]any{"type": "string", "enum": []string{string(PowerDomainExternal), string(PowerDomainGenerated)}},
+	})
+	functionalEndpoint := strictObject(map[string]any{
+		"function":  stringValue,
+		"port":      stringValue,
+		"interface": stringValue,
+		"signal":    stringValue,
+	})
+	functionConnection := strictObject(map[string]any{
+		"name":           stringValue,
+		"role":           map[string]any{"type": "string", "enum": netRoleValues()},
+		"voltage_domain": stringValue,
+		"current_ma":     numberValue,
+		"endpoints": map[string]any{
+			"type": "array", "minItems": 2, "maxItems": MaxEndpointsPerNet, "items": functionalEndpoint,
+		},
+	})
+	functionIntent := strictObject(map[string]any{
+		"functions": map[string]any{
+			"type": "array", "minItems": 1, "maxItems": MaxComponents, "items": functionRequirement,
+		},
+		"interfaces": map[string]any{
+			"type": "array", "maxItems": MaxComponents, "items": interfaceRequirement,
+		},
+		"power_domains": map[string]any{
+			"type": "array", "maxItems": MaxNets, "items": powerDomain,
+		},
+		"connections": map[string]any{
+			"type": "array", "minItems": 1, "maxItems": MaxNets, "items": functionConnection,
+		},
+		"constraints": strictObject(map[string]any{
+			"max_width_mm": positiveMM, "max_height_mm": positiveMM,
+			"preferred_component_spacing_mm": nonnegativeMM,
+			"protection":                     map[string]any{"type": "string", "enum": []string{"", "optional", "required"}},
+		}),
+	})
+	functionGraph := strictObject(map[string]any{
+		"schema":  map[string]any{"type": "string", "const": SchemaID},
+		"version": map[string]any{"type": "integer", "const": Version},
+		"project": strictObject(map[string]any{
+			"name":        map[string]any{"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$"},
+			"title":       stringValue,
+			"description": map[string]any{"type": "string", "maxLength": MaxDescriptionBytes},
+			"acceptance":  map[string]any{"type": "string", "enum": []string{string(AcceptanceStructural), string(AcceptanceConnectivity), string(AcceptanceERCDRC), string(AcceptanceFabricationCandidate)}},
+		}),
+		"synthesis":  functionIntent,
+		"policy":     policy,
+		"extensions": emptyExtensions,
+	})
+	return map[string]any{"oneOf": []any{explicitGraph, functionGraph}}
 }
 
 func strictObject(properties map[string]any) map[string]any {
@@ -291,4 +374,16 @@ func netRoleValues() []string {
 		string(NetRoleSignal), string(NetRolePower), string(NetRolePowerPos), string(NetRolePowerNeg),
 		string(NetRoleGround), string(NetRoleReturn), string(NetRoleFeedback), string(NetRoleBias), string(NetRoleShield),
 	}
+}
+
+func interfaceRoleValues() []string {
+	return []string{
+		string(InterfacePowerInput), string(InterfacePowerOutput), string(InterfaceAnalogInput), string(InterfaceAnalogOut),
+		string(InterfaceDigitalIn), string(InterfaceDigitalOut), string(InterfaceI2C), string(InterfaceSPI),
+		string(InterfaceUART), string(InterfaceGPIO), string(InterfaceProgramming),
+	}
+}
+
+func synthesisPowerRoleValues() []string {
+	return []string{string(NetRolePower), string(NetRolePowerPos), string(NetRolePowerNeg), string(NetRoleGround), string(NetRoleReturn)}
 }

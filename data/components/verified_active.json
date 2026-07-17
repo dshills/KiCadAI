@@ -12,7 +12,7 @@
       "tags": ["analog", "opamp", "single", "low_voltage", "sot23_5"],
       "ratings": [{"kind": "supply_voltage", "min": "2.7", "max": "5.5", "unit": "V"}],
       "temperature": {"min": "-40", "max": "125", "unit": "C"},
-      "companions": [{"id": "opamp.decoupling_capacitor", "family": "capacitor", "role": "decoupling_capacitor", "required": true, "description": "Place supply decoupling capacitor close to V+ and V- pins."}],
+      "companions": [{"id": "opamp.decoupling_capacitor", "family": "capacitor", "role": "decoupling_capacitor", "required": true, "recipes": [{"id": "supply_bypass", "family": "capacitor", "role": "decoupling_capacitor", "package": "0603", "value_kind": "capacitance", "value": "100n", "min_voltage_v": 6.3, "minimum_confidence": "rule_inferred", "required_functions": ["A", "B"], "connections": [{"function": "A", "parent_function": "V_PLUS"}, {"function": "B", "parent_function": "V_MINUS"}]}], "description": "Place supply decoupling capacitor close to V+ and V- pins."}],
       "simulation_models": [{
         "model_id": "mna_opamp_single_pole_v1",
         "parameters": [
@@ -81,7 +81,7 @@
       "tags": ["analog", "opamp", "dual", "multi_unit", "soic8"],
       "ratings": [{"kind": "supply_voltage", "min": "3", "max": "30", "unit": "V"}],
       "temperature": {"min": "0", "max": "70", "unit": "C"},
-      "companions": [{"id": "opamp.decoupling_capacitor", "family": "capacitor", "role": "decoupling_capacitor", "required": true, "description": "Place package supply decoupling close to pins 8 and 4."}],
+      "companions": [{"id": "opamp.decoupling_capacitor", "family": "capacitor", "role": "decoupling_capacitor", "required": true, "recipes": [{"id": "supply_bypass", "family": "capacitor", "role": "decoupling_capacitor", "package": "0603", "value_kind": "capacitance", "value": "100n", "min_voltage_v": 6.3, "minimum_confidence": "rule_inferred", "required_functions": ["A", "B"], "connections": [{"function": "A", "parent_function": "V_PLUS"}, {"function": "B", "parent_function": "V_MINUS"}]}], "description": "Place package supply decoupling close to pins 8 and 4."}],
       "simulation_models": [{
         "model_id": "mna_opamp_single_pole_v1",
         "parameters": [
@@ -196,7 +196,7 @@
         {"kind": "collector_emitter_voltage", "max": "40", "unit": "V"},
         {"kind": "power_dissipation_max", "max": "300", "unit": "mW"}
       ],
-      "companions": [{"id": "amplifier.output_emitter_resistor", "family": "resistor", "role": "emitter_resistor", "required": true, "description": "Emitter resistor or equivalent output-current sharing/current-limit review is required for Class AB output stages."}],
+      "companions": [{"id": "amplifier.output_emitter_resistor", "family": "resistor", "role": "emitter_resistor", "required": true, "applies_to": ["class_ab_output"], "description": "Emitter resistor or equivalent output-current sharing/current-limit review is required for Class AB output stages."}],
       "amplifier_output_evidence": {
         "device_class": "bjt",
         "polarity": "npn",
@@ -271,7 +271,7 @@
         {"kind": "collector_emitter_voltage", "max": "40", "unit": "V"},
         {"kind": "power_dissipation_max", "max": "300", "unit": "mW"}
       ],
-      "companions": [{"id": "amplifier.output_emitter_resistor", "family": "resistor", "role": "emitter_resistor", "required": true, "description": "Emitter resistor or equivalent output-current sharing/current-limit review is required for Class AB output stages."}],
+      "companions": [{"id": "amplifier.output_emitter_resistor", "family": "resistor", "role": "emitter_resistor", "required": true, "applies_to": ["class_ab_output"], "description": "Emitter resistor or equivalent output-current sharing/current-limit review is required for Class AB output stages."}],
       "amplifier_output_evidence": {
         "device_class": "bjt",
         "polarity": "pnp",
@@ -385,16 +385,16 @@
       "tags": ["sensor", "i2c", "spi", "temperature", "humidity", "pressure", "lga8"],
       "ratings": [{"kind": "supply_voltage", "min": "1.71", "max": "3.6", "unit": "V"}],
       "companions": [
-        {"id": "sensor.decoupling_capacitor", "family": "capacitor", "role": "decoupling_capacitor", "required": true, "description": "Place a local decoupling capacitor close to VDD/VDDIO and GND."},
-        {"id": "sensor.i2c_pullups", "family": "resistor", "role": "i2c_pullup", "required": true, "description": "I2C mode requires pull-ups on SDA and SCL."}
+        {"id": "sensor.decoupling_capacitor", "family": "capacitor", "role": "decoupling_capacitor", "required": true, "recipes": [{"id": "supply_bypass", "family": "capacitor", "role": "decoupling_capacitor", "package": "0603", "value_kind": "capacitance", "value": "100n", "min_voltage_v": 6.3, "minimum_confidence": "rule_inferred", "required_functions": ["A", "B"], "connections": [{"function": "A", "parent_function": "VDD"}, {"function": "B", "parent_function": "GND"}]}], "description": "Place a local decoupling capacitor close to VDD/VDDIO and GND."},
+        {"id": "sensor.i2c_pullups", "family": "resistor", "role": "i2c_pullup", "required": true, "applies_to": ["i2c_peripheral"], "recipes": [{"id": "sda_pullup", "family": "resistor", "role": "pullup", "package": "0603", "value_kind": "resistance", "value": "4.7k", "minimum_confidence": "rule_inferred", "required_functions": ["A", "B"], "connections": [{"function": "A", "parent_function": "VDD"}, {"function": "B", "parent_function": "SDA"}]}, {"id": "scl_pullup", "family": "resistor", "role": "pullup", "package": "0603", "value_kind": "resistance", "value": "4.7k", "minimum_confidence": "rule_inferred", "required_functions": ["A", "B"], "connections": [{"function": "A", "parent_function": "VDD"}, {"function": "B", "parent_function": "SCL"}]}], "description": "I2C mode requires pull-ups on SDA and SCL."}
       ],
       "sensor_evidence": {
         "interfaces": ["i2c", "spi"],
         "i2c_addresses": [
-          {"address": "0x76", "select_function": "SDO", "level": "low", "default": true},
-          {"address": "0x77", "select_function": "SDO", "level": "high"}
+          {"address": "0x76", "select_function": "SDO", "level": "low", "parent_function": "GND", "default": true},
+          {"address": "0x77", "select_function": "SDO", "level": "high", "parent_function": "VDDIO"}
         ],
-        "i2c_mode_connections": [{"function": "CSB", "level": "high"}],
+        "i2c_mode_connections": [{"function": "CSB", "level": "high", "parent_function": "VDDIO"}],
         "review_note": "I2C mode requires CSB high and SDO at a defined address-select level."
       },
       "symbols": [{
@@ -444,16 +444,16 @@
       "tags": ["sensor", "i2c", "spi", "temperature", "pressure", "lga8"],
       "ratings": [{"kind": "supply_voltage", "min": "1.71", "max": "3.6", "unit": "V"}],
       "companions": [
-        {"id": "sensor.decoupling_capacitor", "family": "capacitor", "role": "decoupling_capacitor", "required": true, "description": "Place local decoupling close to VDD/VDDIO and GND."},
-        {"id": "sensor.i2c_pullups", "family": "resistor", "role": "i2c_pullup", "required": true, "description": "I2C mode requires an SDA pull-up and a compatible SCL pull-up policy."}
+        {"id": "sensor.decoupling_capacitor", "family": "capacitor", "role": "decoupling_capacitor", "required": true, "recipes": [{"id": "supply_bypass", "family": "capacitor", "role": "decoupling_capacitor", "package": "0603", "value_kind": "capacitance", "value": "100n", "min_voltage_v": 6.3, "minimum_confidence": "rule_inferred", "required_functions": ["A", "B"], "connections": [{"function": "A", "parent_function": "VDD"}, {"function": "B", "parent_function": "GND"}]}], "description": "Place local decoupling close to VDD/VDDIO and GND."},
+        {"id": "sensor.i2c_pullups", "family": "resistor", "role": "i2c_pullup", "required": true, "applies_to": ["i2c_peripheral"], "recipes": [{"id": "sda_pullup", "family": "resistor", "role": "pullup", "package": "0603", "value_kind": "resistance", "value": "4.7k", "minimum_confidence": "rule_inferred", "required_functions": ["A", "B"], "connections": [{"function": "A", "parent_function": "VDD"}, {"function": "B", "parent_function": "SDA"}]}, {"id": "scl_pullup", "family": "resistor", "role": "pullup", "package": "0603", "value_kind": "resistance", "value": "4.7k", "minimum_confidence": "rule_inferred", "required_functions": ["A", "B"], "connections": [{"function": "A", "parent_function": "VDD"}, {"function": "B", "parent_function": "SCL"}]}], "description": "I2C mode requires an SDA pull-up and a compatible SCL pull-up policy."}
       ],
       "sensor_evidence": {
         "interfaces": ["i2c", "spi"],
         "i2c_addresses": [
-          {"address": "0x76", "select_function": "SDO", "level": "low", "default": true},
-          {"address": "0x77", "select_function": "SDO", "level": "high"}
+          {"address": "0x76", "select_function": "SDO", "level": "low", "parent_function": "GND", "default": true},
+          {"address": "0x77", "select_function": "SDO", "level": "high", "parent_function": "VDDIO"}
         ],
-        "i2c_mode_connections": [{"function": "CSB", "level": "high"}],
+        "i2c_mode_connections": [{"function": "CSB", "level": "high", "parent_function": "VDDIO"}],
         "review_note": "Bosch BST-BMP280-DS001-26 requires CSB tied to VDDIO for I2C and SDO at a defined address-select level."
       },
       "symbols": [{
@@ -503,16 +503,16 @@
       "tags": ["sensor", "i2c", "temperature", "humidity", "dfn8", "alert"],
       "ratings": [{"kind": "supply_voltage", "min": "2.15", "max": "5.5", "unit": "V"}],
       "companions": [
-        {"id": "sensor.decoupling_capacitor", "family": "capacitor", "role": "decoupling_capacitor", "required": true, "description": "Place a 100 nF local decoupling capacitor close to VDD and VSS."},
-        {"id": "sensor.i2c_pullups", "family": "resistor", "role": "i2c_pullup", "required": true, "description": "I2C mode requires pull-ups on SDA and SCL."}
+        {"id": "sensor.decoupling_capacitor", "family": "capacitor", "role": "decoupling_capacitor", "required": true, "recipes": [{"id": "supply_bypass", "family": "capacitor", "role": "decoupling_capacitor", "package": "0603", "value_kind": "capacitance", "value": "100n", "min_voltage_v": 6.3, "minimum_confidence": "rule_inferred", "required_functions": ["A", "B"], "connections": [{"function": "A", "parent_function": "VDD"}, {"function": "B", "parent_function": "VSS"}]}], "description": "Place a 100 nF local decoupling capacitor close to VDD and VSS."},
+        {"id": "sensor.i2c_pullups", "family": "resistor", "role": "i2c_pullup", "required": true, "applies_to": ["i2c_peripheral"], "recipes": [{"id": "sda_pullup", "family": "resistor", "role": "pullup", "package": "0603", "value_kind": "resistance", "value": "4.7k", "minimum_confidence": "rule_inferred", "required_functions": ["A", "B"], "connections": [{"function": "A", "parent_function": "VDD"}, {"function": "B", "parent_function": "SDA"}]}, {"id": "scl_pullup", "family": "resistor", "role": "pullup", "package": "0603", "value_kind": "resistance", "value": "4.7k", "minimum_confidence": "rule_inferred", "required_functions": ["A", "B"], "connections": [{"function": "A", "parent_function": "VDD"}, {"function": "B", "parent_function": "SCL"}]}], "description": "I2C mode requires pull-ups on SDA and SCL."}
       ],
       "sensor_evidence": {
         "interfaces": ["i2c"],
         "i2c_addresses": [
-          {"address": "0x44", "select_function": "ADDR", "level": "low", "default": true},
-          {"address": "0x45", "select_function": "ADDR", "level": "high"}
+          {"address": "0x44", "select_function": "ADDR", "level": "low", "parent_function": "VSS", "default": true},
+          {"address": "0x45", "select_function": "ADDR", "level": "high", "parent_function": "VDD"}
         ],
-        "i2c_mode_connections": [{"function": "R", "level": "low"}],
+        "i2c_mode_connections": [{"function": "R", "level": "low", "parent_function": "VSS"}],
         "optional_interrupt_function": "ALERT",
         "unused_pin_policies": [
           {"function": "ALERT", "policy": "no_connect"},
@@ -606,11 +606,11 @@
       ],
       "temperature": {"min": "-40", "max": "85", "unit": "C"},
       "companions": [
-        {"id": "esp32.power_bypass", "family": "capacitor", "role": "decoupling_capacitor", "required": true, "description": "Place local high-frequency bypass capacitance at module pin 2."},
-        {"id": "esp32.power_bulk", "family": "capacitor", "role": "bulk_capacitor", "required": true, "description": "Provide local bulk energy storage for radio current transients."},
-        {"id": "esp32.enable_rc", "family": "resistor", "role": "enable_pullup", "required": true, "description": "EN requires the reviewed 10 kΩ pull-up and 1 µF delay capacitor."},
-        {"id": "esp32.boot_pullup", "family": "resistor", "role": "boot_pullup", "required": true, "description": "GPIO0 requires a normal-boot pull-up and a controlled download-mode path."},
-        {"id": "esp32.uart_programming", "family": "connector", "role": "programming_header", "required": true, "description": "Expose 3.3 V, GND, U0RXD, and U0TXD for firmware loading."}
+        {"id": "esp32.power_bypass", "family": "capacitor", "role": "decoupling_capacitor", "required": true, "recipes": [{"id": "power_bypass", "family": "capacitor", "role": "decoupling_capacitor", "package": "0603", "value_kind": "capacitance", "value": "100n", "min_voltage_v": 6.3, "minimum_confidence": "rule_inferred", "required_functions": ["A", "B"], "connections": [{"function": "A", "parent_function": "VDD"}, {"function": "B", "parent_function": "GND"}]}], "description": "Place local high-frequency bypass capacitance at module pin 2."},
+        {"id": "esp32.power_bulk", "family": "capacitor", "role": "bulk_capacitor", "required": true, "recipes": [{"id": "power_bulk", "family": "capacitor", "role": "bulk_capacitor", "package": "0805", "value_kind": "capacitance", "value": "10u", "min_voltage_v": 6.3, "minimum_confidence": "rule_inferred", "required_functions": ["A", "B"], "connections": [{"function": "A", "parent_function": "VDD"}, {"function": "B", "parent_function": "GND"}]}], "description": "Provide local bulk energy storage for radio current transients."},
+        {"id": "esp32.enable_rc", "family": "resistor", "role": "enable_pullup", "required": true, "recipes": [{"id": "enable_pullup", "family": "resistor", "role": "pullup", "package": "0603", "value_kind": "resistance", "value": "10k", "minimum_confidence": "rule_inferred", "required_functions": ["A", "B"], "connections": [{"function": "A", "parent_function": "VDD"}, {"function": "B", "parent_function": "EN"}]}, {"id": "enable_delay", "family": "capacitor", "role": "capacitor", "package": "0603", "value_kind": "capacitance", "value": "1u", "min_voltage_v": 6.3, "minimum_confidence": "rule_inferred", "required_functions": ["A", "B"], "connections": [{"function": "A", "parent_function": "EN"}, {"function": "B", "parent_function": "GND"}]}], "description": "EN requires the reviewed 10 kΩ pull-up and 1 µF delay capacitor."},
+        {"id": "esp32.boot_pullup", "family": "resistor", "role": "boot_pullup", "required": true, "recipes": [{"id": "boot_pullup", "family": "resistor", "role": "pullup", "package": "0603", "value_kind": "resistance", "value": "10k", "minimum_confidence": "rule_inferred", "required_functions": ["A", "B"], "connections": [{"function": "A", "parent_function": "VDD"}, {"function": "B", "parent_function": "GPIO0"}]}], "description": "GPIO0 requires a normal-boot pull-up and a controlled download-mode path."},
+        {"id": "esp32.uart_programming", "family": "connector", "role": "programming_header", "required": true, "recipes": [{"id": "uart_header", "family": "connector", "role": "connector", "package": "pin_header_1x04", "minimum_confidence": "verified", "required_functions": ["PIN_1", "PIN_2", "PIN_3", "PIN_4"], "connections": [{"function": "PIN_1", "parent_function": "VDD"}, {"function": "PIN_2", "parent_function": "GND"}, {"function": "PIN_3", "parent_function": "GPIO1"}, {"function": "PIN_4", "parent_function": "GPIO3"}]}], "description": "Expose 3.3 V, GND, U0RXD, and U0TXD for firmware loading."}
       ],
       "selection_rules": [
         {"kind": "fixed_peripheral_map", "expression": "I2C_SDA=GPIO21;I2C_SCL=GPIO22;SPI_MOSI=GPIO23;SPI_MISO=GPIO19;SPI_SCK=GPIO18;GPIO=GPIO17", "description": "Deterministic default roles use non-flash pins and avoid boot straps."},
@@ -674,6 +674,7 @@
         "dimensions_mm": {"width": 18.0, "height": 25.5},
         "height_mm": 3.1,
         "constraints": [
+          {"kind": "placement_envelope", "value": "48.5x41.54", "unit": "mm", "description": "KiCad F.CrtYd envelope including the PCB-antenna exclusion, verified from RF_Module:ESP32-WROOM-32E."},
           {"kind": "antenna_keepout", "value": "48x21.44", "unit": "mm", "description": "KiCad footprint and block realization preserve the Espressif base-board antenna exclusion."},
           {"kind": "board_edge", "description": "PCB antenna faces an unobstructed board edge."}
         ],
@@ -707,9 +708,9 @@
       "tags": ["mcu", "avr", "tqfp32", "minimal_system"],
       "ratings": [{"kind": "supply_voltage", "min": "1.8", "max": "5.5", "unit": "V"}],
       "companions": [
-        {"id": "mcu.decoupling_vcc", "family": "capacitor", "role": "decoupling_capacitor", "required": true, "description": "Place decoupling capacitors near VCC/AVCC and GND pins."},
-        {"id": "mcu.reset_pullup", "family": "resistor", "role": "reset_pullup", "required": true, "description": "RESET requires a pull-up unless held by another verified circuit."},
-        {"id": "mcu.programming_header", "family": "connector", "role": "programming_header", "required": true, "description": "Expose SPI programming pins and reset for firmware loading."}
+        {"id": "mcu.decoupling_vcc", "family": "capacitor", "role": "decoupling_capacitor", "required": true, "recipes": [{"id": "vcc_bypass", "family": "capacitor", "role": "decoupling_capacitor", "package": "0603", "value_kind": "capacitance", "value": "100n", "min_voltage_v": 6.3, "minimum_confidence": "rule_inferred", "required_functions": ["A", "B"], "connections": [{"function": "A", "parent_function": "VCC"}, {"function": "B", "parent_function": "GND"}]}, {"id": "avcc_bypass", "family": "capacitor", "role": "decoupling_capacitor", "package": "0603", "value_kind": "capacitance", "value": "100n", "min_voltage_v": 6.3, "minimum_confidence": "rule_inferred", "required_functions": ["A", "B"], "connections": [{"function": "A", "parent_function": "AVCC"}, {"function": "B", "parent_function": "AGND"}]}], "description": "Place decoupling capacitors near VCC/AVCC and GND pins."},
+        {"id": "mcu.reset_pullup", "family": "resistor", "role": "reset_pullup", "required": true, "recipes": [{"id": "reset_pullup", "family": "resistor", "role": "pullup", "package": "0603", "value_kind": "resistance", "value": "10k", "minimum_confidence": "rule_inferred", "required_functions": ["A", "B"], "connections": [{"function": "A", "parent_function": "VCC"}, {"function": "B", "parent_function": "RESET"}]}], "description": "RESET requires a pull-up unless held by another verified circuit."},
+        {"id": "mcu.programming_header", "family": "connector", "role": "programming_header", "required": true, "recipes": [{"id": "isp_header", "family": "connector", "role": "connector", "package": "pin_header_1x06", "minimum_confidence": "verified", "required_functions": ["PIN_1", "PIN_2", "PIN_3", "PIN_4", "PIN_5", "PIN_6"], "connections": [{"function": "PIN_1", "parent_function": "MISO"}, {"function": "PIN_2", "parent_function": "VCC"}, {"function": "PIN_3", "parent_function": "SCK"}, {"function": "PIN_4", "parent_function": "MOSI"}, {"function": "PIN_5", "parent_function": "RESET"}, {"function": "PIN_6", "parent_function": "GND"}]}], "description": "Expose SPI programming pins and reset for firmware loading."}
       ],
       "symbols": [{
         "symbol_id": "MCU_Microchip_ATmega:ATmega328P-A",
@@ -857,9 +858,9 @@
       "tags": ["usb_c", "power_only", "receptacle", "6pin"],
       "ratings": [{"kind": "voltage", "max": "20", "unit": "V"}, {"kind": "current", "max": "3", "unit": "A"}],
       "companions": [
-        {"id": "usb_c.cc1_rd", "family": "resistor", "role": "cc_pull_down", "required": true, "description": "Power sink mode requires Rd pull-down on CC1."},
-        {"id": "usb_c.cc2_rd", "family": "resistor", "role": "cc_pull_down", "required": true, "description": "Power sink mode requires Rd pull-down on CC2."},
-        {"id": "usb_c.esd", "family": "protection", "role": "esd_protection", "required": false, "description": "Add ESD protection for exposed connector pins when required by product environment."}
+        {"id": "usb_c.cc1_rd", "family": "resistor", "role": "cc_pull_down", "required": true, "recipes": [{"id": "cc1_rd", "family": "resistor", "role": "resistor", "package": "0603", "value_kind": "resistance", "value": "5.1k", "minimum_confidence": "rule_inferred", "required_functions": ["A", "B"], "connections": [{"function": "A", "parent_function": "CC1"}, {"function": "B", "parent_function": "GND"}]}], "description": "Power sink mode requires Rd pull-down on CC1."},
+        {"id": "usb_c.cc2_rd", "family": "resistor", "role": "cc_pull_down", "required": true, "recipes": [{"id": "cc2_rd", "family": "resistor", "role": "resistor", "package": "0603", "value_kind": "resistance", "value": "5.1k", "minimum_confidence": "rule_inferred", "required_functions": ["A", "B"], "connections": [{"function": "A", "parent_function": "CC2"}, {"function": "B", "parent_function": "GND"}]}], "description": "Power sink mode requires Rd pull-down on CC2."},
+        {"id": "usb_c.esd", "family": "protection", "role": "esd_protection", "required": false, "recipes": [{"id": "vbus_esd", "family": "protection", "role": "protection", "package": "sod_323", "minimum_confidence": "verified", "required_functions": ["ANODE", "CATHODE"], "connections": [{"function": "CATHODE", "parent_function": "VBUS"}, {"function": "ANODE", "parent_function": "GND"}]}], "description": "Add ESD protection for exposed connector pins when required by product environment."}
       ],
       "symbols": [{
         "symbol_id": "Connector:USB_C_Receptacle_PowerOnly_6P",

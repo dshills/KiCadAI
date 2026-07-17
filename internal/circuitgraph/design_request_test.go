@@ -25,6 +25,9 @@ func TestToDesignRequestCheckedInExamples(t *testing.T) {
 			if request.ExplicitCircuit == nil || len(request.Blocks) != 0 {
 				t.Fatalf("request mode = %#v", request)
 			}
+			if request.ExplicitCircuit.RoutingPolicy != "" {
+				t.Fatalf("explicit graph unexpectedly opted into synthesized routing policy %q", request.ExplicitCircuit.RoutingPolicy)
+			}
 			if len(request.ExplicitCircuit.Components) != len(resolved.Components) || len(request.ExplicitCircuit.Nets) != len(resolved.Nets) {
 				t.Fatalf("explicit counts = components %d nets %d", len(request.ExplicitCircuit.Components), len(request.ExplicitCircuit.Nets))
 			}

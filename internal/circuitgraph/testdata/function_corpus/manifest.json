@@ -1,0 +1,16 @@
+{
+  "schema": "kicadai.function-corpus.v1",
+  "version": 1,
+  "frozen_at": "2026-07-17",
+  "policy_version": "function-synthesis-policy-v1",
+  "fixtures": [
+    {"id": "atmega328p_isp_controller", "file": "atmega328p_isp_controller.json", "domains": ["interface", "mcu"], "sha256": "779670c67ab578d614d1b914ef331a3ff56c48c0b4e252ba2cfb5d4307d3f44b"},
+    {"id": "bme280_i2c_breakout", "file": "bme280_i2c_breakout.json", "domains": ["interface", "sensor"], "sha256": "08869cca459aa14104d626a605463938358780cf3a4354ffb816505c27863a56"},
+    {"id": "buffered_thermistor_frontend", "file": "buffered_thermistor_frontend.json", "domains": ["analog"], "sha256": "258fc19611244479065deed9afcca4c9d07cda71ac477227d86b91c8da802c90"},
+    {"id": "dual_stage_active_lowpass", "file": "dual_stage_active_lowpass.json", "domains": ["analog"], "sha256": "90e5d6c62cd5f1b97e5251339543ff771b34808a0a426d0743c1bb12ec65d026"},
+    {"id": "esp32_sht31_controller", "file": "esp32_sht31_controller.json", "domains": ["interface", "mcu", "sensor"], "sha256": "c0e6754c22aaf13b2618977a7290d3c1661cccf3b01c6e85acbe1e654a10a2b2"},
+    {"id": "npn_low_side_status_driver", "file": "npn_low_side_status_driver.json", "domains": ["transistor"], "sha256": "9c346d9dde88e04de84498952d1a07e74a30149b696bfa34f111e6d37781174e"},
+    {"id": "sht31_i2c_breakout", "file": "sht31_i2c_breakout.json", "domains": ["interface", "sensor"], "sha256": "4b77135705976813f380419540c23e0a953b49e2f78f0e52a5388d3d7998b6f1"},
+    {"id": "usb_c_ap2112_3v3_supply", "file": "usb_c_ap2112_3v3_supply.json", "domains": ["power", "protection"], "sha256": "1fa7558112346bc283798254e12772da1be3df0995151c2caa8e150583b149dc"}
+  ]
+}

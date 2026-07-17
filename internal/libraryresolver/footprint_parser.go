@@ -276,7 +276,7 @@ func readLibraryFootprint(file LibraryFile, node sexpr.ParsedNode, name string) 
 
 func readLibraryPad(path string, node sexpr.ParsedNode) (FootprintPad, []reports.Issue) {
 	var issues []reports.Issue
-	pad := FootprintPad{}
+	pad := FootprintPad{Raw: strings.TrimSpace(node.Raw)}
 	if len(node.Children) < 2 || strings.TrimSpace(node.ListValue(1)) == "" {
 		issues = append(issues, parseIssue(path, "pad without name"))
 	} else {

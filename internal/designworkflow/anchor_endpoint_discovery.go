@@ -62,7 +62,6 @@ func DiscoverPhysicalEndpointsWithOptions(placed PlacementStageResult, opts Phys
 		layer := firstNonEmpty(position.Layer, "F.Cu")
 		padNameCounts := componentPadNameCounts(component.Pads)
 		padNameOccurrences := map[string]int{}
-		reportedDuplicatePadWarning := map[string]struct{}{}
 		if edgeFacingComponent(component.Edge) && (frame.WidthMM <= 0 || frame.HeightMM <= 0) {
 			issues = append(issues, reports.Issue{
 				Code:     reports.CodeInvalidArgument,
@@ -113,12 +112,6 @@ func DiscoverPhysicalEndpointsWithOptions(placed PlacementStageResult, opts Phys
 				seenEndpointIDs[endpoint.ID] = struct{}{}
 			}
 			endpoints = append(endpoints, endpoint)
-			if padNameCounts[padName] > 1 {
-				if _, reported := reportedDuplicatePadWarning[padName]; reported {
-					continue
-				}
-				reportedDuplicatePadWarning[padName] = struct{}{}
-			}
 			derived, deriveIssue, ok := derivedBoardEdgeEndpoint(component, endpoint, padNameCounts[padName], frame, edgeThresholdMM)
 			if deriveIssue != nil {
 				issues = append(issues, *deriveIssue)
@@ -267,16 +260,6 @@ func derivedBoardEdgeEndpoint(component placement.Component, padEndpoint Physica
 	if !edgeFacingComponent(component.Edge) || padEndpoint.Point == nil || frame.WidthMM <= 0 || frame.HeightMM <= 0 {
 		return PhysicalEndpoint{}, nil, false
 	}
-	if padNameCount > 1 {
-		issue := reports.Issue{
-			Code:     reports.CodeInvalidArgument,
-			Severity: reports.SeverityWarning,
-			Path:     "anchor_bindings.endpoints." + padEndpoint.Ref + "." + padEndpoint.Pad + ".edge",
-			Message:  "derived board-edge endpoint skipped for duplicate pad name without durable pad discriminator",
-			Refs:     []string{padEndpoint.Ref},
-		}
-		return PhysicalEndpoint{}, &issue, false
-	}
 	boardPoint := frame.toBoardRelative(placement.Point{XMM: padEndpoint.Point.XMM, YMM: padEndpoint.Point.YMM})
 	edge, distance, ok := nearestBoardEdge(boardPoint, frame, component.Edge)
 	if !ok || distance > thresholdMM+anchorBindingGeometryEpsilonMM {
@@ -284,8 +267,12 @@ func derivedBoardEdgeEndpoint(component placement.Component, padEndpoint Physica
 	}
 	projected := projectPointToBoardEdge(boardPoint, frame, edge)
 	globalProjected := frame.toGlobal(projected)
+	discriminator := ""
+	if padNameCount > 1 {
+		discriminator = padEndpoint.ID
+	}
 	endpoint := PhysicalEndpoint{
-		ID:         derivedBoardEdgeEndpointID(padEndpoint.Ref, padEndpoint.Pad, ""),
+		ID:         derivedBoardEdgeEndpointID(padEndpoint.Ref, padEndpoint.Pad, discriminator),
 		Kind:       PhysicalEndpointBoardEdgePoint,
 		Ref:        padEndpoint.Ref,
 		Pad:        padEndpoint.Pad,

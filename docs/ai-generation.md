@@ -10,9 +10,13 @@ provider never emits KiCad S-expressions or route geometry directly.
 KiCadAI exposes two provider contracts:
 
 1. Bounded automatic profiles selected from prompt semantics.
-2. Explicit `generic-circuit-v1`, where the provider emits a strict circuit
-   graph and KiCadAI resolves every component, function, pin, pad, symbol, and
-   footprint against the trusted catalog.
+2. `generic-circuit-v1`, where the provider emits either a strict explicit
+   circuit graph or strict function-level intent. In the function form the
+   provider supplies functions, named interfaces, operating domains, semantic
+   connectivity, and bounded constraints—not pins, support parts, coordinates,
+   layers, or routes. KiCadAI deterministically synthesizes the explicit graph
+   and resolves every component, function, pin, pad, symbol, and footprint
+   against trusted catalog and library evidence.
 
 The two bounded production references remain:
 
@@ -44,7 +48,7 @@ successful fixtures as arbitrary-circuit support.
 
 | Path | Input contract | Current boundary |
 | --- | --- | --- |
-| `generic-circuit-v1` | `kicadai.circuit-graph.v1` | Catalog-resolved components and explicit graph/layout intent. Ambiguous resolution, unsupported functions, and incomplete intent fail closed. |
+| `generic-circuit-v1` | `kicadai.circuit-graph.v1` explicit graph or function intent | Catalog-resolved explicit topology, or deterministic lowering from functions/interfaces/domains/constraints. Ambiguous resolution, missing support or unused-pin policy, unsupported functions, and incomplete intent fail closed. |
 | `usb_c_bmp280` | `kicadai_bmp280_intent_v1` | Bounded USB-C BMP280 reference composition. |
 | `usb_c_led_protected` | `kicadai_usb_c_led_intent_v1` | Bounded protected USB-C LED reference composition. |
 
@@ -61,6 +65,17 @@ schematic/electrical checks, deterministic placement, routing, project writing,
 and writer correctness. An unknown catalog component is rejected before a
 project is written. KiCad ERC/DRC promotion remains separately optional and
 environment-gated.
+
+A second frozen, held-out corpus exercises function-level synthesis without
+provider-supplied pins, support components, coordinates, layers, or routes. Its
+eight circuits cover analog front ends and repeated active filters, a protected
+USB-C/AP2112 supply, a transistor load driver, SHT31 and BME280 breakouts, an
+ATmega328P ISP controller, and an ESP32/SHT31 controller. Every circuit has a
+clean optional KiCad-backed promotion through strict ERC/DRC, complete routing
+and connectivity, writer correctness, zero schematic/PCB round-trip
+differences, and byte-identical replay. The hashes, selected components,
+unused-pin decisions, derived constraints, and gate results are recorded in the
+[function-level capability report](../specs/function-level-circuit-synthesis/CAPABILITY_REPORT.json).
 
 Generic circuit graphs express schematic lanes explicitly. `power`, `signals`,
 and `ground` are fixed to `top`, `middle`, and `bottom`. Provider output must set
@@ -636,14 +651,16 @@ the reproducibility boundary.
 
 ## Current Limits
 
-The generic graph removes the architectural requirement for one provider
-schema per topology; it does not make every circuit routable or electrically
-proven. V1 is limited to catalog-resolvable parts and functions, flat graph
-topology, bounded relative layout intent, deterministic placement, and the
-current explicit-circuit router. The promoted generic fixtures prove six
-specific topology classes: RC filter, protected USB-C LED, protected USB-C
-BMP280, single-stage LMV321, dual LMV321, and multi-unit LM358. They do not
-prove arbitrary electronics. Dense boards, arbitrary hierarchy, analog
+The generic contract removes the architectural requirement for one provider
+schema per topology and its function form removes the requirement for the AI to
+enumerate pins, support components, or physical implementation details. It does
+not make every circuit routable or electrically proven. V1 is limited to
+catalog-resolvable parts, functions, and reviewed companion/unused-pin policy;
+flat synthesized topology; bounded physical constraints; deterministic
+placement; and the current explicit-circuit router. Six promoted explicit
+topology classes and eight held-out function-level circuits now pass. This is
+meaningful breadth evidence, not proof of arbitrary electronics. Dense boards,
+arbitrary hierarchy, high-speed and RF constraints, comprehensive analog
 performance, thermal/safe-operating-area analysis, safety isolation, and
 fabrication release still require additional evidence.
 

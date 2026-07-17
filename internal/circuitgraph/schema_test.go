@@ -55,17 +55,19 @@ func assertStrictGraphSchema(t *testing.T, path string, node any) {
 }
 
 func TestProviderGraphSchemaTopLevelMatchesDocument(t *testing.T) {
-	properties := ProviderGraphSchema()["properties"].(map[string]any)
 	fields := jsonFieldNames(reflect.TypeOf(Document{}))
-	for name := range properties {
-		if !fields[name] {
-			t.Fatalf("schema property %q has no Document field", name)
+	for branchName, branch := range providerGraphSchemaBranches(t) {
+		properties := branch["properties"].(map[string]any)
+		for name := range properties {
+			if !fields[name] {
+				t.Fatalf("%s schema property %q has no Document field", branchName, name)
+			}
 		}
 	}
 }
 
 func TestProviderGraphSchemaTransientTrustBoundary(t *testing.T) {
-	properties := ProviderGraphSchema()["properties"].(map[string]any)
+	properties := providerGraphSchemaBranches(t)["explicit"]["properties"].(map[string]any)
 	nullableSimulation := properties["simulation"].(map[string]any)
 	var simulation map[string]any
 	for _, option := range nullableSimulation["anyOf"].([]any) {
@@ -109,7 +111,7 @@ func TestProviderGraphSchemaTransientTrustBoundary(t *testing.T) {
 }
 
 func TestProviderGraphSchemaConstrainsSchematicTransforms(t *testing.T) {
-	schema := ProviderGraphSchema()
+	schema := providerGraphSchemaBranches(t)["explicit"]
 	placements := schema["properties"].(map[string]any)["schematic"].(map[string]any)["properties"].(map[string]any)["placements"].(map[string]any)
 	properties := placements["items"].(map[string]any)["properties"].(map[string]any)
 	if got := properties["orientation"].(map[string]any)["enum"]; !reflect.DeepEqual(got, []string{"normal", "rotated_90", "rotated_180", "rotated_270"}) {
@@ -121,7 +123,7 @@ func TestProviderGraphSchemaConstrainsSchematicTransforms(t *testing.T) {
 }
 
 func TestProviderGraphSchemaConstrainsRoutingNetClasses(t *testing.T) {
-	schema := ProviderGraphSchema()
+	schema := providerGraphSchemaBranches(t)["explicit"]
 	nets := schema["properties"].(map[string]any)["nets"].(map[string]any)
 	properties := nets["items"].(map[string]any)["properties"].(map[string]any)
 	if got := properties["net_class"].(map[string]any)["enum"]; !reflect.DeepEqual(got, []string{"", "signal", "clock", "power", "ground"}) {
@@ -130,7 +132,7 @@ func TestProviderGraphSchemaConstrainsRoutingNetClasses(t *testing.T) {
 }
 
 func TestProviderGraphSchemaConstrainsPowerFlags(t *testing.T) {
-	schema := ProviderGraphSchema()
+	schema := providerGraphSchemaBranches(t)["explicit"]
 	flags := schema["properties"].(map[string]any)["power_flags"].(map[string]any)
 	if got := flags["maxItems"]; got != MaxPowerFlags {
 		t.Fatalf("power flag maxItems = %#v, want %d", got, MaxPowerFlags)
@@ -142,7 +144,7 @@ func TestProviderGraphSchemaConstrainsPowerFlags(t *testing.T) {
 }
 
 func TestProviderGraphSchemaRequiresUsableBoardAndPCBLayout(t *testing.T) {
-	properties := ProviderGraphSchema()["properties"].(map[string]any)
+	properties := providerGraphSchemaBranches(t)["explicit"]["properties"].(map[string]any)
 	project := properties["project"].(map[string]any)["properties"].(map[string]any)
 	board := project["board"].(map[string]any)["properties"].(map[string]any)
 	for _, field := range []string{"width_mm", "height_mm"} {
@@ -159,6 +161,55 @@ func TestProviderGraphSchemaRequiresUsableBoardAndPCBLayout(t *testing.T) {
 	if regionBounds["width_mm"].(map[string]any)["exclusiveMinimum"] != 0 || regionBounds["x_mm"].(map[string]any)["minimum"] != 0 {
 		t.Fatalf("region bounds constraints = %#v", regionBounds)
 	}
+}
+
+func TestProviderGraphSchemaFunctionFormExcludesImplementationDetails(t *testing.T) {
+	properties := providerGraphSchemaBranches(t)["function"]["properties"].(map[string]any)
+	if _, exists := properties["synthesis"]; !exists {
+		t.Fatal("function schema lacks synthesis intent")
+	}
+	synthesis := properties["synthesis"].(map[string]any)["properties"].(map[string]any)
+	interfaceItem := synthesis["interfaces"].(map[string]any)["items"].(map[string]any)
+	signals := interfaceItem["properties"].(map[string]any)["signals"].(map[string]any)
+	if signals["maxItems"] != MaxFunctionInterfaceSignals {
+		t.Fatalf("function interface signal limit = %#v", signals["maxItems"])
+	}
+	for _, forbidden := range []string{"components", "nets", "no_connects", "power_flags", "buses", "schematic", "pcb", "simulation"} {
+		if _, exists := properties[forbidden]; exists {
+			t.Fatalf("function schema exposes explicit graph field %q", forbidden)
+		}
+	}
+	encoded, err := json.Marshal(properties["synthesis"])
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, forbidden := range []string{"symbol_pin", "footprint", "pad", "x_mm", "y_mm", "layers", "routes", "block_id"} {
+		if strings.Contains(string(encoded), forbidden) {
+			t.Fatalf("function schema exposes implementation detail %q", forbidden)
+		}
+	}
+}
+
+func providerGraphSchemaBranches(t *testing.T) map[string]map[string]any {
+	t.Helper()
+	result := map[string]map[string]any{}
+	branches, ok := ProviderGraphSchema()["oneOf"].([]any)
+	if !ok || len(branches) != 2 {
+		t.Fatalf("provider graph schema branches = %#v", ProviderGraphSchema()["oneOf"])
+	}
+	for _, raw := range branches {
+		branch := raw.(map[string]any)
+		properties := branch["properties"].(map[string]any)
+		name := "explicit"
+		if _, exists := properties["synthesis"]; exists {
+			name = "function"
+		}
+		result[name] = branch
+	}
+	if result["explicit"] == nil || result["function"] == nil {
+		t.Fatalf("provider graph schema branches are incomplete: %#v", result)
+	}
+	return result
 }
 
 func jsonFieldNames(typ reflect.Type) map[string]bool {

@@ -19,6 +19,7 @@ func footprintRecordPadSpecs(record libraryresolver.FootprintRecord, placementLa
 	pads := make([]designapi.PadSpec, 0, len(record.Pads))
 	for _, pad := range record.Pads {
 		pads = append(pads, designapi.PadSpec{
+			Raw:      pad.Raw,
 			Name:     pad.Name,
 			Type:     pad.Type,
 			Shape:    pad.Shape,
@@ -202,6 +203,7 @@ func importedPadsFromRecord(generator kicadfiles.IDGenerator, ref string, record
 	pads := make([]pcb.Pad, 0, len(record.Pads))
 	for i, pad := range record.Pads {
 		pads = append(pads, pcb.Pad{
+			Raw:         strings.TrimSpace(pad.Raw),
 			UUID:        generator.New("imported.pcb.footprint.pad", ref, pad.Name, strconv.Itoa(i)),
 			Name:        pad.Name,
 			Type:        pad.Type,

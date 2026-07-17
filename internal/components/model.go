@@ -221,12 +221,42 @@ type PhysicalConstraint struct {
 }
 
 type CompanionRequirement struct {
-	ID          string   `json:"id"`
-	Family      string   `json:"family,omitempty"`
-	Role        string   `json:"role"`
-	Required    bool     `json:"required"`
-	AppliesTo   []string `json:"applies_to,omitempty"`
-	Description string   `json:"description,omitempty"`
+	ID          string                `json:"id"`
+	Family      string                `json:"family,omitempty"`
+	Role        string                `json:"role"`
+	Required    bool                  `json:"required"`
+	AppliesTo   []string              `json:"applies_to,omitempty"`
+	Recipes     []CompanionPartRecipe `json:"recipes,omitempty"`
+	Ties        []CompanionTie        `json:"ties,omitempty"`
+	NoConnects  []string              `json:"no_connects,omitempty"`
+	Description string                `json:"description,omitempty"`
+}
+
+// CompanionPartRecipe describes one generic catalog-selected support
+// component relative to semantic functions on its parent component. It has no
+// fixture identity, KiCad pin/pad, coordinate, route, or executable field.
+type CompanionPartRecipe struct {
+	ID                string                `json:"id"`
+	Family            string                `json:"family"`
+	Role              domain.ComponentRole  `json:"role"`
+	Package           string                `json:"package,omitempty"`
+	ValueKind         string                `json:"value_kind,omitempty"`
+	Value             string                `json:"value,omitempty"`
+	MinVoltageV       float64               `json:"min_voltage_v,omitempty"`
+	MinimumConfidence ConfidenceLevel       `json:"minimum_confidence,omitempty"`
+	RequiredFunctions []string              `json:"required_functions,omitempty"`
+	Connections       []CompanionConnection `json:"connections"`
+}
+
+type CompanionConnection struct {
+	Function       string `json:"function"`
+	ParentFunction string `json:"parent_function"`
+}
+
+type CompanionTie struct {
+	Function       string `json:"function"`
+	Level          string `json:"level"`
+	ParentFunction string `json:"parent_function,omitempty"`
 }
 
 type DeratingRule struct {
@@ -297,12 +327,14 @@ type SensorI2CAddress struct {
 	Address        string `json:"address"`
 	SelectFunction string `json:"select_function,omitempty"`
 	Level          string `json:"level,omitempty"`
+	ParentFunction string `json:"parent_function,omitempty"`
 	Default        bool   `json:"default,omitempty"`
 }
 
 type SensorPinConnection struct {
-	Function string `json:"function"`
-	Level    string `json:"level"`
+	Function       string `json:"function"`
+	Level          string `json:"level"`
+	ParentFunction string `json:"parent_function,omitempty"`
 }
 
 type SensorUnusedPinPolicy struct {

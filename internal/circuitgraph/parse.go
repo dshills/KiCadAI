@@ -88,6 +88,9 @@ func decodeDocumentStrict(reader io.Reader) (Document, []reports.Issue) {
 
 func Normalize(document Document) Document {
 	normalized := cloneDocument(document)
+	if normalized.Synthesis != nil {
+		normalizeFunctionIntent(normalized.Synthesis)
+	}
 	if normalized.Simulation != nil {
 		slices.SortStableFunc(normalized.Simulation.Bindings, func(left, right simmodel.Binding) int {
 			return strings.Compare(left.Role, right.Role)
@@ -235,6 +238,10 @@ func canonicalUnitID(value string) string {
 
 func cloneDocument(document Document) Document {
 	cloned := document
+	if document.Synthesis != nil {
+		synthesis := cloneFunctionIntent(*document.Synthesis)
+		cloned.Synthesis = &synthesis
+	}
 	if document.Simulation != nil {
 		simulation := *document.Simulation
 		simulation.Bindings = append([]simmodel.Binding(nil), document.Simulation.Bindings...)

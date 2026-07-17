@@ -41,6 +41,9 @@ func ToDesignRequest(resolved ResolvedDocument) (designworkflow.Request, []repor
 		Components:    make([]designworkflow.ExplicitComponentSpec, 0, len(resolved.Components)),
 		Nets:          make([]designworkflow.ExplicitNetSpec, 0, len(resolved.Nets)),
 	}
+	if resolved.Synthesis != nil {
+		explicit.RoutingPolicy = designworkflow.ExplicitRoutingPolicyConstrainedEndpointAccessV1
+	}
 	if resolved.Simulation != nil {
 		simulation := simmodel.ClonePlan(*resolved.Simulation)
 		explicit.Simulation = &simulation

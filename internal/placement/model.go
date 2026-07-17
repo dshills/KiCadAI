@@ -91,7 +91,10 @@ type Request struct {
 	Rules          Rules
 	Existing       ExistingPlacementPolicy
 	Seed           string
+	ComponentOrder string
 }
+
+const ComponentOrderLargestFootprintFirstV1 = "largest_footprint_first_v1"
 
 type BoardPlacementArea struct {
 	WidthMM  float64

@@ -29,8 +29,8 @@
       }],
       "temperature": {"min": "-40", "max": "85", "unit": "C"},
       "companions": [
-        {"id": "regulator.input_capacitor", "family": "capacitor", "role": "input_capacitor", "required": true, "description": "Input bypass capacitor placed near VIN and GND."},
-        {"id": "regulator.output_capacitor", "family": "capacitor", "role": "output_capacitor", "required": true, "description": "Output capacitor, typically 10uF to 22uF with ESR in the datasheet stability range, required for regulator stability and transient response."}
+        {"id": "regulator.input_capacitor", "family": "capacitor", "role": "input_capacitor", "required": true, "recipes": [{"id": "input_bypass", "family": "capacitor", "role": "decoupling_capacitor", "package": "0805", "value_kind": "capacitance", "value": "10u", "min_voltage_v": 16, "minimum_confidence": "rule_inferred", "required_functions": ["A", "B"], "connections": [{"function": "A", "parent_function": "VIN"}, {"function": "B", "parent_function": "GND"}]}], "description": "Input bypass capacitor placed near VIN and GND."},
+        {"id": "regulator.output_capacitor", "family": "capacitor", "role": "output_capacitor", "required": true, "recipes": [{"id": "output_stability", "family": "capacitor", "role": "bulk_capacitor", "package": "0805", "value_kind": "capacitance", "value": "10u", "min_voltage_v": 6.3, "minimum_confidence": "rule_inferred", "required_functions": ["A", "B"], "connections": [{"function": "A", "parent_function": "VOUT"}, {"function": "B", "parent_function": "GND"}]}], "description": "Output capacitor, typically 10uF to 22uF with ESR in the datasheet stability range, required for regulator stability and transient response."}
       ],
       "derating_rules": [
         {"kind": "thermal", "description": "Check package dissipation for VIN-VOUT drop and requested load current before fabrication."}
@@ -115,8 +115,8 @@
       }],
       "temperature": {"min": "-40", "max": "85", "unit": "C"},
       "companions": [
-        {"id": "regulator.input_capacitor", "family": "capacitor", "role": "input_capacitor", "required": true, "description": "Input bypass capacitor placed near VIN and GND."},
-        {"id": "regulator.output_capacitor", "family": "capacitor", "role": "output_capacitor", "required": true, "description": "Output capacitor selected against AP2112 stability and ceramic derating requirements."}
+        {"id": "regulator.input_capacitor", "family": "capacitor", "role": "input_capacitor", "required": true, "recipes": [{"id": "input_bypass", "family": "capacitor", "role": "decoupling_capacitor", "package": "0603", "value_kind": "capacitance", "value": "1u", "min_voltage_v": 6.3, "minimum_confidence": "rule_inferred", "required_functions": ["A", "B"], "connections": [{"function": "A", "parent_function": "VIN"}, {"function": "B", "parent_function": "GND"}]}], "description": "Input bypass capacitor placed near VIN and GND."},
+        {"id": "regulator.output_capacitor", "family": "capacitor", "role": "output_capacitor", "required": true, "recipes": [{"id": "output_stability", "family": "capacitor", "role": "decoupling_capacitor", "package": "0603", "value_kind": "capacitance", "value": "1u", "min_voltage_v": 6.3, "minimum_confidence": "rule_inferred", "required_functions": ["A", "B"], "connections": [{"function": "A", "parent_function": "VOUT"}, {"function": "B", "parent_function": "GND"}]}], "description": "Output capacitor selected against AP2112 stability and ceramic derating requirements."}
       ],
       "derating_rules": [
         {"kind": "thermal", "description": "Use power_dissipation_max for conservative free-air SOT-23-5 screening until package/copper thermal metadata is modeled."},

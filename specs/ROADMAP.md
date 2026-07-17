@@ -114,6 +114,16 @@ from validation feedback to safe automatic repair.
   attempt 2 with clean KiCad ERC/DRC, writer correctness, and normalized
   round-trip evidence; the existing provider-backed promotion suite remains
   in a passing state.
+- Function-level synthesis for `generic-circuit-v1`: strict function,
+  interface, operating-domain, semantic-connectivity, and bounded-constraint
+  intent lowers deterministically to the explicit graph without provider pins,
+  support components, coordinates, layers, or routes. Catalog companion recipes
+  and unused-pin policy supply reviewed implementation detail. A frozen
+  eight-circuit held-out corpus spanning analog, power/protection, transistor,
+  sensor/interface, ATmega328P, and ESP32/SHT31 designs passes clean KiCad ERC,
+  strict DRC, routing/connectivity, writer correctness, zero round-trip diffs,
+  and byte-identical replay; authoritative hashes are published in
+  `specs/function-level-circuit-synthesis/CAPABILITY_REPORT.json`.
 - Agent-facing generic graph repair loop: capability discovery, strict direct
   graph preflight, constrained typed patching, deterministic re-preflight, and
   provider-free project creation. The patch contract is fail-closed, preserves

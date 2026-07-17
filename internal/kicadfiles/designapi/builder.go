@@ -193,6 +193,7 @@ type PlaceFootprintOptions struct {
 }
 
 type PadSpec struct {
+	Raw      string
 	Name     string
 	Type     string
 	Offset   kicadfiles.Point
@@ -420,6 +421,7 @@ func (builder *Builder) AddSymbol(options SymbolOptions) (SymbolHandle, error) {
 	pins := make(map[string]kicadfiles.Point, len(pinSpecs))
 	pinNets := make(map[string]string, len(pinSpecs))
 	pinOrder := make([]string, 0, len(pinSpecs))
+	serializedPins := make(map[string]struct{}, len(pinSpecs))
 	for _, pin := range pinSpecs {
 		number := strings.TrimSpace(pin.Number)
 		if number == "" {
@@ -432,11 +434,22 @@ func (builder *Builder) AddSymbol(options SymbolOptions) (SymbolHandle, error) {
 		pins[number] = anchor
 		builder.schematicPinAnchors[anchor] = struct{}{}
 		pinOrder = append(pinOrder, number)
-		symbol.PinAnchors = append(symbol.PinAnchors, anchor)
-		symbol.Pins = append(symbol.Pins, schematic.SymbolPin{
-			Number: number,
-			UUID:   builder.generator.New("root.schematic.symbol.pin", generationKey, number),
-		})
+		serializedNumber := number
+		if resolverOwned {
+			if record, ok := libraryresolver.ResolveSymbolPtr(builder.libraryIndex, libraryID); ok {
+				if canonical, found := libraryresolver.CanonicalSymbolPinNumber(record, unit, number); found {
+					serializedNumber = canonical
+				}
+			}
+		}
+		if _, emitted := serializedPins[serializedNumber]; !emitted {
+			serializedPins[serializedNumber] = struct{}{}
+			symbol.PinAnchors = append(symbol.PinAnchors, anchor)
+			symbol.Pins = append(symbol.Pins, schematic.SymbolPin{
+				Number: serializedNumber,
+				UUID:   builder.generator.New("root.schematic.symbol.pin", generationKey, serializedNumber),
+			})
+		}
 	}
 	symbol.Instances = []schematic.SymbolInstance{{
 		Project:   builder.design.Project.Name,
@@ -2408,7 +2421,10 @@ func (builder *Builder) validatePadSpecs(reference string, state *symbolState, p
 	for _, padSpec := range padSpecs {
 		name := strings.TrimSpace(padSpec.Name)
 		if name == "" {
-			return fmt.Errorf("pad name required")
+			if !unnamedNonElectricalPad(padSpec) {
+				return fmt.Errorf("pad name required for electrical or copper pad")
+			}
+			continue
 		}
 		seen[name] = struct{}{}
 		netted := strings.TrimSpace(padSpec.Net) != ""
@@ -2452,24 +2468,13 @@ func symbolPinForPhysicalPad(state *symbolState, pad string) (string, bool) {
 }
 
 func groupedSymbolPinMembers(pin string) []string {
-	pin = strings.TrimSpace(pin)
-	if len(pin) < 3 || pin[0] != '[' || pin[len(pin)-1] != ']' {
-		return []string{pin}
-	}
-	parts := strings.Split(pin[1:len(pin)-1], ",")
-	members := make([]string, 0, len(parts))
-	for _, part := range parts {
-		if part = strings.TrimSpace(part); part != "" {
-			members = append(members, part)
-		}
-	}
-	return members
+	return libraryresolver.GroupedPinMembers(pin)
 }
 
 func (builder *Builder) padFromSpec(reference string, occurrence int, spec PadSpec, defaultType string, footprintLayer kicadfiles.BoardLayer) (pcb.Pad, error) {
 	name := strings.TrimSpace(spec.Name)
-	if name == "" {
-		return pcb.Pad{}, fmt.Errorf("pad name required")
+	if name == "" && !unnamedNonElectricalPad(spec) {
+		return pcb.Pad{}, fmt.Errorf("pad name required for electrical or copper pad")
 	}
 	padType := strings.TrimSpace(spec.Type)
 	if padType == "" {
@@ -2499,6 +2504,7 @@ func (builder *Builder) padFromSpec(reference string, occurrence int, spec PadSp
 		net = builder.nets.EnsureNet(builder.canonicalNet(spec.Net))
 	}
 	return pcb.Pad{
+		Raw:      strings.TrimSpace(spec.Raw),
 		UUID:     builder.generator.New("root.pcb.footprint.pad", reference, name, strconv.Itoa(occurrence)),
 		Name:     name,
 		Type:     padType,
@@ -2511,6 +2517,19 @@ func (builder *Builder) padFromSpec(reference string, occurrence int, spec PadSp
 		Drill:    drill,
 		Layers:   append([]kicadfiles.BoardLayer(nil), layers...),
 	}, nil
+}
+
+func unnamedNonElectricalPad(spec PadSpec) bool {
+	if strings.TrimSpace(spec.Name) != "" || strings.TrimSpace(spec.Net) != "" || len(spec.Layers) == 0 {
+		return false
+	}
+	for _, layer := range spec.Layers {
+		name := strings.TrimSpace(string(layer))
+		if name == "*.Cu" || strings.HasSuffix(name, ".Cu") {
+			return false
+		}
+	}
+	return true
 }
 
 func (builder *Builder) footprintProperties(key, reference, value string, placementLayer kicadfiles.BoardLayer, hideDefaultFootprintText bool) []pcb.FootprintProperty {

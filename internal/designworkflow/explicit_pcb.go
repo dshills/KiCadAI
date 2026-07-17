@@ -92,6 +92,9 @@ func PlaceExplicitCircuit(ctx context.Context, request Request, opts PlacementOp
 		})
 	}
 	placementRequest, padEntries, padIssues := hydratePlacementRequestPads(placementRequest, opts.LibraryIndex)
+	if request.ExplicitCircuit.RoutingPolicy == ExplicitRoutingPolicyConstrainedEndpointAccessV1 {
+		placementRequest.ComponentOrder = placement.ComponentOrderLargestFootprintFirstV1
+	}
 	issues = append(issues, padIssues...)
 	placementRequest = placement.NormalizeRequest(placementRequest)
 	result := placement.PlaceContext(ctx, placementRequest)
@@ -122,6 +125,7 @@ func RouteExplicitCircuit(ctx context.Context, request Request, placed Placement
 		return RoutingStageResult{Stage: StageResult{Name: StageRouting, Status: StageStatusSkipped, Summary: map[string]any{"reason": "placement did not complete"}}}
 	}
 	routingRequest, issues := routingadapters.RequestFromPlacement(placed.Request, placed.Result)
+	routingRequest.Strategy.NetOrder = request.ExplicitCircuit.RoutingPolicy
 	routingRequest = expandExplicitPhysicalPadEndpoints(routingRequest)
 	applyRoutingOptions(request, opts, &routingRequest)
 	if routingRequest.Rules.NetOverrides == nil {

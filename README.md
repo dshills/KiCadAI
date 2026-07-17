@@ -21,7 +21,11 @@ path.
   built-in `esp32_wroom_32e_minimal` block, with power conditioning, EN/BOOT
   straps and buttons, UART/I2C/SPI/GPIO headers, and an antenna copper keepout.
 - The provider-backed natural-language lane retains two promoted bounded
-  profiles and now adds an explicit catalog-resolved circuit graph contract.
+  profiles and adds a catalog-resolved circuit graph contract with either an
+  explicit graph or strict function-level intent. Function intent names
+  functions, interfaces, operating domains, and bounded constraints; KiCadAI
+  deterministically supplies verified parts, support networks, unused-pin
+  policy, physical defaults, and routes.
 - Generated `generic-circuit-v1` designs now have a deterministic correction
   loop with at most three placement/routing attempts, protected-invariant
   checks, stable retry evidence, and fail-closed unsupported actions.
@@ -34,6 +38,14 @@ path.
   requires a topology-specific provider schema. The LM358 fixture additionally
   proves one-package, multi-unit schematic lowering with one footprint and BOM
   identity.
+- A frozen held-out function-level corpus adds eight independently authored
+  analog, power/protection, transistor, sensor/interface, ATmega328P, and
+  ESP32/SHT31 circuits. All eight pass deterministic lowering, catalog and
+  KiCad library resolution, support expansion, placement, complete routing,
+  clean ERC and strict DRC, connectivity, writer correctness, zero round-trip
+  differences, and byte-identical replay. The checked-in
+  [capability report](specs/function-level-circuit-synthesis/CAPABILITY_REPORT.json)
+  records the authoritative hashes and per-circuit gates.
 - Arbitrary electronics generation is not yet guaranteed. Generic graphs fail
   closed on unknown parts, pins, ratings, placement, or routing capability.
 - ESP32 support currently covers the exact WROOM-32E-N4 module profile, not the

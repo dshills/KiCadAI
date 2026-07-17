@@ -206,7 +206,7 @@ func validateFootprintPads(board kpcb.PCBFile, path string) []reports.Issue {
 		}
 		for _, pad := range footprint.Pads {
 			padPath := slashPath(path) + ".footprints." + ref + ".pads." + strings.TrimSpace(pad.Name)
-			if strings.TrimSpace(pad.Name) == "" {
+			if strings.TrimSpace(pad.Name) == "" && !kpcb.IsNonElectricalAperturePad(pad) {
 				issues = append(issues, reports.Issue{Code: reports.CodeValidationFailed, Severity: reports.SeverityError, Path: padPath, Message: "PCB pad is missing a name", Refs: []string{ref}})
 			}
 			if pad.Size.X <= 0 || pad.Size.Y <= 0 {

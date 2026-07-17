@@ -1,0 +1,27 @@
+{
+  "schema": "kicadai.circuit-graph.v1",
+  "version": 1,
+  "project": {"name": "atmega328p_isp_controller", "title": "ATmega328P ISP controller", "description": "Minimal catalog-backed ATmega328P controller with power and application interfaces.", "acceptance": "erc-drc"},
+  "synthesis": {
+    "functions": [
+      {"id": "controller", "role": "ic", "query": {"text": "ATmega328P-A TQFP-32", "family": "mcu", "minimum_confidence": "verified"}, "required_functions": ["VCC", "AVCC", "GND", "AGND", "RESET", "MOSI", "MISO", "SCK"], "usage": "microcontroller"}
+    ],
+    "interfaces": [
+      {"id": "power", "role": "power_input", "signals": [{"name": "VCC", "role": "power"}, {"name": "GND", "role": "ground"}]},
+      {"id": "application", "role": "gpio", "signals": [{"name": "GPIO_A", "role": "signal"}, {"name": "GPIO_B", "role": "signal"}, {"name": "VCC", "role": "power"}, {"name": "GND", "role": "ground"}]}
+    ],
+    "power_domains": [
+      {"name": "VCC", "role": "power", "voltage_v": 5, "max_current_ma": 150, "source": "external"},
+      {"name": "GND", "role": "ground", "voltage_v": 0, "source": "external"}
+    ],
+    "connections": [
+      {"name": "VCC", "role": "power", "voltage_domain": "VCC", "endpoints": [{"interface": "power", "signal": "VCC"}, {"interface": "application", "signal": "VCC"}, {"function": "controller", "port": "VCC"}, {"function": "controller", "port": "AVCC"}]},
+      {"name": "GND", "role": "ground", "voltage_domain": "GND", "endpoints": [{"interface": "power", "signal": "GND"}, {"interface": "application", "signal": "GND"}, {"function": "controller", "port": "GND"}, {"function": "controller", "port": "AGND"}]},
+      {"name": "GPIO_A", "role": "signal", "voltage_domain": "VCC", "endpoints": [{"interface": "application", "signal": "GPIO_A"}, {"function": "controller", "port": "GPIO_23"}]},
+      {"name": "GPIO_B", "role": "signal", "voltage_domain": "VCC", "endpoints": [{"interface": "application", "signal": "GPIO_B"}, {"function": "controller", "port": "GPIO_24"}]}
+    ],
+    "constraints": {"max_width_mm": 55, "max_height_mm": 40, "preferred_component_spacing_mm": 1.5}
+  },
+  "policy": {"allow_reference_assignment": true, "allow_value_normalization": true, "allow_layout_inference": true, "allow_spacing_adjustment": true, "allow_label_insertion": true, "allow_placement_adjustment": true, "allow_route_retry": true},
+  "extensions": {}
+}

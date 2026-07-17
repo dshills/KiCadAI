@@ -367,7 +367,7 @@ func validateFootprintText(collection string, index int, text FootprintText) kic
 
 func validatePad(collection string, index int, pad Pad, netCodes map[int]struct{}, netNames map[int]string) kicadfiles.ValidationErrors {
 	var errs kicadfiles.ValidationErrors
-	if strings.TrimSpace(pad.Name) == "" {
+	if strings.TrimSpace(pad.Name) == "" && !IsNonElectricalAperturePad(pad) {
 		errs = append(errs, fieldError(indexed(collection, index, "name"), "required"))
 	}
 	padType := padType(pad)
@@ -408,7 +408,7 @@ func validatePad(collection string, index int, pad Pad, netCodes map[int]struct{
 	if padType == "smd" && pad.Drill > 0 {
 		errs = append(errs, fieldError(indexed(collection, index, "drill"), "not allowed for SMD pads"))
 	}
-	if padType == "smd" && !validSMDPadLayers(pad.Layers) {
+	if padType == "smd" && !validSMDPadLayers(pad.Layers) && !validNonElectricalAperturePadLayers(pad) {
 		errs = append(errs, fieldError(indexed(collection, index, "layers"), "SMD pads require a single copper side with matching mask/paste side"))
 	}
 	if pad.Drill > 0 && !validDrilledPadLayers(pad.Layers) {
@@ -1001,6 +1001,34 @@ func validSMDPadLayers(layers []kicadfiles.BoardLayer) bool {
 		return !hasPadLayerSet(layers, kicadfiles.LayerBMask) && !hasPadLayerSet(layers, kicadfiles.LayerBPaste)
 	}
 	return !hasPadLayerSet(layers, kicadfiles.LayerFMask) && !hasPadLayerSet(layers, kicadfiles.LayerFPaste)
+}
+
+// IsNonElectricalAperturePad reports whether a pad is an unnamed, netless
+// mask/paste-only aperture rather than an electrical copper pad.
+func IsNonElectricalAperturePad(pad Pad) bool {
+	return strings.TrimSpace(pad.Name) == "" && validNonElectricalAperturePadLayers(pad)
+}
+
+func validNonElectricalAperturePadLayers(pad Pad) bool {
+	if pad.NetCode != 0 || strings.TrimSpace(pad.NetName) != "" || len(pad.Layers) == 0 {
+		return false
+	}
+	front := false
+	back := false
+	for _, layer := range pad.Layers {
+		if isCopperLayer(layer) || layer == kicadfiles.LayerAllCu || layer == kicadfiles.LayerAllMask {
+			return false
+		}
+		switch layer {
+		case kicadfiles.LayerFMask, kicadfiles.LayerFPaste:
+			front = true
+		case kicadfiles.LayerBMask, kicadfiles.LayerBPaste:
+			back = true
+		default:
+			return false
+		}
+	}
+	return front != back
 }
 
 func hasAnyMaskLayer(layers []kicadfiles.BoardLayer) bool {

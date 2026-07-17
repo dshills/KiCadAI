@@ -586,7 +586,10 @@
         {"kind": "forward_voltage", "typ": "2.0", "unit": "V"},
         {"kind": "forward_current", "typ": "20", "unit": "mA"}
       ],
-      "ratings": [{"kind": "forward_current", "max": "20", "unit": "mA"}],
+      "ratings": [
+        {"kind": "forward_current", "max": "20", "unit": "mA"},
+        {"kind": "reverse_voltage", "max": "5", "unit": "V"}
+      ],
       "symbols": [{
         "symbol_id": "Device:LED",
         "function_pins": [
@@ -607,7 +610,7 @@
         ],
         "verification": {"confidence": "verified", "sources": ["builtin_pinmap:Device:LED", "curated_part:Lite-On:LTST-C170KRKT"], "pinmap_checked": true}
       }],
-      "verification": {"confidence": "verified", "sources": ["curated_seed_catalog", "curated_part:Lite-On:LTST-C170KRKT", "builtin_pinmap:Device:LED"], "pinmap_checked": true}
+      "verification": {"confidence": "verified", "sources": ["curated_seed_catalog", "curated_part:Lite-On:LTST-C170KRKT", "datasheet:Lite-On:LTST-C170KRKT-5A:DS22-2007-0406", "builtin_pinmap:Device:LED"], "pinmap_checked": true, "notes": ["The official LTST-C170KRKT-5A family datasheet specifies a 5 V absolute-maximum reverse voltage."]}
     },
     {
       "id": "led.liteon.ltst_c190tbkt.0603",

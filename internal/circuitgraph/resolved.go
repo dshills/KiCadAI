@@ -26,6 +26,7 @@ type ResolvedDocument struct {
 	Components     []ResolvedComponent `json:"components"`
 	Nets           []ResolvedNet       `json:"nets"`
 	NoConnects     []ResolvedEndpoint  `json:"no_connects"`
+	Synthesis      *SynthesisReport    `json:"synthesis,omitempty"`
 	Simulation     *simmodel.Plan      `json:"simulation,omitempty"`
 	CatalogID      string              `json:"catalog_id"`
 	CatalogHash    string              `json:"catalog_hash"`

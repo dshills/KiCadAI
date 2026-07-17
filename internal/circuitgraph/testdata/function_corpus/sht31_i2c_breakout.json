@@ -1,0 +1,26 @@
+{
+  "schema": "kicadai.circuit-graph.v1",
+  "version": 1,
+  "project": {"name": "sht31_i2c_breakout", "title": "SHT31 I2C breakout", "description": "Catalog-selected SHT31 environmental sensor with a single host interface.", "acceptance": "erc-drc"},
+  "synthesis": {
+    "functions": [
+      {"id": "sensor", "role": "sensor", "query": {"text": "SHT31-DIS", "family": "sensor", "minimum_confidence": "verified"}, "required_functions": ["VDD", "VSS", "SDA", "SCL", "ADDR", "R"], "usage": "i2c_peripheral", "parameters": [{"name": "i2c_address", "value": "0x44"}]}
+    ],
+    "interfaces": [
+      {"id": "host", "role": "i2c", "signals": [{"name": "VDD", "role": "power"}, {"name": "GND", "role": "ground"}, {"name": "SDA", "role": "signal"}, {"name": "SCL", "role": "signal"}]}
+    ],
+    "power_domains": [
+      {"name": "VDD", "role": "power", "voltage_v": 3.3, "max_current_ma": 20, "source": "external"},
+      {"name": "GND", "role": "ground", "voltage_v": 0, "source": "external"}
+    ],
+    "connections": [
+      {"name": "VDD", "role": "power", "voltage_domain": "VDD", "endpoints": [{"interface": "host", "signal": "VDD"}, {"function": "sensor", "port": "VDD"}]},
+      {"name": "GND", "role": "ground", "voltage_domain": "GND", "endpoints": [{"interface": "host", "signal": "GND"}, {"function": "sensor", "port": "VSS"}]},
+      {"name": "SDA", "role": "signal", "voltage_domain": "VDD", "endpoints": [{"interface": "host", "signal": "SDA"}, {"function": "sensor", "port": "SDA"}]},
+      {"name": "SCL", "role": "signal", "voltage_domain": "VDD", "endpoints": [{"interface": "host", "signal": "SCL"}, {"function": "sensor", "port": "SCL"}]}
+    ],
+    "constraints": {"max_width_mm": 30, "max_height_mm": 25, "preferred_component_spacing_mm": 1.2}
+  },
+  "policy": {"allow_reference_assignment": true, "allow_value_normalization": true, "allow_layout_inference": true, "allow_spacing_adjustment": true, "allow_label_insertion": true, "allow_placement_adjustment": true, "allow_route_retry": true},
+  "extensions": {}
+}
