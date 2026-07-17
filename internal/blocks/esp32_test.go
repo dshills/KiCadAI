@@ -54,6 +54,38 @@ func TestESP32WROOM32EMinimalRejectsSupplyOutsideReviewedRange(t *testing.T) {
 	}
 }
 
+func TestESP32WROOM32EMinimalGenerationIsDeterministic(t *testing.T) {
+	registry := NewBuiltinRegistry()
+	request := BlockRequest{BlockID: "esp32_wroom_32e_minimal", InstanceID: "controller"}
+	first, firstIssues := registry.Instantiate(context.Background(), request)
+	second, secondIssues := registry.Instantiate(context.Background(), request)
+	encode := func(value any) string {
+		t.Helper()
+		data, err := json.MarshalIndent(value, "", "  ")
+		if err != nil {
+			t.Fatal(err)
+		}
+		return string(data)
+	}
+	firstBlockJSON := encode(map[string]any{"output": first, "issues": firstIssues})
+	secondBlockJSON := encode(map[string]any{"output": second, "issues": secondIssues})
+	// Exact JSON equality is intentional: reproducible generation must keep
+	// serialized details such as null versus empty collections stable.
+	if firstBlockJSON != secondBlockJSON {
+		t.Fatalf("repeated block generation differs:\nfirst=%s\nsecond=%s", firstBlockJSON, secondBlockJSON)
+	}
+	definition, ok := registry.GetBlock(request.BlockID)
+	if !ok {
+		t.Fatal("missing ESP32 block")
+	}
+	firstPCB := RealizeBlockPCB(definition, first, PCBRealizationOptions{OriginXMM: 50, OriginYMM: 35})
+	secondPCB := RealizeBlockPCB(definition, second, PCBRealizationOptions{OriginXMM: 50, OriginYMM: 35})
+	firstPCBJSON, secondPCBJSON := encode(firstPCB), encode(secondPCB)
+	if firstPCBJSON != secondPCBJSON {
+		t.Fatalf("repeated PCB realization differs:\nfirst=%s\nsecond=%s", firstPCBJSON, secondPCBJSON)
+	}
+}
+
 func TestESP32WROOM32EMinimalCatalogAndPCBRealization(t *testing.T) {
 	registry := NewBuiltinRegistry()
 	definition, ok := registry.GetBlock("esp32_wroom_32e_minimal")
