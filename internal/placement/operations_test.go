@@ -12,7 +12,7 @@ func TestPlacementOperationPayload(t *testing.T) {
 		Ref:         "R1",
 		Value:       "10k",
 		FootprintID: "Resistor:R_0603",
-		Pads:        []PadSummary{{Name: "1", XMM: -0.5, RotationDeg: 90, WidthMM: 0.4, HeightMM: 0.6}},
+		Pads:        []PadSummary{{Name: "1", XMM: -0.5, RotationDeg: 90, WidthMM: 0.4, HeightMM: 0.6, Type: "thru_hole", Shape: "oval", DrillMM: 0.3, Layers: []string{"*.Cu", "*.Mask"}}},
 	}
 	placement := PlacementResult{
 		Ref:      "R1",
@@ -36,8 +36,33 @@ func TestPlacementOperationPayload(t *testing.T) {
 	if len(payload.Pads) != 1 || payload.Pads[0].Name != "1" || payload.Pads[0].RotationDeg != 90 || payload.Pads[0].WidthMM != 0.4 {
 		t.Fatalf("payload pads = %#v", payload.Pads)
 	}
+	if payload.Pads[0].Type != "thru_hole" || payload.Pads[0].Shape != "oval" || payload.Pads[0].DrillMM != 0.3 || len(payload.Pads[0].Layers) != 2 {
+		t.Fatalf("payload pad stack = %#v", payload.Pads[0])
+	}
 	if !payload.HideDefaultFootprintText {
 		t.Fatalf("placement-generated footprint text should be hidden")
+	}
+}
+
+func TestPlacementOperationPreservesHydratedLibraryPadGeometry(t *testing.T) {
+	net := "SIG"
+	component := Component{
+		Ref: "J1", FootprintID: "Connector:Real", Bounds: Bounds{WidthMM: 4, HeightMM: 8, Source: BoundsLibraryCourtyard},
+		Pads: []PadSummary{{Name: "1", Net: net, Type: "thru_hole", Shape: "circle", DrillMM: 1, Layers: []string{"*.Cu", "*.Mask"}}},
+	}
+	operation, err := PlacementOperation(component, PlacementResult{Ref: "J1", Position: Placement{XMM: 5, YMM: 5, Layer: "F.Cu"}})
+	if err != nil {
+		t.Fatalf("PlacementOperation returned error: %v", err)
+	}
+	var payload transactions.PlaceFootprintOperation
+	if err := json.Unmarshal(operation.Raw, &payload); err != nil {
+		t.Fatalf("unmarshal operation payload: %v", err)
+	}
+	if len(payload.Pads) != 1 || payload.Pads[0].Name != "1" || payload.Pads[0].Net == nil || *payload.Pads[0].Net != net {
+		t.Fatalf("payload pads = %#v", payload.Pads)
+	}
+	if payload.Pads[0].Type != "thru_hole" || payload.Pads[0].Shape != "circle" || payload.Pads[0].DrillMM != 1 || len(payload.Pads[0].Layers) != 2 {
+		t.Fatalf("hydrated library pad geometry was not preserved: %#v", payload.Pads[0])
 	}
 }
 

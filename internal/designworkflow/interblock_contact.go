@@ -1,9 +1,9 @@
 package designworkflow
 
 import (
-	"encoding/json"
 	"fmt"
 	"math"
+	"slices"
 	"strings"
 
 	"kicadai/internal/placement"
@@ -61,6 +61,7 @@ type InterBlockContactTarget struct {
 	BlockID        string                      `json:"block_id,omitempty"`
 	Point          transactions.Point          `json:"point"`
 	Layer          string                      `json:"layer,omitempty"`
+	Layers         []string                    `json:"layers,omitempty"`
 	ToleranceMM    float64                     `json:"tolerance_mm,omitempty"`
 	GeometrySource string                      `json:"geometry_source,omitempty"`
 	Confidence     InterBlockContactConfidence `json:"confidence"`
@@ -112,7 +113,16 @@ type InterBlockContactSummary struct {
 // intended pad/access target.
 const interBlockContactToleranceMM = 1e-4
 
-const interBlockContactSegmentBucketMM = 1.0
+// Large proof tolerances switch to a coarser spatial index instead of expanding
+// fine buckets without bound. Normal endpoint proofs use the fine index.
+const interBlockContactMaxBucketRadius int64 = 16
+
+const (
+	interBlockContactSegmentBucketMM       = 1.0
+	interBlockContactSegmentCoarseBucketMM = 25.0
+	interBlockContactViaBucketMM           = 1.0
+	interBlockContactViaCoarseBucketMM     = 25.0
+)
 
 // BuildInterBlockContactTargets resolves route-candidate endpoints into
 // physical contact targets using placed, hydrated pad evidence. It does not
@@ -259,14 +269,18 @@ func interBlockConnectedNetsFromDecoded(targetsByNet map[string][]InterBlockCont
 }
 
 type interBlockContactGraph struct {
-	parent         []int
-	rank           []int
-	nodes          []interBlockContactGraphNode
-	segments       []interBlockContactGraphSegment
-	segmentMarks   []uint32
-	markGeneration uint32
-	byKey          map[interBlockContactGraphKey][]int
-	segmentsByKey  map[interBlockContactGraphKey][]int
+	parent              []int
+	rank                []int
+	nodes               []interBlockContactGraphNode
+	segments            []interBlockContactGraphSegment
+	vias                []interBlockContactGraphVia
+	segmentMarks        []uint32
+	markGeneration      uint32
+	byKey               map[interBlockContactGraphKey][]int
+	segmentsByKey       map[interBlockContactGraphKey][]int
+	segmentsByCoarseKey map[interBlockContactGraphKey][]int
+	viasByKey           map[interBlockContactGraphKey][]int
+	viasByCoarseKey     map[interBlockContactGraphKey][]int
 }
 
 type interBlockContactGraphNode struct {
@@ -278,6 +292,13 @@ type interBlockContactGraphSegment struct {
 	Left  int
 	Right int
 	Layer string
+	Owner int
+}
+
+type interBlockContactGraphVia struct {
+	At    transactions.Point
+	Layer string
+	Owner int
 }
 
 type interBlockContactGraphKey struct {
@@ -288,8 +309,11 @@ type interBlockContactGraphKey struct {
 
 func newInterBlockContactGraph(operations []decodedContactRouteOperation) interBlockContactGraph {
 	graph := interBlockContactGraph{
-		byKey:         map[interBlockContactGraphKey][]int{},
-		segmentsByKey: map[interBlockContactGraphKey][]int{},
+		byKey:               map[interBlockContactGraphKey][]int{},
+		segmentsByKey:       map[interBlockContactGraphKey][]int{},
+		segmentsByCoarseKey: map[interBlockContactGraphKey][]int{},
+		viasByKey:           map[interBlockContactGraphKey][]int{},
+		viasByCoarseKey:     map[interBlockContactGraphKey][]int{},
 	}
 	segmentKeySeen := map[interBlockContactGraphKey]struct{}{}
 	var segmentKeyBuf []interBlockContactGraphKey
@@ -300,7 +324,7 @@ func newInterBlockContactGraph(operations []decodedContactRouteOperation) interB
 			node := graph.add(point, layer)
 			if previous != -1 {
 				graph.union(previous, node)
-				graph.addSegment(previous, node, layer, segmentKeySeen, &segmentKeyBuf)
+				graph.addSegment(previous, node, layer, operation.SourceIndex, segmentKeySeen, &segmentKeyBuf)
 			}
 			previous = node
 		}
@@ -309,6 +333,13 @@ func newInterBlockContactGraph(operations []decodedContactRouteOperation) interB
 		for _, via := range operation.Vias {
 			first := -1
 			for _, viaLayer := range via.Layers {
+				viaLayer = normalizeContactLayer(viaLayer)
+				viaIndex := len(graph.vias)
+				graph.vias = append(graph.vias, interBlockContactGraphVia{At: via.At, Layer: viaLayer, Owner: operation.SourceIndex})
+				viaKey := contactGraphKeyForBucket(via.At, viaLayer, interBlockContactViaBucketMM)
+				graph.viasByKey[viaKey] = append(graph.viasByKey[viaKey], viaIndex)
+				coarseViaKey := contactGraphKeyForBucket(via.At, viaLayer, interBlockContactViaCoarseBucketMM)
+				graph.viasByCoarseKey[coarseViaKey] = append(graph.viasByCoarseKey[coarseViaKey], viaIndex)
 				node, ok := graph.connectPointToSegments(via.At, viaLayer, interBlockContactToleranceMM)
 				if !ok {
 					node = graph.add(via.At, viaLayer)
@@ -337,7 +368,7 @@ func (graph *interBlockContactGraph) add(point transactions.Point, layer string)
 	return index
 }
 
-func (graph *interBlockContactGraph) addSegment(left int, right int, layer string, segmentKeySeen map[interBlockContactGraphKey]struct{}, segmentKeyBuf *[]interBlockContactGraphKey) {
+func (graph *interBlockContactGraph) addSegment(left int, right int, layer string, owner int, segmentKeySeen map[interBlockContactGraphKey]struct{}, segmentKeyBuf *[]interBlockContactGraphKey) {
 	layer = normalizeContactLayer(layer)
 	graph.union(left, right)
 	leftPoint := graph.nodes[left].Point
@@ -366,11 +397,97 @@ func (graph *interBlockContactGraph) addSegment(left int, right int, layer strin
 		}
 	}
 	index := len(graph.segments)
-	graph.segments = append(graph.segments, interBlockContactGraphSegment{Left: left, Right: right, Layer: layer})
+	graph.segments = append(graph.segments, interBlockContactGraphSegment{Left: left, Right: right, Layer: layer, Owner: owner})
 	graph.segmentMarks = append(graph.segmentMarks, 0)
 	for _, key := range segmentKeys {
 		graph.segmentsByKey[key] = append(graph.segmentsByKey[key], index)
 	}
+	for _, key := range contactGraphBoundingKeys(leftPoint, rightPoint, layer, interBlockContactToleranceMM, interBlockContactSegmentCoarseBucketMM) {
+		graph.segmentsByCoarseKey[key] = append(graph.segmentsByCoarseKey[key], index)
+	}
+}
+
+func (graph *interBlockContactGraph) copperOwnersAt(point transactions.Point, layer string, tolerance float64, excludedOwner int) []int {
+	owners := map[int]struct{}{}
+	for _, owner := range graph.segmentOwnersAt(point, layer, tolerance, excludedOwner) {
+		owners[owner] = struct{}{}
+	}
+	normalizedLayer := normalizeContactLayer(layer)
+	bucketMM := interBlockContactViaBucketMM
+	viaBuckets := graph.viasByKey
+	radius := contactGraphBucketRadius(tolerance, bucketMM)
+	if radius > interBlockContactMaxBucketRadius {
+		bucketMM = interBlockContactViaCoarseBucketMM
+		viaBuckets = graph.viasByCoarseKey
+		radius = contactGraphBucketRadius(tolerance, bucketMM)
+	}
+	key := contactGraphKeyForBucket(point, normalizedLayer, bucketMM)
+	visitVia := func(viaIndex int) {
+		if viaIndex < 0 || viaIndex >= len(graph.vias) {
+			return
+		}
+		via := graph.vias[viaIndex]
+		if via.Owner != excludedOwner && sameLayer(via.Layer, layer) && pointDistanceMM(point, via.At) <= tolerance {
+			owners[via.Owner] = struct{}{}
+		}
+	}
+	for dx := -radius; dx <= radius; dx++ {
+		for dy := -radius; dy <= radius; dy++ {
+			candidateKey := interBlockContactGraphKey{layer: key.layer, x: key.x + dx, y: key.y + dy}
+			for _, viaIndex := range viaBuckets[candidateKey] {
+				visitVia(viaIndex)
+			}
+		}
+	}
+	out := make([]int, 0, len(owners))
+	for owner := range owners {
+		out = append(out, owner)
+	}
+	slices.Sort(out)
+	return out
+}
+
+func (graph *interBlockContactGraph) segmentOwnersAt(point transactions.Point, layer string, tolerance float64, excludedOwner int) []int {
+	graph.nextSegmentMarkGeneration()
+	owners := map[int]struct{}{}
+	bucketMM := interBlockContactSegmentBucketMM
+	segmentBuckets := graph.segmentsByKey
+	radius := contactGraphBucketRadius(tolerance, bucketMM)
+	if radius > interBlockContactMaxBucketRadius {
+		bucketMM = interBlockContactSegmentCoarseBucketMM
+		segmentBuckets = graph.segmentsByCoarseKey
+		radius = contactGraphBucketRadius(tolerance, bucketMM)
+	}
+	key := contactGraphKeyForBucket(point, layer, bucketMM)
+	visitSegment := func(segmentIndex int) {
+		if segmentIndex < 0 || segmentIndex >= len(graph.segmentMarks) || graph.segmentMarks[segmentIndex] == graph.markGeneration {
+			return
+		}
+		graph.segmentMarks[segmentIndex] = graph.markGeneration
+		segment := graph.segments[segmentIndex]
+		if segment.Owner == excludedOwner || !sameLayer(segment.Layer, layer) {
+			return
+		}
+		left := graph.nodes[segment.Left].Point
+		right := graph.nodes[segment.Right].Point
+		if pointToSegmentDistanceMM(point, left, right) <= tolerance {
+			owners[segment.Owner] = struct{}{}
+		}
+	}
+	for dx := -radius; dx <= radius; dx++ {
+		for dy := -radius; dy <= radius; dy++ {
+			candidateKey := interBlockContactGraphKey{layer: key.layer, x: key.x + dx, y: key.y + dy}
+			for _, segmentIndex := range segmentBuckets[candidateKey] {
+				visitSegment(segmentIndex)
+			}
+		}
+	}
+	out := make([]int, 0, len(owners))
+	for owner := range owners {
+		out = append(out, owner)
+	}
+	slices.Sort(out)
+	return out
 }
 
 func (graph *interBlockContactGraph) connectedTargets(targets []InterBlockContactTarget) bool {
@@ -393,11 +510,22 @@ func (graph *interBlockContactGraph) connectedTargets(targets []InterBlockContac
 }
 
 func (graph *interBlockContactGraph) findTargetNode(target InterBlockContactTarget) (int, bool) {
-	layer := normalizeContactLayer(target.Layer)
-	if node, ok := graph.nearbyNode(target.Point, layer); ok {
-		return node, true
+	root := -1
+	for _, layer := range interBlockContactTargetLayers(target) {
+		node, ok := graph.nearbyNode(target.Point, layer)
+		if !ok {
+			node, ok = graph.connectPointToSegments(target.Point, layer, contactToleranceForTarget(target))
+		}
+		if !ok {
+			continue
+		}
+		if root == -1 {
+			root = node
+			continue
+		}
+		graph.union(root, node)
 	}
-	return graph.connectPointToSegments(target.Point, layer, contactToleranceForTarget(target))
+	return root, root != -1
 }
 
 func (graph *interBlockContactGraph) findTargetContact(target InterBlockContactTarget) (transactions.Point, string, bool) {
@@ -519,6 +647,40 @@ func contactGraphKey(point transactions.Point, layer string) interBlockContactGr
 	}
 }
 
+func contactGraphKeyForBucket(point transactions.Point, layer string, bucketMM float64) interBlockContactGraphKey {
+	return interBlockContactGraphKey{
+		layer: normalizeContactLayer(layer),
+		x:     int64(math.Floor(point.XMM / bucketMM)),
+		y:     int64(math.Floor(point.YMM / bucketMM)),
+	}
+}
+
+func contactGraphBucketRadius(tolerance, bucketMM float64) int64 {
+	if tolerance <= 0 || bucketMM <= 0 {
+		return 1
+	}
+	// Floor plus one deliberately includes the neighboring bucket when the
+	// tolerance lies exactly on a bucket boundary. The epsilon absorbs routine
+	// floating-point representation error at that boundary.
+	radius := int64(math.Floor((tolerance+1e-9)/bucketMM)) + 1
+	if radius < 1 {
+		return 1
+	}
+	return radius
+}
+
+func contactGraphBoundingKeys(left, right transactions.Point, layer string, tolerance, bucketMM float64) []interBlockContactGraphKey {
+	minKey := contactGraphKeyForBucket(transactions.Point{XMM: math.Min(left.XMM, right.XMM) - tolerance, YMM: math.Min(left.YMM, right.YMM) - tolerance}, layer, bucketMM)
+	maxKey := contactGraphKeyForBucket(transactions.Point{XMM: math.Max(left.XMM, right.XMM) + tolerance, YMM: math.Max(left.YMM, right.YMM) + tolerance}, layer, bucketMM)
+	keys := make([]interBlockContactGraphKey, 0, (maxKey.x-minKey.x+1)*(maxKey.y-minKey.y+1))
+	for x := minKey.x; x <= maxKey.x; x++ {
+		for y := minKey.y; y <= maxKey.y; y++ {
+			keys = append(keys, interBlockContactGraphKey{layer: minKey.layer, x: x, y: y})
+		}
+	}
+	return keys
+}
+
 func contactGraphSegmentKey(point transactions.Point, layer string) interBlockContactGraphKey {
 	return contactGraphSegmentKeyForNormalizedLayer(point, normalizeContactLayer(layer))
 }
@@ -526,8 +688,8 @@ func contactGraphSegmentKey(point transactions.Point, layer string) interBlockCo
 func contactGraphSegmentKeyForNormalizedLayer(point transactions.Point, layer string) interBlockContactGraphKey {
 	return interBlockContactGraphKey{
 		layer: layer,
-		x:     int64(math.Round(point.XMM / interBlockContactSegmentBucketMM)),
-		y:     int64(math.Round(point.YMM / interBlockContactSegmentBucketMM)),
+		x:     int64(math.Floor(point.XMM / interBlockContactSegmentBucketMM)),
+		y:     int64(math.Floor(point.YMM / interBlockContactSegmentBucketMM)),
 	}
 }
 
@@ -547,10 +709,7 @@ func contactGraphSegmentQueryKeys(left transactions.Point, right transactions.Po
 	if steps < 1 {
 		steps = 1
 	}
-	radius := int64(math.Ceil(tolerance / interBlockContactSegmentBucketMM))
-	if radius < 1 {
-		radius = 1
-	}
+	radius := contactGraphBucketRadius(tolerance, interBlockContactSegmentBucketMM)
 	for step := 0; step <= steps; step++ {
 		t := float64(step) / float64(steps)
 		point := transactions.Point{XMM: left.XMM + dx*t, YMM: left.YMM + dy*t}
@@ -610,6 +769,7 @@ func interBlockContactTarget(path string, netName string, endpoint InterBlockRou
 		BlockID:        endpoint.BlockID,
 		Point:          resolved.Point,
 		Layer:          resolved.Layer,
+		Layers:         append([]string(nil), resolved.Layers...),
 		ToleranceMM:    interBlockContactToleranceMM,
 		GeometrySource: resolved.Source,
 		Confidence:     InterBlockContactConfidenceHigh,
@@ -644,6 +804,7 @@ func contactProofForTarget(target InterBlockContactTarget, status InterBlockCont
 
 type decodedContactRouteOperation struct {
 	OperationID string
+	SourceIndex int
 	NetName     string
 	Layer       string
 	Points      []transactions.Point
@@ -656,23 +817,32 @@ type decodedContactRouteVia struct {
 }
 
 func decodeInterBlockRouteOperations(operations []transactions.Operation) (map[string][]decodedContactRouteOperation, []reports.Issue) {
+	return decodeInterBlockRouteOperationsFromDecoded(decodeRouteOperations(operations))
+}
+
+func decodeInterBlockRouteOperationsFromDecoded(routes []decodedRouteOperation) (map[string][]decodedContactRouteOperation, []reports.Issue) {
 	byNet := map[string][]decodedContactRouteOperation{}
 	var issues []reports.Issue
-	for index, operation := range operations {
+	for index, route := range routes {
+		operation := route.operation
 		if operation.Op != transactions.OpRoute {
 			continue
 		}
-		var payload transactions.RouteOperation
-		if err := json.Unmarshal(operation.Raw, &payload); err != nil {
+		if !route.decoded {
+			message := "route operation could not be decoded for contact validation"
+			if route.decodeErr != nil {
+				message += ": " + route.decodeErr.Error()
+			}
 			issues = append(issues, reports.Issue{
 				Code:        reports.CodeRouteContactUnsupported,
 				Severity:    reports.SeverityBlocked,
 				Path:        fmt.Sprintf("design.inter_block_contact.operations[%d]", index),
-				Message:     "route operation could not be decoded for contact validation: " + err.Error(),
+				Message:     message,
 				OperationID: contactOperationID(operation),
 			})
 			continue
 		}
+		payload := route.payload
 		netName := strings.TrimSpace(operation.Net)
 		if netName == "" {
 			netName = strings.TrimSpace(payload.NetName)
@@ -713,6 +883,7 @@ func decodeInterBlockRouteOperations(operations []transactions.Operation) (map[s
 		}
 		byNet[netName] = append(byNet[netName], decodedContactRouteOperation{
 			OperationID: contactOperationID(operation),
+			SourceIndex: index,
 			NetName:     netName,
 			Layer:       strings.TrimSpace(payload.Layer),
 			Points:      append([]transactions.Point(nil), payload.Points...),
@@ -783,7 +954,7 @@ func proveContactTarget(target InterBlockContactTarget, operations []decodedCont
 			best.EmittedPoint = &point
 			best.Layer = operation.Layer
 			best.DistanceMM = candidate.DistanceMM
-			if candidate.DistanceMM <= contactToleranceForTarget(target) && !sameLayer(operation.Layer, target.Layer) {
+			if candidate.DistanceMM <= contactToleranceForTarget(target) && !interBlockContactTargetAcceptsLayer(target, operation.Layer) {
 				layerCoordinateMatch = true
 			}
 		}
@@ -846,7 +1017,7 @@ func proveContactTargetOnOperation(target InterBlockContactTarget, operation dec
 		record("segment", closest, distance)
 	}
 	candidate := interBlockContactProofCandidate{Side: bestSide, Point: bestPoint, DistanceMM: bestDistance}
-	if bestDistance > contactToleranceForTarget(target) || !sameLayer(operation.Layer, target.Layer) {
+	if bestDistance > contactToleranceForTarget(target) || !interBlockContactTargetAcceptsLayer(target, operation.Layer) {
 		return InterBlockContactProof{}, candidate, false
 	}
 	point := bestPoint
@@ -953,6 +1124,27 @@ func contactToleranceForTarget(target InterBlockContactTarget) float64 {
 		return target.ToleranceMM
 	}
 	return interBlockContactToleranceMM
+}
+
+func interBlockContactTargetLayers(target InterBlockContactTarget) []string {
+	layers := make([]string, 0, max(1, len(target.Layers)))
+	for _, layer := range append(append([]string(nil), target.Layers...), target.Layer) {
+		layer = normalizeContactLayer(layer)
+		if layer == "" || slices.Contains(layers, layer) {
+			continue
+		}
+		layers = append(layers, layer)
+	}
+	return layers
+}
+
+func interBlockContactTargetAcceptsLayer(target InterBlockContactTarget, layer string) bool {
+	for _, candidate := range interBlockContactTargetLayers(target) {
+		if sameLayer(candidate, layer) {
+			return true
+		}
+	}
+	return false
 }
 
 func interBlockContactTargetsByNet(targets []InterBlockContactTarget) map[string][]InterBlockContactTarget {

@@ -199,15 +199,21 @@ func boardHasDrilledFeatures(board pcbfiles.PCBFile) bool {
 }
 
 func hasLayerFile(files scannedFiles, token string) bool {
-	tokenLower := strings.ToLower(token)
+	tokenLower := canonicalFabricationLayerToken(strings.ToLower(token))
 	for _, path := range files.NonEmpty {
 		base := strings.TrimSuffix(filepath.Base(path), filepath.Ext(path))
-		normalized := strings.ToLower(normalizeFabricationLayerToken(base))
+		normalized := canonicalFabricationLayerToken(strings.ToLower(normalizeFabricationLayerToken(base)))
 		if normalized == tokenLower || strings.HasSuffix(normalized, "_"+tokenLower) {
 			return true
 		}
 	}
 	return false
+}
+
+func canonicalFabricationLayerToken(token string) string {
+	token = strings.ReplaceAll(token, "f_silkscreen", "f_silks")
+	token = strings.ReplaceAll(token, "b_silkscreen", "b_silks")
+	return token
 }
 
 func hasAnyDrillFile(files scannedFiles) bool {

@@ -36,6 +36,36 @@ func TestBuildInterBlockContactTargetsResolvesPlacedPad(t *testing.T) {
 	}
 }
 
+func TestInterBlockContactGraphLargeToleranceUsesCoarseViaIndex(t *testing.T) {
+	graph := newInterBlockContactGraph([]decodedContactRouteOperation{{
+		SourceIndex: 7,
+		Vias: []decodedContactRouteVia{{
+			At: transactions.Point{XMM: 100, YMM: 50}, Layers: []string{"F.Cu", "B.Cu"},
+		}},
+	}})
+	owners := graph.copperOwnersAt(transactions.Point{XMM: 80, YMM: 50}, "F.Cu", 20, -1)
+	if len(owners) != 1 || owners[0] != 7 {
+		t.Fatalf("owners = %v, want coarse-indexed via owner 7", owners)
+	}
+}
+
+func TestInterBlockContactGraphLargeToleranceUsesCoarseSegmentIndex(t *testing.T) {
+	graph := newInterBlockContactGraph([]decodedContactRouteOperation{{
+		SourceIndex: 9, NetName: "SIG", Layer: "F.Cu",
+		Points: []transactions.Point{{XMM: 100, YMM: 40}, {XMM: 120, YMM: 40}},
+	}})
+	owners := graph.segmentOwnersAt(transactions.Point{XMM: 90, YMM: 40}, "F.Cu", 10, -1)
+	if len(owners) != 1 || owners[0] != 9 {
+		t.Fatalf("owners = %v, want coarse-indexed segment owner 9", owners)
+	}
+}
+
+func TestContactGraphBucketRadiusIncludesExactBoundaryNeighbor(t *testing.T) {
+	if radius := contactGraphBucketRadius(1, 1); radius != 2 {
+		t.Fatalf("radius = %d, want exact boundary plus neighboring bucket", radius)
+	}
+}
+
 func TestBuildInterBlockContactTargetsReportsMissingPad(t *testing.T) {
 	placed := interBlockContactPlaced("SIG", "SIG")
 	candidates := []InterBlockRouteCandidate{{
@@ -214,6 +244,34 @@ func TestValidateInterBlockRouteEndpointContactsReportsLayerMismatch(t *testing.
 		t.Fatalf("proofs = %#v, want layer mismatch", evidence.Proofs)
 	}
 	assertContactIssueCode(t, evidence.Issues, reports.CodeRouteContactLayerMismatch)
+}
+
+func TestValidateInterBlockRouteEndpointContactsAcceptsBottomCopperAtPlatedPads(t *testing.T) {
+	placed := interBlockContactPlaced("SIG", "SIG")
+	placed.Request.Components[0].Pads[0].DrillMM = 0.8
+	placed.Request.Components[1].Pads[0].DrillMM = 0.8
+	candidates := []InterBlockRouteCandidate{{
+		NetName: "SIG",
+		Status:  InterBlockRouteCandidateRoutable,
+		Endpoints: []InterBlockRouteEndpoint{
+			{Ref: "J1", Pin: "1", InstanceID: "header"},
+			{Ref: "D1", Pin: "1", InstanceID: "status"},
+		},
+	}}
+	operations := []transactions.Operation{mustContactRouteOperation(t, "SIG", "B.Cu",
+		transactions.Point{XMM: 5, YMM: 10},
+		transactions.Point{XMM: 15, YMM: 10},
+	)}
+
+	evidence := ValidateInterBlockRouteEndpointContacts(candidates, operations, &placed)
+	if len(evidence.Issues) != 0 {
+		t.Fatalf("issues = %#v, want plated-pad bottom access proven", evidence.Issues)
+	}
+	for _, proof := range evidence.Proofs {
+		if proof.Status != InterBlockContactProven || !sameLayer(proof.Layer, "B.Cu") {
+			t.Fatalf("proof = %#v, want B.Cu plated-pad contact", proof)
+		}
+	}
 }
 
 func TestValidateInterBlockRouteEndpointContactsProvesViaConnectedOperations(t *testing.T) {

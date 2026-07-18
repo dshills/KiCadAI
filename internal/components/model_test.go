@@ -167,6 +167,7 @@ func TestParseLeadingEngineeringNumber(t *testing.T) {
 		{value: "10 units", want: 10},
 		{value: "10 max", want: 10},
 		{value: "4k7", want: 4700},
+		{value: "1kΩ", want: 1000},
 		{value: "2R2", want: 2.2},
 		{value: "1M5", want: 1500000},
 		{value: "3f", want: 0.000000000000003},

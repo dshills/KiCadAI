@@ -29,6 +29,27 @@ func TestSelectConcreteResistorByPackageAndValue(t *testing.T) {
 	}
 }
 
+func TestSelectResistorRequiresDeclaredTolerance(t *testing.T) {
+	catalog := &Catalog{Records: []ComponentRecord{
+		{ID: "one-percent", Family: "resistor", Values: []ValueConstraint{{Kind: "resistance", Typ: "10k", Unit: "ohm"}}, Tolerances: []ToleranceConstraint{{Kind: "resistance", Max: "1", Unit: "%"}}, Packages: []PackageVariant{{ID: "0805"}}},
+		{ID: "point-one-percent", Family: "resistor", Values: []ValueConstraint{{Kind: "resistance", Typ: "10k", Unit: "ohm"}}, Tolerances: []ToleranceConstraint{{Kind: "resistance", Typ: "0.1", Unit: "%"}}, Packages: []PackageVariant{{ID: "0805"}}},
+	}}
+	candidates, result := Find(context.Background(), catalog, Query{Family: "resistor", ValueKind: "resistance", Value: "10k", MaximumTolerance: 0.1})
+	if !result.OK || len(candidates) != 1 || candidates[0].ComponentID != "point-one-percent" {
+		t.Fatalf("candidates = %#v, issues = %#v", candidates, result.Issues)
+	}
+}
+
+func TestSelectResistorNormalizesToleranceUnitsWithoutStringRoundTrip(t *testing.T) {
+	catalog := &Catalog{Records: []ComponentRecord{
+		{ID: "thousand-ppm", Family: "resistor", Values: []ValueConstraint{{Kind: "resistance", Typ: "10k", Unit: "ohm"}}, Tolerances: []ToleranceConstraint{{Kind: "resistance", Max: "1000", Unit: "ppm"}}, Packages: []PackageVariant{{ID: "0805"}}},
+	}}
+	candidates, result := Find(context.Background(), catalog, Query{Family: "resistor", ValueKind: "resistance", Value: "10k", MaximumTolerance: 0.1, ToleranceUnit: "%"})
+	if !result.OK || len(candidates) != 1 || candidates[0].ComponentID != "thousand-ppm" {
+		t.Fatalf("candidates = %#v, issues = %#v", candidates, result.Issues)
+	}
+}
+
 func TestSelectIncludesActiveProcurementEvidence(t *testing.T) {
 	catalog := loadCheckedInCatalog(t)
 	sources, err := LoadSources(context.Background(), SourceLoadOptions{SourceDir: sourceFixtureDir("valid")})
@@ -325,7 +346,7 @@ func TestSelectConcreteLEDByColorAndPackage(t *testing.T) {
 func TestSelectVerifiedSignalDiodeForConnectivity(t *testing.T) {
 	catalog := loadCheckedInCatalog(t)
 	selection, result := Select(context.Background(), catalog, SelectionRequest{
-		Query:      Query{Family: "diode", Package: "sod_123"},
+		Query:      Query{Text: "1n4148w", Family: "diode", Package: "sod_123"},
 		Acceptance: AcceptanceConnectivity,
 	})
 	if !result.OK {

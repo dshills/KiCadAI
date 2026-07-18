@@ -110,6 +110,9 @@ func findRelativeGroupPlacement(request Request, group Group, components map[str
 	if _, included := memberRefs[anchorRef]; !included {
 		return relativeGroupCandidate{}, false
 	}
+	sort.SliceStable(members, func(left, right int) bool {
+		return normalizeRef(members[left].Ref) == anchorRef && normalizeRef(members[right].Ref) != anchorRef
+	})
 	existingByLayer := make(map[string][]PlacementResult)
 	for _, placed := range placements {
 		if placed.Reason != "" {
@@ -138,6 +141,12 @@ func findRelativeGroupPlacement(request Request, group Group, components map[str
 	// a few nearby transforms that collide with already placed components.
 	maxCandidates *= max(1, len(members))
 	usable := BoardUsableRect(request.Board, request.Rules)
+	boardCandidateCount := max(1, int(math.Floor((usable.Max.XMM-usable.Min.XMM)/grid))+1) * max(1, int(math.Floor((usable.Max.YMM-usable.Min.YMM)/grid))+1)
+	// A rigid group has no legal partial result: either one shared transform is
+	// found or every member loses its authored copper relationship. Permit the
+	// deterministic ring search to cover the finite board before declaring that
+	// no transform exists.
+	maxCandidates = max(maxCandidates, boardCandidateCount)
 	var found relativeGroupCandidate
 	checked := 0
 	forEachRelativeGroupAnchorCandidate(usable, grid, target, func(anchor Placement) bool {
@@ -217,19 +226,29 @@ func relativeGroupAnchorRing(usable Rect, grid float64, target Placement, target
 
 func buildRelativeGroupCandidate(request Request, groupID string, members []Component, authoredAnchor Placement, anchor Placement, existingByLayer map[string][]PlacementResult) (relativeGroupCandidate, bool) {
 	usable := BoardUsableRect(request.Board, request.Rules)
+	groupBoundsLimit := usable
+	for _, member := range members {
+		if normalizeRef(member.Ref) != normalizeRef(requestGroupAnchorRef(request, groupID)) || member.Edge == EdgeNone {
+			continue
+		}
+		groupBoundsLimit = Rect{
+			Min: request.Board.Origin,
+			Max: Point{XMM: request.Board.Origin.XMM + request.Board.WidthMM, YMM: request.Board.Origin.YMM + request.Board.HeightMM},
+		}
+		break
+	}
 	for _, group := range request.Groups {
 		if !strings.EqualFold(strings.TrimSpace(group.ID), strings.TrimSpace(groupID)) || group.Bounds == nil {
 			continue
 		}
 		bounds := translatedGroupBounds(*group.Bounds, authoredAnchor, anchor)
-		if !usable.Contains(bounds) {
+		if !groupBoundsLimit.Contains(bounds) {
 			return relativeGroupCandidate{}, false
 		}
 		break
 	}
 	edgeTolerance := edgeConstraintTolerance(request.Board, request.Rules)
 	translatedKeepouts := translatedKeepoutsForGroup(request.Keepouts, groupID, authoredAnchor, anchor)
-	keepouts := &occupancy{keepouts: translatedKeepouts}
 	for _, existing := range existingByLayer {
 		for _, placed := range existing {
 			for _, keepout := range translatedKeepouts {
@@ -255,6 +274,12 @@ func buildRelativeGroupCandidate(request Request, groupID string, members []Comp
 		if !ok {
 			return relativeGroupCandidate{}, false
 		}
+		if normalizeRef(component.Ref) != normalizeRef(requestGroupAnchorRef(request, groupID)) {
+			placement, ok = legalizeRelativeGroupMember(component, placement, result.placements, anchor, request.Rules)
+			if !ok {
+				return relativeGroupCandidate{}, false
+			}
+		}
 		physicalBounds, ok := ComponentPhysicalBounds(component, placement.Position)
 		if !ok || !usable.Contains(physicalBounds) {
 			return relativeGroupCandidate{}, false
@@ -262,7 +287,7 @@ func buildRelativeGroupCandidate(request Request, groupID string, members []Comp
 		if component.Edge != EdgeNone && !edgeConstraintSatisfied(request.Board, component, placement.Position, component.Edge, edgeTolerance) {
 			return relativeGroupCandidate{}, false
 		}
-		if _, conflict := keepouts.FirstConflictDetail(placement); conflict {
+		if rigidGroupKeepoutConflict(translatedKeepouts, groupID, placement) {
 			return relativeGroupCandidate{}, false
 		}
 		layer := strings.ToUpper(strings.TrimSpace(placement.Position.Layer))
@@ -271,14 +296,89 @@ func buildRelativeGroupCandidate(request Request, groupID string, members []Comp
 				return relativeGroupCandidate{}, false
 			}
 		}
-		for _, grouped := range result.placements {
-			if strings.EqualFold(grouped.Position.Layer, placement.Position.Layer) && grouped.Bounds.Intersects(placement.Bounds) {
-				return relativeGroupCandidate{}, false
-			}
-		}
 		result.placements = append(result.placements, placement)
 	}
 	return result, true
+}
+
+func legalizeRelativeGroupMember(component Component, placement PlacementResult, grouped []PlacementResult, anchor Placement, rules Rules) (PlacementResult, bool) {
+	grid := rules.GridMM
+	if grid <= 0 {
+		grid = DefaultRules().GridMM
+	}
+	directionX := placement.Position.XMM - anchor.XMM
+	directionY := placement.Position.YMM - anchor.YMM
+	if math.Abs(directionX) <= placementCompareEpsilon && math.Abs(directionY) <= placementCompareEpsilon {
+		for _, existing := range grouped {
+			if strings.EqualFold(existing.Position.Layer, placement.Position.Layer) && existing.Bounds.Intersects(placement.Bounds) {
+				return PlacementResult{}, false
+			}
+		}
+		return placement, true
+	}
+	maximumAttempts := max(4, len(grouped)*4)
+	for attempt := 0; attempt < maximumAttempts; attempt++ {
+		conflict := PlacementResult{}
+		found := false
+		for _, existing := range grouped {
+			if strings.EqualFold(existing.Position.Layer, placement.Position.Layer) && existing.Bounds.Intersects(placement.Bounds) {
+				conflict = existing
+				found = true
+				break
+			}
+		}
+		if !found {
+			return placement, true
+		}
+		position := placement.Position
+		if math.Abs(directionX) >= math.Abs(directionY) {
+			if directionX >= 0 {
+				position.XMM += conflict.Bounds.Max.XMM - placement.Bounds.Min.XMM + grid
+			} else {
+				position.XMM += conflict.Bounds.Min.XMM - placement.Bounds.Max.XMM - grid
+			}
+		} else if directionY >= 0 {
+			position.YMM += conflict.Bounds.Max.YMM - placement.Bounds.Min.YMM + grid
+		} else {
+			position.YMM += conflict.Bounds.Min.YMM - placement.Bounds.Max.YMM - grid
+		}
+		var ok bool
+		placement, ok = NewPlacementResult(component, position, rules)
+		if !ok {
+			return PlacementResult{}, false
+		}
+	}
+	return PlacementResult{}, false
+}
+
+func requestGroupAnchorRef(request Request, groupID string) string {
+	for _, group := range request.Groups {
+		if strings.EqualFold(strings.TrimSpace(group.ID), strings.TrimSpace(groupID)) {
+			return group.Anchor.Ref
+		}
+	}
+	return ""
+}
+
+func rigidGroupKeepoutConflict(keepouts []Keepout, groupID string, placement PlacementResult) bool {
+	ref := normalizeRef(placement.Ref)
+	layer := normalizePlacementLayer(placement.Position).Layer
+	for _, keepout := range keepouts {
+		// A group-owned keepout reserves the translated authored cluster from
+		// external components. Its members already have an immutable reviewed
+		// relationship to that envelope, so applying it internally double-counts
+		// coarse component bounds and can make every shared transform impossible.
+		if strings.EqualFold(strings.TrimSpace(keepout.GroupID), strings.TrimSpace(groupID)) {
+			continue
+		}
+		if keepout.Optional || keepoutExemptsNormalizedRef(keepout, ref) || !keepoutAppliesToLayer(keepout, layer) {
+			continue
+		}
+		if keepout.Bounds.Intersects(placement.Bounds) {
+			return true
+		}
+	}
+	return false
 }
 
 func translatedGroupBounds(bounds Rect, authoredAnchor Placement, placedAnchor Placement) Rect {

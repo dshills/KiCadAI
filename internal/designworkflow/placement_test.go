@@ -13,6 +13,7 @@ import (
 	"kicadai/internal/libraryresolver"
 	"kicadai/internal/placement"
 	"kicadai/internal/reports"
+	"kicadai/internal/transactions"
 )
 
 const testTimeout = 10 * time.Second
@@ -102,13 +103,96 @@ func TestPlacementGroupBoundsAreRelativeToAuthoredAnchor(t *testing.T) {
 		}},
 	}
 
-	groups := placementGroupsFromFragment(fragment)
+	groups, issues := placementGroupsFromFragment(fragment)
+	if len(issues) != 0 {
+		t.Fatalf("group issues = %#v", issues)
+	}
 	if len(groups) != 1 || groups[0].Bounds == nil {
 		t.Fatalf("groups = %#v", groups)
 	}
 	want := placement.Rect{Min: placement.Point{XMM: 15, YMM: 13}, Max: placement.Point{XMM: 23, YMM: 19}}
 	if *groups[0].Bounds != want {
 		t.Fatalf("bounds = %#v, want %#v", *groups[0].Bounds, want)
+	}
+}
+
+func TestPlacementGroupsPreserveOverlappingNonRigidMembership(t *testing.T) {
+	fragment := BlockFragment{
+		InstanceID: "amplifier",
+		Realization: blocks.BlockPCBRealizationResult{RoleRefs: map[string]string{
+			"driver": "Q1", "output": "Q2", "sense": "R1",
+		}},
+		PlacementGroups: []blocks.PCBPlacementGroup{
+			{ID: "driver_loop", ComponentRoles: []string{"driver", "output"}, AnchorRole: "driver"},
+			{ID: "output_loop", ComponentRoles: []string{"output", "sense"}, AnchorRole: "output"},
+		},
+	}
+
+	groups, issues := placementGroupsFromFragment(fragment)
+	if len(issues) != 0 {
+		t.Fatalf("group issues = %#v", issues)
+	}
+	if len(groups) != 2 {
+		t.Fatalf("groups = %#v", groups)
+	}
+	if !slices.Equal(groups[0].Components, []string{"Q1", "Q2"}) || groups[0].Anchor.Ref != "Q1" {
+		t.Fatalf("driver group = %#v", groups[0])
+	}
+	if !slices.Equal(groups[1].Components, []string{"Q2", "R1"}) || groups[1].Anchor.Ref != "Q2" {
+		t.Fatalf("output group = %#v", groups[1])
+	}
+}
+
+func TestPlacementGroupsReportUnrealizedRoles(t *testing.T) {
+	fragment := BlockFragment{
+		InstanceID:      "incomplete",
+		Realization:     blocks.BlockPCBRealizationResult{RoleRefs: map[string]string{"anchor": "U1"}},
+		PlacementGroups: []blocks.PCBPlacementGroup{{ID: "rigid", ComponentRoles: []string{"anchor", "missing"}, AnchorRole: "anchor", TranslateAsUnit: true}},
+	}
+
+	groups, issues := placementGroupsFromFragment(fragment)
+	if len(groups) != 1 || !slices.ContainsFunc(issues, func(issue reports.Issue) bool {
+		return issue.Severity == reports.SeverityInfo && strings.HasSuffix(issue.Path, ".missing")
+	}) {
+		t.Fatalf("groups/issues = %#v/%#v, want missing-role evidence", groups, issues)
+	}
+}
+
+func TestProximityRulesFromFragmentIncludesRequiredMaxSpacingConstraint(t *testing.T) {
+	fragment := BlockFragment{
+		InstanceID: "amplifier",
+		BlockID:    "speaker_driver",
+		Realization: blocks.BlockPCBRealizationResult{RoleRefs: map[string]string{
+			"opamp": "U1", "feedback": "R1", "return": "R2",
+		}},
+		Constraints: []blocks.PCBConstraint{{
+			ID: "gain_loop", Kind: "max_spacing", Category: blocks.PCBConstraintFeedbackSense,
+			AppliesTo: []string{"opamp", "feedback", "return"}, MaxLengthMM: 8, Required: true,
+		}},
+	}
+
+	rules := proximityRulesFromFragment(fragment)
+	if len(rules) != 1 || rules[0].AnchorRef != "U1" || !slices.Equal(rules[0].TargetRefs, []string{"R1", "R2"}) || rules[0].MaxDistanceMM != 8 || !rules[0].Required || rules[0].Role != placement.IntentFeedback {
+		t.Fatalf("rules = %#v, want required 8mm feedback proximity", rules)
+	}
+}
+
+func TestProximityRulesFromFragmentPairsComplementarySymmetryRoles(t *testing.T) {
+	fragment := BlockFragment{
+		InstanceID: "output",
+		BlockID:    "class_ab_output",
+		Realization: blocks.BlockPCBRealizationResult{RoleRefs: map[string]string{
+			"source_driver": "Q1", "sink_driver": "Q2", "positive_device": "Q3", "negative_device": "Q4",
+		}},
+		Constraints: []blocks.PCBConstraint{{
+			ID: "symmetry", Kind: "max_spacing", Category: blocks.PCBConstraintDeviceSymmetry,
+			AppliesTo: []string{"source_driver", "sink_driver", "positive_device", "negative_device"}, MaxLengthMM: 12, Required: true,
+		}},
+	}
+
+	rules := proximityRulesFromFragment(fragment)
+	if len(rules) != 2 || rules[0].AnchorRef != "Q1" || !slices.Equal(rules[0].TargetRefs, []string{"Q2"}) || rules[1].AnchorRef != "Q3" || !slices.Equal(rules[1].TargetRefs, []string{"Q4"}) {
+		t.Fatalf("rules = %#v, want upper/lower complementary pairs", rules)
 	}
 }
 
@@ -184,13 +268,27 @@ func TestGeneratedPlacementMobilityAllowsEdgeConstrainedGroupTransform(t *testin
 	request := Request{RoutingRetry: RoutingRetryPolicySpec{Enabled: true}}
 	component := blocks.RealizedPCBComponent{Ref: "U1"}
 
-	policy, fixed := generatedPlacementMobility(request, BlockFragment{BlockID: "radio", InstanceID: "controller"}, component, "controller.module", placement.EdgeAny, true)
+	policy, fixed := generatedPlacementMobility(request, BlockFragment{BlockID: "radio", InstanceID: "controller"}, component, "controller.module", true, placement.EdgeAny, true)
 
 	if fixed {
 		t.Fatal("edge-constrained translated group member unexpectedly fixed")
 	}
 	if policy.Class != placement.MobilityGroupTransform || policy.RouteHandling != placement.RouteHandlingTransformWithGroup {
 		t.Fatalf("mobility = %#v, want group transform with group route handling", policy)
+	}
+}
+
+func TestGeneratedPlacementMobilityRebuildsNonRigidGroupRoutes(t *testing.T) {
+	request := Request{RoutingRetry: RoutingRetryPolicySpec{Enabled: true}}
+	component := blocks.RealizedPCBComponent{Ref: "C1"}
+
+	policy, fixed := generatedPlacementMobility(request, BlockFragment{BlockID: "filter", InstanceID: "input"}, component, "input.network", false, placement.EdgeNone, true)
+
+	if fixed {
+		t.Fatal("non-rigid local-route member unexpectedly fixed")
+	}
+	if policy.Class != placement.MobilityLocalRebuild || policy.RouteHandling != placement.RouteHandlingInvalidateRebuild {
+		t.Fatalf("mobility = %#v, want local route rebuild", policy)
 	}
 }
 
@@ -370,6 +468,30 @@ func TestPlaceFragmentsPromotesRequestConnectionsToPlacementNets(t *testing.T) {
 	}
 	if !slices.Contains(ledCandidate.InstanceIDs, "header") || !slices.Contains(ledCandidate.InstanceIDs, "status") {
 		t.Fatalf("LED_EN candidate instances = %#v, want header and status", ledCandidate.InstanceIDs)
+	}
+}
+
+func TestAddPlacementFragmentOperationNetsIncludesEveryPhysicalConnectEndpoint(t *testing.T) {
+	first, firstIssues := blocks.ConnectOperation("R1", "1", "C1", "1", "amp.vcc")
+	second, secondIssues := blocks.ConnectOperation("C1", "1", "Q1", "2", "amp.vcc")
+	if len(firstIssues) != 0 || len(secondIssues) != 0 {
+		t.Fatalf("connect issues = %#v %#v", firstIssues, secondIssues)
+	}
+	fragment := BlockFragment{
+		InstanceID: "amp",
+		Realization: blocks.BlockPCBRealizationResult{Components: []blocks.RealizedPCBComponent{
+			{Ref: "R1"}, {Ref: "C1"}, {Ref: "Q1"},
+		}},
+		SourceOperations: []transactions.Operation{first, second},
+	}
+	request := placement.Request{}
+	issues := addPlacementFragmentOperationNets(&request, map[string]int{}, fragment, map[string]string{"amp.vcc": "VCC"})
+	if len(issues) != 0 {
+		t.Fatalf("issues = %#v", issues)
+	}
+	net, ok := placementNetByName(request.Nets, "VCC")
+	if !ok || len(net.Endpoints) != 3 {
+		t.Fatalf("placement net = %#v, want all three physical endpoints", net)
 	}
 }
 

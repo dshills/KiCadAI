@@ -3,6 +3,7 @@
   "families": [
     {"id": "bjt", "name": "Bipolar Junction Transistor", "description": "Small-signal and power BJT devices."},
     {"id": "capacitor", "name": "Capacitor", "description": "Charge storage and decoupling components."},
+    {"id": "comparator", "name": "Comparator", "description": "Analog threshold and window-comparator devices with explicit output topology."},
     {"id": "connector", "name": "Connector", "description": "Board interconnects and headers."},
     {"id": "current_source", "name": "Independent Current Source Port", "description": "Board input port with trusted independent-current analysis semantics."},
     {"id": "crystal", "name": "Crystal", "description": "Quartz crystals and resonators for timing circuits."},
@@ -15,6 +16,7 @@
     {"id": "opamp", "name": "Operational Amplifier", "description": "Op-amp devices for analog gain and buffering."},
     {"id": "protection", "name": "Protection Device", "description": "ESD, TVS, reverse-polarity, and other protection components."},
     {"id": "regulator", "name": "Voltage Regulator", "description": "Linear and switching voltage regulator devices."},
+    {"id": "relay", "name": "Relay", "description": "Electromechanical isolation and load-switching devices."},
     {"id": "resistor", "name": "Resistor", "description": "Fixed resistors and pull-up/down components."},
     {"id": "sensor", "name": "Sensor", "description": "Digital and analog sensors."},
     {"id": "switch", "name": "Switch", "description": "Electromechanical buttons, tactile switches, and control contacts."},

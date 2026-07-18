@@ -80,6 +80,10 @@ type ValidationResult struct {
 	Issues   []reports.Issue  `json:"issues,omitempty"`
 }
 
+// ValidateOperatingEnvelope supplies the common analysis baseline for the
+// topology-specific validators in sibling files. Those validators also share
+// this file's rail, finite-number, SOA interpolation, and power-evidence
+// helpers so every topology applies identical electrical validity rules.
 func ValidateOperatingEnvelope(request ValidationRequest) ValidationResult {
 	analyses := []AnalysisResult{
 		validateDC(request),

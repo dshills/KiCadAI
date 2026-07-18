@@ -553,10 +553,23 @@ func TestValidateRejectsDuplicateGroupIDs(t *testing.T) {
 func TestValidateRejectsConflictingComponentGroupID(t *testing.T) {
 	req := minimalRequest()
 	req.Components[0].GroupID = "power"
-	req.Groups = []Group{{ID: "analog", Components: []string{"R1"}}}
+	req.Groups = []Group{{ID: "analog", Components: []string{"R1"}, TranslateAsUnit: true, Anchor: GroupAnchor{Ref: "R1"}}}
 
 	issues := Validate(req)
 	assertIssueContains(t, issues, "has group ID power but is listed in group analog")
+}
+
+func TestValidateAllowsOverlappingNonRigidGroupMembership(t *testing.T) {
+	req := minimalRequest()
+	req.Components[0].GroupID = "power"
+	req.Groups = []Group{
+		{ID: "power", Components: []string{"R1"}, KeepTogether: true},
+		{ID: "analog", Components: []string{"R1"}, KeepTogether: true},
+	}
+
+	if issues := Validate(req); len(issues) != 0 {
+		t.Fatalf("non-rigid overlapping membership issues = %#v", issues)
+	}
 }
 
 func TestValidateRejectsUnknownNetEndpoint(t *testing.T) {

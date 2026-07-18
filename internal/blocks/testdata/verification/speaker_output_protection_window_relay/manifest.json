@@ -1,0 +1,31 @@
+{
+  "id": "speaker_output_protection_window_relay",
+  "block_id": "speaker_output_protection",
+  "description": "Precision bipolar DC window detector with normally-open relay, delayed engagement, fast supply-loss discharge, and flyback clamp.",
+  "acceptance": "connectivity",
+  "request": {"instance_id": "protect"},
+  "expected": {
+    "evidence_level": "schematic_verified",
+    "components": [
+      {"role": "positive_detector", "ref_prefix": "U", "symbol_id": "Comparator:TLV1701", "footprint_id": "Package_TO_SOT_SMD:SOT-23-5"},
+      {"role": "negative_detector", "ref_prefix": "U", "symbol_id": "Comparator:TLV1701", "footprint_id": "Package_TO_SOT_SMD:SOT-23-5"},
+      {"role": "delay_capacitor", "ref_prefix": "C", "symbol_id": "Device:C_Polarized", "footprint_id": "Capacitor_Tantalum_SMD:CP_EIA-3216-18_Kemet-A"},
+      {"role": "relay_driver", "ref_prefix": "Q", "symbol_id": "Transistor_BJT:Q_NPN_BEC", "footprint_id": "Package_TO_SOT_SMD:SOT-23"},
+      {"role": "relay", "ref_prefix": "K", "symbol_id": "Relay:G5Q-1A", "footprint_id": "Relay_THT:Relay_SPST_Omron-G5Q-1A"},
+      {"role": "relay_flyback", "ref_prefix": "D", "symbol_id": "Device:D", "footprint_id": "Diode_SMD:D_SOD-123"},
+      {"role": "supply_loss_diode", "ref_prefix": "D", "symbol_id": "Device:D", "footprint_id": "Diode_SMD:D_SOD-123"}
+    ],
+    "ports": [
+      {"name": "RAW_OUT", "direction": "input"},
+      {"name": "SPEAKER_OUT", "direction": "output"},
+      {"name": "PROTECT_12V", "direction": "power"},
+      {"name": "POWER_STAR", "direction": "power"}
+    ],
+    "pcb": {
+      "required_local_routes": ["raw_contact", "speaker_contact", "sense_positive", "sense_negative", "upper_threshold", "lower_threshold", "fault_wire_or", "fault_delay_cap", "delay_driver", "relay_base", "coil_sink", "coil_clamp", "supply_loss"],
+      "require_realization": true,
+      "allow_unrouted": true
+    },
+    "erc_drc": {"runner": "optional"}
+  }
+}

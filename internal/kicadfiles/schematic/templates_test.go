@@ -305,6 +305,24 @@ func TestLocalSymbolLibraryForRawPreservesResolverSymbolBodies(t *testing.T) {
 	}
 }
 
+func TestLocalSymbolLibraryForEmbeddedPreservesExactBodyAndUnqualifiesName(t *testing.T) {
+	file := SchematicFile{}
+	if !EnsureEmbeddedFallbackSymbol(&file, "Comparator:Missing", []TemplatePin{{Number: "1", Offset: kicadfiles.Point{X: kicadfiles.MM(-5.08)}}}) {
+		t.Fatal("failed to create embedded fallback")
+	}
+	contents, ok := LocalSymbolLibraryForEmbedded(file.LibSymbols)
+	if !ok {
+		t.Fatal("expected local library for embedded fallback")
+	}
+	output := string(contents)
+	if !strings.Contains(output, `"Missing"`) || strings.Contains(output, `"Comparator:Missing"`) {
+		t.Fatalf("embedded local library did not unqualify the top-level symbol name:\n%s", output)
+	}
+	if !strings.Contains(output, `"Missing_1_1"`) {
+		t.Fatalf("embedded local library changed nested body geometry:\n%s", output)
+	}
+}
+
 func findTemplatePin(pins []TemplatePin, number string) (TemplatePin, bool) {
 	for _, pin := range pins {
 		if pin.Number == number {

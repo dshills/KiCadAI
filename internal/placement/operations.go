@@ -9,7 +9,7 @@ import (
 )
 
 func PlacementOperation(component Component, placement PlacementResult) (transactions.Operation, error) {
-	pads := padSpecs(component.Pads)
+	pads := padSpecs(component)
 	payload := transactions.PlaceFootprintOperation{
 		Op:                            transactions.OpPlaceFootprint,
 		Ref:                           firstNonEmpty(component.Ref, placement.Ref),
@@ -96,25 +96,30 @@ func PlacementOperations(request Request, placements []PlacementResult) ([]trans
 	return operations, issues
 }
 
-func padSpecs(pads []PadSummary) []transactions.PadSpec {
-	if len(pads) == 0 {
+func padSpecs(component Component) []transactions.PadSpec {
+	if len(component.Pads) == 0 {
 		return nil
 	}
-	specs := make([]transactions.PadSpec, 0, len(pads))
-	for _, pad := range pads {
+	specs := make([]transactions.PadSpec, 0, len(component.Pads))
+	for _, pad := range component.Pads {
 		var net *string
 		if value := strings.TrimSpace(pad.Net); value != "" {
 			net = &value
 		}
-		specs = append(specs, transactions.PadSpec{
+		spec := transactions.PadSpec{
 			Name:        pad.Name,
+			Type:        pad.Type,
+			Shape:       pad.Shape,
 			XMM:         pad.XMM,
 			YMM:         pad.YMM,
 			RotationDeg: pad.RotationDeg,
 			WidthMM:     pad.WidthMM,
 			HeightMM:    pad.HeightMM,
+			DrillMM:     pad.DrillMM,
+			Layers:      append([]string(nil), pad.Layers...),
 			Net:         net,
-		})
+		}
+		specs = append(specs, spec)
 	}
 	return specs
 }

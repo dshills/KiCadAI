@@ -30,10 +30,19 @@ func TestOperationPreservesRawJSON(t *testing.T) {
 
 func TestTransactionCloneIsolatesRawOperations(t *testing.T) {
 	tx := mustParse(t, `{"operations":[{"op":"create_project","name":"demo"}]}`)
+	tx.Operations[0].RebuildRefs = []string{"U1"}
+	tx.Operations[0].RebuildSourceLayers = []string{"F.Cu"}
+	tx.Operations[0].RebuildTargetLayers = []string{"B.Cu"}
 	clone := tx.Clone()
 	clone.Operations[0].Raw[0] = '['
+	clone.Operations[0].RebuildRefs[0] = "U2"
+	clone.Operations[0].RebuildSourceLayers[0] = "B.Cu"
+	clone.Operations[0].RebuildTargetLayers[0] = "F.Cu"
 	if tx.Operations[0].Raw[0] != '{' {
 		t.Fatalf("clone mutated source raw operation: %q", tx.Operations[0].Raw)
+	}
+	if tx.Operations[0].RebuildRefs[0] != "U1" || tx.Operations[0].RebuildSourceLayers[0] != "F.Cu" || tx.Operations[0].RebuildTargetLayers[0] != "B.Cu" {
+		t.Fatalf("clone mutated source rebuild metadata: %#v", tx.Operations[0])
 	}
 }
 

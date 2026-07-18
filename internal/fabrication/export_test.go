@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"kicadai/internal/kicadfiles"
+	"kicadai/internal/kicadfiles/checks"
 	pcbfiles "kicadai/internal/kicadfiles/pcb"
 	"kicadai/internal/reports"
 )
@@ -36,6 +37,12 @@ func TestExportPackageExecuteWritesArtifacts(t *testing.T) {
 	}
 	if result.ManifestPath == "" {
 		t.Fatalf("ManifestPath is empty")
+	}
+	if result.Summary.BOM != EvidencePass || result.Summary.CPL != EvidencePass {
+		t.Fatalf("BOM/CPL summary = %s/%s, want pass/pass", result.Summary.BOM, result.Summary.CPL)
+	}
+	if hasIssuePath(result.Issues, "bom") || hasIssuePath(result.Issues, "cpl") {
+		t.Fatalf("stale BOM/CPL issues = %#v", result.Issues)
 	}
 }
 
@@ -71,6 +78,29 @@ func TestExportPackageManifestsPhysicalRulesReport(t *testing.T) {
 	}
 }
 
+func TestExportPackageCopiesPassingBlockReadinessEvidence(t *testing.T) {
+	root := testFabricationProject(t)
+	promotionDir := filepath.Join(root, ".kicadai")
+	if err := os.MkdirAll(promotionDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	promotion := []byte(`{"status":"pass","achieved_readiness":"pass","matches_expectation":true,"gates":[{"status":"pass"}]}`)
+	if err := os.WriteFile(filepath.Join(promotionDir, "design-promotion.json"), promotion, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	result := ExportPackage(context.Background(), root, Options{Execute: true, Overwrite: true})
+	if result.Summary.BlockReadiness != EvidencePass {
+		t.Fatalf("block readiness = %s, issues = %#v", result.Summary.BlockReadiness, result.Issues)
+	}
+	artifact := manifestArtifact(result.Artifacts, ArtifactBlockReadiness)
+	if artifact.Status != ArtifactGenerated || artifact.Generator != GeneratorKiCadAI {
+		t.Fatalf("block readiness artifact = %#v", artifact)
+	}
+	if _, err := os.Stat(filepath.Join(root, "fabrication", "block-readiness.json")); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestExportPackageDryRunDoesNotCreatePlotDirectories(t *testing.T) {
 	root := testFabricationProject(t)
 	result := ExportPackage(context.Background(), root, Options{KiCadCLI: "kicad-cli"})
@@ -90,13 +120,15 @@ func TestExportPackageDryRunDoesNotCreatePlotDirectories(t *testing.T) {
 func TestExportPackageExecuteWithFakeRunnerWritesPlotDirectories(t *testing.T) {
 	root := testFabricationProject(t)
 	writeTestPCB(t, root, "demo.kicad_pcb")
+	writeTestSchematic(t, root)
 	result := ExportPackage(context.Background(), root, Options{
-		Execute:    true,
-		Overwrite:  true,
-		KiCadCLI:   "kicad-cli",
-		PlotRunner: writingPlotRunner{},
+		Execute:     true,
+		Overwrite:   true,
+		KiCadCLI:    "kicad-cli",
+		PlotRunner:  writingPlotRunner{},
+		CheckRunner: passingCheckRunner{},
 	})
-	for _, rel := range []string{"gerbers/demo-F_Cu.gbr", "drill/demo.drl"} {
+	for _, rel := range []string{"gerbers/demo-F_Cu.gbr", "drill/demo.drl", "erc.json", "drc.json"} {
 		if _, err := os.Stat(filepath.Join(root, "fabrication", rel)); err != nil {
 			t.Fatalf("%s not written: %v", rel, err)
 		}
@@ -109,6 +141,18 @@ func TestExportPackageExecuteWithFakeRunnerWritesPlotDirectories(t *testing.T) {
 	}
 	if result.Summary.Gerber != EvidencePass || result.Summary.Drill != EvidencePass {
 		t.Fatalf("summary gerber/drill = %s/%s, want pass/pass", result.Summary.Gerber, result.Summary.Drill)
+	}
+	if result.Summary.ERC != EvidencePass || result.Summary.DRC != EvidencePass {
+		t.Fatalf("summary ERC/DRC = %s/%s, want pass/pass", result.Summary.ERC, result.Summary.DRC)
+	}
+	for _, kind := range []ArtifactKind{ArtifactERC, ArtifactDRC} {
+		artifact := manifestArtifact(result.Artifacts, kind)
+		if artifact.Status != ArtifactGenerated || artifact.Generator != GeneratorKiCad || len(artifact.Files) != 1 {
+			t.Fatalf("%s artifact = %#v", kind, artifact)
+		}
+	}
+	if hasIssuePath(result.Issues, "gerber") || hasIssuePath(result.Issues, "drill") {
+		t.Fatalf("stale Gerber/drill issues = %#v", result.Issues)
 	}
 	data, err := os.ReadFile(filepath.Join(root, "fabrication", "package-manifest.json"))
 	if err != nil {
@@ -131,18 +175,27 @@ func TestExportPackageExecuteWithFakeRunnerWritesPlotDirectories(t *testing.T) {
 func TestExportPackageUsesCustomOutputPathForPlotArtifacts(t *testing.T) {
 	root := testFabricationProject(t)
 	writeTestPCB(t, root, "demo.kicad_pcb")
+	writeTestSchematic(t, root)
 	result := ExportPackage(context.Background(), root, Options{
-		Output:     "release",
-		Execute:    true,
-		Overwrite:  true,
-		KiCadCLI:   "kicad-cli",
-		PlotRunner: writingPlotRunner{},
+		Output:      "release",
+		Execute:     true,
+		Overwrite:   true,
+		KiCadCLI:    "kicad-cli",
+		PlotRunner:  writingPlotRunner{},
+		CheckRunner: passingCheckRunner{},
 	})
 	if path := artifactPath(result.Artifacts, ArtifactGerber); path != "release/gerbers" {
 		t.Fatalf("gerber artifact path = %q, want release/gerbers", path)
 	}
 	if path := artifactPath(result.Artifacts, ArtifactDrill); path != "release/drill" {
 		t.Fatalf("drill artifact path = %q, want release/drill", path)
+	}
+}
+
+func writeTestSchematic(t *testing.T, root string) {
+	t.Helper()
+	if err := os.WriteFile(filepath.Join(root, "demo.kicad_sch"), []byte("(kicad_sch)\n"), 0o644); err != nil {
+		t.Fatal(err)
 	}
 }
 
@@ -313,6 +366,36 @@ func manifestArtifact(artifacts []Artifact, kind ArtifactKind) Artifact {
 }
 
 type writingPlotRunner struct{}
+
+type passingCheckRunner struct{}
+
+func (passingCheckRunner) Version(context.Context, string) (string, error) {
+	return "10.0.3", nil
+}
+
+func (passingCheckRunner) Run(_ context.Context, _ string, _ string, args ...string) checks.CommandResult {
+	reportPath := ""
+	kind := "drc"
+	for index, arg := range args {
+		if arg == "erc" {
+			kind = "erc"
+		}
+		if arg == "--output" && index+1 < len(args) {
+			reportPath = args[index+1]
+		}
+	}
+	data := []byte("{\"$schema\":\"https://schemas.kicad.org/drc.v1.json\",\"coordinate_units\":\"mm\",\"kicad_version\":\"10.0.3\",\"violations\":[],\"schematic_parity\":[]}\n")
+	if kind == "erc" {
+		data = []byte("{\"$schema\":\"https://schemas.kicad.org/erc.v1.json\",\"coordinate_units\":\"mm\",\"kicad_version\":\"10.0.3\",\"sheets\":[{\"path\":\"/\",\"uuid_path\":\"/11111111-1111-4111-8111-111111111111\",\"violations\":[]}]}\n")
+	}
+	if reportPath == "" {
+		return checks.CommandResult{Args: args, ExitCode: 2, Err: os.ErrInvalid}
+	}
+	if err := os.WriteFile(reportPath, data, 0o644); err != nil {
+		return checks.CommandResult{Args: args, ExitCode: 2, Err: err}
+	}
+	return checks.CommandResult{Args: args, ExitCode: 0}
+}
 
 func (writingPlotRunner) RunPlotCommand(ctx context.Context, command PlotCommand) PlotCommandEvidence {
 	if err := ctx.Err(); err != nil {

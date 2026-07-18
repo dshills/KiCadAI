@@ -3,7 +3,9 @@ package components
 import (
 	"context"
 	"fmt"
+	"math"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 	"unicode"
@@ -64,6 +66,9 @@ type Query struct {
 	Package           string          `json:"package,omitempty"`
 	ValueKind         string          `json:"value_kind,omitempty"`
 	Value             string          `json:"value,omitempty"`
+	ToleranceKind     string          `json:"tolerance_kind,omitempty"`
+	MaximumTolerance  float64         `json:"maximum_tolerance,omitempty"`
+	ToleranceUnit     string          `json:"tolerance_unit,omitempty"`
 	MinVoltageV       float64         `json:"min_voltage_v,omitempty"`
 	MinimumConfidence ConfidenceLevel `json:"minimum_confidence,omitempty"`
 	Limit             int             `json:"limit,omitempty"`
@@ -307,7 +312,7 @@ func acceptedCandidateLess(leftAccepted acceptedCandidate, rightAccepted accepte
 		}
 		return left.Generic
 	}
-	if equivalentCandidate(left, right) && left.EquivalenceRole != right.EquivalenceRole {
+	if left.EquivalenceRole != right.EquivalenceRole {
 		return equivalenceRoleRank(left.EquivalenceRole) > equivalenceRoleRank(right.EquivalenceRole)
 	}
 	if left.ComponentID != right.ComponentID {
@@ -339,7 +344,7 @@ func equivalentCandidate(left Candidate, right Candidate) bool {
 }
 
 func hasExplicitSelectionPreference(left Candidate, right Candidate) bool {
-	return left.Generic != right.Generic
+	return left.Generic != right.Generic || equivalenceRoleRank(left.EquivalenceRole) != equivalenceRoleRank(right.EquivalenceRole)
 }
 
 func candidateEquivalence(record ComponentRecord) (string, EquivalenceRole) {
@@ -585,7 +590,7 @@ func fabricationCandidateReviewIssues(record ComponentRecord) []reports.Issue {
 	for _, rule := range record.DeratingRules {
 		switch rule.Kind {
 		case "thermal":
-			if (record.PowerSemiconductor != nil && record.PowerSemiconductor.FabricationProof) || (record.Capacitor != nil && record.Capacitor.FabricationProof) {
+			if (record.PowerSemiconductor != nil && record.PowerSemiconductor.FabricationProof) || (record.Capacitor != nil && record.Capacitor.FabricationProof) || (record.Resistor != nil && record.Resistor.FabricationProof) {
 				continue
 			}
 			message := "component requires unresolved " + strings.ReplaceAll(rule.Kind, "_", " ") + " evidence before fabrication-candidate selection"
@@ -644,6 +649,20 @@ func structuredEvidenceReviewIssues(record ComponentRecord, severity reports.Sev
 				value = reviewStatusUnknown
 			}
 			issues = append(issues, NewIssue(CodeComponentReviewRequired, severity, basePath+".capacitor_evidence."+review.path, "capacitor "+review.label+" evidence is not proven: "+value))
+		}
+	}
+	if record.Resistor != nil {
+		if record.Resistor.FabricationCandidateBlocks {
+			issues = append(issues, NewIssue(CodeComponentReviewRequired, severity, basePath+".resistor_evidence.fabrication_candidate_blocks", "resistor evidence blocks fabrication-candidate use until review is complete"))
+		}
+		if !record.Resistor.FabricationProof {
+			issues = append(issues, NewIssue(CodeComponentReviewRequired, severity, basePath+".resistor_evidence.fabrication_proof", "resistor lacks complete fabrication-oriented power-derating evidence"))
+		}
+		if status := record.Resistor.PulseStatus; status != reviewStatusProven && status != reviewStatusNotApplicable {
+			if status == "" {
+				status = reviewStatusUnknown
+			}
+			issues = append(issues, NewIssue(CodeComponentReviewRequired, severity, basePath+".resistor_evidence.pulse_status", "resistor pulse evidence is not proven: "+status))
 		}
 	}
 	if record.OpAmp != nil {
@@ -745,7 +764,40 @@ func recordMatchesQuery(record ComponentRecord, query Query, normalizedQueryText
 	if query.ValueKind != "" && !recordHasValue(record, query.ValueKind, query.Value) {
 		return false
 	}
+	if query.MaximumTolerance > 0 && !recordMeetsTolerance(record, query) {
+		return false
+	}
 	return true
+}
+
+func recordMeetsTolerance(record ComponentRecord, query Query) bool {
+	kind := query.ToleranceKind
+	if kind == "" {
+		kind = query.ValueKind
+	}
+	unit := query.ToleranceUnit
+	if unit == "" {
+		unit = "%"
+	}
+	if kind == "" {
+		return false
+	}
+	for _, constraint := range record.Tolerances {
+		if constraint.Kind != kind {
+			continue
+		}
+		value := constraint.Max
+		if value == "" {
+			value = constraint.Typ
+		}
+		got, ok := parseToleranceValue(value, constraint.Unit)
+		want, wantOK := normalizeToleranceValue(query.MaximumTolerance, unit)
+		if !ok || !wantOK {
+			return false
+		}
+		return got <= want
+	}
+	return false
 }
 
 func normalizeComponentSearchText(value string) string {
@@ -816,7 +868,79 @@ func scoreCandidate(record ComponentRecord, variant PackageVariant, query Query)
 	if query.ValueKind != "" {
 		score += 5
 	}
+	if query.MaximumTolerance > 0 {
+		score += 3 + recordToleranceSpecificity(record, query)
+	}
 	return score
+}
+
+func recordToleranceSpecificity(record ComponentRecord, query Query) int {
+	kind := query.ToleranceKind
+	if kind == "" {
+		kind = query.ValueKind
+	}
+	unit := query.ToleranceUnit
+	if unit == "" {
+		unit = "%"
+	}
+	want, ok := normalizeToleranceValue(query.MaximumTolerance, unit)
+	if !ok {
+		return 0
+	}
+	for _, constraint := range record.Tolerances {
+		if constraint.Kind != kind {
+			continue
+		}
+		value := constraint.Max
+		if value == "" {
+			value = constraint.Typ
+		}
+		got, gotOK := parseToleranceValue(value, constraint.Unit)
+		if !gotOK {
+			return 0
+		}
+		if got == want {
+			return 2
+		}
+		if got < want {
+			return 1
+		}
+	}
+	return 0
+}
+
+func parseToleranceValue(value, unit string) (float64, bool) {
+	trimmed := strings.TrimSpace(value)
+	normalizedUnit := strings.ToLower(strings.TrimSpace(unit))
+	switch {
+	case strings.HasSuffix(trimmed, "%"):
+		normalizedUnit = "%"
+		trimmed = strings.TrimSpace(strings.TrimSuffix(trimmed, "%"))
+	case strings.HasSuffix(strings.ToLower(trimmed), "ppm"):
+		normalizedUnit = "ppm"
+		trimmed = strings.TrimSpace(trimmed[:len(trimmed)-3])
+	}
+	number, err := strconv.ParseFloat(trimmed, 64)
+	if err != nil {
+		return 0, false
+	}
+	return normalizeToleranceValue(number, normalizedUnit)
+}
+
+func normalizeToleranceValue(value float64, unit string) (float64, bool) {
+	if math.IsNaN(value) || math.IsInf(value, 0) || value < 0 {
+		return 0, false
+	}
+	switch strings.ToLower(strings.TrimSpace(unit)) {
+	case "", "%", "percent":
+		return value / 100, true
+	case "ppm":
+		return value * 1e-6, true
+	case "fraction", "ratio":
+		return value, true
+	default:
+		return 0, false
+	}
 }
 
 func candidateReasons(record ComponentRecord, variant PackageVariant, query Query) []string {
@@ -829,6 +953,9 @@ func candidateReasons(record ComponentRecord, variant PackageVariant, query Quer
 	}
 	if query.ValueKind != "" {
 		reasons = append(reasons, "value")
+	}
+	if query.MaximumTolerance > 0 {
+		reasons = append(reasons, "tolerance")
 	}
 	return reasons
 }

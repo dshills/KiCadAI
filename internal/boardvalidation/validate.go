@@ -112,10 +112,10 @@ func validateBoard(ctx context.Context, result *Result, target Target, board *pc
 	result.AddCheck(Check{Name: CheckGeneratedConnectivity, Required: true, Issues: connectivityIssues})
 
 	graph := buildBoardConnectivity(board)
-	netStatuses, unroutedIssues := graph.netStatuses(opts)
+	netStatuses, unroutedIssues := graph.netStatuses(opts, len(connectivityIssues) == 0)
 	result.Nets = netStatuses
 	result.AddCheck(Check{Name: CheckUnroutedNetValidation, Required: true, Issues: unroutedIssues})
-	result.AddCheck(Check{Name: CheckRouteCompletion, Required: true, Issues: validateRouteCompletion(board, graph)})
+	result.AddCheck(Check{Name: CheckRouteCompletion, Required: true, Issues: validateRouteCompletion(board, graph, len(connectivityIssues) == 0)})
 
 	zoneStatuses, zoneIssues := validateZones(board, opts)
 	result.Zones = zoneStatuses
@@ -345,7 +345,7 @@ func (graph boardConnectivity) addViaEdges(netCode int, point kicadfiles.Point, 
 	}
 }
 
-func (graph boardConnectivity) netStatuses(opts Options) ([]NetStatus, []reports.Issue) {
+func (graph boardConnectivity) netStatuses(opts Options, generatedConnectivityValid bool) ([]NetStatus, []reports.Issue) {
 	netCodes := make([]int, 0, len(graph.netNames))
 	for code := range graph.netNames {
 		if code > 0 {
@@ -359,13 +359,31 @@ func (graph boardConnectivity) netStatuses(opts Options) ([]NetStatus, []reports
 		pads := graph.netPads[code]
 		copperCount := graph.netCopperCount[code]
 		zoneCount := graph.netZoneCount[code]
+		centerPointConnected := graph.allPadsHaveRouteAnchor(code, pads) && graph.sameNetCopperIsConnected(code, pads)
 		status := NetStatusIgnored
 		switch {
 		case len(pads) == 0:
 			status = NetStatusIgnored
 		case len(pads) == 1:
 			status = NetStatusSingleEndpoint
-		case graph.allPadsHaveRouteAnchor(code, pads) && graph.sameNetCopperIsConnected(code, pads):
+		case generatedConnectivityValid:
+			// ValidateGeneratedConnectivity models pad extents, trace widths,
+			// segment intersections, vias, and layer spans. Once that complete
+			// board proof succeeds, do not let this lightweight center-point
+			// summary contradict it.
+			status = NetStatusFullyRouted
+			if !centerPointConnected {
+				issues = append(issues, reports.Issue{
+					Code:       reports.CodeValidationTrace,
+					Severity:   reports.SeverityInfo,
+					Path:       "pcb.connectivity.center_point_summary." + graph.netNames[code],
+					Message:    "extent-aware generated connectivity passed while the secondary center-point heuristic did not",
+					Suggestion: "no repair required; center-point anchoring is intentionally non-authoritative after the complete extent-aware proof passes",
+					Refs:       refsForPads(pads),
+					Nets:       []string{graph.netNames[code]},
+				})
+			}
+		case centerPointConnected:
 			status = NetStatusFullyRouted
 		case copperCount == 0 && zoneCount > 0:
 			status = NetStatusZoneDependent
@@ -501,23 +519,23 @@ func refsForPads(pads []connectivityPad) []string {
 	return refs
 }
 
-func validateRouteCompletion(board *pcbfiles.PCBFile, graph boardConnectivity) []reports.Issue {
+func validateRouteCompletion(board *pcbfiles.PCBFile, graph boardConnectivity, generatedConnectivityValid bool) []reports.Issue {
 	var issues []reports.Issue
 	netNames := graph.netNames
 	for index, track := range board.Tracks {
 		path := fmt.Sprintf("tracks.%d", index)
 		issues = append(issues, validateRouteNetAndLayer(path, track.NetCode, track.NetName, string(track.Layer), netNames)...)
 		if track.NetCode > 0 {
-			issues = append(issues, validateRouteEndpoint(path+".start", track.NetCode, track.Start, track.Layer, graph)...)
-			issues = append(issues, validateRouteEndpoint(path+".end", track.NetCode, track.End, track.Layer, graph)...)
+			issues = append(issues, validateRouteEndpointWithProofStatus(path+".start", track.NetCode, track.Start, track.Layer, graph, generatedConnectivityValid)...)
+			issues = append(issues, validateRouteEndpointWithProofStatus(path+".end", track.NetCode, track.End, track.Layer, graph, generatedConnectivityValid)...)
 		}
 	}
 	for index, arc := range board.TrackArcs {
 		path := fmt.Sprintf("track_arcs.%d", index)
 		issues = append(issues, validateRouteNetAndLayer(path, arc.NetCode, arc.NetName, string(arc.Layer), netNames)...)
 		if arc.NetCode > 0 {
-			issues = append(issues, validateRouteEndpoint(path+".start", arc.NetCode, arc.Start, arc.Layer, graph)...)
-			issues = append(issues, validateRouteEndpoint(path+".end", arc.NetCode, arc.End, arc.Layer, graph)...)
+			issues = append(issues, validateRouteEndpointWithProofStatus(path+".start", arc.NetCode, arc.Start, arc.Layer, graph, generatedConnectivityValid)...)
+			issues = append(issues, validateRouteEndpointWithProofStatus(path+".end", arc.NetCode, arc.End, arc.Layer, graph, generatedConnectivityValid)...)
 		}
 	}
 	for index, via := range board.Vias {
@@ -533,6 +551,19 @@ func validateRouteCompletion(board *pcbfiles.PCBFile, graph boardConnectivity) [
 				issues = append(issues, invalidRouteIssue(fmt.Sprintf("%s.layers.%d", path, layerIndex), "via layer must be copper", netIssueNames(via.NetCode, netNames)))
 			}
 		}
+	}
+	return issues
+}
+
+func validateRouteEndpointWithProofStatus(path string, netCode int, point kicadfiles.Point, layer kicadfiles.BoardLayer, graph boardConnectivity, generatedConnectivityValid bool) []reports.Issue {
+	issues := validateRouteEndpoint(path, netCode, point, layer, graph)
+	if !generatedConnectivityValid {
+		return issues
+	}
+	for index := range issues {
+		issues[index].Code = reports.CodeValidationTrace
+		issues[index].Severity = reports.SeverityInfo
+		issues[index].Suggestion = "no repair required; the complete extent-aware connectivity proof is authoritative"
 	}
 	return issues
 }

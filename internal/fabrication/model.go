@@ -10,6 +10,8 @@ import (
 
 	"kicadai/internal/components"
 	"kicadai/internal/fabrication/physicalrules"
+	"kicadai/internal/kicadfiles/checks"
+	"kicadai/internal/libraryresolver"
 	"kicadai/internal/reports"
 )
 
@@ -33,6 +35,7 @@ const (
 	ArtifactDrill           ArtifactKind = "drill"
 	ArtifactERC             ArtifactKind = "erc"
 	ArtifactDRC             ArtifactKind = "drc"
+	ArtifactBlockReadiness  ArtifactKind = "block_readiness"
 	ArtifactPhysicalRules   ArtifactKind = "physical_rules"
 	ArtifactReadinessReport ArtifactKind = "readiness_report"
 )
@@ -123,7 +126,12 @@ type Options struct {
 	ManufacturerProfileDir string                       `json:"manufacturer_profile_dir,omitempty"`
 	SourceDir              string                       `json:"source_dir,omitempty"`
 	PlotRunner             PlotRunner                   `json:"-"`
+	CheckRunner            checks.Runner                `json:"-"`
+	LibraryIndex           libraryresolver.LibraryIndex `json:"-"`
+	HasLibraryIndex        bool                         `json:"-"`
+	LibraryIssues          []reports.Issue              `json:"-"`
 	Sources                *components.SourceCollection `json:"-"`
+	BlockReadinessReport   []byte                       `json:"-"`
 }
 
 type Manifest struct {
@@ -302,7 +310,7 @@ func ValidateManifest(manifest Manifest) []reports.Issue {
 
 func validArtifactKind(kind ArtifactKind) bool {
 	switch kind {
-	case ArtifactBOM, ArtifactCPL, ArtifactManifest, ArtifactGerber, ArtifactDrill, ArtifactERC, ArtifactDRC, ArtifactPhysicalRules, ArtifactReadinessReport:
+	case ArtifactBOM, ArtifactCPL, ArtifactManifest, ArtifactGerber, ArtifactDrill, ArtifactERC, ArtifactDRC, ArtifactBlockReadiness, ArtifactPhysicalRules, ArtifactReadinessReport:
 		return true
 	default:
 		return false
@@ -413,6 +421,8 @@ func reportsArtifactKind(kind ArtifactKind) reports.ArtifactKind {
 		return reports.ArtifactERCReport
 	case ArtifactDRC:
 		return reports.ArtifactDRCReport
+	case ArtifactBlockReadiness:
+		return reports.ArtifactPromotionReport
 	case ArtifactManifest, ArtifactPhysicalRules, ArtifactReadinessReport:
 		return reports.ArtifactFabricationPackage
 	default:

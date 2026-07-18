@@ -163,6 +163,22 @@ func (builder *promotionReportBuilder) addConnectivityGate() {
 	})
 }
 
+func promotionRouteGateStatusForStage(stage StageResult) PromotionGateStatus {
+	status := promotionGateStatusForStage(stage)
+	if status != PromotionGateStatusWarn {
+		return status
+	}
+	for _, issue := range stage.Issues {
+		if issue.Severity != reports.SeverityWarning {
+			continue
+		}
+		if !strings.HasPrefix(strings.TrimSpace(issue.Path), "component_hints.") {
+			return status
+		}
+	}
+	return PromotionGateStatusPass
+}
+
 func (builder *promotionReportBuilder) connectivityIssueSatisfiedByKiCad(issue PromotionIssue) bool {
 	message := strings.TrimSpace(issue.Message)
 	switch {
@@ -237,7 +253,7 @@ func (builder *promotionReportBuilder) addRouteGate() {
 		})
 		return
 	}
-	status := promotionGateStatusForStage(stage)
+	status := promotionRouteGateStatusForStage(stage)
 	if status == PromotionGateStatusPass {
 		if summary, ok := promotionRouteConnectivitySummary(stage); ok {
 			if summary.RoutesAttempted > summary.EndpointContactsProven {

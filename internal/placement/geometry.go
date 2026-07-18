@@ -63,7 +63,7 @@ func ValidateGeometry(request Request, placements []PlacementResult) []reports.I
 	for _, component := range request.Components {
 		components[strings.ToUpper(component.Ref)] = component
 	}
-	occupancy := newOccupancy(request)
+	occupancy := newValidationOccupancy(request)
 	for i := range placements {
 		placement := &placements[i]
 		path := fmt.Sprintf("placements[%d]", i)
@@ -125,8 +125,9 @@ func NewPlacementResult(component Component, placement Placement, rules Rules) (
 }
 
 type occupancy struct {
-	placements []PlacementResult
-	keepouts   []Keepout
+	placements             []PlacementResult
+	keepouts               []Keepout
+	physicalCollisionPairs map[string]struct{}
 }
 
 type occupancyConflictKind string
@@ -157,6 +158,47 @@ func (conflict occupancyConflict) Message() string {
 
 func newOccupancy(request Request) *occupancy {
 	return &occupancy{keepouts: request.Keepouts}
+}
+
+func newValidationOccupancy(request Request) *occupancy {
+	physicalPairs := map[string]struct{}{}
+	groupRefs := map[string][]string{}
+	for _, group := range request.Groups {
+		if !group.TranslateAsUnit {
+			continue
+		}
+		groupKey := strings.ToUpper(strings.TrimSpace(group.ID))
+		groupRefs[groupKey] = append(groupRefs[groupKey], group.Components...)
+		for left := 0; left < len(group.Components); left++ {
+			for right := left + 1; right < len(group.Components); right++ {
+				physicalPairs[placementPairKey(group.Components[left], group.Components[right])] = struct{}{}
+			}
+		}
+	}
+	keepouts := append([]Keepout(nil), request.Keepouts...)
+	for index := range keepouts {
+		refs := groupRefs[strings.ToUpper(strings.TrimSpace(keepouts[index].GroupID))]
+		keepouts[index].ExemptRefs = appendUniqueNormalizedRefs(keepouts[index].ExemptRefs, refs...)
+	}
+	return &occupancy{keepouts: keepouts, physicalCollisionPairs: physicalPairs}
+}
+
+func appendUniqueNormalizedRefs(existing []string, incoming ...string) []string {
+	seen := make(map[string]struct{}, len(existing)+len(incoming))
+	result := make([]string, 0, len(existing)+len(incoming))
+	for _, ref := range append(append([]string(nil), existing...), incoming...) {
+		ref = normalizeRef(ref)
+		if ref == "" {
+			continue
+		}
+		if _, ok := seen[ref]; ok {
+			continue
+		}
+		seen[ref] = struct{}{}
+		result = append(result, ref)
+	}
+	slices.Sort(result)
+	return result
 }
 
 func (o *occupancy) Add(placement PlacementResult) {
@@ -191,11 +233,39 @@ func (o *occupancy) FirstConflictDetail(candidate PlacementResult) (occupancyCon
 		if !strings.EqualFold(existing.Position.Layer, candidateLayer) {
 			continue
 		}
-		if existing.Bounds.Intersects(candidate.Bounds) {
+		// Fixed placements are immutable authored geometry. Coarse component
+		// bounds cannot safely decide that two distinct authored anchors collide;
+		// exact pad/courtyard and KiCad DRC checks remain authoritative. Preserve
+		// the deterministic duplicate-anchor rejection here.
+		if existing.Fixed && candidate.Fixed {
+			if math.Abs(existing.Position.XMM-candidate.Position.XMM) <= placementCompareEpsilon && math.Abs(existing.Position.YMM-candidate.Position.YMM) <= placementCompareEpsilon {
+				return occupancyConflict{Kind: occupancyConflictComponent, Name: existing.Ref}, true
+			}
+			continue
+		}
+		existingBounds := existing.Bounds
+		candidateBounds := candidate.Bounds
+		_, authoredPair := o.physicalCollisionPairs[placementPairKey(existing.Ref, candidate.Ref)]
+		if authoredPair {
+			if math.Abs(existing.Position.XMM-candidate.Position.XMM) <= placementCompareEpsilon && math.Abs(existing.Position.YMM-candidate.Position.YMM) <= placementCompareEpsilon {
+				return occupancyConflict{Kind: occupancyConflictComponent, Name: existing.Ref}, true
+			}
+			continue
+		}
+		if existingBounds.Intersects(candidateBounds) {
 			return occupancyConflict{Kind: occupancyConflictComponent, Name: existing.Ref}, true
 		}
 	}
 	return occupancyConflict{}, false
+}
+
+func placementPairKey(left string, right string) string {
+	left = strings.ToUpper(strings.TrimSpace(left))
+	right = strings.ToUpper(strings.TrimSpace(right))
+	if left > right {
+		left, right = right, left
+	}
+	return left + "\x00" + right
 }
 
 func rotatedBounds(bounds Bounds, placement Placement, spacing float64) Rect {

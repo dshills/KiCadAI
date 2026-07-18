@@ -36,6 +36,29 @@ func TestPreserveRelativeGroupPlacementTranslatesClusterAroundObstacle(t *testin
 	}
 }
 
+func TestPreserveRelativeGroupPlacementUsesPhysicalInternalClearance(t *testing.T) {
+	rules := DefaultRules()
+	rules.GridMM = 0.25
+	rules.ComponentSpacingMM = 1
+	request := Request{
+		Board: BoardPlacementArea{WidthMM: 20, HeightMM: 20},
+		Rules: rules,
+		Components: []Component{
+			{Ref: "U1", FootprintID: "Test:U", Bounds: Bounds{WidthMM: 2, HeightMM: 2, Source: BoundsExplicit}, Position: &Placement{XMM: 5, YMM: 5, Layer: "F.Cu"}, Rotation: RotationConstraint{FixedDeg: float64Pointer(0)}},
+			{Ref: "C1", FootprintID: "Test:C", Bounds: Bounds{WidthMM: 2, HeightMM: 2, Source: BoundsExplicit}, Position: &Placement{XMM: 7.25, YMM: 5, Layer: "F.Cu"}, Rotation: RotationConstraint{FixedDeg: float64Pointer(0)}},
+		},
+		Groups: []Group{{ID: "core", Components: []string{"U1", "C1"}, Anchor: GroupAnchor{Ref: "U1"}, KeepTogether: true, TranslateAsUnit: true}},
+	}
+
+	result := Place(request)
+	if result.Status != StatusPlaced || result.Metrics.PlacedCount != 2 {
+		t.Fatalf("placement = %#v, want authored physically clear group preserved", result)
+	}
+	if issues := ValidateGeometry(request, result.Placements); len(issues) != 0 {
+		t.Fatalf("geometry issues = %#v", issues)
+	}
+}
+
 func TestPreserveRelativeGroupPlacementKeepsEdgeConstrainedAnchorAtEdge(t *testing.T) {
 	rules := DefaultRules()
 	rules.GridMM = 1
@@ -86,6 +109,32 @@ func TestPreserveRelativeGroupPlacementKeepsGroupBoundsInsideUsableBoard(t *test
 	}
 }
 
+func TestPreserveRelativeEdgeGroupAllowsEnvelopeInsidePhysicalBoardMargin(t *testing.T) {
+	rules := DefaultRules()
+	rules.GridMM = 0.5
+	rules.BoardEdgeClearanceMM = 1
+	bounds := Rect{Min: Point{XMM: 0, YMM: 4}, Max: Point{XMM: 8, YMM: 16}}
+	request := Request{
+		Board: BoardPlacementArea{WidthMM: 20, HeightMM: 20},
+		Rules: rules,
+		Components: []Component{{
+			Ref: "J1", FootprintID: "Test:J", Bounds: Bounds{WidthMM: 2, HeightMM: 4, AnchorOffset: Point{XMM: 1, YMM: 2}, Source: BoundsExplicit},
+			Position: &Placement{XMM: 2, YMM: 10, Layer: "F.Cu"}, Rotation: RotationConstraint{FixedDeg: float64Pointer(0)}, Edge: EdgeLeft,
+		}},
+		Groups: []Group{{ID: "edge", Components: []string{"J1"}, Anchor: GroupAnchor{Ref: "J1"}, Bounds: &bounds, TranslateAsUnit: true}},
+	}
+
+	result := Place(request)
+	if result.Status != StatusPlaced {
+		t.Fatalf("placement = %#v, want edge group envelope preserved inside physical board", result)
+	}
+	placed := result.Placements[0].Position
+	translated := translatedGroupBounds(bounds, *request.Components[0].Position, placed)
+	if translated.Min.XMM != 0 || translated.Max.XMM > request.Board.WidthMM {
+		t.Fatalf("translated edge envelope = %#v, want physical-board containment", translated)
+	}
+}
+
 func TestTranslatedKeepoutFollowsRigidGroupAnchor(t *testing.T) {
 	request := Request{
 		Components: []Component{{Ref: "U1", Position: &Placement{XMM: 5, YMM: 6}}},
@@ -128,6 +177,26 @@ func TestRigidGroupTranslationKeepsOwnedKeepoutClearOfExistingComponent(t *testi
 	}
 	if keepouts[0].Bounds.Intersects(existing.Bounds) {
 		t.Fatalf("translated keepout %#v intersects existing component %#v", keepouts[0], existing)
+	}
+}
+
+func TestRigidGroupOwnedKeepoutDoesNotRejectAuthoredMember(t *testing.T) {
+	rules := DefaultRules()
+	rules.GridMM = 1
+	request := Request{
+		Board: BoardPlacementArea{WidthMM: 20, HeightMM: 20},
+		Rules: rules,
+		Components: []Component{
+			{Ref: "J1", FootprintID: "Test:J", Bounds: Bounds{WidthMM: 2, HeightMM: 2, AnchorOffset: Point{XMM: 1, YMM: 1}, Source: BoundsExplicit}, Position: &Placement{XMM: 5, YMM: 10, Layer: "F.Cu"}, Rotation: RotationConstraint{FixedDeg: float64Pointer(0)}},
+			{Ref: "R1", FootprintID: "Test:R", Bounds: Bounds{WidthMM: 2, HeightMM: 1, AnchorOffset: Point{XMM: 1, YMM: 0.5}, Source: BoundsExplicit}, Position: &Placement{XMM: 8, YMM: 10, Layer: "F.Cu"}, Rotation: RotationConstraint{FixedDeg: float64Pointer(0)}},
+		},
+		Groups:   []Group{{ID: "entry", Components: []string{"J1", "R1"}, Anchor: GroupAnchor{Ref: "J1"}, TranslateAsUnit: true}},
+		Keepouts: []Keepout{{ID: "edge", GroupID: "entry", Bounds: Rect{Min: Point{XMM: 3, YMM: 7}, Max: Point{XMM: 8.25, YMM: 13}}, ExemptRefs: []string{"J1"}}},
+	}
+
+	result := Place(request)
+	if result.Status != StatusPlaced {
+		t.Fatalf("placement = %#v, want authored member preserved inside its group-owned envelope", result)
 	}
 }
 

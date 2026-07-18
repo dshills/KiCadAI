@@ -21,7 +21,7 @@ import (
 var explicitSinglePadNetPatterns = []*regexp.Regexp{
 	regexp.MustCompile(`^(?i:PORT|EXPORT)_[A-Z0-9_.+\-]+$`),
 	regexp.MustCompile(`^(?i:IN|OUT|INPUT|OUTPUT)$`),
-	regexp.MustCompile(`^(?i:GND|GNDA|GNDD|VCC|VDD|VSS|VEE)$`),
+	regexp.MustCompile(`^(?i:GND|GNDA|GNDD|VCC|VDD|VSS|VEE|VIN|VOUT)$`),
 	regexp.MustCompile(`^[+-]?(?:[0-9]+(?:V[0-9]+|[._][0-9]+V?)|[0-9]+V)$`),
 }
 
@@ -421,11 +421,17 @@ func isExplicitSinglePadNet(netName string) bool {
 	if normalized == "" {
 		return false
 	}
+	candidates := []string{normalized}
+	if separator := strings.LastIndexAny(normalized, "_./:"); separator >= 0 && separator+1 < len(normalized) {
+		candidates = append(candidates, normalized[separator+1:])
+	}
 	explicitSinglePadNetPatternsMu.RLock()
 	defer explicitSinglePadNetPatternsMu.RUnlock()
-	for _, pattern := range explicitSinglePadNetPatterns {
-		if pattern.MatchString(normalized) {
-			return true
+	for _, candidate := range candidates {
+		for _, pattern := range explicitSinglePadNetPatterns {
+			if pattern.MatchString(candidate) {
+				return true
+			}
 		}
 	}
 	return false

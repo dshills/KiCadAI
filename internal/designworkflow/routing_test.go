@@ -45,6 +45,18 @@ func TestExistingCopperFromRouteOperationsIncludesLocalRouteSegments(t *testing.
 	}
 }
 
+func TestCombinedSequentialRouteStatusUsesKnownCurrentTerminalState(t *testing.T) {
+	if got := combinedSequentialRouteStatus(routing.RouteStatusFailed, routing.RouteStatusRouted); got != routing.RouteStatusRouted {
+		t.Fatalf("failed then routed status = %q", got)
+	}
+	if got := combinedSequentialRouteStatus(routing.RouteStatusRouted, routing.RouteStatusFailed); got != routing.RouteStatusFailed {
+		t.Fatalf("routed then failed status = %q", got)
+	}
+	if got := combinedSequentialRouteStatus(routing.RouteStatusRouted, routing.RouteStatus("future")); got != routing.RouteStatusRouted {
+		t.Fatalf("unknown current status replaced known prior: %q", got)
+	}
+}
+
 func TestExistingCopperFromRouteOperationsSkipsSignalLocalRoutesWithoutVias(t *testing.T) {
 	operation := transactions.NewOperation(transactions.OpRoute, []byte(`{"op":"route","net_name":"SDA","layer":"F.Cu","width_mm":0.25,"points":[{"x_mm":1,"y_mm":2},{"x_mm":6,"y_mm":2}]}`))
 
@@ -280,6 +292,308 @@ func TestTranslatedUnitLocalRoutePointsMovesAuthoredWaypointsWithGroup(t *testin
 	}
 }
 
+func TestPlacedLocalRouteEntryAnchorPointPreservesCommonTranslation(t *testing.T) {
+	fragment := BlockFragment{
+		PlacementGroups: []blocks.PCBPlacementGroup{{ID: "decoupling", ComponentRoles: []string{"ceramic", "bulk"}, TranslateAsUnit: true}},
+		Realization: blocks.BlockPCBRealizationResult{
+			RoleRefs: map[string]string{"ceramic": "C1", "bulk": "C2"},
+			Components: []blocks.RealizedPCBComponent{
+				{Ref: "C1", Placement: blocks.RelativePlacement{XMM: 10, YMM: 15}},
+				{Ref: "C2", Placement: blocks.RelativePlacement{XMM: 19, YMM: 15}},
+			},
+			LocalRoutes: []blocks.RealizedPCBLocalRoute{
+				{From: transactions.Endpoint{Ref: "@anchor:vcc", Pin: "VCC"}, To: transactions.Endpoint{Ref: "C1", Pin: "1"}},
+				{From: transactions.Endpoint{Ref: "@anchor:vcc", Pin: "VCC"}, To: transactions.Endpoint{Ref: "C2", Pin: "1"}},
+			},
+		},
+	}
+	resolver := PlacedPadEndpointResolver{sorted: []PlacedPadEndpoint{
+		{Ref: "C1", ComponentAt: transactions.Point{XMM: 40, YMM: 55}},
+		{Ref: "C2", ComponentAt: transactions.Point{XMM: 49, YMM: 55}},
+	}}
+
+	got, ok := placedLocalRouteEntryAnchorPoint(fragment, "vcc", transactions.Point{XMM: 6, YMM: 15}, resolver, placement.BoardPlacementArea{WidthMM: 100, HeightMM: 100, MarginMM: 1})
+	want := transactions.Point{XMM: 36, YMM: 55}
+	if !ok || !pointsNearlyEqual(got, want) {
+		t.Fatalf("translated anchor = %#v ok=%v, want %#v", got, ok, want)
+	}
+}
+
+func TestPlacedLocalRouteEntryAnchorPointRelocatesSinglePadHandoffFromForeignPad(t *testing.T) {
+	fragment := BlockFragment{
+		Realization: blocks.BlockPCBRealizationResult{
+			Components: []blocks.RealizedPCBComponent{
+				{Ref: "Q1", Placement: blocks.RelativePlacement{XMM: 20, YMM: 10}},
+			},
+			LocalRoutes: []blocks.RealizedPCBLocalRoute{
+				{From: transactions.Endpoint{Ref: "@anchor:vcc", Pin: "VCC"}, To: transactions.Endpoint{Ref: "Q1", Pin: "2"}},
+			},
+		},
+	}
+	pad := PlacedPadEndpoint{Ref: "Q1", Pad: "2", Point: transactions.Point{XMM: 42.5, YMM: 31}, ComponentAt: transactions.Point{XMM: 40, YMM: 31}}
+	foreign := PlacedPadEndpoint{Ref: "Q2", Pad: "1", NetName: "BIAS", Point: transactions.Point{XMM: 26, YMM: 36}, ComponentAt: transactions.Point{XMM: 26, YMM: 36}}
+	pad.NetName = "VCC"
+	resolver := PlacedPadEndpointResolver{
+		sorted: []PlacedPadEndpoint{pad, foreign},
+		endpoints: map[routeEndpointMapKey]PlacedPadEndpoint{
+			routeEndpointKey("Q1", "2"): pad,
+			routeEndpointKey("Q2", "1"): foreign,
+		},
+	}
+
+	got, ok := placedLocalRouteEntryAnchorPoint(fragment, "vcc", transactions.Point{XMM: 6, YMM: 15}, resolver, placement.BoardPlacementArea{WidthMM: 100, HeightMM: 100, MarginMM: 1})
+	if !ok || !pointsNearlyEqual(got, pad.Point) {
+		t.Fatalf("foreign-pad anchor = %#v ok=%v, want physical pad %#v", got, ok, pad.Point)
+	}
+}
+
+func TestPlacedLocalRouteEntryAnchorPointRelocatesSinglePadHandoffFromForeignPadEnvelope(t *testing.T) {
+	fragment := BlockFragment{
+		Realization: blocks.BlockPCBRealizationResult{
+			Components:  []blocks.RealizedPCBComponent{{Ref: "Q1", Placement: blocks.RelativePlacement{XMM: 20, YMM: 10}}},
+			LocalRoutes: []blocks.RealizedPCBLocalRoute{{From: transactions.Endpoint{Ref: "@anchor:vcc", Pin: "VCC"}, To: transactions.Endpoint{Ref: "Q1", Pin: "2"}}},
+		},
+	}
+	pad := PlacedPadEndpoint{Ref: "Q1", Pad: "2", NetName: "VCC", Point: transactions.Point{XMM: 42.5, YMM: 31}, ComponentAt: transactions.Point{XMM: 40, YMM: 31}}
+	foreign := PlacedPadEndpoint{Ref: "Q2", Pad: "1", NetName: "BIAS", Point: transactions.Point{XMM: 27.5, YMM: 36}, ComponentAt: transactions.Point{XMM: 27.5, YMM: 36}, PadWidthMM: 2.5, PadHeightMM: 2.5}
+	resolver := PlacedPadEndpointResolver{
+		sorted: []PlacedPadEndpoint{pad, foreign},
+		endpoints: map[routeEndpointMapKey]PlacedPadEndpoint{
+			routeEndpointKey("Q1", "2"): pad,
+			routeEndpointKey("Q2", "1"): foreign,
+		},
+	}
+
+	got, ok := placedLocalRouteEntryAnchorPoint(fragment, "vcc", transactions.Point{XMM: 6, YMM: 15}, resolver, placement.BoardPlacementArea{WidthMM: 100, HeightMM: 100, MarginMM: 1})
+	if !ok || !pointsNearlyEqual(got, pad.Point) {
+		t.Fatalf("foreign-pad-envelope anchor = %#v ok=%v, want physical pad %#v", got, ok, pad.Point)
+	}
+}
+
+func TestRelocateSinglePadEntryAnchorUsesCircularPadRadius(t *testing.T) {
+	attachedEndpoint := transactions.Endpoint{Ref: "Q1", Pin: "2"}
+	attachedPad := PlacedPadEndpoint{Ref: "Q1", Pad: "2", NetName: "VCC", Point: transactions.Point{XMM: 10, YMM: 10}}
+	foreignCircle := PlacedPadEndpoint{
+		Ref:         "C1",
+		Pad:         "1",
+		NetName:     "BIAS",
+		Point:       transactions.Point{},
+		PadWidthMM:  2,
+		PadHeightMM: 2,
+		PadShape:    "circle",
+	}
+	resolver := PlacedPadEndpointResolver{
+		sorted: []PlacedPadEndpoint{attachedPad, foreignCircle},
+		endpoints: map[routeEndpointMapKey]PlacedPadEndpoint{
+			routeEndpointKey(attachedEndpoint.Ref, attachedEndpoint.Pin): attachedPad,
+		},
+	}
+	// This point clears the 1 mm circular radius plus contact tolerance, but
+	// lies inside the old 1.414 mm diagonal estimate.
+	point := transactions.Point{XMM: 1.2}
+
+	got, ok := relocateSinglePadEntryAnchor(point, map[routeEndpointMapKey]transactions.Endpoint{
+		routeEndpointKey(attachedEndpoint.Ref, attachedEndpoint.Pin): attachedEndpoint,
+	}, 0, resolver, placement.BoardPlacementArea{WidthMM: 100, HeightMM: 100})
+	if !ok || !pointsNearlyEqual(got, point) {
+		t.Fatalf("circular-pad anchor = %#v ok=%v, want unchanged %#v", got, ok, point)
+	}
+}
+
+func TestPlacedLocalRouteEntryAnchorPointRelocatesWideTraceFromUnconnectedPad(t *testing.T) {
+	fragment := BlockFragment{
+		Realization: blocks.BlockPCBRealizationResult{
+			Components:  []blocks.RealizedPCBComponent{{Ref: "Q1", Placement: blocks.RelativePlacement{XMM: 20, YMM: 10}}},
+			LocalRoutes: []blocks.RealizedPCBLocalRoute{{From: transactions.Endpoint{Ref: "@anchor:vcc", Pin: "VCC"}, To: transactions.Endpoint{Ref: "Q1", Pin: "2"}}},
+		},
+	}
+	pad := PlacedPadEndpoint{Ref: "Q1", Pad: "2", NetName: "VCC", Point: transactions.Point{XMM: 42.5, YMM: 31}, ComponentAt: transactions.Point{XMM: 40, YMM: 31}}
+	unused := PlacedPadEndpoint{Ref: "U1", Pad: "5", Point: transactions.Point{XMM: 27.2, YMM: 36}, ComponentAt: transactions.Point{XMM: 27.2, YMM: 36}, PadWidthMM: 1.55, PadHeightMM: 0.6}
+	resolver := PlacedPadEndpointResolver{
+		sorted: []PlacedPadEndpoint{pad, unused},
+		endpoints: map[routeEndpointMapKey]PlacedPadEndpoint{
+			routeEndpointKey("Q1", "2"): pad,
+			routeEndpointKey("U1", "5"): unused,
+		},
+	}
+
+	got, ok := placedLocalRouteEntryAnchorPointWithWidth(fragment, "vcc", transactions.Point{XMM: 6, YMM: 15}, 2, resolver, placement.BoardPlacementArea{WidthMM: 100, HeightMM: 100, MarginMM: 1})
+	if !ok || !pointsNearlyEqual(got, pad.Point) {
+		t.Fatalf("wide-trace anchor = %#v ok=%v, want physical pad %#v", got, ok, pad.Point)
+	}
+}
+
+func TestPadClearDirectLocalRouteDetoursAroundAdjacentForeignPad(t *testing.T) {
+	// The right-side detour is the Q2 pad edge plus half the 2 mm trace and
+	// the deterministic local-route clearance envelope.
+	const expectedRightSideDetourXMM = 13.305
+	from := PlacedPadEndpoint{Ref: "@anchor:vee", Pad: "VEE", NetName: "VEE", Point: transactions.Point{XMM: 7.5, YMM: 41}, Layer: "F.Cu", Source: localRouteEntryAnchorSource}
+	to := PlacedPadEndpoint{Ref: "Q2", Pad: "2", NetName: "VEE", Point: transactions.Point{XMM: 12.95, YMM: 33}, Layer: "F.Cu", Layers: []string{"*.Cu"}, PadWidthMM: 2.5, PadHeightMM: 4.5}
+	outputBase := PlacedPadEndpoint{Ref: "Q2", Pad: "1", NetName: "OUTPUT_BASE", Point: transactions.Point{XMM: 7.5, YMM: 33}, Layer: "F.Cu", Layers: []string{"*.Cu"}, PadWidthMM: 2.5, PadHeightMM: 4.5}
+	driverBase := PlacedPadEndpoint{Ref: "Q1", Pad: "1", NetName: "DRIVER_BASE", Point: transactions.Point{XMM: 11, YMM: 38.5}, Layer: "F.Cu", Layers: []string{"*.Cu"}, PadWidthMM: 1.71, PadHeightMM: 1.8}
+	resolver := PlacedPadEndpointResolver{
+		sorted: []PlacedPadEndpoint{driverBase, outputBase, to},
+		endpoints: map[routeEndpointMapKey]PlacedPadEndpoint{
+			routeEndpointKey("Q1", "1"): driverBase,
+			routeEndpointKey("Q2", "1"): outputBase,
+			routeEndpointKey("Q2", "2"): to,
+		},
+	}
+
+	got, changed, ok := padClearDirectLocalRoute([]transactions.Point{from.Point, to.Point}, "F.Cu", 2, "VEE", from, to, resolver)
+	want := []transactions.Point{from.Point, {XMM: expectedRightSideDetourXMM, YMM: 41}, {XMM: expectedRightSideDetourXMM, YMM: 33}, to.Point}
+	if !ok || !changed || !pointSlicesNearlyEqual(got, want) {
+		t.Fatalf("detoured points = %#v changed=%v ok=%v, want %#v", got, changed, ok, want)
+	}
+}
+
+func TestPadClearDirectLocalRoutePreservesClearAuthoredSegment(t *testing.T) {
+	from := PlacedPadEndpoint{Ref: "R1", Pad: "1", NetName: "SIG", Point: transactions.Point{XMM: 2, YMM: 2}, Layer: "F.Cu"}
+	to := PlacedPadEndpoint{Ref: "R2", Pad: "1", NetName: "SIG", Point: transactions.Point{XMM: 8, YMM: 8}, Layer: "F.Cu"}
+	points := []transactions.Point{from.Point, to.Point}
+
+	got, changed, ok := padClearDirectLocalRoute(points, "F.Cu", 0.25, "SIG", from, to, PlacedPadEndpointResolver{})
+	if !ok || changed || !pointSlicesNearlyEqual(got, points) {
+		t.Fatalf("clear points = %#v changed=%v ok=%v, want unchanged %#v", got, changed, ok, points)
+	}
+}
+
+func TestPadClearLocalRouteEndpointSiblingsDetoursAroundShieldPad(t *testing.T) {
+	// 1.575 mm is the 1 mm shield half-width expanded by half the 0.75 mm
+	// trace and the 0.2 mm local-route clearance.
+	const shieldPadClearanceHalfExtentMM = 1.575
+	from := PlacedPadEndpoint{Ref: "J1", Pad: "A9", NetName: "VBUS", Point: transactions.Point{XMM: 8.52, YMM: 37.92}, Layer: "F.Cu", Layers: []string{"F.Cu"}, PadWidthMM: 0.6, PadHeightMM: 1.2}
+	to := PlacedPadEndpoint{Ref: "F1", Pad: "1", NetName: "VBUS", Point: transactions.Point{XMM: 18.6, YMM: 42.5}, Layer: "F.Cu", Layers: []string{"F.Cu"}, PadWidthMM: 1.4, PadHeightMM: 1.8}
+	shield := PlacedPadEndpoint{Ref: "J1", Pad: "SH", Point: transactions.Point{XMM: 11.32, YMM: 38}, Layer: "F.Cu", Layers: []string{"*.Cu"}, PadWidthMM: 2, PadHeightMM: 2}
+	resolver := PlacedPadEndpointResolver{
+		sorted: []PlacedPadEndpoint{from, shield, to},
+		endpoints: map[routeEndpointMapKey]PlacedPadEndpoint{
+			routeEndpointKey("J1", "A9"): from,
+			routeEndpointKey("J1", "SH"): shield,
+			routeEndpointKey("F1", "1"):  to,
+		},
+	}
+	points := []transactions.Point{from.Point, {XMM: 8.52, YMM: 37}, {XMM: 18.6, YMM: 37}, to.Point}
+
+	got, changed, ok := padClearLocalRouteEndpointSiblings(points, "F.Cu", 0.75, "VBUS", from, to, resolver)
+	if !ok || !changed || pointSlicesNearlyEqual(got, points) {
+		t.Fatalf("detoured points = %#v changed=%v ok=%v, want shield-pad egress detour", got, changed, ok)
+	}
+	if !localRoutePolylineClearsPadRects(got, []localRoutePadRect{{ref: "J1", center: shield.Point, halfWidth: shieldPadClearanceHalfExtentMM, halfHeight: shieldPadClearanceHalfExtentMM}}) {
+		t.Fatalf("detoured points still cross shield clearance: %#v", got)
+	}
+}
+
+func TestDetourLocalRoutePolylineRelocatesUnsafeInteriorWaypoint(t *testing.T) {
+	// These coordinates reproduce a translated transistor route whose middle
+	// waypoint lands inside the Q1 pad's expanded clearance rectangle.
+	points := []transactions.Point{{XMM: 34.0625, YMM: 8.95}, {XMM: 33, YMM: 7}, {XMM: 33, YMM: 12}, {XMM: 35, YMM: 11.0875}}
+	obstacles := []localRoutePadRect{{ref: "Q1", center: transactions.Point{XMM: 34.0625, YMM: 7.05}, halfWidth: 1.1125, halfHeight: 0.675}}
+
+	got, ok := detourLocalRoutePolyline(points, obstacles)
+	if !ok || pointSlicesNearlyEqual(got, points) {
+		t.Fatalf("detoured points = %#v ok=%v, want unsafe waypoint relocated", got, ok)
+	}
+	if !localRoutePolylineClearsPadRects(got, obstacles) {
+		t.Fatalf("detoured points still cross pad clearance: %#v", got)
+	}
+}
+
+func TestLocalRouteForeignPadRectsRotatePadEnvelopeWithFootprint(t *testing.T) {
+	from := PlacedPadEndpoint{Ref: "R1", Pad: "1", NetName: "SIGNAL", Point: transactions.Point{XMM: 0, YMM: 0}, Layer: "F.Cu"}
+	to := PlacedPadEndpoint{Ref: "R2", Pad: "1", NetName: "SIGNAL", Point: transactions.Point{XMM: 5, YMM: 0}, Layer: "F.Cu"}
+	obstacle := PlacedPadEndpoint{Ref: "C1", Pad: "2", NetName: "GND", Point: transactions.Point{XMM: 2, YMM: 0}, Layer: "F.Cu", PadWidthMM: 1, PadHeightMM: 1.45, ComponentRotation: 90}
+	resolver := PlacedPadEndpointResolver{sorted: []PlacedPadEndpoint{from, to, obstacle}}
+
+	rects := localRouteForeignPadRects([]transactions.Point{from.Point, to.Point}, "F.Cu", 0.35, "SIGNAL", from, to, resolver)
+	if len(rects) != 1 {
+		t.Fatalf("rects = %#v, want one foreign pad", rects)
+	}
+	if math.Abs(rects[0].halfWidth-1.1) > 1e-9 || math.Abs(rects[0].halfHeight-0.875) > 1e-9 {
+		t.Fatalf("rotated half extents = (%v, %v), want (1.1, 0.875)", rects[0].halfWidth, rects[0].halfHeight)
+	}
+}
+
+func TestPlacedLocalRouteEntryAnchorPointRelocatesMultiPadHandoffFromForeignPad(t *testing.T) {
+	fragment := BlockFragment{
+		Realization: blocks.BlockPCBRealizationResult{
+			Components: []blocks.RealizedPCBComponent{
+				{Ref: "C1", Placement: blocks.RelativePlacement{XMM: 10, YMM: 15}},
+				{Ref: "C2", Placement: blocks.RelativePlacement{XMM: 20, YMM: 15}},
+			},
+			LocalRoutes: []blocks.RealizedPCBLocalRoute{
+				{From: transactions.Endpoint{Ref: "@anchor:vcc", Pin: "VCC"}, To: transactions.Endpoint{Ref: "C1", Pin: "1"}},
+				{From: transactions.Endpoint{Ref: "@anchor:vcc", Pin: "VCC"}, To: transactions.Endpoint{Ref: "C2", Pin: "1"}},
+			},
+		},
+	}
+	c1 := PlacedPadEndpoint{Ref: "C1", Pad: "1", NetName: "VCC", Point: transactions.Point{XMM: 40, YMM: 55}, ComponentAt: transactions.Point{XMM: 40, YMM: 55}}
+	c2 := PlacedPadEndpoint{Ref: "C2", Pad: "1", NetName: "VCC", Point: transactions.Point{XMM: 50, YMM: 55}, ComponentAt: transactions.Point{XMM: 50, YMM: 55}}
+	foreign := PlacedPadEndpoint{Ref: "R1", Pad: "2", NetName: "BIAS", Point: transactions.Point{XMM: 36, YMM: 55}, PadWidthMM: 1.2, PadHeightMM: 1.2}
+	resolver := PlacedPadEndpointResolver{
+		sorted: []PlacedPadEndpoint{c1, c2, foreign},
+		endpoints: map[routeEndpointMapKey]PlacedPadEndpoint{
+			routeEndpointKey("C1", "1"): c1,
+			routeEndpointKey("C2", "1"): c2,
+			routeEndpointKey("R1", "2"): foreign,
+		},
+	}
+
+	got, ok := placedLocalRouteEntryAnchorPoint(fragment, "vcc", transactions.Point{XMM: 6, YMM: 15}, resolver, placement.BoardPlacementArea{WidthMM: 100, HeightMM: 100, MarginMM: 1})
+	want := transactions.Point{XMM: 45, YMM: 55}
+	if !ok || !pointsNearlyEqual(got, want) {
+		t.Fatalf("multi-pad foreign-anchor relocation = %#v ok=%v, want centroid %#v", got, ok, want)
+	}
+}
+
+func TestPlacedLocalRouteEntryAnchorPointRelocatesSinglePadHandoffFromOutsideBoard(t *testing.T) {
+	fragment := BlockFragment{
+		Realization: blocks.BlockPCBRealizationResult{
+			Components:  []blocks.RealizedPCBComponent{{Ref: "Q1", Placement: blocks.RelativePlacement{XMM: 20, YMM: 10}}},
+			LocalRoutes: []blocks.RealizedPCBLocalRoute{{From: transactions.Endpoint{Ref: "@anchor:vcc", Pin: "VCC"}, To: transactions.Endpoint{Ref: "Q1", Pin: "2"}}},
+		},
+	}
+	pad := PlacedPadEndpoint{Ref: "Q1", Pad: "2", NetName: "VCC", Point: transactions.Point{XMM: 2.5, YMM: 31}, ComponentAt: transactions.Point{XMM: 2, YMM: 31}}
+	resolver := PlacedPadEndpointResolver{
+		sorted:    []PlacedPadEndpoint{pad},
+		endpoints: map[routeEndpointMapKey]PlacedPadEndpoint{routeEndpointKey("Q1", "2"): pad},
+	}
+
+	got, ok := placedLocalRouteEntryAnchorPoint(fragment, "vcc", transactions.Point{XMM: -14, YMM: 10}, resolver, placement.BoardPlacementArea{WidthMM: 100, HeightMM: 100, MarginMM: 1})
+	if !ok || !pointsNearlyEqual(got, pad.Point) {
+		t.Fatalf("outside-board anchor = %#v ok=%v, want physical pad %#v", got, ok, pad.Point)
+	}
+}
+
+func TestPlacedLocalRouteEntryAnchorPointRebuildsDivergentMembersAtPadCentroid(t *testing.T) {
+	fragment := BlockFragment{
+		PlacementGroups: []blocks.PCBPlacementGroup{{ID: "decoupling", ComponentRoles: []string{"ceramic", "bulk"}, TranslateAsUnit: true}},
+		Realization: blocks.BlockPCBRealizationResult{
+			RoleRefs: map[string]string{"ceramic": "C1", "bulk": "C2"},
+			Components: []blocks.RealizedPCBComponent{
+				{Ref: "C1", Placement: blocks.RelativePlacement{XMM: 10, YMM: 15}},
+				{Ref: "C2", Placement: blocks.RelativePlacement{XMM: 19, YMM: 15}},
+			},
+			LocalRoutes: []blocks.RealizedPCBLocalRoute{
+				{From: transactions.Endpoint{Ref: "@anchor:vcc", Pin: "VCC"}, To: transactions.Endpoint{Ref: "C1", Pin: "1"}},
+				{From: transactions.Endpoint{Ref: "@anchor:vcc", Pin: "VCC"}, To: transactions.Endpoint{Ref: "C2", Pin: "1"}},
+			},
+		},
+	}
+	c1 := PlacedPadEndpoint{Ref: "C1", Pad: "1", Point: transactions.Point{XMM: 40, YMM: 55}, ComponentAt: transactions.Point{XMM: 40, YMM: 55}}
+	c2 := PlacedPadEndpoint{Ref: "C2", Pad: "1", Point: transactions.Point{XMM: 50, YMM: 55}, ComponentAt: transactions.Point{XMM: 50, YMM: 55}}
+	resolver := PlacedPadEndpointResolver{
+		sorted:    []PlacedPadEndpoint{c1, c2},
+		endpoints: map[routeEndpointMapKey]PlacedPadEndpoint{routeEndpointKey("C1", "1"): c1, routeEndpointKey("C2", "1"): c2},
+	}
+
+	got, ok := placedLocalRouteEntryAnchorPoint(fragment, "vcc", transactions.Point{XMM: 6, YMM: 15}, resolver, placement.BoardPlacementArea{WidthMM: 100, HeightMM: 100, MarginMM: 1})
+	want := transactions.Point{XMM: 45, YMM: 55}
+	if !ok || !pointsNearlyEqual(got, want) {
+		t.Fatalf("rebuilt anchor = %#v ok=%v, want centroid %#v", got, ok, want)
+	}
+}
+
 func TestTranslatedLocalRoutePointsPreservesWaypointsWhenEndpointsSharePlacementDelta(t *testing.T) {
 	fragment := BlockFragment{Realization: blocks.BlockPCBRealizationResult{Components: []blocks.RealizedPCBComponent{
 		{Ref: "R1", Placement: blocks.RelativePlacement{XMM: 10, YMM: 10}},
@@ -360,8 +674,8 @@ func TestLocalRouteOperationsBindToPlacedPadEndpoints(t *testing.T) {
 	placed := PlacementStageResult{
 		Request: placement.Request{
 			Components: []placement.Component{
-				{Ref: "R1", FootprintID: "Test:R", Pads: []placement.PadSummary{{Name: "2", Net: "SIG", XMM: 1, YMM: 0}}},
-				{Ref: "D1", FootprintID: "Test:D", Pads: []placement.PadSummary{{Name: "1", Net: "SIG", XMM: -1, YMM: 0}}},
+				{Ref: "R1", FootprintID: "Test:R", Pads: []placement.PadSummary{{Name: "2", Net: "SIG", XMM: 1, YMM: 0, Layers: []string{"*.Cu"}}}},
+				{Ref: "D1", FootprintID: "Test:D", Pads: []placement.PadSummary{{Name: "1", Net: "SIG", XMM: -1, YMM: 0, Layers: []string{"F.Cu"}}}},
 			},
 			Nets: []placement.Net{{Name: "SIG", Endpoints: []placement.Endpoint{{Ref: "R1", Pin: "2"}, {Ref: "D1", Pin: "1"}}}},
 		},
@@ -390,6 +704,103 @@ func TestLocalRouteOperationsBindToPlacedPadEndpoints(t *testing.T) {
 		route.Points[0].XMM != 11 || route.Points[0].YMM != 5 ||
 		route.Points[1].XMM != 19 || route.Points[1].YMM != 5 {
 		t.Fatalf("route points = %#v, want physical pad centers", route.Points)
+	}
+	if !operations[1].Rebuildable || !slices.Equal(operations[1].RebuildSourceLayers, []string{"F.Cu", "B.Cu"}) || !slices.Equal(operations[1].RebuildTargetLayers, []string{"F.Cu"}) {
+		t.Fatalf("rebuild metadata = %#v, want plated source and front-only target access", operations[1])
+	}
+}
+
+func TestPlacedPadCopperLayersRecognizesPlatedThroughHoleRepresentations(t *testing.T) {
+	for _, test := range []struct {
+		name string
+		pad  placement.PadSummary
+	}{
+		{name: "drill", pad: placement.PadSummary{DrillMM: 0.8}},
+		{name: "thru type", pad: placement.PadSummary{Type: "thru_hole"}},
+		{name: "through type", pad: placement.PadSummary{Type: "plated_through_hole"}},
+		{name: "tht type", pad: placement.PadSummary{Type: "THT"}},
+		{name: "wildcard copper", pad: placement.PadSummary{Layers: []string{"*.Cu", "*.Mask"}}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			if got := placedPadCopperLayers(test.pad, "F.Cu", 4); !slices.Equal(got, []string{"F.Cu", "In1.Cu", "In2.Cu", "B.Cu"}) {
+				t.Fatalf("layers = %#v, want plated F.Cu/B.Cu access", got)
+			}
+		})
+	}
+	if got := placedPadCopperLayers(placement.PadSummary{Type: "smd", Layers: []string{"B.Cu"}}, "B.Cu", 4); !slices.Equal(got, []string{"B.Cu"}) {
+		t.Fatalf("bottom SMD layers = %#v, want B.Cu only", got)
+	}
+}
+
+func TestLocalRouteRebuildTriesLegalAlternateEndpointLayers(t *testing.T) {
+	operation := mustRouteOperation(t, transactions.RouteOperation{
+		Op:      transactions.OpRoute,
+		NetName: "SIG",
+		Layer:   "F.Cu",
+		WidthMM: 0.25,
+		Points:  []transactions.Point{{XMM: 5, YMM: 10}, {XMM: 15, YMM: 10}},
+	})
+	operation.Rebuildable = true
+	operation.RebuildRefs = []string{"J1", "J2"}
+	operation.RebuildSourceLayers = []string{"F.Cu", "B.Cu"}
+	operation.RebuildTargetLayers = []string{"F.Cu", "B.Cu"}
+	request := routing.Request{
+		Board: routing.Board{
+			WidthMM:  20,
+			HeightMM: 20,
+			Layers: []routing.Layer{
+				{Name: "F.Cu", Kind: routing.LayerCopper, Routable: true},
+				{Name: "B.Cu", Kind: routing.LayerCopper, Routable: true},
+			},
+		},
+		Obstacles: []routing.Obstacle{{
+			Kind:  routing.ObstacleKeepout,
+			Layer: "F.Cu",
+			Geometry: routing.Shape{Rect: &routing.Rect{
+				Min: routing.Point{XMM: 9, YMM: 0},
+				Max: routing.Point{XMM: 11, YMM: 20},
+			}},
+		}},
+		Rules:    routing.DefaultRules(),
+		Strategy: routing.Strategy{Mode: routing.ModeTwoLayer},
+	}
+
+	operations, issues := rebuildMovedLocalRouteOperations(context.Background(), request, []transactions.Operation{operation})
+	if reports.HasBlockingIssue(issues) {
+		t.Fatalf("rebuild issues = %#v, want alternate-layer route", issues)
+	}
+	routes := requireRouteOperationsForNet(t, operations, "SIG")
+	foundBottom := false
+	for _, route := range routes {
+		if strings.EqualFold(route.Layer, "B.Cu") {
+			foundBottom = true
+		}
+	}
+	if !foundBottom {
+		t.Fatalf("routes = %#v, want B.Cu access around front-layer keepout", routes)
+	}
+}
+
+func TestLocalRouteRebuildStopsOnCanceledContext(t *testing.T) {
+	operation := mustRouteOperation(t, transactions.RouteOperation{
+		Op:      transactions.OpRoute,
+		NetName: "SIG",
+		Layer:   "F.Cu",
+		WidthMM: 0.25,
+		Points:  []transactions.Point{{XMM: 5, YMM: 10}, {XMM: 15, YMM: 10}},
+	})
+	operation.Ref = "canceled_local_route"
+	operation.Rebuildable = true
+	operation.RebuildRefs = []string{"J1", "J2"}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	operations, issues := rebuildMovedLocalRouteOperations(ctx, routing.Request{Board: routing.Board{WidthMM: 20, HeightMM: 20}, Rules: routing.DefaultRules()}, []transactions.Operation{operation})
+	if len(operations) != 1 || operations[0].Ref != operation.Ref {
+		t.Fatalf("canceled rebuild operations = %#v, want original operation", operations)
+	}
+	if !slices.ContainsFunc(issues, func(issue reports.Issue) bool { return issue.Code == reports.CodeOperationCanceled }) {
+		t.Fatalf("canceled rebuild issues = %#v, want operation-canceled evidence", issues)
 	}
 }
 
@@ -427,6 +838,39 @@ func TestLocalRouteOperationsSkipCoincidentTrack(t *testing.T) {
 	}
 	if summary.RoutesBound != 1 || summary.EndpointContactsProven != 2 || summary.EmittedTrackSegments != 0 {
 		t.Fatalf("summary = %#v", summary)
+	}
+}
+
+func TestLocalRouteOperationsSkipCollapsedEntryAnchorTransition(t *testing.T) {
+	fragments := PCBFragmentResult{Fragments: []BlockFragment{{
+		InstanceID: "handoff",
+		Realization: blocks.BlockPCBRealizationResult{
+			Components:   []blocks.RealizedPCBComponent{{Ref: "C1", Placement: blocks.RelativePlacement{XMM: 20, YMM: 10}}},
+			EntryAnchors: []blocks.RealizedPCBEntryAnchor{{ID: "in", Port: "IN", NetName: "SIG", Placement: blocks.RelativePlacement{XMM: -14, YMM: 10, Layer: "F.Cu"}}},
+			LocalRoutes: []blocks.RealizedPCBLocalRoute{{
+				ID: "entry", NetName: "SIG",
+				From:  transactions.Endpoint{Ref: "@anchor:in", Pin: "IN"},
+				To:    transactions.Endpoint{Ref: "C1", Pin: "1"},
+				Layer: "B.Cu", WidthMM: 0.25,
+			}},
+		},
+	}}}
+	placed := PlacementStageResult{
+		Request: placement.Request{
+			Board:      placement.BoardPlacementArea{WidthMM: 100, HeightMM: 100, MarginMM: 1},
+			Components: []placement.Component{{Ref: "C1", Pads: []placement.PadSummary{{Name: "1", Net: "SIG", XMM: 0.5, Layers: []string{"F.Cu"}}}}},
+			Nets:       []placement.Net{{Name: "SIG", Endpoints: []placement.Endpoint{{Ref: "C1", Pin: "1"}}}},
+		},
+		Result: placement.Result{Status: placement.StatusPlaced, Placements: []placement.PlacementResult{{Ref: "C1", Position: placement.Placement{XMM: 2, YMM: 31, Layer: "F.Cu"}}}},
+		Stage:  NewStageResult(StagePlacement, nil),
+	}
+
+	operations, issues, summary := localRouteOperations(fragments, &placed)
+	if len(issues) != 0 || len(operations) != 0 {
+		t.Fatalf("operations/issues = %#v/%#v, want collapsed virtual handoff without copper", operations, issues)
+	}
+	if summary.RoutesBound != 1 || summary.EndpointContactsProven != 2 || summary.EmittedTrackSegments != 0 {
+		t.Fatalf("summary = %#v, want electrically proven no-op handoff", summary)
 	}
 }
 
@@ -739,6 +1183,59 @@ func TestRoutePlacementRoutesSimpleSignalWithPads(t *testing.T) {
 		result.Stage.Summary["route_reports"] == nil ||
 		result.Stage.Summary["repair_diagnostics"] == nil {
 		t.Fatalf("routing summary missing quality evidence: %#v", result.Stage.Summary)
+	}
+}
+
+func TestCombineSequentialRoutingResultsAggregatesMetricsAndStatus(t *testing.T) {
+	first := routing.Result{
+		Status:     routing.StatusRouted,
+		Routes:     []routing.Route{{Net: "A", Status: routing.RouteStatusRouted}},
+		Operations: []routing.Operation{{Op: string(transactions.OpRoute)}},
+		Metrics:    routing.Metrics{NetCount: 1, RoutedNetCount: 1, SegmentCount: 2, TotalLengthMM: 3},
+	}
+	second := routing.Result{
+		Status:  routing.StatusBlocked,
+		Routes:  []routing.Route{{Net: "B", Status: routing.RouteStatusFailed}},
+		Metrics: routing.Metrics{NetCount: 1, FailedNetCount: 1, SearchNodes: 7, MaxSearchNodesHit: true},
+	}
+
+	combined := combineSequentialRoutingResults(first, second)
+	if combined.Status != routing.StatusPartial {
+		t.Fatalf("status = %q, want partial", combined.Status)
+	}
+	if combined.Metrics.NetCount != 2 || combined.Metrics.RoutedNetCount != 1 || combined.Metrics.FailedNetCount != 1 {
+		t.Fatalf("metrics = %#v, want aggregate", combined.Metrics)
+	}
+	if len(combined.Routes) != 2 || len(combined.Operations) != 1 || !combined.Metrics.MaxSearchNodesHit {
+		t.Fatalf("result = %#v, want combined routes, operations, and search evidence", combined)
+	}
+}
+
+func TestCombineSequentialRoutingResultsMergesOverlappingNetDelta(t *testing.T) {
+	first := routing.Result{Metrics: routing.Metrics{SearchNodes: 3}, Routes: []routing.Route{{
+		Net: "A", Status: routing.RouteStatusFailed, SearchNodes: 3,
+		Segments: []routing.Segment{{Net: "A", Start: routing.Point{XMM: 0}, End: routing.Point{XMM: 2}}},
+	}}}
+	second := routing.Result{Metrics: routing.Metrics{SearchNodes: 5}, Routes: []routing.Route{{
+		Net: "A", Status: routing.RouteStatusRouted, SearchNodes: 5,
+		Segments: []routing.Segment{{Net: "A", Start: routing.Point{XMM: 2}, End: routing.Point{XMM: 5}}},
+	}}}
+
+	combined := combineSequentialRoutingResults(first, second)
+	if len(combined.Routes) != 1 || len(combined.Routes[0].Segments) != 2 || combined.Routes[0].Status != routing.RouteStatusRouted {
+		t.Fatalf("combined routes = %#v, want one merged routed delta", combined.Routes)
+	}
+	if combined.Metrics.NetCount != 1 || combined.Metrics.RoutedNetCount != 1 || combined.Metrics.FailedNetCount != 0 || combined.Metrics.SearchNodes != 8 || combined.Metrics.TotalLengthMM != 5 {
+		t.Fatalf("combined metrics = %#v, want unique-net geometry metrics", combined.Metrics)
+	}
+}
+
+func TestUniqueRoutingNetsUsesLatestDuplicateDefinition(t *testing.T) {
+	first := []routing.Net{{Name: "A", Endpoints: []routing.Endpoint{{Ref: "R1", Pin: "1"}}, Role: routing.NetSignal, Class: "signal", Priority: 1, Fixed: true}, {Name: "B", Priority: 2}}
+	latest := []routing.Net{{Name: " A ", Endpoints: []routing.Endpoint{{Ref: "R1", Pin: "1"}, {Ref: "R2", Pin: "2"}}, Priority: 7}, {Name: "C", Priority: 3}}
+	got := uniqueRoutingNets(first, latest)
+	if len(got) != 3 || got[0].Priority != 7 || got[0].Name != " A " || len(got[0].Endpoints) != 2 || got[0].Role != routing.NetSignal || got[0].Class != "signal" || !got[0].Fixed || got[1].Name != "B" || got[2].Name != "C" {
+		t.Fatalf("unique nets = %#v, want stable order with latest duplicate", got)
 	}
 }
 
@@ -1780,6 +2277,18 @@ func pointsNearlyEqual(left transactions.Point, right transactions.Point) bool {
 	return math.Abs(left.XMM-right.XMM) <= tolerance && math.Abs(left.YMM-right.YMM) <= tolerance
 }
 
+func pointSlicesNearlyEqual(left []transactions.Point, right []transactions.Point) bool {
+	if len(left) != len(right) {
+		return false
+	}
+	for index := range left {
+		if !pointsNearlyEqual(left[index], right[index]) {
+			return false
+		}
+	}
+	return true
+}
+
 func TestDedupeSameNetRouteViasDropsDuplicateViaLocations(t *testing.T) {
 	first := mustRouteOperation(t, transactions.RouteOperation{
 		Op:      transactions.OpRoute,
@@ -2222,6 +2731,302 @@ func TestRoutePlacementSkipsWhenRequested(t *testing.T) {
 	}
 	if countTransactionOps(result.Operations, transactions.OpRoute) == 0 {
 		t.Fatalf("operations = %#v, want local route operation", result.Operations)
+	}
+}
+
+func TestRemainingPhysicalPadRoutingNetsExcludesOnlyFullyConnectedNets(t *testing.T) {
+	placed := simplePlacedPads()
+	nets := []routing.Net{{Name: "SIG", Endpoints: []routing.Endpoint{{Ref: "U1", Pin: "1"}, {Ref: "U2", Pin: "1"}}}}
+	connected := mustRouteOperation(t, transactions.RouteOperation{
+		Op:      transactions.OpRoute,
+		NetName: "SIG",
+		Layer:   "F.Cu",
+		WidthMM: 0.25,
+		Points:  []transactions.Point{{XMM: 5, YMM: 10}, {XMM: 20, YMM: 10}},
+	})
+
+	if remaining := remainingPhysicalPadRoutingNets(nets, &placed, []transactions.Operation{connected}); len(remaining) != 0 {
+		t.Fatalf("remaining = %#v, want fully connected net excluded", remaining)
+	}
+	placed.Request.Components = append(placed.Request.Components, placement.Component{
+		Ref: "U3", FootprintID: "Test:Pad", Bounds: placement.Bounds{WidthMM: 2, HeightMM: 2, Source: placement.BoundsExplicit},
+		Pads: []placement.PadSummary{{Name: "1", Net: "SIG", WidthMM: 1, HeightMM: 1}},
+	})
+	placed.Request.Nets[0].Endpoints = append(placed.Request.Nets[0].Endpoints, placement.Endpoint{Ref: "U3", Pin: "1"})
+	placed.Result.Placements = append(placed.Result.Placements, placement.PlacementResult{Ref: "U3", FootprintID: "Test:Pad", Position: placement.Placement{XMM: 25, YMM: 5, Layer: "F.Cu"}})
+	placed.Result.Metrics.PlacedCount++
+	nets[0].Endpoints = append(nets[0].Endpoints, routing.Endpoint{Ref: "U3", Pin: "1"})
+
+	remaining := remainingPhysicalPadRoutingNets(nets, &placed, []transactions.Operation{connected})
+	if len(remaining) != 1 || remaining[0].Name != "SIG" {
+		t.Fatalf("remaining = %#v, want partially connected SIG retained", remaining)
+	}
+}
+
+func TestPruneRedundantDanglingRouteStubsPreservesPhysicalConnectivity(t *testing.T) {
+	placed := simplePlacedPads()
+	main := mustRouteOperation(t, transactions.RouteOperation{
+		Op:      transactions.OpRoute,
+		NetName: "SIG",
+		Layer:   "F.Cu",
+		WidthMM: 0.25,
+		Points:  []transactions.Point{{XMM: 5, YMM: 10}, {XMM: 20, YMM: 10}},
+	})
+	stub := mustRouteOperation(t, transactions.RouteOperation{
+		Op:      transactions.OpRoute,
+		NetName: "SIG",
+		Layer:   "F.Cu",
+		WidthMM: 0.5,
+		Points:  []transactions.Point{{XMM: 5, YMM: 10}, {XMM: 5, YMM: 15}},
+	})
+
+	got := pruneRedundantDanglingRouteStubs([]transactions.Operation{main, stub}, &placed, map[int]struct{}{0: {}, 1: {}}, newPhysicalPadRoutingContext(&placed))
+	if len(got) != 1 {
+		t.Fatalf("operations = %#v, want redundant one-ended stub removed", got)
+	}
+	if remaining := remainingPhysicalPadRoutingNets([]routing.Net{{Name: "SIG"}}, &placed, got); len(remaining) != 0 {
+		t.Fatalf("remaining = %#v, want physical pads connected after pruning", remaining)
+	}
+}
+
+func TestPruneRedundantDanglingRouteStubsPeelsLeafChain(t *testing.T) {
+	placed := simplePlacedPads()
+	main := mustRouteOperation(t, transactions.RouteOperation{Op: transactions.OpRoute, NetName: "SIG", Layer: "F.Cu", WidthMM: 0.25, Points: []transactions.Point{{XMM: 5, YMM: 10}, {XMM: 20, YMM: 10}}})
+	inner := mustRouteOperation(t, transactions.RouteOperation{Op: transactions.OpRoute, NetName: "SIG", Layer: "F.Cu", WidthMM: 0.25, Points: []transactions.Point{{XMM: 5, YMM: 10}, {XMM: 5, YMM: 15}}})
+	outer := mustRouteOperation(t, transactions.RouteOperation{Op: transactions.OpRoute, NetName: "SIG", Layer: "F.Cu", WidthMM: 0.25, Points: []transactions.Point{{XMM: 5, YMM: 15}, {XMM: 5, YMM: 18}}})
+
+	got := pruneRedundantDanglingRouteStubs([]transactions.Operation{main, inner, outer}, &placed, map[int]struct{}{0: {}, 1: {}, 2: {}}, newPhysicalPadRoutingContext(&placed))
+	if len(got) != 1 {
+		t.Fatalf("operations = %#v, want full dangling leaf chain removed", got)
+	}
+}
+
+func TestPruneRedundantDanglingRouteStubsKeepsOnlyPhysicalBridge(t *testing.T) {
+	placed := simplePlacedPads()
+	bridge := mustRouteOperation(t, transactions.RouteOperation{
+		Op:      transactions.OpRoute,
+		NetName: "SIG",
+		Layer:   "F.Cu",
+		WidthMM: 0.25,
+		Points:  []transactions.Point{{XMM: 5, YMM: 10}, {XMM: 20, YMM: 10}},
+	})
+
+	got := pruneRedundantDanglingRouteStubs([]transactions.Operation{bridge}, &placed, map[int]struct{}{0: {}}, newPhysicalPadRoutingContext(&placed))
+	if len(got) != 1 {
+		t.Fatalf("operations = %#v, want required physical bridge preserved", got)
+	}
+}
+
+func TestPruneRedundantDanglingRouteStubsPreservesViaAccess(t *testing.T) {
+	placed := simplePlacedPads()
+	main := mustRouteOperation(t, transactions.RouteOperation{
+		Op: transactions.OpRoute, NetName: "SIG", Layer: "F.Cu", WidthMM: 0.25,
+		Points: []transactions.Point{{XMM: 5, YMM: 10}, {XMM: 20, YMM: 10}},
+	})
+	dogbone := mustRouteOperation(t, transactions.RouteOperation{
+		Op: transactions.OpRoute, NetName: "SIG", Layer: "F.Cu", WidthMM: 0.25,
+		Points: []transactions.Point{{XMM: 5, YMM: 10}, {XMM: 5, YMM: 15}},
+	})
+	transition := mustRouteOperation(t, transactions.RouteOperation{
+		Op: transactions.OpRoute, NetName: "SIG", Layer: "B.Cu", WidthMM: 0.25,
+		Points: []transactions.Point{{XMM: 5, YMM: 15}, {XMM: 8, YMM: 15}},
+		Vias:   []transactions.RouteViaSpec{{At: transactions.Point{XMM: 5, YMM: 15}, Layers: []string{"F.Cu", "B.Cu"}}},
+	})
+
+	got := pruneRedundantDanglingRouteStubs(
+		[]transactions.Operation{main, dogbone, transition},
+		&placed,
+		map[int]struct{}{0: {}, 1: {}, 2: {}},
+		newPhysicalPadRoutingContext(&placed),
+	)
+	if len(got) != 3 {
+		t.Fatalf("operations = %#v, want pad-to-via access preserved", got)
+	}
+}
+
+func TestRemoveRedundantRouteViasAtPlatedPadsKeepsFreeTransition(t *testing.T) {
+	placed := simplePlacedPads()
+	pad := &placed.Request.Components[0].Pads[0]
+	pad.Type = "thru_hole"
+	pad.DrillMM = 0.8
+	pad.WidthMM = 1.6
+	pad.HeightMM = 1.6
+	pad.Layers = []string{"*.Cu", "*.Mask"}
+	operation := mustRouteOperation(t, transactions.RouteOperation{
+		Op:      transactions.OpRoute,
+		NetName: "SIG",
+		Vias: []transactions.RouteViaSpec{
+			{At: transactions.Point{XMM: 5, YMM: 10}, DiameterMM: 0.6, DrillMM: 0.3, Layers: []string{"F.Cu", "B.Cu"}},
+			{At: transactions.Point{XMM: 12, YMM: 12}, DiameterMM: 0.6, DrillMM: 0.3, Layers: []string{"F.Cu", "B.Cu"}},
+		},
+	})
+
+	got := removeRedundantRouteViasAtPlatedPads([]transactions.Operation{operation}, &placed)
+	if len(got) != 1 {
+		t.Fatalf("operations = %#v, want one updated route operation", got)
+	}
+	var payload transactions.RouteOperation
+	if err := json.Unmarshal(got[0].Raw, &payload); err != nil {
+		t.Fatal(err)
+	}
+	if len(payload.Vias) != 1 || !pointsNearlyEqual(payload.Vias[0].At, transactions.Point{XMM: 12, YMM: 12}) {
+		t.Fatalf("vias = %#v, want only free-space transition", payload.Vias)
+	}
+}
+
+func TestPlatedPadViaTargetIndexMatchesNearbySameNetOnly(t *testing.T) {
+	index := newPlatedPadViaTargetIndex([]platedPadViaTarget{
+		{netName: "SIG", point: transactions.Point{XMM: 5, YMM: 10}, radiusMM: 0.8},
+		{netName: "OTHER", point: transactions.Point{XMM: 25, YMM: 10}, radiusMM: 0.8},
+		{netName: "LARGE", point: transactions.Point{XMM: 50, YMM: 10}, radiusMM: 8},
+	})
+	if !index.contains("SIG", transactions.Point{XMM: 5.5, YMM: 10}) {
+		t.Fatal("same-net via inside plated pad was not indexed")
+	}
+	if index.contains("OTHER", transactions.Point{XMM: 5.5, YMM: 10}) || index.contains("SIG", transactions.Point{XMM: 15, YMM: 10}) {
+		t.Fatal("via target index matched wrong net or distant pad")
+	}
+	if !index.contains("LARGE", transactions.Point{XMM: 43, YMM: 10}) {
+		t.Fatal("oversized plated pad was not checked outside adjacent buckets")
+	}
+}
+
+func TestPlatedPadViaTargetContainsRotatedRectangularExtent(t *testing.T) {
+	target := platedPadViaTarget{
+		netName: "SIG", point: transactions.Point{XMM: 5, YMM: 10}, radiusMM: math.Hypot(4, 1),
+		widthMM: 8, heightMM: 2, rotationDeg: 90, shape: "rect",
+	}
+	index := newPlatedPadViaTargetIndex([]platedPadViaTarget{target})
+	if !index.contains("SIG", transactions.Point{XMM: 5, YMM: 13.5}) {
+		t.Fatal("via inside rotated rectangular pad end was not recognized")
+	}
+	if index.contains("SIG", transactions.Point{XMM: 8, YMM: 10}) {
+		t.Fatal("via outside rotated rectangular pad was incorrectly recognized")
+	}
+}
+
+func TestPlatedPadViaTargetContainsOvalAndRoundRectEnds(t *testing.T) {
+	for _, shape := range []string{"oval", "roundrect"} {
+		t.Run(shape, func(t *testing.T) {
+			index := newPlatedPadViaTargetIndex([]platedPadViaTarget{{
+				netName: "SIG", point: transactions.Point{XMM: 5, YMM: 10}, radiusMM: 4,
+				widthMM: 8, heightMM: 2, rotationDeg: 90, shape: shape,
+			}})
+			if !index.contains("SIG", transactions.Point{XMM: 5, YMM: 13.5}) {
+				t.Fatal("via inside rotated capsule end was not recognized")
+			}
+			if index.contains("SIG", transactions.Point{XMM: 5.9, YMM: 13.9}) {
+				t.Fatal("via outside rounded pad corner was incorrectly recognized")
+			}
+		})
+	}
+}
+
+func TestUniqueRoutingNetsPreservesStrongestPriority(t *testing.T) {
+	got := uniqueRoutingNets(
+		[]routing.Net{{Name: "SIG", Priority: 9}},
+		[]routing.Net{{Name: " SIG ", Priority: 2}},
+	)
+	if len(got) != 1 || got[0].Priority != 9 {
+		t.Fatalf("merged nets = %#v, want strongest priority 9", got)
+	}
+}
+
+func TestPromoteInterBlockRouteTreesMovesBlockedNetsFirstStably(t *testing.T) {
+	trees := []InterBlockRouteTree{{NetName: "VCC"}, {NetName: "GND"}, {NetName: "SIG"}, {NetName: "AUX"}}
+	ordered := promoteInterBlockRouteTrees(trees, map[string]struct{}{"SIG": {}, "VCC": {}})
+	want := []string{"VCC", "SIG", "GND", "AUX"}
+	for index, netName := range want {
+		if ordered[index].NetName != netName {
+			t.Fatalf("order = %#v, want %v", ordered, want)
+		}
+	}
+}
+
+func TestInterBlockRouteTreeExecutionBetterPrefersFewerBlockedBranches(t *testing.T) {
+	baseline := interBlockRouteTreeExecutionResult{Summary: InterBlockRouteTreeExecutionSummary{BranchesRouted: 7, BranchesBlocked: 1}}
+	candidate := interBlockRouteTreeExecutionResult{Summary: InterBlockRouteTreeExecutionSummary{BranchesRouted: 6, BranchesBlocked: 0}}
+	if !interBlockRouteTreeExecutionBetter(candidate, baseline) {
+		t.Fatal("candidate with no blocked branches must win bounded order negotiation")
+	}
+}
+
+func TestBlockingRoutingIssueNetsSelectsOnlyKnownBlockingNets(t *testing.T) {
+	nets := []routing.Net{{Name: "SIG"}, {Name: "VCC"}}
+	issues := []reports.Issue{
+		{Severity: reports.SeverityBlocked, Nets: []string{"SIG", "UNKNOWN"}},
+		{Severity: reports.SeverityInfo, Nets: []string{"VCC"}},
+	}
+	got := blockingRoutingIssueNets(issues, nets)
+	if len(got) != 1 || got[0] != "SIG" {
+		t.Fatalf("blocking nets = %v, want SIG", got)
+	}
+}
+
+func TestExcludeRoutingNetsByNameLeavesOnlyBlockLocalCompletionNets(t *testing.T) {
+	nets := []routing.Net{{Name: "VCC"}, {Name: "local_bias"}, {Name: "GND"}}
+	got := excludeRoutingNetsByName(nets, map[string]bool{"VCC": true, "GND": true})
+	if len(got) != 1 || got[0].Name != "local_bias" {
+		t.Fatalf("filtered nets = %#v, want local_bias", got)
+	}
+}
+
+func TestSnapRoutePayloadEndpointsLeavesSameNetCopperMergeUnchanged(t *testing.T) {
+	payload := transactions.RouteOperation{
+		NetName: "SIG",
+		Points:  []transactions.Point{{XMM: 5, YMM: 5}, {XMM: 6, YMM: 5}},
+	}
+	targets := []InterBlockContactTarget{
+		{NetName: "SIG", Point: transactions.Point{XMM: 0, YMM: 0}},
+		{NetName: "SIG", Point: transactions.Point{XMM: 10, YMM: 0}},
+	}
+	before := append([]transactions.Point(nil), payload.Points...)
+	issues := snapRoutePayloadEndpoints(&payload, targets, 0, transactions.Operation{})
+	if len(issues) != 1 || issues[0].Severity != reports.SeverityInfo {
+		t.Fatalf("issues = %#v, want informational deferral to contact proof", issues)
+	}
+	if !slices.Equal(payload.Points, before) {
+		t.Fatalf("points = %#v, want unsnapped merge geometry %#v", payload.Points, before)
+	}
+}
+
+func TestRoutingResultBetterPrefersFewerFailedNets(t *testing.T) {
+	baseline := routing.Result{Status: routing.StatusPartial, Metrics: routing.Metrics{RoutedNetCount: 4, FailedNetCount: 1}}
+	candidate := routing.Result{Status: routing.StatusPartial, Metrics: routing.Metrics{RoutedNetCount: 3, FailedNetCount: 0}}
+	if !routingResultBetter(candidate, baseline) {
+		t.Fatal("candidate with no failed nets must win final route-order negotiation")
+	}
+}
+
+func TestLocalRouteRebuildStrategyBudgetBoundsLargeDesigns(t *testing.T) {
+	if got := localRouteRebuildStrategyBudget(8); got != 8 {
+		t.Fatalf("small-design strategy budget = %d, want 8", got)
+	}
+	if got := localRouteRebuildStrategyBudget(50); got != 2 {
+		t.Fatalf("large-design strategy budget = %d, want 2", got)
+	}
+	if got := localRouteRebuildRouterCallBudget(8); got != 128 {
+		t.Fatalf("small-design router-call budget = %d, want two calls per job for eight strategies", got)
+	}
+	if got := localRouteRebuildRouterCallBudget(50); got != 200 {
+		t.Fatalf("large-design router-call budget = %d, want two calls per job for two strategies", got)
+	}
+	if got := localRouteRebuildRouterCallBudget(500); got != localRouteRebuildMaxRouterCalls {
+		t.Fatalf("very-large-design router-call budget = %d, want fixed global cap", got)
+	}
+}
+
+func TestPromoteFailedNetPrioritiesHandlesIntegerSaturation(t *testing.T) {
+	maxInt := math.MaxInt
+	nets := []routing.Net{
+		{Name: "already_high", Priority: maxInt},
+		{Name: "middle", Priority: 7},
+		{Name: "low", Priority: -3},
+		{Name: "failed", Priority: 1},
+	}
+	promoted := promoteFailedNetPriorities(nets, map[string]struct{}{interBlockSummaryNetKey("failed"): {}})
+	if promoted[3].Priority != maxInt || !(promoted[0].Priority > promoted[1].Priority && promoted[1].Priority > promoted[2].Priority) || promoted[0].Priority >= promoted[3].Priority || nets[0].Priority != maxInt || nets[3].Priority != 1 {
+		t.Fatalf("original/promoted priorities = %#v/%#v, want copied strict promotion", nets, promoted)
 	}
 }
 

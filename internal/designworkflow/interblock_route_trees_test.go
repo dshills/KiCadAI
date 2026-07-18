@@ -2,9 +2,11 @@ package designworkflow
 
 import (
 	"context"
+	"slices"
 	"testing"
 	"time"
 
+	"kicadai/internal/routing"
 	"kicadai/internal/transactions"
 )
 
@@ -82,6 +84,28 @@ func TestBuildInterBlockRouteTreesRoutesEveryPhysicalDuplicatePadTarget(t *testi
 	}})[0]
 	if tree.RequiredEndpointCount != 3 || tree.TargetCount != 3 || len(tree.MissingEndpointIDs) != 0 || len(tree.Branches) != 2 {
 		t.Fatalf("tree=%#v, want all physical pad targets routed", tree)
+	}
+}
+
+func TestOrderInterBlockRouteTreesRoutesConstrainedHighFanoutNetsFirst(t *testing.T) {
+	trees := []InterBlockRouteTree{
+		{NetName: "AUDIO", Branches: make([]InterBlockRouteTreeBranch, 1)},
+		{NetName: "VCC", Branches: make([]InterBlockRouteTreeBranch, 3)},
+		{NetName: "POWER_STAR", Branches: make([]InterBlockRouteTreeBranch, 5)},
+		{NetName: "BIAS", Branches: make([]InterBlockRouteTreeBranch, 1)},
+	}
+	nets := []routing.Net{
+		{Name: "AUDIO", Role: routing.NetAnalog},
+		{Name: "VCC", Role: routing.NetPower},
+		{Name: "POWER_STAR", Role: routing.NetGround},
+		{Name: "BIAS", Role: routing.NetAnalog, Priority: 10},
+	}
+
+	ordered := orderInterBlockRouteTreesForRouting(trees, nets)
+	got := []string{ordered[0].NetName, ordered[1].NetName, ordered[2].NetName, ordered[3].NetName}
+	want := []string{"BIAS", "POWER_STAR", "VCC", "AUDIO"}
+	if !slices.Equal(got, want) {
+		t.Fatalf("route-tree order = %#v, want %#v", got, want)
 	}
 }
 

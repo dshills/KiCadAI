@@ -135,6 +135,7 @@ type BlockComponent struct {
 	ComponentQuery           *components.Query          `json:"component_query,omitempty"`
 	ComponentVariant         string                     `json:"component_variant,omitempty"`
 	ComponentValueParam      string                     `json:"component_value_param,omitempty"`
+	ComponentToleranceParam  string                     `json:"component_tolerance_param,omitempty"`
 	ComponentVoltageParam    string                     `json:"component_voltage_param,omitempty"`
 	ComponentPackageParam    string                     `json:"component_package_param,omitempty"`
 	ComponentPackageTemplate string                     `json:"component_package_template,omitempty"`

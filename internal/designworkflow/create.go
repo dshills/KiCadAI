@@ -29,6 +29,7 @@ type CreateOptions struct {
 	Validation    ValidationOptions
 	KiCadChecks   KiCadCheckOptions
 	Writer        writercorrectness.Options
+	Fabrication   *fabrication.Options
 	Repair        repair.Options
 	PostRepair    repair.PostValidationOptions
 	BlockRegistry blocks.Registry
@@ -81,8 +82,7 @@ func Create(ctx context.Context, request Request, opts CreateOptions) WorkflowRe
 	if workflowStageBlocked(fragments.Stage) {
 		return blockedCreateResult(normalized, opts, stages, StagePCBRealization, "PCB realization did not complete")
 	}
-	placementOpts := opts.Placement
-	placementOpts.ComponentSelections = componentSelections.Selections
+	placementOpts := placementOptionsForCreate(opts, componentSelections.Selections)
 	placed := PlaceFragments(ctx, normalized, fragments, placementOpts)
 	placementStageIndex := len(stages)
 	stages = append(stages, placed.Stage)
@@ -129,7 +129,26 @@ func Create(ctx context.Context, request Request, opts CreateOptions) WorkflowRe
 	kicadCheckOpts.RequireDRC = kicadCheckOpts.RequireDRC || normalized.Validation.RequireDRC
 	checked := RunKiCadChecks(ctx, &normalized, &written, kicadCheckOpts)
 	stages = append(stages, checked.Stage)
-	fabricationStage := FabricationReadinessStage(ctx, &normalized, &written)
+	fabricationOptions := opts.Fabrication
+	var blockReadinessReportIssue *reports.Issue
+	if fabricationOptions != nil && len(fabricationOptions.BlockReadinessReport) == 0 {
+		configured := *fabricationOptions
+		report, err := fabricationBlockReadinessReport(plan.Stage)
+		if err != nil {
+			issue := reports.Issue{Code: reports.CodeValidationFailed, Severity: reports.SeverityBlocked, Path: "fabrication.block_readiness_report", Message: err.Error()}
+			blockReadinessReportIssue = &issue
+		} else {
+			configured.BlockReadinessReport = report
+		}
+		fabricationOptions = &configured
+	}
+	fabricationStage := fabricationReadinessStageWithOptions(ctx, &normalized, &written, fabricationOptions)
+	if blockReadinessReportIssue != nil {
+		fabricationStage.Issues = append(fabricationStage.Issues, *blockReadinessReportIssue)
+		status := NewStageResult(StageFabricationReady, fabricationStage.Issues)
+		fabricationStage.Name = StageFabricationReady
+		fabricationStage.Status = status.Status
+	}
 	if fabricationStage.Name != "" {
 		stages = append(stages, fabricationStage)
 	}
@@ -149,7 +168,48 @@ func Create(ctx context.Context, request Request, opts CreateOptions) WorkflowRe
 	return BuildWorkflowResult(ProjectSummary{Name: normalized.Name, OutputDir: opts.OutputDir}, normalized.Validation.Acceptance, stages)
 }
 
+func placementOptionsForCreate(opts CreateOptions, selections []ComponentSelectionEntry) PlacementOptions {
+	placementOpts := opts.Placement
+	if placementOpts.LibraryIndex == nil {
+		placementOpts.LibraryIndex = opts.LibraryIndex
+	}
+	placementOpts.ComponentSelections = selections
+	return placementOpts
+}
+
+func fabricationBlockReadinessReport(plan StageResult) ([]byte, error) {
+	evidence, ok := plan.Summary["block_evidence"].([]BlockEvidenceSummary)
+	if !ok || len(evidence) == 0 {
+		return nil, nil
+	}
+	type gate struct {
+		ID     string `json:"id"`
+		Status string `json:"status"`
+	}
+	report := struct {
+		Status             string `json:"status"`
+		AchievedReadiness  string `json:"achieved_readiness"`
+		MatchesExpectation bool   `json:"matches_expectation"`
+		Gates              []gate `json:"gates"`
+	}{Status: "pass", AchievedReadiness: "pass", MatchesExpectation: true}
+	for _, item := range evidence {
+		if item.Status != "verified" {
+			return nil, nil
+		}
+		report.Gates = append(report.Gates, gate{ID: firstNonEmpty(item.InstanceID, item.BlockID), Status: "pass"})
+	}
+	data, err := json.MarshalIndent(report, "", "  ")
+	if err != nil {
+		return nil, fmt.Errorf("encode fabrication block-readiness report: %w", err)
+	}
+	return append(data, '\n'), nil
+}
+
 func FabricationReadinessStage(ctx context.Context, request *Request, written *ProjectWriteResult) StageResult {
+	return fabricationReadinessStageWithOptions(ctx, request, written, nil)
+}
+
+func fabricationReadinessStageWithOptions(ctx context.Context, request *Request, written *ProjectWriteResult, exportOptions *fabrication.Options) StageResult {
 	if request == nil || written == nil || request.Validation.Acceptance != AcceptanceFabricationCandidate {
 		return StageResult{}
 	}
@@ -166,7 +226,22 @@ func FabricationReadinessStage(ctx context.Context, request *Request, written *P
 	if request.Validation.RequireDRC || request.Validation.RequireERC {
 		policy = fabrication.CLIPolicyRequired
 	}
-	result := fabrication.ExportPreview(ctx, outputDir, fabrication.Options{CLIPolicy: policy})
+	options := fabrication.Options{CLIPolicy: policy}
+	if exportOptions != nil {
+		options = *exportOptions
+		if options.CLIPolicy == "" {
+			options.CLIPolicy = policy
+		}
+	}
+	var result fabrication.Result
+	if exportOptions == nil {
+		result = fabrication.ExportPreview(ctx, outputDir, options)
+	} else {
+		// ExportPackage reruns the same Evaluate preflight as ExportPreview
+		// before producing artifacts, so select one complete path rather than
+		// overwriting or duplicating preflight results.
+		result = fabrication.ExportPackage(ctx, outputDir, options)
+	}
 	issues := append([]reports.Issue(nil), result.Issues...)
 	if result.Status != fabrication.StatusReady {
 		issues = append(issues, reports.Issue{

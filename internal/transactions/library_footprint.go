@@ -113,7 +113,7 @@ func upsertImportedFootprintWithLibrary(board *pcb.PCBFile, generator kicadfiles
 func netOnlyPadSpecs(specs []PadSpec) bool {
 	for _, spec := range specs {
 		if strings.TrimSpace(spec.Name) == "" || strings.TrimSpace(spec.Type) != "" || strings.TrimSpace(spec.Shape) != "" ||
-			spec.XMM != 0 || spec.YMM != 0 || spec.RotationDeg != 0 || spec.WidthMM != 0 || spec.HeightMM != 0 || spec.DrillMM != 0 {
+			spec.XMM != 0 || spec.YMM != 0 || spec.RotationDeg != 0 || spec.WidthMM != 0 || spec.HeightMM != 0 || spec.DrillMM != 0 || len(spec.Layers) != 0 {
 			return false
 		}
 	}

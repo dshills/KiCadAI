@@ -24,6 +24,7 @@ func TestLoadSuiteDiscoversBuiltInCorpus(t *testing.T) {
 		"class_a_voltage_stage_line",
 		"class_ab_output_pair_headphone",
 		"class_ab_output_stage_headphone",
+		"class_ab_speaker_power_stage_10w",
 		"connector_breakout_4pin",
 		"crystal_oscillator_default",
 		"dc_blocking_capacitor_220uf",
@@ -37,6 +38,8 @@ func TestLoadSuiteDiscoversBuiltInCorpus(t *testing.T) {
 		"opamp_gain_stage_noninverting",
 		"reset_programming_header_isp",
 		"reverse_polarity_schottky",
+		"speaker_opamp_driver_opa134",
+		"speaker_output_protection_window_relay",
 		"usb_c_power_5v_sink",
 		"voltage_regulator_3v3",
 	}

@@ -227,6 +227,7 @@ type PCBConstraint struct {
 	MinWidthMM  float64               `json:"min_width_mm,omitempty"`
 	ClearanceMM float64               `json:"clearance_mm,omitempty"`
 	MaxLengthMM float64               `json:"max_length_mm,omitempty"`
+	Required    bool                  `json:"required,omitempty"`
 	Description string                `json:"description,omitempty"`
 	When        RealizationWhen       `json:"when,omitempty"`
 }

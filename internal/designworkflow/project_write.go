@@ -219,6 +219,15 @@ func schematicTransaction(request *Request, plan *BlockPlanResult, overwrite boo
 			Message:  err.Error(),
 		}}
 	}
+	tx, err = applyFabricationMetadata(tx, request.Fabrication)
+	if err != nil {
+		return tx, []reports.Issue{{
+			Code:     reports.CodeInvalidArgument,
+			Severity: reports.SeverityBlocked,
+			Path:     "project.transaction.fabrication",
+			Message:  err.Error(),
+		}}
+	}
 	if paper != "" {
 		tx, err = applySchematicPaper(tx, paper)
 		if err != nil {
@@ -231,6 +240,44 @@ func schematicTransaction(request *Request, plan *BlockPlanResult, overwrite boo
 		}
 	}
 	return tx, nil
+}
+
+func applyFabricationMetadata(tx transactions.Transaction, metadata FabricationMetadataSpec) (transactions.Transaction, error) {
+	variables := map[string]string{}
+	if finish := strings.TrimSpace(metadata.BoardFinish); finish != "" {
+		variables["board_finish"] = finish
+	}
+	if notes := strings.TrimSpace(metadata.FabricationNotes); notes != "" {
+		variables["fabrication_notes"] = notes
+	}
+	if len(variables) == 0 {
+		return tx, nil
+	}
+	for index, operation := range tx.Operations {
+		if operation.Op != transactions.OpCreateProject {
+			continue
+		}
+		updated, err := applyFabricationMetadataToProjectOperation(operation, variables)
+		if err != nil {
+			return tx, err
+		}
+		tx.Operations[index] = updated
+	}
+	return tx, nil
+}
+
+func applyFabricationMetadataToProjectOperation(operation transactions.Operation, variables map[string]string) (transactions.Operation, error) {
+	var payload transactions.CreateProjectOperation
+	if err := json.Unmarshal(operation.Raw, &payload); err != nil {
+		return transactions.Operation{}, err
+	}
+	if payload.TextVariables == nil {
+		payload.TextVariables = map[string]string{}
+	}
+	for key, value := range variables {
+		payload.TextVariables[key] = value
+	}
+	return workflowOperation(transactions.OpCreateProject, payload)
 }
 
 func boardOperations(request *Request) ([]transactions.Operation, []reports.Issue) {

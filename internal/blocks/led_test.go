@@ -6,8 +6,18 @@ import (
 	"strings"
 	"testing"
 
+	"kicadai/internal/reports"
 	"kicadai/internal/transactions"
 )
+
+func TestAppendRoleConnectOperationRejectsUnrealizedRole(t *testing.T) {
+	var operations []transactions.Operation
+	var issues []reports.Issue
+	appendRoleConnectOperation(&operations, &issues, map[string]string{"present": "R1"}, NetPin{ComponentRole: "present", Pin: "1"}, NetPin{ComponentRole: "missing", Pin: "2"}, "SIG")
+	if len(operations) != 0 || len(issues) != 1 {
+		t.Fatalf("operations=%#v issues=%#v, want one missing-role issue", operations, issues)
+	}
+}
 
 func TestLEDIndicatorInstantiatesDeterministicOperations(t *testing.T) {
 	registry := NewBuiltinRegistry()

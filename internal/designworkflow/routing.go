@@ -3,11 +3,13 @@ package designworkflow
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"math"
 	"slices"
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"kicadai/internal/blocks"
 	"kicadai/internal/placement"
@@ -39,6 +41,12 @@ const interBlockRouteSnapMaxDistanceMM = 0.75
 const localRouteShapeEndpointDeltaMismatchMaxMM = 25.0
 
 const localRouteEntryAnchorSource = "pcb_realization.entry_anchor"
+
+const localRouteEndpointDogboneOperationRef = "local_route.endpoint_dogbone"
+
+const localRouteRebuildMaxRouterCalls = 256
+
+const localRouteRebuildMaxDuration = 30 * time.Second
 
 const (
 	defaultLocalRouteTopLayer    = "F.Cu"
@@ -98,11 +106,27 @@ type InterBlockRouteTreeExecutionSummary struct {
 	InfoIssueCount      int      `json:"info_issue_count,omitempty"`
 	FixedNetSkipNotices int      `json:"fixed_net_skip_notices,omitempty"`
 	ManagedNets         []string `json:"managed_nets,omitempty"`
+	OrderAttempts       int      `json:"order_attempts,omitempty"`
+	SelectedOrder       string   `json:"selected_order,omitempty"`
 }
 
 type RouteTreeBranchEvidenceSummary struct {
 	NetName  string                            `json:"net_name"`
 	Branches []InterBlockBranchRoutingEvidence `json:"branches,omitempty"`
+}
+
+type PhysicalPadRoutingCompletionSummary struct {
+	NetsConsidered int            `json:"nets_considered"`
+	Endpoints      int            `json:"endpoints"`
+	EndpointsByNet map[string]int `json:"endpoints_by_net,omitempty"`
+	ConnectedNets  []string       `json:"connected_nets,omitempty"`
+	RemainingNets  []string       `json:"remaining_nets,omitempty"`
+}
+
+type FinalRouteOrderNegotiationSummary struct {
+	Attempts      int      `json:"attempts"`
+	SelectedOrder string   `json:"selected_order,omitempty"`
+	PromotedNets  []string `json:"promoted_nets,omitempty"`
 }
 
 type interBlockRouteTreeExecutionResult struct {
@@ -117,18 +141,17 @@ func RoutePlacement(ctx context.Context, request Request, fragments PCBFragmentR
 	if ctx == nil {
 		ctx = context.Background()
 	}
-	if err := ctx.Err(); err != nil {
-		return RoutingStageResult{Stage: NewStageResult(StageRouting, []reports.Issue{{
-			Code:     reports.CodeOperationCanceled,
-			Severity: reports.SeverityBlocked,
-			Message:  err.Error(),
-		}})}
+	if canceled, ok := canceledRoutingStageResult(ctx); ok {
+		return canceled
 	}
 	localOperations, localRouteIssues, localRouteConnectivity := localRouteOperations(fragments, &placed)
 	interBlockCandidates, interBlockCandidateIssues := BuildInterBlockRouteCandidates(fragments, placed)
 	localRouteMobility := classifyLocalRouteMobility(fragments, placed.Request)
 	componentHintResult := componentRoutingHints(opts.ComponentSelections, fragments)
 	componentHintIssues := ComponentHintIssues(componentHintResult.Evidence)
+	if canceled, ok := canceledRoutingStageResult(ctx); ok {
+		return canceled
+	}
 	if opts.Skip || normalized.Validation.SkipRouting {
 		stage := StageResult{Name: StageRouting, Status: StageStatusSkipped, Summary: map[string]any{
 			"reason":               "routing skipped",
@@ -167,10 +190,15 @@ func RoutePlacement(ctx context.Context, request Request, fragments PCBFragmentR
 	issues = append(issues, interBlockCandidateIssues...)
 	issues = append(issues, anchorIssues...)
 	applyRoutingOptions(normalized, opts, &routingRequest)
-	if localRouteConnectivity.IssueCount == 0 {
-		routingRequest.Nets = excludeNetsWithRouteOperations(routingRequest.Nets, localOperations, interBlockCandidates)
+	var localRebuildIssues []reports.Issue
+	localOperations, localRebuildIssues = rebuildMovedLocalRouteOperations(ctx, routingRequest, localOperations)
+	issues = append(issues, localRebuildIssues...)
+	if canceled, ok := canceledRoutingStageResult(ctx); ok {
+		return canceled
 	}
-	if localRouteConnectivity.IssueCount == 0 {
+	localRouteConnectivity = localRouteConnectivityWithAdditionalIssues(localRouteConnectivity, len(localRebuildIssues))
+	localRouteRoutingBlocked := reports.HasBlockingIssue(localRouteIssues) || reports.HasBlockingIssue(localRebuildIssues)
+	if !localRouteRoutingBlocked {
 		if fragmentsRequireStrictDRC(fragments) {
 			// DRC-required fragments commit all block-local copper before global
 			// routing. Every inter-block branch must therefore avoid foreign-net
@@ -185,7 +213,7 @@ func RoutePlacement(ctx context.Context, request Request, fragments PCBFragmentR
 	}
 	selectiveLocalRouteObstacles := []routing.ExistingCopper(nil)
 	selectiveLocalRouteObstacleNets := map[string]struct{}{}
-	if localRouteConnectivity.IssueCount == 0 {
+	if !localRouteRoutingBlocked {
 		addMultiEndpointGroundRouteObstacleNets(selectiveLocalRouteObstacleNets, interBlockCandidates)
 		for _, netName := range normalized.Constraints.LocalRouteObstacleNets {
 			selectiveLocalRouteObstacleNets[strings.TrimSpace(netName)] = struct{}{}
@@ -198,37 +226,84 @@ func RoutePlacement(ctx context.Context, request Request, fragments PCBFragmentR
 			selectiveLocalRouteObstacles = existingCopperFromAllRouteOperations(localOperations, routeBranchDefaultLayer(routingRequest.Board), routingRequest.Rules)
 		}
 	}
+	baseContactOperations := slices.Concat(localOperations, anchorOperations)
+	physicalContext := newPhysicalPadRoutingContext(&placed)
+	physicalCandidates := physicalContext.candidates
+	preTreeNets, _ := remainingPhysicalPadRoutingNetsWithCandidates(routingRequest.Nets, &placed, baseContactOperations, physicalCandidates)
+	preTreeNets = excludeRoutingNetsByName(preTreeNets, interBlockCandidateNets(interBlockCandidates))
 	targetEvidence := BuildInterBlockContactTargets(interBlockCandidates, &placed)
-	accessOperations := make([]transactions.Operation, 0, len(localOperations)+len(anchorOperations))
-	accessOperations = append(accessOperations, localOperations...)
-	accessOperations = append(accessOperations, anchorOperations...)
-	routeTreeAccess, routeTreeAccessIssues := BuildRouteTreeEndpointAccessWithIssues(targetEvidence, accessOperations)
+	routeTreeAccess, routeTreeAccessIssues := BuildRouteTreeEndpointAccessWithIssues(targetEvidence, baseContactOperations)
 	issues = append(issues, routeTreeAccessIssues...)
+	if canceled, ok := canceledRoutingStageResult(ctx); ok {
+		return canceled
+	}
 	routeTreeExecution := executeInterBlockRouteTrees(ctx, routingRequest, interBlockCandidates, targetEvidence, routeTreeAccess, selectiveLocalRouteObstacles, selectiveLocalRouteObstacleNets)
-	routingRequest.Nets = excludeManagedInterBlockNets(routingRequest.Nets, routeTreeExecution.Summary.ManagedNets)
+	if canceled, ok := canceledRoutingStageResult(ctx); ok {
+		return canceled
+	}
+	// Inter-block trees connect constrained, shared block boundaries. Commit those
+	// paths before routing unrelated residual pads so the residual router can work
+	// around the proven topology instead of consuming endpoint escape corridors.
+	routingRequest.Existing = append(routingRequest.Existing, existingCopperFromAllRouteOperations(routeTreeExecution.Operations, routeBranchDefaultLayer(routingRequest.Board), routingRequest.Rules)...)
 	issues = append(issues, targetEvidence.Issues...)
 	issues = append(issues, routeTreeExecution.Issues...)
+	preTreeResult := routing.Result{Status: routing.StatusRouted}
+	preTreeOrder := FinalRouteOrderNegotiationSummary{}
+	if len(preTreeNets) != 0 && !reports.HasBlockingIssue(issues) {
+		preTreeRequest := routingRequest
+		preTreeRequest.Nets = preTreeNets
+		preTreeResult, preTreeOrder = routeWithFailedNetFirstNegotiation(ctx, preTreeRequest)
+		issues = append(issues, preTreeResult.Issues...)
+	}
+	if canceled, ok := canceledRoutingStageResult(ctx); ok {
+		return canceled
+	}
+	preTreeRouteOperations := transactionRouteOperations(preTreeResult.Operations)
+	routingRequest.Existing = append(routingRequest.Existing, existingCopperFromAllRouteOperations(preTreeRouteOperations, routeBranchDefaultLayer(routingRequest.Board), routingRequest.Rules)...)
+	// Inter-block completion proves only block-boundary endpoints. Retain every
+	// placed-pad endpoint for the final router pass, and expose the route-tree
+	// branches as fixed net-aware copper so remaining pads can merge into the
+	// already proven topology without crossing it.
+	physicalContactOperations := slices.Concat(baseContactOperations, preTreeRouteOperations, routeTreeExecution.Operations)
+	var physicalPadRouting PhysicalPadRoutingCompletionSummary
+	routingRequest.Nets, physicalPadRouting = remainingPhysicalPadRoutingNetsWithCandidates(routingRequest.Nets, &placed, physicalContactOperations, physicalCandidates)
 	result := routing.Result{Status: routing.StatusBlocked}
+	finalRouteOrder := FinalRouteOrderNegotiationSummary{}
 	if !reports.HasBlockingIssue(issues) {
-		result = routing.RouteRequestContext(ctx, routingRequest)
+		result, finalRouteOrder = routeWithFailedNetFirstNegotiation(ctx, routingRequest)
 		issues = append(issues, result.Issues...)
 	}
-	routeOperations := transactionRouteOperations(result.Operations)
-	routeOperations = append(routeOperations, routeTreeExecution.Operations...)
-	routeOperations, snapIssues := snapInterBlockRouteEndpoints(interBlockCandidates, routeOperations, &placed)
+	if canceled, ok := canceledRoutingStageResult(ctx); ok {
+		return canceled
+	}
+	finalRouteOperations := transactionRouteOperations(result.Operations)
+	qualityRequest := routingRequest
+	qualityRequest.Nets = uniqueRoutingNets(preTreeNets, routingRequest.Nets)
+	result = combineSequentialRoutingResults(preTreeResult, result)
+	quality := routing.BuildQualityReport(qualityRequest, result)
+	result.Quality = &quality
+	finalRouteOperations, snapIssues := snapInterBlockRouteEndpoints(interBlockCandidates, finalRouteOperations, &placed)
 	issues = append(issues, snapIssues...)
-	contactGraphOperations := make([]transactions.Operation, 0, len(routeOperations)+len(localOperations)+len(anchorOperations))
-	contactGraphOperations = append(contactGraphOperations, routeOperations...)
-	contactGraphOperations = append(contactGraphOperations, localOperations...)
-	contactGraphOperations = append(contactGraphOperations, anchorOperations...)
+	// Route-tree operations already carry explicit endpoint-access evidence and
+	// are validated by the same-net contact graph below. Re-snapping them to an
+	// arbitrary pair of net targets would corrupt legitimate copper merges.
+	routeOperations := slices.Concat(preTreeRouteOperations, finalRouteOperations, routeTreeExecution.Operations)
+	contactGraphOperations := slices.Concat(routeOperations, baseContactOperations)
 	interBlockContactEvidence := ValidateInterBlockRouteEndpointContacts(interBlockCandidates, contactGraphOperations, &placed)
 	issues = append(issues, interBlockContactEvidence.Issues...)
 	issues = suppressProvenRouteDisconnectedIssues(issues, interBlockContactEvidence, routeOperations, localOperations, localRouteConnectivity)
 	routeTreeRepairHints := BuildRouteTreeRepairHints(issues)
-	operations := append(localOperations, anchorOperations...)
-	operations = append(operations, routeOperations...)
-	operations = dedupeSameNetRouteVias(operations)
-	operations = compactRouteOperationGeometry(operations)
+	operations := slices.Concat(baseContactOperations, routeOperations)
+	for operationIndex := 0; operationIndex < len(localOperations); operationIndex++ {
+		operations[operationIndex].PruneProtected = true
+	}
+	physicalContactEvidence := BuildInterBlockContactTargets(physicalContext.candidates, &placed)
+	var routePostProcessIssues []reports.Issue
+	if canceled, ok := canceledRoutingStageResult(ctx); ok {
+		return canceled
+	}
+	operations, routePostProcessIssues = postProcessRouteOperations(operations, &placed, physicalContext, physicalContactEvidence)
+	issues = append(issues, routePostProcessIssues...)
 	stage := NewStageResult(StageRouting, issues)
 	stage.Issues = cloneIssues(issues)
 	routeDiagnostics := routing.DiagnosticsForResult(result)
@@ -247,6 +322,12 @@ func RoutePlacement(ctx context.Context, request Request, fragments PCBFragmentR
 		"route_tree_branches":          routeTreeExecution.Branches,
 		"route_tree_access":            SummarizeRouteTreeEndpointAccess(routeTreeAccess),
 		"route_tree_contact_graph":     routeTreeContactGraph,
+		"physical_pad_routing":         physicalPadRouting,
+		"pre_tree_route_operations":    len(preTreeRouteOperations),
+		"pre_tree_routed_nets":         preTreeResult.Metrics.RoutedNetCount,
+		"pre_tree_failed_nets":         preTreeResult.Metrics.FailedNetCount,
+		"pre_tree_route_order":         preTreeOrder,
+		"final_route_order":            finalRouteOrder,
 		"route_tree_missing_endpoints": SummarizeRouteTreeMissingEndpointTrace(interBlockContactEvidence, routeTreeAccess),
 		"required_net_classification":  SummarizeRequiredNetClassification(&routeTreeContactGraph),
 		"route_tree_repair":            SummarizeRouteTreeRepair(routeTreeRepairHints),
@@ -262,6 +343,202 @@ func RoutePlacement(ctx context.Context, request Request, fragments PCBFragmentR
 		stage.Summary["route_reports"] = len(result.Quality.NetReports)
 	}
 	return RoutingStageResult{Request: routingRequest, Result: result, Operations: operations, Stage: stage}
+}
+
+func canceledRoutingStageResult(ctx context.Context) (RoutingStageResult, bool) {
+	if err := ctx.Err(); err != nil {
+		return RoutingStageResult{Stage: NewStageResult(StageRouting, []reports.Issue{{
+			Code:     reports.CodeOperationCanceled,
+			Severity: reports.SeverityBlocked,
+			Message:  err.Error(),
+		}})}, true
+	}
+	return RoutingStageResult{}, false
+}
+
+func postProcessRouteOperations(operations []transactions.Operation, placed *PlacementStageResult, physical physicalPadRoutingContext, physicalEvidence InterBlockContactEvidence) ([]transactions.Operation, []reports.Issue) {
+	operations, _ = dedupeSameNetRouteViasWithEvidence(operations)
+	operations, viaReducedRoutes, issues := removeRedundantRouteViasAtPlatedPadsWithContext(operations, placed, physical)
+	if viaReducedRoutes == nil {
+		viaReducedRoutes = map[int]struct{}{}
+	}
+	for operationIndex, operation := range operations {
+		if operation.PruneProtected || operation.Op == transactions.OpRoute && operation.Ref == localRouteEndpointDogboneOperationRef {
+			viaReducedRoutes[operationIndex] = struct{}{}
+		}
+	}
+	decoded := decodeRouteOperations(operations)
+	viaReducedRoutes = expandViaReducedRoutePairsDecoded(decoded, viaReducedRoutes)
+	operations = pruneRedundantDanglingRouteStubsDecoded(operations, placed, viaReducedRoutes, physical, physicalEvidence, decoded)
+	return compactRouteOperationGeometry(operations), issues
+}
+
+func combineSequentialRoutingResults(first routing.Result, second routing.Result) routing.Result {
+	routes := combineSequentialRoutes(first.Routes, second.Routes)
+	combined := routing.Result{
+		Routes:     routes,
+		Operations: slices.Concat(first.Operations, second.Operations),
+		Issues:     slices.Concat(first.Issues, second.Issues),
+		Metrics: routing.Metrics{
+			SearchNodes:       first.Metrics.SearchNodes + second.Metrics.SearchNodes,
+			MaxSearchNodesHit: first.Metrics.MaxSearchNodesHit || second.Metrics.MaxSearchNodesHit,
+		},
+	}
+	for _, route := range routes {
+		combined.Metrics.NetCount++
+		switch route.Status {
+		case routing.RouteStatusRouted:
+			combined.Metrics.RoutedNetCount++
+		case routing.RouteStatusFailed:
+			combined.Metrics.FailedNetCount++
+		}
+		combined.Metrics.SegmentCount += len(route.Segments)
+		combined.Metrics.ViaCount += len(route.Vias)
+		combined.Metrics.MaxSearchNodesHit = combined.Metrics.MaxSearchNodesHit || route.SearchLimitHit
+		for _, segment := range route.Segments {
+			combined.Metrics.TotalLengthMM += math.Hypot(segment.End.XMM-segment.Start.XMM, segment.End.YMM-segment.Start.YMM)
+		}
+	}
+	combined.Metrics.TotalLengthMM = math.Round(combined.Metrics.TotalLengthMM*1e6) / 1e6
+	switch {
+	case combined.Metrics.FailedNetCount == 0 && combined.Metrics.NetCount > 0:
+		combined.Status = routing.StatusRouted
+	case combined.Metrics.RoutedNetCount > 0:
+		combined.Status = routing.StatusPartial
+	case combined.Metrics.NetCount > 0:
+		combined.Status = routing.StatusBlocked
+	case first.Status == routing.StatusBlocked || second.Status == routing.StatusBlocked:
+		combined.Status = routing.StatusBlocked
+	case first.Status == routing.StatusPartial || second.Status == routing.StatusPartial:
+		combined.Status = routing.StatusPartial
+	default:
+		combined.Status = routing.StatusRouted
+	}
+	return combined
+}
+
+// combineSequentialRoutes treats the second pass as a delta routed around the
+// first pass's committed copper. Geometry and search evidence accumulate, but
+// a net present in both passes remains one net and its later non-skipped status
+// is authoritative. This prevents quality metrics from double-counting a
+// partially completed net that required both routing passes.
+func combineSequentialRoutes(first, second []routing.Route) []routing.Route {
+	combined := make([]routing.Route, len(first))
+	copy(combined, first)
+	indexByNet := make(map[string]int, len(first)+len(second))
+	for index, route := range combined {
+		indexByNet[route.Net] = index
+	}
+	for _, route := range second {
+		index, exists := indexByNet[route.Net]
+		if !exists {
+			indexByNet[route.Net] = len(combined)
+			combined = append(combined, route)
+			continue
+		}
+		prior := combined[index]
+		prior.Segments = slices.Concat(prior.Segments, route.Segments)
+		prior.Vias = slices.Concat(prior.Vias, route.Vias)
+		prior.Issues = slices.Concat(prior.Issues, route.Issues)
+		if prior.Status == routing.RouteStatusRouted && route.Status == routing.RouteStatusFailed {
+			prior.Issues = append(prior.Issues, reports.Issue{
+				Code:       reports.CodeValidationTrace,
+				Severity:   reports.SeverityInfo,
+				Path:       "routing.sequential." + route.Net,
+				Message:    "a later routing pass failed after an earlier pass routed part of the net",
+				Suggestion: "inspect the per-pass route issues and combined geometry metrics",
+				Nets:       []string{route.Net},
+			})
+		}
+		prior.SearchNodes += route.SearchNodes
+		prior.SearchLimitHit = prior.SearchLimitHit || route.SearchLimitHit
+		prior.Status = combinedSequentialRouteStatus(prior.Status, route.Status)
+		combined[index] = prior
+	}
+	return combined
+}
+
+func combinedSequentialRouteStatus(prior, current routing.RouteStatus) routing.RouteStatus {
+	switch current {
+	case routing.RouteStatusSkipped:
+		return prior
+	case routing.RouteStatusRouted, routing.RouteStatusFailed:
+		// The second pass routes the endpoints left by the first pass, so its
+		// terminal result is authoritative for the combined net.
+		return current
+	default:
+		// Preserve a known prior status if a future router emits an unknown one.
+		return prior
+	}
+}
+
+func uniqueRoutingNets(groups ...[]routing.Net) []routing.Net {
+	total := 0
+	for _, group := range groups {
+		total += len(group)
+	}
+	unique := make([]routing.Net, 0, total)
+	indexByName := make(map[string]int, total)
+	for _, group := range groups {
+		for _, net := range group {
+			// Net names are normalized exactly once per occurrence. The key helper
+			// is intentionally a trim-only operation so display case remains intact.
+			key := interBlockSummaryNetKey(net.Name)
+			if index, exists := indexByName[key]; exists {
+				unique[index] = mergeSequentialRoutingNet(unique[index], net)
+				continue
+			}
+			indexByName[key] = len(unique)
+			unique = append(unique, net)
+		}
+	}
+	return unique
+}
+
+func mergeSequentialRoutingNet(prior, current routing.Net) routing.Net {
+	merged := prior
+	if strings.TrimSpace(current.Name) != "" {
+		merged.Name = current.Name
+	}
+	merged.Endpoints = mergeRoutingEndpoints(prior.Endpoints, current.Endpoints)
+	if current.Role != "" {
+		merged.Role = current.Role
+	}
+	if strings.TrimSpace(current.Class) != "" {
+		merged.Class = current.Class
+	}
+	merged.Priority = max(prior.Priority, current.Priority)
+	merged.Fixed = prior.Fixed || current.Fixed
+	return merged
+}
+
+func mergeRoutingEndpoints(groups ...[]routing.Endpoint) []routing.Endpoint {
+	merged := make([]routing.Endpoint, 0)
+	type endpointKey struct {
+		ref string
+		pin string
+	}
+	seen := make(map[endpointKey]struct{})
+	for _, group := range groups {
+		for _, endpoint := range group {
+			// routing.Endpoint carries only Ref and Pin, so this key preserves all
+			// available endpoint identity. KiCad ref/pin lookup is case-insensitive.
+			key := endpointKey{ref: strings.ToUpper(strings.TrimSpace(endpoint.Ref)), pin: strings.ToUpper(strings.TrimSpace(endpoint.Pin))}
+			if _, exists := seen[key]; exists {
+				continue
+			}
+			seen[key] = struct{}{}
+			merged = append(merged, endpoint)
+		}
+	}
+	return merged
+}
+
+func localRouteConnectivityWithAdditionalIssues(summary LocalRouteConnectivitySummary, additional int) LocalRouteConnectivitySummary {
+	if additional > 0 {
+		summary.IssueCount += additional
+	}
+	return summary
 }
 
 func fragmentsRequireStrictDRC(fragments PCBFragmentResult) bool {
@@ -318,6 +595,435 @@ func compactRouteOperationGeometry(operations []transactions.Operation) []transa
 		out = append(out, compacted)
 	}
 	return out
+}
+
+type platedPadViaTarget struct {
+	netName     string
+	point       transactions.Point
+	radiusMM    float64
+	widthMM     float64
+	heightMM    float64
+	rotationDeg float64
+	shape       string
+	cosAngle    float64
+	sinAngle    float64
+}
+
+type platedPadViaTargetIndex struct {
+	byKey          map[placedPadSpatialKey][]platedPadViaTarget
+	oversizedByKey map[placedPadSpatialKey][]platedPadViaTarget
+}
+
+const platedPadOversizedSpatialBucketMM = 25.0
+
+func platedPadOversizedSpatialKey(point transactions.Point) placedPadSpatialKey {
+	return placedPadSpatialKey{x: int64(math.Floor(point.XMM / platedPadOversizedSpatialBucketMM)), y: int64(math.Floor(point.YMM / platedPadOversizedSpatialBucketMM))}
+}
+
+func newPlatedPadViaTargetIndex(targets []platedPadViaTarget) platedPadViaTargetIndex {
+	index := platedPadViaTargetIndex{
+		byKey:          make(map[placedPadSpatialKey][]platedPadViaTarget, len(targets)),
+		oversizedByKey: make(map[placedPadSpatialKey][]platedPadViaTarget),
+	}
+	for _, source := range targets {
+		target := normalizedPlatedPadViaTarget(source)
+		if target.radiusMM > placedPadSpatialBucketMM {
+			minKey := platedPadOversizedSpatialKey(transactions.Point{XMM: target.point.XMM - target.radiusMM, YMM: target.point.YMM - target.radiusMM})
+			maxKey := platedPadOversizedSpatialKey(transactions.Point{XMM: target.point.XMM + target.radiusMM, YMM: target.point.YMM + target.radiusMM})
+			for x := minKey.x; x <= maxKey.x; x++ {
+				for y := minKey.y; y <= maxKey.y; y++ {
+					key := placedPadSpatialKey{x: x, y: y}
+					index.oversizedByKey[key] = append(index.oversizedByKey[key], target)
+				}
+			}
+			continue
+		}
+		key := placedPadSpatialKeyForPoint(target.point)
+		index.byKey[key] = append(index.byKey[key], target)
+	}
+	return index
+}
+
+func normalizedPlatedPadViaTarget(source platedPadViaTarget) platedPadViaTarget {
+	target := source
+	target.netName = routeNetKey(source.netName)
+	target.shape = strings.ToLower(strings.TrimSpace(source.shape))
+	angle := source.rotationDeg * math.Pi / 180
+	target.cosAngle = math.Cos(angle)
+	target.sinAngle = math.Sin(angle)
+	return target
+}
+
+func (index platedPadViaTargetIndex) contains(netName string, point transactions.Point) bool {
+	netName = routeNetKey(netName)
+	key := placedPadSpatialKeyForPoint(point)
+	for dx := int64(-1); dx <= 1; dx++ {
+		for dy := int64(-1); dy <= 1; dy++ {
+			for _, target := range index.byKey[placedPadSpatialKey{x: key.x + dx, y: key.y + dy}] {
+				if target.netName == netName && target.contains(point) {
+					return true
+				}
+			}
+		}
+	}
+	for _, target := range index.oversizedByKey[platedPadOversizedSpatialKey(point)] {
+		if target.netName == netName && target.contains(point) {
+			return true
+		}
+	}
+	return false
+}
+
+func (target platedPadViaTarget) contains(point transactions.Point) bool {
+	dx := point.XMM - target.point.XMM
+	dy := point.YMM - target.point.YMM
+	localX := dx*target.cosAngle + dy*target.sinAngle
+	localY := -dx*target.sinAngle + dy*target.cosAngle
+	halfWidth := math.Max(0, target.widthMM) / 2
+	halfHeight := math.Max(0, target.heightMM) / 2
+	if halfWidth > 0 && halfHeight > 0 {
+		switch target.shape {
+		case "rect":
+			return math.Abs(localX) <= halfWidth && math.Abs(localY) <= halfHeight
+		case "oval", "roundrect":
+			// A maximum-radius rounded rectangle is a capsule. This is exact for
+			// KiCad ovals and conservative for every permitted roundrect corner
+			// ratio, so a via is removed only when it is certainly inside copper.
+			return pointInsideAxisAlignedCapsule(localX, localY, halfWidth, halfHeight)
+		}
+	}
+	return dx*dx+dy*dy <= target.radiusMM*target.radiusMM
+}
+
+func pointInsideAxisAlignedCapsule(x, y, halfWidth, halfHeight float64) bool {
+	if halfWidth >= halfHeight {
+		capCenterX := math.Max(-halfWidth+halfHeight, math.Min(halfWidth-halfHeight, x))
+		return math.Hypot(x-capCenterX, y) <= halfHeight
+	}
+	capCenterY := math.Max(-halfHeight+halfWidth, math.Min(halfHeight-halfWidth, y))
+	return math.Hypot(x, y-capCenterY) <= halfWidth
+}
+
+func removeRedundantRouteViasAtPlatedPads(operations []transactions.Operation, placed *PlacementStageResult) []transactions.Operation {
+	out, _ := removeRedundantRouteViasAtPlatedPadsWithEvidence(operations, placed)
+	return out
+}
+
+func removeRedundantRouteViasAtPlatedPadsWithEvidence(operations []transactions.Operation, placed *PlacementStageResult) ([]transactions.Operation, map[int]struct{}) {
+	out, reduced, _ := removeRedundantRouteViasAtPlatedPadsWithContext(operations, placed, newPhysicalPadRoutingContext(placed))
+	return out, reduced
+}
+
+func removeRedundantRouteViasAtPlatedPadsWithContext(operations []transactions.Operation, placed *PlacementStageResult, physical physicalPadRoutingContext) ([]transactions.Operation, map[int]struct{}, []reports.Issue) {
+	if placed == nil || !physical.valid {
+		return operations, nil, nil
+	}
+	resolver := physical.resolver
+	var targets []platedPadViaTarget
+	for _, component := range placed.Request.Components {
+		refKey := strings.ToUpper(strings.TrimSpace(component.Ref))
+		routingNames := routingPadNames(component.Pads)
+		for padIndex, pad := range component.Pads {
+			padType := strings.ToLower(strings.TrimSpace(pad.Type))
+			if pad.DrillMM <= 0 || padType == "np_thru_hole" || padIndex >= len(routingNames) {
+				continue
+			}
+			padKey := strings.ToUpper(strings.TrimSpace(routingNames[padIndex]))
+			endpoint, ok := resolver.ResolveNormalized(refKey, padKey)
+			if !ok || strings.TrimSpace(endpoint.NetName) == "" {
+				continue
+			}
+			widthMM := math.Max(pad.WidthMM, pad.DrillMM)
+			heightMM := math.Max(pad.HeightMM, pad.DrillMM)
+			containmentRadius := math.Min(widthMM, heightMM) / 2
+			searchRadius := containmentRadius
+			switch strings.ToLower(strings.TrimSpace(pad.Shape)) {
+			case "rect":
+				searchRadius = math.Hypot(widthMM, heightMM) / 2
+			case "oval", "roundrect":
+				searchRadius = math.Max(widthMM, heightMM) / 2
+			}
+			targets = append(targets, platedPadViaTarget{
+				netName: endpoint.NetName, point: endpoint.Point, radiusMM: searchRadius,
+				widthMM: widthMM, heightMM: heightMM, rotationDeg: endpoint.ComponentRotation + pad.RotationDeg, shape: pad.Shape,
+			})
+		}
+	}
+	if len(targets) == 0 {
+		return operations, nil, nil
+	}
+	targetIndex := newPlatedPadViaTargetIndex(targets)
+	out := make([]transactions.Operation, 0, len(operations))
+	reduced := map[int]struct{}{}
+	decodedRoutes := decodeRouteOperations(operations)
+	var issues []reports.Issue
+	for operationIndex, decoded := range decodedRoutes {
+		operation := decoded.operation
+		if operation.Op != transactions.OpRoute {
+			out = append(out, operation)
+			continue
+		}
+		if !decoded.decoded || len(decoded.payload.Vias) == 0 {
+			out = append(out, operation)
+			continue
+		}
+		payload := decoded.payload
+		netName := strings.TrimSpace(firstNonEmpty(payload.NetName, operation.Net))
+		var kept []transactions.RouteViaSpec
+		changed := false
+		for viaIndex, via := range payload.Vias {
+			if targetIndex.contains(netName, via.At) {
+				if !changed {
+					kept = append(make([]transactions.RouteViaSpec, 0, len(payload.Vias)-1), payload.Vias[:viaIndex]...)
+					changed = true
+				}
+				continue
+			}
+			if changed {
+				kept = append(kept, via)
+			}
+		}
+		// Raw JSON is rewritten only for operations that actually lost a via.
+		if !changed {
+			out = append(out, operation)
+			continue
+		}
+		payload.Vias = kept
+		raw, err := json.Marshal(payload)
+		if err != nil {
+			out = append(out, operation)
+			issues = append(issues, reports.Issue{Code: reports.CodeValidationFailed, Severity: reports.SeverityWarning, Path: fmt.Sprintf("routing.via_reduction.operations[%d]", operationIndex), Message: "could not serialize route after redundant plated-pad via reduction: " + err.Error(), Nets: compactContactStrings([]string{netName})})
+			continue
+		}
+		updated := operation
+		updated.Raw = raw
+		updated.PruneProtected = true
+		out = append(out, updated)
+		reduced[operationIndex] = struct{}{}
+	}
+	return out, reduced, issues
+}
+
+type danglingRouteStubCandidate struct {
+	operationIndex int
+	netName        string
+	layer          string
+	points         []transactions.Point
+	terminal       [2]bool
+	neighbors      [2][]int
+}
+
+type routeStubPairKey struct {
+	net    string
+	first  routeCoordKey
+	second routeCoordKey
+}
+
+func expandViaReducedRoutePairs(operations []transactions.Operation, reduced map[int]struct{}) map[int]struct{} {
+	return expandViaReducedRoutePairsDecoded(decodeRouteOperations(operations), reduced)
+}
+
+func expandViaReducedRoutePairsDecoded(decoded []decodedRouteOperation, reduced map[int]struct{}) map[int]struct{} {
+	if len(reduced) == 0 {
+		return reduced
+	}
+	keys := map[routeStubPairKey]struct{}{}
+	for operationIndex := range reduced {
+		if operationIndex < 0 || operationIndex >= len(decoded) || !decoded[operationIndex].decoded {
+			continue
+		}
+		if key, ok := routeStubPairGeometryKey(decoded[operationIndex].payload); ok {
+			keys[key] = struct{}{}
+		}
+	}
+	for operationIndex, route := range decoded {
+		if !route.decoded {
+			continue
+		}
+		key, ok := routeStubPairGeometryKey(route.payload)
+		if !ok {
+			continue
+		}
+		if _, paired := keys[key]; paired {
+			reduced[operationIndex] = struct{}{}
+		}
+	}
+	return reduced
+}
+
+func routeStubPairGeometryKey(payload transactions.RouteOperation) (routeStubPairKey, bool) {
+	if len(payload.Points) != 2 {
+		return routeStubPairKey{}, false
+	}
+	first := routePointKey(payload.Points[0])
+	second := routePointKey(payload.Points[1])
+	if second.x < first.x || second.x == first.x && second.y < first.y {
+		first, second = second, first
+	}
+	return routeStubPairKey{net: routeNetKey(payload.NetName), first: first, second: second}, true
+}
+
+// pruneRedundantDanglingRouteStubs peels two-point leaf routes from nets whose
+// physical pads are already connected. A single spatial contact graph supplies
+// all endpoint adjacency, and the queue updates only neighboring leaves.
+func pruneRedundantDanglingRouteStubs(operations []transactions.Operation, placed *PlacementStageResult, eligible map[int]struct{}, physical physicalPadRoutingContext) []transactions.Operation {
+	physicalEvidence := BuildInterBlockContactTargets(physical.candidates, placed)
+	return pruneRedundantDanglingRouteStubsDecoded(operations, placed, eligible, physical, physicalEvidence, decodeRouteOperations(operations))
+}
+
+func pruneRedundantDanglingRouteStubsDecoded(operations []transactions.Operation, placed *PlacementStageResult, eligible map[int]struct{}, physical physicalPadRoutingContext, physicalEvidence InterBlockContactEvidence, decoded []decodedRouteOperation) []transactions.Operation {
+	if len(eligible) == 0 {
+		return operations
+	}
+	if !physical.valid || len(physical.candidates) == 0 {
+		return operations
+	}
+	decodedByNet, decodeIssues := decodeInterBlockRouteOperationsFromDecoded(decoded)
+	connected := interBlockConnectedNetsFromDecoded(interBlockContactTargetsByNet(physicalEvidence.Targets), decodedByNet, decodeIssues)
+	padsBySummaryNet := map[string][]PlacedPadEndpoint{}
+	for _, pad := range physical.resolver.Endpoints() {
+		netKey := interBlockSummaryNetKey(pad.NetName)
+		padsBySummaryNet[netKey] = append(padsBySummaryNet[netKey], pad)
+	}
+	if reports.HasBlockingIssue(decodeIssues) {
+		return operations
+	}
+	decodedBySummaryNet := map[string][]decodedContactRouteOperation{}
+	for netName, decoded := range decodedByNet {
+		netKey := interBlockSummaryNetKey(netName)
+		decodedBySummaryNet[netKey] = append(decodedBySummaryNet[netKey], decoded...)
+	}
+	removed := map[int]struct{}{}
+	for netKey, decoded := range decodedBySummaryNet {
+		if netKey == "" || !connected[netKey] {
+			continue
+		}
+		candidates := map[int]*danglingRouteStubCandidate{}
+		for _, route := range decoded {
+			if len(route.Points) != 2 || len(route.Vias) != 0 {
+				continue
+			}
+			if _, ok := eligible[route.SourceIndex]; !ok {
+				continue
+			}
+			candidates[route.SourceIndex] = &danglingRouteStubCandidate{
+				operationIndex: route.SourceIndex,
+				netName:        route.NetName,
+				layer:          route.Layer,
+				points:         route.Points,
+			}
+		}
+		if len(candidates) == 0 {
+			continue
+		}
+		graph := newInterBlockContactGraph(decoded)
+		pads := padsBySummaryNet[netKey]
+		for operationIndex, candidate := range candidates {
+			protectRouteStubPadContacts(candidate, pads)
+			for endpointIndex, point := range candidate.points {
+				for _, owner := range graph.copperOwnersAt(point, candidate.layer, interBlockContactToleranceMM, operationIndex) {
+					if _, removableNeighbor := candidates[owner]; removableNeighbor {
+						candidate.neighbors[endpointIndex] = append(candidate.neighbors[endpointIndex], owner)
+					} else {
+						candidate.terminal[endpointIndex] = true
+					}
+				}
+			}
+		}
+
+		active := make(map[int]bool, len(candidates))
+		queued := make(map[int]bool, len(candidates))
+		queue := make([]int, 0, len(candidates))
+		for operationIndex := range candidates {
+			active[operationIndex] = true
+		}
+		enqueueLeaf := func(operationIndex int) {
+			if !active[operationIndex] || queued[operationIndex] {
+				return
+			}
+			candidate := candidates[operationIndex]
+			contacts := [2]bool{candidate.terminal[0], candidate.terminal[1]}
+			for endpointIndex := range contacts {
+				for _, neighbor := range candidate.neighbors[endpointIndex] {
+					if active[neighbor] {
+						contacts[endpointIndex] = true
+						break
+					}
+				}
+			}
+			if contacts[0] != contacts[1] {
+				queue = append(queue, operationIndex)
+				queued[operationIndex] = true
+			}
+		}
+		for operationIndex := range candidates {
+			enqueueLeaf(operationIndex)
+		}
+		for head := 0; head < len(queue); head++ {
+			operationIndex := queue[head]
+			queued[operationIndex] = false
+			if !active[operationIndex] {
+				continue
+			}
+			candidate := candidates[operationIndex]
+			contacts := [2]bool{candidate.terminal[0], candidate.terminal[1]}
+			for endpointIndex := range contacts {
+				for _, neighbor := range candidate.neighbors[endpointIndex] {
+					if active[neighbor] {
+						contacts[endpointIndex] = true
+						break
+					}
+				}
+			}
+			if contacts[0] == contacts[1] {
+				continue
+			}
+			active[operationIndex] = false
+			removed[candidate.operationIndex] = struct{}{}
+			for _, endpointNeighbors := range candidate.neighbors {
+				for _, neighbor := range endpointNeighbors {
+					enqueueLeaf(neighbor)
+				}
+			}
+		}
+	}
+	if len(removed) == 0 {
+		return operations
+	}
+	out := make([]transactions.Operation, 0, len(operations)-len(removed))
+	for operationIndex, operation := range operations {
+		if _, drop := removed[operationIndex]; !drop {
+			out = append(out, operation)
+		}
+	}
+	return out
+}
+
+func protectRouteStubPadContacts(candidate *danglingRouteStubCandidate, pads []PlacedPadEndpoint) {
+	if candidate == nil || len(candidate.points) != 2 {
+		return
+	}
+	for _, pad := range pads {
+		if !strings.EqualFold(strings.TrimSpace(pad.NetName), strings.TrimSpace(candidate.netName)) || !localRoutePadAppliesToLayer(pad, candidate.layer) {
+			continue
+		}
+		tolerance := math.Hypot(math.Max(0, pad.PadWidthMM), math.Max(0, pad.PadHeightMM))/2 + interBlockContactToleranceMM
+		if pointToSegmentDistanceMM(pad.Point, candidate.points[0], candidate.points[1]) > tolerance {
+			continue
+		}
+		atEndpoint := false
+		for endpointIndex, point := range candidate.points {
+			if pointDistanceMM(point, pad.Point) <= tolerance {
+				candidate.terminal[endpointIndex] = true
+				atEndpoint = true
+			}
+		}
+		if !atEndpoint {
+			// A pad contacted in the segment interior makes both halves of this
+			// unsplit operation electrically significant, so preserve it whole.
+			candidate.terminal = [2]bool{true, true}
+		}
+	}
 }
 
 func addComponentHintSummaryToStage(stage *StageResult, hints []ComponentHintEvidence) {
@@ -416,13 +1122,393 @@ func localRouteOperations(fragments PCBFragmentResult, placed *PlacementStageRes
 	}
 	table, tableIssues := BuildGeneratedNetTable(placed, nil)
 	resolver := NewPlacedPadEndpointResolver(placed, table)
-	operations, bindIssues, summary := bindLocalRouteOperations(fragments, resolver)
+	operations, bindIssues, summary := bindLocalRouteOperations(fragments, resolver, placed.Request.Board)
 	operations = append(preservedUnmodeledFragmentOperations(fragments), operations...)
 	issues := append([]reports.Issue(nil), tableIssues...)
 	issues = append(issues, resolver.Issues()...)
 	issues = append(issues, bindIssues...)
 	summary.IssueCount = len(issues)
 	return operations, issues, summary
+}
+
+func rebuildMovedLocalRouteOperations(ctx context.Context, base routing.Request, operations []transactions.Operation) ([]transactions.Operation, []reports.Issue) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	rebuildContext, cancelRebuild := context.WithTimeout(ctx, localRouteRebuildMaxDuration)
+	defer cancelRebuild()
+	ctx = rebuildContext
+	type rebuildJob struct {
+		index      int
+		authored   transactions.RouteOperation
+		netKey     string
+		layerPairs [][2]string
+		spanMM     float64
+	}
+	replacements := make([][]transactions.Operation, len(operations))
+	fixed := make([]transactions.Operation, 0, len(operations))
+	jobs := make([]rebuildJob, 0, len(operations))
+	var issues []reports.Issue
+	decodedRoutes := decodeRouteOperations(operations)
+	for index, operation := range operations {
+		if operation.Op != transactions.OpRoute || !operation.Rebuildable {
+			replacements[index] = []transactions.Operation{operation}
+			fixed = append(fixed, operation)
+			continue
+		}
+		decoded := decodedRoutes[index]
+		if !decoded.decoded || len(decoded.payload.Points) < 2 || strings.TrimSpace(decoded.payload.NetName) == "" {
+			issues = append(issues, localRouteRebuildIssue(index, operation.Net, operation.RebuildRefs, "rebuildable local route has invalid authored geometry"))
+			continue
+		}
+		authored := decoded.payload
+		start := authored.Points[0]
+		end := authored.Points[len(authored.Points)-1]
+		sourceLayers := orderedLocalRouteRebuildLayers(operation.RebuildSourceLayers, authored.Layer, routeBranchDefaultLayer(base.Board))
+		targetLayers := orderedLocalRouteRebuildLayers(operation.RebuildTargetLayers, authored.Layer, routeBranchDefaultLayer(base.Board))
+		jobs = append(jobs, rebuildJob{
+			index:      index,
+			authored:   authored,
+			netKey:     strings.TrimSpace(authored.NetName),
+			layerPairs: localRouteRebuildLayerPairs(sourceLayers, targetLayers),
+			spanMM:     math.Hypot(end.XMM-start.XMM, end.YMM-start.YMM),
+		})
+	}
+	constrainedFirst := func(left, right rebuildJob) int {
+		if left.authored.WidthMM != right.authored.WidthMM {
+			if left.authored.WidthMM > right.authored.WidthMM {
+				return -1
+			}
+			return 1
+		}
+		if math.Abs(left.spanMM-right.spanMM) > 0.001 {
+			if left.spanMM < right.spanMM {
+				return -1
+			}
+			return 1
+		}
+		if compare := strings.Compare(left.netKey, right.netKey); compare != 0 {
+			return compare
+		}
+		return left.index - right.index
+	}
+	shortestFirst := func(left, right rebuildJob) int {
+		if math.Abs(left.spanMM-right.spanMM) > 0.001 {
+			if left.spanMM < right.spanMM {
+				return -1
+			}
+			return 1
+		}
+		return constrainedFirst(left, right)
+	}
+	longestFirst := func(left, right rebuildJob) int {
+		if math.Abs(left.spanMM-right.spanMM) > 0.001 {
+			if left.spanMM > right.spanMM {
+				return -1
+			}
+			return 1
+		}
+		return constrainedFirst(left, right)
+	}
+	signalFirst := func(left, right rebuildJob) int {
+		if left.authored.WidthMM != right.authored.WidthMM {
+			if left.authored.WidthMM < right.authored.WidthMM {
+				return -1
+			}
+			return 1
+		}
+		return shortestFirst(left, right)
+	}
+	jobsByNet := map[string]int{}
+	maxWidthByNet := map[string]float64{}
+	for _, job := range jobs {
+		jobsByNet[job.netKey]++
+		maxWidthByNet[job.netKey] = max(maxWidthByNet[job.netKey], job.authored.WidthMM)
+	}
+	netCohesive := func(left, right rebuildJob) int {
+		leftNet := left.netKey
+		rightNet := right.netKey
+		if leftNet != rightNet {
+			if jobsByNet[leftNet] != jobsByNet[rightNet] {
+				return jobsByNet[rightNet] - jobsByNet[leftNet]
+			}
+			if maxWidthByNet[leftNet] != maxWidthByNet[rightNet] {
+				if maxWidthByNet[leftNet] > maxWidthByNet[rightNet] {
+					return -1
+				}
+				return 1
+			}
+			return strings.Compare(leftNet, rightNet)
+		}
+		return shortestFirst(left, right)
+	}
+	wideNetCohesive := func(left, right rebuildJob) int {
+		leftNet := left.netKey
+		rightNet := right.netKey
+		if leftNet != rightNet {
+			if maxWidthByNet[leftNet] != maxWidthByNet[rightNet] {
+				if maxWidthByNet[leftNet] > maxWidthByNet[rightNet] {
+					return -1
+				}
+				return 1
+			}
+			if jobsByNet[leftNet] != jobsByNet[rightNet] {
+				return jobsByNet[rightNet] - jobsByNet[leftNet]
+			}
+			return strings.Compare(leftNet, rightNet)
+		}
+		return constrainedFirst(left, right)
+	}
+	originalOrder := func(left, right rebuildJob) int { return left.index - right.index }
+	strategies := []func(rebuildJob, rebuildJob) int{constrainedFirst, netCohesive, wideNetCohesive, shortestFirst, originalOrder, longestFirst, signalFirst}
+	defaultLayer := routeBranchDefaultLayer(base.Board)
+	fixedExisting := append([]routing.ExistingCopper(nil), base.Existing...)
+	fixedExisting = append(fixedExisting, existingCopperFromAllRouteOperations(fixed, defaultLayer, base.Rules)...)
+	bestReplacements := replacements
+	bestIssues := append([]reports.Issue(nil), issues...)
+	bestRouted := -1
+	attempts := 0
+	attemptBudget := localRouteRebuildStrategyBudget(len(jobs))
+	routerCalls := 0
+	routerCallBudget := localRouteRebuildRouterCallBudget(len(jobs))
+	tryStrategy := func(strategy func(rebuildJob, rebuildJob) int) bool {
+		if ctx != nil && ctx.Err() != nil || attempts >= attemptBudget || routerCalls >= routerCallBudget {
+			return false
+		}
+		remainingAttempts := attemptBudget - attempts
+		remainingCalls := routerCallBudget - routerCalls
+		// Floor division reserves an equal call share for every later strategy;
+		// this allowance is recomputed from actual consumption on each attempt.
+		strategyCallAllowance := max(1, remainingCalls/remainingAttempts)
+		strategyCallLimit := min(routerCallBudget, routerCalls+strategyCallAllowance)
+		attempts++
+		ordered := slices.Clone(jobs)
+		slices.SortStableFunc(ordered, strategy)
+		attemptReplacements := make([][]transactions.Operation, len(replacements))
+		for index := range replacements {
+			attemptReplacements[index] = append([]transactions.Operation(nil), replacements[index]...)
+		}
+		attemptIssues := append([]reports.Issue(nil), issues...)
+		currentExisting := append([]routing.ExistingCopper(nil), fixedExisting...)
+		routedCount := 0
+		for _, job := range ordered {
+			if ctx != nil && ctx.Err() != nil || routerCalls >= strategyCallLimit {
+				return false
+			}
+			index := job.index
+			authored := job.authored
+			failureMessages := make([]string, 0, len(job.layerPairs))
+			addFailureMessage := func(message string) {
+				message = strings.TrimSpace(message)
+				if message != "" && !slices.Contains(failureMessages, message) {
+					failureMessages = append(failureMessages, message)
+				}
+			}
+			var routed []transactions.Operation
+			var routedBranches []routing.Route
+			var selectedIssues []reports.Issue
+			for pairRank, layerPair := range job.layerPairs {
+				if ctx != nil && ctx.Err() != nil {
+					return false
+				}
+				if routerCalls >= strategyCallLimit {
+					addFailureMessage("local route rebuild per-strategy router-call budget exhausted")
+					break
+				}
+				pair := routeTreeBranchAccessPair{
+					Rank:   pairRank,
+					Source: routeTreeBranchAccessCandidate{Access: RouteTreeEndpointAccess{Role: RouteTreeAccessLocalRouteAnchor, Net: authored.NetName, Layer: layerPair[0], XMM: authored.Points[0].XMM, YMM: authored.Points[0].YMM}},
+					Target: routeTreeBranchAccessCandidate{Access: RouteTreeEndpointAccess{Role: RouteTreeAccessLocalRouteAnchor, Net: authored.NetName, Layer: layerPair[1], XMM: authored.Points[len(authored.Points)-1].XMM, YMM: authored.Points[len(authored.Points)-1].YMM}},
+				}
+				request := base
+				request.Existing = currentExisting
+				request = routeTreeAccessBranchRequest(request, authored.NetName, pair)
+				routerCalls++
+				result := routing.RouteRequestContext(ctx, request)
+				candidateIssues := make([]reports.Issue, 0, len(result.Issues))
+				for _, issue := range result.Issues {
+					if issue.Blocking() || issue.Severity == reports.SeverityWarning {
+						candidateIssues = append(candidateIssues, issue)
+						if issue.Blocking() {
+							addFailureMessage(issue.Message)
+						}
+					}
+				}
+				candidateRoutes := transactionRouteOperations(result.Operations)
+				if result.Status == routing.StatusBlocked || len(candidateRoutes) == 0 {
+					if len(selectedIssues) == 0 || len(candidateIssues) < len(selectedIssues) {
+						selectedIssues = candidateIssues
+					}
+					continue
+				}
+				routed = candidateRoutes
+				routedBranches = result.Routes
+				selectedIssues = candidateIssues
+				break
+			}
+			attemptIssues = append(attemptIssues, selectedIssues...)
+			if len(routed) == 0 {
+				if len(failureMessages) == 0 {
+					addFailureMessage("obstacle-aware local route rebuild found no legal path")
+				}
+				attemptIssues = append(attemptIssues, localRouteRebuildIssue(index, authored.NetName, operations[index].RebuildRefs, strings.Join(failureMessages, "; ")))
+				continue
+			}
+			attemptReplacements[index] = routed
+			currentExisting = append(currentExisting, existingCopperFromRoutedBranches(routedBranches, defaultLayer, base.Rules)...)
+			routedCount++
+		}
+		if routedCount > bestRouted || (routedCount == bestRouted && len(attemptIssues) < len(bestIssues)) {
+			bestRouted = routedCount
+			bestReplacements = attemptReplacements
+			bestIssues = attemptIssues
+		}
+		return routedCount == len(jobs)
+	}
+	complete := false
+	for _, strategy := range strategies {
+		if ctx != nil && ctx.Err() != nil || attempts >= attemptBudget || routerCalls >= routerCallBudget {
+			break
+		}
+		if tryStrategy(strategy) {
+			complete = true
+			break
+		}
+	}
+	if !complete && attempts < attemptBudget && routerCalls < routerCallBudget {
+		failed := map[int]struct{}{}
+		for _, job := range jobs {
+			if len(bestReplacements[job.index]) == 0 {
+				failed[job.index] = struct{}{}
+			}
+		}
+		failedFirst := func(left, right rebuildJob) int {
+			_, leftFailed := failed[left.index]
+			_, rightFailed := failed[right.index]
+			if leftFailed != rightFailed {
+				if leftFailed {
+					return -1
+				}
+				return 1
+			}
+			return constrainedFirst(left, right)
+		}
+		complete = tryStrategy(failedFirst)
+		if !complete && attempts < attemptBudget && routerCalls < routerCallBudget {
+			failedIndexes := make([]int, 0, len(failed))
+			for index := range failed {
+				failedIndexes = append(failedIndexes, index)
+			}
+			slices.Sort(failedIndexes)
+			for _, priorityIndex := range failedIndexes {
+				if attempts >= attemptBudget || routerCalls >= routerCallBudget {
+					break
+				}
+				priorityFirst := func(left, right rebuildJob) int {
+					if left.index == priorityIndex && right.index != priorityIndex {
+						return -1
+					}
+					if right.index == priorityIndex && left.index != priorityIndex {
+						return 1
+					}
+					return constrainedFirst(left, right)
+				}
+				if tryStrategy(priorityFirst) {
+					break
+				}
+			}
+		}
+	}
+	if ctx != nil && ctx.Err() != nil {
+		issues = append(issues, reports.Issue{Code: reports.CodeOperationCanceled, Severity: reports.SeverityBlocked, Path: "routing.local_route_rebuild", Message: ctx.Err().Error()})
+		return operations, issues
+	}
+	replacements = bestReplacements
+	issues = bestIssues
+	out := make([]transactions.Operation, 0, len(operations))
+	for _, replacement := range replacements {
+		out = append(out, replacement...)
+	}
+	return out, issues
+}
+
+func localRouteRebuildStrategyBudget(jobCount int) int {
+	switch {
+	case jobCount <= 8:
+		return 8
+	case jobCount <= 32:
+		return 4
+	default:
+		return 2
+	}
+}
+
+func localRouteRebuildRouterCallBudget(jobCount int) int {
+	if jobCount <= 0 {
+		return 0
+	}
+	// Give every deterministic ordering two router calls per job while retaining
+	// a strict linear bound. tryStrategy divides the remaining calls evenly
+	// across the remaining orderings so an early ordering cannot starve later
+	// alternatives.
+	strategyCount := localRouteRebuildStrategyBudget(jobCount)
+	if jobCount > math.MaxInt/(strategyCount*2) {
+		return math.MaxInt
+	}
+	return min(localRouteRebuildMaxRouterCalls, jobCount*strategyCount*2)
+}
+
+func orderedLocalRouteRebuildLayers(layers []string, authoredLayer string, defaultLayer string) []string {
+	preferred := canonicalCopperLayer(firstNonEmpty(authoredLayer, defaultLayer))
+	seen := map[string]struct{}{}
+	out := make([]string, 0, max(1, len(layers)))
+	appendLayer := func(layer string) {
+		canonical := canonicalCopperLayer(firstNonEmpty(layer, defaultLayer))
+		key := strings.ToUpper(strings.TrimSpace(canonical))
+		if key == "" {
+			return
+		}
+		if _, exists := seen[key]; exists {
+			return
+		}
+		seen[key] = struct{}{}
+		out = append(out, canonical)
+	}
+	if len(layers) == 0 {
+		appendLayer(preferred)
+		return out
+	}
+	for _, layer := range layers {
+		if strings.EqualFold(canonicalCopperLayer(layer), preferred) {
+			appendLayer(layer)
+		}
+	}
+	for _, layer := range layers {
+		appendLayer(layer)
+	}
+	return out
+}
+
+func localRouteRebuildLayerPairs(sourceLayers []string, targetLayers []string) [][2]string {
+	pairs := make([][2]string, 0, len(sourceLayers)*len(targetLayers))
+	for _, sourceLayer := range sourceLayers {
+		for _, targetLayer := range targetLayers {
+			pairs = append(pairs, [2]string{sourceLayer, targetLayer})
+		}
+	}
+	return pairs
+}
+
+func localRouteRebuildIssue(index int, netName string, refs []string, message string) reports.Issue {
+	return reports.Issue{
+		Code:       reports.CodeValidationFailed,
+		Severity:   reports.SeverityBlocked,
+		Path:       fmt.Sprintf("design.local_route_rebuild.operations[%d]", index),
+		Message:    message,
+		Refs:       compactContactStrings(refs),
+		Nets:       compactContactStrings([]string{strings.TrimSpace(netName)}),
+		Suggestion: "adjust movable placement or local routing constraints and retry deterministically",
+	}
 }
 
 func summarizeInterBlockRouteCompletion(candidates []InterBlockRouteCandidate, operations []transactions.Operation, issues []reports.Issue, contactEvidence InterBlockContactEvidence) InterBlockRouteCompletionSummary {
@@ -540,9 +1626,34 @@ func interBlockRouteTreeByNet(trees []InterBlockRouteTree) map[string]InterBlock
 func executeInterBlockRouteTrees(ctx context.Context, base routing.Request, candidates []InterBlockRouteCandidate, targetEvidence InterBlockContactEvidence, routeTreeAccess []RouteTreeEndpointAccess, selectiveExisting []routing.ExistingCopper, selectiveNets map[string]struct{}) interBlockRouteTreeExecutionResult {
 	groups, groupIssues := BuildInterBlockRouteGroups(candidates)
 	trees := BuildInterBlockRouteTrees(groups, targetEvidence)
+	trees = orderInterBlockRouteTreesForRouting(trees, base.Nets)
 	groupByNet := interBlockRouteGroupByNet(groups)
+	baseline := executeInterBlockRouteTreesOrdered(ctx, base, trees, groupByNet, routeTreeAccess, selectiveExisting, selectiveNets)
+	baseline.Summary.OrderAttempts = 1
+	baseline.Summary.SelectedOrder = "baseline"
+	selected := baseline
+	if (ctx == nil || ctx.Err() == nil) && baseline.Summary.BranchesBlocked > 0 {
+		blockedNets := blockedInterBlockRouteTreeNets(baseline.Branches)
+		alternateTrees := promoteInterBlockRouteTrees(trees, blockedNets)
+		if !slices.EqualFunc(trees, alternateTrees, func(left, right InterBlockRouteTree) bool { return left.NetName == right.NetName }) {
+			alternate := executeInterBlockRouteTreesOrdered(ctx, base, alternateTrees, groupByNet, routeTreeAccess, selectiveExisting, selectiveNets)
+			alternate.Summary.OrderAttempts = 2
+			alternate.Summary.SelectedOrder = "blocked_tree_first"
+			if interBlockRouteTreeExecutionBetter(alternate, baseline) {
+				selected = alternate
+			} else {
+				selected.Summary.OrderAttempts = 2
+			}
+		}
+	}
+	selected.Issues = append(append([]reports.Issue(nil), groupIssues...), selected.Issues...)
+	selected.Summary.IssueCount = len(selected.Issues)
+	selected.Summary.BlockingIssueCount, selected.Summary.WarningIssueCount, selected.Summary.InfoIssueCount, selected.Summary.FixedNetSkipNotices = routeTreeIssueCounters(selected.Issues)
+	return selected
+}
+
+func executeInterBlockRouteTreesOrdered(ctx context.Context, base routing.Request, trees []InterBlockRouteTree, groupByNet map[string]InterBlockRouteGroup, routeTreeAccess []RouteTreeEndpointAccess, selectiveExisting []routing.ExistingCopper, selectiveNets map[string]struct{}) interBlockRouteTreeExecutionResult {
 	execution := interBlockRouteTreeExecutionResult{}
-	execution.Issues = append(execution.Issues, groupIssues...)
 	workingBase := base
 	workingBase.Existing = append([]routing.ExistingCopper(nil), base.Existing...)
 	selectiveBase := base
@@ -603,6 +1714,185 @@ func executeInterBlockRouteTrees(ctx context.Context, base routing.Request, cand
 	execution.Summary.IssueCount = len(execution.Issues)
 	execution.Summary.BlockingIssueCount, execution.Summary.WarningIssueCount, execution.Summary.InfoIssueCount, execution.Summary.FixedNetSkipNotices = routeTreeIssueCounters(execution.Issues)
 	return execution
+}
+
+func blockedInterBlockRouteTreeNets(branches []RouteTreeBranchEvidenceSummary) map[string]struct{} {
+	blocked := map[string]struct{}{}
+	for _, tree := range branches {
+		for _, branch := range tree.Branches {
+			if branch.Status != routing.StatusRouted {
+				blocked[interBlockSummaryNetKey(tree.NetName)] = struct{}{}
+				break
+			}
+		}
+	}
+	return blocked
+}
+
+func promoteInterBlockRouteTrees(trees []InterBlockRouteTree, promoted map[string]struct{}) []InterBlockRouteTree {
+	if len(trees) == 0 || len(promoted) == 0 {
+		return append([]InterBlockRouteTree(nil), trees...)
+	}
+	ordered := make([]InterBlockRouteTree, 0, len(trees))
+	for _, tree := range trees {
+		if _, ok := promoted[interBlockSummaryNetKey(tree.NetName)]; ok {
+			ordered = append(ordered, tree)
+		}
+	}
+	for _, tree := range trees {
+		if _, ok := promoted[interBlockSummaryNetKey(tree.NetName)]; !ok {
+			ordered = append(ordered, tree)
+		}
+	}
+	return ordered
+}
+
+func interBlockRouteTreeExecutionBetter(candidate, baseline interBlockRouteTreeExecutionResult) bool {
+	if candidate.Summary.BranchesBlocked != baseline.Summary.BranchesBlocked {
+		return candidate.Summary.BranchesBlocked < baseline.Summary.BranchesBlocked
+	}
+	if candidate.Summary.BranchesRouted != baseline.Summary.BranchesRouted {
+		return candidate.Summary.BranchesRouted > baseline.Summary.BranchesRouted
+	}
+	if candidate.Summary.GroupsComplete != baseline.Summary.GroupsComplete {
+		return candidate.Summary.GroupsComplete > baseline.Summary.GroupsComplete
+	}
+	return candidate.Summary.BlockingIssueCount < baseline.Summary.BlockingIssueCount
+}
+
+func promoteFailedNetPriorities(nets []routing.Net, failedSet map[string]struct{}) []routing.Net {
+	promoted := append([]routing.Net(nil), nets...)
+	maxPriority := 0
+	for _, net := range promoted {
+		if net.Priority > maxPriority {
+			maxPriority = net.Priority
+		}
+	}
+	maxInt := math.MaxInt
+	promotedPriority := maxPriority
+	if maxPriority < maxInt {
+		promotedPriority++
+	} else {
+		promotedPriority = maxInt
+		// Reserve maxInt for the failed nets without collapsing any existing
+		// non-failed priority levels. There cannot be enough distinct levels in
+		// an in-memory net slice to exhaust the signed integer range below it.
+		nonFailedPriorities := make(map[int]struct{}, len(promoted))
+		for _, net := range promoted {
+			if _, failed := failedSet[interBlockSummaryNetKey(net.Name)]; !failed {
+				nonFailedPriorities[net.Priority] = struct{}{}
+			}
+		}
+		levels := make([]int, 0, len(nonFailedPriorities))
+		for priority := range nonFailedPriorities {
+			levels = append(levels, priority)
+		}
+		sort.Sort(sort.Reverse(sort.IntSlice(levels)))
+		normalized := make(map[int]int, len(levels))
+		for index, priority := range levels {
+			normalized[priority] = maxInt - 1 - index
+		}
+		for index := range promoted {
+			if _, failed := failedSet[interBlockSummaryNetKey(promoted[index].Name)]; !failed {
+				promoted[index].Priority = normalized[promoted[index].Priority]
+			}
+		}
+	}
+	for index := range promoted {
+		if _, failed := failedSet[interBlockSummaryNetKey(promoted[index].Name)]; failed {
+			promoted[index].Priority = promotedPriority
+		}
+	}
+	return promoted
+}
+
+func blockingRoutingIssueNets(issues []reports.Issue, nets []routing.Net) []string {
+	known := make(map[string]string, len(nets))
+	for _, net := range nets {
+		key := interBlockSummaryNetKey(net.Name)
+		known[key] = net.Name
+	}
+	selected := map[string]string{}
+	for _, issue := range issues {
+		if issue.Severity != reports.SeverityBlocked && issue.Severity != reports.SeverityError {
+			continue
+		}
+		for _, netName := range issue.Nets {
+			key := interBlockSummaryNetKey(netName)
+			if canonical, ok := known[key]; ok {
+				selected[key] = canonical
+			}
+		}
+	}
+	out := make([]string, 0, len(selected))
+	for _, netName := range selected {
+		out = append(out, netName)
+	}
+	slices.Sort(out)
+	return out
+}
+
+func routingResultBetter(candidate, baseline routing.Result) bool {
+	if candidate.Metrics.FailedNetCount != baseline.Metrics.FailedNetCount {
+		return candidate.Metrics.FailedNetCount < baseline.Metrics.FailedNetCount
+	}
+	if candidate.Metrics.RoutedNetCount != baseline.Metrics.RoutedNetCount {
+		return candidate.Metrics.RoutedNetCount > baseline.Metrics.RoutedNetCount
+	}
+	return routingStatusRank(candidate.Status) > routingStatusRank(baseline.Status)
+}
+
+func orderInterBlockRouteTreesForRouting(trees []InterBlockRouteTree, nets []routing.Net) []InterBlockRouteTree {
+	netByName := make(map[string]routing.Net, len(nets))
+	for _, net := range nets {
+		netByName[interBlockSummaryNetKey(net.Name)] = net
+	}
+	type rankedTree struct {
+		tree     InterBlockRouteTree
+		priority int
+		roleRank int
+	}
+	ranked := make([]rankedTree, len(trees))
+	for index, tree := range trees {
+		net := netByName[interBlockSummaryNetKey(tree.NetName)]
+		ranked[index] = rankedTree{tree: tree, priority: net.Priority, roleRank: interBlockRouteRoleRank(net.Role)}
+	}
+	sort.SliceStable(ranked, func(left, right int) bool {
+		if ranked[left].priority != ranked[right].priority {
+			return ranked[left].priority > ranked[right].priority
+		}
+		if ranked[left].roleRank != ranked[right].roleRank {
+			return ranked[left].roleRank < ranked[right].roleRank
+		}
+		// High-fanout trees consume the most routing channels. Route them before
+		// short point-to-point nets so later copper cannot partition their tree.
+		if len(ranked[left].tree.Branches) != len(ranked[right].tree.Branches) {
+			return len(ranked[left].tree.Branches) > len(ranked[right].tree.Branches)
+		}
+		return ranked[left].tree.NetName < ranked[right].tree.NetName
+	})
+	ordered := make([]InterBlockRouteTree, len(ranked))
+	for index := range ranked {
+		ordered[index] = ranked[index].tree
+	}
+	return ordered
+}
+
+func interBlockRouteRoleRank(role routing.NetRole) int {
+	switch role {
+	case routing.NetHighCurrent:
+		return 0
+	case routing.NetPower, routing.NetGround:
+		return 1
+	case routing.NetDifferential, routing.NetClock:
+		return 2
+	case routing.NetAnalog:
+		return 3
+	case routing.NetSignal:
+		return 4
+	default:
+		return 5
+	}
 }
 
 func interBlockRouteGroupByNet(groups []InterBlockRouteGroup) map[string]InterBlockRouteGroup {
@@ -737,6 +2027,20 @@ func interBlockCandidateNets(candidates []InterBlockRouteCandidate) map[string]b
 	return nets
 }
 
+func excludeRoutingNetsByName(nets []routing.Net, excluded map[string]bool) []routing.Net {
+	if len(nets) == 0 || len(excluded) == 0 {
+		return nets
+	}
+	filtered := make([]routing.Net, 0, len(nets))
+	for _, net := range nets {
+		if excluded[interBlockSummaryNetKey(net.Name)] {
+			continue
+		}
+		filtered = append(filtered, net)
+	}
+	return filtered
+}
+
 func excludeManagedInterBlockNets(nets []routing.Net, managed []string) []routing.Net {
 	if len(nets) == 0 || len(managed) == 0 {
 		return nets
@@ -758,6 +2062,120 @@ func excludeManagedInterBlockNets(nets []routing.Net, managed []string) []routin
 		filtered = append(filtered, net)
 	}
 	return filtered
+}
+
+func remainingPhysicalPadRoutingNets(nets []routing.Net, placed *PlacementStageResult, operations []transactions.Operation) []routing.Net {
+	remaining, _ := remainingPhysicalPadRoutingNetsWithSummary(nets, placed, operations)
+	return remaining
+}
+
+func remainingPhysicalPadRoutingNetsWithSummary(nets []routing.Net, placed *PlacementStageResult, operations []transactions.Operation) ([]routing.Net, PhysicalPadRoutingCompletionSummary) {
+	return remainingPhysicalPadRoutingNetsWithCandidates(nets, placed, operations, physicalPadRouteCandidates(placed))
+}
+
+func remainingPhysicalPadRoutingNetsWithCandidates(nets []routing.Net, placed *PlacementStageResult, operations []transactions.Operation, candidates []InterBlockRouteCandidate) ([]routing.Net, PhysicalPadRoutingCompletionSummary) {
+	summary := PhysicalPadRoutingCompletionSummary{NetsConsidered: len(candidates), EndpointsByNet: map[string]int{}}
+	if len(candidates) == 0 {
+		return nets, summary
+	}
+	evidence := BuildInterBlockContactTargets(candidates, placed)
+	connected := interBlockConnectedNets(evidence, operations)
+	physical := make(map[string]struct{}, len(candidates))
+	for _, candidate := range candidates {
+		key := interBlockSummaryNetKey(candidate.NetName)
+		physical[key] = struct{}{}
+		summary.EndpointsByNet[key] += len(candidate.Endpoints)
+		summary.Endpoints += len(candidate.Endpoints)
+		if connected[key] {
+			summary.ConnectedNets = append(summary.ConnectedNets, key)
+		}
+	}
+	slices.Sort(summary.ConnectedNets)
+	remaining := make([]routing.Net, 0, len(nets))
+	for _, net := range nets {
+		key := interBlockSummaryNetKey(net.Name)
+		if _, exists := physical[key]; !exists {
+			continue
+		}
+		if connected[key] {
+			continue
+		}
+		remaining = append(remaining, net)
+		summary.RemainingNets = append(summary.RemainingNets, key)
+	}
+	slices.Sort(summary.RemainingNets)
+	return remaining, summary
+}
+
+type physicalPadRoutingContext struct {
+	resolver   PlacedPadEndpointResolver
+	candidates []InterBlockRouteCandidate
+	valid      bool
+}
+
+func newPhysicalPadRoutingContext(placed *PlacementStageResult) physicalPadRoutingContext {
+	if placed == nil || placed.Stage.Status == StageStatusBlocked {
+		return physicalPadRoutingContext{}
+	}
+	table, tableIssues := BuildGeneratedNetTable(placed, nil)
+	if reports.HasBlockingIssue(tableIssues) {
+		return physicalPadRoutingContext{}
+	}
+	resolver := NewPlacedPadEndpointResolver(placed, table)
+	if reports.HasBlockingIssue(resolver.Issues()) {
+		return physicalPadRoutingContext{}
+	}
+	return physicalPadRoutingContext{resolver: resolver, candidates: physicalPadRouteCandidatesFromResolver(resolver), valid: true}
+}
+
+func physicalPadRouteCandidates(placed *PlacementStageResult) []InterBlockRouteCandidate {
+	return newPhysicalPadRoutingContext(placed).candidates
+}
+
+func physicalPadRouteCandidatesFromResolver(resolver PlacedPadEndpointResolver) []InterBlockRouteCandidate {
+	byNet := map[string][]InterBlockRouteEndpoint{}
+	seen := map[string]map[string]struct{}{}
+	for _, endpoint := range resolver.Endpoints() {
+		netName := strings.TrimSpace(endpoint.NetName)
+		ref := strings.TrimSpace(endpoint.Ref)
+		pad := strings.TrimSpace(endpoint.Pad)
+		if netName == "" || ref == "" || pad == "" {
+			continue
+		}
+		netKey := interBlockSummaryNetKey(netName)
+		endpointKey := interBlockEndpointKey(ref, pad)
+		if seen[netKey] == nil {
+			seen[netKey] = map[string]struct{}{}
+		}
+		if _, exists := seen[netKey][endpointKey]; exists {
+			continue
+		}
+		seen[netKey][endpointKey] = struct{}{}
+		byNet[netKey] = append(byNet[netKey], InterBlockRouteEndpoint{Ref: ref, Pin: pad})
+	}
+	netNames := make([]string, 0, len(byNet))
+	for netName, endpoints := range byNet {
+		if len(endpoints) >= 2 {
+			netNames = append(netNames, netName)
+		}
+	}
+	slices.Sort(netNames)
+	candidates := make([]InterBlockRouteCandidate, 0, len(netNames))
+	for _, netName := range netNames {
+		endpoints := byNet[netName]
+		slices.SortFunc(endpoints, func(left, right InterBlockRouteEndpoint) int {
+			if compare := strings.Compare(strings.ToUpper(left.Ref), strings.ToUpper(right.Ref)); compare != 0 {
+				return compare
+			}
+			return strings.Compare(strings.ToUpper(left.Pin), strings.ToUpper(right.Pin))
+		})
+		candidates = append(candidates, InterBlockRouteCandidate{
+			NetName:   netName,
+			Status:    InterBlockRouteCandidateRoutable,
+			Endpoints: endpoints,
+		})
+	}
+	return candidates
 }
 
 func issueCountsByNet(issues []reports.Issue) map[string]int {
@@ -949,7 +2367,7 @@ func routeOperationCachedNetName(operation transactions.Operation) string {
 	return strings.TrimSpace(operation.Net)
 }
 
-func bindLocalRouteOperations(fragments PCBFragmentResult, resolver PlacedPadEndpointResolver) ([]transactions.Operation, []reports.Issue, LocalRouteConnectivitySummary) {
+func bindLocalRouteOperations(fragments PCBFragmentResult, resolver PlacedPadEndpointResolver, board placement.BoardPlacementArea) ([]transactions.Operation, []reports.Issue, LocalRouteConnectivitySummary) {
 	operations := []transactions.Operation{}
 	var issues []reports.Issue
 	summary := LocalRouteConnectivitySummary{}
@@ -957,7 +2375,7 @@ func bindLocalRouteOperations(fragments PCBFragmentResult, resolver PlacedPadEnd
 		unitContext := newTranslatedUnitRouteContext(fragment)
 		for _, route := range fragment.Realization.LocalRoutes {
 			summary.RoutesAttempted++
-			routeOperations, routeIssues, routeSummary, ok := bindLocalRouteOperation(fragment, route, resolver, unitContext)
+			routeOperations, routeIssues, routeSummary, ok := bindLocalRouteOperation(fragment, route, resolver, unitContext, board)
 			issues = append(issues, routeIssues...)
 			summary.RoutesBound += routeSummary.RoutesBound
 			summary.EndpointsResolved += routeSummary.EndpointsResolved
@@ -974,7 +2392,7 @@ func bindLocalRouteOperations(fragments PCBFragmentResult, resolver PlacedPadEnd
 	return operations, issues, summary
 }
 
-func bindLocalRouteOperation(fragment BlockFragment, route blocks.RealizedPCBLocalRoute, resolver PlacedPadEndpointResolver, unitContext translatedUnitRouteContext) ([]transactions.Operation, []reports.Issue, LocalRouteConnectivitySummary, bool) {
+func bindLocalRouteOperation(fragment BlockFragment, route blocks.RealizedPCBLocalRoute, resolver PlacedPadEndpointResolver, unitContext translatedUnitRouteContext, board placement.BoardPlacementArea) ([]transactions.Operation, []reports.Issue, LocalRouteConnectivitySummary, bool) {
 	var issues []reports.Issue
 	summary := LocalRouteConnectivitySummary{RoutesAttempted: 1}
 	netName := strings.TrimSpace(route.NetName)
@@ -984,8 +2402,8 @@ func bindLocalRouteOperation(fragment BlockFragment, route blocks.RealizedPCBLoc
 		summary.IssueCount = 1
 		return nil, []reports.Issue{localRouteBindingIssue(routePath+".net_name", "local route net name is required", nil)}, summary, false
 	}
-	from, fromIssues, fromOK, fromNetMismatch := resolveLocalRouteEndpoint(fragment, routePath+".from", netName, route.From, resolver)
-	to, toIssues, toOK, toNetMismatch := resolveLocalRouteEndpoint(fragment, routePath+".to", netName, route.To, resolver)
+	from, fromIssues, fromOK, fromNetMismatch := resolveLocalRouteEndpoint(fragment, routePath+".from", netName, route.WidthMM, route.From, resolver, board)
+	to, toIssues, toOK, toNetMismatch := resolveLocalRouteEndpoint(fragment, routePath+".to", netName, route.WidthMM, route.To, resolver, board)
 	issues = append(issues, fromIssues...)
 	issues = append(issues, toIssues...)
 	if fromNetMismatch {
@@ -1008,15 +2426,48 @@ func bindLocalRouteOperation(fragment BlockFragment, route blocks.RealizedPCBLoc
 		summary.IssueCount = len(issues)
 		return nil, issues, summary, false
 	}
+	if sameRoutePoint(from.Point, to.Point) && (localRouteEndpointIsEntryAnchor(from) || localRouteEndpointIsEntryAnchor(to)) && route.EntryAnchorDogbone == nil && !route.FromEndpointDogbone && !route.ToEndpointDogbone {
+		summary.RoutesBound = 1
+		summary.EndpointContactsProven = 2
+		summary.IssueCount = len(issues)
+		return nil, issues, summary, true
+	}
 	layer := firstNonEmpty(route.Layer, from.Layer, to.Layer, "F.Cu")
 	points := []transactions.Point{
 		from.Point,
 		to.Point,
 	}
+	preservedTransform := false
 	if routedPoints, ok := translatedUnitLocalRoutePoints(unitContext, route, from, to); ok {
 		points = routedPoints
+		preservedTransform = true
 	} else if routedPoints, ok := placedLocalRoutePoints(route.Points, from.Point, to.Point); ok {
 		points = routedPoints
+	}
+	if detoured, changed, ok := padClearLocalRouteEndpointSiblings(points, layer, route.WidthMM, netName, from, to, resolver); ok {
+		points = detoured
+		if changed {
+			preservedTransform = false
+		}
+	}
+	if detoured, changed, ok := padClearLocalRouteForeignPads(points, layer, route.WidthMM, netName, from, to, resolver); ok {
+		points = detoured
+		if changed {
+			preservedTransform = false
+		}
+	}
+	if detoured, changed, ok := padClearDirectLocalRoute(points, layer, route.WidthMM, netName, from, to, resolver); ok {
+		points = detoured
+		if changed {
+			preservedTransform = false
+		}
+	} else {
+		// This failure is intentionally terminal: retaining the original direct
+		// segment would emit a known foreign-pad clearance violation, and the
+		// downstream router does not rewrite authored block-local copper.
+		issues = append(issues, localRouteBindingIssue(routePath, "direct local route crosses foreign pad clearance and has no clear orthogonal access path", []string{from.Ref, to.Ref}))
+		summary.IssueCount = len(issues)
+		return nil, issues, summary, false
 	}
 	mainStart := 0
 	mainEnd := len(points)
@@ -1092,6 +2543,12 @@ func bindLocalRouteOperation(fragment BlockFragment, route blocks.RealizedPCBLoc
 			summary.IssueCount = len(issues)
 			return nil, issues, summary, false
 		}
+		operation.Rebuildable = !preservedTransform && route.EntryAnchorDogbone == nil && !route.FromEndpointDogbone && !route.ToEndpointDogbone
+		if operation.Rebuildable {
+			operation.RebuildRefs = compactContactStrings([]string{from.Ref, to.Ref})
+			operation.RebuildSourceLayers = localRouteEndpointCopperLayers(from, layer)
+			operation.RebuildTargetLayers = localRouteEndpointCopperLayers(to, layer)
+		}
 		operations = append(operations, operation)
 	}
 	for _, dogbone := range []struct {
@@ -1118,6 +2575,7 @@ func bindLocalRouteOperation(fragment BlockFragment, route blocks.RealizedPCBLoc
 			summary.IssueCount = len(issues)
 			return nil, issues, summary, false
 		}
+		operation.Ref = localRouteEndpointDogboneOperationRef
 		operations = append(operations, operation)
 	}
 	dogbones, dogboneIssues := localRouteEntryAnchorDogboneOperations(routePath, netName, layer, route.WidthMM, points, from, to, vias, route.EntryAnchorDogbone)
@@ -1128,6 +2586,317 @@ func bindLocalRouteOperation(fragment BlockFragment, route blocks.RealizedPCBLoc
 	summary.EmittedTrackSegments = trackSegments + len(dogbones)
 	summary.IssueCount = len(issues)
 	return operations, issues, summary, true
+}
+
+func padClearLocalRouteEndpointSiblings(points []transactions.Point, layer string, widthMM float64, netName string, from PlacedPadEndpoint, to PlacedPadEndpoint, resolver PlacedPadEndpointResolver) ([]transactions.Point, bool, bool) {
+	if len(points) < 2 {
+		return points, false, true
+	}
+	endpointRefs := map[string]struct{}{}
+	for _, endpoint := range []PlacedPadEndpoint{from, to} {
+		if !localRouteEndpointIsEntryAnchor(endpoint) && strings.TrimSpace(endpoint.Ref) != "" {
+			endpointRefs[strings.ToUpper(strings.TrimSpace(endpoint.Ref))] = struct{}{}
+		}
+	}
+	if len(endpointRefs) == 0 {
+		return points, false, true
+	}
+	all := localRouteForeignPadRects(points, layer, widthMM, netName, from, to, resolver)
+	siblings := make([]localRoutePadRect, 0, len(all))
+	for _, obstacle := range all {
+		if _, ok := endpointRefs[strings.ToUpper(strings.TrimSpace(obstacle.ref))]; ok {
+			siblings = append(siblings, obstacle)
+		}
+	}
+	if len(siblings) == 0 || localRoutePolylineClearsPadRects(points, siblings) {
+		return points, false, true
+	}
+	detoured, ok := detourLocalRoutePolyline(points, siblings)
+	return detoured, ok, ok
+}
+
+func detourLocalRoutePolyline(points []transactions.Point, obstacles []localRoutePadRect) ([]transactions.Point, bool) {
+	laneMarginMM := routing.DefaultRules().GridMM
+	result, ok := relocateLocalRouteInteriorPoints(points, obstacles, laneMarginMM)
+	if !ok {
+		return points, false
+	}
+	rewriteBudget := max(1, len(obstacles)*(len(result)+1)*4)
+	rewrites := 0
+	for index := 1; index < len(result); {
+		start := result[index-1]
+		end := result[index]
+		var blocker *localRoutePadRect
+		for obstacleIndex := range obstacles {
+			obstacle := &obstacles[obstacleIndex]
+			if segmentIntersectsLocalRouteRect(start, end, obstacle.center, obstacle.halfWidth, obstacle.halfHeight) {
+				blocker = obstacle
+				break
+			}
+		}
+		if blocker == nil {
+			index++
+			continue
+		}
+		candidates := [][]transactions.Point{
+			compactRoutePoints([]transactions.Point{start, {XMM: start.XMM, YMM: end.YMM}, end}),
+			compactRoutePoints([]transactions.Point{start, {XMM: end.XMM, YMM: start.YMM}, end}),
+		}
+		for _, x := range []float64{blocker.center.XMM - blocker.halfWidth - laneMarginMM, blocker.center.XMM + blocker.halfWidth + laneMarginMM} {
+			candidates = append(candidates, compactRoutePoints([]transactions.Point{start, {XMM: x, YMM: start.YMM}, {XMM: x, YMM: end.YMM}, end}))
+		}
+		for _, y := range []float64{blocker.center.YMM - blocker.halfHeight - laneMarginMM, blocker.center.YMM + blocker.halfHeight + laneMarginMM} {
+			candidates = append(candidates, compactRoutePoints([]transactions.Point{start, {XMM: start.XMM, YMM: y}, {XMM: end.XMM, YMM: y}, end}))
+		}
+		selected := []transactions.Point(nil)
+		for _, candidate := range candidates {
+			if localRoutePolylineClearsPadRects(candidate, obstacles) {
+				selected = candidate
+				break
+			}
+		}
+		if len(selected) == 0 {
+			return points, false
+		}
+		if rewrites >= rewriteBudget {
+			return points, false
+		}
+		rewrites++
+		replacement := make([]transactions.Point, 0, len(result)+len(selected)-2)
+		replacement = append(replacement, result[:index-1]...)
+		replacement = append(replacement, selected...)
+		replacement = append(replacement, result[index+1:]...)
+		result = compactRoutePoints(replacement)
+		// Revalidate from the segment before the replacement; compaction may
+		// remove collinear points, so no arithmetic based on selected length is
+		// safe here.
+		index = max(1, index-1)
+	}
+	return result, true
+}
+
+func relocateLocalRouteInteriorPoints(points []transactions.Point, obstacles []localRoutePadRect, marginMM float64) ([]transactions.Point, bool) {
+	result := append([]transactions.Point(nil), points...)
+	for index := 1; index+1 < len(result); index++ {
+		point := result[index]
+		if localRoutePointClearsPadRects(point, obstacles) {
+			continue
+		}
+		candidates := make([]transactions.Point, 0, len(obstacles)*4)
+		for _, obstacle := range obstacles {
+			if segmentIntersectsLocalRouteRect(point, point, obstacle.center, obstacle.halfWidth, obstacle.halfHeight) {
+				candidates = append(candidates,
+					transactions.Point{XMM: obstacle.center.XMM - obstacle.halfWidth - marginMM, YMM: point.YMM},
+					transactions.Point{XMM: obstacle.center.XMM + obstacle.halfWidth + marginMM, YMM: point.YMM},
+					transactions.Point{XMM: point.XMM, YMM: obstacle.center.YMM - obstacle.halfHeight - marginMM},
+					transactions.Point{XMM: point.XMM, YMM: obstacle.center.YMM + obstacle.halfHeight + marginMM},
+				)
+			}
+		}
+		selected := transactions.Point{}
+		selectedDistance := math.Inf(1)
+		found := false
+		for _, candidate := range candidates {
+			if !localRoutePointClearsPadRects(candidate, obstacles) {
+				continue
+			}
+			dx := candidate.XMM - point.XMM
+			dy := candidate.YMM - point.YMM
+			distance := dx*dx + dy*dy
+			if !found || distance < selectedDistance {
+				selected = candidate
+				selectedDistance = distance
+				found = true
+			}
+		}
+		if !found {
+			return points, false
+		}
+		result[index] = selected
+	}
+	return compactRoutePoints(result), true
+}
+
+func localRoutePointClearsPadRects(point transactions.Point, obstacles []localRoutePadRect) bool {
+	for _, obstacle := range obstacles {
+		if segmentIntersectsLocalRouteRect(point, point, obstacle.center, obstacle.halfWidth, obstacle.halfHeight) {
+			return false
+		}
+	}
+	return true
+}
+
+func padClearLocalRouteForeignPads(points []transactions.Point, layer string, widthMM float64, netName string, from PlacedPadEndpoint, to PlacedPadEndpoint, resolver PlacedPadEndpointResolver) ([]transactions.Point, bool, bool) {
+	if len(points) < 2 {
+		return points, false, true
+	}
+	obstacles := localRouteForeignPadRects(points, layer, widthMM, netName, from, to, resolver)
+	if len(obstacles) == 0 || localRoutePolylineClearsPadRects(points, obstacles) {
+		return points, false, true
+	}
+	detoured, ok := detourLocalRoutePolyline(points, obstacles)
+	return detoured, ok, ok
+}
+
+func padClearDirectLocalRoute(points []transactions.Point, layer string, widthMM float64, netName string, from PlacedPadEndpoint, to PlacedPadEndpoint, resolver PlacedPadEndpointResolver) ([]transactions.Point, bool, bool) {
+	if len(points) != 2 || (!localRouteEndpointIsEntryAnchor(from) && !localRouteEndpointIsEntryAnchor(to)) || localRoutePolylineClearsForeignPads(points, layer, widthMM, netName, from, to, resolver) {
+		return points, false, true
+	}
+	candidates := [][]transactions.Point{
+		compactRoutePoints([]transactions.Point{points[0], {XMM: points[0].XMM, YMM: points[1].YMM}, points[1]}),
+		compactRoutePoints([]transactions.Point{points[0], {XMM: points[1].XMM, YMM: points[0].YMM}, points[1]}),
+	}
+	laneMarginMM := routing.DefaultRules().GridMM
+	for _, obstacle := range localRouteForeignPadRects(points, layer, widthMM, netName, from, to, resolver) {
+		if !segmentIntersectsLocalRouteRect(points[0], points[1], obstacle.center, obstacle.halfWidth, obstacle.halfHeight) {
+			continue
+		}
+		for _, x := range []float64{obstacle.center.XMM - obstacle.halfWidth - laneMarginMM, obstacle.center.XMM + obstacle.halfWidth + laneMarginMM} {
+			candidates = append(candidates, compactRoutePoints([]transactions.Point{points[0], {XMM: x, YMM: points[0].YMM}, {XMM: x, YMM: points[1].YMM}, points[1]}))
+		}
+		for _, y := range []float64{obstacle.center.YMM - obstacle.halfHeight - laneMarginMM, obstacle.center.YMM + obstacle.halfHeight + laneMarginMM} {
+			candidates = append(candidates, compactRoutePoints([]transactions.Point{points[0], {XMM: points[0].XMM, YMM: y}, {XMM: points[1].XMM, YMM: y}, points[1]}))
+		}
+	}
+	for _, candidate := range candidates {
+		if localRoutePolylineClearsForeignPads(candidate, layer, widthMM, netName, from, to, resolver) {
+			return candidate, true, true
+		}
+	}
+	return points, false, false
+}
+
+type localRoutePadRect struct {
+	ref        string
+	center     transactions.Point
+	halfWidth  float64
+	halfHeight float64
+}
+
+func localRouteForeignPadRects(points []transactions.Point, layer string, widthMM float64, netName string, from PlacedPadEndpoint, to PlacedPadEndpoint, resolver PlacedPadEndpointResolver) []localRoutePadRect {
+	endpointKeys := map[routeEndpointMapKey]struct{}{
+		routeEndpointKey(from.Ref, from.Pad): {},
+		routeEndpointKey(to.Ref, to.Pad):     {},
+	}
+	clearanceMM := routing.DefaultRules().ClearanceMM
+	pads := resolver.Endpoints()
+	if len(points) != 0 {
+		minX, minY := points[0].XMM, points[0].YMM
+		maxX, maxY := minX, minY
+		for _, point := range points[1:] {
+			minX = math.Min(minX, point.XMM)
+			minY = math.Min(minY, point.YMM)
+			maxX = math.Max(maxX, point.XMM)
+			maxY = math.Max(maxY, point.YMM)
+		}
+		padding := resolver.MaximumPadRadiusMM() + math.Max(0, widthMM)/2 + clearanceMM
+		pads = resolver.EndpointsWithinBounds(minX-padding, minY-padding, maxX+padding, maxY+padding)
+	}
+	rects := make([]localRoutePadRect, 0, len(pads))
+	rotationTrig := map[float64][2]float64{}
+	for _, pad := range pads {
+		if _, endpoint := endpointKeys[routeEndpointKey(pad.Ref, pad.Pad)]; endpoint {
+			continue
+		}
+		if strings.TrimSpace(netName) != "" && strings.EqualFold(strings.TrimSpace(pad.NetName), strings.TrimSpace(netName)) {
+			continue
+		}
+		if !localRoutePadAppliesToLayer(pad, layer) {
+			continue
+		}
+		trig, ok := rotationTrig[pad.ComponentRotation]
+		if !ok {
+			angleRadians := pad.ComponentRotation * math.Pi / 180
+			trig = [2]float64{math.Abs(math.Cos(angleRadians)), math.Abs(math.Sin(angleRadians))}
+			rotationTrig[pad.ComponentRotation] = trig
+		}
+		cosine, sine := trig[0], trig[1]
+		padWidthMM := math.Max(0, pad.PadWidthMM)
+		padHeightMM := math.Max(0, pad.PadHeightMM)
+		rotatedWidthMM := cosine*padWidthMM + sine*padHeightMM
+		rotatedHeightMM := sine*padWidthMM + cosine*padHeightMM
+		rects = append(rects, localRoutePadRect{
+			ref:        pad.Ref,
+			center:     pad.Point,
+			halfWidth:  rotatedWidthMM/2 + math.Max(0, widthMM)/2 + clearanceMM,
+			halfHeight: rotatedHeightMM/2 + math.Max(0, widthMM)/2 + clearanceMM,
+		})
+	}
+	return rects
+}
+
+func localRoutePolylineClearsForeignPads(points []transactions.Point, layer string, widthMM float64, netName string, from PlacedPadEndpoint, to PlacedPadEndpoint, resolver PlacedPadEndpointResolver) bool {
+	return localRoutePolylineClearsPadRects(points, localRouteForeignPadRects(points, layer, widthMM, netName, from, to, resolver))
+}
+
+func localRoutePolylineClearsPadRects(points []transactions.Point, obstacles []localRoutePadRect) bool {
+	for _, obstacle := range obstacles {
+		for index := 1; index < len(points); index++ {
+			if segmentIntersectsLocalRouteRect(points[index-1], points[index], obstacle.center, obstacle.halfWidth, obstacle.halfHeight) {
+				return false
+			}
+		}
+	}
+	return true
+}
+
+func localRoutePadAppliesToLayer(pad PlacedPadEndpoint, layer string) bool {
+	layer = canonicalCopperLayer(layer)
+	layers := append([]string(nil), pad.Layers...)
+	if len(layers) == 0 {
+		layers = []string{pad.Layer}
+	}
+	for _, candidate := range layers {
+		candidate = canonicalCopperLayer(candidate)
+		if strings.EqualFold(candidate, "*.Cu") || strings.EqualFold(candidate, layer) {
+			return true
+		}
+	}
+	return false
+}
+
+func segmentIntersectsLocalRouteRect(start transactions.Point, end transactions.Point, center transactions.Point, halfWidth float64, halfHeight float64) bool {
+	minX := center.XMM - halfWidth
+	maxX := center.XMM + halfWidth
+	minY := center.YMM - halfHeight
+	maxY := center.YMM + halfHeight
+	tMin := 0.0
+	tMax := 1.0
+	for _, axis := range []struct {
+		start float64
+		delta float64
+		min   float64
+		max   float64
+	}{
+		{start: start.XMM, delta: end.XMM - start.XMM, min: minX, max: maxX},
+		{start: start.YMM, delta: end.YMM - start.YMM, min: minY, max: maxY},
+	} {
+		if math.Abs(axis.delta) <= interBlockContactToleranceMM {
+			if axis.start < axis.min || axis.start > axis.max {
+				return false
+			}
+			continue
+		}
+		near := (axis.min - axis.start) / axis.delta
+		far := (axis.max - axis.start) / axis.delta
+		if near > far {
+			near, far = far, near
+		}
+		tMin = math.Max(tMin, near)
+		tMax = math.Min(tMax, far)
+		if tMin > tMax {
+			return false
+		}
+	}
+	return true
+}
+
+func localRouteEndpointCopperLayers(endpoint PlacedPadEndpoint, fallback string) []string {
+	layers := endpoint.Layers
+	if len(layers) == 0 {
+		layers = []string{firstNonEmpty(endpoint.Layer, fallback)}
+	}
+	return orderedLocalRouteRebuildLayers(layers, fallback, fallback)
 }
 
 func routeTrackSegmentCount(points []transactions.Point) int {
@@ -1219,6 +2988,7 @@ func localRouteEntryAnchorDogboneOperations(routePath string, netName string, ro
 			issues = append(issues, localRouteBindingIssue(routePath+".entry_anchor_dogbone", err.Error(), []string{endpoint.Ref}))
 			continue
 		}
+		routeLayerOperation.Ref = localRouteEndpointDogboneOperationRef
 		oppositeLayerOperation, err := workflowOperation(transactions.OpRoute, transactions.RouteOperation{
 			Op:      transactions.OpRoute,
 			NetName: netName,
@@ -1239,6 +3009,7 @@ func localRouteEntryAnchorDogboneOperations(routePath string, netName string, ro
 			issues = append(issues, localRouteBindingIssue(routePath+".entry_anchor_dogbone", err.Error(), []string{endpoint.Ref}))
 			continue
 		}
+		oppositeLayerOperation.Ref = localRouteEndpointDogboneOperationRef
 		operations = append(operations, routeLayerOperation, oppositeLayerOperation)
 	}
 	return operations, issues
@@ -1531,13 +3302,13 @@ func transformedLocalRouteShape(points []transactions.Point, from transactions.P
 	return transformed, true
 }
 
-func resolveLocalRouteEndpoint(fragment BlockFragment, routePath string, netName string, endpoint transactions.Endpoint, resolver PlacedPadEndpointResolver) (PlacedPadEndpoint, []reports.Issue, bool, bool) {
+func resolveLocalRouteEndpoint(fragment BlockFragment, routePath string, netName string, routeWidthMM float64, endpoint transactions.Endpoint, resolver PlacedPadEndpointResolver, board placement.BoardPlacementArea) (PlacedPadEndpoint, []reports.Issue, bool, bool) {
 	ref := strings.TrimSpace(endpoint.Ref)
 	pin := strings.TrimSpace(endpoint.Pin)
 	if ref == "" || pin == "" {
 		return PlacedPadEndpoint{}, []reports.Issue{localRouteBindingIssue(routePath, "local route endpoint requires ref and pin", nil)}, false, false
 	}
-	if anchor, ok := resolveLocalRouteAnchorEndpoint(fragment, ref, pin); ok {
+	if anchor, ok := resolveLocalRouteAnchorEndpoint(fragment, ref, pin, routeWidthMM, resolver, board); ok {
 		if strings.TrimSpace(anchor.NetName) != "" && !strings.EqualFold(anchor.NetName, netName) {
 			return anchor, []reports.Issue{localRouteBindingIssue(routePath+".net_name", "local route anchor net "+anchor.NetName+" does not match route net "+netName, []string{ref})}, false, true
 		}
@@ -1562,7 +3333,7 @@ func resolveLocalRouteEndpoint(fragment BlockFragment, routePath string, netName
 	return resolved, nil, true, false
 }
 
-func resolveLocalRouteAnchorEndpoint(fragment BlockFragment, ref string, pin string) (PlacedPadEndpoint, bool) {
+func resolveLocalRouteAnchorEndpoint(fragment BlockFragment, ref string, pin string, routeWidthMM float64, resolver PlacedPadEndpointResolver, board placement.BoardPlacementArea) (PlacedPadEndpoint, bool) {
 	anchorID, ok := localRouteAnchorID(ref)
 	if !ok {
 		return PlacedPadEndpoint{}, false
@@ -1576,21 +3347,175 @@ func resolveLocalRouteAnchorEndpoint(fragment BlockFragment, ref string, pin str
 			continue
 		}
 		layer := firstNonEmpty(anchor.Placement.Layer, "F.Cu")
+		point := transactions.Point{XMM: anchor.Placement.XMM, YMM: anchor.Placement.YMM}
+		if placed, placedOK := placedLocalRouteEntryAnchorPointWithWidth(fragment, anchorID, point, routeWidthMM, resolver, board); placedOK {
+			point = placed
+		}
 		// RealizeBlockPCB offsets entry anchors by the fragment origin before
 		// they are stored here, so these coordinates are already board-level.
+		// Preserve a proven common translation. When attached components moved
+		// independently, rebuild the virtual junction at their pad centroid.
 		return PlacedPadEndpoint{
 			Ref:             strings.TrimSpace(ref),
 			Pad:             strings.TrimSpace(pin),
 			NetName:         strings.TrimSpace(anchor.NetName),
 			NetCodeResolved: true,
-			Point:           transactions.Point{XMM: anchor.Placement.XMM, YMM: anchor.Placement.YMM},
+			Point:           point,
 			Layer:           layer,
-			ComponentAt:     transactions.Point{XMM: anchor.Placement.XMM, YMM: anchor.Placement.YMM},
+			ComponentAt:     point,
 			Source:          "pcb_realization.entry_anchor",
 			Confidence:      PhysicalEndpointConfidenceHigh,
 		}, true
 	}
 	return PlacedPadEndpoint{}, false
+}
+
+func placedLocalRouteEntryAnchorPoint(fragment BlockFragment, anchorID string, point transactions.Point, resolver PlacedPadEndpointResolver, board placement.BoardPlacementArea) (transactions.Point, bool) {
+	return placedLocalRouteEntryAnchorPointWithWidth(fragment, anchorID, point, 0, resolver, board)
+}
+
+func placedLocalRouteEntryAnchorPointWithWidth(fragment BlockFragment, anchorID string, point transactions.Point, routeWidthMM float64, resolver PlacedPadEndpointResolver, board placement.BoardPlacementArea) (transactions.Point, bool) {
+	anchorRef := "@anchor:" + strings.TrimSpace(anchorID)
+	attached := map[routeEndpointMapKey]transactions.Endpoint{}
+	appendAttached := func(endpoint transactions.Endpoint) {
+		if _, isAnchor := localRouteAnchorID(endpoint.Ref); isAnchor || strings.TrimSpace(endpoint.Ref) == "" || strings.TrimSpace(endpoint.Pin) == "" {
+			return
+		}
+		attached[routeEndpointKey(endpoint.Ref, endpoint.Pin)] = endpoint
+	}
+	for _, route := range fragment.Realization.LocalRoutes {
+		switch {
+		case strings.EqualFold(strings.TrimSpace(route.From.Ref), anchorRef):
+			if route.EntryAnchorDogbone != nil {
+				return point, true
+			}
+			appendAttached(route.To)
+		case strings.EqualFold(strings.TrimSpace(route.To.Ref), anchorRef):
+			if route.EntryAnchorDogbone != nil {
+				return point, true
+			}
+			appendAttached(route.From)
+		}
+	}
+	if len(attached) == 0 {
+		return transactions.Point{}, false
+	}
+	authoredByRef := make(map[string]transactions.Point, len(fragment.Realization.Components))
+	for _, component := range fragment.Realization.Components {
+		authoredByRef[strings.ToUpper(strings.TrimSpace(component.Ref))] = transactions.Point{XMM: component.Placement.XMM, YMM: component.Placement.YMM}
+	}
+	placedByRef := map[string]transactions.Point{}
+	for _, endpoint := range resolver.Endpoints() {
+		refKey := strings.ToUpper(strings.TrimSpace(endpoint.Ref))
+		if _, exists := placedByRef[refKey]; !exists {
+			placedByRef[refKey] = endpoint.ComponentAt
+		}
+	}
+
+	var commonDelta transactions.Point
+	commonDeltaProved := false
+	commonDeltaValid := true
+	for _, endpoint := range attached {
+		refKey := strings.ToUpper(strings.TrimSpace(endpoint.Ref))
+		authored, authoredOK := authoredByRef[refKey]
+		placed, placedOK := placedByRef[refKey]
+		if !authoredOK || !placedOK {
+			commonDeltaValid = false
+			break
+		}
+		delta := transactions.Point{XMM: placed.XMM - authored.XMM, YMM: placed.YMM - authored.YMM}
+		if !commonDeltaProved {
+			commonDelta = delta
+			commonDeltaProved = true
+			continue
+		}
+		if math.Hypot(commonDelta.XMM-delta.XMM, commonDelta.YMM-delta.YMM) > 0.001 {
+			commonDeltaValid = false
+			break
+		}
+	}
+	if commonDeltaValid && commonDeltaProved {
+		translated := transactions.Point{XMM: point.XMM + commonDelta.XMM, YMM: point.YMM + commonDelta.YMM}
+		return relocateSinglePadEntryAnchor(translated, attached, routeWidthMM, resolver, board)
+	}
+
+	centroid := transactions.Point{}
+	for _, endpoint := range attached {
+		resolved, ok := resolver.Resolve(endpoint)
+		if !ok {
+			return transactions.Point{}, false
+		}
+		centroid.XMM += resolved.Point.XMM
+		centroid.YMM += resolved.Point.YMM
+	}
+	count := float64(len(attached))
+	centroid.XMM /= count
+	centroid.YMM /= count
+	return centroid, true
+}
+
+func relocateSinglePadEntryAnchor(point transactions.Point, attached map[routeEndpointMapKey]transactions.Endpoint, routeWidthMM float64, resolver PlacedPadEndpointResolver, board placement.BoardPlacementArea) (transactions.Point, bool) {
+	if len(attached) == 0 {
+		return point, true
+	}
+	physical := make([]PlacedPadEndpoint, 0, len(attached))
+	attachedKeys := make(map[routeEndpointMapKey]struct{}, len(attached))
+	for _, endpoint := range attached {
+		resolved, ok := resolver.Resolve(endpoint)
+		if !ok {
+			// Some synthetic callers provide only component centers. In that case
+			// preserve the already-proven common translation rather than guessing
+			// a new electrical junction.
+			return point, true
+		}
+		physical = append(physical, resolved)
+		attachedKeys[routeEndpointKey(endpoint.Ref, endpoint.Pin)] = struct{}{}
+	}
+	centroid := transactions.Point{}
+	netName := ""
+	for _, endpoint := range physical {
+		centroid.XMM += endpoint.Point.XMM
+		centroid.YMM += endpoint.Point.YMM
+		netName = firstNonEmpty(netName, strings.TrimSpace(endpoint.NetName))
+	}
+	centroid.XMM /= float64(len(physical))
+	centroid.YMM /= float64(len(physical))
+	relocate := entryAnchorOutsideBoardCopperBounds(point, board)
+	searchRadius := resolver.MaximumPadRadiusMM() + math.Max(0, routeWidthMM)/2 + interBlockContactToleranceMM
+	nearby := resolver.EndpointsWithinBounds(point.XMM-searchRadius, point.YMM-searchRadius, point.XMM+searchRadius, point.YMM+searchRadius)
+	for _, candidate := range nearby {
+		if _, attachedEndpoint := attachedKeys[routeEndpointKey(candidate.Ref, candidate.Pad)]; attachedEndpoint {
+			continue
+		}
+		if netName != "" && strings.EqualFold(strings.TrimSpace(candidate.NetName), netName) {
+			continue
+		}
+		foreignPadRadius := math.Hypot(candidate.PadWidthMM, candidate.PadHeightMM) / 2
+		if strings.EqualFold(strings.TrimSpace(candidate.PadShape), "circle") {
+			foreignPadRadius = math.Max(candidate.PadWidthMM, candidate.PadHeightMM) / 2
+		}
+		traceRadius := math.Max(0, routeWidthMM) / 2
+		if pointDistanceMM(point, candidate.Point) <= foreignPadRadius+traceRadius+interBlockContactToleranceMM {
+			relocate = true
+			break
+		}
+	}
+	if relocate && !entryAnchorOutsideBoardCopperBounds(centroid, board) {
+		return centroid, true
+	}
+	return point, true
+}
+
+func entryAnchorOutsideBoardCopperBounds(point transactions.Point, board placement.BoardPlacementArea) bool {
+	if board.WidthMM <= 0 || board.HeightMM <= 0 {
+		return false
+	}
+	clearance := math.Max(0, board.MarginMM)
+	minX := board.Origin.XMM + clearance
+	minY := board.Origin.YMM + clearance
+	maxX := board.Origin.XMM + board.WidthMM - clearance
+	maxY := board.Origin.YMM + board.HeightMM - clearance
+	return point.XMM < minX || point.YMM < minY || point.XMM > maxX || point.YMM > maxY
 }
 
 func localRouteAnchorID(ref string) (string, bool) {
@@ -1671,14 +3596,20 @@ func transactionRouteOperations(operations []routing.Operation) []transactions.O
 }
 
 func dedupeSameNetRouteVias(operations []transactions.Operation) []transactions.Operation {
+	out, _ := dedupeSameNetRouteViasWithEvidence(operations)
+	return out
+}
+
+func dedupeSameNetRouteViasWithEvidence(operations []transactions.Operation) ([]transactions.Operation, map[int]struct{}) {
 	if len(operations) == 0 {
-		return nil
+		return nil, nil
 	}
 	routes := decodeRouteOperations(operations)
 	snapPoints := sameNetViaSnapPoints(routes)
 	seen := map[routeViaPointKey]struct{}{}
 	out := make([]transactions.Operation, 0, len(operations))
-	for _, route := range routes {
+	reduced := map[int]struct{}{}
+	for operationIndex, route := range routes {
 		operation := route.operation
 		if !route.decoded {
 			out = append(out, operation)
@@ -1698,6 +3629,7 @@ func dedupeSameNetRouteVias(operations []transactions.Operation) []transactions.
 				changed = true
 			}
 		}
+		originalViaCount := len(payload.Vias)
 		filtered := payload.Vias[:0]
 		for _, via := range payload.Vias {
 			key := sameNetViaPointKey(payload.NetName, via.At, via.Layers)
@@ -1709,6 +3641,9 @@ func dedupeSameNetRouteVias(operations []transactions.Operation) []transactions.
 			filtered = append(filtered, via)
 		}
 		payload.Vias = filtered
+		if len(payload.Vias) < originalViaCount {
+			reduced[operationIndex] = struct{}{}
+		}
 		if !changed {
 			out = append(out, operation)
 			continue
@@ -1719,15 +3654,19 @@ func dedupeSameNetRouteVias(operations []transactions.Operation) []transactions.
 			continue
 		}
 		operation.Raw = raw
+		if len(payload.Vias) < originalViaCount {
+			operation.PruneProtected = true
+		}
 		out = append(out, operation)
 	}
-	return out
+	return out, reduced
 }
 
 type decodedRouteOperation struct {
 	operation transactions.Operation
 	payload   transactions.RouteOperation
 	decoded   bool
+	decodeErr error
 }
 
 type routeViaRecord struct {
@@ -1765,12 +3704,17 @@ type routeCellKey struct {
 }
 
 func decodeRouteOperations(operations []transactions.Operation) []decodedRouteOperation {
+	// Keep one aligned entry per input operation because downstream pruning uses
+	// slice positions as evidence keys. Only route operations are unmarshaled;
+	// non-route entries are zero-cost placeholders that preserve that alignment.
 	routes := make([]decodedRouteOperation, 0, len(operations))
 	for _, operation := range operations {
 		route := decodedRouteOperation{operation: operation}
 		if operation.Op == transactions.OpRoute && len(operation.Raw) > 0 {
 			if err := json.Unmarshal(operation.Raw, &route.payload); err == nil {
 				route.decoded = true
+			} else {
+				route.decodeErr = err
 			}
 		}
 		routes = append(routes, route)
@@ -2050,10 +3994,14 @@ func snapRoutePayloadEndpoints(payload *transactions.RouteOperation, targets []I
 	last := payload.Points[lastIndex]
 	left, right := nearestEndpointTargetPair(first, last, targets)
 	if distance := math.Sqrt(routeSnapDistance(first, left.Point)); distance > interBlockRouteSnapMaxDistanceMM {
-		return []reports.Issue{interBlockRouteSnapIssue(operationIndex, operation, "route start is too far from resolved contact target for endpoint snapping")}
+		// A route may intentionally merge into already-proven same-net copper
+		// instead of terminating at a second concrete pad. Snapping is only a
+		// coordinate-normalization aid; the contact graph below remains the
+		// authoritative completion proof for unsnapped merge geometry.
+		return []reports.Issue{interBlockRouteSnapInfoIssue(operationIndex, operation, "route start was left unchanged because it is too far from the nearest resolved contact target for optional endpoint snapping")}
 	}
 	if distance := math.Sqrt(routeSnapDistance(last, right.Point)); distance > interBlockRouteSnapMaxDistanceMM {
-		return []reports.Issue{interBlockRouteSnapIssue(operationIndex, operation, "route end is too far from resolved contact target for endpoint snapping")}
+		return []reports.Issue{interBlockRouteSnapInfoIssue(operationIndex, operation, "route end was left unchanged because it is too far from the nearest resolved contact target for optional endpoint snapping")}
 	}
 	payload.Points[0] = left.Point
 	payload.Points[lastIndex] = right.Point
@@ -2094,4 +4042,10 @@ func interBlockRouteSnapIssue(index int, operation transactions.Operation, messa
 		Message:     message,
 		OperationID: contactOperationID(operation),
 	}
+}
+
+func interBlockRouteSnapInfoIssue(index int, operation transactions.Operation, message string) reports.Issue {
+	issue := interBlockRouteSnapIssue(index, operation, message)
+	issue.Severity = reports.SeverityInfo
+	return issue
 }

@@ -126,6 +126,22 @@ func TestI2CSensorSelectionRequestUsesConcreteComponentAndSupply(t *testing.T) {
 	}
 }
 
+func TestSelectionRequestUsesParamDrivenTolerance(t *testing.T) {
+	component := BlockComponent{
+		FootprintID:             "Resistor_SMD:R_0805_2012Metric",
+		ComponentQuery:          &components.Query{Family: "resistor", ValueKind: "resistance", ToleranceKind: "resistance", ToleranceUnit: "%"},
+		ComponentValueParam:     "resistance",
+		ComponentToleranceParam: "tolerance_percent",
+	}
+	request, ok := SelectionRequestForComponentWithParams(component, components.AcceptanceConnectivity, map[string]any{
+		"resistance":        "47kΩ",
+		"tolerance_percent": 0.1,
+	})
+	if !ok || request.Query.Value != "47kΩ" || request.Query.MaximumTolerance != 0.1 || request.Query.Package != "0805" {
+		t.Fatalf("request = %#v, ok = %v", request, ok)
+	}
+}
+
 func TestExplicitActiveDeviceSelectionDoesNotRequireSensorBusFunctions(t *testing.T) {
 	component := BlockComponent{ComponentIDParam: "transistor_component_id"}
 	request, ok := SelectionRequestForComponentWithParams(component, components.AcceptanceConnectivity, map[string]any{

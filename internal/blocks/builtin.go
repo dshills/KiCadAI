@@ -28,11 +28,14 @@ func BuiltinDefinitions() []BlockDefinition {
 		i2cSensorDefinition(),
 		amplifierInputBufferDefinition(),
 		opampGainStageDefinition(),
+		speakerOpAmpDriverDefinition(),
+		speakerOutputProtectionDefinition(),
 		amplifierSupplyDecouplingDefinition(),
 		amplifierBiasNetworkDefinition(),
 		classAVoltageStageDefinition(),
 		classABOutputPairDefinition(),
 		classABOutputStageDefinition(),
+		classABSpeakerPowerStageDefinition(),
 		headphoneOutputProtectionDefinition(),
 		headphoneOutputConnectorDefinition(),
 		dcBlockingCapacitorDefinition(),
@@ -413,6 +416,10 @@ func opampGainStageDefinition() BlockDefinition {
 			Notes: []string{"Implements a non-inverting LMV321 template with explicit pin roles; other op-amp symbols require future pin-role metadata."},
 		},
 	}
+}
+
+func speakerOpAmpDriverDefinition() BlockDefinition {
+	return newSpeakerOpAmpDriverDefinition()
 }
 
 func connectorBreakoutDefinition() BlockDefinition {

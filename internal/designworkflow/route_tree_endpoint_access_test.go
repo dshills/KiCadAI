@@ -47,6 +47,28 @@ func TestBuildRouteTreeEndpointAccessIncludesPadAndLocalRouteAnchors(t *testing.
 	}
 }
 
+func TestBuildRouteTreeEndpointAccessIncludesBothLayersForPlatedPad(t *testing.T) {
+	targets := InterBlockContactEvidence{Targets: []InterBlockContactTarget{{
+		NetName:    "VCC",
+		Kind:       InterBlockContactTargetPad,
+		EndpointID: "J1.1",
+		Ref:        "J1",
+		Pad:        "1",
+		Point:      transactions.Point{XMM: 10, YMM: 5},
+		Layer:      "F.Cu",
+		Layers:     []string{"F.Cu", "B.Cu"},
+	}}}
+
+	access := BuildRouteTreeEndpointAccess(targets, nil)
+	if len(access) != 2 || access[0].EndpointID != "J1.1" || access[1].EndpointID != "J1.1" {
+		t.Fatalf("access = %#v, want two endpoint-scoped plated-pad accesses", access)
+	}
+	layers := []string{access[0].Layer, access[1].Layer}
+	if !stringSliceContains(layers, "F.CU") || !stringSliceContains(layers, "B.CU") {
+		t.Fatalf("access layers = %#v, want F.CU and B.CU", layers)
+	}
+}
+
 func TestBuildRouteTreeEndpointAccessReturnsDecodeIssues(t *testing.T) {
 	_, issues := BuildRouteTreeEndpointAccessWithIssues(InterBlockContactEvidence{}, []transactions.Operation{{
 		Op:  transactions.OpRoute,
@@ -142,6 +164,24 @@ func TestRouteTreeAccessCandidatesPreferExactEndpointPadOverEndpointlessAnchor(t
 	}
 	if !strings.Contains(candidates[0].RankReason, "exact_endpoint") || !strings.Contains(candidates[1].RankReason, "net_scoped_fallback") {
 		t.Fatalf("candidates = %#v, want endpoint rank reasons", candidates)
+	}
+}
+
+func TestRouteTreeFallbackLocalAnchorRequiresProvenContactWithExactEndpoint(t *testing.T) {
+	candidates := []routeTreeBranchAccessCandidate{
+		{Access: RouteTreeEndpointAccess{EndpointID: "U1.1", Role: RouteTreeAccessTargetPad, Net: "SIG", Layer: "F.Cu", XMM: 10, YMM: 5}, EndpointRank: routeTreeAccessExactEndpointRank},
+		{Access: RouteTreeEndpointAccess{Role: RouteTreeAccessLocalRouteAnchor, Net: "SIG", Layer: "F.Cu", XMM: 20, YMM: 5}, EndpointRank: routeTreeAccessFallbackEndpointRank},
+	}
+
+	filtered := routeTreeAccessCandidatesWithProvenCopperContact(candidates)
+	if len(filtered) != 1 || filtered[0].Access.Role != RouteTreeAccessTargetPad {
+		t.Fatalf("filtered candidates = %#v, want only the exact endpoint pad", filtered)
+	}
+
+	candidates[1].Access.XMM = 10
+	filtered = routeTreeAccessCandidatesWithProvenCopperContact(candidates)
+	if len(filtered) != 2 {
+		t.Fatalf("contact-proven fallback candidates = %#v, want both candidates", filtered)
 	}
 }
 

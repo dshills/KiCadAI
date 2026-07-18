@@ -88,6 +88,29 @@ func TestFromDesignIncludesHiddenPinsInNetHints(t *testing.T) {
 	}
 }
 
+func TestFromDesignUsesMaterializedFallbackSymbolPinAnchors(t *testing.T) {
+	design := transferFixtureDesign()
+	design.Schematic.Symbols[0].LibraryID = "Comparator:Generated"
+	design.Schematic.Symbols[0].Pins = []schematic.SymbolPin{{Number: "1"}, {Number: "2"}}
+	design.Schematic.Symbols[0].PinAnchors = []kicadfiles.Point{
+		{X: kicadfiles.MM(25), Y: kicadfiles.MM(10)},
+		{X: kicadfiles.MM(10), Y: kicadfiles.MM(12.54)},
+	}
+	index := transferFixtureLibraryIndex()
+
+	result := FromDesign(design, Options{LibraryIndex: &index})
+	if len(result.Issues) != 0 {
+		t.Fatalf("issues = %#v", result.Issues)
+	}
+	var first transactions.PlaceFootprintOperation
+	if err := json.Unmarshal(result.Transaction.Operations[0].Raw, &first); err != nil {
+		t.Fatal(err)
+	}
+	if len(first.Pads) != 2 || first.Pads[0].Net == nil || *first.Pads[0].Net != "BUS_A" {
+		t.Fatalf("fallback symbol net hints = %#v", first.Pads)
+	}
+}
+
 func TestVerifiedTransferUSB4125PowerOnlyPads(t *testing.T) {
 	pads, ok := verifiedTransferPadSpecs("Connector_USB:USB_C_Receptacle_GCT_USB4125-xx-x_6P_TopMnt_Horizontal", map[string]string{
 		"A5": "CC1",

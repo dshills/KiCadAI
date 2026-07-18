@@ -9,11 +9,12 @@ import (
 	"strings"
 
 	"kicadai/internal/fabrication/physicalrules"
+	"kicadai/internal/kicadfiles/checks"
 	"kicadai/internal/reports"
 )
 
 func ExportPreview(ctx context.Context, targetPath string, opts Options) Result {
-	result := Evaluate(ctx, targetPath, EvaluateOptions{KiCadCLI: opts.KiCadCLI, DryRun: !opts.Execute, CLIPolicy: opts.CLIPolicy, ManufacturerProfile: opts.ManufacturerProfile, ManufacturerProfileDir: opts.ManufacturerProfileDir})
+	result := Evaluate(ctx, targetPath, evaluateOptionsForExport(opts))
 	return exportReadiness(ctx, targetPath, opts, result, nil, nil, false)
 }
 
@@ -31,7 +32,7 @@ func MarshalResultJSON(result Result) ([]byte, error) {
 }
 
 func ExportBOM(ctx context.Context, targetPath string, opts Options) Result {
-	result := Evaluate(ctx, targetPath, EvaluateOptions{KiCadCLI: opts.KiCadCLI, DryRun: !opts.Execute, CLIPolicy: opts.CLIPolicy, ManufacturerProfile: opts.ManufacturerProfile, ManufacturerProfileDir: opts.ManufacturerProfileDir})
+	result := Evaluate(ctx, targetPath, evaluateOptionsForExport(opts))
 	reportData, err := BuildReports(ctx, targetPath)
 	if err != nil {
 		result.Issues = append(result.Issues, reports.Issue{Code: reports.CodeValidationFailed, Severity: reports.SeverityError, Path: "bom", Message: err.Error()})
@@ -49,7 +50,7 @@ func ExportBOM(ctx context.Context, targetPath string, opts Options) Result {
 }
 
 func ExportPackage(ctx context.Context, targetPath string, opts Options) Result {
-	result := Evaluate(ctx, targetPath, EvaluateOptions{KiCadCLI: opts.KiCadCLI, DryRun: !opts.Execute, CLIPolicy: opts.CLIPolicy, ManufacturerProfile: opts.ManufacturerProfile, ManufacturerProfileDir: opts.ManufacturerProfileDir})
+	result := Evaluate(ctx, targetPath, evaluateOptionsForExport(opts))
 	reportData, err := BuildReports(ctx, targetPath)
 	if err != nil {
 		result.Issues = append(result.Issues, reports.Issue{Code: reports.CodeValidationFailed, Severity: reports.SeverityError, Path: "package", Message: err.Error()})
@@ -69,6 +70,14 @@ func ExportPackage(ctx context.Context, targetPath string, opts Options) Result 
 		return exportReadiness(ctx, targetPath, opts, result, bomCSV, nil, true)
 	}
 	return exportReadiness(ctx, targetPath, opts, result, bomCSV, cplCSV, true)
+}
+
+func evaluateOptionsForExport(opts Options) EvaluateOptions {
+	return EvaluateOptions{
+		KiCadCLI: opts.KiCadCLI, DryRun: !opts.Execute, CLIPolicy: opts.CLIPolicy,
+		ManufacturerProfile: opts.ManufacturerProfile, ManufacturerProfileDir: opts.ManufacturerProfileDir,
+		LibraryIndex: opts.LibraryIndex, HasLibraryIndex: opts.HasLibraryIndex, LibraryIssues: slices.Clone(opts.LibraryIssues),
+	}
 }
 
 func exportReadiness(ctx context.Context, targetPath string, opts Options, result Result, bomCSV []byte, cplCSV []byte, includeFabricationOutputs bool) Result {
@@ -105,6 +114,44 @@ func exportReadiness(ctx context.Context, targetPath string, opts Options, resul
 		dataWrites = append(dataWrites, exportWrite{Rel: "cpl.csv", Kind: ArtifactCPL, Data: cplCSV})
 	}
 	if includeFabricationOutputs {
+		dataWrites = appendFabricationCheckEvidence(ctx, target.Root, opts, &result, dataWrites)
+		dataWrites = appendBlockReadinessEvidence(target.Root, &result, dataWrites, opts.BlockReadinessReport)
+	}
+	for _, write := range append(slices.Clone(metadataWrites), dataWrites...) {
+		relPath, err := exportRelPath(target.Root, outputDir, write.Rel)
+		if err != nil {
+			result.Issues = append(result.Issues, reports.Issue{Code: reports.CodeValidationFailed, Severity: reports.SeverityError, Path: write.Rel, Message: err.Error()})
+			continue
+		}
+		result.Artifacts = markArtifact(result.Artifacts, write.Kind, filepath.ToSlash(relPath), ArtifactExpected)
+	}
+	for _, write := range dataWrites {
+		if !opts.Execute {
+			continue
+		}
+		if !writeArtifact(ctx, &result, target.Root, outputDir, write, opts.Overwrite) {
+			break
+		}
+		if (write.Kind == ArtifactERC || write.Kind == ArtifactDRC || write.Kind == ArtifactBlockReadiness) && artifactGenerated(result.Artifacts, write.Kind) {
+			relPath, _ := exportRelPath(target.Root, outputDir, write.Rel)
+			generator := GeneratorKiCad
+			if write.Kind == ArtifactBlockReadiness {
+				generator = GeneratorKiCadAI
+			}
+			result.Artifacts = setArtifactEvidence(result.Artifacts, write.Kind, generator, []string{filepath.ToSlash(relPath)})
+		}
+	}
+	if opts.Execute {
+		if artifactGenerated(result.Artifacts, ArtifactBOM) {
+			result.Summary.BOM = EvidencePass
+			result.Issues = removeExactIssuePath(result.Issues, "bom")
+		}
+		if artifactGenerated(result.Artifacts, ArtifactCPL) {
+			result.Summary.CPL = EvidencePass
+			result.Issues = removeExactIssuePath(result.Issues, "cpl")
+		}
+	}
+	if includeFabricationOutputs {
 		gerberRel, gerberRelErr := exportRelPath(target.Root, outputDir, "gerbers")
 		drillRel, drillRelErr := exportRelPath(target.Root, outputDir, "drill")
 		pcbPath, pcbIssue := discoverPlotPCBPath(target.Root, target.Name)
@@ -138,25 +185,15 @@ func exportReadiness(ctx context.Context, targetPath string, opts Options, resul
 			validation := ValidateFabricationArtifacts(ctx, plotRequest)
 			result.Summary.Gerber = validation.Gerber
 			result.Summary.Drill = validation.Drill
+			if validation.Gerber == EvidencePass {
+				result.Issues = removeExactIssuePath(result.Issues, "gerber")
+			}
+			if validation.Drill == EvidencePass {
+				result.Issues = removeExactIssuePath(result.Issues, "drill")
+			}
 			result.Issues = append(result.Issues, validation.Issues...)
 			result.Issues = dedupeIssues(result.Issues)
 			result.Artifacts = applyArtifactValidation(result.Artifacts, validation, filepath.ToSlash(gerberRel), filepath.ToSlash(drillRel))
-		}
-	}
-	for _, write := range append(slices.Clone(metadataWrites), dataWrites...) {
-		relPath, err := exportRelPath(target.Root, outputDir, write.Rel)
-		if err != nil {
-			result.Issues = append(result.Issues, reports.Issue{Code: reports.CodeValidationFailed, Severity: reports.SeverityError, Path: write.Rel, Message: err.Error()})
-			continue
-		}
-		result.Artifacts = markArtifact(result.Artifacts, write.Kind, filepath.ToSlash(relPath), ArtifactExpected)
-	}
-	for _, write := range dataWrites {
-		if !opts.Execute {
-			continue
-		}
-		if !writeArtifact(ctx, &result, target.Root, outputDir, write, opts.Overwrite) {
-			break
 		}
 	}
 	result = finalizeExportResult(result)
@@ -195,6 +232,139 @@ func exportReadiness(ctx context.Context, targetPath string, opts Options, resul
 		result.ManifestPath = filepath.ToSlash(filepath.Join(outputDir, "package-manifest.json"))
 	}
 	return finalizeExportResult(result)
+}
+
+func artifactGenerated(artifacts []Artifact, kind ArtifactKind) bool {
+	for _, artifact := range artifacts {
+		if artifact.Kind == kind {
+			return artifact.Status == ArtifactGenerated
+		}
+	}
+	return false
+}
+
+func removeExactIssuePath(issues []reports.Issue, path string) []reports.Issue {
+	out := issues[:0]
+	for _, issue := range issues {
+		if issue.Path != path {
+			out = append(out, issue)
+		}
+	}
+	return out
+}
+
+func appendFabricationCheckEvidence(ctx context.Context, targetRoot string, opts Options, result *Result, writes []exportWrite) []exportWrite {
+	if !opts.Execute || strings.TrimSpace(opts.KiCadCLI) == "" || cliPolicy(opts.CLIPolicy) == CLIPolicyDisabled {
+		return writes
+	}
+	artifactRoot, err := os.MkdirTemp("", "kicadai-fabrication-checks-")
+	if err != nil {
+		result.Issues = append(result.Issues, reports.Issue{Code: reports.CodeValidationFailed, Severity: reports.SeverityError, Path: "fabrication/checks", Message: err.Error()})
+		return writes
+	}
+	defer os.RemoveAll(artifactRoot)
+	checkOptions := checks.Options{KeepArtifacts: true, ArtifactDir: artifactRoot}
+	cli := checks.KiCadCLI{Path: opts.KiCadCLI}
+	for _, item := range []struct {
+		kind         checks.CheckKind
+		artifactKind ArtifactKind
+		rel          string
+		run          func() (checks.CheckResult, error)
+		setSummary   func(EvidenceStatus)
+	}{
+		{kind: checks.CheckKindERC, artifactKind: ArtifactERC, rel: "erc.json", run: func() (checks.CheckResult, error) {
+			if opts.CheckRunner != nil {
+				return checks.RunERCWithRunner(ctx, opts.CheckRunner, cli, targetRoot, checkOptions)
+			}
+			return checks.RunERC(ctx, cli, targetRoot, checkOptions)
+		}, setSummary: func(status EvidenceStatus) { result.Summary.ERC = status }},
+		{kind: checks.CheckKindDRC, artifactKind: ArtifactDRC, rel: "drc.json", run: func() (checks.CheckResult, error) {
+			if opts.CheckRunner != nil {
+				return checks.RunDRCWithRunner(ctx, opts.CheckRunner, cli, targetRoot, checkOptions)
+			}
+			return checks.RunDRC(ctx, cli, targetRoot, checkOptions)
+		}, setSummary: func(status EvidenceStatus) { result.Summary.DRC = status }},
+	} {
+		check, runErr := item.run()
+		path := string(item.kind)
+		result.Issues = removeExactIssuePath(result.Issues, path)
+		switch check.Status {
+		case checks.CheckStatusPass:
+			item.setSummary(EvidencePass)
+		case checks.CheckStatusFail:
+			item.setSummary(EvidenceFail)
+			result.Issues = append(result.Issues, reports.Issue{Code: reports.CodeValidationFailed, Severity: reports.SeverityError, Path: path, Message: path + " report contains rule violations"})
+		case checks.CheckStatusSkipped:
+			item.setSummary(EvidenceSkipped)
+			result.Issues = append(result.Issues, reports.Issue{Code: reports.CodeSkippedExternalTool, Severity: reports.SeverityWarning, Path: path, Message: path + " check was skipped"})
+		default:
+			item.setSummary(EvidenceFail)
+			message := path + " check failed"
+			if runErr != nil {
+				message += ": " + runErr.Error()
+			}
+			result.Issues = append(result.Issues, reports.Issue{Code: reports.CodeValidationFailed, Severity: reports.SeverityError, Path: path, Message: message})
+		}
+		if check.ReportPath == "" {
+			continue
+		}
+		data, readErr := os.ReadFile(filepath.FromSlash(check.ReportPath))
+		if readErr != nil {
+			result.Issues = append(result.Issues, reports.Issue{Code: reports.CodeValidationFailed, Severity: reports.SeverityError, Path: item.rel, Message: readErr.Error()})
+			continue
+		}
+		writes = append(writes, exportWrite{Rel: item.rel, Kind: item.artifactKind, Data: data})
+	}
+	return writes
+}
+
+type blockReadinessReport struct {
+	Status             string `json:"status"`
+	AchievedReadiness  string `json:"achieved_readiness"`
+	MatchesExpectation bool   `json:"matches_expectation"`
+	Gates              []struct {
+		Status string `json:"status"`
+	} `json:"gates"`
+}
+
+func appendBlockReadinessEvidence(targetRoot string, result *Result, writes []exportWrite, provided []byte) []exportWrite {
+	data := slices.Clone(provided)
+	var err error
+	if len(data) == 0 {
+		path := filepath.Join(targetRoot, ".kicadai", "design-promotion.json")
+		data, err = os.ReadFile(path)
+		if os.IsNotExist(err) {
+			return writes
+		}
+	}
+	result.Issues = removeExactIssuePath(result.Issues, "block_readiness")
+	if err != nil {
+		result.Summary.BlockReadiness = EvidenceFail
+		result.Issues = append(result.Issues, reports.Issue{Code: reports.CodeValidationFailed, Severity: reports.SeverityError, Path: "block_readiness", Message: err.Error()})
+		return writes
+	}
+	var report blockReadinessReport
+	if err := json.Unmarshal(data, &report); err != nil {
+		result.Summary.BlockReadiness = EvidenceFail
+		result.Issues = append(result.Issues, reports.Issue{Code: reports.CodeValidationFailed, Severity: reports.SeverityError, Path: "block_readiness", Message: "invalid design promotion report: " + err.Error()})
+		return writes
+	}
+	status := EvidencePass
+	if report.Status != "pass" || report.AchievedReadiness != "pass" || !report.MatchesExpectation || len(report.Gates) == 0 {
+		status = EvidenceFail
+	} else {
+		for _, gate := range report.Gates {
+			if gate.Status != "pass" {
+				status = EvidenceFail
+				break
+			}
+		}
+	}
+	result.Summary.BlockReadiness = status
+	if status == EvidenceFail {
+		result.Issues = append(result.Issues, reports.Issue{Code: reports.CodeValidationFailed, Severity: reports.SeverityError, Path: "block_readiness", Message: "design promotion report does not prove pass readiness"})
+	}
+	return append(writes, exportWrite{Rel: "block-readiness.json", Kind: ArtifactBlockReadiness, Data: data})
 }
 
 type exportWrite struct {

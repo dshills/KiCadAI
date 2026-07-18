@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -48,6 +49,7 @@ func PlaceContext(ctx context.Context, request Request) Result {
 
 	occupancy := newOccupancy(request)
 	components := slicesForPlacementWithOrder(request.Components, request.ComponentOrder)
+	components = orderComponentsForRequiredProximity(components, request.ProximityRules)
 	padsByRef := componentPadMaps(components)
 	rotatedPadsByRef := componentRotatedPadMaps(components, padsByRef)
 	netsByRef := netsByComponent(request.Nets)
@@ -94,6 +96,10 @@ func PlaceContext(ctx context.Context, request Request) Result {
 		occupancy.Add(placement)
 		placedByRef[normalizeRef(placement.Ref)] = placement
 		result.Placements = append(result.Placements, placement)
+		// A keepout owned by a placement group follows that group's anchor.
+		// Refresh the occupancy view as soon as an anchor is placed so later
+		// candidates are checked against the keepout's actual coordinate frame.
+		occupancy.keepouts = TranslatedKeepoutsForPlacements(request, result.Placements)
 	}
 	rigidIssues := preserveRelativeGroupPlacements(request, result.Placements)
 	result.Issues = append(result.Issues, rigidIssues...)
@@ -121,6 +127,11 @@ func PlaceContext(ctx context.Context, request Request) Result {
 	groupIssues := ValidateGroups(request, successfulPlacements)
 	result.Issues = append(result.Issues, groupIssues...)
 	if len(groupIssues) > 0 && result.Status == StatusPlaced {
+		result.Status = StatusPartial
+	}
+	proximityIssues := ValidateRequiredProximity(request, successfulPlacements)
+	result.Issues = append(result.Issues, proximityIssues...)
+	if len(proximityIssues) > 0 && result.Status == StatusPlaced {
 		result.Status = StatusPartial
 	}
 	operations, operationIssues := PlacementOperations(request, successfulPlacements)
@@ -185,6 +196,150 @@ func slicesForPlacementWithOrder(components []Component, componentOrder string) 
 		return ordered[i].Ref < ordered[j].Ref
 	})
 	return ordered
+}
+
+func orderComponentsForRequiredProximity(components []Component, rules []ProximityRule) []Component {
+	if len(components) < 2 || len(rules) == 0 {
+		return components
+	}
+	byRef := make(map[string]Component, len(components))
+	baseIndex := make(map[string]int, len(components))
+	for index, component := range components {
+		ref := normalizeRef(component.Ref)
+		byRef[ref] = component
+		baseIndex[ref] = index
+	}
+	edges := make(map[string]map[string]struct{}, len(components))
+	for _, rule := range rules {
+		if !rule.Required || rule.MaxDistanceMM <= 0 {
+			continue
+		}
+		anchorRef := normalizeRef(rule.AnchorRef)
+		if _, exists := byRef[anchorRef]; !exists {
+			continue
+		}
+		for _, targetRefRaw := range rule.TargetRefs {
+			targetRef := normalizeRef(targetRefRaw)
+			if targetRef == anchorRef {
+				continue
+			}
+			if _, exists := byRef[targetRef]; !exists {
+				continue
+			}
+			if edges[anchorRef] == nil {
+				edges[anchorRef] = map[string]struct{}{}
+			}
+			if _, exists := edges[anchorRef][targetRef]; exists {
+				continue
+			}
+			edges[anchorRef][targetRef] = struct{}{}
+		}
+	}
+	componentsBySCC, sccByRef := requiredProximityStronglyConnectedComponents(components, edges, baseIndex)
+	sccEdges := make(map[int]map[int]struct{}, len(componentsBySCC))
+	indegree := make([]int, len(componentsBySCC))
+	for sourceRef, targets := range edges {
+		sourceSCC := sccByRef[sourceRef]
+		for targetRef := range targets {
+			targetSCC := sccByRef[targetRef]
+			if sourceSCC == targetSCC {
+				continue
+			}
+			if sccEdges[sourceSCC] == nil {
+				sccEdges[sourceSCC] = map[int]struct{}{}
+			}
+			if _, exists := sccEdges[sourceSCC][targetSCC]; exists {
+				continue
+			}
+			sccEdges[sourceSCC][targetSCC] = struct{}{}
+			indegree[targetSCC]++
+		}
+	}
+	remaining := make(map[int]struct{}, len(componentsBySCC))
+	for scc := range componentsBySCC {
+		remaining[scc] = struct{}{}
+	}
+	ordered := make([]Component, 0, len(components))
+	for len(remaining) > 0 {
+		selected := -1
+		for scc := range remaining {
+			if indegree[scc] != 0 {
+				continue
+			}
+			if selected < 0 || baseIndex[componentsBySCC[scc][0]] < baseIndex[componentsBySCC[selected][0]] {
+				selected = scc
+			}
+		}
+		if selected < 0 {
+			break
+		}
+		for _, ref := range componentsBySCC[selected] {
+			ordered = append(ordered, byRef[ref])
+		}
+		delete(remaining, selected)
+		for targetSCC := range sccEdges[selected] {
+			indegree[targetSCC]--
+		}
+	}
+	return ordered
+}
+
+func requiredProximityStronglyConnectedComponents(components []Component, edges map[string]map[string]struct{}, baseIndex map[string]int) ([][]string, map[string]int) {
+	index := 0
+	indexes := map[string]int{}
+	lowlinks := map[string]int{}
+	onStack := map[string]bool{}
+	stack := make([]string, 0, len(components))
+	var stronglyConnected func(string)
+	var sccs [][]string
+	stronglyConnected = func(ref string) {
+		indexes[ref] = index
+		lowlinks[ref] = index
+		index++
+		stack = append(stack, ref)
+		onStack[ref] = true
+		targets := make([]string, 0, len(edges[ref]))
+		for targetRef := range edges[ref] {
+			targets = append(targets, targetRef)
+		}
+		sort.Slice(targets, func(i, j int) bool { return baseIndex[targets[i]] < baseIndex[targets[j]] })
+		for _, targetRef := range targets {
+			if _, visited := indexes[targetRef]; !visited {
+				stronglyConnected(targetRef)
+				lowlinks[ref] = min(lowlinks[ref], lowlinks[targetRef])
+			} else if onStack[targetRef] {
+				lowlinks[ref] = min(lowlinks[ref], indexes[targetRef])
+			}
+		}
+		if lowlinks[ref] != indexes[ref] {
+			return
+		}
+		var members []string
+		for len(stack) > 0 {
+			last := stack[len(stack)-1]
+			stack = stack[:len(stack)-1]
+			onStack[last] = false
+			members = append(members, last)
+			if last == ref {
+				break
+			}
+		}
+		sort.Slice(members, func(i, j int) bool { return baseIndex[members[i]] < baseIndex[members[j]] })
+		sccs = append(sccs, members)
+	}
+	for _, component := range components {
+		ref := normalizeRef(component.Ref)
+		if _, visited := indexes[ref]; !visited {
+			stronglyConnected(ref)
+		}
+	}
+	sccByRef := make(map[string]int, len(components))
+	for scc, members := range sccs {
+		for _, ref := range members {
+			sccByRef[ref] = scc
+		}
+	}
+	return sccs, sccByRef
 }
 
 func placeComponent(component Component, request Request, occupancy *occupancy, placedByRef map[string]PlacementResult, padsByRef map[string]map[string]Point, rotatedPadsByRef map[string]map[int64]map[string]Point, netsByRef map[string][]*normalizedNet, advancedRequestContext advancedPlacementRequestContext, keepTogetherPeersByRef map[string][]string, scoring *CandidateScoringReport) (PlacementResult, bool, []reports.Issue) {
@@ -257,6 +412,11 @@ func candidatePlacements(component Component, componentRef string, request Reque
 	axisSamples := max(7, int(math.Ceil(math.Sqrt(float64(maxCandidates)/float64(variantsPerPoint)))))
 	xIndices := edgeAwareSampledIndices(component, rotations, component.Edge, true, usable.Min.XMM, usable.Max.XMM, edgeInset, edgeSpan, grid, xCount, axisSamples)
 	yIndices := edgeAwareSampledIndices(component, rotations, component.Edge, false, usable.Min.YMM, usable.Max.YMM, edgeInset, edgeSpan, grid, yCount, axisSamples)
+	xIndices, yIndices = appendRequiredProximityCandidateSamples(component, componentRef, request, placedByRef, usable, grid, xCount, yCount, xIndices, yIndices)
+	if component.Position != nil && mobilityPrefersAuthoredPosition(component.Mobility.Class) {
+		xIndices = appendCandidateSampleIndex(xIndices, component.Position.XMM, usable.Min.XMM, grid, xCount)
+		yIndices = appendCandidateSampleIndex(yIndices, component.Position.YMM, usable.Min.YMM, grid, yCount)
+	}
 	candidateIndex := 0
 	for _, yIndex := range yIndices {
 		y := usable.Min.YMM + float64(yIndex)*grid
@@ -283,6 +443,21 @@ func candidatePlacements(component Component, componentRef string, request Reque
 					}
 					if !component.Fixed && component.Edge != EdgeNone && !edgeConstraintSatisfied(request.Board, component, candidateResult.Position, component.Edge, edgeTolerance) {
 						recordCandidateRejection(scoring, component, componentRef, candidateResult.Position, index, CandidateRejectEdge, "candidate does not satisfy edge constraint")
+						continue
+					}
+					if groupID, peerRef, rejected := candidateGroupSpreadConflict(componentRef, candidateResult, request, placedByRef); rejected {
+						message := fmt.Sprintf("candidate exceeds maximum spread for group %s from %s", groupID, peerRef)
+						recordCandidateRejection(scoring, component, componentRef, candidateResult.Position, index, CandidateRejectGroupConstraint, message, peerRef)
+						continue
+					}
+					if ruleID, peerRef, rejected := candidateRequiredProximityConflict(componentRef, candidateResult, request, placedByRef); rejected {
+						message := fmt.Sprintf("candidate exceeds required proximity %s from %s", ruleID, peerRef)
+						recordCandidateRejection(scoring, component, componentRef, candidateResult.Position, index, CandidateRejectProximity, message, ruleID, peerRef)
+						continue
+					}
+					if keepoutID, placedRef, rejected := candidateTranslatedKeepoutConflict(component, candidateResult, request, placedByRef); rejected {
+						message := fmt.Sprintf("candidate moves keepout %s onto component %s", keepoutID, placedRef)
+						recordCandidateRejection(scoring, component, componentRef, candidateResult.Position, index, CandidateRejectKeepout, message, keepoutID, placedRef)
 						continue
 					}
 					if reason, message, refs, rejected := advancedPlacementHardRejection(component, candidateResult, advancedContext); rejected {
@@ -341,6 +516,167 @@ func candidatePlacements(component Component, componentRef string, request Reque
 		candidates = candidates[:maxCandidates]
 	}
 	return candidates
+}
+
+func appendRequiredProximityCandidateSamples(component Component, componentRef string, request Request, placedByRef map[string]PlacementResult, usable Rect, grid float64, xCount int, yCount int, xIndices []int, yIndices []int) ([]int, []int) {
+	if len(placedByRef) == 0 {
+		return xIndices, yIndices
+	}
+	componentRef = normalizeRef(componentRef)
+	spacing := request.Rules.ComponentSpacingMM
+	if spacing <= 0 {
+		spacing = DefaultRules().ComponentSpacingMM
+	}
+	appendPeer := func(peer PlacementResult, maximumDistance float64) {
+		peerWidth := peer.Bounds.Max.XMM - peer.Bounds.Min.XMM
+		peerHeight := peer.Bounds.Max.YMM - peer.Bounds.Min.YMM
+		xOffset := max(grid, component.Bounds.WidthMM/2+peerWidth/2+spacing)
+		yOffset := max(grid, component.Bounds.HeightMM/2+peerHeight/2+spacing)
+		if maximumDistance > 0 {
+			xOffset = min(xOffset, maximumDistance)
+			yOffset = min(yOffset, maximumDistance)
+		}
+		for _, x := range []float64{peer.Position.XMM, peer.Position.XMM - xOffset, peer.Position.XMM + xOffset} {
+			xIndices = appendCandidateSampleIndex(xIndices, x, usable.Min.XMM, grid, xCount)
+		}
+		for _, y := range []float64{peer.Position.YMM, peer.Position.YMM - yOffset, peer.Position.YMM + yOffset} {
+			yIndices = appendCandidateSampleIndex(yIndices, y, usable.Min.YMM, grid, yCount)
+		}
+	}
+	for _, rule := range request.ProximityRules {
+		if !rule.Required || rule.MaxDistanceMM <= 0 {
+			continue
+		}
+		anchorRef := normalizeRef(rule.AnchorRef)
+		if componentRef == anchorRef {
+			for _, targetRef := range rule.TargetRefs {
+				if peer, ok := placedByRef[normalizeRef(targetRef)]; ok {
+					appendPeer(peer, rule.MaxDistanceMM)
+				}
+			}
+			continue
+		}
+		if normalizedRefsContain(rule.TargetRefs, componentRef) {
+			if peer, ok := placedByRef[anchorRef]; ok {
+				appendPeer(peer, rule.MaxDistanceMM)
+			}
+		}
+	}
+	return xIndices, yIndices
+}
+
+func candidateGroupSpreadConflict(componentRef string, candidate PlacementResult, request Request, placedByRef map[string]PlacementResult) (string, string, bool) {
+	if len(placedByRef) == 0 {
+		return "", "", false
+	}
+	toleranceMM := request.Rules.GridMM
+	if toleranceMM <= 0 {
+		toleranceMM = DefaultRules().GridMM
+	}
+	candidateCenter := candidate.Bounds.Center()
+	for _, group := range request.Groups {
+		if group.MaxSpreadMM <= 0 || !groupContainsRef(group, componentRef) {
+			continue
+		}
+		maximumDistance := group.MaxSpreadMM + toleranceMM
+		for _, peer := range group.Components {
+			peerRef := normalizeRef(peer)
+			if peerRef == componentRef {
+				continue
+			}
+			placed, ok := placedByRef[peerRef]
+			if !ok {
+				continue
+			}
+			peerCenter := placed.Bounds.Center()
+			if math.Hypot(candidateCenter.XMM-peerCenter.XMM, candidateCenter.YMM-peerCenter.YMM) > maximumDistance {
+				return group.ID, placed.Ref, true
+			}
+		}
+	}
+	return "", "", false
+}
+
+func candidateRequiredProximityConflict(componentRef string, candidate PlacementResult, request Request, placedByRef map[string]PlacementResult) (string, string, bool) {
+	if len(placedByRef) == 0 {
+		return "", "", false
+	}
+	componentRef = normalizeRef(componentRef)
+	componentsByRef := componentsByNormalizedRef(request.Components)
+	toleranceMM := request.Rules.GridMM
+	if toleranceMM <= 0 {
+		toleranceMM = DefaultRules().GridMM
+	}
+	for _, rule := range request.ProximityRules {
+		if !rule.Required || rule.MaxDistanceMM <= 0 {
+			continue
+		}
+		maximumDistance := rule.MaxDistanceMM + toleranceMM
+		anchorRef := normalizeRef(rule.AnchorRef)
+		if componentRef == anchorRef {
+			for _, targetRefRaw := range rule.TargetRefs {
+				targetRef := normalizeRef(targetRefRaw)
+				target, ok := placedByRef[targetRef]
+				if !ok {
+					continue
+				}
+				distance, _ := proximityDistance(componentsByRef[anchorRef], candidate, rule.AnchorPins, componentsByRef[targetRef], target, rule.TargetPins)
+				if distance > maximumDistance {
+					return rule.ID, target.Ref, true
+				}
+			}
+			continue
+		}
+		if !normalizedRefsContain(rule.TargetRefs, componentRef) {
+			continue
+		}
+		anchor, ok := placedByRef[anchorRef]
+		if !ok {
+			continue
+		}
+		distance, _ := proximityDistance(componentsByRef[anchorRef], anchor, rule.AnchorPins, componentsByRef[componentRef], candidate, rule.TargetPins)
+		if distance > maximumDistance {
+			return rule.ID, anchor.Ref, true
+		}
+	}
+	return "", "", false
+}
+
+func candidateTranslatedKeepoutConflict(component Component, candidate PlacementResult, request Request, placedByRef map[string]PlacementResult) (string, string, bool) {
+	if component.Position == nil || len(placedByRef) == 0 {
+		return "", "", false
+	}
+	componentRef := normalizeRef(component.Ref)
+	for _, group := range request.Groups {
+		if normalizeRef(group.Anchor.Ref) != componentRef {
+			continue
+		}
+		translated := translatedKeepoutsForGroup(request.Keepouts, group.ID, *component.Position, candidate.Position)
+		for index, keepout := range translated {
+			if !strings.EqualFold(strings.TrimSpace(keepout.GroupID), strings.TrimSpace(group.ID)) || keepout.Optional {
+				continue
+			}
+			for _, placed := range placedByRef {
+				if keepoutExemptsRef(keepout, placed.Ref) || !keepoutAppliesToLayer(keepout, placed.Position.Layer) {
+					continue
+				}
+				if keepout.Bounds.Intersects(placed.Bounds) {
+					return request.Keepouts[index].ID, placed.Ref, true
+				}
+			}
+		}
+	}
+	return "", "", false
+}
+
+func groupContainsRef(group Group, ref string) bool {
+	ref = normalizeRef(ref)
+	for _, member := range group.Components {
+		if normalizeRef(member) == ref {
+			return true
+		}
+	}
+	return false
 }
 
 type placementCandidate struct {
@@ -438,6 +774,28 @@ func sampledIndices(count int, target int) []int {
 	return indices
 }
 
+func appendCandidateSampleIndex(indices []int, position float64, usableMin float64, grid float64, count int) []int {
+	if grid <= 0 || count <= 0 {
+		return indices
+	}
+	index := int(math.Round((position - usableMin) / grid))
+	if index < 0 || index >= count || slices.Contains(indices, index) {
+		return indices
+	}
+	indices = append(indices, index)
+	sort.Ints(indices)
+	return indices
+}
+
+func mobilityPrefersAuthoredPosition(class MobilityClass) bool {
+	switch class {
+	case MobilityGroupTransform, MobilityLocalRebuild, MobilitySoftPreferred:
+		return true
+	default:
+		return false
+	}
+}
+
 func edgeAwareSampledIndices(component Component, rotations []float64, edge EdgeConstraint, horizontal bool, usableMin, usableMax, edgeInset, edgeSpan, grid float64, count, target int) []int {
 	if edge == EdgeNone {
 		return sampledIndices(count, target)
@@ -528,6 +886,9 @@ func placementScore(component Component, placement Placement, request Request, a
 	}
 	if hasGroupTarget {
 		score += boardDistance(placement.XMM-groupTarget.XMM, placement.YMM-groupTarget.YMM) * groupKeepTogetherScoreWeight
+	}
+	if component.Position != nil && mobilityPrefersAuthoredPosition(component.Mobility.Class) {
+		score += boardDistance(placement.XMM-component.Position.XMM, placement.YMM-component.Position.YMM)
 	}
 	score += netDistanceScore(placement, netTargets, rotatedPadsByRotation[rotationKey(placement.RotationDeg)]) * netConnectivityScoreWeight
 	score += seedTieBreak(seedBase, placement) * seedTieBreakScoreWeight

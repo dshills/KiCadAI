@@ -102,6 +102,13 @@ func readFootprint(node sexpr.ParsedNode) Footprint {
 	if path, ok := node.Child("path"); ok {
 		fp.Path = path.ListValue(1)
 	}
+	if attributes, ok := node.Child("attr"); ok {
+		for _, attribute := range attributes.Children[1:] {
+			if value := strings.TrimSpace(attribute.Value()); value != "" {
+				fp.Attributes = append(fp.Attributes, value)
+			}
+		}
+	}
 	for _, property := range node.ChildrenByHead("property") {
 		name := property.ListValue(1)
 		value := property.ListValue(2)
@@ -120,6 +127,12 @@ func readFootprint(node sexpr.ParsedNode) Footprint {
 		parsed := readPad(pad)
 		parsed.Rotation = normalizedFootprintAngle(parsed.Rotation - fp.Rotation)
 		fp.Pads = append(fp.Pads, parsed)
+	}
+	for _, child := range node.Children {
+		switch child.Head() {
+		case "fp_line", "fp_rect", "fp_circle", "fp_arc", "fp_poly":
+			fp.Graphics = append(fp.Graphics, FootprintGraphic(readDrawing(child)))
+		}
 	}
 	return fp
 }
@@ -213,7 +226,9 @@ func readVia(node sexpr.ParsedNode) Via {
 }
 
 func readDrawing(node sexpr.ParsedNode) Drawing {
-	drawing := Drawing{UUID: readPCBUUID(node), Kind: strings.TrimPrefix(node.Head(), "gr_")}
+	kind := strings.TrimPrefix(node.Head(), "gr_")
+	kind = strings.TrimPrefix(kind, "fp_")
+	drawing := Drawing{UUID: readPCBUUID(node), Kind: kind}
 	if layer, ok := node.Child("layer"); ok {
 		drawing.Layer = kicadfiles.BoardLayer(layer.ListValue(1))
 	}

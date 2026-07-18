@@ -37,7 +37,7 @@ func TestFullBoardRetryGeneratedMultiBlockBoundaryEvidence(t *testing.T) {
 	if !ok {
 		t.Fatalf("mobility summary missing: %#v", placementStage.Summary)
 	}
-	if mobility.Total == 0 || mobility.FixedCount+mobility.GroupTransformCount != mobility.Total {
+	if mobility.Total == 0 || mobility.EligibleCount+mobility.FixedCount != mobility.Total || mobility.UnownedCount != 0 {
 		t.Fatalf("expected generated multiblock boundary mobility evidence: %#v", mobility)
 	}
 	localRoutes, ok := fullBoardRetryLocalRouteMobilitySummary(routingStage)

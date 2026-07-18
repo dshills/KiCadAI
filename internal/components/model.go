@@ -104,6 +104,7 @@ type ComponentRecord struct {
 	DeratingRules      []DeratingRule              `json:"derating_rules,omitempty"`
 	Regulator          *RegulatorEvidence          `json:"regulator_evidence,omitempty"`
 	Capacitor          *CapacitorEvidence          `json:"capacitor_evidence,omitempty"`
+	Resistor           *ResistorEvidence           `json:"resistor_evidence,omitempty"`
 	OpAmp              *OpAmpEvidence              `json:"opamp_evidence,omitempty"`
 	Sensor             *SensorEvidence             `json:"sensor_evidence,omitempty"`
 	AmplifierOutput    *AmplifierOutputEvidence    `json:"amplifier_output_evidence,omitempty"`
@@ -316,6 +317,22 @@ type CapacitorEvidence struct {
 	RippleCurrent              *EvidenceMeasurement `json:"ripple_current,omitempty"`
 	EnduranceHours             *float64             `json:"endurance_hours,omitempty"`
 	EnduranceTemperatureC      *float64             `json:"endurance_temperature_c,omitempty"`
+	FabricationProof           bool                 `json:"fabrication_proof,omitempty"`
+	FabricationCandidateBlocks bool                 `json:"fabrication_candidate_blocks,omitempty"`
+	ReviewNote                 string               `json:"review_note,omitempty"`
+}
+
+// ResistorEvidence carries the applied power and temperature points needed to
+// evaluate a resistor's datasheet derating curve. The typed points prevent a
+// free-form thermal note from being mistaken for fabrication proof.
+type ResistorEvidence struct {
+	Technology                 string               `json:"technology,omitempty"`
+	NominalResistance          *EvidenceMeasurement `json:"nominal_resistance,omitempty"`
+	ResistanceTolerancePct     *float64             `json:"resistance_tolerance_percent,omitempty"`
+	RatedPower                 *EvidenceMeasurement `json:"rated_power,omitempty"`
+	DeratedPower               *EvidenceMeasurement `json:"derated_power,omitempty"`
+	MaximumElementTemperatureC *float64             `json:"maximum_element_temperature_c,omitempty"`
+	PulseStatus                string               `json:"pulse_status,omitempty"`
 	FabricationProof           bool                 `json:"fabrication_proof,omitempty"`
 	FabricationCandidateBlocks bool                 `json:"fabrication_candidate_blocks,omitempty"`
 	ReviewNote                 string               `json:"review_note,omitempty"`
@@ -1110,7 +1127,7 @@ func isElectricalUnitSuffix(suffix string) bool {
 		"h", "henry", "henries", "hz",
 		"v", "volt", "volts",
 		"w", "watt", "watts",
-		"o", "ohm", "ohms", "r", "s", "siemens", "Ω":
+		"o", "ohm", "ohms", "r", "s", "siemens", "ω":
 		return true
 	default:
 		return false

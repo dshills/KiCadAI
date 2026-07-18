@@ -456,6 +456,35 @@ func TestBuildPromotionReportStructuralSkippedKiCadAllowsCandidate(t *testing.T)
 	}
 }
 
+func TestBuildPromotionReportRouteCompletionIgnoresAdvisoryComponentHints(t *testing.T) {
+	fixture := PromotionFixture{
+		ID:                "advisory_route_hints",
+		Request:           "advisory_route_hints.json",
+		DeclaredReadiness: PromotionReadinessPass,
+		Acceptance:        AcceptanceERCDRC,
+		ExpectedStages:    []StageName{StageRouting},
+	}
+	result := BuildWorkflowResult(ProjectSummary{Name: fixture.ID}, AcceptanceERCDRC, []StageResult{{
+		Name:   StageRouting,
+		Status: StageStatusWarning,
+		Summary: map[string]any{"route_connectivity": LocalRouteConnectivitySummary{
+			RoutesAttempted:        2,
+			EndpointContactsProven: 2,
+		}},
+		Issues: []reports.Issue{{
+			Code:     reports.CodeValidationFailed,
+			Severity: reports.SeverityWarning,
+			Path:     "component_hints.output.routing.width",
+			Message:  "optional route hint was not consumed",
+		}},
+	}})
+	report := BuildInternalPromotionReport(fixture, result)
+	gate := promotionGateByID(t, report, "route_completion")
+	if gate.Status != PromotionGateStatusPass {
+		t.Fatalf("route completion gate status = %q, want pass: %#v", gate.Status, gate)
+	}
+}
+
 func TestBuildPromotionReportOptionalKiCadChecksSkippedAllowsCandidate(t *testing.T) {
 	fixture := PromotionFixture{
 		ID:                "optional_kicad_erc_drc",

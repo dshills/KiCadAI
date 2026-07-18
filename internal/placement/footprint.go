@@ -46,6 +46,7 @@ func BoundsFromFootprint(record libraryresolver.FootprintRecord) (Bounds, []PadS
 			WidthMM:     iuToMM(pad.Size.X),
 			HeightMM:    iuToMM(pad.Size.Y),
 			Type:        strings.TrimSpace(pad.Type),
+			Shape:       strings.TrimSpace(pad.Shape),
 			DrillMM:     iuToMM(pad.Drill),
 			Layers:      footprintPadLayers(pad.Layers),
 		})

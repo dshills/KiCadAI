@@ -239,6 +239,101 @@ func TestCheckedInCatalogAudioPowerSemiconductorEvidence(t *testing.T) {
 	}
 }
 
+func TestCheckedInCatalogSpeakerAmplifierComponentEvidence(t *testing.T) {
+	catalog, err := LoadCatalog(context.Background(), LoadOptions{CatalogDir: checkedInCatalogDir(t)})
+	if err != nil {
+		t.Fatalf("load checked-in catalog: %v", err)
+	}
+
+	opamp := requireCatalogRecord(t, catalog, "opamp.ti.opa134ua.soic8")
+	if opamp.OpAmp == nil || !opamp.OpAmp.FabricationProof {
+		t.Fatalf("OPA134 fabrication evidence = %#v", opamp.OpAmp)
+	}
+	for name, status := range map[string]string{
+		"output drive": opamp.OpAmp.OutputDriveStatus,
+		"load":         opamp.OpAmp.LoadCompatibilityStatus,
+		"bandwidth":    opamp.OpAmp.GainBandwidthStatus,
+		"stability":    opamp.OpAmp.StabilityStatus,
+		"common mode":  opamp.OpAmp.InputCommonModeStatus,
+		"swing":        opamp.OpAmp.OutputSwingStatus,
+		"noise":        opamp.OpAmp.NoiseStatus,
+		"distortion":   opamp.OpAmp.DistortionStatus,
+	} {
+		if status != "proven" {
+			t.Fatalf("OPA134 %s status = %q", name, status)
+		}
+	}
+	requireSymbolFunctions(t, opamp, "Amplifier_Operational:OPA134", []string{"IN_MINUS", "IN_PLUS", "OUT", "V_MINUS", "V_PLUS"})
+	requirePackagePads(t, opamp, "soic8", []string{"IN_MINUS", "IN_PLUS", "OUT", "V_MINUS", "V_PLUS"})
+
+	for _, test := range []struct {
+		id       string
+		polarity string
+		symbol   string
+	}{
+		{id: "bjt.onsemi.mje243g.to225", polarity: "npn", symbol: "Transistor_BJT:Q_NPN_ECB"},
+		{id: "bjt.onsemi.mje253g.to225", polarity: "pnp", symbol: "Transistor_BJT:Q_PNP_ECB"},
+	} {
+		record := requireCatalogRecord(t, catalog, test.id)
+		evidence := record.PowerSemiconductor
+		if evidence == nil || !evidence.FabricationProof || evidence.Polarity != test.polarity || evidence.ComplementaryGroup != "onsemi_mje243_mje253" || len(evidence.SOA) < 2 || evidence.BJT == nil {
+			t.Fatalf("%s driver evidence = %#v", test.id, evidence)
+		}
+		requireSymbolFunctions(t, record, test.symbol, []string{"BASE", "COLLECTOR", "EMITTER"})
+		requirePackagePads(t, record, "to225", []string{"BASE", "COLLECTOR", "EMITTER"})
+	}
+
+	for _, test := range []struct {
+		id    string
+		value string
+	}{
+		{id: "resistor.vishay.ac03.0r22.axial", value: "0.22"},
+		{id: "resistor.vishay.ac03.10r.axial", value: "10"},
+	} {
+		record := requireCatalogRecord(t, catalog, test.id)
+		if record.Generic || record.MPN == "" || record.Verification.Confidence != ConfidenceVerified {
+			t.Fatalf("%s fabrication identity = %#v", test.id, record)
+		}
+		if record.Resistor == nil || !record.Resistor.FabricationProof || record.Resistor.RatedPower == nil || record.Resistor.DeratedPower == nil {
+			t.Fatalf("%s resistor derating evidence = %#v", test.id, record.Resistor)
+		}
+		requireValueTyp(t, record, "resistance", test.value, "ohm")
+		requireRatingMax(t, record, "power", "3", "W")
+		requirePackagePads(t, record, "axial_ac03", []string{"A", "B"})
+	}
+	baseStopper := requireCatalogRecord(t, catalog, "resistor.yageo.rc0805fr_0747rl.0805")
+	requireValueTyp(t, baseStopper, "resistance", "47", "ohm")
+	requirePackagePads(t, baseStopper, "0805", []string{"A", "B"})
+	filmBypass := requireCatalogRecord(t, catalog, "capacitor.wima.mks2c031001a00kssd.tht")
+	if filmBypass.Capacitor == nil || filmBypass.Capacitor.FabricationCandidateBlocks || filmBypass.Capacitor.DCBiasReview != "not_applicable" || filmBypass.Capacitor.EffectiveCapacitanceReview != "proven" || filmBypass.Capacitor.ESRReview != "proven" {
+		t.Fatalf("film bypass evidence = %#v", filmBypass.Capacitor)
+	}
+	requireValueTyp(t, filmBypass, "capacitance", "100n", "F")
+	requireRatingMax(t, filmBypass, "voltage", "63", "V")
+	requirePackagePads(t, filmBypass, "mks2_pcm5", []string{"A", "B"})
+	bulkCap := requireCatalogRecord(t, catalog, "capacitor.panasonic.eeufr1v221.radial")
+	if bulkCap.Capacitor == nil || !bulkCap.Capacitor.FabricationProof || bulkCap.Capacitor.ESR == nil || bulkCap.Capacitor.RippleCurrent == nil || bulkCap.Capacitor.EnduranceHours == nil {
+		t.Fatalf("low-ESR bulk evidence = %#v", bulkCap.Capacitor)
+	}
+	requireValueTyp(t, bulkCap, "capacitance", "220u", "F")
+	requireRatingMax(t, bulkCap, "voltage", "35", "V")
+	requirePackagePads(t, bulkCap, "radial_d8_p3_5", []string{"A", "B"})
+	comparator := requireCatalogRecord(t, catalog, "comparator.ti.tlv1701aidbvr.sot23_5")
+	if comparator.Generic || comparator.Lifecycle != "active" || comparator.Verification.Confidence != ConfidenceVerified {
+		t.Fatalf("speaker protection comparator evidence = %#v", comparator)
+	}
+	requireSymbolFunctions(t, comparator, "Comparator:TLV1701", []string{"IN_PLUS", "IN_MINUS", "OUT", "V_PLUS", "V_MINUS"})
+	requirePackagePads(t, comparator, "sot23_5", []string{"IN_PLUS", "IN_MINUS", "OUT", "V_PLUS", "V_MINUS"})
+
+	relay := requireCatalogRecord(t, catalog, "relay.omron.g5q_1a.dc12")
+	if relay.Family != "relay" || relay.Generic || relay.MPN == "" || relay.Verification.Confidence != ConfidenceVerified {
+		t.Fatalf("speaker relay evidence = %#v", relay)
+	}
+	requireRatingMax(t, relay, "contact_current_dc", "5", "A")
+	requireSymbolFunctions(t, relay, "Relay:G5Q-1A", []string{"COIL_A", "COIL_B", "CONTACT_IN", "CONTACT_OUT"})
+	requirePackagePads(t, relay, "g5q_1a", []string{"COIL_A", "COIL_B", "CONTACT_IN", "CONTACT_OUT"})
+}
+
 func TestCheckedInCatalogRegulatorSliceEvidence(t *testing.T) {
 	catalog, err := LoadCatalog(context.Background(), LoadOptions{CatalogDir: checkedInCatalogDir(t)})
 	if err != nil {

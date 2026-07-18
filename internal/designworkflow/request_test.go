@@ -4,7 +4,9 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"unicode/utf8"
 
+	"kicadai/internal/components"
 	"kicadai/internal/reports"
 	"kicadai/internal/transactions"
 )
@@ -44,11 +46,74 @@ func TestValidateRequestDoesNotMutateInput(t *testing.T) {
 	}
 }
 
+func TestNormalizeRequestTrimsFabricationMetadata(t *testing.T) {
+	request := validRequest()
+	request.Fabrication = FabricationMetadataSpec{
+		BoardFinish:      " ENIG ",
+		FabricationNotes: " Lead-free assembly. ",
+	}
+	normalized := NormalizeRequest(request)
+	if normalized.Fabrication.BoardFinish != "ENIG" || normalized.Fabrication.FabricationNotes != "Lead-free assembly." {
+		t.Fatalf("fabrication metadata = %#v", normalized.Fabrication)
+	}
+}
+
+func TestNormalizeRequestBoundsFabricationMetadataAtUTF8Boundary(t *testing.T) {
+	request := validRequest()
+	request.Fabrication.BoardFinish = strings.Repeat("é", 100)
+	request.Fabrication.FabricationNotes = strings.Repeat("é", 3000)
+	normalized := NormalizeRequest(request)
+	if len(normalized.Fabrication.BoardFinish) > 128 || len(normalized.Fabrication.FabricationNotes) > 4096 || !utf8.ValidString(normalized.Fabrication.BoardFinish) || !utf8.ValidString(normalized.Fabrication.FabricationNotes) {
+		t.Fatalf("normalized fabrication metadata has unsafe byte bounds: finish=%d notes=%d", len(normalized.Fabrication.BoardFinish), len(normalized.Fabrication.FabricationNotes))
+	}
+}
+
+func TestValidateRequestRejectsOversizedFabricationMetadata(t *testing.T) {
+	request := validRequest()
+	request.Fabrication.BoardFinish = strings.Repeat("x", 129)
+	request.Fabrication.FabricationNotes = strings.Repeat("x", 4097)
+	issues := ValidateRequest(request)
+	assertIssuePath(t, issues, "fabrication.board_finish")
+	assertIssuePath(t, issues, "fabrication.fabrication_notes")
+}
+
 func TestValidateRequestRejectsUnknownAcceptance(t *testing.T) {
 	request := validRequest()
 	request.Validation.Acceptance = "magic"
 	issues := ValidateRequest(request)
 	assertIssuePath(t, issues, "validation.acceptance")
+}
+
+func TestDecodeRequestStrictNormalizesWorkflowComponentAcceptance(t *testing.T) {
+	request, issues := DecodeRequestStrict(strings.NewReader(`{
+	  "version": "0.1.0",
+	  "name": "fabrication candidate",
+	  "board": {"width_mm": 10, "height_mm": 10},
+	  "component_policy": {
+	    "acceptance": "fabrication-candidate",
+	    "overrides": {
+	      "U1": {"acceptance": "erc-drc"}
+	    }
+	  },
+	  "blocks": [{"id": "led", "block_id": "led_indicator"}]
+	}`))
+	if len(issues) != 0 {
+		t.Fatalf("DecodeRequestStrict issues = %#v", issues)
+	}
+	normalized := NormalizeRequest(request)
+	if normalized.Components.Acceptance != components.AcceptanceFabricationCandidate {
+		t.Fatalf("component acceptance = %q", normalized.Components.Acceptance)
+	}
+	if got := normalized.Components.Overrides["U1"].Acceptance; got != components.AcceptanceERCDRC {
+		t.Fatalf("override acceptance = %q", got)
+	}
+}
+
+func TestValidateRequestRejectsUnknownComponentAcceptance(t *testing.T) {
+	request := validRequest()
+	request.Components.Acceptance = "magic"
+	issues := ValidateRequest(request)
+	assertIssuePath(t, issues, "component_policy.acceptance")
 }
 
 func TestValidateRequestRejectsUnsafeComponentSourceDir(t *testing.T) {

@@ -87,6 +87,39 @@ func TestReadPCBPreservesFootprintRotationForConnectivity(t *testing.T) {
 	}
 }
 
+func TestReadPCBParsesFootprintCourtyardGraphics(t *testing.T) {
+	input := strings.Join([]string{
+		`(kicad_pcb`,
+		`  (version 20260206)`,
+		`  (generator "pcbnew")`,
+		`  (generator_version "10.0.0")`,
+		`  (paper "A4")`,
+		`  (layers (0 "F.Cu" signal) (31 "F.CrtYd" user "F.Courtyard"))`,
+		`  (setup)`,
+		`  (footprint "Device:R"`,
+		`    (uuid "11111111-1111-5111-8111-111111111111")`,
+		`    (at 10 10)`,
+		`    (layer "F.Cu")`,
+		`    (property "Reference" "R1" (at 0 0 0) (layer "F.SilkS") (uuid "11111111-1111-5111-8111-111111111112"))`,
+		`    (fp_rect (start -1 -1) (end 1 1) (stroke (width 0.05) (type default)) (fill none) (layer "F.CrtYd") (uuid "11111111-1111-5111-8111-111111111113"))`,
+		`    (pad "1" smd rect (at 0 0) (size 1 1) (layers "F.Cu" "F.Mask") (uuid "11111111-1111-5111-8111-111111111114"))`,
+		`  )`,
+		`)`,
+	}, "\n")
+
+	read, err := Read([]byte(input))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(read.Footprints) != 1 || len(read.Footprints[0].Graphics) != 1 {
+		t.Fatalf("footprint graphics = %#v", read.Footprints)
+	}
+	drawing := Drawing(read.Footprints[0].Graphics[0])
+	if drawing.Kind != "rect" || drawing.Layer != "F.CrtYd" || drawing.Rect == nil {
+		t.Fatalf("courtyard graphic = %#v", drawing)
+	}
+}
+
 func TestReadPCBNameOnlyNetAvoidsUndeclaredNumericCollision(t *testing.T) {
 	input := strings.Join([]string{
 		`(kicad_pcb`,

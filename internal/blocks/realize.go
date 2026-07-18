@@ -156,6 +156,11 @@ func RealizeBlockPCB(definition BlockDefinition, output BlockOutput, opts PCBRea
 		result.Issues = append(result.Issues, issues...)
 		return result
 	}
+	netAliases, netAliasIssues := realizationEntryAnchorNetAliases(definition, output.Instance, opts.NetAliases)
+	result.Issues = append(result.Issues, netAliasIssues...)
+	if reports.HasBlockingIssue(netAliasIssues) {
+		return result
+	}
 	componentFacts, factIssues := componentFactsFromOperations(output.Operations)
 	result.Issues = append(result.Issues, factIssues...)
 	roleRefs := roleRefsFromOutput(definition, output, componentFacts)
@@ -248,7 +253,7 @@ func RealizeBlockPCB(definition BlockDefinition, output BlockOutput, opts PCBRea
 			Description: anchor.Description,
 		}
 		if strings.TrimSpace(anchor.NetTemplate) != "" {
-			realized.NetName = aliasedRealizationNetName(opts.NetAliases, InstanceNetName(output.Instance.InstanceID, anchor.NetTemplate))
+			realized.NetName = aliasedRealizationNetName(netAliases, InstanceNetName(output.Instance.InstanceID, anchor.NetTemplate))
 		}
 		result.EntryAnchors = append(result.EntryAnchors, realized)
 	}
@@ -287,7 +292,7 @@ func RealizeBlockPCB(definition BlockDefinition, output BlockOutput, opts PCBRea
 			result.Issues = append(result.Issues, toIssues...)
 			continue
 		}
-		netName := aliasedRealizationNetName(opts.NetAliases, InstanceNetName(output.Instance.InstanceID, route.NetTemplate))
+		netName := aliasedRealizationNetName(netAliases, InstanceNetName(output.Instance.InstanceID, route.NetTemplate))
 		realizedRoute := RealizedPCBLocalRoute{
 			ID:                    route.ID,
 			NetName:               netName,
@@ -1096,6 +1101,45 @@ func aliasedRealizationNetName(aliases map[string]string, netName string) string
 		return alias
 	}
 	return netName
+}
+
+func realizationEntryAnchorNetAliases(definition BlockDefinition, instance BlockInstance, aliases map[string]string) (map[string]string, []reports.Issue) {
+	resolved := make(map[string]string, len(aliases))
+	for local, canonical := range aliases {
+		resolved[local] = canonical
+	}
+	if definition.PCBRealization == nil {
+		return resolved, nil
+	}
+	var issues []reports.Issue
+	for _, anchor := range definition.PCBRealization.EntryAnchors {
+		if !realizationWhenMatches(anchor.When, instance.Params) {
+			continue
+		}
+		omitted := false
+		for _, condition := range anchor.OmitWhen {
+			if realizationWhenMatches(condition, instance.Params) {
+				omitted = true
+				break
+			}
+		}
+		if omitted || strings.TrimSpace(anchor.Port) == "" || strings.TrimSpace(anchor.NetTemplate) == "" {
+			continue
+		}
+		portNet := InstanceNetName(instance.InstanceID, anchor.Port)
+		canonical, connected := aliases[portNet]
+		canonical = strings.TrimSpace(canonical)
+		if !connected || canonical == "" {
+			continue
+		}
+		internalNet := InstanceNetName(instance.InstanceID, anchor.NetTemplate)
+		if existing := strings.TrimSpace(resolved[internalNet]); existing != "" && !strings.EqualFold(existing, canonical) {
+			issues = append(issues, blockIssue("pcb_realization.entry_anchors."+anchor.ID+".net_template", "entry anchor maps internal net "+internalNet+" to conflicting canonical nets "+existing+" and "+canonical))
+			continue
+		}
+		resolved[internalNet] = canonical
+	}
+	return resolved, issues
 }
 
 func routePointLength(points []transactions.Point) float64 {

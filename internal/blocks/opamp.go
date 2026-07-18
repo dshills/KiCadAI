@@ -138,6 +138,19 @@ func opAmpPins(roles opAmpPinRoleMap) []transactions.PinSpec {
 	}
 }
 
+func opAmpPinsWithAuxiliary(roles opAmpPinRoleMap, auxiliaryPins ...string) []transactions.PinSpec {
+	pins := opAmpPins(roles)
+	for index, number := range auxiliaryPins {
+		pins = append(pins, transactions.PinSpec{
+			Number:         number,
+			XMM:            float64(index) * 1.27,
+			YMM:            7.62,
+			ExplicitOffset: true,
+		})
+	}
+	return pins
+}
+
 func appendOpAmpBiasNetwork(instanceID string, allocator *ReferenceAllocator, footprint string, opampRef string, refs []string, nets []string, operations []transactions.Operation, issues *[]reports.Issue) ([]string, []string, []transactions.Operation) {
 	biasTopRef := allocator.Next("R")
 	biasBottomRef := allocator.Next("R")

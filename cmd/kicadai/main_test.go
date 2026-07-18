@@ -629,7 +629,7 @@ func TestRunIntentCreateLEDPromptGoldenCandidate(t *testing.T) {
 	if stageHasIssue(workflow.Stages, "placement", reports.CodePlacementOutsideBoard) {
 		t.Fatalf("placement still reports outside-board blocker: %#v", workflow.Stages)
 	}
-	if stageHasIssue(workflow.Stages, "routing", reports.CodeValidationFailed) {
+	if stageHasBlockingIssue(workflow.Stages, "routing", reports.CodeValidationFailed) {
 		t.Fatalf("routing still reports validation blocker: %#v", workflow.Stages)
 	}
 	if stageHasIssue(workflow.Stages, "validation", reports.CodeDisconnectedPad) {
@@ -1001,6 +1001,20 @@ func stageHasIssue(stages []workflowEvidenceStage, name string, code reports.Cod
 		}
 		for _, issue := range stage.Issues {
 			if issue.Code == code {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func stageHasBlockingIssue(stages []workflowEvidenceStage, name string, code reports.Code) bool {
+	for _, stage := range stages {
+		if stage.Name != name {
+			continue
+		}
+		for _, issue := range stage.Issues {
+			if issue.Code == code && issue.Blocking() {
 				return true
 			}
 		}

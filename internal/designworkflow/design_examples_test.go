@@ -20,6 +20,7 @@ import (
 
 	"kicadai/internal/blocks"
 	"kicadai/internal/componentprops"
+	"kicadai/internal/fabrication"
 	"kicadai/internal/kicadfiles"
 	"kicadai/internal/kicadfiles/checks"
 	"kicadai/internal/kicadfiles/pcb"
@@ -238,10 +239,28 @@ func TestDesignExamplesOptionalKiCadBackedTier(t *testing.T) {
 			outputDir := designExamplePersistentOutputDir(t, projectName)
 			ctx, cancel := context.WithTimeout(context.Background(), createTimeout*2)
 			defer cancel()
+			writerOptions := designExampleWriterOptionsForMetadata(metadata, cliPath, outputDir)
+			var fabricationOptions *fabrication.Options
+			if metadata.Acceptance == AcceptanceFabricationCandidate {
+				options := fabrication.Options{
+					Command:             "export fabrication",
+					Execute:             true,
+					Overwrite:           true,
+					KiCadCLI:            cliPath,
+					CLIPolicy:           fabrication.CLIPolicyRequired,
+					ManufacturerProfile: fabrication.GenericAssemblyProfileID,
+				}
+				if writerOptions.HasLibraryIndex {
+					options.LibraryIndex = writerOptions.LibraryIndex
+					options.HasLibraryIndex = true
+				}
+				fabricationOptions = &options
+			}
 			result := Create(ctx, request, CreateOptions{
-				OutputDir: outputDir,
-				Overwrite: true,
-				Writer:    designExampleWriterOptionsForMetadata(metadata, cliPath, outputDir),
+				OutputDir:   outputDir,
+				Overwrite:   true,
+				Writer:      writerOptions,
+				Fabrication: fabricationOptions,
 				KiCadChecks: KiCadCheckOptions{
 					KiCadCLI:      cliPath,
 					Timeout:       createTimeout,

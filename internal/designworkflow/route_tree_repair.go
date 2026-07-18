@@ -165,6 +165,9 @@ func isRouteTreeRepairIssue(issue reports.Issue) bool {
 	if strings.Contains(issue.Path, "design.inter_block_route_groups") {
 		return true
 	}
+	if strings.Contains(issue.Path, "design.local_route_rebuild") {
+		return true
+	}
 	switch issue.Code {
 	case reports.CodeRouteContactMiss,
 		reports.CodeRouteContactMissingTarget,

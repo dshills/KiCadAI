@@ -200,7 +200,7 @@ func weightedCandidateDimensionTotal(dimensions []CandidateScoreDimension) float
 
 func semanticCandidateDimensions(component Component, placement Placement, request Request, anchor Point, hasAnchor bool, groupTarget Point, hasGroupTarget bool) []CandidateScoreDimension {
 	weights := request.Rules.CandidateScoring.Weights
-	dimensions := make([]CandidateScoreDimension, 0, 2)
+	dimensions := make([]CandidateScoreDimension, 0, 3)
 	if component.Role != "" && weights.SemanticRole > 0 {
 		dimensions = append(dimensions, CandidateScoreDimension{
 			Name:     CandidateScoreSemanticRole,
@@ -215,7 +215,36 @@ func semanticCandidateDimensions(component Component, placement Placement, reque
 			dimensions = append(dimensions, groupDimension)
 		}
 	}
+	if weights.Mobility > 0 && component.Position != nil && mobilityPrefersAuthoredPosition(component.Mobility.Class) {
+		preferenceRadius := math.Hypot(request.Board.WidthMM, request.Board.HeightMM) * 0.1
+		if preferenceRadius < 5 {
+			preferenceRadius = 5
+		}
+		distance := math.Hypot(placement.XMM-component.Position.XMM, placement.YMM-component.Position.YMM)
+		score := 1 - min(1.0, distance/preferenceRadius)
+		dimensions = append(dimensions, CandidateScoreDimension{
+			Name:     CandidateScoreMobility,
+			Score:    score,
+			Weight:   weights.Mobility * authoredPositionMobilityWeight(component.Mobility.Class),
+			Evidence: []string{"class=" + string(component.Mobility.Class), "authored_position_preference"},
+		})
+	}
 	return dimensions
+}
+
+func authoredPositionMobilityWeight(class MobilityClass) float64 {
+	switch class {
+	case MobilityLocalRebuild:
+		// Until an independently moved local route is rebuilt, authored block
+		// topology is the strongest soft placement signal. Hard placement rules
+		// still reject an illegal authored position and select the nearest legal
+		// candidate deterministically.
+		return 32
+	case MobilityGroupTransform:
+		return 8
+	default:
+		return 4
+	}
 }
 
 type electricalCandidateScoringContext struct {

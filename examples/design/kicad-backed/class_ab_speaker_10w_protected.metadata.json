@@ -1,0 +1,28 @@
+{
+  "id": "class_ab_speaker_10w_protected",
+  "request": "class_ab_speaker_10w_protected.json",
+  "tier": "block-composition",
+  "readiness": "pass",
+  "acceptance": "fabrication-candidate",
+  "require_erc": true,
+  "require_drc": true,
+  "allowlists": [],
+  "expected_artifacts": [
+    ".kicadai/design-promotion.json"
+  ],
+  "expected_stages": [
+    "block_planning",
+    "component_selection",
+    "schematic",
+    "schematic_electrical",
+    "pcb_realization",
+    "placement",
+    "routing",
+    "project_write",
+    "writer_correctness",
+    "validation",
+    "kicad_checks"
+  ],
+  "known_gaps": [],
+  "notes": "Protected 10 W Class AB speaker amplifier release fixture. Pass requires fabrication-candidate component evidence, tolerance-bounded DC protection, complete high-current and Kelvin routing, writer correctness, clean KiCad ERC/strict DRC, and zero-diff round-trip evidence."
+}

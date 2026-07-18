@@ -2638,7 +2638,11 @@ type transform2D struct {
 }
 
 func footprintTransform(footprint *pcbfiles.Footprint) transform2D {
-	radians := float64(footprint.Rotation) * math.Pi / 180
+	// KiCad serializes board Y coordinates downward while positive footprint
+	// angles rotate counter-clockwise on the canvas.  Negating the angle keeps
+	// physical-rule geometry in the same convention as placement, routing, and
+	// connectivity (local +X maps to board -Y at +90 degrees).
+	radians := -float64(footprint.Rotation) * math.Pi / 180
 	return transform2D{
 		Cosine:  math.Cos(radians),
 		Sine:    math.Sin(radians),

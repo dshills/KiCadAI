@@ -98,6 +98,26 @@ func TestValidateBoardUnroutedNet(t *testing.T) {
 	}
 }
 
+func TestNetStatusesHonorSuccessfulGeneratedCopperConnectivityProof(t *testing.T) {
+	graph := boardConnectivity{
+		netNames:       map[int]string{1: "SIGNAL"},
+		netPads:        map[int][]connectivityPad{1: {{ref: "U1"}, {ref: "U2"}}},
+		netCopperCount: map[int]int{1: 1},
+		netZoneCount:   map[int]int{},
+		routeAnchors:   map[int]map[pointKey][]string{},
+		routeEdges:     map[int][]connectivityEdge{},
+	}
+
+	statuses, issues := graph.netStatuses(Options{}, true)
+	if len(issues) != 1 || issues[0].Code != reports.CodeValidationTrace || issues[0].Severity != reports.SeverityInfo || len(statuses) != 1 || statuses[0].Status != NetStatusFullyRouted {
+		t.Fatalf("statuses = %#v issues = %#v, want authoritative fully-routed status with secondary-check evidence", statuses, issues)
+	}
+	statuses, issues = graph.netStatuses(Options{}, false)
+	if len(issues) != 1 || len(statuses) != 1 || statuses[0].Status != NetStatusPartiallyRouted {
+		t.Fatalf("statuses = %#v issues = %#v, want heuristic partial status when proof fails", statuses, issues)
+	}
+}
+
 func TestValidateBoardSplitSameNetCopperIsNotFullyRouted(t *testing.T) {
 	board := twoPadBoard(t)
 	board.Footprints = append(board.Footprints,

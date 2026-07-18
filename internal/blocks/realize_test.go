@@ -502,6 +502,45 @@ func TestRealizeBlockPCBProducesEntryAnchorRoutes(t *testing.T) {
 	}
 }
 
+func TestRealizeBlockPCBPropagatesPublicPortAliasToEntryAnchorInternalNet(t *testing.T) {
+	definition := minimalRealizationDefinition()
+	definition.Components[0].Pins = twoTerminalHorizontalPins()
+	definition.PCBRealization.EntryAnchors = []PCBEntryAnchor{{
+		ID:          "input_entry",
+		Port:        "IN",
+		NetTemplate: "driver_center",
+		Placement:   RelativePlacement{XMM: -3, YMM: 1, Layer: "F.Cu"},
+	}}
+	definition.PCBRealization.LocalRoutes = []PCBLocalRoute{{
+		ID:          "entry_to_resistor",
+		NetTemplate: "driver_center",
+		From:        RouteEndpoint{AnchorID: "input_entry"},
+		To:          RouteEndpoint{ComponentRole: "resistor", Pin: "1"},
+		Layer:       "F.Cu",
+		WidthMM:     0.25,
+	}}
+	output := BlockOutput{
+		Definition: Summary(definition),
+		Instance: BlockInstance{
+			BlockID: definition.ID, InstanceID: "demo1", Params: map[string]any{"footprint": "Device:R_0805"}, Refs: []string{"R1"},
+		},
+		Operations: mustSingleComponentOps(t,
+			BlockComponent{Role: "resistor", RefPrefix: "R", Value: "10k", SymbolID: "Device:R", FootprintID: "Device:R_0805", Pins: twoTerminalHorizontalPins()}, "R1",
+		),
+	}
+
+	result := RealizeBlockPCB(definition, output, PCBRealizationOptions{NetAliases: map[string]string{"demo1_IN": "AUDIO_IN"}})
+	if len(result.Issues) != 0 {
+		t.Fatalf("issues = %#v", result.Issues)
+	}
+	if len(result.EntryAnchors) != 1 || result.EntryAnchors[0].NetName != "AUDIO_IN" {
+		t.Fatalf("entry anchors = %#v, want canonical AUDIO_IN net", result.EntryAnchors)
+	}
+	if len(result.LocalRoutes) != 1 || result.LocalRoutes[0].NetName != "AUDIO_IN" {
+		t.Fatalf("local routes = %#v, want canonical AUDIO_IN net", result.LocalRoutes)
+	}
+}
+
 func TestRealizeBlockPCBResolvesPortEndpointThroughEntryAnchor(t *testing.T) {
 	definition := minimalRealizationDefinition()
 	definition.Components[0].Pins = twoTerminalHorizontalPins()

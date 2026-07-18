@@ -581,7 +581,7 @@ func TestEvaluateBoardWarnsOnOpenLineOutlineAndBlocksOutsideObject(t *testing.T)
 
 func TestEvaluateBoardHandlesRotatedPadContainment(t *testing.T) {
 	board := physicalRuleTestBoard()
-	board.Footprints[0].Position = point(9, 5)
+	board.Footprints[0].Position = point(1, 5)
 	board.Footprints[0].Rotation = 90
 	board.Footprints[0].Pads[0].Position = point(0, 1)
 	project := physicalRuleTestProject()
@@ -589,6 +589,25 @@ func TestEvaluateBoardHandlesRotatedPadContainment(t *testing.T) {
 	report := EvaluateBoard(&board, &project, Options{})
 
 	assertCheckStatus(t, report, CheckEdgeCutsContainment, StatusPass)
+}
+
+func TestFootprintCourtyardBoundsUsesKiCadCanvasRotation(t *testing.T) {
+	footprint := pcbfiles.Footprint{
+		Position: point(10, 10),
+		Rotation: 90,
+		Graphics: []pcbfiles.FootprintGraphic{{
+			Layer: kicadfiles.LayerFCrtYd,
+			Rect:  &pcbfiles.RectDrawing{Start: point(-1, -2), End: point(3, 4)},
+		}},
+	}
+
+	bounds, ok := footprintCourtyardBounds(&footprint)
+	if !ok {
+		t.Fatal("courtyard bounds missing")
+	}
+	if bounds.MinX != kicadfiles.MM(8) || bounds.MaxX != kicadfiles.MM(14) || bounds.MinY != kicadfiles.MM(7) || bounds.MaxY != kicadfiles.MM(11) {
+		t.Fatalf("bounds = %#v, want KiCad +90 canvas transform [8,14]x[7,11]", bounds)
+	}
 }
 
 func TestEvaluateBoardAcceptsTriangularLineOutline(t *testing.T) {

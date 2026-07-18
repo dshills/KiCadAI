@@ -6,10 +6,12 @@ func TestApplyReportEvidenceSetsIdentityConsistencyAndAssemblyGates(t *testing.T
 	result := Result{}
 	applyReportEvidence(&result, ReportData{
 		BOM: []BOMRow{{
-			References:     []string{"U1"},
-			Manufacturer:   "Microchip",
-			MPN:            "ATMEGA328P-AU",
-			IdentityStatus: IdentityPass,
+			References:         []string{"U1"},
+			Manufacturer:       "Microchip",
+			MPN:                "ATMEGA328P-AU",
+			Lifecycle:          "active",
+			ProcurementOutcome: "accepted",
+			IdentityStatus:     IdentityPass,
 		}},
 		CPL: []CPLRow{{Reference: "U1", NormalizedSide: "top"}},
 		Consistency: ConsistencySummary{
@@ -17,8 +19,15 @@ func TestApplyReportEvidenceSetsIdentityConsistencyAndAssemblyGates(t *testing.T
 			MatchedReferences: 1,
 		},
 	}, Options{ManufacturerProfile: GenericAssemblyProfileID})
-	if result.Summary.ComponentIdentity != EvidencePass || result.Summary.BOMCPLConsistency != EvidencePass || result.Summary.ManufacturerProfile != EvidencePass || result.Summary.AssemblyReadiness != EvidencePass {
+	if result.Summary.ComponentReadiness != EvidencePass || result.Summary.ComponentIdentity != EvidencePass || result.Summary.BOMCPLConsistency != EvidencePass || result.Summary.ManufacturerProfile != EvidencePass || result.Summary.AssemblyReadiness != EvidencePass {
 		t.Fatalf("summary = %#v, want pass gates", result.Summary)
+	}
+}
+
+func TestComponentReadinessFailsMissingProcurementIdentity(t *testing.T) {
+	status := componentReadinessEvidence([]BOMRow{{References: []string{"U1"}, Lifecycle: "active", IdentityStatus: IdentityMissing}})
+	if status != EvidenceFail {
+		t.Fatalf("status = %s, want fail", status)
 	}
 }
 

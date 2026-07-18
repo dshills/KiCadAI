@@ -558,12 +558,13 @@ func builderFromTransaction(tx Transaction, opts ApplyOptions) (*designapi.Build
 			paper = kicadfiles.Paper{Name: sheet.Name, Width: sheet.Width, Height: sheet.Height}
 		}
 		return designapi.New(designapi.Options{
-			Name:         payload.Name,
-			Seed:         firstNonEmpty(opts.Seed, payload.Name),
-			DesignID:     deterministicDesignUUID(payload.Name, opts.Seed),
-			Paper:        paper,
-			CopperLayers: opts.CopperLayers,
-			LibraryIndex: opts.LibraryIndex,
+			Name:          payload.Name,
+			Seed:          firstNonEmpty(opts.Seed, payload.Name),
+			DesignID:      deterministicDesignUUID(payload.Name, opts.Seed),
+			Paper:         paper,
+			CopperLayers:  opts.CopperLayers,
+			LibraryIndex:  opts.LibraryIndex,
+			TextVariables: payload.TextVariables,
 		})
 	}
 	return nil, fmt.Errorf("create_project operation is required")
@@ -719,7 +720,7 @@ func applyOperation(builder *designapi.Builder, op Operation, opts ApplyOptions)
 			AllowUnmatchedUnconnectedPads: payload.AllowUnmatchedUnconnectedPads,
 			HideDefaultFootprintText:      payload.HideDefaultFootprintText,
 		}
-		if !opts.PreserveFootprintGeometry && opts.LibraryIndex != nil && strings.TrimSpace(payload.FootprintID) != "" {
+		if opts.LibraryIndex != nil && strings.TrimSpace(payload.FootprintID) != "" {
 			if record, ok := libraryresolver.ResolveFootprint(*opts.LibraryIndex, payload.FootprintID); ok {
 				if err := enrichPlaceFootprintOptionsWithRecord(&placeOptions, record, boardLayer(payload.Layer)); err != nil {
 					return nil, err
@@ -948,7 +949,7 @@ func upsertImportedFootprint(board *pcb.PCBFile, generator kicadfiles.IDGenerato
 			Rotation: kicadfiles.Angle(padSpec.RotationDeg),
 			Size:     padSizeOrDefault(padSpec),
 			Drill:    kicadfiles.MM(padSpec.DrillMM),
-			Layers:   padLayersFor(firstNonEmpty(padSpec.Type, "smd"), footprint.Layer),
+			Layers:   importedPadLayers(padSpec, footprint.Layer),
 			NetName:  net,
 		})
 	}
@@ -1010,7 +1011,7 @@ func applyImportedPadSpec(pad *pcb.Pad, footprintLayer kicadfiles.BoardLayer, sp
 	} else if strings.TrimSpace(pad.Type) == "" {
 		pad.Type = "smd"
 	}
-	pad.Layers = padLayersFor(pad.Type, footprintLayer)
+	pad.Layers = importedPadLayers(spec, footprintLayer)
 	if strings.TrimSpace(spec.Shape) != "" {
 		pad.Shape = strings.TrimSpace(spec.Shape)
 	} else if strings.TrimSpace(pad.Shape) == "" {
@@ -1055,6 +1056,22 @@ func padLayersFor(padType string, footprintLayer kicadfiles.BoardLayer) []kicadf
 		return []kicadfiles.BoardLayer{kicadfiles.LayerBCu, kicadfiles.LayerBMask}
 	}
 	return []kicadfiles.BoardLayer{kicadfiles.LayerFCu, kicadfiles.LayerFMask}
+}
+
+func importedPadLayers(spec PadSpec, footprintLayer kicadfiles.BoardLayer) []kicadfiles.BoardLayer {
+	if len(spec.Layers) == 0 {
+		return padLayersFor(firstNonEmpty(spec.Type, "smd"), footprintLayer)
+	}
+	layers := make([]kicadfiles.BoardLayer, 0, len(spec.Layers))
+	for _, layer := range spec.Layers {
+		if layer = strings.TrimSpace(layer); layer != "" {
+			layers = append(layers, boardLayer(layer))
+		}
+	}
+	if len(layers) == 0 {
+		return padLayersFor(firstNonEmpty(spec.Type, "smd"), footprintLayer)
+	}
+	return layers
 }
 
 func writeImportedProject(root string, base string, design kicaddesign.Design, schematicDirty bool, pcbDirty bool) ([]reports.Artifact, error) {

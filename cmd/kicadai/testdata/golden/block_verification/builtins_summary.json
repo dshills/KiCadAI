@@ -2,7 +2,7 @@
   "ok": true,
   "command": "block",
   "data": {
-    "count": 22,
+    "count": 25,
     "results": [
       {
         "case_id": "amplifier_bias_network_headphone",
@@ -153,6 +153,34 @@
           {
             "name": "semantic_assertions",
             "status": "pass"
+          }
+        ]
+      },
+      {
+        "case_id": "class_ab_speaker_power_stage_10w",
+        "block_id": "class_ab_speaker_power_stage",
+        "evidence_level": "schematic_verified",
+        "status": "pass",
+        "stages": [
+          {
+            "name": "manifest",
+            "status": "pass"
+          },
+          {
+            "name": "instantiate",
+            "status": "pass"
+          },
+          {
+            "name": "semantic_assertions",
+            "status": "pass"
+          },
+          {
+            "name": "pcb_realization",
+            "status": "pass"
+          },
+          {
+            "name": "erc_drc",
+            "status": "skipped"
           }
         ]
       },
@@ -482,6 +510,62 @@
           },
           {
             "name": "pcb_assertions",
+            "status": "pass"
+          },
+          {
+            "name": "erc_drc",
+            "status": "skipped"
+          }
+        ]
+      },
+      {
+        "case_id": "speaker_opamp_driver_opa134",
+        "block_id": "speaker_opamp_driver",
+        "evidence_level": "schematic_verified",
+        "status": "pass",
+        "stages": [
+          {
+            "name": "manifest",
+            "status": "pass"
+          },
+          {
+            "name": "instantiate",
+            "status": "pass"
+          },
+          {
+            "name": "semantic_assertions",
+            "status": "pass"
+          },
+          {
+            "name": "pcb_realization",
+            "status": "pass"
+          },
+          {
+            "name": "erc_drc",
+            "status": "skipped"
+          }
+        ]
+      },
+      {
+        "case_id": "speaker_output_protection_window_relay",
+        "block_id": "speaker_output_protection",
+        "evidence_level": "schematic_verified",
+        "status": "pass",
+        "stages": [
+          {
+            "name": "manifest",
+            "status": "pass"
+          },
+          {
+            "name": "instantiate",
+            "status": "pass"
+          },
+          {
+            "name": "semantic_assertions",
+            "status": "pass"
+          },
+          {
+            "name": "pcb_realization",
             "status": "pass"
           },
           {

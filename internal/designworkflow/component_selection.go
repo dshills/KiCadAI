@@ -45,6 +45,7 @@ type ComponentSelectionEntry struct {
 	Manufacturer    string                              `json:"manufacturer,omitempty"`
 	MPN             string                              `json:"mpn,omitempty"`
 	ComponentClass  string                              `json:"component_class,omitempty"`
+	Lifecycle       string                              `json:"lifecycle,omitempty"`
 	SymbolID        string                              `json:"symbol_id,omitempty"`
 	FunctionPins    []components.FunctionPin            `json:"function_pins,omitempty"`
 	Value           string                              `json:"value,omitempty"`
@@ -99,6 +100,10 @@ func SelectWorkflowComponents(ctx context.Context, registry blocks.Registry, pla
 	}
 	acceptance := componentAcceptanceForRequest(plan.Request)
 	var selections []ComponentSelectionEntry
+	realizedInstances := make(map[string]blocks.BlockInstance, len(plan.Output.Instances))
+	for _, instance := range plan.Output.Instances {
+		realizedInstances[instance.InstanceID] = instance
+	}
 	for index, instance := range plan.Request.Blocks {
 		if err := ctx.Err(); err != nil {
 			issues = append(issues, reports.Issue{Code: reports.CodeOperationCanceled, Severity: reports.SeverityBlocked, Path: "component_selection", Message: err.Error()})
@@ -109,19 +114,17 @@ func SelectWorkflowComponents(ctx context.Context, registry blocks.Registry, pla
 			issues = append(issues, reports.Issue{Code: reports.CodeMissingFile, Severity: reports.SeverityBlocked, Path: "blocks[" + strconv.Itoa(index) + "].block_id", Message: "block not found: " + instance.BlockID})
 			continue
 		}
-		params := blocks.ApplyParameterDefaults(definition, instance.Params)
+		paramsSource := instance.Params
+		if realized, ok := realizedInstances[instance.ID]; ok {
+			// Instantiation may derive standard values (for example feedback or
+			// threshold resistors).  Component selection must consume those
+			// authoritative values rather than the pre-instantiation request.
+			paramsSource = realized.Params
+		}
+		params := blocks.ApplyParameterDefaults(definition, paramsSource)
 		pairedRoles := map[string]bool{}
-		if definition.ID == "class_ab_output_stage" || definition.ID == "class_ab_output_pair" {
-			pair, pairResult := components.SelectAmplifierOutputPair(ctx, catalog, components.AmplifierOutputPairRequest{
-				DeviceClass:      "bjt",
-				Application:      workflowStringParam(params, "application", "headphone"),
-				SupplyVoltage:    workflowStringParam(params, "supply_voltage", ""),
-				SupplyUnit:       "V",
-				LoadImpedance:    workflowStringParam(params, "load_impedance", ""),
-				LoadUnit:         "ohm",
-				Acceptance:       acceptance,
-				RequireHeadphone: workflowStringParam(params, "application", "headphone") == "headphone",
-			})
+		if pairRequest, selectPair := amplifierOutputPairRequestForBlock(definition.ID, params, acceptance); selectPair {
+			pair, pairResult := components.SelectAmplifierOutputPair(ctx, catalog, pairRequest)
 			issues = append(issues, pairResult.Issues...)
 			pairedRoles["upper_output"] = true
 			pairedRoles["lower_output"] = true
@@ -176,6 +179,31 @@ func SelectWorkflowComponents(ctx context.Context, registry blocks.Registry, pla
 	return ComponentSelectionResult{CatalogDir: catalogDir, SourceDir: sourceDir, Selections: selections, Stage: stage}
 }
 
+func amplifierOutputPairRequestForBlock(blockID string, params map[string]any, acceptance components.AcceptanceLevel) (components.AmplifierOutputPairRequest, bool) {
+	request := components.AmplifierOutputPairRequest{
+		DeviceClass:   "bjt",
+		SupplyVoltage: workflowStringParam(params, "supply_voltage", ""),
+		SupplyUnit:    "V",
+		LoadUnit:      "ohm",
+		Acceptance:    acceptance,
+	}
+	switch blockID {
+	case "class_ab_output_stage", "class_ab_output_pair":
+		request.Application = workflowStringParam(params, "application", "headphone")
+		request.LoadImpedance = workflowStringParam(params, "load_impedance", "")
+		request.RequireHeadphone = request.Application == "headphone"
+		return request, true
+	case "class_ab_speaker_power_stage":
+		request.Application = "power"
+		// Component selection runs before block instantiation applies definition
+		// defaults, so mirror the block's declared nominal speaker load here.
+		request.LoadImpedance = workflowStringParam(params, "target_load", "8Ω")
+		return request, true
+	default:
+		return components.AmplifierOutputPairRequest{}, false
+	}
+}
+
 func componentSelectionEntryFromSelection(instanceID string, blockID string, role string, selection components.Selection) ComponentSelectionEntry {
 	return ComponentSelectionEntry{
 		InstanceID:      instanceID,
@@ -186,6 +214,7 @@ func componentSelectionEntryFromSelection(instanceID string, blockID string, rol
 		Manufacturer:    selection.Component.Manufacturer,
 		MPN:             selectedMPN(selection),
 		ComponentClass:  selection.Candidate.Family,
+		Lifecycle:       selectedLifecycle(selection),
 		SymbolID:        firstSelectedSymbolID(selection),
 		FunctionPins:    selectedFunctionPins(selection),
 		FootprintID:     selection.Candidate.FootprintID,
@@ -334,13 +363,29 @@ func componentOperationFacts(operations []transactions.Operation) (map[string]wo
 }
 
 func matchingWorkflowRefForComponent(component blocks.BlockComponent, refs []string, facts map[string]workflowComponentFact, used map[string]struct{}) string {
+	// Resolve explicit generated role evidence before considering geometry.
+	// Component overrides are keyed by the block role, so a different non-empty
+	// generated role is never a valid override target.
+	if component.Role != "" {
+		for _, ref := range refs {
+			if _, ok := used[ref]; ok {
+				continue
+			}
+			if facts[ref].Role == component.Role {
+				return ref
+			}
+		}
+	}
 	for _, ref := range refs {
 		if _, ok := used[ref]; ok {
 			continue
 		}
 		fact := facts[ref]
-		if component.Role != "" && fact.Role == component.Role {
-			return ref
+		if component.Role != "" && fact.Role != "" {
+			// Generated role evidence is authoritative.  Do not let a later
+			// symbol/footprint fallback attach a concrete identity to a sibling
+			// part that happens to use the same generic package.
+			continue
 		}
 		if component.SymbolID != "" && fact.SymbolID != component.SymbolID {
 			continue
@@ -504,9 +549,12 @@ func componentSelectionEvidence(selection ComponentSelectionEntry) componentprop
 		ComponentConfidence: string(selection.Confidence),
 		ComponentSource:     componentSelectionSource(selection),
 		PinmapID:            selection.PinMapID,
+		LifecycleStatus:     selection.Lifecycle,
 	}
 	if selection.Procurement != nil {
-		evidence.LifecycleStatus = string(selection.Procurement.LifecycleStatus)
+		if selection.Procurement.LifecycleStatus != "" {
+			evidence.LifecycleStatus = string(selection.Procurement.LifecycleStatus)
+		}
 		evidence.AvailabilityStatus = string(selection.Procurement.AvailabilityStatus)
 	}
 	return evidence
@@ -630,6 +678,13 @@ func selectedMPN(selection components.Selection) string {
 		return selection.Variant.MPN
 	}
 	return selection.Component.MPN
+}
+
+func selectedLifecycle(selection components.Selection) string {
+	if lifecycle := strings.TrimSpace(selection.Component.Lifecycle); lifecycle != "" {
+		return lifecycle
+	}
+	return strings.TrimSpace(selection.Variant.Lifecycle)
 }
 
 func selectedResolverChecked(selection components.Selection) bool {

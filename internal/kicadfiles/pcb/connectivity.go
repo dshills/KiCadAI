@@ -10,7 +10,11 @@ import (
 
 const (
 	connectivityToleranceIU = kicadfiles.IU(100)
-	connectivityCellSizeIU  = kicadfiles.IU(2_000_000)
+	// A 2 mm cell is comfortably larger than the 0.0001 mm numerical contact
+	// tolerance while remaining below common PCB feature spacing. Correctness is
+	// independent of this tuning value: large pads occupy all intersected cells
+	// and tracks/arcs enumerate every traversed cell.
+	connectivityCellSizeIU = kicadfiles.IU(2_000_000)
 )
 
 type connectivityAnchor struct {

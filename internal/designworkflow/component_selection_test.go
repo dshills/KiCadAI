@@ -70,6 +70,16 @@ func TestApplyComponentSelectionsToPlanAddsSymbolIdentityProperties(t *testing.T
 	}
 }
 
+func TestComponentSelectionEvidenceUsesCatalogLifecycleWithoutProcurementSnapshot(t *testing.T) {
+	evidence := componentSelectionEvidence(ComponentSelectionEntry{
+		ComponentID: "opamp.example",
+		Lifecycle:   "active",
+	})
+	if evidence.LifecycleStatus != "active" {
+		t.Fatalf("lifecycle = %q, want catalog lifecycle", evidence.LifecycleStatus)
+	}
+}
+
 func TestApplyComponentSelectionsToPlanWarnsOnIdentityReplacement(t *testing.T) {
 	falseValue := false
 	trueValue := true
@@ -96,6 +106,37 @@ func TestApplyComponentSelectionsToPlanWarnsOnIdentityReplacement(t *testing.T) 
 	add := decodeAddSymbolOperation(t, plan.Output.Operations[0])
 	properties := symbolPropertyValues(add.Properties)
 	assertProperty(t, properties, componentprops.PropertyComponentID, "new.component")
+}
+
+func TestMatchingWorkflowRefPrefersAuthoritativeRoleOverSharedGeometry(t *testing.T) {
+	component := blocks.BlockComponent{
+		Role:        "output_isolation",
+		SymbolID:    "Device:R",
+		FootprintID: "Resistor_SMD:R_0805_2012Metric",
+	}
+	facts := map[string]workflowComponentFact{
+		"R1": {Role: "gain_to_star", SymbolID: component.SymbolID, FootprintID: component.FootprintID},
+		"R2": {Role: "feedback", SymbolID: component.SymbolID, FootprintID: component.FootprintID},
+		"R3": {Role: "output_isolation", SymbolID: component.SymbolID, FootprintID: component.FootprintID},
+	}
+
+	if got := matchingWorkflowRefForComponent(component, []string{"R1", "R2", "R3"}, facts, nil); got != "R3" {
+		t.Fatalf("matching ref = %q, want role-authoritative R3", got)
+	}
+}
+
+func TestAmplifierOutputPairRequestSeparatesSpeakerContract(t *testing.T) {
+	request, ok := amplifierOutputPairRequestForBlock("class_ab_speaker_power_stage", map[string]any{"supply_voltage": "36V", "target_load": "8Ω", "application": "headphone"}, components.AcceptanceFabricationCandidate)
+	if !ok || request.Application != "power" || request.LoadImpedance != "8Ω" || request.RequireHeadphone {
+		t.Fatalf("speaker pair request = %#v, want distinct power-stage contract", request)
+	}
+}
+
+func TestAmplifierOutputPairRequestUsesSpeakerBlockDefaultLoad(t *testing.T) {
+	request, ok := amplifierOutputPairRequestForBlock("class_ab_speaker_power_stage", map[string]any{"supply_voltage": "36V"}, components.AcceptanceFabricationCandidate)
+	if !ok || request.LoadImpedance != "8Ω" {
+		t.Fatalf("speaker pair request = %#v, want block-default 8 ohm load", request)
+	}
 }
 
 func TestConcreteI2CSensorSelectionReachesWrittenSchematic(t *testing.T) {
@@ -230,6 +271,114 @@ func TestClassABOutputStageSelectsComplementaryPairAsOneEnvelope(t *testing.T) {
 	lowerGroup := selected["lower_output"].AmplifierOutput.ComplementaryGroup
 	if upperGroup == "" || upperGroup != lowerGroup {
 		t.Fatalf("complementary groups = %q / %q", upperGroup, lowerGroup)
+	}
+}
+
+func TestClassABSpeakerPowerStageSelectsFabricationProvenPowerPair(t *testing.T) {
+	registry := blocks.NewBuiltinRegistry()
+	request := Request{
+		Version: RequestVersion,
+		Name:    "catalog_speaker_power",
+		Board:   BoardSpec{WidthMM: 100, HeightMM: 70, Layers: 2},
+		Blocks: []BlockInstanceSpec{{
+			ID:      "power_output",
+			BlockID: "class_ab_speaker_power_stage",
+			Params: map[string]any{
+				"supply_voltage": "36V",
+				"target_load":    "8Ω",
+				"minimum_load":   "4Ω",
+				"target_power":   10.0,
+			},
+		}},
+		Validation: ValidationSpec{Acceptance: AcceptanceFabricationCandidate},
+	}
+	plan := PlanBlocks(context.Background(), registry, request)
+	if reports.HasBlockingIssue(plan.Stage.Issues) {
+		t.Fatalf("plan issues = %#v", plan.Stage.Issues)
+	}
+	selectionResult := SelectWorkflowComponents(context.Background(), registry, plan, ComponentSelectionOptions{})
+	if reports.HasBlockingIssue(selectionResult.Stage.Issues) {
+		t.Fatalf("selection issues = %#v", selectionResult.Stage.Issues)
+	}
+	selected := map[string]ComponentSelectionEntry{}
+	for _, selection := range selectionResult.Selections {
+		if selection.InstanceID == "power_output" {
+			selected[selection.Role] = selection
+		}
+	}
+	if selected["upper_output"].ComponentID != "bjt.onsemi.njw0281g.to3p" || selected["lower_output"].ComponentID != "bjt.onsemi.njw0302g.to3p" {
+		t.Fatalf("selected speaker pair = %#v", selected)
+	}
+	if selected["upper_output"].AmplifierOutput.SafeOperatingAreaStatus != "proven" || selected["lower_output"].AmplifierOutput.SafeOperatingAreaStatus != "proven" {
+		t.Fatalf("selected speaker SOA evidence = %#v / %#v", selected["upper_output"].AmplifierOutput, selected["lower_output"].AmplifierOutput)
+	}
+}
+
+func TestSpeakerOpAmpDriverSelectsFabricationProvenOPA134(t *testing.T) {
+	registry := blocks.NewBuiltinRegistry()
+	request := Request{
+		Version: RequestVersion,
+		Name:    "catalog_speaker_gain",
+		Board:   BoardSpec{WidthMM: 100, HeightMM: 70, Layers: 2},
+		Blocks: []BlockInstanceSpec{{
+			ID:      "gain",
+			BlockID: "speaker_opamp_driver",
+			Params:  map[string]any{"gain": 11.0},
+		}},
+		Validation: ValidationSpec{Acceptance: AcceptanceFabricationCandidate},
+	}
+	plan := PlanBlocks(context.Background(), registry, request)
+	if reports.HasBlockingIssue(plan.Stage.Issues) {
+		t.Fatalf("plan issues = %#v", plan.Stage.Issues)
+	}
+	selectionResult := SelectWorkflowComponents(context.Background(), registry, plan, ComponentSelectionOptions{})
+	if reports.HasBlockingIssue(selectionResult.Stage.Issues) {
+		t.Fatalf("selection issues = %#v", selectionResult.Stage.Issues)
+	}
+	selected := map[string]ComponentSelectionEntry{}
+	for _, selection := range selectionResult.Selections {
+		if selection.InstanceID == "gain" {
+			selected[selection.Role] = selection
+		}
+	}
+	if selected["opamp"].ComponentID != "opamp.ti.opa134ua.soic8" || selected["output_isolation"].ComponentID != "resistor.yageo.rc0805fr_0747rl.0805" {
+		t.Fatalf("selected speaker gain components = %#v", selected)
+	}
+	if selected["gain_to_star"].ComponentID != "resistor.vishay.tnpw0805.1k00.1p0" || selected["feedback"].ComponentID != "resistor.yageo.rc0805fr_0710kl.0805" {
+		t.Fatalf("selected derived speaker feedback values = %#v", selected)
+	}
+}
+
+func TestSpeakerOutputProtectionSelectsConcreteDetectorsRelayAndClamp(t *testing.T) {
+	registry := blocks.NewBuiltinRegistry()
+	request := Request{
+		Version:    RequestVersion,
+		Name:       "catalog_speaker_protection",
+		Board:      BoardSpec{WidthMM: 100, HeightMM: 70, Layers: 2},
+		Blocks:     []BlockInstanceSpec{{ID: "protect", BlockID: "speaker_output_protection"}},
+		Validation: ValidationSpec{Acceptance: AcceptanceFabricationCandidate},
+	}
+	plan := PlanBlocks(context.Background(), registry, request)
+	if reports.HasBlockingIssue(plan.Stage.Issues) {
+		t.Fatalf("plan issues = %#v", plan.Stage.Issues)
+	}
+	selectionResult := SelectWorkflowComponents(context.Background(), registry, plan, ComponentSelectionOptions{})
+	if reports.HasBlockingIssue(selectionResult.Stage.Issues) {
+		t.Fatalf("selection issues = %#v", selectionResult.Stage.Issues)
+	}
+	selected := map[string]ComponentSelectionEntry{}
+	for _, selection := range selectionResult.Selections {
+		if selection.InstanceID == "protect" {
+			selected[selection.Role] = selection
+		}
+	}
+	for _, role := range []string{"positive_detector", "negative_detector"} {
+		if selected[role].ComponentID != "comparator.ti.tlv1701aidbvr.sot23_5" {
+			t.Fatalf("%s selection = %#v", role, selected[role])
+		}
+	}
+	if selected["relay"].ComponentID != "relay.omron.g5q_1a.dc12" || selected["relay_driver"].ComponentID != "bjt.onsemi.mmbt3904.sot23" || selected["relay_flyback"].ComponentID != "diode.onsemi.1n4148w.sod_123" {
+		t.Fatalf("protection selections = %#v", selected)
 	}
 }
 

@@ -18,6 +18,7 @@ const (
 	CodeUnsupportedOperation      Code = "UNSUPPORTED_OPERATION"
 	CodeSkippedExternalTool       Code = "SKIPPED_EXTERNAL_TOOL"
 	CodeOperationCanceled         Code = "OPERATION_CANCELED"
+	CodeValidationTrace           Code = "VALIDATION_TRACE"
 	CodeValidationFailed          Code = "VALIDATION_FAILED"
 	CodeMissingFootprint          Code = "MISSING_FOOTPRINT"
 	CodeDuplicateReference        Code = "DUPLICATE_REFERENCE"

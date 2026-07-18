@@ -361,12 +361,12 @@ func TestCircuitRepairPlanRecordedGenericCorpusAndReviewStop(t *testing.T) {
 			}
 		})
 	}
-	t.Run("protected_led_routing_needs_review", func(t *testing.T) {
+	t.Run("protected_led_routing_ready", func(t *testing.T) {
 		graph := recordedGenericCircuitGraph(t, "generic_usb_c_led_indicator_protected")
 		result := runCircuitPreflightCLI(t, []string{"circuit", "repair-plan", "--request", graph})
 		plan := circuitRepairPlanResultData(t, result).Plan
-		if result.OK || plan.State != circuitgraph.RepairPlanNeedsReview || plan.StopReason != "no_fully_derived_repair" || plan.Patch != nil {
-			t.Fatalf("routing review plan result=%#v plan=%#v", result, plan)
+		if !result.OK || plan.State != circuitgraph.RepairPlanReady || plan.StopReason != "preflight_ready" || plan.Patch != nil {
+			t.Fatalf("ready protected LED plan result=%#v plan=%#v", result, plan)
 		}
 	})
 }

@@ -30,6 +30,26 @@ func TestValidateFabricationArtifactsPassesCompleteOutputs(t *testing.T) {
 	}
 }
 
+func TestValidateFabricationArtifactsAcceptsKiCad10SilkscreenNames(t *testing.T) {
+	root := testFabricationProject(t)
+	writeTestPCB(t, root, "demo.kicad_pcb")
+	packageDir := filepath.Join(root, "fabrication")
+	for _, rel := range []string{
+		"gerbers/demo-F_Cu.gbr", "gerbers/demo-B_Cu.gbr",
+		"gerbers/demo-F_Mask.gbr", "gerbers/demo-B_Mask.gbr",
+		"gerbers/demo-F_Silkscreen.gto", "gerbers/demo-B_Silkscreen.gbo",
+		"gerbers/demo-Edge_Cuts.gm1", "drill/demo.drl",
+	} {
+		writeFabricationFile(t, packageDir, rel)
+	}
+	result := ValidateFabricationArtifacts(context.Background(), PlotRequest{
+		PCBPath: filepath.Join(root, "demo.kicad_pcb"), GerberDir: filepath.Join(packageDir, "gerbers"), DrillDir: filepath.Join(packageDir, "drill"),
+	})
+	if result.Gerber != EvidencePass || result.Drill != EvidencePass {
+		t.Fatalf("validation = %#v, want pass/pass", result)
+	}
+}
+
 func TestValidateFabricationArtifactsFailsMissingCopperLayer(t *testing.T) {
 	root := testFabricationProject(t)
 	writeTestPCB(t, root, "demo.kicad_pcb")

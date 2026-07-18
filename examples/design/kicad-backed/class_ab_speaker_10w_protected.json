@@ -1,0 +1,99 @@
+{
+  "version": "0.1.0",
+  "name": "class_ab_speaker_10w_protected",
+  "intent": {
+    "summary": "Protected 10 W RMS Class AB speaker amplifier with OPA134 load-side feedback, complementary driver and power BJTs, current limiting, dual-rail decoupling, and normally-open DC-fault relay isolation.",
+    "category": "amplifier"
+  },
+  "board": {
+    "width_mm": 180,
+    "height_mm": 120,
+    "layers": 2,
+    "edge_clearance_mm": 1
+  },
+  "fabrication": {
+    "board_finish": "ENIG",
+    "fabrication_notes": "Lead-free assembly. Verify output-transistor insulation, heatsink mounting, relay orientation, and power-device thermal compound before power-up."
+  },
+  "component_policy": {
+    "minimum_confidence": "verified",
+    "acceptance": "fabrication-candidate",
+    "procurement_policy": {}
+  },
+  "blocks": [
+    {
+      "id": "input",
+      "block_id": "connector_breakout",
+      "params": {"pin_names": ["SIG", "GND"], "edge_facing": true, "edge_side": "left"}
+    },
+    {
+      "id": "gain",
+      "block_id": "speaker_opamp_driver",
+      "params": {"gain": 11, "gain_resistor_value": "1kΩ", "output_isolation_value": "47Ω"}
+    },
+    {
+      "id": "power_stage",
+      "block_id": "class_ab_speaker_power_stage",
+      "params": {"supply_voltage": "36V", "target_power": 10, "target_load": "8Ω", "minimum_load": "4Ω", "current_limit": "3A", "current_limit_vbe": "0.66V", "emitter_resistor_value": "0.22Ω"}
+    },
+    {
+      "id": "rail_bypass",
+      "block_id": "amplifier_supply_decoupling",
+      "params": {"rail_mode": "dual_supply", "rail_voltage": "18V", "ceramic_capacitance": "100nF", "bulk_capacitance": "220uF", "include_bulk": true, "capacitor_voltage_rating": "35V", "ceramic_component_id": "capacitor.wima.mks2c031001a00kssd.tht", "bulk_component_id": "capacitor.panasonic.eeufr1v221.radial", "ceramic_footprint": "Capacitor_THT:C_Rect_L7.2mm_W3.0mm_P5.00mm_FKS2_FKP2_MKS2_MKP2", "bulk_footprint": "Capacitor_THT:CP_Radial_D8.0mm_P3.50mm"}
+    },
+    {
+      "id": "protection",
+      "block_id": "speaker_output_protection",
+      "params": {"protection_supply_voltage": "12V", "dc_trip_threshold": "1V", "resistor_tolerance_percent": 0.1, "maximum_load_current": "3A"}
+    },
+    {
+      "id": "speaker",
+      "block_id": "connector_breakout",
+      "params": {"pin_names": ["SIG", "RET"], "edge_facing": true, "edge_side": "right"}
+    },
+    {
+      "id": "power",
+      "block_id": "connector_breakout",
+      "params": {"pin_names": ["VCC", "VEE", "PROTECT_12V", "POWER_STAR"], "power_source_pins": ["VCC", "VEE", "PROTECT_12V", "POWER_STAR"], "edge_facing": true, "edge_side": "bottom"}
+    }
+  ],
+  "connections": [
+    {"from": "input.SIG", "to": "gain.IN", "net_alias": "AUDIO_IN"},
+    {"from": "input.GND", "to": "gain.SIGNAL_STAR", "net_alias": "POWER_STAR"},
+    {"from": "gain.DRIVER_OUT", "to": "power_stage.DRIVER_OUT", "net_alias": "DRIVER_OUT"},
+    {"from": "power_stage.RAW_OUT", "to": "gain.FEEDBACK_SENSE", "net_alias": "RAW_OUT"},
+    {"from": "power_stage.RAW_OUT", "to": "protection.RAW_OUT", "net_alias": "RAW_OUT"},
+    {"from": "protection.SPEAKER_OUT", "to": "speaker.SIG", "net_alias": "SPEAKER_OUT"},
+    {"from": "speaker.RET", "to": "power_stage.POWER_STAR", "net_alias": "POWER_STAR"},
+    {"from": "gain.SIGNAL_STAR", "to": "power_stage.POWER_STAR", "net_alias": "POWER_STAR"},
+    {"from": "protection.POWER_STAR", "to": "power_stage.POWER_STAR", "net_alias": "POWER_STAR"},
+    {"from": "rail_bypass.GND", "to": "power_stage.POWER_STAR", "net_alias": "POWER_STAR"},
+    {"from": "power.VCC", "to": "gain.VCC", "net_alias": "VCC"},
+    {"from": "power.VCC", "to": "power_stage.VCC", "net_alias": "VCC"},
+    {"from": "power.VCC", "to": "rail_bypass.VCC", "net_alias": "VCC"},
+    {"from": "power.VEE", "to": "gain.VEE", "net_alias": "VEE"},
+    {"from": "power.VEE", "to": "power_stage.VEE", "net_alias": "VEE"},
+    {"from": "power.VEE", "to": "rail_bypass.VEE", "net_alias": "VEE"},
+    {"from": "power.PROTECT_12V", "to": "protection.PROTECT_12V", "net_alias": "PROTECT_12V"},
+    {"from": "power.POWER_STAR", "to": "power_stage.POWER_STAR", "net_alias": "POWER_STAR"}
+  ],
+  "constraints": {
+    "route_width_mm": 0.5,
+    "clearance_mm": 0.25,
+    "prefer_top_layer": true,
+    "allow_back_layer": true,
+    "treat_local_power_routes_as_obstacles": true
+  },
+  "routing_retry": {
+    "enabled": true,
+    "max_attempts": 3,
+    "allowed_hint_categories": ["reduce_distance", "increase_spacing", "improve_fanout", "move_from_edge"]
+  },
+  "validation": {
+    "acceptance": "fabrication-candidate",
+    "require_erc": true,
+    "require_drc": true,
+    "strict_unrouted": true,
+    "strict_zones": true
+  }
+}

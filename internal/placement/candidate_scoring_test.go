@@ -28,6 +28,15 @@ func TestNormalizeCandidateScoringRulesDefaults(t *testing.T) {
 	}
 }
 
+func TestAuthoredPositionMobilityWeightPrioritizesLocalRouteTopology(t *testing.T) {
+	local := authoredPositionMobilityWeight(MobilityLocalRebuild)
+	group := authoredPositionMobilityWeight(MobilityGroupTransform)
+	soft := authoredPositionMobilityWeight(MobilitySoftPreferred)
+	if !(local > group && group > soft) {
+		t.Fatalf("mobility weights local/group/soft = %v/%v/%v, want descending topology preservation", local, group, soft)
+	}
+}
+
 func TestNormalizeCandidateScoringRulesPreservesExplicitZero(t *testing.T) {
 	got := normalizeCandidateScoringRules(CandidateScoringRules{
 		Enabled:                     true,

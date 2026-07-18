@@ -488,11 +488,16 @@ func componentsByNormalizedRef(components []Component) map[string]Component {
 func proximityDistance(anchor Component, anchorPlacement PlacementResult, anchorPins []string, target Component, targetPlacement PlacementResult, targetPins []string) (float64, string) {
 	anchorPoint, anchorEvidence := proximityPoint(anchor, anchorPlacement, anchorPins)
 	targetPoint, targetEvidence := proximityPoint(target, targetPlacement, targetPins)
-	evidence := "center"
 	if anchorEvidence == "pad" && targetEvidence == "pad" {
-		evidence = "pad"
+		return boardDistance(anchorPoint.XMM-targetPoint.XMM, anchorPoint.YMM-targetPoint.YMM), "pad"
 	}
-	return boardDistance(anchorPoint.XMM-targetPoint.XMM, anchorPoint.YMM-targetPoint.YMM), evidence
+	return rectEdgeDistance(anchorPlacement.Bounds, targetPlacement.Bounds), "body_edge"
+}
+
+func rectEdgeDistance(first Rect, second Rect) float64 {
+	dx := max(0, max(first.Min.XMM-second.Max.XMM, second.Min.XMM-first.Max.XMM))
+	dy := max(0, max(first.Min.YMM-second.Max.YMM, second.Min.YMM-first.Max.YMM))
+	return math.Hypot(dx, dy)
 }
 
 func proximityPoint(component Component, placement PlacementResult, pins []string) (Point, string) {

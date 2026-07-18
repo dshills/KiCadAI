@@ -189,7 +189,11 @@ func RouteRequestContext(ctx context.Context, request Request) Result {
 			if len(routeIssues) == 0 {
 				segments, metrics = BuildSegmentsFromPathWithNeckdown(path, netRequest.Rules.TraceWidthMM, neckdownWidthMM, neckdownLengthMM)
 				if segmentsUseNeckdown(segments, netRequest.Rules.TraceWidthMM) && !nominalSegmentsClearOccupancy(segments, netRequest.Rules.TraceWidthMM, nominalOccupancy, netRequest.Board.Layers) {
-					routeIssues = []reports.Issue{endpointNeckdownTrunkIssue(plan.Net.Name, pairIndex, pair)}
+					var extended bool
+					segments, metrics, extended = extendEndpointNeckdownToClearTrunk(path, netRequest.Rules.TraceWidthMM, neckdownWidthMM, neckdownLengthMM, nominalOccupancy, netRequest.Board.Layers, route.Segments)
+					if !extended {
+						routeIssues = []reports.Issue{endpointNeckdownTrunkIssue(plan.Net.Name, pairIndex, pair)}
+					}
 				}
 				if len(routeIssues) == 0 && (!pinPathEndpointAccess(&netAccess, path, pair.From, 0) || !pinPathEndpointAccess(&netAccess, path, pair.To, len(path.Points)-1)) {
 					routeIssues = []reports.Issue{routeEndpointAccessIssue(plan.Net.Name, pairIndex, pair)}
@@ -535,6 +539,48 @@ func nominalSegmentsClearOccupancy(segments []Segment, nominalWidthMM float64, o
 		}
 	}
 	return true
+}
+
+func extendEndpointNeckdownToClearTrunk(path GridPath, nominalWidthMM float64, neckdownWidthMM float64, initialLengthMM float64, occupancy Occupancy, layers []Layer, existing []Segment) ([]Segment, Metrics, bool) {
+	base, _ := BuildSegmentsFromPath(path, nominalWidthMM)
+	totalLengthMM := segmentLengthTotal(base)
+	if neckdownWidthMM <= 0 || neckdownWidthMM >= nominalWidthMM || totalLengthMM <= distanceEpsilon {
+		return nil, Metrics{}, false
+	}
+	stepMM := occupancy.Grid.spacingMM()
+	if stepMM <= 0 {
+		stepMM = DefaultRules().GridMM
+	}
+	startLengthMM := max(initialLengthMM+stepMM, stepMM)
+	maximumLengthMM := totalLengthMM / 2
+	tryLength := func(lengthMM float64) ([]Segment, Metrics, bool) {
+		segments, metrics := BuildSegmentsFromPathWithNeckdown(path, nominalWidthMM, neckdownWidthMM, lengthMM)
+		if !nominalSegmentsClearOccupancy(segments, nominalWidthMM, occupancy, layers) {
+			return nil, Metrics{}, false
+		}
+		if segmentsContainNominalWidth(segments, nominalWidthMM) || segmentsContainNominalWidth(existing, nominalWidthMM) {
+			return segments, metrics, true
+		}
+		return nil, Metrics{}, false
+	}
+	for lengthMM := startLengthMM; lengthMM < maximumLengthMM-distanceEpsilon; lengthMM += stepMM {
+		if segments, metrics, ok := tryLength(lengthMM); ok {
+			return segments, metrics, true
+		}
+	}
+	if segments, metrics, ok := tryLength(maximumLengthMM); ok {
+		return segments, metrics, true
+	}
+	return nil, Metrics{}, false
+}
+
+func segmentsContainNominalWidth(segments []Segment, nominalWidthMM float64) bool {
+	for _, segment := range segments {
+		if segment.WidthMM+distanceEpsilon >= nominalWidthMM {
+			return true
+		}
+	}
+	return false
 }
 
 func segmentsUseNeckdown(segments []Segment, nominalWidthMM float64) bool {

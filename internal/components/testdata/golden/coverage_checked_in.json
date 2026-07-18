@@ -1,15 +1,15 @@
 {
-  "record_count": 63,
-  "family_count": 19,
+  "record_count": 81,
+  "family_count": 21,
   "confidence_counts": {
     "blocked": 1,
     "library_derived": 0,
     "placeholder": 4,
     "rule_inferred": 5,
-    "verified": 53
+    "verified": 71
   },
   "alternative_coverage": {
-    "concrete_records": 39,
+    "concrete_records": 57,
     "generic_fallback_records": 24,
     "equivalence_groups": 19
   },
@@ -17,11 +17,11 @@
     {
       "family": "bjt",
       "defined": true,
-      "record_count": 5,
-      "concrete_records": 4,
+      "record_count": 7,
+      "concrete_records": 6,
       "generic_fallback_records": 1,
       "equivalence_groups": 2,
-      "verified_records": 4,
+      "verified_records": 6,
       "library_derived_records": 0,
       "rule_inferred_records": 0,
       "placeholder_records": 0,
@@ -30,6 +30,8 @@
         "bjt.placeholder.npn_power_output.to220"
       ],
       "record_ids": [
+        "bjt.onsemi.mje243g.to225",
+        "bjt.onsemi.mje253g.to225",
         "bjt.onsemi.mmbt3904.sot23",
         "bjt.onsemi.mmbt3906.sot23",
         "bjt.onsemi.njw0281g.to3p",
@@ -40,11 +42,11 @@
     {
       "family": "capacitor",
       "defined": true,
-      "record_count": 7,
-      "concrete_records": 4,
+      "record_count": 10,
+      "concrete_records": 7,
       "generic_fallback_records": 3,
       "equivalence_groups": 3,
-      "verified_records": 4,
+      "verified_records": 7,
       "library_derived_records": 0,
       "rule_inferred_records": 2,
       "placeholder_records": 1,
@@ -61,10 +63,29 @@
         "capacitor.ceramic.0603",
         "capacitor.ceramic.0805",
         "capacitor.electrolytic.radial",
+        "capacitor.kemet.t491a475k025at.case_a",
         "capacitor.murata.grm188r71h104ka93d.0603",
         "capacitor.murata.grm21br61a106ke19l.0805",
         "capacitor.murata.grm21br71h104ka01l.0805",
-        "capacitor.panasonic.eeufr1c221.radial"
+        "capacitor.panasonic.eeufr1c221.radial",
+        "capacitor.panasonic.eeufr1v221.radial",
+        "capacitor.wima.mks2c031001a00kssd.tht"
+      ]
+    },
+    {
+      "family": "comparator",
+      "defined": true,
+      "record_count": 1,
+      "concrete_records": 1,
+      "generic_fallback_records": 0,
+      "equivalence_groups": 0,
+      "verified_records": 1,
+      "library_derived_records": 0,
+      "rule_inferred_records": 0,
+      "placeholder_records": 0,
+      "blocked_records": 0,
+      "record_ids": [
+        "comparator.ti.tlv1701aidbvr.sot23_5"
       ]
     },
     {
@@ -147,11 +168,11 @@
     {
       "family": "diode",
       "defined": true,
-      "record_count": 5,
-      "concrete_records": 2,
+      "record_count": 6,
+      "concrete_records": 3,
       "generic_fallback_records": 3,
       "equivalence_groups": 2,
-      "verified_records": 5,
+      "verified_records": 6,
       "library_derived_records": 0,
       "rule_inferred_records": 0,
       "placeholder_records": 0,
@@ -165,6 +186,7 @@
       ],
       "record_ids": [
         "diode.diodes.bat54ws.sod_323",
+        "diode.diodes.ddz5v1b_7.sod123",
         "diode.onsemi.1n4148w.sod_123",
         "diode.schottky.generic",
         "diode.signal.generic",
@@ -278,11 +300,11 @@
     {
       "family": "opamp",
       "defined": true,
-      "record_count": 3,
-      "concrete_records": 2,
+      "record_count": 4,
+      "concrete_records": 3,
       "generic_fallback_records": 1,
       "equivalence_groups": 0,
-      "verified_records": 2,
+      "verified_records": 3,
       "library_derived_records": 0,
       "rule_inferred_records": 0,
       "placeholder_records": 1,
@@ -295,7 +317,8 @@
       "record_ids": [
         "opamp.generic.single.lmv321",
         "opamp.ti.lm358.soic8",
-        "opamp.ti.lmv321.sot23_5"
+        "opamp.ti.lmv321.sot23_5",
+        "opamp.ti.opa134ua.soic8"
       ]
     },
     {
@@ -343,13 +366,29 @@
       ]
     },
     {
+      "family": "relay",
+      "defined": true,
+      "record_count": 1,
+      "concrete_records": 1,
+      "generic_fallback_records": 0,
+      "equivalence_groups": 0,
+      "verified_records": 1,
+      "library_derived_records": 0,
+      "rule_inferred_records": 0,
+      "placeholder_records": 0,
+      "blocked_records": 0,
+      "record_ids": [
+        "relay.omron.g5q_1a.dc12"
+      ]
+    },
+    {
       "family": "resistor",
       "defined": true,
-      "record_count": 6,
-      "concrete_records": 4,
+      "record_count": 15,
+      "concrete_records": 13,
       "generic_fallback_records": 2,
       "equivalence_groups": 3,
-      "verified_records": 4,
+      "verified_records": 13,
       "library_derived_records": 0,
       "rule_inferred_records": 2,
       "placeholder_records": 0,
@@ -365,9 +404,18 @@
       "record_ids": [
         "resistor.generic.0603",
         "resistor.generic.0805",
+        "resistor.vishay.ac03.0r22.axial",
+        "resistor.vishay.ac03.10r.axial",
         "resistor.vishay.crcw080510k0fkea.0805",
+        "resistor.vishay.tnpw0805.10k0.0p1",
+        "resistor.vishay.tnpw0805.11k7.0p1",
+        "resistor.vishay.tnpw0805.12k5.0p1",
+        "resistor.vishay.tnpw0805.1k00.1p0",
+        "resistor.vishay.tnpw0805.47k0.0p1",
+        "resistor.vishay.tnpw0805.680k.1p0",
         "resistor.yageo.rc0603fr_0710kl.0603",
         "resistor.yageo.rc0805fr_0710kl.0805",
+        "resistor.yageo.rc0805fr_0747rl.0805",
         "resistor.yageo.rc0805fr_074k7l.0805"
       ]
     },

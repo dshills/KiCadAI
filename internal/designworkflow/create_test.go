@@ -10,14 +10,31 @@ import (
 	"kicadai/internal/blocks"
 	"kicadai/internal/componentprops"
 	"kicadai/internal/components"
+	"kicadai/internal/fabrication"
 	"kicadai/internal/inspect"
 	"kicadai/internal/kicadfiles"
 	pcbfiles "kicadai/internal/kicadfiles/pcb"
 	"kicadai/internal/kicadfiles/schematic"
+	"kicadai/internal/libraryresolver"
 	"kicadai/internal/reports"
 	"kicadai/internal/schematicrules"
 	"kicadai/internal/transactions"
 )
+
+func TestPlacementOptionsForCreatePropagatesAuthoritativeLibraryIndex(t *testing.T) {
+	topLevel := &libraryresolver.LibraryIndex{Footprints: map[string]libraryresolver.FootprintRecord{"Test:Top": {FootprintID: "Test:Top"}}}
+	placementLevel := &libraryresolver.LibraryIndex{Footprints: map[string]libraryresolver.FootprintRecord{"Test:Placement": {FootprintID: "Test:Placement"}}}
+	selection := ComponentSelectionEntry{InstanceID: "amp", Role: "output"}
+
+	got := placementOptionsForCreate(CreateOptions{LibraryIndex: topLevel}, []ComponentSelectionEntry{selection})
+	if got.LibraryIndex != topLevel || len(got.ComponentSelections) != 1 || got.ComponentSelections[0].Role != "output" {
+		t.Fatalf("propagated placement options = %#v", got)
+	}
+	got = placementOptionsForCreate(CreateOptions{LibraryIndex: topLevel, Placement: PlacementOptions{LibraryIndex: placementLevel}}, nil)
+	if got.LibraryIndex != placementLevel {
+		t.Fatalf("explicit placement library index was replaced: %#v", got.LibraryIndex)
+	}
+}
 
 func TestCreateWritesWorkflowResult(t *testing.T) {
 	request := Request{
@@ -274,6 +291,15 @@ func TestFabricationReadinessStageBlocksMissingPackageEvidence(t *testing.T) {
 	}
 }
 
+func TestFabricationReadinessStagePackagePathRetainsPreflightFailure(t *testing.T) {
+	request := Request{Validation: ValidationSpec{Acceptance: AcceptanceFabricationCandidate}}
+	written := ProjectWriteResult{Inspection: inspect.ProjectSummary{Root: t.TempDir()}}
+	stage := fabricationReadinessStageWithOptions(context.Background(), &request, &written, &fabrication.Options{})
+	if stage.Status != StageStatusBlocked || stage.Summary["dry_run"] != true {
+		t.Fatalf("stage = %#v, want package path to retain its blocked dry-run preflight", stage)
+	}
+}
+
 func TestFabricationReadinessStageSummarizesPhysicalRules(t *testing.T) {
 	root := t.TempDir()
 	if err := os.WriteFile(filepath.Join(root, "demo.kicad_pro"), []byte("{}\n"), 0o644); err != nil {
@@ -297,6 +323,38 @@ func TestFabricationReadinessStageSummarizesPhysicalRules(t *testing.T) {
 	}
 	if _, ok := physical["blocker_count"].(int); !ok {
 		t.Fatalf("physical_rules blocker_count missing: %#v", physical)
+	}
+}
+
+func TestFabricationBlockReadinessReportRequiresVerifiedEvidence(t *testing.T) {
+	verified := StageResult{Summary: map[string]any{"block_evidence": []BlockEvidenceSummary{
+		{InstanceID: "gain", BlockID: "speaker_opamp_driver", Status: "verified"},
+		{InstanceID: "output", BlockID: "class_ab_speaker_power_stage", Status: "verified"},
+	}}}
+	data, err := fabricationBlockReadinessReport(verified)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(data) == 0 {
+		t.Fatal("verified block evidence did not produce readiness report")
+	}
+	var report struct {
+		Status string `json:"status"`
+		Gates  []struct {
+			Status string `json:"status"`
+		} `json:"gates"`
+	}
+	if err := json.Unmarshal(data, &report); err != nil {
+		t.Fatal(err)
+	}
+	if report.Status != "pass" || len(report.Gates) != 2 || report.Gates[0].Status != "pass" || report.Gates[1].Status != "pass" {
+		t.Fatalf("readiness report = %#v", report)
+	}
+
+	missing := verified
+	missing.Summary = map[string]any{"block_evidence": []BlockEvidenceSummary{{BlockID: "speaker_opamp_driver", Status: "missing"}}}
+	if data, err := fabricationBlockReadinessReport(missing); err != nil || len(data) != 0 {
+		t.Fatalf("missing evidence produced readiness report: %s", data)
 	}
 }
 

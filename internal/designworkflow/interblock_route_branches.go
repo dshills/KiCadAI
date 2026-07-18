@@ -128,6 +128,35 @@ func RouteInterBlockTreeBranches(ctx context.Context, base routing.Request, grou
 }
 
 func RouteInterBlockTreeBranchesWithAccess(ctx context.Context, base routing.Request, group InterBlockRouteGroup, tree InterBlockRouteTree, access []RouteTreeEndpointAccess) InterBlockBranchRoutingResult {
+	baseline := routeInterBlockTreeBranchesWithAccessOrder(ctx, base, group, tree, access, nil)
+	if ctx != nil && ctx.Err() != nil {
+		return baseline
+	}
+	failed := map[int]struct{}{}
+	for _, branch := range baseline.Branches {
+		if branch.Status != routing.StatusRouted {
+			failed[branch.BranchIndex] = struct{}{}
+		}
+	}
+	if len(failed) == 0 || len(failed) == len(tree.Branches) {
+		return baseline
+	}
+	cache := routeTreeAccessCandidateCache{}
+	ordered := routeTreeBranchesForRoutingWithAccess(tree.Branches, access, tree.NetName, cache)
+	selected := baseline
+	for _, retryOrder := range [][]InterBlockRouteTreeBranch{
+		routeTreeBranchesWithFailuresLast(ordered, failed),
+		routeTreeBranchesWithFailuresFirst(ordered, failed),
+	} {
+		retry := routeInterBlockTreeBranchesWithAccessOrder(ctx, base, group, tree, access, retryOrder)
+		if interBlockBranchRoutingResultBetter(retry, selected) {
+			selected = retry
+		}
+	}
+	return selected
+}
+
+func routeInterBlockTreeBranchesWithAccessOrder(ctx context.Context, base routing.Request, group InterBlockRouteGroup, tree InterBlockRouteTree, access []RouteTreeEndpointAccess, orderedBranches []InterBlockRouteTreeBranch) InterBlockBranchRoutingResult {
 	result := InterBlockBranchRoutingResult{NetName: tree.NetName}
 	result.Branches = make([]InterBlockBranchRoutingEvidence, 0, len(tree.Branches))
 	endpoints := interBlockRouteGroupEndpointsByID(group)
@@ -139,7 +168,11 @@ func RouteInterBlockTreeBranchesWithAccess(ctx context.Context, base routing.Req
 	preferSameNetCopperMerge := routeTreePrefersSameNetCopperAccess(base.Nets, tree.NetName)
 	branchAccess = routeTreeEndpointAccessWithSameNetCopper(branchAccess, base.Existing, tree.NetName)
 	accessCandidateCache := routeTreeAccessCandidateCache{}
-	orderedBranches := routeTreeBranchesForRoutingWithAccess(tree.Branches, branchAccess, tree.NetName, accessCandidateCache)
+	if len(orderedBranches) == 0 {
+		orderedBranches = routeTreeBranchesForRoutingWithAccess(tree.Branches, branchAccess, tree.NetName, accessCandidateCache)
+	} else {
+		orderedBranches = slices.Clone(orderedBranches)
+	}
 	mergeAuditBase := routeTreeMergeAuditBaseForRequest(base, tree.NetName, preferSameNetCopperMerge)
 	for branchPosition, branch := range orderedBranches {
 		evidence := InterBlockBranchRoutingEvidence{
@@ -218,6 +251,58 @@ func RouteInterBlockTreeBranchesWithAccess(ctx context.Context, base routing.Req
 		result.Branches = append(result.Branches, evidence)
 	}
 	return result
+}
+
+func routeTreeBranchesWithFailuresLast(branches []InterBlockRouteTreeBranch, failed map[int]struct{}) []InterBlockRouteTreeBranch {
+	ordered := make([]InterBlockRouteTreeBranch, 0, len(branches))
+	for _, branch := range branches {
+		if _, wasFailed := failed[branch.Index]; !wasFailed {
+			ordered = append(ordered, branch)
+		}
+	}
+	for _, branch := range branches {
+		if _, wasFailed := failed[branch.Index]; wasFailed {
+			ordered = append(ordered, branch)
+		}
+	}
+	return ordered
+}
+
+func routeTreeBranchesWithFailuresFirst(branches []InterBlockRouteTreeBranch, failed map[int]struct{}) []InterBlockRouteTreeBranch {
+	ordered := make([]InterBlockRouteTreeBranch, 0, len(branches))
+	for _, branch := range branches {
+		if _, wasFailed := failed[branch.Index]; wasFailed {
+			ordered = append(ordered, branch)
+		}
+	}
+	for _, branch := range branches {
+		if _, wasFailed := failed[branch.Index]; !wasFailed {
+			ordered = append(ordered, branch)
+		}
+	}
+	return ordered
+}
+
+func interBlockBranchRoutingResultBetter(candidate, baseline InterBlockBranchRoutingResult) bool {
+	count := func(result InterBlockBranchRoutingResult) (blocked int, routed int) {
+		for _, branch := range result.Branches {
+			if branch.Status == routing.StatusRouted {
+				routed++
+			} else {
+				blocked++
+			}
+		}
+		return blocked, routed
+	}
+	candidateBlocked, candidateRouted := count(candidate)
+	baselineBlocked, baselineRouted := count(baseline)
+	if candidateBlocked != baselineBlocked {
+		return candidateBlocked < baselineBlocked
+	}
+	if candidateRouted != baselineRouted {
+		return candidateRouted > baselineRouted
+	}
+	return len(candidate.Issues) < len(baseline.Issues)
 }
 
 func routeTreeIssueCounters(issues []reports.Issue) (blocking int, warnings int, info int, fixedNetSkips int) {
@@ -769,11 +854,23 @@ func routeTreeAccessCandidatesWithProvenCopperContact(candidates []routeTreeBran
 	}
 	filtered := make([]routeTreeBranchAccessCandidate, 0, len(candidates))
 	for _, candidate := range candidates {
-		if !routeTreeAccessIsGeneratedSameNetCopper(candidate.Access) || routeTreeCopperTouchesAnyExactAccess(candidate.Access, exact) {
+		if !routeTreeAccessRequiresExactContactProof(candidate) || routeTreeCopperTouchesAnyExactAccess(candidate.Access, exact) {
 			filtered = append(filtered, candidate)
 		}
 	}
 	return filtered
+}
+
+func routeTreeAccessRequiresExactContactProof(candidate routeTreeBranchAccessCandidate) bool {
+	if candidate.EndpointRank == routeTreeAccessExactEndpointRank {
+		return false
+	}
+	// An endpoint-unscoped local-route anchor or generated copper point is a
+	// useful same-net merge candidate only when it is already in physical
+	// contact with the concrete endpoint being connected. Otherwise accepting
+	// it can report a routed branch while leaving the requested pad in another
+	// same-net contact-graph component.
+	return candidate.Access.Role == RouteTreeAccessLocalRouteAnchor || routeTreeAccessIsGeneratedSameNetCopper(candidate.Access)
 }
 
 func routeTreeCopperTouchesAnyExactAccess(copper RouteTreeEndpointAccess, exact []RouteTreeEndpointAccess) bool {

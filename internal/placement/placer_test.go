@@ -4,6 +4,7 @@ import (
 	"context"
 	"math"
 	"reflect"
+	"slices"
 	"testing"
 
 	"kicadai/internal/reports"
@@ -93,6 +94,23 @@ func TestPlaceRejectsFixedComponentCollision(t *testing.T) {
 		t.Fatalf("metrics = %#v, want one placed fixed and one unplaced", result.Metrics)
 	}
 	assertIssueContains(t, result.Issues, "fixed placement conflicts with component R1")
+}
+
+func TestPlacePreservesPhysicallyClearFixedComponentsInsidePreferredSpacing(t *testing.T) {
+	req := twoComponentRequest()
+	req.Rules.ComponentSpacingMM = 1
+	req.Components[0].Fixed = true
+	req.Components[0].Position = &Placement{XMM: 5, YMM: 5, Layer: "F.Cu"}
+	req.Components[1].Fixed = true
+	req.Components[1].Position = &Placement{XMM: 7.25, YMM: 5, Layer: "F.Cu"}
+
+	result := Place(req)
+	if result.Status != StatusPlaced || result.Metrics.PlacedCount != 2 {
+		t.Fatalf("placement = %#v, want both physically clear fixed components preserved", result)
+	}
+	if issues := ValidateGeometry(req, result.Placements); len(issues) != 0 {
+		t.Fatalf("geometry issues = %#v", issues)
+	}
 }
 
 func TestPlaceRejectsFixedComponentKeepoutOverlap(t *testing.T) {
@@ -357,6 +375,169 @@ func TestPlaceContinuesPastInvalidCandidateRotation(t *testing.T) {
 	}
 	if result.Position.RotationDeg != 0 {
 		t.Fatalf("rotation = %.1f, want valid fallback rotation", result.Position.RotationDeg)
+	}
+}
+
+func TestPlaceRejectsCandidatesOutsideDeclaredGroupSpread(t *testing.T) {
+	req := Request{
+		Board: BoardPlacementArea{WidthMM: 30, HeightMM: 20, MarginMM: 1},
+		Rules: DefaultRules(),
+		Components: []Component{
+			{Ref: "U1", FootprintID: "Package_SO:SOIC-8", Bounds: Bounds{WidthMM: 2, HeightMM: 2, Source: BoundsExplicit}, Fixed: true, Position: &Placement{XMM: 5, YMM: 10, Layer: "F.Cu"}},
+			{Ref: "C1", FootprintID: "Capacitor_SMD:C_0805_2012Metric", Bounds: Bounds{WidthMM: 2, HeightMM: 2, Source: BoundsExplicit}},
+		},
+		Groups: []Group{{ID: "local", Components: []string{"U1", "C1"}, KeepTogether: true, MaxSpreadMM: 4}},
+	}
+	req.Rules.CandidateScoring.Enabled = true
+
+	result := Place(req)
+	if result.Status != StatusPlaced {
+		t.Fatalf("status = %s, want placed; issues=%#v", result.Status, result.Issues)
+	}
+	if got := result.CandidateScoring.RejectedByReason[string(CandidateRejectGroupConstraint)]; got == 0 {
+		t.Fatalf("group-constraint candidate rejections = %d, want non-zero", got)
+	}
+	if issues := ValidateGroups(req, result.Placements); len(issues) != 0 {
+		t.Fatalf("declared group spread was not enforced: %#v", issues)
+	}
+}
+
+func TestPlaceRejectsCandidatesOutsideRequiredProximity(t *testing.T) {
+	req := Request{
+		Board: BoardPlacementArea{WidthMM: 30, HeightMM: 20, MarginMM: 1},
+		Rules: DefaultRules(),
+		Components: []Component{
+			{Ref: "U1", FootprintID: "Test:U", Bounds: Bounds{WidthMM: 2, HeightMM: 2, Source: BoundsExplicit}, Fixed: true, Position: &Placement{XMM: 5, YMM: 10, Layer: "F.Cu"}},
+			{Ref: "C1", FootprintID: "Test:C", Bounds: Bounds{WidthMM: 2, HeightMM: 2, Source: BoundsExplicit}, Position: &Placement{XMM: 25, YMM: 10, Layer: "F.Cu"}, Mobility: MobilityPolicy{Class: MobilityLocalRebuild, RouteHandling: RouteHandlingInvalidateRebuild}},
+		},
+		ProximityRules: []ProximityRule{{ID: "local", AnchorRef: "U1", TargetRefs: []string{"C1"}, MaxDistanceMM: 4, Required: true}},
+	}
+	req.Rules.CandidateScoring.Enabled = true
+
+	result := Place(req)
+	if result.Status != StatusPlaced {
+		t.Fatalf("result = %#v, want required proximity satisfied", result)
+	}
+	if got := result.CandidateScoring.RejectedByReason[string(CandidateRejectProximity)]; got == 0 {
+		t.Fatalf("proximity candidate rejections = %d, want non-zero", got)
+	}
+	if issues := ValidateRequiredProximity(req, result.Placements); len(issues) != 0 {
+		t.Fatalf("required proximity was not enforced: %#v", issues)
+	}
+}
+
+func TestPlaceFailsClosedForFixedRequiredProximityViolation(t *testing.T) {
+	req := Request{
+		Board: BoardPlacementArea{WidthMM: 30, HeightMM: 20, MarginMM: 1},
+		Rules: DefaultRules(),
+		Components: []Component{
+			{Ref: "U1", FootprintID: "Test:U", Bounds: Bounds{WidthMM: 2, HeightMM: 2, Source: BoundsExplicit}, Fixed: true, Position: &Placement{XMM: 5, YMM: 10, Layer: "F.Cu"}},
+			{Ref: "C1", FootprintID: "Test:C", Bounds: Bounds{WidthMM: 2, HeightMM: 2, Source: BoundsExplicit}, Fixed: true, Position: &Placement{XMM: 25, YMM: 10, Layer: "F.Cu"}},
+		},
+		ProximityRules: []ProximityRule{{ID: "local", AnchorRef: "U1", TargetRefs: []string{"C1"}, MaxDistanceMM: 4, Required: true}},
+	}
+
+	result := Place(req)
+	if result.Status != StatusPartial || len(ValidateRequiredProximity(req, result.Placements)) == 0 {
+		t.Fatalf("result = %#v, want fixed proximity violation to fail closed", result)
+	}
+}
+
+func TestOrderComponentsForRequiredProximityPlacesAnchorBeforeTargets(t *testing.T) {
+	components := []Component{{Ref: "A"}, {Ref: "B"}, {Ref: "C"}}
+	rules := []ProximityRule{{ID: "local", AnchorRef: "C", TargetRefs: []string{"A", "B"}, MaxDistanceMM: 3, Required: true}}
+
+	ordered := orderComponentsForRequiredProximity(components, rules)
+	if got := []string{ordered[0].Ref, ordered[1].Ref, ordered[2].Ref}; !slices.Equal(got, []string{"C", "A", "B"}) {
+		t.Fatalf("order = %#v, want required anchor before stable targets", got)
+	}
+}
+
+func TestOrderComponentsForRequiredProximityPreservesStableOrderAcrossCycle(t *testing.T) {
+	components := []Component{{Ref: "A"}, {Ref: "B"}, {Ref: "C"}}
+	rules := []ProximityRule{
+		{ID: "ab", AnchorRef: "A", TargetRefs: []string{"B"}, MaxDistanceMM: 3, Required: true},
+		{ID: "ba", AnchorRef: "B", TargetRefs: []string{"A"}, MaxDistanceMM: 3, Required: true},
+	}
+
+	ordered := orderComponentsForRequiredProximity(components, rules)
+	if got := []string{ordered[0].Ref, ordered[1].Ref, ordered[2].Ref}; !slices.Equal(got, []string{"A", "B", "C"}) {
+		t.Fatalf("order = %#v, want cyclic cluster kept at its stable base priority", got)
+	}
+}
+
+func TestPlaceSamplesRequiredProximityNeighborhoodOnCoarseGrid(t *testing.T) {
+	req := Request{
+		Board: BoardPlacementArea{WidthMM: 40, HeightMM: 30, MarginMM: 1},
+		Rules: DefaultRules(),
+		Components: []Component{
+			{Ref: "U1", FootprintID: "Test:U", Bounds: Bounds{WidthMM: 5, HeightMM: 5, Source: BoundsExplicit}, Fixed: true, Position: &Placement{XMM: 7, YMM: 13, Layer: "F.Cu"}},
+			{Ref: "Q1", FootprintID: "Test:Q", Bounds: Bounds{WidthMM: 6, HeightMM: 4, Source: BoundsExplicit}, Position: &Placement{XMM: 35, YMM: 25, Layer: "F.Cu"}, Mobility: MobilityPolicy{Class: MobilityLocalRebuild, RouteHandling: RouteHandlingInvalidateRebuild}},
+		},
+		ProximityRules: []ProximityRule{{ID: "thermal", AnchorRef: "U1", TargetRefs: []string{"Q1"}, MaxDistanceMM: 10, Required: true}},
+	}
+	req.Rules.GridMM = 5
+	req.Rules.MaxCandidatesPerPart = 64
+
+	result := Place(req)
+	if result.Status != StatusPlaced {
+		t.Fatalf("result = %#v, want anchor-centered coarse-grid candidate", result)
+	}
+	if issues := ValidateRequiredProximity(req, result.Placements); len(issues) != 0 {
+		t.Fatalf("required proximity issues = %#v", issues)
+	}
+}
+
+func TestPlaceSamplesAndPrefersAuthoredPositionForRetryMovableComponent(t *testing.T) {
+	preferred := Placement{XMM: 24, YMM: 14, Layer: "F.Cu"}
+	req := Request{
+		Board: BoardPlacementArea{WidthMM: 30, HeightMM: 20, MarginMM: 1},
+		Rules: DefaultRules(),
+		Components: []Component{{
+			Ref: "U1", FootprintID: "Package_SO:SOIC-8",
+			Bounds:   Bounds{WidthMM: 2, HeightMM: 2, Source: BoundsExplicit},
+			Position: &preferred,
+			Mobility: MobilityPolicy{Class: MobilitySoftPreferred, RouteHandling: RouteHandlingInvalidateRebuild},
+		}},
+	}
+	req.Rules.CandidateScoring.Enabled = true
+
+	result := Place(req)
+	if result.Status != StatusPlaced || len(result.Placements) != 1 {
+		t.Fatalf("result = %#v, want one placed component", result)
+	}
+	got := result.Placements[0].Position
+	if got.XMM != preferred.XMM || got.YMM != preferred.YMM {
+		t.Fatalf("placement = %#v, want authored preference %#v", got, preferred)
+	}
+	foundMobility := false
+	for _, dimension := range result.CandidateScoring.WinningCandidates[0].Dimensions {
+		if dimension.Name == CandidateScoreMobility {
+			foundMobility = true
+			break
+		}
+	}
+	if !foundMobility {
+		t.Fatalf("winning dimensions = %#v, want mobility evidence", result.CandidateScoring.WinningCandidates[0].Dimensions)
+	}
+}
+
+func TestCandidateAnchorRejectsTranslatedKeepoutOverPlacedComponent(t *testing.T) {
+	anchorPosition := Placement{XMM: 5, YMM: 5, Layer: "F.Cu"}
+	component := Component{Ref: "Q1", Position: &anchorPosition}
+	candidate := PlacementResult{Ref: "Q1", Position: Placement{XMM: 15, YMM: 5, Layer: "F.Cu"}, Bounds: Rect{Min: Point{XMM: 14, YMM: 4}, Max: Point{XMM: 16, YMM: 6}}}
+	request := Request{
+		Components: []Component{component},
+		Groups:     []Group{{ID: "power", Anchor: GroupAnchor{Ref: "Q1"}, Components: []string{"Q1"}}},
+		Keepouts:   []Keepout{{ID: "heatsink", GroupID: "power", Bounds: Rect{Min: Point{XMM: 4, YMM: 4}, Max: Point{XMM: 6, YMM: 6}}, Layers: []string{"F.Cu"}, ExemptRefs: []string{"Q1"}}},
+	}
+	placed := map[string]PlacementResult{
+		"R1": {Ref: "R1", Position: Placement{XMM: 15, YMM: 5, Layer: "F.Cu"}, Bounds: Rect{Min: Point{XMM: 14.5, YMM: 4.5}, Max: Point{XMM: 15.5, YMM: 5.5}}},
+	}
+
+	keepoutID, placedRef, rejected := candidateTranslatedKeepoutConflict(component, candidate, request, placed)
+	if !rejected || keepoutID != "heatsink" || placedRef != "R1" {
+		t.Fatalf("translated keepout conflict = (%q, %q, %t), want (heatsink, R1, true)", keepoutID, placedRef, rejected)
 	}
 }
 

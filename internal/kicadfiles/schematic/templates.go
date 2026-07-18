@@ -489,6 +489,55 @@ func LocalSymbolLibraryForRaw(rawSymbols []string) ([]byte, bool) {
 	return buf.Bytes(), true
 }
 
+// LocalSymbolLibraryForEmbedded renders the exact embedded symbol bodies used
+// by a generated schematic into a project-local library. This keeps KiCad's
+// library comparison source identical to the serialized schematic even when a
+// bundled fallback and the installed global library have different revisions.
+func LocalSymbolLibraryForEmbedded(symbols []EmbeddedSymbol) ([]byte, bool) {
+	bodies := make([]sexpr.Node, 0, len(symbols))
+	seen := map[string]struct{}{}
+	for _, symbol := range symbols {
+		libraryID := strings.TrimSpace(symbol.LibraryID)
+		if libraryID == "" || len(symbol.Body) < 2 {
+			continue
+		}
+		body := append(sexpr.List(nil), symbol.Body...)
+		head, ok := body[0].(sexpr.Atom)
+		if !ok || string(head) != "symbol" {
+			return nil, false
+		}
+		name := libraryID
+		if separator := strings.LastIndex(name, ":"); separator >= 0 {
+			name = strings.TrimSpace(name[separator+1:])
+		}
+		if name == "" {
+			return nil, false
+		}
+		nameKey := strings.ToLower(name)
+		if _, duplicate := seen[nameKey]; duplicate {
+			continue
+		}
+		seen[nameKey] = struct{}{}
+		body[1] = sexpr.S(name)
+		bodies = append(bodies, body)
+	}
+	if len(bodies) == 0 {
+		return nil, false
+	}
+	nodes := []sexpr.Node{
+		sexpr.A("kicad_symbol_lib"),
+		sexpr.L(sexpr.A("version"), sexpr.I(kicadfiles.KiCadSchematicFormatWithGeneratorVersion)),
+		sexpr.L(sexpr.A("generator"), sexpr.S("kicadai")),
+		sexpr.L(sexpr.A("generator_version"), sexpr.S(schematicGeneratorVersion)),
+	}
+	nodes = append(nodes, bodies...)
+	var buf bytes.Buffer
+	if err := sexpr.Render(&buf, sexpr.L(nodes...)); err != nil {
+		return nil, false
+	}
+	return buf.Bytes(), true
+}
+
 // CanonicalEmbeddedSymbolLibraryID returns the project-local library ID that
 // KiCad resolves for a known generated symbol. Local aliases may use a
 // convenient AI-facing spelling, but the on-disk library and schematic must

@@ -140,6 +140,7 @@ type PadSummary struct {
 	WidthMM     float64
 	HeightMM    float64
 	Type        string
+	Shape       string
 	DrillMM     float64
 	Layers      []string
 }
@@ -541,6 +542,7 @@ const (
 	CandidateRejectSide              CandidateRejectionReasonName = "side"
 	CandidateRejectRotation          CandidateRejectionReasonName = "rotation"
 	CandidateRejectGroupConstraint   CandidateRejectionReasonName = "group_constraint"
+	CandidateRejectProximity         CandidateRejectionReasonName = "proximity_constraint"
 	CandidateRejectMissingGeometry   CandidateRejectionReasonName = "missing_geometry"
 	CandidateRejectUnsupportedPolicy CandidateRejectionReasonName = "unsupported_policy"
 	CandidateRejectAdvancedRule      CandidateRejectionReasonName = "advanced_rule"
@@ -1123,7 +1125,7 @@ func Validate(request Request) []reports.Issue {
 				continue
 			}
 			componentGroup := strings.TrimSpace(component.GroupID)
-			if componentGroup != "" && !strings.EqualFold(componentGroup, id) {
+			if group.TranslateAsUnit && componentGroup != "" && !strings.EqualFold(componentGroup, id) {
 				issues = append(issues, issue(path+".components", fmt.Sprintf("component %s has group ID %s but is listed in group %s", trimmedRef, componentGroup, id)))
 			}
 		}

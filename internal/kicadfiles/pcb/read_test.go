@@ -18,6 +18,8 @@ func TestReadPCBWrittenByWriter(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	attributeFootprintUUID := board.Footprints[0].UUID
+	board.Footprints[0].Attributes = []string{"smd", "exclude_from_bom", "exclude_from_pos_files"}
 	var buf bytes.Buffer
 	if err := Write(&buf, board); err != nil {
 		t.Fatal(err)
@@ -34,6 +36,19 @@ func TestReadPCBWrittenByWriter(t *testing.T) {
 	}
 	if read.Footprints[0].Raw == "" || len(read.Footprints[0].Pads) == 0 || read.Footprints[0].Pads[0].Raw == "" {
 		t.Fatalf("footprint raw nodes not preserved: %#v", read.Footprints[0])
+	}
+	var attributeFootprint *Footprint
+	for index := range read.Footprints {
+		if read.Footprints[index].UUID == attributeFootprintUUID {
+			attributeFootprint = &read.Footprints[index]
+			break
+		}
+	}
+	if attributeFootprint == nil {
+		t.Fatalf("attribute footprint %q not read", attributeFootprintUUID)
+	}
+	if got := strings.Join(attributeFootprint.Attributes, ","); got != "smd,exclude_from_pos_files,exclude_from_bom" {
+		t.Fatalf("footprint attributes = %q, want KiCad-canonical placement and BOM exclusions", got)
 	}
 }
 

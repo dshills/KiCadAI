@@ -279,6 +279,27 @@ func TestPCBEvaluationAllowsSinglePadExportedNet(t *testing.T) {
 	}
 }
 
+func TestPCBEvaluationAllowsNamespacedSinglePadExportedNet(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "namespaced_single_endpoint.kicad_pcb")
+	writeFile(t, path, `(kicad_pcb
+  (version 20260206)
+  (generator "pcbnew")
+  (layers (0 "F.Cu" signal) (25 "Edge.Cuts" user))
+  (setup)
+  (gr_line (start 0 0) (end 1 0) (layer "Edge.Cuts"))
+  (footprint "Test:One" (property "Reference" "J1") (pad "1" smd rect (at 0 0) (layers "F.Cu") (net "power_header_VIN")))
+)`)
+	report, err := PCB(path)
+	if err != nil {
+		t.Fatalf("PCB returned error: %v", err)
+	}
+	for _, issue := range report.Issues {
+		if issue.Code == reports.CodeDisconnectedPad {
+			t.Fatalf("namespaced single-pad exported net should not be disconnected: %#v", report.Issues)
+		}
+	}
+}
+
 func TestPCBEvaluationReportsGenericSinglePadNet(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "single_endpoint.kicad_pcb")
 	writeFile(t, path, `(kicad_pcb

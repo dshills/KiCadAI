@@ -92,6 +92,7 @@ func PlaceExplicitCircuit(ctx context.Context, request Request, opts PlacementOp
 		})
 	}
 	placementRequest, padEntries, padIssues := hydratePlacementRequestPads(placementRequest, opts.LibraryIndex)
+	placementRequest.Rules.ComponentSpacingMM = max(placementRequest.Rules.ComponentSpacingMM, explicitRoutingAccessSpacing(request.ExplicitCircuit.Nets))
 	if request.ExplicitCircuit.RoutingPolicy == ExplicitRoutingPolicyConstrainedEndpointAccessV1 {
 		placementRequest.ComponentOrder = placement.ComponentOrderLargestFootprintFirstV1
 	}
@@ -109,6 +110,26 @@ func PlaceExplicitCircuit(ctx context.Context, request Request, opts PlacementOp
 		stage.Status = StageStatusWarning
 	}
 	return PlacementStageResult{Request: placementRequest, Result: result, Stage: stage}
+}
+
+func explicitRoutingAccessSpacing(nets []ExplicitNetSpec) float64 {
+	// This is a conservative endpoint-access envelope, not a fixed density
+	// policy: each explicit net can tune both width and clearance, and the
+	// placement rule uses only the largest declared envelope.
+	defaultClearance := routing.DefaultRules().ClearanceMM
+	spacing := 0.0
+	for _, net := range nets {
+		width := net.WidthMM
+		if width <= 0 {
+			width = routing.DefaultRules().TraceWidthMM
+		}
+		clearance := net.ClearanceMM
+		if clearance <= 0 {
+			clearance = defaultClearance
+		}
+		spacing = max(spacing, width+2*clearance)
+	}
+	return spacing
 }
 
 func RouteExplicitCircuit(ctx context.Context, request Request, placed PlacementStageResult, opts RoutingOptions) RoutingStageResult {
@@ -144,8 +165,9 @@ func RouteExplicitCircuit(ctx context.Context, request Request, placed Placement
 		routingRequest.Rules.NetOverrides[net.Name] = rule
 	}
 	result := routing.Result{Status: routing.StatusBlocked}
+	routeOrder := FinalRouteOrderNegotiationSummary{}
 	if !reports.HasBlockingIssue(issues) {
-		result = routing.RouteRequestContext(ctx, routingRequest)
+		result, routeOrder = routeWithFailedNetFirstNegotiation(ctx, routingRequest)
 		issues = append(issues, result.Issues...)
 	}
 	issues = append(issues, explicitRequiredRouteIssues(request.ExplicitCircuit.Nets, result)...)
@@ -153,7 +175,7 @@ func RouteExplicitCircuit(ctx context.Context, request Request, placed Placement
 	stage := NewStageResult(StageRouting, issues)
 	stage.Summary = map[string]any{
 		"status": result.Status, "net_count": result.Metrics.NetCount, "routed_nets": result.Metrics.RoutedNetCount,
-		"failed_nets": result.Metrics.FailedNetCount, "route_operations": len(operations),
+		"failed_nets": result.Metrics.FailedNetCount, "route_operations": len(operations), "route_order": routeOrder,
 	}
 	if result.Status != routing.StatusRouted && stage.Status == StageStatusOK {
 		stage.Status = StageStatusWarning

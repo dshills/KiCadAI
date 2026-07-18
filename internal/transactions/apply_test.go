@@ -12,6 +12,7 @@ import (
 	"kicadai/internal/kicadfiles"
 	kicaddesign "kicadai/internal/kicadfiles/design"
 	"kicadai/internal/kicadfiles/pcb"
+	"kicadai/internal/kicadfiles/project"
 	"kicadai/internal/kicadfiles/schematic"
 	"kicadai/internal/libraryresolver"
 	"kicadai/internal/manifest"
@@ -70,6 +71,25 @@ func TestApplyBuildsSimpleProject(t *testing.T) {
 	}
 	if readProvenance.OperationCount != len(tx.Operations) {
 		t.Fatalf("operation count = %d, want %d", readProvenance.OperationCount, len(tx.Operations))
+	}
+}
+
+func TestApplyWritesCreateProjectTextVariables(t *testing.T) {
+	output := filepath.Join(t.TempDir(), "metadata")
+	tx := mustParse(t, `{"operations":[
+	  {"op":"create_project","name":"metadata","text_variables":{"board_finish":"ENIG","fabrication_notes":"Lead-free assembly."}},
+	  {"op":"write_project"}
+	]}`)
+	result := Apply(tx, ApplyOptions{OutputDir: output})
+	if len(result.Issues) != 0 {
+		t.Fatalf("unexpected issues: %#v", result.Issues)
+	}
+	written, err := project.ReadFile(filepath.Join(output, "metadata.kicad_pro"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if written.TextVariables["board_finish"] != "ENIG" || written.TextVariables["fabrication_notes"] != "Lead-free assembly." {
+		t.Fatalf("text variables = %#v", written.TextVariables)
 	}
 }
 
@@ -319,6 +339,11 @@ func TestApplyCanPreserveTransactionFootprintGeometryWithResolver(t *testing.T) 
 	for _, pad := range board.Footprints[0].Pads {
 		if pad.Type != "smd" || pad.Shape != "rect" || pad.Drill != 0 {
 			t.Fatalf("transaction footprint geometry was not preserved: %#v", board.Footprints[0].Pads)
+		}
+	}
+	for _, marker := range []string{"(fp_text", "(fp_line", "(fp_curve", "(model"} {
+		if !strings.Contains(board.Footprints[0].Raw, marker) {
+			t.Fatalf("resolver non-pad footprint geometry missing %q:\n%s", marker, board.Footprints[0].Raw)
 		}
 	}
 }

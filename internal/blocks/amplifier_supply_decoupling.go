@@ -22,6 +22,8 @@ func amplifierSupplyDecouplingDefinition() BlockDefinition {
 			{Name: "bulk_capacitance", Type: ParameterCapacitance, Default: "10uF", Description: "Optional local bulk capacitor value."},
 			{Name: "include_bulk", Type: ParameterBool, Default: true, Description: "Emit local bulk capacitors in addition to ceramic capacitors."},
 			{Name: "capacitor_voltage_rating", Type: ParameterVoltage, Default: "16V", Description: "Rated voltage of emitted decoupling capacitors."},
+			{Name: "ceramic_component_id", Type: ParameterString, Default: "", Description: "Optional concrete stable-capacitance local bypass component ID."},
+			{Name: "bulk_component_id", Type: ParameterString, Default: "", Description: "Optional concrete low-ESR local bulk component ID."},
 			{Name: "ceramic_footprint", Type: ParameterFootprintID, Default: "Capacitor_SMD:C_0805_2012Metric", Description: "Ceramic capacitor footprint."},
 			{Name: "bulk_footprint", Type: ParameterFootprintID, Default: "Capacitor_SMD:C_1210_3225Metric", Description: "Bulk capacitor footprint."},
 		},
@@ -63,10 +65,10 @@ func amplifierSupplyDecouplingDefinition() BlockDefinition {
 
 func amplifierSupplyDecouplingComponents() []BlockComponent {
 	return []BlockComponent{
-		{Role: "vcc_ceramic", RefPrefix: "C", Value: "100nF", SymbolID: "Device:C", FootprintID: "Capacitor_SMD:C_0805_2012Metric", Pins: twoTerminalHorizontalPins(), ComponentQuery: &components.Query{Family: "capacitor", ValueKind: "capacitance"}, ComponentValueParam: "ceramic_capacitance", ComponentVoltageParam: "capacitor_voltage_rating", ComponentPackageParam: "ceramic_footprint", MinimumConfidence: components.ConfidenceRuleInferred, Acceptance: components.AcceptanceConnectivity, PlacementGroup: "local_decoupling"},
-		{Role: "vcc_bulk", RefPrefix: "C", Value: "10uF", SymbolID: "Device:C_Polarized", FootprintID: "Capacitor_SMD:C_1210_3225Metric", Pins: twoTerminalHorizontalPins(), ComponentQuery: &components.Query{Family: "capacitor", ValueKind: "capacitance"}, ComponentValueParam: "bulk_capacitance", ComponentVoltageParam: "capacitor_voltage_rating", ComponentPackageParam: "bulk_footprint", MinimumConfidence: components.ConfidenceRuleInferred, Acceptance: components.AcceptanceConnectivity, PlacementGroup: "local_decoupling", When: RealizationWhen{Params: map[string]any{"include_bulk": true}}},
-		{Role: "vee_ceramic", RefPrefix: "C", Value: "100nF", SymbolID: "Device:C", FootprintID: "Capacitor_SMD:C_0805_2012Metric", Pins: twoTerminalHorizontalPins(), ComponentQuery: &components.Query{Family: "capacitor", ValueKind: "capacitance"}, ComponentValueParam: "ceramic_capacitance", ComponentVoltageParam: "capacitor_voltage_rating", ComponentPackageParam: "ceramic_footprint", MinimumConfidence: components.ConfidenceRuleInferred, Acceptance: components.AcceptanceConnectivity, PlacementGroup: "local_decoupling", When: RealizationWhen{Params: map[string]any{"rail_mode": "dual_supply"}}},
-		{Role: "vee_bulk", RefPrefix: "C", Value: "10uF", SymbolID: "Device:C_Polarized", FootprintID: "Capacitor_SMD:C_1210_3225Metric", Pins: twoTerminalHorizontalPins(), ComponentQuery: &components.Query{Family: "capacitor", ValueKind: "capacitance"}, ComponentValueParam: "bulk_capacitance", ComponentVoltageParam: "capacitor_voltage_rating", ComponentPackageParam: "bulk_footprint", MinimumConfidence: components.ConfidenceRuleInferred, Acceptance: components.AcceptanceConnectivity, PlacementGroup: "local_decoupling", When: RealizationWhen{Params: map[string]any{"rail_mode": "dual_supply", "include_bulk": true}}},
+		{Role: "vcc_ceramic", RefPrefix: "C", Value: "100nF", SymbolID: "Device:C", FootprintID: "Capacitor_SMD:C_0805_2012Metric", Pins: twoTerminalHorizontalPins(), ComponentIDParam: "ceramic_component_id", ComponentQuery: &components.Query{Family: "capacitor", ValueKind: "capacitance"}, ComponentValueParam: "ceramic_capacitance", ComponentVoltageParam: "capacitor_voltage_rating", ComponentPackageParam: "ceramic_footprint", MinimumConfidence: components.ConfidenceRuleInferred, Acceptance: components.AcceptanceConnectivity, PlacementGroup: "local_decoupling"},
+		{Role: "vcc_bulk", RefPrefix: "C", Value: "10uF", SymbolID: "Device:C_Polarized", FootprintID: "Capacitor_SMD:C_1210_3225Metric", Pins: twoTerminalHorizontalPins(), ComponentIDParam: "bulk_component_id", ComponentQuery: &components.Query{Family: "capacitor", ValueKind: "capacitance"}, ComponentValueParam: "bulk_capacitance", ComponentVoltageParam: "capacitor_voltage_rating", ComponentPackageParam: "bulk_footprint", MinimumConfidence: components.ConfidenceRuleInferred, Acceptance: components.AcceptanceConnectivity, PlacementGroup: "local_decoupling", When: RealizationWhen{Params: map[string]any{"include_bulk": true}}},
+		{Role: "vee_ceramic", RefPrefix: "C", Value: "100nF", SymbolID: "Device:C", FootprintID: "Capacitor_SMD:C_0805_2012Metric", Pins: twoTerminalHorizontalPins(), ComponentIDParam: "ceramic_component_id", ComponentQuery: &components.Query{Family: "capacitor", ValueKind: "capacitance"}, ComponentValueParam: "ceramic_capacitance", ComponentVoltageParam: "capacitor_voltage_rating", ComponentPackageParam: "ceramic_footprint", MinimumConfidence: components.ConfidenceRuleInferred, Acceptance: components.AcceptanceConnectivity, PlacementGroup: "local_decoupling", When: RealizationWhen{Params: map[string]any{"rail_mode": "dual_supply"}}},
+		{Role: "vee_bulk", RefPrefix: "C", Value: "10uF", SymbolID: "Device:C_Polarized", FootprintID: "Capacitor_SMD:C_1210_3225Metric", Pins: twoTerminalHorizontalPins(), ComponentIDParam: "bulk_component_id", ComponentQuery: &components.Query{Family: "capacitor", ValueKind: "capacitance"}, ComponentValueParam: "bulk_capacitance", ComponentVoltageParam: "capacitor_voltage_rating", ComponentPackageParam: "bulk_footprint", MinimumConfidence: components.ConfidenceRuleInferred, Acceptance: components.AcceptanceConnectivity, PlacementGroup: "local_decoupling", When: RealizationWhen{Params: map[string]any{"rail_mode": "dual_supply", "include_bulk": true}}},
 	}
 }
 
@@ -75,21 +77,26 @@ func amplifierSupplyDecouplingPCBRealization() *PCBRealization {
 		Version:           "0.1.0",
 		VerificationLevel: PCBVerificationPlacementVerified,
 		Components: []PCBComponentRealization{
-			{ComponentRole: "vcc_ceramic", FootprintParam: "ceramic_footprint", Placement: RelativePlacement{XMM: 0, YMM: -3, Layer: "F.Cu"}},
-			{ComponentRole: "vcc_bulk", FootprintParam: "bulk_footprint", Placement: RelativePlacement{XMM: 6, YMM: -3, Layer: "F.Cu"}, When: RealizationWhen{Params: map[string]any{"include_bulk": true}}},
-			{ComponentRole: "vee_ceramic", FootprintParam: "ceramic_footprint", Placement: RelativePlacement{XMM: 0, YMM: 3, Layer: "F.Cu"}, When: RealizationWhen{Params: map[string]any{"rail_mode": "dual_supply"}}},
-			{ComponentRole: "vee_bulk", FootprintParam: "bulk_footprint", Placement: RelativePlacement{XMM: 6, YMM: 3, Layer: "F.Cu"}, When: RealizationWhen{Params: map[string]any{"rail_mode": "dual_supply", "include_bulk": true}}},
+			{ComponentRole: "vcc_ceramic", FootprintParam: "ceramic_footprint", Placement: RelativePlacement{XMM: 0, YMM: -5, Layer: "F.Cu"}},
+			{ComponentRole: "vcc_bulk", FootprintParam: "bulk_footprint", Placement: RelativePlacement{XMM: 10, YMM: -5, Layer: "F.Cu"}, When: RealizationWhen{Params: map[string]any{"include_bulk": true}}},
+			{ComponentRole: "vee_ceramic", FootprintParam: "ceramic_footprint", Placement: RelativePlacement{XMM: 0, YMM: 5, Layer: "F.Cu"}, When: RealizationWhen{Params: map[string]any{"rail_mode": "dual_supply"}}},
+			{ComponentRole: "vee_bulk", FootprintParam: "bulk_footprint", Placement: RelativePlacement{XMM: 10, YMM: 5, Layer: "F.Cu"}, When: RealizationWhen{Params: map[string]any{"rail_mode": "dual_supply", "include_bulk": true}}},
 		},
-		PlacementGroups: []PCBPlacementGroup{{ID: "local_decoupling", ComponentRoles: []string{"vcc_ceramic", "vcc_bulk", "vee_ceramic", "vee_bulk"}, AnchorRole: "vcc_ceramic", Bounds: &RelativeBounds{MinXMM: -2, MinYMM: -6, MaxXMM: 9, MaxYMM: 6}, Description: "Keep amplifier rail decoupling local to the active stage."}},
+		EntryAnchors: []PCBEntryAnchor{
+			{ID: "vcc", Port: "VCC", NetTemplate: "vcc", Placement: RelativePlacement{XMM: -4, YMM: -5, Layer: "F.Cu"}, Description: "Positive-rail entry for the local decoupling star."},
+			{ID: "vee", Port: "VEE", NetTemplate: "vee", Placement: RelativePlacement{XMM: -4, YMM: 5, Layer: "F.Cu"}, When: RealizationWhen{Params: map[string]any{"rail_mode": "dual_supply"}}, Description: "Negative-rail entry for dual-supply local decoupling."},
+			{ID: "gnd", Port: "GND", NetTemplate: "gnd", Placement: RelativePlacement{XMM: 3, YMM: 0, Layer: "F.Cu"}, Description: "Local return entry shared by the rail bypass branches."},
+		},
+		PlacementGroups: []PCBPlacementGroup{{ID: "local_decoupling", ComponentRoles: []string{"vcc_ceramic", "vcc_bulk", "vee_ceramic", "vee_bulk"}, AnchorRole: "vcc_ceramic", Bounds: &RelativeBounds{MinXMM: -5, MinYMM: -10, MaxXMM: 15, MaxYMM: 10}, TranslateAsUnit: true, Description: "Keep amplifier rail decoupling local to the active stage and preserve its routed rail/return star."}},
 		LocalRoutes: []PCBLocalRoute{
-			{ID: "vcc_ceramic", NetTemplate: "vcc", From: RouteEndpoint{Port: "VCC"}, To: RouteEndpoint{ComponentRole: "vcc_ceramic", Pin: "1"}, Layer: "F.Cu", WidthMM: 0.5, Required: true},
-			{ID: "vcc_ceramic_gnd", NetTemplate: "gnd", From: RouteEndpoint{ComponentRole: "vcc_ceramic", Pin: "2"}, To: RouteEndpoint{Port: "GND"}, Layer: "F.Cu", WidthMM: 0.5, Required: true},
-			{ID: "vcc_bulk", NetTemplate: "vcc", From: RouteEndpoint{Port: "VCC"}, To: RouteEndpoint{ComponentRole: "vcc_bulk", Pin: "1"}, Layer: "F.Cu", WidthMM: 0.6, Required: true, When: RealizationWhen{Params: map[string]any{"include_bulk": true}}},
-			{ID: "vcc_bulk_gnd", NetTemplate: "gnd", From: RouteEndpoint{ComponentRole: "vcc_bulk", Pin: "2"}, To: RouteEndpoint{Port: "GND"}, Layer: "F.Cu", WidthMM: 0.6, Required: true, When: RealizationWhen{Params: map[string]any{"include_bulk": true}}},
-			{ID: "vee_ceramic", NetTemplate: "vee", From: RouteEndpoint{Port: "VEE"}, To: RouteEndpoint{ComponentRole: "vee_ceramic", Pin: "1"}, Layer: "F.Cu", WidthMM: 0.5, Required: true, When: RealizationWhen{Params: map[string]any{"rail_mode": "dual_supply"}}},
-			{ID: "vee_ceramic_gnd", NetTemplate: "gnd", From: RouteEndpoint{ComponentRole: "vee_ceramic", Pin: "2"}, To: RouteEndpoint{Port: "GND"}, Layer: "F.Cu", WidthMM: 0.5, Required: true, When: RealizationWhen{Params: map[string]any{"rail_mode": "dual_supply"}}},
-			{ID: "vee_bulk", NetTemplate: "vee", From: RouteEndpoint{Port: "VEE"}, To: RouteEndpoint{ComponentRole: "vee_bulk", Pin: "2"}, Layer: "F.Cu", WidthMM: 0.6, Required: true, When: RealizationWhen{Params: map[string]any{"rail_mode": "dual_supply", "include_bulk": true}}},
-			{ID: "vee_bulk_gnd", NetTemplate: "gnd", From: RouteEndpoint{ComponentRole: "vee_bulk", Pin: "1"}, To: RouteEndpoint{Port: "GND"}, Layer: "F.Cu", WidthMM: 0.6, Required: true, When: RealizationWhen{Params: map[string]any{"rail_mode": "dual_supply", "include_bulk": true}}},
+			{ID: "vcc_ceramic", NetTemplate: "vcc", From: RouteEndpoint{Port: "VCC"}, To: RouteEndpoint{ComponentRole: "vcc_ceramic", Pin: "1"}, Layer: "F.Cu", WidthMM: 0.5, Required: true, DisableEntryAnchorVia: true},
+			{ID: "vcc_ceramic_gnd", NetTemplate: "gnd", From: RouteEndpoint{ComponentRole: "vcc_ceramic", Pin: "2"}, To: RouteEndpoint{Port: "GND"}, Layer: "F.Cu", WidthMM: 0.5, Required: true, DisableEntryAnchorVia: true},
+			{ID: "vcc_bulk", NetTemplate: "vcc", From: RouteEndpoint{Port: "VCC"}, To: RouteEndpoint{ComponentRole: "vcc_bulk", Pin: "1"}, Waypoints: []RelativePoint{{XMM: -4, YMM: -8}, {XMM: 10, YMM: -8}}, Layer: "F.Cu", WidthMM: 0.6, Required: true, DisableEntryAnchorVia: true, When: RealizationWhen{Params: map[string]any{"include_bulk": true}}},
+			{ID: "vcc_bulk_gnd", NetTemplate: "gnd", From: RouteEndpoint{ComponentRole: "vcc_bulk", Pin: "2"}, To: RouteEndpoint{Port: "GND"}, Layer: "F.Cu", WidthMM: 0.6, Required: true, DisableEntryAnchorVia: true, When: RealizationWhen{Params: map[string]any{"include_bulk": true}}},
+			{ID: "vee_ceramic", NetTemplate: "vee", From: RouteEndpoint{Port: "VEE"}, To: RouteEndpoint{ComponentRole: "vee_ceramic", Pin: "1"}, Layer: "F.Cu", WidthMM: 0.5, Required: true, DisableEntryAnchorVia: true, When: RealizationWhen{Params: map[string]any{"rail_mode": "dual_supply"}}},
+			{ID: "vee_ceramic_gnd", NetTemplate: "gnd", From: RouteEndpoint{ComponentRole: "vee_ceramic", Pin: "2"}, To: RouteEndpoint{Port: "GND"}, Layer: "F.Cu", WidthMM: 0.5, Required: true, DisableEntryAnchorVia: true, When: RealizationWhen{Params: map[string]any{"rail_mode": "dual_supply"}}},
+			{ID: "vee_bulk", NetTemplate: "vee", From: RouteEndpoint{Port: "VEE"}, To: RouteEndpoint{ComponentRole: "vee_bulk", Pin: "2"}, Waypoints: []RelativePoint{{XMM: -4, YMM: 8}, {XMM: 14, YMM: 8}}, Layer: "F.Cu", WidthMM: 0.6, Required: true, DisableEntryAnchorVia: true, When: RealizationWhen{Params: map[string]any{"rail_mode": "dual_supply", "include_bulk": true}}},
+			{ID: "vee_bulk_gnd", NetTemplate: "gnd", From: RouteEndpoint{ComponentRole: "vee_bulk", Pin: "1"}, To: RouteEndpoint{Port: "GND"}, Layer: "F.Cu", WidthMM: 0.6, Required: true, DisableEntryAnchorVia: true, When: RealizationWhen{Params: map[string]any{"rail_mode": "dual_supply", "include_bulk": true}}},
 		},
 		Constraints: []PCBConstraint{{ID: "amplifier_decoupling_proximity", Kind: "proximity", AppliesTo: []string{"vcc_ceramic", "vcc_bulk", "vee_ceramic", "vee_bulk"}, MaxLengthMM: 8, Description: "Local decoupling must remain near the active amplifier supply pins."}},
 	}
@@ -158,6 +165,9 @@ func instantiateAmplifierSupplyDecoupling(definition BlockDefinition, request Bl
 		if component.ComponentPackageParam != "" {
 			component.FootprintID = stringParam(params, component.ComponentPackageParam)
 		}
+		if component.ComponentIDParam != "" {
+			component.ComponentID = stringParam(params, component.ComponentIDParam)
+		}
 		ref := allocator.Next("C")
 		refsByRole[role] = ref
 		refs = append(refs, ref)
@@ -168,6 +178,10 @@ func instantiateAmplifierSupplyDecoupling(definition BlockDefinition, request Bl
 	vccNet := InstanceNetName(request.InstanceID, "vcc")
 	veeNet := InstanceNetName(request.InstanceID, "vee")
 	gndNet := InstanceNetName(request.InstanceID, "gnd")
+	// Connect operations carry the authoritative named rails into both the
+	// schematic graph and PCB net table. Standalone labels are intentionally not
+	// emitted here: without a wire anchor they are visually suggestive but
+	// electrically detached, which weakens writer-correctness evidence.
 	appendConnectOperation(&operations, &issues, request.InstanceID, "VCC", refsByRole["vcc_ceramic"], "1", vccNet)
 	appendConnectOperation(&operations, &issues, refsByRole["vcc_ceramic"], "2", request.InstanceID, "GND", gndNet)
 	if includeBulk {
@@ -183,11 +197,6 @@ func instantiateAmplifierSupplyDecoupling(definition BlockDefinition, request Bl
 			appendConnectOperation(&operations, &issues, refsByRole["vee_bulk"], "1", request.InstanceID, "GND", gndNet)
 		}
 		nets = append(nets, veeNet)
-	}
-	appendLabelOperation(&operations, &issues, vccNet, transactions.Point{XMM: 2, YMM: -12})
-	appendLabelOperation(&operations, &issues, gndNet, transactions.Point{XMM: 2, YMM: 0})
-	if dualSupply {
-		appendLabelOperation(&operations, &issues, veeNet, transactions.Point{XMM: 2, YMM: 12})
 	}
 	output := dryRunBlockOutput(definition, request, operations, issues)
 	output.Instance.Params = params

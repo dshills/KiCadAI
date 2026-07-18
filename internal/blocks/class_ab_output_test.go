@@ -37,6 +37,9 @@ func TestClassABOutputStageDefinitionContract(t *testing.T) {
 	if definition.PCBRealization == nil || len(definition.PCBRealization.EntryAnchors) != 5 {
 		t.Fatalf("PCB entry anchors = %#v, want all five ports", definition.PCBRealization)
 	}
+	if len(definition.PCBRealization.PlacementGroups) == 0 || !definition.PCBRealization.PlacementGroups[0].TranslateAsUnit {
+		t.Fatal("expected Class AB bias network to preserve and legalize its routed placement as a unit")
+	}
 	for _, routeID := range []string{"upper_emitter", "lower_emitter", "amp_out_join", "vcc_output", "vee_output", "load_reference"} {
 		found := false
 		for _, route := range definition.PCBRealization.LocalRoutes {
@@ -44,6 +47,11 @@ func TestClassABOutputStageDefinitionContract(t *testing.T) {
 		}
 		if !found {
 			t.Fatalf("missing required local route %s", routeID)
+		}
+	}
+	for _, route := range definition.PCBRealization.LocalRoutes {
+		if route.From.Port == "DRIVER_OUT" || route.To.Port == "DRIVER_OUT" {
+			t.Fatalf("driver net should enter through routed physical pads, not a redundant virtual-port stub: %#v", route)
 		}
 	}
 }

@@ -15,6 +15,7 @@ import (
 	"kicadai/internal/inspect"
 	pcbfiles "kicadai/internal/kicadfiles/pcb"
 	projectfiles "kicadai/internal/kicadfiles/project"
+	"kicadai/internal/libraryresolver"
 	"kicadai/internal/reports"
 	"kicadai/internal/writercorrectness"
 )
@@ -25,6 +26,9 @@ type EvaluateOptions struct {
 	CLIPolicy              CLIPolicy
 	ManufacturerProfile    string
 	ManufacturerProfileDir string
+	LibraryIndex           libraryresolver.LibraryIndex
+	HasLibraryIndex        bool
+	LibraryIssues          []reports.Issue
 }
 
 func Evaluate(ctx context.Context, targetPath string, opts EvaluateOptions) Result {
@@ -452,7 +456,12 @@ func canceledValidationEvidence(err error) validationEvidence {
 }
 
 func evaluateWriterEvidence(ctx context.Context, root string, opts EvaluateOptions) writerEvidenceResult {
-	writer := writercorrectness.Validate(ctx, root, writercorrectness.Options{KiCadCLI: validationKiCadCLI(opts)})
+	writer := writercorrectness.Validate(ctx, root, writercorrectness.Options{
+		KiCadCLI:        validationKiCadCLI(opts),
+		LibraryIndex:    opts.LibraryIndex,
+		HasLibraryIndex: opts.HasLibraryIndex,
+		LibraryIssues:   slices.Clone(opts.LibraryIssues),
+	})
 	status := EvidencePass
 	if !writer.OK || reports.HasBlockingIssue(writer.Issues) {
 		status = EvidenceFail
@@ -676,6 +685,9 @@ func expectedFabricationArtifacts() []Artifact {
 		{Kind: ArtifactPhysicalRules, Path: "fabrication/physical-rules.json", Status: ArtifactExpected, Required: true, Description: "physical fabrication rule report"},
 		{Kind: ArtifactBOM, Path: "fabrication/bom.csv", Status: ArtifactExpected, Required: true, Description: "bill of materials"},
 		{Kind: ArtifactCPL, Path: "fabrication/cpl.csv", Status: ArtifactExpected, Required: true, Description: "component placement list"},
+		{Kind: ArtifactERC, Path: "fabrication/erc.json", Status: ArtifactExpected, Required: true, Description: "KiCad electrical rules report"},
+		{Kind: ArtifactDRC, Path: "fabrication/drc.json", Status: ArtifactExpected, Required: true, Description: "KiCad design rules report"},
+		{Kind: ArtifactBlockReadiness, Path: "fabrication/block-readiness.json", Status: ArtifactExpected, Required: true, Description: "verified block-composition promotion report"},
 		{Kind: ArtifactGerber, Path: "fabrication/gerbers", Status: ArtifactExpected, Required: true, Description: "Gerber plot directory"},
 		{Kind: ArtifactDrill, Path: "fabrication/drill", Status: ArtifactExpected, Required: true, Description: "Excellon drill directory"},
 	}

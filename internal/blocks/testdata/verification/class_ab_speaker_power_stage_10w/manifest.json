@@ -1,0 +1,45 @@
+{
+  "id": "class_ab_speaker_power_stage_10w",
+  "block_id": "class_ab_speaker_power_stage",
+  "description": "Complementary driver and power-BJT Class AB speaker stage with current limiting, Kelvin emitter sensing, Zobel damping, and shared-heatsink constraints.",
+  "acceptance": "connectivity",
+  "request": {
+    "instance_id": "speaker_power"
+  },
+  "expected": {
+    "evidence_level": "schematic_verified",
+    "components": [
+      {"role": "upper_bias_feed", "ref_prefix": "R", "symbol_id": "Device:R", "footprint_id": "Resistor_SMD:R_0805_2012Metric"},
+      {"role": "bias_diode_1", "ref_prefix": "D", "symbol_id": "Device:D", "footprint_id": "Diode_SMD:D_SOD-123"},
+      {"role": "bias_diode_2", "ref_prefix": "D", "symbol_id": "Device:D", "footprint_id": "Diode_SMD:D_SOD-123"},
+      {"role": "bias_diode_3", "ref_prefix": "D", "symbol_id": "Device:D", "footprint_id": "Diode_SMD:D_SOD-123"},
+      {"role": "bias_diode_4", "ref_prefix": "D", "symbol_id": "Device:D", "footprint_id": "Diode_SMD:D_SOD-123"},
+      {"role": "lower_bias_feed", "ref_prefix": "R", "symbol_id": "Device:R", "footprint_id": "Resistor_SMD:R_0805_2012Metric"},
+      {"role": "upper_driver", "ref_prefix": "Q", "symbol_id": "Transistor_BJT:Q_NPN_ECB", "footprint_id": "Package_TO_SOT_THT:TO-126-3_Vertical"},
+      {"role": "lower_driver", "ref_prefix": "Q", "symbol_id": "Transistor_BJT:Q_PNP_ECB", "footprint_id": "Package_TO_SOT_THT:TO-126-3_Vertical"},
+      {"role": "upper_driver_base_stopper", "ref_prefix": "R", "symbol_id": "Device:R", "footprint_id": "Resistor_SMD:R_0805_2012Metric"},
+      {"role": "lower_driver_base_stopper", "ref_prefix": "R", "symbol_id": "Device:R", "footprint_id": "Resistor_SMD:R_0805_2012Metric"},
+      {"role": "upper_output", "ref_prefix": "Q", "symbol_id": "Transistor_BJT:Q_NPN_BCE", "footprint_id": "Package_TO_SOT_THT:TO-3P-3_Vertical"},
+      {"role": "lower_output", "ref_prefix": "Q", "symbol_id": "Transistor_BJT:Q_PNP_BCE", "footprint_id": "Package_TO_SOT_THT:TO-3P-3_Vertical"},
+      {"role": "upper_emitter_resistor", "ref_prefix": "R", "symbol_id": "Device:R", "footprint_id": "Resistor_THT:R_Axial_DIN0414_L11.9mm_D4.5mm_P20.32mm_Horizontal"},
+      {"role": "lower_emitter_resistor", "ref_prefix": "R", "symbol_id": "Device:R", "footprint_id": "Resistor_THT:R_Axial_DIN0414_L11.9mm_D4.5mm_P20.32mm_Horizontal"},
+      {"role": "upper_current_limit", "ref_prefix": "Q", "symbol_id": "Transistor_BJT:Q_NPN_BEC", "footprint_id": "Package_TO_SOT_SMD:SOT-23"},
+      {"role": "lower_current_limit", "ref_prefix": "Q", "symbol_id": "Transistor_BJT:Q_PNP_BEC", "footprint_id": "Package_TO_SOT_SMD:SOT-23"},
+      {"role": "zobel_resistor", "ref_prefix": "R", "symbol_id": "Device:R", "footprint_id": "Resistor_THT:R_Axial_DIN0414_L11.9mm_D4.5mm_P20.32mm_Horizontal"},
+      {"role": "zobel_capacitor", "ref_prefix": "C", "symbol_id": "Device:C", "footprint_id": "Capacitor_THT:C_Rect_L7.2mm_W3.0mm_P5.00mm_FKS2_FKP2_MKS2_MKP2"}
+    ],
+    "ports": [
+      {"name": "DRIVER_OUT", "direction": "input"},
+      {"name": "VCC", "direction": "power"},
+      {"name": "VEE", "direction": "power"},
+      {"name": "POWER_STAR", "direction": "power"},
+      {"name": "RAW_OUT", "direction": "output"}
+    ],
+    "pcb": {
+      "required_local_routes": ["driver_entry", "vcc_output", "vee_output", "upper_emitter", "lower_emitter", "raw_output_join", "raw_output_port", "zobel_series", "zobel_return"],
+      "require_realization": true,
+      "allow_unrouted": true
+    },
+    "erc_drc": {"runner": "optional"}
+  }
+}

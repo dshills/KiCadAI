@@ -248,7 +248,7 @@ func renderFootprintLibraryModule(footprint *Footprint, name string) sexpr.List 
 	}
 	if len(footprint.Attributes) > 0 {
 		attrNodes := []sexpr.Node{sexpr.A("attr")}
-		for _, attr := range footprint.Attributes {
+		for _, attr := range sortedFootprintAttributes(footprint.Attributes) {
 			attrNodes = append(attrNodes, sexpr.A(attr))
 		}
 		nodes = append(nodes, sexpr.L(attrNodes...))
@@ -338,7 +338,7 @@ func renderFootprint(footprint Footprint, netNames map[int]string) sexpr.List {
 	}
 	if len(footprint.Attributes) > 0 {
 		attrNodes := []sexpr.Node{sexpr.A("attr")}
-		for _, attr := range footprint.Attributes {
+		for _, attr := range sortedFootprintAttributes(footprint.Attributes) {
 			attrNodes = append(attrNodes, sexpr.A(attr))
 		}
 		nodes = append(nodes, sexpr.L(attrNodes...))
@@ -369,6 +369,33 @@ func renderFootprint(footprint Footprint, netNames map[int]string) sexpr.List {
 		nodes = append(nodes, renderModel3D(model))
 	}
 	return sexpr.L(nodes...)
+}
+
+func sortedFootprintAttributes(attributes []string) []string {
+	result := append([]string(nil), attributes...)
+	rank := func(attribute string) int {
+		switch attribute {
+		case "through_hole":
+			return 0
+		case "smd":
+			return 1
+		case "exclude_from_pos_files":
+			return 2
+		case "exclude_from_bom":
+			return 3
+		case "dnp":
+			return 4
+		default:
+			return 5
+		}
+	}
+	slices.SortStableFunc(result, func(left, right string) int {
+		if leftRank, rightRank := rank(left), rank(right); leftRank != rightRank {
+			return cmp.Compare(leftRank, rightRank)
+		}
+		return cmp.Compare(left, right)
+	})
+	return result
 }
 
 func placedFootprintPad(pad Pad, footprintRotation kicadfiles.Angle) Pad {

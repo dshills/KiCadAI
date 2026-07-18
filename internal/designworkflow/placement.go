@@ -2,6 +2,8 @@ package designworkflow
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"math"
 	"slices"
 	"strings"
@@ -11,6 +13,7 @@ import (
 	"kicadai/internal/libraryresolver"
 	"kicadai/internal/placement"
 	"kicadai/internal/reports"
+	"kicadai/internal/transactions"
 )
 
 var defaultWorkflowBounds = placement.Bounds{WidthMM: 2.0, HeightMM: 1.25, Source: placement.BoundsEstimated}
@@ -65,6 +68,8 @@ func PlaceFragments(ctx context.Context, request Request, fragments PCBFragmentR
 		defaultBounds = defaultWorkflowBounds
 	}
 	netIndexes := map[string]int{}
+	netAliasMaps, netAliasIssues := fragmentNetAliasMaps(normalized)
+	issues = append(issues, netAliasIssues...)
 	for _, fragment := range fragments.Fragments {
 		groupIDByRole := placementGroupIDByRole(fragment)
 		edgeByRole := placementEdgeByRole(fragment)
@@ -78,7 +83,7 @@ func PlaceFragments(ctx context.Context, request Request, fragments PCBFragmentR
 			}
 			groupID := groupIDByRole[component.ComponentRole]
 			edge := edgeByRole[component.ComponentRole]
-			mobility, fixed := generatedPlacementMobility(request, fragment, component, groupID, edge, localRouteRefs[strings.TrimSpace(component.Ref)])
+			mobility, fixed := generatedPlacementMobility(request, fragment, component, groupID, placementGroupTranslatesAsUnit(fragment, groupID), edge, localRouteRefs[strings.TrimSpace(component.Ref)])
 			placementRequest.Components = append(placementRequest.Components, placement.Component{
 				Ref:         component.Ref,
 				Value:       component.Value,
@@ -94,9 +99,12 @@ func PlaceFragments(ctx context.Context, request Request, fragments PCBFragmentR
 				Mobility:    mobility,
 			})
 		}
-		placementRequest.Groups = append(placementRequest.Groups, placementGroupsFromFragment(fragment)...)
+		fragmentGroups, fragmentGroupIssues := placementGroupsFromFragment(fragment)
+		placementRequest.Groups = append(placementRequest.Groups, fragmentGroups...)
+		issues = append(issues, fragmentGroupIssues...)
 		placementRequest.Keepouts = append(placementRequest.Keepouts, placementKeepoutsFromFragment(fragment)...)
 		placementRequest.ProximityRules = append(placementRequest.ProximityRules, proximityRulesFromFragment(fragment)...)
+		issues = append(issues, addPlacementFragmentOperationNets(&placementRequest, netIndexes, fragment, netAliasMaps[aliasInstanceKey(fragment.InstanceID)])...)
 		for _, route := range fragment.Realization.LocalRoutes {
 			addPlacementRouteNet(&placementRequest, netIndexes, route)
 		}
@@ -425,6 +433,43 @@ func addPlacementRouteNet(request *placement.Request, indexes map[string]int, ro
 	addPlacementNet(request, indexes, name, netRoleFromName(name), 10, endpoints...)
 }
 
+func addPlacementFragmentOperationNets(request *placement.Request, indexes map[string]int, fragment BlockFragment, aliases map[string]string) []reports.Issue {
+	realizedRefs := realizedFragmentRefs(fragment)
+	var issues []reports.Issue
+	for operationIndex, operation := range fragment.SourceOperations {
+		if operation.Op != transactions.OpConnect || len(operation.Raw) == 0 {
+			continue
+		}
+		var connect transactions.ConnectOperation
+		if err := json.Unmarshal(operation.Raw, &connect); err != nil {
+			issues = append(issues, reports.Issue{
+				Code:     reports.CodeValidationFailed,
+				Severity: reports.SeverityError,
+				Path:     fmt.Sprintf("blocks.%s.operations[%d]", fragment.InstanceID, operationIndex),
+				Message:  "decode block connection for placement: " + err.Error(),
+			})
+			continue
+		}
+		netName := placementFragmentNetAlias(connect.NetName, aliases)
+		endpoints := placementEndpointsFromTransactionEndpointsForRefs([]transactions.Endpoint{connect.From, connect.To}, realizedRefs)
+		addPlacementNet(request, indexes, netName, netRoleFromName(netName), 10, endpoints...)
+	}
+	return issues
+}
+
+func placementFragmentNetAlias(netName string, aliases map[string]string) string {
+	netName = strings.TrimSpace(netName)
+	if aliased := strings.TrimSpace(aliases[netName]); aliased != "" {
+		return aliased
+	}
+	for source, aliased := range aliases {
+		if strings.EqualFold(strings.TrimSpace(source), netName) && strings.TrimSpace(aliased) != "" {
+			return strings.TrimSpace(aliased)
+		}
+	}
+	return netName
+}
+
 func addPlacementNet(request *placement.Request, indexes map[string]int, name string, role placement.NetRole, weight int, endpoints ...placement.Endpoint) {
 	name = strings.TrimSpace(name)
 	if request == nil || name == "" {
@@ -607,13 +652,13 @@ func placementLocalRouteRefs(fragment BlockFragment) map[string]bool {
 	return refs
 }
 
-func generatedPlacementMobility(request Request, fragment BlockFragment, component blocks.RealizedPCBComponent, groupID string, edge placement.EdgeConstraint, hasLocalRoute bool) (placement.MobilityPolicy, bool) {
+func generatedPlacementMobility(request Request, fragment BlockFragment, component blocks.RealizedPCBComponent, groupID string, translateAsUnit bool, edge placement.EdgeConstraint, hasLocalRoute bool) (placement.MobilityPolicy, bool) {
 	ownerScope := "block:" + fragment.BlockID + "/" + fragment.InstanceID
 	constraints := []string{"generated", "block:" + fragment.BlockID}
 	// A translated block group preserves its authored local copper, so an
 	// edge-constrained member can move safely with the rest of the group. Only
 	// standalone edge components need to remain fixed to protect local routes.
-	hardEdge := edge != placement.EdgeNone && hasLocalRoute && groupID == ""
+	hardEdge := edge != placement.EdgeNone && hasLocalRoute && !translateAsUnit
 	hardFixed := component.Placement.Fixed || request.RoutingRetry.PreserveFixed || hardEdge
 	if !request.RoutingRetry.Enabled {
 		hardFixed = true
@@ -646,7 +691,7 @@ func generatedPlacementMobility(request Request, fragment BlockFragment, compone
 		Constraints: constraints,
 	}
 	switch {
-	case groupID != "":
+	case groupID != "" && translateAsUnit:
 		policy.Class = placement.MobilityGroupTransform
 		policy.RouteHandling = placement.RouteHandlingTransformWithGroup
 	case hasLocalRoute:
@@ -657,6 +702,15 @@ func generatedPlacementMobility(request Request, fragment BlockFragment, compone
 		policy.RouteHandling = placement.RouteHandlingInvalidateRebuild
 	}
 	return policy, false
+}
+
+func placementGroupTranslatesAsUnit(fragment BlockFragment, groupID string) bool {
+	for _, group := range fragment.PlacementGroups {
+		if group.TranslateAsUnit && strings.EqualFold(blockPlacementGroupID(fragment, group.ID), strings.TrimSpace(groupID)) {
+			return true
+		}
+	}
+	return false
 }
 
 func generatedMobilityFixedReason(request Request, component blocks.RealizedPCBComponent, hardEdge bool) string {
@@ -689,11 +743,14 @@ func placementEdgeFromConstraint(constraint blocks.PCBConstraint) placement.Edge
 	}
 }
 
-func placementGroupsFromFragment(fragment BlockFragment) []placement.Group {
+func placementGroupsFromFragment(fragment BlockFragment) ([]placement.Group, []reports.Issue) {
 	groups := make([]placement.Group, 0, len(fragment.PlacementGroups))
+	var issues []reports.Issue
+	assignedGroupByRole := placementGroupIDByRole(fragment)
 	for _, group := range fragment.PlacementGroups {
+		groupID := blockPlacementGroupID(fragment, group.ID)
 		converted := placement.Group{
-			ID:              blockPlacementGroupID(fragment, group.ID),
+			ID:              groupID,
 			Role:            group.ID,
 			Anchor:          placement.GroupAnchor{Ref: fragment.Realization.RoleRefs[strings.TrimSpace(group.AnchorRole)]},
 			KeepTogether:    true,
@@ -701,9 +758,32 @@ func placementGroupsFromFragment(fragment BlockFragment) []placement.Group {
 			Priority:        10,
 		}
 		for _, role := range group.ComponentRoles {
-			if ref := fragment.Realization.RoleRefs[strings.TrimSpace(role)]; ref != "" {
-				converted.Components = append(converted.Components, ref)
+			role = strings.TrimSpace(role)
+			// A component has one mobility owner, but it may participate in
+			// several non-rigid electrical/thermal placement groups. Preserve
+			// those overlapping memberships so their hard spread constraints
+			// remain enforceable. Rigid groups retain exclusive ownership.
+			if group.TranslateAsUnit && assignedGroupByRole[role] != groupID {
+				issues = append(issues, reports.Issue{
+					Code: reports.CodeValidationTrace, Severity: reports.SeverityInfo,
+					Path:    "placement.groups." + groupID + "." + role,
+					Message: "rigid placement-group membership was omitted because another authoritative rigid group owns the component role",
+					Refs:    []string{fragment.Realization.RoleRefs[role]},
+				})
+				continue
 			}
+			if ref := fragment.Realization.RoleRefs[role]; ref != "" {
+				converted.Components = append(converted.Components, ref)
+			} else {
+				issues = append(issues, reports.Issue{
+					Code: reports.CodeValidationTrace, Severity: reports.SeverityInfo,
+					Path:    "placement.groups." + groupID + "." + role,
+					Message: "placement-group component role has no realized reference and was omitted (for example, by a conditional block variant)",
+				})
+			}
+		}
+		if !slices.Contains(converted.Components, converted.Anchor.Ref) && len(converted.Components) > 0 {
+			converted.Anchor.Ref = converted.Components[0]
 		}
 		if group.Bounds != nil {
 			converted.MaxSpreadMM = boundsDiagonal(*group.Bounds)
@@ -714,7 +794,7 @@ func placementGroupsFromFragment(fragment BlockFragment) []placement.Group {
 			groups = append(groups, converted)
 		}
 	}
-	return groups
+	return groups, issues
 }
 
 func placementGroupBoundsRect(fragment BlockFragment, anchorRef string, bounds blocks.RelativeBounds) placement.Rect {
@@ -839,7 +919,73 @@ func proximityRulesFromFragment(fragment BlockFragment) []placement.ProximityRul
 			Required:      false,
 		})
 	}
+	for _, constraint := range fragment.Constraints {
+		if !strings.EqualFold(strings.TrimSpace(constraint.Kind), "max_spacing") || constraint.MaxLengthMM <= 0 {
+			continue
+		}
+		role := placementRoleFromGroup(blocks.PCBPlacementGroup{
+			ID:             constraint.ID + " " + string(constraint.Category),
+			Description:    constraint.Description,
+			ComponentRoles: constraint.AppliesTo,
+		})
+		roleGroups := maxSpacingConstraintRoleGroups(constraint)
+		for ruleIndex, roleGroup := range roleGroups {
+			refs := placementRefsForRoles(fragment, roleGroup)
+			if len(refs) < 2 {
+				continue
+			}
+			id := blockPlacementGroupID(fragment, constraint.ID) + ".constraint"
+			if len(roleGroups) > 1 {
+				id += fmt.Sprintf(".%02d", ruleIndex+1)
+			}
+			rules = append(rules, placement.ProximityRule{
+				ID:            id,
+				Source:        "block:" + fragment.BlockID,
+				Role:          role,
+				AnchorRef:     refs[0],
+				TargetRefs:    append([]string(nil), refs[1:]...),
+				MaxDistanceMM: constraint.MaxLengthMM,
+				Weight:        10,
+				Required:      constraint.Required,
+			})
+		}
+	}
 	return rules
+}
+
+func maxSpacingConstraintRoleGroups(constraint blocks.PCBConstraint) [][]string {
+	if constraint.Category != blocks.PCBConstraintDeviceSymmetry {
+		return [][]string{append([]string(nil), constraint.AppliesTo...)}
+	}
+	// Device-symmetry constraints declare complementary roles as adjacent
+	// ordered pairs. This makes the contract explicit without coupling generic
+	// placement to role-name prefixes such as upper/lower or pos/neg.
+	if len(constraint.AppliesTo) == 0 || len(constraint.AppliesTo)%2 != 0 {
+		return [][]string{append([]string(nil), constraint.AppliesTo...)}
+	}
+	groups := make([][]string, 0, len(constraint.AppliesTo)/2)
+	for index := 0; index < len(constraint.AppliesTo); index += 2 {
+		groups = append(groups, []string{constraint.AppliesTo[index], constraint.AppliesTo[index+1]})
+	}
+	return groups
+}
+
+func placementRefsForRoles(fragment BlockFragment, roles []string) []string {
+	refs := make([]string, 0, len(roles))
+	seen := map[string]struct{}{}
+	for _, role := range roles {
+		ref := strings.TrimSpace(fragment.Realization.RoleRefs[strings.TrimSpace(role)])
+		key := strings.ToUpper(ref)
+		if ref == "" {
+			continue
+		}
+		if _, exists := seen[key]; exists {
+			continue
+		}
+		seen[key] = struct{}{}
+		refs = append(refs, ref)
+	}
+	return refs
 }
 
 func blockPlacementGroupID(fragment BlockFragment, id string) string {

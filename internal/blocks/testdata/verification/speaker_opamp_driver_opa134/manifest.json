@@ -1,0 +1,32 @@
+{
+  "id": "speaker_opamp_driver_opa134",
+  "block_id": "speaker_opamp_driver",
+  "description": "OPA134 dual-rail gain stage with load-side feedback and local output isolation.",
+  "acceptance": "connectivity",
+  "request": {"instance_id": "speaker_gain"},
+  "expected": {
+    "evidence_level": "schematic_verified",
+    "components": [
+      {"role": "opamp", "ref_prefix": "U", "symbol_id": "Amplifier_Operational:OPA134", "footprint_id": "Package_SO:SOIC-8_3.9x4.9mm_P1.27mm"},
+      {"role": "gain_to_star", "ref_prefix": "R", "symbol_id": "Device:R", "footprint_id": "Resistor_SMD:R_0805_2012Metric"},
+      {"role": "feedback", "ref_prefix": "R", "symbol_id": "Device:R", "footprint_id": "Resistor_SMD:R_0805_2012Metric"},
+      {"role": "output_isolation", "ref_prefix": "R", "symbol_id": "Device:R", "footprint_id": "Resistor_SMD:R_0805_2012Metric"},
+      {"role": "positive_bypass", "ref_prefix": "C", "symbol_id": "Device:C", "footprint_id": "Capacitor_THT:C_Rect_L7.2mm_W3.0mm_P5.00mm_FKS2_FKP2_MKS2_MKP2"},
+      {"role": "negative_bypass", "ref_prefix": "C", "symbol_id": "Device:C", "footprint_id": "Capacitor_THT:C_Rect_L7.2mm_W3.0mm_P5.00mm_FKS2_FKP2_MKS2_MKP2"}
+    ],
+    "ports": [
+      {"name": "IN", "direction": "input"},
+      {"name": "DRIVER_OUT", "direction": "output"},
+      {"name": "FEEDBACK_SENSE", "direction": "input"},
+      {"name": "VCC", "direction": "power"},
+      {"name": "VEE", "direction": "power"},
+      {"name": "SIGNAL_STAR", "direction": "power"}
+    ],
+    "pcb": {
+      "required_local_routes": ["input", "feedback_sense", "feedback_to_input", "gain_return", "opamp_output", "driver_output", "positive_bypass", "negative_bypass"],
+      "require_realization": true,
+      "allow_unrouted": true
+    },
+    "erc_drc": {"runner": "optional"}
+  }
+}

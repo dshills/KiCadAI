@@ -10,6 +10,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 
 	"kicadai/internal/blocks"
 	"kicadai/internal/components"
@@ -37,21 +38,22 @@ const (
 )
 
 type Request struct {
-	Version             string                 `json:"version"`
-	Name                string                 `json:"name"`
-	Intent              Intent                 `json:"intent,omitempty"`
-	SchematicLayout     *schematicir.Layout    `json:"schematic_layout,omitempty"`
-	AutoSchematicLayout bool                   `json:"auto_schematic_layout,omitempty"`
-	Board               BoardSpec              `json:"board"`
-	Libraries           LibrarySpec            `json:"libraries,omitempty"`
-	Components          ComponentPolicySpec    `json:"component_policy,omitempty"`
-	Blocks              []BlockInstanceSpec    `json:"blocks"`
-	ExplicitCircuit     *ExplicitCircuitSpec   `json:"explicit_circuit,omitempty"`
-	Connections         []ConnectionSpec       `json:"connections,omitempty"`
-	ExternalEndpoints   []ExternalEndpointSpec `json:"external_endpoints,omitempty"`
-	Constraints         ConstraintSpec         `json:"constraints,omitempty"`
-	Validation          ValidationSpec         `json:"validation,omitempty"`
-	RoutingRetry        RoutingRetryPolicySpec `json:"routing_retry,omitempty"`
+	Version             string                  `json:"version"`
+	Name                string                  `json:"name"`
+	Intent              Intent                  `json:"intent,omitempty"`
+	SchematicLayout     *schematicir.Layout     `json:"schematic_layout,omitempty"`
+	AutoSchematicLayout bool                    `json:"auto_schematic_layout,omitempty"`
+	Board               BoardSpec               `json:"board"`
+	Fabrication         FabricationMetadataSpec `json:"fabrication,omitempty"`
+	Libraries           LibrarySpec             `json:"libraries,omitempty"`
+	Components          ComponentPolicySpec     `json:"component_policy,omitempty"`
+	Blocks              []BlockInstanceSpec     `json:"blocks"`
+	ExplicitCircuit     *ExplicitCircuitSpec    `json:"explicit_circuit,omitempty"`
+	Connections         []ConnectionSpec        `json:"connections,omitempty"`
+	ExternalEndpoints   []ExternalEndpointSpec  `json:"external_endpoints,omitempty"`
+	Constraints         ConstraintSpec          `json:"constraints,omitempty"`
+	Validation          ValidationSpec          `json:"validation,omitempty"`
+	RoutingRetry        RoutingRetryPolicySpec  `json:"routing_retry,omitempty"`
 }
 
 type ExplicitCircuitSpec struct {
@@ -155,6 +157,14 @@ type BoardSpec struct {
 	HeightMM        float64 `json:"height_mm"`
 	Layers          int     `json:"layers,omitempty"`
 	EdgeClearanceMM float64 `json:"edge_clearance_mm,omitempty"`
+}
+
+// FabricationMetadataSpec records human-readable manufacturing intent in the
+// generated KiCad project. These values are evidence inputs, not routing or
+// component-selection controls.
+type FabricationMetadataSpec struct {
+	BoardFinish      string `json:"board_finish,omitempty"`
+	FabricationNotes string `json:"fabrication_notes,omitempty"`
 }
 
 type LibrarySpec struct {
@@ -270,6 +280,8 @@ func DecodeRequestStrict(reader io.Reader) (Request, []reports.Issue) {
 
 func NormalizeRequest(request Request) Request {
 	request.Name = NormalizeProjectName(request.Name)
+	request.Fabrication.BoardFinish = truncateFabricationMetadataUTF8Bytes(strings.TrimSpace(request.Fabrication.BoardFinish), 128)
+	request.Fabrication.FabricationNotes = truncateFabricationMetadataUTF8Bytes(strings.TrimSpace(request.Fabrication.FabricationNotes), 4096)
 	if request.SchematicLayout != nil {
 		layout := schematicir.CloneLayout(*request.SchematicLayout)
 		request.SchematicLayout = &layout
@@ -298,6 +310,20 @@ func NormalizeRequest(request Request) Request {
 	}
 	request.ExternalEndpoints = normalizeExternalEndpoints(request.ExternalEndpoints)
 	return request
+}
+
+func truncateFabricationMetadataUTF8Bytes(value string, maximum int) string {
+	if maximum <= 0 {
+		return ""
+	}
+	if len(value) <= maximum {
+		return value
+	}
+	value = value[:maximum]
+	for len(value) > 0 && !utf8.ValidString(value) {
+		value = value[:len(value)-1]
+	}
+	return value
 }
 
 func NormalizeProjectName(name string) string {
@@ -448,6 +474,8 @@ func EnableGeneratedRoutingRetry(request *Request, minAttempts int) {
 }
 
 func ValidateRequest(request Request) []reports.Issue {
+	boardFinishOversized := len(strings.TrimSpace(request.Fabrication.BoardFinish)) > 128
+	fabricationNotesOversized := len(strings.TrimSpace(request.Fabrication.FabricationNotes)) > 4096
 	request = NormalizeRequest(request)
 	var issues []reports.Issue
 	if request.Version == "" {
@@ -466,6 +494,12 @@ func ValidateRequest(request Request) []reports.Issue {
 	}
 	if request.Board.EdgeClearanceMM < 0 {
 		issues = append(issues, issue("board.edge_clearance_mm", "board edge clearance must be non-negative"))
+	}
+	if boardFinishOversized {
+		issues = append(issues, issue("fabrication.board_finish", "board finish must be at most 128 UTF-8 bytes"))
+	}
+	if fabricationNotesOversized {
+		issues = append(issues, issue("fabrication.fabrication_notes", "fabrication notes must be at most 4096 UTF-8 bytes"))
 	}
 	if !validAcceptanceLevel(request.Validation.Acceptance) {
 		issues = append(issues, issue("validation.acceptance", "unsupported acceptance level "+string(request.Validation.Acceptance)))
@@ -1169,9 +1203,21 @@ func cloneParams(params map[string]any) map[string]any {
 func normalizeComponentPolicy(policy ComponentPolicySpec) ComponentPolicySpec {
 	policy.CatalogDir = strings.TrimSpace(policy.CatalogDir)
 	policy.SourceDir = strings.TrimSpace(policy.SourceDir)
+	policy.Acceptance = normalizeComponentAcceptance(policy.Acceptance)
 	policy.Overrides = cloneComponentOverrides(policy.Overrides)
 	policy.PackagePreferences = cloneStringMap(policy.PackagePreferences)
 	return policy
+}
+
+func normalizeComponentAcceptance(level components.AcceptanceLevel) components.AcceptanceLevel {
+	switch level {
+	case AcceptanceERCDRC:
+		return components.AcceptanceERCDRC
+	case AcceptanceFabricationCandidate:
+		return components.AcceptanceFabricationCandidate
+	default:
+		return level
+	}
 }
 
 func invalidComponentPolicySourceDir(value string) bool {
@@ -1213,6 +1259,7 @@ func cloneComponentOverrides(overrides map[string]ComponentOverrideSpec) map[str
 		override.ComponentID = strings.TrimSpace(override.ComponentID)
 		override.VariantID = strings.TrimSpace(override.VariantID)
 		override.Package = strings.TrimSpace(override.Package)
+		override.Acceptance = normalizeComponentAcceptance(override.Acceptance)
 		override.RequiredRatings = append([]components.RequiredRating(nil), override.RequiredRatings...)
 		clone[strings.TrimSpace(key)] = override
 	}

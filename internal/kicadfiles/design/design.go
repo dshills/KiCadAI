@@ -70,8 +70,8 @@ func LEDIndicatorDesign(input LEDIndicatorInput) (Design, error) {
 			Name:        "Default",
 			Clearance:   kicadfiles.MM(0.2),
 			TrackWidth:  kicadfiles.MM(0.25),
-			ViaDiameter: kicadfiles.MM(0.8),
-			ViaDrill:    kicadfiles.MM(0.4),
+			ViaDiameter: kicadfiles.MM(0.6),
+			ViaDrill:    kicadfiles.MM(0.3),
 		}},
 	}
 	schematicFile, err := schematic.LEDIndicatorSchematic(schematic.LEDIndicatorInput{

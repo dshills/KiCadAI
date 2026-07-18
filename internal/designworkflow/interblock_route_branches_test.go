@@ -427,6 +427,34 @@ func TestRouteTreeBranchesForRoutingWithAccessOrdersConstrainedBranchesFirst(t *
 	}
 }
 
+func TestRouteTreeBranchesWithFailuresLastPreservesRelativeOrder(t *testing.T) {
+	branches := []InterBlockRouteTreeBranch{{Index: 3}, {Index: 1}, {Index: 5}, {Index: 2}}
+	ordered := routeTreeBranchesWithFailuresLast(branches, map[int]struct{}{1: {}, 5: {}})
+	want := []int{3, 2, 1, 5}
+	if len(ordered) != len(want) {
+		t.Fatalf("failure-last branch count = %d, want %d", len(ordered), len(want))
+	}
+	for index, branch := range ordered {
+		if branch.Index != want[index] {
+			t.Fatalf("failure-last order index %d = %d, want %d (all=%#v)", index, branch.Index, want[index], ordered)
+		}
+	}
+}
+
+func TestRouteTreeBranchesWithFailuresFirstPreservesRelativeOrder(t *testing.T) {
+	branches := []InterBlockRouteTreeBranch{{Index: 3}, {Index: 1}, {Index: 5}, {Index: 2}}
+	ordered := routeTreeBranchesWithFailuresFirst(branches, map[int]struct{}{1: {}, 5: {}})
+	want := []int{1, 5, 3, 2}
+	if len(ordered) != len(want) {
+		t.Fatalf("failure-first branch count = %d, want %d", len(ordered), len(want))
+	}
+	for index, branch := range ordered {
+		if branch.Index != want[index] {
+			t.Fatalf("failure-first order index %d = %d, want %d (all=%#v)", index, branch.Index, want[index], ordered)
+		}
+	}
+}
+
 func TestRouteInterBlockTreeBranchesDoesNotEmitCopperForFailedBranch(t *testing.T) {
 	group := routeTreeTestGroup("SIG",
 		InterBlockRouteEndpoint{Ref: "J1", Pin: "1"},

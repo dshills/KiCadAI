@@ -49,12 +49,13 @@ type Builder struct {
 }
 
 type Options struct {
-	Name         string
-	DesignID     kicadfiles.UUID
-	Seed         string
-	Paper        kicadfiles.Paper
-	CopperLayers int
-	LibraryIndex *libraryresolver.LibraryIndex
+	Name          string
+	DesignID      kicadfiles.UUID
+	Seed          string
+	Paper         kicadfiles.Paper
+	CopperLayers  int
+	LibraryIndex  *libraryresolver.LibraryIndex
+	TextVariables map[string]string
 }
 
 type SymbolHandle struct {
@@ -319,9 +320,10 @@ func New(options Options) (*Builder, error) {
 				Name:        "Default",
 				Clearance:   kicadfiles.MM(0.2),
 				TrackWidth:  kicadfiles.MM(0.25),
-				ViaDiameter: kicadfiles.MM(0.8),
-				ViaDrill:    kicadfiles.MM(0.4),
+				ViaDiameter: kicadfiles.MM(0.6),
+				ViaDrill:    kicadfiles.MM(0.3),
 			}},
+			TextVariables: cloneStringMap(options.TextVariables),
 		},
 		Schematic: &schematic.SchematicFile{
 			Filename:         name + ".kicad_sch",
@@ -933,17 +935,41 @@ func (builder *Builder) schematicConnectionShouldUseDirectLabels(from, to Endpoi
 	if builder.endpointIsUSBCPowerOnlyCC(from) || builder.endpointIsUSBCPowerOnlyCC(to) {
 		return true
 	}
-	if start.Y != end.Y {
-		return false
-	}
 	fromOffset, fromOK := builder.pinAnchorOffset(from)
 	toOffset, toOK := builder.pinAnchorOffset(to)
-	// An aligned connection between two vertical pin anchors is clearer and
-	// more robust as a pair of same-net labels. A horizontal wire at the pin
-	// extremities can be interpreted by KiCad as an unattached wire for some
-	// otherwise valid embedded passive symbols, while labels bind directly to
-	// the authoritative physical anchors and survive round trips unchanged.
-	return fromOK && toOK && fromOffset.X == 0 && fromOffset.Y != 0 && toOffset.X == 0 && toOffset.Y != 0
+	if !fromOK || !toOK {
+		return false
+	}
+	// Preserve the established label treatment for two vertical pin anchors
+	// joined horizontally, regardless of the distance between them.
+	if start.Y == end.Y && fromOffset.X == 0 && fromOffset.Y != 0 && toOffset.X == 0 && toOffset.Y != 0 {
+		return true
+	}
+	if start.X != end.X && start.Y != end.Y {
+		return false
+	}
+	gap := start.X - end.X
+	if gap < 0 {
+		gap = -gap
+	}
+	if verticalGap := start.Y - end.Y; verticalGap < 0 {
+		gap -= verticalGap
+	} else {
+		gap += verticalGap
+	}
+	// A straight connection between physical pin anchors is clearer and more
+	// robust as a pair of same-net labels. KiCad can interpret a short wire at
+	// otherwise valid embedded-symbol pin extremities as wholly unattached,
+	// while labels bind directly to the authoritative physical anchors and
+	// survive round trips unchanged. Limit this fallback to ordinary
+	// axis-aligned pin geometry; diagonal/custom anchors still use explicit
+	// wire routing.
+	return gap <= kicadfiles.MM(5.08) &&
+		axisAlignedPinOffset(fromOffset) && axisAlignedPinOffset(toOffset)
+}
+
+func axisAlignedPinOffset(offset kicadfiles.Point) bool {
+	return (offset.X == 0) != (offset.Y == 0)
 }
 
 func (builder *Builder) endpointIsUSBCPowerOnlyCC(endpoint Endpoint) bool {
@@ -2010,7 +2036,7 @@ func ensureGeneratedLocalSymbolLibraries(design *kicaddesign.Design, index *libr
 	}
 	libraryIDsByNickname := map[string][]string{}
 	var nicknameOrder []string
-	for _, libraryID := range generatedLocalSymbolLibraryIDs(design.Schematic) {
+	for _, libraryID := range generatedLocalSymbolLibraryIDs(design.Schematic, index) {
 		if _, resolverOwned := resolverSymbolIDs[libraryID]; resolverOwned {
 			continue
 		}
@@ -2027,7 +2053,7 @@ func ensureGeneratedLocalSymbolLibraries(design *kicaddesign.Design, index *libr
 	for _, nickname := range nicknameOrder {
 		nicknameKey := strings.ToLower(nickname)
 		assetPath := "lib/kicadai_" + strings.ToLower(nickname) + ".kicad_sym"
-		contents, ok := schematic.LocalSymbolLibraryForIDs(libraryIDsByNickname[nicknameKey])
+		contents, ok := schematic.LocalSymbolLibraryForEmbedded(embeddedSymbolsForLibraryIDs(design.Schematic, libraryIDsByNickname[nicknameKey]))
 		if !ok {
 			continue
 		}
@@ -2056,7 +2082,7 @@ func ensureResolverLocalSymbolLibraries(design *kicaddesign.Design, index *libra
 	if design == nil || index == nil || len(resolverSymbolIDs) == 0 {
 		return nil
 	}
-	rawByNickname := map[string][]string{}
+	embeddedByNickname := map[string][]schematic.EmbeddedSymbol{}
 	var nicknameOrder []string
 	libraryIDs := make([]string, 0, len(resolverSymbolIDs))
 	for libraryID := range resolverSymbolIDs {
@@ -2099,21 +2125,32 @@ func ensureResolverLocalSymbolLibraries(design *kicaddesign.Design, index *libra
 		}
 	}
 	sort.Strings(libraryIDs)
-	for _, libraryID := range libraryIDs {
-		record, _ := libraryresolver.ResolveSymbolPtr(index, libraryID)
+	for _, symbol := range design.Schematic.Symbols {
+		libraryID := strings.TrimSpace(symbol.LibraryID)
+		record, ok := libraryresolver.ResolveSymbolPtr(index, libraryID)
+		if !ok {
+			continue
+		}
 		nickname := strings.TrimSpace(record.LibraryNickname)
 		if nickname == "" {
 			nickname = libraryNickname(libraryID)
 		}
 		nicknameKey := strings.ToLower(nickname)
-		if _, ok := rawByNickname[nicknameKey]; !ok {
+		if _, shadowed := resolverNicknames[nicknameKey]; !shadowed {
+			continue
+		}
+		if _, ok := embeddedByNickname[nicknameKey]; !ok {
 			nicknameOrder = append(nicknameOrder, nickname)
 		}
-		rawByNickname[nicknameKey] = append(rawByNickname[nicknameKey], record.Raw)
+		embedded, ok := embeddedSymbolForLibraryID(design.Schematic, libraryID)
+		if !ok {
+			return fmt.Errorf("used resolver symbol %s has no embedded body", libraryID)
+		}
+		embeddedByNickname[nicknameKey] = append(embeddedByNickname[nicknameKey], embedded)
 	}
 	for _, nickname := range nicknameOrder {
 		nicknameKey := strings.ToLower(nickname)
-		contents, ok := schematic.LocalSymbolLibraryForRaw(rawByNickname[nicknameKey])
+		contents, ok := schematic.LocalSymbolLibraryForEmbedded(embeddedByNickname[nicknameKey])
 		if !ok {
 			return fmt.Errorf("resolver symbol library %s has no materializable symbol bodies", nickname)
 		}
@@ -2174,18 +2211,43 @@ func ensureResolverLocalSymbolLibraries(design *kicaddesign.Design, index *libra
 	return nil
 }
 
-func generatedLocalSymbolLibraryIDs(file *schematic.SchematicFile) []string {
+func generatedLocalSymbolLibraryIDs(file *schematic.SchematicFile, index *libraryresolver.LibraryIndex) []string {
 	if file == nil {
 		return nil
 	}
 	var ids []string
 	for _, symbol := range file.Symbols {
 		libraryID := strings.TrimSpace(symbol.LibraryID)
-		if _, ok := schematic.LocalSymbolLibrary(libraryID); ok {
+		_, resolverFound := libraryresolver.ResolveSymbolPtr(index, libraryID)
+		_, embeddedFound := embeddedSymbolForLibraryID(file, libraryID)
+		_, bundledTemplate := schematic.EmbeddedSymbolTemplate(libraryID)
+		if _, localTemplate := schematic.LocalSymbolLibrary(libraryID); localTemplate || (!resolverFound && !bundledTemplate && embeddedFound) {
 			ids = appendUnique(ids, libraryID)
 		}
 	}
 	return ids
+}
+
+func embeddedSymbolsForLibraryIDs(file *schematic.SchematicFile, libraryIDs []string) []schematic.EmbeddedSymbol {
+	symbols := make([]schematic.EmbeddedSymbol, 0, len(libraryIDs))
+	for _, libraryID := range libraryIDs {
+		if symbol, ok := embeddedSymbolForLibraryID(file, libraryID); ok {
+			symbols = append(symbols, symbol)
+		}
+	}
+	return symbols
+}
+
+func embeddedSymbolForLibraryID(file *schematic.SchematicFile, libraryID string) (schematic.EmbeddedSymbol, bool) {
+	if file == nil {
+		return schematic.EmbeddedSymbol{}, false
+	}
+	for _, symbol := range file.LibSymbols {
+		if strings.EqualFold(strings.TrimSpace(symbol.LibraryID), strings.TrimSpace(libraryID)) && len(symbol.Body) > 0 {
+			return symbol, true
+		}
+	}
+	return schematic.EmbeddedSymbol{}, false
 }
 
 func ensureGeneratedLocalFootprintLibraries(design *kicaddesign.Design) error {

@@ -104,6 +104,9 @@ func SelectionRequestForComponentWithParams(component BlockComponent, acceptance
 		if queryCopy.Package == "" {
 			queryCopy.Package = component.ComponentVariant
 		}
+		if queryCopy.Package == "" && defaultPackage != "" {
+			queryCopy.Package = defaultPackage
+		}
 		if component.ComponentPackageParam != "" {
 			if value := stringParam(params, component.ComponentPackageParam); value != "" {
 				queryCopy.Package = packageQueryFromFootprint(value)
@@ -116,6 +119,11 @@ func SelectionRequestForComponentWithParams(component BlockComponent, acceptance
 		if component.ComponentValueParam != "" {
 			if value := selectionValueParam(params, component.ComponentValueParam); value != "" {
 				queryCopy.Value = value
+			}
+		}
+		if component.ComponentToleranceParam != "" {
+			if value, ok := numericValue(params[component.ComponentToleranceParam]); ok && value > 0 {
+				queryCopy.MaximumTolerance = value
 			}
 		}
 		if component.ComponentVoltageParam != "" {

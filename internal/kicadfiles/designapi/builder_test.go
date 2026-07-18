@@ -1504,6 +1504,62 @@ func TestBuilderUsesDirectLabelsForAlignedVerticalPinAnchors(t *testing.T) {
 	assertSchematicPinNet(t, builder, Endpoint{Reference: "C2", Pin: "2"}, "GND")
 }
 
+func TestBuilderUsesDirectLabelsForStraightCollinearPinAnchors(t *testing.T) {
+	builder := newTestBuilder(t)
+	for _, symbol := range []SymbolOptions{
+		{Reference: "R1", LibraryID: "Device:R", Value: "10", Position: kicadfiles.Point{X: kicadfiles.MM(20), Y: kicadfiles.MM(20)}},
+		{Reference: "C1", LibraryID: "Device:C", Value: "100n", Position: kicadfiles.Point{X: kicadfiles.MM(20), Y: kicadfiles.MM(30.16)}},
+	} {
+		if _, err := builder.AddSymbol(symbol); err != nil {
+			t.Fatalf("AddSymbol %s returned error: %v", symbol.Reference, err)
+		}
+	}
+
+	if err := builder.Connect(Endpoint{Reference: "R1", Pin: "2"}, Endpoint{Reference: "C1", Pin: "1"}, "ZOBEL_MID"); err != nil {
+		t.Fatalf("Connect returned error: %v", err)
+	}
+
+	design := builder.Design()
+	if len(design.Schematic.Wires) != 0 {
+		t.Fatalf("wires = %d, want collinear pin anchors connected by direct labels", len(design.Schematic.Wires))
+	}
+	if len(design.Schematic.Labels) != 2 || design.Schematic.Labels[0].Text != "ZOBEL_MID" || design.Schematic.Labels[1].Text != "ZOBEL_MID" {
+		t.Fatalf("labels = %#v, want ZOBEL_MID labels on both physical pin anchors", design.Schematic.Labels)
+	}
+}
+
+func TestBuilderUsesDirectLabelsForStraightMixedAxisPinAnchors(t *testing.T) {
+	builder := newTestBuilder(t)
+	for _, symbol := range []SymbolOptions{
+		{Reference: "R1", LibraryID: "Device:R", Value: "4.7k", Position: kicadfiles.Point{X: kicadfiles.MM(20), Y: kicadfiles.MM(20)}},
+		{
+			Reference: "Q1", LibraryID: "Transistor_BJT:Q_NPN_BEC", Value: "MMBT3904",
+			Position: kicadfiles.Point{X: kicadfiles.MM(28.89), Y: kicadfiles.MM(23.81)},
+			Pins: []PinSpec{
+				{Number: "1", Offset: kicadfiles.Point{X: kicadfiles.MM(-5.08)}},
+				{Number: "2", Offset: kicadfiles.Point{X: kicadfiles.MM(2.54), Y: kicadfiles.MM(-5.08)}},
+				{Number: "3", Offset: kicadfiles.Point{X: kicadfiles.MM(2.54), Y: kicadfiles.MM(5.08)}},
+			},
+		},
+	} {
+		if _, err := builder.AddSymbol(symbol); err != nil {
+			t.Fatalf("AddSymbol %s returned error: %v", symbol.Reference, err)
+		}
+	}
+
+	if err := builder.Connect(Endpoint{Reference: "R1", Pin: "2"}, Endpoint{Reference: "Q1", Pin: "1"}, "DRIVER_BASE"); err != nil {
+		t.Fatalf("Connect returned error: %v", err)
+	}
+
+	design := builder.Design()
+	if len(design.Schematic.Wires) != 0 {
+		t.Fatalf("wires = %d, want mixed-axis pin anchors connected by direct labels", len(design.Schematic.Wires))
+	}
+	if len(design.Schematic.Labels) != 2 || design.Schematic.Labels[0].Text != "DRIVER_BASE" || design.Schematic.Labels[1].Text != "DRIVER_BASE" {
+		t.Fatalf("labels = %#v, want DRIVER_BASE labels on both physical pin anchors", design.Schematic.Labels)
+	}
+}
+
 func TestBuilderConn01x04Pin4UsesKiCadERCConnectionAnchor(t *testing.T) {
 	builder := newTestBuilder(t)
 	if _, err := builder.AddSymbol(SymbolOptions{

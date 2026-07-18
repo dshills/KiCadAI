@@ -253,7 +253,9 @@ func dfmCachedRotation(cache map[int64]dfmRotation2D, angle kicadfiles.Angle) df
 	if rotation, ok := cache[key]; ok {
 		return rotation
 	}
-	radians := float64(angle) * math.Pi / 180
+	// Pad-local angles use the same canvas convention as their containing
+	// footprint: positive rotation maps local +X toward board -Y.
+	radians := -float64(angle) * math.Pi / 180
 	rotation := dfmRotation2D{Cosine: math.Cos(radians), Sine: math.Sin(radians)}
 	cache[key] = rotation
 	return rotation

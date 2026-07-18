@@ -145,13 +145,13 @@ func TestDFMTransformPadOpeningPointsUsesBoardValidationRotationDirection(t *tes
 
 	points := dfmTransformPadOpeningPoints(kicadfiles.Point{}, transform2D{Cosine: 1}, rotation, []kicadfiles.Point{point(1, 0)})
 
-	if len(points) != 1 || points[0] != point(0, 1) {
+	if len(points) != 1 || points[0] != point(0, -1) {
 		t.Fatalf("rotated points = %#v, want +90 degrees to match board-validation pad transforms", points)
 	}
 }
 
 func TestDFMMaskOpeningComposesPadAndFootprintRotation(t *testing.T) {
-	pointTransform := dfmTransformPadOpeningPoints(point(10, 12), transform2D{Cosine: 0, Sine: 1}, dfmCachedRotation(map[int64]dfmRotation2D{}, 90), []kicadfiles.Point{point(1, 0)})
+	pointTransform := dfmTransformPadOpeningPoints(point(10, 12), transform2D{Cosine: 0, Sine: -1}, dfmCachedRotation(map[int64]dfmRotation2D{}, 90), []kicadfiles.Point{point(1, 0)})
 	if len(pointTransform) != 1 || pointTransform[0] != point(9, 12) {
 		t.Fatalf("composed point transform = %#v, want pad + footprint rotation to move rightward point left", pointTransform)
 	}
@@ -175,7 +175,7 @@ func TestDFMMaskOpeningComposesPadAndFootprintRotation(t *testing.T) {
 		t.Fatalf("observations = %#v", observations)
 	}
 	bounds := dfmPolygonBounds(observations[0].Points)
-	if math.Abs(bounds.MinX-9) > 1e-9 || math.Abs(bounds.MaxX-11) > 1e-9 || math.Abs(bounds.MinY-11.5) > 1e-9 || math.Abs(bounds.MaxY-12.5) > 1e-9 {
-		t.Fatalf("rotated footprint+pad bounds = %#v, want center (10,12) with composed 180-degree pad opening", bounds)
+	if math.Abs(bounds.MinX-9) > 1e-9 || math.Abs(bounds.MaxX-11) > 1e-9 || math.Abs(bounds.MinY-7.5) > 1e-9 || math.Abs(bounds.MaxY-8.5) > 1e-9 {
+		t.Fatalf("rotated footprint+pad bounds = %#v, want center (10,8) with composed 180-degree pad opening", bounds)
 	}
 }

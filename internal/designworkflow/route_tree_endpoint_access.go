@@ -245,7 +245,7 @@ func compareRouteTreeAccessCandidate(left, right routeTreeBranchAccessCandidate)
 func BuildRouteTreeEndpointAccessWithIssues(targetEvidence InterBlockContactEvidence, routeOperations []transactions.Operation) ([]RouteTreeEndpointAccess, []reports.Issue) {
 	access := make([]RouteTreeEndpointAccess, 0, len(targetEvidence.Targets)+len(routeOperations)*2)
 	for _, target := range targetEvidence.Targets {
-		access = append(access, routeTreeEndpointAccessFromTarget(target))
+		access = append(access, routeTreeEndpointAccessFromTarget(target)...)
 	}
 	targetsByNet := routeTreeEndpointTargetsByNet(targetEvidence)
 	operationsByNet, issues := decodeInterBlockRouteOperations(routeOperations)
@@ -311,7 +311,7 @@ func SummarizeRouteTreeEndpointAccess(access []RouteTreeEndpointAccess) RouteTre
 	return summary
 }
 
-func routeTreeEndpointAccessFromTarget(target InterBlockContactTarget) RouteTreeEndpointAccess {
+func routeTreeEndpointAccessFromTarget(target InterBlockContactTarget) []RouteTreeEndpointAccess {
 	role := RouteTreeAccessTargetPad
 	switch target.Kind {
 	case InterBlockContactTargetSameNetCopper:
@@ -319,17 +319,22 @@ func routeTreeEndpointAccessFromTarget(target InterBlockContactTarget) RouteTree
 	case InterBlockContactTargetTrackEndpoint, InterBlockContactTargetVia:
 		role = RouteTreeAccessLocalRouteAnchor
 	}
-	return RouteTreeEndpointAccess{
-		EndpointID: target.EndpointID,
-		Role:       role,
-		Ref:        target.Ref,
-		Pad:        target.Pad,
-		Net:        target.NetName,
-		Layer:      normalizeContactLayer(target.Layer),
-		XMM:        target.Point.XMM,
-		YMM:        target.Point.YMM,
-		Source:     target.GeometrySource,
+	layers := interBlockContactTargetLayers(target)
+	access := make([]RouteTreeEndpointAccess, 0, len(layers))
+	for _, layer := range layers {
+		access = append(access, RouteTreeEndpointAccess{
+			EndpointID: target.EndpointID,
+			Role:       role,
+			Ref:        target.Ref,
+			Pad:        target.Pad,
+			Net:        target.NetName,
+			Layer:      layer,
+			XMM:        target.Point.XMM,
+			YMM:        target.Point.YMM,
+			Source:     target.GeometrySource,
+		})
 	}
+	return access
 }
 
 func routeTreeOperationAnchorPoints(points []transactions.Point) []transactions.Point {

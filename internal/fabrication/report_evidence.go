@@ -8,6 +8,10 @@ import (
 
 func applyReportEvidence(result *Result, data ReportData, opts Options) {
 	result.Summary.ComponentIdentity = componentIdentityEvidence(data.BOM)
+	result.Summary.ComponentReadiness = componentReadinessEvidence(data.BOM)
+	if result.Summary.ComponentReadiness != EvidenceMissing {
+		result.Issues = removeExactIssuePath(result.Issues, "component_readiness")
+	}
 	result.Summary.BOMCPLConsistency = consistencyEvidence(data)
 	result.Summary.ManufacturerProfile = EvidenceSkipped
 	if profileID := strings.TrimSpace(opts.ManufacturerProfile); profileID != "" {
@@ -28,6 +32,38 @@ func applyReportEvidence(result *Result, data ReportData, opts Options) {
 		}
 	}
 	result.Summary.AssemblyReadiness = assemblyEvidence(result.Summary)
+}
+
+func componentReadinessEvidence(rows []BOMRow) EvidenceStatus {
+	if len(rows) == 0 {
+		return EvidenceMissing
+	}
+	status := EvidencePass
+	for _, row := range rows {
+		if skipComponentIdentityWarning(row) {
+			continue
+		}
+		if row.IdentityBlockingCount > 0 || row.IdentityStatus == IdentityFail || strings.TrimSpace(row.Manufacturer) == "" || strings.TrimSpace(row.MPN) == "" {
+			return EvidenceFail
+		}
+		switch strings.ToLower(strings.TrimSpace(row.Lifecycle)) {
+		case "active", "production", "recommended":
+		case "obsolete", "eol", "end_of_life", "nrnd", "not_recommended_for_new_designs":
+			return EvidenceFail
+		default:
+			status = EvidenceWarning
+		}
+		switch strings.ToLower(strings.TrimSpace(row.ProcurementOutcome)) {
+		case "blocked", "rejected":
+			return EvidenceFail
+		case "warning", "stale":
+			status = EvidenceWarning
+		}
+		if row.IdentityIssueCount > 0 || row.IdentityStatus == IdentityWarning || row.IdentityStatus == IdentityMissing || row.IdentityStatus == IdentitySkipped {
+			status = EvidenceWarning
+		}
+	}
+	return status
 }
 
 func componentIdentityEvidence(rows []BOMRow) EvidenceStatus {
@@ -93,6 +129,7 @@ func evidenceForIssues(issues []reports.Issue, pass EvidenceStatus) EvidenceStat
 
 func assemblyEvidence(summary Summary) EvidenceStatus {
 	statuses := []EvidenceStatus{
+		summary.ComponentReadiness,
 		summary.ComponentIdentity,
 		summary.BOMCPLConsistency,
 		summary.ManufacturerProfile,

@@ -437,6 +437,19 @@ func collectPinAnchors(components []component, index libraryresolver.LibraryInde
 			symbol := componentSymbol.Symbol
 			record, ok := libraryresolver.ResolveSymbol(index, symbol.LibraryID)
 			if !ok {
+				if len(symbol.Pins) != 0 && len(symbol.Pins) == len(symbol.PinAnchors) {
+					for pinIndex, pin := range symbol.Pins {
+						if strings.TrimSpace(pin.Number) == "" {
+							continue
+						}
+						anchors = append(anchors, pinAnchor{
+							Ref:   component.Ref,
+							Pin:   pin.Number,
+							Point: symbol.PinAnchors[pinIndex],
+						})
+					}
+					continue
+				}
 				if templatePins, templateOK := schematic.EmbeddedSymbolPinOffsets(symbol.LibraryID); templateOK {
 					for _, pin := range templatePins {
 						if strings.TrimSpace(pin.Number) == "" {
@@ -514,6 +527,9 @@ func padSpecsWithNetHints(footprint libraryresolver.FootprintRecord, hints map[s
 			WidthMM:  iuToMM(pad.Size.X),
 			HeightMM: iuToMM(pad.Size.Y),
 			DrillMM:  iuToMM(pad.Drill),
+		}
+		for _, layer := range pad.Layers {
+			spec.Layers = append(spec.Layers, string(layer))
 		}
 		if net := strings.TrimSpace(hints[pad.Name]); net != "" {
 			value := net

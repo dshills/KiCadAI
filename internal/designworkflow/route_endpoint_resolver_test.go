@@ -101,6 +101,26 @@ func TestPlacedPadEndpointResolverEndpointsAreStable(t *testing.T) {
 	}
 }
 
+func TestPlacedPadEndpointResolverQueriesSpatialBoundsDeterministically(t *testing.T) {
+	placed := endpointResolverPlacement(placement.Placement{XMM: 10, YMM: 20, Layer: "F.Cu"},
+		placement.PadSummary{Name: "2", Net: "SIG", XMM: 8, WidthMM: 2, HeightMM: 2},
+		placement.PadSummary{Name: "1", Net: "SIG", XMM: 1, WidthMM: 1, HeightMM: 1},
+	)
+	resolver := NewPlacedPadEndpointResolver(&placed, generatedNetTableFromNames("SIG"))
+
+	near := resolver.EndpointsWithinBounds(9, 19, 12, 21)
+	if len(near) != 1 || near[0].Pad != "1" {
+		t.Fatalf("near endpoints = %#v, want only sorted pad 1", near)
+	}
+	if resolver.MaximumPadRadiusMM() < math.Sqrt2 {
+		t.Fatalf("maximum pad radius = %g, want conservative half diagonal", resolver.MaximumPadRadiusMM())
+	}
+	overlap := resolver.EndpointsWithinBounds(17, 19, 17.5, 21)
+	if len(overlap) != 1 || overlap[0].Pad != "2" {
+		t.Fatalf("overlapping endpoints = %#v, want pad 2 whose extent enters bounds", overlap)
+	}
+}
+
 func TestPlacedPadEndpointResolverResolvesSameNetDuplicatePhysicalPads(t *testing.T) {
 	placed := endpointResolverPlacement(placement.Placement{XMM: 10, YMM: 20, Layer: "F.Cu"},
 		placement.PadSummary{Name: "2", Net: "SIG", XMM: 0, YMM: 1},

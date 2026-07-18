@@ -144,6 +144,16 @@ func appendConnectOperation(operations *[]transactions.Operation, issues *[]repo
 	}
 }
 
+func appendRoleConnectOperation(operations *[]transactions.Operation, issues *[]reports.Issue, refsByRole map[string]string, from NetPin, to NetPin, netName string) {
+	fromRef, fromOK := refsByRole[from.ComponentRole]
+	toRef, toOK := refsByRole[to.ComponentRole]
+	if !fromOK || strings.TrimSpace(fromRef) == "" || !toOK || strings.TrimSpace(toRef) == "" {
+		*issues = append(*issues, blockIssue("nets."+netName, "net connection references an unrealized component role"))
+		return
+	}
+	appendConnectOperation(operations, issues, fromRef, from.Pin, toRef, to.Pin, netName)
+}
+
 func appendNoConnectOperation(operations *[]transactions.Operation, issues *[]reports.Issue, ref string, pin string) {
 	noConnect, noConnectIssues := NoConnectOperation(ref, pin)
 	*issues = append(*issues, noConnectIssues...)

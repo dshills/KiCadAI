@@ -2084,6 +2084,17 @@ func runExport(ctx context.Context, opts cliOptions, stdout io.Writer) error {
 		}
 		options.Sources = sources
 	}
+	if pinmapShouldUseLibraryResolver(opts) {
+		index, issues := libraryresolver.Load(ctx, libraryRootsFromOptions(opts), libraryresolver.LoadOptions{
+			CachePath: opts.libraryCache,
+			Refresh:   opts.refreshLibraryCache,
+		})
+		options.LibraryIssues = issues
+		if !reports.HasBlockingIssue(issues) {
+			options.LibraryIndex = index
+			options.HasLibraryIndex = true
+		}
+	}
 	target := opts.commandArgs[1]
 	var data fabrication.Result
 	switch opts.commandArgs[0] {
@@ -4145,6 +4156,16 @@ func designCreateOptions(ctx context.Context, opts cliOptions, checkOpts checks.
 			ArtifactDir:           checkOpts.ArtifactDir,
 			AllowUnrouted:         opts.allowUnrouted,
 		},
+		Fabrication: &fabrication.Options{
+			Command:                "export fabrication",
+			Execute:                opts.execute,
+			Overwrite:              opts.overwrite,
+			KiCadCLI:               checkOpts.KiCadCLI,
+			CLIPolicy:              exportCLIPolicy(opts),
+			ManufacturerProfile:    opts.manufacturerProfile,
+			ManufacturerProfileDir: opts.manufacturerProfileDir,
+			SourceDir:              opts.sourceDir,
+		},
 		Repair:     repairOptionsForDesignCreate(opts),
 		PostRepair: repairPostValidationOptions(opts),
 	}
@@ -4163,6 +4184,9 @@ func designCreateOptions(ctx context.Context, opts cliOptions, checkOpts checks.
 		createOpts.LibraryIndex = &index
 		createOpts.Writer.LibraryIndex = index
 		createOpts.Writer.HasLibraryIndex = true
+		createOpts.Fabrication.LibraryIndex = index
+		createOpts.Fabrication.HasLibraryIndex = true
+		createOpts.Fabrication.LibraryIssues = libraryIssues
 	}
 	if opts.routeAllowPartialSet {
 		createOpts.Routing.AllowPartial = &opts.routeAllowPartial
