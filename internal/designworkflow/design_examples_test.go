@@ -426,13 +426,51 @@ func TestDesignExamplePromotionClassificationMatchesMetadata(t *testing.T) {
 				t.Fatalf("%s promotion report JSON is empty", metadata.ID)
 			}
 			if metadata.Readiness == "pass" {
-				if report.AchievedReadiness != PromotionReadinessCandidate || report.MatchesExpectation {
-					t.Fatalf("%s no-KiCad promotion status=%q achieved=%q matches=%v, want candidate evidence below pass expectation\n%s", metadata.ID, report.Status, report.AchievedReadiness, report.MatchesExpectation, formatDesignExampleRun(metadata, outputDir, result))
+				wantReadiness := PromotionReadinessCandidate
+				if metadata.Acceptance == AcceptanceFabricationCandidate {
+					wantReadiness = PromotionReadinessBlocked
+				}
+				if report.AchievedReadiness != wantReadiness || report.MatchesExpectation {
+					t.Fatalf("%s no-KiCad promotion status=%q achieved=%q matches=%v, want %q evidence below pass expectation\n%s", metadata.ID, report.Status, report.AchievedReadiness, report.MatchesExpectation, wantReadiness, formatDesignExampleRun(metadata, outputDir, result))
 				}
 				return
 			}
 			assertDesignExamplePromotionMatchesMetadata(t, metadata, report, outputDir, result)
 		})
+	}
+}
+
+func TestClassABSpeakerOfflineFallbackCompletesRoutingWithoutKiCadLibraries(t *testing.T) {
+	repoRoot := designExampleRepoRoot(t)
+	metadataPath := filepath.Join(repoRoot, "examples", "design", "kicad-backed", "class_ab_speaker_10w_protected.metadata.json")
+	metadata, err := loadDesignExampleMetadataPath(metadataPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	requestPath, err := designExampleRequestPathForMetadata(metadataPath, metadata)
+	if err != nil {
+		t.Fatal(err)
+	}
+	request, issues := loadDesignExampleRequestPath(t, requestPath)
+	if len(issues) != 0 {
+		t.Fatalf("request issues: %s", formatDesignExampleIssues(issues))
+	}
+	outputDir := filepath.Join(t.TempDir(), metadata.ID)
+	ctx, cancel := context.WithTimeout(context.Background(), designExampleCreateTimeout(t))
+	defer cancel()
+	result := Create(ctx, request, CreateOptions{
+		OutputDir: outputDir,
+		Overwrite: true,
+		KiCadChecks: KiCadCheckOptions{
+			KiCadCLI: filepath.Join(t.TempDir(), "missing-kicad-cli"),
+		},
+	})
+	routingStage, ok := designExampleStageByName(result, StageRouting)
+	if !ok || routingStage.Status == StageStatusBlocked || reports.HasBlockingIssue(routingStage.Issues) {
+		t.Fatalf("offline speaker routing did not complete with verified fallback geometry\n%s", formatDesignExampleRun(metadata, outputDir, result))
+	}
+	if _, ok := designExampleStageByName(result, StageValidation); !ok {
+		t.Fatalf("offline speaker workflow stopped before validation\n%s", formatDesignExampleRun(metadata, outputDir, result))
 	}
 }
 

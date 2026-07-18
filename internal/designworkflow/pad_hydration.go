@@ -202,8 +202,15 @@ func verifiedPadTemplate(footprintID string) (verifiedPadTemplateRecord, bool) {
 	switch footprintID {
 	case "Resistor_SMD:R_0603_1608Metric":
 		return twoPadTemplate(1.6, 0.8, 0.6, 0.6, 1.0), true
-	case "Resistor_SMD:R_0805_2012Metric",
-		"Capacitor_SMD:C_0805_2012Metric",
+	case "Resistor_SMD:R_0805_2012Metric":
+		return verifiedPadTemplateRecord{
+			Bounds: verifiedCourtyardBounds(3.36, 1.9, 1.68, 0.95),
+			Pads: []placement.PadSummary{
+				smdPad("1", -0.9125, 0, 1.025, 1.4, "roundrect"),
+				smdPad("2", 0.9125, 0, 1.025, 1.4, "roundrect"),
+			},
+		}, true
+	case "Capacitor_SMD:C_0805_2012Metric",
 		"LED_SMD:LED_0805_2012Metric",
 		"Diode_SMD:D_SOD-323":
 		return twoPadTemplate(2.0, 1.25, 0.7, 0.8, 1.2), true
@@ -211,14 +218,57 @@ func verifiedPadTemplate(footprintID string) (verifiedPadTemplateRecord, bool) {
 		return twoPadTemplate(3.2, 1.6, 1.2, 1.2, 2.4), true
 	case "Capacitor_SMD:C_1210_3225Metric":
 		return twoPadTemplate(3.2, 2.5, 1.2, 2.5, 2.4), true
+	case "Capacitor_Tantalum_SMD:CP_EIA-3216-18_Kemet-A":
+		pads := []placement.PadSummary{
+			{Name: "1", XMM: -1.3525, WidthMM: 1.415, HeightMM: 1.39, Type: "smd", Shape: "roundrect", Layers: []string{"F.Cu", "F.Mask", "F.Paste"}},
+			{Name: "2", XMM: 1.3525, WidthMM: 1.415, HeightMM: 1.39, Type: "smd", Shape: "roundrect", Layers: []string{"F.Cu", "F.Mask", "F.Paste"}},
+		}
+		return verifiedPadTemplateRecord{Bounds: verifiedCourtyardBounds(4.62, 2.1, 2.31, 1.05), Pads: pads}, true
 	case "Capacitor_SMD:C_0603_1608Metric":
 		return twoPadTemplate(1.6, 0.8, 0.6, 0.6, 1.0), true
+	case "Capacitor_THT:C_Rect_L7.2mm_W3.0mm_P5.00mm_FKS2_FKP2_MKS2_MKP2":
+		template := throughHoleRowTemplate([]float64{0, 5}, []string{"1", "2"}, 1.6, 1.6, 0.8, []string{"circle", "circle"}, 7.2, 3.0)
+		template.Bounds = verifiedCourtyardBoundsFromExtents(-1.35, -1.75, 6.35, 1.75)
+		return template, true
+	case "Capacitor_THT:CP_Radial_D8.0mm_P3.50mm":
+		template := throughHoleRowTemplate([]float64{0, 3.5}, []string{"1", "2"}, 1.6, 1.6, 0.8, []string{"roundrect", "circle"}, 8.0, 8.0)
+		template.Bounds = verifiedCourtyardBounds(8.5, 8.5, 2.5, 4.25)
+		return template, true
 	case "Diode_SMD:D_SOD-123":
-		return twoPadTemplate(3.7, 1.8, 1.2, 1.2, 2.4), true
+		return verifiedPadTemplateRecord{
+			Bounds: verifiedCourtyardBounds(4.7, 2.3, 2.35, 1.15),
+			Pads: []placement.PadSummary{
+				smdPad("1", -1.65, 0, 0.9, 1.2, "roundrect"),
+				smdPad("2", 1.65, 0, 0.9, 1.2, "roundrect"),
+			},
+		}, true
 	case "Diode_SMD:D_SMA":
 		return twoPadTemplate(6.2, 3.0, 1.5, 1.7, 4.4), true
 	case "Fuse:Fuse_1206_3216Metric":
 		return twoPadTemplate(4.5, 2.6, 1.6, 1.6, 2.8), true
+	case "Resistor_THT:R_Axial_DIN0414_L11.9mm_D4.5mm_P20.32mm_Horizontal":
+		template := throughHoleRowTemplate([]float64{0, 20.32}, []string{"1", "2"}, 2.4, 2.4, 1.2, []string{"circle", "circle"}, 23.0, 4.5)
+		template.Bounds = verifiedCourtyardBounds(23.22, 5, 1.45, 2.5)
+		return template, true
+	case "Package_TO_SOT_THT:TO-126-3_Vertical":
+		template := throughHoleRowTemplate([]float64{0, 2.28, 4.56}, []string{"1", "2", "3"}, 1.71, 1.8, 1.0, []string{"rect", "oval", "oval"}, 8.0, 2.5)
+		template.Bounds = verifiedCourtyardBounds(8.5, 3.75, 1.97, 2.25)
+		return template, true
+	case "Package_TO_SOT_THT:TO-3P-3_Vertical":
+		template := throughHoleRowTemplate([]float64{0, 5.45, 10.9}, []string{"1", "2", "3"}, 2.5, 4.5, 1.5, []string{"rect", "oval", "oval"}, 16.0, 5.0)
+		template.Bounds = verifiedCourtyardBounds(16, 5.75, 2.55, 3.25)
+		return template, true
+	case "Relay_THT:Relay_SPST_Omron-G5Q-1A":
+		pads := []placement.PadSummary{
+			throughHolePad("1", 0, 0, 2.3, 2.3, 1.3, "rect"),
+			throughHolePad("2", 10.16, 0, 2.3, 2.3, 1.3, "circle"),
+			throughHolePad("3", 17.78, 0, 2.3, 2.3, 1.3, "circle"),
+			throughHolePad("5", 0, -7.62, 2.3, 2.3, 1.3, "circle"),
+		}
+		for index := range pads {
+			pads[index].RotationDeg = 180
+		}
+		return verifiedPadTemplateRecord{Bounds: verifiedCourtyardBounds(21.65, 11.5, 1.95, 9.55), Pads: pads}, true
 	case "Connector_USB:USB_C_Receptacle_GCT_USB4125-xx-x_6P_TopMnt_Horizontal":
 		return usbCGCTUSB4125PowerOnlyTemplate(), true
 	case "Connector_USB:USB_C_Receptacle_HRO_TYPE-C-31-M-12":
@@ -245,22 +295,22 @@ func verifiedPadTemplate(footprintID string) (verifiedPadTemplateRecord, bool) {
 		}, true
 	case "Package_TO_SOT_SMD:SOT-23-5":
 		return verifiedPadTemplateRecord{
-			Bounds: centeredEstimatedBounds(3.7, 3.0),
+			Bounds: verifiedCourtyardBounds(4.1, 3.4, 2.05, 1.7),
 			Pads: []placement.PadSummary{
-				{Name: "1", XMM: -1.1375, YMM: -0.95, WidthMM: 1.325, HeightMM: 0.6},
-				{Name: "2", XMM: -1.1375, YMM: 0, WidthMM: 1.325, HeightMM: 0.6},
-				{Name: "3", XMM: -1.1375, YMM: 0.95, WidthMM: 1.325, HeightMM: 0.6},
-				{Name: "5", XMM: 1.1375, YMM: -0.95, WidthMM: 1.325, HeightMM: 0.6},
-				{Name: "4", XMM: 1.1375, YMM: 0.95, WidthMM: 1.325, HeightMM: 0.6},
+				smdPad("1", -1.1375, -0.95, 1.325, 0.6, "roundrect"),
+				smdPad("2", -1.1375, 0, 1.325, 0.6, "roundrect"),
+				smdPad("3", -1.1375, 0.95, 1.325, 0.6, "roundrect"),
+				smdPad("4", 1.1375, 0.95, 1.325, 0.6, "roundrect"),
+				smdPad("5", 1.1375, -0.95, 1.325, 0.6, "roundrect"),
 			},
 		}, true
 	case "Package_TO_SOT_SMD:SOT-23":
 		return verifiedPadTemplateRecord{
-			Bounds: centeredEstimatedBounds(3.0, 2.8),
+			Bounds: verifiedCourtyardBounds(3.86, 3.4, 1.93, 1.7),
 			Pads: []placement.PadSummary{
-				{Name: "1", XMM: -0.95, YMM: 0.95, WidthMM: 0.7, HeightMM: 0.8},
-				{Name: "2", XMM: -0.95, YMM: -0.95, WidthMM: 0.7, HeightMM: 0.8},
-				{Name: "3", XMM: 0.95, YMM: 0, WidthMM: 0.7, HeightMM: 0.8},
+				smdPad("1", -0.9375, -0.95, 1.475, 0.6, "roundrect"),
+				smdPad("2", -0.9375, 0.95, 1.475, 0.6, "roundrect"),
+				smdPad("3", 0.9375, 0, 1.475, 0.6, "roundrect"),
 			},
 		}, true
 	case "Package_TO_SOT_SMD:SOT-223-3_TabPin2":
@@ -272,7 +322,17 @@ func verifiedPadTemplate(footprintID string) (verifiedPadTemplateRecord, bool) {
 		}
 		return verifiedPadTemplateRecord{Bounds: padEnvelopeBounds(pads, 6.7, 7.0), Pads: pads}, true
 	case "Package_SO:SOIC-8_3.9x4.9mm_P1.27mm":
-		return rowPadTemplate(5.9, 4.9, 1.27, 0.7, 0.9, []string{"1", "2", "3", "4"}, []string{"8", "7", "6", "5"}), true
+		pads := []placement.PadSummary{
+			smdPad("1", -2.475, -1.905, 1.95, 0.6, "roundrect"),
+			smdPad("2", -2.475, -0.635, 1.95, 0.6, "roundrect"),
+			smdPad("3", -2.475, 0.635, 1.95, 0.6, "roundrect"),
+			smdPad("4", -2.475, 1.905, 1.95, 0.6, "roundrect"),
+			smdPad("5", 2.475, 1.905, 1.95, 0.6, "roundrect"),
+			smdPad("6", 2.475, 0.635, 1.95, 0.6, "roundrect"),
+			smdPad("7", 2.475, -0.635, 1.95, 0.6, "roundrect"),
+			smdPad("8", 2.475, -1.905, 1.95, 0.6, "roundrect"),
+		}
+		return verifiedPadTemplateRecord{Bounds: verifiedCourtyardBounds(7.4, 5.4, 3.7, 2.7), Pads: pads}, true
 	case "Package_QFP:TQFP-32_7x7mm_P0.8mm":
 		return tqfp32Template(), true
 	case "Package_LGA:Bosch_LGA-8_2x2.5mm_P0.65mm_ClockwisePinNumbering":
@@ -301,6 +361,41 @@ func verifiedPadTemplate(footprintID string) (verifiedPadTemplateRecord, bool) {
 	default:
 		return verifiedPadTemplateRecord{}, false
 	}
+}
+
+func throughHoleRowTemplate(xPositions []float64, names []string, widthMM, heightMM, drillMM float64, shapes []string, bodyWidthMM, bodyHeightMM float64) verifiedPadTemplateRecord {
+	count := min(len(xPositions), len(names), len(shapes))
+	pads := make([]placement.PadSummary, 0, count)
+	for index := 0; index < count; index++ {
+		pads = append(pads, throughHolePad(names[index], xPositions[index], 0, widthMM, heightMM, drillMM, shapes[index]))
+	}
+	return verifiedPadTemplateRecord{Bounds: padEnvelopeBounds(pads, bodyWidthMM, bodyHeightMM), Pads: pads}
+}
+
+func throughHolePad(name string, xMM, yMM, widthMM, heightMM, drillMM float64, shape string) placement.PadSummary {
+	return placement.PadSummary{
+		Name: name, XMM: xMM, YMM: yMM, WidthMM: widthMM, HeightMM: heightMM,
+		Type: "thru_hole", Shape: shape, DrillMM: drillMM, Layers: []string{"*.Cu", "*.Mask"},
+	}
+}
+
+func smdPad(name string, xMM, yMM, widthMM, heightMM float64, shape string) placement.PadSummary {
+	return placement.PadSummary{
+		Name: name, XMM: xMM, YMM: yMM, WidthMM: widthMM, HeightMM: heightMM,
+		Type: "smd", Shape: shape, Layers: []string{"F.Cu", "F.Mask", "F.Paste"},
+	}
+}
+
+func verifiedCourtyardBounds(widthMM, heightMM, anchorXMM, anchorYMM float64) placement.Bounds {
+	return placement.Bounds{
+		WidthMM: widthMM, HeightMM: heightMM,
+		AnchorOffset: placement.Point{XMM: anchorXMM, YMM: anchorYMM},
+		Source:       placement.BoundsLibraryCourtyard,
+	}
+}
+
+func verifiedCourtyardBoundsFromExtents(minXMM, minYMM, maxXMM, maxYMM float64) placement.Bounds {
+	return verifiedCourtyardBounds(maxXMM-minXMM, maxYMM-minYMM, -minXMM, -minYMM)
 }
 
 func esp32WROOM32ETemplate() verifiedPadTemplateRecord {
@@ -437,20 +532,30 @@ func rowPadY(index int, count int, pitch float64) float64 {
 
 func pinHeaderTemplate(count int) verifiedPadTemplateRecord {
 	pads := make([]placement.PadSummary, 0, count)
-	height := max(2.54, float64(count)*2.54)
 	for index := 0; index < count; index++ {
+		shape := "circle"
+		if index == 0 {
+			shape = "rect"
+		}
 		pads = append(pads, placement.PadSummary{
 			Name:     fmt.Sprintf("%d", index+1),
 			XMM:      0,
-			YMM:      (float64(index) - float64(count-1)/2) * 2.54,
+			YMM:      float64(index) * 2.54,
 			WidthMM:  1.7,
 			HeightMM: 1.7,
 			Type:     "thru_hole",
+			Shape:    shape,
 			DrillMM:  1.0,
-			Layers:   []string{"*.Cu"},
+			Layers:   []string{"*.Cu", "*.Mask"},
 		})
 	}
-	return verifiedPadTemplateRecord{Bounds: padEnvelopeBounds(pads, 2.54, height), Pads: pads}
+	maxYMM := float64(count-1)*2.54 + 1.77
+	// KiCad's two-position member of this generated footprint family snaps its
+	// positive courtyard edge outward by one hundredth of a millimeter.
+	if count == 2 {
+		maxYMM = 4.32
+	}
+	return verifiedPadTemplateRecord{Bounds: verifiedCourtyardBoundsFromExtents(-1.77, -1.77, 1.77, maxYMM), Pads: pads}
 }
 
 // centeredEstimatedBounds matches verified fallback templates whose pads are centered around the footprint origin.

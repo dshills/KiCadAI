@@ -1,6 +1,8 @@
 package designworkflow
 
 import (
+	"context"
+	"os"
 	"reflect"
 	"strconv"
 	"strings"
@@ -140,20 +142,20 @@ func TestVerifiedPadTemplateUsesPackageSpecificRowPinOrder(t *testing.T) {
 	if !ok {
 		t.Fatal("missing SOIC-8 template")
 	}
-	if got := padTemplateNames(soic.Pads); !reflect.DeepEqual(got, []string{"1", "2", "3", "4", "8", "7", "6", "5"}) {
+	if got := padTemplateNames(soic.Pads); !reflect.DeepEqual(got, []string{"1", "2", "3", "4", "5", "6", "7", "8"}) {
 		t.Fatalf("SOIC pad order = %#v", got)
 	}
 	sot, ok := verifiedPadTemplate("Package_TO_SOT_SMD:SOT-23-5")
 	if !ok {
 		t.Fatal("missing SOT-23-5 template")
 	}
-	if got := padTemplateNames(sot.Pads); !reflect.DeepEqual(got, []string{"1", "2", "3", "5", "4"}) {
+	if got := padTemplateNames(sot.Pads); !reflect.DeepEqual(got, []string{"1", "2", "3", "4", "5"}) {
 		t.Fatalf("SOT pad order = %#v", got)
 	}
 	if len(sot.Pads) != 5 {
 		t.Fatalf("SOT pad count = %d, want 5", len(sot.Pads))
 	}
-	if sot.Pads[2].Name != "3" || sot.Pads[4].Name != "4" || sot.Pads[2].YMM != sot.Pads[4].YMM {
+	if sot.Pads[2].Name != "3" || sot.Pads[3].Name != "4" || sot.Pads[2].YMM != sot.Pads[3].YMM {
 		t.Fatalf("SOT pin 4 should align with pin 3: %#v", sot.Pads)
 	}
 	if sot.Bounds.WidthMM < 3.7 {
@@ -207,7 +209,6 @@ func TestVerifiedB3UControlSwitchTemplateHasOnePadPerTerminal(t *testing.T) {
 func TestVerifiedTwoPadTemplatesDoNotOverlap(t *testing.T) {
 	for _, footprintID := range []string{
 		"Resistor_SMD:R_0603_1608Metric",
-		"Resistor_SMD:R_0805_2012Metric",
 		"Capacitor_SMD:C_0603_1608Metric",
 		"Capacitor_SMD:C_0805_2012Metric",
 		"LED_SMD:LED_0805_2012Metric",
@@ -223,6 +224,79 @@ func TestVerifiedTwoPadTemplatesDoNotOverlap(t *testing.T) {
 			gap := template.Pads[1].XMM - template.Pads[1].WidthMM/2 - (template.Pads[0].XMM + template.Pads[0].WidthMM/2)
 			if gap <= 0 {
 				t.Fatalf("pads overlap or touch, gap=%v pads=%#v", gap, template.Pads)
+			}
+		})
+	}
+}
+
+func TestVerifiedSpeakerPowerFootprintTemplatesPreservePadContracts(t *testing.T) {
+	tests := []struct {
+		footprintID string
+		padNames    []string
+		throughHole bool
+	}{
+		{"Capacitor_THT:C_Rect_L7.2mm_W3.0mm_P5.00mm_FKS2_FKP2_MKS2_MKP2", []string{"1", "2"}, true},
+		{"Capacitor_THT:CP_Radial_D8.0mm_P3.50mm", []string{"1", "2"}, true},
+		{"Capacitor_Tantalum_SMD:CP_EIA-3216-18_Kemet-A", []string{"1", "2"}, false},
+		{"Resistor_THT:R_Axial_DIN0414_L11.9mm_D4.5mm_P20.32mm_Horizontal", []string{"1", "2"}, true},
+		{"Package_TO_SOT_THT:TO-126-3_Vertical", []string{"1", "2", "3"}, true},
+		{"Package_TO_SOT_THT:TO-3P-3_Vertical", []string{"1", "2", "3"}, true},
+		{"Relay_THT:Relay_SPST_Omron-G5Q-1A", []string{"1", "2", "3", "5"}, true},
+	}
+	for _, test := range tests {
+		t.Run(test.footprintID, func(t *testing.T) {
+			template, ok := verifiedPadTemplate(test.footprintID)
+			if !ok || !reflect.DeepEqual(padTemplateNames(template.Pads), test.padNames) {
+				t.Fatalf("template ok=%v pads=%#v, want %v", ok, template.Pads, test.padNames)
+			}
+			for _, pad := range template.Pads {
+				if pad.WidthMM <= 0 || pad.HeightMM <= 0 || test.throughHole && (pad.Type != "thru_hole" || pad.DrillMM <= 0 || !reflect.DeepEqual(pad.Layers, []string{"*.Cu", "*.Mask"})) {
+					t.Fatalf("pad %#v does not preserve verified physical geometry", pad)
+				}
+			}
+		})
+	}
+}
+
+func TestVerifiedSpeakerPowerFootprintTemplatesMatchInstalledKiCadLibraries(t *testing.T) {
+	root := os.Getenv(libraryresolver.EnvFootprintsRoot)
+	if root == "" {
+		t.Skipf("set %s to compare verified templates with installed KiCad libraries", libraryresolver.EnvFootprintsRoot)
+	}
+	index, issues := libraryresolver.Load(context.Background(), libraryresolver.LibraryRoots{FootprintsRoot: root}, libraryresolver.LoadOptions{})
+	for _, issue := range issues {
+		if issue.Severity == reports.SeverityBlocked {
+			t.Fatalf("load installed footprint library: %#v", issues)
+		}
+	}
+	for _, footprintID := range []string{
+		"Capacitor_THT:C_Rect_L7.2mm_W3.0mm_P5.00mm_FKS2_FKP2_MKS2_MKP2",
+		"Capacitor_THT:CP_Radial_D8.0mm_P3.50mm",
+		"Capacitor_Tantalum_SMD:CP_EIA-3216-18_Kemet-A",
+		"Connector_PinHeader_2.54mm:PinHeader_1x02_P2.54mm_Vertical",
+		"Connector_PinHeader_2.54mm:PinHeader_1x04_P2.54mm_Vertical",
+		"Diode_SMD:D_SOD-123",
+		"Package_SO:SOIC-8_3.9x4.9mm_P1.27mm",
+		"Package_TO_SOT_SMD:SOT-23",
+		"Package_TO_SOT_SMD:SOT-23-5",
+		"Resistor_THT:R_Axial_DIN0414_L11.9mm_D4.5mm_P20.32mm_Horizontal",
+		"Resistor_SMD:R_0805_2012Metric",
+		"Package_TO_SOT_THT:TO-126-3_Vertical",
+		"Package_TO_SOT_THT:TO-3P-3_Vertical",
+		"Relay_THT:Relay_SPST_Omron-G5Q-1A",
+	} {
+		t.Run(footprintID, func(t *testing.T) {
+			template, ok := verifiedPadTemplate(footprintID)
+			if !ok {
+				t.Fatalf("missing verified template")
+			}
+			record, ok := libraryresolver.ResolveFootprint(index, footprintID)
+			if !ok {
+				t.Fatalf("installed footprint not resolved")
+			}
+			bounds, pads, _ := placement.BoundsFromFootprint(record)
+			if !reflect.DeepEqual(template.Bounds, bounds) || !reflect.DeepEqual(template.Pads, pads) {
+				t.Fatalf("template mismatch\n bounds: %#v\n library: %#v\n pads: %#v\n library: %#v", template.Bounds, bounds, template.Pads, pads)
 			}
 		})
 	}
@@ -263,7 +337,7 @@ func TestVerifiedPinHeaderTemplateSupportsArbitraryOneRowCount(t *testing.T) {
 		t.Fatalf("template = %#v, ok = %v", template, ok)
 	}
 	for index, pad := range template.Pads {
-		wantY := (float64(index) - 2.5) * 2.54
+		wantY := float64(index) * 2.54
 		if pad.Name != strconv.Itoa(index+1) || pad.YMM != wantY {
 			t.Fatalf("pad[%d] = %#v", index, pad)
 		}
@@ -366,7 +440,7 @@ func TestPinHeaderTemplatePreservesThroughHoleLayerAccess(t *testing.T) {
 		t.Fatalf("template = %#v, ok=%t", template, ok)
 	}
 	for _, pad := range template.Pads {
-		if pad.Type != "thru_hole" || pad.DrillMM <= 0 || !reflect.DeepEqual(pad.Layers, []string{"*.Cu"}) {
+		if pad.Type != "thru_hole" || pad.DrillMM <= 0 || !reflect.DeepEqual(pad.Layers, []string{"*.Cu", "*.Mask"}) {
 			t.Fatalf("pin-header pad lost through-hole access: %#v", pad)
 		}
 	}

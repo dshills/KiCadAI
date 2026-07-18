@@ -139,7 +139,9 @@ func RouteRequestContext(ctx context.Context, request Request) Result {
 				route.SearchLimitHit = true
 				result.Metrics.MaxSearchNodesHit = true
 			}
-			if len(routeIssues) != 0 && len(routableLayerNames(searchRequest.Board.Layers)) > 2 {
+			// A two-layer board can need the same deterministic pad-edge escape as
+			// a multilayer board when dense neighboring copper blocks the pad center.
+			if len(routeIssues) != 0 && len(routableLayerNames(searchRequest.Board.Layers)) >= 2 {
 				edgeAccess := expandSMDPadEdgeAccess(netAccess, searchRequest, []Endpoint{pair.From, pair.To})
 				edgePath, edgeIssues := routePairPath(ctx, searchRequest, edgeAccess, occupancy, viaOccupancy, plan.Net.Name, pair)
 				route.SearchNodes += edgePath.SearchNodes
