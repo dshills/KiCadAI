@@ -417,6 +417,28 @@ func TestDesignExamplePromotionClassificationMatchesMetadata(t *testing.T) {
 	}
 }
 
+func TestProtectedClassABFallbackSymbolsRemainReadableWithoutLibraryIndex(t *testing.T) {
+	repoRoot := designExampleRepoRoot(t)
+	metadataPath := filepath.Join(repoRoot, "examples", "design", "kicad-backed", "class_ab_headphone_protected.metadata.json")
+	metadata, err := loadDesignExampleMetadataPath(metadataPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	requestPath, err := designExampleRequestPathForMetadata(metadataPath, metadata)
+	if err != nil {
+		t.Fatal(err)
+	}
+	request, issues := loadDesignExampleRequestPath(t, requestPath)
+	if len(issues) != 0 {
+		t.Fatalf("decode %s issues:\n%s", requestPath, formatDesignExampleIssues(issues))
+	}
+	outputDir := filepath.Join(t.TempDir(), NormalizeProjectName(metadata.ID))
+	ctx, cancel := context.WithTimeout(context.Background(), designExampleCreateTimeout(t))
+	defer cancel()
+	result := Create(ctx, request, CreateOptions{OutputDir: outputDir, Overwrite: true, LibraryIndex: nil})
+	assertDesignExampleProtectedAmplifierEvidence(t, metadata, outputDir, result)
+}
+
 func assertDesignExampleBMP280Readability(t *testing.T, result WorkflowResult, outputDir string) {
 	t.Helper()
 	stage, ok := designExampleStageByName(result, StageSchematic)
@@ -856,7 +878,7 @@ func assertDesignExampleProtectedAmplifierEvidence(t *testing.T, metadata design
 		{StageRouting, StageStatusOK},
 		{StageProjectWrite, StageStatusOK},
 		{StageWriterCorrect, StageStatusWarning},
-		{StageValidation, StageStatusBlocked},
+		{StageValidation, StageStatusOK},
 		{StageKiCadChecks, StageStatusSkipped},
 	} {
 		stage, ok := designExampleStageByName(result, expectation.stage)
@@ -887,8 +909,8 @@ func assertDesignExampleProtectedAmplifierEvidence(t *testing.T, metadata design
 	if !ok {
 		t.Fatalf("%s missing validation stage:\n%s", metadata.ID, formatDesignExampleRun(metadata, outputDir, result))
 	}
-	if !designExampleIssuesContainCode(validation.Issues, "DISCONNECTED_PAD") {
-		t.Fatalf("%s validation lacks routed-board connectivity blocker evidence:\n%s", metadata.ID, formatDesignExampleIssues(validation.Issues))
+	if designExampleIssuesContainCode(validation.Issues, "DISCONNECTED_PAD") {
+		t.Fatalf("%s validation retained a routed-board connectivity blocker:\n%s", metadata.ID, formatDesignExampleIssues(validation.Issues))
 	}
 }
 

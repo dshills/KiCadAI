@@ -524,7 +524,10 @@ func (builder *Builder) ensureSchematicLibrarySymbol(libraryID string, preferRes
 	if schematic.EnsureEmbeddedSymbol(builder.design.Schematic, libraryID) {
 		return nil
 	}
-	if preferResolver && len(fallbackPins) > 0 {
+	// With no library index there is no external symbol body to resolve at
+	// write or readback time. Always embed a deterministic pin-contract body
+	// in that environment, even when resolver preference was not requested.
+	if len(fallbackPins) > 0 && (preferResolver || builder.libraryIndex == nil) {
 		pins := make([]schematic.TemplatePin, 0, len(fallbackPins))
 		for _, pin := range fallbackPins {
 			pins = append(pins, schematic.TemplatePin{Number: pin.Number, Offset: pin.Offset})
@@ -535,7 +538,7 @@ func (builder *Builder) ensureSchematicLibrarySymbol(libraryID string, preferRes
 		return nil
 	}
 	if builder.libraryIndex == nil {
-		return nil
+		return fmt.Errorf("symbol %s has no embedded template, library index, or fallback pin contract", libraryID)
 	}
 	if !resolverFound {
 		return fmt.Errorf("symbol library record not found: %s", libraryID)

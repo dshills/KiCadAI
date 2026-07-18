@@ -40,15 +40,15 @@
           "upper_headroom_v": 5
         },
         "soa": {
-          "allowed_current_a": 0.030545454545454556,
+          "allowed_current_a": 0.0305454545455,
           "requested_current_a": 0.001,
-          "soa_current_margin_ratio": 30.545454545454554
+          "soa_current_margin_ratio": 30.5454545455
         },
         "stability": {
           "phase_margin_deg": 60
         },
         "thermal": {
-          "junction_margin_c": 101.94200000000001,
+          "junction_margin_c": 101.942,
           "junction_temperature_c": 48.058,
           "thermal_resistance_c_per_w": 556
         },
@@ -58,7 +58,7 @@
         "transient": {
           "available_slew_rate_v_per_s": 1000000,
           "calculated_peak_current_a": 0.0001,
-          "required_slew_rate_v_per_s": 125663.70614359173
+          "required_slew_rate_v_per_s": 125663.706144
         }
       }
     },
@@ -93,9 +93,9 @@
           "upper_headroom_v": 1.5
         },
         "soa": {
-          "allowed_current_a": 0.037333333333333336,
+          "allowed_current_a": 0.0373333333333,
           "requested_current_a": 0.03,
-          "soa_current_margin_ratio": 1.2444444444444447
+          "soa_current_margin_ratio": 1.24444444444
         },
         "stability": {
           "phase_margin_deg": 60
@@ -111,7 +111,7 @@
         "transient": {
           "available_slew_rate_v_per_s": 1000000,
           "calculated_peak_current_a": 0.09375,
-          "required_slew_rate_v_per_s": 376991.1184307752
+          "required_slew_rate_v_per_s": 376991.118431
         }
       }
     }

@@ -1107,15 +1107,15 @@ func TestBuilderAddSymbolClonesInputProperties(t *testing.T) {
 	}
 }
 
-func TestBuilderAddSymbolEmbedsSupportedSymbolTemplates(t *testing.T) {
+func TestBuilderAddSymbolEmbedsSupportedAndNoIndexFallbackTemplates(t *testing.T) {
 	builder := newTestBuilder(t)
 	addTwoPinSymbol(t, builder, "R1", "Device:R", "1k", kicadfiles.Point{X: kicadfiles.MM(20), Y: kicadfiles.MM(20)})
 	addTwoPinSymbol(t, builder, "C1", "Device:C", "100n", kicadfiles.Point{X: kicadfiles.MM(40), Y: kicadfiles.MM(20)})
 	addTwoPinSymbol(t, builder, "X1", "Custom:Block", "Block", kicadfiles.Point{X: kicadfiles.MM(60), Y: kicadfiles.MM(20)})
 
 	design := builder.Design()
-	if len(design.Schematic.LibSymbols) != 2 {
-		t.Fatalf("lib symbols = %d, want 2: %#v", len(design.Schematic.LibSymbols), design.Schematic.LibSymbols)
+	if len(design.Schematic.LibSymbols) != 3 {
+		t.Fatalf("lib symbols = %d, want 3: %#v", len(design.Schematic.LibSymbols), design.Schematic.LibSymbols)
 	}
 	seen := map[string]bool{}
 	for _, symbol := range design.Schematic.LibSymbols {
@@ -1124,8 +1124,8 @@ func TestBuilderAddSymbolEmbedsSupportedSymbolTemplates(t *testing.T) {
 	if !seen["device:r"] || !seen["device:c"] {
 		t.Fatalf("missing embedded templates: %#v", seen)
 	}
-	if seen["custom:block"] {
-		t.Fatalf("unsupported custom symbol should not be embedded: %#v", seen)
+	if !seen["custom:block"] {
+		t.Fatalf("no-index custom symbol should receive an embedded pin-contract fallback: %#v", seen)
 	}
 }
 
@@ -1376,11 +1376,13 @@ func TestBuilderResolverLibraryUpgradesWriterOwnedGeneratedSiblingLibrary(t *tes
 func TestBuilderPreferResolverEmbedsExplicitPinFallbackWhenResolverUnavailable(t *testing.T) {
 	emptyIndex := &libraryresolver.LibraryIndex{Symbols: map[string]libraryresolver.SymbolRecord{}}
 	for _, test := range []struct {
-		name  string
-		index *libraryresolver.LibraryIndex
+		name           string
+		index          *libraryresolver.LibraryIndex
+		preferResolver bool
 	}{
-		{name: "no index"},
-		{name: "partial index", index: emptyIndex},
+		{name: "no index", preferResolver: true},
+		{name: "no index without resolver preference"},
+		{name: "partial index", index: emptyIndex, preferResolver: true},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			builder, err := New(Options{
@@ -1397,7 +1399,7 @@ func TestBuilderPreferResolverEmbedsExplicitPinFallbackWhenResolverUnavailable(t
 			}
 			if _, err := builder.AddSymbol(SymbolOptions{
 				Reference: "U1", LibraryID: "Vendor:Unresolved_Module", Value: "MODULE",
-				Position: position, Pins: pins, PreferResolverSymbol: true,
+				Position: position, Pins: pins, PreferResolverSymbol: test.preferResolver,
 			}); err != nil {
 				t.Fatal(err)
 			}
@@ -1421,6 +1423,19 @@ func TestBuilderPreferResolverEmbedsExplicitPinFallbackWhenResolverUnavailable(t
 				t.Fatalf("fallback symbol connectivity validation failed: %v", err)
 			}
 		})
+	}
+}
+
+func TestBuilderRejectsNoIndexUnknownSymbolWithoutFallbackPins(t *testing.T) {
+	builder := newTestBuilder(t)
+	_, err := builder.AddSymbol(SymbolOptions{
+		Reference: "U1",
+		LibraryID: "Vendor:UnknownWithoutPins",
+		Value:     "UNKNOWN",
+		Position:  kicadfiles.Point{X: kicadfiles.MM(20), Y: kicadfiles.MM(20)},
+	})
+	if err == nil || !strings.Contains(err.Error(), "fallback pin contract") {
+		t.Fatalf("AddSymbol error = %v, want missing fallback pin contract", err)
 	}
 }
 

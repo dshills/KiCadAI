@@ -11,6 +11,7 @@ import (
 	"runtime"
 	"slices"
 	"sort"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -21,6 +22,8 @@ import (
 )
 
 var updateAudioDomainReport = flag.Bool("update-audio-domain-report", false, "update the verified audio amplifier capability report")
+
+const audioMeasurementSignificantDigits = 12
 
 type audioDomainReport struct {
 	Schema          string              `json:"schema"`
@@ -165,9 +168,23 @@ func audioPositive(t *testing.T, id string, request amplifiers.ValidationRequest
 	entry := audioPositiveCase{ID: id, Status: "pass", Layout: layout, Measurements: map[string]map[string]float64{}}
 	for _, analysis := range result.Analyses {
 		entry.Analyses = append(entry.Analyses, analysis.Kind)
-		entry.Measurements[string(analysis.Kind)] = analysis.Measurements
+		entry.Measurements[string(analysis.Kind)] = canonicalAudioMeasurements(t, analysis.Measurements)
 	}
 	return entry
+}
+
+func canonicalAudioMeasurements(t testing.TB, measurements map[string]float64) map[string]float64 {
+	t.Helper()
+	canonical := make(map[string]float64, len(measurements))
+	for name, value := range measurements {
+		formatted := strconv.FormatFloat(value, 'g', audioMeasurementSignificantDigits, 64)
+		parsed, err := strconv.ParseFloat(formatted, 64)
+		if err != nil {
+			t.Fatalf("canonical measurement %s=%q cannot be parsed: %v", name, formatted, err)
+		}
+		canonical[name] = parsed
+	}
+	return canonical
 }
 
 func unsafeCapacitorIssues(record *components.ComponentRecord) []reports.Issue {
