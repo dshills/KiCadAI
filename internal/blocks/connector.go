@@ -23,6 +23,19 @@ func instantiateConnectorBreakout(definition BlockDefinition, request BlockReque
 		}
 		seen[pinName] = struct{}{}
 	}
+	powerSourcePins := stringListParam(params, "power_source_pins")
+	powerSourceSet := make(map[string]struct{}, len(powerSourcePins))
+	for _, pinName := range powerSourcePins {
+		if _, ok := seen[pinName]; !ok {
+			issues = append(issues, blockIssue("params.power_source_pins", "power source pin "+pinName+" is not present in pin_names"))
+			continue
+		}
+		if _, duplicate := powerSourceSet[pinName]; duplicate {
+			issues = append(issues, blockIssue("params.power_source_pins", "duplicate power source pin "+pinName))
+			continue
+		}
+		powerSourceSet[pinName] = struct{}{}
+	}
 	if count, ok := numericValue(params["pin_count"]); ok && int(count) != len(pinNames) {
 		issues = append(issues, blockIssue("params.pin_count", "pin_count must match pin_names length"))
 	}
@@ -56,27 +69,45 @@ func instantiateConnectorBreakout(definition BlockDefinition, request BlockReque
 	allocator := NewInstanceReferenceAllocator(request.InstanceID)
 	connectorRef := allocator.Next("J")
 	component := BlockComponent{
-		Role:        "connector",
-		RefPrefix:   "J",
-		Value:       fmt.Sprintf("Conn_01x%02d", len(pinNames)),
-		SymbolID:    connectorSymbol,
-		FootprintID: connectorFootprint,
-		Pins:        connectorSymbolPins(len(pinNames)),
+		Role:                 "connector",
+		RefPrefix:            "J",
+		Value:                fmt.Sprintf("Conn_01x%02d", len(pinNames)),
+		SymbolID:             connectorSymbol,
+		FootprintID:          connectorFootprint,
+		Pins:                 connectorSymbolPins(len(pinNames)),
+		PreferResolverSymbol: true,
 	}
 	operations, componentIssues := ComponentOperations(component, connectorRef, transactions.Point{XMM: 0, YMM: 0})
 	issues = append(issues, componentIssues...)
 	var ports []BlockPort
 	var nets []string
+	refs := []string{connectorRef}
 	for index, pinName := range pinNames {
 		netName := InstanceNetName(request.InstanceID, pinName)
 		ports = append(ports, BlockPort{Name: pinName, Direction: PortPassive, Description: "Connector pin " + fmt.Sprint(index+1)})
 		nets = append(nets, netName)
 		appendConnectOperation(&operations, &issues, request.InstanceID, pinName, connectorRef, fmt.Sprint(index+1), netName)
+		if _, drivesPower := powerSourceSet[pinName]; drivesPower {
+			flagRef := allocator.Next("#FLG")
+			flag := BlockComponent{
+				Role:          "power_source_" + pinName,
+				RefPrefix:     "#FLG",
+				Value:         "PWR_FLAG",
+				SymbolID:      "power:PWR_FLAG",
+				Pins:          []transactions.PinSpec{{Number: "1", ExplicitOffset: true}},
+				SchematicOnly: true,
+			}
+			flagOperations, flagIssues := ComponentOperations(flag, flagRef, transactions.Point{XMM: -10.16, YMM: connectorPinYMM(len(pinNames), index+1)})
+			operations = append(operations, flagOperations...)
+			issues = append(issues, flagIssues...)
+			appendConnectOperation(&operations, &issues, connectorRef, fmt.Sprint(index+1), flagRef, "1", netName)
+			refs = append(refs, flagRef)
+		}
 	}
 	output := dryRunBlockOutput(definition, request, operations, issues)
 	output.Instance.Params = params
 	output.Instance.Ports = ports
-	output.Instance.Refs = []string{connectorRef}
+	output.Instance.Refs = refs
 	output.Instance.Nets = nets
 	return output
 }

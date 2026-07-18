@@ -1061,17 +1061,10 @@ func absolutePadPosition(footprint Footprint, pad Pad) kicadfiles.Point {
 }
 
 func rotatePoint(point kicadfiles.Point, angle kicadfiles.Angle) kicadfiles.Point {
-	if angle == 0 {
-		return point
-	}
-	radians := float64(angle) * math.Pi / 180
-	cosine := math.Cos(radians)
-	sine := math.Sin(radians)
-	x := float64(point.X)
-	y := float64(point.Y)
+	x, y := kicadfiles.RotateBoardLocalXY(float64(point.X), float64(point.Y), float64(angle))
 	return kicadfiles.Point{
-		X: kicadfiles.IU(math.Round(x*cosine - y*sine)),
-		Y: kicadfiles.IU(math.Round(x*sine + y*cosine)),
+		X: kicadfiles.IU(math.Round(x)),
+		Y: kicadfiles.IU(math.Round(y)),
 	}
 }
 

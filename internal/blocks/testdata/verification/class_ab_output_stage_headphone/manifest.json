@@ -71,7 +71,7 @@
       }
     ],
     "ports": [
-      {"name": "DRIVER_OUT", "direction": "input", "net": "hp_out_driver"},
+      {"name": "DRIVER_OUT", "direction": "input", "net": "hp_out_driver_out"},
       {"name": "VCC", "direction": "power", "net": "hp_out_vcc"},
       {"name": "VEE", "direction": "power", "net": "hp_out_vee"},
       {"name": "AMP_OUT", "direction": "output", "net": "hp_out_amp_out"},
@@ -79,7 +79,7 @@
     ],
     "nets": [
       {
-        "name": "hp_out_driver",
+        "name": "hp_out_driver_out",
         "visibility": "exported",
         "pins": [
           {"role": "bias_upper", "pin": "2"},

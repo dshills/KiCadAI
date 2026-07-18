@@ -950,11 +950,7 @@ func absolutePadPosition(footprint *pcbfiles.Footprint, pad pcbfiles.Pad) kicadf
 	if footprint.Layer == kicadfiles.LayerBCu {
 		localX = -localX
 	}
-	theta := float64(footprint.Rotation) * math.Pi / 180
-	cosTheta := math.Cos(theta)
-	sinTheta := math.Sin(theta)
-	x := float64(localX)*cosTheta - float64(localY)*sinTheta
-	y := float64(localX)*sinTheta + float64(localY)*cosTheta
+	x, y := kicadfiles.RotateBoardLocalXY(float64(localX), float64(localY), float64(footprint.Rotation))
 	return kicadfiles.Point{
 		X: footprint.Position.X + kicadfiles.IU(math.Round(x)),
 		Y: footprint.Position.Y + kicadfiles.IU(math.Round(y)),

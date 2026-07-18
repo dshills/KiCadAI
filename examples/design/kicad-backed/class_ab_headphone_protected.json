@@ -11,8 +11,8 @@
     "layers": 2
   },
   "component_policy": {
-    "minimum_confidence": "verified",
-    "acceptance": "connectivity"
+	"minimum_confidence": "rule_inferred",
+	"acceptance": "structural"
   },
   "blocks": [
     {
@@ -65,7 +65,8 @@
       "id": "power",
       "block_id": "connector_breakout",
       "params": {
-        "pin_names": ["VCC", "LOAD_REF"]
+        "pin_names": ["VCC", "LOAD_REF"],
+        "power_source_pins": ["VCC", "LOAD_REF"]
       }
     }
   ],
@@ -86,8 +87,8 @@
     {"from": "power.LOAD_REF", "to": "output.LOAD_REF", "net_alias": "LOAD_REF"}
   ],
   "validation": {
-    "acceptance": "connectivity",
-    "skip_routing": false,
-    "skip_kicad_checks": true
+	"acceptance": "erc-drc",
+	"skip_routing": false,
+	"skip_kicad_checks": false
   }
 }

@@ -79,7 +79,7 @@ func SelectionRequestForComponentWithParams(component BlockComponent, acceptance
 				},
 				Acceptance:        acceptance,
 				RequiredRatings:   sensorSupplyRating(component, params),
-				RequiredFunctions: []string{"SDA", "SCL"},
+				RequiredFunctions: componentIDRequiredFunctions(component),
 				RequireConcrete:   true,
 				RequireCompanions: true,
 			}, true
@@ -131,6 +131,13 @@ func SelectionRequestForComponentWithParams(component BlockComponent, acceptance
 		return components.SelectionRequest{Query: queryCopy, Acceptance: acceptance}, true
 	}
 	return components.SelectionRequest{}, false
+}
+
+func componentIDRequiredFunctions(component BlockComponent) []string {
+	if component.ComponentIDParam == "sensor_component_id" {
+		return []string{"SDA", "SCL"}
+	}
+	return nil
 }
 
 func sensorSupplyRating(component BlockComponent, params map[string]any) []components.RequiredRating {

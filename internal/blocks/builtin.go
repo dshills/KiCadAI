@@ -30,6 +30,7 @@ func BuiltinDefinitions() []BlockDefinition {
 		opampGainStageDefinition(),
 		amplifierSupplyDecouplingDefinition(),
 		amplifierBiasNetworkDefinition(),
+		classAVoltageStageDefinition(),
 		classABOutputPairDefinition(),
 		classABOutputStageDefinition(),
 		headphoneOutputProtectionDefinition(),
@@ -431,6 +432,7 @@ func connectorBreakoutDefinition() BlockDefinition {
 			{Name: "voltage", Type: ParameterVoltage, Description: "Intent-level signal or rail voltage associated with this connector."},
 			{Name: "bus", Type: ParameterString, Description: "Intent-level bus identifier associated with this connector."},
 			{Name: "include_labels", Type: ParameterBool, Default: true, Description: "Add schematic labels for exported pins."},
+			{Name: "power_source_pins", Type: ParameterStringList, Description: "Connector pins that are explicit external power sources and require ERC power-driver declarations."},
 			{Name: "include_mounting_holes", Type: ParameterBool, Default: false, Description: "Reserve mounting-hole support for later PCB generation."},
 			{Name: "edge_facing", Type: ParameterBool, Default: false, Description: "Place the connector at the board edge for checked-in validation fixtures."},
 			{Name: "edge_side", Type: ParameterEnum, Default: "right", Allowed: []any{"right", "bottom", "left", "top"}, Description: "Preferred board edge when edge_facing is enabled."},
@@ -440,6 +442,7 @@ func connectorBreakoutDefinition() BlockDefinition {
 		},
 		RequiredLibraries: []LibraryRequirement{
 			{Kind: "symbol", ID: defaultConnectorSymbol, Required: false, Description: "Default two-pin connector."},
+			{Kind: "symbol", ID: "power:PWR_FLAG", Required: false, Description: "ERC source declaration used only for explicitly configured external-power pins."},
 			{Kind: "footprint", ID: defaultConnectorFootprint, Required: false, Description: "Default two-pin header."},
 		},
 		Components:     connectorBreakoutComponents(),

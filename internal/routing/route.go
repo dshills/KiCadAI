@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math"
 
+	"kicadai/internal/kicadfiles"
 	"kicadai/internal/pcbrules"
 	"kicadai/internal/reports"
 )
@@ -327,9 +328,6 @@ func expandSMDPadEdgeAccess(access PadAccess, request Request, endpoints []Endpo
 	}
 	routableLayers := routableLayerNames(request.Board.Layers)
 	for _, component := range request.Components {
-		rotation := component.Position.RotationDeg * math.Pi / 180
-		cos := math.Cos(rotation)
-		sin := math.Sin(rotation)
 		for _, pad := range component.Pads {
 			key := endpointKey(component.Ref, pad.Name)
 			if _, ok := wanted[key]; !ok || pad.Type != PadSMD {
@@ -351,15 +349,17 @@ func expandSMDPadEdgeAccess(access PadAccess, request Request, endpoints []Endpo
 			for _, layer := range padAccessLayers(pad, routableLayers) {
 				for index, offset := range physicalOffsets {
 					searchOffset := searchOffsets[index]
+					searchX, searchY := kicadfiles.RotateBoardLocalXY(searchOffset.XMM, searchOffset.YMM, component.Position.RotationDeg)
 					searchPoint := Point{
-						XMM: center.XMM + searchOffset.XMM*cos - searchOffset.YMM*sin,
-						YMM: center.YMM + searchOffset.XMM*sin + searchOffset.YMM*cos,
+						XMM: center.XMM + searchX,
+						YMM: center.YMM + searchY,
 					}
+					physicalX, physicalY := kicadfiles.RotateBoardLocalXY(offset.XMM, offset.YMM, component.Position.RotationDeg)
 					expanded.AccessPoints[key] = append(expanded.AccessPoints[key], AccessPoint{
 						Endpoint: Endpoint{Ref: component.Ref, Pin: pad.Name},
 						Point: Point{
-							XMM: center.XMM + offset.XMM*cos - offset.YMM*sin,
-							YMM: center.YMM + offset.XMM*sin + offset.YMM*cos,
+							XMM: center.XMM + physicalX,
+							YMM: center.YMM + physicalY,
 						},
 						SearchPoint: &searchPoint,
 						Layer:       layer,

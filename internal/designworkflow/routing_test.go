@@ -280,6 +280,45 @@ func TestTranslatedUnitLocalRoutePointsMovesAuthoredWaypointsWithGroup(t *testin
 	}
 }
 
+func TestTranslatedLocalRoutePointsPreservesWaypointsWhenEndpointsSharePlacementDelta(t *testing.T) {
+	fragment := BlockFragment{Realization: blocks.BlockPCBRealizationResult{Components: []blocks.RealizedPCBComponent{
+		{Ref: "R1", Placement: blocks.RelativePlacement{XMM: 10, YMM: 10}},
+		{Ref: "R2", Placement: blocks.RelativePlacement{XMM: 20, YMM: 10}},
+	}}}
+	route := blocks.RealizedPCBLocalRoute{
+		From:   transactions.Endpoint{Ref: "R1", Pin: "1"},
+		To:     transactions.Endpoint{Ref: "R2", Pin: "2"},
+		Points: []transactions.Point{{XMM: 5, YMM: 10}, {XMM: 10, YMM: 5}, {XMM: 20, YMM: 5}, {XMM: 25, YMM: 10}},
+	}
+	from := PlacedPadEndpoint{Ref: "R1", Point: transactions.Point{XMM: 9.4, YMM: 10}, ComponentAt: transactions.Point{XMM: 10, YMM: 10}}
+	to := PlacedPadEndpoint{Ref: "R2", Point: transactions.Point{XMM: 20.6, YMM: 10}, ComponentAt: transactions.Point{XMM: 20, YMM: 10}}
+
+	points, ok := translatedUnitLocalRoutePoints(newTranslatedUnitRouteContext(fragment), route, from, to)
+	want := []transactions.Point{{XMM: 9.4, YMM: 10}, {XMM: 10, YMM: 5}, {XMM: 20, YMM: 5}, {XMM: 20.6, YMM: 10}}
+	if !ok || !slices.Equal(points, want) {
+		t.Fatalf("translated points = %#v ok=%v, want %#v", points, ok, want)
+	}
+}
+
+func TestTranslatedLocalRoutePointsPreservesWaypointsFromEntryAnchorToTranslatedComponent(t *testing.T) {
+	fragment := BlockFragment{Realization: blocks.BlockPCBRealizationResult{Components: []blocks.RealizedPCBComponent{
+		{Ref: "D1", Placement: blocks.RelativePlacement{XMM: 6, YMM: -3}},
+	}}}
+	route := blocks.RealizedPCBLocalRoute{
+		From:   transactions.Endpoint{Ref: "output.driver", Pin: "1"},
+		To:     transactions.Endpoint{Ref: "D1", Pin: "2"},
+		Points: []transactions.Point{{XMM: -3, YMM: 0}, {XMM: 8, YMM: 0}, {XMM: 8, YMM: -3}, {XMM: 7.2, YMM: -3}},
+	}
+	from := PlacedPadEndpoint{Ref: "output.driver", Point: transactions.Point{XMM: 55, YMM: 8}, Source: localRouteEntryAnchorSource}
+	to := PlacedPadEndpoint{Ref: "D1", Point: transactions.Point{XMM: 65.2, YMM: 5}, ComponentAt: transactions.Point{XMM: 64, YMM: 5}}
+
+	points, ok := translatedUnitLocalRoutePoints(newTranslatedUnitRouteContext(fragment), route, from, to)
+	want := []transactions.Point{{XMM: 55, YMM: 8}, {XMM: 66, YMM: 8}, {XMM: 66, YMM: 5}, {XMM: 65.2, YMM: 5}}
+	if !ok || !slices.Equal(points, want) {
+		t.Fatalf("translated points = %#v ok=%v, want %#v", points, ok, want)
+	}
+}
+
 func TestCompactRoutePointsKeepsMinimumTrackEndpoints(t *testing.T) {
 	points := compactRoutePoints([]transactions.Point{
 		{XMM: 10, YMM: 10},

@@ -94,13 +94,17 @@ func ComponentOperations(component BlockComponent, ref string, at transactions.P
 		symbolRole = "generated_terminal"
 	}
 	addSymbol, err := wrapOperation(transactions.OpAddSymbol, transactions.AddSymbolOperation{
-		Op:                   transactions.OpAddSymbol,
-		Ref:                  ref,
-		Role:                 symbolRole,
-		Value:                component.Value,
-		LibraryID:            component.SymbolID,
-		At:                   at,
-		Pins:                 append([]transactions.PinSpec(nil), component.Pins...),
+		Op:        transactions.OpAddSymbol,
+		Ref:       ref,
+		Role:      symbolRole,
+		Value:     component.Value,
+		LibraryID: component.SymbolID,
+		At:        at,
+		Pins:      append([]transactions.PinSpec(nil), component.Pins...),
+		// Exact upstream symbol bodies are opt-in because structural templates may
+		// intentionally use an upstream-looking library ID with a different pin
+		// contract. Verified blocks opt in only when their authored pin contract
+		// matches the resolver symbol.
 		PreferResolverSymbol: component.PreferResolverSymbol,
 	})
 	if err != nil {

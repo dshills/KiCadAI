@@ -109,9 +109,17 @@
         "voltage_unit": "V",
         "dc_bias_review": "not_applicable",
         "effective_capacitance_review": "review_required",
-        "esr_review": "review_required",
-        "fabrication_candidate_blocks": true,
-        "review_note": "Polarity, nominal value, voltage, body diameter, height, and lead pitch are verified. Applied ripple current, ESR, lifetime, temperature derating, and circuit-specific voltage margin require engineering review."
+        "esr_review": "proven",
+        "technology": "aluminum_electrolytic",
+        "polarity": "polarized",
+        "capacitance_tolerance_percent": 20,
+        "esr": {"value": 0.13, "unit": "ohm", "frequency_hz": 100000, "temperature_c": 20, "conditions": "maximum impedance used as a conservative ESR bound"},
+        "ripple_current": {"value": 0.455, "unit": "A_rms", "frequency_hz": 100000, "temperature_c": 105, "conditions": "manufacturer rated ripple current"},
+        "endurance_hours": 5000,
+        "endurance_temperature_c": 105,
+        "fabrication_proof": true,
+        "fabrication_candidate_blocks": false,
+        "review_note": "Part-level polarity, capacitance, voltage, impedance, ripple-current, endurance, body dimensions, and lead pitch are manufacturer-backed. Circuit validation must still enforce applied voltage, ripple, temperature, and lifetime margin."
       },
       "symbols": [{
         "symbol_id": "Device:C_Polarized",

@@ -35,6 +35,15 @@
         "output_swing_status": "review_required",
         "noise_status": "review_required",
         "distortion_status": "review_required",
+        "supply_voltage": {"minimum": 2.7, "maximum": 5.5, "unit": "V", "conditions": "TI LMV3xx recommended operating conditions"},
+        "input_common_mode": {"negative_rail_headroom_v": 0, "positive_rail_headroom_v": 0.8, "conditions": "typical 5 V operation; conservative lower-rail clamp"},
+        "output_swing": {"negative_rail_headroom_v": 0.065, "positive_rail_headroom_v": 0.12, "conditions": "typical 5 V operation at the TI product-table load condition"},
+        "output_current": {"value": 0.06, "unit": "A", "temperature_c": 25, "conditions": "typical product-table output current; not a guaranteed headphone-drive rating"},
+        "gain_bandwidth": {"value": 1000000, "unit": "Hz", "conditions": "unity-gain bandwidth"},
+        "slew_rate": {"value": 1000000, "unit": "V/s", "conditions": "typical large-signal slew rate"},
+        "voltage_noise_density": {"value": 39e-9, "unit": "V/sqrt(Hz)", "frequency_hz": 1000, "temperature_c": 25, "conditions": "typical input voltage-noise density"},
+        "max_junction_temperature_c": 150,
+        "junction_to_ambient_c_per_w": 232.9,
         "fabrication_candidate_blocks": true,
         "review_note": "LMV321 is selected as a low-voltage connectivity seed. Headphone-drive load, gain-bandwidth, compensation, and stability remain design-specific before fabrication-candidate use."
       },
@@ -177,6 +186,7 @@
       "manufacturer": "onsemi",
       "mpn": "MMBT3904LT1G",
       "lifecycle": "active",
+      "temperature": {"min": "-55", "max": "150", "unit": "C"},
       "simulation_models": [{
         "model_id": "mna_bjt_npn_ebers_moll_v1",
         "parameters": [
@@ -194,7 +204,7 @@
       "ratings": [
         {"kind": "collector_current", "max": "200", "unit": "mA"},
         {"kind": "collector_emitter_voltage", "max": "40", "unit": "V"},
-        {"kind": "power_dissipation_max", "max": "300", "unit": "mW"}
+        {"kind": "power_dissipation_max", "max": "225", "unit": "mW"}
       ],
       "companions": [{"id": "amplifier.output_emitter_resistor", "family": "resistor", "role": "emitter_resistor", "required": true, "applies_to": ["class_ab_output"], "description": "Emitter resistor or equivalent output-current sharing/current-limit review is required for Class AB output stages."}],
       "amplifier_output_evidence": {
@@ -211,11 +221,35 @@
         "output_terminal": "EMITTER",
         "voltage_rating_status": "proven",
         "current_rating_status": "proven",
-        "power_dissipation_status": "review_required",
-        "thermal_review": "review_required",
-        "safe_operating_area_status": "review_required",
-        "fabrication_candidate_blocks": true,
-        "review_note": "Low-current headphone or bias seed only; SOA, thermal dissipation, and distortion remain design-specific before fabrication-candidate use."
+        "power_dissipation_status": "proven",
+        "thermal_review": "proven",
+        "safe_operating_area_status": "proven",
+        "fabrication_candidate_blocks": false,
+        "review_note": "Fabrication evidence is bounded to the declared FR-5 SOT-23 thermal path and conservative low-current headphone SOA; applied bias, distortion, and PCB temperature remain circuit-level gates."
+      },
+      "power_semiconductor_evidence": {
+        "device_class": "bjt",
+        "polarity": "npn",
+        "complementary_group": "mmbt390x_sot23",
+        "max_voltage": {"value": 40, "unit": "V", "conditions": "VCEO, IC=1mA, IB=0"},
+        "continuous_current": {"value": 0.2, "unit": "A", "conditions": "absolute maximum continuous collector current"},
+        "peak_current": {"value": 0.9, "unit": "A", "conditions": "single-pulse peak; applied pulse must remain inside Figure 22 SOA"},
+        "power_dissipation": {"value": 0.225, "unit": "W", "temperature_c": 25, "conditions": "FR-5 board at TA=25 C"},
+        "max_junction_temperature_c": 150,
+        "junction_to_ambient_c_per_w": 556,
+        "soa": [
+          {"voltage_v": 1, "current_a": 0.2, "dc": true, "case_temperature_c": 25},
+          {"voltage_v": 5, "current_a": 0.04, "dc": true, "case_temperature_c": 25},
+          {"voltage_v": 10, "current_a": 0.02, "dc": true, "case_temperature_c": 25},
+          {"voltage_v": 20, "current_a": 0.01, "dc": true, "case_temperature_c": 25},
+          {"voltage_v": 40, "current_a": 0.005, "dc": true, "case_temperature_c": 25}
+        ],
+        "secondary_breakdown_status": "proven",
+        "linear_mode_status": "proven",
+        "mounting_assumptions": "Conservative 0.2 W DC boundary below the 225 mW FR-5 TA=25 C thermal limit and inside the manufacturer single-pulse SOA; applied validation must use actual ambient and board thermal path.",
+        "bjt": {"gain_minimum": 100, "gain_test_current_a": 0.01, "transition_frequency_hz": 300000000},
+        "fabrication_proof": true,
+        "review_note": "Source: onsemi MMBT3904LT1/D Rev. 14; SOT-23 Style 6."
       },
       "symbols": [{
         "symbol_id": "Transistor_BJT:Q_NPN_BEC",
@@ -241,7 +275,7 @@
         ],
         "verification": {"confidence": "verified", "sources": ["builtin_pinmap:Transistor_BJT:Q_NPN_BEC", "curated_part:onsemi:MMBT3904LT1G"], "pinmap_checked": true}
       }],
-      "verification": {"confidence": "verified", "sources": ["curated_seed_catalog", "builtin_pinmap:Transistor_BJT:Q_NPN_BEC", "curated_part:onsemi:MMBT3904LT1G"], "pinmap_checked": true, "notes": ["Analog bias, gain, noise, and distortion performance remain design-specific."]}
+      "verification": {"confidence": "verified", "sources": ["https://www.onsemi.com/pdf/datasheet/mmbt3904lt1-d.pdf", "builtin_pinmap:Transistor_BJT:Q_NPN_BEC", "curated_part:onsemi:MMBT3904LT1G"], "resolver_checked": true, "pinmap_checked": true, "tests": ["catalog_audio_power_semiconductor_evidence"], "notes": ["Analog bias, gain, noise, and distortion performance remain design-specific."]}
     },
     {
       "id": "bjt.onsemi.mmbt3906.sot23",
@@ -252,6 +286,7 @@
       "manufacturer": "onsemi",
       "mpn": "MMBT3906LT1G",
       "lifecycle": "active",
+      "temperature": {"min": "-65", "max": "150", "unit": "C"},
       "simulation_models": [{
         "model_id": "mna_bjt_pnp_ebers_moll_v1",
         "parameters": [
@@ -269,7 +304,7 @@
       "ratings": [
         {"kind": "collector_current", "max": "200", "unit": "mA"},
         {"kind": "collector_emitter_voltage", "max": "40", "unit": "V"},
-        {"kind": "power_dissipation_max", "max": "300", "unit": "mW"}
+        {"kind": "power_dissipation_max", "max": "225", "unit": "mW"}
       ],
       "companions": [{"id": "amplifier.output_emitter_resistor", "family": "resistor", "role": "emitter_resistor", "required": true, "applies_to": ["class_ab_output"], "description": "Emitter resistor or equivalent output-current sharing/current-limit review is required for Class AB output stages."}],
       "amplifier_output_evidence": {
@@ -286,11 +321,35 @@
         "output_terminal": "EMITTER",
         "voltage_rating_status": "proven",
         "current_rating_status": "proven",
-        "power_dissipation_status": "review_required",
-        "thermal_review": "review_required",
-        "safe_operating_area_status": "review_required",
-        "fabrication_candidate_blocks": true,
-        "review_note": "Low-current headphone or bias seed only; SOA, thermal dissipation, and distortion remain design-specific before fabrication-candidate use."
+        "power_dissipation_status": "proven",
+        "thermal_review": "proven",
+        "safe_operating_area_status": "proven",
+        "fabrication_candidate_blocks": false,
+        "review_note": "Fabrication evidence is bounded to the declared FR-5 SOT-23 thermal path and conservative low-current headphone SOA; applied bias, distortion, and PCB temperature remain circuit-level gates."
+      },
+      "power_semiconductor_evidence": {
+        "device_class": "bjt",
+        "polarity": "pnp",
+        "complementary_group": "mmbt390x_sot23",
+        "max_voltage": {"value": 40, "unit": "V", "conditions": "VCEO magnitude, IC=-1mA, IB=0"},
+        "continuous_current": {"value": 0.2, "unit": "A", "conditions": "absolute maximum continuous collector-current magnitude"},
+        "peak_current": {"value": 0.8, "unit": "A", "conditions": "single-pulse peak magnitude; applied pulse must remain inside Figure 20 SOA"},
+        "power_dissipation": {"value": 0.225, "unit": "W", "temperature_c": 25, "conditions": "FR-5 board at TA=25 C"},
+        "max_junction_temperature_c": 150,
+        "junction_to_ambient_c_per_w": 556,
+        "soa": [
+          {"voltage_v": 1, "current_a": 0.2, "dc": true, "case_temperature_c": 25},
+          {"voltage_v": 5, "current_a": 0.04, "dc": true, "case_temperature_c": 25},
+          {"voltage_v": 10, "current_a": 0.02, "dc": true, "case_temperature_c": 25},
+          {"voltage_v": 20, "current_a": 0.01, "dc": true, "case_temperature_c": 25},
+          {"voltage_v": 40, "current_a": 0.005, "dc": true, "case_temperature_c": 25}
+        ],
+        "secondary_breakdown_status": "proven",
+        "linear_mode_status": "proven",
+        "mounting_assumptions": "Conservative 0.2 W DC boundary below the 225 mW FR-5 TA=25 C thermal limit and inside the manufacturer single-pulse SOA; applied validation must use actual ambient and board thermal path.",
+        "bjt": {"gain_minimum": 100, "gain_test_current_a": 0.01, "transition_frequency_hz": 250000000},
+        "fabrication_proof": true,
+        "review_note": "Source: onsemi MMBT3906LT1/D Rev. 14; SOT-23 Style 6."
       },
       "symbols": [{
         "symbol_id": "Transistor_BJT:Q_PNP_BEC",
@@ -316,7 +375,7 @@
         ],
         "verification": {"confidence": "verified", "sources": ["builtin_pinmap:Transistor_BJT:Q_PNP_BEC", "curated_part:onsemi:MMBT3906LT1G"], "pinmap_checked": true}
       }],
-      "verification": {"confidence": "verified", "sources": ["curated_seed_catalog", "builtin_pinmap:Transistor_BJT:Q_PNP_BEC", "curated_part:onsemi:MMBT3906LT1G"], "pinmap_checked": true, "notes": ["Analog bias, gain, noise, and distortion performance remain design-specific."]}
+      "verification": {"confidence": "verified", "sources": ["https://www.onsemi.com/download/data-sheet/pdf/mmbt3906lt1-d.pdf", "builtin_pinmap:Transistor_BJT:Q_PNP_BEC", "curated_part:onsemi:MMBT3906LT1G"], "resolver_checked": true, "pinmap_checked": true, "tests": ["catalog_audio_power_semiconductor_evidence"], "notes": ["Analog bias, gain, noise, and distortion performance remain design-specific."]}
     },
     {
       "id": "bjt.placeholder.npn_power_output.to220",

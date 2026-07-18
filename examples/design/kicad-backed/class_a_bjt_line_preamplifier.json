@@ -1,0 +1,41 @@
+{
+  "version": "0.1.0",
+  "name": "class_a_bjt_line_preamplifier",
+  "intent": {
+    "summary": "KiCad-backed low-power single-ended BJT Class A line preamplifier with calculated bias, degeneration, coupling, and local decoupling.",
+    "category": "amplifier"
+  },
+  "board": {"width_mm": 90, "height_mm": 55, "layers": 2},
+  "component_policy": {"minimum_confidence": "rule_inferred", "acceptance": "structural"},
+  "blocks": [
+    {"id": "input", "block_id": "connector_breakout", "params": {"pin_names": ["SIG", "AGND"]}},
+    {"id": "preamp", "block_id": "class_a_voltage_stage", "params": {
+      "device_technology": "bjt",
+      "device_component_id": "bjt.onsemi.mmbt3904.sot23",
+      "device_symbol": "Device:Q_NPN_BEC",
+      "device_footprint": "Package_TO_SOT_SMD:SOT-23",
+      "supply_voltage": "12V",
+      "target_quiescent_current": "1mA",
+      "target_output_bias": "6V",
+      "target_gain": 10,
+      "control_drop_voltage": "0.65V",
+      "bias_divider_current": "100uA",
+      "minimum_current_gain": 100,
+      "input_impedance": "47kΩ",
+      "load_impedance": "10kΩ",
+      "low_frequency_cutoff": "20Hz",
+      "coupling_policy": "ac_both"
+    }},
+    {"id": "output", "block_id": "connector_breakout", "params": {"pin_names": ["SIG", "AGND"]}},
+    {"id": "power", "block_id": "connector_breakout", "params": {"pin_names": ["VCC", "AGND"]}}
+  ],
+  "connections": [
+    {"from": "input.SIG", "to": "preamp.IN", "net_alias": "AUDIO_IN"},
+    {"from": "input.AGND", "to": "preamp.AGND", "net_alias": "AGND"},
+    {"from": "preamp.OUT", "to": "output.SIG", "net_alias": "AUDIO_OUT"},
+    {"from": "output.AGND", "to": "preamp.AGND", "net_alias": "AGND"},
+    {"from": "power.VCC", "to": "preamp.VCC", "net_alias": "VCC"},
+    {"from": "power.AGND", "to": "preamp.AGND", "net_alias": "AGND"}
+  ],
+  "validation": {"acceptance": "erc-drc", "skip_routing": false, "skip_kicad_checks": false}
+}

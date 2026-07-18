@@ -584,7 +584,13 @@ func fabricationCandidateReviewIssues(record ComponentRecord) []reports.Issue {
 	var issues []reports.Issue
 	for _, rule := range record.DeratingRules {
 		switch rule.Kind {
-		case "thermal", "capacitor_stability":
+		case "thermal":
+			if (record.PowerSemiconductor != nil && record.PowerSemiconductor.FabricationProof) || (record.Capacitor != nil && record.Capacitor.FabricationProof) {
+				continue
+			}
+			message := "component requires unresolved " + strings.ReplaceAll(rule.Kind, "_", " ") + " evidence before fabrication-candidate selection"
+			issues = append(issues, NewIssue(CodeComponentReviewRequired, reports.SeverityBlocked, "component."+record.ID+".derating_rules."+rule.Kind, message))
+		case "capacitor_stability":
 			message := "component requires unresolved " + strings.ReplaceAll(rule.Kind, "_", " ") + " evidence before fabrication-candidate selection"
 			issues = append(issues, NewIssue(CodeComponentReviewRequired, reports.SeverityBlocked, "component."+record.ID+".derating_rules."+rule.Kind, message))
 		}
@@ -678,6 +684,28 @@ func structuredEvidenceReviewIssues(record ComponentRecord, severity reports.Sev
 				value = reviewStatusUnknown
 			}
 			issues = append(issues, NewIssue(CodeComponentReviewRequired, severity, basePath+".amplifier_output_evidence."+review.path, "amplifier output "+review.label+" evidence is not proven: "+value))
+		}
+	}
+	if record.PowerSemiconductor != nil {
+		if !record.PowerSemiconductor.FabricationProof {
+			issues = append(issues, NewIssue(CodeComponentReviewRequired, severity, basePath+".power_semiconductor_evidence.fabrication_proof", "power semiconductor lacks complete fabrication-oriented quantitative evidence"))
+		}
+		for _, review := range []struct {
+			path  string
+			label string
+			value string
+		}{
+			{path: "secondary_breakdown_status", label: "secondary-breakdown", value: record.PowerSemiconductor.SecondaryBreakdownStatus},
+			{path: "linear_mode_status", label: "linear-mode", value: record.PowerSemiconductor.LinearModeStatus},
+		} {
+			value := review.value
+			if value == reviewStatusProven || value == reviewStatusNotApplicable {
+				continue
+			}
+			if value == "" {
+				value = reviewStatusUnknown
+			}
+			issues = append(issues, NewIssue(CodeComponentReviewRequired, severity, basePath+".power_semiconductor_evidence."+review.path, "power semiconductor "+review.label+" evidence is not proven: "+value))
 		}
 	}
 	return issues

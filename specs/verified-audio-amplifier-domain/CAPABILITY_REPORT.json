@@ -1,0 +1,263 @@
+{
+  "schema": "kicadai-verified-audio-amplifier-capability-v1",
+  "generated_at": "2026-07-17",
+  "policy_version": "verified-audio-amplifier-policy-v1",
+  "evidence_records": {
+    "bjt.onsemi.mmbt3904.sot23": "69c67281721eb6f2787dd4e32c0b4fe1db340e9baba739c99f6968d3d3f1f6a2",
+    "capacitor.panasonic.eeufr1c221.radial": "94bc003903c4256f37b25f77d2d73d5188ad1681b82548beabdfdd17fa2082a0",
+    "mosfet.vishay.irfp240.to247": "712d8670a5eccd12d63da1c06604423dc081f93b34b426180833e54a05b699b6",
+    "opamp.ti.lmv321.sot23_5": "940b65b04922c2c1df25575e476aef8d5fd81ab0478a42a353cd53a15a9f5f99"
+  },
+  "positive_cases": [
+    {
+      "id": "class_a_bjt_line_preamplifier",
+      "status": "pass",
+      "analyses": [
+        "dc",
+        "ac",
+        "transient",
+        "tolerance",
+        "stability",
+        "thermal",
+        "soa"
+      ],
+      "layout": {
+        "profile": "class_a_line",
+        "present_categories": [
+          "analog_input_separation",
+          "decoupling_proximity",
+          "return_topology",
+          "thermal_keepout"
+        ]
+      },
+      "measurements": {
+        "ac": {
+          "available_gain_bandwidth_hz": 1000000,
+          "required_gain_bandwidth_hz": 400000
+        },
+        "dc": {
+          "lower_headroom_v": 5,
+          "upper_headroom_v": 5
+        },
+        "soa": {
+          "allowed_current_a": 0.030545454545454556,
+          "requested_current_a": 0.001,
+          "soa_current_margin_ratio": 30.545454545454554
+        },
+        "stability": {
+          "phase_margin_deg": 60
+        },
+        "thermal": {
+          "junction_margin_c": 101.94200000000001,
+          "junction_temperature_c": 48.058,
+          "thermal_resistance_c_per_w": 556
+        },
+        "tolerance": {
+          "corner_count": 2
+        },
+        "transient": {
+          "available_slew_rate_v_per_s": 1000000,
+          "calculated_peak_current_a": 0.0001,
+          "required_slew_rate_v_per_s": 125663.70614359173
+        }
+      }
+    },
+    {
+      "id": "protected_bjt_class_ab_headphone_amplifier",
+      "status": "pass",
+      "analyses": [
+        "dc",
+        "ac",
+        "transient",
+        "tolerance",
+        "stability",
+        "thermal",
+        "soa"
+      ],
+      "layout": {
+        "profile": "class_ab_headphone",
+        "present_categories": [
+          "current_path",
+          "device_symmetry",
+          "return_topology",
+          "thermal_coupling"
+        ]
+      },
+      "measurements": {
+        "ac": {
+          "available_gain_bandwidth_hz": 1000000,
+          "required_gain_bandwidth_hz": 400000
+        },
+        "dc": {
+          "lower_headroom_v": 1.5,
+          "upper_headroom_v": 1.5
+        },
+        "soa": {
+          "allowed_current_a": 0.037333333333333336,
+          "requested_current_a": 0.03,
+          "soa_current_margin_ratio": 1.2444444444444447
+        },
+        "stability": {
+          "phase_margin_deg": 60
+        },
+        "thermal": {
+          "junction_margin_c": 93.88,
+          "junction_temperature_c": 56.12,
+          "thermal_resistance_c_per_w": 556
+        },
+        "tolerance": {
+          "corner_count": 2
+        },
+        "transient": {
+          "available_slew_rate_v_per_s": 1000000,
+          "calculated_peak_current_a": 0.09375,
+          "required_slew_rate_v_per_s": 376991.1184307752
+        }
+      }
+    }
+  ],
+  "unsafe_cases": [
+    {
+      "id": "bjt_secondary_breakdown_soa",
+      "expected_status": "blocked",
+      "issue_codes": [
+        "AMPLIFIER_SOA_LIMIT"
+      ],
+      "issue_paths": [
+        "amplifier.soa.current"
+      ]
+    },
+    {
+      "id": "capacitor_voltage_esr_ripple_and_polarity",
+      "expected_status": "blocked",
+      "issue_codes": [
+        "AMPLIFIER_CAPACITOR_ENVELOPE"
+      ],
+      "issue_paths": [
+        "amplifier.capacitor.effective_capacitance",
+        "amplifier.capacitor.esr",
+        "amplifier.capacitor.fabrication_proof",
+        "amplifier.capacitor.polarity",
+        "amplifier.capacitor.ripple_current",
+        "amplifier.capacitor.voltage"
+      ]
+    },
+    {
+      "id": "class_a_excessive_dissipation",
+      "expected_status": "blocked",
+      "issue_codes": [
+        "AMPLIFIER_THERMAL_LIMIT"
+      ],
+      "issue_paths": [
+        "amplifier.thermal.device_dissipation",
+        "amplifier.thermal.junction_temperature"
+      ]
+    },
+    {
+      "id": "class_ab_thermal_runaway_bias_corner",
+      "expected_status": "blocked",
+      "issue_codes": [
+        "AMPLIFIER_TOLERANCE_CORNER"
+      ],
+      "issue_paths": [
+        "amplifier.tolerance.corner.hot_max"
+      ]
+    },
+    {
+      "id": "high_current_return_and_thermal_layout",
+      "expected_status": "blocked",
+      "issue_codes": [
+        "AMPLIFIER_LAYOUT_POLICY"
+      ],
+      "issue_paths": [
+        "amplifier.layout.device_symmetry",
+        "amplifier.layout.return_topology",
+        "amplifier.layout.thermal_coupling",
+        "amplifier.layout.current_path"
+      ]
+    },
+    {
+      "id": "inadequate_phase_margin",
+      "expected_status": "blocked",
+      "issue_codes": [
+        "AMPLIFIER_STABILITY_MARGIN",
+        "AMPLIFIER_TOLERANCE_CORNER"
+      ],
+      "issue_paths": [
+        "amplifier.stability.phase_margin",
+        "amplifier.tolerance.corner.hot_max"
+      ]
+    },
+    {
+      "id": "mosfet_linear_mode_soa",
+      "expected_status": "blocked",
+      "issue_codes": [
+        "AMPLIFIER_SOA_LIMIT"
+      ],
+      "issue_paths": [
+        "amplifier.soa.device_evidence"
+      ]
+    },
+    {
+      "id": "opamp_common_mode_and_output_drive",
+      "expected_status": "blocked",
+      "issue_codes": [
+        "AMPLIFIER_OPAMP_ENVELOPE"
+      ],
+      "issue_paths": [
+        "amplifier.opamp.fabrication_proof",
+        "amplifier.opamp.gain_bandwidth",
+        "amplifier.opamp.input_common_mode",
+        "amplifier.opamp.output_current",
+        "amplifier.opamp.output_swing",
+        "amplifier.opamp.slew_rate",
+        "amplifier.opamp.supply_voltage"
+      ]
+    }
+  ],
+  "kicad_fixtures": [
+    {
+      "id": "class_a_bjt_line_preamplifier",
+      "declared_readiness": "pass",
+      "acceptance": "erc-drc",
+      "require_erc": true,
+      "require_drc": true,
+      "expected_stages": [
+        "block_planning",
+        "component_selection",
+        "schematic",
+        "schematic_electrical",
+        "pcb_realization",
+        "placement",
+        "routing",
+        "project_write",
+        "writer_correctness",
+        "validation",
+        "kicad_checks"
+      ],
+      "request_sha256": "9382029a38b191b26c40281d8a8f01c91d365aeca22c5c355e8d5b7e0199ae61",
+      "metadata_sha256": "60ceb88efbcd9fc6d0cf915b53bb3193ea710d3269f9cc2f0e1c607523c74de6"
+    },
+    {
+      "id": "class_ab_headphone_protected",
+      "declared_readiness": "pass",
+      "acceptance": "erc-drc",
+      "require_erc": true,
+      "require_drc": true,
+      "expected_stages": [
+        "block_planning",
+        "component_selection",
+        "schematic",
+        "schematic_electrical",
+        "pcb_realization",
+        "placement",
+        "routing",
+        "project_write",
+        "writer_correctness",
+        "validation"
+      ],
+      "request_sha256": "915c56ef2a3ffd1cd666b3dbc48117cf3c7495c245acfc638055735bb388fd07",
+      "metadata_sha256": "8415bd837d23a38e4fbc06a31bb5490f6c8dad4570f8bd5f8d7da85f7f645d80"
+    }
+  ]
+}

@@ -49,10 +49,10 @@ func headphoneOutputProtectionDefinition() BlockDefinition {
 			{Kind: "footprint", ID: "TestPoint:TestPoint_Pad_D1.0mm", Required: true, Description: "Default load-return anchor footprint."},
 		},
 		Components: []BlockComponent{
-			{Role: "dc_blocking_capacitor", RefPrefix: "C", Value: "220uF", SymbolID: "Device:C_Polarized", FootprintID: "Capacitor_SMD:C_1210_3225Metric", Pins: twoTerminalVerticalPins(), PlacementGroup: "output_protection"},
+			{Role: "dc_blocking_capacitor", RefPrefix: "C", Value: "220uF", SymbolID: "Device:C_Polarized", FootprintID: "Capacitor_SMD:C_1210_3225Metric", Pins: twoTerminalVerticalPins(), PreferResolverSymbol: true, PlacementGroup: "output_protection"},
 			{Role: "bleed_resistor", RefPrefix: "R", Value: "100kΩ", SymbolID: "Device:R", FootprintID: "Resistor_SMD:R_0805_2012Metric", Pins: twoTerminalHorizontalPins(), PlacementGroup: "output_protection"},
 			{Role: "series_resistor", RefPrefix: "R", Value: "0Ω", SymbolID: "Device:R", FootprintID: "Resistor_SMD:R_0805_2012Metric", Pins: twoTerminalHorizontalPins(), PlacementGroup: "output_protection"},
-			{Role: "load_return_anchor", RefPrefix: "TP", Value: "LOAD_RET", SymbolID: "Connector:TestPoint", FootprintID: "TestPoint:TestPoint_Pad_D1.0mm", Pins: []transactions.PinSpec{{Number: "1"}}, PlacementGroup: "output_protection"},
+			{Role: "load_return_anchor", RefPrefix: "TP", Value: "LOAD_RET", SymbolID: "Connector:TestPoint", FootprintID: "TestPoint:TestPoint_Pad_D1.0mm", Pins: []transactions.PinSpec{{Number: "1"}}, PreferResolverSymbol: true, PlacementGroup: "output_protection"},
 		},
 		// BlockNet captures component-pin membership only. Exported block ports
 		// are tied to these nets by Connect operations during realization.
@@ -80,19 +80,20 @@ func headphoneOutputProtectionDefinition() BlockDefinition {
 				{ComponentRole: "load_return_anchor", FootprintID: "TestPoint:TestPoint_Pad_D1.0mm", Placement: RelativePlacement{XMM: 18, YMM: 10, Layer: "F.Cu"}},
 			},
 			EntryAnchors: []PCBEntryAnchor{
-				{ID: "amp_out", Port: "AMP_OUT", NetTemplate: "AMP_OUT", Placement: RelativePlacement{XMM: -4, YMM: 0, Layer: "F.Cu"}, Description: "DC-biased amplifier output entry before AC coupling."},
-				{ID: "hp_out", Port: "HP_OUT", NetTemplate: "HP_OUT", Placement: RelativePlacement{XMM: 8, YMM: 0, Layer: "F.Cu"}, Description: "AC-coupled headphone signal exit."},
-				{ID: "load_ref", Port: "LOAD_REF", NetTemplate: "LOAD_REF", Placement: RelativePlacement{XMM: 12, YMM: 10, Layer: "F.Cu"}, Description: "Load reference or analog-ground tie point."},
-				{ID: "load_ret", Port: "LOAD_RET", NetTemplate: "LOAD_RET", Placement: RelativePlacement{XMM: 18, YMM: 12, Layer: "F.Cu"}, Description: "Headphone return endpoint."},
+				{ID: "amp_out", Port: "AMP_OUT", NetTemplate: "AMP_OUT", Placement: RelativePlacement{XMM: -1.2, YMM: 0, Layer: "F.Cu"}, Description: "DC-biased amplifier output entry at the coupling-capacitor input pad."},
+				{ID: "hp_out", Port: "HP_OUT", NetTemplate: "HP_OUT", Placement: RelativePlacement{XMM: 1.2, YMM: 0, Layer: "F.Cu"}, Description: "AC-coupled headphone signal exit at the coupling-capacitor output pad."},
+				{ID: "load_ref", Port: "LOAD_REF", NetTemplate: "LOAD_REF", Placement: RelativePlacement{XMM: 12.6, YMM: 6, Layer: "F.Cu"}, Description: "Load reference at the bleed-resistor reference pad."},
+				{ID: "load_ret", Port: "LOAD_RET", NetTemplate: "LOAD_RET", Placement: RelativePlacement{XMM: 18, YMM: 10, Layer: "F.Cu"}, Description: "Headphone return at its physical test point."},
 			},
 			PlacementGroups: []PCBPlacementGroup{{ID: "output_protection", ComponentRoles: []string{"dc_blocking_capacitor", "bleed_resistor", "load_return_anchor"}, AnchorRole: "dc_blocking_capacitor", Bounds: &RelativeBounds{MinXMM: -4, MinYMM: -4, MaxXMM: 22, MaxYMM: 12}, Description: "Keep AC-coupling, bleed/reference, and load-return anchor near the headphone output path."}},
 			LocalRoutes: []PCBLocalRoute{
-				{ID: "amp_out_to_coupling", NetTemplate: "AMP_OUT", From: RouteEndpoint{Port: "AMP_OUT"}, To: RouteEndpoint{ComponentRole: "dc_blocking_capacitor", Pin: "1"}, Layer: "F.Cu", WidthMM: 0.5, Required: true},
-				{ID: "hp_out_from_coupling", NetTemplate: "HP_OUT", From: RouteEndpoint{ComponentRole: "dc_blocking_capacitor", Pin: "2"}, To: RouteEndpoint{Port: "HP_OUT"}, Layer: "F.Cu", WidthMM: 0.5, Required: true},
-				{ID: "bleed_reference", NetTemplate: "LOAD_REF", From: RouteEndpoint{ComponentRole: "bleed_resistor", Pin: "2"}, To: RouteEndpoint{Port: "LOAD_REF"}, Layer: "F.Cu", WidthMM: 0.3, Required: true, When: RealizationWhen{Params: map[string]any{"bleed_required": true}}},
-				{ID: "load_return", NetTemplate: "LOAD_RET", From: RouteEndpoint{Port: "LOAD_RET"}, To: RouteEndpoint{ComponentRole: "load_return_anchor", Pin: "1"}, Layer: "F.Cu", WidthMM: 0.4, Required: true},
+				{ID: "amp_out_to_coupling", NetTemplate: "AMP_OUT", From: RouteEndpoint{Port: "AMP_OUT"}, To: RouteEndpoint{ComponentRole: "dc_blocking_capacitor", Pin: "1"}, Layer: "F.Cu", WidthMM: 0.5, Required: true, DisableEntryAnchorVia: true},
+				{ID: "hp_out_from_coupling", NetTemplate: "HP_OUT", From: RouteEndpoint{ComponentRole: "dc_blocking_capacitor", Pin: "2"}, To: RouteEndpoint{Port: "HP_OUT"}, Layer: "F.Cu", WidthMM: 0.5, Required: true, DisableEntryAnchorVia: true},
+				{ID: "hp_out_bleed", NetTemplate: "HP_OUT", From: RouteEndpoint{ComponentRole: "dc_blocking_capacitor", Pin: "2"}, To: RouteEndpoint{ComponentRole: "bleed_resistor", Pin: "1"}, Layer: "F.Cu", WidthMM: 0.3, Required: true, When: RealizationWhen{Params: map[string]any{"bleed_required": true}}},
+				{ID: "bleed_reference", NetTemplate: "LOAD_REF", From: RouteEndpoint{ComponentRole: "bleed_resistor", Pin: "2"}, To: RouteEndpoint{Port: "LOAD_REF"}, Layer: "F.Cu", WidthMM: 0.3, Required: true, DisableEntryAnchorVia: true, When: RealizationWhen{Params: map[string]any{"bleed_required": true}}},
+				{ID: "load_return", NetTemplate: "LOAD_RET", From: RouteEndpoint{Port: "LOAD_RET"}, To: RouteEndpoint{ComponentRole: "load_return_anchor", Pin: "1"}, Layer: "F.Cu", WidthMM: 0.4, Required: true, DisableEntryAnchorVia: true},
 			},
-			Validation: PCBValidationExpectations{RequiredNets: []string{"AMP_OUT", "HP_OUT", "LOAD_REF", "LOAD_RET"}, RequiredRoutes: []string{"amp_out_to_coupling", "hp_out_from_coupling", "load_return"}},
+			Validation: PCBValidationExpectations{RequiredNets: []string{"AMP_OUT", "HP_OUT", "LOAD_REF", "LOAD_RET"}, RequiredRoutes: []string{"amp_out_to_coupling", "hp_out_from_coupling", "hp_out_bleed", "bleed_reference", "load_return"}, RequiresDRC: true},
 			UnsupportedBehaviors: []string{
 				"fault protection is not modeled",
 				"speaker and bridge-tied output protection are intentionally blocked",

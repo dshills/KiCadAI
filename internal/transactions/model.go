@@ -221,6 +221,7 @@ type AddLabelOperation struct {
 	Op          OperationKind `json:"op"`
 	Text        string        `json:"text"`
 	At          Point         `json:"at"`
+	Anchor      *Endpoint     `json:"anchor,omitempty"`
 	Kind        string        `json:"kind,omitempty"`
 	RotationDeg float64       `json:"rotation_deg,omitempty"`
 	Shape       string        `json:"shape,omitempty"`

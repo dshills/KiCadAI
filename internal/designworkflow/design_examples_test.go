@@ -677,25 +677,25 @@ func TestProtectedAmplifierValidationRoutingBaseline(t *testing.T) {
 	if !ok {
 		t.Fatalf("%s missing validation stage:\n%s", metadata.ID, formatDesignExampleRun(metadata, outputDir, result))
 	}
-	if validation.Status != StageStatusBlocked || !designExampleIssuesContainCode(validation.Issues, "DISCONNECTED_PAD") {
-		t.Fatalf("%s validation status/issues = %q, want disconnected-pad blocker:\n%s", metadata.ID, validation.Status, formatDesignExampleRun(metadata, outputDir, result))
+	if validation.Status != StageStatusOK {
+		t.Fatalf("%s validation status/issues = %q, want routed-board pass:\n%s", metadata.ID, validation.Status, formatDesignExampleRun(metadata, outputDir, result))
 	}
 	kicadChecks, ok := designExampleStageByName(result, StageKiCadChecks)
 	if !ok {
 		t.Fatalf("%s missing kicad_checks stage:\n%s", metadata.ID, formatDesignExampleRun(metadata, outputDir, result))
 	}
 	if kicadChecks.Status != StageStatusSkipped {
-		t.Fatalf("%s kicad_checks status = %q, want skipped until validation/routing closeout:\n%s", metadata.ID, kicadChecks.Status, formatDesignExampleRun(metadata, outputDir, result))
+		t.Fatalf("%s kicad_checks status = %q, want skipped without configured KiCad CLI:\n%s", metadata.ID, kicadChecks.Status, formatDesignExampleRun(metadata, outputDir, result))
 	}
 	report := BuildInternalPromotionReport(promotionFixtureFromDesignExampleMetadata(metadata), result)
-	if report.Status != PromotionStatusExpectedFail {
-		t.Fatalf("%s promotion report status = %q, want %q", metadata.ID, report.Status, PromotionStatusExpectedFail)
+	if report.Status != PromotionStatusWarn {
+		t.Fatalf("%s promotion report status = %q, want %q without local KiCad evidence", metadata.ID, report.Status, PromotionStatusWarn)
 	}
-	if report.AchievedReadiness != PromotionReadinessExpectedFail {
-		t.Fatalf("%s promotion report achieved readiness = %q, want %q", metadata.ID, report.AchievedReadiness, PromotionReadinessExpectedFail)
+	if report.AchievedReadiness != PromotionReadinessCandidate {
+		t.Fatalf("%s promotion report achieved readiness = %q, want %q", metadata.ID, report.AchievedReadiness, PromotionReadinessCandidate)
 	}
-	if report.Stages.StoppedAt != StageValidation || !slices.Contains(report.Stages.Reached, StageValidation) {
-		t.Fatalf("%s promotion stages = %#v, want stopped at validation with validation reached", metadata.ID, report.Stages)
+	if !slices.Contains(report.Stages.Reached, StageValidation) || !slices.Contains(report.Stages.Reached, StageKiCadChecks) {
+		t.Fatalf("%s promotion stages = %#v, want validation and skipped KiCad stages reached", metadata.ID, report.Stages)
 	}
 	for _, expectation := range []struct {
 		id                  string
@@ -706,7 +706,7 @@ func TestProtectedAmplifierValidationRoutingBaseline(t *testing.T) {
 		{id: "route_completion", status: PromotionGateStatusPass, wantIssueCodes: true, wantIssueCodePrefix: "routing_fixed_net_skipped_"},
 		{id: "kicad_checks", status: PromotionGateStatusSkipped},
 		{id: "writer_correctness", status: PromotionGateStatusWarn, wantIssueCodes: true, wantIssueCodePrefix: "writer_correctness_"},
-		{id: "connectivity", status: PromotionGateStatusFailed, wantIssueCodes: true, wantIssueCodePrefix: "validation_disconnected_pad"},
+		{id: "connectivity", status: PromotionGateStatusPass, wantIssueCodes: true, wantIssueCodePrefix: "validation_skipped_external_tool_"},
 	} {
 		t.Run("promotion_gate_"+expectation.id, func(t *testing.T) {
 			gate := promotionGateByID(t, report, expectation.id)

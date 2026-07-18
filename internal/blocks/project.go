@@ -266,7 +266,17 @@ func materializedGeneratedConnects(operations []transactions.Operation, generate
 		sort.Slice(endpoints, func(i, j int) bool {
 			return projectEndpointLess(endpoints[i], endpoints[j])
 		})
-		forceLabels := groupForceLabels[root]
+		coincidentLabelAnchors := projectCoincidentEndpointAnchors(endpoints, anchors)
+		coincidentEndpoints := len(coincidentLabelAnchors) != 0
+		// A branched net must not mix order-dependent direct wires and label
+		// stubs at its deterministic root endpoint. A later direct branch can
+		// subsume an earlier label stub and leave the label in the middle of the
+		// new wire, which KiCad reports as one label connecting multiple wires.
+		forceLabels := groupForceLabels[root] || coincidentEndpoints || len(endpoints) > 2
+		var forcedLabelAnchors map[projectEndpointKey]projectPoint
+		if coincidentEndpoints {
+			forcedLabelAnchors = coincidentLabelAnchors
+		}
 		if len(endpoints) >= 1 && len(pseudoEndpoints) >= 1 && !forceLabels {
 			sort.Slice(pseudoEndpoints, func(i, j int) bool {
 				return projectEndpointLess(pseudoEndpoints[i], pseudoEndpoints[j])
@@ -291,25 +301,29 @@ func materializedGeneratedConnects(operations []transactions.Operation, generate
 			netName = pseudoNetName
 		}
 		// Forced labels must be placed after resolver geometry is available.
-		// A one-ended connect explicitly materializes the pseudo-derived block
-		// port label and assigns its concrete anchor to the net without a wire.
-		if forceLabels && len(endpoints) >= 1 && len(pseudoEndpoints) >= 1 {
-			endpoint := endpoints[0]
-			operation, issues := materializedConnectOperation(endpoint, endpoint, netName, true, false, true)
+		// A one-ended connect explicitly materializes a pseudo-derived block
+		// port label. Coincident groups only need that self-label when their
+		// deterministic first endpoint is itself one of the coincident pins.
+		first := endpoints[0]
+		_, firstHasDirectLabelAnchor := forcedLabelAnchors[first]
+		firstLabelMaterialized := false
+		if forceLabels && (len(pseudoEndpoints) >= 1 || firstHasDirectLabelAnchor) {
+			endpoint := first
+			operation, issues := materializedConnectOperation(endpoint, endpoint, netName, true, false, true, forcedLabelAnchors)
 			if len(issues) != 0 {
 				return nil, fmt.Errorf("failed to materialize labeled port %s.%s on %s: %s", endpoint.ref, endpoint.pin, netName, issues[0].Message)
 			}
 			out = append(out, operation)
+			firstLabelMaterialized = true
 		}
 		if len(endpoints) < 2 {
 			continue
 		}
-		first := endpoints[0]
 		for _, endpoint := range endpoints[1:] {
 			// The self-connect above owns the shared endpoint label. Forced
 			// joins suppress that duplicate while retaining each new endpoint's
 			// label; ordinary joins keep their existing direct-wire behavior.
-			operation, issues := materializedConnectOperation(first, endpoint, netName, forceLabels, forceLabels, false)
+			operation, issues := materializedConnectOperation(first, endpoint, netName, forceLabels, forceLabels && firstLabelMaterialized, false, forcedLabelAnchors)
 			if len(issues) != 0 {
 				errs := make([]error, 0, len(issues))
 				for _, issue := range issues {
@@ -318,16 +332,51 @@ func materializedGeneratedConnects(operations []transactions.Operation, generate
 				return nil, fmt.Errorf("failed to connect %s.%s to %s.%s on %s: %w", first.ref, first.pin, endpoint.ref, endpoint.pin, netName, errors.Join(errs...))
 			}
 			out = append(out, operation)
+			if forceLabels {
+				firstLabelMaterialized = true
+			}
 		}
 	}
 	return out, nil
 }
 
-func materializedConnectOperation(from projectEndpointKey, to projectEndpointKey, netName string, useLabels bool, skipFromLabel bool, skipToLabel bool) (transactions.Operation, []reports.Issue) {
+func projectEndpointsShareAnchor(endpoints []projectEndpointKey, anchors map[projectEndpointKey]projectPoint) bool {
+	return len(projectCoincidentEndpointAnchors(endpoints, anchors)) != 0
+}
+
+func projectCoincidentEndpointAnchors(endpoints []projectEndpointKey, anchors map[projectEndpointKey]projectPoint) map[projectEndpointKey]projectPoint {
+	counts := make(map[projectPointKey]int, len(endpoints))
+	for _, endpoint := range endpoints {
+		anchor, ok := anchors[endpoint]
+		if !ok {
+			continue
+		}
+		key := projectPointKeyFromMM(anchor.xMM, anchor.yMM)
+		counts[key]++
+	}
+	coincident := map[projectEndpointKey]projectPoint{}
+	for _, endpoint := range endpoints {
+		anchor, ok := anchors[endpoint]
+		if !ok || counts[projectPointKeyFromMM(anchor.xMM, anchor.yMM)] < 2 {
+			continue
+		}
+		coincident[endpoint] = anchor
+	}
+	return coincident
+}
+
+func materializedConnectOperation(from projectEndpointKey, to projectEndpointKey, netName string, useLabels bool, skipFromLabel bool, skipToLabel bool, anchors map[projectEndpointKey]projectPoint) (transactions.Operation, []reports.Issue) {
 	if !useLabels {
 		return ConnectOperation(from.ref, from.pin, to.ref, to.pin, netName)
 	}
 	forceLabels := true
+	var fromLabelAt, toLabelAt *transactions.Point
+	if anchor, ok := anchors[from]; ok {
+		fromLabelAt = &transactions.Point{XMM: anchor.xMM, YMM: anchor.yMM}
+	}
+	if anchor, ok := anchors[to]; ok {
+		toLabelAt = &transactions.Point{XMM: anchor.xMM, YMM: anchor.yMM}
+	}
 	operation, err := wrapOperation(transactions.OpConnect, transactions.ConnectOperation{
 		Op:            transactions.OpConnect,
 		From:          transactions.Endpoint{Ref: from.ref, Pin: from.pin},
@@ -336,6 +385,8 @@ func materializedConnectOperation(from projectEndpointKey, to projectEndpointKey
 		UseLabels:     &forceLabels,
 		SkipFromLabel: skipFromLabel,
 		SkipToLabel:   skipToLabel,
+		FromLabelAt:   fromLabelAt,
+		ToLabelAt:     toLabelAt,
 	})
 	if err != nil {
 		return transactions.Operation{}, []reports.Issue{blockIssue("connect", err.Error())}
@@ -497,10 +548,11 @@ func materializedPortLabel(endpoint projectEndpointKey, pseudoEndpoint projectEn
 		text = netName
 	}
 	return wrapOperation(transactions.OpAddLabel, transactions.AddLabelOperation{
-		Op:   transactions.OpAddLabel,
-		Text: text,
-		At:   transactions.Point{XMM: anchor.xMM, YMM: anchor.yMM},
-		Kind: "local",
+		Op:     transactions.OpAddLabel,
+		Text:   text,
+		At:     transactions.Point{XMM: anchor.xMM, YMM: anchor.yMM},
+		Anchor: &transactions.Endpoint{Ref: endpoint.ref, Pin: endpoint.pin},
+		Kind:   "local",
 	})
 }
 

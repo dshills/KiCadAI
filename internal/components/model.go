@@ -83,37 +83,38 @@ type FamilyDefinition struct {
 }
 
 type ComponentRecord struct {
-	ID               string                     `json:"id"`
-	Family           string                     `json:"family"`
-	Name             string                     `json:"name"`
-	Description      string                     `json:"description,omitempty"`
-	Generic          bool                       `json:"generic"`
-	Manufacturer     string                     `json:"manufacturer,omitempty"`
-	MPN              string                     `json:"mpn,omitempty"`
-	Lifecycle        string                     `json:"lifecycle,omitempty"`
-	Equivalence      *EquivalenceMetadata       `json:"equivalence,omitempty"`
-	Tags             []string                   `json:"tags,omitempty"`
-	Values           []ValueConstraint          `json:"values,omitempty"`
-	Ratings          []RatingConstraint         `json:"ratings,omitempty"`
-	Tolerances       []ToleranceConstraint      `json:"tolerances,omitempty"`
-	Temperature      *TemperatureRange          `json:"temperature,omitempty"`
-	ElectricalRoles  []ElectricalRole           `json:"electrical_roles,omitempty"`
-	Symbols          []SymbolBinding            `json:"symbols,omitempty"`
-	Packages         []PackageVariant           `json:"packages,omitempty"`
-	Companions       []CompanionRequirement     `json:"companions,omitempty"`
-	DeratingRules    []DeratingRule             `json:"derating_rules,omitempty"`
-	Regulator        *RegulatorEvidence         `json:"regulator_evidence,omitempty"`
-	Capacitor        *CapacitorEvidence         `json:"capacitor_evidence,omitempty"`
-	OpAmp            *OpAmpEvidence             `json:"opamp_evidence,omitempty"`
-	Sensor           *SensorEvidence            `json:"sensor_evidence,omitempty"`
-	AmplifierOutput  *AmplifierOutputEvidence   `json:"amplifier_output_evidence,omitempty"`
-	SimulationModels []simmodel.CatalogEvidence `json:"simulation_models,omitempty"`
-	PlacementHints   []PlacementHint            `json:"placement_hints,omitempty"`
-	RoutingHints     []RoutingHint              `json:"routing_hints,omitempty"`
-	Properties       []SchematicProperty        `json:"properties,omitempty"`
-	SelectionRules   []SelectionRule            `json:"selection_rules,omitempty"`
-	Verification     VerificationRecord         `json:"verification"`
-	SearchText       string                     `json:"-"`
+	ID                 string                      `json:"id"`
+	Family             string                      `json:"family"`
+	Name               string                      `json:"name"`
+	Description        string                      `json:"description,omitempty"`
+	Generic            bool                        `json:"generic"`
+	Manufacturer       string                      `json:"manufacturer,omitempty"`
+	MPN                string                      `json:"mpn,omitempty"`
+	Lifecycle          string                      `json:"lifecycle,omitempty"`
+	Equivalence        *EquivalenceMetadata        `json:"equivalence,omitempty"`
+	Tags               []string                    `json:"tags,omitempty"`
+	Values             []ValueConstraint           `json:"values,omitempty"`
+	Ratings            []RatingConstraint          `json:"ratings,omitempty"`
+	Tolerances         []ToleranceConstraint       `json:"tolerances,omitempty"`
+	Temperature        *TemperatureRange           `json:"temperature,omitempty"`
+	ElectricalRoles    []ElectricalRole            `json:"electrical_roles,omitempty"`
+	Symbols            []SymbolBinding             `json:"symbols,omitempty"`
+	Packages           []PackageVariant            `json:"packages,omitempty"`
+	Companions         []CompanionRequirement      `json:"companions,omitempty"`
+	DeratingRules      []DeratingRule              `json:"derating_rules,omitempty"`
+	Regulator          *RegulatorEvidence          `json:"regulator_evidence,omitempty"`
+	Capacitor          *CapacitorEvidence          `json:"capacitor_evidence,omitempty"`
+	OpAmp              *OpAmpEvidence              `json:"opamp_evidence,omitempty"`
+	Sensor             *SensorEvidence             `json:"sensor_evidence,omitempty"`
+	AmplifierOutput    *AmplifierOutputEvidence    `json:"amplifier_output_evidence,omitempty"`
+	PowerSemiconductor *PowerSemiconductorEvidence `json:"power_semiconductor_evidence,omitempty"`
+	SimulationModels   []simmodel.CatalogEvidence  `json:"simulation_models,omitempty"`
+	PlacementHints     []PlacementHint             `json:"placement_hints,omitempty"`
+	RoutingHints       []RoutingHint               `json:"routing_hints,omitempty"`
+	Properties         []SchematicProperty         `json:"properties,omitempty"`
+	SelectionRules     []SelectionRule             `json:"selection_rules,omitempty"`
+	Verification       VerificationRecord          `json:"verification"`
+	SearchText         string                      `json:"-"`
 }
 
 type EquivalenceMetadata struct {
@@ -300,30 +301,47 @@ type RegulatorCapacitorStability struct {
 }
 
 type CapacitorEvidence struct {
-	Dielectric                 string `json:"dielectric,omitempty"`
-	NominalCapacitance         string `json:"nominal_capacitance,omitempty"`
-	CapacitanceUnit            string `json:"capacitance_unit,omitempty"`
-	VoltageRating              string `json:"voltage_rating,omitempty"`
-	VoltageUnit                string `json:"voltage_unit,omitempty"`
-	DCBiasReview               string `json:"dc_bias_review,omitempty"`
-	EffectiveCapacitanceReview string `json:"effective_capacitance_review,omitempty"`
-	ESRReview                  string `json:"esr_review,omitempty"`
-	FabricationProof           bool   `json:"fabrication_proof,omitempty"`
-	FabricationCandidateBlocks bool   `json:"fabrication_candidate_blocks,omitempty"`
-	ReviewNote                 string `json:"review_note,omitempty"`
+	Dielectric                 string               `json:"dielectric,omitempty"`
+	NominalCapacitance         string               `json:"nominal_capacitance,omitempty"`
+	CapacitanceUnit            string               `json:"capacitance_unit,omitempty"`
+	VoltageRating              string               `json:"voltage_rating,omitempty"`
+	VoltageUnit                string               `json:"voltage_unit,omitempty"`
+	DCBiasReview               string               `json:"dc_bias_review,omitempty"`
+	EffectiveCapacitanceReview string               `json:"effective_capacitance_review,omitempty"`
+	ESRReview                  string               `json:"esr_review,omitempty"`
+	Technology                 string               `json:"technology,omitempty"`
+	Polarity                   string               `json:"polarity,omitempty"`
+	CapacitanceTolerancePct    *float64             `json:"capacitance_tolerance_percent,omitempty"`
+	ESR                        *EvidenceMeasurement `json:"esr,omitempty"`
+	RippleCurrent              *EvidenceMeasurement `json:"ripple_current,omitempty"`
+	EnduranceHours             *float64             `json:"endurance_hours,omitempty"`
+	EnduranceTemperatureC      *float64             `json:"endurance_temperature_c,omitempty"`
+	FabricationProof           bool                 `json:"fabrication_proof,omitempty"`
+	FabricationCandidateBlocks bool                 `json:"fabrication_candidate_blocks,omitempty"`
+	ReviewNote                 string               `json:"review_note,omitempty"`
 }
 
 type OpAmpEvidence struct {
-	IntendedRoles           []string `json:"intended_roles,omitempty"`
-	SupplyMode              string   `json:"supply_mode,omitempty"`
-	OutputDriveStatus       string   `json:"output_drive_status,omitempty"`
-	LoadCompatibilityStatus string   `json:"load_compatibility_status,omitempty"`
-	GainBandwidthStatus     string   `json:"gain_bandwidth_status,omitempty"`
-	StabilityStatus         string   `json:"stability_status,omitempty"`
-	InputCommonModeStatus   string   `json:"input_common_mode_status,omitempty"`
-	OutputSwingStatus       string   `json:"output_swing_status,omitempty"`
-	NoiseStatus             string   `json:"noise_status,omitempty"`
-	DistortionStatus        string   `json:"distortion_status,omitempty"`
+	IntendedRoles           []string              `json:"intended_roles,omitempty"`
+	SupplyMode              string                `json:"supply_mode,omitempty"`
+	OutputDriveStatus       string                `json:"output_drive_status,omitempty"`
+	LoadCompatibilityStatus string                `json:"load_compatibility_status,omitempty"`
+	GainBandwidthStatus     string                `json:"gain_bandwidth_status,omitempty"`
+	StabilityStatus         string                `json:"stability_status,omitempty"`
+	InputCommonModeStatus   string                `json:"input_common_mode_status,omitempty"`
+	OutputSwingStatus       string                `json:"output_swing_status,omitempty"`
+	NoiseStatus             string                `json:"noise_status,omitempty"`
+	DistortionStatus        string                `json:"distortion_status,omitempty"`
+	SupplyVoltage           *EvidenceRange        `json:"supply_voltage,omitempty"`
+	InputCommonMode         *RailHeadroomEvidence `json:"input_common_mode,omitempty"`
+	OutputSwing             *RailHeadroomEvidence `json:"output_swing,omitempty"`
+	OutputCurrent           *EvidenceMeasurement  `json:"output_current,omitempty"`
+	GainBandwidth           *EvidenceMeasurement  `json:"gain_bandwidth,omitempty"`
+	SlewRate                *EvidenceMeasurement  `json:"slew_rate,omitempty"`
+	VoltageNoiseDensity     *EvidenceMeasurement  `json:"voltage_noise_density,omitempty"`
+	MaxJunctionTemperatureC *float64              `json:"max_junction_temperature_c,omitempty"`
+	JunctionToAmbientCPerW  *float64              `json:"junction_to_ambient_c_per_w,omitempty"`
+	FabricationProof        bool                  `json:"fabrication_proof,omitempty"`
 	// FabricationCandidateBlocks is an explicit block flag, not a readiness
 	// flag. A false value does not override per-capability review statuses.
 	FabricationCandidateBlocks bool   `json:"fabrication_candidate_blocks,omitempty"`
@@ -377,6 +395,84 @@ type AmplifierOutputEvidence struct {
 	SafeOperatingAreaStatus    string   `json:"safe_operating_area_status,omitempty"`
 	FabricationCandidateBlocks bool     `json:"fabrication_candidate_blocks,omitempty"`
 	ReviewNote                 string   `json:"review_note,omitempty"`
+}
+
+// EvidenceRange is a quantitative catalog claim. At least one bound is
+// required whenever the range is present. Conditions describe the datasheet
+// test point and are mandatory for fabrication-oriented claims.
+type EvidenceRange struct {
+	Minimum    *float64 `json:"minimum,omitempty"`
+	Typical    *float64 `json:"typical,omitempty"`
+	Maximum    *float64 `json:"maximum,omitempty"`
+	Unit       string   `json:"unit"`
+	Conditions string   `json:"conditions,omitempty"`
+}
+
+// EvidenceMeasurement is a scalar catalog claim with its test conditions.
+// Frequency and temperature are explicit because capacitor and semiconductor
+// ratings are otherwise easy to apply outside their qualified operating point.
+type EvidenceMeasurement struct {
+	Value        float64  `json:"value"`
+	Unit         string   `json:"unit"`
+	FrequencyHz  *float64 `json:"frequency_hz,omitempty"`
+	TemperatureC *float64 `json:"temperature_c,omitempty"`
+	Conditions   string   `json:"conditions,omitempty"`
+}
+
+// RailHeadroomEvidence expresses a valid signal window relative to the supply
+// rails. A zero-volt headroom is valid and therefore uses pointers.
+type RailHeadroomEvidence struct {
+	NegativeRailHeadroomV *float64 `json:"negative_rail_headroom_v,omitempty"`
+	PositiveRailHeadroomV *float64 `json:"positive_rail_headroom_v,omitempty"`
+	Conditions            string   `json:"conditions,omitempty"`
+}
+
+type PowerSemiconductorEvidence struct {
+	DeviceClass              string               `json:"device_class"`
+	Polarity                 string               `json:"polarity"`
+	ComplementaryGroup       string               `json:"complementary_group,omitempty"`
+	MaxVoltage               *EvidenceMeasurement `json:"max_voltage,omitempty"`
+	ContinuousCurrent        *EvidenceMeasurement `json:"continuous_current,omitempty"`
+	PeakCurrent              *EvidenceMeasurement `json:"peak_current,omitempty"`
+	PowerDissipation         *EvidenceMeasurement `json:"power_dissipation,omitempty"`
+	MaxJunctionTemperatureC  *float64             `json:"max_junction_temperature_c,omitempty"`
+	JunctionToCaseCPerW      *float64             `json:"junction_to_case_c_per_w,omitempty"`
+	JunctionToAmbientCPerW   *float64             `json:"junction_to_ambient_c_per_w,omitempty"`
+	SOA                      []SOAEnvelopePoint   `json:"soa,omitempty"`
+	SecondaryBreakdownStatus string               `json:"secondary_breakdown_status,omitempty"`
+	LinearModeStatus         string               `json:"linear_mode_status,omitempty"`
+	MountingAssumptions      string               `json:"mounting_assumptions,omitempty"`
+	BJT                      *PowerBJTEvidence    `json:"bjt,omitempty"`
+	MOSFET                   *PowerMOSFETEvidence `json:"mosfet,omitempty"`
+	FabricationProof         bool                 `json:"fabrication_proof,omitempty"`
+	ReviewNote               string               `json:"review_note,omitempty"`
+}
+
+type SOAEnvelopePoint struct {
+	VoltageV         float64  `json:"voltage_v"`
+	CurrentA         float64  `json:"current_a"`
+	PulseDurationS   *float64 `json:"pulse_duration_s,omitempty"`
+	DC               bool     `json:"dc,omitempty"`
+	CaseTemperatureC float64  `json:"case_temperature_c"`
+}
+
+type PowerBJTEvidence struct {
+	GainMinimum      *float64 `json:"gain_minimum,omitempty"`
+	GainTestCurrentA *float64 `json:"gain_test_current_a,omitempty"`
+	TransitionFreqHz *float64 `json:"transition_frequency_hz,omitempty"`
+}
+
+type PowerMOSFETEvidence struct {
+	RDSOnOhm             *float64 `json:"rds_on_ohm,omitempty"`
+	RDSOnGateVoltageV    *float64 `json:"rds_on_gate_voltage_v,omitempty"`
+	ThresholdMinimumV    *float64 `json:"threshold_minimum_v,omitempty"`
+	ThresholdMaximumV    *float64 `json:"threshold_maximum_v,omitempty"`
+	TransconductanceS    *float64 `json:"transconductance_s,omitempty"`
+	TotalGateChargeC     *float64 `json:"total_gate_charge_c,omitempty"`
+	InputCapacitanceF    *float64 `json:"input_capacitance_f,omitempty"`
+	ReverseTransferCapF  *float64 `json:"reverse_transfer_capacitance_f,omitempty"`
+	BodyDiodeStatus      string   `json:"body_diode_status,omitempty"`
+	GateProtectionStatus string   `json:"gate_protection_status,omitempty"`
 }
 
 type PlacementHint struct {
@@ -529,6 +625,7 @@ func rebuildCatalogIndexesLocked(catalog *Catalog) {
 			catalog.variantIndex[record.ID+"\x00"+variant.ID] = CatalogVariantIndex{Record: i, Variant: j}
 			if amplifierOutputVariantIndexed(&catalog.Records[i], &catalog.Records[i].Packages[j]) {
 				polarity := strings.ToLower(strings.TrimSpace(record.AmplifierOutput.Polarity))
+				role := amplifierOutputIndexRole(record.AmplifierOutput)
 				score := 100
 				if record.Generic {
 					score -= 25
@@ -545,7 +642,7 @@ func rebuildCatalogIndexesLocked(catalog *Catalog) {
 						Confidence:  record.Verification.Confidence,
 						Score:       score,
 						Generic:     record.Generic,
-						Reasons:     []string{"amplifier_output_evidence", "polarity:" + polarity, "role:headphone_output"},
+						Reasons:     []string{"amplifier_output_evidence", "polarity:" + polarity, "role:" + role},
 					},
 				})
 			}
@@ -567,13 +664,13 @@ func amplifierOutputVariantIndexed(record *ComponentRecord, variant *PackageVari
 	if record.AmplifierOutput == nil {
 		return false
 	}
-	if !containsString(record.AmplifierOutput.IntendedRoles, "headphone_output") {
+	if amplifierOutputIndexRole(record.AmplifierOutput) == "" {
 		return false
 	}
 	if strings.TrimSpace(record.AmplifierOutput.Polarity) == "" {
 		return false
 	}
-	if !amplifierOutputSupportsComplementaryBJT(record.AmplifierOutput) {
+	if !amplifierOutputSupportsComplementaryPair(record.AmplifierOutput) {
 		return false
 	}
 	if record.AmplifierOutput.FootprintID != "" && variant.FootprintID != record.AmplifierOutput.FootprintID {
@@ -582,14 +679,34 @@ func amplifierOutputVariantIndexed(record *ComponentRecord, variant *PackageVari
 	return true
 }
 
-func amplifierOutputSupportsComplementaryBJT(evidence *AmplifierOutputEvidence) bool {
+func amplifierOutputIndexRole(evidence *AmplifierOutputEvidence) string {
+	if evidence == nil {
+		return ""
+	}
+	for _, role := range []string{"headphone_output", "power_output", "class_a_output"} {
+		if containsString(evidence.IntendedRoles, role) {
+			return role
+		}
+	}
+	return ""
+}
+
+func amplifierOutputSupportsComplementaryPair(evidence *AmplifierOutputEvidence) bool {
 	if evidence == nil {
 		return false
 	}
-	return strings.EqualFold(evidence.DeviceClass, "bjt") &&
-		strings.EqualFold(evidence.ControlTerminal, "BASE") &&
-		strings.EqualFold(evidence.UpperOrLowerTerminal, "COLLECTOR") &&
-		strings.EqualFold(evidence.OutputTerminal, "EMITTER")
+	switch strings.ToLower(evidence.DeviceClass) {
+	case "bjt":
+		return strings.EqualFold(evidence.ControlTerminal, "BASE") &&
+			strings.EqualFold(evidence.UpperOrLowerTerminal, "COLLECTOR") &&
+			strings.EqualFold(evidence.OutputTerminal, "EMITTER")
+	case "mosfet":
+		return strings.EqualFold(evidence.ControlTerminal, "GATE") &&
+			strings.EqualFold(evidence.UpperOrLowerTerminal, "DRAIN") &&
+			strings.EqualFold(evidence.OutputTerminal, "SOURCE")
+	default:
+		return false
+	}
 }
 
 func NewIssue(code reports.Code, severity reports.Severity, path string, message string) reports.Issue {

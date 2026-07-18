@@ -21,6 +21,7 @@ func TestLoadSuiteDiscoversBuiltInCorpus(t *testing.T) {
 		"amplifier_input_buffer_default",
 		"amplifier_supply_decoupling_single_supply",
 		"canned_oscillator_default",
+		"class_a_voltage_stage_line",
 		"class_ab_output_pair_headphone",
 		"class_ab_output_stage_headphone",
 		"connector_breakout_4pin",

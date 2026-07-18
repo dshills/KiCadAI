@@ -191,6 +191,7 @@ func ValidateCatalog(catalog *Catalog) reports.Result {
 		issues = append(issues, validateOpAmpEvidence(path+".opamp_evidence", record.OpAmp)...)
 		issues = append(issues, validateSensorEvidence(path+".sensor_evidence", record)...)
 		issues = append(issues, validateAmplifierOutputEvidence(path+".amplifier_output_evidence", record)...)
+		issues = append(issues, validatePowerSemiconductorEvidence(path+".power_semiconductor_evidence", record)...)
 		for _, diagnostic := range simmodel.ValidateCatalogEvidence(record.Family, record.SimulationModels) {
 			issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, path+"."+diagnostic.Path, diagnostic.Message))
 		}
@@ -645,8 +646,53 @@ func validateCapacitorEvidence(path string, generic bool, evidence *CapacitorEvi
 	} {
 		issues = append(issues, validateReviewStatus(status.path, status.value, status.label)...)
 	}
+	if evidence.Polarity != "" {
+		switch evidence.Polarity {
+		case "polarized", "nonpolar", "bipolar":
+		default:
+			issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, path+".polarity", "invalid capacitor polarity: "+evidence.Polarity))
+		}
+	}
+	if evidence.CapacitanceTolerancePct != nil && (*evidence.CapacitanceTolerancePct <= 0 || *evidence.CapacitanceTolerancePct > 100) {
+		issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, path+".capacitance_tolerance_percent", "capacitance tolerance must be greater than zero and at most 100 percent"))
+	}
+	issues = append(issues, validateEvidenceMeasurement(path+".esr", evidence.ESR, evidence.FabricationProof)...)
+	issues = append(issues, validateEvidenceMeasurement(path+".ripple_current", evidence.RippleCurrent, evidence.FabricationProof)...)
+	for suffix, number := range map[string]*float64{
+		"endurance_hours":         evidence.EnduranceHours,
+		"endurance_temperature_c": evidence.EnduranceTemperatureC,
+	} {
+		if number != nil && *number <= 0 {
+			issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, path+"."+suffix, "capacitor endurance evidence must be positive"))
+		}
+	}
 	if generic && evidence.FabricationProof {
 		issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, path+".fabrication_proof", "generic capacitor records cannot carry fabrication proof"))
+	}
+	if evidence.FabricationProof {
+		requiredText := map[string]string{
+			"technology": evidence.Technology,
+			"polarity":   evidence.Polarity,
+		}
+		for suffix, value := range requiredText {
+			if strings.TrimSpace(value) == "" {
+				issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, path+"."+suffix, "fabrication-proof capacitor evidence requires "+strings.ReplaceAll(suffix, "_", " ")))
+			}
+		}
+		for _, required := range []struct {
+			suffix  string
+			missing bool
+		}{
+			{suffix: "capacitance_tolerance_percent", missing: evidence.CapacitanceTolerancePct == nil},
+			{suffix: "esr", missing: evidence.ESR == nil},
+			{suffix: "ripple_current", missing: evidence.RippleCurrent == nil},
+			{suffix: "endurance_hours", missing: evidence.EnduranceHours == nil},
+			{suffix: "endurance_temperature_c", missing: evidence.EnduranceTemperatureC == nil},
+		} {
+			if required.missing {
+				issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, path+"."+required.suffix, "fabrication-proof capacitor evidence requires "+strings.ReplaceAll(required.suffix, "_", " ")))
+			}
+		}
 	}
 	return issues
 }
@@ -686,6 +732,46 @@ func validateOpAmpEvidence(path string, evidence *OpAmpEvidence) []reports.Issue
 			continue
 		}
 		issues = append(issues, validateReviewStatus(fieldPath, value, status.label)...)
+	}
+	require := evidence.FabricationProof
+	if evidence.FabricationProof && evidence.FabricationCandidateBlocks {
+		issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, path+".fabrication_proof", "op-amp fabrication proof cannot coexist with a fabrication-candidate blocker"))
+	}
+	issues = append(issues, validateEvidenceRange(path+".supply_voltage", evidence.SupplyVoltage, require)...)
+	issues = append(issues, validateRailHeadroom(path+".input_common_mode", evidence.InputCommonMode, require)...)
+	issues = append(issues, validateRailHeadroom(path+".output_swing", evidence.OutputSwing, require)...)
+	for suffix, measurement := range map[string]*EvidenceMeasurement{
+		"output_current":        evidence.OutputCurrent,
+		"gain_bandwidth":        evidence.GainBandwidth,
+		"slew_rate":             evidence.SlewRate,
+		"voltage_noise_density": evidence.VoltageNoiseDensity,
+	} {
+		issues = append(issues, validateEvidenceMeasurement(path+"."+suffix, measurement, require)...)
+		if require && measurement == nil {
+			issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, path+"."+suffix, "fabrication-oriented op-amp evidence requires this measurement"))
+		}
+	}
+	for suffix, number := range map[string]*float64{
+		"max_junction_temperature_c":  evidence.MaxJunctionTemperatureC,
+		"junction_to_ambient_c_per_w": evidence.JunctionToAmbientCPerW,
+	} {
+		if number != nil && *number <= 0 {
+			issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, path+"."+suffix, "op-amp thermal evidence must be positive"))
+		}
+		if require && number == nil {
+			issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, path+"."+suffix, "fabrication-oriented op-amp evidence requires this thermal limit"))
+		}
+	}
+	if require {
+		if evidence.SupplyVoltage == nil {
+			issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, path+".supply_voltage", "fabrication-oriented op-amp evidence requires a supply range"))
+		}
+		if evidence.InputCommonMode == nil {
+			issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, path+".input_common_mode", "fabrication-oriented op-amp evidence requires common-mode limits"))
+		}
+		if evidence.OutputSwing == nil {
+			issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, path+".output_swing", "fabrication-oriented op-amp evidence requires output-swing limits"))
+		}
 	}
 	return issues
 }
@@ -830,7 +916,7 @@ func validateAmplifierOutputEvidence(path string, record *ComponentRecord) []rep
 			continue
 		}
 		switch role {
-		case "headphone_output", "bias", "small_signal_driver", "blocked_power_output":
+		case "headphone_output", "power_output", "class_a_output", "bias", "small_signal_driver", "blocked_power_output":
 		case "":
 			issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, rolePath, "amplifier output intended role is required"))
 		default:

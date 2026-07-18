@@ -5,6 +5,8 @@ import (
 	"math"
 	"sort"
 	"strings"
+
+	"kicadai/internal/kicadfiles"
 )
 
 const maxOccupancyCellsPerLayer = 5_000_000
@@ -273,9 +275,6 @@ func (layer LayerOccupancy) index(point gridPoint) (int, bool) {
 func padRect(component Component, pad Pad) Shape {
 	width := pad.Size.WidthMM
 	height := pad.Size.HeightMM
-	rotation := component.Position.RotationDeg * math.Pi / 180
-	cos := math.Cos(rotation)
-	sin := math.Sin(rotation)
 	center := absolutePadPoint(component, pad.Position)
 	corners := []Point{
 		{XMM: -width / 2, YMM: -height / 2},
@@ -287,8 +286,9 @@ func padRect(component Component, pad Pad) Shape {
 	maxPoint := Point{XMM: math.Inf(-1), YMM: math.Inf(-1)}
 	polygon := make([]Point, 0, len(corners))
 	for _, corner := range corners {
-		x := center.XMM + corner.XMM*cos - corner.YMM*sin
-		y := center.YMM + corner.XMM*sin + corner.YMM*cos
+		rotatedX, rotatedY := kicadfiles.RotateBoardLocalXY(corner.XMM, corner.YMM, component.Position.RotationDeg)
+		x := center.XMM + rotatedX
+		y := center.YMM + rotatedY
 		polygon = append(polygon, Point{XMM: x, YMM: y})
 		minPoint.XMM = math.Min(minPoint.XMM, x)
 		minPoint.YMM = math.Min(minPoint.YMM, y)
@@ -302,12 +302,10 @@ func padRect(component Component, pad Pad) Shape {
 }
 
 func absolutePadPoint(component Component, relative Point) Point {
-	rotation := component.Position.RotationDeg * math.Pi / 180
-	cos := math.Cos(rotation)
-	sin := math.Sin(rotation)
+	x, y := kicadfiles.RotateBoardLocalXY(relative.XMM, relative.YMM, component.Position.RotationDeg)
 	return Point{
-		XMM: component.Position.XMM + relative.XMM*cos - relative.YMM*sin,
-		YMM: component.Position.YMM + relative.XMM*sin + relative.YMM*cos,
+		XMM: component.Position.XMM + x,
+		YMM: component.Position.YMM + y,
 	}
 }
 

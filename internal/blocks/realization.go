@@ -219,16 +219,32 @@ type PCBKeepout struct {
 }
 
 type PCBConstraint struct {
-	ID          string          `json:"id"`
-	Kind        string          `json:"kind"`
-	NetTemplate string          `json:"net_template,omitempty"`
-	AppliesTo   []string        `json:"applies_to,omitempty"`
-	MinWidthMM  float64         `json:"min_width_mm,omitempty"`
-	ClearanceMM float64         `json:"clearance_mm,omitempty"`
-	MaxLengthMM float64         `json:"max_length_mm,omitempty"`
-	Description string          `json:"description,omitempty"`
-	When        RealizationWhen `json:"when,omitempty"`
+	ID          string                `json:"id"`
+	Kind        string                `json:"kind"`
+	Category    PCBConstraintCategory `json:"category,omitempty"`
+	NetTemplate string                `json:"net_template,omitempty"`
+	AppliesTo   []string              `json:"applies_to,omitempty"`
+	MinWidthMM  float64               `json:"min_width_mm,omitempty"`
+	ClearanceMM float64               `json:"clearance_mm,omitempty"`
+	MaxLengthMM float64               `json:"max_length_mm,omitempty"`
+	Description string                `json:"description,omitempty"`
+	When        RealizationWhen       `json:"when,omitempty"`
 }
+
+type PCBConstraintCategory string
+
+const (
+	PCBConstraintAnalogInputSeparation PCBConstraintCategory = "analog_input_separation"
+	PCBConstraintReturnTopology        PCBConstraintCategory = "return_topology"
+	PCBConstraintFeedbackSense         PCBConstraintCategory = "feedback_sense"
+	PCBConstraintDecouplingProximity   PCBConstraintCategory = "decoupling_proximity"
+	PCBConstraintCurrentPath           PCBConstraintCategory = "current_path"
+	PCBConstraintKelvinSense           PCBConstraintCategory = "kelvin_sense"
+	PCBConstraintThermalCoupling       PCBConstraintCategory = "thermal_coupling"
+	PCBConstraintDeviceSymmetry        PCBConstraintCategory = "device_symmetry"
+	PCBConstraintThermalKeepout        PCBConstraintCategory = "thermal_keepout"
+	PCBConstraintPolarizedOrientation  PCBConstraintCategory = "polarized_orientation"
+)
 
 type PCBValidationExpectations struct {
 	RequiredNets        []string `json:"required_nets,omitempty"`
@@ -579,6 +595,9 @@ func ValidatePCBRealization(definition BlockDefinition) []reports.Issue {
 		if strings.TrimSpace(constraint.Kind) == "" {
 			issues = append(issues, blockIssue(constraintPath+".kind", "constraint kind is required"))
 		}
+		if constraint.Category != "" && !validPCBConstraintCategory(constraint.Category) {
+			issues = append(issues, blockIssue(constraintPath+".category", "unsupported PCB constraint category "+string(constraint.Category)))
+		}
 		for appliesIndex, role := range constraint.AppliesTo {
 			issues = append(issues, validateKnownRole(fmt.Sprintf("%s.applies_to.%d", constraintPath, appliesIndex), role, roles)...)
 		}
@@ -589,6 +608,24 @@ func ValidatePCBRealization(definition BlockDefinition) []reports.Issue {
 		issues = append(issues, validateRealizationWhen(constraintPath+".when", constraint.When, parameters)...)
 	}
 	return issues
+}
+
+func validPCBConstraintCategory(category PCBConstraintCategory) bool {
+	switch category {
+	case PCBConstraintAnalogInputSeparation,
+		PCBConstraintReturnTopology,
+		PCBConstraintFeedbackSense,
+		PCBConstraintDecouplingProximity,
+		PCBConstraintCurrentPath,
+		PCBConstraintKelvinSense,
+		PCBConstraintThermalCoupling,
+		PCBConstraintDeviceSymmetry,
+		PCBConstraintThermalKeepout,
+		PCBConstraintPolarizedOrientation:
+		return true
+	default:
+		return false
+	}
 }
 
 func validPCBTimingKind(kind string) bool {

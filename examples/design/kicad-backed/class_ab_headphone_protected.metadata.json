@@ -2,10 +2,10 @@
   "id": "class_ab_headphone_protected",
   "request": "class_ab_headphone_protected.json",
   "tier": "block-composition",
-  "readiness": "expected_fail",
-  "acceptance": "connectivity",
+  "readiness": "pass",
+  "acceptance": "erc-drc",
   "require_erc": true,
-  "require_drc": false,
+  "require_drc": true,
   "allowlists": [],
   "expected_artifacts": [
     ".kicadai/design-promotion.json"
@@ -22,15 +22,6 @@
     "writer_correctness",
     "validation"
   ],
-  "known_gaps": [
-    "The protected Class AB headphone path now passes schematic electrical validation, PCB realization, placement, and endpoint binding with verified LMV321 op-amp, diode, and output-transistor component selections.",
-    "The board envelope is intentionally larger for this fixture so realized amplifier block placements remain inside the outline without weakening placement validation for undersized boards.",
-    "Routing is now enabled for this fixture and produces explicit route-tree evidence instead of a stale skip policy.",
-    "The current hard blocker has advanced to routed-board validation: routing and project write complete, but internal amplifier/output nets still report disconnected pads and partial routes.",
-    "Routing summaries retain route-tree and required-net evidence so AI repair loops can target the remaining disconnected output drive, emitter, load reference, and supply nets.",
-    "Output protection remains connectivity-level: fault_protection_status is placeholder_blocked, active fault protection is not implemented, HP_RET-to-LOAD_REF load-return policy is not promoted, and separated LOAD_REF-to-GND net-tie evidence is not proven.",
-    "Amplifier output transistor evidence remains warning-only for fabrication promotion: power dissipation, thermal review, safe operating area, and bias-diode thermal placement evidence are still review_required.",
-    "Real KiCad ERC/DRC evidence remains skipped until routed-board validation is clean enough for this fixture to become a KiCad-backed candidate."
-  ],
-  "notes": "Optional protected Class AB headphone amplifier fixture that captures the first KiCad-backed evidence gap after schematic alias cleanup, placement fit, endpoint binding, routing enablement, and project write: routed-board validation still reports disconnected pads and partial internal amplifier/output nets. Configuring KICADAI_KICAD_CLI should not promote this fixture until validation is clean enough to reach kicad_checks. DRC is intentionally not required while the fixture remains validation-blocked."
+  "known_gaps": [],
+  "notes": "Protected BJT Class AB headphone amplifier promotion fixture. It requires catalog-paired output devices, complete routing/connectivity, writer correctness, clean KiCad ERC/strict DRC, and zero-diff round-trip evidence."
 }

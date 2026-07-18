@@ -85,9 +85,9 @@ func TestSelectAmplifierOutputPairRejectsZeroSupply(t *testing.T) {
 	assertIssuePath(t, result.Issues, "amplifier_output.supply_voltage")
 }
 
-func TestSelectAmplifierOutputPairBlocksFabricationCandidateReviewGaps(t *testing.T) {
+func TestSelectAmplifierOutputPairPassesFabricationEvidenceForBoundedHeadphoneLoad(t *testing.T) {
 	catalog := loadCheckedInCatalog(t)
-	_, result := SelectAmplifierOutputPair(context.Background(), catalog, AmplifierOutputPairRequest{
+	pair, result := SelectAmplifierOutputPair(context.Background(), catalog, AmplifierOutputPairRequest{
 		SupplyVoltage:    "9",
 		SupplyUnit:       "V",
 		LoadImpedance:    "32",
@@ -95,10 +95,68 @@ func TestSelectAmplifierOutputPairBlocksFabricationCandidateReviewGaps(t *testin
 		Acceptance:       AcceptanceFabricationCandidate,
 		RequireHeadphone: true,
 	})
+	if !result.OK {
+		t.Fatalf("expected bounded headphone pair to pass fabrication evidence: %+v", result.Issues)
+	}
+	if pair.Upper.Component.PowerSemiconductor == nil || !pair.Upper.Component.PowerSemiconductor.FabricationProof || pair.Lower.Component.PowerSemiconductor == nil || !pair.Lower.Component.PowerSemiconductor.FabricationProof {
+		t.Fatalf("pair lacks typed fabrication evidence: %#v", pair)
+	}
+}
+
+func TestSelectAmplifierOutputPairForPowerBJTLoad(t *testing.T) {
+	catalog := loadCheckedInCatalog(t)
+	pair, result := SelectAmplifierOutputPair(context.Background(), catalog, AmplifierOutputPairRequest{
+		DeviceClass:   "bjt",
+		Application:   "power",
+		SupplyVoltage: "50",
+		SupplyUnit:    "V",
+		LoadImpedance: "8",
+		LoadUnit:      "ohm",
+		Acceptance:    AcceptanceFabricationCandidate,
+	})
+	if !result.OK {
+		t.Fatalf("expected evidence-backed power BJT pair selection to pass: %+v", result.Issues)
+	}
+	if pair.Upper.Component.ID != "bjt.onsemi.njw0281g.to3p" || pair.Lower.Component.ID != "bjt.onsemi.njw0302g.to3p" {
+		t.Fatalf("power BJT pair = %s / %s", pair.Upper.Component.ID, pair.Lower.Component.ID)
+	}
+	if pair.DeviceClass != "bjt" || pair.EstimatedPeakMA != "3125" {
+		t.Fatalf("power BJT pair evidence = %#v", pair)
+	}
+}
+
+func TestSelectAmplifierOutputPairBlocksLinearMOSFETWithoutSOAProof(t *testing.T) {
+	catalog := loadCheckedInCatalog(t)
+	_, result := SelectAmplifierOutputPair(context.Background(), catalog, AmplifierOutputPairRequest{
+		DeviceClass:   "mosfet",
+		Application:   "power",
+		SupplyVoltage: "40",
+		SupplyUnit:    "V",
+		LoadImpedance: "8",
+		LoadUnit:      "ohm",
+		Acceptance:    AcceptanceFabricationCandidate,
+	})
 	if result.OK {
-		t.Fatal("expected fabrication-candidate pair selection to block on review evidence")
+		t.Fatal("expected switching MOSFET pair to block linear fabrication selection")
 	}
 	assertIssueCode(t, result.Issues, CodeComponentReviewRequired)
-	assertIssuePath(t, result.Issues, "component.bjt.onsemi.mmbt3904.sot23.amplifier_output_evidence.thermal_review")
-	assertIssuePath(t, result.Issues, "component.bjt.onsemi.mmbt3906.sot23.amplifier_output_evidence.thermal_review")
+	assertIssuePath(t, result.Issues, "component.mosfet.vishay.irfp240.to247.power_semiconductor_evidence.fabrication_proof")
+	assertIssuePath(t, result.Issues, "component.mosfet.vishay.irfp240.to247.power_semiconductor_evidence.linear_mode_status")
+	assertIssuePath(t, result.Issues, "component.mosfet.vishay.irfp9240.to247.power_semiconductor_evidence.fabrication_proof")
+	assertIssuePath(t, result.Issues, "component.mosfet.vishay.irfp9240.to247.power_semiconductor_evidence.linear_mode_status")
+}
+
+func TestSelectAmplifierOutputPairRejectsUnknownDeviceClass(t *testing.T) {
+	catalog := loadCheckedInCatalog(t)
+	_, result := SelectAmplifierOutputPair(context.Background(), catalog, AmplifierOutputPairRequest{
+		DeviceClass:   "tube",
+		Application:   "power",
+		SupplyVoltage: "40",
+		LoadImpedance: "8",
+	})
+	if result.OK {
+		t.Fatal("expected unsupported device class to block")
+	}
+	assertIssueCode(t, result.Issues, CodeAmplifierOutputUnsupported)
+	assertIssuePath(t, result.Issues, "amplifier_output.device_class")
 }

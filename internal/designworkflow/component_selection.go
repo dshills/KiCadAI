@@ -110,7 +110,32 @@ func SelectWorkflowComponents(ctx context.Context, registry blocks.Registry, pla
 			continue
 		}
 		params := blocks.ApplyParameterDefaults(definition, instance.Params)
+		pairedRoles := map[string]bool{}
+		if definition.ID == "class_ab_output_stage" || definition.ID == "class_ab_output_pair" {
+			pair, pairResult := components.SelectAmplifierOutputPair(ctx, catalog, components.AmplifierOutputPairRequest{
+				DeviceClass:      "bjt",
+				Application:      workflowStringParam(params, "application", "headphone"),
+				SupplyVoltage:    workflowStringParam(params, "supply_voltage", ""),
+				SupplyUnit:       "V",
+				LoadImpedance:    workflowStringParam(params, "load_impedance", ""),
+				LoadUnit:         "ohm",
+				Acceptance:       acceptance,
+				RequireHeadphone: workflowStringParam(params, "application", "headphone") == "headphone",
+			})
+			issues = append(issues, pairResult.Issues...)
+			pairedRoles["upper_output"] = true
+			pairedRoles["lower_output"] = true
+			if pairResult.OK {
+				selections = append(selections,
+					componentSelectionEntryFromSelection(instance.ID, definition.ID, "upper_output", pair.Upper),
+					componentSelectionEntryFromSelection(instance.ID, definition.ID, "lower_output", pair.Lower),
+				)
+			}
+		}
 		for _, blockComponent := range definition.Components {
+			if pairedRoles[blockComponent.Role] {
+				continue
+			}
 			if !blocks.ComponentActiveForParams(blockComponent, params) {
 				continue
 			}
@@ -142,39 +167,51 @@ func SelectWorkflowComponents(ctx context.Context, registry blocks.Registry, pla
 				continue
 			}
 			if result.OK {
-				selections = append(selections, ComponentSelectionEntry{
-					InstanceID:      instance.ID,
-					BlockID:         definition.ID,
-					Role:            blockComponent.Role,
-					ComponentID:     selection.Candidate.ComponentID,
-					VariantID:       selection.Candidate.VariantID,
-					Manufacturer:    selection.Component.Manufacturer,
-					MPN:             selectedMPN(selection),
-					ComponentClass:  selection.Candidate.Family,
-					SymbolID:        firstSelectedSymbolID(selection),
-					FunctionPins:    selectedFunctionPins(selection),
-					FootprintID:     selection.Candidate.FootprintID,
-					PinMapID:        selectedPinMapID(selection),
-					Confidence:      selection.Candidate.Confidence,
-					ResolverChecked: selectedResolverChecked(selection),
-					PinMapChecked:   selectedPinMapChecked(selection),
-					Companions:      append([]components.CompanionRequirement(nil), selection.Component.Companions...),
-					Regulator:       cloneRegulatorEvidence(selection.Component.Regulator),
-					Capacitor:       cloneCapacitorEvidence(selection.Component.Capacitor),
-					OpAmp:           cloneOpAmpEvidence(selection.Component.OpAmp),
-					AmplifierOutput: cloneAmplifierOutputEvidence(selection.Component.AmplifierOutput),
-					PlacementHints:  append([]components.PlacementHint(nil), selection.Component.PlacementHints...),
-					RoutingHints:    append([]components.RoutingHint(nil), selection.Component.RoutingHints...),
-					Procurement:     cloneProcurementEvidence(selection.Procurement),
-					Rejected:        append([]components.CandidateRejection(nil), selection.Rejected...),
-					Warnings:        append([]reports.Issue(nil), selection.Warnings...),
-				})
+				selections = append(selections, componentSelectionEntryFromSelection(instance.ID, definition.ID, blockComponent.Role, selection))
 			}
 		}
 	}
 	stage := NewStageResult(StageComponentSelection, issues)
 	stage.Summary = componentSelectionSummary(catalogDir, sourceDir, selections)
 	return ComponentSelectionResult{CatalogDir: catalogDir, SourceDir: sourceDir, Selections: selections, Stage: stage}
+}
+
+func componentSelectionEntryFromSelection(instanceID string, blockID string, role string, selection components.Selection) ComponentSelectionEntry {
+	return ComponentSelectionEntry{
+		InstanceID:      instanceID,
+		BlockID:         blockID,
+		Role:            role,
+		ComponentID:     selection.Candidate.ComponentID,
+		VariantID:       selection.Candidate.VariantID,
+		Manufacturer:    selection.Component.Manufacturer,
+		MPN:             selectedMPN(selection),
+		ComponentClass:  selection.Candidate.Family,
+		SymbolID:        firstSelectedSymbolID(selection),
+		FunctionPins:    selectedFunctionPins(selection),
+		FootprintID:     selection.Candidate.FootprintID,
+		PinMapID:        selectedPinMapID(selection),
+		Confidence:      selection.Candidate.Confidence,
+		ResolverChecked: selectedResolverChecked(selection),
+		PinMapChecked:   selectedPinMapChecked(selection),
+		Companions:      append([]components.CompanionRequirement(nil), selection.Component.Companions...),
+		Regulator:       cloneRegulatorEvidence(selection.Component.Regulator),
+		Capacitor:       cloneCapacitorEvidence(selection.Component.Capacitor),
+		OpAmp:           cloneOpAmpEvidence(selection.Component.OpAmp),
+		AmplifierOutput: cloneAmplifierOutputEvidence(selection.Component.AmplifierOutput),
+		PlacementHints:  append([]components.PlacementHint(nil), selection.Component.PlacementHints...),
+		RoutingHints:    append([]components.RoutingHint(nil), selection.Component.RoutingHints...),
+		Procurement:     cloneProcurementEvidence(selection.Procurement),
+		Rejected:        append([]components.CandidateRejection(nil), selection.Rejected...),
+		Warnings:        append([]reports.Issue(nil), selection.Warnings...),
+	}
+}
+
+func workflowStringParam(params map[string]any, name string, fallback string) string {
+	value, ok := params[name].(string)
+	if !ok || strings.TrimSpace(value) == "" {
+		return fallback
+	}
+	return strings.TrimSpace(value)
 }
 
 func ApplyComponentSelectionsToPlan(plan *BlockPlanResult, registry blocks.Registry, selections []ComponentSelectionEntry) []reports.Issue {

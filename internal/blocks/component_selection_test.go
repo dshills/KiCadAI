@@ -114,12 +114,28 @@ func TestI2CSensorSelectionRequestUsesConcreteComponentAndSupply(t *testing.T) {
 	if request.Query.Text != "sensor.sensirion.sht31_dis.dfn8" || !request.RequireConcrete || !request.RequireCompanions {
 		t.Fatalf("request = %#v", request)
 	}
+	if got := request.RequiredFunctions; len(got) != 2 || got[0] != "SDA" || got[1] != "SCL" {
+		t.Fatalf("required functions = %#v", got)
+	}
 	if len(request.RequiredRatings) != 1 || request.RequiredRatings[0].Kind != "supply_voltage" || request.RequiredRatings[0].Value != "3.3" {
 		t.Fatalf("ratings = %#v", request.RequiredRatings)
 	}
 	selection, result := components.Select(context.Background(), loadBlockTestCatalog(t), request)
 	if !result.OK || selection.Component.ID != "sensor.sensirion.sht31_dis.dfn8" {
 		t.Fatalf("selection = %#v, issues = %#v", selection, result.Issues)
+	}
+}
+
+func TestExplicitActiveDeviceSelectionDoesNotRequireSensorBusFunctions(t *testing.T) {
+	component := BlockComponent{ComponentIDParam: "transistor_component_id"}
+	request, ok := SelectionRequestForComponentWithParams(component, components.AcceptanceConnectivity, map[string]any{
+		"transistor_component_id": "transistor.bjt.onsemi.mmbt3904.sot23",
+	})
+	if !ok {
+		t.Fatal("expected concrete active-device selection request")
+	}
+	if len(request.RequiredFunctions) != 0 {
+		t.Fatalf("required functions = %#v, want none", request.RequiredFunctions)
 	}
 }
 

@@ -2,7 +2,7 @@
   "ok": true,
   "command": "block",
   "data": {
-    "count": 21,
+    "count": 22,
     "results": [
       {
         "case_id": "amplifier_bias_network_headphone",
@@ -93,6 +93,26 @@
           {
             "name": "erc_drc",
             "status": "skipped"
+          }
+        ]
+      },
+      {
+        "case_id": "class_a_voltage_stage_line",
+        "block_id": "class_a_voltage_stage",
+        "evidence_level": "schematic_verified",
+        "status": "pass",
+        "stages": [
+          {
+            "name": "manifest",
+            "status": "pass"
+          },
+          {
+            "name": "instantiate",
+            "status": "pass"
+          },
+          {
+            "name": "semantic_assertions",
+            "status": "pass"
           }
         ]
       },

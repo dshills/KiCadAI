@@ -47,8 +47,10 @@ func TestDiscoverPhysicalEndpointsFromPlacedPads(t *testing.T) {
 	if len(first.Layers) != 1 || first.Layers[0] != "F.Cu" {
 		t.Fatalf("endpoint layers = %#v", first.Layers)
 	}
-	if first.Point == nil || first.Point.XMM != 10 || first.Point.YMM != 19 {
-		t.Fatalf("endpoint point = %#v, want rotated absolute point 10,19", first.Point)
+	// Pad 1 is at local X=-1. KiCad +90 maps local -X to board +Y, so its
+	// absolute Y coordinate is 20+1=21 (pad 2 at local +X maps to Y=19).
+	if first.Point == nil || first.Point.XMM != 10 || first.Point.YMM != 21 {
+		t.Fatalf("endpoint point = %#v, want local-X=-1 KiCad-rotated absolute point 10,21", first.Point)
 	}
 	if first.Confidence != PhysicalEndpointConfidenceHigh {
 		t.Fatalf("confidence = %q", first.Confidence)

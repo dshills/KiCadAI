@@ -16,6 +16,7 @@ type TemplatePin struct {
 	Number    string
 	Offset    kicadfiles.Point
 	Direction kicadfiles.Point
+	Hidden    bool
 }
 
 // PinDirectionFromOrientation converts KiCad's cardinal library-pin angle to
@@ -87,8 +88,8 @@ var embeddedSymbolTemplates = map[string]embeddedTemplate{
 			{Number: "A9", Offset: kicadfiles.Point{X: kicadfiles.MM(15.24), Y: kicadfiles.MM(7.62)}},
 			{Number: "A12", Offset: kicadfiles.Point{Y: kicadfiles.MM(-17.78)}},
 			{Number: "B5", Offset: kicadfiles.Point{X: kicadfiles.MM(15.24), Y: kicadfiles.MM(-7.62)}},
-			{Number: "B9", Offset: kicadfiles.Point{X: kicadfiles.MM(15.24), Y: kicadfiles.MM(7.62)}},
-			{Number: "B12", Offset: kicadfiles.Point{Y: kicadfiles.MM(-17.78)}},
+			{Number: "B9", Offset: kicadfiles.Point{X: kicadfiles.MM(15.24), Y: kicadfiles.MM(7.62)}, Hidden: true},
+			{Number: "B12", Offset: kicadfiles.Point{Y: kicadfiles.MM(-17.78)}, Hidden: true},
 			{Number: "SH", Offset: kicadfiles.Point{X: kicadfiles.MM(-7.62), Y: kicadfiles.MM(-17.78)}},
 		},
 		connectionPinOverride: map[string]kicadfiles.Point{
@@ -1115,6 +1116,7 @@ func embeddedTemplatePin(bodyName string, pinType string, pin TemplatePin) sexpr
 		sexpr.A("line"),
 		sexpr.L(sexpr.A("at"), sexpr.F(templatePinMM(pin.Offset.X)), sexpr.F(templatePinMM(pin.Offset.Y)), sexpr.I(templatePinRotation(pin.Offset))),
 		sexpr.L(sexpr.A("length"), sexpr.X(pinLength)),
+		sexpr.OmitIf(!pin.Hidden, sexpr.L(sexpr.A("hide"), sexpr.A("yes"))),
 		sexpr.L(sexpr.A("name"), sexpr.S(pinName), renderEffects(false)),
 		sexpr.L(sexpr.A("number"), sexpr.S(pin.Number), renderEffects(false)),
 	)

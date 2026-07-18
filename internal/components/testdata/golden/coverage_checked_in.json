@@ -1,15 +1,15 @@
 {
-  "record_count": 59,
-  "family_count": 18,
+  "record_count": 63,
+  "family_count": 19,
   "confidence_counts": {
     "blocked": 1,
     "library_derived": 0,
     "placeholder": 4,
     "rule_inferred": 5,
-    "verified": 49
+    "verified": 53
   },
   "alternative_coverage": {
-    "concrete_records": 35,
+    "concrete_records": 39,
     "generic_fallback_records": 24,
     "equivalence_groups": 19
   },
@@ -17,23 +17,23 @@
     {
       "family": "bjt",
       "defined": true,
-      "record_count": 3,
-      "concrete_records": 2,
+      "record_count": 5,
+      "concrete_records": 4,
       "generic_fallback_records": 1,
       "equivalence_groups": 2,
-      "verified_records": 2,
+      "verified_records": 4,
       "library_derived_records": 0,
       "rule_inferred_records": 0,
       "placeholder_records": 0,
       "blocked_records": 1,
       "missing_resolver_evidence": [
-        "bjt.onsemi.mmbt3904.sot23",
-        "bjt.onsemi.mmbt3906.sot23",
         "bjt.placeholder.npn_power_output.to220"
       ],
       "record_ids": [
         "bjt.onsemi.mmbt3904.sot23",
         "bjt.onsemi.mmbt3906.sot23",
+        "bjt.onsemi.njw0281g.to3p",
+        "bjt.onsemi.njw0302g.to3p",
         "bjt.placeholder.npn_power_output.to220"
       ]
     },
@@ -256,6 +256,23 @@
         "mcu.espressif.esp32_wroom_32e",
         "mcu.microchip.atmega328p_a.tqfp32",
         "mcu.placeholder.avr_minimal_tqfp32"
+      ]
+    },
+    {
+      "family": "mosfet",
+      "defined": true,
+      "record_count": 2,
+      "concrete_records": 2,
+      "generic_fallback_records": 0,
+      "equivalence_groups": 0,
+      "verified_records": 2,
+      "library_derived_records": 0,
+      "rule_inferred_records": 0,
+      "placeholder_records": 0,
+      "blocked_records": 0,
+      "record_ids": [
+        "mosfet.vishay.irfp240.to247",
+        "mosfet.vishay.irfp9240.to247"
       ]
     },
     {

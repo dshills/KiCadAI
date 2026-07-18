@@ -32,6 +32,9 @@ func TestConnectorBreakoutInstantiatesTwoPinConnector(t *testing.T) {
 	if len(output.Operations) != 5 {
 		t.Fatalf("operations = %#v", output.Operations)
 	}
+	if !strings.Contains(string(output.Operations[0].Raw), `"prefer_resolver_symbol":true`) {
+		t.Fatalf("connector symbol operation must prefer exact resolver geometry: %s", output.Operations[0].Raw)
+	}
 	validation := transactions.Validate(transactions.Transaction{Operations: output.Operations})
 	if len(validation.Issues) != 0 {
 		t.Fatalf("validation issues = %#v", validation.Issues)
@@ -80,6 +83,52 @@ func TestConnectorBreakoutPreservesExplicitDefaultSymbol(t *testing.T) {
 	}
 	if output.Instance.Params["connector_footprint"] != defaultConnectorFootprint {
 		t.Fatalf("params = %#v", output.Instance.Params)
+	}
+}
+
+func TestConnectorBreakoutAddsPowerFlagsOnlyForExplicitSourcePins(t *testing.T) {
+	registry := NewBuiltinRegistry()
+	output, issues := registry.Instantiate(context.Background(), BlockRequest{
+		BlockID:    "connector_breakout",
+		InstanceID: "power",
+		Params: map[string]any{
+			"pin_names":         []string{"VCC", "GND", "SENSE"},
+			"power_source_pins": []string{"VCC", "GND"},
+		},
+	})
+	if len(issues) != 0 {
+		t.Fatalf("issues = %#v", issues)
+	}
+	if len(output.Instance.Refs) != 3 {
+		t.Fatalf("refs = %#v, want connector plus two power flags", output.Instance.Refs)
+	}
+	flagCount := 0
+	for _, operation := range output.Operations {
+		if operation.Op == transactions.OpAddSymbol && strings.Contains(string(operation.Raw), `PWR_FLAG`) {
+			flagCount++
+		}
+	}
+	if flagCount != 2 {
+		t.Fatalf("power flag operations = %d, want 2", flagCount)
+	}
+	validation := transactions.Validate(transactions.Transaction{Operations: output.Operations})
+	if len(validation.Issues) != 0 {
+		t.Fatalf("validation issues = %#v", validation.Issues)
+	}
+}
+
+func TestConnectorBreakoutRejectsUnknownPowerSourcePin(t *testing.T) {
+	registry := NewBuiltinRegistry()
+	_, issues := registry.Instantiate(context.Background(), BlockRequest{
+		BlockID:    "connector_breakout",
+		InstanceID: "power",
+		Params: map[string]any{
+			"pin_names":         []string{"VCC", "GND"},
+			"power_source_pins": []string{"VEE"},
+		},
+	})
+	if len(issues) != 1 || issues[0].Path != "params.power_source_pins" {
+		t.Fatalf("issues = %#v", issues)
 	}
 }
 

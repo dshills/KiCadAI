@@ -1,0 +1,261 @@
+{
+  "version": "0.1.0",
+  "records": [
+    {
+      "id": "bjt.onsemi.njw0281g.to3p",
+      "family": "bjt",
+      "name": "onsemi NJW0281G NPN audio power transistor",
+      "description": "Concrete NPN half of the NJW0281G/NJW0302G complementary high-fidelity audio output pair.",
+      "generic": false,
+      "manufacturer": "onsemi",
+      "mpn": "NJW0281G",
+      "lifecycle": "active",
+      "tags": ["audio", "bjt", "npn", "power_output", "to3p", "linear"],
+      "ratings": [
+        {"kind": "collector_emitter_voltage", "max": "250", "unit": "V"},
+        {"kind": "collector_current", "max": "15", "unit": "A"},
+        {"kind": "power_dissipation", "max": "150", "unit": "W"}
+      ],
+      "temperature": {"min": "-65", "max": "150", "unit": "C"},
+      "companions": [{"id": "amplifier.output_emitter_resistor", "family": "resistor", "role": "emitter_resistor", "required": true, "applies_to": ["class_ab_output"], "description": "Emitter resistance and current sharing must be calculated for the selected output stage."}],
+      "amplifier_output_evidence": {
+        "device_class": "bjt",
+        "polarity": "npn",
+        "intended_roles": ["power_output", "class_a_output"],
+        "package": "TO-3P-3",
+        "symbol_id": "Transistor_BJT:Q_NPN_BCE",
+        "footprint_id": "Package_TO_SOT_THT:TO-3P-3_Vertical",
+        "pinmap_evidence": "datasheet-pinmap:onsemi:NJW0281-D",
+        "complementary_group": "onsemi_njw0281_njw0302",
+        "control_terminal": "BASE",
+        "upper_or_lower_terminal": "COLLECTOR",
+        "output_terminal": "EMITTER",
+        "voltage_rating_status": "proven",
+        "current_rating_status": "proven",
+        "power_dissipation_status": "proven",
+        "thermal_review": "proven",
+        "safe_operating_area_status": "proven",
+        "fabrication_candidate_blocks": false,
+        "review_note": "Manufacturer ratings, TO-3P pinmap, complementary pairing, thermal resistance, and conservative DC SOA boundary are captured; applied heatsink and fault validation remain circuit-level gates."
+      },
+      "power_semiconductor_evidence": {
+        "device_class": "bjt",
+        "polarity": "npn",
+        "complementary_group": "onsemi_njw0281_njw0302",
+        "max_voltage": {"value": 250, "unit": "V", "conditions": "VCEO sustaining voltage, IC=30mA, IB=0"},
+        "continuous_current": {"value": 15, "unit": "A", "conditions": "absolute maximum continuous collector current"},
+        "peak_current": {"value": 30, "unit": "A", "conditions": "5ms pulse, duty cycle below 10 percent"},
+        "power_dissipation": {"value": 150, "unit": "W", "temperature_c": 25, "conditions": "case temperature 25 C"},
+        "max_junction_temperature_c": 150,
+        "junction_to_case_c_per_w": 0.83,
+        "soa": [
+          {"voltage_v": 5, "current_a": 10, "dc": true, "case_temperature_c": 25},
+          {"voltage_v": 50, "current_a": 0.5, "dc": true, "case_temperature_c": 25}
+        ],
+        "secondary_breakdown_status": "proven",
+        "linear_mode_status": "proven",
+        "mounting_assumptions": "Conservative points inside Figure 2 DC SOA at TC=25 C; circuit validation must derate for actual case temperature and heatsink path.",
+        "bjt": {"gain_minimum": 75, "gain_test_current_a": 3, "transition_frequency_hz": 30000000},
+        "fabrication_proof": true,
+        "review_note": "Source: onsemi NJW0281/D Rev. 2, June 2025."
+      },
+      "symbols": [{
+        "symbol_id": "Transistor_BJT:Q_NPN_BCE",
+        "function_pins": [
+          {"function": "BASE", "symbol_pin": "1", "required": true, "aliases": ["B"]},
+          {"function": "COLLECTOR", "symbol_pin": "2", "required": true, "aliases": ["C"]},
+          {"function": "EMITTER", "symbol_pin": "3", "required": true, "aliases": ["E"]}
+        ],
+        "verification": {"confidence": "verified", "sources": ["kicad-symbols:Transistor_BJT:Q_NPN_BCE", "datasheet-pinmap:onsemi:NJW0281-D"], "pinmap_checked": true}
+      }],
+      "packages": [{
+        "id": "to3p_3",
+        "name": "TO-3P-3",
+        "footprint_id": "Package_TO_SOT_THT:TO-3P-3_Vertical",
+        "package_type": "to3p_3",
+        "mpn": "NJW0281G",
+        "lifecycle": "active",
+        "pinmap_id": "Transistor_BJT:Q_NPN_BCE|Package_TO_SOT_THT:TO-3P-3_Vertical",
+        "pad_functions": [
+          {"function": "BASE", "pad": "1", "aliases": ["B"]},
+          {"function": "COLLECTOR", "pad": "2", "aliases": ["C"]},
+          {"function": "EMITTER", "pad": "3", "aliases": ["E"]}
+        ],
+        "dimensions_mm": {"width": 15.8, "height": 5.0},
+        "height_mm": 20.2,
+        "verification": {"confidence": "verified", "sources": ["kicad-footprint:Package_TO_SOT_THT:TO-3P-3_Vertical", "datasheet-pinmap:onsemi:NJW0281-D"], "pinmap_checked": true}
+      }],
+      "derating_rules": [
+        {"kind": "thermal", "description": "Derate the 25 C case rating through the declared interface and heatsink thermal path."},
+        {"kind": "safe_operating_area", "description": "Interpolate only inside the conservative catalog DC SOA boundary and derate for case temperature."}
+      ],
+      "placement_hints": [{"kind": "thermal_edge", "target": "heatsink", "description": "Place against the declared heatsink edge and preserve mounting access."}],
+      "routing_hints": [{"kind": "net_class", "net_role": "high_current_output", "value": "power_output", "unit": "class", "description": "Use the calculated output-current net class."}],
+      "verification": {"confidence": "verified", "sources": ["https://www.onsemi.com/pdf/datasheet/njw0281-d.pdf", "kicad-symbols:Transistor_BJT:Q_NPN_BCE", "kicad-footprint:Package_TO_SOT_THT:TO-3P-3_Vertical", "datasheet-pinmap:onsemi:NJW0281-D"], "resolver_checked": true, "pinmap_checked": true, "tests": ["catalog_audio_power_semiconductor_evidence"]}
+    },
+    {
+      "id": "bjt.onsemi.njw0302g.to3p",
+      "family": "bjt",
+      "name": "onsemi NJW0302G PNP audio power transistor",
+      "description": "Concrete PNP half of the NJW0281G/NJW0302G complementary high-fidelity audio output pair.",
+      "generic": false,
+      "manufacturer": "onsemi",
+      "mpn": "NJW0302G",
+      "lifecycle": "active",
+      "tags": ["audio", "bjt", "pnp", "power_output", "to3p", "linear"],
+      "ratings": [
+        {"kind": "collector_emitter_voltage", "max": "250", "unit": "V"},
+        {"kind": "collector_current", "max": "15", "unit": "A"},
+        {"kind": "power_dissipation", "max": "150", "unit": "W"}
+      ],
+      "temperature": {"min": "-65", "max": "150", "unit": "C"},
+      "companions": [{"id": "amplifier.output_emitter_resistor", "family": "resistor", "role": "emitter_resistor", "required": true, "applies_to": ["class_ab_output"], "description": "Emitter resistance and current sharing must be calculated for the selected output stage."}],
+      "amplifier_output_evidence": {
+        "device_class": "bjt",
+        "polarity": "pnp",
+        "intended_roles": ["power_output", "class_a_output"],
+        "package": "TO-3P-3",
+        "symbol_id": "Transistor_BJT:Q_PNP_BCE",
+        "footprint_id": "Package_TO_SOT_THT:TO-3P-3_Vertical",
+        "pinmap_evidence": "datasheet-pinmap:onsemi:NJW0281-D",
+        "complementary_group": "onsemi_njw0281_njw0302",
+        "control_terminal": "BASE",
+        "upper_or_lower_terminal": "COLLECTOR",
+        "output_terminal": "EMITTER",
+        "voltage_rating_status": "proven",
+        "current_rating_status": "proven",
+        "power_dissipation_status": "proven",
+        "thermal_review": "proven",
+        "safe_operating_area_status": "proven",
+        "fabrication_candidate_blocks": false,
+        "review_note": "Manufacturer ratings, TO-3P pinmap, complementary pairing, thermal resistance, and conservative DC SOA boundary are captured; applied heatsink and fault validation remain circuit-level gates."
+      },
+      "power_semiconductor_evidence": {
+        "device_class": "bjt",
+        "polarity": "pnp",
+        "complementary_group": "onsemi_njw0281_njw0302",
+        "max_voltage": {"value": 250, "unit": "V", "conditions": "VCEO sustaining voltage, IC=30mA, IB=0"},
+        "continuous_current": {"value": 15, "unit": "A", "conditions": "absolute maximum continuous collector current"},
+        "peak_current": {"value": 30, "unit": "A", "conditions": "5ms pulse, duty cycle below 10 percent"},
+        "power_dissipation": {"value": 150, "unit": "W", "temperature_c": 25, "conditions": "case temperature 25 C"},
+        "max_junction_temperature_c": 150,
+        "junction_to_case_c_per_w": 0.83,
+        "soa": [
+          {"voltage_v": 5, "current_a": 10, "dc": true, "case_temperature_c": 25},
+          {"voltage_v": 50, "current_a": 0.5, "dc": true, "case_temperature_c": 25}
+        ],
+        "secondary_breakdown_status": "proven",
+        "linear_mode_status": "proven",
+        "mounting_assumptions": "Conservative points inside Figure 2 DC SOA at TC=25 C; circuit validation must derate for actual case temperature and heatsink path.",
+        "bjt": {"gain_minimum": 75, "gain_test_current_a": 3, "transition_frequency_hz": 30000000},
+        "fabrication_proof": true,
+        "review_note": "Source: onsemi NJW0281/D Rev. 2, June 2025."
+      },
+      "symbols": [{
+        "symbol_id": "Transistor_BJT:Q_PNP_BCE",
+        "function_pins": [
+          {"function": "BASE", "symbol_pin": "1", "required": true, "aliases": ["B"]},
+          {"function": "COLLECTOR", "symbol_pin": "2", "required": true, "aliases": ["C"]},
+          {"function": "EMITTER", "symbol_pin": "3", "required": true, "aliases": ["E"]}
+        ],
+        "verification": {"confidence": "verified", "sources": ["kicad-symbols:Transistor_BJT:Q_PNP_BCE", "datasheet-pinmap:onsemi:NJW0281-D"], "pinmap_checked": true}
+      }],
+      "packages": [{
+        "id": "to3p_3",
+        "name": "TO-3P-3",
+        "footprint_id": "Package_TO_SOT_THT:TO-3P-3_Vertical",
+        "package_type": "to3p_3",
+        "mpn": "NJW0302G",
+        "lifecycle": "active",
+        "pinmap_id": "Transistor_BJT:Q_PNP_BCE|Package_TO_SOT_THT:TO-3P-3_Vertical",
+        "pad_functions": [
+          {"function": "BASE", "pad": "1", "aliases": ["B"]},
+          {"function": "COLLECTOR", "pad": "2", "aliases": ["C"]},
+          {"function": "EMITTER", "pad": "3", "aliases": ["E"]}
+        ],
+        "dimensions_mm": {"width": 15.8, "height": 5.0},
+        "height_mm": 20.2,
+        "verification": {"confidence": "verified", "sources": ["kicad-footprint:Package_TO_SOT_THT:TO-3P-3_Vertical", "datasheet-pinmap:onsemi:NJW0281-D"], "pinmap_checked": true}
+      }],
+      "derating_rules": [
+        {"kind": "thermal", "description": "Derate the 25 C case rating through the declared interface and heatsink thermal path."},
+        {"kind": "safe_operating_area", "description": "Interpolate only inside the conservative catalog DC SOA boundary and derate for case temperature."}
+      ],
+      "placement_hints": [{"kind": "thermal_edge", "target": "heatsink", "description": "Place against the declared heatsink edge and preserve mounting access."}],
+      "routing_hints": [{"kind": "net_class", "net_role": "high_current_output", "value": "power_output", "unit": "class", "description": "Use the calculated output-current net class."}],
+      "verification": {"confidence": "verified", "sources": ["https://www.onsemi.com/pdf/datasheet/njw0281-d.pdf", "kicad-symbols:Transistor_BJT:Q_PNP_BCE", "kicad-footprint:Package_TO_SOT_THT:TO-3P-3_Vertical", "datasheet-pinmap:onsemi:NJW0281-D"], "resolver_checked": true, "pinmap_checked": true, "tests": ["catalog_audio_power_semiconductor_evidence"]}
+    },
+    {
+      "id": "mosfet.vishay.irfp240.to247",
+      "family": "mosfet",
+      "name": "Vishay IRFP240 N-channel power MOSFET",
+      "description": "Concrete TO-247 N-channel power MOSFET with quantitative switching-device evidence; linear audio use remains fail-closed pending a reviewed DC SOA boundary.",
+      "generic": false,
+      "manufacturer": "Vishay Siliconix",
+      "mpn": "IRFP240PbF",
+      "lifecycle": "active",
+      "tags": ["audio_review", "mosfet", "n_channel", "power_output", "to247"],
+      "ratings": [{"kind": "drain_source_voltage", "max": "200", "unit": "V"}, {"kind": "drain_current", "max": "20", "unit": "A"}, {"kind": "power_dissipation", "max": "150", "unit": "W"}],
+      "temperature": {"min": "-55", "max": "150", "unit": "C"},
+      "companions": [{"id": "amplifier.output_gate_stopper", "family": "resistor", "role": "gate_stopper", "required": true, "applies_to": ["class_ab_output", "class_a_output"], "description": "A calculated local gate-stopper resistor is required for power MOSFET amplifier use."}],
+      "amplifier_output_evidence": {
+        "device_class": "mosfet", "polarity": "n_channel", "intended_roles": ["power_output"], "package": "TO-247AC",
+        "symbol_id": "Transistor_FET:Q_NMOS_GDS", "footprint_id": "Package_TO_SOT_THT:TO-247-3_Vertical", "pinmap_evidence": "datasheet-pinmap:vishay:IRFP240-91210",
+        "complementary_group": "vishay_irfp240_irfp9240", "control_terminal": "GATE", "upper_or_lower_terminal": "DRAIN", "output_terminal": "SOURCE",
+        "voltage_rating_status": "proven", "current_rating_status": "proven", "power_dissipation_status": "proven", "thermal_review": "proven", "safe_operating_area_status": "review_required",
+        "fabrication_candidate_blocks": true, "review_note": "Pinmap and quantitative ratings are proven; this switching MOSFET is blocked for linear amplifier selection until its graphical SOA is reviewed and conservatively digitized."
+      },
+      "power_semiconductor_evidence": {
+        "device_class": "mosfet", "polarity": "n_channel", "complementary_group": "vishay_irfp240_irfp9240",
+        "max_voltage": {"value": 200, "unit": "V", "conditions": "VGS=0, ID=250uA"},
+        "continuous_current": {"value": 20, "unit": "A", "temperature_c": 25, "conditions": "VGS=10V, case temperature 25 C"},
+        "peak_current": {"value": 80, "unit": "A", "conditions": "repetitive pulse limited by maximum junction temperature"},
+        "power_dissipation": {"value": 150, "unit": "W", "temperature_c": 25, "conditions": "case temperature 25 C"},
+        "max_junction_temperature_c": 150, "junction_to_case_c_per_w": 0.83, "junction_to_ambient_c_per_w": 40,
+        "secondary_breakdown_status": "not_applicable", "linear_mode_status": "review_required",
+        "mounting_assumptions": "TO-247AC case-to-sink interface and heatsink are circuit-level inputs.",
+        "mosfet": {"rds_on_ohm": 0.18, "rds_on_gate_voltage_v": 10, "threshold_minimum_v": 2, "threshold_maximum_v": 4, "transconductance_s": 6.9, "total_gate_charge_c": 70e-9, "input_capacitance_f": 1300e-12, "reverse_transfer_capacitance_f": 130e-12, "body_diode_status": "proven", "gate_protection_status": "review_required"},
+        "fabrication_proof": false, "review_note": "Source: Vishay IRFP240 document 91210 Rev. C. Linear audio operation is intentionally not proven."
+      },
+      "symbols": [{"symbol_id": "Transistor_FET:Q_NMOS_GDS", "function_pins": [{"function": "GATE", "symbol_pin": "1", "required": true}, {"function": "DRAIN", "symbol_pin": "2", "required": true}, {"function": "SOURCE", "symbol_pin": "3", "required": true}], "verification": {"confidence": "verified", "sources": ["kicad-symbols:Transistor_FET:Q_NMOS_GDS", "datasheet-pinmap:vishay:IRFP240-91210"], "pinmap_checked": true}}],
+      "packages": [{"id": "to247_3", "name": "TO-247AC", "footprint_id": "Package_TO_SOT_THT:TO-247-3_Vertical", "package_type": "to247_3", "mpn": "IRFP240PbF", "lifecycle": "active", "pinmap_id": "Transistor_FET:Q_NMOS_GDS|Package_TO_SOT_THT:TO-247-3_Vertical", "pad_functions": [{"function": "GATE", "pad": "1"}, {"function": "DRAIN", "pad": "2"}, {"function": "SOURCE", "pad": "3"}], "verification": {"confidence": "verified", "sources": ["kicad-footprint:Package_TO_SOT_THT:TO-247-3_Vertical", "datasheet-pinmap:vishay:IRFP240-91210"], "pinmap_checked": true}}],
+      "verification": {"confidence": "verified", "sources": ["https://www.vishay.com/docs/91210/irfp240.pdf", "datasheet-pinmap:vishay:IRFP240-91210"], "resolver_checked": true, "pinmap_checked": true, "tests": ["catalog_audio_power_semiconductor_evidence"]}
+    },
+    {
+      "id": "mosfet.vishay.irfp9240.to247",
+      "family": "mosfet",
+      "name": "Vishay IRFP9240 P-channel power MOSFET",
+      "description": "Concrete TO-247 P-channel power MOSFET with quantitative switching-device evidence; linear audio use remains fail-closed pending a reviewed DC SOA boundary.",
+      "generic": false,
+      "manufacturer": "Vishay Siliconix",
+      "mpn": "IRFP9240PbF",
+      "lifecycle": "active",
+      "tags": ["audio_review", "mosfet", "p_channel", "power_output", "to247"],
+      "ratings": [{"kind": "drain_source_voltage", "max": "200", "unit": "V"}, {"kind": "drain_current", "max": "12", "unit": "A"}, {"kind": "power_dissipation", "max": "150", "unit": "W"}],
+      "temperature": {"min": "-55", "max": "150", "unit": "C"},
+      "companions": [{"id": "amplifier.output_gate_stopper", "family": "resistor", "role": "gate_stopper", "required": true, "applies_to": ["class_ab_output", "class_a_output"], "description": "A calculated local gate-stopper resistor is required for power MOSFET amplifier use."}],
+      "amplifier_output_evidence": {
+        "device_class": "mosfet", "polarity": "p_channel", "intended_roles": ["power_output"], "package": "TO-247AC",
+        "symbol_id": "Transistor_FET:Q_PMOS_GDS", "footprint_id": "Package_TO_SOT_THT:TO-247-3_Vertical", "pinmap_evidence": "datasheet-pinmap:vishay:IRFP9240-91239",
+        "complementary_group": "vishay_irfp240_irfp9240", "control_terminal": "GATE", "upper_or_lower_terminal": "DRAIN", "output_terminal": "SOURCE",
+        "voltage_rating_status": "proven", "current_rating_status": "proven", "power_dissipation_status": "proven", "thermal_review": "proven", "safe_operating_area_status": "review_required",
+        "fabrication_candidate_blocks": true, "review_note": "Pinmap and quantitative ratings are proven; this switching MOSFET is blocked for linear amplifier selection until its graphical SOA is reviewed and conservatively digitized."
+      },
+      "power_semiconductor_evidence": {
+        "device_class": "mosfet", "polarity": "p_channel", "complementary_group": "vishay_irfp240_irfp9240",
+        "max_voltage": {"value": 200, "unit": "V", "conditions": "VGS=0, ID=-250uA; magnitude recorded"},
+        "continuous_current": {"value": 12, "unit": "A", "temperature_c": 25, "conditions": "VGS=-10V, case temperature 25 C; magnitude recorded"},
+        "peak_current": {"value": 48, "unit": "A", "conditions": "repetitive pulse limited by maximum junction temperature; magnitude recorded"},
+        "power_dissipation": {"value": 150, "unit": "W", "temperature_c": 25, "conditions": "case temperature 25 C"},
+        "max_junction_temperature_c": 150, "junction_to_case_c_per_w": 0.83, "junction_to_ambient_c_per_w": 40,
+        "secondary_breakdown_status": "not_applicable", "linear_mode_status": "review_required",
+        "mounting_assumptions": "TO-247AC case-to-sink interface and heatsink are circuit-level inputs.",
+        "mosfet": {"rds_on_ohm": 0.5, "rds_on_gate_voltage_v": 10, "threshold_minimum_v": 2, "threshold_maximum_v": 4, "transconductance_s": 4.2, "total_gate_charge_c": 44e-9, "input_capacitance_f": 1200e-12, "reverse_transfer_capacitance_f": 81e-12, "body_diode_status": "proven", "gate_protection_status": "review_required"},
+        "fabrication_proof": false, "review_note": "Source: Vishay IRFP9240 document 91239 Rev. C. Linear audio operation is intentionally not proven."
+      },
+      "symbols": [{"symbol_id": "Transistor_FET:Q_PMOS_GDS", "function_pins": [{"function": "GATE", "symbol_pin": "1", "required": true}, {"function": "DRAIN", "symbol_pin": "2", "required": true}, {"function": "SOURCE", "symbol_pin": "3", "required": true}], "verification": {"confidence": "verified", "sources": ["kicad-symbols:Transistor_FET:Q_PMOS_GDS", "datasheet-pinmap:vishay:IRFP9240-91239"], "pinmap_checked": true}}],
+      "packages": [{"id": "to247_3", "name": "TO-247AC", "footprint_id": "Package_TO_SOT_THT:TO-247-3_Vertical", "package_type": "to247_3", "mpn": "IRFP9240PbF", "lifecycle": "active", "pinmap_id": "Transistor_FET:Q_PMOS_GDS|Package_TO_SOT_THT:TO-247-3_Vertical", "pad_functions": [{"function": "GATE", "pad": "1"}, {"function": "DRAIN", "pad": "2"}, {"function": "SOURCE", "pad": "3"}], "verification": {"confidence": "verified", "sources": ["kicad-footprint:Package_TO_SOT_THT:TO-247-3_Vertical", "datasheet-pinmap:vishay:IRFP9240-91239"], "pinmap_checked": true}}],
+      "verification": {"confidence": "verified", "sources": ["https://www.vishay.com/docs/91239/irfp9240.pdf", "datasheet-pinmap:vishay:IRFP9240-91239"], "resolver_checked": true, "pinmap_checked": true, "tests": ["catalog_audio_power_semiconductor_evidence"]}
+    }
+  ]
+}

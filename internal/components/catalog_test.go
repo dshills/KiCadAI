@@ -200,6 +200,45 @@ func TestCheckedInCatalogBJTLibraryIdentityIsConsistent(t *testing.T) {
 	}
 }
 
+func TestCheckedInCatalogAudioPowerSemiconductorEvidence(t *testing.T) {
+	catalog, err := LoadCatalog(context.Background(), LoadOptions{CatalogDir: checkedInCatalogDir(t)})
+	if err != nil {
+		t.Fatalf("load checked-in catalog: %v", err)
+	}
+	tests := []struct {
+		id               string
+		family           string
+		deviceClass      string
+		polarity         string
+		fabricationProof bool
+		linearStatus     string
+	}{
+		{id: "bjt.onsemi.njw0281g.to3p", family: "bjt", deviceClass: "bjt", polarity: "npn", fabricationProof: true, linearStatus: "proven"},
+		{id: "bjt.onsemi.njw0302g.to3p", family: "bjt", deviceClass: "bjt", polarity: "pnp", fabricationProof: true, linearStatus: "proven"},
+		{id: "mosfet.vishay.irfp240.to247", family: "mosfet", deviceClass: "mosfet", polarity: "n_channel", linearStatus: "review_required"},
+		{id: "mosfet.vishay.irfp9240.to247", family: "mosfet", deviceClass: "mosfet", polarity: "p_channel", linearStatus: "review_required"},
+	}
+	for _, test := range tests {
+		record := requireCatalogRecord(t, catalog, test.id)
+		if record.Family != test.family || record.PowerSemiconductor == nil {
+			t.Fatalf("%s power semiconductor evidence = %#v", test.id, record.PowerSemiconductor)
+		}
+		evidence := record.PowerSemiconductor
+		if evidence.DeviceClass != test.deviceClass || evidence.Polarity != test.polarity || evidence.FabricationProof != test.fabricationProof || evidence.LinearModeStatus != test.linearStatus {
+			t.Fatalf("%s power semiconductor evidence = %#v", test.id, evidence)
+		}
+		if evidence.MaxVoltage == nil || evidence.ContinuousCurrent == nil || evidence.PeakCurrent == nil || evidence.PowerDissipation == nil || evidence.MaxJunctionTemperatureC == nil || evidence.JunctionToCaseCPerW == nil {
+			t.Fatalf("%s missing quantitative ratings: %#v", test.id, evidence)
+		}
+		if test.fabricationProof && (len(evidence.SOA) < 2 || evidence.MountingAssumptions == "") {
+			t.Fatalf("%s missing fabrication SOA/thermal evidence: %#v", test.id, evidence)
+		}
+		if record.AmplifierOutput == nil || record.AmplifierOutput.DeviceClass != test.deviceClass || record.AmplifierOutput.Polarity != test.polarity || record.AmplifierOutput.ComplementaryGroup != evidence.ComplementaryGroup {
+			t.Fatalf("%s amplifier output evidence mismatch: %#v", test.id, record.AmplifierOutput)
+		}
+	}
+}
+
 func TestCheckedInCatalogRegulatorSliceEvidence(t *testing.T) {
 	catalog, err := LoadCatalog(context.Background(), LoadOptions{CatalogDir: checkedInCatalogDir(t)})
 	if err != nil {
@@ -289,14 +328,20 @@ func TestCheckedInCatalogRegulatorSliceEvidence(t *testing.T) {
 	requireCapacitorEvidence(t, requireCatalogRecord(t, catalog, "capacitor.murata.grm21br61a106ke19l.0805"), "X5R", true)
 
 	npn := requireCatalogRecord(t, catalog, "bjt.onsemi.mmbt3904.sot23")
-	requireAmplifierOutputEvidence(t, npn, "npn", true)
+	requireAmplifierOutputEvidence(t, npn, "npn", false)
 	requireRatingMax(t, npn, "collector_current", "200", "mA")
 	requireRatingMax(t, npn, "collector_emitter_voltage", "40", "V")
-	requireRatingMax(t, npn, "power_dissipation_max", "300", "mW")
+	requireRatingMax(t, npn, "power_dissipation_max", "225", "mW")
+	if npn.PowerSemiconductor == nil || !npn.PowerSemiconductor.FabricationProof || npn.PowerSemiconductor.JunctionToAmbientCPerW == nil {
+		t.Fatalf("MMBT3904 typed power evidence = %#v", npn.PowerSemiconductor)
+	}
 	requireCompanionRole(t, npn, "emitter_resistor")
 
 	pnp := requireCatalogRecord(t, catalog, "bjt.onsemi.mmbt3906.sot23")
-	requireAmplifierOutputEvidence(t, pnp, "pnp", true)
+	requireAmplifierOutputEvidence(t, pnp, "pnp", false)
+	if pnp.PowerSemiconductor == nil || !pnp.PowerSemiconductor.FabricationProof || pnp.PowerSemiconductor.JunctionToAmbientCPerW == nil {
+		t.Fatalf("MMBT3906 typed power evidence = %#v", pnp.PowerSemiconductor)
+	}
 	requireCompanionRole(t, pnp, "emitter_resistor")
 
 	placeholder := requireCatalogRecord(t, catalog, "bjt.placeholder.npn_power_output.to220")

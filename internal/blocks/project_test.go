@@ -45,6 +45,9 @@ func TestProjectTransactionForLEDMaterializesExportedPorts(t *testing.T) {
 			if payload.Text != "IN" && payload.Text != "GND" {
 				t.Fatalf("unexpected generated label: %#v", payload)
 			}
+			if payload.Anchor == nil || payload.Anchor.Ref == "" || payload.Anchor.Pin == "" {
+				t.Fatalf("generated port label must retain its concrete endpoint anchor: %#v", payload)
+			}
 		}
 		if operation.Op != transactions.OpConnect {
 			continue
@@ -439,6 +442,48 @@ func TestProjectTransactionPrefersNonCapacitorMaterializedLabelAnchor(t *testing
 	}
 }
 
+func TestProjectTransactionUsesLabelsForBranchedGeneratedNet(t *testing.T) {
+	var operations []transactions.Operation
+	generated := map[string]struct{}{}
+	for index, ref := range []string{"R1", "R2", "R3"} {
+		componentOperations, issues := ComponentOperations(BlockComponent{
+			Role:      "branch",
+			RefPrefix: "R",
+			Value:     "1k",
+			SymbolID:  "Device:R",
+			Pins:      twoTerminalHorizontalPins(),
+		}, ref, transactions.Point{XMM: float64(index * 10), YMM: 20})
+		if len(issues) != 0 {
+			t.Fatalf("component %s issues: %#v", ref, issues)
+		}
+		operations = append(operations, componentOperations...)
+		generated[ref] = struct{}{}
+	}
+	for _, target := range []string{"R2", "R3"} {
+		connect, issues := ConnectOperation("R1", "1", target, "1", "BRANCH")
+		if len(issues) != 0 {
+			t.Fatalf("connect issues: %#v", issues)
+		}
+		operations = append(operations, connect)
+	}
+	tx, err := projectTransaction("branch", operations, generated, nil, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, operation := range tx.Operations {
+		if operation.Op != transactions.OpConnect {
+			continue
+		}
+		var payload transactions.ConnectOperation
+		if err := decodeBlockOperation(operation, &payload); err != nil {
+			t.Fatal(err)
+		}
+		if payload.UseLabels == nil || !*payload.UseLabels {
+			t.Fatalf("branched generated net must use deterministic label branches: %#v", payload)
+		}
+	}
+}
+
 func TestProjectEndpointAnchorsApplySymbolRotation(t *testing.T) {
 	operation, err := wrapOperation(transactions.OpAddSymbol, transactions.AddSymbolOperation{
 		Op:        transactions.OpAddSymbol,
@@ -463,6 +508,22 @@ func TestProjectEndpointAnchorsApplySymbolRotation(t *testing.T) {
 	anchor := anchors[projectEndpointKey{ref: "R1", pin: "1"}]
 	if math.Abs(anchor.xMM-10) > 0.000001 || math.Abs(anchor.yMM-16.19) > 0.000001 {
 		t.Fatalf("anchor = %#v, want rotated pin offset applied", anchor)
+	}
+}
+
+func TestProjectEndpointsShareAnchorForStackedPins(t *testing.T) {
+	endpoints := []projectEndpointKey{{ref: "J1", pin: "A9"}, {ref: "J1", pin: "B9"}, {ref: "F1", pin: "1"}}
+	anchors := map[projectEndpointKey]projectPoint{
+		endpoints[0]: {xMM: 15.24, yMM: -7.62},
+		endpoints[1]: {xMM: 15.24, yMM: -7.62},
+		endpoints[2]: {xMM: 20.32, yMM: -15.24},
+	}
+	if !projectEndpointsShareAnchor(endpoints, anchors) {
+		t.Fatal("stacked symbol pins must force label-based materialization")
+	}
+	anchors[endpoints[1]] = projectPoint{xMM: 15.24, yMM: 7.62}
+	if projectEndpointsShareAnchor(endpoints, anchors) {
+		t.Fatal("distinct symbol pin anchors must retain direct-wire materialization")
 	}
 }
 

@@ -39,8 +39,8 @@ func TestComponentPlacementBoundsUsesAnchorAndRotation(t *testing.T) {
 	if !nearlyEqual(got.WidthMM(), 2) || !nearlyEqual(got.HeightMM(), 4) {
 		t.Fatalf("rotated bounds size = %.3fx%.3f, want 2x4", got.WidthMM(), got.HeightMM())
 	}
-	if !nearlyEqual(got.Center().XMM, 9.5) || !nearlyEqual(got.Center().YMM, 11) {
-		t.Fatalf("rotated bounds center = %#v, want approximately {9.5, 11}", got.Center())
+	if !nearlyEqual(got.Center().XMM, 10.5) || !nearlyEqual(got.Center().YMM, 9) {
+		t.Fatalf("rotated bounds center = %#v, want approximately {10.5, 9}", got.Center())
 	}
 }
 

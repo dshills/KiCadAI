@@ -72,7 +72,7 @@ func TestPadRectAccountsForComponentRotation(t *testing.T) {
 func TestAbsolutePadPointRotatesAroundComponentOrigin(t *testing.T) {
 	component := Component{Position: Placement{XMM: 10, YMM: 20, RotationDeg: 90}}
 	got := absolutePadPoint(component, Point{XMM: 2, YMM: 0})
-	want := Point{XMM: 10, YMM: 22}
+	want := Point{XMM: 10, YMM: 18}
 	if !floatClose(got.XMM, want.XMM) || !floatClose(got.YMM, want.YMM) {
 		t.Fatalf("absolute pad point = %#v, want %#v", got, want)
 	}

@@ -47,6 +47,7 @@ func NewBuiltinRegistryChecked() (BuiltinRegistry, []reports.Issue) {
 		"amplifier_bias_network":      instantiateAmplifierBiasNetwork,
 		"amplifier_input_buffer":      instantiateAmplifierInputBuffer,
 		"amplifier_supply_decoupling": instantiateAmplifierSupplyDecoupling,
+		"class_a_voltage_stage":       instantiateClassAVoltageStage,
 		"class_ab_output_pair":        instantiateClassABOutputPair,
 		"connector_breakout":          instantiateConnectorBreakout,
 		"canned_oscillator":           instantiateCannedOscillator,

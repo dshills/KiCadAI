@@ -75,14 +75,14 @@ var roadmapBlockFamilies = []roadmapBlockFamily{
 		},
 	},
 	{
-		ID:       "class_a_output_stage",
-		Name:     "Class A Output Stage",
+		ID:       "class_a_voltage_stage",
+		Name:     "Class A Voltage Stage",
 		Category: "analog",
 		Tags:     []string{"amplifier"},
 		Gaps: []string{
-			"Requires quiescent-current and thermal verification",
-			"Requires headphone or speaker load-drive model",
-			"Requires placement rules for heat dissipation and output device pairing",
+			"Calculated low-power BJT and MOSFET topology contracts are implemented",
+			"Requires catalog-backed thermal and SOA promotion evidence",
+			"Initial promotion envelope is a line-level BJT stage; speaker loads remain blocked",
 		},
 	},
 	{

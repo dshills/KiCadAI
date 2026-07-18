@@ -312,7 +312,7 @@ func TestValidateBoardRotatedFootprintPadPosition(t *testing.T) {
 	board.Footprints[0].Position = kicadfiles.Point{X: kicadfiles.MM(10), Y: kicadfiles.MM(10)}
 	board.Footprints[0].Rotation = 90
 	board.Footprints[0].Pads[0].Position = kicadfiles.Point{X: kicadfiles.MM(2), Y: 0}
-	board.Tracks[0].Start = kicadfiles.Point{X: kicadfiles.MM(10), Y: kicadfiles.MM(12)}
+	board.Tracks[0].Start = kicadfiles.Point{X: kicadfiles.MM(10), Y: kicadfiles.MM(8)}
 	result := ValidateBoard(context.Background(), &board, testTarget(), Options{})
 	if result.Status != StatusPass {
 		t.Fatalf("Status = %q, want pass for rotated footprint route; issues=%#v", result.Status, result.Issues)

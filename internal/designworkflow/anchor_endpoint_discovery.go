@@ -8,6 +8,7 @@ import (
 	"sort"
 	"strings"
 
+	"kicadai/internal/kicadfiles"
 	"kicadai/internal/placement"
 	"kicadai/internal/reports"
 	"kicadai/internal/transactions"
@@ -412,25 +413,8 @@ func isBackCopperLayer(layer string) bool {
 }
 
 func rotateEndpointPoint(point placement.Point, rotationDeg float64) placement.Point {
-	normalized := math.Mod(rotationDeg, 360)
-	if normalized < 0 {
-		normalized += 360
-	}
-	switch {
-	case math.Abs(normalized) < 1e-9:
-		return point
-	case math.Abs(normalized-90) < 1e-9:
-		return placement.Point{XMM: -point.YMM, YMM: point.XMM}
-	case math.Abs(normalized-180) < 1e-9:
-		return placement.Point{XMM: -point.XMM, YMM: -point.YMM}
-	case math.Abs(normalized-270) < 1e-9:
-		return placement.Point{XMM: point.YMM, YMM: -point.XMM}
-	default:
-		radians := normalized * math.Pi / 180
-		cosTheta := math.Cos(radians)
-		sinTheta := math.Sin(radians)
-		return placement.Point{XMM: point.XMM*cosTheta - point.YMM*sinTheta, YMM: point.XMM*sinTheta + point.YMM*cosTheta}
-	}
+	x, y := kicadfiles.RotateBoardLocalXY(point.XMM, point.YMM, rotationDeg)
+	return placement.Point{XMM: x, YMM: y}
 }
 
 func endpointRoles(componentRole string, netRole placement.NetRole) []string {

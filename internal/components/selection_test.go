@@ -202,7 +202,7 @@ func TestSelectPolarizedCapacitorBlocksFabricationPendingReview(t *testing.T) {
 		t.Fatal("expected polarized capacitor fabrication selection to require engineering review")
 	}
 	assertIssueCode(t, result.Issues, CodeComponentReviewRequired)
-	assertIssuePath(t, result.Issues, "component.capacitor.panasonic.eeufr1c221.radial.capacitor_evidence.esr_review")
+	assertIssuePath(t, result.Issues, "component.capacitor.panasonic.eeufr1c221.radial.capacitor_evidence.effective_capacitance_review")
 }
 
 func TestSelectRegulatorCompanionCapacitorWithRatings(t *testing.T) {
@@ -562,7 +562,7 @@ func TestSelectConcreteMLCCBlocksFabricationCandidateWithoutDeratingProof(t *tes
 	assertIssuePath(t, result.Issues, "component.capacitor.murata.grm21br61a106ke19l.0805.capacitor_evidence.effective_capacitance_review")
 }
 
-func TestSelectAmplifierOutputBlocksFabricationCandidateReviewGaps(t *testing.T) {
+func TestSelectAmplifierOutputPassesFabricationCandidateWithTypedEvidence(t *testing.T) {
 	catalog := loadCheckedInCatalog(t)
 	_, result := Select(context.Background(), catalog, SelectionRequest{
 		Query:             Query{Family: "bjt", Package: "sot23", Text: "mmbt3904"},
@@ -574,13 +574,9 @@ func TestSelectAmplifierOutputBlocksFabricationCandidateReviewGaps(t *testing.T)
 			{Kind: "collector_emitter_voltage", Value: "12", Unit: "V"},
 		},
 	})
-	if result.OK {
-		t.Fatal("expected amplifier output fabrication-candidate selection to block on review evidence")
+	if !result.OK {
+		t.Fatalf("expected typed amplifier output evidence to pass: %+v", result.Issues)
 	}
-	assertIssueCode(t, result.Issues, CodeComponentReviewRequired)
-	assertIssuePath(t, result.Issues, "component.bjt.onsemi.mmbt3904.sot23.amplifier_output_evidence.power_dissipation_status")
-	assertIssuePath(t, result.Issues, "component.bjt.onsemi.mmbt3904.sot23.amplifier_output_evidence.thermal_review")
-	assertIssuePath(t, result.Issues, "component.bjt.onsemi.mmbt3904.sot23.amplifier_output_evidence.safe_operating_area_status")
 }
 
 func TestSelectRejectsRegulatorOverCurrent(t *testing.T) {

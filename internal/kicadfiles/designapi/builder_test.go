@@ -1258,6 +1258,39 @@ func TestBuilderPreferredResolverBodyUsesResolverPinAnchors(t *testing.T) {
 	}
 }
 
+func TestBuilderAddLabelAtEndpointUsesResolvedPinAnchor(t *testing.T) {
+	index := libraryresolver.LibraryIndex{Symbols: map[string]libraryresolver.SymbolRecord{
+		"Device:D": {
+			LibraryID: "Device:D",
+			Raw:       `(symbol "D")`,
+			Pins: []libraryresolver.SymbolPin{{
+				Number:   "2",
+				Position: kicadfiles.Point{X: kicadfiles.MM(3.81)},
+			}},
+		},
+	}}
+	builder, err := New(Options{Name: "anchored_label", DesignID: kicadfiles.UUID("12345678-1234-5678-9234-123456789abc"), LibraryIndex: &index})
+	if err != nil {
+		t.Fatal(err)
+	}
+	position := kicadfiles.Point{X: kicadfiles.MM(20), Y: kicadfiles.MM(10)}
+	if _, err := builder.AddSymbol(SymbolOptions{
+		Reference: "D1", LibraryID: "Device:D", Value: "D", Position: position,
+		Pins: []PinSpec{{Number: "2", Offset: kicadfiles.Point{X: kicadfiles.MM(3.81)}}}, PreferResolverSymbol: true,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := builder.AddLabelAtEndpointWithOptions("DRIVER_OUT", Endpoint{Reference: "D1", Pin: "2"}, schematic.LabelLocal, LabelOptions{}); err != nil {
+		t.Fatal(err)
+	}
+	labels := builder.Design().Schematic.Labels
+	symbolPosition := builder.Design().Schematic.Symbols[0].Position
+	want := kicadfiles.Point{X: symbolPosition.X + kicadfiles.MM(3.81), Y: symbolPosition.Y}
+	if len(labels) != 1 || labels[0].Position != want {
+		t.Fatalf("labels = %#v, want DRIVER_OUT at resolved pin anchor %#v", labels, want)
+	}
+}
+
 func TestBuilderResolverLibraryMaterializesUsedSiblingSymbols(t *testing.T) {
 	index := libraryresolver.LibraryIndex{Symbols: map[string]libraryresolver.SymbolRecord{
 		"Connector_Generic:Conn_01x04": {
@@ -1565,6 +1598,13 @@ func TestBuilderSuppressesUSBCPreFuseBendLabels(t *testing.T) {
 	design := builder.Design()
 	if len(design.Schematic.Junctions) == 0 {
 		t.Fatalf("junctions = 0, want bend junction for pre-fuse VBUS")
+	}
+	usbAnchor, err := builder.pinAnchor(Endpoint{Reference: "J1", Pin: "A9"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !hasSchematicJunction(design.Schematic.Junctions, usbAnchor) {
+		t.Fatalf("missing junction at stacked USB VBUS pin anchor %v: %#v", usbAnchor, design.Schematic.Junctions)
 	}
 	for _, label := range design.Schematic.Labels {
 		if label.Text == "usb_power_vbus_connector" {

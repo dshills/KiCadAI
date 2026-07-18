@@ -150,8 +150,9 @@ func TestEmbeddedSymbolPinOffsets(t *testing.T) {
 	}
 	usbPins, ok := EmbeddedSymbolPinOffsets("kicadai:USB_C_Receptacle_PowerOnly_6P")
 	usbA5Pin, usbA5OK := findTemplatePin(usbPins, "A5")
+	usbB9Pin, usbB9OK := findTemplatePin(usbPins, "B9")
 	usbSHPin, usbSHOK := findTemplatePin(usbPins, "SH")
-	if !ok || len(usbPins) != 7 || !usbA5OK || usbA5Pin.Offset.Y != kicadfiles.MM(-5.08) || !usbSHOK || usbSHPin.Offset.X != kicadfiles.MM(-7.62) {
+	if !ok || len(usbPins) != 7 || !usbA5OK || usbA5Pin.Offset.Y != kicadfiles.MM(-5.08) || !usbB9OK || !usbB9Pin.Hidden || !usbSHOK || usbSHPin.Offset.X != kicadfiles.MM(-7.62) {
 		t.Fatalf("unexpected USB-C power-only offsets: %#v ok=%v", usbPins, ok)
 	}
 	fullUSBPins, ok := EmbeddedSymbolPinOffsets("kicadai:usb_c_receptacle_poweronly_full")

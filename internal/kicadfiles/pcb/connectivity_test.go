@@ -79,7 +79,7 @@ func TestValidateGeneratedConnectivityAcceptsRotatedPadAnchor(t *testing.T) {
 	board.Tracks = []Track{{
 		UUID:    kicadfiles.UUID("dddddddd-dddd-4ddd-8ddd-dddddddddddd"),
 		Start:   point(10, 10),
-		End:     point(10, 12),
+		End:     point(10, 8),
 		Width:   kicadfiles.MM(0.25),
 		Layer:   kicadfiles.LayerFCu,
 		NetCode: 1,

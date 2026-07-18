@@ -192,6 +192,47 @@ func TestConcreteI2CSensorSelectionReachesWrittenSchematic(t *testing.T) {
 	}
 }
 
+func TestClassABOutputStageSelectsComplementaryPairAsOneEnvelope(t *testing.T) {
+	registry := blocks.NewBuiltinRegistry()
+	request := Request{
+		Version: RequestVersion,
+		Name:    "catalog_class_ab",
+		Board:   BoardSpec{WidthMM: 45, HeightMM: 30, Layers: 2},
+		Blocks: []BlockInstanceSpec{{
+			ID:      "output",
+			BlockID: "class_ab_output_stage",
+			Params: map[string]any{
+				"application":    "headphone",
+				"supply_voltage": "9V",
+				"load_impedance": "32Ω",
+			},
+		}},
+		Validation: ValidationSpec{Acceptance: AcceptanceConnectivity},
+	}
+	plan := PlanBlocks(context.Background(), registry, request)
+	if reports.HasBlockingIssue(plan.Stage.Issues) {
+		t.Fatalf("plan issues = %#v", plan.Stage.Issues)
+	}
+	selectionResult := SelectWorkflowComponents(context.Background(), registry, plan, ComponentSelectionOptions{})
+	if reports.HasBlockingIssue(selectionResult.Stage.Issues) {
+		t.Fatalf("selection issues = %#v", selectionResult.Stage.Issues)
+	}
+	selected := map[string]ComponentSelectionEntry{}
+	for _, selection := range selectionResult.Selections {
+		if selection.InstanceID == "output" {
+			selected[selection.Role] = selection
+		}
+	}
+	if selected["upper_output"].ComponentID != "bjt.onsemi.mmbt3904.sot23" || selected["lower_output"].ComponentID != "bjt.onsemi.mmbt3906.sot23" {
+		t.Fatalf("selected pair = %#v", selected)
+	}
+	upperGroup := selected["upper_output"].AmplifierOutput.ComplementaryGroup
+	lowerGroup := selected["lower_output"].AmplifierOutput.ComplementaryGroup
+	if upperGroup == "" || upperGroup != lowerGroup {
+		t.Fatalf("complementary groups = %q / %q", upperGroup, lowerGroup)
+	}
+}
+
 func componentSelectionResolverIndex(t *testing.T, operations []transactions.Operation) libraryresolver.LibraryIndex {
 	t.Helper()
 	// This minimal passive geometry exists only to prove that workflow identity

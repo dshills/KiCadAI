@@ -29,9 +29,9 @@ func TestPlacedPadEndpointResolverRotatesPadOffsets(t *testing.T) {
 		wantX    float64
 		wantY    float64
 	}{
-		{name: "ninety", rotation: 90, wantX: 10, wantY: 22},
+		{name: "ninety", rotation: 90, wantX: 10, wantY: 18},
 		{name: "one eighty", rotation: 180, wantX: 8, wantY: 20},
-		{name: "arbitrary", rotation: 45, wantX: 10 + math.Sqrt2, wantY: 20 + math.Sqrt2},
+		{name: "arbitrary", rotation: 45, wantX: 10 + math.Sqrt2, wantY: 20 - math.Sqrt2},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

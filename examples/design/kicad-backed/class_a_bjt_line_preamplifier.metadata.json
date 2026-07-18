@@ -1,0 +1,18 @@
+{
+  "id": "class_a_bjt_line_preamplifier",
+  "request": "class_a_bjt_line_preamplifier.json",
+  "tier": "block-composition",
+  "readiness": "pass",
+  "acceptance": "erc-drc",
+  "require_erc": true,
+  "require_drc": true,
+  "allowlists": [],
+  "expected_artifacts": [".kicadai/design-promotion.json"],
+  "expected_stages": [
+    "block_planning", "component_selection", "schematic", "schematic_electrical",
+    "pcb_realization", "placement", "routing", "project_write", "writer_correctness",
+    "validation", "kicad_checks"
+  ],
+  "known_gaps": [],
+  "notes": "Low-power BJT Class A line-preamplifier promotion fixture requiring complete generated routing, writer correctness, clean KiCad ERC/strict DRC, and zero-diff round-trip evidence."
+}

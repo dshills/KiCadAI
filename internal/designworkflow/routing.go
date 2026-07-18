@@ -171,7 +171,13 @@ func RoutePlacement(ctx context.Context, request Request, fragments PCBFragmentR
 		routingRequest.Nets = excludeNetsWithRouteOperations(routingRequest.Nets, localOperations, interBlockCandidates)
 	}
 	if localRouteConnectivity.IssueCount == 0 {
-		if normalized.Constraints.TreatLocalPowerRoutesAsObstacles {
+		if fragmentsRequireStrictDRC(fragments) {
+			// DRC-required fragments commit all block-local copper before global
+			// routing. Every inter-block branch must therefore avoid foreign-net
+			// via-free signal corridors as well as power traces and vias; same-net
+			// merges remain legal because obstacles retain their net identity.
+			routingRequest.Existing = append(routingRequest.Existing, existingCopperFromAllRouteOperations(localOperations, routeBranchDefaultLayer(routingRequest.Board), routingRequest.Rules)...)
+		} else if normalized.Constraints.TreatLocalPowerRoutesAsObstacles {
 			routingRequest.Existing = append(routingRequest.Existing, existingCopperFromRouteOperations(localOperations, routeBranchDefaultLayer(routingRequest.Board), routingRequest.Rules)...)
 		} else {
 			routingRequest.Existing = append(routingRequest.Existing, existingUSBConfigurationCopperFromRouteOperations(localOperations, routeBranchDefaultLayer(routingRequest.Board), routingRequest.Rules)...)
@@ -256,6 +262,15 @@ func RoutePlacement(ctx context.Context, request Request, fragments PCBFragmentR
 		stage.Summary["route_reports"] = len(result.Quality.NetReports)
 	}
 	return RoutingStageResult{Request: routingRequest, Result: result, Operations: operations, Stage: stage}
+}
+
+func fragmentsRequireStrictDRC(fragments PCBFragmentResult) bool {
+	for _, fragment := range fragments.Fragments {
+		if fragment.Realization.Validation.RequiresDRC {
+			return true
+		}
+	}
+	return false
 }
 
 func addMultiEndpointGroundRouteObstacleNets(nets map[string]struct{}, candidates []InterBlockRouteCandidate) {
@@ -1325,6 +1340,9 @@ func translatedUnitLocalRoutePoints(context translatedUnitRouteContext, route bl
 	}
 	fromRef := strings.ToUpper(strings.TrimSpace(from.Ref))
 	toRef := strings.ToUpper(strings.TrimSpace(to.Ref))
+	if points, ok := translatedLocalRoutePointsForCommonPlacementDelta(context, route, from, to, fromRef, toRef); ok {
+		return points, true
+	}
 	for _, members := range context.groups {
 		if _, ok := members[fromRef]; !ok {
 			continue
@@ -1352,6 +1370,35 @@ func translatedUnitLocalRoutePoints(context translatedUnitRouteContext, route bl
 		return compactRoutePoints(points), true
 	}
 	return nil, false
+}
+
+func translatedLocalRoutePointsForCommonPlacementDelta(context translatedUnitRouteContext, route blocks.RealizedPCBLocalRoute, from PlacedPadEndpoint, to PlacedPadEndpoint, fromRef string, toRef string) ([]transactions.Point, bool) {
+	fromDelta, fromOK := translatedLocalRouteEndpointDelta(context, fromRef, from, route.Points[0])
+	toDelta, toOK := translatedLocalRouteEndpointDelta(context, toRef, to, route.Points[len(route.Points)-1])
+	if !fromOK || !toOK {
+		return nil, false
+	}
+	const toleranceMM = 0.001
+	if math.Hypot(fromDelta.XMM-toDelta.XMM, fromDelta.YMM-toDelta.YMM) > toleranceMM {
+		return nil, false
+	}
+	points := make([]transactions.Point, 0, len(route.Points))
+	points = append(points, from.Point)
+	for _, point := range route.Points[1 : len(route.Points)-1] {
+		points = append(points, transactions.Point{XMM: point.XMM + fromDelta.XMM, YMM: point.YMM + fromDelta.YMM})
+	}
+	points = append(points, to.Point)
+	return compactRoutePoints(points), true
+}
+
+func translatedLocalRouteEndpointDelta(context translatedUnitRouteContext, ref string, endpoint PlacedPadEndpoint, authoredEndpoint transactions.Point) (transactions.Point, bool) {
+	if authored, ok := context.authored[ref]; ok {
+		return transactions.Point{XMM: endpoint.ComponentAt.XMM - authored.XMM, YMM: endpoint.ComponentAt.YMM - authored.YMM}, true
+	}
+	if localRouteEndpointIsEntryAnchor(endpoint) {
+		return transactions.Point{XMM: endpoint.Point.XMM - authoredEndpoint.XMM, YMM: endpoint.Point.YMM - authoredEndpoint.YMM}, true
+	}
+	return transactions.Point{}, false
 }
 
 func placedLocalRoutePoints(points []transactions.Point, from transactions.Point, to transactions.Point) ([]transactions.Point, bool) {

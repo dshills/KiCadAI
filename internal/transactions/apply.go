@@ -312,7 +312,15 @@ func applyImported(tx Transaction, opts ApplyOptions, result ApplyResult) ApplyR
 				result.Issues = append(result.Issues, applyIssue(i, err))
 				return result
 			}
-			label := schematic.NewLabel(generator.New("imported.schematic.label", payload.Text, fmt.Sprintf("%d", i)), payload.Text, labelKind(payload.Kind), point(payload.At.XMM, payload.At.YMM))
+			position := point(payload.At.XMM, payload.At.YMM)
+			if payload.Anchor != nil {
+				position, err = symbolPinAnchor(design.Schematic, payload.Anchor.Ref, payload.Anchor.Pin)
+				if err != nil {
+					result.Issues = append(result.Issues, applyIssue(i, err))
+					return result
+				}
+			}
+			label := schematic.NewLabel(generator.New("imported.schematic.label", payload.Text, fmt.Sprintf("%d", i)), payload.Text, labelKind(payload.Kind), position)
 			design.Schematic.Labels = append(design.Schematic.Labels, label)
 			schematicDirty = true
 			lastDirtyIndex = i
@@ -644,10 +652,14 @@ func applyOperation(builder *designapi.Builder, op Operation, opts ApplyOptions)
 		if err := decodeRaw(op, &payload); err != nil {
 			return nil, err
 		}
-		return nil, builder.AddLabelWithOptions(payload.Text, point(payload.At.XMM, payload.At.YMM), labelKind(payload.Kind), designapi.LabelOptions{
+		options := designapi.LabelOptions{
 			Rotation: kicadfiles.Angle(payload.RotationDeg),
 			Shape:    schematic.LabelShape(payload.Shape),
-		})
+		}
+		if payload.Anchor != nil {
+			return nil, builder.AddLabelAtEndpointWithOptions(payload.Text, endpoint(*payload.Anchor), labelKind(payload.Kind), options)
+		}
+		return nil, builder.AddLabelWithOptions(payload.Text, point(payload.At.XMM, payload.At.YMM), labelKind(payload.Kind), options)
 	case OpAddBus:
 		var payload AddBusOperation
 		if err := decodeRaw(op, &payload); err != nil {

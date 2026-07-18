@@ -11,6 +11,7 @@
     {"id": "led", "name": "LED", "description": "Indicator light-emitting diodes."},
     {"id": "level_translator", "name": "Logic Level Translator", "description": "Multi-domain digital level translators and bidirectional bus translators."},
     {"id": "mcu", "name": "Microcontroller", "description": "Microcontrollers and minimal support-system selections."},
+    {"id": "mosfet", "name": "Power MOSFET", "description": "Small-signal and power MOSFET devices with explicit linear-mode and SOA evidence."},
     {"id": "opamp", "name": "Operational Amplifier", "description": "Op-amp devices for analog gain and buffering."},
     {"id": "protection", "name": "Protection Device", "description": "ESD, TVS, reverse-polarity, and other protection components."},
     {"id": "regulator", "name": "Voltage Regulator", "description": "Linear and switching voltage regulator devices."},

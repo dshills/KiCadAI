@@ -10,6 +10,7 @@ import (
 	"strings"
 	"testing"
 
+	"kicadai/internal/kicadfiles/schematic"
 	"kicadai/internal/reports"
 	"kicadai/internal/transactions"
 )
@@ -459,6 +460,36 @@ func TestUSBCPowerProjectTransactionApplies(t *testing.T) {
 		if _, err := os.Stat(filepath.Join(outputDir, name)); err != nil {
 			t.Fatalf("expected %s: %v", name, err)
 		}
+	}
+	file, err := schematic.ReadFile(filepath.Join(outputDir, "usb_power.kicad_sch"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var fusePin1Found bool
+	for _, symbol := range file.Symbols {
+		if !strings.HasPrefix(symbol.Reference, "F") {
+			continue
+		}
+		pinIndex := -1
+		for index, pin := range symbol.Pins {
+			if pin.Number == "1" {
+				pinIndex = index
+				break
+			}
+		}
+		if pinIndex < 0 || pinIndex >= len(symbol.PinAnchors) {
+			continue
+		}
+		fusePin1Found = true
+	}
+	vbusLabels := 0
+	for _, label := range file.Labels {
+		if label.Text == "usb_vbus_connector" {
+			vbusLabels++
+		}
+	}
+	if !fusePin1Found || vbusLabels < 2 {
+		t.Fatalf("stacked VBUS materialization must label both sides of the connection: found=%t labels=%#v", fusePin1Found, file.Labels)
 	}
 }
 

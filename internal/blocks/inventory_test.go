@@ -21,7 +21,7 @@ func TestBuiltinInventoryIncludesRoadmapFamilies(t *testing.T) {
 		"amplifier_stability_network",
 		"amplifier_supply_decoupling",
 		"canned_oscillator",
-		"class_a_output_stage",
+		"class_a_voltage_stage",
 		"class_ab_output_pair",
 		"class_ab_output_stage",
 		"connector_breakout",

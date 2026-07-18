@@ -6,6 +6,7 @@ import (
 	"slices"
 	"strings"
 
+	"kicadai/internal/kicadfiles"
 	"kicadai/internal/reports"
 )
 
@@ -228,27 +229,8 @@ func rotatedBounds(bounds Bounds, placement Placement, spacing float64) Rect {
 }
 
 func rotatePoint(point Point, degrees float64) Point {
-	normalized := math.Mod(degrees, 360)
-	if normalized < 0 {
-		normalized += 360
-	}
-	switch {
-	case nearlyEqual(normalized, 0) || nearlyEqual(normalized, 360):
-		return point
-	case nearlyEqual(normalized, 90):
-		return Point{XMM: -point.YMM, YMM: point.XMM}
-	case nearlyEqual(normalized, 180):
-		return Point{XMM: -point.XMM, YMM: -point.YMM}
-	case nearlyEqual(normalized, 270):
-		return Point{XMM: point.YMM, YMM: -point.XMM}
-	default:
-		radians := normalized * math.Pi / 180
-		sin, cos := math.Sin(radians), math.Cos(radians)
-		return Point{
-			XMM: point.XMM*cos - point.YMM*sin,
-			YMM: point.XMM*sin + point.YMM*cos,
-		}
-	}
+	x, y := kicadfiles.RotateBoardLocalXY(point.XMM, point.YMM, degrees)
+	return Point{XMM: x, YMM: y}
 }
 
 func (r Rect) WidthMM() float64 {

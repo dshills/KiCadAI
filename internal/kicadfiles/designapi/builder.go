@@ -1022,6 +1022,20 @@ func (builder *Builder) AddLabel(text string, position kicadfiles.Point, kind sc
 	return builder.AddLabelWithOptions(text, position, kind, LabelOptions{})
 }
 
+// AddLabelAtEndpointWithOptions places a label at the resolved physical
+// connection anchor of a symbol pin. This keeps endpoint-owned labels aligned
+// when exact resolver symbol geometry supersedes authored fallback pin offsets.
+func (builder *Builder) AddLabelAtEndpointWithOptions(text string, endpoint Endpoint, kind schematic.LabelKind, options LabelOptions) error {
+	if builder == nil {
+		return fmt.Errorf("builder required")
+	}
+	anchor, err := builder.pinAnchor(endpoint)
+	if err != nil {
+		return err
+	}
+	return builder.AddLabelWithOptions(text, anchor, kind, options)
+}
+
 func (builder *Builder) AddLabelWithOptions(text string, position kicadfiles.Point, kind schematic.LabelKind, options LabelOptions) error {
 	if builder == nil {
 		return fmt.Errorf("builder required")
@@ -1438,13 +1452,26 @@ func (builder *Builder) addSchematicEndpointJunction(netName string, position ki
 	if builder == nil || hasSchematicJunction(builder.design.Schematic.Junctions, position) {
 		return
 	}
-	if !builder.schematicWireEndpointExists(position) {
+	if !builder.schematicWireEndpointExists(position) && builder.schematicPinAnchorCount(position) < 2 {
 		return
 	}
 	builder.design.Schematic.Junctions = append(builder.design.Schematic.Junctions, schematic.Junction{
 		UUID:     builder.generator.New("root.schematic.endpoint_junction", netName, formatPoint(position)),
 		Position: position,
 	})
+}
+
+func (builder *Builder) schematicPinAnchorCount(position kicadfiles.Point) int {
+	if builder == nil {
+		return 0
+	}
+	count := 0
+	for _, candidate := range builder.schematicPinBuckets[schematicPointBucket(position)] {
+		if samePoint(candidate.position, position) {
+			count++
+		}
+	}
+	return count
 }
 
 func (builder *Builder) schematicWireEndpointExists(position kicadfiles.Point) bool {
