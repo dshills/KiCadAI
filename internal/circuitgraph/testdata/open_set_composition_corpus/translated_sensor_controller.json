@@ -1,0 +1,67 @@
+{
+  "schema": "kicadai.open-set-requirement.v1",
+  "version": 1,
+  "project": {
+    "name": "translated_sensor_controller",
+    "title": "Translated sensor controller interface",
+    "description": "Connect a controller and environmental sensor over an open-drain bus when their validated logic domains differ."
+  },
+  "requirements": {
+    "domains": [
+      {"id": "ground", "kind": "reference", "nominal_voltage_v": 0, "source": "external"},
+      {"id": "logic_1v8", "kind": "supply", "min_voltage_v": 1.71, "nominal_voltage_v": 1.8, "max_voltage_v": 1.89, "max_current_a": 0.05, "source": "external"},
+      {"id": "logic_3v3", "kind": "supply", "min_voltage_v": 3, "nominal_voltage_v": 3.3, "max_voltage_v": 3.6, "max_current_a": 0.2, "source": "external"}
+    ],
+    "ports": [
+      {"id": "power_1v8", "kind": "power", "direction": "sink", "domain": "logic_1v8", "electrical": {"max_current_a": 0.05}},
+      {"id": "power_3v3", "kind": "power", "direction": "sink", "domain": "logic_3v3", "electrical": {"max_current_a": 0.2}},
+      {"id": "ground", "kind": "reference", "direction": "bidirectional", "domain": "ground"}
+    ],
+    "participants": [
+      {
+        "id": "controller",
+        "capability": "programmable_controller",
+        "domain": "logic_3v3",
+        "required_ports": [
+          {"id": "sensor_bus", "kind": "digital_bus", "direction": "bidirectional", "protocol": {"name": "i2c", "mode": "open_drain", "max_frequency_hz": 400000}}
+        ],
+        "constraints": [
+          {"name": "programmable_interface", "relation": "required", "value": true}
+        ]
+      },
+      {
+        "id": "sensor",
+        "capability": "environment_sensor",
+        "domain": "logic_1v8",
+        "required_ports": [
+          {"id": "controller_bus", "kind": "digital_bus", "direction": "bidirectional", "protocol": {"name": "i2c", "mode": "open_drain", "max_frequency_hz": 400000}}
+        ],
+        "constraints": [
+          {"name": "measurement", "relation": "one_of", "value": ["temperature", "humidity", "pressure"]}
+        ]
+      }
+    ],
+    "objectives": [
+      {
+        "id": "connect_bus_domains",
+        "capability": "logic_level_translation",
+        "bindings": [
+          {"role": "side_a", "participant": "controller", "participant_port": "sensor_bus"},
+          {"role": "side_b", "participant": "sensor", "participant_port": "controller_bus"},
+          {"role": "power_a", "port": "power_3v3"},
+          {"role": "power_b", "port": "power_1v8"},
+          {"role": "reference", "port": "ground"}
+        ],
+        "constraints": [
+          {"name": "protocol", "relation": "equal", "value": "i2c"},
+          {"name": "signaling_mode", "relation": "equal", "value": "open_drain"},
+          {"name": "direction", "relation": "equal", "value": "bidirectional"},
+          {"name": "bus_frequency", "relation": "minimum", "value": 400000, "unit": "Hz"},
+          {"name": "unpowered_backfeed_prevention", "relation": "required", "value": true}
+        ]
+      }
+    ],
+    "constraints": {"max_components": 24, "max_width_mm": 55, "max_height_mm": 40}
+  },
+  "acceptance": {"require_erc": true, "require_strict_drc": true, "require_complete_routing": true, "require_connectivity": true, "require_writer_correctness": true, "require_round_trip_zero_diff": true, "require_deterministic_replay": true}
+}

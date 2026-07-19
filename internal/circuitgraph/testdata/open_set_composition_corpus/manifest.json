@@ -1,0 +1,13 @@
+{
+  "schema": "kicadai.open-set-composition-corpus.v1",
+  "version": 1,
+  "frozen_at": "2026-07-19",
+  "policy_version": "architecture-search-policy-v1",
+  "fixtures": [
+    {"id": "adjustable_regulated_supply", "file": "adjustable_regulated_supply.json", "capabilities": ["voltage_regulation"], "domains": ["power"], "sha256": "ee95dbe4ace6feecbcc070066b90bd3e8490abdcee31f2b3da40932f407161c7"},
+    {"id": "fourth_order_active_lowpass", "file": "fourth_order_active_lowpass.json", "capabilities": ["frequency_filter"], "domains": ["analog"], "sha256": "2553d74c4c745d668a9c71d8f208efd34ed08dd052df03e68a7a27df7119f685"},
+    {"id": "hysteretic_threshold_detector", "file": "hysteretic_threshold_detector.json", "capabilities": ["threshold_detection"], "domains": ["analog", "logic"], "sha256": "e77ce699b8d3a243edcf83e3b385950cb87d092c17c267ce7b71a5f93a10fedf"},
+    {"id": "protected_inductive_load_switch", "file": "protected_inductive_load_switch.json", "capabilities": ["load_switch"], "domains": ["power", "protection", "transistor"], "sha256": "2662fe9ae09790b663c41b00b2b5070285b22bfadc990703fb17c94f66ad6a4f"},
+    {"id": "translated_sensor_controller", "file": "translated_sensor_controller.json", "capabilities": ["logic_level_translation"], "domains": ["interface", "mcu", "sensor"], "sha256": "0c972b012624bbb7021666fcb5291bb72f61ecb002585b7ac7cb5c49b3ced448"}
+  ]
+}

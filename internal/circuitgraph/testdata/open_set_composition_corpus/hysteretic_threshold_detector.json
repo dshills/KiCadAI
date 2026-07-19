@@ -1,0 +1,42 @@
+{
+  "schema": "kicadai.open-set-requirement.v1",
+  "version": 1,
+  "project": {
+    "name": "hysteretic_threshold_detector",
+    "title": "Hysteretic threshold detector",
+    "description": "Detect an analog threshold with controlled hysteresis and a deterministic inactive output state."
+  },
+  "requirements": {
+    "domains": [
+      {"id": "ground", "kind": "reference", "nominal_voltage_v": 0, "source": "external"},
+      {"id": "logic_5v", "kind": "supply", "min_voltage_v": 4.75, "nominal_voltage_v": 5, "max_voltage_v": 5.25, "max_current_a": 0.03, "source": "external"}
+    ],
+    "ports": [
+      {"id": "power", "kind": "power", "direction": "sink", "domain": "logic_5v", "electrical": {"max_current_a": 0.03}},
+      {"id": "ground", "kind": "reference", "direction": "bidirectional", "domain": "ground"},
+      {"id": "sense", "kind": "analog_voltage", "direction": "sink", "domain": "logic_5v", "electrical": {"min_voltage_v": 0, "max_voltage_v": 3.3, "input_impedance_min_ohm": 100000}},
+      {"id": "alert", "kind": "digital_logic", "direction": "source", "domain": "logic_5v", "electrical": {"min_voltage_v": 0, "max_voltage_v": 5, "max_source_current_ma": 2, "default_state": "inactive"}}
+    ],
+    "objectives": [
+      {
+        "id": "detect_threshold",
+        "capability": "threshold_detection",
+        "bindings": [
+          {"role": "sense", "port": "sense"},
+          {"role": "output", "port": "alert"},
+          {"role": "power", "port": "power"},
+          {"role": "reference", "port": "ground"}
+        ],
+        "constraints": [
+          {"name": "threshold_voltage", "relation": "target", "value": 1.65, "unit": "V", "tolerance_percent": 2},
+          {"name": "hysteresis_width", "relation": "target", "value": 0.2, "unit": "V", "tolerance_percent": 10},
+          {"name": "output_polarity", "relation": "equal", "value": "active_low"},
+          {"name": "inactive_at_power_up", "relation": "required", "value": true},
+          {"name": "propagation_delay", "relation": "maximum", "value": 10, "unit": "us"}
+        ]
+      }
+    ],
+    "constraints": {"max_components": 12, "max_width_mm": 35, "max_height_mm": 25}
+  },
+  "acceptance": {"require_erc": true, "require_strict_drc": true, "require_complete_routing": true, "require_connectivity": true, "require_writer_correctness": true, "require_round_trip_zero_diff": true, "require_deterministic_replay": true}
+}
