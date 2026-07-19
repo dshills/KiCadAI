@@ -6,10 +6,11 @@
       "category": "component",
       "domain": "amplifier",
       "title": "Verified op-amp drive and stability choices",
-      "readiness": "draft",
-      "blocker": "Existing op-amp record is placeholder-level and lacks output-drive, load, bandwidth, and stability evidence for headphone or power-amplifier front ends.",
-      "evidence_needed": ["datasheet-backed output current and load limits", "verified symbol-footprint pinmap", "stability and bandwidth constraints", "KiCad-resolvable symbol and footprint"],
+      "readiness": "verified",
       "next_task": "add_component",
+      "evidence": [
+        {"kind": "catalog", "path": "data/components/audio_power.json", "git_object_id": "877f6a9548906843d911043d9b306fea84c2c913", "description": "Reviewed OPA134 drive, bandwidth, slew-rate, noise, distortion, pin-map, and package evidence for the bounded 10 W speaker-amplifier envelope."}
+      ],
       "parallel_group": "catalog_block_expansion"
     },
     {
@@ -17,21 +18,23 @@
       "category": "component",
       "domain": "amplifier",
       "title": "Class A/Class AB output devices",
-      "readiness": "connectivity",
-      "blocker": "Headphone-class MMBT3904/MMBT3906 output-device seeds and selector checks exist, but SOA, dissipation, thermal coupling, and power-device evidence are not verified.",
-      "evidence_needed": ["datasheet-backed current and power ratings beyond the headphone seed", "package thermal evidence", "symbol-footprint pinmap beyond seeded SOT-23 records", "safe operating area review"],
+      "readiness": "verified",
       "next_task": "add_component",
+      "evidence": [
+        {"kind": "catalog", "path": "data/components/audio_power.json", "git_object_id": "877f6a9548906843d911043d9b306fea84c2c913", "description": "Concrete complementary MJE243G/MJE253G drivers and NJW0281G/NJW0302G power BJTs with pin-map, thermal, pairing, and bounded SOA evidence."}
+      ],
       "parallel_group": "catalog_block_expansion"
     },
     {
       "id": "amplifier.block.bias_network",
       "category": "block",
       "domain": "amplifier",
-      "title": "Class AB bias network",
-      "readiness": "connectivity",
-      "blocker": "A diode-string Class AB headphone output-stage block can be realized, but quiescent-current calculation, temperature compensation, Vbe multiplier support, and layout-coupled thermal evidence are not verified.",
-      "evidence_needed": ["quiescent-current calculation", "temperature compensation evidence", "Vbe multiplier topology generator", "thermal coupling/layout constraints"],
-      "next_task": "capture_kicad_evidence",
+      "title": "Thermally tracked Class AB bias and power stage",
+      "readiness": "verified",
+      "next_task": "add_block",
+      "evidence": [
+        {"kind": "implementation", "path": "internal/blocks/class_ab_speaker_power_stage.go", "git_object_id": "2a9b850ff4df63c6577338ec03e603e3edf8b060", "description": "Reusable complementary driver/output stage with bounded bias, emitter sensing, current limiting, Zobel damping, and thermal-coupling constraints."}
+      ],
       "parallel_group": "catalog_block_expansion",
       "depends_on": ["amplifier.component.output_transistor"]
     },
@@ -39,11 +42,12 @@
       "id": "amplifier.block.output_protection",
       "category": "block",
       "domain": "amplifier",
-      "title": "headphone_output_protection block",
-      "readiness": "connectivity",
-      "blocker": "Protected Class AB headphone fixture reaches schematic electrical validation, but label-alias conflicts stop PCB realization before real KiCad ERC/DRC evidence can be captured.",
-      "evidence_needed": ["schematic label-alias conflict resolution: headphones_SIG vs output_amp_out", "schematic label-alias conflict resolution: output_lower_emitter vs output_upper_emitter", "fault/protection component evidence", "KiCad-backed ERC/DRC validation of protected Class AB headphone examples", "SOA and thermal proof for selected output devices", "speaker, bridge, and power-amplifier load-safety constraints"],
-      "next_task": "capture_kicad_evidence",
+      "title": "Active speaker-output protection",
+      "readiness": "verified",
+      "next_task": "add_block",
+      "evidence": [
+        {"kind": "implementation", "path": "internal/blocks/speaker_output_protection.go", "git_object_id": "4ca24f3c930aa2e37884c92baf639e82716cf4c6", "description": "Normally-open relay isolation with bipolar DC detection, tolerance-bounded delay/release, supply-fault muting, rated driver, and coil clamp."}
+      ],
       "parallel_group": "catalog_block_expansion",
       "depends_on": ["amplifier.block.bias_network", "amplifier.component.output_transistor"]
     },
@@ -52,10 +56,12 @@
       "category": "layout",
       "domain": "amplifier",
       "title": "Thermal and high-current layout constraints",
-      "readiness": "draft",
-      "blocker": "Layout rules exist as evidence hooks but are not proven on amplifier output stages with real KiCad DRC-clean boards.",
-      "evidence_needed": ["net-class width checks", "current-role routing rules", "thermal placement metadata", "KiCad DRC artifact with semantic hash or git object ID"],
+      "readiness": "verified",
       "next_task": "verify_layout",
+      "evidence": [
+        {"kind": "fixture", "path": "examples/design/kicad-backed/class_ab_speaker_10w_protected.metadata.json", "git_object_id": "b657428cdeb01ea330cff5835b723b356f82458f", "description": "Fabrication-candidate pass fixture requires complete high-current/Kelvin routing, physical-rule evidence, and strict KiCad DRC."},
+        {"kind": "contract", "path": "specs/verified-low-power-speaker-amplifier/SPEC.md", "git_object_id": "27c24890f23fdcf24c1240f056cacf646bd7c721", "description": "Quantified star-return, copper width, Kelvin sense, heatsink, symmetry, thermal-coupling, and mechanical acceptance contract."}
+      ],
       "parallel_group": "engine_hardening",
       "depends_on": ["amplifier.component.output_transistor"]
     },
@@ -64,10 +70,12 @@
       "category": "layout",
       "domain": "amplifier",
       "title": "Feedback, decoupling, and stability layout",
-      "readiness": "draft",
-      "blocker": "Op-amp feedback and decoupling evidence exists in tests, but broader analog stability placement and routing constraints are not promoted.",
-      "evidence_needed": ["feedback-loop proximity rules", "supply decoupling placement proof", "input/output separation evidence", "KiCad-backed layout fixture"],
+      "readiness": "verified",
       "next_task": "verify_layout",
+      "evidence": [
+        {"kind": "implementation", "path": "internal/blocks/speaker_opamp_driver.go", "git_object_id": "66d0c23d12cf2b5385cabc875d1afc0d65692623", "description": "Load-side Kelvin feedback, bounded gain network, local dual-rail decoupling, output isolation, and signal/power return separation."},
+        {"kind": "contract", "path": "specs/verified-low-power-speaker-amplifier/SPEC.md", "git_object_id": "27c24890f23fdcf24c1240f056cacf646bd7c721", "description": "Phase-margin, reactive-load, distortion, feedback, decoupling, and input/output separation gates for the bounded speaker-amplifier slice."}
+      ],
       "parallel_group": "engine_hardening",
       "depends_on": ["amplifier.component.opamp_drive"]
     },
@@ -76,10 +84,12 @@
       "category": "validation",
       "domain": "amplifier",
       "title": "KiCad-backed amplifier promotion",
-      "readiness": "missing",
-      "blocker": "Protected amplifier KiCad-backed fixture is expected_fail and blocks at schematic label-conflict validation before PCB, routing, writer-correctness, or KiCad-check stages.",
-      "evidence_needed": ["schematic label-alias conflict resolution", "real KiCad ERC report", "real KiCad DRC report", "promotion report candidate/pass status", "repair guidance for remaining blockers"],
+      "readiness": "verified",
       "next_task": "capture_kicad_evidence",
+      "evidence": [
+        {"kind": "fixture", "path": "examples/design/kicad-backed/class_ab_speaker_10w_protected.metadata.json", "git_object_id": "b657428cdeb01ea330cff5835b723b356f82458f", "description": "Checked-in 10 W fabrication-candidate pass metadata requires clean ERC, strict DRC, route completion, writer correctness, and zero-diff round trip with no allowlist or known gap."},
+        {"kind": "request", "path": "examples/design/kicad-backed/class_ab_speaker_10w_protected.json", "git_object_id": "0b0e37413f8908698f0c53a16503ce8739238b61", "description": "Parameter-driven dual-rail protected speaker-amplifier generation request."}
+      ],
       "parallel_group": "fixture_promotion",
       "depends_on": ["amplifier.block.bias_network", "amplifier.block.output_protection", "amplifier.layout.stability_feedback", "amplifier.layout.thermal_current"]
     },
@@ -88,10 +98,11 @@
       "category": "documentation",
       "domain": "amplifier",
       "title": "Amplifier design limits for AI generation",
-      "readiness": "connectivity",
-      "blocker": "AI-facing diagnostics now describe supported Class AB headphone output-stage assumptions, but power-amplifier limits and KiCad promotion requirements still need broader examples.",
-      "evidence_needed": ["unsupported load/power ranges", "required validation gates", "safe request examples for dual-rail and single-supply headphone outputs"],
+      "readiness": "verified",
       "next_task": "write_docs",
+      "evidence": [
+        {"kind": "contract", "path": "specs/verified-low-power-speaker-amplifier/SPEC.md", "git_object_id": "27c24890f23fdcf24c1240f056cacf646bd7c721", "description": "Documents the proven 10 W/8 ohm dual-rail envelope, required 4 ohm/reactive-load corners, safety gates, preservation requirements, and non-goals."}
+      ],
       "parallel_group": "documentation"
     }
   ]

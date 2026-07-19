@@ -108,34 +108,26 @@ The `amplifier` matrix covers:
 - KiCad-backed amplifier promotion evidence;
 - AI-facing amplifier design-limit documentation.
 
-Several amplifier records have now reached `connectivity` for the narrow
-low-voltage headphone slice: verified LMV321 op-amp selection for the gain
-stage, seeded MMBT3904/MMBT3906 output devices, diode-string Class AB
-output-stage realization, single-supply DC-blocking diagnostics, an explicit
-`headphone_output_protection` block, and AI-facing design-limit notes. The
-protection block covers AC output coupling through a DC-blocking capacitor,
-required bleed/reference policy, optional series output resistance, and
-connector return/reference diagnostics for headphone-only loads. The optional
-protected KiCad-backed fixture is still `expected_fail`: it passes schematic
-electrical validation, PCB realization, placement, endpoint binding, project
-write, and writer-correctness evidence. It currently stops on structural
-validation evidence for generated schematic label/connectivity issues and
-unrouted or partially routed PCB nets before real KiCad ERC/DRC checks.
-The new simulation evidence layer can emit a SPICE-like Class AB headphone
-artifact, normalize runner measurements, write `.kicadai/amplifier-simulation*`
-files, and feed a `simulation` promotion gate when configured. Missing
-simulator configuration remains a clean skip/not-supported result unless a
-fixture explicitly requires simulation evidence.
-These are not claims that amplifier generation is fabrication-ready. The
-remaining queue is validation/connectivity closeout for the protected amplifier
-fixture, routing policy promotion, SOA and thermal evidence, active output fault
-protection, speaker/bridge/power-amplifier load safety, analog stability/layout
-proof, and KiCad ERC/DRC promotion evidence.
+The bounded amplifier matrix is now `verified`. In addition to the headphone
+slice, the protected 10 W RMS/8 ohm speaker lane selects a reviewed OPA134,
+complementary driver and power BJT pairs, emitter/current-sense resistors,
+stability parts, comparator, relay driver, and normally-open speaker relay. Its
+reusable blocks provide load-side feedback, local current limiting, Zobel
+damping, bipolar DC-fault detection, tolerance-bounded mute timing, supply-loss
+release, relay clamping, star/Kelvin return intent, high-current net classes,
+thermal coupling, device symmetry, and heatsink/mechanical constraints.
 
-The circuit-block inventory now exposes the full verified-amplifier family as
-roadmap entries. Entries that do not have a safe implementation are marked
-unsupported with explicit gaps instead of being hidden; this lets AI agents
-explain why broad speaker or power-amplifier requests are blocked.
+`class_ab_speaker_10w_protected` is a checked-in fabrication-candidate `pass`
+fixture with no allowlist or known gap. Its declared lane requires clean real
+KiCad ERC and strict DRC, complete route/contact evidence, writer correctness,
+zero-difference round trip, and fabrication-package gates. The matrix evidence
+is pinned to Git blob IDs so documentation cannot silently outrun the reviewed
+implementation.
+
+This verification is deliberately bounded. Bridge-tied outputs, substantially
+higher power, mains-connected supplies, arbitrary output architectures,
+unreviewed substitutions, and heatsinks outside the modeled envelope remain
+unsupported and must fail closed.
 
 ## Validation
 

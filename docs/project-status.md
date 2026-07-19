@@ -180,15 +180,18 @@ SOA, or fabrication signoff.
 
 ## Amplifier Coverage
 
-Class A, Class AB, and op-amp headphone examples provide schematic readability,
-semantic, component, routing, and simulation evidence for narrow low-voltage
-headphone slices. This work is useful regression coverage, not proof of a
-general power-amplifier generator.
+Class A and protected Class AB headphone fixtures remain regression coverage.
+The bounded speaker-power lane now adds a protected dual-rail complementary-BJT
+amplifier delivering at least 10 W RMS into 8 ohms. It has reviewed driver and
+output-device evidence, resistive/reactive load cases, tolerance and distortion
+budgets, electrothermal/SOA/current-limit checks, DC speaker protection,
+stability networks, high-current/Kelvin/star-return layout constraints, and a
+KiCad-backed fabrication-candidate `pass` fixture.
 
-Power-amplifier generation still needs broader active-device models, SOA and
-thermal constraints, compensation/stability analysis, protection topologies,
-high-current layout rules, and simulation-backed promotion before it can be
-treated as autonomous or fabrication-ready.
+This is not a general power-amplifier generator. Bridge operation, materially
+higher output power, mains supplies, arbitrary output-device families,
+unreviewed heatsink mechanics, and designs outside the checked load/rail/fault
+envelope remain unsupported.
 
 ## Status Meanings
 

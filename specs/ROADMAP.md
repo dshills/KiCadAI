@@ -1,6 +1,6 @@
 # KiCadAI Roadmap
 
-Date: 2026-07-16
+Date: 2026-07-19
 
 This roadmap replaces the older roadmap and gap analysis now archived as
 `specs/OLD_ROADMAP.md` and `specs/OLD_ROADMAP_GAP.md`.
@@ -183,16 +183,16 @@ from validation feedback to safe automatic repair.
   and package manifests, and `design create` fabrication-candidate acceptance
   integration.
 - `design create` workflow for structured block-based design requests.
-- Amplifier example/test corpus foundation with checked-in Class AB, Class A,
-  and op-amp headphone-buffer schematic fixtures; amplifier semantic landmark
-  checks; structured intent and text fixtures; explicit block inventory gaps;
-  a draft generated op-amp headphone-buffer design request; op-amp PCB
-  constraint/routing evidence checks for feedback, decoupling, input/output
-  separation, high-current output width, and thermal review; and an optional
-  KiCad-backed `expected_fail` fabrication-candidate amplifier fixture.
-  Class AB headphone simulation now has a deterministic SPICE-like artifact,
-  optional runner/evaluator, normalized `.kicadai/amplifier-simulation*`
-  evidence, and a promotion-report `simulation` gate.
+- Verified bounded amplifier generation now spans Class A line-level and Class
+  AB headphone regressions plus a protected dual-rail 10 W RMS/8 ohm speaker
+  amplifier fabrication candidate. The speaker lane selects concrete OPA134,
+  complementary driver/power BJT, power-resistor, comparator, and relay
+  records; validates resistive/reactive loads, tolerance, distortion,
+  electrothermal, SOA, current-limit, DC-fault, and mute behavior; enforces
+  star/Kelvin/high-current/heatsink constraints; and reaches clean KiCad ERC,
+  strict DRC, complete connectivity/routing, writer correctness, zero-diff
+  round trip, and fabrication artifacts. This is a bounded low-power speaker
+  slice, not general high-power, bridge, mains, or arbitrary amplifier support.
 - Runnable `examples/design/*.json` requests are now covered by automated
   regression tests that strict-decode each request, run `design create`, verify
   generated project artifacts, read back generated schematic/PCB files, and
@@ -278,13 +278,13 @@ loop confidence:
   narrow, and broader topology synthesis is still intentionally limited.
   Deterministic rationale reports now explain supported planner decisions and
   blockers, but they do not replace broader synthesis.
-- the default design examples are intentionally small LED workflows. The simple
-  LED prompt is now a strict-promotion candidate without local KiCad and a
-  pass-capable KiCad-backed lane when `--require-erc --require-drc` evidence is
-  clean. The optional KiCad-backed LED and I2C sensor breakout scenarios are
-  candidate-level, while connector/LED and amplifier fabrication-candidate
-  scenarios remain `expected_fail` fixtures until their required KiCad ERC/DRC
-  evidence is clean. These paths now
+- the default design examples remain intentionally bounded. Promoted KiCad-
+  backed lanes now include protected USB-C LED, I2C sensor, ESP32-WROOM-32E,
+  Class A/AB audio regressions, and the protected 10 W speaker amplifier. The
+  speaker fixture declares fabrication-candidate `pass` with no allowlist or
+  known gap and requires real ERC, strict DRC, complete routing/connectivity,
+  writer correctness, and zero-diff round trip. Other unpromoted examples stay
+  fail-closed until their declared gates are clean. These paths now
   progress past the previous writer-correctness pad/copper net-code blocker,
   and the I2C fixture now progresses past stale routing-skip and local
   sensor_* net-alias blockers. LED and connector/LED fixtures also prove
@@ -313,21 +313,13 @@ loop confidence:
   writer-correctness, validation, or selected-attempt branch pathfinding
   blockers.
   Route-tree diagnostics now separate fixed-net skip notices and
-  missing-net-class warnings from repairable blockers. Amplifier route
-  diagnostics also expose the current protected fixture's missing VCC endpoint
-  (`output.3`), nearest same-net access, selected access attempts, and
-  repairable `graph_split` hint so AI workflows can distinguish a concrete
-  same-net contact repair from an opaque route failure. The remaining
-  layout-quality blockers are richer generated-board validation, generated
-  project artifact proof, and KiCad ERC/DRC-clean evidence.
-- amplifier generation is currently evidence-oriented rather than
-  fabrication-ready. The draft op-amp headphone-buffer request uses supported
-  blocks, but Class A/Class AB output stages, headphone DC-blocking/protection,
-  stability networks, verified output-device selection, and load-drive limits
-  remain limited to the narrow low-voltage headphone slice. A separate trusted
-  generic registry now covers ideal regulators, resistor dividers, and RC
-  filters, but not amplifier stability or drive proof. Thermal/current layout proof, active protection, speaker/power loads,
-  and optional KiCad ERC/DRC-clean promotion are still open blockers.
+  missing-net-class warnings from repairable blockers. Remaining layout work is
+  breadth: denser boards, more package/device variants, bridge operation, and
+  higher-power thermal/current envelopes remain unsupported.
+- amplifier generation is fabrication-oriented only inside the reviewed 10 W
+  complementary-BJT envelope. Alternate output architectures, bridge-tied
+  loads, substantially higher power, mains supplies, arbitrary heatsinks, and
+  unreviewed device substitutions remain explicit blockers.
 
 ## Roadmap Principles
 
@@ -529,9 +521,13 @@ Implemented foundation with a documented first AI-controlled generation lane.
   expected stages, expected artifacts, and required ERC/DRC policy. Current
   readiness:
   - `expected_fail`: `connector_led_kicad_smoke` and
-    `opamp_headphone_buffer_kicad_candidate`;
+    `opamp_headphone_buffer_kicad_candidate`, plus the unprotected
+    `class_ab_headphone_driver` skeleton;
   - `candidate`: `led_indicator_kicad_smoke`;
-  - `pass`: `i2c_sensor_breakout_candidate`;
+  - `pass`: the protected USB-C LED/I2C fixtures, BMP280/SHT31 sensor lanes,
+    `esp32_wroom_32e_minimal_pass`, `class_a_bjt_line_preamplifier`,
+    `class_ab_headphone_protected`, and
+    `class_ab_speaker_10w_protected`;
   - `blocked`: none yet.
 - `connector_led_kicad_smoke` now has routing-enabled regression coverage for
   promoted inter-block route candidates, endpoint-contact diagnostics, and
@@ -988,38 +984,22 @@ Public `examples/design/*.json` requests are now executable regression fixtures
 for `design create`. The default set exercises supported LED workflows and
 proves that checked-in examples remain aligned with the current request schema,
 block contracts, project writer, schematic/PCB readers, and component identity
-property propagation. Optional KiCad-backed design examples now live under
-`examples/design/kicad-backed/`; I2C is a checked-in pass fixture, and the
-simple LED smoke fixture is candidate-level. The protected USB-C LED variant
-has reproducible local KiCad-backed pass evidence when DRC is run outside the
-restricted sandbox.
-Connector/LED plus amplifier generated boards currently record `expected_fail`
-evidence while required KiCad ERC/DRC blockers remain open. I2C now reaches
-route-tree-managed inter-block routing with clean
-local-route alias/contact proof, route-tree endpoint access, contact graph
-completion evidence, route-tree repair hints, and selected retry evidence. It
-now emits all route-tree branches, records four graph-complete route-tree nets,
-and reaches project-write, writer-correctness, structural validation, and clean
-required KiCad ERC/DRC evidence in the optional KiCad-backed fixture lane.
-Generated label
-stubs are grid-safe, and a
-logic-only unit test covers the promotion decision path with mocked clean KiCad
-results. The
-protected Class AB headphone amplifier fixture now verifies the
-`headphone_output_protection` block summary and verified
-LMV321/MMBT3904/MMBT3906 selection path, passes schematic electrical
-validation after alias cleanup, and now reaches PCB realization, placement,
-endpoint binding, and routing enablement. The current expected_fail blocker is
-required-net route completion before project write: six inter-block nets are
-graph-complete, but the VCC route-tree/contact graph is partial with
-`output.3` unproven and a blocked same-net branch. Promotion now keeps
-`route_completion` as the first failed gate, skips downstream writer,
-validation, and KiCad evidence gates because routing did not complete, and
-surfaces a VCC-specific repair hint for the AI repair loop. The simulation foundation can now write and evaluate Class AB
-headphone SPICE-like artifacts and feed a `simulation` promotion gate when a
-runner is configured. The next amplifier promotion task is VCC route-tree
-completion so project write, writer correctness, structural validation, and real
-KiCad ERC/DRC evidence can run.
+property propagation. Optional KiCad-backed design examples live under
+`examples/design/kicad-backed/`. Protected USB-C LED/I2C, ESP32-WROOM-32E,
+Class A line-level, protected Class AB headphone, and protected 10 W Class AB
+speaker fixtures are checked-in `pass` lanes. They require their declared
+route/contact, writer, KiCad ERC/DRC, and round-trip evidence; the 10 W speaker
+lane additionally requires fabrication-candidate component, load, tolerance,
+electrothermal, SOA, protection, high-current/Kelvin layout, and package
+evidence. Connector/LED, the unprotected Class AB skeleton, and the older
+op-amp headphone-buffer candidate remain explicit `expected_fail` examples.
+The simple LED smoke fixture remains candidate-level.
+
+The next major generation milestone is open-set functional composition:
+bounded architecture search over typed, catalog-backed circuit fragments with
+deterministic compatibility, value synthesis, alternative scoring, tolerance
+evidence, and rationale. It must replace topology-specific intent mapping for a
+frozen unfamiliar held-out corpus without weakening any existing fixture.
 
 Structured semantic mapping is now implemented for target, bus, and supply
 intent:
