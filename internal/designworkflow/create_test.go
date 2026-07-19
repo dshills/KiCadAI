@@ -36,6 +36,20 @@ func TestPlacementOptionsForCreatePropagatesAuthoritativeLibraryIndex(t *testing
 	}
 }
 
+func TestCreateValidationOptionsRunsRequiredDRCOnlyInCanonicalKiCadStage(t *testing.T) {
+	request := Request{Validation: ValidationSpec{RequireDRC: true}}
+	validation, checks := createValidationOptions(request, CreateOptions{
+		Validation:  ValidationOptions{RequireDRC: true, KiCadCLI: "/test/kicad-cli"},
+		KiCadChecks: KiCadCheckOptions{EnforceRequirements: true},
+	})
+	if validation.RequireDRC || validation.KiCadCLI != "" {
+		t.Fatalf("structural validation retained duplicate DRC options: %#v", validation)
+	}
+	if !checks.RequireDRC || checks.KiCadCLI != "/test/kicad-cli" {
+		t.Fatalf("canonical KiCad options = %#v", checks)
+	}
+}
+
 func TestCreateWritesWorkflowResult(t *testing.T) {
 	request := Request{
 		Version:    RequestVersion,

@@ -114,6 +114,19 @@ func TestBuildViasFromPathKeepsFallbackDrillInsideDiameter(t *testing.T) {
 	}
 }
 
+func TestBuildViasFromPathKeepsTerminalTransitionAtSearchedGridPoint(t *testing.T) {
+	path := GridPath{
+		Net:         "SIG",
+		LayerNames:  map[int]string{0: "B.Cu", 1: "F.Cu"},
+		Coordinates: []GridCoord{{X: 10, Y: 20, Layer: 0}, {X: 10, Y: 20, Layer: 1}},
+		Points:      []Point{{XMM: 2.5, YMM: 5}, {XMM: 2.63, YMM: 5.17}},
+	}
+	vias := BuildViasFromPath(path, DefaultRules())
+	if len(vias) != 1 || vias[0].At != (Point{XMM: 2.5, YMM: 5}) {
+		t.Fatalf("vias = %#v, want terminal transition at searched grid point", vias)
+	}
+}
+
 func TestBuildViasFromPathSkipsUnresolvedLayerNames(t *testing.T) {
 	path := GridPath{
 		Net:        "SIG",

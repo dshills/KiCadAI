@@ -26,7 +26,7 @@ func BuildViasFromPath(path GridPath, rules Rules) []Via {
 		if previous.Layer == current.Layer {
 			continue
 		}
-		point := roundPoint(path.Points[index])
+		point := viaPointForTransition(path, index)
 		key := viaKey(point, previous.Layer, current.Layer)
 		if _, exists := seen[key]; exists {
 			continue
@@ -45,6 +45,17 @@ func BuildViasFromPath(path GridPath, rules Rules) []Via {
 		})
 	}
 	return vias
+}
+
+func viaPointForTransition(path GridPath, index int) Point {
+	// Endpoint alignment may move the terminal path point from the searched
+	// grid coordinate onto off-grid pad copper. Keep the physical via at the
+	// clearance-checked grid point; the segment builder emits a short connector
+	// on the terminal pad layer.
+	if index == len(path.Points)-1 && index > 0 {
+		return roundPoint(path.Points[index-1])
+	}
+	return roundPoint(path.Points[index])
 }
 
 func viaLayers(path GridPath, first int, second int) []string {

@@ -207,6 +207,10 @@ func (resolver *Resolver) Synthesize(ctx context.Context, document Document) (Do
 				continue
 			}
 			connectionFound = true
+			if connectionHasInternalPowerOutput(connection, selectedByIntent) {
+				physicalSourceFound = true
+				break
+			}
 			for _, endpoint := range connection.Endpoints {
 				if endpoint.Interface != "" {
 					physicalSourceFound = true
@@ -442,6 +446,13 @@ func (resolver *Resolver) expandCompanionRecipes(ctx context.Context, document *
 				continue
 			}
 			path := "synthesis.functions." + requirement.ID + ".companions." + companion.ID
+			if explicitCompanionFunctionExists(intent, requirement.ID, companion.Role, connected) {
+				report.DerivedConstraints = append(report.DerivedConstraints, SynthesisConstraintEvidence{
+					Kind: "explicit_companion", Subject: requirement.ID, Value: companion.Role,
+					Source: "typed provider realization contains a fully connected companion function",
+				})
+				continue
+			}
 			if len(companion.Recipes) == 0 && len(companion.Ties) == 0 && len(companion.NoConnects) == 0 {
 				issues = append(issues, synthesisIssue(CodeSynthesisSupportRecipeMissing, path, "required companion has no synthesizable component/network recipe", "add reviewed generic catalog companion recipe evidence"))
 				continue
@@ -514,6 +525,46 @@ func (resolver *Resolver) expandCompanionRecipes(ctx context.Context, document *
 		}
 	}
 	return issues
+}
+
+// connectionHasInternalPowerOutput prevents an external connector from adding
+// a redundant PWR_FLAG to a net that is already driven by a selected device.
+// This is especially important for converter return/output rails: KiCad models
+// both polarities as power outputs, even when one is also exposed externally.
+func connectionHasInternalPowerOutput(connection FunctionConnection, selected map[string]ResolvedComponent) bool {
+	for _, endpoint := range connection.Endpoints {
+		if endpoint.Function == "" {
+			continue
+		}
+		component, exists := selected[endpoint.Function]
+		if !exists {
+			continue
+		}
+		function, ok := uniqueResolvedFunction(component.Functions, endpoint.Port)
+		if ok && strings.EqualFold(strings.TrimSpace(function.Electrical), "power_out") {
+			return true
+		}
+	}
+	return false
+}
+
+func explicitCompanionFunctionExists(intent FunctionIntent, parentID string, role string, connected map[string]bool) bool {
+	for _, candidate := range intent.Functions {
+		if candidate.ID == parentID || !strings.EqualFold(strings.TrimSpace(candidate.Usage), strings.TrimSpace(role)) {
+			continue
+		}
+		connectedFunctions := 0
+		prefix := candidate.ID + "\x00"
+		for key, isConnected := range connected {
+			if isConnected && strings.HasPrefix(key, prefix) {
+				connectedFunctions++
+			}
+		}
+		if connectedFunctions >= 2 {
+			return true
+		}
+	}
+	return false
 }
 
 var e96PreferredValues = []float64{

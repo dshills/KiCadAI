@@ -265,6 +265,18 @@ func TestCheckedInCatalogSpeakerAmplifierComponentEvidence(t *testing.T) {
 	}
 	requireSymbolFunctions(t, opamp, "Amplifier_Operational:OPA134", []string{"IN_MINUS", "IN_PLUS", "OUT", "V_MINUS", "V_PLUS"})
 	requirePackagePads(t, opamp, "soic8", []string{"IN_MINUS", "IN_PLUS", "OUT", "V_MINUS", "V_PLUS"})
+	for _, variant := range opamp.Packages {
+		if variant.ID != "soic8" {
+			continue
+		}
+		pads := map[string]string{}
+		for _, mapping := range variant.PadFunctions {
+			pads[mapping.Function] = mapping.Pad
+		}
+		if pads["OFFSET_TRIM_1"] != "1" || pads["NC"] != "5" || pads["OFFSET_TRIM_2"] != "8" {
+			t.Fatalf("OPA134 auxiliary pad mapping = %#v, want legacy symbol pins 1/8 and hidden NC pad 5", pads)
+		}
+	}
 
 	for _, test := range []struct {
 		id       string

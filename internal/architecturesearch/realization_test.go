@@ -51,3 +51,49 @@ func TestFragmentRealizationRejectsDuplicateEndpointNets(t *testing.T) {
 		t.Fatal("DecodeFragmentRealization() accepted an endpoint assigned to two semantic nets")
 	}
 }
+
+func TestFragmentRealizationNormalizesSeriesTransition(t *testing.T) {
+	payload, err := MarshalFragmentRealization(FragmentRealization{
+		Capability: " current_sensing ",
+		Instances: []RealizationInstance{
+			{ID: "shunt", CatalogID: "resistor.example", Usage: "current_sense"},
+			{ID: "amplifier", CatalogID: "amplifier.example", Usage: "current_sense_amplifier"},
+		},
+		PortBindings: []RealizationPortBinding{{Role: "measurement", Instance: "amplifier", Function: "out"}},
+		SeriesTransitions: []RealizationSeriesTransition{{
+			Role: " power ", Input: RealizationEndpoint{Instance: " shunt ", Function: "a"}, Output: RealizationEndpoint{Instance: "shunt", Function: " b "},
+		}},
+	})
+	if err != nil {
+		t.Fatalf("MarshalFragmentRealization() error = %v", err)
+	}
+	realization, err := DecodeFragmentRealization(payload)
+	if err != nil {
+		t.Fatalf("DecodeFragmentRealization() error = %v", err)
+	}
+	if len(realization.SeriesTransitions) != 1 || realization.SeriesTransitions[0].Role != "power" || realization.SeriesTransitions[0].Input.Function != "A" || realization.SeriesTransitions[0].Output.Function != "B" {
+		t.Fatalf("series transitions = %#v", realization.SeriesTransitions)
+	}
+	var shuntFunctions []string
+	for _, instance := range realization.Instances {
+		if instance.ID == "shunt" {
+			shuntFunctions = instance.RequiredFunctions
+		}
+	}
+	if len(shuntFunctions) != 2 || shuntFunctions[0] != "A" || shuntFunctions[1] != "B" {
+		t.Fatalf("shunt required functions = %#v", shuntFunctions)
+	}
+}
+
+func TestFragmentRealizationRejectsDuplicateSeriesRole(t *testing.T) {
+	realization := FragmentRealization{
+		Schema: FragmentRealizationSchema, Capability: "current_sensing",
+		Instances:         []RealizationInstance{{ID: "shunt", CatalogID: "resistor.example", Usage: "current_sense", RequiredFunctions: []string{"A", "B"}}},
+		PortBindings:      []RealizationPortBinding{{Role: "power", Instance: "shunt", Function: "A"}},
+		SeriesTransitions: []RealizationSeriesTransition{{Role: "power", Input: RealizationEndpoint{Instance: "shunt", Function: "A"}, Output: RealizationEndpoint{Instance: "shunt", Function: "B"}}},
+	}
+	payload, _ := json.Marshal(realization)
+	if _, err := DecodeFragmentRealization(payload); err == nil {
+		t.Fatal("DecodeFragmentRealization() accepted duplicate direct and series role bindings")
+	}
+}

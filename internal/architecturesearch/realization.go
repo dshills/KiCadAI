@@ -7,19 +7,20 @@ import (
 	"strings"
 )
 
-const FragmentRealizationSchema = "kicadai.fragment-realization.v2"
+const FragmentRealizationSchema = "kicadai.fragment-realization.v3"
 
 // FragmentRealization is the identity-neutral output contract between an
 // architecture provider and function-level lowering. It contains semantic
 // component functions only; KiCad pins, footprints, coordinates, and routes
 // remain the responsibility of the existing resolver and writer pipeline.
 type FragmentRealization struct {
-	Schema       string                   `json:"schema"`
-	Capability   string                   `json:"capability"`
-	Instances    []RealizationInstance    `json:"instances"`
-	PortBindings []RealizationPortBinding `json:"port_bindings"`
-	Connections  []RealizationConnection  `json:"connections,omitempty"`
-	Parameters   []RealizationParameter   `json:"parameters,omitempty"`
+	Schema            string                        `json:"schema"`
+	Capability        string                        `json:"capability"`
+	Instances         []RealizationInstance         `json:"instances"`
+	PortBindings      []RealizationPortBinding      `json:"port_bindings"`
+	SeriesTransitions []RealizationSeriesTransition `json:"series_transitions,omitempty"`
+	Connections       []RealizationConnection       `json:"connections,omitempty"`
+	Parameters        []RealizationParameter        `json:"parameters,omitempty"`
 }
 
 type RealizationInstance struct {
@@ -36,6 +37,18 @@ type RealizationPortBinding struct {
 	Lane     string `json:"lane,omitempty"`
 	Instance string `json:"instance"`
 	Function string `json:"function"`
+}
+
+// RealizationSeriesTransition places a two-terminal element in series with an
+// obligation anchor. The input is the source-facing endpoint and the output is
+// the load-facing endpoint. Lowering keeps the external anchor and every other
+// consumer on opposite sides of the element instead of shorting both endpoints
+// onto the shared semantic net.
+type RealizationSeriesTransition struct {
+	Role   string              `json:"role"`
+	Lane   string              `json:"lane,omitempty"`
+	Input  RealizationEndpoint `json:"input"`
+	Output RealizationEndpoint `json:"output"`
 }
 
 // RealizationConnection records a provider-selected semantic net. Endpoints
@@ -77,6 +90,15 @@ func MarshalFragmentRealization(realization FragmentRealization) (json.RawMessag
 		binding.Instance = canonicalIdentifier(binding.Instance)
 		binding.Function = strings.ToUpper(strings.TrimSpace(binding.Function))
 	}
+	for index := range realization.SeriesTransitions {
+		transition := &realization.SeriesTransitions[index]
+		transition.Role = canonicalIdentifier(transition.Role)
+		transition.Lane = canonicalIdentifier(transition.Lane)
+		transition.Input.Instance = canonicalIdentifier(transition.Input.Instance)
+		transition.Input.Function = strings.ToUpper(strings.TrimSpace(transition.Input.Function))
+		transition.Output.Instance = canonicalIdentifier(transition.Output.Instance)
+		transition.Output.Function = strings.ToUpper(strings.TrimSpace(transition.Output.Function))
+	}
 	for index := range realization.Connections {
 		connection := &realization.Connections[index]
 		connection.ID = canonicalIdentifier(connection.ID)
@@ -91,6 +113,10 @@ func MarshalFragmentRealization(realization FragmentRealization) (json.RawMessag
 	functionsByInstance := map[string][]string{}
 	for _, binding := range realization.PortBindings {
 		functionsByInstance[binding.Instance] = append(functionsByInstance[binding.Instance], binding.Function)
+	}
+	for _, transition := range realization.SeriesTransitions {
+		functionsByInstance[transition.Input.Instance] = append(functionsByInstance[transition.Input.Instance], transition.Input.Function)
+		functionsByInstance[transition.Output.Instance] = append(functionsByInstance[transition.Output.Instance], transition.Output.Function)
 	}
 	for _, connection := range realization.Connections {
 		for _, endpoint := range connection.Endpoints {
@@ -121,6 +147,12 @@ func MarshalFragmentRealization(realization FragmentRealization) (json.RawMessag
 			return order
 		}
 		return strings.Compare(left.Function, right.Function)
+	})
+	slices.SortStableFunc(realization.SeriesTransitions, func(left, right RealizationSeriesTransition) int {
+		if order := strings.Compare(left.Role, right.Role); order != 0 {
+			return order
+		}
+		return strings.Compare(left.Lane, right.Lane)
 	})
 	slices.SortStableFunc(realization.Connections, func(left, right RealizationConnection) int {
 		return strings.Compare(left.ID, right.ID)
@@ -168,6 +200,20 @@ func validateFragmentRealization(realization FragmentRealization) error {
 		}
 		roles[key] = true
 		boundEndpoints[endpointKey] = true
+	}
+	for _, transition := range realization.SeriesTransitions {
+		key := transition.Role + "\x00" + transition.Lane
+		inputKey := transition.Input.Instance + "\x00" + transition.Input.Function
+		outputKey := transition.Output.Instance + "\x00" + transition.Output.Function
+		if !validSemanticID(transition.Role) || (transition.Lane != "" && !validSemanticID(transition.Lane)) ||
+			!instances[transition.Input.Instance] || !instances[transition.Output.Instance] ||
+			transition.Input.Function == "" || transition.Output.Function == "" || inputKey == outputKey || roles[key] ||
+			boundEndpoints[inputKey] || boundEndpoints[outputKey] {
+			return fmt.Errorf("fragment realization series transition is invalid or duplicated")
+		}
+		roles[key] = true
+		boundEndpoints[inputKey] = true
+		boundEndpoints[outputKey] = true
 	}
 	connectionIDs := map[string]bool{}
 	connectedEndpoints := map[string]bool{}

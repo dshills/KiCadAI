@@ -16,15 +16,29 @@ import (
 const (
 	catalogProviderRevision         = "1.0.0"
 	thresholdReferenceResistanceOhm = 10_000.0
+	catalogRatingDeratingFactor     = 0.8
 )
 
 var catalogProviderCapabilities = []string{
+	"class_a_amplification",
+	"class_ab_bias_control",
+	"class_ab_output_stage",
+	"current_sensing",
 	"environment_sensor",
+	"fault_indication",
 	"frequency_filter",
+	"galvanic_isolation",
+	"instrumentation_amplification",
 	"load_switch",
 	"logic_level_translation",
+	"mute_control",
+	"output_protection",
 	"programmable_controller",
+	"safety_interlock",
+	"signal_amplification",
+	"split_supply_generation",
 	"threshold_detection",
+	"transient_protection",
 	"voltage_regulation",
 }
 
@@ -63,15 +77,54 @@ func (provider *CatalogProvider) Expand(ctx context.Context, request ProviderReq
 	}
 	switch canonicalIdentifier(request.Capability) {
 	case "threshold_detection":
+		if _, legacy := namedConstraint(request.Constraints, "threshold_voltage"); !legacy {
+			return provider.expandGenericThreshold(ctx, request)
+		}
 		return provider.expandThreshold(ctx, request)
 	case "load_switch":
+		if _, legacy := namedConstraint(request.Constraints, "load_characteristic"); !legacy {
+			return provider.expandGenericLoadSwitch(ctx, request)
+		}
 		return provider.expandLoadSwitch(ctx, request)
 	case "voltage_regulation":
+		if _, legacy := namedConstraint(request.Constraints, "adjustable_output"); !legacy {
+			return provider.expandGenericRegulator(ctx, request)
+		}
 		return provider.expandRegulator(ctx, request)
 	case "frequency_filter":
+		if _, legacy := namedConstraint(request.Constraints, "approximation"); !legacy {
+			return provider.expandGenericFilter(ctx, request)
+		}
 		return provider.expandFilter(ctx, request)
 	case "logic_level_translation":
+		if _, legacy := namedConstraint(request.Constraints, "signaling_mode"); !legacy {
+			return provider.expandGenericTranslator(ctx, request)
+		}
 		return provider.expandTranslator(ctx, request)
+	case "fault_indication":
+		return provider.expandFaultIndication(ctx, request)
+	case "safety_interlock":
+		return provider.expandSafetyInterlock(ctx, request)
+	case "transient_protection":
+		return provider.expandTransientProtection(ctx, request)
+	case "output_protection":
+		return provider.expandOutputProtection(ctx, request)
+	case "signal_amplification", "instrumentation_amplification":
+		return provider.expandSignalAmplification(ctx, request)
+	case "current_sensing":
+		return provider.expandCurrentSensing(ctx, request)
+	case "mute_control":
+		return provider.expandMuteControl(ctx, request)
+	case "class_ab_bias_control":
+		return provider.expandClassABBias(ctx, request)
+	case "class_ab_output_stage":
+		return provider.expandClassABOutput(ctx, request)
+	case "class_a_amplification":
+		return provider.expandClassAAmplification(ctx, request)
+	case "split_supply_generation":
+		return provider.expandSplitSupply(ctx, request)
+	case "galvanic_isolation":
+		return provider.expandGalvanicIsolation(ctx, request)
 	case "programmable_controller":
 		return provider.expandSingleComponent(ctx, request, "mcu", "programmable_controller", "sensor_bus", "I2C_SDA")
 	case "environment_sensor":
@@ -96,11 +149,20 @@ func (provider *CatalogProvider) expandThreshold(ctx context.Context, request Pr
 	if err := requireBool(request.Constraints, "inactive_at_power_up", "required", true); err != nil {
 		return nil, err
 	}
-	if delay, _, err := requiredNumber(request.Constraints, "propagation_delay", "maximum", "us"); err != nil || delay <= 0 {
+	delay, _, err := requiredNumber(request.Constraints, "propagation_delay", "maximum", "us")
+	if err != nil || delay <= 0 {
 		return nil, fmt.Errorf("threshold propagation-delay constraint is invalid")
 	}
 	supply := roleVoltageMaximum(request.Ports, "power")
 	selection, err := provider.selectComponent(ctx, "comparator", "open_collector", []components.RequiredRating{{Kind: "supply_voltage", Value: numericString(supply), Unit: "V"}}, true)
+	if err != nil {
+		return nil, err
+	}
+	observedDelay, ok := recordRatingMaximum(selection.record, "propagation_delay", "us")
+	if !ok || observedDelay > delay {
+		return nil, fmt.Errorf("selected comparator lacks propagation-delay evidence within %.9g us", delay)
+	}
+	response, err := ObservedCalculation("threshold_response", NamedQuantity{Name: "response_time", Value: observedDelay, Unit: "us"})
 	if err != nil {
 		return nil, err
 	}
@@ -136,14 +198,14 @@ func (provider *CatalogProvider) expandThreshold(ctx context.Context, request Pr
 	if err != nil {
 		return nil, err
 	}
-	bindings := bindRoles(request.Ports, selection.selected.InstanceID, map[string]string{"sense": "IN_MINUS", "output": "OUT", "power": "V_PLUS", "reference": "V_MINUS"})
+	bindings := bindRoles(request.Ports, selection.selected.InstanceID, map[string]string{"sense": "IN_MINUS", "input": "IN_MINUS", "output": "OUT", "power": "V_PLUS", "reference": "V_MINUS"})
 	connections := []RealizationConnection{
 		semanticNet("threshold_reference", "analog_signal", endpoint(selection, "IN_PLUS"), passiveEndpoint("threshold_upper", "B"), passiveEndpoint("threshold_lower", "A"), passiveEndpoint("feedback_resistor", "B")),
 		semanticNet("threshold_output", "open_collector_signal", endpoint(selection, "OUT"), passiveEndpoint("output_pullup", "B"), passiveEndpoint("feedback_resistor", "A")),
 		semanticNet("threshold_power", "power", endpoint(selection, "V_PLUS"), passiveEndpoint("threshold_upper", "A"), passiveEndpoint("output_pullup", "A"), passiveEndpoint("supply_bypass", "A")),
 		semanticNet("threshold_ground", "reference", endpoint(selection, "V_MINUS"), passiveEndpoint("threshold_lower", "B"), passiveEndpoint("supply_bypass", "B")),
 	}
-	return provider.expansion(request, "open_collector_hysteresis", parts, bindings, connections, []CalculationEvidence{calculation}, 0)
+	return provider.expansion(request, "open_collector_hysteresis", parts, bindings, connections, []CalculationEvidence{calculation, response}, 0)
 }
 
 func (provider *CatalogProvider) expandLoadSwitch(ctx context.Context, request ProviderRequest) ([]ProviderExpansion, error) {
@@ -167,15 +229,15 @@ func (provider *CatalogProvider) expandLoadSwitch(ctx context.Context, request P
 		return nil, err
 	}
 	selection, err := provider.selectComponent(ctx, "mosfet", "logic_level", []components.RequiredRating{
-		{Kind: "drain_source_voltage", Value: numericString(voltage), Unit: "V"},
-		{Kind: "drain_current", Value: numericString(current), Unit: "A"},
+		{Kind: "drain_source_voltage", Value: numericString(voltage / catalogRatingDeratingFactor), Unit: "V"},
+		{Kind: "drain_current", Value: numericString(current / catalogRatingDeratingFactor), Unit: "A"},
 	}, true)
 	if err != nil {
 		return nil, err
 	}
 	flyback, err := provider.selectComponent(ctx, "diode", "flyback", []components.RequiredRating{
-		{Kind: "current", Value: numericString(current), Unit: "A"},
-		{Kind: "reverse_voltage", Value: numericString(voltage), Unit: "V"},
+		{Kind: "current", Value: numericString(current / catalogRatingDeratingFactor), Unit: "A"},
+		{Kind: "reverse_voltage", Value: numericString(voltage / catalogRatingDeratingFactor), Unit: "V"},
 	}, true)
 	if err != nil {
 		return nil, err
@@ -199,41 +261,60 @@ func (provider *CatalogProvider) expandLoadSwitch(ctx context.Context, request P
 		return nil, fmt.Errorf("selected switch or protection device lacks normalized rating evidence")
 	}
 	calculation, issues := EvaluateRatings("switch_derating", []RatingRequirement{
-		{Kind: "drain_source_voltage", Required: voltage, Rated: ratedVoltage, DeratingFactor: 0.8, Unit: "V", Evidence: selection.evidence},
-		{Kind: "drain_current", Required: current, Rated: ratedCurrent, DeratingFactor: 0.8, Unit: "A", Evidence: selection.evidence},
-		{Kind: "gate_source_voltage", Required: controlMaximum, Rated: gateRated, DeratingFactor: 0.8, Unit: "V", Evidence: selection.evidence},
-		{Kind: "flyback_reverse_voltage", Required: voltage, Rated: flybackVoltage, DeratingFactor: 0.8, Unit: "V", Evidence: flyback.evidence},
-		{Kind: "flyback_current", Required: current, Rated: flybackCurrent, DeratingFactor: 0.8, Unit: "A", Evidence: flyback.evidence},
-		{Kind: "control_clamp_voltage", Required: controlMaximum, Rated: clampVoltage, DeratingFactor: 0.8, Unit: "V", Evidence: controlClamp.evidence},
+		{Kind: "drain_source_voltage", Required: voltage, Rated: ratedVoltage, DeratingFactor: catalogRatingDeratingFactor, Unit: "V", Evidence: selection.evidence},
+		{Kind: "drain_current", Required: current, Rated: ratedCurrent, DeratingFactor: catalogRatingDeratingFactor, Unit: "A", Evidence: selection.evidence},
+		{Kind: "gate_source_voltage", Required: controlMaximum, Rated: gateRated, DeratingFactor: catalogRatingDeratingFactor, Unit: "V", Evidence: selection.evidence},
+		{Kind: "flyback_reverse_voltage", Required: voltage, Rated: flybackVoltage, DeratingFactor: catalogRatingDeratingFactor, Unit: "V", Evidence: flyback.evidence},
+		{Kind: "flyback_current", Required: current, Rated: flybackCurrent, DeratingFactor: catalogRatingDeratingFactor, Unit: "A", Evidence: flyback.evidence},
+		{Kind: "control_clamp_voltage", Required: controlMaximum, Rated: clampVoltage, DeratingFactor: 1, Unit: "V", Evidence: controlClamp.evidence},
 	})
 	if len(issues) != 0 {
 		return nil, fmt.Errorf("switch rating solution failed: %s", issues[0].Message)
 	}
-	parts := []catalogPart{selection, flyback, controlClamp}
-	parts, err = provider.appendPassiveParts(ctx, parts, []passivePart{{"gate_pulldown", "resistor", "default_off", "100k"}, {"gate_series", "resistor", "gate_drive", "100"}, {"supply_bypass", "capacitor", "decoupling", "100n"}})
+	gateCharge, gateChargeOK := recordValueMaximum(selection.record, "total_gate_charge", "C")
+	if !gateChargeOK {
+		gateCharge, gateChargeOK = recordValue(selection.record, "total_gate_charge", "C")
+	}
+	if !gateChargeOK || controlMaximum <= 0 {
+		return nil, fmt.Errorf("selected switch lacks gate-charge or control-voltage response evidence")
+	}
+	gateResponse, err := ObservedCalculation("switch_response", NamedQuantity{Name: "response_time", Value: gateCharge * 100 / controlMaximum, Unit: "s"})
 	if err != nil {
 		return nil, err
 	}
-	bindings := bindRoles(request.Ports, selection.selected.InstanceID, map[string]string{"control": "GATE", "load": "DRAIN", "reference": "SOURCE"})
+	parts := []catalogPart{selection, flyback, controlClamp}
+	passives := []passivePart{{"gate_pulldown", "resistor", "default_off", "100k"}, {"gate_series", "resistor", "gate_drive", "100"}}
+	if hasRoleContract(request.Ports, "logic_power") {
+		passives = append(passives, passivePart{"logic_bypass", "capacitor", "logic_supply_decoupling", "100n"})
+	}
+	parts, err = provider.appendPassiveParts(ctx, parts, passives)
+	if err != nil {
+		return nil, err
+	}
+	bindings := bindRoles(request.Ports, selection.selected.InstanceID, map[string]string{"control": "GATE", "load": "DRAIN", "output": "DRAIN", "reference": "SOURCE"})
 	for index := range bindings {
 		switch bindings[index].Role {
 		case "control":
 			bindings[index].Instance, bindings[index].Function = "gate_series", "A"
 		case "load_power":
 			bindings[index].Instance, bindings[index].Function = flyback.selected.InstanceID, "K"
+		case "power":
+			bindings[index].Instance, bindings[index].Function = flyback.selected.InstanceID, "K"
 		case "logic_power":
-			bindings[index].Instance, bindings[index].Function = "supply_bypass", "A"
+			bindings[index].Instance, bindings[index].Function = "logic_bypass", "A"
 		}
 	}
 	connections := []RealizationConnection{
 		semanticNet("switch_gate", "control", endpoint(selection, "GATE"), passiveEndpoint("gate_series", "B"), passiveEndpoint("gate_pulldown", "A"), endpoint(controlClamp, "K")),
 		semanticNet("switch_load", "switched_power", endpoint(selection, "DRAIN"), endpoint(flyback, "A")),
 		semanticNet("switch_load_power", "power", endpoint(flyback, "K")),
-		semanticNet("switch_logic_power", "power", passiveEndpoint("supply_bypass", "A")),
-		semanticNet("switch_ground", "reference", endpoint(selection, "SOURCE"), endpoint(controlClamp, "A"), passiveEndpoint("gate_pulldown", "B"), passiveEndpoint("supply_bypass", "B")),
+		semanticNet("switch_ground", "reference", endpoint(selection, "SOURCE"), endpoint(controlClamp, "A"), passiveEndpoint("gate_pulldown", "B")),
+	}
+	if hasRoleContract(request.Ports, "logic_power") {
+		connections[len(connections)-1].Endpoints = append(connections[len(connections)-1].Endpoints, passiveEndpoint("logic_bypass", "B"))
 	}
 	connections = retainSemanticNets(connections)
-	return provider.expansion(request, "protected_low_side_switch", parts, bindings, connections, []CalculationEvidence{calculation}, 0)
+	return provider.expansion(request, "protected_low_side_switch", parts, bindings, connections, []CalculationEvidence{calculation, gateResponse}, 0)
 }
 
 func (provider *CatalogProvider) expandRegulator(ctx context.Context, request ProviderRequest) ([]ProviderExpansion, error) {
@@ -397,11 +478,15 @@ func (provider *CatalogProvider) expandFilter(ctx context.Context, request Provi
 	}
 	dualConnections := sallenKeyConnections(dualOpamp.selected.InstanceID, dualOpamp.selected.InstanceID, "CHANNEL_1", "CHANNEL_2")
 	singleConnections := sallenKeyConnections(singleOpamp.selected.InstanceID, "amplifier_2", "", "")
-	dualExpansion, err := provider.expansion(request, "dual_opamp_sallen_key_cascade", dualParts, dualBindings, dualConnections, []CalculationEvidence{first, second}, 0)
+	orderEvidence, err := ObservedCalculation("filter_order", NamedQuantity{Name: "filter_order", Value: 4})
 	if err != nil {
 		return nil, err
 	}
-	singleExpansion, err := provider.expansion(request, "two_single_opamp_sallen_key_cascade", singleParts, singleBindings, singleConnections, []CalculationEvidence{first, second}, 0)
+	dualExpansion, err := provider.expansion(request, "dual_opamp_sallen_key_cascade", dualParts, dualBindings, dualConnections, []CalculationEvidence{first, second, orderEvidence}, 0)
+	if err != nil {
+		return nil, err
+	}
+	singleExpansion, err := provider.expansion(request, "two_single_opamp_sallen_key_cascade", singleParts, singleBindings, singleConnections, []CalculationEvidence{first, second, orderEvidence}, 0)
 	if err != nil {
 		return nil, err
 	}
@@ -493,6 +578,25 @@ func (provider *CatalogProvider) expandSingleComponent(ctx context.Context, requ
 	} else {
 		functions[busRole+"_scl"] = "SCL"
 	}
+	if family == "mcu" {
+		usedFunctions := map[string]bool{}
+		for _, function := range functions {
+			if function != "" {
+				usedFunctions[strings.ToUpper(function)] = true
+			}
+		}
+		for _, port := range request.Ports {
+			if functions[port.Role] != "" || port.Contract.Kind == "power" || port.Contract.Kind == "reference" || port.Contract.Kind == "digital_bus" {
+				continue
+			}
+			gpioFunctions := availableGPIOFunctions(selection.record, port.Contract, usedFunctions)
+			if len(gpioFunctions) == 0 {
+				return nil, fmt.Errorf("programmable controller lacks a capability-compatible GPIO function for role %s (%s)", port.Role, port.Contract.Kind)
+			}
+			functions[port.Role] = gpioFunctions[0]
+			markGPIOFunctionUsed(selection.record, gpioFunctions[0], usedFunctions)
+		}
+	}
 	bindings := bindBusRoles(request.Ports, selection.selected.InstanceID, functions)
 	var connections []RealizationConnection
 	parts := []catalogPart{selection}
@@ -521,6 +625,120 @@ func (provider *CatalogProvider) expandSingleComponent(ctx context.Context, requ
 		}
 	}
 	return provider.expansion(request, usage, parts, bindings, connections, nil, 0)
+}
+
+func availableGPIOFunctions(record components.ComponentRecord, contract PortContract, used map[string]bool) []string {
+	seen := map[string]bool{}
+	var functions []string
+	for _, symbol := range record.Symbols {
+		for _, pin := range symbol.FunctionPins {
+			function := strings.ToUpper(strings.TrimSpace(pin.Function))
+			if !gpioPinNamed(pin) || seen[function] || gpioPinUsed(pin, used) || !gpioPinSupportsContract(pin, contract) {
+				continue
+			}
+			seen[function] = true
+			functions = append(functions, function)
+		}
+	}
+	slices.Sort(functions)
+	return functions
+}
+
+func gpioPinNamed(pin components.FunctionPin) bool {
+	if isGPIOPinName(pin.Function) {
+		return true
+	}
+	return slices.ContainsFunc(pin.Aliases, isGPIOPinName)
+}
+
+func isGPIOPinName(name string) bool {
+	name = strings.ToUpper(strings.TrimSpace(name))
+	if strings.HasPrefix(name, "GPIO") {
+		return true
+	}
+	if len(name) < 2 || name[0] != 'P' {
+		return false
+	}
+	if name[1] >= '0' && name[1] <= '9' {
+		return true
+	}
+	return len(name) >= 3 && name[1] >= 'A' && name[1] <= 'Z' && name[2] >= '0' && name[2] <= '9'
+}
+
+func gpioPinUsed(pin components.FunctionPin, used map[string]bool) bool {
+	if used[strings.ToUpper(strings.TrimSpace(pin.Function))] {
+		return true
+	}
+	return slices.ContainsFunc(pin.Aliases, func(alias string) bool { return used[strings.ToUpper(strings.TrimSpace(alias))] })
+}
+
+func markGPIOFunctionUsed(record components.ComponentRecord, function string, used map[string]bool) {
+	for _, symbol := range record.Symbols {
+		for _, pin := range symbol.FunctionPins {
+			if !strings.EqualFold(pin.Function, function) {
+				continue
+			}
+			used[strings.ToUpper(strings.TrimSpace(pin.Function))] = true
+			for _, alias := range pin.Aliases {
+				used[strings.ToUpper(strings.TrimSpace(alias))] = true
+			}
+			return
+		}
+	}
+}
+
+func gpioPinSupportsContract(pin components.FunctionPin, contract PortContract) bool {
+	capabilities := map[string]bool{"gpio": gpioPinNamed(pin)}
+	for _, alias := range pin.Aliases {
+		alias = strings.ToUpper(strings.TrimSpace(alias))
+		switch {
+		case strings.HasPrefix(alias, "ADC"):
+			capabilities["adc"] = true
+		case strings.HasPrefix(alias, "DAC"):
+			capabilities["dac"] = true
+		case strings.HasPrefix(alias, "PWM") || strings.HasPrefix(alias, "OC"):
+			capabilities["pwm"] = true
+		case strings.HasPrefix(alias, "I2C_SDA"):
+			capabilities["i2c_sda"] = true
+		case strings.HasPrefix(alias, "I2C_SCL"):
+			capabilities["i2c_scl"] = true
+		}
+	}
+	required := map[string]bool{}
+	switch canonicalIdentifier(contract.Kind) {
+	case "digital_logic":
+		required["gpio"] = true
+	case "analog_voltage":
+		if contract.Direction == "sink" {
+			required["adc"] = true
+		} else {
+			required["dac"] = true
+		}
+	case "analog_control":
+		if contract.Direction == "sink" {
+			required["adc"] = true
+		} else {
+			required["pwm"] = true
+		}
+	default:
+		return false
+	}
+	for _, trait := range append(append([]string(nil), contract.Traits...), contract.RequiredTraits...) {
+		switch canonicalIdentifier(trait) {
+		case "adc", "analog_input":
+			required["adc"] = true
+		case "dac", "analog_output":
+			required["dac"] = true
+		case "pwm", "pwm_output":
+			required["pwm"] = true
+		}
+	}
+	for capability := range required {
+		if !capabilities[capability] {
+			return false
+		}
+	}
+	return true
 }
 
 func recordSemanticEndpoints(part catalogPart, functions ...string) []RealizationEndpoint {
@@ -636,7 +854,7 @@ func (provider *CatalogProvider) selectComponent(ctx context.Context, family, te
 		RequiredRatings: ratings, RequireConcrete: concrete,
 	})
 	if !result.OK {
-		return catalogPart{}, fmt.Errorf("no catalog-backed %s satisfies normalized ratings", family)
+		return catalogPart{}, fmt.Errorf("no catalog-backed %s satisfies normalized ratings: %v", family, result.Issues)
 	}
 	evidence := componentEvidence(selection.Component, selection.Candidate.Confidence)
 	return catalogPart{
@@ -660,6 +878,33 @@ func (provider *CatalogProvider) appendPassiveParts(ctx context.Context, parts [
 }
 
 func (provider *CatalogProvider) expansion(request ProviderRequest, id string, parts []catalogPart, bindings []RealizationPortBinding, connections []RealizationConnection, calculations []CalculationEvidence, unproven int) ([]ProviderExpansion, error) {
+	return provider.expansionWithTransitions(request, id, parts, bindings, nil, connections, calculations, unproven)
+}
+
+func (provider *CatalogProvider) expansionWithTransitions(request ProviderRequest, id string, parts []catalogPart, bindings []RealizationPortBinding, transitions []RealizationSeriesTransition, connections []RealizationConnection, calculations []CalculationEvidence, unproven int) ([]ProviderExpansion, error) {
+	primary, err := provider.buildCatalogExpansion(request, id, parts, bindings, transitions, connections, calculations, unproven)
+	if err != nil {
+		return nil, err
+	}
+	expansions := []ProviderExpansion{primary}
+	for index, part := range parts {
+		alternative, ok := provider.catalogAlternativePart(part)
+		if !ok {
+			continue
+		}
+		alternativeParts := append([]catalogPart(nil), parts...)
+		alternativeParts[index] = alternative
+		candidate, err := provider.buildCatalogExpansion(request, id+"_alt", alternativeParts, bindings, transitions, connections, calculations, unproven)
+		if err != nil {
+			return nil, err
+		}
+		expansions = append(expansions, candidate)
+		break
+	}
+	return expansions, nil
+}
+
+func (provider *CatalogProvider) buildCatalogExpansion(request ProviderRequest, id string, parts []catalogPart, bindings []RealizationPortBinding, transitions []RealizationSeriesTransition, connections []RealizationConnection, calculations []CalculationEvidence, unproven int) (ProviderExpansion, error) {
 	instances := make([]RealizationInstance, 0, len(parts))
 	componentsSelected := make([]SelectedComponent, 0, len(parts))
 	for _, part := range parts {
@@ -667,21 +912,128 @@ func (provider *CatalogProvider) expansion(request ProviderRequest, id string, p
 		instances = append(instances, RealizationInstance{ID: part.selected.InstanceID, CatalogID: part.selected.CatalogID, VariantID: part.selected.VariantID, Usage: part.usage, Value: part.value})
 	}
 	parameters := calculationParameters(calculations)
-	payload, err := MarshalFragmentRealization(FragmentRealization{Capability: request.Capability, Instances: instances, PortBindings: bindings, Connections: connections, Parameters: parameters})
+	payload, err := MarshalFragmentRealization(FragmentRealization{Capability: request.Capability, Instances: instances, PortBindings: bindings, SeriesTransitions: transitions, Connections: connections, Parameters: parameters})
 	if err != nil {
-		return nil, err
+		return ProviderExpansion{}, err
 	}
+	behavior, err := catalogBehaviorCalculations(request, parts)
+	if err != nil {
+		return ProviderExpansion{}, err
+	}
+	calculations = append(calculations, behavior...)
+	powerDemand, powerDemandProven, powerCalculations, err := catalogFragmentPowerDemand(request, parts, bindings, transitions, connections)
+	if err != nil {
+		return ProviderExpansion{}, err
+	}
+	calculations = append(calculations, powerCalculations...)
 	margin := minimumCalculationMargin(calculations)
-	return []ProviderExpansion{{
-		ID: id, OfferedPorts: offeredCatalogPorts(request.Ports), Components: componentsSelected,
-		Calculations: calculations, Metrics: ExpansionMetrics{UnprovenNonSafety: unproven, WorstMargin: &margin},
+	area := catalogPartsAreaMM2(parts)
+	metrics := ExpansionMetrics{UnprovenNonSafety: unproven, WorstMargin: &margin}
+	if area > 0 {
+		metrics.AreaMM2 = float64Pointer(area)
+	}
+	return ProviderExpansion{
+		ID: id, OfferedPorts: offeredCatalogPorts(request, powerDemand, powerDemandProven), Components: componentsSelected,
+		Calculations: calculations, Metrics: metrics,
 		Evidence: ContractEvidence{Confidence: EvidenceRuleInferred, Sources: []string{"kicadai:catalog-function-provider:" + catalogProviderRevision}},
 		Payload:  payload,
-	}}, nil
+	}, nil
 }
 
-func offeredCatalogPorts(required []RoleContract) []RoleContract {
-	ports := cloneRoleContractsJSON(required)
+func catalogPartsAreaMM2(parts []catalogPart) float64 {
+	area := 0.0
+	for _, part := range parts {
+		for _, variant := range part.record.Packages {
+			if variant.ID != part.selected.VariantID || variant.DimensionsMM == nil {
+				continue
+			}
+			area += variant.DimensionsMM.Width * variant.DimensionsMM.Height
+			break
+		}
+	}
+	return quantize(area)
+}
+
+func (provider *CatalogProvider) catalogAlternativePart(original catalogPart) (catalogPart, bool) {
+	if provider.catalog == nil || strings.TrimSpace(original.value) == "" {
+		return catalogPart{}, false
+	}
+	requiredFunctions := catalogRecordFunctions(original.record)
+	for _, record := range provider.catalog.Records {
+		if record.ID == original.record.ID || record.Family != original.record.Family || !catalogRecordSupportsFunctions(record, requiredFunctions) {
+			continue
+		}
+		valueKind := sharedCatalogValueKind(original.record, record)
+		if valueKind == "" {
+			continue
+		}
+		selection, result := components.Select(context.Background(), &components.Catalog{Version: provider.catalog.Version, Records: []components.ComponentRecord{record}}, components.SelectionRequest{
+			Query:      components.Query{Family: record.Family, ValueKind: valueKind, Value: original.value, MinimumConfidence: components.ConfidenceRuleInferred, Limit: 8},
+			Acceptance: components.AcceptanceStructural, AllowAlternatives: true,
+		})
+		if !result.OK {
+			continue
+		}
+		evidence := componentEvidence(selection.Component, selection.Candidate.Confidence)
+		alternative := original
+		alternative.record = selection.Component
+		alternative.evidence = evidence
+		alternative.selected.CatalogID = selection.Component.ID
+		alternative.selected.VariantID = selection.Variant.ID
+		alternative.selected.Evidence = evidence.Confidence
+		return alternative, true
+	}
+	return catalogPart{}, false
+}
+
+func sharedCatalogValueKind(left components.ComponentRecord, right components.ComponentRecord) string {
+	for _, leftValue := range left.Values {
+		for _, rightValue := range right.Values {
+			if strings.EqualFold(strings.TrimSpace(leftValue.Kind), strings.TrimSpace(rightValue.Kind)) {
+				return leftValue.Kind
+			}
+		}
+	}
+	return ""
+}
+
+func catalogRecordFunctions(record components.ComponentRecord) []string {
+	seen := map[string]struct{}{}
+	var functions []string
+	for _, symbol := range record.Symbols {
+		for _, binding := range symbol.FunctionPins {
+			key := canonicalIdentifier(binding.Function)
+			if key == "" {
+				continue
+			}
+			if _, ok := seen[key]; ok {
+				continue
+			}
+			seen[key] = struct{}{}
+			functions = append(functions, key)
+		}
+	}
+	slices.Sort(functions)
+	return functions
+}
+
+func catalogRecordSupportsFunctions(record components.ComponentRecord, required []string) bool {
+	offered := catalogRecordFunctions(record)
+	for _, function := range required {
+		if !slices.Contains(offered, function) {
+			return false
+		}
+	}
+	return true
+}
+
+func offeredCatalogPorts(request ProviderRequest, powerDemandA map[string]float64, powerDemandProven map[string]bool) []RoleContract {
+	ports := cloneRoleContractsJSON(request.Ports)
+	startupState := ""
+	if constraint, ok := namedConstraint(request.Constraints, "startup_state"); ok && constraint.Relation == "equal" {
+		_ = json.Unmarshal(constraint.Value, &startupState)
+		startupState = canonicalIdentifier(startupState)
+	}
 	for index := range ports {
 		contract := &ports[index].Contract
 		contract.ID = ""
@@ -689,10 +1041,493 @@ func offeredCatalogPorts(required []RoleContract) []RoleContract {
 		contract.Evidence = ContractEvidence{Confidence: EvidenceRuleInferred, Sources: []string{"kicadai:catalog-function-provider:" + catalogProviderRevision}}
 		contract.CurrentCapacityA = cloneFloat64(contract.RequiredCurrentCapacityA)
 		contract.CurrentDemandA = cloneFloat64(contract.MaximumCurrentDemandA)
+		if contract.Direction == "sink" && contract.Kind == "power" && powerDemandProven[ports[index].Role] {
+			contract.CurrentDemandA = float64Pointer(powerDemandA[ports[index].Role])
+		}
 		contract.Traits = append(contract.Traits, contract.RequiredTraits...)
 		contract.RequiredTraits = nil
+		if startupState != "" && catalogStartupRole(ports[index].Role, *contract) {
+			contract.Traits = append(contract.Traits, "startup_state_"+startupState)
+			if contract.DefaultState == "" {
+				contract.DefaultState = startupState
+			}
+		}
+		if contract.Protocol != nil && canonicalIdentifier(contract.Protocol.Mode) == "open_drain" && contract.Direction != "sink" {
+			contract.Traits = append(contract.Traits, "startup_state_released")
+			if contract.DefaultState == "" {
+				contract.DefaultState = "released"
+			}
+		}
+		if canonicalIdentifier(request.Capability) == "output_protection" && ports[index].Role == "output" {
+			contract.Traits = append(contract.Traits, "startup_state_inactive")
+			if contract.DefaultState == "" {
+				contract.DefaultState = "inactive"
+			}
+		}
+		slices.Sort(contract.Traits)
 	}
 	return ports
+}
+
+func remapOfferedCatalogPorts(request ProviderRequest, existing []RoleContract) []RoleContract {
+	ports := offeredCatalogPorts(request, nil, nil)
+	for index := range ports {
+		if ports[index].Contract.Direction != "sink" || ports[index].Contract.Kind != "power" {
+			continue
+		}
+		for _, offered := range existing {
+			if offered.Role == ports[index].Role && offered.Contract.CurrentDemandA != nil {
+				ports[index].Contract.CurrentDemandA = cloneFloat64(offered.Contract.CurrentDemandA)
+				break
+			}
+		}
+	}
+	return ports
+}
+
+func catalogStartupRole(role string, contract PortContract) bool {
+	role = canonicalIdentifier(role)
+	if role == "reference" || role == "power" || role == "positive_power" || role == "negative_power" || role == "load_power" {
+		return false
+	}
+	return contract.Direction != "sink" || role == "output" || role == "load" || role == "permit" || role == "mute" || role == "bias"
+}
+
+func catalogBehaviorCalculations(request ProviderRequest, parts []catalogPart) ([]CalculationEvidence, error) {
+	var result []CalculationEvidence
+	for _, part := range parts {
+		if part.record.OpAmp == nil {
+			continue
+		}
+		if phase, ok := catalogOpAmpPhaseMargin(request, part.record); ok {
+			calculation, err := ObservedCalculation(part.selected.InstanceID+"_loop_stability", NamedQuantity{Name: "phase_margin", Value: phase, Unit: "deg"})
+			if err != nil {
+				return nil, err
+			}
+			result = append(result, calculation)
+		}
+		if noise := part.record.OpAmp.VoltageNoiseDensity; noise != nil && noise.Value > 0 {
+			calculation, err := ObservedCalculation(part.selected.InstanceID+"_noise", NamedQuantity{Name: "voltage_noise_density", Value: noise.Value, Unit: noise.Unit})
+			if err != nil {
+				return nil, err
+			}
+			result = append(result, calculation)
+		}
+	}
+	if canonicalIdentifier(request.Capability) == "class_a_amplification" {
+		calculation, err := ObservedCalculation("open_loop_stability", NamedQuantity{Name: "phase_margin", Value: 90, Unit: "deg"})
+		if err != nil {
+			return nil, err
+		}
+		result = append(result, calculation)
+	}
+	return result, nil
+}
+
+func catalogOpAmpPhaseMargin(request ProviderRequest, record components.ComponentRecord) (float64, bool) {
+	if record.OpAmp == nil {
+		return 0, false
+	}
+	gbw := 0.0
+	if record.OpAmp.GainBandwidth != nil {
+		gbw = record.OpAmp.GainBandwidth.Value
+	}
+	for _, model := range record.SimulationModels {
+		if canonicalIdentifier(model.ModelID) != "mna_opamp_single_pole_v1" {
+			continue
+		}
+		for _, parameter := range model.Parameters {
+			if canonicalIdentifier(parameter.Name) == "gain_bandwidth_hz" {
+				gbw = math.Max(gbw, parameter.Value)
+			}
+		}
+	}
+	if gbw <= 0 {
+		return 0, false
+	}
+	gain := 1.0
+	if value, _, ok := firstNumericConstraint(request.Constraints, "voltage_gain"); ok {
+		gain = math.Max(value, 1)
+	}
+	ratio := 10.0
+	if value, _, ok := firstNumericConstraint(request.Constraints, "gain_bandwidth_margin"); ok {
+		ratio = value
+	} else if frequency, _, ok := firstNumericConstraint(request.Constraints, "cutoff_frequency"); ok && frequency > 0 {
+		ratio = gbw / (gain * frequency)
+	}
+	if ratio <= 0 {
+		return 0, false
+	}
+	return math.Max(0, 90-math.Atan(1/ratio)*180/math.Pi), true
+}
+
+func catalogFragmentPowerDemand(request ProviderRequest, parts []catalogPart, bindings []RealizationPortBinding, transitions []RealizationSeriesTransition, connections []RealizationConnection) (map[string]float64, map[string]bool, []CalculationEvidence, error) {
+	demand := map[string]float64{}
+	proven := map[string]bool{}
+	var sinkRoles []string
+	for _, port := range request.Ports {
+		if port.Contract.Direction == "sink" && port.Contract.Kind == "power" {
+			sinkRoles = append(sinkRoles, port.Role)
+			demand[port.Role] = 0
+			proven[port.Role] = true
+		}
+	}
+	if len(sinkRoles) == 0 {
+		return demand, proven, nil, nil
+	}
+
+	for _, part := range parts {
+		genericCurrent, genericOK := recordRatingMaximum(part.record, "supply_current", "A")
+		for _, role := range sinkRoles {
+			current, roleOK := recordRatingMaximum(part.record, "supply_current_"+canonicalIdentifier(role), "A")
+			if roleOK {
+				demand[role] += current
+			} else if genericOK {
+				demand[role] += genericCurrent
+			} else if catalogRecordConsumesPower(part.record) && !catalogRecordProvidesPower(part.record) {
+				// Retain the request ceiling for only the unevidenced rail. A
+				// multi-rail fragment must never borrow evidence from another rail.
+				proven[role] = false
+			}
+		}
+	}
+	if quiescent, _, ok := firstNumericConstraint(request.Constraints, "quiescent_current"); ok {
+		for _, role := range sinkRoles {
+			demand[role] += quiescent
+		}
+	}
+	for role, current := range catalogResistorNetworkDemandA(request.Ports, parts, bindings, transitions, connections) {
+		demand[role] += current
+	}
+	directSource, powerSource := sourceCurrentDemandBySinkRole(request.Ports, sinkRoles)
+	converted := catalogConvertedPowerDemandA(request.Ports, parts, sinkRoles)
+	for _, role := range sinkRoles {
+		demand[role] += directSource[role] + math.Max(powerSource[role], converted[role])
+	}
+
+	calculations := make([]CalculationEvidence, 0, len(sinkRoles))
+	for _, role := range sinkRoles {
+		if !proven[role] {
+			continue
+		}
+		demand[role] = quantize(demand[role])
+		id := "catalog_power_current_demand"
+		if len(sinkRoles) > 1 {
+			id += "_" + canonicalIdentifier(role)
+		}
+		calculation, err := ObservedCalculation(id, NamedQuantity{Name: "power_current_demand", Value: demand[role], Unit: "A"})
+		if err != nil {
+			return nil, nil, nil, err
+		}
+		calculations = append(calculations, calculation)
+	}
+	return demand, proven, calculations, nil
+}
+
+func catalogRecordConsumesPower(record components.ComponentRecord) bool {
+	for _, symbol := range record.Symbols {
+		for _, pin := range symbol.FunctionPins {
+			if canonicalIdentifier(pin.Electrical) == "power_in" {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func catalogRecordProvidesPower(record components.ComponentRecord) bool {
+	for _, symbol := range record.Symbols {
+		for _, pin := range symbol.FunctionPins {
+			if canonicalIdentifier(pin.Electrical) == "power_out" {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func sourceCurrentDemandBySinkRole(ports []RoleContract, sinkRoles []string) (map[string]float64, map[string]float64) {
+	direct := map[string]float64{}
+	power := map[string]float64{}
+	for _, source := range ports {
+		if source.Contract.Direction != "source" || source.Contract.RequiredCurrentCapacityA == nil {
+			continue
+		}
+		var matching []string
+		for _, role := range sinkRoles {
+			index := slices.IndexFunc(ports, func(port RoleContract) bool { return port.Role == role })
+			if index >= 0 && ports[index].Contract.Domain != "" && ports[index].Contract.Domain == source.Contract.Domain {
+				matching = append(matching, role)
+			}
+		}
+		if len(matching) == 0 {
+			matching = sinkRoles
+		}
+		for _, role := range matching {
+			if source.Contract.Kind == "power" {
+				power[role] += *source.Contract.RequiredCurrentCapacityA
+			} else {
+				direct[role] += *source.Contract.RequiredCurrentCapacityA
+			}
+		}
+	}
+	return direct, power
+}
+
+func catalogConvertedPowerDemandA(ports []RoleContract, parts []catalogPart, sinkRoles []string) map[string]float64 {
+	result := map[string]float64{}
+	outputPower := 0.0
+	for _, port := range ports {
+		contract := port.Contract
+		if contract.Kind == "power" && contract.Direction == "source" && contract.RequiredCurrentCapacityA != nil && contract.Voltage.Maximum != nil {
+			outputPower += math.Abs(*contract.Voltage.Maximum) * *contract.RequiredCurrentCapacityA
+		}
+	}
+	if outputPower <= 0 {
+		return result
+	}
+	efficiency := 0.0
+	for _, part := range parts {
+		if value, ok := recordValue(part.record, "efficiency", "%"); ok {
+			efficiency = math.Max(efficiency, value/100)
+		}
+	}
+	if efficiency <= 0 || efficiency > 1 {
+		return result
+	}
+	for _, role := range sinkRoles {
+		index := slices.IndexFunc(ports, func(port RoleContract) bool { return port.Role == role })
+		if index < 0 || ports[index].Contract.Voltage.Minimum == nil || *ports[index].Contract.Voltage.Minimum <= 0 {
+			continue
+		}
+		result[role] = outputPower / (*ports[index].Contract.Voltage.Minimum * efficiency)
+	}
+	return result
+}
+
+func catalogResistorNetworkDemandA(ports []RoleContract, parts []catalogPart, bindings []RealizationPortBinding, transitions []RealizationSeriesTransition, connections []RealizationConnection) map[string]float64 {
+	type endpointKey struct{ instance, function string }
+	parent := map[endpointKey]endpointKey{}
+	var find func(endpointKey) endpointKey
+	find = func(key endpointKey) endpointKey {
+		root, exists := parent[key]
+		if !exists {
+			parent[key] = key
+			return key
+		}
+		if root != key {
+			parent[key] = find(root)
+		}
+		return parent[key]
+	}
+	union := func(left, right endpointKey) {
+		leftRoot, rightRoot := find(left), find(right)
+		if leftRoot != rightRoot {
+			parent[rightRoot] = leftRoot
+		}
+	}
+	for _, connection := range connections {
+		if len(connection.Endpoints) == 0 {
+			continue
+		}
+		first := endpointKey{connection.Endpoints[0].Instance, connection.Endpoints[0].Function}
+		find(first)
+		for _, endpoint := range connection.Endpoints[1:] {
+			union(first, endpointKey{endpoint.Instance, endpoint.Function})
+		}
+	}
+	for _, binding := range bindings {
+		find(endpointKey{binding.Instance, binding.Function})
+	}
+
+	fixed := map[endpointKey]float64{}
+	powerNodes := map[endpointKey][]string{}
+	for _, binding := range bindings {
+		portIndex := slices.IndexFunc(ports, func(port RoleContract) bool { return port.Role == binding.Role })
+		if portIndex < 0 {
+			continue
+		}
+		contract := ports[portIndex].Contract
+		root := find(endpointKey{binding.Instance, binding.Function})
+		if contract.Kind == "reference" {
+			fixed[root] = 0
+		} else if contract.Kind == "power" {
+			voltage, ok := maximumMagnitudeVoltage(contract.Voltage)
+			if !ok {
+				continue
+			}
+			fixed[root] = voltage
+			powerNodes[root] = append(powerNodes[root], binding.Role)
+		}
+	}
+	seriesInstances := map[string]struct{}{}
+	for _, transition := range transitions {
+		seriesInstances[transition.Input.Instance] = struct{}{}
+		seriesInstances[transition.Output.Instance] = struct{}{}
+	}
+	type resistorEdge struct {
+		left, right endpointKey
+		resistance  float64
+	}
+	var edges []resistorEdge
+	for _, part := range parts {
+		if canonicalIdentifier(part.record.Family) != "resistor" {
+			continue
+		}
+		if _, series := seriesInstances[part.selected.InstanceID]; series {
+			continue
+		}
+		resistance, ok := components.ParseEngineeringValue(part.value)
+		if !ok || resistance <= 0 {
+			continue
+		}
+		left := find(endpointKey{part.selected.InstanceID, "A"})
+		right := find(endpointKey{part.selected.InstanceID, "B"})
+		if left != right {
+			edges = append(edges, resistorEdge{left: left, right: right, resistance: resistance})
+		}
+	}
+	if len(edges) == 0 || len(fixed) == 0 {
+		return map[string]float64{}
+	}
+	reachable := map[endpointKey]bool{}
+	for node := range fixed {
+		reachable[node] = true
+	}
+	for changed := true; changed; {
+		changed = false
+		for _, edge := range edges {
+			if reachable[edge.left] && !reachable[edge.right] {
+				reachable[edge.right] = true
+				changed = true
+			} else if reachable[edge.right] && !reachable[edge.left] {
+				reachable[edge.left] = true
+				changed = true
+			}
+		}
+	}
+	edges = slices.DeleteFunc(edges, func(edge resistorEdge) bool { return !reachable[edge.left] || !reachable[edge.right] })
+	if len(edges) == 0 {
+		return map[string]float64{}
+	}
+
+	nodes := map[endpointKey]int{}
+	for _, edge := range edges {
+		if _, known := fixed[edge.left]; !known {
+			if _, exists := nodes[edge.left]; !exists {
+				nodes[edge.left] = len(nodes)
+			}
+		}
+		if _, known := fixed[edge.right]; !known {
+			if _, exists := nodes[edge.right]; !exists {
+				nodes[edge.right] = len(nodes)
+			}
+		}
+	}
+	matrix := make([][]float64, len(nodes))
+	rightHand := make([]float64, len(nodes))
+	for index := range matrix {
+		matrix[index] = make([]float64, len(nodes))
+	}
+	for _, edge := range edges {
+		conductance := 1 / edge.resistance
+		leftIndex, leftUnknown := nodes[edge.left]
+		rightIndex, rightUnknown := nodes[edge.right]
+		if leftUnknown {
+			matrix[leftIndex][leftIndex] += conductance
+			if rightUnknown {
+				matrix[leftIndex][rightIndex] -= conductance
+			} else {
+				rightHand[leftIndex] += conductance * fixed[edge.right]
+			}
+		}
+		if rightUnknown {
+			matrix[rightIndex][rightIndex] += conductance
+			if leftUnknown {
+				matrix[rightIndex][leftIndex] -= conductance
+			} else {
+				rightHand[rightIndex] += conductance * fixed[edge.left]
+			}
+		}
+	}
+	voltages, ok := solveLinearSystem(matrix, rightHand)
+	if !ok {
+		return map[string]float64{}
+	}
+	voltageAt := func(node endpointKey) float64 {
+		if voltage, known := fixed[node]; known {
+			return voltage
+		}
+		return voltages[nodes[node]]
+	}
+	demand := map[string]float64{}
+	for _, edge := range edges {
+		current := math.Abs(voltageAt(edge.left)-voltageAt(edge.right)) / edge.resistance
+		for _, role := range powerNodes[edge.left] {
+			demand[role] += current
+		}
+		for _, role := range powerNodes[edge.right] {
+			demand[role] += current
+		}
+	}
+	return demand
+}
+
+func maximumMagnitudeVoltage(voltage NumericRange) (float64, bool) {
+	if voltage.Minimum == nil && voltage.Maximum == nil {
+		return 0, false
+	}
+	value := 0.0
+	if voltage.Minimum != nil {
+		value = *voltage.Minimum
+	}
+	if voltage.Maximum != nil && math.Abs(*voltage.Maximum) >= math.Abs(value) {
+		value = *voltage.Maximum
+	}
+	return value, true
+}
+
+func solveLinearSystem(matrix [][]float64, rightHand []float64) ([]float64, bool) {
+	if len(matrix) != len(rightHand) {
+		return nil, false
+	}
+	augmented := make([][]float64, len(matrix))
+	for row := range matrix {
+		if len(matrix[row]) != len(matrix) {
+			return nil, false
+		}
+		augmented[row] = append(append([]float64(nil), matrix[row]...), rightHand[row])
+	}
+	for pivot := range augmented {
+		best := pivot
+		for row := pivot + 1; row < len(augmented); row++ {
+			if math.Abs(augmented[row][pivot]) > math.Abs(augmented[best][pivot]) {
+				best = row
+			}
+		}
+		if math.Abs(augmented[best][pivot]) < 1e-18 {
+			return nil, false
+		}
+		augmented[pivot], augmented[best] = augmented[best], augmented[pivot]
+		divisor := augmented[pivot][pivot]
+		for column := pivot; column <= len(matrix); column++ {
+			augmented[pivot][column] /= divisor
+		}
+		for row := range augmented {
+			if row == pivot {
+				continue
+			}
+			factor := augmented[row][pivot]
+			for column := pivot; column <= len(matrix); column++ {
+				augmented[row][column] -= factor * augmented[pivot][column]
+			}
+		}
+	}
+	result := make([]float64, len(matrix))
+	for row := range augmented {
+		result[row] = augmented[row][len(matrix)]
+	}
+	return result, true
 }
 
 func cloneRoleContractsJSON(ports []RoleContract) []RoleContract {
@@ -997,6 +1832,20 @@ func recordValue(record components.ComponentRecord, kind, unit string) (float64,
 	return 0, false
 }
 
+func recordValueMaximum(record components.ComponentRecord, kind, unit string) (float64, bool) {
+	for _, value := range record.Values {
+		if value.Kind != kind || value.Max == "" {
+			continue
+		}
+		parsed, err := strconv.ParseFloat(value.Max, 64)
+		if err != nil {
+			return 0, false
+		}
+		return convertCatalogUnit(parsed, value.Unit, unit)
+	}
+	return 0, false
+}
+
 func recordHasFunction(record components.ComponentRecord, function string) bool {
 	for _, symbol := range record.Symbols {
 		for _, pin := range symbol.FunctionPins {
@@ -1031,6 +1880,9 @@ func convertCatalogUnit(value float64, from, to string) (float64, bool) {
 	}
 	if from == "mV" && to == "V" {
 		return value / 1000, true
+	}
+	if from == "nC" && to == "C" {
+		return value * 1e-9, true
 	}
 	return 0, false
 }

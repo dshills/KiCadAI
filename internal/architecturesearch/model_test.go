@@ -54,6 +54,45 @@ func TestFrozenOpenSetCorpusDecodesWithProductionContract(t *testing.T) {
 	}
 }
 
+func TestFrozenAdversarialMultiFunctionCorpusDecodesWithProductionContract(t *testing.T) {
+	root := frozenAdversarialMultiFunctionCorpusRoot(t)
+	manifestBytes, err := os.ReadFile(filepath.Join(root, "manifest.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var manifest struct {
+		Fixtures []struct {
+			ID   string `json:"id"`
+			File string `json:"file"`
+		} `json:"fixtures"`
+	}
+	if err := json.Unmarshal(manifestBytes, &manifest); err != nil {
+		t.Fatal(err)
+	}
+	if len(manifest.Fixtures) != 10 {
+		t.Fatalf("fixture count = %d, want 10", len(manifest.Fixtures))
+	}
+	for _, fixture := range manifest.Fixtures {
+		fixture := fixture
+		t.Run(fixture.ID, func(t *testing.T) {
+			contents, err := os.ReadFile(filepath.Join(root, fixture.File))
+			if err != nil {
+				t.Fatal(err)
+			}
+			requirement, issues := DecodeStrict(bytes.NewReader(contents))
+			if len(issues) != 0 {
+				t.Fatalf("decode issues = %#v", issues)
+			}
+			if requirement.Project.Name != fixture.ID || requirement.Schema != SchemaIDV2 || requirement.Version != VersionV2 {
+				t.Fatalf("decoded identity = %q %q/%d", requirement.Project.Name, requirement.Schema, requirement.Version)
+			}
+			if hash, err := CanonicalHash(requirement); err != nil || len(hash) != 64 {
+				t.Fatalf("canonical hash = %q, %v", hash, err)
+			}
+		})
+	}
+}
+
 func TestDecodeStrictNormalizesOrderAndProducesStableHash(t *testing.T) {
 	firstInput := validRequirement()
 	secondInput := cloneRequirement(firstInput)
@@ -285,6 +324,39 @@ func validRequirement() Requirement {
 	}
 }
 
+func validMultiFunctionRequirement() Requirement {
+	return Requirement{
+		Schema: SchemaIDV2, Version: VersionV2,
+		Project: Project{Name: "synthetic_signal_chain", Title: "Synthetic signal chain", Description: "Two generic objectives joined by a typed behavior-level signal."},
+		Requirements: Requirements{
+			Domains: []Domain{
+				{ID: "vcc", Kind: "supply", MinVoltageV: floatPointer(3.1), NominalVoltageV: 3.3, MaxVoltageV: floatPointer(3.5), MaxCurrentA: floatPointer(0.1), Source: "external"},
+				{ID: "ground", Kind: "reference", NominalVoltageV: 0, Source: "external"},
+			},
+			Ports: []Port{
+				{ID: "power", Kind: "power", Direction: "sink", Domain: "vcc", Electrical: &Electrical{MaxCurrentA: floatPointer(0.1)}},
+				{ID: "ground", Kind: "reference", Direction: "bidirectional", Domain: "ground"},
+				{ID: "input", Kind: "analog_voltage", Direction: "sink", Domain: "vcc", Electrical: &Electrical{MinVoltageV: floatPointer(0), MaxVoltageV: floatPointer(3.3), InputImpedanceMinOhm: floatPointer(100000)}},
+				{ID: "output", Kind: "analog_voltage", Direction: "source", Domain: "vcc", Electrical: &Electrical{MinVoltageV: floatPointer(0), MaxVoltageV: floatPointer(3.3), MaxSourceCurrentMA: floatPointer(2)}},
+			},
+			Signals: []Signal{{ID: "conditioned", Kind: "analog_voltage", Domain: "vcc", Electrical: &Electrical{MinVoltageV: floatPointer(0), MaxVoltageV: floatPointer(3.3), MaxSourceCurrentMA: floatPointer(1), InputImpedanceMinOhm: floatPointer(100000)}}},
+			Objectives: []Objective{
+				{ID: "consume", Capability: "generic_consumer", Bindings: []Binding{{Role: "input", Signal: "conditioned", Direction: "sink"}, {Role: "output", Port: "output"}, {Role: "power", Port: "power"}, {Role: "reference", Port: "ground"}}, Constraints: []Constraint{{Name: "loading_margin", Relation: "minimum", Value: json.RawMessage(`10`)}}},
+				{ID: "produce", Capability: "generic_producer", Bindings: []Binding{{Role: "input", Port: "input"}, {Role: "output", Signal: "conditioned", Direction: "source"}, {Role: "power", Port: "power"}, {Role: "reference", Port: "ground"}}, Constraints: []Constraint{{Name: "gain", Relation: "target", Value: json.RawMessage(`1`), TolerancePercent: floatPointer(1)}}},
+			},
+			SystemConstraints: []Constraint{{Name: "startup_output_state", Relation: "equal", Value: json.RawMessage(`"inactive"`)}},
+			Constraints:       BoardLimits{MaxComponents: 12, MaxWidthMM: 35, MaxHeightMM: 25},
+		},
+		Acceptance: Acceptance{
+			RequireERC: true, RequireStrictDRC: true, RequireCompleteRouting: true,
+			RequireConnectivity: true, RequireWriterCorrectness: true,
+			RequireRoundTripZeroDiff: true, RequireDeterministicReplay: true,
+			RequireContractComposition: true, RequireGlobalReasoning: true,
+			RequireCoverageAccounting: true, RequireAlternatives: true, RequireFailClosed: true,
+		},
+	}
+}
+
 func decodeRequirement(t *testing.T, requirement Requirement) Requirement {
 	t.Helper()
 	encoded, err := json.Marshal(requirement)
@@ -318,4 +390,13 @@ func frozenCorpusRoot(t *testing.T) string {
 		t.Fatal("locate architecture search tests")
 	}
 	return filepath.Join(filepath.Dir(sourcePath), "..", "circuitgraph", "testdata", "open_set_composition_corpus")
+}
+
+func frozenAdversarialMultiFunctionCorpusRoot(t *testing.T) string {
+	t.Helper()
+	_, sourcePath, _, ok := runtime.Caller(0)
+	if !ok {
+		t.Fatal("locate architecture search tests")
+	}
+	return filepath.Join(filepath.Dir(sourcePath), "..", "circuitgraph", "testdata", "adversarial_multi_function_composition_corpus")
 }

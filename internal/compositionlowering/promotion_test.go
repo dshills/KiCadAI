@@ -21,7 +21,7 @@ import (
 )
 
 func TestFrozenOpenSetCorpusPassesOfflineWorkflow(t *testing.T) {
-	runFrozenOpenSetPromotion(t, "", libraryresolver.LibraryIndex{})
+	runFrozenPromotion(t, "open_set_composition_corpus", 5, "KICADAI_OPEN_SET_ARTIFACT_DIR", "", libraryresolver.LibraryIndex{})
 }
 
 func TestFrozenOpenSetCorpusOptionalKiCadPromotion(t *testing.T) {
@@ -37,10 +37,30 @@ func TestFrozenOpenSetCorpusOptionalKiCadPromotion(t *testing.T) {
 	if len(index.Symbols) == 0 || len(index.Footprints) == 0 {
 		t.Fatalf("installed library index is empty: %#v", loadIssues)
 	}
-	runFrozenOpenSetPromotion(t, cli, index)
+	runFrozenPromotion(t, "open_set_composition_corpus", 5, "KICADAI_OPEN_SET_ARTIFACT_DIR", cli, index)
 }
 
-func runFrozenOpenSetPromotion(t *testing.T, cli string, installedIndex libraryresolver.LibraryIndex) {
+func TestFrozenAdversarialMultiFunctionCorpusPassesOfflineWorkflow(t *testing.T) {
+	runFrozenPromotion(t, "adversarial_multi_function_composition_corpus", 10, "KICADAI_ADVERSARIAL_MULTI_FUNCTION_ARTIFACT_DIR", "", libraryresolver.LibraryIndex{})
+}
+
+func TestFrozenAdversarialMultiFunctionCorpusOptionalKiCadPromotion(t *testing.T) {
+	cli := os.Getenv("KICADAI_KICAD_CLI")
+	if cli == "" {
+		t.Skip("set KICADAI_KICAD_CLI to run the KiCad-backed adversarial multi-function corpus")
+	}
+	roots, rootIssues := libraryresolver.ResolveRoots()
+	if roots.SymbolsRoot == "" || roots.FootprintsRoot == "" {
+		t.Skipf("installed KiCad libraries are required: %#v", rootIssues)
+	}
+	index, loadIssues := libraryresolver.Load(context.Background(), roots, libraryresolver.LoadOptions{})
+	if len(index.Symbols) == 0 || len(index.Footprints) == 0 {
+		t.Fatalf("installed library index is empty: %#v", loadIssues)
+	}
+	runFrozenPromotion(t, "adversarial_multi_function_composition_corpus", 10, "KICADAI_ADVERSARIAL_MULTI_FUNCTION_ARTIFACT_DIR", cli, index)
+}
+
+func runFrozenPromotion(t *testing.T, corpusDir string, expectedCount int, artifactEnv string, cli string, installedIndex libraryresolver.LibraryIndex) {
 	t.Helper()
 	catalog, err := components.LoadCatalog(context.Background(), components.LoadOptions{})
 	if err != nil {
@@ -51,9 +71,9 @@ func runFrozenOpenSetPromotion(t *testing.T, cli string, installedIndex libraryr
 		t.Fatalf("registry issues = %#v", registryIssues)
 	}
 	resolver := circuitgraph.NewResolver(circuitgraph.ResolveOptions{Catalog: catalog, CatalogID: "checked-in"})
-	paths, err := filepath.Glob(filepath.Join("..", "circuitgraph", "testdata", "open_set_composition_corpus", "*.json"))
+	paths, err := filepath.Glob(filepath.Join("..", "circuitgraph", "testdata", corpusDir, "*.json"))
 	paths = slices.DeleteFunc(paths, func(path string) bool { return filepath.Base(path) == "manifest.json" })
-	if err != nil || len(paths) != 5 {
+	if err != nil || len(paths) != expectedCount {
 		t.Fatalf("corpus paths = %#v, %v", paths, err)
 	}
 	for _, path := range paths {
@@ -91,7 +111,7 @@ func runFrozenOpenSetPromotion(t *testing.T, cli string, installedIndex libraryr
 				request.Validation.RequireDRC = false
 			}
 			artifactRoot := t.TempDir()
-			if configured := os.Getenv("KICADAI_OPEN_SET_ARTIFACT_DIR"); configured != "" {
+			if configured := os.Getenv(artifactEnv); configured != "" {
 				artifactRoot = filepath.Join(configured, filepath.Base(path))
 				if err := os.MkdirAll(artifactRoot, 0o755); err != nil {
 					t.Fatal(err)

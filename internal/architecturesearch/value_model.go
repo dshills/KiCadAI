@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"math"
 	"slices"
 	"strings"
 
@@ -18,6 +19,7 @@ const (
 	FormulaSallenKeyLowPass  = "sallen_key_low_pass"
 	FormulaHysteresis        = "comparator_hysteresis"
 	FormulaGateDrive         = "gate_drive"
+	FormulaCurrentSense      = "current_sense_transfer"
 	FormulaRatingMargin      = "rating_margin"
 	FormulaRevision          = "1.0.0"
 
@@ -110,6 +112,7 @@ func FormulaLibraryHash() string {
 		{ID: FormulaDividerAttenuator, Revision: FormulaRevision},
 		{ID: FormulaFeedbackDivider, Revision: FormulaRevision},
 		{ID: FormulaGateDrive, Revision: FormulaRevision},
+		{ID: FormulaCurrentSense, Revision: FormulaRevision},
 		{ID: FormulaHysteresis, Revision: FormulaRevision},
 		{ID: FormulaRCPole, Revision: FormulaRevision},
 		{ID: FormulaRatingMargin, Revision: FormulaRevision},
@@ -182,6 +185,31 @@ func ValidateCalculation(evidence CalculationEvidence) []reports.Issue {
 		issues = append(issues, architectureIssue(CodeValueInputInvalid, "calculation.hash", "calculation evidence hash is missing or invalid"))
 	}
 	return issues
+}
+
+// ObservedCalculation records a deterministic provider-derived scalar so a
+// later composition pass can compare it with a system-level constraint. The
+// zero floor makes negative or non-finite observations fail at the provider
+// boundary instead of becoming untrusted global evidence.
+func ObservedCalculation(id string, outputs ...NamedQuantity) (CalculationEvidence, error) {
+	if len(outputs) == 0 {
+		return CalculationEvidence{}, fmt.Errorf("observed calculation requires at least one output")
+	}
+	bounds := make([]CalculationBound, 0, len(outputs))
+	worst := math.Inf(1)
+	for _, output := range outputs {
+		if !finiteNumbers(output.Value) || output.Value < 0 || !validSemanticID(canonicalIdentifier(output.Name)) {
+			return CalculationEvidence{}, fmt.Errorf("observed calculation output is invalid")
+		}
+		bound := minimumBound(canonicalIdentifier(output.Name)+"_evidence", 0, output.Value, output.Unit)
+		bounds = append(bounds, bound)
+		worst = math.Min(worst, normalizedMargin(bound.Margin, 1))
+	}
+	evidence := CalculationEvidence{
+		ID: id, FormulaID: FormulaRatingMargin, FormulaRevision: FormulaRevision,
+		NominalOutputs: outputs, Bounds: bounds, WorstMargin: quantize(worst), Pass: true,
+	}
+	return FinalizeCalculation(evidence)
 }
 
 func normalizeNamedQuantities(values []NamedQuantity) {

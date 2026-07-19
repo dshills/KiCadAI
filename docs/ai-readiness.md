@@ -129,6 +129,23 @@ higher power, mains-connected supplies, arbitrary output architectures,
 unreviewed substitutions, and heatsinks outside the modeled envelope remain
 unsupported and must fail closed.
 
+## Open-Set Composition
+
+The first frozen open-set corpus proves five single-function requirements. A
+second adversarial corpus proves 10 behavior-only multi-function requirements
+containing 35 objectives and 3 abstract participants. Search composes 18 typed,
+registered capabilities, validates 23 whole-circuit constraints before scoring,
+and reports selected, rejected, unsupported, ambiguous, and budget-exhausted
+obligations with deterministic alternatives and rationale.
+
+All 10 adversarial circuits pass component, rating, value, tolerance, lowering,
+writer, round-trip, connectivity, routing, clean installed-KiCad ERC, and strict
+DRC gates. This is measured readiness inside the checked-in 95-record catalog;
+unknown capabilities, insufficient evidence, incompatible domains, unsafe
+startup, and exceeded budgets fail closed. It does not establish unrestricted
+natural-language intent, arbitrary topology or parts, RF/high-speed design,
+mains safety, or general dense-board autorouting.
+
 ## Validation
 
 Run:

@@ -1,0 +1,18 @@
+{
+  "schema": "kicadai.adversarial-multi-function-composition-corpus.v1",
+  "version": 1,
+  "frozen_at": "2026-07-19",
+  "policy_version": "architecture-search-policy-v2",
+  "fixtures": [
+    {"id": "battery_window_disconnect", "file": "battery_window_disconnect.json", "capabilities": ["load_switch", "safety_interlock", "threshold_detection"], "domains": ["power", "protection"], "sha256": "154979e5b226f976aa2a01ca091d09eceddb8c331c3a1aba2b5e2d4454fcfb28"},
+    {"id": "current_sensed_load_protection", "file": "current_sensed_load_protection.json", "capabilities": ["current_sensing", "fault_indication", "load_switch", "threshold_detection"], "domains": ["analog", "logic", "power", "protection"], "sha256": "c24c0706dd61c01f669810778fed040d7dd14344b1bd6aada6a7876f911bfe55"},
+    {"id": "filtered_amplifier_protected_output", "file": "filtered_amplifier_protected_output.json", "capabilities": ["frequency_filter", "output_protection", "signal_amplification"], "domains": ["analog", "protection"], "sha256": "e5f3490cee77ef7486b64b56acd8daa9b766f761a76c7c2e68da5418fce029c7"},
+    {"id": "hysteretic_load_fault_driver", "file": "hysteretic_load_fault_driver.json", "capabilities": ["fault_indication", "load_switch", "threshold_detection"], "domains": ["analog", "logic", "power", "protection"], "sha256": "21c8c7b9ee8fcb99a80403beafa3176915a57a411a91c4be9a5a6ee29bf3c305"},
+    {"id": "isolated_protected_gateway", "file": "isolated_protected_gateway.json", "capabilities": ["galvanic_isolation", "logic_level_translation", "transient_protection", "voltage_regulation"], "domains": ["interface", "isolation", "power", "protection"], "sha256": "085e55028ff1761a7dc4911fd342669a3790f88fd3c524152229ef5d8b06879b"},
+    {"id": "mcu_managed_class_ab_output", "file": "mcu_managed_class_ab_output.json", "capabilities": ["class_ab_bias_control", "class_ab_output_stage", "mute_control", "output_protection"], "domains": ["amplifier", "analog", "mcu", "power", "protection"], "sha256": "b86390ca735f47173817957b0b04414ab40d7654ff74c1381d9994cac2547acd"},
+    {"id": "precision_sensor_decision_chain", "file": "precision_sensor_decision_chain.json", "capabilities": ["fault_indication", "frequency_filter", "instrumentation_amplification", "threshold_detection"], "domains": ["analog", "sensor"], "sha256": "f72ff645d34e996953b608c8bfc48c8330adea81ea91934aa067d6769def6e42"},
+    {"id": "protected_sensor_controller", "file": "protected_sensor_controller.json", "capabilities": ["logic_level_translation", "transient_protection", "voltage_regulation"], "domains": ["interface", "mcu", "power", "protection", "sensor"], "sha256": "03fca1cb31c3c4f9ec8b866e5d5225c7856ee044c4abaa43b0f6c4b8842ac0cb"},
+    {"id": "regulated_class_a_line_driver", "file": "regulated_class_a_line_driver.json", "capabilities": ["class_a_amplification", "output_protection", "voltage_regulation"], "domains": ["amplifier", "analog", "power", "protection"], "sha256": "e43e26e86a026734572be44e1b6f7a675f3af5caf323d2fc1923c8581105ef64"},
+    {"id": "split_supply_analog_frontend", "file": "split_supply_analog_frontend.json", "capabilities": ["frequency_filter", "signal_amplification", "split_supply_generation"], "domains": ["analog", "power"], "sha256": "3017e0280584cf48bbec2555a987a901541d5f3e3ce6adcd296e9ce78b694e69"}
+  ]
+}

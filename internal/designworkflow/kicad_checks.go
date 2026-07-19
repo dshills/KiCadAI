@@ -4,7 +4,6 @@ import (
 	"context"
 	"path/filepath"
 	"strings"
-	"sync"
 	"time"
 
 	"kicadai/internal/kicadfiles/checks"
@@ -90,7 +89,6 @@ func RunKiCadChecks(ctx context.Context, request *Request, write *ProjectWriteRe
 	var result KiCadCheckStageResult
 	var issues []reports.Issue
 	var artifacts []reports.Artifact
-	var wg sync.WaitGroup
 	var ercResult checks.CheckResult
 	var drcResult checks.CheckResult
 	var ercIssues []reports.Issue
@@ -107,11 +105,7 @@ func RunKiCadChecks(ctx context.Context, request *Request, write *ProjectWriteRe
 				Message:  "schematic path or project root is required for ERC",
 			})
 		} else {
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
-				ercResult, ercIssues, ercArtifacts = runWorkflowERC(ctx, cli, target, checkOpts)
-			}()
+			ercResult, ercIssues, ercArtifacts = runWorkflowERC(ctx, cli, target, checkOpts)
 		}
 	}
 	if opts.RequireDRC {
@@ -124,14 +118,9 @@ func RunKiCadChecks(ctx context.Context, request *Request, write *ProjectWriteRe
 				Message:  "PCB path or project root is required for DRC",
 			})
 		} else {
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
-				drcResult, drcIssues, drcArtifacts = runWorkflowDRC(ctx, cli, target, checkOpts)
-			}()
+			drcResult, drcIssues, drcArtifacts = runWorkflowDRC(ctx, cli, target, checkOpts)
 		}
 	}
-	wg.Wait()
 	result.ERC = ercResult
 	result.DRC = drcResult
 	issues = append(issues, ercIssues...)

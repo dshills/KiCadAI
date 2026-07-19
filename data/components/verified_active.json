@@ -10,7 +10,7 @@
       "mpn": "LMV321IDBVR",
       "lifecycle": "active",
       "tags": ["analog", "opamp", "single", "low_voltage", "sot23_5"],
-      "ratings": [{"kind": "supply_voltage", "min": "2.7", "max": "5.5", "unit": "V"}],
+      "ratings": [{"kind": "supply_voltage", "min": "2.7", "max": "5.5", "unit": "V"}, {"kind": "supply_current", "max": "0.35", "unit": "mA"}],
       "temperature": {"min": "-40", "max": "125", "unit": "C"},
       "companions": [{"id": "opamp.decoupling_capacitor", "family": "capacitor", "role": "decoupling_capacitor", "required": true, "recipes": [{"id": "supply_bypass", "family": "capacitor", "role": "decoupling_capacitor", "package": "0603", "value_kind": "capacitance", "value": "100n", "min_voltage_v": 6.3, "minimum_confidence": "rule_inferred", "required_functions": ["A", "B"], "connections": [{"function": "A", "parent_function": "V_PLUS"}, {"function": "B", "parent_function": "V_MINUS"}]}], "description": "Place supply decoupling capacitor close to V+ and V- pins."}],
       "simulation_models": [{
@@ -442,7 +442,7 @@
       "mpn": "BME280",
       "lifecycle": "active",
       "tags": ["sensor", "i2c", "spi", "temperature", "humidity", "pressure", "lga8"],
-      "ratings": [{"kind": "supply_voltage", "min": "1.71", "max": "3.6", "unit": "V"}],
+      "ratings": [{"kind": "supply_voltage", "min": "1.71", "max": "3.6", "unit": "V"}, {"kind": "supply_current", "max": "1.5", "unit": "mA"}],
       "companions": [
         {"id": "sensor.decoupling_capacitor", "family": "capacitor", "role": "decoupling_capacitor", "required": true, "recipes": [{"id": "supply_bypass", "family": "capacitor", "role": "decoupling_capacitor", "package": "0603", "value_kind": "capacitance", "value": "100n", "min_voltage_v": 6.3, "minimum_confidence": "rule_inferred", "required_functions": ["A", "B"], "connections": [{"function": "A", "parent_function": "VDD"}, {"function": "B", "parent_function": "GND"}]}], "description": "Place a local decoupling capacitor close to VDD/VDDIO and GND."},
         {"id": "sensor.i2c_pullups", "family": "resistor", "role": "i2c_pullup", "required": true, "applies_to": ["i2c_peripheral"], "recipes": [{"id": "sda_pullup", "family": "resistor", "role": "pullup", "package": "0603", "value_kind": "resistance", "value": "4.7k", "minimum_confidence": "rule_inferred", "required_functions": ["A", "B"], "connections": [{"function": "A", "parent_function": "VDD"}, {"function": "B", "parent_function": "SDA"}]}, {"id": "scl_pullup", "family": "resistor", "role": "pullup", "package": "0603", "value_kind": "resistance", "value": "4.7k", "minimum_confidence": "rule_inferred", "required_functions": ["A", "B"], "connections": [{"function": "A", "parent_function": "VDD"}, {"function": "B", "parent_function": "SCL"}]}], "description": "I2C mode requires pull-ups on SDA and SCL."}
@@ -765,7 +765,7 @@
       "mpn": "ATmega328P-AU",
       "lifecycle": "active",
       "tags": ["mcu", "avr", "tqfp32", "minimal_system"],
-      "ratings": [{"kind": "supply_voltage", "min": "1.8", "max": "5.5", "unit": "V"}],
+      "ratings": [{"kind": "supply_voltage", "min": "1.8", "max": "5.5", "unit": "V"}, {"kind": "supply_current", "max": "14", "unit": "mA"}],
       "companions": [
         {"id": "mcu.decoupling_vcc", "family": "capacitor", "role": "decoupling_capacitor", "required": true, "recipes": [{"id": "vcc_bypass", "family": "capacitor", "role": "decoupling_capacitor", "package": "0603", "value_kind": "capacitance", "value": "100n", "min_voltage_v": 6.3, "minimum_confidence": "rule_inferred", "required_functions": ["A", "B"], "connections": [{"function": "A", "parent_function": "VCC"}, {"function": "B", "parent_function": "GND"}]}, {"id": "avcc_bypass", "family": "capacitor", "role": "decoupling_capacitor", "package": "0603", "value_kind": "capacitance", "value": "100n", "min_voltage_v": 6.3, "minimum_confidence": "rule_inferred", "required_functions": ["A", "B"], "connections": [{"function": "A", "parent_function": "AVCC"}, {"function": "B", "parent_function": "AGND"}]}], "description": "Place decoupling capacitors near VCC/AVCC and GND pins."},
         {"id": "mcu.reset_pullup", "family": "resistor", "role": "reset_pullup", "required": true, "recipes": [{"id": "reset_pullup", "family": "resistor", "role": "pullup", "package": "0603", "value_kind": "resistance", "value": "10k", "minimum_confidence": "rule_inferred", "required_functions": ["A", "B"], "connections": [{"function": "A", "parent_function": "VCC"}, {"function": "B", "parent_function": "RESET"}]}], "description": "RESET requires a pull-up unless held by another verified circuit."},

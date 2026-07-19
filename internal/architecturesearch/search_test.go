@@ -145,6 +145,127 @@ func TestSearchComposesChildCapabilityObligations(t *testing.T) {
 	}
 }
 
+func TestSearchComposesIndependentProvidersThroughTypedSignal(t *testing.T) {
+	producer := lowDemandTestProvider("generic_producer_provider", "generic_producer", "producer", 0.02)
+	consumer := lowDemandTestProvider("generic_consumer_provider", "generic_consumer", "consumer", 0.02)
+	registry, issues := NewRegistry(producer, consumer)
+	if len(issues) != 0 {
+		t.Fatal(issues)
+	}
+	requirement := validMultiFunctionRequirement()
+	first := Search(context.Background(), requirement, registry, SearchOptions{CatalogHash: "synthetic_catalog"})
+	if first.Status != SearchSelected || first.Selected == nil || len(first.Selected.Selections) != 2 {
+		t.Fatalf("typed-signal search = %#v", first)
+	}
+	if first.PolicyVersion != PolicyVersionV2 || first.Coverage == nil || first.Coverage.Metrics.Total != 2 || first.Coverage.Metrics.Selected != 2 || first.Coverage.Metrics.Rejected != 0 || first.Coverage.Metrics.Unsupported != 0 || first.Coverage.Metrics.Ambiguous != 0 || first.Coverage.Metrics.BudgetExhausted != 0 {
+		t.Fatalf("typed-signal coverage = %#v", first.Coverage)
+	}
+	if len(first.Selected.GlobalChecks) < 2 {
+		t.Fatalf("global checks do not cover signal and domain budgets: %#v", first.Selected.GlobalChecks)
+	}
+	var endpoints []RoleContract
+	for _, selection := range first.Selected.Selections {
+		for _, port := range selection.Ports {
+			if port.Anchor == signalAnchor("conditioned") {
+				endpoints = append(endpoints, port)
+			}
+		}
+	}
+	if len(endpoints) != 2 || endpoints[0].Contract.Direction == endpoints[1].Contract.Direction {
+		t.Fatalf("shared signal endpoints = %#v", endpoints)
+	}
+
+	reordered := cloneRequirement(requirement)
+	slices.Reverse(reordered.Requirements.Objectives)
+	for index := range reordered.Requirements.Objectives {
+		slices.Reverse(reordered.Requirements.Objectives[index].Bindings)
+	}
+	second := Search(context.Background(), reordered, registry, SearchOptions{CatalogHash: "synthetic_catalog"})
+	firstJSON, _ := json.Marshal(first)
+	secondJSON, _ := json.Marshal(second)
+	if string(firstJSON) != string(secondJSON) {
+		t.Fatalf("typed-signal search changed under input reordering\n%s\n%s", firstJSON, secondJSON)
+	}
+}
+
+func TestV2GlobalCurrentBudgetAndHeadroomFailClosed(t *testing.T) {
+	tests := []struct {
+		name       string
+		demandA    float64
+		headroomPC *float64
+	}{
+		{name: "aggregate demand", demandA: 0.06},
+		{name: "required headroom", demandA: 0.03, headroomPC: float64Pointer(50)},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			requirement := validMultiFunctionRequirement()
+			if test.headroomPC != nil {
+				requirement.Requirements.SystemConstraints = append(requirement.Requirements.SystemConstraints, Constraint{Name: "supply_current_headroom", Relation: "minimum", Value: json.RawMessage(fmt.Sprintf("%g", *test.headroomPC)), Unit: "%"})
+			}
+			registry, issues := NewRegistry(
+				lowDemandTestProvider("producer", "generic_producer", "producer", test.demandA),
+				lowDemandTestProvider("consumer", "generic_consumer", "consumer", test.demandA),
+			)
+			if len(issues) != 0 {
+				t.Fatal(issues)
+			}
+			result := Search(context.Background(), requirement, registry, SearchOptions{})
+			if result.Status != SearchUnsupported || result.Selected != nil || !rejectionSummaryContains(result.Rejections, CodeGlobalCurrentExceeded) {
+				t.Fatalf("global-current result = %#v", result)
+			}
+		})
+	}
+}
+
+func TestV2ZeroCurrentBudgetCannotProveHeadroom(t *testing.T) {
+	requirement := Requirement{
+		Version: VersionV2,
+		Requirements: Requirements{
+			Domains:           []Domain{{ID: "zero_supply", Kind: "supply", MaxCurrentA: float64Pointer(0)}},
+			SystemConstraints: []Constraint{{Name: "supply_current_headroom", Relation: "minimum", Value: json.RawMessage(`20`), Unit: "%"}},
+		},
+	}
+	selections := []FragmentSelection{{Ports: []RoleContract{{
+		Role: "power", Anchor: "domain:zero_supply", Contract: PortContract{Kind: "power", Direction: "sink", Domain: "zero_supply", CurrentDemandA: float64Pointer(0)},
+	}}}}
+	_, rejection := validateCandidateGlobal(requirement, selections)
+	if rejection == nil || rejection.Code != CodeGlobalCurrentUnknown {
+		t.Fatalf("zero current budget headroom rejection = %#v", rejection)
+	}
+}
+
+func TestV2UnknownSystemConstraintFailsClosed(t *testing.T) {
+	requirement := validMultiFunctionRequirement()
+	requirement.Requirements.SystemConstraints = []Constraint{{Name: "unmodeled_behavior", Relation: "required", Value: json.RawMessage(`true`)}}
+	registry, issues := NewRegistry(
+		lowDemandTestProvider("producer", "generic_producer", "producer", 0.02),
+		lowDemandTestProvider("consumer", "generic_consumer", "consumer", 0.02),
+	)
+	if len(issues) != 0 {
+		t.Fatal(issues)
+	}
+	result := Search(context.Background(), requirement, registry, SearchOptions{})
+	if result.Status != SearchUnsupported || result.Selected != nil || !rejectionSummaryContains(result.Rejections, CodeGlobalConstraintUnproven) {
+		t.Fatalf("unknown global constraint did not fail closed: %#v", result)
+	}
+}
+
+func TestV2CapabilityCoverageClassifiesUnsupportedRequest(t *testing.T) {
+	requirement := validMultiFunctionRequirement()
+	registry, issues := NewRegistry(scoredTestProvider("producer_only", "generic_producer", []testExpansionScore{{id: "producer", margin: 0.2, components: 1}}))
+	if len(issues) != 0 {
+		t.Fatal(issues)
+	}
+	result := Search(context.Background(), requirement, registry, SearchOptions{})
+	if result.Status != SearchUnsupported || result.Coverage == nil || result.Coverage.Metrics.Total != 2 || result.Coverage.Metrics.Unsupported != 1 {
+		t.Fatalf("unsupported coverage = %#v result=%#v", result.Coverage, result)
+	}
+	if result.Coverage.Metrics.Total != result.Coverage.Metrics.Selected+result.Coverage.Metrics.Rejected+result.Coverage.Metrics.Unsupported+result.Coverage.Metrics.Ambiguous+result.Coverage.Metrics.BudgetExhausted {
+		t.Fatalf("coverage metrics do not reconcile: %#v", result.Coverage.Metrics)
+	}
+}
+
 func TestSearchRecordsDeterministicElectricalRejectionsAndFailsClosed(t *testing.T) {
 	provider := staticTestProvider{
 		descriptor: validProviderDescriptor("unsafe_threshold", "threshold_detection"),
@@ -329,6 +450,30 @@ func scoredTestProvider(id, capability string, scores []testExpansionScore) stat
 				expansions = append(expansions, expansion)
 			}
 			slices.Reverse(expansions)
+			return expansions, nil
+		},
+	}
+}
+
+func lowDemandTestProvider(id, capability, expansionID string, demandA float64) staticTestProvider {
+	return staticTestProvider{
+		descriptor: validProviderDescriptor(id, capability),
+		expand: func(request ProviderRequest) ([]ProviderExpansion, error) {
+			expansions := []ProviderExpansion{
+				compatibleExpansion(request, expansionID, 1, 0.3),
+				compatibleExpansion(request, expansionID+"_alternative", 2, 0.2),
+			}
+			for expansionIndex := range expansions {
+				for index := range expansions[expansionIndex].OfferedPorts {
+					contract := &expansions[expansionIndex].OfferedPorts[index].Contract
+					if contract.Kind == "power" && contract.Direction == "sink" {
+						contract.CurrentDemandA = float64Pointer(demandA)
+					}
+					if expansions[expansionIndex].OfferedPorts[index].Role == "output" && contract.Direction == "source" {
+						contract.DefaultState = "inactive"
+					}
+				}
+			}
 			return expansions, nil
 		},
 	}

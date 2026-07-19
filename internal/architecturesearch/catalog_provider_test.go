@@ -3,6 +3,7 @@ package architecturesearch
 import (
 	"context"
 	"encoding/json"
+	"math"
 	"slices"
 	"strings"
 	"testing"
@@ -27,8 +28,13 @@ func TestCatalogProviderSearchesSyntheticThresholdDeterministically(t *testing.T
 		t.Fatalf("catalog search = %#v", result)
 	}
 	selection := result.Selected.Selections[0]
-	if selection.ProviderID != "catalog_function_fragments" || len(selection.Calculations) != 1 || len(selection.Components) != 6 {
+	if selection.ProviderID != "catalog_function_fragments" || len(selection.Calculations) != 3 || len(selection.Components) != 6 {
 		t.Fatalf("selection = %#v", selection)
+	}
+	if !slices.ContainsFunc(selection.Calculations, func(calculation CalculationEvidence) bool {
+		return calculation.ID == "catalog_power_current_demand"
+	}) {
+		t.Fatalf("selection lacks catalog-backed power demand: %#v", selection.Calculations)
 	}
 	realization, err := DecodeFragmentRealization(selection.Payload)
 	if err != nil {
@@ -100,14 +106,57 @@ func TestCatalogProviderGenericCapabilityMutations(t *testing.T) {
 	}
 }
 
+func TestCatalogProviderUsesRatedReverseBlockingPowerPathWhenRequired(t *testing.T) {
+	provider, err := NewCatalogProvider(loadArchitectureCatalog(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	input := providerRole("input", "power", "sink", 1.7, 1.9)
+	output := providerRole("output", "power", "source", 1.7, 1.9)
+	current := 0.08
+	input.Contract.RequiredCurrentCapacityA = &current
+	output.Contract.MaximumCurrentDemandA = &current
+	expansions, err := provider.Expand(context.Background(), ProviderRequest{
+		Capability:  "transient_protection",
+		Ports:       []RoleContract{input, output, providerRole("reference", "reference", "bidirectional", 0, 0)},
+		Constraints: []Constraint{constraintBool("reverse_current_blocking", "required", true)},
+	})
+	if err != nil || len(expansions) < 2 {
+		t.Fatalf("expansions = %#v err = %v", expansions, err)
+	}
+	realization, err := DecodeFragmentRealization(expansions[0].Payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.ContainsFunc(realization.Instances, func(instance RealizationInstance) bool {
+		return instance.CatalogID == "protection.ti.tps22917dbv.sot23_6" && slices.Contains(instance.RequiredFunctions, "VOUT")
+	}) {
+		t.Fatalf("reverse-blocking realization = %#v", realization)
+	}
+	if !slices.ContainsFunc(realization.Connections, func(connection RealizationConnection) bool {
+		return slices.ContainsFunc(connection.Endpoints, func(endpoint RealizationEndpoint) bool {
+			return endpoint.Instance == "reverse_blocking_switch" && endpoint.Function == "VOUT"
+		})
+	}) {
+		t.Fatalf("reverse-blocking output is not connected: %#v", realization.Connections)
+	}
+}
+
 func TestCatalogProviderOffersAndRanksRealFilterAlternative(t *testing.T) {
 	catalog := loadArchitectureCatalog(t)
 	provider, _ := NewCatalogProvider(catalog)
 	expansions, err := provider.Expand(context.Background(), filterProviderRequest(5, 2000))
-	if err != nil || len(expansions) != 2 {
+	if err != nil || len(expansions) < 2 {
 		t.Fatalf("filter expansions = %#v, %v", expansions, err)
 	}
-	if expansions[0].ID == expansions[1].ID || len(expansions[0].Components) == len(expansions[1].Components) {
+	hasDifferentComponentCount := false
+	for _, expansion := range expansions[1:] {
+		if len(expansions[0].Components) != len(expansion.Components) {
+			hasDifferentComponentCount = true
+			break
+		}
+	}
+	if !hasDifferentComponentCount {
 		t.Fatalf("filter alternatives are not distinct: %#v", expansions)
 	}
 }
@@ -118,7 +167,7 @@ func TestCatalogProviderConnectsAuxiliaryMCUSupplyPinsToTheirDomains(t *testing.
 		t.Fatal(err)
 	}
 	expansions, err := provider.Expand(context.Background(), participantProviderRequest("programmable_controller", "sensor_bus", 3.3))
-	if err != nil || len(expansions) != 1 {
+	if err != nil || len(expansions) < 1 {
 		t.Fatalf("controller expansion = %#v, %v", expansions, err)
 	}
 	realization, err := DecodeFragmentRealization(expansions[0].Payload)
@@ -155,7 +204,7 @@ func TestCatalogProviderIsolatesSensorAddressStrapFromPowerFlagDomain(t *testing
 		t.Fatal(err)
 	}
 	expansions, err := provider.Expand(context.Background(), participantProviderRequest("environment_sensor", "sensor_bus", 1.8))
-	if err != nil || len(expansions) != 1 {
+	if err != nil || len(expansions) < 1 {
 		t.Fatalf("sensor expansion = %#v, %v", expansions, err)
 	}
 	realization, err := DecodeFragmentRealization(expansions[0].Payload)
@@ -220,6 +269,150 @@ func TestRecordSupportsEveryRequiredRating(t *testing.T) {
 	}
 	if !recordSupportsRatings(components.ComponentRecord{Ratings: []components.RatingConstraint{{Kind: "voltage", Max: "0.3", Unit: "V"}}}, []components.RequiredRating{{Kind: "voltage", Value: numericString(0.1 + 0.2), Unit: "V"}}) {
 		t.Fatal("quantized floating-point boundary was rejected")
+	}
+}
+
+func TestCatalogPowerDemandUsesSelectedPartEvidence(t *testing.T) {
+	maximum := 0.1
+	request := ProviderRequest{Capability: "synthetic_powered_fragment", Ports: []RoleContract{{
+		Role: "power", Contract: PortContract{Kind: "power", Direction: "sink", Voltage: NumericRange{Minimum: float64Pointer(4.5), Maximum: float64Pointer(5.5)}, MaximumCurrentDemandA: &maximum},
+	}}}
+	powered := catalogPart{
+		selected: SelectedComponent{InstanceID: "active", CatalogID: "active.synthetic", VariantID: "package"},
+		record: components.ComponentRecord{
+			ID: "active.synthetic", Family: "active",
+			Ratings: []components.RatingConstraint{{Kind: "supply_current", Max: "2.4", Unit: "mA"}},
+			Symbols: []components.SymbolBinding{{FunctionPins: []components.FunctionPin{{Function: "VCC", Electrical: "power_in"}}}},
+		},
+	}
+	demand, proven, calculations, err := catalogFragmentPowerDemand(request, []catalogPart{powered}, nil, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !proven["power"] || len(calculations) != 1 || demand["power"] != 0.0024 {
+		t.Fatalf("demand=%v proven=%v calculations=%#v", demand, proven, calculations)
+	}
+	parts := []catalogPart{{
+		selected: SelectedComponent{InstanceID: "active", CatalogID: "active.synthetic", VariantID: "package"},
+		record: components.ComponentRecord{
+			ID: "active.synthetic", Family: "active",
+			Ratings: []components.RatingConstraint{{Kind: "supply_current", Max: "2.4", Unit: "mA"}},
+			Symbols: []components.SymbolBinding{{FunctionPins: []components.FunctionPin{{Function: "VCC", Electrical: "power_in"}}}},
+		},
+	}}
+	for index := 0; index < 20; index++ {
+		parts = append(parts, catalogPart{
+			selected: SelectedComponent{InstanceID: "passive_" + numericString(float64(index))},
+			record:   components.ComponentRecord{Family: "capacitor"}, value: "100n",
+		})
+	}
+	second, secondProven, _, err := catalogFragmentPowerDemand(request, parts, nil, nil, nil)
+	if err != nil || !secondProven["power"] || second["power"] != demand["power"] {
+		t.Fatalf("passive count changed demand: first=%v second=%v proven=%v err=%v", demand, second, secondProven, err)
+	}
+}
+
+func TestCatalogPowerDemandFallsBackToRequestCeilingWithoutEvidence(t *testing.T) {
+	maximum := 0.01
+	request := ProviderRequest{Capability: "synthetic_powered_fragment", Ports: []RoleContract{{
+		Role: "power", Contract: PortContract{Kind: "power", Direction: "sink", MaximumCurrentDemandA: &maximum},
+	}}}
+	part := catalogPart{record: components.ComponentRecord{Symbols: []components.SymbolBinding{{FunctionPins: []components.FunctionPin{{Function: "VCC", Electrical: "power_in"}}}}}}
+	_, proven, calculations, err := catalogFragmentPowerDemand(request, []catalogPart{part}, nil, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if proven["power"] || len(calculations) != 0 {
+		t.Fatalf("missing evidence was treated as proven: proven=%v calculations=%#v", proven, calculations)
+	}
+	offered := offeredCatalogPorts(request, nil, nil)
+	if len(offered) != 1 || offered[0].Contract.CurrentDemandA == nil || *offered[0].Contract.CurrentDemandA != maximum {
+		t.Fatalf("fallback ports = %#v", offered)
+	}
+}
+
+func TestCatalogPowerDemandSolvesStaticResistorNetwork(t *testing.T) {
+	maximum := 0.01
+	request := ProviderRequest{Capability: "synthetic_divider", Ports: []RoleContract{
+		{Role: "power", Contract: PortContract{Kind: "power", Direction: "sink", Voltage: NumericRange{Minimum: float64Pointer(5), Maximum: float64Pointer(5)}, MaximumCurrentDemandA: &maximum}},
+		{Role: "reference", Contract: PortContract{Kind: "reference", Direction: "bidirectional", Voltage: NumericRange{Minimum: float64Pointer(0), Maximum: float64Pointer(0)}}},
+	}}
+	parts := []catalogPart{
+		{selected: SelectedComponent{InstanceID: "upper"}, record: components.ComponentRecord{Family: "resistor"}, value: "10k"},
+		{selected: SelectedComponent{InstanceID: "lower"}, record: components.ComponentRecord{Family: "resistor"}, value: "10k"},
+	}
+	bindings := []RealizationPortBinding{{Role: "power", Instance: "upper", Function: "A"}, {Role: "reference", Instance: "lower", Function: "B"}}
+	connections := []RealizationConnection{semanticNet("midpoint", "analog_signal", passiveEndpoint("upper", "B"), passiveEndpoint("lower", "A"))}
+	demand, proven, _, err := catalogFragmentPowerDemand(request, parts, bindings, nil, connections)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !proven["power"] || math.Abs(demand["power"]-0.00025) > 1e-12 {
+		t.Fatalf("divider demand=%v proven=%v", demand, proven)
+	}
+}
+
+func TestCatalogPowerDemandIsAccountedPerRail(t *testing.T) {
+	maximum := 0.01
+	request := ProviderRequest{Capability: "synthetic_multi_rail", Ports: []RoleContract{
+		{Role: "power_a", Contract: PortContract{Kind: "power", Direction: "sink", Domain: "a", Voltage: NumericRange{Minimum: float64Pointer(5), Maximum: float64Pointer(5)}, MaximumCurrentDemandA: &maximum}},
+		{Role: "power_b", Contract: PortContract{Kind: "power", Direction: "sink", Domain: "b", Voltage: NumericRange{Minimum: float64Pointer(3.3), Maximum: float64Pointer(3.3)}, MaximumCurrentDemandA: &maximum}},
+		{Role: "reference", Contract: PortContract{Kind: "reference", Direction: "bidirectional", Voltage: NumericRange{Minimum: float64Pointer(0), Maximum: float64Pointer(0)}}},
+	}}
+	part := catalogPart{record: components.ComponentRecord{
+		Ratings: []components.RatingConstraint{{Kind: "supply_current", Max: "1", Unit: "mA"}},
+		Symbols: []components.SymbolBinding{{FunctionPins: []components.FunctionPin{{Function: "VCCA", Electrical: "power_in"}, {Function: "VCCB", Electrical: "power_in"}}}},
+	}}
+	demand, proven, calculations, err := catalogFragmentPowerDemand(request, []catalogPart{part}, nil, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !proven["power_a"] || !proven["power_b"] || demand["power_a"] != 0.001 || demand["power_b"] != 0.001 || len(calculations) != 2 {
+		t.Fatalf("per-rail demand=%v proven=%v calculations=%#v", demand, proven, calculations)
+	}
+}
+
+func TestGPIOAllocationRequiresPinCapabilitiesAndAvoidsAliasReuse(t *testing.T) {
+	record := components.ComponentRecord{Symbols: []components.SymbolBinding{{FunctionPins: []components.FunctionPin{
+		{Function: "GPIO_1"},
+		{Function: "GPIO_2", Aliases: []string{"ADC0"}},
+		{Function: "GPIO_3", Aliases: []string{"PWM_OC1"}},
+		{Function: "GPIO_4", Aliases: []string{"I2C_SDA"}},
+		{Function: "P0.1"},
+		{Function: "PA0", Aliases: []string{"ADC1"}},
+		{Function: "PWR1"},
+	}}}}
+	if got := availableGPIOFunctions(record, PortContract{Kind: "digital_logic", Direction: "source"}, map[string]bool{"I2C_SDA": true}); !slices.Equal(got, []string{"GPIO_1", "GPIO_2", "GPIO_3", "P0.1", "PA0"}) {
+		t.Fatalf("digital GPIO candidates = %v", got)
+	}
+	if got := availableGPIOFunctions(record, PortContract{Kind: "analog_voltage", Direction: "sink"}, nil); !slices.Equal(got, []string{"GPIO_2", "PA0"}) {
+		t.Fatalf("ADC candidates = %v", got)
+	}
+	if got := availableGPIOFunctions(record, PortContract{Kind: "analog_control", Direction: "source"}, nil); !slices.Equal(got, []string{"GPIO_3"}) {
+		t.Fatalf("PWM candidates = %v", got)
+	}
+	if got := availableGPIOFunctions(record, PortContract{Kind: "analog_voltage", Direction: "source"}, nil); len(got) != 0 {
+		t.Fatalf("digital-only record offered a DAC candidate: %v", got)
+	}
+}
+
+func TestCatalogPowerDemandAddsActiveLoadToAlternativeConversionBound(t *testing.T) {
+	maximum := 1.0
+	request := ProviderRequest{Capability: "synthetic_converter", Ports: []RoleContract{
+		{Role: "input", Contract: PortContract{Kind: "power", Direction: "sink", Domain: "input", Voltage: NumericRange{Minimum: float64Pointer(5), Maximum: float64Pointer(5)}, MaximumCurrentDemandA: &maximum}},
+		{Role: "output", Contract: PortContract{Kind: "power", Direction: "source", Domain: "output", Voltage: NumericRange{Minimum: float64Pointer(12), Maximum: float64Pointer(12)}, RequiredCurrentCapacityA: float64Pointer(0.1)}},
+	}}
+	part := catalogPart{record: components.ComponentRecord{
+		Ratings: []components.RatingConstraint{{Kind: "supply_current", Max: "1", Unit: "mA"}},
+		Values:  []components.ValueConstraint{{Kind: "efficiency", Typ: "80", Unit: "%"}},
+		Symbols: []components.SymbolBinding{{FunctionPins: []components.FunctionPin{{Function: "VIN", Electrical: "power_in"}}}},
+	}}
+	demand, proven, _, err := catalogFragmentPowerDemand(request, []catalogPart{part}, nil, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !proven["input"] || math.Abs(demand["input"]-0.301) > 1e-12 {
+		t.Fatalf("converter demand=%v proven=%v", demand, proven)
 	}
 }
 

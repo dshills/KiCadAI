@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math"
+	"strings"
 
 	"kicadai/internal/kicadfiles"
 	"kicadai/internal/pcbrules"
@@ -65,6 +66,7 @@ func RouteRequestContext(ctx context.Context, request Request) Result {
 			route.Status = RouteStatusFailed
 		}
 		netRequest.Rules = applyEffectiveRule(request.Rules, effectiveRule)
+		netRequest.Rules = applyAutomaticEndpointNeckdown(netRequest.Rules, plan.Net.Role, netHasNarrowEndpoint(netRequest, plan.Net))
 		searchRequest := routingSearchRequest(netRequest)
 		if plan.Net.Class == "" && (plan.Net.Role == NetPower || plan.Net.Role == NetGround || plan.Net.Role == NetHighCurrent) {
 			route.Issues = append(route.Issues, reports.Issue{
@@ -504,6 +506,39 @@ func routingSearchRequest(request Request) Request {
 		request.Rules.TraceWidthMM = request.Rules.NeckdownWidthMM
 	}
 	return request
+}
+
+func applyAutomaticEndpointNeckdown(rules Rules, role NetRole, narrowEndpoint bool) Rules {
+	if !narrowEndpoint || role != NetPower && role != NetGround && role != NetHighCurrent || rules.NeckdownWidthMM > 0 {
+		return rules
+	}
+	widthMM := max(pcbrules.DefaultPowerNeckdownWidthMM, rules.MinNeckdownWidthMM)
+	if widthMM >= rules.TraceWidthMM {
+		return rules
+	}
+	rules.NeckdownWidthMM = widthMM
+	rules.NeckdownLengthMM = pcbrules.DefaultPowerNeckdownLengthMM
+	return rules
+}
+
+func netHasNarrowEndpoint(request Request, net Net) bool {
+	for _, endpoint := range net.Endpoints {
+		for _, component := range request.Components {
+			if !strings.EqualFold(strings.TrimSpace(component.Ref), strings.TrimSpace(endpoint.Ref)) {
+				continue
+			}
+			for _, pad := range component.Pads {
+				if !strings.EqualFold(strings.TrimSpace(pad.Name), strings.TrimSpace(endpoint.Pin)) {
+					continue
+				}
+				minimumPadDimensionMM := min(pad.Size.WidthMM, pad.Size.HeightMM)
+				if minimumPadDimensionMM > 0 && minimumPadDimensionMM+distanceEpsilon < request.Rules.TraceWidthMM {
+					return true
+				}
+			}
+		}
+	}
+	return false
 }
 
 func endpointNeckdownFallbackRequest(request Request, rules Rules, role NetRole, allowSignal bool) (Request, bool) {

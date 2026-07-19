@@ -1,0 +1,153 @@
+{
+  "version": "0.1.0",
+  "records": [
+    {
+      "id": "protection.ti.tps22917dbv.sot23_6",
+      "family": "protection",
+      "name": "TI TPS22917 reverse-current-blocking load switch",
+      "description": "Always-on 1 V to 5.5 V, 2 A load switch with full-time reverse-current blocking and controlled rise time.",
+      "generic": false,
+      "manufacturer": "Texas Instruments",
+      "mpn": "TPS22917DBVR",
+      "lifecycle": "active",
+      "tags": ["2a", "always_on", "load_switch", "reverse_current_blocking", "sot23_6"],
+      "values": [{"kind": "on_resistance", "typ": "120", "unit": "mOhm"}],
+      "ratings": [{"kind": "supply_voltage", "min": "1", "max": "5.5", "unit": "V"}, {"kind": "supply_current", "max": "0.0012", "unit": "mA"}, {"kind": "continuous_current", "max": "2", "unit": "A"}, {"kind": "reverse_leakage_current", "max": "1", "unit": "uA"}],
+      "temperature": {"min": "-40", "max": "125", "unit": "C"},
+      "companions": [{"id": "load_switch.optional_timing_and_discharge", "family": "protection", "role": "unused_pin_policy", "required": true, "no_connects": ["CT", "QOD"], "description": "Leave CT and QOD open for the reviewed default rise-time and disabled output-discharge configuration."}],
+      "symbols": [{"symbol_id": "Power_Management:TPS22917DBV", "function_pins": [{"function": "VIN", "symbol_pin": "1", "electrical": "power_in", "required": true}, {"function": "GND", "symbol_pin": "2", "electrical": "power_in", "required": true}, {"function": "ON", "symbol_pin": "3", "electrical": "input", "required": true}, {"function": "CT", "symbol_pin": "4", "electrical": "output"}, {"function": "QOD", "symbol_pin": "5", "electrical": "passive"}, {"function": "VOUT", "symbol_pin": "6", "electrical": "power_out", "required": true}], "verification": {"confidence": "verified", "sources": ["https://www.ti.com/lit/ds/symlink/tps22917.pdf", "kicad-symbols:Power_Management:TPS22917DBV"], "pinmap_checked": true}}],
+      "packages": [{"id": "sot23_6", "name": "SOT-23-6 DBV", "footprint_id": "Package_TO_SOT_SMD:SOT-23-6", "package_type": "sot23_6", "mpn": "TPS22917DBVR", "lifecycle": "active", "pinmap_id": "Power_Management:TPS22917DBV|Package_TO_SOT_SMD:SOT-23-6", "pad_functions": [{"function": "VIN", "pad": "1"}, {"function": "GND", "pad": "2"}, {"function": "ON", "pad": "3"}, {"function": "CT", "pad": "4"}, {"function": "QOD", "pad": "5"}, {"function": "VOUT", "pad": "6"}], "dimensions_mm": {"width": 3.0, "height": 3.0}, "height_mm": 1.45, "verification": {"confidence": "verified", "sources": ["https://www.ti.com/lit/ds/symlink/tps22917.pdf", "kicad-footprint:Package_TO_SOT_SMD:SOT-23-6"], "pinmap_checked": true}}],
+      "verification": {"confidence": "verified", "sources": ["https://www.ti.com/lit/ds/symlink/tps22917.pdf", "datasheet-pinmap:TI:TPS22917DBV", "kicad-footprint:Package_TO_SOT_SMD:SOT-23-6"], "resolver_checked": true, "pinmap_checked": true, "notes": ["TI specifies full-time reverse-current blocking, 1 V to 5.5 V operation, 2 A maximum continuous current, and 120 mOhm typical on-resistance at 1.8 V."]}
+    },
+    {
+      "id": "current_sensor.ti.ina240a3d.soic8",
+      "family": "current_sensor",
+      "name": "TI INA240A3 100 V/V current-sense amplifier",
+      "description": "Precision bidirectional shunt amplifier for high-side sensing across a -4 V to 80 V common-mode range.",
+      "generic": false,
+      "manufacturer": "Texas Instruments",
+      "mpn": "INA240A3DR",
+      "lifecycle": "active",
+      "tags": ["100_v_per_v", "current_sense", "high_side", "precision", "soic8"],
+      "values": [
+        {"kind": "gain", "typ": "100", "unit": "V/V"},
+        {"kind": "gain_error", "max": "0.2", "unit": "%"},
+        {"kind": "input_offset_voltage", "max": "25", "unit": "uV"}
+      ],
+      "ratings": [
+        {"kind": "supply_voltage", "min": "2.7", "max": "5.5", "unit": "V"},
+        {"kind": "supply_current", "max": "2.4", "unit": "mA"},
+        {"kind": "common_mode_voltage", "min": "-4", "max": "80", "unit": "V"},
+        {"kind": "bandwidth", "max": "400000", "unit": "Hz"}
+      ],
+      "temperature": {"min": "-40", "max": "125", "unit": "C"},
+      "symbols": [{
+        "symbol_id": "Amplifier_Current:INA240A3D",
+        "function_pins": [
+          {"function": "IN_MINUS", "symbol_pin": "1", "electrical": "input", "required": true},
+          {"function": "GND_A", "symbol_pin": "2", "electrical": "power_in", "required": true},
+          {"function": "REF2", "symbol_pin": "3", "required": true},
+          {"function": "GND_B", "symbol_pin": "4", "electrical": "power_in", "required": true},
+          {"function": "OUT", "symbol_pin": "5", "electrical": "output", "required": true},
+          {"function": "VCC", "symbol_pin": "6", "electrical": "power_in", "required": true},
+          {"function": "REF1", "symbol_pin": "7", "required": true},
+          {"function": "IN_PLUS", "symbol_pin": "8", "electrical": "input", "required": true}
+        ],
+        "verification": {"confidence": "verified", "sources": ["https://www.ti.com/lit/ds/symlink/ina240.pdf", "kicad-symbols:Amplifier_Current:INA240A3D"], "pinmap_checked": true}
+      }],
+      "packages": [{
+        "id": "soic8", "name": "SOIC-8", "footprint_id": "Package_SO:SOIC-8_3.9x4.9mm_P1.27mm", "package_type": "soic8", "mpn": "INA240A3DR", "lifecycle": "active",
+        "pinmap_id": "Amplifier_Current:INA240A3D|Package_SO:SOIC-8_3.9x4.9mm_P1.27mm",
+        "pad_functions": [
+          {"function": "IN_MINUS", "pad": "1"}, {"function": "GND_A", "pad": "2"}, {"function": "REF2", "pad": "3"}, {"function": "GND_B", "pad": "4"},
+          {"function": "OUT", "pad": "5"}, {"function": "VCC", "pad": "6"}, {"function": "REF1", "pad": "7"}, {"function": "IN_PLUS", "pad": "8"}
+        ],
+        "dimensions_mm": {"width": 6.0, "height": 4.9},
+        "verification": {"confidence": "verified", "sources": ["https://www.ti.com/lit/ds/symlink/ina240.pdf", "kicad-footprint:Package_SO:SOIC-8_3.9x4.9mm_P1.27mm"], "pinmap_checked": true}
+      }],
+      "verification": {"confidence": "verified", "sources": ["https://www.ti.com/lit/ds/symlink/ina240.pdf", "datasheet-pinmap:TI:INA240A3D", "kicad-footprint:Package_SO:SOIC-8_3.9x4.9mm_P1.27mm"], "resolver_checked": true, "pinmap_checked": true}
+    },
+    {
+      "id": "resistor.vishay.wslt2512r0100dea.2512",
+      "family": "resistor",
+      "name": "Vishay WSLT2512 10 mOhm 0.5% current shunt",
+      "description": "One-watt 2512 Power Metal Strip current-sense resistor.",
+      "generic": false,
+      "manufacturer": "Vishay Dale",
+      "mpn": "WSLT2512R0100DEA",
+      "lifecycle": "active",
+      "tags": ["0.5_percent", "10_milliohm", "2512", "current_shunt", "one_watt"],
+      "values": [{"kind": "resistance", "typ": "0.01", "unit": "Ohm"}, {"kind": "tolerance", "max": "0.5", "unit": "%"}],
+      "ratings": [{"kind": "power_dissipation", "max": "1", "unit": "W"}, {"kind": "continuous_current", "max": "10", "unit": "A"}],
+      "temperature": {"min": "-65", "max": "275", "unit": "C"},
+      "symbols": [{"symbol_id": "Device:R", "function_pins": [{"function": "A", "symbol_pin": "1", "required": true}, {"function": "B", "symbol_pin": "2", "required": true}], "verification": {"confidence": "verified", "sources": ["https://www.vishay.com/doc/?30121=", "kicad-symbols:Device:R"], "pinmap_checked": true}}],
+      "packages": [{"id": "2512", "name": "2512", "footprint_id": "Resistor_SMD:R_2512_6332Metric", "package_type": "2512", "mpn": "WSLT2512R0100DEA", "lifecycle": "active", "pinmap_id": "Device:R|Resistor_SMD:R_2512_6332Metric", "pad_functions": [{"function": "A", "pad": "1"}, {"function": "B", "pad": "2"}], "dimensions_mm": {"width": 6.35, "height": 3.18}, "verification": {"confidence": "verified", "sources": ["https://www.vishay.com/doc/?30121=", "kicad-footprint:Resistor_SMD:R_2512_6332Metric"], "pinmap_checked": true}}],
+      "verification": {"confidence": "verified", "sources": ["https://www.vishay.com/doc/?30121=", "datasheet-pinmap:Vishay:WSLT2512", "kicad-footprint:Resistor_SMD:R_2512_6332Metric"], "resolver_checked": true, "pinmap_checked": true}
+    },
+    {
+      "id": "isolated_converter.murata.mee1s0505sc.sip4",
+      "family": "isolated_converter",
+      "name": "Murata MEE1S0505SC 1 W isolated 5 V converter",
+      "description": "Regulated-system front end providing a 1 kV isolated 5 V rail at up to 200 mA.",
+      "generic": false,
+      "manufacturer": "Murata Power Solutions",
+      "mpn": "MEE1S0505SC",
+      "lifecycle": "active",
+      "tags": ["1kv", "1w", "5v_input", "5v_output", "isolated", "sip4"],
+      "values": [{"kind": "output_voltage", "typ": "5", "unit": "V"}, {"kind": "efficiency", "typ": "80", "unit": "%"}],
+      "ratings": [{"kind": "input_voltage", "min": "4.5", "max": "5.5", "unit": "V"}, {"kind": "output_current", "max": "0.2", "unit": "A"}, {"kind": "isolation_voltage", "max": "1000", "unit": "V"}],
+      "symbols": [{"symbol_id": "Converter_DCDC:MEE1S0505SC", "function_pins": [{"function": "VIN_MINUS", "symbol_pin": "1", "electrical": "power_in", "required": true}, {"function": "VIN_PLUS", "symbol_pin": "2", "electrical": "power_in", "required": true}, {"function": "VOUT_MINUS", "symbol_pin": "3", "electrical": "power_out", "required": true}, {"function": "VOUT_PLUS", "symbol_pin": "4", "electrical": "power_out", "required": true}], "verification": {"confidence": "verified", "sources": ["https://www.murata.com/products/productdata/8807029669918/kdc-mee1.pdf", "kicad-symbols:Converter_DCDC:MEE1S0505SC"], "pinmap_checked": true}}],
+      "packages": [{"id": "sip4", "name": "SIP-4", "footprint_id": "Converter_DCDC:Converter_DCDC_Murata_MEE1SxxxxSC_THT", "package_type": "sip4", "mpn": "MEE1S0505SC", "lifecycle": "active", "pinmap_id": "Converter_DCDC:MEE1S0505SC|Converter_DCDC:Converter_DCDC_Murata_MEE1SxxxxSC_THT", "pad_functions": [{"function": "VIN_MINUS", "pad": "1"}, {"function": "VIN_PLUS", "pad": "2"}, {"function": "VOUT_MINUS", "pad": "3"}, {"function": "VOUT_PLUS", "pad": "4"}], "dimensions_mm": {"width": 11.6, "height": 6.0}, "height_mm": 10.0, "verification": {"confidence": "verified", "sources": ["https://www.murata.com/products/productdata/8807029669918/kdc-mee1.pdf", "kicad-footprint:Converter_DCDC:Converter_DCDC_Murata_MEE1SxxxxSC_THT"], "pinmap_checked": true}}],
+      "verification": {"confidence": "verified", "sources": ["https://www.murata.com/products/productdata/8807029669918/kdc-mee1.pdf", "datasheet-pinmap:Murata:MEE1S0505SC", "kicad-footprint:Converter_DCDC:Converter_DCDC_Murata_MEE1SxxxxSC_THT"], "resolver_checked": true, "pinmap_checked": true}
+    },
+    {
+      "id": "isolated_converter.traco.tel12_1222.dip16",
+      "family": "isolated_converter",
+      "name": "TRACO Power TEL 12-1222 isolated dual-output converter",
+      "description": "Twelve-watt 9 V to 18 V input converter with isolated positive and negative 12 V outputs.",
+      "generic": false,
+      "manufacturer": "TRACO Power",
+      "mpn": "TEL 12-1222",
+      "lifecycle": "active",
+      "tags": ["12w", "dual_output", "isolated", "plus_minus_12v", "tel12"],
+      "values": [{"kind": "positive_output_voltage", "typ": "12", "unit": "V"}, {"kind": "negative_output_voltage", "typ": "-12", "unit": "V"}, {"kind": "efficiency", "typ": "87", "unit": "%"}],
+      "ratings": [{"kind": "input_voltage", "min": "9", "max": "18", "unit": "V"}, {"kind": "positive_output_current", "max": "0.5", "unit": "A"}, {"kind": "negative_output_current", "max": "0.5", "unit": "A"}, {"kind": "isolation_voltage", "max": "1500", "unit": "V"}],
+      "symbols": [{"symbol_id": "Converter_DCDC:TEL12-1222", "function_pins": [{"function": "VIN_MINUS", "symbol_pin": "1", "electrical": "power_in", "required": true}, {"function": "COMMON", "symbol_pin": "8", "required": true}, {"function": "VOUT_PLUS", "symbol_pin": "9", "electrical": "power_out", "required": true}, {"function": "VOUT_MINUS", "symbol_pin": "10", "electrical": "power_out", "required": true}, {"function": "VIN_PLUS", "symbol_pin": "16", "electrical": "power_in", "required": true}], "verification": {"confidence": "verified", "sources": ["https://www.tracopower.com/model/tel-12-1222", "kicad-symbols:Converter_DCDC:TEL12-1222"], "pinmap_checked": true}}],
+      "packages": [{"id": "dip16", "name": "TEL12 DIP-16", "footprint_id": "Converter_DCDC:Converter_DCDC_TRACO_TEL12-xxxx_THT", "package_type": "dip16", "mpn": "TEL 12-1222", "lifecycle": "active", "pinmap_id": "Converter_DCDC:TEL12-1222|Converter_DCDC:Converter_DCDC_TRACO_TEL12-xxxx_THT", "pad_functions": [{"function": "VIN_MINUS", "pad": "1"}, {"function": "COMMON", "pad": "8"}, {"function": "VOUT_PLUS", "pad": "9"}, {"function": "VOUT_MINUS", "pad": "10"}, {"function": "VIN_PLUS", "pad": "16"}], "dimensions_mm": {"width": 23.9, "height": 13.7}, "height_mm": 10.2, "verification": {"confidence": "verified", "sources": ["https://www.tracopower.com/model/tel-12-1222", "kicad-footprint:Converter_DCDC:Converter_DCDC_TRACO_TEL12-xxxx_THT"], "pinmap_checked": true}}],
+      "verification": {"confidence": "verified", "sources": ["https://www.tracopower.com/model/tel-12-1222", "datasheet-pinmap:TRACO:TEL12-1222", "kicad-footprint:Converter_DCDC:Converter_DCDC_TRACO_TEL12-xxxx_THT"], "resolver_checked": true, "pinmap_checked": true}
+    },
+    {
+      "id": "regulator.ti.lm337t.to220",
+      "family": "regulator",
+      "name": "TI LM337T adjustable negative linear regulator",
+      "description": "Three-terminal adjustable negative 1.5 A regulator for split-supply composition.",
+      "generic": false,
+      "manufacturer": "Texas Instruments",
+      "mpn": "LM337T",
+      "lifecycle": "active",
+      "tags": ["adjustable", "linear_regulator", "negative", "to220"],
+      "values": [{"kind": "reference_voltage", "typ": "1.25", "unit": "V"}, {"kind": "output_voltage_magnitude", "min": "1.25", "max": "37", "unit": "V"}],
+      "ratings": [{"kind": "input_voltage", "max": "40", "unit": "V"}, {"kind": "output_current", "max": "1.5", "unit": "A"}],
+      "temperature": {"min": "0", "max": "125", "unit": "C"},
+      "symbols": [{"symbol_id": "Regulator_Linear:LM337_TO220", "function_pins": [{"function": "ADJ", "symbol_pin": "1", "electrical": "input", "required": true}, {"function": "VIN", "symbol_pin": "2", "electrical": "power_in", "required": true}, {"function": "VOUT", "symbol_pin": "3", "electrical": "power_out", "required": true}], "verification": {"confidence": "verified", "sources": ["https://www.ti.com/lit/ds/symlink/lm337.pdf", "kicad-symbols:Regulator_Linear:LM337_TO220"], "pinmap_checked": true}}],
+      "packages": [{"id": "to220_vertical", "name": "TO-220-3 vertical", "footprint_id": "Package_TO_SOT_THT:TO-220-3_Vertical", "package_type": "to220", "mpn": "LM337T", "lifecycle": "active", "pinmap_id": "Regulator_Linear:LM337_TO220|Package_TO_SOT_THT:TO-220-3_Vertical", "pad_functions": [{"function": "ADJ", "pad": "1"}, {"function": "VIN", "pad": "2"}, {"function": "VOUT", "pad": "3"}], "dimensions_mm": {"width": 10.2, "height": 4.5}, "height_mm": 15.0, "verification": {"confidence": "verified", "sources": ["https://www.ti.com/lit/ds/symlink/lm337.pdf", "kicad-footprint:Package_TO_SOT_THT:TO-220-3_Vertical"], "pinmap_checked": true}}],
+      "verification": {"confidence": "verified", "sources": ["https://www.ti.com/lit/ds/symlink/lm337.pdf", "datasheet-pinmap:TI:LM337T", "kicad-footprint:Package_TO_SOT_THT:TO-220-3_Vertical"], "resolver_checked": true, "pinmap_checked": true}
+    },
+    {
+      "id": "isolator.analog_devices.adum1252arz.soic8",
+      "family": "isolator",
+      "name": "Analog Devices ADuM1252 bidirectional I2C isolator",
+      "description": "Hot-swappable two-channel I2C isolator with independent 1.71 V to 5.5 V supplies and a 3 kV rms isolation rating.",
+      "generic": false,
+      "manufacturer": "Analog Devices",
+      "mpn": "ADuM1252ARZ",
+      "lifecycle": "active",
+      "tags": ["1.8v", "3kv", "bidirectional", "i2c", "open_drain", "soic8"],
+      "ratings": [{"kind": "side_a_supply_voltage", "min": "1.71", "max": "5.5", "unit": "V"}, {"kind": "side_b_supply_voltage", "min": "1.71", "max": "5.5", "unit": "V"}, {"kind": "supply_current", "max": "0.25", "unit": "mA"}, {"kind": "data_rate", "max": "2000000", "unit": "Hz"}, {"kind": "isolation_voltage", "max": "3000", "unit": "V"}],
+      "temperature": {"min": "-40", "max": "125", "unit": "C"},
+      "symbols": [{"symbol_id": "Connector_Generic:Conn_01x08", "function_pins": [{"function": "VDD1", "symbol_pin": "1", "electrical": "power_in", "required": true}, {"function": "GND1", "symbol_pin": "2", "electrical": "power_in", "required": true}, {"function": "SDA1", "symbol_pin": "3", "electrical": "bidirectional", "required": true}, {"function": "SCL1", "symbol_pin": "4", "electrical": "bidirectional", "required": true}, {"function": "SCL2", "symbol_pin": "5", "electrical": "bidirectional", "required": true}, {"function": "SDA2", "symbol_pin": "6", "electrical": "bidirectional", "required": true}, {"function": "GND2", "symbol_pin": "7", "electrical": "power_in", "required": true}, {"function": "VDD2", "symbol_pin": "8", "electrical": "power_in", "required": true}], "verification": {"confidence": "verified", "sources": ["https://www.analog.com/media/en/technical-documentation/data-sheets/adum1252.pdf", "kicad-symbols:Connector_Generic:Conn_01x08"], "pinmap_checked": true}}],
+      "packages": [{"id": "soic8", "name": "SOIC-8 narrow", "footprint_id": "Package_SO:SOIC-8_3.9x4.9mm_P1.27mm", "package_type": "soic8", "mpn": "ADuM1252ARZ", "lifecycle": "active", "pinmap_id": "Connector_Generic:Conn_01x08|Package_SO:SOIC-8_3.9x4.9mm_P1.27mm", "pad_functions": [{"function": "VDD1", "pad": "1"}, {"function": "GND1", "pad": "2"}, {"function": "SDA1", "pad": "3"}, {"function": "SCL1", "pad": "4"}, {"function": "SCL2", "pad": "5"}, {"function": "SDA2", "pad": "6"}, {"function": "GND2", "pad": "7"}, {"function": "VDD2", "pad": "8"}], "dimensions_mm": {"width": 6.0, "height": 4.9}, "verification": {"confidence": "verified", "sources": ["https://www.analog.com/media/en/technical-documentation/data-sheets/adum1252.pdf", "kicad-footprint:Package_SO:SOIC-8_3.9x4.9mm_P1.27mm"], "pinmap_checked": true}}],
+      "verification": {"confidence": "verified", "sources": ["https://www.analog.com/media/en/technical-documentation/data-sheets/adum1252.pdf", "datasheet-pinmap:AnalogDevices:ADuM1252ARZ", "kicad-footprint:Package_SO:SOIC-8_3.9x4.9mm_P1.27mm"], "resolver_checked": true, "pinmap_checked": true, "notes": ["A generic numbered eight-pin KiCad symbol is used because the installed KiCad library has no ADuM1252 symbol; the catalog pin map preserves the exact datasheet pin numbers."]}
+    }
+  ]
+}

@@ -27,6 +27,9 @@ const (
 	CodeSearchNoCandidate        reports.Code = "ARCHITECTURE_SEARCH_NO_CANDIDATE"
 	CodeSearchAmbiguous          reports.Code = "ARCHITECTURE_SEARCH_AMBIGUOUS"
 	CodeSearchCanceled           reports.Code = "ARCHITECTURE_SEARCH_CANCELED"
+	CodeGlobalCurrentUnknown     reports.Code = "ARCHITECTURE_GLOBAL_CURRENT_UNKNOWN"
+	CodeGlobalCurrentExceeded    reports.Code = "ARCHITECTURE_GLOBAL_CURRENT_EXCEEDED"
+	CodeGlobalConstraintUnproven reports.Code = "ARCHITECTURE_GLOBAL_CONSTRAINT_UNPROVEN"
 )
 
 type SearchPolicy struct {
@@ -138,9 +141,21 @@ type CandidateScore struct {
 }
 
 type CandidateResult struct {
-	Fingerprint string              `json:"fingerprint"`
-	Score       CandidateScore      `json:"score"`
-	Selections  []FragmentSelection `json:"selections"`
+	Fingerprint  string              `json:"fingerprint"`
+	Score        CandidateScore      `json:"score"`
+	Selections   []FragmentSelection `json:"selections"`
+	GlobalChecks []GlobalCheck       `json:"global_checks,omitempty"`
+}
+
+type GlobalCheck struct {
+	// Code identifies the validation rule that passed. The same stable rule ID
+	// is used by rejection summaries when that rule fails.
+	Code     reports.Code `json:"code"`
+	Path     string       `json:"path"`
+	Message  string       `json:"message"`
+	Required *float64     `json:"required,omitempty"`
+	Observed *float64     `json:"observed,omitempty"`
+	Margin   *float64     `json:"margin,omitempty"`
 }
 
 type AlternativeComparison struct {
@@ -188,6 +203,36 @@ const (
 	SearchFailed      SearchStatus = "failed"
 )
 
+type CoverageStatus string
+
+const (
+	CoverageSelected        CoverageStatus = "selected"
+	CoverageRejected        CoverageStatus = "rejected"
+	CoverageUnsupported     CoverageStatus = "unsupported"
+	CoverageAmbiguous       CoverageStatus = "ambiguous"
+	CoverageBudgetExhausted CoverageStatus = "budget_exhausted"
+)
+
+type CapabilityCoverageRecord struct {
+	Path       string         `json:"path"`
+	Capability string         `json:"capability"`
+	Status     CoverageStatus `json:"status"`
+}
+
+type CapabilityCoverageMetrics struct {
+	Total           int `json:"total"`
+	Selected        int `json:"selected"`
+	Rejected        int `json:"rejected"`
+	Unsupported     int `json:"unsupported"`
+	Ambiguous       int `json:"ambiguous"`
+	BudgetExhausted int `json:"budget_exhausted"`
+}
+
+type CapabilityCoverage struct {
+	Metrics CapabilityCoverageMetrics  `json:"metrics"`
+	Records []CapabilityCoverageRecord `json:"records"`
+}
+
 type SearchResult struct {
 	Schema             string              `json:"schema"`
 	PolicyVersion      string              `json:"policy_version"`
@@ -202,6 +247,7 @@ type SearchResult struct {
 	Alternatives       []CandidateResult   `json:"alternatives,omitempty"`
 	Rationale          *SelectionRationale `json:"rationale,omitempty"`
 	Rejections         []RejectionSummary  `json:"rejections,omitempty"`
+	Coverage           *CapabilityCoverage `json:"coverage,omitempty"`
 	Issues             []reports.Issue     `json:"issues,omitempty"`
 }
 

@@ -5,13 +5,17 @@ package architecturesearch
 import "encoding/json"
 
 const (
-	SchemaID      = "kicadai.open-set-requirement.v1"
-	Version       = 1
-	PolicyVersion = "architecture-search-policy-v1"
+	SchemaID        = "kicadai.open-set-requirement.v1"
+	Version         = 1
+	SchemaIDV2      = "kicadai.open-set-requirement.v2"
+	VersionV2       = 2
+	PolicyVersion   = "architecture-search-policy-v1"
+	PolicyVersionV2 = "architecture-search-policy-v2"
 
 	MaxRequirementBytes = 256 * 1024
 	MaxDomains          = 16
 	MaxPorts            = 64
+	MaxSignals          = 64
 	MaxParticipants     = 16
 	MaxParticipantPorts = 32
 	MaxObjectives       = 32
@@ -36,11 +40,13 @@ type Project struct {
 }
 
 type Requirements struct {
-	Domains      []Domain      `json:"domains"`
-	Ports        []Port        `json:"ports"`
-	Participants []Participant `json:"participants,omitempty"`
-	Objectives   []Objective   `json:"objectives"`
-	Constraints  BoardLimits   `json:"constraints"`
+	Domains           []Domain      `json:"domains"`
+	Ports             []Port        `json:"ports"`
+	Signals           []Signal      `json:"signals,omitempty"`
+	Participants      []Participant `json:"participants,omitempty"`
+	Objectives        []Objective   `json:"objectives"`
+	SystemConstraints []Constraint  `json:"system_constraints,omitempty"`
+	Constraints       BoardLimits   `json:"constraints"`
 }
 
 type Domain struct {
@@ -57,6 +63,17 @@ type Port struct {
 	ID         string      `json:"id"`
 	Kind       string      `json:"kind"`
 	Direction  string      `json:"direction"`
+	Domain     string      `json:"domain"`
+	Electrical *Electrical `json:"electrical,omitempty"`
+	Protocol   *Protocol   `json:"protocol,omitempty"`
+}
+
+// Signal is a behavior-level interface between objectives. It deliberately
+// omits implementation concepts such as nets, pins, and topology. Direction is
+// declared by each binding so a producer and consumers can share one contract.
+type Signal struct {
+	ID         string      `json:"id"`
+	Kind       string      `json:"kind"`
 	Domain     string      `json:"domain"`
 	Electrical *Electrical `json:"electrical,omitempty"`
 	Protocol   *Protocol   `json:"protocol,omitempty"`
@@ -103,10 +120,13 @@ type Objective struct {
 
 // Binding is a strict tagged union. Port identifies an external requirement
 // port. Participant and ParticipantPort together identify an abstract
-// participant port. Exactly one form must be present.
+// participant port. Signal plus Direction identifies one endpoint of an
+// internal behavior-level signal. Exactly one form must be present.
 type Binding struct {
 	Role            string `json:"role"`
 	Port            string `json:"port,omitempty"`
+	Signal          string `json:"signal,omitempty"`
+	Direction       string `json:"direction,omitempty"`
 	Participant     string `json:"participant,omitempty"`
 	ParticipantPort string `json:"participant_port,omitempty"`
 }
@@ -136,4 +156,9 @@ type Acceptance struct {
 	RequireWriterCorrectness   bool `json:"require_writer_correctness"`
 	RequireRoundTripZeroDiff   bool `json:"require_round_trip_zero_diff"`
 	RequireDeterministicReplay bool `json:"require_deterministic_replay"`
+	RequireContractComposition bool `json:"require_contract_composition,omitempty"`
+	RequireGlobalReasoning     bool `json:"require_global_reasoning,omitempty"`
+	RequireCoverageAccounting  bool `json:"require_coverage_accounting,omitempty"`
+	RequireAlternatives        bool `json:"require_alternatives,omitempty"`
+	RequireFailClosed          bool `json:"require_fail_closed,omitempty"`
 }

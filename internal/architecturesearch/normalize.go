@@ -44,6 +44,22 @@ func Normalize(requirement Requirement) Requirement {
 		return strings.Compare(left.ID, right.ID)
 	})
 
+	for index := range normalized.Requirements.Signals {
+		signal := &normalized.Requirements.Signals[index]
+		signal.ID = canonicalIdentifier(signal.ID)
+		signal.Kind = canonicalIdentifier(signal.Kind)
+		signal.Domain = canonicalIdentifier(signal.Domain)
+		if signal.Electrical != nil {
+			signal.Electrical.DefaultState = canonicalIdentifier(signal.Electrical.DefaultState)
+		}
+		if signal.Protocol != nil {
+			normalizeProtocol(signal.Protocol)
+		}
+	}
+	slices.SortStableFunc(normalized.Requirements.Signals, func(left, right Signal) int {
+		return strings.Compare(left.ID, right.ID)
+	})
+
 	for index := range normalized.Requirements.Participants {
 		participant := &normalized.Requirements.Participants[index]
 		participant.ID = canonicalIdentifier(participant.ID)
@@ -75,6 +91,8 @@ func Normalize(requirement Requirement) Requirement {
 			binding := &objective.Bindings[bindingIndex]
 			binding.Role = canonicalIdentifier(binding.Role)
 			binding.Port = canonicalIdentifier(binding.Port)
+			binding.Signal = canonicalIdentifier(binding.Signal)
+			binding.Direction = canonicalIdentifier(binding.Direction)
 			binding.Participant = canonicalIdentifier(binding.Participant)
 			binding.ParticipantPort = canonicalIdentifier(binding.ParticipantPort)
 		}
@@ -83,6 +101,12 @@ func Normalize(requirement Requirement) Requirement {
 				return order
 			}
 			if order := strings.Compare(left.Port, right.Port); order != 0 {
+				return order
+			}
+			if order := strings.Compare(left.Signal, right.Signal); order != 0 {
+				return order
+			}
+			if order := strings.Compare(left.Direction, right.Direction); order != 0 {
 				return order
 			}
 			if order := strings.Compare(left.Participant, right.Participant); order != 0 {
@@ -95,6 +119,7 @@ func Normalize(requirement Requirement) Requirement {
 	slices.SortStableFunc(normalized.Requirements.Objectives, func(left, right Objective) int {
 		return strings.Compare(left.ID, right.ID)
 	})
+	normalizeConstraints(normalized.Requirements.SystemConstraints)
 	return normalized
 }
 
@@ -212,6 +237,18 @@ func canonicalUnit(value string) string {
 		return "ratio"
 	case "db":
 		return "dB"
+	case "w":
+		return "W"
+	case "deg":
+		return "deg"
+	case "degc":
+		return "degC"
+	case "%":
+		return "%"
+	case "pf":
+		return "pF"
+	case "uv_rms":
+		return "uV_rms"
 	default:
 		return strings.TrimSpace(value)
 	}

@@ -92,3 +92,20 @@ func TestLowerInterfacesDoesNotDuplicateReferencePortOnItsOwnReturnNet(t *testin
 		t.Fatalf("reference signal = %#v", interfaces[0].Signals[0])
 	}
 }
+
+func TestLowerInterfacesJoinsPowerPortReturnAnchorToReferenceDomain(t *testing.T) {
+	requirement := architecturesearch.Requirement{Requirements: architecturesearch.Requirements{
+		Domains: []architecturesearch.Domain{{ID: "gnd", Kind: "reference"}, {ID: "vin", Kind: "supply"}},
+		Ports: []architecturesearch.Port{
+			{ID: "ground", Kind: "reference", Direction: "bidirectional", Domain: "gnd"},
+			{ID: "input_power", Kind: "power", Direction: "sink", Domain: "vin"},
+		},
+	}}
+	union := newDisjointSet()
+	lowerInterfaces(requirement, union, map[string]circuitgraph.FunctionalEndpoint{}, map[string]nodeMetadata{})
+	returnAnchor := anchorNode("external:input_power", "return")
+	referenceAnchor := anchorNode("domain:gnd", "")
+	if union.find(returnAnchor) != union.find(referenceAnchor) {
+		t.Fatal("power-port return binding is not joined to the physical reference domain")
+	}
+}

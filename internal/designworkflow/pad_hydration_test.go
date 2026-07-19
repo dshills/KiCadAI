@@ -281,6 +281,7 @@ func TestVerifiedSpeakerPowerFootprintTemplatesMatchInstalledKiCadLibraries(t *t
 		"Package_TO_SOT_THT:TO-220-3_Vertical",
 		"Package_TO_SOT_SMD:SOT-23",
 		"Package_TO_SOT_SMD:SOT-23-5",
+		"Package_TO_SOT_SMD:SOT-23-6",
 		"Resistor_THT:R_Axial_DIN0414_L11.9mm_D4.5mm_P20.32mm_Horizontal",
 		"Resistor_SMD:R_0805_2012Metric",
 		"Package_TO_SOT_THT:TO-126-3_Vertical",
@@ -366,6 +367,31 @@ func TestSOT223TemplateMapsDuplicatePinTwoPads(t *testing.T) {
 	}
 	if pinTwoCount != 2 {
 		t.Fatalf("pin 2 pads assigned = %d, pads=%#v", pinTwoCount, pads)
+	}
+}
+
+func TestVerifiedPadTemplatesCoverAdversarialPowerFootprints(t *testing.T) {
+	tests := map[string]int{
+		"Diode_SMD:D_SMC":                                      2,
+		"Resistor_SMD:R_2512_6332Metric":                       2,
+		"Converter_DCDC:Converter_DCDC_Murata_MEE1SxxxxSC_THT": 4,
+		"Converter_DCDC:Converter_DCDC_TRACO_TEL12-xxxx_THT":   5,
+	}
+	for footprintID, padCount := range tests {
+		t.Run(footprintID, func(t *testing.T) {
+			template, ok := verifiedPadTemplate(footprintID)
+			if !ok || len(template.Pads) != padCount {
+				t.Fatalf("template ok=%t pads=%d, want %d", ok, len(template.Pads), padCount)
+			}
+			if template.Bounds.WidthMM <= 0 || template.Bounds.HeightMM <= 0 {
+				t.Fatalf("invalid bounds: %#v", template.Bounds)
+			}
+			for _, pad := range template.Pads {
+				if pad.WidthMM <= 0 || pad.HeightMM <= 0 {
+					t.Fatalf("invalid pad: %#v", pad)
+				}
+			}
+		})
 	}
 }
 

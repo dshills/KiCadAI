@@ -104,11 +104,9 @@ func createExplicitCircuit(ctx context.Context, request Request, opts CreateOpti
 		stages = append(stages, skippedWorkflowStages("writer correctness check did not complete", StageValidation, StageKiCadChecks)...)
 		return BuildWorkflowResult(project, request.Validation.Acceptance, stages)
 	}
-	validated := ValidateProject(ctx, &request, &written, opts.Validation)
+	validationOpts, kicadOpts := createValidationOptions(request, opts)
+	validated := ValidateProject(ctx, &request, &written, validationOpts)
 	stages = append(stages, validated.Stage)
-	kicadOpts := opts.KiCadChecks
-	kicadOpts.RequireERC = kicadOpts.RequireERC || request.Validation.RequireERC
-	kicadOpts.RequireDRC = kicadOpts.RequireDRC || request.Validation.RequireDRC
 	checked := RunKiCadChecks(ctx, &request, &written, kicadOpts)
 	stages = append(stages, checked.Stage)
 	stages = append(stages, runExplicitSimulation(request, opts.OutputDir, opts.Overwrite))

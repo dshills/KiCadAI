@@ -177,31 +177,103 @@ func ContractFromRequirementPort(requirement Requirement, portID string, minimum
 	return NormalizePortContract(contract), nil
 }
 
+// ContractFromRequirementSignal builds one directed endpoint contract for a
+// behavior-level signal. The shared signal supplies electrical/protocol bounds;
+// each binding supplies its endpoint direction.
+func ContractFromRequirementSignal(requirement Requirement, signalID, direction string, minimumEvidence EvidenceConfidence) (PortContract, []reports.Issue) {
+	normalized := Normalize(requirement)
+	if issues := Validate(normalized); len(issues) != 0 {
+		return PortContract{}, issues
+	}
+	signalID = canonicalIdentifier(signalID)
+	direction = canonicalIdentifier(direction)
+	var signal *Signal
+	for index := range normalized.Requirements.Signals {
+		if normalized.Requirements.Signals[index].ID == signalID {
+			signal = &normalized.Requirements.Signals[index]
+			break
+		}
+	}
+	if signal == nil || !allowedDirection(direction) {
+		return PortContract{}, []reports.Issue{architectureIssue(CodeBindingUnresolved, "requirements.signals", "cannot build directed contract for signal "+signalID)}
+	}
+	domain := requirementDomain(normalized, signal.Domain)
+	contract := PortContract{
+		ID: signal.ID, Kind: signal.Kind, Direction: direction, Domain: signal.Domain,
+		Voltage: domainVoltageRange(domain), MinimumEvidence: minimumEvidence,
+	}
+	if signal.Protocol != nil {
+		protocol := *signal.Protocol
+		contract.Protocol = &protocol
+		contract.FrequencyMaxHz = float64Pointer(protocol.MaxFrequencyHz)
+	}
+	if electrical := signal.Electrical; electrical != nil {
+		if electrical.MinVoltageV != nil {
+			contract.Voltage.Minimum = float64Pointer(*electrical.MinVoltageV)
+		}
+		if electrical.MaxVoltageV != nil {
+			contract.Voltage.Maximum = float64Pointer(*electrical.MaxVoltageV)
+		}
+		contract.InputImpedanceMinOhm = cloneFloat64(electrical.InputImpedanceMinOhm)
+		contract.FrequencyMaxHz = cloneFloat64(electrical.FrequencyMaxHz)
+		contract.DefaultState = electrical.DefaultState
+		if electrical.MaxCurrentA != nil {
+			if direction == "source" {
+				contract.RequiredCurrentCapacityA = cloneFloat64(electrical.MaxCurrentA)
+			} else {
+				contract.MaximumCurrentDemandA = cloneFloat64(electrical.MaxCurrentA)
+			}
+		}
+		if electrical.MaxSourceCurrentMA != nil {
+			amps := *electrical.MaxSourceCurrentMA / 1000
+			if direction == "source" {
+				contract.RequiredCurrentCapacityA = maxPointer(contract.RequiredCurrentCapacityA, amps)
+			} else {
+				contract.MaximumCurrentDemandA = minPointer(contract.MaximumCurrentDemandA, amps)
+			}
+		}
+	}
+	return NormalizePortContract(contract), nil
+}
+
 func ContractFromBinding(requirement Requirement, binding Binding, minimumEvidence EvidenceConfidence) (PortContract, []reports.Issue) {
 	normalized := Normalize(requirement)
 	if issues := Validate(normalized); len(issues) != 0 {
 		return PortContract{}, issues
 	}
 	binding.Port = canonicalIdentifier(binding.Port)
+	binding.Signal = canonicalIdentifier(binding.Signal)
+	binding.Direction = canonicalIdentifier(binding.Direction)
 	binding.Participant = canonicalIdentifier(binding.Participant)
 	binding.ParticipantPort = canonicalIdentifier(binding.ParticipantPort)
-	if binding.Port != "" && binding.Participant == "" && binding.ParticipantPort == "" {
+	if binding.Port != "" && binding.Signal == "" && binding.Direction == "" && binding.Participant == "" && binding.ParticipantPort == "" {
 		return ContractFromRequirementPort(normalized, binding.Port, minimumEvidence)
 	}
-	if binding.Port != "" || binding.Participant == "" || binding.ParticipantPort == "" {
-		return PortContract{}, []reports.Issue{architectureIssue(CodeBindingUnresolved, "binding", "binding must select exactly one external or participant port")}
+	if binding.Signal != "" && binding.Direction != "" && binding.Port == "" && binding.Participant == "" && binding.ParticipantPort == "" {
+		return ContractFromRequirementSignal(normalized, binding.Signal, binding.Direction, minimumEvidence)
 	}
-	for _, participant := range normalized.Requirements.Participants {
-		if participant.ID != binding.Participant {
+	if binding.Port != "" || binding.Signal != "" || binding.Direction != "" || binding.Participant == "" || binding.ParticipantPort == "" {
+		return PortContract{}, []reports.Issue{architectureIssue(CodeBindingUnresolved, "binding", "binding must select exactly one external, participant, or directed signal endpoint")}
+	}
+	return contractFromParticipantPort(normalized, binding.Participant, binding.ParticipantPort, minimumEvidence, true)
+}
+
+func contractFromParticipantPort(requirement Requirement, participantID, portID string, minimumEvidence EvidenceConfidence, oppositeEndpoint bool) (PortContract, []reports.Issue) {
+	for _, participant := range requirement.Requirements.Participants {
+		if participant.ID != participantID {
 			continue
 		}
 		for _, port := range participant.RequiredPorts {
-			if port.ID != binding.ParticipantPort {
+			if port.ID != portID {
 				continue
 			}
+			direction := port.Direction
+			if oppositeEndpoint {
+				direction = oppositeDirection(direction)
+			}
 			contract := PortContract{
-				ID: participant.ID + "." + port.ID, Kind: port.Kind, Direction: port.Direction,
-				Domain: participant.Domain, Voltage: domainVoltageRange(requirementDomain(normalized, participant.Domain)),
+				ID: participant.ID + "." + port.ID, Kind: port.Kind, Direction: direction,
+				Domain: participant.Domain, Voltage: domainVoltageRange(requirementDomain(requirement, participant.Domain)),
 				MinimumEvidence: minimumEvidence,
 			}
 			if port.Protocol != nil {
@@ -213,6 +285,17 @@ func ContractFromBinding(requirement Requirement, binding Binding, minimumEviden
 		}
 	}
 	return PortContract{}, []reports.Issue{architectureIssue(CodeBindingUnresolved, "binding", "cannot build contract for unknown participant port")}
+}
+
+func oppositeDirection(direction string) string {
+	switch direction {
+	case "source":
+		return "sink"
+	case "sink":
+		return "source"
+	default:
+		return direction
+	}
 }
 
 func requirementDomain(requirement Requirement, domainID string) Domain {

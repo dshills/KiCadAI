@@ -18,6 +18,7 @@ const (
 	CodeIdentityDuplicate reports.Code = "ARCHITECTURE_IDENTITY_DUPLICATE"
 	CodeDomainInvalid     reports.Code = "ARCHITECTURE_DOMAIN_INVALID"
 	CodePortInvalid       reports.Code = "ARCHITECTURE_PORT_INVALID"
+	CodeSignalInvalid     reports.Code = "ARCHITECTURE_SIGNAL_INVALID"
 	CodeBindingUnresolved reports.Code = "ARCHITECTURE_BINDING_UNRESOLVED"
 	CodeConstraintInvalid reports.Code = "ARCHITECTURE_CONSTRAINT_INVALID"
 	CodeAcceptanceInvalid reports.Code = "ARCHITECTURE_ACCEPTANCE_INVALID"
@@ -30,8 +31,10 @@ func Validate(requirement Requirement) []reports.Issue {
 	validator.header()
 	validator.domains()
 	validator.ports()
+	validator.signals()
 	validator.participants()
 	validator.objectives()
+	validator.constraints("requirements.system_constraints", requirement.Requirements.SystemConstraints)
 	validator.boardLimits()
 	validator.acceptance()
 	slices.SortStableFunc(validator.issues, func(left, right reports.Issue) int {
@@ -51,6 +54,7 @@ type requirementValidator struct {
 	issues           []reports.Issue
 	domainsByID      map[string]Domain
 	portsByID        map[string]Port
+	signalsByID      map[string]Signal
 	participantsByID map[string]Participant
 }
 
@@ -59,11 +63,10 @@ func (validator *requirementValidator) add(code reports.Code, path, message stri
 }
 
 func (validator *requirementValidator) header() {
-	if validator.requirement.Schema != SchemaID {
-		validator.add(CodeSchemaInvalid, "schema", fmt.Sprintf("schema must be %q", SchemaID))
-	}
-	if validator.requirement.Version != Version {
-		validator.add(CodeSchemaInvalid, "version", fmt.Sprintf("version must be %d", Version))
+	v1 := validator.requirement.Schema == SchemaID && validator.requirement.Version == Version
+	v2 := validator.requirement.Schema == SchemaIDV2 && validator.requirement.Version == VersionV2
+	if !v1 && !v2 {
+		validator.add(CodeSchemaInvalid, "schema", fmt.Sprintf("schema/version must be %q/%d or %q/%d", SchemaID, Version, SchemaIDV2, VersionV2))
 	}
 	project := validator.requirement.Project
 	if !validSemanticID(project.Name) {
@@ -82,6 +85,7 @@ func (validator *requirementValidator) header() {
 	}
 	validator.limit("requirements.domains", len(validator.requirement.Requirements.Domains), MaxDomains)
 	validator.limit("requirements.ports", len(validator.requirement.Requirements.Ports), MaxPorts)
+	validator.limit("requirements.signals", len(validator.requirement.Requirements.Signals), MaxSignals)
 	validator.limit("requirements.participants", len(validator.requirement.Requirements.Participants), MaxParticipants)
 	validator.limit("requirements.objectives", len(validator.requirement.Requirements.Objectives), MaxObjectives)
 }
@@ -100,8 +104,12 @@ func (validator *requirementValidator) domains() {
 		if domain.Kind != "reference" && domain.Kind != "supply" {
 			validator.add(CodeDomainInvalid, path+".kind", "domain kind must be reference or supply")
 		}
-		if domain.Source != "external" && domain.Source != "generated" {
-			validator.add(CodeDomainInvalid, path+".source", "domain source must be external or generated")
+		if validator.requirement.Version == Version {
+			if domain.Source != "external" && domain.Source != "generated" {
+				validator.add(CodeDomainInvalid, path+".source", "v1 domain source must be external or generated")
+			}
+		} else if domain.Source != "external" && !validSemanticID(domain.Source) {
+			validator.add(CodeDomainInvalid, path+".source", "v2 domain source must be external or a signal identity")
 		}
 		if !finiteInRange(domain.NominalVoltageV, -1000, 1000) {
 			validator.add(CodeDomainInvalid, path+".nominal_voltage_v", "nominal voltage must be finite and within policy bounds")
@@ -117,6 +125,49 @@ func (validator *requirementValidator) domains() {
 		}
 		if domain.MaxVoltageV != nil && domain.NominalVoltageV > *domain.MaxVoltageV {
 			validator.add(CodeDomainInvalid, path+".nominal_voltage_v", "nominal voltage exceeds maximum voltage")
+		}
+	}
+}
+
+func (validator *requirementValidator) signals() {
+	validator.signalsByID = map[string]Signal{}
+	for index, signal := range validator.requirement.Requirements.Signals {
+		path := fmt.Sprintf("requirements.signals[%d]", index)
+		if !validSemanticID(signal.ID) {
+			validator.add(CodeSignalInvalid, path+".id", "signal id must be a normalized semantic identifier")
+		} else if _, exists := validator.signalsByID[signal.ID]; exists {
+			validator.add(CodeIdentityDuplicate, path+".id", "signal id is duplicated")
+		} else {
+			validator.signalsByID[signal.ID] = signal
+		}
+		if !allowedPortKind(signal.Kind) {
+			validator.add(CodeSignalInvalid, path+".kind", "unsupported signal kind")
+		}
+		if _, exists := validator.domainsByID[signal.Domain]; !exists {
+			validator.add(CodeBindingUnresolved, path+".domain", "signal references an unknown domain")
+		}
+		if signal.Electrical != nil {
+			validator.electrical(path+".electrical", *signal.Electrical)
+		}
+		if signal.Protocol != nil {
+			validator.protocol(path+".protocol", *signal.Protocol)
+		}
+	}
+	if validator.requirement.Version != VersionV2 {
+		if len(validator.requirement.Requirements.Signals) != 0 || len(validator.requirement.Requirements.SystemConstraints) != 0 {
+			validator.add(CodeSchemaInvalid, "requirements", "signals and system_constraints require the v2 schema")
+		}
+		return
+	}
+	for index, domain := range validator.requirement.Requirements.Domains {
+		if domain.Source == "external" {
+			continue
+		}
+		signal, exists := validator.signalsByID[domain.Source]
+		if !exists {
+			validator.add(CodeBindingUnresolved, fmt.Sprintf("requirements.domains[%d].source", index), "derived domain source references an unknown signal")
+		} else if signal.Kind != "power" || signal.Domain != domain.ID {
+			validator.add(CodeDomainInvalid, fmt.Sprintf("requirements.domains[%d].source", index), "derived domain source must be a power signal in the same domain")
 		}
 	}
 }
@@ -196,6 +247,8 @@ func (validator *requirementValidator) participants() {
 
 func (validator *requirementValidator) objectives() {
 	seenObjectives := map[string]bool{}
+	type signalUse struct{ sources, sinks, bidirectional int }
+	signalUses := map[string]signalUse{}
 	for index, objective := range validator.requirement.Requirements.Objectives {
 		path := fmt.Sprintf("requirements.objectives[%d]", index)
 		if !validSemanticID(objective.ID) {
@@ -220,16 +273,38 @@ func (validator *requirementValidator) objectives() {
 				validator.add(CodeIdentityDuplicate, bindingPath+".role", "binding role is duplicated within the objective")
 			}
 			seenRoles[binding.Role] = true
-			external := binding.Port != "" && binding.Participant == "" && binding.ParticipantPort == ""
-			abstract := binding.Port == "" && binding.Participant != "" && binding.ParticipantPort != ""
-			if !external && !abstract {
-				validator.add(CodeBindingUnresolved, bindingPath, "binding must select exactly one external or participant port")
+			external := binding.Port != "" && binding.Signal == "" && binding.Direction == "" && binding.Participant == "" && binding.ParticipantPort == ""
+			abstract := binding.Port == "" && binding.Signal == "" && binding.Direction == "" && binding.Participant != "" && binding.ParticipantPort != ""
+			signal := binding.Port == "" && binding.Signal != "" && allowedDirection(binding.Direction) && binding.Participant == "" && binding.ParticipantPort == ""
+			if !external && !abstract && !signal {
+				validator.add(CodeBindingUnresolved, bindingPath, "binding must select exactly one external, participant, or directed signal endpoint")
 				continue
 			}
 			if external {
 				if _, exists := validator.portsByID[binding.Port]; !exists {
 					validator.add(CodeBindingUnresolved, bindingPath+".port", "binding references an unknown external port")
 				}
+				continue
+			}
+			if signal {
+				if validator.requirement.Version != VersionV2 {
+					validator.add(CodeSchemaInvalid, bindingPath+".signal", "signal bindings require the v2 schema")
+					continue
+				}
+				if _, exists := validator.signalsByID[binding.Signal]; !exists {
+					validator.add(CodeBindingUnresolved, bindingPath+".signal", "binding references an unknown signal")
+					continue
+				}
+				use := signalUses[binding.Signal]
+				switch binding.Direction {
+				case "source":
+					use.sources++
+				case "sink":
+					use.sinks++
+				case "bidirectional":
+					use.bidirectional++
+				}
+				signalUses[binding.Signal] = use
 				continue
 			}
 			participant, exists := validator.participantsByID[binding.Participant]
@@ -249,6 +324,14 @@ func (validator *requirementValidator) objectives() {
 			}
 		}
 		validator.constraints(path+".constraints", objective.Constraints)
+	}
+	for index, signal := range validator.requirement.Requirements.Signals {
+		use := signalUses[signal.ID]
+		unidirectional := use.sources == 1 && use.sinks >= 1 && use.bidirectional == 0
+		bidirectional := use.sources == 0 && use.sinks == 0 && use.bidirectional >= 2
+		if !unidirectional && !bidirectional {
+			validator.add(CodeSignalInvalid, fmt.Sprintf("requirements.signals[%d]", index), fmt.Sprintf("signal endpoints require one source and at least one sink, or at least two bidirectional endpoints; got %d source, %d sink, %d bidirectional", use.sources, use.sinks, use.bidirectional))
+		}
 	}
 }
 
@@ -279,9 +362,33 @@ func (validator *requirementValidator) acceptance() {
 		{"require_round_trip_zero_diff", acceptance.RequireRoundTripZeroDiff},
 		{"require_deterministic_replay", acceptance.RequireDeterministicReplay},
 	}
+	if validator.requirement.Version == VersionV2 {
+		required = append(required,
+			struct {
+				path  string
+				value bool
+			}{"require_contract_composition", acceptance.RequireContractComposition},
+			struct {
+				path  string
+				value bool
+			}{"require_global_reasoning", acceptance.RequireGlobalReasoning},
+			struct {
+				path  string
+				value bool
+			}{"require_coverage_accounting", acceptance.RequireCoverageAccounting},
+			struct {
+				path  string
+				value bool
+			}{"require_alternatives", acceptance.RequireAlternatives},
+			struct {
+				path  string
+				value bool
+			}{"require_fail_closed", acceptance.RequireFailClosed},
+		)
+	}
 	for _, gate := range required {
 		if !gate.value {
-			validator.add(CodeAcceptanceInvalid, "acceptance."+gate.path, "open-set v1 requires this fail-closed acceptance gate")
+			validator.add(CodeAcceptanceInvalid, "acceptance."+gate.path, "open-set schema requires this fail-closed acceptance gate")
 		}
 	}
 }
@@ -435,7 +542,7 @@ func validSemanticID(value string) bool {
 
 func allowedPortKind(value string) bool {
 	switch value {
-	case "power", "reference", "analog_voltage", "digital_logic", "digital_bus", "switched_load", "protected_output":
+	case "power", "reference", "analog_voltage", "analog_control", "differential_analog", "digital_logic", "digital_bus", "switched_load", "protected_output":
 		return true
 	default:
 		return false
@@ -457,7 +564,7 @@ func allowedRelation(value string) bool {
 
 func allowedUnit(value string) bool {
 	switch value {
-	case "V", "A", "Hz", "Ohm", "us", "ratio", "dB":
+	case "V", "A", "Hz", "Ohm", "us", "ratio", "dB", "W", "deg", "degC", "%", "pF", "uV_rms":
 		return true
 	default:
 		return false

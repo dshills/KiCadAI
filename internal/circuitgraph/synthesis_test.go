@@ -104,3 +104,20 @@ func TestUniqueResolvedFunctionCollapsesRepeatedPhysicalPinsWithinOneUnit(t *tes
 		t.Fatal("expected a repeated logical function across units to remain ambiguous")
 	}
 }
+
+func TestConnectionHasInternalPowerOutputSuppressesRedundantExternalFlag(t *testing.T) {
+	connection := FunctionConnection{Endpoints: []FunctionalEndpoint{
+		{Interface: "external_return", Signal: "RETURN"},
+		{Function: "converter", Port: "VOUT_MINUS"},
+	}}
+	selected := map[string]ResolvedComponent{
+		"converter": {Functions: []ResolvedFunction{{Function: "VOUT_MINUS", Electrical: "power_out"}}},
+	}
+	if !connectionHasInternalPowerOutput(connection, selected) {
+		t.Fatal("internal converter power output was not detected")
+	}
+	selected["converter"] = ResolvedComponent{Functions: []ResolvedFunction{{Function: "VIN_MINUS", Electrical: "power_in"}}}
+	if connectionHasInternalPowerOutput(connection, selected) {
+		t.Fatal("power input must not suppress an external-source flag")
+	}
+}

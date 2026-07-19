@@ -230,38 +230,102 @@ func pointKey(point Point, layer string) string {
 
 func clearanceIssues(routes []Route, clearanceMM float64) []reports.Issue {
 	segments := clearanceSegments(routes)
-	if len(segments) < 2 {
-		return nil
-	}
 	maxHalfWidth := 0.0
 	for _, candidate := range segments {
 		maxHalfWidth = max(maxHalfWidth, candidate.Segment.WidthMM/2)
 	}
-	cellSize := clearanceIndexCellSize(clearanceMM)
-	index := clearanceSpatialIndex(segments, cellSize)
-	scratch := newClearanceQueryScratch(len(segments))
 	issues := []reports.Issue{}
-	for leftIndex, left := range segments {
-		queryMargin := clearanceMM + left.Segment.WidthMM/2 + maxHalfWidth
-		for _, rightIndex := range index.query(left.Layer, left.Segment, queryMargin, scratch) {
-			if rightIndex <= leftIndex {
+	if len(segments) >= 2 {
+		cellSize := clearanceIndexCellSize(clearanceMM)
+		index := clearanceSpatialIndex(segments, cellSize)
+		scratch := newClearanceQueryScratch(len(segments))
+		for leftIndex, left := range segments {
+			queryMargin := clearanceMM + left.Segment.WidthMM/2 + maxHalfWidth
+			for _, rightIndex := range index.query(left.Layer, left.Segment, queryMargin, scratch) {
+				if rightIndex <= leftIndex {
+					continue
+				}
+				right := segments[rightIndex]
+				if left.Net == right.Net {
+					continue
+				}
+				requiredGap := clearanceMM + left.Segment.WidthMM/2 + right.Segment.WidthMM/2
+				if !segmentBoundsWithin(left.Segment, right.Segment, requiredGap) {
+					continue
+				}
+				copperClearance := segmentDistance(left.Segment, right.Segment) - left.Segment.WidthMM/2 - right.Segment.WidthMM/2
+				if copperClearance < clearanceMM-distanceEpsilon {
+					issues = append(issues, routeValidationIssue(left.Net, reports.CodeValidationFailed, fmt.Sprintf(
+						"segment clearance violation with net %s: %s to %s crosses %s to %s",
+						right.Net, formatClearancePoint(left.Segment.Start), formatClearancePoint(left.Segment.End), formatClearancePoint(right.Segment.Start), formatClearancePoint(right.Segment.End),
+					)))
+				}
+			}
+		}
+	}
+	vias := clearanceVias(routes)
+	for _, segment := range segments {
+		for _, via := range vias {
+			if segment.Net == via.Net || !viaTouchesLayer(via.Via, segment.Layer) {
 				continue
 			}
-			right := segments[rightIndex]
-			if left.Net == right.Net {
-				continue
-			}
-			requiredGap := clearanceMM + left.Segment.WidthMM/2 + right.Segment.WidthMM/2
-			if !segmentBoundsWithin(left.Segment, right.Segment, requiredGap) {
-				continue
-			}
-			copperClearance := segmentDistance(left.Segment, right.Segment) - left.Segment.WidthMM/2 - right.Segment.WidthMM/2
+			copperClearance := distancePointToSegment(via.Via.At, segment.Segment.Start, segment.Segment.End) - via.Via.DiameterMM/2 - segment.Segment.WidthMM/2
 			if copperClearance < clearanceMM-distanceEpsilon {
-				issues = append(issues, routeValidationIssue(left.Net, reports.CodeValidationFailed, "segment clearance violation with net "+right.Net))
+				issues = append(issues, routeValidationIssue(segment.Net, reports.CodeValidationFailed, "segment clearance violation with via on net "+via.Net))
+			}
+		}
+	}
+	for leftIndex, left := range vias {
+		for rightIndex := leftIndex + 1; rightIndex < len(vias); rightIndex++ {
+			right := vias[rightIndex]
+			if left.Net == right.Net || !viasShareLayer(left.Via, right.Via) {
+				continue
+			}
+			copperClearance := pointDistance(left.Via.At, right.Via.At) - left.Via.DiameterMM/2 - right.Via.DiameterMM/2
+			if copperClearance < clearanceMM-distanceEpsilon {
+				issues = append(issues, routeValidationIssue(left.Net, reports.CodeValidationFailed, "via clearance violation with net "+right.Net))
 			}
 		}
 	}
 	return issues
+}
+
+func formatClearancePoint(point Point) string {
+	return fmt.Sprintf("(%.6g,%.6g)", point.XMM, point.YMM)
+}
+
+type clearanceVia struct {
+	Net string
+	Via Via
+}
+
+func clearanceVias(routes []Route) []clearanceVia {
+	var out []clearanceVia
+	for _, route := range routes {
+		for _, via := range route.Vias {
+			out = append(out, clearanceVia{Net: route.Net, Via: via})
+		}
+	}
+	return out
+}
+
+func viaTouchesLayer(via Via, layer string) bool {
+	layer = normalizeLayer(layer)
+	for _, candidate := range via.Layers {
+		if normalizeLayer(candidate) == layer {
+			return true
+		}
+	}
+	return false
+}
+
+func viasShareLayer(left Via, right Via) bool {
+	for _, layer := range left.Layers {
+		if viaTouchesLayer(right, layer) {
+			return true
+		}
+	}
+	return false
 }
 
 func clearanceIndexCellSize(clearanceMM float64) float64 {

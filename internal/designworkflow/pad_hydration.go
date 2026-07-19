@@ -216,6 +216,14 @@ func verifiedPadTemplate(footprintID string) (verifiedPadTemplateRecord, bool) {
 		return twoPadTemplate(2.0, 1.25, 0.7, 0.8, 1.2), true
 	case "Resistor_SMD:R_1206_3216Metric":
 		return twoPadTemplate(3.2, 1.6, 1.2, 1.2, 2.4), true
+	case "Resistor_SMD:R_2512_6332Metric":
+		return verifiedPadTemplateRecord{
+			Bounds: verifiedCourtyardBoundsFromExtents(-3.83, -1.93, 3.83, 1.93),
+			Pads: []placement.PadSummary{
+				smdPad("1", -2.9625, 0, 1.225, 3.35, "roundrect"),
+				smdPad("2", 2.9625, 0, 1.225, 3.35, "roundrect"),
+			},
+		}, true
 	case "Capacitor_SMD:C_1210_3225Metric":
 		return twoPadTemplate(3.2, 2.5, 1.2, 2.5, 2.4), true
 	case "Capacitor_Tantalum_SMD:CP_EIA-3216-18_Kemet-A":
@@ -244,6 +252,14 @@ func verifiedPadTemplate(footprintID string) (verifiedPadTemplateRecord, bool) {
 		}, true
 	case "Diode_SMD:D_SMA":
 		return twoPadTemplate(6.2, 3.0, 1.5, 1.7, 4.4), true
+	case "Diode_SMD:D_SMC":
+		return verifiedPadTemplateRecord{
+			Bounds: verifiedCourtyardBoundsFromExtents(-4.9, -3.35, 4.9, 3.35),
+			Pads: []placement.PadSummary{
+				smdPad("1", -3.4, 0, 3.3, 2.5, "roundrect"),
+				smdPad("2", 3.4, 0, 3.3, 2.5, "roundrect"),
+			},
+		}, true
 	case "Fuse:Fuse_1206_3216Metric":
 		return twoPadTemplate(4.5, 2.6, 1.6, 1.6, 2.8), true
 	case "Resistor_THT:R_Axial_DIN0414_L11.9mm_D4.5mm_P20.32mm_Horizontal":
@@ -269,6 +285,27 @@ func verifiedPadTemplate(footprintID string) (verifiedPadTemplateRecord, bool) {
 			pads[index].RotationDeg = 180
 		}
 		return verifiedPadTemplateRecord{Bounds: verifiedCourtyardBounds(21.65, 11.5, 1.95, 9.55), Pads: pads}, true
+	case "Converter_DCDC:Converter_DCDC_Murata_MEE1SxxxxSC_THT":
+		pads := make([]placement.PadSummary, 0, 4)
+		for index, name := range []string{"1", "2", "3", "4"} {
+			shape := "oval"
+			if index == 0 {
+				shape = "rect"
+			}
+			pad := throughHolePad(name, 0, float64(index)*2.54, 1.75, 2.25, 1.075, shape)
+			pad.RotationDeg = 270
+			pads = append(pads, pad)
+		}
+		return verifiedPadTemplateRecord{Bounds: verifiedCourtyardBoundsFromExtents(-1.38, -2.33, 5.22, 9.7), Pads: pads}, true
+	case "Converter_DCDC:Converter_DCDC_TRACO_TEL12-xxxx_THT":
+		pads := []placement.PadSummary{
+			throughHolePad("1", 0, 0, 2, 1.5, 0.7, "rect"),
+			throughHolePad("8", 0, 17.78, 2, 1.5, 0.7, "oval"),
+			throughHolePad("9", 10.16, 17.78, 2, 1.5, 0.7, "oval"),
+			throughHolePad("10", 10.16, 15.24, 2, 1.5, 0.7, "oval"),
+			throughHolePad("16", 10.16, 0, 2, 1.5, 0.7, "oval"),
+		}
+		return verifiedPadTemplateRecord{Bounds: verifiedCourtyardBoundsFromExtents(-2.02, -3.25, 12.18, 21.05), Pads: pads}, true
 	case "Connector_USB:USB_C_Receptacle_GCT_USB4125-xx-x_6P_TopMnt_Horizontal":
 		return usbCGCTUSB4125PowerOnlyTemplate(), true
 	case "Connector_USB:USB_C_Receptacle_HRO_TYPE-C-31-M-12":
@@ -302,6 +339,18 @@ func verifiedPadTemplate(footprintID string) (verifiedPadTemplateRecord, bool) {
 				smdPad("3", -1.1375, 0.95, 1.325, 0.6, "roundrect"),
 				smdPad("4", 1.1375, 0.95, 1.325, 0.6, "roundrect"),
 				smdPad("5", 1.1375, -0.95, 1.325, 0.6, "roundrect"),
+			},
+		}, true
+	case "Package_TO_SOT_SMD:SOT-23-6":
+		return verifiedPadTemplateRecord{
+			Bounds: verifiedCourtyardBoundsFromExtents(-2.05, -1.7, 2.05, 1.7),
+			Pads: []placement.PadSummary{
+				smdPad("1", -1.1375, -0.95, 1.325, 0.6, "roundrect"),
+				smdPad("2", -1.1375, 0, 1.325, 0.6, "roundrect"),
+				smdPad("3", -1.1375, 0.95, 1.325, 0.6, "roundrect"),
+				smdPad("4", 1.1375, 0.95, 1.325, 0.6, "roundrect"),
+				smdPad("5", 1.1375, 0, 1.325, 0.6, "roundrect"),
+				smdPad("6", 1.1375, -0.95, 1.325, 0.6, "roundrect"),
 			},
 		}, true
 	case "Package_TO_SOT_SMD:SOT-23":

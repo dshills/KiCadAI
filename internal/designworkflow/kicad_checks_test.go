@@ -68,6 +68,42 @@ func TestRunKiCadChecksWithFakeCLIPasses(t *testing.T) {
 	}
 }
 
+func TestRunKiCadChecksSerializesNonReentrantKiCadCLI(t *testing.T) {
+	request, write := writeValidationFixture(t)
+	request.Validation.RequireERC = true
+	request.Validation.RequireDRC = true
+	path := filepath.Join(t.TempDir(), "non-reentrant-kicad-cli")
+	script := `#!/bin/sh
+if [ "$1" = "--version" ]; then
+  echo "10.0.0"
+  exit 0
+fi
+lock="$0.lock"
+if ! mkdir "$lock" 2>/dev/null; then
+  exit 9
+fi
+trap 'rmdir "$lock"' EXIT
+sleep 1
+out=""
+while [ "$#" -gt 0 ]; do
+  if [ "$1" = "--output" ]; then
+    shift
+    out="$1"
+  fi
+  shift
+done
+printf '{"violations":[],"sheets":[],"coordinate_units":"mm"}' > "$out"
+`
+	if err := os.WriteFile(path, []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	result := RunKiCadChecks(context.Background(), &request, &write, KiCadCheckOptions{KiCadCLI: path, KeepArtifacts: true, ArtifactDir: t.TempDir()})
+	if result.Stage.Status != StageStatusOK {
+		t.Fatalf("serial non-reentrant checks did not pass: %#v", result.Stage)
+	}
+}
+
 func TestKiCadCheckTargetPrefersProjectRoot(t *testing.T) {
 	write := ProjectWriteResult{Inspection: inspect.ProjectSummary{
 		Root:      "/tmp/demo",

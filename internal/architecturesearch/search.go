@@ -36,6 +36,7 @@ type searchAccumulator struct {
 	rejections  []ExpansionRejection
 	complete    []CandidateResult
 	visited     map[string]bool
+	obligations map[string]string
 	budgetHit   bool
 }
 
@@ -43,7 +44,7 @@ func Search(ctx context.Context, requirement Requirement, registry *Registry, op
 	normalized := Normalize(requirement)
 	policy, policyIssues := effectiveSearchPolicy(options.Policy)
 	result := SearchResult{
-		Schema: searchResultSchema, PolicyVersion: PolicyVersion, Status: SearchFailed,
+		Schema: searchResultSchema, PolicyVersion: requirementPolicyVersion(normalized), Status: SearchFailed,
 		RegistryHash: registry.Hash(), CatalogHash: strings.TrimSpace(options.CatalogHash), FormulaLibraryHash: FormulaLibraryHash(), Policy: policy,
 	}
 	validationIssues := Validate(normalized)
@@ -70,8 +71,9 @@ func Search(ctx context.Context, requirement Requirement, registry *Registry, op
 	}
 	accumulator := searchAccumulator{
 		policy: policy, requirement: normalized, registry: registry, result: result,
-		visited: map[string]bool{},
+		visited: map[string]bool{}, obligations: map[string]string{},
 	}
+	accumulator.recordObligations(obligations)
 	initial := normalizeSearchState(searchState{Obligations: obligations})
 	initialKey := searchStateKey(initial)
 	accumulator.visited[initialKey] = true
@@ -90,9 +92,9 @@ func Search(ctx context.Context, requirement Requirement, registry *Registry, op
 		state := frontier[0]
 		frontier = frontier[1:]
 		if len(state.Obligations) == 0 {
-			candidate, err := candidateFromState(state)
-			if err != nil {
-				accumulator.reject(CodeProviderExpansionInvalid, "candidate", "", "", err.Error())
+			candidate, validation := candidateFromState(state, normalized)
+			if validation != nil {
+				accumulator.reject(validation.Code, validation.Path, "", "", validation.Message)
 				continue
 			}
 			accumulator.complete = append(accumulator.complete, candidate)
@@ -164,7 +166,9 @@ func Search(ctx context.Context, requirement Requirement, registry *Registry, op
 					accumulator.reject(CodeLimitExceeded, obligation.Path, provider.descriptor.ID, expansion.ID, "candidate area estimate exceeds board-area limit")
 					continue
 				}
-				candidateObligations := append(append([]searchObligation(nil), remaining...), namespaceChildren(obligation, provider.descriptor, expansion, children)...)
+				namespacedChildren := namespaceChildren(obligation, provider.descriptor, expansion, children)
+				accumulator.recordObligations(namespacedChildren)
+				candidateObligations := append(append([]searchObligation(nil), remaining...), namespacedChildren...)
 				next := normalizeSearchState(searchState{Depth: state.Depth + 1, Obligations: candidateObligations, Selections: candidateSelections})
 				key := searchStateKey(next)
 				if accumulator.visited[key] {
@@ -192,11 +196,13 @@ func (accumulator *searchAccumulator) finish() SearchResult {
 	accumulator.result.Rejections = summarizeRejections(accumulator.rejections, accumulator.policy.MaxRejectionSamples)
 	if accumulator.result.Status == SearchFailed && len(accumulator.result.Issues) != 0 {
 		sortIssues(accumulator.result.Issues)
+		accumulator.finalizeCoverage()
 		return accumulator.result
 	}
 	if accumulator.budgetHit {
 		accumulator.result.Status = SearchExhausted
 		accumulator.result.Issues = []reports.Issue{architectureIssue(CodeSearchBudgetExhausted, "search", "search budget exhausted before the candidate frontier was proven complete")}
+		accumulator.finalizeCoverage()
 		return accumulator.result
 	}
 	if len(accumulator.complete) == 0 {
@@ -208,9 +214,16 @@ func (accumulator *searchAccumulator) finish() SearchResult {
 			message = "one or more required capabilities have no registered provider"
 		}
 		accumulator.result.Issues = []reports.Issue{architectureIssue(code, "search", message)}
+		accumulator.finalizeCoverage()
 		return accumulator.result
 	}
 	slices.SortStableFunc(accumulator.complete, compareCandidateResults)
+	if accumulator.requirement.Acceptance.RequireAlternatives && len(accumulator.complete) < 2 {
+		accumulator.result.Status = SearchUnsupported
+		accumulator.result.Issues = []reports.Issue{architectureIssue(CodeSearchNoCandidate, "search.alternatives", "the requirement mandates a materially distinct complete architecture alternative")}
+		accumulator.finalizeCoverage()
+		return accumulator.result
+	}
 	if len(accumulator.complete) > 1 {
 		for _, candidate := range accumulator.complete[1:] {
 			if !scoresEquivalentBeforeFingerprint(accumulator.complete[0].Score, candidate.Score) {
@@ -219,6 +232,7 @@ func (accumulator *searchAccumulator) finish() SearchResult {
 			if candidatesRequireChoice(accumulator.complete[0], candidate) {
 				accumulator.result.Status = SearchAmbiguous
 				accumulator.result.Issues = []reports.Issue{architectureIssue(CodeSearchAmbiguous, "search", "top-ranked architectures require an unresolved user-visible choice")}
+				accumulator.finalizeCoverage()
 				return accumulator.result
 			}
 		}
@@ -232,7 +246,83 @@ func (accumulator *searchAccumulator) finish() SearchResult {
 	}
 	rationale := buildSelectionRationale(selected, accumulator.result.Alternatives)
 	accumulator.result.Rationale = &rationale
+	accumulator.finalizeCoverage()
 	return accumulator.result
+}
+
+func (accumulator *searchAccumulator) recordObligations(obligations []searchObligation) {
+	for _, obligation := range obligations {
+		accumulator.obligations[obligation.Path] = obligation.Capability
+	}
+}
+
+func (accumulator *searchAccumulator) finalizeCoverage() {
+	if accumulator.requirement.Version != VersionV2 {
+		return
+	}
+	statusByPath := map[string]CoverageStatus{}
+	defaultStatus := CoverageRejected
+	switch accumulator.result.Status {
+	case SearchExhausted:
+		defaultStatus = CoverageBudgetExhausted
+	case SearchAmbiguous:
+		defaultStatus = CoverageAmbiguous
+	}
+	for path := range accumulator.obligations {
+		statusByPath[path] = defaultStatus
+	}
+	for _, rejection := range accumulator.rejections {
+		if _, exists := accumulator.obligations[rejection.Path]; !exists {
+			continue
+		}
+		switch rejection.Code {
+		case CodeCapabilityUnsupported:
+			statusByPath[rejection.Path] = CoverageUnsupported
+		case CodeSearchBudgetExhausted, CodeProviderExpansionLimit:
+			statusByPath[rejection.Path] = CoverageBudgetExhausted
+		}
+	}
+	if accumulator.result.Status == SearchSelected && accumulator.result.Selected != nil {
+		for _, selection := range accumulator.result.Selected.Selections {
+			statusByPath[selection.ObligationPath] = CoverageSelected
+		}
+	}
+	if accumulator.result.Status == SearchAmbiguous && len(accumulator.complete) != 0 {
+		for _, selection := range accumulator.complete[0].Selections {
+			statusByPath[selection.ObligationPath] = CoverageAmbiguous
+		}
+	}
+	paths := make([]string, 0, len(statusByPath))
+	for path := range statusByPath {
+		paths = append(paths, path)
+	}
+	slices.Sort(paths)
+	coverage := CapabilityCoverage{Records: make([]CapabilityCoverageRecord, 0, len(paths))}
+	for _, path := range paths {
+		status := statusByPath[path]
+		coverage.Records = append(coverage.Records, CapabilityCoverageRecord{Path: path, Capability: accumulator.obligations[path], Status: status})
+		switch status {
+		case CoverageSelected:
+			coverage.Metrics.Selected++
+		case CoverageRejected:
+			coverage.Metrics.Rejected++
+		case CoverageUnsupported:
+			coverage.Metrics.Unsupported++
+		case CoverageAmbiguous:
+			coverage.Metrics.Ambiguous++
+		case CoverageBudgetExhausted:
+			coverage.Metrics.BudgetExhausted++
+		}
+	}
+	coverage.Metrics.Total = len(coverage.Records)
+	accumulator.result.Coverage = &coverage
+}
+
+func requirementPolicyVersion(requirement Requirement) string {
+	if requirement.Version == VersionV2 {
+		return PolicyVersionV2
+	}
+	return PolicyVersion
 }
 
 func initialSearchObligations(requirement Requirement, minimumEvidence EvidenceConfidence) ([]searchObligation, []reports.Issue) {
@@ -241,8 +331,7 @@ func initialSearchObligations(requirement Requirement, minimumEvidence EvidenceC
 	for _, participant := range requirement.Requirements.Participants {
 		ports := make([]RoleContract, 0, len(participant.RequiredPorts)+2)
 		for _, port := range participant.RequiredPorts {
-			binding := Binding{Role: port.ID, Participant: participant.ID, ParticipantPort: port.ID}
-			contract, contractIssues := ContractFromBinding(requirement, binding, minimumEvidence)
+			contract, contractIssues := contractFromParticipantPort(requirement, participant.ID, port.ID, minimumEvidence, false)
 			issues = append(issues, contractIssues...)
 			ports = append(ports, RoleContract{Role: port.ID, Anchor: participantAnchor(participant.ID, port.ID), Contract: contract})
 		}
@@ -253,7 +342,7 @@ func initialSearchObligations(requirement Requirement, minimumEvidence EvidenceC
 			Evidence:        ContractEvidence{Confidence: EvidenceRuleInferred, Sources: []string{"kicadai:participant-domain-contract"}},
 			MinimumEvidence: minimumEvidence,
 		}
-		ports = append(ports, RoleContract{Role: "power", Anchor: domainAnchor(participant.Domain), Contract: NormalizePortContract(powerContract)})
+		ports = append(ports, RoleContract{Role: "power", Anchor: requirementDomainAnchor(requirement, domain), Contract: NormalizePortContract(powerContract)})
 		referenceDomain := firstReferenceDomain(requirement)
 		referenceContract := PortContract{
 			ID: participant.ID + "_reference", Kind: "reference", Direction: "bidirectional", Domain: referenceDomain.ID,
@@ -270,6 +359,9 @@ func initialSearchObligations(requirement Requirement, minimumEvidence EvidenceC
 			contract, contractIssues := ContractFromBinding(requirement, binding, minimumEvidence)
 			issues = append(issues, contractIssues...)
 			anchor := externalAnchor(binding.Port)
+			if binding.Signal != "" {
+				anchor = signalAnchor(binding.Signal)
+			}
 			if binding.Participant != "" {
 				anchor = participantAnchor(binding.Participant, binding.ParticipantPort)
 			}
@@ -491,17 +583,27 @@ func normalizeSearchState(state searchState) searchState {
 	return state
 }
 
-func candidateFromState(state searchState) (CandidateResult, error) {
+type candidateValidation struct {
+	Code    reports.Code
+	Path    string
+	Message string
+}
+
+func candidateFromState(state searchState, requirement Requirement) (CandidateResult, *candidateValidation) {
 	selections := append([]FragmentSelection(nil), state.Selections...)
 	slices.SortStableFunc(selections, func(left, right FragmentSelection) int {
 		return strings.Compare(left.ObligationPath, right.ObligationPath)
 	})
 	if err := validateCandidateAnchors(selections); err != nil {
-		return CandidateResult{}, err
+		return CandidateResult{}, &candidateValidation{Code: CodeProviderExpansionInvalid, Path: "candidate.anchors", Message: err.Error()}
+	}
+	globalChecks, validation := validateCandidateGlobal(requirement, selections)
+	if validation != nil {
+		return CandidateResult{}, validation
 	}
 	encoded, err := json.Marshal(selections)
 	if err != nil {
-		return CandidateResult{}, err
+		return CandidateResult{}, &candidateValidation{Code: CodeProviderExpansionInvalid, Path: "candidate", Message: err.Error()}
 	}
 	sum := sha256.Sum256(encoded)
 	fingerprint := hex.EncodeToString(sum[:])
@@ -513,6 +615,11 @@ func candidateFromState(state searchState) (CandidateResult, error) {
 		score.FragmentCount++
 		if rank := confidenceRank(selection.Evidence.Confidence); rank < score.EvidenceRank {
 			score.EvidenceRank = rank
+		}
+		for _, component := range selection.Components {
+			if rank := confidenceRank(component.Evidence); rank < score.EvidenceRank {
+				score.EvidenceRank = rank
+			}
 		}
 		if selection.Metrics.WorstMargin != nil {
 			if !marginKnown || *selection.Metrics.WorstMargin < *score.WorstMargin {
@@ -535,7 +642,394 @@ func candidateFromState(state searchState) (CandidateResult, error) {
 			*score.AreaMM2 += *selection.Metrics.AreaMM2
 		}
 	}
-	return CandidateResult{Fingerprint: fingerprint, Score: score, Selections: selections}, nil
+	return CandidateResult{Fingerprint: fingerprint, Score: score, Selections: selections, GlobalChecks: globalChecks}, nil
+}
+
+func validateCandidateGlobal(requirement Requirement, selections []FragmentSelection) ([]GlobalCheck, *candidateValidation) {
+	if requirement.Version != VersionV2 {
+		return nil, nil
+	}
+	var checks []GlobalCheck
+	byAnchor := map[string][]PortContract{}
+	for _, selection := range selections {
+		for _, port := range selection.Ports {
+			byAnchor[port.Anchor] = append(byAnchor[port.Anchor], port.Contract)
+		}
+	}
+	anchors := make([]string, 0, len(byAnchor))
+	for anchor := range byAnchor {
+		anchors = append(anchors, anchor)
+	}
+	slices.Sort(anchors)
+	for _, anchor := range anchors {
+		ports := byAnchor[anchor]
+		var source *PortContract
+		var demand float64
+		hasDemand := false
+		var impedanceDemand float64
+		hasImpedanceDemand := false
+		voltageMinimum := math.Inf(-1)
+		voltageMaximum := math.Inf(1)
+		hasVoltage := false
+		for index := range ports {
+			port := &ports[index]
+			if port.Direction == "source" {
+				source = port
+			}
+			if port.Direction == "sink" && port.CurrentDemandA != nil {
+				demand += *port.CurrentDemandA
+				hasDemand = true
+			}
+			if port.Direction == "sink" && port.InputImpedanceMinOhm != nil && *port.InputImpedanceMinOhm > 0 && port.Voltage.Minimum != nil && port.Voltage.Maximum != nil {
+				peakVoltage := math.Max(math.Abs(*port.Voltage.Minimum), math.Abs(*port.Voltage.Maximum))
+				impedanceDemand += peakVoltage / *port.InputImpedanceMinOhm
+				hasImpedanceDemand = true
+			}
+			if port.Voltage.Minimum != nil {
+				voltageMinimum = math.Max(voltageMinimum, *port.Voltage.Minimum)
+				hasVoltage = true
+			}
+			if port.Voltage.Maximum != nil {
+				voltageMaximum = math.Min(voltageMaximum, *port.Voltage.Maximum)
+				hasVoltage = true
+			}
+		}
+		if hasVoltage {
+			path := "candidate.anchors." + anchor + ".voltage_window"
+			if voltageMinimum > voltageMaximum {
+				return nil, &candidateValidation{Code: CodeGlobalConstraintUnproven, Path: path, Message: "connected voltage contracts have no common operating window"}
+			}
+			margin := voltageMaximum - voltageMinimum
+			if math.IsInf(margin, 0) {
+				margin = 0
+			}
+			checks = append(checks, GlobalCheck{Code: CodeGlobalConstraintUnproven, Path: path, Message: "connected voltage contracts share an operating window", Required: float64Pointer(voltageMinimum), Observed: float64Pointer(voltageMaximum), Margin: float64Pointer(margin)})
+		}
+		if !hasDemand && hasImpedanceDemand && source != nil && source.CurrentCapacityA != nil {
+			demand = impedanceDemand
+			hasDemand = true
+		}
+		if source == nil || !hasDemand {
+			continue
+		}
+		path := "candidate.anchors." + anchor + ".aggregate_current"
+		if source.CurrentCapacityA == nil {
+			return nil, &candidateValidation{Code: CodeGlobalCurrentUnknown, Path: path, Message: "shared source lacks current-capacity evidence"}
+		}
+		margin := *source.CurrentCapacityA - demand
+		if margin < 0 {
+			return nil, &candidateValidation{Code: CodeGlobalCurrentExceeded, Path: path, Message: fmt.Sprintf("aggregate sink demand %.9g A exceeds source capacity %.9g A", demand, *source.CurrentCapacityA)}
+		}
+		checks = append(checks, GlobalCheck{Code: CodeGlobalCurrentExceeded, Path: path, Message: "aggregate connected current demand is within source capacity", Required: float64Pointer(demand), Observed: float64Pointer(*source.CurrentCapacityA), Margin: float64Pointer(margin)})
+	}
+
+	headroomPercent, requireHeadroom := minimumNumericConstraintAny(requirement.Requirements.SystemConstraints, "supply_current_headroom", "rail_current_headroom")
+	worstHeadroom := math.Inf(1)
+	hasHeadroomEvidence := false
+	for _, domain := range requirement.Requirements.Domains {
+		if domain.Kind != "supply" {
+			continue
+		}
+		path := "candidate.domains." + domain.ID + ".current_budget"
+		if domain.MaxCurrentA == nil {
+			return nil, &candidateValidation{Code: CodeGlobalCurrentUnknown, Path: path, Message: "supply domain lacks maximum-current evidence"}
+		}
+		var demand float64
+		var sinks int
+		for _, selection := range selections {
+			for _, port := range selection.Ports {
+				if port.Contract.Domain != domain.ID || port.Contract.Kind != "power" || port.Contract.Direction != "sink" {
+					continue
+				}
+				sinks++
+				if port.Contract.CurrentDemandA == nil {
+					return nil, &candidateValidation{Code: CodeGlobalCurrentUnknown, Path: path, Message: "power sink lacks current-demand evidence"}
+				}
+				demand += *port.Contract.CurrentDemandA
+			}
+		}
+		if sinks == 0 {
+			continue
+		}
+		margin := *domain.MaxCurrentA - demand
+		if margin < 0 {
+			return nil, &candidateValidation{Code: CodeGlobalCurrentExceeded, Path: path, Message: fmt.Sprintf("aggregate domain demand %.9g A exceeds domain limit %.9g A", demand, *domain.MaxCurrentA)}
+		}
+		if requireHeadroom {
+			if *domain.MaxCurrentA <= 0 {
+				return nil, &candidateValidation{Code: CodeGlobalCurrentUnknown, Path: path, Message: "supply headroom requires a positive maximum-current budget"}
+			}
+			observedPercent := margin / *domain.MaxCurrentA * 100
+			if observedPercent < headroomPercent {
+				return nil, &candidateValidation{Code: CodeGlobalCurrentExceeded, Path: path, Message: fmt.Sprintf("supply headroom %.9g%% is below required %.9g%%", observedPercent, headroomPercent)}
+			}
+			worstHeadroom = math.Min(worstHeadroom, observedPercent)
+			hasHeadroomEvidence = true
+		}
+		checks = append(checks, GlobalCheck{Code: CodeGlobalCurrentExceeded, Path: path, Message: "aggregate supply-domain current demand is within the declared budget", Required: float64Pointer(demand), Observed: float64Pointer(*domain.MaxCurrentA), Margin: float64Pointer(margin)})
+	}
+
+	componentCount := selectedComponentCount(selections)
+	componentMargin := float64(requirement.Requirements.Constraints.MaxComponents - componentCount)
+	if componentMargin < 0 {
+		return nil, &candidateValidation{Code: CodeGlobalConstraintUnproven, Path: "candidate.board.component_count", Message: "selected component count exceeds the board limit"}
+	}
+	checks = append(checks, GlobalCheck{Code: CodeGlobalConstraintUnproven, Path: "candidate.board.component_count", Message: "selected component count is within the board limit", Required: float64Pointer(float64(requirement.Requirements.Constraints.MaxComponents)), Observed: float64Pointer(float64(componentCount)), Margin: float64Pointer(componentMargin)})
+	if area := selectedAreaMM2(selections); area > 0 {
+		available := requirement.Requirements.Constraints.MaxWidthMM * requirement.Requirements.Constraints.MaxHeightMM
+		margin := available - area
+		if margin < 0 {
+			return nil, &candidateValidation{Code: CodeGlobalConstraintUnproven, Path: "candidate.board.area", Message: "selected component area exceeds the board envelope"}
+		}
+		checks = append(checks, GlobalCheck{Code: CodeGlobalConstraintUnproven, Path: "candidate.board.area", Message: "selected component area is within the board envelope", Required: float64Pointer(available), Observed: float64Pointer(area), Margin: float64Pointer(margin)})
+	}
+
+	if len(selections) != 0 {
+		worst := math.Inf(1)
+		calculationCount := 0
+		for _, selection := range selections {
+			for _, calculation := range selection.Calculations {
+				calculationCount++
+				if !calculation.Pass {
+					return nil, &candidateValidation{Code: CodeGlobalConstraintUnproven, Path: "candidate.tolerance", Message: "a selected worst-case calculation is not proven"}
+				}
+				worst = math.Min(worst, calculation.WorstMargin)
+			}
+		}
+		if calculationCount != 0 {
+			checks = append(checks, GlobalCheck{Code: CodeGlobalConstraintUnproven, Path: "candidate.tolerance", Message: "all selected value, tolerance, and rating calculations pass", Required: float64Pointer(0), Observed: float64Pointer(worst), Margin: float64Pointer(worst)})
+		}
+	}
+
+	for _, constraint := range requirement.Requirements.SystemConstraints {
+		path := "candidate.system_constraints." + constraint.Name
+		switch constraint.Name {
+		case "supply_current_headroom", "rail_current_headroom":
+			required, ok := numericConstraintValue(constraint, "minimum")
+			if !ok || !hasHeadroomEvidence || worstHeadroom < required {
+				return nil, &candidateValidation{Code: CodeGlobalConstraintUnproven, Path: path, Message: "required aggregate current headroom is not proven"}
+			}
+			margin := worstHeadroom - required
+			checks = append(checks, GlobalCheck{Code: CodeGlobalConstraintUnproven, Path: path, Message: "worst supply-domain current headroom satisfies the system constraint", Required: float64Pointer(required), Observed: float64Pointer(worstHeadroom), Margin: float64Pointer(margin)})
+		case "startup_load_state", "startup_output_state", "startup_bus_state":
+			var required string
+			if constraint.Relation != "equal" || json.Unmarshal(constraint.Value, &required) != nil || !startupStateProven(constraint.Name, canonicalIdentifier(required), selections) {
+				return nil, &candidateValidation{Code: CodeGlobalConstraintUnproven, Path: path, Message: "required fail-safe startup state is not proven by a selected boundary contract"}
+			}
+			checks = append(checks, GlobalCheck{Code: CodeGlobalConstraintUnproven, Path: path, Message: "selected boundary contracts prove startup state " + canonicalIdentifier(required), Required: float64Pointer(1), Observed: float64Pointer(1), Margin: float64Pointer(0)})
+		case "fault_response_time":
+			required, ok := numericConstraintValue(constraint, "maximum")
+			observed, evidenceOK := summedCalculationOutput(selections, "response_time", constraint.Unit)
+			if !ok || !evidenceOK || observed > required {
+				return nil, &candidateValidation{Code: CodeGlobalConstraintUnproven, Path: path, Message: "composed fault-path response time is missing or exceeds the required maximum"}
+			}
+			margin := required - observed
+			checks = append(checks, GlobalCheck{Code: CodeGlobalConstraintUnproven, Path: path, Message: "composed sensor, decision, and switching delays satisfy the response-time limit", Required: float64Pointer(required), Observed: float64Pointer(observed), Margin: float64Pointer(margin)})
+		case "phase_margin", "thermal_margin":
+			required, ok := numericConstraintValue(constraint, "minimum")
+			observed, evidenceOK := minimumCalculationOutput(selections, constraint.Name, constraint.Unit)
+			if !ok || !evidenceOK || observed < required {
+				return nil, &candidateValidation{Code: CodeGlobalConstraintUnproven, Path: path, Message: "selected architecture lacks sufficient " + strings.ReplaceAll(constraint.Name, "_", " ") + " evidence"}
+			}
+			margin := observed - required
+			checks = append(checks, GlobalCheck{Code: CodeGlobalConstraintUnproven, Path: path, Message: "worst selected " + strings.ReplaceAll(constraint.Name, "_", " ") + " satisfies the system constraint", Required: float64Pointer(required), Observed: float64Pointer(observed), Margin: float64Pointer(margin)})
+		case "input_referred_noise":
+			required, ok := numericConstraintValue(constraint, "maximum")
+			observed, evidenceOK := integratedInputNoise(selections, constraint.Unit)
+			if !ok || !evidenceOK || observed > required {
+				return nil, &candidateValidation{Code: CodeGlobalConstraintUnproven, Path: path, Message: "catalog noise density and composed bandwidth do not prove the required input-referred noise"}
+			}
+			margin := required - observed
+			checks = append(checks, GlobalCheck{Code: CodeGlobalConstraintUnproven, Path: path, Message: "quadrature-integrated selected noise densities satisfy the system limit", Required: float64Pointer(required), Observed: float64Pointer(observed), Margin: float64Pointer(margin)})
+		case "reference_separation":
+			var required bool
+			if constraint.Relation != "required" || json.Unmarshal(constraint.Value, &required) != nil || !required || !referenceSeparationProven(selections) {
+				return nil, &candidateValidation{Code: CodeGlobalConstraintUnproven, Path: path, Message: "galvanic reference separation is not proven by distinct selected domains"}
+			}
+			checks = append(checks, GlobalCheck{Code: CodeGlobalConstraintUnproven, Path: path, Message: "selected isolation boundaries keep references in distinct voltage domains", Required: float64Pointer(1), Observed: float64Pointer(1), Margin: float64Pointer(0)})
+		default:
+			return nil, &candidateValidation{Code: CodeGlobalConstraintUnproven, Path: path, Message: "system constraint has no deterministic global proof rule"}
+		}
+	}
+	if requirement.Acceptance.RequireGlobalReasoning && len(checks) == 0 {
+		return nil, &candidateValidation{Code: CodeGlobalConstraintUnproven, Path: "candidate.global_checks", Message: "global reasoning was required but produced no evidence"}
+	}
+	slices.SortStableFunc(checks, func(left, right GlobalCheck) int { return strings.Compare(left.Path, right.Path) })
+	return checks, nil
+}
+
+func numericConstraintValue(constraint Constraint, relation string) (float64, bool) {
+	if constraint.Relation != relation {
+		return 0, false
+	}
+	var value float64
+	return value, json.Unmarshal(constraint.Value, &value) == nil && finiteNumbers(value)
+}
+
+func minimumNumericConstraintAny(constraints []Constraint, names ...string) (float64, bool) {
+	for _, name := range names {
+		if value, ok := minimumNumericConstraint(constraints, name); ok {
+			return value, true
+		}
+	}
+	return 0, false
+}
+
+func startupStateProven(name, required string, selections []FragmentSelection) bool {
+	for _, selection := range selections {
+		for _, port := range selection.Ports {
+			proven := canonicalIdentifier(port.Contract.DefaultState) == required || slices.Contains(port.Contract.Traits, "startup_state_"+required)
+			if !proven {
+				continue
+			}
+			switch name {
+			case "startup_bus_state":
+				if port.Contract.Protocol != nil {
+					return true
+				}
+			case "startup_load_state":
+				if port.Role == "output" || port.Role == "load" || port.Role == "permit" {
+					return true
+				}
+			case "startup_output_state":
+				if port.Role == "output" || port.Role == "mute" || port.Role == "bias" {
+					return true
+				}
+			}
+		}
+	}
+	return false
+}
+
+func summedCalculationOutput(selections []FragmentSelection, name, unit string) (float64, bool) {
+	result := 0.0
+	found := false
+	for _, selection := range selections {
+		for _, calculation := range selection.Calculations {
+			for _, output := range calculation.NominalOutputs {
+				if output.Name != name {
+					continue
+				}
+				converted, ok := convertCompositionUnit(output.Value, output.Unit, unit)
+				if !ok {
+					return 0, false
+				}
+				result += converted
+				found = true
+			}
+		}
+	}
+	return result, found
+}
+
+func minimumCalculationOutput(selections []FragmentSelection, name, unit string) (float64, bool) {
+	result := math.Inf(1)
+	found := false
+	for _, selection := range selections {
+		for _, calculation := range selection.Calculations {
+			for _, output := range calculation.NominalOutputs {
+				if output.Name != name {
+					continue
+				}
+				converted, ok := convertCompositionUnit(output.Value, output.Unit, unit)
+				if !ok {
+					return 0, false
+				}
+				result = math.Min(result, converted)
+				found = true
+			}
+		}
+	}
+	return result, found
+}
+
+func integratedInputNoise(selections []FragmentSelection, unit string) (float64, bool) {
+	sumSquares := 0.0
+	bandwidth := math.Inf(1)
+	filterOrder := math.Inf(1)
+	hasNoise, hasBandwidth, hasFilterOrder := false, false, false
+	for _, selection := range selections {
+		for _, calculation := range selection.Calculations {
+			for _, output := range calculation.NominalOutputs {
+				switch output.Name {
+				case "voltage_noise_density":
+					if output.Unit != "V/sqrt(Hz)" || output.Value <= 0 {
+						return 0, false
+					}
+					sumSquares += output.Value * output.Value
+					hasNoise = true
+				case "cutoff_frequency", "frequency", "natural_frequency":
+					converted, ok := convertCompositionUnit(output.Value, output.Unit, "Hz")
+					if ok && converted > 0 {
+						bandwidth = math.Min(bandwidth, converted)
+						hasBandwidth = true
+					}
+				case "filter_order":
+					if output.Value < 1 || output.Value != math.Trunc(output.Value) {
+						return 0, false
+					}
+					filterOrder = math.Min(filterOrder, output.Value)
+					hasFilterOrder = true
+				}
+			}
+		}
+	}
+	if !hasNoise || !hasBandwidth || !hasFilterOrder {
+		return 0, false
+	}
+	noiseBandwidthFactor := math.Pi / (2 * filterOrder * math.Sin(math.Pi/(2*filterOrder)))
+	noiseV := math.Sqrt(sumSquares * bandwidth * noiseBandwidthFactor)
+	return convertCompositionUnit(noiseV, "V", unit)
+}
+
+func referenceSeparationProven(selections []FragmentSelection) bool {
+	for _, selection := range selections {
+		if selection.Capability != "galvanic_isolation" {
+			continue
+		}
+		domains := map[string]bool{}
+		for _, port := range selection.Ports {
+			if port.Contract.Domain != "" {
+				domains[port.Contract.Domain] = true
+			}
+		}
+		if len(domains) >= 2 {
+			return true
+		}
+	}
+	return false
+}
+
+func convertCompositionUnit(value float64, from, to string) (float64, bool) {
+	from, to = canonicalUnit(from), canonicalUnit(to)
+	if from == to {
+		return value, true
+	}
+	switch {
+	case from == "s" && to == "us":
+		return value * 1e6, true
+	case from == "us" && to == "s":
+		return value / 1e6, true
+	case from == "V" && to == "uV_rms":
+		return value * 1e6, true
+	case from == "uV_rms" && to == "V":
+		return value / 1e6, true
+	default:
+		return 0, false
+	}
+}
+
+func minimumNumericConstraint(constraints []Constraint, name string) (float64, bool) {
+	for _, constraint := range constraints {
+		if constraint.Name != name || constraint.Relation != "minimum" {
+			continue
+		}
+		var value float64
+		if json.Unmarshal(constraint.Value, &value) == nil {
+			return value, true
+		}
+	}
+	return 0, false
 }
 
 func validateCandidateAnchors(selections []FragmentSelection) error {
@@ -821,8 +1315,20 @@ func canonicalRawJSON(raw json.RawMessage) json.RawMessage {
 
 func externalAnchor(port string) string { return "external:" + canonicalIdentifier(port) }
 func domainAnchor(domain string) string { return "domain:" + canonicalIdentifier(domain) }
+func signalAnchor(signal string) string { return "signal:" + canonicalIdentifier(signal) }
 func participantAnchor(participant, port string) string {
 	return "participant:" + canonicalIdentifier(participant) + ":" + canonicalIdentifier(port)
+}
+
+func requirementDomainAnchor(requirement Requirement, domain Domain) string {
+	if domain.Source != "" && domain.Source != "external" && domain.Source != "generated" {
+		for _, signal := range requirement.Requirements.Signals {
+			if signal.ID == domain.Source {
+				return signalAnchor(signal.ID)
+			}
+		}
+	}
+	return domainAnchor(domain.ID)
 }
 
 func firstReferenceDomain(requirement Requirement) Domain {

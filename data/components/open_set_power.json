@@ -69,6 +69,74 @@
       }
     },
     {
+      "id": "mosfet.infineon.irlz44n.to220",
+      "family": "mosfet",
+      "name": "Infineon IRLZ44N 55 V logic-level N-channel MOSFET",
+      "description": "Concrete through-hole low-side power switch with specified 4.5 V gate-drive performance.",
+      "generic": false,
+      "manufacturer": "Infineon Technologies",
+      "mpn": "IRLZ44NPBF",
+      "lifecycle": "active",
+      "tags": ["logic_level", "low_side_switch", "mosfet", "n_channel", "power", "to220"],
+      "values": [
+        {"kind": "on_resistance", "max": "35", "unit": "mOhm"},
+        {"kind": "on_resistance_gate_voltage", "typ": "4.5", "unit": "V"},
+        {"kind": "total_gate_charge", "typ": "32", "unit": "nC"}
+      ],
+      "ratings": [
+        {"kind": "drain_source_voltage", "max": "55", "unit": "V"},
+        {"kind": "drain_current", "max": "47", "unit": "A"},
+        {"kind": "gate_source_voltage", "max": "16", "unit": "V"},
+        {"kind": "power_dissipation", "max": "83", "unit": "W"}
+      ],
+      "temperature": {"min": "-55", "max": "175", "unit": "C"},
+      "symbols": [
+        {
+          "symbol_id": "Transistor_FET:Q_NMOS_GDS",
+          "function_pins": [
+            {"function": "GATE", "symbol_pin": "1", "electrical": "input", "required": true},
+            {"function": "DRAIN", "symbol_pin": "2", "required": true},
+            {"function": "SOURCE", "symbol_pin": "3", "required": true}
+          ],
+          "verification": {
+            "confidence": "verified",
+            "sources": ["https://www.infineon.com/part/IRLZ44N", "kicad-symbols:Transistor_FET:Q_NMOS_GDS"],
+            "pinmap_checked": true
+          }
+        }
+      ],
+      "packages": [
+        {
+          "id": "to220_vertical",
+          "name": "TO-220-3 vertical",
+          "footprint_id": "Package_TO_SOT_THT:TO-220-3_Vertical",
+          "package_type": "to220",
+          "mpn": "IRLZ44NPBF",
+          "lifecycle": "active",
+          "pinmap_id": "Transistor_FET:Q_NMOS_GDS|Package_TO_SOT_THT:TO-220-3_Vertical",
+          "pad_functions": [
+            {"function": "GATE", "pad": "1"},
+            {"function": "DRAIN", "pad": "2"},
+            {"function": "SOURCE", "pad": "3"}
+          ],
+          "dimensions_mm": {"width": 10.54, "height": 4.69},
+          "height_mm": 15.65,
+          "verification": {
+            "confidence": "verified",
+            "sources": ["https://www.infineon.com/part/IRLZ44N", "kicad-footprint:Package_TO_SOT_THT:TO-220-3_Vertical"],
+            "pinmap_checked": true
+          }
+        }
+      ],
+      "verification": {
+        "confidence": "verified",
+        "sources": ["https://www.infineon.com/part/IRLZ44N", "datasheet-pinmap:Infineon:IRLZ44N", "kicad-footprint:Package_TO_SOT_THT:TO-220-3_Vertical"],
+        "resolver_checked": true,
+        "pinmap_checked": true,
+        "notes": ["The 47 A current and 83 W dissipation ratings require the manufacturer test conditions and thermal design; applied SOA and junction temperature remain circuit-level checks."]
+      }
+    },
+    {
       "id": "diode.diodes.b340la.sma",
       "family": "diode",
       "name": "Diodes Incorporated B340LA 3 A 40 V Schottky rectifier",
@@ -128,6 +196,65 @@
       }
     },
     {
+      "id": "diode.diodes.b560c.smc",
+      "family": "diode",
+      "name": "Diodes Incorporated B560C 5 A 60 V Schottky rectifier",
+      "description": "Concrete high-current recirculation diode for protected power switching.",
+      "generic": false,
+      "manufacturer": "Diodes Incorporated",
+      "mpn": "B560C-13-F",
+      "lifecycle": "active",
+      "tags": ["flyback", "inductive_clamp", "power", "schottky", "smc"],
+      "values": [{"kind": "forward_voltage", "max": "0.7", "unit": "V"}],
+      "ratings": [
+        {"kind": "current", "max": "5", "unit": "A"},
+        {"kind": "reverse_voltage", "max": "60", "unit": "V"},
+        {"kind": "surge_current", "max": "100", "unit": "A"}
+      ],
+      "temperature": {"min": "-55", "max": "150", "unit": "C"},
+      "symbols": [
+        {
+          "symbol_id": "Device:D_Schottky",
+          "function_pins": [
+            {"function": "K", "symbol_pin": "1", "required": true},
+            {"function": "A", "symbol_pin": "2", "required": true}
+          ],
+          "verification": {
+            "confidence": "verified",
+            "sources": ["https://www.diodes.com/datasheet/download/B540C.pdf", "kicad-symbols:Device:D_Schottky"],
+            "pinmap_checked": true
+          }
+        }
+      ],
+      "packages": [
+        {
+          "id": "smc",
+          "name": "SMC",
+          "footprint_id": "Diode_SMD:D_SMC",
+          "package_type": "smc",
+          "mpn": "B560C-13-F",
+          "lifecycle": "active",
+          "pinmap_id": "Device:D_Schottky|Diode_SMD:D_SMC",
+          "pad_functions": [
+            {"function": "K", "pad": "1"},
+            {"function": "A", "pad": "2"}
+          ],
+          "verification": {
+            "confidence": "verified",
+            "sources": ["https://www.diodes.com/datasheet/download/B540C.pdf", "kicad-footprint:Diode_SMD:D_SMC"],
+            "pinmap_checked": true
+          }
+        }
+      ],
+      "verification": {
+        "confidence": "verified",
+        "sources": ["https://www.diodes.com/part/view/B560C", "https://www.diodes.com/datasheet/download/B540C.pdf", "kicad-footprint:Diode_SMD:D_SMC"],
+        "resolver_checked": true,
+        "pinmap_checked": true,
+        "notes": ["The 5 A average-current rating requires the manufacturer-specified terminal temperature and PCB copper; applied temperature and dissipation remain circuit-level checks."]
+      }
+    },
+    {
       "id": "level_translator.ti.txs0102dcu.vssop8",
       "family": "level_translator",
       "name": "TI TXS0102DCU two-bit bidirectional level translator",
@@ -140,6 +267,7 @@
       "ratings": [
         {"kind": "vcca_supply_voltage", "min": "1.65", "max": "3.6", "unit": "V"},
         {"kind": "vccb_supply_voltage", "min": "2.3", "max": "5.5", "unit": "V"},
+        {"kind": "supply_current", "max": "0.025", "unit": "mA"},
         {"kind": "open_drain_data_rate", "max": "2000000", "unit": "Hz"}
       ],
       "temperature": {"min": "-40", "max": "85", "unit": "C"},

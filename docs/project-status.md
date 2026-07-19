@@ -88,6 +88,19 @@ differences, and byte-identical replay. See the
 [function-level synthesis specification](../specs/function-level-circuit-synthesis/SPEC.md)
 and [capability report](../specs/function-level-circuit-synthesis/CAPABILITY_REPORT.json).
 
+Adversarial multi-function composition extends that evidence to 10 frozen,
+behavior-only v2 circuits containing 35 objectives and 3 abstract participants.
+The corpus exercises 18 reusable capabilities and 23 whole-circuit constraints,
+including shared voltage windows, aggregate loading and current, startup state,
+response time, loop margin, integrated noise, thermal margin, isolation,
+tolerance evidence, component count, and board area. Every circuit passes
+deterministic search and alternatives, lowering, writer and round-trip checks,
+complete connectivity/routing, clean installed-KiCad ERC, and strict DRC. The
+[specification](../specs/adversarial-multi-function-composition/SPEC.md) and
+[acceptance audit](../specs/adversarial-multi-function-composition/AUDIT.md)
+define the measured envelope. This is bounded registered-capability evidence,
+not arbitrary-circuit support.
+
 An exact block-composition lane now supports `ESP32-WROOM-32E-N4` through the
 built-in `esp32_wroom_32e_minimal` block. It emits the module, local power
 conditioning, EN/BOOT networks and buttons, UART and peripheral headers, and a

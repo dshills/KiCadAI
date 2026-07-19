@@ -68,6 +68,56 @@ func TestContractFromBindingSupportsAbstractParticipantPorts(t *testing.T) {
 	}
 }
 
+func TestParticipantBindingUsesOppositeEndpointDirection(t *testing.T) {
+	requirement := validRequirement()
+	requirement.Requirements.Participants = []Participant{{
+		ID: "controller", Capability: "programmable_controller", Domain: "vcc",
+		RequiredPorts: []ParticipantPort{{ID: "enable", Kind: "digital_logic", Direction: "source"}},
+		Constraints:   []Constraint{{Name: "programmable_interface", Relation: "required", Value: json.RawMessage(`true`)}},
+	}}
+	requirement.Requirements.Objectives[0].Bindings = append(requirement.Requirements.Objectives[0].Bindings, Binding{Role: "enable", Participant: "controller", ParticipantPort: "enable"})
+	consumer, issues := ContractFromBinding(requirement, Binding{Role: "enable", Participant: "controller", ParticipantPort: "enable"}, EvidenceVerified)
+	if len(issues) != 0 {
+		t.Fatalf("consumer issues = %#v", issues)
+	}
+	participant, issues := contractFromParticipantPort(Normalize(requirement), "controller", "enable", EvidenceVerified, false)
+	if len(issues) != 0 {
+		t.Fatalf("participant issues = %#v", issues)
+	}
+	if consumer.Direction != "sink" || participant.Direction != "source" {
+		t.Fatalf("participant endpoints = consumer:%s participant:%s", consumer.Direction, participant.Direction)
+	}
+	if report := ConnectPorts(consumer, participant); !report.Compatible {
+		t.Fatalf("participant endpoints are incompatible: %#v", report)
+	}
+}
+
+func TestContractFromBindingBuildsOppositeTypedSignalEndpoints(t *testing.T) {
+	requirement := validMultiFunctionRequirement()
+	source, issues := ContractFromBinding(requirement, Binding{Role: "output", Signal: "conditioned", Direction: "source"}, EvidenceVerified)
+	if len(issues) != 0 {
+		t.Fatalf("source issues = %#v", issues)
+	}
+	sink, issues := ContractFromBinding(requirement, Binding{Role: "input", Signal: "conditioned", Direction: "sink"}, EvidenceVerified)
+	if len(issues) != 0 {
+		t.Fatalf("sink issues = %#v", issues)
+	}
+	if source.ID != "conditioned" || sink.ID != "conditioned" || source.Direction != "source" || sink.Direction != "sink" || source.Kind != sink.Kind || source.Domain != sink.Domain {
+		t.Fatalf("signal endpoints do not preserve one typed identity: source=%#v sink=%#v", source, sink)
+	}
+	if source.RequiredCurrentCapacityA == nil || *source.RequiredCurrentCapacityA != 0.001 || sink.MaximumCurrentDemandA == nil || *sink.MaximumCurrentDemandA != 0.001 {
+		t.Fatalf("signal current semantics are incomplete: source=%#v sink=%#v", source, sink)
+	}
+}
+
+func TestContractFromBindingRejectsMixedBindingForms(t *testing.T) {
+	requirement := validMultiFunctionRequirement()
+	_, issues := ContractFromBinding(requirement, Binding{Role: "mixed", Port: "input", Signal: "conditioned", Direction: "sink"}, EvidenceVerified)
+	if !containsIssue(issues, CodeBindingUnresolved, "binding") {
+		t.Fatalf("mixed binding issues = %#v", issues)
+	}
+}
+
 func TestSatisfiesPortRequirementProvesSinkAndSourceContracts(t *testing.T) {
 	requiredSink := PortContract{
 		ID: "sense", Kind: "analog_voltage", Direction: "sink", Domain: "logic_3v3",

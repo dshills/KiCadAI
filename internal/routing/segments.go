@@ -96,6 +96,12 @@ func buildLayeredSegmentsFromPath(path GridPath, widthMM float64) ([]Segment, Me
 		totalLength += metrics.TotalLengthMM
 		if index < len(path.Coordinates) && pointDistanceSquared(path.Points[index-1], path.Points[index]) > distanceEpsilonSquared {
 			transitionLayer := layerNameForPath(path, path.Coordinates[index-1].Layer)
+			if index == len(path.Coordinates)-1 {
+				// A terminal off-grid pad alignment belongs on the destination
+				// layer. The via remains at the searched grid point immediately
+				// before it, preserving both clearance and physical connectivity.
+				transitionLayer = layerNameForPath(path, path.Coordinates[index].Layer)
+			}
 			transitionSegments, metrics := buildSegmentsForPoints(path.Net, transitionLayer, path.Points[index-1:index+1], widthMM, 0)
 			segments = append(segments, transitionSegments...)
 			totalLength += metrics.TotalLengthMM

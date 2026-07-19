@@ -93,6 +93,9 @@ func runCheck(ctx context.Context, runner Runner, cli KiCadCLI, kind CheckKind, 
 		Summary:         SummarizeFindings(remaining),
 	}
 	if toolError {
+		if result.Err != nil {
+			return check, fmt.Errorf("%s check failed with exit code %d: %w", kind, result.ExitCode, result.Err)
+		}
 		return check, fmt.Errorf("%s check failed with exit code %d", kind, result.ExitCode)
 	}
 	return check, nil

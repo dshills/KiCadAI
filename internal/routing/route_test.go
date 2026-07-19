@@ -6,6 +6,7 @@ import (
 	"reflect"
 	"testing"
 
+	"kicadai/internal/pcbrules"
 	"kicadai/internal/reports"
 )
 
@@ -460,6 +461,29 @@ func TestNominalSegmentsClearOccupancyRejectsThickenedCollision(t *testing.T) {
 	}
 	if nominalSegmentsClearOccupancy(segments, 0.8, occupancy, request.Board.Layers) {
 		t.Fatal("thickened segment crossing an obstacle was accepted")
+	}
+}
+
+func TestAutomaticEndpointNeckdownAppliesToWideCurrentCarryingNets(t *testing.T) {
+	for _, role := range []NetRole{NetPower, NetGround, NetHighCurrent} {
+		rules := applyAutomaticEndpointNeckdown(Rules{TraceWidthMM: 0.5, MinNeckdownWidthMM: 0.25}, role, true)
+		if rules.NeckdownWidthMM != 0.25 || rules.NeckdownLengthMM != pcbrules.DefaultPowerNeckdownLengthMM {
+			t.Fatalf("role %s rules = %#v", role, rules)
+		}
+	}
+}
+
+func TestAutomaticEndpointNeckdownPreservesExplicitPolicyAndSignals(t *testing.T) {
+	explicit := Rules{TraceWidthMM: 0.5, NeckdownWidthMM: 0.3, NeckdownLengthMM: 1}
+	if got := applyAutomaticEndpointNeckdown(explicit, NetPower, true); !reflect.DeepEqual(got, explicit) {
+		t.Fatalf("explicit neckdown changed: %#v", got)
+	}
+	signal := Rules{TraceWidthMM: 0.5}
+	if got := applyAutomaticEndpointNeckdown(signal, NetSignal, true); !reflect.DeepEqual(got, signal) {
+		t.Fatalf("signal rules changed: %#v", got)
+	}
+	if got := applyAutomaticEndpointNeckdown(signal, NetPower, false); !reflect.DeepEqual(got, signal) {
+		t.Fatalf("wide endpoint rules changed: %#v", got)
 	}
 }
 

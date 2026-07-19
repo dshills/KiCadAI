@@ -125,6 +125,20 @@ func TestBuildSegmentsFromPathRoundsOutput(t *testing.T) {
 	}
 }
 
+func TestBuildSegmentsFromPathPlacesTerminalTransitionConnectorOnPadLayer(t *testing.T) {
+	path := GridPath{
+		Net:         "SIG",
+		Layer:       "B.Cu",
+		LayerNames:  map[int]string{0: "B.Cu", 1: "F.Cu"},
+		Coordinates: []GridCoord{{X: 10, Y: 20, Layer: 0}, {X: 10, Y: 20, Layer: 1}},
+		Points:      []Point{{XMM: 2.5, YMM: 5}, {XMM: 2.63, YMM: 5.17}},
+	}
+	segments, _ := BuildSegmentsFromPath(path, 0.25)
+	if len(segments) != 1 || normalizeLayer(segments[0].Layer) != "F.CU" || segments[0].Start != path.Points[0] || segments[0].End != path.Points[1] {
+		t.Fatalf("segments = %#v, want terminal connector on destination pad layer", segments)
+	}
+}
+
 func TestBuildSegmentsFromPathPreventsZeroWidthAfterRounding(t *testing.T) {
 	path := GridPath{
 		Net:   "SIG",

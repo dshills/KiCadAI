@@ -1009,6 +1009,16 @@ correctness, and zero round-trip diffs. This proves composition inside the
 registered capability and catalog envelope; it does not imply unbounded or
 arbitrary-topology circuit generation.
 
+Adversarial multi-function composition now extends that bounded proof to 10
+SHA-256-pinned v2 circuits containing 35 objectives and 3 abstract
+participants. Typed shared signals compose 18 registered capabilities while 23
+whole-circuit constraints prove voltage compatibility, current and loading,
+startup behavior, response time, stability, integrated noise, thermal margin,
+isolation, tolerance evidence, and board budgets. All 10 pass deterministic
+alternatives and rationale, lowering, writer and zero-diff round trip,
+connectivity/routing, clean installed-KiCad ERC, and strict DRC. This remains a
+registered-capability and checked-in-catalog envelope, not arbitrary generation.
+
 Structured semantic mapping is now implemented for target, bus, and supply
 intent:
 
@@ -1111,15 +1121,19 @@ B, and shared power units while retaining one physical reference, footprint,
 and BOM item. The live graph is semantically equivalent to the recording and
 reaches the same KiCad-backed pass gates.
 
-1. Add a materially different generic graph only when it exposes a concrete
-   catalog, lowering, hierarchy, placement, routing, simulation, or validation
-   gap; do not extend stage count merely to accumulate fixtures.
-2. Add a materially different analog or mixed-signal fixture only when it
-   exposes a concrete trusted-model, operating-limit, or validation gap; do not
-   broaden transient support by accepting provider models or solver controls.
+The five-requirement open-set milestone and the 10-circuit adversarial
+multi-function milestone are complete. Further fixtures should target genuinely
+new uncertainty rather than repeat the same provider envelope.
+
+1. Add a held-out behavioral-intent front end that must derive the strict v2
+   requirement contract, expose uncertainty, and request clarification instead
+   of guessing.
+2. Add dynamic electrothermal and control-loop evidence where static global
+   bounds cannot prove startup, SOA, stability, or transient protection.
 3. Generalize bounded placement-routing correction from observed
    failures without introducing fixture-identity logic.
-4. Expand calculated rating and fabrication evidence before claiming broader
+4. Expand catalog-independent part qualification, calculated rating, and
+   fabrication evidence before claiming broader
    autonomous or fabrication-ready coverage.
 
 ## Definition Of Autonomous Ready

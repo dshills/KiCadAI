@@ -43,6 +43,21 @@ type nodeMetadata struct {
 	current float64
 }
 
+type pendingPortBinding struct {
+	node     string
+	anchor   string
+	metadata nodeMetadata
+}
+
+type pendingSeriesTransition struct {
+	input    string
+	output   string
+	anchor   string
+	contract architecturesearch.PortContract
+	metadata nodeMetadata
+	path     string
+}
+
 // Lower is deterministic and fail closed: every selected payload must decode,
 // every role binding must resolve, and every semantic component port must join
 // at least one other physical or external endpoint.
@@ -70,6 +85,7 @@ func Lower(requirement architecturesearch.Requirement, search architecturesearch
 	union := newDisjointSet()
 	actual := map[string]circuitgraph.FunctionalEndpoint{}
 	metadata := map[string]nodeMetadata{}
+	referenceDomain := firstReferenceDomain(requirement)
 	interfaces, externalNodes := lowerInterfaces(requirement, union, actual, metadata)
 	intent.Interfaces = interfaces
 
@@ -79,6 +95,8 @@ func Lower(requirement architecturesearch.Requirement, search architecturesearch
 	})
 	selectionEvidence := make([]string, 0, len(selections))
 	instanceIDs := map[string]bool{}
+	bindingsByAnchor := map[string][]pendingPortBinding{}
+	transitionsByAnchor := map[string][]pendingSeriesTransition{}
 	for selectionIndex, selection := range selections {
 		realization, err := architecturesearch.DecodeFragmentRealization(selection.Payload)
 		if err != nil {
@@ -132,8 +150,62 @@ func Lower(requirement architecturesearch.Requirement, search architecturesearch
 			id := localIDs[binding.Instance]
 			function := functionNode(id, binding.Function)
 			anchor := anchorNode(port.Anchor, binding.Lane)
-			union.join(function, anchor)
-			mergeMetadata(metadata, anchor, nodeMetadata{role: contractNetRole(port.Contract), domain: port.Contract.Domain, current: contractCurrentMA(port.Contract)})
+			bindingMetadata := contractNodeMetadata(port.Contract, binding.Lane, referenceDomain)
+			bindingsByAnchor[anchor] = append(bindingsByAnchor[anchor], pendingPortBinding{node: function, anchor: anchor, metadata: bindingMetadata})
+		}
+		for transitionIndex, transition := range realization.SeriesTransitions {
+			port, ok := ports[transition.Role]
+			if !ok || port.Anchor == "" {
+				return Result{}, issues(fmt.Sprintf("selections[%d].series_transitions[%d]", selectionIndex, transitionIndex), "series-transition role has no selected obligation anchor")
+			}
+			anchor := anchorNode(port.Anchor, transition.Lane)
+			transitionsByAnchor[anchor] = append(transitionsByAnchor[anchor], pendingSeriesTransition{
+				input: functionNode(localIDs[transition.Input.Instance], transition.Input.Function), output: functionNode(localIDs[transition.Output.Instance], transition.Output.Function),
+				anchor: anchor, contract: port.Contract, metadata: contractNodeMetadata(port.Contract, transition.Lane, referenceDomain),
+				path: fmt.Sprintf("selections[%d].series_transitions[%d]", selectionIndex, transitionIndex),
+			})
+		}
+	}
+	transitionAnchors := make([]string, 0, len(transitionsByAnchor))
+	for anchor := range transitionsByAnchor {
+		transitionAnchors = append(transitionAnchors, anchor)
+	}
+	slices.Sort(transitionAnchors)
+	for _, anchor := range transitionAnchors {
+		transitions := transitionsByAnchor[anchor]
+		if len(transitions) != 1 {
+			return Result{}, issues(transitions[0].path, "multiple series transitions on one anchor require an explicit ordered-chain contract")
+		}
+		transition := transitions[0]
+		if transition.contract.Direction != "sink" && transition.contract.Direction != "source" {
+			return Result{}, issues(transition.path, "series transition requires a directed source or sink contract")
+		}
+		loadSide := anchor + ":series_load"
+		mergeMetadata(metadata, anchor, transition.metadata)
+		mergeMetadata(metadata, loadSide, transition.metadata)
+		if transition.contract.Direction == "sink" {
+			union.join(transition.input, anchor)
+			union.join(transition.output, loadSide)
+		} else {
+			union.join(transition.input, loadSide)
+			union.join(transition.output, anchor)
+		}
+		for _, binding := range bindingsByAnchor[anchor] {
+			union.join(binding.node, loadSide)
+			mergeMetadata(metadata, loadSide, binding.metadata)
+		}
+		delete(bindingsByAnchor, anchor)
+	}
+	bindingAnchors := make([]string, 0, len(bindingsByAnchor))
+	for anchor := range bindingsByAnchor {
+		bindingAnchors = append(bindingAnchors, anchor)
+	}
+	slices.Sort(bindingAnchors)
+	for _, anchor := range bindingAnchors {
+		bindings := bindingsByAnchor[anchor]
+		for _, binding := range bindings {
+			union.join(binding.node, anchor)
+			mergeMetadata(metadata, anchor, binding.metadata)
 		}
 	}
 
@@ -182,9 +254,9 @@ func lowerDomain(domain architecturesearch.Domain) circuitgraph.PowerDomainInten
 	if domain.Kind == "reference" {
 		role = circuitgraph.NetRoleGround
 	}
-	source := circuitgraph.PowerDomainExternal
-	if domain.Source == "generated" {
-		source = circuitgraph.PowerDomainGenerated
+	source := circuitgraph.PowerDomainGenerated
+	if domain.Source == "external" {
+		source = circuitgraph.PowerDomainExternal
 	}
 	current := 0.0
 	if domain.MaxCurrentA != nil {
@@ -196,13 +268,7 @@ func lowerDomain(domain architecturesearch.Domain) circuitgraph.PowerDomainInten
 func lowerInterfaces(requirement architecturesearch.Requirement, union *disjointSet, actual map[string]circuitgraph.FunctionalEndpoint, metadata map[string]nodeMetadata) ([]circuitgraph.InterfaceRequirement, map[string]string) {
 	result := make([]circuitgraph.InterfaceRequirement, 0, len(requirement.Requirements.Ports))
 	nodes := map[string]string{}
-	referenceDomain := ""
-	for _, domain := range requirement.Requirements.Domains {
-		if domain.Kind == "reference" {
-			referenceDomain = domain.ID
-			break
-		}
-	}
+	referenceDomain := firstReferenceDomain(requirement)
 	for _, port := range requirement.Requirements.Ports {
 		primaryRole := portNetRole(port)
 		candidate := circuitgraph.InterfaceRequirement{ID: port.ID, Role: interfaceRole(port)}
@@ -220,11 +286,18 @@ func lowerInterfaces(requirement architecturesearch.Requirement, union *disjoint
 		result = append(result, candidate)
 		for index, lane := range lanes {
 			node := interfaceNode(port.ID, signals[index].Name)
-			anchor := anchorNode("external:"+port.ID, lane)
+			portAnchor := anchorNode("external:"+port.ID, lane)
+			anchor := portAnchor
 			domain := port.Domain
 			role := primaryRole
 			if lane == "return" {
 				anchor = anchorNode("domain:"+referenceDomain, "")
+				// Device-side return bindings use the power-port return anchor,
+				// while the physical connector return is intentionally shared
+				// with the selected reference domain. Join those representations
+				// so input bypasses and converter return pins cannot form a
+				// private, undriven return net.
+				union.join(portAnchor, anchor)
 				domain = referenceDomain
 				role = circuitgraph.NetRoleGround
 			}
@@ -323,6 +396,22 @@ func contractNetRole(contract architecturesearch.PortContract) circuitgraph.NetR
 		return circuitgraph.NetRolePower
 	}
 	return circuitgraph.NetRoleSignal
+}
+
+func firstReferenceDomain(requirement architecturesearch.Requirement) string {
+	for _, domain := range requirement.Requirements.Domains {
+		if domain.Kind == "reference" {
+			return domain.ID
+		}
+	}
+	return ""
+}
+
+func contractNodeMetadata(contract architecturesearch.PortContract, lane, referenceDomain string) nodeMetadata {
+	if lane == "return" {
+		return nodeMetadata{role: circuitgraph.NetRoleGround, domain: referenceDomain, current: contractCurrentMA(contract)}
+	}
+	return nodeMetadata{role: contractNetRole(contract), domain: contract.Domain, current: contractCurrentMA(contract)}
 }
 
 func lowerNetRole(role string) circuitgraph.NetRole {

@@ -122,11 +122,9 @@ func Create(ctx context.Context, request Request, opts CreateOptions) WorkflowRe
 		}
 		return BuildWorkflowResult(ProjectSummary{Name: normalized.Name, OutputDir: opts.OutputDir}, normalized.Validation.Acceptance, stages)
 	}
-	validated := ValidateProject(ctx, &normalized, &written, opts.Validation)
+	validationOpts, kicadCheckOpts := createValidationOptions(normalized, opts)
+	validated := ValidateProject(ctx, &normalized, &written, validationOpts)
 	stages = append(stages, validated.Stage)
-	kicadCheckOpts := opts.KiCadChecks
-	kicadCheckOpts.RequireERC = kicadCheckOpts.RequireERC || normalized.Validation.RequireERC
-	kicadCheckOpts.RequireDRC = kicadCheckOpts.RequireDRC || normalized.Validation.RequireDRC
 	checked := RunKiCadChecks(ctx, &normalized, &written, kicadCheckOpts)
 	stages = append(stages, checked.Stage)
 	fabricationOptions := opts.Fabrication
@@ -166,6 +164,27 @@ func Create(ctx context.Context, request Request, opts CreateOptions) WorkflowRe
 		}
 	}
 	return BuildWorkflowResult(ProjectSummary{Name: normalized.Name, OutputDir: opts.OutputDir}, normalized.Validation.Acceptance, stages)
+}
+
+func createValidationOptions(request Request, opts CreateOptions) (ValidationOptions, KiCadCheckOptions) {
+	validationOpts := opts.Validation
+	kicadCheckOpts := opts.KiCadChecks
+	if strings.TrimSpace(kicadCheckOpts.KiCadCLI) == "" {
+		kicadCheckOpts.KiCadCLI = validationOpts.KiCadCLI
+	}
+	kicadCheckOpts.RequireERC = kicadCheckOpts.RequireERC || request.Validation.RequireERC
+	kicadCheckOpts.RequireDRC = kicadCheckOpts.RequireDRC || request.Validation.RequireDRC
+	if kicadCheckOpts.RequireDRC && (kicadCheckOpts.EnforceRequirements || strings.TrimSpace(kicadCheckOpts.KiCadCLI) != "") {
+		// The dedicated KiCad stage is the canonical external DRC gate. Avoid
+		// launching the same project-scoped DRC again inside structural board
+		// validation; back-to-back macOS KiCad invocations can enter AppKit and
+		// abort before producing a report. Strict connectivity, route, zone, and
+		// board checks remain in validation, while the following stage still
+		// fails closed on every real DRC finding or tool failure.
+		validationOpts.RequireDRC = false
+		validationOpts.KiCadCLI = ""
+	}
+	return validationOpts, kicadCheckOpts
 }
 
 func placementOptionsForCreate(opts CreateOptions, selections []ComponentSelectionEntry) PlacementOptions {

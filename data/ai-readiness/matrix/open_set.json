@@ -9,7 +9,7 @@
       "readiness": "verified",
       "next_task": "add_component",
       "evidence": [
-        {"kind": "test", "path": "internal/architecturesearch/catalog_provider_test.go", "semantic_hash": "7a36dedc0dab7b2394e260b99dc277d1af4506d75adcb6584dc9d6e6b814392e", "description": "Catalog-backed provider tests cover deterministic component selection, generic electrical mutations, real alternatives, auxiliary supplies, and catalog-order independence."}
+        {"kind": "test", "path": "internal/architecturesearch/catalog_provider_test.go", "semantic_hash": "6c39f8eff1a246a28a27c634b5ca0270819ff4bcd4b8b57fcd6369f68484d27e", "description": "Catalog-backed provider tests cover deterministic component selection, generic electrical mutations, real alternatives, auxiliary supplies, per-rail fail-closed current demand, capability-safe MCU GPIO allocation, component evidence, and catalog-order independence."}
       ],
       "parallel_group": "catalog_block_expansion"
     },
@@ -21,7 +21,7 @@
       "readiness": "verified",
       "next_task": "add_block",
       "evidence": [
-        {"kind": "implementation", "path": "internal/architecturesearch/search.go", "semantic_hash": "6bbd89c2c47cbe890676a8c10a9ce1b3e77d594ae1313747077423370935d1d5", "description": "Reusable typed contracts, bounded provider expansion, value and tolerance solvers, stable rejection, scoring, alternatives, and rationale form the verified open-set search layer."}
+        {"kind": "implementation", "path": "internal/architecturesearch/search.go", "semantic_hash": "366bd479d1ee847de992513a8da37345e89dea6f703f003cf4c9954f3956d2b4", "description": "Reusable typed contracts, bounded provider expansion, whole-circuit constraint checks, value and tolerance solvers, stable rejection, scoring, alternatives, and rationale form the verified open-set search layer."}
       ],
       "parallel_group": "catalog_block_expansion",
       "depends_on": ["openset.component.catalog"]
@@ -34,7 +34,7 @@
       "readiness": "verified",
       "next_task": "verify_layout",
       "evidence": [
-        {"kind": "test", "path": "internal/compositionlowering/promotion_test.go", "semantic_hash": "3007a8bc69dd7424e8a430b80bb4dd27ad11e5a693f1a64872f9b683c53187f0", "description": "The five frozen architectures lower through the existing design workflow with complete placement, routing, connectivity, writer, and deterministic artifact evidence."}
+        {"kind": "test", "path": "internal/compositionlowering/promotion_test.go", "semantic_hash": "0c0be14f7c3a57021b9ddf61b639ac0bb75f2ab733c705d808958535f30c794d", "description": "The five single-function and 10 adversarial multi-function architectures lower through the existing design workflow with complete placement, routing, connectivity, writer, and deterministic artifact evidence."}
       ],
       "parallel_group": "engine_hardening",
       "depends_on": ["openset.block.architecture_search"]
@@ -43,12 +43,14 @@
       "id": "openset.validation.held_out",
       "category": "validation",
       "domain": "openset",
-      "title": "Frozen held-out real-KiCad promotion",
+      "title": "Frozen held-out single- and multi-function real-KiCad promotion",
       "readiness": "verified",
       "next_task": "capture_kicad_evidence",
       "evidence": [
         {"kind": "fixture", "path": "internal/circuitgraph/testdata/open_set_composition_corpus/manifest.json", "semantic_hash": "f3a9b341d64186b6063b9f308ff9bdcf66f2421bf12068eba7f9a1a3ac3580b1", "description": "SHA-256-pinned five-requirement behavior-only corpus for threshold, protected switching, regulation, active filtering, and logic-domain translation."},
-        {"kind": "audit", "path": "specs/open-set-functional-composition/AUDIT.md", "semantic_hash": "2282c01d2ba121408f79c660366d2bcddda66d61a2548bd6d53d7ae3527200fa", "description": "Acceptance audit records clean offline and optional real-KiCad promotion plus all preserved regression lanes."}
+        {"kind": "audit", "path": "specs/open-set-functional-composition/AUDIT.md", "semantic_hash": "2282c01d2ba121408f79c660366d2bcddda66d61a2548bd6d53d7ae3527200fa", "description": "Acceptance audit records clean offline and optional real-KiCad promotion plus all preserved regression lanes."},
+        {"kind": "fixture", "path": "internal/circuitgraph/testdata/adversarial_multi_function_composition_corpus/manifest.json", "semantic_hash": "29308e5393091294a8befe69034fdcb0a8da6e06595ef25f0a5f023eb2618290", "description": "SHA-256-pinned 10-circuit behavior-only corpus containing 35 objectives, 3 abstract participants, 18 capabilities, and 23 whole-circuit constraints."},
+        {"kind": "audit", "path": "specs/adversarial-multi-function-composition/AUDIT.md", "semantic_hash": "8b78e317caf999b851c7b7e243a8412ebbab08f4bbdb88a761a2cfa223bfd894", "description": "Acceptance audit records deterministic alternatives and rationale, global proofs, complete offline promotion, and clean installed-KiCad ERC and strict DRC for all 10 circuits."}
       ],
       "parallel_group": "fixture_promotion",
       "depends_on": ["openset.layout.deterministic_lowering"]
@@ -57,11 +59,12 @@
       "id": "openset.documentation.scope",
       "category": "documentation",
       "domain": "openset",
-      "title": "Bounded composition scope and limits",
+      "title": "Bounded single- and multi-function composition scope",
       "readiness": "verified",
       "next_task": "write_docs",
       "evidence": [
-        {"kind": "contract", "path": "specs/open-set-functional-composition/SPEC.md", "semantic_hash": "4d01cd4998acfb14a49ed7cf4e466fca8fa50acc99418770fb2ad5aa3b28a60d", "description": "Defines the strict behavioral schema, typed compatibility, deterministic budgets, safety rules, frozen corpus, completion gates, and explicit non-goals."}
+        {"kind": "contract", "path": "specs/open-set-functional-composition/SPEC.md", "semantic_hash": "4d01cd4998acfb14a49ed7cf4e466fca8fa50acc99418770fb2ad5aa3b28a60d", "description": "Defines the strict v1 behavioral schema, typed compatibility, deterministic budgets, safety rules, frozen corpus, completion gates, and explicit non-goals."},
+        {"kind": "contract", "path": "specs/adversarial-multi-function-composition/SPEC.md", "semantic_hash": "86b238088da1b5660542f12212669d16c6a5759ac61260f69e7d92625b327886", "description": "Defines the v2 typed-signal and whole-circuit constraint contract, coverage states, alternatives, fail-closed behavior, adversarial corpus, promotion gates, and bounded claims."}
       ],
       "parallel_group": "documentation",
       "depends_on": ["openset.validation.held_out"]

@@ -46,6 +46,13 @@ path.
   differences, and byte-identical replay. The checked-in
   [capability report](specs/function-level-circuit-synthesis/CAPABILITY_REPORT.json)
   records the authoritative hashes and per-circuit gates.
+- A second frozen adversarial corpus composes 10 unfamiliar multi-function
+  circuits from 35 objectives and 3 abstract participants. It exercises 18
+  registered capabilities and 23 whole-circuit voltage, current, startup,
+  loading, stability, tolerance, isolation, thermal, response-time, noise, and
+  board constraints. All 10 pass deterministic replay, lowering, writer,
+  routing/connectivity, zero-diff round trip, and installed-KiCad ERC and strict
+  DRC. See the [composition audit](specs/adversarial-multi-function-composition/AUDIT.md).
 - Arbitrary electronics generation is not yet guaranteed. Generic graphs fail
   closed on unknown parts, pins, ratings, placement, or routing capability.
 - ESP32 support currently covers the exact WROOM-32E-N4 module profile, not the

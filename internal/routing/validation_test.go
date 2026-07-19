@@ -38,7 +38,7 @@ func TestValidateResultDetectsClearanceViolation(t *testing.T) {
 	}}
 
 	report := ValidateResult(request, result)
-	assertValidationIssue(t, report, "segment clearance violation with net B")
+	assertValidationIssue(t, report, "segment clearance violation with net B: (1,1) to (5,1) crosses (1,1.005) to (5,1.005)")
 }
 
 func TestValidateResultDetectsCrossedTraceClearanceViolation(t *testing.T) {
@@ -49,7 +49,44 @@ func TestValidateResultDetectsCrossedTraceClearanceViolation(t *testing.T) {
 	}}
 
 	report := ValidateResult(request, result)
-	assertValidationIssue(t, report, "segment clearance violation with net B")
+	assertValidationIssue(t, report, "segment clearance violation with net B: (1,1) to (5,5) crosses (1,5) to (5,1)")
+}
+
+func TestValidateResultDetectsSegmentToViaClearanceViolation(t *testing.T) {
+	request := singleLayerSearchRequest()
+	request.Rules.ClearanceMM = 0.2
+	result := Result{Routes: []Route{
+		{Net: "A", Status: RouteStatusRouted, Segments: []Segment{{Net: "A", Layer: "F.Cu", Start: Point{XMM: 1, YMM: 1}, End: Point{XMM: 5, YMM: 1}, WidthMM: 0.5}}},
+		{Net: "B", Status: RouteStatusRouted, Vias: []Via{{Net: "B", At: Point{XMM: 3, YMM: 1.74}, DiameterMM: 0.7, DrillMM: 0.35, Layers: []string{"F.Cu", "B.Cu"}}}},
+	}}
+
+	report := ValidateResult(request, result)
+	assertValidationIssue(t, report, "segment clearance violation with via on net B")
+}
+
+func TestValidateResultAcceptsSegmentAtExactViaClearance(t *testing.T) {
+	request := singleLayerSearchRequest()
+	request.Rules.ClearanceMM = 0.2
+	result := Result{Routes: []Route{
+		{Net: "A", Status: RouteStatusRouted, Segments: []Segment{{Net: "A", Layer: "F.Cu", Start: Point{XMM: 1, YMM: 1}, End: Point{XMM: 5, YMM: 1}, WidthMM: 0.5}}},
+		{Net: "B", Status: RouteStatusRouted, Vias: []Via{{Net: "B", At: Point{XMM: 3, YMM: 1.8}, DiameterMM: 0.7, DrillMM: 0.35, Layers: []string{"F.Cu", "B.Cu"}}}},
+	}}
+
+	if report := ValidateResult(request, result); len(report.Issues) != 0 {
+		t.Fatalf("exact segment-to-via clearance produced issues: %#v", report.Issues)
+	}
+}
+
+func TestValidateResultDetectsViaToViaClearanceViolation(t *testing.T) {
+	request := singleLayerSearchRequest()
+	request.Rules.ClearanceMM = 0.2
+	result := Result{Routes: []Route{
+		{Net: "A", Status: RouteStatusRouted, Vias: []Via{{Net: "A", At: Point{XMM: 3, YMM: 3}, DiameterMM: 0.7, DrillMM: 0.35, Layers: []string{"F.Cu", "B.Cu"}}}},
+		{Net: "B", Status: RouteStatusRouted, Vias: []Via{{Net: "B", At: Point{XMM: 3.8, YMM: 3}, DiameterMM: 0.7, DrillMM: 0.35, Layers: []string{"F.Cu", "B.Cu"}}}},
+	}}
+
+	report := ValidateResult(request, result)
+	assertValidationIssue(t, report, "via clearance violation with net B")
 }
 
 func TestClearanceIssuesAcceptsExactDeclaredGap(t *testing.T) {
