@@ -180,7 +180,7 @@ func TestRequestFromPlacementPreservesLocalPadGeometryAndNet(t *testing.T) {
 	if len(placementRequest.Components) < 2 {
 		t.Fatal("placement adapter fixture missing components")
 	}
-	placementRequest.Components[0].Pads = []placement.PadSummary{{Name: "A", Net: "SIG_A", XMM: -0.65, YMM: 0.25, WidthMM: 0.4, HeightMM: 0.8}}
+	placementRequest.Components[0].Pads = []placement.PadSummary{{Name: "A", Net: "SIG_A", XMM: -0.65, YMM: 0.25, RotationDeg: 90, WidthMM: 0.4, HeightMM: 0.8}}
 	placementResult := placement.Result{Placements: []placement.PlacementResult{
 		{Ref: "J1", Position: placement.Placement{XMM: 5, YMM: 5, RotationDeg: 90, Layer: "F.Cu"}},
 		{Ref: "J2", Position: placement.Placement{XMM: 15, YMM: 5, Layer: "F.Cu"}},
@@ -199,6 +199,7 @@ func TestRequestFromPlacementPreservesLocalPadGeometryAndNet(t *testing.T) {
 	}
 	assertCloseFloat(t, pad.Position.XMM, -0.65, "pad x")
 	assertCloseFloat(t, pad.Position.YMM, 0.25, "pad y")
+	assertCloseFloat(t, pad.RotationDeg, 90, "pad rotation")
 	assertCloseFloat(t, pad.Size.WidthMM, 0.4, "pad width")
 	assertCloseFloat(t, pad.Size.HeightMM, 0.8, "pad height")
 }

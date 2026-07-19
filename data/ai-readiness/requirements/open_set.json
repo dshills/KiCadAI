@@ -1,0 +1,12 @@
+{
+  "version": "0.1.0",
+  "domain": "openset",
+  "required_categories": ["component", "block", "layout", "validation", "documentation"],
+  "required_record_ids": [
+    "openset.component.catalog",
+    "openset.block.architecture_search",
+    "openset.layout.deterministic_lowering",
+    "openset.validation.held_out",
+    "openset.documentation.scope"
+  ]
+}

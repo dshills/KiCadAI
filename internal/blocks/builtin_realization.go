@@ -453,8 +453,8 @@ func usbCPowerPCBRealization() *PCBRealization {
 		VerificationLevel: PCBVerificationPlacementVerified,
 		Components: []PCBComponentRealization{
 			{ComponentRole: "usb_c_receptacle", FootprintParam: "connector_footprint", Placement: RelativePlacement{XMM: 0, YMM: 0, Layer: "F.Cu"}},
-			{ComponentRole: "cc1_rd", FootprintID: "Resistor_SMD:R_0805_2012Metric", Placement: RelativePlacement{XMM: 4.5, YMM: 3.5, Layer: "F.Cu", Fixed: true}},
-			{ComponentRole: "cc2_rd", FootprintID: "Resistor_SMD:R_0805_2012Metric", Placement: RelativePlacement{XMM: 6.5, YMM: 1, Layer: "F.Cu", Fixed: true}},
+			{ComponentRole: "cc1_rd", FootprintID: "Resistor_SMD:R_0805_2012Metric", Placement: RelativePlacement{XMM: 7.5, YMM: 3.5, Layer: "F.Cu", Fixed: true}},
+			{ComponentRole: "cc2_rd", FootprintID: "Resistor_SMD:R_0805_2012Metric", Placement: RelativePlacement{XMM: 7.5, YMM: 1, Layer: "F.Cu", Fixed: true}},
 			{ComponentRole: "vbus_fuse", FootprintID: "Fuse:Fuse_1206_3216Metric", Placement: RelativePlacement{XMM: 13, YMM: 1.5, Layer: "F.Cu", Fixed: true}},
 			{ComponentRole: "vbus_tvs", FootprintID: "Diode_SMD:D_SOD-323", Placement: RelativePlacement{XMM: 18, YMM: 4, Layer: "F.Cu", Fixed: true}},
 			{ComponentRole: "bulk_capacitor", FootprintID: "Capacitor_SMD:C_0805_2012Metric", Placement: RelativePlacement{XMM: 18, YMM: -1, Layer: "F.Cu", Fixed: true}},

@@ -991,15 +991,23 @@ speaker fixtures are checked-in `pass` lanes. They require their declared
 route/contact, writer, KiCad ERC/DRC, and round-trip evidence; the 10 W speaker
 lane additionally requires fabrication-candidate component, load, tolerance,
 electrothermal, SOA, protection, high-current/Kelvin layout, and package
-evidence. Connector/LED, the unprotected Class AB skeleton, and the older
-op-amp headphone-buffer candidate remain explicit `expected_fail` examples.
-The simple LED smoke fixture remains candidate-level.
+evidence. The unprotected Class AB skeleton and the older op-amp
+headphone-buffer fixture remain explicit `expected_fail` examples. The
+connector/LED and simple LED smoke fixtures are candidate-level.
 
-The next major generation milestone is open-set functional composition:
-bounded architecture search over typed, catalog-backed circuit fragments with
-deterministic compatibility, value synthesis, alternative scoring, tolerance
-evidence, and rationale. It must replace topology-specific intent mapping for a
-frozen unfamiliar held-out corpus without weakening any existing fixture.
+Open-set functional composition is now implemented for a bounded verified
+envelope. One strict behavior-only schema feeds typed electrical contracts,
+catalog-backed reusable providers, deterministic budgeted architecture search,
+preferred-value and tolerance solving, ranked alternatives, and stable
+rationale before lowering through the normal circuit-graph and design
+workflow. A SHA-256-pinned five-requirement held-out corpus covers hysteretic
+threshold detection, protected inductive-load switching, adjustable
+regulation, a fourth-order active filter, and translated controller/sensor
+interfaces. All five pass deterministic offline replay and the optional real
+KiCad lane with clean ERC, strict DRC, complete routing/connectivity, writer
+correctness, and zero round-trip diffs. This proves composition inside the
+registered capability and catalog envelope; it does not imply unbounded or
+arbitrary-topology circuit generation.
 
 Structured semantic mapping is now implemented for target, bus, and supply
 intent:

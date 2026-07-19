@@ -7,8 +7,8 @@
   "expected": {
     "evidence_level": "schematic_verified",
     "components": [
-      {"role": "positive_detector", "ref_prefix": "U", "symbol_id": "Comparator:TLV1701", "footprint_id": "Package_TO_SOT_SMD:SOT-23-5"},
-      {"role": "negative_detector", "ref_prefix": "U", "symbol_id": "Comparator:TLV1701", "footprint_id": "Package_TO_SOT_SMD:SOT-23-5"},
+      {"role": "positive_detector", "ref_prefix": "U", "symbol_id": "Comparator:LMV331", "footprint_id": "Package_TO_SOT_SMD:SOT-23-5"},
+      {"role": "negative_detector", "ref_prefix": "U", "symbol_id": "Comparator:LMV331", "footprint_id": "Package_TO_SOT_SMD:SOT-23-5"},
       {"role": "delay_capacitor", "ref_prefix": "C", "symbol_id": "Device:C_Polarized", "footprint_id": "Capacitor_Tantalum_SMD:CP_EIA-3216-18_Kemet-A"},
       {"role": "relay_driver", "ref_prefix": "Q", "symbol_id": "Transistor_BJT:Q_NPN_BEC", "footprint_id": "Package_TO_SOT_SMD:SOT-23"},
       {"role": "relay", "ref_prefix": "K", "symbol_id": "Relay:G5Q-1A", "footprint_id": "Relay_THT:Relay_SPST_Omron-G5Q-1A"},

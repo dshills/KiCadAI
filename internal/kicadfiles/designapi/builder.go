@@ -49,13 +49,15 @@ type Builder struct {
 }
 
 type Options struct {
-	Name          string
-	DesignID      kicadfiles.UUID
-	Seed          string
-	Paper         kicadfiles.Paper
-	CopperLayers  int
-	LibraryIndex  *libraryresolver.LibraryIndex
-	TextVariables map[string]string
+	Name                       string
+	DesignID                   kicadfiles.UUID
+	Seed                       string
+	Paper                      kicadfiles.Paper
+	CopperLayers               int
+	DefaultNetClassClearance   kicadfiles.IU
+	MinimumThroughHoleDiameter kicadfiles.IU
+	LibraryIndex               *libraryresolver.LibraryIndex
+	TextVariables              map[string]string
 }
 
 type SymbolHandle struct {
@@ -316,9 +318,10 @@ func New(options Options) (*Builder, error) {
 			FormatVersion: kicadfiles.KiCadFormatV20260306,
 			Generator:     "kicadai",
 			PageSettings:  project.PageSettings{Paper: paper},
+			BoardRules:    project.BoardDesignRules{MinimumThroughHoleDiameter: options.MinimumThroughHoleDiameter},
 			NetClasses: []project.NetClass{{
 				Name:        "Default",
-				Clearance:   kicadfiles.MM(0.2),
+				Clearance:   firstPositiveIU(options.DefaultNetClassClearance, kicadfiles.MM(0.2)),
 				TrackWidth:  kicadfiles.MM(0.25),
 				ViaDiameter: kicadfiles.MM(0.6),
 				ViaDrill:    kicadfiles.MM(0.3),
@@ -347,6 +350,15 @@ func New(options Options) (*Builder, error) {
 		},
 	}
 	return builder, nil
+}
+
+func firstPositiveIU(values ...kicadfiles.IU) kicadfiles.IU {
+	for _, value := range values {
+		if value > 0 {
+			return value
+		}
+	}
+	return 0
 }
 
 func (builder *Builder) AddSymbol(options SymbolOptions) (SymbolHandle, error) {

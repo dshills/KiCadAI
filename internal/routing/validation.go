@@ -256,7 +256,7 @@ func clearanceIssues(routes []Route, clearanceMM float64) []reports.Issue {
 				continue
 			}
 			copperClearance := segmentDistance(left.Segment, right.Segment) - left.Segment.WidthMM/2 - right.Segment.WidthMM/2
-			if copperClearance < clearanceMM {
+			if copperClearance < clearanceMM-distanceEpsilon {
 				issues = append(issues, routeValidationIssue(left.Net, reports.CodeValidationFailed, "segment clearance violation with net "+right.Net))
 			}
 		}

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"strings"
 
+	"kicadai/internal/libraryresolver"
 	"kicadai/internal/placement"
 	"kicadai/internal/reports"
 	"kicadai/internal/routing"
@@ -164,6 +165,7 @@ func RouteExplicitCircuit(ctx context.Context, request Request, placed Placement
 		rule.ClearanceMM = net.ClearanceMM
 		routingRequest.Rules.NetOverrides[net.Name] = rule
 	}
+	issues = append(issues, fitRoutingClearanceToIntrinsicPads(&routingRequest, placed.Request.Components, opts.ClearanceMM > 0 || request.Constraints.ClearanceMM > 0)...)
 	result := routing.Result{Status: routing.StatusBlocked}
 	routeOrder := FinalRouteOrderNegotiationSummary{}
 	if !reports.HasBlockingIssue(issues) {
@@ -171,11 +173,13 @@ func RouteExplicitCircuit(ctx context.Context, request Request, placed Placement
 		issues = append(issues, result.Issues...)
 	}
 	issues = append(issues, explicitRequiredRouteIssues(request.ExplicitCircuit.Nets, result)...)
-	operations := finalizeExplicitRouteOperations(result.Operations)
+	operations, operationIssues := finalizeExplicitRouteOperations(result.Operations, &placed)
+	issues = append(issues, operationIssues...)
 	stage := NewStageResult(StageRouting, issues)
 	stage.Summary = map[string]any{
 		"status": result.Status, "net_count": result.Metrics.NetCount, "routed_nets": result.Metrics.RoutedNetCount,
 		"failed_nets": result.Metrics.FailedNetCount, "route_operations": len(operations), "route_order": routeOrder,
+		"clearance_mm": routingRequest.Rules.ClearanceMM,
 	}
 	if result.Status != routing.StatusRouted && stage.Status == StageStatusOK {
 		stage.Status = StageStatusWarning
@@ -183,10 +187,11 @@ func RouteExplicitCircuit(ctx context.Context, request Request, placed Placement
 	return RoutingStageResult{Request: routingRequest, Result: result, Operations: operations, Stage: stage}
 }
 
-func finalizeExplicitRouteOperations(operations []routing.Operation) []transactions.Operation {
+func finalizeExplicitRouteOperations(operations []routing.Operation, placed *PlacementStageResult) ([]transactions.Operation, []reports.Issue) {
 	transactionOperations := transactionRouteOperations(operations)
 	transactionOperations = dedupeSameNetRouteVias(transactionOperations)
-	return compactRouteOperationGeometry(transactionOperations)
+	transactionOperations, _, issues := removeRedundantRouteViasAtPlatedPadsWithContext(transactionOperations, placed, newPhysicalPadRoutingContext(placed))
+	return compactRouteOperationGeometry(transactionOperations), issues
 }
 
 func expandExplicitPhysicalPadEndpoints(request routing.Request) routing.Request {
@@ -335,10 +340,10 @@ func appendExplicitOperationToSlice(operations *[]transactions.Operation, kind t
 	*operations = append(*operations, op)
 }
 
-func explicitPlacementWriteOperations(source []transactions.Operation) ([]transactions.Operation, []reports.Issue) {
+func explicitPlacementWriteOperations(source []transactions.Operation, index *libraryresolver.LibraryIndex) ([]transactions.Operation, []reports.Issue) {
 	operations := make([]transactions.Operation, 0, len(source))
 	var issues []reports.Issue
-	for index, operation := range source {
+	for operationIndex, operation := range source {
 		if operation.Op != transactions.OpPlaceFootprint {
 			operations = append(operations, operation)
 			continue
@@ -348,8 +353,13 @@ func explicitPlacementWriteOperations(source []transactions.Operation) ([]transa
 			issues = append(issues, reports.Issue{Code: reports.CodeInvalidArgument, Severity: reports.SeverityError, Path: "explicit_circuit.placement_operations", Message: err.Error()})
 			continue
 		}
-		for padIndex, pad := range payload.Pads {
-			payload.Pads[padIndex] = transactions.PadSpec{Name: pad.Name, Net: pad.Net}
+		// Prefer authoritative resolver geometry when it is complete. Otherwise
+		// retain the already-hydrated generic placement geometry so an offline
+		// workflow writes the exact pad anchors that routing used.
+		if record, ok := resolvedFootprintWithPadGeometry(index, payload.FootprintID); ok && len(record.Pads) != 0 {
+			for padIndex, pad := range payload.Pads {
+				payload.Pads[padIndex] = transactions.PadSpec{Name: pad.Name, Net: pad.Net}
+			}
 		}
 		raw, err := json.Marshal(payload)
 		if err != nil {
@@ -357,8 +367,24 @@ func explicitPlacementWriteOperations(source []transactions.Operation) ([]transa
 			continue
 		}
 		converted := transactions.NewOperationWithMetadata(transactions.OpPlaceFootprint, raw, payload.Ref, "")
-		converted.Index = index
+		converted.Index = operationIndex
 		operations = append(operations, converted)
 	}
 	return operations, issues
+}
+
+func resolvedFootprintWithPadGeometry(index *libraryresolver.LibraryIndex, footprintID string) (libraryresolver.FootprintRecord, bool) {
+	if index == nil {
+		return libraryresolver.FootprintRecord{}, false
+	}
+	record, ok := libraryresolver.ResolveFootprint(*index, strings.TrimSpace(footprintID))
+	if !ok || len(record.Pads) == 0 {
+		return libraryresolver.FootprintRecord{}, false
+	}
+	for _, pad := range record.Pads {
+		if strings.TrimSpace(pad.Name) == "" || pad.Size.X <= 0 || pad.Size.Y <= 0 {
+			return libraryresolver.FootprintRecord{}, false
+		}
+	}
+	return record, true
 }

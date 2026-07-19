@@ -2,6 +2,34 @@
   "version": "0.1.0",
   "records": [
     {
+      "id": "connector.pinheader.1x01.2_54mm",
+      "family": "connector",
+      "name": "1x01 2.54 mm pin header",
+      "generic": true,
+      "lifecycle": "active",
+      "tags": ["connector", "pin_header", "2.54mm", "1x01"],
+      "values": [{"kind": "pin_count", "typ": "1", "unit": "pins"}],
+      "symbols": [{
+        "symbol_id": "Connector_Generic:Conn_01x01",
+        "function_pins": [
+          {"function": "PIN_1", "symbol_pin": "1", "required": true}
+        ],
+        "verification": {"confidence": "verified", "sources": ["builtin_pinmap:Connector_Generic:Conn_01x01"], "pinmap_checked": true}
+      }],
+      "packages": [{
+        "id": "vertical",
+        "name": "Vertical",
+        "footprint_id": "Connector_PinHeader_2.54mm:PinHeader_1x01_P2.54mm_Vertical",
+        "package_type": "pin_header_1x01",
+        "pinmap_id": "Connector_Generic:Conn_01x01|Connector_PinHeader_2.54mm:PinHeader_1x01_P2.54mm_Vertical",
+        "pad_functions": [
+          {"function": "PIN_1", "pad": "1"}
+        ],
+        "verification": {"confidence": "verified", "sources": ["builtin_pinmap:Connector_Generic:Conn_01x01"], "pinmap_checked": true}
+      }],
+      "verification": {"confidence": "verified", "sources": ["curated_seed_catalog", "builtin_pinmap:Connector_Generic:Conn_01x01"], "pinmap_checked": true}
+    },
+    {
       "id": "connector.pinheader.1x02.2_54mm",
       "family": "connector",
       "name": "1x02 2.54 mm pin header",

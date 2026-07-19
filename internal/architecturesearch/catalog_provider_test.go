@@ -27,14 +27,14 @@ func TestCatalogProviderSearchesSyntheticThresholdDeterministically(t *testing.T
 		t.Fatalf("catalog search = %#v", result)
 	}
 	selection := result.Selected.Selections[0]
-	if selection.ProviderID != "catalog_function_fragments" || len(selection.Calculations) != 1 || len(selection.Components) != 5 {
+	if selection.ProviderID != "catalog_function_fragments" || len(selection.Calculations) != 1 || len(selection.Components) != 6 {
 		t.Fatalf("selection = %#v", selection)
 	}
 	realization, err := DecodeFragmentRealization(selection.Payload)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if realization.Capability != "threshold_detection" || len(realization.PortBindings) != 4 {
+	if realization.Capability != "threshold_detection" || len(realization.PortBindings) != 4 || len(realization.Connections) != 4 {
 		t.Fatalf("realization = %#v", realization)
 	}
 	encoded, err := json.Marshal(result)
@@ -68,7 +68,7 @@ func TestCatalogProviderGenericCapabilityMutations(t *testing.T) {
 		{name: "load_switch_in_range", request: loadSwitchProviderRequest(13.2, 2)},
 		{name: "load_switch_voltage_out_of_range", request: loadSwitchProviderRequest(250, 2), wantError: true},
 		{name: "adjustable_regulator_in_range", request: regulatorProviderRequest(5.5, 3.3, 0.25)},
-		{name: "adjustable_regulator_input_out_of_range", request: regulatorProviderRequest(15, 5, 0.25), wantError: true},
+		{name: "adjustable_regulator_input_out_of_range", request: regulatorProviderRequest(50, 5, 0.25), wantError: true},
 		{name: "filter_in_range", request: filterProviderRequest(5, 2000)},
 		{name: "filter_supply_out_of_range", request: filterProviderRequest(50, 2000), wantError: true},
 		{name: "translator_in_range", request: translatorProviderRequest(3.3, 1.8)},
@@ -112,14 +112,79 @@ func TestCatalogProviderOffersAndRanksRealFilterAlternative(t *testing.T) {
 	}
 }
 
+func TestCatalogProviderConnectsAuxiliaryMCUSupplyPinsToTheirDomains(t *testing.T) {
+	provider, err := NewCatalogProvider(loadArchitectureCatalog(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	expansions, err := provider.Expand(context.Background(), participantProviderRequest("programmable_controller", "sensor_bus", 3.3))
+	if err != nil || len(expansions) != 1 {
+		t.Fatalf("controller expansion = %#v, %v", expansions, err)
+	}
+	realization, err := DecodeFragmentRealization(expansions[0].Payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := map[string]map[string]bool{
+		"controller_power":  {"VCC": false, "AVCC": false},
+		"controller_ground": {"GND": false, "AGND": false},
+	}
+	for _, connection := range realization.Connections {
+		functions, ok := want[connection.ID]
+		if !ok {
+			continue
+		}
+		for _, endpoint := range connection.Endpoints {
+			if _, expected := functions[endpoint.Function]; expected {
+				functions[endpoint.Function] = true
+			}
+		}
+	}
+	for connection, functions := range want {
+		for function, found := range functions {
+			if !found {
+				t.Fatalf("%s does not contain %s: %#v", connection, function, realization.Connections)
+			}
+		}
+	}
+}
+
+func TestCatalogProviderIsolatesSensorAddressStrapFromPowerFlagDomain(t *testing.T) {
+	provider, err := NewCatalogProvider(loadArchitectureCatalog(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	expansions, err := provider.Expand(context.Background(), participantProviderRequest("environment_sensor", "sensor_bus", 1.8))
+	if err != nil || len(expansions) != 1 {
+		t.Fatalf("sensor expansion = %#v, %v", expansions, err)
+	}
+	realization, err := DecodeFragmentRealization(expansions[0].Payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	foundAddress := false
+	for _, connection := range realization.Connections {
+		for _, endpoint := range connection.Endpoints {
+			if connection.ID == "sensor_ground" && endpoint.Function == "SDO" {
+				t.Fatalf("address-select pin was tied directly to the flagged ground domain: %#v", connection)
+			}
+			if connection.ID == "sensor_address" && endpoint.Function == "SDO" {
+				foundAddress = true
+			}
+		}
+	}
+	if !foundAddress {
+		t.Fatalf("sensor address strap is missing: %#v", realization.Connections)
+	}
+}
+
 func TestCatalogProviderOutputIgnoresCatalogOrdering(t *testing.T) {
 	firstCatalog := loadArchitectureCatalog(t)
-	secondCatalog := *firstCatalog
-	secondCatalog.Records = append([]components.ComponentRecord(nil), firstCatalog.Records...)
+	secondCatalog := loadArchitectureCatalog(t)
 	slices.Reverse(secondCatalog.Records)
-	components.SortCatalog(&secondCatalog)
+	components.SortCatalog(secondCatalog)
 	first, _ := NewCatalogProvider(firstCatalog)
-	second, _ := NewCatalogProvider(&secondCatalog)
+	second, _ := NewCatalogProvider(secondCatalog)
 	request := translatorProviderRequest(3.3, 1.8)
 	firstExpansion, firstErr := first.Expand(context.Background(), request)
 	secondExpansion, secondErr := second.Expand(context.Background(), request)
@@ -130,6 +195,31 @@ func TestCatalogProviderOutputIgnoresCatalogOrdering(t *testing.T) {
 	secondJSON, _ := json.Marshal(secondExpansion)
 	if string(firstJSON) != string(secondJSON) {
 		t.Fatalf("catalog order changed expansion bytes\n%s\n%s", firstJSON, secondJSON)
+	}
+}
+
+func TestRecordSupportsEveryRequiredRating(t *testing.T) {
+	record := components.ComponentRecord{Ratings: []components.RatingConstraint{
+		{Kind: "supply_voltage", Min: "2.2", Max: "36", Unit: "V"},
+		{Kind: "output_sink_current", Max: "0.02", Unit: "A"},
+	}}
+	if !recordSupportsRatings(record, []components.RequiredRating{
+		{Kind: "supply_voltage", Value: "12", Unit: "V"},
+		{Kind: "output_sink_current", Value: "10", Unit: "mA"},
+	}) {
+		t.Fatal("record satisfying every required rating was rejected")
+	}
+	if recordSupportsRatings(record, []components.RequiredRating{
+		{Kind: "supply_voltage", Value: "12", Unit: "V"},
+		{Kind: "output_sink_current", Value: "25", Unit: "mA"},
+	}) {
+		t.Fatal("record satisfying only the first required rating was accepted")
+	}
+	if recordSupportsRatings(record, []components.RequiredRating{{Kind: "power_dissipation", Value: "1", Unit: "W"}}) {
+		t.Fatal("record missing a required rating was accepted")
+	}
+	if !recordSupportsRatings(components.ComponentRecord{Ratings: []components.RatingConstraint{{Kind: "voltage", Max: "0.3", Unit: "V"}}}, []components.RequiredRating{{Kind: "voltage", Value: numericString(0.1 + 0.2), Unit: "V"}}) {
+		t.Fatal("quantized floating-point boundary was rejected")
 	}
 }
 

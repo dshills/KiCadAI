@@ -90,6 +90,19 @@ func TestWriteProjectWithNetClasses(t *testing.T) {
 	}
 }
 
+func TestWriteProjectWithMinimumIntrinsicThroughHoleDiameter(t *testing.T) {
+	project := minimalProject()
+	project.BoardRules.MinimumThroughHoleDiameter = kicadfiles.MM(0.2)
+
+	var buf bytes.Buffer
+	if err := Write(&buf, project); err != nil {
+		t.Fatalf("Write returned error: %v", err)
+	}
+	if !strings.Contains(buf.String(), `"min_through_hole_diameter": 0.2`) {
+		t.Fatalf("project does not serialize intrinsic hole rule:\n%s", buf.String())
+	}
+}
+
 func TestWriteProjectWithSheets(t *testing.T) {
 	project := minimalProject()
 	project.Sheets = []Sheet{{UUID: "root-uuid", Name: "Root"}, {UUID: "child-uuid", Name: "Power"}}

@@ -197,15 +197,16 @@ func routingPadsFromPlacement(component placement.Component, layer string) []rou
 		padType := routingPadType(pad)
 		layers := routingPadLayers(pad, layer, padType)
 		pads = append(pads, routing.Pad{
-			Ref:      component.Ref,
-			Name:     pad.Name,
-			Net:      pad.Net,
-			Position: routing.Point{XMM: pad.XMM, YMM: pad.YMM},
-			Shape:    routing.PadRect,
-			Type:     padType,
-			Size:     routing.Size{WidthMM: positiveOrDefault(pad.WidthMM, 1), HeightMM: positiveOrDefault(pad.HeightMM, 1)},
-			Drill:    routingPadDrill(pad, padType),
-			Layers:   layers,
+			Ref:         component.Ref,
+			Name:        pad.Name,
+			Net:         pad.Net,
+			Position:    routing.Point{XMM: pad.XMM, YMM: pad.YMM},
+			RotationDeg: pad.RotationDeg,
+			Shape:       routing.PadRect,
+			Type:        padType,
+			Size:        routing.Size{WidthMM: positiveOrDefault(pad.WidthMM, 1), HeightMM: positiveOrDefault(pad.HeightMM, 1)},
+			Drill:       routingPadDrill(pad, padType),
+			Layers:      layers,
 		})
 	}
 	return pads

@@ -52,6 +52,16 @@ func TestValidateResultDetectsCrossedTraceClearanceViolation(t *testing.T) {
 	assertValidationIssue(t, report, "segment clearance violation with net B")
 }
 
+func TestClearanceIssuesAcceptsExactDeclaredGap(t *testing.T) {
+	routes := []Route{
+		{Net: "A", Segments: []Segment{{Net: "A", Layer: "F.CU", Start: Point{XMM: 1, YMM: 1}, End: Point{XMM: 5, YMM: 1}, WidthMM: 0.3}}},
+		{Net: "B", Segments: []Segment{{Net: "B", Layer: "F.CU", Start: Point{XMM: 1, YMM: 1.5}, End: Point{XMM: 5, YMM: 1.5}, WidthMM: 0.3}}},
+	}
+	if issues := clearanceIssues(routes, 0.2); len(issues) != 0 {
+		t.Fatalf("exact declared clearance produced issues: %#v", issues)
+	}
+}
+
 func TestRouteRequestEmitsTailSegmentsToOffGridPadCenters(t *testing.T) {
 	request := singleLayerSearchRequest()
 	request.Rules.GridMM = 0.25

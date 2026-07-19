@@ -105,6 +105,7 @@ type Candidate struct {
 	EquivalenceRole  EquivalenceRole `json:"equivalence_role,omitempty"`
 	Reasons          []string        `json:"reasons,omitempty"`
 	valueSpecificity int             `json:"-"`
+	functionSurplus  int             `json:"-"`
 }
 
 type Selection struct {
@@ -256,6 +257,7 @@ func Select(ctx context.Context, catalog *Catalog, request SelectionRequest) (Se
 			rejected = append(rejected, CandidateRejection{Candidate: candidate, Issues: candidateIssues})
 			continue
 		}
+		candidate.functionSurplus = recordFunctionSurplus(record, request.RequiredFunctions)
 		filtered = append(filtered, acceptedCandidate{Candidate: candidate, Warnings: candidateIssues})
 	}
 	sortAcceptedCandidates(filtered, request.Acceptance)
@@ -306,6 +308,9 @@ func acceptedCandidateLess(leftAccepted acceptedCandidate, rightAccepted accepte
 	if left.valueSpecificity != right.valueSpecificity {
 		return left.valueSpecificity > right.valueSpecificity
 	}
+	if left.functionSurplus != right.functionSurplus {
+		return left.functionSurplus < right.functionSurplus
+	}
 	if left.Generic != right.Generic {
 		if strongAcceptance {
 			return !left.Generic
@@ -328,7 +333,7 @@ func ambiguousTopTie(candidates []acceptedCandidate) (bool, []Candidate) {
 	selected := candidates[0].Candidate
 	for _, candidate := range candidates[1:] {
 		current := candidate.Candidate
-		if current.Score != selected.Score || current.Confidence != selected.Confidence || current.valueSpecificity != selected.valueSpecificity {
+		if current.Score != selected.Score || current.Confidence != selected.Confidence || current.valueSpecificity != selected.valueSpecificity || current.functionSurplus != selected.functionSurplus {
 			break
 		}
 		if equivalentCandidate(selected, current) || hasExplicitSelectionPreference(selected, current) {
@@ -1152,6 +1157,44 @@ func recordHasFunction(record ComponentRecord, function string) bool {
 		}
 	}
 	return false
+}
+
+func recordFunctionSurplus(record ComponentRecord, required []string) int {
+	if len(required) == 0 {
+		return 0
+	}
+	wanted := make(map[string]struct{}, len(required))
+	for _, function := range required {
+		if key := strings.ToLower(strings.TrimSpace(function)); key != "" {
+			wanted[key] = struct{}{}
+		}
+	}
+	seen := map[string]struct{}{}
+	surplus := 0
+	for _, symbol := range record.Symbols {
+		for _, pin := range symbol.FunctionPins {
+			primary := strings.ToLower(strings.TrimSpace(pin.Function))
+			if primary == "" {
+				continue
+			}
+			key := primary + "\x00" + strings.TrimSpace(pin.SymbolPin)
+			if _, duplicate := seen[key]; duplicate {
+				continue
+			}
+			seen[key] = struct{}{}
+			_, matched := wanted[primary]
+			for _, alias := range pin.Aliases {
+				if _, ok := wanted[strings.ToLower(strings.TrimSpace(alias))]; ok {
+					matched = true
+					break
+				}
+			}
+			if !matched {
+				surplus++
+			}
+		}
+	}
+	return surplus
 }
 
 func recordHasRequiredCompanions(record ComponentRecord) bool {

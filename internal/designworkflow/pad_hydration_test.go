@@ -277,6 +277,8 @@ func TestVerifiedSpeakerPowerFootprintTemplatesMatchInstalledKiCadLibraries(t *t
 		"Connector_PinHeader_2.54mm:PinHeader_1x04_P2.54mm_Vertical",
 		"Diode_SMD:D_SOD-123",
 		"Package_SO:SOIC-8_3.9x4.9mm_P1.27mm",
+		"Package_SO:VSSOP-8_2.3x2mm_P0.5mm",
+		"Package_TO_SOT_THT:TO-220-3_Vertical",
 		"Package_TO_SOT_SMD:SOT-23",
 		"Package_TO_SOT_SMD:SOT-23-5",
 		"Resistor_THT:R_Axial_DIN0414_L11.9mm_D4.5mm_P20.32mm_Horizontal",
@@ -308,6 +310,8 @@ func TestVerifiedPadTemplateBoundsAreCenteredOnPads(t *testing.T) {
 		"Connector_PinHeader_2.54mm:PinHeader_1x06_P2.54mm_Vertical",
 		"Resistor_SMD:R_0805_2012Metric",
 		"Package_SO:SOIC-8_3.9x4.9mm_P1.27mm",
+		"Package_SO:VSSOP-8_2.3x2mm_P0.5mm",
+		"Package_TO_SOT_THT:TO-220-3_Vertical",
 		"Package_TO_SOT_SMD:SOT-223-3_TabPin2",
 	} {
 		t.Run(footprintID, func(t *testing.T) {

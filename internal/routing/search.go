@@ -486,9 +486,12 @@ func routableViaSpan(occupancy Occupancy, from GridCoord, to GridCoord) bool {
 	if from.X != to.X || from.Y != to.Y {
 		return false
 	}
-	minLayer := min(from.Layer, to.Layer)
-	maxLayer := max(from.Layer, to.Layer)
-	for layerIndex := minLayer; layerIndex <= maxLayer; layerIndex++ {
+	// The current route and transaction models emit ordinary plated through
+	// vias. Even when search uses one to move between adjacent inner layers,
+	// the writer serializes copper on every board copper layer. Validate the
+	// physical span here so a logically short transition cannot pierce foreign
+	// copper elsewhere in the stack.
+	for layerIndex := range occupancy.Layers {
 		if !routableViaCell(occupancy, GridCoord{X: from.X, Y: from.Y, Layer: layerIndex}) {
 			return false
 		}

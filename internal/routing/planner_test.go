@@ -83,6 +83,56 @@ func TestPlanRoutesEscapesConstrainedSmallFanoutPadBeforePowerTree(t *testing.T)
 	}
 }
 
+func TestPlanRoutesConstrainedAccessPrecedesHigherPriorityBroadPower(t *testing.T) {
+	request := singleLayerSearchRequest()
+	request.Strategy.NetOrder = NetOrderConstrainedEndpointAccessV1
+	request.Components = append(request.Components,
+		testComponent("J3", "1", "NARROW", 10, 10),
+		testComponent("J4", "1", "NARROW", 20, 10),
+	)
+	request.Components[2].Pads[0].Size = Size{WidthMM: 0.5, HeightMM: 0.25}
+	request.Components[3].Pads[0].Size = Size{WidthMM: 0.5, HeightMM: 0.25}
+	request.Components[0].Pads[0].Size = Size{WidthMM: 3, HeightMM: 3}
+	request.Components[1].Pads[0].Size = Size{WidthMM: 3, HeightMM: 3}
+	request.Nets = []Net{
+		{Name: "POWER", Role: NetPower, Priority: 100, Endpoints: request.Nets[0].Endpoints},
+		{Name: "NARROW", Role: NetSignal, Priority: 1, Endpoints: []Endpoint{{Ref: "J3", Pin: "1"}, {Ref: "J4", Pin: "1"}}},
+	}
+
+	plans, issues := PlanRoutes(request, BuildPadAccess(request))
+	if len(issues) != 0 {
+		t.Fatalf("issues = %#v", issues)
+	}
+	if len(plans) != 2 || plans[0].Net.Name != "NARROW" {
+		t.Fatalf("plan order = %#v, want physically constrained escape before broad power priority", plans)
+	}
+}
+
+func TestPlanRoutesObservedFailurePromotionPrecedesConstrainedSchedule(t *testing.T) {
+	request := singleLayerSearchRequest()
+	request.Strategy.NetOrder = NetOrderConstrainedEndpointAccessV1
+	request.Components = append(request.Components,
+		testComponent("J3", "1", "NARROW", 10, 10),
+		testComponent("J4", "1", "NARROW", 20, 10),
+	)
+	request.Components[2].Pads[0].Size = Size{WidthMM: 0.5, HeightMM: 0.25}
+	request.Components[3].Pads[0].Size = Size{WidthMM: 0.5, HeightMM: 0.25}
+	request.Components[0].Pads[0].Size = Size{WidthMM: 3, HeightMM: 3}
+	request.Components[1].Pads[0].Size = Size{WidthMM: 3, HeightMM: 3}
+	request.Nets = []Net{
+		{Name: "RETRY_POWER", Role: NetPower, Priority: 11, OrderFirst: true, Endpoints: request.Nets[0].Endpoints},
+		{Name: "NARROW", Role: NetSignal, Priority: 10, Endpoints: []Endpoint{{Ref: "J3", Pin: "1"}, {Ref: "J4", Pin: "1"}}},
+	}
+
+	plans, issues := PlanRoutes(request, BuildPadAccess(request))
+	if len(issues) != 0 {
+		t.Fatalf("issues = %#v", issues)
+	}
+	if len(plans) != 2 || plans[0].Net.Name != "RETRY_POWER" {
+		t.Fatalf("plan order = %#v, want observed failed-net promotion before baseline endpoint schedule", plans)
+	}
+}
+
 func TestPlanRoutesPrioritizesConstrainedSignalBeforeConstrainedSupportPower(t *testing.T) {
 	request := singleLayerSearchRequest()
 	request.Strategy.NetOrder = NetOrderConstrainedEndpointAccessV1
@@ -332,6 +382,31 @@ func TestPlanEndpointPairsIsDeterministicOnTies(t *testing.T) {
 	}
 	if first[0].From.Ref != "A" {
 		t.Fatalf("first pair = %#v, want lexical seed A", first[0])
+	}
+}
+
+func TestPlanEndpointPairsKeepsRepeatedConstrainedComponentPadsAsLeaves(t *testing.T) {
+	request := singleLayerSearchRequest()
+	request.Components = []Component{
+		testComponent("J1", "1", "VCC", 2, 10),
+		{
+			Ref: "U1", Position: Placement{XMM: 15, YMM: 10, Layer: "F.Cu"},
+			Pads: []Pad{
+				{Name: "1", Net: "VCC", Position: Point{XMM: -0.4}, Size: Size{WidthMM: 0.55, HeightMM: 0.55}, Type: PadSMD, Shape: PadRect, Layers: []string{"F.Cu"}},
+				{Name: "2", Net: "VCC", Position: Point{XMM: 0.4}, Size: Size{WidthMM: 0.55, HeightMM: 0.55}, Type: PadSMD, Shape: PadRect, Layers: []string{"F.Cu"}},
+			},
+		},
+	}
+	access := BuildPadAccess(request)
+	endpoints := []Endpoint{{Ref: "J1", Pin: "1"}, {Ref: "U1", Pin: "1"}, {Ref: "U1", Pin: "2"}}
+	pairs, issues := planEndpointPairs("VCC", NetPower, endpoints, access, request.Rules, true)
+	if len(issues) != 0 || len(pairs) != 2 {
+		t.Fatalf("pairs = %#v issues=%#v", pairs, issues)
+	}
+	for _, pair := range pairs {
+		if normalizeKey(pair.From.Ref) == "U1" && normalizeKey(pair.To.Ref) == "U1" {
+			t.Fatalf("constrained same-component pads formed a branch: %#v", pair)
+		}
 	}
 }
 

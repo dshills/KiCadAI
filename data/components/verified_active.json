@@ -800,8 +800,8 @@
           {"function": "GPIO_24", "symbol_pin": "24"},
           {"function": "GPIO_25", "symbol_pin": "25"},
           {"function": "GPIO_26", "symbol_pin": "26"},
-          {"function": "GPIO_27", "symbol_pin": "27"},
-          {"function": "GPIO_28", "symbol_pin": "28"},
+          {"function": "GPIO_27", "symbol_pin": "27", "aliases": ["I2C_SDA"]},
+          {"function": "GPIO_28", "symbol_pin": "28", "aliases": ["I2C_SCL"]},
           {"function": "RESET", "symbol_pin": "29", "required": true},
           {"function": "GPIO_30", "symbol_pin": "30"},
           {"function": "GPIO_31", "symbol_pin": "31"},
@@ -817,6 +817,8 @@
         "mpn": "ATmega328P-AU",
         "lifecycle": "active",
         "pinmap_id": "MCU_Microchip_ATmega:ATmega328P-A|Package_QFP:TQFP-32_7x7mm_P0.8mm",
+		"dimensions_mm": {"width": 7.0, "height": 7.0},
+		"height_mm": 1.2,
         "pad_functions": [
           {"function": "GPIO_1", "pad": "1"}, {"function": "GPIO_2", "pad": "2"}, {"function": "GND", "pad": "3"}, {"function": "VCC", "pad": "4"},
           {"function": "GND", "pad": "5"}, {"function": "VCC", "pad": "6"}, {"function": "GPIO_7", "pad": "7"}, {"function": "GPIO_8", "pad": "8"},
@@ -824,7 +826,7 @@
           {"function": "GPIO_13", "pad": "13"}, {"function": "GPIO_14", "pad": "14"}, {"function": "MOSI", "pad": "15"}, {"function": "MISO", "pad": "16"},
           {"function": "SCK", "pad": "17"}, {"function": "AVCC", "pad": "18"}, {"function": "GPIO_19", "pad": "19"}, {"function": "AREF", "pad": "20"},
           {"function": "AGND", "pad": "21"}, {"function": "GPIO_22", "pad": "22"}, {"function": "GPIO_23", "pad": "23"}, {"function": "GPIO_24", "pad": "24"},
-          {"function": "GPIO_25", "pad": "25"}, {"function": "GPIO_26", "pad": "26"}, {"function": "GPIO_27", "pad": "27"}, {"function": "GPIO_28", "pad": "28"},
+          {"function": "GPIO_25", "pad": "25"}, {"function": "GPIO_26", "pad": "26"}, {"function": "GPIO_27", "pad": "27", "aliases": ["I2C_SDA"]}, {"function": "GPIO_28", "pad": "28", "aliases": ["I2C_SCL"]},
           {"function": "RESET", "pad": "29"}, {"function": "GPIO_30", "pad": "30"}, {"function": "GPIO_31", "pad": "31"}, {"function": "GPIO_32", "pad": "32"}
         ],
         "verification": {"confidence": "verified", "sources": ["builtin_pinmap:MCU_Microchip_ATmega:ATmega328P-A"], "pinmap_checked": true}

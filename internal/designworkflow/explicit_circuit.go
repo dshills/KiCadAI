@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 
 	"kicadai/internal/inspect"
+	"kicadai/internal/kicadfiles"
 	"kicadai/internal/libraryresolver"
 	"kicadai/internal/reports"
 	"kicadai/internal/schematicir"
@@ -82,7 +83,7 @@ func createExplicitCircuit(ctx context.Context, request Request, opts CreateOpti
 		return BuildWorkflowResult(project, request.Validation.Acceptance, stages)
 	}
 	hierarchy, hierarchyIssues := explicitCircuitHierarchy(request, opts.LibraryIndex)
-	tx, projectTxIssues := explicitCircuitTransaction(request, schematicTx, placed, routed, opts.Overwrite, hierarchy)
+	tx, projectTxIssues := explicitCircuitTransaction(request, schematicTx, placed, routed, opts.Overwrite, hierarchy, opts.LibraryIndex)
 	projectTxIssues = append(projectTxIssues, hierarchyIssues...)
 	if reports.HasBlockingIssue(projectTxIssues) {
 		writeStage := NewStageResult(StageProjectWrite, projectTxIssues)
@@ -91,7 +92,7 @@ func createExplicitCircuit(ctx context.Context, request Request, opts CreateOpti
 		return BuildWorkflowResult(project, request.Validation.Acceptance, stages)
 	}
 
-	written := writeExplicitCircuitProject(ctx, request, tx, opts)
+	written := writeExplicitCircuitProject(ctx, request, tx, placed, routed, opts)
 	stages = append(stages, written.Stage)
 	if workflowStageBlocked(written.Stage) {
 		stages = append(stages, skippedWorkflowStages("project write did not complete", StageWriterCorrect, StageValidation, StageKiCadChecks)...)
@@ -162,13 +163,13 @@ func explicitCircuitHierarchy(request Request, index *libraryresolver.LibraryInd
 	return schematicir.HierarchyForProject(request.ExplicitCircuit.Schematic, index)
 }
 
-func explicitCircuitTransaction(request Request, schematicTx transactions.Transaction, placed PlacementStageResult, routed RoutingStageResult, overwrite bool, hierarchy *transactions.SchematicHierarchy) (transactions.Transaction, []reports.Issue) {
+func explicitCircuitTransaction(request Request, schematicTx transactions.Transaction, placed PlacementStageResult, routed RoutingStageResult, overwrite bool, hierarchy *transactions.SchematicHierarchy, libraryIndex *libraryresolver.LibraryIndex) (transactions.Transaction, []reports.Issue) {
 	tx := schematicTx
 	var issues []reports.Issue
 	boardOps, boardIssues := boardOperations(&request)
 	issues = append(issues, boardIssues...)
 	tx.Operations = append(tx.Operations, boardOps...)
-	placementOps, placementIssues := explicitPlacementWriteOperations(placed.Result.Operations)
+	placementOps, placementIssues := explicitPlacementWriteOperations(placed.Result.Operations, libraryIndex)
 	issues = append(issues, placementIssues...)
 	tx.Operations = append(tx.Operations, placementOps...)
 	tx.Operations = append(tx.Operations, routed.Operations...)
@@ -183,7 +184,7 @@ func explicitCircuitTransaction(request Request, schematicTx transactions.Transa
 	return tx, issues
 }
 
-func writeExplicitCircuitProject(ctx context.Context, request Request, tx transactions.Transaction, opts CreateOptions) ProjectWriteResult {
+func writeExplicitCircuitProject(ctx context.Context, request Request, tx transactions.Transaction, placed PlacementStageResult, routed RoutingStageResult, opts CreateOptions) ProjectWriteResult {
 	validation := transactions.Validate(tx)
 	issues := append([]reports.Issue(nil), validation.Issues...)
 	if err := ctx.Err(); err != nil {
@@ -203,6 +204,9 @@ func writeExplicitCircuitProject(ctx context.Context, request Request, tx transa
 	applyResult := transactions.Apply(tx, transactions.ApplyOptions{
 		OutputDir: outputDir, Overwrite: opts.Overwrite, Seed: opts.Seed, CopperLayers: request.Board.Layers, LibraryIndex: opts.LibraryIndex,
 		SuppressPinmapWarnings: opts.LibraryIndex != nil, SuppressExplicitPinSymbolErrors: opts.LibraryIndex != nil,
+		DefaultNetClassClearance:   kicadfiles.MM(projectNetClassClearanceMM(&routed, &placed)),
+		MinimumThroughHoleDiameter: kicadfiles.MM(projectMinimumThroughHoleDiameterMM(&placed)),
+		PreserveFootprintGeometry:  true,
 	})
 	issues = append(issues, applyResult.Issues...)
 	var inspection inspect.ProjectSummary

@@ -285,6 +285,39 @@ func TestRoutableViaSpanChecksIntermediateLayers(t *testing.T) {
 	}
 }
 
+func TestRoutableViaSpanChecksFullPhysicalThroughViaSpan(t *testing.T) {
+	request := twoLayerViaRequest()
+	request.Board.Layers = []Layer{
+		{Name: "F.Cu", Kind: LayerCopper, Routable: true},
+		{Name: "In1.Cu", Kind: LayerCopper, Routable: true},
+		{Name: "In2.Cu", Kind: LayerCopper, Routable: true},
+		{Name: "B.Cu", Kind: LayerCopper, Routable: true},
+	}
+	request.Rules.GridMM = 0.25
+	request.Rules.ViaDiameterMM = 0.6
+	request.Rules.ClearanceMM = 0.2
+	request.Obstacles = []Obstacle{{
+		Kind:     ObstacleKeepout,
+		Layer:    "F.Cu",
+		Geometry: Shape{Rect: &Rect{Min: Point{XMM: 9.75, YMM: 9.75}, Max: Point{XMM: 10.25, YMM: 10.25}}},
+	}}
+	viaOccupancy, err := BuildViaOccupancy(request, "SIG")
+	if err != nil {
+		t.Fatalf("BuildViaOccupancy error: %v", err)
+	}
+	layerIndexes, err := LayerIndexes(request.Board.Layers)
+	if err != nil {
+		t.Fatalf("LayerIndexes error: %v", err)
+	}
+	from := viaOccupancy.Grid.ToGrid(Point{XMM: 10, YMM: 10}, layerIndexes[normalizeLayer("In1.Cu")])
+	to := from
+	to.Layer = layerIndexes[normalizeLayer("In2.Cu")]
+
+	if routableViaSpan(viaOccupancy, from, to) {
+		t.Fatal("inner-layer transition should be blocked by outer-layer copper crossed by the physical through via")
+	}
+}
+
 func TestRouteRequestAllowedLayersCanBlockRoute(t *testing.T) {
 	request := twoLayerViaRequest()
 	request.Rules.NetClasses = map[string]NetClass{
@@ -390,6 +423,26 @@ func TestExistingCopperForSegmentsIncludesTraceWidth(t *testing.T) {
 	}
 }
 
+func TestExistingCopperForViasCoversPhysicalThroughViaSpan(t *testing.T) {
+	existing := existingCopperForVias([]Via{{
+		Net: "SIG", At: Point{XMM: 4, YMM: 5}, DiameterMM: 0.6, DrillMM: 0.3, Layers: []string{"F.Cu", "In1.Cu"},
+	}}, []Layer{
+		{Name: "F.Cu", Kind: LayerCopper},
+		{Name: "In1.Cu", Kind: LayerCopper},
+		{Name: "In2.Cu", Kind: LayerCopper},
+		{Name: "B.Cu", Kind: LayerCopper},
+		{Name: "F.SilkS", Kind: LayerOther},
+	})
+	if len(existing) != 4 {
+		t.Fatalf("existing via layers = %#v, want all four physical copper layers", existing)
+	}
+	for index, want := range []string{"F.Cu", "In1.Cu", "In2.Cu", "B.Cu"} {
+		if existing[index].Layer != want || existing[index].Kind != CopperVia {
+			t.Fatalf("existing[%d] = %#v, want via on %s", index, existing[index], want)
+		}
+	}
+}
+
 func TestNominalSegmentsClearOccupancyRejectsThickenedCollision(t *testing.T) {
 	request := singleLayerSearchRequest()
 	request.Rules.TraceWidthMM = 0.8
@@ -407,6 +460,33 @@ func TestNominalSegmentsClearOccupancyRejectsThickenedCollision(t *testing.T) {
 	}
 	if nominalSegmentsClearOccupancy(segments, 0.8, occupancy, request.Board.Layers) {
 		t.Fatal("thickened segment crossing an obstacle was accepted")
+	}
+}
+
+func TestFallbackSMDEndpointConnectionPreservesSearchedEscapeGeometry(t *testing.T) {
+	from := Endpoint{Ref: "U1", Pin: "1"}
+	to := Endpoint{Ref: "U2", Pin: "1"}
+	fromKey := endpointKey(from.Ref, from.Pin)
+	toKey := endpointKey(to.Ref, to.Pin)
+	fromEdge := Point{XMM: 2.5, YMM: 3}
+	toEdge := Point{XMM: 8.5, YMM: 7}
+	access := PadAccess{
+		Pads: map[endpointID]Pad{
+			fromKey: {Position: Point{XMM: 3, YMM: 3}, Type: PadSMD},
+			toKey:   {Position: Point{XMM: 8, YMM: 7}, Type: PadSMD},
+		},
+		AccessPoints: map[endpointID][]AccessPoint{
+			fromKey: {{Endpoint: from, Point: fromEdge, SearchPoint: &fromEdge, Layer: "F.Cu"}},
+			toKey:   {{Endpoint: to, Point: toEdge, SearchPoint: &toEdge, Layer: "F.Cu"}},
+		},
+	}
+	escape := Segment{Net: "VCC", Layer: "F.Cu", Start: fromEdge, End: toEdge, WidthMM: 0.3}
+	got := connectFallbackSMDEndpointsToCenters([]Segment{escape}, access, EndpointPair{From: from, To: to})
+	if len(got) != 3 {
+		t.Fatalf("segments = %#v, want center connector, unchanged escape, center connector", got)
+	}
+	if got[0].Start != access.Pads[fromKey].Position || got[0].End != fromEdge || got[1] != escape || got[2].Start != toEdge || got[2].End != access.Pads[toKey].Position {
+		t.Fatalf("segments = %#v, searched escape geometry changed", got)
 	}
 }
 

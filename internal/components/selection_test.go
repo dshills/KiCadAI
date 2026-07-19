@@ -520,7 +520,7 @@ func TestSelectAP2112KRejectsOverCurrent(t *testing.T) {
 func TestSelectRegulatorRejectsUnsupportedOutputVoltage(t *testing.T) {
 	catalog := loadCheckedInCatalog(t)
 	_, result := Select(context.Background(), catalog, SelectionRequest{
-		Query:      Query{Family: "regulator", ValueKind: "output_voltage", Value: "5.6"},
+		Query:      Query{Family: "regulator", ValueKind: "output_voltage", Value: "38"},
 		Acceptance: AcceptanceConnectivity,
 	})
 	assertIssueCode(t, result.Issues, CodeComponentNotFound)
@@ -716,6 +716,29 @@ func TestSelectPreservesAmbiguityForNonEquivalentTie(t *testing.T) {
 		t.Fatal("expected non-equivalent tie to remain ambiguous")
 	}
 	assertIssueCode(t, result.Issues, CodeComponentAmbiguous)
+}
+
+func TestSelectPrefersFewestSurplusFunctions(t *testing.T) {
+	catalog := validCatalog()
+	compact := cloneSelectionTestRecord(catalog.Records[0])
+	compact.ID = "resistor.compact.0805"
+	compact.Symbols[0].FunctionPins = append([]FunctionPin(nil), compact.Symbols[0].FunctionPins...)
+	expanded := cloneSelectionTestRecord(compact)
+	expanded.ID = "resistor.expanded.0805"
+	expanded.Symbols[0].FunctionPins = append(expanded.Symbols[0].FunctionPins, FunctionPin{Function: "UNUSED_CHANNEL", SymbolPin: "3"})
+	catalog.Records = []ComponentRecord{expanded, compact}
+
+	selection, result := Select(context.Background(), &catalog, SelectionRequest{
+		Query:             Query{Family: "resistor", Package: "0805"},
+		Acceptance:        AcceptanceStructural,
+		RequiredFunctions: []string{"A", "B"},
+	})
+	if !result.OK {
+		t.Fatalf("select compact function set failed: %+v", result.Issues)
+	}
+	if selection.Component.ID != compact.ID {
+		t.Fatalf("selected %s, want %s", selection.Component.ID, compact.ID)
+	}
 }
 
 func TestSelectVerifiedOpAmpBySupplyRange(t *testing.T) {

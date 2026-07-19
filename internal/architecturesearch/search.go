@@ -239,13 +239,29 @@ func initialSearchObligations(requirement Requirement, minimumEvidence EvidenceC
 	var obligations []searchObligation
 	var issues []reports.Issue
 	for _, participant := range requirement.Requirements.Participants {
-		ports := make([]RoleContract, 0, len(participant.RequiredPorts))
+		ports := make([]RoleContract, 0, len(participant.RequiredPorts)+2)
 		for _, port := range participant.RequiredPorts {
 			binding := Binding{Role: port.ID, Participant: participant.ID, ParticipantPort: port.ID}
 			contract, contractIssues := ContractFromBinding(requirement, binding, minimumEvidence)
 			issues = append(issues, contractIssues...)
 			ports = append(ports, RoleContract{Role: port.ID, Anchor: participantAnchor(participant.ID, port.ID), Contract: contract})
 		}
+		domain := requirementDomain(requirement, participant.Domain)
+		powerContract := PortContract{
+			ID: participant.ID + "_power", Kind: "power", Direction: "sink", Domain: participant.Domain,
+			Voltage: domainVoltageRange(domain), MaximumCurrentDemandA: cloneFloat64(domain.MaxCurrentA),
+			Evidence:        ContractEvidence{Confidence: EvidenceRuleInferred, Sources: []string{"kicadai:participant-domain-contract"}},
+			MinimumEvidence: minimumEvidence,
+		}
+		ports = append(ports, RoleContract{Role: "power", Anchor: domainAnchor(participant.Domain), Contract: NormalizePortContract(powerContract)})
+		referenceDomain := firstReferenceDomain(requirement)
+		referenceContract := PortContract{
+			ID: participant.ID + "_reference", Kind: "reference", Direction: "bidirectional", Domain: referenceDomain.ID,
+			Voltage:         domainVoltageRange(referenceDomain),
+			Evidence:        ContractEvidence{Confidence: EvidenceRuleInferred, Sources: []string{"kicadai:participant-domain-contract"}},
+			MinimumEvidence: minimumEvidence,
+		}
+		ports = append(ports, RoleContract{Role: "reference", Anchor: domainAnchor(referenceDomain.ID), Contract: NormalizePortContract(referenceContract)})
 		obligations = append(obligations, searchObligation{Path: "participant:" + participant.ID, Capability: participant.Capability, Ports: ports, Constraints: cloneConstraints(participant.Constraints)})
 	}
 	for _, objective := range requirement.Requirements.Objectives {
@@ -804,8 +820,18 @@ func canonicalRawJSON(raw json.RawMessage) json.RawMessage {
 }
 
 func externalAnchor(port string) string { return "external:" + canonicalIdentifier(port) }
+func domainAnchor(domain string) string { return "domain:" + canonicalIdentifier(domain) }
 func participantAnchor(participant, port string) string {
 	return "participant:" + canonicalIdentifier(participant) + ":" + canonicalIdentifier(port)
+}
+
+func firstReferenceDomain(requirement Requirement) Domain {
+	for _, domain := range requirement.Requirements.Domains {
+		if domain.Kind == "reference" {
+			return domain
+		}
+	}
+	return Domain{}
 }
 
 func selectedComponentCount(selections []FragmentSelection) int {

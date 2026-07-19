@@ -24,6 +24,7 @@ type ProjectFile struct {
 	FormatVersion     kicadfiles.KiCadFormatVersion
 	Generator         string
 	PageSettings      PageSettings
+	BoardRules        BoardDesignRules
 	NetClasses        []NetClass
 	Sheets            []Sheet
 	TextVariables     map[string]string
@@ -33,6 +34,10 @@ type ProjectFile struct {
 
 type PageSettings struct {
 	Paper kicadfiles.Paper
+}
+
+type BoardDesignRules struct {
+	MinimumThroughHoleDiameter kicadfiles.IU
 }
 
 type NetClass struct {
@@ -83,6 +88,9 @@ func Validate(project ProjectFile) error {
 	}
 	if project.PageSettings.Paper.Height < 0 {
 		errs = append(errs, fieldError("page_settings.height", "must be non-negative"))
+	}
+	if project.BoardRules.MinimumThroughHoleDiameter < 0 {
+		errs = append(errs, fieldError("board_rules.minimum_through_hole_diameter", "must be non-negative"))
 	}
 	seen := map[string]struct{}{}
 	hasDefault := false
@@ -273,7 +281,13 @@ func newDocument(project ProjectFile) map[string]any {
 	for key, raw := range project.Preserved {
 		document[key] = raw
 	}
-	document["board"] = map[string]any{"design_settings": map[string]any{}}
+	designSettings := map[string]any{}
+	if project.BoardRules.MinimumThroughHoleDiameter > 0 {
+		designSettings["rules"] = map[string]any{
+			"min_through_hole_diameter": mmNumber(project.BoardRules.MinimumThroughHoleDiameter),
+		}
+	}
+	document["board"] = map[string]any{"design_settings": designSettings}
 	document["boards"] = []string{}
 	document["component_class_settings"] = map[string]any{}
 	document["cvpcb"] = map[string]any{}

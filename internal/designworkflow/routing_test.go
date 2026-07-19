@@ -112,6 +112,28 @@ func TestExistingCopperFromRouteOperationsIncludesSignalLocalRouteVias(t *testin
 	}
 }
 
+func TestStrictDRCRequestCommitsEveryLocalRouteAsExistingCopper(t *testing.T) {
+	fragment := PCBFragmentResult{Fragments: []BlockFragment{{Realization: blocks.BlockPCBRealizationResult{Validation: blocks.PCBValidationExpectations{RequiresDRC: true}}}}}
+	for _, test := range []struct {
+		name     string
+		request  Request
+		fragment PCBFragmentResult
+		want     bool
+	}{
+		{name: "explicit_requirement", request: Request{Validation: ValidationSpec{RequireDRC: true}}, want: true},
+		{name: "erc_drc_acceptance", request: Request{Validation: ValidationSpec{Acceptance: AcceptanceERCDRC}}, want: true},
+		{name: "fabrication_acceptance", request: Request{Validation: ValidationSpec{Acceptance: AcceptanceFabricationCandidate}}, want: true},
+		{name: "fragment_requirement", fragment: fragment, want: true},
+		{name: "structural", request: Request{Validation: ValidationSpec{Acceptance: AcceptanceStructural}}, want: false},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			if got := requestRequiresStrictDRC(test.request, test.fragment); got != test.want {
+				t.Fatalf("requestRequiresStrictDRC() = %v, want %v", got, test.want)
+			}
+		})
+	}
+}
+
 func TestMultiEndpointGroundRouteObstacleNets(t *testing.T) {
 	candidates := []InterBlockRouteCandidate{
 		{NetName: "GND", Endpoints: make([]InterBlockRouteEndpoint, 3)},
@@ -1087,6 +1109,120 @@ func TestLocalRouteOperationsMovesEndpointViasToDogboneWaypoints(t *testing.T) {
 	}
 	if toDogbone.Layer != "F.Cu" || len(toDogbone.Points) != 2 || toDogbone.Points[0] != toTransition || toDogbone.Points[1] != (transactions.Point{XMM: 19, YMM: 5}) {
 		t.Fatalf("destination dogbone = %#v", toDogbone)
+	}
+}
+
+func TestLocalRouteUnsafeEndpointViaAutomaticallyUsesClearDogbone(t *testing.T) {
+	fragments := PCBFragmentResult{Fragments: []BlockFragment{{
+		InstanceID: "driver",
+		BlockID:    "test_driver",
+		Realization: blocks.BlockPCBRealizationResult{LocalRoutes: []blocks.RealizedPCBLocalRoute{{
+			ID:      "signal_escape",
+			NetName: "SIG",
+			From:    transactions.Endpoint{Ref: "R1", Pin: "2"},
+			To:      transactions.Endpoint{Ref: "U1", Pin: "3"},
+			Points:  []transactions.Point{{XMM: 11, YMM: 5}, {XMM: 12, YMM: 5}, {XMM: 18, YMM: 5}, {XMM: 19, YMM: 5}},
+			Layer:   "B.Cu",
+			WidthMM: 0.25,
+		}}},
+	}}}
+	placed := PlacementStageResult{
+		Request: placement.Request{
+			Board: placement.BoardPlacementArea{WidthMM: 40, HeightMM: 20, MarginMM: 0.25},
+			Components: []placement.Component{
+				{Ref: "R1", FootprintID: "Test:R", Pads: []placement.PadSummary{
+					{Name: "2", Net: "SIG", XMM: 1, WidthMM: 1, HeightMM: 1, Type: "smd", Layers: []string{"F.Cu"}},
+					{Name: "1", Net: "GND", XMM: 2, WidthMM: 1, HeightMM: 1, Type: "smd", Layers: []string{"F.Cu"}},
+				}},
+				{Ref: "U1", FootprintID: "Test:U", Pads: []placement.PadSummary{{Name: "3", Net: "SIG", XMM: -1, WidthMM: 1, HeightMM: 1, Type: "smd", Layers: []string{"F.Cu"}}}},
+			},
+			Nets: []placement.Net{
+				{Name: "SIG", Endpoints: []placement.Endpoint{{Ref: "R1", Pin: "2"}, {Ref: "U1", Pin: "3"}}},
+				{Name: "GND", Endpoints: []placement.Endpoint{{Ref: "R1", Pin: "1"}}},
+			},
+		},
+		Result: placement.Result{Status: placement.StatusPlaced, Placements: []placement.PlacementResult{
+			{Ref: "R1", FootprintID: "Test:R", Position: placement.Placement{XMM: 10, YMM: 5, Layer: "F.Cu"}},
+			{Ref: "U1", FootprintID: "Test:U", Position: placement.Placement{XMM: 20, YMM: 5, Layer: "F.Cu"}},
+		}},
+		Stage: NewStageResult(StagePlacement, nil),
+	}
+
+	operations, issues, summary := localRouteOperations(fragments, &placed)
+	if len(issues) != 0 || summary.RoutesBound != 1 {
+		t.Fatalf("issues=%#v summary=%#v operations=%#v", issues, summary, operations)
+	}
+	var mainRoute transactions.RouteOperation
+	var dogbone transactions.RouteOperation
+	for _, operation := range operations {
+		var route transactions.RouteOperation
+		if err := json.Unmarshal(operation.Raw, &route); err != nil {
+			t.Fatal(err)
+		}
+		if operation.Ref == localRouteEndpointDogboneOperationRef {
+			dogbone = route
+		} else if route.Layer == "B.Cu" {
+			mainRoute = route
+		}
+	}
+	if len(dogbone.Points) < 2 || len(mainRoute.Vias) == 0 {
+		t.Fatalf("main=%#v dogbone=%#v operations=%#v", mainRoute, dogbone, operations)
+	}
+	transition := dogbone.Points[len(dogbone.Points)-1]
+	if transition == (transactions.Point{XMM: 12, YMM: 5}) {
+		t.Fatalf("dogbone transition was not moved from the foreign sibling pad: %#v", dogbone)
+	}
+	if segmentIntersectsLocalRouteRect(transition, transition, transactions.Point{XMM: 12, YMM: 5}, 1.0, 1.0) {
+		t.Fatalf("dogbone transition %#v does not clear the sibling pad's via envelope", transition)
+	}
+	foundVia := false
+	for _, via := range mainRoute.Vias {
+		if sameRoutePoint(via.At, transition) {
+			foundVia = true
+			break
+		}
+	}
+	if !foundVia {
+		t.Fatalf("main route vias %#v do not include moved dogbone transition %#v", mainRoute.Vias, transition)
+	}
+}
+
+func TestLocalRouteCompositionDetoursAroundCommittedForeignCopper(t *testing.T) {
+	existing, err := workflowOperation(transactions.OpRoute, transactions.RouteOperation{
+		Op:      transactions.OpRoute,
+		NetName: "GND",
+		Layer:   "B.Cu",
+		WidthMM: 0.4,
+		Points:  []transactions.Point{{XMM: 4, YMM: 5}, {XMM: 8, YMM: 5}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	current, err := workflowOperation(transactions.OpRoute, transactions.RouteOperation{
+		Op:      transactions.OpRoute,
+		NetName: "SCL",
+		Layer:   "B.Cu",
+		WidthMM: 0.25,
+		Points:  []transactions.Point{{XMM: 6, YMM: 2}, {XMM: 6, YMM: 8}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	adjusted, issues, segmentDelta, ok := detourLocalRouteOperationsAroundExisting([]transactions.Operation{current}, []transactions.Operation{existing}, PlacedPadEndpointResolver{})
+	if !ok || len(issues) != 0 || len(adjusted) != 1 {
+		t.Fatalf("ok=%t issues=%#v adjusted=%#v", ok, issues, adjusted)
+	}
+	var route transactions.RouteOperation
+	if err := json.Unmarshal(adjusted[0].Raw, &route); err != nil {
+		t.Fatal(err)
+	}
+	if segmentDelta <= 0 || len(route.Points) <= 2 {
+		t.Fatalf("route=%#v segment delta=%d, want a deterministic detour", route, segmentDelta)
+	}
+	obstacles := localRouteForeignCopperObstacles([]transactions.Operation{existing}, "SCL", "B.Cu", route.WidthMM/2)
+	if !localRoutePolylineClearsForeignCopper(route.Points, obstacles) {
+		t.Fatalf("detoured route still intersects committed copper: %#v", route)
 	}
 }
 
@@ -2359,7 +2495,7 @@ func TestDedupeSameNetRouteViasSnapsTooCloseViaToExistingVia(t *testing.T) {
 	}
 }
 
-func TestDedupeSameNetRouteViasKeepsDistinctLayerSpans(t *testing.T) {
+func TestDedupeSameNetRouteViasCollapsesLogicalSpansThatEmitOneThroughVia(t *testing.T) {
 	first := mustRouteOperation(t, transactions.RouteOperation{
 		Op:      transactions.OpRoute,
 		NetName: "GND",
@@ -2387,8 +2523,8 @@ func TestDedupeSameNetRouteViasKeepsDistinctLayerSpans(t *testing.T) {
 
 	operations := dedupeSameNetRouteVias([]transactions.Operation{first, second})
 
-	if got := routeViaCountForRoutingTest(t, operations, "GND"); got != 2 {
-		t.Fatalf("GND via count = %d, want distinct layer spans preserved", got)
+	if got := routeViaCountForRoutingTest(t, operations, "GND"); got != 1 {
+		t.Fatalf("GND via count = %d, want logical spans collapsed to one emitted through via", got)
 	}
 }
 
@@ -2763,6 +2899,65 @@ func TestRemainingPhysicalPadRoutingNetsExcludesOnlyFullyConnectedNets(t *testin
 	}
 }
 
+func TestResidualPhysicalRouteTreeContactProofUsesCompletePhysicalGraph(t *testing.T) {
+	placed := simplePlacedPads()
+	placed.Request.Components = append(placed.Request.Components, placement.Component{
+		Ref: "U3", FootprintID: "Test:Pad", Bounds: placement.Bounds{WidthMM: 2, HeightMM: 2, Source: placement.BoundsExplicit},
+		Pads: []placement.PadSummary{{Name: "1", Net: "SIG", WidthMM: 1, HeightMM: 1}},
+	})
+	placed.Request.Nets[0].Endpoints = append(placed.Request.Nets[0].Endpoints, placement.Endpoint{Ref: "U3", Pin: "1"})
+	placed.Result.Placements = append(placed.Result.Placements, placement.PlacementResult{Ref: "U3", FootprintID: "Test:Pad", Position: placement.Placement{XMM: 25, YMM: 10, Layer: "F.Cu"}})
+	placed.Result.Metrics.PlacedCount++
+	net := routing.Net{Name: "SIG", Endpoints: []routing.Endpoint{{Ref: "U1", Pin: "1"}, {Ref: "U2", Pin: "1"}, {Ref: "U3", Pin: "1"}}}
+	candidate := InterBlockRouteCandidate{NetName: "SIG", Status: InterBlockRouteCandidateRoutable, Endpoints: []InterBlockRouteEndpoint{{Ref: "U1", Pin: "1"}, {Ref: "U2", Pin: "1"}, {Ref: "U3", Pin: "1"}}}
+	existing := mustRouteOperation(t, transactions.RouteOperation{Op: transactions.OpRoute, NetName: "SIG", Layer: "F.Cu", WidthMM: 0.25, Points: []transactions.Point{{XMM: 5, YMM: 10}, {XMM: 20, YMM: 10}}})
+	completedBranch := mustRouteOperation(t, transactions.RouteOperation{Op: transactions.OpRoute, NetName: "SIG", Layer: "F.Cu", WidthMM: 0.25, Points: []transactions.Point{{XMM: 20, YMM: 10}, {XMM: 25, YMM: 10}}})
+
+	if residualPhysicalRouteTreeContactProven([]routing.Net{net}, &placed, []transactions.Operation{existing}, candidate) {
+		t.Fatal("partial physical graph was reported complete")
+	}
+	if !residualPhysicalRouteTreeContactProven([]routing.Net{net}, &placed, []transactions.Operation{existing, completedBranch}, candidate) {
+		t.Fatal("complete physical graph was not accepted when a planned branch is redundant")
+	}
+}
+
+func TestNonBlockingRouteTreeIssuesDropsOnlySupersededBranchFailures(t *testing.T) {
+	issues := []reports.Issue{
+		{Code: reports.CodeFixedNetSkipped, Severity: reports.SeverityInfo, Message: "preserved"},
+		{Code: reports.CodeValidationFailed, Severity: reports.SeverityBlocked, Message: "redundant branch failed"},
+	}
+	got := nonBlockingRouteTreeIssues(issues)
+	if len(got) != 1 || got[0].Severity != reports.SeverityInfo || got[0].Code != reports.CodeFixedNetSkipped {
+		t.Fatalf("filtered issues = %#v, want only non-blocking evidence", got)
+	}
+}
+
+func TestReconcileContactProvenRoutingResultClearsOnlyProvenFailedNet(t *testing.T) {
+	result := routing.Result{
+		Status: routing.StatusBlocked,
+		Routes: []routing.Route{
+			{Net: "PROVEN", Status: routing.RouteStatusFailed, Issues: []reports.Issue{{Code: reports.CodeValidationFailed, Severity: reports.SeverityBlocked, Nets: []string{"PROVEN"}}}},
+			{Net: "DONE", Status: routing.RouteStatusRouted},
+		},
+		Issues:  []reports.Issue{{Code: reports.CodeValidationFailed, Severity: reports.SeverityBlocked, Nets: []string{"PROVEN"}}},
+		Metrics: routing.Metrics{NetCount: 2, RoutedNetCount: 1, FailedNetCount: 1},
+	}
+	got := reconcileContactProvenRoutingResult(result, []string{"PROVEN"})
+	if got.Status != routing.StatusRouted || got.Metrics.RoutedNetCount != 2 || got.Metrics.FailedNetCount != 0 || len(got.Issues) != 0 {
+		t.Fatalf("reconciled result = %#v", got)
+	}
+	if got.Routes[0].Status != routing.RouteStatusRouted || len(got.Routes[0].Issues) != 0 {
+		t.Fatalf("proven route = %#v, want routed without superseded blocking issue", got.Routes[0])
+	}
+
+	unrelated := result
+	unrelated.Issues = append(unrelated.Issues, reports.Issue{Code: reports.CodeValidationFailed, Severity: reports.SeverityBlocked, Nets: []string{"OTHER"}})
+	got = reconcileContactProvenRoutingResult(unrelated, []string{"PROVEN"})
+	if got.Status != routing.StatusBlocked || len(got.Issues) != 1 || got.Issues[0].Nets[0] != "OTHER" {
+		t.Fatalf("unrelated blocking issue was not preserved: %#v", got)
+	}
+}
+
 func TestPruneRedundantDanglingRouteStubsPreservesPhysicalConnectivity(t *testing.T) {
 	placed := simplePlacedPads()
 	main := mustRouteOperation(t, transactions.RouteOperation{
@@ -3025,8 +3220,28 @@ func TestPromoteFailedNetPrioritiesHandlesIntegerSaturation(t *testing.T) {
 		{Name: "failed", Priority: 1},
 	}
 	promoted := promoteFailedNetPriorities(nets, map[string]struct{}{interBlockSummaryNetKey("failed"): {}})
-	if promoted[3].Priority != maxInt || !(promoted[0].Priority > promoted[1].Priority && promoted[1].Priority > promoted[2].Priority) || promoted[0].Priority >= promoted[3].Priority || nets[0].Priority != maxInt || nets[3].Priority != 1 {
+	if promoted[3].Priority != maxInt || !promoted[3].OrderFirst || !(promoted[0].Priority > promoted[1].Priority && promoted[1].Priority > promoted[2].Priority) || promoted[0].Priority >= promoted[3].Priority || nets[0].Priority != maxInt || nets[3].Priority != 1 || nets[3].OrderFirst {
 		t.Fatalf("original/promoted priorities = %#v/%#v, want copied strict promotion", nets, promoted)
+	}
+}
+
+func TestApplyRoutingOptionsDoesNotLetImplicitNetClassWeakenGlobalClearance(t *testing.T) {
+	request := Request{Board: BoardSpec{Layers: 2}, Constraints: ConstraintSpec{ClearanceMM: 0.25}}
+	routingRequest := routing.Request{Rules: routing.Rules{
+		ClearanceMM: 0.2,
+		NetClasses: map[string]routing.NetClass{
+			"signal": {ClearanceMM: 0.2},
+			"wide":   {ClearanceMM: 0.3},
+		},
+		NetOverrides: map[string]routing.NetRule{"TUNED": {ClearanceMM: 0.15}},
+	}}
+
+	applyRoutingOptions(request, RoutingOptions{}, &routingRequest)
+	if routingRequest.Rules.ClearanceMM != 0.25 || routingRequest.Rules.NetClasses["signal"].ClearanceMM != 0.25 || routingRequest.Rules.NetClasses["wide"].ClearanceMM != 0.3 {
+		t.Fatalf("routing clearances = %#v, want implicit class floored to global rule", routingRequest.Rules)
+	}
+	if routingRequest.Rules.NetOverrides["TUNED"].ClearanceMM != 0.15 {
+		t.Fatalf("explicit per-net override was changed: %#v", routingRequest.Rules.NetOverrides)
 	}
 }
 

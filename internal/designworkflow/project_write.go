@@ -8,6 +8,7 @@ import (
 
 	"kicadai/internal/blocks"
 	"kicadai/internal/inspect"
+	"kicadai/internal/kicadfiles"
 	"kicadai/internal/libraryresolver"
 	"kicadai/internal/reports"
 	"kicadai/internal/transactions"
@@ -105,6 +106,8 @@ func WriteProject(ctx context.Context, request *Request, plan *BlockPlanResult, 
 		LibraryIndex:                    opts.LibraryIndex,
 		SuppressPinmapWarnings:          opts.LibraryIndex != nil,
 		SuppressExplicitPinSymbolErrors: opts.LibraryIndex != nil,
+		DefaultNetClassClearance:        kicadfiles.MM(projectNetClassClearanceMM(routed, placed)),
+		MinimumThroughHoleDiameter:      kicadfiles.MM(projectMinimumThroughHoleDiameterMM(placed)),
 		// Routing was computed against transaction pads; resolver hydration here
 		// would move anchors after routes have already been generated.
 		PreserveFootprintGeometry: opts.PreserveFootprintGeometry,

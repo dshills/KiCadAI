@@ -1,16 +1,16 @@
 {
-  "record_count": 84,
+  "record_count": 86,
   "family_count": 21,
   "confidence_counts": {
     "blocked": 1,
     "library_derived": 0,
     "placeholder": 4,
     "rule_inferred": 5,
-    "verified": 74
+    "verified": 76
   },
   "alternative_coverage": {
-    "concrete_records": 60,
-    "generic_fallback_records": 24,
+    "concrete_records": 61,
+    "generic_fallback_records": 25,
     "equivalence_groups": 19
   },
   "families": [
@@ -91,16 +91,17 @@
     {
       "family": "connector",
       "defined": true,
-      "record_count": 10,
+      "record_count": 11,
       "concrete_records": 5,
-      "generic_fallback_records": 5,
+      "generic_fallback_records": 6,
       "equivalence_groups": 5,
-      "verified_records": 10,
+      "verified_records": 11,
       "library_derived_records": 0,
       "rule_inferred_records": 0,
       "placeholder_records": 0,
       "blocked_records": 0,
       "missing_resolver_evidence": [
+        "connector.pinheader.1x01.2_54mm",
         "connector.pinheader.1x02.2_54mm",
         "connector.pinheader.1x03.2_54mm",
         "connector.pinheader.1x04.2_54mm",
@@ -113,6 +114,7 @@
         "connector.samtec.tsw_106_07_l_s.1x06"
       ],
       "record_ids": [
+        "connector.pinheader.1x01.2_54mm",
         "connector.pinheader.1x02.2_54mm",
         "connector.pinheader.1x03.2_54mm",
         "connector.pinheader.1x04.2_54mm",
@@ -348,11 +350,11 @@
     {
       "family": "regulator",
       "defined": true,
-      "record_count": 3,
-      "concrete_records": 3,
+      "record_count": 4,
+      "concrete_records": 4,
       "generic_fallback_records": 0,
       "equivalence_groups": 0,
-      "verified_records": 3,
+      "verified_records": 4,
       "library_derived_records": 0,
       "rule_inferred_records": 0,
       "placeholder_records": 0,
@@ -365,7 +367,8 @@
       "record_ids": [
         "regulator.linear.ams1117_3v3.sot223",
         "regulator.linear.ap2112k_3v3.sot23_5",
-        "regulator.linear.ap2127k_adj.sot23_5"
+        "regulator.linear.ap2127k_adj.sot23_5",
+        "regulator.ti.lm317t.to220"
       ]
     },
     {

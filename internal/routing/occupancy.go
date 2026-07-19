@@ -286,7 +286,7 @@ func padRect(component Component, pad Pad) Shape {
 	maxPoint := Point{XMM: math.Inf(-1), YMM: math.Inf(-1)}
 	polygon := make([]Point, 0, len(corners))
 	for _, corner := range corners {
-		rotatedX, rotatedY := kicadfiles.RotateBoardLocalXY(corner.XMM, corner.YMM, component.Position.RotationDeg)
+		rotatedX, rotatedY := kicadfiles.RotateBoardLocalXY(corner.XMM, corner.YMM, component.Position.RotationDeg+pad.RotationDeg)
 		x := center.XMM + rotatedX
 		y := center.YMM + rotatedY
 		polygon = append(polygon, Point{XMM: x, YMM: y})

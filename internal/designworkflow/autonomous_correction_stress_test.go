@@ -164,7 +164,7 @@ func TestAutonomousCorrectionStressOptionalKiCad(t *testing.T) {
 	if reports.HasBlockingIssue(schematicIssues) {
 		t.Fatalf("stress schematic transaction issues = %#v", schematicIssues)
 	}
-	tx, transactionIssues := explicitCircuitTransaction(request, schematicTx, stress.SelectedPlaced, stress.SelectedRouted, true, nil)
+	tx, transactionIssues := explicitCircuitTransaction(request, schematicTx, stress.SelectedPlaced, stress.SelectedRouted, true, nil, &index)
 	if reports.HasBlockingIssue(transactionIssues) {
 		t.Fatalf("stress project transaction issues = %#v", transactionIssues)
 	}
@@ -179,7 +179,7 @@ func TestAutonomousCorrectionStressOptionalKiCad(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = os.RemoveAll(outputDir) })
-	written := writeExplicitCircuitProject(ctx, request, tx, CreateOptions{OutputDir: outputDir, Overwrite: true, LibraryIndex: &index})
+	written := writeExplicitCircuitProject(ctx, request, tx, stress.SelectedPlaced, stress.SelectedRouted, CreateOptions{OutputDir: outputDir, Overwrite: true, LibraryIndex: &index})
 	if workflowStageBlocked(written.Stage) {
 		t.Fatalf("stress project write = %#v", written.Stage)
 	}

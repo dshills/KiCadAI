@@ -321,6 +321,15 @@ func verifiedPadTemplate(footprintID string) (verifiedPadTemplateRecord, bool) {
 			{Name: "2", XMM: 0, YMM: -2.1, WidthMM: 3.8, HeightMM: 2.4},
 		}
 		return verifiedPadTemplateRecord{Bounds: padEnvelopeBounds(pads, 6.7, 7.0), Pads: pads}, true
+	case "Package_TO_SOT_THT:TO-220-3_Vertical":
+		return verifiedPadTemplateRecord{
+			Bounds: verifiedCourtyardBoundsFromExtents(-2.71, -3.4, 7.79, 1.5),
+			Pads: []placement.PadSummary{
+				throughHolePad("1", 0, 0, 1.905, 2, 1.1, "rect"),
+				throughHolePad("2", 2.54, 0, 1.905, 2, 1.1, "oval"),
+				throughHolePad("3", 5.08, 0, 1.905, 2, 1.1, "oval"),
+			},
+		}, true
 	case "Package_SO:SOIC-8_3.9x4.9mm_P1.27mm":
 		pads := []placement.PadSummary{
 			smdPad("1", -2.475, -1.905, 1.95, 0.6, "roundrect"),
@@ -333,6 +342,18 @@ func verifiedPadTemplate(footprintID string) (verifiedPadTemplateRecord, bool) {
 			smdPad("8", 2.475, -1.905, 1.95, 0.6, "roundrect"),
 		}
 		return verifiedPadTemplateRecord{Bounds: verifiedCourtyardBounds(7.4, 5.4, 3.7, 2.7), Pads: pads}, true
+	case "Package_SO:VSSOP-8_2.3x2mm_P0.5mm":
+		pads := []placement.PadSummary{
+			smdPad("1", -1.4, -0.75, 1.25, 0.35, "roundrect"),
+			smdPad("2", -1.4, -0.25, 1.25, 0.35, "roundrect"),
+			smdPad("3", -1.4, 0.25, 1.25, 0.35, "roundrect"),
+			smdPad("4", -1.4, 0.75, 1.25, 0.35, "roundrect"),
+			smdPad("5", 1.4, 0.75, 1.25, 0.35, "roundrect"),
+			smdPad("6", 1.4, 0.25, 1.25, 0.35, "roundrect"),
+			smdPad("7", 1.4, -0.25, 1.25, 0.35, "roundrect"),
+			smdPad("8", 1.4, -0.75, 1.25, 0.35, "roundrect"),
+		}
+		return verifiedPadTemplateRecord{Bounds: verifiedCourtyardBoundsFromExtents(-2.28, -1.25, 2.28, 1.25), Pads: pads}, true
 	case "Package_QFP:TQFP-32_7x7mm_P0.8mm":
 		return tqfp32Template(), true
 	case "Package_LGA:Bosch_LGA-8_2x2.5mm_P0.65mm_ClockwisePinNumbering":

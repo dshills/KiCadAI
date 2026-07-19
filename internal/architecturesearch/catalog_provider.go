@@ -13,7 +13,10 @@ import (
 	"kicadai/internal/reports"
 )
 
-const catalogProviderRevision = "1.0.0"
+const (
+	catalogProviderRevision         = "1.0.0"
+	thresholdReferenceResistanceOhm = 10_000.0
+)
 
 var catalogProviderCapabilities = []string{
 	"environment_sensor",
@@ -104,7 +107,7 @@ func (provider *CatalogProvider) expandThreshold(ctx context.Context, request Pr
 	calculation, issues := SolveHysteresis(HysteresisRequest{
 		ID: "threshold_hysteresis", TargetCenterV: center, CenterTolerancePercent: centerTolerance,
 		TargetWidthV: width, WidthTolerancePercent: widthTolerance, OutputLowV: 0.1,
-		OutputHighV: supply, OutputUncertaintyV: 0.01, ReferenceResistanceOhm: 10000,
+		OutputHighV: supply, OutputUncertaintyV: 0.01, ReferenceResistanceOhm: thresholdReferenceResistanceOhm,
 		ReferenceTolerancePercent: 0.1, FeedbackTolerancePercent: 0.1,
 		ReferenceVoltageTolerancePercent: 0.1, MinimumReferenceVoltageV: 0,
 		MaximumReferenceVoltageV: supply, FeedbackSeries: SeriesE96,
@@ -112,13 +115,35 @@ func (provider *CatalogProvider) expandThreshold(ctx context.Context, request Pr
 	if len(issues) != 0 {
 		return nil, fmt.Errorf("threshold value solution failed: %s", issues[0].Message)
 	}
+	feedbackResistance, ok := calculationSelectedValue(calculation, "feedback_resistance")
+	if !ok {
+		return nil, fmt.Errorf("threshold solution omitted feedback resistance")
+	}
+	referenceVoltage, ok := calculationOutput(calculation, "reference_voltage")
+	if !ok || referenceVoltage <= 0 || referenceVoltage >= supply {
+		return nil, fmt.Errorf("threshold solution produced an invalid reference voltage")
+	}
+	referenceUpper := thresholdReferenceResistanceOhm * supply / referenceVoltage
+	referenceLower := thresholdReferenceResistanceOhm / (1 - referenceVoltage/supply)
 	parts := []catalogPart{selection}
-	parts, err = provider.appendPassiveParts(ctx, parts, []passivePart{{"reference_resistor", "resistor", "threshold_reference"}, {"feedback_resistor", "resistor", "positive_feedback"}, {"output_pullup", "resistor", "open_collector_pullup"}, {"supply_bypass", "capacitor", "decoupling"}})
+	parts, err = provider.appendPassiveParts(ctx, parts, []passivePart{
+		{"threshold_upper", "resistor", "threshold_reference", engineeringValue(referenceUpper, "Ohm")},
+		{"threshold_lower", "resistor", "threshold_reference", engineeringValue(referenceLower, "Ohm")},
+		{"feedback_resistor", "resistor", "positive_feedback", engineeringValue(feedbackResistance, "Ohm")},
+		{"output_pullup", "resistor", "open_collector_pullup", "4.7k"},
+		{"supply_bypass", "capacitor", "decoupling", "100n"},
+	})
 	if err != nil {
 		return nil, err
 	}
-	bindings := bindRoles(request.Ports, selection.selected.InstanceID, map[string]string{"sense": "IN_PLUS", "output": "OUT", "power": "V_PLUS", "reference": "V_MINUS"})
-	return provider.expansion(request, "open_collector_hysteresis", parts, bindings, []CalculationEvidence{calculation}, 1)
+	bindings := bindRoles(request.Ports, selection.selected.InstanceID, map[string]string{"sense": "IN_MINUS", "output": "OUT", "power": "V_PLUS", "reference": "V_MINUS"})
+	connections := []RealizationConnection{
+		semanticNet("threshold_reference", "analog_signal", endpoint(selection, "IN_PLUS"), passiveEndpoint("threshold_upper", "B"), passiveEndpoint("threshold_lower", "A"), passiveEndpoint("feedback_resistor", "B")),
+		semanticNet("threshold_output", "open_collector_signal", endpoint(selection, "OUT"), passiveEndpoint("output_pullup", "B"), passiveEndpoint("feedback_resistor", "A")),
+		semanticNet("threshold_power", "power", endpoint(selection, "V_PLUS"), passiveEndpoint("threshold_upper", "A"), passiveEndpoint("output_pullup", "A"), passiveEndpoint("supply_bypass", "A")),
+		semanticNet("threshold_ground", "reference", endpoint(selection, "V_MINUS"), passiveEndpoint("threshold_lower", "B"), passiveEndpoint("supply_bypass", "B")),
+	}
+	return provider.expansion(request, "open_collector_hysteresis", parts, bindings, connections, []CalculationEvidence{calculation}, 0)
 }
 
 func (provider *CatalogProvider) expandLoadSwitch(ctx context.Context, request ProviderRequest) ([]ProviderExpansion, error) {
@@ -185,20 +210,30 @@ func (provider *CatalogProvider) expandLoadSwitch(ctx context.Context, request P
 		return nil, fmt.Errorf("switch rating solution failed: %s", issues[0].Message)
 	}
 	parts := []catalogPart{selection, flyback, controlClamp}
-	parts, err = provider.appendPassiveParts(ctx, parts, []passivePart{{"gate_pulldown", "resistor", "default_off"}, {"gate_series", "resistor", "gate_drive"}, {"supply_bypass", "capacitor", "decoupling"}})
+	parts, err = provider.appendPassiveParts(ctx, parts, []passivePart{{"gate_pulldown", "resistor", "default_off", "100k"}, {"gate_series", "resistor", "gate_drive", "100"}, {"supply_bypass", "capacitor", "decoupling", "100n"}})
 	if err != nil {
 		return nil, err
 	}
 	bindings := bindRoles(request.Ports, selection.selected.InstanceID, map[string]string{"control": "GATE", "load": "DRAIN", "reference": "SOURCE"})
 	for index := range bindings {
 		switch bindings[index].Role {
+		case "control":
+			bindings[index].Instance, bindings[index].Function = "gate_series", "A"
 		case "load_power":
 			bindings[index].Instance, bindings[index].Function = flyback.selected.InstanceID, "K"
 		case "logic_power":
 			bindings[index].Instance, bindings[index].Function = "supply_bypass", "A"
 		}
 	}
-	return provider.expansion(request, "protected_low_side_switch", parts, bindings, []CalculationEvidence{calculation}, 1)
+	connections := []RealizationConnection{
+		semanticNet("switch_gate", "control", endpoint(selection, "GATE"), passiveEndpoint("gate_series", "B"), passiveEndpoint("gate_pulldown", "A"), endpoint(controlClamp, "K")),
+		semanticNet("switch_load", "switched_power", endpoint(selection, "DRAIN"), endpoint(flyback, "A")),
+		semanticNet("switch_load_power", "power", endpoint(flyback, "K")),
+		semanticNet("switch_logic_power", "power", passiveEndpoint("supply_bypass", "A")),
+		semanticNet("switch_ground", "reference", endpoint(selection, "SOURCE"), endpoint(controlClamp, "A"), passiveEndpoint("gate_pulldown", "B"), passiveEndpoint("supply_bypass", "B")),
+	}
+	connections = retainSemanticNets(connections)
+	return provider.expansion(request, "protected_low_side_switch", parts, bindings, connections, []CalculationEvidence{calculation}, 0)
 }
 
 func (provider *CatalogProvider) expandRegulator(ctx context.Context, request ProviderRequest) ([]ProviderExpansion, error) {
@@ -249,13 +284,38 @@ func (provider *CatalogProvider) expandRegulator(ctx context.Context, request Pr
 	if len(issues) != 0 {
 		return nil, fmt.Errorf("regulator feedback solution failed: %s", issues[0].Message)
 	}
+	feedbackUpper, ok := calculationSelectedValue(calculation, "upper_resistance")
+	if !ok {
+		return nil, fmt.Errorf("regulator solution omitted upper feedback resistance")
+	}
 	parts := []catalogPart{selection}
-	parts, err = provider.appendPassiveParts(ctx, parts, []passivePart{{"feedback_lower", "resistor", "feedback_divider"}, {"feedback_upper", "resistor", "feedback_divider"}, {"input_bypass", "capacitor", "decoupling"}, {"output_bypass", "capacitor", "decoupling"}})
+	parts, err = provider.appendPassiveParts(ctx, parts, []passivePart{{"feedback_lower", "resistor", "feedback_divider", "10k"}, {"feedback_upper", "resistor", "feedback_divider", engineeringValue(feedbackUpper, "Ohm")}, {"input_bypass", "capacitor", "decoupling", "1u"}, {"output_bypass", "capacitor", "decoupling", "1u"}})
 	if err != nil {
 		return nil, err
 	}
 	bindings := bindRoles(request.Ports, selection.selected.InstanceID, map[string]string{"input": "VIN", "output": "VOUT", "reference": "GND"})
-	return provider.expansion(request, "adjustable_linear_regulator", parts, bindings, []CalculationEvidence{calculation}, 1)
+	if !recordHasFunction(selection.record, "GND") {
+		for index := range bindings {
+			if bindings[index].Role == "reference" {
+				bindings[index].Instance, bindings[index].Function = "feedback_lower", "B"
+			}
+		}
+	}
+	inputEndpoints := []RealizationEndpoint{endpoint(selection, "VIN"), passiveEndpoint("input_bypass", "A")}
+	if recordHasFunction(selection.record, "EN") {
+		inputEndpoints = append(inputEndpoints, endpoint(selection, "EN"))
+	}
+	groundEndpoints := []RealizationEndpoint{passiveEndpoint("feedback_lower", "B"), passiveEndpoint("input_bypass", "B"), passiveEndpoint("output_bypass", "B")}
+	if recordHasFunction(selection.record, "GND") {
+		groundEndpoints = append(groundEndpoints, endpoint(selection, "GND"))
+	}
+	connections := []RealizationConnection{
+		semanticNet("regulator_input", "power", inputEndpoints...),
+		semanticNet("regulator_output", "power", endpoint(selection, "VOUT"), passiveEndpoint("feedback_upper", "A"), passiveEndpoint("output_bypass", "A")),
+		semanticNet("regulator_feedback", "analog_signal", endpoint(selection, "ADJ"), passiveEndpoint("feedback_upper", "B"), passiveEndpoint("feedback_lower", "A")),
+		semanticNet("regulator_ground", "reference", groundEndpoints...),
+	}
+	return provider.expansion(request, "adjustable_linear_regulator", parts, bindings, connections, []CalculationEvidence{calculation}, 0)
 }
 
 func (provider *CatalogProvider) expandFilter(ctx context.Context, request ProviderRequest) ([]ProviderExpansion, error) {
@@ -290,17 +350,27 @@ func (provider *CatalogProvider) expandFilter(ctx context.Context, request Provi
 	if err != nil {
 		return nil, err
 	}
-	first, issues := SolveRCPole(RCPoleRequest{ID: "filter_stage_1_pole", TargetFrequencyHz: frequency, TargetTolerancePercent: tolerance, FixedResistanceOhm: 10000, FixedTolerancePercent: 0.1, SelectedTolerancePercent: 1, SelectedSeries: SeriesE96})
+	firstQ, firstQOK := ButterworthStageQ(4, 0)
+	secondQ, secondQOK := ButterworthStageQ(4, 1)
+	if !firstQOK || !secondQOK {
+		return nil, fmt.Errorf("fourth-order Butterworth stage factors are unavailable")
+	}
+	first, issues := SolveSallenKeyLowPass(SallenKeyLowPassRequest{ID: "filter_stage_1", TargetFrequencyHz: frequency, FrequencyTolerancePercent: tolerance, TargetQ: firstQ, QTolerancePercent: 5, ResistanceOhm: 10000, ResistanceTolerancePercent: 0.1, CapacitanceTolerancePercent: 1, CapacitanceSeries: SeriesE96})
 	if len(issues) != 0 {
 		return nil, fmt.Errorf("first filter stage failed: %s", issues[0].Message)
 	}
-	second := first
-	second.ID = "filter_stage_2_pole"
-	second, err = FinalizeCalculation(second)
-	if err != nil {
-		return nil, fmt.Errorf("finalize second filter stage: %w", err)
+	second, issues := SolveSallenKeyLowPass(SallenKeyLowPassRequest{ID: "filter_stage_2", TargetFrequencyHz: frequency, FrequencyTolerancePercent: tolerance, TargetQ: secondQ, QTolerancePercent: 5, ResistanceOhm: 10000, ResistanceTolerancePercent: 0.1, CapacitanceTolerancePercent: 1, CapacitanceSeries: SeriesE96})
+	if len(issues) != 0 {
+		return nil, fmt.Errorf("second filter stage failed: %s", issues[0].Message)
 	}
-	passives := []passivePart{{"stage_1_r1", "resistor", "filter"}, {"stage_1_r2", "resistor", "filter"}, {"stage_1_c1", "capacitor", "filter"}, {"stage_1_c2", "capacitor", "filter"}, {"stage_2_r1", "resistor", "filter"}, {"stage_2_r2", "resistor", "filter"}, {"stage_2_c1", "capacitor", "filter"}, {"stage_2_c2", "capacitor", "filter"}, {"supply_bypass", "capacitor", "decoupling"}}
+	firstC1, firstC1OK := calculationSelectedValue(first, "capacitance_1")
+	firstC2, firstC2OK := calculationSelectedValue(first, "capacitance_2")
+	secondC1, secondC1OK := calculationSelectedValue(second, "capacitance_1")
+	secondC2, secondC2OK := calculationSelectedValue(second, "capacitance_2")
+	if !firstC1OK || !firstC2OK || !secondC1OK || !secondC2OK {
+		return nil, fmt.Errorf("filter solution omitted a stage capacitance")
+	}
+	passives := []passivePart{{"stage_1_r1", "resistor", "filter", "10k"}, {"stage_1_r2", "resistor", "filter", "10k"}, {"stage_1_c1", "capacitor", "filter", engineeringValue(firstC1, "F")}, {"stage_1_c2", "capacitor", "filter", engineeringValue(firstC2, "F")}, {"stage_2_r1", "resistor", "filter", "10k"}, {"stage_2_r2", "resistor", "filter", "10k"}, {"stage_2_c1", "capacitor", "filter", engineeringValue(secondC1, "F")}, {"stage_2_c2", "capacitor", "filter", engineeringValue(secondC2, "F")}, {"supply_bypass", "capacitor", "decoupling", "100n"}}
 	dualParts, err := provider.appendPassiveParts(ctx, []catalogPart{dualOpamp}, passives)
 	if err != nil {
 		return nil, err
@@ -312,12 +382,26 @@ func (provider *CatalogProvider) expandFilter(ctx context.Context, request Provi
 		return nil, err
 	}
 	dualBindings := bindRoles(request.Ports, dualOpamp.selected.InstanceID, map[string]string{"input": "CHANNEL_1_IN_PLUS", "output": "CHANNEL_2_OUT", "power": "V_PLUS", "reference": "V_MINUS"})
+	for index := range dualBindings {
+		if dualBindings[index].Role == "input" {
+			dualBindings[index].Instance, dualBindings[index].Function = "stage_1_r1", "A"
+		}
+	}
 	singleBindings := bindRoles(request.Ports, singleOpamp.selected.InstanceID, map[string]string{"input": "IN_PLUS", "output": "OUT", "power": "V_PLUS", "reference": "V_MINUS"})
-	dualExpansion, err := provider.expansion(request, "dual_opamp_sallen_key_cascade", dualParts, dualBindings, []CalculationEvidence{first, second}, 2)
+	for index := range singleBindings {
+		if singleBindings[index].Role == "input" {
+			singleBindings[index].Instance, singleBindings[index].Function = "stage_1_r1", "A"
+		} else if singleBindings[index].Role == "output" {
+			singleBindings[index].Instance, singleBindings[index].Function = "amplifier_2", "OUT"
+		}
+	}
+	dualConnections := sallenKeyConnections(dualOpamp.selected.InstanceID, dualOpamp.selected.InstanceID, "CHANNEL_1", "CHANNEL_2")
+	singleConnections := sallenKeyConnections(singleOpamp.selected.InstanceID, "amplifier_2", "", "")
+	dualExpansion, err := provider.expansion(request, "dual_opamp_sallen_key_cascade", dualParts, dualBindings, dualConnections, []CalculationEvidence{first, second}, 0)
 	if err != nil {
 		return nil, err
 	}
-	singleExpansion, err := provider.expansion(request, "two_single_opamp_sallen_key_cascade", singleParts, singleBindings, []CalculationEvidence{first, second}, 2)
+	singleExpansion, err := provider.expansion(request, "two_single_opamp_sallen_key_cascade", singleParts, singleBindings, singleConnections, []CalculationEvidence{first, second}, 0)
 	if err != nil {
 		return nil, err
 	}
@@ -349,19 +433,34 @@ func (provider *CatalogProvider) expandTranslator(ctx context.Context, request P
 		return nil, err
 	}
 	parts := []catalogPart{selection}
-	parts, err = provider.appendPassiveParts(ctx, parts, []passivePart{{"side_a_pullup", "resistor", "bus_pullup"}, {"side_b_pullup", "resistor", "bus_pullup"}, {"output_enable_pulldown", "resistor", "power_up_default"}, {"vcca_bypass", "capacitor", "decoupling"}, {"vccb_bypass", "capacitor", "decoupling"}})
+	parts, err = provider.appendPassiveParts(ctx, parts, []passivePart{{"side_a_sda_pullup", "resistor", "bus_pullup", "4.7k"}, {"side_a_scl_pullup", "resistor", "bus_pullup", "4.7k"}, {"side_b_sda_pullup", "resistor", "bus_pullup", "4.7k"}, {"side_b_scl_pullup", "resistor", "bus_pullup", "4.7k"}, {"vcca_bypass", "capacitor", "decoupling", "100n"}, {"vccb_bypass", "capacitor", "decoupling", "100n"}})
 	if err != nil {
 		return nil, err
 	}
-	functions := map[string]string{"side_a": "SDA1", "side_b": "SDA2", "reference": "GND"}
+	functions := map[string]string{"side_a_sda": "A1", "side_a_scl": "A2", "side_b_sda": "B1", "side_b_scl": "B2", "reference": "GND"}
 	if voltageA <= voltageB {
 		functions["power_a"], functions["power_b"] = "VCCA", "VCCB"
 	} else {
 		functions["power_a"], functions["power_b"] = "VCCB", "VCCA"
-		functions["side_a"], functions["side_b"] = "SDA2", "SDA1"
+		functions["side_a_sda"], functions["side_a_scl"] = "B1", "B2"
+		functions["side_b_sda"], functions["side_b_scl"] = "A1", "A2"
 	}
-	bindings := bindRoles(request.Ports, selection.selected.InstanceID, functions)
-	return provider.expansion(request, "bidirectional_open_drain_translator", parts, bindings, nil, 1)
+	bindings := bindBusRoles(request.Ports, selection.selected.InstanceID, functions)
+	connections := []RealizationConnection{
+		semanticNet("translator_side_a_sda", "open_drain_bus", endpoint(selection, functions["side_a_sda"]), passiveEndpoint("side_a_sda_pullup", "B")),
+		semanticNet("translator_side_a_scl", "open_drain_bus", endpoint(selection, functions["side_a_scl"]), passiveEndpoint("side_a_scl_pullup", "B")),
+		semanticNet("translator_side_b_sda", "open_drain_bus", endpoint(selection, functions["side_b_sda"]), passiveEndpoint("side_b_sda_pullup", "B")),
+		semanticNet("translator_side_b_scl", "open_drain_bus", endpoint(selection, functions["side_b_scl"]), passiveEndpoint("side_b_scl_pullup", "B")),
+		semanticNet("translator_power_a", "power", endpoint(selection, functions["power_a"]), passiveEndpoint("side_a_sda_pullup", "A"), passiveEndpoint("side_a_scl_pullup", "A"), bypassPowerEndpoint(voltageA <= voltageB, "A")),
+		semanticNet("translator_power_b", "power", endpoint(selection, functions["power_b"]), passiveEndpoint("side_b_sda_pullup", "A"), passiveEndpoint("side_b_scl_pullup", "A"), bypassPowerEndpoint(voltageA > voltageB, "A")),
+		semanticNet("translator_ground", "reference", endpoint(selection, "GND"), passiveEndpoint("vcca_bypass", "B"), passiveEndpoint("vccb_bypass", "B")),
+	}
+	for index := range connections {
+		if connections[index].ID == "translator_power_a" && functions["power_a"] == "VCCA" || connections[index].ID == "translator_power_b" && functions["power_b"] == "VCCA" {
+			connections[index].Endpoints = append(connections[index].Endpoints, endpoint(selection, "OE"))
+		}
+	}
+	return provider.expansion(request, "bidirectional_open_drain_translator", parts, bindings, connections, nil, 0)
 }
 
 func (provider *CatalogProvider) expandSingleComponent(ctx context.Context, request ProviderRequest, family, usage, busRole, busFunction string) ([]ProviderExpansion, error) {
@@ -379,23 +478,156 @@ func (provider *CatalogProvider) expandSingleComponent(ctx context.Context, requ
 		searchText = measurements[0]
 	}
 	supply := maximumPortVoltage(request.Ports)
-	selection, err := provider.selectComponent(ctx, family, searchText, []components.RequiredRating{{Kind: "supply_voltage", Value: numericString(supply), Unit: "V"}}, true)
+	ratings := []components.RequiredRating{{Kind: "supply_voltage", Value: numericString(supply), Unit: "V"}}
+	selection, err := provider.selectComponent(ctx, family, searchText, ratings, true)
+	if family == "mcu" {
+		selection, err = provider.selectSmallestComponent(ctx, family, ratings)
+	}
 	if err != nil {
 		return nil, err
 	}
-	functions := map[string]string{busRole: busFunction}
-	bindings := bindRoles(request.Ports, selection.selected.InstanceID, functions)
-	return provider.expansion(request, usage, []catalogPart{selection}, bindings, nil, 1)
+	powerFunction := firstRecordFunction(selection.record, "VDD", "VCC")
+	functions := map[string]string{"power": powerFunction, "reference": "GND", busRole + "_sda": busFunction}
+	if family == "mcu" {
+		functions[busRole+"_scl"] = "I2C_SCL"
+	} else {
+		functions[busRole+"_scl"] = "SCL"
+	}
+	bindings := bindBusRoles(request.Ports, selection.selected.InstanceID, functions)
+	var connections []RealizationConnection
+	parts := []catalogPart{selection}
+	if family == "mcu" {
+		powerEndpoints := recordSemanticEndpoints(selection, powerFunction, "AVCC", "VDDIO", "VDDA")
+		groundEndpoints := recordSemanticEndpoints(selection, "GND", "AGND", "DGND", "PGND", "VSS")
+		if len(powerEndpoints) > 1 {
+			connections = append(connections, semanticNet("controller_power", "power", powerEndpoints...))
+		}
+		if len(groundEndpoints) > 1 {
+			connections = append(connections, semanticNet("controller_ground", "reference", groundEndpoints...))
+		}
+	} else if family == "sensor" {
+		connections = append(connections, semanticNet("sensor_power", "power", endpoint(selection, "VDD"), endpoint(selection, "VDDIO"), endpoint(selection, "CSB")))
+		if recordHasFunction(selection.record, "SDO") {
+			parts, err = provider.appendPassiveParts(ctx, parts, []passivePart{{"address_strap", "resistor", "configuration_strap", "10k"}})
+			if err != nil {
+				return nil, err
+			}
+			connections = append(connections,
+				semanticNet("sensor_ground", "reference", endpoint(selection, "GND"), passiveEndpoint("address_strap", "B")),
+				semanticNet("sensor_address", "bias", endpoint(selection, "SDO"), passiveEndpoint("address_strap", "A")),
+			)
+		} else {
+			connections = append(connections, semanticNet("sensor_ground", "reference", endpoint(selection, "GND")))
+		}
+	}
+	return provider.expansion(request, usage, parts, bindings, connections, nil, 0)
+}
+
+func recordSemanticEndpoints(part catalogPart, functions ...string) []RealizationEndpoint {
+	endpoints := make([]RealizationEndpoint, 0, len(functions))
+	seen := map[string]bool{}
+	for _, function := range functions {
+		function = strings.ToUpper(strings.TrimSpace(function))
+		if function == "" || seen[function] || !recordHasFunction(part.record, function) {
+			continue
+		}
+		seen[function] = true
+		endpoints = append(endpoints, endpoint(part, function))
+	}
+	return endpoints
+}
+
+func (provider *CatalogProvider) selectSmallestComponent(_ context.Context, family string, ratings []components.RequiredRating) (catalogPart, error) {
+	type candidate struct {
+		part      catalogPart
+		area      float64
+		variantID string
+	}
+	var candidates []candidate
+	for _, record := range provider.catalog.Records {
+		if record.Family != family || record.Generic || record.MPN == "" || !recordSupportsRatings(record, ratings) {
+			continue
+		}
+		for _, variant := range record.Packages {
+			if variant.DimensionsMM == nil || confidenceRank(EvidenceConfidence(variant.Verification.Confidence)) < confidenceRank(EvidenceRuleInferred) {
+				continue
+			}
+			area := variant.DimensionsMM.Width * variant.DimensionsMM.Height
+			evidence := componentEvidence(record, variant.Verification.Confidence)
+			candidates = append(candidates, candidate{part: catalogPart{
+				selected: SelectedComponent{InstanceID: canonicalIdentifier(family), CatalogID: record.ID, VariantID: variant.ID, Evidence: evidence.Confidence},
+				record:   record, usage: canonicalIdentifier(family), evidence: evidence,
+			}, area: area, variantID: variant.ID})
+		}
+	}
+	if len(candidates) == 0 {
+		return catalogPart{}, fmt.Errorf("no dimensioned catalog-backed %s satisfies normalized ratings", family)
+	}
+	slices.SortStableFunc(candidates, func(left, right candidate) int {
+		if left.area < right.area {
+			return -1
+		}
+		if left.area > right.area {
+			return 1
+		}
+		if order := strings.Compare(left.part.record.ID, right.part.record.ID); order != 0 {
+			return order
+		}
+		return strings.Compare(left.variantID, right.variantID)
+	})
+	return candidates[0].part, nil
+}
+
+func recordSupportsRatings(record components.ComponentRecord, required []components.RequiredRating) bool {
+	for _, want := range required {
+		value, err := strconv.ParseFloat(want.Value, 64)
+		if err != nil {
+			return false
+		}
+		satisfied := false
+		for _, rating := range record.Ratings {
+			if !strings.EqualFold(rating.Kind, want.Kind) {
+				continue
+			}
+			if rating.Min != "" {
+				minimum, err := strconv.ParseFloat(rating.Min, 64)
+				if err != nil {
+					return false
+				}
+				converted, ok := convertCatalogUnit(value, want.Unit, rating.Unit)
+				if !ok || quantize(converted) < quantize(minimum) {
+					continue
+				}
+			}
+			if rating.Max != "" {
+				maximum, err := strconv.ParseFloat(rating.Max, 64)
+				if err != nil {
+					return false
+				}
+				converted, ok := convertCatalogUnit(value, want.Unit, rating.Unit)
+				if !ok || quantize(converted) > quantize(maximum) {
+					continue
+				}
+			}
+			satisfied = true
+			break
+		}
+		if !satisfied {
+			return false
+		}
+	}
+	return true
 }
 
 type catalogPart struct {
 	selected SelectedComponent
 	record   components.ComponentRecord
 	usage    string
+	value    string
 	evidence ContractEvidence
 }
 
-type passivePart struct{ id, family, usage string }
+type passivePart struct{ id, family, usage, value string }
 
 func (provider *CatalogProvider) selectComponent(ctx context.Context, family, text string, ratings []components.RequiredRating, concrete bool) (catalogPart, error) {
 	selection, result := components.Select(ctx, provider.catalog, components.SelectionRequest{
@@ -421,20 +653,21 @@ func (provider *CatalogProvider) appendPassiveParts(ctx context.Context, parts [
 		}
 		part.selected.InstanceID = passive.id
 		part.usage = passive.usage
+		part.value = passive.value
 		parts = append(parts, part)
 	}
 	return parts, nil
 }
 
-func (provider *CatalogProvider) expansion(request ProviderRequest, id string, parts []catalogPart, bindings []RealizationPortBinding, calculations []CalculationEvidence, unproven int) ([]ProviderExpansion, error) {
+func (provider *CatalogProvider) expansion(request ProviderRequest, id string, parts []catalogPart, bindings []RealizationPortBinding, connections []RealizationConnection, calculations []CalculationEvidence, unproven int) ([]ProviderExpansion, error) {
 	instances := make([]RealizationInstance, 0, len(parts))
 	componentsSelected := make([]SelectedComponent, 0, len(parts))
 	for _, part := range parts {
 		componentsSelected = append(componentsSelected, part.selected)
-		instances = append(instances, RealizationInstance{ID: part.selected.InstanceID, CatalogID: part.selected.CatalogID, VariantID: part.selected.VariantID, Usage: part.usage})
+		instances = append(instances, RealizationInstance{ID: part.selected.InstanceID, CatalogID: part.selected.CatalogID, VariantID: part.selected.VariantID, Usage: part.usage, Value: part.value})
 	}
 	parameters := calculationParameters(calculations)
-	payload, err := MarshalFragmentRealization(FragmentRealization{Capability: request.Capability, Instances: instances, PortBindings: bindings, Parameters: parameters})
+	payload, err := MarshalFragmentRealization(FragmentRealization{Capability: request.Capability, Instances: instances, PortBindings: bindings, Connections: connections, Parameters: parameters})
 	if err != nil {
 		return nil, err
 	}
@@ -479,6 +712,135 @@ func bindRoles(ports []RoleContract, instance string, functions map[string]strin
 		bindings = append(bindings, RealizationPortBinding{Role: port.Role, Instance: instance, Function: function})
 	}
 	return bindings
+}
+
+func bindBusRoles(ports []RoleContract, instance string, functions map[string]string) []RealizationPortBinding {
+	bindings := make([]RealizationPortBinding, 0, len(ports)+2)
+	for _, port := range ports {
+		sda, scl := functions[port.Role+"_sda"], functions[port.Role+"_scl"]
+		if sda != "" || scl != "" {
+			if sda != "" {
+				bindings = append(bindings, RealizationPortBinding{Role: port.Role, Lane: "sda", Instance: instance, Function: sda})
+			}
+			if scl != "" {
+				bindings = append(bindings, RealizationPortBinding{Role: port.Role, Lane: "scl", Instance: instance, Function: scl})
+			}
+			continue
+		}
+		function := functions[port.Role]
+		if function == "" {
+			function = strings.ToUpper(port.Role)
+		}
+		bindings = append(bindings, RealizationPortBinding{Role: port.Role, Instance: instance, Function: function})
+	}
+	return bindings
+}
+
+func endpoint(part catalogPart, function string) RealizationEndpoint {
+	return RealizationEndpoint{Instance: part.selected.InstanceID, Function: function}
+}
+
+func passiveEndpoint(instance, function string) RealizationEndpoint {
+	return RealizationEndpoint{Instance: instance, Function: function}
+}
+
+func semanticNet(id, role string, endpoints ...RealizationEndpoint) RealizationConnection {
+	return RealizationConnection{ID: id, Role: role, Endpoints: endpoints}
+}
+
+func retainSemanticNets(connections []RealizationConnection) []RealizationConnection {
+	result := make([]RealizationConnection, 0, len(connections))
+	for _, connection := range connections {
+		if len(connection.Endpoints) >= 2 {
+			result = append(result, connection)
+		}
+	}
+	return result
+}
+
+func bypassPowerEndpoint(vcca bool, function string) RealizationEndpoint {
+	if vcca {
+		return passiveEndpoint("vcca_bypass", function)
+	}
+	return passiveEndpoint("vccb_bypass", function)
+}
+
+func sallenKeyConnections(firstAmplifier, secondAmplifier, firstChannel, secondChannel string) []RealizationConnection {
+	ampFunction := func(channel, function string) string {
+		if channel == "" {
+			return function
+		}
+		return channel + "_" + function
+	}
+	connections := []RealizationConnection{
+		semanticNet("filter_stage_1_node_1", "analog_signal", passiveEndpoint("stage_1_r1", "B"), passiveEndpoint("stage_1_r2", "A"), passiveEndpoint("stage_1_c1", "A")),
+		semanticNet("filter_stage_1_node_2", "analog_signal", passiveEndpoint("stage_1_r2", "B"), passiveEndpoint("stage_1_c2", "A"), passiveEndpoint(firstAmplifier, ampFunction(firstChannel, "IN_PLUS"))),
+		semanticNet("filter_stage_1_output", "analog_signal", passiveEndpoint(firstAmplifier, ampFunction(firstChannel, "OUT")), passiveEndpoint(firstAmplifier, ampFunction(firstChannel, "IN_MINUS")), passiveEndpoint("stage_1_c1", "B"), passiveEndpoint("stage_2_r1", "A")),
+		semanticNet("filter_stage_2_node_1", "analog_signal", passiveEndpoint("stage_2_r1", "B"), passiveEndpoint("stage_2_r2", "A"), passiveEndpoint("stage_2_c1", "A")),
+		semanticNet("filter_stage_2_node_2", "analog_signal", passiveEndpoint("stage_2_r2", "B"), passiveEndpoint("stage_2_c2", "A"), passiveEndpoint(secondAmplifier, ampFunction(secondChannel, "IN_PLUS"))),
+		semanticNet("filter_stage_2_output", "analog_signal", passiveEndpoint(secondAmplifier, ampFunction(secondChannel, "OUT")), passiveEndpoint(secondAmplifier, ampFunction(secondChannel, "IN_MINUS")), passiveEndpoint("stage_2_c1", "B")),
+		semanticNet("filter_power", "power", passiveEndpoint(firstAmplifier, "V_PLUS"), passiveEndpoint("supply_bypass", "A")),
+		semanticNet("filter_ground", "reference", passiveEndpoint(firstAmplifier, "V_MINUS"), passiveEndpoint("stage_1_c2", "B"), passiveEndpoint("stage_2_c2", "B"), passiveEndpoint("supply_bypass", "B")),
+	}
+	if secondAmplifier != firstAmplifier {
+		for index := range connections {
+			switch connections[index].ID {
+			case "filter_power":
+				connections[index].Endpoints = append(connections[index].Endpoints, passiveEndpoint(secondAmplifier, "V_PLUS"))
+			case "filter_ground":
+				connections[index].Endpoints = append(connections[index].Endpoints, passiveEndpoint(secondAmplifier, "V_MINUS"))
+			}
+		}
+	}
+	return connections
+}
+
+func calculationSelectedValue(calculation CalculationEvidence, name string) (float64, bool) {
+	for _, selected := range calculation.SelectedValues {
+		if selected.Name == name {
+			return selected.Selected, true
+		}
+	}
+	return 0, false
+}
+
+func calculationOutput(calculation CalculationEvidence, name string) (float64, bool) {
+	for _, output := range calculation.NominalOutputs {
+		if output.Name == name {
+			return output.Value, true
+		}
+	}
+	return 0, false
+}
+
+func engineeringValue(value float64, unit string) string {
+	if unit == "Ohm" {
+		switch {
+		case value >= 1e6:
+			return compactNumber(value/1e6) + "M"
+		case value >= 1e3:
+			return compactNumber(value/1e3) + "k"
+		default:
+			return compactNumber(value)
+		}
+	}
+	if unit == "F" {
+		switch {
+		case value >= 1e-3:
+			return compactNumber(value*1e3) + "m"
+		case value >= 1e-6:
+			return compactNumber(value*1e6) + "u"
+		case value >= 1e-9:
+			return compactNumber(value*1e9) + "n"
+		default:
+			return compactNumber(value*1e12) + "p"
+		}
+	}
+	return compactNumber(value)
+}
+
+func compactNumber(value float64) string {
+	return strconv.FormatFloat(quantize(value), 'f', -1, 64)
 }
 
 func calculationParameters(calculations []CalculationEvidence) []RealizationParameter {
@@ -633,6 +995,31 @@ func recordValue(record components.ComponentRecord, kind, unit string) (float64,
 		return convertCatalogUnit(parsed, value.Unit, unit)
 	}
 	return 0, false
+}
+
+func recordHasFunction(record components.ComponentRecord, function string) bool {
+	for _, symbol := range record.Symbols {
+		for _, pin := range symbol.FunctionPins {
+			if strings.EqualFold(pin.Function, function) {
+				return true
+			}
+			for _, alias := range pin.Aliases {
+				if strings.EqualFold(alias, function) {
+					return true
+				}
+			}
+		}
+	}
+	return false
+}
+
+func firstRecordFunction(record components.ComponentRecord, candidates ...string) string {
+	for _, candidate := range candidates {
+		if recordHasFunction(record, candidate) {
+			return candidate
+		}
+	}
+	return ""
 }
 
 func convertCatalogUnit(value float64, from, to string) (float64, bool) {

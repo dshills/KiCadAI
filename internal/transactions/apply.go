@@ -35,6 +35,8 @@ type ApplyOptions struct {
 	SuppressPinmapWarnings          bool
 	SuppressExplicitPinSymbolErrors bool
 	PreserveFootprintGeometry       bool
+	DefaultNetClassClearance        kicadfiles.IU
+	MinimumThroughHoleDiameter      kicadfiles.IU
 	LibraryIndex                    *libraryresolver.LibraryIndex
 	LibraryIssues                   []reports.Issue
 }
@@ -558,13 +560,15 @@ func builderFromTransaction(tx Transaction, opts ApplyOptions) (*designapi.Build
 			paper = kicadfiles.Paper{Name: sheet.Name, Width: sheet.Width, Height: sheet.Height}
 		}
 		return designapi.New(designapi.Options{
-			Name:          payload.Name,
-			Seed:          firstNonEmpty(opts.Seed, payload.Name),
-			DesignID:      deterministicDesignUUID(payload.Name, opts.Seed),
-			Paper:         paper,
-			CopperLayers:  opts.CopperLayers,
-			LibraryIndex:  opts.LibraryIndex,
-			TextVariables: payload.TextVariables,
+			Name:                       payload.Name,
+			Seed:                       firstNonEmpty(opts.Seed, payload.Name),
+			DesignID:                   deterministicDesignUUID(payload.Name, opts.Seed),
+			Paper:                      paper,
+			CopperLayers:               opts.CopperLayers,
+			DefaultNetClassClearance:   opts.DefaultNetClassClearance,
+			MinimumThroughHoleDiameter: opts.MinimumThroughHoleDiameter,
+			LibraryIndex:               opts.LibraryIndex,
+			TextVariables:              payload.TextVariables,
 		})
 	}
 	return nil, fmt.Errorf("create_project operation is required")

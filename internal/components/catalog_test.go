@@ -322,7 +322,7 @@ func TestCheckedInCatalogSpeakerAmplifierComponentEvidence(t *testing.T) {
 	if comparator.Generic || comparator.Lifecycle != "active" || comparator.Verification.Confidence != ConfidenceVerified {
 		t.Fatalf("speaker protection comparator evidence = %#v", comparator)
 	}
-	requireSymbolFunctions(t, comparator, "Comparator:TLV1701", []string{"IN_PLUS", "IN_MINUS", "OUT", "V_PLUS", "V_MINUS"})
+	requireSymbolFunctions(t, comparator, "Comparator:LMV331", []string{"IN_PLUS", "IN_MINUS", "OUT", "V_PLUS", "V_MINUS"})
 	requirePackagePads(t, comparator, "sot23_5", []string{"IN_PLUS", "IN_MINUS", "OUT", "V_PLUS", "V_MINUS"})
 
 	relay := requireCatalogRecord(t, catalog, "relay.omron.g5q_1a.dc12")

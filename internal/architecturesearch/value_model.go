@@ -15,6 +15,7 @@ const (
 	FormulaDividerAttenuator = "divider_attenuator"
 	FormulaFeedbackDivider   = "feedback_divider"
 	FormulaRCPole            = "rc_pole"
+	FormulaSallenKeyLowPass  = "sallen_key_low_pass"
 	FormulaHysteresis        = "comparator_hysteresis"
 	FormulaGateDrive         = "gate_drive"
 	FormulaRatingMargin      = "rating_margin"
@@ -112,6 +113,7 @@ func FormulaLibraryHash() string {
 		{ID: FormulaHysteresis, Revision: FormulaRevision},
 		{ID: FormulaRCPole, Revision: FormulaRevision},
 		{ID: FormulaRatingMargin, Revision: FormulaRevision},
+		{ID: FormulaSallenKeyLowPass, Revision: FormulaRevision},
 	}
 	encoded, _ := json.Marshal(descriptors)
 	sum := sha256.Sum256(encoded)

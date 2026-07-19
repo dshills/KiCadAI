@@ -34,6 +34,7 @@ func PlanRoutes(request Request, access PadAccess) ([]PlannedNet, []reports.Issu
 	request = cloneRequest(request)
 	NormalizeRequest(&request)
 	issues := []reports.Issue{}
+	advancedOrder := request.Strategy.NetOrder == NetOrderConstrainedEndpointAccessV1
 	hasInternalRoutingLayers := len(routableLayerNames(request.Board.Layers)) > 2
 	usesFanoutPressureOrder := false
 	if hasInternalRoutingLayers {
@@ -95,13 +96,32 @@ func PlanRoutes(request Request, access PadAccess) ([]PlannedNet, []reports.Issu
 	// recognized only when canonical endpoint-tree distances contain a clear
 	// multiplicative gap; otherwise the established role/endpoint order is
 	// preserved. This keeps the rule bounded, generic, and deterministic.
-	advancedOrder := request.Strategy.NetOrder == NetOrderConstrainedEndpointAccessV1
 	escapeNets, distances, accessSpans := compactEscapeNets(plans, access, advancedOrder)
 	distanceFloors := plannedDistanceFloors(plans, distances)
 	meanDistanceFloors := plannedMeanDistanceFloors(plans, distances)
 	edgeDistances := plannedConstrainedEndpointEdgeDistances(plans, access, request.Board, request.Rules)
 	denseBundleRefs := plannedDenseSignalBundleRefs(plans, access, request.Rules)
 	sort.SliceStable(plans, func(i, j int) bool {
+		if plans[i].Net.OrderFirst != plans[j].Net.OrderFirst {
+			// A bounded failed-net retry is stronger evidence than the baseline
+			// schedule heuristic: it records an observed routing failure, not a
+			// predicted one. Let that explicit promotion lead the next attempt.
+			return plans[i].Net.OrderFirst
+		}
+		if advancedOrder {
+			leftConstrained := endpointAccessConstrained(plans[i], accessSpans, request.Rules, usesFanoutPressureOrder)
+			rightConstrained := endpointAccessConstrained(plans[j], accessSpans, request.Rules, usesFanoutPressureOrder)
+			leftScheduleRank := routingScheduleRank(plans[i], leftConstrained)
+			rightScheduleRank := routingScheduleRank(plans[j], rightConstrained)
+			if leftScheduleRank != rightScheduleRank {
+				// A declared net priority describes electrical importance, but it
+				// cannot create routing space after a physically constrained pad
+				// escape has been sealed. The explicit constrained-access policy
+				// therefore reserves scarce endpoint access before applying priority
+				// within each physical schedule class.
+				return leftScheduleRank < rightScheduleRank
+			}
+		}
 		if plans[i].Net.Priority != plans[j].Net.Priority {
 			return plans[i].Net.Priority > plans[j].Net.Priority
 		}
@@ -541,6 +561,9 @@ func planEndpointPairs(netName string, role NetRole, endpoints []Endpoint, acces
 		sortIssues(issues)
 		return nil, issues
 	}
+	if preserveConstrainedTerminals && repeatedConstrainedEndpointRef(ordered, access, rules) {
+		return planRepeatedConstrainedLeaves(ordered, accessPoints, access, rules), nil
+	}
 	preserveConstrainedLeaves :=
 		preserveConstrainedTerminals && ((role == NetSignal && len(ordered) > 3 && len(ordered) <= maxDenseFanoutBranches+1) ||
 			(role == NetPower && len(ordered) > maxDenseFanoutBranches+maxLocalRoutePrefixNets))
@@ -603,6 +626,98 @@ func planEndpointPairs(netName string, role NetRole, endpoints []Endpoint, acces
 		}
 	}
 	return pairs, nil
+}
+
+func planRepeatedConstrainedLeaves(ordered []Endpoint, accessPoints [][]AccessPoint, access PadAccess, rules Rules) []EndpointPair {
+	refCounts := map[string]int{}
+	for _, endpoint := range ordered {
+		refCounts[normalizeKey(endpoint.Ref)]++
+	}
+	trunkIndexes := make([]int, 0, len(ordered))
+	leafIndexes := make([]int, 0, len(ordered))
+	for index, endpoint := range ordered {
+		if refCounts[normalizeKey(endpoint.Ref)] > 1 && endpointBranchConstrained(endpoint, access, rules) {
+			leafIndexes = append(leafIndexes, index)
+		} else {
+			trunkIndexes = append(trunkIndexes, index)
+		}
+	}
+	if len(trunkIndexes) == 0 {
+		return nil
+	}
+	pairs := planIndexedEndpointTree(ordered, accessPoints, trunkIndexes)
+	for _, leafIndex := range leafIndexes {
+		bestTrunk := trunkIndexes[0]
+		bestDistance := endpointDistance(accessPoints[bestTrunk], accessPoints[leafIndex])
+		for _, trunkIndex := range trunkIndexes[1:] {
+			distance := endpointDistance(accessPoints[trunkIndex], accessPoints[leafIndex])
+			candidate := EndpointPair{From: ordered[trunkIndex], To: ordered[leafIndex]}
+			current := EndpointPair{From: ordered[bestTrunk], To: ordered[leafIndex]}
+			if distanceLess(distance, bestDistance) || (distanceEqual(distance, bestDistance) && endpointPairLess(candidate, current)) {
+				bestTrunk = trunkIndex
+				bestDistance = distance
+			}
+		}
+		pairs = append(pairs, EndpointPair{From: ordered[bestTrunk], To: ordered[leafIndex]})
+	}
+	return pairs
+}
+
+func planIndexedEndpointTree(ordered []Endpoint, accessPoints [][]AccessPoint, indexes []int) []EndpointPair {
+	if len(indexes) < 2 {
+		return nil
+	}
+	inTree := map[int]bool{indexes[0]: true}
+	pairs := make([]EndpointPair, 0, len(indexes)-1)
+	for len(pairs) < len(indexes)-1 {
+		bestFrom := -1
+		bestTo := -1
+		bestDistance := math.Inf(1)
+		for _, from := range indexes {
+			if !inTree[from] {
+				continue
+			}
+			for _, to := range indexes {
+				if inTree[to] {
+					continue
+				}
+				distance := endpointDistance(accessPoints[from], accessPoints[to])
+				candidate := EndpointPair{From: ordered[from], To: ordered[to]}
+				current := EndpointPair{}
+				if bestFrom >= 0 {
+					current = EndpointPair{From: ordered[bestFrom], To: ordered[bestTo]}
+				}
+				if bestFrom < 0 || distanceLess(distance, bestDistance) || (distanceEqual(distance, bestDistance) && endpointPairLess(candidate, current)) {
+					bestFrom = from
+					bestTo = to
+					bestDistance = distance
+				}
+			}
+		}
+		pairs = append(pairs, EndpointPair{From: ordered[bestFrom], To: ordered[bestTo]})
+		inTree[bestTo] = true
+	}
+	return pairs
+}
+
+func repeatedConstrainedEndpointRef(endpoints []Endpoint, access PadAccess, rules Rules) bool {
+	refs := map[string]int{}
+	for _, endpoint := range endpoints {
+		ref := normalizeKey(endpoint.Ref)
+		if ref == "" {
+			continue
+		}
+		refs[ref]++
+	}
+	if len(refs) < 2 {
+		return false
+	}
+	for _, endpoint := range endpoints {
+		if refs[normalizeKey(endpoint.Ref)] > 1 && endpointBranchConstrained(endpoint, access, rules) {
+			return true
+		}
+	}
+	return false
 }
 
 func endpointBranchConstrained(endpoint Endpoint, access PadAccess, rules Rules) bool {

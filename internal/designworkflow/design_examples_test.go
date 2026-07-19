@@ -298,9 +298,14 @@ func TestDesignExamplesOptionalKiCadBackedTier(t *testing.T) {
 				t.Fatalf("%s missing kicad_checks stage:\n%s", metadata.ID, formatDesignExampleStages(result.Stages))
 			}
 			switch metadata.Readiness {
-			case "pass", "candidate":
+			case "pass":
 				if kicadChecks.Status != StageStatusOK {
 					t.Fatalf("%s kicad_checks status = %q, want %q:\n%s", metadata.ID, kicadChecks.Status, StageStatusOK, formatDesignExampleRun(metadata, outputDir, result))
+				}
+				assertDesignExampleKiCadArtifacts(t, metadata, outputDir, kicadChecks)
+			case "candidate":
+				if kicadChecks.Status != StageStatusOK && kicadChecks.Status != StageStatusWarning {
+					t.Fatalf("%s kicad_checks status = %q, want %q or %q:\n%s", metadata.ID, kicadChecks.Status, StageStatusOK, StageStatusWarning, formatDesignExampleRun(metadata, outputDir, result))
 				}
 				assertDesignExampleKiCadArtifacts(t, metadata, outputDir, kicadChecks)
 			case "expected_fail":

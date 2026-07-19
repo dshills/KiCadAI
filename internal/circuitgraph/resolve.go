@@ -381,9 +381,6 @@ func resolveComponentUnits(path string, instance Component, symbols []components
 	}
 	declaredUnits := append([]ComponentUnit(nil), instance.Units...)
 	if len(declaredUnits) == 0 {
-		if instance.Query == nil {
-			return nil, nil, []reports.Issue{graphIssue(CodeUnitInvalid, path+".units", "named multi-unit catalog component requires explicit unit declarations")}
-		}
 		inferred := map[string]ComponentUnit{}
 		for _, function := range instance.RequiredFunctions {
 			matchingUnits := []string{}

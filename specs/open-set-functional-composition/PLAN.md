@@ -6,6 +6,9 @@ Add deterministic bounded architecture search over typed electrical contracts,
 then prove it against a pre-implementation frozen corpus without weakening any
 existing KiCadAI gate.
 
+Status: Complete. Requirement-by-requirement evidence is recorded in
+`AUDIT.md`.
+
 ## Implementation Rules
 
 - Freeze the specification and held-out requirement bytes before search code.

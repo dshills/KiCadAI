@@ -137,16 +137,17 @@ type Placement struct {
 }
 
 type Pad struct {
-	Ref       string   `json:"ref,omitempty"`
-	Name      string   `json:"name"`
-	Net       string   `json:"net,omitempty"`
-	Position  Point    `json:"position"`
-	Shape     PadShape `json:"shape"`
-	Type      PadType  `json:"type"`
-	Size      Size     `json:"size"`
-	Drill     *Drill   `json:"drill,omitempty"`
-	Layers    []string `json:"layers,omitempty"`
-	Clearance *float64 `json:"clearance_mm,omitempty"`
+	Ref         string   `json:"ref,omitempty"`
+	Name        string   `json:"name"`
+	Net         string   `json:"net,omitempty"`
+	Position    Point    `json:"position"`
+	RotationDeg float64  `json:"rotation_deg,omitempty"`
+	Shape       PadShape `json:"shape"`
+	Type        PadType  `json:"type"`
+	Size        Size     `json:"size"`
+	Drill       *Drill   `json:"drill,omitempty"`
+	Layers      []string `json:"layers,omitempty"`
+	Clearance   *float64 `json:"clearance_mm,omitempty"`
 }
 
 type Drill struct {
@@ -154,12 +155,13 @@ type Drill struct {
 }
 
 type Net struct {
-	Name      string     `json:"name"`
-	Endpoints []Endpoint `json:"endpoints,omitempty"`
-	Role      NetRole    `json:"role,omitempty"`
-	Class     string     `json:"class,omitempty"`
-	Priority  int        `json:"priority,omitempty"`
-	Fixed     bool       `json:"fixed,omitempty"`
+	Name       string     `json:"name"`
+	Endpoints  []Endpoint `json:"endpoints,omitempty"`
+	Role       NetRole    `json:"role,omitempty"`
+	Class      string     `json:"class,omitempty"`
+	Priority   int        `json:"priority,omitempty"`
+	OrderFirst bool       `json:"order_first,omitempty"`
+	Fixed      bool       `json:"fixed,omitempty"`
 }
 
 type Endpoint struct {

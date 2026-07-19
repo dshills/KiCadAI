@@ -183,7 +183,7 @@
             {"function": "B1", "pad": "8", "aliases": ["SDA2"]}
           ],
           "verification": {
-            "confidence": "library_derived",
+            "confidence": "verified",
             "sources": ["datasheet:TI:TXS0102:RevL", "kicad-footprint:Package_SO:VSSOP-8_2.3x2mm_P0.5mm"],
             "pinmap_checked": true
           }
@@ -195,6 +195,59 @@
         "resolver_checked": true,
         "pinmap_checked": true,
         "notes": ["TI specifies 2 Mbps maximum data rate for open-drain operation, VCC isolation, and Ioff partial-power-down support."]
+      }
+    },
+    {
+      "id": "regulator.ti.lm317t.to220",
+      "family": "regulator",
+      "name": "TI LM317T adjustable linear regulator",
+      "description": "Three-terminal adjustable 1.5 A regulator for higher-voltage open-set supply composition.",
+      "generic": false,
+      "manufacturer": "Texas Instruments",
+      "mpn": "LM317T",
+      "lifecycle": "active",
+      "tags": ["adjustable", "linear_regulator", "to220"],
+      "values": [
+        {"kind": "reference_voltage", "typ": "1.25", "unit": "V"},
+        {"kind": "output_voltage", "min": "1.25", "max": "37", "unit": "V"}
+      ],
+      "ratings": [
+        {"kind": "input_voltage", "max": "40", "unit": "V"},
+        {"kind": "output_current", "max": "1.5", "unit": "A"}
+      ],
+      "temperature": {"min": "0", "max": "125", "unit": "C"},
+      "symbols": [{
+        "symbol_id": "Regulator_Linear:LM317_TO-220",
+        "function_pins": [
+          {"function": "ADJ", "symbol_pin": "1", "electrical": "input", "required": true},
+          {"function": "VOUT", "symbol_pin": "2", "electrical": "power_out", "required": true},
+          {"function": "VIN", "symbol_pin": "3", "electrical": "power_in", "required": true}
+        ],
+        "verification": {"confidence": "verified", "sources": ["https://www.ti.com/lit/ds/symlink/lm317.pdf", "kicad-symbols:Regulator_Linear:LM317_TO-220"], "pinmap_checked": true}
+      }],
+      "packages": [{
+        "id": "to220_vertical",
+        "name": "TO-220-3 vertical",
+        "footprint_id": "Package_TO_SOT_THT:TO-220-3_Vertical",
+        "package_type": "to220",
+        "mpn": "LM317T",
+        "lifecycle": "active",
+        "pinmap_id": "Regulator_Linear:LM317_TO-220|Package_TO_SOT_THT:TO-220-3_Vertical",
+        "pad_functions": [
+          {"function": "ADJ", "pad": "1"},
+          {"function": "VOUT", "pad": "2"},
+          {"function": "VIN", "pad": "3"}
+        ],
+        "dimensions_mm": {"width": 10.2, "height": 4.5},
+        "height_mm": 15.0,
+        "verification": {"confidence": "verified", "sources": ["https://www.ti.com/lit/ds/symlink/lm317.pdf", "kicad-footprint:Package_TO_SOT_THT:TO-220-3_Vertical"], "pinmap_checked": true}
+      }],
+      "verification": {
+        "confidence": "verified",
+        "sources": ["https://www.ti.com/lit/ds/symlink/lm317.pdf", "datasheet-pinmap:TI:LM317T:RevZ", "kicad-footprint:Package_TO_SOT_THT:TO-220-3_Vertical"],
+        "resolver_checked": true,
+        "pinmap_checked": true,
+        "notes": ["Thermal dissipation and minimum-load-current checks remain fabrication-stage obligations."]
       }
     }
   ]

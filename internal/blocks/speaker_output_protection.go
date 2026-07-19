@@ -62,7 +62,7 @@ func speakerOutputProtectionDefinition() BlockDefinition {
 			{Name: "POWER_STAR", Direction: PortPower, Description: "Protection and speaker-return star."},
 		},
 		RequiredLibraries: []LibraryRequirement{
-			{Kind: "symbol", ID: "Comparator:TLV1701", Required: true, Description: "Two physical open-collector window comparators."},
+			{Kind: "symbol", ID: "Comparator:LMV331", Required: true, Description: "Pin-compatible KiCad geometry for two physical TLV1701 open-collector window comparators."},
 			{Kind: "symbol", ID: "Relay:G5Q-1A", Required: true, Description: "Normally-open speaker isolation relay."},
 			{Kind: "symbol", ID: "Device:D", Required: true, Description: "Flyback and supply-loss discharge diodes."},
 		},
@@ -95,8 +95,8 @@ func speakerOutputProtectionComponents(verified components.ConfidenceLevel, fabr
 	items := []BlockComponent{
 		resistor("sense_input", "47kΩ", "sense_input_resistance", true), resistor("sense_bias_top", "10kΩ", "sense_bias_resistance", true), resistor("sense_bias_bottom", "10kΩ", "sense_bias_resistance", true),
 		resistor("upper_reference_top", "11.7kΩ", "upper_reference_top_value", true), resistor("upper_reference_bottom", "10kΩ", "reference_bottom_resistance", true), resistor("lower_reference_top", "12.5kΩ", "lower_reference_top_value", true), resistor("lower_reference_bottom", "10kΩ", "reference_bottom_resistance", true),
-		{Role: "positive_detector", RefPrefix: "U", Value: "TLV1701AIDBVR", SymbolID: "Comparator:TLV1701", FootprintID: "Package_TO_SOT_SMD:SOT-23-5", Pins: speakerComparatorPins(), PreferResolverSymbol: true, ComponentID: "comparator.ti.tlv1701aidbvr.sot23_5", ComponentVariant: "sot23_5", MinimumConfidence: verified, Acceptance: fabrication, PinmapRequired: true, PlacementGroup: "dc_detector"},
-		{Role: "negative_detector", RefPrefix: "U", Value: "TLV1701AIDBVR", SymbolID: "Comparator:TLV1701", FootprintID: "Package_TO_SOT_SMD:SOT-23-5", Pins: speakerComparatorPins(), PreferResolverSymbol: true, ComponentID: "comparator.ti.tlv1701aidbvr.sot23_5", ComponentVariant: "sot23_5", MinimumConfidence: verified, Acceptance: fabrication, PinmapRequired: true, PlacementGroup: "dc_detector"},
+		{Role: "positive_detector", RefPrefix: "U", Value: "TLV1701AIDBVR", SymbolID: "Comparator:LMV331", FootprintID: "Package_TO_SOT_SMD:SOT-23-5", Pins: speakerComparatorPins(), PreferResolverSymbol: true, ComponentID: "comparator.ti.tlv1701aidbvr.sot23_5", ComponentVariant: "sot23_5", MinimumConfidence: verified, Acceptance: fabrication, PinmapRequired: true, PlacementGroup: "dc_detector"},
+		{Role: "negative_detector", RefPrefix: "U", Value: "TLV1701AIDBVR", SymbolID: "Comparator:LMV331", FootprintID: "Package_TO_SOT_SMD:SOT-23-5", Pins: speakerComparatorPins(), PreferResolverSymbol: true, ComponentID: "comparator.ti.tlv1701aidbvr.sot23_5", ComponentVariant: "sot23_5", MinimumConfidence: verified, Acceptance: fabrication, PinmapRequired: true, PlacementGroup: "dc_detector"},
 		{Role: "comparator_bypass", RefPrefix: "C", Value: "100nF", SymbolID: "Device:C", FootprintID: "Capacitor_THT:C_Rect_L7.2mm_W3.0mm_P5.00mm_FKS2_FKP2_MKS2_MKP2", Pins: twoTerminalHorizontalPins(), ComponentID: "capacitor.wima.mks2c031001a00kssd.tht", ComponentVariant: "mks2_pcm5", MinimumConfidence: verified, Acceptance: fabrication, PinmapRequired: true, PlacementGroup: "dc_detector"},
 		delayPullup,
 		{Role: "delay_capacitor", RefPrefix: "C", Value: "4.7uF", SymbolID: "Device:C_Polarized", FootprintID: "Capacitor_Tantalum_SMD:CP_EIA-3216-18_Kemet-A", Pins: twoTerminalHorizontalPins(), ComponentID: speakerDelayEvidence.CapacitorComponentID, ComponentVariant: "eia_3216_18", MinimumConfidence: verified, Acceptance: fabrication, PinmapRequired: true, PlacementGroup: "mute_timing"},

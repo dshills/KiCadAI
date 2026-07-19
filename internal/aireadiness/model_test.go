@@ -154,12 +154,21 @@ func TestValidateAcceptsVerifiedRecordWithVerifiedDependency(t *testing.T) {
 }
 
 func TestAmplifierRequirementsCoveredByMatrix(t *testing.T) {
+	testRequirementsCoveredByMatrix(t, "amplifier")
+}
+
+func TestOpenSetRequirementsCoveredByMatrix(t *testing.T) {
+	testRequirementsCoveredByMatrix(t, "open_set")
+}
+
+func testRequirementsCoveredByMatrix(t *testing.T, domain string) {
+	t.Helper()
 	root := filepath.Join("..", "..", "data", "ai-readiness")
 	matrix, err := LoadDir(root)
 	if err != nil {
 		t.Fatalf("load matrix: %v", err)
 	}
-	requirement, err := LoadRequirement(filepath.Join(root, "requirements", "amplifier.json"))
+	requirement, err := LoadRequirement(filepath.Join(root, "requirements", domain+".json"))
 	if err != nil {
 		t.Fatalf("load requirement: %v", err)
 	}

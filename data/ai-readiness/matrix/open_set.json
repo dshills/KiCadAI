@@ -1,0 +1,70 @@
+{
+  "version": "0.1.0",
+  "records": [
+    {
+      "id": "openset.component.catalog",
+      "category": "component",
+      "domain": "openset",
+      "title": "Catalog evidence for bounded architecture composition",
+      "readiness": "verified",
+      "next_task": "add_component",
+      "evidence": [
+        {"kind": "test", "path": "internal/architecturesearch/catalog_provider_test.go", "semantic_hash": "7a36dedc0dab7b2394e260b99dc277d1af4506d75adcb6584dc9d6e6b814392e", "description": "Catalog-backed provider tests cover deterministic component selection, generic electrical mutations, real alternatives, auxiliary supplies, and catalog-order independence."}
+      ],
+      "parallel_group": "catalog_block_expansion"
+    },
+    {
+      "id": "openset.block.architecture_search",
+      "category": "block",
+      "domain": "openset",
+      "title": "Typed deterministic architecture search",
+      "readiness": "verified",
+      "next_task": "add_block",
+      "evidence": [
+        {"kind": "implementation", "path": "internal/architecturesearch/search.go", "semantic_hash": "6bbd89c2c47cbe890676a8c10a9ce1b3e77d594ae1313747077423370935d1d5", "description": "Reusable typed contracts, bounded provider expansion, value and tolerance solvers, stable rejection, scoring, alternatives, and rationale form the verified open-set search layer."}
+      ],
+      "parallel_group": "catalog_block_expansion",
+      "depends_on": ["openset.component.catalog"]
+    },
+    {
+      "id": "openset.layout.deterministic_lowering",
+      "category": "layout",
+      "domain": "openset",
+      "title": "Deterministic circuit-graph and board lowering",
+      "readiness": "verified",
+      "next_task": "verify_layout",
+      "evidence": [
+        {"kind": "test", "path": "internal/compositionlowering/promotion_test.go", "semantic_hash": "3007a8bc69dd7424e8a430b80bb4dd27ad11e5a693f1a64872f9b683c53187f0", "description": "The five frozen architectures lower through the existing design workflow with complete placement, routing, connectivity, writer, and deterministic artifact evidence."}
+      ],
+      "parallel_group": "engine_hardening",
+      "depends_on": ["openset.block.architecture_search"]
+    },
+    {
+      "id": "openset.validation.held_out",
+      "category": "validation",
+      "domain": "openset",
+      "title": "Frozen held-out real-KiCad promotion",
+      "readiness": "verified",
+      "next_task": "capture_kicad_evidence",
+      "evidence": [
+        {"kind": "fixture", "path": "internal/circuitgraph/testdata/open_set_composition_corpus/manifest.json", "semantic_hash": "f3a9b341d64186b6063b9f308ff9bdcf66f2421bf12068eba7f9a1a3ac3580b1", "description": "SHA-256-pinned five-requirement behavior-only corpus for threshold, protected switching, regulation, active filtering, and logic-domain translation."},
+        {"kind": "audit", "path": "specs/open-set-functional-composition/AUDIT.md", "semantic_hash": "2282c01d2ba121408f79c660366d2bcddda66d61a2548bd6d53d7ae3527200fa", "description": "Acceptance audit records clean offline and optional real-KiCad promotion plus all preserved regression lanes."}
+      ],
+      "parallel_group": "fixture_promotion",
+      "depends_on": ["openset.layout.deterministic_lowering"]
+    },
+    {
+      "id": "openset.documentation.scope",
+      "category": "documentation",
+      "domain": "openset",
+      "title": "Bounded composition scope and limits",
+      "readiness": "verified",
+      "next_task": "write_docs",
+      "evidence": [
+        {"kind": "contract", "path": "specs/open-set-functional-composition/SPEC.md", "semantic_hash": "4d01cd4998acfb14a49ed7cf4e466fca8fa50acc99418770fb2ad5aa3b28a60d", "description": "Defines the strict behavioral schema, typed compatibility, deterministic budgets, safety rules, frozen corpus, completion gates, and explicit non-goals."}
+      ],
+      "parallel_group": "documentation",
+      "depends_on": ["openset.validation.held_out"]
+    }
+  ]
+}

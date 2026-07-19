@@ -218,7 +218,7 @@ func RouteRequestContext(ctx context.Context, request Request) Result {
 			netViaCount += len(vias)
 			netLengthMM += metrics.TotalLengthMM
 			request.Existing = append(request.Existing, existingCopperForSegments(segments)...)
-			request.Existing = append(request.Existing, existingCopperForVias(vias)...)
+			request.Existing = append(request.Existing, existingCopperForVias(vias, request.Board.Layers)...)
 		}
 		if netFailed || hasBlockingIssue(route.Issues) {
 			request.Existing = request.Existing[:existingStart]
@@ -289,24 +289,34 @@ func connectFallbackSMDEndpointsToCenters(segments []Segment, access PadAccess, 
 	if len(segments) == 0 {
 		return segments
 	}
-	connect := func(endpoint Endpoint, segmentIndex int, start bool) {
+	centerConnection := func(endpoint Endpoint, segment Segment, start bool) (Segment, bool) {
 		points, ok := AccessPointsForEndpoint(access, endpoint)
 		if !ok || len(points) != 1 || points[0].SearchPoint == nil {
-			return
+			return Segment{}, false
 		}
 		pad, ok := access.Pads[endpointKey(endpoint.Ref, endpoint.Pin)]
 		if !ok || pad.Type != PadSMD {
-			return
+			return Segment{}, false
 		}
+		connection := segment
 		if start {
-			segments[segmentIndex].Start = pad.Position
+			connection.Start = pad.Position
+			connection.End = segment.Start
 		} else {
-			segments[segmentIndex].End = pad.Position
+			connection.Start = segment.End
+			connection.End = pad.Position
 		}
+		return connection, roundPoint(connection.Start) != roundPoint(connection.End)
 	}
-	connect(pair.From, 0, true)
-	connect(pair.To, len(segments)-1, false)
-	return segments
+	connected := make([]Segment, 0, len(segments)+2)
+	if connection, ok := centerConnection(pair.From, segments[0], true); ok {
+		connected = append(connected, connection)
+	}
+	connected = append(connected, segments...)
+	if connection, ok := centerConnection(pair.To, segments[len(segments)-1], false); ok {
+		connected = append(connected, connection)
+	}
+	return connected
 }
 
 func segmentLengthTotal(segments []Segment) float64 {
@@ -696,11 +706,31 @@ func polygonBounds(points []Point) Rect {
 	return bounds
 }
 
-func existingCopperForVias(vias []Via) []ExistingCopper {
-	existing := make([]ExistingCopper, 0, len(vias)*2)
+func existingCopperForVias(vias []Via, boardLayers []Layer) []ExistingCopper {
+	physicalLayers := make([]string, 0, len(boardLayers))
+	seenLayers := map[string]struct{}{}
+	for _, layer := range boardLayers {
+		if layer.Kind != LayerCopper {
+			continue
+		}
+		key := normalizeLayer(layer.Name)
+		if key == "" {
+			continue
+		}
+		if _, ok := seenLayers[key]; ok {
+			continue
+		}
+		seenLayers[key] = struct{}{}
+		physicalLayers = append(physicalLayers, layer.Name)
+	}
+	existing := make([]ExistingCopper, 0, len(vias)*max(1, len(physicalLayers)))
 	for _, via := range vias {
 		radius := via.DiameterMM / 2
-		for _, layer := range via.Layers {
+		layers := physicalLayers
+		if len(layers) == 0 {
+			layers = via.Layers
+		}
+		for _, layer := range layers {
 			existing = append(existing, ExistingCopper{
 				Kind:  CopperVia,
 				Net:   via.Net,
