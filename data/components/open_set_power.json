@@ -1,0 +1,201 @@
+{
+  "version": "0.1.0",
+  "records": [
+    {
+      "id": "mosfet.aos.ao3400a.sot23",
+      "family": "mosfet",
+      "name": "AOS AO3400A 30 V logic-level N-channel MOSFET",
+      "description": "Concrete low-side switching MOSFET with guaranteed on-resistance at 2.5 V gate drive.",
+      "generic": false,
+      "manufacturer": "Alpha and Omega Semiconductor",
+      "mpn": "AO3400A",
+      "lifecycle": "active",
+      "tags": ["logic_level", "low_side_switch", "mosfet", "n_channel", "sot23"],
+      "values": [
+        {"kind": "on_resistance", "max": "48", "unit": "mOhm"},
+        {"kind": "on_resistance_gate_voltage", "typ": "2.5", "unit": "V"},
+        {"kind": "total_gate_charge", "max": "7", "unit": "nC"}
+      ],
+      "ratings": [
+        {"kind": "drain_source_voltage", "max": "30", "unit": "V"},
+        {"kind": "drain_current", "max": "5.7", "unit": "A"},
+        {"kind": "gate_source_voltage", "max": "12", "unit": "V"},
+        {"kind": "power_dissipation", "max": "1.4", "unit": "W"}
+      ],
+      "temperature": {"min": "-55", "max": "150", "unit": "C"},
+      "symbols": [
+        {
+          "symbol_id": "Transistor_FET:Q_NMOS_GSD",
+          "function_pins": [
+            {"function": "GATE", "symbol_pin": "1", "electrical": "input", "required": true},
+            {"function": "SOURCE", "symbol_pin": "2", "required": true},
+            {"function": "DRAIN", "symbol_pin": "3", "required": true}
+          ],
+          "verification": {
+            "confidence": "verified",
+            "sources": ["datasheet:AOS:AO3400A:Rev3", "kicad-symbols:Transistor_FET:Q_NMOS_GSD"],
+            "pinmap_checked": true
+          }
+        }
+      ],
+      "packages": [
+        {
+          "id": "sot23",
+          "name": "SOT-23",
+          "footprint_id": "Package_TO_SOT_SMD:SOT-23",
+          "package_type": "sot23",
+          "mpn": "AO3400A",
+          "lifecycle": "active",
+          "pinmap_id": "Transistor_FET:Q_NMOS_GSD|Package_TO_SOT_SMD:SOT-23",
+          "pad_functions": [
+            {"function": "GATE", "pad": "1"},
+            {"function": "SOURCE", "pad": "2"},
+            {"function": "DRAIN", "pad": "3"}
+          ],
+          "dimensions_mm": {"width": 2.9, "height": 2.8},
+          "verification": {
+            "confidence": "verified",
+            "sources": ["datasheet:AOS:AO3400A:Rev3", "kicad-footprint:Package_TO_SOT_SMD:SOT-23"],
+            "pinmap_checked": true
+          }
+        }
+      ],
+      "verification": {
+        "confidence": "verified",
+        "sources": ["https://aosmd.com/res/data_sheets/AO3400A.pdf", "datasheet-pinmap:AOS:AO3400A:Rev3", "kicad-footprint:Package_TO_SOT_SMD:SOT-23"],
+        "resolver_checked": true,
+        "pinmap_checked": true,
+        "notes": ["The 5.7 A and 1.4 W ratings depend on the manufacturer test board and thermal conditions; applied dissipation remains a circuit-level check."]
+      }
+    },
+    {
+      "id": "diode.diodes.b340la.sma",
+      "family": "diode",
+      "name": "Diodes Incorporated B340LA 3 A 40 V Schottky rectifier",
+      "description": "Concrete recirculation diode for low-voltage inductive loads.",
+      "generic": false,
+      "manufacturer": "Diodes Incorporated",
+      "mpn": "B340LA-13-F",
+      "lifecycle": "active",
+      "tags": ["flyback", "inductive_clamp", "power", "schottky", "sma"],
+      "values": [{"kind": "forward_voltage", "max": "0.45", "unit": "V"}],
+      "ratings": [
+        {"kind": "current", "max": "3", "unit": "A"},
+        {"kind": "reverse_voltage", "max": "40", "unit": "V"},
+        {"kind": "surge_current", "max": "70", "unit": "A"}
+      ],
+      "temperature": {"min": "-55", "max": "150", "unit": "C"},
+      "symbols": [
+        {
+          "symbol_id": "Device:D_Schottky",
+          "function_pins": [
+            {"function": "K", "symbol_pin": "1", "required": true},
+            {"function": "A", "symbol_pin": "2", "required": true}
+          ],
+          "verification": {
+            "confidence": "verified",
+            "sources": ["datasheet:Diodes:B340LA", "kicad-symbols:Device:D_Schottky"],
+            "pinmap_checked": true
+          }
+        }
+      ],
+      "packages": [
+        {
+          "id": "sma",
+          "name": "SMA",
+          "footprint_id": "Diode_SMD:D_SMA",
+          "package_type": "sma",
+          "mpn": "B340LA-13-F",
+          "lifecycle": "active",
+          "pinmap_id": "Device:D_Schottky|Diode_SMD:D_SMA",
+          "pad_functions": [
+            {"function": "K", "pad": "1"},
+            {"function": "A", "pad": "2"}
+          ],
+          "verification": {
+            "confidence": "verified",
+            "sources": ["datasheet:Diodes:B340LA", "kicad-footprint:Diode_SMD:D_SMA"],
+            "pinmap_checked": true
+          }
+        }
+      ],
+      "verification": {
+        "confidence": "verified",
+        "sources": ["https://www.diodes.com/part/view/B340LA", "datasheet-pinmap:Diodes:B340LA", "kicad-footprint:Diode_SMD:D_SMA"],
+        "resolver_checked": true,
+        "pinmap_checked": true,
+        "notes": ["The 3 A average-current rating depends on terminal temperature and PCB thermal design; applied temperature remains a circuit-level check."]
+      }
+    },
+    {
+      "id": "level_translator.ti.txs0102dcu.vssop8",
+      "family": "level_translator",
+      "name": "TI TXS0102DCU two-bit bidirectional level translator",
+      "description": "Two-channel open-drain translator with VCC isolation and Ioff partial-power-down support.",
+      "generic": false,
+      "manufacturer": "Texas Instruments",
+      "mpn": "TXS0102DCUR",
+      "lifecycle": "active",
+      "tags": ["bidirectional", "i2c", "ioff", "open_drain", "partial_power_down", "vcc_isolation", "vssop8"],
+      "ratings": [
+        {"kind": "vcca_supply_voltage", "min": "1.65", "max": "3.6", "unit": "V"},
+        {"kind": "vccb_supply_voltage", "min": "2.3", "max": "5.5", "unit": "V"},
+        {"kind": "open_drain_data_rate", "max": "2000000", "unit": "Hz"}
+      ],
+      "temperature": {"min": "-40", "max": "85", "unit": "C"},
+      "symbols": [
+        {
+          "symbol_id": "Logic_LevelTranslator:TXS0102DCU",
+          "function_pins": [
+            {"function": "B2", "symbol_pin": "1", "electrical": "bidirectional", "aliases": ["SCL2"]},
+            {"function": "GND", "symbol_pin": "2", "electrical": "power_in", "required": true},
+            {"function": "VCCA", "symbol_pin": "3", "electrical": "power_in", "required": true, "aliases": ["VREF1"]},
+            {"function": "A2", "symbol_pin": "4", "electrical": "bidirectional", "aliases": ["SCL1"]},
+            {"function": "A1", "symbol_pin": "5", "electrical": "bidirectional", "aliases": ["SDA1"]},
+            {"function": "OE", "symbol_pin": "6", "electrical": "input", "required": true, "aliases": ["EN"]},
+            {"function": "VCCB", "symbol_pin": "7", "electrical": "power_in", "required": true, "aliases": ["VREF2"]},
+            {"function": "B1", "symbol_pin": "8", "electrical": "bidirectional", "aliases": ["SDA2"]}
+          ],
+          "verification": {
+            "confidence": "verified",
+            "sources": ["datasheet:TI:TXS0102:RevL", "kicad-symbols:Logic_LevelTranslator:TXS0102DCU"],
+            "pinmap_checked": true
+          }
+        }
+      ],
+      "packages": [
+        {
+          "id": "vssop8",
+          "name": "VSSOP-8 DCU",
+          "footprint_id": "Package_SO:VSSOP-8_2.3x2mm_P0.5mm",
+          "package_type": "vssop8",
+          "mpn": "TXS0102DCUR",
+          "lifecycle": "active",
+          "pinmap_id": "Logic_LevelTranslator:TXS0102DCU|Package_SO:VSSOP-8_2.3x2mm_P0.5mm",
+          "pad_functions": [
+            {"function": "B2", "pad": "1", "aliases": ["SCL2"]},
+            {"function": "GND", "pad": "2"},
+            {"function": "VCCA", "pad": "3", "aliases": ["VREF1"]},
+            {"function": "A2", "pad": "4", "aliases": ["SCL1"]},
+            {"function": "A1", "pad": "5", "aliases": ["SDA1"]},
+            {"function": "OE", "pad": "6", "aliases": ["EN"]},
+            {"function": "VCCB", "pad": "7", "aliases": ["VREF2"]},
+            {"function": "B1", "pad": "8", "aliases": ["SDA2"]}
+          ],
+          "verification": {
+            "confidence": "library_derived",
+            "sources": ["datasheet:TI:TXS0102:RevL", "kicad-footprint:Package_SO:VSSOP-8_2.3x2mm_P0.5mm"],
+            "pinmap_checked": true
+          }
+        }
+      ],
+      "verification": {
+        "confidence": "verified",
+        "sources": ["https://www.ti.com/lit/ds/symlink/txs0102.pdf", "datasheet-pinmap:TI:TXS0102DCU:RevL", "kicad-footprint:Package_SO:VSSOP-8_2.3x2mm_P0.5mm"],
+        "resolver_checked": true,
+        "pinmap_checked": true,
+        "notes": ["TI specifies 2 Mbps maximum data rate for open-drain operation, VCC isolation, and Ioff partial-power-down support."]
+      }
+    }
+  ]
+}

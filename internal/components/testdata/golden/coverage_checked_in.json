@@ -1,15 +1,15 @@
 {
-  "record_count": 81,
+  "record_count": 84,
   "family_count": 21,
   "confidence_counts": {
     "blocked": 1,
     "library_derived": 0,
     "placeholder": 4,
     "rule_inferred": 5,
-    "verified": 71
+    "verified": 74
   },
   "alternative_coverage": {
-    "concrete_records": 57,
+    "concrete_records": 60,
     "generic_fallback_records": 24,
     "equivalence_groups": 19
   },
@@ -168,11 +168,11 @@
     {
       "family": "diode",
       "defined": true,
-      "record_count": 6,
-      "concrete_records": 3,
+      "record_count": 7,
+      "concrete_records": 4,
       "generic_fallback_records": 3,
       "equivalence_groups": 2,
-      "verified_records": 6,
+      "verified_records": 7,
       "library_derived_records": 0,
       "rule_inferred_records": 0,
       "placeholder_records": 0,
@@ -185,6 +185,7 @@
         "diode.tvs_unidirectional.generic"
       ],
       "record_ids": [
+        "diode.diodes.b340la.sma",
         "diode.diodes.bat54ws.sod_323",
         "diode.diodes.ddz5v1b_7.sod123",
         "diode.onsemi.1n4148w.sod_123",
@@ -242,11 +243,11 @@
     {
       "family": "level_translator",
       "defined": true,
-      "record_count": 1,
-      "concrete_records": 1,
+      "record_count": 2,
+      "concrete_records": 2,
       "generic_fallback_records": 0,
       "equivalence_groups": 0,
-      "verified_records": 1,
+      "verified_records": 2,
       "library_derived_records": 0,
       "rule_inferred_records": 0,
       "placeholder_records": 0,
@@ -255,6 +256,7 @@
         "level_translator.ti.txs0104epw.tssop14"
       ],
       "record_ids": [
+        "level_translator.ti.txs0102dcu.vssop8",
         "level_translator.ti.txs0104epw.tssop14"
       ]
     },
@@ -283,16 +285,17 @@
     {
       "family": "mosfet",
       "defined": true,
-      "record_count": 2,
-      "concrete_records": 2,
+      "record_count": 3,
+      "concrete_records": 3,
       "generic_fallback_records": 0,
       "equivalence_groups": 0,
-      "verified_records": 2,
+      "verified_records": 3,
       "library_derived_records": 0,
       "rule_inferred_records": 0,
       "placeholder_records": 0,
       "blocked_records": 0,
       "record_ids": [
+        "mosfet.aos.ao3400a.sot23",
         "mosfet.vishay.irfp240.to247",
         "mosfet.vishay.irfp9240.to247"
       ]
