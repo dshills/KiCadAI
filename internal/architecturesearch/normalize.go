@@ -54,7 +54,9 @@ func Normalize(requirement Requirement) Requirement {
 			port.ID = canonicalIdentifier(port.ID)
 			port.Kind = canonicalIdentifier(port.Kind)
 			port.Direction = canonicalIdentifier(port.Direction)
-			normalizeProtocol(&port.Protocol)
+			if port.Protocol != nil {
+				normalizeProtocol(port.Protocol)
+			}
 		}
 		slices.SortStableFunc(participant.RequiredPorts, func(left, right ParticipantPort) int {
 			return strings.Compare(left.ID, right.ID)

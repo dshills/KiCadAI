@@ -88,10 +88,10 @@ type Participant struct {
 }
 
 type ParticipantPort struct {
-	ID        string   `json:"id"`
-	Kind      string   `json:"kind"`
-	Direction string   `json:"direction"`
-	Protocol  Protocol `json:"protocol"`
+	ID        string    `json:"id"`
+	Kind      string    `json:"kind"`
+	Direction string    `json:"direction"`
+	Protocol  *Protocol `json:"protocol,omitempty"`
 }
 
 type Objective struct {

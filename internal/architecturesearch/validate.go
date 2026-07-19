@@ -186,7 +186,9 @@ func (validator *requirementValidator) participants() {
 			if !allowedDirection(port.Direction) {
 				validator.add(CodePortInvalid, portPath+".direction", "direction must be source, sink, or bidirectional")
 			}
-			validator.protocol(portPath+".protocol", port.Protocol)
+			if port.Protocol != nil {
+				validator.protocol(portPath+".protocol", *port.Protocol)
+			}
 		}
 		validator.constraints(path+".constraints", participant.Constraints)
 	}
