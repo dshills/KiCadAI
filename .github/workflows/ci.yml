@@ -14,6 +14,8 @@ jobs:
     name: Offline quality gates
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    env:
+      KICADAI_EXAMPLE_TEST_TIMEOUT: 3m
     steps:
       - name: Check out source
         uses: actions/checkout@v4
