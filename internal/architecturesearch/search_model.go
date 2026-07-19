@@ -98,30 +98,32 @@ type ExpansionMetrics struct {
 }
 
 type ProviderExpansion struct {
-	ID                 string              `json:"id"`
-	OfferedPorts       []RoleContract      `json:"offered_ports"`
-	Children           []ChildObligation   `json:"children,omitempty"`
-	Components         []SelectedComponent `json:"components,omitempty"`
-	Metrics            ExpansionMetrics    `json:"metrics"`
-	Evidence           ContractEvidence    `json:"evidence"`
-	DecisionClass      string              `json:"decision_class,omitempty"`
-	RequiresUserChoice bool                `json:"requires_user_choice,omitempty"`
-	Payload            json.RawMessage     `json:"payload,omitempty"`
+	ID                 string                `json:"id"`
+	OfferedPorts       []RoleContract        `json:"offered_ports"`
+	Children           []ChildObligation     `json:"children,omitempty"`
+	Components         []SelectedComponent   `json:"components,omitempty"`
+	Calculations       []CalculationEvidence `json:"calculations,omitempty"`
+	Metrics            ExpansionMetrics      `json:"metrics"`
+	Evidence           ContractEvidence      `json:"evidence"`
+	DecisionClass      string                `json:"decision_class,omitempty"`
+	RequiresUserChoice bool                  `json:"requires_user_choice,omitempty"`
+	Payload            json.RawMessage       `json:"payload,omitempty"`
 }
 
 type FragmentSelection struct {
-	ObligationPath     string              `json:"obligation_path"`
-	Capability         string              `json:"capability"`
-	ProviderID         string              `json:"provider_id"`
-	ProviderRevision   string              `json:"provider_revision"`
-	ExpansionID        string              `json:"expansion_id"`
-	Ports              []RoleContract      `json:"ports"`
-	Components         []SelectedComponent `json:"components,omitempty"`
-	Metrics            ExpansionMetrics    `json:"metrics"`
-	Evidence           ContractEvidence    `json:"evidence"`
-	DecisionClass      string              `json:"decision_class,omitempty"`
-	RequiresUserChoice bool                `json:"requires_user_choice,omitempty"`
-	Payload            json.RawMessage     `json:"payload,omitempty"`
+	ObligationPath     string                `json:"obligation_path"`
+	Capability         string                `json:"capability"`
+	ProviderID         string                `json:"provider_id"`
+	ProviderRevision   string                `json:"provider_revision"`
+	ExpansionID        string                `json:"expansion_id"`
+	Ports              []RoleContract        `json:"ports"`
+	Components         []SelectedComponent   `json:"components,omitempty"`
+	Calculations       []CalculationEvidence `json:"calculations,omitempty"`
+	Metrics            ExpansionMetrics      `json:"metrics"`
+	Evidence           ContractEvidence      `json:"evidence"`
+	DecisionClass      string                `json:"decision_class,omitempty"`
+	RequiresUserChoice bool                  `json:"requires_user_choice,omitempty"`
+	Payload            json.RawMessage       `json:"payload,omitempty"`
 }
 
 type CandidateScore struct {
@@ -139,6 +141,18 @@ type CandidateResult struct {
 	Fingerprint string              `json:"fingerprint"`
 	Score       CandidateScore      `json:"score"`
 	Selections  []FragmentSelection `json:"selections"`
+}
+
+type AlternativeComparison struct {
+	Fingerprint     string `json:"fingerprint"`
+	FirstScoreField string `json:"first_score_field"`
+	Reason          string `json:"reason"`
+}
+
+type SelectionRationale struct {
+	SelectedFingerprint string                  `json:"selected_fingerprint"`
+	Summary             string                  `json:"summary"`
+	Comparisons         []AlternativeComparison `json:"comparisons,omitempty"`
 }
 
 type SearchConsumption struct {
@@ -175,18 +189,20 @@ const (
 )
 
 type SearchResult struct {
-	Schema          string             `json:"schema"`
-	PolicyVersion   string             `json:"policy_version"`
-	Status          SearchStatus       `json:"status"`
-	RequirementHash string             `json:"requirement_hash"`
-	RegistryHash    string             `json:"registry_hash"`
-	CatalogHash     string             `json:"catalog_hash,omitempty"`
-	Policy          SearchPolicy       `json:"policy"`
-	Consumption     SearchConsumption  `json:"consumption"`
-	Selected        *CandidateResult   `json:"selected,omitempty"`
-	Alternatives    []CandidateResult  `json:"alternatives,omitempty"`
-	Rejections      []RejectionSummary `json:"rejections,omitempty"`
-	Issues          []reports.Issue    `json:"issues,omitempty"`
+	Schema             string              `json:"schema"`
+	PolicyVersion      string              `json:"policy_version"`
+	Status             SearchStatus        `json:"status"`
+	RequirementHash    string              `json:"requirement_hash"`
+	RegistryHash       string              `json:"registry_hash"`
+	CatalogHash        string              `json:"catalog_hash,omitempty"`
+	FormulaLibraryHash string              `json:"formula_library_hash"`
+	Policy             SearchPolicy        `json:"policy"`
+	Consumption        SearchConsumption   `json:"consumption"`
+	Selected           *CandidateResult    `json:"selected,omitempty"`
+	Alternatives       []CandidateResult   `json:"alternatives,omitempty"`
+	Rationale          *SelectionRationale `json:"rationale,omitempty"`
+	Rejections         []RejectionSummary  `json:"rejections,omitempty"`
+	Issues             []reports.Issue     `json:"issues,omitempty"`
 }
 
 type SearchOptions struct {

@@ -44,7 +44,7 @@ func Search(ctx context.Context, requirement Requirement, registry *Registry, op
 	policy, policyIssues := effectiveSearchPolicy(options.Policy)
 	result := SearchResult{
 		Schema: searchResultSchema, PolicyVersion: PolicyVersion, Status: SearchFailed,
-		RegistryHash: registry.Hash(), CatalogHash: strings.TrimSpace(options.CatalogHash), Policy: policy,
+		RegistryHash: registry.Hash(), CatalogHash: strings.TrimSpace(options.CatalogHash), FormulaLibraryHash: FormulaLibraryHash(), Policy: policy,
 	}
 	validationIssues := Validate(normalized)
 	result.Issues = append(result.Issues, policyIssues...)
@@ -230,6 +230,8 @@ func (accumulator *searchAccumulator) finish() SearchResult {
 	if limit > 1 {
 		accumulator.result.Alternatives = append([]CandidateResult(nil), accumulator.complete[1:limit]...)
 	}
+	rationale := buildSelectionRationale(selected, accumulator.result.Alternatives)
+	accumulator.result.Rationale = &rationale
 	return accumulator.result
 }
 
@@ -333,6 +335,14 @@ func validateProviderExpansion(obligation searchObligation, descriptor ProviderD
 			rejections = append(rejections, ExpansionRejection{Code: CodeEvidenceInsufficient, Path: path + ".evidence", Message: "selected component evidence is below rule_inferred"})
 		}
 	}
+	for index, calculation := range expansion.Calculations {
+		for _, issue := range ValidateCalculation(calculation) {
+			rejections = append(rejections, ExpansionRejection{Code: issue.Code, Path: fmt.Sprintf("%s.calculations[%d].%s", obligation.Path, index, issue.Path), Message: issue.Message})
+		}
+		if !calculation.Pass {
+			rejections = append(rejections, ExpansionRejection{Code: CodeToleranceFailed, Path: fmt.Sprintf("%s.calculations[%d]", obligation.Path, index), Message: "provider calculation fails a required tolerance or rating bound"})
+		}
+	}
 	if len(expansion.Children) > policy.MaxUnresolvedObligations {
 		rejections = append(rejections, ExpansionRejection{Code: CodeLimitExceeded, Path: obligation.Path + ".children", Message: "expansion exceeds child-obligation limit"})
 	}
@@ -365,7 +375,7 @@ func validateProviderExpansion(obligation searchObligation, descriptor ProviderD
 	selection := FragmentSelection{
 		ObligationPath: obligation.Path, Capability: obligation.Capability,
 		ProviderID: descriptor.ID, ProviderRevision: descriptor.Revision, ExpansionID: expansion.ID,
-		Ports: selectionPorts, Components: expansion.Components, Metrics: expansion.Metrics, Evidence: expansion.Evidence,
+		Ports: selectionPorts, Components: expansion.Components, Calculations: expansion.Calculations, Metrics: expansion.Metrics, Evidence: expansion.Evidence,
 		DecisionClass: expansion.DecisionClass, RequiresUserChoice: expansion.RequiresUserChoice, Payload: expansion.Payload,
 	}
 	return normalizeFragmentSelection(selection), expansion.Children, rejections
@@ -409,6 +419,12 @@ func normalizeProviderExpansion(expansion ProviderExpansion) ProviderExpansion {
 	slices.SortStableFunc(expansion.Components, func(left, right SelectedComponent) int {
 		return strings.Compare(left.InstanceID, right.InstanceID)
 	})
+	sortCalculationEvidence(expansion.Calculations)
+	for _, calculation := range expansion.Calculations {
+		if expansion.Metrics.WorstMargin == nil || calculation.WorstMargin < *expansion.Metrics.WorstMargin {
+			expansion.Metrics.WorstMargin = float64Pointer(calculation.WorstMargin)
+		}
+	}
 	for index := range expansion.Children {
 		child := &expansion.Children[index]
 		child.ID = canonicalIdentifier(child.ID)
@@ -431,6 +447,8 @@ func normalizeFragmentSelection(selection FragmentSelection) FragmentSelection {
 	slices.SortStableFunc(selection.Ports, compareRoleContracts)
 	selection.Components = append([]SelectedComponent(nil), selection.Components...)
 	slices.SortStableFunc(selection.Components, func(left, right SelectedComponent) int { return strings.Compare(left.InstanceID, right.InstanceID) })
+	selection.Calculations = append([]CalculationEvidence(nil), selection.Calculations...)
+	sortCalculationEvidence(selection.Calculations)
 	selection.Evidence = normalizeContractEvidence(selection.Evidence)
 	selection.Payload = canonicalRawJSON(selection.Payload)
 	return selection
@@ -544,6 +562,52 @@ func validateCandidateAnchors(selections []FragmentSelection) error {
 
 func compareCandidateResults(left, right CandidateResult) int {
 	return compareCandidateScores(left.Score, right.Score, true)
+}
+
+func buildSelectionRationale(selected CandidateResult, alternatives []CandidateResult) SelectionRationale {
+	rationale := SelectionRationale{SelectedFingerprint: selected.Fingerprint}
+	if len(alternatives) == 0 {
+		rationale.Summary = "selected the only retained complete architecture candidate"
+		return rationale
+	}
+	rationale.Summary = fmt.Sprintf("selected the highest-ranked candidate from %d retained complete architectures", len(alternatives)+1)
+	for _, alternative := range alternatives {
+		field, reason := firstScoreDifference(selected.Score, alternative.Score)
+		rationale.Comparisons = append(rationale.Comparisons, AlternativeComparison{Fingerprint: alternative.Fingerprint, FirstScoreField: field, Reason: reason})
+	}
+	return rationale
+}
+
+func firstScoreDifference(selected, alternative CandidateScore) (string, string) {
+	if selected.UnprovenNonSafety != alternative.UnprovenNonSafety {
+		return "unproven_non_safety", fmt.Sprintf("selected has %d unproven non-safety obligations versus %d", selected.UnprovenNonSafety, alternative.UnprovenNonSafety)
+	}
+	if compareOptionalDescending(selected.WorstMargin, alternative.WorstMargin) != 0 {
+		return "worst_margin", fmt.Sprintf("selected worst normalized margin %s ranks ahead of %s", optionalFloatText(selected.WorstMargin), optionalFloatText(alternative.WorstMargin))
+	}
+	if selected.EvidenceRank != alternative.EvidenceRank {
+		return "evidence_rank", fmt.Sprintf("selected evidence rank %d exceeds %d", selected.EvidenceRank, alternative.EvidenceRank)
+	}
+	if selected.ComponentCount != alternative.ComponentCount {
+		return "component_count", fmt.Sprintf("selected uses %d components versus %d", selected.ComponentCount, alternative.ComponentCount)
+	}
+	if selected.FragmentCount != alternative.FragmentCount {
+		return "fragment_count", fmt.Sprintf("selected uses %d fragments versus %d", selected.FragmentCount, alternative.FragmentCount)
+	}
+	if compareOptionalAscending(selected.QuiescentPowerW, alternative.QuiescentPowerW) != 0 {
+		return "quiescent_power_w", fmt.Sprintf("selected quiescent power %s ranks ahead of %s", optionalFloatText(selected.QuiescentPowerW), optionalFloatText(alternative.QuiescentPowerW))
+	}
+	if compareOptionalAscending(selected.AreaMM2, alternative.AreaMM2) != 0 {
+		return "area_mm2", fmt.Sprintf("selected area %s ranks ahead of %s", optionalFloatText(selected.AreaMM2), optionalFloatText(alternative.AreaMM2))
+	}
+	return "fingerprint", "all substantive score fields tie; canonical architecture fingerprint is the deterministic tie-breaker"
+}
+
+func optionalFloatText(value *float64) string {
+	if value == nil {
+		return "unknown"
+	}
+	return fmt.Sprintf("%.12g", *value)
 }
 
 func compareCandidateScores(left, right CandidateScore, includeFingerprint bool) int {

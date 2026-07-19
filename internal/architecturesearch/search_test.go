@@ -58,6 +58,9 @@ func TestRegistryAndSearchAreDeterministicUnderProviderRequestAndExpansionOrder(
 	if len(first.Alternatives) != 1 || first.Alternatives[0].Selections[0].ProviderID != "compact_threshold" {
 		t.Fatalf("alternatives = %#v", first.Alternatives)
 	}
+	if first.Rationale == nil || len(first.Rationale.Comparisons) != 1 || first.Rationale.Comparisons[0].FirstScoreField != "worst_margin" {
+		t.Fatalf("selection rationale = %#v", first.Rationale)
+	}
 	firstJSON, err := json.Marshal(first)
 	if err != nil {
 		t.Fatal(err)
@@ -170,6 +173,35 @@ func TestSearchRecordsDeterministicElectricalRejectionsAndFailsClosed(t *testing
 	encodedSecond, _ := json.Marshal(second.Rejections)
 	if string(encodedFirst) != string(encodedSecond) {
 		t.Fatalf("rejection evidence is not deterministic\n%s\n%s", encodedFirst, encodedSecond)
+	}
+}
+
+func TestSearchRejectsTamperedOrFailedCalculationEvidence(t *testing.T) {
+	calculation, issues := SolveDivider(DividerRequest{
+		ID: "provider_divider", Mode: DividerAttenuator,
+		SourceVoltageV: 5, TargetVoltageV: 2.5, TargetTolerancePercent: 3,
+		LowerResistanceOhm: 10000, LowerTolerancePercent: 1, UpperTolerancePercent: 1,
+		UpperSeries: SeriesE96, MinimumUpperOhm: 1000, MaximumUpperOhm: 100000,
+	})
+	if len(issues) != 0 {
+		t.Fatal(issues)
+	}
+	calculation.Hash = "tampered"
+	provider := staticTestProvider{
+		descriptor: validProviderDescriptor("tampered_calculation", "threshold_detection"),
+		expand: func(request ProviderRequest) ([]ProviderExpansion, error) {
+			expansion := compatibleExpansion(request, "tampered", 1, 0.2)
+			expansion.Calculations = []CalculationEvidence{calculation}
+			return []ProviderExpansion{expansion}, nil
+		},
+	}
+	registry, registryIssues := NewRegistry(provider)
+	if len(registryIssues) != 0 {
+		t.Fatal(registryIssues)
+	}
+	result := Search(context.Background(), validRequirement(), registry, SearchOptions{})
+	if result.Status != SearchUnsupported || !rejectionSummaryContains(result.Rejections, CodeValueInputInvalid) {
+		t.Fatalf("tampered calculation result = %#v", result)
 	}
 }
 
