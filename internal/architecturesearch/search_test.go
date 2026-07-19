@@ -1,0 +1,337 @@
+package architecturesearch
+
+import (
+	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"reflect"
+	"slices"
+	"strings"
+	"testing"
+
+	"kicadai/internal/reports"
+)
+
+type staticTestProvider struct {
+	descriptor ProviderDescriptor
+	expand     func(ProviderRequest) ([]ProviderExpansion, error)
+}
+
+func (provider staticTestProvider) Descriptor() ProviderDescriptor {
+	return provider.descriptor
+}
+
+func (provider staticTestProvider) Expand(_ context.Context, request ProviderRequest) ([]ProviderExpansion, error) {
+	return provider.expand(request)
+}
+
+func TestRegistryAndSearchAreDeterministicUnderProviderRequestAndExpansionOrder(t *testing.T) {
+	precision := scoredTestProvider("precision_threshold", "threshold_detection", []testExpansionScore{{id: "precision", margin: 0.6, components: 2, power: 0.002, area: 12}})
+	compact := scoredTestProvider("compact_threshold", "threshold_detection", []testExpansionScore{{id: "compact", margin: 0.5, components: 1, power: 0.001, area: 8}})
+	firstRegistry, issues := NewRegistry(precision, compact)
+	if len(issues) != 0 {
+		t.Fatalf("first registry issues = %#v", issues)
+	}
+	secondRegistry, issues := NewRegistry(compact, precision)
+	if len(issues) != 0 {
+		t.Fatalf("second registry issues = %#v", issues)
+	}
+	if firstRegistry.Hash() != secondRegistry.Hash() {
+		t.Fatalf("registry hash changed with registration order: %s != %s", firstRegistry.Hash(), secondRegistry.Hash())
+	}
+
+	firstRequirement := validRequirement()
+	secondRequirement := cloneRequirement(firstRequirement)
+	slices.Reverse(secondRequirement.Requirements.Domains)
+	slices.Reverse(secondRequirement.Requirements.Ports)
+	slices.Reverse(secondRequirement.Requirements.Objectives[0].Bindings)
+	slices.Reverse(secondRequirement.Requirements.Objectives[0].Constraints)
+	first := Search(context.Background(), firstRequirement, firstRegistry, SearchOptions{CatalogHash: "catalog-test"})
+	second := Search(context.Background(), secondRequirement, secondRegistry, SearchOptions{CatalogHash: "catalog-test"})
+	if first.Status != SearchSelected || first.Selected == nil {
+		t.Fatalf("first result = %#v", first)
+	}
+	if first.Selected.Selections[0].ProviderID != "precision_threshold" {
+		t.Fatalf("selected provider = %s, want precision_threshold; score=%#v", first.Selected.Selections[0].ProviderID, first.Selected.Score)
+	}
+	if len(first.Alternatives) != 1 || first.Alternatives[0].Selections[0].ProviderID != "compact_threshold" {
+		t.Fatalf("alternatives = %#v", first.Alternatives)
+	}
+	firstJSON, err := json.Marshal(first)
+	if err != nil {
+		t.Fatal(err)
+	}
+	secondJSON, err := json.Marshal(second)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(firstJSON) != string(secondJSON) {
+		t.Fatalf("search bytes changed under input/provider reordering\n%s\n%s", firstJSON, secondJSON)
+	}
+	if first.Consumption.ExpandedStates != 1 || first.Consumption.GeneratedStates != 2 || first.Consumption.CompleteCandidates != 2 {
+		t.Fatalf("consumption = %#v", first.Consumption)
+	}
+}
+
+func TestProviderRequestExcludesFixtureAndRequirementIdentity(t *testing.T) {
+	provider := staticTestProvider{
+		descriptor: validProviderDescriptor("identity_blind", "threshold_detection"),
+		expand: func(request ProviderRequest) ([]ProviderExpansion, error) {
+			for _, port := range request.Ports {
+				if port.Anchor != "" || port.Contract.ID != "" {
+					return nil, fmt.Errorf("provider received identity-bearing port %#v", port)
+				}
+			}
+			encoded, err := json.Marshal(request)
+			if err != nil {
+				return nil, err
+			}
+			for _, forbidden := range []string{"synthetic_threshold", "Synthetic threshold", "objective:detect", "external:"} {
+				if strings.Contains(string(encoded), forbidden) {
+					return nil, fmt.Errorf("provider request contains forbidden identity %q", forbidden)
+				}
+			}
+			return []ProviderExpansion{compatibleExpansion(request, "blind", 1, 0.2)}, nil
+		},
+	}
+	registry, issues := NewRegistry(provider)
+	if len(issues) != 0 {
+		t.Fatal(issues)
+	}
+	result := Search(context.Background(), validRequirement(), registry, SearchOptions{})
+	if result.Status != SearchSelected {
+		t.Fatalf("identity-blind search = %#v", result)
+	}
+}
+
+func TestSearchComposesChildCapabilityObligations(t *testing.T) {
+	root := staticTestProvider{
+		descriptor: validProviderDescriptor("threshold_root", "threshold_detection"),
+		expand: func(request ProviderRequest) ([]ProviderExpansion, error) {
+			expansion := compatibleExpansion(request, "protected_threshold", 1, 0.4)
+			expansion.Children = []ChildObligation{{
+				ID: "input_guard", Capability: "input_protection",
+				Ports: []RoleContract{{Role: "protected", Contract: PortContract{
+					Kind: "analog_voltage", Direction: "sink", Domain: "vcc",
+					Voltage:         NumericRange{Minimum: float64Pointer(0), Maximum: float64Pointer(5)},
+					MinimumEvidence: EvidenceRuleInferred,
+				}}},
+			}}
+			return []ProviderExpansion{expansion}, nil
+		},
+	}
+	guard := staticTestProvider{
+		descriptor: validProviderDescriptor("generic_input_guard", "input_protection"),
+		expand: func(request ProviderRequest) ([]ProviderExpansion, error) {
+			return []ProviderExpansion{compatibleExpansion(request, "clamped_input", 1, 0.3)}, nil
+		},
+	}
+	registry, issues := NewRegistry(guard, root)
+	if len(issues) != 0 {
+		t.Fatal(issues)
+	}
+	result := Search(context.Background(), validRequirement(), registry, SearchOptions{})
+	if result.Status != SearchSelected || result.Selected == nil || len(result.Selected.Selections) != 2 || result.Selected.Score.ComponentCount != 2 || result.Selected.Score.FragmentCount != 2 {
+		t.Fatalf("composed result = %#v", result)
+	}
+	capabilities := []string{result.Selected.Selections[0].Capability, result.Selected.Selections[1].Capability}
+	slices.Sort(capabilities)
+	if !reflect.DeepEqual(capabilities, []string{"input_protection", "threshold_detection"}) {
+		t.Fatalf("selected capabilities = %#v", capabilities)
+	}
+}
+
+func TestSearchRecordsDeterministicElectricalRejectionsAndFailsClosed(t *testing.T) {
+	provider := staticTestProvider{
+		descriptor: validProviderDescriptor("unsafe_threshold", "threshold_detection"),
+		expand: func(request ProviderRequest) ([]ProviderExpansion, error) {
+			expansion := compatibleExpansion(request, "unsafe", 1, 0.1)
+			expansion.OfferedPorts[0].Contract.Voltage = NumericRange{}
+			expansion.OfferedPorts[0].Contract.Evidence.Confidence = EvidencePlaceholder
+			return []ProviderExpansion{expansion}, nil
+		},
+	}
+	registry, issues := NewRegistry(provider)
+	if len(issues) != 0 {
+		t.Fatal(issues)
+	}
+	result := Search(context.Background(), validRequirement(), registry, SearchOptions{})
+	if result.Status != SearchUnsupported || result.Selected != nil || len(result.Issues) != 1 || result.Issues[0].Code != CodeSearchNoCandidate {
+		t.Fatalf("unsafe result = %#v", result)
+	}
+	for _, code := range []reports.Code{CodeVoltageEvidenceMissing, CodeEvidenceInsufficient} {
+		if !rejectionSummaryContains(result.Rejections, code) {
+			t.Fatalf("rejections lack %s: %#v", code, result.Rejections)
+		}
+	}
+	encodedFirst, _ := json.Marshal(result.Rejections)
+	second := Search(context.Background(), validRequirement(), registry, SearchOptions{})
+	encodedSecond, _ := json.Marshal(second.Rejections)
+	if string(encodedFirst) != string(encodedSecond) {
+		t.Fatalf("rejection evidence is not deterministic\n%s\n%s", encodedFirst, encodedSecond)
+	}
+}
+
+func TestUnsupportedCapabilityFailsClosed(t *testing.T) {
+	registry, issues := NewRegistry()
+	if len(issues) != 0 {
+		t.Fatal(issues)
+	}
+	result := Search(context.Background(), validRequirement(), registry, SearchOptions{})
+	if result.Status != SearchUnsupported || len(result.Issues) != 1 || result.Issues[0].Code != CodeCapabilityUnsupported || !rejectionSummaryContains(result.Rejections, CodeCapabilityUnsupported) {
+		t.Fatalf("unsupported result = %#v", result)
+	}
+}
+
+func TestSearchBudgetExhaustionDoesNotReturnPartialSelection(t *testing.T) {
+	recursive := staticTestProvider{
+		descriptor: validProviderDescriptor("recursive_provider", "threshold_detection", "recursive_capability"),
+		expand: func(request ProviderRequest) ([]ProviderExpansion, error) {
+			expansion := compatibleExpansion(request, "recurse", 0, 0.1)
+			expansion.Children = []ChildObligation{{ID: "again", Capability: "recursive_capability", Ports: cloneRoleContracts(request.Ports)}}
+			return []ProviderExpansion{expansion}, nil
+		},
+	}
+	registry, issues := NewRegistry(recursive)
+	if len(issues) != 0 {
+		t.Fatal(issues)
+	}
+	policy := DefaultSearchPolicy()
+	policy.MaxDepth = 1
+	result := Search(context.Background(), validRequirement(), registry, SearchOptions{Policy: policy})
+	if result.Status != SearchExhausted || result.Selected != nil || len(result.Issues) != 1 || result.Issues[0].Code != CodeSearchBudgetExhausted {
+		t.Fatalf("depth-exhausted result = %#v", result)
+	}
+
+	many := staticTestProvider{
+		descriptor: validProviderDescriptor("wide_provider", "threshold_detection"),
+		expand: func(request ProviderRequest) ([]ProviderExpansion, error) {
+			expansions := make([]ProviderExpansion, DefaultMaxProviderExpansions+1)
+			for index := range expansions {
+				expansions[index] = compatibleExpansion(request, fmt.Sprintf("candidate_%02d", index), 1, 0.1)
+			}
+			return expansions, nil
+		},
+	}
+	wideRegistry, issues := NewRegistry(many)
+	if len(issues) != 0 {
+		t.Fatal(issues)
+	}
+	wide := Search(context.Background(), validRequirement(), wideRegistry, SearchOptions{})
+	if wide.Status != SearchExhausted || wide.Selected != nil || !rejectionSummaryContains(wide.Rejections, CodeProviderExpansionLimit) {
+		t.Fatalf("provider-limit result = %#v", wide)
+	}
+}
+
+func TestTiedUserVisibleArchitecturesFailAsAmbiguous(t *testing.T) {
+	provider := staticTestProvider{
+		descriptor: validProviderDescriptor("choice_provider", "threshold_detection"),
+		expand: func(request ProviderRequest) ([]ProviderExpansion, error) {
+			linear := compatibleExpansion(request, "linear", 1, 0.5)
+			linear.DecisionClass = "linear"
+			linear.RequiresUserChoice = true
+			switching := compatibleExpansion(request, "switching", 1, 0.5)
+			switching.DecisionClass = "switching"
+			switching.RequiresUserChoice = true
+			return []ProviderExpansion{switching, linear}, nil
+		},
+	}
+	registry, issues := NewRegistry(provider)
+	if len(issues) != 0 {
+		t.Fatal(issues)
+	}
+	result := Search(context.Background(), validRequirement(), registry, SearchOptions{})
+	if result.Status != SearchAmbiguous || result.Selected != nil || len(result.Issues) != 1 || result.Issues[0].Code != CodeSearchAmbiguous {
+		t.Fatalf("ambiguous result = %#v", result)
+	}
+}
+
+func TestRegistryAndPolicyValidationFailBeforeSearch(t *testing.T) {
+	valid := scoredTestProvider("same_id", "threshold_detection", []testExpansionScore{{id: "one", margin: 0.1, components: 1}})
+	duplicate := scoredTestProvider("same_id", "threshold_detection", []testExpansionScore{{id: "two", margin: 0.1, components: 1}})
+	if _, issues := NewRegistry(valid, duplicate); !containsIssue(issues, CodeProviderDuplicate, ".id") {
+		t.Fatalf("duplicate provider issues = %#v", issues)
+	}
+	placeholder := staticTestProvider{
+		descriptor: ProviderDescriptor{ID: "placeholder", Revision: "1", Capabilities: []string{"threshold_detection"}, Evidence: ContractEvidence{Confidence: EvidencePlaceholder}},
+		expand:     func(ProviderRequest) ([]ProviderExpansion, error) { return nil, errors.New("must not run") },
+	}
+	if _, issues := NewRegistry(placeholder); !containsIssue(issues, CodeProviderInvalid, "providers") {
+		t.Fatalf("placeholder provider issues = %#v", issues)
+	}
+
+	registry, issues := NewRegistry(valid)
+	if len(issues) != 0 {
+		t.Fatal(issues)
+	}
+	policy := DefaultSearchPolicy()
+	policy.MaxExpandedStates++
+	result := Search(context.Background(), validRequirement(), registry, SearchOptions{Policy: policy})
+	if result.Status != SearchFailed || !containsIssue(result.Issues, CodeLimitExceeded, "max_expanded_states") || result.Consumption.ExpandedStates != 0 {
+		t.Fatalf("invalid policy result = %#v", result)
+	}
+}
+
+type testExpansionScore struct {
+	id         string
+	margin     float64
+	components int
+	power      float64
+	area       float64
+}
+
+func scoredTestProvider(id, capability string, scores []testExpansionScore) staticTestProvider {
+	return staticTestProvider{
+		descriptor: validProviderDescriptor(id, capability),
+		expand: func(request ProviderRequest) ([]ProviderExpansion, error) {
+			expansions := make([]ProviderExpansion, 0, len(scores))
+			for _, score := range scores {
+				expansion := compatibleExpansion(request, score.id, score.components, score.margin)
+				if score.power > 0 {
+					expansion.Metrics.QuiescentPowerW = float64Pointer(score.power)
+				}
+				if score.area > 0 {
+					expansion.Metrics.AreaMM2 = float64Pointer(score.area)
+				}
+				expansions = append(expansions, expansion)
+			}
+			slices.Reverse(expansions)
+			return expansions, nil
+		},
+	}
+}
+
+func compatibleExpansion(request ProviderRequest, id string, componentCount int, margin float64) ProviderExpansion {
+	ports := cloneRoleContracts(request.Ports)
+	for index := range ports {
+		contract := &ports[index].Contract
+		contract.ID = ""
+		contract.MinimumEvidence = ""
+		contract.Evidence = ContractEvidence{Confidence: EvidenceVerified, Sources: []string{"synthetic_datasheet"}}
+		contract.CurrentCapacityA = cloneFloat64(contract.RequiredCurrentCapacityA)
+		contract.CurrentDemandA = cloneFloat64(contract.MaximumCurrentDemandA)
+		contract.Traits = append(contract.Traits, contract.RequiredTraits...)
+		contract.RequiredTraits = nil
+	}
+	components := make([]SelectedComponent, componentCount)
+	for index := range components {
+		components[index] = SelectedComponent{InstanceID: fmt.Sprintf("part_%02d", index), CatalogID: fmt.Sprintf("catalog_part_%02d", index), Evidence: EvidenceVerified}
+	}
+	return ProviderExpansion{
+		ID: id, OfferedPorts: ports, Components: components,
+		Metrics:  ExpansionMetrics{WorstMargin: float64Pointer(margin)},
+		Evidence: ContractEvidence{Confidence: EvidenceVerified, Sources: []string{"synthetic_provider"}},
+	}
+}
+
+func validProviderDescriptor(id string, capabilities ...string) ProviderDescriptor {
+	return ProviderDescriptor{ID: id, Revision: "1.0.0", Capabilities: capabilities, Evidence: ContractEvidence{Confidence: EvidenceVerified, Sources: []string{"synthetic_provider_contract"}}}
+}
+
+func cloneRoleContracts(ports []RoleContract) []RoleContract {
+	encoded, _ := json.Marshal(ports)
+	var cloned []RoleContract
+	_ = json.Unmarshal(encoded, &cloned)
+	return cloned
+}
