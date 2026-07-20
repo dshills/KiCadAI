@@ -111,14 +111,15 @@ func TestResolveCanonicalizesProviderModelID(t *testing.T) {
 
 func TestClonePlanDoesNotShareMutableEvidence(t *testing.T) {
 	value := 1000.0
-	source := Plan{Bindings: []ResolvedBinding{{Role: "resistor", ValueSI: &value, ModelParameters: []NamedValue{{Name: "parameter", Value: 1}}}}, Inputs: []NamedValue{{Name: "input", Value: 2}}, Assertions: []Assertion{{Metric: "metric", Min: 0, Max: 3}}}
+	source := Plan{Bindings: []ResolvedBinding{{Role: "resistor", ValueSI: &value, ModelParameters: []NamedValue{{Name: "parameter", Value: 1}}}}, Inputs: []NamedValue{{Name: "input", Value: 2}}, Analyses: []Analysis{{ID: "dc", DCSweep: &DCSweep{Component: "source", StartValue: 1, StopValue: 2, Points: 3}}}, Assertions: []Assertion{{Metric: "metric", Min: 0, Max: 3}}}
 	clone := ClonePlan(source)
 	clone.Bindings[0].Role = "changed"
 	*clone.Bindings[0].ValueSI = 2000
 	clone.Bindings[0].ModelParameters[0].Value = 4
 	clone.Inputs[0].Value = 5
+	clone.Analyses[0].DCSweep.StopValue = 3
 	clone.Assertions[0].Max = 6
-	if source.Bindings[0].Role != "resistor" || *source.Bindings[0].ValueSI != 1000 || source.Bindings[0].ModelParameters[0].Value != 1 || source.Inputs[0].Value != 2 || source.Assertions[0].Max != 3 {
+	if source.Bindings[0].Role != "resistor" || *source.Bindings[0].ValueSI != 1000 || source.Bindings[0].ModelParameters[0].Value != 1 || source.Inputs[0].Value != 2 || source.Analyses[0].DCSweep.StopValue != 2 || source.Assertions[0].Max != 3 {
 		t.Fatalf("source plan mutated through clone: %#v", source)
 	}
 }
@@ -152,9 +153,9 @@ func TestSupportedAnalysisKindsDescribeExecutableRegistryPaths(t *testing.T) {
 		{ModelLinearRegulatorIdealV1, []string{AnalysisDCOperatingPoint}},
 		{ModelResistorDividerDCV1, []string{AnalysisDCOperatingPoint}},
 		{ModelRCLowpassACV1, []string{AnalysisACSweep}},
-		{ModelLinearCircuitMNAV1, []string{AnalysisACSweep, AnalysisDCOperatingPoint}},
-		{ModelNonlinearCircuitDCV1, []string{AnalysisDCOperatingPoint}},
-		{ModelTransientCircuitV1, []string{AnalysisTransient}},
+		{ModelLinearCircuitMNAV1, []string{AnalysisACSweep, AnalysisDCOperatingPoint, AnalysisNoise, AnalysisStability, AnalysisThermal}},
+		{ModelNonlinearCircuitDCV1, []string{AnalysisDCOperatingPoint, AnalysisThermal}},
+		{ModelTransientCircuitV1, []string{AnalysisDistortion, AnalysisStartup, AnalysisTransient}},
 	}
 	for _, test := range tests {
 		if got := SupportedAnalysisKinds(test.model); !slices.Equal(got, test.want) {
@@ -164,11 +165,6 @@ func TestSupportedAnalysisKindsDescribeExecutableRegistryPaths(t *testing.T) {
 			if !SupportsAnalysis(test.model, kind) {
 				t.Fatalf("SupportsAnalysis(%q, %q) = false", test.model, kind)
 			}
-		}
-	}
-	for _, future := range []string{AnalysisNoise, AnalysisStability, AnalysisStartup, AnalysisDistortion, AnalysisThermal} {
-		if SupportsAnalysis(ModelLinearCircuitMNAV1, future) {
-			t.Fatalf("future analysis %q was reported executable", future)
 		}
 	}
 	if got := SupportedAnalysisKinds("missing"); len(got) != 0 {

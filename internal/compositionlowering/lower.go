@@ -11,6 +11,7 @@ import (
 
 	"kicadai/internal/architecturesearch"
 	"kicadai/internal/circuitgraph"
+	"kicadai/internal/closedloopsynthesis"
 	"kicadai/internal/reports"
 )
 
@@ -22,14 +23,15 @@ const (
 )
 
 type Evidence struct {
-	Schema               string   `json:"schema"`
-	PolicyVersion        string   `json:"policy_version"`
-	RequirementHash      string   `json:"requirement_hash"`
-	RegistryHash         string   `json:"registry_hash"`
-	CatalogHash          string   `json:"catalog_hash"`
-	FormulaLibraryHash   string   `json:"formula_library_hash"`
-	CandidateFingerprint string   `json:"candidate_fingerprint"`
-	Selections           []string `json:"selections"`
+	Schema               string                                `json:"schema"`
+	PolicyVersion        string                                `json:"policy_version"`
+	RequirementHash      string                                `json:"requirement_hash"`
+	RegistryHash         string                                `json:"registry_hash"`
+	CatalogHash          string                                `json:"catalog_hash"`
+	FormulaLibraryHash   string                                `json:"formula_library_hash"`
+	CandidateFingerprint string                                `json:"candidate_fingerprint"`
+	Selections           []string                              `json:"selections"`
+	SemanticBindings     []closedloopsynthesis.SemanticBinding `json:"semantic_bindings"`
 }
 
 type Result struct {
@@ -221,7 +223,7 @@ func Lower(requirement architecturesearch.Requirement, search architecturesearch
 		}
 	}
 
-	connections, connectionIssues := lowerConnections(union, actual, metadata)
+	connections, connectionNames, connectionIssues := lowerConnections(union, actual, metadata)
 	if len(connectionIssues) != 0 {
 		return Result{}, connectionIssues
 	}
@@ -244,7 +246,7 @@ func Lower(requirement architecturesearch.Requirement, search architecturesearch
 		Schema: EvidenceSchema, PolicyVersion: PolicyVersion,
 		RequirementHash: search.RequirementHash, RegistryHash: search.RegistryHash, CatalogHash: search.CatalogHash,
 		FormulaLibraryHash: search.FormulaLibraryHash, CandidateFingerprint: search.Selected.Score.Fingerprint,
-		Selections: selectionEvidence,
+		Selections: selectionEvidence, SemanticBindings: lowerSemanticBindings(requirement, union, connectionNames, externalNodes),
 	}
 	return Result{Document: document, Evidence: evidence}, nil
 }
@@ -312,7 +314,7 @@ func lowerInterfaces(requirement architecturesearch.Requirement, union *disjoint
 	return result, nodes
 }
 
-func lowerConnections(union *disjointSet, actual map[string]circuitgraph.FunctionalEndpoint, metadata map[string]nodeMetadata) ([]circuitgraph.FunctionConnection, []reports.Issue) {
+func lowerConnections(union *disjointSet, actual map[string]circuitgraph.FunctionalEndpoint, metadata map[string]nodeMetadata) ([]circuitgraph.FunctionConnection, map[string]string, []reports.Issue) {
 	groups := map[string][]string{}
 	for node := range actual {
 		root := union.find(node)
@@ -324,23 +326,53 @@ func lowerConnections(union *disjointSet, actual map[string]circuitgraph.Functio
 	}
 	slices.Sort(roots)
 	connections := make([]circuitgraph.FunctionConnection, 0, len(roots))
+	names := make(map[string]string, len(roots))
 	for index, root := range roots {
 		nodes := groups[root]
 		slices.Sort(nodes)
 		if len(nodes) < 2 {
-			return nil, issues(nodes[0], "semantic endpoint is disconnected after composition")
+			return nil, nil, issues(nodes[0], "semantic endpoint is disconnected after composition")
 		}
 		combined := nodeMetadata{role: circuitgraph.NetRoleSignal}
 		for node := range union.members(root) {
 			combined = combineMetadata(combined, metadata[node])
 		}
 		connection := circuitgraph.FunctionConnection{Name: fmt.Sprintf("composition_net_%03d", index+1), Role: combined.role, VoltageDomain: combined.domain, CurrentMA: combined.current}
+		names[root] = connection.Name
 		for _, node := range nodes {
 			connection.Endpoints = append(connection.Endpoints, actual[node])
 		}
 		connections = append(connections, connection)
 	}
-	return connections, nil
+	return connections, names, nil
+}
+
+func lowerSemanticBindings(requirement architecturesearch.Requirement, union *disjointSet, connectionNames map[string]string, externalNodes map[string]string) []closedloopsynthesis.SemanticBinding {
+	var bindings []closedloopsynthesis.SemanticBinding
+	appendBinding := func(kind, id, node string) {
+		if node == "" {
+			return
+		}
+		if target := connectionNames[union.find(node)]; target != "" {
+			bindings = append(bindings, closedloopsynthesis.SemanticBinding{Kind: kind, ID: id, Target: target})
+		}
+	}
+	for _, port := range requirement.Requirements.Ports {
+		appendBinding("port", port.ID, externalNodes[port.ID])
+	}
+	for _, signal := range requirement.Requirements.Signals {
+		appendBinding("signal", signal.ID, anchorNode("signal:"+signal.ID, ""))
+	}
+	for _, domain := range requirement.Requirements.Domains {
+		appendBinding("domain", domain.ID, anchorNode("domain:"+domain.ID, ""))
+	}
+	slices.SortStableFunc(bindings, func(left, right closedloopsynthesis.SemanticBinding) int {
+		if order := strings.Compare(left.Kind, right.Kind); order != 0 {
+			return order
+		}
+		return strings.Compare(left.ID, right.ID)
+	})
+	return bindings
 }
 
 func interfaceRole(port architecturesearch.Port) circuitgraph.InterfaceRole {

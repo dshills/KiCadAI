@@ -49,7 +49,13 @@ func TestSimModelEvaluatorRepairsThroughFreshTrustedResolution(t *testing.T) {
 	}}
 	input := Input{
 		Requirement: requirement, CatalogHash: testHash("catalog"), FormulaLibraryHash: testHash("formula"), ModelRegistryHash: testHash("models"),
-		Candidates: []Candidate{{Fingerprint: testHash("divider"), Variables: []Variable{{ID: "lower_resistance", Kind: "passive_value", Value: 5_000, AllowedValues: []float64{5_000, 10_000}}}}},
+		Candidates: []Candidate{{
+			Fingerprint: testHash("divider"),
+			Variables: []Variable{{
+				ID: "lower_resistance", Kind: "passive_value", Value: 5_000, AllowedValues: []float64{5_000, 10_000},
+				Effects: []RepairEffect{{Analysis: simmodel.AnalysisDCOperatingPoint, Metric: "dc_voltage", Direction: RepairMetricIncreases}},
+			}},
+		}},
 	}
 	registry, diagnostics := modelprovenance.LoadDefault()
 	if len(diagnostics) != 0 {
@@ -83,6 +89,18 @@ func TestSimModelEvaluatorFailsClosedWithoutIndependentProvenanceRegistry(t *tes
 	evaluator := SimModelEvaluator{Resolver: dividerSimulationResolver{}}
 	if _, err := evaluator.Evaluate(context.Background(), CandidateState{Fingerprint: testHash("missing-provenance")}); err == nil {
 		t.Fatal("simulation without independent model provenance was accepted")
+	}
+}
+
+func TestWorstLinkedAssertionSelectsWorstCornerDeterministically(t *testing.T) {
+	plan := simmodel.Plan{Assertions: []simmodel.Assertion{{Min: 4.5, Max: 5.5}, {Min: 4.5, Max: 5.5}, {Min: 4.5, Max: 5.5}}}
+	report := simmodel.Report{Assertions: []simmodel.AssertionResult{{Actual: 5}, {Actual: 4.6}, {Actual: 5.4}}}
+	worst, err := worstLinkedAssertion(plan, report, []int{0, 1, 2})
+	if err != nil || worst.Actual != 4.6 {
+		t.Fatalf("worst linked assertion = %#v err=%v", worst, err)
+	}
+	if diagnostics := validateSimulationResolution(SimulationResolution{Plan: simmodel.Plan{}, Measurements: []SimulationMeasurementLink{{RequirementID: "r", OperatingCase: "c", Assertions: []int{1, 0}}}}); len(diagnostics) == 0 {
+		t.Fatal("non-canonical aggregate assertion link was accepted")
 	}
 }
 

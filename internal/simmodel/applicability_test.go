@@ -41,6 +41,9 @@ func TestApplicableGraphModelForTransientRequiresTransientCapacitorEvidence(t *t
 	if model, ok, _ := ApplicableGraphModelForAnalysis(transient, AnalysisTransient); !ok || model != ModelTransientCircuitV1 {
 		t.Fatalf("transient applicability = %q, %t", model, ok)
 	}
+	if model, ok, _ := ApplicableGraphModelForAnalysis(transient, AnalysisStartup); !ok || model != ModelTransientCircuitV1 {
+		t.Fatalf("startup applicability = %q, %t", model, ok)
+	}
 
 	dcOnly := append([]ComponentEvidence(nil), base...)
 	dcOnly = append(dcOnly, ComponentEvidence{InstanceID: "capacitor", Family: "capacitor", ModelClaims: []CatalogEvidence{{ModelID: PrimitiveCapacitorV1}}, Connections: []ConnectionEvidence{{Function: "A", Net: "VCC"}}})

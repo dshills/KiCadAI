@@ -103,7 +103,10 @@ func evaluateCandidate(ctx context.Context, requirement architecturesearch.Requi
 		if err := ctx.Err(); err != nil {
 			return finishCandidate(result, current, StopCanceled)
 		}
-		neighbors := neighboringStates(state)
+		neighbors := neighboringStates(state, current.Diagnoses)
+		if len(neighbors) == 0 {
+			return finishCandidate(result, current, StopUnsupportedDiagnosis)
+		}
 		var best *Attempt
 		trials := 0
 		for _, neighbor := range neighbors {
@@ -330,6 +333,21 @@ func validateVariables(path string, variables []Variable, policy Policy) []Diagn
 		if !allowedVariableKind(variable.Kind) {
 			diagnostics = append(diagnostics, Diagnostic{Path: entry + ".kind", Message: "unsupported generic repair variable kind"})
 		}
+		if len(variable.Effects) == 0 {
+			diagnostics = append(diagnostics, Diagnostic{Path: entry + ".effects", Message: "repair variable requires at least one trusted monotonic behavioral effect"})
+		}
+		previousEffect := ""
+		for effectIndex, effect := range variable.Effects {
+			effectPath := fmt.Sprintf("%s.effects[%d]", entry, effectIndex)
+			key := effect.Analysis + "\x00" + effect.Metric + "\x00" + effect.Direction
+			if !validRepairAnalysis(effect.Analysis) || effect.Metric == "" || (effect.Direction != RepairMetricIncreases && effect.Direction != RepairMetricDecreases) {
+				diagnostics = append(diagnostics, Diagnostic{Path: effectPath, Message: "repair effect requires a registered analysis, metric, and monotonic direction"})
+			}
+			if key <= previousEffect {
+				diagnostics = append(diagnostics, Diagnostic{Path: effectPath, Message: "repair effects must be unique and canonically ordered"})
+			}
+			previousEffect = key
+		}
 		if !finite(variable.Value) || len(variable.AllowedValues) < 2 || len(variable.AllowedValues) > policy.MaxValuesPerVariable {
 			diagnostics = append(diagnostics, Diagnostic{Path: entry, Message: "repair variable requires finite current value and a bounded allowed set"})
 			continue
@@ -351,12 +369,15 @@ func validateVariables(path string, variables []Variable, policy Policy) []Diagn
 	return diagnostics
 }
 
-func neighboringStates(state CandidateState) []CandidateState {
+func neighboringStates(state CandidateState, diagnoses []Diagnosis) []CandidateState {
 	var states []CandidateState
 	for variableIndex, variable := range state.Variables {
 		current := slices.Index(variable.AllowedValues, variable.Value)
 		for _, next := range []int{current - 1, current + 1} {
 			if next < 0 || next >= len(variable.AllowedValues) {
+				continue
+			}
+			if _, ok := matchingRepairDiagnosis(variable, variable.AllowedValues[next]-variable.Value, diagnoses); !ok {
 				continue
 			}
 			// AllowedValues is immutable after input normalization. Copy only the
@@ -376,13 +397,54 @@ func repairBetween(before, after CandidateState, number int, beforeHash, afterHa
 		if before.Variables[index].Value == after.Variables[index].Value {
 			continue
 		}
-		reason := "improves the complete behavioral assertion score"
-		if len(diagnoses) != 0 {
-			reason = "addresses " + diagnoses[0].RequirementID + " in " + diagnoses[0].OperatingCase + " while preserving strict whole-report improvement"
+		variable := before.Variables[index]
+		diagnosis, ok := matchingRepairDiagnosis(variable, after.Variables[index].Value-variable.Value, diagnoses)
+		if !ok {
+			return Repair{}, false
 		}
-		return Repair{Number: number, Variable: before.Variables[index].ID, Kind: before.Variables[index].Kind, From: before.Variables[index].Value, To: after.Variables[index].Value, BeforeHash: beforeHash, AfterHash: afterHash, Reason: reason, EvaluatedTrials: trials}, true
+		reason := "addresses " + diagnosis.RequirementID + " in " + diagnosis.OperatingCase + " through its authorized monotonic effect while preserving strict whole-report improvement"
+		return Repair{
+			Number: number, Variable: variable.ID, Kind: variable.Kind, From: variable.Value, To: after.Variables[index].Value,
+			AllowedMinimum: variable.AllowedValues[0], AllowedMaximum: variable.AllowedValues[len(variable.AllowedValues)-1],
+			RequirementID: diagnosis.RequirementID, OperatingCase: diagnosis.OperatingCase, Analysis: diagnosis.Analysis, Metric: diagnosis.Metric, Direction: diagnosis.Direction,
+			BeforeHash: beforeHash, AfterHash: afterHash, Reason: reason, EvaluatedTrials: trials,
+		}, true
 	}
 	return Repair{}, false
+}
+
+func matchingRepairDiagnosis(variable Variable, delta float64, diagnoses []Diagnosis) (Diagnosis, bool) {
+	for _, diagnosis := range diagnoses {
+		for _, effect := range variable.Effects {
+			if effect.Analysis != diagnosis.Analysis || effect.Metric != diagnosis.Metric {
+				continue
+			}
+			direction := "increase"
+			if effect.Direction == RepairMetricDecreases {
+				direction = "decrease"
+			}
+			if delta < 0 {
+				if direction == "increase" {
+					direction = "decrease"
+				} else {
+					direction = "increase"
+				}
+			}
+			if direction == diagnosis.Direction {
+				return diagnosis, true
+			}
+		}
+	}
+	return Diagnosis{}, false
+}
+
+func validRepairAnalysis(analysis string) bool {
+	switch analysis {
+	case simmodel.AnalysisDCOperatingPoint, simmodel.AnalysisACSweep, simmodel.AnalysisTransient, simmodel.AnalysisNoise, simmodel.AnalysisStability, simmodel.AnalysisStartup, simmodel.AnalysisDistortion, simmodel.AnalysisThermal:
+		return true
+	default:
+		return false
+	}
 }
 
 func normalizedMargin(actual float64, minimum, maximum *float64) (float64, bool) {
@@ -545,6 +607,7 @@ func selectionRationale(selected CandidateReport, passing int) string {
 func normalizeState(state *CandidateState) {
 	for index := range state.Variables {
 		state.Variables[index].AllowedValues = append([]float64(nil), state.Variables[index].AllowedValues...)
+		state.Variables[index].Effects = append([]RepairEffect(nil), state.Variables[index].Effects...)
 	}
 	slices.SortStableFunc(state.Variables, func(left, right Variable) int { return strings.Compare(left.ID, right.ID) })
 }
@@ -583,6 +646,7 @@ func cloneVariables(source []Variable) []Variable {
 	clone := append([]Variable(nil), source...)
 	for index := range clone {
 		clone[index].AllowedValues = append([]float64(nil), source[index].AllowedValues...)
+		clone[index].Effects = append([]RepairEffect(nil), source[index].Effects...)
 	}
 	return clone
 }

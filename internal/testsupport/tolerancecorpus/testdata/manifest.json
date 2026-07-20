@@ -3,21 +3,119 @@
   "version": 1,
   "frozen_at": "2026-07-17T00:00:00Z",
   "registry_version": "kicadai.trusted-simulation-registry.v1",
-  "registry_sha256": "afecf21e0cdf9c3ed34b30dc963165be821ac0ad198787ee791b0b6748baf6ee",
+  "registry_sha256": "5475c4f429310651f562db070ebd4d9021f6e059af50b78435a44182973af5b1",
   "cases": [
-    {"id":"regulator_near_boundary","category":"regulator_output","expected":"worst_case_pass","plan_sha256":"07f7defd2a8dc2fb74501ea177a3b9a21ae49f338c47ee5445161598bb299e34","catalog_evidence_sha256":"9d7948ebd4678e0bf946ea9f11db3b295c6d32721b5e2ac9fd4317a3470f1eb5","promotion_corpus":"function","promotion_fixture":"usb_c_ap2112_3v3_supply"},
-    {"id":"regulator_nominal_only","category":"regulator_output","expected":"nominal_only_blocked","plan_sha256":"1088d2ee609dcd3523db987b1b7d678278bf8dd0785d9fe72ecf24d18451ed07","catalog_evidence_sha256":"91f9a97210489a86d4f2eeb400df125dfd4a5e86c663ebe3e4a9712cb0d02384"},
-    {"id":"divider_near_boundary","category":"resistor_divider","expected":"worst_case_pass","plan_sha256":"d8b673154501ae79ee561decc29fe740c533473c4bfdcb03cc52186826ec3a35","catalog_evidence_sha256":"2f3e03ad8203e5c81a5b8f9165b3b8b45598f9b8dfa74b9ffed84777b8326535","promotion_corpus":"function","promotion_fixture":"buffered_thermistor_frontend"},
-    {"id":"divider_nominal_only","category":"resistor_divider","expected":"nominal_only_blocked","plan_sha256":"514686cd8cc47f72400e8f0e5cbc26d0a03a7b18d4dfed8924a53946350e9eb9","catalog_evidence_sha256":"2f3e03ad8203e5c81a5b8f9165b3b8b45598f9b8dfa74b9ffed84777b8326535"},
-    {"id":"rc_filter_near_boundary","category":"rc_timing_filter","expected":"worst_case_pass","plan_sha256":"3e4ddd8f12cefe44c45a1530e1a97667f1659f59a7b987b699fd5a7d425e49b0","catalog_evidence_sha256":"75adb4041b8a9491010bf6746ca779521a20c0aa9cc2d47c03d75779d0a09931","promotion_corpus":"function","promotion_fixture":"dual_stage_active_lowpass"},
-    {"id":"rc_filter_nominal_only","category":"rc_timing_filter","expected":"nominal_only_blocked","plan_sha256":"43febf14bcf5edb0ada9f2d4908855a38ee10c4dbfab33972b286b5bd47fffb4","catalog_evidence_sha256":"75adb4041b8a9491010bf6746ca779521a20c0aa9cc2d47c03d75779d0a09931"},
-    {"id":"transistor_bias_near_boundary","category":"transistor_bias","expected":"worst_case_pass","plan_sha256":"829c96dd9f4024e60f1d1c84db089a6dc88e20e4605be8cbac62aaaf2869d79d","catalog_evidence_sha256":"cc23390e8bbc1a27d0ceded862f473c5683132367c48679fd6be2efaab4272ec","promotion_corpus":"function","promotion_fixture":"npn_low_side_status_driver"},
-    {"id":"transistor_bias_nominal_only","category":"transistor_bias","expected":"nominal_only_blocked","plan_sha256":"196a1459e41917824d30c515052728d30fdabee310603258beddc0b02f307119","catalog_evidence_sha256":"cc23390e8bbc1a27d0ceded862f473c5683132367c48679fd6be2efaab4272ec"},
-    {"id":"opamp_gain_near_boundary","category":"opamp_gain","expected":"worst_case_pass","plan_sha256":"714d60d1a1910777d25ab83fa90c6106236a89ac4c7fa466069c5fb69734aa99","catalog_evidence_sha256":"1b79b17f1ba8e70263e66da66431b22f25788254737b9443433ff344c0f0bba3","promotion_corpus":"function","promotion_fixture":"buffered_thermistor_frontend"},
-    {"id":"opamp_gain_nominal_only","category":"opamp_gain","expected":"nominal_only_blocked","plan_sha256":"ab07ca99d8d5be915173c11552a3a29a620c0724e55057098465365914c0c4b8","catalog_evidence_sha256":"1b79b17f1ba8e70263e66da66431b22f25788254737b9443433ff344c0f0bba3"},
-    {"id":"comparator_threshold_near_boundary","category":"comparator_threshold","expected":"worst_case_pass","plan_sha256":"4a9b5f0a5c65bc9207e82f737a90bdaf5af6c6c578647d294606b4b962464746","catalog_evidence_sha256":"4f643ded69d67baf80d0eb1ab2c0f9fef45377d4118a1c8cf44902818b6de17b","promotion_corpus":"adversarial","promotion_fixture":"lm358_window_comparator"},
-    {"id":"comparator_threshold_nominal_only","category":"comparator_threshold","expected":"nominal_only_blocked","plan_sha256":"7a4ae9c35eed349f1e667ed38394cd739273d1369c2e142f99806741778e12bc","catalog_evidence_sha256":"4f643ded69d67baf80d0eb1ab2c0f9fef45377d4118a1c8cf44902818b6de17b"},
-    {"id":"protection_clamp_near_boundary","category":"protection_network","expected":"worst_case_pass","plan_sha256":"597c37a73bfa59a1b228814f0ae67836d60168df5815436eda360be77e6229dc","catalog_evidence_sha256":"5e9b132bcef81ace22b4a656caa60923c211c9499fedfe571daa2fedb374333a","promotion_corpus":"adversarial","promotion_fixture":"dual_supply_diode_clamp"},
-    {"id":"protection_clamp_nominal_only","category":"protection_network","expected":"nominal_only_blocked","plan_sha256":"1be27e9c497e70e05cc01d19bb85fd875cf385e70beca82e949c0aa7f53224cf","catalog_evidence_sha256":"5e9b132bcef81ace22b4a656caa60923c211c9499fedfe571daa2fedb374333a"}
+    {
+      "id": "regulator_near_boundary",
+      "category": "regulator_output",
+      "expected": "worst_case_pass",
+      "plan_sha256": "50919386624857ab35305011f9b7345d1fcd10c37a65e2457b96d83140629b0f",
+      "catalog_evidence_sha256": "9d7948ebd4678e0bf946ea9f11db3b295c6d32721b5e2ac9fd4317a3470f1eb5",
+      "promotion_corpus": "function",
+      "promotion_fixture": "usb_c_ap2112_3v3_supply"
+    },
+    {
+      "id": "regulator_nominal_only",
+      "category": "regulator_output",
+      "expected": "nominal_only_blocked",
+      "plan_sha256": "7a15b5f2942cd211a4d02904ecf0d1d40b2fbd42296c29e0c912f504aac0d643",
+      "catalog_evidence_sha256": "91f9a97210489a86d4f2eeb400df125dfd4a5e86c663ebe3e4a9712cb0d02384"
+    },
+    {
+      "id": "divider_near_boundary",
+      "category": "resistor_divider",
+      "expected": "worst_case_pass",
+      "plan_sha256": "8c90c690770a5a3fa2f9305be2bdf0a3d80d4ed9a1d94454f196182dd0cb79c2",
+      "catalog_evidence_sha256": "2f3e03ad8203e5c81a5b8f9165b3b8b45598f9b8dfa74b9ffed84777b8326535",
+      "promotion_corpus": "function",
+      "promotion_fixture": "buffered_thermistor_frontend"
+    },
+    {
+      "id": "divider_nominal_only",
+      "category": "resistor_divider",
+      "expected": "nominal_only_blocked",
+      "plan_sha256": "32d416401241afc7587f5118393a7547f776e39e0f0ac768a2066a9df58bc436",
+      "catalog_evidence_sha256": "2f3e03ad8203e5c81a5b8f9165b3b8b45598f9b8dfa74b9ffed84777b8326535"
+    },
+    {
+      "id": "rc_filter_near_boundary",
+      "category": "rc_timing_filter",
+      "expected": "worst_case_pass",
+      "plan_sha256": "36576ca016a19456aed1048a5d0b8e2ed0e4e3dd7972c8f073bcf3e63d941372",
+      "catalog_evidence_sha256": "75adb4041b8a9491010bf6746ca779521a20c0aa9cc2d47c03d75779d0a09931",
+      "promotion_corpus": "function",
+      "promotion_fixture": "dual_stage_active_lowpass"
+    },
+    {
+      "id": "rc_filter_nominal_only",
+      "category": "rc_timing_filter",
+      "expected": "nominal_only_blocked",
+      "plan_sha256": "2eda7dfe5cff0d64a3fd9353445284f13e4c30364a62bad7d3af370d913cda98",
+      "catalog_evidence_sha256": "75adb4041b8a9491010bf6746ca779521a20c0aa9cc2d47c03d75779d0a09931"
+    },
+    {
+      "id": "transistor_bias_near_boundary",
+      "category": "transistor_bias",
+      "expected": "worst_case_pass",
+      "plan_sha256": "d5e259d401c8b867b89b8c8c7081f5e178656a9ea959098441d4bc613cc55611",
+      "catalog_evidence_sha256": "cc23390e8bbc1a27d0ceded862f473c5683132367c48679fd6be2efaab4272ec",
+      "promotion_corpus": "function",
+      "promotion_fixture": "npn_low_side_status_driver"
+    },
+    {
+      "id": "transistor_bias_nominal_only",
+      "category": "transistor_bias",
+      "expected": "nominal_only_blocked",
+      "plan_sha256": "eb72f53451dda4cf99cdf6617f79d4018ba592e920dd97f5e9a4d9be33d175ee",
+      "catalog_evidence_sha256": "cc23390e8bbc1a27d0ceded862f473c5683132367c48679fd6be2efaab4272ec"
+    },
+    {
+      "id": "opamp_gain_near_boundary",
+      "category": "opamp_gain",
+      "expected": "worst_case_pass",
+      "plan_sha256": "d7be9500415053c2f74e9dc7a2a18d8122c665f5070a9826b557a36b78d7b15a",
+      "catalog_evidence_sha256": "1b79b17f1ba8e70263e66da66431b22f25788254737b9443433ff344c0f0bba3",
+      "promotion_corpus": "function",
+      "promotion_fixture": "buffered_thermistor_frontend"
+    },
+    {
+      "id": "opamp_gain_nominal_only",
+      "category": "opamp_gain",
+      "expected": "nominal_only_blocked",
+      "plan_sha256": "424c85dbb82ade307ccc917c8c5bd830fd7e9dd959e7571c7051e1421097b975",
+      "catalog_evidence_sha256": "1b79b17f1ba8e70263e66da66431b22f25788254737b9443433ff344c0f0bba3"
+    },
+    {
+      "id": "comparator_threshold_near_boundary",
+      "category": "comparator_threshold",
+      "expected": "worst_case_pass",
+      "plan_sha256": "9e8fbff94d83f6dec8f0debba2d79d2bf952edc2f5a7875e0fa67e776e8bb7dc",
+      "catalog_evidence_sha256": "4f643ded69d67baf80d0eb1ab2c0f9fef45377d4118a1c8cf44902818b6de17b",
+      "promotion_corpus": "adversarial",
+      "promotion_fixture": "lm358_window_comparator"
+    },
+    {
+      "id": "comparator_threshold_nominal_only",
+      "category": "comparator_threshold",
+      "expected": "nominal_only_blocked",
+      "plan_sha256": "01a8ce8aee39935d4699660286ecd7929a059ee97b643b5b1e528c27caadf318",
+      "catalog_evidence_sha256": "4f643ded69d67baf80d0eb1ab2c0f9fef45377d4118a1c8cf44902818b6de17b"
+    },
+    {
+      "id": "protection_clamp_near_boundary",
+      "category": "protection_network",
+      "expected": "worst_case_pass",
+      "plan_sha256": "f6f70a39d4db5e899deeabb6d60f2bd3995ec5ed8e1f8c19627ccf822730b659",
+      "catalog_evidence_sha256": "5e9b132bcef81ace22b4a656caa60923c211c9499fedfe571daa2fedb374333a",
+      "promotion_corpus": "adversarial",
+      "promotion_fixture": "dual_supply_diode_clamp"
+    },
+    {
+      "id": "protection_clamp_nominal_only",
+      "category": "protection_network",
+      "expected": "nominal_only_blocked",
+      "plan_sha256": "3a02400b956c51b29c1a6fed5e595a9fc5ec759ccc87e1b9afd4eb0dc0436a58",
+      "catalog_evidence_sha256": "5e9b132bcef81ace22b4a656caa60923c211c9499fedfe571daa2fedb374333a"
+    }
   ]
 }

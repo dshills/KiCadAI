@@ -123,6 +123,33 @@ func TestNonlinearDCReportsActionableBoundedSolveFailure(t *testing.T) {
 	}
 }
 
+func TestBidirectionalTVSClampsBothPolarities(t *testing.T) {
+	intent := Intent{
+		ModelID: ModelNonlinearCircuitDCV1,
+		Analyses: []Analysis{
+			{ID: "negative", Kind: AnalysisDCOperatingPoint, Excitations: []SourceExcitation{{Component: "source", DCValue: -12}}},
+			{ID: "positive", Kind: AnalysisDCOperatingPoint, Excitations: []SourceExcitation{{Component: "source", DCValue: 12}}},
+		},
+		Assertions: []Assertion{
+			{AnalysisID: "negative", Node: "OUT", Quantity: QuantityVoltageV, Min: -9.52, Max: -9.50},
+			{AnalysisID: "positive", Node: "OUT", Quantity: QuantityVoltageV, Min: 9.50, Max: 9.52},
+		},
+	}
+	components := []ComponentEvidence{
+		voltageSourceEvidence("source", "SOURCE", "GND"),
+		resistorEvidence("series", 100, "SOURCE", "OUT"),
+		{InstanceID: "clamp", CatalogID: "tvs", Family: "protection", ModelClaims: []CatalogEvidence{{ModelID: PrimitiveBidirectionalTVSV1, Parameters: tvsParameters()}}, Connections: []ConnectionEvidence{{Function: "ANODE", Net: "OUT"}, {Function: "CATHODE", Net: "GND"}}},
+	}
+	plan, diagnostics := ResolveWithTopology(intent, "test", "hash", components, []NodeEvidence{{Name: "GND", Role: "ground"}, {Name: "OUT"}, {Name: "SOURCE"}})
+	if len(diagnostics) != 0 {
+		t.Fatalf("resolve diagnostics=%+v", diagnostics)
+	}
+	report, diagnostics := Evaluate(plan)
+	if len(diagnostics) != 0 || report.Status != "pass" {
+		t.Fatalf("report=%+v diagnostics=%+v", report, diagnostics)
+	}
+}
+
 func resolveNonlinearTestPlan(t *testing.T, components []ComponentEvidence, nodes []NodeEvidence, assertions []Assertion) Plan {
 	t.Helper()
 	plan, diagnostics := ResolveWithTopology(nonlinearTestIntent(assertions), "test", "catalog-hash", components, nodes)
@@ -146,6 +173,15 @@ func resistorEvidence(id string, value float64, a, b string) ComponentEvidence {
 
 func diodeParameters(maxCurrent, maxReverse float64) []NamedValue {
 	return []NamedValue{{Name: "saturation_current_a", Value: 4e-9}, {Name: "emission_coefficient", Value: 1.9}, {Name: "junction_temperature_k", Value: 300.15}, {Name: "max_forward_current_a", Value: maxCurrent}, {Name: "max_reverse_voltage_v", Value: maxReverse}}
+}
+
+func tvsParameters() []NamedValue {
+	return []NamedValue{
+		{Name: "breakdown_voltage_v", Value: 9.5},
+		{Name: "dynamic_resistance_ohm", Value: .5},
+		{Name: "max_pulse_current_a", Value: 12},
+		{Name: "off_resistance_ohm", Value: 50e6},
+	}
 }
 
 func bjtParameters(maxCurrent, maxVoltage float64) []NamedValue {

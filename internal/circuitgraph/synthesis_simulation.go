@@ -218,8 +218,76 @@ func configuredSimulationModels(selection ResolvedComponent) []simmodel.CatalogE
 				models[index].Parameters[parameterIndex].Value = value
 			}
 		}
+		models[index].Parameters = catalogBackedSimulationParameters(models[index], selection.Record)
 	}
 	return models
+}
+
+func catalogBackedSimulationParameters(model simmodel.CatalogEvidence, record components.ComponentRecord) []simmodel.NamedValue {
+	parameters := append([]simmodel.NamedValue(nil), model.Parameters...)
+	switch model.ModelID {
+	case simmodel.PrimitiveOpAmpV1:
+		if evidence := record.OpAmp; evidence != nil {
+			if density := evidence.VoltageNoiseDensity; density != nil && density.Unit == "V/sqrt(Hz)" && density.Value > 0 {
+				parameters = appendMissingSimulationParameter(parameters, "input_voltage_noise_density_v_sqrt_hz", density.Value)
+			}
+			if evidence.MaxJunctionTemperatureC != nil && evidence.JunctionToAmbientCPerW != nil {
+				parameters = appendMissingSimulationParameter(parameters, "max_temperature_c", *evidence.MaxJunctionTemperatureC)
+				parameters = appendMissingSimulationParameter(parameters, "junction_to_ambient_c_per_w", *evidence.JunctionToAmbientCPerW)
+			}
+			if current, ok := catalogSupplyCurrentA(record.Ratings); ok {
+				parameters = appendMissingSimulationParameter(parameters, "quiescent_current_a", current)
+			}
+		}
+	case simmodel.PrimitiveResistorV1:
+		if evidence := record.Resistor; evidence != nil && evidence.FabricationProof && evidence.MaximumElementTemperatureC != nil && evidence.RatedPower != nil && evidence.RatedPower.Unit == "W" && evidence.RatedPower.Value > 0 && evidence.RatedPower.TemperatureC != nil {
+			theta := (*evidence.MaximumElementTemperatureC - *evidence.RatedPower.TemperatureC) / evidence.RatedPower.Value
+			if theta > 0 {
+				parameters = appendMissingSimulationParameter(parameters, "max_temperature_c", *evidence.MaximumElementTemperatureC)
+				parameters = appendMissingSimulationParameter(parameters, "thermal_resistance_c_per_w", theta)
+			}
+		}
+	case simmodel.PrimitiveBJTNPNV1, simmodel.PrimitiveBJTPNPV1:
+		if evidence := record.PowerSemiconductor; evidence != nil && evidence.FabricationProof && evidence.MaxJunctionTemperatureC != nil {
+			parameters = appendMissingSimulationParameter(parameters, "max_temperature_c", *evidence.MaxJunctionTemperatureC)
+			if evidence.JunctionToAmbientCPerW != nil {
+				parameters = appendMissingSimulationParameter(parameters, "junction_to_ambient_c_per_w", *evidence.JunctionToAmbientCPerW)
+			}
+			if evidence.JunctionToCaseCPerW != nil {
+				parameters = appendMissingSimulationParameter(parameters, "junction_to_case_c_per_w", *evidence.JunctionToCaseCPerW)
+			}
+		}
+	}
+	slices.SortStableFunc(parameters, func(left, right simmodel.NamedValue) int { return strings.Compare(left.Name, right.Name) })
+	return parameters
+}
+
+func appendMissingSimulationParameter(parameters []simmodel.NamedValue, name string, value float64) []simmodel.NamedValue {
+	for _, parameter := range parameters {
+		if parameter.Name == name {
+			return parameters
+		}
+	}
+	return append(parameters, simmodel.NamedValue{Name: name, Value: value})
+}
+
+func catalogSupplyCurrentA(ratings []components.RatingConstraint) (float64, bool) {
+	for _, rating := range ratings {
+		if rating.Kind != "supply_current" || rating.Max == "" {
+			continue
+		}
+		value, ok := components.ParseEngineeringValue(rating.Max)
+		if !ok || value < 0 {
+			continue
+		}
+		switch rating.Unit {
+		case "A":
+			return value, true
+		case "mA":
+			return value / 1000, true
+		}
+	}
+	return 0, false
 }
 
 func componentSimulationEvidence(instanceID, catalogID, family string, value float64, hasValue bool, models []simmodel.CatalogEvidence, connections []simmodel.ConnectionEvidence, units []ResolvedUnit, record components.ComponentRecord) []simmodel.ComponentEvidence {

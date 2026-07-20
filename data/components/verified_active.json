@@ -18,6 +18,7 @@
         "parameters": [
           {"name": "dc_open_loop_gain", "value": 100000},
           {"name": "gain_bandwidth_hz", "value": 1000000},
+          {"name": "input_voltage_noise_density_v_sqrt_hz", "value": 39e-9},
           {"name": "output_high_margin_v", "value": 0.1},
           {"name": "output_low_margin_v", "value": 0.1},
           {"name": "supply_max_v", "value": 5.5},

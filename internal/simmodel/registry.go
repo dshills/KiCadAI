@@ -12,6 +12,7 @@ import (
 
 type valueRule struct {
 	Name        string  `json:"name"`
+	Optional    bool    `json:"optional,omitempty"`
 	Positive    bool    `json:"positive,omitempty"`
 	Nonnegative bool    `json:"nonnegative,omitempty"`
 	Minimum     float64 `json:"minimum,omitempty"`
@@ -131,14 +132,16 @@ func SupportedAnalysisKinds(modelID string) []string {
 		return nil
 	}
 	switch model.ID {
-	case ModelLinearRegulatorIdealV1, ModelResistorDividerDCV1, ModelNonlinearCircuitDCV1:
+	case ModelLinearRegulatorIdealV1, ModelResistorDividerDCV1:
 		return []string{AnalysisDCOperatingPoint}
 	case ModelRCLowpassACV1:
 		return []string{AnalysisACSweep}
 	case ModelLinearCircuitMNAV1:
-		return []string{AnalysisACSweep, AnalysisDCOperatingPoint}
+		return []string{AnalysisACSweep, AnalysisDCOperatingPoint, AnalysisNoise, AnalysisStability, AnalysisThermal}
 	case ModelTransientCircuitV1:
-		return []string{AnalysisTransient}
+		return []string{AnalysisDistortion, AnalysisStartup, AnalysisTransient}
+	case ModelNonlinearCircuitDCV1:
+		return []string{AnalysisDCOperatingPoint, AnalysisThermal}
 	default:
 		return nil
 	}
@@ -616,7 +619,7 @@ func validateNamedValues(path string, values []NamedValue, rules []valueRule) []
 		}
 	}
 	for _, rule := range rules {
-		if _, exists := seen[rule.Name]; !exists {
+		if _, exists := seen[rule.Name]; !exists && !rule.Optional {
 			diagnostics = append(diagnostics, Diagnostic{Path: path, Message: "missing required parameter " + rule.Name})
 		}
 	}

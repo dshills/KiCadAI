@@ -19,7 +19,7 @@ func (function evaluatorFunc) Evaluate(ctx context.Context, state CandidateState
 
 func TestClosedLoopRepairsByStrictWholeReportImprovementAndReplays(t *testing.T) {
 	requirement := closedLoopTestRequirement()
-	candidate := Candidate{Fingerprint: testHash("candidate-a"), Variables: []Variable{{ID: "gain_resistance", Kind: "gain", Value: 1, AllowedValues: []float64{1, 2, 3}}}}
+	candidate := Candidate{Fingerprint: testHash("candidate-a"), Variables: []Variable{{ID: "gain_resistance", Kind: "gain", Value: 1, AllowedValues: []float64{1, 2, 3}, Effects: []RepairEffect{{Analysis: simmodel.AnalysisACSweep, Metric: "voltage_gain", Direction: RepairMetricIncreases}}}}}
 	evaluator := closedLoopTestEvaluator(false)
 	input := Input{Requirement: requirement, CatalogHash: testHash("catalog"), FormulaLibraryHash: testHash("formulas"), ModelRegistryHash: testHash("models"), Candidates: []Candidate{candidate}}
 	first := Run(context.Background(), input, evaluator, DefaultPolicy())
@@ -31,6 +31,10 @@ func TestClosedLoopRepairsByStrictWholeReportImprovementAndReplays(t *testing.T)
 	}
 	if first.Consumption.Evaluations != 2 || first.Consumption.RepairTrials != 1 || first.Consumption.RepairsApplied != 1 {
 		t.Fatalf("consumption = %#v", first.Consumption)
+	}
+	repair := first.Candidates[0].Repairs[0]
+	if repair.RequirementID != "gain" || repair.Analysis != simmodel.AnalysisACSweep || repair.Metric != "voltage_gain" || repair.Direction != "increase" || repair.AllowedMinimum != 1 || repair.AllowedMaximum != 3 {
+		t.Fatalf("typed repair authorization evidence = %#v", repair)
 	}
 	if diagnostics := ValidatePromotionReport(first, input.CatalogHash); len(diagnostics) != 0 {
 		t.Fatalf("passing report promotion diagnostics = %#v", diagnostics)
@@ -63,6 +67,19 @@ func TestClosedLoopRepairsByStrictWholeReportImprovementAndReplays(t *testing.T)
 	}
 }
 
+func TestClosedLoopDoesNotTrialVariableWithoutMatchingAuthorizedEffect(t *testing.T) {
+	requirement := closedLoopTestRequirement()
+	candidate := Candidate{Fingerprint: testHash("candidate"), Variables: []Variable{{
+		ID: "temperature_only", Kind: "bias", Value: 1, AllowedValues: []float64{1, 2},
+		Effects: []RepairEffect{{Analysis: simmodel.AnalysisThermal, Metric: "junction_temperature", Direction: RepairMetricDecreases}},
+	}}}
+	input := Input{Requirement: requirement, CatalogHash: testHash("catalog"), FormulaLibraryHash: testHash("formulas"), ModelRegistryHash: testHash("models"), Candidates: []Candidate{candidate}}
+	report := Run(context.Background(), input, closedLoopTestEvaluator(false), DefaultPolicy())
+	if report.Status != "blocked" || report.Candidates[0].StopReason != StopUnsupportedDiagnosis || report.Consumption.Evaluations != 1 || report.Consumption.RepairTrials != 0 {
+		t.Fatalf("unauthorized repair trial was not rejected before evaluation: %#v", report)
+	}
+}
+
 func TestClosedLoopRejectsMissingModelTrustAndIncompleteAssertions(t *testing.T) {
 	requirement := closedLoopTestRequirement()
 	input := Input{Requirement: requirement, CatalogHash: testHash("catalog"), FormulaLibraryHash: testHash("formulas"), ModelRegistryHash: testHash("models"), Candidates: []Candidate{{Fingerprint: testHash("candidate")}}}
@@ -84,7 +101,7 @@ func TestClosedLoopRejectsMissingModelTrustAndIncompleteAssertions(t *testing.T)
 
 func TestClosedLoopWillNotTradeCriticalThermalFailureForGainRepair(t *testing.T) {
 	requirement := closedLoopTestRequirement()
-	candidate := Candidate{Fingerprint: testHash("candidate"), Variables: []Variable{{ID: "gain_resistance", Kind: "gain", Value: 1, AllowedValues: []float64{1, 2, 3}}}}
+	candidate := Candidate{Fingerprint: testHash("candidate"), Variables: []Variable{{ID: "gain_resistance", Kind: "gain", Value: 1, AllowedValues: []float64{1, 2, 3}, Effects: []RepairEffect{{Analysis: simmodel.AnalysisACSweep, Metric: "voltage_gain", Direction: RepairMetricIncreases}, {Analysis: simmodel.AnalysisThermal, Metric: "junction_temperature", Direction: RepairMetricIncreases}}}}}
 	input := Input{Requirement: requirement, CatalogHash: testHash("catalog"), FormulaLibraryHash: testHash("formulas"), ModelRegistryHash: testHash("models"), Candidates: []Candidate{candidate}}
 	report := Run(context.Background(), input, closedLoopTestEvaluator(true), DefaultPolicy())
 	if report.Status != "blocked" || report.Candidates[0].StopReason != StopNonImprovement || len(report.Candidates[0].Repairs) != 0 {
@@ -103,7 +120,7 @@ func TestClosedLoopBoundsEvaluationErrorsAndBudget(t *testing.T) {
 	}
 	policy := DefaultPolicy()
 	policy.MaxEvaluations = 1
-	input.Candidates[0].Variables = []Variable{{ID: "gain", Kind: "gain", Value: 1, AllowedValues: []float64{1, 2}}}
+	input.Candidates[0].Variables = []Variable{{ID: "gain", Kind: "gain", Value: 1, AllowedValues: []float64{1, 2}, Effects: []RepairEffect{{Analysis: simmodel.AnalysisACSweep, Metric: "voltage_gain", Direction: RepairMetricIncreases}}}}
 	exhausted := Run(context.Background(), input, closedLoopTestEvaluator(false), policy)
 	if exhausted.Candidates[0].StopReason != StopBudgetExhausted || !exhausted.Consumption.BudgetExhausted {
 		t.Fatalf("evaluation budget = %#v", exhausted)

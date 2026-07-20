@@ -18,17 +18,18 @@ const (
 type StopReason string
 
 const (
-	StopPassed              StopReason = "passed"
-	StopNoCandidate         StopReason = "no_candidate"
-	StopInvalidInput        StopReason = "invalid_input"
-	StopEvaluationFailed    StopReason = "evaluation_failed"
-	StopModelTrustFailed    StopReason = "model_trust_failed"
-	StopAssertionIncomplete StopReason = "assertion_coverage_incomplete"
-	StopNoRepairVariables   StopReason = "no_repair_variables"
-	StopNonImprovement      StopReason = "non_improvement"
-	StopRepeatedState       StopReason = "repeated_state"
-	StopBudgetExhausted     StopReason = "budget_exhausted"
-	StopCanceled            StopReason = "canceled"
+	StopPassed               StopReason = "passed"
+	StopNoCandidate          StopReason = "no_candidate"
+	StopInvalidInput         StopReason = "invalid_input"
+	StopEvaluationFailed     StopReason = "evaluation_failed"
+	StopModelTrustFailed     StopReason = "model_trust_failed"
+	StopAssertionIncomplete  StopReason = "assertion_coverage_incomplete"
+	StopNoRepairVariables    StopReason = "no_repair_variables"
+	StopUnsupportedDiagnosis StopReason = "unsupported_diagnosis"
+	StopNonImprovement       StopReason = "non_improvement"
+	StopRepeatedState        StopReason = "repeated_state"
+	StopBudgetExhausted      StopReason = "budget_exhausted"
+	StopCanceled             StopReason = "canceled"
 )
 
 type Policy struct {
@@ -58,10 +59,26 @@ type Candidate struct {
 }
 
 type Variable struct {
-	ID            string    `json:"id"`
-	Kind          string    `json:"kind"`
-	Value         float64   `json:"value"`
-	AllowedValues []float64 `json:"allowed_values"`
+	ID            string         `json:"id"`
+	Kind          string         `json:"kind"`
+	Value         float64        `json:"value"`
+	AllowedValues []float64      `json:"allowed_values"`
+	Effects       []RepairEffect `json:"effects"`
+}
+
+const (
+	RepairMetricIncreases = "metric_increases"
+	RepairMetricDecreases = "metric_decreases"
+)
+
+// RepairEffect is trusted candidate evidence describing the monotonic local
+// effect expected when a variable increases. It authorizes trial generation;
+// only a fresh complete simulation with strict whole-report improvement can
+// authorize applying the trial.
+type RepairEffect struct {
+	Analysis  string `json:"analysis"`
+	Metric    string `json:"metric"`
+	Direction string `json:"direction"`
 }
 
 type CandidateState struct {
@@ -189,6 +206,13 @@ type Repair struct {
 	Kind            string  `json:"kind"`
 	From            float64 `json:"from"`
 	To              float64 `json:"to"`
+	AllowedMinimum  float64 `json:"allowed_minimum"`
+	AllowedMaximum  float64 `json:"allowed_maximum"`
+	RequirementID   string  `json:"requirement_id"`
+	OperatingCase   string  `json:"operating_case"`
+	Analysis        string  `json:"analysis"`
+	Metric          string  `json:"metric"`
+	Direction       string  `json:"direction"`
 	BeforeHash      string  `json:"before_hash"`
 	AfterHash       string  `json:"after_hash"`
 	Reason          string  `json:"reason"`

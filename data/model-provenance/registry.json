@@ -9,10 +9,13 @@
       "provenance": {
         "source": "kicadai:trusted-simulation-registry",
         "revision": "kicadai.trusted-simulation-registry.v1",
-        "sha256": "9c470ea3b7a2438e67204d17c20134a06e4344e4f11fe1e8c4a2c533debef08b",
+        "sha256": "034087f5599bd3a4d10a0c038d208d8310ffeefb9232b75ef8094637de0f1381",
         "review_status": "reviewed",
         "allowed_analyses": [
           "dc_operating_point",
+          "distortion",
+          "startup",
+          "thermal",
           "transient"
         ],
         "min_temperature_c": -55,
@@ -26,10 +29,13 @@
       "provenance": {
         "source": "kicadai:trusted-simulation-registry",
         "revision": "kicadai.trusted-simulation-registry.v1",
-        "sha256": "9e12fa1ac84505038cd3c53a3e4511556f5894dc49cf6da7d1cd039275026327",
+        "sha256": "68ffc3e303aa09c98ae4271adecc47b69f5e712ca4a3f90ee5a3a6a7e53d79f5",
         "review_status": "reviewed",
         "allowed_analyses": [
           "dc_operating_point",
+          "distortion",
+          "startup",
+          "thermal",
           "transient"
         ],
         "min_temperature_c": -65,
@@ -46,6 +52,8 @@
         "sha256": "19f725a7b01f981f33aeb7446e16f61398116168eea4ac05a70e2146bee8c049",
         "review_status": "reviewed",
         "allowed_analyses": [
+          "distortion",
+          "startup",
           "transient"
         ]
       }
@@ -61,7 +69,10 @@
         "review_status": "reviewed",
         "allowed_analyses": [
           "ac_sweep",
-          "dc_operating_point"
+          "dc_operating_point",
+          "noise",
+          "stability",
+          "thermal"
         ]
       }
     },
@@ -89,6 +100,8 @@
         "sha256": "19f725a7b01f981f33aeb7446e16f61398116168eea4ac05a70e2146bee8c049",
         "review_status": "reviewed",
         "allowed_analyses": [
+          "distortion",
+          "startup",
           "transient"
         ]
       }
@@ -104,7 +117,10 @@
         "review_status": "reviewed",
         "allowed_analyses": [
           "ac_sweep",
-          "dc_operating_point"
+          "dc_operating_point",
+          "noise",
+          "stability",
+          "thermal"
         ]
       }
     },
@@ -133,7 +149,10 @@
         "review_status": "reviewed",
         "allowed_analyses": [
           "ac_sweep",
-          "dc_operating_point"
+          "dc_operating_point",
+          "noise",
+          "stability",
+          "thermal"
         ]
       }
     },
@@ -148,7 +167,10 @@
         "review_status": "reviewed",
         "allowed_analyses": [
           "ac_sweep",
-          "dc_operating_point"
+          "dc_operating_point",
+          "noise",
+          "stability",
+          "thermal"
         ]
       }
     },
@@ -163,7 +185,10 @@
         "review_status": "reviewed",
         "allowed_analyses": [
           "ac_sweep",
-          "dc_operating_point"
+          "dc_operating_point",
+          "noise",
+          "stability",
+          "thermal"
         ]
       }
     },
@@ -182,6 +207,25 @@
       }
     },
     {
+      "catalog_id": "comparator.ti.tlv1701aidbvr.sot23_5",
+      "family": "comparator",
+      "model_id": "mna_comparator_open_collector_v1",
+      "provenance": {
+        "source": "https://www.ti.com/lit/ds/symlink/tlv1701.pdf",
+        "revision": "TLV1701 datasheet electrical-characteristics bounds",
+        "sha256": "f5feb69f17eebc223cb08c40944b03d26a8cdf1f846dcba75539c835827d776e",
+        "review_status": "reviewed",
+        "allowed_analyses": [
+          "dc_operating_point",
+          "startup",
+          "thermal",
+          "transient"
+        ],
+        "min_temperature_c": -40,
+        "max_temperature_c": 125
+      }
+    },
+    {
       "catalog_id": "connector.pinheader.1x02.2_54mm",
       "family": "connector",
       "model_id": "mna_connector_1x02_voltage_source_pin1_positive_v1",
@@ -193,6 +237,11 @@
         "allowed_analyses": [
           "ac_sweep",
           "dc_operating_point",
+          "distortion",
+          "noise",
+          "stability",
+          "startup",
+          "thermal",
           "transient"
         ]
       }
@@ -209,6 +258,11 @@
         "allowed_analyses": [
           "ac_sweep",
           "dc_operating_point",
+          "distortion",
+          "noise",
+          "stability",
+          "startup",
+          "thermal",
           "transient"
         ]
       }
@@ -220,12 +274,35 @@
       "provenance": {
         "source": "kicadai:trusted-simulation-registry",
         "revision": "kicadai.trusted-simulation-registry.v1",
-        "sha256": "c6c7c5ab0102029e88913520d359f2749f7d0c97461cd279c50feb785767b516",
+        "sha256": "7823f3eede53d83220cfe1aa418091fca443e48437a8bee6bbe7b2110da6036a",
         "review_status": "reviewed",
         "allowed_analyses": [
           "dc_operating_point",
+          "distortion",
+          "startup",
+          "thermal",
           "transient"
         ]
+      }
+    },
+    {
+      "catalog_id": "led.liteon.ltst_c170kgkt.0805",
+      "family": "led",
+      "model_id": "mna_diode_shockley_v1",
+      "provenance": {
+        "source": "https://optoelectronics.liteon.com/upload/download/DS22-2000-073/LTST-C170KGKT.pdf",
+        "revision": "DS22-2000-073 revision I",
+        "sha256": "7823f3eede53d83220cfe1aa418091fca443e48437a8bee6bbe7b2110da6036a",
+        "review_status": "reviewed",
+        "allowed_analyses": [
+          "dc_operating_point",
+          "distortion",
+          "startup",
+          "thermal",
+          "transient"
+        ],
+        "min_temperature_c": -55,
+        "max_temperature_c": 85
       }
     },
     {
@@ -235,10 +312,13 @@
       "provenance": {
         "source": "kicadai:trusted-simulation-registry",
         "revision": "kicadai.trusted-simulation-registry.v1",
-        "sha256": "c6c7c5ab0102029e88913520d359f2749f7d0c97461cd279c50feb785767b516",
+        "sha256": "7823f3eede53d83220cfe1aa418091fca443e48437a8bee6bbe7b2110da6036a",
         "review_status": "reviewed",
         "allowed_analyses": [
           "dc_operating_point",
+          "distortion",
+          "startup",
+          "thermal",
           "transient"
         ]
       }
@@ -250,11 +330,15 @@
       "provenance": {
         "source": "kicadai:trusted-simulation-registry",
         "revision": "kicadai.trusted-simulation-registry.v1",
-        "sha256": "318e6493e7a882957370a6e4a8f0080ad00f68f403d87789a8e47391b21e2662",
+        "sha256": "75004d4df8a0b335690ea7437bad887c16e5ca39f46c10e8345c70045b3ce0d5",
         "review_status": "reviewed",
         "allowed_analyses": [
           "ac_sweep",
           "dc_operating_point",
+          "distortion",
+          "stability",
+          "startup",
+          "thermal",
           "transient"
         ],
         "min_temperature_c": 0,
@@ -268,11 +352,16 @@
       "provenance": {
         "source": "kicadai:trusted-simulation-registry",
         "revision": "kicadai.trusted-simulation-registry.v1",
-        "sha256": "318e6493e7a882957370a6e4a8f0080ad00f68f403d87789a8e47391b21e2662",
+        "sha256": "75004d4df8a0b335690ea7437bad887c16e5ca39f46c10e8345c70045b3ce0d5",
         "review_status": "reviewed",
         "allowed_analyses": [
           "ac_sweep",
           "dc_operating_point",
+          "distortion",
+          "noise",
+          "stability",
+          "startup",
+          "thermal",
           "transient"
         ],
         "min_temperature_c": -40,
@@ -286,15 +375,39 @@
       "provenance": {
         "source": "kicadai:trusted-simulation-registry",
         "revision": "kicadai.trusted-simulation-registry.v1",
-        "sha256": "318e6493e7a882957370a6e4a8f0080ad00f68f403d87789a8e47391b21e2662",
+        "sha256": "75004d4df8a0b335690ea7437bad887c16e5ca39f46c10e8345c70045b3ce0d5",
         "review_status": "reviewed",
         "allowed_analyses": [
           "ac_sweep",
           "dc_operating_point",
+          "distortion",
+          "noise",
+          "stability",
+          "startup",
+          "thermal",
           "transient"
         ],
         "min_temperature_c": -40,
         "max_temperature_c": 85
+      }
+    },
+    {
+      "catalog_id": "protection.nexperia.pesd5v0s1ba.sod_323",
+      "family": "protection",
+      "model_id": "mna_bidirectional_tvs_piecewise_linear_v1",
+      "provenance": {
+        "source": "https://assets.nexperia.com/documents/data-sheet/PESD5V0S1BA.pdf",
+        "revision": "26 April 2024",
+        "sha256": "7d708cda375ca655baa724e6a9932c4a2db7180a151175a4200a8f3a686cd01a",
+        "review_status": "reviewed",
+        "allowed_analyses": [
+          "dc_operating_point",
+          "startup",
+          "thermal",
+          "transient"
+        ],
+        "min_temperature_c": -55,
+        "max_temperature_c": 150
       }
     },
     {
@@ -352,11 +465,16 @@
       "provenance": {
         "source": "kicadai:trusted-simulation-registry",
         "revision": "kicadai.trusted-simulation-registry.v1",
-        "sha256": "b21dc8115929a931de49fe269db8869ff87c40daad1d8231e304a9d0ba5688d8",
+        "sha256": "ed2413ddd37969961f8ad017ba272c18c42228660e14a5757b6b788f4326cf61",
         "review_status": "reviewed",
         "allowed_analyses": [
           "ac_sweep",
           "dc_operating_point",
+          "distortion",
+          "noise",
+          "stability",
+          "startup",
+          "thermal",
           "transient"
         ]
       }
@@ -396,11 +514,16 @@
       "provenance": {
         "source": "kicadai:trusted-simulation-registry",
         "revision": "kicadai.trusted-simulation-registry.v1",
-        "sha256": "b21dc8115929a931de49fe269db8869ff87c40daad1d8231e304a9d0ba5688d8",
+        "sha256": "ed2413ddd37969961f8ad017ba272c18c42228660e14a5757b6b788f4326cf61",
         "review_status": "reviewed",
         "allowed_analyses": [
           "ac_sweep",
           "dc_operating_point",
+          "distortion",
+          "noise",
+          "stability",
+          "startup",
+          "thermal",
           "transient"
         ]
       }
@@ -440,11 +563,16 @@
       "provenance": {
         "source": "kicadai:trusted-simulation-registry",
         "revision": "kicadai.trusted-simulation-registry.v1",
-        "sha256": "b21dc8115929a931de49fe269db8869ff87c40daad1d8231e304a9d0ba5688d8",
+        "sha256": "ed2413ddd37969961f8ad017ba272c18c42228660e14a5757b6b788f4326cf61",
         "review_status": "reviewed",
         "allowed_analyses": [
           "ac_sweep",
           "dc_operating_point",
+          "distortion",
+          "noise",
+          "stability",
+          "startup",
+          "thermal",
           "transient"
         ]
       }
@@ -456,11 +584,16 @@
       "provenance": {
         "source": "kicadai:trusted-simulation-registry",
         "revision": "kicadai.trusted-simulation-registry.v1",
-        "sha256": "b21dc8115929a931de49fe269db8869ff87c40daad1d8231e304a9d0ba5688d8",
+        "sha256": "ed2413ddd37969961f8ad017ba272c18c42228660e14a5757b6b788f4326cf61",
         "review_status": "reviewed",
         "allowed_analyses": [
           "ac_sweep",
           "dc_operating_point",
+          "distortion",
+          "noise",
+          "stability",
+          "startup",
+          "thermal",
           "transient"
         ]
       }
@@ -472,11 +605,16 @@
       "provenance": {
         "source": "kicadai:trusted-simulation-registry",
         "revision": "kicadai.trusted-simulation-registry.v1",
-        "sha256": "b21dc8115929a931de49fe269db8869ff87c40daad1d8231e304a9d0ba5688d8",
+        "sha256": "ed2413ddd37969961f8ad017ba272c18c42228660e14a5757b6b788f4326cf61",
         "review_status": "reviewed",
         "allowed_analyses": [
           "ac_sweep",
           "dc_operating_point",
+          "distortion",
+          "noise",
+          "stability",
+          "startup",
+          "thermal",
           "transient"
         ]
       }
@@ -502,11 +640,16 @@
       "provenance": {
         "source": "kicadai:trusted-simulation-registry",
         "revision": "kicadai.trusted-simulation-registry.v1",
-        "sha256": "b21dc8115929a931de49fe269db8869ff87c40daad1d8231e304a9d0ba5688d8",
+        "sha256": "ed2413ddd37969961f8ad017ba272c18c42228660e14a5757b6b788f4326cf61",
         "review_status": "reviewed",
         "allowed_analyses": [
           "ac_sweep",
           "dc_operating_point",
+          "distortion",
+          "noise",
+          "stability",
+          "startup",
+          "thermal",
           "transient"
         ]
       }
@@ -523,6 +666,11 @@
         "allowed_analyses": [
           "ac_sweep",
           "dc_operating_point",
+          "distortion",
+          "noise",
+          "stability",
+          "startup",
+          "thermal",
           "transient"
         ]
       }
@@ -539,6 +687,11 @@
         "allowed_analyses": [
           "ac_sweep",
           "dc_operating_point",
+          "distortion",
+          "noise",
+          "stability",
+          "startup",
+          "thermal",
           "transient"
         ]
       }

@@ -161,6 +161,16 @@
         {"kind": "forward_current", "typ": "20", "unit": "mA"}
       ],
       "ratings": [{"kind": "forward_current", "max": "30", "unit": "mA"}],
+      "simulation_models": [{
+        "model_id": "mna_diode_shockley_v1",
+        "parameters": [
+          {"name": "saturation_current_a", "value": 3e-19},
+          {"name": "emission_coefficient", "value": 2},
+          {"name": "junction_temperature_k", "value": 300.15},
+          {"name": "max_forward_current_a", "value": 0.03},
+          {"name": "max_reverse_voltage_v", "value": 5}
+        ]
+      }],
       "symbols": [{
         "symbol_id": "Device:LED",
         "function_pins": [
@@ -181,7 +191,7 @@
         ],
         "verification": {"confidence": "verified", "sources": ["builtin_pinmap:Device:LED", "curated_part:Lite-On:LTST-C170KGKT"], "pinmap_checked": true}
       }],
-      "verification": {"confidence": "verified", "sources": ["curated_seed_catalog", "curated_part:Lite-On:LTST-C170KGKT", "builtin_pinmap:Device:LED"], "pinmap_checked": true}
+      "verification": {"confidence": "verified", "sources": ["curated_seed_catalog", "curated_part:Lite-On:LTST-C170KGKT", "https://optoelectronics.liteon.com/upload/download/DS22-2000-073/LTST-C170KGKT.pdf", "builtin_pinmap:Device:LED"], "pinmap_checked": true}
     },
     {
       "id": "connector.samtec.tsw_104_07_l_s.1x04",
@@ -764,6 +774,15 @@
       "equivalence": {"group": "protection.tvs.usb_5v_unidirectional", "role": "preferred"},
       "tags": ["protection", "tvs", "esd", "usb", "5v", "sod_323"],
       "ratings": [{"kind": "working_voltage", "max": "5", "unit": "V"}],
+      "simulation_models": [{
+        "model_id": "mna_bidirectional_tvs_piecewise_linear_v1",
+        "parameters": [
+          {"name": "breakdown_voltage_v", "value": 9.5},
+          {"name": "dynamic_resistance_ohm", "value": 0.5},
+          {"name": "max_pulse_current_a", "value": 12},
+          {"name": "off_resistance_ohm", "value": 50000000}
+        ]
+      }],
       "symbols": [{
         "symbol_id": "Device:D_TVS",
         "function_pins": [
@@ -784,7 +803,7 @@
         ],
         "verification": {"confidence": "verified", "sources": ["builtin_pinmap:Device:D_TVS", "curated_part:Nexperia:PESD5V0S1BA"], "pinmap_checked": true}
       }],
-      "verification": {"confidence": "verified", "sources": ["curated_seed_catalog", "curated_part:Nexperia:PESD5V0S1BA", "builtin_pinmap:Device:D_TVS"], "pinmap_checked": true}
+      "verification": {"confidence": "verified", "sources": ["curated_seed_catalog", "https://assets.nexperia.com/documents/data-sheet/PESD5V0S1BA.pdf", "builtin_pinmap:Device:D_TVS"], "pinmap_checked": true}
     }
   ]
 }

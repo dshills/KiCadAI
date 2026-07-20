@@ -193,6 +193,15 @@ func resolveSimulation(intent simmodel.Intent, resolved ResolvedDocument) (simmo
 	return plan, issues
 }
 
+// ResolveSimulationPlan re-resolves one trusted structured simulation intent
+// against an already catalog-resolved graph. Closed-loop planning uses this to
+// build independent linear, nonlinear, and transient workflow plans from the
+// same immutable candidate topology. The simulation registry still validates
+// every model, analysis, primitive claim, excitation, assertion, and bound.
+func ResolveSimulationPlan(intent simmodel.Intent, resolved ResolvedDocument) (simmodel.Plan, []reports.Issue) {
+	return resolveSimulation(intent, resolved)
+}
+
 func firstGraphRootIssue(issues []reports.Issue) reports.Issue {
 	for _, issue := range issues {
 		if issue.Blocking() && issue.RootCauseID == "" {

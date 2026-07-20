@@ -53,6 +53,39 @@ func TestTransientDiodeAndPNPSwitching(t *testing.T) {
 	}
 }
 
+func TestTransientOpenCollectorComparatorAppliesCatalogDelay(t *testing.T) {
+	intent := Intent{
+		ModelID: ModelTransientCircuitV1,
+		Analyses: []Analysis{{
+			ID: "decision", Kind: AnalysisTransient, DurationS: 9e-6, TimeStepS: 1e-6,
+			Excitations: []SourceExcitation{
+				{Component: "signal", PulseInitialValue: 0, PulseValue: 5, PulseDelayS: 5e-6, PulseWidthS: 3e-6, PulsePeriodS: 20e-6},
+				{Component: "supply", DCValue: 5},
+				{Component: "threshold", DCValue: 2.5},
+			},
+		}},
+		Assertions: []Assertion{
+			{AnalysisID: "decision", Node: "OUT", Quantity: QuantityVoltageV, TimeS: 7e-6, Min: .10, Max: .12},
+			{AnalysisID: "decision", Node: "OUT", Quantity: QuantityVoltageV, TimeS: 8e-6, Min: 4.99, Max: 5},
+		},
+	}
+	components := []ComponentEvidence{
+		{InstanceID: "supply", CatalogID: "source.v", Family: "voltage_source", ModelClaims: []CatalogEvidence{{ModelID: PrimitiveVoltageSourceV1}}, Connections: []ConnectionEvidence{{Function: "POSITIVE", Net: "VP"}, {Function: "NEGATIVE", Net: "GND"}}},
+		{InstanceID: "threshold", CatalogID: "source.v", Family: "voltage_source", ModelClaims: []CatalogEvidence{{ModelID: PrimitiveVoltageSourceV1}}, Connections: []ConnectionEvidence{{Function: "POSITIVE", Net: "THRESH"}, {Function: "NEGATIVE", Net: "GND"}}},
+		{InstanceID: "signal", CatalogID: "source.v", Family: "voltage_source", ModelClaims: []CatalogEvidence{{ModelID: PrimitiveVoltageSourceV1}}, Connections: []ConnectionEvidence{{Function: "POSITIVE", Net: "IN"}, {Function: "NEGATIVE", Net: "GND"}}},
+		{InstanceID: "pullup", CatalogID: "r", Family: "resistor", HasValueSI: true, ValueSI: 10000, ModelClaims: []CatalogEvidence{{ModelID: PrimitiveResistorV1}}, Connections: []ConnectionEvidence{{Function: "A", Net: "VP"}, {Function: "B", Net: "OUT"}}},
+		{InstanceID: "comparator", CatalogID: "comparator", Family: "comparator", ModelClaims: []CatalogEvidence{{ModelID: PrimitiveComparatorOpenCollectorV1, Parameters: comparatorParameters(2e-6)}}, Connections: []ConnectionEvidence{{Function: "IN_PLUS", Net: "IN"}, {Function: "IN_MINUS", Net: "THRESH"}, {Function: "OUT", Net: "OUT"}, {Function: "V_PLUS", Net: "VP"}, {Function: "V_MINUS", Net: "GND"}}},
+	}
+	plan, diagnostics := ResolveWithTopology(intent, "test", "hash", components, []NodeEvidence{{Name: "GND", Role: "ground"}, {Name: "IN"}, {Name: "OUT"}, {Name: "THRESH"}, {Name: "VP"}})
+	if len(diagnostics) != 0 {
+		t.Fatalf("resolve diagnostics=%+v", diagnostics)
+	}
+	report, diagnostics := Evaluate(plan)
+	if len(diagnostics) != 0 || report.Status != "pass" {
+		t.Fatalf("report=%+v diagnostics=%+v", report, diagnostics)
+	}
+}
+
 func TestTransientPNPResistiveSwitchDoesNotRequireCapacitiveState(t *testing.T) {
 	components := transientPNPComponents()
 	for index, component := range components {

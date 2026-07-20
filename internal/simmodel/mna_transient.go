@@ -24,10 +24,15 @@ func solveTransientAnalysis(plan Plan, analysis Analysis) (AnalysisResult, []Dia
 	initialEvidence.TotalIterations = initialEvidence.Iterations
 	initialEvidence.MaxIterationsPerStep = nonlinearMaxIterations
 	initialEvidence.MaxTotalIterations = maxTransientWork
-	if diagnostics := validateTransientOperatingLimits(plan, system, solution); len(diagnostics) != 0 {
+	initialStates, _, initialStateDiagnostic := resolvedComparatorStates(plan, system, solution)
+	if initialStateDiagnostic != nil {
+		return result, []Diagnostic{*initialStateDiagnostic}
+	}
+	if diagnostics := validateTransientOperatingLimits(plan, system, solution, initialStates); len(diagnostics) != 0 {
 		return result, prefixTransientDiagnostics(analysis.ID, 0, 0, diagnostics)
 	}
-	result.Points = append(result.Points, AnalysisPoint{TimeS: 0, Nodes: nodeResults(plan, system, solution), Solver: &initialEvidence})
+	result.Points = append(result.Points, AnalysisPoint{TimeS: 0, Nodes: nodeResults(plan, system, solution), Devices: electricalDeviceResults(plan, initialAnalysis, 0, system, solution), Solver: &initialEvidence})
+	history := [][]complex128{append([]complex128(nil), solution...)}
 
 	devices := compileNonlinearDevices(plan)
 	totalIterations := initialEvidence.Iterations
@@ -41,7 +46,8 @@ func solveTransientAnalysis(plan Plan, analysis Analysis) (AnalysisResult, []Dia
 	for step := 1; step <= steps; step++ {
 		// Derive time directly from the integer grid index; never accumulate it.
 		timeS := float64(step) * analysis.TimeStepS
-		if diagnostics := prepareTransientBase(&base, template, plan, analysis, timeS, solution); len(diagnostics) != 0 {
+		comparatorStates, diagnostics := prepareTransientBase(&base, template, plan, analysis, step, timeS, solution, history)
+		if len(diagnostics) != 0 {
 			return result, prefixTransientDiagnostics(analysis.ID, step, timeS, diagnostics)
 		}
 		var evidence SolverEvidence
@@ -57,12 +63,84 @@ func solveTransientAnalysis(plan Plan, analysis Analysis) (AnalysisResult, []Dia
 			diagnostic.Message = fmt.Sprintf("transient solve failed at step %d, time %.12g s: %s", step, timeS, diagnostic.Message)
 			return result, []Diagnostic{*diagnostic}
 		}
-		if diagnostics := validateTransientOperatingLimits(plan, system, solution); len(diagnostics) != 0 {
+		if diagnostics := validateTransientOperatingLimits(plan, system, solution, comparatorStates); len(diagnostics) != 0 {
 			return result, prefixTransientDiagnostics(analysis.ID, step, timeS, diagnostics)
 		}
-		result.Points = append(result.Points, AnalysisPoint{TimeS: normalizedMNAFloat(timeS), Nodes: nodeResults(plan, system, solution), Solver: &evidence})
+		result.Points = append(result.Points, AnalysisPoint{TimeS: normalizedMNAFloat(timeS), Nodes: nodeResults(plan, system, solution), Devices: electricalDeviceResultsWithComparatorStates(plan, analysis, 0, system, solution, comparatorStates), Solver: &evidence})
+		history = append(history, append([]complex128(nil), solution...))
 	}
 	return result, nil
+}
+
+// solveStartupAnalysis applies every bounded DC source after a canonical
+// zero-energy point. Unlike ordinary transient analysis, it deliberately does
+// not solve a steady-state operating point first: capacitor voltages and all
+// algebraic unknowns begin at zero, making power-up overshoot reproducible.
+func solveStartupAnalysis(plan Plan, analysis Analysis) (AnalysisResult, []Diagnostic) {
+	steps := int(math.Round(analysis.DurationS / analysis.TimeStepS))
+	result := AnalysisResult{ID: analysis.ID, Kind: AnalysisStartup, Points: make([]AnalysisPoint, 0, steps+1)}
+	template, diagnostics := buildTransientTemplate(plan, analysis)
+	if len(diagnostics) != 0 {
+		return result, prefixTransientDiagnostics(analysis.ID, 0, 0, diagnostics)
+	}
+	previous := make([]complex128, len(template.rhs))
+	history := [][]complex128{append([]complex128(nil), previous...)}
+	initialEvidence := SolverEvidence{
+		Method: "zero_energy_startup_v1", InitialCondition: "all_dynamic_and_algebraic_unknowns_zero",
+		MaxIterationsPerStep: nonlinearMaxIterations, MaxTotalIterations: maxTransientWork,
+	}
+	result.Points = append(result.Points, AnalysisPoint{Nodes: nodeResults(plan, template, previous), Devices: electricalDeviceResults(plan, analysis, 0, template, previous), Solver: &initialEvidence})
+
+	devices := compileNonlinearDevices(plan)
+	base := cloneMNASystem(template)
+	workspace := cloneMNASystem(template)
+	guess := make([]complex128, len(previous))
+	totalIterations := 0
+	for step := 1; step <= steps; step++ {
+		timeS := float64(step) * analysis.TimeStepS
+		comparatorStates, diagnostics := prepareTransientBase(&base, template, plan, analysis, step, timeS, previous, history)
+		if len(diagnostics) != 0 {
+			return result, prefixTransientDiagnostics(analysis.ID, step, timeS, diagnostics)
+		}
+		system, solution, evidence, diagnostic := solveTransientStep(base, devices, previous, guess, &workspace)
+		totalIterations += evidence.Iterations
+		evidence.InitialCondition = "previous_accepted_startup_state"
+		evidence.TimeSteps = step
+		evidence.TotalIterations = totalIterations
+		evidence.MaxIterationsPerStep = nonlinearMaxIterations
+		evidence.MaxTotalIterations = maxTransientWork
+		if diagnostic != nil {
+			diagnostic.Path = fmt.Sprintf("analyses.%s.points[%d].%s", analysis.ID, step, diagnostic.Path)
+			diagnostic.Message = fmt.Sprintf("startup solve failed at step %d, time %.12g s: %s", step, timeS, diagnostic.Message)
+			return result, []Diagnostic{*diagnostic}
+		}
+		if diagnostics := validateTransientOperatingLimits(plan, system, solution, comparatorStates); len(diagnostics) != 0 {
+			return result, prefixTransientDiagnostics(analysis.ID, step, timeS, diagnostics)
+		}
+		result.Points = append(result.Points, AnalysisPoint{TimeS: normalizedMNAFloat(timeS), Nodes: nodeResults(plan, system, solution), Devices: electricalDeviceResultsWithComparatorStates(plan, analysis, 0, system, solution, comparatorStates), Solver: &evidence})
+		previous = solution
+		history = append(history, append([]complex128(nil), solution...))
+	}
+	return result, nil
+}
+
+func peakAbsVoltage(result AnalysisResult, assertion Assertion) (float64, *Diagnostic) {
+	peak := 0.0
+	found := false
+	for _, point := range result.Points {
+		for _, node := range point.Nodes {
+			if node.Node != assertion.Node {
+				continue
+			}
+			peak = math.Max(peak, math.Abs(node.Real))
+			found = true
+			break
+		}
+	}
+	if !found {
+		return 0, &Diagnostic{Path: "assertions." + assertion.AnalysisID + "." + assertion.Node, Message: "startup peak assertion did not resolve to a solved node waveform"}
+	}
+	return normalizedMNAFloat(peak), nil
 }
 
 func transientDCAnalysis(analysis Analysis, timeS float64) Analysis {
@@ -76,11 +154,18 @@ func transientDCAnalysis(analysis Analysis, timeS float64) Analysis {
 		dc.Excitations[index].PulseDelayS = 0
 		dc.Excitations[index].PulseWidthS = 0
 		dc.Excitations[index].PulsePeriodS = 0
+		dc.Excitations[index].SineAmplitude = 0
+		dc.Excitations[index].SineFrequencyHz = 0
+		dc.Excitations[index].SinePhaseDeg = 0
 	}
 	return dc
 }
 
 func transientSourceValue(excitation SourceExcitation, timeS, timeStepS float64) float64 {
+	if excitation.SineFrequencyHz > 0 {
+		phase := excitation.SinePhaseDeg * math.Pi / 180
+		return excitation.DCValue + excitation.SineAmplitude*math.Sin(2*math.Pi*excitation.SineFrequencyHz*timeS+phase)
+	}
 	if excitation.PulsePeriodS <= 0 {
 		return excitation.DCValue
 	}
@@ -96,6 +181,73 @@ func transientSourceValue(excitation SourceExcitation, timeS, timeStepS float64)
 		return excitation.PulseValue
 	}
 	return excitation.PulseInitialValue
+}
+
+func solveDistortionAnalysis(plan Plan, analysis Analysis) (AnalysisResult, []Diagnostic) {
+	result, diagnostics := solveTransientAnalysis(plan, analysis)
+	result.Kind = AnalysisDistortion
+	for _, excitation := range analysis.Excitations {
+		if excitation.SineFrequencyHz > 0 {
+			result.FundamentalFrequencyHz = excitation.SineFrequencyHz
+			break
+		}
+	}
+	return result, diagnostics
+}
+
+func totalHarmonicDistortion(result AnalysisResult, assertion Assertion) (float64, *Diagnostic) {
+	frequency := result.FundamentalFrequencyHz
+	if frequency <= 0 {
+		return 0, &Diagnostic{Path: "assertions." + assertion.AnalysisID, Message: "distortion assertion has no resolved sine fundamental"}
+	}
+	if len(result.Points) < 2 || result.Points[1].TimeS <= 0 {
+		return 0, &Diagnostic{Path: "assertions." + assertion.AnalysisID, Message: "distortion waveform has no positive observation step"}
+	}
+	samplesPerCycle := int(math.Round(1 / (frequency * result.Points[1].TimeS)))
+	window := 2 * samplesPerCycle
+	if len(result.Points)-1 < window {
+		return 0, &Diagnostic{Path: "assertions." + assertion.AnalysisID, Message: "distortion waveform does not contain the trusted two-cycle measurement window"}
+	}
+	start := len(result.Points) - 1 - window
+	values := make([]float64, 0, window)
+	for _, point := range result.Points[start : start+window] {
+		found := false
+		for _, node := range point.Nodes {
+			if node.Node == assertion.Node {
+				values = append(values, node.Real)
+				found = true
+				break
+			}
+		}
+		if !found {
+			return 0, &Diagnostic{Path: "assertions." + assertion.AnalysisID + "." + assertion.Node, Message: "distortion assertion did not resolve to a solved waveform"}
+		}
+	}
+	fundamentalBin := 2
+	fundamental := dftMagnitude(values, fundamentalBin)
+	if fundamental <= 1e-15 || !finite(fundamental) {
+		return 0, &Diagnostic{Path: "assertions." + assertion.AnalysisID + "." + assertion.Node, Message: "distortion fundamental is zero or numerically unresolved", Suggestion: "increase the bounded source amplitude or correct circuit transfer"}
+	}
+	harmonicPower := 0.0
+	for harmonic := 2; harmonic <= 5; harmonic++ {
+		bin := fundamentalBin * harmonic
+		if bin >= len(values)/2 {
+			break
+		}
+		magnitude := dftMagnitude(values, bin)
+		harmonicPower += magnitude * magnitude
+	}
+	return normalizedMNAFloat(100 * math.Sqrt(harmonicPower) / fundamental), nil
+}
+
+func dftMagnitude(values []float64, bin int) float64 {
+	realPart, imaginary := 0.0, 0.0
+	for index, value := range values {
+		angle := 2 * math.Pi * float64(bin*index) / float64(len(values))
+		realPart += value * math.Cos(angle)
+		imaginary -= value * math.Sin(angle)
+	}
+	return 2 * math.Hypot(realPart, imaginary) / float64(len(values))
 }
 
 func buildTransientTemplate(plan Plan, analysis Analysis) (mnaSystem, []Diagnostic) {
@@ -129,8 +281,9 @@ func buildTransientTemplate(plan Plan, analysis Analysis) (mnaSystem, []Diagnost
 	return system, nil
 }
 
-func prepareTransientBase(base *mnaSystem, template mnaSystem, plan Plan, analysis Analysis, timeS float64, previous []complex128) []Diagnostic {
+func prepareTransientBase(base *mnaSystem, template mnaSystem, plan Plan, analysis Analysis, step int, timeS float64, previous []complex128, history [][]complex128) (map[string]float64, []Diagnostic) {
 	resetMNASystem(base, template)
+	comparatorStates := map[string]float64{}
 	for _, device := range plan.Devices {
 		terminals := terminalMap(device)
 		switch device.PrimitiveModel {
@@ -142,12 +295,30 @@ func prepareTransientBase(base *mnaSystem, template mnaSystem, plan Plan, analys
 			conductance := *device.ValueSI / analysis.TimeStepS
 			previousVoltage := nonlinearNodeVoltage(base, previous, terminals["A"]) - nonlinearNodeVoltage(base, previous, terminals["B"])
 			stampCurrentSource(base, terminals["A"], terminals["B"], complex(-conductance*previousVoltage, 0))
+		case PrimitiveComparatorOpenCollectorV1:
+			parameters := namedValueMap(device.ModelParameters)
+			delaySteps := int(math.Ceil(parameters["propagation_delay_s"]/analysis.TimeStepS - 1e-12))
+			decisionIndex := step - delaySteps
+			if decisionIndex < 0 {
+				decisionIndex = 0
+			}
+			if decisionIndex >= len(history) {
+				decisionIndex = len(history) - 1
+			}
+			if comparatorOn(device, *base, history[decisionIndex]) {
+				comparatorStates[device.Component] = 1
+				onConductance := 1 / parameters["output_on_resistance_ohm"]
+				offConductance := 1 / parameters["output_off_resistance_ohm"]
+				stampAdmittance(base, terminals["OUT"], terminals["V_MINUS"], complex(onConductance-offConductance, 0))
+			} else {
+				comparatorStates[device.Component] = 0
+			}
 		}
 	}
 	if diagnostic := validateMNASystemBounds(*base); diagnostic != nil {
-		return []Diagnostic{*diagnostic}
+		return comparatorStates, []Diagnostic{*diagnostic}
 	}
-	return nil
+	return comparatorStates, nil
 }
 
 func transientExcitationValue(analysis Analysis, component string, timeS float64) float64 {
@@ -220,17 +391,29 @@ func solveTransientStep(base mnaSystem, devices []compiledNonlinearDevice, previ
 	return mnaSystem{}, nil, evidence, &Diagnostic{Path: "convergence", Message: fmt.Sprintf("fixed backward-Euler Newton solve did not converge within %d iterations; largest voltage update %s, largest current update %s, largest residual %s", nonlinearMaxIterations, largestUpdateLabel, largestCurrentUpdateLabel, largestResidualLabel), Suggestion: "reduce the bounded observation step, add a catalog-backed bias path, or correct incompatible source and switching conditions"}
 }
 
-func validateTransientOperatingLimits(plan Plan, system mnaSystem, solution []complex128) []Diagnostic {
-	diagnostics := validateNonlinearOperatingLimits(plan, system, solution)
+func validateTransientOperatingLimits(plan Plan, system mnaSystem, solution []complex128, comparatorStates map[string]float64) []Diagnostic {
+	diagnostics := validateNonlinearOperatingLimitsWithComparatorStates(plan, system, solution, comparatorStates)
 	for _, device := range plan.Devices {
-		if device.PrimitiveModel != PrimitiveCapacitorTransientV1 {
-			continue
-		}
 		terminals := terminalMap(device)
-		voltage := nonlinearNodeVoltage(&system, solution, terminals["A"]) - nonlinearNodeVoltage(&system, solution, terminals["B"])
-		limit := namedValueMap(device.ModelParameters)["max_voltage_v"]
-		if math.Abs(voltage) > limit {
-			diagnostics = append(diagnostics, Diagnostic{Path: "devices." + device.Component + ".operating_limit", Message: fmt.Sprintf("capacitor voltage %.12g V exceeds catalog-backed limit %.12g V", math.Abs(voltage), limit), Suggestion: "reduce applied voltage or select a suitably rated reviewed capacitor"})
+		parameters := namedValueMap(device.ModelParameters)
+		switch device.PrimitiveModel {
+		case PrimitiveCapacitorTransientV1:
+			voltage := nonlinearNodeVoltage(&system, solution, terminals["A"]) - nonlinearNodeVoltage(&system, solution, terminals["B"])
+			limit := parameters["max_voltage_v"]
+			if math.Abs(voltage) > limit {
+				diagnostics = append(diagnostics, Diagnostic{Path: "devices." + device.Component + ".operating_limit", Message: fmt.Sprintf("capacitor voltage %.12g V exceeds catalog-backed limit %.12g V", math.Abs(voltage), limit), Suggestion: "reduce applied voltage or select a suitably rated reviewed capacitor"})
+			}
+		case PrimitiveComparatorOpenCollectorV1:
+			supply := nonlinearNodeVoltage(&system, solution, terminals["V_PLUS"]) - nonlinearNodeVoltage(&system, solution, terminals["V_MINUS"])
+			if supply < parameters["supply_min_v"] || supply > parameters["supply_max_v"] {
+				diagnostics = append(diagnostics, Diagnostic{Path: "devices." + device.Component + ".supply", Message: fmt.Sprintf("transient supply %.12g V is outside catalog-backed range %.12g..%.12g V", supply, parameters["supply_min_v"], parameters["supply_max_v"]), Suggestion: "adjust source conditions or select a compatible catalog comparator"})
+			}
+			if comparatorStates[device.Component] >= .5 {
+				current := math.Abs((nonlinearNodeVoltage(&system, solution, terminals["OUT"]) - nonlinearNodeVoltage(&system, solution, terminals["V_MINUS"])) / parameters["output_on_resistance_ohm"])
+				if current > parameters["max_sink_current_a"] {
+					diagnostics = append(diagnostics, Diagnostic{Path: "devices." + device.Component + ".operating_limit", Message: fmt.Sprintf("comparator sink current %.12g A exceeds catalog-backed limit %.12g A", current, parameters["max_sink_current_a"]), Suggestion: "increase output pull-up resistance or select a compatible reviewed comparator"})
+				}
+			}
 		}
 	}
 	return diagnostics

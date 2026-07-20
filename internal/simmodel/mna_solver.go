@@ -27,15 +27,24 @@ type mnaSystem struct {
 
 func evaluateMNA(plan Plan, report Report) (Report, []Diagnostic) {
 	model, _ := definitionByID(plan.ModelID)
-	if !model.NonlinearDC {
-		if diagnostics := validateOpAmpStability(plan); len(diagnostics) != 0 {
-			return report, diagnostics
-		}
-	}
 	analysisResults := make([]AnalysisResult, 0, len(plan.Analyses))
 	if model.Transient {
 		for _, analysis := range plan.Analyses {
-			result, diagnostics := solveTransientAnalysis(plan, analysis)
+			analysisPlan := planWithAnalysisOverrides(plan, analysis)
+			if !model.NonlinearDC {
+				if diagnostics := validateOpAmpStability(analysisPlan); len(diagnostics) != 0 {
+					return report, diagnostics
+				}
+			}
+			var result AnalysisResult
+			var diagnostics []Diagnostic
+			if analysis.Kind == AnalysisStartup {
+				result, diagnostics = solveStartupAnalysis(analysisPlan, analysis)
+			} else if analysis.Kind == AnalysisDistortion {
+				result, diagnostics = solveDistortionAnalysis(analysisPlan, analysis)
+			} else {
+				result, diagnostics = solveTransientAnalysis(analysisPlan, analysis)
+			}
 			if len(diagnostics) != 0 {
 				return report, diagnostics
 			}
@@ -45,6 +54,43 @@ func evaluateMNA(plan Plan, report Report) (Report, []Diagnostic) {
 		return evaluateMNAAssertions(plan, report)
 	}
 	for _, analysis := range plan.Analyses {
+		analysisPlan := planWithAnalysisOverrides(plan, analysis)
+		if !model.NonlinearDC && analysis.DCSweep == nil {
+			if diagnostics := validateOpAmpStability(analysisPlan); len(diagnostics) != 0 {
+				return report, diagnostics
+			}
+		}
+		switch analysis.Kind {
+		case AnalysisThermal:
+			result, diagnostics := solveThermalAnalysis(analysisPlan, analysis)
+			if len(diagnostics) != 0 {
+				return report, diagnostics
+			}
+			analysisResults = append(analysisResults, result)
+			continue
+		case AnalysisNoise:
+			result, diagnostics := solveNoiseAnalysis(analysisPlan, analysis)
+			if len(diagnostics) != 0 {
+				return report, diagnostics
+			}
+			analysisResults = append(analysisResults, result)
+			continue
+		case AnalysisStability:
+			result, diagnostics := solveStabilityAnalysis(analysisPlan, analysis)
+			if len(diagnostics) != 0 {
+				return report, diagnostics
+			}
+			analysisResults = append(analysisResults, result)
+			continue
+		}
+		if analysis.Kind == AnalysisDCOperatingPoint && analysis.DCSweep != nil {
+			result, diagnostics := solveDCSweepAnalysis(analysisPlan, analysis, model.NonlinearDC)
+			if len(diagnostics) != 0 {
+				return report, diagnostics
+			}
+			analysisResults = append(analysisResults, result)
+			continue
+		}
 		frequencies := []float64{0}
 		if analysis.Kind == AnalysisACSweep {
 			frequencies = sweepFrequencies(analysis)
@@ -52,19 +98,19 @@ func evaluateMNA(plan Plan, report Report) (Report, []Diagnostic) {
 		result := AnalysisResult{ID: analysis.ID, Kind: analysis.Kind, Points: make([]AnalysisPoint, 0, len(frequencies))}
 		for _, frequency := range frequencies {
 			if model.NonlinearDC {
-				system, solution, evidence, diagnostic := solveNonlinearDC(plan, analysis)
+				system, solution, evidence, diagnostic := solveNonlinearDC(analysisPlan, analysis)
 				if diagnostic != nil {
 					diagnostic.Path = "analyses." + analysis.ID + "." + diagnostic.Path
 					return report, []Diagnostic{*diagnostic}
 				}
-				point := AnalysisPoint{Nodes: nodeResults(plan, system, solution), Solver: &evidence}
-				if diagnostics := validateNonlinearOperatingLimits(plan, system, solution); len(diagnostics) != 0 {
+				point := AnalysisPoint{Nodes: nodeResults(analysisPlan, system, solution), Devices: electricalDeviceResults(analysisPlan, analysis, 0, system, solution), Solver: &evidence}
+				if diagnostics := validateNonlinearOperatingLimits(analysisPlan, system, solution); len(diagnostics) != 0 {
 					return report, diagnostics
 				}
 				result.Points = append(result.Points, point)
 				continue
 			}
-			system, diagnostics := buildMNASystem(plan, analysis, frequency)
+			system, diagnostics := buildMNASystem(analysisPlan, analysis, frequency)
 			if len(diagnostics) != 0 {
 				return report, diagnostics
 			}
@@ -73,13 +119,14 @@ func evaluateMNA(plan Plan, report Report) (Report, []Diagnostic) {
 				diagnostic.Path = "analyses." + analysis.ID + "." + diagnostic.Path
 				return report, []Diagnostic{*diagnostic}
 			}
-			point := AnalysisPoint{FrequencyHz: frequency, Nodes: nodeResults(plan, system, solution)}
+			point := AnalysisPoint{FrequencyHz: frequency, Nodes: nodeResults(analysisPlan, system, solution), Devices: electricalDeviceResults(analysisPlan, analysis, frequency, system, solution)}
 			if analysis.Kind == AnalysisDCOperatingPoint {
-				system, solution, diagnostics = solveBoundedOpAmpDC(plan, analysis, system, solution)
+				system, solution, diagnostics = solveBoundedOpAmpDC(analysisPlan, analysis, system, solution)
 				if len(diagnostics) != 0 {
 					return report, diagnostics
 				}
-				point.Nodes = nodeResults(plan, system, solution)
+				point.Nodes = nodeResults(analysisPlan, system, solution)
+				point.Devices = electricalDeviceResults(analysisPlan, analysis, frequency, system, solution)
 			}
 			result.Points = append(result.Points, point)
 		}
@@ -87,6 +134,93 @@ func evaluateMNA(plan Plan, report Report) (Report, []Diagnostic) {
 	}
 	report.Analyses = analysisResults
 	return evaluateMNAAssertions(plan, report)
+}
+
+func electricalDeviceResults(plan Plan, analysis Analysis, frequency float64, system mnaSystem, solution []complex128) []DeviceResult {
+	return electricalDeviceResultsWithComparatorStates(plan, analysis, frequency, system, solution, nil)
+}
+
+func electricalDeviceResultsWithComparatorStates(plan Plan, analysis Analysis, frequency float64, system mnaSystem, solution []complex128, comparatorStates map[string]float64) []DeviceResult {
+	results := make([]DeviceResult, 0, len(plan.Devices))
+	for _, device := range plan.Devices {
+		terminals := terminalMap(device)
+		var voltage, current complex128
+		include := true
+		switch device.PrimitiveModel {
+		case PrimitiveResistorV1:
+			voltage = solvedNodeVoltage(system, solution, terminals["A"]) - solvedNodeVoltage(system, solution, terminals["B"])
+			current = voltage / complex(*device.ValueSI, 0)
+		case PrimitiveCapacitorV1:
+			voltage = solvedNodeVoltage(system, solution, terminals["A"]) - solvedNodeVoltage(system, solution, terminals["B"])
+			if analysis.Kind == AnalysisACSweep {
+				current = voltage * complex(0, 2*math.Pi*frequency**device.ValueSI)
+			}
+		case PrimitiveVoltageSourceV1:
+			voltage = solvedNodeVoltage(system, solution, terminals["POSITIVE"]) - solvedNodeVoltage(system, solution, terminals["NEGATIVE"])
+			current = solution[system.branchIndex[device.Component]]
+		case PrimitiveConnectorVoltageSourceV1:
+			voltage = solvedNodeVoltage(system, solution, terminals["PIN_1"]) - solvedNodeVoltage(system, solution, terminals["PIN_2"])
+			current = solution[system.branchIndex[device.Component]]
+		case PrimitiveCurrentSourceV1:
+			voltage = solvedNodeVoltage(system, solution, terminals["POSITIVE"]) - solvedNodeVoltage(system, solution, terminals["NEGATIVE"])
+			current = excitationValue(analysis, device.Component)
+		case PrimitiveOpAmpV1:
+			voltage = solvedNodeVoltage(system, solution, terminals["OUT"])
+			current = solution[system.branchIndex[device.Component]]
+		case PrimitiveComparatorOpenCollectorV1:
+			voltage = solvedNodeVoltage(system, solution, terminals["OUT"]) - solvedNodeVoltage(system, solution, terminals["V_MINUS"])
+			parameters := namedValueMap(device.ModelParameters)
+			resistance := parameters["output_off_resistance_ohm"]
+			on := comparatorOn(device, system, solution)
+			if state, exists := comparatorStates[device.Component]; exists {
+				on = state >= .5
+			}
+			if on {
+				resistance = parameters["output_on_resistance_ohm"]
+			}
+			current = voltage / complex(resistance, 0)
+		case PrimitiveDiodeShockleyV1:
+			voltage = solvedNodeVoltage(system, solution, terminals["ANODE"]) - solvedNodeVoltage(system, solution, terminals["CATHODE"])
+			value, _ := diodeCurrentAndGradient(real(voltage), namedValueMap(device.ModelParameters))
+			current = complex(value, 0)
+		case PrimitiveBidirectionalTVSV1:
+			voltage = solvedNodeVoltage(system, solution, terminals["ANODE"]) - solvedNodeVoltage(system, solution, terminals["CATHODE"])
+			value, _ := bidirectionalTVSCurrentAndGradient(real(voltage), namedValueMap(device.ModelParameters))
+			current = complex(value, 0)
+		case PrimitiveBJTNPNV1, PrimitiveBJTPNPV1:
+			polarity := 1.0
+			if device.PrimitiveModel == PrimitiveBJTPNPV1 {
+				polarity = -1
+			}
+			vb := real(solvedNodeVoltage(system, solution, terminals["BASE"]))
+			vc := real(solvedNodeVoltage(system, solution, terminals["COLLECTOR"]))
+			ve := real(solvedNodeVoltage(system, solution, terminals["EMITTER"]))
+			currents, _ := bjtCurrentsAndJacobian(vb, vc, ve, namedValueMap(device.ModelParameters), polarity)
+			voltage, current = complex(vc-ve, 0), complex(currents[1], 0)
+		default:
+			include = false
+		}
+		if include {
+			results = append(results, DeviceResult{Component: device.Component, VoltageV: normalizedMNAFloat(real(voltage)), CurrentA: normalizedMNAFloat(real(current)), CurrentMagnitudeA: normalizedMNAFloat(cmplx.Abs(current))})
+		}
+	}
+	return results
+}
+
+func planWithAnalysisOverrides(plan Plan, analysis Analysis) Plan {
+	if len(analysis.DeviceOverrides) == 0 {
+		return plan
+	}
+	clone := ClonePlan(plan)
+	for _, override := range analysis.DeviceOverrides {
+		for index := range clone.Devices {
+			if clone.Devices[index].Component == override.Component {
+				clone.Devices[index] = applyDeviceOverride(clone.Devices[index], override)
+				break
+			}
+		}
+	}
+	return clone
 }
 
 func evaluateMNAAssertions(plan Plan, report Report) (Report, []Diagnostic) {
@@ -99,12 +233,16 @@ func evaluateMNAAssertions(plan Plan, report Report) (Report, []Diagnostic) {
 		}
 		pass := actual >= assertion.Min && actual <= assertion.Max
 		report.Assertions = append(report.Assertions, AssertionResult{
-			AnalysisID: assertion.AnalysisID, Node: assertion.Node, Quantity: assertion.Quantity, FrequencyHz: assertion.FrequencyHz, TimeS: assertion.TimeS,
+			AnalysisID: assertion.AnalysisID, Node: assertion.Node, Component: assertion.Component, ReferenceNode: assertion.ReferenceNode, Quantity: assertion.Quantity, FrequencyHz: assertion.FrequencyHz, TimeS: assertion.TimeS,
 			Min: assertion.Min, Max: assertion.Max, Actual: actual, Pass: pass,
 		})
 		if !pass {
+			scope := assertion.Node
+			if assertion.Component != "" {
+				scope = assertion.Component
+			}
 			diagnostics = append(diagnostics, Diagnostic{
-				Path:       "assertions." + assertion.AnalysisID + "." + assertion.Node + "." + assertion.Quantity,
+				Path:       "assertions." + assertion.AnalysisID + "." + scope + "." + assertion.Quantity,
 				Message:    fmt.Sprintf("measured %.12g is outside trusted bounds %.12g..%.12g", actual, assertion.Min, assertion.Max),
 				Suggestion: "adjust catalog-backed component values, connectivity, or bounded analysis conditions",
 			})
@@ -160,7 +298,7 @@ func buildMNASystemWithOpAmpClamps(plan Plan, analysis Analysis, frequency float
 			conductance := complex(1 / *device.ValueSI, 0)
 			stampAdmittance(&system, terminals["A"], terminals["B"], conductance)
 		case PrimitiveCapacitorV1:
-			if analysis.Kind == AnalysisACSweep {
+			if smallSignalAnalysis(analysis.Kind) {
 				stampAdmittance(&system, terminals["A"], terminals["B"], complex(0, 2*math.Pi*frequency**device.ValueSI))
 			}
 		case PrimitiveCapacitorTransientV1:
@@ -181,12 +319,19 @@ func buildMNASystemWithOpAmpClamps(plan Plan, analysis Analysis, frequency float
 			}
 			parameters := namedValueMap(device.ModelParameters)
 			gain := complex(parameters["dc_open_loop_gain"], 0)
-			if analysis.Kind == AnalysisACSweep {
+			if smallSignalAnalysis(analysis.Kind) {
 				pole := parameters["gain_bandwidth_hz"] / parameters["dc_open_loop_gain"]
 				gain /= complex(1, frequency/pole)
 			}
 			stampOpAmp(&system, device.Component, terminals, gain)
-		case PrimitiveDiodeShockleyV1, PrimitiveBJTNPNV1, PrimitiveBJTPNPV1:
+		case PrimitiveComparatorOpenCollectorV1:
+			parameters := namedValueMap(device.ModelParameters)
+			resistance := parameters["output_off_resistance_ohm"]
+			if value, decided := opAmpClamps[device.Component]; decided && value >= .5 {
+				resistance = parameters["output_on_resistance_ohm"]
+			}
+			stampAdmittance(&system, terminals["OUT"], terminals["V_MINUS"], complex(1/resistance, 0))
+		case PrimitiveDiodeShockleyV1, PrimitiveBidirectionalTVSV1, PrimitiveBJTNPNV1, PrimitiveBJTPNPV1:
 			// Nonlinear devices are stamped by the bounded DC Newton solver.
 		default:
 			return mnaSystem{}, []Diagnostic{{Path: "devices." + device.Component, Message: "resolved primitive has no trusted MNA stamp"}}
@@ -427,6 +572,15 @@ func excitationValue(analysis Analysis, component string) complex128 {
 	return 0
 }
 
+func smallSignalAnalysis(kind string) bool {
+	switch kind {
+	case AnalysisACSweep, AnalysisNoise, AnalysisStability:
+		return true
+	default:
+		return false
+	}
+}
+
 func terminalMap(device ResolvedDevice) map[string]string {
 	terminals := make(map[string]string, len(device.Terminals))
 	for _, terminal := range device.Terminals {
@@ -456,17 +610,35 @@ func nodeResults(plan Plan, system mnaSystem, solution []complex128) []NodeResul
 // stability proof; repeated states, cycles, and iteration exhaustion return a
 // structured diagnostic and can never be reported as a suboptimal solution.
 func solveBoundedOpAmpDC(plan Plan, analysis Analysis, system mnaSystem, solution []complex128) (mnaSystem, []complex128, []Diagnostic) {
+	system, solution, _, diagnostics := solveBoundedOpAmpDCFromState(plan, analysis, system, solution, nil)
+	return system, solution, diagnostics
+}
+
+func solveBoundedOpAmpDCFromState(plan Plan, analysis Analysis, system mnaSystem, solution []complex128, initial map[string]float64) (mnaSystem, []complex128, map[string]float64, []Diagnostic) {
 	opAmpCount := 0
 	for _, device := range plan.Devices {
-		if device.PrimitiveModel == PrimitiveOpAmpV1 {
+		if device.PrimitiveModel == PrimitiveOpAmpV1 || device.PrimitiveModel == PrimitiveComparatorOpenCollectorV1 {
 			opAmpCount++
 		}
 	}
 	if opAmpCount == 0 {
-		return system, solution, nil
+		return system, solution, nil, nil
 	}
 
-	clamps := map[string]float64{}
+	clamps := cloneOpAmpClamps(initial)
+	if len(clamps) != 0 {
+		var diagnostics []Diagnostic
+		system, diagnostics = buildMNASystemWithOpAmpClamps(plan, analysis, 0, clamps)
+		if len(diagnostics) != 0 {
+			return system, nil, clamps, diagnostics
+		}
+		var diagnostic *Diagnostic
+		solution, diagnostic = solveMNA(system)
+		if diagnostic != nil {
+			diagnostic.Path = "analyses." + analysis.ID + "." + diagnostic.Path
+			return system, nil, clamps, []Diagnostic{*diagnostic}
+		}
+	}
 	seen := map[string]bool{}
 	previousStates := ""
 	iterationLimit := min(opAmpCount*6+2, maxOpAmpActiveSetIterations)
@@ -476,6 +648,26 @@ func solveBoundedOpAmpDC(plan Plan, analysis Analysis, system mnaSystem, solutio
 		statesBuilder.Grow(opAmpCount * 16)
 		var diagnostics []Diagnostic
 		for _, device := range plan.Devices {
+			if device.PrimitiveModel == PrimitiveComparatorOpenCollectorV1 {
+				parameters := namedValueMap(device.ModelParameters)
+				terminals := terminalMap(device)
+				negative := real(solvedNodeVoltage(system, solution, terminals["V_MINUS"]))
+				positive := real(solvedNodeVoltage(system, solution, terminals["V_PLUS"]))
+				supply := positive - negative
+				if supply < parameters["supply_min_v"] || supply > parameters["supply_max_v"] {
+					diagnostics = append(diagnostics, Diagnostic{Path: "devices." + device.Component + ".supply", Message: fmt.Sprintf("DC supply %.12g V is outside catalog-backed range %.12g..%.12g V", supply, parameters["supply_min_v"], parameters["supply_max_v"]), Suggestion: "adjust source conditions or select a compatible catalog comparator"})
+					continue
+				}
+				on := comparatorOn(device, system, solution)
+				if on {
+					next[device.Component] = 1
+					statesBuilder.WriteString(device.Component + ":on;")
+				} else {
+					next[device.Component] = 0
+					statesBuilder.WriteString(device.Component + ":off;")
+				}
+				continue
+			}
 			if device.PrimitiveModel != PrimitiveOpAmpV1 {
 				continue
 			}
@@ -509,13 +701,13 @@ func solveBoundedOpAmpDC(plan Plan, analysis Analysis, system mnaSystem, solutio
 		}
 		states := statesBuilder.String()
 		if len(diagnostics) != 0 {
-			return system, solution, diagnostics
+			return system, solution, clamps, diagnostics
 		}
 		if sameOpAmpClamps(clamps, next) {
-			return system, solution, nil
+			return system, solution, clamps, nil
 		}
 		if states != previousStates && seen[states] {
-			return system, solution, []Diagnostic{{Path: "devices", Message: "bounded op-amp operating-point states did not converge", Suggestion: "correct ambiguous positive feedback or add catalog-backed hysteresis and loading"}}
+			return system, solution, clamps, []Diagnostic{{Path: "devices", Message: "bounded op-amp operating-point states did not converge", Suggestion: "correct ambiguous positive feedback or add catalog-backed hysteresis and loading"}}
 		}
 		seen[states] = true
 		previousStates = states
@@ -527,16 +719,32 @@ func solveBoundedOpAmpDC(plan Plan, analysis Analysis, system mnaSystem, solutio
 		var systemDiagnostics []Diagnostic
 		system, systemDiagnostics = buildMNASystemWithOpAmpClamps(plan, analysis, 0, clamps)
 		if len(systemDiagnostics) != 0 {
-			return system, nil, systemDiagnostics
+			return system, nil, clamps, systemDiagnostics
 		}
 		var diagnostic *Diagnostic
 		solution, diagnostic = solveMNA(system)
 		if diagnostic != nil {
 			diagnostic.Path = "analyses." + analysis.ID + "." + diagnostic.Path
-			return system, nil, []Diagnostic{*diagnostic}
+			return system, nil, clamps, []Diagnostic{*diagnostic}
 		}
 	}
-	return system, solution, []Diagnostic{{Path: "devices", Message: "bounded op-amp operating-point iteration exceeded its deterministic limit", Suggestion: "correct ambiguous positive feedback or reduce coupled comparator stages"}}
+	return system, solution, clamps, []Diagnostic{{Path: "devices", Message: "bounded op-amp operating-point iteration exceeded its deterministic limit", Suggestion: "correct ambiguous positive feedback or reduce coupled comparator stages"}}
+}
+
+func comparatorOn(device ResolvedDevice, system mnaSystem, solution []complex128) bool {
+	terminals := terminalMap(device)
+	parameters := namedValueMap(device.ModelParameters)
+	plus := real(solvedNodeVoltage(system, solution, terminals["IN_PLUS"]))
+	minus := real(solvedNodeVoltage(system, solution, terminals["IN_MINUS"]))
+	return plus-minus < parameters["input_offset_v"]
+}
+
+func cloneOpAmpClamps(source map[string]float64) map[string]float64 {
+	clone := make(map[string]float64, len(source))
+	for component, value := range source {
+		clone[component] = value
+	}
+	return clone
 }
 
 func sameOpAmpClamps(left, right map[string]float64) bool {
@@ -558,8 +766,35 @@ func assertionValue(results []AnalysisResult, assertion Assertion) (float64, *Di
 		if result.ID != assertion.AnalysisID {
 			continue
 		}
+		if result.Kind == AnalysisNoise && assertion.Quantity == QuantityIntegratedNoiseVRMS {
+			return integratedNoise(result, assertion)
+		}
+		if result.Kind == AnalysisStability && (assertion.Quantity == QuantityPhaseMarginDeg || assertion.Quantity == QuantityGainMarginDB) {
+			return stabilityMargin(result, assertion)
+		}
 		if result.Kind == AnalysisTransient && (assertion.Quantity == QuantityRiseTimeS || assertion.Quantity == QuantityFallTimeS) {
 			return transientEdgeTime(result, assertion)
+		}
+		if result.Kind == AnalysisStartup && assertion.Quantity == QuantityPeakAbsVoltageV {
+			return peakAbsVoltage(result, assertion)
+		}
+		if result.Kind == AnalysisDistortion && assertion.Quantity == QuantityTHDPercent {
+			return totalHarmonicDistortion(result, assertion)
+		}
+		if result.Kind == AnalysisThermal && (assertion.Quantity == QuantityDeviceDissipationW || assertion.Quantity == QuantityJunctionTemperatureC) {
+			return thermalAssertionValue(result, assertion)
+		}
+		if result.Kind == AnalysisACSweep && (assertion.Quantity == QuantityVoltageGainRatio || assertion.Quantity == QuantityCutoffFrequencyHz || assertion.Quantity == QuantityBandwidthHz) {
+			return acDerivedValue(result, assertion)
+		}
+		if result.Kind == AnalysisTransient && (assertion.Quantity == QuantityPeakAbsVoltageV || assertion.Quantity == QuantityOutputSwingVPP || assertion.Quantity == QuantitySettlingTimeS || assertion.Quantity == QuantityResponseTimeS || assertion.Quantity == QuantityOutputPowerW) {
+			return transientDerivedValue(result, assertion)
+		}
+		if result.Kind == AnalysisDCOperatingPoint && (assertion.Quantity == QuantityDeviceCurrentA || assertion.Quantity == QuantityTransimpedanceOhm) {
+			return dcDeviceValue(result, assertion)
+		}
+		if result.Kind == AnalysisDCOperatingPoint && (assertion.Quantity == QuantityThresholdVoltageV || assertion.Quantity == QuantityThresholdCurrentA || assertion.Quantity == QuantityHysteresisVoltageV) {
+			return dcSweepDerivedValue(result, assertion)
 		}
 		for _, point := range result.Points {
 			if result.Kind == AnalysisACSweep && math.Abs(point.FrequencyHz-assertion.FrequencyHz) > math.Max(1, math.Abs(point.FrequencyHz))*1e-12 {

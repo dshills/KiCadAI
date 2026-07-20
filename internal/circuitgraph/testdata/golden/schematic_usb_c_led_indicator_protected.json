@@ -5,7 +5,7 @@
     "name": "generic_usb_c_led_protected",
     "title": "Protected USB-C LED Indicator",
     "description": "Explicit component graph equivalent of the promoted protected USB-C LED block design.",
-    "seed": "0f38ca8793bbbaf9234dee06d8455725d3001eaf819745f43128f789115bfb3f",
+    "seed": "1beb61da6f0db3b5a8ea254897ce7781ffe4274b86231a39e921e3ae3fc939d8",
     "paper": "A4"
   },
   "circuit": {
@@ -31,9 +31,9 @@
         ],
         "properties": {
           "KiCadAI Catalog": "checked-in",
-          "KiCadAI Catalog Hash": "75e83780d1602dca38c9370d2280cc3a7ee04f93fbfb9ff08fe2ddad699be1dd",
+          "KiCadAI Catalog Hash": "d61fb62ce8b5a03623785694ef99867d3ba0defd104e6f945e42593ce504e6d2",
           "KiCadAI Component ID": "capacitor.murata.grm21br61a106ke19l.0805",
-          "KiCadAI Resolution Hash": "0f38ca8793bbbaf9234dee06d8455725d3001eaf819745f43128f789115bfb3f",
+          "KiCadAI Resolution Hash": "1beb61da6f0db3b5a8ea254897ce7781ffe4274b86231a39e921e3ae3fc939d8",
           "KiCadAI Variant ID": "0805",
           "MPN": "GRM21BR61A106KE19L",
           "Manufacturer": "Murata"
@@ -60,9 +60,9 @@
         ],
         "properties": {
           "KiCadAI Catalog": "checked-in",
-          "KiCadAI Catalog Hash": "75e83780d1602dca38c9370d2280cc3a7ee04f93fbfb9ff08fe2ddad699be1dd",
+          "KiCadAI Catalog Hash": "d61fb62ce8b5a03623785694ef99867d3ba0defd104e6f945e42593ce504e6d2",
           "KiCadAI Component ID": "resistor.generic.0805",
-          "KiCadAI Resolution Hash": "0f38ca8793bbbaf9234dee06d8455725d3001eaf819745f43128f789115bfb3f",
+          "KiCadAI Resolution Hash": "1beb61da6f0db3b5a8ea254897ce7781ffe4274b86231a39e921e3ae3fc939d8",
           "KiCadAI Variant ID": "0805"
         }
       },
@@ -87,9 +87,9 @@
         ],
         "properties": {
           "KiCadAI Catalog": "checked-in",
-          "KiCadAI Catalog Hash": "75e83780d1602dca38c9370d2280cc3a7ee04f93fbfb9ff08fe2ddad699be1dd",
+          "KiCadAI Catalog Hash": "d61fb62ce8b5a03623785694ef99867d3ba0defd104e6f945e42593ce504e6d2",
           "KiCadAI Component ID": "resistor.generic.0805",
-          "KiCadAI Resolution Hash": "0f38ca8793bbbaf9234dee06d8455725d3001eaf819745f43128f789115bfb3f",
+          "KiCadAI Resolution Hash": "1beb61da6f0db3b5a8ea254897ce7781ffe4274b86231a39e921e3ae3fc939d8",
           "KiCadAI Variant ID": "0805"
         }
       },
@@ -114,9 +114,9 @@
         ],
         "properties": {
           "KiCadAI Catalog": "checked-in",
-          "KiCadAI Catalog Hash": "75e83780d1602dca38c9370d2280cc3a7ee04f93fbfb9ff08fe2ddad699be1dd",
+          "KiCadAI Catalog Hash": "d61fb62ce8b5a03623785694ef99867d3ba0defd104e6f945e42593ce504e6d2",
           "KiCadAI Component ID": "fuse.generic.1206",
-          "KiCadAI Resolution Hash": "0f38ca8793bbbaf9234dee06d8455725d3001eaf819745f43128f789115bfb3f",
+          "KiCadAI Resolution Hash": "1beb61da6f0db3b5a8ea254897ce7781ffe4274b86231a39e921e3ae3fc939d8",
           "KiCadAI Variant ID": "1206"
         }
       },
@@ -141,9 +141,9 @@
         ],
         "properties": {
           "KiCadAI Catalog": "checked-in",
-          "KiCadAI Catalog Hash": "75e83780d1602dca38c9370d2280cc3a7ee04f93fbfb9ff08fe2ddad699be1dd",
+          "KiCadAI Catalog Hash": "d61fb62ce8b5a03623785694ef99867d3ba0defd104e6f945e42593ce504e6d2",
           "KiCadAI Component ID": "led.generic.0805",
-          "KiCadAI Resolution Hash": "0f38ca8793bbbaf9234dee06d8455725d3001eaf819745f43128f789115bfb3f",
+          "KiCadAI Resolution Hash": "1beb61da6f0db3b5a8ea254897ce7781ffe4274b86231a39e921e3ae3fc939d8",
           "KiCadAI Variant ID": "0805"
         }
       },
@@ -168,9 +168,9 @@
         ],
         "properties": {
           "KiCadAI Catalog": "checked-in",
-          "KiCadAI Catalog Hash": "75e83780d1602dca38c9370d2280cc3a7ee04f93fbfb9ff08fe2ddad699be1dd",
+          "KiCadAI Catalog Hash": "d61fb62ce8b5a03623785694ef99867d3ba0defd104e6f945e42593ce504e6d2",
           "KiCadAI Component ID": "resistor.generic.0805",
-          "KiCadAI Resolution Hash": "0f38ca8793bbbaf9234dee06d8455725d3001eaf819745f43128f789115bfb3f",
+          "KiCadAI Resolution Hash": "1beb61da6f0db3b5a8ea254897ce7781ffe4274b86231a39e921e3ae3fc939d8",
           "KiCadAI Variant ID": "0805"
         }
       },
@@ -195,9 +195,9 @@
         ],
         "properties": {
           "KiCadAI Catalog": "checked-in",
-          "KiCadAI Catalog Hash": "75e83780d1602dca38c9370d2280cc3a7ee04f93fbfb9ff08fe2ddad699be1dd",
+          "KiCadAI Catalog Hash": "d61fb62ce8b5a03623785694ef99867d3ba0defd104e6f945e42593ce504e6d2",
           "KiCadAI Component ID": "protection.tvs.usb_5v_unidirectional",
-          "KiCadAI Resolution Hash": "0f38ca8793bbbaf9234dee06d8455725d3001eaf819745f43128f789115bfb3f",
+          "KiCadAI Resolution Hash": "1beb61da6f0db3b5a8ea254897ce7781ffe4274b86231a39e921e3ae3fc939d8",
           "KiCadAI Variant ID": "sod_323"
         }
       },
@@ -247,9 +247,9 @@
         ],
         "properties": {
           "KiCadAI Catalog": "checked-in",
-          "KiCadAI Catalog Hash": "75e83780d1602dca38c9370d2280cc3a7ee04f93fbfb9ff08fe2ddad699be1dd",
+          "KiCadAI Catalog Hash": "d61fb62ce8b5a03623785694ef99867d3ba0defd104e6f945e42593ce504e6d2",
           "KiCadAI Component ID": "usb_c.gct.usb4125_power_only_6p",
-          "KiCadAI Resolution Hash": "0f38ca8793bbbaf9234dee06d8455725d3001eaf819745f43128f789115bfb3f",
+          "KiCadAI Resolution Hash": "1beb61da6f0db3b5a8ea254897ce7781ffe4274b86231a39e921e3ae3fc939d8",
           "KiCadAI Variant ID": "gct_usb4125_6p",
           "MPN": "USB4125",
           "Manufacturer": "GCT"
