@@ -9,20 +9,26 @@ const (
 	Version         = 1
 	SchemaIDV2      = "kicadai.open-set-requirement.v2"
 	VersionV2       = 2
+	SchemaIDV3      = "kicadai.open-set-requirement.v3"
+	VersionV3       = 3
 	PolicyVersion   = "architecture-search-policy-v1"
 	PolicyVersionV2 = "architecture-search-policy-v2"
+	PolicyVersionV3 = "architecture-search-policy-v3"
 
-	MaxRequirementBytes = 256 * 1024
-	MaxDomains          = 16
-	MaxPorts            = 64
-	MaxSignals          = 64
-	MaxParticipants     = 16
-	MaxParticipantPorts = 32
-	MaxObjectives       = 32
-	MaxBindings         = 64
-	MaxConstraints      = 64
-	MaxComponents       = 64
-	MaxBoardDimensionMM = 200.0
+	MaxRequirementBytes       = 256 * 1024
+	MaxDomains                = 16
+	MaxPorts                  = 64
+	MaxSignals                = 64
+	MaxParticipants           = 16
+	MaxParticipantPorts       = 32
+	MaxObjectives             = 32
+	MaxBindings               = 64
+	MaxConstraints            = 64
+	MaxOperatingCases         = 16
+	MaxCaseConditions         = 16
+	MaxBehavioralRequirements = 64
+	MaxComponents             = 64
+	MaxBoardDimensionMM       = 200.0
 )
 
 type Requirement struct {
@@ -40,13 +46,15 @@ type Project struct {
 }
 
 type Requirements struct {
-	Domains           []Domain      `json:"domains"`
-	Ports             []Port        `json:"ports"`
-	Signals           []Signal      `json:"signals,omitempty"`
-	Participants      []Participant `json:"participants,omitempty"`
-	Objectives        []Objective   `json:"objectives"`
-	SystemConstraints []Constraint  `json:"system_constraints,omitempty"`
-	Constraints       BoardLimits   `json:"constraints"`
+	Domains                []Domain                `json:"domains"`
+	Ports                  []Port                  `json:"ports"`
+	Signals                []Signal                `json:"signals,omitempty"`
+	Participants           []Participant           `json:"participants,omitempty"`
+	Objectives             []Objective             `json:"objectives"`
+	SystemConstraints      []Constraint            `json:"system_constraints,omitempty"`
+	OperatingCases         []OperatingCase         `json:"operating_cases,omitempty"`
+	BehavioralRequirements []BehavioralRequirement `json:"behavioral_requirements,omitempty"`
+	Constraints            BoardLimits             `json:"constraints"`
 }
 
 type Domain struct {
@@ -148,6 +156,43 @@ type BoardLimits struct {
 	MaxHeightMM   float64 `json:"max_height_mm"`
 }
 
+// OperatingCase declares bounded environmental and loading axes using only
+// semantic requirement identities. It deliberately cannot name components,
+// nets, models, or solver controls.
+type OperatingCase struct {
+	ID         string               `json:"id"`
+	Conditions []OperatingCondition `json:"conditions"`
+}
+
+type OperatingCondition struct {
+	Axis      string   `json:"axis"`
+	Target    string   `json:"target"`
+	Min       *float64 `json:"min,omitempty"`
+	Max       *float64 `json:"max,omitempty"`
+	Unit      string   `json:"unit,omitempty"`
+	Selection string   `json:"selection,omitempty"`
+}
+
+// BehavioralRequirement is a measurable, topology-neutral assertion. The
+// observation is bound to resolved graph evidence only after architecture
+// selection and lowering.
+type BehavioralRequirement struct {
+	ID             string      `json:"id"`
+	Metric         string      `json:"metric"`
+	Analysis       string      `json:"analysis"`
+	Observation    Observation `json:"observation"`
+	Min            *float64    `json:"min,omitempty"`
+	Max            *float64    `json:"max,omitempty"`
+	Unit           string      `json:"unit"`
+	OperatingCases []string    `json:"operating_cases"`
+	Critical       bool        `json:"critical,omitempty"`
+}
+
+type Observation struct {
+	Kind string `json:"kind"`
+	ID   string `json:"id"`
+}
+
 type Acceptance struct {
 	RequireERC                 bool `json:"require_erc"`
 	RequireStrictDRC           bool `json:"require_strict_drc"`
@@ -161,4 +206,8 @@ type Acceptance struct {
 	RequireCoverageAccounting  bool `json:"require_coverage_accounting,omitempty"`
 	RequireAlternatives        bool `json:"require_alternatives,omitempty"`
 	RequireFailClosed          bool `json:"require_fail_closed,omitempty"`
+	RequireSimulation          bool `json:"require_simulation,omitempty"`
+	RequireAllCorners          bool `json:"require_all_corners,omitempty"`
+	RequireModelProvenance     bool `json:"require_model_provenance,omitempty"`
+	RequireClosedLoopEvidence  bool `json:"require_closed_loop_evidence,omitempty"`
 }

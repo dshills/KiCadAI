@@ -257,7 +257,7 @@ func (accumulator *searchAccumulator) recordObligations(obligations []searchObli
 }
 
 func (accumulator *searchAccumulator) finalizeCoverage() {
-	if accumulator.requirement.Version != VersionV2 {
+	if !supportsTypedSignals(accumulator.requirement.Version) {
 		return
 	}
 	statusByPath := map[string]CoverageStatus{}
@@ -319,6 +319,9 @@ func (accumulator *searchAccumulator) finalizeCoverage() {
 }
 
 func requirementPolicyVersion(requirement Requirement) string {
+	if requirement.Version == VersionV3 {
+		return PolicyVersionV3
+	}
 	if requirement.Version == VersionV2 {
 		return PolicyVersionV2
 	}
@@ -367,7 +370,7 @@ func initialSearchObligations(requirement Requirement, minimumEvidence EvidenceC
 			}
 			ports = append(ports, RoleContract{Role: binding.Role, Anchor: anchor, Contract: contract})
 		}
-		obligations = append(obligations, searchObligation{Path: "objective:" + objective.ID, Capability: objective.Capability, Ports: ports, Constraints: cloneConstraints(objective.Constraints)})
+		obligations = append(obligations, searchObligation{Path: "objective:" + objective.ID, Capability: objective.Capability, Ports: ports, Constraints: effectiveObjectiveConstraints(requirement, objective)})
 	}
 	slices.SortStableFunc(obligations, compareSearchObligations)
 	return obligations, issues
@@ -646,7 +649,7 @@ func candidateFromState(state searchState, requirement Requirement) (CandidateRe
 }
 
 func validateCandidateGlobal(requirement Requirement, selections []FragmentSelection) ([]GlobalCheck, *candidateValidation) {
-	if requirement.Version != VersionV2 {
+	if !supportsTypedSignals(requirement.Version) {
 		return nil, nil
 	}
 	var checks []GlobalCheck

@@ -184,6 +184,9 @@ func (provider *CatalogProvider) expandIsolatedRegulator(ctx context.Context, re
 func (provider *CatalogProvider) expandGenericTranslator(ctx context.Context, request ProviderRequest) ([]ProviderExpansion, error) {
 	frequency := maximumProtocolFrequency(request.Ports)
 	if frequency <= 0 {
+		frequency, _, _ = firstNumericConstraint(request.Constraints, "bus_frequency")
+	}
+	if frequency <= 0 {
 		return nil, fmt.Errorf("logic translation requires protocol frequency evidence")
 	}
 	legacy := cloneProviderRequest(request)
@@ -294,9 +297,9 @@ func (provider *CatalogProvider) expandFaultIndication(ctx context.Context, requ
 	if err != nil {
 		return nil, err
 	}
-	bindings := bindRoles(request.Ports, transistor.selected.InstanceID, map[string]string{"state": "BASE", "output": "EMITTER", "power": "COLLECTOR", "reference": "EMITTER"})
+	bindings := bindRoles(request.Ports, transistor.selected.InstanceID, map[string]string{"state": "BASE", "input": "BASE", "output": "EMITTER", "power": "COLLECTOR", "reference": "EMITTER"})
 	for index := range bindings {
-		if bindings[index].Role == "state" {
+		if bindings[index].Role == "state" || bindings[index].Role == "input" {
 			bindings[index].Instance, bindings[index].Function = "base_resistor", "A"
 		} else if bindings[index].Role == "reference" {
 			bindings[index].Instance, bindings[index].Function = "indicator_led", "K"
@@ -747,10 +750,20 @@ func (provider *CatalogProvider) expandCurrentSensing(ctx context.Context, reque
 	}
 	commonMode := roleVoltageMaximum(request.Ports, "power")
 	_, measurementMaximum, ok := roleVoltageRange(request.Ports, "measurement")
-	if !ok || measurementMaximum <= 0 {
-		return nil, fmt.Errorf("current sensing requires a bounded positive measurement range")
+	if !ok {
+		_, measurementMaximum, ok = roleVoltageRange(request.Ports, "output")
 	}
 	targetOutput := measurementMaximum * 0.8
+	if transimpedance, transferTolerance, hasTransfer := firstNumericConstraint(request.Constraints, "transimpedance"); hasTransfer && transimpedance > 0 {
+		targetOutput = transimpedance * fullScale
+		if !ok || measurementMaximum < targetOutput {
+			measurementMaximum = targetOutput * (1 + math.Max(transferTolerance, 1)/100)
+			ok = true
+		}
+	}
+	if !ok || measurementMaximum <= 0 || targetOutput <= 0 {
+		return nil, fmt.Errorf("current sensing requires a bounded positive measurement range")
+	}
 	sensor, err := provider.selectComponent(ctx, "current_sensor", "precision", []components.RequiredRating{
 		{Kind: "supply_voltage", Value: "5", Unit: "V"},
 		{Kind: "common_mode_voltage", Value: numericString(commonMode), Unit: "V"},
@@ -816,7 +829,7 @@ func (provider *CatalogProvider) expandCurrentSensing(ctx context.Context, reque
 		return nil, fmt.Errorf("current-sense supply solution failed: %s", feedbackIssues[0].Message)
 	}
 	allBindings := bindRoles(request.Ports, sensor.selected.InstanceID, map[string]string{
-		"control": "IN_PLUS", "fault": "REF1", "measurement": "OUT", "permit": "OUT", "reference": "GND_A",
+		"control": "IN_PLUS", "fault": "REF1", "measurement": "OUT", "output": "OUT", "permit": "OUT", "reference": "GND_A",
 	})
 	bindings := make([]RealizationPortBinding, 0, len(allBindings)-1)
 	for _, binding := range allBindings {
@@ -840,6 +853,7 @@ func (provider *CatalogProvider) expandCurrentSensing(ctx context.Context, reque
 		semanticNet("sense_load_side", "power", endpoint(shunt, "B"), endpoint(sensor, "IN_MINUS")),
 		semanticNet("sense_supply", "power", endpoint(regulator, "VOUT"), endpoint(sensor, "VCC"), passiveEndpoint("sense_feedback_lower", "A"), passiveEndpoint("sense_output_bypass", "A")),
 		semanticNet("sense_supply_feedback", "analog_signal", endpoint(regulator, "ADJ"), passiveEndpoint("sense_feedback_lower", "B"), passiveEndpoint("sense_feedback_upper", "A")),
+		semanticNet("sense_measurement", "analog_signal", endpoint(sensor, "OUT"), passiveEndpoint("control_series", "A"), endpoint(clamp, "K")),
 		semanticNet("permit_interlock", "control", passiveEndpoint("control_series", "B"), endpoint(clamp, "A"), passiveEndpoint("permit_pulldown", "A")),
 		semanticNet("sense_reference", "reference", endpoint(sensor, "GND_A"), endpoint(sensor, "GND_B"), endpoint(sensor, "REF1"), endpoint(sensor, "REF2"), passiveEndpoint("sense_feedback_upper", "B"), passiveEndpoint("sense_input_bypass", "B"), passiveEndpoint("sense_output_bypass", "B"), passiveEndpoint("permit_pulldown", "B")),
 	}
@@ -865,25 +879,39 @@ func (provider *CatalogProvider) expandMuteControl(ctx context.Context, request 
 		return nil, err
 	}
 	transistor.selected.InstanceID, transistor.usage = "mute_driver", "default_active_mute"
-	parts, err := provider.appendPassiveParts(ctx, []catalogPart{transistor}, []passivePart{
+	passives := []passivePart{
 		{"enable_resistor", "resistor", "logic_drive", "10k"},
 		{"mute_pullup", "resistor", "startup_mute", "10k"},
-	})
+	}
+	hasSignalPath := hasRoleContract(request.Ports, "signal") || hasRoleContract(request.Ports, "input")
+	if hasSignalPath {
+		passives = append(passives, passivePart{"signal_series", "resistor", "mute_signal_path", "1k"})
+	}
+	parts, err := provider.appendPassiveParts(ctx, []catalogPart{transistor}, passives)
 	if err != nil {
 		return nil, err
 	}
-	bindings := bindRoles(request.Ports, transistor.selected.InstanceID, map[string]string{"enable": "BASE", "mute": "COLLECTOR", "power": "COLLECTOR", "reference": "EMITTER"})
+	bindings := bindRoles(request.Ports, transistor.selected.InstanceID, map[string]string{
+		"enable": "BASE", "control": "BASE", "signal": "COLLECTOR", "input": "COLLECTOR", "mute": "COLLECTOR", "output": "COLLECTOR",
+		"power": "COLLECTOR", "positive_power": "COLLECTOR", "reference": "EMITTER", "negative_power": "EMITTER",
+	})
 	for index := range bindings {
 		switch bindings[index].Role {
-		case "enable":
+		case "enable", "control":
 			bindings[index].Instance, bindings[index].Function = "enable_resistor", "A"
-		case "power":
+		case "signal", "input":
+			bindings[index].Instance, bindings[index].Function = "signal_series", "A"
+		case "power", "positive_power":
 			bindings[index].Instance, bindings[index].Function = "mute_pullup", "A"
 		}
 	}
+	muteStateEndpoints := []RealizationEndpoint{endpoint(transistor, "COLLECTOR"), passiveEndpoint("mute_pullup", "B")}
+	if hasSignalPath {
+		muteStateEndpoints = append(muteStateEndpoints, passiveEndpoint("signal_series", "B"))
+	}
 	connections := []RealizationConnection{
 		semanticNet("mute_enable_drive", "control", passiveEndpoint("enable_resistor", "B"), endpoint(transistor, "BASE")),
-		semanticNet("mute_state", "control", endpoint(transistor, "COLLECTOR"), passiveEndpoint("mute_pullup", "B")),
+		semanticNet("mute_state", "control", muteStateEndpoints...),
 	}
 	return provider.expansion(request, "fail_safe_open_collector_mute", parts, bindings, connections, nil, 0)
 }
@@ -916,16 +944,19 @@ func (provider *CatalogProvider) expandClassABBias(ctx context.Context, request 
 	if err != nil {
 		return nil, err
 	}
-	bindings := bindRoles(request.Ports, inverter.selected.InstanceID, map[string]string{"enable": "BASE", "bias": "COLLECTOR", "power": "COLLECTOR", "reference": "EMITTER"})
+	bindings := bindRoles(request.Ports, inverter.selected.InstanceID, map[string]string{
+		"enable": "BASE", "input": "BASE", "bias": "COLLECTOR", "output": "COLLECTOR",
+		"power": "COLLECTOR", "positive_power": "COLLECTOR", "reference": "EMITTER", "negative_power": "EMITTER",
+	})
 	for index := range bindings {
 		switch bindings[index].Role {
-		case "enable":
+		case "enable", "input":
 			bindings[index].Instance, bindings[index].Function = "enable_resistor", "A"
-		case "bias":
+		case "bias", "output":
 			bindings[index].Instance, bindings[index].Function = diode.selected.InstanceID, "A"
-		case "power":
+		case "power", "positive_power":
 			bindings[index].Instance, bindings[index].Function = "bias_feed", "A"
-		case "reference":
+		case "reference", "negative_power":
 			bindings[index].Instance, bindings[index].Function = secondDiode.selected.InstanceID, "K"
 		}
 	}
@@ -937,6 +968,13 @@ func (provider *CatalogProvider) expandClassABBias(ctx context.Context, request 
 		semanticNet("tracking_junction", "analog_control", endpoint(diode, "K"), endpoint(secondDiode, "A")),
 		semanticNet("bias_reference", "reference", endpoint(secondDiode, "K"), endpoint(inverter, "EMITTER"), endpoint(clamp, "EMITTER")),
 		semanticNet("bias_power", "power", passiveEndpoint("bias_feed", "A"), passiveEndpoint("inverter_pullup", "A")),
+	}
+	if !hasRoleContract(request.Ports, "enable") && !hasRoleContract(request.Ports, "input") {
+		for index := range connections {
+			if connections[index].ID == "bias_reference" {
+				connections[index].Endpoints = append(connections[index].Endpoints, passiveEndpoint("enable_resistor", "A"))
+			}
+		}
 	}
 	return provider.expansion(request, "thermally_tracked_fail_safe_bias", parts, bindings, connections, nil, 0)
 }
@@ -973,19 +1011,28 @@ func (provider *CatalogProvider) expandClassABOutput(ctx context.Context, reques
 		return nil, err
 	}
 	opamp.selected.InstanceID, opamp.usage = "voltage_driver", "class_ab_voltage_driver"
-	parts, err := provider.appendPassiveParts(ctx, []catalogPart{opamp, npn, pnp}, []passivePart{
+	passives := []passivePart{
 		{"input_coupling", "capacitor", "ac_coupling", "1u"},
 		{"midpoint_upper", "resistor", "midpoint_bias", "47k"}, {"midpoint_lower", "resistor", "midpoint_bias", "47k"},
 		{"midpoint_bypass", "capacitor", "midpoint_bypass", "100u"},
 		{"npn_base_stop", "resistor", "base_stop", "47"}, {"pnp_base_stop", "resistor", "base_stop", "47"},
 		{"npn_emitter", "resistor", "emitter_resistor", "0.22"}, {"pnp_emitter", "resistor", "emitter_resistor", "0.22"},
-		{"bias_injection", "resistor", "bias_injection", "10k"}, {"mute_drive", "resistor", "mute_drive", "10k"},
 		{"supply_bypass", "capacitor", "decoupling_capacitor", "100n"},
-	})
+	}
+	if hasRoleContract(request.Ports, "bias") {
+		passives = append(passives, passivePart{"bias_injection", "resistor", "bias_injection", "10k"})
+	}
+	if hasRoleContract(request.Ports, "mute") {
+		passives = append(passives, passivePart{"mute_drive", "resistor", "mute_drive", "10k"})
+	}
+	parts, err := provider.appendPassiveParts(ctx, []catalogPart{opamp, npn, pnp}, passives)
 	if err != nil {
 		return nil, err
 	}
-	bindings := bindRoles(request.Ports, opamp.selected.InstanceID, map[string]string{"input": "IN_PLUS", "bias": "IN_PLUS", "mute": "IN_PLUS", "output": "OUT", "power": "V_PLUS", "reference": "V_MINUS"})
+	bindings := bindRoles(request.Ports, opamp.selected.InstanceID, map[string]string{
+		"input": "IN_PLUS", "bias": "IN_PLUS", "mute": "IN_PLUS", "output": "OUT",
+		"power": "V_PLUS", "positive_power": "V_PLUS", "reference": "V_MINUS", "negative_power": "V_MINUS",
+	})
 	for index := range bindings {
 		switch bindings[index].Role {
 		case "input":
@@ -998,8 +1045,15 @@ func (provider *CatalogProvider) expandClassABOutput(ctx context.Context, reques
 			bindings[index].Instance, bindings[index].Function = "npn_emitter", "B"
 		}
 	}
+	driverInputEndpoints := []RealizationEndpoint{passiveEndpoint("input_coupling", "B"), endpoint(opamp, "IN_PLUS"), passiveEndpoint("midpoint_upper", "B"), passiveEndpoint("midpoint_lower", "A"), passiveEndpoint("midpoint_bypass", "A")}
+	if hasRoleContract(request.Ports, "bias") {
+		driverInputEndpoints = append(driverInputEndpoints, passiveEndpoint("bias_injection", "B"))
+	}
+	if hasRoleContract(request.Ports, "mute") {
+		driverInputEndpoints = append(driverInputEndpoints, passiveEndpoint("mute_drive", "B"))
+	}
 	connections := []RealizationConnection{
-		semanticNet("driver_input", "analog_signal", passiveEndpoint("input_coupling", "B"), endpoint(opamp, "IN_PLUS"), passiveEndpoint("midpoint_upper", "B"), passiveEndpoint("midpoint_lower", "A"), passiveEndpoint("midpoint_bypass", "A"), passiveEndpoint("bias_injection", "B"), passiveEndpoint("mute_drive", "B")),
+		semanticNet("driver_input", "analog_signal", driverInputEndpoints...),
 		semanticNet("base_drive", "analog_signal", endpoint(opamp, "OUT"), passiveEndpoint("npn_base_stop", "A"), passiveEndpoint("pnp_base_stop", "A")),
 		semanticNet("npn_base", "analog_signal", passiveEndpoint("npn_base_stop", "B"), endpoint(npn, "BASE")),
 		semanticNet("pnp_base", "analog_signal", passiveEndpoint("pnp_base_stop", "B"), endpoint(pnp, "BASE")),

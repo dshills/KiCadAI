@@ -77,7 +77,7 @@ func (provider *CatalogProvider) Expand(ctx context.Context, request ProviderReq
 	}
 	switch canonicalIdentifier(request.Capability) {
 	case "threshold_detection":
-		if _, legacy := namedConstraint(request.Constraints, "threshold_voltage"); !legacy {
+		if _, legacy := namedConstraint(request.Constraints, "output_polarity"); !legacy {
 			return provider.expandGenericThreshold(ctx, request)
 		}
 		return provider.expandThreshold(ctx, request)

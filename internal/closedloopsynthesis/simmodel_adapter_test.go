@@ -1,0 +1,93 @@
+package closedloopsynthesis
+
+import (
+	"context"
+	"fmt"
+	"testing"
+
+	"kicadai/internal/architecturesearch"
+	"kicadai/internal/modelprovenance"
+	"kicadai/internal/simmodel"
+)
+
+type dividerSimulationResolver struct{}
+
+func (dividerSimulationResolver) ResolveSimulation(_ context.Context, state CandidateState) (SimulationResolution, error) {
+	lower := 10_000.0
+	for _, variable := range state.Variables {
+		if variable.ID == "lower_resistance" {
+			lower = variable.Value
+		}
+	}
+	intent := simmodel.Intent{
+		ModelID:    simmodel.ModelResistorDividerDCV1,
+		Bindings:   []simmodel.Binding{{Role: "upper_resistor", Component: "r1"}, {Role: "lower_resistor", Component: "r2"}},
+		Inputs:     []simmodel.NamedValue{{Name: "input_voltage_v", Value: 5}},
+		Assertions: []simmodel.Assertion{{Metric: "output_voltage_v", Min: 2.45, Max: 2.55}},
+	}
+	components := []simmodel.ComponentEvidence{
+		{InstanceID: "r1", CatalogID: "resistor.generic.0603", Family: "resistor", ValueSI: 10_000, HasValueSI: true, ModelClaims: []simmodel.CatalogEvidence{{ModelID: simmodel.ModelResistorDividerDCV1}}},
+		{InstanceID: "r2", CatalogID: "resistor.generic.0603", Family: "resistor", ValueSI: lower, HasValueSI: true, ModelClaims: []simmodel.CatalogEvidence{{ModelID: simmodel.ModelResistorDividerDCV1}}},
+	}
+	plan, diagnostics := simmodel.Resolve(intent, "test-catalog", testHash("catalog"), components)
+	if len(diagnostics) != 0 {
+		return SimulationResolution{}, fmt.Errorf("resolve diagnostics: %#v", diagnostics)
+	}
+	return SimulationResolution{
+		Plan:         plan,
+		Measurements: []SimulationMeasurementLink{{RequirementID: "output", OperatingCase: "nominal", Assertion: 0}},
+	}, nil
+}
+
+func TestSimModelEvaluatorRepairsThroughFreshTrustedResolution(t *testing.T) {
+	requirement := closedLoopTestRequirement()
+	minimum, maximum := 2.45, 2.55
+	requirement.Requirements.OperatingCases[0].ID = "nominal"
+	requirement.Requirements.BehavioralRequirements = []architecturesearch.BehavioralRequirement{{
+		ID: "output", Metric: "dc_voltage", Analysis: simmodel.AnalysisDCOperatingPoint,
+		Observation: architecturesearch.Observation{Kind: "port", ID: "output"}, Min: &minimum, Max: &maximum, Unit: "V", OperatingCases: []string{"nominal"}, Critical: true,
+	}}
+	input := Input{
+		Requirement: requirement, CatalogHash: testHash("catalog"), FormulaLibraryHash: testHash("formula"), ModelRegistryHash: testHash("models"),
+		Candidates: []Candidate{{Fingerprint: testHash("divider"), Variables: []Variable{{ID: "lower_resistance", Kind: "passive_value", Value: 5_000, AllowedValues: []float64{5_000, 10_000}}}}},
+	}
+	registry, diagnostics := modelprovenance.LoadDefault()
+	if len(diagnostics) != 0 {
+		t.Fatalf("model provenance registry diagnostics: %#v", diagnostics)
+	}
+	evaluator := SimModelEvaluator{Resolver: dividerSimulationResolver{}, ProvenanceRegistry: registry}
+	report := Run(context.Background(), input, evaluator, DefaultPolicy())
+	if report.Status != "pass" || report.Selected == nil || report.Selected.State.Variables[0].Value != 10_000 {
+		t.Fatalf("closed-loop simmodel report=%#v", report)
+	}
+	if report.Consumption.Evaluations != 2 || report.Consumption.RepairsApplied != 1 {
+		t.Fatalf("consumption=%#v", report.Consumption)
+	}
+	if got := len(report.Candidates[0].Attempts[0].ModelDecisions); got != 2 {
+		t.Fatalf("independently derived model decisions = %d, want 2", got)
+	}
+	replay := Run(context.Background(), input, evaluator, DefaultPolicy())
+	if hashJSON(report) != hashJSON(replay) {
+		t.Fatal("trusted simmodel closed-loop replay differs")
+	}
+}
+
+func TestSimModelEvaluatorFailsClosedForInvalidLinksAndStructuralDiagnostics(t *testing.T) {
+	evaluator := SimModelEvaluator{Resolver: invalidSimulationResolver{}}
+	if _, err := evaluator.Evaluate(context.Background(), CandidateState{Fingerprint: testHash("invalid")}); err == nil {
+		t.Fatal("invalid simulation resolution was accepted")
+	}
+}
+
+func TestSimModelEvaluatorFailsClosedWithoutIndependentProvenanceRegistry(t *testing.T) {
+	evaluator := SimModelEvaluator{Resolver: dividerSimulationResolver{}}
+	if _, err := evaluator.Evaluate(context.Background(), CandidateState{Fingerprint: testHash("missing-provenance")}); err == nil {
+		t.Fatal("simulation without independent model provenance was accepted")
+	}
+}
+
+type invalidSimulationResolver struct{}
+
+func (invalidSimulationResolver) ResolveSimulation(context.Context, CandidateState) (SimulationResolution, error) {
+	return SimulationResolution{Measurements: []SimulationMeasurementLink{{RequirementID: "x", OperatingCase: "y", Assertion: 7}}}, nil
+}

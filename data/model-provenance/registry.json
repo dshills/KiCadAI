@@ -1,0 +1,547 @@
+{
+  "schema": "kicadai.model-provenance-registry.v1",
+  "version": 1,
+  "records": [
+    {
+      "catalog_id": "bjt.onsemi.mmbt3904.sot23",
+      "family": "bjt",
+      "model_id": "mna_bjt_npn_ebers_moll_v1",
+      "provenance": {
+        "source": "kicadai:trusted-simulation-registry",
+        "revision": "kicadai.trusted-simulation-registry.v1",
+        "sha256": "9c470ea3b7a2438e67204d17c20134a06e4344e4f11fe1e8c4a2c533debef08b",
+        "review_status": "reviewed",
+        "allowed_analyses": [
+          "dc_operating_point",
+          "transient"
+        ],
+        "min_temperature_c": -55,
+        "max_temperature_c": 150
+      }
+    },
+    {
+      "catalog_id": "bjt.onsemi.mmbt3906.sot23",
+      "family": "bjt",
+      "model_id": "mna_bjt_pnp_ebers_moll_v1",
+      "provenance": {
+        "source": "kicadai:trusted-simulation-registry",
+        "revision": "kicadai.trusted-simulation-registry.v1",
+        "sha256": "9e12fa1ac84505038cd3c53a3e4511556f5894dc49cf6da7d1cd039275026327",
+        "review_status": "reviewed",
+        "allowed_analyses": [
+          "dc_operating_point",
+          "transient"
+        ],
+        "min_temperature_c": -65,
+        "max_temperature_c": 150
+      }
+    },
+    {
+      "catalog_id": "capacitor.ceramic.0603",
+      "family": "capacitor",
+      "model_id": "mna_capacitor_transient_be_v1",
+      "provenance": {
+        "source": "kicadai:trusted-simulation-registry",
+        "revision": "kicadai.trusted-simulation-registry.v1",
+        "sha256": "19f725a7b01f981f33aeb7446e16f61398116168eea4ac05a70e2146bee8c049",
+        "review_status": "reviewed",
+        "allowed_analyses": [
+          "transient"
+        ]
+      }
+    },
+    {
+      "catalog_id": "capacitor.ceramic.0603",
+      "family": "capacitor",
+      "model_id": "mna_capacitor_v1",
+      "provenance": {
+        "source": "kicadai:trusted-simulation-registry",
+        "revision": "kicadai.trusted-simulation-registry.v1",
+        "sha256": "ef0b29d721870e25f9e49b43cfbcf2510a7136e6ba50da1ad0da0c7b1360d226",
+        "review_status": "reviewed",
+        "allowed_analyses": [
+          "ac_sweep",
+          "dc_operating_point"
+        ]
+      }
+    },
+    {
+      "catalog_id": "capacitor.ceramic.0603",
+      "family": "capacitor",
+      "model_id": "rc_lowpass_ac_v1",
+      "provenance": {
+        "source": "kicadai:trusted-simulation-registry",
+        "revision": "kicadai.trusted-simulation-registry.v1",
+        "sha256": "fa3f2e5de7f34219b8f1fc7438ba14793c99a4d789173cf53db1045f42accca8",
+        "review_status": "reviewed",
+        "allowed_analyses": [
+          "ac_sweep"
+        ]
+      }
+    },
+    {
+      "catalog_id": "capacitor.ceramic.0805",
+      "family": "capacitor",
+      "model_id": "mna_capacitor_transient_be_v1",
+      "provenance": {
+        "source": "kicadai:trusted-simulation-registry",
+        "revision": "kicadai.trusted-simulation-registry.v1",
+        "sha256": "19f725a7b01f981f33aeb7446e16f61398116168eea4ac05a70e2146bee8c049",
+        "review_status": "reviewed",
+        "allowed_analyses": [
+          "transient"
+        ]
+      }
+    },
+    {
+      "catalog_id": "capacitor.ceramic.0805",
+      "family": "capacitor",
+      "model_id": "mna_capacitor_v1",
+      "provenance": {
+        "source": "kicadai:trusted-simulation-registry",
+        "revision": "kicadai.trusted-simulation-registry.v1",
+        "sha256": "ef0b29d721870e25f9e49b43cfbcf2510a7136e6ba50da1ad0da0c7b1360d226",
+        "review_status": "reviewed",
+        "allowed_analyses": [
+          "ac_sweep",
+          "dc_operating_point"
+        ]
+      }
+    },
+    {
+      "catalog_id": "capacitor.ceramic.0805",
+      "family": "capacitor",
+      "model_id": "rc_lowpass_ac_v1",
+      "provenance": {
+        "source": "kicadai:trusted-simulation-registry",
+        "revision": "kicadai.trusted-simulation-registry.v1",
+        "sha256": "fa3f2e5de7f34219b8f1fc7438ba14793c99a4d789173cf53db1045f42accca8",
+        "review_status": "reviewed",
+        "allowed_analyses": [
+          "ac_sweep"
+        ]
+      }
+    },
+    {
+      "catalog_id": "capacitor.murata.grm188r71h104ka93d.0603",
+      "family": "capacitor",
+      "model_id": "mna_capacitor_v1",
+      "provenance": {
+        "source": "kicadai:trusted-simulation-registry",
+        "revision": "kicadai.trusted-simulation-registry.v1",
+        "sha256": "ef0b29d721870e25f9e49b43cfbcf2510a7136e6ba50da1ad0da0c7b1360d226",
+        "review_status": "reviewed",
+        "allowed_analyses": [
+          "ac_sweep",
+          "dc_operating_point"
+        ]
+      }
+    },
+    {
+      "catalog_id": "capacitor.murata.grm21br61a106ke19l.0805",
+      "family": "capacitor",
+      "model_id": "mna_capacitor_v1",
+      "provenance": {
+        "source": "kicadai:trusted-simulation-registry",
+        "revision": "kicadai.trusted-simulation-registry.v1",
+        "sha256": "ef0b29d721870e25f9e49b43cfbcf2510a7136e6ba50da1ad0da0c7b1360d226",
+        "review_status": "reviewed",
+        "allowed_analyses": [
+          "ac_sweep",
+          "dc_operating_point"
+        ]
+      }
+    },
+    {
+      "catalog_id": "capacitor.murata.grm21br71h104ka01l.0805",
+      "family": "capacitor",
+      "model_id": "mna_capacitor_v1",
+      "provenance": {
+        "source": "kicadai:trusted-simulation-registry",
+        "revision": "kicadai.trusted-simulation-registry.v1",
+        "sha256": "ef0b29d721870e25f9e49b43cfbcf2510a7136e6ba50da1ad0da0c7b1360d226",
+        "review_status": "reviewed",
+        "allowed_analyses": [
+          "ac_sweep",
+          "dc_operating_point"
+        ]
+      }
+    },
+    {
+      "catalog_id": "capacitor.murata.grm21br71h104ka01l.0805",
+      "family": "capacitor",
+      "model_id": "rc_lowpass_ac_v1",
+      "provenance": {
+        "source": "kicadai:trusted-simulation-registry",
+        "revision": "kicadai.trusted-simulation-registry.v1",
+        "sha256": "fa3f2e5de7f34219b8f1fc7438ba14793c99a4d789173cf53db1045f42accca8",
+        "review_status": "reviewed",
+        "allowed_analyses": [
+          "ac_sweep"
+        ]
+      }
+    },
+    {
+      "catalog_id": "connector.pinheader.1x02.2_54mm",
+      "family": "connector",
+      "model_id": "mna_connector_1x02_voltage_source_pin1_positive_v1",
+      "provenance": {
+        "source": "kicadai:trusted-simulation-registry",
+        "revision": "kicadai.trusted-simulation-registry.v1",
+        "sha256": "f08d039ba304eafc955e050e82eeb2ee5c81ede8ede722a038f635f54d4afca3",
+        "review_status": "reviewed",
+        "allowed_analyses": [
+          "ac_sweep",
+          "dc_operating_point",
+          "transient"
+        ]
+      }
+    },
+    {
+      "catalog_id": "connector.samtec.tsw_102_07_l_s.1x02",
+      "family": "connector",
+      "model_id": "mna_connector_1x02_voltage_source_pin1_positive_v1",
+      "provenance": {
+        "source": "kicadai:trusted-simulation-registry",
+        "revision": "kicadai.trusted-simulation-registry.v1",
+        "sha256": "f08d039ba304eafc955e050e82eeb2ee5c81ede8ede722a038f635f54d4afca3",
+        "review_status": "reviewed",
+        "allowed_analyses": [
+          "ac_sweep",
+          "dc_operating_point",
+          "transient"
+        ]
+      }
+    },
+    {
+      "catalog_id": "diode.onsemi.1n4148w.sod_123",
+      "family": "diode",
+      "model_id": "mna_diode_shockley_v1",
+      "provenance": {
+        "source": "kicadai:trusted-simulation-registry",
+        "revision": "kicadai.trusted-simulation-registry.v1",
+        "sha256": "c6c7c5ab0102029e88913520d359f2749f7d0c97461cd279c50feb785767b516",
+        "review_status": "reviewed",
+        "allowed_analyses": [
+          "dc_operating_point",
+          "transient"
+        ]
+      }
+    },
+    {
+      "catalog_id": "led.liteon.ltst_c170krkt.0805",
+      "family": "led",
+      "model_id": "mna_diode_shockley_v1",
+      "provenance": {
+        "source": "kicadai:trusted-simulation-registry",
+        "revision": "kicadai.trusted-simulation-registry.v1",
+        "sha256": "c6c7c5ab0102029e88913520d359f2749f7d0c97461cd279c50feb785767b516",
+        "review_status": "reviewed",
+        "allowed_analyses": [
+          "dc_operating_point",
+          "transient"
+        ]
+      }
+    },
+    {
+      "catalog_id": "opamp.ti.lm358.soic8",
+      "family": "opamp",
+      "model_id": "mna_opamp_single_pole_v1",
+      "provenance": {
+        "source": "kicadai:trusted-simulation-registry",
+        "revision": "kicadai.trusted-simulation-registry.v1",
+        "sha256": "318e6493e7a882957370a6e4a8f0080ad00f68f403d87789a8e47391b21e2662",
+        "review_status": "reviewed",
+        "allowed_analyses": [
+          "ac_sweep",
+          "dc_operating_point",
+          "transient"
+        ],
+        "min_temperature_c": 0,
+        "max_temperature_c": 70
+      }
+    },
+    {
+      "catalog_id": "opamp.ti.lmv321.sot23_5",
+      "family": "opamp",
+      "model_id": "mna_opamp_single_pole_v1",
+      "provenance": {
+        "source": "kicadai:trusted-simulation-registry",
+        "revision": "kicadai.trusted-simulation-registry.v1",
+        "sha256": "318e6493e7a882957370a6e4a8f0080ad00f68f403d87789a8e47391b21e2662",
+        "review_status": "reviewed",
+        "allowed_analyses": [
+          "ac_sweep",
+          "dc_operating_point",
+          "transient"
+        ],
+        "min_temperature_c": -40,
+        "max_temperature_c": 125
+      }
+    },
+    {
+      "catalog_id": "opamp.ti.opa134ua.soic8",
+      "family": "opamp",
+      "model_id": "mna_opamp_single_pole_v1",
+      "provenance": {
+        "source": "kicadai:trusted-simulation-registry",
+        "revision": "kicadai.trusted-simulation-registry.v1",
+        "sha256": "318e6493e7a882957370a6e4a8f0080ad00f68f403d87789a8e47391b21e2662",
+        "review_status": "reviewed",
+        "allowed_analyses": [
+          "ac_sweep",
+          "dc_operating_point",
+          "transient"
+        ],
+        "min_temperature_c": -40,
+        "max_temperature_c": 85
+      }
+    },
+    {
+      "catalog_id": "regulator.linear.ams1117_3v3.sot223",
+      "family": "regulator",
+      "model_id": "linear_regulator_ideal_v1",
+      "provenance": {
+        "source": "kicadai:trusted-simulation-registry",
+        "revision": "kicadai.trusted-simulation-registry.v1",
+        "sha256": "0fd867b792a7967cfd7c122428c835b2387034e41e1ccefb93453e54260ce2a3",
+        "review_status": "reviewed",
+        "allowed_analyses": [
+          "dc_operating_point"
+        ],
+        "min_temperature_c": -40,
+        "max_temperature_c": 85
+      }
+    },
+    {
+      "catalog_id": "regulator.linear.ap2112k_3v3.sot23_5",
+      "family": "regulator",
+      "model_id": "linear_regulator_ideal_v1",
+      "provenance": {
+        "source": "kicadai:trusted-simulation-registry",
+        "revision": "kicadai.trusted-simulation-registry.v1",
+        "sha256": "0fd867b792a7967cfd7c122428c835b2387034e41e1ccefb93453e54260ce2a3",
+        "review_status": "reviewed",
+        "allowed_analyses": [
+          "dc_operating_point"
+        ],
+        "min_temperature_c": -40,
+        "max_temperature_c": 85
+      }
+    },
+    {
+      "catalog_id": "regulator.linear.ap2127k_adj.sot23_5",
+      "family": "regulator",
+      "model_id": "linear_regulator_ideal_v1",
+      "provenance": {
+        "source": "kicadai:trusted-simulation-registry",
+        "revision": "kicadai.trusted-simulation-registry.v1",
+        "sha256": "0fd867b792a7967cfd7c122428c835b2387034e41e1ccefb93453e54260ce2a3",
+        "review_status": "reviewed",
+        "allowed_analyses": [
+          "dc_operating_point"
+        ],
+        "min_temperature_c": -40,
+        "max_temperature_c": 85
+      }
+    },
+    {
+      "catalog_id": "resistor.generic.0603",
+      "family": "resistor",
+      "model_id": "mna_resistor_v1",
+      "provenance": {
+        "source": "kicadai:trusted-simulation-registry",
+        "revision": "kicadai.trusted-simulation-registry.v1",
+        "sha256": "b21dc8115929a931de49fe269db8869ff87c40daad1d8231e304a9d0ba5688d8",
+        "review_status": "reviewed",
+        "allowed_analyses": [
+          "ac_sweep",
+          "dc_operating_point",
+          "transient"
+        ]
+      }
+    },
+    {
+      "catalog_id": "resistor.generic.0603",
+      "family": "resistor",
+      "model_id": "rc_lowpass_ac_v1",
+      "provenance": {
+        "source": "kicadai:trusted-simulation-registry",
+        "revision": "kicadai.trusted-simulation-registry.v1",
+        "sha256": "fa3f2e5de7f34219b8f1fc7438ba14793c99a4d789173cf53db1045f42accca8",
+        "review_status": "reviewed",
+        "allowed_analyses": [
+          "ac_sweep"
+        ]
+      }
+    },
+    {
+      "catalog_id": "resistor.generic.0603",
+      "family": "resistor",
+      "model_id": "resistor_divider_dc_v1",
+      "provenance": {
+        "source": "kicadai:trusted-simulation-registry",
+        "revision": "kicadai.trusted-simulation-registry.v1",
+        "sha256": "4710633f28afb52e93954f3c15e64e1339ed176f93bc67ec96f136d6a66b0b30",
+        "review_status": "reviewed",
+        "allowed_analyses": [
+          "dc_operating_point"
+        ]
+      }
+    },
+    {
+      "catalog_id": "resistor.generic.0805",
+      "family": "resistor",
+      "model_id": "mna_resistor_v1",
+      "provenance": {
+        "source": "kicadai:trusted-simulation-registry",
+        "revision": "kicadai.trusted-simulation-registry.v1",
+        "sha256": "b21dc8115929a931de49fe269db8869ff87c40daad1d8231e304a9d0ba5688d8",
+        "review_status": "reviewed",
+        "allowed_analyses": [
+          "ac_sweep",
+          "dc_operating_point",
+          "transient"
+        ]
+      }
+    },
+    {
+      "catalog_id": "resistor.generic.0805",
+      "family": "resistor",
+      "model_id": "rc_lowpass_ac_v1",
+      "provenance": {
+        "source": "kicadai:trusted-simulation-registry",
+        "revision": "kicadai.trusted-simulation-registry.v1",
+        "sha256": "fa3f2e5de7f34219b8f1fc7438ba14793c99a4d789173cf53db1045f42accca8",
+        "review_status": "reviewed",
+        "allowed_analyses": [
+          "ac_sweep"
+        ]
+      }
+    },
+    {
+      "catalog_id": "resistor.generic.0805",
+      "family": "resistor",
+      "model_id": "resistor_divider_dc_v1",
+      "provenance": {
+        "source": "kicadai:trusted-simulation-registry",
+        "revision": "kicadai.trusted-simulation-registry.v1",
+        "sha256": "4710633f28afb52e93954f3c15e64e1339ed176f93bc67ec96f136d6a66b0b30",
+        "review_status": "reviewed",
+        "allowed_analyses": [
+          "dc_operating_point"
+        ]
+      }
+    },
+    {
+      "catalog_id": "resistor.vishay.crcw080510k0fkea.0805",
+      "family": "resistor",
+      "model_id": "mna_resistor_v1",
+      "provenance": {
+        "source": "kicadai:trusted-simulation-registry",
+        "revision": "kicadai.trusted-simulation-registry.v1",
+        "sha256": "b21dc8115929a931de49fe269db8869ff87c40daad1d8231e304a9d0ba5688d8",
+        "review_status": "reviewed",
+        "allowed_analyses": [
+          "ac_sweep",
+          "dc_operating_point",
+          "transient"
+        ]
+      }
+    },
+    {
+      "catalog_id": "resistor.yageo.rc0603fr_0710kl.0603",
+      "family": "resistor",
+      "model_id": "mna_resistor_v1",
+      "provenance": {
+        "source": "kicadai:trusted-simulation-registry",
+        "revision": "kicadai.trusted-simulation-registry.v1",
+        "sha256": "b21dc8115929a931de49fe269db8869ff87c40daad1d8231e304a9d0ba5688d8",
+        "review_status": "reviewed",
+        "allowed_analyses": [
+          "ac_sweep",
+          "dc_operating_point",
+          "transient"
+        ]
+      }
+    },
+    {
+      "catalog_id": "resistor.yageo.rc0805fr_0710kl.0805",
+      "family": "resistor",
+      "model_id": "mna_resistor_v1",
+      "provenance": {
+        "source": "kicadai:trusted-simulation-registry",
+        "revision": "kicadai.trusted-simulation-registry.v1",
+        "sha256": "b21dc8115929a931de49fe269db8869ff87c40daad1d8231e304a9d0ba5688d8",
+        "review_status": "reviewed",
+        "allowed_analyses": [
+          "ac_sweep",
+          "dc_operating_point",
+          "transient"
+        ]
+      }
+    },
+    {
+      "catalog_id": "resistor.yageo.rc0805fr_0710kl.0805",
+      "family": "resistor",
+      "model_id": "rc_lowpass_ac_v1",
+      "provenance": {
+        "source": "kicadai:trusted-simulation-registry",
+        "revision": "kicadai.trusted-simulation-registry.v1",
+        "sha256": "fa3f2e5de7f34219b8f1fc7438ba14793c99a4d789173cf53db1045f42accca8",
+        "review_status": "reviewed",
+        "allowed_analyses": [
+          "ac_sweep"
+        ]
+      }
+    },
+    {
+      "catalog_id": "resistor.yageo.rc0805fr_074k7l.0805",
+      "family": "resistor",
+      "model_id": "mna_resistor_v1",
+      "provenance": {
+        "source": "kicadai:trusted-simulation-registry",
+        "revision": "kicadai.trusted-simulation-registry.v1",
+        "sha256": "b21dc8115929a931de49fe269db8869ff87c40daad1d8231e304a9d0ba5688d8",
+        "review_status": "reviewed",
+        "allowed_analyses": [
+          "ac_sweep",
+          "dc_operating_point",
+          "transient"
+        ]
+      }
+    },
+    {
+      "catalog_id": "source.current.connector.1x02",
+      "family": "current_source",
+      "model_id": "mna_current_source_v1",
+      "provenance": {
+        "source": "kicadai:trusted-simulation-registry",
+        "revision": "kicadai.trusted-simulation-registry.v1",
+        "sha256": "59877e10b9bef589318e4ac1e98bb6f5ee8efd037758ef4a7db45129e7695cb0",
+        "review_status": "reviewed",
+        "allowed_analyses": [
+          "ac_sweep",
+          "dc_operating_point",
+          "transient"
+        ]
+      }
+    },
+    {
+      "catalog_id": "source.voltage.connector.1x02",
+      "family": "voltage_source",
+      "model_id": "mna_voltage_source_v1",
+      "provenance": {
+        "source": "kicadai:trusted-simulation-registry",
+        "revision": "kicadai.trusted-simulation-registry.v1",
+        "sha256": "8609dd48f06784c13b1c1d0ab868bcb3187cd2233ff2e84d97fd541ae4d106d9",
+        "review_status": "reviewed",
+        "allowed_analyses": [
+          "ac_sweep",
+          "dc_operating_point",
+          "transient"
+        ]
+      }
+    }
+  ]
+}

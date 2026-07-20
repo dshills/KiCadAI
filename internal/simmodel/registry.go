@@ -85,12 +85,70 @@ func RegistryHash() string {
 	return hex.EncodeToString(sum[:])
 }
 
+// ModelContentHash returns the immutable canonical hash of one trusted model
+// definition. Provenance records use this narrower identity instead of the
+// aggregate registry hash so an unrelated registry edit cannot be mistaken
+// for a change to every model.
+func ModelContentHash(modelID string) (string, bool) {
+	modelID = strings.TrimSpace(modelID)
+	var payload any
+	if model, exists := definitionByID(modelID); exists {
+		payload = struct {
+			Kind  string     `json:"kind"`
+			Model definition `json:"model"`
+		}{Kind: "workflow", Model: model}
+	} else if primitive, exists := primitiveByID(modelID); exists {
+		payload = struct {
+			Kind  string              `json:"kind"`
+			Model primitiveDefinition `json:"model"`
+		}{Kind: "primitive", Model: primitive}
+	} else {
+		return "", false
+	}
+	data, err := json.Marshal(payload)
+	if err != nil {
+		return "", false
+	}
+	sum := sha256.Sum256(data)
+	return hex.EncodeToString(sum[:]), true
+}
+
 func ModelIDs() []string {
 	ids := make([]string, 0, len(registry))
 	for _, model := range registry {
 		ids = append(ids, model.ID)
 	}
 	return ids
+}
+
+// SupportedAnalysisKinds returns the analysis classes that the current
+// trusted evaluator can actually execute for a registered workflow model.
+// Declaring an analysis name or model-provenance applicability is not enough:
+// behavioral promotion must be backed by an implemented numerical path.
+func SupportedAnalysisKinds(modelID string) []string {
+	model, exists := definitionByID(strings.TrimSpace(modelID))
+	if !exists {
+		return nil
+	}
+	switch model.ID {
+	case ModelLinearRegulatorIdealV1, ModelResistorDividerDCV1, ModelNonlinearCircuitDCV1:
+		return []string{AnalysisDCOperatingPoint}
+	case ModelRCLowpassACV1:
+		return []string{AnalysisACSweep}
+	case ModelLinearCircuitMNAV1:
+		return []string{AnalysisACSweep, AnalysisDCOperatingPoint}
+	case ModelTransientCircuitV1:
+		return []string{AnalysisTransient}
+	default:
+		return nil
+	}
+}
+
+// SupportsAnalysis reports whether modelID has an executable evaluator for
+// kind. It deliberately does not treat merely registered future analysis
+// names as implemented support.
+func SupportsAnalysis(modelID, kind string) bool {
+	return slices.Contains(SupportedAnalysisKinds(modelID), strings.TrimSpace(kind))
 }
 
 func ValidateCatalogEvidence(family string, evidence []CatalogEvidence) []Diagnostic {
@@ -151,6 +209,73 @@ func ValidateCatalogEvidence(family string, evidence []CatalogEvidence) []Diagno
 		diagnostics = append(diagnostics, validateCatalogUncertainties(path+".uncertainties", claim, parameterRules, false)...)
 	}
 	return diagnostics
+}
+
+// ValidateRequiredModelProvenance enforces the stronger trust contract used
+// by simulation-grounded promotion. Legacy simulation remains readable, but a
+// required behavioral analysis cannot rely on an unproven catalog claim.
+func ValidateRequiredModelProvenance(provenance *ModelProvenance, requiredAnalyses []string) []Diagnostic {
+	if provenance == nil {
+		return []Diagnostic{{Path: "provenance", Message: "required simulation model lacks reviewed provenance", Suggestion: "select a catalog model with authoritative source, revision, immutable SHA-256, and reviewed analysis applicability"}}
+	}
+	return validateModelProvenance("provenance", *provenance, requiredAnalyses)
+}
+
+func validateModelProvenance(path string, provenance ModelProvenance, requiredAnalyses []string) []Diagnostic {
+	var diagnostics []Diagnostic
+	if strings.TrimSpace(provenance.Source) == "" || provenance.Source != strings.TrimSpace(provenance.Source) || len(provenance.Source) > 512 {
+		diagnostics = append(diagnostics, Diagnostic{Path: path + ".source", Message: "model provenance source must be a bounded canonical authoritative identity"})
+	}
+	if strings.TrimSpace(provenance.Revision) == "" || provenance.Revision != strings.TrimSpace(provenance.Revision) || len(provenance.Revision) > 128 {
+		diagnostics = append(diagnostics, Diagnostic{Path: path + ".revision", Message: "model provenance revision must be a bounded canonical source revision"})
+	}
+	decoded, err := hex.DecodeString(provenance.SHA256)
+	if err != nil || len(decoded) != sha256.Size || provenance.SHA256 != strings.ToLower(provenance.SHA256) {
+		diagnostics = append(diagnostics, Diagnostic{Path: path + ".sha256", Message: "model provenance sha256 must be 64 lowercase hexadecimal characters"})
+	}
+	if provenance.ReviewStatus != "reviewed" {
+		diagnostics = append(diagnostics, Diagnostic{Path: path + ".review_status", Message: "model provenance review_status must be reviewed"})
+	}
+	if len(provenance.AllowedAnalyses) == 0 {
+		diagnostics = append(diagnostics, Diagnostic{Path: path + ".allowed_analyses", Message: "model provenance must declare at least one reviewed analysis class"})
+	}
+	allowed := map[string]bool{}
+	previous := ""
+	for index, analysis := range provenance.AllowedAnalyses {
+		entryPath := fmt.Sprintf("%s.allowed_analyses[%d]", path, index)
+		if !registeredAnalysisKind(analysis) {
+			diagnostics = append(diagnostics, Diagnostic{Path: entryPath, Message: "model provenance names an unsupported analysis class"})
+		}
+		if analysis <= previous {
+			diagnostics = append(diagnostics, Diagnostic{Path: entryPath, Message: "model provenance analysis classes must be unique and canonically ordered"})
+		}
+		previous = analysis
+		allowed[analysis] = true
+	}
+	for _, analysis := range requiredAnalyses {
+		if !registeredAnalysisKind(analysis) || !allowed[analysis] {
+			diagnostics = append(diagnostics, Diagnostic{Path: path + ".allowed_analyses", Message: "reviewed model provenance does not permit required analysis " + analysis})
+		}
+	}
+	if provenance.MinTemperatureC != nil && !finite(*provenance.MinTemperatureC) {
+		diagnostics = append(diagnostics, Diagnostic{Path: path + ".min_temperature_c", Message: "model provenance minimum temperature must be finite"})
+	}
+	if provenance.MaxTemperatureC != nil && !finite(*provenance.MaxTemperatureC) {
+		diagnostics = append(diagnostics, Diagnostic{Path: path + ".max_temperature_c", Message: "model provenance maximum temperature must be finite"})
+	}
+	if provenance.MinTemperatureC != nil && provenance.MaxTemperatureC != nil && *provenance.MinTemperatureC > *provenance.MaxTemperatureC {
+		diagnostics = append(diagnostics, Diagnostic{Path: path, Message: "model provenance minimum temperature exceeds maximum temperature"})
+	}
+	return diagnostics
+}
+
+func registeredAnalysisKind(kind string) bool {
+	switch kind {
+	case AnalysisDCOperatingPoint, AnalysisACSweep, AnalysisTransient, AnalysisNoise, AnalysisStability, AnalysisStartup, AnalysisDistortion, AnalysisThermal:
+		return true
+	default:
+		return false
+	}
 }
 
 func validateCatalogUncertainties(path string, claim CatalogEvidence, rules []valueRule, source bool) []Diagnostic {

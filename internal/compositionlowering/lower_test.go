@@ -79,6 +79,65 @@ func TestFrozenOpenSetCorpusLowersDeterministically(t *testing.T) {
 	}
 }
 
+func TestFrozenSimulationGroundedCorpusLowersToWriterRequests(t *testing.T) {
+	catalog, err := components.LoadCatalog(context.Background(), components.LoadOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	registry, registryIssues := architecturesearch.NewCatalogRegistry(catalog)
+	if len(registryIssues) != 0 {
+		t.Fatalf("registry issues = %#v", registryIssues)
+	}
+	resolver := circuitgraph.NewResolver(circuitgraph.ResolveOptions{Catalog: catalog, CatalogID: "checked-in"})
+	paths, err := filepath.Glob(filepath.Join("..", "architecturesearch", "testdata", "simulation_grounded_closed_loop_corpus", "*.json"))
+	paths = slices.DeleteFunc(paths, func(path string) bool { return filepath.Base(path) == "manifest.json" })
+	if err != nil || len(paths) != 10 {
+		t.Fatalf("corpus paths = %#v, %v", paths, err)
+	}
+	for _, path := range paths {
+		path := path
+		t.Run(filepath.Base(path), func(t *testing.T) {
+			data, readErr := os.ReadFile(path)
+			if readErr != nil {
+				t.Fatal(readErr)
+			}
+			requirement, decodeIssues := architecturesearch.DecodeStrict(bytes.NewReader(data))
+			if len(decodeIssues) != 0 {
+				t.Fatalf("decode issues = %#v", decodeIssues)
+			}
+			search := architecturesearch.Search(context.Background(), requirement, registry, architecturesearch.SearchOptions{CatalogHash: "checked-in"})
+			if search.Status != architecturesearch.SearchSelected {
+				t.Fatalf("search status = %s issues=%#v rejections=%#v", search.Status, search.Issues, search.Rejections)
+			}
+			lowered, lowerIssues := Lower(requirement, search)
+			if len(lowerIssues) != 0 {
+				t.Fatalf("lower issues = %#v", lowerIssues)
+			}
+			resolved, resolveIssues := resolver.Resolve(context.Background(), lowered.Document)
+			if reports.HasBlockingIssue(resolveIssues) {
+				t.Fatalf("resolve issues = %#v", resolveIssues)
+			}
+			request, requestIssues := circuitgraph.ToDesignRequest(resolved)
+			if reports.HasBlockingIssue(requestIssues) || request.ExplicitCircuit == nil {
+				t.Fatalf("writer request issues=%#v request=%#v", requestIssues, request)
+			}
+			firstJSON, _ := json.Marshal(request)
+			replayed, replayIssues := resolver.Resolve(context.Background(), lowered.Document)
+			if reports.HasBlockingIssue(replayIssues) {
+				t.Fatalf("replay resolve issues = %#v", replayIssues)
+			}
+			secondRequest, secondIssues := circuitgraph.ToDesignRequest(replayed)
+			if reports.HasBlockingIssue(secondIssues) {
+				t.Fatalf("replay writer issues = %#v", secondIssues)
+			}
+			secondJSON, _ := json.Marshal(secondRequest)
+			if !bytes.Equal(firstJSON, secondJSON) {
+				t.Fatal("simulation-grounded writer request replay differs")
+			}
+		})
+	}
+}
+
 func TestLowerInterfacesDoesNotDuplicateReferencePortOnItsOwnReturnNet(t *testing.T) {
 	requirement := architecturesearch.Requirement{Requirements: architecturesearch.Requirements{
 		Domains: []architecturesearch.Domain{{ID: "gnd", Kind: "reference"}},

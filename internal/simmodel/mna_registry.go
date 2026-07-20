@@ -69,6 +69,16 @@ var primitiveRegistry = []primitiveDefinition{
 	{ID: PrimitiveBJTPNPV1, Family: "bjt", Terminals: []string{"BASE", "COLLECTOR", "EMITTER"}, Nonlinear: true, CatalogParameters: bjtParameterRules()},
 }
 
+// PrimitiveModelIDs returns the canonical trusted primitive identities in
+// registry order.
+func PrimitiveModelIDs() []string {
+	ids := make([]string, 0, len(primitiveRegistry))
+	for _, primitive := range primitiveRegistry {
+		ids = append(ids, primitive.ID)
+	}
+	return ids
+}
+
 func bjtParameterRules() []valueRule {
 	return []valueRule{
 		{Name: "saturation_current_a", Positive: true, Minimum: 1e-30, Maximum: 1e-3},

@@ -8,3 +8,9 @@ import "embed"
 //
 //go:embed data/components/*.json
 var DefaultComponentCatalog embed.FS
+
+// DefaultModelProvenance contains the reviewed catalog-to-model trust registry
+// shipped with the KiCadAI binary.
+//
+//go:embed data/model-provenance/*.json
+var DefaultModelProvenance embed.FS

@@ -59,6 +59,19 @@ func TestCatalogProviderSearchesSyntheticThresholdDeterministically(t *testing.T
 	}
 }
 
+func TestCatalogProviderDispatchesBehaviorDerivedThresholdToGenericAdapter(t *testing.T) {
+	provider, err := NewCatalogProvider(loadArchitectureCatalog(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	request := thresholdProviderRequest(5, 1.65, 0.2)
+	request.Constraints = request.Constraints[:2]
+	expansions, err := provider.Expand(context.Background(), request)
+	if err != nil || len(expansions) == 0 {
+		t.Fatalf("behavior-derived threshold dispatch expansions=%d err=%v", len(expansions), err)
+	}
+}
+
 func TestCatalogProviderGenericCapabilityMutations(t *testing.T) {
 	provider, err := NewCatalogProvider(loadArchitectureCatalog(t))
 	if err != nil {

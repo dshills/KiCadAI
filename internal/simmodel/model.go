@@ -25,6 +25,11 @@ const (
 	AnalysisDCOperatingPoint = "dc_operating_point"
 	AnalysisACSweep          = "ac_sweep"
 	AnalysisTransient        = "transient"
+	AnalysisNoise            = "noise"
+	AnalysisStability        = "stability"
+	AnalysisStartup          = "startup"
+	AnalysisDistortion       = "distortion"
+	AnalysisThermal          = "thermal"
 
 	QuantityVoltageV          = "voltage_v"
 	QuantityVoltageMagnitudeV = "voltage_magnitude_v"
@@ -54,6 +59,18 @@ type CatalogEvidence struct {
 	ModelID       string        `json:"model_id"`
 	Parameters    []NamedValue  `json:"parameters,omitempty"`
 	Uncertainties []Uncertainty `json:"uncertainties,omitempty"`
+}
+
+// ModelProvenance is catalog-owned trust evidence. It is never accepted from
+// provider-authored simulation intent.
+type ModelProvenance struct {
+	Source          string   `json:"source"`
+	Revision        string   `json:"revision"`
+	SHA256          string   `json:"sha256"`
+	ReviewStatus    string   `json:"review_status"`
+	AllowedAnalyses []string `json:"allowed_analyses"`
+	MinTemperatureC *float64 `json:"min_temperature_c,omitempty"`
+	MaxTemperatureC *float64 `json:"max_temperature_c,omitempty"`
 }
 
 type Binding struct {

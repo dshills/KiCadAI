@@ -1,0 +1,18 @@
+{
+  "schema": "kicadai.simulation-grounded-closed-loop-corpus.v1",
+  "version": 1,
+  "frozen_at": "2026-07-19",
+  "requirement_schema": "kicadai.open-set-requirement.v3",
+  "fixtures": [
+    {"id": "active_filter_amplifier", "file": "active_filter_amplifier.json", "categories": ["amplifier", "filter", "protection"], "analyses": ["ac_sweep", "stability", "transient"], "sha256": "c78b51e84470f381055eba8742c202a08c2ca8b95f822bb0ea0c8739f053f17d"},
+    {"id": "class_a_amplifier", "file": "class_a_amplifier.json", "categories": ["amplifier", "class_a", "protection", "thermal"], "analyses": ["ac_sweep", "dc_operating_point", "distortion", "stability", "startup", "thermal", "transient"], "sha256": "3440971cdfcfc17f94962498dbdeb78634fa71e396f68dbdf1074a2fbbd88f82"},
+    {"id": "class_ab_amplifier", "file": "class_ab_amplifier.json", "categories": ["amplifier", "class_ab", "control", "protection", "thermal"], "analyses": ["ac_sweep", "dc_operating_point", "distortion", "stability", "startup", "thermal", "transient"], "sha256": "d69518202b296f1c9a1debeb10610e8eaa60d389ce736c1ac0854ccf0957282a"},
+    {"id": "current_sense_protection", "file": "current_sense_protection.json", "categories": ["analog", "control", "power", "protection"], "analyses": ["dc_operating_point", "startup", "transient"], "sha256": "a7f6b2f266a67e39aaab4a3c3f951b35bb92a454440db8f8d1a8d640efe12ccb"},
+    {"id": "hysteretic_mosfet_load", "file": "hysteretic_mosfet_load.json", "categories": ["analog", "control", "mosfet", "power", "protection"], "analyses": ["dc_operating_point", "startup", "thermal"], "sha256": "61e06b72415ceee7815292097dce16d481dd33567de66ed84c26362729c671c1"},
+    {"id": "low_noise_sensor_decision", "file": "low_noise_sensor_decision.json", "categories": ["amplifier", "filter", "noise", "sensor"], "analyses": ["ac_sweep", "dc_operating_point", "noise"], "sha256": "dd4522854c01ff3ec1e0deff208b517f3814cf9ef77a587b5b12aada70cd0478"},
+    {"id": "mixed_function_control_power", "file": "mixed_function_control_power.json", "categories": ["analog", "control", "filter", "power", "protection"], "analyses": ["ac_sweep", "dc_operating_point", "startup", "thermal", "transient"], "sha256": "dddd819abf9065df489fbf634234d368a3389b70fb76c56bf20d1dfc299cd0d8"},
+    {"id": "protected_mixed_signal_interface", "file": "protected_mixed_signal_interface.json", "categories": ["digital", "interface", "power", "protection"], "analyses": ["dc_operating_point", "startup", "transient"], "sha256": "4ba74255926a6d2d86cec48759b1ef78ee7675f7764909e5a9e04d6c7d4e8efe"},
+    {"id": "regulated_sensor_interface", "file": "regulated_sensor_interface.json", "categories": ["digital", "interface", "power", "sensor"], "analyses": ["dc_operating_point", "startup", "thermal", "transient"], "sha256": "564874fa04927975251102ad4f4089326197f0391059623253a30dcdf88c4086"},
+    {"id": "split_supply_frontend", "file": "split_supply_frontend.json", "categories": ["amplifier", "filter", "noise", "power"], "analyses": ["ac_sweep", "dc_operating_point", "noise"], "sha256": "95c4ad7defea7e3c8e316b8b951ad99531d4142eb633334cd8abfba9975d9752"}
+  ]
+}

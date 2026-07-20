@@ -13,6 +13,7 @@ import (
 	"unicode/utf8"
 
 	"kicadai/internal/blocks"
+	"kicadai/internal/closedloopsynthesis"
 	"kicadai/internal/components"
 	"kicadai/internal/domain"
 	"kicadai/internal/reports"
@@ -63,6 +64,7 @@ type ExplicitCircuitSpec struct {
 	Schematic        schematicir.Document           `json:"schematic"`
 	AutoHierarchy    bool                           `json:"auto_hierarchy,omitempty"`
 	Simulation       *simmodel.Plan                 `json:"simulation,omitempty"`
+	ClosedLoop       *closedloopsynthesis.Report    `json:"closed_loop,omitempty"`
 	SchematicSupport []ExplicitSchematicSupportSpec `json:"schematic_support,omitempty"`
 	Components       []ExplicitComponentSpec        `json:"components"`
 	Nets             []ExplicitNetSpec              `json:"nets"`
@@ -601,6 +603,10 @@ func cloneExplicitCircuit(source *ExplicitCircuitSpec) *ExplicitCircuitSpec {
 		simulation := simmodel.ClonePlan(*source.Simulation)
 		clone.Simulation = &simulation
 	}
+	if source.ClosedLoop != nil {
+		closedLoop := closedloopsynthesis.CloneReport(*source.ClosedLoop)
+		clone.ClosedLoop = &closedLoop
+	}
 	clone.Components = append([]ExplicitComponentSpec(nil), source.Components...)
 	for index := range clone.Components {
 		clone.Components[index].SchematicUnits = append([]string(nil), source.Components[index].SchematicUnits...)
@@ -882,6 +888,14 @@ func validateExplicitCircuit(circuit ExplicitCircuitSpec) []reports.Issue {
 			if _, exists := componentsByID[physicalComponent]; !exists {
 				issues = append(issues, issue("explicit_circuit.simulation.devices", "simulation device references missing explicit component "+physicalComponent))
 			}
+		}
+	}
+	if circuit.ClosedLoop != nil {
+		if circuit.Simulation == nil {
+			issues = append(issues, issue("explicit_circuit.closed_loop", "closed-loop evidence requires its final trusted simulation plan"))
+		}
+		for _, diagnostic := range closedloopsynthesis.ValidatePromotionReport(*circuit.ClosedLoop, circuit.CatalogHash) {
+			issues = append(issues, issue("explicit_circuit.closed_loop."+diagnostic.Path, diagnostic.Message))
 		}
 	}
 	return issues

@@ -13,15 +13,17 @@ import (
 )
 
 const (
-	CodeSchemaInvalid     reports.Code = "ARCHITECTURE_SCHEMA_INVALID"
-	CodeLimitExceeded     reports.Code = "ARCHITECTURE_LIMIT_EXCEEDED"
-	CodeIdentityDuplicate reports.Code = "ARCHITECTURE_IDENTITY_DUPLICATE"
-	CodeDomainInvalid     reports.Code = "ARCHITECTURE_DOMAIN_INVALID"
-	CodePortInvalid       reports.Code = "ARCHITECTURE_PORT_INVALID"
-	CodeSignalInvalid     reports.Code = "ARCHITECTURE_SIGNAL_INVALID"
-	CodeBindingUnresolved reports.Code = "ARCHITECTURE_BINDING_UNRESOLVED"
-	CodeConstraintInvalid reports.Code = "ARCHITECTURE_CONSTRAINT_INVALID"
-	CodeAcceptanceInvalid reports.Code = "ARCHITECTURE_ACCEPTANCE_INVALID"
+	CodeSchemaInvalid        reports.Code = "ARCHITECTURE_SCHEMA_INVALID"
+	CodeLimitExceeded        reports.Code = "ARCHITECTURE_LIMIT_EXCEEDED"
+	CodeIdentityDuplicate    reports.Code = "ARCHITECTURE_IDENTITY_DUPLICATE"
+	CodeDomainInvalid        reports.Code = "ARCHITECTURE_DOMAIN_INVALID"
+	CodePortInvalid          reports.Code = "ARCHITECTURE_PORT_INVALID"
+	CodeSignalInvalid        reports.Code = "ARCHITECTURE_SIGNAL_INVALID"
+	CodeBindingUnresolved    reports.Code = "ARCHITECTURE_BINDING_UNRESOLVED"
+	CodeConstraintInvalid    reports.Code = "ARCHITECTURE_CONSTRAINT_INVALID"
+	CodeAcceptanceInvalid    reports.Code = "ARCHITECTURE_ACCEPTANCE_INVALID"
+	CodeOperatingCaseInvalid reports.Code = "ARCHITECTURE_OPERATING_CASE_INVALID"
+	CodeBehaviorInvalid      reports.Code = "ARCHITECTURE_BEHAVIOR_INVALID"
 )
 
 var semanticIDPattern = regexp.MustCompile(`^[a-z][a-z0-9_]{0,63}$`)
@@ -35,6 +37,8 @@ func Validate(requirement Requirement) []reports.Issue {
 	validator.participants()
 	validator.objectives()
 	validator.constraints("requirements.system_constraints", requirement.Requirements.SystemConstraints)
+	validator.operatingCases()
+	validator.behavioralRequirements()
 	validator.boardLimits()
 	validator.acceptance()
 	slices.SortStableFunc(validator.issues, func(left, right reports.Issue) int {
@@ -65,8 +69,9 @@ func (validator *requirementValidator) add(code reports.Code, path, message stri
 func (validator *requirementValidator) header() {
 	v1 := validator.requirement.Schema == SchemaID && validator.requirement.Version == Version
 	v2 := validator.requirement.Schema == SchemaIDV2 && validator.requirement.Version == VersionV2
-	if !v1 && !v2 {
-		validator.add(CodeSchemaInvalid, "schema", fmt.Sprintf("schema/version must be %q/%d or %q/%d", SchemaID, Version, SchemaIDV2, VersionV2))
+	v3 := validator.requirement.Schema == SchemaIDV3 && validator.requirement.Version == VersionV3
+	if !v1 && !v2 && !v3 {
+		validator.add(CodeSchemaInvalid, "schema", fmt.Sprintf("schema/version must be %q/%d, %q/%d, or %q/%d", SchemaID, Version, SchemaIDV2, VersionV2, SchemaIDV3, VersionV3))
 	}
 	project := validator.requirement.Project
 	if !validSemanticID(project.Name) {
@@ -88,6 +93,8 @@ func (validator *requirementValidator) header() {
 	validator.limit("requirements.signals", len(validator.requirement.Requirements.Signals), MaxSignals)
 	validator.limit("requirements.participants", len(validator.requirement.Requirements.Participants), MaxParticipants)
 	validator.limit("requirements.objectives", len(validator.requirement.Requirements.Objectives), MaxObjectives)
+	validator.limit("requirements.operating_cases", len(validator.requirement.Requirements.OperatingCases), MaxOperatingCases)
+	validator.limit("requirements.behavioral_requirements", len(validator.requirement.Requirements.BehavioralRequirements), MaxBehavioralRequirements)
 }
 
 func (validator *requirementValidator) domains() {
@@ -109,7 +116,7 @@ func (validator *requirementValidator) domains() {
 				validator.add(CodeDomainInvalid, path+".source", "v1 domain source must be external or generated")
 			}
 		} else if domain.Source != "external" && !validSemanticID(domain.Source) {
-			validator.add(CodeDomainInvalid, path+".source", "v2 domain source must be external or a signal identity")
+			validator.add(CodeDomainInvalid, path+".source", "typed domain source must be external or a signal identity")
 		}
 		if !finiteInRange(domain.NominalVoltageV, -1000, 1000) {
 			validator.add(CodeDomainInvalid, path+".nominal_voltage_v", "nominal voltage must be finite and within policy bounds")
@@ -153,7 +160,7 @@ func (validator *requirementValidator) signals() {
 			validator.protocol(path+".protocol", *signal.Protocol)
 		}
 	}
-	if validator.requirement.Version != VersionV2 {
+	if !supportsTypedSignals(validator.requirement.Version) {
 		if len(validator.requirement.Requirements.Signals) != 0 || len(validator.requirement.Requirements.SystemConstraints) != 0 {
 			validator.add(CodeSchemaInvalid, "requirements", "signals and system_constraints require the v2 schema")
 		}
@@ -287,8 +294,8 @@ func (validator *requirementValidator) objectives() {
 				continue
 			}
 			if signal {
-				if validator.requirement.Version != VersionV2 {
-					validator.add(CodeSchemaInvalid, bindingPath+".signal", "signal bindings require the v2 schema")
+				if !supportsTypedSignals(validator.requirement.Version) {
+					validator.add(CodeSchemaInvalid, bindingPath+".signal", "signal bindings require the v2 or v3 schema")
 					continue
 				}
 				if _, exists := validator.signalsByID[binding.Signal]; !exists {
@@ -335,6 +342,173 @@ func (validator *requirementValidator) objectives() {
 	}
 }
 
+func (validator *requirementValidator) operatingCases() {
+	cases := validator.requirement.Requirements.OperatingCases
+	if validator.requirement.Version != VersionV3 {
+		if len(cases) != 0 || len(validator.requirement.Requirements.BehavioralRequirements) != 0 {
+			validator.add(CodeSchemaInvalid, "requirements", "operating_cases and behavioral_requirements require the v3 schema")
+		}
+		return
+	}
+	if len(cases) == 0 {
+		validator.add(CodeOperatingCaseInvalid, "requirements.operating_cases", "v3 requires at least one bounded operating case")
+		return
+	}
+	seen := map[string]bool{}
+	for index, operatingCase := range cases {
+		path := fmt.Sprintf("requirements.operating_cases[%d]", index)
+		if !validSemanticID(operatingCase.ID) {
+			validator.add(CodeOperatingCaseInvalid, path+".id", "operating case id must be a normalized semantic identifier")
+		} else if seen[operatingCase.ID] {
+			validator.add(CodeIdentityDuplicate, path+".id", "operating case id is duplicated")
+		}
+		seen[operatingCase.ID] = true
+		validator.limit(path+".conditions", len(operatingCase.Conditions), MaxCaseConditions)
+		if len(operatingCase.Conditions) == 0 {
+			validator.add(CodeOperatingCaseInvalid, path+".conditions", "operating case requires at least one bounded condition")
+		}
+		seenConditions := map[string]bool{}
+		for conditionIndex, condition := range operatingCase.Conditions {
+			conditionPath := fmt.Sprintf("%s.conditions[%d]", path, conditionIndex)
+			key := condition.Axis + "\x00" + condition.Target
+			if seenConditions[key] {
+				validator.add(CodeIdentityDuplicate, conditionPath, "operating condition axis and target are duplicated")
+			}
+			seenConditions[key] = true
+			validator.operatingCondition(conditionPath, condition)
+		}
+	}
+}
+
+func (validator *requirementValidator) operatingCondition(path string, condition OperatingCondition) {
+	expectedUnit, selectionAxis := operatingAxisContract(condition.Axis)
+	if expectedUnit == "" && !selectionAxis {
+		validator.add(CodeOperatingCaseInvalid, path+".axis", "unsupported operating condition axis")
+		return
+	}
+	if !validator.semanticTargetExists(condition.Target) {
+		validator.add(CodeBindingUnresolved, path+".target", "operating condition references an unknown semantic target")
+	}
+	if selectionAxis {
+		if condition.Min != nil || condition.Max != nil || condition.Unit != "" {
+			validator.add(CodeOperatingCaseInvalid, path, "selection corner axes cannot declare numeric bounds or units")
+		}
+		if condition.Selection != "all" && condition.Selection != "nominal" && condition.Selection != "minimum" && condition.Selection != "maximum" {
+			validator.add(CodeOperatingCaseInvalid, path+".selection", "corner selection must be all, nominal, minimum, or maximum")
+		}
+		return
+	}
+	if condition.Selection != "" {
+		validator.add(CodeOperatingCaseInvalid, path+".selection", "numeric operating axes cannot declare a corner selection")
+	}
+	if condition.Unit != expectedUnit {
+		validator.add(CodeOperatingCaseInvalid, path+".unit", "operating condition requires canonical unit "+expectedUnit)
+	}
+	if condition.Min == nil && condition.Max == nil {
+		validator.add(CodeOperatingCaseInvalid, path, "numeric operating condition requires a minimum or maximum")
+	}
+	validator.optionalNumber(CodeOperatingCaseInvalid, path+".min", condition.Min, -1e15, 1e15)
+	validator.optionalNumber(CodeOperatingCaseInvalid, path+".max", condition.Max, -1e15, 1e15)
+	if condition.Min != nil && condition.Max != nil && *condition.Min > *condition.Max {
+		validator.add(CodeOperatingCaseInvalid, path, "operating condition minimum exceeds maximum")
+	}
+}
+
+func (validator *requirementValidator) behavioralRequirements() {
+	behaviors := validator.requirement.Requirements.BehavioralRequirements
+	if validator.requirement.Version != VersionV3 {
+		return
+	}
+	if len(behaviors) == 0 {
+		validator.add(CodeBehaviorInvalid, "requirements.behavioral_requirements", "v3 requires at least one measurable behavioral requirement")
+		return
+	}
+	cases := map[string]bool{}
+	for _, operatingCase := range validator.requirement.Requirements.OperatingCases {
+		cases[operatingCase.ID] = true
+	}
+	seen := map[string]bool{}
+	for index, behavior := range behaviors {
+		path := fmt.Sprintf("requirements.behavioral_requirements[%d]", index)
+		if !validSemanticID(behavior.ID) {
+			validator.add(CodeBehaviorInvalid, path+".id", "behavioral requirement id must be a normalized semantic identifier")
+		} else if seen[behavior.ID] {
+			validator.add(CodeIdentityDuplicate, path+".id", "behavioral requirement id is duplicated")
+		}
+		seen[behavior.ID] = true
+		expectedAnalysis, expectedUnit, knownMetric := behavioralMetricContract(behavior.Metric)
+		if !knownMetric {
+			validator.add(CodeBehaviorInvalid, path+".metric", "unsupported behavioral metric")
+		} else {
+			if behavior.Analysis != expectedAnalysis {
+				validator.add(CodeBehaviorInvalid, path+".analysis", "behavioral metric requires registered analysis "+expectedAnalysis)
+			}
+			if behavior.Unit != expectedUnit {
+				validator.add(CodeBehaviorInvalid, path+".unit", "behavioral metric requires canonical unit "+expectedUnit)
+			}
+		}
+		validator.behaviorObservation(path+".observation", behavior.Observation)
+		if behavior.Min == nil && behavior.Max == nil {
+			validator.add(CodeBehaviorInvalid, path, "behavioral requirement requires a minimum or maximum")
+		}
+		validator.optionalNumber(CodeBehaviorInvalid, path+".min", behavior.Min, -1e15, 1e15)
+		validator.optionalNumber(CodeBehaviorInvalid, path+".max", behavior.Max, -1e15, 1e15)
+		if behavior.Min != nil && behavior.Max != nil && *behavior.Min > *behavior.Max {
+			validator.add(CodeBehaviorInvalid, path, "behavioral requirement minimum exceeds maximum")
+		}
+		if len(behavior.OperatingCases) == 0 {
+			validator.add(CodeBehaviorInvalid, path+".operating_cases", "behavioral requirement must name at least one operating case")
+		}
+		seenCases := map[string]bool{}
+		for caseIndex, caseID := range behavior.OperatingCases {
+			casePath := fmt.Sprintf("%s.operating_cases[%d]", path, caseIndex)
+			if !validSemanticID(caseID) || !cases[caseID] {
+				validator.add(CodeBindingUnresolved, casePath, "behavioral requirement references an unknown operating case")
+			} else if seenCases[caseID] {
+				validator.add(CodeIdentityDuplicate, casePath, "behavioral operating case is duplicated")
+			}
+			seenCases[caseID] = true
+		}
+	}
+}
+
+func (validator *requirementValidator) behaviorObservation(path string, observation Observation) {
+	switch observation.Kind {
+	case "port":
+		if _, exists := validator.portsByID[observation.ID]; !exists {
+			validator.add(CodeBindingUnresolved, path+".id", "behavior observation references an unknown port")
+		}
+	case "signal":
+		if _, exists := validator.signalsByID[observation.ID]; !exists {
+			validator.add(CodeBindingUnresolved, path+".id", "behavior observation references an unknown signal")
+		}
+	case "domain":
+		if _, exists := validator.domainsByID[observation.ID]; !exists {
+			validator.add(CodeBindingUnresolved, path+".id", "behavior observation references an unknown domain")
+		}
+	case "circuit":
+		if observation.ID != "circuit" {
+			validator.add(CodeBehaviorInvalid, path+".id", "whole-circuit observation id must be circuit")
+		}
+	default:
+		validator.add(CodeBehaviorInvalid, path+".kind", "observation kind must be port, signal, domain, or circuit")
+	}
+}
+
+func (validator *requirementValidator) semanticTargetExists(target string) bool {
+	if target == "circuit" {
+		return true
+	}
+	if _, exists := validator.domainsByID[target]; exists {
+		return true
+	}
+	if _, exists := validator.portsByID[target]; exists {
+		return true
+	}
+	_, exists := validator.signalsByID[target]
+	return exists
+}
+
 func (validator *requirementValidator) boardLimits() {
 	limits := validator.requirement.Requirements.Constraints
 	if limits.MaxComponents <= 0 || limits.MaxComponents > MaxComponents {
@@ -362,7 +536,7 @@ func (validator *requirementValidator) acceptance() {
 		{"require_round_trip_zero_diff", acceptance.RequireRoundTripZeroDiff},
 		{"require_deterministic_replay", acceptance.RequireDeterministicReplay},
 	}
-	if validator.requirement.Version == VersionV2 {
+	if supportsTypedSignals(validator.requirement.Version) {
 		required = append(required,
 			struct {
 				path  string
@@ -384,6 +558,26 @@ func (validator *requirementValidator) acceptance() {
 				path  string
 				value bool
 			}{"require_fail_closed", acceptance.RequireFailClosed},
+		)
+	}
+	if validator.requirement.Version == VersionV3 {
+		required = append(required,
+			struct {
+				path  string
+				value bool
+			}{"require_simulation", acceptance.RequireSimulation},
+			struct {
+				path  string
+				value bool
+			}{"require_all_corners", acceptance.RequireAllCorners},
+			struct {
+				path  string
+				value bool
+			}{"require_model_provenance", acceptance.RequireModelProvenance},
+			struct {
+				path  string
+				value bool
+			}{"require_closed_loop_evidence", acceptance.RequireClosedLoopEvidence},
 		)
 	}
 	for _, gate := range required {
@@ -564,10 +758,72 @@ func allowedRelation(value string) bool {
 
 func allowedUnit(value string) bool {
 	switch value {
-	case "V", "A", "Hz", "Ohm", "us", "ratio", "dB", "W", "deg", "degC", "%", "pF", "uV_rms":
+	case "V", "A", "Hz", "Ohm", "us", "s", "F", "ratio", "dB", "W", "deg", "degC", "%", "pF", "uV_rms", "V_rms", "V_pp", "V/A":
 		return true
 	default:
 		return false
+	}
+}
+
+func supportsTypedSignals(version int) bool {
+	return version == VersionV2 || version == VersionV3
+}
+
+func operatingAxisContract(axis string) (unit string, selection bool) {
+	switch axis {
+	case "supply_voltage", "input_amplitude":
+		return "V", false
+	case "load_resistance":
+		return "Ohm", false
+	case "load_capacitance":
+		return "F", false
+	case "load_current":
+		return "A", false
+	case "ambient_temperature":
+		return "degC", false
+	case "input_frequency":
+		return "Hz", false
+	case "tolerance", "model_parameter":
+		return "", true
+	default:
+		return "", false
+	}
+}
+
+func behavioralMetricContract(metric string) (analysis, unit string, ok bool) {
+	switch metric {
+	case "dc_voltage", "threshold_voltage", "output_high_voltage":
+		return "dc_operating_point", "V", true
+	case "dc_current", "quiescent_current", "threshold_current":
+		return "dc_operating_point", "A", true
+	case "transimpedance":
+		return "dc_operating_point", "V/A", true
+	case "voltage_gain":
+		return "ac_sweep", "ratio", true
+	case "bandwidth", "cutoff_frequency":
+		return "ac_sweep", "Hz", true
+	case "integrated_output_noise":
+		return "noise", "V_rms", true
+	case "phase_margin":
+		return "stability", "deg", true
+	case "rise_time", "fall_time", "settling_time", "response_time":
+		return "transient", "s", true
+	case "muted_output_voltage":
+		return "transient", "V", true
+	case "output_swing":
+		return "transient", "V_pp", true
+	case "output_power":
+		return "transient", "W", true
+	case "startup_output_voltage":
+		return "startup", "V", true
+	case "total_harmonic_distortion":
+		return "distortion", "%", true
+	case "junction_temperature":
+		return "thermal", "degC", true
+	case "hysteresis_voltage":
+		return "dc_operating_point", "V", true
+	default:
+		return "", "", false
 	}
 }
 

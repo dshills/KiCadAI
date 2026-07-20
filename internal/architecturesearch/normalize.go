@@ -120,7 +120,59 @@ func Normalize(requirement Requirement) Requirement {
 		return strings.Compare(left.ID, right.ID)
 	})
 	normalizeConstraints(normalized.Requirements.SystemConstraints)
+
+	for index := range normalized.Requirements.OperatingCases {
+		operatingCase := &normalized.Requirements.OperatingCases[index]
+		operatingCase.ID = canonicalIdentifier(operatingCase.ID)
+		for conditionIndex := range operatingCase.Conditions {
+			condition := &operatingCase.Conditions[conditionIndex]
+			condition.Axis = canonicalIdentifier(condition.Axis)
+			condition.Target = canonicalIdentifier(condition.Target)
+			condition.Unit = canonicalUnit(condition.Unit)
+			condition.Selection = canonicalIdentifier(condition.Selection)
+		}
+		slices.SortStableFunc(operatingCase.Conditions, compareOperatingConditions)
+	}
+	slices.SortStableFunc(normalized.Requirements.OperatingCases, func(left, right OperatingCase) int {
+		return strings.Compare(left.ID, right.ID)
+	})
+
+	for index := range normalized.Requirements.BehavioralRequirements {
+		behavior := &normalized.Requirements.BehavioralRequirements[index]
+		behavior.ID = canonicalIdentifier(behavior.ID)
+		behavior.Metric = canonicalIdentifier(behavior.Metric)
+		behavior.Analysis = canonicalIdentifier(behavior.Analysis)
+		behavior.Observation.Kind = canonicalIdentifier(behavior.Observation.Kind)
+		behavior.Observation.ID = canonicalIdentifier(behavior.Observation.ID)
+		behavior.Unit = canonicalUnit(behavior.Unit)
+		for caseIndex := range behavior.OperatingCases {
+			behavior.OperatingCases[caseIndex] = canonicalIdentifier(behavior.OperatingCases[caseIndex])
+		}
+		slices.Sort(behavior.OperatingCases)
+	}
+	slices.SortStableFunc(normalized.Requirements.BehavioralRequirements, func(left, right BehavioralRequirement) int {
+		return strings.Compare(left.ID, right.ID)
+	})
 	return normalized
+}
+
+func compareOperatingConditions(left, right OperatingCondition) int {
+	if order := strings.Compare(left.Axis, right.Axis); order != 0 {
+		return order
+	}
+	if order := strings.Compare(left.Target, right.Target); order != 0 {
+		return order
+	}
+	if order := strings.Compare(left.Selection, right.Selection); order != 0 {
+		return order
+	}
+	if order := cmp.Compare(pointerFloat(left.Min), pointerFloat(right.Min)); order != 0 {
+		return order
+	}
+	if order := cmp.Compare(pointerFloat(left.Max), pointerFloat(right.Max)); order != 0 {
+		return order
+	}
+	return strings.Compare(left.Unit, right.Unit)
 }
 
 func CanonicalJSON(requirement Requirement) ([]byte, error) {
@@ -249,6 +301,16 @@ func canonicalUnit(value string) string {
 		return "pF"
 	case "uv_rms":
 		return "uV_rms"
+	case "v_rms":
+		return "V_rms"
+	case "v_pp":
+		return "V_pp"
+	case "v/a":
+		return "V/A"
+	case "s":
+		return "s"
+	case "f":
+		return "F"
 	default:
 		return strings.TrimSpace(value)
 	}

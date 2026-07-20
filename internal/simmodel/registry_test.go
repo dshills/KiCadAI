@@ -2,6 +2,7 @@ package simmodel
 
 import (
 	"math"
+	"slices"
 	"testing"
 )
 
@@ -119,5 +120,75 @@ func TestClonePlanDoesNotShareMutableEvidence(t *testing.T) {
 	clone.Assertions[0].Max = 6
 	if source.Bindings[0].Role != "resistor" || *source.Bindings[0].ValueSI != 1000 || source.Bindings[0].ModelParameters[0].Value != 1 || source.Inputs[0].Value != 2 || source.Assertions[0].Max != 3 {
 		t.Fatalf("source plan mutated through clone: %#v", source)
+	}
+}
+
+func TestRequiredModelProvenanceFailsClosedAndPreservesTrustedEvidence(t *testing.T) {
+	if diagnostics := ValidateRequiredModelProvenance(nil, []string{AnalysisDCOperatingPoint}); len(diagnostics) == 0 {
+		t.Fatal("missing model provenance was accepted")
+	}
+	provenance := &ModelProvenance{
+		Source: "manufacturer-datasheet:example", Revision: "rev-a",
+		SHA256:       "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+		ReviewStatus: "reviewed", AllowedAnalyses: []string{AnalysisACSweep, AnalysisDCOperatingPoint},
+	}
+	if diagnostics := ValidateRequiredModelProvenance(provenance, []string{AnalysisDCOperatingPoint}); len(diagnostics) != 0 {
+		t.Fatalf("reviewed provenance diagnostics: %#v", diagnostics)
+	}
+	if diagnostics := ValidateRequiredModelProvenance(provenance, []string{AnalysisNoise}); len(diagnostics) == 0 {
+		t.Fatal("model provenance without required analysis applicability was accepted")
+	}
+	provenance.AllowedAnalyses = []string{AnalysisDCOperatingPoint, AnalysisACSweep}
+	if diagnostics := ValidateRequiredModelProvenance(provenance, []string{AnalysisDCOperatingPoint}); len(diagnostics) == 0 {
+		t.Fatal("noncanonical provenance analysis ordering was accepted")
+	}
+}
+
+func TestSupportedAnalysisKindsDescribeExecutableRegistryPaths(t *testing.T) {
+	tests := []struct {
+		model string
+		want  []string
+	}{
+		{ModelLinearRegulatorIdealV1, []string{AnalysisDCOperatingPoint}},
+		{ModelResistorDividerDCV1, []string{AnalysisDCOperatingPoint}},
+		{ModelRCLowpassACV1, []string{AnalysisACSweep}},
+		{ModelLinearCircuitMNAV1, []string{AnalysisACSweep, AnalysisDCOperatingPoint}},
+		{ModelNonlinearCircuitDCV1, []string{AnalysisDCOperatingPoint}},
+		{ModelTransientCircuitV1, []string{AnalysisTransient}},
+	}
+	for _, test := range tests {
+		if got := SupportedAnalysisKinds(test.model); !slices.Equal(got, test.want) {
+			t.Fatalf("SupportedAnalysisKinds(%q) = %#v, want %#v", test.model, got, test.want)
+		}
+		for _, kind := range test.want {
+			if !SupportsAnalysis(test.model, kind) {
+				t.Fatalf("SupportsAnalysis(%q, %q) = false", test.model, kind)
+			}
+		}
+	}
+	for _, future := range []string{AnalysisNoise, AnalysisStability, AnalysisStartup, AnalysisDistortion, AnalysisThermal} {
+		if SupportsAnalysis(ModelLinearCircuitMNAV1, future) {
+			t.Fatalf("future analysis %q was reported executable", future)
+		}
+	}
+	if got := SupportedAnalysisKinds("missing"); len(got) != 0 {
+		t.Fatalf("unknown model support = %#v", got)
+	}
+}
+
+func TestModelContentHashIsStableAndModelSpecific(t *testing.T) {
+	seen := map[string]string{}
+	for _, modelID := range append(ModelIDs(), PrimitiveModelIDs()...) {
+		hash, ok := ModelContentHash(modelID)
+		if !ok || len(hash) != 64 {
+			t.Fatalf("ModelContentHash(%q) = %q, %t", modelID, hash, ok)
+		}
+		if previous, duplicate := seen[hash]; duplicate {
+			t.Fatalf("models %q and %q share content hash %s", previous, modelID, hash)
+		}
+		seen[hash] = modelID
+	}
+	if _, ok := ModelContentHash("missing"); ok {
+		t.Fatal("unknown model produced a content hash")
 	}
 }

@@ -233,6 +233,13 @@ func ContractFromRequirementSignal(requirement Requirement, signalID, direction 
 			}
 		}
 	}
+	if (signal.Electrical == nil || signal.Electrical.MaxCurrentA == nil) && domain.MaxCurrentA != nil && signal.Kind == "power" {
+		if direction == "source" {
+			contract.RequiredCurrentCapacityA = cloneFloat64(domain.MaxCurrentA)
+		} else {
+			contract.MaximumCurrentDemandA = cloneFloat64(domain.MaxCurrentA)
+		}
+	}
 	return NormalizePortContract(contract), nil
 }
 

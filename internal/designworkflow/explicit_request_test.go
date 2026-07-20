@@ -20,6 +20,16 @@ func TestValidateRequestAcceptsExplicitCircuitMode(t *testing.T) {
 	}
 }
 
+func TestValidateRequestRejectsClosedLoopWithoutFinalSimulationPlan(t *testing.T) {
+	request := validExplicitCircuitRequest()
+	report := trustedClosedLoopTestReport(request.ExplicitCircuit.CatalogHash)
+	request.ExplicitCircuit.ClosedLoop = &report
+	issues := ValidateRequest(request)
+	if !reports.HasBlockingIssue(issues) || !hasDesignWorkflowIssuePath(issues, "explicit_circuit.closed_loop") {
+		t.Fatalf("closed-loop validation issues = %#v", issues)
+	}
+}
+
 func TestValidateRequestRejectsUnknownExplicitRoutingPolicy(t *testing.T) {
 	request := validExplicitCircuitRequest()
 	request.ExplicitCircuit.RoutingPolicy = "unknown"
