@@ -28,9 +28,13 @@ func PlaceExplicitCircuit(ctx context.Context, request Request, opts PlacementOp
 	if reports.HasBlockingIssue(issues) {
 		return PlacementStageResult{Stage: NewStageResult(StagePlacement, issues)}
 	}
+	seed := request.ExplicitCircuit.GenerationHash
+	if seed == "" {
+		seed = request.ExplicitCircuit.ResolutionHash
+	}
 	placementRequest := placement.Request{
 		Board: placement.BoardPlacementArea{WidthMM: request.Board.WidthMM, HeightMM: request.Board.HeightMM, MarginMM: request.Board.EdgeClearanceMM, Layers: request.Board.Layers},
-		Rules: mergePlacementRules(opts.Rules), Seed: request.ExplicitCircuit.ResolutionHash,
+		Rules: mergePlacementRules(opts.Rules), Seed: seed,
 	}
 	if placementRequest.Board.MarginMM == 0 {
 		placementRequest.Board.MarginMM = 1

@@ -32,11 +32,15 @@ func ToSchematicIR(resolved ResolvedDocument) (schematicir.Document, []reports.I
 	for _, units := range unitsByComponent {
 		unitCount += len(units)
 	}
+	seed := resolved.GenerationHash
+	if seed == "" {
+		seed = resolved.ResolutionHash
+	}
 	document := schematicir.Document{
 		Schema: schematicir.SchemaID, Version: schematicir.Version,
 		Metadata: schematicir.Metadata{
 			Name: resolved.Source.Project.Name, Title: resolved.Source.Project.Title,
-			Description: resolved.Source.Project.Description, Seed: resolved.ResolutionHash, Paper: schematicir.DefaultPaper,
+			Description: resolved.Source.Project.Description, Seed: seed, Paper: schematicir.DefaultPaper,
 		},
 		Circuit: schematicir.Circuit{
 			Components: make([]schematicir.Component, 0, unitCount+len(powerFlags)),

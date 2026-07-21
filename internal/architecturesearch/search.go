@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math"
 	"slices"
@@ -125,7 +126,12 @@ func Search(ctx context.Context, requirement Requirement, registry *Registry, op
 			request := providerRequestFor(obligation, normalized.Requirements.Constraints)
 			expansions, err := provider.provider.Expand(ctx, request)
 			if err != nil {
-				accumulator.reject(CodeProviderExpansionInvalid, obligation.Path, provider.descriptor.ID, "", "provider expansion failed: "+err.Error())
+				code := CodeProviderExpansionInvalid
+				var rejection interface{ ArchitectureRejectionCode() reports.Code }
+				if errors.As(err, &rejection) {
+					code = rejection.ArchitectureRejectionCode()
+				}
+				accumulator.reject(code, obligation.Path, provider.descriptor.ID, "", "provider expansion failed: "+err.Error())
 				continue
 			}
 			for index := range expansions {

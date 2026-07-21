@@ -151,8 +151,8 @@ Current weak or blocked paths:
 - production layout quality for large or unfamiliar boards without KiCad-backed
   validation evidence;
 - component selection beyond the verified or policy-allowed local catalog;
-- unsupported MCU alternate functions, arbitrary GPIO assignment, and safe
-  external-clock topology generation.
+- MCU devices or electrical behavior absent from verified physical-pin,
+  alternate-function, clock, boot, programming, and current evidence.
 
 ## Default Agent Workflow
 
@@ -736,8 +736,8 @@ Stop and report blockers when:
 - required ERC/DRC checks cannot run;
 - generated board validation reports disconnected pads, missing outlines,
   unrouted required nets, invalid net assignments, or zone problems;
-- request requires unsupported topology, arbitrary GPIO assignment, unknown MCU
-  alternate function mapping, or external-clock generation;
+- request requires unsupported topology, an unverified MCU or alternate
+  function, or a clock/programming policy absent from catalog evidence;
 - command output says imported project mutation is blocked;
 - transaction planning reports a preservation operation review with
   `mutability: "unsafe"`.

@@ -1,15 +1,15 @@
 {
-  "record_count": 111,
+  "record_count": 112,
   "family_count": 24,
   "confidence_counts": {
     "blocked": 1,
     "library_derived": 0,
     "placeholder": 4,
     "rule_inferred": 5,
-    "verified": 101
+    "verified": 102
   },
   "alternative_coverage": {
-    "concrete_records": 86,
+    "concrete_records": 87,
     "generic_fallback_records": 25,
     "equivalence_groups": 22
   },
@@ -322,11 +322,11 @@
     {
       "family": "mcu",
       "defined": true,
-      "record_count": 3,
-      "concrete_records": 2,
+      "record_count": 4,
+      "concrete_records": 3,
       "generic_fallback_records": 1,
       "equivalence_groups": 0,
-      "verified_records": 2,
+      "verified_records": 3,
       "library_derived_records": 0,
       "rule_inferred_records": 0,
       "placeholder_records": 1,
@@ -338,7 +338,8 @@
       "record_ids": [
         "mcu.espressif.esp32_wroom_32e",
         "mcu.microchip.atmega328p_a.tqfp32",
-        "mcu.placeholder.avr_minimal_tqfp32"
+        "mcu.placeholder.avr_minimal_tqfp32",
+        "mcu.st.stm32g031k8t6.lqfp32"
       ]
     },
     {

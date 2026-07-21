@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -493,6 +494,56 @@ func TestResolverUsesTrustedPrecomputedCatalogHash(t *testing.T) {
 	resolver := NewResolver(ResolveOptions{Catalog: minimalResolvedCatalog(), CatalogHash: want})
 	if resolver.catalogHash != want {
 		t.Fatalf("catalog hash = %q", resolver.catalogHash)
+	}
+}
+
+func TestGenerationHashIgnoresUnselectedCatalogRecords(t *testing.T) {
+	document := minimalResolvedDocument()
+	base := minimalResolvedCatalog()
+	expanded := cloneCatalog(t, base)
+	unselected := expanded.Records[0]
+	unselected.ID = "amplifier.unselected"
+	expanded.Records = append(expanded.Records, unselected)
+
+	first, firstIssues := NewResolver(ResolveOptions{Catalog: base, CatalogID: "checked-in"}).Resolve(context.Background(), document)
+	second, secondIssues := NewResolver(ResolveOptions{Catalog: expanded, CatalogID: "checked-in"}).Resolve(context.Background(), document)
+	if reports.HasBlockingIssue(firstIssues) || reports.HasBlockingIssue(secondIssues) {
+		t.Fatalf("resolve issues = %#v / %#v", firstIssues, secondIssues)
+	}
+	if first.GenerationHash == "" || first.GenerationHash != second.GenerationHash {
+		t.Fatalf("generation hashes = %q, %q", first.GenerationHash, second.GenerationHash)
+	}
+	if first.ResolutionHash == second.ResolutionHash {
+		t.Fatalf("resolution hashes must retain catalog provenance: %q", first.ResolutionHash)
+	}
+}
+
+func TestGenerationHashNormalizesResolvedOrdering(t *testing.T) {
+	document := loadGraphExample(t, "rc_filter.json")
+	resolver := NewResolver(ResolveOptions{Catalog: loadGraphCatalog(t), CatalogID: "checked-in"})
+	resolved, issues := resolver.Resolve(context.Background(), document)
+	if reports.HasBlockingIssue(issues) {
+		t.Fatalf("resolve issues = %#v", issues)
+	}
+	shuffled, issues := resolver.Resolve(context.Background(), document)
+	if reports.HasBlockingIssue(issues) {
+		t.Fatalf("second resolve issues = %#v", issues)
+	}
+	slices.Reverse(shuffled.Source.Components)
+	slices.Reverse(shuffled.Source.Nets)
+	slices.Reverse(shuffled.Components)
+	slices.Reverse(shuffled.Nets)
+	for index := range shuffled.Components {
+		slices.Reverse(shuffled.Components[index].Functions)
+	}
+	for index := range shuffled.Nets {
+		slices.Reverse(shuffled.Nets[index].Endpoints)
+		for endpointIndex := range shuffled.Nets[index].Endpoints {
+			slices.Reverse(shuffled.Nets[index].Endpoints[endpointIndex].Bindings)
+		}
+	}
+	if want, got := generationHash(resolved), generationHash(shuffled); want != got {
+		t.Fatalf("generation hash depends on resolved slice order: %q != %q", want, got)
 	}
 }
 

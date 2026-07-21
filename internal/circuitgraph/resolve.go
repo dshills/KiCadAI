@@ -169,6 +169,7 @@ func (resolver *Resolver) Resolve(ctx context.Context, document Document) (Resol
 		}
 	}
 	if !reports.HasBlockingIssue(issues) {
+		result.GenerationHash = generationHash(result)
 		result.ResolutionHash = resolvedHash(result)
 	}
 	return result, finalizeGraphIssues(issues)
@@ -927,6 +928,77 @@ func resolvedHash(document ResolvedDocument) string {
 	copy := document
 	copy.ResolutionHash = ""
 	return hashGraphValue(copy)
+}
+
+// generationHash intentionally excludes repository-wide provenance. Catalog and
+// library hashes remain part of ResolutionHash for auditability, but unrelated
+// catalog additions must not reroll placement and routing for an unchanged
+// resolved circuit.
+func generationHash(document ResolvedDocument) string {
+	type generationDocument struct {
+		Source     Document            `json:"source"`
+		Components []ResolvedComponent `json:"components"`
+		Nets       []ResolvedNet       `json:"nets"`
+		NoConnects []ResolvedEndpoint  `json:"no_connects"`
+	}
+	components := append([]ResolvedComponent(nil), document.Components...)
+	for index := range components {
+		components[index].Functions = append([]ResolvedFunction(nil), components[index].Functions...)
+		for functionIndex := range components[index].Functions {
+			components[index].Functions[functionIndex].Aliases = append([]string(nil), components[index].Functions[functionIndex].Aliases...)
+			slices.Sort(components[index].Functions[functionIndex].Aliases)
+		}
+		slices.SortStableFunc(components[index].Functions, compareResolvedFunctions)
+		components[index].Units = append([]ResolvedUnit(nil), components[index].Units...)
+		slices.SortStableFunc(components[index].Units, func(left, right ResolvedUnit) int {
+			return strings.Compare(left.ID, right.ID)
+		})
+		components[index].CatalogSources = nil
+		components[index].SymbolSources = nil
+		components[index].FootprintSources = nil
+		components[index].Warnings = nil
+	}
+	slices.SortStableFunc(components, func(left, right ResolvedComponent) int {
+		return strings.Compare(left.Instance.ID, right.Instance.ID)
+	})
+	nets := append([]ResolvedNet(nil), document.Nets...)
+	for index := range nets {
+		nets[index].Intent.Endpoints = append([]Endpoint(nil), nets[index].Intent.Endpoints...)
+		slices.SortStableFunc(nets[index].Intent.Endpoints, compareEndpoints)
+		nets[index].Endpoints = normalizeResolvedEndpoints(nets[index].Endpoints)
+	}
+	slices.SortStableFunc(nets, func(left, right ResolvedNet) int {
+		return strings.Compare(left.Intent.Name, right.Intent.Name)
+	})
+	noConnects := normalizeResolvedEndpoints(document.NoConnects)
+	return hashGraphValue(generationDocument{
+		Source: Normalize(document.Source), Components: components,
+		Nets: nets, NoConnects: noConnects,
+	})
+}
+
+func compareResolvedFunctions(left, right ResolvedFunction) int {
+	leftKey := fmt.Sprintf("%s\x00%s\x00%09d\x00%s\x00%s", left.Function, left.SymbolID, left.Unit, left.SymbolPin, left.Pad)
+	rightKey := fmt.Sprintf("%s\x00%s\x00%09d\x00%s\x00%s", right.Function, right.SymbolID, right.Unit, right.SymbolPin, right.Pad)
+	return strings.Compare(leftKey, rightKey)
+}
+
+func normalizeResolvedEndpoints(source []ResolvedEndpoint) []ResolvedEndpoint {
+	result := append([]ResolvedEndpoint(nil), source...)
+	for index := range result {
+		result[index].Bindings = append([]ResolvedBinding(nil), result[index].Bindings...)
+		slices.SortStableFunc(result[index].Bindings, func(left, right ResolvedBinding) int {
+			leftKey := fmt.Sprintf("%s\x00%09d\x00%s\x00%s", left.SymbolID, left.Unit, left.SymbolPin, left.Pad)
+			rightKey := fmt.Sprintf("%s\x00%09d\x00%s\x00%s", right.SymbolID, right.Unit, right.SymbolPin, right.Pad)
+			return strings.Compare(leftKey, rightKey)
+		})
+	}
+	slices.SortStableFunc(result, func(left, right ResolvedEndpoint) int {
+		leftKey := left.Intent.Component + "\x00" + left.Intent.Unit + "\x00" + string(left.Intent.SelectorKind) + "\x00" + left.Intent.Selector + "\x00" + left.Function
+		rightKey := right.Intent.Component + "\x00" + right.Intent.Unit + "\x00" + string(right.Intent.SelectorKind) + "\x00" + right.Intent.Selector + "\x00" + right.Function
+		return strings.Compare(leftKey, rightKey)
+	})
+	return result
 }
 
 func hashGraphValue(value any) string {

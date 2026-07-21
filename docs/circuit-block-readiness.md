@@ -45,7 +45,7 @@ evidence semantics.
 | --- | --- | --- |
 | Registry | 25 built-in block contracts with parameters, ports, rules, PCB constraints, and readiness metadata. | New blocks and variants require catalog, resolver, pinmap, rule, and evidence coverage. |
 | Sensors | Generic I2C template plus concrete BME280, BMP280, and SHT31 profiles. | Unknown sensors, SPI modes, and inferred pin roles fail closed. |
-| MCU | ATmega328P-A seed template and exact ESP32-WROOM-32E-N4 block. | Arbitrary MCU alternate functions, GPIO assignment, module variants, flash sizes, and RF layouts are unsupported. |
+| MCU | Legacy ATmega/ESP32 blocks plus catalog-driven selection and deterministic pin assignment for verified ATmega328P-A, ESP32-WROOM-32E, and STM32G031K8T6 records. | Unverified devices, broader module/flash variants, RF optimization, and electrical constraints absent from catalog evidence remain unsupported. |
 | Power/protection | Fixed 3.3 V LDO profiles, USB-C sink power, fuse/TVS/bulk options, ESD, and reverse-polarity primitives. | Broader regulator stability/thermal envelopes, USB-C variants, PD, mains, and safety isolation need reviewed evidence. |
 | Amplifiers | Bounded Class-A, headphone Class-AB, and protected 10 W/8 ohm speaker evidence. | Bridge operation, materially higher power, arbitrary loads/devices, and unreviewed thermal/mechanical choices remain unsupported. |
 | Placement/routing | Deterministic block-local copper, inter-block route trees, endpoint/contact proof, and bounded correction for promoted shapes. | General dense-board rip-up/reroute, RF/high-speed, controlled impedance, and unrestricted geometry are not guaranteed. |

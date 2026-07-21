@@ -402,6 +402,198 @@ func TestCatalogProviderConnectsAuxiliaryMCUSupplyPinsToTheirDomains(t *testing.
 	}
 }
 
+func TestCatalogProviderTiesFixedRegulatorEnableOnlyWithinCatalogRatings(t *testing.T) {
+	provider, err := NewCatalogProvider(loadArchitectureCatalog(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	request := ProviderRequest{Capability: "voltage_regulation", Ports: []RoleContract{
+		providerRole("input", "power", "sink", 4.75, 5.25),
+		providerRole("output", "power", "source", 3.2, 3.4),
+		providerRole("reference", "reference", "bidirectional", 0, 0),
+	}}
+	expansions, err := provider.expandFixedRegulators(context.Background(), request, 3.3, 3, 4.75, 5.25, 0.1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, expansion := range expansions {
+		if len(expansion.Components) == 0 || expansion.Components[0].CatalogID != "regulator.linear.ap2112k_3v3.sot23_5" {
+			continue
+		}
+		realization, decodeErr := DecodeFragmentRealization(expansion.Payload)
+		if decodeErr != nil {
+			t.Fatal(decodeErr)
+		}
+		for _, connection := range realization.Connections {
+			if connection.ID != "regulator_input" {
+				continue
+			}
+			if slices.ContainsFunc(connection.Endpoints, func(endpoint RealizationEndpoint) bool { return endpoint.Function == "EN" }) {
+				return
+			}
+		}
+		t.Fatalf("AP2112 EN is not tied to its validated input rail: %#v", realization.Connections)
+	}
+	t.Fatal("AP2112 fixed-regulator expansion is missing")
+}
+
+func TestCatalogProviderSelectsESP32FromRequiredWirelessCapability(t *testing.T) {
+	provider, err := NewCatalogProvider(loadArchitectureCatalog(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	request := participantProviderRequest("programmable_controller", "sensor_bus", 3.3)
+	request.Constraints = append(request.Constraints, constraintStringArray("required_capabilities", "all_of", []string{"wifi", "bluetooth"}))
+	expansions, err := provider.Expand(context.Background(), request)
+	if err != nil || len(expansions) < 1 {
+		t.Fatalf("wireless controller expansion = %#v, %v", expansions, err)
+	}
+	if len(expansions[0].Components) == 0 || expansions[0].Components[0].CatalogID != "mcu.espressif.esp32_wroom_32e" {
+		t.Fatalf("wireless capability did not select ESP32: %#v", expansions[0].Components)
+	}
+}
+
+func TestCatalogProviderPrioritizesExplicitMCUComponentSearch(t *testing.T) {
+	provider, err := NewCatalogProvider(loadArchitectureCatalog(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	request := participantProviderRequest("programmable_controller", "sensor_bus", 3.3)
+	request.Constraints = append(request.Constraints, constraintString("component_search", "equal", "ESP32-WROOM-32E"))
+	expansions, err := provider.Expand(context.Background(), request)
+	if err != nil || len(expansions) < 1 {
+		t.Fatalf("explicit MCU expansion = %#v, %v", expansions, err)
+	}
+	if len(expansions[0].Components) == 0 || expansions[0].Components[0].CatalogID != "mcu.espressif.esp32_wroom_32e" {
+		t.Fatalf("explicit component search did not prioritize ESP32: %#v", expansions[0].Components)
+	}
+}
+
+func TestCatalogProviderSelectsSTM32FromProgrammingKind(t *testing.T) {
+	provider, err := NewCatalogProvider(loadArchitectureCatalog(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	request := participantProviderRequest("programmable_controller", "sensor_bus", 3.3)
+	request.Constraints = append(request.Constraints, constraintString("programming_kind", "equal", "swd"))
+	expansions, err := provider.Expand(context.Background(), request)
+	if err != nil || len(expansions) < 1 {
+		t.Fatalf("SWD controller expansion = %#v, %v", expansions, err)
+	}
+	if len(expansions[0].Components) == 0 || expansions[0].Components[0].CatalogID != "mcu.st.stm32g031k8t6.lqfp32" {
+		t.Fatalf("SWD capability did not select STM32: %#v", expansions[0].Components)
+	}
+}
+
+func TestCatalogProviderBindsCompleteMixedMCUPeripheralBundles(t *testing.T) {
+	provider, err := NewCatalogProvider(loadArchitectureCatalog(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	request := participantProviderRequest("programmable_controller", "sensor_bus", 3.3)
+	request.Constraints = append(request.Constraints, constraintString("programming_kind", "equal", "swd"))
+	uart := providerRole("console", "digital_bus", "bidirectional", 3.1, 3.5)
+	uart.Contract.Protocol = &Protocol{Name: "uart", Mode: "push_pull", MaxFrequencyHz: 1_000_000}
+	spi := providerRole("storage", "digital_bus", "bidirectional", 3.1, 3.5)
+	spi.Contract.Protocol = &Protocol{Name: "spi", Mode: "push_pull", MaxFrequencyHz: 8_000_000}
+	adc := providerRole("measurement", "analog_voltage", "sink", 0, 3.3)
+	pwm := providerRole("drive", "analog_control", "source", 0, 3.3)
+	interrupt := providerRole("alarm_irq", "digital_logic", "sink", 0, 3.3)
+	interrupt.Contract.RequiredTraits = []string{"interrupt"}
+	request.Ports = append(request.Ports, uart, spi, adc, pwm, interrupt)
+	expansions, err := provider.Expand(context.Background(), request)
+	if err != nil || len(expansions) < 1 {
+		t.Fatalf("mixed controller expansion = %#v, %v", expansions, err)
+	}
+	realization, err := DecodeFragmentRealization(expansions[0].Payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	wantLanes := map[string]int{"sensor_bus": 2, "console": 2, "storage": 4, "measurement": 1, "drive": 1, "alarm_irq": 1}
+	gotLanes := map[string]int{}
+	for _, binding := range realization.PortBindings {
+		gotLanes[binding.Role]++
+	}
+	for role, want := range wantLanes {
+		if gotLanes[role] != want {
+			t.Fatalf("role %s has %d bindings, want %d: %#v", role, gotLanes[role], want, realization.PortBindings)
+		}
+	}
+}
+
+func TestCatalogProviderDerivesConditionalMCUSupportNetworks(t *testing.T) {
+	provider, err := NewCatalogProvider(loadArchitectureCatalog(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	request := participantProviderRequest("programmable_controller", "sensor_bus", 3.3)
+	request.Constraints = append(request.Constraints, constraintString("programming_kind", "equal", "swd"))
+	internal, err := provider.Expand(context.Background(), request)
+	if err != nil || len(internal) < 1 {
+		t.Fatalf("internal-clock expansion = %#v, %v", internal, err)
+	}
+	internalRealization, err := DecodeFragmentRealization(internal[0].Payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, instance := range internalRealization.Instances {
+		if strings.Contains(instance.ID, "external_hse") {
+			t.Fatalf("internal clock unexpectedly populated external oscillator: %#v", internalRealization.Instances)
+		}
+	}
+	assertMCUSupportUsages(t, internalRealization, map[string]bool{"i2c_pullup": false})
+	controllerID := ""
+	for _, instance := range internalRealization.Instances {
+		if instance.Usage == "programmable_controller" {
+			controllerID = instance.ID
+		}
+	}
+	if controllerID == "" {
+		t.Fatalf("MCU realization lacks controller instance: %#v", internalRealization.Instances)
+	}
+	pullupConnections := 0
+	for _, connection := range internalRealization.Connections {
+		hasController, hasPullup := false, false
+		for _, endpoint := range connection.Endpoints {
+			hasController = hasController || endpoint.Instance == controllerID
+			hasPullup = hasPullup || strings.Contains(endpoint.Instance, "i2c_pullups")
+			if strings.HasPrefix(strings.ToLower(endpoint.Function), "peripheral:") {
+				t.Fatalf("unresolved MCU peripheral role in support connection: %#v", connection)
+			}
+		}
+		if hasController && hasPullup {
+			pullupConnections++
+		}
+	}
+	if pullupConnections != 3 {
+		t.Fatalf("I2C pull-up nets connected to controller = %d, want 3: %#v", pullupConnections, internalRealization.Connections)
+	}
+	request.Constraints = append(request.Constraints, constraintString("clock_source", "equal", "external_hse"))
+	external, err := provider.Expand(context.Background(), request)
+	if err != nil || len(external) < 1 {
+		t.Fatalf("external-clock expansion = %#v, %v", external, err)
+	}
+	externalRealization, err := DecodeFragmentRealization(external[0].Payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertMCUSupportUsages(t, externalRealization, map[string]bool{"clock": false, "load_capacitor": false})
+}
+
+func assertMCUSupportUsages(t *testing.T, realization FragmentRealization, want map[string]bool) {
+	t.Helper()
+	for _, instance := range realization.Instances {
+		if _, exists := want[instance.Usage]; exists {
+			want[instance.Usage] = true
+		}
+	}
+	for usage, found := range want {
+		if !found {
+			t.Fatalf("MCU realization lacks %s support: %#v", usage, realization.Instances)
+		}
+	}
+}
+
 func TestCatalogProviderIsolatesSensorAddressStrapFromPowerFlagDomain(t *testing.T) {
 	provider, err := NewCatalogProvider(loadArchitectureCatalog(t))
 	if err != nil {

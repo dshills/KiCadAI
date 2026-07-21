@@ -59,6 +59,9 @@ devices:
 - 0603/0805 Lite-On indicator LEDs;
 - Signal and Schottky diodes plus a SOD-323 ESD/TVS protection diode;
 - fixed 3.3 V LDO records;
+- verified ATmega328P-A, ESP32-WROOM-32E, and STM32G031K8T6 MCU/module records
+  with physical pins, alternate functions, supplies, programming, clock, boot,
+  and current-budget evidence;
 - onsemi MMBT3904/MMBT3906 SOT-23 BJT amplifier seeds;
 - blocked-by-default NPN TO-220 power-output placeholder.
 

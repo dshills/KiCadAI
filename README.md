@@ -25,6 +25,11 @@ path.
 - Exact `ESP32-WROOM-32E-N4` minimal-system generation is supported through the
   built-in `esp32_wroom_32e_minimal` block, with power conditioning, EN/BOOT
   straps and buttons, UART/I2C/SPI/GPIO headers, and an antenna copper keepout.
+- Behavior-driven MCU subsystem synthesis can select verified ATmega328P-A,
+  ESP32-WROOM-32E, or STM32G031K8T6 targets from catalog evidence, assign real
+  alternate-function pins deterministically, and add catalog-declared power,
+  reset, programming, boot, and optional clock support. Three neutral requests
+  reach the full installed-KiCad promotion lane without naming their target.
 - The provider-backed natural-language lane retains two promoted bounded
   profiles and adds a catalog-resolved circuit graph contract with either an
   explicit graph or strict function-level intent. Function intent names
@@ -66,8 +71,10 @@ path.
   See the [behavioral compiler audit](specs/uncertainty-aware-behavioral-intent-compilation/AUDIT.md).
 - Arbitrary electronics generation is not yet guaranteed. Generic graphs fail
   closed on unknown parts, pins, ratings, placement, or routing capability.
-- ESP32 support currently covers the exact WROOM-32E-N4 module profile, not the
-  full ESP32 module, SoC, flash-size, RF, or pin-remapping family.
+- MCU synthesis is limited to verified catalog records and modeled electrical
+  constraints. It does not infer arbitrary MCU pin data from KiCad symbols, and
+  ESP32 variants, flash choices, RF optimization, and unverified external-bus
+  loading remain fail-closed boundaries.
 - Generated `pass` evidence is not automatically a fabrication-release claim.
 
 See [Project Status](docs/project-status.md) for capability boundaries and

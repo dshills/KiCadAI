@@ -195,3 +195,16 @@ func TestPowerSignalJoinsItsDeclaredDomain(t *testing.T) {
 		t.Fatal("power signal is not joined to its declared domain")
 	}
 }
+
+func TestContractInterfaceRolePreservesDigitalBusProtocol(t *testing.T) {
+	for protocol, want := range map[string]circuitgraph.InterfaceRole{
+		"i2c":  circuitgraph.InterfaceI2C,
+		"spi":  circuitgraph.InterfaceSPI,
+		"uart": circuitgraph.InterfaceUART,
+	} {
+		contract := architecturesearch.PortContract{Kind: "digital_bus", Protocol: &architecturesearch.Protocol{Name: protocol}}
+		if got := contractInterfaceRole(contract); got != want {
+			t.Fatalf("protocol %s interface role = %s, want %s", protocol, got, want)
+		}
+	}
+}

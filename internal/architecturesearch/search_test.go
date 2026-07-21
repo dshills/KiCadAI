@@ -18,6 +18,14 @@ type staticTestProvider struct {
 	expand     func(ProviderRequest) ([]ProviderExpansion, error)
 }
 
+type typedTestProviderError struct {
+	code reports.Code
+}
+
+func (err typedTestProviderError) Error() string { return "typed provider rejection" }
+
+func (err typedTestProviderError) ArchitectureRejectionCode() reports.Code { return err.code }
+
 func (provider staticTestProvider) Descriptor() ProviderDescriptor {
 	return provider.descriptor
 }
@@ -355,6 +363,23 @@ func TestSearchRecordsDeterministicElectricalRejectionsAndFailsClosed(t *testing
 	encodedSecond, _ := json.Marshal(second.Rejections)
 	if string(encodedFirst) != string(encodedSecond) {
 		t.Fatalf("rejection evidence is not deterministic\n%s\n%s", encodedFirst, encodedSecond)
+	}
+}
+
+func TestSearchPreservesTypedProviderRejectionCode(t *testing.T) {
+	provider := staticTestProvider{
+		descriptor: validProviderDescriptor("typed_rejection", "threshold_detection"),
+		expand: func(ProviderRequest) ([]ProviderExpansion, error) {
+			return nil, typedTestProviderError{code: CodeMCUPinAssignmentImpossible}
+		},
+	}
+	registry, issues := NewRegistry(provider)
+	if len(issues) != 0 {
+		t.Fatal(issues)
+	}
+	result := Search(context.Background(), validRequirement(), registry, SearchOptions{})
+	if result.Status != SearchUnsupported || !rejectionSummaryContains(result.Rejections, CodeMCUPinAssignmentImpossible) {
+		t.Fatalf("typed provider rejection was not preserved: %#v", result)
 	}
 }
 

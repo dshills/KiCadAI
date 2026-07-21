@@ -59,6 +59,7 @@ type Request struct {
 
 type ExplicitCircuitSpec struct {
 	ResolutionHash   string                         `json:"resolution_hash"`
+	GenerationHash   string                         `json:"generation_hash,omitempty"`
 	CatalogID        string                         `json:"catalog_id"`
 	CatalogHash      string                         `json:"catalog_hash"`
 	Schematic        schematicir.Document           `json:"schematic"`
@@ -632,6 +633,9 @@ func validateExplicitCircuit(circuit ExplicitCircuitSpec) []reports.Issue {
 	var issues []reports.Issue
 	if !validSHA256(circuit.ResolutionHash) {
 		issues = append(issues, issue("explicit_circuit.resolution_hash", "resolution hash must be a lowercase SHA-256 digest"))
+	}
+	if circuit.GenerationHash != "" && !validSHA256(circuit.GenerationHash) {
+		issues = append(issues, issue("explicit_circuit.generation_hash", "generation hash must be a lowercase SHA-256 digest"))
 	}
 	if strings.TrimSpace(circuit.CatalogID) == "" || !validSHA256(circuit.CatalogHash) {
 		issues = append(issues, issue("explicit_circuit.catalog", "catalog id and lowercase SHA-256 hash are required"))

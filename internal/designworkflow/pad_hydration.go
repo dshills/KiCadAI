@@ -475,7 +475,7 @@ func verifiedPadTemplate(footprintID string) (verifiedPadTemplateRecord, bool) {
 			smdPad("8", 1.4, -0.75, 1.25, 0.35, "roundrect"),
 		}
 		return verifiedPadTemplateRecord{Bounds: verifiedCourtyardBoundsFromExtents(-2.28, -1.25, 2.28, 1.25), Pads: pads}, true
-	case "Package_QFP:TQFP-32_7x7mm_P0.8mm":
+	case "Package_QFP:TQFP-32_7x7mm_P0.8mm", "Package_QFP:LQFP-32_7x7mm_P0.8mm":
 		return tqfp32Template(), true
 	case "Package_LGA:Bosch_LGA-8_2x2.5mm_P0.65mm_ClockwisePinNumbering":
 		pads := []placement.PadSummary{

@@ -191,6 +191,7 @@ func ValidateCatalog(catalog *Catalog) reports.Result {
 		issues = append(issues, validateResistorEvidence(path+".resistor_evidence", record.Generic, record.Resistor)...)
 		issues = append(issues, validateOpAmpEvidence(path+".opamp_evidence", record.OpAmp)...)
 		issues = append(issues, validateSensorEvidence(path+".sensor_evidence", record)...)
+		issues = append(issues, validateMCUEvidence(path+".mcu_evidence", record)...)
 		issues = append(issues, validateAmplifierOutputEvidence(path+".amplifier_output_evidence", record)...)
 		issues = append(issues, validatePowerSemiconductorEvidence(path+".power_semiconductor_evidence", record)...)
 		issues = append(issues, validateThermalEvidence(path+".thermal_evidence", record.Thermal)...)

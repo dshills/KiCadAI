@@ -118,6 +118,11 @@ unsupported power devices:
   behavior, and unused-pin policy. Their exact component IDs are
   `sensor.bosch.bme280.lga8`, `sensor.bosch.bmp280.lga8`, and
   `sensor.sensirion.sht31_dis.dfn8`.
+- Microchip ATmega328P-A TQFP-32, Espressif ESP32-WROOM-32E, and
+  STMicroelectronics STM32G031K8T6 LQFP-32 controller records. Their typed MCU
+  evidence drives target selection, deterministic peripheral-bundle pin
+  assignment, programming and clock policy, boot reservations, supply-domain
+  validation, current budgets, and catalog companion expansion.
 - onsemi MMBT3904/MMBT3906 SOT-23 small-signal BJT amplifier seeds, plus a
   blocked-by-default NPN TO-220 power-output placeholder that requires pinout,
   package, thermal, Safe Operating Area (SOA), and layout-constraint evidence

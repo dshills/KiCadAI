@@ -66,11 +66,17 @@ func searchCapabilityGaps(search architecturesearch.SearchResult) []CapabilityGa
 			if record.Status == architecturesearch.CoverageSelected {
 				continue
 			}
-			capability := strings.TrimSpace(record.Capability)
+			capability := searchRejectionCapability(search, record.Path)
+			if capability == "" {
+				capability = strings.TrimSpace(record.Capability)
+			}
 			if !validSemanticID(capability) {
 				capability = "architecture_search"
 			}
-			id := stableSearchGapID(capability, record.Path)
+			id := capability
+			if !strings.HasPrefix(capability, "mcu_") {
+				id = stableSearchGapID(capability, record.Path)
+			}
 			if seen[id] {
 				continue
 			}
@@ -91,6 +97,21 @@ func searchCapabilityGaps(search architecturesearch.SearchResult) []CapabilityGa
 	}
 	slices.SortFunc(gaps, func(left, right CapabilityGap) int { return strings.Compare(left.ID, right.ID) })
 	return gaps
+}
+
+func searchRejectionCapability(search architecturesearch.SearchResult, path string) string {
+	for _, summary := range search.Rejections {
+		code := strings.ToLower(string(summary.Code))
+		if !strings.HasPrefix(code, "mcu_") {
+			continue
+		}
+		for _, sample := range summary.Samples {
+			if sample.Path == path {
+				return code
+			}
+		}
+	}
+	return ""
 }
 
 func stableSearchGapID(capability, path string) string {

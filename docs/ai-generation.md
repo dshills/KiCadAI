@@ -698,6 +698,13 @@ supported contracts, four clarification prompts, and eight unsupported
 prompts. All six supported contracts pass deterministic replay and installed-
 KiCad promotion.
 
+For programmable-controller objectives, the catalog provider can now choose a
+verified ATmega328P-A, ESP32-WROOM-32E, or STM32G031K8T6 from capability and
+electrical requirements. It assigns compatible GPIO/UART/I2C/SPI/PWM/ADC/
+interrupt bundles to physical functions deterministically and expands the
+selected record's power, reset, boot, programming, and clock companions. A
+three-request neutral corpus validates this lane without target names.
+
 The generic contract removes the architectural requirement for one provider
 schema per topology and its function form removes the requirement for the AI to
 enumerate pins, support components, or physical implementation details. It does

@@ -98,6 +98,8 @@ func Lower(requirement architecturesearch.Requirement, search architecturesearch
 	selectionEvidence := make([]string, 0, len(selections))
 	instanceIDs := map[string]bool{}
 	bindingsByAnchor := map[string][]pendingPortBinding{}
+	participantPorts := map[string]map[string]architecturesearch.PortContract{}
+	anchorBindingCounts := map[string]int{}
 	transitionsByAnchor := map[string][]pendingSeriesTransition{}
 	for selectionIndex, selection := range selections {
 		realization, err := architecturesearch.DecodeFragmentRealization(selection.Payload)
@@ -154,6 +156,13 @@ func Lower(requirement architecturesearch.Requirement, search architecturesearch
 			anchor := anchorNode(port.Anchor, binding.Lane)
 			bindingMetadata := contractNodeMetadata(port.Contract, binding.Lane, referenceDomain)
 			bindingsByAnchor[anchor] = append(bindingsByAnchor[anchor], pendingPortBinding{node: function, anchor: anchor, metadata: bindingMetadata})
+			anchorBindingCounts[anchor]++
+			if strings.HasPrefix(port.Anchor, "participant:") {
+				if participantPorts[port.Anchor] == nil {
+					participantPorts[port.Anchor] = map[string]architecturesearch.PortContract{}
+				}
+				participantPorts[port.Anchor][binding.Lane] = port.Contract
+			}
 		}
 		for transitionIndex, transition := range realization.SeriesTransitions {
 			port, ok := ports[transition.Role]
@@ -210,6 +219,7 @@ func Lower(requirement architecturesearch.Requirement, search architecturesearch
 			mergeMetadata(metadata, anchor, binding.metadata)
 		}
 	}
+	intent.Interfaces = append(intent.Interfaces, exportUnboundParticipantPorts(union, actual, metadata, participantPorts, anchorBindingCounts)...)
 
 	for _, port := range requirement.Requirements.Ports {
 		if port.Kind != "power" && port.Kind != "reference" {
@@ -250,6 +260,79 @@ func Lower(requirement architecturesearch.Requirement, search architecturesearch
 		Selections: selectionEvidence, SemanticBindings: lowerSemanticBindings(requirement, union, connectionNames, externalNodes),
 	}
 	return Result{Document: document, Evidence: evidence}, nil
+}
+
+func exportUnboundParticipantPorts(union *disjointSet, actual map[string]circuitgraph.FunctionalEndpoint, metadata map[string]nodeMetadata, ports map[string]map[string]architecturesearch.PortContract, bindingCounts map[string]int) []circuitgraph.InterfaceRequirement {
+	bases := make([]string, 0, len(ports))
+	for base := range ports {
+		bases = append(bases, base)
+	}
+	slices.Sort(bases)
+	var result []circuitgraph.InterfaceRequirement
+	for _, base := range bases {
+		lanes := make([]string, 0, len(ports[base]))
+		for lane := range ports[base] {
+			lanes = append(lanes, lane)
+		}
+		slices.Sort(lanes)
+		id := safeID(strings.TrimPrefix(base, "participant:"))
+		candidate := circuitgraph.InterfaceRequirement{ID: id}
+		for _, lane := range lanes {
+			anchor := anchorNode(base, lane)
+			if bindingCounts[anchor] != 1 {
+				continue
+			}
+			contract := ports[base][lane]
+			if candidate.Role == "" {
+				candidate.Role = contractInterfaceRole(contract)
+			}
+			signal := lane
+			if signal == "" {
+				signal = "signal"
+			}
+			candidate.Signals = append(candidate.Signals, circuitgraph.InterfaceSignal{Name: signal, Role: contractNetRole(contract)})
+			node := interfaceNode(id, signal)
+			union.join(node, anchor)
+			actual[node] = circuitgraph.FunctionalEndpoint{Interface: id, Signal: signal}
+			mergeMetadata(metadata, node, contractNodeMetadata(contract, lane, ""))
+		}
+		if len(candidate.Signals) != 0 {
+			result = append(result, candidate)
+		}
+	}
+	return result
+}
+
+func contractInterfaceRole(contract architecturesearch.PortContract) circuitgraph.InterfaceRole {
+	switch contract.Kind {
+	case "power", "reference":
+		if contract.Direction == "source" {
+			return circuitgraph.InterfacePowerOutput
+		}
+		return circuitgraph.InterfacePowerInput
+	case "analog_voltage", "analog_control":
+		if contract.Direction == "source" {
+			return circuitgraph.InterfaceAnalogOut
+		}
+		return circuitgraph.InterfaceAnalogInput
+	case "digital_bus":
+		if contract.Protocol != nil {
+			switch strings.ToLower(strings.TrimSpace(contract.Protocol.Name)) {
+			case "i2c", "i²c", "twi":
+				return circuitgraph.InterfaceI2C
+			case "spi":
+				return circuitgraph.InterfaceSPI
+			case "uart", "usart", "serial":
+				return circuitgraph.InterfaceUART
+			}
+		}
+		return circuitgraph.InterfaceGPIO
+	default:
+		if contract.Direction == "source" {
+			return circuitgraph.InterfaceDigitalOut
+		}
+		return circuitgraph.InterfaceDigitalIn
+	}
 }
 
 func lowerDomain(domain architecturesearch.Domain) circuitgraph.PowerDomainIntent {

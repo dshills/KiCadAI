@@ -32,6 +32,28 @@ func TestFrozenOpenSetCorpusPassesOfflineWorkflow(t *testing.T) {
 	runFrozenPromotion(t, "open_set_composition_corpus", 5, "KICADAI_OPEN_SET_ARTIFACT_DIR", "", libraryresolver.LibraryIndex{})
 }
 
+func TestNeutralMCUSynthesisCorpusPassesOfflineWorkflow(t *testing.T) {
+	requireLongPromotionTest(t)
+	runFrozenPromotionAt(t, filepath.Join("..", "architecturesearch", "testdata", "mcu_synthesis_corpus"), 3, "KICADAI_MCU_SYNTHESIS_ARTIFACT_DIR", "", libraryresolver.LibraryIndex{})
+}
+
+func TestNeutralMCUSynthesisCorpusOptionalKiCadPromotion(t *testing.T) {
+	requireLongPromotionTest(t)
+	cli := os.Getenv("KICADAI_KICAD_CLI")
+	if cli == "" {
+		t.Skip("set KICADAI_KICAD_CLI to run the KiCad-backed MCU synthesis corpus")
+	}
+	roots, rootIssues := libraryresolver.ResolveRoots()
+	if roots.SymbolsRoot == "" || roots.FootprintsRoot == "" {
+		t.Skipf("installed KiCad libraries are required: %#v", rootIssues)
+	}
+	index, loadIssues := libraryresolver.Load(context.Background(), roots, libraryresolver.LoadOptions{})
+	if len(index.Symbols) == 0 || len(index.Footprints) == 0 {
+		t.Fatalf("installed library index is empty: %#v", loadIssues)
+	}
+	runFrozenPromotionAt(t, filepath.Join("..", "architecturesearch", "testdata", "mcu_synthesis_corpus"), 3, "KICADAI_MCU_SYNTHESIS_ARTIFACT_DIR", cli, index)
+}
+
 func TestFrozenOpenSetCorpusOptionalKiCadPromotion(t *testing.T) {
 	requireLongPromotionTest(t)
 	cli := os.Getenv("KICADAI_KICAD_CLI")

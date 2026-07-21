@@ -900,6 +900,11 @@ func (provider *CatalogProvider) expandSingleComponent(ctx context.Context, requ
 		if err := requireBool(request.Constraints, "programmable_interface", "required", true); err != nil {
 			return nil, err
 		}
+		for _, name := range []string{"component_search", "component_id", "manufacturer_part_number"} {
+			if searchText = optionalMCUConstraintString(request.Constraints, name); searchText != "" {
+				break
+			}
+		}
 	case "environment_sensor":
 		measurements, err := requiredStringArray(request.Constraints, "measurement", "one_of")
 		if err != nil {
@@ -909,10 +914,20 @@ func (provider *CatalogProvider) expandSingleComponent(ctx context.Context, requ
 	}
 	supply := maximumPortVoltage(request.Ports)
 	ratings := []components.RequiredRating{{Kind: "supply_voltage", Value: numericString(supply), Unit: "V"}}
-	selection, err := provider.selectComponent(ctx, family, searchText, ratings, true)
 	if family == "mcu" {
-		selection, err = provider.selectSmallestComponent(ctx, family, ratings)
+		selection, assignment, err := provider.selectAssignableMCU(request, searchText, ratings)
+		if err != nil {
+			return nil, err
+		}
+		bindings := mcuRealizationBindings(request.Ports, selection.selected.InstanceID, assignment, selection.record)
+		connections := mcuSupplyConnections(selection)
+		parts, connections, err := provider.expandMCUSupport(ctx, selection, assignment, connections)
+		if err != nil {
+			return nil, err
+		}
+		return provider.expansion(request, usage, parts, bindings, connections, nil, 0)
 	}
+	selection, err := provider.selectComponent(ctx, family, searchText, ratings, true)
 	if err != nil {
 		return nil, err
 	}
@@ -923,38 +938,10 @@ func (provider *CatalogProvider) expandSingleComponent(ctx context.Context, requ
 	} else {
 		functions[busRole+"_scl"] = "SCL"
 	}
-	if family == "mcu" {
-		usedFunctions := map[string]bool{}
-		for _, function := range functions {
-			if function != "" {
-				usedFunctions[strings.ToUpper(function)] = true
-			}
-		}
-		for _, port := range request.Ports {
-			if functions[port.Role] != "" || port.Contract.Kind == "power" || port.Contract.Kind == "reference" || port.Contract.Kind == "digital_bus" {
-				continue
-			}
-			gpioFunctions := availableGPIOFunctions(selection.record, port.Contract, usedFunctions)
-			if len(gpioFunctions) == 0 {
-				return nil, fmt.Errorf("programmable controller lacks a capability-compatible GPIO function for role %s (%s)", port.Role, port.Contract.Kind)
-			}
-			functions[port.Role] = gpioFunctions[0]
-			markGPIOFunctionUsed(selection.record, gpioFunctions[0], usedFunctions)
-		}
-	}
 	bindings := bindBusRoles(request.Ports, selection.selected.InstanceID, functions)
 	var connections []RealizationConnection
 	parts := []catalogPart{selection}
-	if family == "mcu" {
-		powerEndpoints := recordSemanticEndpoints(selection, powerFunction, "AVCC", "VDDIO", "VDDA")
-		groundEndpoints := recordSemanticEndpoints(selection, "GND", "AGND", "DGND", "PGND", "VSS")
-		if len(powerEndpoints) > 1 {
-			connections = append(connections, semanticNet("controller_power", "power", powerEndpoints...))
-		}
-		if len(groundEndpoints) > 1 {
-			connections = append(connections, semanticNet("controller_ground", "reference", groundEndpoints...))
-		}
-	} else if family == "sensor" {
+	if family == "sensor" {
 		connections = append(connections, semanticNet("sensor_power", "power", endpoint(selection, "VDD"), endpoint(selection, "VDDIO"), endpoint(selection, "CSB")))
 		if recordHasFunction(selection.record, "SDO") {
 			parts, err = provider.appendPassiveParts(ctx, parts, []passivePart{{"address_strap", "resistor", "configuration_strap", "10k"}})

@@ -169,6 +169,21 @@ one minimal blocking question; unavailable behavior produces a stable
 capability-gap record. This evidence measures the registered envelope and does
 not promote unsupported matrix records implicitly.
 
+## Generic MCU Subsystems
+
+The behavior-driven catalog lane now selects among three verified controller
+families without target names in the request. Typed MCU evidence covers
+physical pins, alternate functions, supplies, programming, clocks, boot state,
+and current budgets; deterministic constraint search binds compatible
+peripheral bundles before graph lowering. A neutral ATmega328P-A,
+ESP32-WROOM-32E, and STM32G031K8T6 corpus passes replay and installed-KiCad ERC,
+strict DRC, routing/connectivity, writer, and zero-diff round-trip gates.
+
+This is a deeper generic capability inside the checked-in catalog, not an
+arbitrary-MCU claim. Unverified targets and unmodeled bus loading, power
+transients, RF, thermal, or high-speed requirements continue to fail closed or
+remain explicit review boundaries.
+
 ## Validation
 
 Run:

@@ -124,6 +124,14 @@ from validation feedback to safe automatic repair.
   strict DRC, routing/connectivity, writer correctness, zero round-trip diffs,
   and byte-identical replay; authoritative hashes are published in
   `specs/function-level-circuit-synthesis/CAPABILITY_REPORT.json`.
+- Catalog-driven MCU subsystem synthesis for verified ATmega328P-A,
+  ESP32-WROOM-32E, and STM32G031K8T6 records. Behavior-level requirements select
+  a feasible target, allocate compatible GPIO/UART/I2C/SPI/PWM/ADC/interrupt
+  bundles to physical pins with deterministic backtracking, validate modeled
+  voltage/current/clock/loading constraints, and expand catalog-declared
+  support networks. A neutral three-case corpus reaches deterministic replay
+  and installed-KiCad ERC, strict DRC, route/connectivity, writer, and zero-diff
+  round-trip gates.
 - Uncertainty-aware behavioral intent compilation above the strict v3
   requirement contract. `intent compile` accepts behavior, interfaces,
   operating conditions, tolerances, and safety constraints without accepting
@@ -1049,16 +1057,17 @@ intent:
 
 - request fields can identify support targets, logical buses, and named supply
   domains;
-- the supported ATmega328P-A seed MCU exposes planner-visible I2C,
-  programming, UART, reset, power, and clock-capable roles;
+- verified ATmega328P-A, ESP32-WROOM-32E, and STM32G031K8T6 records expose
+  planner-visible GPIO, I2C, SPI, UART, PWM, ADC, interrupt, programming,
+  reset, power, and clock-capable roles;
 - MCU/I2C sensor/connector intent produces concrete SDA/SCL connections when a
   compatible target is unambiguous;
 - reset/programming support maps ISP and UART connections through semantic port
   roles with target-scoped signal nets;
 - voltage-domain planning records selected supply source/net evidence and fails
   closed on unknown explicit supply aliases;
-- external MCU clock intent reports a precise non-internal-clock topology
-  limitation instead of a vague missing pin-assignment gap;
+- external MCU clock intent selects catalog-declared clock support when
+  feasible and otherwise reports a precise stable clock capability gap;
 - golden fixtures cover supported semantic plans, partial known-gap plans, and
   intentionally blocked multi-MCU ambiguity.
 - `intent draft` now converts supported natural-language text into structured
@@ -1111,9 +1120,9 @@ intent:
 - Add environment-backed live-provider CI/smoke evidence where outbound Go
   network access and API credentials are intentionally available; default tests
   remain credential-free and deterministic.
-- Expand semantic synthesis beyond the seed MCU template, especially
-  resolver-backed MCU alternate functions, additional bus peripherals,
-  supported GPIO assignment, and safe external-clock topology generation.
+- Expand MCU electrical synthesis beyond assignment: derive bus bias and level
+  transitions from whole-bus evidence, strengthen fanout/ADC/programming-load
+  validation, and size power/decoupling networks from transient demand.
 - Select more blocks and parts from verified catalogs as coverage grows.
 - Expand calculated rating enforcement as the component catalog gains broader
   voltage, capacitance, power, current, and tolerance metadata across more
@@ -1152,15 +1161,18 @@ uncertainty-aware behavioral intent compiler are complete. Further fixtures
 should target genuinely new uncertainty rather than repeat the same provider
 envelope.
 
-1. Expand a neutral held-out corpus into unsupported primitive and model
-   families, especially broader MCU/ESP32, mixed-signal, and power-control
-   behavior. Promote only after the new families have catalog, simulation, and
-   physical evidence.
-2. Add dynamic electrothermal and control-loop evidence where static global
+1. Add deterministic power-tree and signal-integrity synthesis around composed
+   digital/MCU subsystems: rail budgets, transient decoupling, startup order,
+   bus pull-ups, level transitions, fanout, and programming/boot loading, with
+   neutral failure-driven corpus and KiCad-backed promotion.
+2. Expand a neutral held-out corpus into unsupported mixed-signal and
+   power-control primitive/model families. Promote only after the new families
+   have catalog, simulation, and physical evidence.
+3. Add dynamic electrothermal and control-loop evidence where static global
    bounds cannot prove startup, SOA, stability, or transient protection.
-3. Generalize bounded placement-routing correction from observed
+4. Generalize bounded placement-routing correction from observed
    failures without introducing fixture-identity logic.
-4. Expand catalog-independent part qualification, calculated rating, and
+5. Expand catalog-independent part qualification, calculated rating, and
    fabrication evidence before claiming broader
    autonomous or fabrication-ready coverage.
 

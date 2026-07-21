@@ -301,9 +301,11 @@ be regenerated deterministically.
   whole-board placement, routing, and promotion are exercised by design
   fixtures and the block verification harness.
 - `usb_c_power` power-only mode does not emit D+/D- no-connect markers yet.
-- MCU support uses a fixed ATmega328P-A role map; arbitrary MCU semantic
-  extraction is not implemented. The separate exact
-  `esp32_wroom_32e_minimal` block supports only WROOM-32E-N4.
+- Legacy MCU blocks retain fixed target profiles for compatibility. The
+  behavior-driven catalog provider instead selects among verified ATmega328P-A,
+  ESP32-WROOM-32E, and STM32G031K8T6 records and resolves their modeled
+  alternate functions. It does not infer MCU evidence from arbitrary KiCad
+  symbols or support unverified device and module variants.
 - The composed design workflow supports deterministic placement and routing for
   proven shapes, not general dense-board autorouting.
 - Block verification can require KiCad ERC/DRC, but default tests remain

@@ -131,14 +131,15 @@ complete connectivity/routing, clean installed-KiCad ERC, and strict DRC. The
 define the measured envelope. This is bounded registered-capability evidence,
 not arbitrary-circuit support.
 
-An exact block-composition lane now supports `ESP32-WROOM-32E-N4` through the
-built-in `esp32_wroom_32e_minimal` block. It emits the module, local power
-conditioning, EN/BOOT networks and buttons, UART and peripheral headers, and a
-hard antenna copper keepout. Its checked-in fixture reaches KiCad-backed
-`pass` with clean strict ERC/DRC, complete route/contact evidence, writer
-correctness, and zero normalized schematic/PCB round-trip diffs. This is not
-yet general ESP32-family support: alternate modules, SoCs, flash variants,
-pin assignments, and RF layouts fail closed unless explicitly cataloged.
+An exact block-composition lane supports `ESP32-WROOM-32E-N4` through the
+built-in `esp32_wroom_32e_minimal` block. A separate behavior-driven path now
+selects verified ATmega328P-A, ESP32-WROOM-32E, or STM32G031K8T6 targets from
+catalog MCU evidence, assigns complete peripheral bundles to physical pins,
+and expands catalog-declared power, reset, programming, boot, and optional
+clock support. Three neutral target-free requests pass deterministic replay and
+the installed-KiCad ERC, strict DRC, route/connectivity, writer, and zero-diff
+round-trip gates. This is verified-record MCU synthesis, not unrestricted
+ESP32-family or arbitrary-device support.
 
 ### Schematic Readability
 
@@ -165,7 +166,10 @@ This is not yet a general-purpose autorouter for arbitrary dense boards. See
 
 The checked-in catalogs and resolvers cover the promoted designs plus a growing
 set of passives, connectors, regulators, I2C sensors, protection parts,
-low-voltage amplifier components, the ATmega328P-A, and the ESP32-WROOM-32E.
+low-voltage amplifier components, the ATmega328P-A, ESP32-WROOM-32E, and
+STM32G031K8T6. MCU records include normalized physical pins, alternate
+functions, supply domains, programming interfaces, clocks, boot constraints,
+and current budgets.
 Generated schematic symbols can carry
 component identity, manufacturer, MPN, confidence, lifecycle, rating, and
 pinmap evidence.
@@ -256,12 +260,15 @@ envelope remain unsupported.
 
 ## Remaining Direction
 
-The next materially different capability should expand generic compositional
-primitive and trusted-model coverage from concrete held-out failures. The most
-valuable current gaps are broader MCU/ESP32 subsystem semantics, additional
-mixed-signal/control-loop primitives, catalog-independent part qualification,
-and physical synthesis for denser boards. Unknown behavior must continue to
-produce a stable capability gap instead of guessed implementation detail.
+The next materially different capability should make subsystem decisions
+closed-loop and evidence-driven across multiple interacting domains. The most
+valuable current gap is deterministic power-tree and signal-integrity
+synthesis: size rails and decoupling from load/transient evidence, derive bus
+bias and level transitions, and validate startup/boot/programming behavior
+before physical generation. Additional mixed-signal primitives,
+catalog-independent part qualification, and denser-board physical synthesis
+remain important. Unknown behavior must continue to produce a stable
+capability gap instead of guessed implementation detail.
 
 See the [Roadmap](../specs/ROADMAP.md) for prioritized work and the
 [Development Reference](development.md) for repository-level limitations and

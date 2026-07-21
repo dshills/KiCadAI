@@ -896,11 +896,57 @@
         {"kind": "supply_current_minimum", "min": "0.5", "unit": "A"}
       ],
       "temperature": {"min": "-40", "max": "85", "unit": "C"},
+      "mcu_evidence": {
+        "architecture": "xtensa_lx6",
+        "family": "esp32",
+        "capabilities": ["bluetooth", "wifi"],
+        "supply_domains": [{"id": "digital", "power_functions": ["VDD"], "ground_functions": ["GND"], "minimum_v": 3.0, "maximum_v": 3.6}],
+        "pins": [
+          {"function": "SENSOR_VP", "gpio": "GPIO36", "electrical_modes": ["analog_input", "input"], "alternate_functions": [{"kind": "adc", "instance": "adc1", "signal": "in0"}], "interrupt_line": "gpio36"},
+          {"function": "SENSOR_VN", "gpio": "GPIO39", "electrical_modes": ["analog_input", "input"], "alternate_functions": [{"kind": "adc", "instance": "adc1", "signal": "in3"}], "interrupt_line": "gpio39"},
+          {"function": "GPIO34", "gpio": "GPIO34", "electrical_modes": ["analog_input", "input"], "alternate_functions": [{"kind": "adc", "instance": "adc1", "signal": "in6"}], "interrupt_line": "gpio34"},
+          {"function": "GPIO35", "gpio": "GPIO35", "electrical_modes": ["analog_input", "input"], "alternate_functions": [{"kind": "adc", "instance": "adc1", "signal": "in7"}], "interrupt_line": "gpio35"},
+          {"function": "GPIO32", "gpio": "GPIO32", "electrical_modes": ["analog_input", "input", "open_drain", "push_pull"], "alternate_functions": [{"kind": "adc", "instance": "adc1", "signal": "in4"}, {"kind": "pwm", "instance": "ledc", "signal": "channel0"}], "interrupt_line": "gpio32"},
+          {"function": "GPIO33", "gpio": "GPIO33", "electrical_modes": ["analog_input", "input", "open_drain", "push_pull"], "alternate_functions": [{"kind": "adc", "instance": "adc1", "signal": "in5"}, {"kind": "pwm", "instance": "ledc", "signal": "channel1"}], "interrupt_line": "gpio33"},
+          {"function": "GPIO25", "gpio": "GPIO25", "electrical_modes": ["analog_input", "input", "open_drain", "push_pull"], "alternate_functions": [{"kind": "adc", "instance": "adc2", "signal": "in8"}, {"kind": "dac", "instance": "dac", "signal": "out1"}, {"kind": "pwm", "instance": "ledc", "signal": "channel2"}], "interrupt_line": "gpio25"},
+          {"function": "GPIO26", "gpio": "GPIO26", "electrical_modes": ["analog_input", "input", "open_drain", "push_pull"], "alternate_functions": [{"kind": "adc", "instance": "adc2", "signal": "in9"}, {"kind": "dac", "instance": "dac", "signal": "out2"}, {"kind": "pwm", "instance": "ledc", "signal": "channel3"}], "interrupt_line": "gpio26"},
+          {"function": "GPIO27", "gpio": "GPIO27", "electrical_modes": ["analog_input", "input", "open_drain", "push_pull"], "alternate_functions": [{"kind": "adc", "instance": "adc2", "signal": "in7"}, {"kind": "pwm", "instance": "ledc", "signal": "channel4"}], "interrupt_line": "gpio27"},
+          {"function": "GPIO14", "gpio": "GPIO14", "electrical_modes": ["analog_input", "input", "open_drain", "push_pull"], "alternate_functions": [{"kind": "adc", "instance": "adc2", "signal": "in6"}, {"kind": "pwm", "instance": "ledc", "signal": "channel5"}], "interrupt_line": "gpio14"},
+          {"function": "GPIO12", "gpio": "GPIO12", "electrical_modes": ["analog_input", "input", "open_drain", "push_pull"], "alternate_functions": [{"kind": "adc", "instance": "adc2", "signal": "in5"}], "interrupt_line": "gpio12"},
+          {"function": "GPIO13", "gpio": "GPIO13", "electrical_modes": ["analog_input", "input", "open_drain", "push_pull"], "alternate_functions": [{"kind": "adc", "instance": "adc2", "signal": "in4"}, {"kind": "pwm", "instance": "ledc", "signal": "channel6"}], "interrupt_line": "gpio13"},
+          {"function": "GPIO15", "gpio": "GPIO15", "electrical_modes": ["analog_input", "input", "open_drain", "push_pull"], "alternate_functions": [{"kind": "adc", "instance": "adc2", "signal": "in3"}], "interrupt_line": "gpio15"},
+          {"function": "GPIO2", "gpio": "GPIO2", "electrical_modes": ["analog_input", "input", "open_drain", "push_pull"], "alternate_functions": [{"kind": "adc", "instance": "adc2", "signal": "in2"}], "interrupt_line": "gpio2"},
+          {"function": "GPIO0", "gpio": "GPIO0", "electrical_modes": ["analog_input", "input", "open_drain", "push_pull"], "alternate_functions": [{"kind": "adc", "instance": "adc2", "signal": "in1"}], "interrupt_line": "gpio0"},
+          {"function": "GPIO4", "gpio": "GPIO4", "electrical_modes": ["analog_input", "input", "open_drain", "push_pull"], "alternate_functions": [{"kind": "adc", "instance": "adc2", "signal": "in0"}, {"kind": "pwm", "instance": "ledc", "signal": "channel7"}], "interrupt_line": "gpio4"},
+          {"function": "GPIO16", "gpio": "GPIO16", "electrical_modes": ["input", "open_drain", "push_pull"], "alternate_functions": [{"kind": "uart", "instance": "uart2", "signal": "rx"}], "interrupt_line": "gpio16"},
+          {"function": "GPIO17", "gpio": "GPIO17", "electrical_modes": ["input", "open_drain", "push_pull"], "alternate_functions": [{"kind": "uart", "instance": "uart2", "signal": "tx"}], "interrupt_line": "gpio17"},
+          {"function": "GPIO5", "gpio": "GPIO5", "electrical_modes": ["input", "open_drain", "push_pull"], "alternate_functions": [{"kind": "spi", "instance": "vspi", "signal": "cs"}], "interrupt_line": "gpio5"},
+          {"function": "GPIO18", "gpio": "GPIO18", "electrical_modes": ["input", "open_drain", "push_pull"], "alternate_functions": [{"kind": "spi", "instance": "vspi", "signal": "sck"}], "interrupt_line": "gpio18"},
+          {"function": "GPIO19", "gpio": "GPIO19", "electrical_modes": ["input", "open_drain", "push_pull"], "alternate_functions": [{"kind": "spi", "instance": "vspi", "signal": "miso"}], "interrupt_line": "gpio19"},
+          {"function": "GPIO21", "gpio": "GPIO21", "electrical_modes": ["input", "open_drain", "push_pull"], "alternate_functions": [{"kind": "i2c", "instance": "i2c0", "signal": "sda", "mode": "open_drain"}], "interrupt_line": "gpio21"},
+          {"function": "GPIO3", "gpio": "GPIO3", "electrical_modes": ["input", "open_drain", "push_pull"], "alternate_functions": [{"kind": "uart", "instance": "uart0", "signal": "rx"}], "interrupt_line": "gpio3"},
+          {"function": "GPIO1", "gpio": "GPIO1", "electrical_modes": ["input", "open_drain", "push_pull"], "alternate_functions": [{"kind": "uart", "instance": "uart0", "signal": "tx"}], "interrupt_line": "gpio1"},
+          {"function": "GPIO22", "gpio": "GPIO22", "electrical_modes": ["input", "open_drain", "push_pull"], "alternate_functions": [{"kind": "i2c", "instance": "i2c0", "signal": "scl", "mode": "open_drain"}], "interrupt_line": "gpio22"},
+          {"function": "GPIO23", "gpio": "GPIO23", "electrical_modes": ["input", "open_drain", "push_pull"], "alternate_functions": [{"kind": "spi", "instance": "vspi", "signal": "mosi"}], "interrupt_line": "gpio23"}
+        ],
+        "programming_interfaces": [{"id": "uart0_bootloader", "kind": "uart_bootloader", "signals": [{"signal": "rx", "pin_function": "GPIO3"}, {"signal": "tx", "pin_function": "GPIO1"}, {"signal": "boot", "pin_function": "GPIO0"}, {"signal": "enable", "pin_function": "EN"}]}],
+        "clock_options": [{"id": "module_crystal", "kind": "integrated_crystal", "minimum_hz": 40000000, "maximum_hz": 40000000, "default": true}],
+        "boot_constraints": [
+          {"pin_function": "GPIO0", "state": "reset", "level": "high", "reason": "normal flash boot"},
+          {"pin_function": "GPIO2", "state": "reset", "level": "low", "reason": "preserve the default pulldown for download-mode compatibility"},
+          {"pin_function": "GPIO5", "state": "reset", "level": "high", "reason": "preserve the reviewed reset-time strapping default"},
+          {"pin_function": "GPIO12", "state": "reset", "level": "low", "reason": "select 3.3 V flash supply"},
+          {"pin_function": "GPIO15", "state": "reset", "level": "high", "reason": "preserve the reviewed reset-time strapping default"}
+        ],
+        "current_budget": {"maximum_source_per_pin_ma": 20, "maximum_sink_per_pin_ma": 20, "maximum_aggregate_ma": 120, "maximum_supply_ma": 500},
+        "review_note": "Peripheral matrix coverage is intentionally limited to reviewed default assignments; boot straps and RF supply transients remain mandatory validation inputs."
+      },
       "companions": [
         {"id": "esp32.power_bypass", "family": "capacitor", "role": "decoupling_capacitor", "required": true, "recipes": [{"id": "power_bypass", "family": "capacitor", "role": "decoupling_capacitor", "package": "0603", "value_kind": "capacitance", "value": "100n", "min_voltage_v": 6.3, "minimum_confidence": "rule_inferred", "required_functions": ["A", "B"], "connections": [{"function": "A", "parent_function": "VDD"}, {"function": "B", "parent_function": "GND"}]}], "description": "Place local high-frequency bypass capacitance at module pin 2."},
         {"id": "esp32.power_bulk", "family": "capacitor", "role": "bulk_capacitor", "required": true, "recipes": [{"id": "power_bulk", "family": "capacitor", "role": "bulk_capacitor", "package": "0805", "value_kind": "capacitance", "value": "10u", "min_voltage_v": 6.3, "minimum_confidence": "rule_inferred", "required_functions": ["A", "B"], "connections": [{"function": "A", "parent_function": "VDD"}, {"function": "B", "parent_function": "GND"}]}], "description": "Provide local bulk energy storage for radio current transients."},
         {"id": "esp32.enable_rc", "family": "resistor", "role": "enable_pullup", "required": true, "recipes": [{"id": "enable_pullup", "family": "resistor", "role": "pullup", "package": "0603", "value_kind": "resistance", "value": "10k", "minimum_confidence": "rule_inferred", "required_functions": ["A", "B"], "connections": [{"function": "A", "parent_function": "VDD"}, {"function": "B", "parent_function": "EN"}]}, {"id": "enable_delay", "family": "capacitor", "role": "capacitor", "package": "0603", "value_kind": "capacitance", "value": "1u", "min_voltage_v": 6.3, "minimum_confidence": "rule_inferred", "required_functions": ["A", "B"], "connections": [{"function": "A", "parent_function": "EN"}, {"function": "B", "parent_function": "GND"}]}], "description": "EN requires the reviewed 10 kΩ pull-up and 1 µF delay capacitor."},
         {"id": "esp32.boot_pullup", "family": "resistor", "role": "boot_pullup", "required": true, "recipes": [{"id": "boot_pullup", "family": "resistor", "role": "pullup", "package": "0603", "value_kind": "resistance", "value": "10k", "minimum_confidence": "rule_inferred", "required_functions": ["A", "B"], "connections": [{"function": "A", "parent_function": "VDD"}, {"function": "B", "parent_function": "GPIO0"}]}], "description": "GPIO0 requires a normal-boot pull-up and a controlled download-mode path."},
+        {"id": "mcu.i2c_pullups", "family": "resistor", "role": "i2c_pullup", "required": true, "applies_to": ["peripheral:i2c"], "recipes": [{"id": "sda_pullup", "family": "resistor", "role": "i2c_pullup", "package": "0603", "value_kind": "resistance", "value": "4.7k", "minimum_confidence": "rule_inferred", "required_functions": ["A", "B"], "connections": [{"function": "A", "parent_function": "VDD"}, {"function": "B", "parent_function": "peripheral:i2c:sda"}]}, {"id": "scl_pullup", "family": "resistor", "role": "i2c_pullup", "package": "0603", "value_kind": "resistance", "value": "4.7k", "minimum_confidence": "rule_inferred", "required_functions": ["A", "B"], "connections": [{"function": "A", "parent_function": "VDD"}, {"function": "B", "parent_function": "peripheral:i2c:scl"}]}], "description": "Populate reviewed default I2C pull-ups when an I2C peripheral bundle is assigned."},
         {"id": "esp32.uart_programming", "family": "connector", "role": "programming_header", "required": true, "recipes": [{"id": "uart_header", "family": "connector", "role": "connector", "package": "pin_header_1x04", "minimum_confidence": "verified", "required_functions": ["PIN_1", "PIN_2", "PIN_3", "PIN_4"], "connections": [{"function": "PIN_1", "parent_function": "VDD"}, {"function": "PIN_2", "parent_function": "GND"}, {"function": "PIN_3", "parent_function": "GPIO1"}, {"function": "PIN_4", "parent_function": "GPIO3"}]}], "description": "Expose 3.3 V, GND, U0RXD, and U0TXD for firmware loading."}
       ],
       "selection_rules": [
@@ -998,9 +1044,51 @@
       "lifecycle": "active",
       "tags": ["mcu", "avr", "tqfp32", "minimal_system"],
       "ratings": [{"kind": "supply_voltage", "min": "1.8", "max": "5.5", "unit": "V"}, {"kind": "supply_current", "max": "14", "unit": "mA"}],
+      "mcu_evidence": {
+        "architecture": "avr8",
+        "family": "atmega328p",
+        "supply_domains": [
+          {"id": "digital", "rail_group": "main", "power_functions": ["VCC"], "ground_functions": ["GND"], "minimum_v": 1.8, "maximum_v": 5.5},
+          {"id": "analog", "rail_group": "main", "power_functions": ["AVCC"], "ground_functions": ["AGND"], "minimum_v": 1.8, "maximum_v": 5.5}
+        ],
+        "pins": [
+          {"function": "GPIO_1", "gpio": "PD3", "electrical_modes": ["input", "open_drain_emulated", "push_pull"], "alternate_functions": [{"kind": "interrupt", "instance": "extint", "signal": "int1"}, {"kind": "pwm", "instance": "timer2", "signal": "oc2b"}], "interrupt_line": "int1"},
+          {"function": "GPIO_2", "gpio": "PD4", "electrical_modes": ["input", "open_drain_emulated", "push_pull"], "interrupt_line": "pcint20"},
+          {"function": "GPIO_7", "gpio": "PB6", "electrical_modes": ["input", "push_pull"], "alternate_functions": [{"kind": "clock", "instance": "external_crystal", "signal": "xtal1"}], "interrupt_line": "pcint6"},
+          {"function": "GPIO_8", "gpio": "PB7", "electrical_modes": ["input", "push_pull"], "alternate_functions": [{"kind": "clock", "instance": "external_crystal", "signal": "xtal2"}], "interrupt_line": "pcint7"},
+          {"function": "GPIO_9", "gpio": "PD5", "electrical_modes": ["input", "open_drain_emulated", "push_pull"], "alternate_functions": [{"kind": "pwm", "instance": "timer0", "signal": "oc0b"}], "interrupt_line": "pcint21"},
+          {"function": "GPIO_10", "gpio": "PD6", "electrical_modes": ["input", "open_drain_emulated", "push_pull"], "alternate_functions": [{"kind": "pwm", "instance": "timer0", "signal": "oc0a"}], "interrupt_line": "pcint22"},
+          {"function": "GPIO_11", "gpio": "PD7", "electrical_modes": ["input", "open_drain_emulated", "push_pull"], "interrupt_line": "pcint23"},
+          {"function": "GPIO_12", "gpio": "PB0", "electrical_modes": ["input", "open_drain_emulated", "push_pull"], "interrupt_line": "pcint0"},
+          {"function": "GPIO_13", "gpio": "PB1", "electrical_modes": ["input", "open_drain_emulated", "push_pull"], "alternate_functions": [{"kind": "pwm", "instance": "timer1", "signal": "oc1a"}], "interrupt_line": "pcint1"},
+          {"function": "GPIO_14", "gpio": "PB2", "electrical_modes": ["input", "open_drain_emulated", "push_pull"], "alternate_functions": [{"kind": "pwm", "instance": "timer1", "signal": "oc1b"}], "interrupt_line": "pcint2"},
+          {"function": "MOSI", "gpio": "PB3", "electrical_modes": ["input", "open_drain_emulated", "push_pull"], "alternate_functions": [{"kind": "pwm", "instance": "timer2", "signal": "oc2a"}, {"kind": "spi", "instance": "spi0", "signal": "mosi"}], "interrupt_line": "pcint3"},
+          {"function": "MISO", "gpio": "PB4", "electrical_modes": ["input", "open_drain_emulated", "push_pull"], "alternate_functions": [{"kind": "spi", "instance": "spi0", "signal": "miso"}], "interrupt_line": "pcint4"},
+          {"function": "SCK", "gpio": "PB5", "electrical_modes": ["input", "open_drain_emulated", "push_pull"], "alternate_functions": [{"kind": "spi", "instance": "spi0", "signal": "sck"}], "interrupt_line": "pcint5"},
+          {"function": "GPIO_19", "gpio": "ADC6", "electrical_modes": ["analog_input", "input"], "alternate_functions": [{"kind": "adc", "instance": "adc0", "signal": "in6"}]},
+          {"function": "GPIO_22", "gpio": "ADC7", "electrical_modes": ["analog_input", "input"], "alternate_functions": [{"kind": "adc", "instance": "adc0", "signal": "in7"}]},
+          {"function": "GPIO_23", "gpio": "PC0", "electrical_modes": ["analog_input", "input", "open_drain_emulated", "push_pull"], "alternate_functions": [{"kind": "adc", "instance": "adc0", "signal": "in0"}], "interrupt_line": "pcint8"},
+          {"function": "GPIO_24", "gpio": "PC1", "electrical_modes": ["analog_input", "input", "open_drain_emulated", "push_pull"], "alternate_functions": [{"kind": "adc", "instance": "adc0", "signal": "in1"}], "interrupt_line": "pcint9"},
+          {"function": "GPIO_25", "gpio": "PC2", "electrical_modes": ["analog_input", "input", "open_drain_emulated", "push_pull"], "alternate_functions": [{"kind": "adc", "instance": "adc0", "signal": "in2"}], "interrupt_line": "pcint10"},
+          {"function": "GPIO_26", "gpio": "PC3", "electrical_modes": ["analog_input", "input", "open_drain_emulated", "push_pull"], "alternate_functions": [{"kind": "adc", "instance": "adc0", "signal": "in3"}], "interrupt_line": "pcint11"},
+          {"function": "GPIO_27", "gpio": "PC4", "electrical_modes": ["analog_input", "input", "open_drain", "push_pull"], "alternate_functions": [{"kind": "adc", "instance": "adc0", "signal": "in4"}, {"kind": "i2c", "instance": "twi0", "signal": "sda", "mode": "open_drain"}], "interrupt_line": "pcint12"},
+          {"function": "GPIO_28", "gpio": "PC5", "electrical_modes": ["analog_input", "input", "open_drain", "push_pull"], "alternate_functions": [{"kind": "adc", "instance": "adc0", "signal": "in5"}, {"kind": "i2c", "instance": "twi0", "signal": "scl", "mode": "open_drain"}], "interrupt_line": "pcint13"},
+          {"function": "GPIO_30", "gpio": "PD0", "electrical_modes": ["input", "open_drain_emulated", "push_pull"], "alternate_functions": [{"kind": "uart", "instance": "usart0", "signal": "rx"}], "interrupt_line": "pcint16"},
+          {"function": "GPIO_31", "gpio": "PD1", "electrical_modes": ["input", "open_drain_emulated", "push_pull"], "alternate_functions": [{"kind": "uart", "instance": "usart0", "signal": "tx"}], "interrupt_line": "pcint17"},
+          {"function": "GPIO_32", "gpio": "PD2", "electrical_modes": ["input", "open_drain_emulated", "push_pull"], "alternate_functions": [{"kind": "interrupt", "instance": "extint", "signal": "int0"}], "interrupt_line": "int0"}
+        ],
+        "programming_interfaces": [{"id": "isp", "kind": "spi_isp", "signals": [{"signal": "mosi", "pin_function": "MOSI"}, {"signal": "miso", "pin_function": "MISO"}, {"signal": "sck", "pin_function": "SCK"}, {"signal": "reset", "pin_function": "RESET"}]}],
+        "clock_options": [
+          {"id": "external_crystal", "kind": "external_crystal", "minimum_hz": 400000, "maximum_hz": 20000000, "pins": ["GPIO_7", "GPIO_8"]},
+          {"id": "internal_rc", "kind": "internal_rc", "maximum_hz": 8000000, "default": true}
+        ],
+        "current_budget": {"maximum_source_per_pin_ma": 20, "maximum_sink_per_pin_ma": 20, "maximum_aggregate_ma": 100, "maximum_supply_ma": 14},
+        "review_note": "Alternate functions cover the promoted peripheral set; clock-frequency versus supply-voltage and total port-current limits remain enforced by selection policy."
+      },
       "companions": [
         {"id": "mcu.decoupling_vcc", "family": "capacitor", "role": "decoupling_capacitor", "required": true, "recipes": [{"id": "vcc_bypass", "family": "capacitor", "role": "decoupling_capacitor", "package": "0603", "value_kind": "capacitance", "value": "100n", "min_voltage_v": 6.3, "minimum_confidence": "rule_inferred", "required_functions": ["A", "B"], "connections": [{"function": "A", "parent_function": "VCC"}, {"function": "B", "parent_function": "GND"}]}, {"id": "avcc_bypass", "family": "capacitor", "role": "decoupling_capacitor", "package": "0603", "value_kind": "capacitance", "value": "100n", "min_voltage_v": 6.3, "minimum_confidence": "rule_inferred", "required_functions": ["A", "B"], "connections": [{"function": "A", "parent_function": "AVCC"}, {"function": "B", "parent_function": "AGND"}]}], "description": "Place decoupling capacitors near VCC/AVCC and GND pins."},
         {"id": "mcu.reset_pullup", "family": "resistor", "role": "reset_pullup", "required": true, "recipes": [{"id": "reset_pullup", "family": "resistor", "role": "pullup", "package": "0603", "value_kind": "resistance", "value": "10k", "minimum_confidence": "rule_inferred", "required_functions": ["A", "B"], "connections": [{"function": "A", "parent_function": "VCC"}, {"function": "B", "parent_function": "RESET"}]}], "description": "RESET requires a pull-up unless held by another verified circuit."},
+        {"id": "mcu.i2c_pullups", "family": "resistor", "role": "i2c_pullup", "required": true, "applies_to": ["peripheral:i2c"], "recipes": [{"id": "sda_pullup", "family": "resistor", "role": "i2c_pullup", "package": "0603", "value_kind": "resistance", "value": "4.7k", "minimum_confidence": "rule_inferred", "required_functions": ["A", "B"], "connections": [{"function": "A", "parent_function": "VCC"}, {"function": "B", "parent_function": "peripheral:i2c:sda"}]}, {"id": "scl_pullup", "family": "resistor", "role": "i2c_pullup", "package": "0603", "value_kind": "resistance", "value": "4.7k", "minimum_confidence": "rule_inferred", "required_functions": ["A", "B"], "connections": [{"function": "A", "parent_function": "VCC"}, {"function": "B", "parent_function": "peripheral:i2c:scl"}]}], "description": "Populate reviewed default I2C pull-ups when an I2C peripheral bundle is assigned."},
         {"id": "mcu.programming_header", "family": "connector", "role": "programming_header", "required": true, "recipes": [{"id": "isp_header", "family": "connector", "role": "connector", "package": "pin_header_1x06", "minimum_confidence": "verified", "required_functions": ["PIN_1", "PIN_2", "PIN_3", "PIN_4", "PIN_5", "PIN_6"], "connections": [{"function": "PIN_1", "parent_function": "MISO"}, {"function": "PIN_2", "parent_function": "VCC"}, {"function": "PIN_3", "parent_function": "SCK"}, {"function": "PIN_4", "parent_function": "MOSI"}, {"function": "PIN_5", "parent_function": "RESET"}, {"function": "PIN_6", "parent_function": "GND"}]}], "description": "Expose SPI programming pins and reset for firmware loading."}
       ],
       "symbols": [{
@@ -1064,6 +1152,109 @@
         "verification": {"confidence": "verified", "sources": ["builtin_pinmap:MCU_Microchip_ATmega:ATmega328P-A"], "pinmap_checked": true}
       }],
       "verification": {"confidence": "verified", "sources": ["curated_seed_catalog", "builtin_pinmap:MCU_Microchip_ATmega:ATmega328P-A"], "pinmap_checked": true, "notes": ["Minimal-system record. Peripheral suitability and clock/fuse choices remain design-specific."]}
+    },
+    {
+      "id": "mcu.st.stm32g031k8t6.lqfp32",
+      "family": "mcu",
+      "name": "STMicroelectronics STM32G031K8T6 LQFP-32",
+      "description": "Arm Cortex-M0+ MCU with 64 KB flash, 8 KB RAM, 64 MHz operation, SWD, ADC, timers, and multiple serial peripherals.",
+      "generic": false,
+      "manufacturer": "STMicroelectronics",
+      "mpn": "STM32G031K8T6",
+      "lifecycle": "active",
+      "tags": ["mcu", "arm", "cortex_m0plus", "stm32g0", "lqfp32", "swd", "minimal_system"],
+      "ratings": [
+        {"kind": "supply_voltage", "min": "1.7", "typ": "3.3", "max": "3.6", "unit": "V"},
+        {"kind": "clock_frequency", "max": "64", "unit": "MHz"}
+      ],
+      "temperature": {"min": "-40", "max": "85", "unit": "C"},
+      "mcu_evidence": {
+        "architecture": "arm_cortex_m0plus",
+        "family": "stm32g0",
+        "supply_domains": [{"id": "vdd_vdda", "power_functions": ["VDD"], "ground_functions": ["VSS"], "minimum_v": 1.7, "maximum_v": 3.6}],
+        "pins": [
+          {"function": "PB9", "gpio": "PB9", "electrical_modes": ["input", "open_drain", "push_pull"], "alternate_functions": [{"kind": "i2c", "instance": "i2c1", "signal": "sda", "mode": "open_drain"}, {"kind": "pwm", "instance": "tim17", "signal": "ch1"}], "interrupt_line": "exti9"},
+          {"function": "PC14", "gpio": "PC14", "electrical_modes": ["input", "open_drain", "push_pull"], "alternate_functions": [{"kind": "clock", "instance": "hse", "signal": "osc_in"}], "interrupt_line": "exti14"},
+          {"function": "PC15", "gpio": "PC15", "electrical_modes": ["input", "open_drain", "push_pull"], "alternate_functions": [{"kind": "clock", "instance": "hse", "signal": "osc_out"}], "interrupt_line": "exti15"},
+          {"function": "PF2", "gpio": "PF2", "electrical_modes": ["input", "open_drain", "push_pull"], "alternate_functions": [{"kind": "reset", "instance": "system", "signal": "nrst"}], "interrupt_line": "exti2"},
+          {"function": "PA0", "gpio": "PA0", "electrical_modes": ["analog_input", "input", "open_drain", "push_pull"], "alternate_functions": [{"kind": "adc", "instance": "adc1", "signal": "in0"}, {"kind": "spi", "instance": "spi2", "signal": "sck"}, {"kind": "pwm", "instance": "tim2", "signal": "ch1"}], "interrupt_line": "exti0"},
+          {"function": "PA1", "gpio": "PA1", "electrical_modes": ["analog_input", "input", "open_drain", "push_pull"], "alternate_functions": [{"kind": "adc", "instance": "adc1", "signal": "in1"}, {"kind": "spi", "instance": "spi1", "signal": "sck"}, {"kind": "pwm", "instance": "tim2", "signal": "ch2"}], "interrupt_line": "exti1"},
+          {"function": "PA2", "gpio": "PA2", "electrical_modes": ["analog_input", "input", "open_drain", "push_pull"], "alternate_functions": [{"kind": "adc", "instance": "adc1", "signal": "in2"}, {"kind": "spi", "instance": "spi1", "signal": "mosi"}, {"kind": "uart", "instance": "usart2", "signal": "tx"}, {"kind": "uart", "instance": "lpuart1", "signal": "tx"}, {"kind": "pwm", "instance": "tim2", "signal": "ch3"}], "interrupt_line": "exti2"},
+          {"function": "PA3", "gpio": "PA3", "electrical_modes": ["analog_input", "input", "open_drain", "push_pull"], "alternate_functions": [{"kind": "adc", "instance": "adc1", "signal": "in3"}, {"kind": "spi", "instance": "spi2", "signal": "miso"}, {"kind": "uart", "instance": "usart2", "signal": "rx"}, {"kind": "uart", "instance": "lpuart1", "signal": "rx"}, {"kind": "pwm", "instance": "tim2", "signal": "ch4"}], "interrupt_line": "exti3"},
+          {"function": "PA4", "gpio": "PA4", "electrical_modes": ["analog_input", "input", "open_drain", "push_pull"], "alternate_functions": [{"kind": "adc", "instance": "adc1", "signal": "in4"}, {"kind": "spi", "instance": "spi1", "signal": "cs"}, {"kind": "spi", "instance": "spi2", "signal": "mosi"}, {"kind": "pwm", "instance": "tim14", "signal": "ch1"}], "interrupt_line": "exti4"},
+          {"function": "PA5", "gpio": "PA5", "electrical_modes": ["analog_input", "input", "open_drain", "push_pull"], "alternate_functions": [{"kind": "adc", "instance": "adc1", "signal": "in5"}, {"kind": "spi", "instance": "spi1", "signal": "sck"}, {"kind": "pwm", "instance": "tim2", "signal": "ch1"}], "interrupt_line": "exti5"},
+          {"function": "PA6", "gpio": "PA6", "electrical_modes": ["analog_input", "input", "open_drain", "push_pull"], "alternate_functions": [{"kind": "adc", "instance": "adc1", "signal": "in6"}, {"kind": "spi", "instance": "spi1", "signal": "miso"}, {"kind": "pwm", "instance": "tim3", "signal": "ch1"}, {"kind": "pwm", "instance": "tim16", "signal": "ch1"}], "interrupt_line": "exti6"},
+          {"function": "PA7", "gpio": "PA7", "electrical_modes": ["analog_input", "input", "open_drain", "push_pull"], "alternate_functions": [{"kind": "adc", "instance": "adc1", "signal": "in7"}, {"kind": "spi", "instance": "spi1", "signal": "mosi"}, {"kind": "pwm", "instance": "tim3", "signal": "ch2"}, {"kind": "pwm", "instance": "tim14", "signal": "ch1"}, {"kind": "pwm", "instance": "tim17", "signal": "ch1"}], "interrupt_line": "exti7"},
+          {"function": "PB0", "gpio": "PB0", "electrical_modes": ["analog_input", "input", "open_drain", "push_pull"], "alternate_functions": [{"kind": "adc", "instance": "adc1", "signal": "in8"}, {"kind": "spi", "instance": "spi1", "signal": "cs"}, {"kind": "pwm", "instance": "tim3", "signal": "ch3"}], "interrupt_line": "exti0"},
+          {"function": "PB1", "gpio": "PB1", "electrical_modes": ["analog_input", "input", "open_drain", "push_pull"], "alternate_functions": [{"kind": "adc", "instance": "adc1", "signal": "in9"}, {"kind": "pwm", "instance": "tim3", "signal": "ch4"}], "interrupt_line": "exti1"},
+          {"function": "PB2", "gpio": "PB2", "electrical_modes": ["analog_input", "input", "open_drain", "push_pull"], "alternate_functions": [{"kind": "adc", "instance": "adc1", "signal": "in10"}, {"kind": "spi", "instance": "spi2", "signal": "miso"}], "interrupt_line": "exti2"},
+          {"function": "PA8", "gpio": "PA8", "electrical_modes": ["input", "open_drain", "push_pull"], "alternate_functions": [{"kind": "spi", "instance": "spi2", "signal": "cs"}, {"kind": "pwm", "instance": "tim1", "signal": "ch1"}], "interrupt_line": "exti8"},
+          {"function": "PC6", "gpio": "PC6", "electrical_modes": ["input", "open_drain", "push_pull"], "alternate_functions": [{"kind": "pwm", "instance": "tim3", "signal": "ch1"}], "interrupt_line": "exti6"},
+          {"function": "PA9/PA11", "gpio": "PA9_PA11", "electrical_modes": ["analog_input", "input", "open_drain", "push_pull"], "alternate_functions": [{"kind": "adc", "instance": "adc1", "signal": "in15"}, {"kind": "i2c", "instance": "i2c1", "signal": "scl", "mode": "open_drain"}, {"kind": "i2c", "instance": "i2c2", "signal": "scl", "mode": "open_drain"}, {"kind": "spi", "instance": "spi1", "signal": "miso"}, {"kind": "uart", "instance": "usart1", "signal": "tx"}, {"kind": "pwm", "instance": "tim1", "signal": "ch2"}], "interrupt_line": "exti11"},
+          {"function": "PA10/PA12", "gpio": "PA10_PA12", "electrical_modes": ["analog_input", "input", "open_drain", "push_pull"], "alternate_functions": [{"kind": "adc", "instance": "adc1", "signal": "in16"}, {"kind": "i2c", "instance": "i2c1", "signal": "sda", "mode": "open_drain"}, {"kind": "i2c", "instance": "i2c2", "signal": "sda", "mode": "open_drain"}, {"kind": "spi", "instance": "spi1", "signal": "mosi"}, {"kind": "uart", "instance": "usart1", "signal": "rx"}, {"kind": "pwm", "instance": "tim1", "signal": "ch3"}], "interrupt_line": "exti12"},
+          {"function": "PA13", "gpio": "PA13", "electrical_modes": ["analog_input", "input", "open_drain", "push_pull"], "alternate_functions": [{"kind": "adc", "instance": "adc1", "signal": "in17"}, {"kind": "programming", "instance": "swd", "signal": "swdio"}], "interrupt_line": "exti13"},
+          {"function": "PA14", "gpio": "PA14", "electrical_modes": ["analog_input", "input", "open_drain", "push_pull"], "alternate_functions": [{"kind": "adc", "instance": "adc1", "signal": "in18"}, {"kind": "programming", "instance": "swd", "signal": "swclk"}, {"kind": "uart", "instance": "usart2", "signal": "tx"}], "interrupt_line": "exti14"},
+          {"function": "PA15", "gpio": "PA15", "electrical_modes": ["input", "open_drain", "push_pull"], "alternate_functions": [{"kind": "spi", "instance": "spi1", "signal": "cs"}, {"kind": "uart", "instance": "usart2", "signal": "rx"}, {"kind": "pwm", "instance": "tim2", "signal": "ch1"}], "interrupt_line": "exti15"},
+          {"function": "PB3", "gpio": "PB3", "electrical_modes": ["input", "open_drain", "push_pull"], "alternate_functions": [{"kind": "spi", "instance": "spi1", "signal": "sck"}, {"kind": "pwm", "instance": "tim1", "signal": "ch2"}], "interrupt_line": "exti3"},
+          {"function": "PB4", "gpio": "PB4", "electrical_modes": ["input", "open_drain", "push_pull"], "alternate_functions": [{"kind": "spi", "instance": "spi1", "signal": "miso"}, {"kind": "pwm", "instance": "tim3", "signal": "ch1"}], "interrupt_line": "exti4"},
+          {"function": "PB5", "gpio": "PB5", "electrical_modes": ["input", "open_drain", "push_pull"], "alternate_functions": [{"kind": "spi", "instance": "spi1", "signal": "mosi"}, {"kind": "pwm", "instance": "tim3", "signal": "ch2"}], "interrupt_line": "exti5"},
+          {"function": "PB6", "gpio": "PB6", "electrical_modes": ["input", "open_drain", "push_pull"], "alternate_functions": [{"kind": "i2c", "instance": "i2c1", "signal": "scl", "mode": "open_drain"}, {"kind": "spi", "instance": "spi2", "signal": "miso"}, {"kind": "uart", "instance": "usart1", "signal": "tx"}, {"kind": "pwm", "instance": "tim1", "signal": "ch3"}], "interrupt_line": "exti6"},
+          {"function": "PB7", "gpio": "PB7", "electrical_modes": ["analog_input", "input", "open_drain", "push_pull"], "alternate_functions": [{"kind": "adc", "instance": "adc1", "signal": "in11"}, {"kind": "i2c", "instance": "i2c1", "signal": "sda", "mode": "open_drain"}, {"kind": "spi", "instance": "spi2", "signal": "mosi"}, {"kind": "uart", "instance": "usart1", "signal": "rx"}], "interrupt_line": "exti7"},
+          {"function": "PB8", "gpio": "PB8", "electrical_modes": ["input", "open_drain", "push_pull"], "alternate_functions": [{"kind": "i2c", "instance": "i2c1", "signal": "scl", "mode": "open_drain"}, {"kind": "spi", "instance": "spi2", "signal": "sck"}, {"kind": "pwm", "instance": "tim16", "signal": "ch1"}], "interrupt_line": "exti8"}
+        ],
+        "programming_interfaces": [{"id": "swd", "kind": "swd", "signals": [{"signal": "swdio", "pin_function": "PA13"}, {"signal": "swclk", "pin_function": "PA14"}, {"signal": "reset", "pin_function": "PF2"}]}],
+        "clock_options": [
+          {"id": "external_hse", "kind": "external_crystal_or_clock", "minimum_hz": 4000000, "maximum_hz": 48000000, "pins": ["PC14", "PC15"]},
+          {"id": "internal_hsi_pll", "kind": "internal_rc_pll", "maximum_hz": 64000000, "default": true}
+        ],
+        "boot_constraints": [{"pin_function": "PA14", "state": "reset", "level": "low", "reason": "main-flash boot when BOOT0 pin mode is enabled"}],
+        "current_budget": {"maximum_source_per_pin_ma": 20, "maximum_sink_per_pin_ma": 20, "maximum_aggregate_ma": 80},
+        "review_note": "The record promotes the LQFP-32 pinout and reviewed peripheral subset; option-byte boot policy, ADC drive, and high-speed clock accuracy remain explicit design inputs."
+      },
+      "companions": [
+        {"id": "stm32.power_bypass", "family": "capacitor", "role": "decoupling_capacitor", "required": true, "recipes": [{"id": "vdd_bypass", "family": "capacitor", "role": "decoupling_capacitor", "package": "0603", "value_kind": "capacitance", "value": "100n", "min_voltage_v": 6.3, "minimum_confidence": "rule_inferred", "required_functions": ["A", "B"], "connections": [{"function": "A", "parent_function": "VDD"}, {"function": "B", "parent_function": "VSS"}]}, {"id": "vdd_bulk", "family": "capacitor", "role": "bulk_capacitor", "package": "0805", "value_kind": "capacitance", "value": "4.7u", "min_voltage_v": 6.3, "minimum_confidence": "rule_inferred", "required_functions": ["A", "B"], "connections": [{"function": "A", "parent_function": "VDD"}, {"function": "B", "parent_function": "VSS"}]}], "description": "Place 100 nF close to VDD/VSS and provide local bulk capacitance."},
+        {"id": "stm32.reset", "family": "resistor", "role": "reset_pullup", "required": true, "recipes": [{"id": "reset_pullup", "family": "resistor", "role": "pullup", "package": "0603", "value_kind": "resistance", "value": "10k", "minimum_confidence": "rule_inferred", "required_functions": ["A", "B"], "connections": [{"function": "A", "parent_function": "VDD"}, {"function": "B", "parent_function": "PF2"}]}, {"id": "reset_filter", "family": "capacitor", "role": "capacitor", "package": "0603", "value_kind": "capacitance", "value": "100n", "min_voltage_v": 6.3, "minimum_confidence": "rule_inferred", "required_functions": ["A", "B"], "connections": [{"function": "A", "parent_function": "PF2"}, {"function": "B", "parent_function": "VSS"}]}], "description": "Provide a reviewed external reset bias and filter."},
+        {"id": "mcu.i2c_pullups", "family": "resistor", "role": "i2c_pullup", "required": true, "applies_to": ["peripheral:i2c"], "recipes": [{"id": "sda_pullup", "family": "resistor", "role": "i2c_pullup", "package": "0603", "value_kind": "resistance", "value": "4.7k", "minimum_confidence": "rule_inferred", "required_functions": ["A", "B"], "connections": [{"function": "A", "parent_function": "VDD"}, {"function": "B", "parent_function": "peripheral:i2c:sda"}]}, {"id": "scl_pullup", "family": "resistor", "role": "i2c_pullup", "package": "0603", "value_kind": "resistance", "value": "4.7k", "minimum_confidence": "rule_inferred", "required_functions": ["A", "B"], "connections": [{"function": "A", "parent_function": "VDD"}, {"function": "B", "parent_function": "peripheral:i2c:scl"}]}], "description": "Populate reviewed default I2C pull-ups when an I2C peripheral bundle is assigned."},
+        {"id": "stm32.external_hse", "family": "crystal", "role": "clock_network", "required": true, "applies_to": ["clock:external_hse"], "recipes": [{"id": "hse_crystal", "family": "crystal", "role": "clock", "package": "5032_2pin", "value_kind": "frequency", "value": "16", "minimum_confidence": "verified", "required_functions": ["XTAL_1", "XTAL_2"], "connections": [{"function": "XTAL_1", "parent_function": "PC14"}, {"function": "XTAL_2", "parent_function": "PC15"}]}, {"id": "hse_load_in", "family": "capacitor", "role": "load_capacitor", "package": "0603", "value_kind": "capacitance", "value": "22p", "min_voltage_v": 6.3, "minimum_confidence": "rule_inferred", "required_functions": ["A", "B"], "connections": [{"function": "A", "parent_function": "PC14"}, {"function": "B", "parent_function": "VSS"}]}, {"id": "hse_load_out", "family": "capacitor", "role": "load_capacitor", "package": "0603", "value_kind": "capacitance", "value": "22p", "min_voltage_v": 6.3, "minimum_confidence": "rule_inferred", "required_functions": ["A", "B"], "connections": [{"function": "A", "parent_function": "PC15"}, {"function": "B", "parent_function": "VSS"}]}], "description": "Populate the reviewed crystal and load-capacitor network only when external_hse is selected."},
+        {"id": "stm32.swd", "family": "connector", "role": "programming_header", "required": true, "recipes": [{"id": "swd_header", "family": "connector", "role": "connector", "package": "pin_header_1x05", "minimum_confidence": "verified", "required_functions": ["PIN_1", "PIN_2", "PIN_3", "PIN_4", "PIN_5"], "connections": [{"function": "PIN_1", "parent_function": "VDD"}, {"function": "PIN_2", "parent_function": "PA13"}, {"function": "PIN_3", "parent_function": "VSS"}, {"function": "PIN_4", "parent_function": "PA14"}, {"function": "PIN_5", "parent_function": "PF2"}]}], "description": "Expose target voltage, SWDIO, ground, SWCLK, and reset."}
+      ],
+      "symbols": [{
+        "symbol_id": "MCU_ST_STM32G0:STM32G031K8Tx",
+        "function_pins": [
+          {"function": "PB9", "symbol_pin": "1"}, {"function": "PC14", "symbol_pin": "2"}, {"function": "PC15", "symbol_pin": "3"}, {"function": "VDD", "symbol_pin": "4", "electrical": "power_in", "required": true},
+          {"function": "VSS", "symbol_pin": "5", "electrical": "power_in", "required": true}, {"function": "PF2", "symbol_pin": "6", "required": true}, {"function": "PA0", "symbol_pin": "7"}, {"function": "PA1", "symbol_pin": "8"},
+          {"function": "PA2", "symbol_pin": "9"}, {"function": "PA3", "symbol_pin": "10"}, {"function": "PA4", "symbol_pin": "11"}, {"function": "PA5", "symbol_pin": "12"},
+          {"function": "PA6", "symbol_pin": "13"}, {"function": "PA7", "symbol_pin": "14"}, {"function": "PB0", "symbol_pin": "15"}, {"function": "PB1", "symbol_pin": "16"},
+          {"function": "PB2", "symbol_pin": "17"}, {"function": "PA8", "symbol_pin": "18"}, {"function": "NC/PA9", "symbol_pin": "19", "electrical": "no_connect"}, {"function": "PC6", "symbol_pin": "20"},
+          {"function": "NC/PA10", "symbol_pin": "21", "electrical": "no_connect"}, {"function": "PA9/PA11", "symbol_pin": "22"}, {"function": "PA10/PA12", "symbol_pin": "23"}, {"function": "PA13", "symbol_pin": "24", "required": true},
+          {"function": "PA14", "symbol_pin": "25", "required": true}, {"function": "PA15", "symbol_pin": "26"}, {"function": "PB3", "symbol_pin": "27"}, {"function": "PB4", "symbol_pin": "28"},
+          {"function": "PB5", "symbol_pin": "29"}, {"function": "PB6", "symbol_pin": "30"}, {"function": "PB7", "symbol_pin": "31"}, {"function": "PB8", "symbol_pin": "32"}
+        ],
+        "verification": {"confidence": "verified", "sources": ["datasheet:ST:STM32G031x4-x6-x8:DS12992-rev4", "kicad-symbols:MCU_ST_STM32G0:STM32G031K8Tx", "builtin_pinmap:MCU_ST_STM32G0:STM32G031K8Tx"], "pinmap_checked": true}
+      }],
+      "packages": [{
+        "id": "lqfp32",
+        "name": "LQFP-32 7x7 mm P0.8",
+        "footprint_id": "Package_QFP:LQFP-32_7x7mm_P0.8mm",
+        "package_type": "lqfp32",
+        "mpn": "STM32G031K8T6",
+        "lifecycle": "active",
+        "pinmap_id": "MCU_ST_STM32G0:STM32G031K8Tx|Package_QFP:LQFP-32_7x7mm_P0.8mm",
+        "dimensions_mm": {"width": 7.0, "height": 7.0},
+        "height_mm": 1.6,
+        "pad_functions": [
+          {"function": "PB9", "pad": "1"}, {"function": "PC14", "pad": "2"}, {"function": "PC15", "pad": "3"}, {"function": "VDD", "pad": "4"},
+          {"function": "VSS", "pad": "5"}, {"function": "PF2", "pad": "6"}, {"function": "PA0", "pad": "7"}, {"function": "PA1", "pad": "8"},
+          {"function": "PA2", "pad": "9"}, {"function": "PA3", "pad": "10"}, {"function": "PA4", "pad": "11"}, {"function": "PA5", "pad": "12"},
+          {"function": "PA6", "pad": "13"}, {"function": "PA7", "pad": "14"}, {"function": "PB0", "pad": "15"}, {"function": "PB1", "pad": "16"},
+          {"function": "PB2", "pad": "17"}, {"function": "PA8", "pad": "18"}, {"function": "NC/PA9", "pad": "19"}, {"function": "PC6", "pad": "20"},
+          {"function": "NC/PA10", "pad": "21"}, {"function": "PA9/PA11", "pad": "22"}, {"function": "PA10/PA12", "pad": "23"}, {"function": "PA13", "pad": "24"},
+          {"function": "PA14", "pad": "25"}, {"function": "PA15", "pad": "26"}, {"function": "PB3", "pad": "27"}, {"function": "PB4", "pad": "28"},
+          {"function": "PB5", "pad": "29"}, {"function": "PB6", "pad": "30"}, {"function": "PB7", "pad": "31"}, {"function": "PB8", "pad": "32"}
+        ],
+        "verification": {"confidence": "verified", "sources": ["datasheet:ST:STM32G031x4-x6-x8:DS12992-rev4", "kicad-footprints:Package_QFP:LQFP-32_7x7mm_P0.8mm", "builtin_pinmap:MCU_ST_STM32G0:STM32G031K8Tx"], "pinmap_checked": true}
+      }],
+      "verification": {"confidence": "verified", "sources": ["curated_part:STMicroelectronics:STM32G031K8T6", "datasheet:ST:STM32G031x4-x6-x8:DS12992-rev4", "kicad-symbols:MCU_ST_STM32G0:STM32G031K8Tx", "kicad-footprints:Package_QFP:LQFP-32_7x7mm_P0.8mm"], "resolver_checked": true, "pinmap_checked": true, "notes": ["Only the STM32G031K8T6 LQFP-32 variant and encoded alternate-function subset are promoted."]}
     },
     {
       "id": "crystal.generic.5032_2pin",

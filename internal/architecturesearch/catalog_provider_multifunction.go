@@ -153,6 +153,13 @@ func (provider *CatalogProvider) expandFixedRegulators(ctx context.Context, requ
 		if !recordSupportsRatings(record, requiredRatings) {
 			continue
 		}
+		if recordHasFunction(record, "EN") {
+			enableMaximum, enableOK := recordRatingMaximum(record, "enable_voltage", "V")
+			absoluteMaximum, absoluteOK := recordRatingMaximum(record, "enable_voltage_abs_max", "V")
+			if !enableOK || !absoluteOK || inputMaximum > enableMaximum || inputMaximum > absoluteMaximum {
+				continue
+			}
+		}
 		part, err := provider.selectComponent(ctx, "regulator", record.MPN, requiredRatings, true)
 		if err != nil || part.record.ID != record.ID {
 			continue
@@ -163,8 +170,12 @@ func (provider *CatalogProvider) expandFixedRegulators(ctx context.Context, requ
 			return nil, err
 		}
 		bindings := bindRoles(request.Ports, part.selected.InstanceID, map[string]string{"input": "VIN", "output": "VOUT", "reference": "GND"})
+		inputEndpoints := []RealizationEndpoint{endpoint(part, "VIN"), passiveEndpoint("input_bypass", "A")}
+		if recordHasFunction(part.record, "EN") {
+			inputEndpoints = append(inputEndpoints, endpoint(part, "EN"))
+		}
 		connections := []RealizationConnection{
-			semanticNet("regulator_input", "power", endpoint(part, "VIN"), passiveEndpoint("input_bypass", "A")),
+			semanticNet("regulator_input", "power", inputEndpoints...),
 			semanticNet("regulator_output", "power", endpoint(part, "VOUT"), passiveEndpoint("output_bypass", "A")),
 			semanticNet("regulator_ground", "reference", endpoint(part, "GND"), passiveEndpoint("input_bypass", "B"), passiveEndpoint("output_bypass", "B")),
 		}

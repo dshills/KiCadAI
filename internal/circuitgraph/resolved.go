@@ -31,6 +31,7 @@ type ResolvedDocument struct {
 	CatalogID      string              `json:"catalog_id"`
 	CatalogHash    string              `json:"catalog_hash"`
 	LibraryHash    string              `json:"library_hash,omitempty"`
+	GenerationHash string              `json:"generation_hash"`
 	ResolutionHash string              `json:"resolution_hash"`
 }
 

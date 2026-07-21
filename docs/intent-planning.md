@@ -413,27 +413,32 @@ Structured intent supports semantic target, bus, and supply fields:
 
 Implemented semantic mappings:
 
-- MCU plus I2C sensor/connector plans now connect SDA/SCL through the supported
-  ATmega328P-A seed MCU template when exactly one compatible MCU target exists.
+- Behavior-first MCU requirements can select a compatible verified
+  ATmega328P-A, ESP32-WROOM-32E, or STM32G031K8T6 target and connect modeled
+  GPIO, UART, I2C, SPI, PWM, ADC, interrupt, programming, power, reset, and
+  clock roles through resolved physical functions.
 - Reset/programming support can connect ISP or UART headers to a resolved MCU
   target using semantic port roles and target-scoped signal nets.
 - Voltage-domain planning records selected source/net evidence on affected
   requirements and refuses to silently fall back when an explicit supply alias
   is unknown.
-- Multiple compatible MCU targets require explicit target metadata rather than
-  guessed support wiring.
-- External MCU clock intent now reports a precise topology limitation: target
-  clock ports are known, but the current generated MCU block still only emits
-  internal-clock topology.
+- Infeasible MCU selection or pin assignment produces stable capability-gap
+  evidence with deterministic rejected-candidate codes rather than guessed
+  support wiring.
+- External MCU clock intent can select a verified catalog clock option and add
+  its conditional companion network; unavailable policies fail with a stable
+  clock capability code.
 
 Current intent-planner gaps:
 
 - natural-language intake covers only the supported seed phrases and remains a
   deterministic draft adapter, not a general LLM parser;
-- MCU semantic support is limited to the verified seed template and does not
-  yet derive alternate functions from arbitrary KiCad symbols;
-- external MCU clock generation is still blocked until the MCU block can emit a
-  safe non-internal clock topology;
+- MCU semantic support is limited to verified records with explicit physical
+  and alternate-function evidence; it does not derive undocumented MCU facts
+  from arbitrary KiCad symbols;
+- bus fanout, pull-up sizing, ADC source impedance, and programming-load checks
+  remain bounded by the electrical constraints present in the request and
+  catalog;
 - design rationale reports explain current decisions and blockers, but they do
   not create new schematic/PCB topology beyond the deterministic planner;
 - synthesis calculations now apply supported values to LED, I2C pull-up, and

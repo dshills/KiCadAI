@@ -527,12 +527,14 @@ func TestPinHeaderTemplatePreservesThroughHoleLayerAccess(t *testing.T) {
 }
 
 func TestTQFP32TemplatePreservesCourtyardEscapeMargin(t *testing.T) {
-	template, ok := verifiedPadTemplate("Package_QFP:TQFP-32_7x7mm_P0.8mm")
-	if !ok || len(template.Pads) != 32 {
-		t.Fatalf("template = %#v, ok=%t", template, ok)
-	}
-	if template.Bounds.WidthMM != 10.3 || template.Bounds.HeightMM != 10.3 {
-		t.Fatalf("courtyard bounds = %#v, want 10.3 mm square", template.Bounds)
+	for _, footprintID := range []string{"Package_QFP:TQFP-32_7x7mm_P0.8mm", "Package_QFP:LQFP-32_7x7mm_P0.8mm"} {
+		template, ok := verifiedPadTemplate(footprintID)
+		if !ok || len(template.Pads) != 32 {
+			t.Fatalf("%s template = %#v, ok=%t", footprintID, template, ok)
+		}
+		if template.Bounds.WidthMM != 10.3 || template.Bounds.HeightMM != 10.3 {
+			t.Fatalf("%s courtyard bounds = %#v, want 10.3 mm square", footprintID, template.Bounds)
+		}
 	}
 }
 

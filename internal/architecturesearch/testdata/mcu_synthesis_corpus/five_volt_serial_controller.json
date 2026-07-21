@@ -1,0 +1,29 @@
+{
+  "schema": "kicadai.open-set-requirement.v1",
+  "version": 1,
+  "project": {"name": "five_volt_serial_controller", "title": "Five volt serial controller", "description": "A five volt programmable controller exposes a serial interface and two digital controls while preserving programming access."},
+  "requirements": {
+    "domains": [
+      {"id": "ground", "kind": "reference", "nominal_voltage_v": 0, "source": "external"},
+      {"id": "logic", "kind": "supply", "min_voltage_v": 4.75, "nominal_voltage_v": 5, "max_voltage_v": 5.25, "max_current_a": 0.15, "source": "external"}
+    ],
+    "ports": [
+      {"id": "ground", "kind": "reference", "direction": "bidirectional", "domain": "ground"},
+      {"id": "logic_power", "kind": "power", "direction": "sink", "domain": "logic", "electrical": {"max_current_a": 0.15}},
+      {"id": "sense", "kind": "analog_voltage", "direction": "sink", "domain": "logic", "electrical": {"min_voltage_v": 0, "max_voltage_v": 3.3}},
+      {"id": "alert", "kind": "digital_logic", "direction": "source", "domain": "logic", "electrical": {"min_voltage_v": 0, "max_voltage_v": 5, "default_state": "inactive"}}
+    ],
+    "participants": [{
+      "id": "controller", "capability": "programmable_controller", "domain": "logic",
+      "required_ports": [
+        {"id": "host_serial", "kind": "digital_bus", "direction": "bidirectional", "protocol": {"name": "uart", "mode": "push_pull", "max_frequency_hz": 115200}},
+        {"id": "enable", "kind": "digital_logic", "direction": "source"},
+        {"id": "fault", "kind": "digital_logic", "direction": "sink"}
+      ],
+      "constraints": [{"name": "programmable_interface", "relation": "required", "value": true}]
+    }],
+    "objectives": [{"id": "monitor", "capability": "threshold_detection", "bindings": [{"role": "power", "port": "logic_power"}, {"role": "reference", "port": "ground"}, {"role": "sense", "port": "sense"}, {"role": "output", "port": "alert"}], "constraints": [{"name": "threshold_voltage", "relation": "target", "value": 1.5, "unit": "V", "tolerance_percent": 2}, {"name": "hysteresis_width", "relation": "target", "value": 0.2, "unit": "V", "tolerance_percent": 10}, {"name": "output_polarity", "relation": "equal", "value": "active_low"}, {"name": "propagation_delay", "relation": "maximum", "value": 10, "unit": "us"}, {"name": "inactive_at_power_up", "relation": "required", "value": true}] }],
+    "constraints": {"max_components": 16, "max_width_mm": 60, "max_height_mm": 40}
+  },
+  "acceptance": {"require_erc": true, "require_strict_drc": true, "require_complete_routing": true, "require_connectivity": true, "require_writer_correctness": true, "require_round_trip_zero_diff": true, "require_deterministic_replay": true, "require_fail_closed": true}
+}

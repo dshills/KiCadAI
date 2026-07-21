@@ -107,6 +107,7 @@ type ComponentRecord struct {
 	Resistor           *ResistorEvidence           `json:"resistor_evidence,omitempty"`
 	OpAmp              *OpAmpEvidence              `json:"opamp_evidence,omitempty"`
 	Sensor             *SensorEvidence             `json:"sensor_evidence,omitempty"`
+	MCU                *MCUEvidence                `json:"mcu_evidence,omitempty"`
 	AmplifierOutput    *AmplifierOutputEvidence    `json:"amplifier_output_evidence,omitempty"`
 	PowerSemiconductor *PowerSemiconductorEvidence `json:"power_semiconductor_evidence,omitempty"`
 	Thermal            *ThermalEvidence            `json:"thermal_evidence,omitempty"`
@@ -836,6 +837,7 @@ func sortRecord(record *ComponentRecord) {
 		}
 		return record.DeratingRules[i].Kind < record.DeratingRules[j].Kind
 	})
+	sortMCUEvidence(record.MCU)
 	sort.SliceStable(record.PlacementHints, func(i, j int) bool {
 		if record.PlacementHints[i].Kind == record.PlacementHints[j].Kind {
 			return record.PlacementHints[i].Target < record.PlacementHints[j].Target
