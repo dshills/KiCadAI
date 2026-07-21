@@ -28,3 +28,7 @@ examples/promotion_artifacts/
 examples/.generated/
 examples/generated/
 .kicadai/
+
+# Local generated scratch
+/tmp/
+/internal/compositionlowering/tmp/
