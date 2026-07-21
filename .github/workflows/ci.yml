@@ -40,10 +40,40 @@ jobs:
           version: v2.12.2
           args: --timeout=5m ./...
 
-      - name: Run complete test suite
-        run: make test
+      # Frozen end-to-end promotion corpora run in independent jobs below.
+      - name: Run bounded test suite
+        run: make GO_TEST_FLAGS=-short test
 
-      # Coverage uses Go's short-test tier because the complete suite above
-      # already exercises the multi-minute end-to-end promotion corpora.
+      # Coverage uses the same bounded tier; promotion jobs exercise the long
+      # end-to-end gates without instrumenting them a second time.
       - name: Enforce coverage floor
         run: make COVER_TEST_FLAGS=-short coverage-check
+
+  offline-promotion:
+    name: Offline promotion corpus (${{ matrix.name }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      KICADAI_EXAMPLE_TEST_TIMEOUT: 3m
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: open-set
+            test: TestFrozenOpenSetCorpusPassesOfflineWorkflow
+          - name: adversarial-multi-function
+            test: TestFrozenAdversarialMultiFunctionCorpusPassesOfflineWorkflow
+          - name: simulation-grounded
+            test: TestFrozenSimulationGroundedCorpusPassesOfflineWorkflow
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Run frozen promotion corpus
+        run: make GO_TEST_PACKAGE=./internal/compositionlowering GO_TEST_NAME='${{ matrix.test }}' test-one

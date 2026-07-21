@@ -1,6 +1,6 @@
 .DEFAULT_GOAL := help
 
-.PHONY: help build install test lint coverage coverage-check run-help refresh-kicad-proto proto proto-check
+.PHONY: help build install test test-one lint coverage coverage-check run-help refresh-kicad-proto proto proto-check
 
 BIN_DIR := $(CURDIR)/bin
 BIN := $(BIN_DIR)/kicadai
@@ -15,6 +15,9 @@ COVER_NOGEN_TOTAL := $(COVER_DIR)/kicadai.nogen.total
 GEN_COVER_EXCLUDE := (^|\/)internal\/kiapi\/gen\/
 COVERAGE_THRESHOLD ?= 75.0
 GO_TEST_TIMEOUT ?= 20m
+GO_TEST_FLAGS ?=
+GO_TEST_PACKAGE ?= ./...
+GO_TEST_NAME ?=
 COVER_TEST_FLAGS ?=
 
 help:
@@ -22,6 +25,7 @@ help:
 	@printf "  make build           Build CLI binary to ./bin/kicadai\n"
 	@printf "  make install         Install CLI binary to ./bin using go install\n"
 	@printf "  make test            Run Go tests\n"
+	@printf "  make test-one        Run and require one named Go test (GO_TEST_NAME=...)\n"
 	@printf "  make lint            Run gofmt, go vet, and golangci-lint when installed\n"
 	@printf "  make coverage        Generate coverage profiles\n"
 	@printf "  make coverage-check  Enforce coverage threshold (COVERAGE_THRESHOLD=%s)\n" "$(COVERAGE_THRESHOLD)"
@@ -37,7 +41,24 @@ install:
 	GOCACHE="$(GOCACHE_DIR)" GOMODCACHE="$(GOMODCACHE_DIR)" go install ./cmd/kicadai
 
 test:
-	GOCACHE="$(GOCACHE_DIR)" GOMODCACHE="$(GOMODCACHE_DIR)" go test -timeout "$(GO_TEST_TIMEOUT)" ./...
+	GOCACHE="$(GOCACHE_DIR)" GOMODCACHE="$(GOMODCACHE_DIR)" go test $(GO_TEST_FLAGS) -timeout "$(GO_TEST_TIMEOUT)" ./...
+
+test-one:
+	@if [ -z "$(GO_TEST_NAME)" ]; then \
+		printf "GO_TEST_NAME is required\n" >&2; \
+		exit 2; \
+	fi
+	@set +e; \
+	output="$$(GOCACHE="$(GOCACHE_DIR)" GOMODCACHE="$(GOMODCACHE_DIR)" go test $(GO_TEST_FLAGS) -timeout "$(GO_TEST_TIMEOUT)" "$(GO_TEST_PACKAGE)" -run '^$(GO_TEST_NAME)$$' -count=1 -v 2>&1)"; \
+	status=$$?; \
+	printf "%s\n" "$$output"; \
+	if [ "$$status" -ne 0 ]; then \
+		exit "$$status"; \
+	fi; \
+	if ! printf "%s\n" "$$output" | grep -Fq -- "--- PASS: $(GO_TEST_NAME) "; then \
+		printf "named test did not run and pass: %s\n" "$(GO_TEST_NAME)" >&2; \
+		exit 1; \
+	fi
 
 lint:
 	@unformatted="$$(gofmt -l $$(git ls-files '*.go'))"; \
