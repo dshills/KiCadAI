@@ -15,6 +15,7 @@ COVER_NOGEN_TOTAL := $(COVER_DIR)/kicadai.nogen.total
 GEN_COVER_EXCLUDE := (^|\/)internal\/kiapi\/gen\/
 COVERAGE_THRESHOLD ?= 75.0
 GO_TEST_TIMEOUT ?= 20m
+COVER_TEST_FLAGS ?=
 
 help:
 	@printf "KiCadAI targets:\n"
@@ -54,7 +55,7 @@ lint:
 coverage:
 	mkdir -p "$(COVER_DIR)"
 	rm -f "$(COVER_PROFILE)" "$(COVER_NOGEN_PROFILE)" "$(COVER_NOGEN_TOTAL)"
-	GOCACHE="$(GOCACHE_DIR)" GOMODCACHE="$(GOMODCACHE_DIR)" go test -timeout "$(GO_TEST_TIMEOUT)" -coverprofile="$(COVER_PROFILE)" ./...
+	GOCACHE="$(GOCACHE_DIR)" GOMODCACHE="$(GOMODCACHE_DIR)" go test $(COVER_TEST_FLAGS) -timeout "$(GO_TEST_TIMEOUT)" -coverprofile="$(COVER_PROFILE)" ./...
 	awk 'NR == 1 || $$0 !~ /$(GEN_COVER_EXCLUDE)/' "$(COVER_PROFILE)" > "$(COVER_NOGEN_PROFILE)"
 	@printf "\nRaw coverage including generated protobuf code:\n"
 	@printf "Raw total: "

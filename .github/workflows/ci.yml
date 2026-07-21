@@ -40,8 +40,10 @@ jobs:
           version: v2.12.2
           args: --timeout=5m ./...
 
-      # coverage-check runs the complete Go test suite with instrumentation;
-      # a separate uninstrumented pass only duplicates the longest routing
-      # corpus and can exhaust the bounded job window on hosted runners.
-      - name: Run test suite and enforce coverage floor
-        run: make coverage-check
+      - name: Run complete test suite
+        run: make test
+
+      # Coverage uses Go's short-test tier because the complete suite above
+      # already exercises the multi-minute end-to-end promotion corpora.
+      - name: Enforce coverage floor
+        run: make COVER_TEST_FLAGS=-short coverage-check

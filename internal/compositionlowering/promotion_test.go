@@ -27,10 +27,12 @@ import (
 )
 
 func TestFrozenOpenSetCorpusPassesOfflineWorkflow(t *testing.T) {
+	requireLongPromotionTest(t)
 	runFrozenPromotion(t, "open_set_composition_corpus", 5, "KICADAI_OPEN_SET_ARTIFACT_DIR", "", libraryresolver.LibraryIndex{})
 }
 
 func TestFrozenOpenSetCorpusOptionalKiCadPromotion(t *testing.T) {
+	requireLongPromotionTest(t)
 	cli := os.Getenv("KICADAI_KICAD_CLI")
 	if cli == "" {
 		t.Skip("set KICADAI_KICAD_CLI to run the KiCad-backed open-set corpus")
@@ -47,10 +49,12 @@ func TestFrozenOpenSetCorpusOptionalKiCadPromotion(t *testing.T) {
 }
 
 func TestFrozenAdversarialMultiFunctionCorpusPassesOfflineWorkflow(t *testing.T) {
+	requireLongPromotionTest(t)
 	runFrozenPromotion(t, "adversarial_multi_function_composition_corpus", 10, "KICADAI_ADVERSARIAL_MULTI_FUNCTION_ARTIFACT_DIR", "", libraryresolver.LibraryIndex{})
 }
 
 func TestFrozenAdversarialMultiFunctionCorpusOptionalKiCadPromotion(t *testing.T) {
+	requireLongPromotionTest(t)
 	cli := os.Getenv("KICADAI_KICAD_CLI")
 	if cli == "" {
 		t.Skip("set KICADAI_KICAD_CLI to run the KiCad-backed adversarial multi-function corpus")
@@ -67,10 +71,12 @@ func TestFrozenAdversarialMultiFunctionCorpusOptionalKiCadPromotion(t *testing.T
 }
 
 func TestFrozenSimulationGroundedCorpusPassesOfflineWorkflow(t *testing.T) {
+	requireLongPromotionTest(t)
 	runFrozenPromotionAt(t, filepath.Join("..", "architecturesearch", "testdata", "simulation_grounded_closed_loop_corpus"), 10, "KICADAI_SIMULATION_GROUNDED_ARTIFACT_DIR", "", libraryresolver.LibraryIndex{})
 }
 
 func TestFrozenSimulationGroundedCorpusOptionalKiCadPromotion(t *testing.T) {
+	requireLongPromotionTest(t)
 	cli := os.Getenv("KICADAI_KICAD_CLI")
 	if cli == "" {
 		t.Skip("set KICADAI_KICAD_CLI to run the KiCad-backed simulation-grounded corpus")
@@ -84,6 +90,13 @@ func TestFrozenSimulationGroundedCorpusOptionalKiCadPromotion(t *testing.T) {
 		t.Fatalf("installed library index is empty: %#v", loadIssues)
 	}
 	runFrozenPromotionAt(t, filepath.Join("..", "architecturesearch", "testdata", "simulation_grounded_closed_loop_corpus"), 10, "KICADAI_SIMULATION_GROUNDED_ARTIFACT_DIR", cli, index)
+}
+
+func requireLongPromotionTest(t *testing.T) {
+	t.Helper()
+	if testing.Short() {
+		t.Skip("skipping frozen end-to-end promotion corpus in short mode")
+	}
 }
 
 func runFrozenPromotion(t *testing.T, corpusDir string, expectedCount int, artifactEnv string, cli string, installedIndex libraryresolver.LibraryIndex) {
