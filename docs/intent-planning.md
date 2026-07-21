@@ -8,6 +8,53 @@ catalog-resolved before it is lowered into this design workflow. See
 [AI Generation](ai-generation.md); the generic path does not bypass intent,
 electrical, placement, routing, or KiCad validation gates.
 
+### Behavioral Intent Compilation
+
+`intent compile` is the fail-closed natural-language entry point for strict
+open-set behavioral requirements. The prompt describes external interfaces,
+observable behavior, operating ranges and corners, tolerances, safety limits,
+and manufacturing-neutral board bounds. It must not choose topology, parts,
+nets, coordinates, layers, or routes.
+
+```sh
+kicadai \
+  --text "Filter a ground-referenced input at 18 kHz to 22 kHz with gain from 9.5 to 10.5 across a 10.8 V to 13.2 V supply." \
+  --provider openai \
+  --ai-profile behavioral-intent-v1 \
+  --output ./out/behavioral-filter \
+  intent compile
+```
+
+The command derives and hashes the installed semantic capabilities before the
+provider call, strict-decodes provider output, verifies source and reverse
+coverage, qualifies a ready proposal with deterministic architecture search,
+and requires hash-bound trusted closed-loop simulation over every declared
+corner. Its terminal statuses are `ready`, `needs_clarification`,
+`unsupported`, and `invalid`. Only `ready` retains an executable strict v3
+requirement and writes `behavioral-design-request.json`; unsupported behavior
+produces stable semantic capability-gap records instead of a guessed design.
+
+When clarification is required, the output directory contains
+`.kicadai/behavioral-follow-up-template.json`. Fill only each `answer` field,
+then rerun against the complete original text and the same output directory:
+
+```sh
+kicadai \
+  --file ./original-request.txt \
+  --provider openai \
+  --ai-profile behavioral-intent-v1 \
+  --output ./out/behavioral-filter \
+  --follow-up ./out/behavioral-filter/.kicadai/behavioral-follow-up-template.json \
+  --overwrite \
+  intent compile
+```
+
+The follow-up hashes bind answers to the exact original source, capability
+snapshot, proposal, and compilation. Answers may resolve only the named
+clarification and uncertainty identities. Full proposal, compilation,
+architecture-search, closed-loop, provider-attempt, and replay evidence is
+persisted under `.kicadai/`; large simulation evidence is not emitted inline.
+
 ### AI Design Workflow
 
 `design create` is the first deterministic AI-facing workflow. It accepts an

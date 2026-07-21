@@ -77,7 +77,7 @@ Commands:
   writer        Check generated writer correctness
   validate      Validate generated board electrical correctness
   inspect       Inspect KiCad projects and files
-  intent        Plan or explain high-level AI design intent requests
+  intent        Compile, plan, or explain high-level AI design intent requests
   library       Index and query KiCad symbol and footprint libraries
   evaluate      Evaluate KiCad projects and files
   pinmap        List or validate symbol-footprint pinmaps
@@ -111,10 +111,11 @@ Global flags:
   --prompt string        AI-provider natural-language design request
   --prompt-file string   AI-provider request file (avoids shell history)
   --provider string      AI intent provider: openai or recorded
-  --ai-profile string    Explicit AI schema profile, including generic-circuit-v1
+  --ai-profile string    Explicit AI schema profile, including behavioral-intent-v1 and generic-circuit-v1
   --promotion-readiness string Declared promotion readiness: expected_fail, candidate, pass, or blocked
   --model string         AI provider model override
   --provider-record string Recorded AI response fixture path
+  --follow-up string      Behavioral clarification answer JSON path
   --max-ai-attempts int  Maximum AI intent attempts: 1 or 2 (default 1)
   --ai-max-output-tokens int Maximum provider output tokens; profile default when omitted
   --ai-background        Use OpenAI background polling (requires temporary provider storage)
@@ -232,6 +233,7 @@ type cliOptions struct {
 	promotionReadiness          string
 	aiModel                     string
 	aiProviderRecord            string
+	behavioralFollowUp          string
 	maxAIAttempts               int
 	aiMaxOutputTokens           int
 	aiBackground                bool
@@ -438,10 +440,11 @@ func parse(args []string, stderr io.Writer) (cliOptions, string, error) {
 	flags.StringVar(&opts.aiPrompt, "prompt", "", "AI-provider natural-language design request")
 	flags.StringVar(&opts.aiPromptFile, "prompt-file", "", "AI-provider request file")
 	flags.StringVar(&opts.aiProvider, "provider", "", "AI intent provider: openai or recorded")
-	flags.StringVar(&opts.aiProfile, "ai-profile", "", "explicit AI schema profile, including generic-circuit-v1")
+	flags.StringVar(&opts.aiProfile, "ai-profile", "", "explicit AI schema profile, including behavioral-intent-v1 and generic-circuit-v1")
 	flags.StringVar(&opts.promotionReadiness, "promotion-readiness", "", "declared promotion readiness: expected_fail, candidate, pass, or blocked")
 	flags.StringVar(&opts.aiModel, "model", "", "AI provider model override")
 	flags.StringVar(&opts.aiProviderRecord, "provider-record", "", "recorded AI response fixture path")
+	flags.StringVar(&opts.behavioralFollowUp, "follow-up", "", "behavioral clarification answer JSON path")
 	flags.IntVar(&opts.maxAIAttempts, "max-ai-attempts", 1, "maximum AI intent attempts")
 	flags.IntVar(&opts.aiMaxOutputTokens, "ai-max-output-tokens", 0, "maximum AI provider output tokens")
 	flags.BoolVar(&opts.aiBackground, "ai-background", false, "use OpenAI background polling")
@@ -2771,9 +2774,11 @@ type aiLaneStatus struct {
 
 func runIntent(ctx context.Context, opts cliOptions, stdout io.Writer) error {
 	if len(opts.commandArgs) == 0 {
-		return writeReportFailure(stdout, "intent", reports.Issue{Code: reports.CodeInvalidArgument, Severity: reports.SeverityError, Path: "intent", Message: "intent requires subcommand: plan or explain"})
+		return writeReportFailure(stdout, "intent", reports.Issue{Code: reports.CodeInvalidArgument, Severity: reports.SeverityError, Path: "intent", Message: "intent requires subcommand: compile, draft, plan, explain, rationale, or create"})
 	}
 	switch opts.commandArgs[0] {
+	case "compile":
+		return runBehavioralIntentCompile(ctx, opts, stdout)
 	case "draft":
 		return runIntentDraft(opts, stdout)
 	case "plan", "explain":

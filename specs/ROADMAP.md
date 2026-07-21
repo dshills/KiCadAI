@@ -1135,8 +1135,10 @@ The five-requirement open-set milestone and the 10-circuit adversarial
 multi-function milestone are complete. Further fixtures should target genuinely
 new uncertainty rather than repeat the same provider envelope.
 
-1. Add a held-out behavioral-intent front end that must derive the strict v2
-   requirement contract, expose uncertainty, and request clarification instead
+1. Complete the
+   [uncertainty-aware behavioral intent compiler](uncertainty-aware-behavioral-intent-compilation/SPEC.md):
+   derive the strict v3 requirement contract, account for source claims, expose
+   uncertainty, and request clarification or record a capability gap instead
    of guessing.
 2. Add dynamic electrothermal and control-loop evidence where static global
    bounds cannot prove startup, SOA, stability, or transient protection.

@@ -5,6 +5,7 @@ import (
 	"strings"
 	"unicode"
 
+	"kicadai/internal/behavioralintent"
 	"kicadai/internal/circuitgraph"
 )
 
@@ -13,6 +14,8 @@ const (
 	ReferenceProfileProtectedLED    = "usb_c_led_protected"
 	BMP280ReferenceSchemaName       = "kicadai_bmp280_intent_v1"
 	ProtectedLEDReferenceSchemaName = "kicadai_usb_c_led_intent_v1"
+	BehavioralIntentProfileID       = "behavioral-intent-v1"
+	BehavioralIntentSchemaName      = "kicadai_behavioral_intent_v1"
 )
 
 var (
@@ -60,6 +63,16 @@ func GenericCircuitProfile(capabilityContext string) ReferenceProfile {
 	}
 }
 
+// BehavioralIntentProfile translates ordinary design language only into the
+// topology-neutral behavioral proposal consumed by behavioralintent.Compile.
+func BehavioralIntentProfile(capabilityContext string) ReferenceProfile {
+	return ReferenceProfile{
+		ID: BehavioralIntentProfileID, SchemaName: BehavioralIntentSchemaName,
+		CapabilityContext: capabilityContext, MaxOutputTokens: DefaultGenericOutputTokens,
+		schema: behavioralIntentEnvelopeSchema,
+	}
+}
+
 func ReferenceProfileByID(id string) (ReferenceProfile, error) {
 	switch strings.TrimSpace(id) {
 	case ReferenceProfileBMP280:
@@ -69,6 +82,13 @@ func ReferenceProfileByID(id string) (ReferenceProfile, error) {
 	default:
 		return ReferenceProfile{}, ErrUnsupportedReferencePrompt
 	}
+}
+
+func behavioralIntentEnvelopeSchema() map[string]any {
+	return strictObject(map[string]any{
+		"schema": map[string]any{"type": "string", "const": EnvelopeSchemaV1},
+		"intent": behavioralintent.ProposalSchema(),
+	})
 }
 
 func genericCircuitEnvelopeSchema() map[string]any {

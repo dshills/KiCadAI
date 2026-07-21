@@ -54,6 +54,18 @@ func TestGenericCircuitProfileUsesStrictGraphSchema(t *testing.T) {
 	}
 }
 
+func TestBehavioralIntentProfileUsesTopologyNeutralCompilerSchema(t *testing.T) {
+	profile := BehavioralIntentProfile("behavioral-capabilities")
+	if profile.ID != BehavioralIntentProfileID || profile.SchemaName != BehavioralIntentSchemaName || profile.CapabilityContext != "behavioral-capabilities" || profile.MaxOutputTokens != DefaultGenericOutputTokens {
+		t.Fatalf("behavioral profile = %#v", profile)
+	}
+	properties := profile.IntentEnvelopeSchema()["properties"].(map[string]any)
+	intent := properties["intent"].(map[string]any)
+	if intent["additionalProperties"] != false || properties["schema"].(map[string]any)["const"] != EnvelopeSchemaV1 {
+		t.Fatalf("behavioral envelope is not strict: %#v", profile.IntentEnvelopeSchema())
+	}
+}
+
 func TestReferenceProfilesReturnFreshStrictSchemas(t *testing.T) {
 	for _, profile := range []ReferenceProfile{BMP280Profile(), ProtectedLEDProfile()} {
 		first := profile.IntentEnvelopeSchema()

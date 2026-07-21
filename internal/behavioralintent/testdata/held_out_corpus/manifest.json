@@ -1,0 +1,264 @@
+{
+  "schema": "kicadai.behavioral-intent-held-out-corpus.v1",
+  "version": 1,
+  "frozen_at": "2026-07-21T00:00:00Z",
+  "authoring_policy": "Prompts state external behavior, interfaces, operating ranges, tolerances, safety limits, and board constraints without selecting topology, parts, nets, or layout.",
+  "cases": [
+    {
+      "id": "amplifier_continuous_01",
+      "group": "amplifier_continuous",
+      "domain": "amplifier",
+      "outcome": "ready",
+      "prompt": "Create a ground-referenced analog amplifier with a protected output, powered from 16.2 V to 19.8 V at no more than 1 A, delivering 7.6 to 8.4 voltage gain, at least 100 kHz bandwidth and 8 Vpp swing into 600 ohm to 10 kohm loads, while drawing 54 to 66 mA at idle, staying below 0.5 percent distortion, above 45 degrees phase margin and below 125 degC from 0 to 50 degC across tolerances, with startup output within plus or minus 0.5 V and an 85 mm by 58 mm board envelope.",
+      "prompt_sha256": "f7d579b40438fc6972abe3775a6578685f2da790a529c77e4427dc766bdc8e58",
+      "requirement_file": "../architecturesearch/testdata/simulation_grounded_closed_loop_corpus/class_a_amplifier.json",
+      "requirement_sha256": "3440971cdfcfc17f94962498dbdeb78634fa71e396f68dbdf1074a2fbbd88f82"
+    },
+    {
+      "id": "amplifier_continuous_02",
+      "group": "amplifier_continuous",
+      "domain": "amplifier",
+      "outcome": "ready",
+      "prompt": "I need an analog input and protected ground-referenced output operating from an external 18 V nominal rail bounded by 16.2 V and 19.8 V with a 1 A ceiling; require gain between 7.6 and 8.4, bandwidth no lower than 100 kHz, output swing of at least 8 Vpp for 600 ohm through 10 kohm loads, idle current from 54 mA to 66 mA, distortion at or below 0.5 percent, phase margin at least 45 degrees, junction temperature no higher than 125 degC over 0 to 50 degC and all tolerances, startup within plus or minus 0.5 V, and an 85 mm by 58 mm maximum board.",
+      "prompt_sha256": "c3001a5ca88741b7fda22eea00a08e39fb4223a91e07851e42203f79d96892ed",
+      "requirement_file": "../architecturesearch/testdata/simulation_grounded_closed_loop_corpus/class_a_amplifier.json",
+      "requirement_sha256": "3440971cdfcfc17f94962498dbdeb78634fa71e396f68dbdf1074a2fbbd88f82"
+    },
+    {
+      "id": "amplifier_efficient_01",
+      "group": "amplifier_efficient",
+      "domain": "amplifier",
+      "outcome": "ready",
+      "prompt": "Design a protected analog power amplifier with a mute input and ground reference, using external positive and negative rails each nominally 15 V and bounded by 13.5 V to 16.5 V in magnitude plus 3.0 V to 3.6 V logic power, producing 19 to 21 voltage gain, at least 20 kHz bandwidth and 10 W into 8 ohms with no more than 1 percent distortion, 40 mA to 100 mA idle current, at least 45 degrees phase margin, no junction above 125 degC from 0 to 50 degC across tolerances and model corners, muted output within plus or minus 0.05 V, startup within plus or minus 0.5 V, and a 110 mm by 75 mm board limit.",
+      "prompt_sha256": "4ab69dfa80e188434bcffa8dbaaa7d15fd03679ec3429da5f7999c63836f4737",
+      "requirement_file": "../architecturesearch/testdata/simulation_grounded_closed_loop_corpus/class_ab_amplifier.json",
+      "requirement_sha256": "d69518202b296f1c9a1debeb10610e8eaa60d389ce736c1ac0854ccf0957282a"
+    },
+    {
+      "id": "amplifier_efficient_02",
+      "group": "amplifier_efficient",
+      "domain": "amplifier",
+      "outcome": "ready",
+      "prompt": "Provide an analog input, protected 8 ohm output, mute control, ground, dual external 15 V nominal supplies varying from plus or minus 13.5 V to plus or minus 16.5 V and a 3.0 V to 3.6 V logic supply; acceptance is gain 19 through 21, bandwidth at least 20 kHz, power at least 10 W, distortion at most 1 percent, quiescent current 40 mA through 100 mA, phase margin at least 45 degrees, temperature at most 125 degC over 0 to 50 degC with tolerance and model variation, mute within plus or minus 0.05 V, startup within plus or minus 0.5 V, and no more than 110 mm by 75 mm of board area.",
+      "prompt_sha256": "6f13dd6535d0bb69603cebed320c7637e5b48144e58ac01dbf3fea0fb97b3543",
+      "requirement_file": "../architecturesearch/testdata/simulation_grounded_closed_loop_corpus/class_ab_amplifier.json",
+      "requirement_sha256": "d69518202b296f1c9a1debeb10610e8eaa60d389ce736c1ac0854ccf0957282a"
+    },
+    {
+      "id": "filter_01",
+      "group": "active_filter",
+      "domain": "filter",
+      "outcome": "ready",
+      "prompt": "Accept a ground-referenced broadband analog input, limit its passband edge to 18 kHz through 22 kHz, deliver 9.5 through 10.5 voltage gain at a protected output, maintain at least 50 degrees phase margin and settle within 200 us while powered from 10.8 V through 13.2 V into 600 ohm through 100 kohm and up to 1 nF, within a 65 mm by 45 mm board envelope.",
+      "prompt_sha256": "797a86ae2acce1cfe820eac7aaca103ed223491aa641c1e06efb2f530c1ba79a",
+      "requirement_file": "../architecturesearch/testdata/simulation_grounded_closed_loop_corpus/active_filter_amplifier.json",
+      "requirement_sha256": "c78b51e84470f381055eba8742c202a08c2ca8b95f822bb0ea0c8739f053f17d"
+    },
+    {
+      "id": "filter_02",
+      "group": "active_filter",
+      "domain": "filter",
+      "outcome": "ready",
+      "prompt": "Build an analog conditioning function between a ground-referenced input and protected output whose cutoff lies from 18 kHz to 22 kHz, passband gain is 9.5 to 10.5, phase margin never drops below 50 degrees and settling never exceeds 200 us across a 10.8 V to 13.2 V supply, 600 ohm to 100 kohm resistance, zero to 1 nF capacitance, and a maximum 65 mm by 45 mm board.",
+      "prompt_sha256": "fdf01b3448611d1c0524e898d17142779a983646b9582a70c7bd2e2df0afc400",
+      "requirement_file": "../architecturesearch/testdata/simulation_grounded_closed_loop_corpus/active_filter_amplifier.json",
+      "requirement_sha256": "c78b51e84470f381055eba8742c202a08c2ca8b95f822bb0ea0c8739f053f17d"
+    },
+    {
+      "id": "mcu_01",
+      "group": "mcu_i2c_gpio",
+      "domain": "mcu",
+      "outcome": "unsupported",
+      "prompt": "Provide a reprogrammable controller interface powered from 3.0 V through 3.6 V at no more than 250 mA with ground, a protected 400 kHz bidirectional open-drain I2C sensor interface up to 400 pF and a status output limited to 8 mA, requiring bus high level at least 2.6 V, rise time no more than 1 us and startup status no more than 0.4 V from minus 20 degC to 70 degC, within 55 mm by 42 mm.",
+      "prompt_sha256": "50d5e1b3e8a83d1ef882f86b4304dc21b48a2194eff222cfdcb6851b5e4ae40f",
+      "gap_id": "programmable_controller_simulation",
+      "gap_capability": "programmable_controller_simulation",
+      "gap_path": "requirements.participants.controller"
+    },
+    {
+      "id": "mcu_02",
+      "group": "mcu_i2c_gpio",
+      "domain": "mcu",
+      "outcome": "unsupported",
+      "prompt": "I need a reprogrammable control boundary with external 3.3 V nominal power bounded from 3.0 V to 3.6 V and 250 mA, common ground, protected bidirectional open-drain I2C through 400 kHz and 400 pF, and an 8 mA status output; verify at least 2.6 V bus high, at most 1 us rise time and at most 0.4 V startup status over minus 20 degC to 70 degC inside 55 mm by 42 mm.",
+      "prompt_sha256": "35b64e46eb1a2b252b2eee5e96f5ca53fcd79aa19ee83c277b272ec1941a85b6",
+      "gap_id": "programmable_controller_simulation",
+      "gap_capability": "programmable_controller_simulation",
+      "gap_path": "requirements.participants.controller"
+    },
+    {
+      "id": "power_01",
+      "group": "regulated_bus_power",
+      "domain": "power",
+      "outcome": "ready",
+      "prompt": "From an external 4.5 V to 5.5 V supply supporting 500 mA, provide a protected bidirectional 400 kHz open-drain bus between a 5 V host and a 3.2 V to 3.4 V sensor domain supplying 1 mA to 150 mA, keeping the sensor rail inside 3.2 V to 3.4 V, bus startup no higher than 3.4 V, rise time at most 1 us and junction temperature at most 125 degC from minus 20 degC to 70 degC within 68 mm by 48 mm.",
+      "prompt_sha256": "ae41f754340ca271b2e62ad2f36269d17bbf519f8257e6916c3abfa10b85168e",
+      "requirement_file": "../architecturesearch/testdata/simulation_grounded_closed_loop_corpus/regulated_sensor_interface.json",
+      "requirement_sha256": "564874fa04927975251102ad4f4089326197f0391059623253a30dcdf88c4086"
+    },
+    {
+      "id": "power_02",
+      "group": "regulated_bus_power",
+      "domain": "power",
+      "outcome": "ready",
+      "prompt": "Create a ground-referenced power and interface function accepting 4.5 V through 5.5 V with a 500 mA limit and serving a 3.3 V nominal sensor rail at 1 mA through 150 mA plus bidirectional open-drain 400 kHz communication to a 5 V host; require 3.2 V through 3.4 V rail regulation, startup below 3.4 V, edges within 1 us and temperature below 125 degC over minus 20 degC through 70 degC, with a 68 mm by 48 mm board bound.",
+      "prompt_sha256": "74476603c9ef8771d670b7471f362b53a874d68dcb054a3ef05e0c5fb7435eed",
+      "requirement_file": "../architecturesearch/testdata/simulation_grounded_closed_loop_corpus/regulated_sensor_interface.json",
+      "requirement_sha256": "564874fa04927975251102ad4f4089326197f0391059623253a30dcdf88c4086"
+    },
+    {
+      "id": "protection_01",
+      "group": "current_trip_protection",
+      "domain": "protection",
+      "outcome": "ready",
+      "prompt": "Control a protected 12 V nominal load supplied from 10 V through 14 V and zero through 3 A, using a separate 4.75 V through 5.25 V logic interface and fault output, measuring current at 0.98 through 1.02 V per A, tripping from 1.9 A through 2.1 A within 1 ms, holding startup output below 0.5 V from minus 20 degC to 70 degC, within 75 mm by 52 mm.",
+      "prompt_sha256": "8a1226a699c530d60164d503685d351f7fd9a7967c40693873634a6fae5be362",
+      "requirement_file": "../architecturesearch/testdata/simulation_grounded_closed_loop_corpus/current_sense_protection.json",
+      "requirement_sha256": "a7f6b2f266a67e39aaab4a3c3f951b35bb92a454440db8f8d1a8d640efe12ccb"
+    },
+    {
+      "id": "protection_02",
+      "group": "current_trip_protection",
+      "domain": "protection",
+      "outcome": "ready",
+      "prompt": "Provide a ground-referenced overload-protected output for a 10 V to 14 V source and loads up to 3 A plus a 5 V nominal fault indication supply bounded by 4.75 V and 5.25 V; current indication must be 0.98 V per A to 1.02 V per A, disconnect threshold 1.9 A to 2.1 A, response no slower than 1 ms and startup under 0.5 V across minus 20 degC to 70 degC, with a 75 mm by 52 mm board maximum.",
+      "prompt_sha256": "014f59b7a03e05cb554b4910ce449825ee0e1192c131bf6b7dd21e97e23309b0",
+      "requirement_file": "../architecturesearch/testdata/simulation_grounded_closed_loop_corpus/current_sense_protection.json",
+      "requirement_sha256": "a7f6b2f266a67e39aaab4a3c3f951b35bb92a454440db8f8d1a8d640efe12ccb"
+    },
+    {
+      "id": "sensor_01",
+      "group": "low_noise_sensor",
+      "domain": "sensor",
+      "outcome": "ready",
+      "prompt": "Condition a ground-referenced millivolt sensor from a 4.75 V through 5.25 V supply below 80 mA and produce a logic alarm, providing 95 through 105 voltage gain, 800 Hz through 1.2 kHz bandwidth, no more than 1 mV rms integrated output noise and a 9.5 mV through 10.5 mV decision threshold across minus 20 degC to 70 degC and all tolerances, within 70 mm by 50 mm.",
+      "prompt_sha256": "2d5cc34541c53088b93f6d9367ff1380a1eff058140cd5e8e2a8c6c84c62eb3a",
+      "requirement_file": "../architecturesearch/testdata/simulation_grounded_closed_loop_corpus/low_noise_sensor_decision.json",
+      "requirement_sha256": "dd4522854c01ff3ec1e0deff208b517f3814cf9ef77a587b5b12aada70cd0478"
+    },
+    {
+      "id": "sensor_02",
+      "group": "low_noise_sensor",
+      "domain": "sensor",
+      "outcome": "ready",
+      "prompt": "Make a low-noise analog sensor-to-alarm interface referenced to ground and powered between 4.75 V and 5.25 V with an 80 mA ceiling; acceptance requires gain from 95 to 105, response bandwidth from 800 Hz to 1.2 kHz, integrated noise at most 1 mV rms and switching threshold from 9.5 mV to 10.5 mV over minus 20 degC through 70 degC with tolerance corners, no larger than 70 mm by 50 mm.",
+      "prompt_sha256": "7011ffa87d529745d62adca95594c78daae9eb97c8e9d4b68da21e4ae1e04c84",
+      "requirement_file": "../architecturesearch/testdata/simulation_grounded_closed_loop_corpus/low_noise_sensor_decision.json",
+      "requirement_sha256": "dd4522854c01ff3ec1e0deff208b517f3814cf9ef77a587b5b12aada70cd0478"
+    },
+    {
+      "id": "unavailable_isolation_01",
+      "group": "unavailable_isolation",
+      "domain": "protection",
+      "outcome": "unsupported",
+      "prompt": "Pass a bidirectional 1 MHz digital interface across a 5 kV rms safety isolation boundary while proving creepage, clearance, surge withstand and isolation lifetime.",
+      "prompt_sha256": "73925e3fda08b2a1fa23c2d50e9be25b5b93ee0923b32d5757f3b071cdc65a18",
+      "gap_id": "safety_isolation_verification",
+      "gap_capability": "safety_isolation_verification",
+      "gap_path": "requirements.objectives"
+    },
+    {
+      "id": "unavailable_isolation_02",
+      "group": "unavailable_isolation",
+      "domain": "protection",
+      "outcome": "unsupported",
+      "prompt": "Provide two-way digital communication to 1 MHz between domains requiring 5 kV rms isolation and verify spacing, transient withstand and service-life insulation safety.",
+      "prompt_sha256": "b399b6d0f89d46b57500c04da1e61708bfe3ff1216808dafa2f51ac2ef18e7f8",
+      "gap_id": "safety_isolation_verification",
+      "gap_capability": "safety_isolation_verification",
+      "gap_path": "requirements.objectives"
+    },
+    {
+      "id": "unknown_supply_01",
+      "group": "unknown_supply",
+      "domain": "sensor",
+      "outcome": "needs_clarification",
+      "prompt": "Design a battery-powered environmental sensor with a digital host interface and low idle power.",
+      "prompt_sha256": "dbc4a8b6ecd7551fee6889f967c049473d1b6daee78ec9f939e233ce413d7d5f",
+      "clarification_id": "input_supply_range",
+      "clarification_path": "requirements.domains.input",
+      "uncertainty_id": "battery_voltage_range",
+      "uncertainty_kind": "supply_range"
+    },
+    {
+      "id": "unknown_supply_02",
+      "group": "unknown_supply",
+      "domain": "sensor",
+      "outcome": "needs_clarification",
+      "prompt": "Build a low-power environmental sensing interface for a battery source and a digital host.",
+      "prompt_sha256": "7bee2adf6b8ed2fee5bc74079a51fbe2e395f773c79246c2efec80d3affff663",
+      "clarification_id": "input_supply_range",
+      "clarification_path": "requirements.domains.input",
+      "uncertainty_id": "battery_voltage_range",
+      "uncertainty_kind": "supply_range"
+    },
+    {
+      "id": "unsafe_input_01",
+      "group": "unsafe_input",
+      "domain": "protection",
+      "outcome": "needs_clarification",
+      "prompt": "Create an input that survives whatever industrial transient may occur and remains safe for any connected source.",
+      "prompt_sha256": "973e47767dfbae6d1f567760f41ef30e3103cf24ce60aa3a71798cdf60836a72",
+      "clarification_id": "input_safety_limits",
+      "clarification_path": "requirements.domains.input",
+      "uncertainty_id": "input_transient_bounds",
+      "uncertainty_kind": "safety_limit"
+    },
+    {
+      "id": "unsafe_input_02",
+      "group": "unsafe_input",
+      "domain": "protection",
+      "outcome": "needs_clarification",
+      "prompt": "Protect an external industrial input against all possible surges without restricting the source.",
+      "prompt_sha256": "4bb82fa3b3d2b5be9f7e80cce6055faf9d18b8013e84845822f050892a24193d",
+      "clarification_id": "input_safety_limits",
+      "clarification_path": "requirements.domains.input",
+      "uncertainty_id": "input_transient_bounds",
+      "uncertainty_kind": "safety_limit"
+    },
+    {
+      "id": "unsupported_mcu_protocols_01",
+      "group": "unsupported_mcu_protocols",
+      "domain": "mcu",
+      "outcome": "unsupported",
+      "prompt": "Provide one programmable controller boundary that concurrently exposes GPIO, I2C, SPI and UART plus reset, power and an external programming interface with deterministic verification of every mode.",
+      "prompt_sha256": "87308b3c7b2884741e3b7b5e5dbf2a6108a32d624dc029b5c6e61f1ef23e0601",
+      "gap_id": "multi_protocol_controller_verification",
+      "gap_capability": "multi_protocol_controller_verification",
+      "gap_path": "requirements.participants.controller"
+    },
+    {
+      "id": "unsupported_mcu_protocols_02",
+      "group": "unsupported_mcu_protocols",
+      "domain": "mcu",
+      "outcome": "unsupported",
+      "prompt": "I need a reprogrammable control interface with bounded power and reset behavior whose GPIO, open-drain I2C, push-pull SPI and asynchronous UART can all be proven together.",
+      "prompt_sha256": "dd5de1c9c29aa67aecca5db08425d52e5cfa46090194b0385f0b16cf1239021e",
+      "gap_id": "multi_protocol_controller_verification",
+      "gap_capability": "multi_protocol_controller_verification",
+      "gap_path": "requirements.participants.controller"
+    },
+    {
+      "id": "unsupported_rf_01",
+      "group": "unsupported_rf",
+      "domain": "amplifier",
+      "outcome": "unsupported",
+      "prompt": "Deliver 1 W of linear output at 2.4 GHz from a 3.3 V supply with verified efficiency, harmonic emissions, stability and electromagnetic behavior across temperature and process corners.",
+      "prompt_sha256": "5cf7009125e46d8a4f3a79d5bd13b0aa271b2fa523da834f92c55c25a33cd16d",
+      "gap_id": "rf_power_verification",
+      "gap_capability": "rf_power_amplifier_verification",
+      "gap_path": "requirements.behavioral_requirements"
+    },
+    {
+      "id": "unsupported_rf_02",
+      "group": "unsupported_rf",
+      "domain": "amplifier",
+      "outcome": "unsupported",
+      "prompt": "Create a 2.4 GHz linear power output function providing 1 W from 3.3 V and prove efficiency, spurious content, stability and electromagnetic limits over all declared corners.",
+      "prompt_sha256": "e36f959dcf040f4f457d5e0e45189637f5f047fd3618a0ab31ebe0a47e93215a",
+      "gap_id": "rf_power_verification",
+      "gap_capability": "rf_power_amplifier_verification",
+      "gap_path": "requirements.behavioral_requirements"
+    }
+  ]
+}

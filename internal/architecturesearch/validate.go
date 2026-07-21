@@ -699,7 +699,7 @@ func (validator *requirementValidator) protocol(path string, protocol Protocol) 
 	if !validSemanticID(protocol.Name) {
 		validator.add(CodePortInvalid, path+".name", "protocol name must be a normalized semantic identifier")
 	}
-	if protocol.Mode != "open_drain" && protocol.Mode != "push_pull" && protocol.Mode != "differential" && protocol.Mode != "single_ended" {
+	if !slices.Contains(registeredProtocolModes, protocol.Mode) {
 		validator.add(CodePortInvalid, path+".mode", "unsupported signaling mode")
 	}
 	if !finiteInRange(protocol.MaxFrequencyHz, 0.000001, 1e15) {
@@ -735,96 +735,23 @@ func validSemanticID(value string) bool {
 }
 
 func allowedPortKind(value string) bool {
-	switch value {
-	case "power", "reference", "analog_voltage", "analog_control", "differential_analog", "digital_logic", "digital_bus", "switched_load", "protected_output":
-		return true
-	default:
-		return false
-	}
+	return slices.Contains(registeredPortKinds, value)
 }
 
 func allowedDirection(value string) bool {
-	return value == "source" || value == "sink" || value == "bidirectional"
+	return slices.Contains(registeredDirections, value)
 }
 
 func allowedRelation(value string) bool {
-	switch value {
-	case "equal", "maximum", "minimum", "one_of", "range", "required", "target":
-		return true
-	default:
-		return false
-	}
+	return slices.Contains(registeredConstraintRelations, value)
 }
 
 func allowedUnit(value string) bool {
-	switch value {
-	case "V", "A", "Hz", "Ohm", "us", "s", "F", "ratio", "dB", "W", "deg", "degC", "%", "pF", "uV_rms", "V_rms", "V_pp", "V/A":
-		return true
-	default:
-		return false
-	}
+	return slices.Contains(registeredCanonicalUnits, value)
 }
 
 func supportsTypedSignals(version int) bool {
 	return version == VersionV2 || version == VersionV3
-}
-
-func operatingAxisContract(axis string) (unit string, selection bool) {
-	switch axis {
-	case "supply_voltage", "input_amplitude":
-		return "V", false
-	case "load_resistance":
-		return "Ohm", false
-	case "load_capacitance":
-		return "F", false
-	case "load_current":
-		return "A", false
-	case "ambient_temperature":
-		return "degC", false
-	case "input_frequency":
-		return "Hz", false
-	case "tolerance", "model_parameter":
-		return "", true
-	default:
-		return "", false
-	}
-}
-
-func behavioralMetricContract(metric string) (analysis, unit string, ok bool) {
-	switch metric {
-	case "dc_voltage", "threshold_voltage", "output_high_voltage":
-		return "dc_operating_point", "V", true
-	case "dc_current", "quiescent_current", "threshold_current":
-		return "dc_operating_point", "A", true
-	case "transimpedance":
-		return "dc_operating_point", "V/A", true
-	case "voltage_gain":
-		return "ac_sweep", "ratio", true
-	case "bandwidth", "cutoff_frequency":
-		return "ac_sweep", "Hz", true
-	case "integrated_output_noise":
-		return "noise", "V_rms", true
-	case "phase_margin":
-		return "stability", "deg", true
-	case "rise_time", "fall_time", "settling_time", "response_time":
-		return "transient", "s", true
-	case "muted_output_voltage":
-		return "transient", "V", true
-	case "output_swing":
-		return "transient", "V_pp", true
-	case "output_power":
-		return "transient", "W", true
-	case "startup_output_voltage":
-		return "startup", "V", true
-	case "total_harmonic_distortion":
-		return "distortion", "%", true
-	case "junction_temperature":
-		return "thermal", "degC", true
-	case "hysteresis_voltage":
-		return "dc_operating_point", "V", true
-	default:
-		return "", "", false
-	}
 }
 
 func validConstraintScalar(value any) bool {

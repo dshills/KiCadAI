@@ -13,6 +13,7 @@ func TestOpenAIIntentSchemaObjectsAreStrictAndFullyRequired(t *testing.T) {
 		"bmp280":        BMP280ReferenceIntentEnvelopeSchema(),
 		"protected_led": ProtectedLEDReferenceIntentEnvelopeSchema(),
 		"generic":       GenericCircuitProfile("catalog").IntentEnvelopeSchema(),
+		"behavioral":    BehavioralIntentProfile("capabilities").IntentEnvelopeSchema(),
 	} {
 		t.Run(name, func(t *testing.T) {
 			assertStrictSchemaNode(t, "schema", schema)

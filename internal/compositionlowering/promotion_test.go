@@ -3,6 +3,7 @@ package compositionlowering
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"math"
 	"os"
@@ -90,6 +91,74 @@ func TestFrozenSimulationGroundedCorpusOptionalKiCadPromotion(t *testing.T) {
 		t.Fatalf("installed library index is empty: %#v", loadIssues)
 	}
 	runFrozenPromotionAt(t, filepath.Join("..", "architecturesearch", "testdata", "simulation_grounded_closed_loop_corpus"), 10, "KICADAI_SIMULATION_GROUNDED_ARTIFACT_DIR", cli, index)
+}
+
+func TestFrozenBehavioralIntentHeldOutReadyCorpusPassesOfflineWorkflow(t *testing.T) {
+	requireLongPromotionTest(t)
+	corpusRoot, count := behavioralIntentHeldOutReadyCorpus(t)
+	runFrozenPromotionAt(t, corpusRoot, count, "KICADAI_BEHAVIORAL_INTENT_ARTIFACT_DIR", "", libraryresolver.LibraryIndex{})
+}
+
+func TestFrozenBehavioralIntentHeldOutReadyCorpusOptionalKiCadPromotion(t *testing.T) {
+	requireLongPromotionTest(t)
+	cli := os.Getenv("KICADAI_KICAD_CLI")
+	if cli == "" {
+		t.Skip("set KICADAI_KICAD_CLI to run the KiCad-backed behavioral-intent corpus")
+	}
+	roots, rootIssues := libraryresolver.ResolveRoots()
+	if roots.SymbolsRoot == "" || roots.FootprintsRoot == "" {
+		t.Skipf("installed KiCad libraries are required: %#v", rootIssues)
+	}
+	index, loadIssues := libraryresolver.Load(context.Background(), roots, libraryresolver.LoadOptions{})
+	if len(index.Symbols) == 0 || len(index.Footprints) == 0 {
+		t.Fatalf("installed library index is empty: %#v", loadIssues)
+	}
+	corpusRoot, count := behavioralIntentHeldOutReadyCorpus(t)
+	runFrozenPromotionAt(t, corpusRoot, count, "KICADAI_BEHAVIORAL_INTENT_ARTIFACT_DIR", cli, index)
+}
+
+func behavioralIntentHeldOutReadyCorpus(t *testing.T) (string, int) {
+	t.Helper()
+	type manifestCase struct {
+		Outcome         string `json:"outcome"`
+		RequirementFile string `json:"requirement_file"`
+	}
+	var manifest struct {
+		Cases []manifestCase `json:"cases"`
+	}
+	manifestPath := filepath.Join("..", "behavioralintent", "testdata", "held_out_corpus", "manifest.json")
+	data, err := os.ReadFile(manifestPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := json.Unmarshal(data, &manifest); err != nil {
+		t.Fatal(err)
+	}
+	unique := map[string]bool{}
+	for _, fixture := range manifest.Cases {
+		if fixture.Outcome == "ready" {
+			unique[fixture.RequirementFile] = true
+		}
+	}
+	paths := make([]string, 0, len(unique))
+	for path := range unique {
+		paths = append(paths, path)
+	}
+	slices.Sort(paths)
+	root := t.TempDir()
+	for _, path := range paths {
+		if strings.HasPrefix(path, "testdata/") {
+			path = filepath.Join("..", "behavioralintent", path)
+		}
+		body, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatalf("read held-out requirement %s: %v", path, err)
+		}
+		if err := os.WriteFile(filepath.Join(root, filepath.Base(path)), body, 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	return root, len(paths)
 }
 
 func requireLongPromotionTest(t *testing.T) {
