@@ -1,10 +1,13 @@
 package designworkflow
 
 import (
+	"bytes"
+	"encoding/json"
 	"path/filepath"
 	"slices"
 	"testing"
 
+	"kicadai/internal/closedloopsynthesis"
 	"kicadai/internal/reports"
 )
 
@@ -98,9 +101,20 @@ func TestAutonomousCorrectionDiagnosticDedupeUsesFramedFields(t *testing.T) {
 
 func TestAutonomousCorrectionInvariantFingerprint(t *testing.T) {
 	request := correctionExplicitRequest()
+	originalRequest, err := json.Marshal(request)
+	if err != nil {
+		t.Fatal(err)
+	}
 	base, err := AutonomousCorrectionInvariantFingerprint(request)
 	if err != nil {
 		t.Fatal(err)
+	}
+	afterRequest, err := json.Marshal(request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(afterRequest, originalRequest) {
+		t.Fatal("fingerprinting mutated caller request")
 	}
 	renamed := request
 	renamed.Name = "another_project_name"
@@ -121,6 +135,43 @@ func TestAutonomousCorrectionInvariantFingerprint(t *testing.T) {
 	}
 	if changedHash == base {
 		t.Fatal("protected net width did not change invariant fingerprint")
+	}
+}
+
+func TestAutonomousCorrectionInvariantFingerprintUsesCompactClosedLoopBinding(t *testing.T) {
+	request := correctionExplicitRequest()
+	request.ExplicitCircuit.ClosedLoop = &closedloopsynthesis.Report{
+		Schema: "closed-loop-v1", PolicyVersion: "policy-v1",
+		PolicyHash: "policy", RequirementHash: "requirement", RegistryHash: "registry",
+		CatalogHash: "catalog", FormulaLibraryHash: "formula", ModelRegistryHash: "models",
+		SelectedCircuitHash: "circuit", StopReason: closedloopsynthesis.StopPassed, Status: "pass",
+		Diagnostics: []closedloopsynthesis.Diagnostic{{Path: "attempts[0]", Message: "large runtime transcript"}},
+	}
+	base, err := AutonomousCorrectionInvariantFingerprint(request)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	transcriptChanged := request
+	transcriptChanged.ExplicitCircuit = cloneExplicitCircuit(request.ExplicitCircuit)
+	transcriptChanged.ExplicitCircuit.ClosedLoop.Diagnostics[0].Message = "different runtime transcript"
+	transcriptHash, err := AutonomousCorrectionInvariantFingerprint(transcriptChanged)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if transcriptHash != base {
+		t.Fatalf("runtime transcript changed design invariant: %s != %s", transcriptHash, base)
+	}
+
+	bindingChanged := request
+	bindingChanged.ExplicitCircuit = cloneExplicitCircuit(request.ExplicitCircuit)
+	bindingChanged.ExplicitCircuit.ClosedLoop.SelectedCircuitHash = "different-circuit"
+	bindingHash, err := AutonomousCorrectionInvariantFingerprint(bindingChanged)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if bindingHash == base {
+		t.Fatal("selected closed-loop circuit binding did not change invariant fingerprint")
 	}
 }
 

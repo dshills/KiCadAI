@@ -908,24 +908,64 @@ func compareAutonomousCorrectionDiagnostic(left, right AutonomousCorrectionDiagn
 	return slices.Compare(left.Nets, right.Nets)
 }
 
+type autonomousCorrectionClosedLoopBinding struct {
+	Schema              string `json:"schema"`
+	PolicyVersion       string `json:"policy_version"`
+	PolicyHash          string `json:"policy_hash"`
+	RequirementHash     string `json:"requirement_hash"`
+	RegistryHash        string `json:"registry_hash"`
+	CatalogHash         string `json:"catalog_hash"`
+	FormulaLibraryHash  string `json:"formula_library_hash"`
+	ModelRegistryHash   string `json:"model_registry_hash"`
+	SelectedCircuitHash string `json:"selected_circuit_hash"`
+	StopReason          string `json:"stop_reason"`
+	Status              string `json:"status"`
+}
+
 // AutonomousCorrectionInvariantFingerprint hashes the design fields that an
 // autonomous placement/routing correction is never allowed to change.
 func AutonomousCorrectionInvariantFingerprint(request Request) (string, error) {
-	normalized := NormalizeRequest(request)
+	// Closed-loop reports can contain full transient and sweep traces. They are
+	// validation evidence, not placement/routing design input, so hashing the
+	// complete report made every correction attempt clone and encode hundreds of
+	// megabytes. Retain the immutable synthesis binding in the fingerprint and
+	// remove only the bulky evaluation transcript before normalizing the request.
+	fingerprintRequest := request
+	var closedLoopBinding *autonomousCorrectionClosedLoopBinding
+	if fingerprintRequest.ExplicitCircuit != nil {
+		detached := *fingerprintRequest.ExplicitCircuit
+		if report := detached.ClosedLoop; report != nil {
+			closedLoopBinding = &autonomousCorrectionClosedLoopBinding{
+				Schema: report.Schema, PolicyVersion: report.PolicyVersion,
+				PolicyHash: report.PolicyHash, RequirementHash: report.RequirementHash,
+				RegistryHash: report.RegistryHash, CatalogHash: report.CatalogHash,
+				FormulaLibraryHash: report.FormulaLibraryHash, ModelRegistryHash: report.ModelRegistryHash,
+				SelectedCircuitHash: report.SelectedCircuitHash,
+				StopReason:          string(report.StopReason), Status: report.Status,
+			}
+		}
+		detached.ClosedLoop = nil
+		fingerprintRequest.ExplicitCircuit = cloneExplicitCircuit(&detached)
+	}
+	// NormalizeRequest returns isolated mutable fields; the invariant tests
+	// assert byte-for-byte that this path never mutates the caller's request.
+	normalized := NormalizeRequest(fingerprintRequest)
 	projection := struct {
-		Version         string               `json:"version"`
-		Intent          Intent               `json:"intent"`
-		Board           BoardSpec            `json:"board"`
-		Constraints     ConstraintSpec       `json:"constraints"`
-		Validation      ValidationSpec       `json:"validation"`
-		ExplicitCircuit *ExplicitCircuitSpec `json:"explicit_circuit,omitempty"`
+		Version           string                                 `json:"version"`
+		Intent            Intent                                 `json:"intent"`
+		Board             BoardSpec                              `json:"board"`
+		Constraints       ConstraintSpec                         `json:"constraints"`
+		Validation        ValidationSpec                         `json:"validation"`
+		ExplicitCircuit   *ExplicitCircuitSpec                   `json:"explicit_circuit,omitempty"`
+		ClosedLoopBinding *autonomousCorrectionClosedLoopBinding `json:"closed_loop_binding,omitempty"`
 	}{
-		Version:         normalized.Version,
-		Intent:          normalized.Intent,
-		Board:           normalized.Board,
-		Constraints:     normalized.Constraints,
-		Validation:      normalized.Validation,
-		ExplicitCircuit: cloneExplicitCircuit(normalized.ExplicitCircuit),
+		Version:           normalized.Version,
+		Intent:            normalized.Intent,
+		Board:             normalized.Board,
+		Constraints:       normalized.Constraints,
+		Validation:        normalized.Validation,
+		ExplicitCircuit:   normalized.ExplicitCircuit,
+		ClosedLoopBinding: closedLoopBinding,
 	}
 	data, err := json.Marshal(projection)
 	if err != nil {
