@@ -1,5 +1,7 @@
 # Project Status
 
+Last verified: 2026-07-21 at commit `5078346c`.
+
 KiCadAI's direct-file generation workflow is the main functional path. The
 project is beyond basic file serialization: supported designs can move through
 structured intent, deterministic planning, component and block selection,
@@ -23,6 +25,11 @@ See [KiCad Direct File Writers](kicad-file-writers.md) and
 
 ### Structured AI Inputs
 
+- `intent compile` translates ordinary behavior-first requests into strict v3
+  requirements through a fail-closed provider boundary. Source coverage,
+  uncertainty, clarification ownership, installed capabilities, architecture
+  selection, model provenance, and closed-loop evidence are hash-bound and
+  persisted.
 - Structured intent derives requirements, constraints, selected blocks,
   calculated values, assumptions, and fail-closed gaps.
 - Schematic IR separates circuit intent, layout intent, and repair policy.
@@ -32,9 +39,32 @@ See [KiCad Direct File Writers](kicad-file-writers.md) and
 See [Intent Planning And AI Workflow](intent-planning.md) and
 [AI Generation](ai-generation.md).
 
-### Proven Provider Lanes
+### Behavioral Intent Compilation
 
-Two natural-language profiles are promoted:
+The `behavioral-intent-v1` profile accepts behavior, interfaces, operating
+conditions, tolerances, safety limits, and manufacturing-neutral bounds. It
+does not accept provider-selected topology, parts, pins, nets, coordinates,
+layers, routes, solver controls, model files, or validation claims.
+
+Compilation terminates as exactly one of `ready`, `needs_clarification`,
+`unsupported`, or `invalid`. Only `ready` retains an executable requirement,
+and only after deterministic architecture search and hash-bound trusted
+closed-loop evidence pass. Follow-up answers are bound to the complete original
+source, installed-capability snapshot, prior proposal, and prior compilation.
+
+The frozen acceptance corpus contains 24 SHA-256-pinned prompts in 12
+paraphrase groups across amplifier, filter, power, protection, sensor, and MCU
+domains. It records 12 ready prompts representing six unique supported
+contracts, four minimal-clarification prompts, and eight stable unsupported
+outcomes. All six supported contracts pass the installed-KiCad promotion lane,
+including routing/connectivity, writer correctness, clean ERC, strict DRC,
+zero normalized round-trip differences, and deterministic replay. See the
+[specification](../specs/uncertainty-aware-behavioral-intent-compilation/SPEC.md)
+and [completion audit](../specs/uncertainty-aware-behavioral-intent-compilation/AUDIT.md).
+
+### Proven Bounded Provider Lanes
+
+Two bounded natural-language profiles are promoted:
 
 1. Protected USB-C BMP280 I2C breakout with 3.3 V regulation, pull-ups,
    decoupling, and an external connector.
@@ -226,10 +256,12 @@ envelope remain unsupported.
 
 ## Remaining Direction
 
-The next materially different capability should be chosen from a concrete
-held-out failure, with likely candidates including bounded tolerance/sensitivity
-evidence or a new reviewed dynamic primitive. Continue to broaden catalog and
-pin/function evidence only when that target exposes a concrete gap.
+The next materially different capability should expand generic compositional
+primitive and trusted-model coverage from concrete held-out failures. The most
+valuable current gaps are broader MCU/ESP32 subsystem semantics, additional
+mixed-signal/control-loop primitives, catalog-independent part qualification,
+and physical synthesis for denser boards. Unknown behavior must continue to
+produce a stable capability gap instead of guessed implementation detail.
 
 See the [Roadmap](../specs/ROADMAP.md) for prioritized work and the
 [Development Reference](development.md) for repository-level limitations and

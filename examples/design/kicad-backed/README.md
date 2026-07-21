@@ -1,8 +1,8 @@
 # KiCad-Backed Design Examples
 
 These examples are optional `design create` fixtures for local runs with real
-`kicad-cli` evidence. They are not part of the default design example set
-because they currently document richer board-generation gaps.
+`kicad-cli` evidence. They are separate from the default design example set so
+the normal Go test suite remains independent of a local KiCad installation.
 
 Run commands from the repository root. Run the optional test tier:
 
@@ -53,13 +53,16 @@ kicadai \
 | --- | --- | --- |
 | `led_indicator_kicad_smoke` | `candidate` | Tracks the smallest design-level KiCad-backed smoke path with schematic electrical checks, block-local route contact proof, writer correctness, board validation, and warning-only KiCad evidence. |
 | `connector_led_kicad_smoke` | `candidate` | Tracks connector-to-LED multi-block composition with clean required KiCad ERC/DRC, KiCad-native net assignment, and routed inter-block endpoint contact evidence. Writer round-trip evidence remains warning-only when the fixture does not configure a separate writer-side KiCad CLI invocation. |
-| `i2c_sensor_breakout_candidate` | `candidate` | Tracks the richer sensor breakout candidate after placement, local route contact proof, VCC/GND/SDA/SCL alias propagation, route-tree execution, contact graph evidence, project-write, writer-correctness, structural validation, and warning-level optional KiCad evidence. Pass promotion still requires clean required KiCad DRC evidence from a stable `kicad-cli`. |
+| `i2c_sensor_breakout_candidate` | `pass` | Tracks the generic I2C sensor breakout with VCC/GND/SDA/SCL alias propagation, complete route-tree/contact-graph evidence, writer correctness, and clean required KiCad ERC/DRC. The historical fixture name is retained for compatibility. |
 | `sensor_bmp280_breakout` | `pass` | Reproduces the concrete BMP280 structured-intent result through the environment-gated design fixture lane with verified Bosch identity, LGA-8 footprint/pad mapping, complete required-net routing, and clean KiCad ERC/DRC evidence. |
 | `usb_c_led_indicator_pass` | `pass` | Tracks a USB-C powered LED indicator generated from natural-language intent using `usb_c_power` plus `led_indicator`, project-local USB-C symbol export, verified USB4125 pad transfer, routed VBUS/GND connectivity, and clean required KiCad ERC/DRC evidence. |
 | `usb_c_led_indicator_protected` | `pass` | Tracks the protected USB-C LED variant with fuse, TVS, and bulk capacitance enabled. Its schematic layout is inferred from component roles and non-ground topology, with no hand-authored layout coordinates. The checked-in metadata promotes it through the optional KiCad-backed fixture lane; the latest reproduced run is documented below. |
 | `usb_c_i2c_sensor_3v3_protected` | `pass` | Tracks the medium-complexity protected USB-C, AMS1117, and I2C sensor composition with complete physical VCC_3v3 route-tree contact proof, clean strict KiCad ERC/DRC, writer correctness, and normalized round-trip evidence. |
 | `esp32_wroom_32e_minimal_pass` | `pass` | Tracks the exact ESP32-WROOM-32E-N4 minimal-system block with 3.3 V power conditioning, EN/BOOT straps and buttons, UART/I2C/SPI/GPIO headers, a hard all-copper antenna keepout, complete local/inter-block route contact proof, clean strict KiCad ERC/DRC, writer correctness, and zero normalized round-trip diffs. |
-| `class_ab_headphone_protected` | `expected_fail` | Tracks the protected Class AB headphone amplifier path with verified LMV321/op-amp and output transistor selections plus `headphone_output_protection`; schematic electrical validation, PCB realization, placement, endpoint binding, project write, and writer-correctness evidence now run. The current blocker is structural validation evidence for schematic label/connectivity issues and unrouted or partially routed PCB nets before KiCad ERC/DRC promotion. Fabrication promotion still also requires active output fault protection, speaker/bridge/power-amplifier load safety, LOAD_REF/GND net-tie evidence, promoted thermal/SOA evidence, and analog stability/layout proof. |
+| `class_a_bjt_line_preamplifier` | `pass` | Tracks the bounded Class-A line-level BJT preamplifier through electrical, physical, simulation, KiCad ERC/DRC, routing, writer, and round-trip gates. |
+| `class_ab_headphone_driver` | `expected_fail` | Retains the unprotected Class-AB skeleton as an explicit negative fixture pending the protected output and proof requirements. |
+| `class_ab_headphone_protected` | `pass` | Tracks the protected Class-AB headphone amplifier through verified component selection, protection behavior, simulation, layout, routing/connectivity, clean required KiCad ERC/DRC, writer correctness, and zero-diff round trip. |
+| `class_ab_speaker_10w_protected` | `pass` | Tracks the bounded protected dual-rail 10 W RMS/8 ohm speaker amplifier fabrication candidate, including electrothermal, SOA, current-limit, DC-fault, mute, star/Kelvin/high-current, package, KiCad, writer, and round-trip evidence. |
 | `opamp_headphone_buffer_kicad_candidate` | `expected_fail` | Tracks the draft op-amp headphone-buffer seed when promoted to fabrication-candidate requirements; current blockers are missing verified amplifier component evidence, migration to the protected Class AB headphone output path, active fault-protection proof, analog layout proof, and KiCad ERC/DRC promotion evidence. |
 
 ## Protected USB-C LED Pass Evidence
@@ -237,26 +240,18 @@ as `led_indicator_kicad_smoke.metadata.json`.
 
 Tests for `expected_fail` fixtures are considered successful only when they
 encounter the documented blockers. That is not the same as an ERC/DRC-clean
-generated design. These fixtures document that generated design-level PCBs
-can progress past writer correctness net-code assignment and block-local route
-endpoint binding. The I2C fixture also exposes route-tree evidence for its
-multi-endpoint VCC/GND/SDA/SCL nets, including managed nets, planned branches,
-attempted branches, proven endpoints, graph components, and group completion
-counts. The fixture now promotes to structural `candidate` with optional
-warning-level KiCad evidence:
-route-tree execution owns the four I2C nets, emits all 8 route-tree branches,
-proves all required connector and block-local endpoint contacts, and reaches
-project-write, writer-correctness, and structural validation evidence. Generated
-label stubs are grid-safe. A logic-only unit test also exercises the promotion
-decision path with mocked clean KiCad results, but that mocked path is not
-production pass evidence; real clean KiCad CLI DRC evidence is still required
-for `pass` promotion. Route-tree contact
-graph evidence now reports four complete contact-graph groups, local-route
-merge evidence, same-net segment intersection/overlap merges, and via layer
-transitions. Route-tree diagnostics also separate fixed-net preservation
-notices and missing-net-class warnings from repairable blockers. The protected
-USB-C LED variant is now part of the optional promotion lane and has stable
-required KiCad DRC/pass evidence when run outside the restricted sandbox.
+generated design. The remaining expected failures are the unprotected
+Class-AB skeleton and the older op-amp headphone-buffer seed.
+
+The generic I2C fixture is now a real `pass` lane. Route-tree execution owns
+VCC/GND/SDA/SCL, emits all eight branches, proves all required connector and
+block-local endpoint contacts, and reports four complete contact-graph groups,
+including local-route, same-net intersection/overlap, and via-transition merge
+evidence. Project write, writer correctness, structural validation, and
+required real KiCad ERC/DRC evidence must all pass. Logic-only mocked KiCad
+tests cover promotion decisions but are not production pass evidence. The
+protected USB-C LED fixture likewise has stable required KiCad pass evidence
+when run outside the restricted sandbox.
 Sandboxed macOS DRC aborts are execution-environment failures to rerun outside
 the sandbox before classification, not fixture `known_gaps` or board
 violations.
@@ -264,8 +259,9 @@ violations.
 Promotion gates currently include metadata, stages, writer correctness,
 connectivity, KiCad checks, route completion, physical rules, and artifacts.
 Missing `kicad-cli` evidence is recorded as skipped external evidence, but it
-still blocks readiness when ERC or DRC is required. LED and I2C currently
-promote to `candidate`; amplifier optional KiCad-backed fixtures are still
+still blocks readiness when ERC or DRC is required. The LED and connector/LED
+smoke fixtures remain `candidate`; the generic I2C and protected amplifier
+fixtures are `pass`; only the two draft amplifier seeds remain
 `expected_fail`. Do not treat a generated board as `pass` until the promotion
 report achieves `pass` and the configured KiCad ERC/DRC evidence gates pass.
 

@@ -141,8 +141,8 @@ in route-tree contact proof without inflating inter-block emitted-segment
 counts.
 The I2C fixture currently emits all 8 route-tree branches, proves all 12
 required endpoint contacts, and reports four graph-complete route-tree nets. It
-is now a checked-in structural `candidate`; pass requires clean KiCad ERC/DRC
-reports from a stable configured `kicad-cli`.
+is now a checked-in KiCad-backed `pass` fixture whose optional tier requires
+clean ERC/DRC reports from a stable configured `kicad-cli`.
 Fixed-net skip notices and missing-net-class warnings are reported separately
 and do not inflate
 `route_tree_repair.branch_failures`.

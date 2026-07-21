@@ -8,16 +8,17 @@ These fixtures support the `kicadai check` command family.
   - Representative schematic expected to produce ERC findings under KiCad 10.
   - Based on the generated LED indicator example.
 - `drc_pass/drc_pass.kicad_pcb`
-  - Representative generated PCB for DRC smoke testing.
-  - Current local KiCad 10.0.3 DRC probing exited before writing a report for
-    existing PCB examples, so this fixture is kept as a future integration target
-    rather than a normal test dependency.
+  - Historical-path generated PCB for DRC runner and parser smoke testing.
+  - A current KiCad 10.0.3 run writes a report with four warning findings: two
+    library-footprint mismatches and two dangling vias. The fixture proves
+    report ingestion, not a clean DRC pass; its directory name is retained for
+    compatibility.
 - `erc_pass/`
   - Reserved for a known-clean schematic once the generator can produce one with
     complete power/no-connect annotations.
 - `drc_fail/`
-  - Reserved for an intentional DRC-violation board once DRC execution is stable
-    in local KiCad CLI.
+  - Reserved for a purpose-built blocking DRC-violation board. The existing
+    `drc_pass` historical fixture already exercises warning finding parsing.
 
 Normal `go test ./...` does not invoke KiCad. Real CLI checks are opt-in:
 

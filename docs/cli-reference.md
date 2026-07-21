@@ -72,6 +72,9 @@ kicadai --request ./examples/repair/missing_footprint_stage_issues.json repair p
 kicadai --request ./examples/intent/sensor_breakout.json --output ./out/intent_plan --overwrite intent plan
 kicadai --request ./examples/intent/sensor_breakout.json intent explain
 kicadai --text "make a 3.3V I2C temperature sensor breakout" intent rationale
+kicadai --file ./behavioral-request.txt \
+  --provider openai --ai-profile behavioral-intent-v1 \
+  --output ./out/behavioral-request intent compile
 kicadai --request ./examples/intent/sensor_breakout.json --output ./out/intent_sensor --overwrite intent create
 kicadai --prompt-file ./examples/ai/usb_c_bmp280_breakout/prompt.txt \
   --provider recorded \
@@ -118,6 +121,67 @@ strict catalog-resolved graph contract; it never falls back to a bounded
 profile or accepts provider-defined libraries and geometry. See
 [AI Generation](ai-generation.md) for strict KiCad-backed commands and the
 artifact contract.
+
+### Behavioral Intent Compilation
+
+`intent compile` is the provider-backed, behavior-first trust boundary. Its
+input may specify observable behavior, interfaces, operating cases, ranges,
+tolerances, safety limits, and manufacturing-neutral board bounds. Provider
+output may not select topology, parts, pins, nets, coordinates, layers, routes,
+models, solver controls, or validation evidence.
+
+```sh
+kicadai \
+  --file ./behavioral-request.txt \
+  --provider openai \
+  --ai-profile behavioral-intent-v1 \
+  --output ./out/behavioral-request \
+  intent compile
+```
+
+The command returns one terminal compilation status:
+
+- `ready`: deterministic architecture search and hash-bound trusted closed-loop
+  evidence passed; an executable strict v3 requirement and
+  `.kicadai/behavioral-design-request.json` are persisted.
+- `needs_clarification`: the smallest blocking question is persisted in
+  `.kicadai/behavioral-follow-up-template.json`; no executable design request
+  is released.
+- `unsupported`: stable semantic capability-gap evidence is persisted; no
+  guessed design is emitted.
+- `invalid`: strict schema, source coverage, uncertainty, hash binding, or
+  provider-boundary validation failed.
+
+To answer a clarification, edit only the template's `answer` fields and rerun
+against the complete original source and same output directory:
+
+```sh
+kicadai \
+  --file ./behavioral-request.txt \
+  --provider openai \
+  --ai-profile behavioral-intent-v1 \
+  --output ./out/behavioral-request \
+  --follow-up ./out/behavioral-request/.kicadai/behavioral-follow-up-template.json \
+  --overwrite \
+  intent compile
+```
+
+After a `ready` result, create and validate the selected design through the
+normal deterministic workflow:
+
+```sh
+kicadai \
+  --request ./out/behavioral-request/.kicadai/behavioral-design-request.json \
+  --output ./out/behavioral-project --overwrite \
+  --kicad-cli /path/to/kicad-cli \
+  --require-erc --require-drc --require-kicad-roundtrip \
+  --strict-diffs --strict-unrouted \
+  design create
+```
+
+The compilation directory also retains the original source, installed semantic
+capabilities, provider proposal and attempts, compilation, architecture search,
+and full closed-loop report for replay and audit.
 
 Promotion harnesses may pass `--promotion-readiness expected_fail|candidate|pass|blocked`
 to declare the expected readiness recorded in the promotion report. This flag

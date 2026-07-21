@@ -97,6 +97,13 @@ Key packages:
   Its block-planned creation path has an explicit stage contract from planning
   through KiCad checks; a blocked stage marks only its declared downstream
   stages as skipped.
+- `internal/behavioralintent`: strict behavior-first proposal decoding, source
+  and uncertainty validation, clarification binding, semantic capability-gap
+  reporting, and executable requirement compilation.
+- `internal/architecturesearch`: installed semantic capability discovery and
+  deterministic bounded architecture selection.
+- `internal/compositionlowering`: strict v3 requirement lowering and the
+  frozen open-set, adversarial, and simulation-grounded promotion corpora.
 - `internal/kiapi`: live KiCad IPC client and transport boundary.
 - `internal/kicadfiles/project`: `.kicad_pro` reader/writer.
 - `internal/kicadfiles/schematic`: `.kicad_sch` reader/writer and validation.
@@ -157,11 +164,43 @@ make coverage-check
 protobuf code under `internal/kiapi/gen/**`. `make coverage-check` fails if the
 generated-excluded total drops below `COVERAGE_THRESHOLD`, defaulting to `75.0`.
 
-The required GitHub Actions workflow runs formatting, `go vet`, the declared
-golangci-lint policy, `make test`, and `make coverage-check` for pull requests
-and pushes to `main`. It is intentionally offline: KiCad-backed checks and
-OpenAI provider execution remain opt-in local or release evidence, not required
-CI dependencies.
+The required GitHub Actions workflow runs formatting and the declared
+golangci-lint policy, then uses `-short` for the bounded test and instrumented
+coverage tiers. The three long frozen promotion corpora—open-set,
+adversarial-multi-function, and simulation-grounded—run in separate matrix
+jobs through `make test-one`. This keeps the coverage job bounded while still
+requiring those three established end-to-end corpora on pull requests and
+pushes to `main`.
+The workflow is intentionally offline: installed-KiCad checks and live OpenAI
+provider execution remain opt-in local or release evidence, not CI
+dependencies. Run `make lint` locally when an explicit `go vet` pass is
+required.
+
+Local equivalents of the bounded CI tiers are:
+
+```sh
+make GO_TEST_FLAGS=-short test
+make COVER_TEST_FLAGS=-short coverage-check
+```
+
+Run one frozen promotion corpus exactly and fail if the named test is absent:
+
+```sh
+make GO_TEST_PACKAGE=./internal/compositionlowering \
+  GO_TEST_NAME=TestFrozenOpenSetCorpusPassesOfflineWorkflow \
+  test-one
+```
+
+The newer behavioral-intent ready-corpus workflow is also classified as a long
+test and is skipped by `-short`. It is not yet a fourth entry in the CI
+promotion matrix; run it explicitly when changing behavioral compilation or
+its handoff into physical promotion:
+
+```sh
+make GO_TEST_PACKAGE=./internal/compositionlowering \
+  GO_TEST_NAME=TestFrozenBehavioralIntentHeldOutReadyCorpusPassesOfflineWorkflow \
+  test-one
+```
 
 Live integration tests are opt-in:
 

@@ -55,6 +55,12 @@ lives under `examples/design/kicad-backed/` as
 component evidence, output protection/DC blocking, analog layout proof, and
 ERC/DRC-clean evidence exist.
 
+The optional KiCad-backed tier also contains promoted Class-A, protected
+Class-AB headphone, and bounded protected 10 W/8 ohm speaker fixtures. Those
+passes apply only to their declared component, load, operating, simulation,
+layout, routing, writer, and KiCad evidence envelopes; the older seed above
+remains an intentional expected failure.
+
 Round-trip validation for the Go-generated LED schematic, Go-generated LED PCB,
 checked-in LED schematic fixture, and checked-in generated PCB fixture is
 available as an opt-in integration test. Run this command from the repository

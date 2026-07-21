@@ -53,10 +53,11 @@ This connectivity-level amplifier seed uses `opamp_gain_stage`,
 `class_ab_output_stage`, and `headphone_output_protection`. The protected output
 path includes a DC-blocking capacitor for single-supply AC coupling, required
 bleed/reference policy, connector return/reference diagnostics, and a
-placeholder fault-protection status. It is headphone-only; speaker, bridge, and
-power-amplifier loads remain blocked. This example is not fabrication-ready
-until active fault protection, SOA/thermal evidence, stability/layout proof, and
-KiCad ERC/DRC promotion evidence exist.
+placeholder fault-protection status. This particular seed is headphone-only and
+is not fabrication-ready until active fault protection, SOA/thermal evidence,
+stability/layout proof, and KiCad ERC/DRC promotion evidence exist. Separate
+protected headphone and bounded 10 W/8 ohm speaker fixtures prove their exact
+supported envelopes in `kicad-backed/`; they do not promote this draft seed.
 
 Generated artifacts include:
 
@@ -68,22 +69,20 @@ Generated artifacts include:
 
 ## Current Limitations
 
-These examples are artifact-generation fixtures, not fabrication-ready boards.
-They currently surface writer-correctness feedback around PCB net-code evidence
-after project write when resolver-backed library context is not supplied.
-
-The previous multi-block I2C sensor breakout request is not a default design
-example right now because the current generic sensor/connector realization can
-lead to unsatisfiable placement constraints or project-write failures. It
-should return once the sensor symbol/footprint model and connector PCB
-realization are hardened enough for a default runnable fixture.
+These default examples are structural artifact-generation fixtures, not
+fabrication-ready boards. Stronger exact designs live in the optional
+KiCad-backed tier, where resolver, writer, routing/connectivity, ERC/DRC, and
+round-trip evidence can be required. The generic multi-block I2C breakout is
+kept in that tier and now has declared `pass` evidence rather than being a
+default hermetic example.
 
 ## Optional KiCad-Backed Examples
 
 Optional fixtures live under `examples/design/kicad-backed/`. They require
-`KICADAI_KICAD_CLI` for local test runs and currently document `expected_fail`
-evidence for richer generated boards that block before stable KiCad ERC/DRC
-proof.
+`KICADAI_KICAD_CLI` for local test runs. The tier contains promoted protected
+USB-C, sensor, exact ESP32, Class-A, protected Class-AB headphone, and bounded
+protected speaker fixtures; candidate smoke cases; and two explicit
+expected-failure amplifier seeds.
 
 See `examples/design/kicad-backed/README.md` for the fixture list and command
 shape.

@@ -499,10 +499,10 @@ Check output includes:
   `footprint`, and `net_assignment`;
 - an AI-friendly summary prompt grouped by category, reference, net, and layer.
 
-Current caveat: real ERC smoke testing works with local KiCad 10.0.3. The DRC
-runner and parser are implemented and covered with deterministic tests, but the
-current local macOS KiCad CLI can exit before writing DRC JSON, including on
-known KiCad sample boards. KiCadAI classifies that failure as
-`tool_error_kind: "no_output_crash"` and reports it as external tool
-instability instead of design DRC evidence. A `pass` promotion still requires a
+Real ERC and DRC execution works with local KiCad 10.0.3 and the runner parses
+the resulting JSON findings. On macOS, KiCad DRC may still abort before writing
+JSON when launched inside a restricted command sandbox because its process
+touches application-registration services. KiCadAI classifies that condition
+as `tool_error_kind: "no_output_crash"`; rerun the same check outside the
+sandbox before classifying the board. A `pass` promotion always requires a
 stable `kicad-cli` run that produces a clean DRC report.

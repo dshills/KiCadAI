@@ -7,10 +7,13 @@ provider never emits KiCad S-expressions or route geometry directly.
 
 ## Provider Modes
 
-KiCadAI exposes two provider contracts:
+KiCadAI exposes three fail-closed provider paths:
 
-1. Bounded automatic profiles selected from prompt semantics.
-2. `generic-circuit-v1`, where the provider emits either a strict explicit
+1. `behavioral-intent-v1` through `intent compile`, where the provider proposes
+   a strict behavior contract and KiCadAI owns source coverage, uncertainty,
+   capability validation, architecture search, and closed-loop qualification.
+2. Bounded automatic `design create` profiles selected from prompt semantics.
+3. `generic-circuit-v1`, where the provider emits either a strict explicit
    circuit graph or strict function-level intent. In the function form the
    provider supplies functions, named interfaces, operating domains, semantic
    connectivity, and bounded constraints—not pins, support parts, coordinates,
@@ -39,15 +42,22 @@ on repository source or documentation that may be older than the binary:
 kicadai capability generation --json
 ```
 
-The command returns the profile matrix, required evidence, limitations, and the
-catalog-derived generic component/function vocabulary. The generic provider
+The command returns the direct `design create` profile matrix, required
+evidence, limitations, and the catalog-derived generic component/function
+vocabulary. The generic provider
 prompt uses this same serialized document, so the AI-facing contract and CLI
 output cannot drift independently. It distinguishes the strict generic graph
 path from bounded natural-language reference profiles rather than treating all
 successful fixtures as arbitrary-circuit support.
 
+`behavioral-intent-v1` uses a separate compiler-owned installed semantic
+capability snapshot. `intent compile` validates and persists that snapshot
+before provider execution, so it is not advertised as a direct graph-generation
+profile by `capability generation`.
+
 | Path | Input contract | Current boundary |
 | --- | --- | --- |
+| `behavioral-intent-v1` | `behavioralintent.Proposal` v1 compiled to `kicadai.open-set-requirement.v3` | Behavior/interfaces/conditions/tolerances/safety only. Minimum clarification or stable capability gaps replace guessed requirements. Executable output requires selected architecture and hash-bound closed-loop evidence. |
 | `generic-circuit-v1` | `kicadai.circuit-graph.v1` explicit graph or function intent | Catalog-resolved explicit topology, or deterministic lowering from functions/interfaces/domains/constraints. Ambiguous resolution, missing support or unused-pin policy, unsupported functions, and incomplete intent fail closed. |
 | `usb_c_bmp280` | `kicadai_bmp280_intent_v1` | Bounded USB-C BMP280 reference composition. |
 | `usb_c_led_protected` | `kicadai_usb_c_led_intent_v1` | Bounded protected USB-C LED reference composition. |
@@ -58,6 +68,33 @@ electrical/readability checks, required-net routing, writer correctness,
 round-trip preservation, and KiCad ERC/DRC where requested. This matrix is not
 a claim that arbitrary dense, high-speed, RF, thermal, or analog-performance
 requirements can be generated without engineering review.
+
+### Behavioral Intent Compiler
+
+Use the behavioral compiler when the user knows what the circuit must do but
+should not be asked to choose its implementation:
+
+```sh
+kicadai \
+  --file ./behavioral-request.txt \
+  --provider openai \
+  --ai-profile behavioral-intent-v1 \
+  --output ./out/behavioral-request \
+  intent compile
+```
+
+Every source statement must be accounted for as compiled behavior,
+clarification, capability gap, or non-material context. Every generated
+objective, operating case, and behavioral requirement must point back to source
+evidence. The compiler exposes `ready`, `needs_clarification`, `unsupported`,
+and `invalid`; only `ready` retains an executable requirement and writes
+`.kicadai/behavioral-design-request.json`.
+
+Clarification answers use the generated
+`.kicadai/behavioral-follow-up-template.json` and are hash-bound to the exact
+source, installed capabilities, prior proposal, and prior compilation. See
+[Intent Planning](intent-planning.md#behavioral-intent-compilation) and the
+[compiler audit](../specs/uncertainty-aware-behavioral-intent-compilation/AUDIT.md).
 
 The offline generic-composition acceptance corpus exercises the checked-in RC
 filter and transistor-switch graphs through strict decode, catalog resolution,
@@ -640,6 +677,9 @@ the reproducibility boundary.
 
 - Provider configuration, authentication, transport, refusal, malformed
   output, and strict-decode failures stop before project writes.
+- Behavioral compilation with unresolved uncertainty writes a minimal
+  clarification template, while unavailable semantics write stable capability
+  gaps. Neither status releases an executable design request.
 - Unsupported or ambiguous intent fails closed with structured diagnostics.
 - Missing KiCad tooling cannot produce promotion `pass`.
 - ERC, DRC, connectivity, routing, writer, or round-trip failures remain
@@ -650,6 +690,13 @@ the reproducibility boundary.
   evidence.
 
 ## Current Limits
+
+The behavioral compiler removes the need for users to prescribe implementation
+details inside the supported semantic envelope. Its 24-prompt held-out corpus
+contains 12 paraphrase groups: 12 ready prompts representing six unique
+supported contracts, four clarification prompts, and eight unsupported
+prompts. All six supported contracts pass deterministic replay and installed-
+KiCad promotion.
 
 The generic contract removes the architectural requirement for one provider
 schema per topology and its function form removes the requirement for the AI to
@@ -666,6 +713,9 @@ fabrication release still require additional evidence.
 
 Automatic bounded dispatch remains available for the two promoted references.
 Explicit generic mode must be selected with `--ai-profile generic-circuit-v1`.
+Behavioral compilation must be selected with
+`--ai-profile behavioral-intent-v1` and the `intent compile` command; it does
+not silently replace `design create` dispatch.
 Unknown parts, ambiguous catalog matches, invented pins, unsupported geometry,
 and incomplete required routing fail closed. A KiCad-backed pass is
 design-validation evidence, not a fabrication-ready claim.

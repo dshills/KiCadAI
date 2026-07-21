@@ -6,6 +6,12 @@ architecture alternatives, resolves catalog-backed components and models,
 runs registered analyses over declared operating cases, diagnoses failed
 assertions, applies bounded generic repairs, and reruns every required gate.
 
+`intent compile` is the natural-language trust boundary in front of this
+workflow. It releases a requirement to architecture search only after strict
+source/reverse coverage and uncertainty checks, and retains executable output
+only when the selected architecture's closed-loop report is bound to the exact
+requirement, catalog, and model-registry hashes.
+
 Promoted evidence can include DC operating point, AC response, noise,
 stability, transient/startup behavior, distortion, thermal limits, and
 explicit supply/load/temperature/tolerance/model corners. Model identity,
@@ -30,4 +36,5 @@ layout, mains safety, or fabrication release. New capability should be added
 through reviewed catalog/model coverage and new neutral held-out failures.
 
 See the [specification](../specs/simulation-grounded-closed-loop-synthesis/SPEC.md)
-and [completion audit](../specs/simulation-grounded-closed-loop-synthesis/AUDIT.md).
+and [completion audit](../specs/simulation-grounded-closed-loop-synthesis/AUDIT.md),
+plus the upstream [behavioral compiler audit](../specs/uncertainty-aware-behavioral-intent-compilation/AUDIT.md).

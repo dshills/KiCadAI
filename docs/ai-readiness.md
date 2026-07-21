@@ -140,7 +140,8 @@ obligations with deterministic alternatives and rationale.
 
 All 10 adversarial circuits pass component, rating, value, tolerance, lowering,
 writer, round-trip, connectivity, routing, clean installed-KiCad ERC, and strict
-DRC gates. This is measured readiness inside the checked-in 95-record catalog;
+DRC gates. This is measured readiness inside the installed 111-component
+generic graph contract as of 2026-07-21;
 unknown capabilities, insufficient evidence, incompatible domains, unsafe
 startup, and exceeded budgets fail closed. It does not establish unrestricted
 natural-language intent, arbitrary topology or parts, RF/high-speed design,
@@ -156,6 +157,17 @@ protected USB-C LED and I2C evidence. This moves readiness from structural
 composition to measured closed-loop selection inside the checked-in catalog;
 unknown topologies, arbitrary parts/models, RF, mains, and general dense-board
 routing remain fail-closed boundaries.
+
+## Behavioral Intent Compilation
+
+The uncertainty-aware compiler adds a language-facing readiness gate above the
+matrix. Its 24-prompt, 12-paraphrase-group corpus spans amplifiers, filters,
+power, protection, sensors, and MCU interfaces. Supported prompts must compile
+to strict behavior, pass architecture search and trusted closed-loop evidence,
+and then pass the complete physical/KiCad promotion lane. Ambiguous prompts ask
+one minimal blocking question; unavailable behavior produces a stable
+capability-gap record. This evidence measures the registered envelope and does
+not promote unsupported matrix records implicitly.
 
 ## Validation
 

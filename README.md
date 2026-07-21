@@ -17,6 +17,11 @@ path.
   tested.
 - Structured intent can generate supported designs through planning, component
   selection, schematic/PCB realization, placement, routing, and validation.
+- Ordinary behavior-first requests can enter through the uncertainty-aware
+  `intent compile` trust boundary. It accounts for every source statement,
+  asks the minimum blocking clarification, records stable capability gaps, and
+  releases a strict v3 requirement only after deterministic architecture
+  search and trusted all-corner closed-loop evidence pass.
 - Exact `ESP32-WROOM-32E-N4` minimal-system generation is supported through the
   built-in `esp32_wroom_32e_minimal` block, with power conditioning, EN/BOOT
   straps and buttons, UART/I2C/SPI/GPIO headers, and an antenna copper keepout.
@@ -53,6 +58,12 @@ path.
   board constraints. All 10 pass deterministic replay, lowering, writer,
   routing/connectivity, zero-diff round trip, and installed-KiCad ERC and strict
   DRC. See the [composition audit](specs/adversarial-multi-function-composition/AUDIT.md).
+- A frozen 24-prompt behavioral-intent corpus adds 12 paraphrase groups across
+  amplifiers, filters, power, protection, sensors, and MCU interfaces. Twelve
+  prompts compile to six unique supported contracts, four require targeted
+  clarification, and eight produce stable unsupported outcomes. Every supported
+  contract passes deterministic replay and the installed-KiCad promotion lane.
+  See the [behavioral compiler audit](specs/uncertainty-aware-behavioral-intent-compilation/AUDIT.md).
 - Arbitrary electronics generation is not yet guaranteed. Generic graphs fail
   closed on unknown parts, pins, ratings, placement, or routing capability.
 - ESP32 support currently covers the exact WROOM-32E-N4 module profile, not the
@@ -64,7 +75,7 @@ See [Project Status](docs/project-status.md) for capability boundaries and
 
 ## Requirements
 
-- Go 1.22 or newer.
+- Go 1.23 or newer, matching `go.mod`.
 - KiCad 9 or newer for current file output and IPC protobuf compatibility.
 - `kicad-cli` is optional but recommended for ERC, DRC, and round-trip evidence.
 - `protoc` is needed only when regenerating vendored protobuf bindings.
@@ -122,6 +133,25 @@ kicadai validate board ./out/led_indicator
 ```
 
 ## AI Generation
+
+Compile an ordinary behavior-first request without allowing the provider to
+choose topology, parts, nets, or layout:
+
+```sh
+kicadai \
+  --file ./behavioral-request.txt \
+  --provider openai \
+  --ai-profile behavioral-intent-v1 \
+  --output ./out/behavioral-request \
+  intent compile
+```
+
+Only a `ready` result writes
+`./out/behavioral-request/.kicadai/behavioral-design-request.json`. A
+clarification result writes a hash-bound follow-up template; an unsupported
+result writes stable capability-gap evidence and no executable design request.
+See [Intent Planning](docs/intent-planning.md#behavioral-intent-compilation) for
+the follow-up and project-creation flow.
 
 Run the recorded protected USB-C LED profile with KiCad-backed checks:
 
@@ -185,7 +215,7 @@ Start with the [documentation index](docs/README.md).
 | Current capabilities and limits | [Project Status](docs/project-status.md) |
 | Commands and live IPC | [CLI Reference](docs/cli-reference.md) |
 | Natural-language provider workflow | [AI Generation](docs/ai-generation.md) |
-| Structured intent and planning | [Intent Planning](docs/intent-planning.md) |
+| Behavioral compilation, structured intent, and planning | [Intent Planning](docs/intent-planning.md) |
 | Circuit blocks | [Circuit Blocks](docs/circuit-blocks.md) |
 | Components, symbols, and footprints | [Libraries And Components](docs/libraries-and-components.md) |
 | Placement and routing | [Placement And Routing](docs/layout-routing.md) |

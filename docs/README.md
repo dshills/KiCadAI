@@ -7,9 +7,11 @@ This directory holds the detailed reference material that used to live in the pr
 - [Project Status](project-status.md): current capabilities, proven workflows, evidence levels, and explicit limitations.
 - [KiCadAI Agent Skill](kicadai-agent-skill.md): prescriptive command and validation contract for AI agents using KiCadAI.
 - [CLI Reference](cli-reference.md): command overview, KiCad IPC setup, and direct generation commands.
-- [AI Generation](ai-generation.md): bounded and generic provider setup,
-  reproducible KiCad-backed lanes, evidence, and failure behavior.
-- [Intent Planning And AI Workflow](intent-planning.md): structured intent, rationale reports, semantic synthesis, and current AI workflow limits.
+- [AI Generation](ai-generation.md): behavioral, bounded, and generic provider
+  setup, reproducible KiCad-backed lanes, evidence, and failure behavior.
+- [Intent Planning And AI Workflow](intent-planning.md): uncertainty-aware
+  behavioral compilation, structured intent, rationale reports, semantic
+  synthesis, and current AI workflow limits.
 - [Circuit Blocks](circuit-blocks.md): reusable block workflows and block-library commands.
 - [Placement And Routing](layout-routing.md): placement quality, routing policy, route diagnostics, and retry-related evidence.
 - [Validation And Analysis](validation-and-analysis.md): inspection, evaluation, writer correctness, transactions, round-trip validation, and ERC/DRC checks.
@@ -27,3 +29,7 @@ This directory holds the detailed reference material that used to live in the pr
 - [Circuit Block Verification](circuit-block-verification.md): verification corpus and workflow evidence.
 - [Library Resolver](library-resolver.md): focused symbol/footprint resolver reference.
 - [Validation Repair Loop](validation-repair.md): deterministic repair planning and apply behavior.
+
+Completed feature specs and audits remain under `../specs/`. Historical review
+snapshots are under `../specs/archive/`; they describe the repository at their
+recorded date and are not current capability references.

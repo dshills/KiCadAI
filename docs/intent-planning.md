@@ -34,6 +34,19 @@ corner. Its terminal statuses are `ready`, `needs_clarification`,
 requirement and writes `behavioral-design-request.json`; unsupported behavior
 produces stable semantic capability-gap records instead of a guessed design.
 
+After a `ready` compilation, pass the persisted design request through the
+normal project workflow and request the required external gates explicitly:
+
+```sh
+kicadai \
+  --request ./out/behavioral-filter/.kicadai/behavioral-design-request.json \
+  --output ./out/behavioral-filter-project --overwrite \
+  --kicad-cli /path/to/kicad-cli \
+  --require-erc --require-drc --require-kicad-roundtrip \
+  --strict-diffs --strict-unrouted \
+  design create
+```
+
 When clarification is required, the output directory contains
 `.kicadai/behavioral-follow-up-template.json`. Fill only each `answer` field,
 then rerun against the complete original text and the same output directory:
@@ -111,12 +124,17 @@ Examples live in `examples/design/`:
 
 Optional KiCad-backed design examples live in
 `examples/design/kicad-backed/`. They are run only when `KICADAI_KICAD_CLI` is
-configured. The richer fixture set mixes pass, candidate, and expected-fail
-cases: I2C is a checked-in pass fixture with required KiCad ERC/DRC evidence,
-LED is a structural candidate, and remaining richer boards document
-blockers before KiCad ERC/DRC verification can complete. Do not report a
-fixture as passing unless the optional test or manual command produced
-successful KiCad report artifacts and the fixture readiness is `pass`.
+configured. Current pass fixtures include concrete BMP280, USB-C LED,
+protected USB-C LED, protected USB-C/3.3 V/I2C, generic I2C breakout, exact
+ESP32-WROOM-32E, Class-A, protected Class-AB headphone, and protected 10 W
+Class-AB speaker designs. Simple LED and connector/LED smoke cases remain
+candidate-level; the unprotected Class-AB skeleton and older op-amp headphone
+buffer remain explicit expected failures. The authoritative list and manual
+commands are in the
+[KiCad-backed example README](../examples/design/kicad-backed/README.md).
+Do not report a fixture as passing unless the optional test or manual command
+produced successful KiCad report artifacts and its declared readiness is
+`pass`.
 
 The multi-block I2C sensor breakout is covered by block and intent fixtures
 plus the optional KiCad-backed `i2c_sensor_breakout_candidate` design example.
@@ -424,13 +442,12 @@ Current intent-planner gaps:
   linear-regulator slice. Broader analog synthesis remains limited to explicit
   requirement evidence until blocks expose safe parameters and catalog ratings
   cover the target checks;
-- amplifier requests are safest when phrased as low-voltage headphone designs
-  using the supported input/gain/bias/Class AB output/protection/decoupling
-  slices. A request for a "Class AB headphone amplifier" may produce
-  schematic/PCB structure plus optional simulation evidence. Requests for
-  speaker outputs, bridge outputs, mains supplies, high power, thermal claims,
-  or active fault protection remain blocked or partial until those blocks have
-  KiCad and simulation-backed promotion evidence;
+- amplifier requests may use the bounded low-voltage headphone slice or the
+  protected dual-rail 10 W RMS/8 ohm speaker slice with its exact reviewed
+  component, load, SOA, thermal, protection, layout, simulation, KiCad, and
+  fabrication evidence. Bridge outputs, mains supplies, materially higher
+  power, arbitrary output families, unreviewed substitutions, and loads or
+  heatsinks outside those envelopes remain blocked;
 - fabrication-focused intent maps to stricter validation/component/routing
   policy, but external manufacturer acceptance remains a downstream
   fabrication-readiness concern.

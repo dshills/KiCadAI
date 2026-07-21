@@ -16,6 +16,8 @@ but current live API write support is limited.
 
 Use KiCadAI for:
 
+- compiling ordinary behavior-first requests into strict requirements,
+  targeted clarifications, or stable capability-gap evidence;
 - creating generated KiCad projects from structured intent;
 - inspecting and evaluating existing KiCad projects;
 - validating generated schematics and PCBs;
@@ -112,6 +114,9 @@ fields, and unsafe patch operations still fail closed.
 
 Current strong paths:
 
+- uncertainty-aware `intent compile` for behavior, interfaces, operating
+  cases, tolerances, and safety limits, with minimum clarification and stable
+  capability-gap outcomes;
 - direct KiCad project, schematic, and PCB file writing;
 - structured intent planning and `intent create`;
 - strict provider-backed generation for bounded references and explicit
@@ -153,17 +158,37 @@ Current weak or blocked paths:
 
 When asked to create a project from intent:
 
-1. Convert the request into a structured intent JSON file when possible.
-2. Run `intent plan` and inspect status, issues, known gaps, selected blocks,
+1. For an ordinary behavior-first request, run `intent compile`. Stop on
+   `needs_clarification`, `unsupported`, or `invalid`; never fill topology,
+   parts, nets, placement, routing, models, or validation evidence on the
+   provider's behalf.
+2. When `intent compile` is `ready`, use its persisted
+   `.kicadai/behavioral-design-request.json`. For an already structured planner
+   request, use that request directly.
+3. Run `intent plan` when the input is a structured intent request and inspect
+   status, issues, known gaps, selected blocks,
    generated request, and synthesis trace.
-3. If the plan is ready or acceptable with explicit known gaps, run
+4. If the plan or compiled design request is ready, run
    `intent create` or `design create`.
-4. Run writer and board validation on the generated project.
-5. Run ERC/DRC checks when KiCad CLI is available and the requested acceptance
+5. Run writer and board validation on the generated project.
+6. Run ERC/DRC checks when KiCad CLI is available and the requested acceptance
    level requires it.
-6. Produce or inspect the rationale report.
-7. Report success only when blocking issues are absent and required evidence is
+7. Produce or inspect the rationale report.
+8. Report success only when blocking issues are absent and required evidence is
    present.
+
+Behavior-first command sequence:
+
+```sh
+kicadai --file request.txt --provider openai \
+  --ai-profile behavioral-intent-v1 \
+  --output ./out/compiled intent compile
+kicadai --request ./out/compiled/.kicadai/behavioral-design-request.json \
+  --output ./out/project --overwrite \
+  --kicad-cli /path/to/kicad-cli \
+  --require-erc --require-drc --require-kicad-roundtrip \
+  --strict-diffs --strict-unrouted design create
+```
 
 Minimum command sequence:
 

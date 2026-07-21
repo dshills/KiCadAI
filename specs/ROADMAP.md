@@ -1,6 +1,6 @@
 # KiCadAI Roadmap
 
-Date: 2026-07-19
+Date: 2026-07-21
 
 This roadmap replaces the older roadmap and gap analysis now archived as
 `specs/OLD_ROADMAP.md` and `specs/OLD_ROADMAP_GAP.md`.
@@ -124,6 +124,18 @@ from validation feedback to safe automatic repair.
   strict DRC, routing/connectivity, writer correctness, zero round-trip diffs,
   and byte-identical replay; authoritative hashes are published in
   `specs/function-level-circuit-synthesis/CAPABILITY_REPORT.json`.
+- Uncertainty-aware behavioral intent compilation above the strict v3
+  requirement contract. `intent compile` accepts behavior, interfaces,
+  operating conditions, tolerances, and safety constraints without accepting
+  provider-selected implementation details. It validates source/reverse
+  coverage, records uncertainty, asks the minimum owned clarification, emits
+  stable semantic capability gaps, selects only installed architectures, and
+  binds executable output to trusted closed-loop evidence. Its frozen
+  24-prompt corpus has 12 paraphrase groups: 12 ready prompts representing six
+  unique supported contracts, four clarification prompts, and eight
+  unsupported prompts. All six supported contracts pass the installed-KiCad
+  promotion lane. See the
+  [completion audit](uncertainty-aware-behavioral-intent-compilation/AUDIT.md).
 - Agent-facing generic graph repair loop: capability discovery, strict direct
   graph preflight, constrained typed patching, deterministic re-preflight, and
   provider-free project creation. The patch contract is fail-closed, preserves
@@ -197,10 +209,11 @@ from validation feedback to safe automatic repair.
   regression tests that strict-decode each request, run `design create`, verify
   generated project artifacts, read back generated schematic/PCB files, and
   check generated schematic component identity properties. An optional
-  `examples/design/kicad-backed/` tier now validates metadata-backed fixtures
-  only when `KICADAI_KICAD_CLI` is configured. The initial fixtures are
-  `expected_fail` cases that keep richer generated boards visible without
-  making the default test suite depend on KiCad. Generated design PCB net
+  `examples/design/kicad-backed/` tier validates metadata-backed fixtures only
+  when `KICADAI_KICAD_CLI` is configured. The current corpus contains promoted
+  pass fixtures, candidate smoke cases, and two explicit expected-failure
+  amplifier seeds without making the default test suite depend on KiCad.
+  Generated design PCB net
   assignment now propagates pad/copper net names through placement operations,
   resolves KiCad 10 name-only net references during readback, and exposes
   workflow net-assignment evidence. `KICADAI_KICAD_CLI` supplies the executable
@@ -214,9 +227,10 @@ from validation feedback to safe automatic repair.
   compact `data.promotion` summary when the report artifact is written. The
   simple LED prompt now reaches strict promotion `candidate` in the default
   structural lane and `pass` when required KiCad ERC/DRC plus writer
-  round-trip evidence are clean. Richer KiCad-backed fixtures remain
-  `expected_fail` with explicit promotion blockers rather than silently skipped
-  or accidentally promoted.
+  round-trip evidence are clean. Richer protected USB-C, sensor, ESP32, and
+  bounded amplifier fixtures now reach `pass`; remaining draft amplifier seeds
+  retain explicit promotion blockers rather than being silently skipped or
+  accidentally promoted.
 - Multi-endpoint generated inter-block routing now models route groups,
   resolves deterministic route trees, routes branch requests with same-net
   copper evidence, and reports group-level completion semantics. The
@@ -520,11 +534,12 @@ Implemented foundation with a documented first AI-controlled generation lane.
   exercise full generated-design workflows with metadata-declared readiness,
   expected stages, expected artifacts, and required ERC/DRC policy. Current
   readiness:
-  - `expected_fail`: `connector_led_kicad_smoke` and
-    `opamp_headphone_buffer_kicad_candidate`, plus the unprotected
-    `class_ab_headphone_driver` skeleton;
-  - `candidate`: `led_indicator_kicad_smoke`;
-  - `pass`: the protected USB-C LED/I2C fixtures, BMP280/SHT31 sensor lanes,
+  - `expected_fail`: `opamp_headphone_buffer_kicad_candidate` and the
+    unprotected `class_ab_headphone_driver` skeleton;
+  - `candidate`: `led_indicator_kicad_smoke` and
+    `connector_led_kicad_smoke`;
+  - `pass`: the protected USB-C LED/I2C fixtures, BMP280 and generic I2C
+    sensor lanes,
     `esp32_wroom_32e_minimal_pass`, `class_a_bjt_line_preamplifier`,
     `class_ab_headphone_protected`, and
     `class_ab_speaker_10w_protected`;
@@ -533,10 +548,9 @@ Implemented foundation with a documented first AI-controlled generation lane.
   promoted inter-block route candidates, endpoint-contact diagnostics, and
   same-net contact graph completion semantics. `led_indicator_kicad_smoke`
   now exercises standalone exported-port labels, schematic electrical checks,
-  and LED local-route contact proof. `led_indicator_kicad_smoke` is a candidate
-  fixture with warning-only KiCad evidence; `connector_led_kicad_smoke` remains
-  `expected_fail` because required KiCad ERC evidence reports blocking generated
-  schematic connectivity findings.
+  and LED local-route contact proof. Both smoke fixtures are candidate-level;
+  the connector/LED fixture has clean required KiCad ERC/DRC and routed
+  endpoint-contact evidence but retains warning-only writer round-trip policy.
   `i2c_sensor_breakout_candidate` now enables routing and bounded retry, proves
   block-local VCC/GND/SDA/SCL alias propagation into local routes, proves
   route-tree contact completion for its multi-endpoint inter-block nets, and
@@ -920,11 +934,12 @@ decisions.
 ### Status
 
 Production BMP280 and protected USB-C LED bounded provider lanes are retained.
-The generic catalog-resolved circuit graph lane is implemented and has four
+The generic catalog-resolved circuit graph lane is implemented and has six
 promoted KiCad-backed topology classes: RC filter, protected USB-C LED,
-protected USB-C BMP280, and LMV321 AC-coupled gain-stage. The RC, BMP280, and
-LMV321 references include live provider pass evidence; broader placement,
-routing, catalog, and domain-specific validation coverage remain.
+protected USB-C BMP280, LMV321 AC-coupled gain-stage, dual-LMV321 signal
+conditioning, and multi-unit LM358 signal conditioning. Selected references
+include live-provider pass evidence; broader placement, routing, catalog, and
+domain-specific validation coverage remain.
 
 ### Current Foundation
 
@@ -1131,15 +1146,16 @@ B, and shared power units while retaining one physical reference, footprint,
 and BOM item. The live graph is semantically equivalent to the recording and
 reaches the same KiCad-backed pass gates.
 
-The five-requirement open-set milestone and the 10-circuit adversarial
-multi-function milestone are complete. Further fixtures should target genuinely
-new uncertainty rather than repeat the same provider envelope.
+The five-requirement open-set milestone, the 10-circuit adversarial
+multi-function milestone, simulation-grounded v3 synthesis, and the
+uncertainty-aware behavioral intent compiler are complete. Further fixtures
+should target genuinely new uncertainty rather than repeat the same provider
+envelope.
 
-1. Complete the
-   [uncertainty-aware behavioral intent compiler](uncertainty-aware-behavioral-intent-compilation/SPEC.md):
-   derive the strict v3 requirement contract, account for source claims, expose
-   uncertainty, and request clarification or record a capability gap instead
-   of guessing.
+1. Expand a neutral held-out corpus into unsupported primitive and model
+   families, especially broader MCU/ESP32, mixed-signal, and power-control
+   behavior. Promote only after the new families have catalog, simulation, and
+   physical evidence.
 2. Add dynamic electrothermal and control-loop evidence where static global
    bounds cannot prove startup, SOA, stability, or transient protection.
 3. Generalize bounded placement-routing correction from observed
@@ -1152,7 +1168,8 @@ new uncertainty rather than repeat the same provider envelope.
 
 KiCadAI is ready for full autonomous schematic and PCB generation when:
 
-- user intent can be converted into structured constraints;
+- user intent can be converted into structured constraints across the claimed
+  capability envelope, while ambiguity and capability gaps fail closed;
 - selected components are verified against libraries and pinmaps;
 - generated schematics pass schematic validation and configured ERC;
 - generated PCBs pass writer correctness, board validation, and configured DRC;

@@ -7,10 +7,14 @@ roadmaps, and dated review material.
 
 - [ROADMAP.md](ROADMAP.md) - current project roadmap.
 
-## Current Code Review
+## Latest Completed Milestone
 
-- [CODE_REVIEW_07_02_2026.md](CODE_REVIEW_07_02_2026.md) - latest full codebase review.
-- [CODE_REVIEW_FIX_PLAN_07_02_2026.md](CODE_REVIEW_FIX_PLAN_07_02_2026.md) - active phased remediation plan for the July 2026 review.
+- [Uncertainty-aware behavioral intent compilation](uncertainty-aware-behavioral-intent-compilation/SPEC.md)
+  - completed behavior-first compiler specification.
+- [Implementation plan](uncertainty-aware-behavioral-intent-compilation/PLAN.md)
+  - completed implementation phases and acceptance gates.
+- [Completion audit](uncertainty-aware-behavioral-intent-compilation/AUDIT.md)
+  - frozen-corpus and installed-KiCad evidence.
 
 ## Active Spec Areas
 
@@ -21,3 +25,6 @@ the relevant subdirectory instead of adding loose historical files at the root.
 
 - [archive/README.md](archive/README.md) - superseded reviews, older fix plans,
   and retired roadmap snapshots.
+- [July 2026 code review](archive/CODE_REVIEW_07_02_2026.md) and
+  [remediation plan](archive/CODE_REVIEW_FIX_PLAN_07_02_2026.md) - historical
+  review material; the tracked findings have been closed or superseded.

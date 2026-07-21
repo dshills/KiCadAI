@@ -4,11 +4,12 @@ The circuit block library provides reusable, parameterized schematic fragments
 for common circuits. Blocks are exposed through the `kicadai block` CLI and are
 intended to be a safer AI-facing design primitive than raw file writes.
 
-The current implementation generates structural KiCad project and schematic
-outputs. It does not yet claim fabrication-ready PCB output.
-The checked-in `led_indicator` and `connector_breakout` schematic examples pass
-the focused KiCad CLI round-trip fixture test, but block verification levels
-remain conservative until broader parameter, ERC/DRC, and PCB evidence exists.
+The library generates structural schematic operations and PCB realization
+metadata that the design workflow can place, route, write, and validate. Most
+individual blocks deliberately retain `structural` verification even when a
+specific composed design has stronger promotion evidence. A whole-design
+KiCad-backed `pass` is not an automatic fabrication claim for every parameter
+combination of its constituent blocks.
 The current readiness review and gap matrix are tracked in
 [circuit-block-readiness.md](circuit-block-readiness.md).
 
@@ -24,13 +25,31 @@ Current built-in blocks:
 
 | Block ID | Category | Current level | Purpose |
 |---|---|---|---|
+| `amplifier_bias_network` | analog | `structural` | Diode-string Class-AB headphone bias network. |
+| `amplifier_input_buffer` | analog | `structural` | AC-coupled input and bias-reference conditioning. |
+| `amplifier_supply_decoupling` | power | `structural` | Local single/dual-rail amplifier decoupling. |
+| `canned_oscillator` | timing | `structural` | Catalog-backed canned-clock source. |
+| `class_a_voltage_stage` | analog | `structural` | Bounded Class-A voltage amplification stage. |
+| `class_ab_output_pair` | analog | `structural` | Headphone-scale complementary emitter follower. |
+| `class_ab_output_stage` | analog | `structural` | Bounded Class-AB headphone output stage. |
+| `class_ab_speaker_power_stage` | analog_power | `structural` | Protected 10 W/8 ohm speaker-power slice. |
+| `connector_breakout` | interconnect | `structural` | Generic connector with exported named pins. |
+| `crystal_oscillator` | timing | `structural` | Crystal and load-capacitor clock network. |
+| `dc_blocking_capacitor` | analog | `structural` | AC-coupled load path. |
+| `esd_protection` | protection | `structural` | Entry-anchored 5 V ESD shunt. |
+| `esp32_wroom_32e_minimal` | digital | `erc_drc_verified` | Exact ESP32-WROOM-32E-N4 minimal system and antenna keepout. |
+| `headphone_output_connector` | interconnect | `structural` | Mono headphone load interface. |
+| `headphone_output_protection` | analog | `structural` | Headphone output coupling and protection. |
+| `i2c_sensor` | sensor | `structural` | Generic or concrete I2C sensor with pull-ups and decoupling. |
 | `led_indicator` | indicator | `structural` | Series resistor plus LED indicator. |
-| `connector_breakout` | interconnect | `experimental` | Generic connector with exported named pins. |
-| `voltage_regulator` | power | `structural` | Fixed-output linear regulator with input/output capacitors. |
-| `i2c_sensor` | sensor | `structural` | I2C peripheral with pull-ups, interrupt, and decoupling. |
-| `opamp_gain_stage` | analog | `structural` | Non-inverting op-amp gain stage with feedback network. |
-| `usb_c_power` | power | `structural` | USB-C sink power input with CC pull-downs and optional protection. |
-| `mcu_minimal` | digital | `structural` | ATmega328P-A minimal system with reset, decoupling, GPIO, and ISP header. |
+| `mcu_minimal` | digital | `structural` | ATmega328P-A minimal system with reset, GPIO, and ISP. |
+| `opamp_gain_stage` | analog | `structural` | Non-inverting op-amp gain stage with feedback. |
+| `reset_programming_header` | mcu_support | `structural` | Reset and programming interface support. |
+| `reverse_polarity_protection` | protection | `structural` | Series-diode reverse-polarity protection. |
+| `speaker_opamp_driver` | analog | `structural` | Driver stage for the bounded speaker lane. |
+| `speaker_output_protection` | protection | `structural` | DC-fault detection and relay-isolated speaker output. |
+| `usb_c_power` | power | `structural` | USB-C sink power with optional fuse/TVS/bulk protection. |
+| `voltage_regulator` | power | `structural` | Verified fixed 3.3 V LDO profiles and capacitors. |
 
 Inspect one block:
 
@@ -71,9 +90,10 @@ Each block declares a verification level:
 | `erc_drc_verified` | Available KiCad ERC/DRC or equivalent validation passes. |
 | `reference_verified` | The block has been checked against a known-good reference design. |
 
-Only `roundtrip_verified` or stronger blocks should be treated as candidates
-for fully autonomous generation without an explicit warning. The current block
-examples are useful for schematic generation experiments, not manufacturing.
+Only `roundtrip_verified` or stronger block-level records should be treated as
+autonomous block evidence without an explicit warning. Whole-design promotion
+reports may prove a narrower composition at a stronger level; inspect the
+report instead of projecting that result onto every use of the block.
 
 ## Instantiate One Block
 
@@ -274,15 +294,21 @@ be regenerated deterministically.
 
 ## Current Limitations
 
-- Current blocks are structural schematic generators, not full PCB generators.
-- Block-generated PCB files are not committed as examples because footprint pad
-  geometry and routing are still incomplete.
-- Connector breakout remains `experimental`.
+- Most blocks remain `structural` at the block contract level even though the
+  design workflow can realize their PCB fragments and several exact
+  compositions have KiCad-backed pass evidence.
+- Standalone checked-in block examples emphasize schematic/project output;
+  whole-board placement, routing, and promotion are exercised by design
+  fixtures and the block verification harness.
 - `usb_c_power` power-only mode does not emit D+/D- no-connect markers yet.
 - MCU support uses a fixed ATmega328P-A role map; arbitrary MCU semantic
-  extraction is not implemented.
-- Composition checks voltage-domain conflicts but does not solve placement or
-  routing.
-- ERC/DRC integration is not yet part of the normal block workflow.
+  extraction is not implemented. The separate exact
+  `esp32_wroom_32e_minimal` block supports only WROOM-32E-N4.
+- The composed design workflow supports deterministic placement and routing for
+  proven shapes, not general dense-board autorouting.
+- Block verification can require KiCad ERC/DRC, but default tests remain
+  hermetic and report external checks as skipped unless configured.
+- The protected 10 W/8 ohm speaker composition is bounded evidence, not general
+  bridge, mains, high-power, or arbitrary-load amplifier support.
 - Blocks do not execute external block-pack code. Future block packs must remain
   data-only and path-safe.

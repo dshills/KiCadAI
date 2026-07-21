@@ -47,16 +47,12 @@ KiCad ERC/DRC, route/contact completion, writer correctness, and zero
 round-trip diffs. Requests for other ESP32 modules, package/flash variants,
 arbitrary pin remapping, or unverified RF layouts fail closed.
 
-Amplifier inventory is intentionally broader than the currently implemented
-amplifier blocks. The roadmap-backed family now names input buffer, gain stage,
-bias network, Class AB output pair, output protection, supply decoupling,
-headphone output, and speaker output entries. Several of those entries are
-explicit `unsupported` readiness records that point to the existing narrow
-`opamp_gain_stage`, `class_ab_output_stage`, or `headphone_output_protection`
-implementations where appropriate. Treat those entries as AI-facing capability
-boundaries: headphone-scale slices may be modeled, while speaker and power
-amplifier requests remain blocked until SOA, thermal, protection, layout, and
-KiCad-backed evidence are implemented.
+The amplifier inventory includes input conditioning, gain, bias, Class-A and
+Class-AB stages, local supply decoupling, headphone output/protection, and a
+bounded speaker-power/protection path. Headphone-scale designs and the exact
+protected dual-rail 10 W RMS/8 ohm speaker composition have promoted evidence.
+Other speaker powers, bridge operation, mains supplies, arbitrary output-device
+families, substitutions, loads, and heatsinks remain fail-closed boundaries.
 
 `amplifier_input_buffer` is the first implemented family-level front-end
 contract. It emits a passive AC-coupled input conditioning and bias-reference
@@ -85,8 +81,10 @@ AC-coupled output fragment, calculates output high-pass cutoff, checks coupling
 capacitor voltage margin, and blocks speaker/bridge/fault-protection claims.
 The connector block provides a mono three-pin board-edge interface with
 `HP_OUT`, `LOAD_RET`, and `LOAD_REF` anchors. Speaker output connectors remain
-unsupported until active DC fault protection, current, and thermal evidence are
-available.
+outside these headphone blocks. The bounded speaker lane instead uses
+`speaker_opamp_driver`, `class_ab_speaker_power_stage`, and
+`speaker_output_protection` with its separate active fault, current, thermal,
+and load evidence.
 
 `amplifier_supply_decoupling` provides the local rail evidence slice for active
 amplifier stages. It emits VCC-to-GND ceramic decoupling, optional local bulk
@@ -322,8 +320,10 @@ requirements, and selected MLCC capacitors report DC-bias/effective-capacitance
 review status. Fabrication-candidate workflows block on unproven stability,
 thermal, or derating evidence.
 
-The generated block examples are structural schematic/project outputs; they are
-not yet fabrication-ready PCB designs. See
+The standalone generated block examples are structural schematic/project
+outputs. PCB realization and stronger KiCad-backed evidence are attached to
+specific verification manifests and composed design fixtures; they do not make
+every block parameterization fabrication-ready. See
 [docs/circuit-block-library.md](circuit-block-library.md) for request
 formats, verification levels, resolver requirements, examples, AI usage, and
 known limitations. The current release-readiness gap matrix is in
