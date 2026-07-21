@@ -56,6 +56,23 @@ func TestSynthesisCopperLayerCountUsesRoutingBranchPressure(t *testing.T) {
 	}
 }
 
+func TestSynthesisComponentPitchReservesChannelsUnderBranchPressure(t *testing.T) {
+	sparse := []Net{{Name: "A", Endpoints: []Endpoint{{Component: "u1"}, {Component: "u2"}}}}
+	if got := synthesisComponentPitchMM(4, sparse); got != synthesisEstimatedComponentPitchMM {
+		t.Fatalf("sparse pitch = %.1f", got)
+	}
+	dense := []Net{
+		{Name: "A", Endpoints: []Endpoint{{Component: "u1"}, {Component: "u2"}, {Component: "u3"}, {Component: "u4"}}},
+		{Name: "B", Endpoints: []Endpoint{{Component: "u1"}, {Component: "u2"}, {Component: "u3"}}},
+	}
+	if got := synthesisComponentPitchMM(4, dense); got != synthesisCongestedComponentPitchMM {
+		t.Fatalf("congested pitch = %.1f", got)
+	}
+	if got := synthesisComponentPitchMM(synthesisCongestedComponentCount, sparse); got != synthesisCongestedComponentPitchMM {
+		t.Fatalf("large-circuit pitch = %.1f", got)
+	}
+}
+
 func TestDeriveFunctionLayoutReservesPackingBandsAroundLargestEnvelope(t *testing.T) {
 	componentsInLayout := make([]Component, 16)
 	for index := range componentsInLayout {

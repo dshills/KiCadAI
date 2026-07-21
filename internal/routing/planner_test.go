@@ -385,6 +385,15 @@ func TestPlanEndpointPairsIsDeterministicOnTies(t *testing.T) {
 	}
 }
 
+func TestPlanEndpointPairsDeduplicatesIdenticalPhysicalEndpoints(t *testing.T) {
+	request := singleLayerSearchRequest()
+	access := BuildPadAccess(request)
+	pairs, issues := planEndpointPairs("SIG", NetSignal, []Endpoint{{Ref: "J1", Pin: "1"}, {Ref: "J2", Pin: "1"}, {Ref: " j2 ", Pin: "1"}}, access, request.Rules, false)
+	if len(issues) != 0 || len(pairs) != 1 {
+		t.Fatalf("pairs = %#v, issues = %#v, want one physical branch", pairs, issues)
+	}
+}
+
 func TestPlanEndpointPairsKeepsRepeatedConstrainedComponentPadsAsLeaves(t *testing.T) {
 	request := singleLayerSearchRequest()
 	request.Components = []Component{

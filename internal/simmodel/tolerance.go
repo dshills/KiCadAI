@@ -3,15 +3,23 @@ package simmodel
 import (
 	"fmt"
 	"math"
+	"runtime"
 	"slices"
 	"strings"
+	"sync"
 )
 
-const maxWorstCaseUncertainties = 6
+const (
+	maxWorstCaseUncertainties = 6
+	maxWorstCaseWorkers       = 8
+)
 
 // EvaluateWorstCase evaluates the nominal point, each one-at-a-time endpoint,
-// and the complete lower/upper corner set. The fixed enumeration makes the
-// result reproducible and deliberately fails closed before unbounded work.
+// and the complete lower/upper corner set across independent uncertainty
+// groups. Catalog temperature ranges are one correlated environmental group,
+// even when many devices carry the same operating-temperature evidence. The
+// fixed enumeration makes the result reproducible and deliberately fails
+// closed before unbounded work.
 func EvaluateWorstCase(plan Plan) (Report, []Diagnostic) {
 	if diagnostics := validateUncertainties(plan.Uncertainties); len(diagnostics) != 0 {
 		report, _ := evaluateNominal(planWithoutUncertainties(plan))
@@ -25,21 +33,16 @@ func EvaluateWorstCase(plan Plan) (Report, []Diagnostic) {
 	report := nominal
 	report.Corners = []CornerResult{{ID: "nominal", Assignments: nominalAssignments(plan.Uncertainties), Assertions: nominal.Assertions, Status: nominal.Status}}
 
-	for _, assignments := range deterministicCorners(plan.Uncertainties) {
-		cornerPlan := ClonePlan(base)
-		for _, assignment := range assignments {
-			if diagnostic := applyUncertainty(&cornerPlan, assignment.Name, assignment.Value); diagnostic != nil {
-				return report, []Diagnostic{*diagnostic}
-			}
+	corners := deterministicCorners(plan.Uncertainties)
+	evaluations := evaluateWorstCaseCorners(base, corners)
+	for index, evaluation := range evaluations {
+		assignments := corners[index]
+		if hasCornerEvaluationFailure(evaluation.diagnostics) {
+			id := cornerID(assignments)
+			report.Corners = append(report.Corners, CornerResult{ID: id, Assignments: assignments, Assertions: evaluation.report.Assertions, Status: "blocked"})
+			return report, append([]Diagnostic{{Path: "worst_case", Message: "corner " + id + " could not be evaluated", Suggestion: "supply bounded catalog evidence compatible with the trusted model"}}, evaluation.diagnostics...)
 		}
-		if cornerPlan.TopologyHash != "" {
-			cornerPlan.TopologyHash = topologyHash(cornerPlan.GroundNode, cornerPlan.Nodes, cornerPlan.Devices)
-		}
-		corner, diagnostics := evaluateNominal(cornerPlan)
-		if len(diagnostics) != 0 && len(corner.Assertions) == 0 {
-			return report, append([]Diagnostic{{Path: "worst_case", Message: "corner " + cornerID(assignments) + " could not be evaluated", Suggestion: "supply bounded catalog evidence compatible with the trusted model"}}, diagnostics...)
-		}
-		report.Corners = append(report.Corners, CornerResult{ID: cornerID(assignments), Assignments: assignments, Assertions: corner.Assertions, Status: corner.Status})
+		report.Corners = append(report.Corners, CornerResult{ID: cornerID(assignments), Assignments: assignments, Assertions: evaluation.report.Assertions, Status: evaluation.report.Status})
 	}
 	report.Sensitivity = sensitivity(report.Corners, plan.Uncertainties)
 	for _, corner := range report.Corners[1:] {
@@ -61,6 +64,78 @@ func EvaluateWorstCase(plan Plan) (Report, []Diagnostic) {
 	return report, nominalDiagnostics
 }
 
+func hasCornerEvaluationFailure(diagnostics []Diagnostic) bool {
+	return slices.ContainsFunc(diagnostics, func(diagnostic Diagnostic) bool {
+		return !strings.HasPrefix(diagnostic.Path, "assertions.")
+	})
+}
+
+type worstCaseCornerEvaluation struct {
+	report      Report
+	diagnostics []Diagnostic
+}
+
+func evaluateWorstCaseCorners(base Plan, corners [][]NamedValue) []worstCaseCornerEvaluation {
+	results := make([]worstCaseCornerEvaluation, len(corners))
+	if len(corners) == 0 {
+		return results
+	}
+	uniqueCorners, resultIndex := uniqueCornerEvaluationPlan(corners)
+	uniqueResults := make([]worstCaseCornerEvaluation, len(uniqueCorners))
+	workerCount := min(len(uniqueCorners), maxWorstCaseWorkers, max(1, runtime.GOMAXPROCS(0)))
+	jobs := make(chan int)
+	var workers sync.WaitGroup
+	workers.Add(workerCount)
+	for worker := 0; worker < workerCount; worker++ {
+		go func() {
+			defer workers.Done()
+			for index := range jobs {
+				cornerPlan := ClonePlan(base)
+				for _, assignment := range uniqueCorners[index] {
+					if diagnostic := applyUncertainty(&cornerPlan, assignment.Name, assignment.Value); diagnostic != nil {
+						uniqueResults[index].diagnostics = []Diagnostic{*diagnostic}
+						break
+					}
+				}
+				if len(uniqueResults[index].diagnostics) != 0 {
+					continue
+				}
+				if cornerPlan.TopologyHash != "" {
+					cornerPlan.TopologyHash = topologyHash(cornerPlan.GroundNode, cornerPlan.Nodes, cornerPlan.Devices)
+				}
+				uniqueResults[index].report, uniqueResults[index].diagnostics = evaluateNominal(cornerPlan)
+			}
+		}()
+	}
+	for index := range uniqueCorners {
+		jobs <- index
+	}
+	close(jobs)
+	workers.Wait()
+	for index, uniqueIndex := range resultIndex {
+		results[index] = uniqueResults[uniqueIndex]
+	}
+	return results
+}
+
+func uniqueCornerEvaluationPlan(corners [][]NamedValue) ([][]NamedValue, []int) {
+	unique := make([][]NamedValue, 0, len(corners))
+	indices := make([]int, len(corners))
+	seen := make(map[string]int, len(corners))
+	for index, corner := range corners {
+		id := cornerID(corner)
+		if uniqueIndex, exists := seen[id]; exists {
+			indices[index] = uniqueIndex
+			continue
+		}
+		uniqueIndex := len(unique)
+		seen[id] = uniqueIndex
+		indices[index] = uniqueIndex
+		unique = append(unique, corner)
+	}
+	return unique, indices
+}
+
 func planWithoutUncertainties(plan Plan) Plan {
 	clone := ClonePlan(plan)
 	clone.Uncertainties = nil
@@ -68,9 +143,6 @@ func planWithoutUncertainties(plan Plan) Plan {
 }
 
 func validateUncertainties(uncertainties []Uncertainty) []Diagnostic {
-	if len(uncertainties) > maxWorstCaseUncertainties {
-		return []Diagnostic{{Path: "uncertainties", Message: fmt.Sprintf("worst-case analysis supports at most %d bounded uncertainties", maxWorstCaseUncertainties), Suggestion: "partition the design or provide a smaller reviewed uncertainty set"}}
-	}
 	if len(uncertainties) == 0 {
 		return []Diagnostic{{Path: "uncertainties", Message: "worst-case analysis requires reviewed bounded uncertainty evidence"}}
 	}
@@ -88,7 +160,49 @@ func validateUncertainties(uncertainties []Uncertainty) []Diagnostic {
 			return []Diagnostic{{Path: path, Message: "uncertainty requires finite minimum <= nominal <= maximum with nonzero span"}}
 		}
 	}
+	groups := groupedUncertainties(uncertainties)
+	for _, group := range groups {
+		if group.correlated && group.minimum > group.maximum {
+			return []Diagnostic{{Path: "uncertainties", Message: "correlated environmental temperature ranges do not overlap", Suggestion: "select components qualified for one shared operating-temperature range"}}
+		}
+	}
+	if len(groups) > maxWorstCaseUncertainties {
+		return []Diagnostic{{Path: "uncertainties", Message: fmt.Sprintf("worst-case analysis supports at most %d independent bounded uncertainty groups", maxWorstCaseUncertainties), Suggestion: "partition the design or provide a smaller reviewed uncertainty set"}}
+	}
 	return nil
+}
+
+type uncertaintyGroup struct {
+	key        string
+	target     string
+	members    []int
+	minimum    float64
+	maximum    float64
+	correlated bool
+}
+
+func groupedUncertainties(uncertainties []Uncertainty) []uncertaintyGroup {
+	groups := []uncertaintyGroup{}
+	indices := map[string]int{}
+	for index, uncertainty := range uncertainties {
+		key, target := uncertainty.Target, uncertainty.Target
+		correlated := false
+		if _, parameter, ok := deviceParameterTarget(uncertainty.Target); ok && parameter == "junction_temperature_k" && strings.HasSuffix(uncertainty.Source, ":temperature") {
+			key, target = "environment.temperature", "environment.temperature"
+			correlated = true
+		}
+		groupIndex, exists := indices[key]
+		if !exists {
+			groupIndex = len(groups)
+			indices[key] = groupIndex
+			groups = append(groups, uncertaintyGroup{key: key, target: target, minimum: uncertainty.Minimum, maximum: uncertainty.Maximum, correlated: correlated})
+		} else if correlated {
+			groups[groupIndex].minimum = math.Max(groups[groupIndex].minimum, uncertainty.Minimum)
+			groups[groupIndex].maximum = math.Min(groups[groupIndex].maximum, uncertainty.Maximum)
+		}
+		groups[groupIndex].members = append(groups[groupIndex].members, index)
+	}
+	return groups
 }
 
 func nominalAssignments(uncertainties []Uncertainty) []NamedValue {
@@ -100,22 +214,44 @@ func nominalAssignments(uncertainties []Uncertainty) []NamedValue {
 }
 
 func deterministicCorners(uncertainties []Uncertainty) [][]NamedValue {
-	result := make([][]NamedValue, 0, 2*len(uncertainties)+(1<<len(uncertainties)))
-	for index, uncertainty := range uncertainties {
-		for _, value := range []float64{uncertainty.Minimum, uncertainty.Maximum} {
+	groups := groupedUncertainties(uncertainties)
+	result := make([][]NamedValue, 0, 2*len(groups)+(1<<len(groups)))
+	for _, group := range groups {
+		for _, maximum := range []bool{false, true} {
 			assignments := nominalAssignments(uncertainties)
-			assignments[index].Value = value
+			for _, index := range group.members {
+				if group.correlated {
+					assignments[index].Value = group.minimum
+					if maximum {
+						assignments[index].Value = group.maximum
+					}
+				} else {
+					assignments[index].Value = uncertainties[index].Minimum
+					if maximum {
+						assignments[index].Value = uncertainties[index].Maximum
+					}
+				}
+			}
 			result = append(result, assignments)
 		}
 	}
-	for mask := 0; mask < 1<<len(uncertainties); mask++ {
+	for mask := 0; mask < 1<<len(groups); mask++ {
 		assignments := make([]NamedValue, len(uncertainties))
-		for index, uncertainty := range uncertainties {
-			value := uncertainty.Minimum
-			if mask&(1<<index) != 0 {
-				value = uncertainty.Maximum
+		for groupIndex, group := range groups {
+			for _, index := range group.members {
+				uncertainty := uncertainties[index]
+				value := group.minimum
+				if !group.correlated {
+					value = uncertainty.Minimum
+				}
+				if mask&(1<<groupIndex) != 0 {
+					value = group.maximum
+					if !group.correlated {
+						value = uncertainty.Maximum
+					}
+				}
+				assignments[index] = NamedValue{Name: uncertainty.Target, Value: value}
 			}
-			assignments[index] = NamedValue{Name: uncertainty.Target, Value: value}
 		}
 		result = append(result, assignments)
 	}
@@ -242,7 +378,7 @@ func assertionID(assertion AssertionResult) string {
 	if assertion.Metric != "" {
 		return assertion.Metric
 	}
-	return assertion.AnalysisID + "." + assertion.Node + "." + assertion.Quantity + fmt.Sprintf("@%.12g/%.12g", assertion.FrequencyHz, assertion.TimeS)
+	return assertion.AnalysisID + "." + assertion.Node + "." + assertion.Component + "." + strings.Join(assertion.Components, "\x1f") + "." + assertion.Quantity + fmt.Sprintf("@%.12g/%.12g", assertion.FrequencyHz, assertion.TimeS)
 }
 
 func assertionMargin(assertion AssertionResult) float64 {
@@ -258,15 +394,15 @@ func sensitivity(corners []CornerResult, uncertainties []Uncertainty) []Sensitiv
 		nominal[assertionID(assertion)] = assertion
 	}
 	result := []SensitivityResult{}
-	for index, uncertainty := range uncertainties {
-		best := SensitivityResult{Target: uncertainty.Target, Margin: math.Inf(1)}
+	for index, group := range groupedUncertainties(uncertainties) {
+		best := SensitivityResult{Target: group.target, Margin: math.Inf(1)}
 		for _, corner := range corners[1+2*index : 1+2*index+2] {
 			for _, assertion := range corner.Assertions {
 				id := assertionID(assertion)
 				if _, exists := nominal[id]; !exists {
 					continue
 				}
-				if _, present := assignmentFor(corner.Assignments, uncertainty.Target); present && assertionMargin(assertion) < best.Margin {
+				if assertionMargin(assertion) < best.Margin {
 					best.Assertion, best.Corner, best.Margin = id, corner.ID, assertionMargin(assertion)
 				}
 			}

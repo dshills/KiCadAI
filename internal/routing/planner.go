@@ -108,6 +108,9 @@ func PlanRoutes(request Request, access PadAccess) ([]PlannedNet, []reports.Issu
 			// predicted one. Let that explicit promotion lead the next attempt.
 			return plans[i].Net.OrderFirst
 		}
+		if plans[i].Net.OrderFirst && plans[i].Net.Priority != plans[j].Net.Priority {
+			return plans[i].Net.Priority > plans[j].Net.Priority
+		}
 		if advancedOrder {
 			leftConstrained := endpointAccessConstrained(plans[i], accessSpans, request.Rules, usesFanoutPressureOrder)
 			rightConstrained := endpointAccessConstrained(plans[j], accessSpans, request.Rules, usesFanoutPressureOrder)
@@ -544,6 +547,7 @@ func planEndpointPairs(netName string, role NetRole, endpoints []Endpoint, acces
 	sort.SliceStable(ordered, func(i int, j int) bool {
 		return endpointLess(ordered[i], ordered[j])
 	})
+	ordered = uniquePhysicalEndpoints(ordered)
 	if len(ordered) < 2 {
 		return nil, nil
 	}
@@ -626,6 +630,17 @@ func planEndpointPairs(netName string, role NetRole, endpoints []Endpoint, acces
 		}
 	}
 	return pairs, nil
+}
+
+func uniquePhysicalEndpoints(ordered []Endpoint) []Endpoint {
+	unique := ordered[:0]
+	for _, endpoint := range ordered {
+		if len(unique) != 0 && endpointKey(unique[len(unique)-1].Ref, unique[len(unique)-1].Pin) == endpointKey(endpoint.Ref, endpoint.Pin) {
+			continue
+		}
+		unique = append(unique, endpoint)
+	}
+	return unique
 }
 
 func planRepeatedConstrainedLeaves(ordered []Endpoint, accessPoints [][]AccessPoint, access PadAccess, rules Rules) []EndpointPair {

@@ -464,6 +464,22 @@ func TestNominalSegmentsClearOccupancyRejectsThickenedCollision(t *testing.T) {
 	}
 }
 
+func TestEndpointNeckdownCanAwaitLaterNetTrunk(t *testing.T) {
+	request := singleLayerSearchRequest()
+	occupancy, err := BuildOccupancy(request, "SIG")
+	if err != nil {
+		t.Fatal(err)
+	}
+	path := GridPath{Net: "SIG", Layer: "F.Cu", Points: []Point{{XMM: 2, YMM: 10}, {XMM: 6, YMM: 10}}}
+	segments, _, ok := endpointNeckdownAwaitingNetTrunk(path, .8, .2, occupancy, request.Board.Layers)
+	if !ok || len(segments) == 0 {
+		t.Fatalf("provisional neckdown = %#v, ok=%t", segments, ok)
+	}
+	if segmentsContainNominalWidth(segments, .8) {
+		t.Fatalf("provisional branch unexpectedly contains a full-width trunk: %#v", segments)
+	}
+}
+
 func TestAutomaticEndpointNeckdownAppliesToWideCurrentCarryingNets(t *testing.T) {
 	for _, role := range []NetRole{NetPower, NetGround, NetHighCurrent} {
 		rules := applyAutomaticEndpointNeckdown(Rules{TraceWidthMM: 0.5, MinNeckdownWidthMM: 0.25}, role, true)
@@ -511,6 +527,14 @@ func TestFallbackSMDEndpointConnectionPreservesSearchedEscapeGeometry(t *testing
 	}
 	if got[0].Start != access.Pads[fromKey].Position || got[0].End != fromEdge || got[1] != escape || got[2].Start != toEdge || got[2].End != access.Pads[toKey].Position {
 		t.Fatalf("segments = %#v, searched escape geometry changed", got)
+	}
+}
+
+func TestPruneSameLayerSegmentCyclesKeepsDeterministicSpanningCopper(t *testing.T) {
+	segments := []Segment{{Net: "SIG", Layer: "F.Cu", Start: Point{XMM: 1, YMM: 1}, End: Point{XMM: 2, YMM: 1}}, {Net: "SIG", Layer: "F.Cu", Start: Point{XMM: 2, YMM: 1}, End: Point{XMM: 2, YMM: 2}}, {Net: "SIG", Layer: "F.Cu", Start: Point{XMM: 2, YMM: 2}, End: Point{XMM: 1, YMM: 1}}, {Net: "SIG", Layer: "B.Cu", Start: Point{XMM: 2, YMM: 2}, End: Point{XMM: 1, YMM: 1}}}
+	got := removeSegmentIndexes(segments, sameLayerCycleClosingIndexes(segments))
+	if len(got) != 3 || got[0] != segments[0] || got[1] != segments[1] || got[2] != segments[3] {
+		t.Fatalf("segments = %#v, want stable same-layer spanning copper", got)
 	}
 }
 

@@ -135,6 +135,26 @@ func TestTrustedSimulationFailsClosedWithoutCatalogModelEvidence(t *testing.T) {
 	t.Fatalf("missing actionable catalog-model blocker: %#v", issues)
 }
 
+func TestSimulationHarnessRejectsPhysicalComponentIdentityCollision(t *testing.T) {
+	graph := loadGraphExample(t, "rc_filter.json")
+	resolver := NewResolver(ResolveOptions{Catalog: loadGraphCatalog(t), CatalogID: "checked-in"})
+	resolved, issues := resolver.Resolve(context.Background(), graph)
+	if reports.HasBlockingIssue(issues) {
+		t.Fatalf("physical graph resolution issues = %#v", issues)
+	}
+
+	_, issues = resolver.ResolveSimulationPlanWithHarness(simmodel.Intent{}, resolved, []SimulationHarnessDevice{{
+		InstanceID: resolved.Components[0].Instance.ID,
+		CatalogID:  resolved.Components[0].ComponentID,
+	}})
+	for _, issue := range issues {
+		if issue.Code == CodeSimulationInvalid && issue.Path == "simulation.harness[0].instance_id" && issue.Blocking() {
+			return
+		}
+	}
+	t.Fatalf("physical/harness identity collision was accepted: %#v", issues)
+}
+
 func TestTrustedSimulationSchemaRejectsProviderModelContent(t *testing.T) {
 	graph := loadGraphExample(t, "rc_filter.json")
 	graph.Simulation = &SimulationIntent{

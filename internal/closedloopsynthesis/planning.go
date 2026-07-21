@@ -212,7 +212,7 @@ func expandOperatingCase(operatingCase architecturesearch.OperatingCase, binding
 func conditionAssignments(condition architecturesearch.OperatingCondition, target string) []CornerAssignment {
 	if condition.Selection != "" {
 		selections := []string{condition.Selection}
-		if condition.Selection == "all" {
+		if condition.Selection == "all" && condition.Axis != "tolerance" && condition.Axis != "model_parameter" {
 			selections = []string{"minimum", "nominal", "maximum"}
 		}
 		result := make([]CornerAssignment, 0, len(selections))
@@ -284,11 +284,12 @@ func validateModelTemperatureDomains(requirement architecturesearch.Requirement,
 			continue
 		}
 		path := fmt.Sprintf("model_decisions[%d].provenance", index)
+		identity := fmt.Sprintf("component %q model %q", decision.Component, decision.Claim.ModelID)
 		if !math.IsInf(minimum, 1) && (decision.Provenance.MinTemperatureC == nil || *decision.Provenance.MinTemperatureC > minimum) {
-			diagnostics = append(diagnostics, Diagnostic{Path: path + ".min_temperature_c", Message: "reviewed model temperature domain does not cover the required minimum ambient corner"})
+			diagnostics = append(diagnostics, Diagnostic{Path: path + ".min_temperature_c", Message: identity + " reviewed temperature domain does not cover the required minimum ambient corner"})
 		}
 		if !math.IsInf(maximum, -1) && (decision.Provenance.MaxTemperatureC == nil || *decision.Provenance.MaxTemperatureC < maximum) {
-			diagnostics = append(diagnostics, Diagnostic{Path: path + ".max_temperature_c", Message: "reviewed model temperature domain does not cover the required maximum ambient corner"})
+			diagnostics = append(diagnostics, Diagnostic{Path: path + ".max_temperature_c", Message: identity + " reviewed temperature domain does not cover the required maximum ambient corner"})
 		}
 	}
 	return diagnostics

@@ -186,18 +186,19 @@ type FootprintProperty struct {
 }
 
 type FootprintPad struct {
-	Raw         string                  `json:"raw,omitempty"`
-	Name        string                  `json:"name"`
-	Type        string                  `json:"type,omitempty"`
-	Shape       string                  `json:"shape,omitempty"`
-	Position    kicadfiles.Point        `json:"position"`
-	Rotation    float64                 `json:"rotation,omitempty"`
-	Size        kicadfiles.Point        `json:"size"`
-	Drill       kicadfiles.IU           `json:"drill,omitempty"`
-	Layers      []kicadfiles.BoardLayer `json:"layers,omitempty"`
-	PinFunction string                  `json:"pin_function,omitempty"`
-	PinType     string                  `json:"pin_type,omitempty"`
-	RoundRectR  float64                 `json:"round_rect_r,omitempty"`
+	Raw           string                  `json:"raw,omitempty"`
+	Name          string                  `json:"name"`
+	Type          string                  `json:"type,omitempty"`
+	Shape         string                  `json:"shape,omitempty"`
+	Position      kicadfiles.Point        `json:"position"`
+	Rotation      float64                 `json:"rotation,omitempty"`
+	Size          kicadfiles.Point        `json:"size"`
+	Drill         kicadfiles.IU           `json:"drill,omitempty"`
+	Layers        []kicadfiles.BoardLayer `json:"layers,omitempty"`
+	PinFunction   string                  `json:"pin_function,omitempty"`
+	PinType       string                  `json:"pin_type,omitempty"`
+	RoundRectR    float64                 `json:"round_rect_r,omitempty"`
+	CopperRegions []BoundingBox           `json:"copper_regions,omitempty"`
 }
 
 type FootprintText struct {

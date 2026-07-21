@@ -145,18 +145,8 @@ func hydratePadsFromResolverRecord(index libraryresolver.LibraryIndex, ref strin
 	bounds, pads, issues := placement.BoundsFromFootprint(record)
 	result.Bounds = bounds
 	result.Issues = append(result.Issues, contextualizePadHydrationIssues(ref, issues)...)
-	for padIndex, pad := range pads {
-		pad.Name = strings.TrimSpace(pad.Name)
-		if pad.Name == "" {
-			result.Issues = append(result.Issues, padHydrationWarning(ref, footprintID, fmt.Sprintf("pads[%d].name", padIndex), "unnamed footprint pad skipped during routing summary hydration"))
-			continue
-		}
-		if pad.WidthMM <= 0 || pad.HeightMM <= 0 {
-			result.Issues = append(result.Issues, padHydrationIssue(ref, footprintID, fmt.Sprintf("pads[%d].size", padIndex), "footprint pad size must be positive"))
-			continue
-		}
-		result.Pads = append(result.Pads, pad)
-	}
+	result.Pads, issues = routableHydrationPads(ref, footprintID, pads)
+	result.Issues = append(result.Issues, issues...)
 	if len(result.Pads) == 0 {
 		result.Entry.MissingReason = "no routable footprint pads"
 		result.Issues = append(result.Issues, padHydrationIssue(ref, footprintID, "pads", "footprint has no routable pads"))
@@ -165,6 +155,41 @@ func hydratePadsFromResolverRecord(index libraryresolver.LibraryIndex, ref strin
 	result.Entry.Source = PadHydrationSourceResolver
 	result.Entry.PadCount = len(result.Pads)
 	return result
+}
+
+func routableHydrationPads(ref string, footprintID string, pads []placement.PadSummary) ([]placement.PadSummary, []reports.Issue) {
+	result := make([]placement.PadSummary, 0, len(pads))
+	var issues []reports.Issue
+	for padIndex, pad := range pads {
+		pad.Name = strings.TrimSpace(pad.Name)
+		if pad.Name == "" {
+			if len(pad.Layers) > 0 && !padHasCopperLayer(pad) {
+				continue
+			}
+			issues = append(issues, padHydrationWarning(ref, footprintID, fmt.Sprintf("pads[%d].name", padIndex), "unnamed footprint pad skipped during routing summary hydration"))
+			continue
+		}
+		if len(pad.Layers) > 0 && !padHasCopperLayer(pad) {
+			issues = append(issues, padHydrationWarning(ref, footprintID, fmt.Sprintf("pads[%d].layers", padIndex), "non-copper footprint aperture skipped during routing summary hydration"))
+			continue
+		}
+		if pad.WidthMM <= 0 || pad.HeightMM <= 0 {
+			issues = append(issues, padHydrationIssue(ref, footprintID, fmt.Sprintf("pads[%d].size", padIndex), "footprint pad size must be positive"))
+			continue
+		}
+		result = append(result, pad)
+	}
+	return result, issues
+}
+
+func padHasCopperLayer(pad placement.PadSummary) bool {
+	for _, layer := range pad.Layers {
+		layer = strings.TrimSpace(layer)
+		if layer == "*.Cu" || strings.HasSuffix(layer, ".Cu") {
+			return true
+		}
+	}
+	return false
 }
 
 func hydratePadsFromVerifiedTemplate(ref string, footprintID string) padHydrationResult {
@@ -178,7 +203,12 @@ func hydratePadsFromVerifiedTemplate(ref string, footprintID string) padHydratio
 		return result
 	}
 	result.Bounds = template.Bounds
-	result.Pads = append([]placement.PadSummary(nil), template.Pads...)
+	result.Pads, result.Issues = routableHydrationPads(ref, footprintID, template.Pads)
+	if len(result.Pads) == 0 {
+		result.Entry.MissingReason = "no routable footprint pads"
+		result.Issues = append(result.Issues, padHydrationIssue(ref, footprintID, "pads", "footprint has no routable pads"))
+		return result
+	}
 	result.Entry.Source = PadHydrationSourceVerifiedTemplate
 	result.Entry.PadCount = len(result.Pads)
 	return result
@@ -250,6 +280,14 @@ func verifiedPadTemplate(footprintID string) (verifiedPadTemplateRecord, bool) {
 				smdPad("2", 1.65, 0, 0.9, 1.2, "roundrect"),
 			},
 		}, true
+	case "Diode_SMD:D_SMB":
+		return verifiedPadTemplateRecord{
+			Bounds: verifiedCourtyardBounds(7.3, 4.5, 3.65, 2.25),
+			Pads: []placement.PadSummary{
+				smdPad("1", -2.15, 0, 2.5, 2.3, "roundrect"),
+				smdPad("2", 2.15, 0, 2.5, 2.3, "roundrect"),
+			},
+		}, true
 	case "Diode_SMD:D_SMA":
 		return twoPadTemplate(6.2, 3.0, 1.5, 1.7, 4.4), true
 	case "Diode_SMD:D_SMC":
@@ -274,6 +312,16 @@ func verifiedPadTemplate(footprintID string) (verifiedPadTemplateRecord, bool) {
 		template := throughHoleRowTemplate([]float64{0, 5.45, 10.9}, []string{"1", "2", "3"}, 2.5, 4.5, 1.5, []string{"rect", "oval", "oval"}, 16.0, 5.0)
 		template.Bounds = verifiedCourtyardBounds(16, 5.75, 2.55, 3.25)
 		return template, true
+	case "Package_DIP:DIP-4_W7.62mm":
+		return verifiedPadTemplateRecord{
+			Bounds: verifiedCourtyardBoundsFromExtents(-1.06, -1.52, 8.67, 4.07),
+			Pads: []placement.PadSummary{
+				throughHolePad("1", 0, 0, 1.6, 1.6, 0.8, "roundrect"),
+				throughHolePad("2", 0, 2.54, 1.6, 1.6, 0.8, "circle"),
+				throughHolePad("3", 7.62, 2.54, 1.6, 1.6, 0.8, "circle"),
+				throughHolePad("4", 7.62, 0, 1.6, 1.6, 0.8, "circle"),
+			},
+		}, true
 	case "Relay_THT:Relay_SPST_Omron-G5Q-1A":
 		pads := []placement.PadSummary{
 			throughHolePad("1", 0, 0, 2.3, 2.3, 1.3, "rect"),
@@ -362,6 +410,16 @@ func verifiedPadTemplate(footprintID string) (verifiedPadTemplateRecord, bool) {
 				smdPad("3", 0.9375, 0, 1.475, 0.6, "roundrect"),
 			},
 		}, true
+	case "Package_TO_SOT_SMD:SOT-89-3":
+		return verifiedPadTemplateRecord{
+			Bounds: verifiedCourtyardBoundsFromExtents(-2.85, -2.5, 2.25, 2.5),
+			Pads: []placement.PadSummary{
+				smdPad("1", -1.95, -1.5, 1.3, 0.9, "roundrect"),
+				smdPad("2", -1.8625, 0, 1.475, 0.9, "rect"),
+				smdPad("2", 0.4375, 0, 3.125, 1.733, "rect"),
+				smdPad("3", -1.95, 1.5, 1.3, 0.9, "roundrect"),
+			},
+		}, true
 	case "Package_TO_SOT_SMD:SOT-223-3_TabPin2":
 		pads := []placement.PadSummary{
 			{Name: "1", XMM: -2.3, YMM: 2.4, WidthMM: 1.2, HeightMM: 1.5},
@@ -370,6 +428,20 @@ func verifiedPadTemplate(footprintID string) (verifiedPadTemplateRecord, bool) {
 			{Name: "2", XMM: 0, YMM: -2.1, WidthMM: 3.8, HeightMM: 2.4},
 		}
 		return verifiedPadTemplateRecord{Bounds: padEnvelopeBounds(pads, 6.7, 7.0), Pads: pads}, true
+	case "Package_TO_SOT_SMD:TO-252-3_TabPin2":
+		return verifiedPadTemplateRecord{
+			Bounds: verifiedCourtyardBoundsFromExtents(-6.39, -3.5, 4.71, 3.5),
+			Pads: []placement.PadSummary{
+				{Name: "", XMM: -0.415, YMM: -1.525, WidthMM: 3.05, HeightMM: 2.75, Type: "smd", Shape: "roundrect", Layers: []string{"F.Paste"}},
+				{Name: "", XMM: -0.415, YMM: 1.525, WidthMM: 3.05, HeightMM: 2.75, Type: "smd", Shape: "roundrect", Layers: []string{"F.Paste"}},
+				{Name: "", XMM: 2.935, YMM: -1.525, WidthMM: 3.05, HeightMM: 2.75, Type: "smd", Shape: "roundrect", Layers: []string{"F.Paste"}},
+				{Name: "", XMM: 2.935, YMM: 1.525, WidthMM: 3.05, HeightMM: 2.75, Type: "smd", Shape: "roundrect", Layers: []string{"F.Paste"}},
+				smdPad("1", -5.04, -2.28, 2.2, 1.2, "roundrect"),
+				smdPad("2", -5.04, 0, 2.2, 1.2, "roundrect"),
+				{Name: "2", XMM: 1.26, YMM: 0, WidthMM: 6.4, HeightMM: 5.8, Type: "smd", Shape: "roundrect", Layers: []string{"F.Cu", "F.Mask"}},
+				smdPad("3", -5.04, 2.28, 2.2, 1.2, "roundrect"),
+			},
+		}, true
 	case "Package_TO_SOT_THT:TO-220-3_Vertical":
 		return verifiedPadTemplateRecord{
 			Bounds: verifiedCourtyardBoundsFromExtents(-2.71, -3.4, 7.79, 1.5),

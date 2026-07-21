@@ -3,10 +3,10 @@
   "generated_at": "2026-07-17",
   "policy_version": "verified-audio-amplifier-policy-v1",
   "evidence_records": {
-    "bjt.onsemi.mmbt3904.sot23": "69c67281721eb6f2787dd4e32c0b4fe1db340e9baba739c99f6968d3d3f1f6a2",
+    "bjt.onsemi.mmbt3904.sot23": "5749887a9e7d723d4837238b3e81306952c1f9153bfdc5b039b93c34d314065d",
     "capacitor.panasonic.eeufr1c221.radial": "94bc003903c4256f37b25f77d2d73d5188ad1681b82548beabdfdd17fa2082a0",
     "mosfet.vishay.irfp240.to247": "712d8670a5eccd12d63da1c06604423dc081f93b34b426180833e54a05b699b6",
-    "opamp.ti.lmv321.sot23_5": "6570529a206702294e02283bd29b66a251367484c59a06d865c2caf85ea0c1d6"
+    "opamp.ti.lmv321.sot23_5": "b754fa1be4a7e5b7cb3ab88f0ab5d7b47e94ed2b18339f2b8951b7ca210927b3"
   },
   "positive_cases": [
     {

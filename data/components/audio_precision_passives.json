@@ -148,8 +148,24 @@
       "ratings": [{"kind": "power", "max": "0.5", "unit": "W"}, {"kind": "reverse_voltage", "max": "5.1", "unit": "V"}],
       "tolerances": [{"kind": "zener_voltage", "max": "2.564", "unit": "%"}],
       "temperature": {"min": "-65", "max": "150", "unit": "C"},
-      "symbols": [{"symbol_id": "Device:D_Zener", "function_pins": [{"function": "K", "symbol_pin": "1", "required": true}, {"function": "A", "symbol_pin": "2", "required": true}], "verification": {"confidence": "verified", "sources": ["https://www.diodes.com/part/view/DDZ5V1B", "builtin_pinmap:Device:D_Zener"], "pinmap_checked": true}}],
-      "packages": [{"id": "sod_123", "name": "SOD-123", "footprint_id": "Diode_SMD:D_SOD-123", "package_type": "sod_123", "mpn": "DDZ5V1B-7", "lifecycle": "active", "pinmap_id": "Device:D_Zener|Diode_SMD:D_SOD-123", "pad_functions": [{"function": "K", "pad": "1"}, {"function": "A", "pad": "2"}], "dimensions_mm": {"width": 3.8, "height": 1.8}, "height_mm": 1.35, "verification": {"confidence": "verified", "sources": ["https://www.diodes.com/part/view/DDZ5V1B", "kicad-footprint:Diode_SMD:D_SOD-123"], "pinmap_checked": true}}],
+      "simulation_models": [{
+        "model_id": "mna_unidirectional_zener_spice_v1",
+        "parameters": [
+          {"name": "forward_saturation_current_a", "value": 4.04e-11},
+          {"name": "forward_series_resistance_ohm", "value": 34.9},
+          {"name": "forward_emission_coefficient", "value": 1.1},
+          {"name": "reverse_saturation_current_a", "value": 8.08e-15},
+          {"name": "reverse_series_resistance_ohm", "value": 13.1},
+          {"name": "reverse_emission_coefficient", "value": 3},
+          {"name": "zener_offset_voltage_v", "value": 2.62},
+          {"name": "junction_temperature_k", "value": 300.15},
+          {"name": "max_current_a", "value": 0.0980392156863},
+          {"name": "max_temperature_c", "value": 150}
+        ],
+        "uncertainties": [{"target": "model_parameters.zener_offset_voltage_v", "source": "diodes:ddz5v1b:datasheet:zener_voltage_tolerance", "nominal": 2.62, "minimum": 2.489, "maximum": 2.751}]
+      }],
+      "symbols": [{"symbol_id": "Device:D_Zener", "function_pins": [{"function": "CATHODE", "symbol_pin": "1", "required": true, "aliases": ["K"]}, {"function": "ANODE", "symbol_pin": "2", "required": true, "aliases": ["A"]}], "verification": {"confidence": "verified", "sources": ["https://www.diodes.com/part/view/DDZ5V1B", "builtin_pinmap:Device:D_Zener"], "pinmap_checked": true}}],
+      "packages": [{"id": "sod_123", "name": "SOD-123", "footprint_id": "Diode_SMD:D_SOD-123", "package_type": "sod_123", "mpn": "DDZ5V1B-7", "lifecycle": "active", "pinmap_id": "Device:D_Zener|Diode_SMD:D_SOD-123", "pad_functions": [{"function": "CATHODE", "pad": "1", "aliases": ["K"]}, {"function": "ANODE", "pad": "2", "aliases": ["A"]}], "dimensions_mm": {"width": 3.8, "height": 1.8}, "height_mm": 1.35, "verification": {"confidence": "verified", "sources": ["https://www.diodes.com/part/view/DDZ5V1B", "kicad-footprint:Diode_SMD:D_SOD-123"], "pinmap_checked": true}}],
       "verification": {"confidence": "verified", "sources": ["https://www.diodes.com/part/view/DDZ5V1B", "kicad-pinmap:Device:D_Zener|Diode_SMD:D_SOD-123"], "resolver_checked": true, "pinmap_checked": true, "tests": ["catalog_audio_precision_passive_evidence"]}
     }
   ]

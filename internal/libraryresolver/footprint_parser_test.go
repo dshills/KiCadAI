@@ -289,6 +289,42 @@ func TestIndexFootprintsOddInternalUnitPadBoundingBox(t *testing.T) {
 	}
 }
 
+func TestIndexFootprintsParsesCustomPadCopperRegions(t *testing.T) {
+	root := t.TempDir()
+	footprints := filepath.Join(root, "footprints")
+	mustWrite(t, filepath.Join(footprints, "Test.pretty", "CustomPad.kicad_mod"), `
+(footprint "CustomPad"
+  (pad "2" smd custom
+    (at -1.8625 0)
+    (size 1.475 0.9)
+    (layers "F.Cu" "F.Mask" "F.Paste")
+    (options (clearance outline) (anchor rect))
+    (primitives
+      (gr_poly
+        (pts (xy 3.8625 0.8665) (xy 0.7375 0.8665) (xy 0.7375 -0.8665) (xy 3.8625 -0.8665))
+        (width 0)
+        (fill yes)))))`)
+
+	records, issues := IndexFootprints(Discover(LibraryRoots{FootprintsRoot: footprints}))
+	if len(issues) != 0 {
+		t.Fatalf("issues = %#v", issues)
+	}
+	pad := records["Test:CustomPad"].Pads[0]
+	if len(pad.CopperRegions) != 2 {
+		t.Fatalf("custom pad copper regions = %#v", pad.CopperRegions)
+	}
+	anchor, primitive := pad.CopperRegions[0], pad.CopperRegions[1]
+	if anchor.Min.X != kicadfiles.MM(-2.6) || anchor.Max.X != kicadfiles.MM(-1.125) ||
+		primitive.Min.X != kicadfiles.MM(-1.125) || primitive.Max.X != kicadfiles.MM(2) ||
+		primitive.Min.Y != kicadfiles.MM(-0.8665) || primitive.Max.Y != kicadfiles.MM(0.8665) {
+		t.Fatalf("custom pad copper regions = %#v", pad.CopperRegions)
+	}
+	box := records["Test:CustomPad"].BoundingBox
+	if box.Min.X != kicadfiles.MM(-2.6) || box.Max.X != kicadfiles.MM(2) || box.Min.Y != kicadfiles.MM(-0.8665) || box.Max.Y != kicadfiles.MM(0.8665) {
+		t.Fatalf("custom pad bounding box = %#v", box)
+	}
+}
+
 func TestIndexFootprintsRotatedPadBoundingBox(t *testing.T) {
 	var bounds footprintBounds
 	bounds.includePad(FootprintPad{

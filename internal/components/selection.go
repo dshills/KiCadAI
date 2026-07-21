@@ -19,6 +19,8 @@ const (
 	CodeComponentUnsafe              reports.Code = "COMPONENT_UNSAFE_CONFIDENCE"
 	CodeComponentRatingTooLow        reports.Code = "COMPONENT_RATING_TOO_LOW"
 	CodeComponentRatingMissing       reports.Code = "COMPONENT_RATING_MISSING"
+	CodeComponentTemperatureUnproven reports.Code = "COMPONENT_TEMPERATURE_UNPROVEN"
+	CodeComponentThermalUnproven     reports.Code = "COMPONENT_THERMAL_UNPROVEN"
 	CodeComponentFunctionMissing     reports.Code = "COMPONENT_FUNCTION_MISSING"
 	CodeComponentVariantMissing      reports.Code = "COMPONENT_VARIANT_MISSING"
 	CodeComponentConcreteRequired    reports.Code = "COMPONENT_CONCRETE_REQUIRED"
@@ -75,15 +77,40 @@ type Query struct {
 }
 
 type SelectionRequest struct {
-	Query             Query             `json:"query"`
-	Acceptance        AcceptanceLevel   `json:"acceptance,omitempty"`
-	AllowAlternatives bool              `json:"allow_alternatives,omitempty"`
-	RequiredRatings   []RequiredRating  `json:"required_ratings,omitempty"`
-	RequiredFunctions []string          `json:"required_functions,omitempty"`
-	RequireConcrete   bool              `json:"require_concrete,omitempty"`
-	RequireCompanions bool              `json:"require_companions,omitempty"`
-	Procurement       ProcurementPolicy `json:"procurement_policy,omitempty"`
-	Sources           *SourceCollection `json:"-"`
+	Query               Query                   `json:"query"`
+	Acceptance          AcceptanceLevel         `json:"acceptance,omitempty"`
+	AllowAlternatives   bool                    `json:"allow_alternatives,omitempty"`
+	RequiredRatings     []RequiredRating        `json:"required_ratings,omitempty"`
+	RequiredTemperature *TemperatureRequirement `json:"required_temperature,omitempty"`
+	RequiredThermal     *ThermalRequirement     `json:"required_thermal,omitempty"`
+	RequiredFunctions   []string                `json:"required_functions,omitempty"`
+	RequireConcrete     bool                    `json:"require_concrete,omitempty"`
+	RequireCompanions   bool                    `json:"require_companions,omitempty"`
+	Procurement         ProcurementPolicy       `json:"procurement_policy,omitempty"`
+	Sources             *SourceCollection       `json:"-"`
+}
+
+const (
+	ThermalReferenceAmbient = "ambient"
+	ThermalReferenceCase    = "case"
+)
+
+// ThermalRequirement describes the applied boundary needed to prove a
+// component's steady-state junction temperature. A part is eligible only when
+// its structured evidence contains the matching complete thermal path.
+type ThermalRequirement struct {
+	DissipationW                float64 `json:"dissipation_w"`
+	Reference                   string  `json:"reference"`
+	ReferenceTemperatureC       float64 `json:"reference_temperature_c"`
+	MaximumJunctionTemperatureC float64 `json:"maximum_junction_temperature_c,omitempty"`
+}
+
+// TemperatureRequirement is the complete ambient operating range a selected
+// component must be cataloged to support. Pointer bounds preserve zero as a
+// meaningful temperature while allowing one-sided requirements.
+type TemperatureRequirement struct {
+	MinimumC *float64 `json:"minimum_c,omitempty"`
+	MaximumC *float64 `json:"maximum_c,omitempty"`
 }
 
 type RequiredRating struct {
@@ -406,6 +433,8 @@ func dedupeRejectedIssues(rejected []CandidateRejection) []reports.Issue {
 func selectionCandidateIssues(record ComponentRecord, candidate Candidate, request SelectionRequest) []reports.Issue {
 	var issues []reports.Issue
 	issues = append(issues, requiredRatingIssues(record, request.RequiredRatings)...)
+	issues = append(issues, requiredTemperatureIssues(record, request.RequiredTemperature)...)
+	issues = append(issues, requiredThermalIssues(record, request.RequiredThermal)...)
 	issues = append(issues, requiredFunctionIssues(record, request.RequiredFunctions)...)
 	if request.RequireConcrete && record.Generic {
 		issues = append(issues, NewIssue(CodeComponentConcreteRequired, reports.SeverityBlocked, "component."+record.ID, "concrete component record is required"))
@@ -424,6 +453,108 @@ func selectionCandidateIssues(record ComponentRecord, candidate Candidate, reque
 		issues = append(issues, NewIssue(CodeComponentUnsafe, reports.SeverityBlocked, "component."+candidate.ComponentID, fmt.Sprintf("component confidence %s is not allowed for %s acceptance", candidate.Confidence, request.Acceptance)))
 	}
 	return issues
+}
+
+func requiredTemperatureIssues(record ComponentRecord, required *TemperatureRequirement) []reports.Issue {
+	if required == nil {
+		return nil
+	}
+	path := "component." + record.ID + ".temperature"
+	if required.MinimumC == nil && required.MaximumC == nil {
+		return []reports.Issue{NewIssue(reports.CodeInvalidArgument, reports.SeverityBlocked, path, "temperature requirement must contain at least one finite bound")}
+	}
+	for _, bound := range []*float64{required.MinimumC, required.MaximumC} {
+		if bound != nil && (math.IsNaN(*bound) || math.IsInf(*bound, 0)) {
+			return []reports.Issue{NewIssue(reports.CodeInvalidArgument, reports.SeverityBlocked, path, "temperature requirement must contain finite bounds")}
+		}
+	}
+	if required.MinimumC != nil && required.MaximumC != nil && *required.MinimumC > *required.MaximumC {
+		return []reports.Issue{NewIssue(reports.CodeInvalidArgument, reports.SeverityBlocked, path, "temperature requirement minimum exceeds maximum")}
+	}
+	if record.Temperature == nil || strings.TrimSpace(record.Temperature.Unit) != "C" {
+		return []reports.Issue{NewIssue(CodeComponentTemperatureUnproven, reports.SeverityBlocked, path, "component lacks a cataloged Celsius operating-temperature range")}
+	}
+	minimum, minimumOK := parseCatalogTemperature(record.Temperature.Min)
+	maximum, maximumOK := parseCatalogTemperature(record.Temperature.Max)
+	if required.MinimumC != nil && (!minimumOK || minimum > *required.MinimumC) {
+		return []reports.Issue{NewIssue(CodeComponentTemperatureUnproven, reports.SeverityBlocked, path, "component operating-temperature evidence does not cover the required minimum")}
+	}
+	if required.MaximumC != nil && (!maximumOK || maximum < *required.MaximumC) {
+		return []reports.Issue{NewIssue(CodeComponentTemperatureUnproven, reports.SeverityBlocked, path, "component operating-temperature evidence does not cover the required maximum")}
+	}
+	return nil
+}
+
+func parseCatalogTemperature(value string) (float64, bool) {
+	parsed, err := strconv.ParseFloat(strings.TrimSpace(value), 64)
+	return parsed, err == nil && !math.IsNaN(parsed) && !math.IsInf(parsed, 0)
+}
+
+func requiredThermalIssues(record ComponentRecord, required *ThermalRequirement) []reports.Issue {
+	if required == nil {
+		return nil
+	}
+	path := "component." + record.ID + ".thermal"
+	if required.DissipationW < 0 || math.IsNaN(required.DissipationW) || math.IsInf(required.DissipationW, 0) || math.IsNaN(required.ReferenceTemperatureC) || math.IsInf(required.ReferenceTemperatureC, 0) ||
+		(required.MaximumJunctionTemperatureC != 0 && !finitePositive(required.MaximumJunctionTemperatureC)) {
+		return []reports.Issue{NewIssue(reports.CodeInvalidArgument, reports.SeverityBlocked, path, "thermal requirement must contain non-negative finite dissipation, finite reference temperature, and an optional positive junction limit")}
+	}
+	maximum, junctionToAmbient, junctionToCase, ok := componentThermalEvidence(record)
+	if !ok || !finitePositive(maximum) {
+		return []reports.Issue{NewIssue(CodeComponentThermalUnproven, reports.SeverityBlocked, path, "component lacks structured maximum-junction-temperature evidence")}
+	}
+	thermalResistance := 0.0
+	switch required.Reference {
+	case ThermalReferenceAmbient:
+		thermalResistance = junctionToAmbient
+	case ThermalReferenceCase:
+		thermalResistance = junctionToCase
+	default:
+		return []reports.Issue{NewIssue(reports.CodeInvalidArgument, reports.SeverityBlocked, path, "thermal requirement reference must be ambient or case")}
+	}
+	if !finitePositive(thermalResistance) {
+		return []reports.Issue{NewIssue(CodeComponentThermalUnproven, reports.SeverityBlocked, path, fmt.Sprintf("component lacks a complete junction-to-%s thermal path", required.Reference))}
+	}
+	maximumJunction := maximum
+	if required.MaximumJunctionTemperatureC > 0 {
+		maximumJunction = math.Min(maximumJunction, required.MaximumJunctionTemperatureC)
+	}
+	predictedJunction := required.ReferenceTemperatureC + required.DissipationW*thermalResistance
+	if predictedJunction > maximumJunction {
+		return []reports.Issue{NewIssue(CodeComponentThermalUnproven, reports.SeverityBlocked, path, fmt.Sprintf("predicted junction temperature %.6g C exceeds the allowed %.6g C", predictedJunction, maximumJunction))}
+	}
+	return nil
+}
+
+func componentThermalEvidence(record ComponentRecord) (maximum, junctionToAmbient, junctionToCase float64, ok bool) {
+	if evidence := record.Thermal; evidence != nil && evidence.MaxJunctionTemperatureC != nil {
+		maximum = *evidence.MaxJunctionTemperatureC
+		if evidence.JunctionToAmbientCPerW != nil {
+			junctionToAmbient = *evidence.JunctionToAmbientCPerW
+		}
+		if evidence.JunctionToCaseCPerW != nil {
+			junctionToCase = *evidence.JunctionToCaseCPerW
+		}
+		return maximum, junctionToAmbient, junctionToCase, true
+	}
+	if evidence := record.PowerSemiconductor; evidence != nil && evidence.MaxJunctionTemperatureC != nil {
+		maximum = *evidence.MaxJunctionTemperatureC
+		if evidence.JunctionToAmbientCPerW != nil {
+			junctionToAmbient = *evidence.JunctionToAmbientCPerW
+		}
+		if evidence.JunctionToCaseCPerW != nil {
+			junctionToCase = *evidence.JunctionToCaseCPerW
+		}
+		return maximum, junctionToAmbient, junctionToCase, true
+	}
+	if evidence := record.OpAmp; evidence != nil && evidence.MaxJunctionTemperatureC != nil {
+		maximum = *evidence.MaxJunctionTemperatureC
+		if evidence.JunctionToAmbientCPerW != nil {
+			junctionToAmbient = *evidence.JunctionToAmbientCPerW
+		}
+		return maximum, junctionToAmbient, 0, true
+	}
+	return 0, 0, 0, false
 }
 
 func evaluateProcurement(record ComponentRecord, request SelectionRequest, candidateGate bool) (*ProcurementEvidence, []reports.Issue) {
@@ -760,7 +891,7 @@ func recordMatchesQuery(record ComponentRecord, query Query, normalizedQueryText
 	if query.Text != "" {
 		text := record.SearchText
 		if text == "" {
-			text = strings.ToLower(record.ID + " " + record.Name + " " + record.Description + " " + strings.Join(record.Tags, " "))
+			text = strings.ToLower(record.ID + " " + record.Name + " " + record.Description + " " + record.Manufacturer + " " + record.MPN + " " + strings.Join(record.Tags, " "))
 		}
 		if !strings.Contains(text, query.Text) && !strings.Contains(normalizeComponentSearchText(text), normalizedQueryText) {
 			return false

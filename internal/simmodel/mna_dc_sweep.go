@@ -30,16 +30,18 @@ func solveDCSweepAnalysis(plan Plan, analysis Analysis, nonlinear bool) (Analysi
 
 	result := AnalysisResult{ID: analysis.ID, Kind: analysis.Kind, Points: make([]AnalysisPoint, 0, sweep.Points*len(passes))}
 	var clamps map[string]float64
+	var previousSolution []complex128
 	for _, pass := range passes {
 		for _, value := range pass.values {
-			pointAnalysis := analysisWithDCSweepValue(analysis, sweep.Component, value)
+			pointAnalysis := analysisWithDCSweepValue(analysis, sweep.Component, value*dcSweepExcitationScale(*sweep))
 			if nonlinear {
-				system, solution, evidence, next, diagnostic := solveNonlinearDCFromState(plan, pointAnalysis, clamps)
+				system, solution, evidence, next, diagnostic := solveNonlinearDCFromWarmState(plan, pointAnalysis, clamps, previousSolution)
 				if diagnostic != nil {
 					diagnostic.Path = fmt.Sprintf("analyses.%s.dc_sweep.%s.%.12g.%s", analysis.ID, pass.direction, value, diagnostic.Path)
 					return AnalysisResult{}, []Diagnostic{*diagnostic}
 				}
 				clamps = next
+				previousSolution = append(previousSolution[:0], solution...)
 				if diagnostics := validateNonlinearOperatingLimits(plan, system, solution); len(diagnostics) != 0 {
 					return AnalysisResult{}, diagnostics
 				}
@@ -64,6 +66,13 @@ func solveDCSweepAnalysis(plan Plan, analysis Analysis, nonlinear bool) (Analysi
 		}
 	}
 	return result, nil
+}
+
+func dcSweepExcitationScale(sweep DCSweep) float64 {
+	if sweep.ExcitationScale == 0 {
+		return 1
+	}
+	return sweep.ExcitationScale
 }
 
 func dcSweepValues(sweep DCSweep) []float64 {

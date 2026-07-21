@@ -11,12 +11,14 @@ import (
 
 	"kicadai/internal/components"
 	"kicadai/internal/reports"
+	"kicadai/internal/simmodel"
 )
 
 const (
 	catalogProviderRevision         = "1.0.0"
 	thresholdReferenceResistanceOhm = 10_000.0
 	catalogRatingDeratingFactor     = 0.8
+	lowVoltageGateDriveCeilingV     = 5.5
 )
 
 var catalogProviderCapabilities = []string{
@@ -143,8 +145,17 @@ func (provider *CatalogProvider) expandThreshold(ctx context.Context, request Pr
 	if err != nil {
 		return nil, err
 	}
-	if err := requireString(request.Constraints, "output_polarity", "equal", "active_low"); err != nil {
-		return nil, err
+	polarityConstraint, ok := namedConstraint(request.Constraints, "output_polarity")
+	if !ok || polarityConstraint.Relation != "equal" {
+		return nil, fmt.Errorf("threshold output polarity must be declared")
+	}
+	var outputPolarity string
+	if err := json.Unmarshal(polarityConstraint.Value, &outputPolarity); err != nil {
+		return nil, fmt.Errorf("threshold output polarity is invalid")
+	}
+	outputPolarity = canonicalIdentifier(outputPolarity)
+	if outputPolarity != "active_low" && outputPolarity != "active_high" {
+		return nil, fmt.Errorf("threshold output polarity must be active_low or active_high")
 	}
 	if err := requireBool(request.Constraints, "inactive_at_power_up", "required", true); err != nil {
 		return nil, err
@@ -153,8 +164,13 @@ func (provider *CatalogProvider) expandThreshold(ctx context.Context, request Pr
 	if err != nil || delay <= 0 {
 		return nil, fmt.Errorf("threshold propagation-delay constraint is invalid")
 	}
-	supply := roleVoltageMaximum(request.Ports, "power")
-	selection, err := provider.selectComponent(ctx, "comparator", "open_collector", []components.RequiredRating{{Kind: "supply_voltage", Value: numericString(supply), Unit: "V"}}, true)
+	supplyMinimum, supplyMaximum, supplyRangeOK := roleVoltageRange(request.Ports, "power")
+	if !supplyRangeOK {
+		supplyMaximum = roleVoltageMaximum(request.Ports, "power")
+		supplyMinimum = supplyMaximum
+	}
+	supply := .5 * (supplyMinimum + supplyMaximum)
+	selection, err := provider.selectComponent(ctx, "comparator", "open_collector", []components.RequiredRating{{Kind: "supply_voltage", Value: numericString(supplyMaximum), Unit: "V"}}, true)
 	if err != nil {
 		return nil, err
 	}
@@ -166,13 +182,38 @@ func (provider *CatalogProvider) expandThreshold(ctx context.Context, request Pr
 	if err != nil {
 		return nil, err
 	}
+	referenceSupply := supplyMaximum
+	hysteresisOutputHigh := supplyMaximum
+	var referenceRegulator catalogPart
+	useStableReference := thresholdRequiresStableReference(supplyMinimum, supplyMaximum, centerTolerance)
+	if useStableReference {
+		candidate, selectionErr := provider.selectComponent(ctx, "regulator", "AP2127R-3.3", []components.RequiredRating{
+			{Kind: "input_voltage", Value: numericString(supplyMinimum), Unit: "V"},
+			{Kind: "input_voltage", Value: numericString(supplyMaximum), Unit: "V"},
+			{Kind: "output_current", Value: "0.001", Unit: "A"},
+		}, true)
+		if selectionErr == nil {
+			candidateSupply, parameterOK := catalogSimulationParameter(candidate.record, "output_voltage_v")
+			if parameterOK && candidateSupply > center && supplyMinimum-candidateSupply >= 0.3 {
+				referenceRegulator = candidate
+				referenceRegulator.selected.InstanceID = "threshold_reference_regulator"
+				referenceRegulator.usage = "threshold_voltage_reference"
+				referenceSupply = candidateSupply
+				hysteresisOutputHigh = supply
+			} else {
+				useStableReference = false
+			}
+		} else {
+			useStableReference = false
+		}
+	}
 	calculation, issues := SolveHysteresis(HysteresisRequest{
 		ID: "threshold_hysteresis", TargetCenterV: center, CenterTolerancePercent: centerTolerance,
 		TargetWidthV: width, WidthTolerancePercent: widthTolerance, OutputLowV: 0.1,
-		OutputHighV: supply, OutputUncertaintyV: 0.01, ReferenceResistanceOhm: thresholdReferenceResistanceOhm,
+		OutputHighV: hysteresisOutputHigh, OutputUncertaintyV: 0.01, ReferenceResistanceOhm: thresholdReferenceResistanceOhm,
 		ReferenceTolerancePercent: 0.1, FeedbackTolerancePercent: 0.1,
 		ReferenceVoltageTolerancePercent: 0.1, MinimumReferenceVoltageV: 0,
-		MaximumReferenceVoltageV: supply, FeedbackSeries: SeriesE96,
+		MaximumReferenceVoltageV: referenceSupply, FeedbackSeries: SeriesE96,
 	})
 	if len(issues) != 0 {
 		return nil, fmt.Errorf("threshold value solution failed: %s", issues[0].Message)
@@ -182,39 +223,106 @@ func (provider *CatalogProvider) expandThreshold(ctx context.Context, request Pr
 		return nil, fmt.Errorf("threshold solution omitted feedback resistance")
 	}
 	referenceVoltage, ok := calculationOutput(calculation, "reference_voltage")
-	if !ok || referenceVoltage <= 0 || referenceVoltage >= supply {
+	if !ok || referenceVoltage <= 0 || referenceVoltage >= referenceSupply {
 		return nil, fmt.Errorf("threshold solution produced an invalid reference voltage")
 	}
-	referenceUpper := thresholdReferenceResistanceOhm * supply / referenceVoltage
-	referenceLower := thresholdReferenceResistanceOhm / (1 - referenceVoltage/supply)
+	referenceUpper := thresholdReferenceResistanceOhm * referenceSupply / referenceVoltage
+	referenceLower := thresholdReferenceResistanceOhm / (1 - referenceVoltage/referenceSupply)
 	parts := []catalogPart{selection}
-	parts, err = provider.appendPassiveParts(ctx, parts, []passivePart{
+	supplyBypassValue := "100n"
+	if useStableReference {
+		supplyBypassValue = "1u"
+	}
+	passives := []passivePart{
 		{"threshold_upper", "resistor", "threshold_reference", engineeringValue(referenceUpper, "Ohm")},
 		{"threshold_lower", "resistor", "threshold_reference", engineeringValue(referenceLower, "Ohm")},
 		{"feedback_resistor", "resistor", "positive_feedback", engineeringValue(feedbackResistance, "Ohm")},
 		{"output_pullup", "resistor", "open_collector_pullup", "4.7k"},
-		{"supply_bypass", "capacitor", "decoupling", "100n"},
-	})
+		{"supply_bypass", "capacitor", "decoupling", supplyBypassValue},
+	}
+	if useStableReference {
+		parts = append(parts, referenceRegulator)
+		passives = append(passives,
+			passivePart{"reference_output_bypass", "capacitor", "reference_output_decoupling", "1u"},
+		)
+	}
+	parts, err = provider.appendPassiveParts(ctx, parts, passives)
 	if err != nil {
 		return nil, err
 	}
+	var outputInverter catalogPart
+	if outputPolarity == "active_high" {
+		outputInverter, err = provider.selectComponentWithTemperature(ctx, "bjt", "npn", nil, true, temperatureRequirementFromConstraints(request.Constraints))
+		if err != nil {
+			return nil, err
+		}
+		outputInverter.selected.InstanceID = "output_inverter"
+		outputInverter.usage = "active_high_output_buffer"
+		parts = append(parts, outputInverter)
+		parts, err = provider.appendPassiveParts(ctx, parts, []passivePart{
+			{"inverter_base", "resistor", "output_inverter_base", "10k"},
+			{"inverted_output_pullup", "resistor", "active_high_output_pullup", "4.7k"},
+		})
+		if err != nil {
+			return nil, err
+		}
+	}
 	bindings := bindRoles(request.Ports, selection.selected.InstanceID, map[string]string{"sense": "IN_MINUS", "input": "IN_MINUS", "output": "OUT", "power": "V_PLUS", "reference": "V_MINUS"})
+	if outputPolarity == "active_high" {
+		for index := range bindings {
+			if bindings[index].Role == "output" {
+				bindings[index].Instance = outputInverter.selected.InstanceID
+				bindings[index].Function = "COLLECTOR"
+			}
+		}
+	}
+	thresholdPowerEndpoints := []RealizationEndpoint{endpoint(selection, "V_PLUS"), passiveEndpoint("output_pullup", "A"), passiveEndpoint("supply_bypass", "A")}
+	thresholdGroundEndpoints := []RealizationEndpoint{endpoint(selection, "V_MINUS"), passiveEndpoint("threshold_lower", "B"), passiveEndpoint("supply_bypass", "B")}
+	if !useStableReference {
+		thresholdPowerEndpoints = append(thresholdPowerEndpoints, passiveEndpoint("threshold_upper", "A"))
+	} else {
+		thresholdPowerEndpoints = append(thresholdPowerEndpoints, endpoint(referenceRegulator, "VIN"))
+		thresholdGroundEndpoints = append(thresholdGroundEndpoints, endpoint(referenceRegulator, "GND"), passiveEndpoint("reference_output_bypass", "B"))
+	}
 	connections := []RealizationConnection{
 		semanticNet("threshold_reference", "analog_signal", endpoint(selection, "IN_PLUS"), passiveEndpoint("threshold_upper", "B"), passiveEndpoint("threshold_lower", "A"), passiveEndpoint("feedback_resistor", "B")),
 		semanticNet("threshold_output", "open_collector_signal", endpoint(selection, "OUT"), passiveEndpoint("output_pullup", "B"), passiveEndpoint("feedback_resistor", "A")),
-		semanticNet("threshold_power", "power", endpoint(selection, "V_PLUS"), passiveEndpoint("threshold_upper", "A"), passiveEndpoint("output_pullup", "A"), passiveEndpoint("supply_bypass", "A")),
-		semanticNet("threshold_ground", "reference", endpoint(selection, "V_MINUS"), passiveEndpoint("threshold_lower", "B"), passiveEndpoint("supply_bypass", "B")),
+		semanticNet("threshold_power", "power", thresholdPowerEndpoints...),
+		semanticNet("threshold_ground", "reference", thresholdGroundEndpoints...),
 	}
-	return provider.expansion(request, "open_collector_hysteresis", parts, bindings, connections, []CalculationEvidence{calculation, response}, 0)
+	if useStableReference {
+		connections = append(connections, semanticNet("threshold_reference_supply", "power", endpoint(referenceRegulator, "VOUT"), passiveEndpoint("threshold_upper", "A"), passiveEndpoint("reference_output_bypass", "A")))
+	}
+	if outputPolarity == "active_high" {
+		connections[1].Endpoints = append(connections[1].Endpoints, passiveEndpoint("inverter_base", "A"))
+		connections[2].Endpoints = append(connections[2].Endpoints, passiveEndpoint("inverted_output_pullup", "A"))
+		connections[3].Endpoints = append(connections[3].Endpoints, endpoint(outputInverter, "EMITTER"))
+		connections = append(connections,
+			semanticNet("threshold_inverter_base", "logic_drive", passiveEndpoint("inverter_base", "B"), endpoint(outputInverter, "BASE")),
+			semanticNet("threshold_active_high_output", "logic_signal", endpoint(outputInverter, "COLLECTOR"), passiveEndpoint("inverted_output_pullup", "B")),
+		)
+	}
+	repairs := []RealizationRepairVariable{{
+		ID: "threshold_feedback_resistance", Kind: "passive_value", Instance: "feedback_resistor", Value: feedbackResistance,
+		AllowedValues: preferredRepairValues(feedbackResistance), Unit: "Ohm",
+		Effects: []RealizationRepairEffect{{Analysis: "dc_operating_point", Metric: "hysteresis_voltage", Direction: "metric_decreases"}},
+	}}
+	return provider.expansionWithRepairs(request, "open_collector_hysteresis", parts, bindings, connections, []CalculationEvidence{calculation, response}, repairs, 0)
 }
 
 func (provider *CatalogProvider) expandLoadSwitch(ctx context.Context, request ProviderRequest) ([]ProviderExpansion, error) {
 	if err := requireString(request.Constraints, "load_characteristic", "equal", "inductive"); err != nil {
 		return nil, err
 	}
-	if err := requireString(request.Constraints, "control_active_state", "equal", "high"); err != nil {
-		return nil, err
+	controlState, ok := namedConstraint(request.Constraints, "control_active_state")
+	if !ok || controlState.Relation != "equal" {
+		return nil, fmt.Errorf("load-switch control active state must be declared")
 	}
+	var controlActiveState string
+	if err := json.Unmarshal(controlState.Value, &controlActiveState); err != nil || (controlActiveState != "high" && controlActiveState != "high_disconnect") {
+		return nil, fmt.Errorf("load-switch control active state must be high or high_disconnect")
+	}
+	failSafeDisconnect := controlActiveState == "high_disconnect"
 	for _, name := range []string{"default_off", "inductive_transient_clamp", "control_overvoltage_clamp"} {
 		if err := requireBool(request.Constraints, name, "required", true); err != nil {
 			return nil, err
@@ -228,24 +336,36 @@ func (provider *CatalogProvider) expandLoadSwitch(ctx context.Context, request P
 	if err != nil {
 		return nil, err
 	}
-	selection, err := provider.selectComponent(ctx, "mosfet", "logic_level", []components.RequiredRating{
+	temperatureRequirement := temperatureRequirementFromConstraints(request.Constraints)
+	controlMaximum := roleVoltageMaximum(request.Ports, "control")
+	if offState, exists := namedConstraint(request.Constraints, "off_output_state"); exists && constraintStringEquals(offState, "low") {
+		return provider.expandHighSideLoadSwitch(ctx, request, voltage, current, temperatureRequirement)
+	}
+	mosfetQuery := "logic_level"
+	if controlMaximum > 0 && controlMaximum <= lowVoltageGateDriveCeilingV {
+		mosfetQuery = "low_voltage_gate_drive"
+	}
+	selection, err := provider.selectComponentWithTemperature(ctx, "mosfet", mosfetQuery, []components.RequiredRating{
 		{Kind: "drain_source_voltage", Value: numericString(voltage / catalogRatingDeratingFactor), Unit: "V"},
 		{Kind: "drain_current", Value: numericString(current / catalogRatingDeratingFactor), Unit: "A"},
-	}, true)
+	}, true, temperatureRequirement)
 	if err != nil {
 		return nil, err
 	}
-	flyback, err := provider.selectComponent(ctx, "diode", "flyback", []components.RequiredRating{
+	// The flyback is reverse-biased at the steady-state operating point, so its
+	// nominal dissipation requirement is zero. A thermal workflow still requires
+	// a complete package path; the coupled electrical solve supplies the actual
+	// leakage/conduction loss used by the thermal assertion.
+	flyback, err := provider.selectComponentWithRequirements(ctx, "diode", "flyback", []components.RequiredRating{
 		{Kind: "current", Value: numericString(current / catalogRatingDeratingFactor), Unit: "A"},
 		{Kind: "reverse_voltage", Value: numericString(voltage / catalogRatingDeratingFactor), Unit: "V"},
-	}, true)
+	}, true, temperatureRequirement, thermalRequirementFromConstraints(request.Constraints, 0))
 	if err != nil {
 		return nil, err
 	}
 	flyback.selected.InstanceID = "flyback_clamp"
 	flyback.usage = "inductive_transient_clamp"
-	controlMaximum := roleVoltageMaximum(request.Ports, "control")
-	controlClamp, err := provider.selectComponent(ctx, "diode", "zener", []components.RequiredRating{{Kind: "reverse_voltage", Value: numericString(controlMaximum), Unit: "V"}}, true)
+	controlClamp, err := provider.selectComponentWithTemperature(ctx, "diode", "zener", []components.RequiredRating{{Kind: "reverse_voltage", Value: numericString(controlMaximum), Unit: "V"}}, true, temperatureRequirement)
 	if err != nil {
 		return nil, err
 	}
@@ -283,9 +403,38 @@ func (provider *CatalogProvider) expandLoadSwitch(ctx context.Context, request P
 		return nil, err
 	}
 	parts := []catalogPart{selection, flyback, controlClamp}
-	passives := []passivePart{{"gate_pulldown", "resistor", "default_off", "100k"}, {"gate_series", "resistor", "gate_drive", "100"}}
-	if hasRoleContract(request.Ports, "logic_power") {
-		passives = append(passives, passivePart{"logic_bypass", "capacitor", "logic_supply_decoupling", "100n"})
+	hasLogicPower := hasRoleContract(request.Ports, "logic_power")
+	gateSeries := passivePart{"gate_series", "resistor", "gate_drive", "100"}
+	if failSafeDisconnect {
+		gateSeries = passivePart{"gate_series", "resistor", "gate_buffer_input", "10k"}
+	}
+	passives := []passivePart{gateSeries}
+	var controlInverter, gateInverter catalogPart
+	if hasLogicPower || failSafeDisconnect {
+		gateInverter, err = provider.selectComponentWithTemperature(ctx, "bjt", "npn", nil, true, temperatureRequirement)
+		if err != nil {
+			return nil, err
+		}
+		gateInverter.selected.InstanceID = "gate_inverter"
+		gateInverter.usage = "gate_control_inverter"
+		parts = append(parts, gateInverter)
+		passives = append(passives, passivePart{"gate_drive_pullup", "resistor", "gate_drive_pullup", "4.7k"})
+		if !failSafeDisconnect {
+			passives = append(passives, passivePart{"gate_inverter_base", "resistor", "gate_buffer_interstage", "10k"})
+		}
+		if hasLogicPower {
+			passives = append(passives, passivePart{"logic_bypass", "capacitor", "logic_supply_decoupling", "100n"})
+		}
+		if !failSafeDisconnect {
+			controlInverter = gateInverter
+			controlInverter.selected.InstanceID = "control_inverter"
+			controlInverter.usage = "active_high_gate_buffer_stage_1"
+			gateInverter.usage = "active_high_gate_buffer_stage_2"
+			parts = append(parts, controlInverter)
+			passives = append(passives, passivePart{"control_inverter_base", "resistor", "gate_buffer_input", "10k"}, passivePart{"control_inverter_pullup", "resistor", "gate_buffer_stage_pullup", "4.7k"})
+		}
+	} else {
+		passives = append(passives, passivePart{"gate_pulldown", "resistor", "default_off", "100k"})
 	}
 	parts, err = provider.appendPassiveParts(ctx, parts, passives)
 	if err != nil {
@@ -295,7 +444,13 @@ func (provider *CatalogProvider) expandLoadSwitch(ctx context.Context, request P
 	for index := range bindings {
 		switch bindings[index].Role {
 		case "control":
-			bindings[index].Instance, bindings[index].Function = "gate_series", "A"
+			if failSafeDisconnect {
+				bindings[index].Instance, bindings[index].Function = "gate_series", "A"
+			} else if hasLogicPower {
+				bindings[index].Instance, bindings[index].Function = "control_inverter_base", "A"
+			} else {
+				bindings[index].Instance, bindings[index].Function = "gate_series", "A"
+			}
 		case "load_power":
 			bindings[index].Instance, bindings[index].Function = flyback.selected.InstanceID, "K"
 		case "power":
@@ -305,16 +460,173 @@ func (provider *CatalogProvider) expandLoadSwitch(ctx context.Context, request P
 		}
 	}
 	connections := []RealizationConnection{
-		semanticNet("switch_gate", "control", endpoint(selection, "GATE"), passiveEndpoint("gate_series", "B"), passiveEndpoint("gate_pulldown", "A"), endpoint(controlClamp, "K")),
 		semanticNet("switch_load", "switched_power", endpoint(selection, "DRAIN"), endpoint(flyback, "A")),
 		semanticNet("switch_load_power", "power", endpoint(flyback, "K")),
-		semanticNet("switch_ground", "reference", endpoint(selection, "SOURCE"), endpoint(controlClamp, "A"), passiveEndpoint("gate_pulldown", "B")),
 	}
-	if hasRoleContract(request.Ports, "logic_power") {
-		connections[len(connections)-1].Endpoints = append(connections[len(connections)-1].Endpoints, passiveEndpoint("logic_bypass", "B"))
+	if hasLogicPower {
+		if failSafeDisconnect {
+			connections = append(connections,
+				semanticNet("switch_gate_inverter_base", "logic_drive", passiveEndpoint("gate_series", "B"), endpoint(gateInverter, "BASE")),
+				semanticNet("switch_gate", "control", endpoint(gateInverter, "COLLECTOR"), passiveEndpoint("gate_drive_pullup", "B"), endpoint(selection, "GATE"), endpoint(controlClamp, "K")),
+			)
+		} else {
+			connections = append(connections, semanticNet("switch_gate_inverter_base", "logic_drive", passiveEndpoint("gate_inverter_base", "B"), endpoint(gateInverter, "BASE")), semanticNet("switch_gate_drive", "control", endpoint(gateInverter, "COLLECTOR"), passiveEndpoint("gate_drive_pullup", "B"), passiveEndpoint("gate_series", "A")), semanticNet("switch_gate", "control", endpoint(selection, "GATE"), passiveEndpoint("gate_series", "B"), endpoint(controlClamp, "K")))
+		}
+		logicPowerEndpoints := []RealizationEndpoint{passiveEndpoint("gate_drive_pullup", "A"), passiveEndpoint("logic_bypass", "A")}
+		groundEndpoints := []RealizationEndpoint{endpoint(selection, "SOURCE"), endpoint(controlClamp, "A"), endpoint(gateInverter, "EMITTER"), passiveEndpoint("logic_bypass", "B")}
+		if !failSafeDisconnect {
+			connections = append(connections, semanticNet("switch_control_inverter_base", "logic_drive", passiveEndpoint("control_inverter_base", "B"), endpoint(controlInverter, "BASE")), semanticNet("switch_gate_buffer_stage", "logic_drive", endpoint(controlInverter, "COLLECTOR"), passiveEndpoint("control_inverter_pullup", "B"), passiveEndpoint("gate_inverter_base", "A")))
+			logicPowerEndpoints = append(logicPowerEndpoints, passiveEndpoint("control_inverter_pullup", "A"))
+			groundEndpoints = append(groundEndpoints, endpoint(controlInverter, "EMITTER"))
+		}
+		connections = append(connections, semanticNet("switch_logic_power", "power", logicPowerEndpoints...), semanticNet("switch_ground", "reference", groundEndpoints...))
+	} else if failSafeDisconnect {
+		for index := range connections {
+			if connections[index].ID == "switch_load_power" {
+				connections[index].Endpoints = append(connections[index].Endpoints, passiveEndpoint("gate_drive_pullup", "A"))
+				break
+			}
+		}
+		connections = append(connections,
+			semanticNet("switch_gate_inverter_base", "logic_drive", passiveEndpoint("gate_series", "B"), endpoint(gateInverter, "BASE")),
+			semanticNet("switch_gate", "control", endpoint(gateInverter, "COLLECTOR"), passiveEndpoint("gate_drive_pullup", "B"), endpoint(selection, "GATE"), endpoint(controlClamp, "K")),
+			semanticNet("switch_ground", "reference", endpoint(selection, "SOURCE"), endpoint(controlClamp, "A"), endpoint(gateInverter, "EMITTER")),
+		)
+	} else {
+		connections = append(connections,
+			semanticNet("switch_gate", "control", endpoint(selection, "GATE"), passiveEndpoint("gate_series", "B"), passiveEndpoint("gate_pulldown", "A"), endpoint(controlClamp, "K")),
+			semanticNet("switch_ground", "reference", endpoint(selection, "SOURCE"), endpoint(controlClamp, "A"), passiveEndpoint("gate_pulldown", "B")),
+		)
 	}
 	connections = retainSemanticNets(connections)
 	return provider.expansion(request, "protected_low_side_switch", parts, bindings, connections, []CalculationEvidence{calculation, gateResponse}, 0)
+}
+
+func (provider *CatalogProvider) expandHighSideLoadSwitch(ctx context.Context, request ProviderRequest, voltage, current float64, temperatureRequirement *components.TemperatureRequirement) ([]ProviderExpansion, error) {
+	selection, err := provider.selectComponentWithTemperature(ctx, "mosfet", "p_channel", []components.RequiredRating{
+		{Kind: "drain_source_voltage", Value: numericString(voltage / catalogRatingDeratingFactor), Unit: "V"},
+		{Kind: "drain_current", Value: numericString(current / catalogRatingDeratingFactor), Unit: "A"},
+	}, true, temperatureRequirement)
+	if err != nil {
+		return nil, err
+	}
+	selection.selected.InstanceID, selection.usage = "high_side_switch", "default_off_high_side_switch"
+	flyback, err := provider.selectComponentWithRequirements(ctx, "diode", "flyback", []components.RequiredRating{
+		{Kind: "current", Value: numericString(current / catalogRatingDeratingFactor), Unit: "A"},
+		{Kind: "reverse_voltage", Value: numericString(voltage / catalogRatingDeratingFactor), Unit: "V"},
+	}, true, temperatureRequirement, thermalRequirementFromConstraints(request.Constraints, 0))
+	if err != nil {
+		return nil, err
+	}
+	flyback.selected.InstanceID, flyback.usage = "flyback_clamp", "inductive_transient_clamp"
+	driver, err := provider.selectComponentWithTemperature(ctx, "bjt", "npn", []components.RequiredRating{{Kind: "collector_emitter_voltage", Value: numericString(voltage / catalogRatingDeratingFactor), Unit: "V"}}, true, temperatureRequirement)
+	if err != nil {
+		return nil, err
+	}
+	driver.selected.InstanceID, driver.usage = "high_side_gate_driver", "source_referenced_gate_sink"
+
+	ratedVoltage, okVoltage := recordRatingMaximum(selection.record, "drain_source_voltage", "V")
+	ratedCurrent, okCurrent := recordRatingMaximum(selection.record, "drain_current", "A")
+	gateRated, okGate := recordRatingMaximum(selection.record, "gate_source_voltage", "V")
+	gateOn, okGateOn := catalogSimulationParameter(selection.record, "gate_on_voltage_v")
+	flybackVoltage, okFlybackVoltage := recordRatingMaximum(flyback.record, "reverse_voltage", "V")
+	flybackCurrent, okFlybackCurrent := recordRatingMaximum(flyback.record, "current", "A")
+	if !okVoltage || !okCurrent || !okGate || !okGateOn || !okFlybackVoltage || !okFlybackCurrent {
+		return nil, fmt.Errorf("selected high-side switch or protection device lacks normalized rating and gate-drive evidence")
+	}
+
+	parts := []catalogPart{selection, flyback, driver}
+	passives := []passivePart{{"gate_control_base", "resistor", "gate_drive", "10k"}, {"gate_pullup", "resistor", "default_off", "100k"}}
+	gateSeriesResistance := 100.0
+	clampVoltage := 0.0
+	var clamps []catalogPart
+	if voltage > gateRated*catalogRatingDeratingFactor {
+		clamp, clampErr := provider.selectComponentWithTemperature(ctx, "diode", "zener", nil, true, temperatureRequirement)
+		if clampErr != nil {
+			return nil, clampErr
+		}
+		unitClampVoltage, clampOK := recordValue(clamp.record, "zener_voltage", "V")
+		if !clampOK || unitClampVoltage <= 0 {
+			return nil, fmt.Errorf("selected high-side gate clamp lacks a positive catalog Zener voltage")
+		}
+		count := int(math.Ceil(gateOn / unitClampVoltage))
+		if count < 1 || count > 4 || float64(count)*unitClampVoltage > gateRated*catalogRatingDeratingFactor {
+			return nil, fmt.Errorf("catalog Zener series cannot provide a bounded high-side gate-drive window")
+		}
+		clampVoltage = float64(count) * unitClampVoltage
+		for index := 0; index < count; index++ {
+			part := clamp
+			part.selected.InstanceID = fmt.Sprintf("control_clamp_%d", index+1)
+			part.usage = "series_gate_overvoltage_clamp"
+			clamps = append(clamps, part)
+			parts = append(parts, part)
+		}
+		gateSeriesResistance = 10000
+		passives = append(passives, passivePart{"gate_sink_series", "resistor", "gate_clamp_current_limit", "10k"})
+	} else {
+		passives = append(passives, passivePart{"gate_sink_series", "resistor", "gate_stopper", "100"})
+	}
+	parts, err = provider.appendPassiveParts(ctx, parts, passives)
+	if err != nil {
+		return nil, err
+	}
+
+	gateDriveVoltage := voltage
+	if clampVoltage > 0 {
+		gateDriveVoltage = clampVoltage
+	}
+	ratings, issues := EvaluateRatings("high_side_switch_derating", []RatingRequirement{
+		{Kind: "drain_source_voltage", Required: voltage, Rated: ratedVoltage, DeratingFactor: catalogRatingDeratingFactor, Unit: "V", Evidence: selection.evidence},
+		{Kind: "drain_current", Required: current, Rated: ratedCurrent, DeratingFactor: catalogRatingDeratingFactor, Unit: "A", Evidence: selection.evidence},
+		{Kind: "gate_source_voltage", Required: gateDriveVoltage, Rated: gateRated, DeratingFactor: catalogRatingDeratingFactor, Unit: "V", Evidence: selection.evidence},
+		{Kind: "flyback_reverse_voltage", Required: voltage, Rated: flybackVoltage, DeratingFactor: catalogRatingDeratingFactor, Unit: "V", Evidence: flyback.evidence},
+		{Kind: "flyback_current", Required: current, Rated: flybackCurrent, DeratingFactor: catalogRatingDeratingFactor, Unit: "A", Evidence: flyback.evidence},
+	})
+	if len(issues) != 0 {
+		return nil, fmt.Errorf("high-side switch rating solution failed: %s", issues[0].Message)
+	}
+	gateCharge, gateChargeOK := recordValueMaximum(selection.record, "total_gate_charge", "C")
+	if !gateChargeOK {
+		gateCharge, gateChargeOK = recordValue(selection.record, "total_gate_charge", "C")
+	}
+	driveHeadroom := voltage - clampVoltage
+	if clampVoltage == 0 {
+		driveHeadroom = voltage
+	}
+	if !gateChargeOK || driveHeadroom <= 0 {
+		return nil, fmt.Errorf("selected high-side switch lacks gate-charge or bounded sink-current evidence")
+	}
+	gateResponse, err := ObservedCalculation("high_side_switch_response", NamedQuantity{Name: "response_time", Value: gateCharge * gateSeriesResistance / driveHeadroom, Unit: "s"})
+	if err != nil {
+		return nil, err
+	}
+
+	bindings := bindRoles(request.Ports, selection.selected.InstanceID, map[string]string{"control": "GATE", "load": "DRAIN", "output": "DRAIN", "power": "SOURCE", "load_power": "SOURCE", "reference": "SOURCE"})
+	for index := range bindings {
+		switch bindings[index].Role {
+		case "control":
+			bindings[index].Instance, bindings[index].Function = "gate_control_base", "A"
+		case "reference":
+			bindings[index].Instance, bindings[index].Function = driver.selected.InstanceID, "EMITTER"
+		}
+	}
+	connections := []RealizationConnection{
+		semanticNet("high_side_supply", "power", endpoint(selection, "SOURCE"), passiveEndpoint("gate_pullup", "A")),
+		semanticNet("high_side_output", "switched_power", endpoint(selection, "DRAIN"), endpoint(flyback, "K")),
+		semanticNet("high_side_reference", "reference", endpoint(flyback, "A"), endpoint(driver, "EMITTER")),
+		semanticNet("high_side_driver_base", "logic_drive", passiveEndpoint("gate_control_base", "B"), endpoint(driver, "BASE")),
+		semanticNet("high_side_driver_collector", "gate_drive", endpoint(driver, "COLLECTOR"), passiveEndpoint("gate_sink_series", "B")),
+		semanticNet("high_side_gate", "control", endpoint(selection, "GATE"), passiveEndpoint("gate_pullup", "B"), passiveEndpoint("gate_sink_series", "A")),
+	}
+	if len(clamps) != 0 {
+		connections[0].Endpoints = append(connections[0].Endpoints, endpoint(clamps[0], "K"))
+		connections[5].Endpoints = append(connections[5].Endpoints, endpoint(clamps[len(clamps)-1], "A"))
+		for index := 0; index+1 < len(clamps); index++ {
+			connections = append(connections, semanticNet(fmt.Sprintf("high_side_gate_clamp_series_%d", index+1), "gate_clamp", endpoint(clamps[index], "A"), endpoint(clamps[index+1], "K")))
+		}
+	}
+	connections = retainSemanticNets(connections)
+	return provider.expansion(request, "protected_high_side_switch", parts, bindings, connections, []CalculationEvidence{ratings, gateResponse}, 0)
 }
 
 func (provider *CatalogProvider) expandRegulator(ctx context.Context, request ProviderRequest) ([]ProviderExpansion, error) {
@@ -517,8 +829,30 @@ func (provider *CatalogProvider) expandTranslator(ctx context.Context, request P
 	if err != nil {
 		return nil, err
 	}
+	pullupResistance := 4700.0
+	minimumPullupResistance := 1.0
+	maximumPullupResistance := pullupResistance
+	if riseTime, _, hasRiseTime := firstNumericConstraint(request.Constraints, "rise_time"); hasRiseTime && riseTime > 0 {
+		if _, loadCapacitance, hasLoadCapacitance := numericConstraintBounds(request.Constraints, "load_capacitance"); hasLoadCapacitance && loadCapacitance > 0 {
+			// Bound a 10%-to-90% RC rise plus deterministic margin for switch,
+			// protection, and interconnect capacitance that shares the bus.
+			maximumPullupResistance = riseTime / (2.5 * loadCapacitance)
+			if maximumChannelCurrent, currentOK := catalogSimulationParameter(selection.record, "max_channel_current_a"); currentOK && maximumChannelCurrent > 0 {
+				minimumPullupResistance = high / (catalogRatingDeratingFactor * maximumChannelCurrent)
+			}
+			if !finitePositive(maximumPullupResistance) || maximumPullupResistance < minimumPullupResistance {
+				return nil, fmt.Errorf("open-drain rise-time and sink-current requirements have no bounded pull-up solution")
+			}
+			candidates, candidateIssues := PreferredValueCandidates(maximumPullupResistance, SeriesE24, minimumPullupResistance, maximumPullupResistance, 1)
+			if len(candidateIssues) != 0 || len(candidates) == 0 {
+				return nil, fmt.Errorf("open-drain pull-up preferred-value solution failed")
+			}
+			pullupResistance = candidates[0]
+		}
+	}
 	parts := []catalogPart{selection}
-	parts, err = provider.appendPassiveParts(ctx, parts, []passivePart{{"side_a_sda_pullup", "resistor", "bus_pullup", "4.7k"}, {"side_a_scl_pullup", "resistor", "bus_pullup", "4.7k"}, {"side_b_sda_pullup", "resistor", "bus_pullup", "4.7k"}, {"side_b_scl_pullup", "resistor", "bus_pullup", "4.7k"}, {"vcca_bypass", "capacitor", "decoupling", "100n"}, {"vccb_bypass", "capacitor", "decoupling", "100n"}})
+	pullupValue := engineeringValue(pullupResistance, "Ohm")
+	parts, err = provider.appendPassiveParts(ctx, parts, []passivePart{{"side_a_sda_pullup", "resistor", "bus_pullup", pullupValue}, {"side_a_scl_pullup", "resistor", "bus_pullup", pullupValue}, {"side_b_sda_pullup", "resistor", "bus_pullup", pullupValue}, {"side_b_scl_pullup", "resistor", "bus_pullup", pullupValue}, {"vcca_bypass", "capacitor", "decoupling", "100n"}, {"vccb_bypass", "capacitor", "decoupling", "100n"}})
 	if err != nil {
 		return nil, err
 	}
@@ -545,7 +879,18 @@ func (provider *CatalogProvider) expandTranslator(ctx context.Context, request P
 			connections[index].Endpoints = append(connections[index].Endpoints, endpoint(selection, "OE"))
 		}
 	}
-	return provider.expansion(request, "bidirectional_open_drain_translator", parts, bindings, connections, nil, 0)
+	allowedPullups := preferredRepairValues(pullupResistance)
+	allowedPullups = slices.DeleteFunc(allowedPullups, func(value float64) bool {
+		return value < minimumPullupResistance || value > maximumPullupResistance
+	})
+	repairs := make([]RealizationRepairVariable, 0, 4)
+	for _, instance := range []string{"side_a_sda_pullup", "side_a_scl_pullup", "side_b_sda_pullup", "side_b_scl_pullup"} {
+		repairs = append(repairs, RealizationRepairVariable{
+			ID: instance + "_resistance", Kind: "passive_value", Instance: instance, Value: pullupResistance, AllowedValues: allowedPullups, Unit: "Ohm",
+			Effects: []RealizationRepairEffect{{Analysis: simmodel.AnalysisTransient, Metric: "rise_time", Direction: "metric_increases"}},
+		})
+	}
+	return provider.expansionWithRepairs(request, "bidirectional_open_drain_translator", parts, bindings, connections, nil, repairs, 0)
 }
 
 func (provider *CatalogProvider) expandSingleComponent(ctx context.Context, request ProviderRequest, family, usage, busRole, busFunction string) ([]ProviderExpansion, error) {
@@ -848,10 +1193,22 @@ type catalogPart struct {
 type passivePart struct{ id, family, usage, value string }
 
 func (provider *CatalogProvider) selectComponent(ctx context.Context, family, text string, ratings []components.RequiredRating, concrete bool) (catalogPart, error) {
+	return provider.selectComponentWithRequirements(ctx, family, text, ratings, concrete, nil, nil)
+}
+
+func (provider *CatalogProvider) selectComponentWithThermal(ctx context.Context, family, text string, ratings []components.RequiredRating, concrete bool, thermal *components.ThermalRequirement) (catalogPart, error) {
+	return provider.selectComponentWithRequirements(ctx, family, text, ratings, concrete, nil, thermal)
+}
+
+func (provider *CatalogProvider) selectComponentWithTemperature(ctx context.Context, family, text string, ratings []components.RequiredRating, concrete bool, temperature *components.TemperatureRequirement) (catalogPart, error) {
+	return provider.selectComponentWithRequirements(ctx, family, text, ratings, concrete, temperature, nil)
+}
+
+func (provider *CatalogProvider) selectComponentWithRequirements(ctx context.Context, family, text string, ratings []components.RequiredRating, concrete bool, temperature *components.TemperatureRequirement, thermal *components.ThermalRequirement) (catalogPart, error) {
 	selection, result := components.Select(ctx, provider.catalog, components.SelectionRequest{
 		Query:      components.Query{Text: text, Family: family, MinimumConfidence: components.ConfidenceRuleInferred, Limit: 64},
 		Acceptance: components.AcceptanceStructural, AllowAlternatives: true,
-		RequiredRatings: ratings, RequireConcrete: concrete,
+		RequiredRatings: ratings, RequiredTemperature: temperature, RequiredThermal: thermal, RequireConcrete: concrete,
 	})
 	if !result.OK {
 		return catalogPart{}, fmt.Errorf("no catalog-backed %s satisfies normalized ratings: %v", family, result.Issues)
@@ -882,7 +1239,15 @@ func (provider *CatalogProvider) expansion(request ProviderRequest, id string, p
 }
 
 func (provider *CatalogProvider) expansionWithTransitions(request ProviderRequest, id string, parts []catalogPart, bindings []RealizationPortBinding, transitions []RealizationSeriesTransition, connections []RealizationConnection, calculations []CalculationEvidence, unproven int) ([]ProviderExpansion, error) {
-	primary, err := provider.buildCatalogExpansion(request, id, parts, bindings, transitions, connections, calculations, unproven)
+	return provider.expansionWithTransitionsAndRepairs(request, id, parts, bindings, transitions, connections, calculations, nil, unproven)
+}
+
+func (provider *CatalogProvider) expansionWithRepairs(request ProviderRequest, id string, parts []catalogPart, bindings []RealizationPortBinding, connections []RealizationConnection, calculations []CalculationEvidence, repairs []RealizationRepairVariable, unproven int) ([]ProviderExpansion, error) {
+	return provider.expansionWithTransitionsAndRepairs(request, id, parts, bindings, nil, connections, calculations, repairs, unproven)
+}
+
+func (provider *CatalogProvider) expansionWithTransitionsAndRepairs(request ProviderRequest, id string, parts []catalogPart, bindings []RealizationPortBinding, transitions []RealizationSeriesTransition, connections []RealizationConnection, calculations []CalculationEvidence, repairs []RealizationRepairVariable, unproven int) ([]ProviderExpansion, error) {
+	primary, err := provider.buildCatalogExpansion(request, id, parts, bindings, transitions, connections, calculations, repairs, unproven)
 	if err != nil {
 		return nil, err
 	}
@@ -894,7 +1259,7 @@ func (provider *CatalogProvider) expansionWithTransitions(request ProviderReques
 		}
 		alternativeParts := append([]catalogPart(nil), parts...)
 		alternativeParts[index] = alternative
-		candidate, err := provider.buildCatalogExpansion(request, id+"_alt", alternativeParts, bindings, transitions, connections, calculations, unproven)
+		candidate, err := provider.buildCatalogExpansion(request, id+"_alt", alternativeParts, bindings, transitions, connections, calculations, repairs, unproven)
 		if err != nil {
 			return nil, err
 		}
@@ -904,7 +1269,7 @@ func (provider *CatalogProvider) expansionWithTransitions(request ProviderReques
 	return expansions, nil
 }
 
-func (provider *CatalogProvider) buildCatalogExpansion(request ProviderRequest, id string, parts []catalogPart, bindings []RealizationPortBinding, transitions []RealizationSeriesTransition, connections []RealizationConnection, calculations []CalculationEvidence, unproven int) (ProviderExpansion, error) {
+func (provider *CatalogProvider) buildCatalogExpansion(request ProviderRequest, id string, parts []catalogPart, bindings []RealizationPortBinding, transitions []RealizationSeriesTransition, connections []RealizationConnection, calculations []CalculationEvidence, repairs []RealizationRepairVariable, unproven int) (ProviderExpansion, error) {
 	instances := make([]RealizationInstance, 0, len(parts))
 	componentsSelected := make([]SelectedComponent, 0, len(parts))
 	for _, part := range parts {
@@ -912,14 +1277,15 @@ func (provider *CatalogProvider) buildCatalogExpansion(request ProviderRequest, 
 		instances = append(instances, RealizationInstance{ID: part.selected.InstanceID, CatalogID: part.selected.CatalogID, VariantID: part.selected.VariantID, Usage: part.usage, Value: part.value})
 	}
 	parameters := calculationParameters(calculations)
-	payload, err := MarshalFragmentRealization(FragmentRealization{Capability: request.Capability, Instances: instances, PortBindings: bindings, SeriesTransitions: transitions, Connections: connections, Parameters: parameters})
+	payload, err := MarshalFragmentRealization(FragmentRealization{Capability: request.Capability, Instances: instances, PortBindings: bindings, SeriesTransitions: transitions, Connections: connections, Parameters: parameters, RepairVariables: repairs})
 	if err != nil {
 		return ProviderExpansion{}, err
 	}
-	behavior, err := catalogBehaviorCalculations(request, parts)
+	behavior, behaviorUnproven, err := catalogBehaviorCalculations(request, parts)
 	if err != nil {
 		return ProviderExpansion{}, err
 	}
+	unproven += behaviorUnproven
 	calculations = append(calculations, behavior...)
 	powerDemand, powerDemandProven, powerCalculations, err := catalogFragmentPowerDemand(request, parts, bindings, transitions, connections)
 	if err != nil {
@@ -1093,23 +1459,37 @@ func catalogStartupRole(role string, contract PortContract) bool {
 	return contract.Direction != "sink" || role == "output" || role == "load" || role == "permit" || role == "mute" || role == "bias"
 }
 
-func catalogBehaviorCalculations(request ProviderRequest, parts []catalogPart) ([]CalculationEvidence, error) {
+func catalogBehaviorCalculations(request ProviderRequest, parts []catalogPart) ([]CalculationEvidence, int, error) {
 	var result []CalculationEvidence
+	unproven := 0
 	for _, part := range parts {
+		for _, analysis := range requiredCatalogAnalyses(request) {
+			if !catalogRecordSupportsAnalysis(part.record, analysis) {
+				unproven++
+			}
+		}
+		if part.usage == "regulator" && regulatorThermalEvidenceRequired(request) {
+			calculation, proven := catalogRegulatorThermalCalculation(request, part)
+			if !proven {
+				unproven++
+			} else {
+				result = append(result, calculation)
+			}
+		}
 		if part.record.OpAmp == nil {
 			continue
 		}
 		if phase, ok := catalogOpAmpPhaseMargin(request, part.record); ok {
 			calculation, err := ObservedCalculation(part.selected.InstanceID+"_loop_stability", NamedQuantity{Name: "phase_margin", Value: phase, Unit: "deg"})
 			if err != nil {
-				return nil, err
+				return nil, 0, err
 			}
 			result = append(result, calculation)
 		}
 		if noise := part.record.OpAmp.VoltageNoiseDensity; noise != nil && noise.Value > 0 {
 			calculation, err := ObservedCalculation(part.selected.InstanceID+"_noise", NamedQuantity{Name: "voltage_noise_density", Value: noise.Value, Unit: noise.Unit})
 			if err != nil {
-				return nil, err
+				return nil, 0, err
 			}
 			result = append(result, calculation)
 		}
@@ -1117,11 +1497,73 @@ func catalogBehaviorCalculations(request ProviderRequest, parts []catalogPart) (
 	if canonicalIdentifier(request.Capability) == "class_a_amplification" {
 		calculation, err := ObservedCalculation("open_loop_stability", NamedQuantity{Name: "phase_margin", Value: 90, Unit: "deg"})
 		if err != nil {
-			return nil, err
+			return nil, 0, err
 		}
 		result = append(result, calculation)
 	}
-	return result, nil
+	return result, unproven, nil
+}
+
+func requiredCatalogAnalyses(request ProviderRequest) []string {
+	var analyses []string
+	for _, constraint := range request.Constraints {
+		if constraint.Relation != "required" || !strings.HasPrefix(constraint.Name, "analysis_") {
+			continue
+		}
+		var required bool
+		if json.Unmarshal(constraint.Value, &required) != nil || !required {
+			continue
+		}
+		analyses = append(analyses, strings.TrimPrefix(constraint.Name, "analysis_"))
+	}
+	slices.Sort(analyses)
+	return slices.Compact(analyses)
+}
+
+func catalogRecordSupportsAnalysis(record components.ComponentRecord, analysis string) bool {
+	for _, model := range record.SimulationModels {
+		if simmodel.SupportsAnalysis(model.ModelID, analysis) {
+			return true
+		}
+	}
+	return false
+}
+
+func regulatorThermalEvidenceRequired(request ProviderRequest) bool {
+	_, junctionRequired := namedConstraint(request.Constraints, "junction_temperature")
+	_, trackingRequired := namedConstraint(request.Constraints, "thermal_tracking")
+	return canonicalIdentifier(request.Capability) == "voltage_regulation" && (junctionRequired || trackingRequired)
+}
+
+func catalogRegulatorThermalCalculation(request ProviderRequest, part catalogPart) (CalculationEvidence, bool) {
+	inputMinimum, inputMaximum, inputOK := roleVoltageRange(request.Ports, "input")
+	_ = inputMinimum
+	output, _, outputOK := firstNumericConstraint(request.Constraints, "output_voltage", "dc_voltage")
+	current, _, currentOK := firstNumericConstraint(request.Constraints, "continuous_output_current", "output_current", "load_current")
+	ambient, _, ambientOK := firstNumericConstraint(request.Constraints, "ambient_temperature")
+	thermalResistance, thermalOK := catalogSimulationParameter(part.record, "junction_to_ambient_c_per_w")
+	maximumTemperature, maximumOK := catalogSimulationParameter(part.record, "max_temperature_c")
+	quiescentCurrent, _ := catalogSimulationParameter(part.record, "quiescent_current_a")
+	if !inputOK || !outputOK || !currentOK || !ambientOK || !thermalOK || !maximumOK || inputMaximum <= output || current <= 0 || thermalResistance <= 0 || maximumTemperature <= 0 || quiescentCurrent < 0 {
+		return CalculationEvidence{}, false
+	}
+	dissipation := (inputMaximum-output)*current + inputMaximum*quiescentCurrent
+	predictedJunction := ambient + dissipation*thermalResistance
+	calculation, _ := EvaluateRatings(part.selected.InstanceID+"_thermal", []RatingRequirement{{
+		Kind: "junction_temperature", Required: predictedJunction, Rated: maximumTemperature, DeratingFactor: 1, Unit: "degC", Evidence: part.evidence,
+	}})
+	return calculation, calculation.Hash != ""
+}
+
+func catalogSimulationParameter(record components.ComponentRecord, name string) (float64, bool) {
+	for _, model := range record.SimulationModels {
+		for _, parameter := range model.Parameters {
+			if canonicalIdentifier(parameter.Name) == name && finiteNumbers(parameter.Value) {
+				return parameter.Value, true
+			}
+		}
+	}
+	return 0, false
 }
 
 func catalogOpAmpPhaseMargin(request ProviderRequest, record components.ComponentRecord) (float64, bool) {
@@ -1878,11 +2320,20 @@ func convertCatalogUnit(value float64, from, to string) (float64, bool) {
 	if from == "mA" && to == "A" {
 		return value / 1000, true
 	}
+	if from == "A" && to == "mA" {
+		return value * 1000, true
+	}
 	if from == "mV" && to == "V" {
 		return value / 1000, true
 	}
+	if from == "V" && to == "mV" {
+		return value * 1000, true
+	}
 	if from == "nC" && to == "C" {
 		return value * 1e-9, true
+	}
+	if from == "C" && to == "nC" {
+		return value * 1e9, true
 	}
 	return 0, false
 }

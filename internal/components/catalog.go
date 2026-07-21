@@ -193,6 +193,7 @@ func ValidateCatalog(catalog *Catalog) reports.Result {
 		issues = append(issues, validateSensorEvidence(path+".sensor_evidence", record)...)
 		issues = append(issues, validateAmplifierOutputEvidence(path+".amplifier_output_evidence", record)...)
 		issues = append(issues, validatePowerSemiconductorEvidence(path+".power_semiconductor_evidence", record)...)
+		issues = append(issues, validateThermalEvidence(path+".thermal_evidence", record.Thermal)...)
 		for _, diagnostic := range simmodel.ValidateCatalogEvidence(record.Family, record.SimulationModels) {
 			issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, path+"."+diagnostic.Path, diagnostic.Message))
 		}
@@ -216,6 +217,43 @@ func ValidateCatalog(catalog *Catalog) reports.Result {
 		"family_count": len(catalog.Families),
 		"record_count": len(catalog.Records),
 	}, issues, nil)
+}
+
+func validateThermalEvidence(path string, evidence *ThermalEvidence) []reports.Issue {
+	if evidence == nil {
+		return nil
+	}
+	var issues []reports.Issue
+	if evidence.MaxJunctionTemperatureC == nil || !finitePositive(*evidence.MaxJunctionTemperatureC) {
+		issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, path+".max_junction_temperature_c", "thermal evidence requires a finite positive maximum junction temperature"))
+	}
+	paths := []struct {
+		name  string
+		value *float64
+	}{
+		{name: "junction_to_case_c_per_w", value: evidence.JunctionToCaseCPerW},
+		{name: "junction_to_ambient_c_per_w", value: evidence.JunctionToAmbientCPerW},
+	}
+	hasPath := false
+	for _, candidate := range paths {
+		if candidate.value == nil {
+			continue
+		}
+		hasPath = true
+		if !finitePositive(*candidate.value) {
+			issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, path+"."+candidate.name, "thermal resistance must be finite and positive"))
+		}
+	}
+	if !hasPath {
+		issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, path, "thermal evidence requires at least one reviewed junction-to-case or junction-to-ambient path"))
+	}
+	if strings.TrimSpace(evidence.MountingAssumptions) == "" {
+		issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, path+".mounting_assumptions", "thermal evidence requires explicit mounting or boundary assumptions"))
+	}
+	if strings.TrimSpace(evidence.ReviewNote) == "" {
+		issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, path+".review_note", "thermal evidence requires a review note"))
+	}
+	return issues
 }
 
 type equivalenceMember struct {

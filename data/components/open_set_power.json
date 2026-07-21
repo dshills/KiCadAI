@@ -10,7 +10,7 @@
       "manufacturer": "Alpha and Omega Semiconductor",
       "mpn": "AO3400A",
       "lifecycle": "active",
-      "tags": ["logic_level", "low_side_switch", "mosfet", "n_channel", "sot23"],
+      "tags": ["logic_level", "low_side_switch", "low_voltage_gate_drive", "mosfet", "n_channel", "sot23"],
       "values": [
         {"kind": "on_resistance", "max": "48", "unit": "mOhm"},
         {"kind": "on_resistance_gate_voltage", "typ": "2.5", "unit": "V"},
@@ -23,6 +23,18 @@
         {"kind": "power_dissipation", "max": "1.4", "unit": "W"}
       ],
       "temperature": {"min": "-55", "max": "150", "unit": "C"},
+      "simulation_models": [{
+        "model_id": "mna_nmos_guaranteed_switch_v1",
+        "parameters": [
+          {"name": "gate_on_voltage_v", "value": 2.5},
+          {"name": "on_resistance_ohm", "value": 0.048},
+          {"name": "max_drain_current_a", "value": 5.7},
+          {"name": "max_drain_source_voltage_v", "value": 30},
+          {"name": "max_gate_source_voltage_v", "value": 12},
+          {"name": "max_temperature_c", "value": 150},
+          {"name": "junction_to_ambient_c_per_w", "value": 89.3}
+        ]
+      }],
       "symbols": [
         {
           "symbol_id": "Transistor_FET:Q_NMOS_GSD",
@@ -69,6 +81,141 @@
       }
     },
     {
+      "id": "mosfet.onsemi.fqp47p06.to220",
+      "family": "mosfet",
+      "name": "onsemi FQP47P06 60 V P-channel power MOSFET",
+      "description": "High-side power switch with guaranteed 26 mOhm on-resistance at -10 V gate drive.",
+      "generic": false,
+      "manufacturer": "onsemi",
+      "mpn": "FQP47P06",
+      "lifecycle": "active",
+      "tags": ["high_side_switch", "mosfet", "p_channel", "power", "to220"],
+      "values": [
+        {"kind": "on_resistance", "max": "26", "unit": "mOhm"},
+        {"kind": "on_resistance_gate_voltage", "typ": "10", "unit": "V"},
+        {"kind": "total_gate_charge", "typ": "84", "unit": "nC"}
+      ],
+      "ratings": [
+        {"kind": "drain_source_voltage", "max": "60", "unit": "V"},
+        {"kind": "drain_current", "max": "47", "unit": "A"},
+        {"kind": "gate_source_voltage", "max": "25", "unit": "V"},
+        {"kind": "power_dissipation", "max": "160", "unit": "W"}
+      ],
+      "temperature": {"min": "-55", "max": "175", "unit": "C"},
+      "simulation_models": [{
+        "model_id": "mna_pmos_guaranteed_switch_v1",
+        "parameters": [
+          {"name": "gate_on_voltage_v", "value": 10},
+          {"name": "on_resistance_ohm", "value": 0.026},
+          {"name": "max_drain_current_a", "value": 47},
+          {"name": "max_drain_source_voltage_v", "value": 60},
+          {"name": "max_gate_source_voltage_v", "value": 25},
+          {"name": "max_temperature_c", "value": 175},
+          {"name": "junction_to_ambient_c_per_w", "value": 62.5},
+          {"name": "junction_to_case_c_per_w", "value": 0.94}
+        ]
+      }],
+      "symbols": [{
+        "symbol_id": "Transistor_FET:Q_PMOS_GDS",
+        "function_pins": [
+          {"function": "GATE", "symbol_pin": "1", "electrical": "input", "required": true},
+          {"function": "DRAIN", "symbol_pin": "2", "required": true},
+          {"function": "SOURCE", "symbol_pin": "3", "required": true}
+        ],
+        "verification": {"confidence": "verified", "sources": ["https://www.onsemi.com/download/data-sheet/pdf/fqp47p06-d.pdf", "kicad-symbols:Transistor_FET:Q_PMOS_GDS"], "pinmap_checked": true}
+      }],
+      "packages": [{
+        "id": "to220_3",
+        "name": "TO-220-3",
+        "footprint_id": "Package_TO_SOT_THT:TO-220-3_Vertical",
+        "package_type": "to220_3",
+        "mpn": "FQP47P06",
+        "lifecycle": "active",
+        "pinmap_id": "Transistor_FET:Q_PMOS_GDS|Package_TO_SOT_THT:TO-220-3_Vertical",
+        "pad_functions": [{"function": "GATE", "pad": "1"}, {"function": "DRAIN", "pad": "2"}, {"function": "SOURCE", "pad": "3"}],
+        "dimensions_mm": {"width": 10.16, "height": 4.7},
+        "height_mm": 15.8,
+        "verification": {"confidence": "verified", "sources": ["https://www.onsemi.com/download/data-sheet/pdf/fqp47p06-d.pdf", "kicad-footprint:Package_TO_SOT_THT:TO-220-3_Vertical"], "pinmap_checked": true}
+      }],
+      "verification": {"confidence": "verified", "sources": ["https://www.onsemi.com/download/data-sheet/pdf/fqp47p06-d.pdf", "datasheet-pinmap:onsemi:FQP47P06:Rev3", "kicad-footprint:Package_TO_SOT_THT:TO-220-3_Vertical"], "resolver_checked": true, "pinmap_checked": true, "notes": ["The 47 A and 160 W ratings require the manufacturer case-temperature conditions; circuit thermal analysis uses the reviewed package path and actual switched-load dissipation."]}
+    },
+    {
+      "id": "mosfet.onsemi.rfd16n05lsm.to252",
+      "family": "mosfet",
+      "name": "onsemi RFD16N05LSM 50 V logic-level N-channel MOSFET",
+      "description": "Low-side power switch with guaranteed on-resistance at 4 V gate drive and a reviewed free-air thermal path.",
+      "generic": false,
+      "manufacturer": "onsemi",
+      "mpn": "RFD16N05LSM9A",
+      "lifecycle": "active",
+      "tags": ["logic_level", "low_side_switch", "low_voltage_gate_drive", "mosfet", "n_channel", "power", "to252"],
+      "values": [
+        {"kind": "on_resistance", "max": "56", "unit": "mOhm"},
+        {"kind": "on_resistance_gate_voltage", "typ": "4", "unit": "V"},
+        {"kind": "total_gate_charge", "max": "45", "unit": "nC"}
+      ],
+      "ratings": [
+        {"kind": "drain_source_voltage", "max": "50", "unit": "V"},
+        {"kind": "drain_current", "max": "16", "unit": "A"},
+        {"kind": "gate_source_voltage", "max": "10", "unit": "V"},
+        {"kind": "power_dissipation", "max": "60", "unit": "W"}
+      ],
+      "temperature": {"min": "-55", "max": "175", "unit": "C"},
+      "simulation_models": [{
+        "model_id": "mna_nmos_guaranteed_switch_v1",
+        "parameters": [
+          {"name": "gate_on_voltage_v", "value": 4},
+          {"name": "on_resistance_ohm", "value": 0.056},
+          {"name": "max_drain_current_a", "value": 16},
+          {"name": "max_drain_source_voltage_v", "value": 50},
+          {"name": "max_gate_source_voltage_v", "value": 10},
+          {"name": "max_temperature_c", "value": 175},
+          {"name": "junction_to_ambient_c_per_w", "value": 100},
+          {"name": "junction_to_case_c_per_w", "value": 2.083}
+        ]
+      }],
+      "thermal_evidence": {
+        "max_junction_temperature_c": 175,
+        "junction_to_case_c_per_w": 2.083,
+        "junction_to_ambient_c_per_w": 100,
+        "mounting_assumptions": "Datasheet free-air TO-252 junction-to-ambient boundary; the lower junction-to-case path requires a separately declared case temperature.",
+        "review_note": "onsemi RFD16N05LSM datasheet specifies 100 C/W maximum junction-to-ambient and 2.083 C/W maximum junction-to-case resistance."
+      },
+      "symbols": [{
+        "symbol_id": "Transistor_FET:Q_NMOS_GDS",
+        "function_pins": [
+          {"function": "GATE", "symbol_pin": "1", "electrical": "input", "required": true},
+          {"function": "DRAIN", "symbol_pin": "2", "required": true},
+          {"function": "SOURCE", "symbol_pin": "3", "required": true}
+        ],
+        "verification": {"confidence": "verified", "sources": ["https://www.onsemi.com/download/data-sheet/pdf/rfd16n05lsm-d.pdf", "kicad-symbols:Transistor_FET:Q_NMOS_GDS"], "pinmap_checked": true}
+      }],
+      "packages": [{
+        "id": "to252_3",
+        "name": "TO-252AA / DPAK",
+        "footprint_id": "Package_TO_SOT_SMD:TO-252-3_TabPin2",
+        "package_type": "to252",
+        "mpn": "RFD16N05LSM9A",
+        "lifecycle": "active",
+        "pinmap_id": "Transistor_FET:Q_NMOS_GDS|Package_TO_SOT_SMD:TO-252-3_TabPin2",
+        "pad_functions": [
+          {"function": "GATE", "pad": "1"},
+          {"function": "DRAIN", "pad": "2"},
+          {"function": "SOURCE", "pad": "3"}
+        ],
+        "dimensions_mm": {"width": 6.73, "height": 6.22},
+        "height_mm": 2.38,
+        "verification": {"confidence": "verified", "sources": ["https://www.onsemi.com/download/data-sheet/pdf/rfd16n05lsm-d.pdf", "kicad-footprint:Package_TO_SOT_SMD:TO-252-3_TabPin2"], "pinmap_checked": true}
+      }],
+      "verification": {
+        "confidence": "verified",
+        "sources": ["https://www.onsemi.com/download/data-sheet/pdf/rfd16n05lsm-d.pdf", "kicad-footprint:Package_TO_SOT_SMD:TO-252-3_TabPin2"],
+        "resolver_checked": true,
+        "pinmap_checked": true,
+        "notes": ["The guaranteed 56 mOhm path applies at 4 V gate drive; thermal ratings remain boundary-dependent."]
+      }
+    },
+    {
       "id": "mosfet.infineon.irlz44n.to220",
       "family": "mosfet",
       "name": "Infineon IRLZ44N 55 V logic-level N-channel MOSFET",
@@ -90,6 +237,26 @@
         {"kind": "power_dissipation", "max": "83", "unit": "W"}
       ],
       "temperature": {"min": "-55", "max": "175", "unit": "C"},
+      "simulation_models": [{
+        "model_id": "mna_nmos_guaranteed_switch_v1",
+        "parameters": [
+          {"name": "gate_on_voltage_v", "value": 4.5},
+          {"name": "on_resistance_ohm", "value": 0.035},
+          {"name": "max_drain_current_a", "value": 47},
+          {"name": "max_drain_source_voltage_v", "value": 55},
+          {"name": "max_gate_source_voltage_v", "value": 16},
+          {"name": "max_temperature_c", "value": 175},
+          {"name": "junction_to_ambient_c_per_w", "value": 62},
+          {"name": "junction_to_case_c_per_w", "value": 1.8}
+        ]
+      }],
+      "thermal_evidence": {
+        "max_junction_temperature_c": 175,
+        "junction_to_case_c_per_w": 1.8,
+        "junction_to_ambient_c_per_w": 62,
+        "mounting_assumptions": "Free-air TO-220 junction-to-ambient boundary from the manufacturer datasheet; the lower junction-to-case value requires a separately declared case temperature.",
+        "review_note": "Infineon IRLZ44N datasheet records 62 C/W maximum junction-to-ambient and 1.8 C/W maximum junction-to-case thermal resistance."
+      },
       "symbols": [
         {
           "symbol_id": "Transistor_FET:Q_NMOS_GDS",
@@ -137,6 +304,73 @@
       }
     },
     {
+      "id": "diode.onsemi.ss34fa.sod123fl",
+      "family": "diode",
+      "name": "onsemi SS34FA 3 A 40 V Schottky rectifier",
+      "description": "Thermally qualified recirculation diode for low-voltage inductive loads.",
+      "generic": false,
+      "manufacturer": "onsemi",
+      "mpn": "SS34FA",
+      "lifecycle": "active",
+      "tags": ["flyback", "inductive_clamp", "power", "schottky", "sod123fl"],
+      "values": [{"kind": "forward_voltage", "max": "0.5", "unit": "V"}],
+      "ratings": [
+        {"kind": "current", "max": "3", "unit": "A"},
+        {"kind": "reverse_voltage", "max": "40", "unit": "V"},
+        {"kind": "surge_current", "max": "80", "unit": "A"}
+      ],
+      "temperature": {"min": "-55", "max": "125", "unit": "C"},
+      "thermal_evidence": {
+        "max_junction_temperature_c": 125,
+        "junction_to_ambient_c_per_w": 152,
+        "mounting_assumptions": "JESD51-3 recommended thermal test board: SS34FA mounted on a 76.2 mm by 114.3 mm FR-4 PCB.",
+        "review_note": "onsemi SS36FA/D Rev. 3 specifies the SS34FA junction range and the package junction-to-ambient path; board realization must preserve an equivalent or better thermal boundary."
+      },
+      "simulation_models": [{
+        "model_id": "mna_diode_shockley_v1",
+        "parameters": [
+          {"name": "saturation_current_a", "value": 7.096e-7},
+          {"name": "emission_coefficient", "value": 1},
+          {"name": "junction_temperature_k", "value": 300.15},
+          {"name": "max_forward_current_a", "value": 3},
+          {"name": "max_reverse_voltage_v", "value": 40},
+          {"name": "max_temperature_c", "value": 125},
+          {"name": "thermal_resistance_c_per_w", "value": 152}
+        ]
+      }],
+      "symbols": [{
+        "symbol_id": "Device:D_Schottky",
+        "function_pins": [
+          {"function": "CATHODE", "symbol_pin": "1", "required": true, "aliases": ["K"]},
+          {"function": "ANODE", "symbol_pin": "2", "required": true, "aliases": ["A"]}
+        ],
+        "verification": {"confidence": "verified", "sources": ["https://www.onsemi.com/download/data-sheet/pdf/ss36fa-d.pdf", "kicad-symbols:Device:D_Schottky"], "pinmap_checked": true}
+      }],
+      "packages": [{
+        "id": "sod123fl",
+        "name": "SOD-123FL",
+        "footprint_id": "Diode_SMD:D_SOD-123F",
+        "package_type": "sod123fl",
+        "mpn": "SS34FA",
+        "lifecycle": "active",
+        "pinmap_id": "Device:D_Schottky|Diode_SMD:D_SOD-123F",
+        "pad_functions": [
+          {"function": "CATHODE", "pad": "1", "aliases": ["K"]},
+          {"function": "ANODE", "pad": "2", "aliases": ["A"]}
+        ],
+        "dimensions_mm": {"width": 3.8, "height": 1.7},
+        "height_mm": 1.08,
+        "verification": {"confidence": "verified", "sources": ["https://www.onsemi.com/download/data-sheet/pdf/ss36fa-d.pdf", "kicad-footprint:Diode_SMD:D_SOD-123F"], "pinmap_checked": true}
+      }],
+      "verification": {
+        "confidence": "verified",
+        "sources": ["https://www.onsemi.com/download/data-sheet/pdf/ss36fa-d.pdf", "https://www.onsemi.com/download/models/lib/ss34fa%28pspice%20model%29.lib", "kicad-footprint:Diode_SMD:D_SOD-123F"],
+        "resolver_checked": true,
+        "pinmap_checked": true,
+        "notes": ["The 152 C/W junction-to-ambient rating is valid only for the manufacturer-declared JESD51-3 FR-4 test board boundary."]
+      }
+    },
+    {
       "id": "diode.diodes.b340la.sma",
       "family": "diode",
       "name": "Diodes Incorporated B340LA 3 A 40 V Schottky rectifier",
@@ -153,12 +387,23 @@
         {"kind": "surge_current", "max": "70", "unit": "A"}
       ],
       "temperature": {"min": "-55", "max": "150", "unit": "C"},
+      "simulation_models": [{
+        "model_id": "mna_diode_shockley_v1",
+        "parameters": [
+          {"name": "saturation_current_a", "value": 0.00115},
+          {"name": "emission_coefficient", "value": 1.7},
+          {"name": "junction_temperature_k", "value": 300.15},
+          {"name": "max_forward_current_a", "value": 3},
+          {"name": "max_reverse_voltage_v", "value": 40},
+          {"name": "max_temperature_c", "value": 150}
+        ]
+      }],
       "symbols": [
         {
           "symbol_id": "Device:D_Schottky",
           "function_pins": [
-            {"function": "K", "symbol_pin": "1", "required": true},
-            {"function": "A", "symbol_pin": "2", "required": true}
+            {"function": "CATHODE", "symbol_pin": "1", "required": true, "aliases": ["K"]},
+            {"function": "ANODE", "symbol_pin": "2", "required": true, "aliases": ["A"]}
           ],
           "verification": {
             "confidence": "verified",
@@ -177,8 +422,8 @@
           "lifecycle": "active",
           "pinmap_id": "Device:D_Schottky|Diode_SMD:D_SMA",
           "pad_functions": [
-            {"function": "K", "pad": "1"},
-            {"function": "A", "pad": "2"}
+            {"function": "CATHODE", "pad": "1", "aliases": ["K"]},
+            {"function": "ANODE", "pad": "2", "aliases": ["A"]}
           ],
           "verification": {
             "confidence": "verified",
@@ -212,16 +457,34 @@
         {"kind": "surge_current", "max": "100", "unit": "A"}
       ],
       "temperature": {"min": "-55", "max": "150", "unit": "C"},
+      "thermal_evidence": {
+        "max_junction_temperature_c": 150,
+        "junction_to_ambient_c_per_w": 50,
+        "mounting_assumptions": "Manufacturer thermal test boundary: glass-epoxy substrate with 1 oz/ft^2 copper and a 30 mm by 30 mm copper pad.",
+        "review_note": "Diodes Incorporated B560C(LS) DS44488 Rev. 7 specifies 15 C/W typical junction-to-lead and 50 C/W typical junction-to-ambient thermal resistance under the declared PCB boundary."
+      },
+      "simulation_models": [{
+        "model_id": "mna_diode_shockley_v1",
+        "parameters": [
+          {"name": "saturation_current_a", "value": 0.0000667},
+          {"name": "emission_coefficient", "value": 1.7},
+          {"name": "junction_temperature_k", "value": 300.15},
+          {"name": "max_forward_current_a", "value": 5},
+          {"name": "max_reverse_voltage_v", "value": 60},
+          {"name": "max_temperature_c", "value": 150},
+          {"name": "thermal_resistance_c_per_w", "value": 50}
+        ]
+      }],
       "symbols": [
         {
           "symbol_id": "Device:D_Schottky",
           "function_pins": [
-            {"function": "K", "symbol_pin": "1", "required": true},
-            {"function": "A", "symbol_pin": "2", "required": true}
+            {"function": "CATHODE", "symbol_pin": "1", "required": true, "aliases": ["K"]},
+            {"function": "ANODE", "symbol_pin": "2", "required": true, "aliases": ["A"]}
           ],
           "verification": {
             "confidence": "verified",
-            "sources": ["https://www.diodes.com/datasheet/download/B540C.pdf", "kicad-symbols:Device:D_Schottky"],
+            "sources": ["https://www.diodes.com/datasheet/download/B560C%28LS%29.pdf", "kicad-symbols:Device:D_Schottky"],
             "pinmap_checked": true
           }
         }
@@ -236,19 +499,19 @@
           "lifecycle": "active",
           "pinmap_id": "Device:D_Schottky|Diode_SMD:D_SMC",
           "pad_functions": [
-            {"function": "K", "pad": "1"},
-            {"function": "A", "pad": "2"}
+            {"function": "CATHODE", "pad": "1", "aliases": ["K"]},
+            {"function": "ANODE", "pad": "2", "aliases": ["A"]}
           ],
           "verification": {
             "confidence": "verified",
-            "sources": ["https://www.diodes.com/datasheet/download/B540C.pdf", "kicad-footprint:Diode_SMD:D_SMC"],
+            "sources": ["https://www.diodes.com/datasheet/download/B560C%28LS%29.pdf", "kicad-footprint:Diode_SMD:D_SMC"],
             "pinmap_checked": true
           }
         }
       ],
       "verification": {
         "confidence": "verified",
-        "sources": ["https://www.diodes.com/part/view/B560C", "https://www.diodes.com/datasheet/download/B540C.pdf", "kicad-footprint:Diode_SMD:D_SMC"],
+        "sources": ["https://www.diodes.com/part/view/B560C", "https://www.diodes.com/datasheet/download/B560C%28LS%29.pdf", "kicad-footprint:Diode_SMD:D_SMC"],
         "resolver_checked": true,
         "pinmap_checked": true,
         "notes": ["The 5 A average-current rating requires the manufacturer-specified terminal temperature and PCB copper; applied temperature and dissipation remain circuit-level checks."]
@@ -271,6 +534,24 @@
         {"kind": "open_drain_data_rate", "max": "2000000", "unit": "Hz"}
       ],
       "temperature": {"min": "-40", "max": "85", "unit": "C"},
+      "simulation_models": [{
+        "model_id": "mna_bidirectional_open_drain_translator_v1",
+        "parameters": [
+          {"name": "vcca_min_v", "value": 1.65},
+          {"name": "vcca_max_v", "value": 3.6},
+          {"name": "vccb_min_v", "value": 2.3},
+          {"name": "vccb_max_v", "value": 5.5},
+          {"name": "low_level_threshold_v", "value": 0.15},
+          {"name": "enable_high_ratio", "value": 0.65},
+          {"name": "channel_on_resistance_ohm", "value": 400},
+          {"name": "channel_off_resistance_ohm", "value": 2750000},
+          {"name": "max_channel_current_a", "value": 0.05},
+          {"name": "vcca_quiescent_current_a", "value": 0.0000024},
+          {"name": "vccb_quiescent_current_a", "value": 0.000012},
+          {"name": "max_temperature_c", "value": 150},
+          {"name": "junction_to_ambient_c_per_w", "value": 239.8}
+        ]
+      }],
       "symbols": [
         {
           "symbol_id": "Logic_LevelTranslator:TXS0102DCU",
@@ -326,6 +607,67 @@
       }
     },
     {
+      "id": "regulator.ti.lm317at.to220",
+      "family": "regulator",
+      "name": "TI LM317AT/NOPB adjustable linear regulator",
+      "description": "Industrial-temperature three-terminal adjustable 1.5 A regulator for higher-voltage open-set supply composition.",
+      "generic": false,
+      "manufacturer": "Texas Instruments",
+      "mpn": "LM317AT/NOPB",
+      "lifecycle": "active",
+      "simulation_models": [{"model_id": "mna_floating_adjustable_regulator_v1", "parameters": [
+        {"name": "reference_voltage_v", "value": 1.25}, {"name": "polarity", "value": 1},
+        {"name": "min_headroom_v", "value": 3}, {"name": "max_load_current_a", "value": 1.5},
+        {"name": "max_input_output_voltage_v", "value": 40}, {"name": "adjustment_pin_current_a", "value": 0.00005},
+        {"name": "soft_start_time_s", "value": 0}
+      ], "uncertainties": [
+        {"target": "model_parameters.reference_voltage_v", "source": "ti:lm317a:snvsac2a:reference_voltage_accuracy", "nominal": 1.25, "minimum": 1.2375, "maximum": 1.2625}
+      ]}],
+      "tags": ["adjustable", "industrial_temperature", "linear_regulator", "positive", "to220"],
+      "values": [
+        {"kind": "reference_voltage", "typ": "1.25", "unit": "V"},
+        {"kind": "output_voltage", "min": "1.25", "max": "37", "unit": "V"}
+      ],
+      "ratings": [
+        {"kind": "input_voltage", "max": "40", "unit": "V"},
+        {"kind": "output_current", "max": "1.5", "unit": "A"}
+      ],
+      "temperature": {"min": "-40", "max": "125", "unit": "C"},
+      "symbols": [{
+        "symbol_id": "Regulator_Linear:LM317_TO-220",
+        "function_pins": [
+          {"function": "ADJ", "symbol_pin": "1", "electrical": "input", "required": true},
+          {"function": "VOUT", "symbol_pin": "2", "electrical": "power_out", "required": true},
+          {"function": "VIN", "symbol_pin": "3", "electrical": "power_in", "required": true}
+        ],
+        "verification": {"confidence": "verified", "sources": ["https://www.ti.com/lit/ds/symlink/lm317a.pdf", "kicad-symbols:Regulator_Linear:LM317_TO-220"], "pinmap_checked": true}
+      }],
+      "packages": [{
+        "id": "to220_vertical",
+        "name": "TO-220-3 vertical",
+        "footprint_id": "Package_TO_SOT_THT:TO-220-3_Vertical",
+        "package_type": "to220",
+        "mpn": "LM317AT/NOPB",
+        "lifecycle": "active",
+        "pinmap_id": "Regulator_Linear:LM317_TO-220|Package_TO_SOT_THT:TO-220-3_Vertical",
+        "pad_functions": [
+          {"function": "ADJ", "pad": "1"},
+          {"function": "VOUT", "pad": "2"},
+          {"function": "VIN", "pad": "3"}
+        ],
+        "dimensions_mm": {"width": 10.2, "height": 4.5},
+        "height_mm": 15.0,
+        "verification": {"confidence": "verified", "sources": ["https://www.ti.com/lit/ds/symlink/lm317a.pdf", "kicad-footprint:Package_TO_SOT_THT:TO-220-3_Vertical"], "pinmap_checked": true}
+      }],
+      "verification": {
+        "confidence": "verified",
+        "sources": ["https://www.ti.com/lit/ds/symlink/lm317a.pdf", "datasheet-pinmap:TI:LM317AT/NOPB:RevA", "kicad-footprint:Package_TO_SOT_THT:TO-220-3_Vertical"],
+        "resolver_checked": true,
+        "pinmap_checked": true,
+        "notes": ["TI specifies a -40 C to 125 C operating range; thermal dissipation and minimum-load-current checks remain fabrication-stage obligations."]
+      }
+    },
+    {
       "id": "regulator.ti.lm317t.to220",
       "family": "regulator",
       "name": "TI LM317T adjustable linear regulator",
@@ -334,7 +676,13 @@
       "manufacturer": "Texas Instruments",
       "mpn": "LM317T",
       "lifecycle": "active",
-      "tags": ["adjustable", "linear_regulator", "to220"],
+      "simulation_models": [{"model_id": "mna_floating_adjustable_regulator_v1", "parameters": [
+        {"name": "reference_voltage_v", "value": 1.25}, {"name": "polarity", "value": 1},
+        {"name": "min_headroom_v", "value": 3}, {"name": "max_load_current_a", "value": 1.5},
+        {"name": "max_input_output_voltage_v", "value": 40}, {"name": "adjustment_pin_current_a", "value": 0.00005},
+        {"name": "soft_start_time_s", "value": 0}
+      ]}],
+      "tags": ["adjustable", "linear_regulator", "positive", "to220"],
       "values": [
         {"kind": "reference_voltage", "typ": "1.25", "unit": "V"},
         {"kind": "output_voltage", "min": "1.25", "max": "37", "unit": "V"}

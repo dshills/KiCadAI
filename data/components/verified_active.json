@@ -9,7 +9,7 @@
       "manufacturer": "Texas Instruments",
       "mpn": "LMV321IDBVR",
       "lifecycle": "active",
-      "tags": ["analog", "opamp", "single", "low_voltage", "sot23_5"],
+      "tags": ["analog", "opamp", "single", "rail_to_rail", "low_voltage", "sot23_5"],
       "ratings": [{"kind": "supply_voltage", "min": "2.7", "max": "5.5", "unit": "V"}, {"kind": "supply_current", "max": "0.35", "unit": "mA"}],
       "temperature": {"min": "-40", "max": "125", "unit": "C"},
       "companions": [{"id": "opamp.decoupling_capacitor", "family": "capacitor", "role": "decoupling_capacitor", "required": true, "recipes": [{"id": "supply_bypass", "family": "capacitor", "role": "decoupling_capacitor", "package": "0603", "value_kind": "capacitance", "value": "100n", "min_voltage_v": 6.3, "minimum_confidence": "rule_inferred", "required_functions": ["A", "B"], "connections": [{"function": "A", "parent_function": "V_PLUS"}, {"function": "B", "parent_function": "V_MINUS"}]}], "description": "Place supply decoupling capacitor close to V+ and V- pins."}],
@@ -19,8 +19,8 @@
           {"name": "dc_open_loop_gain", "value": 100000},
           {"name": "gain_bandwidth_hz", "value": 1000000},
           {"name": "input_voltage_noise_density_v_sqrt_hz", "value": 39e-9},
-          {"name": "output_high_margin_v", "value": 0.1},
-          {"name": "output_low_margin_v", "value": 0.1},
+          {"name": "output_high_margin_v", "value": 0.12},
+          {"name": "output_low_margin_v", "value": 0.065},
           {"name": "supply_max_v", "value": 5.5},
           {"name": "supply_min_v", "value": 2.7}
         ]
@@ -78,6 +78,99 @@
         "verification": {"confidence": "verified", "sources": ["builtin_pinmap:Amplifier_Operational:LMV321"], "pinmap_checked": true}
       }],
       "verification": {"confidence": "verified", "sources": ["curated_seed_catalog", "builtin_pinmap:Amplifier_Operational:LMV321"], "pinmap_checked": true}
+    },
+    {
+      "id": "opamp.ti.opa197id.soic8",
+      "family": "opamp",
+      "name": "TI OPA197 precision rail-to-rail op-amp SOIC-8",
+      "description": "Manufacturer-backed single rail-to-rail input/output op-amp for bounded 4.5 V to 36 V single-supply analog stages.",
+      "generic": false,
+      "manufacturer": "Texas Instruments",
+      "mpn": "OPA197ID",
+      "lifecycle": "active",
+      "tags": ["analog", "opamp", "single", "rail_to_rail", "high_voltage", "soic8"],
+      "ratings": [{"kind": "supply_voltage", "min": "4.5", "max": "36", "unit": "V"}, {"kind": "supply_current", "max": "1.5", "unit": "mA"}],
+      "temperature": {"min": "-40", "max": "125", "unit": "C"},
+      "companions": [{"id": "opamp.decoupling_capacitor", "family": "capacitor", "role": "decoupling_capacitor", "required": true, "recipes": [{"id": "supply_bypass", "family": "capacitor", "role": "decoupling_capacitor", "package": "0603", "value_kind": "capacitance", "value": "100n", "min_voltage_v": 50, "minimum_confidence": "rule_inferred", "required_functions": ["A", "B"], "connections": [{"function": "A", "parent_function": "V_PLUS"}, {"function": "B", "parent_function": "V_MINUS"}]}], "description": "Place a low-inductance bypass capacitor directly across the OPA197 supply pins."}],
+      "simulation_models": [{
+        "model_id": "mna_opamp_single_pole_v1",
+        "parameters": [
+          {"name": "dc_open_loop_gain", "value": 158000},
+          {"name": "gain_bandwidth_hz", "value": 10000000},
+          {"name": "input_voltage_noise_density_v_sqrt_hz", "value": 12.5e-9},
+          {"name": "junction_to_ambient_c_per_w", "value": 115.8},
+          {"name": "max_temperature_c", "value": 150},
+          {"name": "output_high_margin_v", "value": 0.125},
+          {"name": "output_low_margin_v", "value": 0.125},
+          {"name": "quiescent_current_a", "value": 0.0015},
+          {"name": "supply_max_v", "value": 36},
+          {"name": "supply_min_v", "value": 4.5}
+        ],
+        "uncertainties": [{
+          "target": "model_parameters.dc_open_loop_gain",
+          "source": "ti:opa197:sbos737c:open_loop_gain_2kohm_low_supply_envelope",
+          "nominal": 158000,
+          "minimum": 100000,
+          "maximum": 1995262.314969
+        }]
+      }],
+      "opamp_evidence": {
+        "intended_roles": ["input_buffer", "gain_stage", "small_signal_driver"],
+        "supply_mode": "rail_to_rail_single_supply",
+        "output_drive_status": "proven",
+        "load_compatibility_status": "proven",
+        "gain_bandwidth_status": "proven",
+        "stability_status": "proven",
+        "input_common_mode_status": "proven",
+        "output_swing_status": "proven",
+        "noise_status": "proven",
+        "distortion_status": "proven",
+        "supply_voltage": {"minimum": 4.5, "maximum": 36, "unit": "V", "conditions": "TI OPAx197 recommended single-supply operating range"},
+        "input_common_mode": {"negative_rail_headroom_v": 0, "positive_rail_headroom_v": 0, "conditions": "conservative rail-to-rail abstraction of the TI SBOS737C specified common-mode range"},
+        "output_swing": {"negative_rail_headroom_v": 0.125, "positive_rail_headroom_v": 0.125, "conditions": "maximum rail headroom with a 10 kohm load"},
+        "output_current": {"value": 0.065, "unit": "A", "temperature_c": 25, "conditions": "typical short-circuit output-current magnitude; normal load operation remains circuit-validated"},
+        "gain_bandwidth": {"value": 10000000, "unit": "Hz", "conditions": "typical unity-gain bandwidth"},
+        "slew_rate": {"value": 14000000, "unit": "V/s", "conditions": "minimum reviewed low-voltage large-signal slew rate"},
+        "voltage_noise_density": {"value": 12.5e-9, "unit": "V/sqrt(Hz)", "frequency_hz": 1000, "temperature_c": 25, "conditions": "conservative typical density across the reviewed rail-to-rail common-mode regions"},
+        "max_junction_temperature_c": 150,
+        "junction_to_ambient_c_per_w": 115.8,
+        "fabrication_candidate_blocks": true,
+        "review_note": "TI SBOS737C supplies the bounded electrical, pin, package, and thermal evidence used by the compact trusted model; the model remains a single-pole approximation, not TI's executable PSpice macro-model."
+      },
+      "placement_hints": [{"kind": "near", "target": "decoupling_capacitor", "value": "3", "unit": "mm"}],
+      "symbols": [{
+        "symbol_id": "Amplifier_Operational:OPA197xD",
+        "function_pins": [
+          {"function": "IN_MINUS", "symbol_pin": "2", "electrical": "input", "required": true},
+          {"function": "IN_PLUS", "symbol_pin": "3", "electrical": "input", "required": true},
+          {"function": "V_MINUS", "symbol_pin": "4", "electrical": "power_in", "required": true},
+          {"function": "OUT", "symbol_pin": "6", "electrical": "output", "required": true},
+          {"function": "V_PLUS", "symbol_pin": "7", "electrical": "power_in", "required": true}
+        ],
+        "verification": {"confidence": "verified", "sources": ["https://www.ti.com/lit/ds/symlink/opa197.pdf", "kicad-symbols:Amplifier_Operational:OPA197xD"], "pinmap_checked": true}
+      }],
+      "packages": [{
+        "id": "soic8",
+        "name": "SOIC-8 3.9 x 4.9 mm P1.27 mm",
+        "footprint_id": "Package_SO:SOIC-8_3.9x4.9mm_P1.27mm",
+        "package_type": "soic8",
+        "mpn": "OPA197ID",
+        "lifecycle": "active",
+        "pinmap_id": "Amplifier_Operational:OPA197xD|Package_SO:SOIC-8_3.9x4.9mm_P1.27mm",
+        "pad_functions": [
+          {"function": "NC", "pad": "1"},
+          {"function": "IN_MINUS", "pad": "2"},
+          {"function": "IN_PLUS", "pad": "3"},
+          {"function": "V_MINUS", "pad": "4"},
+          {"function": "NC", "pad": "5"},
+          {"function": "OUT", "pad": "6"},
+          {"function": "V_PLUS", "pad": "7"},
+          {"function": "NC", "pad": "8"}
+        ],
+        "dimensions_mm": {"width": 6.0, "height": 4.9},
+        "verification": {"confidence": "verified", "sources": ["https://www.ti.com/lit/ds/symlink/opa197.pdf", "kicad-footprints:Package_SO:SOIC-8_3.9x4.9mm_P1.27mm"], "pinmap_checked": true}
+      }],
+      "verification": {"confidence": "verified", "sources": ["https://www.ti.com/lit/ds/symlink/opa197.pdf", "kicad-symbols:Amplifier_Operational:OPA197xD", "kicad-footprints:Package_SO:SOIC-8_3.9x4.9mm_P1.27mm"], "resolver_checked": true, "pinmap_checked": true}
     },
     {
       "id": "opamp.ti.lm358.soic8",
@@ -196,6 +289,7 @@
           {"name": "reverse_beta", "value": 1},
           {"name": "emission_coefficient", "value": 1},
           {"name": "junction_temperature_k", "value": 300.15},
+          {"name": "transition_frequency_hz", "value": 300000000},
           {"name": "max_collector_current_a", "value": 0.2},
           {"name": "max_collector_emitter_voltage_v", "value": 40}
         ]
@@ -296,6 +390,7 @@
           {"name": "reverse_beta", "value": 1},
           {"name": "emission_coefficient", "value": 1},
           {"name": "junction_temperature_k", "value": 300.15},
+          {"name": "transition_frequency_hz", "value": 300000000},
           {"name": "max_collector_current_a", "value": 0.2},
           {"name": "max_collector_emitter_voltage_v", "value": 40}
         ]
@@ -377,6 +472,142 @@
         "verification": {"confidence": "verified", "sources": ["builtin_pinmap:Transistor_BJT:Q_PNP_BEC", "curated_part:onsemi:MMBT3906LT1G"], "pinmap_checked": true}
       }],
       "verification": {"confidence": "verified", "sources": ["https://www.onsemi.com/download/data-sheet/pdf/mmbt3906lt1-d.pdf", "builtin_pinmap:Transistor_BJT:Q_PNP_BEC", "curated_part:onsemi:MMBT3906LT1G"], "resolver_checked": true, "pinmap_checked": true, "tests": ["catalog_audio_power_semiconductor_evidence"], "notes": ["Analog bias, gain, noise, and distortion performance remain design-specific."]}
+    },
+    {
+      "id": "bjt.onsemi.pzt3904t1g.sot223",
+      "family": "bjt",
+      "name": "onsemi PZT3904T1G NPN medium-power driver transistor",
+      "description": "Concrete high-gain NPN BJT with a reviewed copper-area thermal boundary for predriver, linear, and switching stages.",
+      "generic": false,
+      "manufacturer": "onsemi",
+      "mpn": "PZT3904T1G",
+      "lifecycle": "active",
+      "temperature": {"min": "-55", "max": "150", "unit": "C"},
+      "thermal_evidence": {
+        "max_junction_temperature_c": 150,
+        "junction_to_ambient_c_per_w": 83.3,
+        "junction_to_case_c_per_w": 35,
+        "mounting_assumptions": "FR-4 PCB with 1 oz copper and 713 mm2 copper area, as specified by datasheet note 1.",
+        "review_note": "onsemi PZT3904T1/D Rev. 7 thermal characteristics."
+      },
+      "simulation_models": [{
+        "model_id": "mna_bjt_npn_ebers_moll_v1",
+        "parameters": [
+          {"name": "saturation_current_a", "value": 1e-14},
+          {"name": "forward_beta", "value": 100},
+          {"name": "reverse_beta", "value": 1},
+          {"name": "emission_coefficient", "value": 1},
+          {"name": "junction_temperature_k", "value": 300.15},
+          {"name": "transition_frequency_hz", "value": 300000000},
+          {"name": "max_collector_current_a", "value": 0.2},
+          {"name": "max_collector_emitter_voltage_v", "value": 40},
+          {"name": "max_temperature_c", "value": 150},
+          {"name": "junction_to_ambient_c_per_w", "value": 83.3},
+          {"name": "junction_to_case_c_per_w", "value": 35}
+        ]
+      }],
+      "equivalence": {"group": "bjt.npn.high_gain_driver.sot223", "role": "preferred"},
+      "tags": ["audio", "bjt", "driver", "high_gain", "linear", "medium_power", "npn", "sot223"],
+      "ratings": [
+        {"kind": "collector_current", "max": "200", "unit": "mA"},
+        {"kind": "collector_emitter_voltage", "max": "40", "unit": "V"},
+        {"kind": "power_dissipation", "max": "1.5", "unit": "W"}
+      ],
+      "symbols": [{
+        "symbol_id": "Transistor_BJT:Q_NPN_BCE",
+        "function_pins": [
+          {"function": "BASE", "symbol_pin": "1", "electrical": "passive", "required": true, "aliases": ["B"]},
+          {"function": "COLLECTOR", "symbol_pin": "2", "electrical": "passive", "required": true, "aliases": ["C"]},
+          {"function": "EMITTER", "symbol_pin": "3", "electrical": "passive", "required": true, "aliases": ["E"]}
+        ],
+        "verification": {"confidence": "verified", "sources": ["https://www.onsemi.com/download/data-sheet/pdf/pzt3904t1-d.pdf", "kicad-symbols:Transistor_BJT:Q_NPN_BCE"], "pinmap_checked": true}
+      }],
+      "packages": [{
+        "id": "sot223_tab2",
+        "name": "SOT-223-4 / TO-261-4",
+        "footprint_id": "Package_TO_SOT_SMD:SOT-223-3_TabPin2",
+        "package_type": "sot223",
+        "mpn": "PZT3904T1G",
+        "lifecycle": "active",
+        "pinmap_id": "Transistor_BJT:Q_NPN_BCE|Package_TO_SOT_SMD:SOT-223-3_TabPin2",
+        "pad_functions": [
+          {"function": "BASE", "pad": "1", "aliases": ["B"]},
+          {"function": "COLLECTOR", "pad": "2", "aliases": ["C"]},
+          {"function": "EMITTER", "pad": "3", "aliases": ["E"]}
+        ],
+        "dimensions_mm": {"width": 6.7, "height": 3.7},
+        "height_mm": 1.8,
+        "verification": {"confidence": "verified", "sources": ["https://www.onsemi.com/download/data-sheet/pdf/pzt3904t1-d.pdf", "kicad-footprint:Package_TO_SOT_SMD:SOT-223-3_TabPin2"], "pinmap_checked": true}
+      }],
+      "verification": {"confidence": "verified", "sources": ["https://www.onsemi.com/download/data-sheet/pdf/pzt3904t1-d.pdf", "kicad-symbols:Transistor_BJT:Q_NPN_BCE", "kicad-footprint:Package_TO_SOT_SMD:SOT-223-3_TabPin2"], "resolver_checked": true, "pinmap_checked": true, "tests": ["catalog_medium_power_driver_evidence"]}
+    },
+    {
+      "id": "bjt.onsemi.pzt3906t1g.sot223",
+      "family": "bjt",
+      "name": "onsemi PZT3906T1G PNP medium-power driver transistor",
+      "description": "Concrete high-gain PNP BJT with a reviewed copper-area thermal boundary for complementary predriver, linear, and switching stages.",
+      "generic": false,
+      "manufacturer": "onsemi",
+      "mpn": "PZT3906T1G",
+      "lifecycle": "active",
+      "temperature": {"min": "-55", "max": "150", "unit": "C"},
+      "thermal_evidence": {
+        "max_junction_temperature_c": 150,
+        "junction_to_ambient_c_per_w": 83.3,
+        "junction_to_case_c_per_w": 35,
+        "mounting_assumptions": "FR-4 PCB with 1 oz copper and 713 mm2 copper area, as specified by datasheet note 1.",
+        "review_note": "onsemi PZT3906T1/D Rev. 3 thermal characteristics."
+      },
+      "simulation_models": [{
+        "model_id": "mna_bjt_pnp_ebers_moll_v1",
+        "parameters": [
+          {"name": "saturation_current_a", "value": 1e-14},
+          {"name": "forward_beta", "value": 100},
+          {"name": "reverse_beta", "value": 1},
+          {"name": "emission_coefficient", "value": 1},
+          {"name": "junction_temperature_k", "value": 300.15},
+          {"name": "transition_frequency_hz", "value": 250000000},
+          {"name": "max_collector_current_a", "value": 0.2},
+          {"name": "max_collector_emitter_voltage_v", "value": 40},
+          {"name": "max_temperature_c", "value": 150},
+          {"name": "junction_to_ambient_c_per_w", "value": 83.3},
+          {"name": "junction_to_case_c_per_w", "value": 35}
+        ]
+      }],
+      "equivalence": {"group": "bjt.pnp.high_gain_driver.sot223", "role": "preferred"},
+      "tags": ["audio", "bjt", "driver", "high_gain", "linear", "medium_power", "pnp", "sot223"],
+      "ratings": [
+        {"kind": "collector_current", "max": "200", "unit": "mA"},
+        {"kind": "collector_emitter_voltage", "max": "40", "unit": "V"},
+        {"kind": "power_dissipation", "max": "1.5", "unit": "W"}
+      ],
+      "symbols": [{
+        "symbol_id": "Transistor_BJT:Q_PNP_BCE",
+        "function_pins": [
+          {"function": "BASE", "symbol_pin": "1", "electrical": "passive", "required": true, "aliases": ["B"]},
+          {"function": "COLLECTOR", "symbol_pin": "2", "electrical": "passive", "required": true, "aliases": ["C"]},
+          {"function": "EMITTER", "symbol_pin": "3", "electrical": "passive", "required": true, "aliases": ["E"]}
+        ],
+        "verification": {"confidence": "verified", "sources": ["https://www.onsemi.com/download/data-sheet/pdf/pzt3906t1-d.pdf", "kicad-symbols:Transistor_BJT:Q_PNP_BCE"], "pinmap_checked": true}
+      }],
+      "packages": [{
+        "id": "sot223_tab2",
+        "name": "SOT-223-4 / TO-261-4",
+        "footprint_id": "Package_TO_SOT_SMD:SOT-223-3_TabPin2",
+        "package_type": "sot223",
+        "mpn": "PZT3906T1G",
+        "lifecycle": "active",
+        "pinmap_id": "Transistor_BJT:Q_PNP_BCE|Package_TO_SOT_SMD:SOT-223-3_TabPin2",
+        "pad_functions": [
+          {"function": "BASE", "pad": "1", "aliases": ["B"]},
+          {"function": "COLLECTOR", "pad": "2", "aliases": ["C"]},
+          {"function": "EMITTER", "pad": "3", "aliases": ["E"]}
+        ],
+        "dimensions_mm": {"width": 6.7, "height": 3.7},
+        "height_mm": 1.8,
+        "verification": {"confidence": "verified", "sources": ["https://www.onsemi.com/download/data-sheet/pdf/pzt3906t1-d.pdf", "kicad-footprint:Package_TO_SOT_SMD:SOT-223-3_TabPin2"], "pinmap_checked": true}
+      }],
+      "verification": {"confidence": "verified", "sources": ["https://www.onsemi.com/download/data-sheet/pdf/pzt3906t1-d.pdf", "kicad-symbols:Transistor_BJT:Q_PNP_BCE", "kicad-footprint:Package_TO_SOT_SMD:SOT-223-3_TabPin2"], "resolver_checked": true, "pinmap_checked": true, "tests": ["catalog_medium_power_driver_evidence"]}
     },
     {
       "id": "bjt.placeholder.npn_power_output.to220",

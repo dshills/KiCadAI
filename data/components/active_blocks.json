@@ -2,6 +2,88 @@
   "version": "0.1.0",
   "records": [
     {
+      "id": "regulator.linear.ap2127r_3v3.sot89",
+      "family": "regulator",
+      "name": "Diodes AP2127R-3.3 SOT-89 linear regulator",
+      "description": "Concrete 300 mA fixed 3.3 V LDO in the lower-thermal-resistance SOT-89 package.",
+      "generic": false,
+      "manufacturer": "Diodes Incorporated",
+      "mpn": "AP2127R-3.3TRG1",
+      "lifecycle": "active",
+      "equivalence": {"group": "regulator.fixed.3v3.300ma", "role": "preferred"},
+      "tags": ["power", "linear_regulator", "ldo", "3v3", "sot89", "fixed"],
+      "values": [
+        {"kind": "output_voltage", "typ": "3.3", "unit": "V"},
+        {"kind": "dropout_voltage", "max": "300", "unit": "mV"}
+      ],
+      "ratings": [
+        {"kind": "input_voltage", "min": "2.5", "max": "6", "unit": "V"},
+        {"kind": "output_current", "max": "300", "unit": "mA"}
+      ],
+      "tolerances": [{"kind": "output_voltage", "typ": "2", "unit": "%"}],
+      "simulation_models": [
+        {
+          "model_id": "linear_regulator_ideal_v1",
+          "parameters": [
+            {"name": "output_voltage_v", "value": 3.3},
+            {"name": "min_headroom_v", "value": 0.3},
+            {"name": "max_load_current_ma", "value": 300}
+          ]
+        },
+        {
+          "model_id": "mna_fixed_linear_regulator_v1",
+          "parameters": [
+            {"name": "output_voltage_v", "value": 3.3},
+            {"name": "min_headroom_v", "value": 0.3},
+            {"name": "max_load_current_a", "value": 0.3},
+            {"name": "min_input_voltage_v", "value": 2.5},
+            {"name": "max_input_voltage_v", "value": 6},
+            {"name": "quiescent_current_a", "value": 0.00009},
+            {"name": "soft_start_time_s", "value": 0.00005},
+            {"name": "max_temperature_c", "value": 125},
+            {"name": "junction_to_ambient_c_per_w", "value": 100}
+          ],
+          "uncertainties": [
+            {"target": "model_parameters.output_voltage_v", "source": "diodes:AP2127:DS36478-rev7-2:output_accuracy", "nominal": 3.3, "minimum": 3.234, "maximum": 3.366}
+          ]
+        }
+      ],
+      "temperature": {"min": "-40", "max": "85", "unit": "C"},
+      "companions": [
+        {"id": "regulator.input_capacitor", "family": "capacitor", "role": "input_capacitor", "required": true, "recipes": [{"id": "input_bypass", "family": "capacitor", "role": "decoupling_capacitor", "package": "0603", "value_kind": "capacitance", "value": "1u", "min_voltage_v": 6.3, "minimum_confidence": "rule_inferred", "required_functions": ["A", "B"], "connections": [{"function": "A", "parent_function": "VIN"}, {"function": "B", "parent_function": "GND"}]}], "description": "Datasheet input bypass capacitor."},
+        {"id": "regulator.output_capacitor", "family": "capacitor", "role": "output_capacitor", "required": true, "recipes": [{"id": "output_stability", "family": "capacitor", "role": "decoupling_capacitor", "package": "0603", "value_kind": "capacitance", "value": "1u", "min_voltage_v": 6.3, "minimum_confidence": "rule_inferred", "required_functions": ["A", "B"], "connections": [{"function": "A", "parent_function": "VOUT"}, {"function": "B", "parent_function": "GND"}]}], "description": "Datasheet output bypass capacitor."}
+      ],
+      "derating_rules": [{"kind": "thermal", "description": "Check (VIN-VOUT)*IOUT + VIN*IQ against the SOT-89 100 C/W junction-to-ambient bound."}],
+      "regulator_evidence": {
+        "thermal_review": "proven",
+        "output_capacitor": {"kind": "ceramic_stable", "min_capacitance": "1u", "capacitance_unit": "F", "accepted_dielectrics": ["X5R", "X7R"], "proof_status": "review_required", "fabrication_candidate_blocks": true, "review_note": "AP2127 is stable with 1 uF or higher X5R/X7R MLCC; the selected capacitor still requires applied-voltage effective-capacitance review."},
+        "notes": ["DS36478 Rev. 7-2 specifies 300 mA operation, 300 mV maximum dropout for 3.3 V, 100 C/W SOT-89 junction-to-ambient resistance, and 125 C continuous junction limit."]
+      },
+      "placement_hints": [{"kind": "near", "target": "input_capacitor", "value": "2", "unit": "mm"}, {"kind": "near", "target": "output_capacitor", "value": "2", "unit": "mm"}],
+      "routing_hints": [{"kind": "net_class", "net_role": "power", "value": "0.3", "unit": "mm"}],
+      "symbols": [{
+        "symbol_id": "Regulator_Linear:AP2127R-3.3",
+        "function_pins": [
+          {"function": "GND", "symbol_pin": "1", "electrical": "power_in", "required": true},
+          {"function": "VIN", "symbol_pin": "2", "electrical": "power_in", "required": true},
+          {"function": "VOUT", "symbol_pin": "3", "electrical": "power_out", "required": true}
+        ],
+        "verification": {"confidence": "verified", "sources": ["kicad-symbols:Regulator_Linear:AP2127R-3.3", "diodes:AP2127:DS36478-rev7-2"], "pinmap_checked": true}
+      }],
+      "packages": [{
+        "id": "sot89",
+        "name": "SOT-89-3",
+        "footprint_id": "Package_TO_SOT_SMD:SOT-89-3",
+        "package_type": "sot89",
+        "mpn": "AP2127R-3.3TRG1",
+        "lifecycle": "active",
+        "pinmap_id": "Regulator_Linear:AP2127R-3.3|Package_TO_SOT_SMD:SOT-89-3",
+        "pad_functions": [{"function": "GND", "pad": "1"}, {"function": "VIN", "pad": "2"}, {"function": "VOUT", "pad": "3"}],
+        "verification": {"confidence": "verified", "sources": ["kicad-symbols:Regulator_Linear:AP2127R-3.3", "diodes:AP2127:DS36478-rev7-2"], "pinmap_checked": true}
+      }],
+      "verification": {"confidence": "verified", "sources": ["https://www.diodes.com/assets/Datasheets/AP2127.pdf", "kicad-symbols:Regulator_Linear:AP2127R-3.3"], "pinmap_checked": true}
+    },
+    {
       "id": "regulator.linear.ams1117_3v3.sot223",
       "family": "regulator",
       "name": "AMS1117-3.3 SOT-223 linear regulator",
@@ -195,14 +277,33 @@
         {"kind": "output_current", "max": "300", "unit": "mA"},
         {"kind": "enable_voltage", "max": "6", "unit": "V"}
       ],
-      "simulation_models": [{
-        "model_id": "linear_regulator_ideal_v1",
-        "parameters": [
-          {"name": "output_voltage_v", "value": 0.8},
-          {"name": "min_headroom_v", "value": 0.3},
-          {"name": "max_load_current_ma", "value": 300}
-        ]
-      }],
+      "simulation_models": [
+        {
+          "model_id": "linear_regulator_ideal_v1",
+          "parameters": [
+            {"name": "output_voltage_v", "value": 0.8},
+            {"name": "min_headroom_v", "value": 0.3},
+            {"name": "max_load_current_ma", "value": 300}
+          ]
+        },
+        {
+          "model_id": "mna_adjustable_linear_regulator_v1",
+          "parameters": [
+            {"name": "reference_voltage_v", "value": 0.8},
+            {"name": "min_headroom_v", "value": 0.3},
+            {"name": "max_load_current_a", "value": 0.3},
+            {"name": "min_input_voltage_v", "value": 2.5},
+            {"name": "max_input_voltage_v", "value": 6},
+            {"name": "quiescent_current_a", "value": 0.00009},
+            {"name": "soft_start_time_s", "value": 0.00005},
+            {"name": "max_temperature_c", "value": 125},
+            {"name": "junction_to_ambient_c_per_w", "value": 250}
+          ],
+          "uncertainties": [
+            {"target": "model_parameters.reference_voltage_v", "source": "diodes:AP2127:DS36478-rev7-2:reference_accuracy", "nominal": 0.8, "minimum": 0.784, "maximum": 0.816}
+          ]
+        }
+      ],
       "temperature": {"min": "-40", "max": "85", "unit": "C"},
       "companions": [
         {"id": "regulator.input_capacitor", "family": "capacitor", "role": "input_capacitor", "required": true, "recipes": [{"id": "input_bypass", "family": "capacitor", "role": "decoupling_capacitor", "package": "0603", "value_kind": "capacitance", "value": "1u", "min_voltage_v": 6.3, "minimum_confidence": "rule_inferred", "required_functions": ["A", "B"], "connections": [{"function": "A", "parent_function": "VIN"}, {"function": "B", "parent_function": "GND"}]}], "description": "Datasheet input bypass capacitor."},

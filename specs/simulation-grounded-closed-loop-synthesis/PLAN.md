@@ -1,6 +1,7 @@
 # Simulation-Grounded Closed-Loop Circuit Synthesis Plan
 
-Status: in progress.
+Status: complete. See [AUDIT.md](AUDIT.md) for the requirement-to-evidence map
+and fresh verification commands.
 
 ## Phase 1 — Specification, Gap Audit, And Corpus Freeze
 

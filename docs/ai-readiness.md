@@ -146,6 +146,17 @@ startup, and exceeded budgets fail closed. It does not establish unrestricted
 natural-language intent, arbitrary topology or parts, RF/high-speed design,
 mains safety, or general dense-board autorouting.
 
+## Simulation-Grounded Synthesis
+
+A SHA-256-pinned ten-circuit v3 corpus now proves bounded behavioral
+requirements, trusted model decisions, registered analyses, named operating
+corners, deterministic diagnosis/repair, and replay through the physical
+workflow. It includes Class-A and Class-AB amplification and preserves clean
+protected USB-C LED and I2C evidence. This moves readiness from structural
+composition to measured closed-loop selection inside the checked-in catalog;
+unknown topologies, arbitrary parts/models, RF, mains, and general dense-board
+routing remain fail-closed boundaries.
+
 ## Validation
 
 Run:

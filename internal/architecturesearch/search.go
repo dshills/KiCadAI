@@ -238,16 +238,87 @@ func (accumulator *searchAccumulator) finish() SearchResult {
 		}
 	}
 	accumulator.result.Status = SearchSelected
-	selected := accumulator.complete[0]
-	accumulator.result.Selected = &selected
 	limit := minInt(len(accumulator.complete), accumulator.policy.MaxCompleteCandidates)
+	retained := retainTopologicallyDiverseCandidates(accumulator.complete, limit)
+	selected := retained[0]
+	accumulator.result.Selected = &selected
 	if limit > 1 {
-		accumulator.result.Alternatives = append([]CandidateResult(nil), accumulator.complete[1:limit]...)
+		accumulator.result.Alternatives = append([]CandidateResult(nil), retained[1:]...)
 	}
 	rationale := buildSelectionRationale(selected, accumulator.result.Alternatives)
 	accumulator.result.Rationale = &rationale
 	accumulator.finalizeCoverage()
 	return accumulator.result
+}
+
+// retainTopologicallyDiverseCandidates keeps the highest-ranked candidate and
+// then prefers distinct semantic connection graphs before filling the bounded
+// frontier with part/value variants. This prevents a large catalog family from
+// crowding a materially different architecture out of closed-loop evaluation.
+func retainTopologicallyDiverseCandidates(candidates []CandidateResult, limit int) []CandidateResult {
+	if len(candidates) == 0 || limit <= 0 {
+		return nil
+	}
+	if limit > len(candidates) {
+		limit = len(candidates)
+	}
+	retained := []CandidateResult{candidates[0]}
+	retainedFingerprints := map[string]bool{candidates[0].Fingerprint: true}
+	seenTopologies := map[string]bool{candidateTopologySignature(candidates[0]): true}
+	for _, candidate := range candidates[1:] {
+		signature := candidateTopologySignature(candidate)
+		if seenTopologies[signature] {
+			continue
+		}
+		retained = append(retained, candidate)
+		retainedFingerprints[candidate.Fingerprint] = true
+		seenTopologies[signature] = true
+		if len(retained) == limit {
+			return retained
+		}
+	}
+	for _, candidate := range candidates[1:] {
+		if retainedFingerprints[candidate.Fingerprint] {
+			continue
+		}
+		retained = append(retained, candidate)
+		if len(retained) == limit {
+			break
+		}
+	}
+	return retained
+}
+
+func candidateTopologySignature(candidate CandidateResult) string {
+	type topologySelection struct {
+		ObligationPath string              `json:"obligation_path"`
+		Capability     string              `json:"capability"`
+		Realization    FragmentRealization `json:"realization"`
+	}
+	selections := make([]topologySelection, 0, len(candidate.Selections))
+	for _, selection := range candidate.Selections {
+		realization, err := DecodeFragmentRealization(selection.Payload)
+		if err != nil {
+			return "invalid:" + candidate.Fingerprint
+		}
+		for index := range realization.Instances {
+			realization.Instances[index].CatalogID = ""
+			realization.Instances[index].VariantID = ""
+			realization.Instances[index].Value = ""
+		}
+		realization.Parameters = nil
+		selections = append(selections, topologySelection{
+			ObligationPath: selection.ObligationPath,
+			Capability:     selection.Capability,
+			Realization:    realization,
+		})
+	}
+	encoded, err := json.Marshal(selections)
+	if err != nil {
+		return "invalid:" + candidate.Fingerprint
+	}
+	digest := sha256.Sum256(encoded)
+	return hex.EncodeToString(digest[:])
 }
 
 func (accumulator *searchAccumulator) recordObligations(obligations []searchObligation) {
@@ -370,10 +441,129 @@ func initialSearchObligations(requirement Requirement, minimumEvidence EvidenceC
 			}
 			ports = append(ports, RoleContract{Role: binding.Role, Anchor: anchor, Contract: contract})
 		}
+		if reference, ok := inferredSignalReferenceRole(requirement, objective, ports, minimumEvidence); ok {
+			ports = append(ports, reference)
+		}
+		if power, ok := inferredUpstreamPowerRole(requirement, objective, ports, minimumEvidence); ok {
+			ports = append(ports, power)
+		}
 		obligations = append(obligations, searchObligation{Path: "objective:" + objective.ID, Capability: objective.Capability, Ports: ports, Constraints: effectiveObjectiveConstraints(requirement, objective)})
 	}
 	slices.SortStableFunc(obligations, compareSearchObligations)
 	return obligations, issues
+}
+
+func inferredUpstreamPowerRole(requirement Requirement, objective Objective, ports []RoleContract, minimumEvidence EvidenceConfidence) (RoleContract, bool) {
+	for _, port := range ports {
+		if port.Role == "power" || port.Role == "positive_power" {
+			return RoleContract{}, false
+		}
+	}
+	requiresProtectedStartup := false
+	for _, behavior := range requirement.Requirements.BehavioralRequirements {
+		if behavior.Critical && behavior.Analysis == "startup" && objectiveProducesObservation(requirement, objective, behavior.Observation) {
+			requiresProtectedStartup = true
+			break
+		}
+	}
+	if !requiresProtectedStartup {
+		return RoleContract{}, false
+	}
+	type candidate struct {
+		anchor   string
+		contract PortContract
+	}
+	var candidates []candidate
+	for _, input := range objective.Bindings {
+		if input.Signal == "" || input.Direction != "sink" {
+			continue
+		}
+		for _, upstream := range requirement.Requirements.Objectives {
+			if upstream.ID == objective.ID {
+				continue
+			}
+			produces := false
+			for _, output := range upstream.Bindings {
+				produces = produces || (output.Signal == input.Signal && output.Direction == "source")
+			}
+			if !produces {
+				continue
+			}
+			for _, binding := range upstream.Bindings {
+				if binding.Role != "power" && binding.Role != "positive_power" {
+					continue
+				}
+				contract, issues := ContractFromBinding(requirement, binding, minimumEvidence)
+				if len(issues) != 0 || contract.Kind != "power" || contract.Voltage.Maximum == nil || *contract.Voltage.Maximum <= 0 {
+					continue
+				}
+				anchor := externalAnchor(binding.Port)
+				if binding.Signal != "" {
+					anchor = signalAnchor(binding.Signal)
+				}
+				candidates = append(candidates, candidate{anchor: anchor, contract: contract})
+			}
+		}
+	}
+	slices.SortStableFunc(candidates, func(left, right candidate) int {
+		if order := strings.Compare(left.anchor, right.anchor); order != 0 {
+			return order
+		}
+		return strings.Compare(left.contract.ID, right.contract.ID)
+	})
+	if len(candidates) != 1 {
+		return RoleContract{}, false
+	}
+	contract := candidates[0].contract
+	contract.ID = objective.ID + "_inferred_power"
+	contract.Direction = "sink"
+	contract.Evidence = ContractEvidence{Confidence: EvidenceRuleInferred, Sources: []string{"kicadai:upstream-protected-startup-power"}}
+	return RoleContract{Role: "power", Anchor: candidates[0].anchor, Contract: NormalizePortContract(contract)}, true
+}
+
+func inferredSignalReferenceRole(requirement Requirement, objective Objective, ports []RoleContract, minimumEvidence EvidenceConfidence) (RoleContract, bool) {
+	for _, port := range ports {
+		if port.Role == "reference" {
+			return RoleContract{}, false
+		}
+	}
+	type directions struct {
+		sink   bool
+		source bool
+	}
+	referenceDirections := map[string]directions{}
+	for _, domain := range requirement.Requirements.Domains {
+		if domain.Kind == "reference" {
+			referenceDirections[domain.ID] = directions{}
+		}
+	}
+	for _, port := range ports {
+		state, referenceDomain := referenceDirections[port.Contract.Domain]
+		if !referenceDomain || port.Contract.Kind == "reference" || port.Contract.Kind == "power" {
+			continue
+		}
+		switch port.Contract.Direction {
+		case "sink":
+			state.sink = true
+		case "source":
+			state.source = true
+		}
+		referenceDirections[port.Contract.Domain] = state
+	}
+	for _, domain := range requirement.Requirements.Domains {
+		state, exists := referenceDirections[domain.ID]
+		if !exists || !state.sink || !state.source {
+			continue
+		}
+		contract := NormalizePortContract(PortContract{
+			ID: objective.ID + "_reference", Kind: "reference", Direction: "bidirectional", Domain: domain.ID,
+			Voltage:         domainVoltageRange(domain),
+			Evidence:        ContractEvidence{Confidence: EvidenceRuleInferred, Sources: []string{"kicadai:signal-reference-domain-contract"}},
+			MinimumEvidence: minimumEvidence,
+		})
+		return RoleContract{Role: "reference", Anchor: domainAnchor(domain.ID), Contract: contract}, true
+	}
+	return RoleContract{}, false
 }
 
 func providerRequestFor(obligation searchObligation, limits BoardLimits) ProviderRequest {

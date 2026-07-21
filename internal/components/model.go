@@ -109,6 +109,7 @@ type ComponentRecord struct {
 	Sensor             *SensorEvidence             `json:"sensor_evidence,omitempty"`
 	AmplifierOutput    *AmplifierOutputEvidence    `json:"amplifier_output_evidence,omitempty"`
 	PowerSemiconductor *PowerSemiconductorEvidence `json:"power_semiconductor_evidence,omitempty"`
+	Thermal            *ThermalEvidence            `json:"thermal_evidence,omitempty"`
 	SimulationModels   []simmodel.CatalogEvidence  `json:"simulation_models,omitempty"`
 	PlacementHints     []PlacementHint             `json:"placement_hints,omitempty"`
 	RoutingHints       []RoutingHint               `json:"routing_hints,omitempty"`
@@ -444,6 +445,18 @@ type RailHeadroomEvidence struct {
 	Conditions            string   `json:"conditions,omitempty"`
 }
 
+// ThermalEvidence records a reviewed package-level heat-flow path for any
+// component family. Device-specific evidence may add richer SOA or operating
+// limits, but thermal selection must not require a diode, regulator, or other
+// dissipative component to masquerade as a BJT or MOSFET.
+type ThermalEvidence struct {
+	MaxJunctionTemperatureC *float64 `json:"max_junction_temperature_c,omitempty"`
+	JunctionToCaseCPerW     *float64 `json:"junction_to_case_c_per_w,omitempty"`
+	JunctionToAmbientCPerW  *float64 `json:"junction_to_ambient_c_per_w,omitempty"`
+	MountingAssumptions     string   `json:"mounting_assumptions,omitempty"`
+	ReviewNote              string   `json:"review_note,omitempty"`
+}
+
 type PowerSemiconductorEvidence struct {
 	DeviceClass              string               `json:"device_class"`
 	Polarity                 string               `json:"polarity"`
@@ -635,10 +648,10 @@ func rebuildCatalogIndexesLocked(catalog *Catalog) {
 	catalog.variantIndex = map[string]CatalogVariantIndex{}
 	catalog.amplifierOutputIndex = map[string][]amplifierOutputIndexCandidate{}
 	for i, record := range catalog.Records {
-		catalog.Records[i].SearchText = strings.ToLower(record.ID + " " + record.Name + " " + record.Description + " " + strings.Join(record.Tags, " "))
+		catalog.Records[i].SearchText = strings.ToLower(record.ID + " " + record.Name + " " + record.Description + " " + record.Manufacturer + " " + record.MPN + " " + strings.Join(record.Tags, " "))
 		catalog.recordIndex[record.ID] = i
 		for j, variant := range record.Packages {
-			catalog.Records[i].Packages[j].SearchText = strings.ToLower(variant.ID + " " + variant.Name + " " + variant.PackageType + " " + variant.FootprintID)
+			catalog.Records[i].Packages[j].SearchText = strings.ToLower(variant.ID + " " + variant.Name + " " + variant.PackageType + " " + variant.FootprintID + " " + variant.MPN)
 			catalog.variantIndex[record.ID+"\x00"+variant.ID] = CatalogVariantIndex{Record: i, Variant: j}
 			if amplifierOutputVariantIndexed(&catalog.Records[i], &catalog.Records[i].Packages[j]) {
 				polarity := strings.ToLower(strings.TrimSpace(record.AmplifierOutput.Polarity))

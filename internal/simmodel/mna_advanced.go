@@ -37,7 +37,15 @@ func solveNoiseAnalysis(plan Plan, analysis Analysis) (AnalysisResult, []Diagnos
 		if len(diagnostics) != 0 {
 			return result, prefixAnalysisDiagnostics(analysis.ID, diagnostics)
 		}
+		baseSolution, baseDiagnostic := solveMNA(base)
+		if baseDiagnostic != nil {
+			baseDiagnostic.Path = "analyses." + analysis.ID + ".noise_baseline." + baseDiagnostic.Path
+			baseDiagnostic.Message = "noise baseline solve failed: " + baseDiagnostic.Message
+			return result, []Diagnostic{*baseDiagnostic}
+		}
 		powerSpectralDensity := make(map[string]float64, len(plan.Nodes))
+		dominantSource := make(map[string]string, len(plan.Nodes))
+		dominantDensity := make(map[string]float64, len(plan.Nodes))
 		noiseSources := 0
 		for _, device := range plan.Devices {
 			system := cloneMNASystem(base)
@@ -49,9 +57,13 @@ func solveNoiseAnalysis(plan Plan, analysis Analysis) (AnalysisResult, []Diagnos
 				stampCurrentSource(&system, terminals["A"], terminals["B"], complex(density, 0))
 			case PrimitiveOpAmpV1:
 				parameters := namedValueMap(device.ModelParameters)
-				gain := opAmpOpenLoopGain(parameters, frequency)
 				density := parameters["input_voltage_noise_density_v_sqrt_hz"]
-				system.rhs[system.branchIndex[device.Component]] += gain * complex(density, 0)
+				// stampOpAmp writes Vout/Aol-(V+ - V-) = rhs. An
+				// input-referred voltage-noise source therefore belongs directly
+				// on the equation's right-hand side; the controlled source applies
+				// the open-loop gain exactly once while feedback sets the closed-loop
+				// noise gain.
+				system.rhs[system.branchIndex[device.Component]] += complex(density, 0)
 			default:
 				continue
 			}
@@ -63,8 +75,17 @@ func solveNoiseAnalysis(plan Plan, analysis Analysis) (AnalysisResult, []Diagnos
 				return result, []Diagnostic{*diagnostic}
 			}
 			for _, node := range plan.Nodes {
-				magnitude := cmplx.Abs(solvedNodeVoltage(system, solution, node))
+				// Some reviewed compact devices have affine operating-point
+				// terms in their linearized system. Noise is the incremental
+				// response to one physical source, so remove the source-free
+				// baseline before accumulating spectral density.
+				incremental := solvedNodeVoltage(system, solution, node) - solvedNodeVoltage(base, baseSolution, node)
+				magnitude := cmplx.Abs(incremental)
 				powerSpectralDensity[node] += magnitude * magnitude
+				if magnitude > dominantDensity[node] {
+					dominantDensity[node] = magnitude
+					dominantSource[node] = device.Component
+				}
 			}
 		}
 		if noiseSources == 0 {
@@ -73,17 +94,21 @@ func solveNoiseAnalysis(plan Plan, analysis Analysis) (AnalysisResult, []Diagnos
 		nodes := make([]NodeResult, 0, len(plan.Nodes))
 		for _, node := range plan.Nodes {
 			density := normalizedMNAFloat(math.Sqrt(powerSpectralDensity[node]))
-			nodes = append(nodes, NodeResult{Node: node, Magnitude: density})
+			nodes = append(nodes, NodeResult{
+				Node: node, Magnitude: density, DominantNoiseSource: dominantSource[node],
+				DominantNoiseDensityVSqrtHz: normalizedMNAFloat(dominantDensity[node]),
+			})
 		}
 		result.Points = append(result.Points, AnalysisPoint{FrequencyHz: frequency, Nodes: nodes})
 	}
 	return result, nil
 }
 
-// solveStabilityAnalysis breaks each catalog op-amp loop at its output,
-// applies a trusted one-volt perturbation, and reports the return ratio
-// -A(s)*(V+ - V-). Assertions derive phase and gain margins from this bounded
-// sweep; the provider cannot choose an equation or hidden loop-breaking node.
+// solveStabilityAnalysis breaks each catalog op-amp loop at its output and,
+// when no op-amp exists, evaluates the local emitter-degeneration return ratio
+// of catalog BJTs. Assertions derive phase and gain margins from these bounded
+// trusted loop definitions; the provider cannot choose an equation or hidden
+// loop-breaking node.
 func solveStabilityAnalysis(plan Plan, analysis Analysis) (AnalysisResult, []Diagnostic) {
 	result := AnalysisResult{ID: analysis.ID, Kind: AnalysisStability, Points: make([]AnalysisPoint, 0, analysis.Points)}
 	opAmps := make([]ResolvedDevice, 0)
@@ -100,7 +125,7 @@ func solveStabilityAnalysis(plan Plan, analysis Analysis) (AnalysisResult, []Dia
 		opAmps = append(opAmps, device)
 	}
 	if len(opAmps) == 0 {
-		return result, []Diagnostic{{Path: "analyses." + analysis.ID, Message: "stability analysis requires at least one trusted op-amp primitive"}}
+		return solveBJTEmitterDegenerationStability(plan, analysis)
 	}
 
 	for _, frequency := range sweepFrequencies(analysis) {
@@ -124,6 +149,92 @@ func solveStabilityAnalysis(plan Plan, analysis Analysis) (AnalysisResult, []Dia
 			}
 			nodes = append(nodes, NodeResult{
 				Node: terminalMap(device)["OUT"], Real: normalizedMNAFloat(real(loop)), Imaginary: normalizedMNAFloat(imag(loop)),
+				Magnitude: normalizedMNAFloat(cmplx.Abs(loop)), PhaseDeg: normalizedMNAFloat(cmplx.Phase(loop) * 180 / math.Pi),
+			})
+		}
+		result.Points = append(result.Points, AnalysisPoint{FrequencyHz: frequency, Nodes: nodes})
+	}
+	return result, nil
+}
+
+func solveBJTEmitterDegenerationStability(plan Plan, analysis Analysis) (AnalysisResult, []Diagnostic) {
+	result := AnalysisResult{ID: analysis.ID, Kind: AnalysisStability, Points: make([]AnalysisPoint, 0, analysis.Points)}
+	var transistors []ResolvedDevice
+	for _, device := range plan.Devices {
+		if device.PrimitiveModel != PrimitiveBJTNPNV1 && device.PrimitiveModel != PrimitiveBJTPNPV1 {
+			continue
+		}
+		parameters := namedValueMap(device.ModelParameters)
+		terminals := terminalMap(device)
+		if terminals["EMITTER"] == plan.GroundNode || parameters["transition_frequency_hz"] <= 0 {
+			continue
+		}
+		transistors = append(transistors, device)
+	}
+	if len(transistors) == 0 {
+		return result, []Diagnostic{{Path: "analyses." + analysis.ID, Message: "stability analysis requires a trusted op-amp loop or a catalog BJT with emitter degeneration and transition-frequency evidence"}}
+	}
+
+	dc := analysis
+	dc.ID = analysis.ID + "_operating_point"
+	dc.Kind = AnalysisDCOperatingPoint
+	dc.StartFrequencyHz, dc.StopFrequencyHz, dc.Points = 0, 0, 0
+	dc.DurationS, dc.TimeStepS, dc.DCSweep = 0, 0, nil
+	dc.Excitations = append([]SourceExcitation(nil), analysis.Excitations...)
+	for index := range dc.Excitations {
+		dc.Excitations[index].ACMagnitude = 0
+		dc.Excitations[index].ACPhaseDeg = 0
+	}
+	dcSystem, operatingPoint, _, diagnostic := solveNonlinearDC(plan, dc)
+	if diagnostic != nil {
+		diagnostic.Path = "analyses." + analysis.ID + ".operating_point." + diagnostic.Path
+		return result, []Diagnostic{*diagnostic}
+	}
+	if diagnostics := validateNonlinearOperatingLimits(plan, dcSystem, operatingPoint); len(diagnostics) != 0 {
+		return result, prefixAnalysisDiagnostics(analysis.ID, diagnostics)
+	}
+	compiled := compileNonlinearDevices(plan)
+	for _, frequency := range sweepFrequencies(analysis) {
+		nodes := make([]NodeResult, 0, len(transistors))
+		for _, device := range transistors {
+			system, diagnostics := buildMNASystemWithOpAmpClamps(plan, analysis, frequency, nil)
+			if len(diagnostics) != 0 {
+				return result, prefixAnalysisDiagnostics(analysis.ID, diagnostics)
+			}
+			stampSmallSignalNonlinearDevicesExcept(&system, compiled, &dcSystem, operatingPoint, frequency, device.Component)
+			terminals := terminalMap(device)
+			stampCurrentSource(&system, plan.GroundNode, terminals["EMITTER"], 1)
+			if diagnostic := validateMNASystemBounds(system); diagnostic != nil {
+				return result, prefixAnalysisDiagnostics(analysis.ID, []Diagnostic{*diagnostic})
+			}
+			solution, diagnostic := solveMNA(system)
+			if diagnostic != nil {
+				diagnostic.Path = "analyses." + analysis.ID + ".devices." + device.Component + "." + diagnostic.Path
+				diagnostic.Message = "BJT emitter-loop return solve failed: " + diagnostic.Message
+				return result, []Diagnostic{*diagnostic}
+			}
+			parameters := namedValueMap(device.ModelParameters)
+			polarity := 1.0
+			if device.PrimitiveModel == PrimitiveBJTPNPV1 {
+				polarity = -1
+			}
+			_, jacobian := bjtCurrentsAndJacobian(
+				nonlinearNodeVoltage(&dcSystem, operatingPoint, terminals["BASE"]),
+				nonlinearNodeVoltage(&dcSystem, operatingPoint, terminals["COLLECTOR"]),
+				nonlinearNodeVoltage(&dcSystem, operatingPoint, terminals["EMITTER"]),
+				parameters, polarity,
+			)
+			emitterTransconductance := math.Abs(jacobian[2][0])
+			beta := parameters["forward_beta"]
+			betaPole := parameters["transition_frequency_hz"] / beta
+			emitterImpedance := solvedNodeVoltage(system, solution, terminals["EMITTER"])
+			rawLoop := complex(emitterTransconductance, 0) * emitterImpedance / complex(1, frequency/betaPole)
+			loop := rawLoop / (1 + rawLoop/complex(beta, 0))
+			if !boundedComplex(loop, maxMNASolutionValue) || cmplx.Abs(loop) <= mnaPivotTolerance {
+				return result, []Diagnostic{{Path: "analyses." + analysis.ID + ".devices." + device.Component, Message: "trusted BJT emitter-degeneration return ratio is absent, non-finite, or exceeds the numerical bound"}}
+			}
+			nodes = append(nodes, NodeResult{
+				Node: terminals["COLLECTOR"], Real: normalizedMNAFloat(real(loop)), Imaginary: normalizedMNAFloat(imag(loop)),
 				Magnitude: normalizedMNAFloat(cmplx.Abs(loop)), PhaseDeg: normalizedMNAFloat(cmplx.Phase(loop) * 180 / math.Pi),
 			})
 		}

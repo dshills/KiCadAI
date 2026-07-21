@@ -90,6 +90,26 @@ func TestValidateGeneratedConnectivityAcceptsRotatedPadAnchor(t *testing.T) {
 	}
 }
 
+func TestValidateGeneratedConnectivityAcceptsCustomPadCopperPrimitive(t *testing.T) {
+	board := minimalPCB()
+	board.Nets = []Net{{Code: 1, Name: "A"}}
+	board.Footprints = []Footprint{connectivityFootprint(
+		"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", "J1", point(10, 10), Pad{
+			Raw:  `(pad "1" smd custom (at 0 0) (size 1 1) (layers "F.Cu") (net 1 "A") (primitives (gr_poly (pts (xy 0.5 -0.5) (xy 3 -0.5) (xy 3 0.5) (xy 0.5 0.5)) (width 0) (fill yes))))`,
+			UUID: kicadfiles.UUID("bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"), Name: "1", NetCode: 1,
+			Shape: "custom", Size: point(1, 1), Layers: []kicadfiles.BoardLayer{kicadfiles.LayerFCu},
+		},
+	)}
+	board.Tracks = []Track{{
+		UUID:  kicadfiles.UUID("cccccccc-cccc-4ccc-8ccc-cccccccccccc"),
+		Start: point(10, 10), End: point(12.5, 10), Width: kicadfiles.MM(0.25), Layer: kicadfiles.LayerFCu, NetCode: 1,
+	}}
+
+	if err := ValidateGeneratedConnectivity(board); err != nil {
+		t.Fatalf("ValidateGeneratedConnectivity returned error: %v", err)
+	}
+}
+
 func TestValidateGeneratedConnectivityRejectsRectangularPadCornerFalsePositive(t *testing.T) {
 	board := minimalPCB()
 	board.Nets = []Net{{Code: 1, Name: "A"}}

@@ -84,6 +84,47 @@ func TestSynthesisOperatingRailSupportsSignedSupplies(t *testing.T) {
 	}
 }
 
+func TestSynthesisInterfaceOperatingRailUsesInterfaceDomain(t *testing.T) {
+	domains := map[string]PowerDomainIntent{
+		"negative_15v": {Name: "negative_15v", Role: NetRolePowerNeg, VoltageV: -15},
+		"logic_3v3":    {Name: "logic_3v3", Role: NetRolePower, VoltageV: 3.3},
+		"ground":       {Name: "ground", Role: NetRoleGround},
+	}
+	if got := synthesisInterfaceOperatingRail(domains, "logic_3v3", -15); got != 3.3 {
+		t.Fatalf("logic-domain operating rail = %v, want 3.3", got)
+	}
+	if got := synthesisInterfaceOperatingRail(domains, "ground", -15); got != -15 {
+		t.Fatalf("zero-volt domain fallback = %v, want -15", got)
+	}
+	if got := synthesisInterfaceOperatingRail(domains, "", -15); got != -15 {
+		t.Fatalf("unbound-domain fallback = %v, want -15", got)
+	}
+}
+
+func TestCatalogModelUncertaintiesRequireExplicitVariabilityEvidence(t *testing.T) {
+	temperature := simmodel.Uncertainty{
+		Target:  "model_parameters.junction_temperature_k",
+		Source:  "reviewed:temperature",
+		Nominal: 298.15,
+		Minimum: 273.15,
+		Maximum: 323.15,
+	}
+	models := []simmodel.CatalogEvidence{{
+		ModelID:       simmodel.PrimitiveBJTNPNV1,
+		Parameters:    []simmodel.NamedValue{{Name: "junction_temperature_k", Value: 298.15}},
+		Uncertainties: []simmodel.Uncertainty{temperature},
+	}}
+	got := catalogModelUncertainties(models)
+	if len(got) != 1 || got[0] != temperature {
+		t.Fatalf("explicit model uncertainty = %#v", got)
+	}
+
+	models[0].Uncertainties = nil
+	if got := catalogModelUncertainties(models); len(got) != 0 {
+		t.Fatalf("catalog qualification parameters became stochastic uncertainties: %#v", got)
+	}
+}
+
 func TestDerivedSynthesisTransientUsesCompleteBoundedOperatingCase(t *testing.T) {
 	sourceRecord := components.ComponentRecord{Family: "connector", SimulationModels: []simmodel.CatalogEvidence{{ModelID: simmodel.PrimitiveConnectorVoltageSourceV1}}}
 	selected := map[string]ResolvedComponent{

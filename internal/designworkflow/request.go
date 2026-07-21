@@ -897,6 +897,9 @@ func validateExplicitCircuit(circuit ExplicitCircuitSpec) []reports.Issue {
 		for _, diagnostic := range closedloopsynthesis.ValidatePromotionReport(*circuit.ClosedLoop, circuit.CatalogHash) {
 			issues = append(issues, issue("explicit_circuit.closed_loop."+diagnostic.Path, diagnostic.Message))
 		}
+		if circuit.ClosedLoop.SelectedCircuitHash == "" || circuit.ClosedLoop.SelectedCircuitHash != circuit.ResolutionHash {
+			issues = append(issues, issue("explicit_circuit.closed_loop.selected_circuit_hash", "closed-loop evidence must bind the exact resolved circuit promoted by the workflow"))
+		}
 	}
 	return issues
 }

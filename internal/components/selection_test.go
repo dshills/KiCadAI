@@ -50,6 +50,19 @@ func TestSelectResistorNormalizesToleranceUnitsWithoutStringRoundTrip(t *testing
 	}
 }
 
+func TestFindMatchesManufacturerPartNumberWithNormalizedPunctuation(t *testing.T) {
+	catalog := &Catalog{Records: []ComponentRecord{{
+		ID: "regulator.fixed.test", Family: "regulator", Name: "Fixed linear regulator",
+		Manufacturer: "Diodes Incorporated", MPN: "AP2127R-3.3TRG1",
+		Packages: []PackageVariant{{ID: "sot89", Name: "SOT-89"}},
+	}}}
+	RebuildCatalogIndexes(catalog)
+	candidates, result := Find(context.Background(), catalog, Query{Family: "regulator", Text: "ap2127r 3.3trg1"})
+	if !result.OK || len(candidates) != 1 || candidates[0].ComponentID != "regulator.fixed.test" {
+		t.Fatalf("candidates = %#v, issues = %#v", candidates, result.Issues)
+	}
+}
+
 func TestSelectIncludesActiveProcurementEvidence(t *testing.T) {
 	catalog := loadCheckedInCatalog(t)
 	sources, err := LoadSources(context.Background(), SourceLoadOptions{SourceDir: sourceFixtureDir("valid")})
@@ -142,6 +155,109 @@ func TestSelectRejectsCapacitorBelowVoltageRating(t *testing.T) {
 		t.Fatal("expected voltage rating rejection")
 	}
 	assertIssueCode(t, result.Issues, CodeComponentRatingTooLow)
+}
+
+func TestSelectRejectsJunctionToCaseEvidenceForAmbientThermalRequirement(t *testing.T) {
+	catalog := &Catalog{Records: []ComponentRecord{testSelectablePowerSemiconductor("case-only", nil, float64Pointer(1))}}
+	_, result := Select(context.Background(), catalog, SelectionRequest{
+		Query:           Query{Family: "bjt", MinimumConfidence: ConfidenceVerified},
+		Acceptance:      AcceptanceStructural,
+		RequireConcrete: true,
+		RequiredThermal: &ThermalRequirement{
+			DissipationW: 1, Reference: ThermalReferenceAmbient, ReferenceTemperatureC: 50, MaximumJunctionTemperatureC: 125,
+		},
+	})
+	if result.OK {
+		t.Fatal("junction-to-case-only evidence satisfied an ambient thermal requirement")
+	}
+	assertIssueCode(t, result.Issues, CodeComponentThermalUnproven)
+}
+
+func TestSelectUsesCandidateWithCompleteRequestedThermalPath(t *testing.T) {
+	catalog := &Catalog{Records: []ComponentRecord{
+		testSelectablePowerSemiconductor("case-only", nil, float64Pointer(1)),
+		testSelectablePowerSemiconductor("ambient-complete", float64Pointer(50), float64Pointer(1)),
+	}}
+	selection, result := Select(context.Background(), catalog, SelectionRequest{
+		Query:             Query{Family: "bjt", MinimumConfidence: ConfidenceVerified},
+		Acceptance:        AcceptanceStructural,
+		AllowAlternatives: true,
+		RequireConcrete:   true,
+		RequiredThermal: &ThermalRequirement{
+			DissipationW: 1, Reference: ThermalReferenceAmbient, ReferenceTemperatureC: 50, MaximumJunctionTemperatureC: 125,
+		},
+	})
+	if !result.OK {
+		t.Fatalf("select thermally complete candidate: %+v", result.Issues)
+	}
+	if selection.Component.PowerSemiconductor == nil || selection.Component.PowerSemiconductor.JunctionToAmbientCPerW == nil {
+		t.Fatalf("selected component lacks requested ambient path: %#v", selection.Component.PowerSemiconductor)
+	}
+}
+
+func TestSelectUsesGenericThermalEvidenceForZeroDissipationDiodeBoundary(t *testing.T) {
+	catalog := loadCheckedInCatalog(t)
+	selection, result := Select(context.Background(), catalog, SelectionRequest{
+		Query: Query{
+			Text:              "SS34FA flyback",
+			Family:            "diode",
+			MinimumConfidence: ConfidenceVerified,
+		},
+		Acceptance:        AcceptanceStructural,
+		AllowAlternatives: true,
+		RequireConcrete:   true,
+		RequiredRatings: []RequiredRating{
+			{Kind: "current", Value: "2.5", Unit: "A"},
+			{Kind: "reverse_voltage", Value: "35", Unit: "V"},
+		},
+		RequiredThermal: &ThermalRequirement{
+			DissipationW:                0,
+			Reference:                   ThermalReferenceAmbient,
+			ReferenceTemperatureC:       70,
+			MaximumJunctionTemperatureC: 125,
+		},
+	})
+	if !result.OK {
+		t.Fatalf("select thermally qualified diode: %+v", result.Issues)
+	}
+	if selection.Component.ID != "diode.onsemi.ss34fa.sod123fl" || selection.Component.Thermal == nil || selection.Component.Thermal.JunctionToAmbientCPerW == nil {
+		t.Fatalf("selected diode lacks generic ambient thermal evidence: %#v", selection.Component)
+	}
+}
+
+func TestSelectUsesCandidateCoveringRequiredOperatingTemperature(t *testing.T) {
+	commercial := testSelectablePowerSemiconductor("commercial", float64Pointer(50), float64Pointer(1))
+	commercial.Temperature = &TemperatureRange{Min: "0", Max: "125", Unit: "C"}
+	industrial := testSelectablePowerSemiconductor("industrial", float64Pointer(50), float64Pointer(1))
+	industrial.Temperature = &TemperatureRange{Min: "-40", Max: "125", Unit: "C"}
+	catalog := &Catalog{Records: []ComponentRecord{commercial, industrial}}
+	selection, result := Select(context.Background(), catalog, SelectionRequest{
+		Query:               Query{Family: "bjt", MinimumConfidence: ConfidenceVerified},
+		Acceptance:          AcceptanceStructural,
+		AllowAlternatives:   true,
+		RequireConcrete:     true,
+		RequiredTemperature: &TemperatureRequirement{MinimumC: float64Pointer(-20), MaximumC: float64Pointer(70)},
+	})
+	if !result.OK {
+		t.Fatalf("select temperature-qualified candidate: %+v", result.Issues)
+	}
+	if selection.Component.ID != "industrial" {
+		t.Fatalf("selected component = %q, want industrial", selection.Component.ID)
+	}
+}
+
+func TestSelectRejectsMissingOperatingTemperatureEvidence(t *testing.T) {
+	catalog := &Catalog{Records: []ComponentRecord{testSelectablePowerSemiconductor("unknown", float64Pointer(50), float64Pointer(1))}}
+	_, result := Select(context.Background(), catalog, SelectionRequest{
+		Query:               Query{Family: "bjt", MinimumConfidence: ConfidenceVerified},
+		Acceptance:          AcceptanceStructural,
+		RequireConcrete:     true,
+		RequiredTemperature: &TemperatureRequirement{MinimumC: float64Pointer(-20), MaximumC: float64Pointer(70)},
+	})
+	if result.OK {
+		t.Fatal("missing operating-temperature evidence satisfied a bounded requirement")
+	}
+	assertIssueCode(t, result.Issues, CodeComponentTemperatureUnproven)
 }
 
 func TestSelectZeroOhm0603ResistorForCatalogDerivedLink(t *testing.T) {
@@ -1017,7 +1133,7 @@ func TestSelectRejectsSmallSignalBJTOverCurrent(t *testing.T) {
 func TestSelectBlocksPowerBJTPlaceholderForConnectivity(t *testing.T) {
 	catalog := loadCheckedInCatalog(t)
 	_, result := Select(context.Background(), catalog, SelectionRequest{
-		Query:      Query{Family: "bjt", Package: "to220"},
+		Query:      Query{Text: "blocked", Family: "bjt", Package: "to220"},
 		Acceptance: AcceptanceConnectivity,
 	})
 	if result.OK {
@@ -1295,5 +1411,18 @@ func testSelectableResistor(id string) ComponentRecord {
 			Verification: VerificationRecord{Confidence: ConfidenceRuleInferred},
 		}},
 		Verification: VerificationRecord{Confidence: ConfidenceRuleInferred},
+	}
+}
+
+func testSelectablePowerSemiconductor(id string, junctionToAmbient, junctionToCase *float64) ComponentRecord {
+	return ComponentRecord{
+		ID: id, Family: "bjt", Name: id, Manufacturer: "example", MPN: id,
+		PowerSemiconductor: &PowerSemiconductorEvidence{
+			MaxJunctionTemperatureC: float64Pointer(150),
+			JunctionToAmbientCPerW:  junctionToAmbient,
+			JunctionToCaseCPerW:     junctionToCase,
+		},
+		Packages:     []PackageVariant{{ID: "package", FootprintID: "example:package", Verification: VerificationRecord{Confidence: ConfidenceVerified}}},
+		Verification: VerificationRecord{Confidence: ConfidenceVerified},
 	}
 }

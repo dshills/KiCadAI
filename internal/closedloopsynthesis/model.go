@@ -94,9 +94,19 @@ type Evaluator interface {
 }
 
 type Evaluation struct {
-	EvidenceHash   string          `json:"evidence_hash"`
-	Measurements   []Measurement   `json:"measurements"`
-	ModelDecisions []ModelDecision `json:"model_decisions"`
+	EvidenceHash   string              `json:"evidence_hash"`
+	Measurements   []Measurement       `json:"measurements"`
+	ModelDecisions []ModelDecision     `json:"model_decisions"`
+	Simulation     *SimulationEvidence `json:"simulation,omitempty"`
+}
+
+// SimulationEvidence is the canonical trusted input/output transcript behind
+// one complete candidate evaluation. Keeping it in the closed-loop report
+// makes analysis plans, operating-corner bindings, reports, and measurement
+// links independently replayable instead of relying on an opaque hash alone.
+type SimulationEvidence struct {
+	Resolution SimulationResolution `json:"resolution"`
+	Reports    []simmodel.Report    `json:"reports"`
 }
 
 type Measurement struct {
@@ -116,21 +126,22 @@ type ModelDecision struct {
 }
 
 type Report struct {
-	Schema             string            `json:"schema"`
-	PolicyVersion      string            `json:"policy_version"`
-	PolicyHash         string            `json:"policy_hash"`
-	RequirementHash    string            `json:"requirement_hash"`
-	RegistryHash       string            `json:"registry_hash"`
-	CatalogHash        string            `json:"catalog_hash"`
-	FormulaLibraryHash string            `json:"formula_library_hash"`
-	ModelRegistryHash  string            `json:"model_registry_hash"`
-	Policy             Policy            `json:"policy"`
-	Candidates         []CandidateReport `json:"candidates"`
-	Selected           *SelectedResult   `json:"selected,omitempty"`
-	Consumption        Consumption       `json:"consumption"`
-	StopReason         StopReason        `json:"stop_reason"`
-	Status             string            `json:"status"`
-	Diagnostics        []Diagnostic      `json:"diagnostics"`
+	Schema              string            `json:"schema"`
+	PolicyVersion       string            `json:"policy_version"`
+	PolicyHash          string            `json:"policy_hash"`
+	RequirementHash     string            `json:"requirement_hash"`
+	RegistryHash        string            `json:"registry_hash"`
+	CatalogHash         string            `json:"catalog_hash"`
+	FormulaLibraryHash  string            `json:"formula_library_hash"`
+	ModelRegistryHash   string            `json:"model_registry_hash"`
+	Policy              Policy            `json:"policy"`
+	Candidates          []CandidateReport `json:"candidates"`
+	Selected            *SelectedResult   `json:"selected,omitempty"`
+	SelectedCircuitHash string            `json:"selected_circuit_hash,omitempty"`
+	Consumption         Consumption       `json:"consumption"`
+	StopReason          StopReason        `json:"stop_reason"`
+	Status              string            `json:"status"`
+	Diagnostics         []Diagnostic      `json:"diagnostics"`
 }
 
 // CloneReport returns a deep copy suitable for persistence boundaries.
@@ -158,16 +169,17 @@ type CandidateReport struct {
 }
 
 type Attempt struct {
-	Number         int               `json:"number"`
-	State          CandidateState    `json:"state"`
-	StateHash      string            `json:"state_hash"`
-	EvidenceHash   string            `json:"evidence_hash,omitempty"`
-	Assertions     []AssertionResult `json:"assertions"`
-	ModelDecisions []ModelDecision   `json:"model_decisions"`
-	Diagnoses      []Diagnosis       `json:"diagnoses"`
-	Score          EvaluationScore   `json:"score"`
-	Status         string            `json:"status"`
-	Diagnostics    []Diagnostic      `json:"diagnostics"`
+	Number         int                 `json:"number"`
+	State          CandidateState      `json:"state"`
+	StateHash      string              `json:"state_hash"`
+	EvidenceHash   string              `json:"evidence_hash,omitempty"`
+	Simulation     *SimulationEvidence `json:"simulation,omitempty"`
+	Assertions     []AssertionResult   `json:"assertions"`
+	ModelDecisions []ModelDecision     `json:"model_decisions"`
+	Diagnoses      []Diagnosis         `json:"diagnoses"`
+	Score          EvaluationScore     `json:"score"`
+	Status         string              `json:"status"`
+	Diagnostics    []Diagnostic        `json:"diagnostics"`
 }
 
 type AssertionResult struct {
@@ -201,22 +213,40 @@ type Diagnosis struct {
 }
 
 type Repair struct {
-	Number          int     `json:"number"`
-	Variable        string  `json:"variable"`
-	Kind            string  `json:"kind"`
-	From            float64 `json:"from"`
-	To              float64 `json:"to"`
-	AllowedMinimum  float64 `json:"allowed_minimum"`
-	AllowedMaximum  float64 `json:"allowed_maximum"`
-	RequirementID   string  `json:"requirement_id"`
-	OperatingCase   string  `json:"operating_case"`
-	Analysis        string  `json:"analysis"`
-	Metric          string  `json:"metric"`
-	Direction       string  `json:"direction"`
-	BeforeHash      string  `json:"before_hash"`
-	AfterHash       string  `json:"after_hash"`
-	Reason          string  `json:"reason"`
-	EvaluatedTrials int     `json:"evaluated_trials"`
+	Number          int            `json:"number"`
+	Variable        string         `json:"variable"`
+	Kind            string         `json:"kind"`
+	From            float64        `json:"from"`
+	To              float64        `json:"to"`
+	AllowedMinimum  float64        `json:"allowed_minimum"`
+	AllowedMaximum  float64        `json:"allowed_maximum"`
+	RequirementID   string         `json:"requirement_id"`
+	OperatingCase   string         `json:"operating_case"`
+	Analysis        string         `json:"analysis"`
+	Metric          string         `json:"metric"`
+	Direction       string         `json:"direction"`
+	BeforeHash      string         `json:"before_hash"`
+	AfterHash       string         `json:"after_hash"`
+	Reason          string         `json:"reason"`
+	EvaluatedTrials int            `json:"evaluated_trials"`
+	Changes         []RepairChange `json:"changes,omitempty"`
+}
+
+// RepairChange records every authorized variable mutation in a coordinated
+// repair. The legacy top-level Repair fields remain the canonical primary
+// change so existing single-variable reports retain their stable shape.
+type RepairChange struct {
+	Variable       string  `json:"variable"`
+	Kind           string  `json:"kind"`
+	From           float64 `json:"from"`
+	To             float64 `json:"to"`
+	AllowedMinimum float64 `json:"allowed_minimum"`
+	AllowedMaximum float64 `json:"allowed_maximum"`
+	RequirementID  string  `json:"requirement_id"`
+	OperatingCase  string  `json:"operating_case"`
+	Analysis       string  `json:"analysis"`
+	Metric         string  `json:"metric"`
+	Direction      string  `json:"direction"`
 }
 
 type SelectedResult struct {

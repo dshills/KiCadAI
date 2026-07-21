@@ -168,3 +168,30 @@ func TestLowerInterfacesJoinsPowerPortReturnAnchorToReferenceDomain(t *testing.T
 		t.Fatal("power-port return binding is not joined to the physical reference domain")
 	}
 }
+
+func TestLowerInterfacesSelectsDeterministicPrimaryBusLaneForSemanticBinding(t *testing.T) {
+	requirement := architecturesearch.Requirement{Requirements: architecturesearch.Requirements{
+		Domains: []architecturesearch.Domain{{ID: "gnd", Kind: "reference"}, {ID: "logic", Kind: "supply"}},
+		Ports: []architecturesearch.Port{{
+			ID: "bus", Kind: "digital_bus", Direction: "bidirectional", Domain: "logic",
+			Protocol: &architecturesearch.Protocol{Name: "i2c", Mode: "open_drain"},
+		}},
+	}}
+	nodes := map[string]string{}
+	_, nodes = lowerInterfaces(requirement, newDisjointSet(), map[string]circuitgraph.FunctionalEndpoint{}, map[string]nodeMetadata{})
+	if nodes["bus"] != interfaceNode("bus", "sda") {
+		t.Fatalf("primary bus binding = %q, want deterministic first lane", nodes["bus"])
+	}
+}
+
+func TestPowerSignalJoinsItsDeclaredDomain(t *testing.T) {
+	requirement := architecturesearch.Requirement{Requirements: architecturesearch.Requirements{
+		Domains: []architecturesearch.Domain{{ID: "generated", Kind: "supply"}},
+		Signals: []architecturesearch.Signal{{ID: "rail", Kind: "power", Domain: "generated"}},
+	}}
+	union := newDisjointSet()
+	joinPowerSignalsToDomains(requirement, union)
+	if union.find(anchorNode("signal:rail", "")) != union.find(anchorNode("domain:generated", "")) {
+		t.Fatal("power signal is not joined to its declared domain")
+	}
+}

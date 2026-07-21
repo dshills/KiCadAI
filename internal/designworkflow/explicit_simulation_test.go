@@ -63,8 +63,11 @@ func trustedRegulatorTestPlan(inputVoltage float64) simmodel.Plan {
 type workflowClosedLoopEvaluator struct{}
 
 func (workflowClosedLoopEvaluator) Evaluate(context.Context, closedloopsynthesis.CandidateState) (closedloopsynthesis.Evaluation, error) {
+	simulation := &closedloopsynthesis.SimulationEvidence{}
+	evidenceHash, _ := closedloopsynthesis.HashSimulationEvidence(*simulation)
 	return closedloopsynthesis.Evaluation{
-		EvidenceHash: simulationTestHash("evidence"),
+		EvidenceHash: evidenceHash,
+		Simulation:   simulation,
 		Measurements: []closedloopsynthesis.Measurement{{RequirementID: "output", OperatingCase: "nominal", Actual: 3.3}},
 		ModelDecisions: []closedloopsynthesis.ModelDecision{{
 			Component: "r1", Family: "resistor", Claim: simmodel.CatalogEvidence{ModelID: simmodel.PrimitiveResistorV1},
@@ -87,7 +90,9 @@ func trustedClosedLoopTestReport(catalogHash string) closedloopsynthesis.Report 
 		Requirement: requirement, CatalogHash: catalogHash, FormulaLibraryHash: simulationTestHash("formula"), ModelRegistryHash: simulationTestHash("models"),
 		Candidates: []closedloopsynthesis.Candidate{{Fingerprint: simulationTestHash("candidate")}},
 	}
-	return closedloopsynthesis.Run(context.Background(), input, workflowClosedLoopEvaluator{}, closedloopsynthesis.DefaultPolicy())
+	report := closedloopsynthesis.Run(context.Background(), input, workflowClosedLoopEvaluator{}, closedloopsynthesis.DefaultPolicy())
+	report.SelectedCircuitHash = simulationTestHash("resolved-circuit")
+	return report
 }
 
 func simulationTestHash(value string) string {

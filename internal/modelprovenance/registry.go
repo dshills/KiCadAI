@@ -120,10 +120,15 @@ func Validate(registry Registry) []Diagnostic {
 		if modelHash, exists := simmodel.ModelContentHash(record.ModelID); !exists {
 			diagnostics = append(diagnostics, Diagnostic{Path: path + ".model_id", Message: "provenance record references an unknown trusted model"})
 		} else if record.Provenance.SHA256 != modelHash {
-			diagnostics = append(diagnostics, Diagnostic{Path: path + ".provenance.sha256", Message: "provenance hash does not match the canonical trusted model definition"})
+			diagnostics = append(diagnostics, Diagnostic{Path: path + ".provenance.sha256", Message: fmt.Sprintf("provenance hash %s does not match canonical trusted model definition %s", record.Provenance.SHA256, modelHash)})
 		}
 		for _, diagnostic := range simmodel.ValidateRequiredModelProvenance(&record.Provenance, record.Provenance.AllowedAnalyses) {
 			diagnostics = append(diagnostics, Diagnostic{Path: path + "." + diagnostic.Path, Message: diagnostic.Message})
+		}
+		if record.Provenance.MinTemperatureC == nil || record.Provenance.MaxTemperatureC == nil {
+			diagnostics = append(diagnostics, Diagnostic{Path: path + ".provenance", Message: "reviewed model requires an explicit temperature domain"})
+		} else if *record.Provenance.MinTemperatureC >= *record.Provenance.MaxTemperatureC {
+			diagnostics = append(diagnostics, Diagnostic{Path: path + ".provenance", Message: "reviewed model temperature domain must be ordered"})
 		}
 	}
 	slices.SortStableFunc(diagnostics, func(left, right Diagnostic) int {

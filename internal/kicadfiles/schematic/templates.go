@@ -789,7 +789,33 @@ func appendCanonicalEmbeddedSymbolProperties(result sexpr.List, properties map[s
 			result = append(result, property)
 		}
 	}
-	return append(result, extra...)
+	// KiCad writes symbol-library metadata after user and private properties,
+	// regardless of the order in which an inherited library record presented
+	// those properties. Preserve relative order within each class while matching
+	// that canonical partition so an embedded resolver symbol is save-stable.
+	for rank := 0; rank <= 2; rank++ {
+		for _, property := range extra {
+			if embeddedSymbolMetadataRank(property) == rank {
+				result = append(result, property)
+			}
+		}
+	}
+	return result
+}
+
+func embeddedSymbolMetadataRank(node sexpr.Node) int {
+	property, ok := node.(sexpr.List)
+	if !ok {
+		return 0
+	}
+	switch strings.ToLower(strings.TrimSpace(embeddedSymbolNodeKey(property))) {
+	case "ki_keywords":
+		return 1
+	case "ki_fp_filters":
+		return 2
+	default:
+		return 0
+	}
 }
 
 func normalizeRawEmbeddedSymbolProperty(property sexpr.List) sexpr.List {

@@ -59,6 +59,18 @@ func TestBehavioralProjectionAvoidsInventedBipolarTarget(t *testing.T) {
 	}
 }
 
+func TestBehavioralProjectionPreservesAbsoluteMuteLimit(t *testing.T) {
+	minimum, maximum := -0.05, 0.05
+	constraints := constraintsFromBehavior(BehavioralRequirement{Metric: "muted_output_voltage", Min: &minimum, Max: &maximum, Unit: "V"})
+	if len(constraints) != 1 || constraints[0].Relation != "maximum" {
+		t.Fatalf("mute constraints = %#v, want one absolute maximum", constraints)
+	}
+	value, _, ok := projectedNumericValue(constraints[0])
+	if !ok || value != .05 {
+		t.Fatalf("mute magnitude = %.12g, %t; want 0.05 V", value, ok)
+	}
+}
+
 func TestRiseTimeProjectionUsesHalfPeriodFrequencyBound(t *testing.T) {
 	maximum := 0.5e-6
 	constraints := constraintsFromBehavior(BehavioralRequirement{Metric: "rise_time", Max: &maximum, Unit: "s"})

@@ -172,6 +172,28 @@ func TestNormalizeIsIdempotentAndDoesNotMutateCaller(t *testing.T) {
 	}
 }
 
+func TestDerivedSemanticIdentifierNormalizesCatalogPunctuation(t *testing.T) {
+	if got := derivedSemanticIdentifier(" Regulator.Linear/AP2127R-3.3@SOT-89 "); got != "regulator_linear_ap2127r_3_3_sot_89" || !validSemanticID(got) {
+		t.Fatalf("derived semantic identifier = %q", got)
+	}
+}
+
+func TestOperatingConditionProjectsWorstAmbientTemperature(t *testing.T) {
+	minimum, maximum := -20.0, 70.0
+	constraints := constraintsFromOperatingCondition(OperatingCondition{Axis: "ambient_temperature", Target: "circuit", Min: &minimum, Max: &maximum, Unit: "degC"})
+	if len(constraints) != 2 || constraints[0].Name != "ambient_temperature_minimum" || constraints[0].Relation != "minimum" || constraints[1].Name != "ambient_temperature" || constraints[1].Relation != "maximum" {
+		t.Fatalf("ambient constraints = %#v", constraints)
+	}
+	minimumValue, _, minimumOK := firstNumericConstraint(constraints, "ambient_temperature_minimum")
+	if !minimumOK || minimumValue != minimum {
+		t.Fatalf("ambient minimum = %g, %t", minimumValue, minimumOK)
+	}
+	value, _, ok := firstNumericConstraint(constraints, "ambient_temperature")
+	if !ok || value != maximum {
+		t.Fatalf("ambient maximum = %g, %t", value, ok)
+	}
+}
+
 func TestDecodeStrictRejectsUnknownTrailingAndOversizedInput(t *testing.T) {
 	encoded, err := json.Marshal(validRequirement())
 	if err != nil {

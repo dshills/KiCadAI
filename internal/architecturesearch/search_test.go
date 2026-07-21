@@ -77,6 +77,47 @@ func TestRegistryAndSearchAreDeterministicUnderProviderRequestAndExpansionOrder(
 	}
 }
 
+func TestRetainedFrontierPrefersSemanticTopologyDiversityOverPartVariants(t *testing.T) {
+	direct := func(catalogID, value string) json.RawMessage {
+		payload, err := MarshalFragmentRealization(FragmentRealization{
+			Capability: "voltage_regulation",
+			Instances: []RealizationInstance{{
+				ID: "regulator", CatalogID: catalogID, Usage: "regulator", Value: value,
+				RequiredFunctions: []string{"VIN", "VOUT"},
+			}},
+			PortBindings: []RealizationPortBinding{{Role: "input", Instance: "regulator", Function: "VIN"}, {Role: "output", Instance: "regulator", Function: "VOUT"}},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return payload
+	}
+	feedback, err := MarshalFragmentRealization(FragmentRealization{
+		Capability: "voltage_regulation",
+		Instances: []RealizationInstance{
+			{ID: "regulator", CatalogID: "regulator.adjustable", Usage: "regulator", RequiredFunctions: []string{"VIN", "VOUT", "ADJ"}},
+			{ID: "feedback", CatalogID: "resistor.feedback", Usage: "feedback", Value: "10k", RequiredFunctions: []string{"A", "B"}},
+		},
+		PortBindings: []RealizationPortBinding{{Role: "input", Instance: "regulator", Function: "VIN"}, {Role: "output", Instance: "regulator", Function: "VOUT"}},
+		Connections:  []RealizationConnection{{ID: "feedback", Role: "signal", Endpoints: []RealizationEndpoint{{Instance: "regulator", Function: "ADJ"}, {Instance: "feedback", Function: "A"}}}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	candidates := []CandidateResult{
+		{Fingerprint: "best", Selections: []FragmentSelection{{ObligationPath: "objectives.regulate", Capability: "voltage_regulation", Payload: direct("regulator.fixed.a", "3.3V")}}},
+		{Fingerprint: "part-variant", Selections: []FragmentSelection{{ObligationPath: "objectives.regulate", Capability: "voltage_regulation", Payload: direct("regulator.fixed.b", "3.3V")}}},
+		{Fingerprint: "feedback-topology", Selections: []FragmentSelection{{ObligationPath: "objectives.regulate", Capability: "voltage_regulation", Payload: feedback}}},
+	}
+	retained := retainTopologicallyDiverseCandidates(candidates, 2)
+	if len(retained) != 2 || retained[0].Fingerprint != "best" || retained[1].Fingerprint != "feedback-topology" {
+		t.Fatalf("retained candidates = %#v", retained)
+	}
+	if candidateTopologySignature(candidates[0]) != candidateTopologySignature(candidates[1]) {
+		t.Fatal("part identity or value changed the semantic topology signature")
+	}
+}
+
 func TestProviderRequestExcludesFixtureAndRequirementIdentity(t *testing.T) {
 	provider := staticTestProvider{
 		descriptor: validProviderDescriptor("identity_blind", "threshold_detection"),
@@ -105,6 +146,26 @@ func TestProviderRequestExcludesFixtureAndRequirementIdentity(t *testing.T) {
 	result := Search(context.Background(), validRequirement(), registry, SearchOptions{})
 	if result.Status != SearchSelected {
 		t.Fatalf("identity-blind search = %#v", result)
+	}
+}
+
+func TestSignalProcessingObjectiveInheritsSharedReferenceDomain(t *testing.T) {
+	requirement := Requirement{Requirements: Requirements{Domains: []Domain{{ID: "ground", Kind: "reference", NominalVoltageV: 0, Source: "external"}}}}
+	objective := Objective{ID: "amplify", Capability: "signal_processing"}
+	ports := []RoleContract{
+		{Role: "input", Contract: PortContract{Kind: "analog_voltage", Direction: "sink", Domain: "ground"}},
+		{Role: "output", Contract: PortContract{Kind: "analog_voltage", Direction: "source", Domain: "ground"}},
+	}
+	reference, ok := inferredSignalReferenceRole(requirement, objective, ports, EvidenceRuleInferred)
+	if !ok || reference.Role != "reference" || reference.Anchor != "domain:ground" || reference.Contract.Domain != "ground" || reference.Contract.Direction != "bidirectional" {
+		t.Fatalf("inferred reference = %#v, ok=%t", reference, ok)
+	}
+	if _, ok := inferredSignalReferenceRole(requirement, objective, ports[1:], EvidenceRuleInferred); ok {
+		t.Fatal("output-only objective inherited a signal-processing reference")
+	}
+	ports = append(ports, RoleContract{Role: "reference", Contract: PortContract{Kind: "reference", Direction: "bidirectional", Domain: "ground"}})
+	if _, ok := inferredSignalReferenceRole(requirement, objective, ports, EvidenceRuleInferred); ok {
+		t.Fatal("objective with an explicit reference inherited a duplicate")
 	}
 }
 

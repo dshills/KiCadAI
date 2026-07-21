@@ -21,6 +21,7 @@ type FragmentRealization struct {
 	SeriesTransitions []RealizationSeriesTransition `json:"series_transitions,omitempty"`
 	Connections       []RealizationConnection       `json:"connections,omitempty"`
 	Parameters        []RealizationParameter        `json:"parameters,omitempty"`
+	RepairVariables   []RealizationRepairVariable   `json:"repair_variables,omitempty"`
 }
 
 type RealizationInstance struct {
@@ -69,6 +70,26 @@ type RealizationParameter struct {
 	Name  string  `json:"name"`
 	Value float64 `json:"value"`
 	Unit  string  `json:"unit"`
+}
+
+// RealizationRepairVariable exposes a bounded provider-calculated design
+// degree of freedom to the trusted closed loop. It names only a local semantic
+// instance and registered behavioral effects; lowering remains responsible
+// for namespacing it and simulation remains authoritative for every trial.
+type RealizationRepairVariable struct {
+	ID            string                    `json:"id"`
+	Kind          string                    `json:"kind"`
+	Instance      string                    `json:"instance"`
+	Value         float64                   `json:"value"`
+	AllowedValues []float64                 `json:"allowed_values"`
+	Unit          string                    `json:"unit"`
+	Effects       []RealizationRepairEffect `json:"effects"`
+}
+
+type RealizationRepairEffect struct {
+	Analysis  string `json:"analysis"`
+	Metric    string `json:"metric"`
+	Direction string `json:"direction"`
 }
 
 func MarshalFragmentRealization(realization FragmentRealization) (json.RawMessage, error) {
@@ -133,6 +154,28 @@ func MarshalFragmentRealization(realization FragmentRealization) (json.RawMessag
 		parameter.Unit = canonicalUnit(parameter.Unit)
 		parameter.Value = quantize(parameter.Value)
 	}
+	for index := range realization.RepairVariables {
+		variable := &realization.RepairVariables[index]
+		variable.ID = canonicalIdentifier(variable.ID)
+		variable.Kind = canonicalIdentifier(variable.Kind)
+		variable.Instance = canonicalIdentifier(variable.Instance)
+		variable.Unit = canonicalUnit(variable.Unit)
+		variable.Value = quantize(variable.Value)
+		for valueIndex := range variable.AllowedValues {
+			variable.AllowedValues[valueIndex] = quantize(variable.AllowedValues[valueIndex])
+		}
+		slices.Sort(variable.AllowedValues)
+		variable.AllowedValues = slices.Compact(variable.AllowedValues)
+		for effectIndex := range variable.Effects {
+			effect := &variable.Effects[effectIndex]
+			effect.Analysis = canonicalIdentifier(effect.Analysis)
+			effect.Metric = canonicalIdentifier(effect.Metric)
+			effect.Direction = canonicalIdentifier(effect.Direction)
+		}
+		slices.SortStableFunc(variable.Effects, func(left, right RealizationRepairEffect) int {
+			return strings.Compare(left.Analysis+"\x00"+left.Metric+"\x00"+left.Direction, right.Analysis+"\x00"+right.Metric+"\x00"+right.Direction)
+		})
+	}
 	slices.SortStableFunc(realization.Instances, func(left, right RealizationInstance) int {
 		return strings.Compare(left.ID, right.ID)
 	})
@@ -159,6 +202,9 @@ func MarshalFragmentRealization(realization FragmentRealization) (json.RawMessag
 	})
 	slices.SortStableFunc(realization.Parameters, func(left, right RealizationParameter) int {
 		return strings.Compare(left.Name, right.Name)
+	})
+	slices.SortStableFunc(realization.RepairVariables, func(left, right RealizationRepairVariable) int {
+		return strings.Compare(left.ID, right.ID)
 	})
 	if err := validateFragmentRealization(realization); err != nil {
 		return nil, err
@@ -251,6 +297,32 @@ func validateFragmentRealization(realization FragmentRealization) error {
 	for _, parameter := range realization.Parameters {
 		if !validSemanticID(parameter.Name) || !finiteNumbers(parameter.Value) || parameter.Unit == "" {
 			return fmt.Errorf("fragment realization parameter is invalid")
+		}
+	}
+	repairIDs := map[string]bool{}
+	for _, variable := range realization.RepairVariables {
+		if !validSemanticID(variable.ID) || repairIDs[variable.ID] || !validSemanticID(variable.Kind) || !instances[variable.Instance] || !finiteNumbers(variable.Value) || variable.Unit == "" || len(variable.AllowedValues) < 2 || len(variable.Effects) == 0 {
+			return fmt.Errorf("fragment realization repair variable is invalid or duplicated")
+		}
+		repairIDs[variable.ID] = true
+		found, previous := false, -1.0e300
+		for _, value := range variable.AllowedValues {
+			if !finiteNumbers(value) || value <= previous {
+				return fmt.Errorf("fragment realization repair values are not finite and strictly ascending")
+			}
+			previous = value
+			found = found || value == variable.Value
+		}
+		if !found {
+			return fmt.Errorf("fragment realization repair values omit the current value")
+		}
+		previousEffect := ""
+		for _, effect := range variable.Effects {
+			key := effect.Analysis + "\x00" + effect.Metric + "\x00" + effect.Direction
+			if !validSemanticID(effect.Analysis) || !validSemanticID(effect.Metric) || !validSemanticID(effect.Direction) || key <= previousEffect {
+				return fmt.Errorf("fragment realization repair effect is invalid, duplicated, or unordered")
+			}
+			previousEffect = key
 		}
 	}
 	return nil

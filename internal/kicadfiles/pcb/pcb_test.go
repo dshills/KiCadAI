@@ -1683,6 +1683,18 @@ func TestWriteAdvancedGeometry(t *testing.T) {
 			t.Fatalf("output missing %q:\n%s", want, output)
 		}
 	}
+	fpArcStart := strings.Index(output, "(fp_arc")
+	if fpArcStart < 0 {
+		t.Fatalf("output missing footprint arc section:\n%s", output)
+	}
+	fpArcEnd := strings.Index(output[fpArcStart:], "(fp_poly")
+	if fpArcEnd < 0 {
+		t.Fatalf("output missing bounded footprint arc section:\n%s", output)
+	}
+	fpArc := output[fpArcStart : fpArcStart+fpArcEnd]
+	if strings.Contains(fpArc, "(fill ") {
+		t.Fatalf("KiCad-canonical footprint arc unexpectedly contains fill:\n%s", fpArc)
+	}
 }
 
 func TestValidateRejectsGraphicWithMultipleShapes(t *testing.T) {

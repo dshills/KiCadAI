@@ -11,6 +11,84 @@ type ValidationReport struct {
 	Issues []reports.Issue `json:"issues,omitempty"`
 }
 
+// ValidatePhysicalClearance checks the complete emitted copper set against
+// itself and every foreign-net pad. It is intended for workflows that compose
+// multiple independently routed phases before writing one board.
+func ValidatePhysicalClearance(request Request, routes []Route) []reports.Issue {
+	request = cloneRequest(request)
+	NormalizeRequest(&request)
+	issues := clearanceIssues(routes, request.Rules.ClearanceMM)
+	for _, route := range routes {
+		for _, segment := range route.Segments {
+			for _, component := range request.Components {
+				for _, pad := range component.Pads {
+					if sameOccupancyNet(pad.Net, route.Net) || !padAppliesToCopperLayer(pad, segment.Layer, request.Board.Layers) {
+						continue
+					}
+					clearanceMM := request.Rules.ClearanceMM
+					if pad.Clearance != nil {
+						clearanceMM = max(clearanceMM, *pad.Clearance)
+					}
+					if segmentShapeDistance(segment, padRect(component, pad))-segment.WidthMM/2 < clearanceMM-distanceEpsilon {
+						issues = append(issues, reports.Issue{
+							Code:       reports.CodeValidationFailed,
+							Severity:   reports.SeverityBlocked,
+							Message:    fmt.Sprintf("segment clearance violation with pad %s.%s", component.Ref, pad.Name),
+							Refs:       []string{component.Ref},
+							Nets:       []string{route.Net, pad.Net},
+							Suggestion: "reroute the conflicting net or move the foreign pad",
+						})
+					}
+				}
+			}
+		}
+		for _, via := range route.Vias {
+			probe := Segment{Start: via.At, End: via.At}
+			for _, component := range request.Components {
+				for _, pad := range component.Pads {
+					if sameOccupancyNet(pad.Net, route.Net) || !viaAndPadShareCopperLayer(via, pad, request.Board.Layers) {
+						continue
+					}
+					clearanceMM := request.Rules.ClearanceMM
+					if pad.Clearance != nil {
+						clearanceMM = max(clearanceMM, *pad.Clearance)
+					}
+					if segmentShapeDistance(probe, padRect(component, pad))-via.DiameterMM/2 < clearanceMM-distanceEpsilon {
+						issues = append(issues, reports.Issue{
+							Code:       reports.CodeValidationFailed,
+							Severity:   reports.SeverityBlocked,
+							Message:    fmt.Sprintf("via clearance violation with pad %s.%s", component.Ref, pad.Name),
+							Refs:       []string{component.Ref},
+							Nets:       []string{route.Net, pad.Net},
+							Suggestion: "move the via or reroute the conflicting net",
+						})
+					}
+				}
+			}
+		}
+	}
+	return issues
+}
+
+func padAppliesToCopperLayer(pad Pad, layer string, boardLayers []Layer) bool {
+	wanted := normalizeLayer(layer)
+	for _, candidate := range padAccessLayers(pad, routableLayerNames(boardLayers)) {
+		if normalizeLayer(candidate) == wanted {
+			return true
+		}
+	}
+	return false
+}
+
+func viaAndPadShareCopperLayer(via Via, pad Pad, boardLayers []Layer) bool {
+	for _, layer := range via.Layers {
+		if padAppliesToCopperLayer(pad, layer, boardLayers) {
+			return true
+		}
+	}
+	return false
+}
+
 func ValidateResult(request Request, result Result) ValidationReport {
 	request = cloneRequest(request)
 	NormalizeRequest(&request)
@@ -64,6 +142,38 @@ func segmentIntersectsShape(segment Segment, shape Shape) bool {
 		return segmentIntersectsRect(segment, *shape.Rect)
 	}
 	return segmentIntersectsPolygon(segment, shape.Polygon)
+}
+
+func segmentShapeDistance(segment Segment, shape Shape) float64 {
+	if len(shape.Polygon) >= 3 {
+		if pointInPolygon(segment.Start, shape.Polygon) || pointInPolygon(segment.End, shape.Polygon) {
+			return 0
+		}
+		best := math.Inf(1)
+		for index, start := range shape.Polygon {
+			end := shape.Polygon[(index+1)%len(shape.Polygon)]
+			best = min(best, segmentDistance(segment, Segment{Start: start, End: end}))
+		}
+		return best
+	}
+	if shape.Rect == nil {
+		return math.Inf(1)
+	}
+	rect := normalizeRect(*shape.Rect)
+	if rect.ContainsPoint(segment.Start) || rect.ContainsPoint(segment.End) || segmentIntersectsRect(segment, rect) {
+		return 0
+	}
+	corners := []Point{
+		{XMM: rect.Min.XMM, YMM: rect.Min.YMM},
+		{XMM: rect.Max.XMM, YMM: rect.Min.YMM},
+		{XMM: rect.Max.XMM, YMM: rect.Max.YMM},
+		{XMM: rect.Min.XMM, YMM: rect.Max.YMM},
+	}
+	best := math.Inf(1)
+	for index, start := range corners {
+		best = min(best, segmentDistance(segment, Segment{Start: start, End: corners[(index+1)%len(corners)]}))
+	}
+	return best
 }
 
 func routeEndpointsConnected(request Request, route Route, access PadAccess) bool {

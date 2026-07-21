@@ -118,6 +118,10 @@ func RouteRequestContext(ctx context.Context, request Request) Result {
 		netSegmentCount := 0
 		netViaCount := 0
 		netLengthMM := 0.0
+		var pendingNeckdownTrunkPair *struct {
+			index int
+			pair  EndpointPair
+		}
 		var fallbackRequest Request
 		var fallbackOccupancy Occupancy
 		var fallbackViaOccupancy Occupancy
@@ -196,7 +200,23 @@ func RouteRequestContext(ctx context.Context, request Request) Result {
 					var extended bool
 					segments, metrics, extended = extendEndpointNeckdownToClearTrunk(path, netRequest.Rules.TraceWidthMM, neckdownWidthMM, neckdownLengthMM, nominalOccupancy, netRequest.Board.Layers, route.Segments)
 					if !extended {
-						routeIssues = []reports.Issue{endpointNeckdownTrunkIssue(plan.Net.Name, pairIndex, pair)}
+						// Do not make a multi-endpoint net's result depend on branch
+						// order. A short or obstructed first branch may legitimately be
+						// all neckdown when a later branch establishes the full-width
+						// trunk. Retain the safe narrow branch provisionally and verify
+						// the completed net contains nominal-width copper below.
+						var provisional bool
+						segments, metrics, provisional = endpointNeckdownAwaitingNetTrunk(path, netRequest.Rules.TraceWidthMM, neckdownWidthMM, nominalOccupancy, netRequest.Board.Layers)
+						if provisional {
+							if pendingNeckdownTrunkPair == nil {
+								pendingNeckdownTrunkPair = &struct {
+									index int
+									pair  EndpointPair
+								}{index: pairIndex, pair: pair}
+							}
+						} else {
+							routeIssues = []reports.Issue{endpointNeckdownTrunkIssue(plan.Net.Name, pairIndex, pair)}
+						}
 					}
 				}
 				if len(routeIssues) == 0 && (!pinPathEndpointAccess(&netAccess, path, pair.From, 0) || !pinPathEndpointAccess(&netAccess, path, pair.To, len(path.Points)-1)) {
@@ -221,6 +241,19 @@ func RouteRequestContext(ctx context.Context, request Request) Result {
 			netLengthMM += metrics.TotalLengthMM
 			request.Existing = append(request.Existing, existingCopperForSegments(segments)...)
 			request.Existing = append(request.Existing, existingCopperForVias(vias, request.Board.Layers)...)
+		}
+		if !netFailed && pendingNeckdownTrunkPair != nil && !segmentsContainNominalWidth(route.Segments, netRequest.Rules.TraceWidthMM) {
+			route.Issues = append(route.Issues, endpointNeckdownTrunkIssue(plan.Net.Name, pendingNeckdownTrunkPair.index, pendingNeckdownTrunkPair.pair))
+			netFailed = true
+			failed = true
+		}
+		if !netFailed {
+			route.Segments = pruneConnectedSameLayerSegmentCycles(request, route, access)
+			netSegmentCount = len(route.Segments)
+			netLengthMM = segmentLengthTotal(route.Segments)
+			request.Existing = request.Existing[:existingStart]
+			request.Existing = append(request.Existing, existingCopperForSegments(route.Segments)...)
+			request.Existing = append(request.Existing, existingCopperForVias(route.Vias, request.Board.Layers)...)
 		}
 		if netFailed || hasBlockingIssue(route.Issues) {
 			request.Existing = request.Existing[:existingStart]
@@ -327,6 +360,83 @@ func segmentLengthTotal(segments []Segment) float64 {
 		total += pointDistance(segment.Start, segment.End)
 	}
 	return roundMM(total)
+}
+
+type routeSegmentVertex struct {
+	Layer    string
+	XMM, YMM float64
+}
+
+func pruneConnectedSameLayerSegmentCycles(request Request, route Route, access PadAccess) []Segment {
+	segments := append([]Segment(nil), route.Segments...)
+	for {
+		candidates := sameLayerCycleClosingIndexes(segments)
+		removed := false
+		for index := len(candidates) - 1; index >= 0; index-- {
+			candidateSegments := removeSegmentIndexes(segments, []int{candidates[index]})
+			candidateRoute := route
+			candidateRoute.Segments = candidateSegments
+			if routeEndpointsConnected(request, candidateRoute, access) {
+				segments = candidateSegments
+				removed = true
+				break
+			}
+		}
+		if !removed {
+			return segments
+		}
+	}
+}
+
+func sameLayerCycleClosingIndexes(segments []Segment) []int {
+	parent := map[routeSegmentVertex]routeSegmentVertex{}
+	find := func(vertex routeSegmentVertex) routeSegmentVertex {
+		root, ok := parent[vertex]
+		if !ok {
+			parent[vertex] = vertex
+			return vertex
+		}
+		for root != parent[root] {
+			root = parent[root]
+		}
+		for vertex != root {
+			next := parent[vertex]
+			parent[vertex] = root
+			vertex = next
+		}
+		return root
+	}
+	vertexFor := func(point Point, layer string) routeSegmentVertex {
+		return routeSegmentVertex{Layer: normalizeLayer(layer), XMM: roundMM(point.XMM), YMM: roundMM(point.YMM)}
+	}
+	closing := make([]int, 0)
+	for index, segment := range segments {
+		startRoot := find(vertexFor(segment.Start, segment.Layer))
+		endRoot := find(vertexFor(segment.End, segment.Layer))
+		if startRoot == endRoot {
+			closing = append(closing, index)
+			continue
+		}
+		parent[endRoot] = startRoot
+	}
+	return closing
+}
+
+func removeSegmentIndexes(segments []Segment, indexes []int) []Segment {
+	if len(indexes) == 0 {
+		return append([]Segment(nil), segments...)
+	}
+	removed := map[int]struct{}{}
+	for _, index := range indexes {
+		removed[index] = struct{}{}
+	}
+	kept := make([]Segment, 0, len(segments)-len(removed))
+	for index, segment := range segments {
+		if _, ok := removed[index]; !ok {
+			kept = append(kept, segment)
+		}
+	}
+	return kept
 }
 
 func clonePadAccessPoints(access PadAccess) PadAccess {
@@ -563,13 +673,17 @@ func buildRouteOccupancy(request Request, netName string) (Occupancy, Occupancy,
 }
 
 func nominalSegmentsClearOccupancy(segments []Segment, nominalWidthMM float64, occupancy Occupancy, layers []Layer) bool {
+	return segmentsClearOccupancyAtLeastWidth(segments, nominalWidthMM, occupancy, layers)
+}
+
+func segmentsClearOccupancyAtLeastWidth(segments []Segment, minimumWidthMM float64, occupancy Occupancy, layers []Layer) bool {
 	gridMM := occupancy.Grid.spacingMM()
 	if gridMM <= 0 {
 		return false
 	}
 	layerIndexes, _ := LayerIndexes(layers)
 	for _, segment := range segments {
-		if segment.WidthMM+distanceEpsilon < nominalWidthMM {
+		if segment.WidthMM+distanceEpsilon < minimumWidthMM {
 			continue
 		}
 		layerIndex, ok := layerIndexes[normalizeLayer(segment.Layer)]
@@ -619,6 +733,19 @@ func extendEndpointNeckdownToClearTrunk(path GridPath, nominalWidthMM float64, n
 		return segments, metrics, true
 	}
 	return nil, Metrics{}, false
+}
+
+func endpointNeckdownAwaitingNetTrunk(path GridPath, nominalWidthMM, neckdownWidthMM float64, occupancy Occupancy, layers []Layer) ([]Segment, Metrics, bool) {
+	base, _ := BuildSegmentsFromPath(path, nominalWidthMM)
+	totalLengthMM := segmentLengthTotal(base)
+	if neckdownWidthMM <= 0 || neckdownWidthMM >= nominalWidthMM || totalLengthMM <= distanceEpsilon {
+		return nil, Metrics{}, false
+	}
+	segments, metrics := BuildSegmentsFromPathWithNeckdown(path, nominalWidthMM, neckdownWidthMM, totalLengthMM/2)
+	if segmentsContainNominalWidth(segments, nominalWidthMM) || !nominalSegmentsClearOccupancy(segments, nominalWidthMM, occupancy, layers) {
+		return nil, Metrics{}, false
+	}
+	return segments, metrics, true
 }
 
 func segmentsContainNominalWidth(segments []Segment, nominalWidthMM float64) bool {

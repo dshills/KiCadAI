@@ -213,6 +213,8 @@ func TestCheckedInCatalogAudioPowerSemiconductorEvidence(t *testing.T) {
 		fabricationProof bool
 		linearStatus     string
 	}{
+		{id: "bjt.onsemi.d44h11g.to220", family: "bjt", deviceClass: "bjt", polarity: "npn", fabricationProof: true, linearStatus: "proven"},
+		{id: "bjt.onsemi.d45h11g.to220", family: "bjt", deviceClass: "bjt", polarity: "pnp", fabricationProof: true, linearStatus: "proven"},
 		{id: "bjt.onsemi.njw0281g.to3p", family: "bjt", deviceClass: "bjt", polarity: "npn", fabricationProof: true, linearStatus: "proven"},
 		{id: "bjt.onsemi.njw0302g.to3p", family: "bjt", deviceClass: "bjt", polarity: "pnp", fabricationProof: true, linearStatus: "proven"},
 		{id: "mosfet.vishay.irfp240.to247", family: "mosfet", deviceClass: "mosfet", polarity: "n_channel", linearStatus: "review_required"},
@@ -235,6 +237,29 @@ func TestCheckedInCatalogAudioPowerSemiconductorEvidence(t *testing.T) {
 		}
 		if record.AmplifierOutput == nil || record.AmplifierOutput.DeviceClass != test.deviceClass || record.AmplifierOutput.Polarity != test.polarity || record.AmplifierOutput.ComplementaryGroup != evidence.ComplementaryGroup {
 			t.Fatalf("%s amplifier output evidence mismatch: %#v", test.id, record.AmplifierOutput)
+		}
+		wantModel := "mna_bjt_npn_ebers_moll_v1"
+		if test.polarity == "pnp" {
+			wantModel = "mna_bjt_pnp_ebers_moll_v1"
+		}
+		if test.family == "bjt" && (len(record.SimulationModels) != 1 || record.SimulationModels[0].ModelID != wantModel) {
+			t.Fatalf("%s trusted compact model = %#v, want %s", test.id, record.SimulationModels, wantModel)
+		}
+	}
+}
+
+func TestCheckedInCatalogMediumPowerDriverThermalEvidence(t *testing.T) {
+	catalog, err := LoadCatalog(context.Background(), LoadOptions{CatalogDir: checkedInCatalogDir(t)})
+	if err != nil {
+		t.Fatalf("load checked-in catalog: %v", err)
+	}
+	for _, id := range []string{"bjt.onsemi.pzt3904t1g.sot223", "bjt.onsemi.pzt3906t1g.sot223"} {
+		record := requireCatalogRecord(t, catalog, id)
+		if record.Thermal == nil || record.Thermal.MaxJunctionTemperatureC == nil || record.Thermal.JunctionToAmbientCPerW == nil || *record.Thermal.JunctionToAmbientCPerW != 83.3 {
+			t.Fatalf("%s thermal evidence = %#v", id, record.Thermal)
+		}
+		if len(record.SimulationModels) != 1 || len(record.Symbols) != 1 || len(record.Packages) != 1 || record.Verification.Confidence != ConfidenceVerified {
+			t.Fatalf("%s fabrication identity is incomplete: model=%#v symbols=%#v packages=%#v verification=%#v", id, record.SimulationModels, record.Symbols, record.Packages, record.Verification)
 		}
 	}
 }
@@ -293,6 +318,13 @@ func TestCheckedInCatalogSpeakerAmplifierComponentEvidence(t *testing.T) {
 		}
 		requireSymbolFunctions(t, record, test.symbol, []string{"BASE", "COLLECTOR", "EMITTER"})
 		requirePackagePads(t, record, "to225", []string{"BASE", "COLLECTOR", "EMITTER"})
+		wantModel := "mna_bjt_npn_ebers_moll_v1"
+		if test.polarity == "pnp" {
+			wantModel = "mna_bjt_pnp_ebers_moll_v1"
+		}
+		if len(record.SimulationModels) != 1 || record.SimulationModels[0].ModelID != wantModel {
+			t.Fatalf("%s trusted compact model = %#v, want %s", test.id, record.SimulationModels, wantModel)
+		}
 	}
 
 	for _, test := range []struct {

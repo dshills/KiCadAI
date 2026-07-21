@@ -52,6 +52,37 @@ func TestValidateResultDetectsCrossedTraceClearanceViolation(t *testing.T) {
 	assertValidationIssue(t, report, "segment clearance violation with net B: (1,1) to (5,5) crosses (1,5) to (5,1)")
 }
 
+func TestClearanceIssuesDetectsLongShallowDiagonalViolation(t *testing.T) {
+	routes := []Route{
+		{Net: "composition_net_008", Segments: []Segment{{
+			Net: "composition_net_008", Layer: "B.Cu", Start: Point{XMM: 10.25, YMM: 8}, End: Point{XMM: 29.75, YMM: 8.5}, WidthMM: 0.2,
+		}}},
+		{Net: "composition_net_017", Segments: []Segment{{
+			Net: "composition_net_017", Layer: "B.Cu", Start: Point{XMM: 15.25, YMM: 7.75}, End: Point{XMM: 50.25, YMM: 7.75}, WidthMM: 0.2,
+		}}},
+	}
+	if issues := clearanceIssues(routes, 0.2); len(issues) == 0 {
+		t.Fatal("long shallow diagonal clearance violation was not detected")
+	}
+}
+
+func TestValidatePhysicalClearanceDetectsCrossPhasePadCollision(t *testing.T) {
+	request := singleLayerSearchRequest()
+	request.Rules.ClearanceMM = 0.2
+	request.Components = append(request.Components, Component{
+		Ref: "J7", Position: Placement{XMM: 22, YMM: 11}, Pads: []Pad{{
+			Name: "1", Net: "OTHER", Type: PadThroughHole, Shape: PadCircle,
+			Size: Size{WidthMM: 1.7, HeightMM: 1.7}, Layers: []string{"*.Cu"},
+		}},
+	})
+	routes := []Route{{Net: "SIG", Segments: []Segment{{
+		Net: "SIG", Layer: "F.Cu", Start: Point{XMM: 22.75, YMM: 13.5}, End: Point{XMM: 23.25, YMM: 8}, WidthMM: 0.3,
+	}}}}
+	if issues := ValidatePhysicalClearance(request, routes); len(issues) == 0 {
+		t.Fatal("cross-phase segment-to-pad violation was not detected")
+	}
+}
+
 func TestValidateResultDetectsSegmentToViaClearanceViolation(t *testing.T) {
 	request := singleLayerSearchRequest()
 	request.Rules.ClearanceMM = 0.2

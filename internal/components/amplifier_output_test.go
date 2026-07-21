@@ -117,7 +117,7 @@ func TestSelectAmplifierOutputPairForPowerBJTLoad(t *testing.T) {
 	if !result.OK {
 		t.Fatalf("expected evidence-backed power BJT pair selection to pass: %+v", result.Issues)
 	}
-	if pair.Upper.Component.ID != "bjt.onsemi.njw0281g.to3p" || pair.Lower.Component.ID != "bjt.onsemi.njw0302g.to3p" {
+	if pair.Upper.Component.ID != "bjt.onsemi.d44h11g.to220" || pair.Lower.Component.ID != "bjt.onsemi.d45h11g.to220" {
 		t.Fatalf("power BJT pair = %s / %s", pair.Upper.Component.ID, pair.Lower.Component.ID)
 	}
 	if pair.DeviceClass != "bjt" || pair.EstimatedPeakMA != "3125" {

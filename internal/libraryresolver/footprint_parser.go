@@ -139,7 +139,13 @@ func readLibraryFootprint(file LibraryFile, node sexpr.ParsedNode, name string) 
 			pad, padIssues := readLibraryPad(file.Path, child)
 			issues = append(issues, padIssues...)
 			record.Pads = append(record.Pads, pad)
-			bounds.includePad(pad)
+			if len(pad.CopperRegions) == 0 {
+				bounds.includePad(pad)
+			} else {
+				for _, region := range pad.CopperRegions {
+					bounds.includeBox(region)
+				}
+			}
 		case "fp_text":
 			text := readLibraryFootprintText(child)
 			record.Texts = append(record.Texts, text)
@@ -334,7 +340,85 @@ func readLibraryPad(path string, node sexpr.ParsedNode) (FootprintPad, []reports
 			issues = append(issues, parseIssue(path, "roundrect_rratio requires numeric value"))
 		}
 	}
+	if pad.Shape == "custom" {
+		var regionIssues []reports.Issue
+		pad.CopperRegions, regionIssues = readCustomPadCopperRegions(path, node, pad)
+		issues = append(issues, regionIssues...)
+	}
 	return pad, issues
+}
+
+func readCustomPadCopperRegions(path string, node sexpr.ParsedNode, pad FootprintPad) ([]BoundingBox, []reports.Issue) {
+	anchor := newBounds()
+	anchorPad := pad
+	anchorPad.Position = kicadfiles.Point{}
+	anchorPad.Rotation = 0
+	anchorPad.Shape = "rect"
+	anchor.includePad(anchorPad)
+	regions := []BoundingBox{transformPadLocalBox(anchor.box(), pad)}
+	var issues []reports.Issue
+	primitives, ok := node.Child("primitives")
+	if !ok {
+		return regions, issues
+	}
+	for _, primitive := range primitives.Children {
+		bounds := newBounds()
+		switch primitive.Head() {
+		case "gr_poly", "gr_curve":
+			points, pointIssues := readPolyPoints(path, primitive)
+			issues = append(issues, pointIssues...)
+			for _, point := range points {
+				bounds.includePoint(point)
+			}
+		case "gr_rect", "gr_bbox", "gr_line":
+			bounds.includeNamedPoint(primitive, "start")
+			bounds.includeNamedPoint(primitive, "end")
+		case "gr_circle":
+			center, centerOK := readNamedPointOK(primitive, "center")
+			end, endOK := readNamedPointOK(primitive, "end")
+			if centerOK && endOK {
+				bounds.includeCircle(center, end)
+			}
+		case "gr_arc":
+			start, mid, end, pointsOK := readLibraryArcPointsOK(primitive)
+			if pointsOK {
+				bounds.includeArc(start, mid, end)
+			}
+		}
+		if !bounds.initialized {
+			continue
+		}
+		if width := readPadPrimitiveWidth(primitive); width > 0 {
+			bounds.expand(width / 2)
+		}
+		regions = append(regions, transformPadLocalBox(bounds.box(), pad))
+	}
+	return regions, issues
+}
+
+func readPadPrimitiveWidth(node sexpr.ParsedNode) kicadfiles.IU {
+	if width, ok := node.Child("width"); ok {
+		if value, valueOK := firstNumericMM(width, 1); valueOK {
+			return value
+		}
+	}
+	return readStrokeWidth(node)
+}
+
+func transformPadLocalBox(box BoundingBox, pad FootprintPad) BoundingBox {
+	transformed := newBounds()
+	for _, corner := range []kicadfiles.Point{
+		{X: box.Min.X, Y: box.Min.Y},
+		{X: box.Min.X, Y: box.Max.Y},
+		{X: box.Max.X, Y: box.Min.Y},
+		{X: box.Max.X, Y: box.Max.Y},
+	} {
+		corner = rotatePointAround(kicadfiles.Point{}, corner, pad.Rotation)
+		corner.X += pad.Position.X
+		corner.Y += pad.Position.Y
+		transformed.includePoint(corner)
+	}
+	return transformed.box()
 }
 
 func readLibraryFootprintText(node sexpr.ParsedNode) FootprintText {
@@ -642,6 +726,21 @@ func (bounds *footprintBounds) includePoint(point kicadfiles.Point) {
 	if point.Y > bounds.max.Y {
 		bounds.max.Y = point.Y
 	}
+}
+
+func (bounds *footprintBounds) includeBox(box BoundingBox) {
+	bounds.includePoint(box.Min)
+	bounds.includePoint(box.Max)
+}
+
+func (bounds *footprintBounds) expand(delta kicadfiles.IU) {
+	if !bounds.initialized || delta <= 0 {
+		return
+	}
+	bounds.min.X -= delta
+	bounds.min.Y -= delta
+	bounds.max.X += delta
+	bounds.max.Y += delta
 }
 
 func (bounds *footprintBounds) includeNamedPoint(node sexpr.ParsedNode, name string) {

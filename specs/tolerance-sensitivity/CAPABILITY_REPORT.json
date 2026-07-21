@@ -3,7 +3,7 @@
   "generated_at": "2026-07-17T00:00:00Z",
   "corpus_manifest_sha256": "4640e4445ef4a02ec13810a5e2432eac5b81f05e00fc10ec01fc41c61b741eb6",
   "registry_version": "kicadai.trusted-simulation-registry.v1",
-  "registry_sha256": "5475c4f429310651f562db070ebd4d9021f6e059af50b78435a44182973af5b1",
+  "registry_sha256": "25e88c87363422f0dbc6402a91a975b2ca0904426a51e612469a03be77ada225",
   "promotion_gate_profile": {
     "byte_identical_replay": "required",
     "connectivity": "required",
@@ -19,10 +19,10 @@
       "category": "regulator_output",
       "nominal_status": "pass",
       "worst_case_status": "pass",
-      "plan_sha256": "50919386624857ab35305011f9b7345d1fcd10c37a65e2457b96d83140629b0f",
+      "plan_sha256": "0285c9df50e79577652e1a2977eb63bc57191aa34b3ac822c88e47cb08287500",
       "catalog_evidence_sha256": "9d7948ebd4678e0bf946ea9f11db3b295c6d32721b5e2ac9fd4317a3470f1eb5",
-      "nominal_report_sha256": "73c97d1aa4bd123c40a04be0df6e0a65354246ef730b9e6ed98f3d6d617ff6e0",
-      "worst_report_sha256": "70af488bb5e916dfffd471100c10b65d0dc3a08e78a407c9cab8cd4c5a198163",
+      "nominal_report_sha256": "b48b79a7abc06806d3cc79afc7046ebced9532416c81639730cd802ee33529f5",
+      "worst_report_sha256": "654fb8cbcff1a73b4de35c48c3b46e91c128ea1817bf62b5f468f0e623c76975",
       "dominant_sensitivity": {
         "assertion": "output_voltage_v",
         "target": "bindings.regulator.model_parameters.output_voltage_v",
@@ -38,10 +38,10 @@
       "nominal_status": "pass",
       "worst_case_status": "blocked",
       "failure_taxonomy": "assertion_out_of_bounds",
-      "plan_sha256": "7a15b5f2942cd211a4d02904ecf0d1d40b2fbd42296c29e0c912f504aac0d643",
+      "plan_sha256": "6177883b127903883405c27451e5955597ed5ed1eced59da7e4c699aaaa4c8cd",
       "catalog_evidence_sha256": "91f9a97210489a86d4f2eeb400df125dfd4a5e86c663ebe3e4a9712cb0d02384",
-      "nominal_report_sha256": "15380601ceef10ea7f196e9e9d9eae259a4b96691993fa6317c890c10eef947e",
-      "worst_report_sha256": "5d615749df5cafe89a6dea04a8b69ffcf48c38ab800853361b183b334bb53325",
+      "nominal_report_sha256": "b19ffa2a17eea645259f04abb6cacded6f65f73ced1ba809c8ecd1453facf00f",
+      "worst_report_sha256": "078462a90ea0d0ba5b4f3fa09974a55ad567ef5f37f81a4b236f39dcf8af25d7",
       "dominant_sensitivity": {
         "assertion": "output_voltage_v",
         "target": "bindings.regulator.model_parameters.output_voltage_v",
@@ -54,10 +54,10 @@
       "category": "resistor_divider",
       "nominal_status": "pass",
       "worst_case_status": "pass",
-      "plan_sha256": "8c90c690770a5a3fa2f9305be2bdf0a3d80d4ed9a1d94454f196182dd0cb79c2",
+      "plan_sha256": "539819cd861235d472f5ad9e8f2e663e2480fe3a89978af94772f2cd6f20b2f7",
       "catalog_evidence_sha256": "2f3e03ad8203e5c81a5b8f9165b3b8b45598f9b8dfa74b9ffed84777b8326535",
-      "nominal_report_sha256": "8f326aac20a655c299fc973d514019eada662bc11192f5453331429db9758c9e",
-      "worst_report_sha256": "667472852dfd73291b49e84dc5e784b763230c7c80fb4ff83fc5cdcaa855ec3f",
+      "nominal_report_sha256": "66c4be01592403124b25609d470f1ac8dbbe00dd8aa8d816323d38cf91e2050f",
+      "worst_report_sha256": "eda1a1a5d47f844a990769529283b4b21a580e89ee76b09efc7ce4430e01a5c9",
       "dominant_sensitivity": {
         "assertion": "output_voltage_v",
         "target": "bindings.lower_resistor.value_si",
@@ -73,10 +73,10 @@
       "nominal_status": "pass",
       "worst_case_status": "blocked",
       "failure_taxonomy": "assertion_out_of_bounds",
-      "plan_sha256": "32d416401241afc7587f5118393a7547f776e39e0f0ac768a2066a9df58bc436",
+      "plan_sha256": "7dd768d57a43994d951c7cdcb86a61b789444f577786aa355f2ed6ad86e7f23a",
       "catalog_evidence_sha256": "2f3e03ad8203e5c81a5b8f9165b3b8b45598f9b8dfa74b9ffed84777b8326535",
-      "nominal_report_sha256": "757ddbd09a044489f8e7e101c8e52e28d147e139ea5b2897e04992d883948bd7",
-      "worst_report_sha256": "d13ed6f75d68b3062a41e852d25198b8b8bab0a78cb547afedf1344602fb3c76",
+      "nominal_report_sha256": "98bcfe5da84f4e025349e8302558044fe7f05392401be8f791dd7870bca8b087",
+      "worst_report_sha256": "471ad22f152c04d7d4ff30de68feb23bef343292bd431640130e554eb503d3c9",
       "dominant_sensitivity": {
         "assertion": "output_voltage_v",
         "target": "bindings.lower_resistor.value_si",
@@ -89,10 +89,10 @@
       "category": "rc_timing_filter",
       "nominal_status": "pass",
       "worst_case_status": "pass",
-      "plan_sha256": "36576ca016a19456aed1048a5d0b8e2ed0e4e3dd7972c8f073bcf3e63d941372",
+      "plan_sha256": "3919e2b07842ab1a1bd2a4ea6c4d1916c9b7b3c0b11824db74eb502d20cde022",
       "catalog_evidence_sha256": "75adb4041b8a9491010bf6746ca779521a20c0aa9cc2d47c03d75779d0a09931",
-      "nominal_report_sha256": "d4054ce9ae0b6ef82a960d2f32ccd7bb1b458001083ec42fd8cb7e489b569914",
-      "worst_report_sha256": "e15b57d9d4be9cca68a1287591c1763fe878c74d46060820480fafa9bca45495",
+      "nominal_report_sha256": "44c2f19635736b661be8926a01ae716c1ced1378a181103691597bd7a0f0f45f",
+      "worst_report_sha256": "5e118d0be79b003891317858188935b4270d13b42920901dac280a0188cdc183",
       "dominant_sensitivity": {
         "assertion": "cutoff_frequency_hz",
         "target": "bindings.capacitor.value_si",
@@ -108,10 +108,10 @@
       "nominal_status": "pass",
       "worst_case_status": "blocked",
       "failure_taxonomy": "assertion_out_of_bounds",
-      "plan_sha256": "2eda7dfe5cff0d64a3fd9353445284f13e4c30364a62bad7d3af370d913cda98",
+      "plan_sha256": "de584d7201893076aee093ce2c6c3f7777a126eda4db4739a3aa7ccc871f819f",
       "catalog_evidence_sha256": "75adb4041b8a9491010bf6746ca779521a20c0aa9cc2d47c03d75779d0a09931",
-      "nominal_report_sha256": "1138f0cb7fbc3f48fcf54b66d9e85c3a1741486c1b8c9cdf3e280a50b5d33c0a",
-      "worst_report_sha256": "8e048fc21516588a700182a38f3a623e86ac1183c5832387005e6347cba1879a",
+      "nominal_report_sha256": "c5cc9f031ff10bc37455bf3fac6775cc95fb6af1374fef79d6840c47a6dbab91",
+      "worst_report_sha256": "a3c4804aaa65e0ab05c43f2219c3c9207b31221263ebb360cac6b35dcb21373b",
       "dominant_sensitivity": {
         "assertion": "cutoff_frequency_hz",
         "target": "bindings.capacitor.value_si",
@@ -124,15 +124,15 @@
       "category": "transistor_bias",
       "nominal_status": "pass",
       "worst_case_status": "pass",
-      "plan_sha256": "d5e259d401c8b867b89b8c8c7081f5e178656a9ea959098441d4bc613cc55611",
+      "plan_sha256": "7ba661f5f06c35387a4d17e6394a6ad5e9e6f4b75ce06ea606d76d61ac02e65f",
       "catalog_evidence_sha256": "cc23390e8bbc1a27d0ceded862f473c5683132367c48679fd6be2efaab4272ec",
-      "nominal_report_sha256": "fb658079e12689ddfee4630d555940c188152de9d29e6a16284b93e29b1f080a",
-      "worst_report_sha256": "2bd3115609036dd0de2982de9c3300beb984eb9426e03d21bd175bc19320958e",
+      "nominal_report_sha256": "2a222e95b89e4476116afa659c5935c23c8098b4f05ffb3acd64caa70a385991",
+      "worst_report_sha256": "2bbabf602ba0e00befcf9ed23f94fbd7f38318e2cb5768f53ee8f8fbda504dbe",
       "dominant_sensitivity": {
-        "assertion": "bias.COLLECTOR.voltage_v@0/0",
+        "assertion": "bias.COLLECTOR...voltage_v@0/0",
         "target": "devices.q1.model_parameters.forward_beta",
         "corner": "devices.q1.model_parameters.forward_beta=80,devices.q1.model_parameters.junction_temperature_k=300.15",
-        "margin": 0.7408203744908262
+        "margin": 0.7408203744908226
       },
       "promotion_corpus": "function",
       "promotion_fixture": "npn_low_side_status_driver"
@@ -143,12 +143,12 @@
       "nominal_status": "pass",
       "worst_case_status": "blocked",
       "failure_taxonomy": "assertion_out_of_bounds",
-      "plan_sha256": "eb72f53451dda4cf99cdf6617f79d4018ba592e920dd97f5e9a4d9be33d175ee",
+      "plan_sha256": "371259fe6e7ba6b47a9c5abecd7d9de04d92ddb7d7992d66ff19cf1ceeeff23d",
       "catalog_evidence_sha256": "cc23390e8bbc1a27d0ceded862f473c5683132367c48679fd6be2efaab4272ec",
-      "nominal_report_sha256": "7724ba8670a772158ea7063e113563148df30db501d8d85be68e9233d1e2788a",
-      "worst_report_sha256": "56b17f9c1a801d13a404e46ae273758af64b4c09c85cc6723f816b2b9159f629",
+      "nominal_report_sha256": "7dd8f39f5513e505775791f1df01b384f85d40885f00184c94e84c24a66ab203",
+      "worst_report_sha256": "d62e8835bd824d58e92cbf414c04a69cc0fe0ba0e3984e632055ba079147e5a6",
       "dominant_sensitivity": {
-        "assertion": "bias.COLLECTOR.voltage_v@0/0",
+        "assertion": "bias.COLLECTOR...voltage_v@0/0",
         "target": "devices.q1.model_parameters.forward_beta",
         "corner": "devices.q1.model_parameters.forward_beta=120,devices.q1.model_parameters.junction_temperature_k=300.15",
         "margin": -0.008595851476586258
@@ -159,15 +159,15 @@
       "category": "opamp_gain",
       "nominal_status": "pass",
       "worst_case_status": "pass",
-      "plan_sha256": "d7be9500415053c2f74e9dc7a2a18d8122c665f5070a9826b557a36b78d7b15a",
+      "plan_sha256": "4c572dcedd26e9b7444ebee7ddc335f3139039a1db677fbe10e901275e5be55b",
       "catalog_evidence_sha256": "1b79b17f1ba8e70263e66da66431b22f25788254737b9443433ff344c0f0bba3",
-      "nominal_report_sha256": "d5f50a8e4eb5581af8efd53367c1ad5041056f7335ed9c02fd9dea4403eb3dbc",
-      "worst_report_sha256": "d842d06c8797500b6f2d32c67cdae7f71e41832989242030cd20fbb793b07114",
+      "nominal_report_sha256": "0e0d5742cdf969989e3aad50c9cdbd909205e7d03f26cecb54458af6fb38681a",
+      "worst_report_sha256": "c20cc901e51d8cc0844fa475bb40b0e897fba5e33b35da74c82c4e8997336779",
       "dominant_sensitivity": {
-        "assertion": "gain.OUT.voltage_v@0/0",
+        "assertion": "gain.OUT...voltage_v@0/0",
         "target": "devices.opamp.model_parameters.dc_open_loop_gain",
         "corner": "devices.opamp.model_parameters.dc_open_loop_gain=150000",
-        "margin": 0.000006666622222484264
+        "margin": 0.0000066666222225952865
       },
       "promotion_corpus": "function",
       "promotion_fixture": "buffered_thermistor_frontend"
@@ -178,15 +178,15 @@
       "nominal_status": "pass",
       "worst_case_status": "blocked",
       "failure_taxonomy": "assertion_out_of_bounds",
-      "plan_sha256": "424c85dbb82ade307ccc917c8c5bd830fd7e9dd959e7571c7051e1421097b975",
+      "plan_sha256": "98a2c0aae446297719a8093b49c0a4f73e9122bf3fe7f275c4e514aeaea99c56",
       "catalog_evidence_sha256": "1b79b17f1ba8e70263e66da66431b22f25788254737b9443433ff344c0f0bba3",
-      "nominal_report_sha256": "b980e8a672ede3c6aca1f93ca35f3b201e8d985d3a1c16c42da684a726835a0b",
-      "worst_report_sha256": "15898d2f6ab0ba912aff3bbeb1a15867beed5180806e0d08d7bbe6d0f676bff8",
+      "nominal_report_sha256": "0f76fc3246129deb6f885fb295b2b4ff064294a8f12f32d69e865e8b4dc8eea8",
+      "worst_report_sha256": "ab1ffc1170da367a1514246c2370f65c1e503e703ee1a10879b38d5bb4ec31b0",
       "dominant_sensitivity": {
-        "assertion": "gain.OUT.voltage_v@0/0",
+        "assertion": "gain.OUT...voltage_v@0/0",
         "target": "devices.opamp.model_parameters.dc_open_loop_gain",
         "corner": "devices.opamp.model_parameters.dc_open_loop_gain=50000",
-        "margin": -0.000004999600007993266
+        "margin": -0.000004999600007882243
       }
     },
     {
@@ -194,12 +194,12 @@
       "category": "comparator_threshold",
       "nominal_status": "pass",
       "worst_case_status": "pass",
-      "plan_sha256": "9e8fbff94d83f6dec8f0debba2d79d2bf952edc2f5a7875e0fa67e776e8bb7dc",
+      "plan_sha256": "2a6aef7ffcb07ea816ed253454c31e0f760fbf315a623340103ff0b5be4e1e65",
       "catalog_evidence_sha256": "4f643ded69d67baf80d0eb1ab2c0f9fef45377d4118a1c8cf44902818b6de17b",
-      "nominal_report_sha256": "c70afa8abdb522b224f211d250838420f6863fd1356507f13776d73d8ff8d173",
-      "worst_report_sha256": "2bcd32a184de646ebdad22e34bc35b275d2e752d665b5110cc8ef39eea24557d",
+      "nominal_report_sha256": "b293a81b80e59a12a6604c242791a65864c5a5bf8f24849106624b8febe91858",
+      "worst_report_sha256": "5b4eab6bda1f01aa39847edfd619b7d526047863d1ae6c20f52d3253dfae28b2",
       "dominant_sensitivity": {
-        "assertion": "decision.OUT.voltage_v@0/0",
+        "assertion": "decision.OUT...voltage_v@0/0",
         "target": "analyses.decision.excitations.threshold.dc_value",
         "corner": "analyses.decision.excitations.threshold.dc_value=2.4",
         "margin": 0.009999999999999787
@@ -213,12 +213,12 @@
       "nominal_status": "pass",
       "worst_case_status": "blocked",
       "failure_taxonomy": "assertion_out_of_bounds",
-      "plan_sha256": "01a8ce8aee39935d4699660286ecd7929a059ee97b643b5b1e528c27caadf318",
+      "plan_sha256": "5b93bc0d2083728e530dfa356c3debd8e8b102509b7184697eb612f4abb4212f",
       "catalog_evidence_sha256": "4f643ded69d67baf80d0eb1ab2c0f9fef45377d4118a1c8cf44902818b6de17b",
-      "nominal_report_sha256": "cb9ac21c4f81c377df7102f1237f1e892a2095570b3514086fef23e650b8a36d",
-      "worst_report_sha256": "91e8b8acef5c62fe7d1fc8ded3635e4e1cedb150fa310049512ba39b3f17a3c3",
+      "nominal_report_sha256": "7d3d8e15e2a18aaf3992dcd426bf656102b6937fbae12464360f8cbbf855c141",
+      "worst_report_sha256": "cbd3b0dc3d6c3f2c10499ee146aedd4e288df3aab896fb7060db1f8885c59d71",
       "dominant_sensitivity": {
-        "assertion": "decision.OUT.voltage_v@0/0",
+        "assertion": "decision.OUT...voltage_v@0/0",
         "target": "analyses.decision.excitations.threshold.dc_value",
         "corner": "analyses.decision.excitations.threshold.dc_value=2.6",
         "margin": -4.79
@@ -229,15 +229,15 @@
       "category": "protection_network",
       "nominal_status": "pass",
       "worst_case_status": "pass",
-      "plan_sha256": "f6f70a39d4db5e899deeabb6d60f2bd3995ec5ed8e1f8c19627ccf822730b659",
+      "plan_sha256": "96a0c874b8058487197e02582fc748cb5e083b9a347918a2bbf1b17bf8269a4d",
       "catalog_evidence_sha256": "5e9b132bcef81ace22b4a656caa60923c211c9499fedfe571daa2fedb374333a",
-      "nominal_report_sha256": "e4abf415d51e4c047cd94f673151c028c27b45abfebe2b8479e1fae40ac04a68",
-      "worst_report_sha256": "eff2aff11f461fceb45b99a6e0966d63056c1bae370f91587ebe63294c374c85",
+      "nominal_report_sha256": "dead4513178d08df4c1d0d2f32b22b29f256ff7ad2318305ae597f9c047d90b9",
+      "worst_report_sha256": "f59684aab200d78077166ba875855afacb47a3d853b3003ec7b7dd1667cabc15",
       "dominant_sensitivity": {
-        "assertion": "bias.OUT.voltage_v@0/0",
-        "target": "devices.clamp.model_parameters.junction_temperature_k",
-        "corner": "analyses.bias.excitations.supply.dc_value=5,devices.clamp.model_parameters.junction_temperature_k=273.15,devices.limit.value_si=1000",
-        "margin": 0.17190583253227504
+        "assertion": "bias.OUT...voltage_v@0/0",
+        "target": "environment.temperature",
+        "corner": "analyses.bias.excitations.supply.dc_value=5,devices.clamp.model_parameters.junction_temperature_k=358.15,devices.limit.value_si=1000",
+        "margin": 0.13507667540510865
       },
       "promotion_corpus": "adversarial",
       "promotion_fixture": "dual_supply_diode_clamp"
@@ -248,15 +248,15 @@
       "nominal_status": "pass",
       "worst_case_status": "blocked",
       "failure_taxonomy": "assertion_out_of_bounds",
-      "plan_sha256": "3a02400b956c51b29c1a6fed5e595a9fc5ec759ccc87e1b9afd4eb0dc0436a58",
+      "plan_sha256": "c8ceefe3e90402a189349a85439616a904b47f3e183505a5c2db2b1011b84ab4",
       "catalog_evidence_sha256": "5e9b132bcef81ace22b4a656caa60923c211c9499fedfe571daa2fedb374333a",
-      "nominal_report_sha256": "9fc0d86eb6f51169b2a2648d9ec0bda2bf67b019c0403b1299e5f88866cc1a5e",
-      "worst_report_sha256": "d4ebb4b3c2fd91921d209070c32eaaa9d1f1aa25c7d4a62c77ba89fc9f6b58c7",
+      "nominal_report_sha256": "80457a7bdd1d96b766c4adc8b3e2ec71d8167efebc5406a6493e5245c14f8503",
+      "worst_report_sha256": "ab74c6cc25b45f250dd600176d76aa6416304d2e53c75e921302db21350601b5",
       "dominant_sensitivity": {
-        "assertion": "bias.OUT.voltage_v@0/0",
-        "target": "devices.clamp.model_parameters.junction_temperature_k",
+        "assertion": "bias.OUT...voltage_v@0/0",
+        "target": "environment.temperature",
         "corner": "analyses.bias.excitations.supply.dc_value=5,devices.clamp.model_parameters.junction_temperature_k=358.15,devices.limit.value_si=1000",
-        "margin": -0.11281869391968591
+        "margin": -0.044923324594891345
       }
     }
   ],

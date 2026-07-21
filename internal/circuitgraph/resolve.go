@@ -45,6 +45,16 @@ func NewResolver(options ResolveOptions) *Resolver {
 	return resolver
 }
 
+// CatalogHash returns the immutable catalog snapshot bound to this resolver.
+// Architecture search and downstream simulation must use the same value so
+// promotion evidence cannot accidentally span different catalog snapshots.
+func (resolver *Resolver) CatalogHash() string {
+	if resolver == nil {
+		return ""
+	}
+	return resolver.catalogHash
+}
+
 func (resolver *Resolver) Resolve(ctx context.Context, document Document) (ResolvedDocument, []reports.Issue) {
 	normalized := Normalize(document)
 	if issues := Validate(normalized); len(issues) != 0 {
@@ -183,6 +193,68 @@ func resolveSimulation(intent simmodel.Intent, resolved ResolvedDocument) (simmo
 			configuredSimulationModels(component), connections[component.Instance.ID], component.Units, component.Record,
 		)...)
 	}
+	return resolveSimulationEvidence(intent, resolved, evidence, nodes)
+}
+
+// SimulationHarnessDevice is a catalog-backed external testbench element. It
+// participates only in a re-resolved simulation workflow and never mutates the
+// candidate's physical circuit graph or writer request.
+type SimulationHarnessDevice struct {
+	InstanceID  string
+	CatalogID   string
+	ValueSI     float64
+	HasValueSI  bool
+	Connections []simmodel.ConnectionEvidence
+}
+
+// ResolveSimulationPlanWithHarness adds bounded catalog-backed operating loads
+// to one simulation workflow while preserving the immutable physical design.
+func (resolver *Resolver) ResolveSimulationPlanWithHarness(intent simmodel.Intent, resolved ResolvedDocument, harness []SimulationHarnessDevice) (simmodel.Plan, []reports.Issue) {
+	connections := make(map[string][]simmodel.ConnectionEvidence, len(resolved.Components))
+	nodes := make([]simmodel.NodeEvidence, 0, len(resolved.Nets))
+	for _, net := range resolved.Nets {
+		nodes = append(nodes, simmodel.NodeEvidence{Name: net.Intent.Name, Role: string(net.Intent.Role), VoltageDomain: net.Intent.VoltageDomain})
+		for _, endpoint := range net.Endpoints {
+			connections[endpoint.Intent.Component] = append(connections[endpoint.Intent.Component], simmodel.ConnectionEvidence{Function: endpoint.Function, UnitID: endpoint.Intent.Unit, Net: net.Intent.Name})
+		}
+	}
+	evidence := make([]simmodel.ComponentEvidence, 0, len(resolved.Components)+len(harness))
+	for _, component := range resolved.Components {
+		value, hasValue := components.ParseEngineeringValue(component.Instance.Value)
+		evidence = append(evidence, componentSimulationEvidence(
+			component.Instance.ID, component.ComponentID, component.Family, value, hasValue,
+			configuredSimulationModels(component), connections[component.Instance.ID], component.Units, component.Record,
+		)...)
+	}
+	seen := make(map[string]bool, len(resolved.Components)+len(harness))
+	for _, component := range resolved.Components {
+		seen[component.Instance.ID] = true
+	}
+	var issues []reports.Issue
+	for index, device := range harness {
+		path := fmt.Sprintf("simulation.harness[%d]", index)
+		if strings.TrimSpace(device.InstanceID) == "" || seen[device.InstanceID] {
+			issues = append(issues, graphIssue(CodeSimulationInvalid, path+".instance_id", "simulation harness instance identity must be nonempty and unique"))
+			continue
+		}
+		seen[device.InstanceID] = true
+		record, exists := resolver.recordsByID[device.CatalogID]
+		if !exists {
+			issues = append(issues, graphIssue(CodeSimulationInvalid, path+".catalog_id", "simulation harness component is absent from the immutable catalog"))
+			continue
+		}
+		evidence = append(evidence, componentSimulationEvidence(
+			device.InstanceID, device.CatalogID, record.Family, device.ValueSI, device.HasValueSI,
+			record.SimulationModels, append([]simmodel.ConnectionEvidence(nil), device.Connections...), nil, record,
+		)...)
+	}
+	if reports.HasBlockingIssue(issues) {
+		return simmodel.Plan{}, finalizeGraphIssues(issues)
+	}
+	return resolveSimulationEvidence(intent, resolved, evidence, nodes)
+}
+
+func resolveSimulationEvidence(intent simmodel.Intent, resolved ResolvedDocument, evidence []simmodel.ComponentEvidence, nodes []simmodel.NodeEvidence) (simmodel.Plan, []reports.Issue) {
 	plan, diagnostics := simmodel.ResolveWithTopology(intent, resolved.CatalogID, resolved.CatalogHash, evidence, nodes)
 	issues := make([]reports.Issue, 0, len(diagnostics))
 	for _, diagnostic := range diagnostics {

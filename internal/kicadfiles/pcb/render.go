@@ -705,8 +705,12 @@ func renderGraphic(prefix string, drawing Drawing) sexpr.List {
 			sexpr.L(sexpr.A("mid"), fixed(drawing.Arc.Mid.X), fixed(drawing.Arc.Mid.Y)),
 			sexpr.L(sexpr.A("end"), fixed(drawing.Arc.End.X), fixed(drawing.Arc.End.Y)),
 			renderStroke(drawing.Arc.Width, drawing.StrokeType),
-			sexpr.L(sexpr.A("fill"), sexpr.A(fillMode(drawing.Fill))),
 		)
+		// KiCad footprint arcs are open primitives and its writer omits fill.
+		// Board-level graphics retain the modeled fill field for compatibility.
+		if prefix != "fp" {
+			nodes = append(nodes, sexpr.L(sexpr.A("fill"), sexpr.A(fillMode(drawing.Fill))))
+		}
 	case drawing.Poly != nil:
 		nodes = append(nodes, renderPoints(drawing.Poly.Points), renderStroke(drawing.Poly.Width, drawing.StrokeType), sexpr.L(sexpr.A("fill"), sexpr.A(fillMode(drawing.Fill))))
 	case drawing.Curve != nil:

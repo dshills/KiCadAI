@@ -3,17 +3,106 @@
   "version": 1,
   "records": [
     {
+      "catalog_id": "bjt.onsemi.d44h11g.to220",
+      "family": "bjt",
+      "model_id": "mna_bjt_npn_ebers_moll_v1",
+      "provenance": {
+        "source": "https://www.onsemi.com/download/data-sheet/pdf/d44h-d.pdf",
+        "revision": "onsemi:D44H/D:rev14:2021-08",
+        "sha256": "0e6cc91b02404fe1f03deb0433e20ad7bec267176753155bce1bfb9a53c0ef5b",
+        "review_status": "reviewed",
+        "allowed_analyses": [
+          "ac_sweep",
+          "dc_operating_point",
+          "distortion",
+          "stability",
+          "startup",
+          "thermal",
+          "transient"
+        ],
+        "min_temperature_c": -55,
+        "max_temperature_c": 150
+      }
+    },
+    {
+      "catalog_id": "bjt.onsemi.d45h11g.to220",
+      "family": "bjt",
+      "model_id": "mna_bjt_pnp_ebers_moll_v1",
+      "provenance": {
+        "source": "https://www.onsemi.com/download/data-sheet/pdf/d44h-d.pdf",
+        "revision": "onsemi:D44H/D:rev14:2021-08",
+        "sha256": "d0e998bcf629d85ae72d254a4129eb9b02d17088e764e230d992102c10fdfa5c",
+        "review_status": "reviewed",
+        "allowed_analyses": [
+          "ac_sweep",
+          "dc_operating_point",
+          "distortion",
+          "stability",
+          "startup",
+          "thermal",
+          "transient"
+        ],
+        "min_temperature_c": -55,
+        "max_temperature_c": 150
+      }
+    },
+    {
+      "catalog_id": "bjt.onsemi.mje243g.to225",
+      "family": "bjt",
+      "model_id": "mna_bjt_npn_ebers_moll_v1",
+      "provenance": {
+        "source": "https://www.onsemi.com/pdf/datasheet/mje243-d.pdf",
+        "revision": "onsemi:MJE243/D:rev17:2024-12",
+        "sha256": "0e6cc91b02404fe1f03deb0433e20ad7bec267176753155bce1bfb9a53c0ef5b",
+        "review_status": "reviewed",
+        "allowed_analyses": [
+          "ac_sweep",
+          "dc_operating_point",
+          "distortion",
+          "stability",
+          "startup",
+          "thermal",
+          "transient"
+        ],
+        "min_temperature_c": -65,
+        "max_temperature_c": 150
+      }
+    },
+    {
+      "catalog_id": "bjt.onsemi.mje253g.to225",
+      "family": "bjt",
+      "model_id": "mna_bjt_pnp_ebers_moll_v1",
+      "provenance": {
+        "source": "https://www.onsemi.com/pdf/datasheet/mje243-d.pdf",
+        "revision": "onsemi:MJE243/D:rev17:2024-12",
+        "sha256": "d0e998bcf629d85ae72d254a4129eb9b02d17088e764e230d992102c10fdfa5c",
+        "review_status": "reviewed",
+        "allowed_analyses": [
+          "ac_sweep",
+          "dc_operating_point",
+          "distortion",
+          "stability",
+          "startup",
+          "thermal",
+          "transient"
+        ],
+        "min_temperature_c": -65,
+        "max_temperature_c": 150
+      }
+    },
+    {
       "catalog_id": "bjt.onsemi.mmbt3904.sot23",
       "family": "bjt",
       "model_id": "mna_bjt_npn_ebers_moll_v1",
       "provenance": {
         "source": "kicadai:trusted-simulation-registry",
         "revision": "kicadai.trusted-simulation-registry.v1",
-        "sha256": "034087f5599bd3a4d10a0c038d208d8310ffeefb9232b75ef8094637de0f1381",
+        "sha256": "0e6cc91b02404fe1f03deb0433e20ad7bec267176753155bce1bfb9a53c0ef5b",
         "review_status": "reviewed",
         "allowed_analyses": [
           "dc_operating_point",
           "distortion",
+          "stability",
           "startup",
           "thermal",
           "transient"
@@ -29,11 +118,13 @@
       "provenance": {
         "source": "kicadai:trusted-simulation-registry",
         "revision": "kicadai.trusted-simulation-registry.v1",
-        "sha256": "68ffc3e303aa09c98ae4271adecc47b69f5e712ca4a3f90ee5a3a6a7e53d79f5",
+        "sha256": "d0e998bcf629d85ae72d254a4129eb9b02d17088e764e230d992102c10fdfa5c",
         "review_status": "reviewed",
         "allowed_analyses": [
+          "ac_sweep",
           "dc_operating_point",
           "distortion",
+          "stability",
           "startup",
           "thermal",
           "transient"
@@ -43,6 +134,133 @@
       }
     },
     {
+      "catalog_id": "bjt.onsemi.njw0281g.to3p",
+      "family": "bjt",
+      "model_id": "mna_bjt_npn_ebers_moll_v1",
+      "provenance": {
+        "source": "https://www.onsemi.com/pdf/datasheet/njw0281-d.pdf",
+        "revision": "onsemi:NJW0281/D:rev2:2025-06",
+        "sha256": "0e6cc91b02404fe1f03deb0433e20ad7bec267176753155bce1bfb9a53c0ef5b",
+        "review_status": "reviewed",
+        "allowed_analyses": [
+          "ac_sweep",
+          "dc_operating_point",
+          "distortion",
+          "stability",
+          "startup",
+          "thermal",
+          "transient"
+        ],
+        "min_temperature_c": -65,
+        "max_temperature_c": 150
+      }
+    },
+    {
+      "catalog_id": "bjt.onsemi.njw0302g.to3p",
+      "family": "bjt",
+      "model_id": "mna_bjt_pnp_ebers_moll_v1",
+      "provenance": {
+        "source": "https://www.onsemi.com/pdf/datasheet/njw0281-d.pdf",
+        "revision": "onsemi:NJW0281/D:rev2:2025-06",
+        "sha256": "d0e998bcf629d85ae72d254a4129eb9b02d17088e764e230d992102c10fdfa5c",
+        "review_status": "reviewed",
+        "allowed_analyses": [
+          "ac_sweep",
+          "dc_operating_point",
+          "distortion",
+          "stability",
+          "startup",
+          "thermal",
+          "transient"
+        ],
+        "min_temperature_c": -65,
+        "max_temperature_c": 150
+      }
+    },
+    {
+      "catalog_id": "bjt.onsemi.pzt3904t1g.sot223",
+      "family": "bjt",
+      "model_id": "mna_bjt_npn_ebers_moll_v1",
+      "provenance": {
+        "source": "https://www.onsemi.com/download/data-sheet/pdf/pzt3904t1-d.pdf",
+        "revision": "onsemi:PZT3904T1/D:rev7:2024-10",
+        "sha256": "0e6cc91b02404fe1f03deb0433e20ad7bec267176753155bce1bfb9a53c0ef5b",
+        "review_status": "reviewed",
+        "allowed_analyses": [
+          "ac_sweep",
+          "dc_operating_point",
+          "distortion",
+          "stability",
+          "startup",
+          "thermal",
+          "transient"
+        ],
+        "min_temperature_c": -55,
+        "max_temperature_c": 150
+      }
+    },
+    {
+      "catalog_id": "bjt.onsemi.pzt3906t1g.sot223",
+      "family": "bjt",
+      "model_id": "mna_bjt_pnp_ebers_moll_v1",
+      "provenance": {
+        "source": "https://www.onsemi.com/download/data-sheet/pdf/pzt3906t1-d.pdf",
+        "revision": "onsemi:PZT3906T1/D:rev3:2020-05",
+        "sha256": "d0e998bcf629d85ae72d254a4129eb9b02d17088e764e230d992102c10fdfa5c",
+        "review_status": "reviewed",
+        "allowed_analyses": [
+          "ac_sweep",
+          "dc_operating_point",
+          "distortion",
+          "stability",
+          "startup",
+          "thermal",
+          "transient"
+        ],
+        "min_temperature_c": -55,
+        "max_temperature_c": 150
+      }
+    },
+    {
+      "catalog_id": "capacitor.panasonic.eeufr1v221.radial",
+      "family": "capacitor",
+      "model_id": "mna_capacitor_transient_be_v1",
+      "provenance": {
+        "source": "https://industrial.panasonic.com/cdbs/www-data/pdf/RDF0000/ABA0000C1259.pdf",
+        "revision": "panasonic:FR-A:EEUFR1V221:2026-04",
+        "sha256": "19f725a7b01f981f33aeb7446e16f61398116168eea4ac05a70e2146bee8c049",
+        "review_status": "reviewed",
+        "allowed_analyses": [
+          "distortion",
+          "startup",
+          "thermal",
+          "transient"
+        ],
+        "min_temperature_c": -40,
+        "max_temperature_c": 105
+      }
+    },
+    {
+      "catalog_id": "capacitor.panasonic.eeufr1v221.radial",
+      "family": "capacitor",
+      "model_id": "mna_capacitor_v1",
+      "provenance": {
+        "source": "https://industrial.panasonic.com/cdbs/www-data/pdf/RDF0000/ABA0000C1259.pdf",
+        "revision": "panasonic:FR-A:EEUFR1V221:2026-04",
+        "sha256": "ef0b29d721870e25f9e49b43cfbcf2510a7136e6ba50da1ad0da0c7b1360d226",
+        "review_status": "reviewed",
+        "allowed_analyses": [
+          "ac_sweep",
+          "dc_operating_point",
+          "noise",
+          "stability",
+          "thermal"
+        ],
+        "min_temperature_c": -40,
+        "max_temperature_c": 105
+      }
+    },
+    {
       "catalog_id": "capacitor.ceramic.0603",
       "family": "capacitor",
       "model_id": "mna_capacitor_transient_be_v1",
@@ -54,8 +272,11 @@
         "allowed_analyses": [
           "distortion",
           "startup",
+          "thermal",
           "transient"
-        ]
+        ],
+        "min_temperature_c": -40,
+        "max_temperature_c": 85
       }
     },
     {
@@ -73,7 +294,9 @@
           "noise",
           "stability",
           "thermal"
-        ]
+        ],
+        "min_temperature_c": -40,
+        "max_temperature_c": 85
       }
     },
     {
@@ -87,7 +310,9 @@
         "review_status": "reviewed",
         "allowed_analyses": [
           "ac_sweep"
-        ]
+        ],
+        "min_temperature_c": -40,
+        "max_temperature_c": 85
       }
     },
     {
@@ -102,8 +327,11 @@
         "allowed_analyses": [
           "distortion",
           "startup",
+          "thermal",
           "transient"
-        ]
+        ],
+        "min_temperature_c": -40,
+        "max_temperature_c": 85
       }
     },
     {
@@ -121,7 +349,9 @@
           "noise",
           "stability",
           "thermal"
-        ]
+        ],
+        "min_temperature_c": -40,
+        "max_temperature_c": 85
       }
     },
     {
@@ -135,7 +365,28 @@
         "review_status": "reviewed",
         "allowed_analyses": [
           "ac_sweep"
-        ]
+        ],
+        "min_temperature_c": -40,
+        "max_temperature_c": 85
+      }
+    },
+    {
+      "catalog_id": "capacitor.murata.grm188r71h104ka93d.0603",
+      "family": "capacitor",
+      "model_id": "mna_capacitor_transient_be_v1",
+      "provenance": {
+        "source": "https://www.murata.com/en-us/products/productdetail?partno=GRM188R71H104KA93%23",
+        "revision": "Murata GRM188R71H104KA93 product detail, reviewed 2026-07-19",
+        "sha256": "19f725a7b01f981f33aeb7446e16f61398116168eea4ac05a70e2146bee8c049",
+        "review_status": "reviewed",
+        "allowed_analyses": [
+          "distortion",
+          "startup",
+          "thermal",
+          "transient"
+        ],
+        "min_temperature_c": -55,
+        "max_temperature_c": 125
       }
     },
     {
@@ -153,7 +404,9 @@
           "noise",
           "stability",
           "thermal"
-        ]
+        ],
+        "min_temperature_c": -55,
+        "max_temperature_c": 125
       }
     },
     {
@@ -171,7 +424,28 @@
           "noise",
           "stability",
           "thermal"
-        ]
+        ],
+        "min_temperature_c": -55,
+        "max_temperature_c": 125
+      }
+    },
+    {
+      "catalog_id": "capacitor.murata.grm21br71h104ka01l.0805",
+      "family": "capacitor",
+      "model_id": "mna_capacitor_transient_be_v1",
+      "provenance": {
+        "source": "https://pim.murata.com/asset/pim4/ceramicCapacitorSMD/GRM21BR71H104KA01-01-EN_PDF_CERAMICCAPACITORSMD?lastModifiedDatetime=20250707233810",
+        "revision": "Murata GRM21BR71H104KA01 reference sheet, reviewed 2026-07-20",
+        "sha256": "19f725a7b01f981f33aeb7446e16f61398116168eea4ac05a70e2146bee8c049",
+        "review_status": "reviewed",
+        "allowed_analyses": [
+          "distortion",
+          "startup",
+          "thermal",
+          "transient"
+        ],
+        "min_temperature_c": -55,
+        "max_temperature_c": 125
       }
     },
     {
@@ -189,7 +463,9 @@
           "noise",
           "stability",
           "thermal"
-        ]
+        ],
+        "min_temperature_c": -55,
+        "max_temperature_c": 125
       }
     },
     {
@@ -203,7 +479,9 @@
         "review_status": "reviewed",
         "allowed_analyses": [
           "ac_sweep"
-        ]
+        ],
+        "min_temperature_c": -55,
+        "max_temperature_c": 125
       }
     },
     {
@@ -216,8 +494,11 @@
         "sha256": "f5feb69f17eebc223cb08c40944b03d26a8cdf1f846dcba75539c835827d776e",
         "review_status": "reviewed",
         "allowed_analyses": [
+          "ac_sweep",
           "dc_operating_point",
+          "noise",
           "startup",
+          "stability",
           "thermal",
           "transient"
         ],
@@ -243,7 +524,9 @@
           "startup",
           "thermal",
           "transient"
-        ]
+        ],
+        "min_temperature_c": -40,
+        "max_temperature_c": 85
       }
     },
     {
@@ -264,7 +547,28 @@
           "startup",
           "thermal",
           "transient"
-        ]
+        ],
+        "min_temperature_c": -40,
+        "max_temperature_c": 85
+      }
+    },
+    {
+      "catalog_id": "current_sensor.ti.ina240a3d.soic8",
+      "family": "current_sensor",
+      "model_id": "mna_current_sense_amplifier_single_pole_v1",
+      "provenance": {
+        "source": "https://www.ti.com/lit/ds/symlink/ina240.pdf",
+        "revision": "TI:INA240:SBOS662C:2026-07",
+        "sha256": "515550ef24b843e68a0b3ac7f6310bfec3a6d1fabb44460a440795af736ab3be",
+        "review_status": "reviewed",
+        "allowed_analyses": [
+          "ac_sweep",
+          "dc_operating_point",
+          "startup",
+          "transient"
+        ],
+        "min_temperature_c": -40,
+        "max_temperature_c": 125
       }
     },
     {
@@ -274,7 +578,47 @@
       "provenance": {
         "source": "kicadai:trusted-simulation-registry",
         "revision": "kicadai.trusted-simulation-registry.v1",
-        "sha256": "7823f3eede53d83220cfe1aa418091fca443e48437a8bee6bbe7b2110da6036a",
+        "sha256": "8c618feeac1df4db789a6bee02d9724683a1f2df53dc88632818c0283c75a26b",
+        "review_status": "reviewed",
+        "allowed_analyses": [
+          "ac_sweep",
+          "dc_operating_point",
+          "distortion",
+          "stability",
+          "startup",
+          "thermal",
+          "transient"
+        ],
+        "min_temperature_c": -40,
+        "max_temperature_c": 85
+      }
+    },
+    {
+      "catalog_id": "diode.diodes.bat54ws.sod_323",
+      "family": "diode",
+      "model_id": "mna_diode_shockley_v1",
+      "provenance": {
+        "source": "https://www.diodes.com/assets/Datasheets/BAT54WS.pdf",
+        "revision": "Diodes:BAT54WS:DS11005:Rev13-2",
+        "sha256": "8c618feeac1df4db789a6bee02d9724683a1f2df53dc88632818c0283c75a26b",
+        "review_status": "reviewed",
+        "allowed_analyses": [
+          "dc_operating_point",
+          "startup",
+          "transient"
+        ],
+        "min_temperature_c": -65,
+        "max_temperature_c": 125
+      }
+    },
+    {
+      "catalog_id": "diode.diodes.ddz5v1b_7.sod123",
+      "family": "diode",
+      "model_id": "mna_unidirectional_zener_spice_v1",
+      "provenance": {
+        "source": "https://www.diodes.com/spice/download/925/DDZ5V1B.spice.txt",
+        "revision": "DI_DDZ5V1B manufacturer SPICE model",
+        "sha256": "0a615ddc5e5c6d2d05446a542ac142a159d3e5d77bce853a43f60d05f2f5a3fe",
         "review_status": "reviewed",
         "allowed_analyses": [
           "dc_operating_point",
@@ -282,7 +626,51 @@
           "startup",
           "thermal",
           "transient"
-        ]
+        ],
+        "min_temperature_c": -65,
+        "max_temperature_c": 150
+      }
+    },
+    {
+      "catalog_id": "diode.onsemi.ss34fa.sod123fl",
+      "family": "diode",
+      "model_id": "mna_diode_shockley_v1",
+      "provenance": {
+        "source": "https://www.onsemi.com/download/models/lib/ss34fa%28pspice%20model%29.lib",
+        "revision": "SS34FA PSpice Rev 1.0; SHA256 4de92e9ca840022b77ff9efb8519b1e599b24fc5384a8026c2bfbce3d7e61a16; SS36FA/D Rev 3",
+        "sha256": "8c618feeac1df4db789a6bee02d9724683a1f2df53dc88632818c0283c75a26b",
+        "review_status": "reviewed",
+        "allowed_analyses": ["dc_operating_point", "distortion", "startup", "thermal", "transient"],
+        "min_temperature_c": -55,
+        "max_temperature_c": 125
+      }
+    },
+    {
+      "catalog_id": "diode.diodes.b340la.sma",
+      "family": "diode",
+      "model_id": "mna_diode_shockley_v1",
+      "provenance": {
+        "source": "https://www.diodes.com/spice/download/112/B340LA.spice.txt",
+        "revision": "DI_B340LA manufacturer SPICE model",
+        "sha256": "8c618feeac1df4db789a6bee02d9724683a1f2df53dc88632818c0283c75a26b",
+        "review_status": "reviewed",
+        "allowed_analyses": ["dc_operating_point", "distortion", "startup", "thermal", "transient"],
+        "min_temperature_c": -55,
+        "max_temperature_c": 150
+      }
+    },
+    {
+      "catalog_id": "diode.diodes.b560c.smc",
+      "family": "diode",
+      "model_id": "mna_diode_shockley_v1",
+      "provenance": {
+        "source": "https://www.diodes.com/spice/download/128/B560C.spice.txt",
+        "revision": "DI_B560C manufacturer SPICE model",
+        "sha256": "8c618feeac1df4db789a6bee02d9724683a1f2df53dc88632818c0283c75a26b",
+        "review_status": "reviewed",
+        "allowed_analyses": ["dc_operating_point", "distortion", "startup", "thermal", "transient"],
+        "min_temperature_c": -55,
+        "max_temperature_c": 150
       }
     },
     {
@@ -292,7 +680,7 @@
       "provenance": {
         "source": "https://optoelectronics.liteon.com/upload/download/DS22-2000-073/LTST-C170KGKT.pdf",
         "revision": "DS22-2000-073 revision I",
-        "sha256": "7823f3eede53d83220cfe1aa418091fca443e48437a8bee6bbe7b2110da6036a",
+        "sha256": "8c618feeac1df4db789a6bee02d9724683a1f2df53dc88632818c0283c75a26b",
         "review_status": "reviewed",
         "allowed_analyses": [
           "dc_operating_point",
@@ -306,13 +694,74 @@
       }
     },
     {
+      "catalog_id": "fuse.littelfuse.0483002dr.1206",
+      "family": "fuse",
+      "model_id": "mna_fuse_closed_state_v1",
+      "provenance": {
+        "source": "https://www.littelfuse.com/assetdocs/littelfuse-fuse-483-datasheet?assetguid=5efd7580-3a45-4eb9-9869-f350543371fa",
+        "revision": "Littelfuse 483 Series datasheet, reviewed 2026-07-20",
+        "sha256": "df26535b900c9f100a2ff5ad597b9873ce446a51cb6ccf50b658bc5809b4dc9f",
+        "review_status": "reviewed",
+        "allowed_analyses": [
+          "ac_sweep",
+          "dc_operating_point",
+          "distortion",
+          "stability",
+          "startup",
+          "thermal",
+          "transient"
+        ],
+        "min_temperature_c": -55,
+        "max_temperature_c": 125
+      }
+    },
+    {
+      "catalog_id": "fuse.littelfuse.0483_500dr.1206",
+      "family": "fuse",
+      "model_id": "mna_fuse_closed_state_v1",
+      "provenance": {
+        "source": "https://www.littelfuse.com/assetdocs/littelfuse-fuse-483-datasheet?assetguid=5efd7580-3a45-4eb9-9869-f350543371fa",
+        "revision": "Littelfuse 483 Series datasheet, reviewed 2026-07-20",
+        "sha256": "df26535b900c9f100a2ff5ad597b9873ce446a51cb6ccf50b658bc5809b4dc9f",
+        "review_status": "reviewed",
+        "allowed_analyses": [
+          "ac_sweep",
+          "dc_operating_point",
+          "distortion",
+          "stability",
+          "startup",
+          "thermal",
+          "transient"
+        ],
+        "min_temperature_c": -55,
+        "max_temperature_c": 125
+      }
+    },
+    {
+      "catalog_id": "isolated_converter.traco.tel12_1222.dip16",
+      "family": "isolated_converter",
+      "model_id": "mna_dual_output_isolated_converter_v1",
+      "provenance": {
+        "source": "https://www.tracopower.com/model/tel-12-1222",
+        "revision": "TRACO TEL 12 datasheet, Rev. August 7, 2024",
+        "sha256": "ae2d792f716eb4abf1c369fb863af1eee4c9e88c2736cd3d2774f58db0e56e22",
+        "review_status": "reviewed",
+        "allowed_analyses": [
+          "ac_sweep",
+          "dc_operating_point"
+        ],
+        "min_temperature_c": -40,
+        "max_temperature_c": 85
+      }
+    },
+    {
       "catalog_id": "led.liteon.ltst_c170krkt.0805",
       "family": "led",
       "model_id": "mna_diode_shockley_v1",
       "provenance": {
         "source": "kicadai:trusted-simulation-registry",
         "revision": "kicadai.trusted-simulation-registry.v1",
-        "sha256": "7823f3eede53d83220cfe1aa418091fca443e48437a8bee6bbe7b2110da6036a",
+        "sha256": "8c618feeac1df4db789a6bee02d9724683a1f2df53dc88632818c0283c75a26b",
         "review_status": "reviewed",
         "allowed_analyses": [
           "dc_operating_point",
@@ -320,7 +769,79 @@
           "startup",
           "thermal",
           "transient"
-        ]
+        ],
+        "min_temperature_c": -40,
+        "max_temperature_c": 85
+      }
+    },
+    {
+      "catalog_id": "mosfet.aos.ao3400a.sot23",
+      "family": "mosfet",
+      "model_id": "mna_nmos_guaranteed_switch_v1",
+      "provenance": {
+        "source": "https://aosmd.com/res/data_sheets/AO3400A.pdf",
+        "revision": "AO3400A Rev 3 December 2011",
+        "sha256": "78ce647741033404bd4880f0af4e21dc68cdc100152cabd71eb63dcaeb71e654",
+        "review_status": "reviewed",
+        "allowed_analyses": ["ac_sweep", "dc_operating_point", "distortion", "stability", "startup", "thermal", "transient"],
+        "min_temperature_c": -55,
+        "max_temperature_c": 150
+      }
+    },
+    {
+      "catalog_id": "mosfet.vishay.irfp9240.to247",
+      "family": "mosfet",
+      "model_id": "mna_pmos_guaranteed_switch_v1",
+      "provenance": {
+        "source": "https://www.vishay.com/docs/91239/irfp9240.pdf",
+        "revision": "Vishay IRFP9240 document 91239 Rev. C; guaranteed switching boundary",
+        "sha256": "8de012144fa75a9b820ddcdb05fd6f3a0651e7632030659fec8583126e141f09",
+        "review_status": "reviewed",
+        "allowed_analyses": ["ac_sweep", "dc_operating_point", "distortion", "stability", "startup", "thermal", "transient"],
+        "min_temperature_c": -55,
+        "max_temperature_c": 150
+      }
+    },
+    {
+      "catalog_id": "mosfet.onsemi.fqp47p06.to220",
+      "family": "mosfet",
+      "model_id": "mna_pmos_guaranteed_switch_v1",
+      "provenance": {
+        "source": "https://www.onsemi.com/download/data-sheet/pdf/fqp47p06-d.pdf",
+        "revision": "FQP47P06/D Rev. 3, May 2022; guaranteed -10 V switching boundary",
+        "sha256": "8de012144fa75a9b820ddcdb05fd6f3a0651e7632030659fec8583126e141f09",
+        "review_status": "reviewed",
+        "allowed_analyses": ["ac_sweep", "dc_operating_point", "distortion", "stability", "startup", "thermal", "transient"],
+        "min_temperature_c": -55,
+        "max_temperature_c": 175
+      }
+    },
+    {
+      "catalog_id": "mosfet.onsemi.rfd16n05lsm.to252",
+      "family": "mosfet",
+      "model_id": "mna_nmos_guaranteed_switch_v1",
+      "provenance": {
+        "source": "https://www.onsemi.com/download/data-sheet/pdf/rfd16n05lsm-d.pdf",
+        "revision": "RFD16N05LSM/D Rev 3, manufacturer PSPICE model and guaranteed 4 V operating data",
+        "sha256": "78ce647741033404bd4880f0af4e21dc68cdc100152cabd71eb63dcaeb71e654",
+        "review_status": "reviewed",
+        "allowed_analyses": ["ac_sweep", "dc_operating_point", "distortion", "stability", "startup", "thermal", "transient"],
+        "min_temperature_c": -55,
+        "max_temperature_c": 175
+      }
+    },
+    {
+      "catalog_id": "mosfet.infineon.irlz44n.to220",
+      "family": "mosfet",
+      "model_id": "mna_nmos_guaranteed_switch_v1",
+      "provenance": {
+        "source": "https://www.infineon.com/part/IRLZ44N",
+        "revision": "IRLZ44NPbF reviewed product data",
+        "sha256": "78ce647741033404bd4880f0af4e21dc68cdc100152cabd71eb63dcaeb71e654",
+        "review_status": "reviewed",
+        "allowed_analyses": ["ac_sweep", "dc_operating_point", "distortion", "stability", "startup", "thermal", "transient"],
+        "min_temperature_c": -55,
+        "max_temperature_c": 175
       }
     },
     {
@@ -343,6 +864,25 @@
         ],
         "min_temperature_c": 0,
         "max_temperature_c": 70
+      }
+    },
+    {
+      "catalog_id": "level_translator.ti.txs0102dcu.vssop8",
+      "family": "level_translator",
+      "model_id": "mna_bidirectional_open_drain_translator_v1",
+      "provenance": {
+        "source": "https://www.ti.com/lit/ds/symlink/txs0102.pdf",
+        "revision": "SCES640L, revised January 2026; source PDF SHA-256 2f81661591dbfa6e1c2b1145f0aa88c4a2e56487f31fdc1330a49451033ae983",
+        "sha256": "1dc318309c5f8e29d2f7bb907cb670f859947aa43b456c71d28a3d6300f7fc26",
+        "review_status": "reviewed",
+        "allowed_analyses": [
+          "dc_operating_point",
+          "startup",
+          "thermal",
+          "transient"
+        ],
+        "min_temperature_c": -40,
+        "max_temperature_c": 85
       }
     },
     {
@@ -392,16 +932,86 @@
       }
     },
     {
+      "catalog_id": "opamp.ti.opa197id.soic8",
+      "family": "opamp",
+      "model_id": "mna_opamp_single_pole_v1",
+      "provenance": {
+        "source": "https://www.ti.com/lit/ds/symlink/opa197.pdf",
+        "revision": "TI SBOS737C",
+        "sha256": "75004d4df8a0b335690ea7437bad887c16e5ca39f46c10e8345c70045b3ce0d5",
+        "review_status": "reviewed",
+        "allowed_analyses": [
+          "ac_sweep",
+          "dc_operating_point",
+          "distortion",
+          "noise",
+          "stability",
+          "startup",
+          "thermal",
+          "transient"
+        ],
+        "min_temperature_c": -40,
+        "max_temperature_c": 125
+      }
+    },
+    {
+      "catalog_id": "protection.littelfuse.smbj18ca.smb",
+      "family": "protection",
+      "model_id": "mna_bidirectional_tvs_piecewise_linear_v1",
+      "provenance": {
+        "source": "https://www.littelfuse.com/products/overvoltage-protection/tvs-diodes/surface-mount/smbj/smbj18ca",
+        "revision": "Littelfuse SMBJ series JC.03/21/25 v2",
+        "sha256": "424ad5349f2ab44886cf03c8198dbbe846b1369d87f59c647b227679b2d74721",
+        "review_status": "reviewed",
+        "allowed_analyses": [
+          "ac_sweep",
+          "dc_operating_point",
+          "distortion",
+          "stability",
+          "startup",
+          "thermal",
+          "transient"
+        ],
+        "min_temperature_c": -65,
+        "max_temperature_c": 150
+      }
+    },
+    {
+      "catalog_id": "protection.littelfuse.smbj20ca.smb",
+      "family": "protection",
+      "model_id": "mna_bidirectional_tvs_piecewise_linear_v1",
+      "provenance": {
+        "source": "https://www.littelfuse.com/products/overvoltage-protection/tvs-diodes/surface-mount/smbj/smbj20ca",
+        "revision": "Littelfuse SMBJ series JC.03/21/25 v2",
+        "sha256": "424ad5349f2ab44886cf03c8198dbbe846b1369d87f59c647b227679b2d74721",
+        "review_status": "reviewed",
+        "allowed_analyses": [
+          "ac_sweep",
+          "dc_operating_point",
+          "distortion",
+          "stability",
+          "startup",
+          "thermal",
+          "transient"
+        ],
+        "min_temperature_c": -65,
+        "max_temperature_c": 150
+      }
+    },
+    {
       "catalog_id": "protection.nexperia.pesd5v0s1ba.sod_323",
       "family": "protection",
       "model_id": "mna_bidirectional_tvs_piecewise_linear_v1",
       "provenance": {
         "source": "https://assets.nexperia.com/documents/data-sheet/PESD5V0S1BA.pdf",
         "revision": "26 April 2024",
-        "sha256": "7d708cda375ca655baa724e6a9932c4a2db7180a151175a4200a8f3a686cd01a",
+        "sha256": "424ad5349f2ab44886cf03c8198dbbe846b1369d87f59c647b227679b2d74721",
         "review_status": "reviewed",
         "allowed_analyses": [
+          "ac_sweep",
           "dc_operating_point",
+          "distortion",
+          "stability",
           "startup",
           "thermal",
           "transient"
@@ -459,6 +1069,216 @@
       }
     },
     {
+      "catalog_id": "regulator.linear.ap2127k_adj.sot23_5",
+      "family": "regulator",
+      "model_id": "mna_adjustable_linear_regulator_v1",
+      "provenance": {
+        "source": "https://www.diodes.com/assets/Datasheets/AP2127.pdf",
+        "revision": "DS36478 Rev. 7-2, December 2017; source PDF SHA-256 d48c96ac985d348a379084ad921f699b8ec6f298c3d72fddc0ecae6bbe328993",
+        "sha256": "6d5a3b35cd8290bbcdfe0fec58ffaf4732c6e25fc3d49024d219b07aced2ae4f",
+        "review_status": "reviewed",
+        "allowed_analyses": [
+          "dc_operating_point",
+          "startup",
+          "thermal",
+          "transient"
+        ],
+        "min_temperature_c": -40,
+        "max_temperature_c": 85
+      }
+    },
+    {
+      "catalog_id": "regulator.linear.ap2127r_3v3.sot89",
+      "family": "regulator",
+      "model_id": "linear_regulator_ideal_v1",
+      "provenance": {
+        "source": "https://www.diodes.com/assets/Datasheets/AP2127.pdf",
+        "revision": "DS36478 Rev. 7-2, December 2017; source PDF SHA-256 d48c96ac985d348a379084ad921f699b8ec6f298c3d72fddc0ecae6bbe328993",
+        "sha256": "0fd867b792a7967cfd7c122428c835b2387034e41e1ccefb93453e54260ce2a3",
+        "review_status": "reviewed",
+        "allowed_analyses": [
+          "dc_operating_point"
+        ],
+        "min_temperature_c": -40,
+        "max_temperature_c": 85
+      }
+    },
+    {
+      "catalog_id": "regulator.linear.ap2127r_3v3.sot89",
+      "family": "regulator",
+      "model_id": "mna_fixed_linear_regulator_v1",
+      "provenance": {
+        "source": "https://www.diodes.com/assets/Datasheets/AP2127.pdf",
+        "revision": "DS36478 Rev. 7-2, December 2017; source PDF SHA-256 d48c96ac985d348a379084ad921f699b8ec6f298c3d72fddc0ecae6bbe328993",
+        "sha256": "b91850fcf3ec70ab1c138ebffc7be1258e35fbc4e74589138a4958439ee5e704",
+        "review_status": "reviewed",
+        "allowed_analyses": [
+          "ac_sweep",
+          "dc_operating_point",
+          "startup",
+          "thermal",
+          "transient"
+        ],
+        "min_temperature_c": -40,
+        "max_temperature_c": 85
+      }
+    },
+    {
+      "catalog_id": "regulator.ti.lm317at.to220",
+      "family": "regulator",
+      "model_id": "mna_floating_adjustable_regulator_v1",
+      "provenance": {
+        "source": "https://www.ti.com/lit/ds/symlink/lm317a.pdf",
+        "revision": "TI:LM317A:SNVSAC2A:RevA; source PDF SHA-256 3dc18281338a7dcc8f80b9873ecaf84a9c3097731cbbcaeb43406f20a59d127d",
+        "sha256": "3dff7c3aadd3d5f4f5e5fe186cb74082b1ea522cd772cf56d23ffab74e5fd0b1",
+        "review_status": "reviewed",
+        "allowed_analyses": [
+          "ac_sweep",
+          "dc_operating_point",
+          "distortion",
+          "stability",
+          "startup",
+          "thermal",
+          "transient"
+        ],
+        "min_temperature_c": -40,
+        "max_temperature_c": 125
+      }
+    },
+    {
+      "catalog_id": "regulator.ti.lm317t.to220",
+      "family": "regulator",
+      "model_id": "mna_floating_adjustable_regulator_v1",
+      "provenance": {
+        "source": "https://www.ti.com/lit/ds/symlink/lm317.pdf",
+        "revision": "TI:LM317:SLVS044Z:RevZ; source PDF SHA-256 ae6ffbfc7e1c6be2f018c93aaa40cd35f701295be787060a990235ff573fdfe1",
+        "sha256": "3dff7c3aadd3d5f4f5e5fe186cb74082b1ea522cd772cf56d23ffab74e5fd0b1",
+        "review_status": "reviewed",
+        "allowed_analyses": [
+          "ac_sweep",
+          "dc_operating_point",
+          "distortion",
+          "stability",
+          "startup",
+          "thermal",
+          "transient"
+        ],
+        "min_temperature_c": 0,
+        "max_temperature_c": 125
+      }
+    },
+    {
+      "catalog_id": "regulator.ti.lm337t.to220",
+      "family": "regulator",
+      "model_id": "mna_floating_adjustable_regulator_v1",
+      "provenance": {
+        "source": "https://www.ti.com/lit/ds/symlink/lm337.pdf",
+        "revision": "TI:LMx37:SLVS047L:RevL; source PDF SHA-256 b1b0bec3efb793ceb1f6d1f09d414c8c5910bca49d884ed401569f6fb3bcb6a0",
+        "sha256": "3dff7c3aadd3d5f4f5e5fe186cb74082b1ea522cd772cf56d23ffab74e5fd0b1",
+        "review_status": "reviewed",
+        "allowed_analyses": [
+          "ac_sweep",
+          "dc_operating_point",
+          "distortion",
+          "stability",
+          "startup",
+          "thermal",
+          "transient"
+        ],
+        "min_temperature_c": 0,
+        "max_temperature_c": 125
+      }
+    },
+    {
+      "catalog_id": "regulator.ti.lm337imp.sot223",
+      "family": "regulator",
+      "model_id": "mna_floating_adjustable_regulator_v1",
+      "provenance": {
+        "source": "https://www.ti.com/lit/ds/symlink/lm337-n.pdf",
+        "revision": "TI:LM337-N:SNVS778F:RevF; source PDF SHA-256 7df8d589ae49fbcf5498f4bd0c87bbaed31a128665fb0d96d9050cbb9d2c2d12",
+        "sha256": "3dff7c3aadd3d5f4f5e5fe186cb74082b1ea522cd772cf56d23ffab74e5fd0b1",
+        "review_status": "reviewed",
+        "allowed_analyses": [
+          "ac_sweep",
+          "dc_operating_point",
+          "distortion",
+          "stability",
+          "startup",
+          "thermal",
+          "transient"
+        ],
+        "min_temperature_c": -40,
+        "max_temperature_c": 125
+      }
+    },
+    {
+      "catalog_id": "relay.omron.g5q_1a.dc12",
+      "family": "relay",
+      "model_id": "mna_relay_closed_state_v1",
+      "provenance": {
+        "source": "https://components.omron.com/eu-en/system/files/2026-04/datasheet_pdf/J155-E1.pdf",
+        "revision": "omron:G5Q:2026-04",
+        "sha256": "3fbf8683cb808c75f5208ef1e99d57c6eea6ce08ffc1f2ef1226a85fdd8c07c3",
+        "review_status": "reviewed",
+        "allowed_analyses": [
+          "ac_sweep",
+          "dc_operating_point",
+          "distortion",
+          "stability",
+          "thermal",
+          "transient"
+        ],
+        "min_temperature_c": -40,
+        "max_temperature_c": 85
+      }
+    },
+    {
+      "catalog_id": "relay.omron.g5q_1a.dc12",
+      "family": "relay",
+      "model_id": "mna_relay_normally_open_v1",
+      "provenance": {
+        "source": "https://components.omron.com/eu-en/system/files/2026-04/datasheet_pdf/J155-E1.pdf",
+        "revision": "omron:G5Q:2026-04",
+        "sha256": "1c85a4eef304803c7d0b9fbc6e62da995ca7c996d674aad744aaa150cf1021a1",
+        "review_status": "reviewed",
+        "allowed_analyses": [
+          "distortion",
+          "startup",
+          "transient"
+        ],
+        "min_temperature_c": -40,
+        "max_temperature_c": 85
+      }
+    },
+    {
+      "catalog_id": "relay.panasonic.aqy212gh.dip4",
+      "family": "relay",
+      "model_id": "mna_relay_closed_state_v1",
+      "provenance": {
+        "source": "https://industry.panasonic.com/global/en/products/control/relay/photomos/number/aqy212gh",
+        "revision": "panasonic:AQY212GH:2026-07-20",
+        "sha256": "3fbf8683cb808c75f5208ef1e99d57c6eea6ce08ffc1f2ef1226a85fdd8c07c3",
+        "review_status": "reviewed",
+        "allowed_analyses": ["ac_sweep", "dc_operating_point", "distortion", "stability", "thermal", "transient"],
+        "min_temperature_c": -40,
+        "max_temperature_c": 85
+      }
+    },
+    {
+      "catalog_id": "relay.panasonic.aqy212gh.dip4",
+      "family": "relay",
+      "model_id": "mna_relay_normally_open_v1",
+      "provenance": {
+        "source": "https://industry.panasonic.com/global/en/products/control/relay/photomos/number/aqy212gh",
+        "revision": "panasonic:AQY212GH:2026-07-20",
+        "sha256": "1c85a4eef304803c7d0b9fbc6e62da995ca7c996d674aad744aaa150cf1021a1",
+        "review_status": "reviewed",
+        "allowed_analyses": ["distortion", "startup", "transient"],
+        "min_temperature_c": -40,
+        "max_temperature_c": 85
+      }
+    },
+    {
       "catalog_id": "resistor.generic.0603",
       "family": "resistor",
       "model_id": "mna_resistor_v1",
@@ -476,7 +1296,9 @@
           "startup",
           "thermal",
           "transient"
-        ]
+        ],
+        "min_temperature_c": -40,
+        "max_temperature_c": 85
       }
     },
     {
@@ -490,7 +1312,9 @@
         "review_status": "reviewed",
         "allowed_analyses": [
           "ac_sweep"
-        ]
+        ],
+        "min_temperature_c": -40,
+        "max_temperature_c": 85
       }
     },
     {
@@ -504,7 +1328,9 @@
         "review_status": "reviewed",
         "allowed_analyses": [
           "dc_operating_point"
-        ]
+        ],
+        "min_temperature_c": -40,
+        "max_temperature_c": 85
       }
     },
     {
@@ -525,7 +1351,9 @@
           "startup",
           "thermal",
           "transient"
-        ]
+        ],
+        "min_temperature_c": -40,
+        "max_temperature_c": 85
       }
     },
     {
@@ -539,7 +1367,9 @@
         "review_status": "reviewed",
         "allowed_analyses": [
           "ac_sweep"
-        ]
+        ],
+        "min_temperature_c": -40,
+        "max_temperature_c": 85
       }
     },
     {
@@ -553,7 +1383,9 @@
         "review_status": "reviewed",
         "allowed_analyses": [
           "dc_operating_point"
-        ]
+        ],
+        "min_temperature_c": -40,
+        "max_temperature_c": 85
       }
     },
     {
@@ -574,7 +1406,9 @@
           "startup",
           "thermal",
           "transient"
-        ]
+        ],
+        "min_temperature_c": -40,
+        "max_temperature_c": 85
       }
     },
     {
@@ -595,7 +1429,9 @@
           "startup",
           "thermal",
           "transient"
-        ]
+        ],
+        "min_temperature_c": -40,
+        "max_temperature_c": 85
       }
     },
     {
@@ -616,7 +1452,9 @@
           "startup",
           "thermal",
           "transient"
-        ]
+        ],
+        "min_temperature_c": -40,
+        "max_temperature_c": 85
       }
     },
     {
@@ -630,7 +1468,9 @@
         "review_status": "reviewed",
         "allowed_analyses": [
           "ac_sweep"
-        ]
+        ],
+        "min_temperature_c": -40,
+        "max_temperature_c": 85
       }
     },
     {
@@ -651,7 +1491,9 @@
           "startup",
           "thermal",
           "transient"
-        ]
+        ],
+        "min_temperature_c": -40,
+        "max_temperature_c": 85
       }
     },
     {
@@ -672,7 +1514,9 @@
           "startup",
           "thermal",
           "transient"
-        ]
+        ],
+        "min_temperature_c": -40,
+        "max_temperature_c": 85
       }
     },
     {
@@ -693,7 +1537,9 @@
           "startup",
           "thermal",
           "transient"
-        ]
+        ],
+        "min_temperature_c": -40,
+        "max_temperature_c": 85
       }
     }
   ]

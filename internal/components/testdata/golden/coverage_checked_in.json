@@ -1,27 +1,27 @@
 {
-  "record_count": 95,
+  "record_count": 111,
   "family_count": 24,
   "confidence_counts": {
     "blocked": 1,
     "library_derived": 0,
     "placeholder": 4,
     "rule_inferred": 5,
-    "verified": 85
+    "verified": 101
   },
   "alternative_coverage": {
-    "concrete_records": 70,
+    "concrete_records": 86,
     "generic_fallback_records": 25,
-    "equivalence_groups": 19
+    "equivalence_groups": 22
   },
   "families": [
     {
       "family": "bjt",
       "defined": true,
-      "record_count": 7,
-      "concrete_records": 6,
+      "record_count": 11,
+      "concrete_records": 10,
       "generic_fallback_records": 1,
-      "equivalence_groups": 2,
-      "verified_records": 6,
+      "equivalence_groups": 4,
+      "verified_records": 10,
       "library_derived_records": 0,
       "rule_inferred_records": 0,
       "placeholder_records": 0,
@@ -30,12 +30,16 @@
         "bjt.placeholder.npn_power_output.to220"
       ],
       "record_ids": [
+        "bjt.onsemi.d44h11g.to220",
+        "bjt.onsemi.d45h11g.to220",
         "bjt.onsemi.mje243g.to225",
         "bjt.onsemi.mje253g.to225",
         "bjt.onsemi.mmbt3904.sot23",
         "bjt.onsemi.mmbt3906.sot23",
         "bjt.onsemi.njw0281g.to3p",
         "bjt.onsemi.njw0302g.to3p",
+        "bjt.onsemi.pzt3904t1g.sot223",
+        "bjt.onsemi.pzt3906t1g.sot223",
         "bjt.placeholder.npn_power_output.to220"
       ]
     },
@@ -186,11 +190,11 @@
     {
       "family": "diode",
       "defined": true,
-      "record_count": 8,
-      "concrete_records": 5,
+      "record_count": 9,
+      "concrete_records": 6,
       "generic_fallback_records": 3,
       "equivalence_groups": 2,
-      "verified_records": 8,
+      "verified_records": 9,
       "library_derived_records": 0,
       "rule_inferred_records": 0,
       "placeholder_records": 0,
@@ -208,6 +212,7 @@
         "diode.diodes.bat54ws.sod_323",
         "diode.diodes.ddz5v1b_7.sod123",
         "diode.onsemi.1n4148w.sod_123",
+        "diode.onsemi.ss34fa.sod123fl",
         "diode.schottky.generic",
         "diode.signal.generic",
         "diode.tvs_unidirectional.generic"
@@ -216,11 +221,11 @@
     {
       "family": "fuse",
       "defined": true,
-      "record_count": 1,
-      "concrete_records": 0,
+      "record_count": 3,
+      "concrete_records": 2,
       "generic_fallback_records": 1,
       "equivalence_groups": 0,
-      "verified_records": 0,
+      "verified_records": 2,
       "library_derived_records": 0,
       "rule_inferred_records": 1,
       "placeholder_records": 0,
@@ -229,7 +234,9 @@
         "fuse.generic.1206"
       ],
       "record_ids": [
-        "fuse.generic.1206"
+        "fuse.generic.1206",
+        "fuse.littelfuse.0483002dr.1206",
+        "fuse.littelfuse.0483_500dr.1206"
       ]
     },
     {
@@ -337,11 +344,11 @@
     {
       "family": "mosfet",
       "defined": true,
-      "record_count": 4,
-      "concrete_records": 4,
+      "record_count": 6,
+      "concrete_records": 6,
       "generic_fallback_records": 0,
       "equivalence_groups": 0,
-      "verified_records": 4,
+      "verified_records": 6,
       "library_derived_records": 0,
       "rule_inferred_records": 0,
       "placeholder_records": 0,
@@ -349,6 +356,8 @@
       "record_ids": [
         "mosfet.aos.ao3400a.sot23",
         "mosfet.infineon.irlz44n.to220",
+        "mosfet.onsemi.fqp47p06.to220",
+        "mosfet.onsemi.rfd16n05lsm.to252",
         "mosfet.vishay.irfp240.to247",
         "mosfet.vishay.irfp9240.to247"
       ]
@@ -356,11 +365,11 @@
     {
       "family": "opamp",
       "defined": true,
-      "record_count": 4,
-      "concrete_records": 3,
+      "record_count": 5,
+      "concrete_records": 4,
       "generic_fallback_records": 1,
       "equivalence_groups": 0,
-      "verified_records": 3,
+      "verified_records": 4,
       "library_derived_records": 0,
       "rule_inferred_records": 0,
       "placeholder_records": 1,
@@ -374,17 +383,18 @@
         "opamp.generic.single.lmv321",
         "opamp.ti.lm358.soic8",
         "opamp.ti.lmv321.sot23_5",
-        "opamp.ti.opa134ua.soic8"
+        "opamp.ti.opa134ua.soic8",
+        "opamp.ti.opa197id.soic8"
       ]
     },
     {
       "family": "protection",
       "defined": true,
-      "record_count": 3,
-      "concrete_records": 2,
+      "record_count": 5,
+      "concrete_records": 4,
       "generic_fallback_records": 1,
       "equivalence_groups": 1,
-      "verified_records": 3,
+      "verified_records": 5,
       "library_derived_records": 0,
       "rule_inferred_records": 0,
       "placeholder_records": 0,
@@ -394,6 +404,8 @@
         "protection.tvs.usb_5v_unidirectional"
       ],
       "record_ids": [
+        "protection.littelfuse.smbj18ca.smb",
+        "protection.littelfuse.smbj20ca.smb",
         "protection.nexperia.pesd5v0s1ba.sod_323",
         "protection.ti.tps22917dbv.sot23_6",
         "protection.tvs.usb_5v_unidirectional"
@@ -402,11 +414,11 @@
     {
       "family": "regulator",
       "defined": true,
-      "record_count": 5,
-      "concrete_records": 5,
+      "record_count": 8,
+      "concrete_records": 8,
       "generic_fallback_records": 0,
-      "equivalence_groups": 0,
-      "verified_records": 5,
+      "equivalence_groups": 1,
+      "verified_records": 8,
       "library_derived_records": 0,
       "rule_inferred_records": 0,
       "placeholder_records": 0,
@@ -414,30 +426,35 @@
       "missing_resolver_evidence": [
         "regulator.linear.ams1117_3v3.sot223",
         "regulator.linear.ap2112k_3v3.sot23_5",
-        "regulator.linear.ap2127k_adj.sot23_5"
+        "regulator.linear.ap2127k_adj.sot23_5",
+        "regulator.linear.ap2127r_3v3.sot89"
       ],
       "record_ids": [
         "regulator.linear.ams1117_3v3.sot223",
         "regulator.linear.ap2112k_3v3.sot23_5",
         "regulator.linear.ap2127k_adj.sot23_5",
+        "regulator.linear.ap2127r_3v3.sot89",
+        "regulator.ti.lm317at.to220",
         "regulator.ti.lm317t.to220",
+        "regulator.ti.lm337imp.sot223",
         "regulator.ti.lm337t.to220"
       ]
     },
     {
       "family": "relay",
       "defined": true,
-      "record_count": 1,
-      "concrete_records": 1,
+      "record_count": 2,
+      "concrete_records": 2,
       "generic_fallback_records": 0,
       "equivalence_groups": 0,
-      "verified_records": 1,
+      "verified_records": 2,
       "library_derived_records": 0,
       "rule_inferred_records": 0,
       "placeholder_records": 0,
       "blocked_records": 0,
       "record_ids": [
-        "relay.omron.g5q_1a.dc12"
+        "relay.omron.g5q_1a.dc12",
+        "relay.panasonic.aqy212gh.dip4"
       ]
     },
     {

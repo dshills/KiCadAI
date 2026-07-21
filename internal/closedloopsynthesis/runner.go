@@ -166,6 +166,7 @@ func runAttempt(ctx context.Context, requirement architecturesearch.Requirement,
 		return attempt
 	}
 	attempt.EvidenceHash = evaluation.EvidenceHash
+	attempt.Simulation = cloneSimulationEvidence(evaluation.Simulation)
 	if !validHash(evaluation.EvidenceHash) {
 		attempt.Diagnostics = append(attempt.Diagnostics, Diagnostic{Path: "evaluation.evidence_hash", Message: "trusted evaluation must provide a lowercase SHA-256 evidence hash"})
 	}
@@ -370,29 +371,67 @@ func validateVariables(path string, variables []Variable, policy Policy) []Diagn
 }
 
 func neighboringStates(state CandidateState, diagnoses []Diagnosis) []CandidateState {
-	var states []CandidateState
+	const maxDirectionalRepairSteps = 4
+	type directedNeighbor struct {
+		state         CandidateState
+		variableIndex int
+		direction     int
+		step          int
+	}
+	var singles []directedNeighbor
 	for variableIndex, variable := range state.Variables {
 		current := slices.Index(variable.AllowedValues, variable.Value)
-		for _, next := range []int{current - 1, current + 1} {
-			if next < 0 || next >= len(variable.AllowedValues) {
-				continue
+		for step := 1; step <= maxDirectionalRepairSteps; step++ {
+			for _, next := range []int{current - step, current + step} {
+				if next < 0 || next >= len(variable.AllowedValues) {
+					continue
+				}
+				if _, ok := matchingRepairDiagnosis(variable, variable.AllowedValues[next]-variable.Value, diagnoses); !ok {
+					continue
+				}
+				// AllowedValues is immutable after input normalization. Copy only the
+				// variable records here; persisted attempts are deep-cloned at their
+				// boundary.
+				neighbor := CandidateState{Fingerprint: state.Fingerprint, Variables: append([]Variable(nil), state.Variables...)}
+				neighbor.Variables[variableIndex].Value = variable.AllowedValues[next]
+				direction := 1
+				if next < current {
+					direction = -1
+				}
+				singles = append(singles, directedNeighbor{state: neighbor, variableIndex: variableIndex, direction: direction, step: step})
 			}
-			if _, ok := matchingRepairDiagnosis(variable, variable.AllowedValues[next]-variable.Value, diagnoses); !ok {
-				continue
-			}
-			// AllowedValues is immutable after input normalization. Copy only the
-			// variable records here; persisted attempts are deep-cloned at their
-			// boundary.
-			neighbor := CandidateState{Fingerprint: state.Fingerprint, Variables: append([]Variable(nil), state.Variables...)}
-			neighbor.Variables[variableIndex].Value = variable.AllowedValues[next]
-			states = append(states, neighbor)
 		}
+	}
+	statesByHash := make(map[string]CandidateState, len(singles))
+	for _, single := range singles {
+		statesByHash[stateHash(single.state)] = single.state
+	}
+	// Some analog and power repairs are coupled: one authorized value change
+	// can correct gain while another restores swing, bias, or headroom. Explore
+	// deterministic two-variable neighbors so strict whole-report improvement
+	// does not reject both individually valid steps before they can be applied
+	// together. Larger bundles remain outside the bounded policy.
+	for leftIndex, left := range singles {
+		for _, right := range singles[leftIndex+1:] {
+			if left.variableIndex == right.variableIndex || left.direction != right.direction || left.step != right.step {
+				continue
+			}
+			neighbor := CandidateState{Fingerprint: state.Fingerprint, Variables: append([]Variable(nil), state.Variables...)}
+			neighbor.Variables[left.variableIndex].Value = left.state.Variables[left.variableIndex].Value
+			neighbor.Variables[right.variableIndex].Value = right.state.Variables[right.variableIndex].Value
+			statesByHash[stateHash(neighbor)] = neighbor
+		}
+	}
+	states := make([]CandidateState, 0, len(statesByHash))
+	for _, neighbor := range statesByHash {
+		states = append(states, neighbor)
 	}
 	slices.SortStableFunc(states, func(left, right CandidateState) int { return strings.Compare(stateHash(left), stateHash(right)) })
 	return states
 }
 
 func repairBetween(before, after CandidateState, number int, beforeHash, afterHash string, trials int, diagnoses []Diagnosis) (Repair, bool) {
+	var changes []RepairChange
 	for index := range before.Variables {
 		if before.Variables[index].Value == after.Variables[index].Value {
 			continue
@@ -402,15 +441,30 @@ func repairBetween(before, after CandidateState, number int, beforeHash, afterHa
 		if !ok {
 			return Repair{}, false
 		}
-		reason := "addresses " + diagnosis.RequirementID + " in " + diagnosis.OperatingCase + " through its authorized monotonic effect while preserving strict whole-report improvement"
-		return Repair{
-			Number: number, Variable: variable.ID, Kind: variable.Kind, From: variable.Value, To: after.Variables[index].Value,
+		changes = append(changes, RepairChange{
+			Variable: variable.ID, Kind: variable.Kind, From: variable.Value, To: after.Variables[index].Value,
 			AllowedMinimum: variable.AllowedValues[0], AllowedMaximum: variable.AllowedValues[len(variable.AllowedValues)-1],
 			RequirementID: diagnosis.RequirementID, OperatingCase: diagnosis.OperatingCase, Analysis: diagnosis.Analysis, Metric: diagnosis.Metric, Direction: diagnosis.Direction,
-			BeforeHash: beforeHash, AfterHash: afterHash, Reason: reason, EvaluatedTrials: trials,
-		}, true
+		})
 	}
-	return Repair{}, false
+	if len(changes) == 0 {
+		return Repair{}, false
+	}
+	primary := changes[0]
+	reason := "addresses " + primary.RequirementID + " in " + primary.OperatingCase + " through its authorized monotonic effect while preserving strict whole-report improvement"
+	if len(changes) > 1 {
+		reason = fmt.Sprintf("coordinates %d authorized monotonic value changes while preserving strict whole-report improvement", len(changes))
+	}
+	repair := Repair{
+		Number: number, Variable: primary.Variable, Kind: primary.Kind, From: primary.From, To: primary.To,
+		AllowedMinimum: primary.AllowedMinimum, AllowedMaximum: primary.AllowedMaximum,
+		RequirementID: primary.RequirementID, OperatingCase: primary.OperatingCase, Analysis: primary.Analysis, Metric: primary.Metric, Direction: primary.Direction,
+		BeforeHash: beforeHash, AfterHash: afterHash, Reason: reason, EvaluatedTrials: trials,
+	}
+	if len(changes) > 1 {
+		repair.Changes = changes
+	}
+	return repair, true
 }
 
 func matchingRepairDiagnosis(variable Variable, delta float64, diagnoses []Diagnosis) (Diagnosis, bool) {

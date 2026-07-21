@@ -41,6 +41,32 @@ func TestBoundsFromFootprintUsesBoundingBoxAndPads(t *testing.T) {
 	}
 }
 
+func TestBoundsFromFootprintExpandsCustomPadCopperRegions(t *testing.T) {
+	record := libraryresolver.FootprintRecord{
+		FootprintID: "Test:CustomPad",
+		BoundingBox: libraryresolver.BoundingBox{
+			Min: kicadfiles.Point{X: kicadfiles.MM(-3), Y: kicadfiles.MM(-1)},
+			Max: kicadfiles.Point{X: kicadfiles.MM(2), Y: kicadfiles.MM(1)},
+		},
+		Pads: []libraryresolver.FootprintPad{{
+			Name: "2", Type: "smd", Shape: "custom", Layers: []kicadfiles.BoardLayer{kicadfiles.LayerFCu},
+			CopperRegions: []libraryresolver.BoundingBox{
+				{Min: kicadfiles.Point{X: kicadfiles.MM(-2.6), Y: kicadfiles.MM(-0.45)}, Max: kicadfiles.Point{X: kicadfiles.MM(-1.125), Y: kicadfiles.MM(0.45)}},
+				{Min: kicadfiles.Point{X: kicadfiles.MM(-1.125), Y: kicadfiles.MM(-0.8665)}, Max: kicadfiles.Point{X: kicadfiles.MM(2), Y: kicadfiles.MM(0.8665)}},
+			},
+		}},
+	}
+
+	_, pads, issues := BoundsFromFootprint(record)
+	if len(issues) != 0 || len(pads) != 2 {
+		t.Fatalf("custom pad summaries = %#v issues=%#v", pads, issues)
+	}
+	if pads[0].Name != "2" || !nearlyEqual(pads[0].XMM, -1.8625) || !nearlyEqual(pads[0].WidthMM, 1.475) ||
+		pads[1].Name != "2" || !nearlyEqual(pads[1].XMM, 0.4375) || !nearlyEqual(pads[1].WidthMM, 3.125) || !nearlyEqual(pads[1].HeightMM, 1.733) {
+		t.Fatalf("custom pad summaries = %#v", pads)
+	}
+}
+
 func TestBoundsFromFootprintPrefersCourtyardBox(t *testing.T) {
 	record := libraryresolver.FootprintRecord{
 		FootprintID: "Test:R_0603",

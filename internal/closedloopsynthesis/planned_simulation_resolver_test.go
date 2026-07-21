@@ -10,6 +10,172 @@ import (
 	"kicadai/internal/simmodel"
 )
 
+func TestLoadCurrentCornerFollowsPulsedSupplyWindow(t *testing.T) {
+	analysis := simmodel.Analysis{Kind: simmodel.AnalysisTransient, Excitations: []simmodel.SourceExcitation{
+		{Component: "supply", PulseInitialValue: 0, PulseValue: 5, PulseDelayS: 1e-6, PulseWidthS: 8e-6, PulsePeriodS: 10e-6},
+		{Component: "load", DCValue: 0},
+	}}
+	value := 0.15
+	diagnostic := applyOperatingAssignment(&analysis, &simmodel.Plan{}, SimulationOperatingBinding{Axis: "load_current", Kind: OperatingSourceDCValue, Component: "load"}, CornerAssignment{Value: &value})
+	if diagnostic != nil {
+		t.Fatal(diagnostic)
+	}
+	load := analysis.Excitations[1]
+	if load.DCValue != 0 || load.PulseInitialValue != 0 || load.PulseValue != value || load.PulseDelayS != 1e-6 || load.PulseWidthS != 8e-6 || load.PulsePeriodS != 10e-6 {
+		t.Fatalf("dynamic load excitation = %#v", load)
+	}
+}
+
+func TestLoadCurrentCornerUsesEquivalentStartupResistance(t *testing.T) {
+	baseResistance := 4.0
+	plan := simmodel.Plan{Devices: []simmodel.ResolvedDevice{{Component: "load", Family: "resistor", ValueSI: &baseResistance}}}
+	for current, expected := range map[float64]float64{3: 4, 1.5: 8, 0: maxCompiledAssertionBound} {
+		analysis := simmodel.Analysis{Kind: simmodel.AnalysisStartup}
+		value := current
+		diagnostic := applyOperatingAssignment(&analysis, &plan, SimulationOperatingBinding{Axis: "load_current", Kind: OperatingLoadCurrent, Component: "load", Scale: 12}, CornerAssignment{Value: &value})
+		if diagnostic != nil {
+			t.Fatalf("current %.12g: %#v", current, diagnostic)
+		}
+		if len(analysis.DeviceOverrides) != 1 || analysis.DeviceOverrides[0].ValueSI == nil || *analysis.DeviceOverrides[0].ValueSI != expected {
+			t.Fatalf("current %.12g override = %#v, want %.12g ohm", current, analysis.DeviceOverrides, expected)
+		}
+	}
+}
+
+func TestOperatingDeviceValueAllowsZeroOnlyForCapacitors(t *testing.T) {
+	zero := 0.0
+	plan := simmodel.Plan{Devices: []simmodel.ResolvedDevice{{Component: "capacitive_load", Family: "capacitor"}, {Component: "resistive_load", Family: "resistor"}}}
+	analysis := simmodel.Analysis{}
+	if diagnostic := applyOperatingAssignment(&analysis, &plan, SimulationOperatingBinding{Axis: "load_capacitance", Kind: OperatingDeviceValueSI, Component: "capacitive_load"}, CornerAssignment{Value: &zero}); diagnostic != nil {
+		t.Fatalf("zero-capacitance corner = %#v", diagnostic)
+	}
+	if len(analysis.DeviceOverrides) != 1 || analysis.DeviceOverrides[0].ValueSI == nil || *analysis.DeviceOverrides[0].ValueSI != 0 {
+		t.Fatalf("zero-capacitance override = %#v", analysis.DeviceOverrides)
+	}
+	if diagnostic := applyOperatingAssignment(&analysis, &plan, SimulationOperatingBinding{Axis: "load_resistance", Kind: OperatingDeviceValueSI, Component: "resistive_load"}, CornerAssignment{Value: &zero}); diagnostic == nil {
+		t.Fatal("zero-resistance corner was accepted")
+	}
+}
+
+func TestOperatingModelParameterMergesExistingDeviceOverride(t *testing.T) {
+	valueSI := 1_000.0
+	analysis := simmodel.Analysis{DeviceOverrides: []simmodel.DeviceOverride{{
+		Component: "gain_device",
+		ValueSI:   &valueSI,
+		ModelParameters: []simmodel.NamedValue{
+			{Name: "forward_beta", Value: 80},
+		},
+	}}}
+	earlyVoltage := 120.0
+	diagnostic := applyOperatingAssignment(&analysis, &simmodel.Plan{}, SimulationOperatingBinding{
+		Axis: "model_corner", Kind: OperatingModelParameter, Component: "gain_device", Parameter: "early_voltage",
+	}, CornerAssignment{Value: &earlyVoltage})
+	if diagnostic != nil {
+		t.Fatal(diagnostic)
+	}
+	if len(analysis.DeviceOverrides) != 1 {
+		t.Fatalf("device overrides = %#v, want one merged component override", analysis.DeviceOverrides)
+	}
+	override := analysis.DeviceOverrides[0]
+	if override.ValueSI == nil || *override.ValueSI != valueSI {
+		t.Fatalf("merged override lost device value: %#v", override)
+	}
+	if len(override.ModelParameters) != 2 || override.ModelParameters[0] != (simmodel.NamedValue{Name: "early_voltage", Value: 120}) || override.ModelParameters[1] != (simmodel.NamedValue{Name: "forward_beta", Value: 80}) {
+		t.Fatalf("merged model parameters = %#v", override.ModelParameters)
+	}
+}
+
+func TestAmbientTemperatureCornerOverridesTemperatureSensitiveDevices(t *testing.T) {
+	plan := simmodel.Plan{Devices: []simmodel.ResolvedDevice{
+		{Component: "output_npn", ModelParameters: []simmodel.NamedValue{{Name: "junction_temperature_k", Value: 298.15}}},
+		{Component: "output_pnp", ModelParameters: []simmodel.NamedValue{{Name: "junction_temperature_k", Value: 298.15}}},
+		{Component: "load", ModelParameters: []simmodel.NamedValue{{Name: "resistance_temperature_coefficient", Value: 1e-6}}},
+	}}
+	analysis := simmodel.Analysis{DeviceOverrides: []simmodel.DeviceOverride{{Component: "output_npn", ModelParameters: []simmodel.NamedValue{{Name: "forward_beta", Value: 80}}}}}
+	ambientC := 50.0
+	diagnostic := applyOperatingAssignment(&analysis, &plan, SimulationOperatingBinding{Axis: "ambient_temperature", Kind: OperatingAnalysisCondition, Parameter: "ambient_temperature_c"}, CornerAssignment{Value: &ambientC})
+	if diagnostic != nil {
+		t.Fatal(diagnostic)
+	}
+	if len(analysis.Conditions) != 1 || analysis.Conditions[0].Name != "ambient_temperature_c" || analysis.Conditions[0].Value != 50 {
+		t.Fatalf("ambient condition = %#v", analysis.Conditions)
+	}
+	if len(analysis.DeviceOverrides) != 2 {
+		t.Fatalf("temperature overrides = %#v", analysis.DeviceOverrides)
+	}
+	for _, override := range analysis.DeviceOverrides {
+		if override.Component == "load" {
+			t.Fatalf("temperature-insensitive device received override: %#v", override)
+		}
+		foundTemperature := false
+		for _, parameter := range override.ModelParameters {
+			if parameter.Name == "junction_temperature_k" {
+				foundTemperature = true
+				if parameter.Value != 323.15 {
+					t.Fatalf("%s junction temperature = %.12g K", override.Component, parameter.Value)
+				}
+			}
+		}
+		if !foundTemperature {
+			t.Fatalf("%s missing junction-temperature override: %#v", override.Component, override)
+		}
+	}
+}
+
+func TestAmbientTemperatureCornerRejectsAbsoluteZero(t *testing.T) {
+	analysis := simmodel.Analysis{}
+	ambientC := -273.15
+	if diagnostic := applyOperatingAssignment(&analysis, &simmodel.Plan{}, SimulationOperatingBinding{Axis: "ambient_temperature", Kind: OperatingAnalysisCondition, Parameter: "ambient_temperature_c"}, CornerAssignment{Value: &ambientC}); diagnostic == nil {
+		t.Fatal("absolute-zero ambient corner was accepted")
+	}
+}
+
+func TestEdgeTimeAssertionsRequireDynamicExcitation(t *testing.T) {
+	static := simmodel.Analysis{Excitations: []simmodel.SourceExcitation{{Component: "load", PulseInitialValue: 0, PulseValue: 0, PulseWidthS: 1e-3, PulsePeriodS: 2e-3}}}
+	dynamicPulse := static
+	dynamicPulse.Excitations = append([]simmodel.SourceExcitation(nil), static.Excitations...)
+	dynamicPulse.Excitations[0].PulseValue = 3
+	dynamicSine := simmodel.Analysis{Excitations: []simmodel.SourceExcitation{{Component: "input", SineAmplitude: 1, SineFrequencyHz: 1000}}}
+	if analysisHasDynamicExcitation(static) {
+		t.Fatal("constant pulse endpoints were treated as a dynamic excitation")
+	}
+	if !analysisHasDynamicExcitation(dynamicPulse) || !analysisHasDynamicExcitation(dynamicSine) {
+		t.Fatal("bounded changing excitation was not recognized")
+	}
+	for _, quantity := range []string{simmodel.QuantityRiseTimeS, simmodel.QuantityFallTimeS, simmodel.QuantitySettlingTimeS, simmodel.QuantityResponseTimeS} {
+		if !edgeTimeQuantity(quantity) {
+			t.Fatalf("%s is not recognized as an edge-time quantity", quantity)
+		}
+	}
+	if edgeTimeQuantity(simmodel.QuantityOutputPowerW) {
+		t.Fatal("non-edge measurement was classified as edge time")
+	}
+}
+
+func TestDynamicAnalysesPartitionAtTrustedPlanWorkBound(t *testing.T) {
+	analyses := make([]simmodel.Analysis, 16)
+	for index := range analyses {
+		analyses[index] = simmodel.Analysis{ID: fmt.Sprintf("startup_%02d", index), Kind: simmodel.AnalysisStartup, DurationS: 100e-6, TimeStepS: 100e-6 / 256}
+	}
+	if simmodel.FitsPlanDynamicWork(analyses) {
+		t.Fatal("oversized dynamic analysis set unexpectedly fits one plan")
+	}
+	batches := partitionAnalysesByDynamicWork(analyses)
+	if len(batches) != 2 {
+		t.Fatalf("dynamic batches = %d, want 2", len(batches))
+	}
+	covered := 0
+	for _, batch := range batches {
+		if !simmodel.FitsPlanDynamicWork(batch) {
+			t.Fatalf("partition exceeds trusted work bound: %d analyses", len(batch))
+		}
+		covered += len(batch)
+	}
+	if covered != len(analyses) {
+		t.Fatalf("partition covered %d/%d analyses", covered, len(analyses))
+	}
+}
+
 func TestCompileSimulationResolutionBindsDeviceCornersAndAggregateLinks(t *testing.T) {
 	baseIntent := simmodel.Intent{
 		ModelID:    simmodel.ModelLinearCircuitMNAV1,

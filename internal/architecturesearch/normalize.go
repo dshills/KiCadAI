@@ -271,6 +271,35 @@ func canonicalIdentifier(value string) string {
 	return strings.ToLower(strings.TrimSpace(value))
 }
 
+// derivedSemanticIdentifier converts trusted catalog identity into the same
+// restricted identifier grammar used by provider expansion IDs. Request IDs
+// still use canonicalIdentifier and fail closed when callers provide invalid
+// syntax; this helper is only for deterministic identities derived internally.
+func derivedSemanticIdentifier(value string) string {
+	value = canonicalIdentifier(value)
+	var result strings.Builder
+	separator := false
+	for _, character := range value {
+		if (character >= 'a' && character <= 'z') || (character >= '0' && character <= '9') {
+			if separator && result.Len() != 0 {
+				result.WriteByte('_')
+			}
+			result.WriteRune(character)
+			separator = false
+			continue
+		}
+		separator = true
+	}
+	identifier := result.String()
+	if identifier == "" {
+		return "derived"
+	}
+	if identifier[0] >= '0' && identifier[0] <= '9' {
+		return "derived_" + identifier
+	}
+	return identifier
+}
+
 func canonicalUnit(value string) string {
 	switch strings.ToLower(strings.TrimSpace(value)) {
 	case "":

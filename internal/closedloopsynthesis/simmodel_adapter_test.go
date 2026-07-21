@@ -104,6 +104,38 @@ func TestWorstLinkedAssertionSelectsWorstCornerDeterministically(t *testing.T) {
 	}
 }
 
+func TestWorstLinkedMeasurementSpansDeterministicPlanBatches(t *testing.T) {
+	plans := []simmodel.Plan{
+		{Assertions: []simmodel.Assertion{{Min: 4.5, Max: 5.5}}},
+		{Assertions: []simmodel.Assertion{{Min: 4.5, Max: 5.5}}},
+	}
+	reports := []simmodel.Report{
+		{Assertions: []simmodel.AssertionResult{{Min: 4.5, Max: 5.5, Actual: 5}}},
+		{Assertions: []simmodel.AssertionResult{{Min: 4.5, Max: 5.5, Actual: 4.6}}},
+	}
+	link := SimulationMeasurementLink{Evidence: []SimulationAssertionSet{{Plan: 0, Assertions: []int{0}}, {Plan: 1, Assertions: []int{0}}}}
+	worst, err := worstLinkedMeasurement(plans, reports, link)
+	if err != nil || worst.Actual != 4.6 {
+		t.Fatalf("worst batched assertion = %#v err=%v", worst, err)
+	}
+}
+
+func TestOnlyAssertionFailuresRecognizesWorstCaseAssertionDiagnostics(t *testing.T) {
+	report := simmodel.Report{Assertions: []simmodel.AssertionResult{{Pass: false}}}
+	if !onlyAssertionFailures(report, []simmodel.Diagnostic{{Path: "assertions.bandwidth", Message: "measured 90000 is outside trusted bounds 100000..1e+12"}}) {
+		t.Fatal("nominal measured assertion failure was treated as a model execution failure")
+	}
+	if !onlyAssertionFailures(report, []simmodel.Diagnostic{{Path: "worst_case.devices.r1.value_si=900", Message: "worst-case corner devices.r1.value_si=900 measured 8.5 outside trusted bounds 9..11"}}) {
+		t.Fatal("worst-case assertion failure was treated as a model execution failure")
+	}
+	if onlyAssertionFailures(report, []simmodel.Diagnostic{{Path: "assertions.bandwidth", Message: "solved AC sweep does not bracket the -3 dB cutoff"}}) {
+		t.Fatal("unavailable derived measurement was treated as numeric assertion evidence")
+	}
+	if onlyAssertionFailures(report, []simmodel.Diagnostic{{Path: "worst_case", Message: "corner could not be evaluated"}}) {
+		t.Fatal("worst-case execution failure was treated as an assertion failure")
+	}
+}
+
 type invalidSimulationResolver struct{}
 
 func (invalidSimulationResolver) ResolveSimulation(context.Context, CandidateState) (SimulationResolution, error) {

@@ -27,14 +27,15 @@ type roleDefinition struct {
 }
 
 type definition struct {
-	ID          string           `json:"id"`
-	Roles       []roleDefinition `json:"roles"`
-	Inputs      []valueRule      `json:"inputs"`
-	Metrics     []string         `json:"metrics"`
-	Description string           `json:"description"`
-	GraphMNA    bool             `json:"graph_mna,omitempty"`
-	NonlinearDC bool             `json:"nonlinear_dc,omitempty"`
-	Transient   bool             `json:"transient,omitempty"`
+	ID                   string           `json:"id"`
+	Roles                []roleDefinition `json:"roles"`
+	Inputs               []valueRule      `json:"inputs"`
+	Metrics              []string         `json:"metrics"`
+	Description          string           `json:"description"`
+	GraphMNA             bool             `json:"graph_mna,omitempty"`
+	NonlinearDC          bool             `json:"nonlinear_dc,omitempty"`
+	SmallSignalNonlinear bool             `json:"small_signal_nonlinear,omitempty"`
+	Transient            bool             `json:"transient,omitempty"`
 }
 
 var registry = []definition{
@@ -61,7 +62,7 @@ var registry = []definition{
 		Metrics: []string{"cutoff_frequency_hz", "gain_ratio"}, Description: "Ideal first-order unloaded RC low-pass AC magnitude model.",
 	},
 	{
-		ID: ModelLinearCircuitMNAV1, GraphMNA: true,
+		ID: ModelLinearCircuitMNAV1, GraphMNA: true, SmallSignalNonlinear: true,
 		Description: "Graph-derived deterministic modified nodal analysis using trusted catalog primitive models.",
 	},
 	{
@@ -139,7 +140,7 @@ func SupportedAnalysisKinds(modelID string) []string {
 	case ModelLinearCircuitMNAV1:
 		return []string{AnalysisACSweep, AnalysisDCOperatingPoint, AnalysisNoise, AnalysisStability, AnalysisThermal}
 	case ModelTransientCircuitV1:
-		return []string{AnalysisDistortion, AnalysisStartup, AnalysisTransient}
+		return []string{AnalysisDistortion, AnalysisStartup, AnalysisThermal, AnalysisTransient}
 	case ModelNonlinearCircuitDCV1:
 		return []string{AnalysisDCOperatingPoint, AnalysisThermal}
 	default:
@@ -152,6 +153,54 @@ func SupportedAnalysisKinds(modelID string) []string {
 // names as implemented support.
 func SupportsAnalysis(modelID, kind string) bool {
 	return slices.Contains(SupportedAnalysisKinds(modelID), strings.TrimSpace(kind))
+}
+
+// CatalogAnalysisDependencies maps a workflow analysis to the catalog-model
+// behavior actually consumed by that analysis. Noise evaluation treats ideal
+// independent and regulated supplies as zero-noise small-signal boundaries;
+// their catalog dependency is therefore their reviewed AC boundary behavior.
+// Memoryless nonlinear devices are linearized from their reviewed DC I-V
+// operating point for AC, noise-transfer, and stability workflows, so those
+// workflows depend on DC applicability rather than inventing an independent
+// frequency or noise model. Noise-producing resistors and amplifiers continue
+// to require explicit noise applicability.
+func CatalogAnalysisDependencies(modelID string, workflowAnalyses []string) []string {
+	dependencies := make([]string, 0, len(workflowAnalyses))
+	for _, analysis := range workflowAnalyses {
+		analysis = strings.TrimSpace(analysis)
+		if memorylessNonlinearPrimitive(modelID) && (analysis == AnalysisACSweep || analysis == AnalysisNoise || analysis == AnalysisStability) {
+			analysis = AnalysisDCOperatingPoint
+		} else if analysis == AnalysisNoise && idealNoiseBoundaryPrimitive(modelID) {
+			analysis = AnalysisACSweep
+		}
+		if analysis != "" {
+			dependencies = append(dependencies, analysis)
+		}
+	}
+	slices.Sort(dependencies)
+	return slices.Compact(dependencies)
+}
+
+func memorylessNonlinearPrimitive(modelID string) bool {
+	switch strings.TrimSpace(modelID) {
+	case PrimitiveComparatorOpenCollectorV1, PrimitiveBidirectionalTVSV1,
+		PrimitiveUnidirectionalZenerV1, PrimitiveDiodeShockleyV1,
+		PrimitiveNMOSSwitchV1, PrimitivePMOSSwitchV1, PrimitiveBJTNPNV1, PrimitiveBJTPNPV1:
+		return true
+	default:
+		return false
+	}
+}
+
+func idealNoiseBoundaryPrimitive(modelID string) bool {
+	switch strings.TrimSpace(modelID) {
+	case PrimitiveVoltageSourceV1, PrimitiveConnectorVoltageSourceV1, PrimitiveCurrentSourceV1,
+		PrimitiveAdjustableLinearRegulatorV1, PrimitiveFixedLinearRegulatorV1,
+		PrimitiveFloatingAdjustableRegulatorV1, PrimitiveDualOutputIsolatedConverterV1:
+		return true
+	default:
+		return false
+	}
 }
 
 func ValidateCatalogEvidence(family string, evidence []CatalogEvidence) []Diagnostic {
@@ -427,9 +476,6 @@ func Resolve(intent Intent, catalogID, catalogHash string, components []Componen
 		}
 		plan.Bindings = append(plan.Bindings, resolved)
 		for _, uncertainty := range component.Uncertainties {
-			if !intent.WorstCase {
-				break
-			}
 			if uncertainty.Target != "value_si" && !strings.HasPrefix(uncertainty.Target, "model_parameters.") {
 				diagnostics = append(diagnostics, Diagnostic{Path: "bindings." + role.Role + ".uncertainties", Message: "catalog uncertainty target is incompatible with the trusted model binding"})
 				continue

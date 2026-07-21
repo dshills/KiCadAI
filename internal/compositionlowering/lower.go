@@ -222,6 +222,7 @@ func Lower(requirement architecturesearch.Requirement, search architecturesearch
 			return Result{}, issues("requirements.ports."+port.ID, "external power or reference port was not lowered")
 		}
 	}
+	joinPowerSignalsToDomains(requirement, union)
 
 	connections, connectionNames, connectionIssues := lowerConnections(union, actual, metadata)
 	if len(connectionIssues) != 0 {
@@ -306,12 +307,24 @@ func lowerInterfaces(requirement architecturesearch.Requirement, union *disjoint
 			union.join(node, anchor)
 			actual[node] = circuitgraph.FunctionalEndpoint{Interface: port.ID, Signal: signals[index].Name}
 			mergeMetadata(metadata, node, nodeMetadata{role: role, domain: domain, current: portCurrentMA(port)})
-			if lane == "" {
+			if _, exists := nodes[port.ID]; !exists {
 				nodes[port.ID] = node
 			}
 		}
 	}
 	return result, nodes
+}
+
+// A power signal denotes the rail of its declared domain. Joining the semantic
+// anchors lets domain-level observations and load corners resolve to the same
+// generated net without introducing a second physical connection.
+func joinPowerSignalsToDomains(requirement architecturesearch.Requirement, union *disjointSet) {
+	for _, signal := range requirement.Requirements.Signals {
+		if signal.Kind != "power" || signal.Domain == "" {
+			continue
+		}
+		union.join(anchorNode("signal:"+signal.ID, ""), anchorNode("domain:"+signal.Domain, ""))
+	}
 }
 
 func lowerConnections(union *disjointSet, actual map[string]circuitgraph.FunctionalEndpoint, metadata map[string]nodeMetadata) ([]circuitgraph.FunctionConnection, map[string]string, []reports.Issue) {

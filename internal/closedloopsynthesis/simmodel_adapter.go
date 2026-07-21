@@ -34,11 +34,20 @@ type SimulationResolution struct {
 // simmodel assertion result. The index is resolver-owned and refers to the
 // final validated plan returned in the same resolution.
 type SimulationMeasurementLink struct {
-	RequirementID string `json:"requirement_id"`
-	OperatingCase string `json:"operating_case"`
-	Plan          int    `json:"plan,omitempty"`
-	Assertion     int    `json:"assertion,omitempty"`
-	Assertions    []int  `json:"assertions,omitempty"`
+	RequirementID string                   `json:"requirement_id"`
+	OperatingCase string                   `json:"operating_case"`
+	Plan          int                      `json:"plan,omitempty"`
+	Assertion     int                      `json:"assertion,omitempty"`
+	Assertions    []int                    `json:"assertions,omitempty"`
+	Evidence      []SimulationAssertionSet `json:"evidence,omitempty"`
+}
+
+// SimulationAssertionSet identifies the assertions for one deterministic plan
+// batch. A measurement may span several batches when independent operating
+// corners cannot fit under one plan's trusted work bound.
+type SimulationAssertionSet struct {
+	Plan       int   `json:"plan"`
+	Assertions []int `json:"assertions"`
 }
 
 // SimModelEvaluator executes resolved plans only through the registered
@@ -72,13 +81,17 @@ func (evaluator SimModelEvaluator) Evaluate(ctx context.Context, state Candidate
 	for index, plan := range plans {
 		report, diagnostics := simmodel.Evaluate(simmodel.ClonePlan(plan))
 		if len(diagnostics) != 0 && !onlyAssertionFailures(report, diagnostics) {
-			return Evaluation{}, fmt.Errorf("trusted simulation plan %d failed: %s", index, joinSimModelDiagnostics(diagnostics))
+			analysisKinds := make([]string, 0, len(plan.Analyses))
+			for _, analysis := range plan.Analyses {
+				analysisKinds = append(analysisKinds, analysis.Kind)
+			}
+			return Evaluation{}, fmt.Errorf("trusted simulation plan %d (%s: %s) failed: %s", index, plan.ModelID, strings.Join(analysisKinds, ","), joinSimModelDiagnostics(diagnostics))
 		}
 		reports[index] = report
 	}
 	measurements := make([]Measurement, 0, len(resolution.Measurements))
 	for _, link := range resolution.Measurements {
-		assertion, err := worstLinkedAssertion(plans[link.Plan], reports[link.Plan], measurementAssertionIndices(link))
+		assertion, err := worstLinkedMeasurement(plans, reports, link)
 		if err != nil {
 			return Evaluation{}, err
 		}
@@ -93,7 +106,11 @@ func (evaluator SimModelEvaluator) Evaluate(ctx context.Context, state Candidate
 	if err != nil {
 		return Evaluation{}, fmt.Errorf("hash simulation evidence: %w", err)
 	}
-	return Evaluation{EvidenceHash: evidenceHash, Measurements: measurements, ModelDecisions: cloneModelDecisions(resolution.ModelDecisions)}, nil
+	return Evaluation{
+		EvidenceHash: evidenceHash, Measurements: measurements,
+		ModelDecisions: cloneModelDecisions(resolution.ModelDecisions),
+		Simulation:     &SimulationEvidence{Resolution: cloneSimulationResolution(resolution), Reports: cloneSimulationReports(reports)},
+	}, nil
 }
 
 func validateSimulationResolution(resolution SimulationResolution) []Diagnostic {
@@ -117,32 +134,43 @@ func validateSimulationResolution(resolution SimulationResolution) []Diagnostic 
 		if strings.TrimSpace(link.RequirementID) == "" || strings.TrimSpace(link.OperatingCase) == "" {
 			diagnostics = append(diagnostics, Diagnostic{Path: path, Message: "simulation measurement link requires requirement and operating-case identities"})
 		}
-		indices := measurementAssertionIndices(link)
-		if link.Plan < 0 || link.Plan >= len(plans) {
-			diagnostics = append(diagnostics, Diagnostic{Path: path + ".plan", Message: "simulation measurement link references an out-of-range plan"})
-			continue
-		}
-		if len(indices) == 0 {
-			diagnostics = append(diagnostics, Diagnostic{Path: path + ".assertions", Message: "simulation measurement link requires at least one assertion"})
+		sets := measurementAssertionSets(link)
+		if len(sets) == 0 {
+			diagnostics = append(diagnostics, Diagnostic{Path: path + ".evidence", Message: "simulation measurement link requires at least one assertion set"})
 		}
 		behaviorKey := link.RequirementID + "\x00" + link.OperatingCase
 		if seenBehavior[behaviorKey] {
 			diagnostics = append(diagnostics, Diagnostic{Path: path, Message: "simulation measurement link duplicates a behavioral assertion"})
 		}
-		previous := -1
-		for _, assertion := range indices {
-			assertionKey := fmt.Sprintf("%d:%d", link.Plan, assertion)
-			if assertion < 0 || assertion >= len(plans[link.Plan].Assertions) {
-				diagnostics = append(diagnostics, Diagnostic{Path: path + ".assertions", Message: "simulation measurement link references an out-of-range assertion"})
+		previousPlan := -1
+		for setIndex, set := range sets {
+			setPath := fmt.Sprintf("%s.evidence[%d]", path, setIndex)
+			if set.Plan < 0 || set.Plan >= len(plans) {
+				diagnostics = append(diagnostics, Diagnostic{Path: setPath + ".plan", Message: "simulation assertion set references an out-of-range plan"})
+				continue
 			}
-			if assertion <= previous {
-				diagnostics = append(diagnostics, Diagnostic{Path: path + ".assertions", Message: "simulation assertion indices must be unique and canonically ordered"})
+			if set.Plan <= previousPlan {
+				diagnostics = append(diagnostics, Diagnostic{Path: setPath + ".plan", Message: "simulation assertion sets must use unique canonically ordered plans"})
 			}
-			if seenAssertion[assertionKey] {
-				diagnostics = append(diagnostics, Diagnostic{Path: path + ".assertions", Message: "simulation assertion is mapped more than once"})
+			if len(set.Assertions) == 0 {
+				diagnostics = append(diagnostics, Diagnostic{Path: setPath + ".assertions", Message: "simulation assertion set requires at least one assertion"})
 			}
-			seenAssertion[assertionKey] = true
-			previous = assertion
+			previous := -1
+			for _, assertion := range set.Assertions {
+				assertionKey := fmt.Sprintf("%d:%d", set.Plan, assertion)
+				if assertion < 0 || assertion >= len(plans[set.Plan].Assertions) {
+					diagnostics = append(diagnostics, Diagnostic{Path: setPath + ".assertions", Message: "simulation assertion set references an out-of-range assertion"})
+				}
+				if assertion <= previous {
+					diagnostics = append(diagnostics, Diagnostic{Path: setPath + ".assertions", Message: "simulation assertion indices must be unique and canonically ordered"})
+				}
+				if seenAssertion[assertionKey] {
+					diagnostics = append(diagnostics, Diagnostic{Path: setPath + ".assertions", Message: "simulation assertion is mapped more than once"})
+				}
+				seenAssertion[assertionKey] = true
+				previous = assertion
+			}
+			previousPlan = set.Plan
 		}
 		seenBehavior[behaviorKey] = true
 	}
@@ -218,9 +246,53 @@ func measurementAssertionIndices(link SimulationMeasurementLink) []int {
 	return []int{link.Assertion}
 }
 
+func measurementAssertionSets(link SimulationMeasurementLink) []SimulationAssertionSet {
+	if len(link.Evidence) != 0 {
+		sets := make([]SimulationAssertionSet, len(link.Evidence))
+		for index, set := range link.Evidence {
+			sets[index] = SimulationAssertionSet{Plan: set.Plan, Assertions: append([]int(nil), set.Assertions...)}
+		}
+		return sets
+	}
+	return []SimulationAssertionSet{{Plan: link.Plan, Assertions: measurementAssertionIndices(link)}}
+}
+
+func worstLinkedMeasurement(plans []simmodel.Plan, reports []simmodel.Report, link SimulationMeasurementLink) (simmodel.AssertionResult, error) {
+	sets := measurementAssertionSets(link)
+	if len(sets) == 0 {
+		return simmodel.AssertionResult{}, fmt.Errorf("simulation measurement link has no assertion sets")
+	}
+	var worst simmodel.AssertionResult
+	worstMargin := math.Inf(1)
+	for _, set := range sets {
+		if set.Plan < 0 || set.Plan >= len(plans) || set.Plan >= len(reports) {
+			return simmodel.AssertionResult{}, fmt.Errorf("simulation measurement plan index %d is outside plan/report bounds %d/%d", set.Plan, len(plans), len(reports))
+		}
+		candidate, err := worstLinkedAssertion(plans[set.Plan], reports[set.Plan], set.Assertions)
+		if err != nil {
+			return simmodel.AssertionResult{}, err
+		}
+		margin := linkedAssertionResultMargin(candidate)
+		if margin < worstMargin {
+			worst, worstMargin = candidate, margin
+		}
+	}
+	return worst, nil
+}
+
+func linkedAssertionResultMargin(result simmodel.AssertionResult) float64 {
+	scale := math.Max(1, math.Max(math.Abs(result.Min), math.Abs(result.Max)))
+	return math.Min(result.Actual-result.Min, result.Max-result.Actual) / scale
+}
+
 func worstLinkedAssertion(plan simmodel.Plan, report simmodel.Report, indices []int) (simmodel.AssertionResult, error) {
 	if len(indices) == 0 {
 		return simmodel.AssertionResult{}, fmt.Errorf("simulation measurement link has no assertions")
+	}
+	for _, index := range indices {
+		if index < 0 || index >= len(plan.Assertions) || index >= len(report.Assertions) {
+			return simmodel.AssertionResult{}, fmt.Errorf("simulation measurement assertion index %d is outside plan/report bounds %d/%d", index, len(plan.Assertions), len(report.Assertions))
+		}
 	}
 	worst := report.Assertions[indices[0]]
 	worstMargin := linkedAssertionMargin(plan.Assertions[indices[0]], worst.Actual)
@@ -244,7 +316,11 @@ func onlyAssertionFailures(report simmodel.Report, diagnostics []simmodel.Diagno
 		return false
 	}
 	for _, diagnostic := range diagnostics {
-		if !strings.HasPrefix(diagnostic.Path, "assertions.") {
+		measured := strings.HasPrefix(diagnostic.Message, "measured ") || strings.Contains(diagnostic.Message, " measured ")
+		measuredOutOfBounds := measured && strings.Contains(diagnostic.Message, " outside trusted bounds ")
+		nominalAssertion := strings.HasPrefix(diagnostic.Path, "assertions.") && measuredOutOfBounds
+		cornerAssertion := strings.HasPrefix(diagnostic.Path, "worst_case.") && measuredOutOfBounds
+		if !nominalAssertion && !cornerAssertion {
 			return false
 		}
 	}
@@ -262,6 +338,42 @@ func simulationEvidenceHash(resolution SimulationResolution, reports []simmodel.
 	}
 	sum := sha256.Sum256(encoded)
 	return hex.EncodeToString(sum[:]), nil
+}
+
+// HashSimulationEvidence returns the canonical digest used by an attempt.
+func HashSimulationEvidence(evidence SimulationEvidence) (string, error) {
+	return simulationEvidenceHash(evidence.Resolution, evidence.Reports)
+}
+
+func cloneSimulationEvidence(source *SimulationEvidence) *SimulationEvidence {
+	if source == nil {
+		return nil
+	}
+	return &SimulationEvidence{Resolution: cloneSimulationResolution(source.Resolution), Reports: cloneSimulationReports(source.Reports)}
+}
+
+func cloneSimulationResolution(source SimulationResolution) SimulationResolution {
+	data, err := json.Marshal(source)
+	if err != nil {
+		return source
+	}
+	var clone SimulationResolution
+	if err := json.Unmarshal(data, &clone); err != nil {
+		return source
+	}
+	return clone
+}
+
+func cloneSimulationReports(source []simmodel.Report) []simmodel.Report {
+	data, err := json.Marshal(source)
+	if err != nil {
+		return source
+	}
+	var clone []simmodel.Report
+	if err := json.Unmarshal(data, &clone); err != nil {
+		return source
+	}
+	return clone
 }
 
 func joinDiagnosticMessages(diagnostics []Diagnostic) string {

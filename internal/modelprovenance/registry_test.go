@@ -24,7 +24,7 @@ func TestRegistryStrictDecodeHashLookupAndOrderIndependence(t *testing.T) {
 		t.Fatalf("reordered hash=%q err=%v want=%q", reversedHash, err, hash)
 	}
 	modelHash, _ := simmodel.ModelContentHash(simmodel.PrimitiveResistorV1)
-	data := []byte(`{"schema":"kicadai.model-provenance-registry.v1","version":1,"records":[{"catalog_id":"r","family":"resistor","model_id":"mna_resistor_v1","provenance":{"source":"datasheet:r","revision":"a","sha256":"` + modelHash + `","review_status":"reviewed","allowed_analyses":["ac_sweep","dc_operating_point"]}}]}`)
+	data := []byte(`{"schema":"kicadai.model-provenance-registry.v1","version":1,"records":[{"catalog_id":"r","family":"resistor","model_id":"mna_resistor_v1","provenance":{"source":"datasheet:r","revision":"a","sha256":"` + modelHash + `","review_status":"reviewed","allowed_analyses":["ac_sweep","dc_operating_point"],"min_temperature_c":-40,"max_temperature_c":85}}]}`)
 	decoded, diagnostics := DecodeStrict(bytes.NewReader(data))
 	if len(diagnostics) != 0 {
 		t.Fatalf("decode diagnostics: %#v", diagnostics)
@@ -48,6 +48,11 @@ func TestRegistryFailsClosedForMissingTrustUnknownFieldsAndDuplicates(t *testing
 	unknown := []byte(`{"schema":"kicadai.model-provenance-registry.v1","version":1,"records":[],"model_text":"unsafe"}`)
 	if _, diagnostics := DecodeStrict(bytes.NewReader(unknown)); len(diagnostics) == 0 {
 		t.Fatal("unknown provider-like model content was accepted")
+	}
+	missingTemperatureDomain := testRegistry()
+	missingTemperatureDomain.Records[0].Provenance.MinTemperatureC = nil
+	if diagnostics := Validate(Normalize(missingTemperatureDomain)); len(diagnostics) == 0 {
+		t.Fatal("reviewed provenance without a temperature domain was accepted")
 	}
 }
 
@@ -84,6 +89,7 @@ func TestEmbeddedRegistryCoversEveryCheckedInCatalogModelClaim(t *testing.T) {
 
 func testRegistry() Registry {
 	modelHash, _ := simmodel.ModelContentHash(simmodel.PrimitiveResistorV1)
-	provenance := simmodel.ModelProvenance{Source: "datasheet:r", Revision: "a", SHA256: modelHash, ReviewStatus: "reviewed", AllowedAnalyses: []string{simmodel.AnalysisACSweep, simmodel.AnalysisDCOperatingPoint}}
+	minimumTemperatureC, maximumTemperatureC := -40.0, 85.0
+	provenance := simmodel.ModelProvenance{Source: "datasheet:r", Revision: "a", SHA256: modelHash, ReviewStatus: "reviewed", AllowedAnalyses: []string{simmodel.AnalysisACSweep, simmodel.AnalysisDCOperatingPoint}, MinTemperatureC: &minimumTemperatureC, MaxTemperatureC: &maximumTemperatureC}
 	return Registry{Schema: Schema, Version: Version, Records: []Record{{CatalogID: "r2", Family: "resistor", ModelID: simmodel.PrimitiveResistorV1, Provenance: provenance}, {CatalogID: "r1", Family: "resistor", ModelID: simmodel.PrimitiveResistorV1, Provenance: provenance}}}
 }

@@ -11,18 +11,30 @@ const (
 	ModelNonlinearCircuitDCV1   = "nonlinear_circuit_dc_v1"
 	ModelTransientCircuitV1     = "transient_circuit_v1"
 
-	PrimitiveResistorV1                = "mna_resistor_v1"
-	PrimitiveCapacitorV1               = "mna_capacitor_v1"
-	PrimitiveCapacitorTransientV1      = "mna_capacitor_transient_be_v1"
-	PrimitiveVoltageSourceV1           = "mna_voltage_source_v1"
-	PrimitiveConnectorVoltageSourceV1  = "mna_connector_1x02_voltage_source_pin1_positive_v1"
-	PrimitiveCurrentSourceV1           = "mna_current_source_v1"
-	PrimitiveOpAmpV1                   = "mna_opamp_single_pole_v1"
-	PrimitiveComparatorOpenCollectorV1 = "mna_comparator_open_collector_v1"
-	PrimitiveBidirectionalTVSV1        = "mna_bidirectional_tvs_piecewise_linear_v1"
-	PrimitiveDiodeShockleyV1           = "mna_diode_shockley_v1"
-	PrimitiveBJTNPNV1                  = "mna_bjt_npn_ebers_moll_v1"
-	PrimitiveBJTPNPV1                  = "mna_bjt_pnp_ebers_moll_v1"
+	PrimitiveResistorV1                         = "mna_resistor_v1"
+	PrimitiveFuseClosedStateV1                  = "mna_fuse_closed_state_v1"
+	PrimitiveCapacitorV1                        = "mna_capacitor_v1"
+	PrimitiveCapacitorTransientV1               = "mna_capacitor_transient_be_v1"
+	PrimitiveVoltageSourceV1                    = "mna_voltage_source_v1"
+	PrimitiveConnectorVoltageSourceV1           = "mna_connector_1x02_voltage_source_pin1_positive_v1"
+	PrimitiveCurrentSourceV1                    = "mna_current_source_v1"
+	PrimitiveOpAmpV1                            = "mna_opamp_single_pole_v1"
+	PrimitiveComparatorOpenCollectorV1          = "mna_comparator_open_collector_v1"
+	PrimitiveCurrentSenseAmplifierV1            = "mna_current_sense_amplifier_single_pole_v1"
+	PrimitiveAdjustableLinearRegulatorV1        = "mna_adjustable_linear_regulator_v1"
+	PrimitiveFixedLinearRegulatorV1             = "mna_fixed_linear_regulator_v1"
+	PrimitiveFloatingAdjustableRegulatorV1      = "mna_floating_adjustable_regulator_v1"
+	PrimitiveDualOutputIsolatedConverterV1      = "mna_dual_output_isolated_converter_v1"
+	PrimitiveBidirectionalOpenDrainTranslatorV1 = "mna_bidirectional_open_drain_translator_v1"
+	PrimitiveBidirectionalTVSV1                 = "mna_bidirectional_tvs_piecewise_linear_v1"
+	PrimitiveUnidirectionalZenerV1              = "mna_unidirectional_zener_spice_v1"
+	PrimitiveDiodeShockleyV1                    = "mna_diode_shockley_v1"
+	PrimitiveNMOSSwitchV1                       = "mna_nmos_guaranteed_switch_v1"
+	PrimitivePMOSSwitchV1                       = "mna_pmos_guaranteed_switch_v1"
+	PrimitiveBJTNPNV1                           = "mna_bjt_npn_ebers_moll_v1"
+	PrimitiveBJTPNPV1                           = "mna_bjt_pnp_ebers_moll_v1"
+	PrimitiveRelayClosedV1                      = "mna_relay_closed_state_v1"
+	PrimitiveRelayNormallyOpenV1                = "mna_relay_normally_open_v1"
 
 	AnalysisDCOperatingPoint = "dc_operating_point"
 	AnalysisACSweep          = "ac_sweep"
@@ -53,6 +65,7 @@ const (
 	QuantitySettlingTimeS        = "settling_time_s"
 	QuantityResponseTimeS        = "response_time_s"
 	QuantityDeviceCurrentA       = "device_current_a"
+	QuantityTotalSupplyCurrentA  = "total_supply_current_a"
 	QuantityTransimpedanceOhm    = "transimpedance_ohm"
 	QuantityOutputPowerW         = "output_power_w"
 	QuantityThresholdVoltageV    = "threshold_voltage_v"
@@ -100,16 +113,17 @@ type Binding struct {
 }
 
 type Assertion struct {
-	Metric        string  `json:"metric,omitempty"`
-	AnalysisID    string  `json:"analysis_id,omitempty"`
-	Node          string  `json:"node,omitempty"`
-	Component     string  `json:"component,omitempty"`
-	ReferenceNode string  `json:"reference_node,omitempty"`
-	Quantity      string  `json:"quantity,omitempty"`
-	FrequencyHz   float64 `json:"frequency_hz,omitempty"`
-	TimeS         float64 `json:"time_s,omitempty"`
-	Min           float64 `json:"min"`
-	Max           float64 `json:"max"`
+	Metric        string   `json:"metric,omitempty"`
+	AnalysisID    string   `json:"analysis_id,omitempty"`
+	Node          string   `json:"node,omitempty"`
+	Component     string   `json:"component,omitempty"`
+	Components    []string `json:"components,omitempty"`
+	ReferenceNode string   `json:"reference_node,omitempty"`
+	Quantity      string   `json:"quantity,omitempty"`
+	FrequencyHz   float64  `json:"frequency_hz,omitempty"`
+	TimeS         float64  `json:"time_s,omitempty"`
+	Min           float64  `json:"min"`
+	Max           float64  `json:"max"`
 }
 
 // SourceExcitation is a bounded operating condition for a catalog-resolved
@@ -151,11 +165,12 @@ type Analysis struct {
 // state between adjacent points so threshold and hysteresis are measured from
 // the circuit equations rather than inferred from a provider formula.
 type DCSweep struct {
-	Component     string  `json:"component"`
-	StartValue    float64 `json:"start_value"`
-	StopValue     float64 `json:"stop_value"`
-	Points        int     `json:"points"`
-	Bidirectional bool    `json:"bidirectional,omitempty"`
+	Component       string  `json:"component"`
+	StartValue      float64 `json:"start_value"`
+	StopValue       float64 `json:"stop_value"`
+	Points          int     `json:"points"`
+	Bidirectional   bool    `json:"bidirectional,omitempty"`
+	ExcitationScale float64 `json:"excitation_scale,omitempty"`
 }
 
 // DeviceOverride applies bounded scalar corner values to an already resolved
@@ -263,6 +278,9 @@ func ClonePlan(source Plan) Plan {
 	}
 	clone.Analyses = cloneAnalyses(source.Analyses)
 	clone.Assertions = append([]Assertion(nil), source.Assertions...)
+	for index := range clone.Assertions {
+		clone.Assertions[index].Components = append([]string(nil), source.Assertions[index].Components...)
+	}
 	clone.Uncertainties = append([]Uncertainty(nil), source.Uncertainties...)
 	return clone
 }
@@ -300,26 +318,29 @@ type Measurement struct {
 }
 
 type AssertionResult struct {
-	Metric        string  `json:"metric,omitempty"`
-	AnalysisID    string  `json:"analysis_id,omitempty"`
-	Node          string  `json:"node,omitempty"`
-	Component     string  `json:"component,omitempty"`
-	ReferenceNode string  `json:"reference_node,omitempty"`
-	Quantity      string  `json:"quantity,omitempty"`
-	FrequencyHz   float64 `json:"frequency_hz,omitempty"`
-	TimeS         float64 `json:"time_s,omitempty"`
-	Min           float64 `json:"min"`
-	Max           float64 `json:"max"`
-	Actual        float64 `json:"actual"`
-	Pass          bool    `json:"pass"`
+	Metric        string   `json:"metric,omitempty"`
+	AnalysisID    string   `json:"analysis_id,omitempty"`
+	Node          string   `json:"node,omitempty"`
+	Component     string   `json:"component,omitempty"`
+	Components    []string `json:"components,omitempty"`
+	ReferenceNode string   `json:"reference_node,omitempty"`
+	Quantity      string   `json:"quantity,omitempty"`
+	FrequencyHz   float64  `json:"frequency_hz,omitempty"`
+	TimeS         float64  `json:"time_s,omitempty"`
+	Min           float64  `json:"min"`
+	Max           float64  `json:"max"`
+	Actual        float64  `json:"actual"`
+	Pass          bool     `json:"pass"`
 }
 
 type NodeResult struct {
-	Node      string  `json:"node"`
-	Real      float64 `json:"real"`
-	Imaginary float64 `json:"imaginary"`
-	Magnitude float64 `json:"magnitude"`
-	PhaseDeg  float64 `json:"phase_deg"`
+	Node                        string  `json:"node"`
+	Real                        float64 `json:"real"`
+	Imaginary                   float64 `json:"imaginary"`
+	Magnitude                   float64 `json:"magnitude"`
+	PhaseDeg                    float64 `json:"phase_deg"`
+	DominantNoiseSource         string  `json:"dominant_noise_source,omitempty"`
+	DominantNoiseDensityVSqrtHz float64 `json:"dominant_noise_density_v_sqrt_hz,omitempty"`
 }
 
 type AnalysisPoint struct {

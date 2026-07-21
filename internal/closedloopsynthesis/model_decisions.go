@@ -41,6 +41,7 @@ func ResolvePlanModelDecisions(plan simmodel.Plan, registry modelprovenance.Regi
 	decisions := make([]ModelDecision, 0, len(dependencies))
 	for _, dependency := range dependencies {
 		decision := ModelDecision{Component: dependency.Component, Family: dependency.Family, Claim: dependency.Claim}
+		dependencyAnalyses := simmodel.CatalogAnalysisDependencies(dependency.Claim.ModelID, required)
 		record, exists := modelprovenance.Lookup(registry, dependency.CatalogID, dependency.Claim.ModelID)
 		if !exists {
 			decision.Status = "rejected"
@@ -57,7 +58,7 @@ func ResolvePlanModelDecisions(plan simmodel.Plan, registry modelprovenance.Regi
 			continue
 		}
 		claimDiagnostics := simmodel.ValidateCatalogEvidence(dependency.Family, []simmodel.CatalogEvidence{dependency.Claim})
-		provenanceDiagnostics := simmodel.ValidateRequiredModelProvenance(&record.Provenance, required)
+		provenanceDiagnostics := simmodel.ValidateRequiredModelProvenance(&record.Provenance, dependencyAnalyses)
 		if len(claimDiagnostics) != 0 || len(provenanceDiagnostics) != 0 {
 			decision.Status = "rejected"
 			decision.Reason = "catalog model claim or reviewed applicability is invalid"
@@ -70,8 +71,8 @@ func ResolvePlanModelDecisions(plan simmodel.Plan, registry modelprovenance.Regi
 		provenance := record.Provenance
 		decision.Provenance = &provenance
 		decision.Status = "used"
-		decision.Reason = "resolved catalog model has reviewed provenance for every executable plan analysis"
-		decision.RequiredAnalyses = append([]string(nil), required...)
+		decision.Reason = "resolved catalog model has reviewed provenance for every consumed analysis behavior"
+		decision.RequiredAnalyses = append([]string(nil), dependencyAnalyses...)
 		decisions = append(decisions, decision)
 	}
 	slices.SortStableFunc(decisions, compareModelDecisions)

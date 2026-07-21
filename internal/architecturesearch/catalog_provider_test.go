@@ -28,7 +28,7 @@ func TestCatalogProviderSearchesSyntheticThresholdDeterministically(t *testing.T
 		t.Fatalf("catalog search = %#v", result)
 	}
 	selection := result.Selected.Selections[0]
-	if selection.ProviderID != "catalog_function_fragments" || len(selection.Calculations) != 3 || len(selection.Components) != 6 {
+	if selection.ProviderID != "catalog_function_fragments" || len(selection.Calculations) != 3 || len(selection.Components) != 8 {
 		t.Fatalf("selection = %#v", selection)
 	}
 	if !slices.ContainsFunc(selection.Calculations, func(calculation CalculationEvidence) bool {
@@ -40,8 +40,18 @@ func TestCatalogProviderSearchesSyntheticThresholdDeterministically(t *testing.T
 	if err != nil {
 		t.Fatal(err)
 	}
-	if realization.Capability != "threshold_detection" || len(realization.PortBindings) != 4 || len(realization.Connections) != 4 {
+	if realization.Capability != "threshold_detection" || len(realization.PortBindings) != 4 || len(realization.Connections) != 5 {
 		t.Fatalf("realization = %#v", realization)
+	}
+	if len(realization.RepairVariables) != 1 {
+		t.Fatalf("threshold repair variables = %#v", realization.RepairVariables)
+	}
+	feedbackRepair := realization.RepairVariables[0]
+	if feedbackRepair.ID != "threshold_feedback_resistance" || feedbackRepair.Instance != "feedback_resistor" || len(feedbackRepair.AllowedValues) < 2 || !slices.Contains(feedbackRepair.AllowedValues, feedbackRepair.Value) {
+		t.Fatalf("threshold feedback repair = %#v", feedbackRepair)
+	}
+	if len(feedbackRepair.Effects) != 1 || feedbackRepair.Effects[0] != (RealizationRepairEffect{Analysis: "dc_operating_point", Metric: "hysteresis_voltage", Direction: "metric_decreases"}) {
+		t.Fatalf("threshold feedback repair effects = %#v", feedbackRepair.Effects)
 	}
 	encoded, err := json.Marshal(result)
 	if err != nil {
@@ -59,6 +69,39 @@ func TestCatalogProviderSearchesSyntheticThresholdDeterministically(t *testing.T
 	}
 }
 
+func TestPreferredRepairValuesIncludeFineAndCoarseE96Neighbors(t *testing.T) {
+	values := preferredRepairValues(15.8)
+	for _, expected := range []float64{14.3, 15.4, 16.2, 17.4, 19.1} {
+		if !slices.Contains(values, expected) {
+			t.Fatalf("preferred repair values %v lack E96 neighbor %.3g", values, expected)
+		}
+	}
+}
+
+func TestLowerEdgeAmplifierGainTargetCoversOpposingFeedbackTolerance(t *testing.T) {
+	target := lowerEdgeAmplifierGainTarget(20, 5, .1)
+	feedbackTolerance := .001
+	worstCaseGain := 1 + (target-1)*(1-feedbackTolerance)/(1+feedbackTolerance)
+	if worstCaseGain < 19 {
+		t.Fatalf("worst-case gain = %.12g, want at least lower requirement edge 19", worstCaseGain)
+	}
+	if target >= 20 {
+		t.Fatalf("target gain = %.12g, want lower-edge-centered target below band midpoint", target)
+	}
+}
+
+func TestFailSafeMutePulldownIsBoundedByResidualOutputRatio(t *testing.T) {
+	resistance, ok := failSafeMutePulldownResistance(.05, math.Sqrt(2*10*8), 60_000_000)
+	if !ok {
+		t.Fatal("failSafeMutePulldownResistance() did not solve bounded request")
+	}
+	attenuation := resistance / (60_000_000 + resistance)
+	residual := math.Sqrt(2*10*8) * attenuation
+	if residual > .025 {
+		t.Fatalf("residual output = %.12g V with %.12g ohm pull-down, want at most half of 50 mV requirement", residual, resistance)
+	}
+}
+
 func TestCatalogProviderDispatchesBehaviorDerivedThresholdToGenericAdapter(t *testing.T) {
 	provider, err := NewCatalogProvider(loadArchitectureCatalog(t))
 	if err != nil {
@@ -69,6 +112,71 @@ func TestCatalogProviderDispatchesBehaviorDerivedThresholdToGenericAdapter(t *te
 	expansions, err := provider.Expand(context.Background(), request)
 	if err != nil || len(expansions) == 0 {
 		t.Fatalf("behavior-derived threshold dispatch expansions=%d err=%v", len(expansions), err)
+	}
+}
+
+func TestCatalogProviderUsesHighDisconnectControlForFailSafeLoad(t *testing.T) {
+	provider, err := NewCatalogProvider(loadArchitectureCatalog(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	request := loadSwitchProviderRequest(24, 2)
+	request.Ports = slices.DeleteFunc(request.Ports, func(port RoleContract) bool { return port.Role == "logic_power" })
+	request.Constraints = []Constraint{
+		constraintNumber("load_current", "minimum", 2, "A", 10),
+		constraintBool("fail_safe_interlock", "required", true),
+	}
+	expansions, err := provider.Expand(context.Background(), request)
+	if err != nil || len(expansions) == 0 {
+		t.Fatalf("fail-safe load expansions=%d err=%v", len(expansions), err)
+	}
+	realization, err := DecodeFragmentRealization(expansions[0].Payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	components := map[string]bool{}
+	for _, component := range realization.Instances {
+		components[component.ID] = true
+	}
+	if !components["gate_inverter"] || components["control_inverter"] {
+		t.Fatalf("fail-safe load components = %#v", components)
+	}
+}
+
+func TestCatalogProviderUsesDefaultOffHighSideSwitchForLowStartupOutput(t *testing.T) {
+	provider, err := NewCatalogProvider(loadArchitectureCatalog(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	request := loadSwitchProviderRequest(28, 2)
+	request.Ports = slices.DeleteFunc(request.Ports, func(port RoleContract) bool { return port.Role == "logic_power" })
+	request.Constraints = []Constraint{
+		constraintNumber("load_current", "minimum", 2, "A", 10),
+		constraintNumber("startup_output_voltage", "maximum", .5, "V", 0),
+		constraintBool("fail_safe_interlock", "required", true),
+	}
+	expansions, err := provider.Expand(context.Background(), request)
+	if err != nil || len(expansions) == 0 {
+		t.Fatalf("startup-safe load expansions=%d err=%v", len(expansions), err)
+	}
+	realization, err := DecodeFragmentRealization(expansions[0].Payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.ContainsFunc(realization.Instances, func(instance RealizationInstance) bool { return instance.CatalogID == "mosfet.onsemi.fqp47p06.to220" }) {
+		t.Fatalf("startup-safe load did not select a trusted high-side PMOS: %#v", realization.Instances)
+	}
+	seenOutput := false
+	for _, binding := range realization.PortBindings {
+		if (binding.Role == "power" || binding.Role == "load_power") && (binding.Instance != "high_side_switch" || binding.Function != "SOURCE") {
+			t.Fatalf("high-side power binding = %#v", binding)
+		}
+		if (binding.Role == "output" || binding.Role == "load") && binding.Instance == "high_side_switch" && binding.Function == "DRAIN" {
+			seenOutput = true
+		}
+	}
+	if !seenOutput {
+		t.Fatalf("high-side output binding = %#v", realization.PortBindings)
 	}
 }
 
@@ -116,6 +224,41 @@ func TestCatalogProviderGenericCapabilityMutations(t *testing.T) {
 				t.Fatal(err)
 			}
 		})
+	}
+}
+
+func TestCatalogProviderPreservesEnvironmentalConstraintsAcrossGenericLoadSwitchAdapter(t *testing.T) {
+	catalog := loadArchitectureCatalog(t)
+	provider, err := NewCatalogProvider(catalog)
+	if err != nil {
+		t.Fatal(err)
+	}
+	request := loadSwitchProviderRequest(28, 2)
+	request.Constraints = []Constraint{
+		constraintNumber("load_current", "minimum", 2, "A", 0),
+		constraintNumber("ambient_temperature_minimum", "minimum", -20, "degC", 0),
+		constraintNumber("ambient_temperature", "maximum", 70, "degC", 0),
+		constraintNumber("junction_temperature", "maximum", 125, "degC", 0),
+	}
+	expansions, err := provider.Expand(context.Background(), request)
+	if err != nil || len(expansions) == 0 {
+		t.Fatalf("thermal load-switch expansion = %#v, %v", expansions, err)
+	}
+	flybackIndex := slices.IndexFunc(expansions[0].Components, func(component SelectedComponent) bool {
+		return component.InstanceID == "flyback_clamp"
+	})
+	if flybackIndex < 0 {
+		t.Fatalf("thermal load-switch expansion did not select the ambient-qualified flyback: %#v", expansions[0].Components)
+	}
+	flyback := expansions[0].Components[flybackIndex]
+	resolved, resolvedResult := components.ResolveBinding(context.Background(), catalog, flyback.CatalogID, flyback.VariantID)
+	if !resolvedResult.OK || resolved.Component.Thermal == nil || resolved.Component.Thermal.MaxJunctionTemperatureC == nil || resolved.Component.Thermal.JunctionToAmbientCPerW == nil {
+		t.Fatalf("selected flyback lacks ambient thermal evidence: selected=%#v resolved=%#v issues=%#v", flyback, resolved, resolvedResult.Issues)
+	}
+	if !slices.ContainsFunc(expansions[0].Components, func(component SelectedComponent) bool {
+		return component.CatalogID == "mosfet.onsemi.rfd16n05lsm.to252"
+	}) {
+		t.Fatalf("low-voltage control expansion did not select a MOSFET with guaranteed gate-drive margin: %#v", expansions[0].Components)
 	}
 }
 
@@ -171,6 +314,54 @@ func TestCatalogProviderOffersAndRanksRealFilterAlternative(t *testing.T) {
 	}
 	if !hasDifferentComponentCount {
 		t.Fatalf("filter alternatives are not distinct: %#v", expansions)
+	}
+}
+
+func TestCatalogProviderOffersFixedAndAdjustableRegulatorTopologies(t *testing.T) {
+	provider, err := NewCatalogProvider(loadArchitectureCatalog(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	request := regulatorProviderRequest(5.5, 3.3, 0.15)
+	request.Ports[0].Contract.Voltage.Minimum = float64Pointer(4.5)
+	request.Constraints = request.Constraints[:2]
+	expansions, err := provider.Expand(context.Background(), request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fixed, adjustable := false, false
+	for _, expansion := range expansions {
+		realization, decodeErr := DecodeFragmentRealization(expansion.Payload)
+		if decodeErr != nil {
+			t.Fatal(decodeErr)
+		}
+		for _, instance := range realization.Instances {
+			if instance.Usage != "regulator" {
+				continue
+			}
+			if slices.Contains(instance.RequiredFunctions, "ADJ") {
+				adjustable = true
+			} else if slices.Contains(instance.RequiredFunctions, "VIN") && slices.Contains(instance.RequiredFunctions, "VOUT") && slices.Contains(instance.RequiredFunctions, "GND") {
+				fixed = true
+			}
+		}
+	}
+	if !fixed || !adjustable {
+		t.Fatalf("regulator topology coverage fixed=%t adjustable=%t expansions=%d", fixed, adjustable, len(expansions))
+	}
+}
+
+func TestCatalogUnitConversionIsSymmetricForSupportedScaledUnits(t *testing.T) {
+	tests := []struct {
+		value    float64
+		from, to string
+		want     float64
+	}{{0.15, "A", "mA", 150}, {150, "mA", "A", 0.15}, {3.3, "V", "mV", 3300}, {3300, "mV", "V", 3.3}, {2e-9, "C", "nC", 2}, {2, "nC", "C", 2e-9}}
+	for _, test := range tests {
+		got, ok := convertCatalogUnit(test.value, test.from, test.to)
+		if !ok || math.Abs(got-test.want) > math.Max(1e-15, math.Abs(test.want)*1e-12) {
+			t.Fatalf("convertCatalogUnit(%g, %q, %q) = %g, %t; want %g", test.value, test.from, test.to, got, ok, test.want)
+		}
 	}
 }
 
@@ -257,6 +448,290 @@ func TestCatalogProviderOutputIgnoresCatalogOrdering(t *testing.T) {
 	secondJSON, _ := json.Marshal(secondExpansion)
 	if string(firstJSON) != string(secondJSON) {
 		t.Fatalf("catalog order changed expansion bytes\n%s\n%s", firstJSON, secondJSON)
+	}
+}
+
+func TestCatalogProviderSizesOpenDrainPullupsFromRiseTimeAndCapacitance(t *testing.T) {
+	provider, err := NewCatalogProvider(loadArchitectureCatalog(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	request := translatorProviderRequest(3.3, 5)
+	request.Constraints = append(request.Constraints,
+		constraintNumber("rise_time", "maximum", 1e-6, "s", 0),
+		constraintNumber("load_capacitance", "maximum", 4e-10, "F", 0),
+	)
+	expansions, err := provider.Expand(context.Background(), request)
+	if err != nil || len(expansions) == 0 {
+		t.Fatalf("Expand() = %#v, %v", expansions, err)
+	}
+	realization, err := DecodeFragmentRealization(expansions[0].Payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, id := range []string{"side_a_sda_pullup", "side_a_scl_pullup", "side_b_sda_pullup", "side_b_scl_pullup"} {
+		if !slices.ContainsFunc(realization.Instances, func(instance RealizationInstance) bool {
+			return instance.ID == id && instance.Value == "910"
+		}) {
+			t.Fatalf("%s is not rise-time sized: %#v", id, realization.Instances)
+		}
+		if !slices.ContainsFunc(realization.RepairVariables, func(variable RealizationRepairVariable) bool {
+			return variable.Instance == id && variable.Value == 910 && len(variable.AllowedValues) != 0
+		}) {
+			t.Fatalf("%s lacks bounded timing repair values: %#v", id, realization.RepairVariables)
+		}
+	}
+}
+
+func TestCatalogProviderKeepsClassABNegativeRailDistinctFromReference(t *testing.T) {
+	provider, err := NewCatalogProvider(loadArchitectureCatalog(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	request := ProviderRequest{Capability: "class_ab_output_stage", Ports: []RoleContract{
+		providerRole("input", "analog_voltage", "sink", -2, 2),
+		providerRole("output", "analog_voltage", "source", -13, 13),
+		providerRole("positive_power", "power", "sink", 15, 15),
+		providerRole("negative_power", "power", "sink", -15, -15),
+		providerRole("reference", "reference", "bidirectional", 0, 0),
+	}, Constraints: []Constraint{
+		constraintNumber("load_impedance", "target", 8, "ohm", 0),
+		constraintNumber("continuous_output_power", "minimum", 10, "W", 0),
+	}}
+	expansions, err := provider.Expand(context.Background(), request)
+	if err != nil || len(expansions) == 0 {
+		t.Fatalf("Expand() = %#v, %v", expansions, err)
+	}
+	realization, err := DecodeFragmentRealization(expansions[0].Payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	negativeRail := false
+	referenceBinding := false
+	driverEmitterReturns := map[string]bool{}
+	biasTrackerJunctions := map[string]map[string]bool{}
+	selectedParts := map[string]string{}
+	selectedValues := map[string]string{}
+	for _, instance := range realization.Instances {
+		selectedParts[instance.ID] = instance.CatalogID
+		selectedValues[instance.ID] = instance.Value
+	}
+	if selectedParts["output_npn_1"] != "bjt.onsemi.d44h11g.to220" || selectedParts["output_pnp_1"] != "bjt.onsemi.d45h11g.to220" {
+		t.Fatalf("Class AB output pair = %q/%q, want thermally qualified D44H11G/D45H11G", selectedParts["output_npn_1"], selectedParts["output_pnp_1"])
+	}
+	if selectedParts["driver_npn"] != "bjt.onsemi.pzt3904t1g.sot223" || selectedParts["driver_pnp"] != "bjt.onsemi.pzt3906t1g.sot223" {
+		t.Fatalf("Class AB predriver pair = %q/%q, want thermally qualified PZT3904T1G/PZT3906T1G", selectedParts["driver_npn"], selectedParts["driver_pnp"])
+	}
+	if selectedValues["npn_base_stop"] != "68" || selectedValues["pnp_base_stop"] != "68" {
+		t.Fatalf("Class AB driver input stoppers = %q/%q, want bounded 68-ohm pair", selectedValues["npn_base_stop"], selectedValues["pnp_base_stop"])
+	}
+	if selectedValues["npn_driver_base_emitter"] != "10k" || selectedValues["pnp_driver_base_emitter"] != "10k" {
+		t.Fatalf("Class AB driver turn-off shunts = %q/%q, want ratio-derived 10-kilohm pair", selectedValues["npn_driver_base_emitter"], selectedValues["pnp_driver_base_emitter"])
+	}
+	for _, binding := range realization.PortBindings {
+		if binding.Role == "reference" && binding.Instance == "input_bias" && binding.Function == "B" {
+			referenceBinding = true
+		}
+	}
+	for _, connection := range realization.Connections {
+		if connection.Role == "reference" {
+			t.Fatalf("dual-rail Class AB realization invented a reference net: %#v", connection)
+		}
+		if connection.ID == "class_ab_negative_power" && connection.Role == "power" {
+			negativeRail = true
+		}
+		if connection.ID == "class_ab_output" {
+			for _, endpoint := range connection.Endpoints {
+				if endpoint.Function == "B" && (endpoint.Instance == "npn_driver_emitter" || endpoint.Instance == "pnp_driver_emitter") {
+					driverEmitterReturns[endpoint.Instance] = true
+				}
+			}
+		}
+		for _, endpoint := range connection.Endpoints {
+			if endpoint.Instance != "upper_bias_tracker" && endpoint.Instance != "lower_bias_tracker" {
+				continue
+			}
+			if biasTrackerJunctions[endpoint.Instance] == nil {
+				biasTrackerJunctions[endpoint.Instance] = map[string]bool{}
+			}
+			biasTrackerJunctions[endpoint.Instance][connection.ID+":"+endpoint.Function] = true
+		}
+	}
+	if !negativeRail {
+		t.Fatalf("dual-rail Class AB realization lacks a power-role negative rail: %#v", realization.Connections)
+	}
+	if !referenceBinding {
+		t.Fatalf("dual-rail Class AB realization does not bind signal reference separately: %#v", realization.PortBindings)
+	}
+	if !driverEmitterReturns["npn_driver_emitter"] || !driverEmitterReturns["pnp_driver_emitter"] {
+		t.Fatalf("Class AB complementary-feedback driver emitters do not return to the output: %#v", realization.Connections)
+	}
+	if !biasTrackerJunctions["upper_bias_tracker"]["npn_driver_base:BASE"] || !biasTrackerJunctions["upper_bias_tracker"]["npn_driver_base:COLLECTOR"] || !biasTrackerJunctions["upper_bias_tracker"]["base_drive:EMITTER"] {
+		t.Fatalf("upper Class AB bias tracker is not diode-connected across the NPN driver junction: %#v", realization.Connections)
+	}
+	if !biasTrackerJunctions["lower_bias_tracker"]["pnp_driver_base:BASE"] || !biasTrackerJunctions["lower_bias_tracker"]["pnp_driver_base:COLLECTOR"] || !biasTrackerJunctions["lower_bias_tracker"]["base_drive:EMITTER"] {
+		t.Fatalf("lower Class AB bias tracker is not diode-connected across the PNP driver junction: %#v", realization.Connections)
+	}
+
+	biasRequest := ProviderRequest{Capability: "class_ab_bias_control", Ports: []RoleContract{
+		providerRole("output", "analog_voltage", "source", -1, 1),
+		providerRole("positive_power", "power", "sink", 15, 15),
+		providerRole("negative_power", "power", "sink", -15, -15),
+	}, Constraints: []Constraint{constraintBool("thermal_tracking", "required", true)}}
+	biasExpansions, err := provider.Expand(context.Background(), biasRequest)
+	if err != nil || len(biasExpansions) == 0 {
+		t.Fatalf("bias Expand() = %#v, %v", biasExpansions, err)
+	}
+	biasRealization, err := DecodeFragmentRealization(biasExpansions[0].Payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	biasNegativeRail := false
+	for _, binding := range biasRealization.PortBindings {
+		if binding.Role == "negative_power" && binding.Instance == "tracking_diode_2" && binding.Function == "K" {
+			biasNegativeRail = true
+		}
+	}
+	for _, connection := range biasRealization.Connections {
+		if connection.Role == "reference" {
+			t.Fatalf("dual-rail Class AB bias realization invented a reference net: %#v", connection)
+		}
+	}
+	if !biasNegativeRail {
+		t.Fatalf("dual-rail Class AB bias realization lacks a negative-rail binding: %#v", biasRealization.PortBindings)
+	}
+	for _, instance := range biasRealization.Instances {
+		if instance.ID == "bias_enable_inverter" || instance.ID == "bias_clamp" || instance.ID == "enable_resistor" {
+			t.Fatalf("always-on Class AB bias contains a dead enable/clamp device: %#v", biasRealization.Instances)
+		}
+	}
+}
+
+func TestCatalogProviderConnectsSingleSupplyClassABOpAmpNegativeSupplyToReference(t *testing.T) {
+	provider, err := NewCatalogProvider(loadArchitectureCatalog(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	request := ProviderRequest{Capability: "class_ab_output_stage", Ports: []RoleContract{
+		providerRole("input", "analog_voltage", "sink", 0, 2),
+		providerRole("output", "analog_voltage", "source", 0, 13),
+		providerRole("positive_power", "power", "sink", 15, 15),
+		providerRole("reference", "reference", "bidirectional", 0, 0),
+	}, Constraints: []Constraint{
+		constraintNumber("load_impedance", "target", 8, "ohm", 0),
+		constraintNumber("continuous_output_power", "minimum", 1, "W", 0),
+	}}
+	expansions, err := provider.Expand(context.Background(), request)
+	if err != nil || len(expansions) == 0 {
+		t.Fatalf("Expand() = %#v, %v", expansions, err)
+	}
+	realization, err := DecodeFragmentRealization(expansions[0].Payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, connection := range realization.Connections {
+		if connection.ID != "class_ab_reference" {
+			continue
+		}
+		if slices.ContainsFunc(connection.Endpoints, func(endpoint RealizationEndpoint) bool {
+			return endpoint.Instance == "voltage_driver" && endpoint.Function == "V_MINUS"
+		}) {
+			return
+		}
+	}
+	t.Fatalf("single-supply Class AB reference does not connect the voltage-driver negative supply: %#v", realization.Connections)
+}
+
+func TestCatalogProviderSizesOutputFuseFromBehavioralPowerAndLoad(t *testing.T) {
+	provider, err := NewCatalogProvider(loadArchitectureCatalog(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	request := ProviderRequest{Capability: "output_protection", Ports: []RoleContract{
+		providerRole("input", "analog_voltage", "sink", -13, 13),
+		providerRole("output", "protected_output", "source", -13, 13),
+		providerRole("reference", "reference", "bidirectional", 0, 0),
+	}, Constraints: []Constraint{
+		constraintNumber("continuous_output_power", "minimum", 10, "W", 0),
+		constraintNumber("load_impedance", "target", 8, "ohm", 0),
+	}}
+	expansions, err := provider.Expand(context.Background(), request)
+	if err != nil || len(expansions) == 0 {
+		t.Fatalf("Expand() = %#v, %v", expansions, err)
+	}
+	realization, err := DecodeFragmentRealization(expansions[0].Payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.ContainsFunc(realization.Instances, func(instance RealizationInstance) bool {
+		return instance.ID == "output_fuse" && instance.CatalogID == "fuse.littelfuse.0483002dr.1206" && instance.Value == "2"
+	}) {
+		t.Fatalf("10 W / 8 ohm protection did not select the catalog 2 A fuse: %#v", realization.Instances)
+	}
+	if !slices.ContainsFunc(realization.Instances, func(instance RealizationInstance) bool {
+		return instance.ID == "output_clamp" && instance.CatalogID == "protection.littelfuse.smbj18ca.smb"
+	}) {
+		t.Fatalf("audio output protection did not select a voltage-qualified TVS: %#v", realization.Instances)
+	}
+}
+
+func TestCatalogProviderRaisesOutputTVSWorkingVoltageFromPortContract(t *testing.T) {
+	provider, err := NewCatalogProvider(loadArchitectureCatalog(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	request := ProviderRequest{Capability: "output_protection", Ports: []RoleContract{
+		providerRole("input", "analog_voltage", "sink", -19.8, 19.8),
+		providerRole("output", "protected_output", "source", -19.8, 19.8),
+		providerRole("reference", "reference", "bidirectional", 0, 0),
+	}}
+	expansions, err := provider.Expand(context.Background(), request)
+	if err != nil || len(expansions) == 0 {
+		t.Fatalf("Expand() = %#v, %v", expansions, err)
+	}
+	realization, err := DecodeFragmentRealization(expansions[0].Payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.ContainsFunc(realization.Instances, func(instance RealizationInstance) bool {
+		return instance.ID == "output_clamp" && instance.CatalogID == "protection.littelfuse.smbj20ca.smb"
+	}) {
+		t.Fatalf("19.8 V output did not select the 20 V working TVS: %#v", realization.Instances)
+	}
+}
+
+func TestCatalogProviderBroadensRelayTechnologyWhenPreferredRelayIsUnderrated(t *testing.T) {
+	provider, err := NewCatalogProvider(loadArchitectureCatalog(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	request := ProviderRequest{Capability: "output_protection", Ports: []RoleContract{
+		providerRole("input", "analog_voltage", "sink", -13, 13),
+		providerRole("output", "protected_output", "source", -13, 13),
+		providerRole("reference", "reference", "bidirectional", 0, 0),
+		providerRole("power", "power", "sink", 13.5, 16.5),
+	}, Constraints: []Constraint{
+		constraintNumber("continuous_output_power", "minimum", 10, "W", 0),
+		constraintNumber("load_impedance", "target", 8, "ohm", 0),
+		constraintBool("startup_isolation", "required", true),
+	}}
+	expansions, err := provider.Expand(context.Background(), request)
+	if err != nil || len(expansions) == 0 {
+		t.Fatalf("Expand() = %#v, %v", expansions, err)
+	}
+	realization, err := DecodeFragmentRealization(expansions[0].Payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.ContainsFunc(realization.Instances, func(instance RealizationInstance) bool {
+		return instance.ID == "output_relay" && instance.CatalogID == "relay.omron.g5q_1a.dc12"
+	}) {
+		t.Fatalf("high-current startup isolation did not select a suitably rated relay: %#v", realization.Instances)
+	}
+	if !slices.ContainsFunc(realization.Instances, func(instance RealizationInstance) bool {
+		return instance.ID == "relay_coil_series" && instance.Value == "30"
+	}) {
+		t.Fatalf("startup-isolation relay lacks minimum-rail operate-current margin: %#v", realization.Instances)
 	}
 }
 

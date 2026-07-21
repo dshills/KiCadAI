@@ -156,6 +156,106 @@
       "verification": {"confidence": "rule_inferred", "sources": ["curated_seed_catalog", "builtin_pinmap:Device:C"], "pinmap_checked": true, "notes": ["Nonpolar passive; voltage derating remains design-specific."]}
     },
     {
+      "id": "fuse.littelfuse.0483002dr.1206",
+      "family": "fuse",
+      "name": "Littelfuse 0483002.DR 2 A fast-acting fuse",
+      "description": "Concrete 75 V 1206 fast-acting fuse with reviewed cold resistance and nominal melting I2t.",
+      "generic": false,
+      "manufacturer": "Littelfuse",
+      "mpn": "0483002.DR",
+      "lifecycle": "active",
+      "tags": ["protection", "fuse", "fast_acting", "smd", "1206"],
+      "values": [{"kind": "resistance", "typ": "0.073", "unit": "ohm"}],
+      "ratings": [
+        {"kind": "current", "max": "2", "unit": "A"},
+        {"kind": "voltage", "max": "75", "unit": "V"},
+        {"kind": "melting_i2t", "typ": "2", "unit": "A2s"}
+      ],
+      "temperature": {"min": "-55", "max": "125", "unit": "C"},
+      "simulation_models": [{
+        "model_id": "mna_fuse_closed_state_v1",
+        "parameters": [
+          {"name": "cold_resistance_ohm", "value": 0.073},
+          {"name": "rated_current_a", "value": 2},
+          {"name": "max_voltage_v", "value": 75},
+          {"name": "nominal_melting_i2t_a2s", "value": 2}
+        ]
+      }],
+      "symbols": [{
+        "symbol_id": "Device:Fuse",
+        "function_pins": [
+          {"function": "A", "symbol_pin": "1", "required": true},
+          {"function": "B", "symbol_pin": "2", "required": true}
+        ],
+        "verification": {"confidence": "verified", "sources": ["https://www.littelfuse.com/assetdocs/littelfuse-fuse-483-datasheet?assetguid=5efd7580-3a45-4eb9-9869-f350543371fa", "builtin_pinmap:Device:Fuse"], "pinmap_checked": true}
+      }],
+      "packages": [{
+        "id": "1206",
+        "name": "1206 SMD",
+        "footprint_id": "Fuse:Fuse_1206_3216Metric",
+        "package_type": "1206",
+        "mpn": "0483002.DR",
+        "lifecycle": "active",
+        "pinmap_id": "Device:Fuse|Fuse:Fuse_1206_3216Metric",
+        "pad_functions": [
+          {"function": "A", "pad": "1"},
+          {"function": "B", "pad": "2"}
+        ],
+        "verification": {"confidence": "verified", "sources": ["https://www.littelfuse.com/assetdocs/littelfuse-fuse-483-datasheet?assetguid=5efd7580-3a45-4eb9-9869-f350543371fa", "kicad-footprint:Fuse:Fuse_1206_3216Metric"], "pinmap_checked": true}
+      }],
+      "verification": {"confidence": "verified", "sources": ["https://www.littelfuse.com/assetdocs/littelfuse-fuse-483-datasheet?assetguid=5efd7580-3a45-4eb9-9869-f350543371fa", "https://www.littelfuse.com/products/fuses-overcurrent-protection/fuses/surface-mount-fuses/thin-film-chip-fuses/483/0483002-dr"], "resolver_checked": true, "pinmap_checked": true, "notes": ["The registered primitive proves closed-state behavior only; clearing requires a future reviewed time-current model."]}
+    },
+    {
+      "id": "fuse.littelfuse.0483_500dr.1206",
+      "family": "fuse",
+      "name": "Littelfuse 0483.500DR 500 mA fast-acting fuse",
+      "description": "Concrete 75 V 1206 fast-acting fuse with reviewed cold resistance and nominal melting I2t.",
+      "generic": false,
+      "manufacturer": "Littelfuse",
+      "mpn": "0483.500DR",
+      "lifecycle": "active",
+      "tags": ["protection", "fuse", "fast_acting", "smd", "1206"],
+      "values": [{"kind": "resistance", "typ": "0.38", "unit": "ohm"}],
+      "ratings": [
+        {"kind": "current", "max": "0.5", "unit": "A"},
+        {"kind": "voltage", "max": "75", "unit": "V"},
+        {"kind": "melting_i2t", "typ": "0.065", "unit": "A2s"}
+      ],
+      "temperature": {"min": "-55", "max": "125", "unit": "C"},
+      "simulation_models": [{
+        "model_id": "mna_fuse_closed_state_v1",
+        "parameters": [
+          {"name": "cold_resistance_ohm", "value": 0.38},
+          {"name": "rated_current_a", "value": 0.5},
+          {"name": "max_voltage_v", "value": 75},
+          {"name": "nominal_melting_i2t_a2s", "value": 0.065}
+        ]
+      }],
+      "symbols": [{
+        "symbol_id": "Device:Fuse",
+        "function_pins": [
+          {"function": "A", "symbol_pin": "1", "required": true},
+          {"function": "B", "symbol_pin": "2", "required": true}
+        ],
+        "verification": {"confidence": "verified", "sources": ["https://www.littelfuse.com/assetdocs/littelfuse-fuse-483-datasheet?assetguid=5efd7580-3a45-4eb9-9869-f350543371fa", "builtin_pinmap:Device:Fuse"], "pinmap_checked": true}
+      }],
+      "packages": [{
+        "id": "1206",
+        "name": "1206 SMD",
+        "footprint_id": "Fuse:Fuse_1206_3216Metric",
+        "package_type": "1206",
+        "mpn": "0483.500DR",
+        "lifecycle": "active",
+        "pinmap_id": "Device:Fuse|Fuse:Fuse_1206_3216Metric",
+        "pad_functions": [
+          {"function": "A", "pad": "1"},
+          {"function": "B", "pad": "2"}
+        ],
+        "verification": {"confidence": "verified", "sources": ["https://www.littelfuse.com/assetdocs/littelfuse-fuse-483-datasheet?assetguid=5efd7580-3a45-4eb9-9869-f350543371fa", "kicad-footprint:Fuse:Fuse_1206_3216Metric"], "pinmap_checked": true}
+      }],
+      "verification": {"confidence": "verified", "sources": ["https://www.littelfuse.com/assetdocs/littelfuse-fuse-483-datasheet?assetguid=5efd7580-3a45-4eb9-9869-f350543371fa", "https://www.littelfuse.com/products/fuses-overcurrent-protection/fuses/surface-mount-fuses/thin-film-chip-fuses/483/0483-500dr"], "resolver_checked": true, "pinmap_checked": true, "notes": ["The registered primitive proves closed-state behavior only; clearing requires a future reviewed time-current model."]}
+    },
+    {
       "id": "fuse.generic.1206",
       "family": "fuse",
       "name": "Generic 1206 fuse",

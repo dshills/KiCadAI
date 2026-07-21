@@ -16,6 +16,9 @@ func TestApplicableGraphModelRequiresCompleteTrustedTopology(t *testing.T) {
 	if model, ok, _ := ApplicableGraphModel(nonlinear); !ok || model != ModelNonlinearCircuitDCV1 {
 		t.Fatalf("nonlinear applicability = %q, %t", model, ok)
 	}
+	if model, ok, reason := ApplicableGraphModelForAnalysis(nonlinear, AnalysisACSweep); !ok || model != ModelLinearCircuitMNAV1 {
+		t.Fatalf("nonlinear small-signal applicability = %q, %t, %s", model, ok, reason)
+	}
 	mixed := append([]ComponentEvidence(nil), nonlinear...)
 	mixed = append(mixed, ComponentEvidence{InstanceID: "amplifier", Family: "opamp", ModelClaims: []CatalogEvidence{{ModelID: PrimitiveOpAmpV1}}, Connections: []ConnectionEvidence{{Function: "OUT", Net: "VCC"}}})
 	if model, ok, _ := ApplicableGraphModel(mixed); !ok || model != ModelNonlinearCircuitDCV1 {
@@ -49,6 +52,29 @@ func TestApplicableGraphModelForTransientRequiresTransientCapacitorEvidence(t *t
 	dcOnly = append(dcOnly, ComponentEvidence{InstanceID: "capacitor", Family: "capacitor", ModelClaims: []CatalogEvidence{{ModelID: PrimitiveCapacitorV1}}, Connections: []ConnectionEvidence{{Function: "A", Net: "VCC"}}})
 	if model, ok, _ := ApplicableGraphModelForAnalysis(dcOnly, AnalysisTransient); ok || model != "" {
 		t.Fatalf("DC-only capacitor transient applicability = %q, %t", model, ok)
+	}
+}
+
+func TestRelayPrimitiveStateFollowsDynamicAnalysisSemantics(t *testing.T) {
+	model, ok := definitionByID(ModelTransientCircuitV1)
+	if !ok {
+		t.Fatal("transient model is not registered")
+	}
+	component := ComponentEvidence{Family: "relay", ModelClaims: []CatalogEvidence{
+		{ModelID: PrimitiveRelayClosedV1}, {ModelID: PrimitiveRelayNormallyOpenV1},
+	}}
+	for _, test := range []struct {
+		kind string
+		want string
+	}{
+		{AnalysisTransient, PrimitiveRelayNormallyOpenV1},
+		{AnalysisDistortion, PrimitiveRelayNormallyOpenV1},
+		{AnalysisStartup, PrimitiveRelayNormallyOpenV1},
+	} {
+		matches := compatiblePrimitiveClaims(component, model, test.kind)
+		if len(matches) != 1 || matches[0].primitive.ID != test.want {
+			t.Fatalf("%s relay claims = %#v; want %s", test.kind, matches, test.want)
+		}
 	}
 }
 

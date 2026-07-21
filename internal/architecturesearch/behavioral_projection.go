@@ -25,7 +25,21 @@ func effectiveObjectiveConstraints(requirement Requirement, objective Objective)
 		if !cone[objective.ID] {
 			continue
 		}
+		// Threshold voltage is expressed at the public semantic input, while a
+		// threshold detector may consume a conditioned downstream signal. When
+		// a cumulative voltage-gain requirement is declared on that exact data
+		// path, size the detector's local reference in its own input domain. The
+		// public assertion remains unchanged and is still measured by sweeping
+		// the external semantic input.
+		if behavior.Metric == "threshold_voltage" && objectiveProducesObservation(requirement, objective, behavior.Observation) {
+			if threshold, ok := projectedBehaviorTarget(behavior); ok {
+				if gain, ok := nearestUpstreamVoltageGain(requirement, objective); ok {
+					derived = append(derived, targetConstraint("threshold_voltage", threshold.value*gain.value, behavior.Unit, combinedTolerance(threshold.tolerance, gain.tolerance)))
+				}
+			}
+		}
 		derived = append(derived, constraintsFromBehavior(behavior)...)
+		derived = append(derived, requiredConstraint("analysis_"+derivedSemanticIdentifier(behavior.Analysis)))
 		if behavior.Critical && behavior.Analysis == "startup" {
 			derived = append(derived, requiredConstraint("fail_safe_interlock"))
 		}
@@ -69,12 +83,119 @@ type projectedTarget struct {
 	tolerance float64
 }
 
-func constraintsFromBehavior(behavior BehavioralRequirement) []Constraint {
+func projectedBehaviorTarget(behavior BehavioralRequirement) (projectedTarget, bool) {
 	constraint, ok := boundedConstraint(behavior.Metric, behavior.Min, behavior.Max, behavior.Unit)
 	if !ok {
-		return nil
+		return projectedTarget{}, false
 	}
-	result := []Constraint{constraint}
+	value, tolerance, ok := projectedNumericValue(constraint)
+	if !ok {
+		return projectedTarget{}, false
+	}
+	return projectedTarget{value: value, tolerance: tolerance}, true
+}
+
+func objectiveProducesObservation(requirement Requirement, objective Objective, observation Observation) bool {
+	for _, endpoint := range observationEndpoints(requirement, observation) {
+		if objectiveProducesEndpoint(requirement, objective, endpoint) {
+			return true
+		}
+	}
+	return false
+}
+
+// nearestUpstreamVoltageGain finds the closest declared cumulative gain on a
+// directed signal path into objective. A closer observation supersedes a more
+// distant one because behavioral gain is measured from the public excitation
+// to its observation, rather than being a per-stage multiplier.
+func nearestUpstreamVoltageGain(requirement Requirement, objective Objective) (projectedTarget, bool) {
+	bestDistance := math.MaxInt
+	bestID := ""
+	best := projectedTarget{}
+	for _, behavior := range requirement.Requirements.BehavioralRequirements {
+		if behavior.Metric != "voltage_gain" {
+			continue
+		}
+		gain, ok := projectedBehaviorTarget(behavior)
+		if !ok || gain.value <= 0 {
+			continue
+		}
+		distance, ok := observationDistanceToObjective(requirement, behavior.Observation, objective.ID)
+		if !ok || distance > bestDistance || (distance == bestDistance && bestID != "" && behavior.ID >= bestID) {
+			continue
+		}
+		bestDistance, bestID, best = distance, behavior.ID, gain
+	}
+	return best, bestID != ""
+}
+
+func observationDistanceToObjective(requirement Requirement, observation Observation, targetObjective string) (int, bool) {
+	frontier := observationEndpoints(requirement, observation)
+	seenEndpoints := map[string]bool{}
+	for distance := 0; len(frontier) != 0; distance++ {
+		next := []string{}
+		for _, endpoint := range frontier {
+			if seenEndpoints[endpoint] {
+				continue
+			}
+			seenEndpoints[endpoint] = true
+			for _, objective := range requirement.Requirements.Objectives {
+				if !objectiveConsumesEndpoint(requirement, objective, endpoint) {
+					continue
+				}
+				if objective.ID == targetObjective {
+					return distance, true
+				}
+				next = append(next, objectiveOutputEndpoints(requirement, objective)...)
+			}
+		}
+		slices.Sort(next)
+		frontier = slices.Compact(next)
+	}
+	return 0, false
+}
+
+func objectiveConsumesEndpoint(requirement Requirement, objective Objective, endpoint string) bool {
+	return slices.Contains(objectiveInputEndpoints(requirement, objective), endpoint)
+}
+
+func objectiveOutputEndpoints(requirement Requirement, objective Objective) []string {
+	var endpoints []string
+	for _, binding := range objective.Bindings {
+		if binding.Signal != "" && (binding.Direction == "source" || binding.Direction == "bidirectional") {
+			endpoints = append(endpoints, "signal:"+binding.Signal)
+			continue
+		}
+		if binding.Port == "" {
+			continue
+		}
+		port, ok := requirementPort(requirement, binding.Port)
+		if ok && (port.Direction == "source" || port.Direction == "bidirectional") {
+			endpoints = append(endpoints, "port:"+binding.Port)
+		}
+	}
+	slices.Sort(endpoints)
+	return endpoints
+}
+
+func constraintsFromBehavior(behavior BehavioralRequirement) []Constraint {
+	constraint, ok := boundedConstraint(behavior.Metric, behavior.Min, behavior.Max, behavior.Unit)
+	var result []Constraint
+	if !ok && (behavior.Metric == "muted_output_voltage" || behavior.Metric == "startup_output_voltage") && behavior.Min != nil && behavior.Max != nil && *behavior.Min <= 0 && *behavior.Max >= 0 {
+		// These metrics are evaluated as peak absolute voltage. Preserve that
+		// semantic magnitude when projecting a bipolar public interval instead
+		// of inventing an invalid zero-centered percentage target.
+		limit := math.Max(math.Abs(*behavior.Min), math.Abs(*behavior.Max))
+		constraint = numericProjectedConstraint(behavior.Metric, "maximum", limit, behavior.Unit, nil)
+		ok = limit > 0
+	}
+	if behavior.Critical && behavior.Analysis == "startup" {
+		result = append(result, requiredConstraint("startup_isolation"))
+	}
+	if !ok {
+		return result
+	}
+	result = append(result, constraint)
 	switch behavior.Metric {
 	case "bandwidth":
 		result = append(result, renamedConstraint(constraint, "cutoff_frequency"), equalStringConstraint("response", "low_pass"))
@@ -119,6 +240,21 @@ func constraintsFromOperatingCondition(condition OperatingCondition) []Constrain
 			targetConstraint("full_scale_current", *condition.Max, condition.Unit, tolerance),
 			targetConstraint("output_current", *condition.Max, condition.Unit, tolerance),
 		}
+	case "load_capacitance":
+		constraint, ok := boundedConstraint("load_capacitance", condition.Min, condition.Max, condition.Unit)
+		if !ok {
+			return nil
+		}
+		return []Constraint{constraint}
+	case "ambient_temperature":
+		var constraints []Constraint
+		if condition.Min != nil {
+			constraints = append(constraints, numericProjectedConstraint("ambient_temperature_minimum", "minimum", *condition.Min, condition.Unit, nil))
+		}
+		if condition.Max != nil {
+			constraints = append(constraints, numericProjectedConstraint("ambient_temperature", "maximum", *condition.Max, condition.Unit, nil))
+		}
+		return constraints
 	default:
 		return nil
 	}
@@ -307,13 +443,8 @@ func behaviorTarget(behaviors []BehavioralRequirement, metric string) (projected
 		if behavior.Metric != metric {
 			continue
 		}
-		constraint, ok := boundedConstraint(metric, behavior.Min, behavior.Max, behavior.Unit)
-		if !ok {
-			continue
-		}
-		value, tolerance, ok := projectedNumericValue(constraint)
-		if ok {
-			return projectedTarget{value: value, tolerance: tolerance}, true
+		if target, ok := projectedBehaviorTarget(behavior); ok {
+			return target, true
 		}
 	}
 	return projectedTarget{}, false

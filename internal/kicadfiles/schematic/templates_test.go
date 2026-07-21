@@ -89,6 +89,30 @@ func TestEnsureEmbeddedSymbolFromRawQualifiesLibraryID(t *testing.T) {
 	}
 }
 
+func TestEnsureEmbeddedSymbolFromRawCanonicalizesMetadataAfterPrivateProperties(t *testing.T) {
+	var file SchematicFile
+	raw := `(symbol "Relay"
+		(property "Reference" "U")
+		(property "Value" "Relay")
+		(property "ki_keywords" "photorelay")
+		(property "ki_fp_filters" "DIP*")
+		(property private "KLC_S6.2" "internal structure note")
+		(symbol "Relay_1_1"))`
+	if !EnsureEmbeddedSymbolFromRaw(&file, "Relay_SolidState:Relay", raw) {
+		t.Fatal("expected raw symbol to be embedded")
+	}
+	formatted, err := sexpr.Format(file.LibSymbols[0].Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	privateAt := strings.Index(formatted, `"KLC_S6.2"`)
+	keywordsAt := strings.Index(formatted, `"ki_keywords"`)
+	filtersAt := strings.Index(formatted, `"ki_fp_filters"`)
+	if privateAt < 0 || keywordsAt < 0 || filtersAt < 0 || !(privateAt < keywordsAt && keywordsAt < filtersAt) {
+		t.Fatalf("embedded property order is not KiCad-canonical:\n%s", formatted)
+	}
+}
+
 func TestEmbeddedSymbolPinOffsets(t *testing.T) {
 	pins, ok := EmbeddedSymbolPinOffsets("Device:R")
 	if !ok || len(pins) != 2 {

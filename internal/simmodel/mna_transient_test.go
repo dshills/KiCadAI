@@ -2,9 +2,138 @@ package simmodel
 
 import (
 	"encoding/json"
+	"math"
+	"reflect"
 	"strings"
 	"testing"
 )
+
+func TestPeriodicTransientMeasurementsUseSettledTwoCycleWindow(t *testing.T) {
+	result := AnalysisResult{Kind: AnalysisTransient, FundamentalFrequencyHz: 1}
+	for index := 0; index <= 12; index++ {
+		voltage, powerVoltage := .02, 2.0
+		if index < 4 {
+			voltage, powerVoltage = 100, 100
+		}
+		result.Points = append(result.Points, AnalysisPoint{
+			TimeS:   float64(index) * .25,
+			Nodes:   []NodeResult{{Node: "OUT", Real: voltage}},
+			Devices: []DeviceResult{{Component: "LOAD", VoltageV: powerVoltage, CurrentA: 2}},
+		})
+	}
+	peak, diagnostic := peakAbsVoltage(result, Assertion{AnalysisID: "transient", Node: "OUT"})
+	if diagnostic != nil || peak != .02 {
+		t.Fatalf("peakAbsVoltage() = %.12g, %#v; want settled 0.02 V", peak, diagnostic)
+	}
+	power, diagnostic := transientDerivedValue(result, Assertion{AnalysisID: "transient", Component: "LOAD", Quantity: QuantityOutputPowerW})
+	if diagnostic != nil || power != 4 {
+		t.Fatalf("output power = %.12g, %#v; want settled 4 W", power, diagnostic)
+	}
+}
+
+func TestTransientAnalysisWorkersPreserveOrderAndReplay(t *testing.T) {
+	plan := resolveTransientSwitchPlan(t, 25)
+	second := cloneAnalyses(plan.Analyses)[0]
+	second.ID = "z_switch"
+	plan.Analyses = append(plan.Analyses, second)
+	secondAssertions := append([]Assertion(nil), plan.Assertions...)
+	for index := range secondAssertions {
+		secondAssertions[index].AnalysisID = second.ID
+	}
+	plan.Assertions = append(plan.Assertions, secondAssertions...)
+	first, firstDiagnostics := Evaluate(plan)
+	secondReport, secondDiagnostics := Evaluate(ClonePlan(plan))
+	if len(firstDiagnostics) != 0 || len(secondDiagnostics) != 0 {
+		t.Fatalf("parallel transient diagnostics: first=%#v second=%#v", firstDiagnostics, secondDiagnostics)
+	}
+	if len(first.Analyses) != 2 || first.Analyses[0].ID != "switch" || first.Analyses[1].ID != "z_switch" {
+		t.Fatalf("parallel transient result order = %#v", first.Analyses)
+	}
+	if !reflect.DeepEqual(first, secondReport) {
+		t.Fatal("parallel transient replay is not deterministic")
+	}
+}
+
+func TestNonlinearControlUpdateIgnoresCommonModeMovement(t *testing.T) {
+	system := mnaSystem{nodeIndex: map[string]int{"B": 0, "C": 1, "E": 2}}
+	devices := []compiledNonlinearDevice{{primitive: PrimitiveBJTNPNV1, terminals: map[string]string{"BASE": "B", "COLLECTOR": "C", "EMITTER": "E"}}}
+	before := []complex128{.6, 0, 0}
+	commonMode := []complex128{10.6, 10, 10}
+	if update := maxNonlinearControlVoltageUpdate(devices, &system, before, commonMode); update > 1e-12 {
+		t.Fatalf("common-mode nonlinear control update = %.12g", update)
+	}
+	changedJunction := []complex128{10.8, 10, 10}
+	if update := maxNonlinearControlVoltageUpdate(devices, &system, before, changedJunction); math.Abs(update-.2) > 1e-12 {
+		t.Fatalf("junction nonlinear control update = %.12g", update)
+	}
+}
+
+func TestTransientPeriodicZeroCrossingUsesOperatingPointSeed(t *testing.T) {
+	analysis := Analysis{Excitations: []SourceExcitation{{Component: "input", SineAmplitude: 1, SineFrequencyHz: 1000, SinePhaseDeg: 180}}}
+	previous := []complex128{2, -3}
+	history := [][]complex128{{.1, -.2}, previous}
+	guess := transientInitialGuess(analysis, .0005, previous, history)
+	if guess[0] != .1 || guess[1] != -.2 {
+		t.Fatalf("zero-crossing guess=%#v", guess)
+	}
+	guess[0] = 99
+	if history[0][0] != .1 {
+		t.Fatal("initial guess aliases the accepted operating point")
+	}
+	ordinary := transientInitialGuess(analysis, .00025, previous, history)
+	if ordinary[0] != 2 || ordinary[1] != -3 {
+		t.Fatalf("ordinary guess=%#v", ordinary)
+	}
+}
+
+func TestTransientOutputLimitGuessInterpolatesBracketSolutions(t *testing.T) {
+	base := mnaSystem{nodeIndex: map[string]int{"OUT": 0, "OTHER": 1}}
+	devices := []ResolvedDevice{{Component: "amp", PrimitiveModel: PrimitiveOpAmpV1, Terminals: []TerminalBinding{{Terminal: "OUT", Net: "OUT"}}}}
+	guess := make([]complex128, 2)
+	next := map[string]transientOutputLimitState{"amp": {
+		value: 2.5, lower: 0, upper: 10,
+		lowerSolution: []complex128{0, 4}, upperSolution: []complex128{10, 8},
+	}}
+	seedTransientOutputLimitGuess(base, devices, guess, nil, next)
+	if guess[0] != 2.5 || guess[1] != 5 {
+		t.Fatalf("interpolated transient output-limit guess = %#v", guess)
+	}
+}
+
+func TestNormallyOpenRelayIsolatesStartupAndClosesForNormalAnalyses(t *testing.T) {
+	parameters := []NamedValue{
+		{Name: "coil_resistance_ohm", Value: 720}, {Name: "contact_off_resistance_ohm", Value: 1e12},
+		{Name: "contact_on_resistance_ohm", Value: .05}, {Name: "max_contact_current_a", Value: 5},
+		{Name: "max_contact_voltage_v", Value: 30}, {Name: "operate_current_a", Value: .005}, {Name: "operate_delay_s", Value: .01},
+	}
+	intent := Intent{
+		ModelID: ModelTransientCircuitV1,
+		Analyses: []Analysis{
+			{ID: "muted", Kind: AnalysisTransient, DurationS: 10e-6, TimeStepS: 1e-6, Excitations: []SourceExcitation{{Component: "control", DCValue: 0}, {Component: "source", DCValue: 5}}},
+			{ID: "normal", Kind: AnalysisTransient, DurationS: 10e-6, TimeStepS: 1e-6, Excitations: []SourceExcitation{{Component: "control", DCValue: 5}, {Component: "source", DCValue: 5}}},
+			{ID: "startup", Kind: AnalysisStartup, DurationS: 100e-6, TimeStepS: 10e-6, Excitations: []SourceExcitation{{Component: "control", DCValue: 5}, {Component: "source", DCValue: 5}}},
+		},
+		Assertions: []Assertion{
+			{AnalysisID: "muted", Node: "OUT", Quantity: QuantityVoltageV, TimeS: 10e-6, Min: 0, Max: 1e-6},
+			{AnalysisID: "normal", Node: "OUT", Quantity: QuantityVoltageV, TimeS: 10e-6, Min: 4.99, Max: 5.01},
+			{AnalysisID: "startup", Node: "OUT", Quantity: QuantityPeakAbsVoltageV, Min: 0, Max: 1e-6},
+		},
+	}
+	components := []ComponentEvidence{
+		{InstanceID: "control", CatalogID: "source", Family: "voltage_source", ModelClaims: []CatalogEvidence{{ModelID: PrimitiveVoltageSourceV1}}, Connections: []ConnectionEvidence{{Function: "POSITIVE", Net: "CONTROL"}, {Function: "NEGATIVE", Net: "GND"}}},
+		{InstanceID: "source", CatalogID: "source", Family: "voltage_source", ModelClaims: []CatalogEvidence{{ModelID: PrimitiveVoltageSourceV1}}, Connections: []ConnectionEvidence{{Function: "POSITIVE", Net: "IN"}, {Function: "NEGATIVE", Net: "GND"}}},
+		{InstanceID: "relay", CatalogID: "relay", Family: "relay", ModelClaims: []CatalogEvidence{{ModelID: PrimitiveRelayNormallyOpenV1, Parameters: parameters}}, Connections: []ConnectionEvidence{{Function: "COIL_A", Net: "CONTROL"}, {Function: "COIL_B", Net: "GND"}, {Function: "CONTACT_IN", Net: "IN"}, {Function: "CONTACT_OUT", Net: "OUT"}}},
+		{InstanceID: "load", CatalogID: "resistor", Family: "resistor", HasValueSI: true, ValueSI: 1000, ModelClaims: []CatalogEvidence{{ModelID: PrimitiveResistorV1}}, Connections: []ConnectionEvidence{{Function: "A", Net: "OUT"}, {Function: "B", Net: "GND"}}},
+	}
+	plan, diagnostics := ResolveWithTopology(intent, "test", "hash", components, []NodeEvidence{{Name: "GND", Role: "ground"}, {Name: "CONTROL"}, {Name: "IN"}, {Name: "OUT"}})
+	if len(diagnostics) != 0 {
+		t.Fatalf("resolve diagnostics=%+v", diagnostics)
+	}
+	report, diagnostics := Evaluate(plan)
+	if len(diagnostics) != 0 || report.Status != "pass" {
+		t.Fatalf("report=%+v diagnostics=%+v", report, diagnostics)
+	}
+}
 
 func TestTransientNPNSwitchWaveformIsDeterministic(t *testing.T) {
 	plan := resolveTransientSwitchPlan(t, 25)
@@ -16,7 +145,7 @@ func TestTransientNPNSwitchWaveformIsDeterministic(t *testing.T) {
 		t.Fatalf("transient points=%d", len(report.Analyses[0].Points))
 	}
 	lastEvidence := report.Analyses[0].Points[len(report.Analyses[0].Points)-1].Solver
-	if lastEvidence == nil || lastEvidence.Method != "backward_euler_bounded_newton_v1" || lastEvidence.TimeSteps != 300 || lastEvidence.TotalIterations <= 0 || lastEvidence.MaxIterationsPerStep != nonlinearMaxIterations || lastEvidence.MaxTotalIterations != maxTransientWork {
+	if lastEvidence == nil || lastEvidence.Method != "backward_euler_bounded_newton_v1" || lastEvidence.TimeSteps != 300 || lastEvidence.TotalIterations <= 0 || lastEvidence.MaxIterationsPerStep != transientMaxNewtonIterations*transientMaxNewtonAttemptsPerObservation || lastEvidence.MaxTotalIterations != maxTransientWork {
 		t.Fatalf("transient evidence=%+v", lastEvidence)
 	}
 	first, _ := json.Marshal(report)

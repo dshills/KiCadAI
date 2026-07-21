@@ -306,7 +306,7 @@ func TestClassABSpeakerPowerStageSelectsFabricationProvenPowerPair(t *testing.T)
 			selected[selection.Role] = selection
 		}
 	}
-	if selected["upper_output"].ComponentID != "bjt.onsemi.njw0281g.to3p" || selected["lower_output"].ComponentID != "bjt.onsemi.njw0302g.to3p" {
+	if selected["upper_output"].ComponentID != "bjt.onsemi.d44h11g.to220" || selected["lower_output"].ComponentID != "bjt.onsemi.d45h11g.to220" {
 		t.Fatalf("selected speaker pair = %#v", selected)
 	}
 	if selected["upper_output"].AmplifierOutput.SafeOperatingAreaStatus != "proven" || selected["lower_output"].AmplifierOutput.SafeOperatingAreaStatus != "proven" {

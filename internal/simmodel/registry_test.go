@@ -155,7 +155,7 @@ func TestSupportedAnalysisKindsDescribeExecutableRegistryPaths(t *testing.T) {
 		{ModelRCLowpassACV1, []string{AnalysisACSweep}},
 		{ModelLinearCircuitMNAV1, []string{AnalysisACSweep, AnalysisDCOperatingPoint, AnalysisNoise, AnalysisStability, AnalysisThermal}},
 		{ModelNonlinearCircuitDCV1, []string{AnalysisDCOperatingPoint, AnalysisThermal}},
-		{ModelTransientCircuitV1, []string{AnalysisDistortion, AnalysisStartup, AnalysisTransient}},
+		{ModelTransientCircuitV1, []string{AnalysisDistortion, AnalysisStartup, AnalysisThermal, AnalysisTransient}},
 	}
 	for _, test := range tests {
 		if got := SupportedAnalysisKinds(test.model); !slices.Equal(got, test.want) {
@@ -169,6 +169,25 @@ func TestSupportedAnalysisKindsDescribeExecutableRegistryPaths(t *testing.T) {
 	}
 	if got := SupportedAnalysisKinds("missing"); len(got) != 0 {
 		t.Fatalf("unknown model support = %#v", got)
+	}
+}
+
+func TestCatalogAnalysisDependenciesKeepNoiseSourcesExplicitAndMapIdealBoundariesToAC(t *testing.T) {
+	if got := CatalogAnalysisDependencies(PrimitiveDualOutputIsolatedConverterV1, []string{AnalysisNoise, AnalysisDCOperatingPoint}); !slices.Equal(got, []string{AnalysisACSweep, AnalysisDCOperatingPoint}) {
+		t.Fatalf("converter dependencies = %#v", got)
+	}
+	if got := CatalogAnalysisDependencies(PrimitiveFloatingAdjustableRegulatorV1, []string{AnalysisNoise}); !slices.Equal(got, []string{AnalysisACSweep}) {
+		t.Fatalf("regulator dependencies = %#v", got)
+	}
+	for _, model := range []string{PrimitiveResistorV1, PrimitiveOpAmpV1, PrimitiveCurrentSenseAmplifierV1} {
+		if got := CatalogAnalysisDependencies(model, []string{AnalysisNoise}); !slices.Equal(got, []string{AnalysisNoise}) {
+			t.Fatalf("noise-producing model %s dependencies = %#v", model, got)
+		}
+	}
+	for _, model := range []string{PrimitiveComparatorOpenCollectorV1, PrimitiveDiodeShockleyV1, PrimitiveUnidirectionalZenerV1, PrimitiveBidirectionalTVSV1, PrimitiveNMOSSwitchV1, PrimitivePMOSSwitchV1, PrimitiveBJTNPNV1, PrimitiveBJTPNPV1} {
+		if got := CatalogAnalysisDependencies(model, []string{AnalysisACSweep, AnalysisNoise, AnalysisStability}); !slices.Equal(got, []string{AnalysisDCOperatingPoint}) {
+			t.Fatalf("memoryless nonlinear model %s dependencies = %#v", model, got)
+		}
 	}
 }
 

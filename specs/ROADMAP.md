@@ -1019,6 +1019,16 @@ alternatives and rationale, lowering, writer and zero-diff round trip,
 connectivity/routing, clean installed-KiCad ERC, and strict DRC. This remains a
 registered-capability and checked-in-catalog envelope, not arbitrary generation.
 
+Simulation-grounded closed-loop synthesis now extends the same trust boundary
+to a frozen ten-circuit behavior-only v3 corpus. Deterministic candidate
+selection, reviewed model provenance, registered DC/AC/noise/stability/
+transient/startup/distortion/thermal evidence, named operating corners, bounded
+generic repairs, and complete physical promotion are integrated. Class-A and
+Class-AB cases pass installed-KiCad ERC/strict DRC, routing/connectivity, writer
+correctness, zero normalized round trips, and replay. The next expansion must
+come from a neutral held-out unsupported behavior or model family; this remains
+a bounded envelope rather than arbitrary generation.
+
 Structured semantic mapping is now implemented for target, bus, and supply
 intent:
 

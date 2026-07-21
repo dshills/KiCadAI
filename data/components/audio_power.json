@@ -50,6 +50,10 @@
       "tolerances": [{"kind": "capacitance", "typ": "20", "unit": "%"}],
       "temperature": {"min": "-40", "max": "105", "unit": "C"},
       "companions": [{"id": "audio_rail.high_frequency_bypass", "family": "capacitor", "role": "decoupling_capacitor", "required": true, "applies_to": ["amplifier_supply_decoupling"], "description": "Pair the bulk electrolytic with a stable-capacitance local high-frequency bypass."}],
+      "simulation_models": [
+        {"model_id": "mna_capacitor_v1"},
+        {"model_id": "mna_capacitor_transient_be_v1", "parameters": [{"name": "max_voltage_v", "value": 35}]}
+      ],
       "capacitor_evidence": {
         "dielectric": "aluminum electrolytic",
         "nominal_capacitance": "220u",
@@ -107,7 +111,7 @@
       "ratings": [{"kind": "supply_voltage", "min": "5", "max": "36", "unit": "V"}, {"kind": "supply_current", "max": "5", "unit": "mA"}],
       "temperature": {"min": "-40", "max": "85", "unit": "C"},
       "companions": [{"id": "opamp.decoupling_capacitor", "family": "capacitor", "role": "decoupling_capacitor", "required": true, "description": "Place low-inductance bypass capacitors directly between each supply and the signal-star return."}, {"id": "opamp.offset_trim_unused", "family": "opamp", "role": "unused_pin_policy", "required": true, "no_connects": ["OFFSET_TRIM_1", "OFFSET_TRIM_2"], "description": "Leave KiCad's legacy OPA134 offset-trim symbol pins 1 and 8 explicitly unconnected; TI SBOS058B classifies pins 1, 5, and 8 as NC."}],
-      "simulation_models": [{"model_id": "mna_opamp_single_pole_v1", "parameters": [{"name": "dc_open_loop_gain", "value": 100000}, {"name": "gain_bandwidth_hz", "value": 8000000}, {"name": "input_voltage_noise_density_v_sqrt_hz", "value": 8e-9}, {"name": "output_high_margin_v", "value": 2.0}, {"name": "output_low_margin_v", "value": 2.0}, {"name": "supply_max_v", "value": 36}, {"name": "supply_min_v", "value": 5}]}],
+      "simulation_models": [{"model_id": "mna_opamp_single_pole_v1", "parameters": [{"name": "dc_open_loop_gain", "value": 1000000}, {"name": "gain_bandwidth_hz", "value": 8000000}, {"name": "input_voltage_noise_density_v_sqrt_hz", "value": 8e-9}, {"name": "output_high_margin_v", "value": 2.0}, {"name": "output_low_margin_v", "value": 2.0}, {"name": "supply_max_v", "value": 36}, {"name": "supply_min_v", "value": 5}], "uncertainties": [{"target": "model_parameters.dc_open_loop_gain", "source": "ti:opa134:sbos058b:open_loop_gain_model_envelope", "nominal": 1000000, "minimum": 158489.319246, "maximum": 10000000}]}],
       "opamp_evidence": {
         "intended_roles": ["input_buffer", "gain_stage", "small_signal_driver"],
         "supply_mode": "dual_supply",
@@ -138,6 +142,138 @@
       "verification": {"confidence": "verified", "sources": ["https://www.ti.com/lit/ds/symlink/opa134.pdf", "kicad-symbols:Amplifier_Operational:OPA134", "kicad-footprints:Package_SO:SOIC-8_3.9x4.9mm_P1.27mm"], "resolver_checked": true, "pinmap_checked": true, "notes": ["TI SBOS058B marks pins 1, 5, and 8 NC. KiCad's legacy OPA134 symbol retains offset-trim names on pins 1 and 8, so those functions map to pads 1 and 8 and remain explicitly unconnected; hidden NC maps to pad 5."], "tests": ["catalog_audio_power_opamp_evidence"]}
     },
     {
+      "id": "bjt.onsemi.d44h11g.to220",
+      "family": "bjt",
+      "name": "onsemi D44H11G NPN audio power transistor",
+      "description": "Concrete high-gain NPN half of the D44H11G/D45H11G complementary pair for power-amplifier output and driver stages.",
+      "generic": false,
+      "manufacturer": "onsemi",
+      "mpn": "D44H11G",
+      "lifecycle": "active",
+      "simulation_models": [{
+        "model_id": "mna_bjt_npn_ebers_moll_v1",
+        "parameters": [
+          {"name": "saturation_current_a", "value": 1e-12},
+          {"name": "forward_beta", "value": 40},
+          {"name": "reverse_beta", "value": 1},
+          {"name": "emission_coefficient", "value": 1},
+          {"name": "junction_temperature_k", "value": 300.15},
+          {"name": "transition_frequency_hz", "value": 50000000},
+          {"name": "max_collector_current_a", "value": 10},
+          {"name": "max_collector_emitter_voltage_v", "value": 80},
+          {"name": "max_temperature_c", "value": 150},
+          {"name": "junction_to_ambient_c_per_w", "value": 62.5},
+          {"name": "junction_to_case_c_per_w", "value": 1.8}
+        ]
+      }],
+      "tags": ["audio", "bjt", "driver", "linear", "npn", "power_output", "to220"],
+      "ratings": [
+        {"kind": "collector_emitter_voltage", "max": "80", "unit": "V"},
+        {"kind": "collector_current", "max": "10", "unit": "A"},
+        {"kind": "power_dissipation", "max": "70", "unit": "W"}
+      ],
+      "temperature": {"min": "-55", "max": "150", "unit": "C"},
+      "companions": [{"id": "amplifier.output_emitter_resistor", "family": "resistor", "role": "emitter_resistor", "required": true, "applies_to": ["class_ab_output"], "description": "Emitter resistance and current sharing must be calculated for each parallel output device."}],
+      "amplifier_output_evidence": {
+        "device_class": "bjt", "polarity": "npn", "intended_roles": ["power_output", "small_signal_driver"], "package": "TO-220-3",
+        "symbol_id": "Transistor_BJT:Q_NPN_BCE", "footprint_id": "Package_TO_SOT_THT:TO-220-3_Vertical", "pinmap_evidence": "https://www.onsemi.com/download/data-sheet/pdf/d44h-d.pdf",
+        "complementary_group": "onsemi_d44h11_d45h11", "control_terminal": "BASE", "upper_or_lower_terminal": "COLLECTOR", "output_terminal": "EMITTER",
+        "voltage_rating_status": "proven", "current_rating_status": "proven", "power_dissipation_status": "proven", "thermal_review": "proven", "safe_operating_area_status": "proven",
+        "fabrication_candidate_blocks": false, "review_note": "Manufacturer electrical limits, Figure 9 forward-bias SOA, complementary identity, thermal paths, and TO-220 Style 1 pin map are reviewed."
+      },
+      "power_semiconductor_evidence": {
+        "device_class": "bjt", "polarity": "npn", "complementary_group": "onsemi_d44h11_d45h11",
+        "max_voltage": {"value": 80, "unit": "V", "conditions": "VCEO sustaining voltage, IC=30 mA, IB=0"},
+        "continuous_current": {"value": 10, "unit": "A", "conditions": "absolute maximum continuous collector current"},
+        "peak_current": {"value": 20, "unit": "A", "conditions": "pulse width at most 6 ms and duty cycle at most 50 percent"},
+        "power_dissipation": {"value": 70, "unit": "W", "temperature_c": 25, "conditions": "case temperature 25 C"},
+        "max_junction_temperature_c": 150, "junction_to_case_c_per_w": 1.8, "junction_to_ambient_c_per_w": 62.5,
+        "soa": [
+          {"voltage_v": 5, "current_a": 5, "dc": true, "case_temperature_c": 70},
+          {"voltage_v": 10, "current_a": 2, "dc": true, "case_temperature_c": 70},
+          {"voltage_v": 20, "current_a": 0.75, "dc": true, "case_temperature_c": 70},
+          {"voltage_v": 30, "current_a": 0.35, "dc": true, "case_temperature_c": 70},
+          {"voltage_v": 50, "current_a": 0.15, "dc": true, "case_temperature_c": 70},
+          {"voltage_v": 80, "current_a": 0.08, "dc": true, "case_temperature_c": 70}
+        ],
+        "secondary_breakdown_status": "proven", "linear_mode_status": "proven",
+        "mounting_assumptions": "Free-air operation uses the manufacturer's 62.5 C/W junction-to-ambient maximum; higher dissipation requires an explicit case-to-ambient assembly.",
+        "bjt": {"gain_minimum": 40, "gain_test_current_a": 4, "transition_frequency_hz": 50000000},
+        "fabrication_proof": true, "review_note": "Source: onsemi D44H/D Rev. 14; conservative DC points lie within Figure 9 for D44H/45H10,11 at TC at most 70 C."
+      },
+      "symbols": [{"symbol_id": "Transistor_BJT:Q_NPN_BCE", "function_pins": [{"function": "BASE", "symbol_pin": "1", "required": true}, {"function": "COLLECTOR", "symbol_pin": "2", "required": true}, {"function": "EMITTER", "symbol_pin": "3", "required": true}], "verification": {"confidence": "verified", "sources": ["https://www.onsemi.com/download/data-sheet/pdf/d44h-d.pdf", "kicad-symbols:Transistor_BJT:Q_NPN_BCE"], "pinmap_checked": true}}],
+      "packages": [{"id": "to220_3", "name": "TO-220-3", "footprint_id": "Package_TO_SOT_THT:TO-220-3_Vertical", "package_type": "to220", "mpn": "D44H11G", "lifecycle": "active", "pinmap_id": "Transistor_BJT:Q_NPN_BCE|Package_TO_SOT_THT:TO-220-3_Vertical", "pad_functions": [{"function": "BASE", "pad": "1"}, {"function": "COLLECTOR", "pad": "2"}, {"function": "EMITTER", "pad": "3"}], "dimensions_mm": {"width": 10.28, "height": 4.82}, "height_mm": 15.75, "verification": {"confidence": "verified", "sources": ["https://www.onsemi.com/download/data-sheet/pdf/d44h-d.pdf", "kicad-footprint:Package_TO_SOT_THT:TO-220-3_Vertical"], "pinmap_checked": true}}],
+      "derating_rules": [{"kind": "thermal", "description": "Validate the selected ambient or case thermal path at the declared dissipation."}, {"kind": "safe_operating_area", "description": "Interpolate only inside the conservative catalog DC SOA boundary."}],
+      "placement_hints": [{"kind": "thermal_edge", "target": "board_edge", "description": "Preserve copper area and optional heatsink mounting access."}],
+      "verification": {"confidence": "verified", "sources": ["https://www.onsemi.com/download/data-sheet/pdf/d44h-d.pdf", "kicad-symbols:Transistor_BJT:Q_NPN_BCE", "kicad-footprint:Package_TO_SOT_THT:TO-220-3_Vertical"], "resolver_checked": true, "pinmap_checked": true, "tests": ["catalog_audio_power_semiconductor_evidence"]}
+    },
+    {
+      "id": "bjt.onsemi.d45h11g.to220",
+      "family": "bjt",
+      "name": "onsemi D45H11G PNP audio power transistor",
+      "description": "Concrete high-gain PNP half of the D44H11G/D45H11G complementary pair for power-amplifier output and driver stages.",
+      "generic": false,
+      "manufacturer": "onsemi",
+      "mpn": "D45H11G",
+      "lifecycle": "active",
+      "simulation_models": [{
+        "model_id": "mna_bjt_pnp_ebers_moll_v1",
+        "parameters": [
+          {"name": "saturation_current_a", "value": 1e-12},
+          {"name": "forward_beta", "value": 40},
+          {"name": "reverse_beta", "value": 1},
+          {"name": "emission_coefficient", "value": 1},
+          {"name": "junction_temperature_k", "value": 300.15},
+          {"name": "transition_frequency_hz", "value": 40000000},
+          {"name": "max_collector_current_a", "value": 10},
+          {"name": "max_collector_emitter_voltage_v", "value": 80},
+          {"name": "max_temperature_c", "value": 150},
+          {"name": "junction_to_ambient_c_per_w", "value": 62.5},
+          {"name": "junction_to_case_c_per_w", "value": 1.8}
+        ]
+      }],
+      "tags": ["audio", "bjt", "driver", "linear", "pnp", "power_output", "to220"],
+      "ratings": [
+        {"kind": "collector_emitter_voltage", "max": "80", "unit": "V"},
+        {"kind": "collector_current", "max": "10", "unit": "A"},
+        {"kind": "power_dissipation", "max": "70", "unit": "W"}
+      ],
+      "temperature": {"min": "-55", "max": "150", "unit": "C"},
+      "companions": [{"id": "amplifier.output_emitter_resistor", "family": "resistor", "role": "emitter_resistor", "required": true, "applies_to": ["class_ab_output"], "description": "Emitter resistance and current sharing must be calculated for each parallel output device."}],
+      "amplifier_output_evidence": {
+        "device_class": "bjt", "polarity": "pnp", "intended_roles": ["power_output", "small_signal_driver"], "package": "TO-220-3",
+        "symbol_id": "Transistor_BJT:Q_PNP_BCE", "footprint_id": "Package_TO_SOT_THT:TO-220-3_Vertical", "pinmap_evidence": "https://www.onsemi.com/download/data-sheet/pdf/d44h-d.pdf",
+        "complementary_group": "onsemi_d44h11_d45h11", "control_terminal": "BASE", "upper_or_lower_terminal": "COLLECTOR", "output_terminal": "EMITTER",
+        "voltage_rating_status": "proven", "current_rating_status": "proven", "power_dissipation_status": "proven", "thermal_review": "proven", "safe_operating_area_status": "proven",
+        "fabrication_candidate_blocks": false, "review_note": "Manufacturer electrical limits, Figure 9 forward-bias SOA, complementary identity, thermal paths, and TO-220 Style 1 pin map are reviewed."
+      },
+      "power_semiconductor_evidence": {
+        "device_class": "bjt", "polarity": "pnp", "complementary_group": "onsemi_d44h11_d45h11",
+        "max_voltage": {"value": 80, "unit": "V", "conditions": "VCEO sustaining-voltage magnitude, IC=-30 mA, IB=0"},
+        "continuous_current": {"value": 10, "unit": "A", "conditions": "absolute maximum continuous collector-current magnitude"},
+        "peak_current": {"value": 20, "unit": "A", "conditions": "pulse-width at most 6 ms and duty cycle at most 50 percent; magnitude recorded"},
+        "power_dissipation": {"value": 70, "unit": "W", "temperature_c": 25, "conditions": "case temperature 25 C"},
+        "max_junction_temperature_c": 150, "junction_to_case_c_per_w": 1.8, "junction_to_ambient_c_per_w": 62.5,
+        "soa": [
+          {"voltage_v": 5, "current_a": 5, "dc": true, "case_temperature_c": 70},
+          {"voltage_v": 10, "current_a": 2, "dc": true, "case_temperature_c": 70},
+          {"voltage_v": 20, "current_a": 0.75, "dc": true, "case_temperature_c": 70},
+          {"voltage_v": 30, "current_a": 0.35, "dc": true, "case_temperature_c": 70},
+          {"voltage_v": 50, "current_a": 0.15, "dc": true, "case_temperature_c": 70},
+          {"voltage_v": 80, "current_a": 0.08, "dc": true, "case_temperature_c": 70}
+        ],
+        "secondary_breakdown_status": "proven", "linear_mode_status": "proven",
+        "mounting_assumptions": "Free-air operation uses the manufacturer's 62.5 C/W junction-to-ambient maximum; higher dissipation requires an explicit case-to-ambient assembly.",
+        "bjt": {"gain_minimum": 40, "gain_test_current_a": 4, "transition_frequency_hz": 40000000},
+        "fabrication_proof": true, "review_note": "Source: onsemi D44H/D Rev. 14; conservative DC points lie within Figure 9 for D44H/45H10,11 at TC at most 70 C."
+      },
+      "symbols": [{"symbol_id": "Transistor_BJT:Q_PNP_BCE", "function_pins": [{"function": "BASE", "symbol_pin": "1", "required": true}, {"function": "COLLECTOR", "symbol_pin": "2", "required": true}, {"function": "EMITTER", "symbol_pin": "3", "required": true}], "verification": {"confidence": "verified", "sources": ["https://www.onsemi.com/download/data-sheet/pdf/d44h-d.pdf", "kicad-symbols:Transistor_BJT:Q_PNP_BCE"], "pinmap_checked": true}}],
+      "packages": [{"id": "to220_3", "name": "TO-220-3", "footprint_id": "Package_TO_SOT_THT:TO-220-3_Vertical", "package_type": "to220", "mpn": "D45H11G", "lifecycle": "active", "pinmap_id": "Transistor_BJT:Q_PNP_BCE|Package_TO_SOT_THT:TO-220-3_Vertical", "pad_functions": [{"function": "BASE", "pad": "1"}, {"function": "COLLECTOR", "pad": "2"}, {"function": "EMITTER", "pad": "3"}], "dimensions_mm": {"width": 10.28, "height": 4.82}, "height_mm": 15.75, "verification": {"confidence": "verified", "sources": ["https://www.onsemi.com/download/data-sheet/pdf/d44h-d.pdf", "kicad-footprint:Package_TO_SOT_THT:TO-220-3_Vertical"], "pinmap_checked": true}}],
+      "derating_rules": [{"kind": "thermal", "description": "Validate the selected ambient or case thermal path at the declared dissipation."}, {"kind": "safe_operating_area", "description": "Interpolate only inside the conservative catalog DC SOA boundary."}],
+      "placement_hints": [{"kind": "thermal_edge", "target": "board_edge", "description": "Preserve copper area and optional heatsink mounting access."}],
+      "verification": {"confidence": "verified", "sources": ["https://www.onsemi.com/download/data-sheet/pdf/d44h-d.pdf", "kicad-symbols:Transistor_BJT:Q_PNP_BCE", "kicad-footprint:Package_TO_SOT_THT:TO-220-3_Vertical"], "resolver_checked": true, "pinmap_checked": true, "tests": ["catalog_audio_power_semiconductor_evidence"]}
+    },
+    {
       "id": "bjt.onsemi.mje243g.to225",
       "family": "bjt",
       "name": "onsemi MJE243G NPN audio driver transistor",
@@ -146,6 +282,22 @@
       "manufacturer": "onsemi",
       "mpn": "MJE243G",
       "lifecycle": "active",
+      "simulation_models": [{
+        "model_id": "mna_bjt_npn_ebers_moll_v1",
+        "parameters": [
+          {"name": "saturation_current_a", "value": 1e-12},
+          {"name": "forward_beta", "value": 15},
+          {"name": "reverse_beta", "value": 1},
+          {"name": "emission_coefficient", "value": 1},
+          {"name": "junction_temperature_k", "value": 300.15},
+          {"name": "transition_frequency_hz", "value": 40000000},
+          {"name": "max_collector_current_a", "value": 4},
+          {"name": "max_collector_emitter_voltage_v", "value": 100},
+          {"name": "max_temperature_c", "value": 150},
+          {"name": "junction_to_ambient_c_per_w", "value": 83.4},
+          {"name": "junction_to_case_c_per_w", "value": 8.34}
+        ]
+      }],
       "tags": ["audio", "bjt", "driver", "npn", "to225", "linear"],
       "ratings": [{"kind": "collector_emitter_voltage", "max": "100", "unit": "V"}, {"kind": "collector_current", "max": "4", "unit": "A"}, {"kind": "power_dissipation", "max": "15", "unit": "W"}],
       "temperature": {"min": "-65", "max": "150", "unit": "C"},
@@ -178,6 +330,22 @@
       "manufacturer": "onsemi",
       "mpn": "MJE253G",
       "lifecycle": "active",
+      "simulation_models": [{
+        "model_id": "mna_bjt_pnp_ebers_moll_v1",
+        "parameters": [
+          {"name": "saturation_current_a", "value": 1e-12},
+          {"name": "forward_beta", "value": 15},
+          {"name": "reverse_beta", "value": 1},
+          {"name": "emission_coefficient", "value": 1},
+          {"name": "junction_temperature_k", "value": 300.15},
+          {"name": "transition_frequency_hz", "value": 40000000},
+          {"name": "max_collector_current_a", "value": 4},
+          {"name": "max_collector_emitter_voltage_v", "value": 100},
+          {"name": "max_temperature_c", "value": 150},
+          {"name": "junction_to_ambient_c_per_w", "value": 83.4},
+          {"name": "junction_to_case_c_per_w", "value": 8.34}
+        ]
+      }],
       "tags": ["audio", "bjt", "driver", "pnp", "to225", "linear"],
       "ratings": [{"kind": "collector_emitter_voltage", "max": "100", "unit": "V"}, {"kind": "collector_current", "max": "4", "unit": "A"}, {"kind": "power_dissipation", "max": "15", "unit": "W"}],
       "temperature": {"min": "-65", "max": "150", "unit": "C"},
@@ -283,6 +451,35 @@
       "verification": {"confidence": "verified", "sources": ["https://www.vishay.com/docs/28730/ac_ac-at_ac-ni.pdf", "kicad-footprint:Resistor_THT:R_Axial_DIN0414_L11.9mm_D4.5mm_P20.32mm_Horizontal"], "resolver_checked": true, "pinmap_checked": true, "tests": ["catalog_audio_power_passive_evidence"]}
     },
     {
+      "id": "relay.panasonic.aqy212gh.dip4",
+      "family": "relay",
+      "name": "Panasonic AQY212GH PhotoMOS normally-open solid-state relay",
+      "description": "Bidirectional 1 Form A PhotoMOS output isolator for low-quiescent delayed audio-output connection.",
+      "generic": false,
+      "manufacturer": "Panasonic Industry",
+      "mpn": "AQY212GH",
+      "lifecycle": "active",
+      "tags": ["audio", "bidirectional", "normally_open", "photomos", "solid_state"],
+      "values": [
+        {"kind": "coil_voltage", "typ": "1.32", "unit": "V"},
+        {"kind": "coil_resistance", "typ": "264", "unit": "ohm"},
+        {"kind": "control_current", "typ": "5", "unit": "mA"}
+      ],
+      "ratings": [
+        {"kind": "contact_current_dc", "max": "1.1", "unit": "A"},
+        {"kind": "contact_voltage_dc", "max": "60", "unit": "V"},
+        {"kind": "control_current", "min": "5", "max": "30", "unit": "mA"}
+      ],
+      "temperature": {"min": "-40", "max": "85", "unit": "C"},
+      "simulation_models": [
+        {"model_id": "mna_relay_closed_state_v1", "parameters": [{"name": "coil_resistance_ohm", "value": 264}, {"name": "contact_on_resistance_ohm", "value": 0.7}, {"name": "max_contact_current_a", "value": 1.1}, {"name": "max_contact_voltage_v", "value": 60}]},
+        {"model_id": "mna_relay_normally_open_v1", "parameters": [{"name": "coil_resistance_ohm", "value": 264}, {"name": "operate_current_a", "value": 0.005}, {"name": "contact_off_resistance_ohm", "value": 60000000}, {"name": "contact_on_resistance_ohm", "value": 0.7}, {"name": "max_contact_current_a", "value": 1.1}, {"name": "max_contact_voltage_v", "value": 60}, {"name": "operate_delay_s", "value": 0.005}]}
+      ],
+      "symbols": [{"symbol_id": "Relay_SolidState:AQY280EH", "function_pins": [{"function": "COIL_A", "symbol_pin": "1", "required": true}, {"function": "COIL_B", "symbol_pin": "2", "required": true}, {"function": "CONTACT_IN", "symbol_pin": "4", "required": true}, {"function": "CONTACT_OUT", "symbol_pin": "3", "required": true}], "verification": {"confidence": "verified", "sources": ["https://industry.panasonic.com/global/en/products/control/relay/photomos/number/aqy212gh", "kicad-symbols:Relay_SolidState:AQY280EH"], "pinmap_checked": true}}],
+      "packages": [{"id": "dip4_7_62", "name": "DIP-4 7.62 mm", "footprint_id": "Package_DIP:DIP-4_W7.62mm", "package_type": "dip4", "mpn": "AQY212GH", "lifecycle": "active", "pinmap_id": "Relay_SolidState:AQY280EH|Package_DIP:DIP-4_W7.62mm", "pad_functions": [{"function": "COIL_A", "pad": "1"}, {"function": "COIL_B", "pad": "2"}, {"function": "CONTACT_OUT", "pad": "3"}, {"function": "CONTACT_IN", "pad": "4"}], "dimensions_mm": {"width": 10.16, "height": 7.62}, "height_mm": 4.1, "verification": {"confidence": "verified", "sources": ["https://industry.panasonic.com/global/en/products/control/relay/photomos/number/aqy212gh", "kicad-footprint:Package_DIP:DIP-4_W7.62mm"], "pinmap_checked": true}}],
+      "verification": {"confidence": "verified", "sources": ["https://industry.panasonic.com/global/en/products/control/relay/photomos/number/aqy212gh", "kicad-symbols:Relay_SolidState:AQY280EH", "kicad-footprint:Package_DIP:DIP-4_W7.62mm"], "resolver_checked": true, "pinmap_checked": true, "tests": ["catalog_audio_solid_state_relay_evidence"]}
+    },
+    {
       "id": "relay.omron.g5q_1a.dc12",
       "family": "relay",
       "name": "Omron G5Q-1A DC12 power relay",
@@ -296,6 +493,26 @@
       "ratings": [{"kind": "contact_current_dc", "max": "5", "unit": "A"}, {"kind": "contact_voltage_dc", "max": "30", "unit": "V"}, {"kind": "coil_power", "typ": "0.2", "unit": "W"}],
       "temperature": {"min": "-40", "max": "85", "unit": "C"},
       "companions": [{"id": "relay.coil_driver", "family": "bjt", "role": "relay_driver", "required": true, "applies_to": ["speaker_protection"], "description": "A rated low-side coil driver is required so the timing detector does not source relay current."}, {"id": "relay.coil_flyback", "family": "diode", "role": "flyback_diode", "required": true, "applies_to": ["speaker_protection"], "description": "A local reverse-biased diode clamp is required across the relay coil."}],
+      "simulation_models": [{
+        "model_id": "mna_relay_closed_state_v1",
+        "parameters": [
+          {"name": "coil_resistance_ohm", "value": 720},
+          {"name": "contact_on_resistance_ohm", "value": 0.05},
+          {"name": "max_contact_current_a", "value": 5},
+          {"name": "max_contact_voltage_v", "value": 30}
+        ]
+      }, {
+        "model_id": "mna_relay_normally_open_v1",
+        "parameters": [
+          {"name": "coil_resistance_ohm", "value": 720},
+          {"name": "operate_current_a", "value": 0.0125},
+          {"name": "contact_off_resistance_ohm", "value": 1000000000000},
+          {"name": "contact_on_resistance_ohm", "value": 0.05},
+          {"name": "max_contact_current_a", "value": 5},
+          {"name": "max_contact_voltage_v", "value": 30},
+          {"name": "operate_delay_s", "value": 0.01}
+        ]
+      }],
       "symbols": [{"symbol_id": "Relay:G5Q-1A", "function_pins": [{"function": "COIL_A", "symbol_pin": "1", "required": true}, {"function": "COIL_B", "symbol_pin": "2", "required": true}, {"function": "CONTACT_IN", "symbol_pin": "3", "required": true}, {"function": "CONTACT_OUT", "symbol_pin": "5", "required": true}], "verification": {"confidence": "verified", "sources": ["https://components.omron.com/eu-en/system/files/2026-04/datasheet_pdf/J155-E1.pdf", "kicad-symbols:Relay:G5Q-1A"], "pinmap_checked": true}}],
       "packages": [{"id": "g5q_1a", "name": "Omron G5Q-1A through-hole", "footprint_id": "Relay_THT:Relay_SPST_Omron-G5Q-1A", "package_type": "relay_tht", "mpn": "G5Q-1A DC12", "lifecycle": "active", "pinmap_id": "Relay:G5Q-1A|Relay_THT:Relay_SPST_Omron-G5Q-1A", "pad_functions": [{"function": "COIL_A", "pad": "1"}, {"function": "COIL_B", "pad": "2"}, {"function": "CONTACT_IN", "pad": "3"}, {"function": "CONTACT_OUT", "pad": "5"}], "dimensions_mm": {"width": 20.3, "height": 10.3}, "height_mm": 15.8, "verification": {"confidence": "verified", "sources": ["https://components.omron.com/eu-en/system/files/2026-04/datasheet_pdf/J155-E1.pdf", "kicad-footprint:Relay_THT:Relay_SPST_Omron-G5Q-1A"], "pinmap_checked": true}}],
       "placement_hints": [{"kind": "keepout", "target": "small_signal_input", "value": "8", "unit": "mm", "description": "Separate the coil/contact loop from the input and feedback network."}],
@@ -311,6 +528,21 @@
       "manufacturer": "onsemi",
       "mpn": "NJW0281G",
       "lifecycle": "active",
+      "simulation_models": [{
+        "model_id": "mna_bjt_npn_ebers_moll_v1",
+        "parameters": [
+          {"name": "saturation_current_a", "value": 1e-12},
+          {"name": "forward_beta", "value": 75},
+          {"name": "reverse_beta", "value": 1},
+          {"name": "emission_coefficient", "value": 1},
+          {"name": "junction_temperature_k", "value": 300.15},
+          {"name": "transition_frequency_hz", "value": 30000000},
+          {"name": "max_collector_current_a", "value": 15},
+          {"name": "max_collector_emitter_voltage_v", "value": 250},
+          {"name": "max_temperature_c", "value": 150},
+          {"name": "junction_to_case_c_per_w", "value": 0.83}
+        ]
+      }],
       "tags": ["audio", "bjt", "npn", "power_output", "to3p", "linear"],
       "ratings": [
         {"kind": "collector_emitter_voltage", "max": "250", "unit": "V"},
@@ -407,6 +639,21 @@
       "manufacturer": "onsemi",
       "mpn": "NJW0302G",
       "lifecycle": "active",
+      "simulation_models": [{
+        "model_id": "mna_bjt_pnp_ebers_moll_v1",
+        "parameters": [
+          {"name": "saturation_current_a", "value": 1e-12},
+          {"name": "forward_beta", "value": 75},
+          {"name": "reverse_beta", "value": 1},
+          {"name": "emission_coefficient", "value": 1},
+          {"name": "junction_temperature_k", "value": 300.15},
+          {"name": "transition_frequency_hz", "value": 30000000},
+          {"name": "max_collector_current_a", "value": 15},
+          {"name": "max_collector_emitter_voltage_v", "value": 250},
+          {"name": "max_temperature_c", "value": 150},
+          {"name": "junction_to_case_c_per_w", "value": 0.83}
+        ]
+      }],
       "tags": ["audio", "bjt", "pnp", "power_output", "to3p", "linear"],
       "ratings": [
         {"kind": "collector_emitter_voltage", "max": "250", "unit": "V"},
@@ -539,8 +786,15 @@
       "manufacturer": "Vishay Siliconix",
       "mpn": "IRFP9240PbF",
       "lifecycle": "active",
+	  "simulation_models": [{"model_id": "mna_pmos_guaranteed_switch_v1", "parameters": [
+		{"name": "gate_on_voltage_v", "value": 10}, {"name": "on_resistance_ohm", "value": 0.5},
+		{"name": "max_drain_current_a", "value": 12}, {"name": "max_drain_source_voltage_v", "value": 200},
+		{"name": "max_gate_source_voltage_v", "value": 20}, {"name": "max_temperature_c", "value": 150},
+		{"name": "junction_to_ambient_c_per_w", "value": 40}, {"name": "junction_to_case_c_per_w", "value": 0.83}
+	  ]}],
       "tags": ["audio_review", "mosfet", "p_channel", "power_output", "to247"],
-      "ratings": [{"kind": "drain_source_voltage", "max": "200", "unit": "V"}, {"kind": "drain_current", "max": "12", "unit": "A"}, {"kind": "power_dissipation", "max": "150", "unit": "W"}],
+      "values": [{"kind": "on_resistance", "max": "0.5", "unit": "Ohm"}, {"kind": "on_resistance_gate_voltage", "typ": "10", "unit": "V"}, {"kind": "total_gate_charge", "max": "44", "unit": "nC"}],
+      "ratings": [{"kind": "drain_source_voltage", "max": "200", "unit": "V"}, {"kind": "drain_current", "max": "12", "unit": "A"}, {"kind": "gate_source_voltage", "max": "20", "unit": "V"}, {"kind": "power_dissipation", "max": "150", "unit": "W"}],
       "temperature": {"min": "-55", "max": "150", "unit": "C"},
       "companions": [{"id": "amplifier.output_gate_stopper", "family": "resistor", "role": "gate_stopper", "required": true, "applies_to": ["class_ab_output", "class_a_output"], "description": "A calculated local gate-stopper resistor is required for power MOSFET amplifier use."}],
       "amplifier_output_evidence": {
@@ -565,6 +819,106 @@
       "symbols": [{"symbol_id": "Transistor_FET:Q_PMOS_GDS", "function_pins": [{"function": "GATE", "symbol_pin": "1", "required": true}, {"function": "DRAIN", "symbol_pin": "2", "required": true}, {"function": "SOURCE", "symbol_pin": "3", "required": true}], "verification": {"confidence": "verified", "sources": ["kicad-symbols:Transistor_FET:Q_PMOS_GDS", "datasheet-pinmap:vishay:IRFP9240-91239"], "pinmap_checked": true}}],
       "packages": [{"id": "to247_3", "name": "TO-247AC", "footprint_id": "Package_TO_SOT_THT:TO-247-3_Vertical", "package_type": "to247_3", "mpn": "IRFP9240PbF", "lifecycle": "active", "pinmap_id": "Transistor_FET:Q_PMOS_GDS|Package_TO_SOT_THT:TO-247-3_Vertical", "pad_functions": [{"function": "GATE", "pad": "1"}, {"function": "DRAIN", "pad": "2"}, {"function": "SOURCE", "pad": "3"}], "verification": {"confidence": "verified", "sources": ["kicad-footprint:Package_TO_SOT_THT:TO-247-3_Vertical", "datasheet-pinmap:vishay:IRFP9240-91239"], "pinmap_checked": true}}],
       "verification": {"confidence": "verified", "sources": ["https://www.vishay.com/docs/91239/irfp9240.pdf", "datasheet-pinmap:vishay:IRFP9240-91239"], "resolver_checked": true, "pinmap_checked": true, "tests": ["catalog_audio_power_semiconductor_evidence"]}
+    },
+    {
+      "id": "protection.littelfuse.smbj18ca.smb",
+      "family": "protection",
+      "name": "Littelfuse SMBJ18CA 18 V bidirectional TVS diode",
+      "description": "Concrete 600 W bidirectional TVS diode for protected ground-referenced power and audio outputs whose valid signal envelope remains within 18 V.",
+      "generic": false,
+      "manufacturer": "Littelfuse",
+      "mpn": "SMBJ18CA",
+      "lifecycle": "active",
+      "simulation_models": [{
+        "model_id": "mna_bidirectional_tvs_piecewise_linear_v1",
+        "parameters": [
+          {"name": "breakdown_voltage_v", "value": 20},
+          {"name": "dynamic_resistance_ohm", "value": 0.44660194174757284},
+          {"name": "junction_capacitance_f", "value": 1.1e-9},
+          {"name": "max_pulse_current_a", "value": 20.6},
+          {"name": "off_resistance_ohm", "value": 18000000}
+        ]
+      }],
+      "tags": ["audio", "bidirectional", "protection", "tvs", "18v", "smb"],
+      "ratings": [
+        {"kind": "working_voltage", "max": "18", "unit": "V"},
+        {"kind": "pulse_current", "max": "20.6", "unit": "A"},
+        {"kind": "pulse_power", "max": "600", "unit": "W"}
+      ],
+      "temperature": {"min": "-65", "max": "150", "unit": "C"},
+      "symbols": [{
+        "symbol_id": "Device:D_TVS",
+        "function_pins": [
+          {"function": "CATHODE", "symbol_pin": "1", "polarity": "negative", "required": true, "aliases": ["K", "LINE"]},
+          {"function": "ANODE", "symbol_pin": "2", "polarity": "positive", "required": true, "aliases": ["A", "RETURN"]}
+        ],
+        "verification": {"confidence": "verified", "sources": ["kicad-symbols:Device:D_TVS", "datasheet-pinmap:Littelfuse:SMBJ18CA"], "pinmap_checked": true}
+      }],
+      "packages": [{
+        "id": "smb_do_214aa",
+        "name": "DO-214AA (SMB)",
+        "footprint_id": "Diode_SMD:D_SMB",
+        "package_type": "smb_do_214aa",
+        "mpn": "SMBJ18CA",
+        "lifecycle": "active",
+        "pinmap_id": "Device:D_TVS|Diode_SMD:D_SMB",
+        "pad_functions": [
+          {"function": "CATHODE", "pad": "1", "polarity": "negative", "aliases": ["K", "LINE"]},
+          {"function": "ANODE", "pad": "2", "polarity": "positive", "aliases": ["A", "RETURN"]}
+        ],
+        "verification": {"confidence": "verified", "sources": ["kicad-footprint:Diode_SMD:D_SMB", "datasheet-pinmap:Littelfuse:SMBJ18CA"], "pinmap_checked": true}
+      }],
+      "verification": {"confidence": "verified", "sources": ["https://www.littelfuse.com/products/overvoltage-protection/tvs-diodes/surface-mount/smbj/smbj18ca", "kicad-symbols:Device:D_TVS", "kicad-footprint:Diode_SMD:D_SMB"], "resolver_checked": true, "pinmap_checked": true, "tests": ["catalog_audio_output_protection_evidence"]}
+    },
+    {
+      "id": "protection.littelfuse.smbj20ca.smb",
+      "family": "protection",
+      "name": "Littelfuse SMBJ20CA 20 V bidirectional TVS diode",
+      "description": "Concrete 600 W bidirectional TVS diode for protected ground-referenced power and audio outputs whose valid signal envelope remains within 20 V.",
+      "generic": false,
+      "manufacturer": "Littelfuse",
+      "mpn": "SMBJ20CA",
+      "lifecycle": "active",
+      "simulation_models": [{
+        "model_id": "mna_bidirectional_tvs_piecewise_linear_v1",
+        "parameters": [
+          {"name": "breakdown_voltage_v", "value": 22.2},
+          {"name": "dynamic_resistance_ohm", "value": 0.5483870967741935},
+          {"name": "junction_capacitance_f", "value": 1e-9},
+          {"name": "max_pulse_current_a", "value": 18.6},
+          {"name": "off_resistance_ohm", "value": 20000000}
+        ]
+      }],
+      "tags": ["audio", "bidirectional", "protection", "tvs", "20v", "smb"],
+      "ratings": [
+        {"kind": "working_voltage", "max": "20", "unit": "V"},
+        {"kind": "pulse_current", "max": "18.6", "unit": "A"},
+        {"kind": "pulse_power", "max": "600", "unit": "W"}
+      ],
+      "temperature": {"min": "-65", "max": "150", "unit": "C"},
+      "symbols": [{
+        "symbol_id": "Device:D_TVS",
+        "function_pins": [
+          {"function": "CATHODE", "symbol_pin": "1", "polarity": "negative", "required": true, "aliases": ["K", "LINE"]},
+          {"function": "ANODE", "symbol_pin": "2", "polarity": "positive", "required": true, "aliases": ["A", "RETURN"]}
+        ],
+        "verification": {"confidence": "verified", "sources": ["kicad-symbols:Device:D_TVS", "datasheet-pinmap:Littelfuse:SMBJ20CA"], "pinmap_checked": true}
+      }],
+      "packages": [{
+        "id": "smb_do_214aa",
+        "name": "DO-214AA (SMB)",
+        "footprint_id": "Diode_SMD:D_SMB",
+        "package_type": "smb_do_214aa",
+        "mpn": "SMBJ20CA",
+        "lifecycle": "active",
+        "pinmap_id": "Device:D_TVS|Diode_SMD:D_SMB",
+        "pad_functions": [
+          {"function": "CATHODE", "pad": "1", "polarity": "negative", "aliases": ["K", "LINE"]},
+          {"function": "ANODE", "pad": "2", "polarity": "positive", "aliases": ["A", "RETURN"]}
+        ],
+        "verification": {"confidence": "verified", "sources": ["kicad-footprint:Diode_SMD:D_SMB", "datasheet-pinmap:Littelfuse:SMBJ20CA"], "pinmap_checked": true}
+      }],
+      "verification": {"confidence": "verified", "sources": ["https://www.littelfuse.com/products/overvoltage-protection/tvs-diodes/surface-mount/smbj/smbj20ca", "kicad-symbols:Device:D_TVS", "kicad-footprint:Diode_SMD:D_SMB"], "resolver_checked": true, "pinmap_checked": true, "tests": ["catalog_audio_output_protection_evidence"]}
     }
   ]
 }

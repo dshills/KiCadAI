@@ -14,8 +14,11 @@ import (
 )
 
 const (
-	SynthesisReportSchema              = "kicadai.function-synthesis-report.v1"
-	synthesisEstimatedComponentPitchMM = 5.0
+	SynthesisReportSchema                       = "kicadai.function-synthesis-report.v1"
+	synthesisEstimatedComponentPitchMM          = 5.0
+	synthesisCongestedComponentPitchMM          = 7.5
+	synthesisCongestedComponentCount            = 32
+	synthesisCongestedBranchesPerComponentRatio = 0.75
 )
 
 type SynthesisReport struct {
@@ -880,6 +883,7 @@ func deriveFunctionLayout(document *Document, intent FunctionIntent, selections 
 		spacing = 1.5
 	}
 	maxEnvelopeWidth, maxEnvelopeHeight := synthesisPhysicalEnvelope(document.Components, recordsByID)
+	componentPitch := synthesisComponentPitchMM(count, document.Nets)
 	// Leave one board-edge clearance and two placement-spacing bands on each
 	// side. The second spacing band gives an asymmetric library courtyard a
 	// non-zero deterministic candidate interval after the synthesized region is
@@ -895,8 +899,8 @@ func deriveFunctionLayout(document *Document, intent FunctionIntent, selections 
 		issue := synthesisIssue(CodeSynthesisLayoutConstraintUnsupported, "synthesis.constraints", fmt.Sprintf("minimum %.1fx%.1f mm physical envelope exceeds %.1fx%.1f mm function-intent bounds", minimumWidth, minimumHeight, intent.Constraints.MaxWidthMM, intent.Constraints.MaxHeightMM), "increase bounded board dimensions or reduce physical-envelope constraints")
 		return []reports.Issue{issue}
 	}
-	packingWidth := math.Max(math.Max(20, 15+synthesisEstimatedComponentPitchMM*float64(columns)), maxEnvelopeWidth+envelopeMargin+synthesisEstimatedComponentPitchMM*math.Max(float64(columns-1), 0))
-	packingHeight := math.Max(math.Max(15, 12+synthesisEstimatedComponentPitchMM*float64(rows)), maxEnvelopeHeight+envelopeMargin+synthesisEstimatedComponentPitchMM*math.Max(float64(rows-1), 0))
+	packingWidth := math.Max(math.Max(20, 15+componentPitch*float64(columns)), maxEnvelopeWidth+envelopeMargin+componentPitch*math.Max(float64(columns-1), 0))
+	packingHeight := math.Max(math.Max(15, 12+componentPitch*float64(rows)), maxEnvelopeHeight+envelopeMargin+componentPitch*math.Max(float64(rows-1), 0))
 	// The packing estimate is conservative, not a physical minimum. Respect a
 	// tighter provider bound when the largest reviewed envelope still fits and
 	// let the deterministic placer prove or reject the denser arrangement.
@@ -938,12 +942,7 @@ func deriveFunctionLayout(document *Document, intent FunctionIntent, selections 
 }
 
 func synthesisCopperLayerCount(componentCount int, nets []Net) int {
-	routingBranches := 0
-	for _, net := range nets {
-		if len(net.Endpoints) > 1 {
-			routingBranches += len(net.Endpoints) - 1
-		}
-	}
+	routingBranches := synthesisRoutingBranchCount(nets)
 	// Two copper layers are sufficient while the connection forest remains
 	// sparse. Once there are at least two independent tree branches per placed
 	// component, reserve two internal routing planes deterministically.
@@ -951,6 +950,27 @@ func synthesisCopperLayerCount(componentCount int, nets []Net) int {
 		return 4
 	}
 	return 2
+}
+
+func synthesisComponentPitchMM(componentCount int, nets []Net) float64 {
+	if componentCount <= 0 {
+		return synthesisEstimatedComponentPitchMM
+	}
+	routingBranches := synthesisRoutingBranchCount(nets)
+	if componentCount >= synthesisCongestedComponentCount || float64(routingBranches)/float64(componentCount) >= synthesisCongestedBranchesPerComponentRatio {
+		return synthesisCongestedComponentPitchMM
+	}
+	return synthesisEstimatedComponentPitchMM
+}
+
+func synthesisRoutingBranchCount(nets []Net) int {
+	count := 0
+	for _, net := range nets {
+		if len(net.Endpoints) > 1 {
+			count += len(net.Endpoints) - 1
+		}
+	}
+	return count
 }
 
 func uniqueResolvedFunction(functions []ResolvedFunction, requested string) (ResolvedFunction, bool) {

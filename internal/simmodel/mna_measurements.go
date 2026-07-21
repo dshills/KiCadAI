@@ -1,6 +1,7 @@
 package simmodel
 
 import (
+	"fmt"
 	"math"
 )
 
@@ -102,7 +103,11 @@ func transientDerivedValue(result AnalysisResult, assertion Assertion) (float64,
 			return 0, advancedAssertionDiagnostic(assertion, "output-power assertion requires a solved waveform")
 		}
 		sum, count := 0.0, 0
-		for _, point := range result.Points[1:] {
+		points := periodicSteadyStatePoints(result)
+		if len(points) == len(result.Points) {
+			points = points[1:]
+		}
+		for _, point := range points {
 			for _, device := range point.Devices {
 				if device.Component == assertion.Component {
 					sum += math.Abs(device.VoltageV * device.CurrentA)
@@ -120,8 +125,65 @@ func transientDerivedValue(result AnalysisResult, assertion Assertion) (float64,
 }
 
 func dcDeviceValue(result AnalysisResult, assertion Assertion) (float64, *Diagnostic) {
-	if len(result.Points) != 1 {
-		return 0, advancedAssertionDiagnostic(assertion, "DC device assertion requires exactly one operating point")
+	if len(result.Points) == 0 {
+		return 0, advancedAssertionDiagnostic(assertion, "DC device assertion requires at least one operating point")
+	}
+	if len(result.Points) > 1 {
+		if assertion.Quantity != QuantityTransimpedanceOhm {
+			return 0, advancedAssertionDiagnostic(assertion, "DC device-current assertion requires exactly one operating point")
+		}
+		minimumCurrent, maximumCurrent := math.Inf(1), math.Inf(-1)
+		minimumVoltage, maximumVoltage := 0.0, 0.0
+		for _, point := range result.Points {
+			if point.Sweep != "" && point.Sweep != dcSweepForward {
+				continue
+			}
+			current, voltage, currentOK, voltageOK := 0.0, 0.0, false, false
+			for _, device := range point.Devices {
+				if device.Component == assertion.Component {
+					current, currentOK = device.CurrentMagnitudeA, true
+					break
+				}
+			}
+			for _, node := range point.Nodes {
+				if node.Node == assertion.Node {
+					voltage, voltageOK = node.Real, true
+					break
+				}
+			}
+			if !currentOK || !voltageOK {
+				continue
+			}
+			if current < minimumCurrent {
+				minimumCurrent, minimumVoltage = current, voltage
+			}
+			if current > maximumCurrent {
+				maximumCurrent, maximumVoltage = current, voltage
+			}
+		}
+		span := maximumCurrent - minimumCurrent
+		if !finite(span) || span <= 1e-15 {
+			return 0, advancedAssertionDiagnostic(assertion, "transimpedance DC sweep does not span two finite input-current levels")
+		}
+		return normalizedMNAFloat(math.Abs((maximumVoltage - minimumVoltage) / span)), nil
+	}
+	if assertion.Quantity == QuantityTotalSupplyCurrentA {
+		remaining := make(map[string]struct{}, len(assertion.Components))
+		for _, component := range assertion.Components {
+			remaining[component] = struct{}{}
+		}
+		total := 0.0
+		for _, device := range result.Points[0].Devices {
+			if _, ok := remaining[device.Component]; !ok {
+				continue
+			}
+			total += device.CurrentMagnitudeA
+			delete(remaining, device.Component)
+		}
+		if len(remaining) != 0 {
+			return 0, advancedAssertionDiagnostic(assertion, "total-supply-current assertion component is absent from the solved point")
+		}
+		return normalizedMNAFloat(total), nil
 	}
 	for _, device := range result.Points[0].Devices {
 		if device.Component != assertion.Component {
@@ -166,6 +228,7 @@ func dcSweepTransition(result AnalysisResult, assertion Assertion, direction str
 	}
 	var samples []sample
 	minimum, maximum := math.Inf(1), math.Inf(-1)
+	minimumSweep, maximumSweep := math.Inf(1), math.Inf(-1)
 	for _, point := range result.Points {
 		if point.Sweep != direction {
 			continue
@@ -174,12 +237,16 @@ func dcSweepTransition(result AnalysisResult, assertion Assertion, direction str
 			if node.Node == assertion.Node {
 				samples = append(samples, sample{sweep: point.SweepValue, output: node.Real})
 				minimum, maximum = math.Min(minimum, node.Real), math.Max(maximum, node.Real)
+				minimumSweep, maximumSweep = math.Min(minimumSweep, point.SweepValue), math.Max(maximumSweep, point.SweepValue)
 				break
 			}
 		}
 	}
 	if len(samples) < 3 || !finite(minimum) || !finite(maximum) || maximum-minimum <= 1e-9*math.Max(1, math.Max(math.Abs(minimum), math.Abs(maximum))) {
-		return 0, advancedAssertionDiagnostic(assertion, "DC sweep output does not contain a resolved decision transition")
+		if len(samples) >= 3 && finite(minimum) && finite(maximum) {
+			return censoredDCSweepAssertionValue(minimumSweep, maximumSweep, assertion), nil
+		}
+		return 0, advancedAssertionDiagnostic(assertion, fmt.Sprintf("DC sweep output does not contain enough finite decision samples (samples=%d, output_min=%.12g, output_max=%.12g)", len(samples), minimum, maximum))
 	}
 	midpoint := minimum + .5*(maximum-minimum)
 	transitions := make([]float64, 0, 1)
@@ -203,6 +270,17 @@ func dcSweepTransition(result AnalysisResult, assertion Assertion, direction str
 		return 0, advancedAssertionDiagnostic(assertion, "DC sweep must contain exactly one unambiguous decision transition in each required direction")
 	}
 	return normalizedMNAFloat(transitions[0]), nil
+}
+
+func censoredDCSweepAssertionValue(minimumSweep, maximumSweep float64, assertion Assertion) float64 {
+	if minimumSweep < assertion.Min {
+		return normalizedMNAFloat(minimumSweep)
+	}
+	if maximumSweep > assertion.Max {
+		return normalizedMNAFloat(maximumSweep)
+	}
+	margin := math.Max(maximumSweep-minimumSweep, math.Max(1, math.Max(math.Abs(assertion.Min), math.Abs(assertion.Max)))*1e-9)
+	return normalizedMNAFloat(assertion.Max + margin)
 }
 
 func waveform(result AnalysisResult, assertion Assertion) ([]float64, []float64, *Diagnostic) {

@@ -16,7 +16,6 @@ const (
 	synthesisACStopFrequencyHz      = 10000.0
 	synthesisACSweepPoints          = 21
 	synthesisMaxIndependentACInputs = 7
-	celsiusToKelvin                 = 273.15
 )
 
 type synthesisSourceCondition struct {
@@ -122,10 +121,11 @@ func deriveSynthesisSimulation(document Document, intent FunctionIntent, selecte
 			condition.acInput = true
 			condition.pulseInput = true
 		case InterfaceDigitalIn:
-			if operatingRail == 0 {
+			inputRail := synthesisInterfaceOperatingRail(domains, voltageDomain, operatingRail)
+			if inputRail == 0 {
 				return nil, SynthesisSimulationEvidence{Status: "not_applicable", Reason: "no_bounded_interface_operating_condition"}
 			}
-			condition.dcValue = operatingRail
+			condition.dcValue = inputRail
 			condition.pulseInput = true
 		default:
 			continue
@@ -204,6 +204,13 @@ func deriveSynthesisSimulation(document Document, intent FunctionIntent, selecte
 	return &SimulationIntent{ModelID: modelID, Analyses: analyses, Assertions: assertions}, SynthesisSimulationEvidence{
 		Status: "derived", ModelID: modelID, Reason: "complete_registered_graph_model_and_bounded_interface_conditions",
 	}
+}
+
+func synthesisInterfaceOperatingRail(domains map[string]PowerDomainIntent, voltageDomain string, fallback float64) float64 {
+	if domain, ok := domains[voltageDomain]; ok && domain.VoltageV != 0 {
+		return domain.VoltageV
+	}
+	return fallback
 }
 
 func configuredSimulationModels(selection ResolvedComponent) []simmodel.CatalogEvidence {
@@ -291,7 +298,7 @@ func catalogSupplyCurrentA(ratings []components.RatingConstraint) (float64, bool
 }
 
 func componentSimulationEvidence(instanceID, catalogID, family string, value float64, hasValue bool, models []simmodel.CatalogEvidence, connections []simmodel.ConnectionEvidence, units []ResolvedUnit, record components.ComponentRecord) []simmodel.ComponentEvidence {
-	uncertainties := append(catalogValueUncertainties(value, hasValue, record), catalogModelUncertainties(models, record)...)
+	uncertainties := append(catalogValueUncertainties(value, hasValue, record), catalogModelUncertainties(models)...)
 	functionalUnits := []ResolvedUnit{}
 	sharedUnits := map[string]bool{}
 	for _, unit := range units {
@@ -324,51 +331,17 @@ func componentSimulationEvidence(instanceID, catalogID, family string, value flo
 	return evidence
 }
 
-func catalogModelUncertainties(models []simmodel.CatalogEvidence, record components.ComponentRecord) []simmodel.Uncertainty {
+func catalogModelUncertainties(models []simmodel.CatalogEvidence) []simmodel.Uncertainty {
 	var result []simmodel.Uncertainty
 	for _, model := range models {
-		hasTemperatureEvidence := false
 		for _, uncertainty := range model.Uncertainties {
 			if strings.HasPrefix(uncertainty.Target, "model_parameters.") || uncertainty.Target == "excitation_dc_value" {
 				result = append(result, uncertainty)
 			}
-			hasTemperatureEvidence = hasTemperatureEvidence || uncertainty.Target == "model_parameters.junction_temperature_k"
-		}
-		if temperatureUncertainty, ok := catalogTemperatureUncertainty(model, record); ok && !hasTemperatureEvidence {
-			result = append(result, temperatureUncertainty)
 		}
 	}
 	slices.SortStableFunc(result, func(a, b simmodel.Uncertainty) int { return strings.Compare(a.Target, b.Target) })
 	return result
-}
-
-func catalogTemperatureUncertainty(model simmodel.CatalogEvidence, record components.ComponentRecord) (simmodel.Uncertainty, bool) {
-	if record.Temperature == nil || (record.Temperature.Unit != "C" && record.Temperature.Unit != "K") || len(record.Verification.Sources) == 0 {
-		return simmodel.Uncertainty{}, false
-	}
-	nominal, found := 0.0, false
-	for _, parameter := range model.Parameters {
-		if parameter.Name == "junction_temperature_k" {
-			nominal, found = parameter.Value, true
-			break
-		}
-	}
-	if !found {
-		return simmodel.Uncertainty{}, false
-	}
-	minimum, minimumOK := components.ParseEngineeringValue(record.Temperature.Min)
-	maximum, maximumOK := components.ParseEngineeringValue(record.Temperature.Max)
-	if !minimumOK || !maximumOK || minimum > maximum {
-		return simmodel.Uncertainty{}, false
-	}
-	if record.Temperature.Unit == "C" {
-		minimum += celsiusToKelvin
-		maximum += celsiusToKelvin
-	}
-	if nominal < minimum || nominal > maximum {
-		return simmodel.Uncertainty{}, false
-	}
-	return simmodel.Uncertainty{Target: "model_parameters.junction_temperature_k", Source: "catalog:" + record.ID + ":temperature", Nominal: nominal, Minimum: minimum, Maximum: maximum}, true
 }
 
 func catalogValueUncertainties(value float64, hasValue bool, record components.ComponentRecord) []simmodel.Uncertainty {

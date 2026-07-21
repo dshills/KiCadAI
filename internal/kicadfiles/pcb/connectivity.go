@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"kicadai/internal/kicadfiles"
+	"kicadai/internal/kicadfiles/sexpr"
 )
 
 const (
@@ -94,6 +95,8 @@ func collectConnectivityAnchors(board PCBFile) []connectivityAnchor {
 				continue
 			}
 			field := indexed(indexedValue("footprints", footprintIndex)+".pads", padIndex, "connectivity")
+			padPoint := absolutePadPosition(footprint, pad)
+			padRotation := footprint.Rotation + pad.Rotation
 			anchors = append(anchors, connectivityAnchor{
 				id:               len(anchors),
 				itemKey:          "pad:" + string(pad.UUID),
@@ -101,14 +104,31 @@ func collectConnectivityAnchors(board PCBFile) []connectivityAnchor {
 				field:            field,
 				kind:             "pad",
 				netCode:          pad.NetCode,
-				point:            absolutePadPosition(footprint, pad),
+				point:            padPoint,
 				layers:           layers,
 				allCopper:        allCopper,
 				padShape:         pad.Shape,
 				padSize:          pad.Size,
 				// KiCad applies the footprint rotation to the pad's local rotation.
-				padRotation: footprint.Rotation + pad.Rotation,
+				padRotation: padRotation,
 			})
+			for primitiveIndex, primitive := range customPadCopperRegions(pad) {
+				offset := rotatePoint(primitive.center, padRotation)
+				anchors = append(anchors, connectivityAnchor{
+					id:               len(anchors),
+					itemKey:          fmt.Sprintf("pad:%s:primitive:%d", pad.UUID, primitiveIndex),
+					electricalPadKey: fmt.Sprintf("%s:%s:%d", footprint.UUID, pad.Name, pad.NetCode),
+					field:            field,
+					kind:             "pad",
+					netCode:          pad.NetCode,
+					point:            kicadfiles.Point{X: padPoint.X + offset.X, Y: padPoint.Y + offset.Y},
+					layers:           layers,
+					allCopper:        allCopper,
+					padShape:         "rect",
+					padSize:          primitive.size,
+					padRotation:      padRotation,
+				})
+			}
 		}
 	}
 	for index, track := range board.Tracks {
@@ -150,6 +170,89 @@ func collectConnectivityAnchors(board PCBFile) []connectivityAnchor {
 		})
 	}
 	return anchors
+}
+
+type customPadCopperRegion struct {
+	center kicadfiles.Point
+	size   kicadfiles.Point
+}
+
+func customPadCopperRegions(pad Pad) []customPadCopperRegion {
+	if pad.Shape != "custom" || strings.TrimSpace(pad.Raw) == "" {
+		return nil
+	}
+	parsed, err := sexpr.Parse([]byte(strings.TrimSpace(pad.Raw)))
+	if err != nil || parsed.Head() != "pad" {
+		return nil
+	}
+	primitives, ok := parsed.Child("primitives")
+	if !ok {
+		return nil
+	}
+	regions := make([]customPadCopperRegion, 0, len(primitives.Children))
+	for _, primitive := range primitives.Children {
+		minPoint, maxPoint, ok := customPadPrimitiveBounds(primitive)
+		if !ok {
+			continue
+		}
+		if width := customPadPrimitiveWidth(primitive); width > 0 {
+			minPoint.X -= width / 2
+			minPoint.Y -= width / 2
+			maxPoint.X += width / 2
+			maxPoint.Y += width / 2
+		}
+		regions = append(regions, customPadCopperRegion{
+			center: kicadfiles.Point{X: (minPoint.X + maxPoint.X) / 2, Y: (minPoint.Y + maxPoint.Y) / 2},
+			size:   kicadfiles.Point{X: maxPoint.X - minPoint.X, Y: maxPoint.Y - minPoint.Y},
+		})
+	}
+	return regions
+}
+
+func customPadPrimitiveBounds(node sexpr.ParsedNode) (kicadfiles.Point, kicadfiles.Point, bool) {
+	points := readPoints(node)
+	for _, name := range []string{"start", "mid", "end", "center"} {
+		if _, ok := node.Child(name); ok {
+			points = append(points, readNamedPCBPoint(node, name))
+		}
+	}
+	if node.Head() == "gr_circle" {
+		_, centerOK := node.Child("center")
+		_, endOK := node.Child("end")
+		if centerOK && endOK {
+			center := readNamedPCBPoint(node, "center")
+			end := readNamedPCBPoint(node, "end")
+			radius := kicadfiles.IU(math.Round(math.Hypot(float64(end.X-center.X), float64(end.Y-center.Y))))
+			return kicadfiles.Point{X: center.X - radius, Y: center.Y - radius}, kicadfiles.Point{X: center.X + radius, Y: center.Y + radius}, true
+		}
+	}
+	if len(points) == 0 {
+		return kicadfiles.Point{}, kicadfiles.Point{}, false
+	}
+	minimum, maximum := points[0], points[0]
+	for _, point := range points[1:] {
+		minimum.X = minIU(minimum.X, point.X)
+		minimum.Y = minIU(minimum.Y, point.Y)
+		maximum.X = maxIU(maximum.X, point.X)
+		maximum.Y = maxIU(maximum.Y, point.Y)
+	}
+	return minimum, maximum, true
+}
+
+func customPadPrimitiveWidth(node sexpr.ParsedNode) kicadfiles.IU {
+	if width, ok := node.Child("width"); ok {
+		if value, ok := width.FloatValue(1); ok {
+			return kicadfiles.MM(value)
+		}
+	}
+	if stroke, ok := node.Child("stroke"); ok {
+		if width, ok := stroke.Child("width"); ok {
+			if value, ok := width.FloatValue(1); ok {
+				return kicadfiles.MM(value)
+			}
+		}
+	}
+	return 0
 }
 
 // unionEquivalentFootprintPads models KiCad's duplicate pad-name convention:

@@ -172,6 +172,37 @@ func TestVerifiedPadTemplateUsesPackageSpecificRowPinOrder(t *testing.T) {
 	}
 }
 
+func TestVerifiedDIP4TemplateMatchesStandardDualInlinePinOrder(t *testing.T) {
+	template, ok := verifiedPadTemplate("Package_DIP:DIP-4_W7.62mm")
+	if !ok {
+		t.Fatal("missing DIP-4 template")
+	}
+	if got := padTemplateNames(template.Pads); !reflect.DeepEqual(got, []string{"1", "2", "3", "4"}) {
+		t.Fatalf("DIP-4 pad order = %#v", got)
+	}
+	wantPositions := []placement.Point{
+		{XMM: 0, YMM: 0},
+		{XMM: 0, YMM: 2.54},
+		{XMM: 7.62, YMM: 2.54},
+		{XMM: 7.62, YMM: 0},
+	}
+	for index, pad := range template.Pads {
+		if pad.XMM != wantPositions[index].XMM || pad.YMM != wantPositions[index].YMM {
+			t.Fatalf("DIP-4 pad[%d] position = (%v, %v), want %#v", index, pad.XMM, pad.YMM, wantPositions[index])
+		}
+		if pad.Type != "thru_hole" || pad.WidthMM != 1.6 || pad.HeightMM != 1.6 || pad.DrillMM != 0.8 || !reflect.DeepEqual(pad.Layers, []string{"*.Cu", "*.Mask"}) {
+			t.Fatalf("DIP-4 pad[%d] geometry = %#v", index, pad)
+		}
+	}
+	if template.Pads[0].Shape != "roundrect" || template.Pads[1].Shape != "circle" {
+		t.Fatalf("DIP-4 pin-one marking is not preserved: %#v", template.Pads)
+	}
+	wantBounds := verifiedCourtyardBoundsFromExtents(-1.06, -1.52, 8.67, 4.07)
+	if !reflect.DeepEqual(template.Bounds, wantBounds) {
+		t.Fatalf("DIP-4 bounds = %#v, want %#v", template.Bounds, wantBounds)
+	}
+}
+
 func TestVerifiedBMP280PadTemplateMatchesKiCadFootprint(t *testing.T) {
 	template, ok := verifiedPadTemplate("Package_LGA:Bosch_LGA-8_2x2.5mm_P0.65mm_ClockwisePinNumbering")
 	if !ok {
@@ -238,6 +269,7 @@ func TestVerifiedSpeakerPowerFootprintTemplatesPreservePadContracts(t *testing.T
 		{"Capacitor_THT:C_Rect_L7.2mm_W3.0mm_P5.00mm_FKS2_FKP2_MKS2_MKP2", []string{"1", "2"}, true},
 		{"Capacitor_THT:CP_Radial_D8.0mm_P3.50mm", []string{"1", "2"}, true},
 		{"Capacitor_Tantalum_SMD:CP_EIA-3216-18_Kemet-A", []string{"1", "2"}, false},
+		{"Diode_SMD:D_SMB", []string{"1", "2"}, false},
 		{"Resistor_THT:R_Axial_DIN0414_L11.9mm_D4.5mm_P20.32mm_Horizontal", []string{"1", "2"}, true},
 		{"Package_TO_SOT_THT:TO-126-3_Vertical", []string{"1", "2", "3"}, true},
 		{"Package_TO_SOT_THT:TO-3P-3_Vertical", []string{"1", "2", "3"}, true},
@@ -276,12 +308,16 @@ func TestVerifiedSpeakerPowerFootprintTemplatesMatchInstalledKiCadLibraries(t *t
 		"Connector_PinHeader_2.54mm:PinHeader_1x02_P2.54mm_Vertical",
 		"Connector_PinHeader_2.54mm:PinHeader_1x04_P2.54mm_Vertical",
 		"Diode_SMD:D_SOD-123",
+		"Diode_SMD:D_SMB",
 		"Package_SO:SOIC-8_3.9x4.9mm_P1.27mm",
 		"Package_SO:VSSOP-8_2.3x2mm_P0.5mm",
+		"Package_DIP:DIP-4_W7.62mm",
 		"Package_TO_SOT_THT:TO-220-3_Vertical",
+		"Package_TO_SOT_SMD:TO-252-3_TabPin2",
 		"Package_TO_SOT_SMD:SOT-23",
 		"Package_TO_SOT_SMD:SOT-23-5",
 		"Package_TO_SOT_SMD:SOT-23-6",
+		"Package_TO_SOT_SMD:SOT-89-3",
 		"Resistor_THT:R_Axial_DIN0414_L11.9mm_D4.5mm_P20.32mm_Horizontal",
 		"Resistor_SMD:R_0805_2012Metric",
 		"Package_TO_SOT_THT:TO-126-3_Vertical",
@@ -373,6 +409,8 @@ func TestSOT223TemplateMapsDuplicatePinTwoPads(t *testing.T) {
 func TestVerifiedPadTemplatesCoverAdversarialPowerFootprints(t *testing.T) {
 	tests := map[string]int{
 		"Diode_SMD:D_SMC":                                      2,
+		"Package_TO_SOT_SMD:SOT-89-3":                          4,
+		"Package_TO_SOT_SMD:TO-252-3_TabPin2":                  8,
 		"Resistor_SMD:R_2512_6332Metric":                       2,
 		"Converter_DCDC:Converter_DCDC_Murata_MEE1SxxxxSC_THT": 4,
 		"Converter_DCDC:Converter_DCDC_TRACO_TEL12-xxxx_THT":   5,
@@ -392,6 +430,18 @@ func TestVerifiedPadTemplatesCoverAdversarialPowerFootprints(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestVerifiedTO252HydrationExcludesPasteOnlyApertures(t *testing.T) {
+	result := hydratePadsFromVerifiedTemplate("Q1", "Package_TO_SOT_SMD:TO-252-3_TabPin2")
+	if result.Entry.Source != PadHydrationSourceVerifiedTemplate || len(result.Pads) != 4 || len(result.Issues) != 0 {
+		t.Fatalf("TO-252 routing hydration = %#v, pads=%#v", result.Entry, result.Pads)
+	}
+	for _, pad := range result.Pads {
+		if pad.Name == "" || !padHasCopperLayer(pad) {
+			t.Fatalf("non-routable aperture leaked into hydration: %#v", pad)
+		}
 	}
 }
 

@@ -369,6 +369,517 @@ func RoutePlacement(ctx context.Context, request Request, fragments PCBFragmentR
 	return RoutingStageResult{Request: routingRequest, Result: result, Operations: operations, Stage: stage}
 }
 
+func routingRoutesFromOperations(operations []transactions.Operation) []routing.Route {
+	routesByNet := map[string]*routing.Route{}
+	order := make([]string, 0)
+	for _, operation := range operations {
+		if operation.Op != transactions.OpRoute {
+			continue
+		}
+		var payload transactions.RouteOperation
+		if err := json.Unmarshal(operation.Raw, &payload); err != nil {
+			continue
+		}
+		netName := strings.TrimSpace(payload.NetName)
+		if netName == "" {
+			netName = strings.TrimSpace(operation.Net)
+		}
+		if netName == "" {
+			continue
+		}
+		route := routesByNet[netName]
+		if route == nil {
+			route = &routing.Route{Net: netName, Status: routing.RouteStatusRouted}
+			routesByNet[netName] = route
+			order = append(order, netName)
+		}
+		for index := 1; index < len(payload.Points); index++ {
+			route.Segments = append(route.Segments, routing.Segment{
+				Net: netName, Layer: payload.Layer,
+				Start:   routing.Point{XMM: payload.Points[index-1].XMM, YMM: payload.Points[index-1].YMM},
+				End:     routing.Point{XMM: payload.Points[index].XMM, YMM: payload.Points[index].YMM},
+				WidthMM: payload.WidthMM,
+			})
+		}
+		for _, via := range payload.Vias {
+			route.Vias = append(route.Vias, routing.Via{
+				Net: netName, At: routing.Point{XMM: via.At.XMM, YMM: via.At.YMM},
+				DiameterMM: via.DiameterMM, DrillMM: via.DrillMM, Layers: append([]string(nil), via.Layers...),
+			})
+		}
+	}
+	routes := make([]routing.Route, 0, len(order))
+	for _, netName := range order {
+		routes = append(routes, *routesByNet[netName])
+	}
+	return routes
+}
+
+type emittedRouteTransitionVia struct {
+	operationIndex int
+	viaIndex       int
+	netName        string
+	via            transactions.RouteViaSpec
+}
+
+// repairRouteTransitionViaClearance moves only explicit, free-space layer
+// transitions whose via is proven to participate in a physical-clearance
+// violation. Every same-net route vertex at the transition moves with the via,
+// preserving the copper graph on both layers. Candidate order is grid-based
+// and deterministic, and a candidate is accepted only when it reduces physical
+// blockers without introducing any other routing validation blocker.
+func repairRouteTransitionViaClearance(request routing.Request, operations []transactions.Operation) ([]transactions.Operation, []reports.Issue) {
+	repaired := append([]transactions.Operation(nil), operations...)
+	maxRepairs := len(emittedRouteTransitionVias(repaired))
+	for attempt := 0; attempt < maxRepairs; attempt++ {
+		routes := routingRoutesFromOperations(repaired)
+		baselinePhysical := blockingIssueCount(routing.ValidatePhysicalClearance(request, routes))
+		if baselinePhysical == 0 {
+			return repaired, nil
+		}
+		baselineValidation := blockingIssueCount(routing.ValidateResult(request, routing.Result{Status: routing.StatusRouted, Routes: routes}).Issues)
+		progress := false
+		for _, transition := range emittedRouteTransitionVias(repaired) {
+			withoutVia := routingRoutesWithoutVia(routes, transition.netName, transition.via)
+			if blockingIssueCount(routing.ValidatePhysicalClearance(request, withoutVia)) >= baselinePhysical {
+				continue
+			}
+			for _, candidatePoint := range routeTransitionViaCandidates(request, transition.via) {
+				candidate, ok := moveRouteTransitionVia(repaired, transition, candidatePoint)
+				if !ok {
+					continue
+				}
+				candidateRoutes := routingRoutesFromOperations(candidate)
+				candidatePhysical := blockingIssueCount(routing.ValidatePhysicalClearance(request, candidateRoutes))
+				candidateWithoutVia := routingRoutesWithoutVia(candidateRoutes, transition.netName, transactions.RouteViaSpec{At: candidatePoint})
+				if candidatePhysical >= baselinePhysical ||
+					blockingIssueCount(routing.ValidatePhysicalClearance(request, candidateWithoutVia)) < candidatePhysical ||
+					blockingIssueCount(routing.ValidateResult(request, routing.Result{Status: routing.StatusRouted, Routes: candidateRoutes}).Issues) > baselineValidation {
+					continue
+				}
+				repaired = candidate
+				progress = true
+				break
+			}
+			if progress {
+				break
+			}
+			return repaired, []reports.Issue{{
+				Code:       reports.CodeValidationFailed,
+				Severity:   reports.SeverityBlocked,
+				Path:       fmt.Sprintf("operations[%d].vias[%d]", transition.operationIndex, transition.viaIndex),
+				Message:    fmt.Sprintf("layer-transition via at (%.6g,%.6g) on net %s has no clearance-safe grid relocation", transition.via.At.XMM, transition.via.At.YMM, transition.netName),
+				Nets:       []string{transition.netName},
+				Suggestion: "reroute the layer transition with additional free-space clearance",
+			}}
+		}
+		if !progress {
+			return repaired, nil
+		}
+	}
+	return repaired, nil
+}
+
+func emittedRouteTransitionVias(operations []transactions.Operation) []emittedRouteTransitionVia {
+	decoded := decodeRouteOperations(operations)
+	var transitions []emittedRouteTransitionVia
+	for operationIndex, route := range decoded {
+		if !route.decoded {
+			continue
+		}
+		for viaIndex, via := range route.payload.Vias {
+			layers := map[string]struct{}{}
+			for _, candidate := range decoded {
+				if !candidate.decoded || routeNetKey(candidate.payload.NetName) != routeNetKey(route.payload.NetName) || strings.TrimSpace(candidate.payload.Layer) == "" || len(candidate.payload.Points) == 0 {
+					continue
+				}
+				first := candidate.payload.Points[0]
+				last := candidate.payload.Points[len(candidate.payload.Points)-1]
+				if sameRoutePoint(first, via.At) || sameRoutePoint(last, via.At) {
+					layers[canonicalCopperLayer(candidate.payload.Layer)] = struct{}{}
+				}
+			}
+			if len(layers) < 2 {
+				continue
+			}
+			transitions = append(transitions, emittedRouteTransitionVia{
+				operationIndex: operationIndex,
+				viaIndex:       viaIndex,
+				netName:        route.payload.NetName,
+				via:            via,
+			})
+		}
+	}
+	return transitions
+}
+
+func routingRoutesWithoutVia(routes []routing.Route, netName string, via transactions.RouteViaSpec) []routing.Route {
+	without := make([]routing.Route, len(routes))
+	removed := false
+	for routeIndex, route := range routes {
+		without[routeIndex] = route
+		without[routeIndex].Segments = append([]routing.Segment(nil), route.Segments...)
+		without[routeIndex].Vias = make([]routing.Via, 0, len(route.Vias))
+		for _, candidate := range route.Vias {
+			if !removed && routeNetKey(route.Net) == routeNetKey(netName) &&
+				math.Abs(candidate.At.XMM-via.At.XMM) <= 1e-6 && math.Abs(candidate.At.YMM-via.At.YMM) <= 1e-6 {
+				removed = true
+				continue
+			}
+			without[routeIndex].Vias = append(without[routeIndex].Vias, candidate)
+		}
+	}
+	return without
+}
+
+func routeTransitionViaCandidates(request routing.Request, via transactions.RouteViaSpec) []transactions.Point {
+	gridMM := request.Rules.GridMM
+	if gridMM <= 0 || math.IsNaN(gridMM) || math.IsInf(gridMM, 0) {
+		gridMM = routing.DefaultRules().GridMM
+	}
+	searchDistanceMM := max(4*gridMM, 2*(via.DiameterMM+max(request.Rules.ClearanceMM, request.Rules.ViaClearanceMM)))
+	maxRing := max(1, int(math.Ceil(searchDistanceMM/gridMM)))
+	var candidates []transactions.Point
+	for ring := 1; ring <= maxRing; ring++ {
+		type offset struct{ x, y int }
+		var offsets []offset
+		for x := -ring; x <= ring; x++ {
+			for y := -ring; y <= ring; y++ {
+				if max(absInt(x), absInt(y)) == ring {
+					offsets = append(offsets, offset{x: x, y: y})
+				}
+			}
+		}
+		sort.SliceStable(offsets, func(i, j int) bool {
+			leftDistance := offsets[i].x*offsets[i].x + offsets[i].y*offsets[i].y
+			rightDistance := offsets[j].x*offsets[j].x + offsets[j].y*offsets[j].y
+			if leftDistance != rightDistance {
+				return leftDistance < rightDistance
+			}
+			if offsets[i].x != offsets[j].x {
+				return offsets[i].x > offsets[j].x
+			}
+			return offsets[i].y > offsets[j].y
+		})
+		for _, candidate := range offsets {
+			candidates = append(candidates, transactions.Point{
+				XMM: via.At.XMM + float64(candidate.x)*gridMM,
+				YMM: via.At.YMM + float64(candidate.y)*gridMM,
+			})
+		}
+	}
+	return candidates
+}
+
+func moveRouteTransitionVia(operations []transactions.Operation, transition emittedRouteTransitionVia, point transactions.Point) ([]transactions.Operation, bool) {
+	candidate := append([]transactions.Operation(nil), operations...)
+	changedVia := false
+	changedLayerEndpoints := map[string]struct{}{}
+	for operationIndex, route := range decodeRouteOperations(candidate) {
+		if !route.decoded || routeNetKey(route.payload.NetName) != routeNetKey(transition.netName) {
+			continue
+		}
+		payload := route.payload
+		changed := false
+		for viaIndex := range payload.Vias {
+			if sameRoutePoint(payload.Vias[viaIndex].At, transition.via.At) {
+				payload.Vias[viaIndex].At = point
+				changed = true
+				changedVia = true
+			}
+		}
+		for pointIndex := range payload.Points {
+			if !sameRoutePoint(payload.Points[pointIndex], transition.via.At) {
+				continue
+			}
+			payload.Points[pointIndex] = point
+			changed = true
+			if strings.TrimSpace(payload.Layer) != "" {
+				changedLayerEndpoints[canonicalCopperLayer(payload.Layer)] = struct{}{}
+			}
+		}
+		if !changed {
+			continue
+		}
+		raw, err := json.Marshal(payload)
+		if err != nil {
+			return operations, false
+		}
+		candidate[operationIndex].Raw = raw
+	}
+	return candidate, changedVia && len(changedLayerEndpoints) >= 2
+}
+
+// KiCad's copper-sliver DRC treats same-net junctions below 20 degrees as
+// acute. Keep the transaction repair aligned with that boundary so ordinary
+// shallow branches are not rejected before KiCad evaluates them.
+const minimumEmittedRouteJunctionAngleDegrees = 20.0
+
+type emittedRouteSegment struct {
+	operationIndex int
+	pointIndex     int
+	netName        string
+	layer          string
+	widthMM        float64
+	start          transactions.Point
+	end            transactions.Point
+}
+
+type acuteEmittedRouteJunction struct {
+	fixed       emittedRouteSegment
+	repair      emittedRouteSegment
+	shared      transactions.Point
+	fixedRemote transactions.Point
+}
+
+func repairAcuteRouteOperationJunctions(request routing.Request, operations []transactions.Operation) ([]transactions.Operation, []reports.Issue) {
+	repaired := append([]transactions.Operation(nil), operations...)
+	ignoredFilledJunctions := map[string]struct{}{}
+	maxRepairs := len(emittedRouteSegments(repaired)) * 2
+	for attempt := 0; attempt < maxRepairs; attempt++ {
+		junction, ok := firstAcuteRouteOperationJunctionIgnoring(repaired, ignoredFilledJunctions)
+		if !ok {
+			return repaired, nil
+		}
+		decoded := decodeRouteOperations(repaired)
+		if junction.repair.operationIndex < 0 || junction.repair.operationIndex >= len(decoded) || !decoded[junction.repair.operationIndex].decoded {
+			break
+		}
+		payload := decoded[junction.repair.operationIndex].payload
+		if junction.repair.pointIndex < 0 || junction.repair.pointIndex+1 >= len(payload.Points) {
+			break
+		}
+		remote := junction.repair.end
+		if !sameRoutePoint(junction.repair.start, junction.shared) {
+			remote = junction.repair.start
+		}
+		corners := []transactions.Point{
+			{XMM: junction.shared.XMM, YMM: remote.YMM},
+			{XMM: remote.XMM, YMM: junction.shared.YMM},
+		}
+		if emittedRouteJunctionAngleDegrees(junction.shared, junction.fixedRemote, corners[1]) > emittedRouteJunctionAngleDegrees(junction.shared, junction.fixedRemote, corners[0]) {
+			corners[0], corners[1] = corners[1], corners[0]
+		}
+		baselineRoutes := routingRoutesFromOperations(repaired)
+		baselineValidationBlockers := blockingIssueCount(routing.ValidateResult(request, routing.Result{Status: routing.StatusRouted, Routes: baselineRoutes}).Issues)
+		baselineClearanceBlockers := blockingIssueCount(routing.ValidatePhysicalClearance(request, baselineRoutes))
+		accepted := false
+		for _, corner := range corners {
+			if sameRoutePoint(corner, junction.shared) || sameRoutePoint(corner, remote) ||
+				emittedRouteJunctionAngleDegrees(junction.shared, junction.fixedRemote, corner) < minimumEmittedRouteJunctionAngleDegrees {
+				continue
+			}
+			candidatePayload := payload
+			candidatePayload.Points = insertRoutePoint(payload.Points, junction.repair.pointIndex+1, corner)
+			raw, err := json.Marshal(candidatePayload)
+			if err != nil {
+				continue
+			}
+			candidate := append([]transactions.Operation(nil), repaired...)
+			candidate[junction.repair.operationIndex].Raw = raw
+			routes := routingRoutesFromOperations(candidate)
+			if blockingIssueCount(routing.ValidateResult(request, routing.Result{Status: routing.StatusRouted, Routes: routes}).Issues) > baselineValidationBlockers ||
+				blockingIssueCount(routing.ValidatePhysicalClearance(request, routes)) > baselineClearanceBlockers {
+				continue
+			}
+			repaired = candidate
+			accepted = true
+			break
+		}
+		if !accepted {
+			if acuteRouteJunctionUsesWidenedCopper(request, junction) && acuteRouteJunctionClosesCopperCycle(junction, emittedRouteSegments(repaired)) {
+				ignoredFilledJunctions[acuteRouteJunctionKey(junction)] = struct{}{}
+				continue
+			}
+			return repaired, []reports.Issue{{
+				Code:     reports.CodeValidationFailed,
+				Severity: reports.SeverityBlocked,
+				Path:     fmt.Sprintf("operations[%d].points[%d]", junction.repair.operationIndex, junction.repair.pointIndex),
+				Message: fmt.Sprintf(
+					"acute same-net copper junction at (%.6g,%.6g) between (%.6g,%.6g) and (%.6g,%.6g), widths %.6g/%.6g mm, could not be replaced by a clearance-safe dogleg",
+					junction.shared.XMM, junction.shared.YMM, junction.fixedRemote.XMM, junction.fixedRemote.YMM,
+					emittedRouteJunctionRemote(junction).XMM, emittedRouteJunctionRemote(junction).YMM, junction.fixed.widthMM, junction.repair.widthMM,
+				),
+				Nets:       []string{junction.repair.netName},
+				Suggestion: "reroute the affected net with a non-acute branch transition",
+			}}
+		}
+	}
+	if _, ok := firstAcuteRouteOperationJunction(repaired); ok {
+		return repaired, []reports.Issue{{
+			Code:       reports.CodeValidationFailed,
+			Severity:   reports.SeverityBlocked,
+			Message:    "acute same-net copper junction repair budget exhausted",
+			Suggestion: "reroute the affected nets with non-acute branch transitions",
+		}}
+	}
+	return repaired, nil
+}
+
+func blockingIssueCount(issues []reports.Issue) int {
+	count := 0
+	for _, issue := range issues {
+		if issue.Severity == reports.SeverityBlocked {
+			count++
+		}
+	}
+	return count
+}
+
+func firstAcuteRouteOperationJunction(operations []transactions.Operation) (acuteEmittedRouteJunction, bool) {
+	return firstAcuteRouteOperationJunctionIgnoring(operations, nil)
+}
+
+func firstAcuteRouteOperationJunctionIgnoring(operations []transactions.Operation, ignored map[string]struct{}) (acuteEmittedRouteJunction, bool) {
+	segments := emittedRouteSegments(operations)
+	for rightIndex := 1; rightIndex < len(segments); rightIndex++ {
+		for leftIndex := 0; leftIndex < rightIndex; leftIndex++ {
+			left := segments[leftIndex]
+			right := segments[rightIndex]
+			if routeNetKey(left.netName) != routeNetKey(right.netName) || canonicalCopperLayer(left.layer) != canonicalCopperLayer(right.layer) {
+				continue
+			}
+			shared, leftRemote, rightRemote, ok := sharedEmittedRouteEndpoint(left, right)
+			if !ok {
+				continue
+			}
+			angle := emittedRouteJunctionAngleDegrees(shared, leftRemote, rightRemote)
+			if angle > 1e-9 && angle < minimumEmittedRouteJunctionAngleDegrees-1e-9 {
+				junction := acuteEmittedRouteJunction{fixed: left, repair: right, shared: shared, fixedRemote: leftRemote}
+				if _, skip := ignored[acuteRouteJunctionKey(junction)]; skip {
+					continue
+				}
+				return junction, true
+			}
+		}
+	}
+	return acuteEmittedRouteJunction{}, false
+}
+
+func acuteRouteJunctionKey(junction acuteEmittedRouteJunction) string {
+	return fmt.Sprintf("%d:%d:%d:%d", junction.fixed.operationIndex, junction.fixed.pointIndex, junction.repair.operationIndex, junction.repair.pointIndex)
+}
+
+func emittedRouteJunctionRemote(junction acuteEmittedRouteJunction) transactions.Point {
+	if sameRoutePoint(junction.repair.start, junction.shared) {
+		return junction.repair.end
+	}
+	return junction.repair.start
+}
+
+func acuteRouteJunctionUsesWidenedCopper(request routing.Request, junction acuteEmittedRouteJunction) bool {
+	nominalWidthMM := request.Rules.TraceWidthMM
+	if nominalWidthMM <= 0 {
+		return false
+	}
+	return math.Max(junction.fixed.widthMM, junction.repair.widthMM) >= 1.2*nominalWidthMM-1e-9
+}
+
+func acuteRouteJunctionClosesCopperCycle(junction acuteEmittedRouteJunction, segments []emittedRouteSegment) bool {
+	type neighbor struct {
+		point  routeCoordKey
+		length float64
+	}
+	repairRemote := emittedRouteJunctionRemote(junction)
+	adjacent := map[routeCoordKey][]neighbor{}
+	for _, segment := range segments {
+		if routeNetKey(segment.netName) != routeNetKey(junction.repair.netName) || canonicalCopperLayer(segment.layer) != canonicalCopperLayer(junction.repair.layer) {
+			continue
+		}
+		if (segment.operationIndex == junction.fixed.operationIndex && segment.pointIndex == junction.fixed.pointIndex) ||
+			(segment.operationIndex == junction.repair.operationIndex && segment.pointIndex == junction.repair.pointIndex) {
+			continue
+		}
+		startKey := routePointKey(segment.start)
+		endKey := routePointKey(segment.end)
+		length := math.Hypot(segment.end.XMM-segment.start.XMM, segment.end.YMM-segment.start.YMM)
+		adjacent[startKey] = append(adjacent[startKey], neighbor{point: endKey, length: length})
+		adjacent[endKey] = append(adjacent[endKey], neighbor{point: startKey, length: length})
+	}
+	target := routePointKey(repairRemote)
+	queue := []routeCoordKey{routePointKey(junction.fixedRemote)}
+	distance := map[routeCoordKey]float64{queue[0]: 0}
+	maximumLocalCycleLengthMM := 2 * math.Max(junction.fixed.widthMM, junction.repair.widthMM)
+	for len(queue) != 0 {
+		current := queue[0]
+		queue = queue[1:]
+		if current == target {
+			return true
+		}
+		for _, next := range adjacent[current] {
+			candidateDistance := distance[current] + next.length
+			if candidateDistance > maximumLocalCycleLengthMM {
+				continue
+			}
+			prior, seen := distance[next.point]
+			if !seen || candidateDistance < prior {
+				distance[next.point] = candidateDistance
+				queue = append(queue, next.point)
+			}
+		}
+	}
+	return false
+}
+
+func emittedRouteSegments(operations []transactions.Operation) []emittedRouteSegment {
+	segments := make([]emittedRouteSegment, 0)
+	for operationIndex, route := range decodeRouteOperations(operations) {
+		if !route.decoded {
+			continue
+		}
+		for pointIndex := 0; pointIndex+1 < len(route.payload.Points); pointIndex++ {
+			segments = append(segments, emittedRouteSegment{
+				operationIndex: operationIndex,
+				pointIndex:     pointIndex,
+				netName:        route.payload.NetName,
+				layer:          route.payload.Layer,
+				widthMM:        route.payload.WidthMM,
+				start:          route.payload.Points[pointIndex],
+				end:            route.payload.Points[pointIndex+1],
+			})
+		}
+	}
+	return segments
+}
+
+func sharedEmittedRouteEndpoint(left, right emittedRouteSegment) (transactions.Point, transactions.Point, transactions.Point, bool) {
+	for _, candidate := range []struct {
+		shared, leftRemote, rightPoint, rightRemote transactions.Point
+	}{
+		{left.start, left.end, right.start, right.end},
+		{left.start, left.end, right.end, right.start},
+		{left.end, left.start, right.start, right.end},
+		{left.end, left.start, right.end, right.start},
+	} {
+		if sameRoutePoint(candidate.shared, candidate.rightPoint) {
+			return candidate.shared, candidate.leftRemote, candidate.rightRemote, true
+		}
+	}
+	return transactions.Point{}, transactions.Point{}, transactions.Point{}, false
+}
+
+func emittedRouteJunctionAngleDegrees(origin, left, right transactions.Point) float64 {
+	leftX := left.XMM - origin.XMM
+	leftY := left.YMM - origin.YMM
+	rightX := right.XMM - origin.XMM
+	rightY := right.YMM - origin.YMM
+	denominator := math.Hypot(leftX, leftY) * math.Hypot(rightX, rightY)
+	if denominator <= 1e-12 {
+		return 0
+	}
+	cosine := (leftX*rightX + leftY*rightY) / denominator
+	cosine = math.Max(-1, math.Min(1, cosine))
+	return math.Acos(cosine) * 180 / math.Pi
+}
+
+func insertRoutePoint(points []transactions.Point, index int, point transactions.Point) []transactions.Point {
+	inserted := make([]transactions.Point, 0, len(points)+1)
+	inserted = append(inserted, points[:index]...)
+	inserted = append(inserted, point)
+	inserted = append(inserted, points[index:]...)
+	return inserted
+}
+
 func canceledRoutingStageResult(ctx context.Context) (RoutingStageResult, bool) {
 	if err := ctx.Err(); err != nil {
 		return RoutingStageResult{Stage: NewStageResult(StageRouting, []reports.Issue{{

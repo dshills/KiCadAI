@@ -20,8 +20,8 @@ const (
 	maxMNADeviceOverrides = 64
 	maxMNASourceMagnitude = 1e6
 	maxTransientSteps     = 2048
-	maxTransientWork      = (maxTransientSteps + 6) * nonlinearMaxIterations
-	maxTotalDynamicWork   = 1_000_000
+	maxTransientWork      = (maxTransientSteps + 6) * transientMaxNewtonIterations
+	maxTotalDynamicWork   = 2_000_000
 	minTransientTimeStepS = 1e-9
 	maxTransientDurationS = 10
 )
@@ -41,6 +41,36 @@ type primitiveDefinition struct {
 
 var primitiveRegistry = []primitiveDefinition{
 	{ID: PrimitiveResistorV1, Family: "resistor", Terminals: []string{"A", "B"}, RequiresValueSI: true, CatalogParameters: thermalParameterRules()},
+	{
+		ID: PrimitiveFuseClosedStateV1, Family: "fuse", Terminals: []string{"A", "B"},
+		CatalogParameters: []valueRule{
+			{Name: "cold_resistance_ohm", Positive: true, Minimum: 1e-6, Maximum: 1e6},
+			{Name: "rated_current_a", Positive: true, Minimum: 1e-9, Maximum: 1e4},
+			{Name: "max_voltage_v", Positive: true, Minimum: .01, Maximum: 1e6},
+			{Name: "nominal_melting_i2t_a2s", Optional: true, Positive: true, Minimum: 1e-12, Maximum: 1e12},
+		},
+	},
+	{
+		ID: PrimitiveRelayClosedV1, Family: "relay", Terminals: []string{"COIL_A", "COIL_B", "CONTACT_IN", "CONTACT_OUT"},
+		CatalogParameters: []valueRule{
+			{Name: "coil_resistance_ohm", Positive: true, Minimum: 1e-3, Maximum: 1e9},
+			{Name: "contact_on_resistance_ohm", Positive: true, Minimum: 1e-6, Maximum: 1e6},
+			{Name: "max_contact_current_a", Positive: true, Minimum: 1e-9, Maximum: 1e5},
+			{Name: "max_contact_voltage_v", Positive: true, Minimum: 1e-3, Maximum: 1e6},
+		},
+	},
+	{
+		ID: PrimitiveRelayNormallyOpenV1, Family: "relay", Terminals: []string{"COIL_A", "COIL_B", "CONTACT_IN", "CONTACT_OUT"}, Transient: true,
+		CatalogParameters: []valueRule{
+			{Name: "coil_resistance_ohm", Positive: true, Minimum: 1e-3, Maximum: 1e9},
+			{Name: "operate_current_a", Positive: true, Minimum: 1e-9, Maximum: 1e4},
+			{Name: "contact_on_resistance_ohm", Positive: true, Minimum: 1e-6, Maximum: 1e6},
+			{Name: "contact_off_resistance_ohm", Positive: true, Minimum: 1, Maximum: 1e15},
+			{Name: "operate_delay_s", Positive: true, Minimum: 1e-9, Maximum: 10},
+			{Name: "max_contact_current_a", Positive: true, Minimum: 1e-9, Maximum: 1e5},
+			{Name: "max_contact_voltage_v", Positive: true, Minimum: 1e-3, Maximum: 1e6},
+		},
+	},
 	{ID: PrimitiveCapacitorV1, Family: "capacitor", Terminals: []string{"A", "B"}, RequiresValueSI: true},
 	{ID: PrimitiveCapacitorTransientV1, Family: "capacitor", Terminals: []string{"A", "B"}, RequiresValueSI: true, Transient: true,
 		CatalogParameters: []valueRule{{Name: "max_voltage_v", Positive: true, Minimum: .01, Maximum: 1e6}}},
@@ -65,6 +95,22 @@ var primitiveRegistry = []primitiveDefinition{
 		},
 	},
 	{
+		ID: PrimitiveCurrentSenseAmplifierV1, Family: "current_sensor",
+		Terminals: []string{"IN_PLUS", "IN_MINUS", "REF1", "REF2", "OUT", "VCC", "GND_A", "GND_B"},
+		CatalogParameters: []valueRule{
+			{Name: "gain_v_per_v", Positive: true, Maximum: 1e6},
+			{Name: "bandwidth_hz", Positive: true, Maximum: 1e12},
+			{Name: "input_offset_voltage_v", Minimum: -1, Maximum: 1},
+			{Name: "supply_min_v", Positive: true, Maximum: 1000},
+			{Name: "supply_max_v", Positive: true, Maximum: 1000},
+			{Name: "common_mode_min_v", Minimum: -1e6, Maximum: 1e6},
+			{Name: "common_mode_max_v", Minimum: -1e6, Maximum: 1e6},
+			{Name: "output_low_margin_v", Nonnegative: true, Maximum: 100},
+			{Name: "output_high_margin_v", Nonnegative: true, Maximum: 100},
+			{Name: "quiescent_current_a", Nonnegative: true, Maximum: 100},
+		},
+	},
+	{
 		ID: PrimitiveComparatorOpenCollectorV1, Family: "comparator", Terminals: []string{"IN_PLUS", "IN_MINUS", "OUT", "V_PLUS", "V_MINUS"}, Comparator: true, Nonlinear: true,
 		CatalogParameters: []valueRule{
 			{Name: "input_offset_v", Minimum: -1, Maximum: 1},
@@ -82,11 +128,84 @@ var primitiveRegistry = []primitiveDefinition{
 		},
 	},
 	{
+		ID: PrimitiveAdjustableLinearRegulatorV1, Family: "regulator", Terminals: []string{"VIN", "VOUT", "GND", "ADJ"},
+		CatalogParameters: []valueRule{
+			{Name: "reference_voltage_v", Positive: true, Minimum: .01, Maximum: 100},
+			{Name: "min_headroom_v", Nonnegative: true, Maximum: 20},
+			{Name: "max_load_current_a", Positive: true, Minimum: 1e-9, Maximum: 1e4},
+			{Name: "min_input_voltage_v", Positive: true, Maximum: 1000},
+			{Name: "max_input_voltage_v", Positive: true, Maximum: 1000},
+			{Name: "quiescent_current_a", Nonnegative: true, Maximum: 100},
+			{Name: "soft_start_time_s", Nonnegative: true, Maximum: 10},
+			{Name: "max_temperature_c", Maximum: 1000},
+			{Name: "junction_to_ambient_c_per_w", Positive: true, Maximum: 1e6},
+		},
+	},
+	{
+		ID: PrimitiveFixedLinearRegulatorV1, Family: "regulator", Terminals: []string{"VIN", "VOUT", "GND"},
+		CatalogParameters: []valueRule{
+			{Name: "output_voltage_v", Positive: true, Minimum: .01, Maximum: 100},
+			{Name: "min_headroom_v", Nonnegative: true, Maximum: 20},
+			{Name: "max_load_current_a", Positive: true, Minimum: 1e-9, Maximum: 1e4},
+			{Name: "min_input_voltage_v", Positive: true, Maximum: 1000},
+			{Name: "max_input_voltage_v", Positive: true, Maximum: 1000},
+			{Name: "quiescent_current_a", Nonnegative: true, Maximum: 100},
+			{Name: "soft_start_time_s", Nonnegative: true, Maximum: 10},
+			{Name: "max_temperature_c", Maximum: 1000},
+			{Name: "junction_to_ambient_c_per_w", Positive: true, Maximum: 1e6},
+		},
+	},
+	{
+		ID: PrimitiveFloatingAdjustableRegulatorV1, Family: "regulator", Terminals: []string{"VIN", "VOUT", "ADJ"},
+		CatalogParameters: []valueRule{
+			{Name: "reference_voltage_v", Positive: true, Minimum: .01, Maximum: 100},
+			{Name: "polarity", Minimum: -1, Maximum: 1},
+			{Name: "min_headroom_v", Nonnegative: true, Maximum: 20},
+			{Name: "max_load_current_a", Positive: true, Minimum: 1e-9, Maximum: 1e4},
+			{Name: "max_input_output_voltage_v", Positive: true, Maximum: 1000},
+			{Name: "adjustment_pin_current_a", Nonnegative: true, Maximum: 1},
+			{Name: "soft_start_time_s", Nonnegative: true, Maximum: 10},
+			{Name: "max_temperature_c", Optional: true, Maximum: 1000},
+			{Name: "junction_to_ambient_c_per_w", Optional: true, Positive: true, Maximum: 1e6},
+		},
+	},
+	{
+		ID: PrimitiveDualOutputIsolatedConverterV1, Family: "isolated_converter", Terminals: []string{"VIN_PLUS", "VIN_MINUS", "COMMON", "VOUT_PLUS", "VOUT_MINUS"},
+		CatalogParameters: []valueRule{
+			{Name: "input_min_v", Positive: true, Maximum: 1000},
+			{Name: "input_max_v", Positive: true, Maximum: 1000},
+			{Name: "positive_output_voltage_v", Positive: true, Minimum: .01, Maximum: 1000},
+			{Name: "negative_output_voltage_v", Positive: true, Minimum: .01, Maximum: 1000},
+			{Name: "positive_max_output_current_a", Positive: true, Minimum: 1e-9, Maximum: 1e4},
+			{Name: "negative_max_output_current_a", Positive: true, Minimum: 1e-9, Maximum: 1e4},
+			{Name: "soft_start_time_s", Nonnegative: true, Maximum: 10},
+		},
+	},
+	{
+		ID: PrimitiveBidirectionalOpenDrainTranslatorV1, Family: "level_translator", Terminals: []string{"A1", "A2", "B1", "B2", "VCCA", "VCCB", "GND", "OE"}, Nonlinear: true,
+		CatalogParameters: []valueRule{
+			{Name: "vcca_min_v", Positive: true, Maximum: 1000},
+			{Name: "vcca_max_v", Positive: true, Maximum: 1000},
+			{Name: "vccb_min_v", Positive: true, Maximum: 1000},
+			{Name: "vccb_max_v", Positive: true, Maximum: 1000},
+			{Name: "low_level_threshold_v", Positive: true, Maximum: 100},
+			{Name: "enable_high_ratio", Positive: true, Maximum: 1},
+			{Name: "channel_on_resistance_ohm", Positive: true, Minimum: 1e-6, Maximum: 1e12},
+			{Name: "channel_off_resistance_ohm", Positive: true, Minimum: 1, Maximum: 1e15},
+			{Name: "max_channel_current_a", Positive: true, Minimum: 1e-9, Maximum: 1e4},
+			{Name: "vcca_quiescent_current_a", Nonnegative: true, Maximum: 100},
+			{Name: "vccb_quiescent_current_a", Nonnegative: true, Maximum: 100},
+			{Name: "max_temperature_c", Maximum: 1000},
+			{Name: "junction_to_ambient_c_per_w", Positive: true, Maximum: 1e6},
+		},
+	},
+	{
 		ID: PrimitiveBidirectionalTVSV1, Family: "protection", Terminals: []string{"ANODE", "CATHODE"}, Nonlinear: true,
 		CatalogParameters: []valueRule{
 			{Name: "breakdown_voltage_v", Positive: true, Minimum: .01, Maximum: 1e6},
 			{Name: "dynamic_resistance_ohm", Positive: true, Minimum: 1e-6, Maximum: 1e12},
 			{Name: "off_resistance_ohm", Positive: true, Minimum: 1, Maximum: 1e15},
+			{Name: "junction_capacitance_f", Positive: true, Minimum: 1e-15, Maximum: 1},
 			{Name: "max_pulse_current_a", Positive: true, Minimum: 1e-9, Maximum: 1e6},
 			{Name: "max_temperature_c", Optional: true, Maximum: 1000},
 			{Name: "thermal_resistance_c_per_w", Optional: true, Positive: true, Maximum: 1e6},
@@ -95,13 +214,57 @@ var primitiveRegistry = []primitiveDefinition{
 	{
 		ID: PrimitiveDiodeShockleyV1, Family: "diode", Terminals: []string{"ANODE", "CATHODE"}, Nonlinear: true,
 		CatalogParameters: []valueRule{
-			{Name: "saturation_current_a", Positive: true, Minimum: 1e-30, Maximum: 1e-3},
+			{Name: "saturation_current_a", Positive: true, Minimum: 1e-30, Maximum: 1e-2},
 			{Name: "emission_coefficient", Positive: true, Minimum: .5, Maximum: 10},
 			{Name: "junction_temperature_k", Positive: true, Minimum: 200, Maximum: 1000},
 			{Name: "max_forward_current_a", Positive: true, Minimum: 1e-9, Maximum: 1e4},
 			{Name: "max_reverse_voltage_v", Positive: true, Minimum: .01, Maximum: 1e6},
 			{Name: "max_temperature_c", Optional: true, Maximum: 1000},
 			{Name: "thermal_resistance_c_per_w", Optional: true, Positive: true, Maximum: 1e6},
+		},
+	},
+	{
+		ID: PrimitiveUnidirectionalZenerV1, Family: "diode", Terminals: []string{"ANODE", "CATHODE"}, Nonlinear: true,
+		CatalogParameters: []valueRule{
+			{Name: "forward_saturation_current_a", Positive: true, Minimum: 1e-30, Maximum: 1e-3},
+			{Name: "forward_series_resistance_ohm", Nonnegative: true, Maximum: 1e12},
+			{Name: "forward_emission_coefficient", Positive: true, Minimum: .5, Maximum: 10},
+			{Name: "reverse_saturation_current_a", Positive: true, Minimum: 1e-30, Maximum: 1e-3},
+			{Name: "reverse_series_resistance_ohm", Nonnegative: true, Maximum: 1e12},
+			{Name: "reverse_emission_coefficient", Positive: true, Minimum: .5, Maximum: 10},
+			{Name: "zener_offset_voltage_v", Positive: true, Minimum: .01, Maximum: 1e6},
+			{Name: "junction_temperature_k", Positive: true, Minimum: 200, Maximum: 1000},
+			{Name: "max_current_a", Positive: true, Minimum: 1e-9, Maximum: 1e4},
+			{Name: "max_temperature_c", Optional: true, Maximum: 1000},
+			{Name: "thermal_resistance_c_per_w", Optional: true, Positive: true, Maximum: 1e6},
+		},
+	},
+	{
+		ID: PrimitiveNMOSSwitchV1, Family: "mosfet", Terminals: []string{"GATE", "DRAIN", "SOURCE"}, Nonlinear: true,
+		CatalogParameters: []valueRule{
+			{Name: "gate_on_voltage_v", Positive: true, Minimum: .01, Maximum: 1000},
+			{Name: "on_resistance_ohm", Positive: true, Minimum: 1e-6, Maximum: 1e12},
+			{Name: "max_drain_current_a", Positive: true, Minimum: 1e-9, Maximum: 1e4},
+			{Name: "max_drain_source_voltage_v", Positive: true, Minimum: .01, Maximum: 1e6},
+			{Name: "max_gate_source_voltage_v", Positive: true, Minimum: .01, Maximum: 1e6},
+			{Name: "max_temperature_c", Optional: true, Maximum: 1000},
+			{Name: "thermal_resistance_c_per_w", Optional: true, Positive: true, Maximum: 1e6},
+			{Name: "junction_to_ambient_c_per_w", Optional: true, Positive: true, Maximum: 1e6},
+			{Name: "junction_to_case_c_per_w", Optional: true, Positive: true, Maximum: 1e6},
+		},
+	},
+	{
+		ID: PrimitivePMOSSwitchV1, Family: "mosfet", Terminals: []string{"GATE", "DRAIN", "SOURCE"}, Nonlinear: true,
+		CatalogParameters: []valueRule{
+			{Name: "gate_on_voltage_v", Positive: true, Minimum: .01, Maximum: 1000},
+			{Name: "on_resistance_ohm", Positive: true, Minimum: 1e-6, Maximum: 1e12},
+			{Name: "max_drain_current_a", Positive: true, Minimum: 1e-9, Maximum: 1e4},
+			{Name: "max_drain_source_voltage_v", Positive: true, Minimum: .01, Maximum: 1e6},
+			{Name: "max_gate_source_voltage_v", Positive: true, Minimum: .01, Maximum: 1e6},
+			{Name: "max_temperature_c", Optional: true, Maximum: 1000},
+			{Name: "thermal_resistance_c_per_w", Optional: true, Positive: true, Maximum: 1e6},
+			{Name: "junction_to_ambient_c_per_w", Optional: true, Positive: true, Maximum: 1e6},
+			{Name: "junction_to_case_c_per_w", Optional: true, Positive: true, Maximum: 1e6},
 		},
 	},
 	// NPN and PNP are distinct primitive equations under the catalog's
@@ -127,6 +290,7 @@ func bjtParameterRules() []valueRule {
 		{Name: "reverse_beta", Positive: true, Minimum: .01, Maximum: 1e6},
 		{Name: "emission_coefficient", Positive: true, Minimum: .5, Maximum: 10},
 		{Name: "junction_temperature_k", Positive: true, Minimum: 200, Maximum: 1000},
+		{Name: "transition_frequency_hz", Optional: true, Positive: true, Minimum: 1, Maximum: 1e12},
 		{Name: "max_collector_current_a", Positive: true, Minimum: 1e-9, Maximum: 1e4},
 		{Name: "max_collector_emitter_voltage_v", Positive: true, Minimum: .01, Maximum: 1e6},
 	}
@@ -176,16 +340,44 @@ type primitiveClaim struct {
 	claim     CatalogEvidence
 }
 
-func compatiblePrimitiveClaims(component ComponentEvidence, model definition) []primitiveClaim {
+func compatiblePrimitiveClaims(component ComponentEvidence, model definition, analysisKind string) []primitiveClaim {
 	var matches []primitiveClaim
 	for _, claim := range component.ModelClaims {
 		primitive, exists := primitiveByID(strings.TrimSpace(claim.ModelID))
-		if !exists || !primitiveFamilyCompatible(primitive.Family, component.Family) || (primitive.Nonlinear && !model.NonlinearDC) || (primitive.Transient && !model.Transient) || (model.Transient && primitive.Family == "capacitor" && !primitive.Transient) {
+		if !exists || !primitiveFamilyCompatible(primitive.Family, component.Family) || (primitive.Nonlinear && !model.NonlinearDC && !model.SmallSignalNonlinear) || (primitive.Transient && !model.Transient) || (model.Transient && primitive.Family == "capacitor" && !primitive.Transient) {
 			continue
 		}
 		matches = append(matches, primitiveClaim{primitive: primitive, claim: claim})
 	}
+	if component.Family == "relay" && len(matches) > 1 {
+		preferred := ""
+		switch analysisKind {
+		case AnalysisStartup:
+			preferred = PrimitiveRelayNormallyOpenV1
+		case AnalysisTransient, AnalysisDistortion:
+			preferred = PrimitiveRelayNormallyOpenV1
+		case AnalysisThermal:
+			preferred = PrimitiveRelayClosedV1
+		}
+		if preferred != "" {
+			matches = slices.DeleteFunc(matches, func(match primitiveClaim) bool { return match.primitive.ID != preferred })
+		}
+	}
 	return matches
+}
+
+func uniqueIntentAnalysisKind(analyses []Analysis) string {
+	kind := ""
+	for _, analysis := range analyses {
+		if kind == "" {
+			kind = analysis.Kind
+			continue
+		}
+		if analysis.Kind != kind {
+			return ""
+		}
+	}
+	return kind
 }
 
 // ApplicableGraphModel returns a graph workflow only when every connected
@@ -193,7 +385,7 @@ func compatiblePrimitiveClaims(component ComponentEvidence, model definition) []
 // keeps synthesis fail-closed: an incomplete catalog model never produces a
 // partial or optimistic simulation.
 func ApplicableGraphModel(components []ComponentEvidence) (string, bool, string) {
-	return applicableGraphModel(components, "")
+	return applicableGraphModel(components, "", "")
 }
 
 // ApplicableGraphModelForAnalysis selects a registered graph workflow for an
@@ -202,18 +394,20 @@ func ApplicableGraphModel(components []ComponentEvidence) (string, bool, string)
 // compatible reviewed primitive.
 func ApplicableGraphModelForAnalysis(components []ComponentEvidence, analysisKind string) (string, bool, string) {
 	switch analysisKind {
+	case AnalysisACSweep:
+		return applicableGraphModel(components, ModelLinearCircuitMNAV1, analysisKind)
 	case AnalysisTransient, AnalysisStartup, AnalysisDistortion:
-		return applicableGraphModel(components, ModelTransientCircuitV1)
+		return applicableGraphModel(components, ModelTransientCircuitV1, analysisKind)
 	case AnalysisNoise, AnalysisStability:
-		return applicableGraphModel(components, ModelLinearCircuitMNAV1)
+		return applicableGraphModel(components, ModelLinearCircuitMNAV1, analysisKind)
 	case AnalysisThermal:
-		return applicableGraphModel(components, "")
+		return applicableGraphModel(components, "", analysisKind)
 	default:
 		return "", false, "unsupported_graph_analysis"
 	}
 }
 
-func applicableGraphModel(components []ComponentEvidence, requestedModelID string) (string, bool, string) {
+func applicableGraphModel(components []ComponentEvidence, requestedModelID, analysisKind string) (string, bool, string) {
 	hasSource := false
 	hasDevice := false
 	hasNonlinear := false
@@ -251,7 +445,7 @@ func applicableGraphModel(components []ComponentEvidence, requestedModelID strin
 		}
 		// compatiblePrimitiveClaims admits trusted primitive IDs only; legacy
 		// component/workflow claims never participate in this uniqueness rule.
-		if len(compatiblePrimitiveClaims(component, model)) != 1 {
+		if len(compatiblePrimitiveClaims(component, model, analysisKind)) != 1 {
 			return "", false, "component_" + component.InstanceID + "_has_no_unique_compatible_primitive"
 		}
 	}
@@ -295,6 +489,9 @@ func validateMNAIntent(intent Intent, components map[string]string) []Diagnostic
 				if strings.TrimSpace(sweep.Component) == "" || !finite(sweep.StartValue) || !finite(sweep.StopValue) || !boundedMagnitude(sweep.StartValue) || !boundedMagnitude(sweep.StopValue) || sweep.StartValue >= sweep.StopValue || sweep.Points < 3 || sweep.Points > maxMNADCSweepPoints {
 					diagnostics = append(diagnostics, Diagnostic{Path: path + ".dc_sweep", Message: fmt.Sprintf("DC source sweep requires a resolved component, finite bounded start < stop, and 3..%d points", maxMNADCSweepPoints)})
 				}
+				if sweep.ExcitationScale != 0 && sweep.ExcitationScale != -1 && sweep.ExcitationScale != 1 {
+					diagnostics = append(diagnostics, Diagnostic{Path: path + ".dc_sweep.excitation_scale", Message: "DC source sweep excitation scale must be exactly -1 or 1 when specified"})
+				}
 				family := components[strings.TrimSpace(sweep.Component)]
 				if family != "voltage_source" && family != "current_source" && family != "connector" {
 					diagnostics = append(diagnostics, Diagnostic{Path: path + ".dc_sweep.component", Message: "DC sweep component must be a resolved independent voltage or current source"})
@@ -333,11 +530,22 @@ func validateMNAIntent(intent Intent, components map[string]string) []Diagnostic
 			if analysis.DCSweep != nil {
 				diagnostics = append(diagnostics, Diagnostic{Path: path + ".dc_sweep", Message: "DC source sweep is accepted only by DC operating-point analysis"})
 			}
-			if model.Transient {
-				diagnostics = append(diagnostics, Diagnostic{Path: path + ".kind", Message: "steady-state thermal analysis requires a DC-capable graph workflow"})
+			if analysis.StartFrequencyHz != 0 || analysis.StopFrequencyHz != 0 || analysis.Points != 0 {
+				diagnostics = append(diagnostics, Diagnostic{Path: path, Message: "steady-state thermal analysis cannot contain frequency-sweep fields"})
 			}
-			if analysis.StartFrequencyHz != 0 || analysis.StopFrequencyHz != 0 || analysis.Points != 0 || analysis.DurationS != 0 || analysis.TimeStepS != 0 {
-				diagnostics = append(diagnostics, Diagnostic{Path: path, Message: "steady-state thermal analysis cannot contain frequency or time-grid fields"})
+			driven := analysis.DurationS != 0 || analysis.TimeStepS != 0
+			if driven {
+				if !model.Transient {
+					diagnostics = append(diagnostics, Diagnostic{Path: path + ".kind", Message: "periodically driven thermal analysis requires transient_circuit_v1"})
+				}
+				if !validTransientGrid(analysis.DurationS, analysis.TimeStepS) || transientWork(analysis) > maxTransientWork {
+					diagnostics = append(diagnostics, Diagnostic{Path: path, Message: fmt.Sprintf("periodically driven thermal analysis requires finite %.0e <= time_step_s, duration_s <= %d, an exact integer grid, and at most %d steps", minTransientTimeStepS, maxTransientDurationS, maxTransientSteps)})
+				}
+				totalDynamicWork += transientWork(analysis)
+			} else if model.Transient {
+				// A transient-capable graph can still perform the legacy DC thermal
+				// operating point. This keeps one resolved device set usable for both
+				// quiescent and periodically driven thermal contracts.
 			}
 		default:
 			diagnostics = append(diagnostics, Diagnostic{Path: path + ".kind", Message: "analysis kind is not supported by graph MNA", Suggestion: "use dc_operating_point, ac_sweep, or transient in its dedicated workflow"})
@@ -353,7 +561,12 @@ func validateMNAIntent(intent Intent, components map[string]string) []Diagnostic
 				diagnostics = append(diagnostics, Diagnostic{Path: path + ".conditions.case_temperature_c", Message: "case temperature must be finite and within -100..300 C"})
 			}
 		} else if len(analysis.Conditions) != 0 {
-			diagnostics = append(diagnostics, Diagnostic{Path: path + ".conditions", Message: "analysis conditions are not accepted by this trusted analysis kind"})
+			if diagnosticsForConditions := validateNamedValues(path+".conditions", analysis.Conditions, []valueRule{{Name: "ambient_temperature_c", Minimum: -100, Maximum: 300}}); len(diagnosticsForConditions) != 0 {
+				diagnostics = append(diagnostics, diagnosticsForConditions...)
+			}
+			if ambient := namedValueMap(analysis.Conditions)["ambient_temperature_c"]; !finite(ambient) || ambient < -100 || ambient > 300 {
+				diagnostics = append(diagnostics, Diagnostic{Path: path + ".conditions.ambient_temperature_c", Message: "ambient temperature must be finite and within -100..300 C"})
+			}
 		}
 		if len(analysis.DeviceOverrides) > maxMNADeviceOverrides {
 			diagnostics = append(diagnostics, Diagnostic{Path: path + ".device_overrides", Message: fmt.Sprintf("analysis exceeds %d bounded device overrides", maxMNADeviceOverrides)})
@@ -372,8 +585,8 @@ func validateMNAIntent(intent Intent, components map[string]string) []Diagnostic
 			if override.ValueSI == nil && len(override.ModelParameters) == 0 {
 				diagnostics = append(diagnostics, Diagnostic{Path: overridePath, Message: "device override requires a bounded value or model parameter"})
 			}
-			if override.ValueSI != nil && (!finite(*override.ValueSI) || *override.ValueSI <= 0) {
-				diagnostics = append(diagnostics, Diagnostic{Path: overridePath + ".value_si", Message: "device override value must be finite and positive"})
+			if override.ValueSI != nil && (!finite(*override.ValueSI) || *override.ValueSI < 0 || (*override.ValueSI == 0 && components[component] != "capacitor")) {
+				diagnostics = append(diagnostics, Diagnostic{Path: overridePath + ".value_si", Message: "device override value must be finite and positive, except that a capacitor may be zero to represent an absent load"})
 			}
 			previousParameter := ""
 			for parameterIndex, parameter := range override.ModelParameters {
@@ -411,14 +624,14 @@ func validateMNAIntent(intent Intent, components map[string]string) []Diagnostic
 			if analysis.Kind == AnalysisThermal && (excitation.ACMagnitude != 0 || excitation.ACPhaseDeg != 0) {
 				diagnostics = append(diagnostics, Diagnostic{Path: sourcePath, Message: "steady-state thermal excitation accepts DC values only"})
 			}
-			if (analysis.Kind == AnalysisNoise || analysis.Kind == AnalysisStability) && (excitation.DCValue != 0 || excitation.ACMagnitude != 0 || excitation.ACPhaseDeg != 0) {
-				diagnostics = append(diagnostics, Diagnostic{Path: sourcePath, Message: "noise and stability analyses require zeroed independent sources; trusted analysis injects only its own test stimuli"})
+			if (analysis.Kind == AnalysisNoise || analysis.Kind == AnalysisStability) && (excitation.ACMagnitude != 0 || excitation.ACPhaseDeg != 0) {
+				diagnostics = append(diagnostics, Diagnostic{Path: sourcePath, Message: "noise and stability analyses require zeroed small-signal independent sources; dc_value is retained only to solve the trusted operating point"})
 			}
 			if analysis.Kind != AnalysisTransient && hasPulse(excitation) {
 				diagnostics = append(diagnostics, Diagnostic{Path: sourcePath, Message: "pulse conditions are accepted only by transient analysis"})
 			}
-			if analysis.Kind != AnalysisDistortion && analysis.Kind != AnalysisTransient && hasSine(excitation) {
-				diagnostics = append(diagnostics, Diagnostic{Path: sourcePath, Message: "sine conditions are accepted only by transient or distortion analysis"})
+			if analysis.Kind != AnalysisDistortion && analysis.Kind != AnalysisTransient && analysis.Kind != AnalysisThermal && hasSine(excitation) {
+				diagnostics = append(diagnostics, Diagnostic{Path: sourcePath, Message: "sine conditions are accepted only by transient, distortion, or periodically driven thermal analysis"})
 			}
 			if analysis.Kind == AnalysisDistortion {
 				if excitation.ACMagnitude != 0 || excitation.ACPhaseDeg != 0 || hasPulse(excitation) {
@@ -426,6 +639,11 @@ func validateMNAIntent(intent Intent, components map[string]string) []Diagnostic
 				}
 				if hasSine(excitation) && (!validDistortionSine(excitation, analysis) || excitation.SineAmplitude <= 0 || excitation.SineFrequencyHz <= 0 || excitation.SinePhaseDeg < -360 || excitation.SinePhaseDeg > 360) {
 					diagnostics = append(diagnostics, Diagnostic{Path: sourcePath, Message: "distortion sine requires positive amplitude/frequency, phase within -360..360 degrees, at least 16 samples per cycle, and an exact grid containing at least four complete cycles"})
+				}
+			}
+			if analysis.Kind == AnalysisThermal && hasSine(excitation) {
+				if excitation.ACMagnitude != 0 || excitation.ACPhaseDeg != 0 || hasPulse(excitation) || !validDistortionSine(excitation, analysis) || excitation.SineAmplitude <= 0 || excitation.SineFrequencyHz <= 0 || excitation.SinePhaseDeg < -360 || excitation.SinePhaseDeg > 360 {
+					diagnostics = append(diagnostics, Diagnostic{Path: sourcePath, Message: "periodically driven thermal sine requires positive amplitude/frequency, phase within -360..360 degrees, at least 16 samples per cycle, and an exact grid containing at least four complete cycles"})
 				}
 			}
 			if analysis.Kind == AnalysisStartup && (excitation.ACMagnitude != 0 || excitation.ACPhaseDeg != 0) {
@@ -439,8 +657,8 @@ func validateMNAIntent(intent Intent, components map[string]string) []Diagnostic
 					// PulseInitialValue and PulseValue are absolute source levels,
 					// not offsets from DCValue. Requiring zero DCValue keeps one
 					// canonical representation and prevents an ambiguous double bias.
-					if excitation.DCValue != 0 || !finite(excitation.PulseDelayS) || !finite(excitation.PulseWidthS) || !finite(excitation.PulsePeriodS) || excitation.PulseDelayS < 0 || excitation.PulseWidthS <= 0 || excitation.PulsePeriodS <= excitation.PulseWidthS || excitation.PulseDelayS+excitation.PulseWidthS > analysis.DurationS || !onTransientGrid(excitation.PulseDelayS, analysis.TimeStepS) || !onTransientGrid(excitation.PulseWidthS, analysis.TimeStepS) || !onTransientGrid(excitation.PulsePeriodS, analysis.TimeStepS) {
-						diagnostics = append(diagnostics, Diagnostic{Path: sourcePath, Message: "transient pulse uses absolute initial/pulsed levels and requires zero dc_value, 0 <= delay, 0 < width < period, a falling edge within duration, and all times exactly on the observation grid"})
+					if excitation.DCValue != 0 || !finite(excitation.PulseDelayS) || !finite(excitation.PulseWidthS) || !finite(excitation.PulsePeriodS) || excitation.PulseDelayS < 0 || excitation.PulseDelayS >= analysis.DurationS || excitation.PulseWidthS <= 0 || excitation.PulsePeriodS <= excitation.PulseWidthS || !onTransientGrid(excitation.PulseDelayS, analysis.TimeStepS) || !onTransientGrid(excitation.PulseWidthS, analysis.TimeStepS) || !onTransientGrid(excitation.PulsePeriodS, analysis.TimeStepS) {
+						diagnostics = append(diagnostics, Diagnostic{Path: sourcePath, Message: "transient pulse uses absolute initial/pulsed levels and requires zero dc_value, a rising edge within duration, 0 < width < period, and all times exactly on the observation grid"})
 					}
 				} else if excitation.PulseDelayS != 0 || excitation.PulseWidthS != 0 || excitation.PulseInitialValue != 0 || excitation.PulseValue != 0 {
 					diagnostics = append(diagnostics, Diagnostic{Path: sourcePath, Message: "transient pulse fields require a positive pulse_period_s"})
@@ -460,6 +678,12 @@ func validateMNAIntent(intent Intent, components map[string]string) []Diagnostic
 		}
 		if analysis.Kind == AnalysisDistortion && sineSources != 1 {
 			diagnostics = append(diagnostics, Diagnostic{Path: path + ".excitations", Message: "distortion analysis requires exactly one bounded sine source"})
+		}
+		if analysis.Kind == AnalysisThermal {
+			driven := analysis.DurationS != 0 || analysis.TimeStepS != 0
+			if (driven && sineSources != 1) || (!driven && sineSources != 0) {
+				diagnostics = append(diagnostics, Diagnostic{Path: path + ".excitations", Message: "periodically driven thermal analysis requires exactly one bounded sine source and DC thermal analysis requires none"})
+			}
 		}
 	}
 	if model.Transient && totalDynamicWork > maxTotalDynamicWork {
@@ -481,7 +705,7 @@ func validateMNAIntent(intent Intent, components map[string]string) []Diagnostic
 		if !exists {
 			diagnostics = append(diagnostics, Diagnostic{Path: path + ".analysis_id", Message: "assertion references an unknown analysis"})
 		}
-		nodeOptional := kind == AnalysisThermal || assertion.Quantity == QuantityDeviceCurrentA
+		nodeOptional := kind == AnalysisThermal || assertion.Quantity == QuantityDeviceCurrentA || assertion.Quantity == QuantityTotalSupplyCurrentA
 		if !nodeOptional && strings.TrimSpace(assertion.Node) == "" {
 			diagnostics = append(diagnostics, Diagnostic{Path: path + ".node", Message: "assertion node is required"})
 		}
@@ -491,6 +715,19 @@ func validateMNAIntent(intent Intent, components map[string]string) []Diagnostic
 		}
 		if !componentRequired && assertion.Component != "" {
 			diagnostics = append(diagnostics, Diagnostic{Path: path + ".component", Message: "assertion quantity does not accept a component scope"})
+		}
+		componentsRequired := assertion.Quantity == QuantityTotalSupplyCurrentA
+		if componentsRequired && (len(assertion.Components) == 0 || !slices.IsSorted(assertion.Components)) {
+			diagnostics = append(diagnostics, Diagnostic{Path: path + ".components", Message: "total-supply-current assertion requires canonically ordered resolved components"})
+		}
+		for componentIndex, component := range assertion.Components {
+			if strings.TrimSpace(component) == "" || (componentIndex > 0 && assertion.Components[componentIndex-1] == component) {
+				diagnostics = append(diagnostics, Diagnostic{Path: path + ".components", Message: "assertion components must be non-empty and unique"})
+				break
+			}
+		}
+		if !componentsRequired && len(assertion.Components) != 0 {
+			diagnostics = append(diagnostics, Diagnostic{Path: path + ".components", Message: "assertion quantity does not accept a component collection"})
 		}
 		switch assertion.Quantity {
 		case QuantityVoltageV:
@@ -537,9 +774,9 @@ func validateMNAIntent(intent Intent, components map[string]string) []Diagnostic
 			if kind != AnalysisTransient {
 				diagnostics = append(diagnostics, Diagnostic{Path: path + ".quantity", Message: "waveform-derived assertion requires transient analysis"})
 			}
-		case QuantityDeviceCurrentA, QuantityTransimpedanceOhm:
+		case QuantityDeviceCurrentA, QuantityTotalSupplyCurrentA, QuantityTransimpedanceOhm:
 			if kind != AnalysisDCOperatingPoint {
-				diagnostics = append(diagnostics, Diagnostic{Path: path + ".quantity", Message: "device-current/transimpedance assertion requires DC operating-point analysis"})
+				diagnostics = append(diagnostics, Diagnostic{Path: path + ".quantity", Message: "device-current/total-supply-current/transimpedance assertion requires DC operating-point analysis"})
 			}
 		case QuantityOutputPowerW:
 			if kind != AnalysisTransient {
@@ -640,7 +877,7 @@ func resolveMNA(intent Intent, catalogID, catalogHash string, components []Compo
 	uncertainties := []Uncertainty{}
 	model, _ := definitionByID(intent.ModelID)
 	for _, component := range sortedComponents {
-		matches := compatiblePrimitiveClaims(component, model)
+		matches := compatiblePrimitiveClaims(component, model, uniqueIntentAnalysisKind(intent.Analyses))
 		_, sourceReferenced := referencedSources[component.InstanceID]
 		if len(matches) == 0 {
 			if sourceReferenced {
@@ -653,7 +890,7 @@ func resolveMNA(intent Intent, catalogID, catalogHash string, components []Compo
 				if model.Transient {
 					kind = "transient"
 				}
-				diagnostics = append(diagnostics, Diagnostic{Path: "topology.devices." + component.InstanceID, Message: fmt.Sprintf("connected component family %s has no trusted %s primitive claim", component.Family, kind), Suggestion: "select a component with a unique reviewed catalog primitive claim"})
+				diagnostics = append(diagnostics, Diagnostic{Path: "topology.devices." + component.InstanceID, Message: fmt.Sprintf("connected catalog component %s family %s has no trusted %s primitive claim", component.CatalogID, component.Family, kind), Suggestion: "select a component with a unique reviewed catalog primitive claim"})
 			}
 			continue
 		}
@@ -697,9 +934,6 @@ func resolveMNA(intent Intent, catalogID, catalogHash string, components []Compo
 		if len(device.Terminals) == len(primitive.Terminals) {
 			devices = append(devices, device)
 			for _, uncertainty := range component.Uncertainties {
-				if !intent.WorstCase {
-					break
-				}
 				if uncertainty.Target == "excitation_dc_value" {
 					matched := false
 					for _, analysis := range intent.Analyses {
@@ -760,19 +994,49 @@ func mnaBoundaryFamily(family string) bool {
 
 func validatePrimitiveParameters(path string, primitive primitiveDefinition, parameters []NamedValue) []Diagnostic {
 	diagnostics := validateNamedValues(path, parameters, primitive.CatalogParameters)
-	if len(diagnostics) != 0 || !primitive.OpAmp {
+	if len(diagnostics) != 0 {
 		return diagnostics
 	}
 	values := namedValueMap(parameters)
-	minimum := values["supply_min_v"]
-	maximum := values["supply_max_v"]
-	lowMargin := values["output_low_margin_v"]
-	highMargin := values["output_high_margin_v"]
-	if maximum <= minimum {
-		diagnostics = append(diagnostics, Diagnostic{Path: path, Message: "op-amp supply_max_v must exceed supply_min_v"})
+	if primitive.OpAmp {
+		minimum := values["supply_min_v"]
+		maximum := values["supply_max_v"]
+		lowMargin := values["output_low_margin_v"]
+		highMargin := values["output_high_margin_v"]
+		if maximum <= minimum {
+			diagnostics = append(diagnostics, Diagnostic{Path: path, Message: "op-amp supply_max_v must exceed supply_min_v"})
+		}
+		if lowMargin+highMargin >= minimum {
+			diagnostics = append(diagnostics, Diagnostic{Path: path, Message: "op-amp output margins leave no valid output range at supply_min_v"})
+		}
 	}
-	if lowMargin+highMargin >= minimum {
-		diagnostics = append(diagnostics, Diagnostic{Path: path, Message: "op-amp output margins leave no valid output range at supply_min_v"})
+	if primitive.ID == PrimitiveCurrentSenseAmplifierV1 {
+		if values["supply_max_v"] <= values["supply_min_v"] {
+			diagnostics = append(diagnostics, Diagnostic{Path: path, Message: "current-sense amplifier supply_max_v must exceed supply_min_v"})
+		}
+		if values["common_mode_max_v"] <= values["common_mode_min_v"] {
+			diagnostics = append(diagnostics, Diagnostic{Path: path, Message: "current-sense amplifier common_mode_max_v must exceed common_mode_min_v"})
+		}
+		if values["output_low_margin_v"]+values["output_high_margin_v"] >= values["supply_min_v"] {
+			diagnostics = append(diagnostics, Diagnostic{Path: path, Message: "current-sense amplifier output margins leave no valid output range at supply_min_v"})
+		}
+	}
+	if (primitive.ID == PrimitiveAdjustableLinearRegulatorV1 || primitive.ID == PrimitiveFixedLinearRegulatorV1) && values["max_input_voltage_v"] <= values["min_input_voltage_v"] {
+		diagnostics = append(diagnostics, Diagnostic{Path: path, Message: "linear regulator max_input_voltage_v must exceed min_input_voltage_v"})
+	}
+	if primitive.ID == PrimitiveFloatingAdjustableRegulatorV1 && math.Abs(values["polarity"]) != 1 {
+		diagnostics = append(diagnostics, Diagnostic{Path: path, Message: "floating adjustable regulator polarity must be -1 or 1"})
+	}
+	if primitive.ID == PrimitiveDualOutputIsolatedConverterV1 && values["input_max_v"] <= values["input_min_v"] {
+		diagnostics = append(diagnostics, Diagnostic{Path: path, Message: "dual-output isolated converter input_max_v must exceed input_min_v"})
+	}
+	if primitive.ID == PrimitiveBidirectionalOpenDrainTranslatorV1 {
+		if values["vcca_max_v"] <= values["vcca_min_v"] || values["vccb_max_v"] <= values["vccb_min_v"] {
+			diagnostics = append(diagnostics, Diagnostic{Path: path, Message: "level-translator supply maxima must exceed their corresponding minima"})
+		}
+		if values["channel_off_resistance_ohm"] <= values["channel_on_resistance_ohm"] {
+			diagnostics = append(diagnostics, Diagnostic{Path: path, Message: "level-translator off resistance must exceed on resistance"})
+		}
 	}
 	return diagnostics
 }
@@ -815,8 +1079,8 @@ func validateMNAPlan(plan Plan) []Diagnostic {
 		if primitive.Nonlinear {
 			nonlinearDevices++
 		}
-		if primitive.Nonlinear && !model.NonlinearDC {
-			diagnostics = append(diagnostics, Diagnostic{Path: path + ".primitive_model", Message: "linear MNA plan contains a nonlinear primitive"})
+		if primitive.Nonlinear && !model.NonlinearDC && (!model.SmallSignalNonlinear || !onlySmallSignalAnalyses(plan.Analyses)) {
+			diagnostics = append(diagnostics, Diagnostic{Path: path + ".primitive_model", Message: "workflow does not support this nonlinear primitive for every requested analysis"})
 		}
 		if primitive.Transient && !model.Transient {
 			diagnostics = append(diagnostics, Diagnostic{Path: path + ".primitive_model", Message: "non-transient plan contains a transient-only primitive"})
@@ -824,7 +1088,7 @@ func validateMNAPlan(plan Plan) []Diagnostic {
 		if primitive.Comparator {
 			for _, analysis := range plan.Analyses {
 				switch analysis.Kind {
-				case AnalysisDCOperatingPoint, AnalysisTransient, AnalysisStartup, AnalysisThermal:
+				case AnalysisDCOperatingPoint, AnalysisACSweep, AnalysisNoise, AnalysisStability, AnalysisTransient, AnalysisStartup, AnalysisThermal:
 				default:
 					diagnostics = append(diagnostics, Diagnostic{Path: path + ".primitive_model", Message: "open-collector comparator primitive does not support " + analysis.Kind + " analysis"})
 				}
@@ -884,7 +1148,7 @@ func validateMNAPlan(plan Plan) []Diagnostic {
 	}
 	for index, assertion := range plan.Assertions {
 		analysis, exists := analysisByID(plan.Analyses, assertion.AnalysisID)
-		nodeRequired := assertion.Quantity != QuantityDeviceCurrentA && analysis.Kind != AnalysisThermal
+		nodeRequired := assertion.Quantity != QuantityDeviceCurrentA && assertion.Quantity != QuantityTotalSupplyCurrentA && analysis.Kind != AnalysisThermal
 		if exists && nodeRequired && !slices.Contains(plan.Nodes, assertion.Node) {
 			diagnostics = append(diagnostics, Diagnostic{Path: fmt.Sprintf("assertions[%d].node", index), Message: "assertion references a node absent from resolved topology"})
 		}
@@ -894,6 +1158,13 @@ func validateMNAPlan(plan Plan) []Diagnostic {
 		if exists && (analysis.Kind == AnalysisThermal || assertion.Component != "") {
 			if _, componentExists := deviceFamilies[assertion.Component]; !componentExists {
 				diagnostics = append(diagnostics, Diagnostic{Path: fmt.Sprintf("assertions[%d].component", index), Message: "thermal assertion references a component absent from resolved topology"})
+			}
+		}
+		if exists {
+			for _, component := range assertion.Components {
+				if _, componentExists := deviceFamilies[component]; !componentExists {
+					diagnostics = append(diagnostics, Diagnostic{Path: fmt.Sprintf("assertions[%d].components", index), Message: "assertion references a component absent from resolved topology"})
+				}
 			}
 		}
 		if exists && analysis.Kind == AnalysisACSweep && assertion.FrequencyHz > 0 && !frequencyInSweep(analysis, assertion.FrequencyHz) {
@@ -910,6 +1181,18 @@ func validateMNAPlan(plan Plan) []Diagnostic {
 		diagnostics = append(diagnostics, Diagnostic{Path: "topology_hash", Message: "resolved topology hash does not match canonical nodes and devices", Suggestion: "resolve the circuit again"})
 	}
 	return diagnostics
+}
+
+func onlySmallSignalAnalyses(analyses []Analysis) bool {
+	if len(analyses) == 0 {
+		return false
+	}
+	for _, analysis := range analyses {
+		if !smallSignalAnalysis(analysis.Kind) {
+			return false
+		}
+	}
+	return true
 }
 
 func canonicalNodes(nodes []NodeEvidence) (string, []string, []Diagnostic) {
@@ -996,7 +1279,7 @@ func applyDeviceOverride(device ResolvedDevice, override DeviceOverride) Resolve
 	for _, parameter := range override.ModelParameters {
 		parameters[parameter.Name] = parameter.Value
 	}
-	device.ModelParameters = device.ModelParameters[:0]
+	device.ModelParameters = make([]NamedValue, 0, len(parameters))
 	for name, value := range parameters {
 		device.ModelParameters = append(device.ModelParameters, NamedValue{Name: name, Value: value})
 	}
@@ -1035,7 +1318,7 @@ func assertionKey(assertion Assertion) string {
 	if assertion.Metric != "" {
 		return "legacy\x00" + assertion.Metric
 	}
-	return fmt.Sprintf("mna\x00%s\x00%s\x00%s\x00%s\x00%s\x00%024.12e\x00%024.12e", assertion.AnalysisID, assertion.Node, assertion.Component, assertion.ReferenceNode, assertion.Quantity, assertion.FrequencyHz, assertion.TimeS)
+	return fmt.Sprintf("mna\x00%s\x00%s\x00%s\x00%s\x00%s\x00%s\x00%024.12e\x00%024.12e", assertion.AnalysisID, assertion.Node, assertion.Component, strings.Join(assertion.Components, "\x1f"), assertion.ReferenceNode, assertion.Quantity, assertion.FrequencyHz, assertion.TimeS)
 }
 
 func analysisByID(analyses []Analysis, id string) (Analysis, bool) {
@@ -1092,7 +1375,28 @@ func transientWork(analysis Analysis) int {
 	if !finite(analysis.DurationS) || !finite(analysis.TimeStepS) || analysis.TimeStepS <= 0 {
 		return maxTransientWork + 1
 	}
-	return (int(math.Round(analysis.DurationS/analysis.TimeStepS)) + len(nonlinearContinuation)) * nonlinearMaxIterations
+	return (int(math.Round(analysis.DurationS/analysis.TimeStepS)) + len(nonlinearContinuation)) * transientMaxNewtonIterations
+}
+
+// FitsPlanDynamicWork reports whether a canonical analysis batch remains
+// within the trusted per-plan dynamic-work bound. Callers may use it to split
+// independent operating corners without weakening any individual analysis.
+func FitsPlanDynamicWork(analyses []Analysis) bool {
+	total := 0
+	for _, analysis := range analyses {
+		switch analysis.Kind {
+		case AnalysisTransient, AnalysisStartup, AnalysisDistortion:
+			total += transientWork(analysis)
+		case AnalysisThermal:
+			if analysis.DurationS != 0 || analysis.TimeStepS != 0 {
+				total += transientWork(analysis)
+			}
+		}
+		if total > maxTotalDynamicWork {
+			return false
+		}
+	}
+	return true
 }
 
 func onTransientGrid(value, step float64) bool {

@@ -29,7 +29,7 @@ func TestClosedLoopRepairsByStrictWholeReportImprovementAndReplays(t *testing.T)
 	if len(first.Candidates) != 1 || len(first.Candidates[0].Repairs) != 1 || first.Selected.State.Variables[0].Value != 2 {
 		t.Fatalf("repair evidence = %#v", first.Candidates)
 	}
-	if first.Consumption.Evaluations != 2 || first.Consumption.RepairTrials != 1 || first.Consumption.RepairsApplied != 1 {
+	if first.Consumption.Evaluations != 3 || first.Consumption.RepairTrials != 2 || first.Consumption.RepairsApplied != 1 {
 		t.Fatalf("consumption = %#v", first.Consumption)
 	}
 	repair := first.Candidates[0].Repairs[0]
@@ -64,6 +64,52 @@ func TestClosedLoopRepairsByStrictWholeReportImprovementAndReplays(t *testing.T)
 	}
 	if string(firstBytes) != string(secondBytes) {
 		t.Fatalf("closed-loop replay differs\nfirst: %s\nsecond: %s", firstBytes, secondBytes)
+	}
+}
+
+func TestClosedLoopCoordinatesTwoVariablesWhenSinglesRegressWholeReport(t *testing.T) {
+	requirement := closedLoopTestRequirement()
+	minimumCombined, balanceMinimum, balanceMaximum := 4.0, -0.1, 0.1
+	requirement.Requirements.BehavioralRequirements = []architecturesearch.BehavioralRequirement{
+		{ID: "gain", Metric: "voltage_gain", Analysis: simmodel.AnalysisACSweep, Observation: architecturesearch.Observation{Kind: "port", ID: "output"}, Min: &minimumCombined, Unit: "ratio", OperatingCases: []string{"rated"}},
+		{ID: "bandwidth", Metric: "bandwidth", Analysis: simmodel.AnalysisACSweep, Observation: architecturesearch.Observation{Kind: "port", ID: "output"}, Min: &minimumCombined, Unit: "Hz", OperatingCases: []string{"rated"}},
+		{ID: "balance", Metric: "phase_margin", Analysis: simmodel.AnalysisStability, Observation: architecturesearch.Observation{Kind: "port", ID: "output"}, Min: &balanceMinimum, Max: &balanceMaximum, Unit: "deg", OperatingCases: []string{"rated"}},
+	}
+	effects := []RepairEffect{
+		{Analysis: simmodel.AnalysisACSweep, Metric: "bandwidth", Direction: RepairMetricIncreases},
+		{Analysis: simmodel.AnalysisACSweep, Metric: "voltage_gain", Direction: RepairMetricIncreases},
+	}
+	candidate := Candidate{Fingerprint: testHash("coordinated"), Variables: []Variable{
+		{ID: "collector", Kind: "gain", Value: 1, AllowedValues: []float64{1, 2}, Effects: effects},
+		{ID: "emitter", Kind: "gain", Value: 1, AllowedValues: []float64{1, 2}, Effects: effects},
+	}}
+	evaluator := evaluatorFunc(func(_ context.Context, state CandidateState) (Evaluation, error) {
+		x, y := state.Variables[0].Value, state.Variables[1].Value
+		simulation := &SimulationEvidence{}
+		evidenceHash, _ := HashSimulationEvidence(*simulation)
+		return Evaluation{
+			EvidenceHash: evidenceHash,
+			Measurements: []Measurement{
+				{RequirementID: "gain", OperatingCase: "rated", Actual: x + y},
+				{RequirementID: "bandwidth", OperatingCase: "rated", Actual: x + y},
+				{RequirementID: "balance", OperatingCase: "rated", Actual: x - y},
+			},
+			Simulation: simulation,
+			ModelDecisions: []ModelDecision{{
+				Component: "network", Family: "resistor", Status: "used", Reason: "trusted coordinated repair test",
+				RequiredAnalyses: []string{simmodel.AnalysisACSweep, simmodel.AnalysisStability}, Claim: simmodel.CatalogEvidence{ModelID: simmodel.PrimitiveResistorV1},
+				Provenance: &simmodel.ModelProvenance{Source: "manufacturer-datasheet:test", Revision: "rev-a", SHA256: testHash("coordinated-model"), ReviewStatus: "reviewed", AllowedAnalyses: []string{simmodel.AnalysisACSweep, simmodel.AnalysisStability}},
+			}},
+		}, nil
+	})
+	input := Input{Requirement: requirement, CatalogHash: testHash("catalog"), FormulaLibraryHash: testHash("formulas"), ModelRegistryHash: testHash("models"), Candidates: []Candidate{candidate}}
+	report := Run(context.Background(), input, evaluator, DefaultPolicy())
+	if report.Status != "pass" || report.Selected == nil || len(report.Candidates[0].Repairs) != 1 {
+		t.Fatalf("coordinated closed loop = %#v", report)
+	}
+	repair := report.Candidates[0].Repairs[0]
+	if len(repair.Changes) != 2 || repair.Changes[0].Variable != "collector" || repair.Changes[1].Variable != "emitter" || report.Selected.State.Variables[0].Value != 2 || report.Selected.State.Variables[1].Value != 2 {
+		t.Fatalf("coordinated repair evidence = %#v selected=%#v", repair, report.Selected.State)
 	}
 }
 
@@ -137,8 +183,10 @@ func closedLoopTestEvaluator(thermalRegression bool) evaluatorFunc {
 		if thermalRegression && gain >= 10 {
 			temperature = 130
 		}
+		simulation := &SimulationEvidence{}
+		evidenceHash, _ := HashSimulationEvidence(*simulation)
 		return Evaluation{
-			EvidenceHash: stateHash(state), Measurements: closedLoopMeasurements(gain, temperature),
+			EvidenceHash: evidenceHash, Measurements: closedLoopMeasurements(gain, temperature), Simulation: simulation,
 			ModelDecisions: []ModelDecision{{
 				Component: "r1", Family: "resistor", Status: "used", Reason: "trusted full behavioral evaluation",
 				RequiredAnalyses: []string{simmodel.AnalysisACSweep, simmodel.AnalysisThermal},

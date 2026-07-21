@@ -175,6 +175,19 @@ func RouteExplicitCircuit(ctx context.Context, request Request, placed Placement
 	issues = append(issues, explicitRequiredRouteIssues(request.ExplicitCircuit.Nets, result)...)
 	operations, operationIssues := finalizeExplicitRouteOperations(result.Operations, &placed)
 	issues = append(issues, operationIssues...)
+	if request.Validation.RequireDRC {
+		var transitionIssues []reports.Issue
+		operations, transitionIssues = repairRouteTransitionViaClearance(routingRequest, operations)
+		issues = append(issues, transitionIssues...)
+		result.Issues = append(result.Issues, transitionIssues...)
+		var junctionIssues []reports.Issue
+		operations, junctionIssues = repairAcuteRouteOperationJunctions(routingRequest, operations)
+		issues = append(issues, junctionIssues...)
+		result.Issues = append(result.Issues, junctionIssues...)
+		if reports.HasBlockingIssue(transitionIssues) || reports.HasBlockingIssue(junctionIssues) {
+			result.Status = routing.StatusBlocked
+		}
+	}
 	stage := NewStageResult(StageRouting, issues)
 	stage.Summary = map[string]any{
 		"status": result.Status, "net_count": result.Metrics.NetCount, "routed_nets": result.Metrics.RoutedNetCount,

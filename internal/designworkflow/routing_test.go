@@ -45,6 +45,150 @@ func TestExistingCopperFromRouteOperationsIncludesLocalRouteSegments(t *testing.
 	}
 }
 
+func TestRoutingRoutesFromOperationsPreservesCrossPhaseClearanceGeometry(t *testing.T) {
+	operations := []transactions.Operation{
+		mustRouteOperation(t, transactions.RouteOperation{
+			Op: transactions.OpRoute, NetName: "left", Layer: "B.Cu", WidthMM: 0.2,
+			Points: []transactions.Point{{XMM: 10.25, YMM: 8}, {XMM: 29.75, YMM: 8.5}},
+		}),
+		mustRouteOperation(t, transactions.RouteOperation{
+			Op: transactions.OpRoute, NetName: "right", Layer: "B.Cu", WidthMM: 0.2,
+			Points: []transactions.Point{{XMM: 15.25, YMM: 7.25}, {XMM: 15.25, YMM: 7.75}, {XMM: 50.25, YMM: 7.75}},
+		}),
+	}
+	routes := routingRoutesFromOperations(operations)
+	issues := routing.ValidatePhysicalClearance(routing.Request{
+		Board: routing.Board{WidthMM: 60, HeightMM: 30, Layers: []routing.Layer{{Name: "F.Cu"}, {Name: "B.Cu"}}},
+		Rules: routing.Rules{ClearanceMM: 0.2},
+	}, routes)
+	if !reports.HasBlockingIssue(issues) {
+		t.Fatalf("issues = %#v, want the emitted cross-phase copper clearance violation", issues)
+	}
+}
+
+func TestRepairRouteTransitionViaClearanceMovesViaAndAttachedLayerEndpoints(t *testing.T) {
+	request := routing.Request{
+		Board: routing.Board{WidthMM: 20, HeightMM: 20, Layers: []routing.Layer{
+			{Name: "F.Cu", Kind: routing.LayerCopper, Routable: true},
+			{Name: "B.Cu", Kind: routing.LayerCopper, Routable: true},
+		}},
+		Rules: routing.Rules{GridMM: 0.25, TraceWidthMM: 0.2, ClearanceMM: 0.2, ViaDiameterMM: 0.6, ViaDrillMM: 0.3, ViaClearanceMM: 0.2},
+	}
+	operations := []transactions.Operation{
+		mustRouteOperation(t, transactions.RouteOperation{Op: transactions.OpRoute, NetName: "FIXED", Layer: "B.Cu", WidthMM: 0.3, Points: []transactions.Point{{XMM: 5, YMM: 4}, {XMM: 4.5, YMM: 8.5}}}),
+		mustRouteOperation(t, transactions.RouteOperation{Op: transactions.OpRoute, NetName: "MOVING", Layer: "B.Cu", WidthMM: 0.2, Points: []transactions.Point{{XMM: 8, YMM: 5}, {XMM: 5.25, YMM: 5}}}),
+		mustRouteOperation(t, transactions.RouteOperation{Op: transactions.OpRoute, NetName: "MOVING", Layer: "F.Cu", WidthMM: 0.2, Points: []transactions.Point{{XMM: 5.25, YMM: 5}, {XMM: 3, YMM: 5}}}),
+		mustRouteOperation(t, transactions.RouteOperation{Op: transactions.OpRoute, NetName: "MOVING", Vias: []transactions.RouteViaSpec{{At: transactions.Point{XMM: 5.25, YMM: 5}, DiameterMM: 0.6, DrillMM: 0.3, Layers: []string{"F.Cu", "B.Cu"}}}}),
+	}
+	if issues := routing.ValidatePhysicalClearance(request, routingRoutesFromOperations(operations)); !reports.HasBlockingIssue(issues) {
+		t.Fatal("fixture must begin with a transition-via clearance violation")
+	}
+
+	got, issues := repairRouteTransitionViaClearance(request, operations)
+	if reports.HasBlockingIssue(issues) {
+		t.Fatalf("repair issues = %#v", issues)
+	}
+	if issues := routing.ValidatePhysicalClearance(request, routingRoutesFromOperations(got)); reports.HasBlockingIssue(issues) {
+		t.Fatalf("repaired clearance issues = %#v", issues)
+	}
+	decoded := decodeRouteOperations(got)
+	moved := decoded[3].payload.Vias[0].At
+	if sameRoutePoint(moved, transactions.Point{XMM: 5.25, YMM: 5}) {
+		t.Fatal("transition via did not move")
+	}
+	if decoded[1].payload.Points[len(decoded[1].payload.Points)-1] != moved || decoded[2].payload.Points[0] != moved {
+		t.Fatalf("attached endpoints did not move with via: via=%#v bottom=%#v top=%#v", moved, decoded[1].payload.Points, decoded[2].payload.Points)
+	}
+
+	again, againIssues := repairRouteTransitionViaClearance(request, operations)
+	if reports.HasBlockingIssue(againIssues) || len(got) != len(again) {
+		t.Fatalf("second repair issues = %#v", againIssues)
+	}
+	for index := range got {
+		if string(got[index].Raw) != string(again[index].Raw) {
+			t.Fatalf("repair is not deterministic at operation %d", index)
+		}
+	}
+}
+
+func TestRepairAcuteRouteOperationJunctionsAcrossGeneratedPhases(t *testing.T) {
+	operations := []transactions.Operation{
+		mustRouteOperation(t, transactions.RouteOperation{
+			Op: transactions.OpRoute, NetName: "SIG", Layer: "B.Cu", WidthMM: 0.2,
+			Points: []transactions.Point{{XMM: 5.5, YMM: 19.25}, {XMM: 7.75, YMM: 19.25}},
+		}),
+		mustRouteOperation(t, transactions.RouteOperation{
+			Op: transactions.OpRoute, NetName: "SIG", Layer: "B.Cu", WidthMM: 0.2,
+			Points: []transactions.Point{{XMM: 7.75, YMM: 19.25}, {XMM: 5.5, YMM: 19.75}},
+		}),
+	}
+	request := routing.Request{
+		Board: routing.Board{WidthMM: 30, HeightMM: 30, Layers: []routing.Layer{{Name: "F.Cu", Kind: routing.LayerCopper, Routable: true}, {Name: "B.Cu", Kind: routing.LayerCopper, Routable: true}}},
+		Rules: routing.Rules{TraceWidthMM: 0.2, ClearanceMM: 0.2},
+	}
+	if _, ok := firstAcuteRouteOperationJunction(operations); !ok {
+		t.Fatal("expected cross-operation acute junction")
+	}
+
+	got, issues := repairAcuteRouteOperationJunctions(request, operations)
+	if reports.HasBlockingIssue(issues) {
+		t.Fatalf("issues = %#v", issues)
+	}
+	if _, ok := firstAcuteRouteOperationJunction(got); ok {
+		t.Fatalf("acute junction remains in %#v", got)
+	}
+	var repaired transactions.RouteOperation
+	if err := json.Unmarshal(got[1].Raw, &repaired); err != nil {
+		t.Fatal(err)
+	}
+	if len(repaired.Points) != 3 || repaired.Points[1] != (transactions.Point{XMM: 7.75, YMM: 19.75}) {
+		t.Fatalf("repaired route = %#v, want vertical-first dogleg", repaired)
+	}
+}
+
+func TestRepairAcuteRouteOperationJunctionsLeavesNonSliverBranch(t *testing.T) {
+	operations := []transactions.Operation{
+		mustRouteOperation(t, transactions.RouteOperation{
+			Op: transactions.OpRoute, NetName: "SIG", Layer: "F.Cu", WidthMM: 0.2,
+			Points: []transactions.Point{{XMM: 0, YMM: 0}, {XMM: 10, YMM: 0}},
+		}),
+		mustRouteOperation(t, transactions.RouteOperation{
+			Op: transactions.OpRoute, NetName: "SIG", Layer: "F.Cu", WidthMM: 0.2,
+			Points: []transactions.Point{{XMM: 10, YMM: 0}, {XMM: 10 - 10*math.Cos(25*math.Pi/180), YMM: 10 * math.Sin(25*math.Pi/180)}},
+		}),
+	}
+	if junction, ok := firstAcuteRouteOperationJunction(operations); ok {
+		t.Fatalf("junction = %#v, want branch above KiCad copper-sliver angle left unchanged", junction)
+	}
+}
+
+func TestAcuteRouteOperationJunctionRecognizesClosedCopperCycle(t *testing.T) {
+	operations := []transactions.Operation{
+		mustRouteOperation(t, transactions.RouteOperation{
+			Op: transactions.OpRoute, NetName: "SIG", Layer: "F.Cu", WidthMM: 0.3,
+			Points: []transactions.Point{{XMM: 12.75, YMM: 25}, {XMM: 12.5, YMM: 25}},
+		}),
+		mustRouteOperation(t, transactions.RouteOperation{
+			Op: transactions.OpRoute, NetName: "SIG", Layer: "F.Cu", WidthMM: 0.3,
+			Points: []transactions.Point{{XMM: 12.75, YMM: 25}, {XMM: 12.3625, YMM: 25.05}},
+		}),
+		mustRouteOperation(t, transactions.RouteOperation{
+			Op: transactions.OpRoute, NetName: "SIG", Layer: "F.Cu", WidthMM: 0.3,
+			Points: []transactions.Point{{XMM: 12.5, YMM: 25}, {XMM: 12.3625, YMM: 25.05}},
+		}),
+	}
+	junction, ok := firstAcuteRouteOperationJunction(operations)
+	if !ok {
+		t.Fatal("expected acute pair in filled triangle")
+	}
+	if !acuteRouteJunctionClosesCopperCycle(junction, emittedRouteSegments(operations)) {
+		t.Fatalf("junction = %#v, want closing same-net edge recognized", junction)
+	}
+	if !acuteRouteJunctionUsesWidenedCopper(routing.Request{Rules: routing.Rules{TraceWidthMM: 0.2}}, junction) {
+		t.Fatalf("junction = %#v, want 0.3 mm local copper recognized as widened against 0.2 mm nominal", junction)
+	}
+}
+
 func TestCombinedSequentialRouteStatusUsesKnownCurrentTerminalState(t *testing.T) {
 	if got := combinedSequentialRouteStatus(routing.RouteStatusFailed, routing.RouteStatusRouted); got != routing.RouteStatusRouted {
 		t.Fatalf("failed then routed status = %q", got)

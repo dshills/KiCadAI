@@ -45,6 +45,15 @@ func TestBuildAnalysisPlanFailsClosedForMissingBindingAndTemperatureDomain(t *te
 	}
 }
 
+func TestConditionAssignmentsKeepsCompleteUncertaintySelectionsAtomic(t *testing.T) {
+	for _, axis := range []string{"tolerance", "model_parameter"} {
+		assignments := conditionAssignments(architecturesearch.OperatingCondition{Axis: axis, Target: "circuit", Selection: "all"}, "circuit")
+		if len(assignments) != 1 || assignments[0].Selection != "all" {
+			t.Fatalf("%s assignments = %#v; want one complete expansion", axis, assignments)
+		}
+	}
+}
+
 func closedLoopModelDecisions() []ModelDecision {
 	return []ModelDecision{{
 		Component: "r1", Family: "resistor", Claim: simmodel.CatalogEvidence{ModelID: simmodel.PrimitiveResistorV1},

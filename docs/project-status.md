@@ -164,6 +164,15 @@ primary generation mechanism, so KiCadAI writes native project files and uses
 
 ## Generic Functional Evidence
 
+Simulation-grounded closed-loop synthesis now adds a frozen ten-circuit
+behavior-only corpus over the registered catalog and reviewed model registry.
+It evaluates deterministic alternatives, runs required analyses and declared
+corners, diagnoses failed assertions, applies bounded generic repairs, and
+reruns downstream physical gates. The Class-A and Class-AB cases pass installed
+KiCad ERC/strict DRC, routing/connectivity, writer correctness, deterministic
+replay, and zero normalized round-trip gates. See
+[Simulation-Grounded Closed-Loop Synthesis](closed-loop-synthesis.md).
+
 Generic graphs can resolve ideal fixed-regulator, resistor-divider DC, and RC
 low-pass AC models through a deterministic trusted registry. They can also use
 graph-derived Modified Nodal Analysis assembled from resolved connectivity and
