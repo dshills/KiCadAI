@@ -13,7 +13,7 @@ jobs:
   offline-quality:
     name: Offline quality gates
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 30
     env:
       KICADAI_EXAMPLE_TEST_TIMEOUT: 3m
     steps:
@@ -40,8 +40,8 @@ jobs:
           version: v2.12.2
           args: --timeout=5m ./...
 
-      - name: Run test suite
-        run: make test
-
-      - name: Enforce coverage floor
+      # coverage-check runs the complete Go test suite with instrumentation;
+      # a separate uninstrumented pass only duplicates the longest routing
+      # corpus and can exhaust the bounded job window on hosted runners.
+      - name: Run test suite and enforce coverage floor
         run: make coverage-check
