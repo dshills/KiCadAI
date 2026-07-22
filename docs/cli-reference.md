@@ -47,6 +47,15 @@ Use `--format text` only for commands that expose a human-readable summary.
 The legacy `--json` flag remains accepted as a compatibility alias for
 `--format json`.
 
+JSON mode writes exactly one JSON document to stdout on both success and
+failure. Logs and tool diagnostics use stderr, so stdout can be passed directly
+to a JSON decoder. When a command has more than 128 issues, the envelope emits
+a deterministic 128-issue sample and a `diagnostics` summary with exact total,
+emitted, omitted, and group counts. A circuit creation attempt whose output
+directory already exists also retains the complete list in
+`.kicadai/diagnostics.json` and reports that file as a `diagnostics_report`
+artifact.
+
 ```sh
 kicadai config
 kicadai ping
@@ -206,6 +215,9 @@ Agents can validate a `generic-circuit-v1` graph before invoking a provider or
 writing a KiCad project:
 
 ```sh
+kicadai circuit --help
+kicadai circuit preflight --help
+kicadai circuit create --help
 kicadai capability generation --json
 kicadai --request ./graph.json circuit preflight
 kicadai --request ./corrected-graph.json circuit preflight
@@ -213,6 +225,10 @@ kicadai --symbols-root /path/to/kicad-symbols \
   --footprints-root /path/to/kicad-footprints \
   circuit create --request ./corrected-graph.json --output ./out/project --overwrite
 ```
+
+The three help forms exit successfully, describe their actual registered
+flags, and end with a concrete next command. They do not parse or validate a
+circuit request.
 
 `circuit preflight` is read-only. It returns normalized graph and catalog
 resolution evidence, the lowered request, schematic validation, deterministic

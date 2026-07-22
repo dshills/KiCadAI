@@ -3,12 +3,13 @@ package reports
 const Version = "0.1.0"
 
 type Result struct {
-	OK        bool       `json:"ok"`
-	Command   string     `json:"command"`
-	Version   string     `json:"version"`
-	Data      any        `json:"data,omitempty"`
-	Issues    []Issue    `json:"issues"`
-	Artifacts []Artifact `json:"artifacts"`
+	OK          bool               `json:"ok"`
+	Command     string             `json:"command"`
+	Version     string             `json:"version"`
+	Data        any                `json:"data,omitempty"`
+	Issues      []Issue            `json:"issues"`
+	Diagnostics *DiagnosticSummary `json:"diagnostics,omitempty"`
+	Artifacts   []Artifact         `json:"artifacts"`
 }
 
 func OKResult(command string, data any, artifacts []Artifact) Result {

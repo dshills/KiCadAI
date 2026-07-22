@@ -80,7 +80,55 @@ type circuitRepairPlanData struct {
 	OutstandingEvidence []string                `json:"outstanding_evidence"`
 }
 
+func (data circuitPreflightData) BoundedDiagnostics(maxIssues int) any {
+	data.SchematicIssues = reports.BoundedIssues(data.SchematicIssues, maxIssues)
+	data.Gates = append([]circuitPreflightGate(nil), data.Gates...)
+	for index := range data.Gates {
+		data.Gates[index].Issues = reports.BoundedIssues(data.Gates[index].Issues, maxIssues)
+	}
+	if data.Placement != nil {
+		placement := *data.Placement
+		placement.Result.Issues = reports.BoundedIssues(placement.Result.Issues, maxIssues)
+		placement.Stage.Issues = reports.BoundedIssues(placement.Stage.Issues, maxIssues)
+		data.Placement = &placement
+	}
+	if data.Routing != nil {
+		routing := *data.Routing
+		routing.Result.Issues = reports.BoundedIssues(routing.Result.Issues, maxIssues)
+		routing.Stage.Issues = reports.BoundedIssues(routing.Stage.Issues, maxIssues)
+		data.Routing = &routing
+	}
+	return data
+}
+
+func (data circuitCreateData) BoundedDiagnostics(maxIssues int) any {
+	data.Preflight = data.Preflight.BoundedDiagnostics(maxIssues).(circuitPreflightData)
+	if data.Workflow != nil {
+		workflow := *data.Workflow
+		workflow.Stages = append([]designworkflow.StageResult(nil), workflow.Stages...)
+		for index := range workflow.Stages {
+			workflow.Stages[index].Issues = reports.BoundedIssues(workflow.Stages[index].Issues, maxIssues)
+		}
+		data.Workflow = &workflow
+	}
+	return data
+}
+
+func (data circuitPatchData) BoundedDiagnostics(maxIssues int) any {
+	data.Preflight = data.Preflight.BoundedDiagnostics(maxIssues).(circuitPreflightData)
+	return data
+}
+
+func (data circuitRepairPlanData) BoundedDiagnostics(maxIssues int) any {
+	data.Preflight = data.Preflight.BoundedDiagnostics(maxIssues).(circuitPreflightData)
+	data.Plan.Issues = reports.BoundedIssues(data.Plan.Issues, maxIssues)
+	return data
+}
+
 func runCircuit(ctx context.Context, opts cliOptions, stdout io.Writer) error {
+	if topic, ok := circuitHelpTopic(opts.commandArgs); ok {
+		return writeCircuitHelp(stdout, opts, topic)
+	}
 	if len(opts.commandArgs) == 0 {
 		return writeReportFailure(stdout, "circuit", reports.Issue{Code: reports.CodeInvalidArgument, Severity: reports.SeverityError, Path: "circuit", Message: "circuit requires subcommand: preflight or create", Suggestion: "run kicadai circuit preflight --request graph.json"})
 	}
@@ -96,6 +144,70 @@ func runCircuit(ctx context.Context, opts cliOptions, stdout io.Writer) error {
 	default:
 		return writeReportFailure(stdout, "circuit", reports.Issue{Code: reports.CodeInvalidArgument, Severity: reports.SeverityError, Path: "circuit", Message: "unsupported circuit subcommand " + opts.commandArgs[0], Suggestion: "run kicadai circuit preflight or circuit create"})
 	}
+}
+
+func circuitHelpTopic(args []string) (string, bool) {
+	if len(args) == 1 && (args[0] == "--help" || args[0] == "-h" || args[0] == "help") {
+		return "circuit", true
+	}
+	if len(args) == 2 && (args[1] == "--help" || args[1] == "-h" || args[1] == "help") {
+		switch args[0] {
+		case "preflight", "create":
+			return args[0], true
+		}
+	}
+	return "", false
+}
+
+func writeCircuitHelp(output io.Writer, opts cliOptions, topic string) error {
+	type helpSpec struct {
+		usage       string
+		description string
+		next        string
+		flags       []string
+	}
+	specs := map[string]helpSpec{
+		"circuit": {
+			usage:       "kicadai circuit <preflight|create|patch|repair-plan> [options]",
+			description: "Validate, repair, or create a catalog-resolved circuit graph.",
+			next:        "kicadai circuit preflight --request graph.json",
+			flags:       []string{"request", "symbols-root", "footprints-root", "library-cache", "catalog-dir"},
+		},
+		"preflight": {
+			usage:       "kicadai circuit preflight --request graph.json [options]",
+			description: "Resolve and validate a circuit without writing a project.",
+			next:        "kicadai circuit preflight --request graph.json",
+			flags:       []string{"request", "symbols-root", "footprints-root", "library-cache", "refresh-library-cache", "catalog-dir", "format", "json"},
+		},
+		"create": {
+			usage:       "kicadai circuit create --request graph.json --output ./out/project [options]",
+			description: "Create and validate a KiCad project from a preflight-ready circuit graph.",
+			next:        "kicadai circuit create --request graph.json --output ./out/project --overwrite",
+			flags:       []string{"request", "output", "overwrite", "symbols-root", "footprints-root", "library-cache", "refresh-library-cache", "kicad-cli", "require-erc", "require-drc", "require-kicad-roundtrip", "strict-diffs", "format", "json"},
+		},
+	}
+	spec, exists := specs[topic]
+	if !exists {
+		return errors.New("unsupported circuit help topic")
+	}
+	if _, err := io.WriteString(output, "Usage:\n  "+spec.usage+"\n\n"+spec.description+"\n\nOptions:\n"); err != nil {
+		return err
+	}
+	for _, name := range spec.flags {
+		definition, exists := opts.flagHelp[name]
+		if !exists {
+			continue
+		}
+		defaultText := ""
+		if definition.Default != "" && definition.Default != "false" && definition.Default != "0" {
+			defaultText = " (default " + definition.Default + ")"
+		}
+		if _, err := io.WriteString(output, "  --"+name+"\n      "+definition.Usage+defaultText+"\n"); err != nil {
+			return err
+		}
+	}
+	_, err := io.WriteString(output, "\nNext:\n  "+spec.next+"\n")
+	return err
 }
 
 func runCircuitRepairPlan(ctx context.Context, opts cliOptions, stdout io.Writer) error {
@@ -325,21 +437,21 @@ func runCircuitCreate(ctx context.Context, opts cliOptions, stdout io.Writer) er
 	evaluation := evaluateCircuitPreflight(ctx, opts)
 	data := circuitCreateData{Preflight: evaluation.Data, OutstandingEvidence: circuitOutstandingEvidence(evaluation.Data)}
 	if !evaluation.Data.ReadyForWrite || evaluation.Data.Request == nil {
-		return writeCircuitCreateResult(stdout, data, evaluation.Issues)
+		return writeCircuitCreateResult(stdout, data, evaluation.Issues, opts.output)
 	}
 	if evaluation.LibraryIndex == nil {
 		issue := reports.Issue{Code: reports.CodeValidationFailed, Severity: reports.SeverityError, Path: "library_index", Stage: string(designworkflow.StageLibraryContext), RetryScope: string(designworkflow.RetryScopeForStage(designworkflow.StageLibraryContext, reports.Issue{})), Message: "circuit create requires resolved symbol and footprint library evidence", Suggestion: "provide --symbols-root and --footprints-root, or a populated --library-cache"}
-		return writeCircuitCreateResult(stdout, data, append(evaluation.Issues, issue))
+		return writeCircuitCreateResult(stdout, data, append(evaluation.Issues, issue), opts.output)
 	}
 	checkOpts, err := checkOptions(opts)
 	if err != nil {
 		issue := reports.Issue{Code: reports.CodeInvalidArgument, Severity: reports.SeverityError, Path: "check_options", Message: err.Error()}
-		return writeCircuitCreateResult(stdout, data, append(evaluation.Issues, issue))
+		return writeCircuitCreateResult(stdout, data, append(evaluation.Issues, issue), opts.output)
 	}
 	createOpts, err := designCreateOptions(ctx, opts, checkOpts)
 	if err != nil {
 		issue := reports.Issue{Code: reports.CodeInvalidArgument, Severity: reports.SeverityError, Path: "create_options", Message: err.Error()}
-		return writeCircuitCreateResult(stdout, data, append(evaluation.Issues, issue))
+		return writeCircuitCreateResult(stdout, data, append(evaluation.Issues, issue), opts.output)
 	}
 	// Reuse the exact library evidence that participated in preflight resolution.
 	createOpts.LibraryIndex = evaluation.LibraryIndex
@@ -353,7 +465,7 @@ func runCircuitCreate(ctx context.Context, opts cliOptions, stdout io.Writer) er
 	data.OutstandingEvidence = circuitOutstandingEvidence(evaluation.Data)
 	issues := append([]reports.Issue(nil), evaluation.Issues...)
 	issues = append(issues, designworkflow.WorkflowIssues(workflow)...)
-	return writeCircuitCreateResult(stdout, data, issues)
+	return writeCircuitCreateResult(stdout, data, issues, opts.output)
 }
 
 func parseCircuitCreateArgs(opts *cliOptions) *reports.Issue {
@@ -427,8 +539,23 @@ func circuitOutstandingEvidence(preflight circuitPreflightData) []string {
 	return result
 }
 
-func writeCircuitCreateResult(stdout io.Writer, data circuitCreateData, issues []reports.Issue) error {
-	result := reports.ResultWithIssues("circuit.create", data, issues, nil)
+type circuitDiagnosticsArtifact struct {
+	Command    string          `json:"command"`
+	Version    string          `json:"version"`
+	TotalCount int             `json:"total_count"`
+	Issues     []reports.Issue `json:"issues"`
+}
+
+func writeCircuitCreateResult(stdout io.Writer, data circuitCreateData, issues []reports.Issue, outputDir string) error {
+	artifacts := []reports.Artifact{}
+	if len(issues) > reports.DefaultMaxEmittedIssues {
+		if artifact, issue := writeCompleteCircuitDiagnostics(outputDir, issues); issue != nil {
+			issues = append(issues, *issue)
+		} else if artifact.Path != "" {
+			artifacts = append(artifacts, artifact)
+		}
+	}
+	result := reports.ResultWithIssues("circuit.create", data, issues, artifacts)
 	if data.Workflow != nil {
 		result.OK = designworkflow.AcceptanceSatisfied(data.Workflow.Acceptance.Requested, data.Workflow.Acceptance.Achieved) && !reports.HasBlockingIssue(result.Issues)
 	}
@@ -439,6 +566,39 @@ func writeCircuitCreateResult(stdout io.Writer, data circuitCreateData, issues [
 		return errors.New("circuit create reported blocking issues")
 	}
 	return nil
+}
+
+func writeCompleteCircuitDiagnostics(outputDir string, issues []reports.Issue) (reports.Artifact, *reports.Issue) {
+	if strings.TrimSpace(outputDir) == "" {
+		return reports.Artifact{}, nil
+	}
+	info, err := os.Stat(outputDir)
+	if os.IsNotExist(err) {
+		return reports.Artifact{}, nil
+	}
+	if err != nil {
+		return reports.Artifact{}, &reports.Issue{Code: reports.CodeValidationFailed, Severity: reports.SeverityError, Path: ".kicadai/diagnostics.json", Stage: "reporting", Message: err.Error()}
+	}
+	if !info.IsDir() {
+		return reports.Artifact{}, &reports.Issue{Code: reports.CodeInvalidArgument, Severity: reports.SeverityError, Path: outputDir, Stage: "reporting", Message: "circuit output path is not a directory"}
+	}
+	artifactDir := filepath.Join(outputDir, ".kicadai")
+	if err := os.MkdirAll(artifactDir, 0o755); err != nil {
+		return reports.Artifact{}, &reports.Issue{Code: reports.CodeValidationFailed, Severity: reports.SeverityError, Path: ".kicadai/diagnostics.json", Stage: "reporting", Message: err.Error()}
+	}
+	complete := circuitDiagnosticsArtifact{
+		Command:    "circuit.create",
+		Version:    reports.Version,
+		TotalCount: len(issues),
+		Issues:     reports.SortedIssues(issues),
+	}
+	return writeJSONArtifact(
+		filepath.Join(artifactDir, "diagnostics.json"),
+		complete,
+		reports.ArtifactDiagnosticsReport,
+		".kicadai/diagnostics.json",
+		"complete circuit diagnostics omitted from bounded stdout",
+	)
 }
 
 func parseCircuitPreflightArgs(opts *cliOptions) *reports.Issue {

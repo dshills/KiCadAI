@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -52,27 +53,35 @@ func TestCircuitPreflightAcceptsDocumentedArgumentOrder(t *testing.T) {
 func TestCircuitPreflightIgnoresUnreferencedLibraryDiagnostics(t *testing.T) {
 	graph := writeCircuitCreateRCGraph(t)
 	symbolsRoot, footprintsRoot := writeCircuitCreateLibraryFixture(t)
-	writeTestFile(t, filepath.Join(symbolsRoot, "Unrelated.kicad_sym"), `
-(kicad_symbol_lib
+	var unrelated strings.Builder
+	unrelated.WriteString(`(kicad_symbol_lib
   (version 20220914)
   (generator "kicadai-test")
   (symbol "HiddenPower"
     (property "Reference" "#PWR" (at 0 -2.54 0) hide)
     (property "Value" "HiddenPower" (at 0 2.54 0))
     (symbol "HiddenPower_1_1"
-      (pin power_in line (at 0 0 90) (length 0) hide (name "PWR") (number "1"))
-    )
-  )
-)`)
+`)
+	for index := 0; index < 160; index++ {
+		fmt.Fprintf(&unrelated, "      (pin power_in line (at 0 0 90) (length 0) hide (name \"PWR\") (number \"%d\"))\n", index+1)
+	}
+	unrelated.WriteString("    )\n  )\n)\n")
+	writeTestFile(t, filepath.Join(symbolsRoot, "Unrelated.kicad_sym"), unrelated.String())
 
-	result := runCircuitPreflightCLI(t, []string{
+	args := []string{
 		"--symbols-root", symbolsRoot,
 		"--footprints-root", footprintsRoot,
 		"--request", graph,
 		"circuit", "preflight",
-	})
+	}
+	var stdout, stderr bytes.Buffer
+	_ = run(args, &stdout, &stderr)
+	result := decodeSingleResultDocument(t, stdout.Bytes())
 	if !result.OK || !preflightResultData(t, result).ReadyForWrite {
 		t.Fatalf("unreferenced library diagnostic blocked design: %#v", result)
+	}
+	if stdout.Len() > 512_000 {
+		t.Fatalf("stock-library regression output = %d bytes, want <= 512000", stdout.Len())
 	}
 
 	audit := runCircuitPreflightCLI(t, []string{
@@ -211,13 +220,29 @@ func TestCircuitPreflightIncludesProjectSymbolTableInClosure(t *testing.T) {
 }
 
 func TestCircuitHelpIsSuccessful(t *testing.T) {
-	t.Skip("known F5: remove after circuit help is routed before subcommand validation")
-	var stdout, stderr bytes.Buffer
-	if err := run([]string{"circuit", "--help"}, &stdout, &stderr); err != nil {
-		t.Fatalf("circuit --help: %v; stdout=%s stderr=%s", err, stdout.String(), stderr.String())
-	}
-	if !strings.Contains(stdout.String(), "circuit preflight") || !strings.Contains(stdout.String(), "circuit create") {
-		t.Fatalf("circuit help omitted workflow commands: %s", stdout.String())
+	for _, test := range []struct {
+		name string
+		args []string
+		want []string
+	}{
+		{name: "circuit", args: []string{"circuit", "--help"}, want: []string{"circuit <preflight|create", "circuit preflight --request"}},
+		{name: "preflight", args: []string{"circuit", "preflight", "--help"}, want: []string{"circuit preflight --request", "--symbols-root"}},
+		{name: "create", args: []string{"circuit", "create", "--help"}, want: []string{"circuit create --request", "--require-kicad-roundtrip"}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			var stdout, stderr bytes.Buffer
+			if err := run(test.args, &stdout, &stderr); err != nil {
+				t.Fatalf("help error: %v; stdout=%s stderr=%s", err, stdout.String(), stderr.String())
+			}
+			for _, want := range test.want {
+				if !strings.Contains(stdout.String(), want) {
+					t.Fatalf("help omitted %q: %s", want, stdout.String())
+				}
+			}
+			if stderr.Len() != 0 {
+				t.Fatalf("help wrote stderr: %s", stderr.String())
+			}
+		})
 	}
 }
 
@@ -801,6 +826,15 @@ func resultHasIssueMessage(result reports.Result, fragment string) bool {
 	for _, issue := range result.Issues {
 		if strings.Contains(issue.Message, fragment) {
 			return true
+		}
+	}
+	if result.Diagnostics != nil {
+		for _, group := range result.Diagnostics.Groups {
+			for _, issue := range group.Samples {
+				if strings.Contains(issue.Message, fragment) {
+					return true
+				}
+			}
 		}
 	}
 	return false

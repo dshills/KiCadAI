@@ -303,6 +303,12 @@ type cliOptions struct {
 	feedbackOutput              bool
 	prettyOutput                bool
 	commandArgs                 []string
+	flagHelp                    map[string]cliFlagHelp
+}
+
+type cliFlagHelp struct {
+	Default string
+	Usage   string
 }
 
 type apiClient interface {
@@ -571,6 +577,10 @@ func parse(args []string, stderr io.Writer) (cliOptions, string, error) {
 	if opts.repairApply {
 		opts.repairEnabled = true
 	}
+	opts.flagHelp = make(map[string]cliFlagHelp)
+	flags.VisitAll(func(value *flag.Flag) {
+		opts.flagHelp[value.Name] = cliFlagHelp{Default: value.DefValue, Usage: value.Usage}
+	})
 	opts.commandArgs = flags.Args()[1:]
 	return opts, flags.Arg(0), nil
 }
