@@ -21,6 +21,15 @@ roadmaps, and dated review material.
 Subdirectories group feature specs and plans by area. Prefer adding new work to
 the relevant subdirectory instead of adding loose historical files at the root.
 
+- [External review mitigation specification](external-review-mitigation/SPEC.md)
+  - closes the confirmed placement, stock-library, CLI, discoverability, and
+    evidence-artifact findings from the 2026-07-21 independent review.
+- [External review mitigation implementation plan](external-review-mitigation/PLAN.md)
+  - phases the generic fixes, KiCad-backed regression ladder, Prism review,
+    commits, push, and CI verification.
+- [Independent test-session feedback](FEEDBACK.md)
+  - source review and reproduction context for the mitigation milestone.
+
 ## Archive
 
 - [archive/README.md](archive/README.md) - superseded reviews, older fix plans,
