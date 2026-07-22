@@ -481,6 +481,8 @@ func TestStrictDRCRequestCommitsEveryLocalRouteAsExistingCopper(t *testing.T) {
 		{name: "explicit_requirement", request: Request{Validation: ValidationSpec{RequireDRC: true}}, want: true},
 		{name: "erc_drc_acceptance", request: Request{Validation: ValidationSpec{Acceptance: AcceptanceERCDRC}}, want: true},
 		{name: "fabrication_acceptance", request: Request{Validation: ValidationSpec{Acceptance: AcceptanceFabricationCandidate}}, want: true},
+		{name: "connectivity_routing_retry", request: Request{Validation: ValidationSpec{Acceptance: AcceptanceConnectivity}, RoutingRetry: RoutingRetryPolicySpec{Enabled: true}}, want: true},
+		{name: "unqualified_routing_retry", request: Request{RoutingRetry: RoutingRetryPolicySpec{Enabled: true}}, want: false},
 		{name: "fragment_requirement", fragment: fragment, want: true},
 		{name: "structural", request: Request{Validation: ValidationSpec{Acceptance: AcceptanceStructural}}, want: false},
 	} {

@@ -75,8 +75,13 @@ func TestPlacementKeepoutsPreserveAppliedRoleAsExemptRef(t *testing.T) {
 
 func TestPlacementKeepoutFollowsAppliedRoleTranslatedGroup(t *testing.T) {
 	fragment := BlockFragment{
-		InstanceID:      "controller",
-		Realization:     blocks.BlockPCBRealizationResult{RoleRefs: map[string]string{"module": "U1"}},
+		InstanceID: "controller",
+		Realization: blocks.BlockPCBRealizationResult{
+			RoleRefs: map[string]string{"module": "U1"},
+			Components: []blocks.RealizedPCBComponent{{
+				ComponentRole: "module", Ref: "U1", Placement: blocks.RelativePlacement{XMM: 0, YMM: 0},
+			}},
+		},
 		PlacementGroups: []blocks.PCBPlacementGroup{{ID: "module_system", ComponentRoles: []string{"module"}, AnchorRole: "module", TranslateAsUnit: true}},
 		Keepouts:        []blocks.PCBKeepout{{ID: "antenna", PlacementGroupID: "module_system", AppliesTo: []string{"module"}}},
 	}
@@ -220,6 +225,98 @@ func TestPlacementKeepoutsPreserveRoutingPolicy(t *testing.T) {
 	}
 }
 
+func TestPlacementKeepoutShrinksAfterConditionalComponentOmission(t *testing.T) {
+	fragment := BlockFragment{
+		InstanceID: "power",
+		Keepouts: []blocks.PCBKeepout{{
+			ID: "entry", PlacementGroupID: "core",
+			Bounds:    blocks.RelativeBounds{MinXMM: -5, MinYMM: -5, MaxXMM: 20, MaxYMM: 10},
+			AppliesTo: []string{"connector", "resistor", "optional_protection"},
+		}},
+		Realization: blocks.BlockPCBRealizationResult{
+			RoleRefs: map[string]string{"connector": "J1", "resistor": "R1"},
+			Components: []blocks.RealizedPCBComponent{
+				{ComponentRole: "connector", Ref: "J1", Placement: blocks.RelativePlacement{XMM: 0, YMM: 0}},
+				{ComponentRole: "resistor", Ref: "R1", Placement: blocks.RelativePlacement{XMM: 6, YMM: 2}},
+			},
+			LocalRoutes: []blocks.RealizedPCBLocalRoute{{
+				From: transactions.Endpoint{Ref: "J1"}, To: transactions.Endpoint{Ref: "R1"}, WidthMM: 0.5,
+				Points: []transactions.Point{{XMM: 1, YMM: -2}, {XMM: 5, YMM: -2}},
+			}},
+		},
+	}
+
+	keepouts := placementKeepoutsFromFragment(fragment)
+	if len(keepouts) != 1 {
+		t.Fatalf("keepouts = %#v", keepouts)
+	}
+	if keepouts[0].Bounds.Min.XMM != -0.5 || keepouts[0].Bounds.Min.YMM != -2.5 || keepouts[0].Bounds.Max.XMM != 8.5 || keepouts[0].Bounds.Max.YMM != 3.75 {
+		t.Fatalf("conditional keepout bounds = %#v", keepouts[0].Bounds)
+	}
+}
+
+func TestPlacementKeepoutIsOmittedWhenEveryAppliedRoleIsOmitted(t *testing.T) {
+	fragment := BlockFragment{
+		InstanceID: "power",
+		Keepouts: []blocks.PCBKeepout{{
+			ID: "optional", PlacementGroupID: "core",
+			Bounds:    blocks.RelativeBounds{MinXMM: -5, MinYMM: -5, MaxXMM: 20, MaxYMM: 10},
+			AppliesTo: []string{"optional_protection"},
+		}},
+		Realization: blocks.BlockPCBRealizationResult{
+			RoleRefs: map[string]string{"connector": "J1"},
+			Components: []blocks.RealizedPCBComponent{{
+				ComponentRole: "connector", Ref: "J1", Placement: blocks.RelativePlacement{XMM: 0, YMM: 0},
+			}},
+		},
+	}
+
+	if keepouts := placementKeepoutsFromFragment(fragment); len(keepouts) != 0 {
+		t.Fatalf("keepouts = %#v, want omitted semantic keepout", keepouts)
+	}
+}
+
+func TestPlacementKeepoutPreservesAuthoredBoundsWithoutRoleMetadata(t *testing.T) {
+	fragment := BlockFragment{
+		Keepouts: []blocks.PCBKeepout{{
+			ID: "legacy", PlacementGroupID: "core",
+			Bounds:    blocks.RelativeBounds{MinXMM: -5, MinYMM: -5, MaxXMM: 20, MaxYMM: 10},
+			AppliesTo: []string{"component"},
+		}},
+	}
+
+	keepouts := placementKeepoutsFromFragment(fragment)
+	want := relativeBoundsToPlacementRect(fragment, fragment.Keepouts[0].Bounds)
+	if len(keepouts) != 1 || keepouts[0].Bounds != want {
+		t.Fatalf("legacy keepout = %#v, want authored %#v", keepouts, want)
+	}
+}
+
+func TestPlacementKeepoutPreservesAuthoredBoundsForFullyRealizedRoles(t *testing.T) {
+	fragment := BlockFragment{
+		OriginXMM: 5,
+		OriginYMM: 7,
+		Keepouts: []blocks.PCBKeepout{{
+			ID: "heatsink", PlacementGroupID: "output",
+			Bounds:    blocks.RelativeBounds{MinXMM: 2, MinYMM: 3, MaxXMM: 12, MaxYMM: 13},
+			AppliesTo: []string{"upper_output", "lower_output"},
+		}},
+		Realization: blocks.BlockPCBRealizationResult{
+			RoleRefs: map[string]string{"upper_output": "Q1", "lower_output": "Q2"},
+			Components: []blocks.RealizedPCBComponent{
+				{ComponentRole: "power_output", Ref: "Q1", Placement: blocks.RelativePlacement{XMM: 40, YMM: 20}},
+				{ComponentRole: "power_output", Ref: "Q2", Placement: blocks.RelativePlacement{XMM: 50, YMM: 20}},
+			},
+		},
+	}
+
+	keepouts := placementKeepoutsFromFragment(fragment)
+	want := relativeBoundsToPlacementRect(fragment, fragment.Keepouts[0].Bounds)
+	if len(keepouts) != 1 || keepouts[0].Bounds != want {
+		t.Fatalf("fully realized keepout = %#v, want authored %#v", keepouts, want)
+	}
+}
+
 func TestPlaceFragmentsHydratesGeneratedMobilityWhenRetryEnabled(t *testing.T) {
 	request := Request{
 		Version: RequestVersion,
@@ -275,6 +372,37 @@ func TestGeneratedPlacementMobilityAllowsEdgeConstrainedGroupTransform(t *testin
 	}
 	if policy.Class != placement.MobilityGroupTransform || policy.RouteHandling != placement.RouteHandlingTransformWithGroup {
 		t.Fatalf("mobility = %#v, want group transform with group route handling", policy)
+	}
+}
+
+func TestGeneratedPlacementMobilityRebuildsStandaloneEdgeRoutes(t *testing.T) {
+	request := Request{RoutingRetry: RoutingRetryPolicySpec{Enabled: true}}
+	component := blocks.RealizedPCBComponent{Ref: "J1", Placement: blocks.RelativePlacement{Fixed: true}}
+
+	policy, fixed := generatedPlacementMobility(request, BlockFragment{BlockID: "connector", InstanceID: "power"}, component, "", false, placement.EdgeLeft, true)
+
+	if fixed {
+		t.Fatal("edge-constrained local-route component unexpectedly fixed")
+	}
+	if policy.Class != placement.MobilityLocalRebuild || policy.RouteHandling != placement.RouteHandlingInvalidateRebuild {
+		t.Fatalf("mobility = %#v, want local route rebuild", policy)
+	}
+	if !slices.Contains(policy.Constraints, "edge") {
+		t.Fatalf("mobility constraints = %#v, want edge", policy.Constraints)
+	}
+}
+
+func TestGeneratedPlacementMobilityPreservesFabricationFixedEdgeRoutes(t *testing.T) {
+	request := Request{
+		RoutingRetry: RoutingRetryPolicySpec{Enabled: true},
+		Validation:   ValidationSpec{Acceptance: AcceptanceFabricationCandidate},
+	}
+	component := blocks.RealizedPCBComponent{Ref: "J1", Placement: blocks.RelativePlacement{Fixed: true}}
+
+	policy, fixed := generatedPlacementMobility(request, BlockFragment{BlockID: "connector", InstanceID: "power"}, component, "", false, placement.EdgeLeft, true)
+
+	if !fixed || policy.Class != placement.MobilityFixed || policy.RouteHandling != placement.RouteHandlingPreserveFixed {
+		t.Fatalf("fabrication edge mobility = %#v fixed=%v, want preserved fixed route", policy, fixed)
 	}
 }
 

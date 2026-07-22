@@ -425,6 +425,25 @@ type Result struct {
 	Operations       []transactions.Operation `json:"operations,omitempty"`
 	Quality          *QualityReport           `json:"quality,omitempty"`
 	CandidateScoring *CandidateScoringReport  `json:"candidate_scoring,omitempty"`
+	GroupSearch      *RigidGroupSearchReport  `json:"group_search,omitempty"`
+}
+
+type RigidGroupSearchReport struct {
+	Enabled          bool                          `json:"enabled"`
+	GroupCount       int                           `json:"group_count"`
+	BranchBudget     int                           `json:"branch_budget"`
+	ExploredBranches int                           `json:"explored_branches"`
+	Backtracks       int                           `json:"backtracks"`
+	Complete         bool                          `json:"complete"`
+	BudgetExhausted  bool                          `json:"budget_exhausted,omitempty"`
+	RejectedByReason map[string]int                `json:"rejected_by_reason,omitempty"`
+	Selected         []RigidGroupSelectedPlacement `json:"selected,omitempty"`
+}
+
+type RigidGroupSelectedPlacement struct {
+	GroupID string    `json:"group_id"`
+	Anchor  string    `json:"anchor"`
+	At      Placement `json:"at"`
 }
 
 type PlacementResult struct {

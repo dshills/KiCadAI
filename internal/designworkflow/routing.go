@@ -1548,6 +1548,7 @@ func requestRequiresStrictDRC(request Request, fragments PCBFragmentResult) bool
 	return request.Validation.RequireDRC ||
 		request.Validation.Acceptance == AcceptanceERCDRC ||
 		request.Validation.Acceptance == AcceptanceFabricationCandidate ||
+		(request.RoutingRetry.Enabled && request.Validation.Acceptance == AcceptanceConnectivity) ||
 		fragmentsRequireStrictDRC(fragments)
 }
 

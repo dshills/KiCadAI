@@ -159,13 +159,17 @@
     "strict_zones": true
   },
   "routing_retry": {
-    "max_attempts": 1,
+    "enabled": true,
+    "max_attempts": 2,
+    "min_routing_score_delta": 0.01,
     "allowed_hint_categories": [
       "reduce_distance",
       "increase_spacing",
       "improve_fanout",
       "move_from_edge"
-    ]
+    ],
+    "drc_policy": "optional",
+    "stop_on_new_blockers": true
   },
   "auto_schematic_layout": true
 }

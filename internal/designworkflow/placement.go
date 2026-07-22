@@ -132,6 +132,9 @@ func PlaceFragments(ctx context.Context, request Request, fragments PCBFragmentR
 	if scoring := placementCandidateScoringSummary(result.CandidateScoring); scoring != nil {
 		stage.Summary["candidate_scoring"] = scoring
 	}
+	if result.GroupSearch != nil {
+		stage.Summary["group_search"] = result.GroupSearch
+	}
 	if len(padEntries) != 0 || len(padIssues) != 0 {
 		stage.Summary["pad_hydration"] = summarizePadHydration(padEntries, padIssues)
 	}
@@ -655,11 +658,15 @@ func placementLocalRouteRefs(fragment BlockFragment) map[string]bool {
 func generatedPlacementMobility(request Request, fragment BlockFragment, component blocks.RealizedPCBComponent, groupID string, translateAsUnit bool, edge placement.EdgeConstraint, hasLocalRoute bool) (placement.MobilityPolicy, bool) {
 	ownerScope := "block:" + fragment.BlockID + "/" + fragment.InstanceID
 	constraints := []string{"generated", "block:" + fragment.BlockID}
-	// A translated block group preserves its authored local copper, so an
-	// edge-constrained member can move safely with the rest of the group. Only
-	// standalone edge components need to remain fixed to protect local routes.
-	hardEdge := edge != placement.EdgeNone && hasLocalRoute && !translateAsUnit
-	hardFixed := component.Placement.Fixed || request.RoutingRetry.PreserveFixed || hardEdge
+	// Edge constraints restrict the candidate set; they do not make generated
+	// components immutable. Local copper for a movable standalone edge member is
+	// invalidated and rebound from its placed endpoints below.
+	// Connectivity-oriented retries may relax generated fixed coordinates when
+	// endpoint-backed local copper can be rebuilt. Fabrication-candidate requests
+	// retain authored fixed edge geometry unless the caller supplies a different
+	// non-fabrication acceptance policy.
+	rebuildableEdge := edge != placement.EdgeNone && hasLocalRoute && request.Validation.Acceptance != AcceptanceFabricationCandidate
+	hardFixed := request.RoutingRetry.PreserveFixed || (component.Placement.Fixed && !rebuildableEdge)
 	if !request.RoutingRetry.Enabled {
 		hardFixed = true
 		constraints = append(constraints, "retry_disabled")
@@ -667,16 +674,19 @@ func generatedPlacementMobility(request Request, fragment BlockFragment, compone
 	if request.RoutingRetry.PreserveFixed {
 		constraints = append(constraints, "preserve_fixed")
 	}
-	if hardEdge {
+	if edge != placement.EdgeNone {
 		constraints = append(constraints, "edge")
 	}
-	if component.Placement.Fixed {
+	if component.Placement.Fixed && !rebuildableEdge {
 		constraints = append(constraints, "component_fixed")
+	}
+	if rebuildableEdge {
+		constraints = append(constraints, "component_fixed_relaxed_for_endpoint_rebuild")
 	}
 	if hardFixed {
 		return placement.MobilityPolicy{
 			Class:         placement.MobilityFixed,
-			Reason:        generatedMobilityFixedReason(request, component, hardEdge),
+			Reason:        generatedMobilityFixedReason(request, component),
 			OwnerScope:    ownerScope,
 			GroupID:       groupID,
 			RouteHandling: placement.RouteHandlingPreserveFixed,
@@ -713,7 +723,7 @@ func placementGroupTranslatesAsUnit(fragment BlockFragment, groupID string) bool
 	return false
 }
 
-func generatedMobilityFixedReason(request Request, component blocks.RealizedPCBComponent, hardEdge bool) string {
+func generatedMobilityFixedReason(request Request, component blocks.RealizedPCBComponent) string {
 	switch {
 	case !request.RoutingRetry.Enabled:
 		return "routing retry is disabled"
@@ -721,8 +731,6 @@ func generatedMobilityFixedReason(request Request, component blocks.RealizedPCBC
 		return "routing retry preserve_fixed is enabled"
 	case component.Placement.Fixed:
 		return "generated component has fixed placement attribute"
-	case hardEdge:
-		return "generated component has hard edge constraint"
 	}
 	return "generated component is treated as fixed by safety policy"
 }
@@ -815,11 +823,31 @@ func placementGroupBoundsRect(fragment BlockFragment, anchorRef string, bounds b
 
 func placementKeepoutsFromFragment(fragment BlockFragment) []placement.Keepout {
 	keepouts := make([]placement.Keepout, 0, len(fragment.Keepouts))
+	componentsByRef := make(map[string]blocks.RealizedPCBComponent, len(fragment.Realization.Components))
+	for _, component := range fragment.Realization.Components {
+		componentsByRef[strings.ToUpper(strings.TrimSpace(component.Ref))] = component
+	}
+	refsByRole := make(map[string]string, len(fragment.Realization.RoleRefs))
+	for role, ref := range fragment.Realization.RoleRefs {
+		refsByRole[strings.ToLower(strings.TrimSpace(role))] = strings.ToUpper(strings.TrimSpace(ref))
+	}
+	localRoutes := make([]normalizedPlacementKeepoutRoute, 0, len(fragment.Realization.LocalRoutes))
+	for _, route := range fragment.Realization.LocalRoutes {
+		localRoutes = append(localRoutes, normalizedPlacementKeepoutRoute{
+			route:   route,
+			fromRef: strings.ToUpper(strings.TrimSpace(route.From.Ref)),
+			toRef:   strings.ToUpper(strings.TrimSpace(route.To.Ref)),
+		})
+	}
 	for _, keepout := range fragment.Keepouts {
+		bounds, active := placementKeepoutBoundsFromFragment(fragment, keepout, componentsByRef, refsByRole, localRoutes)
+		if !active {
+			continue
+		}
 		keepouts = append(keepouts, placement.Keepout{
 			ID:          blockPlacementGroupID(fragment, keepout.ID),
 			GroupID:     placementKeepoutGroupID(fragment, keepout),
-			Bounds:      relativeBoundsToPlacementRect(fragment, keepout.Bounds),
+			Bounds:      bounds,
 			Layers:      []string{keepout.Layer},
 			ExemptRefs:  keepoutExemptRefsFromFragment(fragment, keepout),
 			Reason:      keepout.Description,
@@ -827,6 +855,77 @@ func placementKeepoutsFromFragment(fragment BlockFragment) []placement.Keepout {
 		})
 	}
 	return keepouts
+}
+
+type normalizedPlacementKeepoutRoute struct {
+	route          blocks.RealizedPCBLocalRoute
+	fromRef, toRef string
+}
+
+func placementKeepoutBoundsFromFragment(fragment BlockFragment, keepout blocks.PCBKeepout, componentsByRef map[string]blocks.RealizedPCBComponent, refsByRole map[string]string, localRoutes []normalizedPlacementKeepoutRoute) (placement.Rect, bool) {
+	authored := relativeBoundsToPlacementRect(fragment, keepout.Bounds)
+	if strings.TrimSpace(keepout.PlacementGroupID) == "" || len(keepout.AppliesTo) == 0 {
+		return authored, true
+	}
+	if len(refsByRole) == 0 {
+		return authored, true
+	}
+	activeRefs := map[string]struct{}{}
+	points := make([]placement.Point, 0, len(keepout.AppliesTo)*2)
+	for _, role := range keepout.AppliesTo {
+		ref, ok := refsByRole[strings.ToLower(strings.TrimSpace(role))]
+		if !ok {
+			continue
+		}
+		component, ok := componentsByRef[ref]
+		if !ok {
+			continue
+		}
+		activeRefs[ref] = struct{}{}
+		bounds := defaultWorkflowBounds
+		if template, ok := verifiedPadTemplate(component.FootprintID); ok {
+			bounds = template.Bounds
+		}
+		physical, ok := placement.ComponentPhysicalBounds(placement.Component{Bounds: bounds}, placement.Placement{
+			XMM: component.Placement.XMM, YMM: component.Placement.YMM, RotationDeg: component.Placement.RotationDeg,
+		})
+		if ok {
+			points = append(points, physical.Min, physical.Max)
+		} else {
+			points = append(points, placement.Point{XMM: component.Placement.XMM, YMM: component.Placement.YMM})
+		}
+	}
+	if len(activeRefs) == len(keepout.AppliesTo) {
+		return authored, true
+	}
+	if len(points) == 0 {
+		return placement.Rect{}, false
+	}
+	padding := 0.5
+	for _, normalized := range localRoutes {
+		route := normalized.route
+		_, fromActive := activeRefs[normalized.fromRef]
+		_, toActive := activeRefs[normalized.toRef]
+		if !fromActive && !toActive {
+			continue
+		}
+		padding = max(padding, route.WidthMM/2+0.25)
+		for _, point := range route.Points {
+			points = append(points, placement.Point{XMM: point.XMM, YMM: point.YMM})
+		}
+	}
+	compact := placement.Rect{Min: points[0], Max: points[0]}
+	for _, point := range points[1:] {
+		compact.Min.XMM = min(compact.Min.XMM, point.XMM)
+		compact.Min.YMM = min(compact.Min.YMM, point.YMM)
+		compact.Max.XMM = max(compact.Max.XMM, point.XMM)
+		compact.Max.YMM = max(compact.Max.YMM, point.YMM)
+	}
+	compact.Min.XMM = max(authored.Min.XMM, compact.Min.XMM-padding)
+	compact.Min.YMM = max(authored.Min.YMM, compact.Min.YMM-padding)
+	compact.Max.XMM = min(authored.Max.XMM, compact.Max.XMM+padding)
+	compact.Max.YMM = min(authored.Max.YMM, compact.Max.YMM+padding)
+	return compact, true
 }
 
 func placementKeepoutGroupID(fragment BlockFragment, keepout blocks.PCBKeepout) string {

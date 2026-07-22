@@ -23,7 +23,7 @@ func relativeGroupIndexesByMember(groups []Group) map[string]int {
 	return result
 }
 
-func relativeGroupOrder(groups []Group) []int {
+func relativeGroupOrder(groups []Group, components map[string]Component) []int {
 	groupOrder := make([]int, 0, len(groups))
 	for groupIndex, group := range groups {
 		if group.TranslateAsUnit {
@@ -36,15 +36,104 @@ func relativeGroupOrder(groups []Group) []int {
 		if leftGroup.Priority != rightGroup.Priority {
 			return leftGroup.Priority > rightGroup.Priority
 		}
-		if len(leftGroup.Components) != len(rightGroup.Components) {
-			return len(leftGroup.Components) > len(rightGroup.Components)
+		leftEdge := relativeGroupHasEdgeConstraint(leftGroup, components)
+		rightEdge := relativeGroupHasEdgeConstraint(rightGroup, components)
+		if leftEdge != rightEdge {
+			return leftEdge
 		}
 		return leftGroup.ID < rightGroup.ID
 	})
 	return groupOrder
 }
 
+func relativeGroupHasEdgeConstraint(group Group, components map[string]Component) bool {
+	for _, ref := range group.Components {
+		if component, ok := components[normalizeRef(ref)]; ok && component.Edge != EdgeNone {
+			return true
+		}
+	}
+	return false
+}
+
 func placeRelativeGroup(request Request, group Group, components map[string]Component, existing []PlacementResult) (relativeGroupCandidate, bool) {
+	var found relativeGroupCandidate
+	forEachRelativeGroupPlacement(request, group, components, existing, func(candidate relativeGroupCandidate) bool {
+		found = candidate
+		return false
+	})
+	return found, len(found.placements) != 0
+}
+
+func placeRelativeGroupSet(request Request, groupOrder []int, components map[string]Component, existing []PlacementResult) ([]relativeGroupCandidate, *RigidGroupSearchReport) {
+	report := &RigidGroupSearchReport{Enabled: true, GroupCount: len(groupOrder), RejectedByReason: map[string]int{}}
+	if len(groupOrder) == 0 {
+		report.Complete = true
+		return nil, report
+	}
+	maxBranches := request.Rules.MaxCandidatesPerPart
+	if maxBranches <= 0 {
+		maxBranches = DefaultRules().MaxCandidatesPerPart
+	}
+	maxBranches *= len(groupOrder)
+	report.BranchBudget = maxBranches
+	branches := 0
+	result := make([]relativeGroupCandidate, len(groupOrder))
+	var search func(int, []PlacementResult) bool
+	search = func(orderIndex int, placed []PlacementResult) bool {
+		if orderIndex == len(groupOrder) {
+			return true
+		}
+		group := request.Groups[groupOrder[orderIndex]]
+		completed := false
+		legalCandidates := 0
+		forEachRelativeGroupPlacement(request, group, components, placed, func(candidate relativeGroupCandidate) bool {
+			legalCandidates++
+			branches++
+			report.ExploredBranches = branches
+			if branches > maxBranches {
+				report.BudgetExhausted = true
+				report.RejectedByReason["search_budget"]++
+				return false
+			}
+			next := make([]PlacementResult, 0, len(placed)+len(candidate.placements))
+			next = append(next, placed...)
+			next = append(next, candidate.placements...)
+			if search(orderIndex+1, next) {
+				result[orderIndex] = candidate
+				completed = true
+				return false
+			}
+			report.Backtracks++
+			report.RejectedByReason["downstream_infeasible"]++
+			return branches <= maxBranches
+		})
+		if legalCandidates == 0 {
+			report.RejectedByReason["no_legal_transform"]++
+		}
+		return completed
+	}
+	if !search(0, append([]PlacementResult(nil), existing...)) {
+		return nil, report
+	}
+	report.Complete = true
+	for orderIndex, candidate := range result {
+		group := request.Groups[groupOrder[orderIndex]]
+		anchorRef := normalizeRef(group.Anchor.Ref)
+		for _, placed := range candidate.placements {
+			if normalizeRef(placed.Ref) == anchorRef {
+				report.Selected = append(report.Selected, RigidGroupSelectedPlacement{GroupID: group.ID, Anchor: placed.Ref, At: placed.Position})
+				break
+			}
+		}
+	}
+	if len(report.RejectedByReason) == 0 {
+		report.RejectedByReason = nil
+	}
+	return result, report
+}
+
+func forEachRelativeGroupPlacement(request Request, group Group, components map[string]Component, existing []PlacementResult, visit func(relativeGroupCandidate) bool) {
+	request.Keepouts = keepoutsForRelativeGroupSearch(request, group.ID, existing, components)
 	workingPlacements := make([]PlacementResult, 0, len(existing)+len(group.Components))
 	workingPlacements = append(workingPlacements, existing...)
 	placementIndexes := make(map[string]int, len(existing)+len(group.Components))
@@ -58,27 +147,46 @@ func placeRelativeGroup(request Request, group Group, components map[string]Comp
 		componentRef := normalizeRef(ref)
 		component, ok := components[componentRef]
 		if !ok || component.Position == nil {
-			return relativeGroupCandidate{}, false
+			return
 		}
 		placement, ok := NewPlacementResult(component, *component.Position, request.Rules)
 		if !ok {
-			return relativeGroupCandidate{}, false
+			return
 		}
 		placementIndexes[componentRef] = len(workingPlacements)
 		workingPlacements = append(workingPlacements, placement)
 	}
-	return findRelativeGroupPlacement(request, group, components, workingPlacements, placementIndexes, hardRefs)
+	visitRelativeGroupPlacements(request, group, components, workingPlacements, placementIndexes, hardRefs, visit)
+}
+
+func keepoutsForRelativeGroupSearch(request Request, groupID string, existing []PlacementResult, components map[string]Component) []Keepout {
+	keepouts := translatedKeepoutsForPlacements(request, existing, components)
+	for _, keepout := range request.Keepouts {
+		if strings.EqualFold(strings.TrimSpace(keepout.GroupID), strings.TrimSpace(groupID)) {
+			keepouts = append(keepouts, keepout)
+		}
+	}
+	return keepouts
 }
 
 func findRelativeGroupPlacement(request Request, group Group, components map[string]Component, placements []PlacementResult, placementIndexes map[string]int, hardRefs map[string]struct{}) (relativeGroupCandidate, bool) {
+	var found relativeGroupCandidate
+	visitRelativeGroupPlacements(request, group, components, placements, placementIndexes, hardRefs, func(candidate relativeGroupCandidate) bool {
+		found = candidate
+		return false
+	})
+	return found, len(found.placements) != 0
+}
+
+func visitRelativeGroupPlacements(request Request, group Group, components map[string]Component, placements []PlacementResult, placementIndexes map[string]int, hardRefs map[string]struct{}, visit func(relativeGroupCandidate) bool) {
 	anchorRef := normalizeRef(group.Anchor.Ref)
 	anchorComponent, ok := components[anchorRef]
 	if !ok || anchorComponent.Position == nil {
-		return relativeGroupCandidate{}, false
+		return
 	}
 	anchorIndex, ok := placementIndexes[anchorRef]
 	if !ok {
-		return relativeGroupCandidate{}, false
+		return
 	}
 	target := placements[anchorIndex].Position
 	// Authored block-local copper currently supports translation only.
@@ -90,16 +198,16 @@ func findRelativeGroupPlacement(request Request, group Group, components map[str
 	for _, ref := range group.Components {
 		component, exists := components[normalizeRef(ref)]
 		if !exists || component.Position == nil {
-			return relativeGroupCandidate{}, false
+			return
 		}
 		if _, exists := placementIndexes[normalizeRef(ref)]; !exists {
-			return relativeGroupCandidate{}, false
+			return
 		}
 		members = append(members, component)
 		memberRefs[normalizeRef(ref)] = struct{}{}
 	}
 	if _, included := memberRefs[anchorRef]; !included {
-		return relativeGroupCandidate{}, false
+		return
 	}
 	sort.SliceStable(members, func(left, right int) bool {
 		return normalizeRef(members[left].Ref) == anchorRef && normalizeRef(members[right].Ref) != anchorRef
@@ -138,7 +246,6 @@ func findRelativeGroupPlacement(request Request, group Group, components map[str
 	// deterministic ring search to cover the finite board before declaring that
 	// no transform exists.
 	maxCandidates = max(maxCandidates, boardCandidateCount)
-	var found relativeGroupCandidate
 	checked := 0
 	forEachRelativeGroupAnchorCandidate(usable, grid, target, func(anchor Placement) bool {
 		if anchorComponent.Edge != EdgeNone && !edgeConstraintSatisfied(request.Board, anchorComponent, anchor, anchorComponent.Edge, edgeConstraintTolerance(request.Board, request.Rules)) {
@@ -150,12 +257,10 @@ func findRelativeGroupPlacement(request Request, group Group, components map[str
 		checked++
 		candidate, legal := buildRelativeGroupCandidate(request, group.ID, members, *anchorComponent.Position, anchor, existingByLayer)
 		if legal {
-			found = candidate
-			return false
+			return visit(candidate)
 		}
 		return true
 	})
-	return found, len(found.placements) != 0
 }
 
 func forEachRelativeGroupAnchorCandidate(usable Rect, grid float64, target Placement, visit func(Placement) bool) {
@@ -217,23 +322,20 @@ func relativeGroupAnchorRing(usable Rect, grid float64, target Placement, target
 
 func buildRelativeGroupCandidate(request Request, groupID string, members []Component, authoredAnchor Placement, anchor Placement, existingByLayer map[string][]PlacementResult) (relativeGroupCandidate, bool) {
 	usable := BoardUsableRect(request.Board, request.Rules)
-	groupBoundsLimit := usable
+	anchorRef := normalizeRef(requestGroupAnchorRef(request, groupID))
+	anchorComponent := Component{}
 	for _, member := range members {
-		if normalizeRef(member.Ref) != normalizeRef(requestGroupAnchorRef(request, groupID)) || member.Edge == EdgeNone {
-			continue
+		if normalizeRef(member.Ref) == anchorRef {
+			anchorComponent = member
+			break
 		}
-		groupBoundsLimit = Rect{
-			Min: request.Board.Origin,
-			Max: Point{XMM: request.Board.Origin.XMM + request.Board.WidthMM, YMM: request.Board.Origin.YMM + request.Board.HeightMM},
-		}
-		break
 	}
 	for _, group := range request.Groups {
 		if !strings.EqualFold(strings.TrimSpace(group.ID), strings.TrimSpace(groupID)) || group.Bounds == nil {
 			continue
 		}
 		bounds := translatedGroupBounds(*group.Bounds, authoredAnchor, anchor)
-		if !groupBoundsLimit.Contains(bounds) {
+		if !relativeGroupBoundsContained(request, anchorComponent, anchor, bounds) {
 			return relativeGroupCandidate{}, false
 		}
 		break
@@ -290,6 +392,26 @@ func buildRelativeGroupCandidate(request Request, groupID string, members []Comp
 		result.placements = append(result.placements, placement)
 	}
 	return result, true
+}
+
+func relativeGroupBoundsContained(request Request, anchor Component, placement Placement, bounds Rect) bool {
+	limit := BoardUsableRect(request.Board, request.Rules)
+	if anchor.Edge == EdgeNone {
+		return limit.Contains(bounds)
+	}
+	limit = Rect{
+		Min: request.Board.Origin,
+		Max: Point{XMM: request.Board.Origin.XMM + request.Board.WidthMM, YMM: request.Board.Origin.YMM + request.Board.HeightMM},
+	}
+	tolerance := edgeConstraintTolerance(request.Board, request.Rules)
+	allowLeft := anchor.Edge == EdgeLeft || anchor.Edge == EdgeAny && edgeConstraintSatisfied(request.Board, anchor, placement, EdgeLeft, tolerance)
+	allowRight := anchor.Edge == EdgeRight || anchor.Edge == EdgeAny && edgeConstraintSatisfied(request.Board, anchor, placement, EdgeRight, tolerance)
+	allowTop := anchor.Edge == EdgeTop || anchor.Edge == EdgeAny && edgeConstraintSatisfied(request.Board, anchor, placement, EdgeTop, tolerance)
+	allowBottom := anchor.Edge == EdgeBottom || anchor.Edge == EdgeAny && edgeConstraintSatisfied(request.Board, anchor, placement, EdgeBottom, tolerance)
+	return (allowLeft || bounds.Min.XMM >= limit.Min.XMM) &&
+		(allowRight || bounds.Max.XMM <= limit.Max.XMM) &&
+		(allowTop || bounds.Min.YMM >= limit.Min.YMM) &&
+		(allowBottom || bounds.Max.YMM <= limit.Max.YMM)
 }
 
 func legalizeRelativeGroupMember(component Component, placement PlacementResult, grouped []PlacementResult, anchor Placement, rules Rules) (PlacementResult, bool) {
@@ -384,12 +506,21 @@ func translatedGroupBounds(bounds Rect, authoredAnchor Placement, placedAnchor P
 
 // TranslatedKeepoutsForPlacements returns keepouts in the same coordinate
 // frame as their final translated placement groups. Unowned keepouts and
-// groups without a completed anchor placement remain unchanged.
+// keepouts owned by non-translated semantic groups remain active at authored
+// coordinates until their anchor is placed. Keepouts owned by translated groups
+// remain inactive until the group's anchor has a successful placement,
+// preventing stale authored coordinates from constraining groups that have not
+// yet been searched. Once any group anchor is placed, its keepouts follow it.
 func TranslatedKeepoutsForPlacements(request Request, placements []PlacementResult) []Keepout {
-	keepouts := append([]Keepout(nil), request.Keepouts...)
-	components := make(map[string]Component, len(request.Components))
-	for _, component := range request.Components {
-		components[normalizeRef(component.Ref)] = component
+	return translatedKeepoutsForPlacements(request, placements, nil)
+}
+
+func translatedKeepoutsForPlacements(request Request, placements []PlacementResult, components map[string]Component) []Keepout {
+	if components == nil {
+		components = make(map[string]Component, len(request.Components))
+		for _, component := range request.Components {
+			components[normalizeRef(component.Ref)] = component
+		}
 	}
 	placedByRef := make(map[string]PlacementResult, len(placements))
 	for _, placed := range placements {
@@ -397,14 +528,42 @@ func TranslatedKeepoutsForPlacements(request Request, placements []PlacementResu
 			placedByRef[normalizeRef(placed.Ref)] = placed
 		}
 	}
+	type groupTransform struct {
+		authored Placement
+		placed   Placement
+	}
+	transforms := make(map[string]groupTransform, len(request.Groups))
+	translatedGroups := make(map[string]struct{}, len(request.Groups))
 	for _, group := range request.Groups {
+		groupID := normalizeRef(group.ID)
+		if group.TranslateAsUnit {
+			translatedGroups[groupID] = struct{}{}
+		}
 		anchorRef := normalizeRef(group.Anchor.Ref)
 		component, componentOK := components[anchorRef]
 		placed, placedOK := placedByRef[anchorRef]
 		if !componentOK || component.Position == nil || !placedOK {
 			continue
 		}
-		keepouts = translatedKeepoutsForGroup(keepouts, group.ID, *component.Position, placed.Position)
+		transforms[groupID] = groupTransform{authored: *component.Position, placed: placed.Position}
+	}
+	keepouts := make([]Keepout, 0, len(request.Keepouts))
+	for _, keepout := range request.Keepouts {
+		groupID := normalizeRef(keepout.GroupID)
+		if groupID == "" {
+			keepouts = append(keepouts, keepout)
+			continue
+		}
+		transform, ok := transforms[groupID]
+		if ok {
+			translated := translatedKeepoutsForGroup([]Keepout{keepout}, keepout.GroupID, transform.authored, transform.placed)
+			keepouts = append(keepouts, translated[0])
+			continue
+		}
+		if _, translated := translatedGroups[groupID]; translated {
+			continue
+		}
+		keepouts = append(keepouts, keepout)
 	}
 	return keepouts
 }

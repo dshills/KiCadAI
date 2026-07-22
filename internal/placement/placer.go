@@ -47,7 +47,13 @@ func PlaceContext(ctx context.Context, request Request) Result {
 		return result
 	}
 
-	occupancy := newOccupancy(request)
+	componentsByRef := make(map[string]Component, len(request.Components))
+	for _, component := range request.Components {
+		componentsByRef[normalizeRef(component.Ref)] = component
+	}
+	occupancyRequest := request
+	occupancyRequest.Keepouts = translatedKeepoutsForPlacements(request, nil, componentsByRef)
+	occupancy := newOccupancy(occupancyRequest)
 	components := slicesForPlacementWithOrder(request.Components, request.ComponentOrder)
 	components = orderComponentsForRequiredProximity(components, request.ProximityRules)
 	padsByRef := componentPadMaps(components)
@@ -56,13 +62,9 @@ func PlaceContext(ctx context.Context, request Request) Result {
 	advancedRequestContext := newAdvancedPlacementRequestContext(request)
 	keepTogetherPeersByRef := keepTogetherPeersByComponent(request)
 	placedByRef := make(map[string]PlacementResult, len(components))
-	componentsByRef := make(map[string]Component, len(components))
-	for _, component := range components {
-		componentsByRef[normalizeRef(component.Ref)] = component
-	}
 	committedPlacements := make([]PlacementResult, 0, len(components))
 	rigidGroupByMember := relativeGroupIndexesByMember(request.Groups)
-	rigidGroupOrder := relativeGroupOrder(request.Groups)
+	rigidGroupOrder := relativeGroupOrder(request.Groups, componentsByRef)
 	rigidGroupsProcessed := false
 	rigidPlacements := make(map[string]PlacementResult, len(rigidGroupByMember))
 	rigidFailures := make(map[string]struct{})
@@ -81,9 +83,18 @@ func PlaceContext(ctx context.Context, request Request) Result {
 		if _, grouped := rigidGroupByMember[componentRef]; grouped {
 			if !rigidGroupsProcessed {
 				rigidGroupsProcessed = true
-				for _, groupIndex := range rigidGroupOrder {
+				planned, groupSearch := placeRelativeGroupSet(request, rigidGroupOrder, componentsByRef, committedPlacements)
+				result.GroupSearch = groupSearch
+				plannedAll := groupSearch.Complete
+				for orderIndex, groupIndex := range rigidGroupOrder {
 					group := request.Groups[groupIndex]
-					candidate, ok := placeRelativeGroup(request, group, componentsByRef, committedPlacements)
+					candidate := relativeGroupCandidate{}
+					ok := false
+					if plannedAll {
+						candidate, ok = planned[orderIndex], true
+					} else {
+						candidate, ok = placeRelativeGroup(request, group, componentsByRef, committedPlacements)
+					}
 					if !ok {
 						result.Status = StatusPartial
 						result.Issues = append(result.Issues, reports.Issue{
@@ -104,8 +115,7 @@ func PlaceContext(ctx context.Context, request Request) Result {
 						placedByRef[ref] = groupPlacement
 					}
 					committedPlacements = append(committedPlacements, candidate.placements...)
-					request.Keepouts = TranslatedKeepoutsForPlacements(request, committedPlacements)
-					occupancy.keepouts = request.Keepouts
+					occupancy.keepouts = translatedKeepoutsForPlacements(request, committedPlacements, componentsByRef)
 				}
 			}
 			if placement, placed := rigidPlacements[componentRef]; placed {
@@ -175,7 +185,9 @@ func PlaceContext(ctx context.Context, request Request) Result {
 		result.Status = StatusBlocked
 	}
 	successfulPlacements := successfulPlacementResults(result.Placements)
-	geometryIssues := ValidateGeometry(request, successfulPlacements)
+	placedRequest := request
+	placedRequest.Keepouts = translatedKeepoutsForPlacements(request, successfulPlacements, componentsByRef)
+	geometryIssues := ValidateGeometry(placedRequest, successfulPlacements)
 	result.Issues = append(result.Issues, geometryIssues...)
 	for _, geometryIssue := range geometryIssues {
 		if geometryIssue.Code == reports.CodePlacementCollision {
@@ -193,12 +205,12 @@ func PlaceContext(ctx context.Context, request Request) Result {
 	if len(groupIssues) > 0 && result.Status == StatusPlaced {
 		result.Status = StatusPartial
 	}
-	proximityIssues := ValidateRequiredProximity(request, successfulPlacements)
+	proximityIssues := validateRequiredProximity(request, successfulPlacements, rigidFailures)
 	result.Issues = append(result.Issues, proximityIssues...)
 	if len(proximityIssues) > 0 && result.Status == StatusPlaced {
 		result.Status = StatusPartial
 	}
-	operations, operationIssues := PlacementOperations(request, successfulPlacements)
+	operations, operationIssues := PlacementOperations(placedRequest, successfulPlacements)
 	result.Operations = operations
 	result.Issues = append(result.Issues, operationIssues...)
 	if len(operationIssues) > 0 && result.Status == StatusPlaced {

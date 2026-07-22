@@ -1,29 +1,26 @@
 {
   "version": "0.1.0",
   "name": "led_indicator_compact",
-  "intent": {
-    "summary": "Active-high red 5 V LED indicator with a power header, routed at connectivity acceptance.",
-    "category": "indicator"
-  },
+  "summary": "Active-high red 5 V LED indicator with a power header, routed at connectivity acceptance.",
+  "kind": "breakout",
+  "acceptance": "connectivity",
   "board": {
     "width_mm": 40,
     "height_mm": 25,
     "layers": 2
   },
-  "blocks": [
-    {
-      "id": "power",
-      "block_id": "connector_breakout",
-      "params": {
-        "pin_names": [
-          "VCC",
-          "GND"
-        ]
+  "power": {
+    "inputs": [
+      {
+        "kind": "external",
+        "voltage": "5V",
+        "current_ma": 20
       }
-    },
+    ]
+  },
+  "functions": [
     {
-      "id": "status",
-      "block_id": "led_indicator",
+      "kind": "indicator",
       "params": {
         "color": "red",
         "supply_voltage": "5V",
@@ -32,26 +29,5 @@
         "active_high": true
       }
     }
-  ],
-  "connections": [
-    {
-      "from": "power.VCC",
-      "to": "status.IN",
-      "net_alias": "VCC"
-    },
-    {
-      "from": "power.VCC",
-      "to": "status.VCC",
-      "net_alias": "VCC"
-    },
-    {
-      "from": "power.GND",
-      "to": "status.GND",
-      "net_alias": "GND"
-    }
-  ],
-  "validation": {
-    "acceptance": "connectivity",
-    "skip_routing": false
-  }
+  ]
 }

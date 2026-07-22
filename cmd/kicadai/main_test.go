@@ -822,24 +822,30 @@ func TestRunIntentCreateLEDPromptOptionalKiCadSmoke(t *testing.T) {
 }
 
 func TestRunIntentCreateSensorBreakoutPersistsRegulatorEvidence(t *testing.T) {
+	symbolsRoot := strings.TrimSpace(os.Getenv("KICADAI_SYMBOLS_ROOT"))
+	footprintsRoot := strings.TrimSpace(os.Getenv("KICADAI_FOOTPRINTS_ROOT"))
+	if symbolsRoot == "" || footprintsRoot == "" {
+		t.Skip("set KICADAI_SYMBOLS_ROOT and KICADAI_FOOTPRINTS_ROOT to run AP2112K intent-create regression")
+	}
 	output := filepath.Join(t.TempDir(), "sensor_breakout")
-	requestPath := filepath.Join("..", "..", "examples", "intent", "sensor_breakout.json")
+	requestPath := filepath.Join("..", "..", "examples", "intent", "regulator_ap2112k_sensor.json")
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
-	err := run([]string{"--json", "--request", requestPath, "--output", output, "--overwrite", "--skip-routing", "intent", "create"}, &stdout, &stderr)
-	if err == nil {
-		t.Fatal("expected downstream workflow validation to report issues for this fixture")
+	err := run([]string{"--json", "--symbols-root", symbolsRoot, "--footprints-root", footprintsRoot, "--request", requestPath, "--output", output, "--overwrite", "intent", "create"}, &stdout, &stderr)
+	if err != nil {
+		t.Fatalf("intent create failed: %v\nstdout_bytes=%d\nstderr=%s", err, stdout.Len(), stderr.String())
 	}
-	if !strings.Contains(err.Error(), "intent create reported issues") {
-		t.Fatalf("unexpected intent create error: %v\nstdout_bytes=%d\nstderr=%s", err, stdout.Len(), stderr.String())
-	}
-	t.Logf("intent create returned expected error: %v; stdout_bytes=%d; stderr=%s", err, stdout.Len(), stderr.String())
 
 	workflowPath := filepath.Join(output, ".kicadai", "workflow-result.json")
 	var workflow struct {
 		Stages []workflowEvidenceStage `json:"stages"`
 	}
 	readJSONFile(t, workflowPath, &workflow)
+	for _, stage := range []string{"placement", "routing", "project_write", "writer_correctness", "validation"} {
+		if status := workflowStageStatus(workflow.Stages, stage); status == "blocked" || status == "skipped" || status == "" {
+			t.Fatalf("workflow stage %s = %q; stages=%#v", stage, status, workflow.Stages)
+		}
+	}
 	if !workflowSelectedComponent(workflow.Stages, "regulator", "regulator", "regulator.linear.ap2112k_3v3.sot23_5") {
 		t.Fatalf("workflow missing regulator selection: %#v", workflow.Stages)
 	}

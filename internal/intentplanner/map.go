@@ -242,17 +242,20 @@ func validationForIntent(acceptance designworkflow.AcceptanceLevel, skipRouting 
 }
 
 func routingRetryForIntent(acceptance designworkflow.AcceptanceLevel) designworkflow.RoutingRetryPolicySpec {
-	if acceptance != designworkflow.AcceptanceFabricationCandidate {
+	if acceptance == designworkflow.AcceptanceDraft || acceptance == designworkflow.AcceptanceStructural {
 		return designworkflow.RoutingRetryPolicySpec{}
 	}
-	return designworkflow.RoutingRetryPolicySpec{
+	policy := designworkflow.RoutingRetryPolicySpec{
 		Enabled:              true,
 		MaxAttempts:          2,
 		MinRoutingScoreDelta: 0.01,
 		DRCPolicy:            designworkflow.RetryDRCPolicyOptional,
-		PreserveFixed:        true,
 		StopOnNewBlockers:    true,
 	}
+	if acceptance == designworkflow.AcceptanceFabricationCandidate {
+		policy.PreserveFixed = true
+	}
+	return policy
 }
 
 func (builder *planBuilder) recordComponentPolicy(acceptance designworkflow.AcceptanceLevel) {

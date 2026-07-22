@@ -10,6 +10,13 @@ import (
 // ValidateRequiredProximity fail-closes placement when a declared required
 // electrical-proximity relationship is not satisfied by final geometry.
 func ValidateRequiredProximity(request Request, placements []PlacementResult) []reports.Issue {
+	return validateRequiredProximity(request, placements, nil)
+}
+
+// validateRequiredProximity preserves strict standalone validation while allowing
+// the placement orchestrator to omit derivative missing-component messages for
+// refs that already have an authoritative placement root cause.
+func validateRequiredProximity(request Request, placements []PlacementResult, rootedPlacementFailures map[string]struct{}) []reports.Issue {
 	request = NormalizeRequest(request)
 	placementsByRef := make(map[string]PlacementResult, len(placements))
 	for _, placed := range placements {
@@ -28,6 +35,9 @@ func ValidateRequiredProximity(request Request, placements []PlacementResult) []
 			continue
 		}
 		anchorRef := normalizeRef(rule.AnchorRef)
+		if _, rooted := rootedPlacementFailures[anchorRef]; rooted {
+			continue
+		}
 		anchorPlacement, anchorOK := placementsByRef[anchorRef]
 		anchorComponent, componentOK := componentsByRef[anchorRef]
 		if !anchorOK || !componentOK {
@@ -36,6 +46,9 @@ func ValidateRequiredProximity(request Request, placements []PlacementResult) []
 		}
 		for _, targetRefRaw := range rule.TargetRefs {
 			targetRef := normalizeRef(targetRefRaw)
+			if _, rooted := rootedPlacementFailures[targetRef]; rooted {
+				continue
+			}
 			targetPlacement, targetOK := placementsByRef[targetRef]
 			targetComponent, targetComponentOK := componentsByRef[targetRef]
 			if !targetOK || !targetComponentOK {

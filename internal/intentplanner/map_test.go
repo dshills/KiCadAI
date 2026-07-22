@@ -1434,6 +1434,26 @@ func TestPlanDerivesFabricationValidationPolicy(t *testing.T) {
 	}
 }
 
+func TestPlanEnablesPlacementCorrectionForConnectivityIntent(t *testing.T) {
+	plan := Plan(Request{
+		Version:    "0.1.0",
+		Name:       "connectivity_policy",
+		Kind:       IntentBreakout,
+		Acceptance: designworkflow.AcceptanceConnectivity,
+		Board:      BoardIntent{WidthMM: 30, HeightMM: 20, Layers: 2},
+		Functions:  []FunctionIntent{{Kind: "connector"}},
+	})
+	if plan.GeneratedRequest == nil {
+		t.Fatalf("GeneratedRequest missing: status=%s issues=%#v", plan.Status, plan.Issues)
+	}
+	if !plan.GeneratedRequest.RoutingRetry.Enabled || plan.GeneratedRequest.RoutingRetry.MaxAttempts != 2 {
+		t.Fatalf("routing retry = %#v", plan.GeneratedRequest.RoutingRetry)
+	}
+	if plan.GeneratedRequest.RoutingRetry.PreserveFixed {
+		t.Fatalf("connectivity placement unexpectedly frozen: %#v", plan.GeneratedRequest.RoutingRetry)
+	}
+}
+
 func TestPlanDerivesPackagePreferencesAndRatings(t *testing.T) {
 	plan := Plan(Request{
 		Version: "0.1.0",
