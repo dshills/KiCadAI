@@ -27,6 +27,9 @@ the relevant subdirectory instead of adding loose historical files at the root.
 - [External review mitigation implementation plan](external-review-mitigation/PLAN.md)
   - phases the generic fixes, KiCad-backed regression ladder, Prism review,
     commits, push, and CI verification.
+- [External review mitigation baseline](external-review-mitigation/BASELINE.md)
+  - freezes the reproduced findings, durable fixtures, known-failure tests, and
+    initial test evidence before implementation.
 - [Independent test-session feedback](FEEDBACK.md)
   - source review and reproduction context for the mitigation milestone.
 

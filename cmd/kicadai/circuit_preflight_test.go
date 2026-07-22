@@ -40,6 +40,45 @@ func TestCircuitPreflightAcceptsDocumentedArgumentOrder(t *testing.T) {
 	}
 }
 
+func TestCircuitPreflightIgnoresUnreferencedLibraryDiagnostics(t *testing.T) {
+	t.Skip("known F2: remove after circuit preflight scopes library blockers to the design closure")
+	graph := writeCircuitCreateRCGraph(t)
+	symbolsRoot, footprintsRoot := writeCircuitCreateLibraryFixture(t)
+	writeTestFile(t, filepath.Join(symbolsRoot, "Unrelated.kicad_sym"), `
+(kicad_symbol_lib
+  (version 20220914)
+  (generator "kicadai-test")
+  (symbol "HiddenPower"
+    (property "Reference" "#PWR" (at 0 -2.54 0) hide)
+    (property "Value" "HiddenPower" (at 0 2.54 0))
+    (symbol "HiddenPower_1_1"
+      (pin power_in line (at 0 0 90) (length 0) hide (name "PWR") (number "1"))
+    )
+  )
+)`)
+
+	result := runCircuitPreflightCLI(t, []string{
+		"--symbols-root", symbolsRoot,
+		"--footprints-root", footprintsRoot,
+		"--request", graph,
+		"circuit", "preflight",
+	})
+	if !result.OK || !preflightResultData(t, result).ReadyForWrite {
+		t.Fatalf("unreferenced library diagnostic blocked design: %#v", result)
+	}
+}
+
+func TestCircuitHelpIsSuccessful(t *testing.T) {
+	t.Skip("known F5: remove after circuit help is routed before subcommand validation")
+	var stdout, stderr bytes.Buffer
+	if err := run([]string{"circuit", "--help"}, &stdout, &stderr); err != nil {
+		t.Fatalf("circuit --help: %v; stdout=%s stderr=%s", err, stdout.String(), stderr.String())
+	}
+	if !strings.Contains(stdout.String(), "circuit preflight") || !strings.Contains(stdout.String(), "circuit create") {
+		t.Fatalf("circuit help omitted workflow commands: %s", stdout.String())
+	}
+}
+
 func TestCircuitPreflightFailsClosedBeforeWrite(t *testing.T) {
 	graph := filepath.Join("..", "..", "examples", "circuit-graph", "unsupported_unknown_component.json")
 	output := filepath.Join(t.TempDir(), "must-not-be-written")
@@ -132,6 +171,33 @@ func TestCircuitCreateWritesPreflightReadyRCGraph(t *testing.T) {
 	for _, name := range []string{"generic_rc_filter.kicad_pro", "generic_rc_filter.kicad_sch", "generic_rc_filter.kicad_pcb", ".kicadai/transaction.json"} {
 		if _, statErr := os.Stat(filepath.Join(output, name)); statErr != nil {
 			t.Fatalf("missing written %s: %v", name, statErr)
+		}
+	}
+}
+
+func TestCircuitCreateWritesSharedCoreEvidence(t *testing.T) {
+	t.Skip("known F6: remove after circuit create uses the shared core evidence writer")
+	graph := writeCircuitCreateRCGraph(t)
+	symbolsRoot, footprintsRoot := writeCircuitCreateLibraryFixture(t)
+	cli := fakeWorkflowKiCadCLI(t, 0, passingWorkflowKiCadReport)
+	output := filepath.Join(t.TempDir(), "project")
+	result, err := runCircuitCreateCLI(t, []string{
+		"--kicad-cli", cli, "--symbols-root", symbolsRoot, "--footprints-root", footprintsRoot,
+		"circuit", "create", "--request", graph, "--output", output, "--overwrite",
+	})
+	if err != nil || !result.OK {
+		t.Fatalf("circuit create err=%v result=%#v", err, result)
+	}
+	for _, name := range []string{
+		"design-request.json",
+		"transaction.json",
+		"workflow-result.json",
+		"validation-summary.json",
+		"design-promotion.json",
+		"manifest.json",
+	} {
+		if _, statErr := os.Stat(filepath.Join(output, ".kicadai", name)); statErr != nil {
+			t.Fatalf("missing shared core evidence %s: %v", name, statErr)
 		}
 	}
 }

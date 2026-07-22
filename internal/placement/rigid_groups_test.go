@@ -25,11 +25,47 @@ func TestPreserveRelativeGroupPlacementTranslatesClusterAroundObstacle(t *testin
 	for _, placed := range result.Placements {
 		byRef[placed.Ref] = placed
 	}
-	if delta := byRef["C1"].Position.XMM - byRef["U1"].Position.XMM; delta != 4 {
+	u1, hasU1 := byRef["U1"]
+	c1, hasC1 := byRef["C1"]
+	if !hasU1 || !hasC1 {
+		t.Fatalf("missing expected group placements: %#v", result.Placements)
+	}
+	if delta := c1.Position.XMM - u1.Position.XMM; delta != 4 {
 		t.Fatalf("relative X offset = %v, want 4; placements = %#v", delta, result.Placements)
 	}
 	if delta := byRef["C1"].Position.YMM - byRef["U1"].Position.YMM; delta != 0 {
 		t.Fatalf("relative Y offset = %v, want 0; placements = %#v", delta, result.Placements)
+	}
+	if issues := ValidateGeometry(request, successfulPlacementResults(result.Placements)); len(issues) != 0 {
+		t.Fatalf("geometry issues = %#v", issues)
+	}
+}
+
+func TestPlaceTranslatableFixedGroupBeforeRejectingAuthoredCoordinates(t *testing.T) {
+	t.Skip("known F1: remove after translatable fixed groups are legalized atomically")
+	rules := DefaultRules()
+	rules.GridMM = 1
+	rules.ComponentSpacingMM = 0
+	request := Request{
+		Board: BoardPlacementArea{WidthMM: 20, HeightMM: 20},
+		Rules: rules,
+		Components: []Component{
+			{Ref: "U1", FootprintID: "Test:U", Bounds: Bounds{WidthMM: 2, HeightMM: 2, Source: BoundsExplicit}, Fixed: true, Position: &Placement{XMM: 24, YMM: 5, Layer: "F.Cu"}, Rotation: RotationConstraint{FixedDeg: float64Pointer(0)}},
+			{Ref: "C1", FootprintID: "Test:C", Bounds: Bounds{WidthMM: 2, HeightMM: 2, Source: BoundsExplicit}, Fixed: true, Position: &Placement{XMM: 28, YMM: 5, Layer: "F.Cu"}, Rotation: RotationConstraint{FixedDeg: float64Pointer(0)}},
+		},
+		Groups: []Group{{ID: "core", Components: []string{"U1", "C1"}, Anchor: GroupAnchor{Ref: "U1"}, KeepTogether: true, TranslateAsUnit: true}},
+	}
+
+	result := Place(request)
+	if result.Status != StatusPlaced {
+		t.Fatalf("placement = %#v, want atomic group translation onto board", result)
+	}
+	byRef := map[string]PlacementResult{}
+	for _, placed := range result.Placements {
+		byRef[placed.Ref] = placed
+	}
+	if delta := byRef["C1"].Position.XMM - byRef["U1"].Position.XMM; delta != 4 {
+		t.Fatalf("relative X offset = %v, want 4; placements = %#v", delta, result.Placements)
 	}
 	if issues := ValidateGeometry(request, successfulPlacementResults(result.Placements)); len(issues) != 0 {
 		t.Fatalf("geometry issues = %#v", issues)
