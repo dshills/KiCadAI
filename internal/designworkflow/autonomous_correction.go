@@ -457,10 +457,10 @@ func ApplyAutonomousCorrectionPlan(request Request, placementRequest placement.R
 		application.StopReason = CorrectionStopNoSafeAdjustment
 		return current, application, nil
 	}
-	adjusted, adjustment := BuildPlacementRetryAdjustment(current, hints, 1)
+	adjusted, adjustment := BuildPlacementRetryAdjustment(current, hints, plan.Attempt-1)
 	adjustment.Attempt = plan.Attempt - 1
 	application.Adjustment = adjustment
-	if !adjustment.Applied || adjustment.SpacingDeltaMM > placementRetryBaseSpacingDeltaMM+retryScoreComparisonEpsilon || len(adjustment.ProximityRules) == 0 && math.Abs(adjustment.SpacingDeltaMM) < retryScoreComparisonEpsilon {
+	if !adjustment.Applied || adjustment.SpacingDeltaMM > placementRetryMaxSpacingDeltaMM+retryScoreComparisonEpsilon || len(adjustment.ProximityRules) == 0 && math.Abs(adjustment.SpacingDeltaMM) < retryScoreComparisonEpsilon {
 		application.StopReason = CorrectionStopNoSafeAdjustment
 		return current, application, nil
 	}

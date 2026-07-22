@@ -33,6 +33,9 @@ var catalogProviderCapabilities = []string{
 	"instrumentation_amplification",
 	"load_switch",
 	"logic_level_translation",
+	"signal_termination",
+	"clock_conditioning",
+	"adc_drive_conditioning",
 	"mute_control",
 	"output_protection",
 	"programmable_controller",
@@ -103,6 +106,12 @@ func (provider *CatalogProvider) Expand(ctx context.Context, request ProviderReq
 			return provider.expandGenericTranslator(ctx, request)
 		}
 		return provider.expandTranslator(ctx, request)
+	case "signal_termination":
+		return provider.expandSourceTermination(ctx, request, false)
+	case "clock_conditioning":
+		return provider.expandSourceTermination(ctx, request, true)
+	case "adc_drive_conditioning":
+		return provider.expandADCDrive(ctx, request)
 	case "fault_indication":
 		return provider.expandFaultIndication(ctx, request)
 	case "safety_interlock":
@@ -681,8 +690,12 @@ func (provider *CatalogProvider) expandRegulator(ctx context.Context, request Pr
 	if !ok {
 		return nil, fmt.Errorf("regulator solution omitted upper feedback resistance")
 	}
+	outputCapacitance, transientCalculation, err := regulatorOutputCapacitor(request, selection.record)
+	if err != nil {
+		return nil, err
+	}
 	parts := []catalogPart{selection}
-	parts, err = provider.appendPassiveParts(ctx, parts, []passivePart{{"feedback_lower", "resistor", "feedback_divider", "10k"}, {"feedback_upper", "resistor", "feedback_divider", engineeringValue(feedbackUpper, "Ohm")}, {"input_bypass", "capacitor", "decoupling", "1u"}, {"output_bypass", "capacitor", "decoupling", "1u"}})
+	parts, err = provider.appendPassiveParts(ctx, parts, []passivePart{{"feedback_lower", "resistor", "feedback_divider", "10k"}, {"feedback_upper", "resistor", "feedback_divider", engineeringValue(feedbackUpper, "Ohm")}, {"input_bypass", "capacitor", "decoupling", "1u"}, {"output_bypass", "capacitor", "decoupling", outputCapacitance}})
 	if err != nil {
 		return nil, err
 	}
@@ -708,7 +721,11 @@ func (provider *CatalogProvider) expandRegulator(ctx context.Context, request Pr
 		semanticNet("regulator_feedback", "analog_signal", endpoint(selection, "ADJ"), passiveEndpoint("feedback_upper", "B"), passiveEndpoint("feedback_lower", "A")),
 		semanticNet("regulator_ground", "reference", groundEndpoints...),
 	}
-	return provider.expansion(request, "adjustable_linear_regulator", parts, bindings, connections, []CalculationEvidence{calculation}, 0)
+	calculations := []CalculationEvidence{calculation}
+	if transientCalculation != nil {
+		calculations = append(calculations, *transientCalculation)
+	}
+	return provider.expansion(request, "adjustable_linear_regulator", parts, bindings, connections, calculations, 0)
 }
 
 func (provider *CatalogProvider) expandFilter(ctx context.Context, request ProviderRequest) ([]ProviderExpansion, error) {
@@ -841,11 +858,11 @@ func (provider *CatalogProvider) expandTranslator(ctx context.Context, request P
 				minimumPullupResistance = high / (catalogRatingDeratingFactor * maximumChannelCurrent)
 			}
 			if !finitePositive(maximumPullupResistance) || maximumPullupResistance < minimumPullupResistance {
-				return nil, fmt.Errorf("open-drain rise-time and sink-current requirements have no bounded pull-up solution")
+				return nil, &interfaceSynthesisError{code: CodeInterfacePullupWindowEmpty, message: "open-drain rise-time and sink-current requirements have no bounded pull-up solution"}
 			}
 			candidates, candidateIssues := PreferredValueCandidates(maximumPullupResistance, SeriesE24, minimumPullupResistance, maximumPullupResistance, 1)
 			if len(candidateIssues) != 0 || len(candidates) == 0 {
-				return nil, fmt.Errorf("open-drain pull-up preferred-value solution failed")
+				return nil, &interfaceSynthesisError{code: CodeInterfacePullupWindowEmpty, message: "open-drain pull-up preferred-value solution failed"}
 			}
 			pullupResistance = candidates[0]
 		}
@@ -1463,6 +1480,15 @@ func catalogBehaviorCalculations(request ProviderRequest, parts []catalogPart) (
 				result = append(result, calculation)
 			}
 		}
+		if part.usage == "regulator" && powerSequenceEvidenceRequested(request.Constraints) {
+			if startupTime, ok := catalogSimulationParameter(part.record, "soft_start_time_s"); ok && startupTime >= 0 {
+				calculation, err := ObservedCalculation(part.selected.InstanceID+"_startup", NamedQuantity{Name: "startup_time", Value: startupTime, Unit: "s"})
+				if err != nil {
+					return nil, 0, err
+				}
+				result = append(result, calculation)
+			}
+		}
 		if part.record.OpAmp == nil {
 			continue
 		}
@@ -1489,6 +1515,15 @@ func catalogBehaviorCalculations(request ProviderRequest, parts []catalogPart) (
 		result = append(result, calculation)
 	}
 	return result, unproven, nil
+}
+
+func powerSequenceEvidenceRequested(constraints []Constraint) bool {
+	for _, name := range []string{"rail_sequence_before", "rail_sequence_delay", "startup_monotonic", "startup_inrush_current"} {
+		if _, ok := namedConstraint(constraints, name); ok {
+			return true
+		}
+	}
+	return false
 }
 
 func requiredCatalogAnalyses(request ProviderRequest) []string {

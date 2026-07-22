@@ -162,6 +162,40 @@ func TestRepairAcuteRouteOperationJunctionsLeavesNonSliverBranch(t *testing.T) {
 	}
 }
 
+func TestRepairAcuteRouteOperationJunctionsOffsetsCollinearRepairSegment(t *testing.T) {
+	operations := []transactions.Operation{
+		mustRouteOperation(t, transactions.RouteOperation{
+			Op: transactions.OpRoute, NetName: "POWER", Layer: "F.Cu", WidthMM: 0.5,
+			Points: []transactions.Point{{XMM: 3.3375, YMM: 5.3}, {XMM: 3.5, YMM: 5.25}},
+		}),
+		mustRouteOperation(t, transactions.RouteOperation{
+			Op: transactions.OpRoute, NetName: "POWER", Layer: "F.Cu", WidthMM: 0.5,
+			Points: []transactions.Point{{XMM: 3.3375, YMM: 5.3}, {XMM: 4.00125, YMM: 5.3}},
+		}),
+	}
+	request := routing.Request{
+		Board: routing.Board{WidthMM: 10, HeightMM: 10, Layers: []routing.Layer{{Name: "F.Cu", Kind: routing.LayerCopper, Routable: true}}},
+		Rules: routing.Rules{GridMM: 0.25, TraceWidthMM: 0.5, ClearanceMM: 0.2},
+	}
+	if _, ok := firstAcuteRouteOperationJunction(operations); !ok {
+		t.Fatal("expected collinear acute junction")
+	}
+	got, issues := repairAcuteRouteOperationJunctions(request, operations)
+	if reports.HasBlockingIssue(issues) {
+		t.Fatalf("issues = %#v", issues)
+	}
+	if _, ok := firstAcuteRouteOperationJunction(got); ok {
+		t.Fatalf("acute junction remains in %#v", got)
+	}
+	var repaired transactions.RouteOperation
+	if err := json.Unmarshal(got[1].Raw, &repaired); err != nil {
+		t.Fatal(err)
+	}
+	if len(repaired.Points) != 4 {
+		t.Fatalf("repaired route = %#v, want two-point offset dogleg", repaired)
+	}
+}
+
 func TestAcuteRouteOperationJunctionRecognizesClosedCopperCycle(t *testing.T) {
 	operations := []transactions.Operation{
 		mustRouteOperation(t, transactions.RouteOperation{

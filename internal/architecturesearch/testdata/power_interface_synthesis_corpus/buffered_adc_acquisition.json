@@ -1,0 +1,57 @@
+{
+  "schema": "kicadai.open-set-requirement.v2",
+  "version": 2,
+  "project": {
+    "name": "buffered_adc_acquisition",
+    "title": "Buffered ADC acquisition interface",
+    "description": "Condition a bounded high-impedance midrail sensor signal for a finite-capacitance ADC acquisition window."
+  },
+  "requirements": {
+    "domains": [
+      {"id": "analog_5v", "kind": "supply", "min_voltage_v": 5, "nominal_voltage_v": 5, "max_voltage_v": 5, "max_current_a": 0.1, "source": "external"},
+      {"id": "ground", "kind": "reference", "nominal_voltage_v": 0, "source": "external"}
+    ],
+    "ports": [
+      {"id": "adc_output", "kind": "analog_voltage", "direction": "source", "domain": "analog_5v", "electrical": {"min_voltage_v": 2.5, "max_voltage_v": 2.5, "frequency_max_hz": 10000}},
+      {"id": "ground", "kind": "reference", "direction": "bidirectional", "domain": "ground"},
+      {"id": "power", "kind": "power", "direction": "sink", "domain": "analog_5v", "electrical": {"max_current_a": 0.1}},
+      {"id": "sensor_input", "kind": "analog_voltage", "direction": "sink", "domain": "analog_5v", "electrical": {"min_voltage_v": 2.5, "max_voltage_v": 2.5, "input_impedance_min_ohm": 1000000, "frequency_max_hz": 10000}}
+    ],
+    "objectives": [
+      {
+        "id": "condition_adc_drive",
+        "capability": "adc_drive_conditioning",
+        "bindings": [
+          {"role": "input", "port": "sensor_input"},
+          {"role": "output", "port": "adc_output"},
+          {"role": "power", "port": "power"},
+          {"role": "reference", "port": "ground"}
+        ],
+        "constraints": [
+          {"name": "source_impedance", "relation": "maximum", "value": 1000000, "unit": "Ohm"},
+          {"name": "adc_input_capacitance", "relation": "target", "value": 0.00000000002, "unit": "F"},
+          {"name": "acquisition_time", "relation": "minimum", "value": 0.000002, "unit": "s"},
+          {"name": "settling_accuracy", "relation": "maximum", "value": 0.0001, "unit": "ratio"}
+        ]
+      }
+    ],
+    "system_constraints": [
+      {"name": "phase_margin", "relation": "minimum", "value": 45, "unit": "deg"}
+    ],
+    "constraints": {"max_components": 8, "max_width_mm": 45, "max_height_mm": 30}
+  },
+  "acceptance": {
+    "require_erc": true,
+    "require_strict_drc": true,
+    "require_complete_routing": true,
+    "require_connectivity": true,
+    "require_writer_correctness": true,
+    "require_round_trip_zero_diff": true,
+    "require_deterministic_replay": true,
+    "require_contract_composition": true,
+    "require_global_reasoning": true,
+    "require_coverage_accounting": true,
+    "require_alternatives": true,
+    "require_fail_closed": true
+  }
+}

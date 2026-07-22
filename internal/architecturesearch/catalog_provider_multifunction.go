@@ -164,8 +164,12 @@ func (provider *CatalogProvider) expandFixedRegulators(ctx context.Context, requ
 		if err != nil || part.record.ID != record.ID {
 			continue
 		}
+		outputCapacitance, transientCalculation, err := regulatorOutputCapacitor(request, part.record)
+		if err != nil {
+			return nil, err
+		}
 		parts := []catalogPart{part}
-		parts, err = provider.appendPassiveParts(ctx, parts, []passivePart{{"input_bypass", "capacitor", "decoupling", "1u"}, {"output_bypass", "capacitor", "decoupling", "1u"}})
+		parts, err = provider.appendPassiveParts(ctx, parts, []passivePart{{"input_bypass", "capacitor", "decoupling", "1u"}, {"output_bypass", "capacitor", "decoupling", outputCapacitance}})
 		if err != nil {
 			return nil, err
 		}
@@ -179,7 +183,11 @@ func (provider *CatalogProvider) expandFixedRegulators(ctx context.Context, requ
 			semanticNet("regulator_output", "power", endpoint(part, "VOUT"), passiveEndpoint("output_bypass", "A")),
 			semanticNet("regulator_ground", "reference", endpoint(part, "GND"), passiveEndpoint("input_bypass", "B"), passiveEndpoint("output_bypass", "B")),
 		}
-		expansions, err := provider.expansion(request, "fixed_linear_regulator_"+derivedSemanticIdentifier(record.ID), parts, bindings, connections, nil, 0)
+		var calculations []CalculationEvidence
+		if transientCalculation != nil {
+			calculations = append(calculations, *transientCalculation)
+		}
+		expansions, err := provider.expansion(request, "fixed_linear_regulator_"+derivedSemanticIdentifier(record.ID), parts, bindings, connections, calculations, 0)
 		if err != nil {
 			return nil, err
 		}
@@ -1748,7 +1756,9 @@ func (provider *CatalogProvider) expandClassABOutput(ctx context.Context, reques
 		case "output":
 			bindings[index].Instance, bindings[index].Function = pnp.selected.InstanceID, "COLLECTOR"
 		case "reference":
-			bindings[index].Instance, bindings[index].Function = "input_bias", "B"
+			if hasNegativePower {
+				bindings[index].Instance, bindings[index].Function = "input_bias", "B"
+			}
 		}
 	}
 	driverInputEndpoints := []RealizationEndpoint{passiveEndpoint("input_coupling", "B"), endpoint(opamp, "IN_PLUS"), passiveEndpoint("input_bias", "A")}

@@ -30,6 +30,10 @@ const (
 	CodeGlobalCurrentUnknown     reports.Code = "ARCHITECTURE_GLOBAL_CURRENT_UNKNOWN"
 	CodeGlobalCurrentExceeded    reports.Code = "ARCHITECTURE_GLOBAL_CURRENT_EXCEEDED"
 	CodeGlobalConstraintUnproven reports.Code = "ARCHITECTURE_GLOBAL_CONSTRAINT_UNPROVEN"
+	CodePowerRailSourceMissing   reports.Code = "POWER_RAIL_SOURCE_MISSING"
+	CodePowerRailSourceAmbiguous reports.Code = "POWER_RAIL_SOURCE_AMBIGUOUS"
+	CodePowerRailCycle           reports.Code = "POWER_RAIL_CYCLE"
+	CodePowerSequenceUnproven    reports.Code = "POWER_SEQUENCE_UNPROVEN"
 )
 
 type SearchPolicy struct {

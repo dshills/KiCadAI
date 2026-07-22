@@ -849,6 +849,11 @@ func validateCandidateGlobal(requirement Requirement, selections []FragmentSelec
 		return nil, nil
 	}
 	var checks []GlobalCheck
+	powerChecks, powerValidation := validatePowerTreeTopology(requirement, selections)
+	if powerValidation != nil {
+		return nil, powerValidation
+	}
+	checks = append(checks, powerChecks...)
 	byAnchor := map[string][]PortContract{}
 	for _, selection := range selections {
 		for _, port := range selection.Ports {
@@ -1046,6 +1051,12 @@ func validateCandidateGlobal(requirement Requirement, selections []FragmentSelec
 				return nil, &candidateValidation{Code: CodeGlobalConstraintUnproven, Path: path, Message: "galvanic reference separation is not proven by distinct selected domains"}
 			}
 			checks = append(checks, GlobalCheck{Code: CodeGlobalConstraintUnproven, Path: path, Message: "selected isolation boundaries keep references in distinct voltage domains", Required: float64Pointer(1), Observed: float64Pointer(1), Margin: float64Pointer(0)})
+		case "rail_sequence_before", "rail_sequence_delay", "startup_monotonic", "startup_inrush_current":
+			check, validation := validatePowerSequenceConstraint(requirement, selections, constraint, path)
+			if validation != nil {
+				return nil, validation
+			}
+			checks = append(checks, check)
 		default:
 			return nil, &candidateValidation{Code: CodeGlobalConstraintUnproven, Path: path, Message: "system constraint has no deterministic global proof rule"}
 		}

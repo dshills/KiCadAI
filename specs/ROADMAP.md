@@ -1161,10 +1161,13 @@ uncertainty-aware behavioral intent compiler are complete. Further fixtures
 should target genuinely new uncertainty rather than repeat the same provider
 envelope.
 
-1. Add deterministic power-tree and signal-integrity synthesis around composed
-   digital/MCU subsystems: rail budgets, transient decoupling, startup order,
-   bus pull-ups, level transitions, fanout, and programming/boot loading, with
-   neutral failure-driven corpus and KiCad-backed promotion.
+1. Finish promotion of deterministic power-tree and interface synthesis. Rail
+   source/cycle proof, current/headroom reuse, transient-derived regulator
+   capacitance, startup order/delay, pull-up windows, level translation,
+   source termination, clock damping, and passive/proven-buffer ADC settling
+   are implemented. The remaining milestone work is broader clock evidence,
+   programming/boot loading, and the dedicated neutral failure-driven
+   KiCad-backed corpus.
 2. Expand a neutral held-out corpus into unsupported mixed-signal and
    power-control primitive/model families. Promote only after the new families
    have catalog, simulation, and physical evidence.

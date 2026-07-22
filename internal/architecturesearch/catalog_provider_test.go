@@ -3,6 +3,7 @@ package architecturesearch
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"math"
 	"slices"
 	"strings"
@@ -673,6 +674,17 @@ func TestCatalogProviderSizesOpenDrainPullupsFromRiseTimeAndCapacitance(t *testi
 			t.Fatalf("%s lacks bounded timing repair values: %#v", id, realization.RepairVariables)
 		}
 	}
+
+	impossible := translatorProviderRequest(3.3, 5)
+	impossible.Constraints = append(impossible.Constraints,
+		constraintNumber("rise_time", "maximum", 1e-12, "s", 0),
+		constraintNumber("load_capacitance", "maximum", 1e-6, "F", 0),
+	)
+	_, err = provider.Expand(context.Background(), impossible)
+	var typed *interfaceSynthesisError
+	if !errors.As(err, &typed) || typed.code != CodeInterfacePullupWindowEmpty {
+		t.Fatalf("impossible pull-up window error = %#v", err)
+	}
 }
 
 func TestCatalogProviderKeepsClassABNegativeRailDistinctFromReference(t *testing.T) {
@@ -796,6 +808,42 @@ func TestCatalogProviderKeepsClassABNegativeRailDistinctFromReference(t *testing
 		if instance.ID == "bias_enable_inverter" || instance.ID == "bias_clamp" || instance.ID == "enable_resistor" {
 			t.Fatalf("always-on Class AB bias contains a dead enable/clamp device: %#v", biasRealization.Instances)
 		}
+	}
+}
+
+func TestCatalogProviderBindsSingleSupplyClassABReferenceToNegativeRail(t *testing.T) {
+	provider, err := NewCatalogProvider(loadArchitectureCatalog(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	request := ProviderRequest{Capability: "class_ab_output_stage", Ports: []RoleContract{
+		providerRole("input", "analog_voltage", "sink", -1, 1),
+		providerRole("output", "analog_voltage", "source", -10, 10),
+		providerRole("power", "power", "sink", 21.6, 26.4),
+		providerRole("reference", "reference", "bidirectional", 0, 0),
+	}, Constraints: []Constraint{
+		constraintNumber("load_impedance", "minimum", 8, "ohm", 0),
+		constraintNumber("continuous_output_power", "minimum", 8, "W", 0),
+	}}
+	expansions, err := provider.Expand(context.Background(), request)
+	if err != nil || len(expansions) == 0 {
+		t.Fatalf("Expand() = %#v, %v", expansions, err)
+	}
+	realization, err := DecodeFragmentRealization(expansions[0].Payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.ContainsFunc(realization.PortBindings, func(binding RealizationPortBinding) bool {
+		return binding.Role == "reference" && binding.Instance == "voltage_driver" && binding.Function == "V_MINUS"
+	}) {
+		t.Fatalf("single-supply reference is not bound to the negative rail: %#v", realization.PortBindings)
+	}
+	if !slices.ContainsFunc(realization.Connections, func(connection RealizationConnection) bool {
+		return connection.ID == "class_ab_reference" && slices.ContainsFunc(connection.Endpoints, func(endpoint RealizationEndpoint) bool {
+			return endpoint.Instance == "voltage_driver" && endpoint.Function == "V_MINUS"
+		})
+	}) {
+		t.Fatalf("single-supply negative rail lacks the external reference endpoint: %#v", realization.Connections)
 	}
 }
 

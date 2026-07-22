@@ -663,14 +663,49 @@ func repairAcuteRouteOperationJunctions(request routing.Request, operations []tr
 		baselineRoutes := routingRoutesFromOperations(repaired)
 		baselineValidationBlockers := blockingIssueCount(routing.ValidateResult(request, routing.Result{Status: routing.StatusRouted, Routes: baselineRoutes}).Issues)
 		baselineClearanceBlockers := blockingIssueCount(routing.ValidatePhysicalClearance(request, baselineRoutes))
-		accepted := false
+		candidateDoglegs := make([][]transactions.Point, 0, 2+16*2)
 		for _, corner := range corners {
-			if sameRoutePoint(corner, junction.shared) || sameRoutePoint(corner, remote) ||
-				emittedRouteJunctionAngleDegrees(junction.shared, junction.fixedRemote, corner) < minimumEmittedRouteJunctionAngleDegrees {
+			candidateDoglegs = append(candidateDoglegs, []transactions.Point{corner})
+		}
+		segmentX := remote.XMM - junction.shared.XMM
+		segmentY := remote.YMM - junction.shared.YMM
+		segmentLength := math.Hypot(segmentX, segmentY)
+		if segmentLength > 1e-12 {
+			step := request.Rules.GridMM / 4
+			if step <= 0 {
+				step = math.Max(junction.fixed.widthMM, junction.repair.widthMM) / 8
+			}
+			step = math.Max(step, 0.025)
+			for ring := 1; ring <= 16; ring++ {
+				offset := float64(ring) * step
+				for _, direction := range []float64{1, -1} {
+					dx := direction * -segmentY / segmentLength * offset
+					dy := direction * segmentX / segmentLength * offset
+					candidateDoglegs = append(candidateDoglegs, []transactions.Point{
+						{XMM: junction.shared.XMM + dx, YMM: junction.shared.YMM + dy},
+						{XMM: remote.XMM + dx, YMM: remote.YMM + dy},
+					})
+				}
+			}
+		}
+		accepted := false
+		for _, dogleg := range candidateDoglegs {
+			if len(dogleg) == 0 || sameRoutePoint(dogleg[0], junction.shared) || sameRoutePoint(dogleg[0], remote) ||
+				emittedRouteJunctionAngleDegrees(junction.shared, junction.fixedRemote, dogleg[0]) < minimumEmittedRouteJunctionAngleDegrees {
+				continue
+			}
+			invalid := false
+			for _, point := range dogleg {
+				if sameRoutePoint(point, junction.shared) || sameRoutePoint(point, remote) {
+					invalid = true
+					break
+				}
+			}
+			if invalid {
 				continue
 			}
 			candidatePayload := payload
-			candidatePayload.Points = insertRoutePoint(payload.Points, junction.repair.pointIndex+1, corner)
+			candidatePayload.Points = insertRoutePoints(payload.Points, junction.repair.pointIndex+1, dogleg)
 			raw, err := json.Marshal(candidatePayload)
 			if err != nil {
 				continue
@@ -873,9 +908,13 @@ func emittedRouteJunctionAngleDegrees(origin, left, right transactions.Point) fl
 }
 
 func insertRoutePoint(points []transactions.Point, index int, point transactions.Point) []transactions.Point {
-	inserted := make([]transactions.Point, 0, len(points)+1)
+	return insertRoutePoints(points, index, []transactions.Point{point})
+}
+
+func insertRoutePoints(points []transactions.Point, index int, insertedPoints []transactions.Point) []transactions.Point {
+	inserted := make([]transactions.Point, 0, len(points)+len(insertedPoints))
 	inserted = append(inserted, points[:index]...)
-	inserted = append(inserted, point)
+	inserted = append(inserted, insertedPoints...)
 	inserted = append(inserted, points[index:]...)
 	return inserted
 }

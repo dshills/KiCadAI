@@ -13,6 +13,14 @@ import (
 // Explicit objective constraints always take precedence over inferred ones.
 func effectiveObjectiveConstraints(requirement Requirement, objective Objective) []Constraint {
 	constraints := cloneConstraints(objective.Constraints)
+	var sequenceConstraints []Constraint
+	for _, constraint := range requirement.Requirements.SystemConstraints {
+		switch constraint.Name {
+		case "rail_sequence_before", "rail_sequence_delay", "startup_monotonic", "startup_inrush_current":
+			sequenceConstraints = append(sequenceConstraints, constraint)
+		}
+	}
+	constraints = mergeProjectedConstraints(constraints, sequenceConstraints)
 	if requirement.Version != VersionV3 {
 		return constraints
 	}
