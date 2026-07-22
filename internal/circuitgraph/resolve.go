@@ -345,6 +345,45 @@ func LibraryEvidenceFromIndex(index libraryresolver.LibraryIndex) (map[string]Li
 	return symbols, footprints
 }
 
+// BindLibraryEvidence verifies the concrete symbols, pins, footprint, and pads
+// of an already catalog-resolved document. It avoids repeating catalog
+// selection, endpoint resolution, and graph validation when a caller must first
+// derive a design-scoped library closure from that concrete selection.
+func BindLibraryEvidence(resolved ResolvedDocument, options ResolveOptions) (ResolvedDocument, []reports.Issue) {
+	result := resolved
+	result.Components = append([]ResolvedComponent(nil), resolved.Components...)
+	var issues []reports.Issue
+	for index := range result.Components {
+		component := &result.Components[index]
+		path := fmt.Sprintf("components[%d]", index)
+		componentIssues := verifyLibraryEvidence(path, component.Functions, components.ResolvedComponent{Variant: component.Variant}, options)
+		issues = append(issues, componentIssues...)
+		if reports.HasBlockingIssue(componentIssues) {
+			continue
+		}
+		component.SymbolSources = nil
+		for _, function := range component.Functions {
+			if evidence, exists := options.LibrarySymbols[function.SymbolID]; exists && evidence.Source != "" {
+				component.SymbolSources = append(component.SymbolSources, evidence.Source)
+			}
+		}
+		slices.Sort(component.SymbolSources)
+		component.SymbolSources = slices.Compact(component.SymbolSources)
+		component.FootprintSources = nil
+		if evidence, exists := options.LibraryFootprints[component.FootprintID]; exists && evidence.Source != "" {
+			component.FootprintSources = []string{evidence.Source}
+		}
+	}
+	issues = dedupeGraphIssues(issues)
+	if reports.HasBlockingIssue(issues) {
+		return result, issues
+	}
+	result.LibraryHash = libraryEvidenceHash(options)
+	result.GenerationHash = generationHash(result)
+	result.ResolutionHash = resolvedHash(result)
+	return result, issues
+}
+
 func resolveComponent(ctx context.Context, instance Component, options ResolveOptions, recordsByID map[string]components.ComponentRecord, acceptance AcceptanceLevel, index int) (ResolvedComponent, []reports.Issue) {
 	path := fmt.Sprintf("components[%d]", index)
 	var resolved components.ResolvedComponent

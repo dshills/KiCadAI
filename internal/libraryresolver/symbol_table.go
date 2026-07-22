@@ -60,20 +60,20 @@ func discoverSymbolTableLibraries(ctx context.Context, tablePath string, project
 			return files, issues
 		}
 		if _, exists := seen[entry.Name]; exists {
-			issues = append(issues, reports.Issue{Code: reports.CodeValidationFailed, Severity: reports.SeverityError, Path: filepath.ToSlash(tablePath), Message: "duplicate symbol library nickname " + entry.Name + " in " + source})
+			issues = append(issues, symbolTableEntryIssue(entry.Name, tablePath, "duplicate symbol library nickname "+entry.Name+" in "+source))
 			continue
 		}
 		seen[entry.Name] = struct{}{}
 		resolved, ok := expandSymbolTableURI(entry.URI, variables)
 		if !ok {
-			issues = append(issues, reports.Issue{Code: reports.CodeValidationFailed, Severity: reports.SeverityError, Path: filepath.ToSlash(tablePath), Message: "unresolved symbol library URI variable in " + entry.Name + ": " + entry.URI})
+			issues = append(issues, symbolTableEntryIssue(entry.Name, tablePath, "unresolved symbol library URI variable in "+entry.Name+": "+entry.URI))
 			continue
 		}
 		if !filepath.IsAbs(resolved) && projectDir != "" {
 			resolved = filepath.Join(projectDir, resolved)
 		}
 		if !filepath.IsAbs(resolved) {
-			issues = append(issues, reports.Issue{Code: reports.CodeValidationFailed, Severity: reports.SeverityError, Path: filepath.ToSlash(tablePath), Message: "relative symbol library URI requires a base directory for " + entry.Name + ": " + entry.URI})
+			issues = append(issues, symbolTableEntryIssue(entry.Name, tablePath, "relative symbol library URI requires a base directory for "+entry.Name+": "+entry.URI))
 			continue
 		}
 		info, err := os.Stat(resolved)
@@ -84,16 +84,31 @@ func discoverSymbolTableLibraries(ctx context.Context, tablePath string, project
 				code = reports.CodeMissingFile
 				message = "symbol library path not found for " + entry.Name + ": " + filepath.ToSlash(resolved)
 			}
-			issues = append(issues, reports.Issue{Code: code, Severity: reports.SeverityError, Path: filepath.ToSlash(tablePath), Message: message})
+			issue := symbolTableEntryIssue(entry.Name, tablePath, message)
+			issue.Code = code
+			issues = append(issues, issue)
 			continue
 		}
 		if info.IsDir() {
-			issues = append(issues, reports.Issue{Code: reports.CodeInvalidArgument, Severity: reports.SeverityError, Path: filepath.ToSlash(tablePath), Message: "symbol library path is a directory for " + entry.Name + ": " + filepath.ToSlash(resolved)})
+			issue := symbolTableEntryIssue(entry.Name, tablePath, "symbol library path is a directory for "+entry.Name+": "+filepath.ToSlash(resolved))
+			issue.Code = reports.CodeInvalidArgument
+			issues = append(issues, issue)
 			continue
 		}
+		// Name is the container stem for monolithic symbol files; individual
+		// symbol names are discovered by parseSymbolFile. Footprint LibraryFile
+		// values instead represent one object per .kicad_mod file.
 		files = append(files, LibraryFile{Kind: LibraryFileSymbol, Path: filepath.ToSlash(resolved), LibraryNickname: entry.Name, Name: trimSuffixFold(filepath.Base(resolved), ".kicad_sym"), IDPrefix: entry.Name + ":", Source: source})
 	}
 	return files, issues
+}
+
+func symbolTableEntryIssue(nickname string, tablePath string, message string) reports.Issue {
+	return reports.Issue{
+		Code: reports.CodeValidationFailed, Severity: reports.SeverityError,
+		Path: "library.symbol." + strings.TrimSpace(nickname), Message: message,
+		Refs: []string{filepath.ToSlash(tablePath)},
+	}
 }
 
 func ParseSymbolLibraryTable(path string) ([]SymbolLibraryTableEntry, []reports.Issue) {

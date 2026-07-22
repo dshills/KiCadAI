@@ -9,6 +9,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"kicadai/internal/circuitgraph"
@@ -502,27 +503,54 @@ func evaluateCircuitPreflight(ctx context.Context, opts cliOptions) circuitPrefl
 	}
 
 	libraryIndex, libraryIssues := circuitPreflightLibraryIndex(ctx, opts)
-	issues = append(issues, preflightIssues(designworkflow.StageLibraryContext, libraryIssues)...)
-	if reports.HasBlockingIssue(libraryIssues) {
-		result.Data.Gates = append(result.Data.Gates, preflightGate("library_context", libraryIssues, designworkflow.StageLibraryContext))
-		result.Issues = issues
-		return result
-	}
 	result.LibraryIndex = libraryIndex
 	var symbols map[string]circuitgraph.LibrarySymbolEvidence
 	var footprints map[string]circuitgraph.LibraryFootprintEvidence
 	if libraryIndex != nil {
 		symbols, footprints = circuitgraph.LibraryEvidenceFromIndex(*libraryIndex)
 	}
-	resolver := circuitgraph.NewResolver(circuitgraph.ResolveOptions{Catalog: catalog, CatalogID: "preflight-catalog", LibrarySymbols: symbols, LibraryFootprints: footprints, RequireLibraryEvidence: libraryIndex != nil})
-	resolved, resolveIssues := resolver.Resolve(ctx, graph)
+	resolveOptions := circuitgraph.ResolveOptions{Catalog: catalog, CatalogID: "preflight-catalog", LibrarySymbols: symbols, LibraryFootprints: footprints, RequireLibraryEvidence: libraryIndex != nil}
+	resolver := circuitgraph.NewResolver(resolveOptions)
+	var resolved circuitgraph.ResolvedDocument
+	var resolveIssues []reports.Issue
+	if libraryIndex != nil {
+		// Select the concrete catalog records and variants without allowing
+		// unrelated inventory diagnostics to decide design validity. The strict
+		// evidence-backed resolution below still verifies every selected pin and
+		// pad after the corresponding library closure has passed.
+		selectionResolver := circuitgraph.NewResolver(circuitgraph.ResolveOptions{Catalog: catalog, CatalogID: "preflight-catalog"})
+		resolved, resolveIssues = selectionResolver.Resolve(ctx, graph)
+	} else {
+		resolved, resolveIssues = resolver.Resolve(ctx, graph)
+	}
 	resolveIssues = preflightIssues(designworkflow.StageComponentSelection, resolveIssues)
-	issues = append(issues, resolveIssues...)
+	issues = appendUniquePreflightIssues(issues, resolveIssues)
 	result.Data.Gates = append(result.Data.Gates, preflightGate("catalog_resolution", resolveIssues, designworkflow.StageComponentSelection))
 	if reports.HasBlockingIssue(resolveIssues) {
 		result.Issues = issues
 		result.Data.RepairOptions = circuitgraph.RepairOptions(graph, catalog, result.Issues)
 		return result
+	}
+	if libraryIndex != nil {
+		closure, closureIssues := libraryresolver.ResolveDesignClosure(*libraryIndex, circuitPreflightClosureRequest(resolved))
+		closureIssues = append(closureIssues, libraryresolver.DesignClosureIssuesFrom(libraryIssues, closure)...)
+		closureIssues = preflightIssues(designworkflow.StageLibraryContext, closureIssues)
+		issues = appendUniquePreflightIssues(issues, closureIssues)
+		result.Data.Gates = append(result.Data.Gates, preflightGate("library_context", closureIssues, designworkflow.StageLibraryContext))
+		if reports.HasBlockingIssue(closureIssues) {
+			result.Issues = issues
+			result.Data.RepairOptions = circuitgraph.RepairOptions(graph, catalog, result.Issues)
+			return result
+		}
+		resolved, resolveIssues = circuitgraph.BindLibraryEvidence(resolved, resolveOptions)
+		resolveIssues = preflightIssues(designworkflow.StageComponentSelection, resolveIssues)
+		issues = appendUniquePreflightIssues(issues, resolveIssues)
+		if reports.HasBlockingIssue(resolveIssues) {
+			result.Data.Gates = append(result.Data.Gates, preflightGate("library_evidence", resolveIssues, designworkflow.StageComponentSelection))
+			result.Issues = issues
+			result.Data.RepairOptions = circuitgraph.RepairOptions(graph, catalog, result.Issues)
+			return result
+		}
 	}
 	result.Data.Resolution = &resolved
 
@@ -585,8 +613,89 @@ func circuitPreflightLibraryIndex(ctx context.Context, opts cliOptions) (*librar
 	if !pinmapShouldUseLibraryResolver(opts) {
 		return nil, nil
 	}
-	index, issues := libraryresolver.Load(ctx, libraryRootsFromOptions(opts), libraryresolver.LoadOptions{CachePath: opts.libraryCache, Refresh: opts.refreshLibraryCache})
+	roots := libraryRootsFromOptions(opts)
+	if requestPath := strings.TrimSpace(opts.requestPath); requestPath != "" {
+		roots.ProjectDir = filepath.Dir(requestPath)
+	}
+	index, issues := libraryresolver.Load(ctx, roots, libraryresolver.LoadOptions{CachePath: opts.libraryCache, Refresh: opts.refreshLibraryCache})
 	return &index, issues
+}
+
+func circuitPreflightClosureRequest(resolved circuitgraph.ResolvedDocument) libraryresolver.ClosureRequest {
+	request := libraryresolver.ClosureRequest{}
+	for _, component := range resolved.Components {
+		request.Variants = append(request.Variants, libraryresolver.VariantReference{
+			ComponentID: component.ComponentID, VariantID: component.VariantID, FootprintID: component.FootprintID,
+		})
+		pinsBySymbol := map[string]map[string]struct{}{}
+		unitsBySymbol := map[string]map[int]struct{}{}
+		padSet := map[string]struct{}{}
+		for _, function := range component.Functions {
+			if pinsBySymbol[function.SymbolID] == nil {
+				pinsBySymbol[function.SymbolID] = map[string]struct{}{}
+			}
+			pinsBySymbol[function.SymbolID][function.SymbolPin] = struct{}{}
+			if unitsBySymbol[function.SymbolID] == nil {
+				unitsBySymbol[function.SymbolID] = map[int]struct{}{}
+			}
+			unitsBySymbol[function.SymbolID][function.Unit] = struct{}{}
+			padSet[function.Pad] = struct{}{}
+		}
+		for _, symbol := range component.Symbols {
+			unitSet := unitsBySymbol[symbol.SymbolID]
+			if unitSet == nil {
+				unitSet = map[int]struct{}{}
+			}
+			unitSet[symbol.Unit] = struct{}{}
+			request.Symbols = append(request.Symbols, libraryresolver.SymbolReference{
+				LibraryID: symbol.SymbolID, Units: sortedIntSet(unitSet), Pins: sortedStringSet(pinsBySymbol[symbol.SymbolID]),
+			})
+		}
+		request.Footprints = append(request.Footprints, libraryresolver.FootprintReference{LibraryID: component.FootprintID, Pads: sortedStringSet(padSet)})
+	}
+	return request
+}
+
+func sortedStringSet(values map[string]struct{}) []string {
+	result := make([]string, 0, len(values))
+	for value := range values {
+		result = append(result, value)
+	}
+	slices.Sort(result)
+	return result
+}
+
+func sortedIntSet(values map[int]struct{}) []int {
+	result := make([]int, 0, len(values))
+	for value := range values {
+		result = append(result, value)
+	}
+	slices.Sort(result)
+	return result
+}
+
+func appendUniquePreflightIssues(existing []reports.Issue, additional []reports.Issue) []reports.Issue {
+	seen := make(map[string]struct{}, len(existing)+len(additional))
+	for _, issue := range existing {
+		seen[preflightIssueKey(issue)] = struct{}{}
+	}
+	for _, issue := range additional {
+		key := preflightIssueKey(issue)
+		if _, exists := seen[key]; exists {
+			continue
+		}
+		seen[key] = struct{}{}
+		existing = append(existing, issue)
+	}
+	return existing
+}
+
+func preflightIssueKey(issue reports.Issue) string {
+	return strings.Join([]string{
+		string(issue.Code), string(issue.Severity), issue.IssueID, issue.RootCauseID,
+		issue.Stage, issue.RetryScope, issue.Path, issue.Message, issue.Suggestion,
+		issue.OperationID, strings.Join(issue.UUIDs, "\x1f"), strings.Join(issue.Refs, "\x1f"), strings.Join(issue.Nets, "\x1f"),
+	}, "\x00")
 }
 
 func preflightGate(name string, issues []reports.Issue, stage designworkflow.StageName) circuitPreflightGate {

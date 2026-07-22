@@ -65,7 +65,7 @@ func IndexSymbolsContext(ctx context.Context, inventory LibraryInventory) (map[s
 				issues = append(issues, reports.Issue{
 					Code:     reports.CodeValidationFailed,
 					Severity: reports.SeverityWarning,
-					Path:     record.Path,
+					Path:     "library.symbol." + record.LibraryID,
 					Message:  "duplicate symbol ID " + record.LibraryID,
 				})
 				continue

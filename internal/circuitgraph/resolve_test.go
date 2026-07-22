@@ -285,6 +285,42 @@ func TestResolveRequiresTrustedLibraryPinAndPadEvidence(t *testing.T) {
 	assertGraphIssueCode(t, issues, CodePadUnresolved)
 }
 
+func TestBindLibraryEvidenceMatchesDirectResolution(t *testing.T) {
+	document := minimalResolvedDocument()
+	catalog := minimalResolvedCatalog()
+	options := ResolveOptions{
+		Catalog: catalog, RequireLibraryEvidence: true,
+		LibrarySymbols: map[string]LibrarySymbolEvidence{
+			"Amplifier:Dual": {LibraryID: "Amplifier:Dual", Pins: map[string]struct{}{"1": {}, "2": {}}, Source: "amplifier.kicad_sym"},
+		},
+		LibraryFootprints: map[string]LibraryFootprintEvidence{
+			"Package:Dual": {LibraryID: "Package:Dual", Pads: map[string]struct{}{"1": {}, "2": {}}, Source: "dual.kicad_mod"},
+		},
+	}
+	provisional, provisionalIssues := NewResolver(ResolveOptions{Catalog: catalog}).Resolve(context.Background(), document)
+	if reports.HasBlockingIssue(provisionalIssues) {
+		t.Fatalf("provisional issues = %#v", provisionalIssues)
+	}
+	bound, bindIssues := BindLibraryEvidence(provisional, options)
+	direct, directIssues := NewResolver(options).Resolve(context.Background(), document)
+	if reports.HasBlockingIssue(bindIssues) || reports.HasBlockingIssue(directIssues) {
+		t.Fatalf("bind issues=%#v direct issues=%#v", bindIssues, directIssues)
+	}
+	if bound.LibraryHash == "" || bound.ResolutionHash != direct.ResolutionHash || bound.GenerationHash != direct.GenerationHash {
+		t.Fatalf("bound hashes=%s/%s/%s direct=%s/%s/%s", bound.LibraryHash, bound.ResolutionHash, bound.GenerationHash, direct.LibraryHash, direct.ResolutionHash, direct.GenerationHash)
+	}
+	if got := bound.Components[0].SymbolSources; len(got) != 1 || got[0] != "amplifier.kicad_sym" {
+		t.Fatalf("symbol sources=%#v", got)
+	}
+	if got := bound.Components[0].FootprintSources; len(got) != 1 || got[0] != "dual.kicad_mod" {
+		t.Fatalf("footprint sources=%#v", got)
+	}
+
+	delete(options.LibrarySymbols["Amplifier:Dual"].Pins, "2")
+	_, bindIssues = BindLibraryEvidence(provisional, options)
+	assertGraphIssueCode(t, bindIssues, CodePinUnresolved)
+}
+
 func TestResolveCollectsAllMultiUnitSymbolSources(t *testing.T) {
 	document := minimalResolvedDocument()
 	catalog := minimalResolvedCatalog()

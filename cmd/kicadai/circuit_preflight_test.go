@@ -32,6 +32,15 @@ func TestCircuitPreflightReadyAndDeterministic(t *testing.T) {
 	}
 }
 
+func TestAppendUniquePreflightIssuesPreservesOrder(t *testing.T) {
+	first := reports.Issue{Code: reports.CodeValidationFailed, Severity: reports.SeverityWarning, Path: "selection", Message: "selection warning"}
+	second := reports.Issue{Code: reports.CodeValidationFailed, Severity: reports.SeverityWarning, Path: "evidence", Message: "evidence warning"}
+	got := appendUniquePreflightIssues([]reports.Issue{first}, []reports.Issue{first, second})
+	if !reflect.DeepEqual(got, []reports.Issue{first, second}) {
+		t.Fatalf("issues=%#v", got)
+	}
+}
+
 func TestCircuitPreflightAcceptsDocumentedArgumentOrder(t *testing.T) {
 	graph := filepath.Join("..", "..", "examples", "circuit-graph", "rc_filter.json")
 	result := runCircuitPreflightCLI(t, []string{"circuit", "preflight", "--request", graph, "--json"})
@@ -41,7 +50,6 @@ func TestCircuitPreflightAcceptsDocumentedArgumentOrder(t *testing.T) {
 }
 
 func TestCircuitPreflightIgnoresUnreferencedLibraryDiagnostics(t *testing.T) {
-	t.Skip("known F2: remove after circuit preflight scopes library blockers to the design closure")
 	graph := writeCircuitCreateRCGraph(t)
 	symbolsRoot, footprintsRoot := writeCircuitCreateLibraryFixture(t)
 	writeTestFile(t, filepath.Join(symbolsRoot, "Unrelated.kicad_sym"), `
@@ -65,6 +73,140 @@ func TestCircuitPreflightIgnoresUnreferencedLibraryDiagnostics(t *testing.T) {
 	})
 	if !result.OK || !preflightResultData(t, result).ReadyForWrite {
 		t.Fatalf("unreferenced library diagnostic blocked design: %#v", result)
+	}
+
+	audit := runCircuitPreflightCLI(t, []string{
+		"--json",
+		"--catalog-dir", testComponentCatalogDir(t),
+		"--symbols-root", symbolsRoot,
+		"--footprints-root", footprintsRoot,
+		"component", "validate",
+	})
+	if !resultHasIssueMessage(audit, "hidden power pin") {
+		t.Fatalf("explicit library audit omitted unrelated diagnostic: %#v", audit)
+	}
+}
+
+func TestCircuitPreflightBlocksReferencedLibraryDefects(t *testing.T) {
+	for _, test := range []struct {
+		name string
+		edit func(t *testing.T, symbolsRoot string, footprintsRoot string)
+		want string
+	}{
+		{
+			name: "symbol_semantic_diagnostic",
+			edit: func(t *testing.T, symbolsRoot string, _ string) {
+				writeTestFile(t, filepath.Join(symbolsRoot, "Device.kicad_sym"), `
+(kicad_symbol_lib (version 20220914) (generator "kicadai-test")
+  (symbol "R"
+    (property "Reference" "R" (at 0 0 0))
+    (property "Value" "R" (at 0 -2.54 0))
+    (symbol "R_1_1"
+      (pin power_in line (at -5.08 0 0) (length 2.54) hide (name "PWR") (number "1"))
+      (pin passive line (at 5.08 0 180) (length 2.54) (name "~") (number "2"))))
+  (symbol "C"
+    (property "Reference" "C" (at 0 0 0))
+    (property "Value" "C" (at 0 -2.54 0))
+    (symbol "C_1_1"
+      (pin passive line (at -5.08 0 0) (length 2.54) (name "~") (number "1"))
+      (pin passive line (at 5.08 0 180) (length 2.54) (name "~") (number "2")))))`)
+			},
+			want: "hidden power pin",
+		},
+		{
+			name: "symbol_file_syntax",
+			edit: func(t *testing.T, symbolsRoot string, _ string) {
+				writeTestFile(t, filepath.Join(symbolsRoot, "Device.kicad_sym"), `(kicad_symbol_lib (symbol "R"`)
+			},
+			want: "referenced symbol is absent",
+		},
+		{
+			name: "footprint_file_syntax",
+			edit: func(t *testing.T, _ string, footprintsRoot string) {
+				writeTestFile(t, filepath.Join(footprintsRoot, "Resistor_SMD.pretty", "R_0805_2012Metric.kicad_mod"), `(footprint "R_0805_2012Metric"`)
+			},
+			want: "referenced footprint is absent",
+		},
+		{
+			name: "missing_inherited_base",
+			edit: func(t *testing.T, symbolsRoot string, _ string) {
+				writeTestFile(t, filepath.Join(symbolsRoot, "Device.kicad_sym"), `
+(kicad_symbol_lib (version 20220914) (generator "kicadai-test")
+  (symbol "R" (extends "Missing"))
+  (symbol "C"
+    (property "Reference" "C" (at 0 0 0))
+    (property "Value" "C" (at 0 -2.54 0))
+    (symbol "C_1_1"
+      (pin passive line (at -5.08 0 0) (length 2.54) (name "~") (number "1"))
+      (pin passive line (at 5.08 0 180) (length 2.54) (name "~") (number "2")))))`)
+			},
+			want: "referenced symbol is absent",
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			graph := writeCircuitCreateRCGraph(t)
+			symbolsRoot, footprintsRoot := writeCircuitCreateLibraryFixture(t)
+			test.edit(t, symbolsRoot, footprintsRoot)
+			result := runCircuitPreflightCLI(t, []string{
+				"--symbols-root", symbolsRoot,
+				"--footprints-root", footprintsRoot,
+				"--request", graph,
+				"circuit", "preflight",
+			})
+			if result.OK || preflightResultData(t, result).ReadyForWrite || !resultHasIssueMessage(result, test.want) {
+				t.Fatalf("referenced defect did not block with %q: %#v", test.want, result)
+			}
+		})
+	}
+}
+
+func TestCircuitPreflightIgnoresUnreferencedMalformedInheritance(t *testing.T) {
+	graph := writeCircuitCreateRCGraph(t)
+	symbolsRoot, footprintsRoot := writeCircuitCreateLibraryFixture(t)
+	writeTestFile(t, filepath.Join(symbolsRoot, "Unrelated.kicad_sym"), `
+(kicad_symbol_lib (version 20220914) (generator "kicadai-test")
+  (symbol "BrokenChild" (extends "MissingBase")))`)
+	result := runCircuitPreflightCLI(t, []string{
+		"--symbols-root", symbolsRoot,
+		"--footprints-root", footprintsRoot,
+		"--request", graph,
+		"circuit", "preflight",
+	})
+	if !result.OK || !preflightResultData(t, result).ReadyForWrite {
+		t.Fatalf("unreferenced inherited symbol blocked design: %#v", result)
+	}
+}
+
+func TestCircuitPreflightIncludesProjectSymbolTableInClosure(t *testing.T) {
+	graph := writeCircuitCreateRCGraph(t)
+	symbolsRoot, footprintsRoot := writeCircuitCreateLibraryFixture(t)
+	projectDir := filepath.Dir(graph)
+	writeTestFile(t, filepath.Join(projectDir, "sym-lib-table"), `
+(sym_lib_table
+  (version 7)
+  (lib (name "Device")(type "KiCad")(uri "${KIPRJMOD}/local-device.kicad_sym")(options "")(descr "local generated symbols")))`)
+	writeTestFile(t, filepath.Join(projectDir, "local-device.kicad_sym"), `
+(kicad_symbol_lib (version 20220914) (generator "kicadai-test")
+  (symbol "R"
+    (property "Reference" "R" (at 0 0 0))
+    (property "Value" "R" (at 0 -2.54 0))
+    (symbol "R_1_1"
+      (pin power_in line (at -5.08 0 0) (length 2.54) hide (name "PWR") (number "1"))
+      (pin passive line (at 5.08 0 180) (length 2.54) (name "~") (number "2"))))
+  (symbol "C"
+    (property "Reference" "C" (at 0 0 0))
+    (property "Value" "C" (at 0 -2.54 0))
+    (symbol "C_1_1"
+      (pin passive line (at -5.08 0 0) (length 2.54) (name "~") (number "1"))
+      (pin passive line (at 5.08 0 180) (length 2.54) (name "~") (number "2")))))`)
+	result := runCircuitPreflightCLI(t, []string{
+		"--symbols-root", symbolsRoot,
+		"--footprints-root", footprintsRoot,
+		"--request", graph,
+		"circuit", "preflight",
+	})
+	if result.OK || !resultHasIssueMessage(result, "hidden power pin") {
+		t.Fatalf("project symbol table did not participate in closure: %#v", result)
 	}
 }
 
@@ -653,6 +795,15 @@ func runCircuitPreflightCLI(t *testing.T, args []string) reports.Result {
 		t.Fatalf("decode preflight: %v\n%s", err, stdout.String())
 	}
 	return result
+}
+
+func resultHasIssueMessage(result reports.Result, fragment string) bool {
+	for _, issue := range result.Issues {
+		if strings.Contains(issue.Message, fragment) {
+			return true
+		}
+	}
+	return false
 }
 
 func preflightResultData(t *testing.T, result reports.Result) circuitPreflightData {

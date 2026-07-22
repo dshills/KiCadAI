@@ -38,8 +38,11 @@ kicadai component validate
 When symbol or footprint roots are configured, `component validate` also
 resolves every selectable catalog binding against those KiCad libraries. It
 fails before provider execution on missing symbols, units, pins, footprints,
-or pads and reports a deterministic `library_validation` summary. Explicitly
-blocked records remain excluded.
+or pads, retains the complete indexed-library diagnostic set, and reports a
+deterministic `library_validation` summary. Explicitly blocked records remain
+excluded. This command is the comprehensive audit path: diagnostics from any
+configured library object remain visible even when no current design selects
+that object.
 
 ```sh
 kicadai --symbols-root /path/to/kicad-symbols \
@@ -148,6 +151,15 @@ These commands report parsed units, common pins, electrical types, power-symbol
 flags, inherited metadata, rough graphics bounds, and resolver diagnostics.
 `writer check` can use the same resolver evidence when symbol roots are
 configured, and reports a `library_resolver` check when resolution is attempted.
+
+Circuit preflight and create use a narrower fail-closed rule. They first select
+the concrete catalog records and package variants, then construct a stable
+library closure containing the selected symbols, inherited bases, units, pins,
+footprints, pads, and variants. Diagnostics attached to that closure are
+blocking, including source-file parse failures and ambiguous nicknames. An
+unrelated installed-library diagnostic does not block the design and is omitted
+from create output; use `component validate` when a complete inventory audit is
+required. Missing closure objects still block before any project is written.
 
 Use `--library-cache .kicadai/library-index.json` for faster repeated loads and
 `--refresh-library-cache` to rebuild it. See

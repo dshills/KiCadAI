@@ -36,7 +36,7 @@ func IndexFootprintsContext(ctx context.Context, inventory LibraryInventory) (ma
 			issues = append(issues, reports.Issue{
 				Code:     reports.CodeValidationFailed,
 				Severity: reports.SeverityWarning,
-				Path:     result.record.Path,
+				Path:     "library.footprint." + result.record.FootprintID,
 				Message:  "duplicate footprint ID " + result.record.FootprintID,
 			})
 			continue

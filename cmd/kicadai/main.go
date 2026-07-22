@@ -1736,6 +1736,7 @@ func runComponent(ctx context.Context, opts cliOptions, stdout io.Writer) error 
 		if strings.TrimSpace(roots.SymbolsRoot) != "" || strings.TrimSpace(roots.FootprintsRoot) != "" {
 			index, _ := libraryresolver.Load(ctx, roots, libraryresolver.LoadOptions{CachePath: opts.libraryCache, Refresh: opts.refreshLibraryCache})
 			librarySummary, catalogLibraryIssues := components.ValidateCatalogLibraries(catalog, index)
+			result.Issues = append(result.Issues, index.Diagnostics...)
 			result.Issues = append(result.Issues, catalogLibraryIssues...)
 			data := map[string]any{
 				"family_count":       len(catalog.Families),
