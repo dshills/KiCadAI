@@ -6,6 +6,7 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"reflect"
 	"slices"
 	"sort"
 	"strings"
@@ -63,6 +64,185 @@ func TestRoutingRoutesFromOperationsPreservesCrossPhaseClearanceGeometry(t *test
 	}, routes)
 	if !reports.HasBlockingIssue(issues) {
 		t.Fatalf("issues = %#v, want the emitted cross-phase copper clearance violation", issues)
+	}
+}
+
+func TestRoutingRoutesFromOperationsModelsLogicalInnerTransitionAsThroughVia(t *testing.T) {
+	operations := []transactions.Operation{mustRouteOperation(t, transactions.RouteOperation{
+		Op: transactions.OpRoute, NetName: "A", Vias: []transactions.RouteViaSpec{{
+			At: transactions.Point{XMM: 5, YMM: 5}, DiameterMM: .7, DrillMM: .35, Layers: []string{"In1.Cu", "In2.Cu"},
+		}},
+	})}
+	routes := routingRoutesFromOperations(operations)
+	if len(routes) != 1 || len(routes[0].Vias) != 1 || !reflect.DeepEqual(routes[0].Vias[0].Layers, []string{"F.Cu", "B.Cu"}) {
+		t.Fatalf("physical via model = %#v, want writer-equivalent through span", routes)
+	}
+}
+
+func TestRepairEmittedRoutePhysicalClearanceDetoursCrossPhaseCopperAndForeignPad(t *testing.T) {
+	request := routing.Request{
+		Board: routing.Board{WidthMM: 60, HeightMM: 30, Layers: []routing.Layer{{Name: "F.Cu", Kind: routing.LayerCopper, Routable: true}, {Name: "B.Cu", Kind: routing.LayerCopper, Routable: true}}},
+		Rules: routing.Rules{GridMM: .25, TraceWidthMM: .2, ClearanceMM: .2},
+		Components: []routing.Component{{
+			Ref: "J7", Position: routing.Placement{XMM: 22, YMM: 11},
+			Pads: []routing.Pad{{Name: "1", Net: "composition_net_004", Shape: routing.PadCircle, Type: routing.PadThroughHole, Size: routing.Size{WidthMM: 1.7, HeightMM: 1.7}, Layers: []string{"*.Cu"}}},
+		}},
+	}
+	operations := []transactions.Operation{
+		mustRouteOperation(t, transactions.RouteOperation{Op: transactions.OpRoute, NetName: "composition_net_001", Layer: "F.Cu", WidthMM: .3, Points: []transactions.Point{{XMM: 22.75, YMM: 13.5}, {XMM: 23.25, YMM: 8}, {XMM: 21.25, YMM: 8}}}),
+		mustRouteOperation(t, transactions.RouteOperation{Op: transactions.OpRoute, NetName: "composition_net_008", Layer: "B.Cu", WidthMM: .2, Points: []transactions.Point{{XMM: 10.25, YMM: 8}, {XMM: 29.75, YMM: 8.5}}}),
+		mustRouteOperation(t, transactions.RouteOperation{Op: transactions.OpRoute, NetName: "composition_net_017", Layer: "B.Cu", WidthMM: .2, Points: []transactions.Point{{XMM: 1.75, YMM: 7.25}, {XMM: 15.25, YMM: 7.25}, {XMM: 15.25, YMM: 7.75}, {XMM: 50.25, YMM: 7.75}}}),
+	}
+	if issues := routing.ValidatePhysicalClearance(request, routingRoutesFromOperations(operations)); blockingIssueCount(issues) < 3 {
+		t.Fatalf("fixture issues = %#v, want cross-phase copper and foreign-pad blockers", issues)
+	}
+	repaired, issues := repairEmittedRoutePhysicalClearance(request, operations)
+	if reports.HasBlockingIssue(issues) {
+		t.Fatalf("repair issues = %#v", issues)
+	}
+	if issues := routing.ValidatePhysicalClearance(request, routingRoutesFromOperations(repaired)); reports.HasBlockingIssue(issues) {
+		t.Fatalf("repaired physical clearance = %#v", issues)
+	}
+	again, againIssues := repairEmittedRoutePhysicalClearance(request, operations)
+	if reports.HasBlockingIssue(againIssues) || len(repaired) != len(again) {
+		t.Fatalf("deterministic replay issues = %#v", againIssues)
+	}
+	for index := range repaired {
+		if string(repaired[index].Raw) != string(again[index].Raw) {
+			t.Fatalf("repair changed at operation %d", index)
+		}
+	}
+}
+
+func TestDeferPhysicalClearanceIssuesOnlyWhenStrictDRCIsRequired(t *testing.T) {
+	input := []reports.Issue{{Code: reports.CodeValidationFailed, Severity: reports.SeverityBlocked, Message: "conservative clearance"}}
+	offline, count := deferPhysicalClearanceIssuesToRequiredDRC(false, input)
+	if count != 0 || !reports.HasBlockingIssue(offline) {
+		t.Fatalf("offline issues = %#v count=%d, want blocking", offline, count)
+	}
+	external, count := deferPhysicalClearanceIssuesToRequiredDRC(true, input)
+	if count != 1 || len(external) != 0 {
+		t.Fatalf("external issues = %#v count=%d, want one finding delegated only to DRC evidence", external, count)
+	}
+	if input[0].Severity != reports.SeverityBlocked {
+		t.Fatalf("input mutated: %#v", input)
+	}
+}
+
+func TestFinalizeEmittedRoutePhysicalClearanceRunsOnlyForRequiredDRC(t *testing.T) {
+	request := routing.Request{
+		Board: routing.Board{WidthMM: 20, HeightMM: 20, Layers: []routing.Layer{{Name: "F.Cu", Kind: routing.LayerCopper, Routable: true}}},
+		Rules: routing.Rules{GridMM: .25, TraceWidthMM: .2, ClearanceMM: .2},
+	}
+	operations := []transactions.Operation{
+		mustRouteOperation(t, transactions.RouteOperation{Op: transactions.OpRoute, NetName: "A", Layer: "F.Cu", WidthMM: .2, Points: []transactions.Point{{XMM: 2, YMM: 10}, {XMM: 18, YMM: 10}}}),
+		mustRouteOperation(t, transactions.RouteOperation{Op: transactions.OpRoute, NetName: "B", Layer: "F.Cu", WidthMM: .2, Points: []transactions.Point{{XMM: 10, YMM: 2}, {XMM: 10, YMM: 18}}}),
+	}
+	offline, issues, before, after, _ := finalizeEmittedRoutePhysicalClearanceWhenRequired(false, request, operations)
+	if len(issues) != 0 || before != 0 || after != 0 || len(offline) != len(operations) {
+		t.Fatalf("offline finalization = operations:%d issues:%#v before:%d after:%d", len(offline), issues, before, after)
+	}
+	_, issues, before, _, _ = finalizeEmittedRoutePhysicalClearanceWhenRequired(true, request, operations)
+	if before == 0 || !reports.HasBlockingIssue(issues) {
+		t.Fatalf("strict finalization = issues:%#v before:%d, want detected unresolved crossing", issues, before)
+	}
+}
+
+func TestRepairEmittedRoutePhysicalClearanceRelocatesInteriorDoglegBetweenPads(t *testing.T) {
+	request := routing.Request{
+		Board: routing.Board{WidthMM: 20, HeightMM: 12, Layers: []routing.Layer{{Name: "F.Cu", Kind: routing.LayerCopper, Routable: true}}},
+		Rules: routing.Rules{GridMM: .25, TraceWidthMM: .5, ClearanceMM: .2},
+		Components: []routing.Component{{
+			Ref: "J1", Position: routing.Placement{XMM: 7.5, YMM: 0}, Pads: []routing.Pad{
+				{Name: "1", Net: "B", Position: routing.Point{YMM: 3.5}, Shape: routing.PadCircle, Type: routing.PadThroughHole, Size: routing.Size{WidthMM: 1.7, HeightMM: 1.7}, Layers: []string{"*.Cu"}},
+				{Name: "2", Net: "C", Position: routing.Point{YMM: 6.04}, Shape: routing.PadCircle, Type: routing.PadThroughHole, Size: routing.Size{WidthMM: 1.7, HeightMM: 1.7}, Layers: []string{"*.Cu"}},
+			},
+		}},
+	}
+	operations := []transactions.Operation{mustRouteOperation(t, transactions.RouteOperation{
+		Op: transactions.OpRoute, NetName: "A", Layer: "F.Cu", WidthMM: .5,
+		Points: []transactions.Point{{XMM: 1, YMM: 4.75}, {XMM: 5.95, YMM: 4.75}, {XMM: 5.95, YMM: 5}, {XMM: 9.05, YMM: 5}, {XMM: 9.05, YMM: 4.75}, {XMM: 15, YMM: 4.75}},
+	})}
+	repaired, issues := repairEmittedRoutePhysicalClearance(request, operations)
+	if reports.HasBlockingIssue(issues) {
+		t.Fatalf("repair issues = %#v", issues)
+	}
+	if issues := routing.ValidatePhysicalTrackClearance(request, routingRoutesFromOperations(repaired)); reports.HasBlockingIssue(issues) {
+		t.Fatalf("relocated dogleg clearance = %#v", issues)
+	}
+	for operationIndex, route := range decodeRouteOperations(repaired) {
+		if !route.decoded {
+			continue
+		}
+		for pointIndex := 1; pointIndex < len(route.payload.Points); pointIndex++ {
+			if route.payload.Points[pointIndex] == route.payload.Points[pointIndex-1] {
+				t.Fatalf("operation %d contains duplicate point %d after repair: %#v", operationIndex, pointIndex, route.payload.Points)
+			}
+		}
+	}
+}
+
+func TestBuildAlternateLayerPadDetourPreservesEndpointsAndAddsTransitions(t *testing.T) {
+	payload := transactions.RouteOperation{
+		Op: transactions.OpRoute, NetName: "A", Layer: "F.Cu", WidthMM: .2,
+		Points: []transactions.Point{{XMM: 1, YMM: 5}, {XMM: 9, YMM: 5}},
+	}
+	operation := mustRouteOperation(t, payload)
+	candidate, ok := buildAlternateLayerPadDetour([]transactions.Operation{operation}, 0, 0, payload, []routing.Point{
+		{XMM: 3, YMM: 5}, {XMM: 3, YMM: 3}, {XMM: 7, YMM: 3}, {XMM: 7, YMM: 5},
+	}, "B.Cu", routing.Rules{ViaDiameterMM: .7, ViaDrillMM: .35})
+	if !ok || len(candidate) != 3 {
+		t.Fatalf("candidate = %#v ok=%v, want three split operations", candidate, ok)
+	}
+	decoded := decodeRouteOperations(candidate)
+	if len(decoded) != 3 || decoded[1].payload.Layer != "B.Cu" || len(decoded[1].payload.Vias) != 2 {
+		t.Fatalf("decoded candidate = %#v", decoded)
+	}
+	if !sameRoutePoint(decoded[0].payload.Points[0], payload.Points[0]) ||
+		!sameRoutePoint(decoded[2].payload.Points[len(decoded[2].payload.Points)-1], payload.Points[len(payload.Points)-1]) {
+		t.Fatalf("route endpoints changed: %#v", decoded)
+	}
+}
+
+func TestBuildAlternateLayerPadDetourDistributesExistingViasByRetainedGeometry(t *testing.T) {
+	via := func(x float64) transactions.RouteViaSpec {
+		return transactions.RouteViaSpec{At: transactions.Point{XMM: x, YMM: 5}, DiameterMM: .7, DrillMM: .35, Layers: []string{"F.Cu", "B.Cu"}}
+	}
+	payload := transactions.RouteOperation{
+		Op: transactions.OpRoute, NetName: "A", Layer: "F.Cu", WidthMM: .2,
+		Points: []transactions.Point{{XMM: 1, YMM: 5}, {XMM: 4, YMM: 5}, {XMM: 6, YMM: 5}, {XMM: 9, YMM: 5}},
+		Vias:   []transactions.RouteViaSpec{via(2.5), via(7.5)},
+	}
+	operation := mustRouteOperation(t, payload)
+	detour := []routing.Point{{XMM: 4, YMM: 4}, {XMM: 6, YMM: 4}}
+	candidate, ok := buildAlternateLayerPadDetour([]transactions.Operation{operation}, 0, 1, payload, detour, "B.Cu", routing.Rules{ViaDiameterMM: .7, ViaDrillMM: .35})
+	if !ok {
+		t.Fatal("via-preserving split was rejected")
+	}
+	decoded := decodeRouteOperations(candidate)
+	if len(decoded) != 3 || len(decoded[0].payload.Vias) != 1 || len(decoded[1].payload.Vias) != 2 || len(decoded[2].payload.Vias) != 1 {
+		t.Fatalf("distributed vias = %#v", decoded)
+	}
+	if !sameRoutePoint(decoded[0].payload.Vias[0].At, via(2.5).At) || !sameRoutePoint(decoded[2].payload.Vias[0].At, via(7.5).At) {
+		t.Fatalf("existing vias moved between split operations: %#v", decoded)
+	}
+
+	payload.Vias = append(payload.Vias, via(5))
+	operation = mustRouteOperation(t, payload)
+	if _, ok := buildAlternateLayerPadDetour([]transactions.Operation{operation}, 0, 1, payload, detour, "B.Cu", routing.Rules{ViaDiameterMM: .7, ViaDrillMM: .35}); ok {
+		t.Fatal("split silently orphaned a via on the replaced segment")
+	}
+}
+
+func TestExpandPadDetourTransitionSpanMovesBothViasAwayFromObstacle(t *testing.T) {
+	detour := []routing.Point{{XMM: 3, YMM: 5}, {XMM: 3, YMM: 3}, {XMM: 7, YMM: 3}, {XMM: 7, YMM: 5}}
+	expanded := expandPadDetourTransitionSpan(detour, routing.Point{XMM: 1, YMM: 5}, routing.Point{XMM: 9, YMM: 5}, .5)
+	want := []routing.Point{{XMM: 2.5, YMM: 5}, {XMM: 2.5, YMM: 3}, {XMM: 7.5, YMM: 3}, {XMM: 7.5, YMM: 5}}
+	if !reflect.DeepEqual(expanded, want) {
+		t.Fatalf("expanded detour = %#v, want %#v", expanded, want)
+	}
+	if !reflect.DeepEqual(detour, []routing.Point{{XMM: 3, YMM: 5}, {XMM: 3, YMM: 3}, {XMM: 7, YMM: 3}, {XMM: 7, YMM: 5}}) {
+		t.Fatalf("input detour mutated: %#v", detour)
 	}
 }
 

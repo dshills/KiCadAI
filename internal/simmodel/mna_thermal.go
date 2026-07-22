@@ -147,7 +147,7 @@ func thermalDeviceSupportsDissipation(device ResolvedDevice) bool {
 		PrimitiveNMOSSwitchV1, PrimitivePMOSSwitchV1, PrimitiveBJTNPNV1, PrimitiveBJTPNPV1,
 		PrimitiveOpAmpV1, PrimitiveComparatorOpenCollectorV1,
 		PrimitiveAdjustableLinearRegulatorV1, PrimitiveFixedLinearRegulatorV1, PrimitiveFloatingAdjustableRegulatorV1,
-		PrimitiveBidirectionalOpenDrainTranslatorV1:
+		PrimitiveBidirectionalOpenDrainTranslatorV1, PrimitiveMCUStaticSupplyLoadV1, PrimitiveSensorStaticSupplyLoadV1:
 		return true
 	default:
 		return false
@@ -236,6 +236,10 @@ func thermalDeviceDissipation(device ResolvedDevice, system mnaSystem, solution 
 		outputPower := output * output / resistance
 		supply := math.Abs(voltage(terminals["V_PLUS"]) - voltage(terminals["V_MINUS"]))
 		return outputPower + parameters["quiescent_current_a"]*supply, true
+	case PrimitiveMCUStaticSupplyLoadV1, PrimitiveSensorStaticSupplyLoadV1:
+		parameters := namedValueMap(device.ModelParameters)
+		supply := math.Abs(voltage(terminals["POWER"]) - voltage(terminals["GROUND"]))
+		return parameters["maximum_supply_current_a"] * supply, true
 	default:
 		return 0, false
 	}

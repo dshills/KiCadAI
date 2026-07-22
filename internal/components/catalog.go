@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/fs"
+	"math"
 	"os"
 	"path"
 	"path/filepath"
@@ -190,6 +191,10 @@ func ValidateCatalog(catalog *Catalog) reports.Result {
 		issues = append(issues, validateCapacitorEvidence(path+".capacitor_evidence", record.Generic, record.Capacitor)...)
 		issues = append(issues, validateResistorEvidence(path+".resistor_evidence", record.Generic, record.Resistor)...)
 		issues = append(issues, validateOpAmpEvidence(path+".opamp_evidence", record.OpAmp)...)
+		issues = append(issues, validateClockEvidence(path+".clock_evidence", record.Clock)...)
+		issues = append(issues, validateInterfaceEvidence(path+".interface_evidence", record.Interface)...)
+		issues = append(issues, validateTranslatorEvidence(path+".translator_evidence", record.Translator)...)
+		issues = append(issues, validateADCEvidence(path+".adc_evidence", record.ADC)...)
 		issues = append(issues, validateSensorEvidence(path+".sensor_evidence", record)...)
 		issues = append(issues, validateMCUEvidence(path+".mcu_evidence", record)...)
 		issues = append(issues, validateAmplifierOutputEvidence(path+".amplifier_output_evidence", record)...)
@@ -612,8 +617,49 @@ func validateRegulatorEvidence(path string, evidence *RegulatorEvidence) []repor
 	}
 	var issues []reports.Issue
 	issues = append(issues, validateReviewStatus(path+".thermal_review", evidence.ThermalReview, "thermal review")...)
+	if evidence.SoftStartStatus != "" {
+		issues = append(issues, validateReviewStatus(path+".soft_start_status", evidence.SoftStartStatus, "soft-start")...)
+	}
+	if evidence.StartupMonotonicStatus != "" {
+		issues = append(issues, validateReviewStatus(path+".startup_monotonic_status", evidence.StartupMonotonicStatus, "monotonic startup")...)
+	}
 	if evidence.OutputCapacitor != nil {
 		issues = append(issues, validateRegulatorCapacitorStability(path+".output_capacitor", *evidence.OutputCapacitor)...)
+	}
+	require := evidence.FabricationProof
+	for suffix, value := range map[string]*EvidenceMeasurement{
+		"startup_time":                  evidence.StartupTime,
+		"maximum_inrush_current":        evidence.MaximumInrushCurrent,
+		"quiescent_current":             evidence.QuiescentCurrent,
+		"dropout_voltage":               evidence.DropoutVoltage,
+		"load_transient_recovery_time":  evidence.LoadTransientRecoveryTime,
+		"load_transient_peak_deviation": evidence.LoadTransientPeakDeviation,
+	} {
+		issues = append(issues, validateEvidenceMeasurement(path+"."+suffix, value, require)...)
+		if require && value == nil {
+			issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, path+"."+suffix, "fabrication-oriented regulator evidence requires this measurement"))
+		}
+	}
+	issues = append(issues, validateEvidenceRange(path+".efficiency", evidence.Efficiency, require)...)
+	if evidence.FabricationProof && evidence.FabricationCandidateBlocks {
+		issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, path+".fabrication_proof", "regulator fabrication proof cannot coexist with a fabrication-candidate blocker"))
+	}
+	if require {
+		if evidence.OutputCapacitor == nil {
+			issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, path+".output_capacitor", "fabrication-oriented regulator evidence requires output-capacitor stability"))
+		}
+		if evidence.Efficiency == nil {
+			issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, path+".efficiency", "fabrication-oriented regulator evidence requires an efficiency range"))
+		}
+		if evidence.SoftStartStatus != "proven" {
+			issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, path+".soft_start_status", "regulator fabrication proof requires proven soft-start status"))
+		}
+		if evidence.StartupMonotonicStatus != "proven" {
+			issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, path+".startup_monotonic_status", "regulator fabrication proof requires proven monotonic startup"))
+		}
+		if evidence.ThermalReview != "proven" {
+			issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, path+".thermal_review", "regulator fabrication proof requires proven thermal review"))
+		}
 	}
 	return issues
 }
@@ -802,6 +848,23 @@ func validateOpAmpEvidence(path string, evidence *OpAmpEvidence) []reports.Issue
 			issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, path+"."+suffix, "fabrication-oriented op-amp evidence requires this thermal limit"))
 		}
 	}
+	if stability := evidence.CapacitiveLoadStability; stability != nil {
+		issues = append(issues, validateEvidenceMeasurement(path+".capacitive_load_stability.direct_load_maximum", stability.DirectLoadMaximum, false)...)
+		issues = append(issues, validateEvidenceMeasurement(path+".capacitive_load_stability.isolated_load_maximum", stability.IsolatedLoadMaximum, false)...)
+		issues = append(issues, validateEvidenceRange(path+".capacitive_load_stability.isolation_resistance", stability.IsolationResistance, false)...)
+		if stability.DirectLoadMaximum == nil {
+			issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, path+".capacitive_load_stability.direct_load_maximum", "op-amp capacitive-load evidence requires a direct-load maximum"))
+		}
+		if stability.IsolatedLoadMaximum != nil && stability.IsolationResistance == nil {
+			issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, path+".capacitive_load_stability.isolation_resistance", "isolated capacitive-load evidence requires an isolation-resistance range"))
+		}
+		if stability.MinimumPhaseMarginDeg == nil || *stability.MinimumPhaseMarginDeg <= 0 || *stability.MinimumPhaseMarginDeg >= 180 {
+			issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, path+".capacitive_load_stability.minimum_phase_margin_deg", "op-amp capacitive-load evidence requires a phase margin between zero and 180 degrees"))
+		}
+		if strings.TrimSpace(stability.Conditions) == "" {
+			issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, path+".capacitive_load_stability.conditions", "op-amp capacitive-load evidence requires operating conditions"))
+		}
+	}
 	if require {
 		if evidence.SupplyVoltage == nil {
 			issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, path+".supply_voltage", "fabrication-oriented op-amp evidence requires a supply range"))
@@ -812,6 +875,169 @@ func validateOpAmpEvidence(path string, evidence *OpAmpEvidence) []reports.Issue
 		if evidence.OutputSwing == nil {
 			issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, path+".output_swing", "fabrication-oriented op-amp evidence requires output-swing limits"))
 		}
+	}
+	return issues
+}
+
+func validateClockEvidence(path string, evidence *ClockEvidence) []reports.Issue {
+	if evidence == nil {
+		return nil
+	}
+	var issues []reports.Issue
+	if strings.TrimSpace(evidence.ProofStatus) == "" {
+		issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, path+".proof_status", "clock proof status is required"))
+	} else {
+		issues = append(issues, validateReviewStatus(path+".proof_status", evidence.ProofStatus, "clock")...)
+	}
+	if len(evidence.SignalingModes) == 0 {
+		issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, path+".signaling_modes", "clock evidence requires at least one signaling mode"))
+	}
+	for index, mode := range evidence.SignalingModes {
+		if issue, ok := validateTrimmedMetadata(fmt.Sprintf("%s.signaling_modes[%d]", path, index), mode, "clock signaling mode"); ok {
+			issues = append(issues, issue)
+		}
+	}
+	if evidence.FabricationProof && evidence.FabricationCandidateBlocks {
+		issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, path+".fabrication_proof", "clock fabrication proof cannot coexist with a fabrication-candidate blocker"))
+	}
+	require := evidence.FabricationProof
+	for suffix, value := range map[string]*EvidenceRange{
+		"amplitude":   evidence.Amplitude,
+		"common_mode": evidence.CommonMode,
+		"edge_time":   evidence.EdgeTime,
+	} {
+		issues = append(issues, validateEvidenceRange(path+"."+suffix, value, require)...)
+		if require && value == nil {
+			issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, path+"."+suffix, "fabrication-oriented clock evidence requires this range"))
+		}
+	}
+	for suffix, value := range map[string]*EvidenceMeasurement{
+		"rms_jitter":              evidence.RMSJitter,
+		"startup_time":            evidence.StartupTime,
+		"maximum_frequency":       evidence.MaximumFrequency,
+		"output_impedance":        evidence.OutputImpedance,
+		"output_current":          evidence.OutputCurrent,
+		"maximum_capacitive_load": evidence.MaximumCapacitiveLoad,
+	} {
+		issues = append(issues, validateEvidenceMeasurement(path+"."+suffix, value, require)...)
+		if require && value == nil {
+			issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, path+"."+suffix, "fabrication-oriented clock evidence requires this measurement"))
+		}
+	}
+	if require && evidence.ProofStatus != "proven" {
+		issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, path+".proof_status", "clock fabrication proof requires proven status"))
+	}
+	return issues
+}
+
+func validateInterfaceEvidence(path string, evidence *InterfaceEvidence) []reports.Issue {
+	if evidence == nil {
+		return nil
+	}
+	issues := validateInterfaceEvidenceIdentity(path, evidence.ProofStatus, evidence.SignalingModes, evidence.Directions, evidence.FabricationProof, evidence.FabricationCandidateBlocks)
+	require := evidence.FabricationProof
+	issues = append(issues, validateEvidenceRange(path+".voltage", evidence.Voltage, require)...)
+	issues = append(issues, validateEvidenceRange(path+".edge_time", evidence.EdgeTime, require)...)
+	for suffix, value := range map[string]*EvidenceMeasurement{
+		"output_impedance":  evidence.OutputImpedance,
+		"output_current":    evidence.OutputCurrent,
+		"input_capacitance": evidence.InputCapacitance,
+		"input_leakage":     evidence.InputLeakage,
+		"maximum_frequency": evidence.MaximumFrequency,
+		"startup_time":      evidence.StartupTime,
+	} {
+		issues = append(issues, validateEvidenceMeasurement(path+"."+suffix, value, require)...)
+		if require && value == nil {
+			issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, path+"."+suffix, "fabrication-oriented interface evidence requires this measurement"))
+		}
+	}
+	for suffix, value := range map[string]*float64{
+		"output_low_maximum_v":  evidence.OutputLowMaximumV,
+		"output_high_minimum_v": evidence.OutputHighMinimumV,
+		"input_low_maximum_v":   evidence.InputLowMaximumV,
+		"input_high_minimum_v":  evidence.InputHighMinimumV,
+	} {
+		if value != nil && (math.IsNaN(*value) || math.IsInf(*value, 0) || *value < 0) {
+			issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, path+"."+suffix, "interface logic-level evidence must be finite and non-negative"))
+		}
+		if require && value == nil {
+			issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, path+"."+suffix, "fabrication-oriented interface evidence requires this logic level"))
+		}
+	}
+	return issues
+}
+
+func validateTranslatorEvidence(path string, evidence *TranslatorEvidence) []reports.Issue {
+	if evidence == nil {
+		return nil
+	}
+	issues := validateInterfaceEvidenceIdentity(path, evidence.ProofStatus, evidence.SignalingModes, evidence.Directions, evidence.FabricationProof, evidence.FabricationCandidateBlocks)
+	if evidence.ChannelCount <= 0 {
+		issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, path+".channel_count", "translator evidence requires a positive channel count"))
+	}
+	issues = append(issues, validateEvidenceRange(path+".side_a_voltage", evidence.SideAVoltage, true)...)
+	issues = append(issues, validateEvidenceRange(path+".side_b_voltage", evidence.SideBVoltage, true)...)
+	issues = append(issues, validateEvidenceMeasurement(path+".maximum_frequency", evidence.MaximumFrequency, true)...)
+	issues = append(issues, validateEvidenceMeasurement(path+".startup_time", evidence.StartupTime, evidence.FabricationProof)...)
+	if evidence.SideAVoltage == nil || evidence.SideBVoltage == nil || evidence.MaximumFrequency == nil {
+		issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, path, "translator evidence requires both voltage ranges and maximum frequency"))
+	}
+	if strings.TrimSpace(evidence.StartupState) == "" {
+		issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, path+".startup_state", "translator evidence requires a startup state"))
+	}
+	if evidence.FabricationProof && (!evidence.PartialPowerDown || evidence.StartupTime == nil) {
+		issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, path, "fabrication-oriented translator evidence requires partial-power-down and startup-time proof"))
+	}
+	return issues
+}
+
+func validateADCEvidence(path string, evidence *ADCEvidence) []reports.Issue {
+	if evidence == nil {
+		return nil
+	}
+	issues := validateRequiredProofStatus(path, "ADC", evidence.ProofStatus, evidence.FabricationProof, evidence.FabricationCandidateBlocks)
+	for suffix, value := range map[string]*EvidenceMeasurement{
+		"acquisition_capacitance":  evidence.AcquisitionCapacitance,
+		"acquisition_time":         evidence.AcquisitionTime,
+		"maximum_source_impedance": evidence.MaximumSourceImpedance,
+		"input_leakage":            evidence.InputLeakage,
+		"maximum_frequency":        evidence.MaximumFrequency,
+	} {
+		issues = append(issues, validateEvidenceMeasurement(path+"."+suffix, value, evidence.FabricationProof)...)
+		if evidence.FabricationProof && value == nil {
+			issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, path+"."+suffix, "fabrication-oriented ADC evidence requires this measurement"))
+		}
+	}
+	return issues
+}
+
+func validateInterfaceEvidenceIdentity(path, proofStatus string, modes, directions []string, fabricationProof, blocked bool) []reports.Issue {
+	issues := validateRequiredProofStatus(path, "interface", proofStatus, fabricationProof, blocked)
+	for suffix, values := range map[string][]string{"signaling_modes": modes, "directions": directions} {
+		if len(values) == 0 {
+			issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, path+"."+suffix, "interface evidence requires at least one "+strings.ReplaceAll(suffix, "_", " ")))
+		}
+		for index, value := range values {
+			if issue, ok := validateTrimmedMetadata(fmt.Sprintf("%s.%s[%d]", path, suffix, index), value, "interface evidence value"); ok {
+				issues = append(issues, issue)
+			}
+		}
+	}
+	return issues
+}
+
+func validateRequiredProofStatus(path, label, proofStatus string, fabricationProof, blocked bool) []reports.Issue {
+	var issues []reports.Issue
+	if strings.TrimSpace(proofStatus) == "" {
+		issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, path+".proof_status", label+" proof status is required"))
+	} else {
+		issues = append(issues, validateReviewStatus(path+".proof_status", proofStatus, label)...)
+	}
+	if fabricationProof && blocked {
+		issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, path+".fabrication_proof", label+" fabrication proof cannot coexist with a fabrication-candidate blocker"))
+	}
+	if fabricationProof && proofStatus != "proven" {
+		issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, path+".proof_status", label+" fabrication proof requires proven status"))
 	}
 	return issues
 }

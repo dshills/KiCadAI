@@ -534,6 +534,18 @@
         {"kind": "open_drain_data_rate", "max": "2000000", "unit": "Hz"}
       ],
       "temperature": {"min": "-40", "max": "85", "unit": "C"},
+      "translator_evidence": {
+        "proof_status": "proven",
+        "signaling_modes": ["open_drain"],
+        "directions": ["bidirectional"],
+        "channel_count": 2,
+        "side_a_voltage": {"minimum": 1.65, "maximum": 3.6, "unit": "V", "conditions": "TI TXS0102 Rev L recommended operating conditions"},
+        "side_b_voltage": {"minimum": 2.3, "maximum": 5.5, "unit": "V", "conditions": "TI TXS0102 Rev L recommended operating conditions"},
+        "maximum_frequency": {"value": 2000000, "unit": "Hz", "conditions": "open-drain operation"},
+        "partial_power_down": true,
+        "startup_state": "high_impedance",
+        "review_note": "VCC isolation and Ioff support bound the unpowered and disabled high-impedance state; enable propagation time is not promoted as fabrication proof."
+      },
       "simulation_models": [{
         "model_id": "mna_bidirectional_open_drain_translator_v1",
         "parameters": [

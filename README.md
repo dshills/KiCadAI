@@ -69,6 +69,13 @@ path.
   clarification, and eight produce stable unsupported outcomes. Every supported
   contract passes deterministic replay and the installed-KiCad promotion lane.
   See the [behavioral compiler audit](specs/uncertainty-aware-behavioral-intent-compilation/AUDIT.md).
+- Constraint-driven power-tree and interface synthesis now has a four-design
+  neutral promotion corpus: regulated MCU/sensor, protected power-MOSFET load,
+  buffered ADC acquisition, and Class-AB power/interface cases. All four pass
+  deterministic replay, complete routing/connectivity, writer correctness,
+  clean installed-KiCad ERC and strict DRC, and zero-difference round trip.
+  Ten reordered negative cases prove stable fail-closed power and interface
+  diagnostics. See the [completion audit](specs/constraint-driven-power-tree-interface-synthesis/AUDIT.md).
 - Arbitrary electronics generation is not yet guaranteed. Generic graphs fail
   closed on unknown parts, pins, ratings, placement, or routing capability.
 - MCU synthesis is limited to verified catalog records and modeled electrical

@@ -123,15 +123,18 @@ func (provider *CatalogProvider) expandGenericRegulator(ctx context.Context, req
 		numericConstraint("output_voltage", "target", output, "V", tolerance),
 		numericConstraint("continuous_output_current", "minimum", current, "A", currentTolerance),
 	})
-	adjustable, err := provider.expandRegulator(ctx, legacy)
-	if err != nil {
-		return nil, err
+	adjustable, adjustableErr := provider.expandRegulator(ctx, legacy)
+	fixed, fixedErr := provider.expandFixedRegulators(ctx, request, output, tolerance, inputMinimum, inputMaximum, current)
+	if fixedErr != nil {
+		return nil, fixedErr
 	}
-	fixed, err := provider.expandFixedRegulators(ctx, request, output, tolerance, inputMinimum, inputMaximum, current)
-	if err != nil {
-		return nil, err
+	if adjustableErr == nil {
+		return append(adjustable, fixed...), nil
 	}
-	return append(adjustable, fixed...), nil
+	if len(fixed) != 0 {
+		return fixed, nil
+	}
+	return nil, adjustableErr
 }
 
 func (provider *CatalogProvider) expandFixedRegulators(ctx context.Context, request ProviderRequest, output, tolerance, inputMinimum, inputMaximum, current float64) ([]ProviderExpansion, error) {
@@ -151,6 +154,10 @@ func (provider *CatalogProvider) expandFixedRegulators(ctx context.Context, requ
 			{Kind: "output_current", Value: numericString(current), Unit: "A"},
 		}
 		if !recordSupportsRatings(record, requiredRatings) {
+			continue
+		}
+		dropout, dropoutOK := recordRegulatorDropoutV(record)
+		if !dropoutOK || inputMinimum-output < dropout {
 			continue
 		}
 		if recordHasFunction(record, "EN") {
@@ -183,7 +190,11 @@ func (provider *CatalogProvider) expandFixedRegulators(ctx context.Context, requ
 			semanticNet("regulator_output", "power", endpoint(part, "VOUT"), passiveEndpoint("output_bypass", "A")),
 			semanticNet("regulator_ground", "reference", endpoint(part, "GND"), passiveEndpoint("input_bypass", "B"), passiveEndpoint("output_bypass", "B")),
 		}
-		var calculations []CalculationEvidence
+		dropoutCalculation, err := regulatorDropoutCalculation(inputMinimum, output, part.record)
+		if err != nil {
+			return nil, err
+		}
+		calculations := []CalculationEvidence{dropoutCalculation}
 		if transientCalculation != nil {
 			calculations = append(calculations, *transientCalculation)
 		}
@@ -278,7 +289,7 @@ func (provider *CatalogProvider) expandGenericTranslator(ctx context.Context, re
 		frequency, _, _ = firstNumericConstraint(request.Constraints, "bus_frequency")
 	}
 	if frequency <= 0 {
-		return nil, fmt.Errorf("logic translation requires protocol frequency evidence")
+		return nil, &interfaceSynthesisError{code: CodeInterfaceTranslationUnavailable, message: "logic translation requires protocol frequency evidence"}
 	}
 	legacy := cloneProviderRequest(request)
 	legacy.Constraints = mergeProjectedConstraints(legacy.Constraints, []Constraint{

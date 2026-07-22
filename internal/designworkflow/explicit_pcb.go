@@ -192,11 +192,19 @@ func RouteExplicitCircuit(ctx context.Context, request Request, placed Placement
 			result.Status = routing.StatusBlocked
 		}
 	}
+	operations, clearanceIssues, clearanceBlockersBefore, clearanceBlockersAfter, clearanceMM := finalizeEmittedRoutePhysicalClearanceWhenRequired(request.Validation.RequireDRC, routingRequest, operations)
+	clearanceIssues, clearanceDeferredToDRC := deferPhysicalClearanceIssuesToRequiredDRC(request.Validation.RequireDRC, clearanceIssues)
+	issues = append(issues, clearanceIssues...)
+	result.Issues = append(result.Issues, clearanceIssues...)
+	if reports.HasBlockingIssue(clearanceIssues) {
+		result.Status = routing.StatusBlocked
+	}
 	stage := NewStageResult(StageRouting, issues)
 	stage.Summary = map[string]any{
 		"status": result.Status, "net_count": result.Metrics.NetCount, "routed_nets": result.Metrics.RoutedNetCount,
 		"failed_nets": result.Metrics.FailedNetCount, "route_operations": len(operations), "route_order": routeOrder,
-		"clearance_mm": routingRequest.Rules.ClearanceMM,
+		"clearance_mm": clearanceMM, "physical_clearance_before_repair": clearanceBlockersBefore,
+		"physical_clearance_after_repair": clearanceBlockersAfter, "physical_clearance_deferred_drc": clearanceDeferredToDRC,
 	}
 	if result.Status != routing.StatusRouted && stage.Status == StageStatusOK {
 		stage.Status = StageStatusWarning

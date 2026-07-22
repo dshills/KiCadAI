@@ -54,6 +54,12 @@ protected dual-rail 10 W RMS/8 ohm speaker composition have promoted evidence.
 Other speaker powers, bridge operation, mains supplies, arbitrary output-device
 families, substitutions, loads, and heatsinks remain fail-closed boundaries.
 
+Power-tree and interface synthesis composes these and other ordinary fragment
+realizations from typed obligations; it does not add a block family for each
+promoted circuit. Regulator, translation, pull-up, termination, clock, ADC, and
+op-amp support decisions remain catalog/evidence driven, then lower through the
+same generic placement, routing, writer, and KiCad validation path.
+
 `amplifier_input_buffer` is the first implemented family-level front-end
 contract. It emits a passive AC-coupled input conditioning and bias-reference
 fragment with input impedance and high-pass cutoff evidence. It is structural

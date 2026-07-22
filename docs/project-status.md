@@ -208,16 +208,22 @@ KiCad ERC/strict DRC, routing/connectivity, writer correctness, deterministic
 replay, and zero normalized round-trip gates. See
 [Simulation-Grounded Closed-Loop Synthesis](closed-loop-synthesis.md).
 
-Constraint-driven power-tree and interface synthesis is now implemented for a
-first bounded slice. Typed requirements prove one selected producer per
-generated rail and reject rail cycles deterministically. Regulator output
-capacitance can be derived from catalog stability evidence and bounded load
-transients. Rail sequence order/delay, whole-bus pull-up windows,
-source-series termination, clock-source damping, passive ADC settling, and
-catalog-evidence-gated buffered ADC drive now produce calculation evidence and
-stable unsupported results. These are reusable architecture capabilities, not
-fixture-specific circuit families. Dedicated mixed-signal corpus promotion is
-still in progress; see the [implementation audit](../specs/constraint-driven-power-tree-interface-synthesis/AUDIT.md).
+Constraint-driven power-tree and interface synthesis is promoted for a bounded
+catalog-backed slice. Typed requirements prove one selected producer per
+generated rail, reject rail cycles, aggregate current/quiescent demand, apply
+dropout and efficiency evidence, derive transient/stability capacitance, and
+check startup sequence, monotonicity, inrush, and thermal bounds. Whole-bus
+pull-up windows, level translation, source-series termination, clock
+conditioning, passive ADC settling, and catalog-evidence-gated buffered ADC
+drive produce calculation evidence and stable unsupported results.
+
+A neutral four-design corpus covers a regulated MCU/sensor subsystem, protected
+power-MOSFET load, buffered ADC acquisition path, and Class-AB amplifier power
+interface. Every case passes offline deterministic replay plus installed-KiCad
+clean ERC, strict DRC, complete routing/connectivity, writer correctness, and
+zero-difference round trip. Ten reordered negative cases prove stable failure
+codes. These are reusable architecture capabilities, not fixture-specific
+circuit families; see the [completion audit](../specs/constraint-driven-power-tree-interface-synthesis/AUDIT.md).
 
 Generic graphs can resolve ideal fixed-regulator, resistor-divider DC, and RC
 low-pass AC models through a deterministic trusted registry. They can also use
@@ -272,13 +278,12 @@ envelope remain unsupported.
 
 ## Remaining Direction
 
-The next closure step is the dedicated neutral power/interface corpus and
-broader clock evidence for amplitude, common mode, edge, and jitter bounds.
-The first deterministic power-tree, transient-capacitance, bus-bias,
-termination, sequence, and ADC-drive primitives now exist; they still need
-held-out mixed-domain KiCad promotion as a group. Additional mixed-signal
-primitives, catalog-independent part qualification, and denser-board physical
-synthesis remain important. Unknown behavior must continue to produce a stable
+The next closure step is to expand genuinely unsupported mixed-signal and
+power-control primitive/model families, especially dynamic electrothermal and
+control-loop evidence that static bounds cannot prove. Broader clock/fanout,
+programming-load, converter, isolation, and high-energy protection coverage,
+catalog-independent part qualification, and denser-board physical synthesis
+remain important. Unknown behavior must continue to produce a stable
 capability gap instead of guessed implementation detail.
 
 See the [Roadmap](../specs/ROADMAP.md) for prioritized work and the

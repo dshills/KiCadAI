@@ -9,7 +9,7 @@ import (
 	"testing"
 )
 
-const frozenAdversarialMultiFunctionManifestSHA256 = "29308e5393091294a8befe69034fdcb0a8da6e06595ef25f0a5f023eb2618290"
+const frozenAdversarialMultiFunctionManifestSHA256 = "3daf2327b26cfebf13b2975f065b0ffac78033d208a86fcd01a830a450d9588d"
 
 type adversarialMultiFunctionManifest struct {
 	Schema        string                                    `json:"schema"`

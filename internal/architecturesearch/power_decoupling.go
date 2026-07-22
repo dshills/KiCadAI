@@ -12,6 +12,7 @@ import (
 const (
 	CodePowerCapacitorStabilityUnproven      reports.Code = "POWER_CAPACITOR_STABILITY_UNPROVEN"
 	CodePowerTransientCapacitanceUnavailable reports.Code = "POWER_TRANSIENT_CAPACITANCE_UNAVAILABLE"
+	CodePowerDropoutMarginUnavailable        reports.Code = "POWER_DROPOUT_MARGIN_UNAVAILABLE"
 )
 
 type powerSynthesisError struct {

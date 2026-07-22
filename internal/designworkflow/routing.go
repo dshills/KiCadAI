@@ -327,35 +327,42 @@ func RoutePlacement(ctx context.Context, request Request, fragments PCBFragmentR
 	}
 	operations, routePostProcessIssues = postProcessRouteOperations(operations, &placed, physicalContext, physicalContactEvidence)
 	issues = append(issues, routePostProcessIssues...)
+	operations, physicalClearanceRepairIssues, physicalClearanceBlockersBeforeRepair, physicalClearanceBlockersAfterRepair, physicalClearanceMM := finalizeEmittedRoutePhysicalClearanceWhenRequired(request.Validation.RequireDRC, routingRequest, operations)
+	physicalClearanceRepairIssues, physicalClearanceDeferredToDRC := deferPhysicalClearanceIssuesToRequiredDRC(request.Validation.RequireDRC, physicalClearanceRepairIssues)
+	issues = append(issues, physicalClearanceRepairIssues...)
 	stage := NewStageResult(StageRouting, issues)
 	stage.Issues = cloneIssues(issues)
 	routeDiagnostics := routing.DiagnosticsForResult(result)
 	routeTreeContactGraph := SummarizeRouteTreeContactGraph(interBlockContactEvidence, contactGraphOperations, routeTreeAccess)
 	stage.Summary = map[string]any{
-		"local_route_operations":        len(localOperations),
-		"route_operations":              len(result.Operations),
-		"routed_nets":                   result.Metrics.RoutedNetCount,
-		"failed_nets":                   result.Metrics.FailedNetCount,
-		"status":                        result.Status,
-		"repair_diagnostics":            len(routeDiagnostics),
-		"local_route_mobility":          localRouteMobility,
-		"route_connectivity":            localRouteConnectivity,
-		"inter_block_routing":           summarizeInterBlockRouteCompletionWithGraphOperations(interBlockCandidates, routeOperations, contactGraphOperations, issues, interBlockContactEvidence),
-		"inter_block_route_trees":       routeTreeExecution.Summary,
-		"route_tree_branches":           routeTreeExecution.Branches,
-		"route_tree_access":             SummarizeRouteTreeEndpointAccess(routeTreeAccess),
-		"route_tree_contact_graph":      routeTreeContactGraph,
-		"physical_pad_routing":          physicalPadRouting,
-		"residual_physical_route_trees": residualTreeExecution.Summary,
-		"pre_tree_route_operations":     len(preTreeRouteOperations),
-		"pre_tree_routed_nets":          preTreeResult.Metrics.RoutedNetCount,
-		"pre_tree_failed_nets":          preTreeResult.Metrics.FailedNetCount,
-		"pre_tree_route_order":          preTreeOrder,
-		"final_route_order":             finalRouteOrder,
-		"route_tree_missing_endpoints":  SummarizeRouteTreeMissingEndpointTrace(interBlockContactEvidence, routeTreeAccess),
-		"required_net_classification":   SummarizeRequiredNetClassification(&routeTreeContactGraph),
-		"route_tree_repair":             SummarizeRouteTreeRepair(routeTreeRepairHints),
-		"inter_block_contacts":          SummarizeInterBlockContacts(interBlockContactEvidence),
+		"local_route_operations":           len(localOperations),
+		"route_operations":                 len(result.Operations),
+		"routed_nets":                      result.Metrics.RoutedNetCount,
+		"failed_nets":                      result.Metrics.FailedNetCount,
+		"status":                           result.Status,
+		"repair_diagnostics":               len(routeDiagnostics),
+		"local_route_mobility":             localRouteMobility,
+		"route_connectivity":               localRouteConnectivity,
+		"inter_block_routing":              summarizeInterBlockRouteCompletionWithGraphOperations(interBlockCandidates, routeOperations, contactGraphOperations, issues, interBlockContactEvidence),
+		"inter_block_route_trees":          routeTreeExecution.Summary,
+		"route_tree_branches":              routeTreeExecution.Branches,
+		"route_tree_access":                SummarizeRouteTreeEndpointAccess(routeTreeAccess),
+		"route_tree_contact_graph":         routeTreeContactGraph,
+		"physical_pad_routing":             physicalPadRouting,
+		"residual_physical_route_trees":    residualTreeExecution.Summary,
+		"pre_tree_route_operations":        len(preTreeRouteOperations),
+		"pre_tree_routed_nets":             preTreeResult.Metrics.RoutedNetCount,
+		"pre_tree_failed_nets":             preTreeResult.Metrics.FailedNetCount,
+		"pre_tree_route_order":             preTreeOrder,
+		"final_route_order":                finalRouteOrder,
+		"physical_clearance_before_repair": physicalClearanceBlockersBeforeRepair,
+		"physical_clearance_after_repair":  physicalClearanceBlockersAfterRepair,
+		"physical_clearance_deferred_drc":  physicalClearanceDeferredToDRC,
+		"physical_clearance_mm":            physicalClearanceMM,
+		"route_tree_missing_endpoints":     SummarizeRouteTreeMissingEndpointTrace(interBlockContactEvidence, routeTreeAccess),
+		"required_net_classification":      SummarizeRequiredNetClassification(&routeTreeContactGraph),
+		"route_tree_repair":                SummarizeRouteTreeRepair(routeTreeRepairHints),
+		"inter_block_contacts":             SummarizeInterBlockContacts(interBlockContactEvidence),
 	}
 	if len(anchorOperations) > 0 {
 		stage.Summary["anchor_binding_route_operations"] = len(anchorOperations)
@@ -369,20 +376,66 @@ func RoutePlacement(ctx context.Context, request Request, fragments PCBFragmentR
 	return RoutingStageResult{Request: routingRequest, Result: result, Operations: operations, Stage: stage}
 }
 
+// finalizeEmittedRoutePhysicalClearance is the shared last copper-geometry
+// boundary for every routing pipeline. The search grid may reduce its working
+// clearance to escape intrinsic footprint pad spacing, but the writer still
+// emits the project default for ordinary tracks. Validate and repair against
+// that unchanged writer-visible floor before returning transaction operations.
+func finalizeEmittedRoutePhysicalClearance(request routing.Request, operations []transactions.Operation) ([]transactions.Operation, []reports.Issue, int, int, float64) {
+	request.Rules.ClearanceMM = math.Max(request.Rules.ClearanceMM, routing.DefaultRules().ClearanceMM)
+	before := blockingIssueCount(routing.ValidatePhysicalTrackClearance(request, routingRoutesFromOperations(operations)))
+	repaired, issues := repairEmittedRoutePhysicalClearance(request, operations)
+	after := blockingIssueCount(routing.ValidatePhysicalTrackClearance(request, routingRoutesFromOperations(repaired)))
+	return repaired, issues, before, after, request.Rules.ClearanceMM
+}
+
+// finalizeEmittedRoutePhysicalClearanceWhenRequired reserves writer-level DRC
+// geometry enforcement for workflows that explicitly request authoritative
+// KiCad DRC. Structural/offline workflows may use conservative template pad
+// geometry and do not claim this physical acceptance level.
+func finalizeEmittedRoutePhysicalClearanceWhenRequired(requireDRC bool, request routing.Request, operations []transactions.Operation) ([]transactions.Operation, []reports.Issue, int, int, float64) {
+	if !requireDRC {
+		return operations, nil, 0, 0, request.Rules.ClearanceMM
+	}
+	return finalizeEmittedRoutePhysicalClearance(request, operations)
+}
+
+// deferPhysicalClearanceIssuesToRequiredDRC keeps offline workflows fail-closed
+// while allowing the authoritative installed-KiCad DRC to decide conservative
+// internal geometry findings. Strict-DRC workflows retain the delegated count
+// in stage evidence instead of reporting findings that KiCad may disprove.
+func deferPhysicalClearanceIssuesToRequiredDRC(requireDRC bool, issues []reports.Issue) ([]reports.Issue, int) {
+	deferred := cloneIssues(issues)
+	if !requireDRC {
+		return deferred, 0
+	}
+	count := 0
+	retained := deferred[:0]
+	for _, issue := range deferred {
+		if issue.Blocking() {
+			count++
+			continue
+		}
+		retained = append(retained, issue)
+	}
+	return retained, count
+}
+
 func routingRoutesFromOperations(operations []transactions.Operation) []routing.Route {
+	return routingRoutesFromDecodedOperations(decodeRouteOperations(operations))
+}
+
+func routingRoutesFromDecodedOperations(operations []decodedRouteOperation) []routing.Route {
 	routesByNet := map[string]*routing.Route{}
 	order := make([]string, 0)
 	for _, operation := range operations {
-		if operation.Op != transactions.OpRoute {
+		if !operation.decoded {
 			continue
 		}
-		var payload transactions.RouteOperation
-		if err := json.Unmarshal(operation.Raw, &payload); err != nil {
-			continue
-		}
+		payload := operation.payload
 		netName := strings.TrimSpace(payload.NetName)
 		if netName == "" {
-			netName = strings.TrimSpace(operation.Net)
+			netName = strings.TrimSpace(operation.operation.Net)
 		}
 		if netName == "" {
 			continue
@@ -402,9 +455,17 @@ func routingRoutesFromOperations(operations []transactions.Operation) []routing.
 			})
 		}
 		for _, via := range payload.Vias {
+			layers := append([]string(nil), via.Layers...)
+			if len(layers) >= 2 {
+				// RouteViaSpec has no blind/buried via type, and the PCB writer
+				// deliberately emits every ordinary route via as a plated F.Cu-to-
+				// B.Cu through via regardless of logical transition endpoints. Model
+				// that exact writer contract during candidate validation.
+				layers = []string{"F.Cu", "B.Cu"}
+			}
 			route.Vias = append(route.Vias, routing.Via{
 				Net: netName, At: routing.Point{XMM: via.At.XMM, YMM: via.At.YMM},
-				DiameterMM: via.DiameterMM, DrillMM: via.DrillMM, Layers: append([]string(nil), via.Layers...),
+				DiameterMM: via.DiameterMM, DrillMM: via.DrillMM, Layers: layers,
 			})
 		}
 	}
@@ -413,6 +474,28 @@ func routingRoutesFromOperations(operations []transactions.Operation) []routing.
 		routes = append(routes, *routesByNet[netName])
 	}
 	return routes
+}
+
+func routingRoutesWithPayload(operations []decodedRouteOperation, operationIndex int, payload transactions.RouteOperation) []routing.Route {
+	candidate := append([]decodedRouteOperation(nil), operations...)
+	if operationIndex >= 0 && operationIndex < len(candidate) {
+		candidate[operationIndex].payload = payload
+		candidate[operationIndex].decoded = true
+	}
+	return routingRoutesFromDecodedOperations(candidate)
+}
+
+func replaceRouteOperationPayload(operations []transactions.Operation, operationIndex int, payload transactions.RouteOperation) ([]transactions.Operation, bool) {
+	if operationIndex < 0 || operationIndex >= len(operations) {
+		return nil, false
+	}
+	raw, err := json.Marshal(payload)
+	if err != nil {
+		return nil, false
+	}
+	candidate := append([]transactions.Operation(nil), operations...)
+	candidate[operationIndex].Raw = raw
+	return candidate, true
 }
 
 type emittedRouteTransitionVia struct {
@@ -478,6 +561,343 @@ func repairRouteTransitionViaClearance(request routing.Request, operations []tra
 		}
 	}
 	return repaired, nil
+}
+
+// repairEmittedRoutePhysicalClearance validates the complete cross-phase
+// copper set, including foreign pads, after all route trees and local routes
+// have been combined. It preserves every route endpoint and tries bounded,
+// grid-ordered parallel doglegs only when they strictly reduce the number of
+// physical blockers. This closes the gap between independently valid routing
+// phases without recognizing a fixture, net, component, or coordinate.
+func repairEmittedRoutePhysicalClearance(request routing.Request, operations []transactions.Operation) ([]transactions.Operation, []reports.Issue) {
+	repaired := append([]transactions.Operation(nil), operations...)
+	maximumAttempts := max(1, len(emittedRouteSegments(repaired))*2)
+	gridMM := request.Rules.GridMM
+	if gridMM <= 0 || math.IsNaN(gridMM) || math.IsInf(gridMM, 0) {
+		gridMM = routing.DefaultRules().GridMM
+	}
+	for attempt := 0; attempt < maximumAttempts; attempt++ {
+		baselineRoutes := routingRoutesFromOperations(repaired)
+		baselineIssues := routing.ValidatePhysicalTrackClearance(request, baselineRoutes)
+		baselineBlockers := blockingIssueCount(baselineIssues)
+		if baselineBlockers == 0 {
+			return compactRouteOperationGeometry(repaired), nil
+		}
+		baselineValidation := blockingIssueCount(routing.ValidateResult(request, routing.Result{Status: routing.StatusRouted, Routes: baselineRoutes}).Issues)
+		progress := false
+		decoded := decodeRouteOperations(repaired)
+		for _, segment := range emittedRouteSegments(repaired) {
+			if segment.operationIndex < 0 || segment.operationIndex >= len(repaired) || repaired[segment.operationIndex].Ref == localRouteEndpointDogboneOperationRef {
+				continue
+			}
+			dx := segment.end.XMM - segment.start.XMM
+			dy := segment.end.YMM - segment.start.YMM
+			length := math.Hypot(dx, dy)
+			if length <= 1e-9 {
+				continue
+			}
+			if segment.operationIndex >= len(decoded) || !decoded[segment.operationIndex].decoded {
+				continue
+			}
+			payload := decoded[segment.operationIndex].payload
+			if segment.pointIndex < 0 || segment.pointIndex+1 >= len(payload.Points) {
+				continue
+			}
+			targetSegment := routing.Segment{
+				Net: payload.NetName, Layer: payload.Layer,
+				Start: routing.Point{XMM: segment.start.XMM, YMM: segment.start.YMM},
+				End:   routing.Point{XMM: segment.end.XMM, YMM: segment.end.YMM}, WidthMM: payload.WidthMM,
+			}
+			if !reports.HasBlockingIssue(routing.ValidatePhysicalTrackClearanceForSegment(request, baselineRoutes, targetSegment)) {
+				continue
+			}
+			baselineNetBlockers := blockingIssueCount(routing.ValidatePhysicalTrackClearanceForNet(request, baselineRoutes, payload.NetName))
+			if baselineNetBlockers == 0 {
+				continue
+			}
+			if segment.pointIndex > 0 && segment.pointIndex+2 < len(payload.Points) {
+				for ring := 1; ring <= 16 && !progress; ring++ {
+					offsetMM := float64(ring) * gridMM
+					for _, direction := range []float64{1, -1} {
+						offsetX := direction * -dy / length * offsetMM
+						offsetY := direction * dx / length * offsetMM
+						candidatePayload := payload
+						candidatePayload.Points = append([]transactions.Point(nil), payload.Points...)
+						candidatePayload.Points[segment.pointIndex].XMM += offsetX
+						candidatePayload.Points[segment.pointIndex].YMM += offsetY
+						candidatePayload.Points[segment.pointIndex+1].XMM += offsetX
+						candidatePayload.Points[segment.pointIndex+1].YMM += offsetY
+						if !routePointsInsideBoard(request.Board, candidatePayload.Points) {
+							continue
+						}
+						candidateRoutes := routingRoutesWithPayload(decoded, segment.operationIndex, candidatePayload)
+						candidateNetBlockers := blockingIssueCount(routing.ValidatePhysicalTrackClearanceForNet(request, candidateRoutes, payload.NetName))
+						if candidateNetBlockers >= baselineNetBlockers ||
+							blockingIssueCount(routing.ValidateResult(request, routing.Result{Status: routing.StatusRouted, Routes: candidateRoutes}).Issues) > baselineValidation {
+							continue
+						}
+						candidate, ok := replaceRouteOperationPayload(repaired, segment.operationIndex, candidatePayload)
+						if !ok {
+							continue
+						}
+						repaired = candidate
+						progress = true
+						break
+					}
+				}
+			}
+			if progress {
+				break
+			}
+			padDetours := routing.PhysicalPadDetourCandidates(request, targetSegment, 16)
+			for _, detour := range padDetours {
+				candidatePoints := make([]transactions.Point, len(detour))
+				for index, point := range detour {
+					candidatePoints[index] = transactions.Point{XMM: point.XMM, YMM: point.YMM}
+				}
+				if !routePointsInsideBoard(request.Board, candidatePoints) {
+					continue
+				}
+				candidatePayload := payload
+				candidatePayload.Points = insertRoutePoints(payload.Points, segment.pointIndex+1, candidatePoints)
+				candidateRoutes := routingRoutesWithPayload(decoded, segment.operationIndex, candidatePayload)
+				candidateNetBlockers := blockingIssueCount(routing.ValidatePhysicalTrackClearanceForNet(request, candidateRoutes, payload.NetName))
+				if candidateNetBlockers >= baselineNetBlockers ||
+					blockingIssueCount(routing.ValidateResult(request, routing.Result{Status: routing.StatusRouted, Routes: candidateRoutes}).Issues) > baselineValidation {
+					continue
+				}
+				candidate, ok := replaceRouteOperationPayload(repaired, segment.operationIndex, candidatePayload)
+				if !ok {
+					continue
+				}
+				repaired = candidate
+				progress = true
+				break
+			}
+			if progress {
+				break
+			}
+			for ring := 1; ring <= 16 && !progress; ring++ {
+				offsetMM := float64(ring) * gridMM
+				for _, direction := range []float64{1, -1} {
+					offsetX := direction * -dy / length * offsetMM
+					offsetY := direction * dx / length * offsetMM
+					dogleg := []transactions.Point{
+						{XMM: segment.start.XMM + offsetX, YMM: segment.start.YMM + offsetY},
+						{XMM: segment.end.XMM + offsetX, YMM: segment.end.YMM + offsetY},
+					}
+					if !routePointsInsideBoard(request.Board, dogleg) {
+						continue
+					}
+					candidatePayload := payload
+					candidatePayload.Points = insertRoutePoints(payload.Points, segment.pointIndex+1, dogleg)
+					candidateRoutes := routingRoutesWithPayload(decoded, segment.operationIndex, candidatePayload)
+					candidateNetBlockers := blockingIssueCount(routing.ValidatePhysicalTrackClearanceForNet(request, candidateRoutes, payload.NetName))
+					if candidateNetBlockers >= baselineNetBlockers ||
+						blockingIssueCount(routing.ValidateResult(request, routing.Result{Status: routing.StatusRouted, Routes: candidateRoutes}).Issues) > baselineValidation {
+						continue
+					}
+					candidate, ok := replaceRouteOperationPayload(repaired, segment.operationIndex, candidatePayload)
+					if !ok {
+						continue
+					}
+					repaired = candidate
+					progress = true
+					break
+				}
+			}
+			if !progress && len(padDetours) != 0 {
+				baselineAllPhysical := blockingIssueCount(routing.ValidatePhysicalClearance(request, baselineRoutes))
+				for _, detour := range padDetours {
+					for spanRing := 0; spanRing <= 8 && !progress; spanRing++ {
+						expandedDetour := expandPadDetourTransitionSpan(detour, routing.Point{XMM: segment.start.XMM, YMM: segment.start.YMM}, routing.Point{XMM: segment.end.XMM, YMM: segment.end.YMM}, float64(spanRing)*gridMM)
+						for _, alternateLayer := range alternateRoutableLayers(request.Board, payload.Layer) {
+							candidate, ok := buildAlternateLayerPadDetour(repaired, segment.operationIndex, segment.pointIndex, payload, expandedDetour, alternateLayer, request.Rules)
+							if !ok {
+								continue
+							}
+							candidateRoutes := routingRoutesFromOperations(candidate)
+							candidateNetBlockers := blockingIssueCount(routing.ValidatePhysicalTrackClearanceForNet(request, candidateRoutes, payload.NetName))
+							if candidateNetBlockers >= baselineNetBlockers ||
+								blockingIssueCount(routing.ValidateResult(request, routing.Result{Status: routing.StatusRouted, Routes: candidateRoutes}).Issues) > baselineValidation ||
+								blockingIssueCount(routing.ValidatePhysicalClearance(request, candidateRoutes)) > baselineAllPhysical {
+								continue
+							}
+							repaired = candidate
+							progress = true
+							break
+						}
+					}
+					if progress {
+						break
+					}
+				}
+			}
+			if progress {
+				break
+			}
+		}
+		if !progress {
+			return compactRouteOperationGeometry(repaired), baselineIssues
+		}
+	}
+	repaired = compactRouteOperationGeometry(repaired)
+	return repaired, routing.ValidatePhysicalTrackClearance(request, routingRoutesFromOperations(repaired))
+}
+
+func alternateRoutableLayers(board routing.Board, current string) []string {
+	var layers []string
+	for _, layer := range board.Layers {
+		if !layer.Routable || layer.Kind != routing.LayerCopper || canonicalCopperLayer(layer.Name) == canonicalCopperLayer(current) {
+			continue
+		}
+		layers = append(layers, layer.Name)
+	}
+	return layers
+}
+
+func expandPadDetourTransitionSpan(detour []routing.Point, segmentStart routing.Point, segmentEnd routing.Point, extensionMM float64) []routing.Point {
+	expanded := append([]routing.Point(nil), detour...)
+	if len(expanded) < 4 || extensionMM <= 0 {
+		return expanded
+	}
+	dx := segmentEnd.XMM - segmentStart.XMM
+	dy := segmentEnd.YMM - segmentStart.YMM
+	length := math.Hypot(dx, dy)
+	if length <= 1e-9 {
+		return expanded
+	}
+	offsetX, offsetY := dx/length*extensionMM, dy/length*extensionMM
+	expanded[0].XMM -= offsetX
+	expanded[0].YMM -= offsetY
+	expanded[1].XMM -= offsetX
+	expanded[1].YMM -= offsetY
+	last := len(expanded) - 1
+	expanded[last-1].XMM += offsetX
+	expanded[last-1].YMM += offsetY
+	expanded[last].XMM += offsetX
+	expanded[last].YMM += offsetY
+	return expanded
+}
+
+func buildAlternateLayerPadDetour(operations []transactions.Operation, operationIndex int, pointIndex int, payload transactions.RouteOperation, detour []routing.Point, alternateLayer string, rules routing.Rules) ([]transactions.Operation, bool) {
+	if operationIndex < 0 || operationIndex >= len(operations) || pointIndex < 0 || pointIndex+1 >= len(payload.Points) || len(detour) < 2 || strings.TrimSpace(alternateLayer) == "" {
+		return nil, false
+	}
+	toTransactionPoint := func(point routing.Point) transactions.Point {
+		return transactions.Point{XMM: point.XMM, YMM: point.YMM}
+	}
+	entry := toTransactionPoint(detour[0])
+	exit := toTransactionPoint(detour[len(detour)-1])
+	prefix := payload
+	prefix.Points = append([]transactions.Point(nil), payload.Points[:pointIndex+1]...)
+	prefix.Points = appendDistinctTransactionPoint(prefix.Points, entry)
+	prefix.Vias = nil
+	middle := transactions.RouteOperation{Op: transactions.OpRoute, NetName: payload.NetName, Layer: alternateLayer, WidthMM: payload.WidthMM}
+	for _, point := range detour {
+		middle.Points = appendDistinctTransactionPoint(middle.Points, toTransactionPoint(point))
+	}
+	suffix := payload
+	suffix.Points = []transactions.Point{exit}
+	for _, point := range payload.Points[pointIndex+1:] {
+		suffix.Points = appendDistinctTransactionPoint(suffix.Points, point)
+	}
+	suffix.Vias = nil
+	for _, via := range payload.Vias {
+		switch {
+		case routeViaOnTransactionPolyline(via, prefix.Points):
+			prefix.Vias = append(prefix.Vias, via)
+		case routeViaOnTransactionPolyline(via, suffix.Points):
+			suffix.Vias = append(suffix.Vias, via)
+		case routeViaOnTransactionPolyline(via, middle.Points):
+			middle.Vias = append(middle.Vias, via)
+		default:
+			// Never silently orphan an existing physical layer transition when
+			// replacing the segment that carried it.
+			return nil, false
+		}
+	}
+	defaults := routing.DefaultRules()
+	viaDiameterMM := rules.ViaDiameterMM
+	if viaDiameterMM <= 0 {
+		viaDiameterMM = defaults.ViaDiameterMM
+	}
+	viaDrillMM := rules.ViaDrillMM
+	if viaDrillMM <= 0 {
+		viaDrillMM = defaults.ViaDrillMM
+	}
+	transitionVias := []transactions.RouteViaSpec{
+		{At: entry, DiameterMM: viaDiameterMM, DrillMM: viaDrillMM, Layers: []string{payload.Layer, alternateLayer}},
+		{At: exit, DiameterMM: viaDiameterMM, DrillMM: viaDrillMM, Layers: []string{payload.Layer, alternateLayer}},
+	}
+	for _, via := range transitionVias {
+		if !routeViaAtTransactionPoint(prefix.Vias, via.At) && !routeViaAtTransactionPoint(middle.Vias, via.At) && !routeViaAtTransactionPoint(suffix.Vias, via.At) {
+			middle.Vias = append(middle.Vias, via)
+		}
+	}
+	if len(prefix.Points) < 2 || len(middle.Points) < 2 || len(suffix.Points) < 2 {
+		return nil, false
+	}
+	encode := func(template transactions.Operation, route transactions.RouteOperation) (transactions.Operation, bool) {
+		raw, err := json.Marshal(route)
+		if err != nil {
+			return transactions.Operation{}, false
+		}
+		encoded := template.Clone()
+		encoded.Raw = raw
+		encoded.Net = route.NetName
+		return encoded, true
+	}
+	template := operations[operationIndex]
+	prefixOperation, ok := encode(template, prefix)
+	if !ok {
+		return nil, false
+	}
+	middleOperation, ok := encode(template, middle)
+	if !ok {
+		return nil, false
+	}
+	suffixOperation, ok := encode(template, suffix)
+	if !ok {
+		return nil, false
+	}
+	candidate := make([]transactions.Operation, 0, len(operations)+2)
+	candidate = append(candidate, operations[:operationIndex]...)
+	candidate = append(candidate, prefixOperation, middleOperation, suffixOperation)
+	candidate = append(candidate, operations[operationIndex+1:]...)
+	return candidate, true
+}
+
+func routeViaOnTransactionPolyline(via transactions.RouteViaSpec, points []transactions.Point) bool {
+	for index := 1; index < len(points); index++ {
+		if pointToSegmentDistanceMM(via.At, points[index-1], points[index]) <= 1e-6 {
+			return true
+		}
+	}
+	return false
+}
+
+func routeViaAtTransactionPoint(vias []transactions.RouteViaSpec, point transactions.Point) bool {
+	return slices.ContainsFunc(vias, func(via transactions.RouteViaSpec) bool {
+		return sameRoutePoint(via.At, point)
+	})
+}
+
+func appendDistinctTransactionPoint(points []transactions.Point, point transactions.Point) []transactions.Point {
+	if len(points) != 0 && sameRoutePoint(points[len(points)-1], point) {
+		return points
+	}
+	return append(points, point)
+}
+
+func routePointsInsideBoard(board routing.Board, points []transactions.Point) bool {
+	for _, point := range points {
+		if point.XMM < 0 || point.YMM < 0 || point.XMM > board.WidthMM || point.YMM > board.HeightMM ||
+			math.IsNaN(point.XMM) || math.IsNaN(point.YMM) || math.IsInf(point.XMM, 0) || math.IsInf(point.YMM, 0) {
+			return false
+		}
+	}
+	return true
 }
 
 func emittedRouteTransitionVias(operations []transactions.Operation) []emittedRouteTransitionVia {

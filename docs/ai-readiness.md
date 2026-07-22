@@ -184,6 +184,24 @@ arbitrary-MCU claim. Unverified targets and unmodeled bus loading, power
 transients, RF, thermal, or high-speed requirements continue to fail closed or
 remain explicit review boundaries.
 
+## Power-Tree And Interface Synthesis
+
+A neutral four-design corpus now proves the bounded catalog-backed power and
+mixed-signal interface slice without naming selected parts or physical
+coordinates. It covers a regulated MCU/sensor subsystem, protected MOSFET load,
+buffered ADC acquisition path, and Class-AB amplifier power interface. The
+shared lane derives or validates rail source topology, current and transient
+budgets, regulator dynamics and thermal margin, sequencing, pull-ups, level
+translation, source termination, clock conditioning, and passive or buffered
+ADC settling.
+
+All four designs pass deterministic offline replay and the installed-KiCad
+ERC, strict DRC, route/connectivity, writer, and zero-difference round-trip
+gates. Ten reordered negative cases retain stable typed failure codes. This
+promotes the modeled slice only; unreviewed converter/control-loop behavior,
+isolation, RF/high-speed interfaces, arbitrary parts, and high-energy thermal
+or protection claims remain unsupported.
+
 ## Validation
 
 Run:

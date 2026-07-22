@@ -1,85 +1,95 @@
-# Constraint-Driven Power-Tree and Interface Synthesis Audit
+# Constraint-Driven Power-Tree And Interface Synthesis Completion Audit
 
-## Status
+Verified 2026-07-22 with Go 1.26.5 on darwin/arm64 and KiCad CLI 10.0.3.
 
-The bounded milestone is implemented and reproducible. Clock support remains
-deliberately limited to frequency- and impedance-bounded source damping;
-requests needing unmodeled amplitude, common-mode, edge, or jitter correction
-remain unsupported rather than guessed.
+## Result
 
-## Implemented evidence
+The bounded catalog-backed milestone is complete. Four neutral, target-free
+requirements pass deterministic architecture selection, offline workflow
+replay, lowering, complete routing/connectivity, writer correctness, clean
+installed-KiCad ERC, strict DRC, and zero normalized round-trip differences.
+Ten failure-driven requests retain the same typed code and message after
+semantically irrelevant input reordering.
 
-| Requirement | Evidence | Status |
-|---|---|---|
-| One selected source per generated rail | `power_tree.go`; missing and ambiguous producer tests | pass |
-| Acyclic rail graph | deterministic sorted graph walk and shuffled-input cycle test | pass |
-| Current/headroom/load aggregation | existing candidate-global domain current and headroom checks | pass |
-| Regulator voltage, current, dropout, thermal selection | existing catalog ratings, simulation headroom, and thermal calculations | pass |
-| Stability and transient output capacitance | catalog stability window plus `C >= I*dt/dV`, upward E12 selection, hashed calculation evidence | pass |
-| Rail startup order and delay | selected producer startup evidence with stable `POWER_SEQUENCE_UNPROVEN` failure | pass |
-| Monotonic startup and inrush | fail closed until a selected model supplies the missing evidence | pass/unsupported |
-| Whole-bus I2C pull-up sizing | bounded rise-time/sink-current window and stable empty-window rejection | pass |
-| Level translation | existing reviewed bidirectional open-drain translator selection | pass |
-| Source termination | driver/target impedance calculation and deterministic E24 series resistance | pass |
-| Clock source damping | frequency-gated source termination with a clock-specific stable rejection | bounded pass |
-| Passive ADC drive | acquisition/accuracy/source-capacitance settling proof | pass |
-| Buffered ADC drive | proven op-amp evidence filter plus bandwidth and RC settling proof | pass |
-| Generic physical lowering | semantic instances, connections, power/reference roles, and ordinary transaction lowering | pass |
-| Class-AB single-supply reference | negative rail is bound to the external reference; midpoint remains a bias node | pass |
-| Acute same-net branch repair | bounded perpendicular two-corner doglegs with full route/clearance revalidation | pass |
+This is not an arbitrary-electronics or fabrication-release claim. It proves
+the reviewed component, model, analysis, and physical-synthesis envelope
+described by `SPEC.md`.
 
-## Stable rejection families
+## Ready corpus evidence
 
-- `POWER_RAIL_SOURCE_MISSING`
-- `POWER_RAIL_SOURCE_AMBIGUOUS`
-- `POWER_RAIL_CYCLE`
-- `POWER_CAPACITOR_STABILITY_UNPROVEN`
-- `POWER_TRANSIENT_CAPACITANCE_UNAVAILABLE`
-- `POWER_SEQUENCE_UNPROVEN`
-- `INTERFACE_PULLUP_WINDOW_EMPTY`
-- `INTERFACE_TERMINATION_UNPROVEN`
-- `INTERFACE_CLOCK_CONDITIONING_UNPROVEN`
-- `INTERFACE_ADC_DRIVE_UNPROVEN`
+| Requirement | Request SHA-256 | Transaction SHA-256 | Installed-KiCad result |
+|---|---|---|---|
+| Buffered ADC acquisition | `f5eaa58d20992d329d27c9fd27c63e33dda25c3b51aea19bab48edef63cf8539` | `5c7253895c8810d0530805b34fec2a8be7e6c3e6f0053b0c909eb22c283fd273` | pass |
+| Class-AB power interface | `d69518202b296f1c9a1debeb10610e8eaa60d389ce736c1ac0854ccf0957282a` | `58759000b62815ac9e06b8e8add9eb3aa3e09728e45ee1f7d735c63f035ec544` | pass |
+| Protected power-MOSFET load | `61e06b72415ceee7815292097dce16d481dd33567de66ed84c26362729c671c1` | `2ec3f902301a5026f8509dee554929d26293b41e4ec212837e743d06656f8ee4` | pass |
+| Regulated MCU/sensor subsystem | `25125c0b12e9fdb266ae149b1ef23ed3b80eae42eba40f690d61537132b2f31a` | `7518eef53dde9960397886f0a2a54fc739c63119013de665e41941c734fa628f` | pass |
 
-Existing global checks continue to provide stable voltage-window,
-current-budget, headroom, phase-margin, thermal-margin, noise, startup-state,
-fault-response, and reference-separation failures.
+The authoritative promotion test is
+`TestPowerInterfaceSynthesisCorpusOptionalKiCadPromotion`. Its final post-review
+run passed all four subtests in 303.62 seconds. Each subtest generates twice and requires
+byte-stable transactions, normalized KiCad equality, clean ERC and strict DRC,
+zero unconnected items, complete required-net routing/connectivity, and writer
+correctness.
 
-## Verification evidence
+## Requirement-to-evidence map
 
-- `go test ./... -count=1 -timeout 1200s`: pass after all routing, reference,
-  and synthesis corrections (the composition-lowering suite completed in
-  521.972 seconds).
-- `go test ./internal/architecturesearch ./internal/designworkflow`: pass.
-- Installed-KiCad design examples: `usb_c_led_indicator_protected`,
-  `usb_c_i2c_sensor_3v3_protected`, and `esp32_wroom_32e_minimal_pass`: pass.
-- Existing ten-case adversarial corpus: pass after the generic route and
-  Class-AB reference corrections (216.04 seconds).
-- Held-out `buffered_adc_acquisition`: offline and installed-KiCad pass with
-  clean ERC/strict DRC, complete routing/connectivity, writer correctness,
-  zero round-trip differences, and replay.
-- `mcu_managed_class_ab_output` initially reproduced a committed-baseline acute
-  route-junction failure. After the generic dogleg correction and single-supply
-  reference correction it passes complete routing/connectivity, writer
-  correctness, clean ERC, strict DRC, zero round-trip differences, and replay.
+| Specification area | Implementation and test evidence |
+|---|---|
+| Typed regulator dynamics and fabrication proof | `components.RegulatorDynamicEvidence`; `TestRegulatorDynamicEvidenceSupportsFabricationProof`; malformed/missing startup rejection |
+| Translator, ADC, op-amp, and clock facts | typed component interface/clock evidence; deterministic normalization and incomplete-evidence tests |
+| Rail source uniqueness and cycles | `validatePowerTreeTopology`; `TestValidatePowerTreeTopologyProvesUniqueAcyclicSources` and deterministic rejection tests |
+| Current, quiescent, efficiency, dropout, and thermal demand | catalog power-demand calculations; `power_dynamic_integration_test.go`; MNA regulator/load tests |
+| Stability and transient capacitance | `regulatorOutputCapacitor`; upward preferred-value rounding and unavailable/impossible-window tests |
+| Sequence, monotonic startup, and inrush | `validatePowerSequenceConstraint`; typed startup calculation tests; startup/transient MNA analyses |
+| Pull-ups, translation, termination, and clock conditioning | catalog interface expansion and deterministic whole-interface calculation tests |
+| Passive and buffered ADC drive | passive settling and catalog-backed op-amp buffer/headroom tests |
+| Thermal and dynamic simulation | fixed/adjustable regulator, startup, transient, periodic thermal, and missing-path fail-closed tests |
+| Physical lowering and writer agreement | shared emitted-route clearance repair, physical through-via modeling, route compaction, and explicit/composed routing tests |
+| Neutral physical promotion | four ready corpus fixtures plus the installed-KiCad promotion test |
+| Stable unsupported behavior | ten-case reordered negative corpus in `TestPowerInterfaceNegativeRequestCorpus` |
 
-## Reproducibility constraints
+## Stable negative corpus
 
-- No production branch uses a fixture name, component identity, coordinate,
-  project allowlist, or block-family dispatch for these changes.
-- Existing formula-library hashes remain unchanged; new calculations use the
-  established rating-margin evidence envelope so unrelated tied candidate
-  ordering is stable.
-- Startup calculations are emitted only for requirements that request power
-  sequence evidence, preserving unrelated architecture fingerprints.
-- All graph walks, catalog filtering, preferred-value selection, and fallback
-  route candidates have stable ordering and bounded search.
-- Autonomous spacing correction retains the established three-attempt policy:
-  retries deterministically progress from +1 mm to +2 mm rather than changing
-  the public retry limit or existing policy hashes.
+The negative corpus proves these families without selecting a fixture-specific
+repair or component family:
 
-## Remaining broader-envelope work
+- missing rail source and rail cycle;
+- unproven regulator capacitor stability and unavailable transient
+  capacitance;
+- unproven rail sequence;
+- voltage-domain mismatch and empty pull-up window;
+- unproven termination, clock conditioning, and ADC settling.
 
-The next capability expansion is typed clock amplitude, common-mode, edge, and
-jitter evidence. It is outside this bounded source-damping milestone and must
-be added through reviewed catalog/model facts and a new held-out case.
+## Physical correction evidence
+
+Final emitted copper is checked at a shared transaction boundary for workflows
+that explicitly require KiCad DRC. The correction is generic and deterministic:
+it can relocate transition vias, insert pad-clear doglegs, split a segment onto
+an alternate routable layer with physical through vias, expand transition
+spans, and compact duplicate/zero-length geometry. Validation models every
+ordinary multi-layer writer via as the physical F.Cu-to-B.Cu through via that
+the PCB writer emits.
+
+Structural/offline workflows retain ordinary router validation but do not claim
+writer-level DRC against conservative template pad geometry. Strict workflows
+record delegated conservative findings and rely on mandatory KiCad DRC as the
+authoritative physical gate. No fixture coordinates, identities, allowlists,
+schemas, or new per-circuit block families were added.
+
+## Preserved regressions
+
+The final installed-KiCad regression run also passed:
+
+- `usb_c_led_indicator_protected`;
+- `usb_c_i2c_sensor_3v3_protected`;
+- `esp32_wroom_32e_minimal_pass`;
+- `class_ab_headphone_protected`.
+
+## Remaining boundary
+
+Next work should add genuinely unsupported mixed-signal and power-control
+primitive/model families, followed by dynamic electrothermal and control-loop
+evidence where static bounds cannot prove startup, SOA, stability, or transient
+protection. Broader clock/fanout, programming-load, isolation, converter,
+high-energy protection, arbitrary-part qualification, RF/high-speed, dense-board
+routing, and fabrication signoff remain outside this milestone.

@@ -27,16 +27,17 @@ const (
 )
 
 type primitiveDefinition struct {
-	ID                string      `json:"id"`
-	Family            string      `json:"family"`
-	Terminals         []string    `json:"terminals"`
-	RequiresValueSI   bool        `json:"requires_value_si,omitempty"`
-	CatalogParameters []valueRule `json:"catalog_parameters,omitempty"`
-	Source            bool        `json:"source,omitempty"`
-	OpAmp             bool        `json:"op_amp,omitempty"`
-	Comparator        bool        `json:"comparator,omitempty"`
-	Nonlinear         bool        `json:"nonlinear,omitempty"`
-	Transient         bool        `json:"transient,omitempty"`
+	ID                string              `json:"id"`
+	Family            string              `json:"family"`
+	Terminals         []string            `json:"terminals"`
+	TerminalAliases   map[string][]string `json:"terminal_aliases,omitempty"`
+	RequiresValueSI   bool                `json:"requires_value_si,omitempty"`
+	CatalogParameters []valueRule         `json:"catalog_parameters,omitempty"`
+	Source            bool                `json:"source,omitempty"`
+	OpAmp             bool                `json:"op_amp,omitempty"`
+	Comparator        bool                `json:"comparator,omitempty"`
+	Nonlinear         bool                `json:"nonlinear,omitempty"`
+	Transient         bool                `json:"transient,omitempty"`
 }
 
 var primitiveRegistry = []primitiveDefinition{
@@ -77,6 +78,22 @@ var primitiveRegistry = []primitiveDefinition{
 	{ID: PrimitiveVoltageSourceV1, Family: "voltage_source", Terminals: []string{"POSITIVE", "NEGATIVE"}, Source: true},
 	{ID: PrimitiveConnectorVoltageSourceV1, Family: "connector", Terminals: []string{"PIN_1", "PIN_2"}, Source: true},
 	{ID: PrimitiveCurrentSourceV1, Family: "current_source", Terminals: []string{"POSITIVE", "NEGATIVE"}, Source: true},
+	{
+		ID: PrimitiveMCUStaticSupplyLoadV1, Family: "mcu", Terminals: []string{"POWER", "GROUND"},
+		TerminalAliases: map[string][]string{
+			"POWER":  {"VDD", "VCC", "AVCC", "VDDA"},
+			"GROUND": {"GND", "VSS", "AGND", "VSSA"},
+		},
+		CatalogParameters: append([]valueRule{{Name: "maximum_supply_current_a", Positive: true, Maximum: 100}}, thermalParameterRules()...),
+	},
+	{
+		ID: PrimitiveSensorStaticSupplyLoadV1, Family: "sensor", Terminals: []string{"POWER", "GROUND"},
+		TerminalAliases: map[string][]string{
+			"POWER":  {"VDD", "VDDIO", "VCC", "VDDA"},
+			"GROUND": {"GND", "VSS", "AGND", "VSSA"},
+		},
+		CatalogParameters: append([]valueRule{{Name: "maximum_supply_current_a", Positive: true, Maximum: 100}}, thermalParameterRules()...),
+	},
 	{
 		ID: PrimitiveOpAmpV1, Family: "opamp", Terminals: []string{"IN_PLUS", "IN_MINUS", "OUT", "V_PLUS", "V_MINUS"}, OpAmp: true,
 		CatalogParameters: []valueRule{
@@ -924,7 +941,7 @@ func resolveMNA(intent Intent, catalogID, catalogHash string, components []Compo
 			device.ValueSI = &value
 		}
 		for _, terminal := range primitive.Terminals {
-			net, terminalDiagnostics := connectedNet(component, terminal)
+			net, terminalDiagnostics := connectedPrimitiveNet(component, primitive, terminal)
 			if len(terminalDiagnostics) != 0 {
 				diagnostics = append(diagnostics, terminalDiagnostics...)
 				continue
@@ -968,6 +985,7 @@ func resolveMNA(intent Intent, catalogID, catalogHash string, components []Compo
 	if len(diagnostics) != 0 {
 		return Plan{}, diagnostics
 	}
+	nodeNames = modeledNodeNames(ground, nodeNames, devices)
 	plan := Plan{
 		RegistryVersion: RegistryVersion, RegistryHash: RegistryHash(), CatalogID: catalogID, CatalogHash: catalogHash,
 		ModelID: intent.ModelID, GroundNode: ground, Nodes: nodeNames, Devices: devices,
@@ -981,6 +999,22 @@ func resolveMNA(intent Intent, catalogID, catalogHash string, components []Compo
 		return Plan{}, diagnostics
 	}
 	return plan, nil
+}
+
+func modeledNodeNames(ground string, nodes []string, devices []ResolvedDevice) []string {
+	used := map[string]struct{}{ground: {}}
+	for _, device := range devices {
+		for _, terminal := range device.Terminals {
+			used[terminal.Net] = struct{}{}
+		}
+	}
+	modeled := make([]string, 0, len(used))
+	for _, node := range nodes {
+		if _, ok := used[node]; ok {
+			modeled = append(modeled, node)
+		}
+	}
+	return modeled
 }
 
 func mnaBoundaryFamily(family string) bool {
@@ -1230,14 +1264,29 @@ func canonicalNodes(nodes []NodeEvidence) (string, []string, []Diagnostic) {
 }
 
 func connectedNet(component ComponentEvidence, terminal string) (string, []Diagnostic) {
+	return connectedNetAlternatives(component, terminal, []string{terminal})
+}
+
+func connectedPrimitiveNet(component ComponentEvidence, primitive primitiveDefinition, terminal string) (string, []Diagnostic) {
+	alternatives := primitive.TerminalAliases[terminal]
+	if len(alternatives) == 0 {
+		alternatives = []string{terminal}
+	}
+	return connectedNetAlternatives(component, terminal, alternatives)
+}
+
+func connectedNetAlternatives(component ComponentEvidence, terminal string, alternatives []string) (string, []Diagnostic) {
 	nets := map[string]struct{}{}
 	for _, connection := range component.Connections {
-		if strings.EqualFold(strings.TrimSpace(connection.Function), terminal) {
-			nets[strings.TrimSpace(connection.Net)] = struct{}{}
+		for _, alternative := range alternatives {
+			if strings.EqualFold(strings.TrimSpace(connection.Function), alternative) {
+				nets[strings.TrimSpace(connection.Net)] = struct{}{}
+				break
+			}
 		}
 	}
 	if len(nets) != 1 {
-		return "", []Diagnostic{{Path: "topology.devices." + component.InstanceID + ".terminals." + terminal, Message: fmt.Sprintf("trusted primitive terminal must resolve to exactly one net, got %d", len(nets)), Suggestion: "connect every simulated terminal once through the resolved circuit graph"}}
+		return "", []Diagnostic{{Path: "topology.devices." + component.InstanceID + ".terminals." + terminal, Message: fmt.Sprintf("trusted primitive terminal must resolve to exactly one net, got %d", len(nets)), Suggestion: "connect every simulated terminal alias to one resolved circuit net"}}
 	}
 	for net := range nets {
 		return net, nil

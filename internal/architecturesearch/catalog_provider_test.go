@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"kicadai/internal/components"
+	"kicadai/internal/reports"
 )
 
 func TestCatalogProviderSearchesSyntheticThresholdDeterministically(t *testing.T) {
@@ -644,6 +645,22 @@ func TestCatalogProviderOutputIgnoresCatalogOrdering(t *testing.T) {
 	}
 }
 
+func TestTranslatorEvidenceModeAndDirectionMatchingIsCaseInsensitive(t *testing.T) {
+	catalog := loadArchitectureCatalog(t)
+	for _, record := range catalog.Records {
+		if record.Translator == nil {
+			continue
+		}
+		record.Translator.SignalingModes = []string{"OPEN_DRAIN"}
+		record.Translator.Directions = []string{"BIDIRECTIONAL"}
+		if !translatorEvidenceSupports(record, 1.8, 3.3, "open_drain", "bidirectional", 400000, 2, true) {
+			t.Fatalf("case-normalized translator evidence was rejected: %#v", record.Translator)
+		}
+		return
+	}
+	t.Fatal("checked-in catalog has no translator evidence")
+}
+
 func TestCatalogProviderSizesOpenDrainPullupsFromRiseTimeAndCapacitance(t *testing.T) {
 	provider, err := NewCatalogProvider(loadArchitectureCatalog(t))
 	if err != nil {
@@ -684,6 +701,33 @@ func TestCatalogProviderSizesOpenDrainPullupsFromRiseTimeAndCapacitance(t *testi
 	var typed *interfaceSynthesisError
 	if !errors.As(err, &typed) || typed.code != CodeInterfacePullupWindowEmpty {
 		t.Fatalf("impossible pull-up window error = %#v", err)
+	}
+}
+
+func TestCatalogProviderTranslationFailuresHaveStableCodes(t *testing.T) {
+	provider, err := NewCatalogProvider(loadArchitectureCatalog(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	tests := []struct {
+		name    string
+		request ProviderRequest
+		code    reports.Code
+	}{
+		{name: "missing_domain", request: translatorProviderRequest(3.3, 0), code: CodeInterfaceVoltageDomainMismatch},
+		{name: "unsupported_domain", request: translatorProviderRequest(3.3, 1.2), code: CodeInterfaceTranslationUnavailable},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			_, err := provider.Expand(context.Background(), test.request)
+			var typed *interfaceSynthesisError
+			if !errors.As(err, &typed) || typed.code != test.code {
+				t.Fatalf("Expand() error = %#v; want %s", err, test.code)
+			}
+			if typed.ArchitectureRejectionCode() != test.code {
+				t.Fatalf("ArchitectureRejectionCode() = %s; want %s", typed.ArchitectureRejectionCode(), test.code)
+			}
+		})
 	}
 }
 
@@ -1187,14 +1231,15 @@ func loadSwitchProviderRequest(voltage, current float64) ProviderRequest {
 }
 
 func regulatorProviderRequest(inputMaximum, output, current float64) ProviderRequest {
+	inputMinimum := output + .5
 	return ProviderRequest{Capability: "voltage_regulation", Ports: []RoleContract{
-		providerRole("input", "power", "sink", 2.5, inputMaximum),
+		providerRole("input", "power", "sink", inputMinimum, inputMaximum),
 		providerRole("output", "power", "source", output*0.98, output*1.02),
 		providerRole("reference", "reference", "bidirectional", 0, 0),
 	}, Constraints: []Constraint{
 		constraintNumber("output_voltage", "target", output, "V", 2),
 		constraintNumber("continuous_output_current", "minimum", current, "A", 0),
-		constraintRange("input_voltage", "range", 2.5, inputMaximum, "V"),
+		constraintRange("input_voltage", "range", inputMinimum, inputMaximum, "V"),
 		constraintBool("adjustable_output", "required", true),
 		constraintString("set_point_programming", "equal", "passive_feedback"),
 		constraintBool("input_decoupling", "required", true),

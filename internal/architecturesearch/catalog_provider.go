@@ -666,10 +666,10 @@ func (provider *CatalogProvider) expandRegulator(ctx context.Context, request Pr
 	if inputRange[1] != inputMaximum {
 		return nil, fmt.Errorf("input-voltage range and input port contract disagree")
 	}
-	selection, err := provider.selectComponent(ctx, "regulator", "adjustable", []components.RequiredRating{
+	selection, err := provider.selectRegulatorWithDropout(ctx, "adjustable", []components.RequiredRating{
 		{Kind: "input_voltage", Value: numericString(inputMaximum), Unit: "V"},
 		{Kind: "output_current", Value: numericString(current), Unit: "A"},
-	}, true)
+	}, inputRange[0]-output)
 	if err != nil {
 		return nil, err
 	}
@@ -721,7 +721,11 @@ func (provider *CatalogProvider) expandRegulator(ctx context.Context, request Pr
 		semanticNet("regulator_feedback", "analog_signal", endpoint(selection, "ADJ"), passiveEndpoint("feedback_upper", "B"), passiveEndpoint("feedback_lower", "A")),
 		semanticNet("regulator_ground", "reference", groundEndpoints...),
 	}
-	calculations := []CalculationEvidence{calculation}
+	dropoutCalculation, err := regulatorDropoutCalculation(inputRange[0], output, selection.record)
+	if err != nil {
+		return nil, err
+	}
+	calculations := []CalculationEvidence{calculation, dropoutCalculation}
 	if transientCalculation != nil {
 		calculations = append(calculations, *transientCalculation)
 	}
@@ -837,6 +841,9 @@ func (provider *CatalogProvider) expandTranslator(ctx context.Context, request P
 	}
 	voltageA := roleVoltageMaximum(request.Ports, "power_a")
 	voltageB := roleVoltageMaximum(request.Ports, "power_b")
+	if !finitePositive(voltageA) || !finitePositive(voltageB) {
+		return nil, &interfaceSynthesisError{code: CodeInterfaceVoltageDomainMismatch, message: "level translation requires bounded positive voltage domains on both sides"}
+	}
 	low, high := math.Min(voltageA, voltageB), math.Max(voltageA, voltageB)
 	selection, err := provider.selectComponent(ctx, "level_translator", "partial_power_down", []components.RequiredRating{
 		{Kind: "vcca_supply_voltage", Value: numericString(low), Unit: "V"},
@@ -844,7 +851,10 @@ func (provider *CatalogProvider) expandTranslator(ctx context.Context, request P
 		{Kind: "open_drain_data_rate", Value: numericString(frequency), Unit: "Hz"},
 	}, true)
 	if err != nil {
-		return nil, err
+		return nil, &interfaceSynthesisError{code: CodeInterfaceTranslationUnavailable, message: "no catalog-backed translator proves both voltage domains, signaling mode, frequency, and unpowered behavior"}
+	}
+	if !translatorEvidenceSupports(selection.record, low, high, "open_drain", "bidirectional", frequency, 2, true) {
+		return nil, &interfaceSynthesisError{code: CodeInterfaceTranslationUnavailable, message: "selected translator lacks normalized mode, channel, voltage, frequency, startup, or partial-power-down evidence"}
 	}
 	pullupResistance := 4700.0
 	minimumPullupResistance := 1.0
@@ -908,6 +918,31 @@ func (provider *CatalogProvider) expandTranslator(ctx context.Context, request P
 		})
 	}
 	return provider.expansionWithRepairs(request, "bidirectional_open_drain_translator", parts, bindings, connections, nil, repairs, 0)
+}
+
+func translatorEvidenceSupports(record components.ComponentRecord, low, high float64, mode, direction string, frequency float64, channels int, partialPowerDown bool) bool {
+	evidence := record.Translator
+	if evidence == nil || evidence.ProofStatus != "proven" || evidence.ChannelCount < channels || strings.TrimSpace(evidence.StartupState) == "" ||
+		partialPowerDown && !evidence.PartialPowerDown || !containsEqualFold(evidence.SignalingModes, mode) || !containsEqualFold(evidence.Directions, direction) {
+		return false
+	}
+	containsVoltage := func(bounds *components.EvidenceRange, value float64) bool {
+		if bounds == nil || !strings.EqualFold(bounds.Unit, "V") {
+			return false
+		}
+		return (bounds.Minimum == nil || value >= *bounds.Minimum) && (bounds.Maximum == nil || value <= *bounds.Maximum)
+	}
+	if !containsVoltage(evidence.SideAVoltage, low) || !containsVoltage(evidence.SideBVoltage, high) || evidence.MaximumFrequency == nil {
+		return false
+	}
+	maximumFrequency, ok := convertCatalogUnit(evidence.MaximumFrequency.Value, evidence.MaximumFrequency.Unit, "Hz")
+	return ok && maximumFrequency >= frequency
+}
+
+func containsEqualFold(values []string, target string) bool {
+	return slices.ContainsFunc(values, func(value string) bool {
+		return strings.EqualFold(strings.TrimSpace(value), strings.TrimSpace(target))
+	})
 }
 
 func (provider *CatalogProvider) expandSingleComponent(ctx context.Context, request ProviderRequest, family, usage, busRole, busFunction string) ([]ProviderExpansion, error) {
@@ -1224,6 +1259,63 @@ func (provider *CatalogProvider) selectComponentWithRequirements(ctx context.Con
 	}, nil
 }
 
+func (provider *CatalogProvider) selectRegulatorWithDropout(ctx context.Context, text string, ratings []components.RequiredRating, availableHeadroomV float64) (catalogPart, error) {
+	if !finitePositive(availableHeadroomV) {
+		return catalogPart{}, &powerSynthesisError{code: CodePowerDropoutMarginUnavailable, message: "regulator input range provides no positive dropout headroom"}
+	}
+	filtered := components.Catalog{
+		Version: provider.catalog.Version, GeneratedAt: provider.catalog.GeneratedAt,
+		Families: append([]components.FamilyDefinition(nil), provider.catalog.Families...), Diagnostics: append([]reports.Issue(nil), provider.catalog.Diagnostics...),
+	}
+	for _, record := range provider.catalog.Records {
+		dropout, ok := recordRegulatorDropoutV(record)
+		if record.Family == "regulator" && ok && dropout <= availableHeadroomV {
+			filtered.Records = append(filtered.Records, record)
+		}
+	}
+	components.RebuildCatalogIndexes(&filtered)
+	filteredProvider := *provider
+	filteredProvider.catalog = &filtered
+	part, err := filteredProvider.selectComponent(ctx, "regulator", text, ratings, true)
+	if err != nil {
+		return catalogPart{}, &powerSynthesisError{code: CodePowerDropoutMarginUnavailable, message: "no catalog regulator proves the requested input, output, current, and dropout envelope"}
+	}
+	return part, nil
+}
+
+func recordRegulatorDropoutV(record components.ComponentRecord) (float64, bool) {
+	if record.Regulator != nil && record.Regulator.DropoutVoltage != nil {
+		if value, ok := convertCatalogUnit(record.Regulator.DropoutVoltage.Value, record.Regulator.DropoutVoltage.Unit, "V"); ok && finitePositive(value) {
+			return value, true
+		}
+	}
+	if value, ok := recordValueMaximum(record, "dropout_voltage", "V"); ok && finitePositive(value) {
+		return value, true
+	}
+	value, ok := catalogSimulationParameter(record, "min_headroom_v")
+	return value, ok && finitePositive(value)
+}
+
+func regulatorDropoutCalculation(inputMinimumV, outputV float64, record components.ComponentRecord) (CalculationEvidence, error) {
+	dropout, ok := recordRegulatorDropoutV(record)
+	headroom := inputMinimumV - outputV
+	if !ok || headroom < dropout {
+		return CalculationEvidence{}, &powerSynthesisError{code: CodePowerDropoutMarginUnavailable, message: "selected regulator does not prove dropout margin at minimum input voltage"}
+	}
+	evidence := CalculationEvidence{
+		ID: "regulator_dropout_margin", FormulaID: FormulaRatingMargin, FormulaRevision: FormulaRevision,
+		Inputs:         []NamedQuantity{{Name: "minimum_input_voltage", Value: inputMinimumV, Unit: "V"}, {Name: "output_voltage", Value: outputV, Unit: "V"}, {Name: "maximum_dropout_voltage", Value: dropout, Unit: "V"}},
+		NominalOutputs: []NamedQuantity{{Name: "available_headroom", Value: headroom, Unit: "V"}},
+		Bounds:         []CalculationBound{minimumBound("dropout_headroom", dropout, headroom, "V")},
+		WorstMargin:    quantize((headroom - dropout) / math.Max(dropout, 1e-12)), Pass: true,
+	}
+	finalized, err := FinalizeCalculation(evidence)
+	if err != nil {
+		return CalculationEvidence{}, &powerSynthesisError{code: CodePowerDropoutMarginUnavailable, message: "could not finalize regulator dropout-margin evidence"}
+	}
+	return finalized, nil
+}
+
 func (provider *CatalogProvider) appendPassiveParts(ctx context.Context, parts []catalogPart, requested []passivePart) ([]catalogPart, error) {
 	for _, passive := range requested {
 		part, err := provider.selectComponent(ctx, passive.family, "", nil, false)
@@ -1481,8 +1573,26 @@ func catalogBehaviorCalculations(request ProviderRequest, parts []catalogPart) (
 			}
 		}
 		if part.usage == "regulator" && powerSequenceEvidenceRequested(request.Constraints) {
-			if startupTime, ok := catalogSimulationParameter(part.record, "soft_start_time_s"); ok && startupTime >= 0 {
+			startupTime, startupTimeOK := regulatorEvidenceMeasurement(part.record.Regulator, "startup_time", "s")
+			if !startupTimeOK {
+				startupTime, startupTimeOK = catalogSimulationParameter(part.record, "soft_start_time_s")
+			}
+			if startupTimeOK && startupTime >= 0 {
 				calculation, err := ObservedCalculation(part.selected.InstanceID+"_startup", NamedQuantity{Name: "startup_time", Value: startupTime, Unit: "s"})
+				if err != nil {
+					return nil, 0, err
+				}
+				result = append(result, calculation)
+			}
+			if part.record.Regulator != nil && part.record.Regulator.StartupMonotonicStatus == "proven" {
+				calculation, err := ObservedCalculation(part.selected.InstanceID+"_startup_monotonic", NamedQuantity{Name: "startup_monotonic", Value: 1, Unit: "ratio"})
+				if err != nil {
+					return nil, 0, err
+				}
+				result = append(result, calculation)
+			}
+			if inrush, ok := regulatorEvidenceMeasurement(part.record.Regulator, "maximum_inrush_current", "A"); ok {
+				calculation, err := ObservedCalculation(part.selected.InstanceID+"_startup_inrush", NamedQuantity{Name: "startup_inrush_current", Value: inrush, Unit: "A"})
 				if err != nil {
 					return nil, 0, err
 				}
@@ -1515,6 +1625,28 @@ func catalogBehaviorCalculations(request ProviderRequest, parts []catalogPart) (
 		result = append(result, calculation)
 	}
 	return result, unproven, nil
+}
+
+func regulatorEvidenceMeasurement(evidence *components.RegulatorEvidence, name, unit string) (float64, bool) {
+	if evidence == nil {
+		return 0, false
+	}
+	var measurement *components.EvidenceMeasurement
+	switch name {
+	case "startup_time":
+		measurement = evidence.StartupTime
+	case "maximum_inrush_current":
+		measurement = evidence.MaximumInrushCurrent
+	default:
+		return 0, false
+	}
+	if measurement == nil || !finitePositive(measurement.Value) {
+		return 0, false
+	}
+	if value, ok := convertCatalogUnit(measurement.Value, measurement.Unit, unit); ok {
+		return value, true
+	}
+	return 0, false
 }
 
 func powerSequenceEvidenceRequested(constraints []Constraint) bool {
@@ -1565,8 +1697,19 @@ func catalogRegulatorThermalCalculation(request ProviderRequest, part catalogPar
 	ambient, _, ambientOK := firstNumericConstraint(request.Constraints, "ambient_temperature")
 	thermalResistance, thermalOK := catalogSimulationParameter(part.record, "junction_to_ambient_c_per_w")
 	maximumTemperature, maximumOK := catalogSimulationParameter(part.record, "max_temperature_c")
-	quiescentCurrent, _ := catalogSimulationParameter(part.record, "quiescent_current_a")
-	if !inputOK || !outputOK || !currentOK || !ambientOK || !thermalOK || !maximumOK || inputMaximum <= output || current <= 0 || thermalResistance <= 0 || maximumTemperature <= 0 || quiescentCurrent < 0 {
+	if part.record.Thermal != nil {
+		if !thermalOK && part.record.Thermal.JunctionToAmbientCPerW != nil {
+			thermalResistance, thermalOK = *part.record.Thermal.JunctionToAmbientCPerW, true
+		}
+		if !maximumOK && part.record.Thermal.MaxJunctionTemperatureC != nil {
+			maximumTemperature, maximumOK = *part.record.Thermal.MaxJunctionTemperatureC, true
+		}
+	}
+	quiescentCurrent, quiescentOK := catalogSimulationParameter(part.record, "quiescent_current_a")
+	if !quiescentOK && part.record.Regulator != nil && part.record.Regulator.QuiescentCurrent != nil {
+		quiescentCurrent, quiescentOK = convertCatalogUnit(part.record.Regulator.QuiescentCurrent.Value, part.record.Regulator.QuiescentCurrent.Unit, "A")
+	}
+	if !inputOK || !outputOK || !currentOK || !ambientOK || !thermalOK || !maximumOK || !quiescentOK || inputMaximum <= output || current <= 0 || thermalResistance <= 0 || maximumTemperature <= 0 || quiescentCurrent < 0 {
 		return CalculationEvidence{}, false
 	}
 	dissipation := (inputMaximum-output)*current + inputMaximum*quiescentCurrent
@@ -1641,7 +1784,7 @@ func catalogFragmentPowerDemand(request ProviderRequest, parts []catalogPart, bi
 	}
 
 	for _, part := range parts {
-		genericCurrent, genericOK := recordRatingMaximum(part.record, "supply_current", "A")
+		genericCurrent, genericOK := recordSupplyCurrentA(part.record)
 		for _, role := range sinkRoles {
 			current, roleOK := recordRatingMaximum(part.record, "supply_current_"+canonicalIdentifier(role), "A")
 			if roleOK {
@@ -1664,8 +1807,11 @@ func catalogFragmentPowerDemand(request ProviderRequest, parts []catalogPart, bi
 		demand[role] += current
 	}
 	directSource, powerSource := sourceCurrentDemandBySinkRole(request.Ports, sinkRoles)
-	converted := catalogConvertedPowerDemandA(request.Ports, parts, sinkRoles)
+	converted, convertedProven := catalogConvertedPowerDemandA(request.Ports, parts, sinkRoles)
 	for _, role := range sinkRoles {
+		if !convertedProven {
+			proven[role] = false
+		}
 		demand[role] += directSource[role] + math.Max(powerSource[role], converted[role])
 	}
 
@@ -1686,6 +1832,19 @@ func catalogFragmentPowerDemand(request ProviderRequest, parts []catalogPart, bi
 		calculations = append(calculations, calculation)
 	}
 	return demand, proven, calculations, nil
+}
+
+func recordSupplyCurrentA(record components.ComponentRecord) (float64, bool) {
+	if current, ok := recordRatingMaximum(record, "supply_current", "A"); ok {
+		return current, true
+	}
+	if record.Regulator != nil && record.Regulator.QuiescentCurrent != nil {
+		measurement := record.Regulator.QuiescentCurrent
+		if current, ok := convertCatalogUnit(measurement.Value, measurement.Unit, "A"); ok && current >= 0 && finiteNumbers(current) {
+			return current, true
+		}
+	}
+	return 0, false
 }
 
 func catalogRecordConsumesPower(record components.ComponentRecord) bool {
@@ -1738,8 +1897,32 @@ func sourceCurrentDemandBySinkRole(ports []RoleContract, sinkRoles []string) (ma
 	return direct, power
 }
 
-func catalogConvertedPowerDemandA(ports []RoleContract, parts []catalogPart, sinkRoles []string) map[string]float64 {
+func catalogConvertedPowerDemandA(ports []RoleContract, parts []catalogPart, sinkRoles []string) (map[string]float64, bool) {
 	result := map[string]float64{}
+	requiresEfficiency := false
+	for _, part := range parts {
+		if _, ok := recordMinimumEfficiency(part.record); ok {
+			requiresEfficiency = true
+			continue
+		}
+		if canonicalIdentifier(part.record.Family) != "regulator" {
+			continue
+		}
+		linear := slices.ContainsFunc(part.record.Tags, func(tag string) bool {
+			return canonicalIdentifier(tag) == "linear_regulator"
+		})
+		if !linear {
+			requiresEfficiency = true
+			break
+		}
+	}
+	// Direct sources and linear regulators transfer output load current to the
+	// matching input rail; sourceCurrentDemandBySinkRole already accounts for
+	// that current. Only a non-linear or unspecified regulator needs a power /
+	// efficiency conversion here.
+	if !requiresEfficiency {
+		return result, true
+	}
 	outputPower := 0.0
 	for _, port := range ports {
 		contract := port.Contract
@@ -1748,25 +1931,48 @@ func catalogConvertedPowerDemandA(ports []RoleContract, parts []catalogPart, sin
 		}
 	}
 	if outputPower <= 0 {
-		return result
+		return result, true
 	}
-	efficiency := 0.0
+	efficiency := math.Inf(1)
 	for _, part := range parts {
-		if value, ok := recordValue(part.record, "efficiency", "%"); ok {
-			efficiency = math.Max(efficiency, value/100)
+		if value, ok := recordMinimumEfficiency(part.record); ok {
+			efficiency = math.Min(efficiency, value)
 		}
 	}
-	if efficiency <= 0 || efficiency > 1 {
-		return result
+	if math.IsInf(efficiency, 1) || efficiency <= 0 || efficiency > 1 {
+		return result, false
 	}
 	for _, role := range sinkRoles {
 		index := slices.IndexFunc(ports, func(port RoleContract) bool { return port.Role == role })
 		if index < 0 || ports[index].Contract.Voltage.Minimum == nil || *ports[index].Contract.Voltage.Minimum <= 0 {
-			continue
+			return map[string]float64{}, false
 		}
-		result[role] = outputPower / (*ports[index].Contract.Voltage.Minimum * efficiency)
+		current := outputPower / (*ports[index].Contract.Voltage.Minimum * efficiency)
+		if !finitePositive(current) {
+			return map[string]float64{}, false
+		}
+		result[role] = current
 	}
-	return result
+	return result, true
+}
+
+func recordMinimumEfficiency(record components.ComponentRecord) (float64, bool) {
+	if record.Regulator != nil && record.Regulator.Efficiency != nil && record.Regulator.Efficiency.Minimum != nil {
+		value := *record.Regulator.Efficiency.Minimum
+		switch record.Regulator.Efficiency.Unit {
+		case "ratio":
+		case "%":
+			value /= 100
+		default:
+			return 0, false
+		}
+		return value, finitePositive(value) && value <= 1
+	}
+	if value, ok := recordValue(record, "efficiency", "%"); ok {
+		value /= 100
+		return value, finitePositive(value) && value <= 1
+	}
+	return 0, false
 }
 
 func catalogResistorNetworkDemandA(ports []RoleContract, parts []catalogPart, bindings []RealizationPortBinding, transitions []RealizationSeriesTransition, connections []RealizationConnection) map[string]float64 {

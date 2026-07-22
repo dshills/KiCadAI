@@ -56,7 +56,7 @@ func TestNeutralMCUSynthesisCorpusOptionalKiCadPromotion(t *testing.T) {
 
 func TestPowerInterfaceSynthesisCorpusPassesOfflineWorkflow(t *testing.T) {
 	requireLongPromotionTest(t)
-	runFrozenPromotionAt(t, filepath.Join("..", "architecturesearch", "testdata", "power_interface_synthesis_corpus"), 1, "KICADAI_POWER_INTERFACE_ARTIFACT_DIR", "", libraryresolver.LibraryIndex{})
+	runFrozenPromotionAt(t, filepath.Join("..", "architecturesearch", "testdata", "power_interface_synthesis_corpus"), 4, "KICADAI_POWER_INTERFACE_ARTIFACT_DIR", "", libraryresolver.LibraryIndex{})
 }
 
 func TestPowerInterfaceSynthesisCorpusOptionalKiCadPromotion(t *testing.T) {
@@ -73,7 +73,7 @@ func TestPowerInterfaceSynthesisCorpusOptionalKiCadPromotion(t *testing.T) {
 	if len(index.Symbols) == 0 || len(index.Footprints) == 0 {
 		t.Fatalf("installed library index is empty: %#v", loadIssues)
 	}
-	runFrozenPromotionAt(t, filepath.Join("..", "architecturesearch", "testdata", "power_interface_synthesis_corpus"), 1, "KICADAI_POWER_INTERFACE_ARTIFACT_DIR", cli, index)
+	runFrozenPromotionAt(t, filepath.Join("..", "architecturesearch", "testdata", "power_interface_synthesis_corpus"), 4, "KICADAI_POWER_INTERFACE_ARTIFACT_DIR", cli, index)
 }
 
 func TestFrozenOpenSetCorpusOptionalKiCadPromotion(t *testing.T) {
@@ -686,6 +686,9 @@ func runOpenSetWorkflow(t *testing.T, request designworkflow.Request, index libr
 		opts.Writer = writercorrectness.Options{RequireKiCadRoundTrip: true, StrictDiffs: true, KiCadCLI: cli, KeepArtifacts: true, ArtifactDir: filepath.Join(output, ".kicadai", "roundtrip"), LibraryIndex: index, HasLibraryIndex: true, LibraryResolutionUsed: true}
 	}
 	result := designworkflow.Create(context.Background(), request, opts)
+	if os.Getenv("KICADAI_ROUTE_DIAGNOSTICS") != "" {
+		t.Logf("routing diagnostics: %#v", openSetWorkflowStage(result, designworkflow.StageRouting))
+	}
 	for _, stageName := range []designworkflow.StageName{designworkflow.StageSchematic, designworkflow.StageSchematicElectrical, designworkflow.StagePlacement, designworkflow.StageRouting, designworkflow.StageProjectWrite, designworkflow.StageWriterCorrect, designworkflow.StageValidation} {
 		stage := openSetWorkflowStage(result, stageName)
 		if stage == nil || stage.Status == designworkflow.StageStatusBlocked || stage.Status == designworkflow.StageStatusSkipped {

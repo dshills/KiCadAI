@@ -106,6 +106,10 @@ type ComponentRecord struct {
 	Capacitor          *CapacitorEvidence          `json:"capacitor_evidence,omitempty"`
 	Resistor           *ResistorEvidence           `json:"resistor_evidence,omitempty"`
 	OpAmp              *OpAmpEvidence              `json:"opamp_evidence,omitempty"`
+	Clock              *ClockEvidence              `json:"clock_evidence,omitempty"`
+	Interface          *InterfaceEvidence          `json:"interface_evidence,omitempty"`
+	Translator         *TranslatorEvidence         `json:"translator_evidence,omitempty"`
+	ADC                *ADCEvidence                `json:"adc_evidence,omitempty"`
 	Sensor             *SensorEvidence             `json:"sensor_evidence,omitempty"`
 	MCU                *MCUEvidence                `json:"mcu_evidence,omitempty"`
 	AmplifierOutput    *AmplifierOutputEvidence    `json:"amplifier_output_evidence,omitempty"`
@@ -282,9 +286,20 @@ type DeratingRule struct {
 }
 
 type RegulatorEvidence struct {
-	OutputCapacitor *RegulatorCapacitorStability `json:"output_capacitor,omitempty"`
-	ThermalReview   string                       `json:"thermal_review,omitempty"`
-	Notes           []string                     `json:"notes,omitempty"`
+	OutputCapacitor            *RegulatorCapacitorStability `json:"output_capacitor,omitempty"`
+	StartupTime                *EvidenceMeasurement         `json:"startup_time,omitempty"`
+	SoftStartStatus            string                       `json:"soft_start_status,omitempty"`
+	StartupMonotonicStatus     string                       `json:"startup_monotonic_status,omitempty"`
+	MaximumInrushCurrent       *EvidenceMeasurement         `json:"maximum_inrush_current,omitempty"`
+	QuiescentCurrent           *EvidenceMeasurement         `json:"quiescent_current,omitempty"`
+	Efficiency                 *EvidenceRange               `json:"efficiency,omitempty"`
+	DropoutVoltage             *EvidenceMeasurement         `json:"dropout_voltage,omitempty"`
+	LoadTransientRecoveryTime  *EvidenceMeasurement         `json:"load_transient_recovery_time,omitempty"`
+	LoadTransientPeakDeviation *EvidenceMeasurement         `json:"load_transient_peak_deviation,omitempty"`
+	ThermalReview              string                       `json:"thermal_review,omitempty"`
+	FabricationProof           bool                         `json:"fabrication_proof,omitempty"`
+	FabricationCandidateBlocks bool                         `json:"fabrication_candidate_blocks,omitempty"`
+	Notes                      []string                     `json:"notes,omitempty"`
 }
 
 type RegulatorCapacitorStability struct {
@@ -358,6 +373,7 @@ type OpAmpEvidence struct {
 	GainBandwidth           *EvidenceMeasurement  `json:"gain_bandwidth,omitempty"`
 	SlewRate                *EvidenceMeasurement  `json:"slew_rate,omitempty"`
 	VoltageNoiseDensity     *EvidenceMeasurement  `json:"voltage_noise_density,omitempty"`
+	CapacitiveLoadStability *OpAmpLoadStability   `json:"capacitive_load_stability,omitempty"`
 	MaxJunctionTemperatureC *float64              `json:"max_junction_temperature_c,omitempty"`
 	JunctionToAmbientCPerW  *float64              `json:"junction_to_ambient_c_per_w,omitempty"`
 	FabricationProof        bool                  `json:"fabrication_proof,omitempty"`
@@ -365,6 +381,93 @@ type OpAmpEvidence struct {
 	// flag. A false value does not override per-capability review statuses.
 	FabricationCandidateBlocks bool   `json:"fabrication_candidate_blocks,omitempty"`
 	ReviewNote                 string `json:"review_note,omitempty"`
+}
+
+// OpAmpLoadStability bounds direct and isolation-resistor-assisted capacitive
+// loading. Conditions identify the gain, supply, and test context under which
+// the reviewed phase-margin policy applies.
+type OpAmpLoadStability struct {
+	DirectLoadMaximum     *EvidenceMeasurement `json:"direct_load_maximum,omitempty"`
+	IsolatedLoadMaximum   *EvidenceMeasurement `json:"isolated_load_maximum,omitempty"`
+	IsolationResistance   *EvidenceRange       `json:"isolation_resistance,omitempty"`
+	MinimumPhaseMarginDeg *float64             `json:"minimum_phase_margin_deg,omitempty"`
+	Conditions            string               `json:"conditions,omitempty"`
+}
+
+// ClockEvidence carries the source-side electrical facts required to prove a
+// clock interface. It is intentionally independent of oscillator technology:
+// a crystal module, clock generator, MCU clock output, or other reviewed source
+// can use the same amplitude, timing, loading, and startup contract.
+type ClockEvidence struct {
+	ProofStatus                string               `json:"proof_status"`
+	SignalingModes             []string             `json:"signaling_modes"`
+	Amplitude                  *EvidenceRange       `json:"amplitude,omitempty"`
+	CommonMode                 *EvidenceRange       `json:"common_mode,omitempty"`
+	EdgeTime                   *EvidenceRange       `json:"edge_time,omitempty"`
+	RMSJitter                  *EvidenceMeasurement `json:"rms_jitter,omitempty"`
+	StartupTime                *EvidenceMeasurement `json:"startup_time,omitempty"`
+	MaximumFrequency           *EvidenceMeasurement `json:"maximum_frequency,omitempty"`
+	OutputImpedance            *EvidenceMeasurement `json:"output_impedance,omitempty"`
+	OutputCurrent              *EvidenceMeasurement `json:"output_current,omitempty"`
+	MaximumCapacitiveLoad      *EvidenceMeasurement `json:"maximum_capacitive_load,omitempty"`
+	FabricationProof           bool                 `json:"fabrication_proof,omitempty"`
+	FabricationCandidateBlocks bool                 `json:"fabrication_candidate_blocks,omitempty"`
+	ReviewNote                 string               `json:"review_note,omitempty"`
+}
+
+// InterfaceEvidence is a topology-neutral electrical contract for a reviewed
+// digital or analog interface endpoint.
+type InterfaceEvidence struct {
+	ProofStatus                string               `json:"proof_status"`
+	SignalingModes             []string             `json:"signaling_modes"`
+	Directions                 []string             `json:"directions"`
+	Voltage                    *EvidenceRange       `json:"voltage,omitempty"`
+	OutputLowMaximumV          *float64             `json:"output_low_maximum_v,omitempty"`
+	OutputHighMinimumV         *float64             `json:"output_high_minimum_v,omitempty"`
+	InputLowMaximumV           *float64             `json:"input_low_maximum_v,omitempty"`
+	InputHighMinimumV          *float64             `json:"input_high_minimum_v,omitempty"`
+	OutputImpedance            *EvidenceMeasurement `json:"output_impedance,omitempty"`
+	OutputCurrent              *EvidenceMeasurement `json:"output_current,omitempty"`
+	InputCapacitance           *EvidenceMeasurement `json:"input_capacitance,omitempty"`
+	InputLeakage               *EvidenceMeasurement `json:"input_leakage,omitempty"`
+	EdgeTime                   *EvidenceRange       `json:"edge_time,omitempty"`
+	MaximumFrequency           *EvidenceMeasurement `json:"maximum_frequency,omitempty"`
+	StartupTime                *EvidenceMeasurement `json:"startup_time,omitempty"`
+	FabricationProof           bool                 `json:"fabrication_proof,omitempty"`
+	FabricationCandidateBlocks bool                 `json:"fabrication_candidate_blocks,omitempty"`
+	ReviewNote                 string               `json:"review_note,omitempty"`
+}
+
+// TranslatorEvidence captures mode, direction, channel, domain, frequency,
+// and startup behavior independently of a manufacturer family.
+type TranslatorEvidence struct {
+	ProofStatus                string               `json:"proof_status"`
+	SignalingModes             []string             `json:"signaling_modes"`
+	Directions                 []string             `json:"directions"`
+	ChannelCount               int                  `json:"channel_count"`
+	SideAVoltage               *EvidenceRange       `json:"side_a_voltage,omitempty"`
+	SideBVoltage               *EvidenceRange       `json:"side_b_voltage,omitempty"`
+	MaximumFrequency           *EvidenceMeasurement `json:"maximum_frequency,omitempty"`
+	StartupTime                *EvidenceMeasurement `json:"startup_time,omitempty"`
+	PartialPowerDown           bool                 `json:"partial_power_down,omitempty"`
+	StartupState               string               `json:"startup_state,omitempty"`
+	FabricationProof           bool                 `json:"fabrication_proof,omitempty"`
+	FabricationCandidateBlocks bool                 `json:"fabrication_candidate_blocks,omitempty"`
+	ReviewNote                 string               `json:"review_note,omitempty"`
+}
+
+// ADCEvidence carries acquisition-window facts used to prove passive or
+// buffered drive networks.
+type ADCEvidence struct {
+	ProofStatus                string               `json:"proof_status"`
+	AcquisitionCapacitance     *EvidenceMeasurement `json:"acquisition_capacitance,omitempty"`
+	AcquisitionTime            *EvidenceMeasurement `json:"acquisition_time,omitempty"`
+	MaximumSourceImpedance     *EvidenceMeasurement `json:"maximum_source_impedance,omitempty"`
+	InputLeakage               *EvidenceMeasurement `json:"input_leakage,omitempty"`
+	MaximumFrequency           *EvidenceMeasurement `json:"maximum_frequency,omitempty"`
+	FabricationProof           bool                 `json:"fabrication_proof,omitempty"`
+	FabricationCandidateBlocks bool                 `json:"fabrication_candidate_blocks,omitempty"`
+	ReviewNote                 string               `json:"review_note,omitempty"`
 }
 
 type SensorEvidence struct {
@@ -838,6 +941,17 @@ func sortRecord(record *ComponentRecord) {
 		return record.DeratingRules[i].Kind < record.DeratingRules[j].Kind
 	})
 	sortMCUEvidence(record.MCU)
+	if record.Clock != nil {
+		sort.Strings(record.Clock.SignalingModes)
+	}
+	if record.Interface != nil {
+		sort.Strings(record.Interface.SignalingModes)
+		sort.Strings(record.Interface.Directions)
+	}
+	if record.Translator != nil {
+		sort.Strings(record.Translator.SignalingModes)
+		sort.Strings(record.Translator.Directions)
+	}
 	sort.SliceStable(record.PlacementHints, func(i, j int) bool {
 		if record.PlacementHints[i].Kind == record.PlacementHints[j].Kind {
 			return record.PlacementHints[i].Target < record.PlacementHints[j].Target

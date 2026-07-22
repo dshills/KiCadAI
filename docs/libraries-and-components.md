@@ -78,6 +78,14 @@ these as warnings; fabrication-candidate selection blocks until the required
 regulator stability, MLCC derating, and thermal evidence is proven or marked
 not applicable.
 
+Reviewed records used by power/interface synthesis also carry typed regulator
+startup, transient, quiescent-current, efficiency, dropout, and thermal facts;
+driver/receiver impedance and current limits; translator mode/channel/speed
+facts; ADC acquisition limits; op-amp capacitive-load/isolation evidence; and
+clock amplitude, common-mode, edge, jitter, startup, and frequency evidence.
+Normalization and fabrication-level validation fail closed when a record
+claims one of these analyses without the required fields.
+
 `design create` includes a `component_selection` stage after block planning and
 before schematic or PCB writes. Request JSON can include `component_policy` to
 set a catalog directory, minimum confidence, package preferences, per-role

@@ -132,6 +132,13 @@
         "gain_bandwidth": {"value": 10000000, "unit": "Hz", "conditions": "typical unity-gain bandwidth"},
         "slew_rate": {"value": 14000000, "unit": "V/s", "conditions": "minimum reviewed low-voltage large-signal slew rate"},
         "voltage_noise_density": {"value": 12.5e-9, "unit": "V/sqrt(Hz)", "frequency_hz": 1000, "temperature_c": 25, "conditions": "conservative typical density across the reviewed rail-to-rail common-mode regions"},
+        "capacitive_load_stability": {
+          "direct_load_maximum": {"value": 1e-9, "unit": "F", "conditions": "TI SBOS737C section 7.3.5: unity-gain direct pure-capacitive-load drive"},
+          "isolated_load_maximum": {"value": 1e-6, "unit": "F", "conditions": "TI SBOS737C Table 3 isolation-resistor results"},
+          "isolation_resistance": {"minimum": 2, "maximum": 360, "unit": "Ohm", "conditions": "TI SBOS737C Table 3 calculated 45/60 degree phase-margin resistor envelope for 100 pF through 1 uF"},
+          "minimum_phase_margin_deg": 45,
+          "conditions": "Unity-gain buffer; circuit-level selection must remain within the reviewed load and isolation-resistance envelope"
+        },
         "max_junction_temperature_c": 150,
         "junction_to_ambient_c_per_w": 115.8,
         "fabrication_candidate_blocks": true,
@@ -675,6 +682,10 @@
       "lifecycle": "active",
       "tags": ["sensor", "i2c", "spi", "temperature", "humidity", "pressure", "lga8"],
       "ratings": [{"kind": "supply_voltage", "min": "1.71", "max": "3.6", "unit": "V"}, {"kind": "supply_current", "max": "1.5", "unit": "mA"}],
+      "simulation_models": [{
+        "model_id": "mna_sensor_static_supply_load_v1",
+        "parameters": [{"name": "maximum_supply_current_a", "value": 0.0015}]
+      }],
       "companions": [
         {"id": "sensor.decoupling_capacitor", "family": "capacitor", "role": "decoupling_capacitor", "required": true, "recipes": [{"id": "supply_bypass", "family": "capacitor", "role": "decoupling_capacitor", "package": "0603", "value_kind": "capacitance", "value": "100n", "min_voltage_v": 6.3, "minimum_confidence": "rule_inferred", "required_functions": ["A", "B"], "connections": [{"function": "A", "parent_function": "VDD"}, {"function": "B", "parent_function": "GND"}]}], "description": "Place a local decoupling capacitor close to VDD/VDDIO and GND."},
         {"id": "sensor.i2c_pullups", "family": "resistor", "role": "i2c_pullup", "required": true, "applies_to": ["i2c_peripheral"], "recipes": [{"id": "sda_pullup", "family": "resistor", "role": "pullup", "package": "0603", "value_kind": "resistance", "value": "4.7k", "minimum_confidence": "rule_inferred", "required_functions": ["A", "B"], "connections": [{"function": "A", "parent_function": "VDD"}, {"function": "B", "parent_function": "SDA"}]}, {"id": "scl_pullup", "family": "resistor", "role": "pullup", "package": "0603", "value_kind": "resistance", "value": "4.7k", "minimum_confidence": "rule_inferred", "required_functions": ["A", "B"], "connections": [{"function": "A", "parent_function": "VDD"}, {"function": "B", "parent_function": "SCL"}]}], "description": "I2C mode requires pull-ups on SDA and SCL."}
@@ -895,6 +906,10 @@
         {"kind": "supply_voltage", "min": "3.0", "typ": "3.3", "max": "3.6", "unit": "V"},
         {"kind": "supply_current_minimum", "min": "0.5", "unit": "A"}
       ],
+      "simulation_models": [{
+        "model_id": "mna_mcu_static_supply_load_v1",
+        "parameters": [{"name": "maximum_supply_current_a", "value": 0.5}]
+      }],
       "temperature": {"min": "-40", "max": "85", "unit": "C"},
       "mcu_evidence": {
         "architecture": "xtensa_lx6",
@@ -1044,6 +1059,10 @@
       "lifecycle": "active",
       "tags": ["mcu", "avr", "tqfp32", "minimal_system"],
       "ratings": [{"kind": "supply_voltage", "min": "1.8", "max": "5.5", "unit": "V"}, {"kind": "supply_current", "max": "14", "unit": "mA"}],
+      "simulation_models": [{
+        "model_id": "mna_mcu_static_supply_load_v1",
+        "parameters": [{"name": "maximum_supply_current_a", "value": 0.014}]
+      }],
       "mcu_evidence": {
         "architecture": "avr8",
         "family": "atmega328p",

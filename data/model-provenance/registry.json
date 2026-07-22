@@ -775,6 +775,34 @@
       }
     },
     {
+      "catalog_id": "mcu.espressif.esp32_wroom_32e",
+      "family": "mcu",
+      "model_id": "mna_mcu_static_supply_load_v1",
+      "provenance": {
+        "source": "https://www.espressif.com/sites/default/files/documentation/esp32-wroom-32e_esp32-wroom-32ue_datasheet_en.pdf",
+        "revision": "ESP32-WROOM-32E/32UE datasheet v2.0; reviewed catalog maximum supply envelope",
+        "sha256": "efde98c21f13c54560498a9ad4164335e31ec5ab821b10ada4ce82e7e0c24994",
+        "review_status": "reviewed",
+        "allowed_analyses": ["ac_sweep", "dc_operating_point", "distortion", "noise", "stability", "startup", "thermal", "transient"],
+        "min_temperature_c": -40,
+        "max_temperature_c": 85
+      }
+    },
+    {
+      "catalog_id": "mcu.microchip.atmega328p_a.tqfp32",
+      "family": "mcu",
+      "model_id": "mna_mcu_static_supply_load_v1",
+      "provenance": {
+        "source": "https://ww1.microchip.com/downloads/en/DeviceDoc/Atmel-7810-Automotive-Microcontrollers-ATmega328P_Datasheet.pdf",
+        "revision": "ATmega328P complete datasheet; reviewed catalog maximum supply-current envelope",
+        "sha256": "efde98c21f13c54560498a9ad4164335e31ec5ab821b10ada4ce82e7e0c24994",
+        "review_status": "reviewed",
+        "allowed_analyses": ["ac_sweep", "dc_operating_point", "distortion", "noise", "stability", "startup", "thermal", "transient"],
+        "min_temperature_c": -40,
+        "max_temperature_c": 85
+      }
+    },
+    {
       "catalog_id": "mosfet.aos.ao3400a.sot23",
       "family": "mosfet",
       "model_id": "mna_nmos_guaranteed_switch_v1",
@@ -1515,6 +1543,20 @@
           "thermal",
           "transient"
         ],
+        "min_temperature_c": -40,
+        "max_temperature_c": 85
+      }
+    },
+    {
+      "catalog_id": "sensor.bosch.bme280.lga8",
+      "family": "sensor",
+      "model_id": "mna_sensor_static_supply_load_v1",
+      "provenance": {
+        "source": "https://www.bosch-sensortec.com/media/boschsensortec/downloads/datasheets/bst-bme280-ds002.pdf",
+        "revision": "BST-BME280-DS002; reviewed catalog maximum supply-current envelope",
+        "sha256": "cfd949a608975a6a3f95f7e1e263eac742546797b54cc627a493db4ad3dc057c",
+        "review_status": "reviewed",
+        "allowed_analyses": ["ac_sweep", "dc_operating_point", "distortion", "noise", "stability", "startup", "thermal", "transient"],
         "min_temperature_c": -40,
         "max_temperature_c": 85
       }

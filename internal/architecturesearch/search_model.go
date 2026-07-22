@@ -18,17 +18,21 @@ const (
 )
 
 const (
-	CodeProviderInvalid          reports.Code = "ARCHITECTURE_PROVIDER_INVALID"
-	CodeProviderDuplicate        reports.Code = "ARCHITECTURE_PROVIDER_DUPLICATE"
-	CodeProviderExpansionInvalid reports.Code = "ARCHITECTURE_PROVIDER_EXPANSION_INVALID"
-	CodeProviderExpansionLimit   reports.Code = "ARCHITECTURE_PROVIDER_EXPANSION_LIMIT"
-	CodeCapabilityUnsupported    reports.Code = "ARCHITECTURE_CAPABILITY_UNSUPPORTED"
-	CodeSearchBudgetExhausted    reports.Code = "ARCHITECTURE_SEARCH_BUDGET_EXHAUSTED"
-	CodeSearchNoCandidate        reports.Code = "ARCHITECTURE_SEARCH_NO_CANDIDATE"
-	CodeSearchAmbiguous          reports.Code = "ARCHITECTURE_SEARCH_AMBIGUOUS"
-	CodeSearchCanceled           reports.Code = "ARCHITECTURE_SEARCH_CANCELED"
-	CodeGlobalCurrentUnknown     reports.Code = "ARCHITECTURE_GLOBAL_CURRENT_UNKNOWN"
-	CodeGlobalCurrentExceeded    reports.Code = "ARCHITECTURE_GLOBAL_CURRENT_EXCEEDED"
+	CodeProviderInvalid            reports.Code = "ARCHITECTURE_PROVIDER_INVALID"
+	CodeProviderDuplicate          reports.Code = "ARCHITECTURE_PROVIDER_DUPLICATE"
+	CodeProviderExpansionInvalid   reports.Code = "ARCHITECTURE_PROVIDER_EXPANSION_INVALID"
+	CodeProviderExpansionLimit     reports.Code = "ARCHITECTURE_PROVIDER_EXPANSION_LIMIT"
+	CodeCapabilityUnsupported      reports.Code = "ARCHITECTURE_CAPABILITY_UNSUPPORTED"
+	CodeSearchBudgetExhausted      reports.Code = "ARCHITECTURE_SEARCH_BUDGET_EXHAUSTED"
+	CodeSearchNoCandidate          reports.Code = "ARCHITECTURE_SEARCH_NO_CANDIDATE"
+	CodeSearchAmbiguous            reports.Code = "ARCHITECTURE_SEARCH_AMBIGUOUS"
+	CodeSearchCanceled             reports.Code = "ARCHITECTURE_SEARCH_CANCELED"
+	CodePowerCurrentBudgetUnknown  reports.Code = "POWER_CURRENT_BUDGET_UNKNOWN"
+	CodePowerCurrentBudgetExceeded reports.Code = "POWER_CURRENT_BUDGET_EXCEEDED"
+	// CodeGlobalCurrentUnknown and CodeGlobalCurrentExceeded remain source-level
+	// aliases for callers compiled against the original architecture-search API.
+	CodeGlobalCurrentUnknown     reports.Code = CodePowerCurrentBudgetUnknown
+	CodeGlobalCurrentExceeded    reports.Code = CodePowerCurrentBudgetExceeded
 	CodeGlobalConstraintUnproven reports.Code = "ARCHITECTURE_GLOBAL_CONSTRAINT_UNPROVEN"
 	CodePowerRailSourceMissing   reports.Code = "POWER_RAIL_SOURCE_MISSING"
 	CodePowerRailSourceAmbiguous reports.Code = "POWER_RAIL_SOURCE_AMBIGUOUS"

@@ -83,6 +83,168 @@ func TestValidatePhysicalClearanceDetectsCrossPhasePadCollision(t *testing.T) {
 	}
 }
 
+func TestValidatePhysicalClearanceForNetMatchesAffectedFullBoardSubset(t *testing.T) {
+	request := singleLayerSearchRequest()
+	request.Rules.ClearanceMM = 0.2
+	request.Components = append(request.Components, Component{
+		Ref: "J7", Position: Placement{XMM: 3, YMM: 3}, Pads: []Pad{{
+			Name: "1", Net: "PAD_NET", Type: PadThroughHole, Shape: PadCircle,
+			Size: Size{WidthMM: 1, HeightMM: 1}, Layers: []string{"*.Cu"},
+		}},
+	})
+	routes := []Route{
+		{Net: "A", Segments: []Segment{{Net: "A", Layer: "F.Cu", Start: Point{XMM: 1, YMM: 1}, End: Point{XMM: 5, YMM: 5}, WidthMM: 0.2}}},
+		{Net: "B", Segments: []Segment{{Net: "B", Layer: "F.Cu", Start: Point{XMM: 1, YMM: 5}, End: Point{XMM: 5, YMM: 1}, WidthMM: 0.2}}},
+		{Net: "C", Segments: []Segment{{Net: "C", Layer: "F.Cu", Start: Point{XMM: 8, YMM: 8}, End: Point{XMM: 9, YMM: 8}, WidthMM: 0.2}}},
+	}
+	full := ValidatePhysicalClearance(request, routes)
+	affected := ValidatePhysicalClearanceForNet(request, routes, "A")
+	if len(affected) != 2 || len(full) != 3 {
+		t.Fatalf("affected issues = %d, full issues = %d: affected=%#v full=%#v", len(affected), len(full), affected, full)
+	}
+	if issues := ValidatePhysicalClearanceForNet(request, routes, "C"); len(issues) != 0 {
+		t.Fatalf("unaffected net produced issues: %#v", issues)
+	}
+}
+
+func TestValidatePhysicalClearanceChecksSameComponentEndpointEscape(t *testing.T) {
+	request := singleLayerSearchRequest()
+	request.Rules.ClearanceMM = 0.2
+	request.Components = []Component{{
+		Ref: "U1", Position: Placement{XMM: 3, YMM: 3}, Pads: []Pad{
+			{Name: "1", Net: "A", Type: PadSMD, Shape: PadRect, Size: Size{WidthMM: 0.4, HeightMM: 0.4}, Layers: []string{"F.Cu"}},
+			{Name: "2", Net: "B", Type: PadSMD, Shape: PadRect, Position: Point{YMM: 0.4}, Size: Size{WidthMM: 0.4, HeightMM: 0.4}, Layers: []string{"F.Cu"}},
+		},
+	}}
+	routes := []Route{{Net: "A", Segments: []Segment{{
+		Net: "A", Layer: "F.Cu", Start: Point{XMM: 3, YMM: 3}, End: Point{XMM: 5, YMM: 3}, WidthMM: 0.2,
+	}}}}
+	if issues := ValidatePhysicalClearance(request, routes); len(issues) == 0 {
+		t.Fatal("same-component endpoint escape bypassed adjacent-pad clearance")
+	}
+}
+
+func TestValidatePhysicalClearanceRejectsCrossingDifferentPadOnEndpointComponent(t *testing.T) {
+	request := singleLayerSearchRequest()
+	request.Rules.ClearanceMM = 0.2
+	request.Components = []Component{{
+		Ref: "J1", Position: Placement{XMM: 5, YMM: 5}, Pads: []Pad{
+			{Name: "1", Net: "A", Type: PadThroughHole, Shape: PadCircle, Position: Point{YMM: -2}, Size: Size{WidthMM: 1.7, HeightMM: 1.7}, Layers: []string{"*.Cu"}},
+			{Name: "2", Net: "B", Type: PadThroughHole, Shape: PadCircle, Size: Size{WidthMM: 1.7, HeightMM: 1.7}, Layers: []string{"*.Cu"}},
+		},
+	}}
+	routes := []Route{{Net: "A", Segments: []Segment{{
+		Net: "A", Layer: "F.Cu", Start: Point{XMM: 2, YMM: 5}, End: Point{XMM: 8, YMM: 5}, WidthMM: 0.2,
+	}}}}
+	if issues := ValidatePhysicalTrackClearance(request, routes); len(issues) == 0 {
+		t.Fatal("crossing a different pad was hidden by component endpoint access")
+	}
+}
+
+func TestValidatePhysicalClearanceChecksSameComponentEndpointEscapeVia(t *testing.T) {
+	request := singleLayerSearchRequest()
+	request.Rules.ClearanceMM = 0.2
+	request.Components = []Component{{
+		Ref: "U1", Position: Placement{XMM: 3, YMM: 3}, Pads: []Pad{
+			{Name: "1", Net: "A", Type: PadSMD, Shape: PadRect, Size: Size{WidthMM: 0.4, HeightMM: 0.4}, Layers: []string{"F.Cu"}},
+			{Name: "2", Net: "B", Type: PadSMD, Shape: PadRect, Position: Point{XMM: 0.7}, Size: Size{WidthMM: 0.4, HeightMM: 0.4}, Layers: []string{"F.Cu"}},
+		},
+	}}
+	routes := []Route{{
+		Net:      "A",
+		Segments: []Segment{{Net: "A", Layer: "F.Cu", Start: Point{XMM: 3, YMM: 3}, End: Point{XMM: 3.4, YMM: 3}, WidthMM: 0.2}},
+		Vias:     []Via{{Net: "A", At: Point{XMM: 3.4, YMM: 3}, DiameterMM: 0.7, DrillMM: 0.35, Layers: []string{"F.Cu", "B.Cu"}}},
+	}}
+	if issues := ValidatePhysicalClearance(request, routes); len(issues) == 0 {
+		t.Fatal("same-component endpoint escape via bypassed adjacent-pad clearance")
+	}
+}
+
+func TestValidatePhysicalTrackClearanceLeavesViaPadChecksToTransitionValidation(t *testing.T) {
+	request := singleLayerSearchRequest()
+	request.Rules.ClearanceMM = 0.2
+	request.Components = []Component{{
+		Ref: "R1", Position: Placement{XMM: 3, YMM: 3}, Pads: []Pad{{
+			Name: "1", Net: "B", Type: PadThroughHole, Shape: PadCircle,
+			Size: Size{WidthMM: 1, HeightMM: 1}, Layers: []string{"*.Cu"},
+		}},
+	}}
+	routes := []Route{{Net: "A", Vias: []Via{{Net: "A", At: Point{XMM: 3.6, YMM: 3}, DiameterMM: 0.7, DrillMM: 0.35, Layers: []string{"F.Cu", "B.Cu"}}}}}
+	if issues := ValidatePhysicalClearance(request, routes); len(issues) == 0 {
+		t.Fatal("full physical validation did not detect the via-to-pad violation")
+	}
+	if issues := ValidatePhysicalTrackClearance(request, routes); len(issues) != 0 {
+		t.Fatalf("track validation claimed transition-owned via-to-pad issue: %#v", issues)
+	}
+}
+
+func TestValidatePhysicalTrackClearanceTreatsOuterSpanViaAsMultilayerThroughVia(t *testing.T) {
+	request := singleLayerSearchRequest()
+	request.Board.Layers = []Layer{
+		{Name: "F.Cu", Kind: LayerCopper, Routable: true},
+		{Name: "In1.Cu", Kind: LayerCopper, Routable: true},
+		{Name: "B.Cu", Kind: LayerCopper, Routable: true},
+	}
+	request.Rules.ClearanceMM = 0.2
+	routes := []Route{
+		{Net: "A", Vias: []Via{{Net: "A", At: Point{XMM: 3, YMM: 3}, DiameterMM: 0.7, DrillMM: 0.35, Layers: []string{"F.Cu", "B.Cu"}}}},
+		{Net: "B", Segments: []Segment{{Net: "B", Layer: "In1.Cu", Start: Point{XMM: 2, YMM: 3}, End: Point{XMM: 4, YMM: 3}, WidthMM: 0.2}}},
+	}
+	if issues := ValidatePhysicalTrackClearance(request, routes); len(issues) == 0 {
+		t.Fatal("outer-span through via did not block inner-layer foreign copper")
+	}
+}
+
+func TestPhysicalPadDetourCandidatesClearLongTrackNearForeignPad(t *testing.T) {
+	request := singleLayerSearchRequest()
+	request.Rules.ClearanceMM = 0.2
+	request.Rules.GridMM = 0.25
+	request.Components = []Component{{
+		Ref: "J1", Position: Placement{XMM: 8, YMM: 6.04}, Pads: []Pad{{
+			Name: "1", Net: "B", Type: PadThroughHole, Shape: PadCircle,
+			Size: Size{WidthMM: 1.7, HeightMM: 1.7}, Layers: []string{"*.Cu"},
+		}},
+	}}
+	segment := Segment{Net: "A", Layer: "F.Cu", Start: Point{XMM: 1, YMM: 5}, End: Point{XMM: 15, YMM: 5}, WidthMM: 0.2}
+	if issues := ValidatePhysicalTrackClearance(request, []Route{{Net: "A", Segments: []Segment{segment}}}); len(issues) == 0 {
+		t.Fatal("test setup does not violate foreign-pad clearance")
+	}
+	found := false
+	for _, detour := range PhysicalPadDetourCandidates(request, segment, 16) {
+		points := append([]Point{segment.Start}, detour...)
+		points = append(points, segment.End)
+		route := Route{Net: "A"}
+		for index := 1; index < len(points); index++ {
+			route.Segments = append(route.Segments, Segment{Net: "A", Layer: "F.Cu", Start: points[index-1], End: points[index], WidthMM: segment.WidthMM})
+		}
+		if len(ValidatePhysicalTrackClearance(request, []Route{route})) == 0 {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatal("no deterministic local detour cleared the foreign pad")
+	}
+}
+
+func TestValidatePhysicalTrackClearanceForSegmentIgnoresBlockedSiblingSegment(t *testing.T) {
+	request := singleLayerSearchRequest()
+	request.Rules.ClearanceMM = .2
+	routes := []Route{
+		{Net: "A", Segments: []Segment{
+			{Net: "A", Layer: "F.Cu", Start: Point{XMM: 1, YMM: 1}, End: Point{XMM: 5, YMM: 1}, WidthMM: .2},
+			{Net: "A", Layer: "F.Cu", Start: Point{XMM: 1, YMM: 8}, End: Point{XMM: 5, YMM: 8}, WidthMM: .2},
+		}},
+		{Net: "B", Segments: []Segment{{Net: "B", Layer: "F.Cu", Start: Point{XMM: 3, YMM: .5}, End: Point{XMM: 3, YMM: 1.5}, WidthMM: .2}}},
+	}
+	if issues := ValidatePhysicalTrackClearanceForSegment(request, routes, routes[0].Segments[0]); len(issues) == 0 {
+		t.Fatal("blocked segment was not detected")
+	}
+	if issues := ValidatePhysicalTrackClearanceForSegment(request, routes, routes[0].Segments[1]); len(issues) != 0 {
+		t.Fatalf("clear sibling segment inherited net blocker: %#v", issues)
+	}
+}
+
 func TestValidateResultDetectsSegmentToViaClearanceViolation(t *testing.T) {
 	request := singleLayerSearchRequest()
 	request.Rules.ClearanceMM = 0.2

@@ -1,5 +1,13 @@
 # Constraint-Driven Power-Tree and Interface Synthesis Plan
 
+## Completion status
+
+Completed 2026-07-22. Phases 1-11 are implemented. The neutral four-design
+corpus and ten-case reordered negative corpus pass their deterministic gates;
+the four ready designs pass installed-KiCad clean ERC, strict DRC, complete
+routing/connectivity, writer correctness, and zero-difference round trip. The
+completion evidence and remaining boundary are recorded in `AUDIT.md`.
+
 ## Working rules
 
 - Keep the open-set requirement and typed contract model topology-neutral.

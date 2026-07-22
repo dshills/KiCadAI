@@ -488,6 +488,11 @@ func buildMNASystemWithOpAmpClamps(plan Plan, analysis Analysis, frequency float
 		case PrimitiveCurrentSourceV1:
 			value := excitationValue(analysis, device.Component)
 			stampCurrentSource(&system, terminals["POSITIVE"], terminals["NEGATIVE"], value)
+		case PrimitiveMCUStaticSupplyLoadV1, PrimitiveSensorStaticSupplyLoadV1:
+			if !smallSignalAnalysis(analysis.Kind) {
+				current := namedValueMap(device.ModelParameters)["maximum_supply_current_a"]
+				stampCurrentSource(&system, terminals["POWER"], terminals["GROUND"], complex(current, 0))
+			}
 		case PrimitiveOpAmpV1:
 			if value, clamped := opAmpClamps[device.Component]; clamped {
 				stampVoltageSource(&system, device.Component, terminals["OUT"], plan.GroundNode, complex(value, 0))

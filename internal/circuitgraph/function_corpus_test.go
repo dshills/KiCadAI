@@ -665,6 +665,7 @@ func appendUniqueString(values []string, value string) []string {
 
 func TestFrozenFunctionLevelCorpusRunsEveryApplicableTrustedSimulation(t *testing.T) {
 	expectedModels := map[string]string{
+		"atmega328p_isp_controller":    simmodel.ModelLinearCircuitMNAV1,
 		"buffered_thermistor_frontend": simmodel.ModelLinearCircuitMNAV1,
 		"dual_stage_active_lowpass":    simmodel.ModelLinearCircuitMNAV1,
 		"npn_low_side_status_driver":   simmodel.ModelNonlinearCircuitDCV1,

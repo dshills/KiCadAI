@@ -31,7 +31,13 @@
           {"name": "source_impedance", "relation": "maximum", "value": 1000000, "unit": "Ohm"},
           {"name": "adc_input_capacitance", "relation": "target", "value": 0.00000000002, "unit": "F"},
           {"name": "acquisition_time", "relation": "minimum", "value": 0.000002, "unit": "s"},
-          {"name": "settling_accuracy", "relation": "maximum", "value": 0.0001, "unit": "ratio"}
+          {"name": "settling_accuracy", "relation": "maximum", "value": 0.0001, "unit": "ratio"},
+          {"name": "maximum_input_step", "relation": "maximum", "value": 3, "unit": "V"},
+          {"name": "noise_bandwidth", "relation": "maximum", "value": 100000, "unit": "Hz"},
+          {"name": "maximum_integrated_noise", "relation": "maximum", "value": 0.00001, "unit": "V"},
+          {"name": "maximum_output_load_current", "relation": "maximum", "value": 0.001, "unit": "A"},
+          {"name": "ambient_temperature", "relation": "maximum", "value": 70, "unit": "degC"},
+          {"name": "minimum_thermal_margin", "relation": "minimum", "value": 20, "unit": "degC"}
         ]
       }
     ],

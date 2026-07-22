@@ -705,6 +705,16 @@ interrupt bundles to physical functions deterministically and expands the
 selected record's power, reset, boot, programming, and clock companions. A
 three-request neutral corpus validates this lane without target names.
 
+For power and mixed-signal interfaces, the architecture provider can now build
+a deterministic rail graph, aggregate bounded loads and quiescent demand,
+apply regulator dropout/efficiency/startup/thermal evidence, derive stability
+and transient capacitance, and solve supported pull-up, translation,
+termination, clock, and ADC-drive obligations. A neutral four-design corpus
+covering MCU/sensor, power-MOSFET, buffered ADC, and Class-AB cases passes the
+complete installed-KiCad promotion lane. Missing safety-relevant evidence and
+incompatible constraints produce stable capability gaps instead of guessed
+values or topology.
+
 The generic contract removes the architectural requirement for one provider
 schema per topology and its function form removes the requirement for the AI to
 enumerate pins, support components, or physical implementation details. It does

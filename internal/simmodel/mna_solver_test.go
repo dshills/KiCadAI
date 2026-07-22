@@ -3,6 +3,7 @@ package simmodel
 import (
 	"encoding/json"
 	"math"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -78,6 +79,86 @@ func TestMNACurrentSourceStamp(t *testing.T) {
 	report, diagnostics := Evaluate(plan)
 	if len(diagnostics) != 0 || report.Status != "pass" {
 		t.Fatalf("report=%+v diagnostics=%+v", report, diagnostics)
+	}
+}
+
+func TestMNAResolutionOmitsGraphNodesWithoutModeledDevices(t *testing.T) {
+	intent := Intent{
+		ModelID:    ModelLinearCircuitMNAV1,
+		Analyses:   []Analysis{{ID: "operating_point", Kind: AnalysisDCOperatingPoint, Excitations: []SourceExcitation{{Component: "source", DCValue: 3.3}}}},
+		Assertions: []Assertion{{AnalysisID: "operating_point", Node: "VCC", Quantity: QuantityVoltageV, Min: 3.29, Max: 3.31}},
+	}
+	components := []ComponentEvidence{
+		{InstanceID: "load", CatalogID: "r", Family: "resistor", HasValueSI: true, ValueSI: 1000, ModelClaims: []CatalogEvidence{{ModelID: PrimitiveResistorV1}}, Connections: []ConnectionEvidence{{Function: "A", Net: "VCC"}, {Function: "B", Net: "GND"}}},
+		{InstanceID: "source", CatalogID: "v", Family: "voltage_source", ModelClaims: []CatalogEvidence{{ModelID: PrimitiveVoltageSourceV1}}, Connections: []ConnectionEvidence{{Function: "POSITIVE", Net: "VCC"}, {Function: "NEGATIVE", Net: "GND"}}},
+	}
+	plan, diagnostics := ResolveWithTopology(intent, "test", "hash", components, []NodeEvidence{{Name: "FLOATING_GPIO"}, {Name: "GND", Role: "ground"}, {Name: "VCC"}})
+	if len(diagnostics) != 0 {
+		t.Fatalf("resolve diagnostics = %+v", diagnostics)
+	}
+	if slices.Contains(plan.Nodes, "FLOATING_GPIO") {
+		t.Fatalf("unmodeled graph node retained in MNA plan: %+v", plan.Nodes)
+	}
+	report, diagnostics := Evaluate(plan)
+	if len(diagnostics) != 0 || report.Status != "pass" {
+		t.Fatalf("report=%+v diagnostics=%+v", report, diagnostics)
+	}
+}
+
+func TestMNAStaticDigitalSupplyLoadUsesCanonicalSupplyAliases(t *testing.T) {
+	intent := Intent{
+		ModelID:  ModelLinearCircuitMNAV1,
+		Analyses: []Analysis{{ID: "operating_point", Kind: AnalysisDCOperatingPoint, Excitations: []SourceExcitation{{Component: "source", DCValue: 3.3}}}},
+		Assertions: []Assertion{
+			{AnalysisID: "operating_point", Node: "V3V3", Quantity: QuantityVoltageV, Min: 3.299, Max: 3.301},
+			{AnalysisID: "operating_point", Component: "source", Quantity: QuantityDeviceCurrentA, Min: .013999, Max: .014001},
+		},
+	}
+	components := []ComponentEvidence{
+		voltageSourceEvidence("source", "V3V3", "GND"),
+		{InstanceID: "pullup", CatalogID: "resistor.test", Family: "resistor", HasValueSI: true, ValueSI: 4700, ModelClaims: []CatalogEvidence{{ModelID: PrimitiveResistorV1}}, Connections: []ConnectionEvidence{{Function: "A", Net: "V3V3"}, {Function: "B", Net: "SDA"}}},
+		{
+			InstanceID: "controller", CatalogID: "mcu.test", Family: "mcu",
+			ModelClaims: []CatalogEvidence{{ModelID: PrimitiveMCUStaticSupplyLoadV1, Parameters: []NamedValue{{Name: "maximum_supply_current_a", Value: .014}}}},
+			Connections: []ConnectionEvidence{
+				{Function: "VCC", Net: "V3V3"}, {Function: "AVCC", Net: "V3V3"},
+				{Function: "GND", Net: "GND"}, {Function: "AGND", Net: "GND"},
+				{Function: "SDA", Net: "SDA"},
+			},
+		},
+	}
+	plan, diagnostics := ResolveWithTopology(intent, "test", "hash", components, []NodeEvidence{{Name: "GND", Role: "ground"}, {Name: "V3V3", Role: "power"}, {Name: "SDA", Role: "signal"}})
+	if len(diagnostics) != 0 {
+		t.Fatalf("resolve diagnostics = %+v", diagnostics)
+	}
+	if got := terminalMap(plan.Devices[0]); got["POWER"] != "V3V3" || got["GROUND"] != "GND" {
+		t.Fatalf("canonical load terminals = %+v", got)
+	}
+	report, diagnostics := Evaluate(plan)
+	if len(diagnostics) != 0 || report.Status != "pass" {
+		t.Fatalf("report=%+v diagnostics=%+v", report, diagnostics)
+	}
+}
+
+func TestMNAStaticDigitalSupplyLoadRejectsMultipleSupplyDomains(t *testing.T) {
+	intent := Intent{
+		ModelID:    ModelLinearCircuitMNAV1,
+		Analyses:   []Analysis{{ID: "operating_point", Kind: AnalysisDCOperatingPoint, Excitations: []SourceExcitation{{Component: "source", DCValue: 3.3}}}},
+		Assertions: []Assertion{{AnalysisID: "operating_point", Node: "V3V3", Quantity: QuantityVoltageV, Min: 3.2, Max: 3.4}},
+	}
+	components := []ComponentEvidence{
+		voltageSourceEvidence("source", "V3V3", "GND"),
+		{
+			InstanceID: "controller", CatalogID: "mcu.test", Family: "mcu",
+			ModelClaims: []CatalogEvidence{{ModelID: PrimitiveMCUStaticSupplyLoadV1, Parameters: []NamedValue{{Name: "maximum_supply_current_a", Value: .014}}}},
+			Connections: []ConnectionEvidence{
+				{Function: "VCC", Net: "V3V3"}, {Function: "AVCC", Net: "AV3V3"}, {Function: "GND", Net: "GND"},
+			},
+		},
+	}
+	_, diagnostics := ResolveWithTopology(intent, "test", "hash", components, []NodeEvidence{{Name: "GND", Role: "ground"}, {Name: "V3V3", Role: "power"}, {Name: "AV3V3", Role: "power"}})
+	if len(diagnostics) != 1 || diagnostics[0].Path != "topology.devices.controller.terminals.POWER" {
+		t.Fatalf("diagnostics = %+v", diagnostics)
 	}
 }
 

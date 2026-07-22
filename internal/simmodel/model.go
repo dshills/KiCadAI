@@ -18,6 +18,8 @@ const (
 	PrimitiveVoltageSourceV1                    = "mna_voltage_source_v1"
 	PrimitiveConnectorVoltageSourceV1           = "mna_connector_1x02_voltage_source_pin1_positive_v1"
 	PrimitiveCurrentSourceV1                    = "mna_current_source_v1"
+	PrimitiveMCUStaticSupplyLoadV1              = "mna_mcu_static_supply_load_v1"
+	PrimitiveSensorStaticSupplyLoadV1           = "mna_sensor_static_supply_load_v1"
 	PrimitiveOpAmpV1                            = "mna_opamp_single_pole_v1"
 	PrimitiveComparatorOpenCollectorV1          = "mna_comparator_open_collector_v1"
 	PrimitiveCurrentSenseAmplifierV1            = "mna_current_sense_amplifier_single_pole_v1"

@@ -15,6 +15,17 @@ type ValidationReport struct {
 // itself and every foreign-net pad. It is intended for workflows that compose
 // multiple independently routed phases before writing one board.
 func ValidatePhysicalClearance(request Request, routes []Route) []reports.Issue {
+	return validatePhysicalClearance(request, routes, true)
+}
+
+// ValidatePhysicalTrackClearance validates cross-copper geometry and tracks
+// against foreign pads. Layer-transition via-to-pad clearance is owned by the
+// transition repair path, which can move the via and its attached vertices.
+func ValidatePhysicalTrackClearance(request Request, routes []Route) []reports.Issue {
+	return validatePhysicalClearance(request, routes, false)
+}
+
+func validatePhysicalClearance(request Request, routes []Route, includeViaPad bool) []reports.Issue {
 	request = cloneRequest(request)
 	NormalizeRequest(&request)
 	issues := clearanceIssues(routes, request.Rules.ClearanceMM)
@@ -30,10 +41,11 @@ func ValidatePhysicalClearance(request Request, routes []Route) []reports.Issue 
 						clearanceMM = max(clearanceMM, *pad.Clearance)
 					}
 					if segmentShapeDistance(segment, padRect(component, pad))-segment.WidthMM/2 < clearanceMM-distanceEpsilon {
+						center := absolutePadPoint(component, pad.Position)
 						issues = append(issues, reports.Issue{
 							Code:       reports.CodeValidationFailed,
 							Severity:   reports.SeverityBlocked,
-							Message:    fmt.Sprintf("segment clearance violation with pad %s.%s", component.Ref, pad.Name),
+							Message:    fmt.Sprintf("segment %s to %s clearance violation with pad %s.%s at %s", formatClearancePoint(segment.Start), formatClearancePoint(segment.End), component.Ref, pad.Name, formatClearancePoint(center)),
 							Refs:       []string{component.Ref},
 							Nets:       []string{route.Net, pad.Net},
 							Suggestion: "reroute the conflicting net or move the foreign pad",
@@ -41,6 +53,9 @@ func ValidatePhysicalClearance(request Request, routes []Route) []reports.Issue 
 					}
 				}
 			}
+		}
+		if !includeViaPad {
+			continue
 		}
 		for _, via := range route.Vias {
 			probe := Segment{Start: via.At, End: via.At}
@@ -70,6 +85,244 @@ func ValidatePhysicalClearance(request Request, routes []Route) []reports.Issue 
 	return issues
 }
 
+// ValidatePhysicalClearanceForNet checks only violations whose geometry is on
+// netName. It is equivalent to the affected subset of ValidatePhysicalClearance
+// and lets deterministic repair search score one changed net without repeatedly
+// revalidating unrelated copper.
+func ValidatePhysicalClearanceForNet(request Request, routes []Route, netName string) []reports.Issue {
+	return validatePhysicalClearanceForNet(request, routes, netName, true)
+}
+
+// ValidatePhysicalTrackClearanceForNet is the affected-net form of
+// ValidatePhysicalTrackClearance for deterministic repair search.
+func ValidatePhysicalTrackClearanceForNet(request Request, routes []Route, netName string) []reports.Issue {
+	return validatePhysicalClearanceForNet(request, routes, netName, false)
+}
+
+// ValidatePhysicalTrackClearanceForSegment reports only blockers involving the
+// supplied segment. It is used to avoid launching repair search for unrelated
+// segments merely because another segment on the same net is blocked.
+func ValidatePhysicalTrackClearanceForSegment(request Request, routes []Route, segment Segment) []reports.Issue {
+	localized := make([]Route, 0, len(routes)+1)
+	for _, route := range routes {
+		if sameOccupancyNet(route.Net, segment.Net) {
+			continue
+		}
+		localized = append(localized, route)
+	}
+	localized = append(localized, Route{Net: segment.Net, Status: RouteStatusRouted, Segments: []Segment{segment}})
+	return validatePhysicalClearanceForNet(request, localized, segment.Net, false)
+}
+
+func validatePhysicalClearanceForNet(request Request, routes []Route, netName string, includeViaPad bool) []reports.Issue {
+	request = cloneRequest(request)
+	NormalizeRequest(&request)
+	issues := []reports.Issue{}
+	for _, route := range routes {
+		if !sameOccupancyNet(route.Net, netName) {
+			continue
+		}
+		for _, segment := range route.Segments {
+			for _, otherRoute := range routes {
+				if sameOccupancyNet(otherRoute.Net, route.Net) {
+					continue
+				}
+				for _, other := range otherRoute.Segments {
+					if normalizeLayer(segment.Layer) != normalizeLayer(other.Layer) {
+						continue
+					}
+					requiredGap := request.Rules.ClearanceMM + segment.WidthMM/2 + other.WidthMM/2
+					if !segmentBoundsWithin(segment, other, requiredGap) {
+						continue
+					}
+					if segmentDistance(segment, other)-segment.WidthMM/2-other.WidthMM/2 < request.Rules.ClearanceMM-distanceEpsilon {
+						issues = append(issues, routeValidationIssue(route.Net, reports.CodeValidationFailed, fmt.Sprintf(
+							"segment clearance violation with net %s: %s to %s crosses %s to %s",
+							otherRoute.Net, formatClearancePoint(segment.Start), formatClearancePoint(segment.End), formatClearancePoint(other.Start), formatClearancePoint(other.End),
+						)))
+					}
+				}
+				for _, via := range otherRoute.Vias {
+					if !viaTouchesLayer(via, segment.Layer) {
+						continue
+					}
+					if distancePointToSegment(via.At, segment.Start, segment.End)-via.DiameterMM/2-segment.WidthMM/2 < request.Rules.ClearanceMM-distanceEpsilon {
+						issues = append(issues, routeValidationIssue(route.Net, reports.CodeValidationFailed, "segment clearance violation with via on net "+otherRoute.Net))
+					}
+				}
+			}
+			for _, component := range request.Components {
+				for _, pad := range component.Pads {
+					if sameOccupancyNet(pad.Net, route.Net) || !padAppliesToCopperLayer(pad, segment.Layer, request.Board.Layers) {
+						continue
+					}
+					clearanceMM := request.Rules.ClearanceMM
+					if pad.Clearance != nil {
+						clearanceMM = max(clearanceMM, *pad.Clearance)
+					}
+					if segmentShapeDistance(segment, padRect(component, pad))-segment.WidthMM/2 < clearanceMM-distanceEpsilon {
+						center := absolutePadPoint(component, pad.Position)
+						issues = append(issues, reports.Issue{Code: reports.CodeValidationFailed, Severity: reports.SeverityBlocked, Message: fmt.Sprintf("segment %s to %s clearance violation with pad %s.%s at %s", formatClearancePoint(segment.Start), formatClearancePoint(segment.End), component.Ref, pad.Name, formatClearancePoint(center)), Refs: []string{component.Ref}, Nets: []string{route.Net, pad.Net}, Suggestion: "reroute the conflicting net or move the foreign pad"})
+					}
+				}
+			}
+		}
+		if !includeViaPad {
+			continue
+		}
+		for _, via := range route.Vias {
+			for _, otherRoute := range routes {
+				if sameOccupancyNet(otherRoute.Net, route.Net) {
+					continue
+				}
+				for _, segment := range otherRoute.Segments {
+					if !viaTouchesLayer(via, segment.Layer) {
+						continue
+					}
+					if distancePointToSegment(via.At, segment.Start, segment.End)-via.DiameterMM/2-segment.WidthMM/2 < request.Rules.ClearanceMM-distanceEpsilon {
+						issues = append(issues, routeValidationIssue(route.Net, reports.CodeValidationFailed, "via clearance violation with segment on net "+otherRoute.Net))
+					}
+				}
+				for _, other := range otherRoute.Vias {
+					if !viasShareLayer(via, other) {
+						continue
+					}
+					if pointDistance(via.At, other.At)-via.DiameterMM/2-other.DiameterMM/2 < request.Rules.ClearanceMM-distanceEpsilon {
+						issues = append(issues, routeValidationIssue(route.Net, reports.CodeValidationFailed, "via clearance violation with net "+otherRoute.Net))
+					}
+				}
+			}
+			probe := Segment{Start: via.At, End: via.At}
+			for _, component := range request.Components {
+				for _, pad := range component.Pads {
+					if sameOccupancyNet(pad.Net, route.Net) || !viaAndPadShareCopperLayer(via, pad, request.Board.Layers) {
+						continue
+					}
+					clearanceMM := request.Rules.ClearanceMM
+					if pad.Clearance != nil {
+						clearanceMM = max(clearanceMM, *pad.Clearance)
+					}
+					if segmentShapeDistance(probe, padRect(component, pad))-via.DiameterMM/2 < clearanceMM-distanceEpsilon {
+						issues = append(issues, reports.Issue{Code: reports.CodeValidationFailed, Severity: reports.SeverityBlocked, Message: fmt.Sprintf("via clearance violation with pad %s.%s", component.Ref, pad.Name), Refs: []string{component.Ref}, Nets: []string{route.Net, pad.Net}, Suggestion: "move the via or reroute the conflicting net"})
+					}
+				}
+			}
+		}
+	}
+	return issues
+}
+
+// PhysicalPadDetourCandidates returns deterministic, grid-aligned local
+// doglegs around foreign pads that currently violate segment clearance. The
+// detour rejoins the original segment outside the pad envelope, so distant
+// endpoint geometry is preserved.
+func PhysicalPadDetourCandidates(request Request, segment Segment, maxRing int) [][]Point {
+	request = cloneRequest(request)
+	NormalizeRequest(&request)
+	dx := segment.End.XMM - segment.Start.XMM
+	dy := segment.End.YMM - segment.Start.YMM
+	length := math.Hypot(dx, dy)
+	if length <= distanceEpsilon || maxRing <= 0 {
+		return nil
+	}
+	gridMM := request.Rules.GridMM
+	if gridMM <= 0 || math.IsNaN(gridMM) || math.IsInf(gridMM, 0) {
+		gridMM = DefaultRules().GridMM
+	}
+	ux, uy := dx/length, dy/length
+	px, py := -uy, ux
+	var candidates [][]Point
+	seen := map[string]struct{}{}
+	for _, component := range request.Components {
+		for _, pad := range component.Pads {
+			if sameOccupancyNet(pad.Net, segment.Net) || !padAppliesToCopperLayer(pad, segment.Layer, request.Board.Layers) {
+				continue
+			}
+			clearanceMM := request.Rules.ClearanceMM
+			if pad.Clearance != nil {
+				clearanceMM = max(clearanceMM, *pad.Clearance)
+			}
+			shape := padRect(component, pad)
+			if segmentShapeDistance(segment, shape)-segment.WidthMM/2 >= clearanceMM-distanceEpsilon {
+				continue
+			}
+			vertices := shape.Polygon
+			if len(vertices) == 0 && shape.Rect != nil {
+				vertices = []Point{
+					{XMM: shape.Rect.Min.XMM, YMM: shape.Rect.Min.YMM},
+					{XMM: shape.Rect.Max.XMM, YMM: shape.Rect.Min.YMM},
+					{XMM: shape.Rect.Max.XMM, YMM: shape.Rect.Max.YMM},
+					{XMM: shape.Rect.Min.XMM, YMM: shape.Rect.Max.YMM},
+				}
+			}
+			if len(vertices) == 0 {
+				continue
+			}
+			minAlong, maxAlong := math.Inf(1), math.Inf(-1)
+			for _, vertex := range vertices {
+				relX := vertex.XMM - segment.Start.XMM
+				relY := vertex.YMM - segment.Start.YMM
+				along := relX*ux + relY*uy
+				minAlong = min(minAlong, along)
+				maxAlong = max(maxAlong, along)
+			}
+			margin := clearanceMM + segment.WidthMM/2 + gridMM
+			entryDistance := max(gridMM, minAlong-margin)
+			exitDistance := min(length-gridMM, maxAlong+margin)
+			if entryDistance >= exitDistance-distanceEpsilon {
+				continue
+			}
+			entry := Point{XMM: segment.Start.XMM + ux*entryDistance, YMM: segment.Start.YMM + uy*entryDistance}
+			exit := Point{XMM: segment.Start.XMM + ux*exitDistance, YMM: segment.Start.YMM + uy*exitDistance}
+			for ring := 1; ring <= maxRing; ring++ {
+				offsetMM := float64(ring) * gridMM
+				for _, direction := range []float64{1, -1} {
+					offsetX, offsetY := direction*px*offsetMM, direction*py*offsetMM
+					candidate := []Point{
+						entry,
+						{XMM: entry.XMM + offsetX, YMM: entry.YMM + offsetY},
+						{XMM: exit.XMM + offsetX, YMM: exit.YMM + offsetY},
+						exit,
+					}
+					complete := append([]Point{segment.Start}, candidate...)
+					complete = append(complete, segment.End)
+					if !detourClearsForeignPads(request, segment, complete) {
+						continue
+					}
+					key := fmt.Sprintf("%.6f,%.6f:%.6f,%.6f:%.6f,%.6f:%.6f,%.6f", candidate[0].XMM, candidate[0].YMM, candidate[1].XMM, candidate[1].YMM, candidate[2].XMM, candidate[2].YMM, candidate[3].XMM, candidate[3].YMM)
+					if _, exists := seen[key]; exists {
+						continue
+					}
+					seen[key] = struct{}{}
+					candidates = append(candidates, candidate)
+				}
+			}
+		}
+	}
+	return candidates
+}
+
+func detourClearsForeignPads(request Request, segment Segment, points []Point) bool {
+	for pointIndex := 1; pointIndex < len(points); pointIndex++ {
+		candidate := Segment{Net: segment.Net, Layer: segment.Layer, Start: points[pointIndex-1], End: points[pointIndex], WidthMM: segment.WidthMM}
+		for _, component := range request.Components {
+			for _, pad := range component.Pads {
+				if sameOccupancyNet(pad.Net, segment.Net) || !padAppliesToCopperLayer(pad, segment.Layer, request.Board.Layers) {
+					continue
+				}
+				clearanceMM := request.Rules.ClearanceMM
+				if pad.Clearance != nil {
+					clearanceMM = max(clearanceMM, *pad.Clearance)
+				}
+				if segmentShapeDistance(candidate, padRect(component, pad))-candidate.WidthMM/2 < clearanceMM-distanceEpsilon {
+					return false
+				}
+			}
+		}
+	}
+	return true
+}
+
 func padAppliesToCopperLayer(pad Pad, layer string, boardLayers []Layer) bool {
 	wanted := normalizeLayer(layer)
 	for _, candidate := range padAccessLayers(pad, routableLayerNames(boardLayers)) {
@@ -81,6 +334,13 @@ func padAppliesToCopperLayer(pad Pad, layer string, boardLayers []Layer) bool {
 }
 
 func viaAndPadShareCopperLayer(via Via, pad Pad, boardLayers []Layer) bool {
+	if throughVia(via) {
+		for _, layer := range routableLayerNames(boardLayers) {
+			if padAppliesToCopperLayer(pad, layer, boardLayers) {
+				return true
+			}
+		}
+	}
 	for _, layer := range via.Layers {
 		if padAppliesToCopperLayer(pad, layer, boardLayers) {
 			return true
@@ -420,6 +680,9 @@ func clearanceVias(routes []Route) []clearanceVia {
 }
 
 func viaTouchesLayer(via Via, layer string) bool {
+	if throughVia(via) {
+		return true
+	}
 	layer = normalizeLayer(layer)
 	for _, candidate := range via.Layers {
 		if normalizeLayer(candidate) == layer {
@@ -430,12 +693,28 @@ func viaTouchesLayer(via Via, layer string) bool {
 }
 
 func viasShareLayer(left Via, right Via) bool {
+	if (throughVia(left) && len(right.Layers) != 0) || (throughVia(right) && len(left.Layers) != 0) {
+		return true
+	}
 	for _, layer := range left.Layers {
 		if viaTouchesLayer(right, layer) {
 			return true
 		}
 	}
 	return false
+}
+
+func throughVia(via Via) bool {
+	front, back := false, false
+	for _, layer := range via.Layers {
+		switch normalizeLayer(layer) {
+		case normalizeLayer("F.Cu"):
+			front = true
+		case normalizeLayer("B.Cu"):
+			back = true
+		}
+	}
+	return front && back
 }
 
 func clearanceIndexCellSize(clearanceMM float64) float64 {
