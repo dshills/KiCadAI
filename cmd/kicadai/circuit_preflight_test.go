@@ -11,7 +11,9 @@ import (
 	"testing"
 
 	"kicadai/internal/circuitgraph"
+	"kicadai/internal/designworkflow"
 	"kicadai/internal/kicadfiles/checks"
+	"kicadai/internal/libraryresolver"
 	"kicadai/internal/reports"
 )
 
@@ -47,6 +49,47 @@ func TestCircuitPreflightAcceptsDocumentedArgumentOrder(t *testing.T) {
 	result := runCircuitPreflightCLI(t, []string{"circuit", "preflight", "--request", graph, "--json"})
 	if !result.OK || !preflightResultData(t, result).ReadyForWrite {
 		t.Fatalf("documented argument order result = %#v", result)
+	}
+}
+
+func TestPublicFunctionLevelExamplePreflightsThroughDocumentedCLI(t *testing.T) {
+	example := filepath.Join("..", "..", "examples", "circuit-graph", "function_low_side_status_driver.json")
+	result := runCircuitPreflightCLI(t, []string{"--request", example, "circuit", "preflight"})
+	if !result.OK || !preflightResultData(t, result).ReadyForWrite {
+		t.Fatalf("public function example result = %#v", result)
+	}
+}
+
+func TestPublicFunctionLevelExampleOptionalKiCadCLI(t *testing.T) {
+	cliPath := strings.TrimSpace(os.Getenv(checks.EnvKiCadCLI))
+	symbolsRoot := strings.TrimSpace(os.Getenv(libraryresolver.EnvSymbolsRoot))
+	footprintsRoot := strings.TrimSpace(os.Getenv(libraryresolver.EnvFootprintsRoot))
+	if cliPath == "" || symbolsRoot == "" || footprintsRoot == "" {
+		t.Skipf("set %s, %s, and %s to run public function example through KiCad", checks.EnvKiCadCLI, libraryresolver.EnvSymbolsRoot, libraryresolver.EnvFootprintsRoot)
+	}
+	example := filepath.Join("..", "..", "examples", "circuit-graph", "function_low_side_status_driver.json")
+	output := filepath.Join(t.TempDir(), "project")
+	var stdout, stderr bytes.Buffer
+	err := run([]string{
+		"--symbols-root", symbolsRoot,
+		"--footprints-root", footprintsRoot,
+		"--kicad-cli", cliPath,
+		"--require-erc",
+		"--require-drc",
+		"--require-kicad-roundtrip",
+		"--strict-diffs",
+		"--request", example,
+		"--output", output,
+		"--overwrite",
+		"circuit", "create",
+	}, &stdout, &stderr)
+	if err != nil {
+		t.Fatalf("documented circuit create: %v\nstderr=%s\nstdout=%s", err, stderr.String(), stdout.String())
+	}
+	result := decodeSingleResultDocument(t, stdout.Bytes())
+	created := circuitCreateResultData(t, result)
+	if !result.OK || created.Workflow == nil || !designworkflow.AcceptanceSatisfied(created.Workflow.Acceptance.Requested, created.Workflow.Acceptance.Achieved) {
+		t.Fatalf("public function KiCad create = %#v", result)
 	}
 }
 

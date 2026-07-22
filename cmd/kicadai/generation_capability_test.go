@@ -32,6 +32,9 @@ func TestCapabilityGenerationEmitsSharedMachineReadableContract(t *testing.T) {
 	if _, ok := generationcapability.Lookup(generationcapability.ProfileGenericCircuit); !ok || !json.Valid(document.GenericGraphContract) {
 		t.Fatalf("document = %#v", document)
 	}
+	if document.FunctionLevelContract.Schema != "kicadai.function-level-capabilities.v1" || len(document.FunctionLevelContract.Operations) == 0 {
+		t.Fatalf("missing function-level contract: %#v", document.FunctionLevelContract)
+	}
 }
 
 func TestCapabilityGenerationFailsClosedForUnknownSubcommand(t *testing.T) {

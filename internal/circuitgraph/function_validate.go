@@ -3,6 +3,7 @@ package circuitgraph
 import (
 	"fmt"
 	"math"
+	"slices"
 	"strings"
 
 	"kicadai/internal/reports"
@@ -98,6 +99,7 @@ func (validator *graphValidator) functionIntent(intent FunctionIntent) {
 			}
 			seenRequired[key] = true
 		}
+		validator.functionCapability(path, function, parameterNames, seenRequired)
 	}
 
 	interfaces := map[string]map[string]bool{}
@@ -228,6 +230,73 @@ func (validator *graphValidator) functionIntent(intent FunctionIntent) {
 	}
 	if constraints.Protection != "" && constraints.Protection != "optional" && constraints.Protection != "required" {
 		validator.add(CodeSynthesisIntentInvalid, "synthesis.constraints.protection", "protection must be optional or required")
+	}
+}
+
+func (validator *graphValidator) functionCapability(path string, function FunctionRequirement, parameterNames, requiredFunctions map[string]bool) {
+	if strings.TrimSpace(function.Usage) == "" {
+		return
+	}
+	capability, published := FunctionCapabilityForUsage(function.Usage)
+	if !published {
+		if !knownLegacyFunctionUsage(function.Usage) {
+			validator.add(CodeSynthesisIntentInvalid, path+".usage", "unknown function usage "+function.Usage+"; query capability generation for published operation names")
+		}
+		return
+	}
+	if !slices.Contains(capability.SupportedRoles, function.Role) {
+		validator.add(CodeSynthesisIntentInvalid, path+".role", "usage "+capability.Name+" does not support role "+string(function.Role))
+	}
+	parameters := make(map[string]Parameter, len(function.Parameters))
+	for _, parameter := range function.Parameters {
+		parameters[parameter.Name] = parameter
+	}
+	for _, parameter := range capability.RequiredParameters {
+		if !parameterNames[parameter.Name] {
+			validator.add(CodeSynthesisIntentInvalid, path+".parameters", "usage "+capability.Name+" requires parameter "+parameter.Name)
+			continue
+		}
+		validator.functionParameterKind(path, capability.Name, parameter, parameters[parameter.Name])
+	}
+	for _, parameter := range capability.OptionalParameters {
+		if parameterNames[parameter.Name] {
+			validator.functionParameterKind(path, capability.Name, parameter, parameters[parameter.Name])
+		}
+	}
+	for _, endpoint := range capability.EndpointRoles {
+		if !endpoint.Required {
+			continue
+		}
+		matched := false
+		for _, functionName := range endpoint.Functions {
+			if requiredFunctions[normalizedFunctionKey(functionName)] {
+				matched = true
+				break
+			}
+		}
+		if !matched {
+			validator.add(CodeSynthesisIntentInvalid, path+".required_functions", "usage "+capability.Name+" requires endpoint role "+endpoint.Role+" ("+strings.Join(endpoint.Functions, " or ")+")")
+		}
+	}
+}
+
+func (validator *graphValidator) functionParameterKind(path, usage string, capability FunctionParameter, parameter Parameter) {
+	valid := false
+	switch capability.ValueKind {
+	case "string":
+		valid = parameter.Value.String != nil && strings.TrimSpace(*parameter.Value.String) != ""
+	case "number":
+		valid = parameter.Value.Number != nil
+	case "bool":
+		valid = parameter.Value.Bool != nil
+	case "list":
+		valid = len(parameter.Value.List) > 0
+	default:
+		validator.add(CodeSynthesisIntentInvalid, path+".parameters."+capability.Name, "published usage "+usage+" has unsupported parameter metadata kind "+capability.ValueKind)
+		return
+	}
+	if !valid {
+		validator.add(CodeSynthesisIntentInvalid, path+".parameters."+capability.Name, "usage "+usage+" requires "+capability.Name+" as "+capability.ValueKind)
 	}
 }
 

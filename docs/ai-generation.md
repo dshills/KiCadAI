@@ -113,6 +113,11 @@ and connectivity, writer correctness, zero schematic/PCB round-trip
 differences, and byte-identical replay. The hashes, selected components,
 unused-pin decisions, derived constraints, and gate results are recorded in the
 [function-level capability report](../specs/function-level-circuit-synthesis/CAPABILITY_REPORT.json).
+The public operation registry and runnable, provider-free example are described
+in [Function-Level Circuit Workflow](function-level-circuits.md). Query
+`kicadai capability generation --json` and use
+`data.function_level_contract`; do not derive the `usage` vocabulary from
+internal corpus files.
 
 Generic circuit graphs express schematic lanes explicitly. `power`, `signals`,
 and `ground` are fixed to `top`, `middle`, and `bottom`. Provider output must set

@@ -67,6 +67,15 @@ catalog's component/function vocabulary. Feed that result into the provider
 prompt and fail closed on any structured diagnostic; do not infer support from
 fixture names or repository paths.
 
+For function-level requests, read `data.function_level_contract` from the same
+response. It is generated from validation metadata and lists published
+`usage` names, parameters, endpoint roles, units, readiness limits, and
+unsupported claims. Start from
+`examples/circuit-graph/function_low_side_status_driver.json`; the complete
+provider-free command sequence is documented in
+`docs/function-level-circuits.md`. Do not grep internal testdata to construct a
+request.
+
 Use the generic graph loop before project creation:
 
 ```sh

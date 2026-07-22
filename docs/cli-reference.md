@@ -206,6 +206,10 @@ kicadai capability generation --json
 Use `data.capabilities` for generic versus bounded profile distinctions,
 limitations, and required evidence. Use `data.generic_graph_contract` as the
 catalog-resolved component/function vocabulary for `generic-circuit-v1`.
+Use `data.function_level_contract` for the registry-backed function-level
+operation names, parameters, endpoint roles, unit conventions, readiness
+limits, and unsupported claims. The complete provider-free workflow is in
+[Function-Level Circuit Workflow](function-level-circuits.md).
 Unsupported graph data must be treated as a fail-closed preflight result; no
 KiCad project should be written after a blocking diagnostic.
 

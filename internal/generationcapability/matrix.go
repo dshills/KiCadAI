@@ -40,9 +40,10 @@ type Capability struct {
 // stable profile matrix with the catalog-derived generic graph vocabulary that
 // an AI provider must obey for this installation.
 type Document struct {
-	Capabilities          []Capability    `json:"capabilities"`
-	GenericGraphContract  json.RawMessage `json:"generic_graph_contract"`
-	GenericRepairContract RepairContract  `json:"generic_repair_contract"`
+	Capabilities          []Capability                                 `json:"capabilities"`
+	GenericGraphContract  json.RawMessage                              `json:"generic_graph_contract"`
+	FunctionLevelContract circuitgraph.FunctionLevelCapabilityDocument `json:"function_level_contract"`
+	GenericRepairContract RepairContract                               `json:"generic_repair_contract"`
 }
 
 type RepairContract struct {
@@ -135,6 +136,7 @@ func BuildDocument(catalog *components.Catalog) (Document, error) {
 	document := Document{
 		Capabilities:          All(),
 		GenericGraphContract:  json.RawMessage(genericContract),
+		FunctionLevelContract: circuitgraph.FunctionLevelCapabilities(),
 		GenericRepairContract: RepairContract{PatchSchema: circuitgraph.PatchSchemaID, SupportedOperations: []string{"replace_component", "replace_endpoint", "replace_pcb_region"}, Policy: "preflight reports candidates but never applies them"},
 	}
 	if !json.Valid(document.GenericGraphContract) {

@@ -1,0 +1,32 @@
+{
+  "schema": "kicadai.circuit-graph.v1",
+  "version": 1,
+  "project": {"name": "function_low_side_status_driver", "title": "Function-level low-side status driver", "description": "Public function-level example for a logic-controlled NPN LED driver.", "acceptance": "erc-drc"},
+  "synthesis": {
+    "functions": [
+      {"id": "switch", "role": "bjt", "query": {"text": "MMBT3904", "family": "bjt", "minimum_confidence": "verified"}, "required_functions": ["BASE", "COLLECTOR", "EMITTER"], "usage": "low_side_switch"},
+      {"id": "base_resistor", "role": "resistor", "query": {"family": "resistor", "package": "0603", "value_kind": "resistance", "value": "4.7k", "minimum_confidence": "rule_inferred"}, "value": "4.7k"},
+      {"id": "indicator", "role": "indicator_led", "query": {"text": "red 0805 LED", "family": "led", "minimum_confidence": "verified"}, "required_ratings": [{"kind": "reverse_voltage", "value": "5", "unit": "V"}]},
+      {"id": "current_limit", "role": "current_limiter", "query": {"family": "resistor", "package": "0603", "value_kind": "resistance", "value": "330", "minimum_confidence": "rule_inferred"}, "value": "330"}
+    ],
+    "interfaces": [
+      {"id": "power", "role": "power_input", "signals": [{"name": "VCC", "role": "power"}, {"name": "GND", "role": "ground"}]},
+      {"id": "control", "role": "digital_input", "signals": [{"name": "CONTROL", "role": "signal"}, {"name": "GND", "role": "ground"}]}
+    ],
+    "power_domains": [
+      {"name": "VCC", "role": "power", "voltage_v": 5, "max_current_ma": 25, "source": "external"},
+      {"name": "GND", "role": "ground", "voltage_v": 0, "source": "external"}
+    ],
+    "connections": [
+      {"name": "VCC", "role": "power", "voltage_domain": "VCC", "endpoints": [{"interface": "power", "signal": "VCC"}, {"function": "current_limit", "port": "A"}]},
+      {"name": "GND", "role": "ground", "voltage_domain": "GND", "endpoints": [{"interface": "power", "signal": "GND"}, {"interface": "control", "signal": "GND"}, {"function": "switch", "port": "EMITTER"}]},
+      {"name": "CONTROL", "role": "signal", "endpoints": [{"interface": "control", "signal": "CONTROL"}, {"function": "base_resistor", "port": "A"}]},
+      {"name": "BASE_DRIVE", "role": "bias", "endpoints": [{"function": "base_resistor", "port": "B"}, {"function": "switch", "port": "BASE"}]},
+      {"name": "LED_ANODE", "role": "signal", "endpoints": [{"function": "current_limit", "port": "B"}, {"function": "indicator", "port": "ANODE"}]},
+      {"name": "SWITCHED_LED", "role": "signal", "endpoints": [{"function": "indicator", "port": "CATHODE"}, {"function": "switch", "port": "COLLECTOR"}]}
+    ],
+    "constraints": {"max_width_mm": 40, "max_height_mm": 25, "preferred_component_spacing_mm": 1.5}
+  },
+  "policy": {"allow_reference_assignment": true, "allow_value_normalization": true, "allow_layout_inference": true, "allow_spacing_adjustment": true, "allow_label_insertion": true, "allow_placement_adjustment": true, "allow_route_retry": true},
+  "extensions": {}
+}
