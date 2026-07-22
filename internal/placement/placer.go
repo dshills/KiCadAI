@@ -56,6 +56,16 @@ func PlaceContext(ctx context.Context, request Request) Result {
 	advancedRequestContext := newAdvancedPlacementRequestContext(request)
 	keepTogetherPeersByRef := keepTogetherPeersByComponent(request)
 	placedByRef := make(map[string]PlacementResult, len(components))
+	componentsByRef := make(map[string]Component, len(components))
+	for _, component := range components {
+		componentsByRef[normalizeRef(component.Ref)] = component
+	}
+	committedPlacements := make([]PlacementResult, 0, len(components))
+	rigidGroupByMember := relativeGroupIndexesByMember(request.Groups)
+	rigidGroupOrder := relativeGroupOrder(request.Groups)
+	rigidGroupsProcessed := false
+	rigidPlacements := make(map[string]PlacementResult, len(rigidGroupByMember))
+	rigidFailures := make(map[string]struct{})
 	for index, component := range components {
 		if issue, ok := placementContextIssue(ctx); ok {
 			if result.Metrics.PlacedCount > 0 {
@@ -66,6 +76,65 @@ func PlaceContext(ctx context.Context, request Request) Result {
 			result.Issues = append(result.Issues, issue)
 			result.Metrics.UnplacedCount += totalComponents - index
 			break
+		}
+		componentRef := normalizeRef(component.Ref)
+		if _, grouped := rigidGroupByMember[componentRef]; grouped {
+			if !rigidGroupsProcessed {
+				rigidGroupsProcessed = true
+				for _, groupIndex := range rigidGroupOrder {
+					group := request.Groups[groupIndex]
+					candidate, ok := placeRelativeGroup(request, group, componentsByRef, committedPlacements)
+					if !ok {
+						result.Status = StatusPartial
+						result.Issues = append(result.Issues, reports.Issue{
+							Code:     reports.CodePlacementCollision,
+							Severity: reports.SeverityError,
+							Path:     fmt.Sprintf("groups[%d].translate_as_unit", groupIndex),
+							Message:  "no legal translation preserves relative placement for group " + group.ID,
+						})
+						for _, ref := range group.Components {
+							rigidFailures[normalizeRef(ref)] = struct{}{}
+						}
+						continue
+					}
+					for _, groupPlacement := range candidate.placements {
+						ref := normalizeRef(groupPlacement.Ref)
+						rigidPlacements[ref] = groupPlacement
+						occupancy.Add(groupPlacement)
+						placedByRef[ref] = groupPlacement
+					}
+					committedPlacements = append(committedPlacements, candidate.placements...)
+					request.Keepouts = TranslatedKeepoutsForPlacements(request, committedPlacements)
+					occupancy.keepouts = request.Keepouts
+				}
+			}
+			if placement, placed := rigidPlacements[componentRef]; placed {
+				if component.Fixed {
+					result.Metrics.FixedCount++
+				}
+				if estimatedBoundsSource(component.Bounds.Source) {
+					result.Metrics.EstimatedBoundsCount++
+				}
+				result.Metrics.PlacedCount++
+				anchor, hasAnchor := groupAnchorPoint(component, request)
+				dimensions := semanticCandidateDimensions(component, placement.Position, request, anchor, hasAnchor, Point{}, false)
+				recordCandidateWinner(result.CandidateScoring, component, placement, placementCandidate{Placement: placement, Index: 0, Dimensions: dimensions, Total: weightedCandidateDimensionTotal(dimensions)})
+				result.Placements = append(result.Placements, placement)
+				continue
+			}
+			if _, failed := rigidFailures[componentRef]; !failed {
+				result.Issues = append(result.Issues, issue("components."+component.Ref, "relative-placement group did not produce a placement for component "+component.Ref))
+			}
+			result.Metrics.UnplacedCount++
+			result.Placements = append(result.Placements, PlacementResult{
+				Ref:         component.Ref,
+				FootprintID: component.FootprintID,
+				Fixed:       component.Fixed,
+				GroupID:     component.GroupID,
+				Mobility:    component.Mobility,
+				Reason:      "no legal group placement found",
+			})
+			continue
 		}
 		placement, ok, placementIssues := placeComponent(component, request, occupancy, placedByRef, padsByRef, rotatedPadsByRef, netsByRef, advancedRequestContext, keepTogetherPeersByRef, result.CandidateScoring)
 		if !ok {
@@ -95,17 +164,12 @@ func PlaceContext(ctx context.Context, request Request) Result {
 		result.Metrics.PlacedCount++
 		occupancy.Add(placement)
 		placedByRef[normalizeRef(placement.Ref)] = placement
+		committedPlacements = append(committedPlacements, placement)
 		result.Placements = append(result.Placements, placement)
 		// A keepout owned by a placement group follows that group's anchor.
 		// Refresh the occupancy view as soon as an anchor is placed so later
 		// candidates are checked against the keepout's actual coordinate frame.
-		occupancy.keepouts = TranslatedKeepoutsForPlacements(request, result.Placements)
-	}
-	rigidIssues := preserveRelativeGroupPlacements(request, result.Placements)
-	result.Issues = append(result.Issues, rigidIssues...)
-	request.Keepouts = TranslatedKeepoutsForPlacements(request, result.Placements)
-	if len(rigidIssues) > 0 && result.Status == StatusPlaced {
-		result.Status = StatusPartial
+		occupancy.keepouts = TranslatedKeepoutsForPlacements(request, committedPlacements)
 	}
 	if result.Metrics.UnplacedCount > 0 && result.Metrics.PlacedCount == 0 {
 		result.Status = StatusBlocked

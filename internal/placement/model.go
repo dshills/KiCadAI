@@ -1105,6 +1105,7 @@ func Validate(request Request) []reports.Issue {
 		}
 	}
 	groupIDs := map[string]int{}
+	translatedGroupByRef := map[string]string{}
 	for i, group := range request.Groups {
 		path := fmt.Sprintf("groups[%d]", i)
 		id := strings.TrimSpace(group.ID)
@@ -1119,6 +1120,7 @@ func Validate(request Request) []reports.Issue {
 		}
 		for _, ref := range group.Components {
 			trimmedRef := strings.TrimSpace(ref)
+			normalizedRef := normalizeRef(trimmedRef)
 			component, ok := refs[strings.ToUpper(trimmedRef)]
 			if !ok {
 				issues = append(issues, issue(path+".components", "group references unknown component "+trimmedRef))
@@ -1127,6 +1129,13 @@ func Validate(request Request) []reports.Issue {
 			componentGroup := strings.TrimSpace(component.GroupID)
 			if group.TranslateAsUnit && componentGroup != "" && !strings.EqualFold(componentGroup, id) {
 				issues = append(issues, issue(path+".components", fmt.Sprintf("component %s has group ID %s but is listed in group %s", trimmedRef, componentGroup, id)))
+			}
+			if group.TranslateAsUnit {
+				if previous, exists := translatedGroupByRef[normalizedRef]; exists && !strings.EqualFold(previous, id) {
+					issues = append(issues, issue(path+".components", fmt.Sprintf("component %s belongs to multiple translated groups %s and %s", trimmedRef, previous, id)))
+				} else {
+					translatedGroupByRef[normalizedRef] = id
+				}
 			}
 		}
 		if group.Anchor.Ref != "" {

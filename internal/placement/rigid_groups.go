@@ -1,38 +1,38 @@
 package placement
 
 import (
-	"fmt"
 	"math"
 	"sort"
 	"strings"
-
-	"kicadai/internal/reports"
 )
 
 type relativeGroupCandidate struct {
 	placements []PlacementResult
 }
 
-func preserveRelativeGroupPlacements(request Request, placements []PlacementResult) []reports.Issue {
-	authoredKeepouts := append([]Keepout(nil), request.Keepouts...)
-	components := make(map[string]Component, len(request.Components))
-	for _, component := range request.Components {
-		components[normalizeRef(component.Ref)] = component
-	}
-	translatedMemberRefs := map[string]struct{}{}
-	groupOrder := make([]int, 0, len(request.Groups))
-	for groupIndex, group := range request.Groups {
+func relativeGroupIndexesByMember(groups []Group) map[string]int {
+	result := map[string]int{}
+	for groupIndex, group := range groups {
 		if !group.TranslateAsUnit {
 			continue
 		}
-		groupOrder = append(groupOrder, groupIndex)
 		for _, ref := range group.Components {
-			translatedMemberRefs[normalizeRef(ref)] = struct{}{}
+			result[normalizeRef(ref)] = groupIndex
+		}
+	}
+	return result
+}
+
+func relativeGroupOrder(groups []Group) []int {
+	groupOrder := make([]int, 0, len(groups))
+	for groupIndex, group := range groups {
+		if group.TranslateAsUnit {
+			groupOrder = append(groupOrder, groupIndex)
 		}
 	}
 	sort.SliceStable(groupOrder, func(left, right int) bool {
-		leftGroup := request.Groups[groupOrder[left]]
-		rightGroup := request.Groups[groupOrder[right]]
+		leftGroup := groups[groupOrder[left]]
+		rightGroup := groups[groupOrder[right]]
 		if leftGroup.Priority != rightGroup.Priority {
 			return leftGroup.Priority > rightGroup.Priority
 		}
@@ -41,42 +41,33 @@ func preserveRelativeGroupPlacements(request Request, placements []PlacementResu
 		}
 		return leftGroup.ID < rightGroup.ID
 	})
-	hardRefs := map[string]struct{}{}
-	for ref, component := range components {
-		_, translatedMember := translatedMemberRefs[ref]
-		if !translatedMember || component.Fixed || component.Mobility.Class == MobilityFixed {
-			hardRefs[ref] = struct{}{}
-		}
-	}
-	placementIndexes := make(map[string]int, len(placements))
-	for index, result := range placements {
-		if result.Reason == "" {
-			placementIndexes[normalizeRef(result.Ref)] = index
-		}
-	}
+	return groupOrder
+}
 
-	var issues []reports.Issue
-	for _, groupIndex := range groupOrder {
-		group := request.Groups[groupIndex]
-		candidate, ok := findRelativeGroupPlacement(request, group, components, placements, placementIndexes, hardRefs)
-		if !ok {
-			issues = append(issues, reports.Issue{
-				Code:     reports.CodePlacementCollision,
-				Severity: reports.SeverityError,
-				Path:     fmt.Sprintf("groups[%d].translate_as_unit", groupIndex),
-				Message:  "no legal translation preserves relative placement for group " + group.ID,
-			})
-			continue
-		}
-		for _, result := range candidate.placements {
-			placements[placementIndexes[normalizeRef(result.Ref)]] = result
-			hardRefs[normalizeRef(result.Ref)] = struct{}{}
-		}
-		keepoutRequest := request
-		keepoutRequest.Keepouts = authoredKeepouts
-		request.Keepouts = TranslatedKeepoutsForPlacements(keepoutRequest, placements)
+func placeRelativeGroup(request Request, group Group, components map[string]Component, existing []PlacementResult) (relativeGroupCandidate, bool) {
+	workingPlacements := make([]PlacementResult, 0, len(existing)+len(group.Components))
+	workingPlacements = append(workingPlacements, existing...)
+	placementIndexes := make(map[string]int, len(existing)+len(group.Components))
+	hardRefs := make(map[string]struct{}, len(existing))
+	for index, placement := range workingPlacements {
+		ref := normalizeRef(placement.Ref)
+		placementIndexes[ref] = index
+		hardRefs[ref] = struct{}{}
 	}
-	return issues
+	for _, ref := range group.Components {
+		componentRef := normalizeRef(ref)
+		component, ok := components[componentRef]
+		if !ok || component.Position == nil {
+			return relativeGroupCandidate{}, false
+		}
+		placement, ok := NewPlacementResult(component, *component.Position, request.Rules)
+		if !ok {
+			return relativeGroupCandidate{}, false
+		}
+		placementIndexes[componentRef] = len(workingPlacements)
+		workingPlacements = append(workingPlacements, placement)
+	}
+	return findRelativeGroupPlacement(request, group, components, workingPlacements, placementIndexes, hardRefs)
 }
 
 func findRelativeGroupPlacement(request Request, group Group, components map[string]Component, placements []PlacementResult, placementIndexes map[string]int, hardRefs map[string]struct{}) (relativeGroupCandidate, bool) {

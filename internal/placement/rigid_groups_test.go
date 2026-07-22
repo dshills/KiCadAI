@@ -1,6 +1,9 @@
 package placement
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestPreserveRelativeGroupPlacementTranslatesClusterAroundObstacle(t *testing.T) {
 	rules := DefaultRules()
@@ -42,7 +45,6 @@ func TestPreserveRelativeGroupPlacementTranslatesClusterAroundObstacle(t *testin
 }
 
 func TestPlaceTranslatableFixedGroupBeforeRejectingAuthoredCoordinates(t *testing.T) {
-	t.Skip("known F1: remove after translatable fixed groups are legalized atomically")
 	rules := DefaultRules()
 	rules.GridMM = 1
 	rules.ComponentSpacingMM = 0
@@ -69,6 +71,31 @@ func TestPlaceTranslatableFixedGroupBeforeRejectingAuthoredCoordinates(t *testin
 	}
 	if issues := ValidateGeometry(request, successfulPlacementResults(result.Placements)); len(issues) != 0 {
 		t.Fatalf("geometry issues = %#v", issues)
+	}
+}
+
+func TestPlaceTranslatableGroupFailureIsAtomic(t *testing.T) {
+	rules := DefaultRules()
+	rules.GridMM = 1
+	rules.ComponentSpacingMM = 0
+	request := Request{
+		Board: BoardPlacementArea{WidthMM: 10, HeightMM: 10},
+		Rules: rules,
+		Components: []Component{
+			{Ref: "U1", FootprintID: "Test:U", Bounds: Bounds{WidthMM: 2, HeightMM: 2, Source: BoundsExplicit}, Fixed: true, Position: &Placement{XMM: 1, YMM: 5, Layer: "F.Cu"}, Rotation: RotationConstraint{FixedDeg: float64Pointer(0)}},
+			{Ref: "C1", FootprintID: "Test:C", Bounds: Bounds{WidthMM: 2, HeightMM: 2, Source: BoundsExplicit}, Fixed: true, Position: &Placement{XMM: 21, YMM: 5, Layer: "F.Cu"}, Rotation: RotationConstraint{FixedDeg: float64Pointer(0)}},
+		},
+		Groups: []Group{{ID: "core", Components: []string{"U1", "C1"}, Anchor: GroupAnchor{Ref: "U1"}, KeepTogether: true, TranslateAsUnit: true}},
+	}
+
+	result := Place(request)
+	if result.Status != StatusBlocked || result.Metrics.PlacedCount != 0 || result.Metrics.UnplacedCount != 2 {
+		t.Fatalf("placement = %#v, want atomic group failure", result)
+	}
+	for _, placed := range result.Placements {
+		if placed.Reason == "" {
+			t.Fatalf("partially committed group member: %#v", placed)
+		}
 	}
 }
 
@@ -260,6 +287,25 @@ func TestValidateTranslatedGroupRequiresAnchorMembership(t *testing.T) {
 	if issues := Validate(request); len(issues) == 0 {
 		t.Fatal("expected anchor-membership validation issue")
 	}
+}
+
+func TestValidateRejectsComponentInMultipleTranslatedGroups(t *testing.T) {
+	position := Placement{XMM: 5, YMM: 5, Layer: "F.Cu"}
+	request := Request{
+		Board:      BoardPlacementArea{WidthMM: 20, HeightMM: 20},
+		Components: []Component{{Ref: "U1", Bounds: Bounds{WidthMM: 2, HeightMM: 2, Source: BoundsExplicit}, Position: &position}},
+		Groups: []Group{
+			{ID: "first", Components: []string{"U1"}, Anchor: GroupAnchor{Ref: "U1"}, TranslateAsUnit: true},
+			{ID: "second", Components: []string{"U1"}, Anchor: GroupAnchor{Ref: "U1"}, TranslateAsUnit: true},
+		},
+	}
+	issues := Validate(request)
+	for _, validationIssue := range issues {
+		if strings.Contains(validationIssue.Message, "belongs to multiple translated groups") {
+			return
+		}
+	}
+	t.Fatalf("validation issues = %#v, want translated-group ownership issue", issues)
 }
 
 func float64Pointer(value float64) *float64 {
