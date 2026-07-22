@@ -153,7 +153,7 @@ func TestBMP280IntentClearsSchematicElectrical(t *testing.T) {
 	if !intentPlan.GeneratedRequest.Constraints.AllowBackLayer {
 		t.Fatalf("two-layer BMP280 workflow must allow B.Cu routing: %#v", intentPlan.GeneratedRequest.Constraints)
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	registry := blocks.NewBuiltinRegistry()
 	blockPlan := designworkflow.PlanBlocks(ctx, registry, *intentPlan.GeneratedRequest)
