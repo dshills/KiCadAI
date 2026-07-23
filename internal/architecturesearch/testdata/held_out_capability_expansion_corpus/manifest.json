@@ -1,0 +1,159 @@
+{
+  "schema": "kicadai.held-out-capability-expansion-corpus.v1",
+  "version": 1,
+  "base_commit": "a026fc78b7c79210b1f632590fcb4828e63cbbd0",
+  "frozen_at": "2026-07-23T00:00:00Z",
+  "requirement_schema": "kicadai.open-set-requirement.v3",
+  "authoring_policy": "Requests state only observable behavior, external interfaces, operating ranges, tolerances, safety limits, and manufacturing-neutral board bounds. They do not select topology, components, nets, pins, coordinates, layers, routes, providers, models, or repair actions.",
+  "stages": [
+    "integrity",
+    "schema",
+    "intent",
+    "architecture",
+    "component_evidence",
+    "simulation",
+    "lowering",
+    "schematic",
+    "placement",
+    "routing",
+    "writer",
+    "erc",
+    "drc",
+    "round_trip",
+    "replay"
+  ],
+  "cases": [
+    {
+      "id": "analog_class_a_line_amplifier",
+      "domain": "analog",
+      "family": "continuous_linear_amplification",
+      "role": "control",
+      "prompt": "Create a ground-referenced analog interface powered from 16.2 V to 19.8 V that provides 7.6 to 8.4 voltage gain, at least 100 kHz bandwidth, at least 8 Vpp output into 600 ohm to 10 kohm loads, 54 mA to 66 mA idle current, less than 0.5 percent distortion, at least 45 degrees phase margin, junction temperature below 125 degC, and startup output within plus or minus 0.5 V on a board no larger than 85 mm by 58 mm.",
+      "prompt_sha256": "0c12fed26d31b1d15b18f2229294152104b7700a03ba4eae120c1f6381f831c3",
+      "requirement_file": "../simulation_grounded_closed_loop_corpus/class_a_amplifier.json",
+      "requirement_sha256": "3440971cdfcfc17f94962498dbdeb78634fa71e396f68dbdf1074a2fbbd88f82",
+      "safety_critical": true
+    },
+    {
+      "id": "analog_precision_rectifier",
+      "domain": "analog",
+      "family": "precision_rectification",
+      "role": "held_out",
+      "prompt": "Create a 5 V analog interface that accepts a signal from minus 1 V to plus 1 V and produces its positive magnitude with no more than 50 mV transfer error into 10 kohm to 100 kohm loads, at least 100 kohm input impedance, settling within 1 ms, less than 10 mA idle current, and full validation across supply and manufacturing tolerances on a board no larger than 45 mm by 32 mm.",
+      "prompt_sha256": "1cb10abd6f8096960c9c3648013a86461ae00f35a789a1066fdbeb17257bfd45",
+      "requirement_file": "analog_precision_rectifier.json",
+      "requirement_sha256": "bf7593043f6e205bd1bc25a811bf52cbbc4188a9b04eea26bf4a8385eba81e6e",
+      "safety_critical": true
+    },
+    {
+      "id": "digital_clock_source",
+      "domain": "digital",
+      "family": "clock_generation",
+      "role": "held_out",
+      "prompt": "Create a 3.3 V single-ended logic clock output at 8 MHz with 0.01 percent frequency tolerance, no more than 1 ns RMS jitter, at least two logic loads of fanout, rise and fall times below 10 ns into 5 pF to 20 pF, valid logic-high level across minus 20 degC to 70 degC, and deterministic startup on a board no larger than 38 mm by 28 mm.",
+      "prompt_sha256": "c5a9c99b8902280e19c7b0b11df9e3255e0ec5e1bac66d862283f60fa34b6df7",
+      "requirement_file": "digital_clock_source.json",
+      "requirement_sha256": "4dd9431499e817f24963595caa02ddec67b7eaa32de804725e7c11419e4e72e7",
+      "safety_critical": false
+    },
+    {
+      "id": "digital_protected_level_interface",
+      "domain": "digital",
+      "family": "protected_level_translation",
+      "role": "control",
+      "prompt": "Create a protected bidirectional open-drain digital interface between a 4.5 V to 5.5 V host and a 3.0 V to 3.6 V device, operating to 400 kHz with device-side logic high above 2.6 V, rise time below 1 us, bounded startup, and operation into 1 pF to 400 pF loads from minus 20 degC to 70 degC on a board no larger than 68 mm by 46 mm.",
+      "prompt_sha256": "2b3e98c56752af7c4e63aff30b4dc7ea5325c2a595792526fed7f843dd485569",
+      "requirement_file": "../simulation_grounded_closed_loop_corpus/protected_mixed_signal_interface.json",
+      "requirement_sha256": "4ba74255926a6d2d86cec48759b1ef78ee7675f7764909e5a9e04d6c7d4e8efe",
+      "safety_critical": true
+    },
+    {
+      "id": "mcu_constant_current_peripheral",
+      "domain": "mcu",
+      "family": "constant_current_regulation",
+      "role": "held_out",
+      "prompt": "Create a programmable 5 V controller with retained programming access that enables a 100 mA current-regulated peripheral output, holds current within 5 percent into 5 ohm to 30 ohm loads, remains off during startup, responds within 2 ms, and stays below 125 degC from 0 degC to 60 degC on a board no larger than 62 mm by 44 mm.",
+      "prompt_sha256": "e827adc8af84876438ccee47d0177aa0a43e5612491ef68ec2af1cdf23aac9d6",
+      "requirement_file": "mcu_constant_current_peripheral.json",
+      "requirement_sha256": "e7009d39a5caa5e86b5ef1f307c26c57b754eca90a6e5281892f1eda59c99bee",
+      "safety_critical": true
+    },
+    {
+      "id": "mcu_regulated_sensor_controller",
+      "domain": "mcu",
+      "family": "regulated_sensor_controller",
+      "role": "control",
+      "prompt": "Create a programmable controller and environmental sensor subsystem powered from 4.5 V to 5.5 V, generate a 3.2 V to 3.4 V internal rail for up to 150 mA, communicate over 400 kHz open-drain buses across the voltage boundary, tolerate minus 20 degC to 70 degC, retain programming access, and fit within 80 mm by 60 mm.",
+      "prompt_sha256": "3798a111aae0a2b2d4274e1a040bc6d66f191555d0720bdbc339998c6329421b",
+      "requirement_file": "../power_interface_synthesis_corpus/regulated_mcu_sensor_subsystem.json",
+      "requirement_sha256": "25125c0b12e9fdb266ae149b1ef23ed3b80eae42eba40f690d61537132b2f31a",
+      "safety_critical": true
+    },
+    {
+      "id": "mixed_signal_protected_load_control",
+      "domain": "mixed_signal",
+      "family": "current_sensed_load_protection",
+      "role": "control",
+      "prompt": "Create a 12 V protected load controller that measures load current, disconnects above a 1.0 A to 1.1 A threshold with 50 mA to 100 mA hysteresis, indicates a fault, remains off at startup, responds within 50 us, operates into 1 ohm to 20 ohm loads from minus 20 degC to 70 degC, and fits within 70 mm by 48 mm.",
+      "prompt_sha256": "e78e844bbab1a7d3be3d403da91ea09f838919fb46a436de8320622e9eb39330",
+      "requirement_file": "../simulation_grounded_closed_loop_corpus/current_sense_protection.json",
+      "requirement_sha256": "a7f6b2f266a67e39aaab4a3c3f951b35bb92a454440db8f8d1a8d640efe12ccb",
+      "safety_critical": true
+    },
+    {
+      "id": "mixed_signal_rectified_acquisition",
+      "domain": "mixed_signal",
+      "family": "precision_rectification",
+      "role": "held_out",
+      "prompt": "Create a 5 V acquisition interface that accepts a minus 1 V to plus 1 V sensor signal, presents its positive magnitude to a data-converter input with no more than 50 mV transfer error, settles within 10 us into 5 pF to 20 pF, keeps integrated output noise below 200 uV RMS, and passes supply and manufacturing tolerance corners on a board no larger than 56 mm by 38 mm.",
+      "prompt_sha256": "f3dc25cd348ddff77d467dd69c2203b4b1339dd206195cdd6d3b1b5b9d8d0cd3",
+      "requirement_file": "mixed_signal_rectified_acquisition.json",
+      "requirement_sha256": "9b23e22e856d29c53be278f45ccb3da590d60e315d37534d31652f0b66a12ac7",
+      "safety_critical": true
+    },
+    {
+      "id": "power_constant_current_output",
+      "domain": "power",
+      "family": "constant_current_regulation",
+      "role": "held_out",
+      "prompt": "Create a protected output powered from 10.8 V to 13.2 V that regulates 20 mA within 5 percent into 50 ohm to 400 ohm loads, provides at least 8 V compliance, remains below 1 V during startup, responds within 1 ms, and stays below 125 degC from minus 20 degC to 70 degC on a board no larger than 48 mm by 34 mm.",
+      "prompt_sha256": "4a0d076d5603d0f1de0cadf42b57049369ea5e5ee5769da1b0523f10027e95cb",
+      "requirement_file": "power_constant_current_output.json",
+      "requirement_sha256": "de554c5535aa434e0259949ae2abce142cd7585df274c2c6f1a517d9407206a0",
+      "safety_critical": true
+    },
+    {
+      "id": "power_regulated_sensor_supply",
+      "domain": "power",
+      "family": "regulated_protected_supply",
+      "role": "control",
+      "prompt": "Create a protected sensor interface powered from 4.5 V to 5.5 V that provides a 3.0 V to 3.6 V rail up to 150 mA, translates a 400 kHz open-drain interface, holds device logic high above 2.6 V, limits rise time to 1 us, and operates from minus 20 degC to 70 degC on a board no larger than 68 mm by 46 mm.",
+      "prompt_sha256": "c19e0c8c9a6ef4809419f9ab4ce37e2c53309e95763184fdaf5242e8e70e5b5c",
+      "requirement_file": "../simulation_grounded_closed_loop_corpus/regulated_sensor_interface.json",
+      "requirement_sha256": "564874fa04927975251102ad4f4089326197f0391059623253a30dcdf88c4086",
+      "safety_critical": true
+    },
+    {
+      "id": "sensor_constant_current_excitation",
+      "domain": "sensor",
+      "family": "constant_current_regulation",
+      "role": "held_out",
+      "prompt": "Create a sensor excitation interface powered from 8.1 V to 9.9 V that supplies 1 mA within 1 percent into 500 ohm to 5 kohm sensors, provides at least 5 V compliance, responds within 1 ms, remains below 0.5 V during startup, and stays below 105 degC from minus 20 degC to 70 degC on a board no larger than 44 mm by 32 mm.",
+      "prompt_sha256": "9d8aec65aca926d9129ec79aa9450b94508a86d29a8aa1ec9ade5ff4a12bcd69",
+      "requirement_file": "sensor_constant_current_excitation.json",
+      "requirement_sha256": "8297fcee31a5790225320e1274b498efdd3ab828352ff8a72ea860ed5036ddac",
+      "safety_critical": true
+    },
+    {
+      "id": "sensor_low_noise_decision_chain",
+      "domain": "sensor",
+      "family": "low_noise_sensor_decision",
+      "role": "control",
+      "prompt": "Create a 5 V sensor decision interface for a small analog input that provides 80 to 120 V per V gain, at least 2 kHz bandwidth, less than 100 uV RMS integrated output noise, a 2.45 V to 2.55 V decision threshold with 80 mV to 120 mV hysteresis, response below 50 us, and operation from minus 20 degC to 70 degC on a board no larger than 62 mm by 42 mm.",
+      "prompt_sha256": "ded70bdeb1e6f7b5153f0d31ca4a37fb74c1cb42c785bd86db91d796dcc675f4",
+      "requirement_file": "../simulation_grounded_closed_loop_corpus/low_noise_sensor_decision.json",
+      "requirement_sha256": "dd4522854c01ff3ec1e0deff208b517f3814cf9ef77a587b5b12aada70cd0478",
+      "safety_critical": true
+    }
+  ]
+}

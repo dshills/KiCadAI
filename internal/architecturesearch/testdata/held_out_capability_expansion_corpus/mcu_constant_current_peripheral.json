@@ -1,0 +1,245 @@
+{
+  "schema": "kicadai.open-set-requirement.v3",
+  "version": 3,
+  "project": {
+    "name": "mcu_constant_current_peripheral",
+    "title": "Programmable constant-current peripheral",
+    "description": "Use a programmable controller to enable a bounded current output while preserving safe startup, programming access, and thermal margin."
+  },
+  "requirements": {
+    "domains": [
+      {
+        "id": "power_5v",
+        "kind": "supply",
+        "min_voltage_v": 4.75,
+        "nominal_voltage_v": 5,
+        "max_voltage_v": 5.25,
+        "max_current_a": 0.5,
+        "source": "external"
+      },
+      {
+        "id": "ground",
+        "kind": "reference",
+        "nominal_voltage_v": 0,
+        "source": "external"
+      }
+    ],
+    "ports": [
+      {
+        "id": "ground",
+        "kind": "reference",
+        "direction": "bidirectional",
+        "domain": "ground"
+      },
+      {
+        "id": "power",
+        "kind": "power",
+        "direction": "sink",
+        "domain": "power_5v",
+        "electrical": {
+          "max_current_a": 0.5
+        }
+      },
+      {
+        "id": "current_output",
+        "kind": "protected_output",
+        "direction": "source",
+        "domain": "ground",
+        "electrical": {
+          "min_voltage_v": 0,
+          "max_voltage_v": 3,
+          "max_source_current_ma": 105
+        }
+      }
+    ],
+    "participants": [
+      {
+        "id": "controller",
+        "capability": "programmable_controller",
+        "domain": "power_5v",
+        "required_ports": [
+          {
+            "id": "current_enable",
+            "kind": "digital_logic",
+            "direction": "source",
+            "protocol": {
+              "name": "gpio",
+              "mode": "push_pull",
+              "max_frequency_hz": 1000
+            }
+          }
+        ],
+        "constraints": [
+          {
+            "name": "programmable_interface",
+            "relation": "required",
+            "value": true
+          }
+        ]
+      }
+    ],
+    "objectives": [
+      {
+        "id": "regulate_current",
+        "capability": "constant_current_regulation",
+        "bindings": [
+          {
+            "role": "control",
+            "participant": "controller",
+            "participant_port": "current_enable"
+          },
+          {
+            "role": "input",
+            "port": "power"
+          },
+          {
+            "role": "output",
+            "port": "current_output"
+          },
+          {
+            "role": "reference",
+            "port": "ground"
+          }
+        ],
+        "constraints": [
+          {
+            "name": "output_current",
+            "relation": "target",
+            "value": 0.1,
+            "unit": "A",
+            "tolerance_percent": 5
+          },
+          {
+            "name": "minimum_compliance_voltage",
+            "relation": "minimum",
+            "value": 3,
+            "unit": "V"
+          },
+          {
+            "name": "default_off",
+            "relation": "required",
+            "value": true
+          }
+        ]
+      }
+    ],
+    "operating_cases": [
+      {
+        "id": "enabled",
+        "conditions": [
+          {
+            "axis": "supply_voltage",
+            "target": "power_5v",
+            "min": 4.75,
+            "max": 5.25,
+            "unit": "V"
+          },
+          {
+            "axis": "load_resistance",
+            "target": "current_output",
+            "min": 5,
+            "max": 30,
+            "unit": "Ohm"
+          },
+          {
+            "axis": "ambient_temperature",
+            "target": "circuit",
+            "min": 0,
+            "max": 60,
+            "unit": "degC"
+          },
+          {
+            "axis": "tolerance",
+            "target": "circuit",
+            "selection": "all"
+          }
+        ]
+      }
+    ],
+    "behavioral_requirements": [
+      {
+        "id": "regulated_current",
+        "metric": "dc_current",
+        "analysis": "dc_operating_point",
+        "observation": {
+          "kind": "port",
+          "id": "current_output"
+        },
+        "min": 0.095,
+        "max": 0.105,
+        "unit": "A",
+        "operating_cases": [
+          "enabled"
+        ],
+        "critical": true
+      },
+      {
+        "id": "response",
+        "metric": "response_time",
+        "analysis": "transient",
+        "observation": {
+          "kind": "port",
+          "id": "current_output"
+        },
+        "max": 0.002,
+        "unit": "s",
+        "operating_cases": [
+          "enabled"
+        ]
+      },
+      {
+        "id": "startup",
+        "metric": "startup_output_voltage",
+        "analysis": "startup",
+        "observation": {
+          "kind": "port",
+          "id": "current_output"
+        },
+        "max": 0.5,
+        "unit": "V",
+        "operating_cases": [
+          "enabled"
+        ],
+        "critical": true
+      },
+      {
+        "id": "thermal",
+        "metric": "junction_temperature",
+        "analysis": "thermal",
+        "observation": {
+          "kind": "port",
+          "id": "current_output"
+        },
+        "max": 125,
+        "unit": "degC",
+        "operating_cases": [
+          "enabled"
+        ],
+        "critical": true
+      }
+    ],
+    "constraints": {
+      "max_components": 28,
+      "max_width_mm": 62,
+      "max_height_mm": 44
+    }
+  },
+  "acceptance": {
+    "require_erc": true,
+    "require_strict_drc": true,
+    "require_complete_routing": true,
+    "require_connectivity": true,
+    "require_writer_correctness": true,
+    "require_round_trip_zero_diff": true,
+    "require_deterministic_replay": true,
+    "require_contract_composition": true,
+    "require_global_reasoning": true,
+    "require_coverage_accounting": true,
+    "require_alternatives": true,
+    "require_fail_closed": true,
+    "require_simulation": true,
+    "require_all_corners": true,
+    "require_model_provenance": true,
+    "require_closed_loop_evidence": true
+  }
+}
