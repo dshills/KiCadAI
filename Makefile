@@ -1,6 +1,6 @@
 .DEFAULT_GOAL := help
 
-.PHONY: help build install test test-one review-matrix lint coverage coverage-check run-help refresh-kicad-proto proto proto-check
+.PHONY: help build install test test-one review-matrix promotion-bundle lint coverage coverage-check run-help refresh-kicad-proto proto proto-check
 
 BIN_DIR := $(CURDIR)/bin
 BIN := $(BIN_DIR)/kicadai
@@ -19,6 +19,9 @@ GO_TEST_FLAGS ?=
 GO_TEST_PACKAGE ?= ./...
 GO_TEST_NAME ?=
 COVER_TEST_FLAGS ?=
+PROMOTION_ROOT ?= $(CURDIR)/.tmp/clean-checkout-promotion
+PROMOTION_CACHE_DIR ?= $(CURDIR)/.cache/kicadai-promotion-toolchain
+PROMOTION_SCENARIO_TIMEOUT ?= 20m
 
 help:
 	@printf "KiCadAI targets:\n"
@@ -27,6 +30,7 @@ help:
 	@printf "  make test            Run Go tests\n"
 	@printf "  make test-one        Run and require one named Go test (GO_TEST_NAME=...)\n"
 	@printf "  make review-matrix   Run the external-review mitigation ladder twice\n"
+	@printf "  make promotion-bundle Reproduce and verify the installed-KiCad promotion bundle\n"
 	@printf "  make lint            Run gofmt, go vet, and golangci-lint when installed\n"
 	@printf "  make coverage        Generate coverage profiles\n"
 	@printf "  make coverage-check  Enforce coverage threshold (COVERAGE_THRESHOLD=%s)\n" "$(COVERAGE_THRESHOLD)"
@@ -64,6 +68,14 @@ test-one:
 
 review-matrix:
 	KICADAI_RUN_EXTERNAL_REVIEW_MATRIX=1 GOCACHE="$(GOCACHE_DIR)" GOMODCACHE="$(GOMODCACHE_DIR)" go test -timeout "$(GO_TEST_TIMEOUT)" -count=2 ./cmd/kicadai ./internal/placement ./internal/circuitgraph ./internal/designworkflow ./internal/creationevidence -run '^TestExternalReviewMatrix'
+
+promotion-bundle:
+	PROMOTION_ROOT="$(PROMOTION_ROOT)" \
+	PROMOTION_CACHE_DIR="$(PROMOTION_CACHE_DIR)" \
+	PROMOTION_SCENARIO_TIMEOUT="$(PROMOTION_SCENARIO_TIMEOUT)" \
+	GOCACHE="$(GOCACHE_DIR)" \
+	GOMODCACHE="$(GOMODCACHE_DIR)" \
+	./scripts/clean-checkout-promotion.sh
 
 lint:
 	@unformatted="$$(gofmt -l $$(git ls-files '*.go'))"; \

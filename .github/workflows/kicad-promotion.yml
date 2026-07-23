@@ -1,0 +1,42 @@
+name: Installed KiCad Promotion
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  installed-kicad-promotion:
+    name: Installed KiCad promotion and bundle publication
+    runs-on: macos-15
+    timeout-minutes: 60
+    steps:
+      - name: Check out source
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Set up Go
+        uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Reproduce installed-KiCad promotion
+        env:
+          PROMOTION_ROOT: ${{ runner.temp }}/kicadai-promotion
+          PROMOTION_CACHE_DIR: ${{ runner.temp }}/kicadai-toolchain-cache
+        run: make promotion-bundle
+
+      - name: Verify content-addressed bundle
+        run: |
+          bundle_path="$(cat '${{ runner.temp }}/kicadai-promotion/bundle-path.txt')"
+          '${{ runner.temp }}/kicadai-promotion/bin/kicadai-promotion' verify --bundle "$bundle_path"
+
+      - name: Upload verified promotion bundle
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: kicadai-promotion-${{ github.sha }}
+          path: ${{ runner.temp }}/kicadai-promotion/bundles/sha256-*
+          if-no-files-found: error
+          include-hidden-files: true
+          retention-days: 30

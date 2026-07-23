@@ -51,6 +51,8 @@ func runPromote(arguments []string) error {
 	outputRoot := flags.String("output", "", "empty promotion output root")
 	bundleOutput := flags.String("bundle-output", "", "parent directory for a content-addressed bundle")
 	revision := flags.String("revision", "", "lowercase 40-character repository revision for the bundle")
+	bootstrap := flags.Bool("bootstrap", false, "bootstrap the locked toolchain when discovery fails")
+	cacheDir := flags.String("cache-dir", "", "caller-owned cache for a bootstrapped toolchain")
 	timeout := flags.Duration("scenario-timeout", 20*time.Minute, "maximum duration for each scenario run")
 	if err := flags.Parse(arguments); err != nil {
 		return err
@@ -73,7 +75,28 @@ func runPromote(arguments []string) error {
 	defer stop()
 	toolchain, err := promotiontoolchain.Resolve(ctx, document, promotiontoolchain.ResolveOptions{})
 	if err != nil {
-		return err
+		if !*bootstrap {
+			return err
+		}
+		resolveErr := err
+		cache := *cacheDir
+		if cache != "" {
+			absoluteCache, absErr := filepath.Abs(cache)
+			if absErr != nil {
+				return absErr
+			}
+			cache = absoluteCache
+		}
+		bootstrapped, bootstrapErr := promotiontoolchain.BootstrapToolchain(
+			ctx, document, promotiontoolchain.BootstrapOptions{CacheDir: cache},
+		)
+		if bootstrapErr != nil {
+			return errors.Join(
+				fmt.Errorf("resolve locked toolchain: %w", resolveErr),
+				fmt.Errorf("bootstrap locked toolchain: %w", bootstrapErr),
+			)
+		}
+		toolchain = bootstrapped
 	}
 	matrix, err := promotionrunner.LoadMatrix(*matrixPath, repository)
 	if err != nil {
