@@ -386,7 +386,6 @@ func TestCircuitCreateWritesPreflightReadyRCGraph(t *testing.T) {
 }
 
 func TestCircuitCreateWritesSharedCoreEvidence(t *testing.T) {
-	t.Skip("known F6: remove after circuit create uses the shared core evidence writer")
 	graph := writeCircuitCreateRCGraph(t)
 	symbolsRoot, footprintsRoot := writeCircuitCreateLibraryFixture(t)
 	cli := fakeWorkflowKiCadCLI(t, 0, passingWorkflowKiCadReport)
@@ -408,6 +407,11 @@ func TestCircuitCreateWritesSharedCoreEvidence(t *testing.T) {
 	} {
 		if _, statErr := os.Stat(filepath.Join(output, ".kicadai", name)); statErr != nil {
 			t.Fatalf("missing shared core evidence %s: %v", name, statErr)
+		}
+		var document map[string]any
+		readJSONFile(t, filepath.Join(output, ".kicadai", name), &document)
+		if version, ok := document["schema_version"].(string); !ok || strings.TrimSpace(version) == "" {
+			t.Fatalf("shared core evidence %s has no schema_version: %#v", name, document)
 		}
 	}
 }

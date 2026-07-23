@@ -14,6 +14,7 @@ import (
 
 	"kicadai/internal/circuitgraph"
 	"kicadai/internal/components"
+	"kicadai/internal/creationevidence"
 	"kicadai/internal/designworkflow"
 	"kicadai/internal/generationcapability"
 	"kicadai/internal/libraryresolver"
@@ -55,6 +56,7 @@ type circuitCreateData struct {
 	Workflow            *designworkflow.WorkflowResult `json:"workflow,omitempty"`
 	ProjectPaths        []string                       `json:"project_paths,omitempty"`
 	OutstandingEvidence []string                       `json:"outstanding_evidence"`
+	EvidenceArtifacts   []reports.Artifact             `json:"evidence_artifacts,omitempty"`
 }
 
 type circuitPatchData struct {
@@ -457,7 +459,37 @@ func runCircuitCreate(ctx context.Context, opts cliOptions, stdout io.Writer) er
 	createOpts.LibraryIndex = evaluation.LibraryIndex
 	createOpts.Writer.LibraryIndex = *evaluation.LibraryIndex
 	createOpts.Writer.HasLibraryIndex = true
+	// Create is synchronous and completes the transactional project-write stage,
+	// including .kicadai/transaction.json, before core evidence is assembled.
 	workflow := designworkflow.Create(ctx, *evaluation.Data.Request, createOpts)
+	promotionFixture, promotionErr := designPromotionFixture(opts, *evaluation.Data.Request, workflow)
+	var promotion *designworkflow.PromotionReport
+	if promotionErr == nil {
+		report := designworkflow.BuildInternalPromotionReport(promotionFixture, workflow)
+		promotion = &report
+		workflow.Promotion = promotionSummaryPointer(designworkflow.PromotionSummaryFromReport(report, designworkflow.PromotionReportArtifactPath))
+	} else {
+		evaluation.Issues = append(evaluation.Issues, reports.Issue{Code: reports.CodeValidationFailed, Severity: reports.SeverityError, Path: creationevidence.DesignPromotionPath, Stage: "reporting", Message: promotionErr.Error()})
+	}
+	validation := circuitCreationValidationSummary(workflow)
+	var promotionApplicability *creationevidence.Applicability
+	if promotionErr != nil {
+		validation.Status = "blocked"
+		validation.Message = "promotion evidence could not be evaluated: " + promotionErr.Error()
+		validation.Gates = append(validation.Gates, creationevidence.Gate{Name: "promotion", Status: "error", Rationale: promotionErr.Error()})
+		promotionApplicability = &creationevidence.Applicability{Status: "error", Rationale: "promotion evidence could not be evaluated: " + promotionErr.Error()}
+	}
+	coreArtifacts, dataIssues := creationevidence.Write(opts.output, creationevidence.Bundle{
+		Lane:                   "circuit",
+		Request:                *evaluation.Data.Request,
+		Workflow:               workflow,
+		Validation:             validation,
+		Promotion:              promotion,
+		PromotionApplicability: promotionApplicability,
+		Artifacts:              designworkflow.WorkflowArtifacts(workflow),
+	})
+	data.EvidenceArtifacts = coreArtifacts
+	evaluation.Issues = append(evaluation.Issues, dataIssues...)
 	data.Workflow = &workflow
 	if designworkflow.AcceptanceSatisfied(workflow.Acceptance.Requested, workflow.Acceptance.Achieved) {
 		data.ProjectPaths = circuitProjectPaths(opts.output, workflow)
@@ -547,7 +579,7 @@ type circuitDiagnosticsArtifact struct {
 }
 
 func writeCircuitCreateResult(stdout io.Writer, data circuitCreateData, issues []reports.Issue, outputDir string) error {
-	artifacts := []reports.Artifact{}
+	artifacts := append([]reports.Artifact(nil), data.EvidenceArtifacts...)
 	if len(issues) > reports.DefaultMaxEmittedIssues {
 		if artifact, issue := writeCompleteCircuitDiagnostics(outputDir, issues); issue != nil {
 			issues = append(issues, *issue)
@@ -566,6 +598,20 @@ func writeCircuitCreateResult(stdout io.Writer, data circuitCreateData, issues [
 		return errors.New("circuit create reported blocking issues")
 	}
 	return nil
+}
+
+func circuitCreationValidationSummary(workflow designworkflow.WorkflowResult) creationevidence.ValidationSummary {
+	status := "ready"
+	message := "requested creation acceptance was achieved"
+	if !designworkflow.AcceptanceSatisfied(workflow.Acceptance.Requested, workflow.Acceptance.Achieved) {
+		status = "blocked"
+		message = "requested creation acceptance was not achieved"
+	}
+	stage := ""
+	if len(workflow.Stages) > 0 {
+		stage = string(workflow.Stages[len(workflow.Stages)-1].Name)
+	}
+	return creationevidence.ValidationSummary{Status: status, Stage: stage, Message: message, Gates: creationevidence.GatesFromWorkflow(workflow)}
 }
 
 func writeCompleteCircuitDiagnostics(outputDir string, issues []reports.Issue) (reports.Artifact, *reports.Issue) {

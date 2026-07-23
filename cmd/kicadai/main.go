@@ -23,6 +23,7 @@ import (
 	"kicadai/internal/boardvalidation"
 	"kicadai/internal/components"
 	"kicadai/internal/config"
+	"kicadai/internal/creationevidence"
 	"kicadai/internal/designworkflow"
 	"kicadai/internal/evaluate"
 	"kicadai/internal/fabrication"
@@ -3081,21 +3082,7 @@ func persistCreateRationale(output string, plan intentplanner.PlanResult, draft 
 	return report, nil, []reports.Artifact{artifact}
 }
 
-func writeWorkflowResultArtifact(outputDir string, workflow designworkflow.WorkflowResult) []reports.Issue {
-	if strings.TrimSpace(outputDir) == "" {
-		return nil
-	}
-	data, err := json.MarshalIndent(workflow, "", "  ")
-	if err != nil {
-		return []reports.Issue{{Code: reports.CodeInvalidArgument, Severity: reports.SeverityError, Path: "workflow-result.json", Message: err.Error()}}
-	}
-	if issue := writeLocalArtifact(filepath.Join(outputDir, "workflow-result.json"), append(data, '\n'), true); issue != nil {
-		return []reports.Issue{*issue}
-	}
-	return nil
-}
-
-func writeAILaneArtifacts(outputDir string, plan intentplanner.PlanResult, draft *intentDraftOutput, sourceText string, status aiLaneStatus, artifacts []reports.Artifact) ([]reports.Artifact, []reports.Issue) {
+func writeAILaneArtifacts(outputDir string, lane string, plan intentplanner.PlanResult, draft *intentDraftOutput, sourceText string, status aiLaneStatus, workflow *designworkflow.WorkflowResult, promotion *designworkflow.PromotionReport, artifacts []reports.Artifact) ([]reports.Artifact, []reports.Issue) {
 	if strings.TrimSpace(outputDir) == "" {
 		return nil, nil
 	}
@@ -3105,17 +3092,19 @@ func writeAILaneArtifacts(outputDir string, plan intentplanner.PlanResult, draft
 	}
 	var written []reports.Artifact
 	var issues []reports.Issue
-	if plan.GeneratedRequest != nil {
+	if workflow == nil && plan.GeneratedRequest != nil {
 		if artifact, issue := writeJSONArtifact(filepath.Join(artifactDir, "design-request.json"), plan.GeneratedRequest, reports.ArtifactPreview, ".kicadai/design-request.json", "AI lane design workflow request"); issue != nil {
 			issues = append(issues, *issue)
 		} else {
 			written = append(written, artifact)
 		}
 	}
-	if artifact, issue := writeJSONArtifact(filepath.Join(artifactDir, "validation-summary.json"), status, reports.ArtifactValidationReport, ".kicadai/validation-summary.json", "AI lane status summary"); issue != nil {
-		issues = append(issues, *issue)
-	} else {
-		written = append(written, artifact)
+	if workflow == nil {
+		if artifact, issue := writeJSONArtifact(filepath.Join(artifactDir, "validation-summary.json"), status, reports.ArtifactValidationReport, ".kicadai/validation-summary.json", "AI lane status summary"); issue != nil {
+			issues = append(issues, *issue)
+		} else {
+			written = append(written, artifact)
+		}
 	}
 	retryState := map[string]any{
 		"retry_allowed":                   status.RetryAllowed,
@@ -3137,12 +3126,51 @@ func writeAILaneArtifacts(outputDir string, plan intentplanner.PlanResult, draft
 	}
 	manifestArtifacts := append([]reports.Artifact(nil), artifacts...)
 	manifestArtifacts = append(manifestArtifacts, written...)
+	if workflow != nil && plan.GeneratedRequest != nil {
+		coreArtifacts, coreIssues := creationevidence.Write(outputDir, creationevidence.Bundle{
+			Lane:       lane,
+			Request:    *plan.GeneratedRequest,
+			Workflow:   *workflow,
+			Validation: creationValidationSummary(status, *workflow),
+			Promotion:  promotion,
+			Artifacts:  normalizeManifestArtifacts(outputDir, manifestArtifacts),
+			AILane: &manifest.AILaneSummary{
+				Status:         string(status.Status),
+				Stage:          status.Stage,
+				SourceHash:     aiLaneSourceHash(draft, sourceText),
+				RequestHash:    aiLaneRequestHash(plan),
+				RetryStatePath: ".kicadai/retry-state.json",
+			},
+		})
+		written = append(written, coreArtifacts...)
+		issues = append(issues, coreIssues...)
+		return written, issues
+	}
 	if artifact, issue := writeAILaneManifest(outputDir, plan, draft, sourceText, status, manifestArtifacts); issue != nil {
 		issues = append(issues, *issue)
 	} else {
 		written = append(written, artifact)
 	}
 	return written, issues
+}
+
+func creationValidationSummary(status aiLaneStatus, workflow designworkflow.WorkflowResult) creationevidence.ValidationSummary {
+	return creationevidence.ValidationSummary{
+		Status:                    string(status.Status),
+		Stage:                     status.Stage,
+		IssueCode:                 status.IssueCode,
+		Message:                   status.Message,
+		Detail:                    status.Detail,
+		ArtifactPaths:             append([]string(nil), status.ArtifactPaths...),
+		RepairCategory:            string(status.RepairCategory),
+		RepairBundlePath:          status.RepairBundlePath,
+		SuggestedNextAction:       status.SuggestedNextAction,
+		RetryAllowed:              status.RetryAllowed,
+		RetryKey:                  status.RetryKey,
+		MaxAutomaticRetryAttempts: status.MaxAutomaticRetryAttempts,
+		UserClarificationRequired: status.UserClarificationRequired,
+		Gates:                     creationevidence.GatesFromWorkflow(workflow),
+	}
 }
 
 func writeJSONArtifact(path string, value any, kind reports.ArtifactKind, relPath string, description string) (reports.Artifact, *reports.Issue) {
@@ -3627,7 +3655,7 @@ func runIntentCreate(ctx context.Context, opts cliOptions, stdout io.Writer) err
 		artifacts := append([]reports.Artifact(nil), plan.Artifacts...)
 		artifacts = append(artifacts, rationaleArtifacts...)
 		aiStatus := buildAILaneStatus(plan, nil, allIssues, artifacts)
-		aiArtifacts, aiArtifactIssues := writeAILaneArtifacts(opts.output, plan, draft, sourceText, aiStatus, artifacts)
+		aiArtifacts, aiArtifactIssues := writeAILaneArtifacts(opts.output, "intent", plan, draft, sourceText, aiStatus, nil, nil, artifacts)
 		allIssues = append(allIssues, aiArtifactIssues...)
 		artifacts = append(artifacts, aiArtifacts...)
 		aiStatus.ArtifactPaths = artifactPaths(artifacts)
@@ -3656,34 +3684,22 @@ func runIntentCreate(ctx context.Context, opts cliOptions, stdout io.Writer) err
 	}
 	promotion := designworkflow.BuildInternalPromotionReport(promotionFixture, workflow)
 	workflow.Promotion = promotionSummaryPointer(designworkflow.PromotionSummaryFromReport(promotion, designworkflow.PromotionReportArtifactPath))
-	promotionArtifact, promotionIssue := designworkflow.WritePromotionReportArtifact(opts.output, promotion, opts.overwrite)
-	var promotionArtifacts []reports.Artifact
-	var promotionIssues []reports.Issue
-	if promotionIssue != nil {
-		promotionIssues = append(promotionIssues, *promotionIssue)
-	}
-	if strings.TrimSpace(promotionArtifact.Path) != "" {
-		promotionArtifacts = append(promotionArtifacts, promotionArtifact)
-	}
 	artifactDir := filepath.Join(opts.output, ".kicadai")
 	plan, artifactIssues := intentplanner.WriteArtifacts(plan, intentplanner.ArtifactOptions{OutputDir: artifactDir, Overwrite: true})
 	if draft != nil {
 		artifactIssues = append(artifactIssues, writeIntentDraftArtifacts(artifactDir, sourceText, intentdraft.Result{Request: draft.Request, Extraction: draft.Extraction, Clarifications: draft.Clarifications}, true)...)
 	}
-	artifactIssues = append(artifactIssues, writeWorkflowResultArtifact(artifactDir, workflow)...)
 	rationaleReport, rationaleIssues, rationaleArtifacts := persistCreateRationale(opts.output, plan, draft, &workflow)
 	allIssues := append([]reports.Issue(nil), issues...)
 	allIssues = append(allIssues, plan.Issues...)
 	allIssues = append(allIssues, artifactIssues...)
-	allIssues = append(allIssues, promotionIssues...)
 	allIssues = append(allIssues, rationaleIssues...)
 	allIssues = append(allIssues, designworkflow.WorkflowIssues(workflow)...)
 	artifacts := append([]reports.Artifact(nil), plan.Artifacts...)
 	artifacts = append(artifacts, designworkflow.WorkflowArtifacts(workflow)...)
-	artifacts = append(artifacts, promotionArtifacts...)
 	artifacts = append(artifacts, rationaleArtifacts...)
 	aiStatus := buildAILaneStatus(plan, &workflow, allIssues, artifacts)
-	aiArtifacts, aiArtifactIssues := writeAILaneArtifacts(opts.output, plan, draft, sourceText, aiStatus, artifacts)
+	aiArtifacts, aiArtifactIssues := writeAILaneArtifacts(opts.output, "intent", plan, draft, sourceText, aiStatus, &workflow, &promotion, artifacts)
 	allIssues = append(allIssues, aiArtifactIssues...)
 	artifacts = append(artifacts, aiArtifacts...)
 	aiStatus.ArtifactPaths = artifactPaths(artifacts)

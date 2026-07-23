@@ -10,12 +10,17 @@ import (
 	"path/filepath"
 	"strings"
 
+	"kicadai/internal/atomicfile"
 	"kicadai/internal/reports"
 )
 
 const RelativePath = ".kicadai/manifest.json"
 
+const SchemaVersion = "kicadai.manifest.v2"
+
 type Manifest struct {
+	SchemaVersion    string             `json:"schema_version"`
+	CreationLane     string             `json:"creation_lane,omitempty"`
 	ProjectName      string             `json:"project_name"`
 	GeneratorVersion string             `json:"generator_version"`
 	Operations       []OperationSummary `json:"operations"`
@@ -23,6 +28,27 @@ type Manifest struct {
 	FileHashes       map[string]string  `json:"file_hashes"`
 	Provenance       *ProvenanceRef     `json:"provenance,omitempty"`
 	AILane           *AILaneSummary     `json:"ai_lane,omitempty"`
+	Evidence         []EvidenceArtifact `json:"evidence,omitempty"`
+	ExternalEvidence []ExternalArtifact `json:"external_evidence,omitempty"`
+}
+
+// EvidenceArtifact identifies one lane-neutral creation artifact and binds its
+// representation to the exact bytes present in the generated project.
+type EvidenceArtifact struct {
+	Kind            reports.ArtifactKind `json:"kind"`
+	Path            string               `json:"path"`
+	SHA256          string               `json:"sha256"`
+	SchemaVersion   string               `json:"schema_version"`
+	GenerationStage string               `json:"generation_stage"`
+}
+
+// ExternalArtifact records content-addressed evidence that is intentionally
+// not copied into the generated project.
+type ExternalArtifact struct {
+	Kind            reports.ArtifactKind `json:"kind"`
+	URI             string               `json:"uri"`
+	SHA256          string               `json:"sha256"`
+	GenerationStage string               `json:"generation_stage"`
 }
 
 type AILaneSummary struct {
@@ -59,6 +85,9 @@ func Write(root string, manifest Manifest) (reports.Artifact, error) {
 	absRoot, err := filepath.Abs(root)
 	if err != nil {
 		return reports.Artifact{}, err
+	}
+	if strings.TrimSpace(manifest.SchemaVersion) == "" {
+		manifest.SchemaVersion = SchemaVersion
 	}
 	if manifest.FileHashes == nil {
 		manifest.FileHashes = map[string]string{}
@@ -101,10 +130,10 @@ func Write(root string, manifest Manifest) (reports.Artifact, error) {
 	if err != nil {
 		return reports.Artifact{}, err
 	}
-	if err := os.WriteFile(path, append(data, '\n'), 0o644); err != nil {
+	if err := atomicfile.Write(path, append(data, '\n'), 0o644); err != nil {
 		return reports.Artifact{}, err
 	}
-	return reports.Artifact{Kind: reports.ArtifactValidationReport, Path: filepath.ToSlash(path), Description: "KiCadAI generated-project manifest"}, nil
+	return reports.Artifact{Kind: reports.ArtifactValidationReport, Path: RelativePath, Description: "KiCadAI generated-project manifest"}, nil
 }
 
 func Read(root string) (Manifest, Status, error) {

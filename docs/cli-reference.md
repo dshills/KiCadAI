@@ -465,6 +465,9 @@ project directory. That bundle can be passed back via `--request` to
 
 New generated projects also include `.kicadai/transaction.json`, and
 `.kicadai/manifest.json` records a hash for that provenance file.
+Successful provider, intent, and circuit creation commands share the complete
+[creation evidence contract](creation-evidence.md), including typed request,
+workflow, validation, promotion, transaction, and manifest artifacts.
 Target-oriented repair commands use that evidence to reconstruct the original
 transaction when a caller does not provide one. Targets with missing, stale, or
 malformed metadata, plus imported or unsupported targets, remain blocked before

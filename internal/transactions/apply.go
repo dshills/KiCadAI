@@ -24,6 +24,7 @@ import (
 const ApplyLockFileName = ".kicadai.apply.lock"
 const applyLockFileName = ApplyLockFileName
 const transactionProvenanceSchema = "kicadai.transaction.provenance.v1"
+const transactionProvenanceSchemaVersion = "1"
 const transactionProvenancePath = ".kicadai/transaction.json"
 
 type ApplyOptions struct {
@@ -49,6 +50,7 @@ type ApplyResult struct {
 
 type transactionProvenance struct {
 	Schema             string                      `json:"schema"`
+	SchemaVersion      string                      `json:"schema_version"`
 	ProjectName        string                      `json:"project_name"`
 	GeneratorVersion   string                      `json:"generator_version,omitempty"`
 	CreatedBy          string                      `json:"created_by,omitempty"`
@@ -480,6 +482,7 @@ func lastOperationIndex(tx Transaction) int {
 func writeTransactionProvenanceForApply(outputDir string, projectName string, tx Transaction) (reports.Artifact, error) {
 	data := transactionProvenance{
 		Schema:             transactionProvenanceSchema,
+		SchemaVersion:      transactionProvenanceSchemaVersion,
 		ProjectName:        projectName,
 		GeneratorVersion:   reports.Version,
 		CreatedBy:          "kicadai",

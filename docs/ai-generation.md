@@ -640,6 +640,11 @@ and `circuit-resolution.json`. The workflow report embeds writer and round-trip
 summaries and records the exact temporary KiCad ERC/DRC report paths used by
 that run.
 
+These paths now follow the lane-neutral [creation evidence
+contract](creation-evidence.md). Provider, intent, and circuit entry points
+write the same six versioned core artifacts; provider responses, circuit
+resolution, rationale, and retry records remain additive.
+
 For the LMV321 commands, inspect
 `./out/ai_generic_lmv321/.kicadai/` or
 `./out/live_generic_lmv321/.kicadai/`. The recorded and live lanes preserve

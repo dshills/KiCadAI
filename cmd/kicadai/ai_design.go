@@ -159,25 +159,14 @@ func runAIDesignCreateAttempt(ctx context.Context, opts cliOptions, stdout io.Wr
 	}
 	promotion := designworkflow.BuildInternalPromotionReport(promotionFixture, workflow)
 	workflow.Promotion = promotionSummaryPointer(designworkflow.PromotionSummaryFromReport(promotion, designworkflow.PromotionReportArtifactPath))
-	promotionArtifact, promotionIssue := designworkflow.WritePromotionReportArtifact(opts.output, promotion, opts.overwrite)
 	var artifactIssues []reports.Issue
 	var artifacts []reports.Artifact
-	if promotionIssue != nil {
-		artifactIssues = append(artifactIssues, *promotionIssue)
-	} else if strings.TrimSpace(promotionArtifact.Path) != "" {
-		artifacts = append(artifacts, promotionArtifact)
-	}
 	artifactDir := filepath.Join(opts.output, ".kicadai")
 	plan, planIssues := intentplanner.WriteArtifacts(plan, intentplanner.ArtifactOptions{OutputDir: artifactDir, Overwrite: true})
 	artifactIssues = append(artifactIssues, planIssues...)
 	for _, artifact := range plan.Artifacts {
 		artifact.Path = filepath.ToSlash(filepath.Join(".kicadai", artifact.Path))
 		artifacts = append(artifacts, artifact)
-	}
-	workflowIssues := writeWorkflowResultArtifact(artifactDir, workflow)
-	artifactIssues = append(artifactIssues, workflowIssues...)
-	if len(workflowIssues) == 0 {
-		artifacts = append(artifacts, reports.Artifact{Kind: reports.ArtifactValidationReport, Path: ".kicadai/workflow-result.json", Description: "AI design workflow result"})
 	}
 	providerArtifacts, providerArtifactIssues := writeAIProviderArtifacts(artifactDir, opts, promptSource, prompt, intent, providerResult, attempts)
 	providerArtifacts = append(providerArtifacts, replayCapture.Artifacts()...)
@@ -188,7 +177,7 @@ func runAIDesignCreateAttempt(ctx context.Context, opts cliOptions, stdout io.Wr
 	allIssues = append(allIssues, designworkflow.WorkflowIssues(workflow)...)
 	status := buildAILaneStatus(plan, &workflow, allIssues, artifacts)
 	status = aiLaneStatusWithPromotionEvidence(status, promotion)
-	aiArtifacts, aiArtifactIssues := writeAILaneArtifacts(opts.output, plan, nil, prompt, status, artifacts)
+	aiArtifacts, aiArtifactIssues := writeAILaneArtifacts(opts.output, "provider", plan, nil, prompt, status, &workflow, &promotion, artifacts)
 	artifacts = append(artifacts, aiArtifacts...)
 	allIssues = append(allIssues, aiArtifactIssues...)
 	status.ArtifactPaths = artifactPaths(artifacts)

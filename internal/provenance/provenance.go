@@ -13,12 +13,14 @@ import (
 )
 
 const (
-	Schema       = "kicadai.transaction.provenance.v1"
-	RelativePath = ".kicadai/transaction.json"
+	Schema        = "kicadai.transaction.provenance.v1"
+	SchemaVersion = "1"
+	RelativePath  = ".kicadai/transaction.json"
 )
 
 type TransactionProvenance struct {
 	Schema             string                      `json:"schema"`
+	SchemaVersion      string                      `json:"schema_version"`
 	ProjectName        string                      `json:"project_name"`
 	GeneratorVersion   string                      `json:"generator_version,omitempty"`
 	CreatedBy          string                      `json:"created_by,omitempty"`
@@ -36,6 +38,7 @@ type Source struct {
 func New(projectName string, tx transactions.Transaction, generatorVersion string) TransactionProvenance {
 	return TransactionProvenance{
 		Schema:             Schema,
+		SchemaVersion:      SchemaVersion,
 		ProjectName:        strings.TrimSpace(projectName),
 		GeneratorVersion:   strings.TrimSpace(generatorVersion),
 		CreatedBy:          "kicadai",
@@ -63,6 +66,11 @@ func Validate(provenance TransactionProvenance) []reports.Issue {
 		issues = append(issues, issue("provenance.schema", "transaction provenance schema is required"))
 	} else if schema != Schema {
 		issues = append(issues, issue("provenance.schema", "unsupported transaction provenance schema "+schema))
+	}
+	// Missing schema_version remains readable for v1 projects written before
+	// shared creation evidence. All newly written provenance includes it.
+	if strings.TrimSpace(provenance.SchemaVersion) != "" && provenance.SchemaVersion != SchemaVersion {
+		issues = append(issues, issue("provenance.schema_version", "unsupported transaction provenance schema_version "+provenance.SchemaVersion))
 	}
 	if projectName == "" {
 		issues = append(issues, issue("provenance.project_name", "transaction provenance project_name is required"))

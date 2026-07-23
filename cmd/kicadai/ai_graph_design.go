@@ -76,19 +76,9 @@ func runAIGenericCircuitCreate(ctx context.Context, opts cliOptions, prompt, pro
 	}
 	promotion := designworkflow.BuildInternalPromotionReport(promotionFixture, workflow)
 	workflow.Promotion = promotionSummaryPointer(designworkflow.PromotionSummaryFromReport(promotion, designworkflow.PromotionReportArtifactPath))
-	promotionArtifact, promotionIssue := designworkflow.WritePromotionReportArtifact(opts.output, promotion, opts.overwrite)
 	var artifacts []reports.Artifact
 	var artifactIssues []reports.Issue
-	if promotionIssue != nil {
-		artifactIssues = append(artifactIssues, *promotionIssue)
-	} else if promotionArtifact.Path != "" {
-		artifacts = append(artifacts, promotionArtifact)
-	}
 	artifactDir := filepath.Join(opts.output, ".kicadai")
-	artifactIssues = append(artifactIssues, writeWorkflowResultArtifact(artifactDir, workflow)...)
-	if len(artifactIssues) == 0 {
-		artifacts = append(artifacts, reports.Artifact{Kind: reports.ArtifactValidationReport, Path: ".kicadai/workflow-result.json", Description: "generic AI design workflow result"})
-	}
 	if correctionArtifact, correctionIssue := writeAutonomousCorrectionArtifact(artifactDir, request, workflow); correctionIssue != nil {
 		artifactIssues = append(artifactIssues, *correctionIssue)
 	} else {
@@ -107,7 +97,7 @@ func runAIGenericCircuitCreate(ctx context.Context, opts cliOptions, prompt, pro
 	plan := intentplanner.PlanResult{Status: intentplanner.PlanStatusReady, GeneratedRequest: &request}
 	status := buildAILaneStatus(plan, &workflow, allIssues, artifacts)
 	status = aiLaneStatusWithPromotionEvidence(status, promotion)
-	aiArtifacts, aiArtifactIssues := writeAILaneArtifacts(opts.output, plan, nil, prompt, status, artifacts)
+	aiArtifacts, aiArtifactIssues := writeAILaneArtifacts(opts.output, "provider", plan, nil, prompt, status, &workflow, &promotion, artifacts)
 	artifacts = append(artifacts, aiArtifacts...)
 	allIssues = append(allIssues, aiArtifactIssues...)
 	status.ArtifactPaths = artifactPaths(artifacts)
