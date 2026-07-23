@@ -878,6 +878,51 @@ func TestRunIntentCreateSensorBreakoutPersistsRegulatorEvidence(t *testing.T) {
 	}
 }
 
+func TestRunIntentCreateCompactLEDOptionalKiCadPromotion(t *testing.T) {
+	cliPath := strings.TrimSpace(os.Getenv(checks.EnvKiCadCLI))
+	symbolsRoot := strings.TrimSpace(os.Getenv(libraryresolver.EnvSymbolsRoot))
+	footprintsRoot := strings.TrimSpace(os.Getenv(libraryresolver.EnvFootprintsRoot))
+	if cliPath == "" || symbolsRoot == "" || footprintsRoot == "" {
+		t.Skipf("set %s, %s, and %s to run compact LED promotion", checks.EnvKiCadCLI, libraryresolver.EnvSymbolsRoot, libraryresolver.EnvFootprintsRoot)
+	}
+	output := filepath.Join(t.TempDir(), "compact_led")
+	requestPath := filepath.Join("..", "..", "examples", "intent", "led_indicator_compact.json")
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	err := run([]string{
+		"--json",
+		"--symbols-root", symbolsRoot,
+		"--footprints-root", footprintsRoot,
+		"--kicad-cli", cliPath,
+		"--require-erc",
+		"--require-drc",
+		"--require-kicad-roundtrip",
+		"--strict-diffs",
+		"--request", requestPath,
+		"--output", output,
+		"--overwrite",
+		"intent", "create",
+	}, &stdout, &stderr)
+	if err != nil {
+		t.Fatalf("compact LED promotion failed: %v\nstdout=%s\nstderr=%s", err, stdout.String(), stderr.String())
+	}
+	result := decodeSingleResultDocument(t, stdout.Bytes())
+	if !result.OK {
+		t.Fatalf("compact LED promotion result = %#v", result)
+	}
+	var promotion designworkflow.PromotionReport
+	readJSONFile(t, filepath.Join(output, ".kicadai", "design-promotion.json"), &promotion)
+	if promotion.Status != designworkflow.PromotionStatusPass || promotion.AchievedReadiness != designworkflow.PromotionReadinessPass {
+		t.Fatalf("compact LED promotion = %#v", promotion)
+	}
+	for _, gateID := range []string{"connectivity", "kicad_checks", "route_completion", "writer_correctness"} {
+		gate := promotionGateByName(promotion.Gates, gateID)
+		if gate == nil || gate.Status != designworkflow.PromotionGateStatusPass {
+			t.Fatalf("compact LED gate %s = %#v", gateID, gate)
+		}
+	}
+}
+
 func TestRunIntentPlanRegulatorEvidenceFixtures(t *testing.T) {
 	for _, tc := range []struct {
 		name       string

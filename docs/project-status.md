@@ -3,6 +3,13 @@
 Last verified: 2026-07-22 by the complete repository suite and installed-KiCad
 promotion corpus.
 
+The six-circuit independent external review is now a release-blocking,
+machine-readable regression ladder. Its fixes cover atomic composed placement,
+design-scoped stock-library diagnostics, bounded JSON transport, public
+function-level discovery, and lane-neutral creation evidence. See
+[External Review Regression Ladder](external-review-regression.md) and its
+[completion audit](../specs/external-review-mitigation/AUDIT.md).
+
 KiCadAI's direct-file generation workflow is the main functional path. The
 project is beyond basic file serialization: supported designs can move through
 structured intent, deterministic planning, component and block selection,

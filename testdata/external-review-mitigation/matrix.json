@@ -1,0 +1,77 @@
+{
+  "schema_version": "kicadai.external-review-matrix.v1",
+  "scenarios": [
+    {
+      "id": "t1_compact_led",
+      "review_equivalent": "5 V LED indicator and power header on the original compact board",
+      "lane": "intent",
+      "fixture": "examples/intent/led_indicator_compact.json",
+      "board": {"mode": "declared", "width_mm": 40, "height_mm": 25, "layers": 2},
+      "expected_status": "pass",
+      "required_artifacts": ["design-request.json", "transaction.json", "workflow-result.json", "validation-summary.json", "design-promotion.json", "manifest.json"],
+      "internal_gates": ["placement", "routing", "connectivity", "route_completion", "writer_correctness", "round_trip", "deterministic_repeat"],
+      "optional_kicad_gates": ["erc", "strict_drc", "writer_correctness", "round_trip"]
+    },
+    {
+      "id": "t2_stock_rc_filter",
+      "review_equivalent": "explicit-graph two-pole passive filter quickstart against stock KiCad libraries",
+      "lane": "circuit-explicit",
+      "fixture": "examples/circuit-graph/rc_filter.json",
+      "board": {"mode": "declared", "width_mm": 40, "height_mm": 25, "layers": 2},
+      "expected_status": "pass",
+      "required_artifacts": ["design-request.json", "transaction.json", "workflow-result.json", "validation-summary.json", "design-promotion.json", "manifest.json"],
+      "internal_gates": ["library_closure", "routing", "connectivity", "route_completion", "writer_correctness", "round_trip", "json_transport", "deterministic_repeat"],
+      "optional_kicad_gates": ["erc", "strict_drc", "writer_correctness", "round_trip"]
+    },
+    {
+      "id": "t3_ap2112k_sensor",
+      "review_equivalent": "intent-composed USB-C, AP2112K regulator, sensor, and status indicator",
+      "lane": "intent",
+      "fixture": "examples/intent/regulator_ap2112k_sensor.json",
+      "board": {"mode": "declared", "width_mm": 45, "height_mm": 30, "layers": 2},
+      "expected_status": "pass",
+      "required_artifacts": ["design-request.json", "transaction.json", "workflow-result.json", "validation-summary.json", "design-promotion.json", "manifest.json"],
+      "internal_gates": ["intent_readiness", "placement", "routing", "connectivity", "route_completion", "writer_correctness", "round_trip", "deterministic_repeat"],
+      "optional_kicad_gates": ["erc", "strict_drc", "writer_correctness", "round_trip"]
+    },
+    {
+      "id": "t4_multi_unit_active_filter",
+      "review_equivalent": "dual-stage multi-unit active filter with one shared amplifier package",
+      "lane": "circuit-function",
+      "fixture": "internal/circuitgraph/testdata/function_corpus/dual_stage_active_lowpass.json",
+      "board": {"mode": "synthesized", "layers": 2},
+      "expected_status": "pass",
+      "required_artifacts": ["design-request.json", "transaction.json", "workflow-result.json", "validation-summary.json", "design-promotion.json", "manifest.json"],
+      "internal_gates": ["multi_unit_resolution", "schematic", "routing", "connectivity", "route_completion", "writer_correctness", "round_trip", "deterministic_repeat"],
+      "optional_kicad_gates": ["erc", "strict_drc", "writer_correctness", "round_trip"]
+    },
+    {
+      "id": "t5_split_supply_amplifier",
+      "review_equivalent": "split-supply amplifier with explicit analog layout and safety evidence",
+      "lane": "design",
+      "fixture": "examples/design/amplifier/class_ab_headphone_driver.json",
+      "board": {"mode": "declared", "width_mm": 125, "height_mm": 80, "layers": 2},
+      "expected_status": "pass",
+      "required_artifacts": ["design-request.json", "transaction.json", "workflow-result.json", "validation-summary.json", "design-promotion.json", "manifest.json"],
+      "internal_gates": ["split_supply", "schematic", "placement", "routing", "connectivity", "route_completion", "writer_correctness", "round_trip", "deterministic_repeat"],
+      "optional_kicad_gates": ["erc", "strict_drc", "writer_correctness", "round_trip"]
+    },
+    {
+      "id": "t6_function_level_status_driver",
+      "review_equivalent": "function-level analog-to-switch indicator generated without pins, coordinates, or board dimensions",
+      "lane": "circuit-function",
+      "fixture": "examples/circuit-graph/function_low_side_status_driver.json",
+      "board": {"mode": "synthesized", "layers": 2},
+      "expected_status": "pass",
+      "required_artifacts": ["design-request.json", "transaction.json", "workflow-result.json", "validation-summary.json", "design-promotion.json", "manifest.json"],
+      "internal_gates": ["capability_validation", "synthesis", "placement", "routing", "connectivity", "route_completion", "writer_correctness", "round_trip", "deterministic_repeat"],
+      "optional_kicad_gates": ["erc", "strict_drc", "writer_correctness", "round_trip"]
+    }
+  ],
+  "negative_cases": [
+    {"id": "infeasible_rigid_group"},
+    {"id": "referenced_malformed_library_object"},
+    {"id": "invalid_function_parameter"},
+    {"id": "artifact_write_failure"}
+  ]
+}

@@ -127,6 +127,8 @@ var legacyFunctionUsages = []string{
 	"active_high_gate_buffer_stage_1",
 	"active_high_output_buffer",
 	"active_high_output_pullup",
+	"adc_drive_buffer",
+	"adc_drive_isolation",
 	"base_bias",
 	"base_bias_feedback",
 	"base_bias_isolation",

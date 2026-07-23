@@ -171,6 +171,15 @@ adversarial-multi-function, and simulation-grounded—run in separate matrix
 jobs through `make test-one`. This keeps the coverage job bounded while still
 requiring those three established end-to-end corpora on pull requests and
 pushes to `main`.
+The independent external-review ladder is also a required job. Run its six
+positive scenarios and four fail-closed cases twice with:
+
+```sh
+make review-matrix
+```
+
+See [External Review Regression Ladder](external-review-regression.md) for the
+matrix contract and installed-KiCad promotion commands.
 The workflow is intentionally offline: installed-KiCad checks and live OpenAI
 provider execution remain opt-in local or release evidence, not CI
 dependencies. Run `make lint` locally when an explicit `go vet` pass is

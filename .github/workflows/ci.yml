@@ -77,3 +77,22 @@ jobs:
 
       - name: Run frozen promotion corpus
         run: make GO_TEST_PACKAGE=./internal/compositionlowering GO_TEST_NAME='${{ matrix.test }}' test-one
+
+  external-review-matrix:
+    name: External review regression ladder
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      KICADAI_EXAMPLE_TEST_TIMEOUT: 3m
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Run external review matrix twice
+        run: make review-matrix
