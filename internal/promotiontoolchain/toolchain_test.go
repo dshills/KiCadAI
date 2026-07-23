@@ -145,6 +145,15 @@ func fakeToolchain(t *testing.T, root, version string) (string, string, string) 
 	if err := os.WriteFile(filepath.Join(footprints, "Device.kicad_mod"), []byte("footprints"), 0o600); err != nil {
 		t.Fatal(err)
 	}
+	template := filepath.Join(root, "template")
+	if err := os.MkdirAll(template, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"sym-lib-table", "fp-lib-table"} {
+		if err := os.WriteFile(filepath.Join(template, name), []byte(name), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
 	return cli, symbols, footprints
 }
 
@@ -158,6 +167,7 @@ func testLockJSON(t *testing.T, root string) string {
   "platforms":[{
     "os":"testos","arch":"testarch","trusted_roots":[` + quoteJSON(t, root) + `],
     "kicad_cli":"bin/kicad-cli","symbols_root":"symbols","footprints_root":"footprints",
+    "symbol_table":"template/sym-lib-table","footprint_table":"template/fp-lib-table",
     "bootstrap":{"kind":"dmg","url":"https://example.invalid/kicad.dmg","sha256":"` + strings.Repeat("a", 64) + `","size_bytes":1}
   }]
 }`

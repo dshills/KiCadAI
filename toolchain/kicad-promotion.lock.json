@@ -17,6 +17,8 @@
       "kicad_cli": "KiCad.app/Contents/MacOS/kicad-cli",
       "symbols_root": "KiCad.app/Contents/SharedSupport/symbols",
       "footprints_root": "KiCad.app/Contents/SharedSupport/footprints",
+      "symbol_table": "KiCad.app/Contents/SharedSupport/template/sym-lib-table",
+      "footprint_table": "KiCad.app/Contents/SharedSupport/template/fp-lib-table",
       "bootstrap": {
         "kind": "dmg",
         "url": "https://s3.cern.ch/kicad-downloads/osx/stable/kicad-unified-universal-10.0.3.dmg",
@@ -33,6 +35,8 @@
       "kicad_cli": "KiCad.app/Contents/MacOS/kicad-cli",
       "symbols_root": "KiCad.app/Contents/SharedSupport/symbols",
       "footprints_root": "KiCad.app/Contents/SharedSupport/footprints",
+      "symbol_table": "KiCad.app/Contents/SharedSupport/template/sym-lib-table",
+      "footprint_table": "KiCad.app/Contents/SharedSupport/template/fp-lib-table",
       "bootstrap": {
         "kind": "dmg",
         "url": "https://s3.cern.ch/kicad-downloads/osx/stable/kicad-unified-universal-10.0.3.dmg",

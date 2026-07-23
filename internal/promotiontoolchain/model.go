@@ -43,6 +43,8 @@ type Platform struct {
 	KiCadCLI       string    `json:"kicad_cli"`
 	SymbolsRoot    string    `json:"symbols_root"`
 	FootprintsRoot string    `json:"footprints_root"`
+	SymbolTable    string    `json:"symbol_table"`
+	FootprintTable string    `json:"footprint_table"`
 	Bootstrap      Bootstrap `json:"bootstrap"`
 }
 
@@ -67,18 +69,22 @@ type LibraryIdentity struct {
 }
 
 type Evidence struct {
-	Schema             string          `json:"schema"`
-	Version            int             `json:"version"`
-	LockSHA256         string          `json:"lock_sha256"`
-	OS                 string          `json:"os"`
-	Arch               string          `json:"arch"`
-	KiCadVersion       string          `json:"kicad_version"`
-	KiCadCLI           string          `json:"kicad_cli"`
-	SymbolsRoot        string          `json:"symbols_root"`
-	FootprintsRoot     string          `json:"footprints_root"`
-	SymbolsIdentity    LibraryIdentity `json:"symbols_identity"`
-	FootprintsIdentity LibraryIdentity `json:"footprints_identity"`
-	Resolution         string          `json:"resolution"`
+	Schema               string          `json:"schema"`
+	Version              int             `json:"version"`
+	LockSHA256           string          `json:"lock_sha256"`
+	OS                   string          `json:"os"`
+	Arch                 string          `json:"arch"`
+	KiCadVersion         string          `json:"kicad_version"`
+	KiCadCLI             string          `json:"kicad_cli"`
+	SymbolsRoot          string          `json:"symbols_root"`
+	FootprintsRoot       string          `json:"footprints_root"`
+	SymbolTable          string          `json:"symbol_table"`
+	FootprintTable       string          `json:"footprint_table"`
+	SymbolTableSHA256    string          `json:"symbol_table_sha256"`
+	FootprintTableSHA256 string          `json:"footprint_table_sha256"`
+	SymbolsIdentity      LibraryIdentity `json:"symbols_identity"`
+	FootprintsIdentity   LibraryIdentity `json:"footprints_identity"`
+	Resolution           string          `json:"resolution"`
 }
 
 func Load(path string) (Document, error) {
@@ -169,6 +175,8 @@ func validatePlatform(platform Platform) error {
 		"kicad_cli":       platform.KiCadCLI,
 		"symbols_root":    platform.SymbolsRoot,
 		"footprints_root": platform.FootprintsRoot,
+		"symbol_table":    platform.SymbolTable,
+		"footprint_table": platform.FootprintTable,
 	} {
 		if !safeRelativePath(value) {
 			return fmt.Errorf("%s %q must be a clean relative path", name, value)

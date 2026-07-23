@@ -18,6 +18,7 @@ import (
 
 	"kicadai/internal/components"
 	"kicadai/internal/config"
+	"kicadai/internal/creationevidence"
 	"kicadai/internal/designworkflow"
 	"kicadai/internal/intentplanner"
 	"kicadai/internal/kiapi"
@@ -1612,6 +1613,18 @@ func TestRunDesignCreateWritesPromotionReport(t *testing.T) {
 	}
 	if !hasCLIArtifact(result.Artifacts, reports.ArtifactPromotionReport, designworkflow.PromotionReportArtifactPath) {
 		t.Fatalf("promotion artifact missing from result artifacts: %#v", result.Artifacts)
+	}
+	for _, relative := range []string{
+		creationevidence.DesignRequestPath,
+		creationevidence.WorkflowResultPath,
+		creationevidence.ValidationSummaryPath,
+		creationevidence.DesignPromotionPath,
+		".kicadai/transaction.json",
+		".kicadai/manifest.json",
+	} {
+		if _, err := os.Stat(filepath.Join(output, filepath.FromSlash(relative))); err != nil {
+			t.Fatalf("missing common creation evidence %s: %v", relative, err)
+		}
 	}
 }
 

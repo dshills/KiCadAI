@@ -3926,16 +3926,19 @@ func runDesignCreate(ctx context.Context, opts cliOptions, stdout io.Writer) err
 		return writeDesignFailure(stdout, reports.Issue{Code: reports.CodeValidationFailed, Severity: reports.SeverityError, Path: opts.requestPath, Message: err.Error()})
 	}
 	promotion := designworkflow.BuildInternalPromotionReport(promotionFixture, workflow)
-	promotionArtifact, promotionIssue := designworkflow.WritePromotionReportArtifact(opts.output, promotion, opts.overwrite)
-	var artifactIssues []reports.Issue
-	var promotionArtifacts []reports.Artifact
-	if promotionIssue != nil {
-		artifactIssues = append(artifactIssues, *promotionIssue)
-	} else {
-		workflow.Promotion = promotionSummaryPointer(designworkflow.PromotionSummaryFromReport(promotion, designworkflow.PromotionReportArtifactPath))
-		promotionArtifacts = append(promotionArtifacts, promotionArtifact)
-	}
-	result := designWorkflowReport(workflow, artifactIssues, promotionArtifacts)
+	workflow.Promotion = promotionSummaryPointer(designworkflow.PromotionSummaryFromReport(promotion, designworkflow.PromotionReportArtifactPath))
+	coreArtifacts, artifactIssues := creationevidence.Write(opts.output, creationevidence.Bundle{
+		Lane:     "design",
+		Request:  request,
+		Workflow: workflow,
+		Validation: creationevidence.ValidationSummary{
+			Status: string(promotion.Status), Stage: "promotion",
+			Message: promotion.Summary, Gates: creationevidence.GatesFromWorkflow(workflow),
+		},
+		Promotion: &promotion,
+		Artifacts: normalizeManifestArtifacts(opts.output, designworkflow.WorkflowArtifacts(workflow)),
+	})
+	result := designWorkflowReport(workflow, artifactIssues, coreArtifacts)
 	if err := writeReportJSON(stdout, result); err != nil {
 		return err
 	}

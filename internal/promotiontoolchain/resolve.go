@@ -28,10 +28,12 @@ type ResolveOptions struct {
 }
 
 type candidate struct {
-	cli        string
-	symbols    string
-	footprints string
-	resolution string
+	cli            string
+	symbols        string
+	footprints     string
+	symbolTable    string
+	footprintTable string
+	resolution     string
 }
 
 func Resolve(ctx context.Context, document Document, options ResolveOptions) (Evidence, error) {
@@ -74,6 +76,7 @@ func ResolveRoot(ctx context.Context, document Document, root, osName, arch, res
 	return validateCandidate(ctx, document, platform, candidate{
 		cli: filepath.Join(root, platform.KiCadCLI), symbols: filepath.Join(root, platform.SymbolsRoot),
 		footprints: filepath.Join(root, platform.FootprintsRoot), resolution: resolution,
+		symbolTable: filepath.Join(root, platform.SymbolTable), footprintTable: filepath.Join(root, platform.FootprintTable),
 	}, 0)
 }
 
@@ -83,7 +86,7 @@ func resolveCandidates(document Document, platform Platform, options ResolveOpti
 		if countNonEmpty(explicit) != len(explicit) {
 			return nil, errors.New("explicit kicad-cli, symbols root, and footprints root must be provided together")
 		}
-		return []candidate{{cli: explicit[0], symbols: explicit[1], footprints: explicit[2], resolution: "explicit"}}, nil
+		return []candidate{candidateFromPaths(explicit[0], explicit[1], explicit[2], platform, "explicit")}, nil
 	}
 	env := []string{
 		strings.TrimSpace(getenv(document.Lock.Environment.KiCadCLI)),
@@ -94,16 +97,29 @@ func resolveCandidates(document Document, platform Platform, options ResolveOpti
 		if countNonEmpty(env) != len(env) {
 			return nil, errors.New("toolchain environment paths must be provided together")
 		}
-		return []candidate{{cli: env[0], symbols: env[1], footprints: env[2], resolution: "environment"}}, nil
+		return []candidate{candidateFromPaths(env[0], env[1], env[2], platform, "environment")}, nil
 	}
 	result := make([]candidate, 0, len(platform.TrustedRoots))
 	for _, root := range platform.TrustedRoots {
 		result = append(result, candidate{
 			cli: filepath.Join(root, platform.KiCadCLI), symbols: filepath.Join(root, platform.SymbolsRoot),
 			footprints: filepath.Join(root, platform.FootprintsRoot), resolution: "trusted_root",
+			symbolTable: filepath.Join(root, platform.SymbolTable), footprintTable: filepath.Join(root, platform.FootprintTable),
 		})
 	}
 	return result, nil
+}
+
+func candidateFromPaths(cli, symbols, footprints string, platform Platform, resolution string) candidate {
+	root := filepath.Clean(cli)
+	for range strings.Split(filepath.Clean(platform.KiCadCLI), string(filepath.Separator)) {
+		root = filepath.Dir(root)
+	}
+	return candidate{
+		cli: cli, symbols: symbols, footprints: footprints, resolution: resolution,
+		symbolTable:    filepath.Join(root, platform.SymbolTable),
+		footprintTable: filepath.Join(root, platform.FootprintTable),
+	}
 }
 
 func countNonEmpty(values []string) int {
@@ -128,6 +144,14 @@ func validateCandidate(ctx context.Context, document Document, platform Platform
 	footprints, err := canonicalDirectory(item.footprints)
 	if err != nil {
 		return Evidence{}, fmt.Errorf("footprints root: %w", err)
+	}
+	symbolTable, symbolTableHash, err := canonicalHashedFile(item.symbolTable)
+	if err != nil {
+		return Evidence{}, fmt.Errorf("symbol table: %w", err)
+	}
+	footprintTable, footprintTableHash, err := canonicalHashedFile(item.footprintTable)
+	if err != nil {
+		return Evidence{}, fmt.Errorf("footprint table: %w", err)
 	}
 	if timeout <= 0 {
 		timeout = 10 * time.Second
@@ -154,9 +178,35 @@ func validateCandidate(ctx context.Context, document Document, platform Platform
 		Schema: EvidenceSchema, Version: 1, LockSHA256: document.SHA256,
 		OS: platform.OS, Arch: platform.Arch, KiCadVersion: version,
 		KiCadCLI: cli, SymbolsRoot: symbols, FootprintsRoot: footprints,
+		SymbolTable: symbolTable, FootprintTable: footprintTable,
+		SymbolTableSHA256: symbolTableHash, FootprintTableSHA256: footprintTableHash,
 		SymbolsIdentity: symbolIdentity, FootprintsIdentity: footprintIdentity,
 		Resolution: item.resolution,
 	}, nil
+}
+
+func canonicalHashedFile(path string) (string, string, error) {
+	resolved, err := canonicalPath(path)
+	if err != nil {
+		return "", "", err
+	}
+	info, err := os.Stat(resolved)
+	if err != nil {
+		return "", "", err
+	}
+	if !info.Mode().IsRegular() {
+		return "", "", fmt.Errorf("%q is not a regular file", resolved)
+	}
+	file, err := os.Open(resolved)
+	if err != nil {
+		return "", "", err
+	}
+	defer file.Close()
+	hash := sha256.New()
+	if _, err := io.Copy(hash, file); err != nil {
+		return "", "", err
+	}
+	return resolved, hex.EncodeToString(hash.Sum(nil)), nil
 }
 
 func canonicalExecutable(path string) (string, error) {

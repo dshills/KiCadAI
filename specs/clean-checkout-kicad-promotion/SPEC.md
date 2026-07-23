@@ -70,7 +70,8 @@ contain:
   working directory;
 - a bootstrap distribution reference pinned by immutable SHA-256 or OCI
   digest;
-- symbol and footprint relative paths;
+- symbol, footprint, stock symbol-table, and stock footprint-table relative
+  paths;
 - accepted `kicad-cli --version` pattern; and
 - the lock file's own normalized identity in promotion evidence.
 
@@ -148,10 +149,11 @@ For each scenario, the orchestrator MUST:
 
 Execution order is matrix order. Environment keys and file inventories are
 lexically ordered. The command environment is constructed from a strict list:
-`KICAD_CONFIG_HOME`, `KICAD10_SYMBOL_DIR`, `KICAD10_FOOTPRINT_DIR`,
+an isolated `HOME`, `KICAD_CONFIG_HOME`, `KICAD10_SYMBOL_DIR`, `KICAD10_FOOTPRINT_DIR`,
 `KICADAI_KICAD_CLI`, `KICADAI_SYMBOLS_ROOT`, and
-`KICADAI_FOOTPRINTS_ROOT`. `PATH`, `HOME`, and the inherited process
-environment are neither captured nor copied; executable paths are explicit.
+`KICADAI_FOOTPRINTS_ROOT`. `PATH` and the inherited process environment are
+neither captured nor copied; executable paths are explicit. The isolated home
+and config roots contain generated versioned stock library tables.
 Recorded values are normalized to lock, checkout, or output tokens. Secrets,
 provider keys, CI tokens, shell state, and unrelated environment variables are
 never copied to evidence. No wall-clock timestamp, temporary root, checkout

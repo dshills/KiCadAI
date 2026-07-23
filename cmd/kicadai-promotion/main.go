@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"kicadai/internal/promotionrunner"
 	"kicadai/internal/promotiontoolchain"
 )
 
@@ -25,16 +26,68 @@ func main() {
 
 func run(arguments []string) error {
 	if len(arguments) == 0 {
-		return errors.New("usage: kicadai-promotion <resolve|bootstrap> [options]")
+		return errors.New("usage: kicadai-promotion <resolve|bootstrap|promote> [options]")
 	}
 	switch arguments[0] {
 	case "resolve":
 		return runResolve(arguments[1:])
 	case "bootstrap":
 		return runBootstrap(arguments[1:])
+	case "promote":
+		return runPromote(arguments[1:])
 	default:
 		return fmt.Errorf("unknown command %q", arguments[0])
 	}
+}
+
+func runPromote(arguments []string) error {
+	flags := flag.NewFlagSet("promote", flag.ContinueOnError)
+	lockPath := flags.String("lock", defaultLockPath, "toolchain lock path")
+	matrixPath := flags.String("matrix", "testdata/external-review-mitigation/matrix.json", "promotion matrix path")
+	repositoryRoot := flags.String("repository", ".", "repository root")
+	kicadaiPath := flags.String("kicadai", "bin/kicadai", "kicadai executable path")
+	outputRoot := flags.String("output", "", "empty promotion output root")
+	timeout := flags.Duration("scenario-timeout", 20*time.Minute, "maximum duration for each scenario run")
+	if err := flags.Parse(arguments); err != nil {
+		return err
+	}
+	if *outputRoot == "" || *timeout <= 0 {
+		return errors.New("positive --scenario-timeout and --output are required")
+	}
+	repository, err := filepath.Abs(*repositoryRoot)
+	if err != nil {
+		return err
+	}
+	document, err := promotiontoolchain.Load(*lockPath)
+	if err != nil {
+		return err
+	}
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
+	defer stop()
+	toolchain, err := promotiontoolchain.Resolve(ctx, document, promotiontoolchain.ResolveOptions{})
+	if err != nil {
+		return err
+	}
+	matrix, err := promotionrunner.LoadMatrix(*matrixPath, repository)
+	if err != nil {
+		return err
+	}
+	results, err := promotionrunner.Run(ctx, matrix, toolchain, promotionrunner.Options{
+		RepositoryRoot: repository, KiCadAI: *kicadaiPath, OutputRoot: *outputRoot, ScenarioTimeout: *timeout,
+	})
+	if err != nil {
+		return err
+	}
+	return writeJSON(struct {
+		Schema             string                      `json:"schema"`
+		MatrixSHA256       string                      `json:"matrix_sha256"`
+		LaneRegistrySHA256 string                      `json:"lane_registry_sha256"`
+		Toolchain          promotiontoolchain.Evidence `json:"toolchain"`
+		Results            []promotionrunner.RunResult `json:"results"`
+	}{
+		Schema: "kicadai.promotion-run.v1", MatrixSHA256: matrix.SHA256,
+		LaneRegistrySHA256: promotionrunner.LaneRegistrySHA256(), Toolchain: toolchain, Results: results,
+	})
 }
 
 func runResolve(arguments []string) error {
