@@ -202,6 +202,21 @@ promotes the modeled slice only; unreviewed converter/control-loop behavior,
 isolation, RF/high-speed interfaces, arbitrary parts, and high-energy thermal
 or protection claims remain unsupported.
 
+## Reproducible Promotion Evidence
+
+Run `make promotion-bundle` from an unmodified checkout to reproduce the
+supported release evidence without hand-configured KiCad or library paths. The
+toolchain lock fixes KiCad 10.0.3 and its stock libraries; each required design
+runs twice, and a passing bundle proves the declared ERC, strict DRC,
+connectivity, route, writer, round-trip, and deterministic-comparison gates.
+The content-addressed bundle can be verified later without KiCad or network
+access.
+
+This strengthens provenance and reproducibility for records already inside the
+verified capability envelope. It does not promote an unverified matrix record,
+qualify an unknown part or model, prove arbitrary-circuit generation, or turn a
+design-validation pass into fabrication approval.
+
 ## Validation
 
 Run:

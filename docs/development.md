@@ -179,11 +179,27 @@ make review-matrix
 ```
 
 See [External Review Regression Ladder](external-review-regression.md) for the
-matrix contract and installed-KiCad promotion commands.
-The workflow is intentionally offline: installed-KiCad checks and live OpenAI
-provider execution remain opt-in local or release evidence, not CI
-dependencies. Run `make lint` locally when an explicit `go vet` pass is
-required.
+matrix contract and targeted installed-KiCad diagnostics. The required ordinary
+workflow remains offline; installed-KiCad release evidence is produced by the
+separate `Installed KiCad Promotion` workflow and the same clean-checkout
+command used locally:
+
+```sh
+make promotion-bundle
+```
+
+That target requires an unmodified checkout and a nonexistent output root. It
+discovers the locked KiCad toolchain or bootstraps its checksum-pinned
+distribution, supplies matching stock library paths itself, executes each
+promotion scenario twice, and verifies the resulting content-addressed bundle.
+It does not require hand-set `KICADAI_*` path variables. By default it writes
+under `.tmp/clean-checkout-promotion/`; set `PROMOTION_ROOT` and
+`PROMOTION_CACHE_DIR` only to relocate generated output and the immutable
+toolchain cache.
+
+Live OpenAI provider execution remains credential-gated and is not part of
+ordinary CI or the recorded clean-checkout promotion matrix. Run `make lint`
+locally when an explicit `go vet` pass is required.
 
 Local equivalents of the bounded CI tiers are:
 

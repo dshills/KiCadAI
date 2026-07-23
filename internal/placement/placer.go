@@ -25,7 +25,15 @@ func Place(request Request) Result {
 }
 
 func PlaceContext(ctx context.Context, request Request) Result {
+	return placeContext(ctx, request, true)
+}
+
+func placeContext(ctx context.Context, request Request, planRigidGroups bool) Result {
 	request = NormalizeRequest(request)
+	return placeNormalizedContext(ctx, request, planRigidGroups)
+}
+
+func placeNormalizedContext(ctx context.Context, request Request, planRigidGroups bool) Result {
 	totalComponents := len(request.Components)
 	result := Result{
 		Status:           StatusPlaced,
@@ -56,6 +64,9 @@ func PlaceContext(ctx context.Context, request Request) Result {
 	occupancy := newOccupancy(occupancyRequest)
 	components := slicesForPlacementWithOrder(request.Components, request.ComponentOrder)
 	components = orderComponentsForRequiredProximity(components, request.ProximityRules)
+	// These are immutable request indexes. Placement commits update only
+	// occupancy and placedByRef; every later candidate reads pad/net metadata
+	// from these complete indexes plus positions from placedByRef.
 	padsByRef := componentPadMaps(components)
 	rotatedPadsByRef := componentRotatedPadMaps(components, padsByRef)
 	netsByRef := netsByComponent(request.Nets)
@@ -65,9 +76,19 @@ func PlaceContext(ctx context.Context, request Request) Result {
 	committedPlacements := make([]PlacementResult, 0, len(components))
 	rigidGroupByMember := relativeGroupIndexesByMember(request.Groups)
 	rigidGroupOrder := relativeGroupOrder(request.Groups, componentsByRef)
+	rigidPreview := relativeGroupSearchPreview{request: request}
+	if planRigidGroups && shouldPreviewRelativeGroupSearch(request.Groups, rigidGroupOrder, componentsByRef) {
+		rigidPreview = previewRelativeGroupSearch(ctx, request, rigidGroupOrder, rigidGroupByMember)
+	}
+	if !planRigidGroups {
+		rigidGroupByMember = nil
+		rigidGroupOrder = nil
+	}
 	rigidGroupsProcessed := false
 	rigidPlacements := make(map[string]PlacementResult, len(rigidGroupByMember))
 	rigidFailures := make(map[string]struct{})
+	usePreviewReservations := len(rigidPreview.reservationsByRef) > 0
+	keepoutAnchorRefs := placementKeepoutAnchorRefs(request)
 	for index, component := range components {
 		if issue, ok := placementContextIssue(ctx); ok {
 			if result.Metrics.PlacedCount > 0 {
@@ -83,17 +104,24 @@ func PlaceContext(ctx context.Context, request Request) Result {
 		if _, grouped := rigidGroupByMember[componentRef]; grouped {
 			if !rigidGroupsProcessed {
 				rigidGroupsProcessed = true
-				planned, groupSearch := placeRelativeGroupSet(request, rigidGroupOrder, componentsByRef, committedPlacements)
+				planningObstacles := mergePlacementReservations(committedPlacements, rigidPreview.reservations)
+				groupPlanningRequest := rigidPreview.request
+				planned, groupSearch := placeRelativeGroupSet(groupPlanningRequest, rigidGroupOrder, componentsByRef, planningObstacles)
+				if !groupSearch.Complete && len(rigidPreview.reservations) > 0 {
+					usePreviewReservations = false
+					groupPlanningRequest = request
+					planned, groupSearch = placeRelativeGroupSet(groupPlanningRequest, rigidGroupOrder, componentsByRef, committedPlacements)
+				}
 				result.GroupSearch = groupSearch
 				plannedAll := groupSearch.Complete
 				for orderIndex, groupIndex := range rigidGroupOrder {
-					group := request.Groups[groupIndex]
+					group := groupPlanningRequest.Groups[groupIndex]
 					candidate := relativeGroupCandidate{}
 					ok := false
 					if plannedAll {
 						candidate, ok = planned[orderIndex], true
 					} else {
-						candidate, ok = placeRelativeGroup(request, group, componentsByRef, committedPlacements)
+						candidate, ok = placeRelativeGroup(groupPlanningRequest, group, componentsByRef, committedPlacements)
 					}
 					if !ok {
 						result.Status = StatusPartial
@@ -115,7 +143,7 @@ func PlaceContext(ctx context.Context, request Request) Result {
 						placedByRef[ref] = groupPlacement
 					}
 					committedPlacements = append(committedPlacements, candidate.placements...)
-					occupancy.keepouts = translatedKeepoutsForPlacements(request, committedPlacements, componentsByRef)
+					refreshPlacementKeepouts(occupancy, request, committedPlacements, keepoutAnchorRefs, group.Anchor.Ref)
 				}
 			}
 			if placement, placed := rigidPlacements[componentRef]; placed {
@@ -144,6 +172,26 @@ func PlaceContext(ctx context.Context, request Request) Result {
 				Mobility:    component.Mobility,
 				Reason:      "no legal group placement found",
 			})
+			continue
+		}
+		if placement, reserved := rigidPreview.reservationsByRef[componentRef]; reserved && usePreviewReservations {
+			if component.Fixed {
+				result.Metrics.FixedCount++
+			}
+			if estimatedBoundsSource(component.Bounds.Source) {
+				result.Metrics.EstimatedBoundsCount++
+			}
+			result.Metrics.PlacedCount++
+			occupancy.Add(placement)
+			placedByRef[componentRef] = placement
+			committedPlacements = append(committedPlacements, placement)
+			if result.CandidateScoring != nil {
+				anchor, hasAnchor := groupAnchorPoint(component, request)
+				dimensions := semanticCandidateDimensions(component, placement.Position, request, anchor, hasAnchor, Point{}, false)
+				recordCandidateWinner(result.CandidateScoring, component, placement, placementCandidate{Placement: placement, Index: 0, Dimensions: dimensions, Total: weightedCandidateDimensionTotal(dimensions)})
+			}
+			result.Placements = append(result.Placements, placement)
+			refreshPlacementKeepouts(occupancy, request, committedPlacements, keepoutAnchorRefs, componentRef)
 			continue
 		}
 		placement, ok, placementIssues := placeComponent(component, request, occupancy, placedByRef, padsByRef, rotatedPadsByRef, netsByRef, advancedRequestContext, keepTogetherPeersByRef, result.CandidateScoring)
@@ -179,7 +227,7 @@ func PlaceContext(ctx context.Context, request Request) Result {
 		// A keepout owned by a placement group follows that group's anchor.
 		// Refresh the occupancy view as soon as an anchor is placed so later
 		// candidates are checked against the keepout's actual coordinate frame.
-		occupancy.keepouts = TranslatedKeepoutsForPlacements(request, committedPlacements)
+		refreshPlacementKeepouts(occupancy, request, committedPlacements, keepoutAnchorRefs, componentRef)
 	}
 	if result.Metrics.UnplacedCount > 0 && result.Metrics.PlacedCount == 0 {
 		result.Status = StatusBlocked
@@ -247,6 +295,114 @@ func successfulPlacementResults(placements []PlacementResult) []PlacementResult 
 		}
 	}
 	return successful
+}
+
+type relativeGroupSearchPreview struct {
+	request           Request
+	reservations      []PlacementResult
+	reservationsByRef map[string]PlacementResult
+}
+
+func shouldPreviewRelativeGroupSearch(groups []Group, groupOrder []int, components map[string]Component) bool {
+	if len(groupOrder) != 1 {
+		return false
+	}
+	return !relativeGroupHasEdgeConstraint(groups[groupOrder[0]], components)
+}
+
+// previewRelativeGroupSearch obtains a deterministic whole-board forecast
+// without committing rigid-group transforms. Its successful ungrouped
+// placements are reused directly by the final pass, not recomputed. They also
+// become reservations for the atomic group search so an early group does not
+// consume space that the remaining circuit needs. If the reservation-backed
+// search is infeasible, the caller falls back to the ordinary bounded group
+// search.
+func previewRelativeGroupSearch(ctx context.Context, request Request, groupOrder []int, rigidGroupByMember map[string]int) relativeGroupSearchPreview {
+	if len(groupOrder) == 0 {
+		return relativeGroupSearchPreview{request: request}
+	}
+	preview := placeNormalizedContext(ctx, request, false)
+	previewByRef := make(map[string]PlacementResult, len(preview.Placements))
+	for _, placed := range preview.Placements {
+		if placed.Reason == "" {
+			previewByRef[normalizeRef(placed.Ref)] = placed
+		}
+	}
+	// Group validation is expected to be incomplete in a transform-free
+	// preview, so its aggregate status is not authoritative. Every component
+	// must nevertheless have a successful provisional placement before any
+	// preview coordinate is allowed to constrain the atomic pass.
+	if len(previewByRef) != len(request.Components) {
+		return relativeGroupSearchPreview{request: request}
+	}
+	searchRequest := CloneRequest(request)
+	for _, groupIndex := range groupOrder {
+		if request.Groups[groupIndex].Anchor.At != nil {
+			continue
+		}
+		placed, ok := previewByRef[normalizeRef(request.Groups[groupIndex].Anchor.Ref)]
+		if !ok {
+			continue
+		}
+		group := &searchRequest.Groups[groupIndex]
+		target := Point{XMM: placed.Position.XMM, YMM: placed.Position.YMM}
+		group.Anchor.At = &target
+	}
+	reservations := make([]PlacementResult, 0, len(preview.Placements))
+	reservationsByRef := make(map[string]PlacementResult, len(preview.Placements))
+	for _, placed := range preview.Placements {
+		if placed.Reason != "" {
+			continue
+		}
+		if _, grouped := rigidGroupByMember[normalizeRef(placed.Ref)]; grouped {
+			continue
+		}
+		reservations = append(reservations, placed)
+		reservationsByRef[normalizeRef(placed.Ref)] = placed
+	}
+	return relativeGroupSearchPreview{
+		request:           searchRequest,
+		reservations:      reservations,
+		reservationsByRef: reservationsByRef,
+	}
+}
+
+func mergePlacementReservations(committed []PlacementResult, preview []PlacementResult) []PlacementResult {
+	merged := make([]PlacementResult, 0, len(committed)+len(preview))
+	merged = append(merged, committed...)
+	committedRefs := make(map[string]struct{}, len(committed))
+	for _, placed := range committed {
+		committedRefs[normalizeRef(placed.Ref)] = struct{}{}
+	}
+	for _, placed := range preview {
+		if _, exists := committedRefs[normalizeRef(placed.Ref)]; exists {
+			continue
+		}
+		merged = append(merged, placed)
+	}
+	return merged
+}
+
+func placementKeepoutAnchorRefs(request Request) map[string]struct{} {
+	anchors := make(map[string]struct{})
+	for _, keepout := range request.Keepouts {
+		groupID := normalizeRef(keepout.GroupID)
+		if groupID == "" {
+			continue
+		}
+		anchorRef := normalizeRef(requestGroupAnchorRef(request, groupID))
+		if anchorRef != "" {
+			anchors[anchorRef] = struct{}{}
+		}
+	}
+	return anchors
+}
+
+func refreshPlacementKeepouts(occupancy *occupancy, request Request, placements []PlacementResult, anchorRefs map[string]struct{}, placedRef string) {
+	if _, movesKeepout := anchorRefs[normalizeRef(placedRef)]; !movesKeepout {
+		return
+	}
+	occupancy.keepouts = TranslatedKeepoutsForPlacements(request, placements)
 }
 
 func slicesForPlacement(components []Component) []Component {

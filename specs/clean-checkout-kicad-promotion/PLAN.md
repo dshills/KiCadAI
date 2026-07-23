@@ -1,7 +1,7 @@
 # Clean-Checkout KiCad Promotion Implementation Plan
 
 Date: 2026-07-23
-Status: In progress
+Status: Complete
 Specification: [`SPEC.md`](SPEC.md)
 
 ## 1. Implementation rules
@@ -124,7 +124,7 @@ third-party action by full commit SHA.
 
 Acceptance:
 
-- `make clean-checkout-promotion` is the exact reproduction command;
+- `make promotion-bundle` is the exact reproduction command;
 - ordinary offline CI does not download or require KiCad;
 - configured promotion CI cannot skip the installed lane;
 - uploaded artifact name includes the source commit; and

@@ -746,3 +746,16 @@ not silently replace `design create` dispatch.
 Unknown parts, ambiguous catalog matches, invented pins, unsupported geometry,
 and incomplete required routing fail closed. A KiCad-backed pass is
 design-validation evidence, not a fabrication-ready claim.
+
+To reproduce the complete supported installed-KiCad release corpus from an
+unmodified checkout, use:
+
+```sh
+make promotion-bundle
+```
+
+This path discovers or bootstraps the locked KiCad toolchain and stock
+libraries, runs each matrix scenario twice, and emits a verified
+content-addressed bundle. It does not need hand-set library paths. Individual
+provider or corpus test commands remain useful for focused diagnosis, but they
+are not substitutes for the release bundle.

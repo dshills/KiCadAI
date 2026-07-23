@@ -1,7 +1,7 @@
 # Project Status
 
-Last verified: 2026-07-22 by the complete repository suite and installed-KiCad
-promotion corpus.
+Last verified: 2026-07-23 by the complete repository suite, the external-review
+ladder, and the clean-checkout installed-KiCad promotion corpus.
 
 The six-circuit independent external review is now a release-blocking,
 machine-readable regression ladder. Its fixes cover atomic composed placement,
@@ -17,6 +17,26 @@ schematic and PCB realization, placement, routing, writer validation, and
 optional KiCad-backed checks.
 
 ## Production-Capable Foundations
+
+### Reproducible Promotion Evidence
+
+An unmodified checkout can now run `make promotion-bundle` without hand-set
+library paths. The command resolves the locked KiCad 10.0.3 toolchain or
+bootstraps its checksum-pinned distribution, executes the release promotion
+matrix twice in isolated roots, and requires clean ERC, strict DRC,
+connectivity, route completion, writer correctness, zero normalized round-trip
+differences, and equal normalized outputs.
+
+The result is a `sha256-<manifest-digest>` bundle containing immutable
+toolchain, command, request, project, validation, and comparison evidence. Its
+standalone verifier checks the full inventory and semantic gate contract
+without KiCad or network access. The configured `Installed KiCad Promotion`
+workflow reruns the same command and publishes the verified bundle as a
+commit-named Actions artifact. Ordinary push and pull-request CI remains
+offline.
+
+This makes the supported evidence reproducible; it does not expand the
+supported circuit, part, simulation, routing, or fabrication envelope.
 
 ### KiCad File Generation
 

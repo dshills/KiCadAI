@@ -1,6 +1,6 @@
 # KiCadAI Roadmap
 
-Date: 2026-07-21
+Date: 2026-07-23
 
 This roadmap replaces the older roadmap and gap analysis now archived as
 `specs/OLD_ROADMAP.md` and `specs/OLD_ROADMAP_GAP.md`.
@@ -34,6 +34,13 @@ from validation feedback to safe automatic repair.
 
 ### Implemented Foundations
 
+- Clean-checkout KiCad promotion with an exact `make promotion-bundle`
+  reproduction command, a checksum-pinned KiCad 10.0.3 toolchain lock,
+  manifest-driven two-run execution, strict normalized comparison,
+  content-addressed offline-verifiable evidence, and a separate installed-KiCad
+  Actions artifact lane. This makes the supported promotion envelope
+  independently reproducible without hand-configured library paths; it does
+  not broaden that envelope.
 - Direct KiCad project, schematic, and PCB writers.
 - Review-follow-up foundation with offline GitHub Actions quality gates,
   embedded default component catalog loading, fail-closed routing retry

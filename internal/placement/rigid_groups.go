@@ -189,6 +189,10 @@ func visitRelativeGroupPlacements(request Request, group Group, components map[s
 		return
 	}
 	target := placements[anchorIndex].Position
+	if group.Anchor.At != nil {
+		target.XMM = group.Anchor.At.XMM
+		target.YMM = group.Anchor.At.YMM
+	}
 	// Authored block-local copper currently supports translation only.
 	// Keep the source orientation and side while searching for a legal offset.
 	target.RotationDeg = anchorComponent.Position.RotationDeg

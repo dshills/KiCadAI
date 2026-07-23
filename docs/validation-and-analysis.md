@@ -77,6 +77,49 @@ technical evidence. When required KiCad checks run cleanly, the report records
 `kicad_version`, `external_evidence`, and ERC/DRC report artifacts on the
 `kicad_checks` gate.
 
+### Reproducible Promotion Bundles
+
+The release-level promotion path wraps individual reports in a
+`kicadai.clean-checkout-promotion.v1` bundle:
+
+```sh
+make promotion-bundle
+```
+
+The command must start from an unmodified checkout and a nonexistent promotion
+output root. It resolves the exact KiCad version and stock libraries from
+`toolchain/kicad-promotion.lock.json`, using host discovery first and a
+checksum-pinned bootstrap when needed. It then consumes the versioned promotion
+matrix, runs every positive scenario twice in isolated roots, and requires:
+
+- clean KiCad ERC and strict DRC;
+- connectivity and required-route completion;
+- writer correctness;
+- zero normalized KiCad round-trip differences; and
+- equal normalized project and evidence inventories between both runs.
+
+The resulting `sha256-<manifest-digest>` directory contains the normalized
+toolchain and command environment, source revision, matrix and request hashes,
+both runs' immutable artifacts, per-scenario comparisons, a sorted file
+inventory, `manifest.json`, and `manifest.sha256`. Machine-local roots are
+normalized, while semantic project values and generated identities remain part
+of the comparison and content address.
+
+`verification.json` is only an optional receipt. Trust comes from rerunning the
+offline verifier over the entire bundle:
+
+```sh
+.tmp/clean-checkout-promotion/bin/kicadai-promotion verify \
+  --bundle "$(cat .tmp/clean-checkout-promotion/bundle-path.txt)"
+```
+
+Verification rejects malformed schemas, unsafe paths, symlinks, extra or
+missing files, hash or size changes, a wrong content-address directory,
+non-pass scenarios, skipped required KiCad gates, and unequal comparisons. It
+does not need KiCad or network access. The separate installed-KiCad GitHub
+Actions workflow runs the same reproduction command, re-verifies the directory,
+and uploads it under an artifact name containing the source commit.
+
 ### Generated Schematic Semantic Checks
 
 Generated schematics have an in-process semantic connectivity gate before any

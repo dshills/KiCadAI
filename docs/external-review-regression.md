@@ -35,9 +35,20 @@ go run ./cmd/kicadai \
   --output "$OUTPUT" --overwrite circuit create
 ```
 
-Installed-KiCad promotion remains optional on ordinary developer machines. A
-configured promotion environment must set the three paths below and run the
-affected fixtures with strict gates:
+Release promotion from a clean checkout does not require manually configured
+KiCad paths:
+
+```sh
+make promotion-bundle
+```
+
+The command discovers or bootstraps the locked KiCad release and matching stock
+libraries, runs the whole positive matrix twice, and independently verifies the
+content-addressed bundle. It is also the command used by the separate
+`Installed KiCad Promotion` GitHub Actions workflow.
+
+For focused debugging only, individual optional Go harnesses can still be run
+against explicitly selected local paths:
 
 ```sh
 export KICADAI_KICAD_CLI=/path/to/kicad-cli
@@ -54,6 +65,9 @@ go test ./internal/compositionlowering \
   -run '^TestPowerInterfaceSynthesisCorpusOptionalKiCadPromotion$' \
   -count=1 -v
 ```
+
+Those environment variables are a targeted diagnostic interface, not the
+clean-checkout release reproduction procedure.
 
 For every applicable generated project, promotion requires clean ERC, strict
 DRC, connectivity, required-route completion, writer correctness, and zero

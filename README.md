@@ -83,6 +83,10 @@ path.
   ESP32 variants, flash choices, RF optimization, and unverified external-bus
   loading remain fail-closed boundaries.
 - Generated `pass` evidence is not automatically a fabrication-release claim.
+- A clean checkout can discover the locked KiCad 10.0.3 installation or
+  bootstrap its checksum-pinned distribution, run the release promotion matrix
+  twice, compare normalized projects, and emit an independently verifiable,
+  content-addressed evidence bundle with one command.
 
 See [Project Status](docs/project-status.md) for capability boundaries and
 [Roadmap](specs/ROADMAP.md) for remaining work.
@@ -204,6 +208,33 @@ See [AI Generation](docs/ai-generation.md) for bounded and generic modes, live
 commands, evidence files, failure behavior, and current limits. AI agents
 should also follow the [KiCadAI Agent Skill](docs/kicadai-agent-skill.md).
 
+## Reproduce Promotion Evidence
+
+From an unmodified checkout, run:
+
+```sh
+make promotion-bundle
+```
+
+The command builds the repository CLIs, resolves the version and stock
+libraries locked by `toolchain/kicad-promotion.lock.json`, bootstraps the
+checksum-pinned distribution only when needed, executes every required scenario
+twice, verifies all promotion gates and deterministic comparisons, and writes
+one content-addressed bundle below
+`.tmp/clean-checkout-promotion/bundles/`. No manually configured KiCad or
+library paths are required. The output directory must not already exist.
+
+Use `bundle-path.txt` to locate the bundle. Its included files and semantic
+promotion claims can be verified offline:
+
+```sh
+.tmp/clean-checkout-promotion/bin/kicadai-promotion verify \
+  --bundle "$(cat .tmp/clean-checkout-promotion/bundle-path.txt)"
+```
+
+This is release-validation evidence for the supported corpus, not a claim that
+arbitrary designs or fabrication outputs are automatically qualified.
+
 ## Schematic IR
 
 The schematic design/layout IR is a strict JSON handoff for circuit intent,
@@ -234,6 +265,7 @@ Start with the [documentation index](docs/README.md).
 | Components, symbols, and footprints | [Libraries And Components](docs/libraries-and-components.md) |
 | Placement and routing | [Placement And Routing](docs/layout-routing.md) |
 | Validation, writer checks, and round-trip | [Validation And Analysis](docs/validation-and-analysis.md) |
+| Clean-checkout release evidence | [Validation And Analysis](docs/validation-and-analysis.md#reproducible-promotion-bundles) |
 | Fabrication evidence | [Fabrication](docs/fabrication.md) |
 | Direct KiCad file writers | [KiCad File Writers](docs/kicad-file-writers.md) |
 | Tests, packages, and troubleshooting | [Development Reference](docs/development.md) |

@@ -1,6 +1,7 @@
 package placement
 
 import (
+	"context"
 	"strings"
 	"testing"
 )
@@ -359,6 +360,160 @@ func TestRelativeGroupSetRecordsDeterministicSearchEvidence(t *testing.T) {
 	}
 	if report.ExploredBranches < 2 || len(report.Selected) != 2 || report.BudgetExhausted {
 		t.Fatalf("group search evidence = %#v", report)
+	}
+}
+
+func TestRelativeGroupSearchHonorsPreferredAnchorTarget(t *testing.T) {
+	rules := DefaultRules()
+	rules.GridMM = 1
+	rules.ComponentSpacingMM = 0
+	target := Point{XMM: 20, YMM: 10}
+	request := Request{
+		Board: BoardPlacementArea{WidthMM: 30, HeightMM: 20},
+		Rules: rules,
+		Components: []Component{{
+			Ref: "U1", FootprintID: "Test:U",
+			Bounds:   Bounds{WidthMM: 2, HeightMM: 2, AnchorOffset: Point{XMM: 1, YMM: 1}, Source: BoundsExplicit},
+			Position: &Placement{XMM: 5, YMM: 5, Layer: "F.Cu"},
+		}},
+		Groups: []Group{{
+			ID: "core", Components: []string{"U1"},
+			Anchor: GroupAnchor{Ref: "U1", At: &target}, TranslateAsUnit: true,
+		}},
+	}
+	components := map[string]Component{"U1": request.Components[0]}
+
+	planned, report := placeRelativeGroupSet(request, []int{0}, components, nil)
+	if !report.Complete || len(planned) != 1 || len(planned[0].placements) != 1 {
+		t.Fatalf("group plan = %#v, report=%#v", planned, report)
+	}
+	got := planned[0].placements[0].Position
+	if got.XMM != target.XMM || got.YMM != target.YMM {
+		t.Fatalf("group anchor = %#v, want preferred target %#v", got, target)
+	}
+}
+
+func TestRelativeGroupSearchMovesPastBlockedPreferredAnchorTarget(t *testing.T) {
+	rules := DefaultRules()
+	rules.GridMM = 1
+	rules.ComponentSpacingMM = 0
+	target := Point{XMM: 20, YMM: 10}
+	request := Request{
+		Board: BoardPlacementArea{WidthMM: 30, HeightMM: 20},
+		Rules: rules,
+		Components: []Component{{
+			Ref: "U1", FootprintID: "Test:U",
+			Bounds:   Bounds{WidthMM: 2, HeightMM: 2, AnchorOffset: Point{XMM: 1, YMM: 1}, Source: BoundsExplicit},
+			Position: &Placement{XMM: 5, YMM: 5, Layer: "F.Cu"},
+		}},
+		Groups: []Group{{
+			ID: "core", Components: []string{"U1"},
+			Anchor: GroupAnchor{Ref: "U1", At: &target}, TranslateAsUnit: true,
+		}},
+	}
+	components := map[string]Component{"U1": request.Components[0]}
+	obstacleComponent := Component{
+		Ref: "X1", FootprintID: "Test:X",
+		Bounds: Bounds{WidthMM: 4, HeightMM: 4, AnchorOffset: Point{XMM: 2, YMM: 2}, Source: BoundsExplicit},
+	}
+	obstacle, ok := NewPlacementResult(obstacleComponent, Placement{XMM: target.XMM, YMM: target.YMM, Layer: "F.Cu"}, rules)
+	if !ok {
+		t.Fatal("failed to build test obstacle")
+	}
+
+	planned, report := placeRelativeGroupSet(request, []int{0}, components, []PlacementResult{obstacle})
+	if !report.Complete || len(planned) != 1 || len(planned[0].placements) != 1 {
+		t.Fatalf("group plan = %#v, report=%#v", planned, report)
+	}
+	got := planned[0].placements[0].Position
+	if got.XMM == target.XMM && got.YMM == target.YMM {
+		t.Fatalf("group remained at blocked preferred target: %#v", got)
+	}
+}
+
+func TestRelativeGroupPreviewLeavesEdgeAndJointSearchToAtomicPlanner(t *testing.T) {
+	groups := []Group{
+		{ID: "entry", Components: []string{"J1"}, TranslateAsUnit: true},
+		{ID: "core", Components: []string{"U1"}, TranslateAsUnit: true},
+	}
+	components := map[string]Component{
+		"J1": {Ref: "J1", Edge: EdgeLeft},
+		"U1": {Ref: "U1"},
+	}
+	if shouldPreviewRelativeGroupSearch(groups, []int{0}, components) {
+		t.Fatal("edge-constrained group unexpectedly enabled preview reservations")
+	}
+	if shouldPreviewRelativeGroupSearch(groups, []int{1, 0}, components) {
+		t.Fatal("joint group search unexpectedly enabled preview reservations")
+	}
+	if !shouldPreviewRelativeGroupSearch(groups, []int{1}, components) {
+		t.Fatal("isolated interior group did not enable preview reservations")
+	}
+}
+
+func TestRigidGroupPlanningPreservesPreviewedUngroupedPlacements(t *testing.T) {
+	rules := DefaultRules()
+	rules.GridMM = 1
+	rules.ComponentSpacingMM = 0
+	request := Request{
+		Board: BoardPlacementArea{WidthMM: 24, HeightMM: 20},
+		Rules: rules,
+		Components: []Component{
+			{Ref: "U1", FootprintID: "Test:U", Bounds: Bounds{WidthMM: 2, HeightMM: 2, AnchorOffset: Point{XMM: 1, YMM: 1}, Source: BoundsExplicit}, Position: &Placement{XMM: 25, YMM: 3, Layer: "F.Cu"}},
+			{Ref: "C1", FootprintID: "Test:C", Bounds: Bounds{WidthMM: 2, HeightMM: 2, AnchorOffset: Point{XMM: 1, YMM: 1}, Source: BoundsExplicit}, Position: &Placement{XMM: 29, YMM: 3, Layer: "F.Cu"}},
+			{Ref: "X1", FootprintID: "Test:X", Bounds: Bounds{WidthMM: 4, HeightMM: 4, AnchorOffset: Point{XMM: 2, YMM: 2}, Source: BoundsExplicit}, Position: &Placement{XMM: 10, YMM: 10, Layer: "F.Cu"}},
+		},
+		Groups: []Group{{
+			ID: "core", Components: []string{"U1", "C1"},
+			Anchor: GroupAnchor{Ref: "U1"}, TranslateAsUnit: true,
+		}},
+	}
+
+	preview := placeContext(context.Background(), request, false)
+	result := Place(request)
+	if result.Status != StatusPlaced {
+		t.Fatalf("placement = %#v", result)
+	}
+	previewByRef := map[string]PlacementResult{}
+	for _, placed := range preview.Placements {
+		previewByRef[placed.Ref] = placed
+	}
+	resultByRef := map[string]PlacementResult{}
+	for _, placed := range result.Placements {
+		resultByRef[placed.Ref] = placed
+	}
+	if got, want := resultByRef["X1"].Position, previewByRef["X1"].Position; got != want {
+		t.Fatalf("ungrouped placement = %#v, want preview reservation %#v", got, want)
+	}
+	if got := resultByRef["C1"].Position.XMM - resultByRef["U1"].Position.XMM; got != 4 {
+		t.Fatalf("rigid group X offset = %v, want 4", got)
+	}
+}
+
+func TestRigidGroupPreviewFailsOpenWhenAnyProvisionalPlacementFails(t *testing.T) {
+	rules := DefaultRules()
+	rules.GridMM = 1
+	request := Request{
+		Board: BoardPlacementArea{WidthMM: 20, HeightMM: 20},
+		Rules: rules,
+		Components: []Component{
+			{Ref: "U1", FootprintID: "Test:U", Bounds: Bounds{WidthMM: 2, HeightMM: 2, Source: BoundsExplicit}, Position: &Placement{XMM: 5, YMM: 5, Layer: "F.Cu"}},
+			{Ref: "X1", FootprintID: "Test:X", Bounds: Bounds{WidthMM: 2, HeightMM: 2, Source: BoundsExplicit}, Fixed: true, Position: &Placement{XMM: 30, YMM: 30, Layer: "F.Cu"}},
+		},
+		Groups: []Group{{
+			ID: "core", Components: []string{"U1"},
+			Anchor: GroupAnchor{Ref: "U1"}, TranslateAsUnit: true,
+		}},
+	}
+	components := map[string]Component{"U1": request.Components[0], "X1": request.Components[1]}
+	groupOrder := relativeGroupOrder(request.Groups, components)
+	preview := previewRelativeGroupSearch(context.Background(), request, groupOrder, relativeGroupIndexesByMember(request.Groups))
+
+	if len(preview.reservations) != 0 || len(preview.reservationsByRef) != 0 {
+		t.Fatalf("incomplete preview leaked reservations: %#v", preview)
+	}
+	if preview.request.Groups[0].Anchor.At != nil {
+		t.Fatalf("incomplete preview leaked anchor target: %#v", preview.request.Groups[0].Anchor.At)
 	}
 }
 

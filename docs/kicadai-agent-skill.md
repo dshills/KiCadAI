@@ -720,8 +720,19 @@ one physical package. A live graph is equivalent to a recording only when the
 fixture's semantic-projection test passes; textual or ordering similarity is
 not sufficient.
 
-To run all checked-in provider fixtures through the optional KiCad-backed
-promotion lane:
+For a release-level reproduction of all required checked-in lanes, start from
+an unmodified checkout and run:
+
+```sh
+make promotion-bundle
+```
+
+The command resolves or bootstraps the locked KiCad version and matching stock
+libraries, runs every promotion-matrix scenario twice, and verifies the
+content-addressed evidence bundle. Agents must not replace this command with
+manually selected library paths when claiming reproducible release evidence.
+
+For focused provider-harness debugging, the narrower optional test remains:
 
 ```sh
 KICADAI_KICAD_CLI=/path/to/kicad-cli \
@@ -732,7 +743,9 @@ KICADAI_FOOTPRINTS_ROOT=/path/to/kicad-footprints \
 
 Generation commands accept library and KiCad paths as CLI flags. The optional
 Go promotion harness uses the corresponding environment variables because it
-runs multiple checked-in fixtures in one test process.
+runs multiple checked-in fixtures in one test process. Those variables are a
+diagnostic interface, not a prerequisite for the clean-checkout promotion
+command.
 
 ## Stop Conditions
 

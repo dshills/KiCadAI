@@ -14,7 +14,9 @@ This directory holds the detailed reference material that used to live in the pr
   synthesis, and current AI workflow limits.
 - [Circuit Blocks](circuit-blocks.md): reusable block workflows and block-library commands.
 - [Placement And Routing](layout-routing.md): placement quality, routing policy, route diagnostics, and retry-related evidence.
-- [Validation And Analysis](validation-and-analysis.md): inspection, evaluation, writer correctness, transactions, round-trip validation, and ERC/DRC checks.
+- [Validation And Analysis](validation-and-analysis.md): inspection, evaluation,
+  writer correctness, transactions, round-trip validation, ERC/DRC checks, and
+  independently verifiable clean-checkout promotion bundles.
 - [Fabrication Export And Readiness](fabrication.md): readiness gates, BOM/CPL evidence, physical-rule fabrication profiles, provenance, and export commands.
 
 ## Libraries And Internals

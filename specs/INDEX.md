@@ -9,12 +9,12 @@ roadmaps, and dated review material.
 
 ## Latest Completed Milestone
 
-- [Uncertainty-aware behavioral intent compilation](uncertainty-aware-behavioral-intent-compilation/SPEC.md)
-  - completed behavior-first compiler specification.
-- [Implementation plan](uncertainty-aware-behavioral-intent-compilation/PLAN.md)
-  - completed implementation phases and acceptance gates.
-- [Completion audit](uncertainty-aware-behavioral-intent-compilation/AUDIT.md)
-  - frozen-corpus and installed-KiCad evidence.
+- [Clean-checkout KiCad promotion](clean-checkout-kicad-promotion/SPEC.md)
+  - manifest-driven, pinned-toolchain release evidence specification.
+- [Implementation plan](clean-checkout-kicad-promotion/PLAN.md)
+  - independently reviewed implementation phases and acceptance gates.
+- [Completion audit](clean-checkout-kicad-promotion/AUDIT.md)
+  - exact reproduction, corpus, bundle, review, commit, and Actions evidence.
 
 ## Active Spec Areas
 
