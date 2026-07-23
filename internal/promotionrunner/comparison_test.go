@@ -94,7 +94,7 @@ func TestInventoryFileRejectsOversizedParseRequiredFile(t *testing.T) {
 	if err := file.Close(); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := inventoryFile(path, "oversized.json", newNormalizationContext(t.TempDir(), t.TempDir(), comparisonToolchain())); err == nil ||
+	if _, err := inventoryFile(path, "oversized.json", "", newNormalizationContext(t.TempDir(), t.TempDir(), comparisonToolchain())); err == nil ||
 		!strings.Contains(err.Error(), "normalization limit") {
 		t.Fatalf("expected normalization-limit failure, got %v", err)
 	}

@@ -26,7 +26,7 @@ func main() {
 
 func run(arguments []string) error {
 	if len(arguments) == 0 {
-		return errors.New("usage: kicadai-promotion <resolve|bootstrap|promote> [options]")
+		return errors.New("usage: kicadai-promotion <resolve|bootstrap|promote|verify> [options]")
 	}
 	switch arguments[0] {
 	case "resolve":
@@ -35,6 +35,8 @@ func run(arguments []string) error {
 		return runBootstrap(arguments[1:])
 	case "promote":
 		return runPromote(arguments[1:])
+	case "verify":
+		return runVerify(arguments[1:])
 	default:
 		return fmt.Errorf("unknown command %q", arguments[0])
 	}
@@ -47,12 +49,17 @@ func runPromote(arguments []string) error {
 	repositoryRoot := flags.String("repository", ".", "repository root")
 	kicadaiPath := flags.String("kicadai", "bin/kicadai", "kicadai executable path")
 	outputRoot := flags.String("output", "", "empty promotion output root")
+	bundleOutput := flags.String("bundle-output", "", "parent directory for a content-addressed bundle")
+	revision := flags.String("revision", "", "lowercase 40-character repository revision for the bundle")
 	timeout := flags.Duration("scenario-timeout", 20*time.Minute, "maximum duration for each scenario run")
 	if err := flags.Parse(arguments); err != nil {
 		return err
 	}
 	if *outputRoot == "" || *timeout <= 0 {
 		return errors.New("positive --scenario-timeout and --output are required")
+	}
+	if (*bundleOutput == "") != (*revision == "") {
+		return errors.New("--bundle-output and --revision must be provided together")
 	}
 	repository, err := filepath.Abs(*repositoryRoot)
 	if err != nil {
@@ -72,8 +79,12 @@ func runPromote(arguments []string) error {
 	if err != nil {
 		return err
 	}
+	promotionOutput, err := filepath.Abs(*outputRoot)
+	if err != nil {
+		return err
+	}
 	results, runErr := promotionrunner.Run(ctx, matrix, toolchain, promotionrunner.Options{
-		RepositoryRoot: repository, KiCadAI: *kicadaiPath, OutputRoot: *outputRoot, ScenarioTimeout: *timeout,
+		RepositoryRoot: repository, KiCadAI: *kicadaiPath, OutputRoot: promotionOutput, ScenarioTimeout: *timeout,
 	})
 	if results == nil {
 		results = []promotionrunner.RunResult{}
@@ -84,22 +95,62 @@ func runPromote(arguments []string) error {
 		status = "failed"
 		errorMessage = runErr.Error()
 	}
+	var bundle *promotionrunner.BundleResult
+	if runErr == nil && *bundleOutput != "" {
+		bundleParent, absErr := filepath.Abs(*bundleOutput)
+		if absErr != nil {
+			runErr = absErr
+		} else {
+			built, buildErr := promotionrunner.BuildBundle(promotionrunner.BundleBuildOptions{
+				RepositoryRoot: repository, PromotionRoot: promotionOutput,
+				DestinationParent: bundleParent, RepositoryRevision: *revision,
+				Matrix: matrix, Toolchain: toolchain, Results: results,
+			})
+			if buildErr != nil {
+				runErr = buildErr
+			} else {
+				bundle = &built
+			}
+		}
+		if runErr != nil {
+			status = "failed"
+			errorMessage = runErr.Error()
+		}
+	}
 	writeErr := writeJSON(struct {
-		Schema             string                      `json:"schema"`
-		Status             string                      `json:"status"`
-		Error              string                      `json:"error,omitempty"`
-		MatrixSHA256       string                      `json:"matrix_sha256"`
-		LaneRegistrySHA256 string                      `json:"lane_registry_sha256"`
-		Toolchain          promotiontoolchain.Evidence `json:"toolchain"`
-		Results            []promotionrunner.RunResult `json:"results"`
+		Schema             string                        `json:"schema"`
+		Status             string                        `json:"status"`
+		Error              string                        `json:"error,omitempty"`
+		MatrixSHA256       string                        `json:"matrix_sha256"`
+		LaneRegistrySHA256 string                        `json:"lane_registry_sha256"`
+		Toolchain          promotiontoolchain.Evidence   `json:"toolchain"`
+		Results            []promotionrunner.RunResult   `json:"results"`
+		Bundle             *promotionrunner.BundleResult `json:"bundle,omitempty"`
 	}{
 		Schema: "kicadai.promotion-run.v1", Status: status, Error: errorMessage, MatrixSHA256: matrix.SHA256,
-		LaneRegistrySHA256: promotionrunner.LaneRegistrySHA256(), Toolchain: toolchain, Results: results,
+		LaneRegistrySHA256: promotionrunner.LaneRegistrySHA256(), Toolchain: toolchain, Results: results, Bundle: bundle,
 	})
 	if writeErr != nil {
 		return errors.Join(writeErr, runErr)
 	}
 	return runErr
+}
+
+func runVerify(arguments []string) error {
+	flags := flag.NewFlagSet("verify", flag.ContinueOnError)
+	bundle := flags.String("bundle", "", "content-addressed promotion bundle")
+	receipt := flags.Bool("receipt", false, "write an untrusted verification receipt into the bundle")
+	if err := flags.Parse(arguments); err != nil {
+		return err
+	}
+	if *bundle == "" {
+		return errors.New("--bundle is required")
+	}
+	verification, err := promotionrunner.VerifyBundle(*bundle, *receipt)
+	if err != nil {
+		return err
+	}
+	return writeJSON(verification)
 }
 
 func runResolve(arguments []string) error {

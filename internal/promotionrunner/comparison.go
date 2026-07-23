@@ -129,6 +129,10 @@ func CompareProjects(scenario, firstProject, secondProject, repositoryRoot strin
 }
 
 func normalizedInventory(projectRoot, repositoryRoot string, toolchain promotiontoolchain.Evidence) ([]NormalizedFile, error) {
+	return normalizedInventoryAt(projectRoot, repositoryRoot, toolchain, "")
+}
+
+func normalizedInventoryAt(projectRoot, repositoryRoot string, toolchain promotiontoolchain.Evidence, destinationRoot string) ([]NormalizedFile, error) {
 	context := newNormalizationContext(projectRoot, repositoryRoot, toolchain)
 	var inventory []NormalizedFile
 	hashes := make(map[string]string)
@@ -153,7 +157,11 @@ func normalizedInventory(projectRoot, repositoryRoot string, toolchain promotion
 		if relative == ".kicadai/manifest.json" {
 			return nil
 		}
-		normalizedFile, err := inventoryFile(path, relative, context)
+		destination := ""
+		if destinationRoot != "" {
+			destination = filepath.Join(destinationRoot, filepath.FromSlash(relative))
+		}
+		normalizedFile, err := inventoryFile(path, relative, destination, context)
 		if err != nil {
 			return fmt.Errorf("%s: %w", relative, err)
 		}
@@ -174,6 +182,13 @@ func normalizedInventory(projectRoot, repositoryRoot string, toolchain promotion
 			Path: ".kicadai/manifest.json", Kind: "json",
 			SHA256: hashBytes(manifest), Bytes: int64(len(manifest)),
 		})
+		if destinationRoot != "" {
+			if err := writeExclusiveFile(
+				filepath.Join(destinationRoot, ".kicadai", "manifest.json"), manifest,
+			); err != nil {
+				return nil, err
+			}
+		}
 	} else if !errors.Is(err, os.ErrNotExist) {
 		return nil, err
 	}
@@ -181,7 +196,7 @@ func normalizedInventory(projectRoot, repositoryRoot string, toolchain promotion
 	return inventory, nil
 }
 
-func inventoryFile(path, relative string, context normalizationContext) (NormalizedFile, error) {
+func inventoryFile(path, relative, destination string, context normalizationContext) (NormalizedFile, error) {
 	file, err := os.Open(path)
 	if err != nil {
 		return NormalizedFile{}, err
@@ -189,9 +204,26 @@ func inventoryFile(path, relative string, context normalizationContext) (Normali
 	defer file.Close()
 	if !strings.HasSuffix(relative, ".json") && !isKiCadFile(relative) {
 		hash := sha256.New()
-		size, err := io.Copy(hash, file)
+		writer := io.Writer(hash)
+		var output *os.File
+		if destination != "" {
+			output, err = createExclusiveFile(destination)
+			if err != nil {
+				return NormalizedFile{}, err
+			}
+			writer = io.MultiWriter(hash, output)
+		}
+		size, err := io.Copy(writer, file)
 		if err != nil {
+			if output != nil {
+				output.Close()
+			}
 			return NormalizedFile{}, err
+		}
+		if output != nil {
+			if err := output.Close(); err != nil {
+				return NormalizedFile{}, err
+			}
 		}
 		return NormalizedFile{
 			Path: relative, Kind: "bytes", SHA256: hex.EncodeToString(hash.Sum(nil)), Bytes: size,
@@ -212,13 +244,33 @@ func inventoryFile(path, relative string, context normalizationContext) (Normali
 	}
 	if strings.HasSuffix(relative, ".json") {
 		hash := sha256.New()
-		counter := &countingWriter{writer: hash}
+		writer := io.Writer(hash)
+		var output *os.File
+		if destination != "" {
+			output, err = createExclusiveFile(destination)
+			if err != nil {
+				return NormalizedFile{}, err
+			}
+			writer = io.MultiWriter(hash, output)
+		}
+		counter := &countingWriter{writer: writer}
 		limited := &io.LimitedReader{R: file, N: limit + 1}
 		if err := normalizeJSONReader(limited, counter, context); err != nil {
+			if output != nil {
+				output.Close()
+			}
 			return NormalizedFile{}, err
 		}
 		if limited.N == 0 {
+			if output != nil {
+				output.Close()
+			}
 			return NormalizedFile{}, fmt.Errorf("parse-required file grew beyond normalization limit %d", limit)
+		}
+		if output != nil {
+			if err := output.Close(); err != nil {
+				return NormalizedFile{}, err
+			}
 		}
 		return NormalizedFile{
 			Path: relative, Kind: "json", SHA256: hex.EncodeToString(hash.Sum(nil)), Bytes: counter.bytes,
@@ -235,9 +287,33 @@ func inventoryFile(path, relative string, context normalizationContext) (Normali
 	if err != nil {
 		return NormalizedFile{}, err
 	}
+	if destination != "" {
+		if err := writeExclusiveFile(destination, normalized); err != nil {
+			return NormalizedFile{}, err
+		}
+	}
 	return NormalizedFile{
 		Path: relative, Kind: "kicad", SHA256: hashBytes(normalized), Bytes: int64(len(normalized)),
 	}, nil
+}
+
+func createExclusiveFile(path string) (*os.File, error) {
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return nil, err
+	}
+	return os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
+}
+
+func writeExclusiveFile(path string, value []byte) error {
+	file, err := createExclusiveFile(path)
+	if err != nil {
+		return err
+	}
+	if _, err := file.Write(value); err != nil {
+		file.Close()
+		return err
+	}
+	return file.Close()
 }
 
 type countingWriter struct {
