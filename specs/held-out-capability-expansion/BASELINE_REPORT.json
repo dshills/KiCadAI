@@ -1,0 +1,1175 @@
+{
+  "schema": "kicadai.held-out-capability-expansion-report.v1",
+  "version": 1,
+  "generated_at": "2026-07-23T00:00:00Z",
+  "benchmark_version": 1,
+  "manifest_sha256": "e0d55f484c749eba7d3279da13c21380f5b52f9953f333adf1916409620eb442",
+  "capability_base_commit": "6e4d2209c6aae04994febca30c9ec38a40051cc2",
+  "evaluator": "held-out-capability-stage-v1",
+  "gate_profile": {
+    "all_declared_corners": "required",
+    "byte_identical_replay": "required",
+    "clean_erc": "required",
+    "connectivity": "required",
+    "deterministic_architecture": "required",
+    "strict_drc": "required",
+    "trusted_simulation": "required",
+    "verified_component_evidence": "required",
+    "writer_correctness": "required",
+    "zero_round_trip_diffs": "required"
+  },
+  "tools": {
+    "catalog_hash": "eccf342c90aa1c601108a0947cd1fc27ee37e413041112a85a5e3f71673c896a",
+    "installed_library_summary": "1e4cf2eea96135332f649e5b2888dc873ef10ee3aacf6c2d11f7d4bae813b7b8",
+    "kicad_cli": "/Applications/KiCad/KiCad.app/Contents/MacOS/kicad-cli",
+    "kicad_version": "10.0.3",
+    "model_registry_hash": "7fb36ff8e05b978a010dad3028cee9697a0b662f89d033e4d2e8fc473aa1cf6d",
+    "provider_registry_hash": "1746fd5eb1f225af1fa95e97f98550571d1162b6892f67dd8d25deaddd145b08"
+  },
+  "cases": [
+    {
+      "id": "analog_class_a_line_amplifier",
+      "domain": "analog",
+      "family": "continuous_linear_amplification",
+      "role": "control",
+      "safety_critical": true,
+      "status": "pass",
+      "stages": [
+        {
+          "stage": "integrity",
+          "status": "pass"
+        },
+        {
+          "stage": "schema",
+          "status": "pass"
+        },
+        {
+          "stage": "intent",
+          "status": "pass"
+        },
+        {
+          "stage": "architecture",
+          "status": "pass"
+        },
+        {
+          "stage": "component_evidence",
+          "status": "pass"
+        },
+        {
+          "stage": "simulation",
+          "status": "pass"
+        },
+        {
+          "stage": "lowering",
+          "status": "pass"
+        },
+        {
+          "stage": "schematic",
+          "status": "pass"
+        },
+        {
+          "stage": "placement",
+          "status": "pass"
+        },
+        {
+          "stage": "routing",
+          "status": "pass"
+        },
+        {
+          "stage": "writer",
+          "status": "pass"
+        },
+        {
+          "stage": "erc",
+          "status": "pass"
+        },
+        {
+          "stage": "drc",
+          "status": "pass"
+        },
+        {
+          "stage": "round_trip",
+          "status": "pass"
+        },
+        {
+          "stage": "replay",
+          "status": "pass"
+        }
+      ],
+      "evidence_hashes": {
+        "closed_loop": "b2f822670a311692defb8cb7e7ab1ead46f1698e406f76d1b914883bf7f7f8ca",
+        "generated_project": "9a9a07685ad1e06a38d6241eb92aaa1bdedb60c399bd99d2baba7c3d8548038f",
+        "requirement_bytes": "3440971cdfcfc17f94962498dbdeb78634fa71e396f68dbdf1074a2fbbd88f82",
+        "requirement_canonical": "b6604f27a0b35b33536f9c7106895deb8d1159c31f43bbe23773f8f0e0eed729",
+        "resolved_circuit": "8522f107bef145071ada7da4b8da8a92869b951750b5c483f6c89aa7c213d63f",
+        "search": "2ee950c67d9178bd50abff902224b577ceb0e920a17cdd5e29b93468ad3093a6",
+        "selected_architecture": "7fc4bfe7d8c617b977e2560482309770ad1621f77966e9c3d5ae0225b54467bf"
+      }
+    },
+    {
+      "id": "analog_precision_rectifier",
+      "domain": "analog",
+      "family": "precision_rectification",
+      "role": "held_out",
+      "safety_critical": true,
+      "status": "blocked",
+      "blocking_stage": "architecture",
+      "blocking_code": "ARCHITECTURE_CAPABILITY_UNSUPPORTED",
+      "blocking_path": "search",
+      "blocking_message": "one or more required capabilities have no registered provider",
+      "blocking_capability": "precision_rectification",
+      "capability_gaps": [
+        "precision_rectification"
+      ],
+      "stages": [
+        {
+          "stage": "integrity",
+          "status": "pass"
+        },
+        {
+          "stage": "schema",
+          "status": "pass"
+        },
+        {
+          "stage": "intent",
+          "status": "pass"
+        },
+        {
+          "stage": "architecture",
+          "status": "blocked",
+          "code": "ARCHITECTURE_CAPABILITY_UNSUPPORTED",
+          "path": "search",
+          "message": "one or more required capabilities have no registered provider"
+        },
+        {
+          "stage": "component_evidence",
+          "status": "not_reached"
+        },
+        {
+          "stage": "simulation",
+          "status": "not_reached"
+        },
+        {
+          "stage": "lowering",
+          "status": "not_reached"
+        },
+        {
+          "stage": "schematic",
+          "status": "not_reached"
+        },
+        {
+          "stage": "placement",
+          "status": "not_reached"
+        },
+        {
+          "stage": "routing",
+          "status": "not_reached"
+        },
+        {
+          "stage": "writer",
+          "status": "not_reached"
+        },
+        {
+          "stage": "erc",
+          "status": "not_reached"
+        },
+        {
+          "stage": "drc",
+          "status": "not_reached"
+        },
+        {
+          "stage": "round_trip",
+          "status": "not_reached"
+        },
+        {
+          "stage": "replay",
+          "status": "not_reached"
+        }
+      ],
+      "evidence_hashes": {
+        "requirement_bytes": "bf7593043f6e205bd1bc25a811bf52cbbc4188a9b04eea26bf4a8385eba81e6e",
+        "requirement_canonical": "1995fd568b8c65cb041ae592d9a076242eaaa7fe14e82add29aed13361f1d317",
+        "search": "dbd2f0dec3d9a5051235626dc80244372357df23c40599ab24c0e55eed984aee"
+      }
+    },
+    {
+      "id": "digital_clock_source",
+      "domain": "digital",
+      "family": "clock_generation",
+      "role": "held_out",
+      "safety_critical": false,
+      "status": "blocked",
+      "blocking_stage": "architecture",
+      "blocking_code": "ARCHITECTURE_CAPABILITY_UNSUPPORTED",
+      "blocking_path": "search",
+      "blocking_message": "one or more required capabilities have no registered provider",
+      "blocking_capability": "clock_generation",
+      "capability_gaps": [
+        "clock_generation"
+      ],
+      "stages": [
+        {
+          "stage": "integrity",
+          "status": "pass"
+        },
+        {
+          "stage": "schema",
+          "status": "pass"
+        },
+        {
+          "stage": "intent",
+          "status": "pass"
+        },
+        {
+          "stage": "architecture",
+          "status": "blocked",
+          "code": "ARCHITECTURE_CAPABILITY_UNSUPPORTED",
+          "path": "search",
+          "message": "one or more required capabilities have no registered provider"
+        },
+        {
+          "stage": "component_evidence",
+          "status": "not_reached"
+        },
+        {
+          "stage": "simulation",
+          "status": "not_reached"
+        },
+        {
+          "stage": "lowering",
+          "status": "not_reached"
+        },
+        {
+          "stage": "schematic",
+          "status": "not_reached"
+        },
+        {
+          "stage": "placement",
+          "status": "not_reached"
+        },
+        {
+          "stage": "routing",
+          "status": "not_reached"
+        },
+        {
+          "stage": "writer",
+          "status": "not_reached"
+        },
+        {
+          "stage": "erc",
+          "status": "not_reached"
+        },
+        {
+          "stage": "drc",
+          "status": "not_reached"
+        },
+        {
+          "stage": "round_trip",
+          "status": "not_reached"
+        },
+        {
+          "stage": "replay",
+          "status": "not_reached"
+        }
+      ],
+      "evidence_hashes": {
+        "requirement_bytes": "4dd9431499e817f24963595caa02ddec67b7eaa32de804725e7c11419e4e72e7",
+        "requirement_canonical": "db48c8161c0e4098a930aba0f0d7fabfafe35e6dad548ac332a1f190bacee4cd",
+        "search": "9d505fddcd37dd4eddbad8bc67b8fd419653c7d1b6ccc09477928ef59b656025"
+      }
+    },
+    {
+      "id": "digital_protected_level_interface",
+      "domain": "digital",
+      "family": "protected_level_translation",
+      "role": "control",
+      "safety_critical": true,
+      "status": "blocked",
+      "blocking_stage": "drc",
+      "blocking_code": "KICAD_CLI_FAILED",
+      "blocking_path": "workflow.drc",
+      "blocking_message": "drc check failed: drc check failed with exit code -1: signal: abort trap",
+      "blocking_capability": "protected_level_translation",
+      "capability_gaps": [
+        "protected_level_translation"
+      ],
+      "stages": [
+        {
+          "stage": "integrity",
+          "status": "pass"
+        },
+        {
+          "stage": "schema",
+          "status": "pass"
+        },
+        {
+          "stage": "intent",
+          "status": "pass"
+        },
+        {
+          "stage": "architecture",
+          "status": "pass"
+        },
+        {
+          "stage": "component_evidence",
+          "status": "pass"
+        },
+        {
+          "stage": "simulation",
+          "status": "pass"
+        },
+        {
+          "stage": "lowering",
+          "status": "pass"
+        },
+        {
+          "stage": "schematic",
+          "status": "pass"
+        },
+        {
+          "stage": "placement",
+          "status": "pass"
+        },
+        {
+          "stage": "routing",
+          "status": "pass"
+        },
+        {
+          "stage": "writer",
+          "status": "pass"
+        },
+        {
+          "stage": "erc",
+          "status": "pass"
+        },
+        {
+          "stage": "drc",
+          "status": "blocked",
+          "code": "KICAD_CLI_FAILED",
+          "path": "workflow.drc",
+          "message": "drc check failed: drc check failed with exit code -1: signal: abort trap"
+        },
+        {
+          "stage": "round_trip",
+          "status": "not_reached"
+        },
+        {
+          "stage": "replay",
+          "status": "not_reached"
+        }
+      ],
+      "evidence_hashes": {
+        "closed_loop": "dc3d61c63be0072ce346f5424c610d5d08de59bfc27641eeff932ac65b3d93a2",
+        "requirement_bytes": "4ba74255926a6d2d86cec48759b1ef78ee7675f7764909e5a9e04d6c7d4e8efe",
+        "requirement_canonical": "8e5d342593ba6737ab2161624d1d399fa39f71af50d86d4b61ad44d7e4d18f21",
+        "resolved_circuit": "dc22239d8a0e972fb77780267facc06c7e3cba53c13880e17a13c0fed21044db",
+        "search": "68a9427845217c34d04194ea9e8b810f0d86e45520eefac2b1ec280d6bdf0062",
+        "selected_architecture": "10583113ea85938593035fa9d1286e13b103d5041c9c6b4a0e4e7ad89ad2d959"
+      }
+    },
+    {
+      "id": "mcu_constant_current_peripheral",
+      "domain": "mcu",
+      "family": "constant_current_regulation",
+      "role": "held_out",
+      "safety_critical": true,
+      "status": "blocked",
+      "blocking_stage": "architecture",
+      "blocking_code": "ARCHITECTURE_CAPABILITY_UNSUPPORTED",
+      "blocking_path": "search",
+      "blocking_message": "one or more required capabilities have no registered provider",
+      "blocking_capability": "constant_current_regulation",
+      "capability_gaps": [
+        "constant_current_regulation",
+        "programmable_controller"
+      ],
+      "stages": [
+        {
+          "stage": "integrity",
+          "status": "pass"
+        },
+        {
+          "stage": "schema",
+          "status": "pass"
+        },
+        {
+          "stage": "intent",
+          "status": "pass"
+        },
+        {
+          "stage": "architecture",
+          "status": "blocked",
+          "code": "ARCHITECTURE_CAPABILITY_UNSUPPORTED",
+          "path": "search",
+          "message": "one or more required capabilities have no registered provider"
+        },
+        {
+          "stage": "component_evidence",
+          "status": "not_reached"
+        },
+        {
+          "stage": "simulation",
+          "status": "not_reached"
+        },
+        {
+          "stage": "lowering",
+          "status": "not_reached"
+        },
+        {
+          "stage": "schematic",
+          "status": "not_reached"
+        },
+        {
+          "stage": "placement",
+          "status": "not_reached"
+        },
+        {
+          "stage": "routing",
+          "status": "not_reached"
+        },
+        {
+          "stage": "writer",
+          "status": "not_reached"
+        },
+        {
+          "stage": "erc",
+          "status": "not_reached"
+        },
+        {
+          "stage": "drc",
+          "status": "not_reached"
+        },
+        {
+          "stage": "round_trip",
+          "status": "not_reached"
+        },
+        {
+          "stage": "replay",
+          "status": "not_reached"
+        }
+      ],
+      "evidence_hashes": {
+        "requirement_bytes": "e7009d39a5caa5e86b5ef1f307c26c57b754eca90a6e5281892f1eda59c99bee",
+        "requirement_canonical": "3030e34add12a0c44b34cb41cdeea1f7e12f676d7b8b1d1925ae0cac8b199925",
+        "search": "be5542a7b3a248c9f917ed163a548f5b472b47a3bce168f726ad92bc13a64de1"
+      }
+    },
+    {
+      "id": "mcu_regulated_sensor_controller",
+      "domain": "mcu",
+      "family": "regulated_sensor_controller",
+      "role": "control",
+      "safety_critical": true,
+      "status": "pass",
+      "stages": [
+        {
+          "stage": "integrity",
+          "status": "pass"
+        },
+        {
+          "stage": "schema",
+          "status": "pass"
+        },
+        {
+          "stage": "intent",
+          "status": "pass"
+        },
+        {
+          "stage": "architecture",
+          "status": "pass"
+        },
+        {
+          "stage": "component_evidence",
+          "status": "pass"
+        },
+        {
+          "stage": "simulation",
+          "status": "pass"
+        },
+        {
+          "stage": "lowering",
+          "status": "pass"
+        },
+        {
+          "stage": "schematic",
+          "status": "pass"
+        },
+        {
+          "stage": "placement",
+          "status": "pass"
+        },
+        {
+          "stage": "routing",
+          "status": "pass"
+        },
+        {
+          "stage": "writer",
+          "status": "pass"
+        },
+        {
+          "stage": "erc",
+          "status": "pass"
+        },
+        {
+          "stage": "drc",
+          "status": "pass"
+        },
+        {
+          "stage": "round_trip",
+          "status": "pass"
+        },
+        {
+          "stage": "replay",
+          "status": "pass"
+        }
+      ],
+      "evidence_hashes": {
+        "closed_loop": "a5bf0de6824fe3823806b46b3bc10c817a5e396e5df7084d0fc8797ae46489fc",
+        "generated_project": "8fed4fc48a19951ea1b71fc2a5627990bfb5c35e4bd229ecdfcf2c4c2b90e9b5",
+        "requirement_bytes": "25125c0b12e9fdb266ae149b1ef23ed3b80eae42eba40f690d61537132b2f31a",
+        "requirement_canonical": "84f24467c852ba7437813611dfd89116ba9e733cc1ecb4da56edb62e6319c18f",
+        "resolved_circuit": "4e83f23de0bea9db9291115b757e7d4372c0121dbe45b2db07fa8b1e93f63126",
+        "search": "35ac8130b0ae461b3797b173b75e52a5026b8f2e72c2912974121ab981121b1c",
+        "selected_architecture": "342206e22e7deab877cce42478194267448bd399037a236181ebf93dfa6f432f"
+      }
+    },
+    {
+      "id": "mixed_signal_protected_load_control",
+      "domain": "mixed_signal",
+      "family": "current_sensed_load_protection",
+      "role": "control",
+      "safety_critical": true,
+      "status": "pass",
+      "stages": [
+        {
+          "stage": "integrity",
+          "status": "pass"
+        },
+        {
+          "stage": "schema",
+          "status": "pass"
+        },
+        {
+          "stage": "intent",
+          "status": "pass"
+        },
+        {
+          "stage": "architecture",
+          "status": "pass"
+        },
+        {
+          "stage": "component_evidence",
+          "status": "pass"
+        },
+        {
+          "stage": "simulation",
+          "status": "pass"
+        },
+        {
+          "stage": "lowering",
+          "status": "pass"
+        },
+        {
+          "stage": "schematic",
+          "status": "pass"
+        },
+        {
+          "stage": "placement",
+          "status": "pass"
+        },
+        {
+          "stage": "routing",
+          "status": "pass"
+        },
+        {
+          "stage": "writer",
+          "status": "pass"
+        },
+        {
+          "stage": "erc",
+          "status": "pass"
+        },
+        {
+          "stage": "drc",
+          "status": "pass"
+        },
+        {
+          "stage": "round_trip",
+          "status": "pass"
+        },
+        {
+          "stage": "replay",
+          "status": "pass"
+        }
+      ],
+      "evidence_hashes": {
+        "closed_loop": "e4165091363f571c7b71ac063fd5008422dcc334664aff8e9f791b49d8ea9912",
+        "generated_project": "67d017e1237efe9a020a0f7b63123c725e1063eab1d936d615cd1f5c741f0603",
+        "requirement_bytes": "a7f6b2f266a67e39aaab4a3c3f951b35bb92a454440db8f8d1a8d640efe12ccb",
+        "requirement_canonical": "b54f3dfea13216b99923e3a09d6e52f262d63dfba5afb1f85bdf850032d85f98",
+        "resolved_circuit": "d8e270086d7e2c0e248858b69cddef74d6ae1bcaabe766673d6089097d00849b",
+        "search": "01919fb2c2428ade8855e411da3dca995ecd0d87b60846e4a0c8678ef09d8373",
+        "selected_architecture": "12a235bc9b3e5a3e17b5add668cbad5a393db4ad34b63d672dd9c27c7aa9ca0a"
+      }
+    },
+    {
+      "id": "mixed_signal_rectified_acquisition",
+      "domain": "mixed_signal",
+      "family": "precision_rectification",
+      "role": "held_out",
+      "safety_critical": true,
+      "status": "blocked",
+      "blocking_stage": "architecture",
+      "blocking_code": "ARCHITECTURE_CAPABILITY_UNSUPPORTED",
+      "blocking_path": "search",
+      "blocking_message": "one or more required capabilities have no registered provider",
+      "blocking_capability": "adc_drive_conditioning",
+      "capability_gaps": [
+        "adc_drive_conditioning",
+        "precision_rectification"
+      ],
+      "stages": [
+        {
+          "stage": "integrity",
+          "status": "pass"
+        },
+        {
+          "stage": "schema",
+          "status": "pass"
+        },
+        {
+          "stage": "intent",
+          "status": "pass"
+        },
+        {
+          "stage": "architecture",
+          "status": "blocked",
+          "code": "ARCHITECTURE_CAPABILITY_UNSUPPORTED",
+          "path": "search",
+          "message": "one or more required capabilities have no registered provider"
+        },
+        {
+          "stage": "component_evidence",
+          "status": "not_reached"
+        },
+        {
+          "stage": "simulation",
+          "status": "not_reached"
+        },
+        {
+          "stage": "lowering",
+          "status": "not_reached"
+        },
+        {
+          "stage": "schematic",
+          "status": "not_reached"
+        },
+        {
+          "stage": "placement",
+          "status": "not_reached"
+        },
+        {
+          "stage": "routing",
+          "status": "not_reached"
+        },
+        {
+          "stage": "writer",
+          "status": "not_reached"
+        },
+        {
+          "stage": "erc",
+          "status": "not_reached"
+        },
+        {
+          "stage": "drc",
+          "status": "not_reached"
+        },
+        {
+          "stage": "round_trip",
+          "status": "not_reached"
+        },
+        {
+          "stage": "replay",
+          "status": "not_reached"
+        }
+      ],
+      "evidence_hashes": {
+        "requirement_bytes": "9b23e22e856d29c53be278f45ccb3da590d60e315d37534d31652f0b66a12ac7",
+        "requirement_canonical": "c3837c2922be7c8b3526dffc9698e90a44d1ea09928f946df56ebd1ee6b5ee66",
+        "search": "3481e719da5b570e8f0ca3866a6d013ed3263312a19b77610228be6daa34acd3"
+      }
+    },
+    {
+      "id": "power_constant_current_output",
+      "domain": "power",
+      "family": "constant_current_regulation",
+      "role": "held_out",
+      "safety_critical": true,
+      "status": "blocked",
+      "blocking_stage": "architecture",
+      "blocking_code": "ARCHITECTURE_CAPABILITY_UNSUPPORTED",
+      "blocking_path": "search",
+      "blocking_message": "one or more required capabilities have no registered provider",
+      "blocking_capability": "constant_current_regulation",
+      "capability_gaps": [
+        "constant_current_regulation"
+      ],
+      "stages": [
+        {
+          "stage": "integrity",
+          "status": "pass"
+        },
+        {
+          "stage": "schema",
+          "status": "pass"
+        },
+        {
+          "stage": "intent",
+          "status": "pass"
+        },
+        {
+          "stage": "architecture",
+          "status": "blocked",
+          "code": "ARCHITECTURE_CAPABILITY_UNSUPPORTED",
+          "path": "search",
+          "message": "one or more required capabilities have no registered provider"
+        },
+        {
+          "stage": "component_evidence",
+          "status": "not_reached"
+        },
+        {
+          "stage": "simulation",
+          "status": "not_reached"
+        },
+        {
+          "stage": "lowering",
+          "status": "not_reached"
+        },
+        {
+          "stage": "schematic",
+          "status": "not_reached"
+        },
+        {
+          "stage": "placement",
+          "status": "not_reached"
+        },
+        {
+          "stage": "routing",
+          "status": "not_reached"
+        },
+        {
+          "stage": "writer",
+          "status": "not_reached"
+        },
+        {
+          "stage": "erc",
+          "status": "not_reached"
+        },
+        {
+          "stage": "drc",
+          "status": "not_reached"
+        },
+        {
+          "stage": "round_trip",
+          "status": "not_reached"
+        },
+        {
+          "stage": "replay",
+          "status": "not_reached"
+        }
+      ],
+      "evidence_hashes": {
+        "requirement_bytes": "de554c5535aa434e0259949ae2abce142cd7585df274c2c6f1a517d9407206a0",
+        "requirement_canonical": "b64f600cc69ee0e72e9668d4c72a3e113a84c81ac99ede8e82567d248c4b43e8",
+        "search": "921745fa4841ebc0b2a3387a49fb5e0c9945e5a7be4703133acfa92e23884c47"
+      }
+    },
+    {
+      "id": "power_regulated_sensor_supply",
+      "domain": "power",
+      "family": "regulated_protected_supply",
+      "role": "control",
+      "safety_critical": true,
+      "status": "pass",
+      "stages": [
+        {
+          "stage": "integrity",
+          "status": "pass"
+        },
+        {
+          "stage": "schema",
+          "status": "pass"
+        },
+        {
+          "stage": "intent",
+          "status": "pass"
+        },
+        {
+          "stage": "architecture",
+          "status": "pass"
+        },
+        {
+          "stage": "component_evidence",
+          "status": "pass"
+        },
+        {
+          "stage": "simulation",
+          "status": "pass"
+        },
+        {
+          "stage": "lowering",
+          "status": "pass"
+        },
+        {
+          "stage": "schematic",
+          "status": "pass"
+        },
+        {
+          "stage": "placement",
+          "status": "pass"
+        },
+        {
+          "stage": "routing",
+          "status": "pass"
+        },
+        {
+          "stage": "writer",
+          "status": "pass"
+        },
+        {
+          "stage": "erc",
+          "status": "pass"
+        },
+        {
+          "stage": "drc",
+          "status": "pass"
+        },
+        {
+          "stage": "round_trip",
+          "status": "pass"
+        },
+        {
+          "stage": "replay",
+          "status": "pass"
+        }
+      ],
+      "evidence_hashes": {
+        "closed_loop": "f4af7a16843609f20b2a98b6e222f5410e5ec2440d20a0c2adfd0e26b23cad15",
+        "generated_project": "a1bbe8cf7523dd7345b15d17755ddca1e65bcef48e2a64d969198a1c3e5e4de0",
+        "requirement_bytes": "564874fa04927975251102ad4f4089326197f0391059623253a30dcdf88c4086",
+        "requirement_canonical": "dfe9a21ea2cac994d1bcf524455f02841548e977eed06186bad6df6786bdae2b",
+        "resolved_circuit": "26121cd640120648a5882278d283714fec0c928ed7869be0d403fa2396cfccc1",
+        "search": "d16b478b4433041941b344adeafe5c131a85ae27f6e519a9b2547c2d31c56f14",
+        "selected_architecture": "20beaa49153700958288915909095583ce10d272e72d849ad0964f6bb1883f29"
+      }
+    },
+    {
+      "id": "sensor_constant_current_excitation",
+      "domain": "sensor",
+      "family": "constant_current_regulation",
+      "role": "held_out",
+      "safety_critical": true,
+      "status": "blocked",
+      "blocking_stage": "architecture",
+      "blocking_code": "ARCHITECTURE_CAPABILITY_UNSUPPORTED",
+      "blocking_path": "search",
+      "blocking_message": "one or more required capabilities have no registered provider",
+      "blocking_capability": "constant_current_regulation",
+      "capability_gaps": [
+        "constant_current_regulation"
+      ],
+      "stages": [
+        {
+          "stage": "integrity",
+          "status": "pass"
+        },
+        {
+          "stage": "schema",
+          "status": "pass"
+        },
+        {
+          "stage": "intent",
+          "status": "pass"
+        },
+        {
+          "stage": "architecture",
+          "status": "blocked",
+          "code": "ARCHITECTURE_CAPABILITY_UNSUPPORTED",
+          "path": "search",
+          "message": "one or more required capabilities have no registered provider"
+        },
+        {
+          "stage": "component_evidence",
+          "status": "not_reached"
+        },
+        {
+          "stage": "simulation",
+          "status": "not_reached"
+        },
+        {
+          "stage": "lowering",
+          "status": "not_reached"
+        },
+        {
+          "stage": "schematic",
+          "status": "not_reached"
+        },
+        {
+          "stage": "placement",
+          "status": "not_reached"
+        },
+        {
+          "stage": "routing",
+          "status": "not_reached"
+        },
+        {
+          "stage": "writer",
+          "status": "not_reached"
+        },
+        {
+          "stage": "erc",
+          "status": "not_reached"
+        },
+        {
+          "stage": "drc",
+          "status": "not_reached"
+        },
+        {
+          "stage": "round_trip",
+          "status": "not_reached"
+        },
+        {
+          "stage": "replay",
+          "status": "not_reached"
+        }
+      ],
+      "evidence_hashes": {
+        "requirement_bytes": "8297fcee31a5790225320e1274b498efdd3ab828352ff8a72ea860ed5036ddac",
+        "requirement_canonical": "71c5335a57dee44d8dc182d1ec6aa98e9239daf66f3a80155227dc49fcb1282c",
+        "search": "94a9024e871809ed4386cd8ca207ef09a136c2d61f7088a6e4e60d829d2a39ba"
+      }
+    },
+    {
+      "id": "sensor_low_noise_decision_chain",
+      "domain": "sensor",
+      "family": "low_noise_sensor_decision",
+      "role": "control",
+      "safety_critical": true,
+      "status": "pass",
+      "stages": [
+        {
+          "stage": "integrity",
+          "status": "pass"
+        },
+        {
+          "stage": "schema",
+          "status": "pass"
+        },
+        {
+          "stage": "intent",
+          "status": "pass"
+        },
+        {
+          "stage": "architecture",
+          "status": "pass"
+        },
+        {
+          "stage": "component_evidence",
+          "status": "pass"
+        },
+        {
+          "stage": "simulation",
+          "status": "pass"
+        },
+        {
+          "stage": "lowering",
+          "status": "pass"
+        },
+        {
+          "stage": "schematic",
+          "status": "pass"
+        },
+        {
+          "stage": "placement",
+          "status": "pass"
+        },
+        {
+          "stage": "routing",
+          "status": "pass"
+        },
+        {
+          "stage": "writer",
+          "status": "pass"
+        },
+        {
+          "stage": "erc",
+          "status": "pass"
+        },
+        {
+          "stage": "drc",
+          "status": "pass"
+        },
+        {
+          "stage": "round_trip",
+          "status": "pass"
+        },
+        {
+          "stage": "replay",
+          "status": "pass"
+        }
+      ],
+      "evidence_hashes": {
+        "closed_loop": "279481925349ac1db691ddb1fca613c09fe36ef5916fb28052b953e0029d5825",
+        "generated_project": "efad2454e63fa58cd3df0d2c4cb33940fadf1fb07476f1c77b4c8ba1f87c18bc",
+        "requirement_bytes": "dd4522854c01ff3ec1e0deff208b517f3814cf9ef77a587b5b12aada70cd0478",
+        "requirement_canonical": "d4c2399aaac9ad8216275c5488abc44398b391747e6e7a40e9d9d821d05f8e42",
+        "resolved_circuit": "a8482e466e0049375564c0ecd003bf9957c96e4b474509c7e101f0416d4b4c6f",
+        "search": "80e977fd0d71c4fde2c00f4f373f3c86ebee340e78d4c3d8aa452884e4c60ea6",
+        "selected_architecture": "b6830d43cbb7a8700a094370c175d6ab6363d3ada5075d55faffaf7af250e55f"
+      }
+    }
+  ],
+  "aggregate": {
+    "cases": 12,
+    "passed": 5,
+    "blocked": 7,
+    "stage_reach": {
+      "architecture": 6,
+      "component_evidence": 6,
+      "drc": 5,
+      "erc": 6,
+      "integrity": 12,
+      "intent": 12,
+      "lowering": 6,
+      "placement": 6,
+      "replay": 5,
+      "round_trip": 5,
+      "routing": 6,
+      "schema": 12,
+      "schematic": 6,
+      "simulation": 6,
+      "writer": 6
+    },
+    "blocked_by_stage": {
+      "architecture": 6,
+      "drc": 1
+    },
+    "blocked_by_code": {
+      "ARCHITECTURE_CAPABILITY_UNSUPPORTED": 6,
+      "KICAD_CLI_FAILED": 1
+    },
+    "blocked_by_capability": {
+      "adc_drive_conditioning": 1,
+      "clock_generation": 1,
+      "constant_current_regulation": 3,
+      "precision_rectification": 2,
+      "programmable_controller": 1,
+      "protected_level_translation": 1
+    },
+    "ranked_failure_clusters": [
+      {
+        "rank": 1,
+        "key": "architecture:constant_current_regulation:ARCHITECTURE_CAPABILITY_UNSUPPORTED",
+        "stage": "architecture",
+        "capability": "constant_current_regulation",
+        "code": "ARCHITECTURE_CAPABILITY_UNSUPPORTED",
+        "case_count": 3,
+        "domain_count": 3,
+        "safety_critical_count": 3,
+        "cases": [
+          "mcu_constant_current_peripheral",
+          "power_constant_current_output",
+          "sensor_constant_current_excitation"
+        ],
+        "domains": [
+          "mcu",
+          "power",
+          "sensor"
+        ]
+      },
+      {
+        "rank": 2,
+        "key": "architecture:precision_rectification:ARCHITECTURE_CAPABILITY_UNSUPPORTED",
+        "stage": "architecture",
+        "capability": "precision_rectification",
+        "code": "ARCHITECTURE_CAPABILITY_UNSUPPORTED",
+        "case_count": 2,
+        "domain_count": 2,
+        "safety_critical_count": 2,
+        "cases": [
+          "analog_precision_rectifier",
+          "mixed_signal_rectified_acquisition"
+        ],
+        "domains": [
+          "analog",
+          "mixed_signal"
+        ]
+      },
+      {
+        "rank": 3,
+        "key": "architecture:adc_drive_conditioning:ARCHITECTURE_CAPABILITY_UNSUPPORTED",
+        "stage": "architecture",
+        "capability": "adc_drive_conditioning",
+        "code": "ARCHITECTURE_CAPABILITY_UNSUPPORTED",
+        "case_count": 1,
+        "domain_count": 1,
+        "safety_critical_count": 1,
+        "cases": [
+          "mixed_signal_rectified_acquisition"
+        ],
+        "domains": [
+          "mixed_signal"
+        ]
+      },
+      {
+        "rank": 4,
+        "key": "architecture:programmable_controller:ARCHITECTURE_CAPABILITY_UNSUPPORTED",
+        "stage": "architecture",
+        "capability": "programmable_controller",
+        "code": "ARCHITECTURE_CAPABILITY_UNSUPPORTED",
+        "case_count": 1,
+        "domain_count": 1,
+        "safety_critical_count": 1,
+        "cases": [
+          "mcu_constant_current_peripheral"
+        ],
+        "domains": [
+          "mcu"
+        ]
+      },
+      {
+        "rank": 5,
+        "key": "drc:protected_level_translation:KICAD_CLI_FAILED",
+        "stage": "drc",
+        "capability": "protected_level_translation",
+        "code": "KICAD_CLI_FAILED",
+        "case_count": 1,
+        "domain_count": 1,
+        "safety_critical_count": 1,
+        "cases": [
+          "digital_protected_level_interface"
+        ],
+        "domains": [
+          "digital"
+        ]
+      },
+      {
+        "rank": 6,
+        "key": "architecture:clock_generation:ARCHITECTURE_CAPABILITY_UNSUPPORTED",
+        "stage": "architecture",
+        "capability": "clock_generation",
+        "code": "ARCHITECTURE_CAPABILITY_UNSUPPORTED",
+        "case_count": 1,
+        "domain_count": 1,
+        "safety_critical_count": 0,
+        "cases": [
+          "digital_clock_source"
+        ],
+        "domains": [
+          "digital"
+        ]
+      }
+    ]
+  }
+}
