@@ -9,10 +9,11 @@ Matrix: [`../../testdata/external-review-mitigation/matrix.json`](../../testdata
 ## Outcome
 
 All six findings from the independent review are mitigated by generic behavior
-and are bound into the release regression ladder. The Phase 7 commit is the
-commit titled `Promote external review regression ladder`; its immutable hash
-and GitHub Actions run are reported by the pushed commit and final task result
-because a commit cannot contain its own hash.
+and are bound into the release regression ladder. Phase 7 is commit
+`7689f2d578e3e88f7340e668ee65edd35f61246d` (`Promote external review
+regression ladder`). Its required GitHub Actions run
+[`29971550896`](https://github.com/dshills/KiCadAI/actions/runs/29971550896)
+completed successfully for that exact head SHA.
 
 | Finding | Disposition | Generic correction and evidence |
 |---|---|---|
@@ -41,7 +42,7 @@ only in test data and test bindings.
 | 5 documentation | `40c06286` | Publish function-level circuit workflow |
 | 5 compatibility | `59502dea` | Restore frozen function vocabulary compatibility |
 | 6 | `8bc81e7b` | Unify creation evidence artifacts |
-| 7 | self | Promote external review regression ladder |
+| 7 | `7689f2d5` | Promote external review regression ladder |
 
 ## Reproducible Commands
 
@@ -70,6 +71,54 @@ Installed-KiCad commands and the stock-library quickstart are published in
 The promotion corpus requires clean ERC, strict DRC, connectivity, required
 route completion, writer correctness, and zero normalized round-trip diffs.
 
+## Verification Results
+
+Local default evidence completed successfully:
+
+- `make review-matrix`: all six scenario groups and four negative cases passed
+  twice;
+- `make GO_TEST_FLAGS=-count=1 test`: the complete unshortened repository suite
+  passed, including `internal/compositionlowering` in 666.132 seconds;
+- `make lint`: `gofmt`, `go vet`, and configured golangci-lint checks passed;
+- no `known F1` through `known F6` skips remain;
+- the final worktree was clean before and after the Phase 7 push.
+
+Installed KiCad 10.0.3 evidence completed successfully for:
+
+- the unchanged 40 mm by 25 mm compact LED intent fixture;
+- the AP2112K regulator intent fixture;
+- the stock-library RC quickstart using the uncurated KiCad application roots;
+- the public function-level status-driver example;
+- `usb_c_i2c_sensor_3v3_protected`;
+- the Class A and Class AB amplifier fixtures;
+- all four power/interface synthesis fixtures: buffered ADC acquisition,
+  Class AB power interface, protected power MOSFET load, and regulated MCU
+  sensor subsystem.
+
+Applicable promotion reports recorded clean ERC, strict DRC with zero real
+findings, connectivity success, required-route completion, writer correctness,
+and zero normalized round-trip differences. The power/interface rerun also
+confirmed the generic ADC interface-conditioning operations after adding their
+two generated usage names to the sorted private compatibility vocabulary.
+
+Prism 0.5.0 reviewed the final staged Phase 7 change using
+`gemini/gemini-3-flash-preview`. The final review reported zero high and zero
+medium findings. Its remaining low notes were audited as non-blocking: the
+Makefile already declares `GO_TEST_TIMEOUT ?= 20m`, and the matrix assertion
+intentionally aggregates missing gates for complete diagnostics.
+
+GitHub Actions run
+[`29971550896`](https://github.com/dshills/KiCadAI/actions/runs/29971550896)
+passed all five jobs:
+
+- offline quality gates, including formatting, golangci-lint, bounded tests,
+  and the coverage floor;
+- open-set promotion corpus;
+- adversarial multi-function promotion corpus;
+- simulation-grounded promotion corpus;
+- external-review regression ladder, executing the matrix twice from a clean
+  checkout.
+
 ## Tools And Library Roots
 
 - Go: `go1.26.5 darwin/arm64`.
@@ -77,8 +126,8 @@ route completion, writer correctness, and zero normalized round-trip diffs.
 - KiCad CLI: `/Applications/KiCad/KiCad.app/Contents/MacOS/kicad-cli`.
 - Stock symbols: `/Applications/KiCad/KiCad.app/Contents/SharedSupport/symbols`.
 - Stock footprints: `/Applications/KiCad/KiCad.app/Contents/SharedSupport/footprints`.
-- Prism: record the version printed by the final staged review in the final task
-  result; the required review command is `prism review staged`.
+- Prism: `0.5.0`; required command: `prism review staged`; final reviewer:
+  `gemini/gemini-3-flash-preview`.
 
 ## Fixture Hashes
 
