@@ -116,9 +116,9 @@ For a discovered toolchain, the resolver MUST:
 - execute `kicad-cli --version` with a bounded timeout;
 - require the locked version;
 - require readable stock symbol and footprint roots;
-- content-hash a deterministic library identity inventory, with a cache keyed
-  by the lock digest and a complete path/size/mtime snapshot; any snapshot
-  change forces full rehashing;
+- content-hash every regular file in a deterministic library identity
+  inventory on every promotion; metadata-only caches must never substitute for
+  content verification;
 - return structured provenance; and
 - avoid modifying the host.
 
