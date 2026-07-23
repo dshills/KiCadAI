@@ -28,7 +28,6 @@ const maxJSONObjectBytes = 64 << 20
 const maxJSONDepth = 100
 
 var temporaryCheckPattern = regexp.MustCompile(`(?:[A-Za-z]:)?(?:[\\/][A-Za-z0-9._ -]+)*[\\/]kicadai-check-(?:drc|erc)-[0-9]+`)
-var maskedKiCadPathPattern = regexp.MustCompile(`\$\{(?:PROJECT|RUN|REPOSITORY|KICAD_CLI|SYMBOLS_ROOT|FOOTPRINTS_ROOT|SYMBOL_TABLE|FOOTPRINT_TABLE|KICAD_CHECK)\}[^"\r\n]*`)
 
 type NormalizedFile struct {
 	Path   string `json:"path"`
@@ -232,7 +231,7 @@ func inventoryFile(path, relative string, context normalizationContext) (Normali
 	if int64(len(raw)) > limit {
 		return NormalizedFile{}, fmt.Errorf("parse-required file grew beyond normalization limit %d", limit)
 	}
-	normalized, err := normalizeKiCadFile(relative, raw, context)
+	normalized, err := normalizeKiCadFile(relative, raw)
 	if err != nil {
 		return NormalizedFile{}, err
 	}
@@ -275,16 +274,14 @@ func readBoundedFile(path string, limit int64) ([]byte, error) {
 	return value, nil
 }
 
-func normalizeKiCadFile(relative string, raw []byte, context normalizationContext) ([]byte, error) {
+func normalizeKiCadFile(relative string, raw []byte) ([]byte, error) {
 	if !isKiCadFile(relative) {
 		return nil, fmt.Errorf("%q is not a KiCad file", relative)
 	}
-	normalized, _ := maskKnownPaths(roundtrip.NormalizeBytes(raw), context)
-	normalized = maskedKiCadPathPattern.ReplaceAllStringFunc(normalized, func(path string) string {
-		path = strings.ReplaceAll(path, `\\`, "/")
-		return strings.ReplaceAll(path, `\`, "/")
-	})
-	return []byte(normalized), nil
+	// The strict round-trip normalizer is the sole KiCad field normalizer.
+	// Promotion bundles are platform-specific; masking KiCad fields here could
+	// hide writer regressions that the deterministic replay is meant to expose.
+	return []byte(roundtrip.NormalizeBytes(raw)), nil
 }
 
 func isKiCadFile(path string) bool {

@@ -160,18 +160,15 @@ func TestNormalizeStringCanonicalizesWindowsTemporaryCheckPath(t *testing.T) {
 	}
 }
 
-func TestNormalizeKiCadFileCanonicalizesMaskedWindowsPath(t *testing.T) {
-	context := newNormalizationContext(`C:\repo\run-1\project`, `C:\repo`, promotiontoolchain.Evidence{})
+func TestNormalizeKiCadFilePreservesSemanticAbsolutePaths(t *testing.T) {
 	normalized, err := normalizeKiCadFile(
-		"board.kicad_pcb",
-		[]byte(`(kicad_pcb (property "source" "C:\repo\run-1\project\board.kicad_pcb"))`),
-		context,
+		"board.kicad_pcb", []byte(`(kicad_pcb (property "source" "C:\repo\project\board.kicad_pcb"))`),
 	)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(string(normalized), `${PROJECT}/board.kicad_pcb`) {
-		t.Fatalf("masked KiCad path was not canonicalized: %s", normalized)
+	if !strings.Contains(string(normalized), `C:\repo\project\board.kicad_pcb`) {
+		t.Fatalf("KiCad semantic path was masked: %s", normalized)
 	}
 }
 
@@ -181,8 +178,7 @@ func writeComparisonProject(t *testing.T, project, run, semantic string) {
 	if err := os.MkdirAll(evidence, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	board := `(kicad_pcb (version 20240108) (property "source" "` + project + `/board.kicad_pcb"))` + "\n"
-	if err := os.WriteFile(filepath.Join(project, "board.kicad_pcb"), []byte(board), 0o600); err != nil {
+	if err := os.WriteFile(filepath.Join(project, "board.kicad_pcb"), []byte("(kicad_pcb (version 20240108))\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(filepath.Join(project, "opaque.bin"), []byte("stable opaque artifact"), 0o600); err != nil {
