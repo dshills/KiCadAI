@@ -81,6 +81,44 @@ The locally bootstrapped path independently passed with bundle digest
 Bundle addresses differ when their recorded source/toolchain provenance
 differs; each receipt verified against its own manifest and inventory.
 
+## Final Phase Receipt
+
+Final implementation commit:
+`cae04bf6413f09af9a958ec8630c326ec0584804`.
+
+The exact local `make promotion-bundle` command ran from that clean committed
+source and independently verified:
+
+- content-addressed bundle:
+  `sha256-ab7653ab5e5a8eedfe7a0bd1b1c38f9691fffd132f15c69ecae902d4d81226de`;
+- manifest SHA-256:
+  `ab7653ab5e5a8eedfe7a0bd1b1c38f9691fffd132f15c69ecae902d4d81226de`;
+- inventoried files: 286; and
+- standalone verifier status: `pass`.
+
+Final ordinary CI run
+[`30027522776`](https://github.com/dshills/KiCadAI/actions/runs/30027522776)
+completed successfully. Its external-review ladder, offline quality/coverage
+gates, open-set corpus, simulation-grounded corpus, and adversarial
+multi-function corpus all passed.
+
+Final installed-KiCad publication run
+[`30027714366`](https://github.com/dshills/KiCadAI/actions/runs/30027714366)
+completed successfully and recorded:
+
+- verified bundle:
+  `sha256-f98f6c4cd6c77b749b1a4a06e9742b0afcb1344788aeca08e644cb6d1352de23`;
+- manifest SHA-256:
+  `f98f6c4cd6c77b749b1a4a06e9742b0afcb1344788aeca08e644cb6d1352de23`;
+- inventoried files: 286;
+- artifact ID: `8572295572`;
+- artifact name:
+  `kicadai-promotion-cae04bf6413f09af9a958ec8630c326ec0584804`;
+- uploaded ZIP SHA-256:
+  `16da8c09d3c3e859c4f234bfa2ffaac5aff508de4d2dc240351b24cb7015ca8f`;
+  and
+- [artifact download](https://github.com/dshills/KiCadAI/actions/runs/30027714366/artifacts/8572295572).
+
 ## Regression Preservation
 
 The final phase exposed a placement regression in the protected 10 W Class AB
