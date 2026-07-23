@@ -72,22 +72,34 @@ func runPromote(arguments []string) error {
 	if err != nil {
 		return err
 	}
-	results, err := promotionrunner.Run(ctx, matrix, toolchain, promotionrunner.Options{
+	results, runErr := promotionrunner.Run(ctx, matrix, toolchain, promotionrunner.Options{
 		RepositoryRoot: repository, KiCadAI: *kicadaiPath, OutputRoot: *outputRoot, ScenarioTimeout: *timeout,
 	})
-	if err != nil {
-		return err
+	if results == nil {
+		results = []promotionrunner.RunResult{}
 	}
-	return writeJSON(struct {
+	status := "pass"
+	errorMessage := ""
+	if runErr != nil {
+		status = "failed"
+		errorMessage = runErr.Error()
+	}
+	writeErr := writeJSON(struct {
 		Schema             string                      `json:"schema"`
+		Status             string                      `json:"status"`
+		Error              string                      `json:"error,omitempty"`
 		MatrixSHA256       string                      `json:"matrix_sha256"`
 		LaneRegistrySHA256 string                      `json:"lane_registry_sha256"`
 		Toolchain          promotiontoolchain.Evidence `json:"toolchain"`
 		Results            []promotionrunner.RunResult `json:"results"`
 	}{
-		Schema: "kicadai.promotion-run.v1", MatrixSHA256: matrix.SHA256,
+		Schema: "kicadai.promotion-run.v1", Status: status, Error: errorMessage, MatrixSHA256: matrix.SHA256,
 		LaneRegistrySHA256: promotionrunner.LaneRegistrySHA256(), Toolchain: toolchain, Results: results,
 	})
+	if writeErr != nil {
+		return errors.Join(writeErr, runErr)
+	}
+	return runErr
 }
 
 func runResolve(arguments []string) error {

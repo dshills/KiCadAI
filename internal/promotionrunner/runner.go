@@ -35,11 +35,12 @@ type CommandRecord struct {
 }
 
 type RunResult struct {
-	Scenario  string          `json:"scenario"`
-	Run       int             `json:"run"`
-	Project   string          `json:"project"`
-	Command   CommandRecord   `json:"command"`
-	Promotion json.RawMessage `json:"promotion"`
+	Scenario   string          `json:"scenario"`
+	Run        int             `json:"run"`
+	Project    string          `json:"project"`
+	Command    CommandRecord   `json:"command"`
+	Promotion  json.RawMessage `json:"promotion"`
+	Comparison *Comparison     `json:"comparison,omitempty"`
 }
 
 func Run(ctx context.Context, matrix MatrixDocument, toolchain promotiontoolchain.Evidence, options Options) ([]RunResult, error) {
@@ -54,16 +55,36 @@ func Run(ctx context.Context, matrix MatrixDocument, toolchain promotiontoolchai
 	if err := ensureEmptyOutputRoot(options.OutputRoot); err != nil {
 		return nil, err
 	}
+	var comparisonErrors []error
 	for _, scenario := range matrix.Matrix.Scenarios {
+		var pair []RunResult
 		for run := 1; run <= 2; run++ {
 			result, err := runScenario(ctx, scenario, run, toolchain, options, binary)
 			if err != nil {
 				return nil, fmt.Errorf("%s run %d: %w", scenario.ID, run, err)
 			}
-			results = append(results, result)
+			pair = append(pair, result)
+		}
+		comparison, comparisonErr := CompareProjects(scenario.ID, pair[0].Project, pair[1].Project, options.RepositoryRoot, toolchain)
+		comparisonPath := filepath.Join(options.OutputRoot, "scenarios", scenario.ID, "comparison.json")
+		if err := writeComparison(comparisonPath, comparison); err != nil {
+			return nil, fmt.Errorf("%s: write comparison: %w", scenario.ID, err)
+		}
+		pair[1].Comparison = &comparison
+		results = append(results, pair...)
+		if comparisonErr != nil {
+			comparisonErrors = append(comparisonErrors, fmt.Errorf("%s: %w", scenario.ID, comparisonErr))
 		}
 	}
-	return results, nil
+	return results, errors.Join(comparisonErrors...)
+}
+
+func writeComparison(path string, comparison Comparison) error {
+	encoded, err := json.MarshalIndent(comparison, "", "  ")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(path, append(encoded, '\n'), 0o600)
 }
 
 func runScenario(parent context.Context, scenario Scenario, run int, toolchain promotiontoolchain.Evidence, options Options, binary string) (RunResult, error) {

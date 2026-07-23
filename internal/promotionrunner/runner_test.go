@@ -91,6 +91,41 @@ func TestRunExecutesEveryScenarioTwiceAndRequiresPromotionGates(t *testing.T) {
 	}
 }
 
+func TestRunReturnsCompletedPairWhenComparisonFails(t *testing.T) {
+	if filepath.Separator != '/' {
+		t.Skip("fake promotion CLI requires a POSIX shell")
+	}
+	root := t.TempDir()
+	if err := os.WriteFile(filepath.Join(root, "request.json"), []byte("{}"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	matrixPath := filepath.Join(root, "matrix.json")
+	if err := os.WriteFile(matrixPath, []byte(testMatrixJSONWithIDs("intent", "request.json", "case", "second")), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	matrix, err := LoadMatrix(matrixPath, root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	script := fakeNondeterministicPromotionCLI(t, validPromotionDocument(t))
+	output := filepath.Join(root, "output")
+	results, err := Run(context.Background(), matrix, promotiontoolchain.Evidence{
+		KiCadVersion: "10.0.3", KiCadCLI: "/locked/kicad-cli",
+		SymbolsRoot: "/locked/symbols", FootprintsRoot: "/locked/footprints",
+		SymbolTable: "/locked/template/sym-lib-table", FootprintTable: "/locked/template/fp-lib-table",
+	}, Options{RepositoryRoot: root, KiCadAI: script, OutputRoot: output})
+	if err == nil || !strings.Contains(err.Error(), "case:") || !strings.Contains(err.Error(), "second:") {
+		t.Fatalf("expected comparison failure, got %v", err)
+	}
+	if len(results) != 4 || results[1].Comparison == nil || results[1].Comparison.Status != "failed" ||
+		results[3].Comparison == nil || results[3].Comparison.Status != "failed" {
+		t.Fatalf("missing completed failing pairs: %#v", results)
+	}
+	if _, statErr := os.Stat(filepath.Join(output, "scenarios", "case", "comparison.json")); statErr != nil {
+		t.Fatalf("comparison artifact: %v", statErr)
+	}
+}
+
 func validPromotionDocument(t *testing.T) []byte {
 	t.Helper()
 	required := []designworkflow.PromotionReadiness{designworkflow.PromotionReadinessPass}
@@ -137,12 +172,43 @@ func fakePromotionCLI(t *testing.T, promotion []byte) string {
 	return path
 }
 
+func fakeNondeterministicPromotionCLI(t *testing.T, promotion []byte) string {
+	t.Helper()
+	path := fakePromotionCLI(t, promotion)
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	marker := "printf '{\"ok\":true}'\n"
+	replacement := "case \"$output\" in\n" +
+		"  *run-1*) printf '{\"value\":1}' > \"$output/semantic.json\" ;;\n" +
+		"  *run-2*) printf '{\"value\":2}' > \"$output/semantic.json\" ;;\n" +
+		"esac\n" + marker
+	body := strings.Replace(string(raw), marker, replacement, 1)
+	if body == string(raw) {
+		t.Fatal("fake CLI marker not found")
+	}
+	if err := os.WriteFile(path, []byte(body), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	return path
+}
+
 func testMatrixJSON(lane, fixture string) string {
-	return `{"schema_version":"kicadai.external-review-matrix.v1","scenarios":[{
-	  "id":"case","review_equivalent":"test","lane":"` + lane + `","fixture":"` + fixture + `",
-	  "board":{"mode":"declared","width_mm":10,"height_mm":10,"layers":2},"expected_status":"pass",
-	  "required_artifacts":["design-request.json","transaction.json","workflow-result.json","validation-summary.json","design-promotion.json","manifest.json"],
-	  "internal_gates":["routing","connectivity","route_completion","writer_correctness","round_trip","deterministic_repeat"],
-	  "optional_kicad_gates":["erc","strict_drc","writer_correctness","round_trip"]
-	}],"negative_cases":[{"id":"negative"}]}`
+	return testMatrixJSONWithIDs(lane, fixture, "case")
+}
+
+func testMatrixJSONWithIDs(lane, fixture string, ids ...string) string {
+	scenarios := make([]string, 0, len(ids))
+	for _, id := range ids {
+		scenarios = append(scenarios, `{
+		  "id":"`+id+`","review_equivalent":"test","lane":"`+lane+`","fixture":"`+fixture+`",
+		  "board":{"mode":"declared","width_mm":10,"height_mm":10,"layers":2},"expected_status":"pass",
+		  "required_artifacts":["design-request.json","transaction.json","workflow-result.json","validation-summary.json","design-promotion.json","manifest.json"],
+		  "internal_gates":["routing","connectivity","route_completion","writer_correctness","round_trip","deterministic_repeat"],
+		  "optional_kicad_gates":["erc","strict_drc","writer_correctness","round_trip"]
+		}`)
+	}
+	return `{"schema_version":"kicadai.external-review-matrix.v1","scenarios":[` +
+		strings.Join(scenarios, ",") + `],"negative_cases":[{"id":"negative"}]}`
 }
