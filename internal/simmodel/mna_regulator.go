@@ -70,6 +70,52 @@ func validateResolvedOperatingLimits(plan Plan, system mnaSystem, solution []com
 			}
 			continue
 		}
+		if device.PrimitiveModel == PrimitiveProgrammableCurrentSourceV1 {
+			parameters := namedValueMap(device.ModelParameters)
+			terminals := terminalMap(device)
+			input := real(solvedNodeVoltage(system, solution, terminals["IN"]))
+			output := real(solvedNodeVoltage(system, solution, terminals["OUT"]))
+			differential := math.Abs(input - output)
+			path := "devices." + device.Component
+			powerTransition := (allowPowerTransition || mnaBranchIsDisabled(system, device.Component)) && differential < parameters["min_headroom_v"]
+			if !powerTransition && differential < parameters["min_headroom_v"] {
+				diagnostics = append(diagnostics, Diagnostic{Path: path + ".headroom", Message: fmt.Sprintf("programmable current-source headroom %.12g V is below catalog-backed minimum %.12g V", differential, parameters["min_headroom_v"]), Suggestion: "increase input-output differential or select a lower-dropout reviewed current source"})
+			}
+			if differential > parameters["max_input_output_voltage_v"] {
+				diagnostics = append(diagnostics, Diagnostic{Path: path + ".input_output_voltage", Message: fmt.Sprintf("programmable current-source input-output differential %.12g V exceeds catalog-backed maximum %.12g V", differential, parameters["max_input_output_voltage_v"]), Suggestion: "reduce input-output differential or select a compatible reviewed current source"})
+			}
+			branch, exists := system.branchIndex[device.Component]
+			if !exists || branch >= len(solution) {
+				diagnostics = append(diagnostics, Diagnostic{Path: path + ".output_current", Message: "programmable current-source output branch is absent from the solved topology"})
+			} else if current := math.Abs(real(solution[branch])) + parameters["reference_current_a"]; !powerTransition && current > parameters["max_output_current_a"] {
+				diagnostics = append(diagnostics, Diagnostic{Path: path + ".output_current", Message: fmt.Sprintf("programmable current-source load current %.12g A exceeds catalog-backed limit %.12g A", current, parameters["max_output_current_a"]), Suggestion: "reduce load current or select a compatible reviewed current source"})
+			}
+			continue
+		}
+		if device.PrimitiveModel == PrimitiveShuntVoltageReferenceV1 {
+			parameters := namedValueMap(device.ModelParameters)
+			terminals := terminalMap(device)
+			path := "devices." + device.Component
+			branch, exists := system.branchIndex[device.Component]
+			if !exists || branch >= len(solution) {
+				diagnostics = append(diagnostics, Diagnostic{Path: path + ".bias_current", Message: "shunt voltage-reference branch is absent from the solved topology"})
+				continue
+			}
+			current := math.Abs(real(solution[branch]))
+			tolerance := 1e-9 * math.Max(1, math.Max(current, parameters["max_bias_current_a"]))
+			powerTransition := allowPowerTransition || shuntReferenceDrivenByDisabledCurrentSource(plan, system, terminals["CATHODE"])
+			if !powerTransition && current+tolerance < parameters["min_bias_current_a"] {
+				diagnostics = append(diagnostics, Diagnostic{Path: path + ".bias_current", Message: fmt.Sprintf("shunt voltage-reference bias current %.12g A is below catalog-backed minimum %.12g A", current, parameters["min_bias_current_a"]), Suggestion: "increase reference bias current or select a compatible reviewed reference"})
+			}
+			if current-tolerance > parameters["max_bias_current_a"] {
+				diagnostics = append(diagnostics, Diagnostic{Path: path + ".bias_current", Message: fmt.Sprintf("shunt voltage-reference bias current %.12g A exceeds catalog-backed maximum %.12g A", current, parameters["max_bias_current_a"]), Suggestion: "reduce reference bias current or select a compatible reviewed reference"})
+			}
+			reverse := real(solvedNodeVoltage(system, solution, terminals["ANODE"]) - solvedNodeVoltage(system, solution, terminals["CATHODE"]))
+			if reverse > parameters["max_reverse_voltage_v"] {
+				diagnostics = append(diagnostics, Diagnostic{Path: path + ".reverse_voltage", Message: fmt.Sprintf("shunt voltage-reference reverse voltage %.12g V exceeds catalog-backed maximum %.12g V", reverse, parameters["max_reverse_voltage_v"]), Suggestion: "limit reverse voltage or select a compatible reviewed reference"})
+			}
+			continue
+		}
 		if device.PrimitiveModel == PrimitiveDualOutputIsolatedConverterV1 {
 			parameters := namedValueMap(device.ModelParameters)
 			terminals := terminalMap(device)
@@ -140,8 +186,38 @@ func validateResolvedOperatingLimits(plan Plan, system mnaSystem, solution []com
 	return diagnostics
 }
 
+func mnaBranchIsDisabled(system mnaSystem, component string) bool {
+	branch, exists := system.branchIndex[component]
+	if !exists || branch < 0 || branch >= len(system.matrix) || branch >= len(system.matrix[branch]) {
+		return false
+	}
+	if math.Abs(real(system.matrix[branch][branch])-1) > 1e-12 || math.Abs(imag(system.matrix[branch][branch])) > 1e-12 {
+		return false
+	}
+	for column, value := range system.matrix[branch] {
+		if column != branch && math.Hypot(real(value), imag(value)) > 1e-12 {
+			return false
+		}
+	}
+	return true
+}
+
+func shuntReferenceDrivenByDisabledCurrentSource(plan Plan, system mnaSystem, cathode string) bool {
+	for _, device := range plan.Devices {
+		if device.PrimitiveModel != PrimitiveProgrammableCurrentSourceV1 || !mnaBranchIsDisabled(system, device.Component) {
+			continue
+		}
+		for _, terminal := range device.Terminals {
+			if terminal.Terminal == "SET" && terminal.Net == cathode {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 func adjustableLinearRegulatorDissipation(device ResolvedDevice, system mnaSystem, solution []complex128) (float64, bool) {
-	if device.PrimitiveModel != PrimitiveAdjustableLinearRegulatorV1 && device.PrimitiveModel != PrimitiveFixedLinearRegulatorV1 && device.PrimitiveModel != PrimitiveFloatingAdjustableRegulatorV1 {
+	if device.PrimitiveModel != PrimitiveAdjustableLinearRegulatorV1 && device.PrimitiveModel != PrimitiveFixedLinearRegulatorV1 && device.PrimitiveModel != PrimitiveFloatingAdjustableRegulatorV1 && device.PrimitiveModel != PrimitiveProgrammableCurrentSourceV1 {
 		return 0, false
 	}
 	branch, exists := system.branchIndex[device.Component]
@@ -156,6 +232,14 @@ func adjustableLinearRegulatorDissipation(device ResolvedDevice, system mnaSyste
 		loadCurrent := math.Abs(real(solution[branch]))
 		quiescent := namedValueMap(device.ModelParameters)["quiescent_current_a"]
 		return math.Abs(input-output)*loadCurrent + math.Abs(input-adjust)*quiescent, true
+	}
+	if device.PrimitiveModel == PrimitiveProgrammableCurrentSourceV1 {
+		input := real(solvedNodeVoltage(system, solution, terminals["IN"]))
+		output := real(solvedNodeVoltage(system, solution, terminals["OUT"]))
+		set := real(solvedNodeVoltage(system, solution, terminals["SET"]))
+		reference := namedValueMap(device.ModelParameters)["reference_current_a"]
+		loadCurrent := math.Abs(real(solution[branch]))
+		return math.Abs(input-output)*loadCurrent + math.Abs(input-set)*reference, true
 	}
 	ground := real(solvedNodeVoltage(system, solution, terminals["GND"]))
 	input := real(solvedNodeVoltage(system, solution, terminals["VIN"])) - ground

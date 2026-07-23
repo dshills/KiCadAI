@@ -167,6 +167,30 @@ func TestUniqueLoadComponentPrefersSemanticOperatingHarness(t *testing.T) {
 	}
 }
 
+func TestThermalComponentsTraversePassiveOutputNetworkToNearestActiveDevice(t *testing.T) {
+	resistance := 10.0
+	plan := simmodel.Plan{Devices: []simmodel.ResolvedDevice{
+		{
+			Component: "output_program", Family: "resistor", PrimitiveModel: simmodel.PrimitiveResistorV1, ValueSI: &resistance,
+			Terminals: []simmodel.TerminalBinding{{Terminal: "A", Net: "BUFFER"}, {Terminal: "B", Net: "LOAD"}},
+		},
+		{
+			Component: "current_regulator", Family: "current_regulator", PrimitiveModel: simmodel.PrimitiveProgrammableCurrentSourceV1,
+			Terminals:       []simmodel.TerminalBinding{{Terminal: "OUT", Net: "BUFFER"}, {Terminal: "IN", Net: "SWITCHED"}},
+			ModelParameters: []simmodel.NamedValue{{Name: "junction_to_ambient_c_per_w", Value: 24}},
+		},
+		{
+			Component: "input_switch", Family: "mosfet", PrimitiveModel: simmodel.PrimitivePMOSSwitchV1,
+			Terminals:       []simmodel.TerminalBinding{{Terminal: "DRAIN", Net: "SWITCHED"}, {Terminal: "SOURCE", Net: "SUPPLY"}},
+			ModelParameters: []simmodel.NamedValue{{Name: "junction_to_ambient_c_per_w", Value: 125}},
+		},
+	}}
+
+	if got := thermalComponentsForTarget(plan, "LOAD"); !slices.Equal(got, []string{"current_regulator"}) {
+		t.Fatalf("thermal components = %#v, want nearest active current regulator", got)
+	}
+}
+
 func TestTransimpedanceUsesResolvedLoadCurrentExcitation(t *testing.T) {
 	load := OperatingHarnessComponentID("load_current", "LOAD")
 	plan := simmodel.Plan{Devices: []simmodel.ResolvedDevice{

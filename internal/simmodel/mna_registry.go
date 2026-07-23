@@ -187,6 +187,31 @@ var primitiveRegistry = []primitiveDefinition{
 		},
 	},
 	{
+		ID: PrimitiveProgrammableCurrentSourceV1, Family: "current_regulator", Terminals: []string{"IN", "SET", "OUT"},
+		CatalogParameters: []valueRule{
+			{Name: "reference_current_a", Positive: true, Minimum: 1e-12, Maximum: 1},
+			{Name: "offset_voltage_v", Maximum: 100},
+			{Name: "min_headroom_v", Positive: true, Minimum: 1e-3, Maximum: 100},
+			{Name: "max_output_current_a", Positive: true, Minimum: 1e-9, Maximum: 1e4},
+			{Name: "max_input_output_voltage_v", Positive: true, Minimum: 1e-3, Maximum: 1000},
+			{Name: "soft_start_time_s", Nonnegative: true, Maximum: 10},
+			{Name: "max_temperature_c", Optional: true, Maximum: 1000},
+			{Name: "junction_to_ambient_c_per_w", Optional: true, Positive: true, Maximum: 1e6},
+			{Name: "junction_to_case_c_per_w", Optional: true, Positive: true, Maximum: 1e6},
+		},
+	},
+	{
+		ID: PrimitiveShuntVoltageReferenceV1, Family: "voltage_reference", Terminals: []string{"CATHODE", "ANODE"},
+		CatalogParameters: []valueRule{
+			{Name: "output_voltage_v", Positive: true, Minimum: 1e-3, Maximum: 1000},
+			{Name: "min_bias_current_a", Positive: true, Minimum: 1e-12, Maximum: 100},
+			{Name: "max_bias_current_a", Positive: true, Minimum: 1e-12, Maximum: 100},
+			{Name: "max_reverse_voltage_v", Positive: true, Minimum: 1e-3, Maximum: 1000},
+			{Name: "max_temperature_c", Optional: true, Maximum: 1000},
+			{Name: "junction_to_ambient_c_per_w", Optional: true, Positive: true, Maximum: 1e6},
+		},
+	},
+	{
 		ID: PrimitiveDualOutputIsolatedConverterV1, Family: "isolated_converter", Terminals: []string{"VIN_PLUS", "VIN_MINUS", "COMMON", "VOUT_PLUS", "VOUT_MINUS"},
 		CatalogParameters: []valueRule{
 			{Name: "input_min_v", Positive: true, Maximum: 1000},

@@ -83,6 +83,103 @@ func TestArchitectureSimulationPlanResolverRelowersAndResolvesRetainedCandidate(
 	}
 }
 
+func TestConstantCurrentResolverRetainsEveryBehavioralAnalysis(t *testing.T) {
+	data, err := os.ReadFile("../architecturesearch/testdata/held_out_capability_expansion_corpus/power_constant_current_output.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	requirement, decodeIssues := architecturesearch.DecodeStrict(bytes.NewReader(data))
+	if len(decodeIssues) != 0 {
+		t.Fatalf("decode issues = %#v", decodeIssues)
+	}
+	catalog, err := components.LoadCatalog(context.Background(), components.LoadOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	registry, registryIssues := architecturesearch.NewCatalogRegistry(catalog)
+	if len(registryIssues) != 0 {
+		t.Fatalf("registry issues = %#v", registryIssues)
+	}
+	graphResolver := circuitgraph.NewResolver(circuitgraph.ResolveOptions{Catalog: catalog, CatalogID: "checked-in"})
+	search := architecturesearch.Search(context.Background(), requirement, registry, architecturesearch.SearchOptions{CatalogHash: graphResolver.CatalogHash()})
+	if search.Status != architecturesearch.SearchSelected || search.Selected == nil {
+		t.Fatalf("search = %#v", search)
+	}
+	lowered, loweringIssues := Lower(requirement, search)
+	if len(loweringIssues) != 0 {
+		t.Fatalf("lowering issues = %#v", loweringIssues)
+	}
+	resolved, resolveIssues := graphResolver.Resolve(context.Background(), lowered.Document)
+	if len(resolveIssues) != 0 {
+		t.Fatalf("resolve issues = %#v", resolveIssues)
+	}
+	if len(resolved.Source.PowerFlags) == 0 {
+		t.Fatalf("external power domains lack synthesized PWR_FLAG declarations: %#v", resolved.Source)
+	}
+	regulatorInputNet := ""
+	for _, net := range resolved.Source.Nets {
+		if slices.ContainsFunc(net.Endpoints, func(endpoint circuitgraph.Endpoint) bool {
+			return strings.Contains(endpoint.Component, "current_regulator") && strings.EqualFold(endpoint.Selector, "IN")
+		}) {
+			regulatorInputNet = net.Name
+			break
+		}
+	}
+	if regulatorInputNet == "" || !slices.ContainsFunc(resolved.Source.PowerFlags, func(flag circuitgraph.PowerFlag) bool {
+		return flag.Net == regulatorInputNet
+	}) {
+		t.Fatalf("switched regulator input net %q lacks propagated PWR_FLAG: %#v", regulatorInputNet, resolved.Source.PowerFlags)
+	}
+	resolver := ArchitectureSimulationPlanResolver{Requirement: requirement, Search: search, GraphResolver: graphResolver}
+	plans, err := resolver.ResolveSimulationPlans(context.Background(), closedloopsynthesis.CandidateState{Fingerprint: search.Selected.Fingerprint})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, kind := range []string{simmodel.AnalysisDCOperatingPoint, simmodel.AnalysisTransient, simmodel.AnalysisStartup, simmodel.AnalysisThermal} {
+		if plan, ok := plans[kind]; !ok || len(plan.Analyses) != 1 || plan.Analyses[0].Kind != kind {
+			t.Fatalf("resolved constant-current plans lack %s: %#v", kind, plans)
+		}
+	}
+	transient := plans[simmodel.AnalysisTransient].Analyses[0]
+	if !simulationAnalysisHasDynamicExcitation(transient) || transient.DurationS < .019 || transient.DurationS > .021 {
+		t.Fatalf("autonomous response plan lacks requirement-scaled supply step: %#v", transient)
+	}
+}
+
+func TestAutonomousCurrentRegulatorSupplyStepIgnoresUnrelatedRail(t *testing.T) {
+	maximum := .001
+	requirement := architecturesearch.Requirement{Requirements: architecturesearch.Requirements{
+		BehavioralRequirements: []architecturesearch.BehavioralRequirement{{
+			ID: "response", Metric: "response_time", Analysis: simmodel.AnalysisTransient,
+			Max: &maximum, Unit: "s",
+		}},
+	}}
+	base := simmodel.Plan{
+		Devices: []simmodel.ResolvedDevice{
+			{Component: "logic_supply", PrimitiveModel: simmodel.PrimitiveVoltageSourceV1, Terminals: []simmodel.TerminalBinding{{Terminal: "POSITIVE", Net: "LOGIC"}, {Terminal: "NEGATIVE", Net: "GND"}}},
+			{Component: "load_supply", PrimitiveModel: simmodel.PrimitiveVoltageSourceV1, Terminals: []simmodel.TerminalBinding{{Terminal: "POSITIVE", Net: "LOAD"}, {Terminal: "NEGATIVE", Net: "GND"}}},
+			{Component: "enable", PrimitiveModel: simmodel.PrimitivePMOSSwitchV1, Terminals: []simmodel.TerminalBinding{{Terminal: "SOURCE", Net: "LOAD"}, {Terminal: "DRAIN", Net: "SWITCHED"}, {Terminal: "GATE", Net: "GATE"}}},
+			{Component: "regulator", PrimitiveModel: simmodel.PrimitiveProgrammableCurrentSourceV1, Terminals: []simmodel.TerminalBinding{{Terminal: "IN", Net: "SWITCHED"}, {Terminal: "OUT", Net: "OUT"}, {Terminal: "SET", Net: "SET"}}},
+		},
+	}
+	analysis := simmodel.Analysis{
+		Kind: simmodel.AnalysisTransient, DurationS: .02, TimeStepS: .00005,
+		Excitations: []simmodel.SourceExcitation{
+			{Component: "logic_supply", DCValue: 5},
+			{Component: "load_supply", DCValue: 12},
+		},
+	}
+	if err := configureAutonomousTransientSupplyStep(requirement, base, &analysis); err != nil {
+		t.Fatal(err)
+	}
+	if analysis.Excitations[0].DCValue != 5 || analysis.Excitations[0].PulsePeriodS != 0 {
+		t.Fatalf("unrelated logic rail was modified: %#v", analysis.Excitations[0])
+	}
+	if analysis.Excitations[1].DCValue != 0 || analysis.Excitations[1].PulseValue != 12 || analysis.Excitations[1].PulsePeriodS == 0 {
+		t.Fatalf("upstream load rail was not stepped: %#v", analysis.Excitations[1])
+	}
+}
+
 func TestBuildClosedLoopInputPreservesEveryRetainedArchitecture(t *testing.T) {
 	data, err := os.ReadFile("../architecturesearch/testdata/simulation_grounded_closed_loop_corpus/low_noise_sensor_decision.json")
 	if err != nil {
@@ -753,6 +850,49 @@ func TestLoadCurrentHarnessSpansSemanticLoadSwitchPowerAndOutputRoles(t *testing
 	}
 }
 
+func TestParticipantControlOutputHarnessIsAssertedExceptDuringStartup(t *testing.T) {
+	requirement := architecturesearch.Requirement{Requirements: architecturesearch.Requirements{
+		Domains: []architecturesearch.Domain{
+			{ID: "logic", Kind: "supply", NominalVoltageV: 5},
+			{ID: "ground", Kind: "reference"},
+		},
+		Participants: []architecturesearch.Participant{{
+			ID: "controller", Domain: "logic",
+			RequiredPorts: []architecturesearch.ParticipantPort{{
+				ID: "enable", Kind: "digital_logic", Direction: "source",
+				Protocol: &architecturesearch.Protocol{Name: "gpio", Mode: "push_pull"},
+			}},
+		}},
+		Objectives: []architecturesearch.Objective{{
+			Capability: "controlled_function",
+			Bindings:   []architecturesearch.Binding{{Role: "control", Participant: "controller", ParticipantPort: "enable"}},
+		}},
+	}}
+	bindings := []closedloopsynthesis.SemanticBinding{
+		{Kind: "domain", ID: "ground", Target: "GND"},
+		{Kind: "participant_port", ID: "controller.enable", Target: "CONTROL"},
+	}
+	ordinary, err := operatingHarnessDevices(requirement, bindings, nil, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	startup, err := operatingHarnessDevices(requirement, bindings, nil, simmodel.AnalysisStartup)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(ordinary) != 1 || !ordinary[0].Source || !ordinary[0].HasDefaultValue || ordinary[0].DefaultValue != 5 {
+		t.Fatalf("ordinary participant output harness = %#v", ordinary)
+	}
+	if len(startup) != 1 || startup[0].DefaultValue != 0 {
+		t.Fatalf("startup participant output harness = %#v", startup)
+	}
+	if ordinary[0].Device.InstanceID != startup[0].Device.InstanceID ||
+		ordinary[0].Device.Connections[0].Net != "CONTROL" ||
+		ordinary[0].Device.Connections[1].Net != "GND" {
+		t.Fatalf("participant output harness identity or connectivity differs: ordinary=%#v startup=%#v", ordinary, startup)
+	}
+}
+
 func TestLoadCurrentHarnessUsesGroundReferencedPhysicalLoadForHighSideSwitch(t *testing.T) {
 	minimum, maximum := 0.0, 2.0
 	requirement := architecturesearch.Requirement{Requirements: architecturesearch.Requirements{
@@ -909,7 +1049,7 @@ func TestTransientCurrentHarnessStepsFromQuiescentInitialCondition(t *testing.T)
 		t.Fatalf("transient harness excitations = %#v", intent.Analyses[0].Excitations)
 	}
 	excitation := intent.Analyses[0].Excitations[0]
-	if excitation.DCValue != 0 || excitation.PulseInitialValue != 0 || excitation.PulseValue != 2 || excitation.PulseDelayS != 20e-6 || excitation.PulseWidthS != 980e-6 || excitation.PulsePeriodS != 1.01e-3 {
+	if excitation.DCValue != 0 || excitation.PulseInitialValue != 0 || excitation.PulseValue != 2 || excitation.PulseDelayS != 20e-6 || excitation.PulseWidthS != 1e-3 || excitation.PulsePeriodS != 1.01e-3 {
 		t.Fatalf("transient load step = %#v", excitation)
 	}
 }

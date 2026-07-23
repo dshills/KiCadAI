@@ -325,6 +325,22 @@ func TestPiecewiseLinearRegionStableRejectsBoundaryCrossing(t *testing.T) {
 	}
 }
 
+func TestPiecewiseLinearRegionStableAcceptsForcedMOSFETActiveSetStep(t *testing.T) {
+	system := mnaSystem{nodeIndex: map[string]int{"GATE": 0, "SOURCE": 1}}
+	device := compiledNonlinearDevice{
+		primitive: PrimitivePMOSSwitchV1,
+		terminals: map[string]string{"GATE": "GATE", "SOURCE": "SOURCE"},
+		parameters: map[string]float64{
+			"gate_on_voltage_v":        4.5,
+			parameterForcedMOSFETState: 1,
+		},
+		polarity: -1,
+	}
+	if !piecewiseLinearRegionStable([]compiledNonlinearDevice{device}, &system, []complex128{0, 0}, []complex128{0, 5}) {
+		t.Fatal("forced MOSFET active-set step was incorrectly damped at its physical gate boundary")
+	}
+}
+
 func TestNonlinearResidualIsNormalizedByResolvedEquationScale(t *testing.T) {
 	base := mnaSystem{
 		matrix:        [][]complex128{{1e6}},
@@ -352,6 +368,36 @@ func TestNonlinearIterationConvergenceAcceptsOnlyResidualBoundedNumericalFloor(t
 	}
 	if nonlinearIterationConverged(5e-8, 5e-11, nonlinearResidualTolerance*2) {
 		t.Fatal("nonzero normalized residual above tolerance must still block convergence")
+	}
+}
+
+func TestIntrinsicSourceContinuationScalesProgrammableCurrentAndShuntReferenceSources(t *testing.T) {
+	plan := Plan{Devices: []ResolvedDevice{
+		{
+			PrimitiveModel: PrimitiveProgrammableCurrentSourceV1,
+			ModelParameters: []NamedValue{
+				{Name: "reference_current_a", Value: 10e-6},
+				{Name: "offset_voltage_v", Value: .004},
+				{Name: "min_headroom_v", Value: 1.65},
+			},
+		},
+		{
+			PrimitiveModel:  PrimitiveShuntVoltageReferenceV1,
+			ModelParameters: []NamedValue{{Name: "output_voltage_v", Value: 1.25}, {Name: "min_bias_current_a", Value: 10e-6}},
+		},
+	}}
+	scaled := planWithIntrinsicSourceContinuationScale(plan, .2)
+	currentParameters := namedValueMap(scaled.Devices[0].ModelParameters)
+	referenceParameters := namedValueMap(scaled.Devices[1].ModelParameters)
+	if math.Abs(currentParameters["reference_current_a"]-2e-6) > 1e-15 ||
+		math.Abs(currentParameters["offset_voltage_v"]-.0008) > 1e-15 ||
+		currentParameters["min_headroom_v"] != 1.65 ||
+		math.Abs(referenceParameters["output_voltage_v"]-.25) > 1e-15 ||
+		referenceParameters["min_bias_current_a"] != 10e-6 {
+		t.Fatalf("scaled source parameters = %#v %#v", currentParameters, referenceParameters)
+	}
+	if namedValueMap(plan.Devices[0].ModelParameters)["reference_current_a"] != 10e-6 {
+		t.Fatal("source continuation mutated the original plan")
 	}
 }
 

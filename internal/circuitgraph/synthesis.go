@@ -230,6 +230,7 @@ func (resolver *Resolver) Synthesize(ctx context.Context, document Document) (Do
 			issues = append(issues, synthesisIssue(CodeSynthesisPowerDomainInvalid, "synthesis.power_domains."+domain.Name, "external power domain has no connected external interface signal", "connect the domain to one named external interface signal"))
 		}
 	}
+	propagatePowerFlagsAcrossHighSideSwitches(&lowered, selectedByIntent)
 
 	issues = append(issues, applySensorFunctionPolicies(&lowered, intent, selectedByIntent, connected)...)
 	issues = append(issues, resolver.expandCompanionRecipes(ctx, &lowered, intent, selectedByIntent, connected, &report)...)
@@ -528,6 +529,94 @@ func (resolver *Resolver) expandCompanionRecipes(ctx context.Context, document *
 		}
 	}
 	return issues
+}
+
+// propagatePowerFlagsAcrossHighSideSwitches carries an established external
+// power-drive declaration onto the switched rail of a reviewed high-side
+// switch. KiCad treats MOSFET channel pins as passive, so ERC cannot infer
+// that an enabled switch drives the downstream power-input pins.
+func propagatePowerFlagsAcrossHighSideSwitches(document *Document, selected map[string]ResolvedComponent) {
+	flagged := make(map[string]bool, len(document.PowerFlags))
+	for _, flag := range document.PowerFlags {
+		flagged[flag.Net] = true
+	}
+	componentIDs := make([]string, 0, len(selected))
+	for componentID, component := range selected {
+		if componentHasTags(component.Record, "high_side_switch", "p_channel") {
+			componentIDs = append(componentIDs, componentID)
+		}
+	}
+	slices.Sort(componentIDs)
+	downstream := map[string][]string{}
+	for _, componentID := range componentIDs {
+		sourceNet := componentFunctionNet(document.Nets, componentID, "SOURCE")
+		drainNet := componentFunctionNet(document.Nets, componentID, "DRAIN")
+		target := netByName(document.Nets, drainNet)
+		if sourceNet == "" || drainNet == "" || target == nil || target.Role != NetRolePower || netHasInternalPowerOutput(*target, selected) {
+			continue
+		}
+		downstream[sourceNet] = append(downstream[sourceNet], drainNet)
+	}
+	queue := make([]string, 0, len(document.PowerFlags))
+	for _, flag := range document.PowerFlags {
+		queue = append(queue, flag.Net)
+	}
+	for index := 0; index < len(queue); index++ {
+		for _, drainNet := range downstream[queue[index]] {
+			if flagged[drainNet] {
+				continue
+			}
+			document.PowerFlags = append(document.PowerFlags, PowerFlag{Net: drainNet})
+			flagged[drainNet] = true
+			queue = append(queue, drainNet)
+		}
+	}
+}
+
+func componentHasTags(record components.ComponentRecord, tags ...string) bool {
+	for _, required := range tags {
+		found := slices.ContainsFunc(record.Tags, func(tag string) bool {
+			return strings.EqualFold(strings.TrimSpace(tag), required)
+		})
+		if !found {
+			return false
+		}
+	}
+	return true
+}
+
+func componentFunctionNet(nets []Net, componentID, function string) string {
+	for _, net := range nets {
+		for _, endpoint := range net.Endpoints {
+			if endpoint.Component == componentID && endpoint.SelectorKind == SelectorFunction && strings.EqualFold(endpoint.Selector, function) {
+				return net.Name
+			}
+		}
+	}
+	return ""
+}
+
+func netByName(nets []Net, name string) *Net {
+	for index := range nets {
+		if nets[index].Name == name {
+			return &nets[index]
+		}
+	}
+	return nil
+}
+
+func netHasInternalPowerOutput(net Net, selected map[string]ResolvedComponent) bool {
+	for _, endpoint := range net.Endpoints {
+		component, exists := selected[endpoint.Component]
+		if !exists || endpoint.SelectorKind != SelectorFunction {
+			continue
+		}
+		function, ok := uniqueResolvedFunction(component.Functions, endpoint.Selector)
+		if ok && strings.EqualFold(strings.TrimSpace(function.Electrical), "power_out") {
+			return true
+		}
+	}
+	return false
 }
 
 // connectionHasInternalPowerOutput prevents an external connector from adding

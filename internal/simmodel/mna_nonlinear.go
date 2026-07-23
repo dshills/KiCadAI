@@ -756,6 +756,9 @@ func piecewiseLinearRegionStable(devices []compiledNonlinearDevice, system *mnaS
 				return false
 			}
 		case PrimitiveNMOSSwitchV1, PrimitivePMOSSwitchV1:
+			if _, forced := device.parameters[parameterForcedMOSFETState]; forced {
+				continue
+			}
 			isOn := func(solution []complex128) bool {
 				gate := nonlinearNodeVoltage(system, solution, device.terminals["GATE"])
 				source := nonlinearNodeVoltage(system, solution, device.terminals["SOURCE"])
@@ -802,7 +805,7 @@ func compileNonlinearDevicesWithStates(plan Plan, states map[string]float64) []c
 		parameters := namedValueMap(device.ModelParameters)
 		if device.PrimitiveModel == PrimitiveNMOSSwitchV1 || device.PrimitiveModel == PrimitivePMOSSwitchV1 {
 			if state, exists := states[device.Component]; exists {
-				parameters["__forced_mosfet_state"] = state
+				parameters[parameterForcedMOSFETState] = state
 			}
 		}
 		devices = append(devices, compiledNonlinearDevice{
@@ -819,7 +822,11 @@ func buildNonlinearBaseSystem(plan Plan, analysis Analysis, stage continuationSt
 	for index := range scaled.Excitations {
 		scaled.Excitations[index].DCValue *= stage.sourceScale
 	}
-	scaledPlan := planWithOpAmpGainScale(plan, stage.gainScale)
+	// Independent voltage/current-source primitives are driven exclusively by
+	// Analysis.Excitations, which were scaled above. Only intrinsic sources
+	// encoded in device model parameters need a cloned plan.
+	scaledPlan := planWithIntrinsicSourceContinuationScale(plan, stage.sourceScale)
+	scaledPlan = planWithOpAmpGainScale(scaledPlan, stage.gainScale)
 	system, diagnostics := buildMNASystemWithOpAmpClamps(scaledPlan, scaled, 0, comparatorStates)
 	if len(diagnostics) != 0 {
 		return system, diagnostics
@@ -833,6 +840,32 @@ func buildNonlinearBaseSystem(plan Plan, analysis Analysis, stage continuationSt
 		return mnaSystem{}, []Diagnostic{*diagnostic}
 	}
 	return system, nil
+}
+
+func planWithIntrinsicSourceContinuationScale(plan Plan, scale float64) Plan {
+	if scale <= 0 || scale == 1 {
+		return plan
+	}
+	clone := ClonePlan(plan)
+	for deviceIndex := range clone.Devices {
+		device := &clone.Devices[deviceIndex]
+		switch device.PrimitiveModel {
+		case PrimitiveProgrammableCurrentSourceV1:
+			for parameterIndex := range device.ModelParameters {
+				switch device.ModelParameters[parameterIndex].Name {
+				case "reference_current_a", "offset_voltage_v":
+					device.ModelParameters[parameterIndex].Value *= scale
+				}
+			}
+		case PrimitiveShuntVoltageReferenceV1:
+			for parameterIndex := range device.ModelParameters {
+				if device.ModelParameters[parameterIndex].Name == "output_voltage_v" {
+					device.ModelParameters[parameterIndex].Value *= scale
+				}
+			}
+		}
+	}
+	return clone
 }
 
 func planWithOpAmpGainScale(plan Plan, scale float64) Plan {
@@ -1095,7 +1128,7 @@ func stampNonlinearZener(system *mnaSystem, device compiledNonlinearDevice, gues
 }
 
 func mosfetSwitchConductance(device compiledNonlinearDevice, system *mnaSystem, solution []complex128) float64 {
-	if state, forced := device.parameters["__forced_mosfet_state"]; forced {
+	if state, forced := device.parameters[parameterForcedMOSFETState]; forced {
 		if state >= .5 {
 			return 1 / device.parameters["on_resistance_ohm"]
 		}

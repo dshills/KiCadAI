@@ -428,6 +428,16 @@ func verifiedPadTemplate(footprintID string) (verifiedPadTemplateRecord, bool) {
 			{Name: "2", XMM: 0, YMM: -2.1, WidthMM: 3.8, HeightMM: 2.4},
 		}
 		return verifiedPadTemplateRecord{Bounds: padEnvelopeBounds(pads, 6.7, 7.0), Pads: pads}, true
+	case "Package_TO_SOT_SMD:SOT-223":
+		return verifiedPadTemplateRecord{
+			Bounds: verifiedCourtyardBoundsFromExtents(-4.4, -3.6, 4.4, 3.6),
+			Pads: []placement.PadSummary{
+				smdPad("1", -3.15, -2.3, 2, 1.5, "roundrect"),
+				smdPad("2", -3.15, 0, 2, 1.5, "roundrect"),
+				smdPad("3", -3.15, 2.3, 2, 1.5, "roundrect"),
+				smdPad("4", 3.15, 0, 2, 3.8, "roundrect"),
+			},
+		}, true
 	case "Package_TO_SOT_SMD:TO-252-3_TabPin2":
 		return verifiedPadTemplateRecord{
 			Bounds: verifiedCourtyardBoundsFromExtents(-6.39, -3.5, 4.71, 3.5),

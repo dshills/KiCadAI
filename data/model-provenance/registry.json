@@ -1417,6 +1417,90 @@
       }
     },
     {
+      "catalog_id": "resistor.vishay.tnpw0805.10k0.0p1",
+      "family": "resistor",
+      "model_id": "mna_resistor_v1",
+      "provenance": {
+        "source": "https://www.vishay.com/docs/28758/tnpw_e3.pdf",
+        "revision": "vishay:TNPW-e3:2025-01",
+        "sha256": "ed2413ddd37969961f8ad017ba272c18c42228660e14a5757b6b788f4326cf61",
+        "review_status": "reviewed",
+        "allowed_analyses": ["ac_sweep", "dc_operating_point", "distortion", "noise", "stability", "startup", "thermal", "transient"],
+        "min_temperature_c": -55,
+        "max_temperature_c": 175
+      }
+    },
+    {
+      "catalog_id": "resistor.vishay.tnpw0805.11k7.0p1",
+      "family": "resistor",
+      "model_id": "mna_resistor_v1",
+      "provenance": {
+        "source": "https://www.vishay.com/docs/28758/tnpw_e3.pdf",
+        "revision": "vishay:TNPW-e3:2025-01",
+        "sha256": "ed2413ddd37969961f8ad017ba272c18c42228660e14a5757b6b788f4326cf61",
+        "review_status": "reviewed",
+        "allowed_analyses": ["ac_sweep", "dc_operating_point", "distortion", "noise", "stability", "startup", "thermal", "transient"],
+        "min_temperature_c": -55,
+        "max_temperature_c": 175
+      }
+    },
+    {
+      "catalog_id": "resistor.vishay.tnpw0805.12k5.0p1",
+      "family": "resistor",
+      "model_id": "mna_resistor_v1",
+      "provenance": {
+        "source": "https://www.vishay.com/docs/28758/tnpw_e3.pdf",
+        "revision": "vishay:TNPW-e3:2025-01",
+        "sha256": "ed2413ddd37969961f8ad017ba272c18c42228660e14a5757b6b788f4326cf61",
+        "review_status": "reviewed",
+        "allowed_analyses": ["ac_sweep", "dc_operating_point", "distortion", "noise", "stability", "startup", "thermal", "transient"],
+        "min_temperature_c": -55,
+        "max_temperature_c": 175
+      }
+    },
+    {
+      "catalog_id": "resistor.vishay.tnpw0805.1k00.1p0",
+      "family": "resistor",
+      "model_id": "mna_resistor_v1",
+      "provenance": {
+        "source": "https://www.vishay.com/docs/28758/tnpw_e3.pdf",
+        "revision": "vishay:TNPW-e3:2025-01",
+        "sha256": "ed2413ddd37969961f8ad017ba272c18c42228660e14a5757b6b788f4326cf61",
+        "review_status": "reviewed",
+        "allowed_analyses": ["ac_sweep", "dc_operating_point", "distortion", "noise", "stability", "startup", "thermal", "transient"],
+        "min_temperature_c": -55,
+        "max_temperature_c": 175
+      }
+    },
+    {
+      "catalog_id": "resistor.vishay.tnpw0805.47k0.0p1",
+      "family": "resistor",
+      "model_id": "mna_resistor_v1",
+      "provenance": {
+        "source": "https://www.vishay.com/docs/28758/tnpw_e3.pdf",
+        "revision": "vishay:TNPW-e3:2025-01",
+        "sha256": "ed2413ddd37969961f8ad017ba272c18c42228660e14a5757b6b788f4326cf61",
+        "review_status": "reviewed",
+        "allowed_analyses": ["ac_sweep", "dc_operating_point", "distortion", "noise", "stability", "startup", "thermal", "transient"],
+        "min_temperature_c": -55,
+        "max_temperature_c": 175
+      }
+    },
+    {
+      "catalog_id": "resistor.vishay.tnpw0805.680k.1p0",
+      "family": "resistor",
+      "model_id": "mna_resistor_v1",
+      "provenance": {
+        "source": "https://www.vishay.com/docs/28758/tnpw_e3.pdf",
+        "revision": "vishay:TNPW-e3:2025-01",
+        "sha256": "ed2413ddd37969961f8ad017ba272c18c42228660e14a5757b6b788f4326cf61",
+        "review_status": "reviewed",
+        "allowed_analyses": ["ac_sweep", "dc_operating_point", "distortion", "noise", "stability", "startup", "thermal", "transient"],
+        "min_temperature_c": -55,
+        "max_temperature_c": 175
+      }
+    },
+    {
       "catalog_id": "resistor.vishay.crcw080510k0fkea.0805",
       "family": "resistor",
       "model_id": "mna_resistor_v1",
@@ -1580,6 +1664,90 @@
           "thermal",
           "transient"
         ],
+        "min_temperature_c": -40,
+        "max_temperature_c": 85
+      }
+    },
+    {
+      "catalog_id": "current_regulator.analog_devices.lt3080ist.sot223",
+      "family": "current_regulator",
+      "model_id": "mna_programmable_current_source_v1",
+      "provenance": {
+        "source": "https://www.analog.com/media/en/technical-documentation/data-sheets/3080fc.pdf",
+        "revision": "LT3080 Rev. C; SOT-223 full-temperature SET current, offset, 100 mA dropout, current, voltage, and thermal limits",
+        "sha256": "a2cf10835506c8061c2fb715459e119b5f81f26694f1f82d58ba24a67e9ab7ca",
+        "review_status": "reviewed",
+        "allowed_analyses": ["dc_operating_point", "startup", "thermal", "transient"],
+        "min_temperature_c": -40,
+        "max_temperature_c": 125
+      }
+    },
+    {
+      "catalog_id": "current_regulator.analog_devices.lt3092mpst.sot223",
+      "family": "current_regulator",
+      "model_id": "mna_programmable_current_source_v1",
+      "provenance": {
+        "source": "https://www.analog.com/media/en/technical-documentation/data-sheets/lt3092.pdf",
+        "revision": "LT3092 Rev. D; full-temperature SET current, offset, dropout, current, voltage, and thermal limits",
+        "sha256": "a2cf10835506c8061c2fb715459e119b5f81f26694f1f82d58ba24a67e9ab7ca",
+        "review_status": "reviewed",
+        "allowed_analyses": ["dc_operating_point", "startup", "thermal", "transient"],
+        "min_temperature_c": -55,
+        "max_temperature_c": 125
+      }
+    },
+    {
+      "catalog_id": "mosfet.aos.ao3401.sot23",
+      "family": "mosfet",
+      "model_id": "mna_pmos_guaranteed_switch_v1",
+      "provenance": {
+        "source": "https://www.aosmd.com/sites/default/files/res/data_sheets/AO3401.pdf",
+        "revision": "AO3401 current datasheet; guaranteed 4.5 V and 2.5 V switching boundaries",
+        "sha256": "8de012144fa75a9b820ddcdb05fd6f3a0651e7632030659fec8583126e141f09",
+        "review_status": "reviewed",
+        "allowed_analyses": ["ac_sweep", "dc_operating_point", "distortion", "stability", "startup", "thermal", "transient"],
+        "min_temperature_c": -55,
+        "max_temperature_c": 150
+      }
+    },
+    {
+      "catalog_id": "mosfet.aos.aoss21311c.sot23",
+      "family": "mosfet",
+      "model_id": "mna_pmos_guaranteed_switch_v1",
+      "provenance": {
+        "source": "https://www.aosmd.com/sites/default/files/res/datasheets/AOSS21311C.pdf",
+        "revision": "AOSS21311C datasheet and current product parametrics; guaranteed 4.5 V switching boundary",
+        "sha256": "8de012144fa75a9b820ddcdb05fd6f3a0651e7632030659fec8583126e141f09",
+        "review_status": "reviewed",
+        "allowed_analyses": ["ac_sweep", "dc_operating_point", "distortion", "stability", "startup", "thermal", "transient"],
+        "min_temperature_c": -55,
+        "max_temperature_c": 150
+      }
+    },
+    {
+      "catalog_id": "mosfet.aos.aod21357.to252",
+      "family": "mosfet",
+      "model_id": "mna_pmos_guaranteed_switch_v1",
+      "provenance": {
+        "source": "https://www.aosmd.com/sites/default/files/res/datasheets/AOI21357.pdf",
+        "revision": "AOD21357/AOI21357 Rev. 1.1 July 2023; guaranteed 4.5 V switching and steady-state thermal boundaries",
+        "sha256": "8de012144fa75a9b820ddcdb05fd6f3a0651e7632030659fec8583126e141f09",
+        "review_status": "reviewed",
+        "allowed_analyses": ["ac_sweep", "dc_operating_point", "distortion", "stability", "startup", "thermal", "transient"],
+        "min_temperature_c": -55,
+        "max_temperature_c": 150
+      }
+    },
+    {
+      "catalog_id": "voltage_reference.analog_devices.lt1634ais8_1v25.soic8",
+      "family": "voltage_reference",
+      "model_id": "mna_shunt_voltage_reference_v1",
+      "provenance": {
+        "source": "https://www.analog.com/media/en/technical-documentation/data-sheets/1634ff.pdf",
+        "revision": "LT1634 Rev. F; 1.25 V accuracy, drift, bias, reverse-voltage, and temperature limits",
+        "sha256": "784915a4c6bdc4f763d8108796dce22a27da54b7ca3d96dfd99e513774c116e5",
+        "review_status": "reviewed",
+        "allowed_analyses": ["dc_operating_point", "startup", "thermal", "transient"],
         "min_temperature_c": -40,
         "max_temperature_c": 85
       }

@@ -147,6 +147,7 @@ func thermalDeviceSupportsDissipation(device ResolvedDevice) bool {
 		PrimitiveNMOSSwitchV1, PrimitivePMOSSwitchV1, PrimitiveBJTNPNV1, PrimitiveBJTPNPV1,
 		PrimitiveOpAmpV1, PrimitiveComparatorOpenCollectorV1,
 		PrimitiveAdjustableLinearRegulatorV1, PrimitiveFixedLinearRegulatorV1, PrimitiveFloatingAdjustableRegulatorV1,
+		PrimitiveProgrammableCurrentSourceV1, PrimitiveShuntVoltageReferenceV1,
 		PrimitiveBidirectionalOpenDrainTranslatorV1, PrimitiveMCUStaticSupplyLoadV1, PrimitiveSensorStaticSupplyLoadV1:
 		return true
 	default:
@@ -194,6 +195,13 @@ func thermalDeviceDissipation(device ResolvedDevice, system mnaSystem, solution 
 	case PrimitiveFuseClosedStateV1:
 		delta := voltage(terminals["A"]) - voltage(terminals["B"])
 		return delta * delta / namedValueMap(device.ModelParameters)["cold_resistance_ohm"], true
+	case PrimitiveShuntVoltageReferenceV1:
+		branch, exists := system.branchIndex[device.Component]
+		if !exists {
+			return 0, true
+		}
+		delta := voltage(terminals["CATHODE"]) - voltage(terminals["ANODE"])
+		return math.Abs(delta * real(solution[branch])), true
 	case PrimitiveDiodeShockleyV1:
 		delta := voltage(terminals["ANODE"]) - voltage(terminals["CATHODE"])
 		current, _ := diodeCurrentAndGradient(delta, namedValueMap(device.ModelParameters))

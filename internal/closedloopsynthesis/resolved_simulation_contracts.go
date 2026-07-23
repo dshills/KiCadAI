@@ -398,9 +398,12 @@ func resolvedAssertionBinding(assertion PlannedAssertion, referenceNode string, 
 			binding.Prototypes = append(binding.Prototypes, simmodel.Assertion{Quantity: simmodel.QuantityTotalSupplyCurrentA, Components: components})
 			return binding, nil
 		}
-		component, ok := uniqueSourceComponent(plan, assertion.Target)
+		component, ok := uniqueLoadComponent(plan, assertion.Target)
 		if !ok {
-			return binding, &Diagnostic{Path: "assertions." + assertion.RequirementID, Message: "current measurement requires exactly one resolved source component"}
+			component, ok = uniqueSourceComponent(plan, assertion.Target)
+		}
+		if !ok {
+			return binding, &Diagnostic{Path: "assertions." + assertion.RequirementID, Message: "current measurement requires exactly one resolved operating load or source component"}
 		}
 		prototype.Node, prototype.Quantity, prototype.Component = "", simmodel.QuantityDeviceCurrentA, component
 	case "transimpedance":
@@ -904,17 +907,49 @@ func OperatingHarnessComponentID(axis, target string) string {
 }
 
 func thermalComponentsForTarget(plan simmodel.Plan, target string) []string {
-	var result []string
-	for _, device := range plan.Devices {
-		if target != "circuit" && !deviceTouchesNet(device, target) {
-			continue
+	if target == "circuit" {
+		var result []string
+		for _, device := range plan.Devices {
+			if hasThermalPath(device.ModelParameters) {
+				result = append(result, device.Component)
+			}
 		}
-		if hasThermalPath(device.ModelParameters) {
-			result = append(result, device.Component)
-		}
+		slices.Sort(result)
+		return slices.Compact(result)
 	}
-	slices.Sort(result)
-	return result
+	frontier := []string{target}
+	visited := map[string]bool{target: true}
+	for depth := 0; depth < 8 && len(frontier) != 0; depth++ {
+		var result, next []string
+		for _, net := range frontier {
+			for _, device := range plan.Devices {
+				if !deviceTouchesNet(device, net) {
+					continue
+				}
+				if hasThermalPath(device.ModelParameters) {
+					result = append(result, device.Component)
+					continue
+				}
+				if !stabilityPassivePathPrimitive(device.PrimitiveModel) {
+					continue
+				}
+				for _, terminal := range device.Terminals {
+					if terminal.Net == "" || visited[terminal.Net] {
+						continue
+					}
+					visited[terminal.Net] = true
+					next = append(next, terminal.Net)
+				}
+			}
+		}
+		if len(result) != 0 {
+			slices.Sort(result)
+			return slices.Compact(result)
+		}
+		slices.Sort(next)
+		frontier = slices.Compact(next)
+	}
+	return nil
 }
 
 func hasThermalPath(parameters []simmodel.NamedValue) bool {

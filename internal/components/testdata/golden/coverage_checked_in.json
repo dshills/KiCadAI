@@ -1,15 +1,15 @@
 {
-  "record_count": 112,
-  "family_count": 24,
+  "record_count": 118,
+  "family_count": 26,
   "confidence_counts": {
     "blocked": 1,
     "library_derived": 0,
     "placeholder": 4,
     "rule_inferred": 5,
-    "verified": 102
+    "verified": 108
   },
   "alternative_coverage": {
-    "concrete_records": 87,
+    "concrete_records": 93,
     "generic_fallback_records": 25,
     "equivalence_groups": 22
   },
@@ -150,6 +150,23 @@
       "record_ids": [
         "crystal.abracon.abm3_16mhz.5032_2pin",
         "crystal.generic.5032_2pin"
+      ]
+    },
+    {
+      "family": "current_regulator",
+      "defined": true,
+      "record_count": 2,
+      "concrete_records": 2,
+      "generic_fallback_records": 0,
+      "equivalence_groups": 0,
+      "verified_records": 2,
+      "library_derived_records": 0,
+      "rule_inferred_records": 0,
+      "placeholder_records": 0,
+      "blocked_records": 0,
+      "record_ids": [
+        "current_regulator.analog_devices.lt3080ist.sot223",
+        "current_regulator.analog_devices.lt3092mpst.sot223"
       ]
     },
     {
@@ -345,17 +362,20 @@
     {
       "family": "mosfet",
       "defined": true,
-      "record_count": 6,
-      "concrete_records": 6,
+      "record_count": 9,
+      "concrete_records": 9,
       "generic_fallback_records": 0,
       "equivalence_groups": 0,
-      "verified_records": 6,
+      "verified_records": 9,
       "library_derived_records": 0,
       "rule_inferred_records": 0,
       "placeholder_records": 0,
       "blocked_records": 0,
       "record_ids": [
         "mosfet.aos.ao3400a.sot23",
+        "mosfet.aos.ao3401.sot23",
+        "mosfet.aos.aod21357.to252",
+        "mosfet.aos.aoss21311c.sot23",
         "mosfet.infineon.irlz44n.to220",
         "mosfet.onsemi.fqp47p06.to220",
         "mosfet.onsemi.rfd16n05lsm.to252",
@@ -558,6 +578,22 @@
       ],
       "record_ids": [
         "usb_c.gct.usb4125_power_only_6p"
+      ]
+    },
+    {
+      "family": "voltage_reference",
+      "defined": true,
+      "record_count": 1,
+      "concrete_records": 1,
+      "generic_fallback_records": 0,
+      "equivalence_groups": 0,
+      "verified_records": 1,
+      "library_derived_records": 0,
+      "rule_inferred_records": 0,
+      "placeholder_records": 0,
+      "blocked_records": 0,
+      "record_ids": [
+        "voltage_reference.analog_devices.lt1634ais8_1v25.soic8"
       ]
     },
     {

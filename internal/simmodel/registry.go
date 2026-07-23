@@ -196,7 +196,8 @@ func idealNoiseBoundaryPrimitive(modelID string) bool {
 	switch strings.TrimSpace(modelID) {
 	case PrimitiveVoltageSourceV1, PrimitiveConnectorVoltageSourceV1, PrimitiveCurrentSourceV1,
 		PrimitiveAdjustableLinearRegulatorV1, PrimitiveFixedLinearRegulatorV1,
-		PrimitiveFloatingAdjustableRegulatorV1, PrimitiveDualOutputIsolatedConverterV1:
+		PrimitiveFloatingAdjustableRegulatorV1, PrimitiveProgrammableCurrentSourceV1,
+		PrimitiveShuntVoltageReferenceV1, PrimitiveDualOutputIsolatedConverterV1:
 		return true
 	default:
 		return false

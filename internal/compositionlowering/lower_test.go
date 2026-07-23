@@ -184,6 +184,24 @@ func TestLowerInterfacesSelectsDeterministicPrimaryBusLaneForSemanticBinding(t *
 	}
 }
 
+func TestLowerSemanticBindingsExposeScalarParticipantPorts(t *testing.T) {
+	requirement := architecturesearch.Requirement{Requirements: architecturesearch.Requirements{
+		Participants: []architecturesearch.Participant{{
+			ID: "controller", RequiredPorts: []architecturesearch.ParticipantPort{
+				{ID: "enable", Kind: "digital_logic", Direction: "source"},
+				{ID: "bus", Kind: "digital_bus", Direction: "bidirectional"},
+			},
+		}},
+	}}
+	union := newDisjointSet()
+	control := anchorNode("participant:controller:enable", "")
+	union.add(control)
+	bindings := lowerSemanticBindings(requirement, union, map[string]string{union.find(control): "CONTROL"}, nil)
+	if len(bindings) != 1 || bindings[0].Kind != "participant_port" || bindings[0].ID != "controller.enable" || bindings[0].Target != "CONTROL" {
+		t.Fatalf("participant semantic bindings = %#v", bindings)
+	}
+}
+
 func TestPowerSignalJoinsItsDeclaredDomain(t *testing.T) {
 	requirement := architecturesearch.Requirement{Requirements: architecturesearch.Requirements{
 		Domains: []architecturesearch.Domain{{ID: "generated", Kind: "supply"}},

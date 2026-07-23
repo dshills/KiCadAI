@@ -462,6 +462,14 @@ func lowerSemanticBindings(requirement architecturesearch.Requirement, union *di
 	for _, domain := range requirement.Requirements.Domains {
 		appendBinding("domain", domain.ID, anchorNode("domain:"+domain.ID, ""))
 	}
+	for _, participant := range requirement.Requirements.Participants {
+		for _, port := range participant.RequiredPorts {
+			if port.Kind == "digital_bus" {
+				continue
+			}
+			appendBinding("participant_port", participant.ID+"."+port.ID, anchorNode("participant:"+participant.ID+":"+port.ID, ""))
+		}
+	}
 	slices.SortStableFunc(bindings, func(left, right closedloopsynthesis.SemanticBinding) int {
 		if order := strings.Compare(left.Kind, right.Kind); order != 0 {
 			return order

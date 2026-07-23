@@ -81,6 +81,240 @@
       }
     },
     {
+      "id": "mosfet.aos.ao3401.sot23",
+      "family": "mosfet",
+      "name": "AOS AO3401 30 V logic-level P-channel MOSFET",
+      "description": "Concrete default-off high-side switch with guaranteed on-resistance at 4.5 V and 2.5 V gate drive.",
+      "generic": false,
+      "manufacturer": "Alpha and Omega Semiconductor",
+      "mpn": "AO3401",
+      "lifecycle": "active",
+      "tags": ["high_side_switch", "logic_level", "low_voltage_gate_drive", "mosfet", "p_channel", "sot23"],
+      "values": [
+        {"kind": "on_resistance", "max": "60", "unit": "mOhm"},
+        {"kind": "on_resistance_gate_voltage", "typ": "4.5", "unit": "V"},
+        {"kind": "total_gate_charge", "max": "7", "unit": "nC"}
+      ],
+      "ratings": [
+        {"kind": "drain_source_voltage", "max": "30", "unit": "V"},
+        {"kind": "drain_current", "max": "4", "unit": "A"},
+        {"kind": "gate_source_voltage", "max": "12", "unit": "V"},
+        {"kind": "power_dissipation", "max": "1.4", "unit": "W"}
+      ],
+      "temperature": {"min": "-55", "max": "150", "unit": "C"},
+      "simulation_models": [{
+        "model_id": "mna_pmos_guaranteed_switch_v1",
+        "parameters": [
+          {"name": "gate_on_voltage_v", "value": 4.5},
+          {"name": "on_resistance_ohm", "value": 0.06},
+          {"name": "max_drain_current_a", "value": 4},
+          {"name": "max_drain_source_voltage_v", "value": 30},
+          {"name": "max_gate_source_voltage_v", "value": 12},
+          {"name": "max_temperature_c", "value": 150},
+          {"name": "junction_to_ambient_c_per_w", "value": 125}
+        ]
+      }],
+      "symbols": [{
+        "symbol_id": "Transistor_FET:Q_PMOS_GSD",
+        "function_pins": [
+          {"function": "GATE", "symbol_pin": "1", "electrical": "input", "required": true},
+          {"function": "SOURCE", "symbol_pin": "2", "required": true},
+          {"function": "DRAIN", "symbol_pin": "3", "required": true}
+        ],
+        "verification": {
+          "confidence": "verified",
+          "sources": ["https://www.aosmd.com/products/mosfets/p-channel-mosfets-8v-60v/ao3401", "kicad-symbols:Transistor_FET:Q_PMOS_GSD"],
+          "pinmap_checked": true
+        }
+      }],
+      "packages": [{
+        "id": "sot23",
+        "name": "SOT-23",
+        "footprint_id": "Package_TO_SOT_SMD:SOT-23",
+        "package_type": "sot23",
+        "mpn": "AO3401",
+        "lifecycle": "active",
+        "pinmap_id": "Transistor_FET:Q_PMOS_GSD|Package_TO_SOT_SMD:SOT-23",
+        "pad_functions": [
+          {"function": "GATE", "pad": "1"},
+          {"function": "SOURCE", "pad": "2"},
+          {"function": "DRAIN", "pad": "3"}
+        ],
+        "dimensions_mm": {"width": 2.9, "height": 2.8},
+        "verification": {
+          "confidence": "verified",
+          "sources": ["https://www.aosmd.com/products/mosfets/p-channel-mosfets-8v-60v/ao3401", "kicad-footprint:Package_TO_SOT_SMD:SOT-23"],
+          "pinmap_checked": true
+        }
+      }],
+      "verification": {
+        "confidence": "verified",
+        "sources": ["https://www.aosmd.com/products/mosfets/p-channel-mosfets-8v-60v/ao3401", "https://www.aosmd.com/sites/default/files/res/data_sheets/AO3401.pdf", "kicad-footprint:Package_TO_SOT_SMD:SOT-23"],
+        "resolver_checked": true,
+        "pinmap_checked": true,
+        "notes": ["The trusted switch model uses the 60 mOhm maximum at 4.5 V gate drive and the steady-state 125 C/W junction-to-ambient boundary."]
+      }
+    },
+    {
+      "id": "mosfet.aos.aoss21311c.sot23",
+      "family": "mosfet",
+      "name": "AOS AOSS21311C 30 V logic-level P-channel MOSFET",
+      "description": "Concrete default-off high-side switch with a 20 V gate rating and guaranteed on-resistance at 4.5 V gate drive.",
+      "generic": false,
+      "manufacturer": "Alpha and Omega Semiconductor",
+      "mpn": "AOSS21311C",
+      "lifecycle": "active",
+      "tags": ["high_side_switch", "logic_level", "low_voltage_gate_drive", "mosfet", "p_channel", "sot23"],
+      "values": [
+        {"kind": "on_resistance", "max": "65", "unit": "mOhm"},
+        {"kind": "on_resistance_gate_voltage", "typ": "4.5", "unit": "V"},
+        {"kind": "total_gate_charge", "max": "12.5", "unit": "nC"}
+      ],
+      "ratings": [
+        {"kind": "drain_source_voltage", "max": "30", "unit": "V"},
+        {"kind": "drain_current", "max": "4.3", "unit": "A"},
+        {"kind": "gate_source_voltage", "max": "20", "unit": "V"},
+        {"kind": "power_dissipation", "max": "1.3", "unit": "W"}
+      ],
+      "temperature": {"min": "-55", "max": "150", "unit": "C"},
+      "simulation_models": [{
+        "model_id": "mna_pmos_guaranteed_switch_v1",
+        "parameters": [
+          {"name": "gate_on_voltage_v", "value": 4.5},
+          {"name": "on_resistance_ohm", "value": 0.065},
+          {"name": "max_drain_current_a", "value": 4.3},
+          {"name": "max_drain_source_voltage_v", "value": 30},
+          {"name": "max_gate_source_voltage_v", "value": 20},
+          {"name": "max_temperature_c", "value": 150},
+          {"name": "junction_to_ambient_c_per_w", "value": 125}
+        ]
+      }],
+      "symbols": [{
+        "symbol_id": "Transistor_FET:Q_PMOS_GSD",
+        "function_pins": [
+          {"function": "GATE", "symbol_pin": "1", "electrical": "input", "required": true},
+          {"function": "SOURCE", "symbol_pin": "2", "required": true},
+          {"function": "DRAIN", "symbol_pin": "3", "required": true}
+        ],
+        "verification": {
+          "confidence": "verified",
+          "sources": ["https://www.aosmd.com/products/mosfets/p-channel-mosfets-8v-60v/aoss21311c", "kicad-symbols:Transistor_FET:Q_PMOS_GSD"],
+          "pinmap_checked": true
+        }
+      }],
+      "packages": [{
+        "id": "sot23",
+        "name": "SOT-23",
+        "footprint_id": "Package_TO_SOT_SMD:SOT-23",
+        "package_type": "sot23",
+        "mpn": "AOSS21311C",
+        "lifecycle": "active",
+        "pinmap_id": "Transistor_FET:Q_PMOS_GSD|Package_TO_SOT_SMD:SOT-23",
+        "pad_functions": [
+          {"function": "GATE", "pad": "1"},
+          {"function": "SOURCE", "pad": "2"},
+          {"function": "DRAIN", "pad": "3"}
+        ],
+        "dimensions_mm": {"width": 2.9, "height": 2.8},
+        "verification": {
+          "confidence": "verified",
+          "sources": ["https://www.aosmd.com/products/mosfets/p-channel-mosfets-8v-60v/aoss21311c", "kicad-footprint:Package_TO_SOT_SMD:SOT-23"],
+          "pinmap_checked": true
+        }
+      }],
+      "verification": {
+        "confidence": "verified",
+        "sources": ["https://www.aosmd.com/products/mosfets/p-channel-mosfets-8v-60v/aoss21311c", "https://www.aosmd.com/sites/default/files/res/datasheets/AOSS21311C.pdf", "kicad-footprint:Package_TO_SOT_SMD:SOT-23"],
+        "resolver_checked": true,
+        "pinmap_checked": true,
+        "notes": ["The trusted switch model uses the 65 mOhm maximum at 4.5 V gate drive and a conservative steady-state junction-to-ambient boundary."]
+      }
+    },
+    {
+      "id": "mosfet.aos.aod21357.to252",
+      "family": "mosfet",
+      "name": "AOS AOD21357 30 V logic-level P-channel MOSFET",
+      "description": "Low-resistance high-side power switch with guaranteed 13 mOhm on-resistance at 4.5 V gate drive and a reviewed steady-state free-air thermal path.",
+      "generic": false,
+      "manufacturer": "Alpha and Omega Semiconductor",
+      "mpn": "AOD21357",
+      "lifecycle": "active",
+      "tags": ["high_side_switch", "logic_level", "low_voltage_gate_drive", "mosfet", "p_channel", "power", "to252"],
+      "values": [
+        {"kind": "on_resistance", "max": "13", "unit": "mOhm"},
+        {"kind": "on_resistance_gate_voltage", "typ": "4.5", "unit": "V"},
+        {"kind": "total_gate_charge", "max": "35", "unit": "nC"}
+      ],
+      "ratings": [
+        {"kind": "drain_source_voltage", "max": "30", "unit": "V"},
+        {"kind": "drain_current", "max": "70", "unit": "A"},
+        {"kind": "gate_source_voltage", "max": "25", "unit": "V"},
+        {"kind": "power_dissipation", "max": "78", "unit": "W"}
+      ],
+      "temperature": {"min": "-55", "max": "150", "unit": "C"},
+      "simulation_models": [{
+        "model_id": "mna_pmos_guaranteed_switch_v1",
+        "parameters": [
+          {"name": "gate_on_voltage_v", "value": 4.5},
+          {"name": "on_resistance_ohm", "value": 0.013},
+          {"name": "max_drain_current_a", "value": 70},
+          {"name": "max_drain_source_voltage_v", "value": 30},
+          {"name": "max_gate_source_voltage_v", "value": 25},
+          {"name": "max_temperature_c", "value": 150},
+          {"name": "junction_to_ambient_c_per_w", "value": 50},
+          {"name": "junction_to_case_c_per_w", "value": 1.6}
+        ]
+      }],
+      "thermal_evidence": {
+        "max_junction_temperature_c": 150,
+        "junction_to_case_c_per_w": 1.6,
+        "junction_to_ambient_c_per_w": 50,
+        "mounting_assumptions": "Datasheet steady-state TO-252 junction-to-ambient boundary on a 1 square inch FR-4 board with 2 oz copper in still air; the lower junction-to-case path requires a separately declared case temperature.",
+        "review_note": "AOS AOD21357/AOI21357 Rev. 1.1 specifies 50 C/W maximum steady-state junction-to-ambient and 1.6 C/W maximum steady-state junction-to-case resistance."
+      },
+      "symbols": [{
+        "symbol_id": "Transistor_FET:Q_PMOS_GDS",
+        "function_pins": [
+          {"function": "GATE", "symbol_pin": "1", "electrical": "input", "required": true},
+          {"function": "DRAIN", "symbol_pin": "2", "required": true},
+          {"function": "SOURCE", "symbol_pin": "3", "required": true}
+        ],
+        "verification": {
+          "confidence": "verified",
+          "sources": ["https://www.aosmd.com/sites/default/files/res/datasheets/AOI21357.pdf", "kicad-symbols:Transistor_FET:Q_PMOS_GDS"],
+          "pinmap_checked": true
+        }
+      }],
+      "packages": [{
+        "id": "to252_3",
+        "name": "TO-252 / DPAK",
+        "footprint_id": "Package_TO_SOT_SMD:TO-252-3_TabPin2",
+        "package_type": "to252",
+        "mpn": "AOD21357",
+        "lifecycle": "active",
+        "pinmap_id": "Transistor_FET:Q_PMOS_GDS|Package_TO_SOT_SMD:TO-252-3_TabPin2",
+        "pad_functions": [
+          {"function": "GATE", "pad": "1"},
+          {"function": "DRAIN", "pad": "2"},
+          {"function": "SOURCE", "pad": "3"}
+        ],
+        "dimensions_mm": {"width": 6.73, "height": 6.22},
+        "height_mm": 2.38,
+        "verification": {
+          "confidence": "verified",
+          "sources": ["https://www.aosmd.com/sites/default/files/res/datasheets/AOI21357.pdf", "kicad-footprint:Package_TO_SOT_SMD:TO-252-3_TabPin2"],
+          "pinmap_checked": true
+        }
+      }],
+      "verification": {
+        "confidence": "verified",
+        "sources": ["https://www.aosmd.com/products/mosfets/p-channel-mosfets-8v-60v/aod21357", "https://www.aosmd.com/sites/default/files/res/datasheets/AOI21357.pdf", "kicad-footprint:Package_TO_SOT_SMD:TO-252-3_TabPin2"],
+        "resolver_checked": true,
+        "pinmap_checked": true,
+        "notes": ["The trusted switch model uses the 13 mOhm maximum at 4.5 V gate drive and the steady-state 50 C/W junction-to-ambient boundary; the 70 A and 78 W headline ratings require the manufacturer case-temperature conditions."]
+      }
+    },
+    {
       "id": "mosfet.onsemi.fqp47p06.to220",
       "family": "mosfet",
       "name": "onsemi FQP47P06 60 V P-channel power MOSFET",
@@ -736,6 +970,332 @@
         "resolver_checked": true,
         "pinmap_checked": true,
         "notes": ["Thermal dissipation and minimum-load-current checks remain fabrication-stage obligations."]
+      }
+    },
+    {
+      "id": "current_regulator.analog_devices.lt3080ist.sot223",
+      "family": "current_regulator",
+      "name": "Analog Devices LT3080IST low-dropout programmable current regulator",
+      "description": "Industrial-temperature SOT-223 current-reference regulator with internally tied IN and VCONTROL pins, suitable for the reviewed two-terminal current-source topology.",
+      "generic": false,
+      "manufacturer": "Analog Devices",
+      "mpn": "LT3080IST#PBF",
+      "lifecycle": "active",
+      "tags": ["constant_current", "current_regulator", "high_side", "industrial_temperature", "low_dropout", "programmable", "sot223"],
+      "values": [
+        {"kind": "reference_current", "min": "9.8", "typ": "10", "max": "10.2", "unit": "uA"},
+        {"kind": "offset_voltage", "min": "-6", "typ": "0", "max": "6", "unit": "mV"},
+        {"kind": "minimum_output_current", "max": "1", "unit": "mA"},
+        {"kind": "dropout_voltage", "max": "1.2", "unit": "V"}
+      ],
+      "ratings": [
+        {"kind": "input_output_voltage", "max": "36", "unit": "V"},
+        {"kind": "output_current", "max": "1.1", "unit": "A"},
+        {"kind": "set_pin_voltage", "max": "0.3", "unit": "V"},
+        {"kind": "set_pin_current", "max": "10", "unit": "mA"}
+      ],
+      "temperature": {"min": "-40", "max": "125", "unit": "C"},
+      "thermal_evidence": {
+        "max_junction_temperature_c": 125,
+        "junction_to_case_c_per_w": 15,
+        "junction_to_ambient_c_per_w": 55,
+        "mounting_assumptions": "SOT-223 output tab soldered to the OUT copper area; the catalog boundary uses the package headline thermal resistance and physical design retains copper-spreading as an explicit obligation.",
+        "review_note": "LT3080 Rev. C specifies 55 C/W junction-to-ambient and 15 C/W junction-to-case for the ST package; its board-area table ranges from 48 C/W to 62 C/W."
+      },
+      "simulation_models": [{
+        "model_id": "mna_programmable_current_source_v1",
+        "parameters": [
+          {"name": "reference_current_a", "value": 0.00001},
+          {"name": "offset_voltage_v", "value": 0},
+          {"name": "min_headroom_v", "value": 1.2},
+          {"name": "max_output_current_a", "value": 1.1},
+          {"name": "max_input_output_voltage_v", "value": 36},
+          {"name": "soft_start_time_s", "value": 0},
+          {"name": "max_temperature_c", "value": 125},
+          {"name": "junction_to_ambient_c_per_w", "value": 55},
+          {"name": "junction_to_case_c_per_w", "value": 15}
+        ],
+        "uncertainties": [{
+          "target": "model_parameters.offset_voltage_v",
+          "source": "analog_devices:lt3080:rev_c:sot223_offset_voltage_full_temperature",
+          "nominal": 0,
+          "minimum": -0.006,
+          "maximum": 0.006
+        }, {
+          "target": "model_parameters.reference_current_a",
+          "source": "analog_devices:lt3080:rev_c:set_pin_current_full_temperature",
+          "nominal": 0.00001,
+          "minimum": 0.0000098,
+          "maximum": 0.0000102
+        }]
+      }],
+      "symbols": [{
+        "symbol_id": "Regulator_Linear:LT3080xST",
+        "function_pins": [
+          {"function": "SET", "symbol_pin": "1", "electrical": "input", "required": true},
+          {"function": "OUT", "symbol_pin": "2", "electrical": "power_out", "required": true},
+          {"function": "IN", "symbol_pin": "3", "electrical": "power_in", "required": true},
+          {"function": "OUT_TAB", "symbol_pin": "4", "electrical": "power_out", "required": true}
+        ],
+        "verification": {
+          "confidence": "verified",
+          "sources": ["https://www.analog.com/media/en/technical-documentation/data-sheets/3080fc.pdf", "kicad-symbols:Regulator_Linear:LT3080xST"],
+          "pinmap_checked": true
+        }
+      }],
+      "packages": [{
+        "id": "sot223",
+        "name": "SOT-223-3 with output tab",
+        "footprint_id": "Package_TO_SOT_SMD:SOT-223",
+        "package_type": "sot223",
+        "mpn": "LT3080IST#PBF",
+        "lifecycle": "active",
+        "pinmap_id": "Regulator_Linear:LT3080xST|Package_TO_SOT_SMD:SOT-223",
+        "pad_functions": [
+          {"function": "SET", "pad": "1"},
+          {"function": "OUT", "pad": "2"},
+          {"function": "IN", "pad": "3"},
+          {"function": "OUT_TAB", "pad": "4"}
+        ],
+        "dimensions_mm": {"width": 6.5, "height": 7.0},
+        "height_mm": 1.8,
+        "verification": {
+          "confidence": "verified",
+          "sources": ["https://www.analog.com/media/en/technical-documentation/data-sheets/3080fc.pdf", "kicad-footprint:Package_TO_SOT_SMD:SOT-223"],
+          "pinmap_checked": true
+        }
+      }],
+      "verification": {
+        "confidence": "verified",
+        "sources": ["https://www.analog.com/en/products/lt3080.html", "https://www.analog.com/media/en/technical-documentation/data-sheets/3080fc.pdf", "kicad-symbols:Regulator_Linear:LT3080xST", "kicad-footprint:Package_TO_SOT_SMD:SOT-223"],
+        "resolver_checked": true,
+        "pinmap_checked": true,
+        "notes": [
+          "The SOT-223 package ties IN and VCONTROL internally, so the trusted model uses the 1.2 V maximum VCONTROL dropout specified at 100 mA.",
+          "The trusted model uses the full-temperature 9.8 uA to 10.2 uA SET-current range and the SOT-223 full-temperature plus-or-minus 6 mV output-offset bound.",
+          "The data sheet explicitly documents the two-terminal current-source application using the SET/OUT resistor network."
+        ],
+        "tests": ["catalog_lt3080_current_regulator_evidence"]
+      }
+    },
+    {
+      "id": "current_regulator.analog_devices.lt3092mpst.sot223",
+      "family": "current_regulator",
+      "name": "Analog Devices LT3092MPST programmable current source",
+      "description": "Industrial-temperature 0.5 mA to 200 mA two-terminal current source whose external SET and OUT resistor network programs load current.",
+      "generic": false,
+      "manufacturer": "Analog Devices",
+      "mpn": "LT3092MPST#PBF",
+      "lifecycle": "active",
+      "tags": ["constant_current", "current_regulator", "high_side", "industrial_temperature", "programmable", "sot223"],
+      "values": [
+        {"kind": "reference_current", "min": "9.8", "typ": "10", "max": "10.2", "unit": "uA"},
+        {"kind": "offset_voltage", "min": "-4", "typ": "0", "max": "4", "unit": "mV"},
+        {"kind": "minimum_output_current", "typ": "0.5", "unit": "mA"},
+        {"kind": "dropout_voltage", "max": "1.65", "unit": "V"}
+      ],
+      "ratings": [
+        {"kind": "input_output_voltage", "max": "40", "unit": "V"},
+        {"kind": "output_current", "max": "0.2", "unit": "A"},
+        {"kind": "set_pin_voltage", "max": "10", "unit": "V"},
+        {"kind": "set_pin_current", "max": "15", "unit": "mA"}
+      ],
+      "temperature": {"min": "-55", "max": "125", "unit": "C"},
+      "thermal_evidence": {
+        "max_junction_temperature_c": 125,
+        "junction_to_case_c_per_w": 15,
+        "junction_to_ambient_c_per_w": 55,
+        "mounting_assumptions": "Conservative natural-convection SOT-223 estimate without credit for the data-sheet best-case 2500 mm2 2 oz copper test board.",
+        "review_note": "Package thermal limits are used with solved worst-case dissipation; any improvement from dedicated OUT copper remains a physical-design obligation."
+      },
+      "simulation_models": [{
+        "model_id": "mna_programmable_current_source_v1",
+        "parameters": [
+          {"name": "reference_current_a", "value": 0.00001},
+          {"name": "offset_voltage_v", "value": 0},
+          {"name": "min_headroom_v", "value": 1.65},
+          {"name": "max_output_current_a", "value": 0.2},
+          {"name": "max_input_output_voltage_v", "value": 40},
+          {"name": "soft_start_time_s", "value": 0},
+          {"name": "max_temperature_c", "value": 125},
+          {"name": "junction_to_ambient_c_per_w", "value": 55},
+          {"name": "junction_to_case_c_per_w", "value": 15}
+        ],
+        "uncertainties": [{
+          "target": "model_parameters.offset_voltage_v",
+          "source": "analog_devices:lt3092:rev_d:offset_voltage_full_temperature",
+          "nominal": 0,
+          "minimum": -0.004,
+          "maximum": 0.004
+        }, {
+          "target": "model_parameters.reference_current_a",
+          "source": "analog_devices:lt3092:rev_d:set_pin_current_full_temperature",
+          "nominal": 0.00001,
+          "minimum": 0.0000098,
+          "maximum": 0.0000102
+        }]
+      }],
+      "symbols": [{
+        "symbol_id": "Regulator_Linear:LT3080xST",
+        "function_pins": [
+          {"function": "SET", "symbol_pin": "1", "electrical": "input", "required": true},
+          {"function": "OUT", "symbol_pin": "2", "electrical": "power_out", "required": true},
+          {"function": "IN", "symbol_pin": "3", "electrical": "power_in", "required": true},
+          {"function": "OUT_TAB", "symbol_pin": "4", "electrical": "power_out", "required": true}
+        ],
+        "verification": {
+          "confidence": "verified",
+          "sources": [
+            "https://www.analog.com/media/en/technical-documentation/data-sheets/lt3092.pdf",
+            "kicad-symbols:Regulator_Linear:LT3080xST",
+            "pin-compatible-symbol-template:SET=1,OUT=2,IN=3,OUT_TAB=4"
+          ],
+          "pinmap_checked": true
+        }
+      }],
+      "packages": [{
+        "id": "sot223",
+        "name": "SOT-223-3 with output tab",
+        "footprint_id": "Package_TO_SOT_SMD:SOT-223",
+        "package_type": "sot223",
+        "mpn": "LT3092MPST#PBF",
+        "lifecycle": "active",
+        "pinmap_id": "Regulator_Linear:LT3080xST|Package_TO_SOT_SMD:SOT-223",
+        "pad_functions": [
+          {"function": "SET", "pad": "1"},
+          {"function": "OUT", "pad": "2"},
+          {"function": "IN", "pad": "3"},
+          {"function": "OUT_TAB", "pad": "4"}
+        ],
+        "dimensions_mm": {"width": 6.5, "height": 7.0},
+        "height_mm": 1.8,
+        "verification": {
+          "confidence": "verified",
+          "sources": [
+            "https://www.analog.com/media/en/technical-documentation/data-sheets/lt3092.pdf",
+            "kicad-footprint:Package_TO_SOT_SMD:SOT-223"
+          ],
+          "pinmap_checked": true
+        }
+      }],
+      "verification": {
+        "confidence": "verified",
+        "sources": [
+          "https://www.analog.com/media/en/technical-documentation/data-sheets/lt3092.pdf",
+          "analog_devices:lt3092:rev_d:pin_configuration",
+          "kicad-footprint:Package_TO_SOT_SMD:SOT-223"
+        ],
+        "resolver_checked": true,
+        "pinmap_checked": true,
+        "notes": [
+          "The installed KiCad LT3080xST symbol is used only as a reviewed pin-compatible SET/OUT/IN SOT-223 template; the schematic value and catalog identity remain LT3092MPST#PBF.",
+          "The trusted model deliberately uses the full-temperature 9.8 uA to 10.2 uA SET-current range and the 1.65 V maximum 200 mA dropout bound."
+        ],
+        "tests": ["catalog_lt3092_current_regulator_evidence"]
+      }
+    },
+    {
+      "id": "voltage_reference.analog_devices.lt1634ais8_1v25.soic8",
+      "family": "voltage_reference",
+      "name": "Analog Devices LT1634AIS8-1.25 precision shunt reference",
+      "description": "Industrial-temperature 1.25 V micropower shunt reference for precision floating set-point generation.",
+      "generic": false,
+      "manufacturer": "Analog Devices",
+      "mpn": "LT1634AIS8-1.25#PBF",
+      "lifecycle": "active",
+      "tags": ["1v25", "industrial_temperature", "precision", "shunt_reference", "soic8"],
+      "values": [
+        {"kind": "output_voltage", "min": "1.2478", "typ": "1.25", "max": "1.2522", "unit": "V"},
+        {"kind": "minimum_bias_current", "typ": "10", "unit": "uA"},
+        {"kind": "temperature_coefficient", "max": "10", "unit": "ppm/C"}
+      ],
+      "ratings": [
+        {"kind": "bias_current", "min": "10", "max": "20000", "unit": "uA"},
+        {"kind": "reverse_voltage", "max": "20", "unit": "V"}
+      ],
+      "temperature": {"min": "-40", "max": "85", "unit": "C"},
+      "thermal_evidence": {
+        "max_junction_temperature_c": 85,
+        "junction_to_ambient_c_per_w": 150,
+        "mounting_assumptions": "JEDEC low-power SOIC-8 natural-convection estimate.",
+        "review_note": "The reference dissipates only its solved shunt voltage times bias current in this topology."
+      },
+      "simulation_models": [{
+        "model_id": "mna_shunt_voltage_reference_v1",
+        "parameters": [
+          {"name": "output_voltage_v", "value": 1.25},
+          {"name": "min_bias_current_a", "value": 0.00001},
+          {"name": "max_bias_current_a", "value": 0.02},
+          {"name": "max_reverse_voltage_v", "value": 20},
+          {"name": "max_temperature_c", "value": 85},
+          {"name": "junction_to_ambient_c_per_w", "value": 150}
+        ],
+        "uncertainties": [{
+          "target": "model_parameters.output_voltage_v",
+          "source": "analog_devices:lt1634:initial_accuracy_and_10ppm_per_c_drift",
+          "nominal": 1.25,
+          "minimum": 1.2478,
+          "maximum": 1.2522
+        }]
+      }],
+      "symbols": [{
+        "symbol_id": "Reference_Voltage:LT1634xxS8-1.25",
+        "function_pins": [
+          {"function": "ANODE", "symbol_pin": "4", "electrical": "power_in", "required": true},
+          {"function": "TEST", "symbol_pin": "5", "electrical": "input", "required": false},
+          {"function": "CATHODE", "symbol_pin": "6", "electrical": "power_out", "required": true}
+        ],
+        "verification": {
+          "confidence": "verified",
+          "sources": [
+            "https://www.analog.com/media/en/technical-documentation/data-sheets/1634ff.pdf",
+            "kicad-symbols:Reference_Voltage:LT1634xxS8-1.25"
+          ],
+          "pinmap_checked": true
+        }
+      }],
+      "packages": [{
+        "id": "soic8",
+        "name": "SOIC-8 narrow",
+        "footprint_id": "Package_SO:SOIC-8_3.9x4.9mm_P1.27mm",
+        "package_type": "soic8",
+        "mpn": "LT1634AIS8-1.25#PBF",
+        "lifecycle": "active",
+        "pinmap_id": "Reference_Voltage:LT1634xxS8-1.25|Package_SO:SOIC-8_3.9x4.9mm_P1.27mm",
+        "pad_functions": [
+          {"function": "NC_1", "pad": "1"},
+          {"function": "NC_2", "pad": "2"},
+          {"function": "NC_3", "pad": "3"},
+          {"function": "ANODE", "pad": "4"},
+          {"function": "TEST", "pad": "5"},
+          {"function": "CATHODE", "pad": "6"},
+          {"function": "NC_7", "pad": "7"},
+          {"function": "NC_8", "pad": "8"}
+        ],
+        "dimensions_mm": {"width": 3.9, "height": 4.9},
+        "height_mm": 1.75,
+        "verification": {
+          "confidence": "verified",
+          "sources": [
+            "https://www.analog.com/media/en/technical-documentation/data-sheets/1634ff.pdf",
+            "kicad-footprint:Package_SO:SOIC-8_3.9x4.9mm_P1.27mm"
+          ],
+          "pinmap_checked": true
+        }
+      }],
+      "verification": {
+        "confidence": "verified",
+        "sources": [
+          "https://www.analog.com/media/en/technical-documentation/data-sheets/1634ff.pdf",
+          "analog_devices:lt1634:ais8_pin_configuration",
+          "kicad-footprint:Package_SO:SOIC-8_3.9x4.9mm_P1.27mm"
+        ],
+        "resolver_checked": true,
+        "pinmap_checked": true,
+        "notes": [
+          "The trusted uncertainty bound combines the reviewed initial-accuracy and temperature-drift limits over the supported industrial range."
+        ],
+        "tests": ["catalog_lt1634_precision_shunt_reference_evidence"]
       }
     }
   ]

@@ -563,6 +563,8 @@ func verifiedTransferPadSpecs(footprintID string, hints map[string]string) ([]tr
 		return sot23_5TransferPads(hints), true
 	case "Package_TO_SOT_SMD:SOT-223-3_TabPin2":
 		return sot223_3TransferPads(hints), true
+	case "Package_TO_SOT_SMD:SOT-223":
+		return sot223_4TransferPads(hints), true
 	case "Package_LGA:Bosch_LGA-8_2x2.5mm_P0.65mm_ClockwisePinNumbering":
 		return boschLGA8TransferPads(hints), true
 	case "Package_LGA:Bosch_LGA-8_2.5x2.5mm_P0.65mm_ClockwisePinNumbering":
@@ -600,6 +602,15 @@ func sot223_3TransferPads(hints map[string]string) []transactions.PadSpec {
 		transferPadSpec("2", 0, 2.4, 1.2, 1.5, hints),
 		transferPadSpec("3", 2.3, 2.4, 1.2, 1.5, hints),
 		transferPadSpec("2", 0, -2.1, 3.8, 2.4, hints),
+	}
+}
+
+func sot223_4TransferPads(hints map[string]string) []transactions.PadSpec {
+	return []transactions.PadSpec{
+		transferPadSpec("1", -3.15, -2.3, 2, 1.5, hints),
+		transferPadSpec("2", -3.15, 0, 2, 1.5, hints),
+		transferPadSpec("3", -3.15, 2.3, 2, 1.5, hints),
+		transferPadSpec("4", 3.15, 0, 2, 3.8, hints),
 	}
 }
 

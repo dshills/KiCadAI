@@ -53,7 +53,7 @@ func solveTransientAnalysis(plan Plan, analysis Analysis) (AnalysisResult, []Dia
 	if initialStateDiagnostic != nil {
 		return result, []Diagnostic{*initialStateDiagnostic}
 	}
-	if diagnostics := validateTransientOperatingLimits(plan, system, solution, initialStates, false, 0, nil); len(diagnostics) != 0 {
+	if diagnostics := validateTransientOperatingLimits(plan, system, solution, initialStates, transientSourcesInitiallyZero(analysis), 0, nil); len(diagnostics) != 0 {
 		return result, prefixTransientDiagnostics(analysis.ID, 0, 0, diagnostics)
 	}
 	result.Points = append(result.Points, AnalysisPoint{TimeS: 0, Nodes: nodeResults(plan, system, solution), Devices: transientObservationDeviceResults(plan, analysis, initialAnalysis, system, solution, nil), Solver: &initialEvidence})
@@ -103,7 +103,7 @@ func solveTransientAnalysis(plan Plan, analysis Analysis) (AnalysisResult, []Dia
 		if totalIterations > maxTransientWork {
 			return result, []Diagnostic{{Path: fmt.Sprintf("analyses.%s.points[%d].work", analysis.ID, step), Message: fmt.Sprintf("transient solve exceeded bounded total work limit %d", maxTransientWork), Suggestion: "reduce the bounded observation duration or partition the analysis"}}
 		}
-		if diagnostics := validateTransientOperatingLimits(plan, system, solution, comparatorStates, false, analysis.TimeStepS, fuseSurgeI2t); len(diagnostics) != 0 {
+		if diagnostics := validateTransientOperatingLimits(plan, system, solution, comparatorStates, transientSourcesZeroAtTime(analysis, timeS), analysis.TimeStepS, fuseSurgeI2t); len(diagnostics) != 0 {
 			return result, prefixTransientDiagnostics(analysis.ID, step, timeS, diagnostics)
 		}
 		result.Points = append(result.Points, AnalysisPoint{TimeS: normalizedMNAFloat(timeS), Nodes: nodeResults(plan, system, solution), Devices: transientObservationDeviceResults(plan, analysis, analysis, system, solution, comparatorStates), Solver: &evidence})
@@ -120,11 +120,15 @@ func transientObservationDeviceResults(plan Plan, observation, evaluation Analys
 }
 
 func transientSourcesInitiallyZero(analysis Analysis) bool {
+	return transientSourcesZeroAtTime(analysis, 0)
+}
+
+func transientSourcesZeroAtTime(analysis Analysis, timeS float64) bool {
 	if len(analysis.Excitations) == 0 {
 		return false
 	}
 	for _, excitation := range analysis.Excitations {
-		if math.Abs(transientExcitationValue(analysis, excitation.Component, 0)) > 1e-15 {
+		if math.Abs(transientExcitationValue(analysis, excitation.Component, timeS)) > 1e-15 {
 			return false
 		}
 	}
@@ -384,6 +388,12 @@ func buildTransientTemplate(plan Plan, analysis Analysis) (mnaSystem, []Diagnost
 			adjustmentCurrent := parameters["polarity"] * parameters["adjustment_pin_current_a"]
 			system.rhs[system.branchIndex[device.Component]] -= complex(reference, 0)
 			stampCurrentSource(&system, terminals["VIN"], terminals["ADJ"], complex(-adjustmentCurrent, 0))
+		case PrimitiveProgrammableCurrentSourceV1:
+			parameters := namedValueMap(device.ModelParameters)
+			system.rhs[system.branchIndex[device.Component]] -= complex(parameters["offset_voltage_v"], 0)
+			stampCurrentSource(&system, terminals["IN"], terminals["SET"], complex(-parameters["reference_current_a"], 0))
+		case PrimitiveShuntVoltageReferenceV1:
+			system.rhs[system.branchIndex[device.Component]] -= complex(namedValueMap(device.ModelParameters)["output_voltage_v"], 0)
 		case PrimitiveDualOutputIsolatedConverterV1:
 			parameters := namedValueMap(device.ModelParameters)
 			positiveBranch := system.multiBranchIndex[mnaBranchKey{component: device.Component, terminal: "VOUT_PLUS"}]
@@ -548,6 +558,29 @@ func prepareTransientBase(base *mnaSystem, template mnaSystem, plan Plan, analys
 				adjustmentCurrent := parameters["polarity"] * parameters["adjustment_pin_current_a"]
 				stampCurrentSource(base, terminals["VIN"], terminals["ADJ"], complex(adjustmentCurrent, 0))
 			}
+		case PrimitiveProgrammableCurrentSourceV1:
+			parameters := namedValueMap(device.ModelParameters)
+			reference := parameters["reference_current_a"]
+			offset := parameters["offset_voltage_v"]
+			headroom := nonlinearNodeVoltage(base, previous, terminals["IN"]) - nonlinearNodeVoltage(base, previous, terminals["OUT"])
+			powerTransition := headroom < parameters["min_headroom_v"] || analysis.Kind == AnalysisStartup && startupSourceRampScale(analysis, timeS) < 1
+			if powerTransition {
+				disableTransientBranch(base, device.Component)
+			} else if analysis.Kind == AnalysisStartup && parameters["soft_start_time_s"] > 0 {
+				scale := math.Min(1, timeS/parameters["soft_start_time_s"])
+				reference *= scale
+				offset *= scale
+			}
+			if !powerTransition {
+				base.rhs[base.branchIndex[device.Component]] += complex(offset, 0)
+				stampCurrentSource(base, terminals["IN"], terminals["SET"], complex(reference, 0))
+			}
+		case PrimitiveShuntVoltageReferenceV1:
+			output := namedValueMap(device.ModelParameters)["output_voltage_v"]
+			if analysis.Kind == AnalysisStartup {
+				output *= startupSourceRampScale(analysis, timeS)
+			}
+			base.rhs[base.branchIndex[device.Component]] += complex(output, 0)
 		case PrimitiveDualOutputIsolatedConverterV1:
 			parameters := namedValueMap(device.ModelParameters)
 			positive := parameters["positive_output_voltage_v"]
@@ -620,6 +653,15 @@ func stampTransientRelativeOutputClamp(system *mnaSystem, component, output, ref
 		system.matrix[branch][referenceIndex] = -1
 	}
 	system.rhs[branch] = complex(value, 0)
+}
+
+func disableTransientBranch(system *mnaSystem, component string) {
+	branch := system.branchIndex[component]
+	for column := range system.matrix[branch] {
+		system.matrix[branch][column] = 0
+	}
+	system.matrix[branch][branch] = 1
+	system.rhs[branch] = 0
 }
 
 func transientKnownNodeVoltage(plan Plan, analysis Analysis, node string, timeS float64) (float64, bool) {
@@ -899,7 +941,7 @@ func compiledDevicesWithForcedMOSFETStates(devices []compiledNonlinearDevice, st
 			clone[index].parameters[name] = value
 		}
 		if device.primitive == PrimitiveNMOSSwitchV1 || device.primitive == PrimitivePMOSSwitchV1 {
-			clone[index].parameters["__forced_mosfet_state"] = states[device.component]
+			clone[index].parameters[parameterForcedMOSFETState] = states[device.component]
 		}
 	}
 	return clone

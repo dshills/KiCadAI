@@ -137,6 +137,30 @@ func TestFrozenSimulationGroundedCorpusOptionalKiCadPromotion(t *testing.T) {
 	runFrozenPromotionAt(t, filepath.Join("..", "architecturesearch", "testdata", "simulation_grounded_closed_loop_corpus"), 10, "KICADAI_SIMULATION_GROUNDED_ARTIFACT_DIR", cli, index)
 }
 
+func TestHeldOutConstantCurrentCorpusPassesOfflineWorkflow(t *testing.T) {
+	requireLongPromotionTest(t)
+	corpusRoot, count := heldOutCapabilityFamilyCorpus(t, "constant_current_regulation")
+	runFrozenPromotionAt(t, corpusRoot, count, "KICADAI_CONSTANT_CURRENT_ARTIFACT_DIR", "", libraryresolver.LibraryIndex{})
+}
+
+func TestHeldOutConstantCurrentCorpusOptionalKiCadPromotion(t *testing.T) {
+	requireLongPromotionTest(t)
+	cli := os.Getenv("KICADAI_KICAD_CLI")
+	if cli == "" {
+		t.Skip("set KICADAI_KICAD_CLI to run the KiCad-backed constant-current corpus")
+	}
+	roots, rootIssues := libraryresolver.ResolveRoots()
+	if roots.SymbolsRoot == "" || roots.FootprintsRoot == "" {
+		t.Skipf("installed KiCad libraries are required: %#v", rootIssues)
+	}
+	index, loadIssues := libraryresolver.Load(context.Background(), roots, libraryresolver.LoadOptions{})
+	if len(index.Symbols) == 0 || len(index.Footprints) == 0 {
+		t.Fatalf("installed library index is empty: %#v", loadIssues)
+	}
+	corpusRoot, count := heldOutCapabilityFamilyCorpus(t, "constant_current_regulation")
+	runFrozenPromotionAt(t, corpusRoot, count, "KICADAI_CONSTANT_CURRENT_ARTIFACT_DIR", cli, index)
+}
+
 func TestFrozenBehavioralIntentHeldOutReadyCorpusPassesOfflineWorkflow(t *testing.T) {
 	requireLongPromotionTest(t)
 	corpusRoot, count := behavioralIntentHeldOutReadyCorpus(t)
@@ -159,6 +183,44 @@ func TestFrozenBehavioralIntentHeldOutReadyCorpusOptionalKiCadPromotion(t *testi
 	}
 	corpusRoot, count := behavioralIntentHeldOutReadyCorpus(t)
 	runFrozenPromotionAt(t, corpusRoot, count, "KICADAI_BEHAVIORAL_INTENT_ARTIFACT_DIR", cli, index)
+}
+
+func heldOutCapabilityFamilyCorpus(t *testing.T, family string) (string, int) {
+	t.Helper()
+	type manifestCase struct {
+		Family          string `json:"family"`
+		RequirementFile string `json:"requirement_file"`
+	}
+	var manifest struct {
+		Cases []manifestCase `json:"cases"`
+	}
+	sourceRoot := filepath.Join("..", "architecturesearch", "testdata", "held_out_capability_expansion_corpus")
+	data, err := os.ReadFile(filepath.Join(sourceRoot, "manifest.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := json.Unmarshal(data, &manifest); err != nil {
+		t.Fatal(err)
+	}
+	root := t.TempDir()
+	count := 0
+	for _, fixture := range manifest.Cases {
+		if fixture.Family != family {
+			continue
+		}
+		body, err := os.ReadFile(filepath.Join(sourceRoot, fixture.RequirementFile))
+		if err != nil {
+			t.Fatalf("read held-out requirement %s: %v", fixture.RequirementFile, err)
+		}
+		if err := os.WriteFile(filepath.Join(root, filepath.Base(fixture.RequirementFile)), body, 0o644); err != nil {
+			t.Fatal(err)
+		}
+		count++
+	}
+	if count == 0 {
+		t.Fatalf("held-out capability family %q has no fixtures", family)
+	}
+	return root, count
 }
 
 func behavioralIntentHeldOutReadyCorpus(t *testing.T) (string, int) {
@@ -364,7 +426,7 @@ func closedLoopFailureSummary(report closedloopsynthesis.Report) string {
 			lines = append(lines, fmt.Sprintf("%s final variable %s=%.12g", candidate.Fingerprint, variable.ID, variable.Value))
 		}
 		for _, decision := range attempt.ModelDecisions {
-			lines = append(lines, fmt.Sprintf("%s model %s/%s %s parameters=%v", candidate.Fingerprint, decision.Component, decision.Family, decision.Claim.ModelID, decision.Claim.Parameters))
+			lines = append(lines, fmt.Sprintf("%s model %s/%s %s status=%s analyses=%v reason=%s parameters=%v", candidate.Fingerprint, decision.Component, decision.Family, decision.Claim.ModelID, decision.Status, decision.RequiredAnalyses, decision.Reason, decision.Claim.Parameters))
 		}
 		for _, diagnostic := range attempt.Diagnostics {
 			lines = append(lines, fmt.Sprintf("%s %s: %s", candidate.Fingerprint, diagnostic.Path, diagnostic.Message))

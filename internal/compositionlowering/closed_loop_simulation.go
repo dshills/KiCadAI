@@ -840,19 +840,26 @@ func operatingHarnessDevices(requirement architecturesearch.Requirement, binding
 			}
 		}
 	}
-	if !needsHarness {
-		return nil, nil
-	}
 	targets := map[string]string{}
 	for _, binding := range bindings {
 		targets[binding.Kind+"\x00"+binding.ID] = binding.Target
 	}
 	ground := targets["domain\x00"+firstReferenceDomain(requirement)]
+	controlHarness, err := participantControlOutputHarnessDevices(requirement, targets, ground, resolvedPlan, analysisKind)
+	if err != nil {
+		return nil, err
+	}
+	if !needsHarness {
+		return controlHarness, nil
+	}
 	if ground == "" {
 		return nil, fmt.Errorf("catalog-backed operating loads require one resolved reference domain")
 	}
 	seen := map[string]bool{}
-	var result []operatingHarnessDevice
+	result := append([]operatingHarnessDevice(nil), controlHarness...)
+	for _, entry := range result {
+		seen[entry.Device.InstanceID] = true
+	}
 	for _, operatingCase := range requirement.Requirements.OperatingCases {
 		for _, condition := range operatingCase.Conditions {
 			var catalogID string
@@ -913,6 +920,82 @@ func operatingHarnessDevices(requirement architecturesearch.Requirement, binding
 				entry.DefaultValue, entry.HasDefaultValue = maximumPositiveOperatingValue(condition)
 			}
 			result = append(result, entry)
+		}
+	}
+	slices.SortStableFunc(result, func(left, right operatingHarnessDevice) int {
+		return strings.Compare(left.Device.InstanceID, right.Device.InstanceID)
+	})
+	return result, nil
+}
+
+func participantControlOutputHarnessDevices(requirement architecturesearch.Requirement, targets map[string]string, ground string, resolvedPlan *simmodel.Plan, analysisKind string) ([]operatingHarnessDevice, error) {
+	participants := map[string]architecturesearch.Participant{}
+	for _, participant := range requirement.Requirements.Participants {
+		participants[participant.ID] = participant
+	}
+	domains := map[string]architecturesearch.Domain{}
+	for _, domain := range requirement.Requirements.Domains {
+		domains[domain.ID] = domain
+	}
+	seen := map[string]bool{}
+	var result []operatingHarnessDevice
+	for _, objective := range requirement.Requirements.Objectives {
+		for _, binding := range objective.Bindings {
+			if binding.Role != "control" || binding.Participant == "" || binding.ParticipantPort == "" {
+				continue
+			}
+			participant, ok := participants[binding.Participant]
+			if !ok {
+				return nil, fmt.Errorf("control binding references unknown participant %q", binding.Participant)
+			}
+			var port architecturesearch.ParticipantPort
+			found := false
+			for _, candidate := range participant.RequiredPorts {
+				if candidate.ID == binding.ParticipantPort {
+					port, found = candidate, true
+					break
+				}
+			}
+			if !found || port.Direction != "source" || (port.Kind != "digital_logic" && port.Kind != "analog_control") {
+				continue
+			}
+			if port.Protocol != nil && strings.TrimSpace(port.Protocol.Mode) != "" && !strings.EqualFold(strings.TrimSpace(port.Protocol.Mode), "push_pull") {
+				continue
+			}
+			if ground == "" {
+				return nil, fmt.Errorf("participant control-output harness requires one resolved reference domain")
+			}
+			semanticID := participant.ID + "." + port.ID
+			target := targets["participant_port\x00"+semanticID]
+			if target == "" || target == ground {
+				return nil, fmt.Errorf("participant control output %q does not resolve to a non-reference semantic net", semanticID)
+			}
+			if resolvedPlan != nil && planHasVoltageSourceAtNode(*resolvedPlan, target) {
+				continue
+			}
+			instanceID := closedloopsynthesis.OperatingHarnessComponentID("participant_output", semanticID)
+			if seen[instanceID] {
+				continue
+			}
+			high := domains[participant.Domain].NominalVoltageV
+			if !finiteArchitectureValue(high) || high <= 0 {
+				return nil, fmt.Errorf("participant control output %q requires a positive nominal domain voltage", semanticID)
+			}
+			if analysisKind == simmodel.AnalysisStartup {
+				high = 0
+			}
+			seen[instanceID] = true
+			result = append(result, operatingHarnessDevice{
+				Source: true, DefaultValue: high, HasDefaultValue: true,
+				Device: circuitgraph.SimulationHarnessDevice{
+					InstanceID: instanceID,
+					CatalogID:  "source.voltage.connector.1x02",
+					Connections: []simmodel.ConnectionEvidence{
+						{Function: "POSITIVE", Net: target},
+						{Function: "NEGATIVE", Net: ground},
+					},
+				},
+			})
 		}
 	}
 	slices.SortStableFunc(result, func(left, right operatingHarnessDevice) int {
@@ -1164,7 +1247,7 @@ func addOperatingHarnessExcitations(intent *simmodel.Intent, harness []operating
 					excitation.PulseInitialValue = 0
 					excitation.PulseValue = entry.DefaultValue
 					excitation.PulseDelayS = 2 * analysis.TimeStepS
-					excitation.PulseWidthS = analysis.DurationS - excitation.PulseDelayS
+					excitation.PulseWidthS = analysis.DurationS
 					excitation.PulsePeriodS = analysis.DurationS + analysis.TimeStepS
 				}
 			}
@@ -1368,6 +1451,11 @@ func derivedGraphWorkflowIntent(requirement architecturesearch.Requirement, base
 			}
 		}
 		analysis.DurationS, analysis.TimeStepS = boundedBehavioralDynamicGrid(analysis.DurationS, analysis.TimeStepS)
+		if kind == simmodel.AnalysisTransient {
+			if err := configureAutonomousTransientSupplyStep(requirement, base, &analysis); err != nil {
+				return simmodel.Intent{}, err
+			}
+		}
 		if len(analysis.Excitations) == 0 {
 			return simmodel.Intent{}, fmt.Errorf("dynamic analysis has no catalog-backed source excitation")
 		}
@@ -1415,6 +1503,107 @@ func derivedGraphWorkflowIntent(requirement architecturesearch.Requirement, base
 		}
 	}
 	return simmodel.Intent{ModelID: modelID, Analyses: []simmodel.Analysis{analysis}, Assertions: []simmodel.Assertion{assertion}}, nil
+}
+
+func configureAutonomousTransientSupplyStep(requirement architecturesearch.Requirement, base simmodel.Plan, analysis *simmodel.Analysis) error {
+	hasAutonomousCurrentRegulator := slices.ContainsFunc(base.Devices, func(device simmodel.ResolvedDevice) bool {
+		return device.PrimitiveModel == simmodel.PrimitiveProgrammableCurrentSourceV1
+	})
+	if !hasAutonomousCurrentRegulator {
+		return nil
+	}
+	needsEdge := false
+	for _, behavior := range requirement.Requirements.BehavioralRequirements {
+		if behavior.Analysis != simmodel.AnalysisTransient {
+			continue
+		}
+		switch behavior.Metric {
+		case "rise_time", "fall_time", "settling_time", "response_time":
+			needsEdge = true
+		}
+	}
+	if !needsEdge || simulationAnalysisHasDynamicExcitation(*analysis) {
+		return nil
+	}
+	voltageSources := map[string]string{}
+	reachableSupplyNets := autonomousCurrentRegulatorSupplyNets(base)
+	for _, device := range base.Devices {
+		switch device.PrimitiveModel {
+		case simmodel.PrimitiveVoltageSourceV1, simmodel.PrimitiveConnectorVoltageSourceV1:
+			positive := resolvedDeviceTerminalNet(device, "POSITIVE")
+			if positive == "" {
+				positive = resolvedDeviceTerminalNet(device, "PIN_1")
+			}
+			voltageSources[device.Component] = positive
+		}
+	}
+	var candidates []int
+	for index, excitation := range analysis.Excitations {
+		if reachableSupplyNets[voltageSources[excitation.Component]] && excitation.DCValue != 0 {
+			candidates = append(candidates, index)
+		}
+	}
+	if len(candidates) != 1 {
+		return fmt.Errorf("autonomous edge-response analysis requires exactly one bounded DC source electrically upstream of the programmable current source")
+	}
+	index := candidates[0]
+	value := analysis.Excitations[index].DCValue
+	delay := 2 * analysis.TimeStepS
+	if delay >= analysis.DurationS {
+		return fmt.Errorf("autonomous edge-response analysis has no bounded pulse window")
+	}
+	analysis.Excitations[index].DCValue = 0
+	analysis.Excitations[index].PulseInitialValue = 0
+	analysis.Excitations[index].PulseValue = value
+	analysis.Excitations[index].PulseDelayS = delay
+	analysis.Excitations[index].PulseWidthS = analysis.DurationS
+	analysis.Excitations[index].PulsePeriodS = analysis.DurationS + analysis.TimeStepS
+	return nil
+}
+
+func autonomousCurrentRegulatorSupplyNets(base simmodel.Plan) map[string]bool {
+	reachable := map[string]bool{}
+	for _, device := range base.Devices {
+		if device.PrimitiveModel == simmodel.PrimitiveProgrammableCurrentSourceV1 {
+			if input := resolvedDeviceTerminalNet(device, "IN"); input != "" {
+				reachable[input] = true
+			}
+		}
+	}
+	changed := true
+	for changed {
+		changed = false
+		for _, device := range base.Devices {
+			if device.PrimitiveModel != simmodel.PrimitivePMOSSwitchV1 {
+				continue
+			}
+			drain := resolvedDeviceTerminalNet(device, "DRAIN")
+			source := resolvedDeviceTerminalNet(device, "SOURCE")
+			if reachable[drain] && source != "" && !reachable[source] {
+				reachable[source] = true
+				changed = true
+			}
+		}
+	}
+	return reachable
+}
+
+func resolvedDeviceTerminalNet(device simmodel.ResolvedDevice, terminal string) string {
+	for _, binding := range device.Terminals {
+		if strings.EqualFold(binding.Terminal, terminal) {
+			return binding.Net
+		}
+	}
+	return ""
+}
+
+func simulationAnalysisHasDynamicExcitation(analysis simmodel.Analysis) bool {
+	for _, excitation := range analysis.Excitations {
+		if excitation.PulsePeriodS > 0 || excitation.SineFrequencyHz > 0 {
+			return true
+		}
+	}
+	return false
 }
 
 func derivedBehavioralDistortionAnalysis(requirement architecturesearch.Requirement, base simmodel.Plan, analysis simmodel.Analysis, primaryInputNode string, inputSourceFallback ...string) (simmodel.Analysis, error) {
@@ -1668,14 +1857,15 @@ func deviceHasThermalPath(device simmodel.ResolvedDevice) bool {
 }
 
 func behavioralDynamicGrid(requirement architecturesearch.Requirement, kind string) (float64, float64) {
-	referenceTime := 1e-6
+	referenceTime := math.Inf(1)
 	for _, behavior := range requirement.Requirements.BehavioralRequirements {
 		if behavior.Analysis != kind || behavior.Unit != "s" || behavior.Max == nil || *behavior.Max <= 0 {
 			continue
 		}
-		if referenceTime <= 0 || *behavior.Max < referenceTime {
-			referenceTime = *behavior.Max
-		}
+		referenceTime = math.Min(referenceTime, *behavior.Max)
+	}
+	if !finiteArchitectureValue(referenceTime) {
+		referenceTime = 1e-6
 	}
 	timeStep := math.Max(1e-9, referenceTime/20)
 	duration := math.Max(referenceTime*20, timeStep*100)

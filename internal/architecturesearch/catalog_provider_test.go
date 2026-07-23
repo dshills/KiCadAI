@@ -168,6 +168,16 @@ func TestCatalogProviderUsesDefaultOffHighSideSwitchForLowStartupOutput(t *testi
 	if !slices.ContainsFunc(realization.Instances, func(instance RealizationInstance) bool { return instance.CatalogID == "mosfet.onsemi.fqp47p06.to220" }) {
 		t.Fatalf("startup-safe load did not select a trusted high-side PMOS: %#v", realization.Instances)
 	}
+	if !slices.ContainsFunc(realization.Instances, func(instance RealizationInstance) bool {
+		return instance.Usage == "series_gate_overvoltage_clamp"
+	}) {
+		t.Fatalf("full gate swing exceeds the selected PMOS rating without a synthesized series clamp: %#v", realization.Instances)
+	}
+	if !slices.ContainsFunc(expansions[0].Calculations, func(calculation CalculationEvidence) bool {
+		return calculation.ID == "high_side_switch_derating" && calculation.Pass
+	}) {
+		t.Fatalf("startup-safe load lacks passing gate-drive derating evidence: %#v", expansions[0].Calculations)
+	}
 	seenOutput := false
 	for _, binding := range realization.PortBindings {
 		if (binding.Role == "power" || binding.Role == "load_power") && (binding.Instance != "high_side_switch" || binding.Function != "SOURCE") {

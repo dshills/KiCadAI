@@ -146,8 +146,8 @@ func validateSemanticBindings(bindings []SemanticBinding) (map[string]string, []
 	var diagnostics []Diagnostic
 	for index, binding := range bindings {
 		path := fmt.Sprintf("bindings[%d]", index)
-		if binding.Kind != "port" && binding.Kind != "signal" && binding.Kind != "domain" {
-			diagnostics = append(diagnostics, Diagnostic{Path: path + ".kind", Message: "semantic binding kind must be port, signal, or domain"})
+		if binding.Kind != "port" && binding.Kind != "signal" && binding.Kind != "domain" && binding.Kind != "participant_port" {
+			diagnostics = append(diagnostics, Diagnostic{Path: path + ".kind", Message: "semantic binding kind must be port, signal, domain, or participant_port"})
 		}
 		if binding.ID == "" || binding.Target == "" {
 			diagnostics = append(diagnostics, Diagnostic{Path: path, Message: "semantic binding requires identity and resolved target"})

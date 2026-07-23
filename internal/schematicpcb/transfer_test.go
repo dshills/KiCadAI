@@ -434,6 +434,21 @@ func TestVerifiedTransferSOT223PreservesDuplicateOutputPads(t *testing.T) {
 	}
 }
 
+func TestVerifiedTransferSOT223PreservesSeparateOutputTab(t *testing.T) {
+	pads, ok := verifiedTransferPadSpecs("Package_TO_SOT_SMD:SOT-223", map[string]string{"1": "SET", "2": "OUT", "3": "IN", "4": "OUT"})
+	if !ok || len(pads) != 4 {
+		t.Fatalf("SOT-223 pads = %#v ok=%v, want four verified copper shapes", pads, ok)
+	}
+	if pads[0].XMM != -3.15 || pads[0].YMM != -2.3 || pads[3].XMM != 3.15 || pads[3].WidthMM != 2 || pads[3].HeightMM != 3.8 {
+		t.Fatalf("SOT-223 geometry = %#v", pads)
+	}
+	for _, index := range []int{1, 3} {
+		if pads[index].Net == nil || *pads[index].Net != "OUT" {
+			t.Fatalf("SOT-223 output pad %d = %#v, want OUT net hint", index, pads[index])
+		}
+	}
+}
+
 func TestFromDesignFallsBackToVerifiedTemplatesWhenIndexMissesFootprint(t *testing.T) {
 	trueValue := true
 	point := func(x, y float64) kicadfiles.Point {

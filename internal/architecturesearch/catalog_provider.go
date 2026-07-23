@@ -25,6 +25,7 @@ var catalogProviderCapabilities = []string{
 	"class_a_amplification",
 	"class_ab_bias_control",
 	"class_ab_output_stage",
+	"constant_current_regulation",
 	"current_sensing",
 	"environment_sensor",
 	"fault_indication",
@@ -48,14 +49,19 @@ var catalogProviderCapabilities = []string{
 }
 
 type CatalogProvider struct {
-	catalog *components.Catalog
+	catalog            *components.Catalog
+	alternativeRecords []components.ComponentRecord
 }
 
 func NewCatalogProvider(catalog *components.Catalog) (*CatalogProvider, error) {
 	if catalog == nil {
 		return nil, fmt.Errorf("catalog provider requires a component catalog")
 	}
-	return &CatalogProvider{catalog: catalog}, nil
+	alternativeRecords := slices.Clone(catalog.Records)
+	slices.SortFunc(alternativeRecords, func(left, right components.ComponentRecord) int {
+		return strings.Compare(left.ID, right.ID)
+	})
+	return &CatalogProvider{catalog: catalog, alternativeRecords: alternativeRecords}, nil
 }
 
 func NewCatalogRegistry(catalog *components.Catalog) (*Registry, []reports.Issue) {
@@ -124,6 +130,8 @@ func (provider *CatalogProvider) Expand(ctx context.Context, request ProviderReq
 		return provider.expandSignalAmplification(ctx, request)
 	case "current_sensing":
 		return provider.expandCurrentSensing(ctx, request)
+	case "constant_current_regulation":
+		return provider.expandConstantCurrentRegulation(ctx, request)
 	case "mute_control":
 		return provider.expandMuteControl(ctx, request)
 	case "class_ab_bias_control":
@@ -512,10 +520,20 @@ func (provider *CatalogProvider) expandLoadSwitch(ctx context.Context, request P
 }
 
 func (provider *CatalogProvider) expandHighSideLoadSwitch(ctx context.Context, request ProviderRequest, voltage, current float64, temperatureRequirement *components.TemperatureRequirement) ([]ProviderExpansion, error) {
-	selection, err := provider.selectComponentWithTemperature(ctx, "mosfet", "p_channel", []components.RequiredRating{
+	baseRatings := []components.RequiredRating{
 		{Kind: "drain_source_voltage", Value: numericString(voltage / catalogRatingDeratingFactor), Unit: "V"},
 		{Kind: "drain_current", Value: numericString(current / catalogRatingDeratingFactor), Unit: "A"},
-	}, true, temperatureRequirement)
+	}
+	unclampedRatings := append(slices.Clone(baseRatings), components.RequiredRating{
+		Kind: "gate_source_voltage", Value: numericString(voltage / catalogRatingDeratingFactor), Unit: "V",
+	})
+	selection, err := provider.selectComponentMinimizingRatingsWithTemperature(ctx, "mosfet", "p_channel", unclampedRatings, true, temperatureRequirement, []string{"drain_source_voltage", "drain_current"})
+	gateClampRequired := err != nil
+	if err != nil {
+		// A part that cannot tolerate the full source-referenced gate swing is
+		// eligible only through the bounded series-Zener clamp path below.
+		selection, err = provider.selectComponentMinimizingRatingsWithTemperature(ctx, "mosfet", "p_channel", baseRatings, true, temperatureRequirement, []string{"drain_source_voltage", "drain_current"})
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -549,7 +567,7 @@ func (provider *CatalogProvider) expandHighSideLoadSwitch(ctx context.Context, r
 	gateSeriesResistance := 100.0
 	clampVoltage := 0.0
 	var clamps []catalogPart
-	if voltage > gateRated*catalogRatingDeratingFactor {
+	if gateClampRequired || voltage > gateRated*catalogRatingDeratingFactor {
 		clamp, clampErr := provider.selectComponentWithTemperature(ctx, "diode", "zener", nil, true, temperatureRequirement)
 		if clampErr != nil {
 			return nil, clampErr
@@ -598,13 +616,13 @@ func (provider *CatalogProvider) expandHighSideLoadSwitch(ctx context.Context, r
 	if !gateChargeOK {
 		gateCharge, gateChargeOK = recordValue(selection.record, "total_gate_charge", "C")
 	}
-	driveHeadroom := voltage - clampVoltage
-	if clampVoltage == 0 {
-		driveHeadroom = voltage
-	}
+	driveHeadroom := gateDriveVoltage
 	if !gateChargeOK || driveHeadroom <= 0 {
 		return nil, fmt.Errorf("selected high-side switch lacks gate-charge or bounded sink-current evidence")
 	}
+	// This is a deterministic first-order estimate from reviewed total gate
+	// charge and the bounded resistive drive; it is not a waveform-level
+	// Miller-plateau model.
 	gateResponse, err := ObservedCalculation("high_side_switch_response", NamedQuantity{Name: "response_time", Value: gateCharge * gateSeriesResistance / driveHeadroom, Unit: "s"})
 	if err != nil {
 		return nil, err
@@ -1222,11 +1240,15 @@ func recordSupportsRatings(record components.ComponentRecord, required []compone
 }
 
 type catalogPart struct {
-	selected SelectedComponent
-	record   components.ComponentRecord
-	usage    string
-	value    string
-	evidence ContractEvidence
+	selected             SelectedComponent
+	record               components.ComponentRecord
+	usage                string
+	value                string
+	evidence             ContractEvidence
+	toleranceKind        string
+	maximumTolerance     float64
+	toleranceUnit        string
+	maximumTempcoPPMPerC float64
 }
 
 type passivePart struct{ id, family, usage, value string }
@@ -1257,6 +1279,236 @@ func (provider *CatalogProvider) selectComponentWithRequirements(ctx context.Con
 		selected: SelectedComponent{InstanceID: canonicalIdentifier(family), CatalogID: selection.Component.ID, VariantID: selection.Variant.ID, Evidence: evidence.Confidence},
 		record:   selection.Component, usage: canonicalIdentifier(family), evidence: evidence,
 	}, nil
+}
+
+func (provider *CatalogProvider) selectComponentMinimizingRatingsWithTemperature(ctx context.Context, family, text string, ratings []components.RequiredRating, concrete bool, temperature *components.TemperatureRequirement, ratingKinds []string) (catalogPart, error) {
+	request := components.SelectionRequest{
+		Query:               components.Query{Text: text, Family: family, MinimumConfidence: components.ConfidenceRuleInferred, Limit: 64},
+		Acceptance:          components.AcceptanceStructural,
+		AllowAlternatives:   true,
+		RequiredRatings:     ratings,
+		RequiredTemperature: temperature,
+		RequireConcrete:     concrete,
+	}
+	candidates, result := components.Find(ctx, provider.catalog, request.Query)
+	if !result.OK {
+		return catalogPart{}, fmt.Errorf("no catalog-backed %s satisfies normalized ratings: %v", family, result.Issues)
+	}
+	type eligible struct {
+		candidate components.Candidate
+		resolved  components.ResolvedComponent
+		values    []float64
+	}
+	var choices []eligible
+	for _, candidate := range candidates {
+		resolved, resolveResult := components.ResolveBinding(ctx, provider.catalog, candidate.ComponentID, candidate.VariantID)
+		if !resolveResult.OK || !components.ValidateResolvedComponent(resolved, request).OK {
+			continue
+		}
+		values := make([]float64, len(ratingKinds))
+		complete := true
+		for index, ratingKind := range ratingKinds {
+			value, ok := catalogMaximumRating(resolved.Component, ratingKind)
+			if !ok {
+				complete = false
+				break
+			}
+			values[index] = value
+		}
+		if !complete {
+			continue
+		}
+		choices = append(choices, eligible{candidate: candidate, resolved: resolved, values: values})
+	}
+	slices.SortStableFunc(choices, func(left, right eligible) int {
+		for index := range left.values {
+			if left.values[index] < right.values[index] {
+				return -1
+			}
+			if left.values[index] > right.values[index] {
+				return 1
+			}
+		}
+		if order := strings.Compare(left.candidate.ComponentID, right.candidate.ComponentID); order != 0 {
+			return order
+		}
+		return strings.Compare(left.candidate.VariantID, right.candidate.VariantID)
+	})
+	if len(choices) == 0 {
+		return catalogPart{}, fmt.Errorf("no catalog-backed %s satisfies normalized ratings with positive maxima for %s", family, strings.Join(ratingKinds, ", "))
+	}
+	selected := choices[0]
+	evidence := componentEvidence(selected.resolved.Component, selected.candidate.Confidence)
+	return catalogPart{
+		selected: SelectedComponent{InstanceID: canonicalIdentifier(family), CatalogID: selected.resolved.Component.ID, VariantID: selected.resolved.Variant.ID, Evidence: evidence.Confidence},
+		record:   selected.resolved.Component, usage: canonicalIdentifier(family), evidence: evidence,
+	}, nil
+}
+
+func catalogMaximumRating(record components.ComponentRecord, kind string) (float64, bool) {
+	for _, rating := range record.Ratings {
+		if rating.Kind != kind || rating.Max == "" {
+			continue
+		}
+		value, err := strconv.ParseFloat(rating.Max, 64)
+		if err == nil && finitePositive(value) {
+			return value, true
+		}
+	}
+	return 0, false
+}
+
+func (provider *CatalogProvider) selectComponentMinimizingModelParameterWithTemperature(ctx context.Context, family, text string, ratings []components.RequiredRating, concrete bool, temperature *components.TemperatureRequirement, thermal *components.ThermalRequirement, modelID, parameter string, parameterMaximums map[string]float64) (catalogPart, error) {
+	request := components.SelectionRequest{
+		Query:               components.Query{Text: text, Family: family, MinimumConfidence: components.ConfidenceRuleInferred, Limit: 64},
+		Acceptance:          components.AcceptanceStructural,
+		AllowAlternatives:   true,
+		RequiredRatings:     ratings,
+		RequiredTemperature: temperature,
+		RequiredThermal:     thermal,
+		RequireConcrete:     concrete,
+	}
+	candidates, result := components.Find(ctx, provider.catalog, request.Query)
+	if !result.OK {
+		return catalogPart{}, fmt.Errorf("no catalog-backed %s satisfies normalized ratings: %v", family, result.Issues)
+	}
+	type eligible struct {
+		candidate components.Candidate
+		resolved  components.ResolvedComponent
+		value     float64
+	}
+	var choices []eligible
+	for _, candidate := range candidates {
+		resolved, resolveResult := components.ResolveBinding(ctx, provider.catalog, candidate.ComponentID, candidate.VariantID)
+		if !resolveResult.OK || !components.ValidateResolvedComponent(resolved, request).OK {
+			continue
+		}
+		value, ok := catalogSimulationParameterForModel(resolved.Component, modelID, parameter)
+		if !ok || !finitePositive(value) {
+			continue
+		}
+		compatible := true
+		for boundedParameter, maximum := range parameterMaximums {
+			boundedValue, boundedOK := catalogSimulationParameterForModel(resolved.Component, modelID, boundedParameter)
+			if !boundedOK || !finitePositive(boundedValue) || boundedValue > maximum {
+				compatible = false
+				break
+			}
+		}
+		if !compatible {
+			continue
+		}
+		choices = append(choices, eligible{candidate: candidate, resolved: resolved, value: value})
+	}
+	slices.SortStableFunc(choices, func(left, right eligible) int {
+		if left.value < right.value {
+			return -1
+		}
+		if left.value > right.value {
+			return 1
+		}
+		if order := strings.Compare(left.candidate.ComponentID, right.candidate.ComponentID); order != 0 {
+			return order
+		}
+		return strings.Compare(left.candidate.VariantID, right.candidate.VariantID)
+	})
+	if len(choices) == 0 {
+		return catalogPart{}, fmt.Errorf("no catalog-backed %s satisfies normalized ratings with a positive %s.%s model parameter", family, modelID, parameter)
+	}
+	selected := choices[0]
+	evidence := componentEvidence(selected.resolved.Component, selected.candidate.Confidence)
+	return catalogPart{
+		selected: SelectedComponent{InstanceID: canonicalIdentifier(family), CatalogID: selected.resolved.Component.ID, VariantID: selected.resolved.Variant.ID, Evidence: evidence.Confidence},
+		record:   selected.resolved.Component, usage: canonicalIdentifier(family), evidence: evidence,
+	}, nil
+}
+
+func (provider *CatalogProvider) selectComponentMinimizingModelUncertaintyWithTemperature(ctx context.Context, family, text string, ratings []components.RequiredRating, concrete bool, temperature *components.TemperatureRequirement, thermal *components.ThermalRequirement, modelID, parameter, uncertaintyTarget string, parameterMaximums map[string]float64) (catalogPart, error) {
+	request := components.SelectionRequest{
+		Query:               components.Query{Text: text, Family: family, MinimumConfidence: components.ConfidenceRuleInferred, Limit: 64},
+		Acceptance:          components.AcceptanceStructural,
+		AllowAlternatives:   true,
+		RequiredRatings:     ratings,
+		RequiredTemperature: temperature,
+		RequiredThermal:     thermal,
+		RequireConcrete:     concrete,
+	}
+	candidates, result := components.Find(ctx, provider.catalog, request.Query)
+	if !result.OK {
+		return catalogPart{}, fmt.Errorf("no catalog-backed %s satisfies normalized ratings: %v", family, result.Issues)
+	}
+	type eligible struct {
+		candidate components.Candidate
+		resolved  components.ResolvedComponent
+		radius    float64
+	}
+	var choices []eligible
+	for _, candidate := range candidates {
+		resolved, resolveResult := components.ResolveBinding(ctx, provider.catalog, candidate.ComponentID, candidate.VariantID)
+		if !resolveResult.OK || !components.ValidateResolvedComponent(resolved, request).OK {
+			continue
+		}
+		radius, ok := catalogModelUncertaintyRadius(resolved.Component, modelID, parameter, uncertaintyTarget)
+		if !ok {
+			continue
+		}
+		compatible := true
+		for boundedParameter, maximum := range parameterMaximums {
+			value, valueOK := catalogSimulationParameterForModel(resolved.Component, modelID, boundedParameter)
+			if !valueOK || value > maximum {
+				compatible = false
+				break
+			}
+		}
+		if compatible {
+			choices = append(choices, eligible{candidate: candidate, resolved: resolved, radius: radius})
+		}
+	}
+	slices.SortStableFunc(choices, func(left, right eligible) int {
+		if left.radius < right.radius {
+			return -1
+		}
+		if left.radius > right.radius {
+			return 1
+		}
+		if order := strings.Compare(left.candidate.ComponentID, right.candidate.ComponentID); order != 0 {
+			return order
+		}
+		return strings.Compare(left.candidate.VariantID, right.candidate.VariantID)
+	})
+	if len(choices) == 0 {
+		return catalogPart{}, fmt.Errorf("no catalog-backed %s satisfies normalized ratings with bounded %s uncertainty", family, uncertaintyTarget)
+	}
+	selected := choices[0]
+	evidence := componentEvidence(selected.resolved.Component, selected.candidate.Confidence)
+	return catalogPart{
+		selected: SelectedComponent{InstanceID: canonicalIdentifier(family), CatalogID: selected.resolved.Component.ID, VariantID: selected.resolved.Variant.ID, Evidence: evidence.Confidence},
+		record:   selected.resolved.Component, usage: canonicalIdentifier(family), evidence: evidence,
+	}, nil
+}
+
+func catalogModelUncertaintyRadius(record components.ComponentRecord, modelID, parameter, target string) (float64, bool) {
+	for _, model := range record.SimulationModels {
+		if model.ModelID != modelID {
+			continue
+		}
+		nominal, nominalOK := 0.0, false
+		for _, candidate := range model.Parameters {
+			if candidate.Name == parameter && finiteNumbers(candidate.Value) {
+				nominal, nominalOK = candidate.Value, true
+				break
+			}
+		}
+		if !nominalOK {
+			return 0, false
+		}
+		for _, uncertainty := range model.Uncertainties {
+			if uncertainty.Target == target && finiteNumbers(uncertainty.Minimum, uncertainty.Maximum) && uncertainty.Maximum >= uncertainty.Minimum {
+				return math.Max(math.Abs(uncertainty.Minimum-nominal), math.Abs(uncertainty.Maximum-nominal)), true
+			}
+		}
+	}
+	return 0, false
 }
 
 func (provider *CatalogProvider) selectRegulatorWithDropout(ctx context.Context, text string, ratings []components.RequiredRating, availableHeadroomV float64) (catalogPart, error) {
@@ -1317,8 +1569,18 @@ func regulatorDropoutCalculation(inputMinimumV, outputV float64, record componen
 }
 
 func (provider *CatalogProvider) appendPassiveParts(ctx context.Context, parts []catalogPart, requested []passivePart) ([]catalogPart, error) {
+	return provider.appendPassivePartsWithTolerances(ctx, parts, requested, nil, 0)
+}
+
+func (provider *CatalogProvider) appendPassivePartsWithTolerances(ctx context.Context, parts []catalogPart, requested []passivePart, maximumTolerancePercent map[string]float64, maximumTempcoPPMPerC float64) ([]catalogPart, error) {
 	for _, passive := range requested {
-		part, err := provider.selectComponent(ctx, passive.family, "", nil, false)
+		var part catalogPart
+		var err error
+		if maximum := maximumTolerancePercent[passive.id]; maximum > 0 {
+			part, err = provider.selectComponentWithTolerance(ctx, passive.family, "resistance", maximum, "%", maximumTempcoPPMPerC)
+		} else {
+			part, err = provider.selectComponent(ctx, passive.family, "", nil, false)
+		}
 		if err != nil {
 			return nil, err
 		}
@@ -1328,6 +1590,83 @@ func (provider *CatalogProvider) appendPassiveParts(ctx context.Context, parts [
 		parts = append(parts, part)
 	}
 	return parts, nil
+}
+
+func (provider *CatalogProvider) selectComponentWithTolerance(ctx context.Context, family, toleranceKind string, maximumTolerance float64, toleranceUnit string, maximumTempcoPPMPerC float64) (catalogPart, error) {
+	request := components.SelectionRequest{
+		Query: components.Query{
+			Family: family, ToleranceKind: toleranceKind, MaximumTolerance: maximumTolerance,
+			ToleranceUnit: toleranceUnit, MinimumConfidence: components.ConfidenceRuleInferred, Limit: 64,
+		},
+		Acceptance: components.AcceptanceStructural, AllowAlternatives: true,
+	}
+	candidates, result := components.Find(ctx, provider.catalog, request.Query)
+	if !result.OK {
+		return catalogPart{}, fmt.Errorf("no catalog-backed %s satisfies maximum %g %s %s tolerance: %v", family, maximumTolerance, toleranceUnit, toleranceKind, result.Issues)
+	}
+	type eligible struct {
+		candidate components.Candidate
+		resolved  components.ResolvedComponent
+		tolerance float64
+	}
+	var choices []eligible
+	for _, candidate := range candidates {
+		resolved, resolveResult := components.ResolveBinding(ctx, provider.catalog, candidate.ComponentID, candidate.VariantID)
+		if !resolveResult.OK || !components.ValidateResolvedComponent(resolved, request).OK {
+			continue
+		}
+		tolerance, ok := catalogToleranceMaximum(resolved.Component, toleranceKind, toleranceUnit)
+		if !ok || tolerance > maximumTolerance {
+			continue
+		}
+		if maximumTempcoPPMPerC > 0 {
+			tempco, tempcoOK := recordValueMaximum(resolved.Component, "temperature_coefficient", "ppm/C")
+			if !tempcoOK || tempco > maximumTempcoPPMPerC {
+				continue
+			}
+		}
+		choices = append(choices, eligible{candidate: candidate, resolved: resolved, tolerance: tolerance})
+	}
+	slices.SortStableFunc(choices, func(left, right eligible) int {
+		if left.tolerance < right.tolerance {
+			return -1
+		}
+		if left.tolerance > right.tolerance {
+			return 1
+		}
+		if order := strings.Compare(left.candidate.ComponentID, right.candidate.ComponentID); order != 0 {
+			return order
+		}
+		return strings.Compare(left.candidate.VariantID, right.candidate.VariantID)
+	})
+	if len(choices) == 0 {
+		return catalogPart{}, fmt.Errorf("no catalog-backed %s proves maximum %g %s %s tolerance", family, maximumTolerance, toleranceUnit, toleranceKind)
+	}
+	selected := choices[0]
+	evidence := componentEvidence(selected.resolved.Component, selected.candidate.Confidence)
+	return catalogPart{
+		selected: SelectedComponent{InstanceID: canonicalIdentifier(family), CatalogID: selected.resolved.Component.ID, VariantID: selected.resolved.Variant.ID, Evidence: evidence.Confidence},
+		record:   selected.resolved.Component, usage: canonicalIdentifier(family), evidence: evidence,
+		toleranceKind: toleranceKind, maximumTolerance: maximumTolerance, toleranceUnit: toleranceUnit,
+		maximumTempcoPPMPerC: maximumTempcoPPMPerC,
+	}, nil
+}
+
+func catalogToleranceMaximum(record components.ComponentRecord, kind, unit string) (float64, bool) {
+	for _, tolerance := range record.Tolerances {
+		if tolerance.Kind != kind || tolerance.Unit != unit {
+			continue
+		}
+		raw := tolerance.Max
+		if raw == "" {
+			raw = tolerance.Typ
+		}
+		value, err := strconv.ParseFloat(raw, 64)
+		if err == nil && finitePositive(value) {
+			return value, true
+		}
+	}
+	return 0, false
 }
 
 func (provider *CatalogProvider) expansion(request ProviderRequest, id string, parts []catalogPart, bindings []RealizationPortBinding, connections []RealizationConnection, calculations []CalculationEvidence, unproven int) ([]ProviderExpansion, error) {
@@ -1421,9 +1760,21 @@ func (provider *CatalogProvider) catalogAlternativePart(original catalogPart) (c
 		return catalogPart{}, false
 	}
 	requiredFunctions := catalogRecordFunctions(original.record)
-	for _, record := range provider.catalog.Records {
+	for _, record := range provider.alternativeRecords {
 		if record.ID == original.record.ID || record.Family != original.record.Family || !catalogRecordSupportsFunctions(record, requiredFunctions) {
 			continue
+		}
+		if original.maximumTolerance > 0 {
+			tolerance, ok := catalogToleranceMaximum(record, original.toleranceKind, original.toleranceUnit)
+			if !ok || tolerance > original.maximumTolerance {
+				continue
+			}
+		}
+		if original.maximumTempcoPPMPerC > 0 {
+			tempco, ok := recordValueMaximum(record, "temperature_coefficient", "ppm/C")
+			if !ok || tempco > original.maximumTempcoPPMPerC {
+				continue
+			}
 		}
 		valueKind := sharedCatalogValueKind(original.record, record)
 		if valueKind == "" {

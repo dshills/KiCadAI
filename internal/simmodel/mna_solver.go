@@ -241,6 +241,13 @@ func electricalDeviceResultsWithComparatorStates(plan Plan, analysis Analysis, f
 		case PrimitiveFloatingAdjustableRegulatorV1:
 			voltage = solvedNodeVoltage(system, solution, terminals["VOUT"]) - solvedNodeVoltage(system, solution, terminals["ADJ"])
 			current = solution[system.branchIndex[device.Component]]
+		case PrimitiveProgrammableCurrentSourceV1:
+			voltage = solvedNodeVoltage(system, solution, terminals["IN"]) - solvedNodeVoltage(system, solution, terminals["OUT"])
+			reference := namedValueMap(device.ModelParameters)["reference_current_a"]
+			current = solution[system.branchIndex[device.Component]] - complex(reference, 0)
+		case PrimitiveShuntVoltageReferenceV1:
+			voltage = solvedNodeVoltage(system, solution, terminals["CATHODE"]) - solvedNodeVoltage(system, solution, terminals["ANODE"])
+			current = solution[system.branchIndex[device.Component]]
 		case PrimitiveDualOutputIsolatedConverterV1:
 			positiveVoltage := solvedNodeVoltage(system, solution, terminals["VOUT_PLUS"]) - solvedNodeVoltage(system, solution, terminals["COMMON"])
 			negativeVoltage := solvedNodeVoltage(system, solution, terminals["VOUT_MINUS"]) - solvedNodeVoltage(system, solution, terminals["COMMON"])
@@ -441,7 +448,7 @@ func buildMNASystemWithOpAmpClamps(plan Plan, analysis Analysis, frequency float
 	branchIndex := map[string]int{}
 	multiBranchIndex := map[mnaBranchKey]int{}
 	for _, device := range plan.Devices {
-		if device.PrimitiveModel == PrimitiveVoltageSourceV1 || device.PrimitiveModel == PrimitiveConnectorVoltageSourceV1 || device.PrimitiveModel == PrimitiveOpAmpV1 || device.PrimitiveModel == PrimitiveCurrentSenseAmplifierV1 || device.PrimitiveModel == PrimitiveAdjustableLinearRegulatorV1 || device.PrimitiveModel == PrimitiveFixedLinearRegulatorV1 || device.PrimitiveModel == PrimitiveFloatingAdjustableRegulatorV1 {
+		if device.PrimitiveModel == PrimitiveVoltageSourceV1 || device.PrimitiveModel == PrimitiveConnectorVoltageSourceV1 || device.PrimitiveModel == PrimitiveOpAmpV1 || device.PrimitiveModel == PrimitiveCurrentSenseAmplifierV1 || device.PrimitiveModel == PrimitiveAdjustableLinearRegulatorV1 || device.PrimitiveModel == PrimitiveFixedLinearRegulatorV1 || device.PrimitiveModel == PrimitiveFloatingAdjustableRegulatorV1 || device.PrimitiveModel == PrimitiveProgrammableCurrentSourceV1 || device.PrimitiveModel == PrimitiveShuntVoltageReferenceV1 {
 			branchIndex[device.Component] = len(labels)
 			labels = append(labels, "branch_current:"+device.Component)
 		}
@@ -561,6 +568,22 @@ func buildMNASystemWithOpAmpClamps(plan Plan, analysis Analysis, frequency float
 			}
 			stampFloatingAdjustableRegulator(&system, device.Component, terminals, complex(reference, 0))
 			stampCurrentSource(&system, terminals["VIN"], terminals["ADJ"], complex(adjustmentCurrent, 0))
+		case PrimitiveProgrammableCurrentSourceV1:
+			parameters := namedValueMap(device.ModelParameters)
+			reference := parameters["reference_current_a"]
+			offset := parameters["offset_voltage_v"]
+			if smallSignalAnalysis(analysis.Kind) {
+				reference = 0
+				offset = 0
+			}
+			stampProgrammableCurrentSource(&system, device.Component, terminals, complex(offset, 0))
+			stampCurrentSource(&system, terminals["IN"], terminals["SET"], complex(reference, 0))
+		case PrimitiveShuntVoltageReferenceV1:
+			output := namedValueMap(device.ModelParameters)["output_voltage_v"]
+			if smallSignalAnalysis(analysis.Kind) {
+				output = 0
+			}
+			stampVoltageSource(&system, device.Component, terminals["CATHODE"], terminals["ANODE"], complex(output, 0))
 		case PrimitiveDualOutputIsolatedConverterV1:
 			parameters := namedValueMap(device.ModelParameters)
 			positive, negative := parameters["positive_output_voltage_v"], -parameters["negative_output_voltage_v"]
@@ -863,6 +886,25 @@ func stampFloatingAdjustableRegulator(system *mnaSystem, component string, termi
 		system.matrix[branch][index] -= 1
 	}
 	system.rhs[branch] += reference
+}
+
+// stampProgrammableCurrentSource models the power follower in a three-pin,
+// two-terminal programmable current source. The catalog-backed reference
+// current flows from IN through SET and its external resistor. This branch
+// forces OUT to the same voltage as SET while supplying the additional current
+// through the external OUT resistor. The physical two-terminal output is the
+// shared far end of those two resistors, so their solved ratio determines the
+// delivered current.
+func stampProgrammableCurrentSource(system *mnaSystem, component string, terminals map[string]string, offset complex128) {
+	branch := system.branchIndex[component]
+	stampBranchKCL(system, branch, terminals["OUT"], terminals["IN"])
+	if index, exists := system.nodeIndex[terminals["OUT"]]; exists {
+		system.matrix[branch][index] += 1
+	}
+	if index, exists := system.nodeIndex[terminals["SET"]]; exists {
+		system.matrix[branch][index] -= 1
+	}
+	system.rhs[branch] += offset
 }
 
 func stampBranchKCL(system *mnaSystem, branch int, positive, negative string) {

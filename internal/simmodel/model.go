@@ -26,6 +26,8 @@ const (
 	PrimitiveAdjustableLinearRegulatorV1        = "mna_adjustable_linear_regulator_v1"
 	PrimitiveFixedLinearRegulatorV1             = "mna_fixed_linear_regulator_v1"
 	PrimitiveFloatingAdjustableRegulatorV1      = "mna_floating_adjustable_regulator_v1"
+	PrimitiveProgrammableCurrentSourceV1        = "mna_programmable_current_source_v1"
+	PrimitiveShuntVoltageReferenceV1            = "mna_shunt_voltage_reference_v1"
 	PrimitiveDualOutputIsolatedConverterV1      = "mna_dual_output_isolated_converter_v1"
 	PrimitiveBidirectionalOpenDrainTranslatorV1 = "mna_bidirectional_open_drain_translator_v1"
 	PrimitiveBidirectionalTVSV1                 = "mna_bidirectional_tvs_piecewise_linear_v1"
@@ -74,6 +76,8 @@ const (
 	QuantityThresholdCurrentA    = "threshold_current_a"
 	QuantityHysteresisVoltageV   = "hysteresis_voltage_v"
 )
+
+const parameterForcedMOSFETState = "__forced_mosfet_state"
 
 type NamedValue struct {
 	Name  string  `json:"name"`
