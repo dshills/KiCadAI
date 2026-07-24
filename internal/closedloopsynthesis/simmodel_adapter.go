@@ -15,6 +15,8 @@ import (
 	"kicadai/internal/simmodel"
 )
 
+const maxPersistedAnalysisPoints = 512
+
 // SimulationResolver is the trusted boundary between a candidate state and a
 // fully resolved simulation plan. Implementations must apply every variable,
 // re-resolve catalog identities and connectivity, and return a fresh plan on
@@ -102,14 +104,15 @@ func (evaluator SimModelEvaluator) Evaluate(ctx context.Context, state Candidate
 		})
 	}
 	slices.SortStableFunc(measurements, compareMeasurements)
-	evidenceHash, err := simulationEvidenceHash(resolution, reports)
+	canonicalReports := cloneSimulationReports(reports)
+	evidenceHash, err := simulationEvidenceHash(resolution, canonicalReports)
 	if err != nil {
 		return Evaluation{}, fmt.Errorf("hash simulation evidence: %w", err)
 	}
 	return Evaluation{
 		EvidenceHash: evidenceHash, Measurements: measurements,
 		ModelDecisions: cloneModelDecisions(resolution.ModelDecisions),
-		Simulation:     &SimulationEvidence{Resolution: cloneSimulationResolution(resolution), Reports: cloneSimulationReports(reports)},
+		Simulation:     &SimulationEvidence{Resolution: cloneSimulationResolution(resolution), Reports: canonicalReports},
 	}, nil
 }
 
@@ -328,6 +331,19 @@ func onlyAssertionFailures(report simmodel.Report, diagnostics []simmodel.Diagno
 }
 
 func simulationEvidenceHash(resolution SimulationResolution, reports []simmodel.Report) (string, error) {
+	for reportIndex := range reports {
+		for analysisIndex := range reports[reportIndex].Analyses {
+			if len(reports[reportIndex].Analyses[analysisIndex].Points) > maxPersistedAnalysisPoints {
+				return "", fmt.Errorf(
+					"reports[%d].analyses[%d].points has %d entries, exceeds canonical persistence limit %d",
+					reportIndex,
+					analysisIndex,
+					len(reports[reportIndex].Analyses[analysisIndex].Points),
+					maxPersistedAnalysisPoints,
+				)
+			}
+		}
+	}
 	payload := struct {
 		Resolution SimulationResolution `json:"resolution"`
 		Reports    []simmodel.Report    `json:"reports"`
@@ -365,13 +381,15 @@ func cloneSimulationResolution(source SimulationResolution) SimulationResolution
 }
 
 func cloneSimulationReports(source []simmodel.Report) []simmodel.Report {
-	data, err := json.Marshal(source)
-	if err != nil {
-		return source
+	if source == nil {
+		return nil
 	}
-	var clone []simmodel.Report
-	if err := json.Unmarshal(data, &clone); err != nil {
-		return source
+	clone := make([]simmodel.Report, len(source))
+	for reportIndex := range source {
+		clone[reportIndex] = simmodel.CloneReportWithAnalysisPointLimit(
+			source[reportIndex],
+			maxPersistedAnalysisPoints,
+		)
 	}
 	return clone
 }

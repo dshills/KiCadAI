@@ -115,6 +115,46 @@ func TestReplaySimulationEvidenceRequiresExactDeterministicTranscript(t *testing
 	}
 }
 
+func TestSimulationEvidenceCompactsDenseAnalysesDeterministically(t *testing.T) {
+	if cloneSimulationReports(nil) != nil {
+		t.Fatal("nil simulation reports did not retain canonical nil representation")
+	}
+	points := make([]simmodel.AnalysisPoint, 2000)
+	for index := range points {
+		points[index] = simmodel.AnalysisPoint{TimeS: float64(index)}
+	}
+	reports := []simmodel.Report{{
+		Analyses: []simmodel.AnalysisResult{{ID: "transient", Kind: simmodel.AnalysisTransient, Points: points}},
+	}}
+	compact := cloneSimulationReports(reports)
+	got := compact[0].Analyses[0].Points
+	if len(got) != maxPersistedAnalysisPoints {
+		t.Fatalf("persisted points = %d, want %d", len(got), maxPersistedAnalysisPoints)
+	}
+	if got[0].TimeS != 0 || got[len(got)-1].TimeS != 1999 {
+		t.Fatalf("persisted point endpoints = %g..%g, want 0..1999", got[0].TimeS, got[len(got)-1].TimeS)
+	}
+	if _, err := simulationEvidenceHash(SimulationResolution{}, reports); err == nil {
+		t.Fatal("dense reports bypassed the canonical persistence boundary")
+	}
+	compactHash, err := simulationEvidenceHash(SimulationResolution{}, compact)
+	if err != nil {
+		t.Fatalf("hash compact evidence: %v", err)
+	}
+	replayedCompactHash, err := simulationEvidenceHash(SimulationResolution{}, cloneSimulationReports(reports))
+	if err != nil || replayedCompactHash != compactHash {
+		t.Fatalf("canonical replay hash = %s, %v; want %s", replayedCompactHash, err, compactHash)
+	}
+	compact[0].Analyses[0].Points[1].TimeS++
+	tamperedHash, err := simulationEvidenceHash(SimulationResolution{}, compact)
+	if err != nil {
+		t.Fatalf("hash tampered evidence: %v", err)
+	}
+	if tamperedHash == compactHash {
+		t.Fatal("tampered persisted point did not change canonical evidence hash")
+	}
+}
+
 func TestWorstLinkedAssertionSelectsWorstCornerDeterministically(t *testing.T) {
 	plan := simmodel.Plan{Assertions: []simmodel.Assertion{{Min: 4.5, Max: 5.5}, {Min: 4.5, Max: 5.5}, {Min: 4.5, Max: 5.5}}}
 	report := simmodel.Report{Assertions: []simmodel.AssertionResult{{Actual: 5}, {Actual: 4.6}, {Actual: 5.4}}}

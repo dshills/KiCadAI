@@ -430,3 +430,140 @@ type Report struct {
 	Sensitivity     []SensitivityResult `json:"sensitivity,omitempty"`
 	Status          string              `json:"status"`
 }
+
+// CloneReport returns a deep copy of one simulation report. Keep this
+// implementation adjacent to Report so schema changes also update the
+// persistence-safe clone boundary.
+func CloneReport(source Report) Report {
+	return CloneReportWithAnalysisPointLimit(source, 0)
+}
+
+// CloneReportWithAnalysisPointLimit returns a deep copy while retaining at
+// most pointLimit uniformly spaced points per analysis, including both
+// endpoints. A non-positive limit preserves every point.
+func CloneReportWithAnalysisPointLimit(source Report, pointLimit int) Report {
+	clone := Report{
+		Schema:          source.Schema,
+		RegistryVersion: source.RegistryVersion,
+		RegistryHash:    source.RegistryHash,
+		CatalogID:       source.CatalogID,
+		CatalogHash:     source.CatalogHash,
+		ModelID:         source.ModelID,
+		GroundNode:      source.GroundNode,
+		TopologyHash:    source.TopologyHash,
+		Status:          source.Status,
+	}
+	plan := ClonePlan(Plan{
+		Bindings: source.Bindings,
+		Inputs:   source.Inputs,
+		Nodes:    source.Nodes,
+		Devices:  source.Devices,
+	})
+	clone.Bindings = plan.Bindings
+	clone.Inputs = plan.Inputs
+	clone.Nodes = plan.Nodes
+	clone.Devices = plan.Devices
+	if source.Analyses != nil {
+		clone.Analyses = make([]AnalysisResult, len(source.Analyses))
+	}
+	for analysisIndex := range clone.Analyses {
+		clone.Analyses[analysisIndex] = AnalysisResult{
+			ID:                     source.Analyses[analysisIndex].ID,
+			Kind:                   source.Analyses[analysisIndex].Kind,
+			FundamentalFrequencyHz: source.Analyses[analysisIndex].FundamentalFrequencyHz,
+		}
+		clone.Analyses[analysisIndex].Points = cloneAnalysisPoints(
+			source.Analyses[analysisIndex].Points,
+			pointLimit,
+		)
+	}
+	// Measurement and SensitivityResult are value-only schema records. The
+	// clone-schema guard test fails if either gains a reference field.
+	clone.Measurements = append([]Measurement(nil), source.Measurements...)
+	clone.Assertions = cloneAssertionResults(source.Assertions)
+	if source.Corners != nil {
+		clone.Corners = make([]CornerResult, len(source.Corners))
+	}
+	for cornerIndex := range clone.Corners {
+		clone.Corners[cornerIndex] = CornerResult{
+			ID:     source.Corners[cornerIndex].ID,
+			Status: source.Corners[cornerIndex].Status,
+		}
+		clone.Corners[cornerIndex].Assignments = append([]NamedValue(nil), source.Corners[cornerIndex].Assignments...)
+		clone.Corners[cornerIndex].Assertions = cloneAssertionResults(source.Corners[cornerIndex].Assertions)
+	}
+	clone.Sensitivity = append([]SensitivityResult(nil), source.Sensitivity...)
+	return clone
+}
+
+func cloneAnalysisPoints(source []AnalysisPoint, limit int) []AnalysisPoint {
+	if source == nil {
+		return nil
+	}
+	count := len(source)
+	if limit > 0 {
+		count = min(count, limit)
+	}
+	clone := make([]AnalysisPoint, count)
+	last := len(source) - 1
+	for index := range clone {
+		sourceIndex := index
+		if len(source) > count && count > 1 {
+			sourceIndex = int(int64(index) * int64(last) / int64(count-1))
+		}
+		clone[index] = AnalysisPoint{
+			FrequencyHz: source[sourceIndex].FrequencyHz,
+			TimeS:       source[sourceIndex].TimeS,
+			SweepValue:  source[sourceIndex].SweepValue,
+			Sweep:       source[sourceIndex].Sweep,
+		}
+		clone[index].Nodes = append([]NodeResult(nil), source[sourceIndex].Nodes...)
+		if source[sourceIndex].Devices != nil {
+			clone[index].Devices = make([]DeviceResult, len(source[sourceIndex].Devices))
+		}
+		for deviceIndex := range clone[index].Devices {
+			sourceDevice := source[sourceIndex].Devices[deviceIndex]
+			clone[index].Devices[deviceIndex] = DeviceResult{
+				Component:         sourceDevice.Component,
+				VoltageV:          sourceDevice.VoltageV,
+				CurrentA:          sourceDevice.CurrentA,
+				CurrentMagnitudeA: sourceDevice.CurrentMagnitudeA,
+				DissipationW:      sourceDevice.DissipationW,
+			}
+			if source[sourceIndex].Devices[deviceIndex].JunctionTemperatureC != nil {
+				value := *source[sourceIndex].Devices[deviceIndex].JunctionTemperatureC
+				clone[index].Devices[deviceIndex].JunctionTemperatureC = &value
+			}
+		}
+		if source[sourceIndex].Solver != nil {
+			solver := *source[sourceIndex].Solver
+			clone[index].Solver = &solver
+		}
+	}
+	return clone
+}
+
+func cloneAssertionResults(source []AssertionResult) []AssertionResult {
+	if source == nil {
+		return nil
+	}
+	clone := make([]AssertionResult, len(source))
+	for index := range clone {
+		clone[index] = AssertionResult{
+			Metric:        source[index].Metric,
+			AnalysisID:    source[index].AnalysisID,
+			Node:          source[index].Node,
+			Component:     source[index].Component,
+			ReferenceNode: source[index].ReferenceNode,
+			Quantity:      source[index].Quantity,
+			FrequencyHz:   source[index].FrequencyHz,
+			TimeS:         source[index].TimeS,
+			Min:           source[index].Min,
+			Max:           source[index].Max,
+			Actual:        source[index].Actual,
+			Pass:          source[index].Pass,
+		}
+		clone[index].Components = append([]string(nil), source[index].Components...)
+	}
+	return clone
+}

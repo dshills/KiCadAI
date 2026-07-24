@@ -128,7 +128,7 @@ func ReplaySimulationEvidence(evidence SimulationEvidence) []Diagnostic {
 		persistedHash, persistedErr := HashSimulationEvidence(evidence)
 		replayedHash, replayedErr := HashSimulationEvidence(SimulationEvidence{
 			Resolution: cloneSimulationResolution(evidence.Resolution),
-			Reports:    replayed,
+			Reports:    cloneSimulationReports(replayed),
 		})
 		if persistedErr != nil || replayedErr != nil || persistedHash != replayedHash {
 			diagnostics = append(diagnostics, Diagnostic{

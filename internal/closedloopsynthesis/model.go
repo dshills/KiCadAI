@@ -101,9 +101,9 @@ type Evaluation struct {
 }
 
 // SimulationEvidence is the canonical trusted input/output transcript behind
-// one complete candidate evaluation. Keeping it in the closed-loop report
-// makes analysis plans, operating-corner bindings, reports, and measurement
-// links independently replayable instead of relying on an opaque hash alone.
+// one complete candidate evaluation. Dense analysis point arrays are
+// deterministically sampled at the persistence boundary; replay regenerates
+// the complete reports and applies the same sampling before comparison.
 type SimulationEvidence struct {
 	Resolution SimulationResolution `json:"resolution"`
 	Reports    []simmodel.Report    `json:"reports"`

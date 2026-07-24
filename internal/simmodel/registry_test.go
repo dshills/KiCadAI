@@ -2,6 +2,7 @@ package simmodel
 
 import (
 	"math"
+	"reflect"
 	"slices"
 	"testing"
 )
@@ -121,6 +122,112 @@ func TestClonePlanDoesNotShareMutableEvidence(t *testing.T) {
 	clone.Assertions[0].Max = 6
 	if source.Bindings[0].Role != "resistor" || *source.Bindings[0].ValueSI != 1000 || source.Bindings[0].ModelParameters[0].Value != 1 || source.Inputs[0].Value != 2 || source.Analyses[0].DCSweep.StopValue != 2 || source.Assertions[0].Max != 3 {
 		t.Fatalf("source plan mutated through clone: %#v", source)
+	}
+}
+
+func TestCloneReportDoesNotShareMutableEvidence(t *testing.T) {
+	value := 1000.0
+	temperature := 40.0
+	source := Report{
+		Bindings: []ResolvedBinding{{Role: "resistor", ValueSI: &value, ModelParameters: []NamedValue{{Name: "parameter", Value: 1}}}},
+		Analyses: []AnalysisResult{{ID: "transient", Points: []AnalysisPoint{{
+			TimeS: 1,
+			Nodes: []NodeResult{{Node: "out", Real: 2}},
+			Devices: []DeviceResult{{
+				Component: "r1", JunctionTemperatureC: &temperature,
+			}},
+			Solver: &SolverEvidence{Method: "mna", Iterations: 3},
+		}}}},
+		Assertions: []AssertionResult{{Metric: "output", Components: []string{"r1"}}},
+		Corners: []CornerResult{{
+			ID: "hot", Assignments: []NamedValue{{Name: "temperature_c", Value: 85}},
+			Assertions: []AssertionResult{{Metric: "output", Components: []string{"r1"}}},
+		}},
+	}
+	clone := CloneReport(source)
+	clone.Bindings[0].Role = "changed"
+	*clone.Bindings[0].ValueSI = 2000
+	clone.Analyses[0].Points[0].Nodes[0].Real = 4
+	*clone.Analyses[0].Points[0].Devices[0].JunctionTemperatureC = 90
+	clone.Analyses[0].Points[0].Solver.Iterations = 6
+	clone.Assertions[0].Components[0] = "r2"
+	clone.Corners[0].Assignments[0].Value = 125
+	clone.Corners[0].Assertions[0].Components[0] = "r3"
+	if source.Bindings[0].Role != "resistor" || *source.Bindings[0].ValueSI != 1000 ||
+		source.Analyses[0].Points[0].Nodes[0].Real != 2 ||
+		*source.Analyses[0].Points[0].Devices[0].JunctionTemperatureC != 40 ||
+		source.Analyses[0].Points[0].Solver.Iterations != 3 ||
+		source.Assertions[0].Components[0] != "r1" ||
+		source.Corners[0].Assignments[0].Value != 85 ||
+		source.Corners[0].Assertions[0].Components[0] != "r1" {
+		t.Fatalf("source report mutated through clone: %#v", source)
+	}
+}
+
+func TestCloneReportPointLimitAndValueOnlySchemaGuard(t *testing.T) {
+	if got := CloneReportWithAnalysisPointLimit(Report{
+		Analyses: []AnalysisResult{{Points: nil}},
+	}, 512).Analyses[0].Points; got != nil {
+		t.Fatalf("nil analysis points cloned as %#v, want nil", got)
+	}
+	points := make([]AnalysisPoint, 2000)
+	for index := range points {
+		points[index].TimeS = float64(index)
+	}
+	clone := CloneReportWithAnalysisPointLimit(Report{
+		Analyses: []AnalysisResult{{Points: points}},
+	}, 512)
+	got := clone.Analyses[0].Points
+	if len(got) != 512 || got[0].TimeS != 0 || got[len(got)-1].TimeS != 1999 {
+		t.Fatalf("bounded report points = %d (%g..%g), want 512 (0..1999)", len(got), got[0].TimeS, got[len(got)-1].TimeS)
+	}
+	for _, value := range []any{
+		Measurement{},
+		SensitivityResult{},
+		NamedValue{},
+		NodeResult{},
+		SolverEvidence{},
+		TerminalBinding{},
+	} {
+		recordType := reflect.TypeOf(value)
+		for index := 0; index < recordType.NumField(); index++ {
+			switch recordType.Field(index).Type.Kind() {
+			case reflect.Chan, reflect.Func, reflect.Interface, reflect.Map, reflect.Pointer, reflect.Slice, reflect.UnsafePointer:
+				t.Fatalf("%s.%s gained reference storage; update CloneReportWithAnalysisPointLimit", recordType.Name(), recordType.Field(index).Name)
+			}
+		}
+	}
+	for _, guarded := range []struct {
+		value   any
+		handled map[string]bool
+	}{
+		{value: Report{}, handled: map[string]bool{
+			"Bindings": true, "Inputs": true, "Nodes": true, "Devices": true,
+			"Analyses": true, "Measurements": true, "Assertions": true,
+			"Corners": true, "Sensitivity": true,
+		}},
+		{value: ResolvedBinding{}, handled: map[string]bool{"ValueSI": true, "ModelParameters": true}},
+		{value: ResolvedDevice{}, handled: map[string]bool{"ValueSI": true, "ModelParameters": true, "Terminals": true}},
+		{value: AnalysisResult{}, handled: map[string]bool{"Points": true}},
+		{value: AssertionResult{}, handled: map[string]bool{"Components": true}},
+		{value: CornerResult{}, handled: map[string]bool{"Assignments": true, "Assertions": true}},
+		{value: AnalysisPoint{}, handled: map[string]bool{"Nodes": true, "Devices": true, "Solver": true}},
+		{value: DeviceResult{}, handled: map[string]bool{"JunctionTemperatureC": true}},
+	} {
+		recordType := reflect.TypeOf(guarded.value)
+		for index := 0; index < recordType.NumField(); index++ {
+			field := recordType.Field(index)
+			switch field.Type.Kind() {
+			case reflect.Chan, reflect.Func, reflect.Interface, reflect.Map, reflect.Pointer, reflect.Slice, reflect.UnsafePointer:
+				if !guarded.handled[field.Name] {
+					t.Fatalf("%s.%s gained unhandled reference storage; update CloneReportWithAnalysisPointLimit", recordType.Name(), field.Name)
+				}
+				delete(guarded.handled, field.Name)
+			}
+		}
+		if len(guarded.handled) != 0 {
+			t.Fatalf("%s clone guard references missing fields: %#v", recordType.Name(), guarded.handled)
+		}
 	}
 }
 
