@@ -124,9 +124,9 @@ func Create(ctx context.Context, request Request, opts CreateOptions) WorkflowRe
 	}
 	validationOpts, kicadCheckOpts := createValidationOptions(normalized, opts)
 	validated := ValidateProject(ctx, &normalized, &written, validationOpts)
-	stages = append(stages, validated.Stage)
 	checked := RunKiCadChecks(ctx, &normalized, &written, kicadCheckOpts)
-	stages = append(stages, checked.Stage)
+	validated.Stage = reconcileDeferredZoneFillValidation(validated.Stage, checked.DRC)
+	stages = append(stages, validated.Stage, checked.Stage)
 	fabricationOptions := opts.Fabrication
 	var blockReadinessReportIssue *reports.Issue
 	if fabricationOptions != nil && len(fabricationOptions.BlockReadinessReport) == 0 {
@@ -344,12 +344,14 @@ func persistedValidationRepairStage(ctx context.Context, request *Request, writt
 		RepairOptions: opts.Repair,
 	}
 	result := repair.ApplyPersistedBundleContext(ctx, opts.OutputDir, bundle, repair.PersistedApplyOptions{
-		Execute:        true,
-		OutputDir:      opts.OutputDir,
-		Overwrite:      opts.Overwrite,
-		Seed:           opts.Seed,
-		Repair:         opts.Repair,
-		Board:          &transactions.BoardSize{WidthMM: request.Board.WidthMM, HeightMM: request.Board.HeightMM},
+		Execute:   true,
+		OutputDir: opts.OutputDir,
+		Overwrite: opts.Overwrite,
+		Seed:      opts.Seed,
+		Repair:    opts.Repair,
+		Board: &transactions.BoardSize{
+			WidthMM: request.Board.WidthMM, HeightMM: request.Board.HeightMM, ThicknessMM: request.Board.ThicknessMM,
+		},
 		PostValidation: opts.PostRepair,
 	})
 	attemptCount, appliedCount := repairAttemptCounts(&result)

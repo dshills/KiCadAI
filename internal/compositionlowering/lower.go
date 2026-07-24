@@ -119,9 +119,17 @@ func Lower(requirement architecturesearch.Requirement, search architecturesearch
 			}
 			instanceIDs[id] = true
 			localIDs[instance.ID] = id
+		}
+		for _, instance := range realization.Instances {
+			id := localIDs[instance.ID]
+			near := ""
+			if instance.Near != "" {
+				near = localIDs[instance.Near]
+			}
 			intent.Functions = append(intent.Functions, circuitgraph.FunctionRequirement{
 				ID: id, Role: componentRole(instance.CatalogID, instance.Usage), ComponentID: instance.CatalogID,
 				Value: instance.Value, RequiredFunctions: append([]string(nil), instance.RequiredFunctions...), Usage: instance.Usage,
+				Near: near, MaxDistanceMM: instance.MaxDistanceMM,
 			})
 			for _, function := range instance.RequiredFunctions {
 				node := functionNode(id, function)
@@ -155,6 +163,9 @@ func Lower(requirement architecturesearch.Requirement, search architecturesearch
 			function := functionNode(id, binding.Function)
 			anchor := anchorNode(port.Anchor, binding.Lane)
 			bindingMetadata := contractNodeMetadata(port.Contract, binding.Lane, referenceDomain)
+			if binding.NetRole != "" {
+				bindingMetadata.role = lowerNetRole(binding.NetRole)
+			}
 			bindingsByAnchor[anchor] = append(bindingsByAnchor[anchor], pendingPortBinding{node: function, anchor: anchor, metadata: bindingMetadata})
 			anchorBindingCounts[anchor]++
 			if strings.HasPrefix(port.Anchor, "participant:") {
@@ -565,6 +576,12 @@ func lowerNetRole(role string) circuitgraph.NetRole {
 		return circuitgraph.NetRolePower
 	case "reference":
 		return circuitgraph.NetRoleGround
+	case "clock":
+		return circuitgraph.NetRoleClock
+	case "timing":
+		return circuitgraph.NetRoleTiming
+	case "bias":
+		return circuitgraph.NetRoleBias
 	case "feedback":
 		return circuitgraph.NetRoleFeedback
 	default:
@@ -593,7 +610,9 @@ func componentRole(catalogID, usage string) circuitgraph.ComponentRole {
 		return circuitgraph.RoleRegulator
 	case "sensor":
 		return circuitgraph.RoleSensor
-	case "mcu", "opamp", "comparator", "level_translator":
+	case "clock_source":
+		return circuitgraph.RoleOscillator
+	case "mcu", "opamp", "comparator", "level_translator", "logic_buffer":
 		return circuitgraph.RoleIC
 	default:
 		return circuitgraph.RoleGeneric
@@ -657,11 +676,13 @@ func combineMetadata(left, right nodeMetadata) nodeMetadata {
 func netRoleRank(role circuitgraph.NetRole) int {
 	switch role {
 	case circuitgraph.NetRoleGround:
-		return 3
+		return 5
 	case circuitgraph.NetRolePower:
+		return 4
+	case circuitgraph.NetRoleClock:
+		return 3
+	case circuitgraph.NetRoleFeedback, circuitgraph.NetRoleBias, circuitgraph.NetRoleTiming:
 		return 2
-	case circuitgraph.NetRoleFeedback:
-		return 1
 	default:
 		return 0
 	}

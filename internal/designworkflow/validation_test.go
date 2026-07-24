@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"kicadai/internal/blocks"
+	"kicadai/internal/kicadfiles/checks"
 	"kicadai/internal/reports"
 )
 
@@ -53,6 +54,42 @@ func TestBoardValidationOptionsPassesKiCadCLI(t *testing.T) {
 	required := boardValidationOptions(&request, opts)
 	if required.KiCadCLI != opts.KiCadCLI || !required.RequireDRC {
 		t.Fatalf("required board validation opts = %#v, want KiCad CLI and required DRC", required)
+	}
+}
+
+func TestReconcileDeferredZoneFillValidationRequiresCleanDRC(t *testing.T) {
+	stage := NewStageResult(StageValidation, []reports.Issue{{
+		Code:       reports.CodeValidationFailed,
+		Severity:   reports.SeverityWarning,
+		Path:       "zones.0.filled_polygons",
+		Message:    deferredZoneFillMessage,
+		Suggestion: "repair category: zone",
+	}})
+
+	unresolved := reconcileDeferredZoneFillValidation(stage, checks.CheckResult{
+		Kind:   checks.CheckKindDRC,
+		Status: checks.CheckStatusFail,
+	})
+	if unresolved.Status != StageStatusWarning || unresolved.Issues[0].Code != reports.CodeValidationFailed {
+		t.Fatalf("failed DRC resolved deferred zone warning: %#v", unresolved)
+	}
+	wrongCheck := reconcileDeferredZoneFillValidation(stage, checks.CheckResult{
+		Kind:   checks.CheckKindERC,
+		Status: checks.CheckStatusPass,
+	})
+	if wrongCheck.Status != StageStatusWarning || wrongCheck.Issues[0].Code != reports.CodeValidationFailed {
+		t.Fatalf("non-DRC evidence resolved deferred zone warning: %#v", wrongCheck)
+	}
+
+	resolved := reconcileDeferredZoneFillValidation(stage, checks.CheckResult{
+		Kind:   checks.CheckKindDRC,
+		Status: checks.CheckStatusPass,
+	})
+	if resolved.Status != StageStatusOK {
+		t.Fatalf("resolved stage status = %q, want ok: %#v", resolved.Status, resolved)
+	}
+	if len(resolved.Issues) != 1 || resolved.Issues[0].Code != reports.CodeValidationTrace || resolved.Issues[0].Severity != reports.SeverityInfo {
+		t.Fatalf("resolved issue = %#v, want informational validation trace", resolved.Issues)
 	}
 }
 

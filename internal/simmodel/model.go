@@ -39,6 +39,9 @@ const (
 	PrimitiveBJTPNPV1                           = "mna_bjt_pnp_ebers_moll_v1"
 	PrimitiveRelayClosedV1                      = "mna_relay_closed_state_v1"
 	PrimitiveRelayNormallyOpenV1                = "mna_relay_normally_open_v1"
+	PrimitiveFixedClockSourceV1                 = "mna_fixed_clock_source_v1"
+	PrimitiveResistorProgrammedClockSourceV1    = "mna_resistor_programmed_clock_source_v1"
+	PrimitiveCMOSBufferV1                       = "mna_cmos_schmitt_buffer_v1"
 
 	AnalysisDCOperatingPoint = "dc_operating_point"
 	AnalysisACSweep          = "ac_sweep"
@@ -211,6 +214,7 @@ type ComponentEvidence struct {
 	PhysicalComponent string
 	CatalogID         string
 	Family            string
+	Usage             string `json:"usage,omitempty"`
 	ValueSI           float64
 	HasValueSI        bool
 	ModelClaims       []CatalogEvidence
@@ -237,6 +241,7 @@ type ResolvedDevice struct {
 	PhysicalComponent string            `json:"physical_component,omitempty"`
 	CatalogID         string            `json:"catalog_id"`
 	Family            string            `json:"family"`
+	Usage             string            `json:"usage,omitempty"`
 	PrimitiveModel    string            `json:"primitive_model"`
 	ValueSI           *float64          `json:"value_si,omitempty"`
 	ModelParameters   []NamedValue      `json:"model_parameters,omitempty"`

@@ -901,10 +901,18 @@ func validateClockEvidence(path string, evidence *ClockEvidence) []reports.Issue
 		issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, path+".fabrication_proof", "clock fabrication proof cannot coexist with a fabrication-candidate blocker"))
 	}
 	require := evidence.FabricationProof
+	if require && strings.TrimSpace(evidence.ArchitectureClass) == "" {
+		issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, path+".architecture_class", "fabrication-oriented clock evidence requires an architecture class"))
+	} else if issue, ok := validateTrimmedMetadata(path+".architecture_class", evidence.ArchitectureClass, "clock architecture class"); ok {
+		issues = append(issues, issue)
+	}
 	for suffix, value := range map[string]*EvidenceRange{
-		"amplitude":   evidence.Amplitude,
-		"common_mode": evidence.CommonMode,
-		"edge_time":   evidence.EdgeTime,
+		"frequency":      evidence.Frequency,
+		"duty_cycle":     evidence.DutyCycle,
+		"supply_voltage": evidence.SupplyVoltage,
+		"amplitude":      evidence.Amplitude,
+		"common_mode":    evidence.CommonMode,
+		"edge_time":      evidence.EdgeTime,
 	} {
 		issues = append(issues, validateEvidenceRange(path+"."+suffix, value, require)...)
 		if require && value == nil {
@@ -912,12 +920,17 @@ func validateClockEvidence(path string, evidence *ClockEvidence) []reports.Issue
 		}
 	}
 	for suffix, value := range map[string]*EvidenceMeasurement{
+		"frequency_accuracy":      evidence.FrequencyAccuracy,
+		"supply_current":          evidence.SupplyCurrent,
+		"output_high_voltage":     evidence.OutputHighVoltage,
+		"output_low_voltage":      evidence.OutputLowVoltage,
 		"rms_jitter":              evidence.RMSJitter,
 		"startup_time":            evidence.StartupTime,
 		"maximum_frequency":       evidence.MaximumFrequency,
 		"output_impedance":        evidence.OutputImpedance,
 		"output_current":          evidence.OutputCurrent,
 		"maximum_capacitive_load": evidence.MaximumCapacitiveLoad,
+		"maximum_fanout":          evidence.MaximumFanout,
 	} {
 		issues = append(issues, validateEvidenceMeasurement(path+"."+suffix, value, require)...)
 		if require && value == nil {

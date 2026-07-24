@@ -203,6 +203,34 @@ func TestVerifiedDIP4TemplateMatchesStandardDualInlinePinOrder(t *testing.T) {
 	}
 }
 
+func TestVerifiedSiTOscillatorTemplateMatchesKiCadFootprint(t *testing.T) {
+	template, ok := verifiedPadTemplate("Oscillator:Oscillator_SMD_SiT_PQFN-4Pin_5.0x3.2mm")
+	if !ok {
+		t.Fatal("missing SiTime oscillator template")
+	}
+	if got := padTemplateNames(template.Pads); !reflect.DeepEqual(got, []string{"1", "2", "3", "4"}) {
+		t.Fatalf("SiTime oscillator pad order = %#v", got)
+	}
+	wantCenters := []placement.Point{
+		{XMM: -1.27, YMM: 1.1},
+		{XMM: 1.27, YMM: 1.1},
+		{XMM: 1.27, YMM: -1.1},
+		{XMM: -1.27, YMM: -1.1},
+	}
+	for index, pad := range template.Pads {
+		if pad.XMM != wantCenters[index].XMM || pad.YMM != wantCenters[index].YMM ||
+			pad.WidthMM != 1.5 || pad.HeightMM != 1.6 || pad.Type != "smd" ||
+			pad.Shape != "roundrect" ||
+			!reflect.DeepEqual(pad.Layers, []string{"F.Cu", "F.Mask", "F.Paste"}) {
+			t.Fatalf("SiTime oscillator pad[%d] = %#v, want center %#v and verified SMD geometry", index, pad, wantCenters[index])
+		}
+	}
+	wantBounds := verifiedCourtyardBoundsFromExtents(-3, -2.16, 3, 2.16)
+	if !reflect.DeepEqual(template.Bounds, wantBounds) {
+		t.Fatalf("SiTime oscillator bounds = %#v, want %#v", template.Bounds, wantBounds)
+	}
+}
+
 func TestVerifiedBMP280PadTemplateMatchesKiCadFootprint(t *testing.T) {
 	template, ok := verifiedPadTemplate("Package_LGA:Bosch_LGA-8_2x2.5mm_P0.65mm_ClockwisePinNumbering")
 	if !ok {
@@ -325,8 +353,10 @@ func TestVerifiedSpeakerPowerFootprintTemplatesMatchInstalledKiCadLibraries(t *t
 		"Package_TO_SOT_SMD:SOT-23",
 		"Package_TO_SOT_SMD:SOT-23-5",
 		"Package_TO_SOT_SMD:SOT-23-6",
+		"Package_TO_SOT_SMD:TSOT-23-6",
 		"Package_TO_SOT_SMD:SOT-89-3",
 		"Package_TO_SOT_SMD:SOT-223",
+		"Oscillator:Oscillator_SMD_SiT_PQFN-4Pin_5.0x3.2mm",
 		"Resistor_THT:R_Axial_DIN0411_L9.9mm_D3.6mm_P15.24mm_Horizontal",
 		"Resistor_THT:R_Axial_DIN0414_L11.9mm_D4.5mm_P20.32mm_Horizontal",
 		"Resistor_SMD:R_0805_2012Metric",

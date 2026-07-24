@@ -153,6 +153,7 @@ func Normalize(document Document) Document {
 		return strings.Compare(left.Name, right.Name)
 	})
 	for index := range normalized.Nets {
+		slices.Sort(normalized.Nets[index].AllowedLayers)
 		for endpointIndex := range normalized.Nets[index].Endpoints {
 			normalized.Nets[index].Endpoints[endpointIndex].Unit = canonicalUnitID(normalized.Nets[index].Endpoints[endpointIndex].Unit)
 		}
@@ -282,6 +283,7 @@ func cloneDocument(document Document) Document {
 	cloned.Nets = append([]Net(nil), document.Nets...)
 	for index := range cloned.Nets {
 		cloned.Nets[index].Required = cloneBool(document.Nets[index].Required)
+		cloned.Nets[index].AllowedLayers = append([]string(nil), document.Nets[index].AllowedLayers...)
 		cloned.Nets[index].Endpoints = append([]Endpoint(nil), document.Nets[index].Endpoints...)
 	}
 	cloned.NoConnects = append([]Endpoint(nil), document.NoConnects...)

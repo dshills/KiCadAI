@@ -186,7 +186,7 @@ func (builder *promotionReportBuilder) connectivityIssueSatisfiedByKiCad(issue P
 		return builder.kiCadCheckPassed(promotionKiCadERCSummaryKey)
 	case strings.HasPrefix(message, "drc_validation is available through the `check` command"):
 		return builder.kiCadCheckPassed(promotionKiCadDRCSummaryKey)
-	case message == "zone has no fill evidence; run KiCad refill/DRC for authoritative zone connectivity":
+	case isDeferredZoneFillMessage(message):
 		return builder.kiCadCheckPassed(promotionKiCadDRCSummaryKey)
 	default:
 		return false

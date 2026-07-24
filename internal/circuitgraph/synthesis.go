@@ -19,6 +19,9 @@ const (
 	synthesisCongestedComponentPitchMM          = 7.5
 	synthesisCongestedComponentCount            = 32
 	synthesisCongestedBranchesPerComponentRatio = 0.75
+	synthesisClockMaxLengthMM                   = 100.0
+	synthesisTimingMaxLengthMM                  = 12.0
+	synthesisClockReturnPathMaxDistanceMM       = 8.0
 )
 
 type SynthesisReport struct {
@@ -109,7 +112,7 @@ func (resolver *Resolver) Synthesize(ctx context.Context, document Document) (Do
 	for index, requirement := range intent.Functions {
 		query := cloneComponentQuery(requirement.Query)
 		instance := Component{
-			ID: requirement.ID, Role: requirement.Role, ComponentID: requirement.ComponentID,
+			ID: requirement.ID, Role: requirement.Role, Usage: simulationEvidenceUsage(requirement.Usage), ComponentID: requirement.ComponentID,
 			Query: query, Value: requirement.Value, Parameters: append([]Parameter(nil), requirement.Parameters...),
 			RequiredRatings:   append([]RequiredRating(nil), requirement.RequiredRatings...),
 			RequiredFunctions: append([]string(nil), requirement.RequiredFunctions...),
@@ -164,6 +167,7 @@ func (resolver *Resolver) Synthesize(ctx context.Context, document Document) (Do
 			NetClass: synthesisNetClass(connection.Role), WidthMM: synthesisNetWidth(connection), ClearanceMM: 0.2,
 			Endpoints: []Endpoint{},
 		}
+		applySynthesisNetPhysicalPolicy(&net)
 		for _, endpoint := range connection.Endpoints {
 			if endpoint.Function != "" {
 				selection, exists := selectedByIntent[endpoint.Function]
@@ -264,6 +268,7 @@ func (resolver *Resolver) Synthesize(ctx context.Context, document Document) (Do
 
 	layoutIssues := deriveFunctionLayout(&lowered, intent, report.Selections, resolver.recordsByID)
 	issues = append(issues, layoutIssues...)
+	assignSynthesisClockReturnPaths(&lowered)
 	if !reports.HasBlockingIssue(issues) {
 		if validationIssues := Validate(Normalize(lowered)); reports.HasBlockingIssue(validationIssues) {
 			for _, issue := range validationIssues {
@@ -285,6 +290,25 @@ func (resolver *Resolver) Synthesize(ctx context.Context, document Document) (Do
 		SynthesisConstraintEvidence{Kind: "board_height", Subject: lowered.Project.Name, Value: strconv.FormatFloat(lowered.Project.Board.HeightMM, 'f', -1, 64) + " mm", Source: SynthesisPolicyVersion},
 		SynthesisConstraintEvidence{Kind: "board_layers", Subject: lowered.Project.Name, Value: strconv.Itoa(lowered.Project.Board.Layers), Source: SynthesisPolicyVersion},
 	)
+	for _, net := range lowered.Nets {
+		if net.PreferLayer != "" {
+			report.DerivedConstraints = append(report.DerivedConstraints, SynthesisConstraintEvidence{
+				Kind: "preferred_route_layer", Subject: net.Name, Value: net.PreferLayer, Source: SynthesisPolicyVersion,
+			})
+		}
+		if net.MaxLengthMM > 0 {
+			report.DerivedConstraints = append(report.DerivedConstraints, SynthesisConstraintEvidence{
+				Kind: "maximum_route_length", Subject: net.Name, Value: strconv.FormatFloat(net.MaxLengthMM, 'f', -1, 64) + " mm", Source: SynthesisPolicyVersion,
+			})
+		}
+		if net.ReturnNet != "" {
+			report.DerivedConstraints = append(report.DerivedConstraints, SynthesisConstraintEvidence{
+				Kind: "adjacent_return_path", Subject: net.Name,
+				Value:  net.ReturnNet + " within " + strconv.FormatFloat(net.ReturnPathMaxDistanceMM, 'f', -1, 64) + " mm",
+				Source: SynthesisPolicyVersion,
+			})
+		}
+	}
 	slices.SortStableFunc(report.Selections, func(left, right SynthesisSelection) int {
 		if left.Kind != right.Kind {
 			return strings.Compare(left.Kind, right.Kind)
@@ -312,6 +336,15 @@ func (resolver *Resolver) Synthesize(ctx context.Context, document Document) (Do
 		report.LoweredGraphHash = hashGraphValue(lowered)
 	}
 	return lowered, report, report.Issues
+}
+
+func simulationEvidenceUsage(usage string) string {
+	switch usage {
+	case "timing_resistor":
+		return usage
+	default:
+		return ""
+	}
 }
 
 func cloneComponentQuery(query *ComponentQuery) *ComponentQuery {
@@ -998,10 +1031,19 @@ func deriveFunctionLayout(document *Document, intent FunctionIntent, selections 
 	layers := synthesisCopperLayerCount(count, document.Nets)
 	document.Project.Board = Board{WidthMM: width, HeightMM: height, Layers: layers, EdgeClearanceMM: 1}
 	members := make([]string, 0, len(document.Components))
+	functionsByID := make(map[string]FunctionRequirement, len(intent.Functions))
+	for _, function := range intent.Functions {
+		functionsByID[function.ID] = function
+	}
 	for _, component := range document.Components {
 		members = append(members, component.ID)
 		document.Schematic.Placements = append(document.Schematic.Placements, SchematicPlacement{Component: component.ID, Group: "synthesized", Orientation: "normal", Mirror: "none"})
-		document.PCB.Placements = append(document.PCB.Placements, PCBPlacement{Component: component.ID, Region: "main"})
+		placement := PCBPlacement{Component: component.ID, Region: "main"}
+		if function, ok := functionsByID[component.ID]; ok {
+			placement.Near = function.Near
+			placement.MaxDistanceMM = function.MaxDistanceMM
+		}
+		document.PCB.Placements = append(document.PCB.Placements, placement)
 	}
 	document.Schematic.Flow = FlowLeftToRight
 	document.Schematic.Origin = OriginCentered
@@ -1171,6 +1213,8 @@ func synthesisNetClass(role NetRole) string {
 		return "power"
 	case NetRoleGround, NetRoleReturn:
 		return "ground"
+	case NetRoleClock:
+		return "clock"
 	default:
 		return "signal"
 	}
@@ -1185,6 +1229,90 @@ func synthesisNetWidth(connection FunctionConnection) float64 {
 		return 0.3
 	default:
 		return 0.2
+	}
+}
+
+func applySynthesisNetPhysicalPolicy(net *Net) {
+	if net == nil {
+		return
+	}
+	switch net.Role {
+	case NetRoleClock:
+		net.NetClass = "clock"
+		net.ClearanceMM = math.Max(net.ClearanceMM, 0.25)
+		// The generated KiCad stack records total board thickness but does not
+		// yet claim inner-layer dielectric geometry. Keep clock copper on the
+		// two surfaces whose separation is physically bounded by that value.
+		net.AllowedLayers = []string{"F.Cu", "B.Cu"}
+		net.PreferLayer = "F.Cu"
+		net.MaxLengthMM = synthesisClockMaxLengthMM
+	case NetRoleTiming:
+		net.ClearanceMM = math.Max(net.ClearanceMM, 0.3)
+		net.PreferLayer = "F.Cu"
+		net.MaxLengthMM = synthesisTimingMaxLengthMM
+	}
+}
+
+func assignSynthesisClockReturnPaths(document *Document) {
+	if document == nil {
+		return
+	}
+	for index := range document.Nets {
+		clock := &document.Nets[index]
+		if clock.Role != NetRoleClock {
+			continue
+		}
+		clockComponents := map[string]bool{}
+		for _, endpoint := range clock.Endpoints {
+			if endpoint.Component != "" {
+				clockComponents[endpoint.Component] = true
+			}
+		}
+		bestNet, bestScore, ambiguous := "", 0, false
+		for _, candidate := range document.Nets {
+			if candidate.Role != NetRoleGround && candidate.Role != NetRoleReturn {
+				continue
+			}
+			score := 0
+			for _, endpoint := range candidate.Endpoints {
+				if clockComponents[endpoint.Component] {
+					score++
+				}
+			}
+			if score > bestScore {
+				bestNet, bestScore, ambiguous = candidate.Name, score, false
+			} else if score > 0 && score == bestScore && candidate.Name != bestNet {
+				ambiguous = true
+			}
+		}
+		if bestScore == 0 || ambiguous {
+			continue
+		}
+		clock.ReturnNet = bestNet
+		clock.ReturnPathMaxDistanceMM = synthesisClockReturnPathMaxDistanceMM
+		ensureSynthesisClockReturnZone(document, bestNet)
+	}
+}
+
+func ensureSynthesisClockReturnZone(document *Document, net string) {
+	if document == nil || net == "" {
+		return
+	}
+	for _, layer := range []string{"F.Cu", "B.Cu"} {
+		found := false
+		for index := range document.PCB.Zones {
+			if document.PCB.Zones[index].Net == net &&
+				slices.Contains(document.PCB.Zones[index].Layers, layer) {
+				document.PCB.Zones[index].ClearanceMM = math.Max(document.PCB.Zones[index].ClearanceMM, 0.25)
+				found = true
+				break
+			}
+		}
+		if !found {
+			document.PCB.Zones = append(document.PCB.Zones, PCBZone{
+				Net: net, Layers: []string{layer}, ClearanceMM: 0.25,
+			})
+		}
 	}
 }
 

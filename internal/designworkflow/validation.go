@@ -3,12 +3,16 @@ package designworkflow
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync"
 
 	"kicadai/internal/boardvalidation"
 	"kicadai/internal/evaluate"
+	"kicadai/internal/kicadfiles/checks"
 	"kicadai/internal/reports"
 )
+
+const deferredZoneFillMessage = "zone has no fill evidence; run KiCad refill/DRC for authoritative zone connectivity"
 
 type ValidationOptions struct {
 	StrictZones    bool
@@ -139,4 +143,32 @@ func boardValidationOptions(request *Request, opts ValidationOptions) boardvalid
 		KeepArtifacts:  opts.KeepArtifacts,
 		ArtifactDir:    opts.ArtifactDir,
 	}
+}
+
+func reconcileDeferredZoneFillValidation(stage StageResult, drc checks.CheckResult) StageResult {
+	if drc.Kind != checks.CheckKindDRC || drc.Status != checks.CheckStatusPass {
+		return stage
+	}
+	issues := append([]reports.Issue(nil), stage.Issues...)
+	changed := false
+	for index := range issues {
+		if issues[index].Severity != reports.SeverityWarning || !isDeferredZoneFillMessage(issues[index].Message) {
+			continue
+		}
+		issues[index].Code = reports.CodeValidationTrace
+		issues[index].Severity = reports.SeverityInfo
+		issues[index].Message = "zone fill evidence was deferred to authoritative KiCad DRC, which passed"
+		issues[index].Suggestion = "no repair required; authoritative KiCad DRC passed"
+		changed = true
+	}
+	if !changed {
+		return stage
+	}
+	stage.Issues = issues
+	stage.Status = StageStatusForIssues(issues)
+	return stage
+}
+
+func isDeferredZoneFillMessage(message string) bool {
+	return strings.TrimSpace(message) == deferredZoneFillMessage
 }

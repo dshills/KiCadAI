@@ -156,6 +156,9 @@ func validateOperation(op Operation) []reports.Issue {
 			if payload.Board.HeightMM <= 0 || !finite(payload.Board.HeightMM) {
 				issues = append(issues, issue(reports.CodeInvalidArgument, path+".board.height_mm", "board height must be positive and finite"))
 			}
+			if payload.Board.ThicknessMM < 0 || !finite(payload.Board.ThicknessMM) {
+				issues = append(issues, issue(reports.CodeInvalidArgument, path+".board.thickness_mm", "board thickness must be non-negative and finite"))
+			}
 			return issues
 		})
 	case OpAddSymbol:

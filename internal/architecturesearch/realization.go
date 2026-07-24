@@ -30,12 +30,15 @@ type RealizationInstance struct {
 	VariantID         string   `json:"variant_id,omitempty"`
 	Usage             string   `json:"usage"`
 	Value             string   `json:"value,omitempty"`
+	Near              string   `json:"near,omitempty"`
+	MaxDistanceMM     float64  `json:"max_distance_mm,omitempty"`
 	RequiredFunctions []string `json:"required_functions,omitempty"`
 }
 
 type RealizationPortBinding struct {
 	Role     string `json:"role"`
 	Lane     string `json:"lane,omitempty"`
+	NetRole  string `json:"net_role,omitempty"`
 	Instance string `json:"instance"`
 	Function string `json:"function"`
 }
@@ -102,12 +105,15 @@ func MarshalFragmentRealization(realization FragmentRealization) (json.RawMessag
 		instance.VariantID = strings.TrimSpace(instance.VariantID)
 		instance.Usage = canonicalIdentifier(instance.Usage)
 		instance.Value = strings.TrimSpace(instance.Value)
+		instance.Near = canonicalIdentifier(instance.Near)
+		instance.MaxDistanceMM = quantize(instance.MaxDistanceMM)
 		instance.RequiredFunctions = normalizeFunctionSet(instance.RequiredFunctions)
 	}
 	for index := range realization.PortBindings {
 		binding := &realization.PortBindings[index]
 		binding.Role = canonicalIdentifier(binding.Role)
 		binding.Lane = canonicalIdentifier(binding.Lane)
+		binding.NetRole = canonicalIdentifier(binding.NetRole)
 		binding.Instance = canonicalIdentifier(binding.Instance)
 		binding.Function = strings.ToUpper(strings.TrimSpace(binding.Function))
 	}
@@ -236,12 +242,25 @@ func validateFragmentRealization(realization FragmentRealization) error {
 		}
 		instances[instance.ID] = true
 	}
+	for _, instance := range realization.Instances {
+		if instance.Near == "" {
+			if instance.MaxDistanceMM != 0 {
+				return fmt.Errorf("fragment realization instance distance requires a near target")
+			}
+			continue
+		}
+		if instance.Near == instance.ID || !instances[instance.Near] || !finiteNumbers(instance.MaxDistanceMM) || instance.MaxDistanceMM <= 0 {
+			return fmt.Errorf("fragment realization instance proximity is invalid")
+		}
+	}
 	roles := map[string]bool{}
 	boundEndpoints := map[string]bool{}
 	for _, binding := range realization.PortBindings {
 		key := binding.Role + "\x00" + binding.Lane
 		endpointKey := binding.Instance + "\x00" + binding.Function
-		if !validSemanticID(binding.Role) || (binding.Lane != "" && !validSemanticID(binding.Lane)) || !instances[binding.Instance] || binding.Function == "" || roles[key] || boundEndpoints[endpointKey] {
+		if !validSemanticID(binding.Role) || (binding.Lane != "" && !validSemanticID(binding.Lane)) ||
+			(binding.NetRole != "" && !validSemanticID(binding.NetRole)) ||
+			!instances[binding.Instance] || binding.Function == "" || roles[key] || boundEndpoints[endpointKey] {
 			return fmt.Errorf("fragment realization port binding is invalid or duplicated")
 		}
 		roles[key] = true

@@ -103,14 +103,19 @@ type ExplicitPadSpec struct {
 }
 
 type ExplicitNetSpec struct {
-	Name        string                `json:"name"`
-	Endpoints   []ExplicitNetEndpoint `json:"endpoints"`
-	Role        string                `json:"role,omitempty"`
-	NetClass    string                `json:"net_class,omitempty"`
-	Required    bool                  `json:"required,omitempty"`
-	CurrentMA   float64               `json:"current_ma,omitempty"`
-	WidthMM     float64               `json:"width_mm,omitempty"`
-	ClearanceMM float64               `json:"clearance_mm,omitempty"`
+	Name                    string                `json:"name"`
+	Endpoints               []ExplicitNetEndpoint `json:"endpoints"`
+	Role                    string                `json:"role,omitempty"`
+	NetClass                string                `json:"net_class,omitempty"`
+	Required                bool                  `json:"required,omitempty"`
+	CurrentMA               float64               `json:"current_ma,omitempty"`
+	WidthMM                 float64               `json:"width_mm,omitempty"`
+	ClearanceMM             float64               `json:"clearance_mm,omitempty"`
+	AllowedLayers           []string              `json:"allowed_layers,omitempty"`
+	PreferLayer             string                `json:"prefer_layer,omitempty"`
+	MaxLengthMM             float64               `json:"max_length_mm,omitempty"`
+	ReturnNet               string                `json:"return_net,omitempty"`
+	ReturnPathMaxDistanceMM float64               `json:"return_path_max_distance_mm,omitempty"`
 }
 
 type ExplicitNetEndpoint struct {
@@ -159,8 +164,11 @@ type BoardSpec struct {
 	WidthMM         float64 `json:"width_mm"`
 	HeightMM        float64 `json:"height_mm"`
 	Layers          int     `json:"layers,omitempty"`
+	ThicknessMM     float64 `json:"thickness_mm,omitempty"`
 	EdgeClearanceMM float64 `json:"edge_clearance_mm,omitempty"`
 }
+
+const DefaultBoardThicknessMM = 1.6
 
 // FabricationMetadataSpec records human-readable manufacturing intent in the
 // generated KiCad project. These values are evidence inputs, not routing or
@@ -291,6 +299,9 @@ func NormalizeRequest(request Request) Request {
 	}
 	if request.Board.Layers == 0 {
 		request.Board.Layers = 2
+	}
+	if request.Board.ThicknessMM == 0 {
+		request.Board.ThicknessMM = DefaultBoardThicknessMM
 	}
 	if request.Validation.Acceptance == "" {
 		request.Validation.Acceptance = AcceptanceStructural
@@ -495,6 +506,9 @@ func ValidateRequest(request Request) []reports.Issue {
 	if request.Board.Layers != 1 && request.Board.Layers != 2 && request.Board.Layers != 4 {
 		issues = append(issues, issue("board.layers", "board layers must be 1, 2, or 4"))
 	}
+	if !finiteScalar(request.Board.ThicknessMM) || request.Board.ThicknessMM <= 0 {
+		issues = append(issues, issue("board.thickness_mm", "board thickness must be positive and finite"))
+	}
 	if request.Board.EdgeClearanceMM < 0 {
 		issues = append(issues, issue("board.edge_clearance_mm", "board edge clearance must be non-negative"))
 	}
@@ -615,6 +629,7 @@ func cloneExplicitCircuit(source *ExplicitCircuitSpec) *ExplicitCircuitSpec {
 	}
 	clone.Nets = append([]ExplicitNetSpec(nil), source.Nets...)
 	for index := range clone.Nets {
+		clone.Nets[index].AllowedLayers = append([]string(nil), source.Nets[index].AllowedLayers...)
 		clone.Nets[index].Endpoints = append([]ExplicitNetEndpoint(nil), source.Nets[index].Endpoints...)
 	}
 	clone.Regions = append([]ExplicitRegionSpec(nil), source.Regions...)
@@ -811,8 +826,16 @@ func validateExplicitCircuit(circuit ExplicitCircuitSpec) []reports.Issue {
 		if net.Name == "" || len(net.Endpoints) < 2 {
 			issues = append(issues, issue(path, "net name and at least two endpoints are required"))
 		}
-		if net.CurrentMA < 0 || net.WidthMM < 0 || net.ClearanceMM < 0 || !finiteScalar(net.CurrentMA) || !finiteScalar(net.WidthMM) || !finiteScalar(net.ClearanceMM) {
-			issues = append(issues, issue(path, "net current, width, and clearance must be finite and non-negative"))
+		if net.CurrentMA < 0 || net.WidthMM < 0 || net.ClearanceMM < 0 || net.MaxLengthMM < 0 || net.ReturnPathMaxDistanceMM < 0 || !finiteScalar(net.CurrentMA) || !finiteScalar(net.WidthMM) || !finiteScalar(net.ClearanceMM) || !finiteScalar(net.MaxLengthMM) || !finiteScalar(net.ReturnPathMaxDistanceMM) {
+			issues = append(issues, issue(path, "net current, width, clearance, and maximum length must be finite and non-negative"))
+		}
+		for _, layer := range net.AllowedLayers {
+			if !isCopperLayer(layer) {
+				issues = append(issues, issue(path+".allowed_layers", "allowed layers must name copper layers"))
+			}
+		}
+		if net.PreferLayer != "" && !isCopperLayer(net.PreferLayer) {
+			issues = append(issues, issue(path+".prefer_layer", "preferred layer must name a copper layer"))
 		}
 		if _, exists := seenNets[net.Name]; exists {
 			issues = append(issues, issue(path+".name", "duplicate explicit net name"))
@@ -847,6 +870,18 @@ func validateExplicitCircuit(circuit ExplicitCircuitSpec) []reports.Issue {
 	for name := range schematicNets {
 		if _, exists := seenNets[name]; !exists {
 			issues = append(issues, issue("explicit_circuit.schematic", "schematic net "+name+" has no resolved explicit net"))
+		}
+	}
+	for index, net := range circuit.Nets {
+		if net.ReturnNet != "" {
+			if _, exists := seenNets[net.ReturnNet]; !exists {
+				issues = append(issues, issue(fmt.Sprintf("explicit_circuit.nets[%d].return_net", index), "return-path net does not exist"))
+			}
+			if net.ReturnPathMaxDistanceMM <= 0 {
+				issues = append(issues, issue(fmt.Sprintf("explicit_circuit.nets[%d].return_path_max_distance_mm", index), "return-path net requires a positive maximum distance"))
+			}
+		} else if net.ReturnPathMaxDistanceMM != 0 {
+			issues = append(issues, issue(fmt.Sprintf("explicit_circuit.nets[%d].return_path_max_distance_mm", index), "return-path distance requires a return net"))
 		}
 	}
 	for componentID, pads := range padsByComponent {

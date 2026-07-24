@@ -75,16 +75,21 @@ func ProviderGraphSchema() map[string]any {
 		"selector":      stringValue,
 	})
 	net := strictObject(map[string]any{
-		"name":              stringValue,
-		"role":              map[string]any{"type": "string", "enum": netRoleValues()},
-		"required":          boolValue,
-		"voltage_domain":    stringValue,
-		"net_class":         map[string]any{"type": "string", "enum": []string{"", "signal", "clock", "power", "ground"}},
-		"current_ma":        numberValue,
-		"width_mm":          numberValue,
-		"clearance_mm":      numberValue,
-		"differential_pair": stringValue,
-		"endpoints":         map[string]any{"type": "array", "minItems": 2, "maxItems": MaxEndpointsPerNet, "items": endpoint},
+		"name":                        stringValue,
+		"role":                        map[string]any{"type": "string", "enum": netRoleValues()},
+		"required":                    boolValue,
+		"voltage_domain":              stringValue,
+		"net_class":                   map[string]any{"type": "string", "enum": []string{"", "signal", "clock", "power", "ground"}},
+		"current_ma":                  numberValue,
+		"width_mm":                    numberValue,
+		"clearance_mm":                numberValue,
+		"allowed_layers":              stringArray(32),
+		"prefer_layer":                stringValue,
+		"max_length_mm":               numberValue,
+		"return_net":                  stringValue,
+		"return_path_max_distance_mm": numberValue,
+		"differential_pair":           stringValue,
+		"endpoints":                   map[string]any{"type": "array", "minItems": 2, "maxItems": MaxEndpointsPerNet, "items": endpoint},
 	})
 	busMember := strictObject(map[string]any{"net": stringValue, "label": stringValue, "polarity": stringValue})
 	bus := strictObject(map[string]any{
@@ -280,6 +285,8 @@ func ProviderGraphSchema() map[string]any {
 		},
 		"required_functions": stringArray(256),
 		"usage":              stringValue,
+		"near":               stringValue,
+		"max_distance_mm":    nonnegativeMM,
 		"extensions":         emptyExtensions,
 	})
 	interfaceSignal := strictObject(map[string]any{
@@ -376,7 +383,7 @@ func componentRoleValues() []string {
 func netRoleValues() []string {
 	return []string{
 		string(NetRoleSignal), string(NetRolePower), string(NetRolePowerPos), string(NetRolePowerNeg),
-		string(NetRoleGround), string(NetRoleReturn), string(NetRoleFeedback), string(NetRoleBias), string(NetRoleShield),
+		string(NetRoleGround), string(NetRoleReturn), string(NetRoleClock), string(NetRoleFeedback), string(NetRoleBias), string(NetRoleTiming), string(NetRoleShield),
 	}
 }
 

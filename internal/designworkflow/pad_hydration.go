@@ -338,6 +338,16 @@ func verifiedPadTemplate(footprintID string) (verifiedPadTemplateRecord, bool) {
 				throughHolePad("4", 7.62, 0, 1.6, 1.6, 0.8, "circle"),
 			},
 		}, true
+	case "Oscillator:Oscillator_SMD_SiT_PQFN-4Pin_5.0x3.2mm":
+		return verifiedPadTemplateRecord{
+			Bounds: verifiedCourtyardBoundsFromExtents(-3, -2.16, 3, 2.16),
+			Pads: []placement.PadSummary{
+				smdPad("1", -1.27, 1.1, 1.5, 1.6, "roundrect"),
+				smdPad("2", 1.27, 1.1, 1.5, 1.6, "roundrect"),
+				smdPad("3", 1.27, -1.1, 1.5, 1.6, "roundrect"),
+				smdPad("4", -1.27, -1.1, 1.5, 1.6, "roundrect"),
+			},
+		}, true
 	case "Relay_THT:Relay_SPST_Omron-G5Q-1A":
 		pads := []placement.PadSummary{
 			throughHolePad("1", 0, 0, 2.3, 2.3, 1.3, "rect"),
@@ -405,7 +415,8 @@ func verifiedPadTemplate(footprintID string) (verifiedPadTemplateRecord, bool) {
 				smdPad("5", 1.1375, -0.95, 1.325, 0.6, "roundrect"),
 			},
 		}, true
-	case "Package_TO_SOT_SMD:SOT-23-6":
+	case "Package_TO_SOT_SMD:SOT-23-6",
+		"Package_TO_SOT_SMD:TSOT-23-6":
 		return verifiedPadTemplateRecord{
 			Bounds: verifiedCourtyardBoundsFromExtents(-2.05, -1.7, 2.05, 1.7),
 			Pads: []placement.PadSummary{

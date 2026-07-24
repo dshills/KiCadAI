@@ -91,6 +91,7 @@ type Component struct {
 	ID                string                     `json:"id"`
 	Reference         string                     `json:"reference,omitempty"`
 	Role              ComponentRole              `json:"role"`
+	Usage             string                     `json:"usage,omitempty"`
 	Units             []ComponentUnit            `json:"units,omitempty"`
 	ComponentID       string                     `json:"component_id,omitempty"`
 	VariantID         string                     `json:"variant_id,omitempty"`
@@ -193,16 +194,21 @@ const (
 )
 
 type Net struct {
-	Name             string     `json:"name"`
-	Role             NetRole    `json:"role"`
-	Required         *bool      `json:"required,omitempty"`
-	VoltageDomain    string     `json:"voltage_domain,omitempty"`
-	NetClass         string     `json:"net_class,omitempty"`
-	CurrentMA        float64    `json:"current_ma,omitempty"`
-	WidthMM          float64    `json:"width_mm,omitempty"`
-	ClearanceMM      float64    `json:"clearance_mm,omitempty"`
-	DifferentialPair string     `json:"differential_pair,omitempty"`
-	Endpoints        []Endpoint `json:"endpoints"`
+	Name                    string     `json:"name"`
+	Role                    NetRole    `json:"role"`
+	Required                *bool      `json:"required,omitempty"`
+	VoltageDomain           string     `json:"voltage_domain,omitempty"`
+	NetClass                string     `json:"net_class,omitempty"`
+	CurrentMA               float64    `json:"current_ma,omitempty"`
+	WidthMM                 float64    `json:"width_mm,omitempty"`
+	ClearanceMM             float64    `json:"clearance_mm,omitempty"`
+	AllowedLayers           []string   `json:"allowed_layers,omitempty"`
+	PreferLayer             string     `json:"prefer_layer,omitempty"`
+	MaxLengthMM             float64    `json:"max_length_mm,omitempty"`
+	ReturnNet               string     `json:"return_net,omitempty"`
+	ReturnPathMaxDistanceMM float64    `json:"return_path_max_distance_mm,omitempty"`
+	DifferentialPair        string     `json:"differential_pair,omitempty"`
+	Endpoints               []Endpoint `json:"endpoints"`
 }
 
 type NetRole = domain.NetRole
@@ -215,8 +221,10 @@ const (
 	NetRolePowerNeg = domain.NetRolePowerNeg
 	NetRoleGround   = domain.NetRoleGround
 	NetRoleReturn   = domain.NetRoleReturn
+	NetRoleClock    = domain.NetRoleClock
 	NetRoleFeedback = domain.NetRoleFeedback
 	NetRoleBias     = domain.NetRoleBias
+	NetRoleTiming   = domain.NetRoleTiming
 	NetRoleShield   = domain.NetRoleShield
 )
 

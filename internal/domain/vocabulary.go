@@ -68,6 +68,7 @@ const (
 	NetRoleReturn       NetRole = "return"
 	NetRoleFeedback     NetRole = "feedback"
 	NetRoleBias         NetRole = "bias"
+	NetRoleTiming       NetRole = "timing"
 	NetRoleShield       NetRole = "shield"
 	NetRoleBus          NetRole = "bus"
 	NetRoleNoConnect    NetRole = "no_connect"

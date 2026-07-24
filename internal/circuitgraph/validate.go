@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math"
 	"regexp"
+	"strconv"
 	"strings"
 	"unicode/utf8"
 
@@ -337,8 +338,16 @@ func (validator *graphValidator) nets(componentsByID map[string]Component) (map[
 			validator.add(CodeLimitExceeded, path+".endpoints", "endpoint count exceeds per-net limit")
 		}
 		totalEndpoints += len(net.Endpoints)
-		if !finiteInRange(net.CurrentMA, 0, math.MaxFloat64, true) || !finiteInRange(net.WidthMM, 0, MaxBoardDimensionMM, true) || !finiteInRange(net.ClearanceMM, 0, MaxBoardDimensionMM, true) {
+		if !finiteInRange(net.CurrentMA, 0, math.MaxFloat64, true) || !finiteInRange(net.WidthMM, 0, MaxBoardDimensionMM, true) || !finiteInRange(net.ClearanceMM, 0, MaxBoardDimensionMM, true) || !finiteInRange(net.MaxLengthMM, 0, MaxBoardDimensionMM*2, true) || !finiteInRange(net.ReturnPathMaxDistanceMM, 0, MaxBoardDimensionMM, true) {
 			validator.add(CodeNetInvalid, path, "net numeric constraints must be finite and non-negative")
+		}
+		for layerIndex, layer := range net.AllowedLayers {
+			if !validCopperLayer(layer, validator.document.Project.Board.Layers) {
+				validator.add(CodeNetInvalid, fmt.Sprintf("%s.allowed_layers[%d]", path, layerIndex), "allowed layer must name copper present on the board")
+			}
+		}
+		if net.PreferLayer != "" && !validCopperLayer(net.PreferLayer, validator.document.Project.Board.Layers) {
+			validator.add(CodeNetInvalid, path+".prefer_layer", "preferred layer must name copper present on the board")
 		}
 		if net.DifferentialPair != "" {
 			differentialPairs[net.DifferentialPair]++
@@ -355,6 +364,25 @@ func (validator *graphValidator) nets(componentsByID map[string]Component) (map[
 	}
 	if totalEndpoints > MaxTotalEndpoints {
 		validator.add(CodeLimitExceeded, "nets", "total endpoint count exceeds limit")
+	}
+	for index, net := range validator.document.Nets {
+		if net.ReturnNet == "" {
+			if net.ReturnPathMaxDistanceMM != 0 {
+				validator.add(CodeNetInvalid, fmt.Sprintf("nets[%d].return_path_max_distance_mm", index), "return-path distance requires a return net")
+			}
+			continue
+		}
+		if net.ReturnPathMaxDistanceMM <= 0 {
+			validator.add(CodeNetInvalid, fmt.Sprintf("nets[%d].return_path_max_distance_mm", index), "return-path net requires a positive maximum distance")
+		}
+		reference, exists := byName[net.ReturnNet]
+		if !exists {
+			validator.add(CodeNetInvalid, fmt.Sprintf("nets[%d].return_net", index), "return-path net does not exist")
+			continue
+		}
+		if reference.Role != NetRoleGround && reference.Role != NetRoleReturn {
+			validator.add(CodeNetInvalid, fmt.Sprintf("nets[%d].return_net", index), "return-path net must have ground or return role")
+		}
 	}
 	for pair, count := range differentialPairs {
 		if count != 2 {
@@ -697,11 +725,23 @@ func validComponentRole(value ComponentRole) bool {
 
 func validNetRole(value NetRole) bool {
 	switch value {
-	case NetRoleSignal, NetRolePower, NetRolePowerPos, NetRolePowerNeg, NetRoleGround, NetRoleReturn, NetRoleFeedback, NetRoleBias, NetRoleShield:
+	case NetRoleSignal, NetRolePower, NetRolePowerPos, NetRolePowerNeg, NetRoleGround, NetRoleReturn, NetRoleClock, NetRoleFeedback, NetRoleBias, NetRoleTiming, NetRoleShield:
 		return true
 	default:
 		return false
 	}
+}
+
+func validCopperLayer(layer string, boardLayers int) bool {
+	switch layer {
+	case "F.Cu", "B.Cu":
+		return true
+	}
+	if !strings.HasPrefix(layer, "In") || !strings.HasSuffix(layer, ".Cu") {
+		return false
+	}
+	index, err := strconv.Atoi(strings.TrimSuffix(strings.TrimPrefix(layer, "In"), ".Cu"))
+	return err == nil && index >= 1 && index <= boardLayers-2
 }
 
 func validPowerFlagNetRole(value NetRole) bool {

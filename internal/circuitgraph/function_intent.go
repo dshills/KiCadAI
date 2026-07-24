@@ -27,6 +27,8 @@ type FunctionRequirement struct {
 	RequiredRatings   []RequiredRating           `json:"required_ratings,omitempty"`
 	RequiredFunctions []string                   `json:"required_functions,omitempty"`
 	Usage             string                     `json:"usage"`
+	Near              string                     `json:"near,omitempty"`
+	MaxDistanceMM     float64                    `json:"max_distance_mm,omitempty"`
 	Extensions        map[string]json.RawMessage `json:"extensions,omitempty"`
 }
 

@@ -726,7 +726,7 @@ func validPinRole(role PinRole) bool {
 func validNetRole(role NetRole) bool {
 	switch role {
 	case NetRoleSignal, NetRolePower, NetRolePowerPos, NetRolePowerNeg, NetRoleGround,
-		NetRoleReturn, NetRoleFeedback, NetRoleBias, NetRoleShield, NetRoleBus, NetRoleNoConnect:
+		NetRoleReturn, NetRoleClock, NetRoleFeedback, NetRoleBias, NetRoleTiming, NetRoleShield, NetRoleBus, NetRoleNoConnect:
 		return true
 	default:
 		return false

@@ -19,10 +19,14 @@ const (
 	maxMNAExcitations     = 16
 	maxMNADeviceOverrides = 64
 	maxMNASourceMagnitude = 1e6
-	maxTransientSteps     = 2048
+	// A single dynamic analysis cannot consume more work than the trusted
+	// per-plan ceiling, even when it converges faster than the worst case.
+	// This retains enough samples for clock edges without admitting an
+	// unbounded 65k-step Newton solve.
+	maxTransientSteps     = 3_900
 	maxTransientWork      = (maxTransientSteps + 6) * transientMaxNewtonIterations
 	maxTotalDynamicWork   = 2_000_000
-	minTransientTimeStepS = 1e-9
+	minTransientTimeStepS = 1e-12
 	maxTransientDurationS = 10
 )
 
@@ -34,6 +38,7 @@ type primitiveDefinition struct {
 	RequiresValueSI   bool                `json:"requires_value_si,omitempty"`
 	CatalogParameters []valueRule         `json:"catalog_parameters,omitempty"`
 	Source            bool                `json:"source,omitempty"`
+	Autonomous        bool                `json:"autonomous,omitempty"`
 	OpAmp             bool                `json:"op_amp,omitempty"`
 	Comparator        bool                `json:"comparator,omitempty"`
 	Nonlinear         bool                `json:"nonlinear,omitempty"`
@@ -78,6 +83,35 @@ var primitiveRegistry = []primitiveDefinition{
 	{ID: PrimitiveVoltageSourceV1, Family: "voltage_source", Terminals: []string{"POSITIVE", "NEGATIVE"}, Source: true},
 	{ID: PrimitiveConnectorVoltageSourceV1, Family: "connector", Terminals: []string{"PIN_1", "PIN_2"}, Source: true},
 	{ID: PrimitiveCurrentSourceV1, Family: "current_source", Terminals: []string{"POSITIVE", "NEGATIVE"}, Source: true},
+	{
+		ID: PrimitiveFixedClockSourceV1, Family: "clock_source",
+		Terminals: []string{"VDD", "GND", "OUT", "ENABLE"}, Autonomous: true, Nonlinear: true, Transient: true,
+		CatalogParameters: clockSourceParameterRules(false),
+	},
+	{
+		ID: PrimitiveResistorProgrammedClockSourceV1, Family: "clock_source",
+		// GRD is an optional PCB guard driver that follows SET and does not
+		// participate in the oscillator's electrical transfer function. Keep it
+		// out of the trusted primitive topology so a reviewed no-connect policy
+		// remains simulatable when no bare-copper guard is generated.
+		Terminals: []string{"VDD", "GND", "OUT", "SET", "DIV"}, Autonomous: true, Nonlinear: true, Transient: true,
+		CatalogParameters: clockSourceParameterRules(true),
+	},
+	{
+		ID: PrimitiveCMOSBufferV1, Family: "logic_buffer",
+		Terminals: []string{"IN", "OUT", "VCC", "GND"}, Nonlinear: true, Transient: true,
+		CatalogParameters: []valueRule{
+			{Name: "input_low_max_v", Nonnegative: true, Maximum: 100},
+			{Name: "input_high_min_v", Positive: true, Maximum: 100},
+			{Name: "output_high_drop_v_at_rated_current", Nonnegative: true, Maximum: 100},
+			{Name: "output_low_rise_v_at_rated_current", Nonnegative: true, Maximum: 100},
+			{Name: "rated_output_current_a", Positive: true, Minimum: 1e-9, Maximum: 100},
+			{Name: "output_resistance_ohm", Positive: true, Minimum: 1e-6, Maximum: 1e9},
+			{Name: "propagation_delay_s", Nonnegative: true, Maximum: 10},
+			{Name: "max_load_capacitance_f", Positive: true, Minimum: 1e-15, Maximum: 1},
+			{Name: "supply_current_a", Nonnegative: true, Maximum: 100},
+		},
+	},
 	{
 		ID: PrimitiveMCUStaticSupplyLoadV1, Family: "mcu", Terminals: []string{"POWER", "GROUND"},
 		TerminalAliases: map[string][]string{
@@ -325,6 +359,38 @@ func PrimitiveModelIDs() []string {
 	return ids
 }
 
+func clockSourceParameterRules(programmable bool) []valueRule {
+	rules := []valueRule{
+		{Name: "frequency_hz", Positive: true, Minimum: 1e-3, Maximum: 1e12, Optional: programmable},
+		{Name: "frequency_accuracy_fraction", Nonnegative: true, Maximum: 1},
+		{Name: "duty_cycle_fraction", Positive: true, Minimum: 1e-6, Maximum: 1},
+		{Name: "startup_time_s", Nonnegative: true, Maximum: 100, Optional: programmable},
+		{Name: "rms_jitter_s", Nonnegative: true, Maximum: 100},
+		{Name: "dc_output_high", Nonnegative: true, Maximum: 1},
+		{Name: "output_high_ratio", Positive: true, Maximum: 1},
+		{Name: "output_low_ratio", Nonnegative: true, Maximum: 1},
+		{Name: "output_resistance_ohm", Positive: true, Minimum: 1e-6, Maximum: 1e9},
+		{Name: "max_output_current_a", Positive: true, Minimum: 1e-9, Maximum: 100},
+		{Name: "max_load_capacitance_f", Positive: true, Minimum: 1e-15, Maximum: 1},
+		{Name: "supply_current_a", Nonnegative: true, Maximum: 100},
+	}
+	if programmable {
+		rules = append(rules,
+			valueRule{Name: "frequency_scale_hz_ohm", Positive: true, Minimum: 1, Maximum: 1e18},
+			valueRule{Name: "divider_ratio", Positive: true, Minimum: 1, Maximum: 1e9},
+			valueRule{Name: "timing_resistance_min_ohm", Positive: true, Minimum: 1e-3, Maximum: 1e15},
+			valueRule{Name: "timing_resistance_max_ohm", Positive: true, Minimum: 1e-3, Maximum: 1e15},
+			valueRule{Name: "startup_cycles", Positive: true, Minimum: 1, Maximum: 1e12},
+			valueRule{Name: "startup_fixed_s", Nonnegative: true, Maximum: 100},
+		)
+	} else {
+		rules = append(rules,
+			valueRule{Name: "enable_high_ratio", Positive: true, Minimum: 1e-6, Maximum: 1},
+		)
+	}
+	return rules
+}
+
 func bjtParameterRules() []valueRule {
 	rules := []valueRule{
 		{Name: "saturation_current_a", Positive: true, Minimum: 1e-30, Maximum: 1e-3},
@@ -453,6 +519,7 @@ func applicableGraphModel(components []ComponentEvidence, requestedModelID, anal
 	hasSource := false
 	hasDevice := false
 	hasNonlinear := false
+	hasAutonomousTransient := false
 	for _, component := range components {
 		if len(component.Connections) == 0 || (mnaBoundaryFamily(component.Family) && !componentHasSourceClaim(component)) {
 			continue
@@ -465,6 +532,7 @@ func applicableGraphModel(components []ComponentEvidence, requestedModelID, anal
 			hasSource = hasSource || primitive.Source
 			hasDevice = hasDevice || !primitive.Source
 			hasNonlinear = hasNonlinear || primitive.Nonlinear
+			hasAutonomousTransient = hasAutonomousTransient || primitive.Autonomous && primitive.Transient
 		}
 	}
 	if !hasSource || !hasDevice {
@@ -475,6 +543,9 @@ func applicableGraphModel(components []ComponentEvidence, requestedModelID, anal
 		modelID = ModelLinearCircuitMNAV1
 		if hasNonlinear {
 			modelID = ModelNonlinearCircuitDCV1
+		}
+		if hasAutonomousTransient {
+			modelID = ModelTransientCircuitV1
 		}
 	}
 	model, exists := definitionByID(modelID)
@@ -520,9 +591,6 @@ func validateMNAIntent(intent Intent, components map[string]string) []Diagnostic
 		analysisKinds[id] = analysis.Kind
 		switch analysis.Kind {
 		case AnalysisDCOperatingPoint:
-			if model.Transient {
-				diagnostics = append(diagnostics, Diagnostic{Path: path + ".kind", Message: "transient circuit workflow supports transient analysis only"})
-			}
 			if analysis.StartFrequencyHz != 0 || analysis.StopFrequencyHz != 0 || analysis.Points != 0 || analysis.DurationS != 0 || analysis.TimeStepS != 0 {
 				diagnostics = append(diagnostics, Diagnostic{Path: path, Message: "DC operating-point analysis cannot contain AC sweep fields"})
 			}
@@ -564,10 +632,14 @@ func validateMNAIntent(intent Intent, components map[string]string) []Diagnostic
 			if !model.Transient {
 				diagnostics = append(diagnostics, Diagnostic{Path: path + ".kind", Message: "dynamic analysis requires transient_circuit_v1"})
 			}
-			if analysis.StartFrequencyHz != 0 || analysis.StopFrequencyHz != 0 || analysis.Points != 0 || !validTransientGrid(analysis.DurationS, analysis.TimeStepS) || transientWork(analysis) > maxTransientWork {
+			work := transientWork(analysis)
+			gridValid := validTransientGrid(analysis.DurationS, analysis.TimeStepS) && work <= maxTransientWork
+			if analysis.StartFrequencyHz != 0 || analysis.StopFrequencyHz != 0 || analysis.Points != 0 || !gridValid {
 				diagnostics = append(diagnostics, Diagnostic{Path: path, Message: fmt.Sprintf("dynamic analysis requires finite %.0e <= time_step_s, duration_s <= %d, an exact integer grid, and at most %d steps", minTransientTimeStepS, maxTransientDurationS, maxTransientSteps)})
 			}
-			totalDynamicWork += transientWork(analysis)
+			if gridValid {
+				totalDynamicWork += work
+			}
 		case AnalysisThermal:
 			if analysis.DCSweep != nil {
 				diagnostics = append(diagnostics, Diagnostic{Path: path + ".dc_sweep", Message: "DC source sweep is accepted only by DC operating-point analysis"})
@@ -580,10 +652,14 @@ func validateMNAIntent(intent Intent, components map[string]string) []Diagnostic
 				if !model.Transient {
 					diagnostics = append(diagnostics, Diagnostic{Path: path + ".kind", Message: "periodically driven thermal analysis requires transient_circuit_v1"})
 				}
-				if !validTransientGrid(analysis.DurationS, analysis.TimeStepS) || transientWork(analysis) > maxTransientWork {
+				work := transientWork(analysis)
+				gridValid := validTransientGrid(analysis.DurationS, analysis.TimeStepS) && work <= maxTransientWork
+				if !gridValid {
 					diagnostics = append(diagnostics, Diagnostic{Path: path, Message: fmt.Sprintf("periodically driven thermal analysis requires finite %.0e <= time_step_s, duration_s <= %d, an exact integer grid, and at most %d steps", minTransientTimeStepS, maxTransientDurationS, maxTransientSteps)})
 				}
-				totalDynamicWork += transientWork(analysis)
+				if gridValid {
+					totalDynamicWork += work
+				}
 			} else if model.Transient {
 				// A transient-capable graph can still perform the legacy DC thermal
 				// operating point. This keeps one resolved device set usable for both
@@ -954,7 +1030,7 @@ func resolveMNA(intent Intent, catalogID, catalogHash string, components []Compo
 		}
 		device := ResolvedDevice{
 			Component: component.InstanceID, PhysicalComponent: component.PhysicalComponent,
-			CatalogID: component.CatalogID, Family: component.Family, PrimitiveModel: primitive.ID,
+			CatalogID: component.CatalogID, Family: component.Family, Usage: component.Usage, PrimitiveModel: primitive.ID,
 			ModelParameters: normalizeNamedValues(claim.Parameters),
 		}
 		if primitive.RequiresValueSI {

@@ -287,7 +287,9 @@ func CompileSimulationResolution(
 				}
 				for _, prototype := range binding.Prototypes {
 					analysisIndex := slices.IndexFunc(compiledPlan.Analyses, func(analysis simmodel.Analysis) bool { return analysis.ID == analysisID })
-					if analysisIndex >= 0 && edgeTimeQuantity(prototype.Quantity) && !analysisHasDynamicExcitation(compiledPlan.Analyses[analysisIndex]) {
+					if analysisIndex >= 0 && edgeTimeQuantity(prototype.Quantity) &&
+						!analysisHasDynamicExcitation(compiledPlan.Analyses[analysisIndex]) &&
+						!planHasAutonomousTransientDevice(compiledPlan) {
 						continue
 					}
 					assertion := prototype
@@ -401,6 +403,13 @@ func analysisHasDynamicExcitation(analysis simmodel.Analysis) bool {
 		}
 	}
 	return false
+}
+
+func planHasAutonomousTransientDevice(plan simmodel.Plan) bool {
+	return slices.ContainsFunc(plan.Devices, func(device simmodel.ResolvedDevice) bool {
+		return device.PrimitiveModel == simmodel.PrimitiveFixedClockSourceV1 ||
+			device.PrimitiveModel == simmodel.PrimitiveResistorProgrammedClockSourceV1
+	})
 }
 
 func validOperatingBinding(binding SimulationOperatingBinding) bool {

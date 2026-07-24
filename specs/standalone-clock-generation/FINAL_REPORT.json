@@ -1,0 +1,80 @@
+{
+  "schema": "kicadai.standalone-clock-generation-final.v1",
+  "version": 1,
+  "generated_at": "2026-07-24T00:00:00Z",
+  "baseline_schema": "kicadai.standalone-clock-generation-baseline.v1",
+  "manifest_sha256": "7d75d83e8f50ee9780b40472a106aff06462f9b0a42f7d9509005f157c94deaa",
+  "capability_base_commit": "0cd2b17aa725839b192f2f4bbb82538c963c6ebc",
+  "evaluator": "standalone-clock-architecture-v1",
+  "gate_profile": {
+    "architecture_search": "required",
+    "component_evidence": "required",
+    "corner_proof": "required",
+    "simulation": "required",
+    "routing": "required",
+    "connectivity": "required",
+    "route_completion": "required",
+    "writer_correctness": "required",
+    "kicad_erc": "required",
+    "strict_kicad_drc": "required",
+    "zero_round_trip_diffs": "required",
+    "deterministic_replay": "required"
+  },
+  "cases": [
+    {
+      "id": "precision_logic_clock",
+      "status": "pass",
+      "architecture_family": "fixed_packaged_oscillator",
+      "source_catalog_id": "clock_source.sitime.sit8008ac_31_33e_8mhz",
+      "endpoint_catalog_id": "logic_buffer.ti.sn74lvc1g17dbv",
+      "corner_evaluations": 8,
+      "installed_kicad": "pass",
+      "replay": "byte_identical"
+    },
+    {
+      "id": "relaxed_logic_clock",
+      "status": "pass",
+      "architecture_family": "resistor_programmed_relaxation_oscillator",
+      "source_catalog_id": "clock_source.analog_devices.ltc6906is6",
+      "endpoint_catalog_id": "logic_buffer.ti.sn74lvc1g17dbv",
+      "corner_evaluations": 8,
+      "installed_kicad": "pass",
+      "replay": "byte_identical"
+    }
+  ],
+  "negative_requirement_classes": {
+    "accuracy": "CLOCK_ACCURACY_UNSUPPORTED",
+    "startup": "CLOCK_STARTUP_UNSUPPORTED",
+    "loading": "CLOCK_LOADING_UNSUPPORTED",
+    "fanout": "CLOCK_FANOUT_UNSUPPORTED",
+    "jitter": "CLOCK_JITTER_UNSUPPORTED",
+    "edge": "CLOCK_EDGE_UNSUPPORTED",
+    "duty_cycle": "CLOCK_DUTY_CYCLE_UNSUPPORTED",
+    "supply": "CLOCK_SUPPLY_UNSUPPORTED",
+    "temperature": "CLOCK_TEMPERATURE_UNSUPPORTED"
+  },
+  "physical_evidence": {
+    "clock_preferred_layer": "F.Cu",
+    "clock_max_route_length_mm": 100,
+    "timing_preferred_layer": "F.Cu",
+    "timing_max_route_length_mm": 12,
+    "clock_return_path_max_distance_mm": 8,
+    "measurement_source": "final_emitted_copper"
+  },
+  "held_out_benchmark": {
+    "cases": 12,
+    "passed": 12,
+    "blocked": 0,
+    "promoted_case": "digital_clock_source",
+    "promoted_case_installed_kicad": "pass"
+  },
+  "preserved_regressions": {
+    "usb_c_i2c_sensor_3v3_protected": "installed_kicad_pass"
+  },
+  "aggregate": {
+    "cases": 2,
+    "passed": 2,
+    "blocked": 0,
+    "architecture_families": 2
+  }
+}

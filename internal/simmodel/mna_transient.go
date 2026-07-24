@@ -17,9 +17,14 @@ const (
 	transientSourceContinuationStages        = 4
 	transientMaxNewtonAttemptsPerObservation = 2 * (1 + transientSourceContinuationStages)
 	transientActiveLimitContinuationStepV    = 1
+	maxClockPhaseCycles                      = 1e9
 )
 
 func solveTransientAnalysis(plan Plan, analysis Analysis) (AnalysisResult, []Diagnostic) {
+	plan = resolveProgrammedClockFrequencies(plan)
+	if diagnostics := validateClockPhaseResolution(plan, analysis); len(diagnostics) != 0 {
+		return AnalysisResult{ID: analysis.ID, Kind: AnalysisTransient}, diagnostics
+	}
 	steps := int(math.Round(analysis.DurationS / analysis.TimeStepS))
 	result := AnalysisResult{ID: analysis.ID, Kind: AnalysisTransient, Points: make([]AnalysisPoint, 0, steps+1)}
 	for _, excitation := range analysis.Excitations {
@@ -56,7 +61,11 @@ func solveTransientAnalysis(plan Plan, analysis Analysis) (AnalysisResult, []Dia
 	if diagnostics := validateTransientOperatingLimits(plan, system, solution, initialStates, transientSourcesInitiallyZero(analysis), 0, nil); len(diagnostics) != 0 {
 		return result, prefixTransientDiagnostics(analysis.ID, 0, 0, diagnostics)
 	}
-	result.Points = append(result.Points, AnalysisPoint{TimeS: 0, Nodes: nodeResults(plan, system, solution), Devices: transientObservationDeviceResults(plan, analysis, initialAnalysis, system, solution, nil), Solver: &initialEvidence})
+	result.Points = append(result.Points, AnalysisPoint{
+		TimeS: 0, Nodes: nodeResults(plan, system, solution),
+		Devices: transientObservationDeviceResults(plan, analysis, initialAnalysis, system, solution, nil, 0, 0, solution, nil),
+		Solver:  &initialEvidence,
+	})
 	history := [][]complex128{append([]complex128(nil), solution...)}
 
 	devices := compileNonlinearDevices(plan)
@@ -106,17 +115,69 @@ func solveTransientAnalysis(plan Plan, analysis Analysis) (AnalysisResult, []Dia
 		if diagnostics := validateTransientOperatingLimits(plan, system, solution, comparatorStates, transientSourcesZeroAtTime(analysis, timeS), analysis.TimeStepS, fuseSurgeI2t); len(diagnostics) != 0 {
 			return result, prefixTransientDiagnostics(analysis.ID, step, timeS, diagnostics)
 		}
-		result.Points = append(result.Points, AnalysisPoint{TimeS: normalizedMNAFloat(timeS), Nodes: nodeResults(plan, system, solution), Devices: transientObservationDeviceResults(plan, analysis, analysis, system, solution, comparatorStates), Solver: &evidence})
+		result.Points = append(result.Points, AnalysisPoint{
+			TimeS: normalizedMNAFloat(timeS), Nodes: nodeResults(plan, system, solution),
+			Devices: transientObservationDeviceResults(
+				plan, analysis, analysis, system, solution, comparatorStates,
+				step, timeS, previousSolution, history,
+			),
+			Solver: &evidence,
+		})
 		history = append(history, append([]complex128(nil), solution...))
 	}
 	return result, nil
 }
 
-func transientObservationDeviceResults(plan Plan, observation, evaluation Analysis, system mnaSystem, solution []complex128, comparatorStates map[string]float64) []DeviceResult {
+func transientObservationDeviceResults(
+	plan Plan,
+	observation Analysis,
+	evaluation Analysis,
+	system mnaSystem,
+	solution []complex128,
+	comparatorStates map[string]float64,
+	step int,
+	timeS float64,
+	previous []complex128,
+	history [][]complex128,
+) []DeviceResult {
 	if observation.Kind == AnalysisDistortion {
 		return nil
 	}
-	return electricalDeviceResultsWithComparatorStates(plan, evaluation, 0, system, solution, comparatorStates)
+	var digitalOutputStates map[string]bool
+	var digitalOutputEnabled map[string]bool
+	switch evaluation.Kind {
+	case AnalysisTransient, AnalysisStartup:
+		digitalOutputStates, digitalOutputEnabled = transientDigitalOutputStates(
+			plan, evaluation, &system, step, timeS, previous, history,
+		)
+	}
+	return electricalDeviceResultsWithComparatorStates(
+		plan, evaluation, 0, system, solution, comparatorStates, digitalOutputStates, digitalOutputEnabled,
+	)
+}
+
+func transientDigitalOutputStates(
+	plan Plan,
+	analysis Analysis,
+	system *mnaSystem,
+	step int,
+	timeS float64,
+	previous []complex128,
+	history [][]complex128,
+) (map[string]bool, map[string]bool) {
+	states := map[string]bool{}
+	enabled := map[string]bool{}
+	for _, device := range plan.Devices {
+		switch device.PrimitiveModel {
+		case PrimitiveFixedClockSourceV1, PrimitiveResistorProgrammedClockSourceV1:
+			enabled[device.Component] = clockSourceEnabled(device, system, previous)
+			states[device.Component] = clockSourceHigh(device, system, analysis, timeS, previous)
+		case PrimitiveCMOSBufferV1:
+			enabled[device.Component] = true
+			states[device.Component] = clockBufferHigh(device, system, analysis, step, previous, history)
+		}
+	}
+	return states, enabled
 }
 
 func transientSourcesInitiallyZero(analysis Analysis) bool {
@@ -140,6 +201,10 @@ func transientSourcesZeroAtTime(analysis Analysis, timeS float64) bool {
 // not solve a steady-state operating point first: capacitor voltages and all
 // algebraic unknowns begin at zero, making power-up overshoot reproducible.
 func solveStartupAnalysis(plan Plan, analysis Analysis) (AnalysisResult, []Diagnostic) {
+	plan = resolveProgrammedClockFrequencies(plan)
+	if diagnostics := validateClockPhaseResolution(plan, analysis); len(diagnostics) != 0 {
+		return AnalysisResult{ID: analysis.ID, Kind: AnalysisStartup}, diagnostics
+	}
 	steps := int(math.Round(analysis.DurationS / analysis.TimeStepS))
 	result := AnalysisResult{ID: analysis.ID, Kind: AnalysisStartup, Points: make([]AnalysisPoint, 0, steps+1)}
 	template, diagnostics := buildTransientTemplate(plan, analysis)
@@ -152,7 +217,13 @@ func solveStartupAnalysis(plan Plan, analysis Analysis) (AnalysisResult, []Diagn
 		Method: "zero_energy_startup_v1", InitialCondition: "all_dynamic_and_algebraic_unknowns_zero",
 		MaxIterationsPerStep: transientMaxNewtonIterations, MaxTotalIterations: maxTransientWork,
 	}
-	result.Points = append(result.Points, AnalysisPoint{Nodes: nodeResults(plan, template, previous), Devices: electricalDeviceResults(plan, analysis, 0, template, previous), Solver: &initialEvidence})
+	result.Points = append(result.Points, AnalysisPoint{
+		Nodes: nodeResults(plan, template, previous),
+		Devices: transientObservationDeviceResults(
+			plan, analysis, analysis, template, previous, nil, 0, 0, previous, history,
+		),
+		Solver: &initialEvidence,
+	})
 
 	devices := compileNonlinearDevices(plan)
 	base := cloneMNASystem(template)
@@ -181,7 +252,14 @@ func solveStartupAnalysis(plan Plan, analysis Analysis) (AnalysisResult, []Diagn
 		if diagnostics := validateTransientOperatingLimits(plan, system, solution, comparatorStates, true, analysis.TimeStepS, fuseSurgeI2t); len(diagnostics) != 0 {
 			return result, prefixTransientDiagnostics(analysis.ID, step, timeS, diagnostics)
 		}
-		result.Points = append(result.Points, AnalysisPoint{TimeS: normalizedMNAFloat(timeS), Nodes: nodeResults(plan, system, solution), Devices: electricalDeviceResultsWithComparatorStates(plan, analysis, 0, system, solution, comparatorStates), Solver: &evidence})
+		result.Points = append(result.Points, AnalysisPoint{
+			TimeS: normalizedMNAFloat(timeS), Nodes: nodeResults(plan, system, solution),
+			Devices: transientObservationDeviceResults(
+				plan, analysis, analysis, system, solution, comparatorStates,
+				step, timeS, previous, history,
+			),
+			Solver: &evidence,
+		})
 		previous = solution
 		history = append(history, append([]complex128(nil), solution...))
 	}
@@ -435,6 +513,40 @@ func prepareTransientBase(base *mnaSystem, template mnaSystem, plan Plan, analys
 				value *= startupSourceRampScale(analysis, timeS)
 			}
 			stampCurrentSource(base, terminals["POSITIVE"], terminals["NEGATIVE"], complex(value, 0))
+		case PrimitiveFixedClockSourceV1, PrimitiveResistorProgrammedClockSourceV1:
+			parameters := namedValueMap(device.ModelParameters)
+			conductance := complex(1/parameters["output_resistance_ohm"], 0)
+			dcEnabled := clockSourceDCEnabled(device)
+			dcReference := terminals["GND"]
+			if parameters["dc_output_high"] >= .5 {
+				dcReference = terminals["VDD"]
+			}
+			if dcEnabled {
+				stampAdmittance(base, terminals["OUT"], dcReference, -conductance)
+			}
+			transientEnabled := clockSourceEnabled(device, base, previous)
+			if transientEnabled != dcEnabled {
+				supplyDelta := parameters["supply_current_a"]
+				if !transientEnabled {
+					supplyDelta = -supplyDelta
+				}
+				stampCurrentSource(base, terminals["VDD"], terminals["GND"], complex(supplyDelta, 0))
+			}
+			transientHigh := clockSourceHigh(device, base, analysis, timeS, previous)
+			if transientEnabled {
+				transientReference := terminals["GND"]
+				if transientHigh {
+					transientReference = terminals["VDD"]
+				}
+				stampAdmittance(base, terminals["OUT"], transientReference, conductance)
+			}
+		case PrimitiveCMOSBufferV1:
+			if !clockBufferHigh(device, base, analysis, step, previous, history) {
+				resistance := namedValueMap(device.ModelParameters)["output_resistance_ohm"]
+				conductance := complex(1/resistance, 0)
+				stampAdmittance(base, terminals["OUT"], terminals["VCC"], -conductance)
+				stampAdmittance(base, terminals["OUT"], terminals["GND"], conductance)
+			}
 		case PrimitiveCapacitorTransientV1:
 			conductance := *device.ValueSI / analysis.TimeStepS
 			previousVoltage := nonlinearNodeVoltage(base, previous, terminals["A"]) - nonlinearNodeVoltage(base, previous, terminals["B"])
@@ -706,6 +818,178 @@ func transientExcitationValue(analysis Analysis, component string, timeS float64
 		}
 	}
 	return 0
+}
+
+func clockSourceHigh(device ResolvedDevice, system *mnaSystem, analysis Analysis, timeS float64, state []complex128) bool {
+	parameters := namedValueMap(device.ModelParameters)
+	frequency := parameters["frequency_hz"]
+	dutyCycle := parameters["duty_cycle_fraction"]
+	if !finite(frequency) || frequency <= 0 || !finite(dutyCycle) ||
+		dutyCycle <= 0 || dutyCycle >= 1 || !finite(timeS) {
+		return false
+	}
+	if !clockSourceEnabled(device, system, state) {
+		return false
+	}
+	phaseTime := timeS
+	if analysis.Kind == AnalysisStartup {
+		startup := parameters["startup_time_s"]
+		if device.PrimitiveModel == PrimitiveResistorProgrammedClockSourceV1 {
+			startup = parameters["startup_fixed_s"] + parameters["startup_cycles"]/frequency
+		}
+		if !finite(startup) || startup < 0 || timeS < startup {
+			return false
+		}
+		phaseTime -= startup
+	}
+	period := 1 / frequency
+	if !finite(period) || period <= 0 || !finite(phaseTime) {
+		return false
+	}
+	elapsedCycles := math.Max(phaseTime, 0) * frequency
+	if !finite(elapsedCycles) || elapsedCycles > maxClockPhaseCycles {
+		return false
+	}
+	phaseFraction := elapsedCycles - math.Floor(elapsedCycles)
+	return finite(phaseFraction) && phaseFraction < dutyCycle
+}
+
+func clockSourceDCEnabled(device ResolvedDevice) bool {
+	terminals := terminalMap(device)
+	enable := terminals["ENABLE"]
+	return enable == "" || enable == terminals["VDD"]
+}
+
+func clockSourceEnabled(device ResolvedDevice, system *mnaSystem, state []complex128) bool {
+	terminals := terminalMap(device)
+	enable := terminals["ENABLE"]
+	if enable == "" {
+		return true
+	}
+	if system == nil {
+		return false
+	}
+	groundV := nonlinearNodeVoltage(system, state, terminals["GND"])
+	supplyV := nonlinearNodeVoltage(system, state, terminals["VDD"]) - groundV
+	enableV := nonlinearNodeVoltage(system, state, enable) - groundV
+	threshold := namedValueMap(device.ModelParameters)["enable_high_ratio"] * supplyV
+	return finite(supplyV) && supplyV > 0 && finite(enableV) && enableV >= threshold
+}
+
+func validateClockPhaseResolution(plan Plan, analysis Analysis) []Diagnostic {
+	var diagnostics []Diagnostic
+	for _, device := range plan.Devices {
+		if device.PrimitiveModel != PrimitiveFixedClockSourceV1 &&
+			device.PrimitiveModel != PrimitiveResistorProgrammedClockSourceV1 {
+			continue
+		}
+		frequency := namedValueMap(device.ModelParameters)["frequency_hz"]
+		cycles := analysis.DurationS * frequency
+		if !finite(frequency) || frequency <= 0 || !finite(cycles) || cycles > maxClockPhaseCycles {
+			diagnostics = append(diagnostics, Diagnostic{
+				Path: "analyses." + analysis.ID + ".duration_s",
+				Message: fmt.Sprintf(
+					"clock source %s would require %.12g elapsed cycles; deterministic phase limit is %.12g",
+					device.Component, cycles, maxClockPhaseCycles,
+				),
+				Suggestion: "shorten the analysis duration or use a lower clock frequency",
+			})
+		}
+	}
+	return diagnostics
+}
+
+func resolveProgrammedClockFrequencies(plan Plan) Plan {
+	resolved := ClonePlan(plan)
+	for index := range resolved.Devices {
+		device := &resolved.Devices[index]
+		if device.PrimitiveModel != PrimitiveResistorProgrammedClockSourceV1 {
+			continue
+		}
+		frequency := programmedClockFrequency(plan, *device)
+		if !finite(frequency) || frequency <= 0 {
+			continue
+		}
+		found := false
+		for parameterIndex := range device.ModelParameters {
+			if device.ModelParameters[parameterIndex].Name == "frequency_hz" {
+				device.ModelParameters[parameterIndex].Value = frequency
+				found = true
+				break
+			}
+		}
+		if !found {
+			device.ModelParameters = append(device.ModelParameters, NamedValue{Name: "frequency_hz", Value: frequency})
+			slices.SortFunc(device.ModelParameters, func(left, right NamedValue) int {
+				return strings.Compare(left.Name, right.Name)
+			})
+		}
+	}
+	return resolved
+}
+
+func programmedClockFrequency(plan Plan, source ResolvedDevice) float64 {
+	parameters := namedValueMap(source.ModelParameters)
+	terminals := terminalMap(source)
+	setNode := terminals["SET"]
+	groundNode := terminals["GND"]
+	scale := parameters["frequency_scale_hz_ohm"]
+	divider := parameters["divider_ratio"]
+	if setNode == "" || groundNode == "" || setNode == groundNode ||
+		!finite(scale) || scale <= 0 || !finite(divider) || divider <= 0 {
+		return 0
+	}
+	frequency := 0.0
+	for _, candidate := range plan.Devices {
+		if candidate.PrimitiveModel != PrimitiveResistorV1 || candidate.Usage != "timing_resistor" || candidate.ValueSI == nil ||
+			!finite(*candidate.ValueSI) || *candidate.ValueSI <= 0 {
+			continue
+		}
+		resistorTerminals := terminalMap(candidate)
+		aNode := resistorTerminals["A"]
+		bNode := resistorTerminals["B"]
+		if !((aNode == setNode && bNode == groundNode) || (aNode == groundNode && bNode == setNode)) {
+			continue
+		}
+		if frequency != 0 {
+			return 0
+		}
+		denominator := divider * *candidate.ValueSI
+		if !finite(denominator) || denominator <= 0 {
+			return 0
+		}
+		frequency = scale / denominator
+		if !finite(frequency) || frequency <= 0 {
+			return 0
+		}
+	}
+	return frequency
+}
+
+func clockBufferHigh(device ResolvedDevice, system *mnaSystem, analysis Analysis, step int, previous []complex128, history [][]complex128) bool {
+	parameters := namedValueMap(device.ModelParameters)
+	terminals := terminalMap(device)
+	delaySteps := int(math.Ceil(parameters["propagation_delay_s"]/analysis.TimeStepS - 1e-12))
+	decision := previous
+	if len(history) != 0 {
+		index := step - delaySteps
+		if index < 0 {
+			index = 0
+		}
+		if index >= len(history) {
+			index = len(history) - 1
+		}
+		decision = history[index]
+	}
+	input := nonlinearNodeVoltage(system, decision, terminals["IN"])
+	if input >= parameters["input_high_min_v"] {
+		return true
+	}
+	if input <= parameters["input_low_max_v"] {
+		return false
+	}
+	return nonlinearNodeVoltage(system, previous, terminals["OUT"]) >
+		.5*(nonlinearNodeVoltage(system, previous, terminals["VCC"])+nonlinearNodeVoltage(system, previous, terminals["GND"]))
 }
 
 type transientOutputLimitState struct {

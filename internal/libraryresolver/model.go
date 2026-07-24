@@ -19,6 +19,7 @@ const (
 	LibrarySourceRoot         = "root"
 	LibrarySourceProjectTable = "project_table"
 	LibrarySourceGlobalTable  = "global_table"
+	LibrarySourceBundled      = "bundled"
 )
 
 type LibraryRoots struct {

@@ -594,6 +594,91 @@ func TestDerivedOutputSwingTransientRetainsBoundedTimingGridWhenRequested(t *tes
 	}
 }
 
+func TestBoundedBehavioralDynamicGridNeverRoundsBelowMinimumStep(t *testing.T) {
+	duration, step := boundedBehavioralDynamicGrid(200e-9, 1e-9, behavioralDynamicMaxSteps)
+	steps := duration / step
+	if step < 1e-9*(1-1e-12) || math.Abs(steps-math.Round(steps)) > 1e-12 || steps > 2048 {
+		t.Fatalf("bounded grid = duration %.12g step %.12g steps %.12g", duration, step, steps)
+	}
+}
+
+func TestBoundedBehavioralDynamicGridDoesNotCoarsenRequestedResolution(t *testing.T) {
+	duration, step := boundedBehavioralDynamicGrid(10e-9, 3e-9, behavioralDynamicMaxSteps)
+	if duration != 10e-9 || step > 3e-9 {
+		t.Fatalf("bounded grid = duration %.12g step %.12g, want step no greater than 3e-9", duration, step)
+	}
+}
+
+func TestBehavioralDynamicGridCoversAutonomousClockCycles(t *testing.T) {
+	maximumEdgeTime := 200e-9
+	requirement := architecturesearch.Requirement{Requirements: architecturesearch.Requirements{BehavioralRequirements: []architecturesearch.BehavioralRequirement{{
+		ID: "rise", Metric: "rise_time", Analysis: simmodel.AnalysisTransient, Max: &maximumEdgeTime, Unit: "s",
+	}}}}
+	plan := simmodel.Plan{Devices: []simmodel.ResolvedDevice{{
+		Component: "clock", PrimitiveModel: simmodel.PrimitiveFixedClockSourceV1,
+		ModelParameters: []simmodel.NamedValue{{Name: "frequency_hz", Value: 100e3}},
+	}}}
+	duration, step := behavioralDynamicGrid(requirement, plan, simmodel.AnalysisTransient)
+	if duration < 30e-6 || step > 1/(100e3*40) || duration/step > behavioralAutonomousClockMaxSteps {
+		t.Fatalf("autonomous clock grid = duration %.12g step %.12g steps %.12g", duration, step, duration/step)
+	}
+}
+
+func TestBehavioralDynamicGridCoversProgrammedClockStartup(t *testing.T) {
+	timingResistance := 1e6
+	plan := simmodel.Plan{Devices: []simmodel.ResolvedDevice{
+		{
+			Component: "clock", PrimitiveModel: simmodel.PrimitiveResistorProgrammedClockSourceV1,
+			ModelParameters: []simmodel.NamedValue{
+				{Name: "frequency_scale_hz_ohm", Value: 1e11},
+				{Name: "divider_ratio", Value: 1},
+				{Name: "startup_fixed_s", Value: 100e-6},
+				{Name: "startup_cycles", Value: 64},
+			},
+			Terminals: []simmodel.TerminalBinding{{Terminal: "SET", Net: "SET"}, {Terminal: "GND", Net: "GND"}},
+		},
+		{
+			Component: "timing", Usage: "timing_resistor", PrimitiveModel: simmodel.PrimitiveResistorV1, ValueSI: &timingResistance,
+			Terminals: []simmodel.TerminalBinding{{Terminal: "A", Net: "SET"}, {Terminal: "B", Net: "GND"}},
+		},
+	}}
+	duration, step := behavioralDynamicGrid(architecturesearch.Requirement{}, plan, simmodel.AnalysisStartup)
+	if duration+1e-15 < 740e-6 || step > 1/(100e3*20) || duration/step > behavioralDynamicMaxSteps {
+		t.Fatalf("programmed clock startup grid = duration %.12g step %.12g steps %.12g", duration, step, duration/step)
+	}
+}
+
+func TestResistorProgrammedClockFrequencyRequiresUniqueSetToGroundResistor(t *testing.T) {
+	timingResistance := 1e6
+	decoyResistance := 10e3
+	source := simmodel.ResolvedDevice{
+		Component: "clock", PrimitiveModel: simmodel.PrimitiveResistorProgrammedClockSourceV1,
+		ModelParameters: []simmodel.NamedValue{
+			{Name: "frequency_scale_hz_ohm", Value: 1e11},
+			{Name: "divider_ratio", Value: 1},
+		},
+		Terminals: []simmodel.TerminalBinding{{Terminal: "SET", Net: "SET"}, {Terminal: "GND", Net: "GND"}},
+	}
+	timing := simmodel.ResolvedDevice{
+		Component: "timing", Usage: "timing_resistor", PrimitiveModel: simmodel.PrimitiveResistorV1, ValueSI: &timingResistance,
+		Terminals: []simmodel.TerminalBinding{{Terminal: "A", Net: "SET"}, {Terminal: "B", Net: "GND"}},
+	}
+	decoy := simmodel.ResolvedDevice{
+		Component: "decoy", PrimitiveModel: simmodel.PrimitiveResistorV1, ValueSI: &decoyResistance,
+		Terminals: []simmodel.TerminalBinding{{Terminal: "A", Net: "SET"}, {Terminal: "B", Net: "AUX"}},
+	}
+	plan := simmodel.Plan{Devices: []simmodel.ResolvedDevice{source, decoy, timing}}
+	if got := resistorProgrammedClockFrequency(plan, source); got != 100e3 {
+		t.Fatalf("programmed frequency = %g, want 100 kHz", got)
+	}
+	duplicate := timing
+	duplicate.Component = "duplicate"
+	plan.Devices = append(plan.Devices, duplicate)
+	if got := resistorProgrammedClockFrequency(plan, source); got != 0 {
+		t.Fatalf("ambiguous programmed frequency = %g, want fail-closed zero", got)
+	}
+}
+
 func TestDerivedACSweepExtendsBeyondRequiredBandwidth(t *testing.T) {
 	minimumBandwidth := 100_000.0
 	requirement := architecturesearch.Requirement{Requirements: architecturesearch.Requirements{BehavioralRequirements: []architecturesearch.BehavioralRequirement{{

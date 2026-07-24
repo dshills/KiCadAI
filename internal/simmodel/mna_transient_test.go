@@ -2,6 +2,7 @@ package simmodel
 
 import (
 	"encoding/json"
+	"fmt"
 	"math"
 	"reflect"
 	"strings"
@@ -267,9 +268,9 @@ func TestTransientBoundsClaimsAndOperatingLimitsFailClosed(t *testing.T) {
 		t.Fatalf("grid diagnostics=%+v", diagnostics)
 	}
 	tooMuchWork := transientSwitchIntent()
-	tooMuchWork.Analyses[0].DurationS = .02049
-	tooMuchWork.Analyses[0].Excitations[1].PulsePeriodS = .03
-	if _, diagnostics := ResolveWithTopology(tooMuchWork, "test", "hash", transientSwitchComponents(25), transientSwitchNodes()); len(diagnostics) == 0 || !diagnosticsContain(diagnostics, "at most 2048 steps") {
+	tooMuchWork.Analyses[0].DurationS = float64(maxTransientSteps+1) * tooMuchWork.Analyses[0].TimeStepS
+	tooMuchWork.Analyses[0].Excitations[1].PulsePeriodS = tooMuchWork.Analyses[0].DurationS + tooMuchWork.Analyses[0].TimeStepS
+	if _, diagnostics := ResolveWithTopology(tooMuchWork, "test", "hash", transientSwitchComponents(25), transientSwitchNodes()); len(diagnostics) == 0 || !diagnosticsContain(diagnostics, fmt.Sprintf("at most %d steps", maxTransientSteps)) {
 		t.Fatalf("work-limit diagnostics=%+v", diagnostics)
 	}
 	badPulse := transientSwitchIntent()

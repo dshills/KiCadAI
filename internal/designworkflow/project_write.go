@@ -293,8 +293,10 @@ func boardOperations(request *Request) ([]transactions.Operation, []reports.Issu
 		}}
 	}
 	operation, err := workflowOperation(transactions.OpSetBoardOutline, transactions.SetBoardOutlineOperation{
-		Op:    transactions.OpSetBoardOutline,
-		Board: &transactions.BoardSize{WidthMM: request.Board.WidthMM, HeightMM: request.Board.HeightMM},
+		Op: transactions.OpSetBoardOutline,
+		Board: &transactions.BoardSize{
+			WidthMM: request.Board.WidthMM, HeightMM: request.Board.HeightMM, ThicknessMM: request.Board.ThicknessMM,
+		},
 	})
 	if err != nil {
 		return nil, []reports.Issue{{

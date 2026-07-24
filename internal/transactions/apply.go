@@ -594,6 +594,11 @@ func applyOperation(builder *designapi.Builder, op Operation, opts ApplyOptions)
 			return nil, err
 		}
 		if payload.Board != nil {
+			if payload.Board.ThicknessMM > 0 {
+				if err := builder.SetBoardThickness(kicadfiles.MM(payload.Board.ThicknessMM)); err != nil {
+					return nil, err
+				}
+			}
 			_, err := builder.SetRectangularBoardOutline(kicadfiles.MM(payload.Board.WidthMM), kicadfiles.MM(payload.Board.HeightMM))
 			return nil, err
 		}

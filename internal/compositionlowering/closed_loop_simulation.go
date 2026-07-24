@@ -31,6 +31,8 @@ const (
 	behavioralTransientSamplesPerCycle    = 32
 	behavioralRatedPowerVoltageGuard      = 1.02
 	behavioralStartupSteps                = 256
+	behavioralDynamicMaxSteps             = 2048
+	behavioralAutonomousClockMaxSteps     = 3_900
 )
 
 // ArchitectureVariantChoice is a resolver-owned catalog identity selected by
@@ -389,7 +391,11 @@ func (resolver ArchitectureSimulationPlanResolver) ResolveSimulationPlans(ctx co
 			}
 			continue
 		}
-		if resolved.Simulation == nil || !simmodel.SupportsAnalysis(resolved.Simulation.ModelID, kind) {
+		baseHasAnalysis := false
+		if resolved.Simulation != nil {
+			_, baseHasAnalysis = simulationAnalysisOfKind(resolved.Simulation.Analyses, kind)
+		}
+		if resolved.Simulation == nil || !simmodel.SupportsAnalysis(resolved.Simulation.ModelID, kind) || !baseHasAnalysis {
 			if resolved.Simulation == nil {
 				return nil, fmt.Errorf("resolved architecture has no trusted base intent for required analysis %s", kind)
 			}
@@ -1425,7 +1431,7 @@ func derivedGraphWorkflowIntent(requirement architecturesearch.Requirement, base
 		}
 	}
 	if kind == simmodel.AnalysisTransient || kind == simmodel.AnalysisStartup {
-		analysis.DurationS, analysis.TimeStepS = behavioralDynamicGrid(requirement, kind)
+		analysis.DurationS, analysis.TimeStepS = behavioralDynamicGrid(requirement, base, kind)
 		if kind == simmodel.AnalysisTransient {
 			for _, behavior := range requirement.Requirements.BehavioralRequirements {
 				if behavior.Analysis != simmodel.AnalysisTransient || (behavior.Metric != "output_swing" && behavior.Metric != "output_power") {
@@ -1449,7 +1455,7 @@ func derivedGraphWorkflowIntent(requirement architecturesearch.Requirement, base
 				break
 			}
 		}
-		analysis.DurationS, analysis.TimeStepS = boundedBehavioralDynamicGrid(analysis.DurationS, analysis.TimeStepS)
+		analysis.DurationS, analysis.TimeStepS = boundedBehavioralDynamicGrid(analysis.DurationS, analysis.TimeStepS, behavioralDynamicMaxSteps)
 		if kind == simmodel.AnalysisTransient {
 			if err := configureAutonomousTransientSupplyStep(requirement, base, &analysis); err != nil {
 				return simmodel.Intent{}, err
@@ -1858,7 +1864,7 @@ func deviceHasThermalPath(device simmodel.ResolvedDevice) bool {
 	return false
 }
 
-func behavioralDynamicGrid(requirement architecturesearch.Requirement, kind string) (float64, float64) {
+func behavioralDynamicGrid(requirement architecturesearch.Requirement, plan simmodel.Plan, kind string) (float64, float64) {
 	referenceTime := math.Inf(1)
 	for _, behavior := range requirement.Requirements.BehavioralRequirements {
 		if behavior.Analysis != kind || behavior.Unit != "s" || behavior.Max == nil || *behavior.Max <= 0 {
@@ -1869,13 +1875,97 @@ func behavioralDynamicGrid(requirement architecturesearch.Requirement, kind stri
 	if !finiteArchitectureValue(referenceTime) {
 		referenceTime = 1e-6
 	}
-	timeStep := math.Max(1e-9, referenceTime/20)
+	timeStep := math.Max(1e-12, referenceTime/20)
 	duration := math.Max(referenceTime*20, timeStep*100)
 	if kind == simmodel.AnalysisStartup {
 		duration = math.Max(duration, 100e-6)
 		timeStep = math.Max(timeStep, duration/behavioralStartupSteps)
 	}
-	return boundedBehavioralDynamicGrid(duration, timeStep)
+	maximumSteps := float64(behavioralDynamicMaxSteps)
+	if clockDuration, clockStep := autonomousClockDynamicGrid(plan, kind); clockDuration > 0 {
+		duration = math.Max(duration, clockDuration)
+		if clockStep > 0 {
+			timeStep = math.Min(timeStep, clockStep)
+			maximumSteps = behavioralAutonomousClockMaxSteps
+		}
+	}
+	return boundedBehavioralDynamicGrid(duration, timeStep, maximumSteps)
+}
+
+func autonomousClockDynamicGrid(plan simmodel.Plan, kind string) (float64, float64) {
+	var duration float64
+	timeStep := math.Inf(1)
+	for _, source := range plan.Devices {
+		var frequency float64
+		switch source.PrimitiveModel {
+		case simmodel.PrimitiveFixedClockSourceV1:
+			frequency, _ = simulationModelParameter(source.ModelParameters, "frequency_hz")
+		case simmodel.PrimitiveResistorProgrammedClockSourceV1:
+			frequency = resistorProgrammedClockFrequency(plan, source)
+		default:
+			continue
+		}
+		if frequency <= 0 || !finiteArchitectureValue(frequency) {
+			continue
+		}
+		if kind == simmodel.AnalysisStartup {
+			startup, _ := simulationModelParameter(source.ModelParameters, "startup_time_s")
+			if source.PrimitiveModel == simmodel.PrimitiveResistorProgrammedClockSourceV1 {
+				fixed, _ := simulationModelParameter(source.ModelParameters, "startup_fixed_s")
+				cycles, _ := simulationModelParameter(source.ModelParameters, "startup_cycles")
+				startup = fixed + cycles/frequency
+			}
+			duration = math.Max(duration, startup)
+			continue
+		}
+		duration = math.Max(duration, 3/frequency)
+		timeStep = math.Min(timeStep, 1/(frequency*40))
+	}
+	if duration <= 0 {
+		return 0, 0
+	}
+	if !finiteArchitectureValue(timeStep) {
+		return duration, 0
+	}
+	return duration, timeStep
+}
+
+func resistorProgrammedClockFrequency(plan simmodel.Plan, source simmodel.ResolvedDevice) float64 {
+	setNode := resolvedDeviceTerminalNet(source, "SET")
+	groundNode := resolvedDeviceTerminalNet(source, "GND")
+	if setNode == "" || groundNode == "" || setNode == groundNode {
+		return 0
+	}
+	scale, scaleOK := simulationModelParameter(source.ModelParameters, "frequency_scale_hz_ohm")
+	divider, dividerOK := simulationModelParameter(source.ModelParameters, "divider_ratio")
+	if !scaleOK || !dividerOK || scale <= 0 || divider <= 0 ||
+		!finiteArchitectureValue(scale) || !finiteArchitectureValue(divider) {
+		return 0
+	}
+	frequency := 0.0
+	for _, device := range plan.Devices {
+		if device.PrimitiveModel != simmodel.PrimitiveResistorV1 || device.Usage != "timing_resistor" || device.ValueSI == nil ||
+			*device.ValueSI <= 0 || !finiteArchitectureValue(*device.ValueSI) {
+			continue
+		}
+		aNode := resolvedDeviceTerminalNet(device, "A")
+		bNode := resolvedDeviceTerminalNet(device, "B")
+		if !((aNode == setNode && bNode == groundNode) || (aNode == groundNode && bNode == setNode)) {
+			continue
+		}
+		if frequency != 0 {
+			return 0
+		}
+		denominator := divider * *device.ValueSI
+		if !finiteArchitectureValue(denominator) || denominator <= 0 {
+			return 0
+		}
+		frequency = scale / denominator
+		if !finiteArchitectureValue(frequency) || frequency <= 0 {
+			return 0
+		}
+	}
+	return frequency
 }
 
 func behavioralDynamicTimeRequirement(requirement architecturesearch.Requirement, kind string) bool {
@@ -1887,9 +1977,10 @@ func behavioralDynamicTimeRequirement(requirement architecturesearch.Requirement
 	return false
 }
 
-func boundedBehavioralDynamicGrid(duration, requestedTimeStep float64) (float64, float64) {
-	steps := math.Ceil(duration / requestedTimeStep)
-	steps = math.Max(1, math.Min(2048, steps))
+func boundedBehavioralDynamicGrid(duration, requestedTimeStep, maximumSteps float64) (float64, float64) {
+	requestedTimeStep = math.Max(1e-12, requestedTimeStep)
+	steps := math.Ceil(duration/requestedTimeStep - 1e-12)
+	steps = math.Max(1, math.Min(maximumSteps, steps))
 	return duration, duration / steps
 }
 

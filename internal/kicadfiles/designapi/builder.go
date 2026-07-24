@@ -1989,6 +1989,15 @@ func (builder *Builder) SetRectangularBoardOutline(width, height kicadfiles.IU) 
 	})
 }
 
+func (builder *Builder) SetBoardThickness(thickness kicadfiles.IU) error {
+	if thickness <= 0 {
+		return fmt.Errorf("board thickness must be positive")
+	}
+	builder.design.PCB.General.Thickness = thickness
+	builder.design.PCB.Setup.Stackup.Thickness = thickness
+	return nil
+}
+
 func (builder *Builder) Design() kicaddesign.Design {
 	if builder == nil {
 		return kicaddesign.Design{}

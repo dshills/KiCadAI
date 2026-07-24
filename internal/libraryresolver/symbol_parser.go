@@ -102,11 +102,12 @@ func ResolveSymbol(index LibraryIndex, libraryID string) (SymbolRecord, bool) {
 // ResolveSymbolPtr is the pointer form used by write paths that may resolve
 // many symbols from one index without copying the complete inventory.
 func ResolveSymbolPtr(index *LibraryIndex, libraryID string) (SymbolRecord, bool) {
-	if index == nil || index.Symbols == nil {
-		return SymbolRecord{}, false
+	if index != nil && index.Symbols != nil {
+		if record, ok := index.Symbols[libraryID]; ok {
+			return record, true
+		}
 	}
-	record, ok := index.Symbols[libraryID]
-	return record, ok
+	return resolveBundledSymbol(libraryID)
 }
 
 func parseSymbolFile(file LibraryFile) ([]SymbolRecord, []reports.Issue) {
@@ -122,6 +123,10 @@ func parseSymbolFile(file LibraryFile) ([]SymbolRecord, []reports.Issue) {
 	if err != nil {
 		return nil, []reports.Issue{parseIssue(file.Path, err.Error())}
 	}
+	return parseSymbolData(file, data)
+}
+
+func parseSymbolData(file LibraryFile, data []byte) ([]SymbolRecord, []reports.Issue) {
 	root, err := sexpr.Parse(data)
 	if err != nil {
 		return nil, []reports.Issue{parseIssue(file.Path, err.Error())}

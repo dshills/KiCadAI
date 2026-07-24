@@ -401,8 +401,16 @@ type OpAmpLoadStability struct {
 type ClockEvidence struct {
 	ProofStatus                string               `json:"proof_status"`
 	SignalingModes             []string             `json:"signaling_modes"`
+	ArchitectureClass          string               `json:"architecture_class,omitempty"`
+	Frequency                  *EvidenceRange       `json:"frequency,omitempty"`
+	FrequencyAccuracy          *EvidenceMeasurement `json:"frequency_accuracy,omitempty"`
+	DutyCycle                  *EvidenceRange       `json:"duty_cycle,omitempty"`
+	SupplyVoltage              *EvidenceRange       `json:"supply_voltage,omitempty"`
+	SupplyCurrent              *EvidenceMeasurement `json:"supply_current,omitempty"`
 	Amplitude                  *EvidenceRange       `json:"amplitude,omitempty"`
 	CommonMode                 *EvidenceRange       `json:"common_mode,omitempty"`
+	OutputHighVoltage          *EvidenceMeasurement `json:"output_high_voltage,omitempty"`
+	OutputLowVoltage           *EvidenceMeasurement `json:"output_low_voltage,omitempty"`
 	EdgeTime                   *EvidenceRange       `json:"edge_time,omitempty"`
 	RMSJitter                  *EvidenceMeasurement `json:"rms_jitter,omitempty"`
 	StartupTime                *EvidenceMeasurement `json:"startup_time,omitempty"`
@@ -410,6 +418,7 @@ type ClockEvidence struct {
 	OutputImpedance            *EvidenceMeasurement `json:"output_impedance,omitempty"`
 	OutputCurrent              *EvidenceMeasurement `json:"output_current,omitempty"`
 	MaximumCapacitiveLoad      *EvidenceMeasurement `json:"maximum_capacitive_load,omitempty"`
+	MaximumFanout              *EvidenceMeasurement `json:"maximum_fanout,omitempty"`
 	FabricationProof           bool                 `json:"fabrication_proof,omitempty"`
 	FabricationCandidateBlocks bool                 `json:"fabrication_candidate_blocks,omitempty"`
 	ReviewNote                 string               `json:"review_note,omitempty"`

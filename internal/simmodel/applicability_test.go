@@ -47,6 +47,18 @@ func TestApplicableGraphModelForTransientRequiresTransientCapacitorEvidence(t *t
 	if model, ok, _ := ApplicableGraphModelForAnalysis(transient, AnalysisStartup); !ok || model != ModelTransientCircuitV1 {
 		t.Fatalf("startup applicability = %q, %t", model, ok)
 	}
+	if model, ok, _ := ApplicableGraphModel(transient); !ok || model != ModelLinearCircuitMNAV1 {
+		t.Fatalf("unspecified-analysis applicability = %q, %t; optional transient evidence must not change the default DC/AC workflow", model, ok)
+	}
+	transientOnly := append([]ComponentEvidence(nil), base...)
+	transientOnly = append(transientOnly, ComponentEvidence{
+		InstanceID: "clock", Family: "clock_source",
+		ModelClaims: []CatalogEvidence{{ModelID: PrimitiveFixedClockSourceV1}},
+		Connections: []ConnectionEvidence{{Function: "VDD", Net: "VCC"}, {Function: "GND", Net: "GND"}, {Function: "OUT", Net: "CLOCK"}, {Function: "ENABLE", Net: "VCC"}},
+	})
+	if model, ok, _ := ApplicableGraphModel(transientOnly); !ok || model != ModelTransientCircuitV1 {
+		t.Fatalf("autonomous-transient applicability = %q, %t; an autonomous source must select the transient workflow", model, ok)
+	}
 
 	dcOnly := append([]ComponentEvidence(nil), base...)
 	dcOnly = append(dcOnly, ComponentEvidence{InstanceID: "capacitor", Family: "capacitor", ModelClaims: []CatalogEvidence{{ModelID: PrimitiveCapacitorV1}}, Connections: []ConnectionEvidence{{Function: "A", Net: "VCC"}}})

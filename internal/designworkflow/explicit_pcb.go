@@ -3,6 +3,8 @@ package designworkflow
 import (
 	"context"
 	"encoding/json"
+	"math"
+	"slices"
 	"strings"
 
 	"kicadai/internal/libraryresolver"
@@ -158,7 +160,7 @@ func RouteExplicitCircuit(ctx context.Context, request Request, placed Placement
 		routingRequest.Rules.NetOverrides = map[string]routing.NetRule{}
 	}
 	for _, net := range request.ExplicitCircuit.Nets {
-		if net.NetClass == "" && net.WidthMM == 0 && net.ClearanceMM == 0 {
+		if net.NetClass == "" && net.WidthMM == 0 && net.ClearanceMM == 0 && len(net.AllowedLayers) == 0 && net.PreferLayer == "" && net.MaxLengthMM == 0 {
 			continue
 		}
 		rule := routingRequest.Rules.NetOverrides[net.Name]
@@ -167,6 +169,9 @@ func RouteExplicitCircuit(ctx context.Context, request Request, placed Placement
 		}
 		rule.TraceWidthMM = net.WidthMM
 		rule.ClearanceMM = net.ClearanceMM
+		rule.AllowedLayers = append([]string(nil), net.AllowedLayers...)
+		rule.PreferLayer = net.PreferLayer
+		rule.MaxLengthMM = net.MaxLengthMM
 		routingRequest.Rules.NetOverrides[net.Name] = rule
 	}
 	issues = append(issues, fitRoutingClearanceToIntrinsicPads(&routingRequest, placed.Request.Components, opts.ClearanceMM > 0 || request.Constraints.ClearanceMM > 0)...)
@@ -239,6 +244,15 @@ func RouteExplicitCircuit(ctx context.Context, request Request, placed Placement
 	}
 	operations, endpointTailCleanup := trimDisconnectedRouteTailsAtSameNetPadsWithSummary(operations, newPhysicalPadRoutingContext(&placed))
 	operations = compactRouteOperationGeometry(operations)
+	returnPathEvidence, returnPathIssues := explicitReturnPathEvidence(
+		request.ExplicitCircuit.Nets, request.ExplicitCircuit.Zones, routingRoutesFromOperations(operations),
+		routingRequest.Board.Layers, request.Board.ThicknessMM,
+	)
+	issues = append(issues, returnPathIssues...)
+	result.Issues = append(result.Issues, returnPathIssues...)
+	if reports.HasBlockingIssue(returnPathIssues) {
+		result.Status = routing.StatusBlocked
+	}
 	if endpointTailCleanup.Trimmed > 0 {
 		finalClearanceRequest := routingRequest
 		routing.NormalizeRequest(&finalClearanceRequest)
@@ -259,11 +273,219 @@ func RouteExplicitCircuit(ctx context.Context, request Request, placed Placement
 		"physical_clearance_after_repair": clearanceBlockersAfter, "physical_clearance_deferred_drc": clearanceDeferredToDRC,
 		"layer_transition_vias_added": layerTransitionViasAdded,
 		"route_endpoint_tail_cleanup": endpointTailCleanup,
+		"return_path_evidence":        returnPathEvidence,
 	}
 	if result.Status != routing.StatusRouted && stage.Status == StageStatusOK {
 		stage.Status = StageStatusWarning
 	}
 	return RoutingStageResult{Request: routingRequest, Result: result, Operations: operations, Stage: stage}
+}
+
+type ExplicitReturnPathEvidence struct {
+	Net                string   `json:"net"`
+	ReturnNet          string   `json:"return_net"`
+	PreferredLayer     string   `json:"preferred_layer,omitempty"`
+	PreferredLayerUsed bool     `json:"preferred_layer_used"`
+	UsedLayers         []string `json:"used_layers"`
+	ReturnPlaneLayers  []string `json:"return_plane_layers,omitempty"`
+	MaxLengthMM        float64  `json:"max_length_mm,omitempty"`
+	RouteLengthMM      float64  `json:"route_length_mm"`
+	MaxDistanceMM      float64  `json:"max_distance_mm"`
+	WorstDistanceMM    float64  `json:"worst_distance_mm"`
+	SampleCount        int      `json:"sample_count"`
+	Pass               bool     `json:"pass"`
+}
+
+func explicitReturnPathEvidence(
+	nets []ExplicitNetSpec,
+	zones []ExplicitZoneSpec,
+	routes []routing.Route,
+	boardLayers []routing.Layer,
+	boardThicknessMM float64,
+) ([]ExplicitReturnPathEvidence, []reports.Issue) {
+	routesByNet := make(map[string]routing.Route, len(routes))
+	for _, route := range routes {
+		routesByNet[route.Net] = route
+	}
+	copperLayers := make(map[string]bool, len(boardLayers))
+	for _, layer := range copperLayerNames(boardLayers) {
+		copperLayers[layer] = true
+	}
+	var evidence []ExplicitReturnPathEvidence
+	var issues []reports.Issue
+	for _, net := range nets {
+		if net.ReturnNet == "" || net.ReturnPathMaxDistanceMM <= 0 {
+			continue
+		}
+		signal := routesByNet[net.Name]
+		returnPath := routesByNet[net.ReturnNet]
+		var returnPlaneLayers []string
+		for _, zone := range zones {
+			if zone.Net != net.ReturnNet {
+				continue
+			}
+			for _, layer := range zone.Layers {
+				if copperLayers[layer] && !slices.Contains(returnPlaneLayers, layer) {
+					returnPlaneLayers = append(returnPlaneLayers, layer)
+				}
+			}
+		}
+		slices.Sort(returnPlaneLayers)
+		item := ExplicitReturnPathEvidence{
+			Net: net.Name, ReturnNet: net.ReturnNet, PreferredLayer: net.PreferLayer, MaxLengthMM: net.MaxLengthMM,
+			MaxDistanceMM: net.ReturnPathMaxDistanceMM, UsedLayers: []string{},
+			ReturnPlaneLayers: returnPlaneLayers, Pass: true,
+		}
+		if (len(signal.Segments) == 0 && len(signal.Vias) == 0) ||
+			(len(returnPath.Segments) == 0 && len(returnPath.Vias) == 0 && len(returnPlaneLayers) == 0) {
+			item.Pass = false
+		} else {
+			usedLayers := map[string]bool{}
+			for _, segment := range signal.Segments {
+				usedLayers[segment.Layer] = true
+				item.RouteLengthMM += math.Hypot(segment.End.XMM-segment.Start.XMM, segment.End.YMM-segment.Start.YMM)
+				samples := []routing.Point{
+					segment.Start,
+					{XMM: (segment.Start.XMM + segment.End.XMM) / 2, YMM: (segment.Start.YMM + segment.End.YMM) / 2},
+					segment.End,
+				}
+				for _, sample := range samples {
+					distance := nearestReturnConductorDistance(
+						sample, segment.Layer, returnPath, returnPlaneLayers, boardLayers, boardThicknessMM,
+					)
+					item.SampleCount++
+					item.WorstDistanceMM = math.Max(item.WorstDistanceMM, distance)
+					if distance > net.ReturnPathMaxDistanceMM {
+						item.Pass = false
+					}
+				}
+			}
+			for _, via := range signal.Vias {
+				viaLayers := copperLayerNames(boardLayers)
+				if len(via.Layers) != 0 {
+					viaLayers = append([]string(nil), via.Layers...)
+				}
+				for _, layer := range viaLayers {
+					usedLayers[layer] = true
+					distance := nearestReturnConductorDistance(
+						via.At, layer, returnPath, returnPlaneLayers, boardLayers, boardThicknessMM,
+					)
+					item.SampleCount++
+					item.WorstDistanceMM = math.Max(item.WorstDistanceMM, distance)
+					if distance > net.ReturnPathMaxDistanceMM {
+						item.Pass = false
+					}
+				}
+				item.RouteLengthMM += viaVerticalSpanMM(via, boardLayers, boardThicknessMM)
+			}
+			for layer := range usedLayers {
+				item.UsedLayers = append(item.UsedLayers, layer)
+			}
+			slices.Sort(item.UsedLayers)
+			item.PreferredLayerUsed = net.PreferLayer == "" || usedLayers[net.PreferLayer]
+			if !item.PreferredLayerUsed || (net.MaxLengthMM > 0 && item.RouteLengthMM > net.MaxLengthMM) {
+				item.Pass = false
+			}
+		}
+		evidence = append(evidence, item)
+		if !item.Pass {
+			issues = append(issues, reports.Issue{
+				Code: reports.CodeValidationFailed, Severity: reports.SeverityBlocked, Stage: string(StageRouting),
+				Path:       "explicit_circuit.nets." + net.Name + ".return_path",
+				Message:    "routed net violates its declared route-length, preferred-layer, or return-path bound",
+				Nets:       []string{net.Name, net.ReturnNet},
+				Suggestion: "shorten the route, use the preferred layer, or move the return conductor closer",
+			})
+		}
+	}
+	return evidence, issues
+}
+
+func nearestReturnConductorDistance(
+	point routing.Point,
+	signalLayer string,
+	route routing.Route,
+	returnPlaneLayers []string,
+	boardLayers []routing.Layer,
+	boardThicknessMM float64,
+) float64 {
+	distance := math.Inf(1)
+	for _, segment := range route.Segments {
+		planarDistance := pointToSegmentDistance(point, segment.Start, segment.End)
+		layerDistance := copperLayerSeparationMM(signalLayer, segment.Layer, boardLayers, boardThicknessMM)
+		distance = math.Min(distance, math.Hypot(planarDistance, layerDistance))
+	}
+	for _, via := range route.Vias {
+		distance = math.Min(distance, math.Hypot(point.XMM-via.At.XMM, point.YMM-via.At.YMM))
+	}
+	for _, planeLayer := range returnPlaneLayers {
+		if planeLayer == signalLayer {
+			continue
+		}
+		distance = math.Min(distance, copperLayerSeparationMM(signalLayer, planeLayer, boardLayers, boardThicknessMM))
+	}
+	return distance
+}
+
+func copperLayerNames(layers []routing.Layer) []string {
+	var names []string
+	for _, layer := range layers {
+		if layer.Kind == routing.LayerCopper && layer.Routable {
+			names = append(names, layer.Name)
+		}
+	}
+	return names
+}
+
+func copperLayerSeparationMM(left, right string, layers []routing.Layer, boardThicknessMM float64) float64 {
+	if left == right {
+		return 0
+	}
+	names := copperLayerNames(layers)
+	// Generated boards declare copper order and total thickness but not a
+	// manufacturer-specific core/prepreg build. Use the deterministic uniform
+	// stack model implied by that declaration; the emitted evidence remains
+	// reproducible and can be replaced by explicit stackup geometry later.
+	if len(names) < 2 || !finiteScalar(boardThicknessMM) || boardThicknessMM <= 0 {
+		return math.Inf(1)
+	}
+	leftIndex, rightIndex := -1, -1
+	for index, name := range names {
+		if name == left {
+			leftIndex = index
+		}
+		if name == right {
+			rightIndex = index
+		}
+	}
+	if leftIndex < 0 || rightIndex < 0 {
+		return math.Inf(1)
+	}
+	return math.Abs(float64(leftIndex-rightIndex)) * boardThicknessMM / float64(len(names)-1)
+}
+
+func viaVerticalSpanMM(via routing.Via, layers []routing.Layer, boardThicknessMM float64) float64 {
+	names := copperLayerNames(layers)
+	if len(names) < 2 {
+		return boardThicknessMM
+	}
+	if len(via.Layers) < 2 {
+		return boardThicknessMM
+	}
+	return copperLayerSeparationMM(via.Layers[0], via.Layers[len(via.Layers)-1], layers, boardThicknessMM)
+}
+
+func pointToSegmentDistance(point, start, end routing.Point) float64 {
+	dx := end.XMM - start.XMM
+	dy := end.YMM - start.YMM
+	if dx == 0 && dy == 0 {
+		return math.Hypot(point.XMM-start.XMM, point.YMM-start.YMM)
+	}
+	projection := ((point.XMM-start.XMM)*dx + (point.YMM-start.YMM)*dy) / (dx*dx + dy*dy)
+	projection = math.Max(0, math.Min(1, projection))
+	nearestX := start.XMM + projection*dx
+	nearestY := start.YMM + projection*dy
+	return math.Hypot(point.XMM-nearestX, point.YMM-nearestY)
 }
 
 func finalizeExplicitRouteOperations(operations []routing.Operation, placed *PlacementStageResult) ([]transactions.Operation, []reports.Issue) {
@@ -363,13 +585,13 @@ func explicitPlacementEdge(edge string) placement.EdgeConstraint {
 
 func explicitPlacementNetRole(role string) placement.NetRole {
 	switch strings.ToLower(strings.TrimSpace(role)) {
-	case "power", "power_pos", "power_neg", "bias":
+	case "power", "power_pos", "power_neg":
 		return placement.NetPower
 	case "ground", "return", "shield":
 		return placement.NetGround
 	case "clock":
 		return placement.NetClock
-	case "analog", "feedback":
+	case "analog", "feedback", "bias", "timing":
 		return placement.NetAnalog
 	default:
 		return placement.NetSignal
@@ -401,11 +623,19 @@ func explicitZoneOperations(request Request) ([]transactions.Operation, []report
 	}
 	inset := max(request.Board.EdgeClearanceMM, 0.25)
 	polygon := []transactions.Point{{XMM: inset, YMM: inset}, {XMM: request.Board.WidthMM - inset, YMM: inset}, {XMM: request.Board.WidthMM - inset, YMM: request.Board.HeightMM - inset}, {XMM: inset, YMM: request.Board.HeightMM - inset}}
+	counts := map[string]int{}
+	for _, zone := range request.ExplicitCircuit.Zones {
+		counts[zone.Net]++
+	}
 	var operations []transactions.Operation
 	var issues []reports.Issue
 	for _, zone := range request.ExplicitCircuit.Zones {
 		net := zone.Net
-		appendExplicitOperationToSlice(&operations, transactions.OpAddZone, transactions.AddZoneOperation{Op: transactions.OpAddZone, Name: "explicit_" + zone.Net, NetName: &net, Layers: append([]string(nil), zone.Layers...), Polygon: polygon, ClearanceMM: zone.ClearanceMM}, &issues)
+		name := "explicit_" + zone.Net
+		if counts[zone.Net] > 1 {
+			name += "_" + strings.NewReplacer(".", "_", "/", "_").Replace(strings.Join(zone.Layers, "_"))
+		}
+		appendExplicitOperationToSlice(&operations, transactions.OpAddZone, transactions.AddZoneOperation{Op: transactions.OpAddZone, Name: name, NetName: &net, Layers: append([]string(nil), zone.Layers...), Polygon: polygon, ClearanceMM: zone.ClearanceMM}, &issues)
 	}
 	return operations, issues
 }

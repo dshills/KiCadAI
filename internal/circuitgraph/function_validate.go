@@ -101,6 +101,23 @@ func (validator *graphValidator) functionIntent(intent FunctionIntent) {
 		}
 		validator.functionCapability(path, function, parameterNames, seenRequired)
 	}
+	for index, function := range intent.Functions {
+		path := fmt.Sprintf("synthesis.functions[%d]", index)
+		if function.Near == "" {
+			if function.MaxDistanceMM != 0 {
+				validator.add(CodeSynthesisIntentInvalid, path+".max_distance_mm", "proximity distance requires a near target")
+			}
+			continue
+		}
+		if function.Near == function.ID {
+			validator.add(CodeSynthesisIntentInvalid, path+".near", "function cannot be placed near itself")
+		} else if _, exists := functions[function.Near]; !exists {
+			validator.add(CodeSynthesisIntentInvalid, path+".near", "near target is not a declared function")
+		}
+		if !finiteInRange(function.MaxDistanceMM, 0, MaxBoardDimensionMM, false) {
+			validator.add(CodeSynthesisIntentInvalid, path+".max_distance_mm", "proximity distance must be finite and positive")
+		}
+	}
 
 	interfaces := map[string]map[string]bool{}
 	for index, candidate := range intent.Interfaces {

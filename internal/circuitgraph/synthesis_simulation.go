@@ -56,7 +56,7 @@ func deriveSynthesisSimulation(document Document, intent FunctionIntent, selecte
 		selection := selected[id]
 		value, hasValue := components.ParseEngineeringValue(selection.Instance.Value)
 		evidence = append(evidence, componentSimulationEvidence(
-			selection.Instance.ID, selection.ComponentID, selection.Record.Family, value, hasValue,
+			selection.Instance.ID, selection.ComponentID, selection.Record.Family, selection.Instance.Usage, value, hasValue,
 			configuredSimulationModels(selection), connections[selection.Instance.ID], selection.Units, selection.Record,
 		)...)
 	}
@@ -297,7 +297,7 @@ func catalogSupplyCurrentA(ratings []components.RatingConstraint) (float64, bool
 	return 0, false
 }
 
-func componentSimulationEvidence(instanceID, catalogID, family string, value float64, hasValue bool, models []simmodel.CatalogEvidence, connections []simmodel.ConnectionEvidence, units []ResolvedUnit, record components.ComponentRecord) []simmodel.ComponentEvidence {
+func componentSimulationEvidence(instanceID, catalogID, family, usage string, value float64, hasValue bool, models []simmodel.CatalogEvidence, connections []simmodel.ConnectionEvidence, units []ResolvedUnit, record components.ComponentRecord) []simmodel.ComponentEvidence {
 	uncertainties := append(catalogValueUncertainties(value, hasValue, record), catalogModelUncertainties(models)...)
 	functionalUnits := []ResolvedUnit{}
 	sharedUnits := map[string]bool{}
@@ -310,7 +310,7 @@ func componentSimulationEvidence(instanceID, catalogID, family string, value flo
 	}
 	if len(functionalUnits) <= 1 || !synthesisRecordHasModel(models, simmodel.PrimitiveOpAmpV1) {
 		return []simmodel.ComponentEvidence{{
-			InstanceID: instanceID, CatalogID: catalogID, Family: family, ValueSI: value, HasValueSI: hasValue,
+			InstanceID: instanceID, CatalogID: catalogID, Family: family, Usage: usage, ValueSI: value, HasValueSI: hasValue,
 			ModelClaims: models, Connections: connections, Uncertainties: uncertainties,
 		}}
 	}
@@ -324,7 +324,7 @@ func componentSimulationEvidence(instanceID, catalogID, family string, value flo
 		}
 		evidence = append(evidence, simmodel.ComponentEvidence{
 			InstanceID: instanceID + "." + unit.ID, PhysicalComponent: instanceID,
-			CatalogID: catalogID, Family: family, ValueSI: value, HasValueSI: hasValue,
+			CatalogID: catalogID, Family: family, Usage: usage, ValueSI: value, HasValueSI: hasValue,
 			ModelClaims: models, Connections: unitConnections, Uncertainties: uncertainties,
 		})
 	}

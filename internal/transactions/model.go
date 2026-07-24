@@ -149,8 +149,9 @@ type Point struct {
 }
 
 type BoardSize struct {
-	WidthMM  float64 `json:"width_mm"`
-	HeightMM float64 `json:"height_mm"`
+	WidthMM     float64 `json:"width_mm"`
+	HeightMM    float64 `json:"height_mm"`
+	ThicknessMM float64 `json:"thickness_mm,omitempty"`
 }
 
 type Endpoint struct {

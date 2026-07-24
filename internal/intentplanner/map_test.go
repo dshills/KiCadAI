@@ -269,6 +269,7 @@ func TestBMP280IntentMatchesKiCadBackedPassFixture(t *testing.T) {
 	if reports.HasBlockingIssue(fixtureIssues) {
 		t.Fatalf("decode fixture issues = %#v", fixtureIssues)
 	}
+	fixture = designworkflow.NormalizeRequest(fixture)
 	generatedJSON, err := json.Marshal(plan.GeneratedRequest)
 	if err != nil {
 		t.Fatal(err)

@@ -74,6 +74,37 @@ var functionCapabilities = []FunctionCapability{
 		Limitations:     []string{"thermal headroom and capacitor derating remain evidence requirements"},
 	},
 	{
+		Name: "standalone_clock_source", Description: "Select a self-contained clock source with catalog-backed timing and output evidence.", SupportedRoles: []ComponentRole{RoleOscillator},
+		EndpointRoles: []FunctionEndpointCapability{
+			{Role: "output", Functions: []string{"OUT"}, Required: false, Description: "Generated clock output."},
+			{Role: "supply", Functions: []string{"VDD"}, Required: false, Description: "Clock-source supply."},
+			{Role: "return", Functions: []string{"GND"}, Required: false, Description: "Clock-source return."},
+			{Role: "control", Functions: []string{"ENABLE", "DIV"}, Required: false, Description: "Optional enable or divider control."},
+			{Role: "timing", Functions: []string{"SET", "GUARD"}, Required: false, Description: "Optional timing and guard nodes."},
+		},
+		ProvenReadiness: AcceptanceERCDRC,
+		Limitations:     []string{"frequency, startup, jitter, duty cycle, environment, and load limits require quantitative catalog and simulation evidence"},
+	},
+	{
+		Name: "clock_buffer", Description: "Buffer a generated clock through a qualified logic receiver and output stage.", SupportedRoles: []ComponentRole{RoleIC},
+		EndpointRoles: []FunctionEndpointCapability{
+			{Role: "input", Functions: []string{"IN"}, Required: false, Description: "Clock input."},
+			{Role: "output", Functions: []string{"OUT"}, Required: false, Description: "Buffered clock output."},
+			{Role: "supply", Functions: []string{"VCC"}, Required: false, Description: "Buffer supply."},
+			{Role: "return", Functions: []string{"GND"}, Required: false, Description: "Buffer return."},
+		},
+		ProvenReadiness: AcceptanceERCDRC,
+		Limitations:     []string{"input thresholds, propagation delay, output levels, edge rate, fanout, and capacitive loading require quantitative evidence"},
+	},
+	{
+		Name: "timing_resistor", Description: "Program a timing function with a catalog-qualified precision resistor.", SupportedRoles: []ComponentRole{RoleResistor},
+		EndpointRoles: []FunctionEndpointCapability{
+			{Role: "timing", Functions: []string{"A", "B"}, Required: false, Description: "Timing-network terminals."},
+		},
+		ProvenReadiness: AcceptanceERCDRC,
+		Limitations:     []string{"frequency accuracy requires tolerance and temperature-coefficient corner analysis"},
+	},
+	{
 		Name: "i2c_peripheral", Description: "Select an I2C peripheral and apply reviewed address and unused-pin policies.", SupportedRoles: []ComponentRole{RoleSensor, RoleIC},
 		OptionalParameters: []FunctionParameter{{Name: "i2c_address", ValueKind: "string", Description: "Reviewed address such as 0x44 or 0x76."}},
 		EndpointRoles: []FunctionEndpointCapability{
@@ -268,6 +299,10 @@ var legacyFunctionUsages = []string{
 }
 
 func FunctionLevelCapabilities() FunctionLevelCapabilityDocument {
+	operations := cloneFunctionCapabilities(functionCapabilities)
+	slices.SortStableFunc(operations, func(left, right FunctionCapability) int {
+		return strings.Compare(left.Name, right.Name)
+	})
 	return FunctionLevelCapabilityDocument{
 		Schema:           FunctionCapabilitySchema,
 		InputSchema:      SchemaID,
@@ -281,7 +316,7 @@ func FunctionLevelCapabilities() FunctionLevelCapabilityDocument {
 			{Field: "constraints.max_height_mm", Unit: "mm"},
 			{Field: "constraints.preferred_component_spacing_mm", Unit: "mm"},
 		},
-		Operations:        cloneFunctionCapabilities(functionCapabilities),
+		Operations:        operations,
 		ReadinessLimits:   []string{"proven_readiness is fixture evidence, not a guarantee for every selected component or topology", "KiCad ERC/DRC, connectivity, route completion, writer correctness, and zero round-trip differences must be requested and pass for erc-drc promotion"},
 		UnsupportedClaims: []string{"fabrication release", "regulatory compliance", "unmodeled analog or thermal performance", "general high-speed, RF, or unrestricted autorouting"},
 	}

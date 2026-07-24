@@ -111,6 +111,7 @@ type protectedLEDProjection struct {
 
 func protectedLEDProjectionFor(t *testing.T, request designworkflow.Request) protectedLEDProjection {
 	t.Helper()
+	request = designworkflow.NormalizeRequest(request)
 	usb := designBlockByID(request, "usb_power")
 	indicator := designBlockByID(request, "indicator")
 	if usb.BlockID != "usb_c_power" || indicator.BlockID != "led_indicator" {

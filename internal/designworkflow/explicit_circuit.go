@@ -106,9 +106,9 @@ func createExplicitCircuit(ctx context.Context, request Request, opts CreateOpti
 	}
 	validationOpts, kicadOpts := createValidationOptions(request, opts)
 	validated := ValidateProject(ctx, &request, &written, validationOpts)
-	stages = append(stages, validated.Stage)
 	checked := RunKiCadChecks(ctx, &request, &written, kicadOpts)
-	stages = append(stages, checked.Stage)
+	validated.Stage = reconcileDeferredZoneFillValidation(validated.Stage, checked.DRC)
+	stages = append(stages, validated.Stage, checked.Stage)
 	stages = append(stages, runExplicitSimulation(request, opts.OutputDir, opts.Overwrite))
 	return BuildWorkflowResult(project, request.Validation.Acceptance, stages)
 }

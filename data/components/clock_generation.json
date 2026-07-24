@@ -1,0 +1,423 @@
+{
+  "version": "0.1.0",
+  "records": [
+    {
+      "id": "clock_source.sitime.sit8008ac_31_33e_8mhz",
+      "family": "clock_source",
+      "name": "SiT8008AC 8 MHz ±20 ppm MEMS oscillator",
+      "description": "Qualified fixed-frequency packaged clock source for 3.3 V systems.",
+      "generic": false,
+      "manufacturer": "SiTime",
+      "mpn": "SiT8008AC-31-33E-8.000000",
+      "lifecycle": "active",
+      "tags": ["clock", "fixed_frequency", "mems_oscillator", "push_pull", "precision"],
+      "values": [{"kind": "frequency", "typ": "8000000", "unit": "Hz"}],
+      "ratings": [
+        {"kind": "supply_voltage", "min": "2.97", "max": "3.63", "unit": "V"},
+        {"kind": "capacitive_load", "max": "60e-12", "unit": "F"}
+      ],
+      "tolerances": [{"kind": "total_frequency_stability", "max": "20", "unit": "ppm"}],
+      "temperature": {"min": "-20", "max": "70", "unit": "C"},
+      "electrical_roles": [{"role": "standalone_clock_source", "description": "Self-contained fixed-frequency source with output enable."}],
+      "symbols": [{
+        "symbol_id": "Oscillator:SiT8008xx-3x-xxE",
+        "function_pins": [
+          {"function": "ENABLE", "symbol_pin": "1", "electrical": "input", "required": true},
+          {"function": "GND", "symbol_pin": "2", "electrical": "power_in", "required": true},
+          {"function": "OUT", "symbol_pin": "3", "electrical": "output", "required": true},
+          {"function": "VDD", "symbol_pin": "4", "electrical": "power_in", "required": true}
+        ],
+        "verification": {
+          "confidence": "verified",
+          "sources": ["https://www.sitime.com/datasheet/SiT8008", "kicad-symbols:Oscillator:SiT8008xx-3x-xxE"],
+          "pinmap_checked": true
+        }
+      }],
+      "packages": [{
+        "id": "qfn_5x3_2",
+        "name": "SiTime 4-pin 5.0 x 3.2 mm PQFN",
+        "footprint_id": "Oscillator:Oscillator_SMD_SiT_PQFN-4Pin_5.0x3.2mm",
+        "package_type": "qfn_5x3_2",
+        "mpn": "SiT8008AC-31-33E-8.000000",
+        "lifecycle": "active",
+        "pinmap_id": "Oscillator:SiT8008xx-3x-xxE|Oscillator:Oscillator_SMD_SiT_PQFN-4Pin_5.0x3.2mm",
+        "pad_functions": [
+          {"function": "ENABLE", "pad": "1"},
+          {"function": "GND", "pad": "2"},
+          {"function": "OUT", "pad": "3"},
+          {"function": "VDD", "pad": "4"}
+        ],
+        "dimensions_mm": {"width": 5.0, "height": 3.2},
+        "verification": {
+          "confidence": "verified",
+          "sources": ["https://www.sitime.com/datasheet/SiT8008", "kicad-footprints:Oscillator:Oscillator_SMD_SiT_PQFN-4Pin_5.0x3.2mm"],
+          "pinmap_checked": true
+        }
+      }],
+      "companions": [
+        {
+          "id": "clock_source.supply_bypass",
+          "family": "capacitor",
+          "role": "decoupling_capacitor",
+          "required": true,
+          "recipes": [{
+            "id": "supply_bypass",
+            "family": "capacitor",
+            "role": "decoupling_capacitor",
+            "package": "0603",
+            "value_kind": "capacitance",
+            "value": "100n",
+            "min_voltage_v": 6.3,
+            "minimum_confidence": "rule_inferred",
+            "required_functions": ["A", "B"],
+            "connections": [
+              {"function": "A", "parent_function": "VDD"},
+              {"function": "B", "parent_function": "GND"}
+            ]
+          }],
+          "description": "Place at least 0.1 uF directly across VDD and GND."
+        },
+        {
+          "id": "clock_source.enable",
+          "family": "net_tie",
+          "role": "enable_tie",
+          "required": true,
+          "ties": [{"function": "ENABLE", "level": "high", "parent_function": "VDD"}],
+          "description": "Assert output enable for continuous clock generation."
+        }
+      ],
+      "clock_evidence": {
+        "proof_status": "proven",
+        "signaling_modes": ["push_pull"],
+        "architecture_class": "fixed_packaged_oscillator",
+        "frequency": {"minimum": 8000000, "typical": 8000000, "maximum": 8000000, "unit": "Hz", "conditions": "ordered 8.000000 MHz frequency option"},
+        "frequency_accuracy": {"value": 20, "unit": "ppm", "conditions": "total stability including initial tolerance, temperature, supply, load, and first-year aging"},
+        "duty_cycle": {"minimum": 45, "typical": 50, "maximum": 55, "unit": "%", "conditions": "rated supply and load"},
+        "supply_voltage": {"minimum": 2.97, "typical": 3.3, "maximum": 3.63, "unit": "V", "conditions": "3.3 V ordering option"},
+        "supply_current": {"value": 0.0045, "unit": "A", "conditions": "conservative maximum operating-current model"},
+        "amplitude": {"minimum": 2.673, "maximum": 3.63, "unit": "V", "conditions": "VOH is at least 90% VDD at rated source current"},
+        "common_mode": {"minimum": 1.3365, "maximum": 1.9965, "unit": "V", "conditions": "bounded midpoint from 10%/90% rail logic levels"},
+        "output_high_voltage": {"value": 2.673, "unit": "V", "conditions": "minimum supply, VOH >= 90% VDD, IOH = -4 mA"},
+        "output_low_voltage": {"value": 0.363, "unit": "V", "conditions": "maximum supply, VOL <= 10% VDD, IOL = 4 mA"},
+        "edge_time": {"minimum": 0, "maximum": 2e-9, "unit": "s", "conditions": "2.5 V to 3.3 V operation with 15 pF load"},
+        "rms_jitter": {"value": 3e-12, "unit": "s", "conditions": "datasheet RMS period-jitter maximum"},
+        "startup_time": {"value": 0.005, "unit": "s", "conditions": "power-up to valid output maximum"},
+        "maximum_frequency": {"value": 110000000, "unit": "Hz", "conditions": "SiT8008B family operating range"},
+        "output_impedance": {"value": 75, "unit": "Ohm", "conditions": "conservative bound from 0.3 V rail drop at 4 mA"},
+        "output_current": {"value": 0.004, "unit": "A", "conditions": "guaranteed VOH and VOL test current"},
+        "maximum_capacitive_load": {"value": 60e-12, "unit": "F", "conditions": "programmable drive-strength load range"},
+        "maximum_fanout": {"value": 4, "unit": "count", "conditions": "four 15 pF receiver-equivalent loads within 60 pF limit"},
+        "fabrication_proof": true,
+        "review_note": "The architecture provider may add a qualified endpoint buffer when requested current or fanout exceeds the direct-output guarantee."
+      },
+      "simulation_models": [{
+        "model_id": "mna_fixed_clock_source_v1",
+        "parameters": [
+          {"name": "frequency_hz", "value": 8000000},
+          {"name": "frequency_accuracy_fraction", "value": 0.00002},
+          {"name": "duty_cycle_fraction", "value": 0.5},
+          {"name": "startup_time_s", "value": 0.005},
+          {"name": "rms_jitter_s", "value": 3e-12},
+          {"name": "dc_output_high", "value": 1},
+          {"name": "enable_high_ratio", "value": 0.7},
+          {"name": "output_high_ratio", "value": 0.9},
+          {"name": "output_low_ratio", "value": 0.1},
+          {"name": "output_resistance_ohm", "value": 75},
+          {"name": "max_output_current_a", "value": 0.004},
+          {"name": "max_load_capacitance_f", "value": 60e-12},
+          {"name": "supply_current_a", "value": 0.0045}
+        ]
+      }],
+      "placement_hints": [{"kind": "near", "target": "decoupling_capacitor", "value": "2", "unit": "mm", "description": "Minimize the VDD bypass loop."}],
+      "routing_hints": [{"kind": "clock_route", "net_role": "clock", "description": "Keep the source-to-buffer clock segment short and isolated from switching-current loops."}],
+      "verification": {
+        "confidence": "verified",
+        "sources": ["https://www.sitime.com/datasheet/SiT8008", "https://www.sitime.com/part-details/sit8008ac-31-33e-8.000000"],
+        "resolver_checked": true,
+        "pinmap_checked": true,
+        "tests": ["clock_generation_precision_corpus"]
+      }
+    },
+    {
+      "id": "clock_source.analog_devices.ltc6906is6",
+      "family": "clock_source",
+      "name": "LTC6906 industrial resistor-set oscillator",
+      "description": "Qualified micropower programmable oscillator using a precision timing resistor.",
+      "generic": false,
+      "manufacturer": "Analog Devices",
+      "mpn": "LTC6906IS6#PBF",
+      "lifecycle": "active",
+      "tags": ["clock", "resistor_programmed", "push_pull", "micropower"],
+      "values": [{"kind": "frequency", "min": "10000", "max": "1000000", "unit": "Hz"}],
+      "ratings": [
+        {"kind": "supply_voltage", "min": "2.25", "max": "3.6", "unit": "V"},
+        {"kind": "timing_resistance", "min": "100000", "max": "1000000", "unit": "Ohm"}
+      ],
+      "tolerances": [{"kind": "frequency_accuracy", "max": "1.3", "unit": "%"}],
+      "temperature": {"min": "-40", "max": "85", "unit": "C"},
+      "electrical_roles": [{"role": "standalone_clock_source", "description": "Frequency programmed by one external resistor and divider strapping."}],
+      "symbols": [{
+        "symbol_id": "KiCadAI_Clock:LTC6906",
+        "function_pins": [
+          {"function": "OUT", "symbol_pin": "1", "electrical": "output", "required": true},
+          {"function": "GND", "symbol_pin": "2", "electrical": "power_in", "required": true},
+          {"function": "DIV", "symbol_pin": "3", "electrical": "input", "required": true},
+          {"function": "SET", "symbol_pin": "4", "electrical": "passive", "required": true},
+          {"function": "GUARD", "symbol_pin": "5", "electrical": "output", "required": true},
+          {"function": "VDD", "symbol_pin": "6", "electrical": "power_in", "required": true}
+        ],
+        "verification": {
+          "confidence": "verified",
+          "sources": ["https://www.analog.com/media/en/technical-documentation/data-sheets/ltc6906.pdf", "bundled-symbol:KiCadAI_Clock:LTC6906"],
+          "pinmap_checked": true
+        }
+      }],
+      "packages": [{
+        "id": "tsot23_6",
+        "name": "ThinSOT-23-6",
+        "footprint_id": "Package_TO_SOT_SMD:TSOT-23-6",
+        "package_type": "tsot23_6",
+        "mpn": "LTC6906IS6#PBF",
+        "lifecycle": "active",
+        "pinmap_id": "KiCadAI_Clock:LTC6906|Package_TO_SOT_SMD:TSOT-23-6",
+        "pad_functions": [
+          {"function": "OUT", "pad": "1"},
+          {"function": "GND", "pad": "2"},
+          {"function": "DIV", "pad": "3"},
+          {"function": "SET", "pad": "4"},
+          {"function": "GUARD", "pad": "5"},
+          {"function": "VDD", "pad": "6"}
+        ],
+        "dimensions_mm": {"width": 2.9, "height": 1.75},
+        "verification": {
+          "confidence": "verified",
+          "sources": ["https://www.analog.com/media/en/technical-documentation/data-sheets/ltc6906.pdf", "kicad-footprints:Package_TO_SOT_SMD:TSOT-23-6"],
+          "pinmap_checked": true
+        }
+      }],
+      "companions": [
+        {
+          "id": "clock_source.supply_bypass",
+          "family": "capacitor",
+          "role": "decoupling_capacitor",
+          "required": true,
+          "recipes": [{
+            "id": "supply_bypass",
+            "family": "capacitor",
+            "role": "decoupling_capacitor",
+            "package": "0603",
+            "value_kind": "capacitance",
+            "value": "100n",
+            "min_voltage_v": 6.3,
+            "minimum_confidence": "rule_inferred",
+            "required_functions": ["A", "B"],
+            "connections": [
+              {"function": "A", "parent_function": "VDD"},
+              {"function": "B", "parent_function": "GND"}
+            ]
+          }],
+          "description": "Place a local ceramic bypass across VDD and GND."
+        },
+        {
+          "id": "clock_source.timing_resistor",
+          "family": "resistor",
+          "role": "timing_resistor",
+          "required": true,
+          "description": "Select a verified precision resistor from the requested frequency and the oscillator transfer equation."
+        }
+      ],
+      "clock_evidence": {
+        "proof_status": "proven",
+        "signaling_modes": ["push_pull"],
+        "architecture_class": "resistor_programmed_relaxation_oscillator",
+        "frequency": {"minimum": 10000, "maximum": 1000000, "unit": "Hz", "conditions": "RSET and DIV programming range"},
+        "frequency_accuracy": {"value": 1.3, "unit": "%", "conditions": "industrial-grade guaranteed accuracy across -40 C to 85 C"},
+        "duty_cycle": {"minimum": 45, "typical": 50, "maximum": 55, "unit": "%", "conditions": "rated supply and temperature"},
+        "supply_voltage": {"minimum": 2.25, "maximum": 3.6, "unit": "V", "conditions": "normal operating range"},
+        "supply_current": {"value": 0.000018, "unit": "A", "conditions": "maximum at 100 kHz and 3.6 V"},
+        "amplitude": {"minimum": 2.0, "maximum": 3.6, "unit": "V", "conditions": "push-pull output prior to endpoint buffering"},
+        "common_mode": {"minimum": 1.0, "maximum": 2.2, "unit": "V", "conditions": "bounded midpoint from guaranteed output levels"},
+        "output_high_voltage": {"value": 2.8, "unit": "V", "conditions": "3.6 V supply, IOH = -1 mA"},
+        "output_low_voltage": {"value": 0.8, "unit": "V", "conditions": "3.6 V supply, IOL = 1 mA"},
+        "edge_time": {"minimum": 0, "maximum": 25e-9, "unit": "s", "conditions": "5 pF test load over the operating supply range"},
+        "rms_jitter": {"value": 15e-9, "unit": "s", "conditions": "conservative RMS bound from 0.15% peak-to-peak timing jitter at 100 kHz"},
+        "startup_time": {"value": 0.00074, "unit": "s", "conditions": "64 oscillator periods plus 100 us at 100 kHz"},
+        "maximum_frequency": {"value": 1000000, "unit": "Hz", "conditions": "rated operating limit"},
+        "output_impedance": {"value": 300, "unit": "Ohm", "conditions": "equivalent output resistance shown by datasheet output model"},
+        "output_current": {"value": 0.001, "unit": "A", "conditions": "guaranteed VOH and VOL test current"},
+        "maximum_capacitive_load": {"value": 50e-12, "unit": "F", "conditions": "application waveforms cover 5 pF through 50 pF"},
+        "maximum_fanout": {"value": 1, "unit": "count", "conditions": "one receiver before qualified endpoint buffering"},
+        "fabrication_proof": true,
+        "review_note": "SET leakage is controlled by a short, isolated timing-resistor connection. The optional GRD guard driver remains unconnected because this generated topology does not claim bare-copper guard geometry."
+      },
+      "simulation_models": [{
+        "model_id": "mna_resistor_programmed_clock_source_v1",
+        "parameters": [
+          {"name": "frequency_accuracy_fraction", "value": 0.013},
+          {"name": "duty_cycle_fraction", "value": 0.5},
+          {"name": "rms_jitter_s", "value": 15e-9},
+          {"name": "dc_output_high", "value": 1},
+          {"name": "output_high_ratio", "value": 0.7777777778},
+          {"name": "output_low_ratio", "value": 0.2222222222},
+          {"name": "output_resistance_ohm", "value": 300},
+          {"name": "max_output_current_a", "value": 0.001},
+          {"name": "max_load_capacitance_f", "value": 50e-12},
+          {"name": "supply_current_a", "value": 0.000018},
+          {"name": "frequency_scale_hz_ohm", "value": 100000000000},
+          {"name": "divider_ratio", "value": 1},
+          {"name": "timing_resistance_min_ohm", "value": 100000},
+          {"name": "timing_resistance_max_ohm", "value": 1000000},
+          {"name": "startup_cycles", "value": 64},
+          {"name": "startup_fixed_s", "value": 0.0001}
+        ]
+      }],
+      "placement_hints": [
+        {"kind": "near", "target": "timing_resistor", "value": "2", "unit": "mm", "description": "Keep SET copper short to limit leakage and pickup."}
+      ],
+      "routing_hints": [
+        {"kind": "clock_route", "net_role": "clock", "description": "Keep the source-to-buffer segment short."},
+        {"kind": "no_connect", "net_role": "GUARD", "description": "Leave the optional GRD guard driver unconnected because no bare-copper guard ring is generated."}
+      ],
+      "verification": {
+        "confidence": "verified",
+        "sources": ["https://www.analog.com/en/products/ltc6906.html", "https://www.analog.com/media/en/technical-documentation/data-sheets/ltc6906.pdf"],
+        "resolver_checked": true,
+        "pinmap_checked": true,
+        "tests": ["clock_generation_relaxed_corpus"]
+      }
+    },
+    {
+      "id": "logic_buffer.ti.sn74lvc1g17dbv",
+      "family": "logic_buffer",
+      "name": "SN74LVC1G17 Schmitt-trigger buffer",
+      "description": "Qualified single-channel endpoint buffer for clock drive and edge restoration.",
+      "generic": false,
+      "manufacturer": "Texas Instruments",
+      "mpn": "SN74LVC1G17DBVR",
+      "lifecycle": "active",
+      "tags": ["buffer", "clock_endpoint", "push_pull", "schmitt_trigger"],
+      "ratings": [
+        {"kind": "supply_voltage", "min": "1.65", "max": "5.5", "unit": "V"},
+        {"kind": "output_current", "max": "0.016", "unit": "A"},
+        {"kind": "capacitive_load", "max": "50e-12", "unit": "F"},
+        {"kind": "fanout", "max": "4", "unit": "count"}
+      ],
+      "temperature": {"min": "-40", "max": "125", "unit": "C"},
+      "electrical_roles": [{"role": "clock_endpoint_buffer", "description": "Restores logic levels and supplies bounded endpoint drive."}],
+      "symbols": [{
+        "symbol_id": "74xGxx:74LVC1G17",
+        "function_pins": [
+          {"function": "NC", "symbol_pin": "1", "electrical": "no_connect", "required": true},
+          {"function": "IN", "symbol_pin": "2", "electrical": "input", "required": true},
+          {"function": "GND", "symbol_pin": "3", "electrical": "power_in", "required": true},
+          {"function": "OUT", "symbol_pin": "4", "electrical": "output", "required": true},
+          {"function": "VCC", "symbol_pin": "5", "electrical": "power_in", "required": true}
+        ],
+        "verification": {
+          "confidence": "verified",
+          "sources": ["https://www.ti.com/lit/ds/symlink/sn74lvc1g17.pdf", "kicad-symbols:74xGxx:74LVC1G17"],
+          "pinmap_checked": true
+        }
+      }],
+      "packages": [{
+        "id": "sot23_5",
+        "name": "SOT-23-5",
+        "footprint_id": "Package_TO_SOT_SMD:SOT-23-5",
+        "package_type": "sot23_5",
+        "mpn": "SN74LVC1G17DBVR",
+        "lifecycle": "active",
+        "pinmap_id": "74xGxx:74LVC1G17|Package_TO_SOT_SMD:SOT-23-5",
+        "pad_functions": [
+          {"function": "NC", "pad": "1"},
+          {"function": "IN", "pad": "2"},
+          {"function": "GND", "pad": "3"},
+          {"function": "OUT", "pad": "4"},
+          {"function": "VCC", "pad": "5"}
+        ],
+        "dimensions_mm": {"width": 2.9, "height": 1.6},
+        "verification": {
+          "confidence": "verified",
+          "sources": ["https://www.ti.com/lit/ds/symlink/sn74lvc1g17.pdf", "kicad-footprints:Package_TO_SOT_SMD:SOT-23-5"],
+          "pinmap_checked": true
+        }
+      }],
+      "companions": [
+        {
+          "id": "logic_buffer.supply_bypass",
+          "family": "capacitor",
+          "role": "decoupling_capacitor",
+          "required": true,
+          "recipes": [{
+            "id": "supply_bypass",
+            "family": "capacitor",
+            "role": "decoupling_capacitor",
+            "package": "0603",
+            "value_kind": "capacitance",
+            "value": "100n",
+            "min_voltage_v": 6.3,
+            "minimum_confidence": "rule_inferred",
+            "required_functions": ["A", "B"],
+            "connections": [
+              {"function": "A", "parent_function": "VCC"},
+              {"function": "B", "parent_function": "GND"}
+            ]
+          }],
+          "description": "Place a 0.1 uF ceramic capacitor at VCC."
+        },
+        {
+          "id": "logic_buffer.nc",
+          "family": "logic_buffer",
+          "role": "unused_pin_policy",
+          "required": true,
+          "no_connects": ["NC"],
+          "description": "Mark package pin 1 explicitly unconnected."
+        }
+      ],
+      "interface_evidence": {
+        "proof_status": "proven",
+        "signaling_modes": ["push_pull", "schmitt_trigger"],
+        "directions": ["source"],
+        "voltage": {"minimum": 3.0, "maximum": 3.6, "unit": "V", "conditions": "qualified interface-evidence range for the cataloged logic-level, drive, and timing bounds"},
+        "output_low_maximum_v": 0.4,
+        "output_high_minimum_v": 2.4,
+        "input_low_maximum_v": 0.89,
+        "input_high_minimum_v": 1.92,
+        "output_impedance": {"value": 37.5, "unit": "Ohm", "conditions": "worst high-side bound from 0.6 V drop at 16 mA"},
+        "output_current": {"value": 0.016, "unit": "A", "conditions": "recommended output current at 3 V"},
+        "input_capacitance": {"value": 4.5e-12, "unit": "F", "conditions": "datasheet typical input capacitance"},
+        "input_leakage": {"value": 5e-6, "unit": "A", "conditions": "conservative rated-temperature input leakage bound"},
+        "edge_time": {"minimum": 0, "maximum": 4.125e-9, "unit": "s", "conditions": "analytical 2.2RC bound using 37.5 Ohm and 50 pF"},
+        "maximum_frequency": {"value": 80000000, "unit": "Hz", "conditions": "conservative bound from 6.5 ns maximum propagation delay"},
+        "startup_time": {"value": 6.5e-9, "unit": "s", "conditions": "maximum propagation delay at 3.3 V class supply and rated temperature"},
+        "fabrication_proof": true,
+        "review_note": "The physical part supports 1.65 V to 5.5 V, but this fabrication proof is intentionally limited to 3.0 V to 3.6 V where the cataloged logic-level, drive, and timing bounds apply."
+      },
+      "simulation_models": [{
+        "model_id": "mna_cmos_schmitt_buffer_v1",
+        "parameters": [
+          {"name": "input_low_max_v", "value": 0.89},
+          {"name": "input_high_min_v", "value": 1.92},
+          {"name": "output_high_drop_v_at_rated_current", "value": 0.6},
+          {"name": "output_low_rise_v_at_rated_current", "value": 0.4},
+          {"name": "rated_output_current_a", "value": 0.016},
+          {"name": "output_resistance_ohm", "value": 37.5},
+          {"name": "propagation_delay_s", "value": 6.5e-9},
+          {"name": "max_load_capacitance_f", "value": 50e-12},
+          {"name": "supply_current_a", "value": 0.00001}
+        ]
+      }],
+      "placement_hints": [
+        {"kind": "near", "target": "clock_source", "value": "5", "unit": "mm", "description": "Keep the unbuffered clock stub compact."},
+        {"kind": "near", "target": "decoupling_capacitor", "value": "2", "unit": "mm", "description": "Minimize the VCC bypass loop."}
+      ],
+      "routing_hints": [{"kind": "clock_route", "net_role": "clock", "description": "Route the buffered endpoint directly, without stubs, and away from high-current switching loops."}],
+      "verification": {
+        "confidence": "verified",
+        "sources": ["https://www.ti.com/lit/ds/symlink/sn74lvc1g17.pdf"],
+        "resolver_checked": true,
+        "pinmap_checked": true,
+        "tests": ["clock_generation_endpoint_buffer"]
+      }
+    }
+  ]
+}

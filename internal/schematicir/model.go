@@ -164,8 +164,10 @@ const (
 	NetRolePowerNeg  = domain.NetRolePowerNeg
 	NetRoleGround    = domain.NetRoleGround
 	NetRoleReturn    = domain.NetRoleReturn
+	NetRoleClock     = domain.NetRoleClock
 	NetRoleFeedback  = domain.NetRoleFeedback
 	NetRoleBias      = domain.NetRoleBias
+	NetRoleTiming    = domain.NetRoleTiming
 	NetRoleShield    = domain.NetRoleShield
 	NetRoleBus       = domain.NetRoleBus
 	NetRoleNoConnect = domain.NetRoleNoConnect

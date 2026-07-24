@@ -140,7 +140,7 @@ func SupportedAnalysisKinds(modelID string) []string {
 	case ModelLinearCircuitMNAV1:
 		return []string{AnalysisACSweep, AnalysisDCOperatingPoint, AnalysisNoise, AnalysisStability, AnalysisThermal}
 	case ModelTransientCircuitV1:
-		return []string{AnalysisDistortion, AnalysisStartup, AnalysisThermal, AnalysisTransient}
+		return []string{AnalysisDCOperatingPoint, AnalysisDistortion, AnalysisStartup, AnalysisThermal, AnalysisTransient}
 	case ModelNonlinearCircuitDCV1:
 		return []string{AnalysisDCOperatingPoint, AnalysisThermal}
 	default:
@@ -197,7 +197,8 @@ func idealNoiseBoundaryPrimitive(modelID string) bool {
 	case PrimitiveVoltageSourceV1, PrimitiveConnectorVoltageSourceV1, PrimitiveCurrentSourceV1,
 		PrimitiveAdjustableLinearRegulatorV1, PrimitiveFixedLinearRegulatorV1,
 		PrimitiveFloatingAdjustableRegulatorV1, PrimitiveProgrammableCurrentSourceV1,
-		PrimitiveShuntVoltageReferenceV1, PrimitiveDualOutputIsolatedConverterV1:
+		PrimitiveShuntVoltageReferenceV1, PrimitiveDualOutputIsolatedConverterV1,
+		PrimitiveFixedClockSourceV1, PrimitiveResistorProgrammedClockSourceV1:
 		return true
 	default:
 		return false

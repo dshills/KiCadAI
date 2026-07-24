@@ -1,0 +1,28 @@
+{
+  "schema_version": "kicadai.external-review-matrix.v1",
+  "scenarios": [
+    {
+      "id": "precision_fixed_clock_family",
+      "review_equivalent": "behavior-only precision standalone clock realized by a qualified fixed-frequency source and endpoint buffer",
+      "lane": "requirement",
+      "fixture": "internal/architecturesearch/testdata/standalone_clock_generation_corpus/precision_logic_clock.json",
+      "board": {"mode": "synthesized", "layers": 2},
+      "expected_status": "pass",
+      "required_artifacts": ["design-request.json", "transaction.json", "workflow-result.json", "validation-summary.json", "design-promotion.json", "manifest.json", "normalized-requirement.json", "architecture-search.json", "closed-loop-synthesis.json", "simulation.json"],
+      "internal_gates": ["architecture_search", "component_evidence", "simulation", "routing", "connectivity", "route_completion", "writer_correctness", "round_trip", "deterministic_repeat"],
+      "optional_kicad_gates": ["erc", "strict_drc", "writer_correctness", "round_trip"]
+    },
+    {
+      "id": "resistor_programmed_clock_family",
+      "review_equivalent": "behavior-only relaxed standalone clock realized by a resistor-programmed source and qualified endpoint buffer",
+      "lane": "requirement",
+      "fixture": "internal/architecturesearch/testdata/standalone_clock_generation_corpus/relaxed_logic_clock.json",
+      "board": {"mode": "synthesized", "layers": 2},
+      "expected_status": "pass",
+      "required_artifacts": ["design-request.json", "transaction.json", "workflow-result.json", "validation-summary.json", "design-promotion.json", "manifest.json", "normalized-requirement.json", "architecture-search.json", "closed-loop-synthesis.json", "simulation.json"],
+      "internal_gates": ["architecture_search", "component_evidence", "simulation", "routing", "connectivity", "route_completion", "writer_correctness", "round_trip", "deterministic_repeat"],
+      "optional_kicad_gates": ["erc", "strict_drc", "writer_correctness", "round_trip"]
+    }
+  ],
+  "negative_cases": []
+}

@@ -231,6 +231,7 @@
         "sha256": "19f725a7b01f981f33aeb7446e16f61398116168eea4ac05a70e2146bee8c049",
         "review_status": "reviewed",
         "allowed_analyses": [
+          "dc_operating_point",
           "distortion",
           "startup",
           "thermal",
@@ -270,6 +271,7 @@
         "sha256": "19f725a7b01f981f33aeb7446e16f61398116168eea4ac05a70e2146bee8c049",
         "review_status": "reviewed",
         "allowed_analyses": [
+          "dc_operating_point",
           "distortion",
           "startup",
           "thermal",
@@ -309,6 +311,7 @@
         "sha256": "19f725a7b01f981f33aeb7446e16f61398116168eea4ac05a70e2146bee8c049",
         "review_status": "reviewed",
         "allowed_analyses": [
+          "dc_operating_point",
           "distortion",
           "startup",
           "thermal",
@@ -348,6 +351,7 @@
         "sha256": "19f725a7b01f981f33aeb7446e16f61398116168eea4ac05a70e2146bee8c049",
         "review_status": "reviewed",
         "allowed_analyses": [
+          "dc_operating_point",
           "distortion",
           "startup",
           "thermal",
@@ -387,6 +391,7 @@
         "sha256": "19f725a7b01f981f33aeb7446e16f61398116168eea4ac05a70e2146bee8c049",
         "review_status": "reviewed",
         "allowed_analyses": [
+          "dc_operating_point",
           "distortion",
           "startup",
           "thermal",
@@ -426,6 +431,7 @@
         "sha256": "19f725a7b01f981f33aeb7446e16f61398116168eea4ac05a70e2146bee8c049",
         "review_status": "reviewed",
         "allowed_analyses": [
+          "dc_operating_point",
           "distortion",
           "startup",
           "thermal",
@@ -481,6 +487,7 @@
         "sha256": "19f725a7b01f981f33aeb7446e16f61398116168eea4ac05a70e2146bee8c049",
         "review_status": "reviewed",
         "allowed_analyses": [
+          "dc_operating_point",
           "distortion",
           "startup",
           "thermal",
@@ -536,6 +543,7 @@
         "sha256": "19f725a7b01f981f33aeb7446e16f61398116168eea4ac05a70e2146bee8c049",
         "review_status": "reviewed",
         "allowed_analyses": [
+          "dc_operating_point",
           "distortion",
           "startup",
           "thermal",
@@ -591,6 +599,7 @@
         "sha256": "19f725a7b01f981f33aeb7446e16f61398116168eea4ac05a70e2146bee8c049",
         "review_status": "reviewed",
         "allowed_analyses": [
+          "dc_operating_point",
           "distortion",
           "startup",
           "thermal",
@@ -650,6 +659,7 @@
         "sha256": "19f725a7b01f981f33aeb7446e16f61398116168eea4ac05a70e2146bee8c049",
         "review_status": "reviewed",
         "allowed_analyses": [
+          "dc_operating_point",
           "distortion",
           "startup",
           "thermal",
@@ -669,6 +679,7 @@
         "sha256": "19f725a7b01f981f33aeb7446e16f61398116168eea4ac05a70e2146bee8c049",
         "review_status": "reviewed",
         "allowed_analyses": [
+          "dc_operating_point",
           "distortion",
           "startup",
           "thermal",
@@ -2154,6 +2165,48 @@
         "allowed_analyses": ["dc_operating_point", "startup", "thermal", "transient"],
         "min_temperature_c": -40,
         "max_temperature_c": 85
+      }
+    },
+    {
+      "catalog_id": "clock_source.sitime.sit8008ac_31_33e_8mhz",
+      "family": "clock_source",
+      "model_id": "mna_fixed_clock_source_v1",
+      "provenance": {
+        "source": "https://www.sitime.com/datasheet/SiT8008",
+        "revision": "SiT8008 Rev. 1.5; ordered 8 MHz, 3.3 V, 20 ppm clock, startup, load, output, and jitter limits",
+        "sha256": "de3ae8930027e7d69a05d29890ccc56b4c61beb9291821f17cbbfdf412c940b5",
+        "review_status": "reviewed",
+        "allowed_analyses": ["dc_operating_point", "startup", "transient"],
+        "min_temperature_c": -20,
+        "max_temperature_c": 70
+      }
+    },
+    {
+      "catalog_id": "clock_source.analog_devices.ltc6906is6",
+      "family": "clock_source",
+      "model_id": "mna_resistor_programmed_clock_source_v1",
+      "provenance": {
+        "source": "https://www.analog.com/media/en/technical-documentation/data-sheets/ltc6906.pdf",
+        "revision": "LTC6906 Rev. E; industrial frequency, RSET transfer, duty, startup, output, jitter, supply, and temperature limits",
+        "sha256": "3bf51298548fbe088258ad160f5a91a6e0fde340eea84d68a5add9fe8a8d5a6f",
+        "review_status": "reviewed",
+        "allowed_analyses": ["dc_operating_point", "startup", "transient"],
+        "min_temperature_c": -40,
+        "max_temperature_c": 85
+      }
+    },
+    {
+      "catalog_id": "logic_buffer.ti.sn74lvc1g17dbv",
+      "family": "logic_buffer",
+      "model_id": "mna_cmos_schmitt_buffer_v1",
+      "provenance": {
+        "source": "https://www.ti.com/lit/ds/symlink/sn74lvc1g17.pdf",
+        "revision": "SN74LVC1G17 Rev. S; 3.3 V thresholds, output drive, propagation delay, load, and temperature limits",
+        "sha256": "ec5bb53ed998bef3ee0ed6ce7141059fde864e62aa5a73ee9912777ad52f0a3b",
+        "review_status": "reviewed",
+        "allowed_analyses": ["dc_operating_point", "startup", "transient"],
+        "min_temperature_c": -40,
+        "max_temperature_c": 125
       }
     }
   ]

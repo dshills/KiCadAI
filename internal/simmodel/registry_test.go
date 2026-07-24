@@ -155,7 +155,7 @@ func TestSupportedAnalysisKindsDescribeExecutableRegistryPaths(t *testing.T) {
 		{ModelRCLowpassACV1, []string{AnalysisACSweep}},
 		{ModelLinearCircuitMNAV1, []string{AnalysisACSweep, AnalysisDCOperatingPoint, AnalysisNoise, AnalysisStability, AnalysisThermal}},
 		{ModelNonlinearCircuitDCV1, []string{AnalysisDCOperatingPoint, AnalysisThermal}},
-		{ModelTransientCircuitV1, []string{AnalysisDistortion, AnalysisStartup, AnalysisThermal, AnalysisTransient}},
+		{ModelTransientCircuitV1, []string{AnalysisDCOperatingPoint, AnalysisDistortion, AnalysisStartup, AnalysisThermal, AnalysisTransient}},
 	}
 	for _, test := range tests {
 		if got := SupportedAnalysisKinds(test.model); !slices.Equal(got, test.want) {

@@ -106,6 +106,9 @@ func ToDesignRequest(resolved ResolvedDocument) (designworkflow.Request, []repor
 			Name: net.Intent.Name, Role: string(net.Intent.Role), NetClass: net.Intent.NetClass,
 			Required: net.Intent.Required != nil && *net.Intent.Required, CurrentMA: net.Intent.CurrentMA,
 			WidthMM: net.Intent.WidthMM, ClearanceMM: net.Intent.ClearanceMM,
+			AllowedLayers: append([]string(nil), net.Intent.AllowedLayers...), PreferLayer: net.Intent.PreferLayer,
+			MaxLengthMM: net.Intent.MaxLengthMM, ReturnNet: net.Intent.ReturnNet,
+			ReturnPathMaxDistanceMM: net.Intent.ReturnPathMaxDistanceMM,
 		}
 		seen := map[physicalBindingID]struct{}{}
 		for _, endpoint := range net.Endpoints {

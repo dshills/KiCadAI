@@ -185,7 +185,7 @@ func resolveSimulation(intent simmodel.Intent, resolved ResolvedDocument) (simmo
 	for _, component := range resolved.Components {
 		value, hasValue := components.ParseEngineeringValue(component.Instance.Value)
 		evidence = append(evidence, componentSimulationEvidence(
-			component.Instance.ID, component.ComponentID, component.Family, value, hasValue,
+			component.Instance.ID, component.ComponentID, component.Family, component.Instance.Usage, value, hasValue,
 			configuredSimulationModels(component), connections[component.Instance.ID], component.Units, component.Record,
 		)...)
 	}
@@ -215,7 +215,7 @@ func (resolver *Resolver) ResolveSimulationPlanWithHarness(intent simmodel.Inten
 	for _, component := range resolved.Components {
 		value, hasValue := components.ParseEngineeringValue(component.Instance.Value)
 		evidence = append(evidence, componentSimulationEvidence(
-			component.Instance.ID, component.ComponentID, component.Family, value, hasValue,
+			component.Instance.ID, component.ComponentID, component.Family, component.Instance.Usage, value, hasValue,
 			configuredSimulationModels(component), connections[component.Instance.ID], component.Units, component.Record,
 		)...)
 	}
@@ -237,7 +237,7 @@ func (resolver *Resolver) ResolveSimulationPlanWithHarness(intent simmodel.Inten
 			continue
 		}
 		evidence = append(evidence, componentSimulationEvidence(
-			device.InstanceID, device.CatalogID, record.Family, device.ValueSI, device.HasValueSI,
+			device.InstanceID, device.CatalogID, record.Family, "", device.ValueSI, device.HasValueSI,
 			record.SimulationModels, append([]simmodel.ConnectionEvidence(nil), device.Connections...), nil, record,
 		)...)
 	}

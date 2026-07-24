@@ -186,6 +186,52 @@ func TestHeldOutPrecisionRectificationCorpusOptionalKiCadPromotion(t *testing.T)
 	runFrozenPromotionAt(t, corpusRoot, count, "KICADAI_PRECISION_RECTIFICATION_ARTIFACT_DIR", cli, index)
 }
 
+func TestStandaloneClockGenerationCorpusPassesOfflineWorkflow(t *testing.T) {
+	requireLongPromotionTest(t)
+	runFrozenPromotionAt(t, filepath.Join("..", "architecturesearch", "testdata", "standalone_clock_generation_corpus"), 2, "KICADAI_CLOCK_GENERATION_ARTIFACT_DIR", "", libraryresolver.LibraryIndex{})
+}
+
+func TestStandaloneClockGenerationCorpusOptionalKiCadPromotion(t *testing.T) {
+	requireLongPromotionTest(t)
+	cli := os.Getenv("KICADAI_KICAD_CLI")
+	if cli == "" {
+		t.Skip("set KICADAI_KICAD_CLI to run the KiCad-backed standalone clock-generation corpus")
+	}
+	roots, rootIssues := libraryresolver.ResolveRoots()
+	if roots.SymbolsRoot == "" || roots.FootprintsRoot == "" {
+		t.Skipf("installed KiCad libraries are required: %#v", rootIssues)
+	}
+	index, loadIssues := libraryresolver.Load(context.Background(), roots, libraryresolver.LoadOptions{})
+	if len(index.Symbols) == 0 || len(index.Footprints) == 0 {
+		t.Fatalf("installed library index is empty: %#v", loadIssues)
+	}
+	runFrozenPromotionAt(t, filepath.Join("..", "architecturesearch", "testdata", "standalone_clock_generation_corpus"), 2, "KICADAI_CLOCK_GENERATION_ARTIFACT_DIR", cli, index)
+}
+
+func TestHeldOutClockGenerationCorpusPassesOfflineWorkflow(t *testing.T) {
+	requireLongPromotionTest(t)
+	corpusRoot, count := heldOutCapabilityFamilyCorpus(t, "clock_generation")
+	runFrozenPromotionAt(t, corpusRoot, count, "KICADAI_CLOCK_GENERATION_ARTIFACT_DIR", "", libraryresolver.LibraryIndex{})
+}
+
+func TestHeldOutClockGenerationCorpusOptionalKiCadPromotion(t *testing.T) {
+	requireLongPromotionTest(t)
+	cli := os.Getenv("KICADAI_KICAD_CLI")
+	if cli == "" {
+		t.Skip("set KICADAI_KICAD_CLI to run the KiCad-backed held-out clock-generation corpus")
+	}
+	roots, rootIssues := libraryresolver.ResolveRoots()
+	if roots.SymbolsRoot == "" || roots.FootprintsRoot == "" {
+		t.Skipf("installed KiCad libraries are required: %#v", rootIssues)
+	}
+	index, loadIssues := libraryresolver.Load(context.Background(), roots, libraryresolver.LoadOptions{})
+	if len(index.Symbols) == 0 || len(index.Footprints) == 0 {
+		t.Fatalf("installed library index is empty: %#v", loadIssues)
+	}
+	corpusRoot, count := heldOutCapabilityFamilyCorpus(t, "clock_generation")
+	runFrozenPromotionAt(t, corpusRoot, count, "KICADAI_CLOCK_GENERATION_ARTIFACT_DIR", cli, index)
+}
+
 func TestFrozenBehavioralIntentHeldOutReadyCorpusPassesOfflineWorkflow(t *testing.T) {
 	requireLongPromotionTest(t)
 	corpusRoot, count := behavioralIntentHeldOutReadyCorpus(t)
@@ -536,6 +582,15 @@ func closedLoopFailureSummary(report closedloopsynthesis.Report) string {
 		for _, variable := range attempt.State.Variables {
 			lines = append(lines, fmt.Sprintf("%s final variable %s=%.12g", candidate.Fingerprint, variable.ID, variable.Value))
 		}
+		if attempt.Simulation != nil {
+			for planIndex, plan := range attempt.Simulation.Resolution.Plans {
+				kinds := make([]string, 0, len(plan.Analyses))
+				for _, analysis := range plan.Analyses {
+					kinds = append(kinds, analysis.Kind)
+				}
+				lines = append(lines, fmt.Sprintf("%s plan %d model=%s analyses=%v", candidate.Fingerprint, planIndex, plan.ModelID, kinds))
+			}
+		}
 		for _, decision := range attempt.ModelDecisions {
 			lines = append(lines, fmt.Sprintf("%s model %s/%s %s status=%s analyses=%v reason=%s parameters=%v", candidate.Fingerprint, decision.Component, decision.Family, decision.Claim.ModelID, decision.Status, decision.RequiredAnalyses, decision.Reason, decision.Claim.Parameters))
 		}
@@ -591,16 +646,33 @@ func closedLoopResolutionFailureSummary(
 			continue
 		}
 		lines = append(lines, fmt.Sprintf(
-			"%s synthesis simulation: status=%s model=%s reason=%s resolved_plan=%t claims=%s",
+			"%s synthesis simulation: status=%s model=%s reason=%s resolved_plan=%t claims=%s devices=%s",
 			candidate.Fingerprint,
 			resolved.SynthesisReport.Simulation.Status,
 			resolved.SynthesisReport.Simulation.ModelID,
 			resolved.SynthesisReport.Simulation.Reason,
 			resolved.Resolved.Simulation != nil,
 			closedLoopComponentClaimSummary(resolved.Resolved),
+			closedLoopResolvedDeviceSummary(resolved.Resolved),
 		))
 	}
 	return strings.Join(lines, "\n")
+}
+
+func closedLoopResolvedDeviceSummary(resolved circuitgraph.ResolvedDocument) string {
+	if resolved.Simulation == nil {
+		return ""
+	}
+	var devices []string
+	for _, device := range resolved.Simulation.Devices {
+		terminals := make([]string, 0, len(device.Terminals))
+		for _, terminal := range device.Terminals {
+			terminals = append(terminals, terminal.Terminal+"="+terminal.Net)
+		}
+		devices = append(devices, fmt.Sprintf("%s:%s:%v", device.Component, device.PrimitiveModel, terminals))
+	}
+	slices.Sort(devices)
+	return strings.Join(devices, ",")
 }
 
 func closedLoopComponentClaimSummary(resolved circuitgraph.ResolvedDocument) string {

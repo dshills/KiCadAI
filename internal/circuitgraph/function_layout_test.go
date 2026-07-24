@@ -1,6 +1,7 @@
 package circuitgraph
 
 import (
+	"reflect"
 	"testing"
 
 	"kicadai/internal/components"
@@ -39,6 +40,67 @@ func TestDeriveFunctionLayoutAddsNegativePowerLaneOnlyForNegativeRails(t *testin
 	}
 	if withoutNegative.Schematic.Lanes.PowerNegative != nil {
 		t.Fatalf("single-supply negative power lane = %#v, want omitted", withoutNegative.Schematic.Lanes.PowerNegative)
+	}
+}
+
+func TestDeriveFunctionLayoutPreservesSemanticProximityContracts(t *testing.T) {
+	document := Document{Components: []Component{
+		{ID: "source"}, {ID: "timing"},
+	}}
+	intent := FunctionIntent{
+		Functions: []FunctionRequirement{
+			{ID: "source"},
+			{ID: "timing", Near: "source", MaxDistanceMM: 2},
+		},
+		Constraints: SynthesisConstraints{MaxWidthMM: 30, MaxHeightMM: 20},
+	}
+	if issues := deriveFunctionLayout(&document, intent, nil, nil); len(issues) != 0 {
+		t.Fatal(issues)
+	}
+	if len(document.PCB.Placements) != 2 || document.PCB.Placements[1].Near != "source" || document.PCB.Placements[1].MaxDistanceMM != 2 {
+		t.Fatalf("semantic proximity contract was not preserved: %#v", document.PCB.Placements)
+	}
+}
+
+func TestSynthesisClockPhysicalPolicyIsMachineCheckable(t *testing.T) {
+	clock := Net{Name: "CLK", Role: NetRoleClock, ClearanceMM: 0.2}
+	timing := Net{Name: "SET", Role: NetRoleTiming, ClearanceMM: 0.2}
+	applySynthesisNetPhysicalPolicy(&clock)
+	applySynthesisNetPhysicalPolicy(&timing)
+	if clock.NetClass != "clock" || clock.PreferLayer != "F.Cu" || clock.MaxLengthMM != synthesisClockMaxLengthMM ||
+		clock.ClearanceMM != 0.25 || !reflect.DeepEqual(clock.AllowedLayers, []string{"F.Cu", "B.Cu"}) {
+		t.Fatalf("clock policy = %#v", clock)
+	}
+	if timing.PreferLayer != "F.Cu" || timing.MaxLengthMM != synthesisTimingMaxLengthMM || timing.ClearanceMM != 0.3 {
+		t.Fatalf("timing policy = %#v", timing)
+	}
+
+	document := Document{Nets: []Net{
+		{Name: "CLK", Role: NetRoleClock, Endpoints: []Endpoint{{Component: "clock_source"}, {Component: "clock_buffer"}}},
+		{Name: "AGND", Role: NetRoleGround, Endpoints: []Endpoint{{Component: "analog_frontend"}}},
+		{Name: "DGND", Role: NetRoleGround, Endpoints: []Endpoint{{Component: "clock_source"}, {Component: "clock_buffer"}}},
+	}}
+	assignSynthesisClockReturnPaths(&document)
+	if document.Nets[0].ReturnNet != "DGND" || document.Nets[0].ReturnPathMaxDistanceMM != synthesisClockReturnPathMaxDistanceMM {
+		t.Fatalf("clock return policy = %#v", document.Nets[0])
+	}
+	if !reflect.DeepEqual(document.PCB.Zones, []PCBZone{
+		{Net: "DGND", Layers: []string{"F.Cu"}, ClearanceMM: 0.25},
+		{Net: "DGND", Layers: []string{"B.Cu"}, ClearanceMM: 0.25},
+	}) {
+		t.Fatalf("clock return zone = %#v", document.PCB.Zones)
+	}
+
+	document.Nets[1].Endpoints = append(document.Nets[1].Endpoints, Endpoint{Component: "clock_source"}, Endpoint{Component: "clock_buffer"})
+	document.Nets[0].ReturnNet = ""
+	document.Nets[0].ReturnPathMaxDistanceMM = 0
+	document.PCB.Zones = nil
+	assignSynthesisClockReturnPaths(&document)
+	if document.Nets[0].ReturnNet != "" || document.Nets[0].ReturnPathMaxDistanceMM != 0 {
+		t.Fatalf("ambiguous clock return was accepted: %#v", document.Nets[0])
+	}
+	if len(document.PCB.Zones) != 0 {
+		t.Fatalf("ambiguous clock return created zones: %#v", document.PCB.Zones)
 	}
 }
 

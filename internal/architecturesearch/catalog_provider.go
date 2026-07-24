@@ -36,6 +36,7 @@ var catalogProviderCapabilities = []string{
 	"logic_level_translation",
 	"signal_termination",
 	"clock_conditioning",
+	"clock_generation",
 	"adc_drive_conditioning",
 	"mute_control",
 	"output_protection",
@@ -117,6 +118,8 @@ func (provider *CatalogProvider) Expand(ctx context.Context, request ProviderReq
 		return provider.expandSourceTermination(ctx, request, false)
 	case "clock_conditioning":
 		return provider.expandSourceTermination(ctx, request, true)
+	case "clock_generation":
+		return provider.expandClockGeneration(ctx, request)
 	case "adc_drive_conditioning":
 		return provider.expandADCDrive(ctx, request)
 	case "fault_indication":
@@ -1302,6 +1305,8 @@ type catalogPart struct {
 	maximumTolerance     float64
 	toleranceUnit        string
 	maximumTempcoPPMPerC float64
+	near                 string
+	maxDistanceMM        float64
 }
 
 type passivePart struct{ id, family, usage, value string }
@@ -2035,7 +2040,10 @@ func (provider *CatalogProvider) buildCatalogExpansion(request ProviderRequest, 
 	componentsSelected := make([]SelectedComponent, 0, len(parts))
 	for _, part := range parts {
 		componentsSelected = append(componentsSelected, part.selected)
-		instances = append(instances, RealizationInstance{ID: part.selected.InstanceID, CatalogID: part.selected.CatalogID, VariantID: part.selected.VariantID, Usage: part.usage, Value: part.value})
+		instances = append(instances, RealizationInstance{
+			ID: part.selected.InstanceID, CatalogID: part.selected.CatalogID, VariantID: part.selected.VariantID,
+			Usage: part.usage, Value: part.value, Near: part.near, MaxDistanceMM: part.maxDistanceMM,
+		})
 	}
 	parameters := calculationParameters(calculations)
 	payload, err := MarshalFragmentRealization(FragmentRealization{Capability: request.Capability, Instances: instances, PortBindings: bindings, SeriesTransitions: transitions, Connections: connections, Parameters: parameters, RepairVariables: repairs})
