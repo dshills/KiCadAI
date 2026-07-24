@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -298,6 +299,86 @@ func requireLongPromotionTest(t *testing.T) {
 	}
 }
 
+func TestPromotionShardSelectionIsCompleteAndNonOverlapping(t *testing.T) {
+	paths := []string{"00", "01", "02", "03", "04", "05", "06", "07", "08", "09"}
+	const shardCount = 3
+	seen := make(map[string]int, len(paths))
+	for shard := range shardCount {
+		spec := fmt.Sprintf("%d/%d", shard, shardCount)
+		selected, err := selectPromotionShard(paths, spec)
+		if err != nil {
+			t.Fatalf("select shard %s: %v", spec, err)
+		}
+		var want []string
+		for index := shard; index < len(paths); index += shardCount {
+			want = append(want, paths[index])
+		}
+		if !slices.Equal(selected, want) {
+			t.Fatalf("shard %s = %#v, want %#v", spec, selected, want)
+		}
+		for _, path := range selected {
+			seen[path]++
+		}
+	}
+	for _, path := range paths {
+		if seen[path] != 1 {
+			t.Fatalf("path %s appeared in %d shards, want exactly one", path, seen[path])
+		}
+	}
+	unsharded, err := selectPromotionShard(paths, "")
+	if err != nil || !slices.Equal(unsharded, paths) {
+		t.Fatalf("unsharded paths = %#v, %v", unsharded, err)
+	}
+	spaced, err := selectPromotionShard(paths, " 0 / 3 ")
+	if err != nil {
+		t.Fatalf("select spaced shard: %v", err)
+	}
+	if want := []string{"00", "03", "06", "09"}; !slices.Equal(spaced, want) {
+		t.Fatalf("spaced shard = %#v, want %#v", spaced, want)
+	}
+	for _, spec := range []string{"0", "0/3/4", "x/3", "0/x", "-1/3", "3/3", "0/0", "10/11"} {
+		if selected, err := selectPromotionShard(paths, spec); err == nil {
+			t.Errorf("invalid shard %q selected %#v", spec, selected)
+		}
+	}
+}
+
+// selectPromotionShard parses the shard specification once, then partitions
+// the complete corpus path list in a single pass before any cases run.
+func selectPromotionShard(paths []string, spec string) ([]string, error) {
+	spec = strings.TrimSpace(spec)
+	if spec == "" {
+		return paths, nil
+	}
+	parts := strings.Split(spec, "/")
+	if len(parts) != 2 {
+		return nil, fmt.Errorf("promotion shard %q must use index/count syntax", spec)
+	}
+	indexText := strings.TrimSpace(parts[0])
+	index, err := strconv.Atoi(indexText)
+	if err != nil {
+		return nil, fmt.Errorf("promotion shard %q has invalid index %q: %w", spec, indexText, err)
+	}
+	countText := strings.TrimSpace(parts[1])
+	count, err := strconv.Atoi(countText)
+	if err != nil {
+		return nil, fmt.Errorf("promotion shard %q has invalid count %q: %w", spec, countText, err)
+	}
+	if count <= 0 || index < 0 || index >= count {
+		return nil, fmt.Errorf("promotion shard %q must have 0 <= index < count", spec)
+	}
+	selected := make([]string, 0, (len(paths)+count-1)/count)
+	for pathIndex, path := range paths {
+		if pathIndex%count == index {
+			selected = append(selected, path)
+		}
+	}
+	if len(selected) == 0 {
+		return nil, fmt.Errorf("promotion shard %q selects no cases from a %d-case corpus", spec, len(paths))
+	}
+	return selected, nil
+}
+
 func runFrozenPromotion(t *testing.T, corpusDir string, expectedCount int, artifactEnv string, cli string, installedIndex libraryresolver.LibraryIndex) {
 	t.Helper()
 	runFrozenPromotionAt(t, filepath.Join("..", "circuitgraph", "testdata", corpusDir), expectedCount, artifactEnv, cli, installedIndex)
@@ -324,8 +405,13 @@ func runFrozenPromotionAt(t *testing.T, corpusRoot string, expectedCount int, ar
 	}
 	paths, err := filepath.Glob(filepath.Join(corpusRoot, "*.json"))
 	paths = slices.DeleteFunc(paths, func(path string) bool { return filepath.Base(path) == "manifest.json" })
+	slices.Sort(paths)
 	if err != nil || len(paths) != expectedCount {
 		t.Fatalf("corpus paths = %#v, %v", paths, err)
+	}
+	paths, err = selectPromotionShard(paths, os.Getenv("KICADAI_PROMOTION_SHARD"))
+	if err != nil {
+		t.Fatalf("select promotion shard: %v", err)
 	}
 	// go.mod requires Go 1.23, so each range iteration has its own path
 	// variable even when the subtest closure captures it.

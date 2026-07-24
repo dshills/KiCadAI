@@ -104,6 +104,24 @@ func TestPromotionWorkflowContractAndPinnedActions(t *testing.T) {
 			t.Errorf("installed promotion workflow contains skip mechanism %q", forbidden)
 		}
 	}
+
+	ci := readContractFile(t, filepath.Join(workflowRoot, "ci.yml"))
+	for _, required := range []string{
+		"timeout-minutes: 60",
+		"KICADAI_PROMOTION_SHARD: ${{ matrix.shard }}",
+		"shard: 0/3",
+		"shard: 1/3",
+		"shard: 2/3",
+		"go_timeout: 55m",
+		"GO_TEST_TIMEOUT='${{ matrix.go_timeout }}'",
+	} {
+		if !strings.Contains(ci, required) {
+			t.Errorf("CI workflow is missing promotion shard contract %q", required)
+		}
+	}
+	if got := strings.Count(ci, "test: TestFrozenSimulationGroundedCorpusPassesOfflineWorkflow"); got != 3 {
+		t.Errorf("CI workflow has %d simulation-grounded shards, want 3", got)
+	}
 }
 
 func repositoryRootForContractTest(t *testing.T) string {

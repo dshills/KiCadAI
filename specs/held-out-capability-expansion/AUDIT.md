@@ -236,6 +236,30 @@ parallelism while retaining each plan's bounded corner parallelism, the
 accepted only after its complete ordinary CI and installed-KiCad publication
 runs are green.
 
+Delivery commit `2360664d69af867108875a375a04c6785f988502` proved the
+bounded plan order and passed installed-KiCad publication run
+[`30105781899`](https://github.com/dshills/KiCadAI/actions/runs/30105781899).
+Ordinary CI run
+[`30105758288`](https://github.com/dshills/KiCadAI/actions/runs/30105758288)
+passed quality/coverage, open-set, adversarial, and external-review jobs. Its
+simulation-grounded job validated the full ten-case corpus, passed the first
+two serial cases, then reached the cumulative 40-minute alarm after Class AB
+had actively solved for `30m46s`.
+
+The final delivery correction retains deterministic plan order and partitions
+the already validated corpus into three generic `index/count` CI shards.
+Unit and workflow-contract tests require complete, non-overlapping shard
+coverage. Each shard retains every simulation and downstream acceptance gate
+and receives a 55-minute Go alarm inside a 60-minute job; the unsharded local
+and installed-KiCad paths remain unchanged.
+
+All three shard selections passed the real simulation-grounded corpus locally:
+shard `0/3` completed in `138.504s`, shard `1/3` in `169.236s`, and shard
+`2/3` in `880.194s` with the hosted-run-equivalent four-core budget. The slow
+shard deliberately starts with Class AB, which completed in `840.63s`. The
+partition test proves that the three selections form the complete original
+corpus with no overlap.
+
 ## Remaining Boundary And Next Goal
 
 This milestone proves measurable generic expansion over one frozen twelve-case
