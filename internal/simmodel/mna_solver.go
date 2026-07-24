@@ -18,6 +18,7 @@ const (
 	mnaPivotTolerance           = 1e-12
 	mnaResidualTolerance        = 1e-8
 	maxMNAAnalysisWorkers       = 8
+	mnaUnobservedReferenceS     = 1e-9
 )
 
 type mnaSystem struct {
@@ -33,6 +34,15 @@ type mnaBranchKey struct {
 	component string
 	terminal  string
 }
+
+type mnaSolveScratch struct {
+	matrix        [][]complex128
+	matrixStorage []complex128
+	rhs           []complex128
+	scales        []float64
+}
+
+var mnaSolveScratchPool = sync.Pool{New: func() any { return new(mnaSolveScratch) }}
 
 func evaluateMNA(plan Plan, report Report) (Report, []Diagnostic) {
 	model, _ := definitionByID(plan.ModelID)
@@ -604,10 +614,69 @@ func buildMNASystemWithOpAmpClamps(plan Plan, analysis Analysis, frequency float
 			return mnaSystem{}, []Diagnostic{{Path: "devices." + device.Component, Message: "resolved primitive has no trusted MNA stamp"}}
 		}
 	}
+	if smallSignalAnalysis(analysis.Kind) {
+		referenceUnobservedMNAComponents(plan, analysis, &system)
+	}
 	if diagnostic := validateMNASystemBounds(system); diagnostic != nil {
 		return mnaSystem{}, []Diagnostic{*diagnostic}
 	}
 	return system, nil
+}
+
+func referenceUnobservedMNAComponents(plan Plan, analysis Analysis, system *mnaSystem) {
+	observed := map[int]bool{}
+	for _, assertion := range plan.Assertions {
+		if assertion.AnalysisID != analysis.ID {
+			continue
+		}
+		if index, exists := system.nodeIndex[assertion.Node]; exists {
+			observed[index] = true
+		}
+		if index, exists := system.branchIndex[assertion.Component]; exists {
+			observed[index] = true
+		}
+		for _, component := range assertion.Components {
+			if index, exists := system.branchIndex[component]; exists {
+				observed[index] = true
+			}
+		}
+	}
+	if len(observed) == 0 {
+		return
+	}
+	visited := make([]bool, len(system.matrix))
+	for start := range system.matrix {
+		if visited[start] {
+			continue
+		}
+		component := []int{start}
+		visited[start] = true
+		hasObservation := observed[start]
+		for cursor := 0; cursor < len(component); cursor++ {
+			row := component[cursor]
+			for column := range system.matrix {
+				if visited[column] || system.matrix[row][column] == 0 && system.matrix[column][row] == 0 {
+					continue
+				}
+				visited[column] = true
+				hasObservation = hasObservation || observed[column]
+				component = append(component, column)
+			}
+		}
+		if hasObservation {
+			continue
+		}
+		for _, index := range component {
+			if !strings.HasPrefix(system.unknownLabels[index], "node:") {
+				continue
+			}
+			// This algebraic component cannot affect a requested measurement.
+			// A single deterministic reference fixes its otherwise arbitrary
+			// common mode without loading the observable signal graph.
+			system.matrix[index][index] += complex(mnaUnobservedReferenceS, 0)
+			break
+		}
+	}
 }
 
 func validateMNASystemBounds(system mnaSystem) *Diagnostic {
@@ -686,15 +755,38 @@ func solvedNodeVoltage(system mnaSystem, solution []complex128, node string) com
 
 func solveMNA(system mnaSystem) ([]complex128, *Diagnostic) {
 	size := len(system.rhs)
-	matrix := make([][]complex128, size)
-	original := make([][]complex128, size)
-	for row := range matrix {
-		matrix[row] = append([]complex128(nil), system.matrix[row]...)
-		original[row] = append([]complex128(nil), system.matrix[row]...)
+	scratch := mnaSolveScratchPool.Get().(*mnaSolveScratch)
+	defer mnaSolveScratchPool.Put(scratch)
+	if cap(scratch.matrix) < size {
+		scratch.matrix = make([][]complex128, size)
+	} else {
+		scratch.matrix = scratch.matrix[:size]
 	}
-	rhs := append([]complex128(nil), system.rhs...)
-	originalRHS := append([]complex128(nil), system.rhs...)
-	scales := make([]float64, size)
+	if cap(scratch.matrixStorage) < size*size {
+		scratch.matrixStorage = make([]complex128, size*size)
+	} else {
+		scratch.matrixStorage = scratch.matrixStorage[:size*size]
+	}
+	if cap(scratch.rhs) < size {
+		scratch.rhs = make([]complex128, size)
+	} else {
+		scratch.rhs = scratch.rhs[:size]
+	}
+	if cap(scratch.scales) < size {
+		scratch.scales = make([]float64, size)
+	} else {
+		scratch.scales = scratch.scales[:size]
+		clear(scratch.scales)
+	}
+	matrix := scratch.matrix
+	matrixStorage := scratch.matrixStorage
+	for row := range matrix {
+		matrix[row] = matrixStorage[row*size : (row+1)*size]
+		copy(matrix[row], system.matrix[row])
+	}
+	rhs := scratch.rhs
+	copy(rhs, system.rhs)
+	scales := scratch.scales
 	for row := range matrix {
 		for _, coefficient := range matrix[row] {
 			scales[row] = math.Max(scales[row], cmplx.Abs(coefficient))
@@ -752,12 +844,12 @@ func solveMNA(system mnaSystem) ([]complex128, *Diagnostic) {
 		reconstructed := complex(0, 0)
 		rowNorm := 0.0
 		for column := 0; column < size; column++ {
-			reconstructed += original[row][column] * solution[column]
-			rowNorm += cmplx.Abs(original[row][column])
+			reconstructed += system.matrix[row][column] * solution[column]
+			rowNorm += cmplx.Abs(system.matrix[row][column])
 		}
-		maxResidual = math.Max(maxResidual, cmplx.Abs(reconstructed-originalRHS[row]))
+		maxResidual = math.Max(maxResidual, cmplx.Abs(reconstructed-system.rhs[row]))
 		matrixNorm = math.Max(matrixNorm, rowNorm)
-		rhsNorm = math.Max(rhsNorm, cmplx.Abs(originalRHS[row]))
+		rhsNorm = math.Max(rhsNorm, cmplx.Abs(system.rhs[row]))
 	}
 	for _, value := range solution {
 		solutionNorm = math.Max(solutionNorm, cmplx.Abs(value))

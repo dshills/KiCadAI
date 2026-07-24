@@ -1163,14 +1163,18 @@ and BOM item. The live graph is semantically equivalent to the recording and
 reaches the same KiCad-backed pass gates.
 
 The five-requirement open-set milestone, the 10-circuit adversarial
-multi-function milestone, simulation-grounded v3 synthesis, and the
-uncertainty-aware behavioral intent compiler are complete. Further fixtures
+multi-function milestone, simulation-grounded v3 synthesis, the
+uncertainty-aware behavioral intent compiler, and the first held-out capability
+expansion are complete. The frozen twelve-case benchmark improved from 5/12 to
+11/12 complete installed-KiCad passes by promoting constant-current regulation
+and precision rectification without regressing any control. Further fixtures
 should target genuinely new uncertainty rather than repeat the same provider
 envelope.
 
-1. Expand a neutral held-out corpus into unsupported mixed-signal and
-   power-control primitive/model families. Promote only after the new families
-   have catalog, simulation, and physical evidence.
+1. Add generic standalone clock-generation support, including deterministic
+   architecture/component evidence, startup and frequency proof, and
+   clock-aware placement/routing. Close the remaining `clock_generation`
+   benchmark gap with at least two electrically distinct clock-source families.
 2. Add dynamic electrothermal and control-loop evidence where static global
    bounds cannot prove startup, SOA, stability, or transient protection.
 3. Broaden clock/fanout and programming-load evidence beyond the completed

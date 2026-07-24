@@ -143,6 +143,29 @@
       "verification": {"confidence": "verified", "sources": ["https://www.tracopower.com/model/tel-12-1222", "datasheet-pinmap:TRACO:TEL12-1222", "kicad-footprint:Converter_DCDC:Converter_DCDC_TRACO_TEL12-xxxx_THT"], "resolver_checked": true, "pinmap_checked": true}
     },
     {
+      "id": "isolated_converter.traco.tel12_1223.dip16",
+      "family": "isolated_converter",
+      "name": "TRACO Power TEL 12-1223 isolated dual-output converter",
+      "description": "Twelve-watt 9 V to 18 V input converter with isolated positive and negative 15 V outputs.",
+      "generic": false,
+      "manufacturer": "TRACO Power",
+      "mpn": "TEL 12-1223",
+      "lifecycle": "active",
+      "simulation_models": [{"model_id": "mna_dual_output_isolated_converter_v1", "parameters": [
+        {"name": "input_min_v", "value": 9}, {"name": "input_max_v", "value": 18},
+        {"name": "positive_output_voltage_v", "value": 15}, {"name": "negative_output_voltage_v", "value": 15},
+        {"name": "positive_max_output_current_a", "value": 0.4}, {"name": "negative_max_output_current_a", "value": 0.4},
+        {"name": "soft_start_time_s", "value": 0}
+      ]}],
+      "tags": ["12w", "dual_output", "isolated", "plus_minus_15v", "tel12"],
+      "values": [{"kind": "positive_output_voltage", "typ": "15", "unit": "V"}, {"kind": "negative_output_voltage", "typ": "-15", "unit": "V"}, {"kind": "efficiency", "typ": "87", "unit": "%"}],
+      "ratings": [{"kind": "input_voltage", "min": "9", "max": "18", "unit": "V"}, {"kind": "positive_output_current", "max": "0.4", "unit": "A"}, {"kind": "negative_output_current", "max": "0.4", "unit": "A"}, {"kind": "isolation_voltage", "max": "1500", "unit": "V"}],
+      "temperature": {"min": "-40", "max": "85", "unit": "C"},
+      "symbols": [{"symbol_id": "Converter_DCDC:TEL12-1223", "function_pins": [{"function": "VIN_MINUS", "symbol_pin": "1", "electrical": "power_in", "required": true}, {"function": "COMMON", "symbol_pin": "8", "required": true}, {"function": "VOUT_PLUS", "symbol_pin": "9", "electrical": "power_out", "required": true}, {"function": "VOUT_MINUS", "symbol_pin": "10", "electrical": "power_out", "required": true}, {"function": "VIN_PLUS", "symbol_pin": "16", "electrical": "power_in", "required": true}], "verification": {"confidence": "verified", "sources": ["https://www.tracopower.com/model/tel-12-1223", "kicad-symbols:Converter_DCDC:TEL12-1223"], "pinmap_checked": true}}],
+      "packages": [{"id": "dip16", "name": "TEL12 DIP-16", "footprint_id": "Converter_DCDC:Converter_DCDC_TRACO_TEL12-xxxx_THT", "package_type": "dip16", "mpn": "TEL 12-1223", "lifecycle": "active", "pinmap_id": "Converter_DCDC:TEL12-1223|Converter_DCDC:Converter_DCDC_TRACO_TEL12-xxxx_THT", "pad_functions": [{"function": "VIN_MINUS", "pad": "1"}, {"function": "COMMON", "pad": "8"}, {"function": "VOUT_PLUS", "pad": "9"}, {"function": "VOUT_MINUS", "pad": "10"}, {"function": "VIN_PLUS", "pad": "16"}], "dimensions_mm": {"width": 23.9, "height": 13.7}, "height_mm": 10.2, "verification": {"confidence": "verified", "sources": ["https://www.tracopower.com/model/tel-12-1223", "kicad-footprint:Converter_DCDC:Converter_DCDC_TRACO_TEL12-xxxx_THT"], "pinmap_checked": true}}],
+      "verification": {"confidence": "verified", "sources": ["https://www.tracopower.com/model/tel-12-1223", "datasheet-pinmap:TRACO:TEL12-1223", "kicad-footprint:Converter_DCDC:Converter_DCDC_TRACO_TEL12-xxxx_THT"], "resolver_checked": true, "pinmap_checked": true}
+    },
+    {
       "id": "regulator.ti.lm337t.to220",
       "family": "regulator",
       "name": "TI LM337T adjustable negative linear regulator",
@@ -158,7 +181,7 @@
         {"name": "soft_start_time_s", "value": 0}
       ]}],
       "tags": ["adjustable", "linear_regulator", "negative", "to220"],
-      "values": [{"kind": "reference_voltage", "typ": "1.25", "unit": "V"}, {"kind": "output_voltage_magnitude", "min": "1.25", "max": "37", "unit": "V"}],
+      "values": [{"kind": "reference_voltage", "typ": "1.25", "unit": "V"}, {"kind": "output_voltage_magnitude", "min": "1.25", "max": "37", "unit": "V"}, {"kind": "minimum_load_current", "max": "0.01", "unit": "A"}, {"kind": "adjustment_pin_current", "typ": "0.000065", "max": "0.0001", "unit": "A"}],
       "ratings": [{"kind": "input_voltage", "max": "40", "unit": "V"}, {"kind": "output_current", "max": "1.5", "unit": "A"}],
       "temperature": {"min": "0", "max": "125", "unit": "C"},
       "symbols": [{"symbol_id": "Regulator_Linear:LM337_TO220", "function_pins": [{"function": "ADJ", "symbol_pin": "1", "electrical": "input", "required": true}, {"function": "VIN", "symbol_pin": "2", "electrical": "power_in", "required": true}, {"function": "VOUT", "symbol_pin": "3", "electrical": "power_out", "required": true}], "verification": {"confidence": "verified", "sources": ["https://www.ti.com/lit/ds/symlink/lm337.pdf", "kicad-symbols:Regulator_Linear:LM337_TO220"], "pinmap_checked": true}}],
@@ -181,7 +204,7 @@
         {"name": "soft_start_time_s", "value": 0}
       ]}],
       "tags": ["adjustable", "industrial_temperature", "linear_regulator", "negative", "sot223"],
-      "values": [{"kind": "reference_voltage", "typ": "1.25", "unit": "V"}, {"kind": "output_voltage_magnitude", "min": "1.25", "max": "37", "unit": "V"}],
+      "values": [{"kind": "reference_voltage", "typ": "1.25", "unit": "V"}, {"kind": "output_voltage_magnitude", "min": "1.25", "max": "37", "unit": "V"}, {"kind": "minimum_load_current", "max": "0.01", "unit": "A"}, {"kind": "adjustment_pin_current", "typ": "0.000065", "max": "0.0001", "unit": "A"}],
       "ratings": [{"kind": "input_voltage", "max": "40", "unit": "V"}, {"kind": "output_current", "max": "1.5", "unit": "A"}],
       "temperature": {"min": "-40", "max": "125", "unit": "C"},
       "symbols": [{"symbol_id": "Regulator_Linear:LM337_SOT223", "function_pins": [{"function": "ADJ", "symbol_pin": "1", "electrical": "input", "required": true}, {"function": "VIN", "symbol_pin": "2", "electrical": "power_in", "required": true}, {"function": "VOUT", "symbol_pin": "3", "electrical": "power_out", "required": true}], "verification": {"confidence": "verified", "sources": ["https://www.ti.com/lit/ds/symlink/lm337-n.pdf", "kicad-symbols:Regulator_Linear:LM337_SOT223"], "pinmap_checked": true}}],

@@ -1,17 +1,17 @@
 {
-  "record_count": 118,
+  "record_count": 132,
   "family_count": 26,
   "confidence_counts": {
     "blocked": 1,
     "library_derived": 0,
-    "placeholder": 4,
-    "rule_inferred": 5,
-    "verified": 108
+    "placeholder": 3,
+    "rule_inferred": 6,
+    "verified": 122
   },
   "alternative_coverage": {
-    "concrete_records": 93,
-    "generic_fallback_records": 25,
-    "equivalence_groups": 22
+    "concrete_records": 101,
+    "generic_fallback_records": 31,
+    "equivalence_groups": 23
   },
   "families": [
     {
@@ -46,14 +46,14 @@
     {
       "family": "capacitor",
       "defined": true,
-      "record_count": 10,
-      "concrete_records": 7,
-      "generic_fallback_records": 3,
+      "record_count": 13,
+      "concrete_records": 9,
+      "generic_fallback_records": 4,
       "equivalence_groups": 3,
-      "verified_records": 7,
+      "verified_records": 10,
       "library_derived_records": 0,
-      "rule_inferred_records": 2,
-      "placeholder_records": 1,
+      "rule_inferred_records": 3,
+      "placeholder_records": 0,
       "blocked_records": 0,
       "missing_resolver_evidence": [
         "capacitor.ceramic.0603",
@@ -67,11 +67,14 @@
         "capacitor.ceramic.0603",
         "capacitor.ceramic.0805",
         "capacitor.electrolytic.radial",
+        "capacitor.kemet.mil-prf-32535.c0g.1210.e12.1p0",
         "capacitor.kemet.t491a475k025at.case_a",
         "capacitor.murata.grm188r71h104ka93d.0603",
         "capacitor.murata.grm21br61a106ke19l.0805",
         "capacitor.murata.grm21br71h104ka01l.0805",
+        "capacitor.panasonic.eeufr1a151.radial",
         "capacitor.panasonic.eeufr1c221.radial",
+        "capacitor.panasonic.eeufr1c471.radial",
         "capacitor.panasonic.eeufr1v221.radial",
         "capacitor.wima.mks2c031001a00kssd.tht"
       ]
@@ -259,18 +262,19 @@
     {
       "family": "isolated_converter",
       "defined": true,
-      "record_count": 2,
-      "concrete_records": 2,
+      "record_count": 3,
+      "concrete_records": 3,
       "generic_fallback_records": 0,
       "equivalence_groups": 0,
-      "verified_records": 2,
+      "verified_records": 3,
       "library_derived_records": 0,
       "rule_inferred_records": 0,
       "placeholder_records": 0,
       "blocked_records": 0,
       "record_ids": [
         "isolated_converter.murata.mee1s0505sc.sip4",
-        "isolated_converter.traco.tel12_1222.dip16"
+        "isolated_converter.traco.tel12_1222.dip16",
+        "isolated_converter.traco.tel12_1223.dip16"
       ]
     },
     {
@@ -435,11 +439,11 @@
     {
       "family": "regulator",
       "defined": true,
-      "record_count": 8,
-      "concrete_records": 8,
+      "record_count": 9,
+      "concrete_records": 9,
       "generic_fallback_records": 0,
       "equivalence_groups": 1,
-      "verified_records": 8,
+      "verified_records": 9,
       "library_derived_records": 0,
       "rule_inferred_records": 0,
       "placeholder_records": 0,
@@ -458,7 +462,8 @@
         "regulator.ti.lm317at.to220",
         "regulator.ti.lm317t.to220",
         "regulator.ti.lm337imp.sot223",
-        "regulator.ti.lm337t.to220"
+        "regulator.ti.lm337t.to220",
+        "regulator.ti.lm7705mme.vssop8"
       ]
     },
     {
@@ -481,11 +486,11 @@
     {
       "family": "resistor",
       "defined": true,
-      "record_count": 16,
-      "concrete_records": 14,
-      "generic_fallback_records": 2,
-      "equivalence_groups": 3,
-      "verified_records": 14,
+      "record_count": 24,
+      "concrete_records": 17,
+      "generic_fallback_records": 7,
+      "equivalence_groups": 4,
+      "verified_records": 22,
       "library_derived_records": 0,
       "rule_inferred_records": 2,
       "placeholder_records": 0,
@@ -504,12 +509,20 @@
         "resistor.vishay.ac03.0r22.axial",
         "resistor.vishay.ac03.10r.axial",
         "resistor.vishay.crcw080510k0fkea.0805",
+        "resistor.vishay.crcw080547r0fkea.0805",
+        "resistor.vishay.mca1206at.e192.0p1",
+        "resistor.vishay.mca1206at.e192.0p1.10ppm",
+        "resistor.vishay.pr02.1k00.2w",
+        "resistor.vishay.pr02.2k00.2w",
+        "resistor.vishay.tnpu1206.e192.0p02.2ppm",
+        "resistor.vishay.tnpu1206.e192.0p05.5ppm",
         "resistor.vishay.tnpw0805.10k0.0p1",
         "resistor.vishay.tnpw0805.11k7.0p1",
         "resistor.vishay.tnpw0805.12k5.0p1",
         "resistor.vishay.tnpw0805.1k00.1p0",
         "resistor.vishay.tnpw0805.47k0.0p1",
         "resistor.vishay.tnpw0805.680k.1p0",
+        "resistor.vishay.tnpw1206.e192.0p1",
         "resistor.vishay.wslt2512r0100dea.2512",
         "resistor.yageo.rc0603fr_0710kl.0603",
         "resistor.yageo.rc0805fr_0710kl.0805",
@@ -583,17 +596,18 @@
     {
       "family": "voltage_reference",
       "defined": true,
-      "record_count": 1,
-      "concrete_records": 1,
+      "record_count": 2,
+      "concrete_records": 2,
       "generic_fallback_records": 0,
       "equivalence_groups": 0,
-      "verified_records": 1,
+      "verified_records": 2,
       "library_derived_records": 0,
       "rule_inferred_records": 0,
       "placeholder_records": 0,
       "blocked_records": 0,
       "record_ids": [
-        "voltage_reference.analog_devices.lt1634ais8_1v25.soic8"
+        "voltage_reference.analog_devices.lt1634ais8_1v25.soic8",
+        "voltage_reference.analog_devices.max6006aeur_1v25.sot23"
       ]
     },
     {

@@ -176,15 +176,10 @@ func (resolver *Resolver) Resolve(ctx context.Context, document Document) (Resol
 }
 
 func resolveSimulation(intent simmodel.Intent, resolved ResolvedDocument) (simmodel.Plan, []reports.Issue) {
-	connections := make(map[string][]simmodel.ConnectionEvidence, len(resolved.Components))
+	connections := resolvedSimulationConnections(resolved)
 	nodes := make([]simmodel.NodeEvidence, 0, len(resolved.Nets))
 	for _, net := range resolved.Nets {
 		nodes = append(nodes, simmodel.NodeEvidence{Name: net.Intent.Name, Role: string(net.Intent.Role), VoltageDomain: net.Intent.VoltageDomain})
-		for _, endpoint := range net.Endpoints {
-			connections[endpoint.Intent.Component] = append(connections[endpoint.Intent.Component], simmodel.ConnectionEvidence{
-				Function: endpoint.Function, UnitID: endpoint.Intent.Unit, Net: net.Intent.Name,
-			})
-		}
 	}
 	evidence := make([]simmodel.ComponentEvidence, 0, len(resolved.Components))
 	for _, component := range resolved.Components {
@@ -211,13 +206,10 @@ type SimulationHarnessDevice struct {
 // ResolveSimulationPlanWithHarness adds bounded catalog-backed operating loads
 // to one simulation workflow while preserving the immutable physical design.
 func (resolver *Resolver) ResolveSimulationPlanWithHarness(intent simmodel.Intent, resolved ResolvedDocument, harness []SimulationHarnessDevice) (simmodel.Plan, []reports.Issue) {
-	connections := make(map[string][]simmodel.ConnectionEvidence, len(resolved.Components))
+	connections := resolvedSimulationConnections(resolved)
 	nodes := make([]simmodel.NodeEvidence, 0, len(resolved.Nets))
 	for _, net := range resolved.Nets {
 		nodes = append(nodes, simmodel.NodeEvidence{Name: net.Intent.Name, Role: string(net.Intent.Role), VoltageDomain: net.Intent.VoltageDomain})
-		for _, endpoint := range net.Endpoints {
-			connections[endpoint.Intent.Component] = append(connections[endpoint.Intent.Component], simmodel.ConnectionEvidence{Function: endpoint.Function, UnitID: endpoint.Intent.Unit, Net: net.Intent.Name})
-		}
 	}
 	evidence := make([]simmodel.ComponentEvidence, 0, len(resolved.Components)+len(harness))
 	for _, component := range resolved.Components {
@@ -253,6 +245,55 @@ func (resolver *Resolver) ResolveSimulationPlanWithHarness(intent simmodel.Inten
 		return simmodel.Plan{}, finalizeGraphIssues(issues)
 	}
 	return resolveSimulationEvidence(intent, resolved, evidence, nodes)
+}
+
+func resolvedSimulationConnections(resolved ResolvedDocument) map[string][]simmodel.ConnectionEvidence {
+	functionsByComponent := make(map[string][]ResolvedFunction, len(resolved.Components))
+	for _, component := range resolved.Components {
+		functionsByComponent[component.Instance.ID] = component.Functions
+	}
+	connections := make(map[string][]simmodel.ConnectionEvidence, len(resolved.Components))
+	seen := map[string]struct{}{}
+	for _, net := range resolved.Nets {
+		for _, endpoint := range net.Endpoints {
+			names := []string{endpoint.Function}
+			for _, function := range functionsByComponent[endpoint.Intent.Component] {
+				if !strings.EqualFold(function.Function, endpoint.Function) {
+					continue
+				}
+				names = append(names, function.Aliases...)
+				break
+			}
+			for _, name := range names {
+				name = strings.TrimSpace(name)
+				if name == "" {
+					continue
+				}
+				key := strings.ToLower(endpoint.Intent.Component) + "\x00" +
+					strings.ToLower(endpoint.Intent.Unit) + "\x00" +
+					strings.ToLower(name) + "\x00" + strings.ToLower(net.Intent.Name)
+				if _, exists := seen[key]; exists {
+					continue
+				}
+				seen[key] = struct{}{}
+				connections[endpoint.Intent.Component] = append(connections[endpoint.Intent.Component], simmodel.ConnectionEvidence{
+					Function: name, UnitID: endpoint.Intent.Unit, Net: net.Intent.Name,
+				})
+			}
+		}
+	}
+	for component := range connections {
+		slices.SortStableFunc(connections[component], func(left, right simmodel.ConnectionEvidence) int {
+			if order := strings.Compare(strings.ToLower(left.Function), strings.ToLower(right.Function)); order != 0 {
+				return order
+			}
+			if order := strings.Compare(left.UnitID, right.UnitID); order != 0 {
+				return order
+			}
+			return strings.Compare(left.Net, right.Net)
+		})
+	}
+	return connections
 }
 
 func resolveSimulationEvidence(intent simmodel.Intent, resolved ResolvedDocument, evidence []simmodel.ComponentEvidence, nodes []simmodel.NodeEvidence) (simmodel.Plan, []reports.Issue) {
@@ -620,6 +661,9 @@ func componentSelectionRequest(instance Component, acceptance AcceptanceLevel) c
 			Text: instance.Query.Text, Family: instance.Query.Family, Package: instance.Query.Package,
 			ValueKind: instance.Query.ValueKind, Value: instance.Query.Value,
 			MinVoltageV: instance.Query.MinVoltageV, MinimumConfidence: instance.Query.MinimumConfidence,
+		}
+		if query.ValueKind != "" && strings.TrimSpace(query.Value) == "" {
+			query.Value = strings.TrimSpace(instance.Value)
 		}
 	}
 	ratings := make([]components.RequiredRating, len(instance.RequiredRatings))

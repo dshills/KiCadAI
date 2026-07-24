@@ -66,6 +66,46 @@ func TestEvaluateWorstCaseIsOrderIndependentAndFailsClosed(t *testing.T) {
 	}
 }
 
+func TestEightIndependentUncertaintyGroupsRemainDeterministicallyBounded(t *testing.T) {
+	const uncertaintyCount = 8
+	uncertainties := make([]Uncertainty, uncertaintyCount)
+	for index := range uncertainties {
+		uncertainties[index] = Uncertainty{
+			Target:  fmt.Sprintf("devices.r%02d.value_si", index),
+			Source:  fmt.Sprintf("catalog:r%02d:tolerance", index),
+			Nominal: 1000,
+			Minimum: 990,
+			Maximum: 1010,
+		}
+	}
+	if diagnostics := validateUncertainties(uncertainties); len(diagnostics) != 0 {
+		t.Fatalf("bounded uncertainty set rejected: %#v", diagnostics)
+	}
+	corners := deterministicCorners(uncertainties)
+	want := 2*uncertaintyCount + 2 + 2*4
+	if len(corners) != want {
+		t.Fatalf("corners=%d, want %d", len(corners), want)
+	}
+	unique, resultIndex := uniqueCornerEvaluationPlan(corners)
+	if len(unique) != want || len(resultIndex) != want {
+		t.Fatalf("unique corners=%d indices=%d, want %d", len(unique), len(resultIndex), want)
+	}
+	for first := 0; first < uncertaintyCount; first++ {
+		for second := first + 1; second < uncertaintyCount; second++ {
+			combinations := map[[2]bool]bool{}
+			for _, corner := range corners[2*uncertaintyCount:] {
+				combinations[[2]bool{
+					corner[first].Value == uncertainties[first].Maximum,
+					corner[second].Value == uncertainties[second].Maximum,
+				}] = true
+			}
+			if len(combinations) != 4 {
+				t.Fatalf("groups %d/%d pair coverage = %#v", first, second, combinations)
+			}
+		}
+	}
+}
+
 func TestCatalogJunctionTemperaturesShareOneEnvironmentalCorner(t *testing.T) {
 	uncertainties := make([]Uncertainty, 8)
 	for index := range uncertainties {

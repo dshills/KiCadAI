@@ -56,6 +56,61 @@ func TestBuildOccupancyBlocksOtherNetPadButNotCurrentNetPad(t *testing.T) {
 	}
 }
 
+func TestBuildOccupancyHonorsForeignPadClearanceOverride(t *testing.T) {
+	request := minimalRequest()
+	request.Rules.GridMM = 0.25
+	request.Rules.TraceWidthMM = 0.2
+	request.Rules.ClearanceMM = 0.2
+	request.Components[0].Pads[0].Net = "SIG"
+	request.Components[1].Pads[0].Net = "OTHER"
+	clearanceMM := 0.6
+	request.Components[1].Pads[0].Clearance = &clearanceMM
+
+	occupancy := mustBuildOccupancy(t, request, "SIG")
+	coord := occupancy.Grid.ToGrid(Point{XMM: 21, YMM: 10}, 0)
+	if !occupancy.BlockedCell(coord) {
+		t.Fatal("foreign pad clearance override should block the trace-center cell")
+	}
+	obstacle, ok := occupancy.FirstObstacle(coord)
+	if !ok || obstacle.Kind != ObstacleOtherNetPad || obstacle.Clearance != clearanceMM {
+		t.Fatalf("obstacle = %#v ok=%v, want foreign pad with %.2fmm clearance", obstacle, ok, clearanceMM)
+	}
+}
+
+func TestBuildViaOccupancyBlocksFinePitchForeignPadClearance(t *testing.T) {
+	request := minimalRequest()
+	request.Board.WidthMM = 50
+	request.Board.HeightMM = 40
+	request.Board.Layers = []Layer{
+		{Name: "F.Cu", Kind: LayerCopper, Routable: true},
+		{Name: "In1.Cu", Kind: LayerCopper, Routable: true},
+		{Name: "In2.Cu", Kind: LayerCopper, Routable: true},
+		{Name: "B.Cu", Kind: LayerCopper, Routable: true},
+	}
+	request.Rules.GridMM = 0.25
+	request.Rules.ClearanceMM = 0.15
+	request.Rules.ViaDiameterMM = 0.6
+	request.Components = []Component{{
+		Ref: "U1", Position: Placement{XMM: 32, YMM: 25.5, Layer: "F.Cu"},
+		Pads: []Pad{
+			{Name: "29", Net: "RESET", Position: Point{XMM: -0.4, YMM: -4.1625}, Size: Size{WidthMM: 0.55, HeightMM: 1.475}, Type: PadSMD, Shape: PadRect, Layers: []string{"F.Cu"}},
+			{Name: "30", Position: Point{XMM: -1.2, YMM: -4.1625}, Size: Size{WidthMM: 0.55, HeightMM: 1.475}, Type: PadSMD, Shape: PadRect, Layers: []string{"F.Cu"}},
+		},
+	}}
+	occupancy, err := BuildViaOccupancy(request, "RESET")
+	if err != nil {
+		t.Fatal(err)
+	}
+	layerIndexes, err := LayerIndexes(request.Board.Layers)
+	if err != nil {
+		t.Fatal(err)
+	}
+	coord := occupancy.Grid.ToGrid(Point{XMM: 31.5, YMM: 21.5}, layerIndexes[normalizeLayer("F.Cu")])
+	if !occupancy.BlockedCell(coord) {
+		t.Fatalf("fine-pitch via cell %#v was not blocked by the adjacent unconnected pad", coord)
+	}
+}
+
 func TestPadRectAccountsForComponentRotation(t *testing.T) {
 	component := Component{Position: Placement{RotationDeg: 90}}
 	pad := Pad{Position: Point{XMM: 10, YMM: 10}, Size: Size{WidthMM: 4, HeightMM: 2}}

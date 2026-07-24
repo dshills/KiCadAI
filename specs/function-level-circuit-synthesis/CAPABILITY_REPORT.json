@@ -3,7 +3,7 @@
   "generated_at": "2026-07-17",
   "corpus_manifest_sha256": "5eb592caf268c68505357e5d62226a89a8d65e558efe1dd5dcaab75dc000e902",
   "synthesis_policy_version": "function-synthesis-policy-v1",
-  "catalog_sha256": "26da178feabe4758793c5bbcb8cf6b93f3dcd0dba5bae71068651e57670447fc",
+  "catalog_sha256": "c842a210fa00816599e397af3be9069517a0d0249eea3fcf56ba481fec3b464d",
   "kicad_library_index_sha256": "d838c505ae7fc49c9a42816e53496b5f7de30f713c53dc279719ec6968363140",
   "round_trip_zero_diff_sha256": "27163ab962d0833a026fc2af5143528164484f2fbec3a7d90e53a82a960a839c",
   "gate_profile": {
@@ -34,11 +34,11 @@
       ],
       "status": "pass",
       "hashes": {
-        "generated_files": "d0bf30e27039bbcf9e01a0717629e5f91de2f9f8df4fb5b3bc5009819cae19eb",
+        "generated_files": "3e63bf93e3d1fc481d2980cd69d3e3919f9b590a5ba926d749cb85687ba77a7c",
         "input": "c62d3ceb1e9a1dcad52c4445ca92f813a36dc223b133de958ebb4faa937abaaa",
         "lowered_graph": "d6815f398ba04eb43dd77b51e26209fac6087bda8fe039d453cf35a674ad859d",
-        "request": "706704c7fccac437088e9fa2090cfc7046ee7361fc4ab44672f591d552c5fbf7",
-        "resolution": "1b15dfad8914c8d9046e85da44f1e036eae3964e320f1ae164229e3bb887d583"
+        "request": "b223e0bdde8d48d17cb37bf898dee2dfbbeef72aa7730f2508a6b7bbfbf09c63",
+        "resolution": "dd9b89420a1a676f0e3fe989837d1d47e8c791cc0a19e859a508e9ac6f57fb81"
       },
       "primary_components": [
         "mcu.microchip.atmega328p_a.tqfp32"
@@ -69,11 +69,11 @@
       ],
       "status": "pass",
       "hashes": {
-        "generated_files": "5e02c51451511dbbd5c8bb948bbdd65e5037c237adddebe95070f4cfd24a04fe",
+        "generated_files": "c90008f6d883a846d5a8a202e336dd1a65b5999b8c88b9d6dac4dcf384b0f7bf",
         "input": "aa7a9677de39c94881a8094696c85114f34f148b3f80aa731d7524e07d3c9a37",
         "lowered_graph": "d2c23444d819ad4980a160414c702ef2a49e94749dcd5294d61b41525a895d06",
-        "request": "001103c5c9251c660ad5eada336c113a51534225f17f9a5172e8df67536881f4",
-        "resolution": "cda441d402840cf8e27df80accfb537076d95d1ab2913d3799eb7295c4020f31"
+        "request": "eb72a658e06b7976ab3ea3e75e3c92b626d2ff60103715aff5b3caecd01f123c",
+        "resolution": "3c65236e0872dd69af3a4b4f932f2360b6f7165308d5facce174b3faedb65591"
       },
       "primary_components": [
         "sensor.bosch.bme280.lga8"
@@ -101,11 +101,11 @@
       ],
       "status": "pass",
       "hashes": {
-        "generated_files": "c49229d50c17b40d7714e0835b8e48a23018571f40d5626ee02579ee145d99b4",
+        "generated_files": "58f288658c9382b25e07d6db93a1a9f9ac9fccf44bd83cf8f46be212f7c361c0",
         "input": "851fde8bb0d9a4fa5b49679224fc1b3f78645401609ff16f895b9b56dea9b405",
         "lowered_graph": "8b86f6bf9ce723598c0bf27abc378d575c0759358004511879f1cbb9571d6a58",
-        "request": "692baa0a75953a9b1300c24f9e848fd6bdcad16fe813dafe93cdd5099bd9a4df",
-        "resolution": "94c3dab067523ee09a96fb2f78844ad548edc68212c0ea4d778821cbd263bb81"
+        "request": "7d6db5f1176c90ba79f0a540b5255d990199fe9ce168039d098cfc984a312874",
+        "resolution": "b0317181d80149963a9044d9e91da1ad1405df76712564f37ccefb7402b8ae35"
       },
       "primary_components": [
         "opamp.ti.lmv321.sot23_5",
@@ -134,11 +134,11 @@
       ],
       "status": "pass",
       "hashes": {
-        "generated_files": "9516189e70d1a5964178296088533cc4209ad7ea848ec390b2786008c7ef0b7c",
+        "generated_files": "39f4a4ba1b8360f138f4f4d1fcb8595b4ea9175c874011f6651af2574b752f82",
         "input": "9ff5c885596fa6cfb1da0dd11f9457f0db0fdb1a528e226b003e84bf6529472e",
         "lowered_graph": "c0ec6d426ed798f1c03e65558b6cb9d6605f38b77363d62b38d15aced438e049",
-        "request": "a391c26884f87a16dfa374bcd8475499e9df27f36982a45c8a4e585e03d03e4b",
-        "resolution": "c61b80812f298fdcb747b3041093758e44c52273f094753a82e9569b31ad1f96"
+        "request": "54392429f418a7185f4f0d5147d8016e03970ca0fd2991acc0551d398848e9a6",
+        "resolution": "146a14089023bde448927164994f1f4b51e16055e7998e9d141521260ca2d936"
       },
       "primary_components": [
         "capacitor.ceramic.0603",
@@ -169,11 +169,11 @@
       ],
       "status": "pass",
       "hashes": {
-        "generated_files": "c5937849a6fec256719e21255b8a103037f7bf75943c4bd58ed978a3f1f5cbc8",
+        "generated_files": "72a5f8777808d0104f58cd7a23e59217ec3cf2e154b46ce2a35f93b0b7bce79a",
         "input": "0693530028d700755906f81534396ce298ad0ce694e585490377702f4f2fdd67",
         "lowered_graph": "b4188c9b138d28f58138c42593247052a41980d3346c2d39941085002e47eeed",
-        "request": "b3ea20e29f46c159294cdaa21773a85a4926ee55a0cf901cf37c9d88de38f1cf",
-        "resolution": "3c4fc7cdf45b0c906368aad119f7c5f493f45a8111fb8def2dc0b1ebc48a6d2c"
+        "request": "d8451c586eef3f9bdf6912c6a79f3e2ed4ca17b391c51ae1692f1a86f0938e70",
+        "resolution": "f7d95b1fe376f3f6ea6e4e9e81af057239940f9c40d7fa28065fa04371fd1179"
       },
       "primary_components": [
         "mcu.espressif.esp32_wroom_32e",
@@ -207,11 +207,11 @@
       ],
       "status": "pass",
       "hashes": {
-        "generated_files": "abf252b3d7f5b5c59dda705d336d0053f63803670de2d59728fee6c8704d7cba",
+        "generated_files": "eb4e23656a9b4b2156b141419372e1312354037e844c3dbcc4a8e1650cae40f0",
         "input": "fd4db9a8307619bb701efb9166524a6c3ed0b0b8de66743294e1dc840483c6c1",
         "lowered_graph": "6c4d66c2bf1e18041f511d07650a922a1e4e1b1f9bc1d8cb4e1acab079f5d2b4",
-        "request": "fd5cd04fad03e7c9071666be3ea98f7136ef25336325d34ca6700ddb9ef78af2",
-        "resolution": "bddae809de7c1709ad5c56b9e7ceca6f86b45dd5a81819bf4544b8be867589a7"
+        "request": "7bc517ce7e482cf7f88c2514319476b69194d61ed79afb590083207b19f6ddb9",
+        "resolution": "afcc992b241a575133e597eb66cf0a85d77515164290f57f5e56eab5505057f2"
       },
       "primary_components": [
         "bjt.onsemi.mmbt3904.sot23",
@@ -239,11 +239,11 @@
       ],
       "status": "pass",
       "hashes": {
-        "generated_files": "267c3b0745a5be0e3270616eb2c346f9c127ecb851ffe73799273eee37ea8db1",
+        "generated_files": "b1d8c7b2191f526b26495b8b9ef2fb996cc57179fb77f08e4af63fc0550469c7",
         "input": "bd721fd20d2c0fae287d0740faa8bf5658c7ec8b55d025a3f7ec28fd95933c5e",
         "lowered_graph": "395994217e29bba3cd04c08e251d9bc4ace1452a317ed2d48188f20153ec34f4",
-        "request": "7fb625b62466ab5a2bed8d79175a8cace8aa3c774375b05dcae286bee8919265",
-        "resolution": "acdd4b11f2ce0c2d468da21c49e3c2d10e8cdba3bf64ca3cac2b586f5d7514f4"
+        "request": "95157c59ce28c7216d3a1c32b62d9ed492b65919c1e6157bd574d6d7c03d65af",
+        "resolution": "b50ce32f4e5545253b0e2901b418768560face9a275210f6f7daea7d2441ade9"
       },
       "primary_components": [
         "sensor.sensirion.sht31_dis.dfn8"
@@ -272,11 +272,11 @@
       ],
       "status": "pass",
       "hashes": {
-        "generated_files": "6348b743be8eb31a902d0e7f429f70a7ddc9f1708e6dc55f653f73d17376210c",
+        "generated_files": "d125b97f922ad37c6d2d10259467d68cb9903326b39650efad6def22b2c4d478",
         "input": "ff6df77ec3e9a7b0fd2acba5a1acb37025293f93d8ac89b29a0e45bdfb8fd3d5",
         "lowered_graph": "39fe6c044c73c6ce78c8fa4b6dfbe992ee62006909d8d0d6d2569bee8887580f",
-        "request": "3cfe45fb839fd02aad3f64748083e0eca10a134472ef4e8d10c889c7cb58f699",
-        "resolution": "a62334bfcdb5bfcb95d1da3686538d125c1ebcb9b33c1fca6d2154a97c87f488"
+        "request": "cf708d7883e8fa30b5a3a271b08674313c277c6d56d8246182d4f363240b0892",
+        "resolution": "7b988c93f8d5dd98a0b953580e3f2859bf9a69a6f4f20fd538493a4a1fb6945c"
       },
       "primary_components": [
         "regulator.linear.ap2112k_3v3.sot23_5",

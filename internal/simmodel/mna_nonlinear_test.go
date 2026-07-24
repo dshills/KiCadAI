@@ -2,6 +2,7 @@ package simmodel
 
 import (
 	"encoding/json"
+	"fmt"
 	"math"
 	"strings"
 	"testing"
@@ -26,6 +27,119 @@ func TestNonlinearDCDiodeOperatingPointIsDeterministic(t *testing.T) {
 	second, _ := json.Marshal(replayed)
 	if string(first) != string(second) {
 		t.Fatalf("nonlinear replay differs\n%s\n%s", first, second)
+	}
+}
+
+func TestNonlinearDCPrecisionRectifierFindsCenteredOpAmpOperatingPoint(t *testing.T) {
+	opAmpParameters := []NamedValue{
+		{Name: "dc_open_loop_gain", Value: 120000},
+		{Name: "gain_bandwidth_hz", Value: 10_000_000},
+		{Name: "output_high_margin_v", Value: .05},
+		{Name: "output_low_margin_v", Value: .05},
+		{Name: "supply_max_v", Value: 36},
+		{Name: "supply_min_v", Value: 4.5},
+	}
+	opAmp := func(id, plus, minus, output string) ComponentEvidence {
+		return ComponentEvidence{
+			InstanceID: id, CatalogID: "opamp.reviewed", Family: "opamp",
+			ModelClaims: []CatalogEvidence{{ModelID: PrimitiveOpAmpV1, Parameters: opAmpParameters}},
+			Connections: []ConnectionEvidence{
+				{Function: "IN_PLUS", Net: plus}, {Function: "IN_MINUS", Net: minus}, {Function: "OUT", Net: output},
+				{Function: "V_PLUS", Net: "VP"}, {Function: "V_MINUS", Net: "VN"},
+			},
+		}
+	}
+	components := []ComponentEvidence{
+		voltageSourceEvidence("supply", "VP", "GND"),
+		voltageSourceEvidence("negative_supply", "VN", "GND"),
+		voltageSourceEvidence("signal", "IN", "GND"),
+		resistorEvidence("input", 680_000, "IN", "SUM"),
+		resistorEvidence("feedback", 680_000, "OUT", "SUM"),
+		resistorEvidence("steering_input", 680_000, "IN", "STEER"),
+		resistorEvidence("steering_damping", 47, "STEERING_OUT", "DIODE_DRIVE"),
+		opAmp("magnitude_amplifier", "STEER", "SUM", "OUT"),
+		opAmp("steering_amplifier", "GND", "STEER", "STEERING_OUT"),
+		{
+			InstanceID: "steering_diode", CatalogID: "diode.reviewed", Family: "diode",
+			ModelClaims: []CatalogEvidence{{ModelID: PrimitiveDiodeShockleyV1, Parameters: diodeParameters(.2, 100)}},
+			Connections: []ConnectionEvidence{{Function: "ANODE", Net: "DIODE_DRIVE"}, {Function: "CATHODE", Net: "STEER"}},
+		},
+	}
+	intent := Intent{
+		ModelID: ModelNonlinearCircuitDCV1,
+		Analyses: []Analysis{{ID: "negative", Kind: AnalysisDCOperatingPoint, Excitations: []SourceExcitation{
+			{Component: "supply", DCValue: 5}, {Component: "negative_supply", DCValue: -.232}, {Component: "signal", DCValue: -1},
+		}}},
+		Assertions: []Assertion{{AnalysisID: "negative", Node: "OUT", Quantity: QuantityVoltageV, Min: .95, Max: 1.05}},
+	}
+	nodes := []NodeEvidence{
+		{Name: "GND", Role: "ground"}, {Name: "VP"}, {Name: "VN"}, {Name: "IN"}, {Name: "SUM"},
+		{Name: "STEER"}, {Name: "OUT"}, {Name: "STEERING_OUT"}, {Name: "DIODE_DRIVE"},
+	}
+	plan, diagnostics := ResolveWithTopology(intent, "test", "catalog-hash", components, nodes)
+	if len(diagnostics) != 0 {
+		t.Fatalf("resolve diagnostics=%+v", diagnostics)
+	}
+	report, diagnostics := Evaluate(plan)
+	if len(diagnostics) != 0 || report.Status != "pass" {
+		t.Fatalf("report=%+v diagnostics=%+v", report, diagnostics)
+	}
+}
+
+func TestNonlinearDCCenteredSeedSupportsMoreThanFourOpAmps(t *testing.T) {
+	opAmpParameters := []NamedValue{
+		{Name: "dc_open_loop_gain", Value: 120000},
+		{Name: "gain_bandwidth_hz", Value: 10_000_000},
+		{Name: "output_high_margin_v", Value: .05},
+		{Name: "output_low_margin_v", Value: .05},
+		{Name: "supply_max_v", Value: 36},
+		{Name: "supply_min_v", Value: 4.5},
+	}
+	components := []ComponentEvidence{
+		voltageSourceEvidence("positive_supply", "VP", "GND"),
+		voltageSourceEvidence("negative_supply", "VN", "GND"),
+		voltageSourceEvidence("signal", "IN", "GND"),
+		resistorEvidence("diode_bias", 1000, "VP", "DIODE"),
+		{
+			InstanceID: "diode", CatalogID: "diode.reviewed", Family: "diode",
+			ModelClaims: []CatalogEvidence{{ModelID: PrimitiveDiodeShockleyV1, Parameters: diodeParameters(.2, 100)}},
+			Connections: []ConnectionEvidence{{Function: "ANODE", Net: "DIODE"}, {Function: "CATHODE", Net: "GND"}},
+		},
+	}
+	nodes := []NodeEvidence{{Name: "GND", Role: "ground"}, {Name: "VP"}, {Name: "VN"}, {Name: "IN"}, {Name: "DIODE"}}
+	for index := 1; index <= 5; index++ {
+		id := fmt.Sprintf("buffer_%d", index)
+		output := fmt.Sprintf("OUT_%d", index)
+		components = append(components, ComponentEvidence{
+			InstanceID: id, CatalogID: "opamp.reviewed", Family: "opamp",
+			ModelClaims: []CatalogEvidence{{ModelID: PrimitiveOpAmpV1, Parameters: opAmpParameters}},
+			Connections: []ConnectionEvidence{
+				{Function: "IN_PLUS", Net: "IN"}, {Function: "IN_MINUS", Net: output}, {Function: "OUT", Net: output},
+				{Function: "V_PLUS", Net: "VP"}, {Function: "V_MINUS", Net: "VN"},
+			},
+		})
+		nodes = append(nodes, NodeEvidence{Name: output})
+	}
+	intent := Intent{
+		ModelID: ModelNonlinearCircuitDCV1,
+		Analyses: []Analysis{{ID: "bias", Kind: AnalysisDCOperatingPoint, Excitations: []SourceExcitation{
+			{Component: "positive_supply", DCValue: 5},
+			{Component: "negative_supply", DCValue: -5},
+			{Component: "signal", DCValue: 1},
+		}}},
+		Assertions: []Assertion{{AnalysisID: "bias", Node: "OUT_5", Quantity: QuantityVoltageV, Min: .99, Max: 1.01}},
+	}
+	plan, diagnostics := ResolveWithTopology(intent, "test", "catalog-hash", components, nodes)
+	if len(diagnostics) != 0 {
+		t.Fatalf("resolve diagnostics=%+v", diagnostics)
+	}
+	_, _, evidence, _, ok := solveNonlinearDCByCenteredOpAmpSeed(plan, plan.Analyses[0], map[string]float64{})
+	if !ok || evidence.Method != "bounded_newton_centered_opamp_seed_v1" {
+		t.Fatalf("five-op-amp centered seed failed: ok=%v evidence=%+v", ok, evidence)
+	}
+	report, diagnostics := Evaluate(plan)
+	if len(diagnostics) != 0 || report.Status != "pass" {
+		t.Fatalf("report=%+v diagnostics=%+v", report, diagnostics)
 	}
 }
 

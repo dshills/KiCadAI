@@ -16,8 +16,9 @@ func TestCleanCheckoutPromotionCommandContract(t *testing.T) {
 	root := repositoryRootForContractTest(t)
 	makefile := readContractFile(t, filepath.Join(root, "Makefile"))
 	for _, required := range []string{
-		"promotion-bundle:", "./scripts/clean-checkout-promotion.sh",
+		"promotion-bundle:", "held-out-promotion-bundle:", "./scripts/clean-checkout-promotion.sh",
 		`PROMOTION_ROOT="$(PROMOTION_ROOT)"`, `PROMOTION_CACHE_DIR="$(PROMOTION_CACHE_DIR)"`,
+		`PROMOTION_MATRIX="$(HELD_OUT_PROMOTION_MATRIX)"`,
 	} {
 		if !strings.Contains(makefile, required) {
 			t.Errorf("Makefile is missing %q", required)
@@ -40,7 +41,8 @@ func TestCleanCheckoutPromotionCommandContract(t *testing.T) {
 		"status --porcelain --untracked-files=normal",
 		"go build -o \"$kicadai_cli\" ./cmd/kicadai",
 		"go build -o \"$promotion_cli\" ./cmd/kicadai-promotion",
-		"--matrix \"$repo_root/testdata/external-review-mitigation/matrix.json\"",
+		"matrix_path=${PROMOTION_MATRIX:-\"$repo_root/testdata/external-review-mitigation/matrix.json\"}",
+		"--matrix \"$matrix_path\"",
 		"--bundle-output \"$bundle_root\"",
 		"--revision \"$revision\"",
 		"--bootstrap",

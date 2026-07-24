@@ -21,7 +21,6 @@ const (
 	currentRegulatorEnablePulldownOhm      = 150_000.0
 	currentRegulatorEnableCapacitanceF     = 10e-9
 	currentRegulatorReferenceBiasOhm       = 4_700.0
-	currentRegulatorPrecisionBiasOhm       = 4_700_000.0
 	currentRegulatorDividerLowerOhm        = 1_000.0
 	currentRegulatorDividerMinimumVoltageV = 0.05
 	currentRegulatorDividerStepVoltageV    = 0.0005
@@ -41,11 +40,16 @@ func (provider *CatalogProvider) expandConstantCurrentRegulation(ctx context.Con
 	if !ok || inputMinimum <= compliance {
 		return nil, fmt.Errorf("constant-current input range does not provide positive compliance headroom")
 	}
+	outputMinimum, outputMaximum, outputRangeOK := roleVoltageRange(request.Ports, "output")
+	if !outputRangeOK {
+		outputMinimum, outputMaximum = 0, compliance
+	}
 	if err := requireBool(request.Constraints, "startup_isolation", "required", true); err != nil {
 		return nil, fmt.Errorf("constant-current regulation requires startup isolation: %w", err)
 	}
 
 	temperature := temperatureRequirementFromConstraints(request.Constraints)
+	temperatureDeltaC := currentRegulatorMaximumTemperatureDelta(temperature)
 	passiveTolerance := currentRegulatorEffectivePassiveTolerance(temperature)
 	precisionMode := tolerance <= 1.5
 	worstDissipation := inputMaximum * current
@@ -142,7 +146,13 @@ func (provider *CatalogProvider) expandConstantCurrentRegulation(ctx context.Con
 	setVoltageMaximum := referenceCurrentMaximum * currentRegulatorSetResistanceOhm * (1 + passiveTolerance/100)
 	setResistance := currentRegulatorSetResistanceOhm
 	designCurrent := current
+	parallelOutputCurrentMinimum := 0.0
 	parallelOutputCurrentMaximum := 0.0
+	parallelResistance := 0.0
+	dividerUpperResistance := 0.0
+	dividerReferenceVoltage := 0.0
+	dividerReferenceMinimum := 0.0
+	dividerReferenceMaximum := 0.0
 	parts := []catalogPart{regulator, inputSwitch, enableDriver}
 	passives := []passivePart{
 		{"output_program", "resistor", "series_current_shunt", ""},
@@ -159,9 +169,9 @@ func (provider *CatalogProvider) expandConstantCurrentRegulation(ctx context.Con
 	}
 	var reference catalogPart
 	if precisionMode {
-		reference, err = provider.selectComponentWithTemperature(ctx, "voltage_reference", "LT1634", []components.RequiredRating{
+		reference, err = provider.selectComponentMinimizingModelParameterWithTemperature(ctx, "voltage_reference", "", []components.RequiredRating{
 			{Kind: "bias_current", Value: "0.001", Unit: "A"},
-		}, true, temperature)
+		}, true, temperature, nil, "mna_shunt_voltage_reference_v1", "min_bias_current_a", nil)
 		if err != nil {
 			return nil, fmt.Errorf("precision constant-current reference selection failed: %w", err)
 		}
@@ -172,9 +182,31 @@ func (provider *CatalogProvider) expandConstantCurrentRegulation(ctx context.Con
 			return nil, fmt.Errorf("selected precision current reference lacks output-voltage evidence")
 		}
 		setVoltageMinimum, setVoltageMaximum = catalogUncertaintyBounds(reference.record, "model_parameters.output_voltage_v", setVoltageNominal)
-		parallelOutputCurrentMaximum = inputMaximum / (currentRegulatorPrecisionBiasOhm * (1 - passiveTolerance/100))
-		designCurrent = math.Max(current*(1-tolerance/100), current-parallelOutputCurrentMaximum/2)
-		passives = append(passives, passivePart{"reference_bias", "resistor", "bias_current", engineeringValue(currentRegulatorPrecisionBiasOhm, "Ohm")})
+		minimumBiasCurrent, minimumBiasOK := catalogSimulationParameter(reference.record, "min_bias_current_a")
+		maximumBiasCurrent, maximumBiasOK := catalogSimulationParameter(reference.record, "max_bias_current_a")
+		if !minimumBiasOK || !maximumBiasOK || minimumBiasCurrent <= 0 || maximumBiasCurrent < minimumBiasCurrent {
+			return nil, fmt.Errorf("selected precision current reference lacks bounded bias-current evidence")
+		}
+		if referenceCurrentMinimum >= minimumBiasCurrent && referenceCurrentMaximum <= maximumBiasCurrent {
+			designCurrent = current
+		} else {
+			parallelResistance, parallelOutputCurrentMinimum, parallelOutputCurrentMaximum, err = provider.solveCurrentReferenceBias(
+				ctx,
+				inputMinimum, inputMaximum,
+				outputMinimum, outputMaximum,
+				setVoltageMinimum, setVoltageMaximum,
+				minimumBiasCurrent, maximumBiasCurrent,
+				passiveTolerance,
+			)
+			if err != nil {
+				return nil, err
+			}
+			designCurrent = current - (parallelOutputCurrentMinimum+parallelOutputCurrentMaximum)/2
+			passives = append(passives, passivePart{"reference_bias", "resistor", "bias_current", engineeringValue(parallelResistance, "Ohm")})
+		}
+		if designCurrent < minimumOutputCurrent {
+			return nil, fmt.Errorf("precision reference burden leaves regulator design current %.12g A below minimum %.12g A", designCurrent, minimumOutputCurrent)
+		}
 	} else {
 		standardCalculation, standardErr := currentRegulatorCalculation(currentRegulatorCalculationRequest{
 			CurrentA: current, TolerancePercent: tolerance,
@@ -209,9 +241,9 @@ func (provider *CatalogProvider) expandConstantCurrentRegulation(ctx context.Con
 				setVoltageNominal, setVoltageMinimum, setVoltageMaximum = directSolution.NominalV, directSolution.MinimumV, directSolution.MaximumV
 				passives = append(passives, passivePart{"set_program", "resistor", "bias_current", engineeringValue(setResistance, "Ohm")})
 			} else {
-				reference, err = provider.selectComponentWithTemperature(ctx, "voltage_reference", "LT1634", []components.RequiredRating{
+				reference, err = provider.selectComponentMinimizingModelParameterWithTemperature(ctx, "voltage_reference", "", []components.RequiredRating{
 					{Kind: "bias_current", Value: "0.001", Unit: "A"},
-				}, true, temperature)
+				}, true, temperature, nil, "mna_shunt_voltage_reference_v1", "min_bias_current_a", nil)
 				if err != nil {
 					return nil, fmt.Errorf("low-headroom constant-current reference selection failed: %w", err)
 				}
@@ -223,6 +255,7 @@ func (provider *CatalogProvider) expandConstantCurrentRegulation(ctx context.Con
 				}
 				referenceMinimum, referenceMaximum := catalogUncertaintyBounds(reference.record, "model_parameters.output_voltage_v", referenceVoltage)
 				parallelOutputCurrentMaximum = inputMaximum / (currentRegulatorReferenceBiasOhm * (1 - passiveTolerance/100))
+				parallelResistance = currentRegulatorReferenceBiasOhm
 				setSolution, solveErr := solveLowHeadroomSetpoint(lowHeadroomSetpointRequest{
 					CurrentA: current, TolerancePercent: tolerance,
 					ComplianceV: compliance, InputMinimumV: inputMinimum, InputMaximumV: inputMaximum,
@@ -240,6 +273,8 @@ func (provider *CatalogProvider) expandConstantCurrentRegulation(ctx context.Con
 				precisionMode = true
 				designCurrent = setSolution.DesignCurrentA
 				setVoltageNominal, setVoltageMinimum, setVoltageMaximum = setSolution.NominalV, setSolution.MinimumV, setSolution.MaximumV
+				dividerUpperResistance = setSolution.UpperResistanceOhm
+				dividerReferenceVoltage, dividerReferenceMinimum, dividerReferenceMaximum = referenceVoltage, referenceMinimum, referenceMaximum
 				passives = append(passives,
 					passivePart{"reference_bias", "resistor", "bias_current", engineeringValue(currentRegulatorReferenceBiasOhm, "Ohm")},
 					passivePart{"set_divider_upper", "resistor", "threshold_divider", engineeringValue(setSolution.UpperResistanceOhm, "Ohm")},
@@ -249,18 +284,53 @@ func (provider *CatalogProvider) expandConstantCurrentRegulation(ctx context.Con
 		}
 	}
 
-	outputResistance := setVoltageNominal / (designCurrent - referenceCurrent)
-	if !finitePositive(outputResistance) {
-		return nil, fmt.Errorf("constant-current output-program resistor has no positive solution")
+	preferred, err := provider.realizeCurrentRegulatorPreferredValues(ctx, currentRegulatorPreferredRealizationRequest{
+		Calculation: currentRegulatorCalculationRequest{
+			CurrentA: current, TolerancePercent: tolerance,
+			ComplianceV: compliance, InputMinimumV: inputMinimum, InputMaximumV: inputMaximum,
+			ReferenceCurrentA: referenceCurrent, ReferenceCurrentMinimumA: referenceCurrentMinimum, ReferenceCurrentMaximumA: referenceCurrentMaximum,
+			OffsetVoltageMinimumV: offsetMinimum, OffsetVoltageMaximumV: offsetMaximum,
+			DesignCurrentA: designCurrent, ParallelOutputCurrentMaximumA: parallelOutputCurrentMaximum,
+			ParallelOutputCurrentMinimumA: parallelOutputCurrentMinimum,
+			SetVoltageNominalV:            setVoltageNominal, SetVoltageMinimumV: setVoltageMinimum, SetVoltageMaximumV: setVoltageMaximum,
+			SetResistanceOhm: setResistance, PrecisionMode: precisionMode,
+			PassiveTolerancePercent: passiveTolerance,
+			MinimumHeadroomV:        minimumHeadroom, SwitchResistanceOhm: switchResistance,
+		},
+		DividerUpperResistanceOhm: dividerUpperResistance,
+		DividerLowerResistanceOhm: currentRegulatorDividerLowerOhm,
+		ReferenceVoltageV:         dividerReferenceVoltage,
+		ReferenceMinimumV:         dividerReferenceMinimum,
+		ReferenceMaximumV:         dividerReferenceMaximum,
+		ParallelResistanceOhm:     parallelResistance,
+		TemperatureDeltaC:         temperatureDeltaC,
+	})
+	if err != nil {
+		return nil, err
 	}
+	setResistance = preferred.SetResistanceOhm
+	dividerUpperResistance = preferred.DividerUpperResistanceOhm
+	setVoltageNominal, setVoltageMinimum, setVoltageMaximum = preferred.SetVoltageNominalV, preferred.SetVoltageMinimumV, preferred.SetVoltageMaximumV
+	outputResistance, outputTrimResistance, designCurrent := preferred.OutputResistanceOhm, preferred.OutputTrimResistanceOhm, preferred.DesignCurrentA
 	for index := range passives {
-		if passives[index].id == "output_program" {
+		switch passives[index].id {
+		case "output_program":
 			passives[index].value = engineeringValue(outputResistance, "Ohm")
+		case "set_program":
+			passives[index].value = engineeringValue(setResistance, "Ohm")
+		case "set_divider_upper":
+			passives[index].value = engineeringValue(dividerUpperResistance, "Ohm")
 		}
 	}
+	if outputTrimResistance > 0 {
+		passives = append(passives, passivePart{
+			"output_program_trim", "resistor", "series_current_shunt", engineeringValue(outputTrimResistance, "Ohm"),
+		})
+	}
 	precisionPassives := map[string]float64{
-		"output_program": currentRegulatorPassiveTolerance,
-		"set_program":    currentRegulatorPassiveTolerance,
+		"output_program":      currentRegulatorPassiveTolerance,
+		"output_program_trim": currentRegulatorPassiveTolerance,
+		"set_program":         currentRegulatorPassiveTolerance,
 	}
 	if precisionMode {
 		precisionPassives["reference_bias"] = currentRegulatorPassiveTolerance
@@ -272,21 +342,7 @@ func (provider *CatalogProvider) expandConstantCurrentRegulation(ctx context.Con
 		return nil, err
 	}
 
-	calculation, err := currentRegulatorCalculation(currentRegulatorCalculationRequest{
-		CurrentA: current, TolerancePercent: tolerance,
-		ComplianceV: compliance, InputMinimumV: inputMinimum, InputMaximumV: inputMaximum,
-		ReferenceCurrentA: referenceCurrent, ReferenceCurrentMinimumA: referenceCurrentMinimum, ReferenceCurrentMaximumA: referenceCurrentMaximum,
-		OffsetVoltageMinimumV: offsetMinimum, OffsetVoltageMaximumV: offsetMaximum,
-		DesignCurrentA: designCurrent, ParallelOutputCurrentMaximumA: parallelOutputCurrentMaximum,
-		SetVoltageNominalV: setVoltageNominal,
-		SetVoltageMinimumV: setVoltageMinimum, SetVoltageMaximumV: setVoltageMaximum,
-		SetResistanceOhm: setResistance, OutputResistanceOhm: outputResistance, PrecisionMode: precisionMode,
-		PassiveTolerancePercent: passiveTolerance,
-		MinimumHeadroomV:        minimumHeadroom, SwitchResistanceOhm: switchResistance,
-	})
-	if err != nil {
-		return nil, err
-	}
+	calculation := preferred.Calculation
 	responseTime := gateCharge * currentRegulatorGateDriveOhm / inputMinimum
 	if !controlled {
 		finalBaseVoltage := inputMinimum * currentRegulatorEnablePulldownOhm / (currentRegulatorEnableResistanceOhm + currentRegulatorEnablePulldownOhm)
@@ -304,12 +360,16 @@ func (provider *CatalogProvider) expandConstantCurrentRegulation(ctx context.Con
 	bindings := bindRoles(request.Ports, regulator.selected.InstanceID, map[string]string{
 		"input": "IN", "output": "OUT", "reference": "OUT", "control": "SET",
 	})
+	outputProgramEndpointID := "output_program"
+	if outputTrimResistance > 0 {
+		outputProgramEndpointID = "output_program_trim"
+	}
 	for index := range bindings {
 		switch bindings[index].Role {
 		case "input":
 			bindings[index].Instance, bindings[index].Function = inputSwitch.selected.InstanceID, "SOURCE"
 		case "output":
-			bindings[index].Instance, bindings[index].Function = "output_program", "B"
+			bindings[index].Instance, bindings[index].Function = outputProgramEndpointID, "B"
 		case "reference":
 			bindings[index].Instance, bindings[index].Function = "output_pulldown", "B"
 		case "control":
@@ -328,7 +388,7 @@ func (provider *CatalogProvider) expandConstantCurrentRegulation(ctx context.Con
 		passiveEndpoint("enable_base_pulldown", "B"),
 		endpoint(enableDriver, "SOURCE"),
 	}
-	outputEndpoints := []RealizationEndpoint{passiveEndpoint("output_program", "B"), passiveEndpoint("output_pulldown", "A")}
+	outputEndpoints := []RealizationEndpoint{passiveEndpoint(outputProgramEndpointID, "B"), passiveEndpoint("output_pulldown", "A")}
 	lowHeadroomMode := precisionMode && slices.ContainsFunc(passives, func(passive passivePart) bool {
 		return passive.id == "set_divider_upper"
 	})
@@ -336,7 +396,10 @@ func (provider *CatalogProvider) expandConstantCurrentRegulation(ctx context.Con
 		setEndpoints = append(setEndpoints, passiveEndpoint("set_divider_upper", "B"), passiveEndpoint("set_divider_lower", "A"))
 		outputEndpoints = append(outputEndpoints, endpoint(reference, "ANODE"), passiveEndpoint("set_divider_lower", "B"))
 	} else if precisionMode {
-		setEndpoints = append(setEndpoints, endpoint(reference, "CATHODE"), passiveEndpoint("reference_bias", "B"))
+		setEndpoints = append(setEndpoints, endpoint(reference, "CATHODE"))
+		if parallelResistance > 0 {
+			setEndpoints = append(setEndpoints, passiveEndpoint("reference_bias", "B"))
+		}
 		outputEndpoints = append(outputEndpoints, endpoint(reference, "ANODE"))
 	} else {
 		setEndpoints = append(setEndpoints, passiveEndpoint("set_program", "A"))
@@ -359,8 +422,18 @@ func (provider *CatalogProvider) expandConstantCurrentRegulation(ctx context.Con
 	if !controlled {
 		connections[4].Endpoints = append(connections[4].Endpoints, passiveEndpoint("enable_delay", "A"))
 	}
-	if precisionMode {
+	if precisionMode && parallelResistance > 0 {
 		connections[1].Endpoints = append(connections[1].Endpoints, passiveEndpoint("reference_bias", "A"))
+	}
+	if outputTrimResistance > 0 {
+		connections = append(connections,
+			semanticNet(
+				"current_source_output_program",
+				"regulated_current",
+				passiveEndpoint("output_program", "B"),
+				passiveEndpoint("output_program_trim", "A"),
+			),
+		)
 	}
 	if lowHeadroomMode {
 		connections = append(connections,
@@ -372,6 +445,11 @@ func (provider *CatalogProvider) expandConstantCurrentRegulation(ctx context.Con
 }
 
 func currentRegulatorEffectivePassiveTolerance(temperature *components.TemperatureRequirement) float64 {
+	maximumDeltaC := currentRegulatorMaximumTemperatureDelta(temperature)
+	return currentRegulatorPassiveTolerance + currentRegulatorPassiveTempcoPPMPerC*maximumDeltaC/10_000
+}
+
+func currentRegulatorMaximumTemperatureDelta(temperature *components.TemperatureRequirement) float64 {
 	maximumDeltaC := 150.0
 	if temperature != nil {
 		maximumDeltaC = 0
@@ -382,7 +460,51 @@ func currentRegulatorEffectivePassiveTolerance(temperature *components.Temperatu
 			maximumDeltaC = math.Max(maximumDeltaC, math.Abs(*temperature.MaximumC-25))
 		}
 	}
-	return currentRegulatorPassiveTolerance + currentRegulatorPassiveTempcoPPMPerC*maximumDeltaC/10_000
+	return maximumDeltaC
+}
+
+func catalogResistorEffectiveTolerance(record components.ComponentRecord, maximumDeltaC float64) (float64, bool) {
+	tolerance, toleranceOK := catalogToleranceMaximum(record, "resistance", "%")
+	tempco, tempcoOK := recordValueMaximum(record, "temperature_coefficient", "ppm/C")
+	if !toleranceOK || !tempcoOK || tolerance <= 0 || tempco <= 0 || maximumDeltaC < 0 {
+		return 0, false
+	}
+	return tolerance + tempco*maximumDeltaC/10_000, true
+}
+
+func (provider *CatalogProvider) solveCurrentReferenceBias(
+	ctx context.Context,
+	inputMinimum, inputMaximum,
+	outputMinimum, outputMaximum,
+	referenceMinimum, referenceMaximum,
+	minimumBiasCurrent, maximumBiasCurrent,
+	passiveTolerancePercent float64,
+) (float64, float64, float64, error) {
+	minimumAvailableVoltage := inputMinimum - outputMaximum - referenceMaximum
+	maximumAvailableVoltage := inputMaximum - outputMinimum - referenceMinimum
+	if minimumAvailableVoltage <= 0 || maximumAvailableVoltage < minimumAvailableVoltage || minimumBiasCurrent <= 0 || maximumBiasCurrent < minimumBiasCurrent {
+		return 0, 0, 0, fmt.Errorf("precision current reference has no positive bounded bias-voltage envelope")
+	}
+	tolerance := passiveTolerancePercent / 100
+	maximumResistance := minimumAvailableVoltage / (minimumBiasCurrent * (1 + tolerance))
+	candidates, err := provider.preferredResistanceCandidates(
+		ctx, maximumResistance, currentRegulatorPassiveTolerance, currentRegulatorPassiveTempcoPPMPerC, DefaultMaxValueCandidates,
+	)
+	if err != nil {
+		return 0, 0, 0, fmt.Errorf("precision current reference bias realization failed: %w", err)
+	}
+	for _, resistance := range candidates {
+		if resistance > maximumResistance {
+			continue
+		}
+		minimumCurrent := minimumAvailableVoltage / (resistance * (1 + tolerance))
+		maximumCurrent := maximumAvailableVoltage / (resistance * (1 - tolerance))
+		if minimumCurrent < minimumBiasCurrent || maximumCurrent > maximumBiasCurrent {
+			continue
+		}
+		return resistance, minimumCurrent, maximumCurrent, nil
+	}
+	return 0, 0, 0, fmt.Errorf("precision current reference has no catalog-realizable bias resistor satisfying its operating-current envelope")
 }
 
 type currentRegulatorCalculationRequest struct {
@@ -402,11 +524,278 @@ type currentRegulatorCalculationRequest struct {
 	SetVoltageMaximumV            float64
 	SetResistanceOhm              float64
 	OutputResistanceOhm           float64
+	ParallelOutputCurrentMinimumA float64
 	ParallelOutputCurrentMaximumA float64
 	PrecisionMode                 bool
 	PassiveTolerancePercent       float64
+	SetTolerancePercent           float64
+	OutputTolerancePercent        float64
 	MinimumHeadroomV              float64
 	SwitchResistanceOhm           float64
+	SelectedValues                []SelectedValueEvidence
+}
+
+type currentRegulatorPreferredRealizationRequest struct {
+	Calculation               currentRegulatorCalculationRequest
+	DividerUpperResistanceOhm float64
+	DividerLowerResistanceOhm float64
+	ReferenceVoltageV         float64
+	ReferenceMinimumV         float64
+	ReferenceMaximumV         float64
+	ParallelResistanceOhm     float64
+	TemperatureDeltaC         float64
+}
+
+type currentRegulatorPreferredRealization struct {
+	Calculation               CalculationEvidence
+	SetResistanceOhm          float64
+	DividerUpperResistanceOhm float64
+	OutputResistanceOhm       float64
+	OutputTrimResistanceOhm   float64
+	SetVoltageNominalV        float64
+	SetVoltageMinimumV        float64
+	SetVoltageMaximumV        float64
+	DesignCurrentA            float64
+}
+
+func (provider *CatalogProvider) realizeCurrentRegulatorPreferredValues(ctx context.Context, request currentRegulatorPreferredRealizationRequest) (currentRegulatorPreferredRealization, error) {
+	base := request.Calculation
+	setCandidates := []float64{base.SetResistanceOhm}
+	if !base.PrecisionMode {
+		var err error
+		setCandidates, err = provider.preferredResistanceCandidates(
+			ctx, base.SetResistanceOhm, currentRegulatorPassiveTolerance, currentRegulatorPassiveTempcoPPMPerC, DefaultMaxValueCandidates,
+		)
+		if err != nil {
+			return currentRegulatorPreferredRealization{}, fmt.Errorf("constant-current SET resistor realization failed: %w", err)
+		}
+		offsetNominal := (base.OffsetVoltageMinimumV + base.OffsetVoltageMaximumV) / 2
+		idealOutputResistance := (base.SetVoltageNominalV + offsetNominal) / (base.DesignCurrentA - base.ReferenceCurrentA)
+		outputCandidates, outputErr := provider.preferredResistanceCandidates(
+			ctx, idealOutputResistance, currentRegulatorPassiveTolerance, currentRegulatorPassiveTempcoPPMPerC, DefaultMaxValueCandidates,
+		)
+		if outputErr == nil && len(outputCandidates) > 0 && outputCandidates[0] > idealOutputResistance {
+			neededSetResistance := ((base.DesignCurrentA-base.ReferenceCurrentA)*outputCandidates[0] - offsetNominal) / base.ReferenceCurrentA
+			if finitePositive(neededSetResistance) {
+				accessCandidates, accessErr := provider.preferredResistanceCandidates(
+					ctx, neededSetResistance, currentRegulatorPassiveTolerance, currentRegulatorPassiveTempcoPPMPerC, DefaultMaxValueCandidates,
+				)
+				if accessErr == nil {
+					seen := make(map[float64]bool, len(setCandidates)+len(accessCandidates))
+					for _, candidate := range setCandidates {
+						seen[candidate] = true
+					}
+					for _, candidate := range accessCandidates {
+						if !seen[candidate] {
+							setCandidates = append(setCandidates, candidate)
+							seen[candidate] = true
+						}
+					}
+				}
+			}
+		}
+	}
+	dividerCandidates := []float64{request.DividerUpperResistanceOhm}
+	if request.DividerUpperResistanceOhm > 0 {
+		var err error
+		dividerCandidates, err = provider.preferredResistanceCandidates(
+			ctx, request.DividerUpperResistanceOhm, currentRegulatorPassiveTolerance, currentRegulatorPassiveTempcoPPMPerC, DefaultMaxValueCandidates,
+		)
+		if err != nil {
+			return currentRegulatorPreferredRealization{}, fmt.Errorf("constant-current divider realization failed: %w", err)
+		}
+	}
+	offsetNominal := (base.OffsetVoltageMinimumV + base.OffsetVoltageMaximumV) / 2
+	evaluated := 0
+	var firstErr error
+	var lastErr error
+	for _, setResistance := range setCandidates {
+		for _, dividerUpper := range dividerCandidates {
+			candidate := base
+			candidate.SelectedValues = nil
+			if !candidate.PrecisionMode {
+				setPart, selectErr := provider.selectComponentWithTolerance(
+					ctx, "resistor", "resistance", engineeringValue(setResistance, "Ohm"),
+					"resistance", currentRegulatorPassiveTolerance, "%", currentRegulatorPassiveTempcoPPMPerC,
+				)
+				if selectErr != nil {
+					continue
+				}
+				setTolerance, toleranceOK := catalogResistorEffectiveTolerance(setPart.record, request.TemperatureDeltaC)
+				if !toleranceOK {
+					continue
+				}
+				candidate.SetTolerancePercent = setTolerance
+				candidate.SetResistanceOhm = setResistance
+				candidate.SetVoltageNominalV = candidate.ReferenceCurrentA * setResistance
+				candidate.SetVoltageMinimumV = candidate.ReferenceCurrentMinimumA * setResistance * (1 - setTolerance/100)
+				candidate.SetVoltageMaximumV = candidate.ReferenceCurrentMaximumA * setResistance * (1 + setTolerance/100)
+				candidate.SelectedValues = append(candidate.SelectedValues, SelectedValueEvidence{
+					Name: "set_program_resistance", Ideal: base.SetResistanceOhm, Selected: setResistance, Unit: "Ohm",
+					Series: SeriesE192, TolerancePercent: setTolerance,
+					RelativeError: quantize(math.Abs(setResistance-base.SetResistanceOhm) / base.SetResistanceOhm),
+				})
+			} else if dividerUpper > 0 {
+				denominator := 1/dividerUpper + 1/request.DividerLowerResistanceOhm
+				if !finitePositive(denominator) {
+					continue
+				}
+				upperPart, upperErr := provider.selectComponentWithTolerance(
+					ctx, "resistor", "resistance", engineeringValue(dividerUpper, "Ohm"),
+					"resistance", currentRegulatorPassiveTolerance, "%", currentRegulatorPassiveTempcoPPMPerC,
+				)
+				lowerPart, lowerErr := provider.selectComponentWithTolerance(
+					ctx, "resistor", "resistance", engineeringValue(request.DividerLowerResistanceOhm, "Ohm"),
+					"resistance", currentRegulatorPassiveTolerance, "%", currentRegulatorPassiveTempcoPPMPerC,
+				)
+				upperTolerance, upperToleranceOK := catalogResistorEffectiveTolerance(upperPart.record, request.TemperatureDeltaC)
+				lowerTolerance, lowerToleranceOK := catalogResistorEffectiveTolerance(lowerPart.record, request.TemperatureDeltaC)
+				if upperErr != nil || lowerErr != nil || !upperToleranceOK || !lowerToleranceOK {
+					continue
+				}
+				setTolerance := math.Max(upperTolerance, lowerTolerance)
+				candidate.SetTolerancePercent = setTolerance
+				candidate.SetVoltageNominalV = (request.ReferenceVoltageV/dividerUpper + candidate.ReferenceCurrentA) / denominator
+				boundsRequest := lowHeadroomSetpointRequest{
+					ReferenceCurrentMinimumA: candidate.ReferenceCurrentMinimumA,
+					ReferenceCurrentMaximumA: candidate.ReferenceCurrentMaximumA,
+					ReferenceMinimumV:        request.ReferenceMinimumV,
+					ReferenceMaximumV:        request.ReferenceMaximumV,
+					PassiveTolerancePercent:  setTolerance,
+				}
+				candidate.SetVoltageMinimumV, candidate.SetVoltageMaximumV = precisionDividerSetpointBounds(boundsRequest, dividerUpper)
+				candidate.SelectedValues = append(candidate.SelectedValues,
+					SelectedValueEvidence{
+						Name: "set_divider_upper_resistance", Ideal: request.DividerUpperResistanceOhm, Selected: dividerUpper, Unit: "Ohm",
+						Series: SeriesE192, TolerancePercent: upperTolerance,
+						RelativeError: quantize(math.Abs(dividerUpper-request.DividerUpperResistanceOhm) / request.DividerUpperResistanceOhm),
+					},
+					SelectedValueEvidence{
+						Name: "set_divider_lower_resistance", Ideal: request.DividerLowerResistanceOhm, Selected: request.DividerLowerResistanceOhm, Unit: "Ohm",
+						Series: SeriesE192, TolerancePercent: lowerTolerance,
+					},
+				)
+			}
+			if request.ParallelResistanceOhm > 0 {
+				biasPart, biasErr := provider.selectComponentWithTolerance(
+					ctx, "resistor", "resistance", engineeringValue(request.ParallelResistanceOhm, "Ohm"),
+					"resistance", currentRegulatorPassiveTolerance, "%", currentRegulatorPassiveTempcoPPMPerC,
+				)
+				biasTolerance, biasToleranceOK := catalogResistorEffectiveTolerance(biasPart.record, request.TemperatureDeltaC)
+				if biasErr != nil || !biasToleranceOK {
+					continue
+				}
+				candidate.SelectedValues = append(candidate.SelectedValues, SelectedValueEvidence{
+					Name: "reference_bias_resistance", Ideal: request.ParallelResistanceOhm, Selected: request.ParallelResistanceOhm, Unit: "Ohm",
+					Series: SeriesE192, TolerancePercent: biasTolerance,
+				})
+			}
+			idealOutputResistance := (candidate.SetVoltageNominalV + offsetNominal) / (base.DesignCurrentA - candidate.ReferenceCurrentA)
+			if !finitePositive(idealOutputResistance) {
+				continue
+			}
+			outputCandidates, err := provider.preferredResistanceCandidates(
+				ctx, idealOutputResistance, currentRegulatorPassiveTolerance, currentRegulatorPassiveTempcoPPMPerC, DefaultMaxValueCandidates,
+			)
+			if err != nil {
+				lastErr = err
+				continue
+			}
+			evaluateOutput := func(outputResistance, outputTrimResistance float64) (currentRegulatorPreferredRealization, bool) {
+				trial := candidate
+				outputPart, selectErr := provider.selectComponentWithTolerance(
+					ctx, "resistor", "resistance", engineeringValue(outputResistance, "Ohm"),
+					"resistance", currentRegulatorPassiveTolerance, "%", currentRegulatorPassiveTempcoPPMPerC,
+				)
+				if selectErr != nil {
+					return currentRegulatorPreferredRealization{}, false
+				}
+				outputTolerance, toleranceOK := catalogResistorEffectiveTolerance(outputPart.record, request.TemperatureDeltaC)
+				if !toleranceOK {
+					return currentRegulatorPreferredRealization{}, false
+				}
+				totalOutputResistance := outputResistance
+				selectedValues := []SelectedValueEvidence{{
+					Name: "output_program_resistance", Ideal: idealOutputResistance, Selected: outputResistance, Unit: "Ohm",
+					Series: SeriesE192, TolerancePercent: outputTolerance,
+					RelativeError: quantize(math.Abs(outputResistance-idealOutputResistance) / idealOutputResistance),
+				}}
+				if outputTrimResistance > 0 {
+					trimPart, trimErr := provider.selectComponentWithTolerance(
+						ctx, "resistor", "resistance", engineeringValue(outputTrimResistance, "Ohm"),
+						"resistance", currentRegulatorPassiveTolerance, "%", currentRegulatorPassiveTempcoPPMPerC,
+					)
+					if trimErr != nil {
+						return currentRegulatorPreferredRealization{}, false
+					}
+					trimTolerance, trimToleranceOK := catalogResistorEffectiveTolerance(trimPart.record, request.TemperatureDeltaC)
+					if !trimToleranceOK {
+						return currentRegulatorPreferredRealization{}, false
+					}
+					totalOutputResistance += outputTrimResistance
+					outputTolerance = (outputResistance*outputTolerance + outputTrimResistance*trimTolerance) / totalOutputResistance
+					selectedValues = append(selectedValues, SelectedValueEvidence{
+						Name: "output_program_trim_resistance", Ideal: idealOutputResistance - outputResistance,
+						Selected: outputTrimResistance, Unit: "Ohm", Series: SeriesE192, TolerancePercent: trimTolerance,
+						RelativeError: quantize(math.Abs(totalOutputResistance-idealOutputResistance) / idealOutputResistance),
+					})
+				}
+				trial.OutputTolerancePercent = outputTolerance
+				trial.OutputResistanceOhm = totalOutputResistance
+				trial.DesignCurrentA = (trial.SetVoltageNominalV+offsetNominal)/totalOutputResistance +
+					trial.ReferenceCurrentA + (trial.ParallelOutputCurrentMinimumA+trial.ParallelOutputCurrentMaximumA)/2
+				trial.SelectedValues = append(slices.Clone(candidate.SelectedValues), selectedValues...)
+				calculation, err := currentRegulatorCalculation(trial)
+				evaluated++
+				if err != nil || !calculation.Pass {
+					if err != nil {
+						lastErr = fmt.Errorf(
+							"SET %.12g Ohm, divider %.12g Ohm, output %.12g+%.12g Ohm: %w",
+							setResistance, dividerUpper, outputResistance, outputTrimResistance, err,
+						)
+						if firstErr == nil {
+							firstErr = lastErr
+						}
+					}
+					return currentRegulatorPreferredRealization{}, false
+				}
+				return currentRegulatorPreferredRealization{
+					Calculation: calculation, SetResistanceOhm: trial.SetResistanceOhm,
+					DividerUpperResistanceOhm: dividerUpper, OutputResistanceOhm: outputResistance,
+					OutputTrimResistanceOhm: outputTrimResistance,
+					SetVoltageNominalV:      trial.SetVoltageNominalV, SetVoltageMinimumV: trial.SetVoltageMinimumV,
+					SetVoltageMaximumV: trial.SetVoltageMaximumV, DesignCurrentA: trial.DesignCurrentA,
+				}, true
+			}
+			for _, outputResistance := range outputCandidates {
+				if realization, ok := evaluateOutput(outputResistance, 0); ok {
+					return realization, nil
+				}
+			}
+			for _, outputResistance := range outputCandidates {
+				remainingResistance := idealOutputResistance - outputResistance
+				if !finitePositive(remainingResistance) {
+					continue
+				}
+				trimCandidates, trimErr := provider.preferredResistanceCandidates(
+					ctx, remainingResistance, currentRegulatorPassiveTolerance, currentRegulatorPassiveTempcoPPMPerC, DefaultMaxValueCandidates,
+				)
+				if trimErr != nil {
+					lastErr = trimErr
+					continue
+				}
+				for _, outputTrimResistance := range trimCandidates {
+					if realization, ok := evaluateOutput(outputResistance, outputTrimResistance); ok {
+						return realization, nil
+					}
+				}
+			}
+		}
+	}
+	return currentRegulatorPreferredRealization{}, fmt.Errorf(
+		"constant-current envelope has no catalog-realizable preferred-value solution within tolerance and compliance headroom after %d candidates (first rejection: %v; last rejection: %v)",
+		evaluated, firstErr, lastErr,
+	)
 }
 
 type directCurrentSetpointRequest struct {
@@ -693,7 +1082,16 @@ func currentRegulatorCalculation(request currentRegulatorCalculationRequest) (Ca
 	if request.PassiveTolerancePercent <= 0 {
 		request.PassiveTolerancePercent = currentRegulatorPassiveTolerance
 	}
-	passiveTolerance := request.PassiveTolerancePercent / 100
+	setTolerance := request.SetTolerancePercent
+	if setTolerance <= 0 {
+		setTolerance = request.PassiveTolerancePercent
+	}
+	outputTolerance := request.OutputTolerancePercent
+	if outputTolerance <= 0 {
+		outputTolerance = request.PassiveTolerancePercent
+	}
+	setTolerance /= 100
+	outputTolerance /= 100
 	referenceMinimum := request.ReferenceCurrentMinimumA
 	referenceMaximum := request.ReferenceCurrentMaximumA
 	if referenceMinimum <= 0 || referenceMaximum < referenceMinimum {
@@ -703,8 +1101,8 @@ func currentRegulatorCalculation(request currentRegulatorCalculationRequest) (Ca
 	var corners []CornerEvidence
 	for _, referenceCurrent := range []float64{referenceMinimum, referenceMaximum} {
 		for _, offset := range []float64{request.OffsetVoltageMinimumV, request.OffsetVoltageMaximumV} {
-			for _, setScale := range []float64{1 - passiveTolerance, 1 + passiveTolerance} {
-				for _, outputScale := range []float64{1 - passiveTolerance, 1 + passiveTolerance} {
+			for _, setScale := range []float64{1 - setTolerance, 1 + setTolerance} {
+				for _, outputScale := range []float64{1 - outputTolerance, 1 + outputTolerance} {
 					setVoltage := request.SetVoltageNominalV
 					if request.PrecisionMode {
 						if setScale < 1 {
@@ -734,7 +1132,7 @@ func currentRegulatorCalculation(request currentRegulatorCalculationRequest) (Ca
 		}
 	}
 	leakageUncertainty := (request.InputMaximumV + request.ComplianceV) / currentRegulatorLeakageOhm
-	outputMinimum -= leakageUncertainty
+	outputMinimum += request.ParallelOutputCurrentMinimumA - leakageUncertainty
 	outputMaximum += leakageUncertainty + request.ParallelOutputCurrentMaximumA
 	requiredMinimum := request.CurrentA * (1 - request.TolerancePercent/100)
 	requiredMaximum := request.CurrentA * (1 + request.TolerancePercent/100)
@@ -757,8 +1155,10 @@ func currentRegulatorCalculation(request currentRegulatorCalculationRequest) (Ca
 			{Name: "minimum_input_voltage", Value: request.InputMinimumV, Unit: "V"},
 			{Name: "minimum_compliance_voltage", Value: request.ComplianceV, Unit: "V"},
 			{Name: "nominal_set_voltage", Value: request.SetVoltageNominalV, Unit: "V"},
+			{Name: "set_program_resistance", Value: request.SetResistanceOhm, Unit: "Ohm"},
 			{Name: "output_program_resistance", Value: request.OutputResistanceOhm, Unit: "Ohm"},
 		},
+		SelectedValues: request.SelectedValues,
 		NominalOutputs: []NamedQuantity{{Name: "output_current", Value: request.DesignCurrentA, Unit: "A"}, {Name: "compliance_headroom", Value: headroom, Unit: "V"}},
 		Corners:        corners, Bounds: bounds, CornerEvaluations: len(corners), WorstMargin: worstMargin, Pass: pass,
 	}
@@ -802,6 +1202,20 @@ func catalogSimulationParameterForModel(record components.ComponentRecord, model
 		}
 		for _, parameter := range model.Parameters {
 			if parameter.Name == name && finitePositive(parameter.Value) {
+				return parameter.Value, true
+			}
+		}
+	}
+	return 0, false
+}
+
+func catalogSimulationParameterForModelNonNegative(record components.ComponentRecord, modelID, name string) (float64, bool) {
+	for _, model := range record.SimulationModels {
+		if model.ModelID != modelID {
+			continue
+		}
+		for _, parameter := range model.Parameters {
+			if parameter.Name == name && parameter.Value >= 0 && finiteNumbers(parameter.Value) {
 				return parameter.Value, true
 			}
 		}

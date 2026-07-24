@@ -169,6 +169,32 @@ the installed-KiCad ERC, strict DRC, route/connectivity, writer, and zero-diff
 round-trip gates. This is verified-record MCU synthesis, not unrestricted
 ESP32-family or arbitrary-device support.
 
+### Held-Out Capability Expansion
+
+A frozen twelve-case benchmark now measures behavior-only circuit requirements
+across analog, power, digital, MCU, sensor, and mixed-signal domains. Inputs
+contain no topology, components, nets, pins, coordinates, layers, or routes.
+The initial installed-KiCad baseline passed 5/12 cases and ranked unsupported
+families before production changes.
+
+The final report passes 11/12 with the same evaluator and gate profile.
+Constant-current regulation now passes in power-output, MCU-peripheral, and
+sensor-excitation contexts. Precision rectification passes alone and composed
+with ADC acquisition. Every control case passes. Each passing row includes
+trusted simulation, deterministic architecture/component evidence, complete
+physical routing/connectivity, writer correctness, clean ERC, strict DRC,
+zero-difference round trip, and byte-identical replay.
+
+The one remaining row, standalone digital clock generation, fails closed at
+architecture selection as capability `clock_generation`. The
+[baseline](../specs/held-out-capability-expansion/BASELINE_REPORT.json) and
+[final report](../specs/held-out-capability-expansion/FINAL_REPORT.json) are
+checksum-pinned. The five newly promoted cases are also bound into a
+clean-checkout
+[promotion matrix](../specs/held-out-capability-expansion/PROMOTION_MATRIX.json).
+This is measurable progress across two electrically distinct families, not
+evidence that an arbitrary requested circuit can be generated.
+
 ### Schematic Readability
 
 Generated schematics use deterministic role, stage, and lane classification;

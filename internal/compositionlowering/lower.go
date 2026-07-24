@@ -310,7 +310,14 @@ func contractInterfaceRole(contract architecturesearch.PortContract) circuitgrap
 			return circuitgraph.InterfacePowerOutput
 		}
 		return circuitgraph.InterfacePowerInput
-	case "analog_voltage", "analog_control":
+	case "switched_load":
+		// A switched-load terminal is an actuator output even when its
+		// electrical direction says that the board sinks current. Modeling it
+		// as a digital input would incorrectly drive the terminal from its
+		// voltage domain instead of letting the operating harness attach the
+		// external load.
+		return circuitgraph.InterfacePowerOutput
+	case "analog_voltage", "differential_analog", "analog_current", "analog_control":
 		if contract.Direction == "source" {
 			return circuitgraph.InterfaceAnalogOut
 		}
@@ -486,7 +493,9 @@ func interfaceRole(port architecturesearch.Port) circuitgraph.InterfaceRole {
 			return circuitgraph.InterfacePowerOutput
 		}
 		return circuitgraph.InterfacePowerInput
-	case "analog_voltage":
+	case "switched_load":
+		return circuitgraph.InterfacePowerOutput
+	case "analog_voltage", "differential_analog", "analog_current", "analog_control":
 		if port.Direction == "source" {
 			return circuitgraph.InterfaceAnalogOut
 		}

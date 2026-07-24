@@ -590,7 +590,7 @@ func validateProviderExpansion(obligation searchObligation, descriptor ProviderD
 	if !validEvidenceConfidence(expansion.Evidence.Confidence) || confidenceRank(expansion.Evidence.Confidence) < confidenceRank(EvidenceRuleInferred) {
 		rejections = append(rejections, ExpansionRejection{Code: CodeEvidenceInsufficient, Path: obligation.Path + ".evidence", Message: "expansion evidence is below rule_inferred"})
 	}
-	if expansion.Metrics.UnprovenNonSafety < 0 || !validOptionalNonnegative(expansion.Metrics.QuiescentPowerW) || !validOptionalNonnegative(expansion.Metrics.AreaMM2) || !validOptionalFinite(expansion.Metrics.WorstMargin) {
+	if expansion.Metrics.UnprovenNonSafety < 0 || expansion.Metrics.CatalogSubstitutions < 0 || !validOptionalNonnegative(expansion.Metrics.QuiescentPowerW) || !validOptionalNonnegative(expansion.Metrics.AreaMM2) || !validOptionalFinite(expansion.Metrics.WorstMargin) {
 		rejections = append(rejections, ExpansionRejection{Code: CodeProviderExpansionInvalid, Path: obligation.Path + ".metrics", Message: "expansion metrics are non-finite or invalid"})
 	}
 	if expansion.Metrics.WorstMargin != nil && *expansion.Metrics.WorstMargin < 0 {
@@ -810,6 +810,7 @@ func candidateFromState(state searchState, requirement Requirement) (CandidateRe
 	var marginKnown, powerKnown, areaKnown bool
 	for _, selection := range selections {
 		score.UnprovenNonSafety += selection.Metrics.UnprovenNonSafety
+		score.CatalogSubstitutions += selection.Metrics.CatalogSubstitutions
 		score.ComponentCount += len(selection.Components)
 		score.FragmentCount++
 		if rank := confidenceRank(selection.Evidence.Confidence); rank < score.EvidenceRank {
@@ -1320,6 +1321,9 @@ func firstScoreDifference(selected, alternative CandidateScore) (string, string)
 	if compareOptionalAscending(selected.AreaMM2, alternative.AreaMM2) != 0 {
 		return "area_mm2", fmt.Sprintf("selected area %s ranks ahead of %s", optionalFloatText(selected.AreaMM2), optionalFloatText(alternative.AreaMM2))
 	}
+	if selected.CatalogSubstitutions != alternative.CatalogSubstitutions {
+		return "catalog_substitutions", fmt.Sprintf("selected uses %d catalog substitutions versus %d", selected.CatalogSubstitutions, alternative.CatalogSubstitutions)
+	}
 	return "fingerprint", "all substantive score fields tie; canonical architecture fingerprint is the deterministic tie-breaker"
 }
 
@@ -1353,6 +1357,9 @@ func compareCandidateScores(left, right CandidateScore, includeFingerprint bool)
 		return order
 	}
 	if includeFingerprint {
+		if order := left.CatalogSubstitutions - right.CatalogSubstitutions; order != 0 {
+			return order
+		}
 		return strings.Compare(left.Fingerprint, right.Fingerprint)
 	}
 	return 0

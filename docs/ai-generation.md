@@ -725,6 +725,31 @@ complete installed-KiCad promotion lane. Missing safety-relevant evidence and
 incompatible constraints produce stable capability gaps instead of guessed
 values or topology.
 
+A frozen twelve-case benchmark now measures behavior-only requirements across
+analog, power, digital, MCU, sensor, and mixed-signal domains. Its requests
+contain no topology, component, net, pin, coordinate, route, provider, or
+expected-result instructions. The untouched installed-KiCad baseline passed
+5/12 cases; the final report passes 11/12 with the same evaluator and unchanged
+gate profile.
+
+Reusable constant-current regulation passes as a bounded power output,
+MCU-controlled peripheral, and sensor excitation. Precision rectification
+passes alone and as the front end of a mixed-signal acquisition chain. Every
+control case passes. Each pass requires trusted all-corner simulation,
+deterministic architecture and component evidence, complete
+routing/connectivity, writer correctness, clean ERC, strict DRC, zero
+normalized round-trip differences, and byte-identical replay. Standalone clock
+generation is the sole remaining benchmark blocker and fails closed at
+architecture selection as capability `clock_generation`.
+
+The [specification](../specs/held-out-capability-expansion/SPEC.md),
+[baseline](../specs/held-out-capability-expansion/BASELINE_REPORT.json), and
+[final report](../specs/held-out-capability-expansion/FINAL_REPORT.json) define
+the measured envelope. Run `make held-out-promotion-bundle` from an unmodified
+checkout to reproduce the five newly promoted cases. This demonstrates
+reusable progress across two electrically distinct families, not arbitrary
+circuit generation.
+
 The generic contract removes the architectural requirement for one provider
 schema per topology and its function form removes the requirement for the AI to
 enumerate pins, support components, or physical implementation details. It does

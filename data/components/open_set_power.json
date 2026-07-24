@@ -872,7 +872,9 @@
       "tags": ["adjustable", "industrial_temperature", "linear_regulator", "positive", "to220"],
       "values": [
         {"kind": "reference_voltage", "typ": "1.25", "unit": "V"},
-        {"kind": "output_voltage", "min": "1.25", "max": "37", "unit": "V"}
+        {"kind": "output_voltage", "min": "1.25", "max": "37", "unit": "V"},
+        {"kind": "minimum_load_current", "max": "0.01", "unit": "A"},
+        {"kind": "adjustment_pin_current", "typ": "0.00005", "max": "0.0001", "unit": "A"}
       ],
       "ratings": [
         {"kind": "input_voltage", "max": "40", "unit": "V"},
@@ -931,7 +933,9 @@
       "tags": ["adjustable", "linear_regulator", "positive", "to220"],
       "values": [
         {"kind": "reference_voltage", "typ": "1.25", "unit": "V"},
-        {"kind": "output_voltage", "min": "1.25", "max": "37", "unit": "V"}
+        {"kind": "output_voltage", "min": "1.25", "max": "37", "unit": "V"},
+        {"kind": "minimum_load_current", "max": "0.01", "unit": "A"},
+        {"kind": "adjustment_pin_current", "typ": "0.00005", "max": "0.0001", "unit": "A"}
       ],
       "ratings": [
         {"kind": "input_voltage", "max": "40", "unit": "V"},
@@ -1192,6 +1196,105 @@
           "The trusted model deliberately uses the full-temperature 9.8 uA to 10.2 uA SET-current range and the 1.65 V maximum 200 mA dropout bound."
         ],
         "tests": ["catalog_lt3092_current_regulator_evidence"]
+      }
+    },
+    {
+      "id": "voltage_reference.analog_devices.max6006aeur_1v25.sot23",
+      "family": "voltage_reference",
+      "name": "Analog Devices MAX6006AEUR+T 1.25 V nanopower shunt reference",
+      "description": "Industrial-temperature 1.25 V nanopower shunt reference for low-burden floating set-point generation.",
+      "generic": false,
+      "manufacturer": "Analog Devices",
+      "mpn": "MAX6006AEUR+T",
+      "lifecycle": "active",
+      "tags": ["1v25", "industrial_temperature", "precision", "nanopower", "shunt_reference", "sot23"],
+      "values": [
+        {"kind": "output_voltage", "min": "1.24525", "typ": "1.25", "max": "1.25475", "unit": "V"},
+        {"kind": "minimum_bias_current", "max": "1", "unit": "uA"},
+        {"kind": "temperature_coefficient", "max": "30", "unit": "ppm/C"}
+      ],
+      "ratings": [
+        {"kind": "bias_current", "min": "1", "max": "2000", "unit": "uA"},
+        {"kind": "reverse_voltage", "max": "12.6", "unit": "V"}
+      ],
+      "temperature": {"min": "-40", "max": "85", "unit": "C"},
+      "thermal_evidence": {
+        "max_junction_temperature_c": 85,
+        "junction_to_ambient_c_per_w": 274.23,
+        "mounting_assumptions": "JEDEC JESD51-7 multilayer-board SOT-23 thermal characterization.",
+        "review_note": "The reference dissipates only its solved shunt voltage times bias current in this topology."
+      },
+      "simulation_models": [{
+        "model_id": "mna_shunt_voltage_reference_v1",
+        "parameters": [
+          {"name": "output_voltage_v", "value": 1.25},
+          {"name": "min_bias_current_a", "value": 0.000001},
+          {"name": "max_bias_current_a", "value": 0.002},
+          {"name": "max_reverse_voltage_v", "value": 12.6},
+          {"name": "max_temperature_c", "value": 85},
+          {"name": "junction_to_ambient_c_per_w", "value": 274.23}
+        ],
+        "uncertainties": [{
+          "target": "model_parameters.output_voltage_v",
+          "source": "analog_devices:max6006a:initial_accuracy_and_30ppm_per_c_full_range_drift",
+          "nominal": 1.25,
+          "minimum": 1.24525,
+          "maximum": 1.25475
+        }]
+      }],
+      "symbols": [{
+        "symbol_id": "Device:D_Zener",
+        "function_pins": [
+          {"function": "CATHODE", "symbol_pin": "1", "electrical": "power_out", "required": true},
+          {"function": "ANODE", "symbol_pin": "2", "electrical": "power_in", "required": true}
+        ],
+        "verification": {
+          "confidence": "verified",
+          "sources": [
+            "https://www.analog.com/media/en/technical-documentation/data-sheets/MAX6006A-MAX6009B.pdf",
+            "kicad-symbols:Device:D_Zener"
+          ],
+          "pinmap_checked": true
+        }
+      }],
+      "packages": [{
+        "id": "sot23",
+        "name": "SOT-23",
+        "footprint_id": "Package_TO_SOT_SMD:SOT-23",
+        "package_type": "sot23",
+        "mpn": "MAX6006AEUR+T",
+        "lifecycle": "active",
+        "pinmap_id": "Device:D_Zener|Package_TO_SOT_SMD:SOT-23",
+        "pad_functions": [
+          {"function": "CATHODE", "pad": "1"},
+          {"function": "ANODE", "pad": "2"},
+          {"function": "IC", "pad": "3"}
+        ],
+        "dimensions_mm": {"width": 2.92, "height": 1.30},
+        "height_mm": 1.12,
+        "verification": {
+          "confidence": "verified",
+          "sources": [
+            "https://www.analog.com/media/en/technical-documentation/data-sheets/MAX6006A-MAX6009B.pdf",
+            "kicad-footprint:Package_TO_SOT_SMD:SOT-23"
+          ],
+          "pinmap_checked": true
+        }
+      }],
+      "verification": {
+        "confidence": "verified",
+        "sources": [
+          "https://www.analog.com/media/en/technical-documentation/data-sheets/MAX6006A-MAX6009B.pdf",
+          "analog_devices:max6006a:sot23_pin_configuration",
+          "kicad-footprint:Package_TO_SOT_SMD:SOT-23"
+        ],
+        "resolver_checked": true,
+        "pinmap_checked": true,
+        "notes": [
+          "The output-voltage uncertainty combines the 0.2% initial limit with 30 ppm/C over the full -40 C to 85 C rated range.",
+          "SOT-23 pin 3 is an internally connected test point that the datasheet permits leaving unconnected."
+        ],
+        "tests": ["catalog_max6006_nanopower_shunt_reference_evidence"]
       }
     },
     {

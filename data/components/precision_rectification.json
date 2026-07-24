@@ -1,0 +1,109 @@
+{
+  "version": "0.1.0",
+  "records": [
+    {
+      "id": "regulator.ti.lm7705mme.vssop8",
+      "family": "regulator",
+      "name": "TI LM7705 low-noise negative bias generator VSSOP-8",
+      "description": "Regulated -0.232 V switched-capacitor bias generator for extending a low-voltage amplifier below ground without a separate negative supply.",
+      "generic": false,
+      "manufacturer": "Texas Instruments",
+      "mpn": "LM7705MME/NOPB",
+      "lifecycle": "active",
+      "tags": ["analog", "charge_pump", "negative_bias", "true_zero", "vssop8"],
+      "ratings": [
+        {"kind": "supply_voltage", "min": "3", "max": "5.25", "unit": "V"},
+        {"kind": "output_current", "max": "0.026", "unit": "A"},
+        {"kind": "supply_current", "max": "0.0002", "unit": "A"}
+      ],
+      "temperature": {"min": "-40", "max": "125", "unit": "C"},
+      "values": [
+        {"kind": "output_voltage", "typ": "-0.232", "min": "-0.2436", "max": "-0.2204", "unit": "V"},
+        {"kind": "output_ripple", "max": "0.004", "unit": "V_pp"},
+        {"kind": "turn_on_time", "max": "0.0005", "unit": "s"}
+      ],
+      "simulation_models": [
+        {
+          "model_id": "mna_floating_adjustable_regulator_v1",
+          "parameters": [
+            {"name": "reference_voltage_v", "value": 0.232},
+            {"name": "polarity", "value": -1},
+            {"name": "min_headroom_v", "value": 3},
+            {"name": "max_load_current_a", "value": 0.026},
+            {"name": "max_input_output_voltage_v", "value": 5.75},
+            {"name": "adjustment_pin_current_a", "value": 0},
+            {"name": "soft_start_time_s", "value": 0.0005},
+            {"name": "max_temperature_c", "value": 150},
+            {"name": "junction_to_ambient_c_per_w", "value": 194.6}
+          ]
+        }
+      ],
+      "placement_hints": [
+        {"kind": "near", "target": "charge_pump_support_capacitors", "value": "3", "unit": "mm"}
+      ],
+      "symbols": [
+        {
+          "symbol_id": "Regulator_SwitchedCapacitor:LM7705",
+          "function_pins": [
+            {"function": "CF_PLUS", "symbol_pin": "1", "required": true},
+            {"function": "ADJ", "symbol_pin": "2", "electrical": "power_in", "required": true, "aliases": ["VSS", "GND"]},
+            {"function": "ENABLE_N", "symbol_pin": "3", "electrical": "input", "required": true, "aliases": ["SD"]},
+            {"function": "VIN", "symbol_pin": "4", "electrical": "power_in", "required": true, "aliases": ["VDD"]},
+            {"function": "GROUND_SECONDARY", "symbol_pin": "5", "electrical": "power_in", "required": true, "aliases": ["VSS", "GND"]},
+            {"function": "VOUT", "symbol_pin": "6", "electrical": "power_out", "required": true},
+            {"function": "RESERVE", "symbol_pin": "7", "required": true, "aliases": ["CRES"]},
+            {"function": "CF_MINUS", "symbol_pin": "8", "required": true}
+          ],
+          "verification": {
+            "confidence": "verified",
+            "sources": ["https://www.ti.com/lit/ds/symlink/lm7705.pdf", "kicad-symbols:Regulator_SwitchedCapacitor:LM7705"],
+            "pinmap_checked": true
+          }
+        }
+      ],
+      "packages": [
+        {
+          "id": "vssop8",
+          "name": "VSSOP-8 3 x 3 mm P0.65 mm",
+          "footprint_id": "Package_SO:VSSOP-8_3x3mm_P0.65mm",
+          "package_type": "vssop8",
+          "mpn": "LM7705MME/NOPB",
+          "lifecycle": "active",
+          "pinmap_id": "Regulator_SwitchedCapacitor:LM7705|Package_SO:VSSOP-8_3x3mm_P0.65mm",
+          "pad_functions": [
+            {"function": "CF_PLUS", "pad": "1"},
+            {"function": "ADJ", "pad": "2", "aliases": ["VSS", "GND"]},
+            {"function": "ENABLE_N", "pad": "3", "aliases": ["SD"]},
+            {"function": "VIN", "pad": "4", "aliases": ["VDD"]},
+            {"function": "GROUND_SECONDARY", "pad": "5", "aliases": ["VSS", "GND"]},
+            {"function": "VOUT", "pad": "6"},
+            {"function": "RESERVE", "pad": "7", "aliases": ["CRES"]},
+            {"function": "CF_MINUS", "pad": "8"}
+          ],
+          "dimensions_mm": {"width": 4.9, "height": 3},
+          "height_mm": 1.1,
+          "verification": {
+            "confidence": "verified",
+            "sources": ["https://www.ti.com/lit/ds/symlink/lm7705.pdf", "kicad-footprint:Package_SO:VSSOP-8_3x3mm_P0.65mm"],
+            "pinmap_checked": true
+          }
+        }
+      ],
+      "verification": {
+        "confidence": "verified",
+        "sources": [
+          "https://www.ti.com/lit/ds/symlink/lm7705.pdf",
+          "https://www.ti.com/tool/CIRCUIT060058",
+          "kicad-symbols:Regulator_SwitchedCapacitor:LM7705",
+          "kicad-footprint:Package_SO:VSSOP-8_3x3mm_P0.65mm"
+        ],
+        "resolver_checked": true,
+        "pinmap_checked": true,
+        "tests": ["catalog_precision_rectifier_negative_bias_evidence"],
+        "notes": [
+          "The trusted floating-regulator primitive represents the reviewed regulated -0.232 V output, load limit, startup time, and bounded tolerance; it does not model switching ripple or internal charge-pump waveforms."
+        ]
+      }
+    }
+  ]
+}

@@ -138,17 +138,23 @@ func RouteRequestContext(ctx context.Context, request Request) Result {
 			if netFailed {
 				break
 			}
-			path, routeIssues := routePairPath(ctx, searchRequest, netAccess, occupancy, viaOccupancy, plan.Net.Name, pair)
+			pairAccess := filterPhysicalEndpointAccess(netAccess, searchRequest, plan.Net.Name, []Endpoint{pair.From, pair.To})
+			path, routeIssues := routePairPath(ctx, searchRequest, pairAccess, occupancy, viaOccupancy, plan.Net.Name, pair)
 			route.SearchNodes += path.SearchNodes
 			result.Metrics.SearchNodes += path.SearchNodes
 			if path.SearchLimitHit {
 				route.SearchLimitHit = true
 				result.Metrics.MaxSearchNodesHit = true
 			}
-			// A two-layer board can need the same deterministic pad-edge escape as
-			// a multilayer board when dense neighboring copper blocks the pad center.
-			if len(routeIssues) != 0 && len(routableLayerNames(searchRequest.Board.Layers)) >= 2 {
+			if len(routeIssues) == 0 {
+				netAccess = pairAccess
+			}
+			// Dense neighboring copper can block a pad center on any board.
+			// Retry from deterministic physical pad-edge access before changing
+			// width or declaring the endpoint inaccessible.
+			if len(routeIssues) != 0 {
 				edgeAccess := expandSMDPadEdgeAccess(netAccess, searchRequest, []Endpoint{pair.From, pair.To})
+				edgeAccess = filterPhysicalEndpointAccess(edgeAccess, searchRequest, plan.Net.Name, []Endpoint{pair.From, pair.To})
 				edgePath, edgeIssues := routePairPath(ctx, searchRequest, edgeAccess, occupancy, viaOccupancy, plan.Net.Name, pair)
 				route.SearchNodes += edgePath.SearchNodes
 				result.Metrics.SearchNodes += edgePath.SearchNodes
@@ -180,12 +186,14 @@ func RouteRequestContext(ctx context.Context, request Request) Result {
 						}
 					}
 					if fallbackReady {
-						fallbackPath, fallbackIssues := routePairPath(ctx, fallbackRequest, netAccess, fallbackOccupancy, fallbackViaOccupancy, plan.Net.Name, pair)
+						fallbackAccess := filterPhysicalEndpointAccess(netAccess, fallbackRequest, plan.Net.Name, []Endpoint{pair.From, pair.To})
+						fallbackPath, fallbackIssues := routePairPath(ctx, fallbackRequest, fallbackAccess, fallbackOccupancy, fallbackViaOccupancy, plan.Net.Name, pair)
 						route.SearchNodes += fallbackPath.SearchNodes
 						result.Metrics.SearchNodes += fallbackPath.SearchNodes
 						if len(fallbackIssues) == 0 {
 							path = fallbackPath
 							routeIssues = nil
+							netAccess = fallbackAccess
 							neckdownWidthMM = fallbackRequest.Rules.TraceWidthMM
 							neckdownLengthMM = pcbrules.DefaultPowerNeckdownLengthMM
 						}
@@ -383,9 +391,50 @@ func pruneConnectedSameLayerSegmentCycles(request Request, route Route, access P
 			}
 		}
 		if !removed {
+			return pruneRedundantSameLayerSegmentLeaves(request, route, access, segments)
+		}
+	}
+}
+
+func pruneRedundantSameLayerSegmentLeaves(request Request, route Route, access PadAccess, segments []Segment) []Segment {
+	for {
+		degrees := make(map[routeSegmentVertex]int, len(segments)*2)
+		for _, segment := range segments {
+			degrees[routeSegmentVertex{Layer: segment.Layer, XMM: segment.Start.XMM, YMM: segment.Start.YMM}]++
+			degrees[routeSegmentVertex{Layer: segment.Layer, XMM: segment.End.XMM, YMM: segment.End.YMM}]++
+		}
+		removed := false
+		for index := len(segments) - 1; index >= 0; index-- {
+			segment := segments[index]
+			start := routeSegmentVertex{Layer: segment.Layer, XMM: segment.Start.XMM, YMM: segment.Start.YMM}
+			end := routeSegmentVertex{Layer: segment.Layer, XMM: segment.End.XMM, YMM: segment.End.YMM}
+			startLeaf := degrees[start] == 1 && !routePointHasVia(route.Vias, segment.Start)
+			endLeaf := degrees[end] == 1 && !routePointHasVia(route.Vias, segment.End)
+			if !startLeaf && !endLeaf {
+				continue
+			}
+			candidateSegments := removeSegmentIndexes(segments, []int{index})
+			candidateRoute := route
+			candidateRoute.Segments = candidateSegments
+			if routeEndpointsConnected(request, candidateRoute, access) {
+				segments = candidateSegments
+				removed = true
+				break
+			}
+		}
+		if !removed {
 			return segments
 		}
 	}
+}
+
+func routePointHasVia(vias []Via, point Point) bool {
+	for _, via := range vias {
+		if roundPoint(via.At) == roundPoint(point) {
+			return true
+		}
+	}
+	return false
 }
 
 func sameLayerCycleClosingIndexes(segments []Segment) []int {
@@ -497,6 +546,55 @@ func expandSMDPadEdgeAccess(access PadAccess, request Request, endpoints []Endpo
 		}
 	}
 	return expanded
+}
+
+func filterPhysicalEndpointAccess(access PadAccess, request Request, netName string, endpoints []Endpoint) PadAccess {
+	filtered := clonePadAccessPoints(access)
+	for _, endpoint := range endpoints {
+		key := endpointKey(endpoint.Ref, endpoint.Pin)
+		points, ok := AccessPointsForEndpoint(filtered, endpoint)
+		if !ok {
+			continue
+		}
+		safe := make([]AccessPoint, 0, len(points))
+		for _, point := range points {
+			probe := Segment{
+				Net:     netName,
+				Layer:   point.Layer,
+				Start:   point.Point,
+				End:     accessSearchPoint(point),
+				WidthMM: request.Rules.TraceWidthMM,
+			}
+			clear := true
+			for _, component := range request.Components {
+				for _, pad := range component.Pads {
+					if sameOccupancyNet(pad.Net, netName) || !padAppliesToCopperLayer(pad, point.Layer, request.Board.Layers) {
+						continue
+					}
+					clearanceMM := request.Rules.ClearanceMM
+					if pad.Clearance != nil {
+						clearanceMM = max(clearanceMM, *pad.Clearance)
+					}
+					if segmentShapeDistance(probe, padRect(component, pad))-probe.WidthMM/2 < clearanceMM-distanceEpsilon {
+						clear = false
+						break
+					}
+				}
+				if !clear {
+					break
+				}
+			}
+			if clear {
+				safe = append(safe, point)
+			}
+		}
+		if len(safe) == 0 {
+			delete(filtered.AccessPoints, key)
+			continue
+		}
+		filtered.AccessPoints[key] = safe
+	}
+	return filtered
 }
 
 func pinPathEndpointAccess(access *PadAccess, path GridPath, endpoint Endpoint, pointIndex int) bool {

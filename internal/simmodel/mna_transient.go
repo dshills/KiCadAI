@@ -597,6 +597,7 @@ func prepareTransientBase(base *mnaSystem, template mnaSystem, plan Plan, analys
 			base.rhs[base.multiBranchIndex[mnaBranchKey{component: device.Component, terminal: "VOUT_MINUS"}]] += complex(negative, 0)
 		}
 	}
+	referenceUnobservedMNAComponents(plan, analysis, base)
 	if diagnostic := validateMNASystemBounds(*base); diagnostic != nil {
 		return comparatorStates, fixedOutputClamps, []Diagnostic{*diagnostic}
 	}

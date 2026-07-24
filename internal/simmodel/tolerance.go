@@ -10,16 +10,21 @@ import (
 )
 
 const (
-	maxWorstCaseUncertainties = 6
-	maxWorstCaseWorkers       = 8
+	// Full lower/upper enumeration is retained for compact plans. Larger
+	// verified circuits use deterministic one-at-a-time, pairwise-covering,
+	// and assertion-directed corners so analysis remains bounded without
+	// silently discarding independent catalog uncertainty.
+	maxExhaustiveWorstCaseGroups = 6
+	maxWorstCaseUncertainties    = 32
+	maxWorstCaseWorkers          = 8
 )
 
-// EvaluateWorstCase evaluates the nominal point, each one-at-a-time endpoint,
-// and the complete lower/upper corner set across independent uncertainty
-// groups. Catalog temperature ranges are one correlated environmental group,
-// even when many devices carry the same operating-temperature evidence. The
-// fixed enumeration makes the result reproducible and deliberately fails
-// closed before unbounded work.
+// EvaluateWorstCase evaluates the nominal point and each one-at-a-time
+// endpoint. Compact plans also receive complete lower/upper enumeration.
+// Larger plans receive a deterministic pairwise covering array followed by
+// assertion-directed aggregate corners inferred from the endpoint responses.
+// Catalog temperature ranges are one correlated environmental group, even
+// when many devices carry the same operating-temperature evidence.
 func EvaluateWorstCase(plan Plan) (Report, []Diagnostic) {
 	if diagnostics := validateUncertainties(plan.Uncertainties); len(diagnostics) != 0 {
 		report, _ := evaluateNominal(planWithoutUncertainties(plan))
@@ -43,6 +48,31 @@ func EvaluateWorstCase(plan Plan) (Report, []Diagnostic) {
 			return report, append([]Diagnostic{{Path: "worst_case", Message: "corner " + id + " could not be evaluated", Suggestion: "supply bounded catalog evidence compatible with the trusted model"}}, evaluation.diagnostics...)
 		}
 		report.Corners = append(report.Corners, CornerResult{ID: cornerID(assignments), Assignments: assignments, Assertions: evaluation.report.Assertions, Status: evaluation.report.Status})
+	}
+	if len(groupedUncertainties(plan.Uncertainties)) > maxExhaustiveWorstCaseGroups {
+		directed := assertionDirectedCorners(report.Corners, plan.Uncertainties)
+		existing := make(map[string]struct{}, len(report.Corners))
+		for _, corner := range report.Corners {
+			existing[corner.ID] = struct{}{}
+		}
+		directed = slices.DeleteFunc(directed, func(assignments []NamedValue) bool {
+			id := cornerID(assignments)
+			if _, ok := existing[id]; ok {
+				return true
+			}
+			existing[id] = struct{}{}
+			return false
+		})
+		directedEvaluations := evaluateWorstCaseCorners(base, directed)
+		for index, evaluation := range directedEvaluations {
+			assignments := directed[index]
+			if hasCornerEvaluationFailure(evaluation.diagnostics) {
+				id := cornerID(assignments)
+				report.Corners = append(report.Corners, CornerResult{ID: id, Assignments: assignments, Assertions: evaluation.report.Assertions, Status: "blocked"})
+				return report, append([]Diagnostic{{Path: "worst_case", Message: "directed corner " + id + " could not be evaluated", Suggestion: "supply bounded catalog evidence compatible with the trusted model"}}, evaluation.diagnostics...)
+			}
+			report.Corners = append(report.Corners, CornerResult{ID: cornerID(assignments), Assignments: assignments, Assertions: evaluation.report.Assertions, Status: evaluation.report.Status})
+		}
 	}
 	report.Sensitivity = sensitivity(report.Corners, plan.Uncertainties)
 	for _, corner := range report.Corners[1:] {
@@ -215,7 +245,11 @@ func nominalAssignments(uncertainties []Uncertainty) []NamedValue {
 
 func deterministicCorners(uncertainties []Uncertainty) [][]NamedValue {
 	groups := groupedUncertainties(uncertainties)
-	result := make([][]NamedValue, 0, 2*len(groups)+(1<<len(groups)))
+	fullCornerCount := 0
+	if len(groups) <= maxExhaustiveWorstCaseGroups {
+		fullCornerCount = 1 << len(groups)
+	}
+	result := make([][]NamedValue, 0, 2*len(groups)+fullCornerCount)
 	for _, group := range groups {
 		for _, maximum := range []bool{false, true} {
 			assignments := nominalAssignments(uncertainties)
@@ -235,27 +269,103 @@ func deterministicCorners(uncertainties []Uncertainty) [][]NamedValue {
 			result = append(result, assignments)
 		}
 	}
-	for mask := 0; mask < 1<<len(groups); mask++ {
-		assignments := make([]NamedValue, len(uncertainties))
-		for groupIndex, group := range groups {
-			for _, index := range group.members {
-				uncertainty := uncertainties[index]
-				value := group.minimum
-				if !group.correlated {
-					value = uncertainty.Minimum
-				}
-				if mask&(1<<groupIndex) != 0 {
-					value = group.maximum
-					if !group.correlated {
-						value = uncertainty.Maximum
-					}
-				}
-				assignments[index] = NamedValue{Name: uncertainty.Target, Value: value}
-			}
+	if len(groups) <= maxExhaustiveWorstCaseGroups {
+		for mask := 0; mask < 1<<len(groups); mask++ {
+			result = append(result, groupedCornerAssignments(uncertainties, groups, func(groupIndex int) bool {
+				return mask&(1<<groupIndex) != 0
+			}))
 		}
-		result = append(result, assignments)
+		return result
+	}
+	result = append(result, pairwiseCoveringCorners(uncertainties, groups)...)
+	return result
+}
+
+func pairwiseCoveringCorners(uncertainties []Uncertainty, groups []uncertaintyGroup) [][]NamedValue {
+	if len(groups) == 0 {
+		return nil
+	}
+	result := [][]NamedValue{
+		groupedCornerAssignments(uncertainties, groups, func(int) bool { return false }),
+		groupedCornerAssignments(uncertainties, groups, func(int) bool { return true }),
+	}
+	bits := 0
+	for 1<<bits < len(groups)+1 {
+		bits++
+	}
+	for bit := 0; bit < bits; bit++ {
+		currentBit := bit
+		result = append(result,
+			groupedCornerAssignments(uncertainties, groups, func(groupIndex int) bool {
+				return (groupIndex+1)&(1<<currentBit) != 0
+			}),
+			groupedCornerAssignments(uncertainties, groups, func(groupIndex int) bool {
+				return (groupIndex+1)&(1<<currentBit) == 0
+			}),
+		)
 	}
 	return result
+}
+
+func groupedCornerAssignments(uncertainties []Uncertainty, groups []uncertaintyGroup, maximum func(groupIndex int) bool) []NamedValue {
+	assignments := make([]NamedValue, len(uncertainties))
+	for groupIndex, group := range groups {
+		for _, index := range group.members {
+			uncertainty := uncertainties[index]
+			value := group.minimum
+			if !group.correlated {
+				value = uncertainty.Minimum
+			}
+			if maximum(groupIndex) {
+				value = group.maximum
+				if !group.correlated {
+					value = uncertainty.Maximum
+				}
+			}
+			assignments[index] = NamedValue{Name: uncertainty.Target, Value: value}
+		}
+	}
+	return assignments
+}
+
+func assertionDirectedCorners(corners []CornerResult, uncertainties []Uncertainty) [][]NamedValue {
+	groups := groupedUncertainties(uncertainties)
+	if len(corners) < 1+2*len(groups) {
+		return nil
+	}
+	var result [][]NamedValue
+	for _, nominal := range corners[0].Assertions {
+		id := assertionID(nominal)
+		maximumForMinimum := make([]bool, len(groups))
+		maximumForMaximum := make([]bool, len(groups))
+		for groupIndex := range groups {
+			low, lowOK := assertionActual(corners[1+2*groupIndex].Assertions, id)
+			high, highOK := assertionActual(corners[1+2*groupIndex+1].Assertions, id)
+			if !lowOK || !highOK {
+				continue
+			}
+			maximumForMinimum[groupIndex] = high < low
+			maximumForMaximum[groupIndex] = high >= low
+		}
+		result = append(result,
+			groupedCornerAssignments(uncertainties, groups, func(groupIndex int) bool {
+				return maximumForMinimum[groupIndex]
+			}),
+			groupedCornerAssignments(uncertainties, groups, func(groupIndex int) bool {
+				return maximumForMaximum[groupIndex]
+			}),
+		)
+	}
+	return result
+}
+
+func assertionActual(assertions []AssertionResult, id string) (float64, bool) {
+	for _, assertion := range assertions {
+		if assertionID(assertion) == id {
+			return assertion.Actual, true
+		}
+	}
+	return 0, false
 }
 
 func cornerID(assignments []NamedValue) string {

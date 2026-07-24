@@ -102,10 +102,11 @@ type SelectedComponent struct {
 }
 
 type ExpansionMetrics struct {
-	UnprovenNonSafety int      `json:"unproven_non_safety"`
-	WorstMargin       *float64 `json:"worst_margin,omitempty"`
-	QuiescentPowerW   *float64 `json:"quiescent_power_w,omitempty"`
-	AreaMM2           *float64 `json:"area_mm2,omitempty"`
+	UnprovenNonSafety    int      `json:"unproven_non_safety"`
+	CatalogSubstitutions int      `json:"catalog_substitutions,omitempty"`
+	WorstMargin          *float64 `json:"worst_margin,omitempty"`
+	QuiescentPowerW      *float64 `json:"quiescent_power_w,omitempty"`
+	AreaMM2              *float64 `json:"area_mm2,omitempty"`
 }
 
 type ProviderExpansion struct {
@@ -138,14 +139,15 @@ type FragmentSelection struct {
 }
 
 type CandidateScore struct {
-	UnprovenNonSafety int      `json:"unproven_non_safety"`
-	WorstMargin       *float64 `json:"worst_margin,omitempty"`
-	EvidenceRank      int      `json:"evidence_rank"`
-	ComponentCount    int      `json:"component_count"`
-	FragmentCount     int      `json:"fragment_count"`
-	QuiescentPowerW   *float64 `json:"quiescent_power_w,omitempty"`
-	AreaMM2           *float64 `json:"area_mm2,omitempty"`
-	Fingerprint       string   `json:"fingerprint"`
+	UnprovenNonSafety    int      `json:"unproven_non_safety"`
+	CatalogSubstitutions int      `json:"catalog_substitutions,omitempty"`
+	WorstMargin          *float64 `json:"worst_margin,omitempty"`
+	EvidenceRank         int      `json:"evidence_rank"`
+	ComponentCount       int      `json:"component_count"`
+	FragmentCount        int      `json:"fragment_count"`
+	QuiescentPowerW      *float64 `json:"quiescent_power_w,omitempty"`
+	AreaMM2              *float64 `json:"area_mm2,omitempty"`
+	Fingerprint          string   `json:"fingerprint"`
 }
 
 type CandidateResult struct {

@@ -28,6 +28,9 @@ type DividerRequest struct {
 	UpperSeries            PreferredSeries
 	MinimumUpperOhm        float64
 	MaximumUpperOhm        float64
+	FeedbackBiasCurrentA   float64
+	MinimumOutputV         float64
+	MaximumOutputV         float64
 	MaxCandidates          int
 }
 
@@ -62,13 +65,18 @@ func SolveDivider(request DividerRequest) (CalculationEvidence, []reports.Issue)
 	if request.UpperSeries == "" {
 		request.UpperSeries = SeriesE96
 	}
-	if !finitePositive(request.SourceVoltageV) || !finitePositive(request.TargetVoltageV) || !finitePositive(request.LowerResistanceOhm) || !validPercentage(request.SourceTolerancePercent) || !validPercentage(request.TargetTolerancePercent) || !validPercentage(request.LowerTolerancePercent) || !validPercentage(request.UpperTolerancePercent) {
+	if !finitePositive(request.SourceVoltageV) || !finitePositive(request.TargetVoltageV) || !finitePositive(request.LowerResistanceOhm) || !validPercentage(request.SourceTolerancePercent) || !validPercentage(request.TargetTolerancePercent) || !validPercentage(request.LowerTolerancePercent) || !validPercentage(request.UpperTolerancePercent) ||
+		!finiteNumbers(request.FeedbackBiasCurrentA, request.MinimumOutputV, request.MaximumOutputV) || request.FeedbackBiasCurrentA < 0 || request.MinimumOutputV < 0 || request.MaximumOutputV < 0 ||
+		(request.MinimumOutputV > 0 && request.MaximumOutputV > 0 && request.MinimumOutputV >= request.MaximumOutputV) {
 		return CalculationEvidence{}, calculationIssue(CodeValueInputInvalid, "divider", "divider voltages, resistance, and tolerances are invalid")
 	}
 	var formulaID string
 	var idealUpper float64
 	switch request.Mode {
 	case DividerAttenuator:
+		if request.FeedbackBiasCurrentA != 0 {
+			return CalculationEvidence{}, calculationIssue(CodeValueInputInvalid, "divider.feedback_bias_current_a", "attenuator dividers cannot declare feedback bias current")
+		}
 		if request.TargetVoltageV >= request.SourceVoltageV {
 			return CalculationEvidence{}, calculationIssue(CodeValueInputInvalid, "divider.target_voltage_v", "attenuator target must be below source voltage")
 		}
@@ -79,7 +87,11 @@ func SolveDivider(request DividerRequest) (CalculationEvidence, []reports.Issue)
 			return CalculationEvidence{}, calculationIssue(CodeValueInputInvalid, "divider.target_voltage_v", "feedback target must exceed reference voltage")
 		}
 		formulaID = FormulaFeedbackDivider
-		idealUpper = request.LowerResistanceOhm * (request.TargetVoltageV/request.SourceVoltageV - 1)
+		denominator := request.SourceVoltageV/request.LowerResistanceOhm + request.FeedbackBiasCurrentA
+		idealUpper = (request.TargetVoltageV - request.SourceVoltageV) / denominator
+		if request.FeedbackBiasCurrentA > 0 {
+			formulaID = FormulaFeedbackBias
+		}
 	default:
 		return CalculationEvidence{}, calculationIssue(CodeValueInputInvalid, "divider.mode", "unsupported divider mode")
 	}
@@ -113,6 +125,9 @@ func SolveDivider(request DividerRequest) (CalculationEvidence, []reports.Issue)
 		WorstMargin: selected.worstMargin, Pass: selected.pass,
 		RejectedCandidates: rejectedValueCandidates(evaluated, selected.value, "Ohm"),
 	}
+	if request.FeedbackBiasCurrentA > 0 {
+		evidence.Inputs = append(evidence.Inputs, NamedQuantity{Name: "feedback_bias_current", Value: request.FeedbackBiasCurrentA, Unit: "A"})
+	}
 	evidence, err := FinalizeCalculation(evidence)
 	if err != nil {
 		return CalculationEvidence{}, calculationIssue(CodeValueUnsolved, "divider", "finalize divider evidence: "+err.Error())
@@ -124,8 +139,14 @@ func SolveDivider(request DividerRequest) (CalculationEvidence, []reports.Issue)
 }
 
 func evaluateDividerCandidate(request DividerRequest, upper float64) evaluatedValueCandidate {
-	nominal := dividerOutput(request.Mode, request.SourceVoltageV, upper, request.LowerResistanceOhm)
+	nominal := dividerOutput(request.Mode, request.SourceVoltageV, upper, request.LowerResistanceOhm, request.FeedbackBiasCurrentA)
 	allowedMinimum, allowedMaximum := toleranceRange(request.TargetVoltageV, request.TargetTolerancePercent)
+	if request.MinimumOutputV > 0 {
+		allowedMinimum = request.MinimumOutputV
+	}
+	if request.MaximumOutputV > 0 {
+		allowedMaximum = request.MaximumOutputV
+	}
 	sourceValues := toleranceEndpoints(request.SourceVoltageV, request.SourceTolerancePercent)
 	upperValues := toleranceEndpoints(upper, request.UpperTolerancePercent)
 	lowerValues := toleranceEndpoints(request.LowerResistanceOhm, request.LowerTolerancePercent)
@@ -136,12 +157,16 @@ func evaluateDividerCandidate(request DividerRequest, upper float64) evaluatedVa
 	for _, source := range sourceValues {
 		for _, upperCorner := range upperValues {
 			for _, lower := range lowerValues {
-				output := dividerOutput(request.Mode, source, upperCorner, lower)
+				output := dividerOutput(request.Mode, source, upperCorner, lower, request.FeedbackBiasCurrentA)
 				worstMinimum = math.Min(worstMinimum, output)
 				worstMaximum = math.Max(worstMaximum, output)
+				inputs := []NamedQuantity{{Name: "source_voltage", Value: source, Unit: "V"}, {Name: "upper_resistance", Value: upperCorner, Unit: "Ohm"}, {Name: "lower_resistance", Value: lower, Unit: "Ohm"}}
+				if request.FeedbackBiasCurrentA > 0 {
+					inputs = append(inputs, NamedQuantity{Name: "feedback_bias_current", Value: request.FeedbackBiasCurrentA, Unit: "A"})
+				}
 				corners = append(corners, CornerEvidence{
 					ID:      fmt.Sprintf("corner_%02d", cornerIndex),
-					Inputs:  []NamedQuantity{{Name: "source_voltage", Value: source, Unit: "V"}, {Name: "upper_resistance", Value: upperCorner, Unit: "Ohm"}, {Name: "lower_resistance", Value: lower, Unit: "Ohm"}},
+					Inputs:  inputs,
 					Outputs: []NamedQuantity{{Name: "output_voltage", Value: output, Unit: "V"}},
 				})
 				cornerIndex++
@@ -267,9 +292,9 @@ func evaluateRCCandidate(request RCPoleRequest, selected float64) evaluatedValue
 	}
 }
 
-func dividerOutput(mode DividerMode, source, upper, lower float64) float64 {
+func dividerOutput(mode DividerMode, source, upper, lower, feedbackBiasCurrent float64) float64 {
 	if mode == DividerFeedback {
-		return source * (1 + upper/lower)
+		return source*(1+upper/lower) + feedbackBiasCurrent*upper
 	}
 	return source * lower / (upper + lower)
 }

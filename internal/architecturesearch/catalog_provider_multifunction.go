@@ -328,24 +328,33 @@ func (provider *CatalogProvider) expandGenericFilter(ctx context.Context, reques
 	if err != nil {
 		return nil, err
 	}
-	calculation, issues := SolveSallenKeyLowPass(SallenKeyLowPassRequest{
+	const (
+		filterTargetQ             = 0.70710678
+		filterMinimumCapacitanceF = 560e-12
+		filterMaximumCapacitanceF = 47e-9
+	)
+	minimumResistance := filterTargetQ / (math.Pi * frequency * filterMaximumCapacitanceF)
+	maximumResistance := 1 / (4 * math.Pi * frequency * filterTargetQ * filterMinimumCapacitanceF)
+	calculation, issues := SolvePreferredResistanceSallenKeyLowPass(SallenKeyLowPassRequest{
 		ID: "filter_stage", TargetFrequencyHz: frequency, FrequencyTolerancePercent: tolerance,
-		TargetQ: 0.70710678, QTolerancePercent: 5, ResistanceOhm: 10000,
-		ResistanceTolerancePercent: 0.1, CapacitanceTolerancePercent: 1, CapacitanceSeries: SeriesE96,
-	})
+		TargetQ: filterTargetQ, QTolerancePercent: 10, ResistanceOhm: 10000,
+		ResistanceTolerancePercent: 0.1, CapacitanceTolerancePercent: 1, CapacitanceSeries: SeriesE12,
+		MinimumCapacitanceF: filterMinimumCapacitanceF, MaximumCapacitanceF: filterMaximumCapacitanceF,
+	}, SeriesE96, minimumResistance, maximumResistance)
 	if len(issues) != 0 {
 		return nil, fmt.Errorf("filter value solution failed: %s", issues[0].Message)
 	}
 	c1, c1OK := calculationSelectedValue(calculation, "capacitance_1")
 	c2, c2OK := calculationSelectedValue(calculation, "capacitance_2")
-	if !c1OK || !c2OK {
-		return nil, fmt.Errorf("filter solution omitted capacitance values")
+	resistance, resistanceOK := calculationSelectedValue(calculation, "resistance")
+	if !c1OK || !c2OK || !resistanceOK {
+		return nil, fmt.Errorf("filter solution omitted resistance or capacitance values")
 	}
-	parts, err := provider.appendPassiveParts(ctx, []catalogPart{opamp}, []passivePart{
-		{"filter_r1", "resistor", "filter", "10k"}, {"filter_r2", "resistor", "filter", "10k"},
+	parts, err := provider.appendPassivePartsWithTolerances(ctx, []catalogPart{opamp}, []passivePart{
+		{"filter_r1", "resistor", "filter", engineeringValue(resistance, "Ohm")}, {"filter_r2", "resistor", "filter", engineeringValue(resistance, "Ohm")},
 		{"filter_c1", "capacitor", "filter", engineeringValue(c1, "F")}, {"filter_c2", "capacitor", "filter", engineeringValue(c2, "F")},
 		{"supply_bypass", "capacitor", "decoupling_capacitor", "100n"},
-	})
+	}, map[string]float64{"filter_r1": 0.1, "filter_r2": 0.1, "filter_c1": 1, "filter_c2": 1}, 0)
 	if err != nil {
 		return nil, err
 	}
@@ -1107,16 +1116,37 @@ func (provider *CatalogProvider) expandCurrentSensing(ctx context.Context, reque
 		return nil, err
 	}
 	regulator.selected.InstanceID, regulator.usage = "sense_supply", "local_measurement_supply"
-	clamp, err := provider.selectComponent(ctx, "diode", "schottky", nil, true)
-	if err != nil {
-		return nil, err
+	hasControl := hasRoleContract(request.Ports, "control")
+	hasFault := hasRoleContract(request.Ports, "fault")
+	hasPermit := hasRoleContract(request.Ports, "permit")
+	hasAnyInterlockRole := hasControl || hasFault || hasPermit
+	hasCompleteInterlock := hasControl && hasFault && hasPermit
+	if hasAnyInterlockRole && !hasCompleteInterlock {
+		return nil, fmt.Errorf("current-sensing fail-safe interlock requires control, fault, and permit role contracts together")
 	}
-	clamp.selected.InstanceID, clamp.usage = "fault_clamp", "fail_safe_fault_clamp"
-	parts, err := provider.appendPassiveParts(ctx, []catalogPart{sensor, shunt, regulator, clamp}, []passivePart{
+	activeParts := []catalogPart{sensor, shunt, regulator}
+	var faultPulldown catalogPart
+	passiveParts := []passivePart{
 		{"sense_feedback_lower", "resistor", "feedback_divider", "240"}, {"sense_feedback_upper", "resistor", "feedback_divider", "720"},
 		{"sense_input_bypass", "capacitor", "decoupling", "1u"}, {"sense_output_bypass", "capacitor", "decoupling", "1u"},
-		{"control_series", "resistor", "interlock_drive", "10k"}, {"permit_pulldown", "resistor", "default_off", "100k"},
-	})
+	}
+	if hasCompleteInterlock {
+		var selectErr error
+		faultPulldown, selectErr = provider.selectComponent(ctx, "bjt", "NPN", []components.RequiredRating{
+			{Kind: "collector_emitter_voltage", Value: numericString(math.Max(roleVoltageMaximum(request.Ports, "control"), roleVoltageMaximum(request.Ports, "fault"))), Unit: "V"},
+			{Kind: "collector_current", Value: "4", Unit: "mA"},
+		}, true)
+		if selectErr != nil {
+			return nil, selectErr
+		}
+		faultPulldown.selected.InstanceID, faultPulldown.usage = "fault_inverter", "fail_safe_enable"
+		activeParts = append(activeParts, faultPulldown)
+		passiveParts = append(passiveParts,
+			passivePart{"control_series", "resistor", "interlock_drive", "10k"},
+			passivePart{"fault_base_resistor", "resistor", "interlock_drive", "10k"},
+		)
+	}
+	parts, err := provider.appendPassiveParts(ctx, activeParts, passiveParts)
 	if err != nil {
 		return nil, err
 	}
@@ -1158,7 +1188,7 @@ func (provider *CatalogProvider) expandCurrentSensing(ctx context.Context, reque
 		case "control":
 			binding.Instance, binding.Function = "control_series", "A"
 		case "fault":
-			binding.Instance, binding.Function = clamp.selected.InstanceID, "K"
+			binding.Instance, binding.Function = "fault_base_resistor", "A"
 		case "permit":
 			binding.Instance, binding.Function = "control_series", "B"
 		case "reference":
@@ -1171,9 +1201,17 @@ func (provider *CatalogProvider) expandCurrentSensing(ctx context.Context, reque
 		semanticNet("sense_load_side", "power", endpoint(shunt, "B"), endpoint(sensor, "IN_MINUS")),
 		semanticNet("sense_supply", "power", endpoint(regulator, "VOUT"), endpoint(sensor, "VCC"), passiveEndpoint("sense_feedback_lower", "A"), passiveEndpoint("sense_output_bypass", "A")),
 		semanticNet("sense_supply_feedback", "analog_signal", endpoint(regulator, "ADJ"), passiveEndpoint("sense_feedback_lower", "B"), passiveEndpoint("sense_feedback_upper", "A")),
-		semanticNet("sense_measurement", "analog_signal", endpoint(sensor, "OUT"), passiveEndpoint("control_series", "A"), endpoint(clamp, "K")),
-		semanticNet("permit_interlock", "control", passiveEndpoint("control_series", "B"), endpoint(clamp, "A"), passiveEndpoint("permit_pulldown", "A")),
-		semanticNet("sense_reference", "reference", endpoint(sensor, "GND_A"), endpoint(sensor, "GND_B"), endpoint(sensor, "REF1"), endpoint(sensor, "REF2"), passiveEndpoint("sense_feedback_upper", "B"), passiveEndpoint("sense_input_bypass", "B"), passiveEndpoint("sense_output_bypass", "B"), passiveEndpoint("permit_pulldown", "B")),
+		semanticNet("sense_reference", "reference", endpoint(sensor, "GND_A"), endpoint(sensor, "GND_B"), endpoint(sensor, "REF1"), endpoint(sensor, "REF2"), passiveEndpoint("sense_feedback_upper", "B"), passiveEndpoint("sense_input_bypass", "B"), passiveEndpoint("sense_output_bypass", "B")),
+	}
+	architectureID := "precision_high_side_current_measurement"
+	if hasCompleteInterlock {
+		referenceIndex := len(connections) - 1
+		connections[referenceIndex].Endpoints = append(connections[referenceIndex].Endpoints, endpoint(faultPulldown, "EMITTER"))
+		connections = append(connections,
+			semanticNet("fault_base_drive", "control", passiveEndpoint("fault_base_resistor", "B"), endpoint(faultPulldown, "BASE")),
+			semanticNet("permit_interlock", "control", passiveEndpoint("control_series", "B"), endpoint(faultPulldown, "COLLECTOR")),
+		)
+		architectureID = "precision_high_side_current_interlock"
 	}
 	transitions := []RealizationSeriesTransition{{Role: "power", Input: endpoint(shunt, "A"), Output: endpoint(shunt, "B")}}
 	bandwidth, bandwidthOK := recordRatingMaximum(sensor.record, "bandwidth", "Hz")
@@ -1184,7 +1222,7 @@ func (provider *CatalogProvider) expandCurrentSensing(ctx context.Context, reque
 	if err != nil {
 		return nil, err
 	}
-	return provider.expansionWithTransitions(request, "precision_high_side_current_interlock", parts, bindings, transitions, connections, []CalculationEvidence{transfer, regulatorFeedback, response}, 0)
+	return provider.expansionWithTransitions(request, architectureID, parts, bindings, transitions, connections, []CalculationEvidence{transfer, regulatorFeedback, response}, 0)
 }
 
 func (provider *CatalogProvider) expandMuteControl(ctx context.Context, request ProviderRequest) ([]ProviderExpansion, error) {
@@ -1740,7 +1778,7 @@ func (provider *CatalogProvider) expandClassABOutput(ctx context.Context, reques
 		passives = append(passives, passivePart{"midpoint_bypass", "capacitor", "midpoint_bypass", "100u"})
 	}
 	if hasRoleContract(request.Ports, "bias") {
-		passives = append(passives, passivePart{"bias_injection", "resistor", "bias_injection", "1G"})
+		passives = append(passives, passivePart{"bias_injection", "resistor", "bias_injection", "10M"})
 	}
 	if hasRoleContract(request.Ports, "mute") {
 		passives = append(passives, passivePart{"mute_drive", "resistor", "mute_drive", "10k"})
@@ -1751,6 +1789,34 @@ func (provider *CatalogProvider) expandClassABOutput(ctx context.Context, reques
 	parts, err := provider.appendPassiveParts(ctx, activeParts, passives)
 	if err != nil {
 		return nil, err
+	}
+	for _, feed := range []struct {
+		id         string
+		resistance float64
+	}{
+		{id: "upper_bias_feed", resistance: upperBiasFeedResistance},
+		{id: "lower_bias_feed", resistance: lowerBiasFeedResistance},
+	} {
+		minimumPowerRating := availablePeakVoltage * availablePeakVoltage / feed.resistance / catalogRatingDeratingFactor
+		replacement, selectionErr := provider.selectPassiveComponentWithRatings(
+			ctx,
+			"resistor",
+			"resistance",
+			engineeringValue(feed.resistance, "Ohm"),
+			[]components.RequiredRating{{Kind: "power", Value: numericString(minimumPowerRating), Unit: "W"}},
+		)
+		if selectionErr != nil {
+			return nil, fmt.Errorf("Class-AB %s power-rated resistor selection failed: %w", feed.id, selectionErr)
+		}
+		replacement.selected.InstanceID = feed.id
+		replacement.usage = "bias_current"
+		replacement.value = engineeringValue(feed.resistance, "Ohm")
+		for index := range parts {
+			if parts[index].selected.InstanceID == feed.id {
+				parts[index] = replacement
+				break
+			}
+		}
 	}
 	bindings := bindRoles(request.Ports, opamp.selected.InstanceID, map[string]string{
 		"input": "IN_PLUS", "bias": "IN_PLUS", "mute": "IN_PLUS", "output": "OUT",
@@ -2445,16 +2511,6 @@ func (provider *CatalogProvider) expandSplitSupply(ctx context.Context, request 
 		return nil, fmt.Errorf("split-supply generation requires current contracts on both outputs")
 	}
 	temperature := temperatureRequirementFromConstraints(request.Constraints)
-	converter, err := provider.selectComponentWithTemperature(ctx, "isolated_converter", "dual_output", []components.RequiredRating{
-		{Kind: "input_voltage", Value: numericString(inputMinimum), Unit: "V"},
-		{Kind: "input_voltage", Value: numericString(inputMaximum), Unit: "V"},
-		{Kind: "positive_output_current", Value: numericString(positiveCurrent / catalogRatingDeratingFactor), Unit: "A"},
-		{Kind: "negative_output_current", Value: numericString(negativeCurrent / catalogRatingDeratingFactor), Unit: "A"},
-	}, true, temperature)
-	if err != nil {
-		return nil, err
-	}
-	converter.selected.InstanceID, converter.usage = "dual_rail_converter", "split_supply_converter"
 	positiveRegulator, err := provider.selectComponentWithTemperature(ctx, "regulator", "positive", []components.RequiredRating{{Kind: "output_current", Value: numericString(positiveCurrent), Unit: "A"}}, true, temperature)
 	if err != nil {
 		return nil, err
@@ -2481,6 +2537,34 @@ func (provider *CatalogProvider) expandSplitSupply(ctx context.Context, request 
 	if len(negativeIssues) != 0 {
 		return nil, fmt.Errorf("negative split-rail feedback solution failed: %s", negativeIssues[0].Message)
 	}
+	positiveHeadroom, positiveHeadroomOK := recordRegulatorDropoutV(positiveRegulator.record)
+	negativeHeadroom, negativeHeadroomOK := recordRegulatorDropoutV(negativeRegulator.record)
+	if !positiveHeadroomOK || !negativeHeadroomOK {
+		return nil, fmt.Errorf("split-supply regulators lack normalized headroom evidence")
+	}
+	positiveOutputMaximum := positiveVoltage * (1 + positiveTolerance/100)
+	negativeOutputMaximum := math.Abs(negativeVoltage) * (1 + negativeTolerance/100)
+	const converterModel = "mna_dual_output_isolated_converter_v1"
+	converter, err := provider.selectComponentMinimizingModelParameterWithinBoundsWithTemperature(
+		ctx, "isolated_converter", "dual_output", []components.RequiredRating{
+			{Kind: "input_voltage", Value: numericString(inputMinimum), Unit: "V"},
+			{Kind: "input_voltage", Value: numericString(inputMaximum), Unit: "V"},
+			{Kind: "positive_output_current", Value: numericString(positiveCurrent / catalogRatingDeratingFactor), Unit: "A"},
+			{Kind: "negative_output_current", Value: numericString(negativeCurrent / catalogRatingDeratingFactor), Unit: "A"},
+		}, true, temperature, nil, converterModel, "positive_output_voltage_v", map[string]float64{
+			"positive_output_voltage_v": positiveOutputMaximum + positiveHeadroom,
+			"negative_output_voltage_v": negativeOutputMaximum + negativeHeadroom,
+		}, nil,
+	)
+	if err != nil {
+		return nil, err
+	}
+	converter.selected.InstanceID, converter.usage = "dual_rail_converter", "split_supply_converter"
+	positiveRawVoltage, positiveRawOK := catalogSimulationParameterForModel(converter.record, converterModel, "positive_output_voltage_v")
+	negativeRawVoltage, negativeRawOK := catalogSimulationParameterForModel(converter.record, converterModel, "negative_output_voltage_v")
+	if !positiveRawOK || !negativeRawOK {
+		return nil, fmt.Errorf("split-supply converter lacks normalized output-voltage evidence")
+	}
 	positiveSet, _ := calculationSelectedValue(positiveFeedback, "upper_resistance")
 	negativeSet, _ := calculationSelectedValue(negativeFeedback, "upper_resistance")
 	parts, err := provider.appendPassiveParts(ctx, []catalogPart{converter, positiveRegulator, negativeRegulator}, []passivePart{
@@ -2505,8 +2589,8 @@ func (provider *CatalogProvider) expandSplitSupply(ctx context.Context, request 
 		{Kind: "positive_regulator_current", Required: positiveCurrent, Rated: positiveRegRated, DeratingFactor: catalogRatingDeratingFactor, Unit: "A", Evidence: positiveRegulator.evidence},
 		{Kind: "negative_regulator_current", Required: negativeCurrent, Rated: negativeRegRated, DeratingFactor: catalogRatingDeratingFactor, Unit: "A", Evidence: negativeRegulator.evidence},
 		{Kind: "input_power", Required: (positiveVoltage*positiveCurrent + math.Abs(negativeVoltage)*negativeCurrent) / 0.87, Rated: inputMinimum * maximumRoleCurrentDemandA(request.Ports, "input"), DeratingFactor: catalogRatingDeratingFactor, Unit: "W", Evidence: converter.evidence},
-		{Kind: "positive_headroom", Required: positiveVoltage + 2, Rated: 12, DeratingFactor: 1, Unit: "V", Evidence: converter.evidence},
-		{Kind: "negative_headroom", Required: math.Abs(negativeVoltage) + 2, Rated: 12, DeratingFactor: 1, Unit: "V", Evidence: converter.evidence},
+		{Kind: "positive_headroom", Required: positiveOutputMaximum + positiveHeadroom, Rated: positiveRawVoltage, DeratingFactor: 1, Unit: "V", Evidence: converter.evidence},
+		{Kind: "negative_headroom", Required: negativeOutputMaximum + negativeHeadroom, Rated: negativeRawVoltage, DeratingFactor: 1, Unit: "V", Evidence: converter.evidence},
 	})
 	if len(ratingIssues) != 0 {
 		return nil, fmt.Errorf("split-supply rating solution failed: %s", ratingIssues[0].Message)

@@ -4,6 +4,7 @@ set -eu
 repo_root=$(CDPATH= cd "$(dirname "$0")/.." && pwd -P)
 work_root=${PROMOTION_ROOT:-"$repo_root/.tmp/clean-checkout-promotion"}
 cache_root=${PROMOTION_CACHE_DIR:-"$repo_root/.cache/kicadai-promotion-toolchain"}
+matrix_path=${PROMOTION_MATRIX:-"$repo_root/testdata/external-review-mitigation/matrix.json"}
 scenario_timeout=${PROMOTION_SCENARIO_TIMEOUT:-20m}
 
 case "$work_root" in
@@ -14,9 +15,17 @@ case "$cache_root" in
 	/*) ;;
 	*) cache_root="$repo_root/$cache_root" ;;
 esac
+case "$matrix_path" in
+	/*) ;;
+	*) matrix_path="$repo_root/$matrix_path" ;;
+esac
 
 if [ -e "$work_root" ]; then
 	printf 'promotion output already exists: %s\n' "$work_root" >&2
+	exit 1
+fi
+if [ ! -f "$matrix_path" ]; then
+	printf 'promotion matrix is not a regular file: %s\n' "$matrix_path" >&2
 	exit 1
 fi
 if [ -n "$(git -C "$repo_root" status --porcelain --untracked-files=normal)" ]; then
@@ -41,7 +50,7 @@ mkdir -p "$bin_root" "$bundle_root"
 "$promotion_cli" promote \
 	--repository "$repo_root" \
 	--lock "$repo_root/toolchain/kicad-promotion.lock.json" \
-	--matrix "$repo_root/testdata/external-review-mitigation/matrix.json" \
+	--matrix "$matrix_path" \
 	--kicadai "$kicadai_cli" \
 	--output "$run_root" \
 	--bundle-output "$bundle_root" \

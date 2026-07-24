@@ -2020,7 +2020,7 @@ func TestRunComponentValidateUsesConfiguredLibraryRoots(t *testing.T) {
 	if decodeErr := json.Unmarshal(stdout.Bytes(), &result); decodeErr != nil {
 		t.Fatalf("decode result: %v\n%s", decodeErr, stdout.String())
 	}
-	if result.OK || !strings.Contains(stdout.String(), string(components.CodeLibrarySymbolMissing)) || !strings.Contains(stdout.String(), string(components.CodeLibraryFootprintMissing)) {
+	if result.OK || !strings.Contains(stdout.String(), string(components.CodeLibraryFootprintMissing)) {
 		t.Fatalf("configured library validation result = %#v", result)
 	}
 	data, ok := result.Data.(map[string]any)
@@ -2028,8 +2028,15 @@ func TestRunComponentValidateUsesConfiguredLibraryRoots(t *testing.T) {
 		t.Fatalf("result data = %#v", result.Data)
 	}
 	librarySummary, ok := data["library_validation"].(map[string]any)
-	if !ok || librarySummary["configured"] != true {
+	if !ok || librarySummary["configured"] != true ||
+		librarySummary["symbol_validation_enabled"] != true ||
+		librarySummary["footprint_validation_enabled"] != true {
 		t.Fatalf("library summary = %#v", data["library_validation"])
+	}
+	symbolsChecked, symbolsOK := librarySummary["symbol_bindings_checked"].(float64)
+	packagesChecked, packagesOK := librarySummary["package_variants_checked"].(float64)
+	if !symbolsOK || symbolsChecked == 0 || !packagesOK || packagesChecked == 0 {
+		t.Fatalf("library summary lacks checked bindings = %#v", librarySummary)
 	}
 }
 

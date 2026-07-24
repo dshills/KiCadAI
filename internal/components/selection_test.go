@@ -327,19 +327,20 @@ func TestSelectVerifiedPolarizedCapacitorForConnectivity(t *testing.T) {
 	}
 }
 
-func TestSelectPolarizedCapacitorBlocksFabricationPendingReview(t *testing.T) {
+func TestSelectReviewedPolarizedCapacitorForFabrication(t *testing.T) {
 	catalog := loadCheckedInCatalog(t)
-	_, result := Select(context.Background(), catalog, SelectionRequest{
+	selection, result := Select(context.Background(), catalog, SelectionRequest{
 		Query:             Query{Family: "capacitor", Package: "radial_d6_3_p2_5", ValueKind: "capacitance", Value: "220u"},
 		Acceptance:        AcceptanceFabricationCandidate,
 		RequireConcrete:   true,
 		RequiredFunctions: []string{"POSITIVE", "NEGATIVE"},
 	})
-	if result.OK {
-		t.Fatal("expected polarized capacitor fabrication selection to require engineering review")
+	if !result.OK {
+		t.Fatalf("reviewed polarized capacitor selection failed: %+v", result.Issues)
 	}
-	assertIssueCode(t, result.Issues, CodeComponentReviewRequired)
-	assertIssuePath(t, result.Issues, "component.capacitor.panasonic.eeufr1c221.radial.capacitor_evidence.effective_capacitance_review")
+	if selection.Component.ID != "capacitor.panasonic.eeufr1c221.radial" {
+		t.Fatalf("polarized capacitor selection = %q", selection.Component.ID)
+	}
 }
 
 func TestSelectRegulatorCompanionCapacitorWithRatings(t *testing.T) {

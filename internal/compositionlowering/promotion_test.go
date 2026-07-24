@@ -161,6 +161,30 @@ func TestHeldOutConstantCurrentCorpusOptionalKiCadPromotion(t *testing.T) {
 	runFrozenPromotionAt(t, corpusRoot, count, "KICADAI_CONSTANT_CURRENT_ARTIFACT_DIR", cli, index)
 }
 
+func TestHeldOutPrecisionRectificationCorpusPassesOfflineWorkflow(t *testing.T) {
+	requireLongPromotionTest(t)
+	corpusRoot, count := heldOutCapabilityFamilyCorpus(t, "precision_rectification")
+	runFrozenPromotionAt(t, corpusRoot, count, "KICADAI_PRECISION_RECTIFICATION_ARTIFACT_DIR", "", libraryresolver.LibraryIndex{})
+}
+
+func TestHeldOutPrecisionRectificationCorpusOptionalKiCadPromotion(t *testing.T) {
+	requireLongPromotionTest(t)
+	cli := os.Getenv("KICADAI_KICAD_CLI")
+	if cli == "" {
+		t.Skip("set KICADAI_KICAD_CLI to run the KiCad-backed precision-rectification corpus")
+	}
+	roots, rootIssues := libraryresolver.ResolveRoots()
+	if roots.SymbolsRoot == "" || roots.FootprintsRoot == "" {
+		t.Skipf("installed KiCad libraries are required: %#v", rootIssues)
+	}
+	index, loadIssues := libraryresolver.Load(context.Background(), roots, libraryresolver.LoadOptions{})
+	if len(index.Symbols) == 0 || len(index.Footprints) == 0 {
+		t.Fatalf("installed library index is empty: %#v", loadIssues)
+	}
+	corpusRoot, count := heldOutCapabilityFamilyCorpus(t, "precision_rectification")
+	runFrozenPromotionAt(t, corpusRoot, count, "KICADAI_PRECISION_RECTIFICATION_ARTIFACT_DIR", cli, index)
+}
+
 func TestFrozenBehavioralIntentHeldOutReadyCorpusPassesOfflineWorkflow(t *testing.T) {
 	requireLongPromotionTest(t)
 	corpusRoot, count := behavioralIntentHeldOutReadyCorpus(t)
@@ -328,7 +352,7 @@ func runFrozenPromotionAt(t *testing.T, corpusRoot string, expectedCount int, ar
 					GraphResolver: resolver, ProvenanceRegistry: provenance,
 				}, modelRegistryHash, nil, closedloopsynthesis.DefaultPolicy())
 				if reports.HasBlockingIssue(promotionIssues) || promotion.Report.Status != "pass" {
-					t.Fatalf("closed-loop promotion issues=%#v\n%s", promotionIssues, closedLoopFailureSummary(promotion.Report))
+					t.Fatalf("closed-loop promotion issues=%#v\n%s\n%s", promotionIssues, closedLoopFailureSummary(promotion.Report), closedLoopResolutionFailureSummary(context.Background(), requirement, search, resolver, provenance))
 				}
 				request = promotion.Request
 				resolved = promotion.Resolved
@@ -443,7 +467,7 @@ func closedLoopFailureSummary(report closedloopsynthesis.Report) string {
 				if assertion.Metric == "transimpedance" && attempt.Simulation != nil {
 					lines = append(lines, transimpedanceSummary(*attempt.Simulation, assertion.RequirementID, assertion.OperatingCase))
 				}
-				if assertion.Metric == "quiescent_current" && attempt.Simulation != nil {
+				if (assertion.Metric == "quiescent_current" || assertion.Metric == "dc_current") && attempt.Simulation != nil {
 					lines = append(lines, operatingPointSummary(*attempt.Simulation, assertion.RequirementID, assertion.OperatingCase))
 				}
 				if (assertion.Metric == "threshold_voltage" || assertion.Metric == "threshold_current") && attempt.Simulation != nil {
@@ -453,6 +477,58 @@ func closedLoopFailureSummary(report closedloopsynthesis.Report) string {
 		}
 	}
 	return strings.Join(lines, "\n")
+}
+
+func closedLoopResolutionFailureSummary(
+	ctx context.Context,
+	requirement architecturesearch.Requirement,
+	search architecturesearch.SearchResult,
+	resolver *circuitgraph.Resolver,
+	provenance modelprovenance.Registry,
+) string {
+	retained := []architecturesearch.CandidateResult{}
+	if search.Selected != nil {
+		retained = append(retained, *search.Selected)
+	}
+	retained = append(retained, search.Alternatives...)
+	slices.SortStableFunc(retained, func(left, right architecturesearch.CandidateResult) int {
+		return strings.Compare(left.Fingerprint, right.Fingerprint)
+	})
+	lines := make([]string, 0, len(retained))
+	for _, candidate := range retained {
+		resolved, err := (ArchitectureSimulationPlanResolver{
+			Requirement: requirement, Search: search, GraphResolver: resolver, ProvenanceRegistry: provenance,
+		}).resolveArchitectureCandidate(ctx, closedloopsynthesis.CandidateState{Fingerprint: candidate.Fingerprint})
+		if err != nil {
+			lines = append(lines, fmt.Sprintf("%s resolution: %v", candidate.Fingerprint, err))
+			continue
+		}
+		lines = append(lines, fmt.Sprintf(
+			"%s synthesis simulation: status=%s model=%s reason=%s resolved_plan=%t claims=%s",
+			candidate.Fingerprint,
+			resolved.SynthesisReport.Simulation.Status,
+			resolved.SynthesisReport.Simulation.ModelID,
+			resolved.SynthesisReport.Simulation.Reason,
+			resolved.Resolved.Simulation != nil,
+			closedLoopComponentClaimSummary(resolved.Resolved),
+		))
+	}
+	return strings.Join(lines, "\n")
+}
+
+func closedLoopComponentClaimSummary(resolved circuitgraph.ResolvedDocument) string {
+	claims := make([]string, 0, len(resolved.Components))
+	for _, component := range resolved.Components {
+		models := make([]string, 0, len(component.Record.SimulationModels))
+		for _, model := range component.Record.SimulationModels {
+			models = append(models, model.ModelID)
+		}
+		if len(models) > 1 || strings.Contains(component.Instance.ID, "current_shunt") {
+			claims = append(claims, fmt.Sprintf("%s:%s:%v", component.Instance.ID, component.ComponentID, models))
+		}
+	}
+	slices.Sort(claims)
+	return strings.Join(claims, ",")
 }
 
 func acSweepRangeSummary(evidence closedloopsynthesis.SimulationEvidence, requirementID, operatingCase string) string {
@@ -738,6 +814,10 @@ func dominantNoiseSummary(evidence closedloopsynthesis.SimulationEvidence, requi
 
 func runOpenSetWorkflow(t *testing.T, request designworkflow.Request, index libraryresolver.LibraryIndex, cli string, output string) designworkflow.WorkflowResult {
 	t.Helper()
+	indexBefore, err := json.Marshal(index)
+	if err != nil {
+		t.Fatalf("marshal library index before workflow: %v", err)
+	}
 	opts := designworkflow.CreateOptions{
 		OutputDir: output, Overwrite: true, LibraryIndex: &index,
 		Writer: writercorrectness.Options{LibraryIndex: index, HasLibraryIndex: true, LibraryResolutionUsed: true},
@@ -748,10 +828,17 @@ func runOpenSetWorkflow(t *testing.T, request designworkflow.Request, index libr
 		opts.Writer = writercorrectness.Options{RequireKiCadRoundTrip: true, StrictDiffs: true, KiCadCLI: cli, KeepArtifacts: true, ArtifactDir: filepath.Join(output, ".kicadai", "roundtrip"), LibraryIndex: index, HasLibraryIndex: true, LibraryResolutionUsed: true}
 	}
 	result := designworkflow.Create(context.Background(), request, opts)
+	indexAfter, err := json.Marshal(index)
+	if err != nil {
+		t.Fatalf("marshal library index after workflow: %v", err)
+	}
+	if !bytes.Equal(indexBefore, indexAfter) {
+		t.Fatal("design workflow mutated its immutable library index input")
+	}
 	if os.Getenv("KICADAI_ROUTE_DIAGNOSTICS") != "" {
 		t.Logf("routing diagnostics: %#v", openSetWorkflowStage(result, designworkflow.StageRouting))
 	}
-	for _, stageName := range []designworkflow.StageName{designworkflow.StageSchematic, designworkflow.StageSchematicElectrical, designworkflow.StagePlacement, designworkflow.StageRouting, designworkflow.StageProjectWrite, designworkflow.StageWriterCorrect, designworkflow.StageValidation} {
+	for _, stageName := range []designworkflow.StageName{designworkflow.StageSchematic, designworkflow.StageSchematicElectrical, designworkflow.StagePlacement, designworkflow.StageRouting, designworkflow.StageProjectWrite, designworkflow.StageWriterCorrect, designworkflow.StageValidation, designworkflow.StageSimulation} {
 		stage := openSetWorkflowStage(result, stageName)
 		if stage == nil || stage.Status == designworkflow.StageStatusBlocked || stage.Status == designworkflow.StageStatusSkipped {
 			t.Fatalf("%s stage = %#v; workflow issues = %#v", stageName, stage, designworkflow.WorkflowIssues(result))

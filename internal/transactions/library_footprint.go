@@ -203,18 +203,19 @@ func importedPadsFromRecord(generator kicadfiles.IDGenerator, ref string, record
 	pads := make([]pcb.Pad, 0, len(record.Pads))
 	for i, pad := range record.Pads {
 		pads = append(pads, pcb.Pad{
-			Raw:         strings.TrimSpace(pad.Raw),
-			UUID:        generator.New("imported.pcb.footprint.pad", ref, pad.Name, strconv.Itoa(i)),
-			Name:        pad.Name,
-			Type:        pad.Type,
-			Shape:       pad.Shape,
-			Position:    pad.Position,
-			Rotation:    kicadfiles.Angle(pad.Rotation),
-			Size:        pad.Size,
-			Drill:       pad.Drill,
-			Layers:      placementLayers(pad.Layers, layer),
-			PinFunction: pad.PinFunction,
-			PinType:     pad.PinType,
+			Raw:             strings.TrimSpace(pad.Raw),
+			UUID:            generator.New("imported.pcb.footprint.pad", ref, pad.Name, strconv.Itoa(i)),
+			Name:            pad.Name,
+			Type:            pad.Type,
+			Shape:           pad.Shape,
+			RoundRectRRatio: pad.RoundRectR,
+			Position:        pad.Position,
+			Rotation:        kicadfiles.Angle(pad.Rotation),
+			Size:            pad.Size,
+			Drill:           pad.Drill,
+			Layers:          placementLayers(pad.Layers, layer),
+			PinFunction:     pad.PinFunction,
+			PinType:         pad.PinType,
 		})
 	}
 	return pads
@@ -261,7 +262,14 @@ func footprintTextsFromRecord(texts []libraryresolver.FootprintText, placementLa
 			Kind:     text.Kind,
 			Text:     text.Text,
 			Position: text.Position,
+			Rotation: text.Rotation,
 			Layer:    kicadfiles.BoardLayerForPlacement(kicadfiles.BoardLayer(text.Layer), placementLayer),
+			Effects: pcb.TextEffects{
+				FontSize:          text.FontSize,
+				FontThickness:     text.FontThickness,
+				OmitFontThickness: text.OmitFontThickness,
+				Justify:           append([]string(nil), text.Justify...),
+			},
 		})
 	}
 	return result

@@ -655,7 +655,7 @@ func TestDerivedDistortionUsesBehavioralSwingGainAndOneSemanticInput(t *testing.
 		t.Fatal(err)
 	}
 	analysis := intent.Analyses[0]
-	if analysis.DurationS != .004 || analysis.TimeStepS != .00003125 {
+	if analysis.DurationS != .004 || analysis.TimeStepS != 1/(behavioralDistortionFrequencyHz*behavioralDistortionSamplesPerCycle) {
 		t.Fatalf("distortion grid = duration %.12g step %.12g", analysis.DurationS, analysis.TimeStepS)
 	}
 	input, supply := analysis.Excitations[0], analysis.Excitations[1]
@@ -665,6 +665,36 @@ func TestDerivedDistortionUsesBehavioralSwingGainAndOneSemanticInput(t *testing.
 	}
 	if supply.DCValue != 18 || supply.SineFrequencyHz != 0 {
 		t.Fatalf("distortion supply must remain DC-powered: %#v", supply)
+	}
+}
+
+func TestDerivedDistortionMeasuresOutputPowerAtTheRequestedOperatingPoint(t *testing.T) {
+	minimumGain, minimumPower, loadResistance := 20.0, 10.0, 8.0
+	requirement := architecturesearch.Requirement{Requirements: architecturesearch.Requirements{
+		BehavioralRequirements: []architecturesearch.BehavioralRequirement{
+			{ID: "gain", Metric: "voltage_gain", Min: &minimumGain, Unit: "ratio"},
+			{ID: "power", Metric: "output_power", Min: &minimumPower, Unit: "W"},
+		},
+		OperatingCases: []architecturesearch.OperatingCase{{Conditions: []architecturesearch.OperatingCondition{{Axis: "load_resistance", Min: &loadResistance, Max: &loadResistance}}}},
+	}}
+	base := simmodel.Plan{
+		ModelID: simmodel.ModelNonlinearCircuitDCV1, GroundNode: "GND", Nodes: []string{"GND", "IN"},
+		Devices: []simmodel.ResolvedDevice{{
+			Component: "input", PrimitiveModel: simmodel.PrimitiveVoltageSourceV1,
+			Terminals: []simmodel.TerminalBinding{{Terminal: "POSITIVE", Net: "IN"}, {Terminal: "NEGATIVE", Net: "GND"}},
+		}},
+		Analyses: []simmodel.Analysis{{ID: "dc", Kind: simmodel.AnalysisDCOperatingPoint, Excitations: []simmodel.SourceExcitation{{Component: "input"}}}},
+	}
+	intent, err := derivedGraphWorkflowIntent(requirement, base, simmodel.AnalysisDistortion, "IN")
+	if err != nil {
+		t.Fatal(err)
+	}
+	wantRatedAmplitude := math.Sqrt(2*minimumPower*loadResistance) / minimumGain
+	if got := intent.Analyses[0].Excitations[0].SineAmplitude; got != wantRatedAmplitude {
+		t.Fatalf("distortion input amplitude = %.12g, want exact rated-power amplitude %.12g", got, wantRatedAmplitude)
+	}
+	if guarded, ok := behavioralInputAmplitude(requirement); !ok || guarded != wantRatedAmplitude*behavioralRatedPowerVoltageGuard {
+		t.Fatalf("guarded transient/thermal amplitude = %.12g, %t", guarded, ok)
 	}
 }
 
@@ -692,8 +722,8 @@ func TestDerivedThermalUsesRatedPeriodicDrive(t *testing.T) {
 		t.Fatal(err)
 	}
 	analysis := intent.Analyses[0]
-	wantAmplitude := math.Sqrt(2*minimumPower*loadResistance) * 1.02 / minimumGain
-	if intent.ModelID != simmodel.ModelTransientCircuitV1 || analysis.Kind != simmodel.AnalysisThermal || analysis.DurationS != .004 || analysis.TimeStepS != .00003125 {
+	wantAmplitude := math.Sqrt(2*minimumPower*loadResistance) * behavioralRatedPowerVoltageGuard / minimumGain
+	if intent.ModelID != simmodel.ModelTransientCircuitV1 || analysis.Kind != simmodel.AnalysisThermal || analysis.DurationS != .004 || analysis.TimeStepS != 1/(behavioralDistortionFrequencyHz*behavioralDistortionSamplesPerCycle) {
 		t.Fatalf("derived thermal workflow = model %s analysis %#v", intent.ModelID, analysis)
 	}
 	if analysis.Excitations[0].SineAmplitude != wantAmplitude || analysis.Excitations[0].SineFrequencyHz != 1000 || analysis.Excitations[1].SineFrequencyHz != 0 {

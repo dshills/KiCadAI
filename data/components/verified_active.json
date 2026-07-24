@@ -90,6 +90,7 @@
       "lifecycle": "active",
       "tags": ["analog", "opamp", "single", "rail_to_rail", "high_voltage", "soic8"],
       "ratings": [{"kind": "supply_voltage", "min": "4.5", "max": "36", "unit": "V"}, {"kind": "supply_current", "max": "1.5", "unit": "mA"}],
+      "values": [{"kind": "input_offset_voltage", "max": "0.000075", "unit": "V"}],
       "temperature": {"min": "-40", "max": "125", "unit": "C"},
       "companions": [{"id": "opamp.decoupling_capacitor", "family": "capacitor", "role": "decoupling_capacitor", "required": true, "recipes": [{"id": "supply_bypass", "family": "capacitor", "role": "decoupling_capacitor", "package": "0603", "value_kind": "capacitance", "value": "100n", "min_voltage_v": 50, "minimum_confidence": "rule_inferred", "required_functions": ["A", "B"], "connections": [{"function": "A", "parent_function": "V_PLUS"}, {"function": "B", "parent_function": "V_MINUS"}]}], "description": "Place a low-inductance bypass capacitor directly across the OPA197 supply pins."}],
       "simulation_models": [{

@@ -67,6 +67,7 @@ var lanes = []Lane{
 	{Name: "circuit-function", Command: []string{"circuit", "create"}},
 	{Name: "design", Command: []string{"design", "create"}},
 	{Name: "intent", Command: []string{"intent", "create"}},
+	{Name: "requirement", Command: []string{"requirement", "create"}},
 }
 
 var strictGateContract = struct {

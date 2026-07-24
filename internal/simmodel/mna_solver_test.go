@@ -451,6 +451,33 @@ func TestMNAOpAmpTransferIsGroundReferencedWithSplitSupply(t *testing.T) {
 	}
 }
 
+func TestSmallSignalReferenceOnlyAnchorsDisconnectedUnobservedComponent(t *testing.T) {
+	system := mnaSystem{
+		matrix: [][]complex128{
+			{1, 0, 0},
+			{0, 1, -1},
+			{0, -1, 1},
+		},
+		rhs:           []complex128{1, 0, 0},
+		unknownLabels: []string{"node:OUT", "node:FLY_A", "node:FLY_B"},
+		nodeIndex:     map[string]int{"OUT": 0, "FLY_A": 1, "FLY_B": 2},
+		branchIndex:   map[string]int{},
+	}
+	plan := Plan{Assertions: []Assertion{{AnalysisID: "noise", Node: "OUT", Quantity: QuantityIntegratedNoiseVRMS}}}
+	analysis := Analysis{ID: "noise", Kind: AnalysisNoise}
+	referenceUnobservedMNAComponents(plan, analysis, &system)
+	if system.matrix[0][0] != 1 {
+		t.Fatalf("observable graph was loaded: %#v", system.matrix)
+	}
+	if system.matrix[1][1] != 1+complex(mnaUnobservedReferenceS, 0) {
+		t.Fatalf("disconnected graph was not deterministically referenced: %#v", system.matrix)
+	}
+	solution, diagnostic := solveMNA(system)
+	if diagnostic != nil || real(solution[0]) != 1 {
+		t.Fatalf("solution=%#v diagnostic=%#v", solution, diagnostic)
+	}
+}
+
 func TestMNAOpAmpDCClampsOpenLoopComparatorToCatalogOutputRange(t *testing.T) {
 	intent := Intent{
 		ModelID: ModelLinearCircuitMNAV1,

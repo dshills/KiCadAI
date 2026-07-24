@@ -106,10 +106,14 @@ func buildOccupancy(request Request, currentNet string, movingCopperRadiusMM flo
 			if sameOccupancyNet(pad.Net, currentNetKey) {
 				continue
 			}
-			obstacle := Obstacle{Kind: ObstacleOtherNetPad, Geometry: padRect(component, pad), Clearance: request.Rules.ClearanceMM, Source: component.Ref + "." + pad.Name}
+			clearanceMM := request.Rules.ClearanceMM
+			if pad.Clearance != nil {
+				clearanceMM = max(clearanceMM, *pad.Clearance)
+			}
+			obstacle := Obstacle{Kind: ObstacleOtherNetPad, Geometry: padRect(component, pad), Clearance: clearanceMM, Source: component.Ref + "." + pad.Name}
 			for _, layer := range padAccessLayers(pad, routableLayerNames(request.Board.Layers)) {
 				obstacle.Layer = layer
-				occupancy.addShape(layerIndexes, layer, obstacle.Geometry, request.Rules.ClearanceMM+movingCopperRadiusMM, obstacle)
+				occupancy.addShape(layerIndexes, layer, obstacle.Geometry, clearanceMM+movingCopperRadiusMM, obstacle)
 			}
 		}
 	}

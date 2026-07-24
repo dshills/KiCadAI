@@ -15,6 +15,7 @@ import (
 const (
 	FormulaDividerAttenuator = "divider_attenuator"
 	FormulaFeedbackDivider   = "feedback_divider"
+	FormulaFeedbackBias      = "feedback_divider_bias_current"
 	FormulaRCPole            = "rc_pole"
 	FormulaSallenKeyLowPass  = "sallen_key_low_pass"
 	FormulaHysteresis        = "comparator_hysteresis"
@@ -38,11 +39,12 @@ const (
 type PreferredSeries string
 
 const (
-	SeriesE6  PreferredSeries = "E6"
-	SeriesE12 PreferredSeries = "E12"
-	SeriesE24 PreferredSeries = "E24"
-	SeriesE48 PreferredSeries = "E48"
-	SeriesE96 PreferredSeries = "E96"
+	SeriesE6   PreferredSeries = "E6"
+	SeriesE12  PreferredSeries = "E12"
+	SeriesE24  PreferredSeries = "E24"
+	SeriesE48  PreferredSeries = "E48"
+	SeriesE96  PreferredSeries = "E96"
+	SeriesE192 PreferredSeries = "E192"
 )
 
 type FormulaDescriptor struct {
@@ -110,6 +112,7 @@ type CalculationEvidence struct {
 func FormulaLibraryHash() string {
 	descriptors := []FormulaDescriptor{
 		{ID: FormulaDividerAttenuator, Revision: FormulaRevision},
+		{ID: FormulaFeedbackBias, Revision: FormulaRevision},
 		{ID: FormulaFeedbackDivider, Revision: FormulaRevision},
 		{ID: FormulaGateDrive, Revision: FormulaRevision},
 		{ID: FormulaCurrentSense, Revision: FormulaRevision},

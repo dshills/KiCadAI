@@ -222,6 +222,162 @@
       }
     },
     {
+      "catalog_id": "capacitor.panasonic.eeufr1a151.radial",
+      "family": "capacitor",
+      "model_id": "mna_capacitor_transient_be_v1",
+      "provenance": {
+        "source": "https://industrial.panasonic.com/cdbs/www-data/pdf/RDF0000/ABA0000C1259.pdf",
+        "revision": "panasonic:FR-A:EEUFR1A151:2026-07",
+        "sha256": "19f725a7b01f981f33aeb7446e16f61398116168eea4ac05a70e2146bee8c049",
+        "review_status": "reviewed",
+        "allowed_analyses": [
+          "distortion",
+          "startup",
+          "thermal",
+          "transient"
+        ],
+        "min_temperature_c": -40,
+        "max_temperature_c": 105
+      }
+    },
+    {
+      "catalog_id": "capacitor.panasonic.eeufr1a151.radial",
+      "family": "capacitor",
+      "model_id": "mna_capacitor_v1",
+      "provenance": {
+        "source": "https://industrial.panasonic.com/cdbs/www-data/pdf/RDF0000/ABA0000C1259.pdf",
+        "revision": "panasonic:FR-A:EEUFR1A151:2026-07",
+        "sha256": "ef0b29d721870e25f9e49b43cfbcf2510a7136e6ba50da1ad0da0c7b1360d226",
+        "review_status": "reviewed",
+        "allowed_analyses": [
+          "ac_sweep",
+          "dc_operating_point",
+          "noise",
+          "stability",
+          "thermal"
+        ],
+        "min_temperature_c": -40,
+        "max_temperature_c": 105
+      }
+    },
+    {
+      "catalog_id": "capacitor.kemet.t491a475k025at.case_a",
+      "family": "capacitor",
+      "model_id": "mna_capacitor_transient_be_v1",
+      "provenance": {
+        "source": "https://content.kemet.com/datasheets/KEM_T2005_T491.pdf",
+        "revision": "kemet:T491:T491A475K025AT:2026-07",
+        "sha256": "19f725a7b01f981f33aeb7446e16f61398116168eea4ac05a70e2146bee8c049",
+        "review_status": "reviewed",
+        "allowed_analyses": [
+          "distortion",
+          "startup",
+          "thermal",
+          "transient"
+        ],
+        "min_temperature_c": -55,
+        "max_temperature_c": 125
+      }
+    },
+    {
+      "catalog_id": "capacitor.kemet.t491a475k025at.case_a",
+      "family": "capacitor",
+      "model_id": "mna_capacitor_v1",
+      "provenance": {
+        "source": "https://content.kemet.com/datasheets/KEM_T2005_T491.pdf",
+        "revision": "kemet:T491:T491A475K025AT:2026-07",
+        "sha256": "ef0b29d721870e25f9e49b43cfbcf2510a7136e6ba50da1ad0da0c7b1360d226",
+        "review_status": "reviewed",
+        "allowed_analyses": [
+          "ac_sweep",
+          "dc_operating_point",
+          "noise",
+          "stability",
+          "thermal"
+        ],
+        "min_temperature_c": -55,
+        "max_temperature_c": 125
+      }
+    },
+    {
+      "catalog_id": "capacitor.panasonic.eeufr1c221.radial",
+      "family": "capacitor",
+      "model_id": "mna_capacitor_transient_be_v1",
+      "provenance": {
+        "source": "https://industrial.panasonic.com/cdbs/www-data/pdf/RDF0000/ABA0000C1259.pdf",
+        "revision": "panasonic:FR-A:EEUFR1C221:2026-07",
+        "sha256": "19f725a7b01f981f33aeb7446e16f61398116168eea4ac05a70e2146bee8c049",
+        "review_status": "reviewed",
+        "allowed_analyses": [
+          "distortion",
+          "startup",
+          "thermal",
+          "transient"
+        ],
+        "min_temperature_c": -40,
+        "max_temperature_c": 105
+      }
+    },
+    {
+      "catalog_id": "capacitor.panasonic.eeufr1c221.radial",
+      "family": "capacitor",
+      "model_id": "mna_capacitor_v1",
+      "provenance": {
+        "source": "https://industrial.panasonic.com/cdbs/www-data/pdf/RDF0000/ABA0000C1259.pdf",
+        "revision": "panasonic:FR-A:EEUFR1C221:2026-07",
+        "sha256": "ef0b29d721870e25f9e49b43cfbcf2510a7136e6ba50da1ad0da0c7b1360d226",
+        "review_status": "reviewed",
+        "allowed_analyses": [
+          "ac_sweep",
+          "dc_operating_point",
+          "noise",
+          "stability",
+          "thermal"
+        ],
+        "min_temperature_c": -40,
+        "max_temperature_c": 105
+      }
+    },
+    {
+      "catalog_id": "capacitor.panasonic.eeufr1c471.radial",
+      "family": "capacitor",
+      "model_id": "mna_capacitor_transient_be_v1",
+      "provenance": {
+        "source": "https://industrial.panasonic.com/cdbs/www-data/pdf/RDF0000/ABA0000C1259.pdf",
+        "revision": "panasonic:FR-A:EEUFR1C471:2026-07",
+        "sha256": "19f725a7b01f981f33aeb7446e16f61398116168eea4ac05a70e2146bee8c049",
+        "review_status": "reviewed",
+        "allowed_analyses": [
+          "distortion",
+          "startup",
+          "thermal",
+          "transient"
+        ],
+        "min_temperature_c": -40,
+        "max_temperature_c": 105
+      }
+    },
+    {
+      "catalog_id": "capacitor.panasonic.eeufr1c471.radial",
+      "family": "capacitor",
+      "model_id": "mna_capacitor_v1",
+      "provenance": {
+        "source": "https://industrial.panasonic.com/cdbs/www-data/pdf/RDF0000/ABA0000C1259.pdf",
+        "revision": "panasonic:FR-A:EEUFR1C471:2026-07",
+        "sha256": "ef0b29d721870e25f9e49b43cfbcf2510a7136e6ba50da1ad0da0c7b1360d226",
+        "review_status": "reviewed",
+        "allowed_analyses": [
+          "ac_sweep",
+          "dc_operating_point",
+          "noise",
+          "stability",
+          "thermal"
+        ],
+        "min_temperature_c": -40,
+        "max_temperature_c": 105
+      }
+    },
+    {
       "catalog_id": "capacitor.panasonic.eeufr1v221.radial",
       "family": "capacitor",
       "model_id": "mna_capacitor_transient_be_v1",
@@ -368,6 +524,61 @@
         ],
         "min_temperature_c": -40,
         "max_temperature_c": 85
+      }
+    },
+    {
+      "catalog_id": "capacitor.kemet.mil-prf-32535.c0g.1210.e12.1p0",
+      "family": "capacitor",
+      "model_id": "mna_capacitor_transient_be_v1",
+      "provenance": {
+        "source": "https://content.kemet.com/datasheets/KEM_C1095_MIL-PRF-32535.pdf",
+        "revision": "KEMET MIL-PRF-32535 C0G data sheet C1095, reviewed 2026-07-24",
+        "sha256": "19f725a7b01f981f33aeb7446e16f61398116168eea4ac05a70e2146bee8c049",
+        "review_status": "reviewed",
+        "allowed_analyses": [
+          "distortion",
+          "startup",
+          "thermal",
+          "transient"
+        ],
+        "min_temperature_c": -55,
+        "max_temperature_c": 125
+      }
+    },
+    {
+      "catalog_id": "capacitor.kemet.mil-prf-32535.c0g.1210.e12.1p0",
+      "family": "capacitor",
+      "model_id": "mna_capacitor_v1",
+      "provenance": {
+        "source": "https://content.kemet.com/datasheets/KEM_C1095_MIL-PRF-32535.pdf",
+        "revision": "KEMET MIL-PRF-32535 C0G data sheet C1095, reviewed 2026-07-24",
+        "sha256": "ef0b29d721870e25f9e49b43cfbcf2510a7136e6ba50da1ad0da0c7b1360d226",
+        "review_status": "reviewed",
+        "allowed_analyses": [
+          "ac_sweep",
+          "dc_operating_point",
+          "noise",
+          "stability",
+          "thermal"
+        ],
+        "min_temperature_c": -55,
+        "max_temperature_c": 125
+      }
+    },
+    {
+      "catalog_id": "capacitor.kemet.mil-prf-32535.c0g.1210.e12.1p0",
+      "family": "capacitor",
+      "model_id": "rc_lowpass_ac_v1",
+      "provenance": {
+        "source": "https://content.kemet.com/datasheets/KEM_C1095_MIL-PRF-32535.pdf",
+        "revision": "KEMET MIL-PRF-32535 C0G data sheet C1095, reviewed 2026-07-24",
+        "sha256": "fa3f2e5de7f34219b8f1fc7438ba14793c99a4d789173cf53db1045f42accca8",
+        "review_status": "reviewed",
+        "allowed_analyses": [
+          "ac_sweep"
+        ],
+        "min_temperature_c": -55,
+        "max_temperature_c": 125
       }
     },
     {
@@ -427,6 +638,25 @@
         ],
         "min_temperature_c": -55,
         "max_temperature_c": 125
+      }
+    },
+    {
+      "catalog_id": "capacitor.murata.grm21br61a106ke19l.0805",
+      "family": "capacitor",
+      "model_id": "mna_capacitor_transient_be_v1",
+      "provenance": {
+        "source": "https://www.murata.com/en-us/products/productdetail?partno=GRM21BR61A106KE19%23",
+        "revision": "Murata GRM21BR61A106KE19 product detail, reviewed 2026-07-23",
+        "sha256": "19f725a7b01f981f33aeb7446e16f61398116168eea4ac05a70e2146bee8c049",
+        "review_status": "reviewed",
+        "allowed_analyses": [
+          "distortion",
+          "startup",
+          "thermal",
+          "transient"
+        ],
+        "min_temperature_c": -55,
+        "max_temperature_c": 85
       }
     },
     {
@@ -743,6 +973,23 @@
       "model_id": "mna_dual_output_isolated_converter_v1",
       "provenance": {
         "source": "https://www.tracopower.com/model/tel-12-1222",
+        "revision": "TRACO TEL 12 datasheet, Rev. August 7, 2024",
+        "sha256": "ae2d792f716eb4abf1c369fb863af1eee4c9e88c2736cd3d2774f58db0e56e22",
+        "review_status": "reviewed",
+        "allowed_analyses": [
+          "ac_sweep",
+          "dc_operating_point"
+        ],
+        "min_temperature_c": -40,
+        "max_temperature_c": 85
+      }
+    },
+    {
+      "catalog_id": "isolated_converter.traco.tel12_1223.dip16",
+      "family": "isolated_converter",
+      "model_id": "mna_dual_output_isolated_converter_v1",
+      "provenance": {
+        "source": "https://www.tracopower.com/model/tel-12-1223",
         "revision": "TRACO TEL 12 datasheet, Rev. August 7, 2024",
         "sha256": "ae2d792f716eb4abf1c369fb863af1eee4c9e88c2736cd3d2774f58db0e56e22",
         "review_status": "reviewed",
@@ -1240,6 +1487,28 @@
       }
     },
     {
+      "catalog_id": "regulator.ti.lm7705mme.vssop8",
+      "family": "regulator",
+      "model_id": "mna_floating_adjustable_regulator_v1",
+      "provenance": {
+        "source": "https://www.ti.com/lit/ds/symlink/lm7705.pdf",
+        "revision": "TI:LM7705:SNVS420D:RevD; source PDF SHA-256 90c1104b9b42bc575fdc05425e77af07049ba802f6cb02d598be835bc19a3050",
+        "sha256": "3dff7c3aadd3d5f4f5e5fe186cb74082b1ea522cd772cf56d23ffab74e5fd0b1",
+        "review_status": "reviewed",
+        "allowed_analyses": [
+          "ac_sweep",
+          "dc_operating_point",
+          "distortion",
+          "stability",
+          "startup",
+          "thermal",
+          "transient"
+        ],
+        "min_temperature_c": -40,
+        "max_temperature_c": 125
+      }
+    },
+    {
       "catalog_id": "relay.omron.g5q_1a.dc12",
       "family": "relay",
       "model_id": "mna_relay_closed_state_v1",
@@ -1417,6 +1686,104 @@
       }
     },
     {
+      "catalog_id": "resistor.vishay.pr02.1k00.2w",
+      "family": "resistor",
+      "model_id": "mna_resistor_v1",
+      "provenance": {
+        "source": "https://www.vishay.com/docs/28729/pr010203.pdf",
+        "revision": "vishay:PR02:PR02000201001JA100:2026-07",
+        "sha256": "ed2413ddd37969961f8ad017ba272c18c42228660e14a5757b6b788f4326cf61",
+        "review_status": "reviewed",
+        "allowed_analyses": ["ac_sweep", "dc_operating_point", "distortion", "noise", "stability", "startup", "thermal", "transient"],
+        "min_temperature_c": -55,
+        "max_temperature_c": 155
+      }
+    },
+    {
+      "catalog_id": "resistor.vishay.pr02.2k00.2w",
+      "family": "resistor",
+      "model_id": "mna_resistor_v1",
+      "provenance": {
+        "source": "https://www.vishay.com/docs/28729/pr010203.pdf",
+        "revision": "vishay:PR02:PR02000202001JA100:2026-07",
+        "sha256": "ed2413ddd37969961f8ad017ba272c18c42228660e14a5757b6b788f4326cf61",
+        "review_status": "reviewed",
+        "allowed_analyses": ["ac_sweep", "dc_operating_point", "distortion", "noise", "stability", "startup", "thermal", "transient"],
+        "min_temperature_c": -55,
+        "max_temperature_c": 155
+      }
+    },
+    {
+      "catalog_id": "resistor.vishay.mca1206at.e192.0p1",
+      "family": "resistor",
+      "model_id": "mna_resistor_v1",
+      "provenance": {
+        "source": "https://www.vishay.com/docs/28952/mcr0201at-mca1206at.pdf",
+        "revision": "vishay:MCA1206-AT:28952:2026-05-28",
+        "sha256": "ed2413ddd37969961f8ad017ba272c18c42228660e14a5757b6b788f4326cf61",
+        "review_status": "reviewed",
+        "allowed_analyses": ["ac_sweep", "dc_operating_point", "distortion", "noise", "stability", "startup", "thermal", "transient"],
+        "min_temperature_c": -55,
+        "max_temperature_c": 175
+      }
+    },
+    {
+      "catalog_id": "resistor.vishay.mca1206at.e192.0p1.10ppm",
+      "family": "resistor",
+      "model_id": "mna_resistor_v1",
+      "provenance": {
+        "source": "https://www.vishay.com/docs/28952/mcr0201at-mca1206at.pdf",
+        "revision": "vishay:MCA1206-AT:28952:2026-05-28",
+        "sha256": "ed2413ddd37969961f8ad017ba272c18c42228660e14a5757b6b788f4326cf61",
+        "review_status": "reviewed",
+        "allowed_analyses": ["ac_sweep", "dc_operating_point", "distortion", "noise", "stability", "startup", "thermal", "transient"],
+        "min_temperature_c": -55,
+        "max_temperature_c": 175
+      }
+    },
+    {
+      "catalog_id": "resistor.vishay.tnpu1206.e192.0p02.2ppm",
+      "family": "resistor",
+      "model_id": "mna_resistor_v1",
+      "provenance": {
+        "source": "https://www.vishay.com/docs/28779/tnpue3.pdf",
+        "revision": "vishay:TNPU-e3:28779:2025-03-04",
+        "sha256": "ed2413ddd37969961f8ad017ba272c18c42228660e14a5757b6b788f4326cf61",
+        "review_status": "reviewed",
+        "allowed_analyses": ["ac_sweep", "dc_operating_point", "distortion", "noise", "stability", "startup", "thermal", "transient"],
+        "min_temperature_c": -55,
+        "max_temperature_c": 125
+      }
+    },
+    {
+      "catalog_id": "resistor.vishay.tnpu1206.e192.0p05.5ppm",
+      "family": "resistor",
+      "model_id": "mna_resistor_v1",
+      "provenance": {
+        "source": "https://www.vishay.com/docs/28779/tnpue3.pdf",
+        "revision": "vishay:TNPU-e3:28779:2025-03-04",
+        "sha256": "ed2413ddd37969961f8ad017ba272c18c42228660e14a5757b6b788f4326cf61",
+        "review_status": "reviewed",
+        "allowed_analyses": ["ac_sweep", "dc_operating_point", "distortion", "noise", "stability", "startup", "thermal", "transient"],
+        "min_temperature_c": -55,
+        "max_temperature_c": 125
+      }
+    },
+    {
+      "catalog_id": "resistor.vishay.tnpw1206.e192.0p1",
+      "family": "resistor",
+      "model_id": "mna_resistor_v1",
+      "provenance": {
+        "source": "https://www.vishay.com/docs/28758/tnpw_e3.pdf",
+        "revision": "vishay:TNPW-e3:28758:2026-04-10",
+        "sha256": "ed2413ddd37969961f8ad017ba272c18c42228660e14a5757b6b788f4326cf61",
+        "review_status": "reviewed",
+        "allowed_analyses": ["ac_sweep", "dc_operating_point", "distortion", "noise", "stability", "startup", "thermal", "transient"],
+        "min_temperature_c": -55,
+        "max_temperature_c": 155
+      }
+    },
+    {
       "catalog_id": "resistor.vishay.tnpw0805.10k0.0p1",
       "family": "resistor",
       "model_id": "mna_resistor_v1",
@@ -1521,6 +1888,29 @@
         ],
         "min_temperature_c": -40,
         "max_temperature_c": 85
+      }
+    },
+    {
+      "catalog_id": "resistor.vishay.crcw080547r0fkea.0805",
+      "family": "resistor",
+      "model_id": "mna_resistor_v1",
+      "provenance": {
+        "source": "kicadai:trusted-simulation-registry",
+        "revision": "kicadai.trusted-simulation-registry.v1",
+        "sha256": "ed2413ddd37969961f8ad017ba272c18c42228660e14a5757b6b788f4326cf61",
+        "review_status": "reviewed",
+        "allowed_analyses": [
+          "ac_sweep",
+          "dc_operating_point",
+          "distortion",
+          "noise",
+          "stability",
+          "startup",
+          "thermal",
+          "transient"
+        ],
+        "min_temperature_c": -55,
+        "max_temperature_c": 155
       }
     },
     {
@@ -1736,6 +2126,20 @@
         "allowed_analyses": ["ac_sweep", "dc_operating_point", "distortion", "stability", "startup", "thermal", "transient"],
         "min_temperature_c": -55,
         "max_temperature_c": 150
+      }
+    },
+    {
+      "catalog_id": "voltage_reference.analog_devices.max6006aeur_1v25.sot23",
+      "family": "voltage_reference",
+      "model_id": "mna_shunt_voltage_reference_v1",
+      "provenance": {
+        "source": "https://www.analog.com/media/en/technical-documentation/data-sheets/MAX6006A-MAX6009B.pdf",
+        "revision": "MAX6006A-MAX6009B Rev. 4; 1.25 V accuracy, drift, bias, reverse-voltage, and temperature limits",
+        "sha256": "784915a4c6bdc4f763d8108796dce22a27da54b7ca3d96dfd99e513774c116e5",
+        "review_status": "reviewed",
+        "allowed_analyses": ["dc_operating_point", "startup", "thermal", "transient"],
+        "min_temperature_c": -40,
+        "max_temperature_c": 85
       }
     },
     {

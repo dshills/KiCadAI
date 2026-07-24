@@ -202,6 +202,35 @@ promotes the modeled slice only; unreviewed converter/control-loop behavior,
 isolation, RF/high-speed interfaces, arbitrary parts, and high-energy thermal
 or protection claims remain unsupported.
 
+## Held-Out Capability Expansion
+
+The versioned behavior-only capability benchmark supplies two requirements in
+each of six domains: analog, power, digital, MCU, sensor, and mixed-signal.
+Neither prompts nor normalized requirements prescribe topology, components,
+nets, pins, coordinates, layers, routes, providers, or expected evidence.
+
+The frozen baseline passed 5 of 12 complete installed-KiCad workflows. The
+final report passes 11 of 12 with the original evaluator and unchanged gate
+profile. Reusable support now covers three distinct constant-current contexts
+and two precision-rectification contexts. All control rows remain passing.
+Every promoted row reaches trusted simulation, physical realization,
+connectivity and route completion, writer correctness, clean ERC, strict DRC,
+zero-difference round trip, and deterministic replay.
+
+Standalone `clock_generation` is the sole remaining benchmark gap and remains
+fail-closed at architecture selection. This result materially broadens the
+measured envelope, but twelve cases cannot establish arbitrary circuit
+generation, unrestricted part qualification, dense-board routing,
+RF/high-speed behavior, mains safety, or fabrication release.
+
+Authoritative evidence:
+
+- [benchmark specification](../specs/held-out-capability-expansion/SPEC.md);
+- [5/12 frozen baseline](../specs/held-out-capability-expansion/BASELINE_REPORT.json);
+- [11/12 final report](../specs/held-out-capability-expansion/FINAL_REPORT.json);
+  and
+- [five-scenario promotion matrix](../specs/held-out-capability-expansion/PROMOTION_MATRIX.json).
+
 ## Reproducible Promotion Evidence
 
 Run `make promotion-bundle` from an unmodified checkout to reproduce the

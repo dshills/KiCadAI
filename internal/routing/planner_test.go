@@ -417,6 +417,9 @@ func TestPlanEndpointPairsKeepsRepeatedConstrainedComponentPadsAsLeaves(t *testi
 			t.Fatalf("constrained same-component pads formed a branch: %#v", pair)
 		}
 	}
+	if normalizeKey(pairs[0].To.Ref) != "U1" || normalizeKey(pairs[1].To.Ref) != "U1" {
+		t.Fatalf("constrained leaves were not scheduled before trunk work: %#v", pairs)
+	}
 }
 
 func TestPlanRoutesReportsUnreachableEndpoint(t *testing.T) {

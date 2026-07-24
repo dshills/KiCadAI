@@ -76,6 +76,18 @@ path.
   clean installed-KiCad ERC and strict DRC, and zero-difference round trip.
   Ten reordered negative cases prove stable fail-closed power and interface
   diagnostics. See the [completion audit](specs/constraint-driven-power-tree-interface-synthesis/AUDIT.md).
+- A versioned twelve-case held-out capability benchmark spans analog, power,
+  digital, MCU, sensor, and mixed-signal requirements without prescribing
+  topology, components, nets, pins, or coordinates. The frozen installed-KiCad
+  baseline passed 5/12 cases. The final report passes 11/12 after adding
+  reusable constant-current regulation and precision-rectification support:
+  all three constant-current cases, both precision-rectification cases, and
+  every control pass simulation, routing/connectivity, writer, ERC, strict
+  DRC, zero-diff round trip, and deterministic replay. Standalone clock
+  generation remains a structured `clock_generation` capability gap. See the
+  [specification](specs/held-out-capability-expansion/SPEC.md),
+  [baseline](specs/held-out-capability-expansion/BASELINE_REPORT.json), and
+  [final report](specs/held-out-capability-expansion/FINAL_REPORT.json).
 - Arbitrary electronics generation is not yet guaranteed. Generic graphs fail
   closed on unknown parts, pins, ratings, placement, or routing capability.
 - MCU synthesis is limited to verified catalog records and modeled electrical
@@ -214,6 +226,7 @@ From an unmodified checkout, run:
 
 ```sh
 make promotion-bundle
+make held-out-promotion-bundle
 ```
 
 The command builds the repository CLIs, resolves the version and stock
@@ -223,6 +236,9 @@ twice, verifies all promotion gates and deterministic comparisons, and writes
 one content-addressed bundle below
 `.tmp/clean-checkout-promotion/bundles/`. No manually configured KiCad or
 library paths are required. The output directory must not already exist.
+The held-out target uses the same locked toolchain and verifier with the
+versioned five-scenario matrix for the two newly supported families, writing
+below `.tmp/held-out-capability-promotion/`.
 
 Use `bundle-path.txt` to locate the bundle. Its included files and semantic
 promotion claims can be verified offline:

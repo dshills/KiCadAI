@@ -47,3 +47,33 @@ func TestSolveSallenKeyLowPassRejectsImpossibleTolerance(t *testing.T) {
 		t.Fatalf("issues = %+v", issues)
 	}
 }
+
+func TestSolvePreferredResistanceSallenKeyLowPassFitsBoundedCapacitorSeries(t *testing.T) {
+	request := SallenKeyLowPassRequest{
+		ID: "bounded_stage", TargetFrequencyHz: 100, FrequencyTolerancePercent: 3,
+		TargetQ: .70710678, QTolerancePercent: 10, ResistanceOhm: 10000,
+		ResistanceTolerancePercent: .1, CapacitanceTolerancePercent: 1, CapacitanceSeries: SeriesE12,
+		MinimumCapacitanceF: 560e-12, MaximumCapacitanceF: 47e-9,
+	}
+	first, issues := SolvePreferredResistanceSallenKeyLowPass(request, SeriesE96, 48000, 2e6)
+	if len(issues) != 0 {
+		t.Fatalf("solve issues: %+v", issues)
+	}
+	second, issues := SolvePreferredResistanceSallenKeyLowPass(request, SeriesE96, 48000, 2e6)
+	if len(issues) != 0 || !reflect.DeepEqual(first, second) {
+		t.Fatalf("solver replay differs: issues=%+v\nfirst=%+v\nsecond=%+v", issues, first, second)
+	}
+	resistance, ok := calculationSelectedValue(first, "resistance")
+	if !ok || resistance < 48000 || resistance > 2e6 {
+		t.Fatalf("selected resistance = %.12g, ok=%v", resistance, ok)
+	}
+	for _, name := range []string{"capacitance_1", "capacitance_2"} {
+		value, ok := calculationSelectedValue(first, name)
+		if !ok || value < 560e-12 || value > 47e-9 {
+			t.Fatalf("%s = %.12g, ok=%v", name, value, ok)
+		}
+	}
+	if !first.Pass || len(ValidateCalculation(first)) != 0 {
+		t.Fatalf("calculation is not complete and valid: %+v", first)
+	}
+}

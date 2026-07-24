@@ -79,6 +79,141 @@ func TestRoutingRoutesFromOperationsModelsLogicalInnerTransitionAsThroughVia(t *
 	}
 }
 
+func TestEnsureRouteLayerJunctionViasCompletesSameNetLayerTransition(t *testing.T) {
+	operations := []transactions.Operation{
+		transactions.NewOperation(transactions.OpRoute, []byte(`{"op":"route","net_name":"SIG","layer":"In1.Cu","width_mm":0.2,"points":[{"x_mm":1,"y_mm":2},{"x_mm":4,"y_mm":2}]}`)),
+		transactions.NewOperation(transactions.OpRoute, []byte(`{"op":"route","net_name":"SIG","layer":"F.Cu","width_mm":0.2,"points":[{"x_mm":4,"y_mm":2},{"x_mm":7,"y_mm":2}]}`)),
+		transactions.NewOperation(transactions.OpRoute, []byte(`{"op":"route","net_name":"OTHER","layer":"B.Cu","width_mm":0.2,"points":[{"x_mm":4,"y_mm":2},{"x_mm":4,"y_mm":5}]}`)),
+	}
+	repaired, added, issues := ensureRouteLayerJunctionVias(operations, routing.Rules{ViaDiameterMM: 0.6, ViaDrillMM: 0.3})
+	if reports.HasBlockingIssue(issues) || added != 1 {
+		t.Fatalf("layer-junction completion added=%d issues=%#v", added, issues)
+	}
+	decoded := decodeRouteOperations(repaired)
+	viaCount := 0
+	for _, route := range decoded {
+		for _, via := range route.payload.Vias {
+			if sameRoutePoint(via.At, transactions.Point{XMM: 4, YMM: 2}) {
+				viaCount++
+				if via.DiameterMM != 0.6 || via.DrillMM != 0.3 {
+					t.Fatalf("transition via = %#v", via)
+				}
+			}
+		}
+	}
+	if viaCount != 1 {
+		t.Fatalf("transition via count = %d, want 1: %#v", viaCount, repaired)
+	}
+	again, againAdded, againIssues := ensureRouteLayerJunctionVias(repaired, routing.Rules{})
+	if reports.HasBlockingIssue(againIssues) || againAdded != 0 || len(again) != len(repaired) {
+		t.Fatalf("second completion added=%d issues=%#v operations=%#v", againAdded, againIssues, again)
+	}
+}
+
+func TestEnsureRouteLayerJunctionViasBatchesMultipleTransitionsOnOneOperation(t *testing.T) {
+	operations := []transactions.Operation{
+		mustRouteOperation(t, transactions.RouteOperation{
+			Op: transactions.OpRoute, NetName: "SIG", Layer: "F.Cu", WidthMM: 0.2,
+			Points: []transactions.Point{{XMM: 1, YMM: 2}, {XMM: 4, YMM: 2}, {XMM: 7, YMM: 2}},
+		}),
+		mustRouteOperation(t, transactions.RouteOperation{
+			Op: transactions.OpRoute, NetName: "SIG", Layer: "In1.Cu", WidthMM: 0.2,
+			Points: []transactions.Point{{XMM: 4, YMM: 2}, {XMM: 4, YMM: 5}},
+		}),
+		mustRouteOperation(t, transactions.RouteOperation{
+			Op: transactions.OpRoute, NetName: "SIG", Layer: "B.Cu", WidthMM: 0.2,
+			Points: []transactions.Point{{XMM: 7, YMM: 2}, {XMM: 7, YMM: 5}},
+		}),
+	}
+	repaired, added, issues := ensureRouteLayerJunctionVias(operations, routing.Rules{ViaDiameterMM: 0.6, ViaDrillMM: 0.3})
+	if reports.HasBlockingIssue(issues) || added != 2 {
+		t.Fatalf("layer-junction completion added=%d issues=%#v", added, issues)
+	}
+	decoded := decodeRouteOperations(repaired)
+	if got := len(decoded[0].payload.Vias); got != 2 {
+		t.Fatalf("owning operation vias = %d, want 2: %#v", got, decoded[0].payload.Vias)
+	}
+	if !sameRoutePoint(decoded[0].payload.Vias[0].At, transactions.Point{XMM: 4, YMM: 2}) ||
+		!sameRoutePoint(decoded[0].payload.Vias[1].At, transactions.Point{XMM: 7, YMM: 2}) {
+		t.Fatalf("batched vias are not deterministic: %#v", decoded[0].payload.Vias)
+	}
+	validation := transactions.Validate(transactions.Transaction{Operations: repaired})
+	if reports.HasBlockingIssue(validation.Issues) {
+		t.Fatalf("batched route transaction is invalid: %#v", validation.Issues)
+	}
+}
+
+func TestEnsureRouteLayerJunctionViasSkipsAlreadyConnectedLayerCycle(t *testing.T) {
+	operations := []transactions.Operation{
+		mustRouteOperation(t, transactions.RouteOperation{
+			Op: transactions.OpRoute, NetName: "SIG", Layer: "In2.Cu", WidthMM: 0.2,
+			Points: []transactions.Point{{XMM: 1, YMM: 2}, {XMM: 4, YMM: 2}, {XMM: 4, YMM: 5}},
+			Vias: []transactions.RouteViaSpec{{
+				At: transactions.Point{XMM: 4, YMM: 5}, DiameterMM: 0.6, DrillMM: 0.3,
+				Layers: []string{"F.Cu", "In2.Cu"},
+			}},
+		}),
+		mustRouteOperation(t, transactions.RouteOperation{
+			Op: transactions.OpRoute, NetName: "SIG", Layer: "F.Cu", WidthMM: 0.2,
+			Points: []transactions.Point{{XMM: 7, YMM: 2}, {XMM: 4, YMM: 2}, {XMM: 4, YMM: 5}},
+		}),
+	}
+	repaired, added, issues := ensureRouteLayerJunctionVias(operations, routing.Rules{ViaDiameterMM: 0.6, ViaDrillMM: 0.3})
+	if reports.HasBlockingIssue(issues) || added != 0 {
+		t.Fatalf("layer-cycle completion added=%d issues=%#v operations=%#v", added, issues, decodeRouteOperations(repaired))
+	}
+	decoded := decodeRouteOperations(repaired)
+	viaCount := 0
+	for _, route := range decoded {
+		viaCount += len(route.payload.Vias)
+	}
+	if viaCount != 1 {
+		t.Fatalf("via count = %d, want only the existing layer transition", viaCount)
+	}
+}
+
+func TestTrimDisconnectedRouteTailAtSameNetPad(t *testing.T) {
+	operations := []transactions.Operation{
+		transactions.NewOperation(transactions.OpRoute, []byte(`{"op":"route","net_name":"SIG","layer":"F.Cu","width_mm":0.2,"points":[{"x_mm":0,"y_mm":0},{"x_mm":2,"y_mm":0}]}`)),
+		transactions.NewOperation(transactions.OpRoute, []byte(`{"op":"route","net_name":"SIG","layer":"F.Cu","width_mm":0.2,"points":[{"x_mm":1,"y_mm":0},{"x_mm":1,"y_mm":0.75},{"x_mm":1,"y_mm":2}]}`)),
+	}
+	physical := physicalPadRoutingContext{
+		valid: true,
+		resolver: PlacedPadEndpointResolver{sorted: []PlacedPadEndpoint{{
+			Ref: "R1", Pad: "1", NetName: "SIG", Point: transactions.Point{XMM: 1, YMM: 1},
+			Layer: "F.Cu", PadWidthMM: 1, PadHeightMM: 1,
+		}}},
+	}
+	repaired := trimDisconnectedRouteTailsAtSameNetPads(operations, physical)
+	decoded := decodeRouteOperations(repaired)
+	want := []transactions.Point{{XMM: 1, YMM: 0}, {XMM: 1, YMM: 0.75}, {XMM: 1, YMM: 1}}
+	if !reflect.DeepEqual(decoded[1].payload.Points, want) {
+		t.Fatalf("trimmed points = %#v, want %#v", decoded[1].payload.Points, want)
+	}
+
+	connectedTail := append([]transactions.Operation(nil), operations...)
+	connectedTail = append(connectedTail, transactions.NewOperation(transactions.OpRoute, []byte(`{"op":"route","net_name":"SIG","layer":"F.Cu","width_mm":0.2,"points":[{"x_mm":1,"y_mm":2},{"x_mm":3,"y_mm":2}]}`)))
+	preserved := trimDisconnectedRouteTailsAtSameNetPads(connectedTail, physical)
+	preservedDecoded := decodeRouteOperations(preserved)
+	if !reflect.DeepEqual(preservedDecoded[1].payload.Points, decodeRouteOperations(operations)[1].payload.Points) {
+		t.Fatalf("connected tail was trimmed: %#v", preservedDecoded[1].payload.Points)
+	}
+
+	endpointPadPhysical := physical
+	endpointPadPhysical.resolver.sorted = append(
+		append([]PlacedPadEndpoint(nil), physical.resolver.sorted...),
+		PlacedPadEndpoint{
+			Ref: "R2", Pad: "1", NetName: "SIG", Point: transactions.Point{XMM: 1, YMM: 2},
+			Layer: "F.Cu", PadWidthMM: 1, PadHeightMM: 1,
+		},
+	)
+	preserved = trimDisconnectedRouteTailsAtSameNetPads(operations, endpointPadPhysical)
+	preservedDecoded = decodeRouteOperations(preserved)
+	if !reflect.DeepEqual(preservedDecoded[1].payload.Points, decodeRouteOperations(operations)[1].payload.Points) {
+		t.Fatalf("tail terminating at another same-net pad was trimmed: %#v", preservedDecoded[1].payload.Points)
+	}
+}
+
 func TestRepairEmittedRoutePhysicalClearanceDetoursCrossPhaseCopperAndForeignPad(t *testing.T) {
 	request := routing.Request{
 		Board: routing.Board{WidthMM: 60, HeightMM: 30, Layers: []routing.Layer{{Name: "F.Cu", Kind: routing.LayerCopper, Routable: true}, {Name: "B.Cu", Kind: routing.LayerCopper, Routable: true}}},
@@ -145,6 +280,31 @@ func TestFinalizeEmittedRoutePhysicalClearanceRunsOnlyForRequiredDRC(t *testing.
 	_, issues, before, _, _ = finalizeEmittedRoutePhysicalClearanceWhenRequired(true, request, operations)
 	if before == 0 || !reports.HasBlockingIssue(issues) {
 		t.Fatalf("strict finalization = issues:%#v before:%d, want detected unresolved crossing", issues, before)
+	}
+}
+
+func TestFinalizeEmittedRoutePhysicalClearanceUsesWriterVisibleFittedClearance(t *testing.T) {
+	request := routing.Request{
+		Board: routing.Board{WidthMM: 10, HeightMM: 10, Layers: []routing.Layer{{Name: "F.Cu", Kind: routing.LayerCopper, Routable: true}}},
+		Rules: routing.Rules{GridMM: .25, TraceWidthMM: .2, ClearanceMM: .15},
+		Components: []routing.Component{{
+			Ref: "U1", Position: routing.Placement{XMM: 5, YMM: 5},
+			Pads: []routing.Pad{{
+				Name: "1", Net: "B", Shape: routing.PadRect, Type: routing.PadSMD,
+				Size: routing.Size{WidthMM: 1, HeightMM: .6}, Layers: []string{"F.Cu"},
+			}},
+		}},
+	}
+	operations := []transactions.Operation{mustRouteOperation(t, transactions.RouteOperation{
+		Op: transactions.OpRoute, NetName: "A", Layer: "F.Cu", WidthMM: .2,
+		Points: []transactions.Point{{XMM: 2, YMM: 4.425}, {XMM: 8, YMM: 4.425}},
+	})}
+	repaired, issues, before, after, clearance := finalizeEmittedRoutePhysicalClearance(request, operations)
+	if len(issues) != 0 || before != 0 || after != 0 || clearance != .15 {
+		t.Fatalf("fitted-clearance finalization = issues:%#v before:%d after:%d clearance:%g", issues, before, after, clearance)
+	}
+	if !reflect.DeepEqual(repaired, operations) {
+		t.Fatalf("route above the emitted clearance was changed: %#v", repaired)
 	}
 }
 
@@ -288,6 +448,25 @@ func TestRepairRouteTransitionViaClearanceMovesViaAndAttachedLayerEndpoints(t *t
 		if string(got[index].Raw) != string(again[index].Raw) {
 			t.Fatalf("repair is not deterministic at operation %d", index)
 		}
+	}
+}
+
+func TestEmittedRouteTransitionViasRecognizesInteriorVertices(t *testing.T) {
+	viaPoint := transactions.Point{XMM: 5.25, YMM: 5}
+	operations := []transactions.Operation{
+		mustRouteOperation(t, transactions.RouteOperation{
+			Op: transactions.OpRoute, NetName: "MOVING", Layer: "B.Cu", WidthMM: 0.2,
+			Points: []transactions.Point{{XMM: 8, YMM: 5}, viaPoint, {XMM: 5.25, YMM: 6}},
+		}),
+		mustRouteOperation(t, transactions.RouteOperation{
+			Op: transactions.OpRoute, NetName: "MOVING", Layer: "F.Cu", WidthMM: 0.2,
+			Points: []transactions.Point{{XMM: 5.25, YMM: 6}, viaPoint, {XMM: 3, YMM: 5}},
+			Vias:   []transactions.RouteViaSpec{{At: viaPoint, DiameterMM: 0.6, DrillMM: 0.3, Layers: []string{"F.Cu", "B.Cu"}}},
+		}),
+	}
+	transitions := emittedRouteTransitionVias(operations)
+	if len(transitions) != 1 || !sameRoutePoint(transitions[0].via.At, viaPoint) {
+		t.Fatalf("transitions = %#v, want compacted interior transition", transitions)
 	}
 }
 
@@ -1657,7 +1836,7 @@ func TestRoutePlacementAddsAnchorBindingRoutes(t *testing.T) {
 		}
 	}
 	if !found {
-		t.Fatalf("operations = %#v, want anchor binding route", result.Operations)
+		t.Fatalf("operations = %#v, want anchor binding route; summary = %#v", result.Operations, result.Stage.Summary)
 	}
 }
 

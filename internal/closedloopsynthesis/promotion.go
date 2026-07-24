@@ -101,6 +101,46 @@ func SelectedSimulationEvidence(report Report) (*SimulationEvidence, bool) {
 	return nil, false
 }
 
+// ReplaySimulationEvidence re-evaluates every persisted plan and requires the
+// resulting reports to reproduce the selected transcript exactly.
+func ReplaySimulationEvidence(evidence SimulationEvidence) []Diagnostic {
+	diagnostics := validateSimulationResolution(evidence.Resolution)
+	plans := resolutionPlans(evidence.Resolution)
+	if len(evidence.Reports) != len(plans) {
+		diagnostics = append(diagnostics, Diagnostic{
+			Path:    "reports",
+			Message: fmt.Sprintf("simulation transcript has %d reports for %d resolved plans", len(evidence.Reports), len(plans)),
+		})
+	}
+	replayed := make([]simmodel.Report, 0, len(plans))
+	for index, plan := range plans {
+		report, planDiagnostics := simmodel.Evaluate(simmodel.ClonePlan(plan))
+		for _, diagnostic := range planDiagnostics {
+			diagnostics = append(diagnostics, Diagnostic{
+				Path:       fmt.Sprintf("reports[%d].%s", index, diagnostic.Path),
+				Message:    diagnostic.Message,
+				Suggestion: diagnostic.Suggestion,
+			})
+		}
+		replayed = append(replayed, report)
+	}
+	if len(diagnostics) == 0 {
+		persistedHash, persistedErr := HashSimulationEvidence(evidence)
+		replayedHash, replayedErr := HashSimulationEvidence(SimulationEvidence{
+			Resolution: cloneSimulationResolution(evidence.Resolution),
+			Reports:    replayed,
+		})
+		if persistedErr != nil || replayedErr != nil || persistedHash != replayedHash {
+			diagnostics = append(diagnostics, Diagnostic{
+				Path:    "reports",
+				Message: "replayed trusted simulation reports differ from the selected transcript",
+			})
+		}
+	}
+	slices.SortStableFunc(diagnostics, compareDiagnostics)
+	return diagnostics
+}
+
 func attemptForState(attempts []Attempt, state CandidateState) (Attempt, int) {
 	target := stateHash(state)
 	var result Attempt

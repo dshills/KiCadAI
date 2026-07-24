@@ -5,6 +5,7 @@ import (
 	"math"
 	"slices"
 	"strings"
+	"sync"
 )
 
 const (
@@ -49,6 +50,13 @@ type compiledNonlinearDevice struct {
 	parameters map[string]float64
 	polarity   float64
 }
+
+type nonlinearResidualScratch struct {
+	residuals []complex128
+	scales    []float64
+}
+
+var nonlinearResidualScratchPool = sync.Pool{New: func() any { return new(nonlinearResidualScratch) }}
 
 var nonlinearContinuation = []continuationStage{
 	{sourceScale: .05, gmin: 1e-4, gainScale: 1e-4},
@@ -96,7 +104,9 @@ func solveNonlinearDCFromWarmState(plan Plan, analysis Analysis, initial map[str
 	for iteration := 0; iteration < iterationLimit; iteration++ {
 		system, solution, evidence, diagnostic := solveNonlinearDCForComparatorStateWithInitial(plan, analysis, states, warmSolution)
 		if diagnostic != nil {
-			if fallbackSystem, fallbackSolution, fallbackEvidence, ok := solveNonlinearDCByMOSFETActiveSet(plan, analysis, states); ok {
+			if fallbackSystem, fallbackSolution, fallbackEvidence, fallbackStates, ok := solveNonlinearDCByCenteredOpAmpSeed(plan, analysis, states); ok {
+				system, solution, evidence, states, diagnostic = fallbackSystem, fallbackSolution, fallbackEvidence, fallbackStates, nil
+			} else if fallbackSystem, fallbackSolution, fallbackEvidence, ok := solveNonlinearDCByMOSFETActiveSet(plan, analysis, states); ok {
 				system, solution, evidence, diagnostic = fallbackSystem, fallbackSolution, fallbackEvidence, nil
 			} else if fallbackSystem, fallbackSolution, fallbackEvidence, fallbackStates, ok := solveNonlinearDCByComparatorActiveSet(plan, analysis, states); ok {
 				system, solution, evidence, states, diagnostic = fallbackSystem, fallbackSolution, fallbackEvidence, fallbackStates, nil
@@ -158,6 +168,59 @@ func solveNonlinearDCFromWarmState(plan Plan, analysis Analysis, initial map[str
 		warmSolution = append(warmSolution[:0], solution...)
 	}
 	return mnaSystem{}, nil, totalEvidence, states, &Diagnostic{Path: "devices", Message: "bounded comparator operating-point iteration exceeded its deterministic limit", Suggestion: "correct ambiguous feedback or reduce coupled comparator stages"}
+}
+
+func solveNonlinearDCByCenteredOpAmpSeed(plan Plan, analysis Analysis, activeStates map[string]float64) (mnaSystem, []complex128, SolverEvidence, map[string]float64, bool) {
+	var opAmps []ResolvedDevice
+	for _, device := range plan.Devices {
+		if device.PrimitiveModel == PrimitiveOpAmpV1 {
+			if _, constrained := activeStates[device.Component]; constrained {
+				continue
+			}
+			opAmps = append(opAmps, device)
+		}
+	}
+	if len(opAmps) == 0 {
+		return mnaSystem{}, nil, SolverEvidence{}, nil, false
+	}
+	slices.SortFunc(opAmps, func(left, right ResolvedDevice) int {
+		return strings.Compare(left.Component, right.Component)
+	})
+	seeded := cloneOpAmpClamps(activeStates)
+	for _, device := range opAmps {
+		seeded[device.Component] = 0
+	}
+	system, solution, evidence, diagnostic := solveNonlinearDCForComparatorStateWithInitial(plan, analysis, seeded, nil)
+	if diagnostic != nil {
+		return mnaSystem{}, nil, evidence, nil, false
+	}
+	centered := cloneOpAmpClamps(activeStates)
+	centerChanged := false
+	for _, device := range opAmps {
+		terminals := terminalMap(device)
+		parameters := namedValueMap(device.ModelParameters)
+		lower := nonlinearNodeVoltage(&system, solution, terminals["V_MINUS"]) + parameters["output_low_margin_v"]
+		upper := nonlinearNodeVoltage(&system, solution, terminals["V_PLUS"]) - parameters["output_high_margin_v"]
+		if !finite(lower) || !finite(upper) || lower >= upper {
+			return mnaSystem{}, nil, evidence, nil, false
+		}
+		center := (lower + upper) / 2
+		centered[device.Component] = center
+		centerChanged = centerChanged || math.Abs(center) > nonlinearUpdateTolerance
+	}
+	if centerChanged {
+		centerSystem, centerSolution, centerEvidence, centerDiagnostic := solveNonlinearDCForComparatorStateWithInitial(plan, analysis, centered, solution)
+		evidence.SourceStages += centerEvidence.SourceStages
+		evidence.Iterations += centerEvidence.Iterations
+		evidence.TotalIterations = evidence.Iterations
+		if centerDiagnostic != nil {
+			return mnaSystem{}, nil, evidence, nil, false
+		}
+		system, solution = centerSystem, centerSolution
+	}
+	evidence.Method = "bounded_newton_centered_opamp_seed_v1"
+	evidence.TotalIterations = evidence.Iterations
+	return system, solution, evidence, centered, true
 }
 
 func solveLinearOpAmpByBisection(plan Plan, analysis Analysis, current, resolved map[string]float64, operatingSystem mnaSystem, operatingSolution []complex128) (mnaSystem, []complex128, SolverEvidence, map[string]float64, bool) {
@@ -1246,8 +1309,20 @@ func stampNonlinearBJT(system *mnaSystem, device compiledNonlinearDevice, guess 
 }
 
 func nonlinearResidual(base mnaSystem, devices []compiledNonlinearDevice, solution []complex128) (float64, string) {
-	residuals := make([]complex128, len(base.rhs))
-	scales := make([]float64, len(base.rhs))
+	size := len(base.rhs)
+	scratch := nonlinearResidualScratchPool.Get().(*nonlinearResidualScratch)
+	defer nonlinearResidualScratchPool.Put(scratch)
+	if cap(scratch.residuals) < size {
+		scratch.residuals = make([]complex128, size)
+	} else {
+		scratch.residuals = scratch.residuals[:size]
+	}
+	if cap(scratch.scales) < size {
+		scratch.scales = make([]float64, size)
+	} else {
+		scratch.scales = scratch.scales[:size]
+	}
+	residuals, scales := scratch.residuals, scratch.scales
 	for row := range base.rhs {
 		residuals[row] = -base.rhs[row]
 		scales[row] = math.Abs(real(base.rhs[row]))

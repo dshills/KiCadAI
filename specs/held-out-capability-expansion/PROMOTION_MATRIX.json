@@ -1,0 +1,61 @@
+{
+  "schema_version": "kicadai.external-review-matrix.v1",
+  "scenarios": [
+    {
+      "id": "power_constant_current_output",
+      "review_equivalent": "behavior-only power output with regulated constant current across the declared load and supply envelope",
+      "lane": "requirement",
+      "fixture": "internal/architecturesearch/testdata/held_out_capability_expansion_corpus/power_constant_current_output.json",
+      "board": {"mode": "synthesized", "layers": 2},
+      "expected_status": "pass",
+      "required_artifacts": ["design-request.json", "transaction.json", "workflow-result.json", "validation-summary.json", "design-promotion.json", "manifest.json", "normalized-requirement.json", "architecture-search.json", "closed-loop-synthesis.json", "simulation.json"],
+      "internal_gates": ["architecture_search", "component_evidence", "simulation", "routing", "connectivity", "route_completion", "writer_correctness", "round_trip", "deterministic_repeat"],
+      "optional_kicad_gates": ["erc", "strict_drc", "writer_correctness", "round_trip"]
+    },
+    {
+      "id": "mcu_constant_current_peripheral",
+      "review_equivalent": "behavior-only MCU-controlled peripheral with deterministic constant-current actuation and bounded operating cases",
+      "lane": "requirement",
+      "fixture": "internal/architecturesearch/testdata/held_out_capability_expansion_corpus/mcu_constant_current_peripheral.json",
+      "board": {"mode": "synthesized", "layers": 2},
+      "expected_status": "pass",
+      "required_artifacts": ["design-request.json", "transaction.json", "workflow-result.json", "validation-summary.json", "design-promotion.json", "manifest.json", "normalized-requirement.json", "architecture-search.json", "closed-loop-synthesis.json", "simulation.json"],
+      "internal_gates": ["architecture_search", "component_evidence", "simulation", "routing", "connectivity", "route_completion", "writer_correctness", "round_trip", "deterministic_repeat"],
+      "optional_kicad_gates": ["erc", "strict_drc", "writer_correctness", "round_trip"]
+    },
+    {
+      "id": "sensor_constant_current_excitation",
+      "review_equivalent": "behavior-only sensor excitation with regulated current and bounded compliance over the declared sensor range",
+      "lane": "requirement",
+      "fixture": "internal/architecturesearch/testdata/held_out_capability_expansion_corpus/sensor_constant_current_excitation.json",
+      "board": {"mode": "synthesized", "layers": 2},
+      "expected_status": "pass",
+      "required_artifacts": ["design-request.json", "transaction.json", "workflow-result.json", "validation-summary.json", "design-promotion.json", "manifest.json", "normalized-requirement.json", "architecture-search.json", "closed-loop-synthesis.json", "simulation.json"],
+      "internal_gates": ["architecture_search", "component_evidence", "simulation", "routing", "connectivity", "route_completion", "writer_correctness", "round_trip", "deterministic_repeat"],
+      "optional_kicad_gates": ["erc", "strict_drc", "writer_correctness", "round_trip"]
+    },
+    {
+      "id": "analog_precision_rectifier",
+      "review_equivalent": "behavior-only precision analog rectification with declared low-level transfer, loading, and accuracy limits",
+      "lane": "requirement",
+      "fixture": "internal/architecturesearch/testdata/held_out_capability_expansion_corpus/analog_precision_rectifier.json",
+      "board": {"mode": "synthesized", "layers": 2},
+      "expected_status": "pass",
+      "required_artifacts": ["design-request.json", "transaction.json", "workflow-result.json", "validation-summary.json", "design-promotion.json", "manifest.json", "normalized-requirement.json", "architecture-search.json", "closed-loop-synthesis.json", "simulation.json"],
+      "internal_gates": ["architecture_search", "component_evidence", "simulation", "routing", "connectivity", "route_completion", "writer_correctness", "round_trip", "deterministic_repeat"],
+      "optional_kicad_gates": ["erc", "strict_drc", "writer_correctness", "round_trip"]
+    },
+    {
+      "id": "mixed_signal_rectified_acquisition",
+      "review_equivalent": "behavior-only mixed-signal acquisition with precision rectification, buffering, and bounded ADC-drive behavior",
+      "lane": "requirement",
+      "fixture": "internal/architecturesearch/testdata/held_out_capability_expansion_corpus/mixed_signal_rectified_acquisition.json",
+      "board": {"mode": "synthesized", "layers": 2},
+      "expected_status": "pass",
+      "required_artifacts": ["design-request.json", "transaction.json", "workflow-result.json", "validation-summary.json", "design-promotion.json", "manifest.json", "normalized-requirement.json", "architecture-search.json", "closed-loop-synthesis.json", "simulation.json"],
+      "internal_gates": ["architecture_search", "component_evidence", "simulation", "routing", "connectivity", "route_completion", "writer_correctness", "round_trip", "deterministic_repeat"],
+      "optional_kicad_gates": ["erc", "strict_drc", "writer_correctness", "round_trip"]
+    }
+  ],
+  "negative_cases": []
+}

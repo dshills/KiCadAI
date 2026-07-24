@@ -268,7 +268,14 @@ func (provider *CatalogProvider) expandADCDrive(ctx context.Context, request Pro
 	if filterCapacitance > 0 {
 		roleFunctions["reference"] = "B"
 	}
-	bindings := bindRoles(request.Ports, "adc_isolation", roleFunctions)
+	var bindings []RealizationPortBinding
+	for _, port := range request.Ports {
+		function, bound := roleFunctions[port.Role]
+		if !bound {
+			continue
+		}
+		bindings = append(bindings, RealizationPortBinding{Role: port.Role, Instance: "adc_isolation", Function: function})
+	}
 	var connections []RealizationConnection
 	if filterCapacitance > 0 {
 		for index := range bindings {

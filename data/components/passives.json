@@ -289,31 +289,41 @@
       "id": "capacitor.electrolytic.radial",
       "family": "capacitor",
       "name": "Generic radial electrolytic capacitor",
-      "description": "Generic polarized electrolytic capacitor placeholder for bulk capacitance.",
+      "description": "Generic polarized radial electrolytic capacitor for connectivity-level bulk capacitance.",
       "generic": true,
+      "lifecycle": "active",
       "tags": ["passive", "through_hole", "polarized"],
       "values": [{"kind": "capacitance", "min": "1u", "max": "1000u", "unit": "F"}],
       "ratings": [{"kind": "voltage", "max": "16", "unit": "V"}],
+      "capacitor_evidence": {
+        "dielectric": "electrolytic",
+        "dc_bias_review": "unknown",
+        "effective_capacitance_review": "unknown",
+        "esr_review": "unknown",
+        "fabrication_candidate_blocks": true,
+        "review_note": "Generic radial connectivity evidence does not prove a purchasable part, tolerance, ESR, ripple-current capability, lifetime, or voltage derating."
+      },
       "symbols": [{
         "symbol_id": "Device:C_Polarized",
         "function_pins": [
           {"function": "POSITIVE", "symbol_pin": "1", "polarity": "positive", "required": true},
           {"function": "NEGATIVE", "symbol_pin": "2", "polarity": "negative", "required": true}
         ],
-        "verification": {"confidence": "placeholder", "notes": ["Polarity must be verified before connectivity readiness."]}
+        "verification": {"confidence": "rule_inferred", "sources": ["builtin_pinmap:Device:C_Polarized"], "pinmap_checked": true}
       }],
       "packages": [{
         "id": "radial_5mm",
         "name": "Radial 5 mm",
         "footprint_id": "Capacitor_THT:CP_Radial_D5.0mm_P2.50mm",
         "package_type": "radial",
+        "pinmap_id": "Device:C_Polarized|Capacitor_THT:CP_Radial_D5.0mm_P2.50mm",
         "pad_functions": [
           {"function": "POSITIVE", "pad": "1"},
           {"function": "NEGATIVE", "pad": "2"}
         ],
-        "verification": {"confidence": "placeholder"}
+        "verification": {"confidence": "rule_inferred", "sources": ["builtin_pinmap:Device:C_Polarized", "kicad-footprint:Capacitor_THT:CP_Radial_D5.0mm_P2.50mm"], "pinmap_checked": true}
       }],
-      "verification": {"confidence": "placeholder", "sources": ["curated_seed_catalog"], "notes": ["Placeholder until polarized pinmap and voltage derating rules are verified."]}
+      "verification": {"confidence": "rule_inferred", "sources": ["curated_seed_catalog", "builtin_pinmap:Device:C_Polarized", "kicad-footprint:Capacitor_THT:CP_Radial_D5.0mm_P2.50mm"], "pinmap_checked": true, "notes": ["Connectivity and polarity mapping are deterministic; procurement and electrical derating remain design-specific."]}
     }
   ]
 }

@@ -378,6 +378,7 @@
       "manufacturer": "Yageo",
       "mpn": "RC0805FR-0747RL",
       "lifecycle": "active",
+      "equivalence": {"group": "resistor.47r.0805", "role": "preferred"},
       "tags": ["audio", "base_stopper", "damping", "resistor", "smd", "0805"],
       "values": [{"kind": "resistance", "typ": "47", "unit": "ohm"}],
       "ratings": [{"kind": "power", "max": "0.125", "unit": "W"}],
@@ -819,6 +820,140 @@
       "symbols": [{"symbol_id": "Transistor_FET:Q_PMOS_GDS", "function_pins": [{"function": "GATE", "symbol_pin": "1", "required": true}, {"function": "DRAIN", "symbol_pin": "2", "required": true}, {"function": "SOURCE", "symbol_pin": "3", "required": true}], "verification": {"confidence": "verified", "sources": ["kicad-symbols:Transistor_FET:Q_PMOS_GDS", "datasheet-pinmap:vishay:IRFP9240-91239"], "pinmap_checked": true}}],
       "packages": [{"id": "to247_3", "name": "TO-247AC", "footprint_id": "Package_TO_SOT_THT:TO-247-3_Vertical", "package_type": "to247_3", "mpn": "IRFP9240PbF", "lifecycle": "active", "pinmap_id": "Transistor_FET:Q_PMOS_GDS|Package_TO_SOT_THT:TO-247-3_Vertical", "pad_functions": [{"function": "GATE", "pad": "1"}, {"function": "DRAIN", "pad": "2"}, {"function": "SOURCE", "pad": "3"}], "verification": {"confidence": "verified", "sources": ["kicad-footprint:Package_TO_SOT_THT:TO-247-3_Vertical", "datasheet-pinmap:vishay:IRFP9240-91239"], "pinmap_checked": true}}],
       "verification": {"confidence": "verified", "sources": ["https://www.vishay.com/docs/91239/irfp9240.pdf", "datasheet-pinmap:vishay:IRFP9240-91239"], "resolver_checked": true, "pinmap_checked": true, "tests": ["catalog_audio_power_semiconductor_evidence"]}
+    },
+    {
+      "id": "resistor.vishay.pr02.1k00.2w",
+      "family": "resistor",
+      "name": "Vishay PR02000201001JA100 1 kOhm 2 W resistor",
+      "description": "Concrete 1 kOhm axial power metal-film resistor for continuously biased analog and power-control paths.",
+      "generic": false,
+      "manufacturer": "Vishay",
+      "mpn": "PR02000201001JA100",
+      "lifecycle": "active",
+      "tags": ["audio", "bias", "power", "resistor", "metal_film", "through_hole", "1k", "2w"],
+      "values": [
+        {"kind": "resistance", "typ": "1k", "unit": "ohm"},
+        {"kind": "temperature_coefficient", "max": "250", "unit": "ppm/C"}
+      ],
+      "ratings": [
+        {"kind": "power", "max": "2", "unit": "W"},
+        {"kind": "voltage", "max": "500", "unit": "V"}
+      ],
+      "tolerances": [{"kind": "resistance", "max": "5", "unit": "%"}],
+      "temperature": {"min": "-55", "max": "155", "unit": "C"},
+      "simulation_models": [{"model_id": "mna_resistor_v1"}],
+      "resistor_evidence": {
+        "technology": "power metal film",
+        "nominal_resistance": {"value": 1000, "unit": "ohm", "conditions": "ordered resistance at 20 C"},
+        "resistance_tolerance_percent": 5,
+        "rated_power": {"value": 2, "unit": "W", "temperature_c": 70, "conditions": "manufacturer free-air rating"},
+        "derated_power": {"value": 0.7, "unit": "W", "temperature_c": 125, "conditions": "linear derating from 2 W at 70 C to zero at 155 C"},
+        "maximum_element_temperature_c": 155,
+        "pulse_status": "not_applicable",
+        "fabrication_proof": true,
+        "review_note": "Manufacturer-backed resistance, tolerance, power, derating, voltage, temperature, body size, and lead configuration; continuous circuit power remains checked separately."
+      },
+      "symbols": [{
+        "symbol_id": "Device:R",
+        "function_pins": [
+          {"function": "A", "symbol_pin": "1", "required": true},
+          {"function": "B", "symbol_pin": "2", "required": true}
+        ],
+        "verification": {"confidence": "verified", "sources": ["https://www.vishay.com/docs/28729/pr010203.pdf", "builtin_pinmap:Device:R"], "pinmap_checked": true}
+      }],
+      "packages": [{
+        "id": "axial_din0411_p15_24",
+        "name": "Axial DIN 0411, 15.24 mm pitch",
+        "footprint_id": "Resistor_THT:R_Axial_DIN0411_L9.9mm_D3.6mm_P15.24mm_Horizontal",
+        "package_type": "axial_din0411",
+        "mpn": "PR02000201001JA100",
+        "lifecycle": "active",
+        "pinmap_id": "Device:R|Resistor_THT:R_Axial_DIN0411_L9.9mm_D3.6mm_P15.24mm_Horizontal",
+        "pad_functions": [
+          {"function": "A", "pad": "1"},
+          {"function": "B", "pad": "2"}
+        ],
+        "dimensions_mm": {"width": 9.9, "height": 3.6},
+        "height_mm": 3.6,
+        "verification": {"confidence": "verified", "sources": ["https://www.vishay.com/docs/28729/pr010203.pdf", "kicad-footprint:Resistor_THT:R_Axial_DIN0411_L9.9mm_D3.6mm_P15.24mm_Horizontal"], "pinmap_checked": true}
+      }],
+      "verification": {
+        "confidence": "verified",
+        "sources": [
+          "https://www.vishay.com/docs/28729/pr010203.pdf",
+          "kicad-pinmap:Device:R|Resistor_THT:R_Axial_DIN0411_L9.9mm_D3.6mm_P15.24mm_Horizontal"
+        ],
+        "resolver_checked": true,
+        "pinmap_checked": true,
+        "tests": ["catalog_audio_power_resistor_evidence", "catalog_library_validation"]
+      }
+    },
+    {
+      "id": "resistor.vishay.pr02.2k00.2w",
+      "family": "resistor",
+      "name": "Vishay PR02000202001JA100 2 kOhm 2 W resistor",
+      "description": "Concrete 2 kOhm axial power metal-film resistor for continuously biased analog and power-control paths.",
+      "generic": false,
+      "manufacturer": "Vishay",
+      "mpn": "PR02000202001JA100",
+      "lifecycle": "active",
+      "tags": ["audio", "bias", "power", "resistor", "metal_film", "through_hole", "2k", "2w"],
+      "values": [
+        {"kind": "resistance", "typ": "2k", "unit": "ohm"},
+        {"kind": "temperature_coefficient", "max": "250", "unit": "ppm/C"}
+      ],
+      "ratings": [
+        {"kind": "power", "max": "2", "unit": "W"},
+        {"kind": "voltage", "max": "500", "unit": "V"}
+      ],
+      "tolerances": [{"kind": "resistance", "max": "5", "unit": "%"}],
+      "temperature": {"min": "-55", "max": "155", "unit": "C"},
+      "simulation_models": [{"model_id": "mna_resistor_v1"}],
+      "resistor_evidence": {
+        "technology": "power metal film",
+        "nominal_resistance": {"value": 2000, "unit": "ohm", "conditions": "ordered resistance at 20 C"},
+        "resistance_tolerance_percent": 5,
+        "rated_power": {"value": 2, "unit": "W", "temperature_c": 70, "conditions": "manufacturer free-air rating"},
+        "derated_power": {"value": 0.7, "unit": "W", "temperature_c": 125, "conditions": "linear derating from 2 W at 70 C to zero at 155 C"},
+        "maximum_element_temperature_c": 155,
+        "pulse_status": "not_applicable",
+        "fabrication_proof": true,
+        "review_note": "Manufacturer-backed resistance, tolerance, power, derating, voltage, temperature, body size, and lead configuration; continuous circuit power remains checked separately."
+      },
+      "symbols": [{
+        "symbol_id": "Device:R",
+        "function_pins": [
+          {"function": "A", "symbol_pin": "1", "required": true},
+          {"function": "B", "symbol_pin": "2", "required": true}
+        ],
+        "verification": {"confidence": "verified", "sources": ["https://www.vishay.com/docs/28729/pr010203.pdf", "builtin_pinmap:Device:R"], "pinmap_checked": true}
+      }],
+      "packages": [{
+        "id": "axial_din0411_p15_24",
+        "name": "Axial DIN 0411, 15.24 mm pitch",
+        "footprint_id": "Resistor_THT:R_Axial_DIN0411_L9.9mm_D3.6mm_P15.24mm_Horizontal",
+        "package_type": "axial_din0411",
+        "mpn": "PR02000202001JA100",
+        "lifecycle": "active",
+        "pinmap_id": "Device:R|Resistor_THT:R_Axial_DIN0411_L9.9mm_D3.6mm_P15.24mm_Horizontal",
+        "pad_functions": [
+          {"function": "A", "pad": "1"},
+          {"function": "B", "pad": "2"}
+        ],
+        "dimensions_mm": {"width": 9.9, "height": 3.6},
+        "height_mm": 3.6,
+        "verification": {"confidence": "verified", "sources": ["https://www.vishay.com/docs/28729/pr010203.pdf", "kicad-footprint:Resistor_THT:R_Axial_DIN0411_L9.9mm_D3.6mm_P15.24mm_Horizontal"], "pinmap_checked": true}
+      }],
+      "verification": {
+        "confidence": "verified",
+        "sources": [
+          "https://www.vishay.com/docs/28729/pr010203.pdf",
+          "kicad-pinmap:Device:R|Resistor_THT:R_Axial_DIN0411_L9.9mm_D3.6mm_P15.24mm_Horizontal"
+        ],
+        "resolver_checked": true,
+        "pinmap_checked": true,
+        "tests": ["catalog_audio_power_resistor_evidence", "catalog_library_validation"]
+      }
     },
     {
       "id": "protection.littelfuse.smbj18ca.smb",

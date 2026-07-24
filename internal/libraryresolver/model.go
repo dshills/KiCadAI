@@ -202,10 +202,15 @@ type FootprintPad struct {
 }
 
 type FootprintText struct {
-	Kind     string           `json:"kind,omitempty"`
-	Text     string           `json:"text"`
-	Position kicadfiles.Point `json:"position"`
-	Layer    string           `json:"layer,omitempty"`
+	Kind              string           `json:"kind,omitempty"`
+	Text              string           `json:"text"`
+	Position          kicadfiles.Point `json:"position"`
+	Rotation          kicadfiles.Angle `json:"rotation,omitempty"`
+	Layer             string           `json:"layer,omitempty"`
+	FontSize          kicadfiles.Point `json:"font_size,omitempty"`
+	FontThickness     kicadfiles.IU    `json:"font_thickness,omitempty"`
+	OmitFontThickness bool             `json:"omit_font_thickness,omitempty"`
+	Justify           []string         `json:"justify,omitempty"`
 }
 
 type FootprintGraphic struct {

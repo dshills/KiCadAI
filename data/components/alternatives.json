@@ -92,6 +92,80 @@
       "verification": {"confidence": "verified", "sources": ["curated_seed_catalog", "curated_part:Murata:GRM21BR71H104KA01L", "builtin_pinmap:Device:C"], "pinmap_checked": true, "notes": ["Voltage derating remains design-specific."]}
     },
     {
+      "id": "capacitor.panasonic.eeufr1a151.radial",
+      "family": "capacitor",
+      "name": "Panasonic EEUFR1A151 150uF 10V radial electrolytic capacitor",
+      "description": "Concrete polarized 150 uF low-impedance radial aluminum electrolytic capacitor for bulk decoupling and transient-energy storage.",
+      "generic": false,
+      "manufacturer": "Panasonic",
+      "mpn": "EEUFR1A151",
+      "lifecycle": "active",
+      "tags": ["passive", "through_hole", "radial", "polarized", "electrolytic", "low_impedance", "150u", "10v"],
+      "values": [{"kind": "capacitance", "typ": "150u", "unit": "F"}],
+      "ratings": [
+        {"kind": "voltage", "max": "10", "unit": "V"},
+        {"kind": "ripple_current", "max": "0.28", "unit": "A"}
+      ],
+      "tolerances": [{"kind": "capacitance", "typ": "20", "unit": "%"}],
+      "temperature": {"min": "-40", "max": "105", "unit": "C"},
+      "simulation_models": [
+        {"model_id": "mna_capacitor_v1"},
+        {"model_id": "mna_capacitor_transient_be_v1", "parameters": [{"name": "max_voltage_v", "value": 10}]}
+      ],
+      "capacitor_evidence": {
+        "dielectric": "aluminum_electrolytic",
+        "nominal_capacitance": "150u",
+        "capacitance_unit": "F",
+        "voltage_rating": "10",
+        "voltage_unit": "V",
+        "dc_bias_review": "not_applicable",
+        "effective_capacitance_review": "proven",
+        "esr_review": "proven",
+        "technology": "aluminum_electrolytic",
+        "polarity": "polarized",
+        "capacitance_tolerance_percent": 20,
+        "esr": {"value": 0.3, "unit": "ohm", "frequency_hz": 100000, "temperature_c": 20, "conditions": "manufacturer maximum impedance used as a conservative ESR bound"},
+        "ripple_current": {"value": 0.28, "unit": "A_rms", "frequency_hz": 100000, "temperature_c": 105, "conditions": "manufacturer rated ripple current"},
+        "endurance_hours": 5000,
+        "endurance_temperature_c": 105,
+        "fabrication_proof": true,
+        "fabrication_candidate_blocks": false,
+        "review_note": "Manufacturer-backed capacitance, tolerance, voltage, impedance, ripple current, endurance, dimensions, polarity, and lead pitch; circuit validation must still enforce applied-voltage, ripple, temperature, and lifetime margins."
+      },
+      "symbols": [{
+        "symbol_id": "Device:C_Polarized",
+        "function_pins": [
+          {"function": "POSITIVE", "symbol_pin": "1", "polarity": "positive", "required": true, "aliases": ["A", "+"]},
+          {"function": "NEGATIVE", "symbol_pin": "2", "polarity": "negative", "required": true, "aliases": ["B", "-"]}
+        ],
+        "verification": {"confidence": "verified", "sources": ["kicad-symbol:Device:C_Polarized", "https://industrial.panasonic.com/cdbs/www-data/pdf/RDF0000/ABA0000C1259.pdf"], "pinmap_checked": true}
+      }],
+      "packages": [{
+        "id": "radial_d5_p2",
+        "name": "Radial 5 mm, 2.0 mm pitch",
+        "footprint_id": "Capacitor_THT:CP_Radial_D5.0mm_P2.00mm",
+        "package_type": "radial",
+        "pinmap_id": "Device:C_Polarized|Capacitor_THT:CP_Radial_D5.0mm_P2.00mm",
+        "pad_functions": [
+          {"function": "POSITIVE", "pad": "1", "polarity": "positive", "aliases": ["A", "+"]},
+          {"function": "NEGATIVE", "pad": "2", "polarity": "negative", "aliases": ["B", "-"]}
+        ],
+        "dimensions_mm": {"width": 5.0, "height": 5.0},
+        "height_mm": 11.0,
+        "verification": {"confidence": "verified", "sources": ["kicad-footprint:Capacitor_THT:CP_Radial_D5.0mm_P2.00mm", "https://industrial.panasonic.com/cdbs/www-data/pdf/RDF0000/ABA0000C1259.pdf"], "pinmap_checked": true}
+      }],
+      "verification": {
+        "confidence": "verified",
+        "sources": [
+          "https://industrial.panasonic.com/cdbs/www-data/pdf/RDF0000/ABA0000C1259.pdf",
+          "kicad-pinmap:Device:C_Polarized|Capacitor_THT:CP_Radial_D5.0mm_P2.00mm"
+        ],
+        "resolver_checked": true,
+        "pinmap_checked": true,
+        "tests": ["catalog_passive_value_binding", "catalog_library_validation"]
+      }
+    },
+    {
       "id": "capacitor.panasonic.eeufr1c221.radial",
       "family": "capacitor",
       "name": "Panasonic EEUFR1C221 220uF 16V radial electrolytic capacitor",
@@ -105,6 +179,10 @@
       "ratings": [{"kind": "voltage", "max": "16", "unit": "V"}],
       "tolerances": [{"kind": "capacitance", "typ": "20", "unit": "%"}],
       "temperature": {"min": "-40", "max": "105", "unit": "C"},
+      "simulation_models": [
+        {"model_id": "mna_capacitor_v1"},
+        {"model_id": "mna_capacitor_transient_be_v1", "parameters": [{"name": "max_voltage_v", "value": 16}]}
+      ],
       "capacitor_evidence": {
         "dielectric": "aluminum_electrolytic",
         "nominal_capacitance": "220u",
@@ -112,7 +190,7 @@
         "voltage_rating": "16",
         "voltage_unit": "V",
         "dc_bias_review": "not_applicable",
-        "effective_capacitance_review": "review_required",
+        "effective_capacitance_review": "proven",
         "esr_review": "proven",
         "technology": "aluminum_electrolytic",
         "polarity": "polarized",
@@ -128,8 +206,8 @@
       "symbols": [{
         "symbol_id": "Device:C_Polarized",
         "function_pins": [
-          {"function": "POSITIVE", "symbol_pin": "1", "polarity": "positive", "required": true},
-          {"function": "NEGATIVE", "symbol_pin": "2", "polarity": "negative", "required": true}
+          {"function": "POSITIVE", "symbol_pin": "1", "polarity": "positive", "required": true, "aliases": ["A", "+"]},
+          {"function": "NEGATIVE", "symbol_pin": "2", "polarity": "negative", "required": true, "aliases": ["B", "-"]}
         ],
         "verification": {"confidence": "verified", "sources": ["kicad-symbol:Device:C_Polarized", "https://industrial.panasonic.com/ww/products/pt/aluminum-cap-lead/models/EEUFR1C221"], "pinmap_checked": true}
       }],
@@ -140,14 +218,89 @@
         "package_type": "radial",
         "pinmap_id": "Device:C_Polarized|Capacitor_THT:CP_Radial_D6.3mm_P2.50mm",
         "pad_functions": [
-          {"function": "POSITIVE", "pad": "1", "polarity": "positive"},
-          {"function": "NEGATIVE", "pad": "2", "polarity": "negative"}
+          {"function": "POSITIVE", "pad": "1", "polarity": "positive", "aliases": ["A", "+"]},
+          {"function": "NEGATIVE", "pad": "2", "polarity": "negative", "aliases": ["B", "-"]}
         ],
         "dimensions_mm": {"width": 6.3, "height": 6.3},
         "height_mm": 11.2,
         "verification": {"confidence": "verified", "sources": ["kicad-footprint:Capacitor_THT:CP_Radial_D6.3mm_P2.50mm", "https://industrial.panasonic.com/ww/products/pt/aluminum-cap-lead/models/EEUFR1C221"], "pinmap_checked": true}
       }],
-      "verification": {"confidence": "verified", "sources": ["https://industrial.panasonic.com/ww/products/pt/aluminum-cap-lead/models/EEUFR1C221", "https://industrial.panasonic.com/cdbs/www-data/pdf/RDF0000/ABA0000C1259.pdf", "kicad-pinmap:Device:C_Polarized|Capacitor_THT:CP_Radial_D6.3mm_P2.50mm"], "resolver_checked": true, "pinmap_checked": true, "tests": ["catalog_polarized_capacitor_selection", "catalog_library_validation"], "notes": ["Fabrication-candidate use remains blocked pending circuit-specific ESR, ripple-current, lifetime, and derating review."]}
+      "verification": {"confidence": "verified", "sources": ["https://industrial.panasonic.com/ww/products/pt/aluminum-cap-lead/models/EEUFR1C221", "https://industrial.panasonic.com/cdbs/www-data/pdf/RDF0000/ABA0000C1259.pdf", "kicad-pinmap:Device:C_Polarized|Capacitor_THT:CP_Radial_D6.3mm_P2.50mm"], "resolver_checked": true, "pinmap_checked": true, "tests": ["catalog_polarized_capacitor_selection", "catalog_library_validation"]}
+    },
+    {
+      "id": "capacitor.panasonic.eeufr1c471.radial",
+      "family": "capacitor",
+      "name": "Panasonic EEUFR1C471 470uF 16V radial electrolytic capacitor",
+      "description": "Concrete polarized 470 uF low-impedance radial aluminum electrolytic capacitor for AC coupling and bulk energy storage.",
+      "generic": false,
+      "manufacturer": "Panasonic",
+      "mpn": "EEUFR1C471",
+      "lifecycle": "active",
+      "tags": ["passive", "through_hole", "radial", "polarized", "electrolytic", "low_impedance", "470u", "16v"],
+      "values": [{"kind": "capacitance", "typ": "470u", "unit": "F"}],
+      "ratings": [
+        {"kind": "voltage", "max": "16", "unit": "V"},
+        {"kind": "ripple_current", "max": "0.95", "unit": "A"}
+      ],
+      "tolerances": [{"kind": "capacitance", "typ": "20", "unit": "%"}],
+      "temperature": {"min": "-40", "max": "105", "unit": "C"},
+      "simulation_models": [
+        {"model_id": "mna_capacitor_v1"},
+        {"model_id": "mna_capacitor_transient_be_v1", "parameters": [{"name": "max_voltage_v", "value": 16}]}
+      ],
+      "capacitor_evidence": {
+        "dielectric": "aluminum_electrolytic",
+        "nominal_capacitance": "470u",
+        "capacitance_unit": "F",
+        "voltage_rating": "16",
+        "voltage_unit": "V",
+        "dc_bias_review": "not_applicable",
+        "effective_capacitance_review": "proven",
+        "esr_review": "proven",
+        "technology": "aluminum_electrolytic",
+        "polarity": "polarized",
+        "capacitance_tolerance_percent": 20,
+        "esr": {"value": 0.056, "unit": "ohm", "frequency_hz": 100000, "temperature_c": 20, "conditions": "manufacturer maximum impedance used as a conservative ESR bound"},
+        "ripple_current": {"value": 0.95, "unit": "A_rms", "frequency_hz": 100000, "temperature_c": 105, "conditions": "manufacturer rated ripple current"},
+        "endurance_hours": 6000,
+        "endurance_temperature_c": 105,
+        "fabrication_proof": true,
+        "fabrication_candidate_blocks": false,
+        "review_note": "Manufacturer-backed capacitance, tolerance, voltage, impedance, ripple current, endurance, dimensions, polarity, and lead pitch; circuit validation must still enforce applied-voltage, ripple, temperature, and lifetime margins."
+      },
+      "symbols": [{
+        "symbol_id": "Device:C_Polarized",
+        "function_pins": [
+          {"function": "POSITIVE", "symbol_pin": "1", "polarity": "positive", "required": true, "aliases": ["A", "+"]},
+          {"function": "NEGATIVE", "symbol_pin": "2", "polarity": "negative", "required": true, "aliases": ["B", "-"]}
+        ],
+        "verification": {"confidence": "verified", "sources": ["kicad-symbol:Device:C_Polarized", "https://na.industrial.panasonic.com/products/capacitors/aluminum-electrolytic-capacitors/lineup/aluminum-electrolytic-capacitors-radial-lead-type/series/83367/model/83666"], "pinmap_checked": true}
+      }],
+      "packages": [{
+        "id": "radial_d8_p3_5",
+        "name": "Radial 8 mm, 3.5 mm pitch",
+        "footprint_id": "Capacitor_THT:CP_Radial_D8.0mm_P3.50mm",
+        "package_type": "radial",
+        "pinmap_id": "Device:C_Polarized|Capacitor_THT:CP_Radial_D8.0mm_P3.50mm",
+        "pad_functions": [
+          {"function": "POSITIVE", "pad": "1", "polarity": "positive", "aliases": ["A", "+"]},
+          {"function": "NEGATIVE", "pad": "2", "polarity": "negative", "aliases": ["B", "-"]}
+        ],
+        "dimensions_mm": {"width": 8.0, "height": 8.0},
+        "height_mm": 11.5,
+        "verification": {"confidence": "verified", "sources": ["kicad-footprint:Capacitor_THT:CP_Radial_D8.0mm_P3.50mm", "https://na.industrial.panasonic.com/products/capacitors/aluminum-electrolytic-capacitors/lineup/aluminum-electrolytic-capacitors-radial-lead-type/series/83367/model/83666"], "pinmap_checked": true}
+      }],
+      "verification": {
+        "confidence": "verified",
+        "sources": [
+          "https://na.industrial.panasonic.com/products/capacitors/aluminum-electrolytic-capacitors/lineup/aluminum-electrolytic-capacitors-radial-lead-type/series/83367/model/83666",
+          "https://industrial.panasonic.com/cdbs/www-data/pdf/RDF0000/ABA0000C1259.pdf",
+          "kicad-pinmap:Device:C_Polarized|Capacitor_THT:CP_Radial_D8.0mm_P3.50mm"
+        ],
+        "resolver_checked": true,
+        "pinmap_checked": true,
+        "tests": ["catalog_polarized_capacitor_selection", "catalog_library_validation"]
+      }
     },
     {
       "id": "led.liteon.ltst_c170kgkt.0805",
@@ -271,6 +424,45 @@
         "verification": {"confidence": "verified", "sources": ["symmetric_two_terminal_rule", "builtin_pinmap:Device:R"], "pinmap_checked": true}
       }],
       "verification": {"confidence": "verified", "sources": ["curated_seed_catalog", "curated_part:Vishay:CRCW080510K0FKEA", "builtin_pinmap:Device:R"], "pinmap_checked": true}
+    },
+    {
+      "id": "resistor.vishay.crcw080547r0fkea.0805",
+      "family": "resistor",
+      "name": "Vishay CRCW080547R0FKEA 47 ohm 0805 resistor",
+      "description": "Concrete 47 ohm 1% 0805 resistor alternate for local analog-loop and transistor damping.",
+      "generic": false,
+      "manufacturer": "Vishay",
+      "mpn": "CRCW080547R0FKEA",
+      "lifecycle": "active",
+      "equivalence": {"group": "resistor.47r.0805", "role": "alternate"},
+      "tags": ["analog", "damping", "passive", "smd", "0805", "resistor", "47r"],
+      "values": [{"kind": "resistance", "typ": "47", "unit": "ohm"}],
+      "ratings": [{"kind": "power", "max": "0.125", "unit": "W"}],
+      "tolerances": [{"kind": "resistance", "typ": "1", "unit": "%"}],
+      "simulation_models": [{"model_id": "mna_resistor_v1"}],
+      "symbols": [{
+        "symbol_id": "Device:R",
+        "function_pins": [
+          {"function": "A", "symbol_pin": "1", "required": true},
+          {"function": "B", "symbol_pin": "2", "required": true}
+        ],
+        "verification": {"confidence": "verified", "sources": ["https://www.vishay.com/docs/20035/dcrcwe3.pdf", "builtin_pinmap:Device:R"], "pinmap_checked": true}
+      }],
+      "packages": [{
+        "id": "0805",
+        "name": "0805 SMD",
+        "footprint_id": "Resistor_SMD:R_0805_2012Metric",
+        "package_type": "0805",
+        "pinmap_id": "Device:R|Resistor_SMD:R_0805_2012Metric",
+        "dimensions_mm": {"width": 2.0, "height": 1.25},
+        "height_mm": 0.6,
+        "pad_functions": [
+          {"function": "A", "pad": "1"},
+          {"function": "B", "pad": "2"}
+        ],
+        "verification": {"confidence": "verified", "sources": ["https://www.vishay.com/docs/20035/dcrcwe3.pdf", "symmetric_two_terminal_rule", "builtin_pinmap:Device:R"], "pinmap_checked": true}
+      }],
+      "verification": {"confidence": "verified", "sources": ["https://www.vishay.com/docs/20035/dcrcwe3.pdf", "builtin_pinmap:Device:R", "kicad-footprint:Resistor_SMD:R_0805_2012Metric"], "resolver_checked": true, "pinmap_checked": true}
     },
     {
       "id": "resistor.yageo.rc0805fr_074k7l.0805",
@@ -413,7 +605,7 @@
       "values": [{"kind": "capacitance", "typ": "10u", "unit": "F"}],
       "ratings": [{"kind": "voltage", "max": "10", "unit": "V"}],
       "tolerances": [{"kind": "capacitance", "typ": "10", "unit": "%"}],
-      "simulation_models": [{"model_id": "mna_capacitor_v1"}],
+      "simulation_models": [{"model_id": "mna_capacitor_v1"}, {"model_id": "mna_capacitor_transient_be_v1", "parameters": [{"name": "max_voltage_v", "value": 10}]}],
       "derating_rules": [{"kind": "dc_bias", "description": "MLCC effective capacitance must be reviewed under operating DC bias, especially for regulator stability or bulk storage."}],
       "capacitor_evidence": {
         "dielectric": "X5R",
@@ -712,7 +904,8 @@
       }],
       "equivalence": {"group": "diode.signal.generic", "role": "preferred"},
       "tags": ["diode", "signal", "switching", "sod_123"],
-      "ratings": [{"kind": "current", "max": "200", "unit": "mA"}],
+      "ratings": [{"kind": "current", "max": "200", "unit": "mA"}, {"kind": "reverse_voltage", "max": "100", "unit": "V"}],
+      "values": [{"kind": "reverse_leakage_current", "max": "0.000000025", "unit": "A"}, {"kind": "reverse_recovery_time", "max": "0.000000004", "unit": "s"}],
       "symbols": [{
         "symbol_id": "Device:D",
         "function_pins": [

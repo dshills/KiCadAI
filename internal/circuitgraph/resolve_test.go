@@ -12,6 +12,53 @@ import (
 	"kicadai/internal/reports"
 )
 
+func TestComponentSelectionRequestBindsImplicitTypedValueToInstanceValue(t *testing.T) {
+	request := componentSelectionRequest(Component{
+		Query: &ComponentQuery{Family: "resistor", ValueKind: "resistance"},
+		Value: "4.7k",
+	}, AcceptanceConnectivity)
+	if request.Query.Value != "4.7k" {
+		t.Fatalf("selection value = %q, want instance value", request.Query.Value)
+	}
+
+	request = componentSelectionRequest(Component{
+		Query: &ComponentQuery{Family: "resistor", ValueKind: "resistance", Value: "10k"},
+		Value: "4.7k",
+	}, AcceptanceConnectivity)
+	if request.Query.Value != "10k" {
+		t.Fatalf("explicit selection value = %q, want explicit query value", request.Query.Value)
+	}
+}
+
+func TestResolvedSimulationConnectionsPreserveFunctionAliases(t *testing.T) {
+	resolved := ResolvedDocument{
+		Components: []ResolvedComponent{{
+			Instance: Component{ID: "bulk_cap"},
+			Functions: []ResolvedFunction{
+				{Function: "POSITIVE", Aliases: []string{"A", "+"}},
+				{Function: "NEGATIVE", Aliases: []string{"B", "-"}},
+			},
+		}},
+		Nets: []ResolvedNet{
+			{Intent: Net{Name: "VOUT"}, Endpoints: []ResolvedEndpoint{{Intent: Endpoint{Component: "bulk_cap"}, Function: "POSITIVE"}}},
+			{Intent: Net{Name: "GND"}, Endpoints: []ResolvedEndpoint{{Intent: Endpoint{Component: "bulk_cap"}, Function: "NEGATIVE"}}},
+		},
+	}
+	connections := resolvedSimulationConnections(resolved)["bulk_cap"]
+	got := map[string]string{}
+	for _, connection := range connections {
+		got[connection.Function] = connection.Net
+	}
+	for function, net := range map[string]string{
+		"POSITIVE": "VOUT", "A": "VOUT", "+": "VOUT",
+		"NEGATIVE": "GND", "B": "GND", "-": "GND",
+	} {
+		if got[function] != net {
+			t.Fatalf("connection %s = %q, want %q; all=%#v", function, got[function], net, connections)
+		}
+	}
+}
+
 func TestResolveCheckedInExamplesAgainstCatalog(t *testing.T) {
 	catalog := loadGraphCatalog(t)
 	for _, name := range []string{"rc_filter.json", "transistor_switch.json", "usb_c_led_indicator_protected.json", "usb_c_bmp280_breakout.json"} {

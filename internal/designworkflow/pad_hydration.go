@@ -268,6 +268,18 @@ func verifiedPadTemplate(footprintID string) (verifiedPadTemplateRecord, bool) {
 		template := throughHoleRowTemplate([]float64{0, 5}, []string{"1", "2"}, 1.6, 1.6, 0.8, []string{"circle", "circle"}, 7.2, 3.0)
 		template.Bounds = verifiedCourtyardBoundsFromExtents(-1.35, -1.75, 6.35, 1.75)
 		return template, true
+	case "Capacitor_THT:CP_Radial_D5.0mm_P2.00mm":
+		template := throughHoleRowTemplate([]float64{0, 2}, []string{"1", "2"}, 1.6, 1.6, 0.8, []string{"roundrect", "circle"}, 5.0, 5.0)
+		template.Bounds = verifiedCourtyardBounds(5.5, 5.5, 1.75, 2.75)
+		return template, true
+	case "Capacitor_THT:CP_Radial_D5.0mm_P2.50mm":
+		template := throughHoleRowTemplate([]float64{0, 2.5}, []string{"1", "2"}, 1.6, 1.6, 0.8, []string{"roundrect", "circle"}, 5.0, 5.0)
+		template.Bounds = verifiedCourtyardBounds(5.5, 5.5, 1.5, 2.75)
+		return template, true
+	case "Capacitor_THT:CP_Radial_D6.3mm_P2.50mm":
+		template := throughHoleRowTemplate([]float64{0, 2.5}, []string{"1", "2"}, 1.6, 1.6, 0.8, []string{"roundrect", "circle"}, 6.3, 6.3)
+		template.Bounds = verifiedCourtyardBoundsFromExtents(-2.15, -3.4, 4.65, 3.4)
+		return template, true
 	case "Capacitor_THT:CP_Radial_D8.0mm_P3.50mm":
 		template := throughHoleRowTemplate([]float64{0, 3.5}, []string{"1", "2"}, 1.6, 1.6, 0.8, []string{"roundrect", "circle"}, 8.0, 8.0)
 		template.Bounds = verifiedCourtyardBounds(8.5, 8.5, 2.5, 4.25)
@@ -303,6 +315,10 @@ func verifiedPadTemplate(footprintID string) (verifiedPadTemplateRecord, bool) {
 	case "Resistor_THT:R_Axial_DIN0414_L11.9mm_D4.5mm_P20.32mm_Horizontal":
 		template := throughHoleRowTemplate([]float64{0, 20.32}, []string{"1", "2"}, 2.4, 2.4, 1.2, []string{"circle", "circle"}, 23.0, 4.5)
 		template.Bounds = verifiedCourtyardBounds(23.22, 5, 1.45, 2.5)
+		return template, true
+	case "Resistor_THT:R_Axial_DIN0411_L9.9mm_D3.6mm_P15.24mm_Horizontal":
+		template := throughHoleRowTemplate([]float64{0, 15.24}, []string{"1", "2"}, 2.4, 2.4, 1.2, []string{"circle", "circle"}, 18.14, 4.1)
+		template.Bounds = verifiedCourtyardBounds(18.14, 4.1, 1.45, 2.05)
 		return template, true
 	case "Package_TO_SOT_THT:TO-126-3_Vertical":
 		template := throughHoleRowTemplate([]float64{0, 2.28, 4.56}, []string{"1", "2", "3"}, 1.71, 1.8, 1.0, []string{"rect", "oval", "oval"}, 8.0, 2.5)
@@ -485,6 +501,18 @@ func verifiedPadTemplate(footprintID string) (verifiedPadTemplateRecord, bool) {
 			smdPad("8", 1.4, -0.75, 1.25, 0.35, "roundrect"),
 		}
 		return verifiedPadTemplateRecord{Bounds: verifiedCourtyardBoundsFromExtents(-2.28, -1.25, 2.28, 1.25), Pads: pads}, true
+	case "Package_SO:VSSOP-8_3x3mm_P0.65mm":
+		pads := []placement.PadSummary{
+			smdPad("1", -2.1125, -0.975, 1.625, 0.5, "roundrect"),
+			smdPad("2", -2.1125, -0.325, 1.625, 0.5, "roundrect"),
+			smdPad("3", -2.1125, 0.325, 1.625, 0.5, "roundrect"),
+			smdPad("4", -2.1125, 0.975, 1.625, 0.5, "roundrect"),
+			smdPad("5", 2.1125, 0.975, 1.625, 0.5, "roundrect"),
+			smdPad("6", 2.1125, 0.325, 1.625, 0.5, "roundrect"),
+			smdPad("7", 2.1125, -0.325, 1.625, 0.5, "roundrect"),
+			smdPad("8", 2.1125, -0.975, 1.625, 0.5, "roundrect"),
+		}
+		return verifiedPadTemplateRecord{Bounds: verifiedCourtyardBoundsFromExtents(-3.18, -1.75, 3.18, 1.75), Pads: pads}, true
 	case "Package_QFP:TQFP-32_7x7mm_P0.8mm", "Package_QFP:LQFP-32_7x7mm_P0.8mm":
 		return tqfp32Template(), true
 	case "Package_LGA:Bosch_LGA-8_2x2.5mm_P0.65mm_ClockwisePinNumbering":

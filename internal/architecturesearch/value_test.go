@@ -54,6 +54,27 @@ func TestDividerSolversSelectPreferredValuesAndProveToleranceCorners(t *testing.
 	}
 	assertValidCalculation(t, feedback)
 
+	biased, issues := SolveDivider(DividerRequest{
+		ID: "floating_regulator", Mode: DividerFeedback,
+		SourceVoltageV: 1.25, SourceTolerancePercent: 0.5,
+		TargetVoltageV: 15, TargetTolerancePercent: 2,
+		LowerResistanceOhm: 123, LowerTolerancePercent: 0.1,
+		UpperTolerancePercent: 0.1, UpperSeries: SeriesE192,
+		FeedbackBiasCurrentA: 50e-6, MinimumOutputV: 14.7, MaximumOutputV: 15,
+	})
+	if len(issues) != 0 || !biased.Pass || biased.FormulaID != FormulaFeedbackBias {
+		t.Fatalf("bias-current feedback divider = %#v issues=%#v", biased, issues)
+	}
+	if output, ok := calculationOutput(biased, "output_voltage"); !ok || output < 14.7 || output > 15 {
+		t.Fatalf("bias-current feedback output = %g, %t", output, ok)
+	}
+	assertValidCalculation(t, biased)
+
+	preferred, issues := PreferredValueCandidates(125, SeriesE192, 100, 125, 16)
+	if len(issues) != 0 || len(preferred) == 0 || preferred[0] != 124 {
+		t.Fatalf("E192 candidates = %#v issues=%#v", preferred, issues)
+	}
+
 	failed, issues := SolveDivider(DividerRequest{
 		ID: "tight_divider", Mode: DividerAttenuator,
 		SourceVoltageV: 12, SourceTolerancePercent: 2,

@@ -92,6 +92,29 @@ func TestSimModelEvaluatorFailsClosedWithoutIndependentProvenanceRegistry(t *tes
 	}
 }
 
+func TestReplaySimulationEvidenceRequiresExactDeterministicTranscript(t *testing.T) {
+	registry, diagnostics := modelprovenance.LoadDefault()
+	if len(diagnostics) != 0 {
+		t.Fatalf("model provenance registry diagnostics: %#v", diagnostics)
+	}
+	evaluation, err := (SimModelEvaluator{
+		Resolver: dividerSimulationResolver{}, ProvenanceRegistry: registry,
+	}).Evaluate(context.Background(), CandidateState{
+		Fingerprint: testHash("divider"),
+		Variables:   []Variable{{ID: "lower_resistance", Value: 10_000}},
+	})
+	if err != nil || evaluation.Simulation == nil {
+		t.Fatalf("evaluation = %#v, err = %v", evaluation, err)
+	}
+	if replayDiagnostics := ReplaySimulationEvidence(*evaluation.Simulation); len(replayDiagnostics) != 0 {
+		t.Fatalf("replay diagnostics = %#v", replayDiagnostics)
+	}
+	evaluation.Simulation.Reports[0].Status = "tampered"
+	if replayDiagnostics := ReplaySimulationEvidence(*evaluation.Simulation); len(replayDiagnostics) == 0 {
+		t.Fatal("tampered simulation transcript replayed successfully")
+	}
+}
+
 func TestWorstLinkedAssertionSelectsWorstCornerDeterministically(t *testing.T) {
 	plan := simmodel.Plan{Assertions: []simmodel.Assertion{{Min: 4.5, Max: 5.5}, {Min: 4.5, Max: 5.5}, {Min: 4.5, Max: 5.5}}}
 	report := simmodel.Report{Assertions: []simmodel.AssertionResult{{Actual: 5}, {Actual: 4.6}, {Actual: 5.4}}}

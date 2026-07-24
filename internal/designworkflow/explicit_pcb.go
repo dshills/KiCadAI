@@ -193,6 +193,58 @@ func RouteExplicitCircuit(ctx context.Context, request Request, placed Placement
 		}
 	}
 	operations, clearanceIssues, clearanceBlockersBefore, clearanceBlockersAfter, clearanceMM := finalizeEmittedRoutePhysicalClearanceWhenRequired(request.Validation.RequireDRC, routingRequest, operations)
+	layerTransitionViasAdded := 0
+	if request.Validation.RequireDRC {
+		var junctionIssues []reports.Issue
+		operations, layerTransitionViasAdded, junctionIssues = ensureRouteLayerJunctionVias(operations, routingRequest.Rules)
+		issues = append(issues, junctionIssues...)
+		result.Issues = append(result.Issues, junctionIssues...)
+		if layerTransitionViasAdded > 0 && !reports.HasBlockingIssue(junctionIssues) {
+			var reduced map[int]struct{}
+			var reductionIssues []reports.Issue
+			operations, reduced, reductionIssues = removeRedundantRouteViasAtPlatedPadsWithContext(operations, &placed, newPhysicalPadRoutingContext(&placed))
+			layerTransitionViasAdded -= len(reduced)
+			issues = append(issues, reductionIssues...)
+			result.Issues = append(result.Issues, reductionIssues...)
+			junctionIssues = append(junctionIssues, reductionIssues...)
+		}
+		if layerTransitionViasAdded > 0 && !reports.HasBlockingIssue(junctionIssues) {
+			// Newly materialized transitions participate in the complete
+			// cross-copper clearance set. Give their attached tracks the same
+			// bounded generic repair used for combined route phases before the
+			// transition-specific relocation pass proves via-to-pad clearance.
+			var postJunctionClearanceIssues []reports.Issue
+			operations, postJunctionClearanceIssues = repairEmittedRoutePhysicalClearance(routingRequest, operations)
+			issues = append(issues, postJunctionClearanceIssues...)
+			result.Issues = append(result.Issues, postJunctionClearanceIssues...)
+			junctionIssues = append(junctionIssues, postJunctionClearanceIssues...)
+		}
+		if !reports.HasBlockingIssue(junctionIssues) {
+			// Track-clearance repair may add alternate-layer doglegs or move
+			// their attached vertices. Revalidate transition vias afterward;
+			// the pre-clearance transition pass cannot prove this final copper.
+			var transitionIssues []reports.Issue
+			operations, transitionIssues = repairRouteTransitionViaClearance(routingRequest, operations)
+			issues = append(issues, transitionIssues...)
+			result.Issues = append(result.Issues, transitionIssues...)
+			junctionIssues = append(junctionIssues, transitionIssues...)
+			writerClearanceRequest := routingRequest
+			routing.NormalizeRequest(&writerClearanceRequest)
+			clearanceIssues = routing.ValidatePhysicalTrackClearance(writerClearanceRequest, routingRoutesFromOperations(operations))
+			clearanceBlockersAfter = blockingIssueCount(clearanceIssues)
+		}
+		if reports.HasBlockingIssue(junctionIssues) {
+			result.Status = routing.StatusBlocked
+		}
+	}
+	operations, endpointTailCleanup := trimDisconnectedRouteTailsAtSameNetPadsWithSummary(operations, newPhysicalPadRoutingContext(&placed))
+	operations = compactRouteOperationGeometry(operations)
+	if endpointTailCleanup.Trimmed > 0 {
+		finalClearanceRequest := routingRequest
+		routing.NormalizeRequest(&finalClearanceRequest)
+		clearanceIssues = routing.ValidatePhysicalTrackClearance(finalClearanceRequest, routingRoutesFromOperations(operations))
+		clearanceBlockersAfter = blockingIssueCount(clearanceIssues)
+	}
 	clearanceIssues, clearanceDeferredToDRC := deferPhysicalClearanceIssuesToRequiredDRC(request.Validation.RequireDRC, clearanceIssues)
 	issues = append(issues, clearanceIssues...)
 	result.Issues = append(result.Issues, clearanceIssues...)
@@ -205,6 +257,8 @@ func RouteExplicitCircuit(ctx context.Context, request Request, placed Placement
 		"failed_nets": result.Metrics.FailedNetCount, "route_operations": len(operations), "route_order": routeOrder,
 		"clearance_mm": clearanceMM, "physical_clearance_before_repair": clearanceBlockersBefore,
 		"physical_clearance_after_repair": clearanceBlockersAfter, "physical_clearance_deferred_drc": clearanceDeferredToDRC,
+		"layer_transition_vias_added": layerTransitionViasAdded,
+		"route_endpoint_tail_cleanup": endpointTailCleanup,
 	}
 	if result.Status != routing.StatusRouted && stage.Status == StageStatusOK {
 		stage.Status = StageStatusWarning

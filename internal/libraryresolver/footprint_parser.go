@@ -430,8 +430,32 @@ func readLibraryFootprintText(node sexpr.ParsedNode) FootprintText {
 		text.Text = node.ListValue(2)
 	}
 	text.Position = readNamedPoint(node, "at")
+	if at, ok := node.Child("at"); ok {
+		if rotation, rotationOK := at.FloatValue(3); rotationOK {
+			text.Rotation = kicadfiles.Angle(rotation)
+		}
+	}
 	if layer, ok := node.Child("layer"); ok && len(layer.Children) > 1 {
 		text.Layer = layer.ListValue(1)
+	}
+	if effects, ok := node.Child("effects"); ok {
+		if font, fontOK := effects.Child("font"); fontOK {
+			if size, sizeOK := font.Child("size"); sizeOK {
+				text.FontSize = readPointValues(size, 1)
+			}
+			if thickness, thicknessOK := font.Child("thickness"); thicknessOK {
+				text.FontThickness, _ = firstNumericMM(thickness, 1)
+			} else {
+				text.OmitFontThickness = true
+			}
+		}
+		if justify, justifyOK := effects.Child("justify"); justifyOK {
+			for index := 1; index < len(justify.Children); index++ {
+				if value := strings.TrimSpace(justify.ListValue(index)); value != "" {
+					text.Justify = append(text.Justify, value)
+				}
+			}
+		}
 	}
 	return text
 }

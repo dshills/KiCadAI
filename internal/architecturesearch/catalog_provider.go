@@ -40,6 +40,7 @@ var catalogProviderCapabilities = []string{
 	"mute_control",
 	"output_protection",
 	"programmable_controller",
+	"precision_rectification",
 	"safety_interlock",
 	"signal_amplification",
 	"split_supply_generation",
@@ -132,6 +133,8 @@ func (provider *CatalogProvider) Expand(ctx context.Context, request ProviderReq
 		return provider.expandCurrentSensing(ctx, request)
 	case "constant_current_regulation":
 		return provider.expandConstantCurrentRegulation(ctx, request)
+	case "precision_rectification":
+		return provider.expandPrecisionRectification(ctx, request)
 	case "mute_control":
 		return provider.expandMuteControl(ctx, request)
 	case "class_ab_bias_control":
@@ -695,12 +698,52 @@ func (provider *CatalogProvider) expandRegulator(ctx context.Context, request Pr
 	if !ok {
 		return nil, fmt.Errorf("selected adjustable regulator lacks reference-voltage evidence")
 	}
-	calculation, issues := SolveDivider(DividerRequest{
-		ID: "regulator_feedback", Mode: DividerFeedback, SourceVoltageV: reference,
-		SourceTolerancePercent: 0.5, TargetVoltageV: output, TargetTolerancePercent: tolerance,
-		LowerResistanceOhm: 10000, LowerTolerancePercent: 0.1, UpperTolerancePercent: 0.1,
-		UpperSeries: SeriesE96,
-	})
+	floating := !recordHasFunction(selection.record, "GND")
+	referenceResistance := 10000.0
+	feedbackBiasCurrent := 0.0
+	outputMinimum, outputMaximum := toleranceRange(output, tolerance)
+	referenceCandidates := []float64{referenceResistance}
+	upperSeries := SeriesE96
+	if floating {
+		minimumLoadCurrent, ok := recordValueMaximum(selection.record, "minimum_load_current", "A")
+		if !ok || !finitePositive(minimumLoadCurrent) {
+			return nil, fmt.Errorf("selected floating adjustable regulator lacks minimum-load-current evidence")
+		}
+		feedbackBiasCurrent, ok = catalogSimulationParameter(selection.record, "adjustment_pin_current_a")
+		if !ok || feedbackBiasCurrent < 0 {
+			return nil, fmt.Errorf("selected floating adjustable regulator lacks adjustment-pin-current evidence")
+		}
+		maximumReferenceResistance := reference / minimumLoadCurrent
+		var issues []reports.Issue
+		referenceCandidates, issues = PreferredValueCandidates(maximumReferenceResistance, SeriesE192, maximumReferenceResistance/2, maximumReferenceResistance, DefaultMaxValueCandidates)
+		if len(issues) != 0 {
+			return nil, fmt.Errorf("regulator reference-resistor solution failed: %s", issues[0].Message)
+		}
+		dropout, ok := recordRegulatorDropoutV(selection.record)
+		if !ok {
+			return nil, fmt.Errorf("selected floating adjustable regulator lacks dropout evidence")
+		}
+		outputMaximum = math.Min(outputMaximum, inputRange[0]-dropout)
+		if outputMaximum <= outputMinimum {
+			return nil, fmt.Errorf("floating adjustable regulator has no output range satisfying tolerance and dropout")
+		}
+		upperSeries = SeriesE192
+	}
+	var calculation CalculationEvidence
+	var issues []reports.Issue
+	for _, candidate := range referenceCandidates {
+		calculation, issues = SolveDivider(DividerRequest{
+			ID: "regulator_feedback", Mode: DividerFeedback, SourceVoltageV: reference,
+			SourceTolerancePercent: 0.5, TargetVoltageV: output, TargetTolerancePercent: tolerance,
+			LowerResistanceOhm: candidate, LowerTolerancePercent: 0.1, UpperTolerancePercent: 0.1,
+			UpperSeries: upperSeries, FeedbackBiasCurrentA: feedbackBiasCurrent,
+			MinimumOutputV: outputMinimum, MaximumOutputV: outputMaximum,
+		})
+		if len(issues) == 0 {
+			referenceResistance = candidate
+			break
+		}
+	}
 	if len(issues) != 0 {
 		return nil, fmt.Errorf("regulator feedback solution failed: %s", issues[0].Message)
 	}
@@ -708,17 +751,27 @@ func (provider *CatalogProvider) expandRegulator(ctx context.Context, request Pr
 	if !ok {
 		return nil, fmt.Errorf("regulator solution omitted upper feedback resistance")
 	}
+	feedbackLowerValue := engineeringValue(referenceResistance, "Ohm")
+	feedbackUpperValue := engineeringValue(feedbackUpper, "Ohm")
+	if floating {
+		// A floating three-terminal regulator holds VOUT-ADJ at its
+		// reference. Its fixed reference resistor therefore spans VOUT-ADJ
+		// and the calculated programming resistor spans ADJ-reference. A
+		// ground-referenced adjustable regulator instead holds ADJ at its
+		// reference and uses the conventional upper/lower divider order.
+		feedbackLowerValue, feedbackUpperValue = feedbackUpperValue, feedbackLowerValue
+	}
 	outputCapacitance, transientCalculation, err := regulatorOutputCapacitor(request, selection.record)
 	if err != nil {
 		return nil, err
 	}
 	parts := []catalogPart{selection}
-	parts, err = provider.appendPassiveParts(ctx, parts, []passivePart{{"feedback_lower", "resistor", "feedback_divider", "10k"}, {"feedback_upper", "resistor", "feedback_divider", engineeringValue(feedbackUpper, "Ohm")}, {"input_bypass", "capacitor", "decoupling", "1u"}, {"output_bypass", "capacitor", "decoupling", outputCapacitance}})
+	parts, err = provider.appendPassiveParts(ctx, parts, []passivePart{{"feedback_lower", "resistor", "feedback_divider", feedbackLowerValue}, {"feedback_upper", "resistor", "feedback_divider", feedbackUpperValue}, {"input_bypass", "capacitor", "decoupling", "1u"}, {"output_bypass", "capacitor", "decoupling", outputCapacitance}})
 	if err != nil {
 		return nil, err
 	}
 	bindings := bindRoles(request.Ports, selection.selected.InstanceID, map[string]string{"input": "VIN", "output": "VOUT", "reference": "GND"})
-	if !recordHasFunction(selection.record, "GND") {
+	if floating {
 		for index := range bindings {
 			if bindings[index].Role == "reference" {
 				bindings[index].Instance, bindings[index].Function = "feedback_lower", "B"
@@ -1359,6 +1412,13 @@ func catalogMaximumRating(record components.ComponentRecord, kind string) (float
 }
 
 func (provider *CatalogProvider) selectComponentMinimizingModelParameterWithTemperature(ctx context.Context, family, text string, ratings []components.RequiredRating, concrete bool, temperature *components.TemperatureRequirement, thermal *components.ThermalRequirement, modelID, parameter string, parameterMaximums map[string]float64) (catalogPart, error) {
+	return provider.selectComponentMinimizingModelParameterWithinBoundsWithTemperature(
+		ctx, family, text, ratings, concrete, temperature, thermal,
+		modelID, parameter, nil, parameterMaximums,
+	)
+}
+
+func (provider *CatalogProvider) selectComponentMinimizingModelParameterWithinBoundsWithTemperature(ctx context.Context, family, text string, ratings []components.RequiredRating, concrete bool, temperature *components.TemperatureRequirement, thermal *components.ThermalRequirement, modelID, parameter string, parameterMinimums, parameterMaximums map[string]float64) (catalogPart, error) {
 	request := components.SelectionRequest{
 		Query:               components.Query{Text: text, Family: family, MinimumConfidence: components.ConfidenceRuleInferred, Limit: 64},
 		Acceptance:          components.AcceptanceStructural,
@@ -1383,14 +1443,24 @@ func (provider *CatalogProvider) selectComponentMinimizingModelParameterWithTemp
 		if !resolveResult.OK || !components.ValidateResolvedComponent(resolved, request).OK {
 			continue
 		}
-		value, ok := catalogSimulationParameterForModel(resolved.Component, modelID, parameter)
-		if !ok || !finitePositive(value) {
+		value, ok := catalogSimulationParameterForModelNonNegative(resolved.Component, modelID, parameter)
+		if !ok {
 			continue
 		}
 		compatible := true
+		for boundedParameter, minimum := range parameterMinimums {
+			boundedValue, boundedOK := catalogSimulationParameterForModelNonNegative(resolved.Component, modelID, boundedParameter)
+			if !boundedOK || boundedValue < minimum {
+				compatible = false
+				break
+			}
+		}
+		if !compatible {
+			continue
+		}
 		for boundedParameter, maximum := range parameterMaximums {
-			boundedValue, boundedOK := catalogSimulationParameterForModel(resolved.Component, modelID, boundedParameter)
-			if !boundedOK || !finitePositive(boundedValue) || boundedValue > maximum {
+			boundedValue, boundedOK := catalogSimulationParameterForModelNonNegative(resolved.Component, modelID, boundedParameter)
+			if !boundedOK || boundedValue > maximum {
 				compatible = false
 				break
 			}
@@ -1413,7 +1483,7 @@ func (provider *CatalogProvider) selectComponentMinimizingModelParameterWithTemp
 		return strings.Compare(left.candidate.VariantID, right.candidate.VariantID)
 	})
 	if len(choices) == 0 {
-		return catalogPart{}, fmt.Errorf("no catalog-backed %s satisfies normalized ratings with a positive %s.%s model parameter", family, modelID, parameter)
+		return catalogPart{}, fmt.Errorf("no catalog-backed %s satisfies normalized ratings with a finite non-negative %s.%s model parameter", family, modelID, parameter)
 	}
 	selected := choices[0]
 	evidence := componentEvidence(selected.resolved.Component, selected.candidate.Confidence)
@@ -1576,62 +1646,167 @@ func (provider *CatalogProvider) appendPassivePartsWithTolerances(ctx context.Co
 	for _, passive := range requested {
 		var part catalogPart
 		var err error
+		valueKind := passiveCatalogValueKind(passive.family)
 		if maximum := maximumTolerancePercent[passive.id]; maximum > 0 {
-			part, err = provider.selectComponentWithTolerance(ctx, passive.family, "resistance", maximum, "%", maximumTempcoPPMPerC)
+			toleranceKind := passiveToleranceKind(passive.family)
+			if toleranceKind == "" {
+				return nil, fmt.Errorf("select %s tolerance for %s: unsupported passive family", passive.family, passive.id)
+			}
+			part, err = provider.selectComponentWithTolerance(ctx, passive.family, valueKind, passive.value, toleranceKind, maximum, "%", maximumTempcoPPMPerC)
 		} else {
-			part, err = provider.selectComponent(ctx, passive.family, "", nil, false)
+			part, err = provider.selectPassiveComponent(ctx, passive.family, valueKind, passive.value)
 		}
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("select %s %s=%s for %s: %w", passive.family, valueKind, passive.value, passive.id, err)
 		}
 		part.selected.InstanceID = passive.id
 		part.usage = passive.usage
-		part.value = passive.value
+		if strings.TrimSpace(part.value) == "" {
+			part.value = passive.value
+		}
 		parts = append(parts, part)
 	}
 	return parts, nil
 }
 
-func (provider *CatalogProvider) selectComponentWithTolerance(ctx context.Context, family, toleranceKind string, maximumTolerance float64, toleranceUnit string, maximumTempcoPPMPerC float64) (catalogPart, error) {
+func passiveToleranceKind(family string) string {
+	switch strings.ToLower(strings.TrimSpace(family)) {
+	case "resistor":
+		return "resistance"
+	case "capacitor":
+		return "capacitance"
+	case "inductor":
+		return "inductance"
+	default:
+		return ""
+	}
+}
+
+func passiveCatalogValueKind(family string) string {
+	switch strings.ToLower(strings.TrimSpace(family)) {
+	case "resistor":
+		return "resistance"
+	case "capacitor":
+		return "capacitance"
+	case "inductor":
+		return "inductance"
+	default:
+		return ""
+	}
+}
+
+func (provider *CatalogProvider) selectPassiveComponent(ctx context.Context, family, valueKind, value string) (catalogPart, error) {
+	return provider.selectPassiveComponentWithRatings(ctx, family, valueKind, value, nil)
+}
+
+func (provider *CatalogProvider) selectPassiveComponentWithRatings(ctx context.Context, family, valueKind, value string, requiredRatings []components.RequiredRating) (catalogPart, error) {
 	request := components.SelectionRequest{
 		Query: components.Query{
-			Family: family, ToleranceKind: toleranceKind, MaximumTolerance: maximumTolerance,
-			ToleranceUnit: toleranceUnit, MinimumConfidence: components.ConfidenceRuleInferred, Limit: 64,
+			Family: family, ValueKind: valueKind, Value: value,
+			MinimumConfidence: components.ConfidenceRuleInferred, Limit: 64,
 		},
 		Acceptance: components.AcceptanceStructural, AllowAlternatives: true,
+		RequiredRatings: requiredRatings,
 	}
-	candidates, result := components.Find(ctx, provider.catalog, request.Query)
+	selection, result := components.Select(ctx, provider.catalog, request)
 	if !result.OK {
-		return catalogPart{}, fmt.Errorf("no catalog-backed %s satisfies maximum %g %s %s tolerance: %v", family, maximumTolerance, toleranceUnit, toleranceKind, result.Issues)
+		return catalogPart{}, fmt.Errorf("no catalog-backed %s satisfies requested %s %s: %v", family, valueKind, value, result.Issues)
 	}
+	evidence := componentEvidence(selection.Component, selection.Candidate.Confidence)
+	return catalogPart{
+		selected: SelectedComponent{InstanceID: canonicalIdentifier(family), CatalogID: selection.Component.ID, VariantID: selection.Variant.ID, Evidence: evidence.Confidence},
+		record:   selection.Component, usage: canonicalIdentifier(family), evidence: evidence,
+	}, nil
+}
+
+func (provider *CatalogProvider) selectComponentWithTolerance(ctx context.Context, family, valueKind, value, toleranceKind string, maximumTolerance float64, toleranceUnit string, maximumTempcoPPMPerC float64) (catalogPart, error) {
 	type eligible struct {
 		candidate components.Candidate
 		resolved  components.ResolvedComponent
 		tolerance float64
+		tempco    float64
+		value     float64
+		distance  float64
 	}
-	var choices []eligible
-	for _, candidate := range candidates {
-		resolved, resolveResult := components.ResolveBinding(ctx, provider.catalog, candidate.ComponentID, candidate.VariantID)
-		if !resolveResult.OK || !components.ValidateResolvedComponent(resolved, request).OK {
-			continue
+	requestedValue, requestedValueOK := components.ParseEngineeringValue(value)
+	valueUnit := passiveCatalogUnit(valueKind)
+	findEligible := func(query components.Query) []eligible {
+		request := components.SelectionRequest{
+			Query: query, Acceptance: components.AcceptanceStructural, AllowAlternatives: true,
 		}
-		tolerance, ok := catalogToleranceMaximum(resolved.Component, toleranceKind, toleranceUnit)
-		if !ok || tolerance > maximumTolerance {
-			continue
+		candidates, result := components.Find(ctx, provider.catalog, request.Query)
+		if !result.OK {
+			return nil
 		}
-		if maximumTempcoPPMPerC > 0 {
-			tempco, tempcoOK := recordValueMaximum(resolved.Component, "temperature_coefficient", "ppm/C")
-			if !tempcoOK || tempco > maximumTempcoPPMPerC {
+		var choices []eligible
+		for _, candidate := range candidates {
+			resolved, resolveResult := components.ResolveBinding(ctx, provider.catalog, candidate.ComponentID, candidate.VariantID)
+			if !resolveResult.OK || !components.ValidateResolvedComponent(resolved, request).OK {
 				continue
 			}
+			tolerance, ok := catalogToleranceMaximum(resolved.Component, toleranceKind, toleranceUnit)
+			if !ok || tolerance > maximumTolerance {
+				continue
+			}
+			tempco := 0.0
+			if maximumTempcoPPMPerC > 0 {
+				var tempcoOK bool
+				tempco, tempcoOK = recordValueMaximum(resolved.Component, "temperature_coefficient", "ppm/C")
+				if !tempcoOK || tempco > maximumTempcoPPMPerC {
+					continue
+				}
+			}
+			actualValue, actualValueOK := recordValue(resolved.Component, valueKind, valueUnit)
+			if !actualValueOK && requestedValueOK {
+				actualValue, actualValueOK = recordPreferredSeriesValue(resolved.Component, valueKind, valueUnit, requestedValue)
+			}
+			if !actualValueOK || !finitePositive(actualValue) {
+				continue
+			}
+			distance := 0.0
+			if requestedValueOK && finitePositive(requestedValue) {
+				distance = math.Abs(actualValue-requestedValue) / requestedValue
+			}
+			// A fixed catalog value is never an acceptable silent substitute
+			// for the value used by the electrical calculation. Ranged series
+			// records resolve the requested preferred value above.
+			if distance > 1e-12 {
+				continue
+			}
+			choices = append(choices, eligible{
+				candidate: candidate, resolved: resolved, tolerance: tolerance,
+				tempco: tempco, value: actualValue, distance: distance,
+			})
 		}
-		choices = append(choices, eligible{candidate: candidate, resolved: resolved, tolerance: tolerance})
+		return choices
+	}
+	query := components.Query{
+		Family: family, ValueKind: valueKind, Value: value,
+		ToleranceKind: toleranceKind, MaximumTolerance: maximumTolerance,
+		ToleranceUnit: toleranceUnit, MinimumConfidence: components.ConfidenceRuleInferred, Limit: 64,
+	}
+	choices := findEligible(query)
+	if len(choices) == 0 && requestedValueOK && finitePositive(requestedValue) {
+		query.Value = ""
+		choices = findEligible(query)
 	}
 	slices.SortStableFunc(choices, func(left, right eligible) int {
+		if left.distance < right.distance {
+			return -1
+		}
+		if left.distance > right.distance {
+			return 1
+		}
 		if left.tolerance < right.tolerance {
 			return -1
 		}
 		if left.tolerance > right.tolerance {
+			return 1
+		}
+		if left.tempco < right.tempco {
+			return -1
+		}
+		if left.tempco > right.tempco {
 			return 1
 		}
 		if order := strings.Compare(left.candidate.ComponentID, right.candidate.ComponentID); order != 0 {
@@ -1640,16 +1815,166 @@ func (provider *CatalogProvider) selectComponentWithTolerance(ctx context.Contex
 		return strings.Compare(left.candidate.VariantID, right.candidate.VariantID)
 	})
 	if len(choices) == 0 {
-		return catalogPart{}, fmt.Errorf("no catalog-backed %s proves maximum %g %s %s tolerance", family, maximumTolerance, toleranceUnit, toleranceKind)
+		return catalogPart{}, fmt.Errorf("no catalog-backed %s proves a fixed %s value with maximum %g %s %s tolerance", family, valueKind, maximumTolerance, toleranceUnit, toleranceKind)
 	}
 	selected := choices[0]
 	evidence := componentEvidence(selected.resolved.Component, selected.candidate.Confidence)
 	return catalogPart{
 		selected: SelectedComponent{InstanceID: canonicalIdentifier(family), CatalogID: selected.resolved.Component.ID, VariantID: selected.resolved.Variant.ID, Evidence: evidence.Confidence},
 		record:   selected.resolved.Component, usage: canonicalIdentifier(family), evidence: evidence,
+		value:         engineeringValue(selected.value, valueUnit),
 		toleranceKind: toleranceKind, maximumTolerance: maximumTolerance, toleranceUnit: toleranceUnit,
 		maximumTempcoPPMPerC: maximumTempcoPPMPerC,
 	}, nil
+}
+
+func recordPreferredSeriesValue(record components.ComponentRecord, kind, unit string, requested float64) (float64, bool) {
+	series, ok := recordPreferredSeries(record)
+	if !ok {
+		return 0, false
+	}
+	candidates, issues := PreferredValueCandidates(
+		requested,
+		series,
+		requested*(1-1e-10),
+		requested*(1+1e-10),
+		1,
+	)
+	if reports.HasBlockingIssue(issues) || len(candidates) != 1 || math.Abs(candidates[0]-requested) > requested*1e-10 {
+		return 0, false
+	}
+	for _, value := range record.Values {
+		if value.Kind != kind || value.Min == "" || value.Max == "" {
+			continue
+		}
+		minimum, minimumOK := parseCatalogEngineeringValue(value.Min, value.Unit, unit)
+		maximum, maximumOK := parseCatalogEngineeringValue(value.Max, value.Unit, unit)
+		if minimumOK && maximumOK && requested >= minimum && requested <= maximum {
+			return requested, true
+		}
+	}
+	return 0, false
+}
+
+func recordPreferredSeries(record components.ComponentRecord) (PreferredSeries, bool) {
+	for _, candidate := range []PreferredSeries{SeriesE6, SeriesE12, SeriesE24, SeriesE48, SeriesE96, SeriesE192} {
+		if slices.ContainsFunc(record.Tags, func(tag string) bool {
+			return strings.EqualFold(strings.TrimSpace(tag), string(candidate))
+		}) {
+			return candidate, true
+		}
+	}
+	return "", false
+}
+
+func (provider *CatalogProvider) preferredResistanceCandidates(ctx context.Context, ideal, maximumTolerancePercent, maximumTempcoPPMPerC float64, limit int) ([]float64, error) {
+	if provider == nil || provider.catalog == nil || !finitePositive(ideal) || maximumTolerancePercent <= 0 || limit <= 0 || limit > DefaultMaxValueCandidates {
+		return nil, fmt.Errorf("preferred resistance candidate request is invalid")
+	}
+	values := map[float64]bool{}
+	for _, record := range provider.catalog.Records {
+		if !strings.EqualFold(strings.TrimSpace(record.Family), "resistor") {
+			continue
+		}
+		tolerance, toleranceOK := catalogToleranceMaximum(record, "resistance", "%")
+		if !toleranceOK || tolerance > maximumTolerancePercent {
+			continue
+		}
+		if maximumTempcoPPMPerC > 0 {
+			tempco, tempcoOK := recordValueMaximum(record, "temperature_coefficient", "ppm/C")
+			if !tempcoOK || tempco > maximumTempcoPPMPerC {
+				continue
+			}
+		}
+		if fixed, fixedOK := recordValue(record, "resistance", "Ohm"); fixedOK && finitePositive(fixed) {
+			values[fixed] = true
+		}
+		series, seriesOK := recordPreferredSeries(record)
+		if !seriesOK {
+			continue
+		}
+		for _, value := range record.Values {
+			if value.Kind != "resistance" || value.Min == "" || value.Max == "" {
+				continue
+			}
+			minimum, minimumOK := parseCatalogEngineeringValue(value.Min, value.Unit, "Ohm")
+			maximum, maximumOK := parseCatalogEngineeringValue(value.Max, value.Unit, "Ohm")
+			if !minimumOK || !maximumOK || !finitePositive(minimum) || !finitePositive(maximum) || minimum > maximum {
+				continue
+			}
+			candidates, issues := PreferredValueCandidates(ideal, series, minimum, maximum, DefaultMaxValueCandidates)
+			if reports.HasBlockingIssue(issues) {
+				continue
+			}
+			for _, candidate := range candidates {
+				values[candidate] = true
+			}
+		}
+	}
+	candidates := make([]float64, 0, len(values))
+	for value := range values {
+		if _, err := provider.selectComponentWithTolerance(
+			ctx,
+			"resistor",
+			"resistance",
+			engineeringValue(value, "Ohm"),
+			"resistance",
+			maximumTolerancePercent,
+			"%",
+			maximumTempcoPPMPerC,
+		); err == nil {
+			candidates = append(candidates, value)
+		}
+	}
+	slices.SortStableFunc(candidates, func(left, right float64) int {
+		leftError := math.Abs(left-ideal) / ideal
+		rightError := math.Abs(right-ideal) / ideal
+		if leftError < rightError {
+			return -1
+		}
+		if leftError > rightError {
+			return 1
+		}
+		if left < right {
+			return -1
+		}
+		if left > right {
+			return 1
+		}
+		return 0
+	})
+	if len(candidates) > limit {
+		candidates = candidates[:limit]
+	}
+	if len(candidates) == 0 {
+		return nil, fmt.Errorf("no catalog-backed preferred resistance candidate is available near %s", engineeringValue(ideal, "Ohm"))
+	}
+	return candidates, nil
+}
+
+func parseCatalogEngineeringValue(raw, fromUnit, toUnit string) (float64, bool) {
+	value, err := strconv.ParseFloat(raw, 64)
+	if err != nil {
+		var ok bool
+		value, ok = components.ParseEngineeringValue(raw)
+		if !ok {
+			return 0, false
+		}
+	}
+	return convertCatalogUnit(value, fromUnit, toUnit)
+}
+
+func passiveCatalogUnit(valueKind string) string {
+	switch strings.ToLower(strings.TrimSpace(valueKind)) {
+	case "resistance":
+		return "Ohm"
+	case "capacitance":
+		return "F"
+	case "inductance":
+		return "H"
+	default:
+		return ""
+	}
 }
 
 func catalogToleranceMaximum(record components.ComponentRecord, kind, unit string) (float64, bool) {
@@ -1698,6 +2023,7 @@ func (provider *CatalogProvider) expansionWithTransitionsAndRepairs(request Prov
 		if err != nil {
 			return nil, err
 		}
+		candidate.Metrics.CatalogSubstitutions++
 		expansions = append(expansions, candidate)
 		break
 	}
@@ -1760,8 +2086,19 @@ func (provider *CatalogProvider) catalogAlternativePart(original catalogPart) (c
 		return catalogPart{}, false
 	}
 	requiredFunctions := catalogRecordFunctions(original.record)
+	equivalenceGroup := ""
+	if original.record.Equivalence != nil {
+		equivalenceGroup = strings.TrimSpace(original.record.Equivalence.Group)
+	}
 	for _, record := range provider.alternativeRecords {
-		if record.ID == original.record.ID || record.Family != original.record.Family || !catalogRecordSupportsFunctions(record, requiredFunctions) {
+		if record.ID == original.record.ID ||
+			record.Family != original.record.Family ||
+			!catalogRecordSupportsFunctions(record, requiredFunctions) ||
+			!catalogAlternativePreservesSimulationEvidence(original.record, record) {
+			continue
+		}
+		if equivalenceGroup != "" &&
+			(record.Equivalence == nil || !strings.EqualFold(strings.TrimSpace(record.Equivalence.Group), equivalenceGroup)) {
 			continue
 		}
 		if original.maximumTolerance > 0 {
@@ -1799,6 +2136,39 @@ func (provider *CatalogProvider) catalogAlternativePart(original catalogPart) (c
 	return catalogPart{}, false
 }
 
+func catalogAlternativePreservesSimulationEvidence(original, alternative components.ComponentRecord) bool {
+	primitiveIDs := simmodel.PrimitiveModelIDs()
+	slices.Sort(primitiveIDs)
+	originalModels := make([]string, 0, len(original.SimulationModels))
+	alternativeModels := make([]string, 0, len(alternative.SimulationModels))
+	for _, model := range original.SimulationModels {
+		if id := strings.TrimSpace(model.ModelID); id != "" && slices.Contains(primitiveIDs, id) {
+			originalModels = append(originalModels, id)
+		}
+	}
+	for _, model := range alternative.SimulationModels {
+		if id := strings.TrimSpace(model.ModelID); id != "" && slices.Contains(primitiveIDs, id) {
+			alternativeModels = append(alternativeModels, id)
+		}
+	}
+	slices.Sort(originalModels)
+	slices.Sort(alternativeModels)
+	originalModels = slices.Compact(originalModels)
+	alternativeModels = slices.Compact(alternativeModels)
+	if len(originalModels) == 0 {
+		// A model-free concrete record resolves through the single trusted
+		// family primitive. Legacy workflow evidence does not participate in
+		// primitive uniqueness, but multiple registered device primitives do.
+		return len(alternativeModels) <= 1
+	}
+	for _, modelID := range originalModels {
+		if !slices.Contains(alternativeModels, modelID) {
+			return false
+		}
+	}
+	return true
+}
+
 func sharedCatalogValueKind(left components.ComponentRecord, right components.ComponentRecord) string {
 	for _, leftValue := range left.Values {
 		for _, rightValue := range right.Values {
@@ -1813,17 +2183,23 @@ func sharedCatalogValueKind(left components.ComponentRecord, right components.Co
 func catalogRecordFunctions(record components.ComponentRecord) []string {
 	seen := map[string]struct{}{}
 	var functions []string
+	add := func(name string) {
+		key := canonicalIdentifier(name)
+		if key == "" {
+			return
+		}
+		if _, ok := seen[key]; ok {
+			return
+		}
+		seen[key] = struct{}{}
+		functions = append(functions, key)
+	}
 	for _, symbol := range record.Symbols {
 		for _, binding := range symbol.FunctionPins {
-			key := canonicalIdentifier(binding.Function)
-			if key == "" {
-				continue
+			add(binding.Function)
+			for _, alias := range binding.Aliases {
+				add(alias)
 			}
-			if _, ok := seen[key]; ok {
-				continue
-			}
-			seen[key] = struct{}{}
-			functions = append(functions, key)
 		}
 	}
 	slices.Sort(functions)
@@ -2846,7 +3222,11 @@ func recordValue(record components.ComponentRecord, kind, unit string) (float64,
 		}
 		parsed, err := strconv.ParseFloat(value.Typ, 64)
 		if err != nil {
-			return 0, false
+			var ok bool
+			parsed, ok = components.ParseEngineeringValue(value.Typ)
+			if !ok {
+				return 0, false
+			}
 		}
 		return convertCatalogUnit(parsed, value.Unit, unit)
 	}

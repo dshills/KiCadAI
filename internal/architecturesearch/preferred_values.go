@@ -16,7 +16,7 @@ var preferredMantissas = map[PreferredSeries][]float64{
 }
 
 func PreferredValueCandidates(ideal float64, series PreferredSeries, minimum, maximum float64, limit int) ([]float64, []reports.Issue) {
-	mantissas, ok := preferredMantissas[series]
+	mantissas, ok := preferredSeriesMantissas(series)
 	if !ok || !finitePositive(ideal) || !finitePositive(minimum) || !finitePositive(maximum) || minimum > maximum || limit <= 0 || limit > DefaultMaxValueCandidates {
 		return nil, calculationIssue(CodeValueInputInvalid, "preferred_values", "invalid preferred-value series, range, ideal, or candidate limit")
 	}
@@ -65,6 +65,23 @@ func PreferredValueCandidates(ideal float64, series PreferredSeries, minimum, ma
 		return nil, calculationIssue(CodeValueUnsolved, "preferred_values", "no preferred value falls within the permitted range")
 	}
 	return candidates, nil
+}
+
+func preferredSeriesMantissas(series PreferredSeries) ([]float64, bool) {
+	if series != SeriesE192 {
+		mantissas, ok := preferredMantissas[series]
+		return mantissas, ok
+	}
+	// IEC 60063 E192 values are the 192 logarithmically even values in a
+	// decade, rounded to three significant digits. Generate them from the
+	// series definition so the preferred-value table remains auditable and
+	// cannot acquire hand-transcription gaps.
+	mantissas := make([]float64, 0, 192)
+	for index := 0; index < 192; index++ {
+		value := math.Pow(10, float64(index)/192)
+		mantissas = append(mantissas, math.Round(value*100)/100)
+	}
+	return mantissas, true
 }
 
 func quantize(value float64) float64 {

@@ -106,6 +106,46 @@ func SolveSallenKeyLowPass(request SallenKeyLowPassRequest) (CalculationEvidence
 	return finalized, nil
 }
 
+func SolvePreferredResistanceSallenKeyLowPass(request SallenKeyLowPassRequest, series PreferredSeries, minimumResistanceOhm, maximumResistanceOhm float64) (CalculationEvidence, []reports.Issue) {
+	if request.MaxCandidates == 0 {
+		request.MaxCandidates = DefaultMaxValueCandidates
+	}
+	candidates, issues := PreferredValueCandidates(request.ResistanceOhm, series, minimumResistanceOhm, maximumResistanceOhm, request.MaxCandidates)
+	if len(issues) != 0 {
+		return CalculationEvidence{}, issues
+	}
+	rejected := make([]ValueCandidateRejection, 0, len(candidates))
+	for _, resistance := range candidates {
+		attempt := request
+		attempt.ResistanceOhm = resistance
+		calculation, attemptIssues := SolveSallenKeyLowPass(attempt)
+		if len(attemptIssues) != 0 {
+			margin := calculation.WorstMargin
+			if !finiteNumbers(margin) {
+				margin = -1
+			}
+			rejected = append(rejected, ValueCandidateRejection{
+				Value: resistance, Unit: "Ohm", Code: string(attemptIssues[0].Code),
+				Message: "preferred resistance did not satisfy the combined frequency and quality-factor corners",
+				Margin:  quantize(margin),
+			})
+			continue
+		}
+		calculation.SelectedValues = append(calculation.SelectedValues, SelectedValueEvidence{
+			Name: "resistance", Ideal: quantize(request.ResistanceOhm), Selected: resistance,
+			Unit: "Ohm", Series: series, TolerancePercent: request.ResistanceTolerancePercent,
+			RelativeError: quantize(math.Abs(resistance-request.ResistanceOhm) / request.ResistanceOhm),
+		})
+		calculation.RejectedCandidates = append(calculation.RejectedCandidates, rejected...)
+		finalized, err := FinalizeCalculation(calculation)
+		if err != nil {
+			return CalculationEvidence{}, calculationIssue(CodeValueUnsolved, "sallen_key_low_pass", "finalize preferred-resistance evidence: "+err.Error())
+		}
+		return finalized, nil
+	}
+	return CalculationEvidence{}, calculationIssue(CodeToleranceFailed, "sallen_key_low_pass", "no preferred resistance and capacitor combination satisfies all frequency and Q corners")
+}
+
 func evaluateSallenKeyCandidate(request SallenKeyLowPassRequest, c1, c2 float64) evaluatedSallenKeyCandidate {
 	nominalF, nominalQ := sallenKeyResponse(request.ResistanceOhm, request.ResistanceOhm, c1, c2)
 	frequencyMinimum, frequencyMaximum := toleranceRange(request.TargetFrequencyHz, request.FrequencyTolerancePercent)

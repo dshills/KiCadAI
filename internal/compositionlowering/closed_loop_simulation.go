@@ -29,6 +29,7 @@ const (
 	behavioralDistortionCycles            = 4
 	behavioralDistortionSamplesPerCycle   = 32
 	behavioralTransientSamplesPerCycle    = 32
+	behavioralRatedPowerVoltageGuard      = 1.02
 	behavioralStartupSteps                = 256
 )
 
@@ -831,12 +832,12 @@ type operatingHarnessDevice struct {
 }
 
 func operatingHarnessDevices(requirement architecturesearch.Requirement, bindings []closedloopsynthesis.SemanticBinding, resolvedPlan *simmodel.Plan, analysisKind string) ([]operatingHarnessDevice, error) {
-	needsHarness := false
+	loadConditions := make([]architecturesearch.OperatingCondition, 0)
 	for _, operatingCase := range requirement.Requirements.OperatingCases {
 		for _, condition := range operatingCase.Conditions {
 			switch condition.Axis {
 			case "load_current", "load_resistance", "load_capacitance":
-				needsHarness = true
+				loadConditions = append(loadConditions, condition)
 			}
 		}
 	}
@@ -849,7 +850,7 @@ func operatingHarnessDevices(requirement architecturesearch.Requirement, binding
 	if err != nil {
 		return nil, err
 	}
-	if !needsHarness {
+	if len(loadConditions) == 0 {
 		return controlHarness, nil
 	}
 	if ground == "" {
@@ -860,67 +861,65 @@ func operatingHarnessDevices(requirement architecturesearch.Requirement, binding
 	for _, entry := range result {
 		seen[entry.Device.InstanceID] = true
 	}
-	for _, operatingCase := range requirement.Requirements.OperatingCases {
-		for _, condition := range operatingCase.Conditions {
-			var catalogID string
-			var terminals [2]string
-			source := false
-			startupLoadResistance := 0.0
-			switch condition.Axis {
-			case "load_current":
-				catalogID, terminals, source = "source.current.connector.1x02", [2]string{"POSITIVE", "NEGATIVE"}, true
-				if analysisKind == simmodel.AnalysisStartup {
-					var resistanceErr error
-					startupLoadResistance, resistanceErr = startupLoadResistanceOhm(requirement, condition)
-					if resistanceErr != nil {
-						return nil, resistanceErr
-					}
-					catalogID, terminals, source = "resistor.generic.0603", [2]string{"A", "B"}, false
+	for _, condition := range loadConditions {
+		var catalogID string
+		var terminals [2]string
+		source := false
+		startupLoadResistance := 0.0
+		switch condition.Axis {
+		case "load_current":
+			catalogID, terminals, source = "source.current.connector.1x02", [2]string{"POSITIVE", "NEGATIVE"}, true
+			if analysisKind == simmodel.AnalysisStartup {
+				var resistanceErr error
+				startupLoadResistance, resistanceErr = startupLoadResistanceOhm(requirement, condition)
+				if resistanceErr != nil {
+					return nil, resistanceErr
 				}
-			case "load_resistance":
-				catalogID, terminals = "resistor.generic.0603", [2]string{"A", "B"}
-			case "load_capacitance":
-				catalogID, terminals = "capacitor.ceramic.0603", [2]string{"A", "B"}
-			default:
-				continue
+				catalogID, terminals, source = "resistor.generic.0603", [2]string{"A", "B"}, false
 			}
-			target, ok := operatingConditionSemanticTarget(condition, targets)
-			if !ok || target == ground {
-				return nil, fmt.Errorf("%s target %q does not resolve to a non-reference semantic net", condition.Axis, condition.Target)
-			}
-			instanceID := closedloopsynthesis.OperatingHarnessComponentID(condition.Axis, target)
-			if seen[instanceID] {
-				continue
-			}
-			seen[instanceID] = true
-			positive, negative := target, ground
-			if condition.Axis == "load_current" {
-				var endpointErr error
-				positive, negative, endpointErr = loadCurrentHarnessEndpoints(requirement, condition, targets, target, ground, resolvedPlan, analysisKind)
-				if endpointErr != nil {
-					return nil, endpointErr
-				}
-			}
-			device := circuitgraph.SimulationHarnessDevice{
-				InstanceID: instanceID, CatalogID: catalogID,
-				Connections: []simmodel.ConnectionEvidence{{Function: terminals[0], Net: positive}, {Function: terminals[1], Net: negative}},
-			}
-			if !source {
-				value, valueOK := startupLoadResistance, startupLoadResistance > 0
-				if !valueOK {
-					value, valueOK = positiveOperatingValue(condition)
-				}
-				if !valueOK {
-					return nil, fmt.Errorf("%s target %q requires at least one positive bounded load value", condition.Axis, condition.Target)
-				}
-				device.ValueSI, device.HasValueSI = value, true
-			}
-			entry := operatingHarnessDevice{Device: device, Source: source}
-			if condition.Axis == "load_current" {
-				entry.DefaultValue, entry.HasDefaultValue = maximumPositiveOperatingValue(condition)
-			}
-			result = append(result, entry)
+		case "load_resistance":
+			catalogID, terminals = "resistor.generic.0603", [2]string{"A", "B"}
+		case "load_capacitance":
+			catalogID, terminals = "capacitor.ceramic.0603", [2]string{"A", "B"}
+		default:
+			continue
 		}
+		target, ok := operatingConditionSemanticTarget(condition, targets)
+		if !ok || target == ground {
+			return nil, fmt.Errorf("%s target %q does not resolve to a non-reference semantic net", condition.Axis, condition.Target)
+		}
+		instanceID := closedloopsynthesis.OperatingHarnessComponentID(condition.Axis, target)
+		if seen[instanceID] {
+			continue
+		}
+		seen[instanceID] = true
+		positive, negative := target, ground
+		if condition.Axis == "load_current" {
+			var endpointErr error
+			positive, negative, endpointErr = loadCurrentHarnessEndpoints(requirement, condition, targets, target, ground, resolvedPlan, analysisKind)
+			if endpointErr != nil {
+				return nil, endpointErr
+			}
+		}
+		device := circuitgraph.SimulationHarnessDevice{
+			InstanceID: instanceID, CatalogID: catalogID,
+			Connections: []simmodel.ConnectionEvidence{{Function: terminals[0], Net: positive}, {Function: terminals[1], Net: negative}},
+		}
+		if !source {
+			value, valueOK := startupLoadResistance, startupLoadResistance > 0
+			if !valueOK {
+				value, valueOK = positiveOperatingValue(condition)
+			}
+			if !valueOK {
+				return nil, fmt.Errorf("%s target %q requires at least one positive bounded load value", condition.Axis, condition.Target)
+			}
+			device.ValueSI, device.HasValueSI = value, true
+		}
+		entry := operatingHarnessDevice{Device: device, Source: source}
+		if condition.Axis == "load_current" {
+			entry.DefaultValue, entry.HasDefaultValue = maximumPositiveOperatingValue(condition)
+		}
+		result = append(result, entry)
 	}
 	slices.SortStableFunc(result, func(left, right operatingHarnessDevice) int {
 		return strings.Compare(left.Device.InstanceID, right.Device.InstanceID)
@@ -1387,7 +1386,7 @@ func derivedGraphWorkflowIntent(requirement architecturesearch.Requirement, base
 	analysis.ID = "derived_" + kind
 	if kind == simmodel.AnalysisDistortion {
 		var distortionErr error
-		analysis, distortionErr = derivedBehavioralDistortionAnalysis(requirement, base, analysis, primaryInputNode, inputSourceFallback...)
+		analysis, distortionErr = derivedBehavioralDistortionAnalysis(requirement, base, analysis, primaryInputNode, 1, inputSourceFallback...)
 		if distortionErr != nil {
 			return simmodel.Intent{}, distortionErr
 		}
@@ -1395,7 +1394,7 @@ func derivedGraphWorkflowIntent(requirement architecturesearch.Requirement, base
 	if kind == simmodel.AnalysisThermal {
 		if _, driven := behavioralInputAmplitude(requirement); driven {
 			var thermalErr error
-			analysis, thermalErr = derivedBehavioralDistortionAnalysis(requirement, base, analysis, primaryInputNode, inputSourceFallback...)
+			analysis, thermalErr = derivedBehavioralDistortionAnalysis(requirement, base, analysis, primaryInputNode, behavioralRatedPowerVoltageGuard, inputSourceFallback...)
 			if thermalErr != nil {
 				return simmodel.Intent{}, thermalErr
 			}
@@ -1606,7 +1605,7 @@ func simulationAnalysisHasDynamicExcitation(analysis simmodel.Analysis) bool {
 	return false
 }
 
-func derivedBehavioralDistortionAnalysis(requirement architecturesearch.Requirement, base simmodel.Plan, analysis simmodel.Analysis, primaryInputNode string, inputSourceFallback ...string) (simmodel.Analysis, error) {
+func derivedBehavioralDistortionAnalysis(requirement architecturesearch.Requirement, base simmodel.Plan, analysis simmodel.Analysis, primaryInputNode string, voltageGuard float64, inputSourceFallback ...string) (simmodel.Analysis, error) {
 	component, ok := uniquePlanSourceAtNode(base, primaryInputNode)
 	fallback := false
 	if !ok && len(inputSourceFallback) != 0 && inputSourceFallback[0] != "" {
@@ -1622,7 +1621,7 @@ func derivedBehavioralDistortionAnalysis(requirement architecturesearch.Requirem
 	if !ok {
 		return simmodel.Analysis{}, fmt.Errorf("distortion analysis requires a catalog-backed voltage source at the resolved primary input")
 	}
-	amplitude, ok := behavioralInputAmplitude(requirement)
+	amplitude, ok := behavioralInputAmplitudeForGain(requirement, positiveBehavioralNominal, voltageGuard)
 	if !ok {
 		return simmodel.Analysis{}, fmt.Errorf("distortion analysis requires a bounded output-swing or output-power requirement and voltage-gain requirement")
 	}
@@ -1652,14 +1651,17 @@ func derivedBehavioralDistortionAnalysis(requirement architecturesearch.Requirem
 }
 
 func behavioralInputAmplitude(requirement architecturesearch.Requirement) (float64, bool) {
-	return behavioralInputAmplitudeForGain(requirement, positiveBehavioralNominal)
+	return behavioralInputAmplitudeForGain(requirement, positiveBehavioralNominal, behavioralRatedPowerVoltageGuard)
 }
 
 func behavioralOutputSpanInputAmplitude(requirement architecturesearch.Requirement) (float64, bool) {
-	return behavioralInputAmplitudeForGain(requirement, positiveBehavioralLowerBound)
+	return behavioralInputAmplitudeForGain(requirement, positiveBehavioralLowerBound, behavioralRatedPowerVoltageGuard)
 }
 
-func behavioralInputAmplitudeForGain(requirement architecturesearch.Requirement, selectGain func(architecturesearch.BehavioralRequirement) float64) (float64, bool) {
+func behavioralInputAmplitudeForGain(requirement architecturesearch.Requirement, selectGain func(architecturesearch.BehavioralRequirement) float64, voltageGuard float64) (float64, bool) {
+	if !finiteArchitectureValue(voltageGuard) || voltageGuard <= 0 {
+		return 0, false
+	}
 	gain := 0.0
 	outputPeak := 0.0
 	outputPower := 0.0
@@ -1695,12 +1697,12 @@ func behavioralInputAmplitudeForGain(requirement architecturesearch.Requirement,
 			}
 		}
 		if finiteArchitectureValue(loadResistance) && loadResistance > 0 {
-			// Do not place a minimum-power assertion exactly on the ideal
-			// numerical boundary. A small deterministic voltage guard absorbs
-			// preferred-value and integration rounding while simulation remains
-			// authoritative for clipping and distortion.
-			const outputPowerStimulusVoltageGuard = 1.02
-			outputPeak = math.Sqrt(2*outputPower*loadResistance) * outputPowerStimulusVoltageGuard
+			// Transient power and thermal workflows use a small deterministic
+			// voltage guard so preferred-value and integration rounding cannot
+			// turn an exactly rated ideal sine into an artificial power miss.
+			// Distortion is measured at the requested rated power itself: adding
+			// this guard there would measure a different operating point.
+			outputPeak = math.Sqrt(2*outputPower*loadResistance) * voltageGuard
 		}
 	}
 	amplitude := outputPeak / gain

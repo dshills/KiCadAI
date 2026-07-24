@@ -267,9 +267,13 @@ func TestVerifiedSpeakerPowerFootprintTemplatesPreservePadContracts(t *testing.T
 		throughHole bool
 	}{
 		{"Capacitor_THT:C_Rect_L7.2mm_W3.0mm_P5.00mm_FKS2_FKP2_MKS2_MKP2", []string{"1", "2"}, true},
+		{"Capacitor_THT:CP_Radial_D5.0mm_P2.00mm", []string{"1", "2"}, true},
+		{"Capacitor_THT:CP_Radial_D5.0mm_P2.50mm", []string{"1", "2"}, true},
+		{"Capacitor_THT:CP_Radial_D6.3mm_P2.50mm", []string{"1", "2"}, true},
 		{"Capacitor_THT:CP_Radial_D8.0mm_P3.50mm", []string{"1", "2"}, true},
 		{"Capacitor_Tantalum_SMD:CP_EIA-3216-18_Kemet-A", []string{"1", "2"}, false},
 		{"Diode_SMD:D_SMB", []string{"1", "2"}, false},
+		{"Resistor_THT:R_Axial_DIN0411_L9.9mm_D3.6mm_P15.24mm_Horizontal", []string{"1", "2"}, true},
 		{"Resistor_THT:R_Axial_DIN0414_L11.9mm_D4.5mm_P20.32mm_Horizontal", []string{"1", "2"}, true},
 		{"Package_TO_SOT_THT:TO-126-3_Vertical", []string{"1", "2", "3"}, true},
 		{"Package_TO_SOT_THT:TO-3P-3_Vertical", []string{"1", "2", "3"}, true},
@@ -303,6 +307,9 @@ func TestVerifiedSpeakerPowerFootprintTemplatesMatchInstalledKiCadLibraries(t *t
 	}
 	for _, footprintID := range []string{
 		"Capacitor_THT:C_Rect_L7.2mm_W3.0mm_P5.00mm_FKS2_FKP2_MKS2_MKP2",
+		"Capacitor_THT:CP_Radial_D5.0mm_P2.00mm",
+		"Capacitor_THT:CP_Radial_D5.0mm_P2.50mm",
+		"Capacitor_THT:CP_Radial_D6.3mm_P2.50mm",
 		"Capacitor_THT:CP_Radial_D8.0mm_P3.50mm",
 		"Capacitor_Tantalum_SMD:CP_EIA-3216-18_Kemet-A",
 		"Connector_PinHeader_2.54mm:PinHeader_1x02_P2.54mm_Vertical",
@@ -311,6 +318,7 @@ func TestVerifiedSpeakerPowerFootprintTemplatesMatchInstalledKiCadLibraries(t *t
 		"Diode_SMD:D_SMB",
 		"Package_SO:SOIC-8_3.9x4.9mm_P1.27mm",
 		"Package_SO:VSSOP-8_2.3x2mm_P0.5mm",
+		"Package_SO:VSSOP-8_3x3mm_P0.65mm",
 		"Package_DIP:DIP-4_W7.62mm",
 		"Package_TO_SOT_THT:TO-220-3_Vertical",
 		"Package_TO_SOT_SMD:TO-252-3_TabPin2",
@@ -319,6 +327,7 @@ func TestVerifiedSpeakerPowerFootprintTemplatesMatchInstalledKiCadLibraries(t *t
 		"Package_TO_SOT_SMD:SOT-23-6",
 		"Package_TO_SOT_SMD:SOT-89-3",
 		"Package_TO_SOT_SMD:SOT-223",
+		"Resistor_THT:R_Axial_DIN0411_L9.9mm_D3.6mm_P15.24mm_Horizontal",
 		"Resistor_THT:R_Axial_DIN0414_L11.9mm_D4.5mm_P20.32mm_Horizontal",
 		"Resistor_SMD:R_0805_2012Metric",
 		"Package_TO_SOT_THT:TO-126-3_Vertical",
@@ -349,6 +358,7 @@ func TestVerifiedPadTemplateBoundsAreCenteredOnPads(t *testing.T) {
 		"Resistor_SMD:R_0805_2012Metric",
 		"Package_SO:SOIC-8_3.9x4.9mm_P1.27mm",
 		"Package_SO:VSSOP-8_2.3x2mm_P0.5mm",
+		"Package_SO:VSSOP-8_3x3mm_P0.65mm",
 		"Package_TO_SOT_THT:TO-220-3_Vertical",
 		"Package_TO_SOT_SMD:SOT-223-3_TabPin2",
 		"Package_TO_SOT_SMD:SOT-223",

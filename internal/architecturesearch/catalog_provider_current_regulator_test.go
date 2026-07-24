@@ -6,6 +6,7 @@ import (
 	"math"
 	"slices"
 	"strconv"
+	"strings"
 	"testing"
 
 	"kicadai/internal/components"
@@ -41,7 +42,7 @@ func TestCatalogProviderExpandsGenericConstantCurrentEnvelopes(t *testing.T) {
 					t.Fatal(decodeErr)
 				}
 				hasReference := slices.ContainsFunc(realization.Instances, func(instance RealizationInstance) bool {
-					return instance.CatalogID == "voltage_reference.analog_devices.lt1634ais8_1v25.soic8"
+					return strings.HasPrefix(instance.CatalogID, "voltage_reference.")
 				})
 				if hasReference != test.wantReference {
 					t.Fatalf("precision reference present=%t, want %t; instances=%#v", hasReference, test.wantReference, realization.Instances)
@@ -73,6 +74,25 @@ func TestCatalogProviderExpandsGenericConstantCurrentEnvelopes(t *testing.T) {
 				for _, calculation := range expansion.Calculations {
 					if !calculation.Pass || calculation.Hash == "" {
 						t.Fatalf("unproven calculation: %#v", calculation)
+					}
+				}
+				currentCalculation := slices.IndexFunc(expansion.Calculations, func(calculation CalculationEvidence) bool {
+					return calculation.ID == "constant_current_worst_case"
+				})
+				if currentCalculation < 0 {
+					t.Fatal("expansion lacks constant-current calculation")
+				}
+				for _, selected := range expansion.Calculations[currentCalculation].SelectedValues {
+					instanceID := strings.TrimSuffix(selected.Name, "_resistance")
+					instanceIndex := slices.IndexFunc(realization.Instances, func(instance RealizationInstance) bool {
+						return instance.ID == instanceID
+					})
+					if instanceIndex < 0 {
+						t.Fatalf("selected value %q lacks realization instance %q", selected.Name, instanceID)
+					}
+					emitted, emittedOK := components.ParseEngineeringValue(realization.Instances[instanceIndex].Value)
+					if !emittedOK || math.Abs(emitted-selected.Selected) > math.Max(1e-12, selected.Selected*1e-12) {
+						t.Fatalf("%s calculation selected %.12g Ohm but realization emitted %q", instanceID, selected.Selected, realization.Instances[instanceIndex].Value)
 					}
 				}
 			}
@@ -107,11 +127,7 @@ func TestCatalogProviderConstantCurrentExpansionIsCatalogOrderDeterministic(t *t
 	if err != nil {
 		t.Fatal(err)
 	}
-	reversedCatalog := *catalog
-	reversedCatalog.Records = append([]components.ComponentRecord(nil), catalog.Records...)
-	slices.Reverse(reversedCatalog.Records)
-	components.RebuildCatalogIndexes(&reversedCatalog)
-	reversed, err := NewCatalogProvider(&reversedCatalog)
+	reversed, err := NewCatalogProvider(reversedArchitectureCatalog(catalog))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -134,6 +150,52 @@ func TestCatalogProviderConstantCurrentExpansionIsCatalogOrderDeterministic(t *t
 	}
 }
 
+func TestCatalogProviderModelParameterSelectionAcceptsFiniteZero(t *testing.T) {
+	const (
+		componentID = "current_regulator.analog_devices.lt3080ist.sot223"
+		modelID     = "mna_programmable_current_source_v1"
+		parameter   = "min_headroom_v"
+	)
+	catalog := loadArchitectureCatalog(t)
+	updated := false
+	for recordIndex := range catalog.Records {
+		record := &catalog.Records[recordIndex]
+		if record.ID != componentID {
+			continue
+		}
+		for modelIndex := range record.SimulationModels {
+			model := &record.SimulationModels[modelIndex]
+			if model.ModelID != modelID {
+				continue
+			}
+			for parameterIndex := range model.Parameters {
+				if model.Parameters[parameterIndex].Name == parameter {
+					model.Parameters[parameterIndex].Value = 0
+					updated = true
+				}
+			}
+		}
+	}
+	if !updated {
+		t.Fatalf("catalog fixture lacks %s.%s", modelID, parameter)
+	}
+	components.RebuildCatalogIndexes(catalog)
+	provider, err := NewCatalogProvider(catalog)
+	if err != nil {
+		t.Fatal(err)
+	}
+	selected, err := provider.selectComponentMinimizingModelParameterWithTemperature(
+		context.Background(), "current_regulator", "", nil, true, nil, nil,
+		modelID, parameter, nil,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if selected.record.ID != componentID {
+		t.Fatalf("zero-valued model parameter selected %s, want %s", selected.record.ID, componentID)
+	}
+}
+
 func TestCatalogProviderHighSideSwitchChoosesLeastSufficientGateRatedDevice(t *testing.T) {
 	catalog := loadArchitectureCatalog(t)
 	provider, err := NewCatalogProvider(catalog)
@@ -152,11 +214,7 @@ func TestCatalogProviderHighSideSwitchChoosesLeastSufficientGateRatedDevice(t *t
 	if selected.record.ID != "mosfet.aos.aoss21311c.sot23" {
 		t.Fatalf("least sufficient gate-rated switch = %s", selected.record.ID)
 	}
-	reversedCatalog := *catalog
-	reversedCatalog.Records = append([]components.ComponentRecord(nil), catalog.Records...)
-	slices.Reverse(reversedCatalog.Records)
-	components.RebuildCatalogIndexes(&reversedCatalog)
-	reversed, err := NewCatalogProvider(&reversedCatalog)
+	reversed, err := NewCatalogProvider(reversedArchitectureCatalog(catalog))
 	if err != nil {
 		t.Fatal(err)
 	}

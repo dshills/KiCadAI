@@ -25,6 +25,21 @@ func TestRouteRequestRoutesSimpleBoard(t *testing.T) {
 	}
 }
 
+func TestRouteRequestRejectsEndpointAccessBlockedByForeignPad(t *testing.T) {
+	request := singleLayerSearchRequest()
+	foreign := request.Components[0]
+	foreign.Ref = "X1"
+	foreign.Pads = append([]Pad(nil), foreign.Pads...)
+	foreign.Pads[0].Ref = foreign.Ref
+	foreign.Pads[0].Net = "OTHER"
+	request.Components = append(request.Components, foreign)
+
+	result := RouteRequest(request)
+	if result.Status == StatusRouted || result.Metrics.FailedNetCount != 1 {
+		t.Fatalf("status = %s metrics = %#v issues = %#v, want blocked foreign-pad endpoint access", result.Status, result.Metrics, result.Issues)
+	}
+}
+
 func TestRouteRequestReusesDuplicatePadAccessAcrossNetBranches(t *testing.T) {
 	request := singleLayerSearchRequest()
 	request.Components = []Component{
@@ -535,6 +550,23 @@ func TestPruneSameLayerSegmentCyclesKeepsDeterministicSpanningCopper(t *testing.
 	got := removeSegmentIndexes(segments, sameLayerCycleClosingIndexes(segments))
 	if len(got) != 3 || got[0] != segments[0] || got[1] != segments[1] || got[2] != segments[3] {
 		t.Fatalf("segments = %#v, want stable same-layer spanning copper", got)
+	}
+}
+
+func TestPruneSameLayerSegmentCyclesRemovesRedundantDanglingLeaf(t *testing.T) {
+	request := singleLayerSearchRequest()
+	access := BuildPadAccess(request)
+	from := access.Pads[endpointKey(request.Nets[0].Endpoints[0].Ref, request.Nets[0].Endpoints[0].Pin)].Position
+	to := access.Pads[endpointKey(request.Nets[0].Endpoints[1].Ref, request.Nets[0].Endpoints[1].Pin)].Position
+	main := Segment{Net: request.Nets[0].Name, Layer: "F.Cu", Start: from, End: to, WidthMM: request.Rules.TraceWidthMM}
+	stub := Segment{
+		Net: request.Nets[0].Name, Layer: "F.Cu", Start: from,
+		End: Point{XMM: from.XMM, YMM: from.YMM + 2}, WidthMM: request.Rules.TraceWidthMM,
+	}
+	route := Route{Net: request.Nets[0].Name, Segments: []Segment{main, stub}}
+	got := pruneConnectedSameLayerSegmentCycles(request, route, access)
+	if len(got) != 1 || got[0] != main {
+		t.Fatalf("segments = %#v, want only endpoint-spanning copper", got)
 	}
 }
 

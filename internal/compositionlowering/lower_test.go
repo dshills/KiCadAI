@@ -226,3 +226,25 @@ func TestContractInterfaceRolePreservesDigitalBusProtocol(t *testing.T) {
 		}
 	}
 }
+
+func TestSwitchedLoadInterfaceIsAnUnpoweredActuatorOutput(t *testing.T) {
+	contract := architecturesearch.PortContract{Kind: "switched_load", Direction: "sink"}
+	if got := contractInterfaceRole(contract); got != circuitgraph.InterfacePowerOutput {
+		t.Fatalf("switched-load contract interface role = %s, want %s", got, circuitgraph.InterfacePowerOutput)
+	}
+	port := architecturesearch.Port{Kind: "switched_load", Direction: "sink"}
+	if got := interfaceRole(port); got != circuitgraph.InterfacePowerOutput {
+		t.Fatalf("switched-load port interface role = %s, want %s", got, circuitgraph.InterfacePowerOutput)
+	}
+}
+
+func TestDifferentialAnalogInterfaceRemainsAnalogDuringLowering(t *testing.T) {
+	contract := architecturesearch.PortContract{Kind: "differential_analog", Direction: "sink"}
+	if got := contractInterfaceRole(contract); got != circuitgraph.InterfaceAnalogInput {
+		t.Fatalf("differential contract interface role = %s, want %s", got, circuitgraph.InterfaceAnalogInput)
+	}
+	port := architecturesearch.Port{Kind: "differential_analog", Direction: "sink"}
+	if got := interfaceRole(port); got != circuitgraph.InterfaceAnalogInput {
+		t.Fatalf("differential port interface role = %s, want %s", got, circuitgraph.InterfaceAnalogInput)
+	}
+}

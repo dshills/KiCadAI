@@ -31,6 +31,27 @@ func TestPeriodicTransientMeasurementsUseSettledTwoCycleWindow(t *testing.T) {
 	}
 }
 
+func TestTHDFiveHarmonicMeasurementConvergesAtTrustedMinimumGrid(t *testing.T) {
+	build := func(samplesPerCycle int) AnalysisResult {
+		frequency := 1000.0
+		timeStep := 1 / (frequency * float64(samplesPerCycle))
+		result := AnalysisResult{Kind: AnalysisDistortion, FundamentalFrequencyHz: frequency}
+		for index := 0; index <= 4*samplesPerCycle; index++ {
+			phase := 2 * math.Pi * frequency * float64(index) * timeStep
+			value := math.Sin(phase) + .01*math.Sin(2*phase) + .02*math.Sin(3*phase)
+			result.Points = append(result.Points, AnalysisPoint{TimeS: float64(index) * timeStep, Nodes: []NodeResult{{Node: "OUT", Real: value}}})
+		}
+		return result
+	}
+	assertion := Assertion{AnalysisID: "distortion", Node: "OUT", Quantity: QuantityTHDPercent}
+	coarse, coarseDiagnostic := totalHarmonicDistortion(build(16), assertion)
+	fine, fineDiagnostic := totalHarmonicDistortion(build(32), assertion)
+	want := 100 * math.Hypot(.01, .02)
+	if coarseDiagnostic != nil || fineDiagnostic != nil || math.Abs(coarse-want) > 1e-10 || math.Abs(fine-want) > 1e-10 || math.Abs(coarse-fine) > 1e-12 {
+		t.Fatalf("THD convergence: 16-point=%.12g (%#v), 32-point=%.12g (%#v), want %.12g", coarse, coarseDiagnostic, fine, fineDiagnostic, want)
+	}
+}
+
 func TestTransientAnalysisWorkersPreserveOrderAndReplay(t *testing.T) {
 	plan := resolveTransientSwitchPlan(t, 25)
 	second := cloneAnalyses(plan.Analyses)[0]

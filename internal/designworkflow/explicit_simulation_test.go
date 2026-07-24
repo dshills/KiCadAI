@@ -33,18 +33,18 @@ func TestRunExplicitSimulationFailsClosedForInsufficientHeadroom(t *testing.T) {
 	}
 }
 
-func TestRunExplicitSimulationPersistsClosedLoopEvidence(t *testing.T) {
+func TestRunExplicitSimulationRejectsInvalidClosedLoopEvidence(t *testing.T) {
 	output := t.TempDir()
 	catalogHash := simulationTestHash("catalog")
 	plan := trustedRegulatorTestPlan(5)
 	plan.CatalogHash = catalogHash
 	closedLoop := trustedClosedLoopTestReport(catalogHash)
-	stage := runExplicitSimulation(Request{ExplicitCircuit: &ExplicitCircuitSpec{Simulation: &plan, ClosedLoop: &closedLoop}}, output, true)
-	if stage.Status != StageStatusOK || len(stage.Artifacts) != 2 {
+	stage := runExplicitSimulation(Request{ExplicitCircuit: &ExplicitCircuitSpec{
+		CatalogHash: catalogHash, ResolutionHash: closedLoop.SelectedCircuitHash,
+		Simulation: &plan, ClosedLoop: &closedLoop,
+	}}, output, true)
+	if stage.Status != StageStatusBlocked || len(stage.Artifacts) != 0 {
 		t.Fatalf("simulation stage = %#v", stage)
-	}
-	if _, err := os.Stat(filepath.Join(output, ExplicitClosedLoopArtifactPath)); err != nil {
-		t.Fatalf("closed-loop artifact: %v", err)
 	}
 }
 

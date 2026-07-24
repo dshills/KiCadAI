@@ -1,6 +1,6 @@
 .DEFAULT_GOAL := help
 
-.PHONY: help build install test test-one review-matrix promotion-bundle lint coverage coverage-check run-help refresh-kicad-proto proto proto-check
+.PHONY: help build install test test-one review-matrix promotion-bundle held-out-promotion-bundle lint coverage coverage-check run-help refresh-kicad-proto proto proto-check
 
 BIN_DIR := $(CURDIR)/bin
 BIN := $(BIN_DIR)/kicadai
@@ -22,6 +22,8 @@ COVER_TEST_FLAGS ?=
 PROMOTION_ROOT ?= $(CURDIR)/.tmp/clean-checkout-promotion
 PROMOTION_CACHE_DIR ?= $(CURDIR)/.cache/kicadai-promotion-toolchain
 PROMOTION_SCENARIO_TIMEOUT ?= 20m
+HELD_OUT_PROMOTION_ROOT ?= $(CURDIR)/.tmp/held-out-capability-promotion
+HELD_OUT_PROMOTION_MATRIX ?= $(CURDIR)/specs/held-out-capability-expansion/PROMOTION_MATRIX.json
 
 help:
 	@printf "KiCadAI targets:\n"
@@ -31,6 +33,7 @@ help:
 	@printf "  make test-one        Run and require one named Go test (GO_TEST_NAME=...)\n"
 	@printf "  make review-matrix   Run the external-review mitigation ladder twice\n"
 	@printf "  make promotion-bundle Reproduce and verify the installed-KiCad promotion bundle\n"
+	@printf "  make held-out-promotion-bundle Reproduce and verify the held-out capability bundle\n"
 	@printf "  make lint            Run gofmt, go vet, and golangci-lint when installed\n"
 	@printf "  make coverage        Generate coverage profiles\n"
 	@printf "  make coverage-check  Enforce coverage threshold (COVERAGE_THRESHOLD=%s)\n" "$(COVERAGE_THRESHOLD)"
@@ -71,6 +74,15 @@ review-matrix:
 
 promotion-bundle:
 	PROMOTION_ROOT="$(PROMOTION_ROOT)" \
+	PROMOTION_CACHE_DIR="$(PROMOTION_CACHE_DIR)" \
+	PROMOTION_SCENARIO_TIMEOUT="$(PROMOTION_SCENARIO_TIMEOUT)" \
+	GOCACHE="$(GOCACHE_DIR)" \
+	GOMODCACHE="$(GOMODCACHE_DIR)" \
+	./scripts/clean-checkout-promotion.sh
+
+held-out-promotion-bundle:
+	PROMOTION_ROOT="$(HELD_OUT_PROMOTION_ROOT)" \
+	PROMOTION_MATRIX="$(HELD_OUT_PROMOTION_MATRIX)" \
 	PROMOTION_CACHE_DIR="$(PROMOTION_CACHE_DIR)" \
 	PROMOTION_SCENARIO_TIMEOUT="$(PROMOTION_SCENARIO_TIMEOUT)" \
 	GOCACHE="$(GOCACHE_DIR)" \

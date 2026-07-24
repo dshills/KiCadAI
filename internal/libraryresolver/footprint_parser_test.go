@@ -260,7 +260,9 @@ func TestIndexFootprintsTextContributesToSummaryAndBounds(t *testing.T) {
 	footprints := filepath.Join(root, "footprints")
 	mustWrite(t, filepath.Join(footprints, "Test.pretty", "TextOnly.kicad_mod"), `
 (footprint "TextOnly"
-  (fp_text reference "REF**" (at 3 4 0) (layer "F.SilkS"))
+  (fp_text reference "REF**" (at 3 4 90) (layer "F.SilkS")
+    (effects (font (size 1 1) (thickness 0.15)) (justify mirror))
+  )
 )`)
 
 	inventory := Discover(LibraryRoots{FootprintsRoot: footprints})
@@ -274,6 +276,12 @@ func TestIndexFootprintsTextContributesToSummaryAndBounds(t *testing.T) {
 	}
 	if record.BoundingBox.Min.X != kicadfiles.MM(3) || record.BoundingBox.Min.Y != kicadfiles.MM(4) {
 		t.Fatalf("bounding box = %#v", record.BoundingBox)
+	}
+	if len(record.Texts) != 1 || record.Texts[0].Rotation != 90 ||
+		record.Texts[0].FontSize != (kicadfiles.Point{X: kicadfiles.MM(1), Y: kicadfiles.MM(1)}) ||
+		record.Texts[0].FontThickness != kicadfiles.MM(0.15) ||
+		len(record.Texts[0].Justify) != 1 || record.Texts[0].Justify[0] != "mirror" {
+		t.Fatalf("text style = %#v", record.Texts)
 	}
 }
 

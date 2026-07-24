@@ -618,6 +618,15 @@ func TestResolverFootprintBottomPlacementMapsFrontLayers(t *testing.T) {
 	if len(footprint.Texts) == 0 || footprint.Texts[0].Layer != kicadfiles.LayerBSilkS {
 		t.Fatalf("text layers not remapped: %#v", footprint.Texts)
 	}
+	if footprint.Texts[0].Rotation != 90 ||
+		footprint.Texts[0].Effects.FontSize != (kicadfiles.Point{X: kicadfiles.MM(1), Y: kicadfiles.MM(1)}) ||
+		footprint.Texts[0].Effects.FontThickness != kicadfiles.MM(0.15) ||
+		len(footprint.Texts[0].Effects.Justify) != 1 || footprint.Texts[0].Effects.Justify[0] != "mirror" {
+		t.Fatalf("text style not preserved: %#v", footprint.Texts[0])
+	}
+	if len(footprint.Pads) != 2 || footprint.Pads[0].RoundRectRRatio != 0.243902 || footprint.Pads[1].RoundRectRRatio != 0.243902 {
+		t.Fatalf("round-rectangle ratios not preserved: %#v", footprint.Pads)
+	}
 	if len(footprint.Graphics) == 0 {
 		t.Fatalf("graphics not populated: %#v", footprint.Graphics)
 	}
@@ -1277,10 +1286,14 @@ func applyResolverFixture() libraryresolver.LibraryIndex {
 				Name:            "R_0603",
 				Attributes:      []string{"smd"},
 				Pads: []libraryresolver.FootprintPad{
-					{Name: "1", Type: "smd", Shape: "roundrect", Size: kicadfiles.Point{X: kicadfiles.MM(0.8), Y: kicadfiles.MM(0.9)}, Layers: []kicadfiles.BoardLayer{kicadfiles.LayerFCu, kicadfiles.LayerFMask}},
-					{Name: "2", Type: "smd", Shape: "roundrect", Position: kicadfiles.Point{X: kicadfiles.MM(1.6)}, Size: kicadfiles.Point{X: kicadfiles.MM(0.8), Y: kicadfiles.MM(0.9)}, Layers: []kicadfiles.BoardLayer{kicadfiles.LayerFCu, kicadfiles.LayerFMask}},
+					{Name: "1", Type: "smd", Shape: "roundrect", RoundRectR: 0.243902, Size: kicadfiles.Point{X: kicadfiles.MM(0.8), Y: kicadfiles.MM(0.9)}, Layers: []kicadfiles.BoardLayer{kicadfiles.LayerFCu, kicadfiles.LayerFMask}},
+					{Name: "2", Type: "smd", Shape: "roundrect", RoundRectR: 0.243902, Position: kicadfiles.Point{X: kicadfiles.MM(1.6)}, Size: kicadfiles.Point{X: kicadfiles.MM(0.8), Y: kicadfiles.MM(0.9)}, Layers: []kicadfiles.BoardLayer{kicadfiles.LayerFCu, kicadfiles.LayerFMask}},
 				},
-				Texts: []libraryresolver.FootprintText{{Kind: "user", Text: "R", Layer: string(kicadfiles.LayerFSilkS)}},
+				Texts: []libraryresolver.FootprintText{{
+					Kind: "user", Text: "R", Rotation: 90, Layer: string(kicadfiles.LayerFSilkS),
+					FontSize:      kicadfiles.Point{X: kicadfiles.MM(1), Y: kicadfiles.MM(1)},
+					FontThickness: kicadfiles.MM(0.15), Justify: []string{"mirror"},
+				}},
 				Graphics: []libraryresolver.FootprintGraphic{
 					{
 						Kind:  "line",

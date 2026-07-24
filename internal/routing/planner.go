@@ -660,7 +660,8 @@ func planRepeatedConstrainedLeaves(ordered []Endpoint, accessPoints [][]AccessPo
 	if len(trunkIndexes) == 0 {
 		return nil
 	}
-	pairs := planIndexedEndpointTree(ordered, accessPoints, trunkIndexes)
+	trunkPairs := planIndexedEndpointTree(ordered, accessPoints, trunkIndexes)
+	leafPairs := make([]EndpointPair, 0, len(leafIndexes))
 	for _, leafIndex := range leafIndexes {
 		bestTrunk := trunkIndexes[0]
 		bestDistance := endpointDistance(accessPoints[bestTrunk], accessPoints[leafIndex])
@@ -673,9 +674,13 @@ func planRepeatedConstrainedLeaves(ordered []Endpoint, accessPoints [][]AccessPo
 				bestDistance = distance
 			}
 		}
-		pairs = append(pairs, EndpointPair{From: ordered[bestTrunk], To: ordered[leafIndex]})
+		leafPairs = append(leafPairs, EndpointPair{From: ordered[bestTrunk], To: ordered[leafIndex]})
 	}
-	return pairs
+	// A protected leaf is only useful if its scarce pad escape is reserved
+	// before coarse trunk branches consume the surrounding routing channels.
+	// The topology remains the same: every leaf still attaches to its nearest
+	// deterministic trunk endpoint, and the trunk tree is routed afterward.
+	return append(leafPairs, trunkPairs...)
 }
 
 func planIndexedEndpointTree(ordered []Endpoint, accessPoints [][]AccessPoint, indexes []int) []EndpointPair {

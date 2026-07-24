@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -30,10 +31,12 @@ import (
 const (
 	heldOutCapabilityBaselineModeEnv   = "KICADAI_HELD_OUT_CAPABILITY_BASELINE"
 	heldOutCapabilityBaselineReportEnv = "KICADAI_HELD_OUT_CAPABILITY_REPORT"
+	heldOutCapabilityArtifactDirEnv    = "KICADAI_HELD_OUT_CAPABILITY_ARTIFACT_DIR"
 	heldOutCapabilityBaselineSchema    = "kicadai.held-out-capability-expansion-report.v1"
 	heldOutCapabilityEvaluator         = "held-out-capability-stage-v1"
 	heldOutCapabilityManifestSHA256    = "e0d55f484c749eba7d3279da13c21380f5b52f9953f333adf1916409620eb442"
 	heldOutCapabilityBaselineSHA256    = "ba47d125141a56deb54127c3e51ae36f2ce5df2efbd875334b7433d9ee63582c"
+	heldOutCapabilityFinalSHA256       = "9541502f81f2748aded5f00383ba0dd927591c102a61ec980e4e6f17d53047c2"
 	heldOutCapabilityBaseCommit        = "6e4d2209c6aae04994febca30c9ec38a40051cc2"
 )
 
@@ -218,6 +221,120 @@ func TestHeldOutCapabilityExpansionBaselineReportIsFrozen(t *testing.T) {
 		if strings.TrimSpace(report.Tools[key]) == "" {
 			t.Errorf("baseline tool evidence %s is missing", key)
 		}
+	}
+}
+
+func TestHeldOutCapabilityExpansionFinalReportProvesImprovement(t *testing.T) {
+	root := filepath.Join("..", "..", "specs", "held-out-capability-expansion")
+	loadReport := func(name string) ([]byte, heldOutCapabilityReport) {
+		t.Helper()
+		contents, err := os.ReadFile(filepath.Join(root, name))
+		if err != nil {
+			t.Fatal(err)
+		}
+		var report heldOutCapabilityReport
+		if err := json.Unmarshal(contents, &report); err != nil {
+			t.Fatal(err)
+		}
+		return contents, report
+	}
+
+	_, baseline := loadReport("BASELINE_REPORT.json")
+	finalBytes, final := loadReport("FINAL_REPORT.json")
+	if got := heldOutCapabilityHash(finalBytes); got != heldOutCapabilityFinalSHA256 {
+		t.Fatalf("final report sha256 = %s, want %s", got, heldOutCapabilityFinalSHA256)
+	}
+	checksum, err := os.ReadFile(filepath.Join(root, "FINAL_REPORT.sha256"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.TrimSpace(string(checksum)) != heldOutCapabilityFinalSHA256+"  FINAL_REPORT.json" {
+		t.Fatal("final report checksum sidecar does not match frozen report")
+	}
+	if final.Schema != baseline.Schema || final.Version != baseline.Version ||
+		final.BenchmarkVersion != baseline.BenchmarkVersion ||
+		final.ManifestSHA256 != baseline.ManifestSHA256 ||
+		final.CapabilityBaseCommit != baseline.CapabilityBaseCommit ||
+		final.Evaluator != baseline.Evaluator {
+		t.Fatalf("final report identity does not match baseline: baseline=%#v final=%#v", baseline, final)
+	}
+	if !maps.Equal(final.GateProfile, baseline.GateProfile) {
+		t.Fatalf("final gate profile changed: baseline=%#v final=%#v", baseline.GateProfile, final.GateProfile)
+	}
+	if final.Aggregate.Cases != baseline.Aggregate.Cases ||
+		final.Aggregate.Passed <= baseline.Aggregate.Passed ||
+		final.Aggregate.Passed != 11 || final.Aggregate.Blocked != 1 {
+		t.Fatalf("final aggregate does not prove the expected improvement: baseline=%#v final=%#v", baseline.Aggregate, final.Aggregate)
+	}
+	baselineReach, finalReach := 0, 0
+	for _, stage := range heldOutCapabilityStageNames() {
+		baselineReach += baseline.Aggregate.StageReach[stage]
+		finalReach += final.Aggregate.StageReach[stage]
+		if final.Aggregate.StageReach[stage] < baseline.Aggregate.StageReach[stage] {
+			t.Errorf("stage reach regressed at %s: baseline=%d final=%d",
+				stage, baseline.Aggregate.StageReach[stage], final.Aggregate.StageReach[stage])
+		}
+	}
+	if finalReach <= baselineReach {
+		t.Fatalf("cumulative stage reach did not improve: baseline=%d final=%d", baselineReach, finalReach)
+	}
+
+	baselineCases := make(map[string]heldOutCapabilityCaseResult, len(baseline.Cases))
+	for _, result := range baseline.Cases {
+		baselineCases[result.ID] = result
+	}
+	promotedFamilies := map[string]int{
+		"constant_current_regulation": 0,
+		"precision_rectification":     0,
+	}
+	for _, result := range final.Cases {
+		original, ok := baselineCases[result.ID]
+		if !ok || result.Role != original.Role || result.Domain != original.Domain ||
+			result.Family != original.Family || result.SafetyCritical != original.SafetyCritical {
+			t.Fatalf("case identity changed for %q: baseline=%#v final=%#v", result.ID, original, result)
+		}
+		if result.Role == "control" && result.Status != "pass" {
+			t.Errorf("control %s regressed: %#v", result.ID, result)
+		}
+		if _, promoted := promotedFamilies[result.Family]; promoted {
+			if result.Role != "held_out" || result.Status != "pass" {
+				t.Errorf("promoted family case %s did not pass: %#v", result.ID, result)
+			}
+			promotedFamilies[result.Family]++
+		}
+		if result.Status == "pass" {
+			if len(result.Stages) != len(heldOutCapabilityStageNames()) ||
+				result.EvidenceHashes["generated_project"] == "" ||
+				result.EvidenceHashes["closed_loop"] == "" {
+				t.Errorf("passing case %s lacks full evidence: %#v", result.ID, result)
+			}
+			for _, stage := range result.Stages {
+				if stage.Status != "pass" {
+					t.Errorf("passing case %s has non-passing stage %#v", result.ID, stage)
+				}
+			}
+			continue
+		}
+		if result.ID != "digital_clock_source" ||
+			result.BlockingStage != "architecture" ||
+			result.BlockingCode != architecturesearch.CodeCapabilityUnsupported ||
+			result.BlockingCapability != "clock_generation" {
+			t.Errorf("unexpected remaining blocker: %#v", result)
+		}
+	}
+	if len(baselineCases) != len(final.Cases) {
+		t.Fatalf("case membership changed: baseline=%d final=%d", len(baselineCases), len(final.Cases))
+	}
+	if promotedFamilies["constant_current_regulation"] != 3 ||
+		promotedFamilies["precision_rectification"] != 2 {
+		t.Fatalf("promoted family coverage = %#v", promotedFamilies)
+	}
+	if len(final.Aggregate.Clusters) != 1 ||
+		final.Aggregate.Clusters[0].Capability != "clock_generation" ||
+		final.Aggregate.Clusters[0].Stage != "architecture" ||
+		final.Aggregate.Clusters[0].Code != string(architecturesearch.CodeCapabilityUnsupported) ||
+		final.Aggregate.Clusters[0].CaseCount != 1 {
+		t.Fatalf("remaining failure clusters = %#v", final.Aggregate.Clusters)
 	}
 }
 
@@ -417,8 +534,24 @@ func evaluateHeldOutCapabilityCase(
 	result.EvidenceHashes["resolved_circuit"] = promotion.Request.ExplicitCircuit.ResolutionHash
 
 	artifactRoot := t.TempDir()
+	if configured := strings.TrimSpace(os.Getenv(heldOutCapabilityArtifactDirEnv)); configured != "" {
+		artifactRoot = filepath.Join(configured, entry.ID)
+		if err := os.MkdirAll(artifactRoot, 0o755); err != nil {
+			t.Fatalf("create held-out artifact root: %v", err)
+		}
+		requestData, err := json.MarshalIndent(promotion.Request, "", "  ")
+		if err != nil {
+			t.Fatalf("marshal held-out design request: %v", err)
+		}
+		if err := os.WriteFile(filepath.Join(artifactRoot, "design-request.json"), append(requestData, '\n'), 0o644); err != nil {
+			t.Fatalf("write held-out design request: %v", err)
+		}
+	}
 	firstDir := filepath.Join(artifactRoot, "first")
 	first := designworkflow.Create(ctx, promotion.Request, heldOutCapabilityCreateOptions(firstDir, index, cli))
+	if strings.TrimSpace(os.Getenv(heldOutCapabilityArtifactDirEnv)) != "" {
+		writeHeldOutCapabilityArtifactJSON(t, filepath.Join(artifactRoot, "first-workflow-result.json"), first)
+	}
 	passedWorkflowStages, stage, issue, failed := heldOutCapabilityWorkflowFailure(first)
 	for _, passed := range passedWorkflowStages {
 		passHeldOutCapabilityStage(&result, passed)
@@ -439,6 +572,9 @@ func evaluateHeldOutCapabilityCase(
 
 	secondDir := filepath.Join(artifactRoot, "second")
 	second := designworkflow.Create(ctx, promotion.Request, heldOutCapabilityCreateOptions(secondDir, index, cli))
+	if strings.TrimSpace(os.Getenv(heldOutCapabilityArtifactDirEnv)) != "" {
+		writeHeldOutCapabilityArtifactJSON(t, filepath.Join(artifactRoot, "second-workflow-result.json"), second)
+	}
 	if _, _, issue, failed := heldOutCapabilityWorkflowFailure(second); failed {
 		issue.Message = "deterministic replay workflow failed: " + issue.Message
 		return blockHeldOutCapabilityCase(result, "replay", issue, entry.Family)
@@ -451,6 +587,17 @@ func evaluateHeldOutCapabilityCase(
 	passHeldOutCapabilityStage(&result, "replay")
 	result.Status = "pass"
 	return result
+}
+
+func writeHeldOutCapabilityArtifactJSON(t *testing.T, path string, value any) {
+	t.Helper()
+	data, err := json.MarshalIndent(value, "", "  ")
+	if err != nil {
+		t.Fatalf("marshal held-out capability artifact %s: %v", filepath.Base(path), err)
+	}
+	if err := os.WriteFile(path, append(data, '\n'), 0o644); err != nil {
+		t.Fatalf("write held-out capability artifact %s: %v", filepath.Base(path), err)
+	}
 }
 
 func heldOutCapabilityStageNames() []string {
