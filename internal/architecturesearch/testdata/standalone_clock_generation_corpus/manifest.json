@@ -1,0 +1,47 @@
+{
+  "schema": "kicadai.standalone-clock-generation-corpus.v1",
+  "version": 1,
+  "base_commit": "0cd2b17aa725839b192f2f4bbb82538c963c6ebc",
+  "frozen_at": "2026-07-24T00:00:00Z",
+  "requirement_schema": "kicadai.open-set-requirement.v3",
+  "authoring_policy": "Requests state only observable frequency, accuracy, duty cycle, startup, supply, output-level, loading, fanout, edge, jitter, environmental, and manufacturing-neutral board bounds. They do not select topology, components, support networks, nets, pins, coordinates, layers, routes, providers, models, or repair actions.",
+  "stages": [
+    "integrity",
+    "schema",
+    "intent",
+    "architecture",
+    "component_evidence",
+    "simulation",
+    "lowering",
+    "schematic",
+    "placement",
+    "routing",
+    "writer",
+    "erc",
+    "drc",
+    "round_trip",
+    "replay"
+  ],
+  "cases": [
+    {
+      "id": "precision_logic_clock",
+      "domain": "digital",
+      "family": "tight_accuracy_clock_generation",
+      "prompt": "Create a 3.3 V single-ended logic clock output at 8 MHz with 0.01 percent frequency tolerance, 45 to 55 percent duty cycle, no more than 1 ns RMS jitter, startup within 10 ms, at least two logic loads of fanout, rise and fall times below 10 ns into 5 pF to 20 pF, and valid logic levels from minus 20 degC to 70 degC on a board no larger than 38 mm by 28 mm.",
+      "prompt_sha256": "f17c8337315afb5c1119ef09b95154b62cae7ac4a6ec48e3efedd0b94fb4f6e6",
+      "requirement_file": "precision_logic_clock.json",
+      "requirement_sha256": "c72547f2182f5a585ddcc4d0275a95fef1b420be2a595d68943a348560493f3f",
+      "safety_critical": false
+    },
+    {
+      "id": "relaxed_logic_clock",
+      "domain": "digital",
+      "family": "relaxed_accuracy_clock_generation",
+      "prompt": "Create a 3.0 V to 3.6 V single-ended logic clock output at 100 kHz with 2 percent frequency tolerance, 40 to 60 percent duty cycle, no more than 2 us RMS jitter, startup within 5 ms, at least one logic load of fanout, rise and fall times below 200 ns into 5 pF to 50 pF, and valid logic levels from minus 20 degC to 70 degC on a board no larger than 42 mm by 30 mm.",
+      "prompt_sha256": "b12d40eb9ac7701a8c7d3141c45292c18391ffc98e1b3cb4b976079cd24cbfbe",
+      "requirement_file": "relaxed_logic_clock.json",
+      "requirement_sha256": "1ebad227ebdac59966f0bc78d4e602869c909ab0f2e44585dfc0d4229fd5c6e9",
+      "safety_critical": false
+    }
+  ]
+}

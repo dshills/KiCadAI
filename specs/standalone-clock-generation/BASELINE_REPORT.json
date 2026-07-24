@@ -1,0 +1,33 @@
+{
+  "schema": "kicadai.standalone-clock-generation-baseline.v1",
+  "version": 1,
+  "generated_at": "2026-07-24T00:00:00Z",
+  "manifest_sha256": "7d75d83e8f50ee9780b40472a106aff06462f9b0a42f7d9509005f157c94deaa",
+  "capability_base_commit": "0cd2b17aa725839b192f2f4bbb82538c963c6ebc",
+  "evaluator": "standalone-clock-architecture-v1",
+  "provider_registry_hash": "44cee1f95e1550294826d67338c5dba35daac3088d67194a937577588c0e4d70",
+  "cases": [
+    {
+      "id": "precision_logic_clock",
+      "family": "tight_accuracy_clock_generation",
+      "status": "blocked",
+      "blocking_stage": "architecture",
+      "blocking_code": "ARCHITECTURE_CAPABILITY_UNSUPPORTED",
+      "blocking_path": "search",
+      "blocking_message": "one or more required capabilities have no registered provider",
+      "blocking_capability": "clock_generation"
+    },
+    {
+      "id": "relaxed_logic_clock",
+      "family": "relaxed_accuracy_clock_generation",
+      "status": "blocked",
+      "blocking_stage": "architecture",
+      "blocking_code": "ARCHITECTURE_CAPABILITY_UNSUPPORTED",
+      "blocking_path": "search",
+      "blocking_message": "one or more required capabilities have no registered provider",
+      "blocking_capability": "clock_generation"
+    }
+  ],
+  "passed": 0,
+  "blocked": 2
+}
