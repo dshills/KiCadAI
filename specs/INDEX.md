@@ -9,10 +9,12 @@ roadmaps, and dated review material.
 
 ## Latest Completed Milestone
 
-- [Clean-checkout KiCad promotion](clean-checkout-kicad-promotion/SPEC.md)
-  - manifest-driven, pinned-toolchain release evidence specification.
-- [Implementation plan](clean-checkout-kicad-promotion/PLAN.md)
-  - independently reviewed implementation phases and acceptance gates.
+- [Held-out capability expansion](held-out-capability-expansion/SPEC.md)
+  - frozen behavior-only benchmark and generic capability-expansion contract.
+- [Implementation plan](held-out-capability-expansion/PLAN.md)
+  - ranked failure closure, regression, and clean-checkout promotion phases.
+- [Completion audit](held-out-capability-expansion/AUDIT.md)
+  - records the measured 5/12 to 11/12 improvement, verification, and receipts.
 - [Completion audit](clean-checkout-kicad-promotion/AUDIT.md)
   - exact reproduction, corpus, bundle, review, commit, and Actions evidence.
 
@@ -34,6 +36,9 @@ the relevant subdirectory instead of adding loose historical files at the root.
 - [Held-out promotion matrix](held-out-capability-expansion/PROMOTION_MATRIX.json)
   - binds the five newly promoted cases to clean-checkout installed-KiCad
     evidence.
+- [Held-out capability expansion completion audit](held-out-capability-expansion/AUDIT.md)
+  - binds the generic implementation, final report, regression gates,
+    clean-checkout receipts, review, and delivery evidence.
 - [External review mitigation specification](external-review-mitigation/SPEC.md)
   - closes the confirmed placement, stock-library, CLI, discoverability, and
     evidence-artifact findings from the 2026-07-21 independent review.

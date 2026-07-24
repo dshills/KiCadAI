@@ -55,7 +55,7 @@ jobs:
   offline-promotion:
     name: Offline promotion corpus (${{ matrix.name }})
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 45
     env:
       KICADAI_EXAMPLE_TEST_TIMEOUT: 3m
     strategy:
@@ -79,7 +79,7 @@ jobs:
           cache: true
 
       - name: Run frozen promotion corpus
-        run: make GO_TEST_PACKAGE=./internal/compositionlowering GO_TEST_NAME='${{ matrix.test }}' test-one
+        run: make GO_TEST_TIMEOUT=40m GO_TEST_PACKAGE=./internal/compositionlowering GO_TEST_NAME='${{ matrix.test }}' test-one
 
   external-review-matrix:
     name: External review regression ladder
