@@ -107,16 +107,28 @@ make GO_TEST_FLAGS=-count=1 GO_TEST_TIMEOUT=45m test
 make lint
 ```
 
-The uncached full suite passed every package. The slow
-`internal/compositionlowering` package completed in `1763.639s`; lint reported
-zero issues.
+After the final concurrency correction, the uncached full suite passed every
+package. The slow `internal/compositionlowering` package completed in
+`2431.271s` under the full suite's 45-minute timeout; lint reported zero
+issues. This is a local aggregate regression command, not one CI job: hosted
+quality uses the bounded `-short` tier, while open-set, adversarial, and
+simulation-grounded long corpora run in separate 45-minute jobs.
 
-After hosted CI demonstrated that the simulation-grounded lane's former
-20-minute alarm was too short, the exact named-test command was rerun locally
-with the approved 40-minute budget. All ten cases passed in `497.282s`,
-including `class_a_amplifier.json` in `214.57s` and
-`class_ab_amplifier.json` in `496.68s`. The correction changes only the Go
-alarm and outer job deadline; it does not skip, remove, or weaken any test.
+The simulation-grounded corpus also passed three focused runtime checks:
+
+- the isolated Class AB case completed in `464.269s`;
+- all ten cases completed in `774.270s` with the normal local CPU budget,
+  including Class A in `100.55s` and Class AB in `448.42s`; and
+- all ten cases completed in `1289.563s` with `GOMAXPROCS=4`, including Class A
+  in `173.26s` and Class AB in `870.39s`.
+
+The separate four-core named-corpus reproduction exercises the same CPU budget
+as the hosted runner and leaves more than 18 minutes of headroom under that
+lane's unchanged 40-minute Go alarm. The generic corpus runner now evaluates
+plans in deterministic order instead of multiplying each plan's existing
+bounded corner-worker pool through outer fixture concurrency. It does not skip
+cases, reduce corner coverage, change result ordering, or weaken any acceptance
+gate.
 
 Installed KiCad 10.0.3 passed:
 
@@ -183,16 +195,13 @@ benchmark result. The full routing, simulation, and end-to-end suites pass.
 ## GitHub Actions
 
 Implementation commit `fa7f60ba8ed70b1fd921f76e29d13222642880b4`
-is bound to:
+is bound to the initial ordinary CI run
+[`30085430213`](https://github.com/dshills/KiCadAI/actions/runs/30085430213)
+and installed-KiCad publication run
+[`30085458955`](https://github.com/dshills/KiCadAI/actions/runs/30085458955).
 
-- ordinary CI run
-  [`30085430213`](https://github.com/dshills/KiCadAI/actions/runs/30085430213);
-  and
-- installed-KiCad publication run
-  [`30085458955`](https://github.com/dshills/KiCadAI/actions/runs/30085458955).
-
-The installed-KiCad publication run completed successfully. It reproduced and
-verified content-addressed bundle
+The initial installed-KiCad publication run completed successfully. It
+reproduced and verified content-addressed bundle
 `sha256-b414fac72252ec66a76247931b43e9324e9db3152193c0a477de1bed62e35c76`
 with 286 inventoried files, then uploaded:
 
@@ -206,11 +215,26 @@ with 286 inventoried files, then uploaded:
 
 The initial ordinary CI run passed formatting, lint, the clean-checkout
 contract, bounded tests, the coverage floor, open-set and adversarial corpora,
-and the external-review ladder. Its simulation-grounded job reached Go's
-20-minute alarm while the Class A and Class AB cases were still actively
-solving. The approved delivery correction assigns that unchanged corpus a
-40-minute Go alarm and a 45-minute job deadline. The exact pushed delivery
-commit is accepted only after its complete ordinary CI run is green.
+and the external-review ladder. Its simulation-grounded job reached the former
+20-minute Go alarm while Class A and Class AB were still actively solving.
+
+Delivery commit `e966768f4f5c72c3f6ca53608479f941693998c5` increased only
+that lane's Go alarm to 40 minutes and job deadline to 45 minutes. Its
+installed-KiCad publication run
+[`30089160860`](https://github.com/dshills/KiCadAI/actions/runs/30089160860)
+passed and reproduced 286-file bundle
+`f08ef01e1b30eea29809c88a882296de7093a44c71e294a60bbb8a0076c8306d`.
+Its ordinary CI run
+[`30089145081`](https://github.com/dshills/KiCadAI/actions/runs/30089145081)
+passed every other job but showed that Class AB still exceeded 40 minutes on
+the four-core hosted runner when ten plans each created an independent
+worst-case worker pool.
+
+The approved generic concurrency correction removes redundant outer plan
+parallelism while retaining each plan's bounded corner parallelism, the
+40-minute Go alarm, and every corpus gate. The exact pushed delivery commit is
+accepted only after its complete ordinary CI and installed-KiCad publication
+runs are green.
 
 ## Remaining Boundary And Next Goal
 

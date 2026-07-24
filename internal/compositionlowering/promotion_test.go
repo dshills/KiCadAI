@@ -327,12 +327,13 @@ func runFrozenPromotionAt(t *testing.T, corpusRoot string, expectedCount int, ar
 	if err != nil || len(paths) != expectedCount {
 		t.Fatalf("corpus paths = %#v, %v", paths, err)
 	}
+	// go.mod requires Go 1.23, so each range iteration has its own path
+	// variable even when the subtest closure captures it.
 	for _, path := range paths {
-		path := path
 		t.Run(filepath.Base(path), func(t *testing.T) {
-			if cli == "" {
-				t.Parallel()
-			}
+			// Each plan already parallelizes its bounded worst-case corner
+			// solves. Running whole plans in parallel here multiplies that CPU
+			// budget and can starve every nonlinear solve on small runners.
 			data, err := os.ReadFile(path)
 			if err != nil {
 				t.Fatal(err)
