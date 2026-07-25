@@ -51,6 +51,14 @@ preserves declared domain limits through lowering and uses them for external
 power-input assertions, while retaining the deterministic ±1% fallback for
 contracts without limits.
 
+The exact Linux CI replay also showed that the nonlinear/transient
+worst-case evaluation for the protected amplifier can legitimately outlive
+the original 30-minute outer Go-test alarm. Hierarchical shards now use the
+same 55-minute outer budget as simulation-grounded shards. Per-example
+deadlines, solver bounds, corner limits, and all electrical acceptance gates
+remain unchanged; the Actions job ceiling is 75 minutes so setup and teardown
+do not mask the bounded Go-test result.
+
 ## Exact Installed-KiCad Promotion
 
 The authoritative parent implementation revision was:

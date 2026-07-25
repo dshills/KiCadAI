@@ -110,15 +110,13 @@ func TestPromotionWorkflowContractAndPinnedActions(t *testing.T) {
 
 	ci := readContractFile(t, filepath.Join(workflowRoot, "ci.yml"))
 	for _, required := range []string{
-		"timeout-minutes: 60",
+		"timeout-minutes: 75",
 		"KICADAI_PROMOTION_SHARD: ${{ matrix.shard }}",
 		"shard: 0/3",
 		"shard: 1/3",
 		"shard: 2/3",
-		"go_timeout: 55m",
 		"test: TestHierarchicalMultiDomainCorpusPassesOfflineWorkflow",
 		"shard: 5/6",
-		"go_timeout: 30m",
 		"GO_TEST_TIMEOUT='${{ matrix.go_timeout }}'",
 	} {
 		if !strings.Contains(ci, required) {
@@ -130,6 +128,9 @@ func TestPromotionWorkflowContractAndPinnedActions(t *testing.T) {
 	}
 	if got := strings.Count(ci, "test: TestHierarchicalMultiDomainCorpusPassesOfflineWorkflow"); got != 6 {
 		t.Errorf("CI workflow has %d hierarchical multi-domain shards, want 6", got)
+	}
+	if got := strings.Count(ci, "go_timeout: 55m"); got != 9 {
+		t.Errorf("CI workflow has %d extended promotion shard budgets, want 9", got)
 	}
 }
 
