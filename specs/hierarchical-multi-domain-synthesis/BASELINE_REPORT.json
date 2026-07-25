@@ -3,7 +3,7 @@
   "version": 1,
   "recorded_at": "2026-07-25",
   "baseline_revision": "2c5418671072c4c4e965d48401fbe89dd8388768",
-  "corpus_manifest_sha256": "1b8fd6b0a16e59fd334f5e4c5ea94becda181d12542137912445cc4c7af8fd0c",
+  "corpus_manifest_sha256": "eda6dd3bc2c94bb3dac00ad31831d783c8e72fe87aa6859657b4b7661be321f6",
   "production_requirement_schema": "kicadai.open-set-requirement.v3",
   "held_out_requirement_schema": "kicadai.open-set-requirement.v4",
   "summary": {

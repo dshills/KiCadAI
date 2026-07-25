@@ -369,7 +369,7 @@
       }
     ],
     "constraints": {
-      "max_components": 30,
+      "max_components": 48,
       "max_width_mm": 72,
       "max_height_mm": 48
     }

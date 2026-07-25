@@ -56,7 +56,7 @@
       "analyses": ["ac_sweep", "dc_operating_point", "noise"],
       "minimum_functional_blocks": 5,
       "minimum_electrical_domains": 4,
-      "sha256": "a80a36a2bf8d32ecb486fc769c35c808517a275066bb81ff5379165e3184c0cb"
+      "sha256": "d865bbc5d18ce1402e563d48fbf8596e0ac951c5170ab8b97563c9fce4c8773f"
     }
   ]
 }

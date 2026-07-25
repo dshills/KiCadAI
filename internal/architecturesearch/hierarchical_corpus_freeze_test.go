@@ -11,7 +11,7 @@ import (
 	"testing"
 )
 
-const frozenHierarchicalManifestSHA256 = "1b8fd6b0a16e59fd334f5e4c5ea94becda181d12542137912445cc4c7af8fd0c"
+const frozenHierarchicalManifestSHA256 = "eda6dd3bc2c94bb3dac00ad31831d783c8e72fe87aa6859657b4b7661be321f6"
 
 type frozenHierarchicalManifest struct {
 	Schema            string                          `json:"schema"`
