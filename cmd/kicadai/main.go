@@ -196,7 +196,6 @@ const (
 
 	defaultPlacementBoardWidthMM      = 100.0
 	defaultPlacementBoardHeightMM     = 60.0
-	defaultPlacementBoardMarginMM     = 2.0
 	defaultPlacementEstimatedWidthMM  = 2.0
 	defaultPlacementEstimatedHeightMM = 1.25
 )
@@ -208,7 +207,7 @@ var usage = strings.NewReplacer(
 	"{{defaultLibraryIDLED}}", defaultLibraryIDLED,
 	"{{defaultPlacementBoardWidthMM}}", fmt.Sprintf("%g", defaultPlacementBoardWidthMM),
 	"{{defaultPlacementBoardHeightMM}}", fmt.Sprintf("%g", defaultPlacementBoardHeightMM),
-	"{{defaultPlacementBoardMarginMM}}", fmt.Sprintf("%g", defaultPlacementBoardMarginMM),
+	"{{defaultPlacementBoardMarginMM}}", fmt.Sprintf("%g", placement.DefaultRules().BoardEdgeClearanceMM),
 	"{{defaultPlacementEstimatedWidthMM}}", fmt.Sprintf("%g", defaultPlacementEstimatedWidthMM),
 	"{{defaultPlacementEstimatedHeightMM}}", fmt.Sprintf("%g", defaultPlacementEstimatedHeightMM),
 ).Replace(usageTemplate)
@@ -517,7 +516,7 @@ func parse(args []string, stderr io.Writer) (cliOptions, string, error) {
 	flags.BoolVar(&opts.skipRouting, "skip-routing", false, "skip design workflow board routing")
 	flags.Float64Var(&opts.placementBoardWidth, "placement-board-width", defaultPlacementBoardWidthMM, "placement feedback board width in millimeters")
 	flags.Float64Var(&opts.placementBoardHeight, "placement-board-height", defaultPlacementBoardHeightMM, "placement feedback board height in millimeters")
-	flags.Float64Var(&opts.placementBoardMargin, "placement-board-margin", defaultPlacementBoardMarginMM, "placement feedback board margin in millimeters")
+	flags.Float64Var(&opts.placementBoardMargin, "placement-board-margin", placement.DefaultRules().BoardEdgeClearanceMM, "placement feedback board margin in millimeters")
 	flags.Float64Var(&opts.placementEstWidth, "placement-estimated-width", defaultPlacementEstimatedWidthMM, "placement feedback estimated component width in millimeters")
 	flags.Float64Var(&opts.placementEstHeight, "placement-estimated-height", defaultPlacementEstimatedHeightMM, "placement feedback estimated component height in millimeters")
 	flags.BoolVar(&opts.skipPlacementFeedback, "skip-placement-feedback", false, "skip placement feedback in block project generation output")
