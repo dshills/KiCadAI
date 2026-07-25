@@ -365,7 +365,17 @@ func cloneSimulationEvidence(source *SimulationEvidence) *SimulationEvidence {
 	if source == nil {
 		return nil
 	}
-	return &SimulationEvidence{Resolution: cloneSimulationResolution(source.Resolution), Reports: cloneSimulationReports(source.Reports)}
+	var reports []simmodel.Report
+	if source.Reports != nil {
+		reports = make([]simmodel.Report, len(source.Reports))
+		for index := range source.Reports {
+			// The evaluator and replay boundaries already applied the canonical
+			// persistence projection. Cloning must preserve that exact transcript
+			// rather than re-projecting it and invalidating its evidence hash.
+			reports[index] = simmodel.CloneReport(source.Reports[index])
+		}
+	}
+	return &SimulationEvidence{Resolution: cloneSimulationResolution(source.Resolution), Reports: reports}
 }
 
 func cloneSimulationResolution(source SimulationResolution) SimulationResolution {
@@ -390,8 +400,58 @@ func cloneSimulationReports(source []simmodel.Report) []simmodel.Report {
 			source[reportIndex],
 			maxPersistedAnalysisPoints,
 		)
+		retainAssertionObservables(&clone[reportIndex])
 	}
 	return clone
+}
+
+func retainAssertionObservables(report *simmodel.Report) {
+	if report == nil {
+		return
+	}
+	nodes := map[string]bool{}
+	components := map[string]bool{}
+	retain := func(assertion simmodel.AssertionResult) {
+		if assertion.Node != "" {
+			nodes[assertion.Node] = true
+		}
+		if assertion.ReferenceNode != "" {
+			nodes[assertion.ReferenceNode] = true
+		}
+		if assertion.Component != "" {
+			components[assertion.Component] = true
+		}
+		for _, component := range assertion.Components {
+			if component != "" {
+				components[component] = true
+			}
+		}
+	}
+	for _, assertion := range report.Assertions {
+		retain(assertion)
+	}
+	for _, corner := range report.Corners {
+		for _, assertion := range corner.Assertions {
+			retain(assertion)
+		}
+	}
+	for analysisIndex := range report.Analyses {
+		for pointIndex := range report.Analyses[analysisIndex].Points {
+			point := &report.Analyses[analysisIndex].Points[pointIndex]
+			point.Nodes = slices.DeleteFunc(point.Nodes, func(node simmodel.NodeResult) bool {
+				return !nodes[node.Node]
+			})
+			if len(point.Nodes) == 0 {
+				point.Nodes = nil
+			}
+			point.Devices = slices.DeleteFunc(point.Devices, func(device simmodel.DeviceResult) bool {
+				return !components[device.Component]
+			})
+			if len(point.Devices) == 0 {
+				point.Devices = nil
+			}
+		}
+	}
 }
 
 func joinDiagnosticMessages(diagnostics []Diagnostic) string {

@@ -104,8 +104,9 @@ type Evaluation struct {
 
 // SimulationEvidence is the canonical trusted input/output transcript behind
 // one complete candidate evaluation. Dense analysis point arrays are
-// deterministically sampled at the persistence boundary; replay regenerates
-// the complete reports and applies the same sampling before comparison.
+// deterministically sampled at the persistence boundary and retain only
+// assertion-referenced node and device observables. Replay regenerates the
+// complete reports and applies the same projection before comparison.
 type SimulationEvidence struct {
 	Resolution SimulationResolution `json:"resolution"`
 	Reports    []simmodel.Report    `json:"reports"`

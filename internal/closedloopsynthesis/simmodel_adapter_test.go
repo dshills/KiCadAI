@@ -3,6 +3,7 @@ package closedloopsynthesis
 import (
 	"context"
 	"fmt"
+	"slices"
 	"testing"
 
 	"kicadai/internal/architecturesearch"
@@ -145,6 +146,11 @@ func TestSimulationEvidenceCompactsDenseAnalysesDeterministically(t *testing.T) 
 	if err != nil || replayedCompactHash != compactHash {
 		t.Fatalf("canonical replay hash = %s, %v; want %s", replayedCompactHash, err, compactHash)
 	}
+	clonedEvidence := cloneSimulationEvidence(&SimulationEvidence{Reports: compact})
+	clonedHash, err := HashSimulationEvidence(*clonedEvidence)
+	if err != nil || clonedHash != compactHash {
+		t.Fatalf("cloned persisted evidence hash = %s, %v; want %s", clonedHash, err, compactHash)
+	}
 	compact[0].Analyses[0].Points[1].TimeS++
 	tamperedHash, err := simulationEvidenceHash(SimulationResolution{}, compact)
 	if err != nil {
@@ -152,6 +158,58 @@ func TestSimulationEvidenceCompactsDenseAnalysesDeterministically(t *testing.T) 
 	}
 	if tamperedHash == compactHash {
 		t.Fatal("tampered persisted point did not change canonical evidence hash")
+	}
+}
+
+func TestSimulationEvidenceRetainsOnlyAssertionObservables(t *testing.T) {
+	reports := []simmodel.Report{{
+		Assertions: []simmodel.AssertionResult{{
+			Node: "output", ReferenceNode: "reference", Component: "switch",
+			Components: []string{"sense_a", "sense_b"},
+		}},
+		Analyses: []simmodel.AnalysisResult{{Points: []simmodel.AnalysisPoint{
+			{
+				Nodes: []simmodel.NodeResult{
+					{Node: "unused"}, {Node: "output"}, {Node: "reference"},
+				},
+				Devices: []simmodel.DeviceResult{
+					{Component: "unused"}, {Component: "switch"},
+					{Component: "sense_a"}, {Component: "sense_b"},
+				},
+			},
+			{
+				Nodes:   []simmodel.NodeResult{{Node: "unused"}},
+				Devices: []simmodel.DeviceResult{{Component: "unused"}},
+			},
+		}}},
+	}}
+	compact := cloneSimulationReports(reports)
+	point := compact[0].Analyses[0].Points[0]
+	if got, want := []string{point.Nodes[0].Node, point.Nodes[1].Node}, []string{"output", "reference"}; !slices.Equal(got, want) {
+		t.Fatalf("persisted nodes = %#v, want %#v", got, want)
+	}
+	gotComponents := make([]string, 0, len(point.Devices))
+	for _, device := range point.Devices {
+		gotComponents = append(gotComponents, device.Component)
+	}
+	if want := []string{"switch", "sense_a", "sense_b"}; !slices.Equal(gotComponents, want) {
+		t.Fatalf("persisted devices = %#v, want %#v", gotComponents, want)
+	}
+	if len(reports[0].Analyses[0].Points[0].Nodes) != 3 || len(reports[0].Analyses[0].Points[0].Devices) != 4 {
+		t.Fatal("persistence projection mutated the full simulation report")
+	}
+	empty := compact[0].Analyses[0].Points[1]
+	if empty.Nodes != nil || empty.Devices != nil {
+		t.Fatalf("empty projected observables are not canonical nil slices: %#v", empty)
+	}
+	evidence := &SimulationEvidence{Reports: compact}
+	before, err := HashSimulationEvidence(*evidence)
+	if err != nil {
+		t.Fatal(err)
+	}
+	after, err := HashSimulationEvidence(*cloneSimulationEvidence(evidence))
+	if err != nil || after != before {
+		t.Fatalf("projected evidence clone hash = %s, %v; want %s", after, err, before)
 	}
 }
 
