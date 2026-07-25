@@ -63,6 +63,8 @@ type PowerDomainIntent struct {
 	Name         string            `json:"name"`
 	Role         NetRole           `json:"role"`
 	VoltageV     float64           `json:"voltage_v"`
+	MinVoltageV  *float64          `json:"min_voltage_v,omitempty"`
+	MaxVoltageV  *float64          `json:"max_voltage_v,omitempty"`
 	MaxCurrentMA float64           `json:"max_current_ma,omitempty"`
 	Source       PowerDomainSource `json:"source"`
 }

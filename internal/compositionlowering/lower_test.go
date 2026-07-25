@@ -152,6 +152,22 @@ func TestLowerInterfacesDoesNotDuplicateReferencePortOnItsOwnReturnNet(t *testin
 	}
 }
 
+func TestLowerDomainPreservesDeclaredOperatingRange(t *testing.T) {
+	minimum, maximum := 1.71, 1.9
+	domain := lowerDomain(architecturesearch.Domain{
+		ID: "logic", Kind: "supply", NominalVoltageV: 1.8,
+		MinVoltageV: &minimum, MaxVoltageV: &maximum,
+	})
+	if domain.MinVoltageV == nil || *domain.MinVoltageV != minimum ||
+		domain.MaxVoltageV == nil || *domain.MaxVoltageV != maximum {
+		t.Fatalf("lowered domain range = %#v, want %v..%v", domain, minimum, maximum)
+	}
+	minimum, maximum = 1, 2
+	if *domain.MinVoltageV != 1.71 || *domain.MaxVoltageV != 1.9 {
+		t.Fatalf("lowered domain range aliases the requirement: %#v", domain)
+	}
+}
+
 func TestLowerInterfacesJoinsPowerPortReturnAnchorToReferenceDomain(t *testing.T) {
 	requirement := architecturesearch.Requirement{Requirements: architecturesearch.Requirements{
 		Domains: []architecturesearch.Domain{{ID: "gnd", Kind: "reference"}, {ID: "vin", Kind: "supply"}},

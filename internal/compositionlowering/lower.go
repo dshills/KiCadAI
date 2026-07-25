@@ -533,7 +533,19 @@ func lowerDomain(domain architecturesearch.Domain) circuitgraph.PowerDomainInten
 	if domain.MaxCurrentA != nil {
 		current = *domain.MaxCurrentA * 1000
 	}
-	return circuitgraph.PowerDomainIntent{Name: domain.ID, Role: role, VoltageV: domain.NominalVoltageV, MaxCurrentMA: current, Source: source}
+	result := circuitgraph.PowerDomainIntent{
+		Name: domain.ID, Role: role, VoltageV: domain.NominalVoltageV,
+		MaxCurrentMA: current, Source: source,
+	}
+	if domain.MinVoltageV != nil {
+		minimum := *domain.MinVoltageV
+		result.MinVoltageV = &minimum
+	}
+	if domain.MaxVoltageV != nil {
+		maximum := *domain.MaxVoltageV
+		result.MaxVoltageV = &maximum
+	}
+	return result
 }
 
 func lowerInterfaces(requirement architecturesearch.Requirement, union *disjointSet, actual map[string]circuitgraph.FunctionalEndpoint, metadata map[string]nodeMetadata) ([]circuitgraph.InterfaceRequirement, map[string]string) {

@@ -43,6 +43,14 @@ systems. The final routing correction orders explicit strict-DRC repairs so
 transition-via clearance is judged against final repaired copper rather than a
 stale pre-repair route.
 
+Post-publication CI exposed one additional contract-projection defect:
+lowering retained an external power domain's nominal voltage but discarded its
+declared minimum and maximum. That caused derived simulation evidence to
+invent a narrower nominal ±1% source-node assertion. The generic correction
+preserves declared domain limits through lowering and uses them for external
+power-input assertions, while retaining the deterministic ±1% fallback for
+contracts without limits.
+
 ## Exact Installed-KiCad Promotion
 
 The authoritative parent implementation revision was:
@@ -109,6 +117,8 @@ Additional local gates passed:
 - `go test -short -timeout 20m ./...`;
 - focused `internal/designworkflow`, `internal/closedloopsynthesis`,
   `internal/compositionlowering`, `internal/simmodel`, and CLI regressions;
+- unit coverage for domain-limit projection and derived source assertions,
+  plus three consecutive isolated-gateway adversarial workflow passes;
 - `go vet ./...`;
 - `golangci-lint run ./cmd/... ./internal/...` with zero issues;
 - `gofmt` and `git diff --check`;
@@ -131,6 +141,9 @@ non-actionable because:
 
 Focused tests and the exact installed-KiCad isolated-gateway promotion confirm
 that adjudication.
+
+The final staged review also covers the CI-discovered domain-limit projection
+correction and its regression tests.
 
 ## Closeout Boundary
 

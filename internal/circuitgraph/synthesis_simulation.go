@@ -22,6 +22,8 @@ type synthesisSourceCondition struct {
 	component      string
 	node           string
 	dcValue        float64
+	assertionMin   *float64
+	assertionMax   *float64
 	sourcePolarity float64
 	acInput        bool
 	pulseInput     bool
@@ -110,13 +112,16 @@ func deriveSynthesisSimulation(document Document, intent FunctionIntent, selecte
 				return nil, SynthesisSimulationEvidence{Status: "not_applicable", Reason: "no_bounded_interface_operating_condition"}
 			}
 			condition.dcValue = domain.VoltageV
+			condition.assertionMin = domain.MinVoltageV
+			condition.assertionMax = domain.MaxVoltageV
 		case InterfaceAnalogInput:
 			if operatingRail == 0 {
 				return nil, SynthesisSimulationEvidence{Status: "not_applicable", Reason: "no_bounded_interface_operating_condition"}
 			}
 			// A deterministic low common-mode bias leaves headroom for catalog-
 			// resolved non-inverting gain without requiring topology-specific
-			// equations or provider-controlled operating points.
+			// equations or provider-controlled operating points. Power-domain
+			// bounds constrain the supply, not this generated signal bias.
 			condition.dcValue = operatingRail * synthesisAnalogBiasRailFraction
 			condition.acInput = true
 			condition.pulseInput = true
@@ -152,11 +157,21 @@ func deriveSynthesisSimulation(document Document, intent FunctionIntent, selecte
 	assertions := make([]simmodel.Assertion, 0, len(sources)*2)
 	hasACInput := false
 	for _, source := range sources {
+		// Polarity orients the connector's source equation. The operating value
+		// and assertion bounds remain the signed voltage of the physical node.
 		dc.Excitations = append(dc.Excitations, simmodel.SourceExcitation{Component: source.component, DCValue: source.dcValue * source.sourcePolarity})
 		tolerance := math.Max(1e-3, math.Abs(source.dcValue)*0.01)
+		minimum := source.dcValue - tolerance
+		maximum := source.dcValue + tolerance
+		if source.assertionMin != nil {
+			minimum = *source.assertionMin
+		}
+		if source.assertionMax != nil {
+			maximum = *source.assertionMax
+		}
 		assertions = append(assertions, simmodel.Assertion{
 			AnalysisID: dc.ID, Node: source.node, Quantity: simmodel.QuantityVoltageV,
-			Min: source.dcValue - tolerance, Max: source.dcValue + tolerance,
+			Min: minimum, Max: maximum,
 		})
 		hasACInput = hasACInput || source.acInput
 	}

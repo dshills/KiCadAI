@@ -162,6 +162,14 @@ func (validator *graphValidator) functionIntent(intent FunctionIntent) {
 		if !finiteInRange(domain.VoltageV, -MaxSynthesisVoltageV, MaxSynthesisVoltageV, true) {
 			validator.add(CodeSynthesisPowerDomainInvalid, path+".voltage_v", "power-domain voltage must be finite and bounded")
 		}
+		if domain.MinVoltageV != nil &&
+			(!finiteInRange(*domain.MinVoltageV, -MaxSynthesisVoltageV, MaxSynthesisVoltageV, true) || *domain.MinVoltageV > domain.VoltageV) {
+			validator.add(CodeSynthesisPowerDomainInvalid, path+".min_voltage_v", "power-domain minimum voltage must be finite, bounded, and no greater than nominal")
+		}
+		if domain.MaxVoltageV != nil &&
+			(!finiteInRange(*domain.MaxVoltageV, -MaxSynthesisVoltageV, MaxSynthesisVoltageV, true) || *domain.MaxVoltageV < domain.VoltageV) {
+			validator.add(CodeSynthesisPowerDomainInvalid, path+".max_voltage_v", "power-domain maximum voltage must be finite, bounded, and no less than nominal")
+		}
 		if !finiteInRange(domain.MaxCurrentMA, 0, math.MaxFloat64, true) {
 			validator.add(CodeSynthesisPowerDomainInvalid, path+".max_current_ma", "power-domain current must be finite and non-negative")
 		}

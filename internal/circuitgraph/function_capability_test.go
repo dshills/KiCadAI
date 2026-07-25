@@ -109,6 +109,23 @@ func TestFunctionDocumentValidationAggregatesIndependentSections(t *testing.T) {
 	}
 }
 
+func TestFunctionDocumentRejectsPowerDomainRangeOutsideNominal(t *testing.T) {
+	document := loadPublicFunctionExample(t)
+	minimum, maximum := document.Synthesis.PowerDomains[0].VoltageV+1, document.Synthesis.PowerDomains[0].VoltageV-1
+	document.Synthesis.PowerDomains[0].MinVoltageV = &minimum
+	document.Synthesis.PowerDomains[0].MaxVoltageV = &maximum
+
+	issues := Validate(document)
+	for _, path := range []string{
+		"synthesis.power_domains[0].min_voltage_v",
+		"synthesis.power_domains[0].max_voltage_v",
+	} {
+		if !hasIssuePath(issues, path) {
+			t.Fatalf("missing invalid domain-range path %q in %#v", path, issues)
+		}
+	}
+}
+
 func TestFunctionLevelCapabilityCopiesCannotMutateRegistry(t *testing.T) {
 	first := FunctionLevelCapabilities()
 	if len(first.Operations) == 0 || len(first.Operations[0].EndpointRoles) == 0 || len(first.Operations[0].EndpointRoles[0].Functions) == 0 || len(first.Operations[0].RequiredParameters) == 0 {

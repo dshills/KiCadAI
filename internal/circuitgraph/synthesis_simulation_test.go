@@ -8,6 +8,7 @@ import (
 )
 
 func TestDerivedSynthesisACExcitesEachInputIndependently(t *testing.T) {
+	minimum, maximum := 3.0, 3.6
 	sourceRecord := components.ComponentRecord{Family: "connector", SimulationModels: []simmodel.CatalogEvidence{{ModelID: simmodel.PrimitiveConnectorVoltageSourceV1}}}
 	resistorRecord := components.ComponentRecord{Family: "resistor", SimulationModels: []simmodel.CatalogEvidence{{ModelID: simmodel.PrimitiveResistorV1}}}
 	selected := map[string]ResolvedComponent{
@@ -28,7 +29,10 @@ func TestDerivedSynthesisACExcitesEachInputIndependently(t *testing.T) {
 			{ID: "input_a", Role: InterfaceAnalogInput, Signals: []InterfaceSignal{{Name: "GND", Role: NetRoleGround}, {Name: "SIGNAL", Role: NetRoleSignal}}},
 			{ID: "input_b", Role: InterfaceAnalogInput, Signals: []InterfaceSignal{{Name: "GND", Role: NetRoleGround}, {Name: "SIGNAL", Role: NetRoleSignal}}},
 		},
-		PowerDomains: []PowerDomainIntent{{Name: "VCC", Role: NetRolePower, VoltageV: 3.3}},
+		PowerDomains: []PowerDomainIntent{{
+			Name: "VCC", Role: NetRolePower, VoltageV: 3.3,
+			MinVoltageV: &minimum, MaxVoltageV: &maximum,
+		}},
 		Connections: []FunctionConnection{
 			{Name: "VCC", VoltageDomain: "VCC", Endpoints: []FunctionalEndpoint{{Interface: "power", Signal: "VCC"}}},
 			{Name: "INPUT_A", Endpoints: []FunctionalEndpoint{{Interface: "input_a", Signal: "SIGNAL"}}},
@@ -51,6 +55,18 @@ func TestDerivedSynthesisACExcitesEachInputIndependently(t *testing.T) {
 		}
 		if active != 1 {
 			t.Fatalf("analysis %s has %d active AC inputs: %#v", analysis.ID, active, analysis.Excitations)
+		}
+	}
+	for _, assertion := range simulation.Assertions {
+		switch assertion.Node {
+		case "VCC":
+			if assertion.AnalysisID == "dc_operating_point" && (assertion.Min != minimum || assertion.Max != maximum) {
+				t.Fatalf("power assertion = %#v, want declared supply range", assertion)
+			}
+		case "INPUT_A", "INPUT_B":
+			if assertion.AnalysisID == "dc_operating_point" && !(assertion.Min < .33 && assertion.Max > .33) {
+				t.Fatalf("analog bias assertion = %#v, want bounds around 0.33 V", assertion)
+			}
 		}
 	}
 }
@@ -98,6 +114,111 @@ func TestSynthesisInterfaceOperatingRailUsesInterfaceDomain(t *testing.T) {
 	}
 	if got := synthesisInterfaceOperatingRail(domains, "", -15); got != -15 {
 		t.Fatalf("unbound-domain fallback = %v, want -15", got)
+	}
+}
+
+func TestDerivedSynthesisPowerAssertionUsesDeclaredOperatingRange(t *testing.T) {
+	minimum, maximum := 1.71, 1.9
+	sourceRecord := components.ComponentRecord{
+		Family: "connector",
+		SimulationModels: []simmodel.CatalogEvidence{{
+			ModelID: simmodel.PrimitiveConnectorVoltageSourceV1,
+		}},
+	}
+	selected := map[string]ResolvedComponent{
+		"iface_power": {
+			Instance: Component{ID: "iface_power"}, ComponentID: "power",
+			Record: sourceRecord,
+		},
+		"load": {
+			Instance: Component{ID: "load", Value: "1k"}, ComponentID: "load",
+			Record: components.ComponentRecord{
+				Family: "resistor",
+				SimulationModels: []simmodel.CatalogEvidence{{
+					ModelID: simmodel.PrimitiveResistorV1,
+				}},
+			},
+		},
+	}
+	document := Document{Nets: []Net{
+		{Name: "GND", Role: NetRoleGround, Endpoints: []Endpoint{{Component: "iface_power", Selector: "PIN_1"}, {Component: "load", Selector: "B"}}},
+		{Name: "VCC", Role: NetRolePower, Endpoints: []Endpoint{{Component: "iface_power", Selector: "PIN_2"}, {Component: "load", Selector: "A"}}},
+	}}
+	intent := FunctionIntent{
+		Interfaces: []InterfaceRequirement{{
+			ID: "power", Role: InterfacePowerInput,
+			Signals: []InterfaceSignal{{Name: "GND", Role: NetRoleGround}, {Name: "VCC", Role: NetRolePower}},
+		}},
+		PowerDomains: []PowerDomainIntent{{
+			Name: "logic", Role: NetRolePower, VoltageV: 1.8,
+			MinVoltageV: &minimum, MaxVoltageV: &maximum,
+		}},
+		Connections: []FunctionConnection{{
+			Name: "VCC", VoltageDomain: "logic",
+			Endpoints: []FunctionalEndpoint{{Interface: "power", Signal: "VCC"}},
+		}},
+	}
+	simulation, evidence := deriveSynthesisSimulation(document, intent, selected)
+	if simulation == nil || evidence.Status != "derived" || len(simulation.Assertions) != 1 {
+		t.Fatalf("derived simulation = %#v evidence=%#v", simulation, evidence)
+	}
+	assertion := simulation.Assertions[0]
+	if assertion.Min != minimum || assertion.Max != maximum {
+		t.Fatalf("power assertion = %#v, want range %v..%v", assertion, minimum, maximum)
+	}
+}
+
+func TestDerivedSynthesisNegativeRailPolarityChangesSourceEquationNotNodeRange(t *testing.T) {
+	minimum, maximum := -5.25, -4.75
+	sourceRecord := components.ComponentRecord{
+		Family: "connector",
+		SimulationModels: []simmodel.CatalogEvidence{{
+			ModelID: simmodel.PrimitiveConnectorVoltageSourceV1,
+		}},
+	}
+	selected := map[string]ResolvedComponent{
+		"iface_power": {
+			Instance: Component{ID: "iface_power"}, ComponentID: "power",
+			Record: sourceRecord,
+		},
+		"load": {
+			Instance: Component{ID: "load", Value: "1k"}, ComponentID: "load",
+			Record: components.ComponentRecord{
+				Family: "resistor",
+				SimulationModels: []simmodel.CatalogEvidence{{
+					ModelID: simmodel.PrimitiveResistorV1,
+				}},
+			},
+		},
+	}
+	document := Document{Nets: []Net{
+		{Name: "GND", Role: NetRoleGround, Endpoints: []Endpoint{{Component: "iface_power", Selector: "PIN_1"}, {Component: "load", Selector: "B"}}},
+		{Name: "VEE", Role: NetRolePowerNeg, Endpoints: []Endpoint{{Component: "iface_power", Selector: "PIN_2"}, {Component: "load", Selector: "A"}}},
+	}}
+	intent := FunctionIntent{
+		Interfaces: []InterfaceRequirement{{
+			ID: "power", Role: InterfacePowerInput,
+			Signals: []InterfaceSignal{{Name: "GND", Role: NetRoleGround}, {Name: "VEE", Role: NetRolePowerNeg}},
+		}},
+		PowerDomains: []PowerDomainIntent{{
+			Name: "negative", Role: NetRolePowerNeg, VoltageV: -5,
+			MinVoltageV: &minimum, MaxVoltageV: &maximum,
+		}},
+		Connections: []FunctionConnection{{
+			Name: "VEE", VoltageDomain: "negative",
+			Endpoints: []FunctionalEndpoint{{Interface: "power", Signal: "VEE"}},
+		}},
+	}
+	simulation, evidence := deriveSynthesisSimulation(document, intent, selected)
+	if simulation == nil || evidence.Status != "derived" {
+		t.Fatalf("derived simulation = %#v evidence=%#v", simulation, evidence)
+	}
+	if got := simulation.Analyses[0].Excitations[0].DCValue; got != 5 {
+		t.Fatalf("reversed source equation excitation = %v, want +5 V", got)
+	}
+	assertion := simulation.Assertions[0]
+	if assertion.Min != minimum || assertion.Max != maximum {
+		t.Fatalf("physical negative-rail assertion = %#v, want %v..%v", assertion, minimum, maximum)
 	}
 }
 
