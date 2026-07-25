@@ -71,7 +71,7 @@
         "id": "alert",
         "kind": "digital_logic",
         "direction": "source",
-        "domain": "analog_positive",
+      "domain": "positive",
         "electrical": {
           "min_voltage_v": 0,
           "max_voltage_v": 9,
@@ -203,7 +203,7 @@
           },
           {
             "role": "output",
-            "port": "analog_output"
+            "port": "output"
           },
           {
             "role": "reference",

@@ -11,7 +11,7 @@ import (
 	"testing"
 )
 
-const frozenHierarchicalManifestSHA256 = "a1472fc0a8df044ec7ff46af8fd751292ed568d4528da027ee6853571d365dbd"
+const frozenHierarchicalManifestSHA256 = "1b8fd6b0a16e59fd334f5e4c5ea94becda181d12542137912445cc4c7af8fd0c"
 
 type frozenHierarchicalManifest struct {
 	Schema            string                          `json:"schema"`
@@ -257,6 +257,20 @@ func validateFrozenHierarchicalRequirement(t *testing.T, row frozenHierarchicalM
 	if !hasReference || !hasSupply {
 		t.Fatalf("%s must span supply and reference electrical domains", row.ID)
 	}
+	portIDs := map[string]bool{}
+	for _, port := range needs.Ports {
+		if port.ID == "" || portIDs[port.ID] || !domainIDs[port.Domain] {
+			t.Fatalf("%s has invalid external port %#v", row.ID, port)
+		}
+		portIDs[port.ID] = true
+	}
+	signalIDs := map[string]bool{}
+	for _, signal := range needs.Signals {
+		if signal.ID == "" || signalIDs[signal.ID] || !domainIDs[signal.Domain] {
+			t.Fatalf("%s has invalid internal signal %#v", row.ID, signal)
+		}
+		signalIDs[signal.ID] = true
+	}
 
 	hasSupplyCorner := false
 	hasTemperatureCorner := false
@@ -304,11 +318,19 @@ func validateFrozenHierarchicalRequirement(t *testing.T, row frozenHierarchicalM
 
 	objectiveIDs := map[string]bool{}
 	participantIDs := map[string]bool{}
+	participantPorts := map[string]map[string]bool{}
 	for _, participant := range needs.Participants {
-		if participant.ID == "" || participant.Capability == "" || participantIDs[participant.ID] {
+		if participant.ID == "" || participant.Capability == "" || participantIDs[participant.ID] || !domainIDs[participant.Domain] {
 			t.Fatalf("%s has invalid participant %#v", row.ID, participant)
 		}
 		participantIDs[participant.ID] = true
+		participantPorts[participant.ID] = map[string]bool{}
+		for _, port := range participant.RequiredPorts {
+			if port.ID == "" || participantPorts[participant.ID][port.ID] {
+				t.Fatalf("%s has invalid participant port %#v", row.ID, port)
+			}
+			participantPorts[participant.ID][port.ID] = true
+		}
 	}
 	sharedBoundaryUses := map[string]int{}
 	for _, objective := range needs.Objectives {
@@ -319,9 +341,21 @@ func validateFrozenHierarchicalRequirement(t *testing.T, row frozenHierarchicalM
 		for _, binding := range objective.Bindings {
 			switch {
 			case binding.Signal != "":
+				if !signalIDs[binding.Signal] || binding.Port != "" || binding.Participant != "" || binding.ParticipantPort != "" {
+					t.Fatalf("%s has invalid signal binding %#v", row.ID, binding)
+				}
 				sharedBoundaryUses["signal:"+binding.Signal]++
 			case binding.Participant != "":
+				if binding.Port != "" || binding.Signal != "" || !participantPorts[binding.Participant][binding.ParticipantPort] {
+					t.Fatalf("%s has invalid participant binding %#v", row.ID, binding)
+				}
 				sharedBoundaryUses["participant:"+binding.Participant+":"+binding.ParticipantPort]++
+			case binding.Port != "":
+				if !portIDs[binding.Port] || binding.Signal != "" || binding.ParticipantPort != "" {
+					t.Fatalf("%s has invalid external binding %#v", row.ID, binding)
+				}
+			default:
+				t.Fatalf("%s has unresolved binding %#v", row.ID, binding)
 			}
 		}
 	}
