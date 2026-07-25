@@ -21,6 +21,23 @@ func TestBuildPlacementRetryAdjustmentIncreasesSpacing(t *testing.T) {
 	}
 }
 
+func TestBuildPlacementRetryAdjustmentIncreasesSpacingIncrementallyAcrossAttempts(t *testing.T) {
+	req := retryPlacementRequest()
+	hints := []PlacementRetryHint{{
+		Category:      PlacementRetryIncreaseSpacing,
+		RetryEligible: true,
+	}}
+	first, firstAdjustment := BuildPlacementRetryAdjustment(req, hints, 1)
+	second, secondAdjustment := BuildPlacementRetryAdjustment(first, hints, 2)
+
+	if firstAdjustment.SpacingDeltaMM != 1 || secondAdjustment.SpacingDeltaMM != 1 {
+		t.Fatalf("spacing adjustments = %.2f, %.2f; want one bounded increment per attempt", firstAdjustment.SpacingDeltaMM, secondAdjustment.SpacingDeltaMM)
+	}
+	if second.Rules.ComponentSpacingMM != req.Rules.ComponentSpacingMM+2 {
+		t.Fatalf("component spacing = %.2f, want %.2f", second.Rules.ComponentSpacingMM, req.Rules.ComponentSpacingMM+2)
+	}
+}
+
 func TestBuildPlacementRetryAdjustmentPreservesFixedGroupGeometry(t *testing.T) {
 	req := retryPlacementRequest()
 	req.Components[0].Fixed = true

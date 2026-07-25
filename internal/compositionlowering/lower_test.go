@@ -169,6 +169,29 @@ func TestLowerInterfacesJoinsPowerPortReturnAnchorToReferenceDomain(t *testing.T
 	}
 }
 
+func TestLowerInterfacesSelectsMatchingReferenceDomainForIsolatedPowerPorts(t *testing.T) {
+	requirement := architecturesearch.Requirement{Requirements: architecturesearch.Requirements{
+		Domains: []architecturesearch.Domain{
+			{ID: "host_5v", Kind: "supply"}, {ID: "host_ground", Kind: "reference"},
+			{ID: "remote_1v8", Kind: "supply"}, {ID: "remote_ground", Kind: "reference"},
+		},
+		Ports: []architecturesearch.Port{
+			{ID: "host_power", Kind: "power", Direction: "sink", Domain: "host_5v"},
+			{ID: "remote_power", Kind: "power", Direction: "sink", Domain: "remote_1v8"},
+		},
+	}}
+	union := newDisjointSet()
+	lowerInterfaces(requirement, union, map[string]circuitgraph.FunctionalEndpoint{}, map[string]nodeMetadata{})
+	for power, reference := range map[string]string{"host_power": "host_ground", "remote_power": "remote_ground"} {
+		if union.find(anchorNode("external:"+power, "return")) != union.find(anchorNode("domain:"+reference, "")) {
+			t.Fatalf("%s return is not joined to matching reference domain %s", power, reference)
+		}
+	}
+	if union.find(anchorNode("external:host_power", "return")) == union.find(anchorNode("external:remote_power", "return")) {
+		t.Fatal("isolated power-port returns were collapsed")
+	}
+}
+
 func TestLowerInterfacesSelectsDeterministicPrimaryBusLaneForSemanticBinding(t *testing.T) {
 	requirement := architecturesearch.Requirement{Requirements: architecturesearch.Requirements{
 		Domains: []architecturesearch.Domain{{ID: "gnd", Kind: "reference"}, {ID: "logic", Kind: "supply"}},

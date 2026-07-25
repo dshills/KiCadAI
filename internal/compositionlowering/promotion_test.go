@@ -256,6 +256,42 @@ func TestFrozenBehavioralIntentHeldOutReadyCorpusOptionalKiCadPromotion(t *testi
 	runFrozenPromotionAt(t, corpusRoot, count, "KICADAI_BEHAVIORAL_INTENT_ARTIFACT_DIR", cli, index)
 }
 
+func TestHierarchicalMultiDomainCorpusPassesOfflineWorkflow(t *testing.T) {
+	requireLongPromotionTest(t)
+	runFrozenPromotionAt(
+		t,
+		filepath.Join("..", "architecturesearch", "testdata", "hierarchical_multi_domain_corpus"),
+		6,
+		"KICADAI_HIERARCHICAL_MULTI_DOMAIN_ARTIFACT_DIR",
+		"",
+		libraryresolver.LibraryIndex{},
+	)
+}
+
+func TestHierarchicalMultiDomainCorpusOptionalKiCadPromotion(t *testing.T) {
+	requireLongPromotionTest(t)
+	cli := os.Getenv("KICADAI_KICAD_CLI")
+	if cli == "" {
+		t.Skip("set KICADAI_KICAD_CLI to run the KiCad-backed hierarchical multi-domain corpus")
+	}
+	roots, rootIssues := libraryresolver.ResolveRoots()
+	if roots.SymbolsRoot == "" || roots.FootprintsRoot == "" {
+		t.Skipf("installed KiCad libraries are required: %#v", rootIssues)
+	}
+	index, loadIssues := libraryresolver.Load(context.Background(), roots, libraryresolver.LoadOptions{})
+	if len(index.Symbols) == 0 || len(index.Footprints) == 0 {
+		t.Fatalf("installed library index is empty: %#v", loadIssues)
+	}
+	runFrozenPromotionAt(
+		t,
+		filepath.Join("..", "architecturesearch", "testdata", "hierarchical_multi_domain_corpus"),
+		6,
+		"KICADAI_HIERARCHICAL_MULTI_DOMAIN_ARTIFACT_DIR",
+		cli,
+		index,
+	)
+}
+
 func heldOutCapabilityFamilyCorpus(t *testing.T, family string) (string, int) {
 	t.Helper()
 	type manifestCase struct {
@@ -480,7 +516,7 @@ func runFrozenPromotionAt(t *testing.T, corpusRoot string, expectedCount int, ar
 			}
 			var request designworkflow.Request
 			var resolved circuitgraph.ResolvedDocument
-			if requirement.Version == architecturesearch.VersionV3 {
+			if requirement.Version == architecturesearch.VersionV3 || requirement.Version == architecturesearch.VersionV4 {
 				promotion, promotionIssues := SynthesizeClosedLoop(context.Background(), requirement, search, ArchitectureSimulationPlanResolver{
 					GraphResolver: resolver, ProvenanceRegistry: provenance,
 				}, modelRegistryHash, nil, closedloopsynthesis.DefaultPolicy())

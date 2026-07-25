@@ -287,16 +287,31 @@ func waveform(result AnalysisResult, assertion Assertion) ([]float64, []float64,
 	times := make([]float64, 0, len(result.Points))
 	values := make([]float64, 0, len(result.Points))
 	for _, point := range result.Points {
-		for _, node := range point.Nodes {
-			if node.Node == assertion.Node {
-				times = append(times, point.TimeS)
-				values = append(values, node.Real)
-				break
-			}
+		value, found := analysisNodeReal(point, assertion.Node)
+		if !found {
+			continue
 		}
+		if assertion.ReferenceNode != "" {
+			reference, referenceFound := analysisNodeReal(point, assertion.ReferenceNode)
+			if !referenceFound {
+				return nil, nil, advancedAssertionDiagnostic(assertion, "waveform-derived assertion reference node is absent from a solved point")
+			}
+			value -= reference
+		}
+		times = append(times, point.TimeS)
+		values = append(values, value)
 	}
 	if len(values) < 2 {
 		return nil, nil, advancedAssertionDiagnostic(assertion, "waveform-derived assertion requires at least two solved node samples")
 	}
 	return times, values, nil
+}
+
+func analysisNodeReal(point AnalysisPoint, node string) (float64, bool) {
+	for _, result := range point.Nodes {
+		if result.Node == node {
+			return result.Real, true
+		}
+	}
+	return 0, false
 }

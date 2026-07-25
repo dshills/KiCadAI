@@ -37,7 +37,12 @@ func BuildPlacementRetryAdjustment(request placement.Request, hints []PlacementR
 	movableRefs, blockedRefs := placementRetryMobilityRefs(adjusted.Components)
 	adjustment.EligibleRefs = len(movableRefs)
 	adjustment.BlockedRefs = len(blockedRefs)
-	spacingDelta := min(placementRetryMaxSpacingDeltaMM, float64(attempt)*placementRetryBaseSpacingDeltaMM)
+	// The request passed to a retry is already the result of the preceding
+	// adjustment. Apply one bounded increment per attempt; scaling this delta by
+	// the absolute attempt number compounds spacing as 1, then 2 (3 total), and
+	// can make an otherwise improving placement infeasible before the router
+	// receives the intended second increment.
+	spacingDelta := min(placementRetryMaxSpacingDeltaMM, placementRetryBaseSpacingDeltaMM)
 	orderedHints := slices.Clone(hints)
 	for index := range orderedHints {
 		orderedHints[index].Refs = sortedUniqueStrings(orderedHints[index].Refs)

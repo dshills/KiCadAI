@@ -108,6 +108,7 @@ func (resolver *Resolver) Synthesize(ctx context.Context, document Document) (Do
 		Policy: normalized.Policy, Extensions: cloneRawMessages(normalized.Extensions),
 	}
 	selectedByIntent := map[string]ResolvedComponent{}
+	usageByIntent := map[string]string{}
 	var issues []reports.Issue
 	for index, requirement := range intent.Functions {
 		query := cloneComponentQuery(requirement.Query)
@@ -131,6 +132,7 @@ func (resolver *Resolver) Synthesize(ctx context.Context, document Document) (Do
 		lowered.Components = append(lowered.Components, instance)
 		selected.Instance = instance
 		selectedByIntent[requirement.ID] = selected
+		usageByIntent[requirement.ID] = requirement.Usage
 		report.Selections = append(report.Selections, SynthesisSelection{
 			IntentID: requirement.ID, Kind: "primary", ComponentID: selected.ComponentID, VariantID: selected.VariantID,
 			Reason: "selected by the existing catalog acceptance, function, rating, value, package, and confidence rules",
@@ -235,6 +237,7 @@ func (resolver *Resolver) Synthesize(ctx context.Context, document Document) (Do
 		}
 	}
 	propagatePowerFlagsAcrossHighSideSwitches(&lowered, selectedByIntent)
+	propagatePowerFlagsAcrossSeriesPowerLimiters(&lowered, selectedByIntent, usageByIntent)
 
 	issues = append(issues, applySensorFunctionPolicies(&lowered, intent, selectedByIntent, connected)...)
 	issues = append(issues, resolver.expandCompanionRecipes(ctx, &lowered, intent, selectedByIntent, connected, &report)...)
@@ -602,6 +605,67 @@ func propagatePowerFlagsAcrossHighSideSwitches(document *Document, selected map[
 			document.PowerFlags = append(document.PowerFlags, PowerFlag{Net: drainNet})
 			flagged[drainNet] = true
 			queue = append(queue, drainNet)
+		}
+	}
+}
+
+// propagatePowerFlagsAcrossSeriesPowerLimiters carries an established external
+// power-drive declaration through a selected two-terminal current limiter.
+// KiCad correctly treats passive series elements as unable to drive a rail, but
+// the external source on the other side still drives the downstream power net.
+// Requiring exactly two power-role nets prevents propagation through shunts,
+// dividers, signal limiters, and multi-terminal protection networks.
+func propagatePowerFlagsAcrossSeriesPowerLimiters(document *Document, selected map[string]ResolvedComponent, usageByComponent map[string]string) {
+	flagged := make(map[string]bool, len(document.PowerFlags))
+	queue := make([]string, 0, len(document.PowerFlags))
+	for _, flag := range document.PowerFlags {
+		flagged[flag.Net] = true
+		queue = append(queue, flag.Net)
+	}
+
+	componentIDs := make([]string, 0, len(selected))
+	for componentID := range selected {
+		if strings.EqualFold(strings.TrimSpace(usageByComponent[componentID]), "current_limit") {
+			componentIDs = append(componentIDs, componentID)
+		}
+	}
+	slices.Sort(componentIDs)
+
+	adjacent := map[string][]string{}
+	for _, componentID := range componentIDs {
+		netNames := make([]string, 0, 2)
+		for _, net := range document.Nets {
+			if net.Role != NetRolePower && net.Role != NetRolePowerPos && net.Role != NetRolePowerNeg {
+				continue
+			}
+			if slices.ContainsFunc(net.Endpoints, func(endpoint Endpoint) bool {
+				return endpoint.Component == componentID && endpoint.SelectorKind == SelectorFunction
+			}) {
+				netNames = append(netNames, net.Name)
+			}
+		}
+		if len(netNames) != 2 || netNames[0] == netNames[1] {
+			continue
+		}
+		adjacent[netNames[0]] = append(adjacent[netNames[0]], netNames[1])
+		adjacent[netNames[1]] = append(adjacent[netNames[1]], netNames[0])
+	}
+	for netName := range adjacent {
+		slices.Sort(adjacent[netName])
+	}
+
+	for index := 0; index < len(queue); index++ {
+		for _, targetName := range adjacent[queue[index]] {
+			if flagged[targetName] {
+				continue
+			}
+			target := netByName(document.Nets, targetName)
+			if target == nil || netHasInternalPowerOutput(*target, selected) {
+				continue
+			}
+			document.PowerFlags = append(document.PowerFlags, PowerFlag{Net: targetName})
+			flagged[targetName] = true
+			queue = append(queue, targetName)
 		}
 	}
 }

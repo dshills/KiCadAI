@@ -1,15 +1,15 @@
 {
-  "record_count": 135,
+  "record_count": 136,
   "family_count": 28,
   "confidence_counts": {
     "blocked": 1,
     "library_derived": 0,
     "placeholder": 3,
     "rule_inferred": 6,
-    "verified": 125
+    "verified": 126
   },
   "alternative_coverage": {
-    "concrete_records": 104,
+    "concrete_records": 105,
     "generic_fallback_records": 31,
     "equivalence_groups": 23
   },
@@ -519,11 +519,11 @@
     {
       "family": "resistor",
       "defined": true,
-      "record_count": 24,
-      "concrete_records": 17,
+      "record_count": 25,
+      "concrete_records": 18,
       "generic_fallback_records": 7,
       "equivalence_groups": 4,
-      "verified_records": 22,
+      "verified_records": 23,
       "library_derived_records": 0,
       "rule_inferred_records": 2,
       "placeholder_records": 0,
@@ -541,6 +541,7 @@
         "resistor.generic.0805",
         "resistor.vishay.ac03.0r22.axial",
         "resistor.vishay.ac03.10r.axial",
+        "resistor.vishay.ac03.1r6.axial",
         "resistor.vishay.crcw080510k0fkea.0805",
         "resistor.vishay.crcw080547r0fkea.0805",
         "resistor.vishay.mca1206at.e192.0p1",

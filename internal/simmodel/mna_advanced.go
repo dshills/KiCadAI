@@ -12,8 +12,9 @@ const (
 	maxReportedMarginDB    = 300.0
 )
 
-// solveNoiseAnalysis computes uncorrelated resistor thermal noise and
-// catalog-backed op-amp input-voltage noise on the trusted logarithmic grid.
+// solveNoiseAnalysis computes uncorrelated thermal noise from reviewed
+// resistive elements and catalog-backed op-amp input-voltage noise on the
+// trusted logarithmic grid.
 // Independent sources are zeroed by validation, so they act only as their
 // ideal small-signal impedances. No provider-supplied equation or spectrum is
 // accepted by this evaluator.
@@ -55,6 +56,12 @@ func solveNoiseAnalysis(plan Plan, analysis Analysis) (AnalysisResult, []Diagnos
 				// Norton current-noise density sqrt(4 k T / R), A/sqrt(Hz).
 				density := math.Sqrt(4 * boltzmannConstantJPerK * noiseReferenceK / *device.ValueSI)
 				stampCurrentSource(&system, terminals["A"], terminals["B"], complex(density, 0))
+			case PrimitiveFuseClosedStateV1:
+				// A closed fuse is a physical cold resistance and contributes
+				// the same Johnson-Nyquist noise as any other passive resistance.
+				resistance := namedValueMap(device.ModelParameters)["cold_resistance_ohm"]
+				density := math.Sqrt(4 * boltzmannConstantJPerK * noiseReferenceK / resistance)
+				stampCurrentSource(&system, terminals["A"], terminals["B"], complex(density, 0))
 			case PrimitiveOpAmpV1:
 				parameters := namedValueMap(device.ModelParameters)
 				density := parameters["input_voltage_noise_density_v_sqrt_hz"]
@@ -89,7 +96,7 @@ func solveNoiseAnalysis(plan Plan, analysis Analysis) (AnalysisResult, []Diagnos
 			}
 		}
 		if noiseSources == 0 {
-			return result, []Diagnostic{{Path: "analyses." + analysis.ID, Message: "noise analysis resolved no trusted physical noise sources", Suggestion: "include a reviewed resistor or active-device noise model"}}
+			return result, []Diagnostic{{Path: "analyses." + analysis.ID, Message: "noise analysis resolved no trusted physical noise sources", Suggestion: "include a reviewed resistive element or active-device noise model"}}
 		}
 		nodes := make([]NodeResult, 0, len(plan.Nodes))
 		for _, node := range plan.Nodes {

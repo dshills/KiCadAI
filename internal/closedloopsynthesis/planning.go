@@ -64,14 +64,16 @@ type PlannedAssertion struct {
 	Critical      bool     `json:"critical"`
 }
 
-// BuildAnalysisPlan binds v3 semantic behavior to resolved trusted targets and
+// BuildAnalysisPlan binds v3/v4 semantic behavior to resolved trusted targets and
 // expands bounded named operating corners. It does not accept equations,
 // solver settings, or provider model content.
 func BuildAnalysisPlan(requirement architecturesearch.Requirement, bindings []SemanticBinding, modelDecisions []ModelDecision) (AnalysisPlan, []Diagnostic) {
 	plan := AnalysisPlan{Schema: AnalysisPlanSchema, Bindings: append([]SemanticBinding(nil), bindings...), ModelDecisions: cloneModelDecisions(modelDecisions)}
 	requirementHash, err := architecturesearch.CanonicalHash(requirement)
-	if err != nil || requirement.Schema != architecturesearch.SchemaIDV3 || requirement.Version != architecturesearch.VersionV3 {
-		message := "analysis planning requires a valid v3 behavioral requirement"
+	v3 := requirement.Schema == architecturesearch.SchemaIDV3 && requirement.Version == architecturesearch.VersionV3
+	v4 := requirement.Schema == architecturesearch.SchemaIDV4 && requirement.Version == architecturesearch.VersionV4
+	if err != nil || (!v3 && !v4) {
+		message := "analysis planning requires a valid v3 or v4 behavioral requirement"
 		if err != nil {
 			message = err.Error()
 		}

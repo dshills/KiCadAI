@@ -235,6 +235,10 @@ func electricalDeviceResultsWithComparatorStates(
 		case PrimitiveFuseClosedStateV1:
 			voltage = solvedNodeVoltage(system, solution, terminals["A"]) - solvedNodeVoltage(system, solution, terminals["B"])
 			current = voltage / complex(namedValueMap(device.ModelParameters)["cold_resistance_ohm"], 0)
+		case PrimitiveMCUStaticSupplyLoadV1, PrimitiveSensorStaticSupplyLoadV1:
+			voltage = solvedNodeVoltage(system, solution, terminals["POWER"]) - solvedNodeVoltage(system, solution, terminals["GROUND"])
+			value, _ := staticSupplyLoadCurrentAndGradient(real(voltage), namedValueMap(device.ModelParameters))
+			current = complex(value, 0)
 		case PrimitiveRelayClosedV1, PrimitiveRelayNormallyOpenV1:
 			voltage = solvedNodeVoltage(system, solution, terminals["CONTACT_IN"]) - solvedNodeVoltage(system, solution, terminals["CONTACT_OUT"])
 			current = voltage / complex(namedValueMap(device.ModelParameters)["contact_on_resistance_ohm"], 0)
@@ -328,6 +332,9 @@ func electricalDeviceResultsWithComparatorStates(
 			if cmplx.Abs(negativeCurrent) > cmplx.Abs(positiveCurrent) {
 				current = negativeCurrent
 			}
+		case PrimitiveSingleOutputIsolatedConverterV1:
+			voltage = solvedNodeVoltage(system, solution, terminals["VOUT_PLUS"]) - solvedNodeVoltage(system, solution, terminals["VOUT_MINUS"])
+			current = solution[system.branchIndex[device.Component]]
 		case PrimitiveBidirectionalOpenDrainTranslatorV1:
 			parameters := namedValueMap(device.ModelParameters)
 			compiled := compiledNonlinearDevice{primitive: device.PrimitiveModel, terminals: terminals, parameters: parameters}
@@ -340,6 +347,24 @@ func electricalDeviceResultsWithComparatorStates(
 					maximumVoltage = delta
 				}
 				maximumCurrent = math.Max(maximumCurrent, math.Abs((a-b)/resistance))
+			}
+			voltage, current = complex(maximumVoltage, 0), complex(maximumCurrent, 0)
+		case PrimitiveBidirectionalOpenDrainIsolatorV1:
+			parameters := namedValueMap(device.ModelParameters)
+			resolveIsolatedOpenDrainDrivers(plan, device, parameters)
+			compiled := compiledNonlinearDevice{primitive: device.PrimitiveModel, terminals: terminals, parameters: parameters}
+			maximumVoltage, maximumCurrent := 0.0, 0.0
+			for channel := range isolatedOpenDrainChannels {
+				for side := 1; side <= 2; side++ {
+					signal := real(solvedNodeVoltage(system, solution, terminals[isolatedOpenDrainChannels[channel][side-1]]))
+					ground := real(solvedNodeVoltage(system, solution, terminals[fmt.Sprintf("GND%d", side)]))
+					resistance := isolatedOpenDrainResistance(compiled, &system, solution, side, channel)
+					delta := signal - ground
+					if math.Abs(delta) > math.Abs(maximumVoltage) {
+						maximumVoltage = delta
+					}
+					maximumCurrent = math.Max(maximumCurrent, math.Abs(delta/resistance))
+				}
 			}
 			voltage, current = complex(maximumVoltage, 0), complex(maximumCurrent, 0)
 		case PrimitiveDiodeShockleyV1:
@@ -358,6 +383,10 @@ func electricalDeviceResultsWithComparatorStates(
 			voltage = solvedNodeVoltage(system, solution, terminals["DRAIN"]) - solvedNodeVoltage(system, solution, terminals["SOURCE"])
 			conductance := mosfetSwitchConductance(compiledNonlinearDevice{primitive: device.PrimitiveModel, terminals: terminals, parameters: namedValueMap(device.ModelParameters), polarity: mosfetPolarity(device.PrimitiveModel)}, &system, solution)
 			current = voltage * complex(conductance, 0)
+		case PrimitiveReverseBlockingLoadSwitchV1:
+			voltage = solvedNodeVoltage(system, solution, terminals["VIN"]) - solvedNodeVoltage(system, solution, terminals["VOUT"])
+			conductance := reverseBlockingLoadSwitchConductance(compiledNonlinearDevice{primitive: device.PrimitiveModel, terminals: terminals, parameters: namedValueMap(device.ModelParameters), polarity: 1}, &system, solution)
+			current = voltage * complex(conductance, 0)
 		case PrimitiveBJTNPNV1, PrimitiveBJTPNPV1:
 			polarity := 1.0
 			if device.PrimitiveModel == PrimitiveBJTPNPV1 {
@@ -374,7 +403,7 @@ func electricalDeviceResultsWithComparatorStates(
 		if include {
 			entry := DeviceResult{Component: device.Component, VoltageV: normalizedMNAFloat(real(voltage)), CurrentA: normalizedMNAFloat(real(current)), CurrentMagnitudeA: normalizedMNAFloat(cmplx.Abs(current))}
 			if analysis.Kind == AnalysisThermal {
-				if dissipation, dissipative := thermalDeviceDissipation(device, system, solution); dissipative {
+				if dissipation, dissipative := thermalDeviceDissipation(plan, device, system, solution); dissipative {
 					entry.DissipationW = normalizedMNAFloat(dissipation)
 				}
 			}
@@ -516,7 +545,7 @@ func buildMNASystemWithOpAmpClamps(plan Plan, analysis Analysis, frequency float
 	branchIndex := map[string]int{}
 	multiBranchIndex := map[mnaBranchKey]int{}
 	for _, device := range plan.Devices {
-		if device.PrimitiveModel == PrimitiveVoltageSourceV1 || device.PrimitiveModel == PrimitiveConnectorVoltageSourceV1 || device.PrimitiveModel == PrimitiveOpAmpV1 || device.PrimitiveModel == PrimitiveCurrentSenseAmplifierV1 || device.PrimitiveModel == PrimitiveAdjustableLinearRegulatorV1 || device.PrimitiveModel == PrimitiveFixedLinearRegulatorV1 || device.PrimitiveModel == PrimitiveFloatingAdjustableRegulatorV1 || device.PrimitiveModel == PrimitiveProgrammableCurrentSourceV1 || device.PrimitiveModel == PrimitiveShuntVoltageReferenceV1 {
+		if device.PrimitiveModel == PrimitiveVoltageSourceV1 || device.PrimitiveModel == PrimitiveConnectorVoltageSourceV1 || device.PrimitiveModel == PrimitiveOpAmpV1 || device.PrimitiveModel == PrimitiveCurrentSenseAmplifierV1 || device.PrimitiveModel == PrimitiveAdjustableLinearRegulatorV1 || device.PrimitiveModel == PrimitiveFixedLinearRegulatorV1 || device.PrimitiveModel == PrimitiveFloatingAdjustableRegulatorV1 || device.PrimitiveModel == PrimitiveProgrammableCurrentSourceV1 || device.PrimitiveModel == PrimitiveShuntVoltageReferenceV1 || device.PrimitiveModel == PrimitiveSingleOutputIsolatedConverterV1 {
 			branchIndex[device.Component] = len(labels)
 			labels = append(labels, "branch_current:"+device.Component)
 		}
@@ -582,10 +611,8 @@ func buildMNASystemWithOpAmpClamps(plan Plan, analysis Analysis, frequency float
 				stampCurrentSource(&system, terminals["VCC"], terminals["GND"], complex(parameters["supply_current_a"], 0))
 			}
 		case PrimitiveMCUStaticSupplyLoadV1, PrimitiveSensorStaticSupplyLoadV1:
-			if !smallSignalAnalysis(analysis.Kind) {
-				current := namedValueMap(device.ModelParameters)["maximum_supply_current_a"]
-				stampCurrentSource(&system, terminals["POWER"], terminals["GROUND"], complex(current, 0))
-			}
+			// Voltage-dependent static loads are stamped by the bounded
+			// nonlinear solver so unpowered rails do not become negative.
 		case PrimitiveOpAmpV1:
 			if value, clamped := opAmpClamps[device.Component]; clamped {
 				stampVoltageSource(&system, device.Component, terminals["OUT"], plan.GroundNode, complex(value, 0))
@@ -678,11 +705,25 @@ func buildMNASystemWithOpAmpClamps(plan Plan, analysis Analysis, frequency float
 			}
 			stampVoltageSourceBranch(&system, system.multiBranchIndex[mnaBranchKey{component: device.Component, terminal: "VOUT_PLUS"}], terminals["VOUT_PLUS"], terminals["COMMON"], complex(positive, 0))
 			stampVoltageSourceBranch(&system, system.multiBranchIndex[mnaBranchKey{component: device.Component, terminal: "VOUT_MINUS"}], terminals["VOUT_MINUS"], terminals["COMMON"], complex(negative, 0))
+		case PrimitiveSingleOutputIsolatedConverterV1:
+			output := namedValueMap(device.ModelParameters)["output_voltage_v"]
+			if smallSignalAnalysis(analysis.Kind) {
+				output = 0
+			}
+			stampVoltageSource(&system, device.Component, terminals["VOUT_PLUS"], terminals["VOUT_MINUS"], complex(output, 0))
 		case PrimitiveBidirectionalOpenDrainTranslatorV1:
+			// Channel state and supply-current envelopes are stamped by the
+			// bounded nonlinear solver.
+		case PrimitiveBidirectionalOpenDrainIsolatorV1:
 			parameters := namedValueMap(device.ModelParameters)
 			if !smallSignalAnalysis(analysis.Kind) {
-				stampCurrentSource(&system, terminals["VCCA"], terminals["GND"], complex(parameters["vcca_quiescent_current_a"], 0))
-				stampCurrentSource(&system, terminals["VCCB"], terminals["GND"], complex(parameters["vccb_quiescent_current_a"], 0))
+				stampCurrentSource(&system, terminals["VDD1"], terminals["GND1"], complex(parameters["side_a_quiescent_current_a"], 0))
+				stampCurrentSource(&system, terminals["VDD2"], terminals["GND2"], complex(parameters["side_b_quiescent_current_a"], 0))
+			}
+		case PrimitiveReverseBlockingLoadSwitchV1:
+			if !smallSignalAnalysis(analysis.Kind) {
+				parameters := namedValueMap(device.ModelParameters)
+				stampCurrentSource(&system, terminals["VIN"], terminals["GND"], complex(parameters["quiescent_current_a"], 0))
 			}
 		case PrimitiveDiodeShockleyV1, PrimitiveUnidirectionalZenerV1, PrimitiveBidirectionalTVSV1, PrimitiveNMOSSwitchV1, PrimitivePMOSSwitchV1, PrimitiveBJTNPNV1, PrimitiveBJTPNPV1:
 			// Nonlinear devices are stamped by the bounded DC Newton solver.
@@ -1368,7 +1409,15 @@ func assertionValue(results []AnalysisResult, assertion Assertion) (float64, *Di
 				}
 				switch assertion.Quantity {
 				case QuantityVoltageV:
-					return node.Real, nil
+					value := node.Real
+					if assertion.ReferenceNode != "" {
+						reference, found := analysisNodeReal(point, assertion.ReferenceNode)
+						if !found {
+							return 0, &Diagnostic{Path: "assertions." + assertion.AnalysisID + "." + assertion.Node, Message: "voltage assertion reference node is absent from the solved point"}
+						}
+						value -= reference
+					}
+					return normalizedMNAFloat(value), nil
 				case QuantityVoltageMagnitudeV:
 					return node.Magnitude, nil
 				case QuantityVoltagePhaseDeg:
@@ -1386,19 +1435,14 @@ func assertionValue(results []AnalysisResult, assertion Assertion) (float64, *Di
 }
 
 func transientEdgeTime(result AnalysisResult, assertion Assertion) (float64, *Diagnostic) {
-	times := make([]float64, 0, len(result.Points))
-	values := make([]float64, 0, len(result.Points))
+	times, values, waveformDiagnostic := waveform(result, assertion)
+	if waveformDiagnostic != nil {
+		return 0, waveformDiagnostic
+	}
 	minimum, maximum := math.Inf(1), math.Inf(-1)
-	for _, point := range result.Points {
-		for _, node := range point.Nodes {
-			if node.Node == assertion.Node {
-				times = append(times, point.TimeS)
-				values = append(values, node.Real)
-				minimum = math.Min(minimum, node.Real)
-				maximum = math.Max(maximum, node.Real)
-				break
-			}
-		}
+	for _, value := range values {
+		minimum = math.Min(minimum, value)
+		maximum = math.Max(maximum, value)
 	}
 	if len(values) < 2 || !finite(minimum) || !finite(maximum) || maximum-minimum <= 1e-12 {
 		return 0, &Diagnostic{Path: "assertions." + assertion.AnalysisID + "." + assertion.Node, Message: "trusted edge-time assertion requires a nonconstant solved waveform"}

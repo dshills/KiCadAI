@@ -1,0 +1,72 @@
+{
+  "schema_version": "kicadai.external-review-matrix.v1",
+  "scenarios": [
+    {
+      "id": "current_limited_switched_load_system",
+      "review_equivalent": "behavior-only high-current switched-load controller with current limiting, sensing, protection, and deterministic safety-state control",
+      "lane": "requirement",
+      "fixture": "internal/architecturesearch/testdata/hierarchical_multi_domain_corpus/current_limited_switched_load_system.json",
+      "board": {"mode": "synthesized", "layers": 2},
+      "expected_status": "pass",
+      "required_artifacts": ["design-request.json", "transaction.json", "workflow-result.json", "validation-summary.json", "design-promotion.json", "manifest.json", "normalized-requirement.json", "architecture-search.json", "closed-loop-synthesis.json", "simulation.json"],
+      "internal_gates": ["architecture_search", "component_evidence", "simulation", "routing", "connectivity", "route_completion", "writer_correctness", "round_trip", "deterministic_repeat"],
+      "optional_kicad_gates": ["erc", "strict_drc", "writer_correctness", "round_trip"]
+    },
+    {
+      "id": "isolated_mixed_voltage_gateway_system",
+      "review_equivalent": "behavior-only isolated communications gateway spanning independently referenced mixed-voltage domains",
+      "lane": "requirement",
+      "fixture": "internal/architecturesearch/testdata/hierarchical_multi_domain_corpus/isolated_mixed_voltage_gateway_system.json",
+      "board": {"mode": "synthesized", "layers": 2},
+      "expected_status": "pass",
+      "required_artifacts": ["design-request.json", "transaction.json", "workflow-result.json", "validation-summary.json", "design-promotion.json", "manifest.json", "normalized-requirement.json", "architecture-search.json", "closed-loop-synthesis.json", "simulation.json"],
+      "internal_gates": ["architecture_search", "component_evidence", "simulation", "routing", "connectivity", "route_completion", "writer_correctness", "round_trip", "deterministic_repeat"],
+      "optional_kicad_gates": ["erc", "strict_drc", "writer_correctness", "round_trip"]
+    },
+    {
+      "id": "precision_acquisition_alarm_system",
+      "review_equivalent": "behavior-only precision acquisition, filtering, threshold decision, and alarm indication chain",
+      "lane": "requirement",
+      "fixture": "internal/architecturesearch/testdata/hierarchical_multi_domain_corpus/precision_acquisition_alarm_system.json",
+      "board": {"mode": "synthesized", "layers": 2},
+      "expected_status": "pass",
+      "required_artifacts": ["design-request.json", "transaction.json", "workflow-result.json", "validation-summary.json", "design-promotion.json", "manifest.json", "normalized-requirement.json", "architecture-search.json", "closed-loop-synthesis.json", "simulation.json"],
+      "internal_gates": ["architecture_search", "component_evidence", "simulation", "routing", "connectivity", "route_completion", "writer_correctness", "round_trip", "deterministic_repeat"],
+      "optional_kicad_gates": ["erc", "strict_drc", "writer_correctness", "round_trip"]
+    },
+    {
+      "id": "protected_class_ab_system",
+      "review_equivalent": "behavior-only managed Class-AB amplifier with mute, bias control, load protection, and thermal constraints",
+      "lane": "requirement",
+      "fixture": "internal/architecturesearch/testdata/hierarchical_multi_domain_corpus/protected_class_ab_system.json",
+      "board": {"mode": "synthesized", "layers": 2},
+      "expected_status": "pass",
+      "required_artifacts": ["design-request.json", "transaction.json", "workflow-result.json", "validation-summary.json", "design-promotion.json", "manifest.json", "normalized-requirement.json", "architecture-search.json", "closed-loop-synthesis.json", "simulation.json"],
+      "internal_gates": ["architecture_search", "component_evidence", "simulation", "routing", "connectivity", "route_completion", "writer_correctness", "round_trip", "deterministic_repeat"],
+      "optional_kicad_gates": ["erc", "strict_drc", "writer_correctness", "round_trip"]
+    },
+    {
+      "id": "regulated_sensor_mcu_communications_system",
+      "review_equivalent": "behavior-only regulated sensor, MCU, clock, reset, translation, and communications subsystem",
+      "lane": "requirement",
+      "fixture": "internal/architecturesearch/testdata/hierarchical_multi_domain_corpus/regulated_sensor_mcu_communications_system.json",
+      "board": {"mode": "synthesized", "layers": 2},
+      "expected_status": "pass",
+      "required_artifacts": ["design-request.json", "transaction.json", "workflow-result.json", "validation-summary.json", "design-promotion.json", "manifest.json", "normalized-requirement.json", "architecture-search.json", "closed-loop-synthesis.json", "simulation.json"],
+      "internal_gates": ["architecture_search", "component_evidence", "simulation", "routing", "connectivity", "route_completion", "writer_correctness", "round_trip", "deterministic_repeat"],
+      "optional_kicad_gates": ["erc", "strict_drc", "writer_correctness", "round_trip"]
+    },
+    {
+      "id": "split_supply_precision_monitor_system",
+      "review_equivalent": "behavior-only split-supply precision analog monitor with isolation, thresholding, and protected indication",
+      "lane": "requirement",
+      "fixture": "internal/architecturesearch/testdata/hierarchical_multi_domain_corpus/split_supply_precision_monitor_system.json",
+      "board": {"mode": "synthesized", "layers": 2},
+      "expected_status": "pass",
+      "required_artifacts": ["design-request.json", "transaction.json", "workflow-result.json", "validation-summary.json", "design-promotion.json", "manifest.json", "normalized-requirement.json", "architecture-search.json", "closed-loop-synthesis.json", "simulation.json"],
+      "internal_gates": ["architecture_search", "component_evidence", "simulation", "routing", "connectivity", "route_completion", "writer_correctness", "round_trip", "deterministic_repeat"],
+      "optional_kicad_gates": ["erc", "strict_drc", "writer_correctness", "round_trip"]
+    }
+  ],
+  "negative_cases": []
+}

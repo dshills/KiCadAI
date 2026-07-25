@@ -70,8 +70,9 @@ func (validator *requirementValidator) header() {
 	v1 := validator.requirement.Schema == SchemaID && validator.requirement.Version == Version
 	v2 := validator.requirement.Schema == SchemaIDV2 && validator.requirement.Version == VersionV2
 	v3 := validator.requirement.Schema == SchemaIDV3 && validator.requirement.Version == VersionV3
-	if !v1 && !v2 && !v3 {
-		validator.add(CodeSchemaInvalid, "schema", fmt.Sprintf("schema/version must be %q/%d, %q/%d, or %q/%d", SchemaID, Version, SchemaIDV2, VersionV2, SchemaIDV3, VersionV3))
+	v4 := validator.requirement.Schema == SchemaIDV4 && validator.requirement.Version == VersionV4
+	if !v1 && !v2 && !v3 && !v4 {
+		validator.add(CodeSchemaInvalid, "schema", fmt.Sprintf("schema/version must be %q/%d, %q/%d, %q/%d, or %q/%d", SchemaID, Version, SchemaIDV2, VersionV2, SchemaIDV3, VersionV3, SchemaIDV4, VersionV4))
 	}
 	project := validator.requirement.Project
 	if !validSemanticID(project.Name) {
@@ -344,9 +345,9 @@ func (validator *requirementValidator) objectives() {
 
 func (validator *requirementValidator) operatingCases() {
 	cases := validator.requirement.Requirements.OperatingCases
-	if validator.requirement.Version != VersionV3 {
+	if !supportsBehavioralVerification(validator.requirement.Version) {
 		if len(cases) != 0 || len(validator.requirement.Requirements.BehavioralRequirements) != 0 {
-			validator.add(CodeSchemaInvalid, "requirements", "operating_cases and behavioral_requirements require the v3 schema")
+			validator.add(CodeSchemaInvalid, "requirements", "operating_cases and behavioral_requirements require the v3 or v4 schema")
 		}
 		return
 	}
@@ -416,7 +417,7 @@ func (validator *requirementValidator) operatingCondition(path string, condition
 
 func (validator *requirementValidator) behavioralRequirements() {
 	behaviors := validator.requirement.Requirements.BehavioralRequirements
-	if validator.requirement.Version != VersionV3 {
+	if !supportsBehavioralVerification(validator.requirement.Version) {
 		return
 	}
 	if len(behaviors) == 0 {
@@ -560,7 +561,7 @@ func (validator *requirementValidator) acceptance() {
 			}{"require_fail_closed", acceptance.RequireFailClosed},
 		)
 	}
-	if validator.requirement.Version == VersionV3 {
+	if supportsBehavioralVerification(validator.requirement.Version) {
 		required = append(required,
 			struct {
 				path  string
@@ -578,6 +579,34 @@ func (validator *requirementValidator) acceptance() {
 				path  string
 				value bool
 			}{"require_closed_loop_evidence", acceptance.RequireClosedLoopEvidence},
+		)
+	}
+	if validator.requirement.Version == VersionV4 {
+		required = append(required,
+			struct {
+				path  string
+				value bool
+			}{"require_hierarchical_decomposition", acceptance.RequireHierarchicalDecomposition},
+			struct {
+				path  string
+				value bool
+			}{"require_interface_contracts", acceptance.RequireInterfaceContracts},
+			struct {
+				path  string
+				value bool
+			}{"require_shared_resource_planning", acceptance.RequireSharedResourcePlanning},
+			struct {
+				path  string
+				value bool
+			}{"require_deterministic_backtracking", acceptance.RequireDeterministicBacktracking},
+			struct {
+				path  string
+				value bool
+			}{"require_physical_partitioning", acceptance.RequirePhysicalPartitioning},
+			struct {
+				path  string
+				value bool
+			}{"require_end_to_end_traceability", acceptance.RequireEndToEndTraceability},
 		)
 	}
 	for _, gate := range required {
@@ -751,7 +780,11 @@ func allowedUnit(value string) bool {
 }
 
 func supportsTypedSignals(version int) bool {
-	return version == VersionV2 || version == VersionV3
+	return version == VersionV2 || version == VersionV3 || version == VersionV4
+}
+
+func supportsBehavioralVerification(version int) bool {
+	return version == VersionV3 || version == VersionV4
 }
 
 func validConstraintScalar(value any) bool {

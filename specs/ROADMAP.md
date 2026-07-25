@@ -1,6 +1,6 @@
 # KiCadAI Roadmap
 
-Date: 2026-07-23
+Date: 2026-07-25
 
 This roadmap replaces the older roadmap and gap analysis now archived as
 `specs/OLD_ROADMAP.md` and `specs/OLD_ROADMAP_GAP.md`.
@@ -1165,25 +1165,24 @@ reaches the same KiCad-backed pass gates.
 The five-requirement open-set milestone, the 10-circuit adversarial
 multi-function milestone, simulation-grounded v3 synthesis, the
 uncertainty-aware behavioral intent compiler, and the first held-out capability
-expansion are complete. The frozen twelve-case benchmark improved from 5/12 to
-11/12 complete installed-KiCad passes by promoting constant-current regulation
-and precision rectification without regressing any control. Further fixtures
-should target genuinely new uncertainty rather than repeat the same provider
-envelope.
+expansion are complete. Generic standalone clock generation subsequently closed
+the frozen benchmark at 12/12. The V4 hierarchical multi-domain milestone now
+derives hierarchy, boundary contracts, shared-resource plans, complete-candidate
+backtracking, physical partitions, and end-to-end traceability; all six frozen
+systems pass offline and installed-KiCad two-run promotion.
 
-1. Add generic standalone clock-generation support, including deterministic
-   architecture/component evidence, startup and frequency proof, and
-   clock-aware placement/routing. Close the remaining `clock_generation`
-   benchmark gap with at least two electrically distinct clock-source families.
-2. Add dynamic electrothermal and control-loop evidence where static global
+1. Add dynamic electrothermal and control-loop evidence where static global
    bounds cannot prove startup, SOA, stability, or transient protection.
-3. Broaden clock/fanout and programming-load evidence beyond the completed
+2. Broaden clock/fanout and programming-load evidence beyond the completed
    power/interface corpus while retaining stable unsupported outcomes.
-4. Generalize bounded placement-routing correction from observed
+3. Generalize bounded placement-routing correction from observed
    failures without introducing fixture-identity logic.
-5. Expand catalog-independent part qualification, calculated rating, and
+4. Expand catalog-independent part qualification, calculated rating, and
    fabrication evidence before claiming broader
    autonomous or fabrication-ready coverage.
+5. Add active learning/evaluation over novel behavior-only requests so new
+   capability gaps are ranked by reusable family impact rather than fixture
+   identity.
 
 ## Definition Of Autonomous Ready
 

@@ -729,8 +729,9 @@ A frozen twelve-case benchmark now measures behavior-only requirements across
 analog, power, digital, MCU, sensor, and mixed-signal domains. Its requests
 contain no topology, component, net, pin, coordinate, route, provider, or
 expected-result instructions. The untouched installed-KiCad baseline passed
-5/12 cases; the final report passes 11/12 with the same evaluator and unchanged
-gate profile.
+5/12 cases; constant-current and precision-rectification support advanced the
+original report to 11/12, and generic standalone clock generation subsequently
+closes the unchanged benchmark at 12/12.
 
 Reusable constant-current regulation passes as a bounded power output,
 MCU-controlled peripheral, and sensor excitation. Precision rectification
@@ -738,30 +739,38 @@ passes alone and as the front end of a mixed-signal acquisition chain. Every
 control case passes. Each pass requires trusted all-corner simulation,
 deterministic architecture and component evidence, complete
 routing/connectivity, writer correctness, clean ERC, strict DRC, zero
-normalized round-trip differences, and byte-identical replay. Standalone clock
-generation is the sole remaining benchmark blocker and fails closed at
-architecture selection as capability `clock_generation`.
+normalized round-trip differences, and byte-identical replay.
 
 The [specification](../specs/held-out-capability-expansion/SPEC.md),
 [baseline](../specs/held-out-capability-expansion/BASELINE_REPORT.json), and
-[final report](../specs/held-out-capability-expansion/FINAL_REPORT.json) define
-the measured envelope. Run `make held-out-promotion-bundle` from an unmodified
-checkout to reproduce the five newly promoted cases. This demonstrates
-reusable progress across two electrically distinct families, not arbitrary
-circuit generation.
+[11/12 expansion report](../specs/held-out-capability-expansion/FINAL_REPORT.json)
+define the first measured expansion; the
+[clock audit](../specs/standalone-clock-generation/AUDIT.md) records 12/12
+closure. Run `make held-out-promotion-bundle` and the standalone-clock
+promotion matrix from an unmodified checkout to reproduce those cases.
+
+V4 adds generic hierarchical multi-domain synthesis above that flat
+composition lane. It derives canonical system/subsystem/block ownership,
+typed interface contracts, shared-resource budgets, deterministic global
+backtracking, block and end-to-end verification coverage, physical partitions,
+and requirement-to-KiCad traceability. Six frozen systems spanning protected
+Class-AB, precision analog, regulated MCU/sensor, isolation, high-current
+switching, and split supplies pass the offline and installed-KiCad two-run
+gates. Run `make hierarchical-promotion-bundle` from an unmodified checkout to
+reproduce the matrix.
 
 The generic contract removes the architectural requirement for one provider
 schema per topology and its function form removes the requirement for the AI to
 enumerate pins, support components, or physical implementation details. It does
-not make every circuit routable or electrically proven. V1 is limited to
-catalog-resolvable parts, functions, and reviewed companion/unused-pin policy;
-flat synthesized topology; bounded physical constraints; deterministic
-placement; and the current explicit-circuit router. Six promoted explicit
-topology classes and eight held-out function-level circuits now pass. This is
-meaningful breadth evidence, not proof of arbitrary electronics. Dense boards,
-arbitrary hierarchy, high-speed and RF constraints, comprehensive analog
-performance, thermal/safe-operating-area analysis, safety isolation, and
-fabrication release still require additional evidence.
+not make every circuit routable or electrically proven. The current envelope
+is limited to catalog-backed registered capabilities, bounded physical
+constraints, deterministic placement, and the explicit-circuit router. Six
+promoted explicit topology classes, eight held-out function-level circuits,
+and six hierarchical systems now pass. This is meaningful breadth evidence,
+not proof of arbitrary electronics. Dense boards, unregistered circuit
+behavior, high-speed and RF constraints, comprehensive analog performance,
+high-energy thermal/safe-operating-area analysis, and fabrication release
+still require additional evidence.
 
 Automatic bounded dispatch remains available for the two promoted references.
 Explicit generic mode must be selected with `--ai-profile generic-circuit-v1`.

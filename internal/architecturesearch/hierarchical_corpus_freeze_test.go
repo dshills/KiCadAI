@@ -192,7 +192,7 @@ func TestFrozenHierarchicalMultiDomainCorpusPrecedesProductionV4(t *testing.T) {
 	}
 }
 
-func TestFrozenHierarchicalMultiDomainCorpusRecordsUnsupportedV4Baseline(t *testing.T) {
+func TestFrozenHierarchicalMultiDomainCorpusDecodesWithProductionV4(t *testing.T) {
 	root := frozenHierarchicalCorpusRoot()
 	manifestData, err := os.ReadFile(filepath.Join(root, "manifest.json"))
 	if err != nil {
@@ -208,9 +208,12 @@ func TestFrozenHierarchicalMultiDomainCorpusRecordsUnsupportedV4Baseline(t *test
 				t.Fatal(openErr)
 			}
 			defer file.Close()
-			_, issues := DecodeStrict(file)
-			if len(issues) != 1 || issues[0].Code != CodeSchemaInvalid {
-				t.Fatalf("production V4 baseline issues = %#v, want one %s", issues, CodeSchemaInvalid)
+			requirement, issues := DecodeStrict(file)
+			if len(issues) != 0 {
+				t.Fatalf("production V4 decode issues = %#v", issues)
+			}
+			if requirement.Schema != SchemaIDV4 || requirement.Version != VersionV4 || requirement.Project.Name != row.ID {
+				t.Fatalf("decoded identity = %#v", requirement)
 			}
 		})
 	}

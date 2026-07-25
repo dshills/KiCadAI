@@ -210,26 +210,42 @@ Neither prompts nor normalized requirements prescribe topology, components,
 nets, pins, coordinates, layers, routes, providers, or expected evidence.
 
 The frozen baseline passed 5 of 12 complete installed-KiCad workflows. The
-final report passes 11 of 12 with the original evaluator and unchanged gate
-profile. Reusable support now covers three distinct constant-current contexts
-and two precision-rectification contexts. All control rows remain passing.
-Every promoted row reaches trusted simulation, physical realization,
+original expansion report advanced to 11 of 12 with the unchanged evaluator
+and gate profile by covering three constant-current contexts and two
+precision-rectification contexts. Generic fixed packaged and
+resistor-programmed clock generation subsequently closes the unchanged
+benchmark at 12 of 12. Every row reaches trusted simulation, physical realization,
 connectivity and route completion, writer correctness, clean ERC, strict DRC,
 zero-difference round trip, and deterministic replay.
 
-Standalone `clock_generation` is the sole remaining benchmark gap and remains
-fail-closed at architecture selection. This result materially broadens the
-measured envelope, but twelve cases cannot establish arbitrary circuit
-generation, unrestricted part qualification, dense-board routing,
-RF/high-speed behavior, mains safety, or fabrication release.
+This result materially broadens the measured envelope, but twelve cases cannot
+establish arbitrary circuit generation, unrestricted part qualification,
+dense-board routing, RF/high-speed behavior, mains safety, or fabrication
+release.
 
 Authoritative evidence:
 
 - [benchmark specification](../specs/held-out-capability-expansion/SPEC.md);
 - [5/12 frozen baseline](../specs/held-out-capability-expansion/BASELINE_REPORT.json);
-- [11/12 final report](../specs/held-out-capability-expansion/FINAL_REPORT.json);
+- [11/12 expansion report](../specs/held-out-capability-expansion/FINAL_REPORT.json);
+- [12/12 clock closeout audit](../specs/standalone-clock-generation/AUDIT.md);
   and
 - [five-scenario promotion matrix](../specs/held-out-capability-expansion/PROMOTION_MATRIX.json).
+
+## Hierarchical Multi-Domain Synthesis
+
+The V4 lane now derives system/subsystem/block hierarchy, independently
+checkable boundary contracts, shared-resource accounting, global candidate
+backtracking, physical partitions, and end-to-end traceability for a frozen
+six-system corpus. The systems span protected Class-AB, precision analog,
+regulated MCU/sensor, isolation, high-current switching, and split-supply
+monitoring. Each passes two-run offline and installed-KiCad promotion.
+
+This is the strongest current evidence toward AI-directed whole-system design,
+but it remains limited to registered capabilities and verified catalog/model
+evidence. See the
+[hierarchical specification](../specs/hierarchical-multi-domain-synthesis/SPEC.md)
+and [promotion matrix](../specs/hierarchical-multi-domain-synthesis/PROMOTION_MATRIX.json).
 
 ## Reproducible Promotion Evidence
 
@@ -240,6 +256,10 @@ runs twice, and a passing bundle proves the declared ERC, strict DRC,
 connectivity, route, writer, round-trip, and deterministic-comparison gates.
 The content-addressed bundle can be verified later without KiCad or network
 access.
+
+Run `make hierarchical-promotion-bundle` to reproduce the six-system
+hierarchical matrix through the same locked toolchain, two-run comparison, and
+standalone verifier.
 
 This strengthens provenance and reproducibility for records already inside the
 verified capability envelope. It does not promote an unverified matrix record,

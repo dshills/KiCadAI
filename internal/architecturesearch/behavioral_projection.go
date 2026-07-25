@@ -16,12 +16,12 @@ func effectiveObjectiveConstraints(requirement Requirement, objective Objective)
 	var sequenceConstraints []Constraint
 	for _, constraint := range requirement.Requirements.SystemConstraints {
 		switch constraint.Name {
-		case "rail_sequence_before", "rail_sequence_delay", "startup_monotonic", "startup_inrush_current":
+		case "rail_sequence_before", "rail_sequence_delay", "startup_monotonic", "startup_inrush_current", "reference_separation":
 			sequenceConstraints = append(sequenceConstraints, constraint)
 		}
 	}
 	constraints = mergeProjectedConstraints(constraints, sequenceConstraints)
-	if requirement.Version != VersionV3 {
+	if !supportsBehavioralVerification(requirement.Version) {
 		return constraints
 	}
 
@@ -39,14 +39,19 @@ func effectiveObjectiveConstraints(requirement Requirement, objective Objective)
 		// path, size the detector's local reference in its own input domain. The
 		// public assertion remains unchanged and is still measured by sweeping
 		// the external semantic input.
-		if behavior.Metric == "threshold_voltage" && objectiveProducesObservation(requirement, objective, behavior.Observation) {
+		if behavior.Metric == "threshold_voltage" &&
+			(objectiveProducesObservation(requirement, objective, behavior.Observation) || objective.Capability == "threshold_detection") {
 			if threshold, ok := projectedBehaviorTarget(behavior); ok {
 				if gain, ok := nearestUpstreamVoltageGain(requirement, objective); ok {
 					derived = append(derived, targetConstraint("threshold_voltage", threshold.value*gain.value, behavior.Unit, combinedTolerance(threshold.tolerance, gain.tolerance)))
 				}
 			}
 		}
-		derived = append(derived, constraintsFromBehavior(behavior)...)
+		behaviorConstraints := constraintsFromBehavior(behavior)
+		derived = append(derived, behaviorConstraints...)
+		for _, role := range objectiveRolesForObservation(requirement, objective, behavior.Observation) {
+			derived = append(derived, roleScopedConstraints(role, behaviorConstraints)...)
+		}
 		derived = append(derived, requiredConstraint("analysis_"+derivedSemanticIdentifier(behavior.Analysis)))
 		if behavior.Critical && behavior.Analysis == "startup" {
 			derived = append(derived, requiredConstraint("fail_safe_interlock"))
@@ -60,7 +65,13 @@ func effectiveObjectiveConstraints(requirement Requirement, objective Objective)
 	for _, operatingCase := range requirement.Requirements.OperatingCases {
 		for _, condition := range operatingCase.Conditions {
 			observation := observationForOperatingTarget(requirement, condition.Target)
-			if observation.Kind != "circuit" {
+			roles := objectiveRolesForObservation(requirement, objective, observation)
+			if condition.Axis == "supply_voltage" {
+				roles = objectiveRolesForSupplyTarget(requirement, objective, condition.Target)
+				if len(roles) == 0 {
+					continue
+				}
+			} else if observation.Kind != "circuit" {
 				key := observation.Kind + "\x00" + observation.ID
 				cone, exists := conditionCones[key]
 				if !exists {
@@ -71,7 +82,11 @@ func effectiveObjectiveConstraints(requirement Requirement, objective Objective)
 					continue
 				}
 			}
-			derived = append(derived, constraintsFromOperatingCondition(condition)...)
+			conditionConstraints := constraintsFromOperatingCondition(condition)
+			derived = append(derived, conditionConstraints...)
+			for _, role := range roles {
+				derived = append(derived, roleScopedConstraints(role, conditionConstraints)...)
+			}
 		}
 	}
 
@@ -84,6 +99,31 @@ func effectiveObjectiveConstraints(requirement Requirement, objective Objective)
 	}
 
 	return mergeProjectedConstraints(constraints, derived)
+}
+
+func objectiveRolesForSupplyTarget(requirement Requirement, objective Objective, target string) []string {
+	var roles []string
+	for _, binding := range objective.Bindings {
+		matches := binding.Port == target || binding.Signal == target
+		if !matches && binding.Port != "" {
+			if port, ok := requirementPort(requirement, binding.Port); ok {
+				matches = port.Domain == target
+			}
+		}
+		if !matches && binding.Signal != "" {
+			for _, signal := range requirement.Requirements.Signals {
+				if signal.ID == binding.Signal && signal.Domain == target {
+					matches = true
+					break
+				}
+			}
+		}
+		if matches && binding.Role != "" {
+			roles = append(roles, binding.Role)
+		}
+	}
+	slices.Sort(roles)
+	return slices.Compact(roles)
 }
 
 type projectedTarget struct {
@@ -110,6 +150,38 @@ func objectiveProducesObservation(requirement Requirement, objective Objective, 
 		}
 	}
 	return false
+}
+
+func objectiveRolesForObservation(requirement Requirement, objective Objective, observation Observation) []string {
+	endpoints := observationEndpoints(requirement, observation)
+	var roles []string
+	for _, binding := range objective.Bindings {
+		endpoint := ""
+		switch {
+		case binding.Port != "":
+			endpoint = "port:" + binding.Port
+		case binding.Signal != "":
+			endpoint = "signal:" + binding.Signal
+		default:
+			continue
+		}
+		if binding.Role != "" && slices.Contains(endpoints, endpoint) {
+			roles = append(roles, binding.Role)
+		}
+	}
+	slices.Sort(roles)
+	return slices.Compact(roles)
+}
+
+func roleScopedConstraints(role string, constraints []Constraint) []Constraint {
+	if role == "" {
+		return nil
+	}
+	result := make([]Constraint, 0, len(constraints))
+	for _, constraint := range constraints {
+		result = append(result, renamedConstraint(constraint, role+"_"+constraint.Name))
+	}
+	return result
 }
 
 // nearestUpstreamVoltageGain finds the closest declared cumulative gain on a
@@ -250,6 +322,12 @@ func constraintsFromOperatingCondition(condition OperatingCondition) []Constrain
 		}
 	case "load_capacitance":
 		constraint, ok := boundedConstraint("load_capacitance", condition.Min, condition.Max, condition.Unit)
+		if !ok {
+			return nil
+		}
+		return []Constraint{constraint}
+	case "supply_voltage":
+		constraint, ok := boundedConstraint("supply_voltage", condition.Min, condition.Max, condition.Unit)
 		if !ok {
 			return nil
 		}

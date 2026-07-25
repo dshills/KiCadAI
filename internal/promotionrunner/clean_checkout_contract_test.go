@@ -16,9 +16,10 @@ func TestCleanCheckoutPromotionCommandContract(t *testing.T) {
 	root := repositoryRootForContractTest(t)
 	makefile := readContractFile(t, filepath.Join(root, "Makefile"))
 	for _, required := range []string{
-		"promotion-bundle:", "held-out-promotion-bundle:", "./scripts/clean-checkout-promotion.sh",
+		"promotion-bundle:", "held-out-promotion-bundle:", "hierarchical-promotion-bundle:", "./scripts/clean-checkout-promotion.sh",
 		`PROMOTION_ROOT="$(PROMOTION_ROOT)"`, `PROMOTION_CACHE_DIR="$(PROMOTION_CACHE_DIR)"`,
 		`PROMOTION_MATRIX="$(HELD_OUT_PROMOTION_MATRIX)"`,
+		`PROMOTION_MATRIX="$(HIERARCHICAL_PROMOTION_MATRIX)"`,
 	} {
 		if !strings.Contains(makefile, required) {
 			t.Errorf("Makefile is missing %q", required)
@@ -87,11 +88,13 @@ func TestPromotionWorkflowContractAndPinnedActions(t *testing.T) {
 		"workflow_dispatch:",
 		"runs-on: macos-15",
 		"timeout-minutes: 60",
-		"run: make promotion-bundle",
+		"target: promotion-bundle",
+		"target: hierarchical-promotion-bundle",
+		"run: make '${{ matrix.target }}'",
 		"kicadai-promotion' verify --bundle \"$bundle_path\"",
 		"actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02",
-		"name: kicadai-promotion-${{ github.sha }}",
-		"path: ${{ runner.temp }}/kicadai-promotion/bundles/sha256-*",
+		"name: ${{ matrix.artifact }}-${{ github.sha }}",
+		"path: ${{ runner.temp }}/${{ matrix.root }}/bundles/sha256-*",
 		"if-no-files-found: error",
 		"include-hidden-files: true",
 	} {
@@ -113,6 +116,9 @@ func TestPromotionWorkflowContractAndPinnedActions(t *testing.T) {
 		"shard: 1/3",
 		"shard: 2/3",
 		"go_timeout: 55m",
+		"test: TestHierarchicalMultiDomainCorpusPassesOfflineWorkflow",
+		"shard: 5/6",
+		"go_timeout: 30m",
 		"GO_TEST_TIMEOUT='${{ matrix.go_timeout }}'",
 	} {
 		if !strings.Contains(ci, required) {
@@ -121,6 +127,9 @@ func TestPromotionWorkflowContractAndPinnedActions(t *testing.T) {
 	}
 	if got := strings.Count(ci, "test: TestFrozenSimulationGroundedCorpusPassesOfflineWorkflow"); got != 3 {
 		t.Errorf("CI workflow has %d simulation-grounded shards, want 3", got)
+	}
+	if got := strings.Count(ci, "test: TestHierarchicalMultiDomainCorpusPassesOfflineWorkflow"); got != 6 {
+		t.Errorf("CI workflow has %d hierarchical multi-domain shards, want 6", got)
 	}
 }
 

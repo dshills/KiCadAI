@@ -1,6 +1,6 @@
 .DEFAULT_GOAL := help
 
-.PHONY: help build install test test-one review-matrix promotion-bundle held-out-promotion-bundle lint coverage coverage-check run-help refresh-kicad-proto proto proto-check
+.PHONY: help build install test test-one review-matrix promotion-bundle held-out-promotion-bundle hierarchical-promotion-bundle lint coverage coverage-check run-help refresh-kicad-proto proto proto-check
 
 BIN_DIR := $(CURDIR)/bin
 BIN := $(BIN_DIR)/kicadai
@@ -24,6 +24,8 @@ PROMOTION_CACHE_DIR ?= $(CURDIR)/.cache/kicadai-promotion-toolchain
 PROMOTION_SCENARIO_TIMEOUT ?= 20m
 HELD_OUT_PROMOTION_ROOT ?= $(CURDIR)/.tmp/held-out-capability-promotion
 HELD_OUT_PROMOTION_MATRIX ?= $(CURDIR)/specs/held-out-capability-expansion/PROMOTION_MATRIX.json
+HIERARCHICAL_PROMOTION_ROOT ?= $(CURDIR)/.tmp/hierarchical-multi-domain-promotion
+HIERARCHICAL_PROMOTION_MATRIX ?= $(CURDIR)/specs/hierarchical-multi-domain-synthesis/PROMOTION_MATRIX.json
 
 help:
 	@printf "KiCadAI targets:\n"
@@ -34,6 +36,7 @@ help:
 	@printf "  make review-matrix   Run the external-review mitigation ladder twice\n"
 	@printf "  make promotion-bundle Reproduce and verify the installed-KiCad promotion bundle\n"
 	@printf "  make held-out-promotion-bundle Reproduce and verify the held-out capability bundle\n"
+	@printf "  make hierarchical-promotion-bundle Reproduce and verify the hierarchical multi-domain bundle\n"
 	@printf "  make lint            Run gofmt, go vet, and golangci-lint when installed\n"
 	@printf "  make coverage        Generate coverage profiles\n"
 	@printf "  make coverage-check  Enforce coverage threshold (COVERAGE_THRESHOLD=%s)\n" "$(COVERAGE_THRESHOLD)"
@@ -83,6 +86,15 @@ promotion-bundle:
 held-out-promotion-bundle:
 	PROMOTION_ROOT="$(HELD_OUT_PROMOTION_ROOT)" \
 	PROMOTION_MATRIX="$(HELD_OUT_PROMOTION_MATRIX)" \
+	PROMOTION_CACHE_DIR="$(PROMOTION_CACHE_DIR)" \
+	PROMOTION_SCENARIO_TIMEOUT="$(PROMOTION_SCENARIO_TIMEOUT)" \
+	GOCACHE="$(GOCACHE_DIR)" \
+	GOMODCACHE="$(GOMODCACHE_DIR)" \
+	./scripts/clean-checkout-promotion.sh
+
+hierarchical-promotion-bundle:
+	PROMOTION_ROOT="$(HIERARCHICAL_PROMOTION_ROOT)" \
+	PROMOTION_MATRIX="$(HIERARCHICAL_PROMOTION_MATRIX)" \
 	PROMOTION_CACHE_DIR="$(PROMOTION_CACHE_DIR)" \
 	PROMOTION_SCENARIO_TIMEOUT="$(PROMOTION_SCENARIO_TIMEOUT)" \
 	GOCACHE="$(GOCACHE_DIR)" \

@@ -685,7 +685,11 @@
       "ratings": [{"kind": "supply_voltage", "min": "1.71", "max": "3.6", "unit": "V"}, {"kind": "supply_current", "max": "1.5", "unit": "mA"}],
       "simulation_models": [{
         "model_id": "mna_sensor_static_supply_load_v1",
-        "parameters": [{"name": "maximum_supply_current_a", "value": 0.0015}]
+        "parameters": [
+          {"name": "minimum_supply_voltage_v", "value": 1.71},
+          {"name": "maximum_supply_voltage_v", "value": 3.6},
+          {"name": "maximum_supply_current_a", "value": 0.0015}
+        ]
       }],
       "companions": [
         {"id": "sensor.decoupling_capacitor", "family": "capacitor", "role": "decoupling_capacitor", "required": true, "recipes": [{"id": "supply_bypass", "family": "capacitor", "role": "decoupling_capacitor", "package": "0603", "value_kind": "capacitance", "value": "100n", "min_voltage_v": 6.3, "minimum_confidence": "rule_inferred", "required_functions": ["A", "B"], "connections": [{"function": "A", "parent_function": "VDD"}, {"function": "B", "parent_function": "GND"}]}], "description": "Place a local decoupling capacitor close to VDD/VDDIO and GND."},
@@ -909,7 +913,11 @@
       ],
       "simulation_models": [{
         "model_id": "mna_mcu_static_supply_load_v1",
-        "parameters": [{"name": "maximum_supply_current_a", "value": 0.5}]
+        "parameters": [
+          {"name": "minimum_supply_voltage_v", "value": 3.0},
+          {"name": "maximum_supply_voltage_v", "value": 3.6},
+          {"name": "maximum_supply_current_a", "value": 0.5}
+        ]
       }],
       "temperature": {"min": "-40", "max": "85", "unit": "C"},
       "mcu_evidence": {
@@ -1062,7 +1070,11 @@
       "ratings": [{"kind": "supply_voltage", "min": "1.8", "max": "5.5", "unit": "V"}, {"kind": "supply_current", "max": "14", "unit": "mA"}],
       "simulation_models": [{
         "model_id": "mna_mcu_static_supply_load_v1",
-        "parameters": [{"name": "maximum_supply_current_a", "value": 0.014}]
+        "parameters": [
+          {"name": "minimum_supply_voltage_v", "value": 1.8},
+          {"name": "maximum_supply_voltage_v", "value": 5.5},
+          {"name": "maximum_supply_current_a", "value": 0.014}
+        ]
       }],
       "mcu_evidence": {
         "architecture": "avr8",

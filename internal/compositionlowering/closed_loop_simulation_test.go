@@ -83,6 +83,80 @@ func TestArchitectureSimulationPlanResolverRelowersAndResolvesRetainedCandidate(
 	}
 }
 
+func TestIsolatedHierarchicalTransientPlanReleasesDrivenBus(t *testing.T) {
+	data, err := os.ReadFile("../architecturesearch/testdata/hierarchical_multi_domain_corpus/isolated_mixed_voltage_gateway_system.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	requirement, decodeIssues := architecturesearch.DecodeStrict(bytes.NewReader(data))
+	if len(decodeIssues) != 0 {
+		t.Fatalf("decode issues = %#v", decodeIssues)
+	}
+	catalog, err := components.LoadCatalog(context.Background(), components.LoadOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	registry, registryIssues := architecturesearch.NewCatalogRegistry(catalog)
+	if len(registryIssues) != 0 {
+		t.Fatalf("registry issues = %#v", registryIssues)
+	}
+	graphResolver := circuitgraph.NewResolver(circuitgraph.ResolveOptions{Catalog: catalog, CatalogID: "checked-in"})
+	search := architecturesearch.Search(context.Background(), requirement, registry, architecturesearch.SearchOptions{CatalogHash: graphResolver.CatalogHash()})
+	if search.Status != architecturesearch.SearchSelected || search.Selected == nil {
+		t.Fatalf("search status=%s issues=%#v rejections=%#v", search.Status, search.Issues, search.Rejections)
+	}
+	provenance, provenanceDiagnostics := modelprovenance.LoadDefault()
+	if len(provenanceDiagnostics) != 0 {
+		t.Fatalf("provenance diagnostics = %#v", provenanceDiagnostics)
+	}
+	resolver := ArchitectureSimulationPlanResolver{Requirement: requirement, Search: search, GraphResolver: graphResolver, ProvenanceRegistry: provenance}
+	state := closedloopsynthesis.CandidateState{Fingerprint: search.Selected.Fingerprint}
+	planSet, err := resolver.ResolveSimulationPlanSet(context.Background(), state)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resolution, compileDiagnostics := closedloopsynthesis.CompileSimulationResolution(planSet.AnalysisPlan, planSet.Plans, planSet.Templates, planSet.Assertions, planSet.OperatingBindings)
+	if len(compileDiagnostics) != 0 {
+		t.Fatalf("compile diagnostics = %#v", compileDiagnostics)
+	}
+	planIndex := slices.IndexFunc(resolution.Plans, func(plan simmodel.Plan) bool {
+		return slices.ContainsFunc(plan.Assertions, func(assertion simmodel.Assertion) bool {
+			return assertion.Quantity == simmodel.QuantityRiseTimeS
+		})
+	})
+	if planIndex < 0 {
+		t.Fatalf("isolated hierarchy lacks a compiled rise-time plan: %#v", resolution.Plans)
+	}
+	transient := resolution.Plans[planIndex]
+	riseIndex := slices.IndexFunc(transient.Assertions, func(assertion simmodel.Assertion) bool {
+		return assertion.Quantity == simmodel.QuantityRiseTimeS
+	})
+	rise := transient.Assertions[riseIndex]
+	transient.Assertions = []simmodel.Assertion{rise}
+	report, diagnostics := simmodel.Evaluate(transient)
+	if len(diagnostics) != 0 || report.Status != "pass" {
+		var samples []string
+		minimum, maximum := math.Inf(1), math.Inf(-1)
+		for _, analysis := range report.Analyses {
+			if analysis.ID != rise.AnalysisID {
+				continue
+			}
+			for _, point := range analysis.Points {
+				for _, node := range point.Nodes {
+					if node.Node != rise.Node {
+						continue
+					}
+					minimum, maximum = math.Min(minimum, node.Real), math.Max(maximum, node.Real)
+					if len(samples) < 40 {
+						samples = append(samples, fmt.Sprintf("%.9g:%.9g", point.TimeS, node.Real))
+					}
+				}
+			}
+		}
+		t.Fatalf("isolated hierarchy rise min=%.9g max=%.9g samples=%v diagnostics=%#v", minimum, maximum, samples, diagnostics)
+	}
+}
+
 func TestConstantCurrentResolverRetainsEveryBehavioralAnalysis(t *testing.T) {
 	data, err := os.ReadFile("../architecturesearch/testdata/held_out_capability_expansion_corpus/power_constant_current_output.json")
 	if err != nil {
@@ -491,6 +565,42 @@ func TestBehavioralTransientStimulusUsesDataflowIngressAndKeepsSupplyPowered(t *
 	}
 	if supply.DCValue != 5 || supply.PulsePeriodS != 0 {
 		t.Fatalf("supply excitation must remain powered during interface transient: %#v", supply)
+	}
+}
+
+func TestBehavioralTransientStimulusUsesExplicitBidirectionalInputBoundary(t *testing.T) {
+	requirement := architecturesearch.Requirement{Requirements: architecturesearch.Requirements{
+		Domains: []architecturesearch.Domain{
+			{ID: "host_5v", Kind: "supply", NominalVoltageV: 5},
+			{ID: "remote_1v8", Kind: "supply", NominalVoltageV: 1.8},
+		},
+		Ports: []architecturesearch.Port{
+			{ID: "host_bus", Kind: "digital_bus", Direction: "bidirectional", Domain: "host_5v"},
+			{ID: "remote_bus", Kind: "digital_bus", Direction: "bidirectional", Domain: "remote_1v8"},
+		},
+		Signals: []architecturesearch.Signal{{ID: "protected_bus", Kind: "digital_bus", Domain: "host_5v"}},
+		Objectives: []architecturesearch.Objective{
+			{ID: "protect", Bindings: []architecturesearch.Binding{
+				{Role: "input", Port: "host_bus"},
+				{Role: "output", Signal: "protected_bus", Direction: "bidirectional"},
+			}},
+			{ID: "bridge", Bindings: []architecturesearch.Binding{
+				{Role: "side_a", Signal: "protected_bus", Direction: "bidirectional"},
+				{Role: "side_b", Port: "remote_bus"},
+			}},
+		},
+		BehavioralRequirements: []architecturesearch.BehavioralRequirement{{
+			ID: "rise", Metric: "rise_time", Analysis: simmodel.AnalysisTransient,
+			Observation: architecturesearch.Observation{Kind: "port", ID: "remote_bus"},
+		}},
+	}}
+	bindings := []closedloopsynthesis.SemanticBinding{
+		{Kind: "port", ID: "host_bus", Target: "HOST_BUS"},
+		{Kind: "port", ID: "remote_bus", Target: "REMOTE_BUS"},
+	}
+	stimulus, ok := behavioralTransientStimulusForRequirement(requirement, bindings)
+	if !ok || stimulus.SemanticID != "host_bus" || stimulus.Node != "HOST_BUS" || stimulus.InitialV != 0 || stimulus.FinalV != 5 {
+		t.Fatalf("explicit bidirectional ingress stimulus = %#v, ok=%t", stimulus, ok)
 	}
 }
 
@@ -962,6 +1072,41 @@ func TestLoadCurrentHarnessSpansSemanticLoadSwitchPowerAndOutputRoles(t *testing
 	connections := devices[0].Device.Connections
 	if connections[0].Function != "POSITIVE" || connections[0].Net != "SUPPLY" || connections[1].Function != "NEGATIVE" || connections[1].Net != "SWITCHED" {
 		t.Fatalf("load-current connections = %#v", connections)
+	}
+}
+
+func TestOperatingHarnessUsesTargetDomainReferenceForIsolatedLoadCapacitance(t *testing.T) {
+	minimum, maximum := 1e-12, 400e-12
+	requirement := architecturesearch.Requirement{Requirements: architecturesearch.Requirements{
+		Domains: []architecturesearch.Domain{
+			{ID: "host_5v", Kind: "supply", NominalVoltageV: 5},
+			{ID: "host_ground", Kind: "reference"},
+			{ID: "remote_1v8", Kind: "supply", NominalVoltageV: 1.8},
+			{ID: "remote_ground", Kind: "reference"},
+		},
+		Ports: []architecturesearch.Port{
+			{ID: "host_bus", Kind: "digital_bus", Direction: "bidirectional", Domain: "host_5v"},
+			{ID: "remote_bus", Kind: "digital_bus", Direction: "bidirectional", Domain: "remote_1v8"},
+		},
+		OperatingCases: []architecturesearch.OperatingCase{{Conditions: []architecturesearch.OperatingCondition{{
+			Axis: "load_capacitance", Target: "remote_bus", Min: &minimum, Max: &maximum, Unit: "F",
+		}}}},
+	}}
+	bindings := []closedloopsynthesis.SemanticBinding{
+		{Kind: "domain", ID: "host_ground", Target: "HOST_GROUND"},
+		{Kind: "domain", ID: "remote_ground", Target: "REMOTE_GROUND"},
+		{Kind: "port", ID: "remote_bus", Target: "REMOTE_BUS"},
+	}
+	devices, err := operatingHarnessDevices(requirement, bindings, nil, simmodel.AnalysisTransient)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(devices) != 1 {
+		t.Fatalf("load-capacitance harness = %#v", devices)
+	}
+	connections := devices[0].Device.Connections
+	if len(connections) != 2 || connections[0].Net != "REMOTE_BUS" || connections[1].Net != "REMOTE_GROUND" {
+		t.Fatalf("isolated load-capacitance connections = %#v", connections)
 	}
 }
 

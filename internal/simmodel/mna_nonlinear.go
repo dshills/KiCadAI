@@ -37,6 +37,10 @@ const (
 	nonlinearClampConsistencyV      = 1e-3
 )
 
+func nonlinearOperatingVoltageTolerance(maximum float64) float64 {
+	return 10 * nonlinearResidualFloorUpdateV * math.Max(1, math.Abs(maximum))
+}
+
 type continuationStage struct {
 	sourceScale float64
 	gmin        float64
@@ -766,6 +770,12 @@ func maxNonlinearControlVoltageUpdate(devices []compiledNonlinearDevice, system 
 			voltageUpdate(device.terminals["BASE"], device.terminals["COLLECTOR"])
 		case PrimitiveNMOSSwitchV1, PrimitivePMOSSwitchV1:
 			voltageUpdate(device.terminals["GATE"], device.terminals["SOURCE"])
+		case PrimitiveReverseBlockingLoadSwitchV1:
+			voltageUpdate(device.terminals["VIN"], device.terminals["GND"])
+			voltageUpdate(device.terminals["ON"], device.terminals["GND"])
+			voltageUpdate(device.terminals["VOUT"], device.terminals["VIN"])
+		case PrimitiveMCUStaticSupplyLoadV1, PrimitiveSensorStaticSupplyLoadV1:
+			voltageUpdate(device.terminals["POWER"], device.terminals["GROUND"])
 		}
 	}
 	return maximum
@@ -830,6 +840,33 @@ func piecewiseLinearRegionStable(devices []compiledNonlinearDevice, system *mnaS
 			if isOn(before) != isOn(after) {
 				return false
 			}
+		case PrimitiveReverseBlockingLoadSwitchV1:
+			region := func(solution []complex128) [3]bool {
+				vin := nonlinearNodeVoltage(system, solution, device.terminals["VIN"])
+				vout := nonlinearNodeVoltage(system, solution, device.terminals["VOUT"])
+				ground := nonlinearNodeVoltage(system, solution, device.terminals["GND"])
+				enable := nonlinearNodeVoltage(system, solution, device.terminals["ON"])
+				return [3]bool{
+					vin-ground >= device.parameters["input_min_v"],
+					enable-ground >= device.parameters["enable_high_voltage_v"],
+					vout-vin <= device.parameters["reverse_blocking_release_voltage_v"],
+				}
+			}
+			if region(before) != region(after) {
+				return false
+			}
+		case PrimitiveMCUStaticSupplyLoadV1, PrimitiveSensorStaticSupplyLoadV1:
+			region := func(solution []complex128) int {
+				voltage := nonlinearNodeVoltage(system, solution, device.terminals["POWER"]) -
+					nonlinearNodeVoltage(system, solution, device.terminals["GROUND"])
+				if voltage < device.parameters["minimum_supply_voltage_v"] {
+					return 0
+				}
+				return 1
+			}
+			if region(before) != region(after) {
+				return false
+			}
 		default:
 			return false
 		}
@@ -860,7 +897,11 @@ func compileNonlinearDevicesWithStates(plan Plan, states map[string]float64) []c
 			polarity = 1
 		case PrimitiveBJTPNPV1:
 			polarity = -1
-		case PrimitiveBidirectionalOpenDrainTranslatorV1:
+		case PrimitiveBidirectionalOpenDrainTranslatorV1, PrimitiveBidirectionalOpenDrainIsolatorV1:
+			polarity = 1
+		case PrimitiveReverseBlockingLoadSwitchV1:
+			polarity = 1
+		case PrimitiveMCUStaticSupplyLoadV1, PrimitiveSensorStaticSupplyLoadV1:
 			polarity = 1
 		default:
 			continue
@@ -870,6 +911,9 @@ func compileNonlinearDevicesWithStates(plan Plan, states map[string]float64) []c
 			if state, exists := states[device.Component]; exists {
 				parameters[parameterForcedMOSFETState] = state
 			}
+		}
+		if device.PrimitiveModel == PrimitiveBidirectionalOpenDrainIsolatorV1 {
+			resolveIsolatedOpenDrainDrivers(plan, device, parameters)
 		}
 		devices = append(devices, compiledNonlinearDevice{
 			component: device.Component, primitive: device.PrimitiveModel,
@@ -1044,6 +1088,12 @@ func stampCompiledNonlinearDevices(system *mnaSystem, devices []compiledNonlinea
 			stampNonlinearBJT(system, device, guess)
 		case PrimitiveBidirectionalOpenDrainTranslatorV1:
 			stampNonlinearOpenDrainTranslator(system, device, guess)
+		case PrimitiveBidirectionalOpenDrainIsolatorV1:
+			stampNonlinearOpenDrainIsolator(system, device, guess)
+		case PrimitiveReverseBlockingLoadSwitchV1:
+			stampNonlinearReverseBlockingLoadSwitch(system, device, guess)
+		case PrimitiveMCUStaticSupplyLoadV1, PrimitiveSensorStaticSupplyLoadV1:
+			stampNonlinearStaticSupplyLoad(system, device, guess)
 		}
 	}
 }
@@ -1069,6 +1119,14 @@ func stampSmallSignalNonlinearDevicesExcept(system *mnaSystem, devices []compile
 		case PrimitiveNMOSSwitchV1, PrimitivePMOSSwitchV1:
 			conductance := mosfetSwitchConductance(device, operatingSystem, operatingPoint)
 			stampAdmittance(system, device.terminals["DRAIN"], device.terminals["SOURCE"], complex(conductance, 0))
+		case PrimitiveReverseBlockingLoadSwitchV1:
+			conductance := reverseBlockingLoadSwitchConductance(device, operatingSystem, operatingPoint)
+			stampAdmittance(system, device.terminals["VIN"], device.terminals["VOUT"], complex(conductance, 0))
+		case PrimitiveMCUStaticSupplyLoadV1, PrimitiveSensorStaticSupplyLoadV1:
+			voltage := nonlinearNodeVoltage(operatingSystem, operatingPoint, device.terminals["POWER"]) -
+				nonlinearNodeVoltage(operatingSystem, operatingPoint, device.terminals["GROUND"])
+			_, conductance := staticSupplyLoadCurrentAndGradient(voltage, device.parameters)
+			stampAdmittance(system, device.terminals["POWER"], device.terminals["GROUND"], complex(conductance, 0))
 		case PrimitiveBidirectionalTVSV1:
 			voltage := nonlinearNodeVoltage(operatingSystem, operatingPoint, device.terminals["ANODE"]) - nonlinearNodeVoltage(operatingSystem, operatingPoint, device.terminals["CATHODE"])
 			_, conductance := bidirectionalTVSCurrentAndGradient(voltage, device.parameters)
@@ -1106,6 +1164,29 @@ func stampSmallSignalNonlinearDevicesExcept(system *mnaSystem, devices []compile
 			for channel := 1; channel <= 2; channel++ {
 				resistance := translatorChannelResistance(device, operatingSystem, operatingPoint, channel)
 				stampAdmittance(system, device.terminals[fmt.Sprintf("A%d", channel)], device.terminals[fmt.Sprintf("B%d", channel)], complex(1/resistance, 0))
+			}
+			for _, supply := range []struct {
+				power   string
+				minimum string
+				current string
+			}{
+				{power: "VCCA", minimum: "vcca_min_v", current: "vcca_quiescent_current_a"},
+				{power: "VCCB", minimum: "vccb_min_v", current: "vccb_quiescent_current_a"},
+			} {
+				voltage := nonlinearNodeVoltage(operatingSystem, operatingPoint, device.terminals[supply.power]) -
+					nonlinearNodeVoltage(operatingSystem, operatingPoint, device.terminals["GND"])
+				_, conductance := boundedSupplyLoadCurrentAndGradient(voltage, device.parameters[supply.minimum], device.parameters[supply.current])
+				stampAdmittance(system, device.terminals[supply.power], device.terminals["GND"], complex(conductance, 0))
+			}
+		case PrimitiveBidirectionalOpenDrainIsolatorV1:
+			stampAdmittance(system, device.terminals["GND1"], device.terminals["GND2"], complex(1/device.parameters["isolation_resistance_ohm"], 0))
+			for channel := range isolatedOpenDrainChannels {
+				for side := 1; side <= 2; side++ {
+					signal := device.terminals[isolatedOpenDrainChannels[channel][side-1]]
+					ground := device.terminals[fmt.Sprintf("GND%d", side)]
+					resistance := isolatedOpenDrainResistance(device, operatingSystem, operatingPoint, side, channel)
+					stampAdmittance(system, signal, ground, complex(1/resistance, 0))
+				}
 			}
 		}
 	}
@@ -1352,6 +1433,10 @@ func nonlinearResidual(base mnaSystem, devices []compiledNonlinearDevice, soluti
 			if index, exists := base.nodeIndex[device.terminals["SOURCE"]]; exists {
 				residuals[index] -= complex(current, 0)
 			}
+		case PrimitiveReverseBlockingLoadSwitchV1:
+			addReverseBlockingLoadSwitchResidual(residuals, base, device, solution)
+		case PrimitiveMCUStaticSupplyLoadV1, PrimitiveSensorStaticSupplyLoadV1:
+			addStaticSupplyLoadResidual(residuals, base, device, solution)
 		case PrimitiveUnidirectionalZenerV1:
 			voltage := nonlinearNodeVoltage(&base, solution, device.terminals["ANODE"]) - nonlinearNodeVoltage(&base, solution, device.terminals["CATHODE"])
 			current, _ := unidirectionalZenerCurrentAndGradient(voltage, device.parameters)
@@ -1384,6 +1469,8 @@ func nonlinearResidual(base mnaSystem, devices []compiledNonlinearDevice, soluti
 			}
 		case PrimitiveBidirectionalOpenDrainTranslatorV1:
 			addOpenDrainTranslatorResidual(residuals, base, device, solution)
+		case PrimitiveBidirectionalOpenDrainIsolatorV1:
+			addOpenDrainIsolatorResidual(residuals, base, device, solution)
 		}
 	}
 	maximum, label := 0.0, "unknown"
@@ -1436,6 +1523,10 @@ func validateNonlinearOperatingLimitsWithComparatorStates(plan Plan, system mnaS
 			if math.Abs(gate-source) > parameters["max_gate_source_voltage_v"] {
 				diagnostics = append(diagnostics, Diagnostic{Path: "devices." + device.Component + ".operating_limit", Message: fmt.Sprintf("MOSFET gate-source voltage %.12g V exceeds catalog-backed limit %.12g V", math.Abs(gate-source), parameters["max_gate_source_voltage_v"]), Suggestion: "reduce gate drive or select a suitably rated reviewed MOSFET"})
 			}
+		case PrimitiveReverseBlockingLoadSwitchV1:
+			diagnostics = append(diagnostics, validateReverseBlockingLoadSwitchOperatingLimits(device, system, solution)...)
+		case PrimitiveMCUStaticSupplyLoadV1, PrimitiveSensorStaticSupplyLoadV1:
+			diagnostics = append(diagnostics, validateStaticSupplyLoadOperatingLimits(device, system, solution, allowPowerTransition)...)
 		case PrimitiveBidirectionalTVSV1:
 			voltage := nonlinearNodeVoltage(&system, solution, terminals["ANODE"]) - nonlinearNodeVoltage(&system, solution, terminals["CATHODE"])
 			current, _ := bidirectionalTVSCurrentAndGradient(voltage, parameters)
@@ -1476,6 +1567,8 @@ func validateNonlinearOperatingLimitsWithComparatorStates(plan Plan, system mnaS
 			}
 		case PrimitiveBidirectionalOpenDrainTranslatorV1:
 			diagnostics = append(diagnostics, validateOpenDrainTranslatorOperatingLimits(device, system, solution, allowPowerTransition)...)
+		case PrimitiveBidirectionalOpenDrainIsolatorV1:
+			diagnostics = append(diagnostics, validateOpenDrainIsolatorOperatingLimits(plan, device, system, solution, allowPowerTransition)...)
 		}
 	}
 	return diagnostics

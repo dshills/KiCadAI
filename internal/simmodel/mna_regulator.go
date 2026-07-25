@@ -116,6 +116,23 @@ func validateResolvedOperatingLimits(plan Plan, system mnaSystem, solution []com
 			}
 			continue
 		}
+		if device.PrimitiveModel == PrimitiveSingleOutputIsolatedConverterV1 {
+			parameters := namedValueMap(device.ModelParameters)
+			terminals := terminalMap(device)
+			input := real(solvedNodeVoltage(system, solution, terminals["VIN_PLUS"]) - solvedNodeVoltage(system, solution, terminals["VIN_MINUS"]))
+			path := "devices." + device.Component
+			powerTransition := allowPowerTransition && input < parameters["input_min_v"]
+			if !powerTransition && (input < parameters["input_min_v"] || input > parameters["input_max_v"]) {
+				diagnostics = append(diagnostics, Diagnostic{Path: path + ".input_voltage", Message: fmt.Sprintf("single-output isolated converter input %.12g V is outside catalog-backed range %.12g..%.12g V", input, parameters["input_min_v"], parameters["input_max_v"]), Suggestion: "adjust the source conditions or select a compatible reviewed isolated converter"})
+			}
+			branch, exists := system.branchIndex[device.Component]
+			if !exists || branch >= len(solution) {
+				diagnostics = append(diagnostics, Diagnostic{Path: path + ".output_current", Message: "single-output isolated converter output-current branch is absent from the solved topology"})
+			} else if current := math.Abs(real(solution[branch])); current > parameters["max_output_current_a"] {
+				diagnostics = append(diagnostics, Diagnostic{Path: path + ".output_current", Message: fmt.Sprintf("single-output isolated converter current %.12g A exceeds catalog-backed maximum %.12g A", current, parameters["max_output_current_a"]), Suggestion: "reduce output load or select a compatible reviewed isolated converter"})
+			}
+			continue
+		}
 		if device.PrimitiveModel == PrimitiveDualOutputIsolatedConverterV1 {
 			parameters := namedValueMap(device.ModelParameters)
 			terminals := terminalMap(device)

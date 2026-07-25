@@ -83,6 +83,30 @@ jobs:
             test: TestFrozenSimulationGroundedCorpusPassesOfflineWorkflow
             shard: 2/3
             go_timeout: 55m
+          - name: hierarchical-multi-domain-0-of-6
+            test: TestHierarchicalMultiDomainCorpusPassesOfflineWorkflow
+            shard: 0/6
+            go_timeout: 30m
+          - name: hierarchical-multi-domain-1-of-6
+            test: TestHierarchicalMultiDomainCorpusPassesOfflineWorkflow
+            shard: 1/6
+            go_timeout: 30m
+          - name: hierarchical-multi-domain-2-of-6
+            test: TestHierarchicalMultiDomainCorpusPassesOfflineWorkflow
+            shard: 2/6
+            go_timeout: 30m
+          - name: hierarchical-multi-domain-3-of-6
+            test: TestHierarchicalMultiDomainCorpusPassesOfflineWorkflow
+            shard: 3/6
+            go_timeout: 30m
+          - name: hierarchical-multi-domain-4-of-6
+            test: TestHierarchicalMultiDomainCorpusPassesOfflineWorkflow
+            shard: 4/6
+            go_timeout: 30m
+          - name: hierarchical-multi-domain-5-of-6
+            test: TestHierarchicalMultiDomainCorpusPassesOfflineWorkflow
+            shard: 5/6
+            go_timeout: 30m
     steps:
       - name: Check out source
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2

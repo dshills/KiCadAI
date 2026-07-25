@@ -57,7 +57,7 @@ func solveThermalAnalysis(plan Plan, analysis Analysis) (AnalysisResult, []Diagn
 	ambient := namedValueMap(analysis.Conditions)["ambient_temperature_c"]
 	deviceResults := make([]DeviceResult, 0, len(plan.Devices))
 	for _, device := range plan.Devices {
-		dissipation, dissipative := thermalDeviceDissipation(device, system, solution)
+		dissipation, dissipative := thermalDeviceDissipation(plan, device, system, solution)
 		if !dissipative {
 			continue
 		}
@@ -144,11 +144,13 @@ func deviceDissipationByComponent(devices []DeviceResult) map[string]float64 {
 func thermalDeviceSupportsDissipation(device ResolvedDevice) bool {
 	switch device.PrimitiveModel {
 	case PrimitiveResistorV1, PrimitiveFuseClosedStateV1, PrimitiveDiodeShockleyV1, PrimitiveBidirectionalTVSV1,
-		PrimitiveNMOSSwitchV1, PrimitivePMOSSwitchV1, PrimitiveBJTNPNV1, PrimitiveBJTPNPV1,
+		PrimitiveNMOSSwitchV1, PrimitivePMOSSwitchV1, PrimitiveReverseBlockingLoadSwitchV1,
+		PrimitiveBJTNPNV1, PrimitiveBJTPNPV1,
 		PrimitiveOpAmpV1, PrimitiveComparatorOpenCollectorV1,
 		PrimitiveAdjustableLinearRegulatorV1, PrimitiveFixedLinearRegulatorV1, PrimitiveFloatingAdjustableRegulatorV1,
 		PrimitiveProgrammableCurrentSourceV1, PrimitiveShuntVoltageReferenceV1,
-		PrimitiveBidirectionalOpenDrainTranslatorV1, PrimitiveMCUStaticSupplyLoadV1, PrimitiveSensorStaticSupplyLoadV1:
+		PrimitiveBidirectionalOpenDrainTranslatorV1, PrimitiveBidirectionalOpenDrainIsolatorV1,
+		PrimitiveMCUStaticSupplyLoadV1, PrimitiveSensorStaticSupplyLoadV1:
 		return true
 	default:
 		return false
@@ -179,11 +181,14 @@ func thermalDeviceResult(device ResolvedDevice, analysis Analysis, ambient, diss
 	return entry, nil
 }
 
-func thermalDeviceDissipation(device ResolvedDevice, system mnaSystem, solution []complex128) (float64, bool) {
+func thermalDeviceDissipation(plan Plan, device ResolvedDevice, system mnaSystem, solution []complex128) (float64, bool) {
 	if dissipation, ok := adjustableLinearRegulatorDissipation(device, system, solution); ok {
 		return dissipation, true
 	}
 	if dissipation, ok := openDrainTranslatorDissipation(device, system, solution); ok {
+		return dissipation, true
+	}
+	if dissipation, ok := openDrainIsolatorDissipation(plan, device, system, solution); ok {
 		return dissipation, true
 	}
 	terminals := terminalMap(device)
@@ -216,6 +221,12 @@ func thermalDeviceDissipation(device ResolvedDevice, system mnaSystem, solution 
 			primitive: device.PrimitiveModel, terminals: terminals, parameters: namedValueMap(device.ModelParameters), polarity: mosfetPolarity(device.PrimitiveModel),
 		}, &system, solution)
 		return delta * delta * conductance, true
+	case PrimitiveReverseBlockingLoadSwitchV1:
+		delta := voltage(terminals["VIN"]) - voltage(terminals["VOUT"])
+		conductance := reverseBlockingLoadSwitchConductance(compiledNonlinearDevice{
+			primitive: device.PrimitiveModel, terminals: terminals, parameters: namedValueMap(device.ModelParameters), polarity: 1,
+		}, &system, solution)
+		return delta * delta * conductance, true
 	case PrimitiveBJTNPNV1, PrimitiveBJTPNPV1:
 		polarity := 1.0
 		if device.PrimitiveModel == PrimitiveBJTPNPV1 {
@@ -246,8 +257,9 @@ func thermalDeviceDissipation(device ResolvedDevice, system mnaSystem, solution 
 		return outputPower + parameters["quiescent_current_a"]*supply, true
 	case PrimitiveMCUStaticSupplyLoadV1, PrimitiveSensorStaticSupplyLoadV1:
 		parameters := namedValueMap(device.ModelParameters)
-		supply := math.Abs(voltage(terminals["POWER"]) - voltage(terminals["GROUND"]))
-		return parameters["maximum_supply_current_a"] * supply, true
+		supply := voltage(terminals["POWER"]) - voltage(terminals["GROUND"])
+		current, _ := staticSupplyLoadCurrentAndGradient(supply, parameters)
+		return math.Abs(current * supply), true
 	default:
 		return 0, false
 	}

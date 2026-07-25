@@ -234,8 +234,10 @@ func BuildClosedLoopInput(requirement architecturesearch.Requirement, search arc
 		Requirement: requirement, CatalogHash: search.CatalogHash, FormulaLibraryHash: search.FormulaLibraryHash, ModelRegistryHash: modelRegistryHash,
 	}
 	var diagnostics []closedloopsynthesis.Diagnostic
-	if requirement.Schema != architecturesearch.SchemaIDV3 || requirement.Version != architecturesearch.VersionV3 {
-		diagnostics = append(diagnostics, closedloopsynthesis.Diagnostic{Path: "requirement", Message: "behavioral closed-loop integration requires a v3 requirement"})
+	v3 := requirement.Schema == architecturesearch.SchemaIDV3 && requirement.Version == architecturesearch.VersionV3
+	v4 := requirement.Schema == architecturesearch.SchemaIDV4 && requirement.Version == architecturesearch.VersionV4
+	if !v3 && !v4 {
+		diagnostics = append(diagnostics, closedloopsynthesis.Diagnostic{Path: "requirement", Message: "behavioral closed-loop integration requires a v3 or v4 requirement"})
 	}
 	requirementHash, err := architecturesearch.CanonicalHash(architecturesearch.Normalize(requirement))
 	if err != nil || requirementHash != search.RequirementHash {
@@ -257,7 +259,24 @@ func BuildClosedLoopInput(requirement architecturesearch.Requirement, search arc
 		retained = append(retained, *search.Selected)
 	}
 	retained = append(retained, search.Alternatives...)
+	priorityByFingerprint := map[string]int{}
+	if v4 {
+		if search.Backtracking == nil || len(search.Backtracking.CandidateOrder) != len(retained) {
+			diagnostics = append(diagnostics, closedloopsynthesis.Diagnostic{Path: "search.backtracking", Message: "V4 closed-loop integration requires complete architecture backtracking evidence"})
+		} else {
+			for index, fingerprint := range search.Backtracking.CandidateOrder {
+				priorityByFingerprint[fingerprint] = index
+			}
+		}
+	}
 	slices.SortStableFunc(retained, func(left, right architecturesearch.CandidateResult) int {
+		if v4 {
+			leftPriority, leftExists := priorityByFingerprint[left.Fingerprint]
+			rightPriority, rightExists := priorityByFingerprint[right.Fingerprint]
+			if leftExists && rightExists && leftPriority != rightPriority {
+				return leftPriority - rightPriority
+			}
+		}
 		return strings.Compare(left.Fingerprint, right.Fingerprint)
 	})
 	seen := map[string]bool{}
@@ -267,7 +286,22 @@ func BuildClosedLoopInput(requirement architecturesearch.Requirement, search arc
 			continue
 		}
 		seen[candidate.Fingerprint] = true
-		input.Candidates = append(input.Candidates, closedloopsynthesis.Candidate{Fingerprint: candidate.Fingerprint, Score: candidate.Score, Variables: variablesByFingerprint[candidate.Fingerprint]})
+		priority := 0
+		if v4 {
+			var exists bool
+			priority, exists = priorityByFingerprint[candidate.Fingerprint]
+			if !exists {
+				diagnostics = append(diagnostics, closedloopsynthesis.Diagnostic{Path: fmt.Sprintf("search.candidates[%d].priority", index), Message: "retained V4 candidate is absent from architecture backtracking order"})
+			}
+			if candidate.SystemPlan == nil {
+				diagnostics = append(diagnostics, closedloopsynthesis.Diagnostic{Path: fmt.Sprintf("search.candidates[%d].system_plan", index), Message: "retained V4 candidate lacks its generated system plan"})
+			}
+		}
+		input.Candidates = append(input.Candidates, closedloopsynthesis.Candidate{
+			Fingerprint: candidate.Fingerprint, Score: candidate.Score,
+			Variables: variablesByFingerprint[candidate.Fingerprint],
+			Priority:  priority, SystemPlan: candidate.SystemPlan,
+		})
 		delete(variablesByFingerprint, candidate.Fingerprint)
 	}
 	if len(variablesByFingerprint) != 0 {
@@ -447,7 +481,7 @@ func (resolver ArchitectureSimulationPlanResolver) resolveArchitectureCandidate(
 	search := resolver.Search
 	search.Status = architecturesearch.SearchSelected
 	search.Selected = &candidate
-	search.Alternatives = nil
+	search.Alternatives = retainedArchitectureAlternatives(resolver.Search, state.Fingerprint)
 	search.Rationale = nil
 	lowered, loweringIssues := Lower(resolver.Requirement, search)
 	if reports.HasBlockingIssue(loweringIssues) {
@@ -473,6 +507,21 @@ func (resolver ArchitectureSimulationPlanResolver) resolveArchitectureCandidate(
 		return resolvedArchitectureCandidate{}, fmt.Errorf("resolve repaired architecture candidate: %s", joinReportIssues(resolutionIssues))
 	}
 	return resolvedArchitectureCandidate{Lowered: lowered, Resolved: resolved, SynthesisReport: synthesisReport}, nil
+}
+
+func retainedArchitectureAlternatives(search architecturesearch.SearchResult, selectedFingerprint string) []architecturesearch.CandidateResult {
+	retained := []architecturesearch.CandidateResult{}
+	if search.Selected != nil {
+		retained = append(retained, *search.Selected)
+	}
+	retained = append(retained, search.Alternatives...)
+	alternatives := make([]architecturesearch.CandidateResult, 0, len(retained)-1)
+	for _, candidate := range retained {
+		if candidate.Fingerprint != selectedFingerprint {
+			alternatives = append(alternatives, candidate)
+		}
+	}
+	return alternatives
 }
 
 func centerBehavioralInputBias(plan simmodel.Plan, kind, primaryInputNode string) (simmodel.Plan, error) {
@@ -891,7 +940,14 @@ func operatingHarnessDevices(requirement architecturesearch.Requirement, binding
 			continue
 		}
 		target, ok := operatingConditionSemanticTarget(condition, targets)
-		if !ok || target == ground {
+		if !ok {
+			return nil, fmt.Errorf("%s target %q does not resolve to a semantic net", condition.Axis, condition.Target)
+		}
+		loadReference, ok := operatingConditionReferenceTarget(requirement, condition, targets)
+		if !ok {
+			return nil, fmt.Errorf("%s target %q does not resolve to a reference domain", condition.Axis, condition.Target)
+		}
+		if target == loadReference {
 			return nil, fmt.Errorf("%s target %q does not resolve to a non-reference semantic net", condition.Axis, condition.Target)
 		}
 		instanceID := closedloopsynthesis.OperatingHarnessComponentID(condition.Axis, target)
@@ -899,10 +955,10 @@ func operatingHarnessDevices(requirement architecturesearch.Requirement, binding
 			continue
 		}
 		seen[instanceID] = true
-		positive, negative := target, ground
+		positive, negative := target, loadReference
 		if condition.Axis == "load_current" {
 			var endpointErr error
-			positive, negative, endpointErr = loadCurrentHarnessEndpoints(requirement, condition, targets, target, ground, resolvedPlan, analysisKind)
+			positive, negative, endpointErr = loadCurrentHarnessEndpoints(requirement, condition, targets, target, loadReference, resolvedPlan, analysisKind)
 			if endpointErr != nil {
 				return nil, endpointErr
 			}
@@ -1208,6 +1264,44 @@ func operatingConditionSemanticTarget(condition architecturesearch.OperatingCond
 	for _, kind := range []string{"port", "signal", "domain"} {
 		if target := targets[kind+"\x00"+condition.Target]; target != "" {
 			return target, true
+		}
+	}
+	return "", false
+}
+
+func operatingConditionReferenceTarget(requirement architecturesearch.Requirement, condition architecturesearch.OperatingCondition, targets map[string]string) (string, bool) {
+	domainID, ok := operatingConditionTargetDomain(requirement, condition.Target)
+	if !ok {
+		return "", false
+	}
+	for _, domain := range requirement.Requirements.Domains {
+		if domain.ID != domainID {
+			continue
+		}
+		referenceID := domainID
+		if domain.Kind != "reference" {
+			referenceID = referenceDomainForPower(requirement, domainID)
+		}
+		target := targets["domain\x00"+referenceID]
+		return target, target != ""
+	}
+	return "", false
+}
+
+func operatingConditionTargetDomain(requirement architecturesearch.Requirement, semanticID string) (string, bool) {
+	for _, port := range requirement.Requirements.Ports {
+		if port.ID == semanticID {
+			return port.Domain, port.Domain != ""
+		}
+	}
+	for _, signal := range requirement.Requirements.Signals {
+		if signal.ID == semanticID {
+			return signal.Domain, signal.Domain != ""
+		}
+	}
+	for _, domain := range requirement.Requirements.Domains {
+		if domain.ID == semanticID {
+			return domain.ID, true
 		}
 	}
 	return "", false
@@ -1776,12 +1870,13 @@ func behavioralPrimaryInputPort(requirement architecturesearch.Requirement, bind
 		}
 		ingress, roleScore := port.Direction == "sink", 0
 		for _, objective := range requirement.Requirements.Objectives {
-			boundToPort, producesSignal, consumesSignal := false, false, false
+			boundToPort, inputRole, producesSignal, consumesSignal := false, false, false, false
 			for _, binding := range objective.Bindings {
 				if binding.Port == port.ID {
 					boundToPort = true
 					switch binding.Role {
 					case "input", "signal", "sense":
+						inputRole = true
 						roleScore = max(roleScore, 5)
 					case "control", "enable", "mute", "bias":
 						roleScore = min(roleScore, -5)
@@ -1797,7 +1892,7 @@ func behavioralPrimaryInputPort(requirement architecturesearch.Requirement, bind
 					consumesSignal = true
 				}
 			}
-			if boundToPort && producesSignal && !consumesSignal {
+			if boundToPort && (producesSignal && !consumesSignal || port.Direction == "bidirectional" && inputRole) {
 				ingress = true
 			}
 		}
@@ -1994,7 +2089,10 @@ func (resolver ArchitectureSimulationPlanResolver) ResolveSimulationPlanSet(ctx 
 		return closedloopsynthesis.FreshSimulationPlanSet{}, fmt.Errorf("candidate fingerprint is absent from the retained architecture search")
 	}
 	search := resolver.Search
-	search.Status, search.Selected, search.Alternatives, search.Rationale = architecturesearch.SearchSelected, &candidate, nil, nil
+	search.Status = architecturesearch.SearchSelected
+	search.Selected = &candidate
+	search.Alternatives = retainedArchitectureAlternatives(resolver.Search, state.Fingerprint)
+	search.Rationale = nil
 	lowered, issues := Lower(resolver.Requirement, search)
 	if reports.HasBlockingIssue(issues) {
 		return closedloopsynthesis.FreshSimulationPlanSet{}, fmt.Errorf("lower architecture semantic bindings: %s", joinReportIssues(issues))

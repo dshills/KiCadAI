@@ -415,8 +415,123 @@ func resolvedAssertionBinding(assertion PlannedAssertion, referenceNode string, 
 	default:
 		return binding, &Diagnostic{Path: "assertions." + assertion.RequirementID, Message: "behavioral metric has no registered structured simulation binding"}
 	}
+	switch assertion.Metric {
+	case "dc_voltage", "output_high_voltage", "rise_time", "fall_time", "settling_time", "response_time", "muted_output_voltage", "output_swing", "startup_output_voltage":
+		localReference, required := behavioralObservationReferenceNode(requirement, assertion.RequirementID, semanticBindings)
+		if required && (localReference == "" || localReference == prototype.Node) {
+			return binding, &Diagnostic{Path: "assertions." + assertion.RequirementID, Message: "voltage-domain behavior requires one distinct resolved reference-domain node"}
+		}
+		prototype.ReferenceNode = localReference
+	}
 	binding.Prototypes = []simmodel.Assertion{prototype}
 	return binding, nil
+}
+
+func behavioralObservationReferenceNode(requirement architecturesearch.Requirement, requirementID string, semanticBindings []SemanticBinding) (string, bool) {
+	var observation architecturesearch.Observation
+	found := false
+	for _, behavior := range requirement.Requirements.BehavioralRequirements {
+		if behavior.ID == requirementID {
+			observation, found = behavior.Observation, true
+			break
+		}
+	}
+	if !found || observation.Kind == "circuit" {
+		return "", false
+	}
+	domainID := ""
+	switch observation.Kind {
+	case "port":
+		for _, port := range requirement.Requirements.Ports {
+			if port.ID == observation.ID {
+				domainID = port.Domain
+				break
+			}
+		}
+	case "signal":
+		for _, signal := range requirement.Requirements.Signals {
+			if signal.ID == observation.ID {
+				domainID = signal.Domain
+				break
+			}
+		}
+	case "domain":
+		domainID = observation.ID
+	}
+	if domainID == "" {
+		return "", true
+	}
+	referenceID, ok := behavioralReferenceDomain(requirement, domainID)
+	if !ok {
+		return "", true
+	}
+	for _, binding := range semanticBindings {
+		if binding.Kind == "domain" && binding.ID == referenceID {
+			return binding.Target, binding.Target != ""
+		}
+	}
+	return "", true
+}
+
+func behavioralReferenceDomain(requirement architecturesearch.Requirement, domainID string) (string, bool) {
+	var references []string
+	for _, domain := range requirement.Requirements.Domains {
+		if domain.ID == domainID && domain.Kind == "reference" {
+			return domain.ID, true
+		}
+		if domain.Kind == "reference" {
+			references = append(references, domain.ID)
+		}
+	}
+	slices.Sort(references)
+	if len(references) == 0 {
+		return "", false
+	}
+	if len(references) == 1 {
+		return references[0], true
+	}
+	domainTokens := behavioralDomainTokens(domainID)
+	best, bestScore, ambiguous := "", 0, false
+	for _, reference := range references {
+		score := sharedBehavioralDomainTokens(domainTokens, behavioralDomainTokens(reference))
+		switch {
+		case score > bestScore:
+			best, bestScore, ambiguous = reference, score, false
+		case score == bestScore && score > 0:
+			ambiguous = true
+		}
+	}
+	return best, bestScore > 0 && !ambiguous
+}
+
+func behavioralDomainTokens(value string) []string {
+	tokens := strings.FieldsFunc(strings.ToLower(value), func(candidate rune) bool {
+		return candidate < 'a' || candidate > 'z'
+	})
+	filtered := tokens[:0]
+	for _, token := range tokens {
+		switch token {
+		case "", "v", "volt", "volts", "supply", "power", "rail", "ground", "gnd", "reference", "return":
+			continue
+		default:
+			filtered = append(filtered, token)
+		}
+	}
+	return slices.Compact(filtered)
+}
+
+func sharedBehavioralDomainTokens(left, right []string) int {
+	rightSet := map[string]bool{}
+	for _, token := range right {
+		rightSet[token] = true
+	}
+	count := 0
+	for _, token := range left {
+		if rightSet[token] {
+			count++
+		}
+	}
+	return count
 }
 
 func uniqueOperatingSourceForAxis(bindings []SimulationOperatingBinding, axis string, plan simmodel.Plan) (string, bool) {

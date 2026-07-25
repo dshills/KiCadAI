@@ -3,11 +3,12 @@
 package compositionlowering
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"slices"
 	"strings"
-	"unicode"
 
 	"kicadai/internal/architecturesearch"
 	"kicadai/internal/circuitgraph"
@@ -23,15 +24,26 @@ const (
 )
 
 type Evidence struct {
-	Schema               string                                `json:"schema"`
-	PolicyVersion        string                                `json:"policy_version"`
-	RequirementHash      string                                `json:"requirement_hash"`
-	RegistryHash         string                                `json:"registry_hash"`
-	CatalogHash          string                                `json:"catalog_hash"`
-	FormulaLibraryHash   string                                `json:"formula_library_hash"`
-	CandidateFingerprint string                                `json:"candidate_fingerprint"`
-	Selections           []string                              `json:"selections"`
-	SemanticBindings     []closedloopsynthesis.SemanticBinding `json:"semantic_bindings"`
+	Schema               string                                   `json:"schema"`
+	PolicyVersion        string                                   `json:"policy_version"`
+	RequirementHash      string                                   `json:"requirement_hash"`
+	RegistryHash         string                                   `json:"registry_hash"`
+	CatalogHash          string                                   `json:"catalog_hash"`
+	FormulaLibraryHash   string                                   `json:"formula_library_hash"`
+	CandidateFingerprint string                                   `json:"candidate_fingerprint"`
+	Selections           []string                                 `json:"selections"`
+	SemanticBindings     []closedloopsynthesis.SemanticBinding    `json:"semantic_bindings"`
+	SystemPlan           *architecturesearch.SystemPlan           `json:"system_plan,omitempty"`
+	Backtracking         *architecturesearch.BacktrackingEvidence `json:"backtracking,omitempty"`
+	HierarchyBindings    []HierarchyBinding                       `json:"hierarchy_bindings,omitempty"`
+}
+
+type HierarchyBinding struct {
+	Kind           string   `json:"kind"`
+	ID             string   `json:"id"`
+	ObligationPath string   `json:"obligation_path,omitempty"`
+	FunctionIDs    []string `json:"function_ids,omitempty"`
+	ConnectionIDs  []string `json:"connection_ids,omitempty"`
 }
 
 type Result struct {
@@ -71,6 +83,31 @@ func Lower(requirement architecturesearch.Requirement, search architecturesearch
 	if validation := architecturesearch.Validate(requirement); len(validation) != 0 {
 		return Result{}, issues("requirement", "composition lowering requires a valid normalized requirement")
 	}
+	var systemPlan *architecturesearch.SystemPlan
+	var backtracking *architecturesearch.BacktrackingEvidence
+	if requirement.Version == architecturesearch.VersionV4 {
+		if search.Selected.SystemPlan == nil {
+			return Result{}, issues("search.selected.system_plan", "V4 composition lowering requires a persisted system plan")
+		}
+		if err := architecturesearch.ValidateSystemPlan(requirement, search.Selected.Fingerprint, *search.Selected.SystemPlan); err != nil {
+			return Result{}, issues("search.selected.system_plan", err.Error())
+		}
+		if search.Backtracking == nil {
+			return Result{}, issues("search.backtracking", "V4 composition lowering requires deterministic architecture backtracking evidence")
+		}
+		if err := validateRetainedBacktracking(search); err != nil {
+			return Result{}, issues("search.backtracking", err.Error())
+		}
+		var err error
+		systemPlan, err = cloneEvidence(search.Selected.SystemPlan)
+		if err != nil {
+			return Result{}, issues("search.selected.system_plan", "clone system plan: "+err.Error())
+		}
+		backtracking, err = cloneEvidence(search.Backtracking)
+		if err != nil {
+			return Result{}, issues("search.backtracking", "clone backtracking evidence: "+err.Error())
+		}
+	}
 
 	intent := circuitgraph.FunctionIntent{
 		Constraints: circuitgraph.SynthesisConstraints{
@@ -87,7 +124,6 @@ func Lower(requirement architecturesearch.Requirement, search architecturesearch
 	union := newDisjointSet()
 	actual := map[string]circuitgraph.FunctionalEndpoint{}
 	metadata := map[string]nodeMetadata{}
-	referenceDomain := firstReferenceDomain(requirement)
 	interfaces, externalNodes := lowerInterfaces(requirement, union, actual, metadata)
 	intent.Interfaces = interfaces
 
@@ -100,6 +136,8 @@ func Lower(requirement architecturesearch.Requirement, search architecturesearch
 	bindingsByAnchor := map[string][]pendingPortBinding{}
 	participantPorts := map[string]map[string]architecturesearch.PortContract{}
 	anchorBindingCounts := map[string]int{}
+	anchorNodes := map[string][]string{}
+	functionsByObligation := map[string][]string{}
 	transitionsByAnchor := map[string][]pendingSeriesTransition{}
 	for selectionIndex, selection := range selections {
 		realization, err := architecturesearch.DecodeFragmentRealization(selection.Payload)
@@ -119,6 +157,7 @@ func Lower(requirement architecturesearch.Requirement, search architecturesearch
 			}
 			instanceIDs[id] = true
 			localIDs[instance.ID] = id
+			functionsByObligation[selection.ObligationPath] = append(functionsByObligation[selection.ObligationPath], id)
 		}
 		for _, instance := range realization.Instances {
 			id := localIDs[instance.ID]
@@ -162,7 +201,8 @@ func Lower(requirement architecturesearch.Requirement, search architecturesearch
 			id := localIDs[binding.Instance]
 			function := functionNode(id, binding.Function)
 			anchor := anchorNode(port.Anchor, binding.Lane)
-			bindingMetadata := contractNodeMetadata(port.Contract, binding.Lane, referenceDomain)
+			anchorNodes[port.Anchor] = append(anchorNodes[port.Anchor], anchor)
+			bindingMetadata := contractNodeMetadata(port.Contract, binding.Lane, referenceDomainForPower(requirement, port.Contract.Domain))
 			if binding.NetRole != "" {
 				bindingMetadata.role = lowerNetRole(binding.NetRole)
 			}
@@ -181,9 +221,10 @@ func Lower(requirement architecturesearch.Requirement, search architecturesearch
 				return Result{}, issues(fmt.Sprintf("selections[%d].series_transitions[%d]", selectionIndex, transitionIndex), "series-transition role has no selected obligation anchor")
 			}
 			anchor := anchorNode(port.Anchor, transition.Lane)
+			anchorNodes[port.Anchor] = append(anchorNodes[port.Anchor], anchor)
 			transitionsByAnchor[anchor] = append(transitionsByAnchor[anchor], pendingSeriesTransition{
 				input: functionNode(localIDs[transition.Input.Instance], transition.Input.Function), output: functionNode(localIDs[transition.Output.Instance], transition.Output.Function),
-				anchor: anchor, contract: port.Contract, metadata: contractNodeMetadata(port.Contract, transition.Lane, referenceDomain),
+				anchor: anchor, contract: port.Contract, metadata: contractNodeMetadata(port.Contract, transition.Lane, referenceDomainForPower(requirement, port.Contract.Domain)),
 				path: fmt.Sprintf("selections[%d].series_transitions[%d]", selectionIndex, transitionIndex),
 			})
 		}
@@ -269,8 +310,134 @@ func Lower(requirement architecturesearch.Requirement, search architecturesearch
 		RequirementHash: search.RequirementHash, RegistryHash: search.RegistryHash, CatalogHash: search.CatalogHash,
 		FormulaLibraryHash: search.FormulaLibraryHash, CandidateFingerprint: search.Selected.Score.Fingerprint,
 		Selections: selectionEvidence, SemanticBindings: lowerSemanticBindings(requirement, union, connectionNames, externalNodes),
+		SystemPlan: systemPlan, Backtracking: backtracking,
+	}
+	if systemPlan != nil {
+		evidence.HierarchyBindings = lowerHierarchyBindings(*systemPlan, functionsByObligation, anchorNodes, union, connectionNames)
+		if err := validateHierarchyBindings(*systemPlan, evidence.HierarchyBindings); err != nil {
+			return Result{}, issues("evidence.hierarchy_bindings", err.Error())
+		}
 	}
 	return Result{Document: document, Evidence: evidence}, nil
+}
+
+func validateRetainedBacktracking(search architecturesearch.SearchResult) error {
+	if search.Selected == nil || search.Backtracking == nil {
+		return fmt.Errorf("selected candidate and backtracking evidence are required")
+	}
+	byFingerprint := map[string]architecturesearch.CandidateResult{}
+	retained := append([]architecturesearch.CandidateResult{*search.Selected}, search.Alternatives...)
+	for _, candidate := range retained {
+		if candidate.Fingerprint == "" {
+			return fmt.Errorf("retained architecture has an empty fingerprint")
+		}
+		if _, exists := byFingerprint[candidate.Fingerprint]; exists {
+			return fmt.Errorf("retained architecture %s is duplicated", candidate.Fingerprint)
+		}
+		byFingerprint[candidate.Fingerprint] = candidate
+	}
+	ordered := make([]architecturesearch.CandidateResult, 0, len(search.Backtracking.CandidateOrder))
+	for _, fingerprint := range search.Backtracking.CandidateOrder {
+		candidate, exists := byFingerprint[fingerprint]
+		if !exists {
+			return fmt.Errorf("backtracking evidence references missing architecture %s", fingerprint)
+		}
+		ordered = append(ordered, candidate)
+		delete(byFingerprint, fingerprint)
+	}
+	if len(byFingerprint) != 0 {
+		return fmt.Errorf("backtracking evidence omits %d retained architectures", len(byFingerprint))
+	}
+	return architecturesearch.ValidateBacktrackingEvidence(*search.Backtracking, ordered)
+}
+
+func cloneEvidence[T any](source *T) (*T, error) {
+	encoded, err := json.Marshal(source)
+	if err != nil {
+		return nil, err
+	}
+	var result T
+	if err := json.Unmarshal(encoded, &result); err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
+func lowerHierarchyBindings(
+	plan architecturesearch.SystemPlan,
+	functionsByObligation map[string][]string,
+	anchorNodes map[string][]string,
+	union *disjointSet,
+	connectionNames map[string]string,
+) []HierarchyBinding {
+	result := make([]HierarchyBinding, 0, len(plan.Hierarchy.Blocks)+len(plan.Interfaces))
+	for _, block := range plan.Hierarchy.Blocks {
+		result = append(result, HierarchyBinding{
+			Kind: "block", ID: block.ID, ObligationPath: block.ObligationPath,
+			FunctionIDs: sortedUnique(functionsByObligation[block.ObligationPath]),
+		})
+	}
+	for _, contract := range plan.Interfaces {
+		nodes := append([]string(nil), anchorNodes[contract.Anchor]...)
+		nodes = append(nodes, anchorNode(contract.Anchor, ""))
+		connectionIDs := make([]string, 0, len(nodes))
+		for _, node := range nodes {
+			if connection := connectionNames[union.find(node)]; connection != "" {
+				connectionIDs = append(connectionIDs, connection)
+			}
+		}
+		result = append(result, HierarchyBinding{
+			Kind: "interface", ID: contract.ID,
+			ConnectionIDs: sortedUnique(connectionIDs),
+		})
+	}
+	slices.SortStableFunc(result, func(left, right HierarchyBinding) int {
+		if order := strings.Compare(left.Kind, right.Kind); order != 0 {
+			return order
+		}
+		return strings.Compare(left.ID, right.ID)
+	})
+	return result
+}
+
+func validateHierarchyBindings(plan architecturesearch.SystemPlan, bindings []HierarchyBinding) error {
+	expected := map[string]bool{}
+	for _, block := range plan.Hierarchy.Blocks {
+		expected["block:"+block.ID] = true
+	}
+	for _, contract := range plan.Interfaces {
+		expected["interface:"+contract.ID] = true
+	}
+	seen := map[string]bool{}
+	for _, binding := range bindings {
+		key := binding.Kind + ":" + binding.ID
+		if !expected[key] || seen[key] {
+			return fmt.Errorf("hierarchy binding %s is unknown or duplicated", key)
+		}
+		seen[key] = true
+		switch binding.Kind {
+		case "block":
+			if binding.ObligationPath == "" || len(binding.FunctionIDs) == 0 {
+				return fmt.Errorf("block binding %s lacks lowered function identities", binding.ID)
+			}
+		case "interface":
+			if len(binding.ConnectionIDs) == 0 {
+				return fmt.Errorf("interface binding %s lacks lowered connection identities", binding.ID)
+			}
+		default:
+			return fmt.Errorf("hierarchy binding %s has unsupported kind", key)
+		}
+	}
+	if len(seen) != len(expected) {
+		return fmt.Errorf("hierarchy bindings are incomplete: got %d want %d", len(seen), len(expected))
+	}
+	return nil
+}
+
+func sortedUnique(values []string) []string {
+	values = append([]string(nil), values...)
+	slices.Sort(values)
+	return slices.Compact(values)
 }
 
 func exportUnboundParticipantPorts(union *disjointSet, actual map[string]circuitgraph.FunctionalEndpoint, metadata map[string]nodeMetadata, ports map[string]map[string]architecturesearch.PortContract, bindingCounts map[string]int) []circuitgraph.InterfaceRequirement {
@@ -372,7 +539,6 @@ func lowerDomain(domain architecturesearch.Domain) circuitgraph.PowerDomainInten
 func lowerInterfaces(requirement architecturesearch.Requirement, union *disjointSet, actual map[string]circuitgraph.FunctionalEndpoint, metadata map[string]nodeMetadata) ([]circuitgraph.InterfaceRequirement, map[string]string) {
 	result := make([]circuitgraph.InterfaceRequirement, 0, len(requirement.Requirements.Ports))
 	nodes := map[string]string{}
-	referenceDomain := firstReferenceDomain(requirement)
 	for _, port := range requirement.Requirements.Ports {
 		primaryRole := portNetRole(port)
 		candidate := circuitgraph.InterfaceRequirement{ID: port.ID, Role: interfaceRole(port)}
@@ -395,6 +561,7 @@ func lowerInterfaces(requirement architecturesearch.Requirement, union *disjoint
 			domain := port.Domain
 			role := primaryRole
 			if lane == "return" {
+				referenceDomain := referenceDomainForPower(requirement, port.Domain)
 				anchor = anchorNode("domain:"+referenceDomain, "")
 				// Device-side return bindings use the power-port return anchor,
 				// while the physical connector return is intentionally shared
@@ -425,6 +592,9 @@ func joinPowerSignalsToDomains(requirement architecturesearch.Requirement, union
 			continue
 		}
 		union.join(anchorNode("signal:"+signal.ID, ""), anchorNode("domain:"+signal.Domain, ""))
+		if reference := referenceDomainForPower(requirement, signal.Domain); reference != "" {
+			union.join(anchorNode("signal:"+signal.ID, "return"), anchorNode("domain:"+reference, ""))
+		}
 	}
 }
 
@@ -561,6 +731,69 @@ func firstReferenceDomain(requirement architecturesearch.Requirement) string {
 		}
 	}
 	return ""
+}
+
+func referenceDomainForPower(requirement architecturesearch.Requirement, powerDomain string) string {
+	references := []string{}
+	for _, domain := range requirement.Requirements.Domains {
+		if domain.Kind == "reference" {
+			references = append(references, domain.ID)
+		}
+	}
+	slices.Sort(references)
+	if len(references) == 0 {
+		return ""
+	}
+	if len(references) == 1 {
+		return references[0]
+	}
+	powerTokens := semanticDomainTokens(powerDomain)
+	best := references[0]
+	bestScore := 0
+	ambiguous := false
+	for _, reference := range references {
+		score := sharedDomainTokenCount(powerTokens, semanticDomainTokens(reference))
+		switch {
+		case score > bestScore:
+			best, bestScore, ambiguous = reference, score, false
+		case score == bestScore && score > 0:
+			ambiguous = true
+		}
+	}
+	if bestScore > 0 && !ambiguous {
+		return best
+	}
+	return firstReferenceDomain(requirement)
+}
+
+func semanticDomainTokens(value string) []string {
+	tokens := strings.FieldsFunc(strings.ToLower(value), func(candidate rune) bool {
+		return candidate < 'a' || candidate > 'z'
+	})
+	filtered := tokens[:0]
+	for _, token := range tokens {
+		switch token {
+		case "", "v", "volt", "volts", "supply", "power", "rail", "ground", "gnd", "reference", "return":
+			continue
+		default:
+			filtered = append(filtered, token)
+		}
+	}
+	return slices.Compact(filtered)
+}
+
+func sharedDomainTokenCount(left, right []string) int {
+	rightSet := map[string]bool{}
+	for _, token := range right {
+		rightSet[token] = true
+	}
+	count := 0
+	for _, token := range left {
+		if rightSet[token] {
+			count++
+		}
+	}
+	return count
 }
 
 func contractNodeMetadata(contract architecturesearch.PortContract, lane, referenceDomain string) nodeMetadata {
@@ -702,13 +935,23 @@ func anchorNode(anchor, lane string) string {
 func safeID(value string) string {
 	var builder strings.Builder
 	for _, candidate := range strings.ToLower(strings.TrimSpace(value)) {
-		if unicode.IsLetter(candidate) || unicode.IsDigit(candidate) || candidate == '_' {
+		if candidate >= 'a' && candidate <= 'z' || candidate >= '0' && candidate <= '9' || candidate == '_' {
 			builder.WriteRune(candidate)
 		} else {
 			builder.WriteByte('_')
 		}
 	}
-	return strings.Trim(builder.String(), "_")
+	result := strings.Trim(builder.String(), "_")
+	if result == "" || result[0] < 'a' || result[0] > 'z' {
+		result = "id_" + result
+	}
+	const maxGraphIDLength = 63
+	if len(result) <= maxGraphIDLength {
+		return result
+	}
+	digest := sha256.Sum256([]byte(result))
+	suffix := hex.EncodeToString(digest[:8])
+	return result[:maxGraphIDLength-len(suffix)-1] + "_" + suffix
 }
 
 func issues(path, message string) []reports.Issue {

@@ -6,9 +6,11 @@ import (
 	"fmt"
 	"math"
 	"slices"
+	"strings"
 
 	"kicadai/internal/components"
 	"kicadai/internal/reports"
+	"kicadai/internal/simmodel"
 )
 
 // The methods in this file are reusable capability providers for v2 requests.
@@ -31,7 +33,10 @@ func (provider *CatalogProvider) expandGenericThreshold(ctx context.Context, req
 	if hysteresisTolerance == 0 {
 		hysteresisTolerance = 10
 	}
-	legacy := cloneProviderRequest(request)
+	legacy, err := cloneProviderRequest(request)
+	if err != nil {
+		return nil, err
+	}
 	legacy.Constraints = []Constraint{
 		numericConstraint("threshold_voltage", "target", threshold, "V", tolerance),
 		numericConstraint("hysteresis_width", "target", hysteresis, "V", hysteresisTolerance),
@@ -49,7 +54,10 @@ func (provider *CatalogProvider) expandGenericLoadSwitch(ctx context.Context, re
 		return nil, fmt.Errorf("load switch requires a positive load-current bound")
 	}
 	voltage := maximumPortVoltage(request.Ports)
-	legacy := cloneProviderRequest(request)
+	legacy, err := cloneProviderRequest(request)
+	if err != nil {
+		return nil, err
+	}
 	for index := range legacy.Ports {
 		if legacy.Ports[index].Role == "control" && legacy.Ports[index].Contract.Voltage.Maximum != nil && *legacy.Ports[index].Contract.Voltage.Maximum > 5.1 {
 			legacy.Ports[index].Contract.Voltage.Minimum = float64Pointer(0)
@@ -106,6 +114,10 @@ func (provider *CatalogProvider) expandGenericRegulator(ctx context.Context, req
 	if !ok || inputMaximum <= output {
 		return nil, fmt.Errorf("regulator input range does not provide positive headroom")
 	}
+	if operatingMinimum, operatingMaximum, found := numericConstraintBounds(request.Constraints, "input_supply_voltage"); found {
+		inputMinimum = math.Min(inputMinimum, operatingMinimum)
+		inputMaximum = math.Max(inputMaximum, operatingMaximum)
+	}
 	current, currentTolerance, ok := firstNumericConstraint(request.Constraints, "continuous_output_current", "output_current")
 	if !ok {
 		current = requiredRoleCurrentA(request.Ports, "output")
@@ -113,7 +125,10 @@ func (provider *CatalogProvider) expandGenericRegulator(ctx context.Context, req
 	if current <= 0 {
 		return nil, fmt.Errorf("voltage regulation requires an output-current bound")
 	}
-	legacy := cloneProviderRequest(request)
+	legacy, err := cloneProviderRequest(request)
+	if err != nil {
+		return nil, err
+	}
 	legacy.Constraints = mergeProjectedConstraints(legacy.Constraints, []Constraint{
 		boolConstraint("adjustable_output", "required"),
 		stringConstraint("set_point_programming", "equal", "passive_feedback"),
@@ -203,8 +218,243 @@ func (provider *CatalogProvider) expandFixedRegulators(ctx context.Context, requ
 			return nil, err
 		}
 		result = append(result, expansions...)
+		ballasted, found, err := provider.expandThermallyBallastedFixedRegulator(ctx, request, part, output, inputMinimum, inputMaximum, current, outputCapacitance, transientCalculation)
+		if err != nil {
+			return nil, err
+		}
+		if found {
+			result = append(result, ballasted...)
+		}
 	}
 	return result, nil
+}
+
+type fixedRegulatorThermalBallastSolution struct {
+	part                   catalogPart
+	resistanceOhm          float64
+	minimumResistanceOhm   float64
+	maximumResistanceOhm   float64
+	maximumDissipationW    float64
+	allowableDissipationW  float64
+	minimumRegulatorInputV float64
+	maximumRegulatorInputV float64
+}
+
+func (provider *CatalogProvider) expandThermallyBallastedFixedRegulator(
+	ctx context.Context,
+	request ProviderRequest,
+	regulator catalogPart,
+	output, inputMinimum, inputMaximum, current float64,
+	outputCapacitance string,
+	transientCalculation *CalculationEvidence,
+) ([]ProviderExpansion, bool, error) {
+	if !regulatorThermalEvidenceRequired(request) {
+		return nil, false, nil
+	}
+	solution, found := provider.solveFixedRegulatorThermalBallast(ctx, request, regulator, output, inputMinimum, inputMaximum, current)
+	if !found {
+		return nil, false, nil
+	}
+	regulator.selected.InstanceID, regulator.usage = "regulator", "regulator"
+	parts := []catalogPart{regulator, solution.part}
+	var err error
+	parts, err = provider.appendPassiveParts(ctx, parts, []passivePart{
+		{"input_bypass", "capacitor", "decoupling", "1u"},
+		{"output_bypass", "capacitor", "decoupling", outputCapacitance},
+	})
+	if err != nil {
+		return nil, false, err
+	}
+	bindings := bindRoles(request.Ports, regulator.selected.InstanceID, map[string]string{"input": "VIN", "output": "VOUT", "reference": "GND"})
+	for index := range bindings {
+		if bindings[index].Role == "input" {
+			bindings[index].Instance, bindings[index].Function = solution.part.selected.InstanceID, "A"
+		}
+	}
+	regulatorInputEndpoints := []RealizationEndpoint{
+		passiveEndpoint(solution.part.selected.InstanceID, "B"),
+		endpoint(regulator, "VIN"),
+		passiveEndpoint("input_bypass", "A"),
+	}
+	if recordHasFunction(regulator.record, "EN") {
+		regulatorInputEndpoints = append(regulatorInputEndpoints, endpoint(regulator, "EN"))
+	}
+	connections := []RealizationConnection{
+		semanticNet("ballasted_regulator_input", "power", regulatorInputEndpoints...),
+		semanticNet("regulator_output", "power", endpoint(regulator, "VOUT"), passiveEndpoint("output_bypass", "A")),
+		semanticNet("regulator_ground", "reference", endpoint(regulator, "GND"), passiveEndpoint("input_bypass", "B"), passiveEndpoint("output_bypass", "B")),
+	}
+	dropoutCalculation, err := regulatorDropoutCalculation(solution.minimumRegulatorInputV, catalogUncertaintyMaximum(regulator.record, "model_parameters.output_voltage_v", output), regulator.record)
+	if err != nil {
+		return nil, false, err
+	}
+	powerCalculation, issues := EvaluateRatings("thermal_ballast_power", []RatingRequirement{{
+		Kind:           "continuous_power",
+		Required:       solution.maximumDissipationW,
+		Rated:          solution.allowableDissipationW,
+		DeratingFactor: 1,
+		Unit:           "W",
+		Evidence:       solution.part.evidence,
+	}})
+	if len(issues) != 0 {
+		return nil, false, fmt.Errorf("thermal-ballast power evidence failed: %s", issues[0].Message)
+	}
+	calculations := []CalculationEvidence{dropoutCalculation, powerCalculation}
+	if transientCalculation != nil {
+		calculations = append(calculations, *transientCalculation)
+	}
+	expansions, err := provider.expansion(
+		request,
+		"ballasted_regulator_"+derivedSemanticIdentifier(regulator.record.ID),
+		parts,
+		bindings,
+		connections,
+		calculations,
+		0,
+	)
+	if err != nil {
+		return nil, false, err
+	}
+	return expansions, true, nil
+}
+
+func (provider *CatalogProvider) solveFixedRegulatorThermalBallast(
+	ctx context.Context,
+	request ProviderRequest,
+	regulator catalogPart,
+	output, inputMinimum, inputMaximum, current float64,
+) (fixedRegulatorThermalBallastSolution, bool) {
+	ambient, _, ambientOK := firstNumericConstraint(request.Constraints, "ambient_temperature")
+	thermalResistance, thermalOK := catalogSimulationParameter(regulator.record, "junction_to_ambient_c_per_w")
+	maximumTemperature, maximumOK := catalogSimulationParameter(regulator.record, "max_temperature_c")
+	quiescentCurrent, quiescentOK := catalogSimulationParameter(regulator.record, "quiescent_current_a")
+	dropout, dropoutOK := recordRegulatorDropoutV(regulator.record)
+	if !ambientOK || !thermalOK || !maximumOK || !quiescentOK || !dropoutOK ||
+		current <= 0 || inputMinimum <= 0 || inputMaximum < inputMinimum ||
+		thermalResistance <= 0 || maximumTemperature <= ambient || quiescentCurrent < 0 {
+		return fixedRegulatorThermalBallastSolution{}, false
+	}
+	outputMinimum, outputMaximum := catalogUncertaintyInterval(regulator.record, "model_parameters.output_voltage_v", output)
+	inputCurrent := current + quiescentCurrent
+	allowableRegulatorPower := (maximumTemperature - ambient) / thermalResistance
+	maximumRegulatorInput := outputMinimum + (allowableRegulatorPower-outputMinimum*quiescentCurrent)/inputCurrent
+	requiredMinimumResistance := (inputMaximum - maximumRegulatorInput) / inputCurrent
+	permittedMaximumResistance := (inputMinimum - outputMaximum - dropout) / inputCurrent
+	if requiredMinimumResistance <= 0 || permittedMaximumResistance <= requiredMinimumResistance {
+		return fixedRegulatorThermalBallastSolution{}, false
+	}
+	temperature := temperatureRequirementFromConstraints(request.Constraints)
+	type candidate struct {
+		record               components.ComponentRecord
+		resistance           float64
+		minimumResistance    float64
+		maximumResistance    float64
+		maximumDissipation   float64
+		allowableDissipation float64
+		area                 float64
+	}
+	var candidates []candidate
+	for _, record := range provider.catalog.Records {
+		if record.Family != "resistor" || record.Generic || record.Resistor == nil || !record.Resistor.FabricationProof ||
+			!catalogRecordHasSimulationModel(record, simmodel.PrimitiveResistorV1) {
+			continue
+		}
+		resistance, resistanceOK := recordValue(record, "resistance", "ohm")
+		tolerancePercent, toleranceOK := catalogToleranceMaximum(record, "resistance", "%")
+		if !resistanceOK || !toleranceOK || tolerancePercent < 0 || tolerancePercent >= 100 {
+			continue
+		}
+		minimumResistance := resistance * (1 - tolerancePercent/100)
+		maximumResistance := resistance * (1 + tolerancePercent/100)
+		if minimumResistance < requiredMinimumResistance || maximumResistance > permittedMaximumResistance {
+			continue
+		}
+		maximumDissipation := inputCurrent * inputCurrent * maximumResistance
+		allowableDissipation, powerOK := catalogResistorAllowablePowerW(record, ambient)
+		if !powerOK || maximumDissipation > catalogRatingDeratingFactor*allowableDissipation {
+			continue
+		}
+		area := math.Inf(1)
+		for _, variant := range record.Packages {
+			if variant.DimensionsMM != nil {
+				area = math.Min(area, variant.DimensionsMM.Width*variant.DimensionsMM.Height)
+			}
+		}
+		candidates = append(candidates, candidate{
+			record: record, resistance: resistance, minimumResistance: minimumResistance, maximumResistance: maximumResistance,
+			maximumDissipation: maximumDissipation, allowableDissipation: allowableDissipation, area: area,
+		})
+	}
+	slices.SortStableFunc(candidates, func(left, right candidate) int {
+		if left.area < right.area {
+			return -1
+		}
+		if left.area > right.area {
+			return 1
+		}
+		if left.resistance < right.resistance {
+			return -1
+		}
+		if left.resistance > right.resistance {
+			return 1
+		}
+		return strings.Compare(left.record.ID, right.record.ID)
+	})
+	for _, choice := range candidates {
+		requiredRatings := []components.RequiredRating{{Kind: "power", Value: numericString(choice.maximumDissipation), Unit: "W"}}
+		part, err := provider.selectComponentWithTemperature(ctx, "resistor", choice.record.MPN, requiredRatings, true, temperature)
+		if err != nil || part.record.ID != choice.record.ID {
+			continue
+		}
+		part.selected.InstanceID, part.usage, part.value = "thermal_ballast", "current_limit", engineeringValue(choice.resistance, "Ohm")
+		return fixedRegulatorThermalBallastSolution{
+			part:                   part,
+			resistanceOhm:          choice.resistance,
+			minimumResistanceOhm:   choice.minimumResistance,
+			maximumResistanceOhm:   choice.maximumResistance,
+			maximumDissipationW:    choice.maximumDissipation,
+			allowableDissipationW:  choice.allowableDissipation,
+			minimumRegulatorInputV: inputMinimum - inputCurrent*choice.maximumResistance,
+			maximumRegulatorInputV: inputMaximum - inputCurrent*choice.minimumResistance,
+		}, true
+	}
+	return fixedRegulatorThermalBallastSolution{}, false
+}
+
+func catalogRecordHasSimulationModel(record components.ComponentRecord, modelID string) bool {
+	return slices.ContainsFunc(record.SimulationModels, func(model simmodel.CatalogEvidence) bool {
+		return model.ModelID == modelID
+	})
+}
+
+func catalogResistorAllowablePowerW(record components.ComponentRecord, ambientC float64) (float64, bool) {
+	evidence := record.Resistor
+	if evidence == nil || evidence.RatedPower == nil || evidence.DeratedPower == nil ||
+		evidence.RatedPower.TemperatureC == nil || evidence.DeratedPower.TemperatureC == nil ||
+		evidence.MaximumElementTemperatureC == nil {
+		return 0, false
+	}
+	ratedPower, ratedOK := convertCatalogUnit(evidence.RatedPower.Value, evidence.RatedPower.Unit, "W")
+	deratedPower, deratedOK := convertCatalogUnit(evidence.DeratedPower.Value, evidence.DeratedPower.Unit, "W")
+	ratedTemperature, deratedTemperature, maximumTemperature := *evidence.RatedPower.TemperatureC, *evidence.DeratedPower.TemperatureC, *evidence.MaximumElementTemperatureC
+	if !ratedOK || !deratedOK || ratedPower <= 0 || deratedPower <= 0 ||
+		ratedTemperature >= deratedTemperature || deratedTemperature >= maximumTemperature || ambientC >= maximumTemperature {
+		return 0, false
+	}
+	switch {
+	case ambientC <= ratedTemperature:
+		return ratedPower, true
+	case ambientC <= deratedTemperature:
+		fraction := (ambientC - ratedTemperature) / (deratedTemperature - ratedTemperature)
+		return ratedPower + fraction*(deratedPower-ratedPower), true
+	default:
+		return deratedPower * (maximumTemperature - ambientC) / (maximumTemperature - deratedTemperature), true
+	}
+}
+
+func catalogUncertaintyMaximum(record components.ComponentRecord, target string, nominal float64) float64 {
+	_, maximum := catalogUncertaintyInterval(record, target, nominal)
+	return maximum
 }
 
 func (provider *CatalogProvider) expandIsolatedRegulator(ctx context.Context, request ProviderRequest) ([]ProviderExpansion, error) {
@@ -291,7 +541,10 @@ func (provider *CatalogProvider) expandGenericTranslator(ctx context.Context, re
 	if frequency <= 0 {
 		return nil, &interfaceSynthesisError{code: CodeInterfaceTranslationUnavailable, message: "logic translation requires protocol frequency evidence"}
 	}
-	legacy := cloneProviderRequest(request)
+	legacy, err := cloneProviderRequest(request)
+	if err != nil {
+		return nil, err
+	}
 	legacy.Constraints = mergeProjectedConstraints(legacy.Constraints, []Constraint{
 		stringConstraint("protocol", "equal", "i2c"),
 		stringConstraint("signaling_mode", "equal", "open_drain"),
@@ -467,11 +720,16 @@ func (provider *CatalogProvider) expandSafetyInterlock(ctx context.Context, requ
 	return provider.expansion(request, "dual_fault_fail_safe_interlock", parts, bindings, connections, nil, 0)
 }
 
-func cloneProviderRequest(request ProviderRequest) ProviderRequest {
-	encoded, _ := json.Marshal(request)
+func cloneProviderRequest(request ProviderRequest) (ProviderRequest, error) {
+	encoded, err := json.Marshal(request)
+	if err != nil {
+		return ProviderRequest{}, fmt.Errorf("clone provider request: %w", err)
+	}
 	var cloned ProviderRequest
-	_ = json.Unmarshal(encoded, &cloned)
-	return cloned
+	if err := json.Unmarshal(encoded, &cloned); err != nil {
+		return ProviderRequest{}, fmt.Errorf("clone provider request: %w", err)
+	}
+	return cloned, nil
 }
 
 func firstNumericConstraint(constraints []Constraint, names ...string) (float64, float64, bool) {
@@ -2645,9 +2903,19 @@ func (provider *CatalogProvider) expandGalvanicIsolation(ctx context.Context, re
 		return nil, err
 	}
 	isolator.selected.InstanceID, isolator.usage = "bus_isolator", "bidirectional_i2c_isolation"
+	pullupA, err := solveOpenDrainPullup(request, isolator, "side_a", voltageAMax, "max_output_current_a")
+	if err != nil {
+		return nil, err
+	}
+	pullupB, err := solveOpenDrainPullup(request, isolator, "side_b", voltageBMax, "max_output_current_a")
+	if err != nil {
+		return nil, err
+	}
+	pullupValueA := engineeringValue(pullupA.resistance, "Ohm")
+	pullupValueB := engineeringValue(pullupB.resistance, "Ohm")
 	parts, err := provider.appendPassiveParts(ctx, []catalogPart{isolator}, []passivePart{
-		{"isolation_a_sda_pullup", "resistor", "bus_pullup", "4.7k"}, {"isolation_a_scl_pullup", "resistor", "bus_pullup", "4.7k"},
-		{"isolation_b_sda_pullup", "resistor", "bus_pullup", "4.7k"}, {"isolation_b_scl_pullup", "resistor", "bus_pullup", "4.7k"},
+		{"isolation_a_sda_pullup", "resistor", "bus_pullup", pullupValueA}, {"isolation_a_scl_pullup", "resistor", "bus_pullup", pullupValueA},
+		{"isolation_b_sda_pullup", "resistor", "bus_pullup", pullupValueB}, {"isolation_b_scl_pullup", "resistor", "bus_pullup", pullupValueB},
 		{"isolation_a_bypass", "capacitor", "decoupling", "100n"}, {"isolation_b_bypass", "capacitor", "decoupling", "100n"},
 	})
 	if err != nil {
@@ -2679,5 +2947,20 @@ func (provider *CatalogProvider) expandGalvanicIsolation(ctx context.Context, re
 		semanticNet("isolator_power_b", "power", endpoint(isolator, "VDD2"), passiveEndpoint("isolation_b_sda_pullup", "A"), passiveEndpoint("isolation_b_scl_pullup", "A"), passiveEndpoint("isolation_b_bypass", "A")),
 		semanticNet("isolator_reference_b", "reference", endpoint(isolator, "GND2"), passiveEndpoint("isolation_b_bypass", "B")),
 	}
-	return provider.expansion(request, "dual_domain_bidirectional_i2c_isolator", parts, bindings, connections, []CalculationEvidence{ratings}, 0)
+	repairs := make([]RealizationRepairVariable, 0, 4)
+	for _, side := range []struct {
+		instances []string
+		solution  openDrainPullupSolution
+	}{
+		{instances: []string{"isolation_a_sda_pullup", "isolation_a_scl_pullup"}, solution: pullupA},
+		{instances: []string{"isolation_b_sda_pullup", "isolation_b_scl_pullup"}, solution: pullupB},
+	} {
+		for _, instance := range side.instances {
+			repairs = append(repairs, RealizationRepairVariable{
+				ID: instance + "_resistance", Kind: "passive_value", Instance: instance, Value: side.solution.resistance, AllowedValues: side.solution.allowedValues, Unit: "Ohm",
+				Effects: []RealizationRepairEffect{{Analysis: simmodel.AnalysisTransient, Metric: "rise_time", Direction: "metric_increases"}},
+			})
+		}
+	}
+	return provider.expansionWithRepairs(request, "dual_domain_bidirectional_i2c_isolator", parts, bindings, connections, []CalculationEvidence{ratings}, repairs, 0)
 }

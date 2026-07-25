@@ -79,15 +79,23 @@ path.
 - A versioned twelve-case held-out capability benchmark spans analog, power,
   digital, MCU, sensor, and mixed-signal requirements without prescribing
   topology, components, nets, pins, or coordinates. The frozen installed-KiCad
-  baseline passed 5/12 cases. The final report passes 11/12 after adding
-  reusable constant-current regulation and precision-rectification support:
-  all three constant-current cases, both precision-rectification cases, and
-  every control pass simulation, routing/connectivity, writer, ERC, strict
-  DRC, zero-diff round trip, and deterministic replay. Standalone clock
-  generation remains a structured `clock_generation` capability gap. See the
+  baseline passed 5/12 cases. Constant-current regulation and precision
+  rectification advanced the original expansion report to 11/12, and generic
+  fixed-frequency and resistor-programmed clock generation subsequently closed
+  the benchmark at 12/12. Every row now passes simulation,
+  routing/connectivity, writer, ERC, strict DRC, zero-diff round trip, and
+  deterministic replay. See the
   [specification](specs/held-out-capability-expansion/SPEC.md),
   [baseline](specs/held-out-capability-expansion/BASELINE_REPORT.json), and
-  [final report](specs/held-out-capability-expansion/FINAL_REPORT.json).
+  [clock closeout audit](specs/standalone-clock-generation/AUDIT.md).
+- A frozen six-system V4 corpus now measures hierarchical synthesis across
+  protected Class-AB, precision analog, regulated MCU/sensor, isolated
+  mixed-voltage, high-current switched-load, and split-supply monitor systems.
+  Production code derives subsystem/block hierarchy, typed boundary contracts,
+  shared-resource plans, global backtracking evidence, physical partitions,
+  and requirement-to-KiCad traceability. All six pass the complete offline and
+  installed-KiCad two-run promotion gates. This is a bounded catalog-backed
+  envelope, not unrestricted arbitrary-circuit generation.
 - Arbitrary electronics generation is not yet guaranteed. Generic graphs fail
   closed on unknown parts, pins, ratings, placement, or routing capability.
 - MCU synthesis is limited to verified catalog records and modeled electrical

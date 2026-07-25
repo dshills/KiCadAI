@@ -155,6 +155,30 @@ func SupportsAnalysis(modelID, kind string) bool {
 	return slices.Contains(SupportedAnalysisKinds(modelID), strings.TrimSpace(kind))
 }
 
+// SupportsCatalogAnalysis reports whether a catalog claim can participate in
+// an executable workflow for kind. Component records carry primitive IDs,
+// while complete circuit plans carry graph-model IDs; treating only the latter
+// as evidence would incorrectly penalize every additional modeled component.
+func SupportsCatalogAnalysis(modelID, kind string) bool {
+	if SupportsAnalysis(modelID, kind) {
+		return true
+	}
+	primitive, ok := primitiveByID(strings.TrimSpace(modelID))
+	if !ok {
+		return false
+	}
+	switch strings.TrimSpace(kind) {
+	case AnalysisACSweep, AnalysisNoise, AnalysisStability:
+		return !primitive.Transient
+	case AnalysisDCOperatingPoint, AnalysisThermal:
+		return !primitive.Transient
+	case AnalysisDistortion, AnalysisStartup, AnalysisTransient:
+		return primitive.Family != "capacitor" || primitive.Transient
+	default:
+		return false
+	}
+}
+
 // CatalogAnalysisDependencies maps a workflow analysis to the catalog-model
 // behavior actually consumed by that analysis. Noise evaluation treats ideal
 // independent and regulated supplies as zero-noise small-signal boundaries;
@@ -185,7 +209,9 @@ func memorylessNonlinearPrimitive(modelID string) bool {
 	switch strings.TrimSpace(modelID) {
 	case PrimitiveComparatorOpenCollectorV1, PrimitiveBidirectionalTVSV1,
 		PrimitiveUnidirectionalZenerV1, PrimitiveDiodeShockleyV1,
-		PrimitiveNMOSSwitchV1, PrimitivePMOSSwitchV1, PrimitiveBJTNPNV1, PrimitiveBJTPNPV1:
+		PrimitiveNMOSSwitchV1, PrimitivePMOSSwitchV1, PrimitiveReverseBlockingLoadSwitchV1,
+		PrimitiveMCUStaticSupplyLoadV1, PrimitiveSensorStaticSupplyLoadV1,
+		PrimitiveBJTNPNV1, PrimitiveBJTPNPV1:
 		return true
 	default:
 		return false
@@ -197,7 +223,7 @@ func idealNoiseBoundaryPrimitive(modelID string) bool {
 	case PrimitiveVoltageSourceV1, PrimitiveConnectorVoltageSourceV1, PrimitiveCurrentSourceV1,
 		PrimitiveAdjustableLinearRegulatorV1, PrimitiveFixedLinearRegulatorV1,
 		PrimitiveFloatingAdjustableRegulatorV1, PrimitiveProgrammableCurrentSourceV1,
-		PrimitiveShuntVoltageReferenceV1, PrimitiveDualOutputIsolatedConverterV1,
+		PrimitiveShuntVoltageReferenceV1, PrimitiveSingleOutputIsolatedConverterV1, PrimitiveDualOutputIsolatedConverterV1,
 		PrimitiveFixedClockSourceV1, PrimitiveResistorProgrammedClockSourceV1:
 		return true
 	default:

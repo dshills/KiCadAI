@@ -137,9 +137,14 @@ type residualPhysicalRouteTreeResult struct {
 }
 
 type FinalRouteOrderNegotiationSummary struct {
-	Attempts      int      `json:"attempts"`
-	SelectedOrder string   `json:"selected_order,omitempty"`
-	PromotedNets  []string `json:"promoted_nets,omitempty"`
+	Attempts                int      `json:"attempts"`
+	SelectedOrder           string   `json:"selected_order,omitempty"`
+	PromotedNets            []string `json:"promoted_nets,omitempty"`
+	SearchLimitedNets       []string `json:"search_limited_nets,omitempty"`
+	SearchBudgetExpansions  int      `json:"search_budget_expansions,omitempty"`
+	MaximumSearchNodeLimit  int      `json:"maximum_search_node_limit,omitempty"`
+	SelectedSearchNodeLimit int      `json:"selected_search_node_limit,omitempty"`
+	SelectedNetOrder        []string `json:"selected_net_order,omitempty"`
 }
 
 type interBlockRouteTreeExecutionResult struct {

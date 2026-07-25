@@ -155,6 +155,7 @@ type CandidateResult struct {
 	Score        CandidateScore      `json:"score"`
 	Selections   []FragmentSelection `json:"selections"`
 	GlobalChecks []GlobalCheck       `json:"global_checks,omitempty"`
+	SystemPlan   *SystemPlan         `json:"system_plan,omitempty"`
 }
 
 type GlobalCheck struct {
@@ -244,21 +245,22 @@ type CapabilityCoverage struct {
 }
 
 type SearchResult struct {
-	Schema             string              `json:"schema"`
-	PolicyVersion      string              `json:"policy_version"`
-	Status             SearchStatus        `json:"status"`
-	RequirementHash    string              `json:"requirement_hash"`
-	RegistryHash       string              `json:"registry_hash"`
-	CatalogHash        string              `json:"catalog_hash,omitempty"`
-	FormulaLibraryHash string              `json:"formula_library_hash"`
-	Policy             SearchPolicy        `json:"policy"`
-	Consumption        SearchConsumption   `json:"consumption"`
-	Selected           *CandidateResult    `json:"selected,omitempty"`
-	Alternatives       []CandidateResult   `json:"alternatives,omitempty"`
-	Rationale          *SelectionRationale `json:"rationale,omitempty"`
-	Rejections         []RejectionSummary  `json:"rejections,omitempty"`
-	Coverage           *CapabilityCoverage `json:"coverage,omitempty"`
-	Issues             []reports.Issue     `json:"issues,omitempty"`
+	Schema             string                `json:"schema"`
+	PolicyVersion      string                `json:"policy_version"`
+	Status             SearchStatus          `json:"status"`
+	RequirementHash    string                `json:"requirement_hash"`
+	RegistryHash       string                `json:"registry_hash"`
+	CatalogHash        string                `json:"catalog_hash,omitempty"`
+	FormulaLibraryHash string                `json:"formula_library_hash"`
+	Policy             SearchPolicy          `json:"policy"`
+	Consumption        SearchConsumption     `json:"consumption"`
+	Selected           *CandidateResult      `json:"selected,omitempty"`
+	Alternatives       []CandidateResult     `json:"alternatives,omitempty"`
+	Rationale          *SelectionRationale   `json:"rationale,omitempty"`
+	Rejections         []RejectionSummary    `json:"rejections,omitempty"`
+	Coverage           *CapabilityCoverage   `json:"coverage,omitempty"`
+	Backtracking       *BacktrackingEvidence `json:"backtracking,omitempty"`
+	Issues             []reports.Issue       `json:"issues,omitempty"`
 }
 
 type SearchOptions struct {

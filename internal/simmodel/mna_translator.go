@@ -27,6 +27,8 @@ func stampNonlinearOpenDrainTranslator(system *mnaSystem, device compiledNonline
 		resistance := translatorChannelResistance(device, system, guess, channel)
 		stampAdmittance(system, device.terminals[fmt.Sprintf("A%d", channel)], device.terminals[fmt.Sprintf("B%d", channel)], complex(1/resistance, 0))
 	}
+	stampBoundedSupplyLoad(system, device.terminals["VCCA"], device.terminals["GND"], device.parameters["vcca_min_v"], device.parameters["vcca_quiescent_current_a"], guess)
+	stampBoundedSupplyLoad(system, device.terminals["VCCB"], device.terminals["GND"], device.parameters["vccb_min_v"], device.parameters["vccb_quiescent_current_a"], guess)
 }
 
 func addOpenDrainTranslatorResidual(residuals []complex128, base mnaSystem, device compiledNonlinearDevice, solution []complex128) {
@@ -42,6 +44,8 @@ func addOpenDrainTranslatorResidual(residuals []complex128, base mnaSystem, devi
 			residuals[index] -= complex(current, 0)
 		}
 	}
+	addBoundedSupplyLoadResidual(residuals, base, device.terminals["VCCA"], device.terminals["GND"], device.parameters["vcca_min_v"], device.parameters["vcca_quiescent_current_a"], solution)
+	addBoundedSupplyLoadResidual(residuals, base, device.terminals["VCCB"], device.terminals["GND"], device.parameters["vccb_min_v"], device.parameters["vccb_quiescent_current_a"], solution)
 }
 
 func validateOpenDrainTranslatorOperatingLimits(device ResolvedDevice, system mnaSystem, solution []complex128, allowPowerTransition bool) []Diagnostic {
@@ -53,8 +57,8 @@ func validateOpenDrainTranslatorOperatingLimits(device ResolvedDevice, system mn
 	oe := real(solvedNodeVoltage(system, solution, terminals["OE"])) - ground
 	path := "devices." + device.Component
 	var diagnostics []Diagnostic
-	vccaTolerance := 1e-9 * math.Max(1, math.Abs(parameters["vcca_max_v"]))
-	vccbTolerance := 1e-9 * math.Max(1, math.Abs(parameters["vccb_max_v"]))
+	vccaTolerance := nonlinearOperatingVoltageTolerance(parameters["vcca_max_v"])
+	vccbTolerance := nonlinearOperatingVoltageTolerance(parameters["vccb_max_v"])
 	if vcca > parameters["vcca_max_v"]+vccaTolerance || vcca < -vccaTolerance {
 		diagnostics = append(diagnostics, Diagnostic{Path: path + ".vcca", Message: fmt.Sprintf("translator VCCA %.12g V is outside catalog-backed range 0..%.12g V", vcca, parameters["vcca_max_v"]), Suggestion: "adjust supply conditions or select a compatible reviewed translator"})
 	}
@@ -95,7 +99,9 @@ func openDrainTranslatorDissipation(device ResolvedDevice, system mnaSystem, sol
 	vcca := real(solvedNodeVoltage(system, solution, terminals["VCCA"])) - ground
 	vccb := real(solvedNodeVoltage(system, solution, terminals["VCCB"])) - ground
 	compiled := compiledNonlinearDevice{primitive: device.PrimitiveModel, terminals: terminals, parameters: parameters}
-	dissipation := math.Abs(vcca)*parameters["vcca_quiescent_current_a"] + math.Abs(vccb)*parameters["vccb_quiescent_current_a"]
+	vccaCurrent, _ := boundedSupplyLoadCurrentAndGradient(vcca, parameters["vcca_min_v"], parameters["vcca_quiescent_current_a"])
+	vccbCurrent, _ := boundedSupplyLoadCurrentAndGradient(vccb, parameters["vccb_min_v"], parameters["vccb_quiescent_current_a"])
+	dissipation := math.Abs(vcca*vccaCurrent) + math.Abs(vccb*vccbCurrent)
 	for channel := 1; channel <= 2; channel++ {
 		a := real(solvedNodeVoltage(system, solution, terminals[fmt.Sprintf("A%d", channel)]))
 		b := real(solvedNodeVoltage(system, solution, terminals[fmt.Sprintf("B%d", channel)]))

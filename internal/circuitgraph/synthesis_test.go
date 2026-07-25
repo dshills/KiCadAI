@@ -121,3 +121,67 @@ func TestConnectionHasInternalPowerOutputSuppressesRedundantExternalFlag(t *test
 		t.Fatal("power input must not suppress an external-source flag")
 	}
 }
+
+func TestPropagatePowerFlagsAcrossSeriesPowerLimiters(t *testing.T) {
+	document := Document{
+		Nets: []Net{
+			{Name: "VIN", Role: NetRolePower, Endpoints: []Endpoint{
+				{Component: "limiter", SelectorKind: SelectorFunction, Selector: "A"},
+			}},
+			{Name: "VIN_LIMITED", Role: NetRolePower, Endpoints: []Endpoint{
+				{Component: "limiter", SelectorKind: SelectorFunction, Selector: "B"},
+				{Component: "regulator", SelectorKind: SelectorFunction, Selector: "VIN"},
+			}},
+		},
+		PowerFlags: []PowerFlag{{Net: "VIN"}},
+	}
+	selected := map[string]ResolvedComponent{
+		"limiter": {
+			Instance:  Component{Usage: "current_limit"},
+			Functions: []ResolvedFunction{{Function: "A"}, {Function: "B"}},
+		},
+		"regulator": {
+			Functions: []ResolvedFunction{{Function: "VIN", Electrical: "power_in"}},
+		},
+	}
+
+	propagatePowerFlagsAcrossSeriesPowerLimiters(&document, selected, map[string]string{"limiter": "current_limit"})
+
+	if len(document.PowerFlags) != 2 || document.PowerFlags[1].Net != "VIN_LIMITED" {
+		t.Fatalf("power flags = %#v, want VIN followed by VIN_LIMITED", document.PowerFlags)
+	}
+}
+
+func TestSeriesPowerLimiterPropagationRejectsSignalAndMultiPowerNetPaths(t *testing.T) {
+	document := Document{
+		Nets: []Net{
+			{Name: "VIN", Role: NetRolePower, Endpoints: []Endpoint{
+				{Component: "signal_limiter", SelectorKind: SelectorFunction, Selector: "A"},
+				{Component: "multi_limiter", SelectorKind: SelectorFunction, Selector: "A"},
+			}},
+			{Name: "SIGNAL", Role: NetRoleSignal, Endpoints: []Endpoint{
+				{Component: "signal_limiter", SelectorKind: SelectorFunction, Selector: "B"},
+			}},
+			{Name: "RAIL_A", Role: NetRolePower, Endpoints: []Endpoint{
+				{Component: "multi_limiter", SelectorKind: SelectorFunction, Selector: "B"},
+			}},
+			{Name: "RAIL_B", Role: NetRolePower, Endpoints: []Endpoint{
+				{Component: "multi_limiter", SelectorKind: SelectorFunction, Selector: "C"},
+			}},
+		},
+		PowerFlags: []PowerFlag{{Net: "VIN"}},
+	}
+	selected := map[string]ResolvedComponent{
+		"signal_limiter": {Instance: Component{Usage: "current_limit"}},
+		"multi_limiter":  {Instance: Component{Usage: "current_limit"}},
+	}
+
+	propagatePowerFlagsAcrossSeriesPowerLimiters(&document, selected, map[string]string{
+		"signal_limiter": "current_limit",
+		"multi_limiter":  "current_limit",
+	})
+
+	if len(document.PowerFlags) != 1 {
+		t.Fatalf("power flags = %#v, want no propagation", document.PowerFlags)
+	}
+}

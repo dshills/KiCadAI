@@ -102,7 +102,8 @@ func hasTransientEndpointLossDevice(plan Plan) bool {
 		switch device.PrimitiveModel {
 		case PrimitiveFuseClosedStateV1, PrimitiveBidirectionalTVSV1,
 			PrimitiveUnidirectionalZenerV1, PrimitiveDiodeShockleyV1,
-			PrimitiveNMOSSwitchV1, PrimitivePMOSSwitchV1, PrimitiveBJTNPNV1, PrimitiveBJTPNPV1:
+			PrimitiveNMOSSwitchV1, PrimitivePMOSSwitchV1, PrimitiveReverseBlockingLoadSwitchV1,
+			PrimitiveBJTNPNV1, PrimitiveBJTPNPV1:
 			return true
 		}
 	}
@@ -119,7 +120,8 @@ func transientEndpointSemiconductorLoss(plan Plan, point AnalysisPoint) float64 
 		switch models[device.Component] {
 		case PrimitiveFuseClosedStateV1, PrimitiveBidirectionalTVSV1,
 			PrimitiveUnidirectionalZenerV1, PrimitiveDiodeShockleyV1,
-			PrimitiveNMOSSwitchV1, PrimitivePMOSSwitchV1, PrimitiveBJTNPNV1, PrimitiveBJTPNPV1:
+			PrimitiveNMOSSwitchV1, PrimitivePMOSSwitchV1, PrimitiveReverseBlockingLoadSwitchV1,
+			PrimitiveBJTNPNV1, PrimitiveBJTPNPV1:
 			total += math.Abs(device.VoltageV) * device.CurrentMagnitudeA
 		}
 	}

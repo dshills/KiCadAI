@@ -247,6 +247,16 @@ func (accumulator *searchAccumulator) finish() SearchResult {
 	limit := minInt(len(accumulator.complete), accumulator.policy.MaxCompleteCandidates)
 	retained := retainTopologicallyDiverseCandidates(accumulator.complete, limit)
 	selected := retained[0]
+	if accumulator.requirement.Version == VersionV4 {
+		backtracking := BuildBacktrackingEvidence(retained)
+		if err := ValidateBacktrackingEvidence(backtracking, retained); err != nil {
+			accumulator.result.Status = SearchFailed
+			accumulator.result.Issues = []reports.Issue{architectureIssue(CodeHierarchyUnproven, "search.backtracking", err.Error())}
+			accumulator.finalizeCoverage()
+			return accumulator.result
+		}
+		accumulator.result.Backtracking = &backtracking
+	}
 	accumulator.result.Selected = &selected
 	if limit > 1 {
 		accumulator.result.Alternatives = append([]CandidateResult(nil), retained[1:]...)
@@ -396,6 +406,9 @@ func (accumulator *searchAccumulator) finalizeCoverage() {
 }
 
 func requirementPolicyVersion(requirement Requirement) string {
+	if requirement.Version == VersionV4 {
+		return PolicyVersionV4
+	}
 	if requirement.Version == VersionV3 {
 		return PolicyVersionV3
 	}
@@ -842,7 +855,15 @@ func candidateFromState(state searchState, requirement Requirement) (CandidateRe
 			*score.AreaMM2 += *selection.Metrics.AreaMM2
 		}
 	}
-	return CandidateResult{Fingerprint: fingerprint, Score: score, Selections: selections, GlobalChecks: globalChecks}, nil
+	candidate := CandidateResult{Fingerprint: fingerprint, Score: score, Selections: selections, GlobalChecks: globalChecks}
+	if requirement.Version == VersionV4 {
+		systemPlan, validation := BuildSystemPlan(requirement, candidate)
+		if validation != nil {
+			return CandidateResult{}, validation
+		}
+		candidate.SystemPlan = &systemPlan
+	}
+	return candidate, nil
 }
 
 func validateCandidateGlobal(requirement Requirement, selections []FragmentSelection) ([]GlobalCheck, *candidateValidation) {
@@ -1048,7 +1069,13 @@ func validateCandidateGlobal(requirement Requirement, selections []FragmentSelec
 			checks = append(checks, GlobalCheck{Code: CodeGlobalConstraintUnproven, Path: path, Message: "quadrature-integrated selected noise densities satisfy the system limit", Required: float64Pointer(required), Observed: float64Pointer(observed), Margin: float64Pointer(margin)})
 		case "reference_separation":
 			var required bool
-			if constraint.Relation != "required" || json.Unmarshal(constraint.Value, &required) != nil || !required || !referenceSeparationProven(selections) {
+			if constraint.Relation != "required" || json.Unmarshal(constraint.Value, &required) != nil {
+				return nil, &candidateValidation{Code: CodeGlobalConstraintUnproven, Path: path, Message: "reference separation must be expressed as a required boolean constraint"}
+			}
+			if !required {
+				continue
+			}
+			if !referenceSeparationProven(selections) {
 				return nil, &candidateValidation{Code: CodeGlobalConstraintUnproven, Path: path, Message: "galvanic reference separation is not proven by distinct selected domains"}
 			}
 			checks = append(checks, GlobalCheck{Code: CodeGlobalConstraintUnproven, Path: path, Message: "selected isolation boundaries keep references in distinct voltage domains", Required: float64Pointer(1), Observed: float64Pointer(1), Margin: float64Pointer(0)})

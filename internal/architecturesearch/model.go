@@ -11,9 +11,12 @@ const (
 	VersionV2       = 2
 	SchemaIDV3      = "kicadai.open-set-requirement.v3"
 	VersionV3       = 3
+	SchemaIDV4      = "kicadai.open-set-requirement.v4"
+	VersionV4       = 4
 	PolicyVersion   = "architecture-search-policy-v1"
 	PolicyVersionV2 = "architecture-search-policy-v2"
 	PolicyVersionV3 = "architecture-search-policy-v3"
+	PolicyVersionV4 = "architecture-search-policy-v4"
 
 	MaxRequirementBytes       = 256 * 1024
 	MaxDomains                = 16
@@ -194,20 +197,26 @@ type Observation struct {
 }
 
 type Acceptance struct {
-	RequireERC                 bool `json:"require_erc"`
-	RequireStrictDRC           bool `json:"require_strict_drc"`
-	RequireCompleteRouting     bool `json:"require_complete_routing"`
-	RequireConnectivity        bool `json:"require_connectivity"`
-	RequireWriterCorrectness   bool `json:"require_writer_correctness"`
-	RequireRoundTripZeroDiff   bool `json:"require_round_trip_zero_diff"`
-	RequireDeterministicReplay bool `json:"require_deterministic_replay"`
-	RequireContractComposition bool `json:"require_contract_composition,omitempty"`
-	RequireGlobalReasoning     bool `json:"require_global_reasoning,omitempty"`
-	RequireCoverageAccounting  bool `json:"require_coverage_accounting,omitempty"`
-	RequireAlternatives        bool `json:"require_alternatives,omitempty"`
-	RequireFailClosed          bool `json:"require_fail_closed,omitempty"`
-	RequireSimulation          bool `json:"require_simulation,omitempty"`
-	RequireAllCorners          bool `json:"require_all_corners,omitempty"`
-	RequireModelProvenance     bool `json:"require_model_provenance,omitempty"`
-	RequireClosedLoopEvidence  bool `json:"require_closed_loop_evidence,omitempty"`
+	RequireERC                       bool `json:"require_erc"`
+	RequireStrictDRC                 bool `json:"require_strict_drc"`
+	RequireCompleteRouting           bool `json:"require_complete_routing"`
+	RequireConnectivity              bool `json:"require_connectivity"`
+	RequireWriterCorrectness         bool `json:"require_writer_correctness"`
+	RequireRoundTripZeroDiff         bool `json:"require_round_trip_zero_diff"`
+	RequireDeterministicReplay       bool `json:"require_deterministic_replay"`
+	RequireContractComposition       bool `json:"require_contract_composition,omitempty"`
+	RequireGlobalReasoning           bool `json:"require_global_reasoning,omitempty"`
+	RequireCoverageAccounting        bool `json:"require_coverage_accounting,omitempty"`
+	RequireAlternatives              bool `json:"require_alternatives,omitempty"`
+	RequireFailClosed                bool `json:"require_fail_closed,omitempty"`
+	RequireSimulation                bool `json:"require_simulation,omitempty"`
+	RequireAllCorners                bool `json:"require_all_corners,omitempty"`
+	RequireModelProvenance           bool `json:"require_model_provenance,omitempty"`
+	RequireClosedLoopEvidence        bool `json:"require_closed_loop_evidence,omitempty"`
+	RequireHierarchicalDecomposition bool `json:"require_hierarchical_decomposition,omitempty"`
+	RequireInterfaceContracts        bool `json:"require_interface_contracts,omitempty"`
+	RequireSharedResourcePlanning    bool `json:"require_shared_resource_planning,omitempty"`
+	RequireDeterministicBacktracking bool `json:"require_deterministic_backtracking,omitempty"`
+	RequirePhysicalPartitioning      bool `json:"require_physical_partitioning,omitempty"`
+	RequireEndToEndTraceability      bool `json:"require_end_to_end_traceability,omitempty"`
 }

@@ -26,6 +26,37 @@ func TestPrimaryInputReferencePrefersSignalIngressOverControl(t *testing.T) {
 	}
 }
 
+func TestBehavioralVoltageAssertionUsesObservedDomainReference(t *testing.T) {
+	requirement := architecturesearch.Requirement{Requirements: architecturesearch.Requirements{
+		Domains: []architecturesearch.Domain{
+			{ID: "host_5v", Kind: "supply"},
+			{ID: "host_ground", Kind: "reference"},
+			{ID: "remote_1v8", Kind: "supply"},
+			{ID: "remote_ground", Kind: "reference"},
+		},
+		Ports: []architecturesearch.Port{{ID: "remote_bus", Kind: "digital_bus", Direction: "bidirectional", Domain: "remote_1v8"}},
+		BehavioralRequirements: []architecturesearch.BehavioralRequirement{{
+			ID: "rise", Metric: "rise_time", Observation: architecturesearch.Observation{Kind: "port", ID: "remote_bus"},
+		}},
+	}}
+	binding, diagnostic := resolvedAssertionBinding(
+		PlannedAssertion{RequirementID: "rise", Metric: "rise_time", Target: "REMOTE_BUS"},
+		"", nil, nil,
+		simmodel.Plan{Nodes: []string{"REMOTE_BUS", "REMOTE_GROUND"}},
+		requirement,
+		[]SemanticBinding{
+			{Kind: "domain", ID: "host_ground", Target: "HOST_GROUND"},
+			{Kind: "domain", ID: "remote_ground", Target: "REMOTE_GROUND"},
+		},
+	)
+	if diagnostic != nil {
+		t.Fatal(diagnostic.Message)
+	}
+	if len(binding.Prototypes) != 1 || binding.Prototypes[0].ReferenceNode != "REMOTE_GROUND" {
+		t.Fatalf("resolved assertion binding = %#v", binding)
+	}
+}
+
 func TestSourceSweepExcitationScalePreservesSemanticConnectorPolarity(t *testing.T) {
 	plan := simmodel.Plan{Devices: []simmodel.ResolvedDevice{{
 		Component:      "input",

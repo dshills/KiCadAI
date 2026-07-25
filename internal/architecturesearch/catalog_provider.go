@@ -919,79 +919,173 @@ func (provider *CatalogProvider) expandTranslator(ctx context.Context, request P
 		return nil, &interfaceSynthesisError{code: CodeInterfaceVoltageDomainMismatch, message: "level translation requires bounded positive voltage domains on both sides"}
 	}
 	low, high := math.Min(voltageA, voltageB), math.Max(voltageA, voltageB)
-	selection, err := provider.selectComponent(ctx, "level_translator", "partial_power_down", []components.RequiredRating{
-		{Kind: "vcca_supply_voltage", Value: numericString(low), Unit: "V"},
-		{Kind: "vccb_supply_voltage", Value: numericString(high), Unit: "V"},
-		{Kind: "open_drain_data_rate", Value: numericString(frequency), Unit: "Hz"},
-	}, true)
-	if err != nil {
-		return nil, &interfaceSynthesisError{code: CodeInterfaceTranslationUnavailable, message: "no catalog-backed translator proves both voltage domains, signaling mode, frequency, and unpowered behavior"}
-	}
-	if !translatorEvidenceSupports(selection.record, low, high, "open_drain", "bidirectional", frequency, 2, true) {
-		return nil, &interfaceSynthesisError{code: CodeInterfaceTranslationUnavailable, message: "selected translator lacks normalized mode, channel, voltage, frequency, startup, or partial-power-down evidence"}
-	}
-	pullupResistance := 4700.0
-	minimumPullupResistance := 1.0
-	maximumPullupResistance := pullupResistance
-	if riseTime, _, hasRiseTime := firstNumericConstraint(request.Constraints, "rise_time"); hasRiseTime && riseTime > 0 {
-		if _, loadCapacitance, hasLoadCapacitance := numericConstraintBounds(request.Constraints, "load_capacitance"); hasLoadCapacitance && loadCapacitance > 0 {
-			// Bound a 10%-to-90% RC rise plus deterministic margin for switch,
-			// protection, and interconnect capacitance that shares the bus.
-			maximumPullupResistance = riseTime / (2.5 * loadCapacitance)
-			if maximumChannelCurrent, currentOK := catalogSimulationParameter(selection.record, "max_channel_current_a"); currentOK && maximumChannelCurrent > 0 {
-				minimumPullupResistance = high / (catalogRatingDeratingFactor * maximumChannelCurrent)
-			}
-			if !finitePositive(maximumPullupResistance) || maximumPullupResistance < minimumPullupResistance {
-				return nil, &interfaceSynthesisError{code: CodeInterfacePullupWindowEmpty, message: "open-drain rise-time and sink-current requirements have no bounded pull-up solution"}
-			}
-			candidates, candidateIssues := PreferredValueCandidates(maximumPullupResistance, SeriesE24, minimumPullupResistance, maximumPullupResistance, 1)
-			if len(candidateIssues) != 0 || len(candidates) == 0 {
-				return nil, &interfaceSynthesisError{code: CodeInterfacePullupWindowEmpty, message: "open-drain pull-up preferred-value solution failed"}
-			}
-			pullupResistance = candidates[0]
+	isolated := false
+	if constraint, ok := namedConstraint(request.Constraints, "reference_separation"); ok {
+		if constraint.Relation != "required" || json.Unmarshal(constraint.Value, &isolated) != nil {
+			return nil, &interfaceSynthesisError{code: CodeInterfaceTranslationUnavailable, message: "reference separation must be a required boolean constraint"}
 		}
 	}
-	parts := []catalogPart{selection}
-	pullupValue := engineeringValue(pullupResistance, "Ohm")
-	parts, err = provider.appendPassiveParts(ctx, parts, []passivePart{{"side_a_sda_pullup", "resistor", "bus_pullup", pullupValue}, {"side_a_scl_pullup", "resistor", "bus_pullup", pullupValue}, {"side_b_sda_pullup", "resistor", "bus_pullup", pullupValue}, {"side_b_scl_pullup", "resistor", "bus_pullup", pullupValue}, {"vcca_bypass", "capacitor", "decoupling", "100n"}, {"vccb_bypass", "capacitor", "decoupling", "100n"}})
+	var selection catalogPart
+	if isolated {
+		selection, err = provider.selectComponent(ctx, "isolator", "i2c", []components.RequiredRating{
+			{Kind: "side_a_supply_voltage", Value: numericString(voltageA), Unit: "V"},
+			{Kind: "side_b_supply_voltage", Value: numericString(voltageB), Unit: "V"},
+			{Kind: "data_rate", Value: numericString(frequency), Unit: "Hz"},
+		}, true)
+		if err != nil || !recordHasFunction(selection.record, "SDA1") || !recordHasFunction(selection.record, "SCL1") ||
+			!recordHasFunction(selection.record, "SDA2") || !recordHasFunction(selection.record, "SCL2") {
+			return nil, &interfaceSynthesisError{code: CodeInterfaceTranslationUnavailable, message: "no catalog-backed isolating translator proves both voltage domains, bus channels, and frequency"}
+		}
+		selection.selected.InstanceID = "bus_isolator"
+		selection.usage = "bidirectional_i2c_isolation"
+	} else {
+		selection, err = provider.selectComponent(ctx, "level_translator", "partial_power_down", []components.RequiredRating{
+			{Kind: "vcca_supply_voltage", Value: numericString(low), Unit: "V"},
+			{Kind: "vccb_supply_voltage", Value: numericString(high), Unit: "V"},
+			{Kind: "open_drain_data_rate", Value: numericString(frequency), Unit: "Hz"},
+		}, true)
+		if err != nil {
+			return nil, &interfaceSynthesisError{code: CodeInterfaceTranslationUnavailable, message: "no catalog-backed translator proves both voltage domains, signaling mode, frequency, and unpowered behavior"}
+		}
+		if !translatorEvidenceSupports(selection.record, low, high, "open_drain", "bidirectional", frequency, 2, true) {
+			return nil, &interfaceSynthesisError{code: CodeInterfaceTranslationUnavailable, message: "selected translator lacks normalized mode, channel, voltage, frequency, startup, or partial-power-down evidence"}
+		}
+	}
+	currentParameter := "max_channel_current_a"
+	if isolated {
+		currentParameter = "max_output_current_a"
+	}
+	pullupA, err := solveOpenDrainPullup(request, selection, "side_a", voltageA, currentParameter)
 	if err != nil {
 		return nil, err
 	}
-	functions := map[string]string{"side_a_sda": "A1", "side_a_scl": "A2", "side_b_sda": "B1", "side_b_scl": "B2", "reference": "GND"}
-	if voltageA <= voltageB {
-		functions["power_a"], functions["power_b"] = "VCCA", "VCCB"
+	pullupB, err := solveOpenDrainPullup(request, selection, "side_b", voltageB, currentParameter)
+	if err != nil {
+		return nil, err
+	}
+	parts := []catalogPart{selection}
+	pullupValueA := engineeringValue(pullupA.resistance, "Ohm")
+	pullupValueB := engineeringValue(pullupB.resistance, "Ohm")
+	parts, err = provider.appendPassiveParts(ctx, parts, []passivePart{{"side_a_sda_pullup", "resistor", "bus_pullup", pullupValueA}, {"side_a_scl_pullup", "resistor", "bus_pullup", pullupValueA}, {"side_b_sda_pullup", "resistor", "bus_pullup", pullupValueB}, {"side_b_scl_pullup", "resistor", "bus_pullup", pullupValueB}, {"vcca_bypass", "capacitor", "decoupling", "100n"}, {"vccb_bypass", "capacitor", "decoupling", "100n"}})
+	if err != nil {
+		return nil, err
+	}
+	functions := map[string]string{}
+	if isolated {
+		functions = map[string]string{
+			"side_a_sda": "SDA1", "side_a_scl": "SCL1", "side_b_sda": "SDA2", "side_b_scl": "SCL2",
+			"power_a": "VDD1", "power_b": "VDD2", "reference": "GND1",
+		}
 	} else {
-		functions["power_a"], functions["power_b"] = "VCCB", "VCCA"
-		functions["side_a_sda"], functions["side_a_scl"] = "B1", "B2"
-		functions["side_b_sda"], functions["side_b_scl"] = "A1", "A2"
+		functions = map[string]string{"side_a_sda": "A1", "side_a_scl": "A2", "side_b_sda": "B1", "side_b_scl": "B2", "reference": "GND"}
+		if voltageA <= voltageB {
+			functions["power_a"], functions["power_b"] = "VCCA", "VCCB"
+		} else {
+			functions["power_a"], functions["power_b"] = "VCCB", "VCCA"
+			functions["side_a_sda"], functions["side_a_scl"] = "B1", "B2"
+			functions["side_b_sda"], functions["side_b_scl"] = "A1", "A2"
+		}
 	}
 	bindings := bindBusRoles(request.Ports, selection.selected.InstanceID, functions)
+	if isolated {
+		bindings = append(bindings, RealizationPortBinding{Role: "power_b", Lane: "return", Instance: selection.selected.InstanceID, Function: "GND2"})
+	}
 	connections := []RealizationConnection{
 		semanticNet("translator_side_a_sda", "open_drain_bus", endpoint(selection, functions["side_a_sda"]), passiveEndpoint("side_a_sda_pullup", "B")),
 		semanticNet("translator_side_a_scl", "open_drain_bus", endpoint(selection, functions["side_a_scl"]), passiveEndpoint("side_a_scl_pullup", "B")),
 		semanticNet("translator_side_b_sda", "open_drain_bus", endpoint(selection, functions["side_b_sda"]), passiveEndpoint("side_b_sda_pullup", "B")),
 		semanticNet("translator_side_b_scl", "open_drain_bus", endpoint(selection, functions["side_b_scl"]), passiveEndpoint("side_b_scl_pullup", "B")),
-		semanticNet("translator_power_a", "power", endpoint(selection, functions["power_a"]), passiveEndpoint("side_a_sda_pullup", "A"), passiveEndpoint("side_a_scl_pullup", "A"), bypassPowerEndpoint(voltageA <= voltageB, "A")),
-		semanticNet("translator_power_b", "power", endpoint(selection, functions["power_b"]), passiveEndpoint("side_b_sda_pullup", "A"), passiveEndpoint("side_b_scl_pullup", "A"), bypassPowerEndpoint(voltageA > voltageB, "A")),
-		semanticNet("translator_ground", "reference", endpoint(selection, "GND"), passiveEndpoint("vcca_bypass", "B"), passiveEndpoint("vccb_bypass", "B")),
+		semanticNet("translator_power_a", "power", endpoint(selection, functions["power_a"]), passiveEndpoint("side_a_sda_pullup", "A"), passiveEndpoint("side_a_scl_pullup", "A"), bypassPowerEndpoint(isolated || voltageA <= voltageB, "A")),
+		semanticNet("translator_power_b", "power", endpoint(selection, functions["power_b"]), passiveEndpoint("side_b_sda_pullup", "A"), passiveEndpoint("side_b_scl_pullup", "A"), bypassPowerEndpoint(!isolated && voltageA > voltageB, "A")),
 	}
-	for index := range connections {
-		if connections[index].ID == "translator_power_a" && functions["power_a"] == "VCCA" || connections[index].ID == "translator_power_b" && functions["power_b"] == "VCCA" {
-			connections[index].Endpoints = append(connections[index].Endpoints, endpoint(selection, "OE"))
+	if isolated {
+		connections = append(connections,
+			semanticNet("translator_ground_a", "reference", endpoint(selection, "GND1"), passiveEndpoint("vcca_bypass", "B")),
+			semanticNet("translator_ground_b", "reference", endpoint(selection, "GND2"), passiveEndpoint("vccb_bypass", "B")),
+		)
+	} else {
+		connections = append(connections, semanticNet("translator_ground", "reference", endpoint(selection, "GND"), passiveEndpoint("vcca_bypass", "B"), passiveEndpoint("vccb_bypass", "B")))
+		for index := range connections {
+			if connections[index].ID == "translator_power_a" && functions["power_a"] == "VCCA" || connections[index].ID == "translator_power_b" && functions["power_b"] == "VCCA" {
+				connections[index].Endpoints = append(connections[index].Endpoints, endpoint(selection, "OE"))
+			}
 		}
 	}
-	allowedPullups := preferredRepairValues(pullupResistance)
-	allowedPullups = slices.DeleteFunc(allowedPullups, func(value float64) bool {
-		return value < minimumPullupResistance || value > maximumPullupResistance
-	})
 	repairs := make([]RealizationRepairVariable, 0, 4)
-	for _, instance := range []string{"side_a_sda_pullup", "side_a_scl_pullup", "side_b_sda_pullup", "side_b_scl_pullup"} {
-		repairs = append(repairs, RealizationRepairVariable{
-			ID: instance + "_resistance", Kind: "passive_value", Instance: instance, Value: pullupResistance, AllowedValues: allowedPullups, Unit: "Ohm",
-			Effects: []RealizationRepairEffect{{Analysis: simmodel.AnalysisTransient, Metric: "rise_time", Direction: "metric_increases"}},
-		})
+	for _, side := range []struct {
+		instances []string
+		solution  openDrainPullupSolution
+	}{
+		{instances: []string{"side_a_sda_pullup", "side_a_scl_pullup"}, solution: pullupA},
+		{instances: []string{"side_b_sda_pullup", "side_b_scl_pullup"}, solution: pullupB},
+	} {
+		for _, instance := range side.instances {
+			repairs = append(repairs, RealizationRepairVariable{
+				ID: instance + "_resistance", Kind: "passive_value", Instance: instance, Value: side.solution.resistance, AllowedValues: side.solution.allowedValues, Unit: "Ohm",
+				Effects: []RealizationRepairEffect{{Analysis: simmodel.AnalysisTransient, Metric: "rise_time", Direction: "metric_increases"}},
+			})
+		}
 	}
-	return provider.expansionWithRepairs(request, "bidirectional_open_drain_translator", parts, bindings, connections, nil, repairs, 0)
+	expansionID := "bidirectional_open_drain_translator"
+	if isolated {
+		expansionID = "isolated_bidirectional_open_drain_translator"
+	}
+	return provider.expansionWithRepairs(request, expansionID, parts, bindings, connections, nil, repairs, 0)
+}
+
+type openDrainPullupSolution struct {
+	resistance    float64
+	allowedValues []float64
+}
+
+func solveOpenDrainPullup(request ProviderRequest, selection catalogPart, role string, maximumSupplyVoltage float64, currentParameter string) (openDrainPullupSolution, error) {
+	resistance := 4700.0
+	minimumResistance := 1.0
+	maximumResistance := resistance
+	riseTimeConstraint, riseTimeApplies := openDrainConstraintName(request, role, "rise_time")
+	loadCapacitanceConstraint, loadCapacitanceApplies := openDrainConstraintName(request, role, "load_capacitance")
+	if riseTime, _, hasRiseTime := firstNumericConstraint(request.Constraints, riseTimeConstraint); riseTimeApplies && hasRiseTime && riseTime > 0 {
+		if _, loadCapacitance, hasLoadCapacitance := numericConstraintBounds(request.Constraints, loadCapacitanceConstraint); loadCapacitanceApplies && hasLoadCapacitance && loadCapacitance > 0 {
+			// Bound a 10%-to-90% RC rise plus deterministic margin for switch,
+			// protection, and interconnect capacitance that shares the bus.
+			maximumResistance = riseTime / (2.5 * loadCapacitance)
+			if maximumChannelCurrent, currentOK := catalogSimulationParameter(selection.record, currentParameter); currentOK && maximumChannelCurrent > 0 {
+				minimumResistance = maximumSupplyVoltage / (catalogRatingDeratingFactor * maximumChannelCurrent)
+			}
+			if !finitePositive(maximumResistance) || maximumResistance < minimumResistance {
+				return openDrainPullupSolution{}, &interfaceSynthesisError{code: CodeInterfacePullupWindowEmpty, message: "open-drain rise-time and sink-current requirements have no bounded pull-up solution"}
+			}
+			candidates, candidateIssues := PreferredValueCandidates(maximumResistance, SeriesE24, minimumResistance, maximumResistance, 1)
+			if len(candidateIssues) != 0 || len(candidates) == 0 {
+				return openDrainPullupSolution{}, &interfaceSynthesisError{code: CodeInterfacePullupWindowEmpty, message: "open-drain pull-up preferred-value solution failed"}
+			}
+			resistance = candidates[0]
+		}
+	}
+	allowedValues := preferredRepairValues(resistance)
+	allowedValues = slices.DeleteFunc(allowedValues, func(value float64) bool {
+		return value < minimumResistance || value > maximumResistance
+	})
+	return openDrainPullupSolution{resistance: resistance, allowedValues: allowedValues}, nil
+}
+
+func openDrainConstraintName(request ProviderRequest, role, name string) (string, bool) {
+	if role == "" {
+		return name, true
+	}
+	scoped := role + "_" + name
+	if _, ok := namedConstraint(request.Constraints, scoped); ok {
+		return scoped, true
+	}
+	for _, port := range request.Ports {
+		if port.Role == "" || port.Role == role {
+			continue
+		}
+		if _, ok := namedConstraint(request.Constraints, port.Role+"_"+name); ok {
+			return "", false
+		}
+	}
+	return name, true
 }
 
 func translatorEvidenceSupports(record components.ComponentRecord, low, high float64, mode, direction string, frequency float64, channels int, partialPowerDown bool) bool {
@@ -2300,7 +2394,7 @@ func catalogBehaviorCalculations(request ProviderRequest, parts []catalogPart) (
 			}
 		}
 		if part.usage == "regulator" && regulatorThermalEvidenceRequired(request) {
-			calculation, proven := catalogRegulatorThermalCalculation(request, part)
+			calculation, proven := catalogRegulatorThermalCalculationWithParts(request, part, parts)
 			if !proven {
 				unproven++
 			} else {
@@ -2411,7 +2505,7 @@ func requiredCatalogAnalyses(request ProviderRequest) []string {
 
 func catalogRecordSupportsAnalysis(record components.ComponentRecord, analysis string) bool {
 	for _, model := range record.SimulationModels {
-		if simmodel.SupportsAnalysis(model.ModelID, analysis) {
+		if simmodel.SupportsCatalogAnalysis(model.ModelID, analysis) {
 			return true
 		}
 	}
@@ -2421,14 +2515,27 @@ func catalogRecordSupportsAnalysis(record components.ComponentRecord, analysis s
 func regulatorThermalEvidenceRequired(request ProviderRequest) bool {
 	_, junctionRequired := namedConstraint(request.Constraints, "junction_temperature")
 	_, trackingRequired := namedConstraint(request.Constraints, "thermal_tracking")
-	return canonicalIdentifier(request.Capability) == "voltage_regulation" && (junctionRequired || trackingRequired)
+	thermalAnalysisRequired := slices.Contains(requiredCatalogAnalyses(request), simmodel.AnalysisThermal)
+	return canonicalIdentifier(request.Capability) == "voltage_regulation" && (junctionRequired || trackingRequired || thermalAnalysisRequired)
 }
 
 func catalogRegulatorThermalCalculation(request ProviderRequest, part catalogPart) (CalculationEvidence, bool) {
+	return catalogRegulatorThermalCalculationWithParts(request, part, []catalogPart{part})
+}
+
+func catalogRegulatorThermalCalculationWithParts(request ProviderRequest, part catalogPart, parts []catalogPart) (CalculationEvidence, bool) {
 	inputMinimum, inputMaximum, inputOK := roleVoltageRange(request.Ports, "input")
+	if operatingMinimum, operatingMaximum, found := numericConstraintBounds(request.Constraints, "input_supply_voltage"); found {
+		inputMinimum = math.Min(inputMinimum, operatingMinimum)
+		inputMaximum = math.Max(inputMaximum, operatingMaximum)
+	}
 	_ = inputMinimum
 	output, _, outputOK := firstNumericConstraint(request.Constraints, "output_voltage", "dc_voltage")
 	current, _, currentOK := firstNumericConstraint(request.Constraints, "continuous_output_current", "output_current", "load_current")
+	if !currentOK {
+		current = requiredRoleCurrentA(request.Ports, "output")
+		currentOK = current > 0
+	}
 	ambient, _, ambientOK := firstNumericConstraint(request.Constraints, "ambient_temperature")
 	thermalResistance, thermalOK := catalogSimulationParameter(part.record, "junction_to_ambient_c_per_w")
 	maximumTemperature, maximumOK := catalogSimulationParameter(part.record, "max_temperature_c")
@@ -2447,7 +2554,23 @@ func catalogRegulatorThermalCalculation(request ProviderRequest, part catalogPar
 	if !inputOK || !outputOK || !currentOK || !ambientOK || !thermalOK || !maximumOK || !quiescentOK || inputMaximum <= output || current <= 0 || thermalResistance <= 0 || maximumTemperature <= 0 || quiescentCurrent < 0 {
 		return CalculationEvidence{}, false
 	}
-	dissipation := (inputMaximum-output)*current + inputMaximum*quiescentCurrent
+	outputMinimum, _ := catalogUncertaintyInterval(part.record, "model_parameters.output_voltage_v", output)
+	regulatorInputMaximum := inputMaximum
+	for _, candidate := range parts {
+		if candidate.selected.InstanceID != "thermal_ballast" {
+			continue
+		}
+		resistance, resistanceOK := recordValue(candidate.record, "resistance", "ohm")
+		tolerancePercent, toleranceOK := catalogToleranceMaximum(candidate.record, "resistance", "%")
+		if !resistanceOK || !toleranceOK || tolerancePercent < 0 || tolerancePercent >= 100 {
+			return CalculationEvidence{}, false
+		}
+		regulatorInputMaximum -= (current + quiescentCurrent) * resistance * (1 - tolerancePercent/100)
+	}
+	if regulatorInputMaximum <= outputMinimum {
+		return CalculationEvidence{}, false
+	}
+	dissipation := (regulatorInputMaximum-outputMinimum)*current + regulatorInputMaximum*quiescentCurrent
 	predictedJunction := ambient + dissipation*thermalResistance
 	calculation, _ := EvaluateRatings(part.selected.InstanceID+"_thermal", []RatingRequirement{{
 		Kind: "junction_temperature", Required: predictedJunction, Rated: maximumTemperature, DeratingFactor: 1, Unit: "degC", Evidence: part.evidence,

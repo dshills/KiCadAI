@@ -947,6 +947,7 @@
           "ac_sweep",
           "dc_operating_point",
           "distortion",
+          "noise",
           "stability",
           "startup",
           "thermal",
@@ -969,6 +970,7 @@
           "ac_sweep",
           "dc_operating_point",
           "distortion",
+          "noise",
           "stability",
           "startup",
           "thermal",
@@ -1039,7 +1041,7 @@
       "provenance": {
         "source": "https://www.espressif.com/sites/default/files/documentation/esp32-wroom-32e_esp32-wroom-32ue_datasheet_en.pdf",
         "revision": "ESP32-WROOM-32E/32UE datasheet v2.0; reviewed catalog maximum supply envelope",
-        "sha256": "efde98c21f13c54560498a9ad4164335e31ec5ab821b10ada4ce82e7e0c24994",
+        "sha256": "8bbd6f7610b0568484cb58ba6f915fdcb5d716986839a41c2cff525def6bb159",
         "review_status": "reviewed",
         "allowed_analyses": ["ac_sweep", "dc_operating_point", "distortion", "noise", "stability", "startup", "thermal", "transient"],
         "min_temperature_c": -40,
@@ -1053,7 +1055,7 @@
       "provenance": {
         "source": "https://ww1.microchip.com/downloads/en/DeviceDoc/Atmel-7810-Automotive-Microcontrollers-ATmega328P_Datasheet.pdf",
         "revision": "ATmega328P complete datasheet; reviewed catalog maximum supply-current envelope",
-        "sha256": "efde98c21f13c54560498a9ad4164335e31ec5ab821b10ada4ce82e7e0c24994",
+        "sha256": "8bbd6f7610b0568484cb58ba6f915fdcb5d716986839a41c2cff525def6bb159",
         "review_status": "reviewed",
         "allowed_analyses": ["ac_sweep", "dc_operating_point", "distortion", "noise", "stability", "startup", "thermal", "transient"],
         "min_temperature_c": -40,
@@ -1172,6 +1174,43 @@
       }
     },
     {
+      "catalog_id": "isolator.analog_devices.adum1252arz.soic8",
+      "family": "isolator",
+      "model_id": "mna_bidirectional_open_drain_isolator_v1",
+      "provenance": {
+        "source": "kicadai:trusted-simulation-registry",
+        "revision": "kicadai.trusted-simulation-registry.v1",
+        "sha256": "47bf4a564963e45638eabb568305934582b7b2835f0702fa04519255e44f8b54",
+        "review_status": "reviewed",
+        "allowed_analyses": [
+          "dc_operating_point",
+          "startup",
+          "thermal",
+          "transient"
+        ],
+        "min_temperature_c": -40,
+        "max_temperature_c": 125
+      }
+    },
+    {
+      "catalog_id": "isolated_converter.murata.mee1s0505sc.sip4",
+      "family": "isolated_converter",
+      "model_id": "mna_single_output_isolated_converter_v1",
+      "provenance": {
+        "source": "kicadai:trusted-simulation-registry",
+        "revision": "kicadai.trusted-simulation-registry.v1",
+        "sha256": "79fc329c079559d108b972f3b95daff4fdbf351ae435c9e4983aa0a5d8d0ac6b",
+        "review_status": "reviewed",
+        "allowed_analyses": [
+          "dc_operating_point",
+          "startup",
+          "transient"
+        ],
+        "min_temperature_c": -40,
+        "max_temperature_c": 85
+      }
+    },
+    {
       "catalog_id": "opamp.ti.lmv321.sot23_5",
       "family": "opamp",
       "model_id": "mna_opamp_single_pole_v1",
@@ -1232,6 +1271,25 @@
           "distortion",
           "noise",
           "stability",
+          "startup",
+          "thermal",
+          "transient"
+        ],
+        "min_temperature_c": -40,
+        "max_temperature_c": 125
+      }
+    },
+    {
+      "catalog_id": "protection.ti.tps22917dbv.sot23_6",
+      "family": "protection",
+      "model_id": "mna_reverse_blocking_load_switch_v1",
+      "provenance": {
+        "source": "https://www.ti.com/lit/ds/symlink/tps22917.pdf",
+        "revision": "TI TPS22917 SLVSDW8B, revised December 2021, reviewed 2026-07-25",
+        "sha256": "983edeaa5de32b1d5094221a21e79baaefa7250e4e9ce28901d67436f1585a2e",
+        "review_status": "reviewed",
+        "allowed_analyses": [
+          "dc_operating_point",
           "startup",
           "thermal",
           "transient"
@@ -1333,6 +1391,25 @@
         "review_status": "reviewed",
         "allowed_analyses": [
           "dc_operating_point"
+        ],
+        "min_temperature_c": -40,
+        "max_temperature_c": 85
+      }
+    },
+    {
+      "catalog_id": "regulator.linear.ap2112k_3v3.sot23_5",
+      "family": "regulator",
+      "model_id": "mna_fixed_linear_regulator_v1",
+      "provenance": {
+        "source": "kicadai:trusted-simulation-registry",
+        "revision": "kicadai.trusted-simulation-registry.v1",
+        "sha256": "b91850fcf3ec70ab1c138ebffc7be1258e35fbc4e74589138a4958439ee5e704",
+        "review_status": "reviewed",
+        "allowed_analyses": [
+          "dc_operating_point",
+          "startup",
+          "thermal",
+          "transient"
         ],
         "min_temperature_c": -40,
         "max_temperature_c": 85
@@ -1697,6 +1774,20 @@
       }
     },
     {
+      "catalog_id": "resistor.vishay.ac03.1r6.axial",
+      "family": "resistor",
+      "model_id": "mna_resistor_v1",
+      "provenance": {
+        "source": "https://www.vishay.com/docs/28730/ac_ac-at_ac-ni.pdf",
+        "revision": "vishay:AC03:AC03000001608JAC00:2026-07",
+        "sha256": "ed2413ddd37969961f8ad017ba272c18c42228660e14a5757b6b788f4326cf61",
+        "review_status": "reviewed",
+        "allowed_analyses": ["ac_sweep", "dc_operating_point", "distortion", "noise", "stability", "startup", "thermal", "transient"],
+        "min_temperature_c": -55,
+        "max_temperature_c": 250
+      }
+    },
+    {
       "catalog_id": "resistor.vishay.pr02.1k00.2w",
       "family": "resistor",
       "model_id": "mna_resistor_v1",
@@ -1987,6 +2078,29 @@
       }
     },
     {
+      "catalog_id": "resistor.yageo.rc0805fr_0747rl.0805",
+      "family": "resistor",
+      "model_id": "mna_resistor_v1",
+      "provenance": {
+        "source": "kicadai:trusted-simulation-registry",
+        "revision": "kicadai.trusted-simulation-registry.v1",
+        "sha256": "ed2413ddd37969961f8ad017ba272c18c42228660e14a5757b6b788f4326cf61",
+        "review_status": "reviewed",
+        "allowed_analyses": [
+          "ac_sweep",
+          "dc_operating_point",
+          "distortion",
+          "noise",
+          "stability",
+          "startup",
+          "thermal",
+          "transient"
+        ],
+        "min_temperature_c": -40,
+        "max_temperature_c": 85
+      }
+    },
+    {
       "catalog_id": "resistor.yageo.rc0805fr_074k7l.0805",
       "family": "resistor",
       "model_id": "mna_resistor_v1",
@@ -2039,7 +2153,7 @@
       "provenance": {
         "source": "https://www.bosch-sensortec.com/media/boschsensortec/downloads/datasheets/bst-bme280-ds002.pdf",
         "revision": "BST-BME280-DS002; reviewed catalog maximum supply-current envelope",
-        "sha256": "cfd949a608975a6a3f95f7e1e263eac742546797b54cc627a493db4ad3dc057c",
+        "sha256": "68c355c675a78c8f961ef19ea42d0d18d9988d272d9158bfb8af6539b1d6e5d3",
         "review_status": "reviewed",
         "allowed_analyses": ["ac_sweep", "dc_operating_point", "distortion", "noise", "stability", "startup", "thermal", "transient"],
         "min_temperature_c": -40,

@@ -279,6 +279,26 @@ func TestSupportedAnalysisKindsDescribeExecutableRegistryPaths(t *testing.T) {
 	}
 }
 
+func TestSupportsCatalogAnalysisRecognizesGraphPrimitivesWithoutOverclaiming(t *testing.T) {
+	for _, analysis := range []string{AnalysisACSweep, AnalysisDCOperatingPoint, AnalysisNoise, AnalysisStability, AnalysisThermal, AnalysisTransient} {
+		if !SupportsCatalogAnalysis(PrimitiveResistorV1, analysis) {
+			t.Fatalf("resistor primitive should support %s through a graph workflow", analysis)
+		}
+	}
+	if SupportsCatalogAnalysis(PrimitiveCapacitorV1, AnalysisTransient) {
+		t.Fatal("static capacitor primitive must not claim transient integration")
+	}
+	if !SupportsCatalogAnalysis(PrimitiveCapacitorTransientV1, AnalysisTransient) {
+		t.Fatal("backward-Euler capacitor primitive should support transient integration")
+	}
+	if SupportsCatalogAnalysis(PrimitiveRelayNormallyOpenV1, AnalysisThermal) {
+		t.Fatal("stateful normally-open relay primitive must not replace its closed-state thermal claim")
+	}
+	if SupportsCatalogAnalysis("missing", AnalysisThermal) {
+		t.Fatal("unknown catalog model must remain unsupported")
+	}
+}
+
 func TestCatalogAnalysisDependenciesKeepNoiseSourcesExplicitAndMapIdealBoundariesToAC(t *testing.T) {
 	if got := CatalogAnalysisDependencies(PrimitiveDualOutputIsolatedConverterV1, []string{AnalysisNoise, AnalysisDCOperatingPoint}); !slices.Equal(got, []string{AnalysisACSweep, AnalysisDCOperatingPoint}) {
 		t.Fatalf("converter dependencies = %#v", got)
@@ -286,12 +306,17 @@ func TestCatalogAnalysisDependenciesKeepNoiseSourcesExplicitAndMapIdealBoundarie
 	if got := CatalogAnalysisDependencies(PrimitiveFloatingAdjustableRegulatorV1, []string{AnalysisNoise}); !slices.Equal(got, []string{AnalysisACSweep}) {
 		t.Fatalf("regulator dependencies = %#v", got)
 	}
-	for _, model := range []string{PrimitiveResistorV1, PrimitiveOpAmpV1, PrimitiveCurrentSenseAmplifierV1} {
+	for _, model := range []string{PrimitiveResistorV1, PrimitiveFuseClosedStateV1, PrimitiveOpAmpV1, PrimitiveCurrentSenseAmplifierV1} {
 		if got := CatalogAnalysisDependencies(model, []string{AnalysisNoise}); !slices.Equal(got, []string{AnalysisNoise}) {
 			t.Fatalf("noise-producing model %s dependencies = %#v", model, got)
 		}
 	}
-	for _, model := range []string{PrimitiveComparatorOpenCollectorV1, PrimitiveDiodeShockleyV1, PrimitiveUnidirectionalZenerV1, PrimitiveBidirectionalTVSV1, PrimitiveNMOSSwitchV1, PrimitivePMOSSwitchV1, PrimitiveBJTNPNV1, PrimitiveBJTPNPV1} {
+	for _, model := range []string{
+		PrimitiveComparatorOpenCollectorV1, PrimitiveDiodeShockleyV1, PrimitiveUnidirectionalZenerV1,
+		PrimitiveBidirectionalTVSV1, PrimitiveNMOSSwitchV1, PrimitivePMOSSwitchV1,
+		PrimitiveReverseBlockingLoadSwitchV1, PrimitiveMCUStaticSupplyLoadV1,
+		PrimitiveSensorStaticSupplyLoadV1, PrimitiveBJTNPNV1, PrimitiveBJTPNPV1,
+	} {
 		if got := CatalogAnalysisDependencies(model, []string{AnalysisACSweep, AnalysisNoise, AnalysisStability}); !slices.Equal(got, []string{AnalysisDCOperatingPoint}) {
 			t.Fatalf("memoryless nonlinear model %s dependencies = %#v", model, got)
 		}

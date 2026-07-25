@@ -33,3 +33,59 @@ func TestFailedNetNegotiationRevisitsFailureAfterPriorityStateChanges(t *testing
 		t.Fatalf("result=%#v calls=%d summary=%#v", result, calls, summary)
 	}
 }
+
+func TestFailedNetNegotiationExpandsExhaustedSearchBudgetOnce(t *testing.T) {
+	request := routing.Request{
+		Rules: routing.Rules{MaxSearchNodes: 100},
+		Nets:  []routing.Net{{Name: "A"}},
+	}
+	calls := 0
+	route := func(_ context.Context, candidate routing.Request) routing.Result {
+		calls++
+		if candidate.Rules.MaxSearchNodes >= 400 {
+			return routing.Result{Status: routing.StatusRouted, Metrics: routing.Metrics{RoutedNetCount: 1}}
+		}
+		return routing.Result{
+			Status:  routing.StatusPartial,
+			Routes:  []routing.Route{{Net: "A", Status: routing.RouteStatusFailed, SearchLimitHit: true}},
+			Metrics: routing.Metrics{FailedNetCount: 1, MaxSearchNodesHit: true},
+			Issues:  []reports.Issue{{Severity: reports.SeverityBlocked, Nets: []string{"A"}}},
+		}
+	}
+
+	result, summary := routeWithFailedNetFirstNegotiationUsing(context.Background(), request, route)
+	if result.Status != routing.StatusRouted || calls != 3 || summary.Attempts != 3 {
+		t.Fatalf("result=%#v calls=%d summary=%#v", result, calls, summary)
+	}
+}
+
+func TestFailedNetNegotiationCanConvergeBeyondLegacyTwelveAttemptCeiling(t *testing.T) {
+	request := routing.Request{Nets: make([]routing.Net, 13)}
+	for index := range request.Nets {
+		request.Nets[index].Name = string(rune('A' + index))
+	}
+	calls := 0
+	route := func(_ context.Context, candidate routing.Request) routing.Result {
+		calls++
+		priority := 0
+		for _, net := range candidate.Nets {
+			if net.Name == "A" {
+				priority = net.Priority
+				break
+			}
+		}
+		if priority >= 13 {
+			return routing.Result{Status: routing.StatusRouted, Metrics: routing.Metrics{RoutedNetCount: len(candidate.Nets)}}
+		}
+		return routing.Result{
+			Status:  routing.StatusPartial,
+			Metrics: routing.Metrics{RoutedNetCount: len(candidate.Nets) - 1, FailedNetCount: 1},
+			Issues:  []reports.Issue{{Severity: reports.SeverityBlocked, Nets: []string{"A"}}},
+		}
+	}
+
+	result, summary := routeWithFailedNetFirstNegotiationUsing(context.Background(), request, route)
+	if result.Status != routing.StatusRouted || calls != 14 || summary.Attempts != 14 {
+		t.Fatalf("result=%#v calls=%d summary=%#v", result, calls, summary)
+	}
+}

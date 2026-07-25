@@ -114,19 +114,29 @@ var primitiveRegistry = []primitiveDefinition{
 	},
 	{
 		ID: PrimitiveMCUStaticSupplyLoadV1, Family: "mcu", Terminals: []string{"POWER", "GROUND"},
+		Nonlinear: true,
 		TerminalAliases: map[string][]string{
 			"POWER":  {"VDD", "VCC", "AVCC", "VDDA"},
 			"GROUND": {"GND", "VSS", "AGND", "VSSA"},
 		},
-		CatalogParameters: append([]valueRule{{Name: "maximum_supply_current_a", Positive: true, Maximum: 100}}, thermalParameterRules()...),
+		CatalogParameters: append([]valueRule{
+			{Name: "minimum_supply_voltage_v", Positive: true, Minimum: .01, Maximum: 1000},
+			{Name: "maximum_supply_voltage_v", Positive: true, Minimum: .01, Maximum: 1000},
+			{Name: "maximum_supply_current_a", Positive: true, Maximum: 100},
+		}, thermalParameterRules()...),
 	},
 	{
 		ID: PrimitiveSensorStaticSupplyLoadV1, Family: "sensor", Terminals: []string{"POWER", "GROUND"},
+		Nonlinear: true,
 		TerminalAliases: map[string][]string{
 			"POWER":  {"VDD", "VDDIO", "VCC", "VDDA"},
 			"GROUND": {"GND", "VSS", "AGND", "VSSA"},
 		},
-		CatalogParameters: append([]valueRule{{Name: "maximum_supply_current_a", Positive: true, Maximum: 100}}, thermalParameterRules()...),
+		CatalogParameters: append([]valueRule{
+			{Name: "minimum_supply_voltage_v", Positive: true, Minimum: .01, Maximum: 1000},
+			{Name: "maximum_supply_voltage_v", Positive: true, Minimum: .01, Maximum: 1000},
+			{Name: "maximum_supply_current_a", Positive: true, Maximum: 100},
+		}, thermalParameterRules()...),
 	},
 	{
 		ID: PrimitiveOpAmpV1, Family: "opamp", Terminals: []string{"IN_PLUS", "IN_MINUS", "OUT", "V_PLUS", "V_MINUS"}, OpAmp: true,
@@ -246,6 +256,16 @@ var primitiveRegistry = []primitiveDefinition{
 		},
 	},
 	{
+		ID: PrimitiveSingleOutputIsolatedConverterV1, Family: "isolated_converter", Terminals: []string{"VIN_PLUS", "VIN_MINUS", "VOUT_PLUS", "VOUT_MINUS"},
+		CatalogParameters: []valueRule{
+			{Name: "input_min_v", Positive: true, Maximum: 1000},
+			{Name: "input_max_v", Positive: true, Maximum: 1000},
+			{Name: "output_voltage_v", Positive: true, Minimum: .01, Maximum: 1000},
+			{Name: "max_output_current_a", Positive: true, Minimum: 1e-9, Maximum: 1e4},
+			{Name: "soft_start_time_s", Nonnegative: true, Maximum: 10},
+		},
+	},
+	{
 		ID: PrimitiveDualOutputIsolatedConverterV1, Family: "isolated_converter", Terminals: []string{"VIN_PLUS", "VIN_MINUS", "COMMON", "VOUT_PLUS", "VOUT_MINUS"},
 		CatalogParameters: []valueRule{
 			{Name: "input_min_v", Positive: true, Maximum: 1000},
@@ -273,6 +293,40 @@ var primitiveRegistry = []primitiveDefinition{
 			{Name: "vccb_quiescent_current_a", Nonnegative: true, Maximum: 100},
 			{Name: "max_temperature_c", Maximum: 1000},
 			{Name: "junction_to_ambient_c_per_w", Positive: true, Maximum: 1e6},
+		},
+	},
+	{
+		ID: PrimitiveBidirectionalOpenDrainIsolatorV1, Family: "isolator", Terminals: []string{"SDA1", "SCL1", "SDA2", "SCL2", "VDD1", "GND1", "VDD2", "GND2"}, Nonlinear: true,
+		CatalogParameters: []valueRule{
+			{Name: "side_a_min_v", Positive: true, Maximum: 1000},
+			{Name: "side_a_max_v", Positive: true, Maximum: 1000},
+			{Name: "side_b_min_v", Positive: true, Maximum: 1000},
+			{Name: "side_b_max_v", Positive: true, Maximum: 1000},
+			{Name: "low_level_threshold_v", Positive: true, Maximum: 100},
+			{Name: "output_on_resistance_ohm", Positive: true, Minimum: 1e-6, Maximum: 1e12},
+			{Name: "output_off_resistance_ohm", Positive: true, Minimum: 1, Maximum: 1e15},
+			{Name: "isolation_resistance_ohm", Positive: true, Minimum: 1e6, Maximum: 1e18},
+			{Name: "max_output_current_a", Positive: true, Minimum: 1e-9, Maximum: 1e4},
+			{Name: "side_a_quiescent_current_a", Nonnegative: true, Maximum: 100},
+			{Name: "side_b_quiescent_current_a", Nonnegative: true, Maximum: 100},
+			{Name: "max_temperature_c", Maximum: 1000},
+			{Name: "junction_to_ambient_c_per_w", Positive: true, Maximum: 1e6},
+		},
+	},
+	{
+		ID: PrimitiveReverseBlockingLoadSwitchV1, Family: "protection", Terminals: []string{"VIN", "VOUT", "GND", "ON"}, Nonlinear: true,
+		CatalogParameters: []valueRule{
+			{Name: "input_min_v", Positive: true, Minimum: .01, Maximum: 1e6},
+			{Name: "input_max_v", Positive: true, Minimum: .01, Maximum: 1e6},
+			{Name: "enable_high_voltage_v", Positive: true, Minimum: .01, Maximum: 1e6},
+			{Name: "on_resistance_ohm", Positive: true, Minimum: 1e-6, Maximum: 1e12},
+			{Name: "reverse_blocking_release_voltage_v", Nonnegative: true, Maximum: 1e6},
+			{Name: "reverse_leakage_current_a", Positive: true, Minimum: 1e-15, Maximum: 1e4},
+			{Name: "max_output_current_a", Positive: true, Minimum: 1e-9, Maximum: 1e4},
+			{Name: "max_output_voltage_v", Positive: true, Minimum: .01, Maximum: 1e6},
+			{Name: "quiescent_current_a", Nonnegative: true, Maximum: 100},
+			{Name: "max_temperature_c", Optional: true, Maximum: 1000},
+			{Name: "junction_to_ambient_c_per_w", Optional: true, Positive: true, Maximum: 1e6},
 		},
 	},
 	{
@@ -979,7 +1033,7 @@ func resolveMNA(intent Intent, catalogID, catalogHash string, components []Compo
 	if len(nodeEvidence) == 0 {
 		return Plan{}, []Diagnostic{{Path: "topology.nodes", Message: "graph MNA resolution requires resolved circuit net evidence"}}
 	}
-	ground, nodeNames, diagnostics := canonicalNodes(nodeEvidence)
+	ground, nodeNames, diagnostics := canonicalNodes(nodeEvidence, components)
 	if len(diagnostics) != 0 {
 		return Plan{}, diagnostics
 	}
@@ -1165,6 +1219,9 @@ func validatePrimitiveParameters(path string, primitive primitiveDefinition, par
 	if primitive.ID == PrimitiveDualOutputIsolatedConverterV1 && values["input_max_v"] <= values["input_min_v"] {
 		diagnostics = append(diagnostics, Diagnostic{Path: path, Message: "dual-output isolated converter input_max_v must exceed input_min_v"})
 	}
+	if primitive.ID == PrimitiveSingleOutputIsolatedConverterV1 && values["input_max_v"] <= values["input_min_v"] {
+		diagnostics = append(diagnostics, Diagnostic{Path: path, Message: "single-output isolated converter input_max_v must exceed input_min_v"})
+	}
 	if primitive.ID == PrimitiveBidirectionalOpenDrainTranslatorV1 {
 		if values["vcca_max_v"] <= values["vcca_min_v"] || values["vccb_max_v"] <= values["vccb_min_v"] {
 			diagnostics = append(diagnostics, Diagnostic{Path: path, Message: "level-translator supply maxima must exceed their corresponding minima"})
@@ -1172,6 +1229,29 @@ func validatePrimitiveParameters(path string, primitive primitiveDefinition, par
 		if values["channel_off_resistance_ohm"] <= values["channel_on_resistance_ohm"] {
 			diagnostics = append(diagnostics, Diagnostic{Path: path, Message: "level-translator off resistance must exceed on resistance"})
 		}
+	}
+	if primitive.ID == PrimitiveBidirectionalOpenDrainIsolatorV1 {
+		if values["side_a_max_v"] <= values["side_a_min_v"] || values["side_b_max_v"] <= values["side_b_min_v"] {
+			diagnostics = append(diagnostics, Diagnostic{Path: path, Message: "isolator supply maxima must exceed their corresponding minima"})
+		}
+		if values["output_off_resistance_ohm"] <= values["output_on_resistance_ohm"] {
+			diagnostics = append(diagnostics, Diagnostic{Path: path, Message: "isolator off resistance must exceed on resistance"})
+		}
+	}
+	if primitive.ID == PrimitiveReverseBlockingLoadSwitchV1 {
+		if values["input_max_v"] <= values["input_min_v"] {
+			diagnostics = append(diagnostics, Diagnostic{Path: path, Message: "reverse-blocking load-switch input_max_v must exceed input_min_v"})
+		}
+		if values["enable_high_voltage_v"] > values["input_max_v"] {
+			diagnostics = append(diagnostics, Diagnostic{Path: path, Message: "reverse-blocking load-switch enable threshold must not exceed input_max_v"})
+		}
+		if values["reverse_blocking_release_voltage_v"] >= values["max_output_voltage_v"] {
+			diagnostics = append(diagnostics, Diagnostic{Path: path, Message: "reverse-blocking release voltage must be below max_output_voltage_v"})
+		}
+	}
+	if (primitive.ID == PrimitiveMCUStaticSupplyLoadV1 || primitive.ID == PrimitiveSensorStaticSupplyLoadV1) &&
+		values["maximum_supply_voltage_v"] <= values["minimum_supply_voltage_v"] {
+		diagnostics = append(diagnostics, Diagnostic{Path: path, Message: "static supply-load maximum_supply_voltage_v must exceed minimum_supply_voltage_v"})
 	}
 	return diagnostics
 }
@@ -1330,7 +1410,7 @@ func onlySmallSignalAnalyses(analyses []Analysis) bool {
 	return true
 }
 
-func canonicalNodes(nodes []NodeEvidence) (string, []string, []Diagnostic) {
+func canonicalNodes(nodes []NodeEvidence, components []ComponentEvidence) (string, []string, []Diagnostic) {
 	var diagnostics []Diagnostic
 	names := make([]string, 0, len(nodes))
 	groundCandidates := map[string]struct{}{}
@@ -1357,11 +1437,49 @@ func canonicalNodes(nodes []NodeEvidence) (string, []string, []Diagnostic) {
 		grounds = append(grounds, name)
 	}
 	slices.Sort(grounds)
-	if len(grounds) != 1 {
+	if len(grounds) == 0 {
 		diagnostics = append(diagnostics, Diagnostic{Path: "topology.ground", Message: fmt.Sprintf("graph MNA requires exactly one resolved ground/0V node, got %d", len(grounds)), Suggestion: "mark one circuit net as ground with a 0V domain"})
 		return "", names, diagnostics
 	}
+	if len(grounds) > 1 {
+		isolatedReferences := isolatedReferenceNodes(components)
+		for _, ground := range grounds {
+			if !isolatedReferences[ground] {
+				diagnostics = append(diagnostics, Diagnostic{
+					Path:       "topology.ground",
+					Message:    fmt.Sprintf("multiple reference domains require every ground node to terminate a reviewed isolation primitive; %s does not", ground),
+					Suggestion: "connect each local reference through a reviewed isolated converter or signal isolator boundary",
+				})
+			}
+		}
+		if len(diagnostics) != 0 {
+			return "", names, diagnostics
+		}
+	}
 	return grounds[0], names, diagnostics
+}
+
+func isolatedReferenceNodes(components []ComponentEvidence) map[string]bool {
+	result := map[string]bool{}
+	for _, component := range components {
+		terminals := []string{}
+		for _, claim := range component.ModelClaims {
+			switch claim.ModelID {
+			case PrimitiveSingleOutputIsolatedConverterV1:
+				terminals = append(terminals, "VIN_MINUS", "VOUT_MINUS")
+			case PrimitiveDualOutputIsolatedConverterV1:
+				terminals = append(terminals, "VIN_MINUS", "COMMON")
+			case PrimitiveBidirectionalOpenDrainIsolatorV1:
+				terminals = append(terminals, "GND1", "GND2")
+			}
+		}
+		for _, connection := range component.Connections {
+			if slices.Contains(terminals, connection.Function) && strings.TrimSpace(connection.Net) != "" {
+				result[strings.TrimSpace(connection.Net)] = true
+			}
+		}
+	}
+	return result
 }
 
 func connectedNet(component ComponentEvidence, terminal string) (string, []Diagnostic) {

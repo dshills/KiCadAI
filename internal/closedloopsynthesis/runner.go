@@ -34,8 +34,24 @@ func Run(ctx context.Context, input Input, evaluator Evaluator, policy Policy) R
 		return report
 	}
 
-	candidates := cloneCandidates(input.Candidates)
-	slices.SortStableFunc(candidates, func(left, right Candidate) int { return strings.Compare(left.Fingerprint, right.Fingerprint) })
+	candidates, cloneErr := cloneCandidates(input.Candidates)
+	if cloneErr != nil {
+		report.Diagnostics = append(report.Diagnostics, Diagnostic{Path: "candidates", Message: cloneErr.Error()})
+		return report
+	}
+	slices.SortStableFunc(candidates, func(left, right Candidate) int {
+		if left.Priority != right.Priority {
+			return left.Priority - right.Priority
+		}
+		return strings.Compare(left.Fingerprint, right.Fingerprint)
+	})
+	if input.Requirement.Version == architecturesearch.VersionV4 {
+		report.Backtracking = &ClosedLoopBacktrackingEvidence{
+			Schema:        "kicadai.closed-loop-backtracking.v1",
+			Strategy:      "architecture_priority_then_complete_fresh_evaluation",
+			Deterministic: true,
+		}
+	}
 	passing := []int{}
 	for _, candidate := range candidates {
 		if err := ctx.Err(); err != nil {
@@ -50,6 +66,12 @@ func Run(ctx context.Context, input Input, evaluator Evaluator, policy Policy) R
 		}
 		candidateReport := evaluateCandidate(ctx, input.Requirement, candidate, evaluator, policy, &report.Consumption)
 		report.Candidates = append(report.Candidates, candidateReport)
+		if report.Backtracking != nil {
+			report.Backtracking.Candidates = append(report.Backtracking.Candidates, ClosedLoopCandidateOutcome{
+				Priority: candidate.Priority, Fingerprint: candidate.Fingerprint,
+				Status: candidateReport.Status, StopReason: candidateReport.StopReason,
+			})
+		}
 		report.Consumption.CandidatesEvaluated++
 		if candidateReport.Status == "pass" {
 			passing = append(passing, len(report.Candidates)-1)
@@ -76,17 +98,26 @@ func Run(ctx context.Context, input Input, evaluator Evaluator, policy Policy) R
 		Fingerprint: selected.Fingerprint, State: cloneState(selected.FinalState), Score: selected.FinalScore,
 		Repairs: len(selected.Repairs), Rationale: selectionRationale(selected, len(passing)),
 	}
+	for _, candidate := range candidates {
+		if candidate.Fingerprint == selected.Fingerprint && candidate.SystemPlan != nil {
+			report.Selected.SystemPlanHash = candidate.SystemPlan.PlanHash
+			break
+		}
+	}
+	if report.Backtracking != nil {
+		report.Backtracking.SelectedFingerprint = selected.Fingerprint
+	}
 	report.Status = "pass"
 	report.StopReason = StopPassed
 	return report
 }
 
 func evaluateCandidate(ctx context.Context, requirement architecturesearch.Requirement, candidate Candidate, evaluator Evaluator, policy Policy, consumption *Consumption) CandidateReport {
-	result := CandidateReport{Fingerprint: candidate.Fingerprint, StaticScore: candidate.Score, Status: "blocked", StopReason: StopEvaluationFailed}
+	result := CandidateReport{Fingerprint: candidate.Fingerprint, Priority: candidate.Priority, StaticScore: candidate.Score, Status: "blocked", StopReason: StopEvaluationFailed}
 	state := CandidateState{Fingerprint: candidate.Fingerprint, Variables: cloneVariables(candidate.Variables)}
 	normalizeState(&state)
 	evaluated := map[string]bool{}
-	current := runAttempt(ctx, requirement, state, evaluator, consumption, 1)
+	current := runAttempt(ctx, requirement, candidate.SystemPlan, state, evaluator, consumption, 1)
 	result.Attempts = append(result.Attempts, current)
 	evaluated[current.StateHash] = true
 	if current.Status == "pass" {
@@ -118,7 +149,7 @@ func evaluateCandidate(ctx context.Context, requirement architecturesearch.Requi
 				consumption.BudgetExhausted = true
 				return finishCandidate(result, current, StopBudgetExhausted)
 			}
-			trial := runAttempt(ctx, requirement, neighbor, evaluator, consumption, len(result.Attempts)+1)
+			trial := runAttempt(ctx, requirement, candidate.SystemPlan, neighbor, evaluator, consumption, len(result.Attempts)+1)
 			result.Attempts = append(result.Attempts, trial)
 			evaluated[hash] = true
 			consumption.RepairTrials++
@@ -149,7 +180,7 @@ func evaluateCandidate(ctx context.Context, requirement architecturesearch.Requi
 	return finishCandidate(result, current, StopBudgetExhausted)
 }
 
-func runAttempt(ctx context.Context, requirement architecturesearch.Requirement, state CandidateState, evaluator Evaluator, consumption *Consumption, number int) Attempt {
+func runAttempt(ctx context.Context, requirement architecturesearch.Requirement, systemPlan *architecturesearch.SystemPlan, state CandidateState, evaluator Evaluator, consumption *Consumption, number int) Attempt {
 	attempt := Attempt{Number: number, State: cloneState(state), StateHash: stateHash(state), Status: "blocked", Diagnostics: []Diagnostic{}}
 	if !validHash(attempt.StateHash) {
 		attempt.Diagnostics = append(attempt.Diagnostics, Diagnostic{Path: "state", Message: "candidate state could not be canonically hashed"})
@@ -173,6 +204,9 @@ func runAttempt(ctx context.Context, requirement architecturesearch.Requirement,
 	assertions, assertionDiagnostics := evaluateMeasurements(requirement, evaluation.Measurements)
 	attempt.Assertions = assertions
 	attempt.Diagnostics = append(attempt.Diagnostics, assertionDiagnostics...)
+	hierarchy, hierarchyDiagnostics := evaluateHierarchyVerification(requirement, systemPlan, assertions)
+	attempt.Hierarchy = hierarchy
+	attempt.Diagnostics = append(attempt.Diagnostics, hierarchyDiagnostics...)
 	modelDecisions, modelUses, modelDiagnostics := validateModelDecisions(requirement, evaluation.ModelDecisions)
 	attempt.ModelDecisions = modelDecisions
 	attempt.Diagnostics = append(attempt.Diagnostics, modelDiagnostics...)
@@ -294,8 +328,12 @@ func validateInput(input Input, evaluator Evaluator, policy Policy, requirementH
 	}
 	if requirementHashError != nil {
 		diagnostics = append(diagnostics, Diagnostic{Path: "requirement", Message: requirementHashError.Error()})
-	} else if input.Requirement.Version != architecturesearch.VersionV3 || input.Requirement.Schema != architecturesearch.SchemaIDV3 {
-		diagnostics = append(diagnostics, Diagnostic{Path: "requirement", Message: "closed-loop synthesis requires the v3 behavioral requirement schema"})
+	} else {
+		v3 := input.Requirement.Version == architecturesearch.VersionV3 && input.Requirement.Schema == architecturesearch.SchemaIDV3
+		v4 := input.Requirement.Version == architecturesearch.VersionV4 && input.Requirement.Schema == architecturesearch.SchemaIDV4
+		if !v3 && !v4 {
+			diagnostics = append(diagnostics, Diagnostic{Path: "requirement", Message: "closed-loop synthesis requires the v3 or v4 behavioral requirement schema"})
+		}
 	}
 	if !validHash(input.CatalogHash) || !validHash(input.FormulaLibraryHash) || !validHash(input.ModelRegistryHash) {
 		diagnostics = append(diagnostics, Diagnostic{Path: "input", Message: "catalog, formula-library, and model-registry hashes must be lowercase SHA-256 values"})
@@ -307,12 +345,29 @@ func validateInput(input Input, evaluator Evaluator, policy Policy, requirementH
 		diagnostics = append(diagnostics, Diagnostic{Path: "candidates", Message: "candidate count is empty or exceeds the bounded policy"})
 	}
 	seen := map[string]bool{}
+	seenPriorities := map[int]bool{}
 	for index, candidate := range input.Candidates {
 		path := fmt.Sprintf("candidates[%d]", index)
 		if !validHash(candidate.Fingerprint) || seen[candidate.Fingerprint] {
 			diagnostics = append(diagnostics, Diagnostic{Path: path + ".fingerprint", Message: "candidate fingerprint must be a unique lowercase SHA-256 value"})
 		}
 		seen[candidate.Fingerprint] = true
+		if input.Requirement.Version == architecturesearch.VersionV4 {
+			if candidate.Priority < 0 || seenPriorities[candidate.Priority] {
+				diagnostics = append(diagnostics, Diagnostic{Path: path + ".priority", Message: "V4 candidate priority must be unique and nonnegative"})
+			}
+			seenPriorities[candidate.Priority] = true
+			if candidate.SystemPlan == nil {
+				diagnostics = append(diagnostics, Diagnostic{Path: path + ".system_plan", Message: "V4 candidate requires a generated system plan"})
+			} else {
+				if candidate.SystemPlan.Schema != architecturesearch.SystemPlanSchema ||
+					candidate.SystemPlan.CandidateFingerprint != candidate.Fingerprint ||
+					candidate.SystemPlan.RequirementHash == "" ||
+					!validHash(candidate.SystemPlan.PlanHash) {
+					diagnostics = append(diagnostics, Diagnostic{Path: path + ".system_plan", Message: "V4 candidate system plan identity or hash is invalid"})
+				}
+			}
+		}
 		if len(candidate.Variables) > policy.MaxVariablesPerCandidate {
 			diagnostics = append(diagnostics, Diagnostic{Path: path + ".variables", Message: "candidate exceeds the bounded variable count"})
 		}
@@ -688,12 +743,32 @@ func validHash(value string) bool {
 
 func finite(value float64) bool { return !math.IsNaN(value) && !math.IsInf(value, 0) }
 
-func cloneCandidates(source []Candidate) []Candidate {
+func cloneCandidates(source []Candidate) ([]Candidate, error) {
 	clone := append([]Candidate(nil), source...)
 	for index := range clone {
 		clone[index].Variables = cloneVariables(source[index].Variables)
+		systemPlan, err := cloneSystemPlan(source[index].SystemPlan)
+		if err != nil {
+			return nil, fmt.Errorf("clone candidate %q system plan: %w", source[index].Fingerprint, err)
+		}
+		clone[index].SystemPlan = systemPlan
 	}
-	return clone
+	return clone, nil
+}
+
+func cloneSystemPlan(source *architecturesearch.SystemPlan) (*architecturesearch.SystemPlan, error) {
+	if source == nil {
+		return nil, nil
+	}
+	data, err := json.Marshal(source)
+	if err != nil {
+		return nil, fmt.Errorf("marshal: %w", err)
+	}
+	var clone architecturesearch.SystemPlan
+	if err := json.Unmarshal(data, &clone); err != nil {
+		return nil, fmt.Errorf("unmarshal: %w", err)
+	}
+	return &clone, nil
 }
 
 func cloneVariables(source []Variable) []Variable {

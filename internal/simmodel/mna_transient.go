@@ -472,6 +472,8 @@ func buildTransientTemplate(plan Plan, analysis Analysis) (mnaSystem, []Diagnost
 			stampCurrentSource(&system, terminals["IN"], terminals["SET"], complex(-parameters["reference_current_a"], 0))
 		case PrimitiveShuntVoltageReferenceV1:
 			system.rhs[system.branchIndex[device.Component]] -= complex(namedValueMap(device.ModelParameters)["output_voltage_v"], 0)
+		case PrimitiveSingleOutputIsolatedConverterV1:
+			system.rhs[system.branchIndex[device.Component]] -= complex(namedValueMap(device.ModelParameters)["output_voltage_v"], 0)
 		case PrimitiveDualOutputIsolatedConverterV1:
 			parameters := namedValueMap(device.ModelParameters)
 			positiveBranch := system.multiBranchIndex[mnaBranchKey{component: device.Component, terminal: "VOUT_PLUS"}]
@@ -707,6 +709,16 @@ func prepareTransientBase(base *mnaSystem, template mnaSystem, plan Plan, analys
 			}
 			base.rhs[base.multiBranchIndex[mnaBranchKey{component: device.Component, terminal: "VOUT_PLUS"}]] += complex(positive, 0)
 			base.rhs[base.multiBranchIndex[mnaBranchKey{component: device.Component, terminal: "VOUT_MINUS"}]] += complex(negative, 0)
+		case PrimitiveSingleOutputIsolatedConverterV1:
+			parameters := namedValueMap(device.ModelParameters)
+			output := parameters["output_voltage_v"]
+			powerTransition := analysis.Kind == AnalysisStartup && startupSourceRampScale(analysis, timeS) < 1
+			if powerTransition {
+				output = 0
+			} else if analysis.Kind == AnalysisStartup && parameters["soft_start_time_s"] > 0 {
+				output *= math.Min(1, timeS/parameters["soft_start_time_s"])
+			}
+			base.rhs[base.branchIndex[device.Component]] += complex(output, 0)
 		}
 	}
 	referenceUnobservedMNAComponents(plan, analysis, base)
@@ -1495,6 +1507,8 @@ func transientBranchLimitCandidates(base mnaSystem, device ResolvedDevice) []tra
 			{branch: base.multiBranchIndex[mnaBranchKey{component: device.Component, terminal: "VOUT_PLUS"}], limit: parameters["positive_max_output_current_a"]},
 			{branch: base.multiBranchIndex[mnaBranchKey{component: device.Component, terminal: "VOUT_MINUS"}], limit: parameters["negative_max_output_current_a"]},
 		}
+	case PrimitiveSingleOutputIsolatedConverterV1:
+		return []transientBranchLimitCandidate{{branch: base.branchIndex[device.Component], limit: parameters["max_output_current_a"]}}
 	default:
 		return nil
 	}

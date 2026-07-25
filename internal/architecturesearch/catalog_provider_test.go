@@ -659,6 +659,51 @@ func TestCatalogProviderOffersFixedAndAdjustableRegulatorTopologies(t *testing.T
 	}
 }
 
+func TestCatalogProviderOffersCatalogProvenThermalBallastWhenFixedRegulatorNeedsPowerSharing(t *testing.T) {
+	provider, err := NewCatalogProvider(loadArchitectureCatalog(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	request := regulatorProviderRequest(5.5, 3.3, 0.3)
+	request.Ports[0].Contract.Voltage.Minimum = float64Pointer(4.5)
+	request.Constraints = append(request.Constraints,
+		constraintNumber("ambient_temperature_minimum", "minimum", -20, "degC", 0),
+		constraintNumber("ambient_temperature", "maximum", 70, "degC", 0),
+		constraintBool("analysis_thermal", "required", true),
+	)
+	expansions, err := provider.expandFixedRegulators(context.Background(), request, 3.3, 2, 4.5, 5.5, 0.3)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, expansion := range expansions {
+		realization, decodeErr := DecodeFragmentRealization(expansion.Payload)
+		if decodeErr != nil {
+			t.Fatal(decodeErr)
+		}
+		index := slices.IndexFunc(realization.Instances, func(instance RealizationInstance) bool {
+			return instance.ID == "thermal_ballast"
+		})
+		if index < 0 {
+			continue
+		}
+		ballast := realization.Instances[index]
+		if ballast.CatalogID != "resistor.vishay.ac03.1r6.axial" || ballast.Value != "1.6" {
+			t.Fatalf("thermal ballast = %#v, want catalog-proven 1.6 ohm AC03", ballast)
+		}
+		thermalProven := slices.ContainsFunc(expansion.Calculations, func(calculation CalculationEvidence) bool {
+			return calculation.ID == "regulator_thermal" && calculation.Pass && calculation.WorstMargin > 0
+		})
+		powerProven := slices.ContainsFunc(expansion.Calculations, func(calculation CalculationEvidence) bool {
+			return calculation.ID == "thermal_ballast_power" && calculation.Pass && calculation.WorstMargin > 0
+		})
+		if !thermalProven || !powerProven {
+			t.Fatalf("thermally ballasted topology lacks positive regulator and resistor power margins: %#v", expansion.Calculations)
+		}
+		return
+	}
+	t.Fatalf("fixed-regulator expansions omit a catalog-proven thermal ballast: %#v", expansions)
+}
+
 func TestCatalogProviderOrientsFloatingRegulatorFeedbackForItsReferenceEquation(t *testing.T) {
 	provider, err := NewCatalogProvider(loadArchitectureCatalog(t))
 	if err != nil {
@@ -989,6 +1034,60 @@ func TestCatalogProviderOutputIgnoresCatalogOrdering(t *testing.T) {
 	}
 }
 
+func TestCatalogProviderPublishesIsolatedTranslatorAsSupportedFunction(t *testing.T) {
+	provider, err := NewCatalogProvider(loadArchitectureCatalog(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	request := translatorProviderRequest(3.3, 5)
+	request.Constraints = append(request.Constraints, constraintBool("reference_separation", "required", true))
+	expansions, err := provider.Expand(context.Background(), request)
+	if err != nil || len(expansions) == 0 {
+		t.Fatalf("Expand() = %#v, %v", expansions, err)
+	}
+	realization, err := DecodeFragmentRealization(expansions[0].Payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.ContainsFunc(realization.Instances, func(instance RealizationInstance) bool {
+		return instance.ID == "bus_isolator" && instance.Usage == "bidirectional_i2c_isolation"
+	}) {
+		t.Fatalf("isolated translator lacks supported function identity: %#v", realization.Instances)
+	}
+	if !slices.ContainsFunc(realization.PortBindings, func(binding RealizationPortBinding) bool {
+		return binding.Role == "power_b" && binding.Lane == "return" && binding.Instance == "bus_isolator" && binding.Function == "GND2"
+	}) {
+		t.Fatalf("isolated translator lacks distinct side-B return binding: %#v", realization.PortBindings)
+	}
+}
+
+func TestCatalogProviderAllowsExplicitSharedReferenceTranslator(t *testing.T) {
+	provider, err := NewCatalogProvider(loadArchitectureCatalog(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	request := translatorProviderRequest(3.3, 5)
+	request.Constraints = append(request.Constraints, constraintBool("reference_separation", "required", false))
+	expansions, err := provider.Expand(context.Background(), request)
+	if err != nil || len(expansions) == 0 {
+		t.Fatalf("Expand() = %#v, %v", expansions, err)
+	}
+	realization, err := DecodeFragmentRealization(expansions[0].Payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.ContainsFunc(realization.Instances, func(instance RealizationInstance) bool {
+		return instance.Usage == "level_translator"
+	}) {
+		t.Fatalf("explicit shared-reference request lacks a level translator: %#v", realization.Instances)
+	}
+	if slices.ContainsFunc(realization.Instances, func(instance RealizationInstance) bool {
+		return strings.Contains(strings.ToLower(instance.Usage), "isolat")
+	}) {
+		t.Fatalf("explicit shared-reference request selected isolation: %#v", realization.Instances)
+	}
+}
+
 func TestTranslatorEvidenceModeAndDirectionMatchingIsCaseInsensitive(t *testing.T) {
 	catalog := loadArchitectureCatalog(t)
 	for _, record := range catalog.Records {
@@ -1045,6 +1144,47 @@ func TestCatalogProviderSizesOpenDrainPullupsFromRiseTimeAndCapacitance(t *testi
 	var typed *interfaceSynthesisError
 	if !errors.As(err, &typed) || typed.code != CodeInterfacePullupWindowEmpty {
 		t.Fatalf("impossible pull-up window error = %#v", err)
+	}
+}
+
+func TestCatalogProviderSizesGalvanicIsolationPullupsFromRiseTimeAndCapacitance(t *testing.T) {
+	provider, err := NewCatalogProvider(loadArchitectureCatalog(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	request := translatorProviderRequest(3.3, 1.8)
+	request.Capability = "galvanic_isolation"
+	request.Constraints = []Constraint{
+		constraintNumber("isolation_voltage", "minimum", 1000, "V", 0),
+		constraintNumber("side_b_rise_time", "maximum", 1e-6, "s", 0),
+		constraintNumber("side_b_load_capacitance", "maximum", 4e-10, "F", 0),
+	}
+	expansions, err := provider.Expand(context.Background(), request)
+	if err != nil || len(expansions) == 0 {
+		t.Fatalf("Expand() = %#v, %v", expansions, err)
+	}
+	realization, err := DecodeFragmentRealization(expansions[0].Payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, id := range []string{"isolation_b_sda_pullup", "isolation_b_scl_pullup"} {
+		if !slices.ContainsFunc(realization.Instances, func(instance RealizationInstance) bool {
+			return instance.ID == id && instance.Value == "910"
+		}) {
+			t.Fatalf("%s is not rise-time sized: %#v", id, realization.Instances)
+		}
+		if !slices.ContainsFunc(realization.RepairVariables, func(variable RealizationRepairVariable) bool {
+			return variable.Instance == id && variable.Value == 910 && len(variable.AllowedValues) != 0
+		}) {
+			t.Fatalf("%s lacks bounded timing repair values: %#v", id, realization.RepairVariables)
+		}
+	}
+	for _, id := range []string{"isolation_a_sda_pullup", "isolation_a_scl_pullup"} {
+		if !slices.ContainsFunc(realization.Instances, func(instance RealizationInstance) bool {
+			return instance.ID == id && instance.Value == "4.7k"
+		}) {
+			t.Fatalf("%s should retain its unconstrained default: %#v", id, realization.Instances)
+		}
 	}
 }
 

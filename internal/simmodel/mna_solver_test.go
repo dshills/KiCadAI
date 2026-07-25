@@ -57,6 +57,29 @@ func TestMNAResolvesGraphAndRunsDCAndACSweep(t *testing.T) {
 	}
 }
 
+func TestWaveformMeasurementsUseDifferentialReferenceNode(t *testing.T) {
+	result := AnalysisResult{
+		ID: "transient", Kind: AnalysisTransient,
+		Points: []AnalysisPoint{
+			{TimeS: 0, Nodes: []NodeResult{{Node: "OUT", Real: 0}, {Node: "LOCAL_GROUND", Real: 0}}},
+			{TimeS: 1, Nodes: []NodeResult{{Node: "OUT", Real: 10.9}, {Node: "LOCAL_GROUND", Real: 10}}},
+			{TimeS: 2, Nodes: []NodeResult{{Node: "OUT", Real: 1.8}, {Node: "LOCAL_GROUND", Real: 0}}},
+		},
+	}
+	assertion := Assertion{AnalysisID: "transient", Node: "OUT", ReferenceNode: "LOCAL_GROUND", Quantity: QuantityRiseTimeS}
+	_, values, diagnostic := waveform(result, assertion)
+	if diagnostic != nil {
+		t.Fatal(diagnostic.Message)
+	}
+	if len(values) != 3 || values[0] != 0 || math.Abs(values[1]-.9) > 1e-12 || values[2] != 1.8 {
+		t.Fatalf("differential waveform = %#v", values)
+	}
+	actual, diagnostic := transientEdgeTime(result, assertion)
+	if diagnostic != nil || math.Abs(actual-1.6) > 1e-12 {
+		t.Fatalf("differential rise time = %.12g diagnostic=%#v", actual, diagnostic)
+	}
+}
+
 func TestMNACurrentSourceStamp(t *testing.T) {
 	intent := Intent{
 		ModelID:  ModelLinearCircuitMNAV1,
@@ -107,7 +130,7 @@ func TestMNAResolutionOmitsGraphNodesWithoutModeledDevices(t *testing.T) {
 
 func TestMNAStaticDigitalSupplyLoadUsesCanonicalSupplyAliases(t *testing.T) {
 	intent := Intent{
-		ModelID:  ModelLinearCircuitMNAV1,
+		ModelID:  ModelNonlinearCircuitDCV1,
 		Analyses: []Analysis{{ID: "operating_point", Kind: AnalysisDCOperatingPoint, Excitations: []SourceExcitation{{Component: "source", DCValue: 3.3}}}},
 		Assertions: []Assertion{
 			{AnalysisID: "operating_point", Node: "V3V3", Quantity: QuantityVoltageV, Min: 3.299, Max: 3.301},
@@ -119,7 +142,10 @@ func TestMNAStaticDigitalSupplyLoadUsesCanonicalSupplyAliases(t *testing.T) {
 		{InstanceID: "pullup", CatalogID: "resistor.test", Family: "resistor", HasValueSI: true, ValueSI: 4700, ModelClaims: []CatalogEvidence{{ModelID: PrimitiveResistorV1}}, Connections: []ConnectionEvidence{{Function: "A", Net: "V3V3"}, {Function: "B", Net: "SDA"}}},
 		{
 			InstanceID: "controller", CatalogID: "mcu.test", Family: "mcu",
-			ModelClaims: []CatalogEvidence{{ModelID: PrimitiveMCUStaticSupplyLoadV1, Parameters: []NamedValue{{Name: "maximum_supply_current_a", Value: .014}}}},
+			ModelClaims: []CatalogEvidence{{ModelID: PrimitiveMCUStaticSupplyLoadV1, Parameters: []NamedValue{
+				{Name: "minimum_supply_voltage_v", Value: 1.8}, {Name: "maximum_supply_voltage_v", Value: 5.5},
+				{Name: "maximum_supply_current_a", Value: .014},
+			}}},
 			Connections: []ConnectionEvidence{
 				{Function: "VCC", Net: "V3V3"}, {Function: "AVCC", Net: "V3V3"},
 				{Function: "GND", Net: "GND"}, {Function: "AGND", Net: "GND"},
@@ -140,9 +166,24 @@ func TestMNAStaticDigitalSupplyLoadUsesCanonicalSupplyAliases(t *testing.T) {
 	}
 }
 
+func TestStaticSupplyLoadReleasesUnpoweredRailAndKeepsPoweredWorstCase(t *testing.T) {
+	parameters := map[string]float64{
+		"minimum_supply_voltage_v": 1.8,
+		"maximum_supply_current_a": .014,
+	}
+	lowCurrent, lowConductance := staticSupplyLoadCurrentAndGradient(.18, parameters)
+	if math.Abs(lowCurrent-.0014) > 1e-12 || math.Abs(lowConductance-.014/1.8) > 1e-12 {
+		t.Fatalf("low-voltage load = %.12g A, %.12g S", lowCurrent, lowConductance)
+	}
+	poweredCurrent, poweredConductance := staticSupplyLoadCurrentAndGradient(3.3, parameters)
+	if math.Abs(poweredCurrent-.014) > 1e-12 || poweredConductance != 0 {
+		t.Fatalf("powered load = %.12g A, %.12g S", poweredCurrent, poweredConductance)
+	}
+}
+
 func TestMNAStaticDigitalSupplyLoadRejectsMultipleSupplyDomains(t *testing.T) {
 	intent := Intent{
-		ModelID:    ModelLinearCircuitMNAV1,
+		ModelID:    ModelNonlinearCircuitDCV1,
 		Analyses:   []Analysis{{ID: "operating_point", Kind: AnalysisDCOperatingPoint, Excitations: []SourceExcitation{{Component: "source", DCValue: 3.3}}}},
 		Assertions: []Assertion{{AnalysisID: "operating_point", Node: "V3V3", Quantity: QuantityVoltageV, Min: 3.2, Max: 3.4}},
 	}
@@ -150,7 +191,10 @@ func TestMNAStaticDigitalSupplyLoadRejectsMultipleSupplyDomains(t *testing.T) {
 		voltageSourceEvidence("source", "V3V3", "GND"),
 		{
 			InstanceID: "controller", CatalogID: "mcu.test", Family: "mcu",
-			ModelClaims: []CatalogEvidence{{ModelID: PrimitiveMCUStaticSupplyLoadV1, Parameters: []NamedValue{{Name: "maximum_supply_current_a", Value: .014}}}},
+			ModelClaims: []CatalogEvidence{{ModelID: PrimitiveMCUStaticSupplyLoadV1, Parameters: []NamedValue{
+				{Name: "minimum_supply_voltage_v", Value: 1.8}, {Name: "maximum_supply_voltage_v", Value: 5.5},
+				{Name: "maximum_supply_current_a", Value: .014},
+			}}},
 			Connections: []ConnectionEvidence{
 				{Function: "VCC", Net: "V3V3"}, {Function: "AVCC", Net: "AV3V3"}, {Function: "GND", Net: "GND"},
 			},
@@ -222,6 +266,57 @@ func TestMNAFuseClosedStateUsesCatalogResistanceAndFailsAboveRatedCurrent(t *tes
 	_, diagnostics = Evaluate(plan)
 	if !diagnosticsContain(diagnostics, "fuse current") {
 		t.Fatalf("fuse current limit diagnostics = %#v", diagnostics)
+	}
+}
+
+func TestMNAFuseClosedStateContributesCatalogResistanceThermalNoise(t *testing.T) {
+	intent := Intent{
+		ModelID: ModelLinearCircuitMNAV1,
+		Analyses: []Analysis{{
+			ID: "noise", Kind: AnalysisNoise,
+			StartFrequencyHz: 100, StopFrequencyHz: 1000, Points: 3,
+			Excitations: []SourceExcitation{{Component: "supply"}},
+		}},
+		Assertions: []Assertion{{
+			AnalysisID: "noise", Node: "OUT", Quantity: QuantityIntegratedNoiseVRMS,
+			Min: 2e-9, Max: 3e-9,
+		}},
+	}
+	components := []ComponentEvidence{
+		voltageSourceEvidence("supply", "SOURCE", "GND"),
+		{
+			InstanceID: "fuse", CatalogID: "fuse", Family: "fuse",
+			ModelClaims: []CatalogEvidence{{ModelID: PrimitiveFuseClosedStateV1, Parameters: []NamedValue{
+				{Name: "cold_resistance_ohm", Value: .38},
+				{Name: "rated_current_a", Value: .5},
+				{Name: "max_voltage_v", Value: 75},
+			}}},
+			Connections: []ConnectionEvidence{{Function: "A", Net: "SOURCE"}, {Function: "B", Net: "OUT"}},
+		},
+		resistorEvidence("load", 1e9, "OUT", "GND"),
+	}
+	plan, diagnostics := ResolveWithTopology(intent, "catalog", "hash", components, []NodeEvidence{{Name: "GND", Role: "ground"}, {Name: "SOURCE"}, {Name: "OUT"}})
+	if len(diagnostics) != 0 {
+		t.Fatalf("fuse noise resolution diagnostics = %#v", diagnostics)
+	}
+	report, diagnostics := Evaluate(plan)
+	if len(diagnostics) != 0 || report.Status != "pass" {
+		t.Fatalf("fuse noise report = %#v diagnostics=%#v", report, diagnostics)
+	}
+	if len(report.Analyses) != 1 || len(report.Analyses[0].Points) == 0 {
+		t.Fatalf("fuse noise analysis = %#v", report.Analyses)
+	}
+	for _, point := range report.Analyses[0].Points {
+		found := false
+		for _, node := range point.Nodes {
+			if node.Node == "OUT" {
+				found = node.DominantNoiseSource == "fuse"
+				break
+			}
+		}
+		if !found {
+			t.Fatalf("fuse noise point = %#v", point)
+		}
 	}
 }
 

@@ -6,7 +6,7 @@ Generate, verify, and physically realize previously unseen multi-block,
 multi-domain circuits through a generic deterministic hierarchy rather than a
 flat collection of functional selections.
 
-Status: In progress.
+Status: Complete.
 
 ## Phase 1: Specification, Corpus Freeze, And Baseline
 

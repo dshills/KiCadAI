@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"math"
 	"slices"
 	"testing"
 
@@ -46,7 +47,11 @@ func TestClosedLoopRepairsByStrictWholeReportImprovementAndReplays(t *testing.T)
 	}
 
 	reordered := input
-	reordered.Candidates = cloneCandidates(input.Candidates)
+	reorderedCandidates, err := cloneCandidates(input.Candidates)
+	if err != nil {
+		t.Fatal(err)
+	}
+	reordered.Candidates = reorderedCandidates
 	slices.Reverse(reordered.Candidates[0].Variables[0].AllowedValues)
 	// Unsorted allowed values are rejected rather than silently normalized.
 	invalid := Run(context.Background(), reordered, evaluator, DefaultPolicy())
@@ -65,6 +70,148 @@ func TestClosedLoopRepairsByStrictWholeReportImprovementAndReplays(t *testing.T)
 	if string(firstBytes) != string(secondBytes) {
 		t.Fatalf("closed-loop replay differs\nfirst: %s\nsecond: %s", firstBytes, secondBytes)
 	}
+}
+
+func TestCloneSystemPlanFailsWithoutReturningAliasedStorage(t *testing.T) {
+	capacity := 1.0
+	source := &architecturesearch.SystemPlan{
+		Resources: []architecturesearch.SharedResourcePlan{{
+			ID: "rail", Consumers: []string{"block_a"}, CapacityA: &capacity,
+		}},
+	}
+	cloned, err := cloneSystemPlan(source)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cloned.Resources[0].Consumers[0] = "block_b"
+	*cloned.Resources[0].CapacityA = 2
+	if source.Resources[0].Consumers[0] != "block_a" || *source.Resources[0].CapacityA != 1 {
+		t.Fatalf("clone shares nested storage with source: source=%#v clone=%#v", source, cloned)
+	}
+
+	invalid := math.NaN()
+	source.Resources[0].CapacityA = &invalid
+	if cloned, err := cloneSystemPlan(source); err == nil || cloned != nil {
+		t.Fatalf("non-JSON system plan clone = %#v, %v; want explicit failure", cloned, err)
+	}
+}
+
+func TestV4ClosedLoopBacktracksAcrossCompleteArchitecturesWithBlockAndEndToEndEvidence(t *testing.T) {
+	requirement := closedLoopTestRequirement()
+	requirement.Schema = architecturesearch.SchemaIDV4
+	requirement.Version = architecturesearch.VersionV4
+	requirement.Acceptance.RequireHierarchicalDecomposition = true
+	requirement.Acceptance.RequireInterfaceContracts = true
+	requirement.Acceptance.RequireSharedResourcePlanning = true
+	requirement.Acceptance.RequireDeterministicBacktracking = true
+	requirement.Acceptance.RequirePhysicalPartitioning = true
+	requirement.Acceptance.RequireEndToEndTraceability = true
+	firstFingerprint := testHash("v4-first")
+	secondFingerprint := testHash("v4-second")
+	input := Input{
+		Requirement: requirement, CatalogHash: testHash("catalog"), FormulaLibraryHash: testHash("formulas"), ModelRegistryHash: testHash("models"),
+		Candidates: []Candidate{
+			{Fingerprint: firstFingerprint, Priority: 0, SystemPlan: closedLoopV4SystemPlan(t, requirement, firstFingerprint)},
+			{Fingerprint: secondFingerprint, Priority: 1, SystemPlan: closedLoopV4SystemPlan(t, requirement, secondFingerprint)},
+		},
+	}
+	evaluator := evaluatorFunc(func(ctx context.Context, state CandidateState) (Evaluation, error) {
+		evaluation, err := closedLoopTestEvaluator(false).Evaluate(ctx, state)
+		if err == nil && state.Fingerprint == firstFingerprint {
+			evaluation.Measurements[0].Actual = 5
+		}
+		return evaluation, err
+	})
+	report := Run(context.Background(), input, evaluator, DefaultPolicy())
+	if report.Status != "pass" || report.Selected == nil || report.Selected.Fingerprint != secondFingerprint ||
+		report.Selected.SystemPlanHash != input.Candidates[1].SystemPlan.PlanHash {
+		t.Fatalf("V4 global backtracking selection = %#v", report)
+	}
+	if report.Backtracking == nil || !report.Backtracking.Deterministic ||
+		len(report.Backtracking.Candidates) != 2 ||
+		report.Backtracking.Candidates[0].Fingerprint != firstFingerprint ||
+		report.Backtracking.Candidates[0].Status != "rejected" ||
+		report.Backtracking.Candidates[1].Fingerprint != secondFingerprint ||
+		report.Backtracking.Candidates[1].Status != "pass" ||
+		report.Backtracking.SelectedFingerprint != secondFingerprint {
+		t.Fatalf("V4 backtracking evidence = %#v", report.Backtracking)
+	}
+	for _, candidate := range report.Candidates {
+		if len(candidate.Attempts) == 0 || candidate.Attempts[0].Hierarchy == nil ||
+			len(candidate.Attempts[0].Hierarchy.Blocks) != 1 ||
+			len(candidate.Attempts[0].Hierarchy.EndToEnd) != len(requirement.Requirements.BehavioralRequirements) {
+			t.Fatalf("V4 hierarchical verification evidence = %#v", candidate)
+		}
+	}
+	replay := Run(context.Background(), input, evaluator, DefaultPolicy())
+	firstBytes, err := MarshalReport(report)
+	if err != nil {
+		t.Fatal(err)
+	}
+	secondBytes, err := MarshalReport(replay)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(firstBytes, secondBytes) {
+		t.Fatal("V4 closed-loop backtracking replay differs")
+	}
+}
+
+func closedLoopV4SystemPlan(t *testing.T, requirement architecturesearch.Requirement, fingerprint string) *architecturesearch.SystemPlan {
+	t.Helper()
+	requirementHash, err := architecturesearch.CanonicalHash(requirement)
+	if err != nil {
+		t.Fatal(err)
+	}
+	plan := architecturesearch.SystemPlan{
+		Schema: architecturesearch.SystemPlanSchema, RequirementHash: requirementHash, CandidateFingerprint: fingerprint,
+		Hierarchy: architecturesearch.HierarchyPlan{
+			Root: architecturesearch.HierarchyNode{ID: "system", Kind: "system", Children: []string{"subsystem_domain_ground"}, Domains: []string{"ground", "supply"}},
+			Subsystems: []architecturesearch.HierarchyNode{{
+				ID: "subsystem_domain_ground", Kind: "subsystem", ParentID: "system",
+				Children: []string{"block_objective_amplify"}, Domains: []string{"ground", "supply"}, Classifications: []string{"analog"},
+			}},
+			Blocks: []architecturesearch.HierarchyBlock{{
+				ID: "block_objective_amplify", ParentID: "subsystem_domain_ground",
+				ObligationPath: "objective:amplify", Capability: "signal_amplification",
+				RequirementKind: "objective", RequirementID: "amplify", Domains: []string{"ground", "supply"},
+				Classifications: []string{"analog"}, InterfaceIDs: []string{"interface_output"},
+				RequiredBehaviorIDs: []string{"gain", "thermal"},
+				VerificationIDs:     []string{"behavior:gain", "behavior:thermal", "contract:interface_output"},
+			}},
+		},
+		Interfaces: []architecturesearch.InterfaceContractPlan{{
+			ID: "interface_output", Anchor: "external:output", Kind: "analog_voltage", Domain: "ground",
+			Endpoints: []architecturesearch.InterfaceEndpoint{
+				{BlockID: "block_objective_amplify", ObligationPath: "objective:amplify", Role: "output", Direction: "source"},
+				{BlockID: "system", Role: "requirement_boundary", Direction: "source"},
+			},
+			Evidence: architecturesearch.ContractEvidence{Confidence: architecturesearch.EvidenceVerified, Sources: []string{"test:v4-system-plan"}},
+			Status:   "pass",
+		}},
+		Resources: []architecturesearch.SharedResourcePlan{{
+			ID: "resource_domain_supply", Kind: "supply", Domain: "supply", Source: "external:supply",
+			Consumers: []string{"block_objective_amplify"},
+			Evidence:  architecturesearch.ContractEvidence{Confidence: architecturesearch.EvidenceRuleInferred, Sources: []string{"test:v4-system-plan"}},
+			Status:    "pass",
+		}},
+		Physical: architecturesearch.PhysicalPlan{Partitions: []architecturesearch.PhysicalPartition{{
+			ID: "partition_domain_ground", SubsystemID: "subsystem_domain_ground",
+			BlockIDs: []string{"block_objective_amplify"}, Classifications: []string{"analog"},
+			Rules: []string{"keep_owned_components_within_partition", "preserve_continuous_reference_return"},
+		}}},
+		Traceability: []architecturesearch.SystemTraceabilityRecord{
+			{RequirementKind: "objective", RequirementID: "amplify", BlockIDs: []string{"block_objective_amplify"}, InterfaceIDs: []string{"interface_output"}, ResourceIDs: []string{"resource_domain_supply"}, BehavioralRequirementIDs: []string{"gain", "thermal"}},
+			{RequirementKind: "behavior", RequirementID: "gain", BlockIDs: []string{"block_objective_amplify"}, InterfaceIDs: []string{"interface_output"}, ResourceIDs: []string{"resource_domain_supply"}, BehavioralRequirementIDs: []string{"gain"}},
+			{RequirementKind: "behavior", RequirementID: "thermal", BlockIDs: []string{"block_objective_amplify"}, InterfaceIDs: []string{"interface_output"}, ResourceIDs: []string{"resource_domain_supply"}, BehavioralRequirementIDs: []string{"thermal"}},
+		},
+	}
+	hashInput := plan
+	plan.PlanHash = hashJSON(hashInput)
+	if err := architecturesearch.ValidateSystemPlan(requirement, fingerprint, plan); err != nil {
+		t.Fatal(err)
+	}
+	return &plan
 }
 
 func TestClosedLoopCoordinatesTwoVariablesWhenSinglesRegressWholeReport(t *testing.T) {

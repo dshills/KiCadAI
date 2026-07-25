@@ -213,6 +213,65 @@ func TestNonlinearDCGuaranteedPMOSSwitchUsesSourceReferencedGate(t *testing.T) {
 	}
 }
 
+func TestReverseBlockingLoadSwitchConductsForwardAndLimitsBackfeed(t *testing.T) {
+	t.Run("forward", func(t *testing.T) {
+		intent := nonlinearTestIntent([]Assertion{
+			{AnalysisID: "bias", Node: "VOUT", Quantity: QuantityVoltageV, Min: 4.97, Max: 5},
+		})
+		components := []ComponentEvidence{
+			voltageSourceEvidence("supply", "VIN", "GND"),
+			resistorEvidence("load", 100, "VOUT", "GND"),
+			{
+				InstanceID: "switch", CatalogID: "protection.test.reverse_blocking", Family: "protection",
+				ModelClaims: []CatalogEvidence{{ModelID: PrimitiveReverseBlockingLoadSwitchV1, Parameters: reverseBlockingLoadSwitchParameters()}},
+				Connections: []ConnectionEvidence{
+					{Function: "VIN", Net: "VIN"}, {Function: "VOUT", Net: "VOUT"},
+					{Function: "GND", Net: "GND"}, {Function: "ON", Net: "VIN"},
+				},
+			},
+		}
+		plan, diagnostics := ResolveWithTopology(intent, "test", "hash", components, []NodeEvidence{{Name: "GND", Role: "ground"}, {Name: "VIN"}, {Name: "VOUT"}})
+		if len(diagnostics) != 0 {
+			t.Fatalf("resolve diagnostics=%+v", diagnostics)
+		}
+		report, diagnostics := Evaluate(plan)
+		if len(diagnostics) != 0 || report.Status != "pass" {
+			t.Fatalf("report=%+v diagnostics=%+v", report, diagnostics)
+		}
+	})
+
+	t.Run("reverse", func(t *testing.T) {
+		intent := Intent{
+			ModelID: ModelNonlinearCircuitDCV1,
+			Analyses: []Analysis{{ID: "bias", Kind: AnalysisDCOperatingPoint, Excitations: []SourceExcitation{
+				{Component: "input", DCValue: 0}, {Component: "output", DCValue: 5}, {Component: "enable", DCValue: 5},
+			}}},
+			Assertions: []Assertion{{AnalysisID: "bias", Component: "switch", Quantity: QuantityDeviceCurrentA, Min: 0, Max: 1e-6}},
+		}
+		components := []ComponentEvidence{
+			voltageSourceEvidence("input", "VIN", "GND"),
+			voltageSourceEvidence("output", "VOUT", "GND"),
+			voltageSourceEvidence("enable", "ON", "GND"),
+			{
+				InstanceID: "switch", CatalogID: "protection.test.reverse_blocking", Family: "protection",
+				ModelClaims: []CatalogEvidence{{ModelID: PrimitiveReverseBlockingLoadSwitchV1, Parameters: reverseBlockingLoadSwitchParameters()}},
+				Connections: []ConnectionEvidence{
+					{Function: "VIN", Net: "VIN"}, {Function: "VOUT", Net: "VOUT"},
+					{Function: "GND", Net: "GND"}, {Function: "ON", Net: "ON"},
+				},
+			},
+		}
+		plan, diagnostics := ResolveWithTopology(intent, "test", "hash", components, []NodeEvidence{{Name: "GND", Role: "ground"}, {Name: "VIN"}, {Name: "VOUT"}, {Name: "ON"}})
+		if len(diagnostics) != 0 {
+			t.Fatalf("resolve diagnostics=%+v", diagnostics)
+		}
+		report, diagnostics := Evaluate(plan)
+		if len(diagnostics) != 0 || report.Status != "pass" {
+			t.Fatalf("report=%+v diagnostics=%+v", report, diagnostics)
+		}
+	})
+}
+
 func TestNonlinearDCNPNAndPNPBias(t *testing.T) {
 	for _, test := range []struct {
 		name       string
@@ -370,6 +429,113 @@ func TestBidirectionalOpenDrainTranslatorPreservesHighRailsAndPropagatesLow(t *t
 	report, diagnostics := Evaluate(plan)
 	if len(diagnostics) != 0 || report.Status != "pass" {
 		t.Fatalf("translator report=%+v diagnostics=%+v", report, diagnostics)
+	}
+}
+
+func TestBidirectionalOpenDrainIsolatorPropagatesLowWithoutJoiningGroundDomains(t *testing.T) {
+	intent := Intent{
+		ModelID: ModelNonlinearCircuitDCV1,
+		Analyses: []Analysis{{ID: "bus", Kind: AnalysisDCOperatingPoint, Excitations: []SourceExcitation{
+			{Component: "side_a_supply", DCValue: 3.3}, {Component: "side_b_supply", DCValue: 5}, {Component: "driver", DCValue: 0},
+		}}},
+		Assertions: []Assertion{
+			{AnalysisID: "bus", Node: "SDA1", Quantity: QuantityVoltageV, Min: 0, Max: .01},
+			{AnalysisID: "bus", Node: "SDA2", Quantity: QuantityVoltageV, Min: 0, Max: .4},
+			{AnalysisID: "bus", Node: "SCL1", Quantity: QuantityVoltageV, Min: 3.29, Max: 3.31},
+			{AnalysisID: "bus", Node: "SCL2", Quantity: QuantityVoltageV, Min: 4.98, Max: 5.01},
+		},
+	}
+	components := []ComponentEvidence{
+		voltageSourceEvidence("side_a_supply", "VDD1", "GND1"),
+		voltageSourceEvidence("side_b_supply", "VDD2", "GND2"),
+		voltageSourceEvidence("driver", "SDA1", "GND1"),
+		resistorEvidence("sda1_pullup", 4700, "VDD1", "SDA1"),
+		resistorEvidence("sda2_pullup", 4700, "VDD2", "SDA2"),
+		resistorEvidence("scl1_pullup", 4700, "VDD1", "SCL1"),
+		resistorEvidence("scl2_pullup", 4700, "VDD2", "SCL2"),
+		{
+			InstanceID: "isolator", CatalogID: "isolator", Family: "isolator",
+			ModelClaims: []CatalogEvidence{{ModelID: PrimitiveBidirectionalOpenDrainIsolatorV1, Parameters: openDrainIsolatorParameters()}},
+			Connections: []ConnectionEvidence{
+				{Function: "SDA1", Net: "SDA1"}, {Function: "SCL1", Net: "SCL1"},
+				{Function: "SDA2", Net: "SDA2"}, {Function: "SCL2", Net: "SCL2"},
+				{Function: "VDD1", Net: "VDD1"}, {Function: "GND1", Net: "GND1"},
+				{Function: "VDD2", Net: "VDD2"}, {Function: "GND2", Net: "GND2"},
+			},
+		},
+	}
+	nodes := []NodeEvidence{
+		{Name: "GND1", Role: "ground"}, {Name: "GND2"}, {Name: "VDD1"}, {Name: "VDD2"},
+		{Name: "SDA1"}, {Name: "SDA2"}, {Name: "SCL1"}, {Name: "SCL2"},
+	}
+	plan, diagnostics := ResolveWithTopology(intent, "test", "catalog-hash", components, nodes)
+	if len(diagnostics) != 0 {
+		t.Fatalf("isolator resolve diagnostics=%+v", diagnostics)
+	}
+	report, diagnostics := Evaluate(plan)
+	if len(diagnostics) != 0 || report.Status != "pass" {
+		t.Fatalf("isolator report=%+v diagnostics=%+v", report, diagnostics)
+	}
+}
+
+func TestBidirectionalOpenDrainIsolatorReleasesRemotelyDrivenLow(t *testing.T) {
+	intent := Intent{
+		ModelID: ModelTransientCircuitV1,
+		Analyses: []Analysis{{
+			ID: "release", Kind: AnalysisTransient, DurationS: 2e-6, TimeStepS: 50e-9,
+			Excitations: []SourceExcitation{
+				{Component: "side_a_supply", DCValue: 3.3},
+				{Component: "side_b_supply", DCValue: 5},
+				{
+					Component: "driver", PulseInitialValue: 0, PulseValue: 3.3,
+					PulseDelayS: 500e-9, PulseWidthS: 2e-6, PulsePeriodS: 4e-6,
+				},
+			},
+		}},
+		Assertions: []Assertion{
+			{AnalysisID: "release", Node: "SDA2", Quantity: QuantityVoltageV, TimeS: 2e-6, Min: 4.98, Max: 5.01},
+			{AnalysisID: "release", Node: "SDA2", Quantity: QuantityRiseTimeS, Min: 0, Max: 500e-9},
+		},
+	}
+	components := []ComponentEvidence{
+		voltageSourceEvidence("side_a_supply", "VDD1", "GND1"),
+		voltageSourceEvidence("side_b_supply", "VDD2", "GND2"),
+		voltageSourceEvidence("driver", "HOST_SDA", "GND1"),
+		resistorEvidence("host_series", 22, "HOST_SDA", "SDA1"),
+		resistorEvidence("sda1_pullup", 4700, "VDD1", "SDA1"),
+		resistorEvidence("sda2_pullup", 4700, "VDD2", "SDA2"),
+		resistorEvidence("scl1_pullup", 4700, "VDD1", "SCL1"),
+		resistorEvidence("scl2_pullup", 4700, "VDD2", "SCL2"),
+		{
+			InstanceID: "isolator", CatalogID: "isolator", Family: "isolator",
+			ModelClaims: []CatalogEvidence{{
+				ModelID:    PrimitiveBidirectionalOpenDrainIsolatorV1,
+				Parameters: openDrainIsolatorParameters(),
+			}},
+			Connections: []ConnectionEvidence{
+				{Function: "SDA1", Net: "SDA1"}, {Function: "SCL1", Net: "SCL1"},
+				{Function: "SDA2", Net: "SDA2"}, {Function: "SCL2", Net: "SCL2"},
+				{Function: "VDD1", Net: "VDD1"}, {Function: "GND1", Net: "GND1"},
+				{Function: "VDD2", Net: "VDD2"}, {Function: "GND2", Net: "GND2"},
+			},
+		},
+	}
+	for index := range components {
+		if components[index].InstanceID == "host_series" {
+			components[index].Usage = "transient_series_impedance"
+		}
+	}
+	nodes := []NodeEvidence{
+		{Name: "GND1", Role: "ground"}, {Name: "GND2"}, {Name: "VDD1"}, {Name: "VDD2"},
+		{Name: "HOST_SDA"}, {Name: "SDA1"}, {Name: "SDA2"}, {Name: "SCL1"}, {Name: "SCL2"},
+	}
+	plan, diagnostics := ResolveWithTopology(intent, "test", "catalog-hash", components, nodes)
+	if len(diagnostics) != 0 {
+		t.Fatalf("isolator release resolve diagnostics=%+v", diagnostics)
+	}
+	report, diagnostics := Evaluate(plan)
+	if len(diagnostics) != 0 || report.Status != "pass" {
+		t.Fatalf("isolator release report=%+v diagnostics=%+v", report, diagnostics)
 	}
 }
 
@@ -562,6 +728,18 @@ func openDrainTranslatorParameters() []NamedValue {
 	}
 }
 
+func openDrainIsolatorParameters() []NamedValue {
+	return []NamedValue{
+		{Name: "side_a_min_v", Value: 1.71}, {Name: "side_a_max_v", Value: 5.5},
+		{Name: "side_b_min_v", Value: 1.71}, {Name: "side_b_max_v", Value: 5.5},
+		{Name: "low_level_threshold_v", Value: .7},
+		{Name: "output_on_resistance_ohm", Value: 300}, {Name: "output_off_resistance_ohm", Value: 5e8},
+		{Name: "isolation_resistance_ohm", Value: 1e9}, {Name: "max_output_current_a", Value: .003},
+		{Name: "side_a_quiescent_current_a", Value: .00025}, {Name: "side_b_quiescent_current_a", Value: .00025},
+		{Name: "max_temperature_c", Value: 125}, {Name: "junction_to_ambient_c_per_w", Value: 120},
+	}
+}
+
 func bjtParameters(maxCurrent, maxVoltage float64) []NamedValue {
 	return []NamedValue{{Name: "saturation_current_a", Value: 1e-14}, {Name: "forward_beta", Value: 100}, {Name: "reverse_beta", Value: 1}, {Name: "emission_coefficient", Value: 1}, {Name: "junction_temperature_k", Value: 300.15}, {Name: "max_collector_current_a", Value: maxCurrent}, {Name: "max_collector_emitter_voltage_v", Value: maxVoltage}}
 }
@@ -599,6 +777,17 @@ func pmosSwitchParameters() []NamedValue {
 		{Name: "max_drain_current_a", Value: 12}, {Name: "max_drain_source_voltage_v", Value: 200},
 		{Name: "max_gate_source_voltage_v", Value: 20}, {Name: "max_temperature_c", Value: 150},
 		{Name: "junction_to_ambient_c_per_w", Value: 40},
+	}
+}
+
+func reverseBlockingLoadSwitchParameters() []NamedValue {
+	return []NamedValue{
+		{Name: "input_min_v", Value: 1}, {Name: "input_max_v", Value: 5.5},
+		{Name: "enable_high_voltage_v", Value: 1}, {Name: "on_resistance_ohm", Value: .39},
+		{Name: "reverse_blocking_release_voltage_v", Value: .025}, {Name: "reverse_leakage_current_a", Value: 1e-6},
+		{Name: "max_output_current_a", Value: 2}, {Name: "max_output_voltage_v", Value: 5.5},
+		{Name: "quiescent_current_a", Value: 1.2e-6}, {Name: "max_temperature_c", Value: 125},
+		{Name: "junction_to_ambient_c_per_w", Value: 183},
 	}
 }
 

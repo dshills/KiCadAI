@@ -56,6 +56,8 @@ type Candidate struct {
 	Fingerprint string                            `json:"fingerprint"`
 	Score       architecturesearch.CandidateScore `json:"score"`
 	Variables   []Variable                        `json:"variables,omitempty"`
+	Priority    int                               `json:"priority,omitempty"`
+	SystemPlan  *architecturesearch.SystemPlan    `json:"system_plan,omitempty"`
 }
 
 type Variable struct {
@@ -126,22 +128,23 @@ type ModelDecision struct {
 }
 
 type Report struct {
-	Schema              string            `json:"schema"`
-	PolicyVersion       string            `json:"policy_version"`
-	PolicyHash          string            `json:"policy_hash"`
-	RequirementHash     string            `json:"requirement_hash"`
-	RegistryHash        string            `json:"registry_hash"`
-	CatalogHash         string            `json:"catalog_hash"`
-	FormulaLibraryHash  string            `json:"formula_library_hash"`
-	ModelRegistryHash   string            `json:"model_registry_hash"`
-	Policy              Policy            `json:"policy"`
-	Candidates          []CandidateReport `json:"candidates"`
-	Selected            *SelectedResult   `json:"selected,omitempty"`
-	SelectedCircuitHash string            `json:"selected_circuit_hash,omitempty"`
-	Consumption         Consumption       `json:"consumption"`
-	StopReason          StopReason        `json:"stop_reason"`
-	Status              string            `json:"status"`
-	Diagnostics         []Diagnostic      `json:"diagnostics"`
+	Schema              string                          `json:"schema"`
+	PolicyVersion       string                          `json:"policy_version"`
+	PolicyHash          string                          `json:"policy_hash"`
+	RequirementHash     string                          `json:"requirement_hash"`
+	RegistryHash        string                          `json:"registry_hash"`
+	CatalogHash         string                          `json:"catalog_hash"`
+	FormulaLibraryHash  string                          `json:"formula_library_hash"`
+	ModelRegistryHash   string                          `json:"model_registry_hash"`
+	Policy              Policy                          `json:"policy"`
+	Candidates          []CandidateReport               `json:"candidates"`
+	Selected            *SelectedResult                 `json:"selected,omitempty"`
+	SelectedCircuitHash string                          `json:"selected_circuit_hash,omitempty"`
+	Backtracking        *ClosedLoopBacktrackingEvidence `json:"backtracking,omitempty"`
+	Consumption         Consumption                     `json:"consumption"`
+	StopReason          StopReason                      `json:"stop_reason"`
+	Status              string                          `json:"status"`
+	Diagnostics         []Diagnostic                    `json:"diagnostics"`
 }
 
 // CloneReport returns a deep copy suitable for persistence boundaries.
@@ -159,6 +162,7 @@ func CloneReport(source Report) Report {
 
 type CandidateReport struct {
 	Fingerprint string                            `json:"fingerprint"`
+	Priority    int                               `json:"priority,omitempty"`
 	StaticScore architecturesearch.CandidateScore `json:"static_score"`
 	Attempts    []Attempt                         `json:"attempts"`
 	Repairs     []Repair                          `json:"repairs"`
@@ -169,17 +173,18 @@ type CandidateReport struct {
 }
 
 type Attempt struct {
-	Number         int                 `json:"number"`
-	State          CandidateState      `json:"state"`
-	StateHash      string              `json:"state_hash"`
-	EvidenceHash   string              `json:"evidence_hash,omitempty"`
-	Simulation     *SimulationEvidence `json:"simulation,omitempty"`
-	Assertions     []AssertionResult   `json:"assertions"`
-	ModelDecisions []ModelDecision     `json:"model_decisions"`
-	Diagnoses      []Diagnosis         `json:"diagnoses"`
-	Score          EvaluationScore     `json:"score"`
-	Status         string              `json:"status"`
-	Diagnostics    []Diagnostic        `json:"diagnostics"`
+	Number         int                            `json:"number"`
+	State          CandidateState                 `json:"state"`
+	StateHash      string                         `json:"state_hash"`
+	EvidenceHash   string                         `json:"evidence_hash,omitempty"`
+	Simulation     *SimulationEvidence            `json:"simulation,omitempty"`
+	Assertions     []AssertionResult              `json:"assertions"`
+	ModelDecisions []ModelDecision                `json:"model_decisions"`
+	Hierarchy      *HierarchyVerificationEvidence `json:"hierarchy,omitempty"`
+	Diagnoses      []Diagnosis                    `json:"diagnoses"`
+	Score          EvaluationScore                `json:"score"`
+	Status         string                         `json:"status"`
+	Diagnostics    []Diagnostic                   `json:"diagnostics"`
 }
 
 type AssertionResult struct {
@@ -250,11 +255,47 @@ type RepairChange struct {
 }
 
 type SelectedResult struct {
-	Fingerprint string          `json:"fingerprint"`
-	State       CandidateState  `json:"state"`
-	Score       EvaluationScore `json:"score"`
-	Repairs     int             `json:"repairs"`
-	Rationale   string          `json:"rationale"`
+	Fingerprint    string          `json:"fingerprint"`
+	State          CandidateState  `json:"state"`
+	Score          EvaluationScore `json:"score"`
+	Repairs        int             `json:"repairs"`
+	Rationale      string          `json:"rationale"`
+	SystemPlanHash string          `json:"system_plan_hash,omitempty"`
+}
+
+type HierarchyVerificationEvidence struct {
+	SystemPlanHash string                       `json:"system_plan_hash"`
+	Blocks         []BlockVerificationResult    `json:"blocks"`
+	EndToEnd       []EndToEndVerificationResult `json:"end_to_end"`
+	Status         string                       `json:"status"`
+}
+
+type BlockVerificationResult struct {
+	BlockID      string   `json:"block_id"`
+	BehaviorIDs  []string `json:"behavior_ids"`
+	InterfaceIDs []string `json:"interface_ids"`
+	Pass         bool     `json:"pass"`
+}
+
+type EndToEndVerificationResult struct {
+	RequirementID  string   `json:"requirement_id"`
+	OperatingCases []string `json:"operating_cases"`
+	Pass           bool     `json:"pass"`
+}
+
+type ClosedLoopBacktrackingEvidence struct {
+	Schema              string                       `json:"schema"`
+	Strategy            string                       `json:"strategy"`
+	Candidates          []ClosedLoopCandidateOutcome `json:"candidates"`
+	SelectedFingerprint string                       `json:"selected_fingerprint,omitempty"`
+	Deterministic       bool                         `json:"deterministic"`
+}
+
+type ClosedLoopCandidateOutcome struct {
+	Priority    int        `json:"priority"`
+	Fingerprint string     `json:"fingerprint"`
+	Status      string     `json:"status"`
+	StopReason  StopReason `json:"stop_reason"`
 }
 
 type Consumption struct {

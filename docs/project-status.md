@@ -177,23 +177,49 @@ contain no topology, components, nets, pins, coordinates, layers, or routes.
 The initial installed-KiCad baseline passed 5/12 cases and ranked unsupported
 families before production changes.
 
-The final report passes 11/12 with the same evaluator and gate profile.
-Constant-current regulation now passes in power-output, MCU-peripheral, and
-sensor-excitation contexts. Precision rectification passes alone and composed
-with ADC acquisition. Every control case passes. Each passing row includes
+The original expansion report passes 11/12 with the same evaluator and gate
+profile. Constant-current regulation passes in power-output, MCU-peripheral,
+and sensor-excitation contexts. Precision rectification passes alone and
+composed with ADC acquisition. A subsequent generic standalone-clock
+milestone adds fixed packaged and resistor-programmed sources and closes the
+unchanged benchmark at 12/12. Every row includes
 trusted simulation, deterministic architecture/component evidence, complete
 physical routing/connectivity, writer correctness, clean ERC, strict DRC,
 zero-difference round trip, and byte-identical replay.
 
-The one remaining row, standalone digital clock generation, fails closed at
-architecture selection as capability `clock_generation`. The
+The
 [baseline](../specs/held-out-capability-expansion/BASELINE_REPORT.json) and
-[final report](../specs/held-out-capability-expansion/FINAL_REPORT.json) are
-checksum-pinned. The five newly promoted cases are also bound into a
+[11/12 expansion report](../specs/held-out-capability-expansion/FINAL_REPORT.json)
+are checksum-pinned, and the
+[clock closeout](../specs/standalone-clock-generation/AUDIT.md) records the
+12/12 result. The five first-wave cases are also bound into a
 clean-checkout
 [promotion matrix](../specs/held-out-capability-expansion/PROMOTION_MATRIX.json).
-This is measurable progress across two electrically distinct families, not
-evidence that an arbitrary requested circuit can be generated.
+This remains bounded benchmark evidence, not proof that every requested
+circuit can be generated.
+
+### Hierarchical Multi-Domain Synthesis
+
+A frozen six-system V4 corpus extends the prior flat composition envelope to
+multi-block, multi-domain systems. Requirements provide behavior, interfaces,
+operating and fault corners, safety limits, and board limits without providing
+subsystem membership, topology, parts, nets, pins, coordinates, or routes.
+
+The generated evidence includes a canonical system/subsystem/block hierarchy,
+typed boundary contracts, shared rail/reference/clock/reset/protection
+accounting, deterministic complete-candidate backtracking, block and
+end-to-end verification coverage, physical partitions, and requirement-to-
+transaction/KiCad traceability. The corpus covers protected Class-AB,
+precision acquisition/alarm, regulated MCU/sensor/communications, isolated
+mixed-voltage gateway, current-limited switched load, and split-supply
+precision monitor systems. All six pass deterministic two-run offline and
+installed-KiCad ERC, strict DRC, connectivity, routing, writer, and zero-diff
+round-trip gates.
+
+The [specification](../specs/hierarchical-multi-domain-synthesis/SPEC.md) and
+[promotion matrix](../specs/hierarchical-multi-domain-synthesis/PROMOTION_MATRIX.json)
+define the measured boundary. Unsupported capabilities, missing
+safety-relevant evidence, and exhausted bounded search still fail closed.
 
 ### Schematic Readability
 

@@ -194,6 +194,19 @@
           {"name": "min_headroom_v", "value": 0.4},
           {"name": "max_load_current_ma", "value": 600}
         ]
+      }, {
+        "model_id": "mna_fixed_linear_regulator_v1",
+        "parameters": [
+          {"name": "output_voltage_v", "value": 3.3},
+          {"name": "min_headroom_v", "value": 0.4},
+          {"name": "max_load_current_a", "value": 0.6},
+          {"name": "min_input_voltage_v", "value": 3.8},
+          {"name": "max_input_voltage_v", "value": 6},
+          {"name": "quiescent_current_a", "value": 0.000055},
+          {"name": "soft_start_time_s", "value": 0.00005},
+          {"name": "max_temperature_c", "value": 125},
+          {"name": "junction_to_ambient_c_per_w", "value": 250}
+        ]
       }],
       "temperature": {"min": "-40", "max": "85", "unit": "C"},
       "companions": [
