@@ -1,0 +1,66 @@
+{
+  "schema": "kicadai.hierarchical-multi-domain-baseline.v1",
+  "version": 1,
+  "recorded_at": "2026-07-25",
+  "baseline_revision": "2c5418671072c4c4e965d48401fbe89dd8388768",
+  "corpus_manifest_sha256": "a1472fc0a8df044ec7ff46af8fd751292ed568d4528da027ee6853571d365dbd",
+  "production_requirement_schema": "kicadai.open-set-requirement.v3",
+  "held_out_requirement_schema": "kicadai.open-set-requirement.v4",
+  "summary": {
+    "fixtures": 6,
+    "decoded": 0,
+    "hierarchically_decomposed": 0,
+    "interface_contracts_proven": 0,
+    "shared_resource_plans_proven": 0,
+    "deterministic_backtracking_proven": 0,
+    "physical_partitions_proven": 0,
+    "end_to_end_traceability_proven": 0,
+    "complete_passes": 0
+  },
+  "results": [
+    {
+      "id": "current_limited_switched_load_system",
+      "status": "blocked",
+      "code": "ARCHITECTURE_SCHEMA_INVALID",
+      "stage": "strict_decode"
+    },
+    {
+      "id": "isolated_mixed_voltage_gateway_system",
+      "status": "blocked",
+      "code": "ARCHITECTURE_SCHEMA_INVALID",
+      "stage": "strict_decode"
+    },
+    {
+      "id": "precision_acquisition_alarm_system",
+      "status": "blocked",
+      "code": "ARCHITECTURE_SCHEMA_INVALID",
+      "stage": "strict_decode"
+    },
+    {
+      "id": "protected_class_ab_system",
+      "status": "blocked",
+      "code": "ARCHITECTURE_SCHEMA_INVALID",
+      "stage": "strict_decode"
+    },
+    {
+      "id": "regulated_sensor_mcu_communications_system",
+      "status": "blocked",
+      "code": "ARCHITECTURE_SCHEMA_INVALID",
+      "stage": "strict_decode"
+    },
+    {
+      "id": "split_supply_precision_monitor_system",
+      "status": "blocked",
+      "code": "ARCHITECTURE_SCHEMA_INVALID",
+      "stage": "strict_decode"
+    }
+  ],
+  "missing_generated_evidence": [
+    "hierarchical_decomposition",
+    "independently_verifiable_interface_contracts",
+    "shared_resource_plan",
+    "global_candidate_backtracking",
+    "physical_partition_plan",
+    "requirement_to_kicad_traceability"
+  ]
+}

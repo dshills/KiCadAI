@@ -1,0 +1,62 @@
+{
+  "schema": "kicadai.hierarchical-multi-domain-corpus.v1",
+  "version": 1,
+  "frozen_at": "2026-07-25",
+  "requirement_schema": "kicadai.open-set-requirement.v4",
+  "fixtures": [
+    {
+      "id": "current_limited_switched_load_system",
+      "file": "current_limited_switched_load_system.json",
+      "categories": ["analog", "control", "logic", "power", "protection"],
+      "analyses": ["dc_operating_point", "startup", "transient"],
+      "minimum_functional_blocks": 4,
+      "minimum_electrical_domains": 3,
+      "sha256": "dcdd37a84f4712b171eaa067dc23c649ce98a2c792d40cdca502febdae7cc8db"
+    },
+    {
+      "id": "isolated_mixed_voltage_gateway_system",
+      "file": "isolated_mixed_voltage_gateway_system.json",
+      "categories": ["digital", "interface", "isolation", "power", "protection"],
+      "analyses": ["dc_operating_point", "startup", "transient"],
+      "minimum_functional_blocks": 4,
+      "minimum_electrical_domains": 6,
+      "sha256": "1940c08e72c08119bffc599070c0c319f6e731880daaa3ae49cab7296a43d57c"
+    },
+    {
+      "id": "precision_acquisition_alarm_system",
+      "file": "precision_acquisition_alarm_system.json",
+      "categories": ["analog", "control", "logic", "noise", "sensor"],
+      "analyses": ["ac_sweep", "dc_operating_point", "noise"],
+      "minimum_functional_blocks": 4,
+      "minimum_electrical_domains": 2,
+      "sha256": "79c15222e1fffcf482406a92ada38a25d962d780827679075db61d929e9ed46a"
+    },
+    {
+      "id": "protected_class_ab_system",
+      "file": "protected_class_ab_system.json",
+      "categories": ["amplifier", "analog", "class_ab", "control", "power", "protection", "thermal"],
+      "analyses": ["ac_sweep", "dc_operating_point", "distortion", "stability", "startup", "thermal", "transient"],
+      "minimum_functional_blocks": 4,
+      "minimum_electrical_domains": 4,
+      "sha256": "f051c0d0067438208806518d9aa328c137c3ea3c6f18934e96b252bf9f0af9d7"
+    },
+    {
+      "id": "regulated_sensor_mcu_communications_system",
+      "file": "regulated_sensor_mcu_communications_system.json",
+      "categories": ["digital", "interface", "mcu", "power", "protection", "sensor"],
+      "analyses": ["dc_operating_point", "startup", "thermal"],
+      "minimum_functional_blocks": 5,
+      "minimum_electrical_domains": 5,
+      "sha256": "db7b167796f10ce3f113ec8969d2163f2c6e3d702663f3e8d4eb361a668766c7"
+    },
+    {
+      "id": "split_supply_precision_monitor_system",
+      "file": "split_supply_precision_monitor_system.json",
+      "categories": ["analog", "control", "power", "protection"],
+      "analyses": ["ac_sweep", "dc_operating_point", "noise"],
+      "minimum_functional_blocks": 5,
+      "minimum_electrical_domains": 4,
+      "sha256": "aa6c19ada80d8e33ca831b88a371a1e52c43c17bfb20094f3d978d4e6376ff40"
+    }
+  ]
+}
