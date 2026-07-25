@@ -184,26 +184,30 @@ func RouteExplicitCircuit(ctx context.Context, request Request, placed Placement
 	issues = append(issues, explicitRequiredRouteIssues(request.ExplicitCircuit.Nets, result)...)
 	operations, operationIssues := finalizeExplicitRouteOperations(result.Operations, &placed)
 	issues = append(issues, operationIssues...)
+	var clearanceIssues []reports.Issue
+	clearanceBlockersBefore := 0
+	clearanceBlockersAfter := 0
+	clearanceMM := routingRequest.Rules.ClearanceMM
+	layerTransitionViasAdded := 0
 	if request.Validation.RequireDRC {
-		var transitionIssues []reports.Issue
-		operations, transitionIssues = repairRouteTransitionViaClearance(routingRequest, operations)
-		issues = append(issues, transitionIssues...)
-		result.Issues = append(result.Issues, transitionIssues...)
 		var junctionIssues []reports.Issue
 		operations, junctionIssues = repairAcuteRouteOperationJunctions(routingRequest, operations)
 		issues = append(issues, junctionIssues...)
 		result.Issues = append(result.Issues, junctionIssues...)
-		if reports.HasBlockingIssue(transitionIssues) || reports.HasBlockingIssue(junctionIssues) {
+		if reports.HasBlockingIssue(junctionIssues) {
 			result.Status = routing.StatusBlocked
 		}
-	}
-	operations, clearanceIssues, clearanceBlockersBefore, clearanceBlockersAfter, clearanceMM := finalizeEmittedRoutePhysicalClearanceWhenRequired(request.Validation.RequireDRC, routingRequest, operations)
-	layerTransitionViasAdded := 0
-	if request.Validation.RequireDRC {
-		var junctionIssues []reports.Issue
-		operations, layerTransitionViasAdded, junctionIssues = ensureRouteLayerJunctionVias(operations, routingRequest.Rules)
-		issues = append(issues, junctionIssues...)
-		result.Issues = append(result.Issues, junctionIssues...)
+		operations, _, clearanceBlockersBefore, clearanceBlockersAfter, clearanceMM = finalizeEmittedRoutePhysicalClearance(routingRequest, operations)
+		if !reports.HasBlockingIssue(junctionIssues) {
+			var materializationIssues []reports.Issue
+			operations, layerTransitionViasAdded, materializationIssues = ensureRouteLayerJunctionVias(operations, routingRequest.Rules)
+			issues = append(issues, materializationIssues...)
+			result.Issues = append(result.Issues, materializationIssues...)
+			junctionIssues = append(junctionIssues, materializationIssues...)
+			if reports.HasBlockingIssue(materializationIssues) {
+				result.Status = routing.StatusBlocked
+			}
+		}
 		if layerTransitionViasAdded > 0 && !reports.HasBlockingIssue(junctionIssues) {
 			var reduced map[int]struct{}
 			var reductionIssues []reports.Issue
@@ -227,16 +231,16 @@ func RouteExplicitCircuit(ctx context.Context, request Request, placed Placement
 		if !reports.HasBlockingIssue(junctionIssues) {
 			// Track-clearance repair may add alternate-layer doglegs or move
 			// their attached vertices. Revalidate transition vias afterward;
-			// the pre-clearance transition pass cannot prove this final copper.
+			// only this final copper can prove transition clearance, so do not
+			// retain a stale failure from the pre-repair geometry.
 			var transitionIssues []reports.Issue
 			operations, transitionIssues = repairRouteTransitionViaClearance(routingRequest, operations)
 			issues = append(issues, transitionIssues...)
 			result.Issues = append(result.Issues, transitionIssues...)
 			junctionIssues = append(junctionIssues, transitionIssues...)
-			writerClearanceRequest := routingRequest
-			routing.NormalizeRequest(&writerClearanceRequest)
-			clearanceIssues = routing.ValidatePhysicalTrackClearance(writerClearanceRequest, routingRoutesFromOperations(operations))
-			clearanceBlockersAfter = blockingIssueCount(clearanceIssues)
+			if reports.HasBlockingIssue(transitionIssues) {
+				result.Status = routing.StatusBlocked
+			}
 		}
 		if reports.HasBlockingIssue(junctionIssues) {
 			result.Status = routing.StatusBlocked
@@ -244,6 +248,12 @@ func RouteExplicitCircuit(ctx context.Context, request Request, placed Placement
 	}
 	operations, endpointTailCleanup := trimDisconnectedRouteTailsAtSameNetPadsWithSummary(operations, newPhysicalPadRoutingContext(&placed))
 	operations = compactRouteOperationGeometry(operations)
+	if request.Validation.RequireDRC {
+		finalClearanceRequest := routingRequest
+		routing.NormalizeRequest(&finalClearanceRequest)
+		clearanceIssues = routing.ValidatePhysicalTrackClearance(finalClearanceRequest, routingRoutesFromOperations(operations))
+		clearanceBlockersAfter = blockingIssueCount(clearanceIssues)
+	}
 	returnPathEvidence, returnPathIssues := explicitReturnPathEvidence(
 		request.ExplicitCircuit.Nets, request.ExplicitCircuit.Zones, routingRoutesFromOperations(operations),
 		routingRequest.Board.Layers, request.Board.ThicknessMM,
@@ -252,12 +262,6 @@ func RouteExplicitCircuit(ctx context.Context, request Request, placed Placement
 	result.Issues = append(result.Issues, returnPathIssues...)
 	if reports.HasBlockingIssue(returnPathIssues) {
 		result.Status = routing.StatusBlocked
-	}
-	if endpointTailCleanup.Trimmed > 0 {
-		finalClearanceRequest := routingRequest
-		routing.NormalizeRequest(&finalClearanceRequest)
-		clearanceIssues = routing.ValidatePhysicalTrackClearance(finalClearanceRequest, routingRoutesFromOperations(operations))
-		clearanceBlockersAfter = blockingIssueCount(clearanceIssues)
 	}
 	clearanceIssues, clearanceDeferredToDRC := deferPhysicalClearanceIssuesToRequiredDRC(request.Validation.RequireDRC, clearanceIssues)
 	issues = append(issues, clearanceIssues...)

@@ -2243,6 +2243,19 @@ func TestParseDesignRepairApplyImpliesRepair(t *testing.T) {
 	}
 }
 
+func TestParseUsesConservativePlacementBoardMargin(t *testing.T) {
+	opts, command, err := parse([]string{"design", "create"}, io.Discard)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if command != "design" || opts.placementBoardMargin != defaultPlacementBoardMarginMM {
+		t.Fatalf("opts=%#v command=%q", opts, command)
+	}
+	if defaultPlacementBoardMarginMM != 2 {
+		t.Fatalf("default placement board margin = %g, want 2", defaultPlacementBoardMarginMM)
+	}
+}
+
 func TestDesignCreateOptionsRejectsUnknownRouteMode(t *testing.T) {
 	_, err := designCreateOptions(context.Background(), cliOptions{routeMode: "sideways"}, checks.Options{})
 	if err == nil {
