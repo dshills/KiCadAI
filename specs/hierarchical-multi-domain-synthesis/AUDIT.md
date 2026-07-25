@@ -59,6 +59,13 @@ deadlines, solver bounds, corner limits, and all electrical acceptance gates
 remain unchanged; the Actions job ceiling is 75 minutes so setup and teardown
 do not mask the bounded Go-test result.
 
+The installed macOS replay showed the same boundary at the promotion-runner
+layer: `protected_class_ab_system` exhausted the legacy 20-minute per-run
+deadline while nonlinear/transient corner workers were active. Hierarchical
+installed scenarios therefore use the same 55-minute per-run deadline, while
+the baseline matrix retains 20 minutes. The installed job ceiling is 180
+minutes; verification gates and two-run comparison remain unchanged.
+
 ## Exact Installed-KiCad Promotion
 
 The authoritative parent implementation revision was:

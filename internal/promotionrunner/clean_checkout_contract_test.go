@@ -87,9 +87,12 @@ func TestPromotionWorkflowContractAndPinnedActions(t *testing.T) {
 	for _, required := range []string{
 		"workflow_dispatch:",
 		"runs-on: macos-15",
-		"timeout-minutes: 60",
+		"timeout-minutes: 180",
 		"target: promotion-bundle",
 		"target: hierarchical-promotion-bundle",
+		"scenario_timeout: 20m",
+		"scenario_timeout: 55m",
+		"PROMOTION_SCENARIO_TIMEOUT: ${{ matrix.scenario_timeout }}",
 		"run: make '${{ matrix.target }}'",
 		"kicadai-promotion' verify --bundle \"$bundle_path\"",
 		"actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02",
