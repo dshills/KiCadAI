@@ -440,6 +440,24 @@ func TestDerivedStabilitySweepBracketsCatalogOpAmpBandwidth(t *testing.T) {
 	}
 }
 
+func TestDerivedStabilitySweepBracketsCatalogBuckControlBandwidth(t *testing.T) {
+	base := simmodel.Plan{
+		Analyses: []simmodel.Analysis{{ID: "ac", Kind: simmodel.AnalysisACSweep, StartFrequencyHz: 10, StopFrequencyHz: 100_000, Points: 64}},
+		Devices: []simmodel.ResolvedDevice{{
+			Component: "converter", PrimitiveModel: simmodel.PrimitiveSynchronousBuckRegulatorV1,
+			ModelParameters: []simmodel.NamedValue{
+				{Name: "control_pole_hz", Value: 150_000},
+				{Name: "switching_frequency_hz", Value: 500_000},
+			},
+		}},
+	}
+
+	analysis := derivedAnalysisTemplate(base, simmodel.AnalysisStability)
+	if analysis.StartFrequencyHz > 10 || analysis.StopFrequencyHz < 5_000_000 || analysis.Points < 64 {
+		t.Fatalf("stability sweep does not bracket trusted buck control model: %#v", analysis)
+	}
+}
+
 func TestDerivedACSweepBracketsCatalogBJTTransitionFrequency(t *testing.T) {
 	base := simmodel.Plan{
 		GroundNode: "GND", Nodes: []string{"GND", "IN", "OUT"},
@@ -566,6 +584,12 @@ func TestBehavioralTransientStimulusUsesDataflowIngressAndKeepsSupplyPowered(t *
 	if supply.DCValue != 5 || supply.PulsePeriodS != 0 {
 		t.Fatalf("supply excitation must remain powered during interface transient: %#v", supply)
 	}
+	electrothermal := simmodel.ClonePlan(plan)
+	electrothermal.Analyses[0].Kind = simmodel.AnalysisElectrothermal
+	stimulated, err = configureBehavioralTransientStimulus(electrothermal, simmodel.AnalysisElectrothermal, stimulus, true)
+	if err != nil || stimulated.Analyses[0].Excitations[0].PulseValue != -5 {
+		t.Fatalf("electrothermal event stimulus = %#v, err=%v", stimulated.Analyses, err)
+	}
 }
 
 func TestBehavioralTransientStimulusUsesExplicitBidirectionalInputBoundary(t *testing.T) {
@@ -601,6 +625,49 @@ func TestBehavioralTransientStimulusUsesExplicitBidirectionalInputBoundary(t *te
 	stimulus, ok := behavioralTransientStimulusForRequirement(requirement, bindings)
 	if !ok || stimulus.SemanticID != "host_bus" || stimulus.Node != "HOST_BUS" || stimulus.InitialV != 0 || stimulus.FinalV != 5 {
 		t.Fatalf("explicit bidirectional ingress stimulus = %#v, ok=%t", stimulus, ok)
+	}
+}
+
+func TestBehavioralLoadCurrentStepUsesDeclaredOperatingBounds(t *testing.T) {
+	minimum, maximum := 0.25, 2.0
+	requirement := architecturesearch.Requirement{Requirements: architecturesearch.Requirements{
+		BehavioralRequirements: []architecturesearch.BehavioralRequirement{{
+			ID: "response", Metric: "response_time", Analysis: simmodel.AnalysisTransient,
+		}},
+	}}
+	plan := simmodel.Plan{Analyses: []simmodel.Analysis{{
+		ID: "response", Kind: simmodel.AnalysisTransient, DurationS: .01, TimeStepS: .0001,
+		Excitations: []simmodel.SourceExcitation{{Component: "load"}},
+	}}}
+	harness := []operatingHarnessDevice{{
+		Device: circuitgraph.SimulationHarnessDevice{
+			InstanceID: "load", CatalogID: "source.current.connector.1x02",
+		},
+		Source: true, InitialValue: minimum, HasInitialValue: true,
+		DefaultValue: maximum, HasDefaultValue: true,
+	}}
+	configured, err := configureBehavioralLoadCurrentStep(requirement, simmodel.AnalysisTransient, plan, harness, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	excitation := configured.Analyses[0].Excitations[0]
+	if excitation.DCValue != 0 || excitation.PulseInitialValue != minimum || excitation.PulseValue != maximum ||
+		excitation.PulseDelayS != configured.Analyses[0].TimeStepS || excitation.PulseWidthS != configured.Analyses[0].DurationS ||
+		excitation.PulsePeriodS != 2*configured.Analyses[0].DurationS {
+		t.Fatalf("bounded load-current edge = %#v", excitation)
+	}
+	if unchanged, err := configureBehavioralLoadCurrentStep(requirement, simmodel.AnalysisTransient, plan, harness, false); err != nil || simulationAnalysisHasDynamicExcitation(unchanged.Analyses[0]) {
+		t.Fatalf("disabled load-current edge changed plan: err=%v analysis=%#v", err, unchanged.Analyses[0])
+	}
+
+	requirement.Requirements.BehavioralRequirements[0].Observation = architecturesearch.Observation{Kind: "port", ID: "current_output"}
+	requirement.Requirements.BehavioralRequirements = append(requirement.Requirements.BehavioralRequirements, architecturesearch.BehavioralRequirement{
+		ID: "regulated_current", Metric: "dc_current", Analysis: simmodel.AnalysisDCOperatingPoint,
+		Observation: architecturesearch.Observation{Kind: "port", ID: "current_output"},
+	})
+	currentControlled, err := configureBehavioralLoadCurrentStep(requirement, simmodel.AnalysisTransient, plan, harness, true)
+	if err != nil || simulationAnalysisHasDynamicExcitation(currentControlled.Analyses[0]) {
+		t.Fatalf("current-controlled output received a load-current edge: err=%v analysis=%#v", err, currentControlled.Analyses[0])
 	}
 }
 
@@ -893,6 +960,83 @@ func TestDerivedDistortionMeasuresOutputPowerAtTheRequestedOperatingPoint(t *tes
 	}
 }
 
+func TestBehavioralPowerStimulusUsesMaximumDeclaredLoadResistance(t *testing.T) {
+	minimumPower, minimumLoad, maximumLoad := 15.0, 4.0, 8.0
+	requirement := architecturesearch.Requirement{Requirements: architecturesearch.Requirements{
+		BehavioralRequirements: []architecturesearch.BehavioralRequirement{{
+			ID: "power", Metric: "output_power", Min: &minimumPower, Unit: "W",
+		}},
+		OperatingCases: []architecturesearch.OperatingCase{{Conditions: []architecturesearch.OperatingCondition{{
+			Axis: "load_resistance", Min: &minimumLoad, Max: &maximumLoad,
+		}}}},
+	}}
+	got, ok := behavioralOutputSpanInputAmplitude(requirement)
+	want := math.Sqrt(2*minimumPower*maximumLoad) * behavioralRatedPowerVoltageGuard
+	if !ok || got != want {
+		t.Fatalf("behavioral output-power amplitude = %.12g, %t; want %.12g", got, ok, want)
+	}
+}
+
+func TestDerivedDistortionUsesUnityNominalWhenInputGainIsUnconstrained(t *testing.T) {
+	minimumPower, loadResistance := 15.0, 4.0
+	requirement := architecturesearch.Requirement{Requirements: architecturesearch.Requirements{
+		BehavioralRequirements: []architecturesearch.BehavioralRequirement{
+			{ID: "power", Metric: "output_power", Min: &minimumPower, Unit: "W"},
+		},
+		OperatingCases: []architecturesearch.OperatingCase{{Conditions: []architecturesearch.OperatingCondition{{
+			Axis: "load_resistance", Min: &loadResistance, Max: &loadResistance,
+		}}}},
+	}}
+	base := simmodel.Plan{
+		ModelID: simmodel.ModelNonlinearCircuitDCV1, GroundNode: "GND", Nodes: []string{"GND", "IN"},
+		Devices: []simmodel.ResolvedDevice{{
+			Component: "input", PrimitiveModel: simmodel.PrimitiveVoltageSourceV1,
+			Terminals: []simmodel.TerminalBinding{{Terminal: "POSITIVE", Net: "IN"}, {Terminal: "NEGATIVE", Net: "GND"}},
+		}},
+		Analyses: []simmodel.Analysis{{ID: "dc", Kind: simmodel.AnalysisDCOperatingPoint, Excitations: []simmodel.SourceExcitation{{Component: "input"}}}},
+	}
+
+	intent, err := derivedGraphWorkflowIntent(requirement, base, simmodel.AnalysisDistortion, "IN")
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := math.Sqrt(2 * minimumPower * loadResistance)
+	if got := intent.Analyses[0].Excitations[0].SineAmplitude; got != want {
+		t.Fatalf("distortion input amplitude = %.12g, want unity-nominal %.12g", got, want)
+	}
+}
+
+func TestEventObservedTransientDoesNotSuppressPeriodicPowerStimulus(t *testing.T) {
+	minimumPower, loadResistance, maximumResponse := 15.0, 4.0, 1e-3
+	requirement := architecturesearch.Requirement{Requirements: architecturesearch.Requirements{
+		Ports: []architecturesearch.Port{{
+			ID: "input", Kind: "analog_voltage", Direction: "sink", Domain: "ground",
+		}},
+		Domains: []architecturesearch.Domain{{
+			ID: "ground", Kind: "reference", NominalVoltageV: 0,
+		}},
+		BehavioralRequirements: []architecturesearch.BehavioralRequirement{
+			{ID: "power", Metric: "output_power", Analysis: simmodel.AnalysisTransient, Min: &minimumPower, Unit: "W"},
+			{
+				ID: "fault_response", Metric: "protection_response_time", Analysis: simmodel.AnalysisTransient,
+				Observation: architecturesearch.Observation{Kind: "event", ID: "short_fault"},
+				Max:         &maximumResponse, Unit: "s",
+			},
+		},
+		OperatingCases: []architecturesearch.OperatingCase{{
+			Conditions: []architecturesearch.OperatingCondition{{
+				Axis: "load_resistance", Min: &loadResistance, Max: &loadResistance,
+			}},
+		}},
+	}}
+	stimulus, ok := behavioralTransientStimulusForRequirement(requirement, []closedloopsynthesis.SemanticBinding{{
+		Kind: "port", ID: "input", Target: "IN",
+	}})
+	if !ok || !stimulus.Periodic || stimulus.Node != "IN" || stimulus.PeriodicFrequencyHz != behavioralDistortionFrequencyHz {
+		t.Fatalf("periodic power stimulus = %#v, %t", stimulus, ok)
+	}
+}
+
 func TestDerivedThermalUsesRatedPeriodicDrive(t *testing.T) {
 	minimumGain, minimumPower, loadResistance := 19.0, 10.0, 8.0
 	requirement := architecturesearch.Requirement{Requirements: architecturesearch.Requirements{
@@ -926,6 +1070,37 @@ func TestDerivedThermalUsesRatedPeriodicDrive(t *testing.T) {
 	}
 	if len(analysis.Conditions) != 1 || analysis.Conditions[0].Name != "ambient_temperature_c" || analysis.Conditions[0].Value != 25 {
 		t.Fatalf("derived thermal conditions = %#v", analysis.Conditions)
+	}
+}
+
+func TestDerivedElectrothermalUsesBoundedDynamicGrid(t *testing.T) {
+	maximumTemperature := 125.0
+	requirement := architecturesearch.Requirement{Requirements: architecturesearch.Requirements{
+		BehavioralRequirements: []architecturesearch.BehavioralRequirement{
+			{ID: "thermal", Metric: "junction_temperature", Analysis: simmodel.AnalysisElectrothermal, Max: &maximumTemperature, Unit: "degC"},
+		},
+	}}
+	base := simmodel.Plan{
+		ModelID: simmodel.ModelNonlinearCircuitDCV1, GroundNode: "GND", Nodes: []string{"GND", "VCC"},
+		Devices: []simmodel.ResolvedDevice{
+			{Component: "supply", PrimitiveModel: simmodel.PrimitiveVoltageSourceV1, Terminals: []simmodel.TerminalBinding{{Terminal: "POSITIVE", Net: "VCC"}, {Terminal: "NEGATIVE", Net: "GND"}}},
+			{Component: "load", PrimitiveModel: simmodel.PrimitiveResistorV1, ModelParameters: []simmodel.NamedValue{{Name: "junction_to_ambient_c_per_w", Value: 10}, {Name: "max_temperature_c", Value: 150}}},
+		},
+		Analyses: []simmodel.Analysis{{ID: "dc", Kind: simmodel.AnalysisDCOperatingPoint, Excitations: []simmodel.SourceExcitation{{Component: "supply", DCValue: 5}}}},
+	}
+	intent, err := derivedGraphWorkflowIntent(requirement, base, simmodel.AnalysisElectrothermal, "VCC")
+	if err != nil {
+		t.Fatal(err)
+	}
+	analysis := intent.Analyses[0]
+	if intent.ModelID != simmodel.ModelTransientCircuitV1 || analysis.Kind != simmodel.AnalysisElectrothermal || analysis.DurationS <= 0 || analysis.TimeStepS <= 0 {
+		t.Fatalf("derived electrothermal workflow = model %s analysis %#v", intent.ModelID, analysis)
+	}
+	if len(analysis.Conditions) != 1 || analysis.Conditions[0].Name != "ambient_temperature_c" {
+		t.Fatalf("derived electrothermal conditions = %#v", analysis.Conditions)
+	}
+	if len(intent.Assertions) != 1 || intent.Assertions[0].Component != "load" || intent.Assertions[0].Quantity != simmodel.QuantityJunctionTemperatureC {
+		t.Fatalf("derived electrothermal assertion = %#v", intent.Assertions)
 	}
 }
 
@@ -1051,27 +1226,99 @@ func simulationPlanFailureNeighborhood(plans map[string]simmodel.Plan, failure e
 
 func TestLoadCurrentHarnessSpansSemanticLoadSwitchPowerAndOutputRoles(t *testing.T) {
 	minimum, maximum := 0.0, 2.0
+	bindings := []closedloopsynthesis.SemanticBinding{
+		{Kind: "domain", ID: "ground", Target: "GND"},
+		{Kind: "port", ID: "power", Target: "SUPPLY"},
+		{Kind: "port", ID: "load", Target: "SWITCHED"},
+	}
+	for _, supplyRole := range []string{"input", "power", "load_power"} {
+		requirement := architecturesearch.Requirement{Requirements: architecturesearch.Requirements{
+			Domains:    []architecturesearch.Domain{{ID: "supply", Kind: "supply"}, {ID: "ground", Kind: "reference"}},
+			Ports:      []architecturesearch.Port{{ID: "power", Domain: "supply"}, {ID: "load", Domain: "supply"}, {ID: "ground", Domain: "ground"}},
+			Objectives: []architecturesearch.Objective{{Capability: "load_switch", Bindings: []architecturesearch.Binding{{Role: supplyRole, Port: "power"}, {Role: "output", Port: "load"}, {Role: "reference", Port: "ground"}}}},
+			OperatingCases: []architecturesearch.OperatingCase{{Conditions: []architecturesearch.OperatingCondition{{
+				Axis: "load_current", Target: "load", Min: &minimum, Max: &maximum, Unit: "A",
+			}}}},
+		}}
+		devices, err := operatingHarnessDevices(requirement, bindings, nil, "")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(devices) != 1 || !devices[0].Source || len(devices[0].Device.Connections) != 2 {
+			t.Fatalf("%s load-current harness = %#v", supplyRole, devices)
+		}
+		connections := devices[0].Device.Connections
+		if connections[0].Function != "POSITIVE" || connections[0].Net != "SUPPLY" || connections[1].Function != "NEGATIVE" || connections[1].Net != "SWITCHED" {
+			t.Fatalf("%s load-current connections = %#v", supplyRole, connections)
+		}
+	}
+}
+
+func TestLoadInductanceHarnessSpansSemanticLoadSwitchPowerAndOutputRoles(t *testing.T) {
+	minimum, maximum := 2e-3, 80e-3
 	requirement := architecturesearch.Requirement{Requirements: architecturesearch.Requirements{
-		Domains:        []architecturesearch.Domain{{ID: "supply", Kind: "supply"}, {ID: "ground", Kind: "reference"}},
-		Ports:          []architecturesearch.Port{{ID: "power", Domain: "supply"}, {ID: "load", Domain: "supply"}, {ID: "ground", Domain: "ground"}},
-		Objectives:     []architecturesearch.Objective{{Capability: "load_switch", Bindings: []architecturesearch.Binding{{Role: "power", Port: "power"}, {Role: "output", Port: "load"}, {Role: "reference", Port: "ground"}}}},
-		OperatingCases: []architecturesearch.OperatingCase{{Conditions: []architecturesearch.OperatingCondition{{Axis: "load_current", Target: "load", Min: &minimum, Max: &maximum, Unit: "A"}}}},
+		Domains:    []architecturesearch.Domain{{ID: "supply", Kind: "supply"}, {ID: "ground", Kind: "reference"}},
+		Ports:      []architecturesearch.Port{{ID: "power", Domain: "supply"}, {ID: "load", Domain: "supply"}, {ID: "ground", Domain: "ground"}},
+		Objectives: []architecturesearch.Objective{{Capability: "load_switch", Bindings: []architecturesearch.Binding{{Role: "input", Port: "power"}, {Role: "output", Port: "load"}, {Role: "reference", Port: "ground"}}}},
+		OperatingCases: []architecturesearch.OperatingCase{{Conditions: []architecturesearch.OperatingCondition{{
+			Axis: "load_inductance", Target: "load", Min: &minimum, Max: &maximum, Unit: "H",
+		}}}},
 	}}
 	bindings := []closedloopsynthesis.SemanticBinding{
 		{Kind: "domain", ID: "ground", Target: "GND"},
 		{Kind: "port", ID: "power", Target: "SUPPLY"},
 		{Kind: "port", ID: "load", Target: "SWITCHED"},
 	}
-	devices, err := operatingHarnessDevices(requirement, bindings, nil, "")
+
+	devices, err := operatingHarnessDevices(requirement, bindings, nil, simmodel.AnalysisElectrothermal)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(devices) != 1 || !devices[0].Source || len(devices[0].Device.Connections) != 2 {
-		t.Fatalf("load-current harness = %#v", devices)
+	if len(devices) != 1 || devices[0].Source || devices[0].Device.CatalogID != "load.inductive.external.1x02" ||
+		!devices[0].Device.HasValueSI || devices[0].Device.ValueSI != minimum {
+		t.Fatalf("load-inductance harness = %#v", devices)
 	}
 	connections := devices[0].Device.Connections
-	if connections[0].Function != "POSITIVE" || connections[0].Net != "SUPPLY" || connections[1].Function != "NEGATIVE" || connections[1].Net != "SWITCHED" {
-		t.Fatalf("load-current connections = %#v", connections)
+	if len(connections) != 2 ||
+		connections[0] != (simmodel.ConnectionEvidence{Function: "A", Net: "SUPPLY"}) ||
+		connections[1] != (simmodel.ConnectionEvidence{Function: "B", Net: "SWITCHED"}) {
+		t.Fatalf("load-inductance connections = %#v", connections)
+	}
+}
+
+func TestCurrentAndInductanceHarnessesFormOneDeterministicSeriesLoad(t *testing.T) {
+	minimumCurrent, maximumCurrent, inductance := .2, 3.0, 80e-3
+	requirement := architecturesearch.Requirement{Requirements: architecturesearch.Requirements{
+		Domains:    []architecturesearch.Domain{{ID: "supply", Kind: "supply", NominalVoltageV: 24}, {ID: "ground", Kind: "reference"}},
+		Ports:      []architecturesearch.Port{{ID: "power", Domain: "supply"}, {ID: "load", Domain: "supply"}, {ID: "ground", Domain: "ground"}},
+		Objectives: []architecturesearch.Objective{{Capability: "load_switch", Bindings: []architecturesearch.Binding{{Role: "power", Port: "power"}, {Role: "output", Port: "load"}, {Role: "reference", Port: "ground"}}}},
+		OperatingCases: []architecturesearch.OperatingCase{{Conditions: []architecturesearch.OperatingCondition{
+			{Axis: "load_current", Target: "load", Min: &minimumCurrent, Max: &maximumCurrent, Unit: "A"},
+			{Axis: "load_inductance", Target: "load", Min: &inductance, Max: &inductance, Unit: "H"},
+		}}},
+	}}
+	bindings := []closedloopsynthesis.SemanticBinding{
+		{Kind: "domain", ID: "ground", Target: "GND"},
+		{Kind: "port", ID: "power", Target: "SUPPLY"},
+		{Kind: "port", ID: "load", Target: "SWITCHED"},
+	}
+
+	devices, err := operatingHarnessDevices(requirement, bindings, nil, simmodel.AnalysisElectrothermal)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(devices) != 2 {
+		t.Fatalf("series load devices = %#v", devices)
+	}
+	seriesNode := operatingHarnessSeriesNode("SWITCHED")
+	edges := map[string][2]string{}
+	for _, entry := range devices {
+		connections := entry.Device.Connections
+		edges[entry.Device.CatalogID] = [2]string{connections[0].Net, connections[1].Net}
+	}
+	if edges["resistor.generic.0603"] != [2]string{"SUPPLY", seriesNode} ||
+		edges["load.inductive.external.1x02"] != [2]string{seriesNode, "SWITCHED"} {
+		t.Fatalf("series load edges = %#v", edges)
 	}
 }
 
@@ -1140,11 +1387,28 @@ func TestParticipantControlOutputHarnessIsAssertedExceptDuringStartup(t *testing
 	if err != nil {
 		t.Fatal(err)
 	}
+	transient, err := operatingHarnessDevices(requirement, bindings, nil, simmodel.AnalysisTransient)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if len(ordinary) != 1 || !ordinary[0].Source || !ordinary[0].HasDefaultValue || ordinary[0].DefaultValue != 5 {
 		t.Fatalf("ordinary participant output harness = %#v", ordinary)
 	}
 	if len(startup) != 1 || startup[0].DefaultValue != 0 {
 		t.Fatalf("startup participant output harness = %#v", startup)
+	}
+	if len(transient) != 1 || !transient[0].TransientEdge {
+		t.Fatalf("transient participant output harness = %#v", transient)
+	}
+	intent := simmodel.Intent{Analyses: []simmodel.Analysis{{
+		Kind: simmodel.AnalysisTransient, DurationS: 10e-6, TimeStepS: 1e-6,
+	}}}
+	addOperatingHarnessExcitations(&intent, transient)
+	excitation := intent.Analyses[0].Excitations[0]
+	if excitation.DCValue != 0 || excitation.PulseInitialValue != 0 ||
+		excitation.PulseValue != 5 || excitation.PulseDelayS != 2e-6 ||
+		excitation.PulseWidthS != 10e-6 || math.Abs(excitation.PulsePeriodS-11e-6) > 1e-18 {
+		t.Fatalf("transient participant control edge = %#v", excitation)
 	}
 	if ordinary[0].Device.InstanceID != startup[0].Device.InstanceID ||
 		ordinary[0].Device.Connections[0].Net != "CONTROL" ||
@@ -1197,6 +1461,33 @@ func TestLoadCurrentHarnessUsesResolvedDownstreamCurrentSenseNode(t *testing.T) 
 	connections := devices[0].Device.Connections
 	if connections[0].Net != "SENSED" || connections[1].Net != "SWITCHED" {
 		t.Fatalf("load-current connections = %#v", connections)
+	}
+}
+
+func TestLoadCurrentHarnessUsesResolvedSwitchedLoadSenseNode(t *testing.T) {
+	minimum, maximum := 0.0, 3.0
+	requirement := architecturesearch.Requirement{Requirements: architecturesearch.Requirements{
+		Domains: []architecturesearch.Domain{{ID: "supply", Kind: "supply"}, {ID: "ground", Kind: "reference"}},
+		Ports:   []architecturesearch.Port{{ID: "power", Domain: "supply"}, {ID: "load", Kind: "switched_load", Domain: "supply"}, {ID: "ground", Domain: "ground"}},
+		Objectives: []architecturesearch.Objective{
+			{Capability: "current_sensing", Bindings: []architecturesearch.Binding{{Role: "input", Port: "load"}}},
+			{Capability: "load_switch", Bindings: []architecturesearch.Binding{{Role: "power", Port: "power"}, {Role: "output", Port: "load"}, {Role: "reference", Port: "ground"}}},
+		},
+		OperatingCases: []architecturesearch.OperatingCase{{Conditions: []architecturesearch.OperatingCondition{{Axis: "load_current", Target: "load", Min: &minimum, Max: &maximum, Unit: "A"}}}},
+	}}
+	bindings := []closedloopsynthesis.SemanticBinding{{Kind: "domain", ID: "ground", Target: "GND"}, {Kind: "port", ID: "power", Target: "SUPPLY"}, {Kind: "port", ID: "load", Target: "SWITCHED"}}
+	value := .01
+	plan := simmodel.Plan{Devices: []simmodel.ResolvedDevice{
+		{Component: "sensor", PrimitiveModel: simmodel.PrimitiveCurrentSenseAmplifierV1, Terminals: []simmodel.TerminalBinding{{Terminal: "IN_PLUS", Net: "SENSED"}, {Terminal: "IN_MINUS", Net: "SWITCHED"}}},
+		{Component: "shunt", PrimitiveModel: simmodel.PrimitiveResistorV1, ValueSI: &value, Terminals: []simmodel.TerminalBinding{{Terminal: "A", Net: "SWITCHED"}, {Terminal: "B", Net: "SENSED"}}},
+	}}
+	devices, err := operatingHarnessDevices(requirement, bindings, &plan, simmodel.AnalysisTransient)
+	if err != nil {
+		t.Fatal(err)
+	}
+	connections := devices[0].Device.Connections
+	if connections[0].Net != "SUPPLY" || connections[1].Net != "SENSED" {
+		t.Fatalf("switched-load current connections = %#v", connections)
 	}
 }
 
@@ -1282,21 +1573,487 @@ func TestStartupLoadCurrentHarnessUsesTargetDomainWithoutLoadSwitch(t *testing.T
 
 func TestOperatingHarnessSelectionUsesAnalysisSpecificLoads(t *testing.T) {
 	ordinary := []operatingHarnessDevice{{Device: circuitgraph.SimulationHarnessDevice{InstanceID: "ordinary"}}}
+	dynamic := []operatingHarnessDevice{{Device: circuitgraph.SimulationHarnessDevice{InstanceID: "dynamic"}}}
 	dc := []operatingHarnessDevice{{Device: circuitgraph.SimulationHarnessDevice{InstanceID: "dc"}}}
 	startup := []operatingHarnessDevice{{Device: circuitgraph.SimulationHarnessDevice{InstanceID: "startup"}}}
 	for kind, expected := range map[string]string{
-		simmodel.AnalysisTransient:        "ordinary",
+		simmodel.AnalysisTransient:        "dynamic",
+		simmodel.AnalysisElectrothermal:   "dynamic",
 		simmodel.AnalysisDCOperatingPoint: "dc",
 		simmodel.AnalysisStartup:          "startup",
 	} {
-		selected := operatingHarnessForAnalysis(kind, ordinary, dc, startup)
+		selected := operatingHarnessForAnalysis(kind, ordinary, dynamic, dc, startup)
 		if len(selected) != 1 || selected[0].Device.InstanceID != expected {
 			t.Fatalf("%s harness = %#v, want %s", kind, selected, expected)
 		}
 	}
 }
 
-func TestTransientCurrentHarnessStepsFromQuiescentInitialCondition(t *testing.T) {
+func TestDynamicLoadCurrentHarnessUsesAnalysisAppropriateLoad(t *testing.T) {
+	minimum, maximum := 0.02, 1.0
+	requirement := architecturesearch.Requirement{Requirements: architecturesearch.Requirements{
+		Domains: []architecturesearch.Domain{
+			{ID: "regulated", Kind: "supply", NominalVoltageV: 5},
+			{ID: "ground", Kind: "reference"},
+		},
+		Ports: []architecturesearch.Port{{ID: "output", Domain: "regulated"}, {ID: "ground", Domain: "ground"}},
+		OperatingCases: []architecturesearch.OperatingCase{{
+			Conditions: []architecturesearch.OperatingCondition{{
+				Axis: "load_current", Target: "output", Min: &minimum, Max: &maximum, Unit: "A",
+			}},
+		}},
+	}}
+	bindings := []closedloopsynthesis.SemanticBinding{
+		{Kind: "domain", ID: "ground", Target: "GND"},
+		{Kind: "port", ID: "output", Target: "VOUT"},
+	}
+	transient, err := operatingHarnessDevices(requirement, bindings, nil, simmodel.AnalysisTransient)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(transient) != 1 || !transient[0].Source || transient[0].Device.CatalogID != "source.current.connector.1x02" {
+		t.Fatalf("transient load harness = %#v", transient)
+	}
+	electrothermal, err := operatingHarnessDevices(requirement, bindings, nil, simmodel.AnalysisElectrothermal)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(electrothermal) != 1 || electrothermal[0].Source || !electrothermal[0].Device.HasValueSI || math.Abs(electrothermal[0].Device.ValueSI-5) > 1e-12 {
+		t.Fatalf("electrothermal load harness = %#v", electrothermal)
+	}
+}
+
+func TestVoltageEventHarnessCreatesOnlyMissingDynamicVoltageSource(t *testing.T) {
+	initial := 3.3
+	applied := 0.0
+	requirement := architecturesearch.Requirement{Requirements: architecturesearch.Requirements{
+		OperatingCases: []architecturesearch.OperatingCase{{
+			Events: []architecturesearch.OperatingEvent{{
+				ID: "rail_loss", Kind: "rail_loss",
+				Target:  architecturesearch.Observation{Kind: "port", ID: "output_3v3"},
+				Initial: &initial, Applied: &applied, Unit: "V",
+			}},
+		}},
+	}}
+	targets := map[string]string{"port\x00output_3v3": "VCC_3V3"}
+
+	devices, err := voltageEventHarnessDevices(requirement, targets, "GND", nil, simmodel.AnalysisTransient)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(devices) != 1 || !devices[0].Source || !devices[0].HasDefaultValue || devices[0].DefaultValue != initial {
+		t.Fatalf("voltage-event harness = %#v", devices)
+	}
+	intent := simmodel.Intent{Analyses: []simmodel.Analysis{{
+		Kind: simmodel.AnalysisTransient, DurationS: 1e-3, TimeStepS: 10e-6,
+	}}}
+	addOperatingHarnessExcitations(&intent, devices)
+	excitation := intent.Analyses[0].Excitations[0]
+	if excitation.DCValue != initial || excitation.PulsePeriodS != 0 {
+		t.Fatalf("voltage-event harness initial boundary = %#v", excitation)
+	}
+	device := devices[0].Device
+	if device.CatalogID != "source.voltage.connector.1x02" ||
+		len(device.Connections) != 2 ||
+		device.Connections[0] != (simmodel.ConnectionEvidence{Function: "POSITIVE", Net: "VCC_3V3"}) ||
+		device.Connections[1] != (simmodel.ConnectionEvidence{Function: "NEGATIVE", Net: "GND"}) {
+		t.Fatalf("voltage-event source = %#v", device)
+	}
+
+	devices, err = voltageEventHarnessDevices(requirement, targets, "GND", nil, simmodel.AnalysisDCOperatingPoint)
+	if err != nil || len(devices) != 0 {
+		t.Fatalf("DC voltage-event harness = %#v, err=%v", devices, err)
+	}
+
+	resolved := simmodel.Plan{Devices: []simmodel.ResolvedDevice{{
+		Component: "existing_source", PrimitiveModel: simmodel.PrimitiveVoltageSourceV1,
+		Terminals: []simmodel.TerminalBinding{{Terminal: "POSITIVE", Net: "VCC_3V3"}, {Terminal: "NEGATIVE", Net: "GND"}},
+	}}}
+	devices, err = voltageEventHarnessDevices(requirement, targets, "GND", &resolved, simmodel.AnalysisTransient)
+	if err != nil || len(devices) != 0 {
+		t.Fatalf("duplicate voltage-event harness = %#v, err=%v", devices, err)
+	}
+}
+
+func TestShortCircuitEventHarnessUsesCatalogBackedShunt(t *testing.T) {
+	initial, applied, recovered := 5.0, 0.0, 5.0
+	requirement := architecturesearch.Requirement{Requirements: architecturesearch.Requirements{
+		OperatingCases: []architecturesearch.OperatingCase{{
+			Events: []architecturesearch.OperatingEvent{{
+				ID: "output_short", Kind: "short_circuit",
+				Target:    architecturesearch.Observation{Kind: "port", ID: "output"},
+				Initial:   &initial,
+				Applied:   &applied,
+				Recovered: &recovered,
+				Unit:      "Ohm",
+			}},
+		}},
+	}}
+	targets := map[string]string{"port\x00output": "VOUT"}
+
+	devices, err := voltageEventHarnessDevices(requirement, targets, "GND", nil, simmodel.AnalysisElectrothermal)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(devices) != 1 || devices[0].Source || !devices[0].Device.HasValueSI ||
+		devices[0].Device.ValueSI != closedloopsynthesis.ShortCircuitHarnessOpenResistanceOhm {
+		t.Fatalf("short-circuit harness = %#v", devices)
+	}
+	device := devices[0].Device
+	if device.InstanceID != closedloopsynthesis.OperatingHarnessComponentID("short_circuit", "VOUT") ||
+		device.CatalogID != "resistor.generic.0603" ||
+		len(device.Connections) != 2 ||
+		device.Connections[0] != (simmodel.ConnectionEvidence{Function: "A", Net: "VOUT"}) ||
+		device.Connections[1] != (simmodel.ConnectionEvidence{Function: "B", Net: "GND"}) {
+		t.Fatalf("short-circuit shunt = %#v", device)
+	}
+}
+
+func TestResistanceEventHarnessCreatesOnlyMissingDynamicLoad(t *testing.T) {
+	initial, otherInitial, applied, recovered := 10.0, 20.0, 0.01, 10.0
+	requirement := architecturesearch.Requirement{Requirements: architecturesearch.Requirements{
+		Domains: []architecturesearch.Domain{
+			{ID: "regulated", Kind: "supply", NominalVoltageV: 5},
+			{ID: "ground", Kind: "reference"},
+		},
+		Ports: []architecturesearch.Port{{ID: "output", Domain: "regulated"}, {ID: "ground", Domain: "ground"}},
+		OperatingCases: []architecturesearch.OperatingCase{{
+			Events: []architecturesearch.OperatingEvent{{
+				ID: "short", Kind: "short_circuit",
+				Target:  architecturesearch.Observation{Kind: "port", ID: "output"},
+				Initial: &initial, Applied: &applied, Recovered: &recovered, Unit: "Ohm",
+			}},
+		}, {
+			Events: []architecturesearch.OperatingEvent{{
+				ID: "alternate_short", Kind: "short_circuit",
+				Target:  architecturesearch.Observation{Kind: "port", ID: "output"},
+				Initial: &otherInitial, Applied: &applied, Recovered: &recovered, Unit: "Ohm",
+			}},
+		}},
+	}}
+	targets := map[string]string{
+		"port\x00output":   "VOUT",
+		"domain\x00ground": "GND",
+	}
+	devices, err := resistanceEventHarnessDevices(requirement, targets, nil, simmodel.AnalysisElectrothermal)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(devices) != 1 || devices[0].Source || !devices[0].Device.HasValueSI || devices[0].Device.ValueSI != otherInitial {
+		t.Fatalf("resistance-event harness = %#v", devices)
+	}
+	device := devices[0].Device
+	if device.CatalogID != "resistor.generic.0603" ||
+		len(device.Connections) != 2 ||
+		device.Connections[0] != (simmodel.ConnectionEvidence{Function: "A", Net: "VOUT"}) ||
+		device.Connections[1] != (simmodel.ConnectionEvidence{Function: "B", Net: "GND"}) {
+		t.Fatalf("resistance-event load = %#v", device)
+	}
+
+	resolved := simmodel.Plan{Devices: []simmodel.ResolvedDevice{{
+		Component: closedloopsynthesis.OperatingHarnessComponentID("load_resistance", "VOUT"), Family: "resistor", PrimitiveModel: simmodel.PrimitiveResistorV1,
+		Terminals: []simmodel.TerminalBinding{{Terminal: "A", Net: "VOUT"}, {Terminal: "B", Net: "GND"}},
+	}}}
+	devices, err = resistanceEventHarnessDevices(requirement, targets, &resolved, simmodel.AnalysisTransient)
+	if err != nil || len(devices) != 0 {
+		t.Fatalf("duplicate resistance-event harness = %#v, err=%v", devices, err)
+	}
+
+	maximumCurrent := 1.0
+	requirement.Requirements.OperatingCases[0].Conditions = []architecturesearch.OperatingCondition{{
+		Axis: "load_current", Target: "output", Max: &maximumCurrent, Unit: "A",
+	}}
+	devices, err = resistanceEventHarnessDevices(requirement, targets, nil, simmodel.AnalysisTransient)
+	if err != nil || len(devices) != 0 {
+		t.Fatalf("resistance event duplicated the physical current-load harness: %#v, err=%v", devices, err)
+	}
+}
+
+func TestSequencedDualRailDynamicPlansUseControlledDisconnectAndVoltageEventSource(t *testing.T) {
+	data, err := os.ReadFile("../architecturesearch/testdata/dynamic_electrothermal_control_loop_corpus/sequenced_dual_rail_controller.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	requirement, decodeIssues := architecturesearch.DecodeStrict(bytes.NewReader(data))
+	if len(decodeIssues) != 0 {
+		t.Fatalf("decode issues = %#v", decodeIssues)
+	}
+	catalog, err := components.LoadCatalog(context.Background(), components.LoadOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	registry, registryIssues := architecturesearch.NewCatalogRegistry(catalog)
+	if len(registryIssues) != 0 {
+		t.Fatalf("registry issues = %#v", registryIssues)
+	}
+	graphResolver := circuitgraph.NewResolver(circuitgraph.ResolveOptions{Catalog: catalog, CatalogID: "checked-in"})
+	search := architecturesearch.Search(context.Background(), requirement, registry, architecturesearch.SearchOptions{CatalogHash: graphResolver.CatalogHash()})
+	if search.Status != architecturesearch.SearchSelected || search.Selected == nil {
+		t.Fatalf("search status = %s issues=%#v rejections=%#v coverage=%#v", search.Status, search.Issues, search.Rejections, search.Coverage)
+	}
+	provenance, provenanceDiagnostics := modelprovenance.LoadDefault()
+	if len(provenanceDiagnostics) != 0 {
+		t.Fatalf("model provenance diagnostics = %#v", provenanceDiagnostics)
+	}
+	resolver := ArchitectureSimulationPlanResolver{
+		Requirement: requirement, Search: search, GraphResolver: graphResolver, ProvenanceRegistry: provenance,
+	}
+	state := closedloopsynthesis.CandidateState{Fingerprint: search.Selected.Fingerprint}
+	planSet, err := resolver.ResolveSimulationPlanSet(context.Background(), state)
+	if err != nil {
+		t.Fatal(err)
+	}
+	transientPlan := planSet.Plans[simmodel.AnalysisTransient]
+	disconnects := 0
+	for _, device := range transientPlan.Devices {
+		if strings.Contains(device.Component, "output_disconnect") {
+			disconnects++
+			if device.PrimitiveModel != simmodel.PrimitivePMOSSwitchV1 {
+				t.Fatalf("transient disconnect %s model = %s", device.Component, device.PrimitiveModel)
+			}
+		}
+	}
+	if disconnects != 2 {
+		t.Fatalf("transient disconnect count = %d", disconnects)
+	}
+
+	resolution, diagnostics := closedloopsynthesis.CompileSimulationResolution(
+		planSet.AnalysisPlan, planSet.Plans, planSet.Templates, planSet.Assertions, planSet.OperatingBindings,
+	)
+	if len(diagnostics) != 0 {
+		t.Fatalf("compile diagnostics = %#v", diagnostics)
+	}
+	railLossSources := map[string]bool{}
+	for _, plan := range resolution.Plans {
+		for _, analysis := range plan.Analyses {
+			for _, event := range analysis.SourceValueEvents {
+				if strings.HasPrefix(event.ID, "rail_loss_") {
+					railLossSources[event.Component] = true
+				}
+			}
+		}
+	}
+	if len(railLossSources) != 1 {
+		t.Fatalf("rail-loss event sources = %#v", railLossSources)
+	}
+	for component := range railLossSources {
+		foundVoltageSource := false
+		for _, plan := range resolution.Plans {
+			for _, device := range plan.Devices {
+				if device.Component == component && device.PrimitiveModel == simmodel.PrimitiveVoltageSourceV1 {
+					foundVoltageSource = true
+				}
+			}
+		}
+		if !foundVoltageSource || strings.Contains(component, "load_current") {
+			t.Fatalf("rail-loss event source %q is not its dedicated voltage source", component)
+		}
+	}
+}
+
+func TestClassABDynamicPlansResolveMuteRelayPerAnalysis(t *testing.T) {
+	planSet := classABDynamicPlanSetForTest(t)
+	plans := planSet.Plans
+	for _, test := range []struct {
+		kind string
+		want string
+	}{
+		{simmodel.AnalysisTransient, simmodel.PrimitiveRelayNormallyOpenV1},
+		{simmodel.AnalysisDistortion, simmodel.PrimitiveRelayNormallyOpenV1},
+		{simmodel.AnalysisElectrothermal, simmodel.PrimitiveRelayNormallyOpenV1},
+		{simmodel.AnalysisStability, simmodel.PrimitiveRelayClosedV1},
+	} {
+		plan, ok := plans[test.kind]
+		if !ok {
+			t.Fatalf("%s plan is missing", test.kind)
+		}
+		var relays []simmodel.ResolvedDevice
+		for _, device := range plan.Devices {
+			if device.Family == "relay" {
+				relays = append(relays, device)
+			}
+		}
+		if len(relays) != 1 {
+			t.Fatalf("%s relay devices = %#v", test.kind, relays)
+		}
+		if relays[0].PrimitiveModel != test.want {
+			t.Fatalf("%s relay model = %s, want %s", test.kind, relays[0].PrimitiveModel, test.want)
+		}
+	}
+}
+
+func classABDynamicPlanSetForTest(t *testing.T) closedloopsynthesis.FreshSimulationPlanSet {
+	t.Helper()
+	data, err := os.ReadFile("../architecturesearch/testdata/dynamic_electrothermal_control_loop_corpus/class_ab_dynamic_output_stage.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	requirement, decodeIssues := architecturesearch.DecodeStrict(bytes.NewReader(data))
+	if len(decodeIssues) != 0 {
+		t.Fatalf("decode issues = %#v", decodeIssues)
+	}
+	catalog, err := components.LoadCatalog(context.Background(), components.LoadOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	registry, registryIssues := architecturesearch.NewCatalogRegistry(catalog)
+	if len(registryIssues) != 0 {
+		t.Fatalf("registry issues = %#v", registryIssues)
+	}
+	graphResolver := circuitgraph.NewResolver(circuitgraph.ResolveOptions{Catalog: catalog, CatalogID: "checked-in"})
+	search := architecturesearch.Search(context.Background(), requirement, registry, architecturesearch.SearchOptions{CatalogHash: graphResolver.CatalogHash()})
+	if search.Status != architecturesearch.SearchSelected || search.Selected == nil {
+		t.Fatalf("search status = %s issues=%#v rejections=%#v coverage=%#v", search.Status, search.Issues, search.Rejections, search.Coverage)
+	}
+	provenance, provenanceDiagnostics := modelprovenance.LoadDefault()
+	if len(provenanceDiagnostics) != 0 {
+		t.Fatalf("model provenance diagnostics = %#v", provenanceDiagnostics)
+	}
+	resolver := ArchitectureSimulationPlanResolver{
+		Requirement: requirement, Search: search, GraphResolver: graphResolver, ProvenanceRegistry: provenance,
+	}
+	planSet, err := resolver.ResolveSimulationPlanSet(context.Background(), closedloopsynthesis.CandidateState{Fingerprint: search.Selected.Fingerprint})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return planSet
+}
+
+func TestClassABDynamicPerformancePlansPass(t *testing.T) {
+	planSet := classABDynamicPlanSetForTest(t)
+	resolution, diagnostics := closedloopsynthesis.CompileSimulationResolution(
+		planSet.AnalysisPlan,
+		planSet.Plans,
+		planSet.Templates,
+		planSet.Assertions,
+		planSet.OperatingBindings,
+	)
+	if len(diagnostics) != 0 {
+		t.Fatalf("compile diagnostics = %#v", diagnostics)
+	}
+	targets := []string{
+		simmodel.QuantityOutputPowerW,
+		simmodel.QuantityTHDPercent,
+		simmodel.QuantityPhaseMarginDeg,
+		simmodel.QuantityGainMarginDB,
+	}
+	for _, quantity := range targets {
+		t.Run(quantity, func(t *testing.T) {
+			seen := false
+			for _, source := range resolution.Plans {
+				var assertions []simmodel.Assertion
+				for _, assertion := range source.Assertions {
+					if assertion.Quantity == quantity {
+						assertions = append(assertions, assertion)
+						seen = true
+					}
+				}
+				if len(assertions) == 0 {
+					continue
+				}
+				plan := simmodel.ClonePlan(source)
+				plan.Assertions = assertions
+				report, evaluationDiagnostics := simmodel.Evaluate(plan)
+				if len(evaluationDiagnostics) != 0 || report.Status != "pass" {
+					var loops []simmodel.ControlLoop
+					for _, analysis := range report.Analyses {
+						loops = append(loops, analysis.ControlLoops...)
+					}
+					detail := ""
+					if quantity == simmodel.QuantityTHDPercent {
+						minimum, maximum := math.Inf(1), math.Inf(-1)
+						nodeRanges := map[string][2]float64{}
+						nodeTHD := map[string]float64{}
+						nodeMean := map[string]float64{}
+						for _, analysis := range report.Analyses {
+							if analysis.ID != assertions[0].AnalysisID {
+								continue
+							}
+							nodeTHD, nodeMean = distortionNodeTHDForTest(analysis)
+							for _, point := range analysis.Points {
+								for _, node := range point.Nodes {
+									bounds, exists := nodeRanges[node.Node]
+									if !exists {
+										bounds = [2]float64{math.Inf(1), math.Inf(-1)}
+									}
+									nodeRanges[node.Node] = [2]float64{math.Min(bounds[0], node.Real), math.Max(bounds[1], node.Real)}
+									if node.Node == assertions[0].Node {
+										minimum, maximum = math.Min(minimum, node.Real), math.Max(maximum, node.Real)
+									}
+								}
+							}
+						}
+						var stageDevices []simmodel.ResolvedDevice
+						for _, device := range plan.Devices {
+							if strings.Contains(device.Component, "objective_drive") {
+								stageDevices = append(stageDevices, device)
+							}
+						}
+						for _, analysis := range plan.Analyses {
+							if analysis.ID == assertions[0].AnalysisID {
+								detail = fmt.Sprintf(" output_range=%g..%g node_ranges=%#v node_thd=%v node_mean=%v excitations=%#v stage_devices=%#v", minimum, maximum, nodeRanges, nodeTHD, nodeMean, analysis.Excitations, stageDevices)
+							}
+						}
+					}
+					t.Errorf("analysis %s failed:%s assertions=%#v loops=%#v diagnostics=%#v", assertions[0].AnalysisID, detail, report.Assertions, loops, evaluationDiagnostics)
+				}
+			}
+			if !seen {
+				t.Errorf("compiled Class-AB plans omitted %s", quantity)
+			}
+		})
+	}
+}
+
+func distortionNodeTHDForTest(analysis simmodel.AnalysisResult) (map[string]float64, map[string]float64) {
+	if analysis.FundamentalFrequencyHz <= 0 || len(analysis.Points) < 2 || analysis.Points[1].TimeS <= 0 {
+		return nil, nil
+	}
+	samplesPerCycle := int(math.Round(1 / (analysis.FundamentalFrequencyHz * analysis.Points[1].TimeS)))
+	window := 2 * samplesPerCycle
+	if len(analysis.Points)-1 < window {
+		return nil, nil
+	}
+	start := len(analysis.Points) - 1 - window
+	values := map[string][]float64{}
+	for _, point := range analysis.Points[start : start+window] {
+		for _, node := range point.Nodes {
+			values[node.Node] = append(values[node.Node], node.Real)
+		}
+	}
+	magnitude := func(samples []float64, bin int) float64 {
+		realPart, imaginary := 0.0, 0.0
+		for index, value := range samples {
+			angle := 2 * math.Pi * float64(bin*index) / float64(len(samples))
+			realPart += value * math.Cos(angle)
+			imaginary -= value * math.Sin(angle)
+		}
+		return 2 * math.Hypot(realPart, imaginary) / float64(len(samples))
+	}
+	result := map[string]float64{}
+	means := map[string]float64{}
+	for node, samples := range values {
+		fundamental := magnitude(samples, 2)
+		if fundamental <= 1e-15 {
+			continue
+		}
+		harmonicPower := 0.0
+		for harmonic := 2; harmonic <= 5; harmonic++ {
+			harmonicMagnitude := magnitude(samples, 2*harmonic)
+			harmonicPower += harmonicMagnitude * harmonicMagnitude
+		}
+		mean := 0.0
+		for _, sample := range samples {
+			mean += sample
+		}
+		mean /= float64(len(samples))
+		result[node] = 100 * math.Sqrt(harmonicPower) / fundamental
+		means[node] = mean
+	}
+	return result, means
+}
+
+func TestTransientCurrentHarnessUsesDeclaredSteadyBoundary(t *testing.T) {
 	intent := simmodel.Intent{Analyses: []simmodel.Analysis{{Kind: simmodel.AnalysisTransient, DurationS: 1e-3, TimeStepS: 10e-6}}}
 	harness := []operatingHarnessDevice{{
 		Device:          circuitgraph.SimulationHarnessDevice{InstanceID: "load"},
@@ -1309,8 +2066,8 @@ func TestTransientCurrentHarnessStepsFromQuiescentInitialCondition(t *testing.T)
 		t.Fatalf("transient harness excitations = %#v", intent.Analyses[0].Excitations)
 	}
 	excitation := intent.Analyses[0].Excitations[0]
-	if excitation.DCValue != 0 || excitation.PulseInitialValue != 0 || excitation.PulseValue != 2 || excitation.PulseDelayS != 20e-6 || excitation.PulseWidthS != 1e-3 || excitation.PulsePeriodS != 1.01e-3 {
-		t.Fatalf("transient load step = %#v", excitation)
+	if excitation.DCValue != 2 || excitation.PulsePeriodS != 0 {
+		t.Fatalf("transient steady load boundary = %#v", excitation)
 	}
 }
 

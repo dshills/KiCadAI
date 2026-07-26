@@ -37,6 +37,7 @@ type PageSettings struct {
 }
 
 type BoardDesignRules struct {
+	MinimumViaDiameter         kicadfiles.IU
 	MinimumThroughHoleDiameter kicadfiles.IU
 }
 
@@ -91,6 +92,9 @@ func Validate(project ProjectFile) error {
 	}
 	if project.BoardRules.MinimumThroughHoleDiameter < 0 {
 		errs = append(errs, fieldError("board_rules.minimum_through_hole_diameter", "must be non-negative"))
+	}
+	if project.BoardRules.MinimumViaDiameter < 0 {
+		errs = append(errs, fieldError("board_rules.minimum_via_diameter", "must be non-negative"))
 	}
 	seen := map[string]struct{}{}
 	hasDefault := false
@@ -282,10 +286,15 @@ func newDocument(project ProjectFile) map[string]any {
 		document[key] = raw
 	}
 	designSettings := map[string]any{}
+	rules := map[string]any{}
+	if project.BoardRules.MinimumViaDiameter > 0 {
+		rules["min_via_diameter"] = mmNumber(project.BoardRules.MinimumViaDiameter)
+	}
 	if project.BoardRules.MinimumThroughHoleDiameter > 0 {
-		designSettings["rules"] = map[string]any{
-			"min_through_hole_diameter": mmNumber(project.BoardRules.MinimumThroughHoleDiameter),
-		}
+		rules["min_through_hole_diameter"] = mmNumber(project.BoardRules.MinimumThroughHoleDiameter)
+	}
+	if len(rules) > 0 {
+		designSettings["rules"] = rules
 	}
 	document["board"] = map[string]any{"design_settings": designSettings}
 	document["boards"] = []string{}

@@ -260,30 +260,43 @@ func (provider *CatalogProvider) expandADCDrive(ctx context.Context, request Pro
 	if err != nil {
 		return fail("could not finalize ADC settling evidence")
 	}
+	hasPower := hasRoleContract(request.Ports, "power")
+	if hasPower {
+		if !hasRoleContract(request.Ports, "reference") {
+			return fail("powered passive ADC drive requires an explicit reference port")
+		}
+		passives = append(passives, passivePart{"adc_supply_bypass", "capacitor", "decoupling_capacitor", "100n"})
+	}
 	parts, err := provider.appendPassiveParts(ctx, nil, passives)
 	if err != nil {
 		return nil, err
 	}
-	roleFunctions := map[string]string{"input": "A", "output": "B"}
-	if filterCapacitance > 0 {
-		roleFunctions["reference"] = "B"
-	}
 	var bindings []RealizationPortBinding
 	for _, port := range request.Ports {
-		function, bound := roleFunctions[port.Role]
-		if !bound {
-			continue
+		switch port.Role {
+		case "input":
+			bindings = append(bindings, RealizationPortBinding{Role: port.Role, Instance: "adc_isolation", Function: "A"})
+		case "output":
+			bindings = append(bindings, RealizationPortBinding{Role: port.Role, Instance: "adc_isolation", Function: "B"})
+		case "power":
+			if hasPower {
+				bindings = append(bindings, RealizationPortBinding{Role: port.Role, Instance: "adc_supply_bypass", Function: "A"})
+			}
+		case "reference":
+			switch {
+			case hasPower:
+				bindings = append(bindings, RealizationPortBinding{Role: port.Role, Instance: "adc_supply_bypass", Function: "B"})
+			case filterCapacitance > 0:
+				bindings = append(bindings, RealizationPortBinding{Role: port.Role, Instance: "adc_filter", Function: "B"})
+			}
 		}
-		bindings = append(bindings, RealizationPortBinding{Role: port.Role, Instance: "adc_isolation", Function: function})
 	}
 	var connections []RealizationConnection
 	if filterCapacitance > 0 {
-		for index := range bindings {
-			if bindings[index].Role == "reference" {
-				bindings[index].Instance, bindings[index].Function = "adc_filter", "B"
-			}
-		}
 		connections = append(connections, semanticNet("adc_drive_node", "analog_signal", passiveEndpoint("adc_isolation", "B"), passiveEndpoint("adc_filter", "A")))
+		if hasPower {
+			connections = append(connections, semanticNet("adc_reference", "reference", passiveEndpoint("adc_filter", "B"), passiveEndpoint("adc_supply_bypass", "B")))
+		}
 	}
 	return provider.expansion(request, "passive_adc_drive_conditioning", parts, bindings, connections, []CalculationEvidence{evidence}, 0)
 }

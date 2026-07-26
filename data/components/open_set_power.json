@@ -27,12 +27,73 @@
         "model_id": "mna_nmos_guaranteed_switch_v1",
         "parameters": [
           {"name": "gate_on_voltage_v", "value": 2.5},
+          {"name": "gate_threshold_max_v", "value": 1.45},
           {"name": "on_resistance_ohm", "value": 0.048},
           {"name": "max_drain_current_a", "value": 5.7},
           {"name": "max_drain_source_voltage_v", "value": 30},
           {"name": "max_gate_source_voltage_v", "value": 12},
+          {"name": "input_capacitance_f", "value": 6.3e-10},
+          {"name": "output_capacitance_f", "value": 7.5e-11},
+          {"name": "reverse_transfer_capacitance_f", "value": 5e-11},
           {"name": "max_temperature_c", "value": 150},
-          {"name": "junction_to_ambient_c_per_w", "value": 89.3}
+          {"name": "junction_to_ambient_c_per_w", "value": 125}
+        ],
+        "thermal_model": {
+          "reference": "junction_to_ambient",
+          "stages": [
+            {"thermal_resistance_c_per_w": 0.5, "thermal_capacitance_j_per_c": 0.00002},
+            {"thermal_resistance_c_per_w": 5, "thermal_capacitance_j_per_c": 0.0002},
+            {"thermal_resistance_c_per_w": 30, "thermal_capacitance_j_per_c": 0.0016666666666666668},
+            {"thermal_resistance_c_per_w": 89.5, "thermal_capacitance_j_per_c": 0.0111731843575419}
+          ],
+          "boundary_assumption": "AO3400A Rev. 3.1 Figure 11 single-pulse junction-to-ambient curve on the specified 1 square inch FR-4 board with 2 oz copper in still air; Foster coefficients conservatively fit the normalized maximum curve and sum to the 125 C/W maximum."
+        },
+        "transient_soa": [
+          {
+            "pulse_duration_s": 0.00001,
+            "case_temperature_c": 25,
+            "points": [
+              {"voltage_v": 1, "current_a": 20},
+              {"voltage_v": 10, "current_a": 20},
+              {"voltage_v": 30, "current_a": 5}
+            ]
+          },
+          {
+            "pulse_duration_s": 0.001,
+            "case_temperature_c": 25,
+            "points": [
+              {"voltage_v": 1, "current_a": 15},
+              {"voltage_v": 10, "current_a": 1.5},
+              {"voltage_v": 30, "current_a": 0.4}
+            ]
+          },
+          {
+            "pulse_duration_s": 0.01,
+            "case_temperature_c": 25,
+            "points": [
+              {"voltage_v": 1, "current_a": 7},
+              {"voltage_v": 10, "current_a": 0.7},
+              {"voltage_v": 30, "current_a": 0.2}
+            ]
+          },
+          {
+            "pulse_duration_s": 10,
+            "case_temperature_c": 25,
+            "points": [
+              {"voltage_v": 1, "current_a": 0.8},
+              {"voltage_v": 10, "current_a": 0.08},
+              {"voltage_v": 30, "current_a": 0.025}
+            ]
+          },
+          {
+            "dc": true,
+            "case_temperature_c": 25,
+            "points": [
+              {"voltage_v": 1, "current_a": 0.5},
+              {"voltage_v": 10, "current_a": 0.05},
+              {"voltage_v": 30, "current_a": 0.02}
+            ]
+          }
         ]
       }],
       "symbols": [
@@ -91,8 +152,8 @@
       "lifecycle": "active",
       "tags": ["high_side_switch", "logic_level", "low_voltage_gate_drive", "mosfet", "p_channel", "sot23"],
       "values": [
-        {"kind": "on_resistance", "max": "60", "unit": "mOhm"},
-        {"kind": "on_resistance_gate_voltage", "typ": "4.5", "unit": "V"},
+        {"kind": "on_resistance", "max": "85", "unit": "mOhm"},
+        {"kind": "on_resistance_gate_voltage", "typ": "2.5", "unit": "V"},
         {"kind": "total_gate_charge", "max": "7", "unit": "nC"}
       ],
       "ratings": [
@@ -105,8 +166,9 @@
       "simulation_models": [{
         "model_id": "mna_pmos_guaranteed_switch_v1",
         "parameters": [
-          {"name": "gate_on_voltage_v", "value": 4.5},
-          {"name": "on_resistance_ohm", "value": 0.06},
+          {"name": "gate_threshold_max_v", "value": 1.3},
+          {"name": "gate_on_voltage_v", "value": 2.5},
+          {"name": "on_resistance_ohm", "value": 0.085},
           {"name": "max_drain_current_a", "value": 4},
           {"name": "max_drain_source_voltage_v", "value": 30},
           {"name": "max_gate_source_voltage_v", "value": 12},
@@ -152,7 +214,7 @@
         "sources": ["https://www.aosmd.com/products/mosfets/p-channel-mosfets-8v-60v/ao3401", "https://www.aosmd.com/sites/default/files/res/data_sheets/AO3401.pdf", "kicad-footprint:Package_TO_SOT_SMD:SOT-23"],
         "resolver_checked": true,
         "pinmap_checked": true,
-        "notes": ["The trusted switch model uses the 60 mOhm maximum at 4.5 V gate drive and the steady-state 125 C/W junction-to-ambient boundary."]
+        "notes": ["The trusted switch model uses the 85 mOhm maximum at 2.5 V gate drive and the steady-state 125 C/W junction-to-ambient boundary."]
       }
     },
     {
@@ -255,6 +317,7 @@
       "simulation_models": [{
         "model_id": "mna_pmos_guaranteed_switch_v1",
         "parameters": [
+          {"name": "gate_threshold_max_v", "value": 2.3},
           {"name": "gate_on_voltage_v", "value": 4.5},
           {"name": "on_resistance_ohm", "value": 0.013},
           {"name": "max_drain_current_a", "value": 70},
@@ -394,7 +457,7 @@
         {"kind": "gate_source_voltage", "max": "10", "unit": "V"},
         {"kind": "power_dissipation", "max": "60", "unit": "W"}
       ],
-      "temperature": {"min": "-55", "max": "175", "unit": "C"},
+      "temperature": {"min": "-55", "max": "150", "unit": "C"},
       "simulation_models": [{
         "model_id": "mna_nmos_guaranteed_switch_v1",
         "parameters": [
@@ -403,13 +466,64 @@
           {"name": "max_drain_current_a", "value": 16},
           {"name": "max_drain_source_voltage_v", "value": 50},
           {"name": "max_gate_source_voltage_v", "value": 10},
-          {"name": "max_temperature_c", "value": 175},
+          {"name": "max_temperature_c", "value": 150},
           {"name": "junction_to_ambient_c_per_w", "value": 100},
           {"name": "junction_to_case_c_per_w", "value": 2.083}
+        ],
+        "thermal_model": {
+          "reference": "junction_to_ambient",
+          "stages": [
+            {"thermal_resistance_c_per_w": 100, "thermal_capacitance_j_per_c": 0.0104, "cooling_coupling": "ambient_cooling"}
+          ],
+          "boundary_assumption": "RFD16N05LSM/D Rev. 3 maximum 100 C/W junction-to-ambient boundary; the conservative single-stage thermal capacitance is derived from the manufacturer single-pulse UIS SOA energy at the 10 ms, 25 C boundary and the 150 C maximum junction temperature."
+        },
+        "transient_soa": [
+          {
+            "pulse_duration_s": 0.00001,
+            "case_temperature_c": 25,
+            "points": [
+              {"voltage_v": 1, "current_a": 45},
+              {"voltage_v": 50, "current_a": 45}
+            ]
+          },
+          {
+            "pulse_duration_s": 0.0001,
+            "case_temperature_c": 25,
+            "points": [
+              {"voltage_v": 1, "current_a": 30},
+              {"voltage_v": 50, "current_a": 30}
+            ]
+          },
+          {
+            "pulse_duration_s": 0.001,
+            "case_temperature_c": 25,
+            "points": [
+              {"voltage_v": 1, "current_a": 12},
+              {"voltage_v": 50, "current_a": 12}
+            ]
+          },
+          {
+            "pulse_duration_s": 0.01,
+            "case_temperature_c": 25,
+            "points": [
+              {"voltage_v": 1, "current_a": 4},
+              {"voltage_v": 50, "current_a": 4}
+            ]
+          },
+          {
+            "dc": true,
+            "case_temperature_c": 25,
+            "points": [
+              {"voltage_v": 1, "current_a": 16},
+              {"voltage_v": 5, "current_a": 10},
+              {"voltage_v": 10, "current_a": 5},
+              {"voltage_v": 50, "current_a": 1}
+            ]
+          }
         ]
       }],
       "thermal_evidence": {
-        "max_junction_temperature_c": 175,
+        "max_junction_temperature_c": 150,
         "junction_to_case_c_per_w": 2.083,
         "junction_to_ambient_c_per_w": 100,
         "mounting_assumptions": "Datasheet free-air TO-252 junction-to-ambient boundary; the lower junction-to-case path requires a separately declared case temperature.",
@@ -704,6 +818,7 @@
           {"name": "emission_coefficient", "value": 1.7},
           {"name": "junction_temperature_k", "value": 300.15},
           {"name": "max_forward_current_a", "value": 5},
+          {"name": "max_pulse_current_a", "value": 100},
           {"name": "max_reverse_voltage_v", "value": 60},
           {"name": "max_temperature_c", "value": 150},
           {"name": "thermal_resistance_c_per_w", "value": 50}

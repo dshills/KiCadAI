@@ -13,8 +13,10 @@ const (
 
 	PrimitiveResistorV1                         = "mna_resistor_v1"
 	PrimitiveFuseClosedStateV1                  = "mna_fuse_closed_state_v1"
+	PrimitiveFuseI2TClearingV1                  = "mna_fuse_i2t_clearing_v1"
 	PrimitiveCapacitorV1                        = "mna_capacitor_v1"
 	PrimitiveCapacitorTransientV1               = "mna_capacitor_transient_be_v1"
+	PrimitiveInductorTransientV1                = "mna_inductor_transient_be_v1"
 	PrimitiveVoltageSourceV1                    = "mna_voltage_source_v1"
 	PrimitiveConnectorVoltageSourceV1           = "mna_connector_1x02_voltage_source_pin1_positive_v1"
 	PrimitiveCurrentSourceV1                    = "mna_current_source_v1"
@@ -25,6 +27,7 @@ const (
 	PrimitiveCurrentSenseAmplifierV1            = "mna_current_sense_amplifier_single_pole_v1"
 	PrimitiveAdjustableLinearRegulatorV1        = "mna_adjustable_linear_regulator_v1"
 	PrimitiveFixedLinearRegulatorV1             = "mna_fixed_linear_regulator_v1"
+	PrimitiveSynchronousBuckRegulatorV1         = "mna_synchronous_buck_current_mode_v1"
 	PrimitiveFloatingAdjustableRegulatorV1      = "mna_floating_adjustable_regulator_v1"
 	PrimitiveProgrammableCurrentSourceV1        = "mna_programmable_current_source_v1"
 	PrimitiveShuntVoltageReferenceV1            = "mna_shunt_voltage_reference_v1"
@@ -54,36 +57,45 @@ const (
 	AnalysisStartup          = "startup"
 	AnalysisDistortion       = "distortion"
 	AnalysisThermal          = "thermal"
+	AnalysisElectrothermal   = "electrothermal"
 
-	QuantityVoltageV             = "voltage_v"
-	QuantityVoltageMagnitudeV    = "voltage_magnitude_v"
-	QuantityVoltagePhaseDeg      = "voltage_phase_deg"
-	QuantityVoltageDBV           = "voltage_dbv"
-	QuantityRiseTimeS            = "rise_time_s"
-	QuantityFallTimeS            = "fall_time_s"
-	QuantityIntegratedNoiseVRMS  = "integrated_noise_v_rms"
-	QuantityPhaseMarginDeg       = "phase_margin_deg"
-	QuantityGainMarginDB         = "gain_margin_db"
-	QuantityPeakAbsVoltageV      = "peak_abs_voltage_v"
-	QuantityTHDPercent           = "thd_percent"
-	QuantityDeviceDissipationW   = "device_dissipation_w"
-	QuantityJunctionTemperatureC = "junction_temperature_c"
-	QuantityVoltageGainRatio     = "voltage_gain_ratio"
-	QuantityCutoffFrequencyHz    = "cutoff_frequency_hz"
-	QuantityBandwidthHz          = "bandwidth_hz"
-	QuantityOutputSwingVPP       = "output_swing_v_pp"
-	QuantitySettlingTimeS        = "settling_time_s"
-	QuantityResponseTimeS        = "response_time_s"
-	QuantityDeviceCurrentA       = "device_current_a"
-	QuantityTotalSupplyCurrentA  = "total_supply_current_a"
-	QuantityTransimpedanceOhm    = "transimpedance_ohm"
-	QuantityOutputPowerW         = "output_power_w"
-	QuantityThresholdVoltageV    = "threshold_voltage_v"
-	QuantityThresholdCurrentA    = "threshold_current_a"
-	QuantityHysteresisVoltageV   = "hysteresis_voltage_v"
+	QuantityVoltageV                = "voltage_v"
+	QuantityVoltageMagnitudeV       = "voltage_magnitude_v"
+	QuantityVoltagePhaseDeg         = "voltage_phase_deg"
+	QuantityVoltageDBV              = "voltage_dbv"
+	QuantityRiseTimeS               = "rise_time_s"
+	QuantityFallTimeS               = "fall_time_s"
+	QuantityIntegratedNoiseVRMS     = "integrated_noise_v_rms"
+	QuantityPhaseMarginDeg          = "phase_margin_deg"
+	QuantityGainMarginDB            = "gain_margin_db"
+	QuantityLoopCrossoverHz         = "loop_crossover_frequency_hz"
+	QuantityClosedLoopPeakingDB     = "closed_loop_peaking_db"
+	QuantityPeakAbsVoltageV         = "peak_abs_voltage_v"
+	QuantityPeakAbsDeviceVoltageV   = "peak_abs_device_voltage_v"
+	QuantityPeakAbsDeviceCurrentA   = "peak_abs_device_current_a"
+	QuantityOvershootVoltageV       = "overshoot_voltage_v"
+	QuantityConversionEfficiencyPct = "conversion_efficiency_percent"
+	QuantityTHDPercent              = "thd_percent"
+	QuantityDeviceDissipationW      = "device_dissipation_w"
+	QuantityJunctionTemperatureC    = "junction_temperature_c"
+	QuantityTransientSOAMargin      = "transient_soa_margin_ratio"
+	QuantityVoltageGainRatio        = "voltage_gain_ratio"
+	QuantityCutoffFrequencyHz       = "cutoff_frequency_hz"
+	QuantityBandwidthHz             = "bandwidth_hz"
+	QuantityOutputSwingVPP          = "output_swing_v_pp"
+	QuantitySettlingTimeS           = "settling_time_s"
+	QuantityResponseTimeS           = "response_time_s"
+	QuantityDeviceCurrentA          = "device_current_a"
+	QuantityTotalSupplyCurrentA     = "total_supply_current_a"
+	QuantityTransimpedanceOhm       = "transimpedance_ohm"
+	QuantityOutputPowerW            = "output_power_w"
+	QuantityThresholdVoltageV       = "threshold_voltage_v"
+	QuantityThresholdCurrentA       = "threshold_current_a"
+	QuantityHysteresisVoltageV      = "hysteresis_voltage_v"
 )
 
 const parameterForcedMOSFETState = "__forced_mosfet_state"
+const parameterForcedBJTState = "__forced_bjt_state"
 
 type NamedValue struct {
 	Name  string  `json:"name"`
@@ -102,9 +114,67 @@ type Uncertainty struct {
 }
 
 type CatalogEvidence struct {
-	ModelID       string        `json:"model_id"`
-	Parameters    []NamedValue  `json:"parameters,omitempty"`
-	Uncertainties []Uncertainty `json:"uncertainties,omitempty"`
+	ModelID       string                 `json:"model_id"`
+	Parameters    []NamedValue           `json:"parameters,omitempty"`
+	Uncertainties []Uncertainty          `json:"uncertainties,omitempty"`
+	ThermalModel  *ThermalRCNetwork      `json:"thermal_model,omitempty"`
+	TransientSOA  []TransientSOAEnvelope `json:"transient_soa,omitempty"`
+}
+
+// ThermalRCNetwork is reviewed catalog evidence for a bounded Foster thermal
+// impedance model. The evaluator owns the differential equations; catalog
+// data supplies only finite physical coefficients and boundary assumptions.
+type ThermalRCNetwork struct {
+	Reference          string           `json:"reference"`
+	Stages             []ThermalRCStage `json:"stages"`
+	BoundaryAssumption string           `json:"boundary_assumption"`
+}
+
+type ThermalRCStage struct {
+	ThermalResistanceCPerW  float64 `json:"thermal_resistance_c_per_w"`
+	ThermalCapacitanceJPerC float64 `json:"thermal_capacitance_j_per_c"`
+	// CoolingCoupling distinguishes intrinsic/package impedance from the
+	// ambient-coupled stage affected by airflow events. Empty preserves the
+	// legacy behavior of scaling the complete stage.
+	CoolingCoupling string `json:"cooling_coupling,omitempty"`
+}
+
+// TransientSOAEnvelope is one reviewed voltage/current boundary at either a
+// finite pulse duration or DC. Boundaries are interpolated conservatively by
+// the trusted evaluator and cannot contain provider-authored expressions.
+type TransientSOAEnvelope struct {
+	PulseDurationS   *float64            `json:"pulse_duration_s,omitempty"`
+	DC               bool                `json:"dc,omitempty"`
+	CaseTemperatureC float64             `json:"case_temperature_c"`
+	Points           []TransientSOAPoint `json:"points"`
+}
+
+type TransientSOAPoint struct {
+	VoltageV float64 `json:"voltage_v"`
+	CurrentA float64 `json:"current_a"`
+}
+
+func CloneCatalogEvidence(source CatalogEvidence) CatalogEvidence {
+	clone := CatalogEvidence{
+		ModelID:       source.ModelID,
+		Parameters:    append([]NamedValue(nil), source.Parameters...),
+		Uncertainties: append([]Uncertainty(nil), source.Uncertainties...),
+		TransientSOA:  make([]TransientSOAEnvelope, len(source.TransientSOA)),
+	}
+	if source.ThermalModel != nil {
+		thermal := *source.ThermalModel
+		thermal.Stages = append([]ThermalRCStage(nil), source.ThermalModel.Stages...)
+		clone.ThermalModel = &thermal
+	}
+	for index, envelope := range source.TransientSOA {
+		clone.TransientSOA[index] = envelope
+		clone.TransientSOA[index].Points = append([]TransientSOAPoint(nil), envelope.Points...)
+		if envelope.PulseDurationS != nil {
+			duration := *envelope.PulseDurationS
+			clone.TransientSOA[index].PulseDurationS = &duration
+		}
+	}
+	return clone
 }
 
 // ModelProvenance is catalog-owned trust evidence. It is never accepted from
@@ -134,6 +204,8 @@ type Assertion struct {
 	Quantity      string   `json:"quantity,omitempty"`
 	FrequencyHz   float64  `json:"frequency_hz,omitempty"`
 	TimeS         float64  `json:"time_s,omitempty"`
+	WindowStartS  float64  `json:"window_start_s,omitempty"`
+	WindowEndS    float64  `json:"window_end_s,omitempty"`
 	Min           float64  `json:"min"`
 	Max           float64  `json:"max"`
 }
@@ -159,17 +231,60 @@ type SourceExcitation struct {
 // Analysis requests a trusted analysis algorithm. It contains no equation,
 // matrix, expression, executable, include, path, or topology field.
 type Analysis struct {
-	ID               string             `json:"id"`
-	Kind             string             `json:"kind"`
-	StartFrequencyHz float64            `json:"start_frequency_hz,omitempty"`
-	StopFrequencyHz  float64            `json:"stop_frequency_hz,omitempty"`
-	Points           int                `json:"points,omitempty"`
-	DurationS        float64            `json:"duration_s,omitempty"`
-	TimeStepS        float64            `json:"time_step_s,omitempty"`
-	Excitations      []SourceExcitation `json:"excitations"`
-	Conditions       []NamedValue       `json:"conditions,omitempty"`
-	DeviceOverrides  []DeviceOverride   `json:"device_overrides,omitempty"`
-	DCSweep          *DCSweep           `json:"dc_sweep,omitempty"`
+	ID                   string                `json:"id"`
+	Kind                 string                `json:"kind"`
+	StartFrequencyHz     float64               `json:"start_frequency_hz,omitempty"`
+	StopFrequencyHz      float64               `json:"stop_frequency_hz,omitempty"`
+	Points               int                   `json:"points,omitempty"`
+	DurationS            float64               `json:"duration_s,omitempty"`
+	TimeStepS            float64               `json:"time_step_s,omitempty"`
+	Excitations          []SourceExcitation    `json:"excitations"`
+	Conditions           []NamedValue          `json:"conditions,omitempty"`
+	DeviceOverrides      []DeviceOverride      `json:"device_overrides,omitempty"`
+	SourceValueEvents    []SourceValueEvent    `json:"source_value_events,omitempty"`
+	DeviceValueEvents    []DeviceValueEvent    `json:"device_value_events,omitempty"`
+	ConditionValueEvents []ConditionValueEvent `json:"condition_value_events,omitempty"`
+	DCSweep              *DCSweep              `json:"dc_sweep,omitempty"`
+}
+
+// SourceValueEvent applies one bounded, piecewise-constant event to an
+// already-resolved independent source. Events cannot introduce sources,
+// topology, expressions, or solver policy.
+type SourceValueEvent struct {
+	ID                   string   `json:"id"`
+	Component            string   `json:"component"`
+	TriggerTimeS         float64  `json:"trigger_time_s"`
+	OriginalTriggerTimeS float64  `json:"original_trigger_time_s,omitempty"`
+	DurationS            float64  `json:"duration_s"`
+	Initial              float64  `json:"initial"`
+	Applied              float64  `json:"applied"`
+	Recovered            *float64 `json:"recovered,omitempty"`
+}
+
+// DeviceValueEvent applies one bounded, piecewise-constant value to an
+// already-resolved value-bearing device such as a load resistor.
+type DeviceValueEvent struct {
+	ID                   string   `json:"id"`
+	Component            string   `json:"component"`
+	TriggerTimeS         float64  `json:"trigger_time_s"`
+	OriginalTriggerTimeS float64  `json:"original_trigger_time_s,omitempty"`
+	DurationS            float64  `json:"duration_s"`
+	InitialSI            float64  `json:"initial_si"`
+	AppliedSI            float64  `json:"applied_si"`
+	RecoveredSI          *float64 `json:"recovered_si,omitempty"`
+}
+
+// ConditionValueEvent applies one registered bounded environmental
+// condition, currently used for electrothermal boundary changes.
+type ConditionValueEvent struct {
+	ID                   string   `json:"id"`
+	Name                 string   `json:"name"`
+	TriggerTimeS         float64  `json:"trigger_time_s"`
+	OriginalTriggerTimeS float64  `json:"original_trigger_time_s,omitempty"`
+	DurationS            float64  `json:"duration_s"`
+	Initial              float64  `json:"initial"`
+	Applied              float64  `json:"applied"`
+	Recovered            *float64 `json:"recovered,omitempty"`
 }
 
 // DCSweep requests a bounded deterministic sweep of one already resolved
@@ -240,15 +355,17 @@ type TerminalBinding struct {
 }
 
 type ResolvedDevice struct {
-	Component         string            `json:"component"`
-	PhysicalComponent string            `json:"physical_component,omitempty"`
-	CatalogID         string            `json:"catalog_id"`
-	Family            string            `json:"family"`
-	Usage             string            `json:"usage,omitempty"`
-	PrimitiveModel    string            `json:"primitive_model"`
-	ValueSI           *float64          `json:"value_si,omitempty"`
-	ModelParameters   []NamedValue      `json:"model_parameters,omitempty"`
-	Terminals         []TerminalBinding `json:"terminals"`
+	Component         string                 `json:"component"`
+	PhysicalComponent string                 `json:"physical_component,omitempty"`
+	CatalogID         string                 `json:"catalog_id"`
+	Family            string                 `json:"family"`
+	Usage             string                 `json:"usage,omitempty"`
+	PrimitiveModel    string                 `json:"primitive_model"`
+	ValueSI           *float64               `json:"value_si,omitempty"`
+	ModelParameters   []NamedValue           `json:"model_parameters,omitempty"`
+	ThermalModel      *ThermalRCNetwork      `json:"thermal_model,omitempty"`
+	TransientSOA      []TransientSOAEnvelope `json:"transient_soa,omitempty"`
+	Terminals         []TerminalBinding      `json:"terminals"`
 }
 
 type Plan struct {
@@ -284,6 +401,8 @@ func ClonePlan(source Plan) Plan {
 	clone.Devices = append([]ResolvedDevice(nil), source.Devices...)
 	for index := range clone.Devices {
 		clone.Devices[index].ModelParameters = append([]NamedValue(nil), source.Devices[index].ModelParameters...)
+		clone.Devices[index].ThermalModel = cloneThermalRCNetwork(source.Devices[index].ThermalModel)
+		clone.Devices[index].TransientSOA = cloneTransientSOA(source.Devices[index].TransientSOA)
 		clone.Devices[index].Terminals = append([]TerminalBinding(nil), source.Devices[index].Terminals...)
 		if source.Devices[index].ValueSI != nil {
 			value := *source.Devices[index].ValueSI
@@ -299,12 +418,37 @@ func ClonePlan(source Plan) Plan {
 	return clone
 }
 
+func cloneThermalRCNetwork(source *ThermalRCNetwork) *ThermalRCNetwork {
+	if source == nil {
+		return nil
+	}
+	clone := *source
+	clone.Stages = append([]ThermalRCStage(nil), source.Stages...)
+	return &clone
+}
+
+func cloneTransientSOA(source []TransientSOAEnvelope) []TransientSOAEnvelope {
+	clone := make([]TransientSOAEnvelope, len(source))
+	for index, envelope := range source {
+		clone[index] = envelope
+		clone[index].Points = append([]TransientSOAPoint(nil), envelope.Points...)
+		if envelope.PulseDurationS != nil {
+			duration := *envelope.PulseDurationS
+			clone[index].PulseDurationS = &duration
+		}
+	}
+	return clone
+}
+
 func cloneAnalyses(source []Analysis) []Analysis {
 	clone := append([]Analysis(nil), source...)
 	for index := range clone {
 		clone[index].Excitations = append([]SourceExcitation(nil), source[index].Excitations...)
 		clone[index].Conditions = append([]NamedValue(nil), source[index].Conditions...)
 		clone[index].DeviceOverrides = append([]DeviceOverride(nil), source[index].DeviceOverrides...)
+		clone[index].SourceValueEvents = append([]SourceValueEvent(nil), source[index].SourceValueEvents...)
+		clone[index].DeviceValueEvents = append([]DeviceValueEvent(nil), source[index].DeviceValueEvents...)
+		clone[index].ConditionValueEvents = append([]ConditionValueEvent(nil), source[index].ConditionValueEvents...)
 		if source[index].DCSweep != nil {
 			sweep := *source[index].DCSweep
 			clone[index].DCSweep = &sweep
@@ -314,6 +458,24 @@ func cloneAnalyses(source []Analysis) []Analysis {
 			if source[index].DeviceOverrides[overrideIndex].ValueSI != nil {
 				value := *source[index].DeviceOverrides[overrideIndex].ValueSI
 				clone[index].DeviceOverrides[overrideIndex].ValueSI = &value
+			}
+		}
+		for eventIndex := range clone[index].SourceValueEvents {
+			if source[index].SourceValueEvents[eventIndex].Recovered != nil {
+				value := *source[index].SourceValueEvents[eventIndex].Recovered
+				clone[index].SourceValueEvents[eventIndex].Recovered = &value
+			}
+		}
+		for eventIndex := range clone[index].DeviceValueEvents {
+			if source[index].DeviceValueEvents[eventIndex].RecoveredSI != nil {
+				value := *source[index].DeviceValueEvents[eventIndex].RecoveredSI
+				clone[index].DeviceValueEvents[eventIndex].RecoveredSI = &value
+			}
+		}
+		for eventIndex := range clone[index].ConditionValueEvents {
+			if source[index].ConditionValueEvents[eventIndex].Recovered != nil {
+				value := *source[index].ConditionValueEvents[eventIndex].Recovered
+				clone[index].ConditionValueEvents[eventIndex].Recovered = &value
 			}
 		}
 	}
@@ -374,6 +536,7 @@ type DeviceResult struct {
 	CurrentMagnitudeA    float64  `json:"current_magnitude_a,omitempty"`
 	DissipationW         float64  `json:"dissipation_w"`
 	JunctionTemperatureC *float64 `json:"junction_temperature_c,omitempty"`
+	TransientSOAMargin   float64  `json:"transient_soa_margin_ratio,omitempty"`
 }
 
 // SolverEvidence records bounded deterministic nonlinear work without
@@ -396,7 +559,30 @@ type AnalysisResult struct {
 	ID                     string          `json:"id"`
 	Kind                   string          `json:"kind"`
 	FundamentalFrequencyHz float64         `json:"fundamental_frequency_hz,omitempty"`
+	ControlLoops           []ControlLoop   `json:"control_loops,omitempty"`
 	Points                 []AnalysisPoint `json:"points"`
+}
+
+// ControlLoop records a loop derived from resolved primitive connectivity.
+// Provider-authored intent cannot supply any of these fields.
+type ControlLoop struct {
+	ID                       string   `json:"id"`
+	ActiveComponent          string   `json:"active_component"`
+	PrimitiveModel           string   `json:"primitive_model"`
+	InjectionTerminal        string   `json:"injection_terminal"`
+	InjectionNet             string   `json:"injection_net"`
+	ObservationNet           string   `json:"observation_net"`
+	FeedbackTerminal         string   `json:"feedback_terminal"`
+	FeedbackNet              string   `json:"feedback_net"`
+	Polarity                 string   `json:"polarity"`
+	Members                  []string `json:"members"`
+	NetPath                  []string `json:"net_path"`
+	DCPreserved              bool     `json:"dc_preserved"`
+	CrossoverFrequencyHz     float64  `json:"crossover_frequency_hz"`
+	PhaseMarginDeg           float64  `json:"phase_margin_deg"`
+	GainMarginDB             float64  `json:"gain_margin_db"`
+	ClosedLoopPeakingDB      float64  `json:"closed_loop_peaking_db"`
+	ReturnRatioSamplesSHA256 string   `json:"return_ratio_samples_sha256"`
 }
 
 type CornerResult struct {
@@ -475,6 +661,14 @@ func CloneReportWithAnalysisPointLimit(source Report, pointLimit int) Report {
 			Kind:                   source.Analyses[analysisIndex].Kind,
 			FundamentalFrequencyHz: source.Analyses[analysisIndex].FundamentalFrequencyHz,
 		}
+		if source.Analyses[analysisIndex].ControlLoops != nil {
+			clone.Analyses[analysisIndex].ControlLoops = make([]ControlLoop, len(source.Analyses[analysisIndex].ControlLoops))
+		}
+		for loopIndex := range clone.Analyses[analysisIndex].ControlLoops {
+			clone.Analyses[analysisIndex].ControlLoops[loopIndex] = source.Analyses[analysisIndex].ControlLoops[loopIndex]
+			clone.Analyses[analysisIndex].ControlLoops[loopIndex].Members = append([]string(nil), source.Analyses[analysisIndex].ControlLoops[loopIndex].Members...)
+			clone.Analyses[analysisIndex].ControlLoops[loopIndex].NetPath = append([]string(nil), source.Analyses[analysisIndex].ControlLoops[loopIndex].NetPath...)
+		}
 		clone.Analyses[analysisIndex].Points = cloneAnalysisPoints(
 			source.Analyses[analysisIndex].Points,
 			pointLimit,
@@ -527,11 +721,12 @@ func cloneAnalysisPoints(source []AnalysisPoint, limit int) []AnalysisPoint {
 		for deviceIndex := range clone[index].Devices {
 			sourceDevice := source[sourceIndex].Devices[deviceIndex]
 			clone[index].Devices[deviceIndex] = DeviceResult{
-				Component:         sourceDevice.Component,
-				VoltageV:          sourceDevice.VoltageV,
-				CurrentA:          sourceDevice.CurrentA,
-				CurrentMagnitudeA: sourceDevice.CurrentMagnitudeA,
-				DissipationW:      sourceDevice.DissipationW,
+				Component:          sourceDevice.Component,
+				VoltageV:           sourceDevice.VoltageV,
+				CurrentA:           sourceDevice.CurrentA,
+				CurrentMagnitudeA:  sourceDevice.CurrentMagnitudeA,
+				DissipationW:       sourceDevice.DissipationW,
+				TransientSOAMargin: sourceDevice.TransientSOAMargin,
 			}
 			if source[sourceIndex].Devices[deviceIndex].JunctionTemperatureC != nil {
 				value := *source[sourceIndex].Devices[deviceIndex].JunctionTemperatureC

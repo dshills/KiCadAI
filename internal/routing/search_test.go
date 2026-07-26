@@ -166,6 +166,25 @@ func TestRouteSingleLayerPathDeterministic(t *testing.T) {
 	}
 }
 
+func TestAStarPrunesStatesDominatedByLowerViaCount(t *testing.T) {
+	coord := GridCoord{X: 3, Y: 4, Layer: 1}
+	best := map[astarState]float64{
+		{Coord: coord, Dir: routeDirEast, Vias: 1}: 7,
+	}
+	if !astarStateDominatedByLowerViaCount(best, astarState{Coord: coord, Dir: routeDirEast, Vias: 2}, 7) {
+		t.Fatal("equal-cost state with fewer remaining vias was not pruned")
+	}
+	if !astarStateDominatedByLowerViaCount(best, astarState{Coord: coord, Dir: routeDirEast, Vias: 3}, 8) {
+		t.Fatal("higher-cost state with fewer remaining vias was not pruned")
+	}
+	if astarStateDominatedByLowerViaCount(best, astarState{Coord: coord, Dir: routeDirEast, Vias: 2}, 6) {
+		t.Fatal("lower-cost higher-via state was incorrectly pruned")
+	}
+	if astarStateDominatedByLowerViaCount(best, astarState{Coord: coord, Dir: routeDirWest, Vias: 2}, 8) {
+		t.Fatal("state with a different arrival direction was incorrectly pruned")
+	}
+}
+
 func routeFirstPair(t *testing.T, request Request) (GridPath, []reports.Issue) {
 	t.Helper()
 	access := BuildPadAccess(request)

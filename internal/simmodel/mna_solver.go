@@ -17,7 +17,7 @@ const (
 	maxMNASolutionValue         = 1e12
 	mnaPivotTolerance           = 1e-12
 	mnaResidualTolerance        = 1e-8
-	maxMNAAnalysisWorkers       = 8
+	maxMNAAnalysisWorkers       = 4
 	mnaUnobservedReferenceS     = 1e-9
 )
 
@@ -191,6 +191,8 @@ func evaluateTransientMNAAnalyses(plan Plan, nonlinearDC bool) []mnaAnalysisEval
 					}
 				case AnalysisThermal:
 					evaluations[index].result, evaluations[index].diagnostics = solveThermalAnalysis(analysisPlan, analysis)
+				case AnalysisElectrothermal:
+					evaluations[index].result, evaluations[index].diagnostics = solveElectrothermalAnalysis(analysisPlan, analysis)
 				case AnalysisStartup:
 					evaluations[index].result, evaluations[index].diagnostics = solveStartupAnalysis(analysisPlan, analysis)
 				case AnalysisDistortion:
@@ -210,7 +212,7 @@ func evaluateTransientMNAAnalyses(plan Plan, nonlinearDC bool) []mnaAnalysisEval
 }
 
 func electricalDeviceResults(plan Plan, analysis Analysis, frequency float64, system mnaSystem, solution []complex128) []DeviceResult {
-	return electricalDeviceResultsWithComparatorStates(plan, analysis, frequency, system, solution, nil, nil, nil)
+	return electricalDeviceResultsWithComparatorStates(plan, analysis, frequency, system, solution, nil, nil, nil, nil)
 }
 
 func electricalDeviceResultsWithComparatorStates(
@@ -222,6 +224,7 @@ func electricalDeviceResultsWithComparatorStates(
 	comparatorStates map[string]float64,
 	digitalOutputStates map[string]bool,
 	digitalOutputEnabled map[string]bool,
+	openDevices map[string]bool,
 ) []DeviceResult {
 	results := make([]DeviceResult, 0, len(plan.Devices))
 	for _, device := range plan.Devices {
@@ -232,9 +235,14 @@ func electricalDeviceResultsWithComparatorStates(
 		case PrimitiveResistorV1:
 			voltage = solvedNodeVoltage(system, solution, terminals["A"]) - solvedNodeVoltage(system, solution, terminals["B"])
 			current = voltage / complex(*device.ValueSI, 0)
-		case PrimitiveFuseClosedStateV1:
+		case PrimitiveFuseClosedStateV1, PrimitiveFuseI2TClearingV1:
 			voltage = solvedNodeVoltage(system, solution, terminals["A"]) - solvedNodeVoltage(system, solution, terminals["B"])
-			current = voltage / complex(namedValueMap(device.ModelParameters)["cold_resistance_ohm"], 0)
+			parameters := namedValueMap(device.ModelParameters)
+			resistance := parameters["cold_resistance_ohm"]
+			if openDevices[device.Component] {
+				resistance = parameters["open_resistance_ohm"]
+			}
+			current = voltage / complex(resistance, 0)
 		case PrimitiveMCUStaticSupplyLoadV1, PrimitiveSensorStaticSupplyLoadV1:
 			voltage = solvedNodeVoltage(system, solution, terminals["POWER"]) - solvedNodeVoltage(system, solution, terminals["GROUND"])
 			value, _ := staticSupplyLoadCurrentAndGradient(real(voltage), namedValueMap(device.ModelParameters))
@@ -247,6 +255,9 @@ func electricalDeviceResultsWithComparatorStates(
 			if analysis.Kind == AnalysisACSweep {
 				current = voltage * complex(0, 2*math.Pi*frequency**device.ValueSI)
 			}
+		case PrimitiveInductorTransientV1:
+			voltage = solvedNodeVoltage(system, solution, terminals["A"]) - solvedNodeVoltage(system, solution, terminals["B"])
+			current = solution[system.branchIndex[device.Component]]
 		case PrimitiveVoltageSourceV1:
 			voltage = solvedNodeVoltage(system, solution, terminals["POSITIVE"]) - solvedNodeVoltage(system, solution, terminals["NEGATIVE"])
 			current = solution[system.branchIndex[device.Component]]
@@ -310,6 +321,12 @@ func electricalDeviceResultsWithComparatorStates(
 		case PrimitiveFixedLinearRegulatorV1:
 			voltage = solvedNodeVoltage(system, solution, terminals["VOUT"]) - solvedNodeVoltage(system, solution, terminals["GND"])
 			current = solution[system.branchIndex[device.Component]]
+		case PrimitiveSynchronousBuckRegulatorV1:
+			var resolved bool
+			voltage, current, resolved = synchronousBuckDeviceResult(device, system, solution)
+			if !resolved {
+				include = false
+			}
 		case PrimitiveFloatingAdjustableRegulatorV1:
 			voltage = solvedNodeVoltage(system, solution, terminals["VOUT"]) - solvedNodeVoltage(system, solution, terminals["ADJ"])
 			current = solution[system.branchIndex[device.Component]]
@@ -402,7 +419,7 @@ func electricalDeviceResultsWithComparatorStates(
 		}
 		if include {
 			entry := DeviceResult{Component: device.Component, VoltageV: normalizedMNAFloat(real(voltage)), CurrentA: normalizedMNAFloat(real(current)), CurrentMagnitudeA: normalizedMNAFloat(cmplx.Abs(current))}
-			if analysis.Kind == AnalysisThermal {
+			if analysis.Kind == AnalysisThermal || analysis.Kind == AnalysisElectrothermal {
 				if dissipation, dissipative := thermalDeviceDissipation(plan, device, system, solution); dissipative {
 					entry.DissipationW = normalizedMNAFloat(dissipation)
 				}
@@ -426,6 +443,27 @@ func planWithAnalysisOverrides(plan Plan, analysis Analysis) Plan {
 			}
 		}
 	}
+	return clone
+}
+
+func requestedBuckPowerStateAnalysis(plan Plan, analysis Analysis) Analysis {
+	for _, requested := range plan.Analyses {
+		if requested.ID == analysis.ID && requested.Kind == AnalysisDCOperatingPoint {
+			return requested
+		}
+	}
+	return analysis
+}
+
+func planWithRequestedAnalysis(plan Plan, analysis Analysis) Plan {
+	clone := ClonePlan(plan)
+	for index := range clone.Analyses {
+		if clone.Analyses[index].ID == analysis.ID {
+			clone.Analyses[index] = analysis
+			return clone
+		}
+	}
+	clone.Analyses = append(clone.Analyses, analysis)
 	return clone
 }
 
@@ -496,6 +534,23 @@ func buildMNASystemWithOperatingPoint(plan Plan, analysis Analysis, frequency fl
 	if !smallSignalAnalysis(analysis.Kind) || len(compileNonlinearDevices(plan)) == 0 {
 		return buildMNASystemWithOpAmpClamps(plan, smallSignal, frequency, forcedStates)
 	}
+	operatingPoint, diagnostics := prepareSmallSignalOperatingPoint(plan, analysis)
+	if len(diagnostics) != 0 {
+		return mnaSystem{}, diagnostics
+	}
+	return buildMNASystemWithPreparedOperatingPoint(plan, smallSignal, frequency, operatingPoint, forcedStates)
+}
+
+type smallSignalOperatingPoint struct {
+	system   mnaSystem
+	solution []complex128
+	states   map[string]float64
+}
+
+func prepareSmallSignalOperatingPoint(plan Plan, analysis Analysis) (*smallSignalOperatingPoint, []Diagnostic) {
+	if !smallSignalAnalysis(analysis.Kind) || len(compileNonlinearDevices(plan)) == 0 {
+		return nil, nil
+	}
 	dc := analysis
 	dc.ID = analysis.ID + "_operating_point"
 	dc.Kind = AnalysisDCOperatingPoint
@@ -509,23 +564,43 @@ func buildMNASystemWithOperatingPoint(plan Plan, analysis Analysis, frequency fl
 	dcSystem, dcSolution, _, diagnostic := solveNonlinearDC(plan, dc)
 	if diagnostic != nil {
 		diagnostic.Path = "operating_point." + diagnostic.Path
-		return mnaSystem{}, []Diagnostic{*diagnostic}
+		return nil, []Diagnostic{*diagnostic}
 	}
 	if diagnostics := validateNonlinearOperatingLimits(plan, dcSystem, dcSolution); len(diagnostics) != 0 {
-		return mnaSystem{}, diagnostics
+		return nil, diagnostics
 	}
 	states, _, stateDiagnostic := resolvedActiveDeviceStates(plan, dcSystem, dcSolution)
 	if stateDiagnostic != nil {
-		return mnaSystem{}, []Diagnostic{*stateDiagnostic}
+		return nil, []Diagnostic{*stateDiagnostic}
 	}
+	return &smallSignalOperatingPoint{system: dcSystem, solution: dcSolution, states: states}, nil
+}
+
+func buildMNASystemWithPreparedOperatingPoint(
+	plan Plan,
+	analysis Analysis,
+	frequency float64,
+	operatingPoint *smallSignalOperatingPoint,
+	forcedStates map[string]float64,
+) (mnaSystem, []Diagnostic) {
+	if operatingPoint == nil {
+		return buildMNASystemWithOpAmpClamps(plan, analysis, frequency, forcedStates)
+	}
+	states := cloneOpAmpClamps(operatingPoint.states)
 	for component, state := range forcedStates {
 		states[component] = state
 	}
-	system, diagnostics := buildMNASystemWithOpAmpClamps(plan, smallSignal, frequency, states)
+	system, diagnostics := buildMNASystemWithOpAmpClamps(plan, analysis, frequency, states)
 	if len(diagnostics) != 0 {
 		return mnaSystem{}, diagnostics
 	}
-	stampSmallSignalNonlinearDevices(&system, compileNonlinearDevices(plan), &dcSystem, dcSolution, frequency)
+	stampSmallSignalNonlinearDevices(
+		&system,
+		compileNonlinearDevices(plan),
+		&operatingPoint.system,
+		operatingPoint.solution,
+		frequency,
+	)
 	if diagnostic := validateMNASystemBounds(system); diagnostic != nil {
 		return mnaSystem{}, []Diagnostic{*diagnostic}
 	}
@@ -545,7 +620,7 @@ func buildMNASystemWithOpAmpClamps(plan Plan, analysis Analysis, frequency float
 	branchIndex := map[string]int{}
 	multiBranchIndex := map[mnaBranchKey]int{}
 	for _, device := range plan.Devices {
-		if device.PrimitiveModel == PrimitiveVoltageSourceV1 || device.PrimitiveModel == PrimitiveConnectorVoltageSourceV1 || device.PrimitiveModel == PrimitiveOpAmpV1 || device.PrimitiveModel == PrimitiveCurrentSenseAmplifierV1 || device.PrimitiveModel == PrimitiveAdjustableLinearRegulatorV1 || device.PrimitiveModel == PrimitiveFixedLinearRegulatorV1 || device.PrimitiveModel == PrimitiveFloatingAdjustableRegulatorV1 || device.PrimitiveModel == PrimitiveProgrammableCurrentSourceV1 || device.PrimitiveModel == PrimitiveShuntVoltageReferenceV1 || device.PrimitiveModel == PrimitiveSingleOutputIsolatedConverterV1 {
+		if device.PrimitiveModel == PrimitiveVoltageSourceV1 || device.PrimitiveModel == PrimitiveConnectorVoltageSourceV1 || device.PrimitiveModel == PrimitiveInductorTransientV1 || device.PrimitiveModel == PrimitiveOpAmpV1 || device.PrimitiveModel == PrimitiveCurrentSenseAmplifierV1 || device.PrimitiveModel == PrimitiveAdjustableLinearRegulatorV1 || device.PrimitiveModel == PrimitiveFixedLinearRegulatorV1 || device.PrimitiveModel == PrimitiveSynchronousBuckRegulatorV1 || device.PrimitiveModel == PrimitiveFloatingAdjustableRegulatorV1 || device.PrimitiveModel == PrimitiveProgrammableCurrentSourceV1 || device.PrimitiveModel == PrimitiveShuntVoltageReferenceV1 || device.PrimitiveModel == PrimitiveSingleOutputIsolatedConverterV1 {
 			branchIndex[device.Component] = len(labels)
 			labels = append(labels, "branch_current:"+device.Component)
 		}
@@ -570,7 +645,7 @@ func buildMNASystemWithOpAmpClamps(plan Plan, analysis Analysis, frequency float
 		case PrimitiveResistorV1:
 			conductance := complex(1 / *device.ValueSI, 0)
 			stampAdmittance(&system, terminals["A"], terminals["B"], conductance)
-		case PrimitiveFuseClosedStateV1:
+		case PrimitiveFuseClosedStateV1, PrimitiveFuseI2TClearingV1:
 			conductance := complex(1/namedValueMap(device.ModelParameters)["cold_resistance_ohm"], 0)
 			stampAdmittance(&system, terminals["A"], terminals["B"], conductance)
 		case PrimitiveRelayClosedV1, PrimitiveRelayNormallyOpenV1:
@@ -583,6 +658,15 @@ func buildMNASystemWithOpAmpClamps(plan Plan, analysis Analysis, frequency float
 			}
 		case PrimitiveCapacitorTransientV1:
 			// The trusted transient solver stamps the fixed backward-Euler companion.
+		case PrimitiveInductorTransientV1:
+			parameters := namedValueMap(device.ModelParameters)
+			impedance := complex(parameters["series_resistance_ohm"], 0)
+			if smallSignalAnalysis(analysis.Kind) {
+				impedance += complex(0, 2*math.Pi*frequency**device.ValueSI)
+			}
+			branch := system.branchIndex[device.Component]
+			stampVoltageSourceBranch(&system, branch, terminals["A"], terminals["B"], 0)
+			system.matrix[branch][branch] -= impedance
 		case PrimitiveVoltageSourceV1:
 			value := excitationValue(analysis, device.Component)
 			stampVoltageSource(&system, device.Component, terminals["POSITIVE"], terminals["NEGATIVE"], value)
@@ -671,6 +755,37 @@ func buildMNASystemWithOpAmpClamps(plan Plan, analysis Analysis, frequency float
 			}
 			stampFixedLinearRegulator(&system, device.Component, terminals, complex(output, 0))
 			stampCurrentSource(&system, terminals["VIN"], terminals["GND"], complex(quiescent, 0))
+		case PrimitiveSynchronousBuckRegulatorV1:
+			parameters := namedValueMap(device.ModelParameters)
+			reference := parameters["reference_voltage_v"]
+			if smallSignalAnalysis(analysis.Kind) {
+				reference = 0
+			}
+			// conversion_efficiency_fraction is an empirical conversion
+			// boundary and therefore already includes controller operating
+			// current. Do not stamp quiescent_current_a as a second electrical
+			// load; it remains available to the thermal loss model.
+			stampSynchronousBuckCurrentMode(
+				&system,
+				device.Component,
+				terminals,
+				synchronousBuckTransconductance(parameters, frequency),
+				reference,
+				synchronousBuckInputCurrentRatio(plan, analysis, device, 0),
+			)
+			if !smallSignalAnalysis(analysis.Kind) {
+				powerStateAnalysis := requestedBuckPowerStateAnalysis(plan, analysis)
+				inputV := synchronousBuckInputVoltage(plan, powerStateAnalysis, device, 0)
+				enableV := 0.0
+				enable, enableKnown := transientKnownNodeVoltage(plan, powerStateAnalysis, terminals["EN"], 0)
+				ground, groundKnown := transientKnownNodeVoltage(plan, powerStateAnalysis, terminals["AGND"], 0)
+				if enableKnown && groundKnown {
+					enableV = enable - ground
+				}
+				if inputV < parameters["min_input_voltage_v"] || enableV < parameters["enable_threshold_v"] {
+					disableTransientBranch(&system, device.Component)
+				}
+			}
 		case PrimitiveFloatingAdjustableRegulatorV1:
 			parameters := namedValueMap(device.ModelParameters)
 			reference := parameters["polarity"] * parameters["reference_voltage_v"]
@@ -725,7 +840,15 @@ func buildMNASystemWithOpAmpClamps(plan Plan, analysis Analysis, frequency float
 				parameters := namedValueMap(device.ModelParameters)
 				stampCurrentSource(&system, terminals["VIN"], terminals["GND"], complex(parameters["quiescent_current_a"], 0))
 			}
-		case PrimitiveDiodeShockleyV1, PrimitiveUnidirectionalZenerV1, PrimitiveBidirectionalTVSV1, PrimitiveNMOSSwitchV1, PrimitivePMOSSwitchV1, PrimitiveBJTNPNV1, PrimitiveBJTPNPV1:
+		case PrimitiveNMOSSwitchV1, PrimitivePMOSSwitchV1:
+			if smallSignalAnalysis(analysis.Kind) {
+				for _, capacitor := range mosfetDynamicCapacitors(device, analysis.Kind) {
+					stampAdmittance(&system, capacitor.a, capacitor.b, complex(0, 2*math.Pi*frequency*capacitor.capacitanceF))
+				}
+			}
+			// Channel conductance is stamped by the bounded nonlinear
+			// operating-point linearization.
+		case PrimitiveDiodeShockleyV1, PrimitiveUnidirectionalZenerV1, PrimitiveBidirectionalTVSV1, PrimitiveBJTNPNV1, PrimitiveBJTPNPV1:
 			// Nonlinear devices are stamped by the bounded DC Newton solver.
 		default:
 			return mnaSystem{}, []Diagnostic{{Path: "devices." + device.Component, Message: "resolved primitive has no trusted MNA stamp"}}
@@ -738,6 +861,35 @@ func buildMNASystemWithOpAmpClamps(plan Plan, analysis Analysis, frequency float
 		return mnaSystem{}, []Diagnostic{*diagnostic}
 	}
 	return system, nil
+}
+
+type dynamicCapacitor struct {
+	a, b         string
+	capacitanceF float64
+}
+
+func mosfetDynamicCapacitors(device ResolvedDevice, analysisKind string) []dynamicCapacitor {
+	// Startup is a bounded quasi-static source-ramp analysis. Applying the
+	// switching-waveform parasitics there can inject artificial charge into
+	// otherwise floating control nodes; explicit circuit capacitors remain
+	// part of startup. AC, transient, and electrothermal analyses retain the
+	// reviewed MOSFET capacitance model.
+	if analysisKind == AnalysisStartup {
+		return nil
+	}
+	parameters := namedValueMap(device.ModelParameters)
+	ciss := parameters["input_capacitance_f"]
+	coss := parameters["output_capacitance_f"]
+	crss := parameters["reverse_transfer_capacitance_f"]
+	if ciss <= crss || coss <= crss || crss <= 0 {
+		return nil
+	}
+	terminals := terminalMap(device)
+	return []dynamicCapacitor{
+		{a: terminals["GATE"], b: terminals["SOURCE"], capacitanceF: ciss - crss},
+		{a: terminals["GATE"], b: terminals["DRAIN"], capacitanceF: crss},
+		{a: terminals["DRAIN"], b: terminals["SOURCE"], capacitanceF: coss - crss},
+	}
 }
 
 func referenceUnobservedMNAComponents(plan Plan, analysis Analysis, system *mnaSystem) {
@@ -1221,7 +1373,7 @@ func solveBoundedOpAmpDCFromState(plan Plan, analysis Analysis, system mnaSystem
 				negative := real(solvedNodeVoltage(system, solution, terminals["V_MINUS"]))
 				positive := real(solvedNodeVoltage(system, solution, terminals["V_PLUS"]))
 				supply := positive - negative
-				if supply < parameters["supply_min_v"] || supply > parameters["supply_max_v"] {
+				if outsideNonlinearOperatingRange(supply, parameters["supply_min_v"], parameters["supply_max_v"]) {
 					diagnostics = append(diagnostics, Diagnostic{Path: "devices." + device.Component + ".supply", Message: fmt.Sprintf("DC supply %.12g V is outside catalog-backed range %.12g..%.12g V", supply, parameters["supply_min_v"], parameters["supply_max_v"]), Suggestion: "adjust source conditions or select a compatible catalog comparator"})
 					continue
 				}
@@ -1241,7 +1393,7 @@ func solveBoundedOpAmpDCFromState(plan Plan, analysis Analysis, system mnaSystem
 				}
 				parameters := namedValueMap(device.ModelParameters)
 				supply, minimum, maximum, desired := currentSenseOperatingState(device, system, solution)
-				if supply < parameters["supply_min_v"] || supply > parameters["supply_max_v"] {
+				if outsideNonlinearOperatingRange(supply, parameters["supply_min_v"], parameters["supply_max_v"]) {
 					diagnostics = append(diagnostics, Diagnostic{Path: "devices." + device.Component + ".supply", Message: fmt.Sprintf("DC supply %.12g V is outside catalog-backed range %.12g..%.12g V", supply, parameters["supply_min_v"], parameters["supply_max_v"]), Suggestion: "adjust source conditions or select a compatible catalog current-sense amplifier"})
 					continue
 				}
@@ -1263,7 +1415,7 @@ func solveBoundedOpAmpDCFromState(plan Plan, analysis Analysis, system mnaSystem
 			negative := real(solvedNodeVoltage(system, solution, terminals["V_MINUS"]))
 			positive := real(solvedNodeVoltage(system, solution, terminals["V_PLUS"]))
 			supply := positive - negative
-			if supply < parameters["supply_min_v"] || supply > parameters["supply_max_v"] {
+			if outsideNonlinearOperatingRange(supply, parameters["supply_min_v"], parameters["supply_max_v"]) {
 				diagnostics = append(diagnostics, Diagnostic{Path: "devices." + device.Component + ".supply", Message: fmt.Sprintf("DC supply %.12g V is outside catalog-backed range %.12g..%.12g V", supply, parameters["supply_min_v"], parameters["supply_max_v"]), Suggestion: "adjust source conditions or select a compatible catalog op-amp"})
 				continue
 			}
@@ -1372,6 +1524,9 @@ func assertionValue(results []AnalysisResult, assertion Assertion) (float64, *Di
 		if result.Kind == AnalysisStability && (assertion.Quantity == QuantityPhaseMarginDeg || assertion.Quantity == QuantityGainMarginDB) {
 			return stabilityMargin(result, assertion)
 		}
+		if result.Kind == AnalysisStability && (assertion.Quantity == QuantityLoopCrossoverHz || assertion.Quantity == QuantityClosedLoopPeakingDB) {
+			return controlLoopDerivedValue(result, assertion)
+		}
 		if result.Kind == AnalysisTransient && (assertion.Quantity == QuantityRiseTimeS || assertion.Quantity == QuantityFallTimeS) {
 			return transientEdgeTime(result, assertion)
 		}
@@ -1381,13 +1536,22 @@ func assertionValue(results []AnalysisResult, assertion Assertion) (float64, *Di
 		if result.Kind == AnalysisDistortion && assertion.Quantity == QuantityTHDPercent {
 			return totalHarmonicDistortion(result, assertion)
 		}
-		if result.Kind == AnalysisThermal && (assertion.Quantity == QuantityDeviceDissipationW || assertion.Quantity == QuantityJunctionTemperatureC) {
+		if (result.Kind == AnalysisThermal || result.Kind == AnalysisElectrothermal) && (assertion.Quantity == QuantityDeviceDissipationW || assertion.Quantity == QuantityJunctionTemperatureC || assertion.Quantity == QuantityTransientSOAMargin) {
 			return thermalAssertionValue(result, assertion)
 		}
 		if result.Kind == AnalysisACSweep && (assertion.Quantity == QuantityVoltageGainRatio || assertion.Quantity == QuantityCutoffFrequencyHz || assertion.Quantity == QuantityBandwidthHz) {
 			return acDerivedValue(result, assertion)
 		}
-		if result.Kind == AnalysisTransient && (assertion.Quantity == QuantityPeakAbsVoltageV || assertion.Quantity == QuantityOutputSwingVPP || assertion.Quantity == QuantitySettlingTimeS || assertion.Quantity == QuantityResponseTimeS || assertion.Quantity == QuantityOutputPowerW) {
+		if (result.Kind == AnalysisTransient || result.Kind == AnalysisElectrothermal) &&
+			(assertion.Quantity == QuantityPeakAbsVoltageV ||
+				assertion.Quantity == QuantityPeakAbsDeviceVoltageV ||
+				assertion.Quantity == QuantityPeakAbsDeviceCurrentA ||
+				assertion.Quantity == QuantityOvershootVoltageV ||
+				assertion.Quantity == QuantityOutputSwingVPP ||
+				assertion.Quantity == QuantitySettlingTimeS ||
+				assertion.Quantity == QuantityResponseTimeS ||
+				assertion.Quantity == QuantityOutputPowerW ||
+				assertion.Quantity == QuantityConversionEfficiencyPct) {
 			return transientDerivedValue(result, assertion)
 		}
 		if result.Kind == AnalysisDCOperatingPoint && (assertion.Quantity == QuantityDeviceCurrentA || assertion.Quantity == QuantityTotalSupplyCurrentA || assertion.Quantity == QuantityTransimpedanceOhm) {

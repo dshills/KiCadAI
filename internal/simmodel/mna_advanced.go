@@ -56,7 +56,7 @@ func solveNoiseAnalysis(plan Plan, analysis Analysis) (AnalysisResult, []Diagnos
 				// Norton current-noise density sqrt(4 k T / R), A/sqrt(Hz).
 				density := math.Sqrt(4 * boltzmannConstantJPerK * noiseReferenceK / *device.ValueSI)
 				stampCurrentSource(&system, terminals["A"], terminals["B"], complex(density, 0))
-			case PrimitiveFuseClosedStateV1:
+			case PrimitiveFuseClosedStateV1, PrimitiveFuseI2TClearingV1:
 				// A closed fuse is a physical cold resistance and contributes
 				// the same Johnson-Nyquist noise as any other passive resistance.
 				resistance := namedValueMap(device.ModelParameters)["cold_resistance_ohm"]
@@ -111,34 +111,63 @@ func solveNoiseAnalysis(plan Plan, analysis Analysis) (AnalysisResult, []Diagnos
 	return result, nil
 }
 
-// solveStabilityAnalysis breaks each catalog op-amp loop at its output and,
-// when no op-amp exists, evaluates the local emitter-degeneration return ratio
-// of catalog BJTs. Assertions derive phase and gain margins from these bounded
-// trusted loop definitions; the provider cannot choose an equation or hidden
+// solveStabilityAnalysis derives return ratios for catalog op-amp voltage
+// loops and current-mode buck loops, then falls back to local BJT
+// emitter-degeneration loops. The provider cannot choose an equation or hidden
 // loop-breaking node.
 func solveStabilityAnalysis(plan Plan, analysis Analysis) (AnalysisResult, []Diagnostic) {
 	result := AnalysisResult{ID: analysis.ID, Kind: AnalysisStability, Points: make([]AnalysisPoint, 0, analysis.Points)}
+	loops, loopDiagnostics := DiscoverControlLoops(plan)
+	if len(loopDiagnostics) != 0 {
+		return result, prefixAnalysisDiagnostics(analysis.ID, loopDiagnostics)
+	}
+	loops = controlLoopsForStabilityAnalysis(loops, plan.Assertions, analysis.ID)
+	result.ControlLoops = loops
+	activeComponents := make(map[string]bool, len(loops))
+	for _, loop := range loops {
+		activeComponents[loop.ActiveComponent] = true
+	}
 	opAmps := make([]ResolvedDevice, 0)
-	outputs := map[string]string{}
+	bucks := make([]ResolvedDevice, 0)
 	for _, device := range plan.Devices {
-		if device.PrimitiveModel != PrimitiveOpAmpV1 {
+		if !activeComponents[device.Component] {
 			continue
 		}
-		output := terminalMap(device)["OUT"]
-		if previous, exists := outputs[output]; exists {
-			return result, []Diagnostic{{Path: "analyses." + analysis.ID + ".nodes." + output, Message: fmt.Sprintf("stability output is shared by op-amps %s and %s", previous, device.Component), Suggestion: "use a topology with an unambiguous catalog op-amp output loop"}}
+		switch device.PrimitiveModel {
+		case PrimitiveOpAmpV1:
+			opAmps = append(opAmps, device)
+		case PrimitiveSynchronousBuckRegulatorV1:
+			bucks = append(bucks, device)
 		}
-		outputs[output] = device.Component
-		opAmps = append(opAmps, device)
 	}
-	if len(opAmps) == 0 {
+	if len(opAmps) == 0 && len(bucks) == 0 {
 		return solveBJTEmitterDegenerationStability(plan, analysis)
+	}
+	smallSignal := analysis
+	smallSignal.Excitations = append([]SourceExcitation(nil), analysis.Excitations...)
+	for index := range smallSignal.Excitations {
+		smallSignal.Excitations[index].ACMagnitude = 0
+		smallSignal.Excitations[index].ACPhaseDeg = 0
+	}
+	var operatingPoint *smallSignalOperatingPoint
+	if len(opAmps) != 0 {
+		var operatingPointDiagnostics []Diagnostic
+		operatingPoint, operatingPointDiagnostics = prepareSmallSignalOperatingPoint(plan, analysis)
+		if len(operatingPointDiagnostics) != 0 {
+			return result, prefixAnalysisDiagnostics(analysis.ID, operatingPointDiagnostics)
+		}
 	}
 
 	for _, frequency := range sweepFrequencies(analysis) {
-		nodes := make([]NodeResult, 0, len(opAmps))
+		nodes := make([]NodeResult, 0, len(opAmps)+len(bucks))
 		for _, device := range opAmps {
-			system, diagnostics := buildMNASystemWithForcedOpAmp(plan, analysis, frequency, device.Component)
+			system, diagnostics := buildMNASystemWithPreparedOperatingPoint(
+				plan,
+				smallSignal,
+				frequency,
+				operatingPoint,
+				map[string]float64{device.Component: 1},
+			)
 			if len(diagnostics) != 0 {
 				return result, prefixAnalysisDiagnostics(analysis.ID, diagnostics)
 			}
@@ -159,13 +188,76 @@ func solveStabilityAnalysis(plan Plan, analysis Analysis) (AnalysisResult, []Dia
 				Magnitude: normalizedMNAFloat(cmplx.Abs(loop)), PhaseDeg: normalizedMNAFloat(cmplx.Phase(loop) * 180 / math.Pi),
 			})
 		}
+		for _, device := range bucks {
+			system, diagnostics := buildMNASystemWithOpAmpClamps(plan, analysis, frequency, nil)
+			if len(diagnostics) != 0 {
+				return result, prefixAnalysisDiagnostics(analysis.ID, diagnostics)
+			}
+			branch, exists := system.branchIndex[device.Component]
+			if !exists {
+				return result, []Diagnostic{{Path: "analyses." + analysis.ID + ".devices." + device.Component, Message: "current-mode buck loop lacks a controlled-current branch"}}
+			}
+			for column := range system.matrix[branch] {
+				system.matrix[branch][column] = 0
+			}
+			system.matrix[branch][branch] = 1
+			system.rhs[branch] = 1
+			solution, diagnostic := solveMNA(system)
+			if diagnostic != nil {
+				diagnostic.Path = "analyses." + analysis.ID + ".devices." + device.Component + "." + diagnostic.Path
+				diagnostic.Message = "loop-return solve failed: " + diagnostic.Message
+				return result, []Diagnostic{*diagnostic}
+			}
+			terminals := terminalMap(device)
+			beta := solvedNodeVoltage(system, solution, terminals["FB"]) -
+				solvedNodeVoltage(system, solution, terminals["AGND"])
+			loop := synchronousBuckTransconductance(namedValueMap(device.ModelParameters), frequency) * beta
+			if !boundedComplex(loop, maxMNASolutionValue) {
+				return result, []Diagnostic{{Path: "analyses." + analysis.ID + ".devices." + device.Component, Message: "trusted loop-return ratio is non-finite or exceeds the numerical bound"}}
+			}
+			output, ok := synchronousBuckOutputNet(plan, device)
+			if !ok {
+				return result, []Diagnostic{{Path: "analyses." + analysis.ID + ".devices." + device.Component, Message: "current-mode buck loop has no unique output node"}}
+			}
+			nodes = append(nodes, NodeResult{
+				Node: output, Real: normalizedMNAFloat(real(loop)), Imaginary: normalizedMNAFloat(imag(loop)),
+				Magnitude: normalizedMNAFloat(cmplx.Abs(loop)), PhaseDeg: normalizedMNAFloat(cmplx.Phase(loop) * 180 / math.Pi),
+			})
+		}
 		result.Points = append(result.Points, AnalysisPoint{FrequencyHz: frequency, Nodes: nodes})
+	}
+	if diagnostic := populateControlLoopMetrics(&result); diagnostic != nil {
+		return result, []Diagnostic{*diagnostic}
 	}
 	return result, nil
 }
 
+func controlLoopsForStabilityAnalysis(loops []ControlLoop, assertions []Assertion, analysisID string) []ControlLoop {
+	observations := map[string]bool{}
+	for _, assertion := range assertions {
+		if assertion.AnalysisID == analysisID && assertion.Node != "" {
+			observations[assertion.Node] = true
+		}
+	}
+	if len(observations) == 0 {
+		return loops
+	}
+	selected := make([]ControlLoop, 0, len(loops))
+	for _, loop := range loops {
+		if observations[loop.ObservationNet] {
+			selected = append(selected, loop)
+		}
+	}
+	return selected
+}
+
 func solveBJTEmitterDegenerationStability(plan Plan, analysis Analysis) (AnalysisResult, []Diagnostic) {
 	result := AnalysisResult{ID: analysis.ID, Kind: AnalysisStability, Points: make([]AnalysisPoint, 0, analysis.Points)}
+	loops, loopDiagnostics := DiscoverControlLoops(plan)
+	if len(loopDiagnostics) != 0 {
+		return result, prefixAnalysisDiagnostics(analysis.ID, loopDiagnostics)
+	}
+	result.ControlLoops = loops
 	var transistors []ResolvedDevice
 	for _, device := range plan.Devices {
 		if device.PrimitiveModel != PrimitiveBJTNPNV1 && device.PrimitiveModel != PrimitiveBJTPNPV1 {
@@ -246,6 +338,9 @@ func solveBJTEmitterDegenerationStability(plan Plan, analysis Analysis) (Analysi
 			})
 		}
 		result.Points = append(result.Points, AnalysisPoint{FrequencyHz: frequency, Nodes: nodes})
+	}
+	if diagnostic := populateControlLoopMetrics(&result); diagnostic != nil {
+		return result, []Diagnostic{*diagnostic}
 	}
 	return result, nil
 }

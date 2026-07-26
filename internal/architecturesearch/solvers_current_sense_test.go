@@ -30,6 +30,22 @@ func TestSolveCurrentSenseFailsClosedOnInsufficientAccuracy(t *testing.T) {
 	}
 }
 
+func TestSolveCurrentSenseDoesNotInventAccuracyForInternalScale(t *testing.T) {
+	evidence, issues := SolveCurrentSense(CurrentSenseRequest{
+		ID: "internal_scale", FullScaleCurrentA: .5, TargetOutputVoltageV: .5, OutputTolerancePercent: 0, MaximumOutputVoltageV: 2.5,
+		ShuntResistanceOhm: 0.01, ShuntTolerancePercent: 1, ShuntPowerRatingW: 1,
+		AmplifierGain: 100, AmplifierGainErrorPercent: 1, InputOffsetVoltageV: 100e-6,
+	})
+	if len(issues) != 0 || !evidence.Pass {
+		t.Fatalf("architecture-internal scale should pass physical bounds, issues=%v evidence=%+v", issues, evidence)
+	}
+	for _, bound := range evidence.Bounds {
+		if bound.Name == "full_scale_output_minimum" || bound.Name == "full_scale_output_maximum" {
+			t.Fatalf("internal scale contains invented accuracy bound: %+v", evidence.Bounds)
+		}
+	}
+}
+
 func TestSolveCurrentSenseRejectsNonFiniteTolerances(t *testing.T) {
 	base := CurrentSenseRequest{
 		ID: "load_current", FullScaleCurrentA: 2, TargetOutputVoltageV: 2, OutputTolerancePercent: 2, MaximumOutputVoltageV: 2.5,
@@ -44,6 +60,8 @@ func TestSolveCurrentSenseRejectsNonFiniteTolerances(t *testing.T) {
 		{name: "shunt_inf", mutate: func(request *CurrentSenseRequest) { request.ShuntTolerancePercent = math.Inf(1) }},
 		{name: "gain_nan", mutate: func(request *CurrentSenseRequest) { request.AmplifierGainErrorPercent = math.NaN() }},
 		{name: "gain_inf", mutate: func(request *CurrentSenseRequest) { request.AmplifierGainErrorPercent = math.Inf(1) }},
+		{name: "output_negative", mutate: func(request *CurrentSenseRequest) { request.OutputTolerancePercent = -1 }},
+		{name: "output_nan", mutate: func(request *CurrentSenseRequest) { request.OutputTolerancePercent = math.NaN() }},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			request := base

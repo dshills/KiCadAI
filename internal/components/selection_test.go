@@ -69,11 +69,13 @@ func TestSelectIncludesActiveProcurementEvidence(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	now := time.Date(2026, 6, 26, 0, 0, 0, 0, time.UTC)
 	selection, result := Select(context.Background(), catalog, SelectionRequest{
 		Query:           Query{Family: "regulator", Package: "sot23_5", ValueKind: "output_voltage", Value: "3.3"},
 		Acceptance:      AcceptanceConnectivity,
 		RequiredRatings: []RequiredRating{{Kind: "input_voltage", Value: "5", Unit: "V"}},
 		Sources:         sources,
+		Procurement:     ProcurementPolicy{Now: &now},
 	})
 	if !result.OK {
 		t.Fatalf("select regulator failed: %#v", result.Issues)
@@ -861,7 +863,7 @@ func TestSelectPrefersFewestSurplusFunctions(t *testing.T) {
 func TestSelectVerifiedOpAmpBySupplyRange(t *testing.T) {
 	catalog := loadCheckedInCatalog(t)
 	selection, result := Select(context.Background(), catalog, SelectionRequest{
-		Query:      Query{Text: "ti", Family: "opamp", Package: "sot23_5"},
+		Query:      Query{Text: "LMV321IDBVR", Family: "opamp", Package: "sot23_5"},
 		Acceptance: AcceptanceConnectivity,
 		RequiredRatings: []RequiredRating{{
 			Kind:  "supply_voltage",
@@ -966,7 +968,7 @@ func cloneSelectionTestRecord(record ComponentRecord) ComponentRecord {
 func TestSelectRejectsOpAmpOutsideSupplyRange(t *testing.T) {
 	catalog := loadCheckedInCatalog(t)
 	_, result := Select(context.Background(), catalog, SelectionRequest{
-		Query:      Query{Text: "ti", Family: "opamp", Package: "sot23_5"},
+		Query:      Query{Text: "LMV321IDBVR", Family: "opamp", Package: "sot23_5"},
 		Acceptance: AcceptanceConnectivity,
 		RequiredRatings: []RequiredRating{{
 			Kind:  "supply_voltage",
@@ -1032,7 +1034,7 @@ func TestSelectI2CSensorRejectsUnsupportedSupplyAndFunction(t *testing.T) {
 func TestSelectRejectsOpAmpBelowMinimumSupplyRange(t *testing.T) {
 	catalog := loadCheckedInCatalog(t)
 	_, result := Select(context.Background(), catalog, SelectionRequest{
-		Query:      Query{Text: "ti", Family: "opamp", Package: "sot23_5"},
+		Query:      Query{Text: "LMV321IDBVR", Family: "opamp", Package: "sot23_5"},
 		Acceptance: AcceptanceConnectivity,
 		RequiredRatings: []RequiredRating{{
 			Kind:  "supply_voltage",
@@ -1049,7 +1051,7 @@ func TestSelectRejectsOpAmpBelowMinimumSupplyRange(t *testing.T) {
 func TestSelectBlocksOpAmpFabricationCandidateWithoutDriveAndStabilityEvidence(t *testing.T) {
 	catalog := loadCheckedInCatalog(t)
 	_, result := Select(context.Background(), catalog, SelectionRequest{
-		Query:      Query{Text: "ti", Family: "opamp", Package: "sot23_5"},
+		Query:      Query{Text: "LMV321IDBVR", Family: "opamp", Package: "sot23_5"},
 		Acceptance: AcceptanceFabricationCandidate,
 		RequiredRatings: []RequiredRating{{
 			Kind:  "supply_voltage",
@@ -1145,6 +1147,11 @@ func TestSelectBlocksPowerBJTPlaceholderForConnectivity(t *testing.T) {
 
 func TestSelectWithRejectedPlaceholderAlternativeStillSucceeds(t *testing.T) {
 	catalog := loadCheckedInCatalog(t)
+	catalog.Records = []ComponentRecord{
+		*requireCatalogRecord(t, catalog, "opamp.generic.single.lmv321"),
+		*requireCatalogRecord(t, catalog, "opamp.ti.lmv321.sot23_5"),
+	}
+	RebuildCatalogIndexes(catalog)
 	selection, result := Select(context.Background(), catalog, SelectionRequest{
 		Query:      Query{Family: "opamp", Package: "sot23_5"},
 		Acceptance: AcceptanceConnectivity,
@@ -1210,7 +1217,7 @@ func TestSelectRequiresConcreteAndCompanions(t *testing.T) {
 	assertIssueCode(t, result.Issues, CodeComponentConcreteRequired)
 
 	selection, result = Select(context.Background(), catalog, SelectionRequest{
-		Query:             Query{Text: "ti", Family: "opamp", Package: "sot23_5"},
+		Query:             Query{Text: "LMV321IDBVR", Family: "opamp", Package: "sot23_5"},
 		Acceptance:        AcceptanceConnectivity,
 		RequireConcrete:   true,
 		RequireCompanions: true,

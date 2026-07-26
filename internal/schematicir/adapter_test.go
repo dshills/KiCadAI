@@ -657,6 +657,33 @@ func TestToTransactionEmitsLabelPointsForEveryHighFanoutEndpoint(t *testing.T) {
 	}
 }
 
+func TestToTransactionSuppressesLabelsBetweenCoincidentPinAnchors(t *testing.T) {
+	doc := validLEDDocument()
+	doc.Circuit.Components[1].Pins = []Pin{
+		{Number: "1", OffsetYMM: floatPtr(-3.81)},
+		{Number: "2", OffsetYMM: floatPtr(3.81)},
+		{Number: "3", OffsetYMM: floatPtr(3.81)},
+	}
+	doc.Circuit.Nets[1].Connect = []EndpointRef{"r_limit.2", "r_limit.3", "led.1"}
+
+	tx, issues := ToTransaction(doc)
+	if len(issues) != 0 {
+		t.Fatalf("coincident-pin transaction issues = %#v", issues)
+	}
+	for _, connect := range decodeOperations[transactions.ConnectOperation](t, tx, transactions.OpConnect) {
+		if connect.From.Ref == "R1" && connect.From.Pin == "2" && connect.To.Ref == "R1" && connect.To.Pin == "3" {
+			if connect.UseLabels == nil || *connect.UseLabels {
+				t.Fatalf("coincident-pin connection retained label emission: %#v", connect)
+			}
+			if connect.FromLabelAt != nil || connect.ToLabelAt != nil || len(connect.Waypoints) != 0 {
+				t.Fatalf("coincident-pin connection retained redundant geometry: %#v", connect)
+			}
+			return
+		}
+	}
+	t.Fatal("coincident-pin connection was not emitted")
+}
+
 func TestToTransactionAssignsMissingReferencesWhenAllowed(t *testing.T) {
 	doc := validLEDDocument()
 	for index := range doc.Circuit.Components {

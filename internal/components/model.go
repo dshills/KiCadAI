@@ -57,6 +57,7 @@ type Catalog struct {
 	GeneratedAt          *time.Time                                 `json:"generated_at,omitempty"`
 	Records              []ComponentRecord                          `json:"records"`
 	Families             []FamilyDefinition                         `json:"families"`
+	ThermalPaths         []ThermalPathRecord                        `json:"thermal_paths,omitempty"`
 	Diagnostics          []reports.Issue                            `json:"diagnostics,omitempty"`
 	mu                   sync.RWMutex                               `json:"-"`
 	recordIndex          map[string]int                             `json:"-"`
@@ -80,6 +81,32 @@ type FamilyDefinition struct {
 	Name        string   `json:"name"`
 	Description string   `json:"description,omitempty"`
 	Tags        []string `json:"tags,omitempty"`
+}
+
+// ThermalPathRecord is a reviewed non-electrical assembly option that closes
+// a semiconductor package's case-to-ambient boundary. It stays separate from
+// ComponentRecord because heatsinks and interface materials are physical BOM
+// and enclosure obligations, not schematic-connected electrical devices.
+//
+// Natural and forced values are distinct reviewed operating points. Search
+// may only use the forced value when it also retains that cooling boundary as
+// a bounded repair option; dynamic blocked-airflow events remain authoritative.
+type ThermalPathRecord struct {
+	ID                          string             `json:"id"`
+	Manufacturer                string             `json:"manufacturer"`
+	MPN                         string             `json:"mpn"`
+	Lifecycle                   string             `json:"lifecycle,omitempty"`
+	CompatiblePackages          []string           `json:"compatible_packages"`
+	InterfaceMaterial           string             `json:"interface_material"`
+	CaseToSinkCPerW             float64            `json:"case_to_sink_c_per_w"`
+	NaturalSinkToAmbientCPerW   float64            `json:"natural_sink_to_ambient_c_per_w"`
+	ForcedSinkToAmbientCPerW    float64            `json:"forced_sink_to_ambient_c_per_w,omitempty"`
+	ForcedAirflowLFM            float64            `json:"forced_airflow_lfm,omitempty"`
+	SinkThermalCapacitanceJPerC float64            `json:"sink_thermal_capacitance_j_per_c"`
+	MaximumSharedDevices        int                `json:"maximum_shared_devices"`
+	ReviewStatus                string             `json:"review_status"`
+	ReviewNote                  string             `json:"review_note"`
+	Verification                VerificationRecord `json:"verification"`
 }
 
 type ComponentRecord struct {
@@ -740,6 +767,13 @@ func SortCatalog(catalog *Catalog) {
 	sort.SliceStable(catalog.Records, func(i, j int) bool {
 		return catalog.Records[i].ID < catalog.Records[j].ID
 	})
+	sort.SliceStable(catalog.ThermalPaths, func(i, j int) bool {
+		return catalog.ThermalPaths[i].ID < catalog.ThermalPaths[j].ID
+	})
+	for index := range catalog.ThermalPaths {
+		sort.Strings(catalog.ThermalPaths[index].CompatiblePackages)
+		sortVerification(&catalog.ThermalPaths[index].Verification)
+	}
 	for i := range catalog.Records {
 		sortRecord(&catalog.Records[i])
 	}

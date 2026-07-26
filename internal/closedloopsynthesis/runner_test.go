@@ -157,6 +157,138 @@ func TestV4ClosedLoopBacktracksAcrossCompleteArchitecturesWithBlockAndEndToEndEv
 	}
 }
 
+func TestV5ClosedLoopRetainsHierarchicalBacktrackingAndDynamicRequirementIdentity(t *testing.T) {
+	requirement := closedLoopTestRequirement()
+	requirement.Schema = architecturesearch.SchemaIDV5
+	requirement.Version = architecturesearch.VersionV5
+	requirement.Acceptance.RequireHierarchicalDecomposition = true
+	requirement.Acceptance.RequireInterfaceContracts = true
+	requirement.Acceptance.RequireSharedResourcePlanning = true
+	requirement.Acceptance.RequireDeterministicBacktracking = true
+	requirement.Acceptance.RequirePhysicalPartitioning = true
+	requirement.Acceptance.RequireEndToEndTraceability = true
+	requirement.Acceptance.RequireDynamicModelProvenance = true
+	requirement.Acceptance.RequireReturnRatioEvidence = true
+	requirement.Acceptance.RequireDynamicElectrothermalEvidence = true
+	requirement.Acceptance.RequireEventCoverage = true
+	requirement.Acceptance.RequireDynamicArchitectureSelection = true
+	requirement.Acceptance.RequireBoundedDynamicRepair = true
+	applied := 1.0
+	requirement.Requirements.OperatingCases[0].Events = []architecturesearch.OperatingEvent{{
+		ID: "startup", Kind: "startup", Target: architecturesearch.Observation{Kind: "port", ID: "output"},
+		DurationS: 1e-3, Applied: &applied, Unit: "V",
+	}}
+	fingerprint := testHash("v5-candidate")
+	input := Input{
+		Requirement: requirement, CatalogHash: testHash("catalog"), FormulaLibraryHash: testHash("formulas"), ModelRegistryHash: testHash("models"),
+		Candidates: []Candidate{{Fingerprint: fingerprint, Priority: 0, SystemPlan: closedLoopV4SystemPlan(t, requirement, fingerprint)}},
+	}
+	report := Run(context.Background(), input, closedLoopTestEvaluator(false), DefaultPolicy())
+	if report.Status != "pass" || report.Selected == nil || report.Selected.Fingerprint != fingerprint ||
+		report.Backtracking == nil || report.Backtracking.SelectedFingerprint != fingerprint ||
+		report.Candidates[0].Attempts[0].Hierarchy == nil {
+		t.Fatalf("V5 closed-loop hierarchy/backtracking = %#v", report)
+	}
+}
+
+func TestV5DynamicEvidenceRejectsStaticFavoriteAndSelectsSafeAlternative(t *testing.T) {
+	requirement := closedLoopV5DynamicRequirement()
+
+	preferred := testHash("v5-static-favorite")
+	safe := testHash("v5-dynamic-safe")
+	input := Input{
+		Requirement: requirement, CatalogHash: testHash("catalog"), FormulaLibraryHash: testHash("formulas"), ModelRegistryHash: testHash("models"),
+		Candidates: []Candidate{
+			{Fingerprint: preferred, Priority: 0, SystemPlan: closedLoopV4SystemPlan(t, requirement, preferred)},
+			{Fingerprint: safe, Priority: 1, SystemPlan: closedLoopV4SystemPlan(t, requirement, safe)},
+		},
+	}
+	evaluator := evaluatorFunc(func(_ context.Context, state CandidateState) (Evaluation, error) {
+		temperature := 80.0
+		if state.Fingerprint == preferred {
+			temperature = 140
+		}
+		simulation := &SimulationEvidence{}
+		evidenceHash, _ := HashSimulationEvidence(*simulation)
+		return Evaluation{
+			EvidenceHash: evidenceHash, Simulation: simulation,
+			Measurements: []Measurement{
+				{RequirementID: "gain", OperatingCase: "rated", Actual: 10},
+				{RequirementID: "thermal", OperatingCase: "rated", Actual: temperature},
+			},
+			ModelDecisions: []ModelDecision{closedLoopDynamicModelDecision()},
+		}, nil
+	})
+	report := Run(context.Background(), input, evaluator, DefaultPolicy())
+	if report.Status != "pass" || report.Selected == nil || report.Selected.Fingerprint != safe ||
+		report.Candidates[0].Status != "rejected" || report.Candidates[1].Status != "pass" {
+		t.Fatalf("V5 dynamic architecture selection = %#v", report)
+	}
+}
+
+func TestV5DynamicRepairIsBoundedImmutableAndDeterministic(t *testing.T) {
+	requirement := closedLoopV5DynamicRequirement()
+	requirementBefore, err := architecturesearch.CanonicalHash(requirement)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fingerprint := testHash("v5-dynamic-repair")
+	input := Input{
+		Requirement: requirement, CatalogHash: testHash("catalog"), FormulaLibraryHash: testHash("formulas"), ModelRegistryHash: testHash("models"),
+		Candidates: []Candidate{{
+			Fingerprint: fingerprint,
+			Priority:    0,
+			SystemPlan:  closedLoopV4SystemPlan(t, requirement, fingerprint),
+			Variables: []Variable{{
+				ID: "heatsink_thermal_resistance", Kind: "thermal_path", Value: 1,
+				AllowedValues: []float64{1, 2, 3},
+				Effects: []RepairEffect{{
+					Analysis: simmodel.AnalysisElectrothermal, Metric: "peak_junction_temperature", Direction: RepairMetricDecreases,
+				}},
+			}},
+		}},
+	}
+	evaluator := evaluatorFunc(func(_ context.Context, state CandidateState) (Evaluation, error) {
+		temperature := 170 - 30*state.Variables[0].Value
+		simulation := &SimulationEvidence{}
+		evidenceHash, _ := HashSimulationEvidence(*simulation)
+		return Evaluation{
+			EvidenceHash: evidenceHash,
+			Simulation:   simulation,
+			Measurements: []Measurement{
+				{RequirementID: "gain", OperatingCase: "rated", Actual: 10},
+				{RequirementID: "thermal", OperatingCase: "rated", Actual: temperature},
+			},
+			ModelDecisions: []ModelDecision{closedLoopDynamicModelDecision()},
+		}, nil
+	})
+
+	first := Run(context.Background(), input, evaluator, DefaultPolicy())
+	if first.Status != "pass" || first.Selected == nil || first.Selected.State.Variables[0].Value != 3 ||
+		len(first.Candidates[0].Repairs) != 1 || first.Candidates[0].Repairs[0].Kind != "thermal_path" {
+		t.Fatalf("bounded dynamic repair = %#v", first)
+	}
+	requirementAfter, err := architecturesearch.CanonicalHash(input.Requirement)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if requirementAfter != requirementBefore || *input.Requirement.Requirements.BehavioralRequirements[1].Max != 100 {
+		t.Fatalf("dynamic repair changed immutable requirement: before=%s after=%s requirement=%#v", requirementBefore, requirementAfter, input.Requirement)
+	}
+	second := Run(context.Background(), input, evaluator, DefaultPolicy())
+	firstBytes, err := MarshalReport(first)
+	if err != nil {
+		t.Fatal(err)
+	}
+	secondBytes, err := MarshalReport(second)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(firstBytes) != string(secondBytes) {
+		t.Fatalf("dynamic repair replay differs\nfirst: %s\nsecond: %s", firstBytes, secondBytes)
+	}
+}
+
 func closedLoopV4SystemPlan(t *testing.T, requirement architecturesearch.Requirement, fingerprint string) *architecturesearch.SystemPlan {
 	t.Helper()
 	requirementHash, err := architecturesearch.CanonicalHash(requirement)
@@ -348,6 +480,53 @@ func closedLoopTestEvaluator(thermalRegression bool) evaluatorFunc {
 
 func closedLoopMeasurements(gain, temperature float64) []Measurement {
 	return []Measurement{{RequirementID: "gain", OperatingCase: "rated", Actual: gain}, {RequirementID: "thermal", OperatingCase: "rated", Actual: temperature}}
+}
+
+func closedLoopV5DynamicRequirement() architecturesearch.Requirement {
+	requirement := closedLoopTestRequirement()
+	requirement.Schema = architecturesearch.SchemaIDV5
+	requirement.Version = architecturesearch.VersionV5
+	requirement.Acceptance.RequireHierarchicalDecomposition = true
+	requirement.Acceptance.RequireInterfaceContracts = true
+	requirement.Acceptance.RequireSharedResourcePlanning = true
+	requirement.Acceptance.RequireDeterministicBacktracking = true
+	requirement.Acceptance.RequirePhysicalPartitioning = true
+	requirement.Acceptance.RequireEndToEndTraceability = true
+	requirement.Acceptance.RequireDynamicModelProvenance = true
+	requirement.Acceptance.RequireReturnRatioEvidence = true
+	requirement.Acceptance.RequireDynamicElectrothermalEvidence = true
+	requirement.Acceptance.RequireEventCoverage = true
+	requirement.Acceptance.RequireDynamicArchitectureSelection = true
+	requirement.Acceptance.RequireBoundedDynamicRepair = true
+	applied := 1.0
+	requirement.Requirements.OperatingCases[0].Events = []architecturesearch.OperatingEvent{{
+		ID: "load_step", Kind: "load_step", Target: architecturesearch.Observation{Kind: "port", ID: "output"},
+		DurationS: 1e-3, Applied: &applied, Unit: "A",
+	}}
+	requirement.Requirements.BehavioralRequirements[1].Metric = "peak_junction_temperature"
+	requirement.Requirements.BehavioralRequirements[1].Analysis = simmodel.AnalysisElectrothermal
+	return requirement
+}
+
+func closedLoopDynamicModelDecision() ModelDecision {
+	return ModelDecision{
+		Component: "dynamic_stage", Family: "mosfet", Status: "used", Reason: "reviewed dynamic model",
+		RequiredAnalyses: []string{simmodel.AnalysisACSweep, simmodel.AnalysisElectrothermal},
+		Claim: simmodel.CatalogEvidence{
+			ModelID: simmodel.PrimitiveNMOSSwitchV1,
+			Parameters: []simmodel.NamedValue{
+				{Name: "gate_on_voltage_v", Value: 4.5},
+				{Name: "on_resistance_ohm", Value: 0.05},
+				{Name: "max_drain_current_a", Value: 5},
+				{Name: "max_drain_source_voltage_v", Value: 30},
+				{Name: "max_gate_source_voltage_v", Value: 12},
+			},
+		},
+		Provenance: &simmodel.ModelProvenance{
+			Source: "manufacturer-datasheet:test", Revision: "rev-a", SHA256: testHash("v5-dynamic-model"), ReviewStatus: "reviewed",
+			AllowedAnalyses: []string{simmodel.AnalysisACSweep, simmodel.AnalysisElectrothermal},
+		},
+	}
 }
 
 func closedLoopTestRequirement() architecturesearch.Requirement {

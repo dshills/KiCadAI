@@ -25,14 +25,15 @@ type FragmentRealization struct {
 }
 
 type RealizationInstance struct {
-	ID                string   `json:"id"`
-	CatalogID         string   `json:"catalog_id"`
-	VariantID         string   `json:"variant_id,omitempty"`
-	Usage             string   `json:"usage"`
-	Value             string   `json:"value,omitempty"`
-	Near              string   `json:"near,omitempty"`
-	MaxDistanceMM     float64  `json:"max_distance_mm,omitempty"`
-	RequiredFunctions []string `json:"required_functions,omitempty"`
+	ID                string                 `json:"id"`
+	CatalogID         string                 `json:"catalog_id"`
+	VariantID         string                 `json:"variant_id,omitempty"`
+	Usage             string                 `json:"usage"`
+	Value             string                 `json:"value,omitempty"`
+	Parameters        []RealizationParameter `json:"parameters,omitempty"`
+	Near              string                 `json:"near,omitempty"`
+	MaxDistanceMM     float64                `json:"max_distance_mm,omitempty"`
+	RequiredFunctions []string               `json:"required_functions,omitempty"`
 }
 
 type RealizationPortBinding struct {
@@ -43,11 +44,12 @@ type RealizationPortBinding struct {
 	Function string `json:"function"`
 }
 
-// RealizationSeriesTransition places a two-terminal element in series with an
-// obligation anchor. The input is the source-facing endpoint and the output is
-// the load-facing endpoint. Lowering keeps the external anchor and every other
-// consumer on opposite sides of the element instead of shorting both endpoints
-// onto the shared semantic net.
+// RealizationSeriesTransition places a reviewed two-terminal element or
+// connected series path in an obligation anchor. The input is the
+// source-facing endpoint and the output is the load-facing endpoint. An
+// endpoint may also bind a different role at the end of the path; it may not
+// duplicate the transitioned role. Lowering keeps the external anchor and
+// every other consumer on opposite sides instead of shorting the path.
 type RealizationSeriesTransition struct {
 	Role   string              `json:"role"`
 	Lane   string              `json:"lane,omitempty"`
@@ -83,6 +85,7 @@ type RealizationRepairVariable struct {
 	ID            string                    `json:"id"`
 	Kind          string                    `json:"kind"`
 	Instance      string                    `json:"instance"`
+	Instances     []string                  `json:"instances,omitempty"`
 	Value         float64                   `json:"value"`
 	AllowedValues []float64                 `json:"allowed_values"`
 	Unit          string                    `json:"unit"`
@@ -108,6 +111,15 @@ func MarshalFragmentRealization(realization FragmentRealization) (json.RawMessag
 		instance.Near = canonicalIdentifier(instance.Near)
 		instance.MaxDistanceMM = quantize(instance.MaxDistanceMM)
 		instance.RequiredFunctions = normalizeFunctionSet(instance.RequiredFunctions)
+		for parameterIndex := range instance.Parameters {
+			parameter := &instance.Parameters[parameterIndex]
+			parameter.Name = canonicalIdentifier(parameter.Name)
+			parameter.Unit = canonicalUnit(parameter.Unit)
+			parameter.Value = quantize(parameter.Value)
+		}
+		slices.SortStableFunc(instance.Parameters, func(left, right RealizationParameter) int {
+			return strings.Compare(left.Name, right.Name)
+		})
 	}
 	for index := range realization.PortBindings {
 		binding := &realization.PortBindings[index]
@@ -165,6 +177,11 @@ func MarshalFragmentRealization(realization FragmentRealization) (json.RawMessag
 		variable.ID = canonicalIdentifier(variable.ID)
 		variable.Kind = canonicalIdentifier(variable.Kind)
 		variable.Instance = canonicalIdentifier(variable.Instance)
+		for instanceIndex := range variable.Instances {
+			variable.Instances[instanceIndex] = canonicalIdentifier(variable.Instances[instanceIndex])
+		}
+		slices.Sort(variable.Instances)
+		variable.Instances = slices.Compact(variable.Instances)
 		variable.Unit = canonicalUnit(variable.Unit)
 		variable.Value = quantize(variable.Value)
 		for valueIndex := range variable.AllowedValues {
@@ -240,6 +257,13 @@ func validateFragmentRealization(realization FragmentRealization) error {
 		if !validSemanticID(instance.ID) || instance.CatalogID == "" || !validSemanticID(instance.Usage) || instances[instance.ID] {
 			return fmt.Errorf("fragment realization instance is invalid or duplicated")
 		}
+		parameterNames := map[string]bool{}
+		for _, parameter := range instance.Parameters {
+			if !validSemanticID(parameter.Name) || parameterNames[parameter.Name] || !finiteNumbers(parameter.Value) || parameter.Unit == "" {
+				return fmt.Errorf("fragment realization instance parameter is invalid or duplicated")
+			}
+			parameterNames[parameter.Name] = true
+		}
 		instances[instance.ID] = true
 	}
 	for _, instance := range realization.Instances {
@@ -254,18 +278,19 @@ func validateFragmentRealization(realization FragmentRealization) error {
 		}
 	}
 	roles := map[string]bool{}
-	boundEndpoints := map[string]bool{}
+	boundEndpoints := map[string]string{}
 	for _, binding := range realization.PortBindings {
 		key := binding.Role + "\x00" + binding.Lane
 		endpointKey := binding.Instance + "\x00" + binding.Function
 		if !validSemanticID(binding.Role) || (binding.Lane != "" && !validSemanticID(binding.Lane)) ||
 			(binding.NetRole != "" && !validSemanticID(binding.NetRole)) ||
-			!instances[binding.Instance] || binding.Function == "" || roles[key] || boundEndpoints[endpointKey] {
+			!instances[binding.Instance] || binding.Function == "" || roles[key] || boundEndpoints[endpointKey] != "" {
 			return fmt.Errorf("fragment realization port binding is invalid or duplicated")
 		}
 		roles[key] = true
-		boundEndpoints[endpointKey] = true
+		boundEndpoints[endpointKey] = key
 	}
+	transitionEndpoints := map[string]bool{}
 	for _, transition := range realization.SeriesTransitions {
 		key := transition.Role + "\x00" + transition.Lane
 		inputKey := transition.Input.Instance + "\x00" + transition.Input.Function
@@ -273,12 +298,13 @@ func validateFragmentRealization(realization FragmentRealization) error {
 		if !validSemanticID(transition.Role) || (transition.Lane != "" && !validSemanticID(transition.Lane)) ||
 			!instances[transition.Input.Instance] || !instances[transition.Output.Instance] ||
 			transition.Input.Function == "" || transition.Output.Function == "" || inputKey == outputKey || roles[key] ||
-			boundEndpoints[inputKey] || boundEndpoints[outputKey] {
+			boundEndpoints[inputKey] == key || boundEndpoints[outputKey] == key ||
+			transitionEndpoints[inputKey] || transitionEndpoints[outputKey] {
 			return fmt.Errorf("fragment realization series transition is invalid or duplicated")
 		}
 		roles[key] = true
-		boundEndpoints[inputKey] = true
-		boundEndpoints[outputKey] = true
+		transitionEndpoints[inputKey] = true
+		transitionEndpoints[outputKey] = true
 	}
 	connectionIDs := map[string]bool{}
 	connectedEndpoints := map[string]bool{}
@@ -320,8 +346,19 @@ func validateFragmentRealization(realization FragmentRealization) error {
 	}
 	repairIDs := map[string]bool{}
 	for _, variable := range realization.RepairVariables {
-		if !validSemanticID(variable.ID) || repairIDs[variable.ID] || !validSemanticID(variable.Kind) || !instances[variable.Instance] || !finiteNumbers(variable.Value) || variable.Unit == "" || len(variable.AllowedValues) < 2 || len(variable.Effects) == 0 {
+		targets := append([]string(nil), variable.Instances...)
+		if variable.Instance != "" {
+			targets = append(targets, variable.Instance)
+		}
+		if !validSemanticID(variable.ID) || repairIDs[variable.ID] || !validSemanticID(variable.Kind) || len(targets) == 0 || !finiteNumbers(variable.Value) || variable.Unit == "" || len(variable.AllowedValues) < 2 || len(variable.Effects) == 0 {
 			return fmt.Errorf("fragment realization repair variable is invalid or duplicated")
+		}
+		targetSeen := map[string]bool{}
+		for _, target := range targets {
+			if !instances[target] || targetSeen[target] {
+				return fmt.Errorf("fragment realization repair variable target is invalid or duplicated")
+			}
+			targetSeen[target] = true
 		}
 		repairIDs[variable.ID] = true
 		found, previous := false, -1.0e300

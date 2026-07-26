@@ -1,12 +1,14 @@
 package designworkflow
 
 import (
+	"encoding/json"
 	"math"
 	"strings"
 
 	"kicadai/internal/placement"
 	"kicadai/internal/reports"
 	"kicadai/internal/routing"
+	"kicadai/internal/transactions"
 )
 
 const projectClearancePrecisionMM = 1e-6
@@ -73,25 +75,74 @@ func projectNetClassClearanceMM(routed *RoutingStageResult, placed *PlacementSta
 	return clearance
 }
 
-func projectMinimumThroughHoleDiameterMM(placed *PlacementStageResult) float64 {
-	if placed == nil {
-		return 0
-	}
+func projectMinimumThroughHoleDiameterMM(placed *PlacementStageResult, operations []transactions.Operation) float64 {
 	const kicadDefaultMinimumHoleMM = 0.3
 	minimum := kicadDefaultMinimumHoleMM
 	foundSmaller := false
-	for _, component := range placed.Request.Components {
-		for _, pad := range component.Pads {
-			if pad.DrillMM > 0 && pad.DrillMM < minimum {
-				minimum = pad.DrillMM
-				foundSmaller = true
+	if placed != nil {
+		for _, component := range placed.Request.Components {
+			for _, pad := range component.Pads {
+				if pad.DrillMM > 0 && pad.DrillMM < minimum {
+					minimum = pad.DrillMM
+					foundSmaller = true
+				}
 			}
 		}
+	}
+	_, routeDrill := minimumEmittedRouteViaDimensionsMM(operations)
+	if routeDrill > 0 && routeDrill < minimum {
+		minimum = routeDrill
+		foundSmaller = true
 	}
 	if !foundSmaller {
 		return 0
 	}
 	return math.Floor((minimum+1e-9)/projectClearancePrecisionMM) * projectClearancePrecisionMM
+}
+
+func projectMinimumViaDiameterMM(operations []transactions.Operation) float64 {
+	const kicadDefaultMinimumViaDiameterMM = 0.5
+	diameter, _ := minimumEmittedRouteViaDimensionsMM(operations)
+	if diameter <= 0 || diameter >= kicadDefaultMinimumViaDiameterMM {
+		return 0
+	}
+	return math.Floor((diameter+1e-9)/projectClearancePrecisionMM) * projectClearancePrecisionMM
+}
+
+// minimumEmittedRouteViaDimensionsMM inspects the final transaction operations,
+// rather than the router's requested defaults, because bounded endpoint-access
+// repair may select a smaller via after proving its physical clearance.
+func minimumEmittedRouteViaDimensionsMM(operations []transactions.Operation) (diameterMM float64, drillMM float64) {
+	diameterMM = math.Inf(1)
+	drillMM = math.Inf(1)
+	foundDiameter := false
+	foundDrill := false
+	for _, operation := range operations {
+		if operation.Op != transactions.OpRoute {
+			continue
+		}
+		var route transactions.RouteOperation
+		if err := json.Unmarshal(operation.Raw, &route); err != nil {
+			continue
+		}
+		for _, via := range route.Vias {
+			if via.DiameterMM > 0 && via.DiameterMM < diameterMM {
+				diameterMM = via.DiameterMM
+				foundDiameter = true
+			}
+			if via.DrillMM > 0 && via.DrillMM < drillMM {
+				drillMM = via.DrillMM
+				foundDrill = true
+			}
+		}
+	}
+	if !foundDiameter {
+		diameterMM = 0
+	}
+	if !foundDrill {
+		drillMM = 0
+	}
+	return diameterMM, drillMM
 }
 
 func minimumIntrinsicPadClearanceMM(components []placement.Component) (float64, bool) {

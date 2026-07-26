@@ -1,0 +1,669 @@
+{
+  "version": "0.1.0",
+  "records": [
+    {
+      "id": "inductor.sunlord.mwsa1206s_150mt",
+      "family": "inductor",
+      "name": "Sunlord MWSA1206S-150MT 15 uH shielded power inductor",
+      "description": "Concrete molded power inductor with conservative maximum DCR and minimum rated-current boundaries for switching-converter synthesis.",
+      "generic": false,
+      "manufacturer": "Shenzhen Sunlord Electronics",
+      "mpn": "MWSA1206S-150MT",
+      "lifecycle": "active",
+      "tags": ["15uh", "high_current", "inductor", "molded", "power", "shielded", "switching"],
+      "values": [
+        {"kind": "inductance", "typ": "15u", "unit": "H"},
+        {"kind": "dc_resistance", "max": "29", "unit": "mOhm"}
+      ],
+      "ratings": [
+        {"kind": "rms_current", "max": "7.5", "unit": "A"},
+        {"kind": "saturation_current", "max": "7.2", "unit": "A"}
+      ],
+      "tolerances": [{"kind": "inductance", "max": "20", "unit": "%"}],
+      "temperature": {"min": "-55", "max": "125", "unit": "C"},
+      "simulation_models": [{
+        "model_id": "mna_inductor_transient_be_v1",
+        "parameters": [
+          {"name": "rated_current_a", "value": 7.5},
+          {"name": "saturation_current_a", "value": 7.2},
+          {"name": "series_resistance_ohm", "value": 0.029}
+        ],
+        "uncertainties": [{
+          "target": "model_parameters.series_resistance_ohm",
+          "source": "Sunlord MWSA-S series datasheet maximum DCR",
+          "nominal": 0.029,
+          "minimum": 0.0232,
+          "maximum": 0.029
+        }]
+      }],
+      "symbols": [{
+        "symbol_id": "Device:L",
+        "function_pins": [
+          {"function": "A", "symbol_pin": "1", "required": true},
+          {"function": "B", "symbol_pin": "2", "required": true}
+        ],
+        "verification": {
+          "confidence": "verified",
+          "sources": ["https://www.sunlordinc.com/uploads/files/20230303/MWSA-S%C2%A0series%C2%A0of%C2%A0SMD%C2%A0Power%C2%A0Inductor.pdf", "builtin_pinmap:Device:L"],
+          "pinmap_checked": true
+        }
+      }],
+      "packages": [{
+        "id": "mwsa1206s_150",
+        "name": "MWSA1206S-150 molded SMD",
+        "footprint_id": "Inductor_SMD:L_Sunlord_MWSA1206S-150",
+        "package_type": "mwsa1206s",
+        "mpn": "MWSA1206S-150MT",
+        "lifecycle": "active",
+        "pinmap_id": "Device:L|Inductor_SMD:L_Sunlord_MWSA1206S-150",
+        "pad_functions": [
+          {"function": "A", "pad": "1"},
+          {"function": "B", "pad": "2"}
+        ],
+        "dimensions_mm": {"width": 13.45, "height": 12.6},
+        "height_mm": 5.8,
+        "verification": {
+          "confidence": "verified",
+          "sources": ["https://www.sunlordinc.com/uploads/files/20230303/MWSA-S%C2%A0series%C2%A0of%C2%A0SMD%C2%A0Power%C2%A0Inductor.pdf", "kicad-footprint:Inductor_SMD:L_Sunlord_MWSA1206S-150"],
+          "pinmap_checked": true
+        }
+      }],
+      "routing_hints": [{"kind": "net_class", "net_role": "switching_current", "value": "power_switching", "unit": "class", "description": "Use the calculated converter-current net class and minimize the high-di/dt loop."}],
+      "verification": {
+        "confidence": "verified",
+        "sources": ["https://www.sunlordinc.com/uploads/files/20230303/MWSA-S%C2%A0series%C2%A0of%C2%A0SMD%C2%A0Power%C2%A0Inductor.pdf", "kicad-pinmap:Device:L|Inductor_SMD:L_Sunlord_MWSA1206S-150"],
+        "resolver_checked": true,
+        "pinmap_checked": true,
+        "tests": ["catalog_dynamic_power_inductor_models"]
+      }
+    },
+    {
+      "id": "inductor.sunlord.mwsa1206s_220mt",
+      "family": "inductor",
+      "name": "Sunlord MWSA1206S-220MT 22 uH shielded power inductor",
+      "description": "Concrete molded power inductor with conservative maximum DCR and minimum rated-current boundaries for switching-converter synthesis.",
+      "generic": false,
+      "manufacturer": "Shenzhen Sunlord Electronics",
+      "mpn": "MWSA1206S-220MT",
+      "lifecycle": "active",
+      "tags": ["22uh", "high_current", "inductor", "molded", "power", "shielded", "switching"],
+      "values": [
+        {"kind": "inductance", "typ": "22u", "unit": "H"},
+        {"kind": "dc_resistance", "max": "39.5", "unit": "mOhm"}
+      ],
+      "ratings": [
+        {"kind": "rms_current", "max": "6", "unit": "A"},
+        {"kind": "saturation_current", "max": "6", "unit": "A"}
+      ],
+      "tolerances": [{"kind": "inductance", "max": "20", "unit": "%"}],
+      "temperature": {"min": "-55", "max": "125", "unit": "C"},
+      "simulation_models": [{
+        "model_id": "mna_inductor_transient_be_v1",
+        "parameters": [
+          {"name": "rated_current_a", "value": 6},
+          {"name": "saturation_current_a", "value": 6},
+          {"name": "series_resistance_ohm", "value": 0.0395}
+        ],
+        "uncertainties": [{
+          "target": "model_parameters.series_resistance_ohm",
+          "source": "Sunlord MWSA-S series datasheet maximum DCR",
+          "nominal": 0.0395,
+          "minimum": 0.0316,
+          "maximum": 0.0395
+        }]
+      }],
+      "symbols": [{
+        "symbol_id": "Device:L",
+        "function_pins": [
+          {"function": "A", "symbol_pin": "1", "required": true},
+          {"function": "B", "symbol_pin": "2", "required": true}
+        ],
+        "verification": {
+          "confidence": "verified",
+          "sources": ["https://www.sunlordinc.com/uploads/files/20230303/MWSA-S%C2%A0series%C2%A0of%C2%A0SMD%C2%A0Power%C2%A0Inductor.pdf", "builtin_pinmap:Device:L"],
+          "pinmap_checked": true
+        }
+      }],
+      "packages": [{
+        "id": "mwsa1206s_220",
+        "name": "MWSA1206S-220 molded SMD",
+        "footprint_id": "Inductor_SMD:L_Sunlord_MWSA1206S-220",
+        "package_type": "mwsa1206s",
+        "mpn": "MWSA1206S-220MT",
+        "lifecycle": "active",
+        "pinmap_id": "Device:L|Inductor_SMD:L_Sunlord_MWSA1206S-220",
+        "pad_functions": [
+          {"function": "A", "pad": "1"},
+          {"function": "B", "pad": "2"}
+        ],
+        "dimensions_mm": {"width": 13.45, "height": 12.6},
+        "height_mm": 5.8,
+        "verification": {
+          "confidence": "verified",
+          "sources": ["https://www.sunlordinc.com/uploads/files/20230303/MWSA-S%C2%A0series%C2%A0of%C2%A0SMD%C2%A0Power%C2%A0Inductor.pdf", "kicad-footprint:Inductor_SMD:L_Sunlord_MWSA1206S-220"],
+          "pinmap_checked": true
+        }
+      }],
+      "routing_hints": [{"kind": "net_class", "net_role": "switching_current", "value": "power_switching", "unit": "class", "description": "Use the calculated converter-current net class and minimize the high-di/dt loop."}],
+      "verification": {
+        "confidence": "verified",
+        "sources": ["https://www.sunlordinc.com/uploads/files/20230303/MWSA-S%C2%A0series%C2%A0of%C2%A0SMD%C2%A0Power%C2%A0Inductor.pdf", "kicad-pinmap:Device:L|Inductor_SMD:L_Sunlord_MWSA1206S-220"],
+        "resolver_checked": true,
+        "pinmap_checked": true,
+        "tests": ["catalog_dynamic_power_inductor_models"]
+      }
+    },
+    {
+      "id": "regulator.analog_devices.lt8610mse.msop16",
+      "family": "regulator",
+      "name": "Analog Devices LT8610MSE 42 V 2.5 A micropower synchronous buck regulator",
+      "description": "Concrete wide-input micropower synchronous step-down regulator with reviewed low-load efficiency, current-mode control, integrated power switches, soft start, current limiting, and package thermal evidence.",
+      "generic": false,
+      "manufacturer": "Analog Devices",
+      "mpn": "LT8610IMSE#PBF",
+      "lifecycle": "active",
+      "tags": ["buck", "current_mode", "high_efficiency", "high_voltage", "integrated_switches", "micropower", "power", "synchronous", "switching"],
+      "values": [
+        {"kind": "feedback_reference_voltage", "typ": "0.97", "unit": "V"},
+        {"kind": "switching_frequency", "min": "200", "typ": "500", "max": "2200", "unit": "kHz"}
+      ],
+      "ratings": [
+        {"kind": "input_voltage", "min": "3.4", "max": "42", "unit": "V"},
+        {"kind": "output_current", "max": "2.5", "unit": "A"},
+        {"kind": "enable_voltage", "max": "42", "unit": "V"},
+        {"kind": "junction_temperature", "max": "125", "unit": "C"}
+      ],
+      "temperature": {"min": "-40", "max": "125", "unit": "C"},
+      "simulation_models": [{
+        "model_id": "mna_synchronous_buck_current_mode_v1",
+        "parameters": [
+          {"name": "reference_voltage_v", "value": 0.97},
+          {"name": "control_transconductance_s", "value": 200},
+          {"name": "control_pole_hz", "value": 150000},
+          {"name": "nominal_input_voltage_v", "value": 24},
+          {"name": "nominal_output_voltage_v", "value": 5},
+          {"name": "min_input_voltage_v", "value": 3.4},
+          {"name": "max_input_voltage_v", "value": 42},
+          {"name": "max_output_current_a", "value": 2.5},
+          {"name": "peak_current_limit_a", "value": 3.5},
+          {"name": "conversion_efficiency_fraction", "value": 0.9},
+          {"name": "quiescent_current_a", "value": 0.00035},
+          {"name": "soft_start_time_s", "value": 0.0063},
+          {"name": "switching_frequency_hz", "value": 500000},
+          {"name": "high_side_on_resistance_ohm", "value": 0.12},
+          {"name": "low_side_on_resistance_ohm", "value": 0.065},
+          {"name": "switch_transition_time_s", "value": 5e-8},
+          {"name": "enable_threshold_v", "value": 1},
+          {"name": "max_temperature_c", "value": 125},
+          {"name": "junction_to_ambient_c_per_w", "value": 40}
+        ],
+        "uncertainties": [
+          {
+            "target": "model_parameters.conversion_efficiency_fraction",
+            "source": "conservative lower boundary derived from Analog Devices LT8610 Rev. D 5 V efficiency curves G01 and G03 at 700 kHz, with additional margin for the declared 18 V to 30 V and 0.05 A to 2 A envelope",
+            "nominal": 0.9,
+            "minimum": 0.84,
+            "maximum": 0.96
+          },
+          {
+            "target": "model_parameters.reference_voltage_v",
+            "source": "Analog Devices LT8610 Rev. D feedback-reference limits over the full operating temperature range",
+            "nominal": 0.97,
+            "minimum": 0.958,
+            "maximum": 0.982
+          }
+        ],
+        "thermal_model": {
+          "reference": "junction_to_ambient",
+          "boundary_assumption": "Analog Devices LT8610 MSE package junction-to-ambient boundary with the exposed pad soldered to the PCB; the two-stage Foster split is a conservative deterministic approximation whose resistances sum to the reviewed 40 C/W boundary.",
+          "stages": [
+            {"thermal_resistance_c_per_w": 10, "thermal_capacitance_j_per_c": 0.005, "cooling_coupling": "fixed"},
+            {"thermal_resistance_c_per_w": 30, "thermal_capacitance_j_per_c": 0.05, "cooling_coupling": "ambient_cooling"}
+          ]
+        },
+        "transient_soa": [
+          {
+            "pulse_duration_s": 0.02,
+            "case_temperature_c": 85,
+            "points": [
+              {"voltage_v": 3.4, "current_a": 4.25},
+              {"voltage_v": 24, "current_a": 4.25},
+              {"voltage_v": 42, "current_a": 4.25}
+            ]
+          },
+          {
+            "dc": true,
+            "case_temperature_c": 85,
+            "points": [
+              {"voltage_v": 3.4, "current_a": 2.5},
+              {"voltage_v": 24, "current_a": 2.5},
+              {"voltage_v": 42, "current_a": 2.5}
+            ]
+          }
+        ]
+      }],
+      "regulator_evidence": {
+        "startup_time": {"value": 0.0063, "unit": "s", "conditions": "bounded external soft-start programming used by the trusted averaged model"},
+        "soft_start_status": "proven",
+        "startup_monotonic_status": "proven",
+        "maximum_inrush_current": {"value": 3.5, "unit": "A", "conditions": "bounded by the reviewed minimum peak-current limit"},
+        "quiescent_current": {"value": 0.00035, "unit": "A", "conditions": "datasheet maximum input current in regulation at a 1 mA load; empirical efficiency evidence owns the complete conversion-loss boundary"},
+        "efficiency": {"minimum": 84, "typical": 90, "unit": "%", "conditions": "conservative reviewed boundary for 18 V to 30 V input, 5 V output, and 0.05 A to 2 A load"},
+        "thermal_review": "proven",
+        "fabrication_candidate_blocks": false,
+        "notes": [
+          "Analog Devices specifies the LT8610 as an active 3.4 V to 42 V, 2.5 A synchronous buck regulator with 200 kHz to 2.2 MHz operation, internal compensation, current limiting, soft start, and thermal protection.",
+          "The reviewed efficiency interval is bounded below the manufacturer 5 V curves and includes margin for the declared input and load envelope; architecture selection uses the lower bound rather than nominal efficiency.",
+          "The 20 ms pulse boundary is held below the 4.8 A typical top-switch current limit while the control clamp uses the 3.5 A guaranteed minimum limit.",
+          "The averaged current-mode primitive preserves the external inductor, output capacitor, load, feedback divider, and transient thermal boundary."
+        ]
+      },
+      "symbols": [{
+        "symbol_id": "Regulator_Switching:LT8610",
+        "function_pins": [
+          {"function": "SYNC_MODE", "symbol_pin": "1", "electrical": "input", "required": true},
+          {"function": "SS_TRK", "symbol_pin": "2", "electrical": "input", "required": true},
+          {"function": "RT", "symbol_pin": "3", "electrical": "passive", "required": true},
+          {"function": "EN", "symbol_pin": "4", "electrical": "input", "required": true},
+          {"function": "PVIN", "symbol_pin": "5", "electrical": "power_in", "required": true},
+          {"function": "PVIN_AUX", "symbol_pin": "6", "electrical": "passive", "required": true},
+          {"function": "PGND", "symbol_pin": "7", "electrical": "power_in", "required": true},
+          {"function": "PGND_AUX", "symbol_pin": "8", "electrical": "passive", "required": true},
+          {"function": "SW", "symbol_pin": "9", "electrical": "power_out", "required": true},
+          {"function": "SW_AUX1", "symbol_pin": "10", "electrical": "passive", "required": true},
+          {"function": "SW_AUX2", "symbol_pin": "11", "electrical": "passive", "required": true},
+          {"function": "BOOT", "symbol_pin": "12", "electrical": "input", "required": true},
+          {"function": "VCC", "symbol_pin": "13", "electrical": "power_out", "required": true},
+          {"function": "BIAS", "symbol_pin": "14", "electrical": "power_in", "required": true},
+          {"function": "PGOOD", "symbol_pin": "15", "electrical": "open_collector", "required": true},
+          {"function": "FB", "symbol_pin": "16", "electrical": "input", "required": true},
+          {"function": "AGND", "symbol_pin": "17", "electrical": "passive", "required": true}
+        ],
+        "verification": {
+          "confidence": "verified",
+          "sources": ["https://www.analog.com/media/en/technical-documentation/data-sheets/lt8610.pdf", "kicad-symbols:Regulator_Switching:LT8610"],
+          "pinmap_checked": true
+        }
+      }],
+      "packages": [{
+        "id": "mse_msop16_thermal_vias",
+        "name": "Analog Devices MSE 16-lead MSOP exposed pad with thermal vias",
+        "footprint_id": "Package_SO:MSOP-16-1EP_3x4.039mm_P0.5mm_EP1.651x2.845mm_ThermalVias",
+        "package_type": "msop16_mse",
+        "mpn": "LT8610IMSE#PBF",
+        "lifecycle": "active",
+        "pinmap_id": "Regulator_Switching:LT8610|Package_SO:MSOP-16-1EP_3x4.039mm_P0.5mm_EP1.651x2.845mm_ThermalVias",
+        "pad_functions": [
+          {"function": "SYNC_MODE", "pad": "1"},
+          {"function": "SS_TRK", "pad": "2"},
+          {"function": "RT", "pad": "3"},
+          {"function": "EN", "pad": "4"},
+          {"function": "PVIN", "pad": "5"},
+          {"function": "PVIN_AUX", "pad": "6"},
+          {"function": "PGND", "pad": "7"},
+          {"function": "PGND_AUX", "pad": "8"},
+          {"function": "SW", "pad": "9"},
+          {"function": "SW_AUX1", "pad": "10"},
+          {"function": "SW_AUX2", "pad": "11"},
+          {"function": "BOOT", "pad": "12"},
+          {"function": "VCC", "pad": "13"},
+          {"function": "BIAS", "pad": "14"},
+          {"function": "PGOOD", "pad": "15"},
+          {"function": "FB", "pad": "16"},
+          {"function": "AGND", "pad": "17"}
+        ],
+        "dimensions_mm": {"width": 6.26, "height": 4.54},
+        "height_mm": 1.1,
+        "verification": {
+          "confidence": "verified",
+          "sources": ["https://www.analog.com/media/en/technical-documentation/data-sheets/lt8610.pdf", "kicad-footprint:Package_SO:MSOP-16-1EP_3x4.039mm_P0.5mm_EP1.651x2.845mm_ThermalVias"],
+          "pinmap_checked": true
+        }
+      }],
+      "placement_hints": [
+        {"kind": "near", "target": "buck_input_bypass", "value": "2", "unit": "mm"},
+        {"kind": "near", "target": "buck_bootstrap", "value": "2", "unit": "mm"},
+        {"kind": "near", "target": "buck_inductor", "value": "4", "unit": "mm"}
+      ],
+      "routing_hints": [
+        {"kind": "short_loop", "net_role": "switching_current", "description": "Minimize the VIN-switch-PGND high-di/dt loop and keep SW copper away from FB."},
+        {"kind": "kelvin", "net_role": "feedback", "description": "Route FB from the output-capacitor positive terminal with a quiet exposed-pad ground return."}
+      ],
+      "verification": {
+        "confidence": "verified",
+        "sources": [
+          "https://www.analog.com/media/en/technical-documentation/data-sheets/lt8610.pdf",
+          "https://www.analog.com/en/products/lt8610.html",
+          "kicad-pinmap:Regulator_Switching:LT8610|Package_SO:MSOP-16-1EP_3x4.039mm_P0.5mm_EP1.651x2.845mm_ThermalVias"
+        ],
+        "resolver_checked": true,
+        "pinmap_checked": true,
+        "tests": ["catalog_dynamic_power_synchronous_buck_model"]
+      }
+    },
+    {
+      "id": "regulator.ti.lm76002rnp.wqfn30",
+      "family": "regulator",
+      "name": "Texas Instruments LM76002RNPR 60 V 2.5 A synchronous buck regulator",
+      "description": "Concrete wide-input synchronous step-down regulator with reviewed current-mode control, integrated power switches, soft start, current limiting, hiccup short protection, and package thermal evidence.",
+      "generic": false,
+      "manufacturer": "Texas Instruments",
+      "mpn": "LM76002RNPR",
+      "lifecycle": "active",
+      "tags": ["buck", "current_mode", "high_voltage", "integrated_switches", "power", "synchronous", "switching"],
+      "values": [
+        {"kind": "feedback_reference_voltage", "typ": "1", "unit": "V"},
+        {"kind": "switching_frequency", "min": "300", "typ": "500", "max": "2200", "unit": "kHz"}
+      ],
+      "ratings": [
+        {"kind": "input_voltage", "min": "3.5", "max": "60", "unit": "V"},
+        {"kind": "output_current", "max": "2.5", "unit": "A"},
+        {"kind": "enable_voltage", "max": "60", "unit": "V"},
+        {"kind": "junction_temperature", "max": "150", "unit": "C"}
+      ],
+      "temperature": {"min": "-40", "max": "125", "unit": "C"},
+      "simulation_models": [{
+        "model_id": "mna_synchronous_buck_current_mode_v1",
+        "parameters": [
+          {"name": "reference_voltage_v", "value": 1},
+          {"name": "control_transconductance_s", "value": 200},
+          {"name": "control_pole_hz", "value": 150000},
+          {"name": "nominal_input_voltage_v", "value": 24},
+          {"name": "nominal_output_voltage_v", "value": 5},
+          {"name": "min_input_voltage_v", "value": 3.5},
+          {"name": "max_input_voltage_v", "value": 60},
+          {"name": "max_output_current_a", "value": 2.5},
+          {"name": "peak_current_limit_a", "value": 3.4},
+          {"name": "conversion_efficiency_fraction", "value": 0.86},
+          {"name": "quiescent_current_a", "value": 0.0007},
+          {"name": "soft_start_time_s", "value": 0.0063},
+          {"name": "switching_frequency_hz", "value": 500000},
+          {"name": "high_side_on_resistance_ohm", "value": 0.17},
+          {"name": "low_side_on_resistance_ohm", "value": 0.08},
+          {"name": "switch_transition_time_s", "value": 2e-8},
+          {"name": "enable_threshold_v", "value": 1.2},
+          {"name": "max_temperature_c", "value": 150},
+          {"name": "junction_to_ambient_c_per_w", "value": 31.7}
+        ],
+        "uncertainties": [
+          {"target": "model_parameters.conversion_efficiency_fraction", "source": "conservative lower boundary below TI LM76002 24 V to 5 V efficiency curves at the declared load envelope", "nominal": 0.86, "minimum": 0.82, "maximum": 0.9},
+          {"target": "model_parameters.reference_voltage_v", "source": "TI LM76002 datasheet feedback-reference accuracy over temperature", "nominal": 1, "minimum": 0.99, "maximum": 1.01}
+        ],
+        "thermal_model": {
+          "reference": "junction_to_ambient",
+          "boundary_assumption": "TI LM76002 RNP package junction-to-ambient boundary with the datasheet thermal-via layout; the two-stage Foster split is a conservative deterministic approximation whose resistances sum to the reviewed 31.7 C/W boundary.",
+          "stages": [
+            {"thermal_resistance_c_per_w": 2, "thermal_capacitance_j_per_c": 0.005, "cooling_coupling": "fixed"},
+            {"thermal_resistance_c_per_w": 29.7, "thermal_capacitance_j_per_c": 0.05, "cooling_coupling": "ambient_cooling"}
+          ]
+        },
+        "transient_soa": [
+          {
+            "pulse_duration_s": 0.02,
+            "case_temperature_c": 85,
+            "points": [
+              {"voltage_v": 3.5, "current_a": 4.25},
+              {"voltage_v": 30, "current_a": 4.25},
+              {"voltage_v": 60, "current_a": 4.25}
+            ]
+          },
+          {
+            "dc": true,
+            "case_temperature_c": 85,
+            "points": [
+              {"voltage_v": 3.5, "current_a": 2.5},
+              {"voltage_v": 30, "current_a": 2.5},
+              {"voltage_v": 60, "current_a": 2.5}
+            ]
+          }
+        ]
+      }],
+      "regulator_evidence": {
+        "startup_time": {"value": 0.0063, "unit": "s", "conditions": "internal default soft-start setting"},
+        "soft_start_status": "proven",
+        "startup_monotonic_status": "proven",
+        "maximum_inrush_current": {"value": 3.4, "unit": "A", "conditions": "bounded by the reviewed peak-current limit"},
+        "quiescent_current": {"value": 0.0007, "unit": "A", "conditions": "conservative operating-current boundary used by the trusted loss model"},
+        "efficiency": {"minimum": 82, "typical": 86, "unit": "%", "conditions": "18 V to 30 V input, 5 V output, and 0.05 A to 2 A load envelope"},
+        "thermal_review": "proven",
+        "fabrication_candidate_blocks": false,
+        "notes": [
+          "TI LM76002 is an active 3.5 V to 60 V, 2.5 A synchronous buck regulator with 300 kHz to 2.2 MHz operation, peak current-mode control, integrated soft start, current limiting, hiccup short protection, and thermal shutdown.",
+          "The trusted stress envelope uses the reviewed 2.5 A continuous output boundary and a conservative 20 ms pulse boundary below the device current-limit range.",
+          "The averaged current-mode primitive preserves the external inductor, output capacitor, load, and feedback divider and is not a linear-regulator substitute."
+        ]
+      },
+      "symbols": [{
+        "symbol_id": "Regulator_Switching:LM76002",
+        "function_pins": [
+          {"function": "SW", "symbol_pin": "1", "electrical": "power_out", "required": true},
+          {"function": "BOOT", "symbol_pin": "6", "electrical": "input", "required": true},
+          {"function": "VCC", "symbol_pin": "8", "electrical": "power_out", "required": true},
+          {"function": "BIAS", "symbol_pin": "9", "electrical": "power_in", "required": true},
+          {"function": "RT", "symbol_pin": "10", "electrical": "input", "required": true},
+          {"function": "SS_TRK", "symbol_pin": "11", "electrical": "input", "required": true},
+          {"function": "FB", "symbol_pin": "12", "electrical": "input", "required": true},
+          {"function": "AGND", "symbol_pin": "13", "electrical": "power_in", "required": true},
+          {"function": "PGOOD", "symbol_pin": "16", "electrical": "open_collector", "required": true},
+          {"function": "SYNC_MODE", "symbol_pin": "17", "electrical": "input", "required": true},
+          {"function": "EN", "symbol_pin": "18", "electrical": "input", "required": true},
+          {"function": "NC_GND_19", "symbol_pin": "19", "electrical": "passive", "required": true},
+          {"function": "PVIN", "symbol_pin": "20", "electrical": "power_in", "required": true},
+          {"function": "PGND", "symbol_pin": "24", "electrical": "power_in", "required": true},
+          {"function": "NC_GND_27", "symbol_pin": "27", "electrical": "passive", "required": true},
+          {"function": "NC_GND_28", "symbol_pin": "28", "electrical": "passive", "required": true},
+          {"function": "NC_GND_29", "symbol_pin": "29", "electrical": "passive", "required": true},
+          {"function": "NC_GND_30", "symbol_pin": "30", "electrical": "passive", "required": true}
+        ],
+        "verification": {
+          "confidence": "verified",
+          "sources": ["https://www.ti.com/lit/ds/symlink/lm76002.pdf", "kicad-symbols:Regulator_Switching:LM76002"],
+          "pinmap_checked": true
+        }
+      }],
+      "packages": [{
+        "id": "rnp_wqfn30_thermal_vias",
+        "name": "TI RNP0030B WQFN-30 exposed pad with thermal vias",
+        "footprint_id": "Package_DFN_QFN:Texas_RNP0030B_WQFN-30-1EP_4x6mm_P0.5mm_EP1.8x4.5mm_ThermalVias",
+        "package_type": "wqfn30_rnp",
+        "mpn": "LM76002RNPR",
+        "lifecycle": "active",
+        "pinmap_id": "Regulator_Switching:LM76002|Package_DFN_QFN:Texas_RNP0030B_WQFN-30-1EP_4x6mm_P0.5mm_EP1.8x4.5mm_ThermalVias",
+        "pad_functions": [
+          {"function": "SW", "pad": "1"}, {"function": "SW", "pad": "2"}, {"function": "SW", "pad": "3"}, {"function": "SW", "pad": "4"}, {"function": "SW", "pad": "5"},
+          {"function": "BOOT", "pad": "6"}, {"function": "VCC", "pad": "8"}, {"function": "BIAS", "pad": "9"},
+          {"function": "RT", "pad": "10"}, {"function": "SS_TRK", "pad": "11"}, {"function": "FB", "pad": "12"},
+          {"function": "AGND", "pad": "13"}, {"function": "AGND", "pad": "14"}, {"function": "AGND", "pad": "15"},
+          {"function": "PGOOD", "pad": "16"}, {"function": "SYNC_MODE", "pad": "17"}, {"function": "EN", "pad": "18"},
+          {"function": "NC_GND_19", "pad": "19"},
+          {"function": "PVIN", "pad": "20"}, {"function": "PVIN", "pad": "21"}, {"function": "PVIN", "pad": "22"},
+          {"function": "PGND", "pad": "24"}, {"function": "PGND", "pad": "25"}, {"function": "PGND", "pad": "26"},
+          {"function": "NC_GND_27", "pad": "27"}, {"function": "NC_GND_28", "pad": "28"}, {"function": "NC_GND_29", "pad": "29"}, {"function": "NC_GND_30", "pad": "30"},
+          {"function": "AGND", "pad": "31"}
+        ],
+        "dimensions_mm": {"width": 4, "height": 6},
+        "height_mm": 1,
+        "verification": {
+          "confidence": "verified",
+          "sources": ["https://www.ti.com/lit/ds/symlink/lm76002.pdf", "kicad-footprint:Package_DFN_QFN:Texas_RNP0030B_WQFN-30-1EP_4x6mm_P0.5mm_EP1.8x4.5mm_ThermalVias"],
+          "pinmap_checked": true
+        }
+      }],
+      "placement_hints": [
+        {"kind": "near", "target": "buck_input_bypass", "value": "2", "unit": "mm"},
+        {"kind": "near", "target": "buck_bootstrap", "value": "2", "unit": "mm"},
+        {"kind": "near", "target": "buck_inductor", "value": "4", "unit": "mm"}
+      ],
+      "routing_hints": [
+        {"kind": "short_loop", "net_role": "switching_current", "description": "Minimize the PVIN-switch-PGND high-di/dt loop and keep SW copper away from FB."},
+        {"kind": "kelvin", "net_role": "feedback", "description": "Route FB from the output-capacitor positive terminal with a quiet AGND return."}
+      ],
+      "verification": {
+        "confidence": "verified",
+        "sources": [
+          "https://www.ti.com/lit/ds/symlink/lm76002.pdf",
+          "https://www.ti.com/product/LM76002",
+          "kicad-pinmap:Regulator_Switching:LM76002|Package_DFN_QFN:Texas_RNP0030B_WQFN-30-1EP_4x6mm_P0.5mm_EP1.8x4.5mm_ThermalVias"
+        ],
+        "resolver_checked": true,
+        "pinmap_checked": true,
+        "tests": ["catalog_dynamic_power_synchronous_buck_model"]
+      }
+    },
+    {
+      "id": "capacitor.panasonic.eeufr1a682l.radial",
+      "family": "capacitor",
+      "name": "Panasonic EEUFR1A682L 6800 uF 10 V low-ESR capacitor",
+      "description": "Concrete polarized FR-series aluminum electrolytic with reviewed effective capacitance, impedance, ripple-current, and endurance evidence for transient rail-energy storage.",
+      "generic": false,
+      "manufacturer": "Panasonic",
+      "mpn": "EEUFR1A682L",
+      "lifecycle": "active",
+      "tags": ["bulk", "electrolytic", "energy_storage", "hold_up", "low_esr", "polarized", "radial", "through_hole"],
+      "values": [{"kind": "capacitance", "typ": "6800u", "unit": "F"}],
+      "ratings": [
+        {"kind": "voltage", "max": "10", "unit": "V"},
+        {"kind": "ripple_current", "max": "3.75", "unit": "A"}
+      ],
+      "tolerances": [{"kind": "capacitance", "typ": "20", "unit": "%"}],
+      "temperature": {"min": "-40", "max": "105", "unit": "C"},
+      "simulation_models": [
+        {"model_id": "mna_capacitor_v1"},
+        {"model_id": "mna_capacitor_transient_be_v1", "parameters": [{"name": "max_voltage_v", "value": 10}]}
+      ],
+      "capacitor_evidence": {
+        "dielectric": "aluminum electrolytic",
+        "nominal_capacitance": "6800u",
+        "capacitance_unit": "F",
+        "voltage_rating": "10",
+        "voltage_unit": "V",
+        "dc_bias_review": "not_applicable",
+        "effective_capacitance_review": "proven",
+        "esr_review": "proven",
+        "technology": "low-ESR aluminum electrolytic",
+        "polarity": "polarized",
+        "capacitance_tolerance_percent": 20,
+        "esr": {"value": 0.012, "unit": "ohm", "frequency_hz": 100000, "temperature_c": 20, "conditions": "manufacturer maximum impedance used as a conservative ESR bound"},
+        "ripple_current": {"value": 3.75, "unit": "A_rms", "frequency_hz": 100000, "temperature_c": 105, "conditions": "manufacturer rated ripple current"},
+        "endurance_hours": 10000,
+        "endurance_temperature_c": 105,
+        "fabrication_proof": true,
+        "fabrication_candidate_blocks": false,
+        "review_note": "Panasonic EEUFR1A682L product and FR-series data prove capacitance, tolerance, voltage, maximum impedance, ripple current, temperature, dimensions, polarity, and endurance. Circuit validation must enforce applied voltage, current, temperature, and stored-energy margins."
+      },
+      "symbols": [{
+        "symbol_id": "Device:C_Polarized",
+        "function_pins": [
+          {"function": "POSITIVE", "symbol_pin": "1", "polarity": "positive", "required": true, "aliases": ["A", "+"]},
+          {"function": "NEGATIVE", "symbol_pin": "2", "polarity": "negative", "required": true, "aliases": ["B", "-"]}
+        ],
+        "verification": {
+          "confidence": "verified",
+          "sources": ["https://na.industrial.panasonic.com/products/capacitors/aluminum-electrolytic-capacitors/aluminum-electrolytic-capacitors-radial-lead-type/series/83367/model/83639", "builtin_pinmap:Device:C_Polarized"],
+          "pinmap_checked": true
+        }
+      }],
+      "packages": [{
+        "id": "radial_d12_5_p5",
+        "name": "Radial D12.5 mm P5.0 mm",
+        "footprint_id": "Capacitor_THT:CP_Radial_D12.5mm_P5.00mm",
+        "package_type": "radial_electrolytic",
+        "mpn": "EEUFR1A682L",
+        "lifecycle": "active",
+        "pinmap_id": "Device:C_Polarized|Capacitor_THT:CP_Radial_D12.5mm_P5.00mm",
+        "pad_functions": [
+          {"function": "POSITIVE", "pad": "1", "polarity": "positive", "aliases": ["A", "+"]},
+          {"function": "NEGATIVE", "pad": "2", "polarity": "negative", "aliases": ["B", "-"]}
+        ],
+        "dimensions_mm": {"width": 12.5, "height": 12.5},
+        "height_mm": 35,
+        "verification": {
+          "confidence": "verified",
+          "sources": ["https://na.industrial.panasonic.com/products/capacitors/aluminum-electrolytic-capacitors/aluminum-electrolytic-capacitors-radial-lead-type/series/83367/model/83639", "kicad-footprint:Capacitor_THT:CP_Radial_D12.5mm_P5.00mm"],
+          "pinmap_checked": true
+        }
+      }],
+      "placement_hints": [{"kind": "near", "target": "protected_rail_load", "value": "10", "unit": "mm", "description": "Keep the hold-up capacitor discharge loop short and place it downstream of the controlled rail source."}],
+      "routing_hints": [{"kind": "net_class", "net_role": "power", "value": "power", "unit": "class", "description": "Use the calculated rail-current net class for both capacitor terminals."}],
+      "verification": {
+        "confidence": "verified",
+        "sources": [
+          "https://na.industrial.panasonic.com/products/capacitors/aluminum-electrolytic-capacitors/aluminum-electrolytic-capacitors-radial-lead-type/series/83367/model/83639",
+          "https://industrial.panasonic.com/content/data/CP/PDF/S_Alm_A_cap_catalog_am.pdf",
+          "kicad-pinmap:Device:C_Polarized|Capacitor_THT:CP_Radial_D12.5mm_P5.00mm"
+        ],
+        "resolver_checked": true,
+        "pinmap_checked": true,
+        "tests": ["catalog_dynamic_power_hold_up_capacitor"]
+      }
+    },
+    {
+      "id": "protection.littelfuse.smcj33ca.smc",
+      "family": "protection",
+      "name": "Littelfuse SMCJ33CA 33 V bidirectional TVS diode",
+      "description": "Concrete 1500 W bidirectional TVS diode for protected power nodes whose valid operating envelope remains within 33 V.",
+      "generic": false,
+      "manufacturer": "Littelfuse",
+      "mpn": "SMCJ33CA",
+      "lifecycle": "active",
+      "tags": ["bidirectional", "esd", "power", "protection", "tvs", "33v", "smc"],
+      "ratings": [
+        {"kind": "working_voltage", "max": "33", "unit": "V"},
+        {"kind": "pulse_current", "max": "28.2", "unit": "A"},
+        {"kind": "pulse_power", "max": "1500", "unit": "W"}
+      ],
+      "temperature": {"min": "-65", "max": "150", "unit": "C"},
+      "simulation_models": [{
+        "model_id": "mna_bidirectional_tvs_piecewise_linear_v1",
+        "parameters": [
+          {"name": "breakdown_voltage_v", "value": 36.7},
+          {"name": "dynamic_resistance_ohm", "value": 0.5886524822695035},
+          {"name": "junction_capacitance_f", "value": 1e-9},
+          {"name": "max_pulse_current_a", "value": 28.2},
+          {"name": "off_resistance_ohm", "value": 33000000}
+        ]
+      }],
+      "symbols": [{
+        "symbol_id": "Device:D_TVS",
+        "function_pins": [
+          {"function": "CATHODE", "symbol_pin": "1", "polarity": "negative", "required": true, "aliases": ["K", "LINE"]},
+          {"function": "ANODE", "symbol_pin": "2", "polarity": "positive", "required": true, "aliases": ["A", "RETURN"]}
+        ],
+        "verification": {
+          "confidence": "verified",
+          "sources": ["https://www.littelfuse.com/products/overvoltage-protection/tvs-diodes/surface-mount/smcj/smcj33ca", "kicad-symbols:Device:D_TVS"],
+          "pinmap_checked": true
+        }
+      }],
+      "packages": [{
+        "id": "smc_do_214ab",
+        "name": "DO-214AB (SMC)",
+        "footprint_id": "Diode_SMD:D_SMC",
+        "package_type": "smc_do_214ab",
+        "mpn": "SMCJ33CA",
+        "lifecycle": "active",
+        "pinmap_id": "Device:D_TVS|Diode_SMD:D_SMC",
+        "pad_functions": [
+          {"function": "CATHODE", "pad": "1", "polarity": "negative", "aliases": ["K", "LINE"]},
+          {"function": "ANODE", "pad": "2", "polarity": "positive", "aliases": ["A", "RETURN"]}
+        ],
+        "verification": {
+          "confidence": "verified",
+          "sources": ["https://www.littelfuse.com/products/overvoltage-protection/tvs-diodes/surface-mount/smcj/smcj33ca", "kicad-footprint:Diode_SMD:D_SMC"],
+          "pinmap_checked": true
+        }
+      }],
+      "verification": {
+        "confidence": "verified",
+        "sources": [
+          "https://www.littelfuse.com/products/overvoltage-protection/tvs-diodes/surface-mount/smcj/smcj33ca",
+          "https://www.littelfuse.com/assetdocs/tvs-diodes-smcj-series-datasheet",
+          "kicad-pinmap:Device:D_TVS|Diode_SMD:D_SMC"
+        ],
+        "resolver_checked": true,
+        "pinmap_checked": true,
+        "tests": ["catalog_dynamic_power_transient_clamp"]
+      }
+    }
+  ]
+}

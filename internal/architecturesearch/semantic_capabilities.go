@@ -68,6 +68,22 @@ var registeredBehavioralMetrics = []BehavioralMetricCapability{
 	{Metric: "voltage_gain", Analysis: "ac_sweep", Unit: "ratio"},
 }
 
+var registeredDynamicBehavioralMetrics = []BehavioralMetricCapability{
+	{Metric: "closed_loop_peaking", Analysis: "stability", Unit: "dB"},
+	{Metric: "conversion_efficiency", Analysis: "transient", Unit: "%"},
+	{Metric: "gain_margin", Analysis: "stability", Unit: "dB"},
+	{Metric: "loop_crossover_frequency", Analysis: "stability", Unit: "Hz"},
+	{Metric: "overshoot_voltage", Analysis: "transient", Unit: "V"},
+	{Metric: "peak_device_current", Analysis: "transient", Unit: "A"},
+	{Metric: "peak_device_voltage", Analysis: "transient", Unit: "V"},
+	{Metric: "peak_junction_temperature", Analysis: "electrothermal", Unit: "degC"},
+	{Metric: "peak_to_peak_ripple", Analysis: "transient", Unit: "V"},
+	{Metric: "protection_recovery_time", Analysis: "transient", Unit: "s"},
+	{Metric: "protection_response_time", Analysis: "transient", Unit: "s"},
+	{Metric: "sequence_delay", Analysis: "transient", Unit: "s"},
+	{Metric: "transient_soa_margin", Analysis: "electrothermal", Unit: "ratio"},
+}
+
 var registeredOperatingAxes = []OperatingAxisCapability{
 	{Axis: "ambient_temperature", Unit: "degC"},
 	{Axis: "input_amplitude", Unit: "V"},
@@ -80,11 +96,18 @@ var registeredOperatingAxes = []OperatingAxisCapability{
 	{Axis: "tolerance", Selection: true},
 }
 
+var registeredDynamicOperatingAxes = []OperatingAxisCapability{
+	{Axis: "cooling_mode", Selection: true},
+	{Axis: "load_inductance", Unit: "H"},
+}
+
 var registeredPortKinds = []string{"analog_control", "analog_voltage", "differential_analog", "digital_bus", "digital_logic", "power", "protected_output", "reference", "switched_load"}
 var registeredDirections = []string{"bidirectional", "sink", "source"}
 var registeredConstraintRelations = []string{"equal", "maximum", "minimum", "one_of", "range", "required", "target"}
 var registeredCanonicalUnits = []string{"%", "A", "F", "Hz", "Ohm", "V", "V/A", "V_pp", "V_rms", "W", "dB", "deg", "degC", "pF", "ratio", "s", "uV_rms", "us"}
+var registeredDynamicCanonicalUnits = []string{"H"}
 var registeredProtocolModes = []string{"differential", "open_drain", "push_pull", "single_ended"}
+var registeredOperatingEventKinds = []string{"blocked_airflow", "inductive_turn_off", "input_step", "load_step", "overload", "rail_loss", "short_circuit", "shutdown", "startup"}
 
 // ValidateSemanticCapabilities verifies that an encoded capability document is
 // self-consistent and uses this binary's exact registered semantic vocabulary.
@@ -172,6 +195,19 @@ func operatingAxisContract(axis string) (unit string, selection bool) {
 	return "", false
 }
 
+func operatingAxisContractForVersion(axis string, version int) (unit string, selection bool) {
+	unit, selection = operatingAxisContract(axis)
+	if unit != "" || selection || version != VersionV5 {
+		return unit, selection
+	}
+	for _, capability := range registeredDynamicOperatingAxes {
+		if capability.Axis == axis {
+			return capability.Unit, capability.Selection
+		}
+	}
+	return "", false
+}
+
 func behavioralMetricContract(metric string) (analysis, unit string, ok bool) {
 	index, found := slices.BinarySearchFunc(registeredBehavioralMetrics, metric, func(capability BehavioralMetricCapability, target string) int {
 		return strings.Compare(capability.Metric, target)
@@ -181,6 +217,38 @@ func behavioralMetricContract(metric string) (analysis, unit string, ok bool) {
 	}
 	capability := registeredBehavioralMetrics[index]
 	return capability.Analysis, capability.Unit, true
+}
+
+func behavioralMetricContractForVersion(metric string, version int) (analysis, unit string, ok bool) {
+	analysis, unit, ok = behavioralMetricContract(metric)
+	if ok || version != VersionV5 {
+		return analysis, unit, ok
+	}
+	index, found := slices.BinarySearchFunc(registeredDynamicBehavioralMetrics, metric, func(capability BehavioralMetricCapability, target string) int {
+		return strings.Compare(capability.Metric, target)
+	})
+	if !found {
+		return "", "", false
+	}
+	capability := registeredDynamicBehavioralMetrics[index]
+	return capability.Analysis, capability.Unit, true
+}
+
+func eventKindAllowsUnit(kind, unit string) bool {
+	switch kind {
+	case "blocked_airflow":
+		return unit == "ratio"
+	case "inductive_turn_off", "overload":
+		return unit == "A"
+	case "input_step", "rail_loss", "shutdown", "startup":
+		return unit == "V" || unit == "ratio"
+	case "load_step":
+		return unit == "A" || unit == "Ohm"
+	case "short_circuit":
+		return unit == "Ohm" || unit == "V"
+	default:
+		return false
+	}
 }
 
 func sha256Hex(value string) bool {

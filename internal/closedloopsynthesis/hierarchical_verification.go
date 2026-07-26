@@ -8,11 +8,11 @@ import (
 )
 
 func evaluateHierarchyVerification(requirement architecturesearch.Requirement, systemPlan *architecturesearch.SystemPlan, assertions []AssertionResult) (*HierarchyVerificationEvidence, []Diagnostic) {
-	if requirement.Version != architecturesearch.VersionV4 {
+	if !hierarchicalRequirement(requirement) {
 		return nil, nil
 	}
 	if systemPlan == nil {
-		return nil, []Diagnostic{{Path: "evaluation.hierarchy", Message: "V4 evaluation requires its generated system plan"}}
+		return nil, []Diagnostic{{Path: "evaluation.hierarchy", Message: "hierarchical evaluation requires its generated system plan"}}
 	}
 	if err := architecturesearch.ValidateSystemPlan(requirement, systemPlan.CandidateFingerprint, *systemPlan); err != nil {
 		return nil, []Diagnostic{{Path: "evaluation.hierarchy", Message: err.Error()}}

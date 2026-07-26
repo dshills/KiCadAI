@@ -117,6 +117,246 @@ func TestCriticalStartupProjectsFailSafeInterlockThroughLoadObservation(t *testi
 	}
 }
 
+func TestBehavioralProjectionDoesNotCrossSupervisoryControlIntoSiblingRail(t *testing.T) {
+	rail3Minimum, rail3Maximum := 3.2, 3.4
+	rail5Minimum, rail5Maximum := 4.85, 5.15
+	requirement := Requirement{Version: VersionV5, Requirements: Requirements{
+		Domains: []Domain{
+			{ID: "ground", Kind: "reference"},
+			{ID: "rail_3v3", Kind: "supply"},
+			{ID: "rail_5v", Kind: "supply"},
+		},
+		Ports: []Port{
+			{ID: "input", Direction: "sink", Domain: "ground"},
+			{ID: "output_3v3", Direction: "source", Domain: "rail_3v3"},
+			{ID: "output_5v", Direction: "source", Domain: "rail_5v"},
+		},
+		Signals: []Signal{{ID: "rail_3v3_signal"}, {ID: "rail_5v_signal"}, {ID: "sequence_state"}},
+		Objectives: []Objective{
+			{ID: "generate_3v3", Bindings: []Binding{{Role: "input", Port: "input"}, {Role: "output", Signal: "rail_3v3_signal", Direction: "source"}}},
+			{ID: "generate_5v", Bindings: []Binding{{Role: "input", Port: "input"}, {Role: "output", Signal: "rail_5v_signal", Direction: "source"}}},
+			{ID: "sequence", Bindings: []Binding{{Role: "rail_a", Signal: "rail_3v3_signal", Direction: "sink"}, {Role: "rail_b", Signal: "rail_5v_signal", Direction: "sink"}, {Role: "state", Signal: "sequence_state", Direction: "source"}}},
+			{ID: "protect_3v3", Bindings: []Binding{{Role: "input", Signal: "rail_3v3_signal", Direction: "sink"}, {Role: "control", Signal: "sequence_state", Direction: "sink"}, {Role: "output", Port: "output_3v3"}}},
+			{ID: "protect_5v", Bindings: []Binding{{Role: "input", Signal: "rail_5v_signal", Direction: "sink"}, {Role: "control", Signal: "sequence_state", Direction: "sink"}, {Role: "output", Port: "output_5v"}}},
+		},
+		BehavioralRequirements: []BehavioralRequirement{
+			{ID: "rail_3v3_voltage", Metric: "dc_voltage", Observation: Observation{Kind: "port", ID: "output_3v3"}, Min: &rail3Minimum, Max: &rail3Maximum, Unit: "V"},
+			{ID: "rail_5v_voltage", Metric: "dc_voltage", Observation: Observation{Kind: "port", ID: "output_5v"}, Min: &rail5Minimum, Max: &rail5Maximum, Unit: "V"},
+		},
+	}}
+
+	for index, expected := range map[int]float64{0: 3.3, 1: 5} {
+		constraint, ok := constraintByName(effectiveObjectiveConstraints(requirement, requirement.Requirements.Objectives[index]), "output_voltage")
+		if !ok {
+			t.Fatalf("generator %d output-voltage constraint is absent", index)
+		}
+		value, _, ok := projectedNumericValue(constraint)
+		if !ok || math.Abs(value-expected) > 1e-12 {
+			t.Fatalf("generator %d output voltage = %.12g, want %.12g", index, value, expected)
+		}
+	}
+	if _, ok := constraintByName(effectiveObjectiveConstraints(requirement, requirement.Requirements.Objectives[2]), "output_voltage"); ok {
+		t.Fatal("sequencer inherited a downstream rail output-voltage constraint")
+	}
+}
+
+func TestEventProjectionPreservesDistinctStartupAndShutdownDelayContracts(t *testing.T) {
+	startupMinimum, startupMaximum := .002, .02
+	shutdownMinimum, shutdownMaximum := .001, .02
+	requirement := Requirement{Version: VersionV5, Requirements: Requirements{
+		Objectives: []Objective{{ID: "sequence", Capability: "rail_sequencing"}},
+		OperatingCases: []OperatingCase{{
+			ID: "normal",
+			Events: []OperatingEvent{
+				{ID: "power_up", Kind: "startup"},
+				{ID: "power_down", Kind: "shutdown"},
+			},
+		}},
+		BehavioralRequirements: []BehavioralRequirement{
+			{ID: "startup_sequence", Metric: "sequence_delay", Observation: Observation{Kind: "event", ID: "power_up"}, Min: &startupMinimum, Max: &startupMaximum, Unit: "s"},
+			{ID: "shutdown_sequence", Metric: "sequence_delay", Observation: Observation{Kind: "event", ID: "power_down"}, Min: &shutdownMinimum, Max: &shutdownMaximum, Unit: "s"},
+		},
+	}}
+	constraints := effectiveObjectiveConstraints(requirement, requirement.Requirements.Objectives[0])
+	for name, expectedMinimum := range map[string]float64{
+		"startup_delay":  startupMinimum,
+		"shutdown_delay": shutdownMinimum,
+	} {
+		constraint, ok := constraintByName(constraints, name)
+		if !ok {
+			t.Fatalf("%s is absent from event-scoped constraints: %#v", name, constraints)
+		}
+		minimum, _, ok := numericConstraintBounds([]Constraint{constraint}, name)
+		if !ok || math.Abs(minimum-expectedMinimum) > 1e-12 {
+			t.Fatalf("%s minimum = %.12g ok=%t, want %.12g", name, minimum, ok, expectedMinimum)
+		}
+	}
+}
+
+func TestEventProjectionCarriesTransientSOADurationWithoutImplementationIdentity(t *testing.T) {
+	minimumMargin := 1.2
+	requirement := Requirement{Version: VersionV5, Requirements: Requirements{
+		Objectives: []Objective{{
+			ID: "protect", Capability: "output_protection",
+			Bindings: []Binding{{Role: "output", Port: "load"}},
+		}},
+		Ports: []Port{{ID: "load", Kind: "power", Direction: "source", Domain: "rail"}},
+		OperatingCases: []OperatingCase{
+			{ID: "unrelated", Events: []OperatingEvent{{ID: "short", Kind: "short_circuit", DurationS: .5}}},
+			{ID: "fault", Events: []OperatingEvent{{ID: "short", Kind: "short_circuit", DurationS: .02}}},
+		},
+		BehavioralRequirements: []BehavioralRequirement{{
+			ID: "soa", Metric: "transient_soa_margin", Analysis: "electrothermal",
+			Observation:    Observation{Kind: "event", ID: "short"},
+			Min:            &minimumMargin,
+			Unit:           "ratio",
+			OperatingCases: []string{"fault"},
+		}},
+	}}
+	constraints := effectiveObjectiveConstraints(requirement, requirement.Requirements.Objectives[0])
+	duration, _, ok := firstNumericConstraint(constraints, "transient_soa_duration")
+	if !ok || math.Abs(duration-.02) > 1e-15 {
+		t.Fatalf("projected transient SOA duration = %.12g ok=%t; constraints=%#v", duration, ok, constraints)
+	}
+}
+
+func TestLoadConditionProjectsToSupervisoryRoleOnSharedPowerDomain(t *testing.T) {
+	loadMinimum, loadMaximum := .02, 1.0
+	requirement := Requirement{Version: VersionV5, Requirements: Requirements{
+		Domains: []Domain{
+			{ID: "rail_a", Kind: "supply"},
+			{ID: "rail_b", Kind: "supply"},
+		},
+		Ports: []Port{{ID: "output_b", Kind: "power", Direction: "source", Domain: "rail_b"}},
+		Signals: []Signal{
+			{ID: "rail_a_signal", Kind: "power", Domain: "rail_a"},
+			{ID: "rail_b_signal", Kind: "power", Domain: "rail_b"},
+		},
+		Objectives: []Objective{{
+			ID: "sequence", Capability: "rail_sequencing",
+			Bindings: []Binding{
+				{Role: "rail_a", Signal: "rail_a_signal", Direction: "sink"},
+				{Role: "rail_b", Signal: "rail_b_signal", Direction: "sink"},
+			},
+		}},
+		OperatingCases: []OperatingCase{{
+			ID: "normal",
+			Conditions: []OperatingCondition{{
+				Axis: "load_current", Target: "output_b", Min: &loadMinimum, Max: &loadMaximum, Unit: "A",
+			}},
+		}},
+	}}
+	constraints := effectiveObjectiveConstraints(requirement, requirement.Requirements.Objectives[0])
+	constraint, ok := constraintByName(constraints, "rail_b_load_current")
+	if !ok {
+		t.Fatalf("shared-domain rail load is absent: %#v", constraints)
+	}
+	minimum, maximum, ok := numericConstraintBounds([]Constraint{constraint}, "rail_b_load_current")
+	if !ok || math.Abs(minimum-loadMinimum) > 1e-12 || math.Abs(maximum-loadMaximum) > 1e-12 {
+		t.Fatalf("shared-domain rail load = %.12g..%.12g ok=%t, want %.12g..%.12g", minimum, maximum, ok, loadMinimum, loadMaximum)
+	}
+	if _, ok := constraintByName(constraints, "rail_a_load_current"); ok {
+		t.Fatalf("load condition crossed into an unrelated power domain: %#v", constraints)
+	}
+}
+
+func TestOperatingCaseLoadProjectionPreservesCompleteEnvelope(t *testing.T) {
+	hotMinimum, hotMaximum := 4.0, 4.0
+	reactiveMinimum, reactiveMaximum := 4.0, 8.0
+	requirement := Requirement{Version: VersionV5, Requirements: Requirements{
+		Domains: []Domain{{ID: "ground", Kind: "reference"}},
+		Ports:   []Port{{ID: "output", Direction: "source", Domain: "ground"}},
+		Objectives: []Objective{{
+			ID: "drive", Capability: "class_ab_output_stage",
+			Bindings: []Binding{{Role: "output", Port: "output"}},
+		}},
+		OperatingCases: []OperatingCase{
+			{ID: "hot_fault", Conditions: []OperatingCondition{{
+				Axis: "load_resistance", Target: "output", Min: &hotMinimum, Max: &hotMaximum, Unit: "Ohm",
+			}}},
+			{ID: "reactive_audio_load", Conditions: []OperatingCondition{{
+				Axis: "load_resistance", Target: "output", Min: &reactiveMinimum, Max: &reactiveMaximum, Unit: "Ohm",
+			}}},
+		},
+	}}
+	constraint, ok := constraintByName(
+		effectiveObjectiveConstraints(requirement, requirement.Requirements.Objectives[0]),
+		"load_impedance",
+	)
+	if !ok {
+		t.Fatal("load-impedance constraint is absent")
+	}
+	minimum, maximum, ok := numericConstraintBounds([]Constraint{constraint}, "load_impedance")
+	if !ok || minimum > reactiveMinimum || math.Abs(maximum-reactiveMaximum) > 1e-12 {
+		t.Fatalf("projected load envelope = %.12g..%.12g ok=%t, want a lower bound at most 4 and maximum 8", minimum, maximum, ok)
+	}
+}
+
+func TestCurrentEventProjectsTransientStressOntoTargetPowerPath(t *testing.T) {
+	initial, applied, recovered := 1.0, 6.0, 1.0
+	requirement := Requirement{Version: VersionV5, Requirements: Requirements{
+		Domains: []Domain{{ID: "supply", Kind: "supply"}, {ID: "ground", Kind: "reference"}},
+		Ports: []Port{
+			{ID: "power", Kind: "power", Direction: "sink", Domain: "supply"},
+			{ID: "load", Kind: "switched_load", Direction: "source", Domain: "supply"},
+		},
+		Objectives: []Objective{{
+			ID: "switch", Capability: "load_switch",
+			Bindings: []Binding{{Role: "input", Port: "power"}, {Role: "output", Port: "load"}},
+		}},
+		OperatingCases: []OperatingCase{{
+			ID: "fault",
+			Events: []OperatingEvent{{
+				ID: "overload", Kind: "overload", Target: Observation{Kind: "port", ID: "load"},
+				Initial: &initial, Applied: &applied, Recovered: &recovered, Unit: "A",
+			}},
+		}},
+	}}
+
+	constraints := effectiveObjectiveConstraints(requirement, requirement.Requirements.Objectives[0])
+	constraint, ok := constraintByName(constraints, "transient_load_current")
+	if !ok {
+		t.Fatalf("transient current stress is absent: %#v", constraints)
+	}
+	minimum, _, ok := numericConstraintBounds([]Constraint{constraint}, "transient_load_current")
+	if !ok || minimum != 6 {
+		t.Fatalf("transient current stress = %.12g ok=%t, want 6 A", minimum, ok)
+	}
+}
+
+func TestCurrentEventStressRespectsDeliveredPeakCurrentLimit(t *testing.T) {
+	applied, limited := 6.0, 3.5
+	requirement := Requirement{Version: VersionV5, Requirements: Requirements{
+		Ports: []Port{{ID: "load", Kind: "switched_load", Direction: "source", Domain: "supply"}},
+		Objectives: []Objective{{
+			ID: "switch", Capability: "load_switch",
+			Bindings: []Binding{{Role: "output", Port: "load"}},
+		}},
+		OperatingCases: []OperatingCase{{
+			ID: "fault",
+			Events: []OperatingEvent{{
+				ID: "overload", Kind: "overload", Target: Observation{Kind: "port", ID: "load"},
+				Applied: &applied, Unit: "A",
+			}},
+		}},
+		BehavioralRequirements: []BehavioralRequirement{{
+			ID: "current_limit", Metric: "peak_device_current",
+			Observation: Observation{Kind: "port", ID: "load"}, Max: &limited, Unit: "A",
+			OperatingCases: []string{"fault"},
+		}},
+	}}
+
+	constraints := effectiveObjectiveConstraints(requirement, requirement.Requirements.Objectives[0])
+	constraint, ok := constraintByName(constraints, "transient_load_current")
+	if !ok {
+		t.Fatalf("transient current stress is absent: %#v", constraints)
+	}
+	minimum, _, ok := numericConstraintBounds([]Constraint{constraint}, "transient_load_current")
+	if !ok || minimum != limited {
+		t.Fatalf("transient current stress = %.12g ok=%t, want %.12g A", minimum, ok, limited)
+	}
+}
+
 func TestV4ProjectsDynamicInterfaceConstraintsToObservedBidirectionalBoundary(t *testing.T) {
 	riseTime, loadMinimum, loadMaximum := 1e-6, 1e-12, 400e-12
 	requirement := Requirement{Version: VersionV4, Requirements: Requirements{

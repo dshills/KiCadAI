@@ -466,6 +466,115 @@ func TestOrderComponentsForRequiredProximityPreservesStableOrderAcrossCycle(t *t
 	}
 }
 
+func TestOrderComponentsForRequiredProximityPlacesLargestUnlockedTargetFirst(t *testing.T) {
+	components := []Component{
+		{Ref: "ANCHOR", Bounds: Bounds{WidthMM: 2, HeightMM: 2}},
+		{Ref: "SMALL", Bounds: Bounds{WidthMM: 2, HeightMM: 2}},
+		{Ref: "LARGE", Bounds: Bounds{WidthMM: 10, HeightMM: 8}},
+		{Ref: "UNRELATED", Bounds: Bounds{WidthMM: 3, HeightMM: 3}},
+	}
+	rules := []ProximityRule{{
+		ID: "cluster", AnchorRef: "ANCHOR", TargetRefs: []string{"SMALL", "LARGE"},
+		MaxDistanceMM: 4, Required: true,
+	}}
+
+	ordered := orderComponentsForRequiredProximity(components, rules)
+	got := []string{ordered[0].Ref, ordered[1].Ref, ordered[2].Ref, ordered[3].Ref}
+	if !slices.Equal(got, []string{"ANCHOR", "LARGE", "SMALL", "UNRELATED"}) {
+		t.Fatalf("order = %#v, want largest newly unlocked hard-proximity target first", got)
+	}
+}
+
+func TestOrderComponentsForRequiredProximityPrioritizesReadyConstrainedCluster(t *testing.T) {
+	components := []Component{
+		{Ref: "UNRELATED", Bounds: Bounds{WidthMM: 3, HeightMM: 3}},
+		{Ref: "ANCHOR", Bounds: Bounds{WidthMM: 4, HeightMM: 4}},
+		{Ref: "TARGET", Bounds: Bounds{WidthMM: 10, HeightMM: 8}},
+	}
+	rules := []ProximityRule{{
+		ID: "cluster", AnchorRef: "ANCHOR", TargetRefs: []string{"TARGET"},
+		MaxDistanceMM: 4, Required: true,
+	}}
+
+	ordered := orderComponentsForRequiredProximity(components, rules)
+	got := []string{ordered[0].Ref, ordered[1].Ref, ordered[2].Ref}
+	if !slices.Equal(got, []string{"ANCHOR", "TARGET", "UNRELATED"}) {
+		t.Fatalf("order = %#v, want constrained cluster reserved before unrelated movable parts", got)
+	}
+}
+
+func TestOrderComponentsForRequiredProximityKeepsFixedPartsAheadOfMovableCluster(t *testing.T) {
+	components := []Component{
+		{Ref: "ANCHOR"},
+		{Ref: "TARGET"},
+		{Ref: "FIXED", Fixed: true},
+	}
+	rules := []ProximityRule{{
+		ID: "cluster", AnchorRef: "ANCHOR", TargetRefs: []string{"TARGET"},
+		MaxDistanceMM: 4, Required: true,
+	}}
+
+	ordered := orderComponentsForRequiredProximity(components, rules)
+	got := []string{ordered[0].Ref, ordered[1].Ref, ordered[2].Ref}
+	if !slices.Equal(got, []string{"FIXED", "ANCHOR", "TARGET"}) {
+		t.Fatalf("order = %#v, want fixed placement boundary before movable constrained cluster", got)
+	}
+}
+
+func TestPlaceReservesBoardAreaAroundRequiredProximityAnchor(t *testing.T) {
+	req := Request{
+		Board: BoardPlacementArea{WidthMM: 40, HeightMM: 30, MarginMM: 1},
+		Rules: DefaultRules(),
+		Components: []Component{
+			{Ref: "UNRELATED", FootprintID: "Test:R", Bounds: Bounds{WidthMM: 3, HeightMM: 3, Source: BoundsExplicit}},
+			{Ref: "ANCHOR", FootprintID: "Test:U", Bounds: Bounds{WidthMM: 4, HeightMM: 4, Source: BoundsExplicit}},
+			{Ref: "LARGE", FootprintID: "Test:L", Bounds: Bounds{WidthMM: 10, HeightMM: 8, Source: BoundsExplicit}},
+			{Ref: "BULK", FootprintID: "Test:C", Bounds: Bounds{WidthMM: 8, HeightMM: 8, Source: BoundsExplicit}},
+		},
+		ProximityRules: []ProximityRule{
+			{ID: "large", AnchorRef: "ANCHOR", TargetRefs: []string{"LARGE"}, MaxDistanceMM: 4, Required: true},
+			{ID: "bulk", AnchorRef: "ANCHOR", TargetRefs: []string{"BULK"}, MaxDistanceMM: 4, Required: true},
+		},
+	}
+
+	result := Place(req)
+	if result.Status != StatusPlaced {
+		t.Fatalf("placement = %#v", result)
+	}
+	anchorIndex := slices.IndexFunc(result.Placements, func(placement PlacementResult) bool { return placement.Ref == "ANCHOR" })
+	if anchorIndex < 0 {
+		t.Fatalf("anchor placement missing: %#v", result.Placements)
+	}
+	usable := BoardUsableRect(req.Board, req.Rules)
+	reserve, required := requiredProximityAnchorReservation(req.Components[1], "ANCHOR", req, usable)
+	anchor := result.Placements[anchorIndex].Position
+	if !required ||
+		anchor.XMM-reserve < usable.Min.XMM ||
+		anchor.XMM+reserve > usable.Max.XMM ||
+		anchor.YMM-reserve < usable.Min.YMM ||
+		anchor.YMM+reserve > usable.Max.YMM {
+		t.Fatalf("anchor %#v did not preserve required cluster reserve %.12g inside %#v", anchor, reserve, usable)
+	}
+}
+
+func TestOrderComponentsForRequiredProximityPreservesFixedPlacementBoundary(t *testing.T) {
+	components := []Component{
+		{Ref: "ANCHOR", Fixed: true},
+		{Ref: "FIXED", Fixed: true},
+		{Ref: "TARGET"},
+	}
+	rules := []ProximityRule{{
+		ID: "fixed-boundary", AnchorRef: "ANCHOR", TargetRefs: []string{"TARGET"},
+		MaxDistanceMM: 4, Required: true,
+	}}
+
+	ordered := orderComponentsForRequiredProximity(components, rules)
+	got := []string{ordered[0].Ref, ordered[1].Ref, ordered[2].Ref}
+	if !slices.Equal(got, []string{"ANCHOR", "FIXED", "TARGET"}) {
+		t.Fatalf("order = %#v, want all fixed placements committed before movable target", got)
+	}
+}
+
 func TestPlaceSamplesRequiredProximityNeighborhoodOnCoarseGrid(t *testing.T) {
 	req := Request{
 		Board: BoardPlacementArea{WidthMM: 40, HeightMM: 30, MarginMM: 1},

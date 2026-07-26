@@ -25,11 +25,13 @@ type CurrentSenseRequest struct {
 }
 
 // SolveCurrentSense evaluates nominal transfer, both signed error corners,
-// output headroom, and shunt dissipation. It fails closed when any guaranteed
-// corner exceeds the caller's measurement contract.
+// output headroom, and shunt dissipation. A positive OutputTolerancePercent
+// proves an externally required transfer target. Zero means the output scale
+// is architecture-internal, so only its physical headroom and shunt-power
+// bounds participate in acceptance.
 func SolveCurrentSense(request CurrentSenseRequest) (CalculationEvidence, []reports.Issue) {
 	if !validSemanticID(canonicalIdentifier(request.ID)) || !finitePositive(request.FullScaleCurrentA) || !finitePositive(request.TargetOutputVoltageV) ||
-		!finitePositive(request.OutputTolerancePercent) || !finitePositive(request.MaximumOutputVoltageV) || !finitePositive(request.ShuntResistanceOhm) ||
+		!finiteNumbers(request.OutputTolerancePercent) || request.OutputTolerancePercent < 0 || !finitePositive(request.MaximumOutputVoltageV) || !finitePositive(request.ShuntResistanceOhm) ||
 		!finiteNumbers(request.ShuntTolerancePercent, request.AmplifierGainErrorPercent, request.InputOffsetVoltageV) || request.ShuntTolerancePercent < 0 ||
 		!finitePositive(request.ShuntPowerRatingW) || !finitePositive(request.AmplifierGain) || request.AmplifierGainErrorPercent < 0 || request.InputOffsetVoltageV < 0 {
 		return CalculationEvidence{}, calculationIssue(CodeValueInputInvalid, "current_sense", "current-sense inputs must be finite and positive")
@@ -41,15 +43,19 @@ func SolveCurrentSense(request CurrentSenseRequest) (CalculationEvidence, []repo
 	minimumOutput := request.FullScaleCurrentA*shuntLow*gainLow - request.InputOffsetVoltageV*gainHigh
 	maximumOutput := request.FullScaleCurrentA*shuntHigh*gainHigh + request.InputOffsetVoltageV*gainHigh
 	nominalOutput := request.FullScaleCurrentA * request.ShuntResistanceOhm * request.AmplifierGain
-	allowedError := request.TargetOutputVoltageV * request.OutputTolerancePercent / 100
-	minimumAllowed := request.TargetOutputVoltageV - allowedError
-	maximumAllowed := request.TargetOutputVoltageV + allowedError
 	shuntPower := request.FullScaleCurrentA * request.FullScaleCurrentA * shuntHigh
 	bounds := []CalculationBound{
-		minimumBound("full_scale_output_minimum", minimumAllowed, minimumOutput, "V"),
-		maximumBound("full_scale_output_maximum", maximumAllowed, maximumOutput, "V"),
 		maximumBound("measurement_output_headroom", request.MaximumOutputVoltageV, maximumOutput, "V"),
 		maximumBound("shunt_power", request.ShuntPowerRatingW, shuntPower, "W"),
+	}
+	if request.OutputTolerancePercent > 0 {
+		allowedError := request.TargetOutputVoltageV * request.OutputTolerancePercent / 100
+		minimumAllowed := request.TargetOutputVoltageV - allowedError
+		maximumAllowed := request.TargetOutputVoltageV + allowedError
+		bounds = append([]CalculationBound{
+			minimumBound("full_scale_output_minimum", minimumAllowed, minimumOutput, "V"),
+			maximumBound("full_scale_output_maximum", maximumAllowed, maximumOutput, "V"),
+		}, bounds...)
 	}
 	worstMargin, pass := normalizedBoundsMargin(bounds)
 	evidence := CalculationEvidence{
@@ -59,6 +65,7 @@ func SolveCurrentSense(request CurrentSenseRequest) (CalculationEvidence, []repo
 			{Name: "amplifier_gain_error", Value: request.AmplifierGainErrorPercent, Unit: "%"},
 			{Name: "full_scale_current", Value: request.FullScaleCurrentA, Unit: "A"},
 			{Name: "input_offset_voltage", Value: request.InputOffsetVoltageV, Unit: "V"},
+			{Name: "output_tolerance", Value: request.OutputTolerancePercent, Unit: "%"},
 			{Name: "shunt_resistance", Value: request.ShuntResistanceOhm, Unit: "Ohm"},
 			{Name: "shunt_tolerance", Value: request.ShuntTolerancePercent, Unit: "%"},
 		},

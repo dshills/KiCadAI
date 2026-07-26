@@ -138,6 +138,42 @@ func TestFrozenSimulationGroundedCorpusOptionalKiCadPromotion(t *testing.T) {
 	runFrozenPromotionAt(t, filepath.Join("..", "architecturesearch", "testdata", "simulation_grounded_closed_loop_corpus"), 10, "KICADAI_SIMULATION_GROUNDED_ARTIFACT_DIR", cli, index)
 }
 
+func TestDynamicElectrothermalControlLoopCorpusPassesOfflineWorkflow(t *testing.T) {
+	requireLongPromotionTest(t)
+	runFrozenPromotionAt(
+		t,
+		filepath.Join("..", "architecturesearch", "testdata", "dynamic_electrothermal_control_loop_corpus"),
+		6,
+		"KICADAI_DYNAMIC_ELECTROTHERMAL_ARTIFACT_DIR",
+		"",
+		libraryresolver.LibraryIndex{},
+	)
+}
+
+func TestDynamicElectrothermalControlLoopCorpusOptionalKiCadPromotion(t *testing.T) {
+	requireLongPromotionTest(t)
+	cli := os.Getenv("KICADAI_KICAD_CLI")
+	if cli == "" {
+		t.Skip("set KICADAI_KICAD_CLI to run the KiCad-backed dynamic electrothermal/control-loop corpus")
+	}
+	roots, rootIssues := libraryresolver.ResolveRoots()
+	if roots.SymbolsRoot == "" || roots.FootprintsRoot == "" {
+		t.Skipf("installed KiCad libraries are required: %#v", rootIssues)
+	}
+	index, loadIssues := libraryresolver.Load(context.Background(), roots, libraryresolver.LoadOptions{})
+	if len(index.Symbols) == 0 || len(index.Footprints) == 0 {
+		t.Fatalf("installed library index is empty: %#v", loadIssues)
+	}
+	runFrozenPromotionAt(
+		t,
+		filepath.Join("..", "architecturesearch", "testdata", "dynamic_electrothermal_control_loop_corpus"),
+		6,
+		"KICADAI_DYNAMIC_ELECTROTHERMAL_ARTIFACT_DIR",
+		cli,
+		index,
+	)
+}
+
 func TestHeldOutConstantCurrentCorpusPassesOfflineWorkflow(t *testing.T) {
 	requireLongPromotionTest(t)
 	corpusRoot, count := heldOutCapabilityFamilyCorpus(t, "constant_current_regulation")
@@ -516,7 +552,7 @@ func runFrozenPromotionAt(t *testing.T, corpusRoot string, expectedCount int, ar
 			}
 			var request designworkflow.Request
 			var resolved circuitgraph.ResolvedDocument
-			if requirement.Version == architecturesearch.VersionV3 || requirement.Version == architecturesearch.VersionV4 {
+			if requirement.Version == architecturesearch.VersionV3 || requirement.Version == architecturesearch.VersionV4 || requirement.Version == architecturesearch.VersionV5 {
 				promotion, promotionIssues := SynthesizeClosedLoop(context.Background(), requirement, search, ArchitectureSimulationPlanResolver{
 					GraphResolver: resolver, ProvenanceRegistry: provenance,
 				}, modelRegistryHash, nil, closedloopsynthesis.DefaultPolicy())
@@ -527,6 +563,9 @@ func runFrozenPromotionAt(t *testing.T, corpusRoot string, expectedCount int, ar
 				resolved = promotion.Resolved
 				if request.ExplicitCircuit == nil || request.ExplicitCircuit.ClosedLoop == nil || request.ExplicitCircuit.ClosedLoop.SelectedCircuitHash != request.ExplicitCircuit.ResolutionHash {
 					t.Fatalf("closed-loop request is not bound to selected resolved circuit: %#v", request.ExplicitCircuit)
+				}
+				if request.ExplicitCircuit.RoutingPolicy != designworkflow.ExplicitRoutingPolicyConstrainedEndpointAccessV1 {
+					t.Fatalf("closed-loop synthesized routing policy = %q", request.ExplicitCircuit.RoutingPolicy)
 				}
 			} else {
 				lowered, lowerIssues := Lower(requirement, search)
@@ -614,6 +653,9 @@ func closedLoopFailureSummary(report closedloopsynthesis.Report) string {
 				}
 			}
 			lines = append(lines, fmt.Sprintf("%s attempt %d [%s] failed [%s]", candidate.Fingerprint, candidateAttempt.Number, strings.Join(values, ","), strings.Join(failures, ",")))
+			for _, diagnostic := range candidateAttempt.Diagnostics {
+				lines = append(lines, fmt.Sprintf("%s attempt %d %s: %s", candidate.Fingerprint, candidateAttempt.Number, diagnostic.Path, diagnostic.Message))
+			}
 		}
 		for _, variable := range attempt.State.Variables {
 			lines = append(lines, fmt.Sprintf("%s final variable %s=%.12g", candidate.Fingerprint, variable.ID, variable.Value))
@@ -623,6 +665,9 @@ func closedLoopFailureSummary(report closedloopsynthesis.Report) string {
 				kinds := make([]string, 0, len(plan.Analyses))
 				for _, analysis := range plan.Analyses {
 					kinds = append(kinds, analysis.Kind)
+					if len(analysis.SourceValueEvents) != 0 {
+						lines = append(lines, fmt.Sprintf("%s plan %d analysis %s dt=%.12g source_events=%v", candidate.Fingerprint, planIndex, analysis.ID, analysis.TimeStepS, analysis.SourceValueEvents))
+					}
 				}
 				lines = append(lines, fmt.Sprintf("%s plan %d model=%s analyses=%v", candidate.Fingerprint, planIndex, plan.ModelID, kinds))
 			}
@@ -650,6 +695,9 @@ func closedLoopFailureSummary(report closedloopsynthesis.Report) string {
 				}
 				if (assertion.Metric == "threshold_voltage" || assertion.Metric == "threshold_current") && attempt.Simulation != nil {
 					lines = append(lines, thresholdSweepSummary(*attempt.Simulation, assertion.RequirementID, assertion.OperatingCase, assertion.Actual))
+				}
+				if (assertion.Metric == "protection_response_time" || assertion.Metric == "protection_recovery_time") && attempt.Simulation != nil {
+					lines = append(lines, responseTimeSummary(*attempt.Simulation, assertion.RequirementID, assertion.OperatingCase))
 				}
 			}
 		}
@@ -705,7 +753,11 @@ func closedLoopResolvedDeviceSummary(resolved circuitgraph.ResolvedDocument) str
 		for _, terminal := range device.Terminals {
 			terminals = append(terminals, terminal.Terminal+"="+terminal.Net)
 		}
-		devices = append(devices, fmt.Sprintf("%s:%s:%v", device.Component, device.PrimitiveModel, terminals))
+		value := ""
+		if device.ValueSI != nil {
+			value = fmt.Sprintf(":value=%.9g", *device.ValueSI)
+		}
+		devices = append(devices, fmt.Sprintf("%s:%s%s:%v", device.Component, device.PrimitiveModel, value, terminals))
 	}
 	slices.Sort(devices)
 	return strings.Join(devices, ",")
@@ -781,6 +833,89 @@ func testAnalysisNodeMagnitude(point simmodel.AnalysisPoint, node string) (float
 	for _, result := range point.Nodes {
 		if result.Node == node {
 			return result.Magnitude, true
+		}
+	}
+	return 0, false
+}
+
+func responseTimeSummary(evidence closedloopsynthesis.SimulationEvidence, requirementID, operatingCase string) string {
+	plans := evidence.Resolution.Plans
+	if len(plans) == 0 && evidence.Resolution.Plan.ModelID != "" {
+		plans = []simmodel.Plan{evidence.Resolution.Plan}
+	}
+	for _, link := range evidence.Resolution.Measurements {
+		if link.RequirementID != requirementID || link.OperatingCase != operatingCase {
+			continue
+		}
+		sets := append([]closedloopsynthesis.SimulationAssertionSet(nil), link.Evidence...)
+		if len(sets) == 0 {
+			indices := append([]int(nil), link.Assertions...)
+			if len(indices) == 0 {
+				indices = []int{link.Assertion}
+			}
+			sets = []closedloopsynthesis.SimulationAssertionSet{{Plan: link.Plan, Assertions: indices}}
+		}
+		for _, set := range sets {
+			if set.Plan < 0 || set.Plan >= len(plans) || set.Plan >= len(evidence.Reports) {
+				continue
+			}
+			for _, assertionIndex := range set.Assertions {
+				if assertionIndex < 0 || assertionIndex >= len(plans[set.Plan].Assertions) {
+					continue
+				}
+				assertion := plans[set.Plan].Assertions[assertionIndex]
+				for _, analysis := range evidence.Reports[set.Plan].Analyses {
+					if analysis.ID != assertion.AnalysisID || len(analysis.Points) == 0 {
+						continue
+					}
+					targetTimes := []float64{
+						math.Max(0, assertion.WindowStartS-2e-4),
+						assertion.WindowStartS,
+						assertion.WindowStartS + 5e-4,
+						assertion.WindowStartS + 1e-3,
+						assertion.WindowStartS + 5e-3,
+						assertion.WindowStartS + 15e-3,
+						assertion.WindowEndS,
+					}
+					var samples []string
+					for _, target := range targetTimes {
+						point := analysis.Points[0]
+						for _, candidate := range analysis.Points[1:] {
+							if math.Abs(candidate.TimeS-target) >= math.Abs(point.TimeS-target) {
+								continue
+							}
+							point = candidate
+						}
+						value, valueOK := testAnalysisNodeReal(point, assertion.Node)
+						reference := 0.0
+						referenceOK := true
+						if assertion.ReferenceNode != "" {
+							reference, referenceOK = testAnalysisNodeReal(point, assertion.ReferenceNode)
+						}
+						if valueOK && referenceOK {
+							samples = append(samples, fmt.Sprintf("%.9gs=%.9g", point.TimeS, value-reference))
+						}
+					}
+					return fmt.Sprintf(
+						"response waveform node=%s reference=%s window=%.9g..%.9g fundamental=%.9g samples=[%s]",
+						assertion.Node,
+						assertion.ReferenceNode,
+						assertion.WindowStartS,
+						assertion.WindowEndS,
+						analysis.FundamentalFrequencyHz,
+						strings.Join(samples, ","),
+					)
+				}
+			}
+		}
+	}
+	return "response-time evidence unavailable"
+}
+
+func testAnalysisNodeReal(point simmodel.AnalysisPoint, node string) (float64, bool) {
+	for _, result := range point.Nodes {
+		if result.Node == node {
+			return result.Real, true
 		}
 	}
 	return 0, false
@@ -1009,6 +1144,14 @@ func dominantNoiseSummary(evidence closedloopsynthesis.SimulationEvidence, requi
 
 func runOpenSetWorkflow(t *testing.T, request designworkflow.Request, index libraryresolver.LibraryIndex, cli string, output string) designworkflow.WorkflowResult {
 	t.Helper()
+	if os.Getenv("KICADAI_PLACEMENT_DIAGNOSTICS") != "" && request.ExplicitCircuit != nil {
+		diagnostic := designworkflow.PlaceExplicitCircuit(context.Background(), request, designworkflow.PlacementOptions{LibraryIndex: &index})
+		order := make([]string, 0, len(diagnostic.Request.Components))
+		for _, component := range diagnostic.Request.Components {
+			order = append(order, component.Ref)
+		}
+		t.Logf("placement diagnostics: order=%v rules=%#v placements=%#v scoring=%#v", order, diagnostic.Request.ProximityRules, diagnostic.Result.Placements, diagnostic.Result.CandidateScoring)
+	}
 	indexBefore, err := json.Marshal(index)
 	if err != nil {
 		t.Fatalf("marshal library index before workflow: %v", err)

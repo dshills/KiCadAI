@@ -5,6 +5,12 @@ import (
 	"math"
 )
 
+// TransientResponseOnsetFraction is the normalized waveform change used to
+// identify the onset of an event response. Synthesis calculations that bound
+// event latency use the same exported value so sizing and measurement cannot
+// silently drift apart.
+const TransientResponseOnsetFraction = 0.1
+
 func acDerivedValue(result AnalysisResult, assertion Assertion) (float64, *Diagnostic) {
 	if assertion.Quantity == QuantityVoltageGainRatio {
 		for _, point := range result.Points {
@@ -51,6 +57,29 @@ func transientDerivedValue(result AnalysisResult, assertion Assertion) (float64,
 	switch assertion.Quantity {
 	case QuantityPeakAbsVoltageV:
 		return peakAbsVoltage(result, assertion)
+	case QuantityPeakAbsDeviceVoltageV, QuantityPeakAbsDeviceCurrentA:
+		peak := math.Inf(-1)
+		found := false
+		for _, point := range result.Points {
+			if !pointInAssertionWindow(point, assertion) {
+				continue
+			}
+			for _, device := range point.Devices {
+				if device.Component != assertion.Component {
+					continue
+				}
+				value := math.Abs(device.VoltageV)
+				if assertion.Quantity == QuantityPeakAbsDeviceCurrentA {
+					value = math.Max(math.Abs(device.CurrentA), device.CurrentMagnitudeA)
+				}
+				peak = math.Max(peak, value)
+				found = true
+			}
+		}
+		if !found {
+			return 0, advancedAssertionDiagnostic(assertion, "peak device-stress assertion did not resolve to a solved device waveform")
+		}
+		return normalizedMNAFloat(peak), nil
 	case QuantityOutputSwingVPP:
 		_, values, diagnostic := waveform(result, assertion)
 		if diagnostic != nil {
@@ -61,6 +90,27 @@ func transientDerivedValue(result AnalysisResult, assertion Assertion) (float64,
 			minimum, maximum = math.Min(minimum, value), math.Max(maximum, value)
 		}
 		return normalizedMNAFloat(maximum - minimum), nil
+	case QuantityOvershootVoltageV:
+		_, values, diagnostic := waveform(result, assertion)
+		if diagnostic != nil {
+			return 0, diagnostic
+		}
+		initial, final := values[0], values[len(values)-1]
+		overshoot := 0.0
+		if final >= initial {
+			maximum := final
+			for _, value := range values {
+				maximum = math.Max(maximum, value)
+			}
+			overshoot = maximum - final
+		} else {
+			minimum := final
+			for _, value := range values {
+				minimum = math.Min(minimum, value)
+			}
+			overshoot = final - minimum
+		}
+		return normalizedMNAFloat(math.Max(0, overshoot)), nil
 	case QuantitySettlingTimeS:
 		times, values, diagnostic := waveform(result, assertion)
 		if diagnostic != nil {
@@ -86,6 +136,9 @@ func transientDerivedValue(result AnalysisResult, assertion Assertion) (float64,
 		}
 		return 0, advancedAssertionDiagnostic(assertion, "transient waveform does not settle inside the trusted 2% band")
 	case QuantityResponseTimeS:
+		if assertion.WindowEndS > assertion.WindowStartS {
+			return transientResponseLatency(result, assertion)
+		}
 		times, values, diagnostic := waveform(result, assertion)
 		if diagnostic != nil {
 			return 0, diagnostic
@@ -120,8 +173,138 @@ func transientDerivedValue(result AnalysisResult, assertion Assertion) (float64,
 			return 0, advancedAssertionDiagnostic(assertion, "output-power assertion did not resolve to load voltage/current evidence")
 		}
 		return normalizedMNAFloat(sum / float64(count)), nil
+	case QuantityConversionEfficiencyPct:
+		if assertion.Component == "" || len(assertion.Components) == 0 {
+			return 0, advancedAssertionDiagnostic(assertion, "conversion-efficiency assertion requires one resolved load and at least one resolved supply source")
+		}
+		points := periodicSteadyStatePoints(result)
+		if len(points) == len(result.Points) && len(points) > 1 {
+			points = points[1:]
+		}
+		outputEnergy, inputEnergy, count := 0.0, 0.0, 0
+		for _, point := range points {
+			outputPower, outputFound := 0.0, false
+			inputPower := 0.0
+			inputFound := map[string]bool{}
+			for _, device := range point.Devices {
+				power := math.Abs(device.VoltageV * device.CurrentA)
+				if device.Component == assertion.Component {
+					outputPower, outputFound = power, true
+				}
+				for _, source := range assertion.Components {
+					if device.Component == source {
+						inputPower += power
+						inputFound[source] = true
+					}
+				}
+			}
+			if !outputFound || len(inputFound) != len(assertion.Components) {
+				continue
+			}
+			outputEnergy += outputPower
+			inputEnergy += inputPower
+			count++
+		}
+		if count == 0 || inputEnergy <= 0 {
+			return 0, advancedAssertionDiagnostic(assertion, "conversion-efficiency assertion lacks complete nonzero load and supply power waveforms")
+		}
+		return normalizedMNAFloat(100 * outputEnergy / inputEnergy), nil
 	}
 	return 0, advancedAssertionDiagnostic(assertion, "unsupported transient-derived quantity")
+}
+
+func transientResponseLatency(result AnalysisResult, assertion Assertion) (float64, *Diagnostic) {
+	var baseline float64
+	baselineFound := false
+	var preEventTimes, preEventValues, times, residuals []float64
+	scale := 1.0
+	for _, point := range result.Points {
+		value, found := analysisNodeReal(point, assertion.Node)
+		if !found {
+			continue
+		}
+		if assertion.ReferenceNode != "" {
+			reference, referenceFound := analysisNodeReal(point, assertion.ReferenceNode)
+			if !referenceFound {
+				return 0, advancedAssertionDiagnostic(assertion, "event-response assertion reference node is absent from a solved point")
+			}
+			value -= reference
+		}
+		if point.TimeS < assertion.WindowStartS {
+			baseline, baselineFound = value, true
+			preEventTimes = append(preEventTimes, point.TimeS)
+			preEventValues = append(preEventValues, value)
+			continue
+		}
+		if point.TimeS >= assertion.WindowEndS {
+			break
+		}
+		if !baselineFound {
+			baseline, baselineFound = value, true
+		}
+		expected := baseline
+		if result.FundamentalFrequencyHz > 0 {
+			var expectedFound bool
+			expected, expectedFound = periodicEventBaseline(
+				preEventTimes, preEventValues, point.TimeS, assertion.WindowStartS, 1/result.FundamentalFrequencyHz,
+			)
+			if !expectedFound {
+				return 0, advancedAssertionDiagnostic(assertion, "periodic event-response assertion requires one complete solved pre-event cycle")
+			}
+		}
+		times = append(times, point.TimeS)
+		residuals = append(residuals, math.Abs(value-expected))
+		scale = math.Max(scale, math.Max(math.Abs(value), math.Abs(expected)))
+	}
+	if !baselineFound || len(residuals) < 2 {
+		return 0, advancedAssertionDiagnostic(assertion, "event-response assertion requires a baseline and at least two solved samples inside its bounded window")
+	}
+	peak := 0.0
+	for _, residual := range residuals {
+		peak = math.Max(peak, residual)
+	}
+	if peak <= 1e-12*scale {
+		return 0, advancedAssertionDiagnostic(assertion, fmt.Sprintf(
+			"event-response assertion requires a nonconstant solved waveform (baseline=%.12g peak_delta=%.12g scale=%.12g samples=%d)",
+			baseline, peak, scale, len(residuals),
+		))
+	}
+	threshold := TransientResponseOnsetFraction * peak
+	previousTime, previousResidual := assertion.WindowStartS, 0.0
+	for index, residual := range residuals {
+		if residual >= threshold {
+			crossing := interpolateCrossing(previousTime, times[index], previousResidual, residual, threshold)
+			return normalizedMNAFloat(math.Max(0, crossing-assertion.WindowStartS)), nil
+		}
+		previousTime, previousResidual = times[index], residual
+	}
+	return 0, advancedAssertionDiagnostic(assertion, "trusted event window does not contain a complete response onset")
+}
+
+func periodicEventBaseline(times, values []float64, timeS, eventStartS, periodS float64) (float64, bool) {
+	if len(times) != len(values) || len(times) < 2 || !finite(periodS) || periodS <= 0 {
+		return 0, false
+	}
+	phase := math.Mod(timeS-eventStartS, periodS)
+	if phase < 0 {
+		phase += periodS
+	}
+	target := eventStartS - periodS + phase
+	tolerance := math.Max(1, math.Max(math.Abs(target), math.Abs(eventStartS))) * 1e-12
+	for index := range times {
+		if math.Abs(times[index]-target) <= tolerance {
+			return values[index], true
+		}
+		if index == 0 || times[index] < target || times[index-1] > target {
+			continue
+		}
+		if times[index] == times[index-1] {
+			return 0, false
+		}
+		fraction := (target - times[index-1]) / (times[index] - times[index-1])
+		return values[index-1] + fraction*(values[index]-values[index-1]), true
+	}
+	return 0, false
 }
 
 func dcDeviceValue(result AnalysisResult, assertion Assertion) (float64, *Diagnostic) {
@@ -287,6 +470,9 @@ func waveform(result AnalysisResult, assertion Assertion) ([]float64, []float64,
 	times := make([]float64, 0, len(result.Points))
 	values := make([]float64, 0, len(result.Points))
 	for _, point := range result.Points {
+		if !pointInAssertionWindow(point, assertion) {
+			continue
+		}
 		value, found := analysisNodeReal(point, assertion.Node)
 		if !found {
 			continue
@@ -305,6 +491,13 @@ func waveform(result AnalysisResult, assertion Assertion) ([]float64, []float64,
 		return nil, nil, advancedAssertionDiagnostic(assertion, "waveform-derived assertion requires at least two solved node samples")
 	}
 	return times, values, nil
+}
+
+func pointInAssertionWindow(point AnalysisPoint, assertion Assertion) bool {
+	if assertion.WindowEndS == 0 {
+		return true
+	}
+	return point.TimeS >= assertion.WindowStartS && point.TimeS < assertion.WindowEndS
 }
 
 func analysisNodeReal(point AnalysisPoint, node string) (float64, bool) {

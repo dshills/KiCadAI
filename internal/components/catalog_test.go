@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"kicadai/internal/reports"
+	"kicadai/internal/simmodel"
 )
 
 func TestLoadCatalogEmptyDirectory(t *testing.T) {
@@ -111,6 +112,128 @@ func TestCheckedInCatalogLoadsAndValidates(t *testing.T) {
 			t.Fatalf("checked-in catalog missing family record for %s", family.ID)
 		}
 	}
+}
+
+func TestCheckedInCatalogDynamicPowerInductorModels(t *testing.T) {
+	catalog, err := LoadCatalog(context.Background(), LoadOptions{CatalogDir: checkedInCatalogDir(t)})
+	if err != nil {
+		t.Fatalf("load checked-in catalog: %v", err)
+	}
+	for _, test := range []struct {
+		id         string
+		inductance string
+		dcr        float64
+		rated      float64
+		saturation float64
+		footprint  string
+	}{
+		{
+			id: "inductor.sunlord.mwsa1206s_150mt", inductance: "15u",
+			dcr: .029, rated: 7.5, saturation: 7.2,
+			footprint: "Inductor_SMD:L_Sunlord_MWSA1206S-150",
+		},
+		{
+			id: "inductor.sunlord.mwsa1206s_220mt", inductance: "22u",
+			dcr: .0395, rated: 6, saturation: 6,
+			footprint: "Inductor_SMD:L_Sunlord_MWSA1206S-220",
+		},
+	} {
+		record := requireCatalogRecord(t, catalog, test.id)
+		requireValueTyp(t, record, "inductance", test.inductance, "H")
+		if len(record.SimulationModels) != 1 || record.SimulationModels[0].ModelID != simmodel.PrimitiveInductorTransientV1 {
+			t.Fatalf("%s inductor simulation evidence = %#v", test.id, record.SimulationModels)
+		}
+		parameters := map[string]float64{}
+		for _, parameter := range record.SimulationModels[0].Parameters {
+			parameters[parameter.Name] = parameter.Value
+		}
+		if parameters["series_resistance_ohm"] != test.dcr ||
+			parameters["rated_current_a"] != test.rated ||
+			parameters["saturation_current_a"] != test.saturation {
+			t.Fatalf("%s inductor model parameters = %#v", test.id, parameters)
+		}
+		if len(record.Packages) != 1 || record.Packages[0].FootprintID != test.footprint {
+			t.Fatalf("%s package evidence = %#v", test.id, record.Packages)
+		}
+	}
+}
+
+func TestCheckedInCatalogDynamicPowerHoldUpCapacitor(t *testing.T) {
+	catalog, err := LoadCatalog(context.Background(), LoadOptions{CatalogDir: checkedInCatalogDir(t)})
+	if err != nil {
+		t.Fatalf("load checked-in catalog: %v", err)
+	}
+	record := requireCatalogRecord(t, catalog, "capacitor.panasonic.eeufr1a682l.radial")
+	if record.MPN != "EEUFR1A682L" || record.Capacitor == nil ||
+		record.Capacitor.EffectiveCapacitanceReview != "proven" ||
+		record.Capacitor.ESRReview != "proven" || !record.Capacitor.FabricationProof {
+		t.Fatalf("hold-up capacitor identity and applied evidence = %#v", record)
+	}
+	requireValueTyp(t, record, "capacitance", "6800u", "F")
+	requireRatingMax(t, record, "voltage", "10", "V")
+	requireRatingMax(t, record, "ripple_current", "3.75", "A")
+	if record.Capacitor.CapacitanceTolerancePct == nil || *record.Capacitor.CapacitanceTolerancePct != 20 ||
+		record.Capacitor.ESR == nil || record.Capacitor.ESR.Value != .012 || record.Capacitor.ESR.Unit != "ohm" ||
+		record.Capacitor.RippleCurrent == nil || record.Capacitor.RippleCurrent.Value != 3.75 {
+		t.Fatalf("hold-up capacitor tolerance, impedance, and ripple evidence = %#v", record.Capacitor)
+	}
+	if len(record.SimulationModels) != 2 ||
+		!slices.ContainsFunc(record.SimulationModels, func(model simmodel.CatalogEvidence) bool {
+			return model.ModelID == simmodel.PrimitiveCapacitorV1
+		}) ||
+		!slices.ContainsFunc(record.SimulationModels, func(model simmodel.CatalogEvidence) bool {
+			return model.ModelID == simmodel.PrimitiveCapacitorTransientV1
+		}) {
+		t.Fatalf("hold-up capacitor simulation evidence = %#v", record.SimulationModels)
+	}
+	requireSymbolFunctions(t, record, "Device:C_Polarized", []string{"POSITIVE", "NEGATIVE"})
+	requirePackagePads(t, record, "radial_d12_5_p5", []string{"POSITIVE", "NEGATIVE"})
+}
+
+func TestCheckedInCatalogSynchronousBuckModelAndPinMap(t *testing.T) {
+	catalog, err := LoadCatalog(context.Background(), LoadOptions{CatalogDir: checkedInCatalogDir(t)})
+	if err != nil {
+		t.Fatalf("load checked-in catalog: %v", err)
+	}
+	record := requireCatalogRecord(t, catalog, "regulator.ti.lm76002rnp.wqfn30")
+	if record.Family != "regulator" || record.MPN != "LM76002RNPR" ||
+		record.Verification.Confidence != ConfidenceVerified || record.Regulator == nil {
+		t.Fatalf("LM76002 identity and regulator evidence = %#v", record)
+	}
+	if len(record.SimulationModels) != 1 ||
+		record.SimulationModels[0].ModelID != simmodel.PrimitiveSynchronousBuckRegulatorV1 ||
+		record.SimulationModels[0].ThermalModel == nil ||
+		len(record.SimulationModels[0].ThermalModel.Stages) != 2 ||
+		len(record.SimulationModels[0].TransientSOA) != 2 ||
+		record.SimulationModels[0].TransientSOA[0].PulseDurationS == nil ||
+		*record.SimulationModels[0].TransientSOA[0].PulseDurationS != .02 ||
+		!record.SimulationModels[0].TransientSOA[1].DC {
+		t.Fatalf("LM76002 dynamic model evidence = %#v", record.SimulationModels)
+	}
+	parameters := map[string]float64{}
+	for _, parameter := range record.SimulationModels[0].Parameters {
+		parameters[parameter.Name] = parameter.Value
+	}
+	for name, expected := range map[string]float64{
+		"reference_voltage_v":            1,
+		"nominal_input_voltage_v":        24,
+		"nominal_output_voltage_v":       5,
+		"max_output_current_a":           2.5,
+		"peak_current_limit_a":           3.4,
+		"conversion_efficiency_fraction": .86,
+		"switching_frequency_hz":         500_000,
+		"junction_to_ambient_c_per_w":    31.7,
+	} {
+		if parameters[name] != expected {
+			t.Fatalf("LM76002 parameter %s = %.12g, want %.12g; all=%#v", name, parameters[name], expected, parameters)
+		}
+	}
+	requiredFunctions := []string{
+		"SW", "BOOT", "VCC", "BIAS", "RT", "SS_TRK", "FB", "AGND", "PGOOD",
+		"SYNC_MODE", "EN", "PVIN", "PGND",
+	}
+	requireSymbolFunctions(t, record, "Regulator_Switching:LM76002", requiredFunctions)
+	requirePackagePads(t, record, "rnp_wqfn30_thermal_vias", requiredFunctions)
 }
 
 func TestCheckedInCatalogLM358MultiUnitEvidence(t *testing.T) {
@@ -245,6 +368,16 @@ func TestCheckedInCatalogAudioPowerSemiconductorEvidence(t *testing.T) {
 		if test.family == "bjt" && (len(record.SimulationModels) != 1 || record.SimulationModels[0].ModelID != wantModel) {
 			t.Fatalf("%s trusted compact model = %#v, want %s", test.id, record.SimulationModels, wantModel)
 		}
+		if test.id == "bjt.onsemi.d44h11g.to220" || test.id == "bjt.onsemi.d45h11g.to220" {
+			soa := record.SimulationModels[0].TransientSOA
+			if len(soa) != 4 ||
+				soa[0].PulseDurationS == nil || *soa[0].PulseDurationS != 10e-6 ||
+				soa[1].PulseDurationS == nil || *soa[1].PulseDurationS != 100e-6 ||
+				soa[2].PulseDurationS == nil || *soa[2].PulseDurationS != 1e-3 ||
+				!soa[3].DC {
+				t.Fatalf("%s duration-specific trusted SOA = %#v", test.id, soa)
+			}
+		}
 	}
 }
 
@@ -301,6 +434,22 @@ func TestCheckedInCatalogSpeakerAmplifierComponentEvidence(t *testing.T) {
 		if pads["OFFSET_TRIM_1"] != "1" || pads["NC"] != "5" || pads["OFFSET_TRIM_2"] != "8" {
 			t.Fatalf("OPA134 auxiliary pad mapping = %#v, want legacy symbol pins 1/8 and hidden NC pad 5", pads)
 		}
+	}
+
+	wideSwingOpAmp := requireCatalogRecord(t, catalog, "opamp.ti.opa992idbvr.sot23_5")
+	if wideSwingOpAmp.OpAmp == nil || !wideSwingOpAmp.OpAmp.FabricationProof ||
+		wideSwingOpAmp.OpAmp.OutputSwing == nil ||
+		wideSwingOpAmp.OpAmp.OutputSwing.NegativeRailHeadroomV == nil ||
+		wideSwingOpAmp.OpAmp.OutputSwing.PositiveRailHeadroomV == nil ||
+		*wideSwingOpAmp.OpAmp.OutputSwing.NegativeRailHeadroomV != .3 ||
+		*wideSwingOpAmp.OpAmp.OutputSwing.PositiveRailHeadroomV != .3 {
+		t.Fatalf("OPA992 high-voltage rail-to-rail evidence = %#v", wideSwingOpAmp.OpAmp)
+	}
+	requireRatingMax(t, wideSwingOpAmp, "supply_voltage", "40", "V")
+	requireSymbolFunctions(t, wideSwingOpAmp, "Amplifier_Operational:LMV321", []string{"IN_MINUS", "IN_PLUS", "OUT", "V_MINUS", "V_PLUS"})
+	requirePackagePads(t, wideSwingOpAmp, "sot23_5", []string{"IN_MINUS", "IN_PLUS", "OUT", "V_MINUS", "V_PLUS"})
+	if len(wideSwingOpAmp.SimulationModels) != 1 || wideSwingOpAmp.SimulationModels[0].ModelID != "mna_opamp_single_pole_v1" {
+		t.Fatalf("OPA992 trusted compact model = %#v", wideSwingOpAmp.SimulationModels)
 	}
 
 	for _, test := range []struct {

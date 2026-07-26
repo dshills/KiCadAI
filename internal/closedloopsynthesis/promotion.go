@@ -112,9 +112,8 @@ func ReplaySimulationEvidence(evidence SimulationEvidence) []Diagnostic {
 			Message: fmt.Sprintf("simulation transcript has %d reports for %d resolved plans", len(evidence.Reports), len(plans)),
 		})
 	}
-	replayed := make([]simmodel.Report, 0, len(plans))
-	for index, plan := range plans {
-		report, planDiagnostics := simmodel.Evaluate(simmodel.ClonePlan(plan))
+	replayed, replayDiagnostics := evaluateTrustedSimulationPlans(plans)
+	for index, planDiagnostics := range replayDiagnostics {
 		for _, diagnostic := range planDiagnostics {
 			diagnostics = append(diagnostics, Diagnostic{
 				Path:       fmt.Sprintf("reports[%d].%s", index, diagnostic.Path),
@@ -122,7 +121,6 @@ func ReplaySimulationEvidence(evidence SimulationEvidence) []Diagnostic {
 				Suggestion: diagnostic.Suggestion,
 			})
 		}
-		replayed = append(replayed, report)
 	}
 	if len(diagnostics) == 0 {
 		persistedHash, persistedErr := HashSimulationEvidence(evidence)

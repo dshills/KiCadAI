@@ -269,6 +269,51 @@ func TestMNAFuseClosedStateUsesCatalogResistanceAndFailsAboveRatedCurrent(t *tes
 	}
 }
 
+func TestMNAFuseI2TClearingOpensAfterCatalogBackedFaultPulse(t *testing.T) {
+	recovered := .5
+	intent := Intent{
+		ModelID: ModelTransientCircuitV1,
+		Analyses: []Analysis{{
+			ID: "fault", Kind: AnalysisTransient, DurationS: .003, TimeStepS: .0001,
+			Excitations: []SourceExcitation{{Component: "supply", DCValue: .5}},
+			SourceValueEvents: []SourceValueEvent{{
+				ID: "short_fault", Component: "supply", TriggerTimeS: .001, DurationS: .001,
+				Initial: .5, Applied: 10, Recovered: &recovered,
+			}},
+		}},
+		Assertions: []Assertion{{
+			AnalysisID: "fault", Node: "OUT", Quantity: QuantityVoltageV, TimeS: .002,
+			Min: -1e-6, Max: 1e-6,
+		}},
+	}
+	components := []ComponentEvidence{
+		voltageSourceEvidence("supply", "VIN", "GND"),
+		{
+			InstanceID: "fuse", CatalogID: "fuse", Family: "fuse",
+			ModelClaims: []CatalogEvidence{{
+				ModelID: PrimitiveFuseI2TClearingV1,
+				Parameters: []NamedValue{
+					{Name: "cold_resistance_ohm", Value: .1},
+					{Name: "open_resistance_ohm", Value: 1e9},
+					{Name: "rated_current_a", Value: 1},
+					{Name: "max_voltage_v", Value: 75},
+					{Name: "nominal_melting_i2t_a2s", Value: .01},
+				},
+			}},
+			Connections: []ConnectionEvidence{{Function: "A", Net: "VIN"}, {Function: "B", Net: "OUT"}},
+		},
+		resistorEvidence("load", 1, "OUT", "GND"),
+	}
+	plan, diagnostics := ResolveWithTopology(intent, "catalog", "hash", components, []NodeEvidence{{Name: "GND", Role: "ground"}, {Name: "VIN"}, {Name: "OUT"}})
+	if len(diagnostics) != 0 {
+		t.Fatalf("I2t fuse resolution diagnostics = %#v", diagnostics)
+	}
+	report, diagnostics := Evaluate(plan)
+	if len(diagnostics) != 0 || report.Status != "pass" || len(report.Assertions) != 1 {
+		t.Fatalf("I2t fuse report = %#v diagnostics=%#v", report, diagnostics)
+	}
+}
+
 func TestMNAFuseClosedStateContributesCatalogResistanceThermalNoise(t *testing.T) {
 	intent := Intent{
 		ModelID: ModelLinearCircuitMNAV1,
@@ -418,6 +463,116 @@ func TestTransientDerivedWaveformMeasurements(t *testing.T) {
 		actual, diagnostic := transientDerivedValue(result, assertion)
 		if diagnostic != nil || actual < test.wantMin || actual > test.wantMax {
 			t.Fatalf("%s = %.12g diagnostic=%#v", test.quantity, actual, diagnostic)
+		}
+	}
+}
+
+func TestTransientDerivedMeasurementsUseBoundedEventWindow(t *testing.T) {
+	result := AnalysisResult{ID: "wave", Kind: AnalysisTransient, Points: []AnalysisPoint{
+		{TimeS: 0, Nodes: []NodeResult{{Node: "OUT", Real: 0}}},
+		{TimeS: 1, Nodes: []NodeResult{{Node: "OUT", Real: 0}}},
+		{TimeS: 2, Nodes: []NodeResult{{Node: "OUT", Real: 10}}},
+		{TimeS: 3, Nodes: []NodeResult{{Node: "OUT", Real: 9.9}}},
+		{TimeS: 4, Nodes: []NodeResult{{Node: "OUT", Real: 10}}},
+		{TimeS: 5, Nodes: []NodeResult{{Node: "OUT", Real: 0}}},
+	}}
+	assertion := Assertion{
+		AnalysisID: "wave", Node: "OUT", Quantity: QuantitySettlingTimeS,
+		WindowStartS: 1, WindowEndS: 5,
+	}
+	actual, diagnostic := transientDerivedValue(result, assertion)
+	if diagnostic != nil || actual < .99 || actual > 1.01 {
+		t.Fatalf("windowed settling time = %.12g diagnostic=%#v", actual, diagnostic)
+	}
+}
+
+func TestTransientResponseTimeUsesEventToResponseLatencyInBoundedWindow(t *testing.T) {
+	result := AnalysisResult{ID: "event", Kind: AnalysisTransient, Points: []AnalysisPoint{
+		{TimeS: 0, Nodes: []NodeResult{{Node: "OUT", Real: 0}}},
+		{TimeS: 1, Nodes: []NodeResult{{Node: "OUT", Real: 0}}},
+		{TimeS: 1.2, Nodes: []NodeResult{{Node: "OUT", Real: 0}}},
+		{TimeS: 1.4, Nodes: []NodeResult{{Node: "OUT", Real: 2}}},
+		{TimeS: 1.6, Nodes: []NodeResult{{Node: "OUT", Real: 10}}},
+		{TimeS: 2, Nodes: []NodeResult{{Node: "OUT", Real: 10}}},
+	}}
+	assertion := Assertion{
+		AnalysisID: "event", Node: "OUT", Quantity: QuantityResponseTimeS,
+		WindowStartS: 1, WindowEndS: 2.1,
+	}
+	actual, diagnostic := transientDerivedValue(result, assertion)
+	if diagnostic != nil || math.Abs(actual-.3) > 1e-12 {
+		t.Fatalf("event response latency = %.12g, want .3 diagnostic=%#v", actual, diagnostic)
+	}
+}
+
+func TestTransientResponseTimeRejectsPeriodicBaselineMotion(t *testing.T) {
+	result := AnalysisResult{
+		ID: "event", Kind: AnalysisTransient, FundamentalFrequencyHz: 1,
+		Points: []AnalysisPoint{
+			{TimeS: 0, Nodes: []NodeResult{{Node: "OUT", Real: 0}}},
+			{TimeS: .25, Nodes: []NodeResult{{Node: "OUT", Real: 1}}},
+			{TimeS: .5, Nodes: []NodeResult{{Node: "OUT", Real: 0}}},
+			{TimeS: .75, Nodes: []NodeResult{{Node: "OUT", Real: -1}}},
+			{TimeS: 1, Nodes: []NodeResult{{Node: "OUT", Real: 0}}},
+			{TimeS: 1.25, Nodes: []NodeResult{{Node: "OUT", Real: 1}}},
+			{TimeS: 1.5, Nodes: []NodeResult{{Node: "OUT", Real: 0}}},
+			{TimeS: 1.75, Nodes: []NodeResult{{Node: "OUT", Real: -1}}},
+			{TimeS: 2, Nodes: []NodeResult{{Node: "OUT", Real: 0}}},
+			{TimeS: 2.25, Nodes: []NodeResult{{Node: "OUT", Real: 1}}},
+			{TimeS: 2.5, Nodes: []NodeResult{{Node: "OUT", Real: 2}}},
+			{TimeS: 2.75, Nodes: []NodeResult{{Node: "OUT", Real: -1}}},
+			{TimeS: 3, Nodes: []NodeResult{{Node: "OUT", Real: 0}}},
+		},
+	}
+	assertion := Assertion{
+		AnalysisID: "event", Node: "OUT", Quantity: QuantityResponseTimeS,
+		WindowStartS: 2, WindowEndS: 3.1,
+	}
+	actual, diagnostic := transientDerivedValue(result, assertion)
+	if diagnostic != nil || math.Abs(actual-.275) > 1e-12 {
+		t.Fatalf("periodic event response latency = %.12g, want .275 diagnostic=%#v", actual, diagnostic)
+	}
+}
+
+func TestTransientDerivedEventStressAndEfficiencyMeasurements(t *testing.T) {
+	result := AnalysisResult{ID: "event", Kind: AnalysisTransient, Points: []AnalysisPoint{
+		{
+			TimeS: 0,
+			Nodes: []NodeResult{{Node: "OUT", Real: 0}},
+			Devices: []DeviceResult{
+				{Component: "load", VoltageV: 0, CurrentA: 0},
+				{Component: "supply", VoltageV: 12, CurrentA: 0},
+			},
+		},
+		{
+			TimeS: 1,
+			Nodes: []NodeResult{{Node: "OUT", Real: 11}},
+			Devices: []DeviceResult{
+				{Component: "load", VoltageV: 11, CurrentA: .5, CurrentMagnitudeA: .5},
+				{Component: "supply", VoltageV: 12, CurrentA: -.5, CurrentMagnitudeA: .5},
+			},
+		},
+		{
+			TimeS: 2,
+			Nodes: []NodeResult{{Node: "OUT", Real: 10}},
+			Devices: []DeviceResult{
+				{Component: "load", VoltageV: 10, CurrentA: .5, CurrentMagnitudeA: .5},
+				{Component: "supply", VoltageV: 12, CurrentA: -.5, CurrentMagnitudeA: .5},
+			},
+		},
+	}}
+	for _, test := range []struct {
+		assertion Assertion
+		want      float64
+	}{
+		{Assertion{AnalysisID: "event", Node: "OUT", Quantity: QuantityOvershootVoltageV}, 1},
+		{Assertion{AnalysisID: "event", Component: "load", Quantity: QuantityPeakAbsDeviceVoltageV}, 11},
+		{Assertion{AnalysisID: "event", Component: "load", Quantity: QuantityPeakAbsDeviceCurrentA}, .5},
+		{Assertion{AnalysisID: "event", Component: "load", Components: []string{"supply"}, Quantity: QuantityConversionEfficiencyPct}, 87.5},
+	} {
+		actual, diagnostic := transientDerivedValue(result, test.assertion)
+		if diagnostic != nil || math.Abs(actual-test.want) > 1e-12 {
+			t.Fatalf("%s = %.12g, want %.12g diagnostic=%#v", test.assertion.Quantity, actual, test.want, diagnostic)
 		}
 	}
 }
@@ -916,6 +1071,74 @@ func TestMNACurrentSenseAmplifierClampsToCatalogOutputRange(t *testing.T) {
 				t.Fatalf("current-sense report = %#v diagnostics=%#v", report, diagnostics)
 			}
 		})
+	}
+}
+
+func TestMNACurrentSenseAmplifierDefaultsAbsentReferencesToPrimaryGround(t *testing.T) {
+	parameters := []NamedValue{
+		{Name: "gain_v_per_v", Value: 10}, {Name: "bandwidth_hz", Value: 80000},
+		{Name: "input_offset_voltage_v", Value: 0}, {Name: "supply_min_v", Value: 2.7},
+		{Name: "supply_max_v", Value: 60}, {Name: "common_mode_min_v", Value: 2.7},
+		{Name: "common_mode_max_v", Value: 60}, {Name: "output_low_margin_v", Value: 0},
+		{Name: "output_high_margin_v", Value: 1}, {Name: "quiescent_current_a", Value: .00006},
+	}
+	components := []ComponentEvidence{
+		voltageSourceEvidence("supply", "VCC", "GND"),
+		voltageSourceEvidence("input_plus", "SENSEP", "GND"),
+		voltageSourceEvidence("input_minus", "SENSEM", "GND"),
+		{InstanceID: "sensor", CatalogID: "sensor", Family: "current_sensor", ModelClaims: []CatalogEvidence{{ModelID: PrimitiveCurrentSenseAmplifierV1, Parameters: parameters}}, Connections: []ConnectionEvidence{
+			{Function: "IN_PLUS", Net: "SENSEP"}, {Function: "IN_MINUS", Net: "SENSEM"},
+			{Function: "OUT", Net: "OUT"}, {Function: "VCC", Net: "VCC"}, {Function: "GND_A", Net: "GND"},
+		}},
+		resistorEvidence("load", 50000, "OUT", "GND"),
+	}
+	intent := Intent{
+		ModelID:    ModelLinearCircuitMNAV1,
+		Analyses:   []Analysis{{ID: "dc", Kind: AnalysisDCOperatingPoint, Excitations: []SourceExcitation{{Component: "supply", DCValue: 12}, {Component: "input_plus", DCValue: 12.01}, {Component: "input_minus", DCValue: 12}}}},
+		Assertions: []Assertion{{AnalysisID: "dc", Node: "OUT", Quantity: QuantityVoltageV, Min: .099, Max: .101}},
+	}
+	plan, diagnostics := ResolveWithTopology(intent, "catalog", "catalog-hash", components, []NodeEvidence{{Name: "GND", Role: "ground"}, {Name: "VCC", Role: "power"}, {Name: "SENSEP"}, {Name: "SENSEM"}, {Name: "OUT"}})
+	if len(diagnostics) != 0 {
+		t.Fatalf("resolve ground-referenced current-sense amplifier: %#v", diagnostics)
+	}
+	sensor, found := resolvedDeviceByComponent(plan.Devices, "sensor")
+	if !found {
+		t.Fatalf("resolved plan omitted current sensor: %#v", plan.Devices)
+	}
+	terminals := terminalMap(sensor)
+	for _, terminal := range []string{"REF1", "REF2", "GND_B"} {
+		if terminals[terminal] != "GND" {
+			t.Fatalf("%s default net = %q, want GND: %#v", terminal, terminals[terminal], sensor.Terminals)
+		}
+	}
+	report, diagnostics := Evaluate(plan)
+	if len(diagnostics) != 0 || report.Status != "pass" {
+		t.Fatalf("current-sense report = %#v diagnostics=%#v", report, diagnostics)
+	}
+}
+
+func TestCurrentSenseOperatingLimitToleratesNumericalNoiseAtOutputBoundary(t *testing.T) {
+	parameters := []NamedValue{
+		{Name: "supply_min_v", Value: 2.7}, {Name: "supply_max_v", Value: 5.5},
+		{Name: "common_mode_min_v", Value: -4}, {Name: "common_mode_max_v", Value: 80},
+		{Name: "output_low_margin_v", Value: .02}, {Name: "output_high_margin_v", Value: .2},
+	}
+	plan := Plan{Devices: []ResolvedDevice{{
+		Component: "sensor", PrimitiveModel: PrimitiveCurrentSenseAmplifierV1, ModelParameters: parameters,
+		Terminals: []TerminalBinding{
+			{Terminal: "IN_PLUS", Net: "SENSEP"}, {Terminal: "IN_MINUS", Net: "SENSEM"},
+			{Terminal: "OUT", Net: "OUT"}, {Terminal: "VCC", Net: "VCC"},
+			{Terminal: "GND_A", Net: "GND"}, {Terminal: "GND_B", Net: "GND"},
+		},
+	}}}
+	system := mnaSystem{nodeIndex: map[string]int{"VCC": 0, "SENSEP": 1, "SENSEM": 2, "OUT": 3}}
+	solution := []complex128{5, 0, 0, complex(.02-1e-9, 0)}
+	if diagnostics := validateResolvedOperatingLimits(plan, system, solution, false); len(diagnostics) != 0 {
+		t.Fatalf("boundary solve noise was rejected: %#v", diagnostics)
+	}
+	solution[3] = complex(.02-1e-4, 0)
+	if diagnostics := validateResolvedOperatingLimits(plan, system, solution, false); len(diagnostics) != 1 || !strings.Contains(diagnostics[0].Path, ".output") {
+		t.Fatalf("material output-range violation was not rejected: %#v", diagnostics)
 	}
 }
 

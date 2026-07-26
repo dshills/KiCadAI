@@ -132,6 +132,17 @@ func Normalize(requirement Requirement) Requirement {
 			condition.Selection = canonicalIdentifier(condition.Selection)
 		}
 		slices.SortStableFunc(operatingCase.Conditions, compareOperatingConditions)
+		for eventIndex := range operatingCase.Events {
+			event := &operatingCase.Events[eventIndex]
+			event.ID = canonicalIdentifier(event.ID)
+			event.Kind = canonicalIdentifier(event.Kind)
+			event.Target.Kind = canonicalIdentifier(event.Target.Kind)
+			event.Target.ID = canonicalIdentifier(event.Target.ID)
+			event.Unit = canonicalUnit(event.Unit)
+		}
+		slices.SortStableFunc(operatingCase.Events, func(left, right OperatingEvent) int {
+			return strings.Compare(left.ID, right.ID)
+		})
 	}
 	slices.SortStableFunc(normalized.Requirements.OperatingCases, func(left, right OperatingCase) int {
 		return strings.Compare(left.ID, right.ID)
@@ -340,6 +351,8 @@ func canonicalUnit(value string) string {
 		return "s"
 	case "f":
 		return "F"
+	case "h":
+		return "H"
 	default:
 		return strings.TrimSpace(value)
 	}

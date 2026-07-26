@@ -284,6 +284,10 @@ func verifiedPadTemplate(footprintID string) (verifiedPadTemplateRecord, bool) {
 		template := throughHoleRowTemplate([]float64{0, 3.5}, []string{"1", "2"}, 1.6, 1.6, 0.8, []string{"roundrect", "circle"}, 8.0, 8.0)
 		template.Bounds = verifiedCourtyardBounds(8.5, 8.5, 2.5, 4.25)
 		return template, true
+	case "Capacitor_THT:CP_Radial_D12.5mm_P5.00mm":
+		template := throughHoleRowTemplate([]float64{0, 5}, []string{"1", "2"}, 2.4, 2.4, 1.2, []string{"roundrect", "circle"}, 12.5, 12.5)
+		template.Bounds = verifiedCourtyardBoundsFromExtents(-4, -6.5, 9, 6.5)
+		return template, true
 	case "Diode_SMD:D_SOD-123":
 		return verifiedPadTemplateRecord{
 			Bounds: verifiedCourtyardBounds(4.7, 2.3, 2.35, 1.15),
@@ -312,6 +316,9 @@ func verifiedPadTemplate(footprintID string) (verifiedPadTemplateRecord, bool) {
 		}, true
 	case "Fuse:Fuse_1206_3216Metric":
 		return twoPadTemplate(4.5, 2.6, 1.6, 1.6, 2.8), true
+	case "Inductor_SMD:L_Sunlord_MWSA1206S-150",
+		"Inductor_SMD:L_Sunlord_MWSA1206S-220":
+		return sunlordMWSA1206STemplate(), true
 	case "Resistor_THT:R_Axial_DIN0414_L11.9mm_D4.5mm_P20.32mm_Horizontal":
 		template := throughHoleRowTemplate([]float64{0, 20.32}, []string{"1", "2"}, 2.4, 2.4, 1.2, []string{"circle", "circle"}, 23.0, 4.5)
 		template.Bounds = verifiedCourtyardBounds(23.22, 5, 1.45, 2.5)
@@ -500,6 +507,8 @@ func verifiedPadTemplate(footprintID string) (verifiedPadTemplateRecord, bool) {
 			smdPad("8", 2.475, -1.905, 1.95, 0.6, "roundrect"),
 		}
 		return verifiedPadTemplateRecord{Bounds: verifiedCourtyardBounds(7.4, 5.4, 3.7, 2.7), Pads: pads}, true
+	case "Package_SO:MSOP-16-1EP_3x4.039mm_P0.5mm_EP1.651x2.845mm_ThermalVias":
+		return analogMSOP16ExposedPadTemplate(), true
 	case "Package_SO:VSSOP-8_2.3x2mm_P0.5mm":
 		pads := []placement.PadSummary{
 			smdPad("1", -1.4, -0.75, 1.25, 0.35, "roundrect"),
@@ -526,6 +535,8 @@ func verifiedPadTemplate(footprintID string) (verifiedPadTemplateRecord, bool) {
 		return verifiedPadTemplateRecord{Bounds: verifiedCourtyardBoundsFromExtents(-3.18, -1.75, 3.18, 1.75), Pads: pads}, true
 	case "Package_QFP:TQFP-32_7x7mm_P0.8mm", "Package_QFP:LQFP-32_7x7mm_P0.8mm":
 		return tqfp32Template(), true
+	case "Package_DFN_QFN:Texas_RNP0030B_WQFN-30-1EP_4x6mm_P0.5mm_EP1.8x4.5mm_ThermalVias":
+		return texasRNP0030BWQFN30Template(), true
 	case "Package_LGA:Bosch_LGA-8_2x2.5mm_P0.65mm_ClockwisePinNumbering":
 		pads := []placement.PadSummary{
 			{Name: "1", XMM: -0.975, YMM: -0.8, WidthMM: 0.35, HeightMM: 0.5},
@@ -619,6 +630,106 @@ func tqfp32Template() verifiedPadTemplateRecord {
 		pads = append(pads, placement.PadSummary{Name: strconv.Itoa(number), XMM: 2.8 - float64(number-25)*0.8, YMM: -4.1625, WidthMM: 0.55, HeightMM: 1.475})
 	}
 	return verifiedPadTemplateRecord{Bounds: padEnvelopeBounds(pads, 10.3, 10.3), Pads: pads}
+}
+
+func texasRNP0030BWQFN30Template() verifiedPadTemplateRecord {
+	pads := make([]placement.PadSummary, 0, 47)
+	for number := 1; number <= 11; number++ {
+		pads = append(pads, smdPad(strconv.Itoa(number), -1.8625, -2.5+float64(number-1)*.5, 1.025, .25, "roundrect"))
+	}
+	for number := 12; number <= 15; number++ {
+		pads = append(pads, smdPad(strconv.Itoa(number), -.75+float64(number-12)*.5, 2.9875, .25, .775, "roundrect"))
+	}
+	for number := 16; number <= 26; number++ {
+		pads = append(pads, smdPad(strconv.Itoa(number), 1.8625, 2.5-float64(number-16)*.5, 1.025, .25, "roundrect"))
+	}
+	for number := 27; number <= 30; number++ {
+		pads = append(pads, smdPad(strconv.Itoa(number), .75-float64(number-27)*.5, -2.9875, .25, .775, "roundrect"))
+	}
+	pads = append(pads,
+		placement.PadSummary{
+			Name: "31", WidthMM: 1.8, HeightMM: 4.5,
+			Type: "smd", Shape: "rect", Layers: []string{"F.Cu", "F.Mask"},
+		},
+		placement.PadSummary{
+			Name: "31", WidthMM: 1.8, HeightMM: 4.5,
+			Type: "smd", Shape: "rect", Layers: []string{"B.Cu"},
+		},
+	)
+	for _, xMM := range []float64{-.65, 0, .65} {
+		for _, yMM := range []float64{-2, -1, 0, 1, 2} {
+			pads = append(pads, throughHolePad("31", xMM, yMM, .5, .5, .2, "circle"))
+		}
+	}
+	return verifiedPadTemplateRecord{
+		Bounds: verifiedCourtyardBoundsFromExtents(-2.63, -3.63, 2.63, 3.63),
+		Pads:   pads,
+	}
+}
+
+func analogMSOP16ExposedPadTemplate() verifiedPadTemplateRecord {
+	pads := []placement.PadSummary{
+		{Name: "", XMM: -.415, YMM: -.71, WidthMM: .69, HeightMM: 1.19, Type: "smd", Shape: "roundrect", Layers: []string{"F.Paste"}},
+		{Name: "", XMM: -.415, YMM: .71, WidthMM: .69, HeightMM: 1.19, Type: "smd", Shape: "roundrect", Layers: []string{"F.Paste"}},
+		{Name: "", XMM: .415, YMM: -.71, WidthMM: .69, HeightMM: 1.19, Type: "smd", Shape: "roundrect", Layers: []string{"F.Paste"}},
+		{Name: "", XMM: .415, YMM: .71, WidthMM: .69, HeightMM: 1.19, Type: "smd", Shape: "roundrect", Layers: []string{"F.Paste"}},
+	}
+	for number := 1; number <= 8; number++ {
+		pads = append(pads, smdPad(
+			strconv.Itoa(number),
+			-2.15,
+			-1.75+float64(number-1)*.5,
+			1.45,
+			.3,
+			"roundrect",
+		))
+	}
+	for number := 9; number <= 16; number++ {
+		pads = append(pads, smdPad(
+			strconv.Itoa(number),
+			2.15,
+			1.75-float64(number-9)*.5,
+			1.45,
+			.3,
+			"roundrect",
+		))
+	}
+	for _, yMM := range []float64{-1.1475, 0, 1.1475} {
+		pads = append(pads, placement.PadSummary{
+			Name: "17", XMM: -.5505, YMM: yMM, WidthMM: .55, HeightMM: .55,
+			Type: "thru_hole", Shape: "circle", DrillMM: .25, Layers: []string{"*.Cu"},
+		})
+	}
+	pads = append(pads,
+		placement.PadSummary{
+			Name: "17", WidthMM: 1.651, HeightMM: 2.845,
+			Type: "smd", Shape: "rect", Layers: []string{"F.Cu", "F.Mask"},
+		},
+		placement.PadSummary{
+			Name: "17", WidthMM: 1.651, HeightMM: 2.845,
+			Type: "smd", Shape: "rect", Layers: []string{"B.Cu"},
+		},
+	)
+	for _, yMM := range []float64{-1.1475, 0, 1.1475} {
+		pads = append(pads, placement.PadSummary{
+			Name: "17", XMM: .5505, YMM: yMM, WidthMM: .55, HeightMM: .55,
+			Type: "thru_hole", Shape: "circle", DrillMM: .25, Layers: []string{"*.Cu"},
+		})
+	}
+	return verifiedPadTemplateRecord{
+		Bounds: verifiedCourtyardBoundsFromExtents(-3.13, -2.27, 3.13, 2.27),
+		Pads:   pads,
+	}
+}
+
+func sunlordMWSA1206STemplate() verifiedPadTemplateRecord {
+	return verifiedPadTemplateRecord{
+		Bounds: verifiedCourtyardBoundsFromExtents(-7.5, -6.55, 7.5, 6.55),
+		Pads: []placement.PadSummary{
+			smdPad("1", -5.625, 0, 3.25, 5.5, "roundrect"),
+			smdPad("2", 5.625, 0, 3.25, 5.5, "roundrect"),
+		},
+	}
 }
 
 func boschLGA8_2_5Template() verifiedPadTemplateRecord {

@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"kicadai/internal/architecturesearch"
+	"kicadai/internal/simmodel"
 )
 
 const (
@@ -27,6 +28,7 @@ type AnalysisPlan struct {
 	Bindings        []SemanticBinding  `json:"bindings"`
 	Analyses        []PlannedAnalysis  `json:"analyses"`
 	Corners         []PlannedCorner    `json:"corners"`
+	Events          []PlannedEvent     `json:"events,omitempty"`
 	Assertions      []PlannedAssertion `json:"assertions"`
 	ModelDecisions  []ModelDecision    `json:"model_decisions"`
 }
@@ -36,6 +38,20 @@ type PlannedAnalysis struct {
 	Kind          string   `json:"kind"`
 	OperatingCase string   `json:"operating_case"`
 	Requirements  []string `json:"requirements"`
+	Events        []string `json:"events,omitempty"`
+}
+
+type PlannedEvent struct {
+	ID            string   `json:"id"`
+	Kind          string   `json:"kind"`
+	OperatingCase string   `json:"operating_case"`
+	Target        string   `json:"target"`
+	TriggerTimeS  float64  `json:"trigger_time_s"`
+	DurationS     float64  `json:"duration_s"`
+	Initial       *float64 `json:"initial,omitempty"`
+	Applied       float64  `json:"applied"`
+	Recovered     *float64 `json:"recovered,omitempty"`
+	Unit          string   `json:"unit"`
 }
 
 type PlannedCorner struct {
@@ -64,7 +80,7 @@ type PlannedAssertion struct {
 	Critical      bool     `json:"critical"`
 }
 
-// BuildAnalysisPlan binds v3/v4 semantic behavior to resolved trusted targets and
+// BuildAnalysisPlan binds v3/v4/v5 semantic behavior to resolved trusted targets and
 // expands bounded named operating corners. It does not accept equations,
 // solver settings, or provider model content.
 func BuildAnalysisPlan(requirement architecturesearch.Requirement, bindings []SemanticBinding, modelDecisions []ModelDecision) (AnalysisPlan, []Diagnostic) {
@@ -72,8 +88,9 @@ func BuildAnalysisPlan(requirement architecturesearch.Requirement, bindings []Se
 	requirementHash, err := architecturesearch.CanonicalHash(requirement)
 	v3 := requirement.Schema == architecturesearch.SchemaIDV3 && requirement.Version == architecturesearch.VersionV3
 	v4 := requirement.Schema == architecturesearch.SchemaIDV4 && requirement.Version == architecturesearch.VersionV4
-	if err != nil || (!v3 && !v4) {
-		message := "analysis planning requires a valid v3 or v4 behavioral requirement"
+	v5 := requirement.Schema == architecturesearch.SchemaIDV5 && requirement.Version == architecturesearch.VersionV5
+	if err != nil || (!v3 && !v4 && !v5) {
+		message := "analysis planning requires a valid v3, v4, or v5 behavioral requirement"
 		if err != nil {
 			message = err.Error()
 		}
@@ -92,9 +109,55 @@ func BuildAnalysisPlan(requirement architecturesearch.Requirement, bindings []Se
 		corners, cornerDiagnostics := expandOperatingCase(operatingCase, bindingTargets)
 		diagnostics = append(diagnostics, cornerDiagnostics...)
 		plan.Corners = append(plan.Corners, corners...)
+		for eventIndex, event := range operatingCase.Events {
+			target, exists := observationTarget(event.Target, bindingTargets)
+			if !exists {
+				diagnostics = append(diagnostics, Diagnostic{
+					Path:    fmt.Sprintf("operating_cases.%s.events[%d].target", operatingCase.ID, eventIndex),
+					Message: "resolved operating-event target binding is missing",
+				})
+				continue
+			}
+			if event.Applied == nil {
+				diagnostics = append(diagnostics, Diagnostic{
+					Path:    fmt.Sprintf("operating_cases.%s.events[%d].applied", operatingCase.ID, eventIndex),
+					Message: "planned operating event lacks its required applied value",
+				})
+				continue
+			}
+			plan.Events = append(plan.Events, PlannedEvent{
+				ID: event.ID, Kind: event.Kind, OperatingCase: operatingCase.ID, Target: target,
+				TriggerTimeS: event.TriggerTimeS, DurationS: event.DurationS,
+				Initial: cloneFloat(event.Initial), Applied: *event.Applied, Recovered: cloneFloat(event.Recovered), Unit: event.Unit,
+			})
+			bindingTargets["event\x00"+event.ID] = "event:" + event.ID
+		}
 	}
+	slices.SortStableFunc(plan.Events, comparePlannedEvents)
 
 	analysisRequirements := map[string][]string{}
+	analysisKinds := map[string]string{}
+	analysisCases := map[string]string{}
+	analysisEvents := map[string][]string{}
+	observedEvents := map[string]bool{}
+	caseKinds := map[string]map[string]bool{}
+	registerAnalysis := func(kind, caseID, eventID string) string {
+		analysisID := kind + ":" + caseID
+		if eventID != "" {
+			analysisID += ":event:" + eventID
+			analysisEvents[analysisID] = append(analysisEvents[analysisID], eventID)
+		}
+		if _, exists := analysisRequirements[analysisID]; !exists {
+			analysisRequirements[analysisID] = nil
+		}
+		analysisKinds[analysisID] = kind
+		analysisCases[analysisID] = caseID
+		if caseKinds[caseID] == nil {
+			caseKinds[caseID] = map[string]bool{}
+		}
+		caseKinds[caseID][kind] = true
+		return analysisID
+	}
 	for _, behavior := range requirement.Requirements.BehavioralRequirements {
 		target, exists := observationTarget(behavior.Observation, bindingTargets)
 		if !exists {
@@ -102,7 +165,12 @@ func BuildAnalysisPlan(requirement architecturesearch.Requirement, bindings []Se
 			continue
 		}
 		for _, caseID := range behavior.OperatingCases {
-			analysisID := behavior.Analysis + ":" + caseID
+			eventID := ""
+			if behavior.Observation.Kind == "event" {
+				eventID = behavior.Observation.ID
+				observedEvents[caseID+"\x00"+eventID] = true
+			}
+			analysisID := registerAnalysis(behavior.Analysis, caseID, eventID)
 			analysisRequirements[analysisID] = append(analysisRequirements[analysisID], behavior.ID)
 			plan.Assertions = append(plan.Assertions, PlannedAssertion{
 				RequirementID: behavior.ID, AnalysisID: analysisID, OperatingCase: caseID, Metric: behavior.Metric,
@@ -110,16 +178,37 @@ func BuildAnalysisPlan(requirement architecturesearch.Requirement, bindings []Se
 			})
 		}
 	}
+	for _, event := range plan.Events {
+		if observedEvents[event.OperatingCase+"\x00"+event.ID] {
+			continue
+		}
+		kind := simmodel.AnalysisTransient
+		switch event.Kind {
+		case "blocked_airflow", "inductive_turn_off", "overload", "short_circuit":
+			if caseKinds[event.OperatingCase][simmodel.AnalysisElectrothermal] {
+				kind = simmodel.AnalysisElectrothermal
+			}
+		default:
+			if !caseKinds[event.OperatingCase][kind] && caseKinds[event.OperatingCase][simmodel.AnalysisElectrothermal] {
+				kind = simmodel.AnalysisElectrothermal
+			}
+		}
+		registerAnalysis(kind, event.OperatingCase, event.ID)
+	}
 	analysisIDs := make([]string, 0, len(analysisRequirements))
 	for analysisID := range analysisRequirements {
 		analysisIDs = append(analysisIDs, analysisID)
 	}
 	slices.Sort(analysisIDs)
 	for _, analysisID := range analysisIDs {
-		parts := strings.SplitN(analysisID, ":", 2)
 		requirements := analysisRequirements[analysisID]
 		slices.Sort(requirements)
-		plan.Analyses = append(plan.Analyses, PlannedAnalysis{ID: analysisID, Kind: parts[0], OperatingCase: parts[1], Requirements: requirements})
+		events := append([]string(nil), analysisEvents[analysisID]...)
+		slices.Sort(events)
+		plan.Analyses = append(plan.Analyses, PlannedAnalysis{
+			ID: analysisID, Kind: analysisKinds[analysisID], OperatingCase: analysisCases[analysisID],
+			Requirements: requirements, Events: events,
+		})
 	}
 	slices.SortStableFunc(plan.Assertions, func(left, right PlannedAssertion) int {
 		if order := strings.Compare(left.RequirementID, right.RequirementID); order != 0 {
@@ -250,6 +339,10 @@ func operatingConditionTarget(condition architecturesearch.OperatingCondition, b
 	if condition.Target == "circuit" {
 		return "circuit", true
 	}
+	if (condition.Axis == "tolerance" || condition.Axis == "model_parameter") &&
+		(condition.Target == "all_components" || condition.Target == "all_passives") {
+		return condition.Target, true
+	}
 	if condition.Axis == "supply_voltage" {
 		target, exists := bindings["domain\x00"+condition.Target]
 		return target, exists
@@ -324,4 +417,17 @@ func compareCornerAssignments(left, right CornerAssignment) int {
 		return order
 	}
 	return strings.Compare(left.Unit, right.Unit)
+}
+
+func comparePlannedEvents(left, right PlannedEvent) int {
+	if order := strings.Compare(left.OperatingCase, right.OperatingCase); order != 0 {
+		return order
+	}
+	if left.TriggerTimeS < right.TriggerTimeS {
+		return -1
+	}
+	if left.TriggerTimeS > right.TriggerTimeS {
+		return 1
+	}
+	return strings.Compare(left.ID, right.ID)
 }

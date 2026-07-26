@@ -1,0 +1,69 @@
+{
+  "schema": "kicadai.dynamic-electrothermal-control-loop-corpus.v1",
+  "version": 1,
+  "frozen_at": "2026-07-25",
+  "requirement_schema": "kicadai.open-set-requirement.v5",
+  "minimum_dynamic_alternative_selections": 2,
+  "fixtures": [
+    {
+      "id": "class_ab_dynamic_output_stage",
+      "file": "class_ab_dynamic_output_stage.json",
+      "categories": ["amplifier", "analog", "control", "electrothermal", "power", "protection"],
+      "analyses": ["distortion", "electrothermal", "stability", "transient"],
+      "events": ["blocked_airflow", "load_step", "short_circuit", "shutdown", "startup"],
+      "minimum_functional_blocks": 6,
+      "minimum_electrical_domains": 3,
+      "sha256": "d82b2a7960d612779fa7594da7409c99f26ac299b0dd16f8d2a21059bc30251b"
+    },
+    {
+      "id": "efficient_step_down_power_stage",
+      "file": "efficient_step_down_power_stage.json",
+      "categories": ["control", "conversion", "electrothermal", "power", "protection", "switching"],
+      "analyses": ["dc_operating_point", "electrothermal", "stability", "transient"],
+      "events": ["input_step", "load_step", "short_circuit", "startup"],
+      "minimum_functional_blocks": 4,
+      "minimum_electrical_domains": 3,
+      "sha256": "8f7b6d6dd2d2771d0c2bff59d056a8d46ffbafa62de868b813d3ad6a0af14a6a"
+    },
+    {
+      "id": "precision_analog_servo_supply",
+      "file": "precision_analog_servo_supply.json",
+      "categories": ["analog", "control", "electrothermal", "power", "protection", "servo"],
+      "analyses": ["dc_operating_point", "electrothermal", "stability", "transient"],
+      "events": ["blocked_airflow", "load_step", "short_circuit", "startup"],
+      "minimum_functional_blocks": 4,
+      "minimum_electrical_domains": 3,
+      "sha256": "a02ba5233e6248fdab018933d462ea223690be9c3d438480fd81f254df8f2bf7"
+    },
+    {
+      "id": "protected_inductive_actuator_driver",
+      "file": "protected_inductive_actuator_driver.json",
+      "categories": ["control", "electrothermal", "inductive", "power", "protection", "switching"],
+      "analyses": ["electrothermal", "transient"],
+      "events": ["inductive_turn_off", "input_step", "overload", "short_circuit"],
+      "minimum_functional_blocks": 4,
+      "minimum_electrical_domains": 3,
+      "sha256": "324842f8c9724c842c338cfd911fc8283e15dc883fa27f4b2a2974259aded715"
+    },
+    {
+      "id": "sequenced_dual_rail_controller",
+      "file": "sequenced_dual_rail_controller.json",
+      "categories": ["control", "electrothermal", "power", "protection", "sequencing"],
+      "analyses": ["dc_operating_point", "electrothermal", "stability", "transient"],
+      "events": ["load_step", "rail_loss", "shutdown", "startup"],
+      "minimum_functional_blocks": 6,
+      "minimum_electrical_domains": 4,
+      "sha256": "637d0202ca0f159142e8648c9af5a458a841292205b814cee9afff1330d96bc9"
+    },
+    {
+      "id": "stable_reactive_load_line_driver",
+      "file": "stable_reactive_load_line_driver.json",
+      "categories": ["amplifier", "analog", "control", "protection", "reactive_load"],
+      "analyses": ["ac_sweep", "stability", "transient"],
+      "events": ["input_step", "load_step"],
+      "minimum_functional_blocks": 4,
+      "minimum_electrical_domains": 2,
+      "sha256": "be9c4b263db7febb192c31182f77b79bc43af71eefb417e7c0d8b8174b639e30"
+    }
+  ]
+}

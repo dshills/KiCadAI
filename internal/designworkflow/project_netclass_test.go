@@ -1,12 +1,14 @@
 package designworkflow
 
 import (
+	"encoding/json"
 	"math"
 	"testing"
 
 	"kicadai/internal/placement"
 	"kicadai/internal/reports"
 	"kicadai/internal/routing"
+	"kicadai/internal/transactions"
 )
 
 func TestProjectNetClassClearanceFitsIntrinsicFinePitchPadGap(t *testing.T) {
@@ -76,11 +78,36 @@ func TestProjectMinimumThroughHoleDiameterUsesVerifiedIntrinsicDrill(t *testing.
 		{Name: "1", DrillMM: 0.8},
 		{Name: "2", DrillMM: 0.2},
 	}}}}}
-	if got := projectMinimumThroughHoleDiameterMM(&placed); math.Abs(got-0.2) > 1e-9 {
+	if got := projectMinimumThroughHoleDiameterMM(&placed, nil); math.Abs(got-0.2) > 1e-9 {
 		t.Fatalf("minimum through-hole diameter = %v, want intrinsic 0.2 mm", got)
 	}
 	placed.Request.Components[0].Pads[1].DrillMM = 0.3
-	if got := projectMinimumThroughHoleDiameterMM(&placed); got != 0 {
+	if got := projectMinimumThroughHoleDiameterMM(&placed, nil); got != 0 {
 		t.Fatalf("minimum through-hole diameter = %v, want omitted default", got)
+	}
+}
+
+func TestProjectMinimumViaRulesUseFinalEmittedRouteGeometry(t *testing.T) {
+	raw, err := json.Marshal(transactions.RouteOperation{
+		Op:      transactions.OpRoute,
+		NetName: "VOUT",
+		Points:  []transactions.Point{{XMM: 1, YMM: 1}, {XMM: 2, YMM: 2}},
+		Vias: []transactions.RouteViaSpec{{
+			At:         transactions.Point{XMM: 1.5, YMM: 1.5},
+			DiameterMM: 0.4,
+			DrillMM:    0.2,
+			Layers:     []string{"F.Cu", "B.Cu"},
+		}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	operations := []transactions.Operation{transactions.NewOperation(transactions.OpRoute, raw)}
+
+	if got := projectMinimumViaDiameterMM(operations); math.Abs(got-0.4) > 1e-9 {
+		t.Fatalf("minimum via diameter = %v, want emitted 0.4 mm", got)
+	}
+	if got := projectMinimumThroughHoleDiameterMM(nil, operations); math.Abs(got-0.2) > 1e-9 {
+		t.Fatalf("minimum through-hole diameter = %v, want emitted via drill 0.2 mm", got)
 	}
 }

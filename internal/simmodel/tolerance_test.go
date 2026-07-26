@@ -7,6 +7,29 @@ import (
 	"testing"
 )
 
+func TestWorstCaseCornerWorkersReserveNestedAnalysisBudget(t *testing.T) {
+	tests := []struct {
+		name       string
+		corners    int
+		processors int
+		want       int
+	}{
+		{name: "no work", corners: 0, processors: 12, want: 0},
+		{name: "single processor", corners: 20, processors: 1, want: 1},
+		{name: "four processors", corners: 20, processors: 4, want: 1},
+		{name: "twelve processors", corners: 20, processors: 12, want: 3},
+		{name: "corner count caps workers", corners: 2, processors: 32, want: 2},
+		{name: "configured cap remains authoritative", corners: 20, processors: 64, want: maxWorstCaseWorkers},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if got := worstCaseCornerWorkerCount(test.corners, test.processors); got != test.want {
+				t.Fatalf("worstCaseCornerWorkerCount(%d, %d) = %d, want %d", test.corners, test.processors, got, test.want)
+			}
+		})
+	}
+}
+
 func TestEvaluateWorstCaseBlocksNominalOnlyDivider(t *testing.T) {
 	plan, diagnostics := Resolve(Intent{ModelID: ModelResistorDividerDCV1,
 		Bindings:   []Binding{{Role: "upper_resistor", Component: "r1"}, {Role: "lower_resistor", Component: "r2"}},

@@ -122,6 +122,23 @@ func TestCatalogProviderSynthesizesPassiveADCDriveAndFailsClosed(t *testing.T) {
 		t.Fatalf("ADC drive realization = %#v err=%v", realization, err)
 	}
 
+	powered := request
+	powered.Ports = append(append([]RoleContract(nil), request.Ports...),
+		providerRole("power", "power", "sink", 5, 5),
+		providerRole("reference", "reference", "bidirectional", 0, 0),
+	)
+	poweredExpansions, err := provider.Expand(context.Background(), powered)
+	if err != nil || len(poweredExpansions) == 0 {
+		t.Fatalf("powered passive ADC drive expansion = %#v err=%v", poweredExpansions, err)
+	}
+	poweredRealization, err := DecodeFragmentRealization(poweredExpansions[0].Payload)
+	if err != nil ||
+		!slices.ContainsFunc(poweredRealization.Instances, func(instance RealizationInstance) bool { return instance.ID == "adc_supply_bypass" }) ||
+		!slices.ContainsFunc(poweredRealization.PortBindings, func(binding RealizationPortBinding) bool { return binding.Role == "power" }) ||
+		!slices.ContainsFunc(poweredRealization.PortBindings, func(binding RealizationPortBinding) bool { return binding.Role == "reference" }) {
+		t.Fatalf("powered passive ADC drive realization = %#v err=%v", poweredRealization, err)
+	}
+
 	request.Constraints[2] = constraintNumber("acquisition_time", "minimum", 1e-12, "s", 0)
 	_, err = provider.Expand(context.Background(), request)
 	var typed *interfaceSynthesisError

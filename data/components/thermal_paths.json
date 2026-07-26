@@ -1,0 +1,31 @@
+{
+  "version": "0.1.0",
+  "thermal_paths": [
+    {
+      "id": "thermal_path.wakefield.641k_120_5",
+      "manufacturer": "Wakefield Thermal",
+      "mpn": "641K + 120-5",
+      "lifecycle": "active",
+      "compatible_packages": ["to220", "to3p_3", "to_247"],
+      "interface_material": "Wakefield 120-5 thermal joint compound, 0.001 inch film",
+      "case_to_sink_c_per_w": 0.05,
+      "natural_sink_to_ambient_c_per_w": 2.4,
+      "forced_sink_to_ambient_c_per_w": 0.9,
+      "forced_airflow_lfm": 250,
+      "sink_thermal_capacitance_j_per_c": 118,
+      "maximum_shared_devices": 8,
+      "review_status": "reviewed",
+      "review_note": "Wakefield lists 36 C rise at 15 W in natural convection and 0.9 C/W at 250 LFM for the 641K, plus 0.05 C/W for a one-square-inch 0.001-inch 120-series compound film. The 118 J/C sink heat capacity is the conservative reviewed product of the catalog 0.290 lb aluminum mass and 897 J/(kg C) aluminum specific heat; dynamic evaluation retains the intrinsic package stage separately and applies airflow events only to this assembly stage.",
+      "verification": {
+        "confidence": "verified",
+        "sources": [
+          "https://wakefieldthermal.com/content/catalogs/board-level-heatsink-wakefield.pdf",
+          "https://wakefieldthermal.com/wakefield-thermal-silicone-grease-5oz-tube-120-5/",
+          "engineering-derived:0.290lb-aluminum-at-897J-per-kg-C"
+        ],
+        "resolver_checked": true,
+        "tests": ["catalog_thermal_path_evidence", "class_ab_catalog_thermal_path_selection"]
+      }
+    }
+  ]
+}

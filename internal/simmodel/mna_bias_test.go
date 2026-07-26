@@ -80,6 +80,23 @@ func TestSelectCenteredSourceBiasRefinesNearRailForHighGainChain(t *testing.T) {
 	}
 }
 
+func TestSelectFeasibleTransientSourceEdgePreservesSolvableRequestedDirection(t *testing.T) {
+	plan, diagnostics := ResolveWithTopology(
+		transientSwitchIntent(), "test", "catalog-hash",
+		transientSwitchComponents(25), transientSwitchNodes(),
+	)
+	if len(diagnostics) != 0 {
+		t.Fatalf("resolve diagnostics = %#v", diagnostics)
+	}
+	initial, final, diagnostics := SelectFeasibleTransientSourceEdge(plan, "drive", 5, 0)
+	if len(diagnostics) != 0 {
+		t.Fatalf("edge diagnostics = %#v", diagnostics)
+	}
+	if initial != 5 || final != 0 {
+		t.Fatalf("edge = %g -> %g, want requested 5 -> 0", initial, final)
+	}
+}
+
 func centeredBiasTestPlan(t *testing.T, components []ComponentEvidence, nodes []NodeEvidence, excitations []SourceExcitation) Plan {
 	t.Helper()
 	intent := Intent{

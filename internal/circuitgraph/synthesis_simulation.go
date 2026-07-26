@@ -231,7 +231,7 @@ func synthesisInterfaceOperatingRail(domains map[string]PowerDomainIntent, volta
 func configuredSimulationModels(selection ResolvedComponent) []simmodel.CatalogEvidence {
 	models := make([]simmodel.CatalogEvidence, len(selection.Record.SimulationModels))
 	for index, model := range selection.Record.SimulationModels {
-		models[index] = simmodel.CatalogEvidence{ModelID: model.ModelID, Parameters: append([]simmodel.NamedValue(nil), model.Parameters...), Uncertainties: append([]simmodel.Uncertainty(nil), model.Uncertainties...)}
+		models[index] = simmodel.CloneCatalogEvidence(model)
 		for parameterIndex := range models[index].Parameters {
 			name := models[index].Parameters[parameterIndex].Name
 			configured := synthesisParameterString(selection.Instance.Parameters, name)
@@ -241,8 +241,46 @@ func configuredSimulationModels(selection ResolvedComponent) []simmodel.CatalogE
 			}
 		}
 		models[index].Parameters = catalogBackedSimulationParameters(models[index], selection.Record)
+		models[index].ThermalModel = configuredThermalPath(selection.Instance.Parameters, models[index].ThermalModel)
 	}
 	return models
+}
+
+func configuredThermalPath(parameters []Parameter, intrinsic *simmodel.ThermalRCNetwork) *simmodel.ThermalRCNetwork {
+	if intrinsic == nil || intrinsic.Reference != "junction_to_case" {
+		return intrinsic
+	}
+	resistance, resistanceOK := numericSynthesisParameter(parameters, "thermal_path_resistance_c_per_w")
+	capacitance, capacitanceOK := numericSynthesisParameter(parameters, "thermal_path_capacitance_j_per_c")
+	if !resistanceOK || !capacitanceOK || resistance <= 0 || capacitance <= 0 ||
+		math.IsNaN(resistance) || math.IsInf(resistance, 0) || math.IsNaN(capacitance) || math.IsInf(capacitance, 0) {
+		return intrinsic
+	}
+	thermal := simmodel.CloneCatalogEvidence(simmodel.CatalogEvidence{ThermalModel: intrinsic}).ThermalModel
+	thermal.Reference = "junction_to_ambient"
+	thermal.BoundaryAssumption += "; selected reviewed case/interface/heatsink path to ambient"
+	thermal.Stages = append(thermal.Stages, simmodel.ThermalRCStage{
+		ThermalResistanceCPerW: resistance, ThermalCapacitanceJPerC: capacitance,
+		CoolingCoupling: "ambient_cooling",
+	})
+	return thermal
+}
+
+func numericSynthesisParameter(parameters []Parameter, name string) (float64, bool) {
+	for _, parameter := range parameters {
+		if !strings.EqualFold(parameter.Name, name) {
+			continue
+		}
+		if parameter.Value.Number != nil {
+			value := *parameter.Value.Number
+			return value, !math.IsNaN(value) && !math.IsInf(value, 0)
+		}
+		if parameter.Value.String != nil {
+			value, ok := components.ParseEngineeringValue(strings.TrimSpace(*parameter.Value.String))
+			return value, ok && !math.IsNaN(value) && !math.IsInf(value, 0)
+		}
+	}
+	return 0, false
 }
 
 func catalogBackedSimulationParameters(model simmodel.CatalogEvidence, record components.ComponentRecord) []simmodel.NamedValue {

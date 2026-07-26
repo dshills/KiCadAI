@@ -180,12 +180,26 @@ func (occupancy *Occupancy) addShape(layerIndexes map[string]int, layer string, 
 	for y := minY; y <= maxY; y++ {
 		for x := minX; x <= maxX; x++ {
 			point := occupancy.Grid.ToPoint(GridCoord{X: x, Y: y, Layer: layerIndex})
-			if len(shape.Polygon) > 0 && !pointWithinPolygonClearance(point, shape.Polygon, inflateMM) {
+			withinShape := false
+			if shape.Rect != nil && pointWithinRectClearance(point, *shape.Rect, inflateMM) {
+				withinShape = true
+			}
+			if len(shape.Polygon) > 0 && pointWithinPolygonClearance(point, shape.Polygon, inflateMM) {
+				withinShape = true
+			}
+			if !withinShape {
 				continue
 			}
 			occupancy.block(layerIndex, gridPoint{X: x, Y: y}, obstacleIndex)
 		}
 	}
+}
+
+func pointWithinRectClearance(point Point, rect Rect, clearanceMM float64) bool {
+	rect = normalizeRect(rect)
+	dx := max(rect.Min.XMM-point.XMM, 0, point.XMM-rect.Max.XMM)
+	dy := max(rect.Min.YMM-point.YMM, 0, point.YMM-rect.Max.YMM)
+	return math.Hypot(dx, dy) <= clearanceMM
 }
 
 func (occupancy *Occupancy) blockOutsideUsable(layerIndex int, board Rect, usable Rect) {

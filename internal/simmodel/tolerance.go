@@ -112,7 +112,7 @@ func evaluateWorstCaseCorners(base Plan, corners [][]NamedValue) []worstCaseCorn
 	}
 	uniqueCorners, resultIndex := uniqueCornerEvaluationPlan(corners)
 	uniqueResults := make([]worstCaseCornerEvaluation, len(uniqueCorners))
-	workerCount := min(len(uniqueCorners), maxWorstCaseWorkers, max(1, runtime.GOMAXPROCS(0)))
+	workerCount := worstCaseCornerWorkerCount(len(uniqueCorners), runtime.GOMAXPROCS(0))
 	jobs := make(chan int)
 	var workers sync.WaitGroup
 	workers.Add(workerCount)
@@ -146,6 +146,18 @@ func evaluateWorstCaseCorners(base Plan, corners [][]NamedValue) []worstCaseCorn
 		results[index] = uniqueResults[uniqueIndex]
 	}
 	return results
+}
+
+func worstCaseCornerWorkerCount(cornerCount, processors int) int {
+	if cornerCount <= 0 {
+		return 0
+	}
+	processors = max(1, processors)
+	// Every corner can itself evaluate several transient analyses concurrently.
+	// Reserve that inner fan-out here so the two worker pools share one bounded
+	// processor budget instead of multiplying it.
+	analysisWorkers := min(maxMNAAnalysisWorkers, processors)
+	return min(cornerCount, maxWorstCaseWorkers, max(1, processors/analysisWorkers))
 }
 
 func uniqueCornerEvaluationPlan(corners [][]NamedValue) ([][]NamedValue, []int) {

@@ -55,6 +55,7 @@ type Options struct {
 	Paper                      kicadfiles.Paper
 	CopperLayers               int
 	DefaultNetClassClearance   kicadfiles.IU
+	MinimumViaDiameter         kicadfiles.IU
 	MinimumThroughHoleDiameter kicadfiles.IU
 	LibraryIndex               *libraryresolver.LibraryIndex
 	TextVariables              map[string]string
@@ -318,7 +319,10 @@ func New(options Options) (*Builder, error) {
 			FormatVersion: kicadfiles.KiCadFormatV20260306,
 			Generator:     "kicadai",
 			PageSettings:  project.PageSettings{Paper: paper},
-			BoardRules:    project.BoardDesignRules{MinimumThroughHoleDiameter: options.MinimumThroughHoleDiameter},
+			BoardRules: project.BoardDesignRules{
+				MinimumViaDiameter:         options.MinimumViaDiameter,
+				MinimumThroughHoleDiameter: options.MinimumThroughHoleDiameter,
+			},
 			NetClasses: []project.NetClass{{
 				Name:        "Default",
 				Clearance:   firstPositiveIU(options.DefaultNetClassClearance, kicadfiles.MM(0.2)),

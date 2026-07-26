@@ -138,6 +138,65 @@ func TestFrozenSimulationGroundedCorpusLowersToWriterRequests(t *testing.T) {
 	}
 }
 
+func TestMultipleSeriesTransitionsOnOneAnchorFormDeterministicChain(t *testing.T) {
+	data, err := os.ReadFile(filepath.Join("..", "architecturesearch", "testdata", "dynamic_electrothermal_control_loop_corpus", "class_ab_dynamic_output_stage.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	requirement, decodeIssues := architecturesearch.DecodeStrict(bytes.NewReader(data))
+	if len(decodeIssues) != 0 {
+		t.Fatalf("decode issues = %#v", decodeIssues)
+	}
+	catalog, err := components.LoadCatalog(context.Background(), components.LoadOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	registry, registryIssues := architecturesearch.NewCatalogRegistry(catalog)
+	if len(registryIssues) != 0 {
+		t.Fatalf("registry issues = %#v", registryIssues)
+	}
+	search := architecturesearch.Search(context.Background(), requirement, registry, architecturesearch.SearchOptions{CatalogHash: "checked-in"})
+	if search.Status != architecturesearch.SearchSelected || search.Selected == nil {
+		t.Fatalf("search status = %s issues=%#v rejections=%#v", search.Status, search.Issues, search.Rejections)
+	}
+	transitionCountByAnchor := map[string]int{}
+	for _, selection := range search.Selected.Selections {
+		realization, err := architecturesearch.DecodeFragmentRealization(selection.Payload)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, transition := range realization.SeriesTransitions {
+			index := slices.IndexFunc(selection.Ports, func(port architecturesearch.RoleContract) bool {
+				return port.Role == transition.Role
+			})
+			if index >= 0 {
+				transitionCountByAnchor[selection.Ports[index].Anchor]++
+			}
+		}
+	}
+	sharedAnchor := false
+	for _, count := range transitionCountByAnchor {
+		sharedAnchor = sharedAnchor || count >= 2
+	}
+	if !sharedAnchor {
+		t.Fatalf("fixture did not exercise a shared series anchor: %#v", transitionCountByAnchor)
+	}
+
+	first, firstIssues := Lower(requirement, search)
+	second, secondIssues := Lower(requirement, search)
+	if len(firstIssues) != 0 || len(secondIssues) != 0 {
+		t.Fatalf("series-chain lowering issues: first=%#v second=%#v", firstIssues, secondIssues)
+	}
+	if validation := circuitgraph.Validate(first.Document); len(validation) != 0 {
+		t.Fatalf("series-chain graph validation = %#v", validation)
+	}
+	firstJSON, _ := json.Marshal(first)
+	secondJSON, _ := json.Marshal(second)
+	if !bytes.Equal(firstJSON, secondJSON) {
+		t.Fatal("series-chain lowering replay differs")
+	}
+}
+
 func TestLowerInterfacesDoesNotDuplicateReferencePortOnItsOwnReturnNet(t *testing.T) {
 	requirement := architecturesearch.Requirement{Requirements: architecturesearch.Requirements{
 		Domains: []architecturesearch.Domain{{ID: "gnd", Kind: "reference"}},

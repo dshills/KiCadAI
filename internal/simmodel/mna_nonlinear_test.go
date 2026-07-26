@@ -8,6 +8,30 @@ import (
 	"testing"
 )
 
+func TestAdvanceActiveDeviceStateSettlesSensorBeforeController(t *testing.T) {
+	plan := Plan{Devices: []ResolvedDevice{
+		{Component: "controller", PrimitiveModel: PrimitiveOpAmpV1},
+		{Component: "sensor", PrimitiveModel: PrimitiveCurrentSenseAmplifierV1},
+	}}
+	next := advanceActiveDeviceState(plan, nil, map[string]float64{
+		"controller": 5,
+		"sensor":     0,
+	})
+	if len(next) != 1 || next["sensor"] != 0 {
+		t.Fatalf("next active state = %#v; want only upstream sensor clamp", next)
+	}
+}
+
+func TestNonlinearOperatingRangeAcceptsSolverNoiseButRejectsMaterialViolation(t *testing.T) {
+	tolerance := nonlinearOperatingVoltageTolerance(36)
+	if outsideNonlinearOperatingRange(36+tolerance/2, 4.5, 36) {
+		t.Fatal("solver-scale noise at the reviewed maximum was rejected")
+	}
+	if !outsideNonlinearOperatingRange(36+tolerance*2, 4.5, 36) {
+		t.Fatal("material reviewed-range violation was accepted")
+	}
+}
+
 func TestNonlinearDCDiodeOperatingPointIsDeterministic(t *testing.T) {
 	components := []ComponentEvidence{
 		voltageSourceEvidence("supply", "5V", "GND"),

@@ -22,12 +22,14 @@ const (
 )
 
 var catalogProviderCapabilities = []string{
+	"analog_servo_control",
 	"class_a_amplification",
 	"class_ab_bias_control",
 	"class_ab_output_stage",
 	"constant_current_regulation",
 	"current_sensing",
 	"environment_sensor",
+	"efficient_voltage_conversion",
 	"fault_indication",
 	"frequency_filter",
 	"galvanic_isolation",
@@ -42,6 +44,7 @@ var catalogProviderCapabilities = []string{
 	"output_protection",
 	"programmable_controller",
 	"precision_rectification",
+	"rail_sequencing",
 	"safety_interlock",
 	"signal_amplification",
 	"split_supply_generation",
@@ -100,6 +103,9 @@ func (provider *CatalogProvider) Expand(ctx context.Context, request ProviderReq
 		}
 		return provider.expandLoadSwitch(ctx, request)
 	case "voltage_regulation":
+		if slices.Contains(requiredCatalogAnalyses(request), simmodel.AnalysisStability) {
+			return provider.expandSynchronousBuckConversion(ctx, request)
+		}
 		if _, legacy := namedConstraint(request.Constraints, "adjustable_output"); !legacy {
 			return provider.expandGenericRegulator(ctx, request)
 		}
@@ -134,6 +140,12 @@ func (provider *CatalogProvider) Expand(ctx context.Context, request ProviderReq
 		return provider.expandSignalAmplification(ctx, request)
 	case "current_sensing":
 		return provider.expandCurrentSensing(ctx, request)
+	case "analog_servo_control":
+		return provider.expandAnalogServoControl(ctx, request)
+	case "rail_sequencing":
+		return provider.expandRailSequencing(ctx, request)
+	case "efficient_voltage_conversion":
+		return provider.expandEfficientVoltageConversion(ctx, request)
 	case "constant_current_regulation":
 		return provider.expandConstantCurrentRegulation(ctx, request)
 	case "precision_rectification":
@@ -368,10 +380,16 @@ func (provider *CatalogProvider) expandLoadSwitch(ctx context.Context, request P
 	if controlMaximum > 0 && controlMaximum <= lowVoltageGateDriveCeilingV {
 		mosfetQuery = "low_voltage_gate_drive"
 	}
-	selection, err := provider.selectComponentWithTemperature(ctx, "mosfet", mosfetQuery, []components.RequiredRating{
+	switchRatings := []components.RequiredRating{
 		{Kind: "drain_source_voltage", Value: numericString(voltage / catalogRatingDeratingFactor), Unit: "V"},
 		{Kind: "drain_current", Value: numericString(current / catalogRatingDeratingFactor), Unit: "A"},
-	}, true, temperatureRequirement)
+	}
+	var selection catalogPart
+	if requiresDynamicElectrothermalModel(request.Constraints) {
+		selection, err = provider.selectComponentWithDynamicEvidence(ctx, "mosfet", mosfetQuery, switchRatings, true, temperatureRequirement)
+	} else {
+		selection, err = provider.selectComponentWithTemperature(ctx, "mosfet", mosfetQuery, switchRatings, true, temperatureRequirement)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -463,7 +481,10 @@ func (provider *CatalogProvider) expandLoadSwitch(ctx context.Context, request P
 	if err != nil {
 		return nil, err
 	}
-	bindings := bindRoles(request.Ports, selection.selected.InstanceID, map[string]string{"control": "GATE", "load": "DRAIN", "output": "DRAIN", "reference": "SOURCE"})
+	bindings := bindRoles(request.Ports, selection.selected.InstanceID, map[string]string{
+		"control": "GATE", "input": "SOURCE", "load": "DRAIN", "output": "DRAIN",
+		"power": "SOURCE", "load_power": "SOURCE", "logic_power": "SOURCE", "reference": "SOURCE",
+	})
 	for index := range bindings {
 		switch bindings[index].Role {
 		case "control":
@@ -474,7 +495,7 @@ func (provider *CatalogProvider) expandLoadSwitch(ctx context.Context, request P
 			} else {
 				bindings[index].Instance, bindings[index].Function = "gate_series", "A"
 			}
-		case "load_power":
+		case "input", "load_power":
 			bindings[index].Instance, bindings[index].Function = flyback.selected.InstanceID, "K"
 		case "power":
 			bindings[index].Instance, bindings[index].Function = flyback.selected.InstanceID, "K"
@@ -533,12 +554,22 @@ func (provider *CatalogProvider) expandHighSideLoadSwitch(ctx context.Context, r
 	unclampedRatings := append(slices.Clone(baseRatings), components.RequiredRating{
 		Kind: "gate_source_voltage", Value: numericString(voltage / catalogRatingDeratingFactor), Unit: "V",
 	})
-	selection, err := provider.selectComponentMinimizingRatingsWithTemperature(ctx, "mosfet", "p_channel", unclampedRatings, true, temperatureRequirement, []string{"drain_source_voltage", "drain_current"})
+	var selection catalogPart
+	var err error
+	if requiresDynamicElectrothermalModel(request.Constraints) {
+		selection, err = provider.selectComponentWithDynamicEvidence(ctx, "mosfet", "p_channel", unclampedRatings, true, temperatureRequirement)
+	} else {
+		selection, err = provider.selectComponentMinimizingRatingsWithTemperature(ctx, "mosfet", "p_channel", unclampedRatings, true, temperatureRequirement, []string{"drain_source_voltage", "drain_current"})
+	}
 	gateClampRequired := err != nil
 	if err != nil {
 		// A part that cannot tolerate the full source-referenced gate swing is
 		// eligible only through the bounded series-Zener clamp path below.
-		selection, err = provider.selectComponentMinimizingRatingsWithTemperature(ctx, "mosfet", "p_channel", baseRatings, true, temperatureRequirement, []string{"drain_source_voltage", "drain_current"})
+		if requiresDynamicElectrothermalModel(request.Constraints) {
+			selection, err = provider.selectComponentWithDynamicEvidence(ctx, "mosfet", "p_channel", baseRatings, true, temperatureRequirement)
+		} else {
+			selection, err = provider.selectComponentMinimizingRatingsWithTemperature(ctx, "mosfet", "p_channel", baseRatings, true, temperatureRequirement, []string{"drain_source_voltage", "drain_current"})
+		}
 	}
 	if err != nil {
 		return nil, err
@@ -634,7 +665,7 @@ func (provider *CatalogProvider) expandHighSideLoadSwitch(ctx context.Context, r
 		return nil, err
 	}
 
-	bindings := bindRoles(request.Ports, selection.selected.InstanceID, map[string]string{"control": "GATE", "load": "DRAIN", "output": "DRAIN", "power": "SOURCE", "load_power": "SOURCE", "reference": "SOURCE"})
+	bindings := bindRoles(request.Ports, selection.selected.InstanceID, map[string]string{"control": "GATE", "input": "SOURCE", "load": "DRAIN", "output": "DRAIN", "power": "SOURCE", "load_power": "SOURCE", "reference": "SOURCE"})
 	for index := range bindings {
 		switch bindings[index].Role {
 		case "control":
@@ -1401,6 +1432,8 @@ type catalogPart struct {
 	maximumTempcoPPMPerC float64
 	near                 string
 	maxDistanceMM        float64
+	parameters           []RealizationParameter
+	evidenceSources      []string
 }
 
 type passivePart struct{ id, family, usage, value string }
@@ -1409,12 +1442,111 @@ func (provider *CatalogProvider) selectComponent(ctx context.Context, family, te
 	return provider.selectComponentWithRequirements(ctx, family, text, ratings, concrete, nil, nil)
 }
 
+func (provider *CatalogProvider) selectOpAmpForOutputSwing(
+	ctx context.Context,
+	text string,
+	ratings []components.RequiredRating,
+	concrete bool,
+	negativeRailV, positiveRailV, requiredMinimumV, requiredMaximumV float64,
+) (catalogPart, error) {
+	request := components.SelectionRequest{
+		Query:             components.Query{Text: text, Family: "opamp", MinimumConfidence: components.ConfidenceRuleInferred, Limit: 64},
+		Acceptance:        components.AcceptanceStructural,
+		AllowAlternatives: true,
+		RequiredRatings:   ratings,
+		RequireConcrete:   concrete,
+	}
+	candidates, result := components.Find(ctx, provider.catalog, request.Query)
+	if !result.OK {
+		return catalogPart{}, fmt.Errorf("no catalog-backed opamp satisfies normalized ratings: %v", result.Issues)
+	}
+	var rejected []string
+	for _, candidate := range candidates {
+		resolved, resolveResult := components.ResolveBinding(ctx, provider.catalog, candidate.ComponentID, candidate.VariantID)
+		if !resolveResult.OK {
+			rejected = append(rejected, candidate.ComponentID+":binding")
+			continue
+		}
+		validation := components.ValidateResolvedComponent(resolved, request)
+		if !validation.OK {
+			rejected = append(rejected, fmt.Sprintf("%s:validation:%v", candidate.ComponentID, validation.Issues))
+			continue
+		}
+		opamp := resolved.Component.OpAmp
+		if opamp == nil || opamp.OutputSwingStatus != "proven" || opamp.OutputSwing == nil ||
+			opamp.OutputSwing.NegativeRailHeadroomV == nil || opamp.OutputSwing.PositiveRailHeadroomV == nil {
+			rejected = append(rejected, candidate.ComponentID+":evidence")
+			continue
+		}
+		minimumOutput := negativeRailV + *opamp.OutputSwing.NegativeRailHeadroomV
+		maximumOutput := positiveRailV - *opamp.OutputSwing.PositiveRailHeadroomV
+		if requiredMinimumV < minimumOutput || requiredMaximumV > maximumOutput {
+			rejected = append(rejected, candidate.ComponentID+":headroom")
+			continue
+		}
+		evidence := componentEvidence(resolved.Component, candidate.Confidence)
+		return catalogPart{
+			selected: SelectedComponent{InstanceID: "opamp", CatalogID: resolved.Component.ID, VariantID: resolved.Variant.ID, Evidence: evidence.Confidence},
+			record:   resolved.Component, usage: "opamp", evidence: evidence,
+		}, nil
+	}
+	return catalogPart{}, fmt.Errorf(
+		"no catalog-backed opamp has reviewed output swing %.12g..%.12g V inside rails %.12g..%.12g V (%v)",
+		requiredMinimumV,
+		requiredMaximumV,
+		negativeRailV,
+		positiveRailV,
+		rejected,
+	)
+}
+
 func (provider *CatalogProvider) selectComponentWithThermal(ctx context.Context, family, text string, ratings []components.RequiredRating, concrete bool, thermal *components.ThermalRequirement) (catalogPart, error) {
 	return provider.selectComponentWithRequirements(ctx, family, text, ratings, concrete, nil, thermal)
 }
 
 func (provider *CatalogProvider) selectComponentWithTemperature(ctx context.Context, family, text string, ratings []components.RequiredRating, concrete bool, temperature *components.TemperatureRequirement) (catalogPart, error) {
 	return provider.selectComponentWithRequirements(ctx, family, text, ratings, concrete, temperature, nil)
+}
+
+func (provider *CatalogProvider) selectComponentWithDynamicEvidence(ctx context.Context, family, text string, ratings []components.RequiredRating, concrete bool, temperature *components.TemperatureRequirement) (catalogPart, error) {
+	request := components.SelectionRequest{
+		Query:               components.Query{Text: text, Family: family, MinimumConfidence: components.ConfidenceRuleInferred, Limit: 64},
+		Acceptance:          components.AcceptanceStructural,
+		AllowAlternatives:   true,
+		RequiredRatings:     ratings,
+		RequiredTemperature: temperature,
+		RequireConcrete:     concrete,
+	}
+	candidates, result := components.Find(ctx, provider.catalog, request.Query)
+	if !result.OK {
+		return catalogPart{}, fmt.Errorf("no catalog-backed %s satisfies normalized ratings: %v", family, result.Issues)
+	}
+	for _, candidate := range candidates {
+		resolved, resolveResult := components.ResolveBinding(ctx, provider.catalog, candidate.ComponentID, candidate.VariantID)
+		if !resolveResult.OK || !components.ValidateResolvedComponent(resolved, request).OK || !recordHasDynamicElectrothermalEvidence(resolved.Component) {
+			continue
+		}
+		evidence := componentEvidence(resolved.Component, candidate.Confidence)
+		return catalogPart{
+			selected: SelectedComponent{InstanceID: canonicalIdentifier(family), CatalogID: resolved.Component.ID, VariantID: resolved.Variant.ID, Evidence: evidence.Confidence},
+			record:   resolved.Component, usage: canonicalIdentifier(family), evidence: evidence,
+		}, nil
+	}
+	return catalogPart{}, fmt.Errorf("no catalog-backed %s satisfies normalized ratings with reviewed thermal-RC and transient-SOA evidence", family)
+}
+
+func recordHasDynamicElectrothermalEvidence(record components.ComponentRecord) bool {
+	for _, model := range record.SimulationModels {
+		if model.ThermalModel != nil && len(model.ThermalModel.Stages) != 0 && len(model.TransientSOA) != 0 {
+			return true
+		}
+	}
+	return false
+}
+
+func requiresDynamicElectrothermalModel(constraints []Constraint) bool {
+	constraint, ok := namedConstraint(constraints, "analysis_electrothermal")
+	return ok && constraint.Relation == "required"
 }
 
 func (provider *CatalogProvider) selectComponentWithRequirements(ctx context.Context, family, text string, ratings []components.RequiredRating, concrete bool, temperature *components.TemperatureRequirement, thermal *components.ThermalRequirement) (catalogPart, error) {
@@ -1548,7 +1680,7 @@ func (provider *CatalogProvider) selectComponentMinimizingModelParameterWithinBo
 		}
 		compatible := true
 		for boundedParameter, minimum := range parameterMinimums {
-			boundedValue, boundedOK := catalogSimulationParameterForModelNonNegative(resolved.Component, modelID, boundedParameter)
+			boundedValue, boundedOK := catalogSimulationParameterForModelFinite(resolved.Component, modelID, boundedParameter)
 			if !boundedOK || boundedValue < minimum {
 				compatible = false
 				break
@@ -1558,7 +1690,7 @@ func (provider *CatalogProvider) selectComponentMinimizingModelParameterWithinBo
 			continue
 		}
 		for boundedParameter, maximum := range parameterMaximums {
-			boundedValue, boundedOK := catalogSimulationParameterForModelNonNegative(resolved.Component, modelID, boundedParameter)
+			boundedValue, boundedOK := catalogSimulationParameterForModelFinite(resolved.Component, modelID, boundedParameter)
 			if !boundedOK || boundedValue > maximum {
 				compatible = false
 				break
@@ -1654,6 +1786,106 @@ func (provider *CatalogProvider) selectComponentMinimizingModelUncertaintyWithTe
 		selected: SelectedComponent{InstanceID: canonicalIdentifier(family), CatalogID: selected.resolved.Component.ID, VariantID: selected.resolved.Variant.ID, Evidence: evidence.Confidence},
 		record:   selected.resolved.Component, usage: canonicalIdentifier(family), evidence: evidence,
 	}, nil
+}
+
+func (provider *CatalogProvider) selectComponentMaximizingModelUncertaintyMinimumWithTemperature(
+	ctx context.Context,
+	family, text string,
+	ratings []components.RequiredRating,
+	concrete bool,
+	temperature *components.TemperatureRequirement,
+	thermal *components.ThermalRequirement,
+	modelID, parameter, uncertaintyTarget string,
+) (catalogPart, error) {
+	request := components.SelectionRequest{
+		Query:               components.Query{Text: text, Family: family, MinimumConfidence: components.ConfidenceRuleInferred, Limit: 64},
+		Acceptance:          components.AcceptanceStructural,
+		AllowAlternatives:   true,
+		RequiredRatings:     ratings,
+		RequiredTemperature: temperature,
+		RequiredThermal:     thermal,
+		RequireConcrete:     concrete,
+	}
+	candidates, result := components.Find(ctx, provider.catalog, request.Query)
+	if !result.OK {
+		return catalogPart{}, fmt.Errorf("no catalog-backed %s satisfies normalized ratings: %v", family, result.Issues)
+	}
+	type eligible struct {
+		candidate components.Candidate
+		resolved  components.ResolvedComponent
+		minimum   float64
+	}
+	var choices []eligible
+	for _, candidate := range candidates {
+		resolved, resolveResult := components.ResolveBinding(ctx, provider.catalog, candidate.ComponentID, candidate.VariantID)
+		if !resolveResult.OK || !components.ValidateResolvedComponent(resolved, request).OK {
+			continue
+		}
+		minimum, ok := catalogModelUncertaintyMinimum(
+			resolved.Component, modelID, parameter, uncertaintyTarget,
+		)
+		if !ok {
+			continue
+		}
+		choices = append(choices, eligible{candidate: candidate, resolved: resolved, minimum: minimum})
+	}
+	slices.SortStableFunc(choices, func(left, right eligible) int {
+		if left.minimum > right.minimum {
+			return -1
+		}
+		if left.minimum < right.minimum {
+			return 1
+		}
+		if order := strings.Compare(left.candidate.ComponentID, right.candidate.ComponentID); order != 0 {
+			return order
+		}
+		return strings.Compare(left.candidate.VariantID, right.candidate.VariantID)
+	})
+	if len(choices) == 0 {
+		return catalogPart{}, fmt.Errorf(
+			"no catalog-backed %s satisfies normalized ratings with bounded %s uncertainty",
+			family, uncertaintyTarget,
+		)
+	}
+	selected := choices[0]
+	evidence := componentEvidence(selected.resolved.Component, selected.candidate.Confidence)
+	return catalogPart{
+		selected: SelectedComponent{
+			InstanceID: canonicalIdentifier(family),
+			CatalogID:  selected.resolved.Component.ID,
+			VariantID:  selected.resolved.Variant.ID,
+			Evidence:   evidence.Confidence,
+		},
+		record: selected.resolved.Component, usage: canonicalIdentifier(family), evidence: evidence,
+	}, nil
+}
+
+func catalogModelUncertaintyMinimum(record components.ComponentRecord, modelID, parameter, target string) (float64, bool) {
+	for _, model := range record.SimulationModels {
+		if model.ModelID != modelID {
+			continue
+		}
+		nominal, nominalOK := 0.0, false
+		for _, candidate := range model.Parameters {
+			if candidate.Name == parameter && finitePositive(candidate.Value) {
+				nominal, nominalOK = candidate.Value, true
+				break
+			}
+		}
+		if !nominalOK {
+			return 0, false
+		}
+		for _, uncertainty := range model.Uncertainties {
+			if uncertainty.Target == target &&
+				finitePositive(uncertainty.Minimum) &&
+				finitePositive(uncertainty.Maximum) &&
+				uncertainty.Minimum <= nominal &&
+				nominal <= uncertainty.Maximum {
+				return uncertainty.Minimum, true
+			}
+		}
+	}
+	return 0, false
 }
 
 func catalogModelUncertaintyRadius(record components.ComponentRecord, modelID, parameter, target string) (float64, bool) {
@@ -2130,13 +2362,26 @@ func (provider *CatalogProvider) expansionWithTransitionsAndRepairs(request Prov
 }
 
 func (provider *CatalogProvider) buildCatalogExpansion(request ProviderRequest, id string, parts []catalogPart, bindings []RealizationPortBinding, transitions []RealizationSeriesTransition, connections []RealizationConnection, calculations []CalculationEvidence, repairs []RealizationRepairVariable, unproven int) (ProviderExpansion, error) {
+	realizedRoles := map[string]bool{}
+	for _, binding := range bindings {
+		realizedRoles[binding.Role] = true
+	}
+	for _, transition := range transitions {
+		realizedRoles[transition.Role] = true
+	}
+	for _, port := range request.Ports {
+		if !realizedRoles[port.Role] {
+			return ProviderExpansion{}, fmt.Errorf("%s provider does not realize required role %s with a catalog-backed endpoint", request.Capability, port.Role)
+		}
+	}
 	instances := make([]RealizationInstance, 0, len(parts))
 	componentsSelected := make([]SelectedComponent, 0, len(parts))
 	for _, part := range parts {
 		componentsSelected = append(componentsSelected, part.selected)
 		instances = append(instances, RealizationInstance{
 			ID: part.selected.InstanceID, CatalogID: part.selected.CatalogID, VariantID: part.selected.VariantID,
-			Usage: part.usage, Value: part.value, Near: part.near, MaxDistanceMM: part.maxDistanceMM,
+			Usage: part.usage, Value: part.value, Parameters: append([]RealizationParameter(nil), part.parameters...),
+			Near: part.near, MaxDistanceMM: part.maxDistanceMM,
 		})
 	}
 	parameters := calculationParameters(calculations)
@@ -2161,12 +2406,48 @@ func (provider *CatalogProvider) buildCatalogExpansion(request ProviderRequest, 
 	if area > 0 {
 		metrics.AreaMM2 = float64Pointer(area)
 	}
+	offeredPorts := offeredCatalogPorts(request, powerDemand, powerDemandProven)
+	applyCatalogSourceCurrentCapacity(offeredPorts, parts, bindings)
+	evidenceSources := []string{"kicadai:catalog-function-provider:" + catalogProviderRevision}
+	for _, part := range parts {
+		evidenceSources = append(evidenceSources, part.evidenceSources...)
+	}
+	slices.Sort(evidenceSources)
+	evidenceSources = slices.Compact(evidenceSources)
 	return ProviderExpansion{
-		ID: id, OfferedPorts: offeredCatalogPorts(request, powerDemand, powerDemandProven), Components: componentsSelected,
+		ID: id, OfferedPorts: offeredPorts, Components: componentsSelected,
 		Calculations: calculations, Metrics: metrics,
-		Evidence: ContractEvidence{Confidence: EvidenceRuleInferred, Sources: []string{"kicadai:catalog-function-provider:" + catalogProviderRevision}},
+		Evidence: ContractEvidence{Confidence: EvidenceRuleInferred, Sources: evidenceSources},
 		Payload:  payload,
 	}, nil
+}
+
+func applyCatalogSourceCurrentCapacity(ports []RoleContract, parts []catalogPart, bindings []RealizationPortBinding) {
+	for portIndex := range ports {
+		if ports[portIndex].Contract.Direction != "source" || ports[portIndex].Contract.Kind != "power" {
+			continue
+		}
+		bindingIndex := slices.IndexFunc(bindings, func(binding RealizationPortBinding) bool {
+			return binding.Role == ports[portIndex].Role
+		})
+		if bindingIndex < 0 {
+			continue
+		}
+		partIndex := slices.IndexFunc(parts, func(part catalogPart) bool {
+			return part.selected.InstanceID == bindings[bindingIndex].Instance
+		})
+		if partIndex < 0 {
+			continue
+		}
+		for _, ratingKind := range []string{"output_current", "continuous_current"} {
+			capacity, ok := recordRatingMaximum(parts[partIndex].record, ratingKind, "A")
+			if !ok || capacity <= 0 {
+				continue
+			}
+			ports[portIndex].Contract.CurrentCapacityA = float64Pointer(capacity)
+			break
+		}
+	}
 }
 
 func catalogPartsAreaMM2(parts []catalogPart) float64 {
@@ -3070,7 +3351,7 @@ func bindRoles(ports []RoleContract, instance string, functions map[string]strin
 	for _, port := range ports {
 		function := functions[port.Role]
 		if function == "" {
-			function = strings.ToUpper(port.Role)
+			continue
 		}
 		bindings = append(bindings, RealizationPortBinding{Role: port.Role, Instance: instance, Function: function})
 	}
@@ -3337,6 +3618,21 @@ func recordRatingMaximum(record components.ComponentRecord, kind, unit string) (
 			continue
 		}
 		value, err := strconv.ParseFloat(rating.Max, 64)
+		if err != nil {
+			return 0, false
+		}
+		converted, ok := convertCatalogUnit(value, rating.Unit, unit)
+		return converted, ok
+	}
+	return 0, false
+}
+
+func recordRatingMinimum(record components.ComponentRecord, kind, unit string) (float64, bool) {
+	for _, rating := range record.Ratings {
+		if rating.Kind != kind || rating.Min == "" {
+			continue
+		}
+		value, err := strconv.ParseFloat(rating.Min, 64)
 		if err != nil {
 			return 0, false
 		}

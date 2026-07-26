@@ -13,10 +13,13 @@ const (
 	VersionV3       = 3
 	SchemaIDV4      = "kicadai.open-set-requirement.v4"
 	VersionV4       = 4
+	SchemaIDV5      = "kicadai.open-set-requirement.v5"
+	VersionV5       = 5
 	PolicyVersion   = "architecture-search-policy-v1"
 	PolicyVersionV2 = "architecture-search-policy-v2"
 	PolicyVersionV3 = "architecture-search-policy-v3"
 	PolicyVersionV4 = "architecture-search-policy-v4"
+	PolicyVersionV5 = "architecture-search-policy-v5"
 
 	MaxRequirementBytes       = 256 * 1024
 	MaxDomains                = 16
@@ -29,8 +32,11 @@ const (
 	MaxConstraints            = 64
 	MaxOperatingCases         = 16
 	MaxCaseConditions         = 16
+	MaxCaseEvents             = 16
+	MaxOperatingEvents        = 64
 	MaxBehavioralRequirements = 64
 	MaxComponents             = 64
+	MaxComponentsV5           = 96
 	MaxBoardDimensionMM       = 200.0
 )
 
@@ -165,6 +171,7 @@ type BoardLimits struct {
 type OperatingCase struct {
 	ID         string               `json:"id"`
 	Conditions []OperatingCondition `json:"conditions"`
+	Events     []OperatingEvent     `json:"events,omitempty"`
 }
 
 type OperatingCondition struct {
@@ -174,6 +181,21 @@ type OperatingCondition struct {
 	Max       *float64 `json:"max,omitempty"`
 	Unit      string   `json:"unit,omitempty"`
 	Selection string   `json:"selection,omitempty"`
+}
+
+// OperatingEvent is a behavior-only change applied to a semantic requirement
+// target. It deliberately cannot name components, nets, models, equations,
+// solver controls, or implementation geometry.
+type OperatingEvent struct {
+	ID           string      `json:"id"`
+	Kind         string      `json:"kind"`
+	Target       Observation `json:"target"`
+	TriggerTimeS float64     `json:"trigger_time_s"`
+	DurationS    float64     `json:"duration_s"`
+	Initial      *float64    `json:"initial,omitempty"`
+	Applied      *float64    `json:"applied"`
+	Recovered    *float64    `json:"recovered,omitempty"`
+	Unit         string      `json:"unit"`
 }
 
 // BehavioralRequirement is a measurable, topology-neutral assertion. The
@@ -197,26 +219,32 @@ type Observation struct {
 }
 
 type Acceptance struct {
-	RequireERC                       bool `json:"require_erc"`
-	RequireStrictDRC                 bool `json:"require_strict_drc"`
-	RequireCompleteRouting           bool `json:"require_complete_routing"`
-	RequireConnectivity              bool `json:"require_connectivity"`
-	RequireWriterCorrectness         bool `json:"require_writer_correctness"`
-	RequireRoundTripZeroDiff         bool `json:"require_round_trip_zero_diff"`
-	RequireDeterministicReplay       bool `json:"require_deterministic_replay"`
-	RequireContractComposition       bool `json:"require_contract_composition,omitempty"`
-	RequireGlobalReasoning           bool `json:"require_global_reasoning,omitempty"`
-	RequireCoverageAccounting        bool `json:"require_coverage_accounting,omitempty"`
-	RequireAlternatives              bool `json:"require_alternatives,omitempty"`
-	RequireFailClosed                bool `json:"require_fail_closed,omitempty"`
-	RequireSimulation                bool `json:"require_simulation,omitempty"`
-	RequireAllCorners                bool `json:"require_all_corners,omitempty"`
-	RequireModelProvenance           bool `json:"require_model_provenance,omitempty"`
-	RequireClosedLoopEvidence        bool `json:"require_closed_loop_evidence,omitempty"`
-	RequireHierarchicalDecomposition bool `json:"require_hierarchical_decomposition,omitempty"`
-	RequireInterfaceContracts        bool `json:"require_interface_contracts,omitempty"`
-	RequireSharedResourcePlanning    bool `json:"require_shared_resource_planning,omitempty"`
-	RequireDeterministicBacktracking bool `json:"require_deterministic_backtracking,omitempty"`
-	RequirePhysicalPartitioning      bool `json:"require_physical_partitioning,omitempty"`
-	RequireEndToEndTraceability      bool `json:"require_end_to_end_traceability,omitempty"`
+	RequireERC                           bool `json:"require_erc"`
+	RequireStrictDRC                     bool `json:"require_strict_drc"`
+	RequireCompleteRouting               bool `json:"require_complete_routing"`
+	RequireConnectivity                  bool `json:"require_connectivity"`
+	RequireWriterCorrectness             bool `json:"require_writer_correctness"`
+	RequireRoundTripZeroDiff             bool `json:"require_round_trip_zero_diff"`
+	RequireDeterministicReplay           bool `json:"require_deterministic_replay"`
+	RequireContractComposition           bool `json:"require_contract_composition,omitempty"`
+	RequireGlobalReasoning               bool `json:"require_global_reasoning,omitempty"`
+	RequireCoverageAccounting            bool `json:"require_coverage_accounting,omitempty"`
+	RequireAlternatives                  bool `json:"require_alternatives,omitempty"`
+	RequireFailClosed                    bool `json:"require_fail_closed,omitempty"`
+	RequireSimulation                    bool `json:"require_simulation,omitempty"`
+	RequireAllCorners                    bool `json:"require_all_corners,omitempty"`
+	RequireModelProvenance               bool `json:"require_model_provenance,omitempty"`
+	RequireClosedLoopEvidence            bool `json:"require_closed_loop_evidence,omitempty"`
+	RequireHierarchicalDecomposition     bool `json:"require_hierarchical_decomposition,omitempty"`
+	RequireInterfaceContracts            bool `json:"require_interface_contracts,omitempty"`
+	RequireSharedResourcePlanning        bool `json:"require_shared_resource_planning,omitempty"`
+	RequireDeterministicBacktracking     bool `json:"require_deterministic_backtracking,omitempty"`
+	RequirePhysicalPartitioning          bool `json:"require_physical_partitioning,omitempty"`
+	RequireEndToEndTraceability          bool `json:"require_end_to_end_traceability,omitempty"`
+	RequireDynamicModelProvenance        bool `json:"require_dynamic_model_provenance,omitempty"`
+	RequireReturnRatioEvidence           bool `json:"require_return_ratio_evidence,omitempty"`
+	RequireDynamicElectrothermalEvidence bool `json:"require_dynamic_electrothermal_evidence,omitempty"`
+	RequireEventCoverage                 bool `json:"require_event_coverage,omitempty"`
+	RequireDynamicArchitectureSelection  bool `json:"require_dynamic_architecture_selection,omitempty"`
+	RequireBoundedDynamicRepair          bool `json:"require_bounded_dynamic_repair,omitempty"`
 }

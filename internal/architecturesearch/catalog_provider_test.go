@@ -313,6 +313,7 @@ func TestCatalogProviderOmitsUnexposedCurrentSenseInterlock(t *testing.T) {
 		t.Fatal(err)
 	}
 	request := ProviderRequest{Capability: "current_sensing", Ports: []RoleContract{
+		providerRole("input", "analog_voltage", "sink", -1, 1),
 		providerRole("output", "analog_voltage", "source", 0, 2.5),
 		providerRole("power", "power", "sink", 10.8, 13.2),
 		providerRole("reference", "reference", "bidirectional", 0, 0),
@@ -331,11 +332,296 @@ func TestCatalogProviderOmitsUnexposedCurrentSenseInterlock(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	supplyComponentIndex := slices.IndexFunc(expansions[0].Components, func(component SelectedComponent) bool {
+		return component.InstanceID == "sense_supply"
+	})
+	if supplyComponentIndex < 0 {
+		t.Fatalf("selected current-sensing regulator is missing: %#v", expansions[0].Components)
+	}
+	supplyCatalogID := expansions[0].Components[supplyComponentIndex].CatalogID
+	supplyRecordIndex := slices.IndexFunc(provider.catalog.Records, func(record components.ComponentRecord) bool {
+		return record.ID == supplyCatalogID
+	})
+	if supplyRecordIndex < 0 {
+		t.Fatalf("selected current-sensing regulator %q is absent from the catalog", supplyCatalogID)
+	}
+	supplyRecord := provider.catalog.Records[supplyRecordIndex]
+	if !slices.ContainsFunc(realization.Connections, func(connection RealizationConnection) bool {
+		return connection.ID == "sense_reference" &&
+			slices.Contains(connection.Endpoints, RealizationEndpoint{Instance: "sense_feedback_lower", Function: "B"})
+	}) {
+		t.Fatalf("current-sensing feedback reference is not attached to the shared reference: %#v", realization.Connections)
+	}
+	hasInvalidGroundEndpoint := slices.ContainsFunc(realization.Connections, func(connection RealizationConnection) bool {
+		return slices.Contains(connection.Endpoints, RealizationEndpoint{Instance: "sense_supply", Function: "GND"})
+	})
+	if hasInvalidGroundEndpoint != recordHasFunction(supplyRecord, "GND") {
+		t.Fatalf("current-sensing regulator ground endpoint does not match catalog functions: connections=%#v record=%#v", realization.Connections, supplyRecord)
+	}
+	if !slices.ContainsFunc(realization.Connections, func(connection RealizationConnection) bool {
+		return connection.ID == "sense_supply" &&
+			slices.Contains(connection.Endpoints, RealizationEndpoint{Instance: "sense_supply", Function: "VOUT"}) &&
+			slices.Contains(connection.Endpoints, RealizationEndpoint{Instance: "sense_feedback_upper", Function: "A"})
+	}) || !slices.ContainsFunc(realization.Connections, func(connection RealizationConnection) bool {
+		return connection.ID == "sense_supply_feedback" &&
+			slices.Contains(connection.Endpoints, RealizationEndpoint{Instance: "sense_supply", Function: "ADJ"}) &&
+			slices.Contains(connection.Endpoints, RealizationEndpoint{Instance: "sense_feedback_upper", Function: "B"}) &&
+			slices.Contains(connection.Endpoints, RealizationEndpoint{Instance: "sense_feedback_lower", Function: "A"})
+	}) {
+		t.Fatalf("current-sensing regulator feedback divider is not oriented from output through upper and lower resistors to reference: %#v", realization.Connections)
+	}
+	calculationIndex := slices.IndexFunc(expansions[0].Calculations, func(calculation CalculationEvidence) bool {
+		return calculation.ID == "sense_supply_feedback"
+	})
+	if calculationIndex < 0 {
+		t.Fatalf("current-sensing regulator feedback calculation is missing: %#v", expansions[0].Calculations)
+	}
+	calculation := expansions[0].Calculations[calculationIndex]
+	referenceVoltage, referenceOK := catalogSimulationParameter(supplyRecord, "reference_voltage_v")
+	if !referenceOK || !slices.Contains(calculation.Inputs, NamedQuantity{Name: "source_voltage", Value: referenceVoltage, Unit: "V"}) {
+		t.Fatalf("current-sensing regulator feedback calculation is not bound to the selected catalog reference %g V: %#v", referenceVoltage, calculation.Inputs)
+	}
+	selectedName, instanceID := "upper_resistance", "sense_feedback_upper"
+	if catalogRecordHasSimulationModel(supplyRecord, simmodel.PrimitiveFloatingAdjustableRegulatorV1) {
+		selectedName, instanceID = "lower_resistance", "sense_feedback_lower"
+	}
+	selectedResistance, selectedOK := calculationSelectedValue(calculation, selectedName)
+	if !selectedOK || !slices.ContainsFunc(realization.Instances, func(instance RealizationInstance) bool {
+		return instance.ID == instanceID && instance.Value == engineeringValue(selectedResistance, "Ohm")
+	}) {
+		t.Fatalf("current-sensing regulator feedback resistor does not match its selected calculation: selected=%g realization=%#v", selectedResistance, realization.Instances)
+	}
 	for _, instance := range realization.Instances {
 		switch instance.ID {
 		case "fault_inverter", "control_series", "fault_base_resistor":
 			t.Fatalf("measurement-only realization contains interlock instance %#v", instance)
 		}
+	}
+}
+
+func TestCatalogProviderPlacesCurrentSenseShuntInAvailableSeriesRole(t *testing.T) {
+	provider, err := NewCatalogProvider(loadArchitectureCatalog(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	request := ProviderRequest{Capability: "current_sensing", Ports: []RoleContract{
+		providerRole("input", "power", "sink", 4.5, 5.5),
+		providerRole("output", "analog_voltage", "source", 0, 2.5),
+		providerRole("power", "power", "sink", 4.5, 5.5),
+		providerRole("reference", "reference", "bidirectional", 0, 0),
+	}, Constraints: []Constraint{
+		constraintNumber("full_scale_current", "target", 2, "A", 2),
+	}}
+	expansions, err := provider.Expand(context.Background(), request)
+	if err != nil || len(expansions) == 0 {
+		t.Fatalf("current-sensing expansions=%d err=%v", len(expansions), err)
+	}
+	realization, err := DecodeFragmentRealization(expansions[0].Payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(realization.SeriesTransitions) != 1 || realization.SeriesTransitions[0].Role != "input" {
+		t.Fatalf("current-sensing series transitions = %#v", realization.SeriesTransitions)
+	}
+	if slices.ContainsFunc(realization.PortBindings, func(binding RealizationPortBinding) bool {
+		return binding.Role == "input"
+	}) {
+		t.Fatalf("series input was also emitted as a scalar binding: %#v", realization.PortBindings)
+	}
+	if slices.ContainsFunc(realization.Instances, func(instance RealizationInstance) bool {
+		return instance.ID == "sense_supply"
+	}) {
+		t.Fatalf("compatible dedicated sensor rail retained an unnecessary regulator: %#v", realization.Instances)
+	}
+	if !slices.ContainsFunc(realization.PortBindings, func(binding RealizationPortBinding) bool {
+		return binding.Role == "power" && binding.Instance == "current_monitor" && (binding.Function == "VCC" || binding.Function == "V_PLUS")
+	}) {
+		t.Fatalf("compatible dedicated sensor rail was not bound directly: %#v", realization.PortBindings)
+	}
+	if !slices.ContainsFunc(expansions[0].Calculations, func(calculation CalculationEvidence) bool {
+		return calculation.ID == "current_sensor_direct_supply" && calculation.Pass
+	}) {
+		t.Fatalf("direct sensor-supply proof is missing: %#v", expansions[0].Calculations)
+	}
+}
+
+func TestCatalogProviderPowersCurrentSensorDirectlyFromCompatibleSeriesRail(t *testing.T) {
+	provider, err := NewCatalogProvider(loadArchitectureCatalog(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	request := ProviderRequest{Capability: "current_sensing", Ports: []RoleContract{
+		providerRole("input", "power", "sink", 4.85, 5.15),
+		providerRole("output", "analog_voltage", "source", 0, 2.5),
+		providerRole("reference", "reference", "bidirectional", 0, 0),
+	}, Constraints: []Constraint{
+		constraintNumber("full_scale_current", "target", 2, "A", 2),
+	}}
+	expansions, err := provider.Expand(context.Background(), request)
+	if err != nil || len(expansions) == 0 {
+		t.Fatalf("current-sensing expansions=%d err=%v", len(expansions), err)
+	}
+	realization, err := DecodeFragmentRealization(expansions[0].Payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if slices.ContainsFunc(realization.Instances, func(instance RealizationInstance) bool {
+		return instance.ID == "sense_supply"
+	}) {
+		t.Fatalf("compatible sensed series rail retained an unnecessary regulator: %#v", realization.Instances)
+	}
+	if !slices.ContainsFunc(realization.Instances, func(instance RealizationInstance) bool {
+		return instance.ID == "current_monitor" && instance.CatalogID == "current_sensor.ti.ina168na.sot23_5"
+	}) {
+		t.Fatalf("current-sense selection did not minimize catalog-backed quiescent current within the required common-mode interval: %#v", realization.Instances)
+	}
+	if !slices.ContainsFunc(realization.Instances, func(instance RealizationInstance) bool {
+		return instance.ID == "sense_output_load" && instance.Value == "50k"
+	}) {
+		t.Fatalf("current-output sensor omitted its catalog-programmed load resistance: %#v", realization.Instances)
+	}
+	if !slices.ContainsFunc(realization.Connections, func(connection RealizationConnection) bool {
+		return connection.ID == "sense_output_load" &&
+			slices.Contains(connection.Endpoints, RealizationEndpoint{Instance: "current_monitor", Function: "OUT"}) &&
+			slices.Contains(connection.Endpoints, RealizationEndpoint{Instance: "sense_output_load", Function: "A"})
+	}) {
+		t.Fatalf("current-output sensor load is not connected to the measurement output: %#v", realization.Connections)
+	}
+	if !slices.ContainsFunc(realization.Connections, func(connection RealizationConnection) bool {
+		return connection.ID == "sense_load_side" &&
+			slices.ContainsFunc(connection.Endpoints, func(endpoint RealizationEndpoint) bool {
+				return endpoint.Instance == "current_monitor" && (endpoint.Function == "VCC" || endpoint.Function == "V_PLUS")
+			}) &&
+			slices.Contains(connection.Endpoints, RealizationEndpoint{Instance: "sense_input_bypass", Function: "A"}) &&
+			slices.Contains(connection.Endpoints, RealizationEndpoint{Instance: "sense_output_bypass", Function: "A"})
+	}) {
+		t.Fatalf("compatible sensed load-side rail does not power the current sensor and its bypass network: %#v", realization.Connections)
+	}
+	if slices.ContainsFunc(realization.Connections, func(connection RealizationConnection) bool {
+		return connection.ID == "sense_supply"
+	}) {
+		t.Fatalf("compatible sensed series rail was split into a duplicate supply net: %#v", realization.Connections)
+	}
+}
+
+func TestCatalogProviderSelectsBipolarCommonModeCurrentSensor(t *testing.T) {
+	provider, err := NewCatalogProvider(loadArchitectureCatalog(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	request := ProviderRequest{Capability: "current_sensing", Ports: []RoleContract{
+		providerRole("input", "analog_voltage", "sink", -12, 12),
+		providerRole("output", "analog_voltage", "source", 0, 5),
+		providerRole("power", "power", "sink", 16.2, 19.8),
+		providerRole("reference", "reference", "bidirectional", 0, 0),
+	}, Constraints: []Constraint{
+		constraintNumber("full_scale_current", "target", 3, "A", 5),
+	}}
+	expansions, err := provider.Expand(context.Background(), request)
+	if err != nil || len(expansions) == 0 {
+		t.Fatalf("current-sensing expansions=%d err=%v", len(expansions), err)
+	}
+	if !slices.ContainsFunc(expansions[0].Components, func(component SelectedComponent) bool {
+		return component.InstanceID == "current_monitor" && component.CatalogID == "current_sensor.ti.ina149d.soic8"
+	}) {
+		t.Fatalf("bipolar current-sensing components = %#v", expansions[0].Components)
+	}
+	realization, err := DecodeFragmentRealization(expansions[0].Payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.ContainsFunc(realization.Connections, func(connection RealizationConnection) bool {
+		return connection.ID == "sense_output_reference" &&
+			slices.Contains(connection.Endpoints, RealizationEndpoint{Instance: "current_monitor", Function: "REF_A"}) &&
+			slices.Contains(connection.Endpoints, RealizationEndpoint{Instance: "current_monitor", Function: "REF_B"})
+	}) {
+		t.Fatalf("bipolar current-sensing reference network = %#v", realization.Connections)
+	}
+}
+
+func TestCatalogProviderIncludesDeenergizedSwitchedLoadInCurrentSenseCommonMode(t *testing.T) {
+	provider, err := NewCatalogProvider(loadArchitectureCatalog(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	request := ProviderRequest{Capability: "current_sensing", Ports: []RoleContract{
+		providerRole("input", "switched_load", "sink", 21.6, 26.4),
+		providerRole("output", "analog_voltage", "source", 0, 5),
+		providerRole("power", "power", "sink", 4.5, 5.5),
+		providerRole("reference", "reference", "bidirectional", 0, 0),
+	}, Constraints: []Constraint{
+		constraintNumber("full_scale_current", "target", 2, "A", 5),
+	}}
+	expansions, err := provider.Expand(context.Background(), request)
+	if err != nil || len(expansions) == 0 {
+		t.Fatalf("current-sensing expansions=%d err=%v", len(expansions), err)
+	}
+	componentIndex := slices.IndexFunc(expansions[0].Components, func(component SelectedComponent) bool {
+		return component.InstanceID == "current_monitor"
+	})
+	if componentIndex < 0 {
+		t.Fatalf("de-energizable switched-load current sensing omitted its monitor: %#v", expansions[0].Components)
+	}
+	recordIndex := slices.IndexFunc(provider.catalog.Records, func(record components.ComponentRecord) bool {
+		return record.ID == expansions[0].Components[componentIndex].CatalogID
+	})
+	if recordIndex < 0 {
+		t.Fatalf("selected current monitor is absent from the catalog: %#v", expansions[0].Components[componentIndex])
+	}
+	minimum, minimumOK := recordRatingMinimum(provider.catalog.Records[recordIndex], "common_mode_voltage", "V")
+	maximum, maximumOK := recordRatingMaximum(provider.catalog.Records[recordIndex], "common_mode_voltage", "V")
+	if !minimumOK || !maximumOK || minimum > 0 || maximum < 26.4 {
+		t.Fatalf("selected monitor common-mode range %.9g..%.9g V does not cover de-energized through energized states", minimum, maximum)
+	}
+	realization, err := DecodeFragmentRealization(expansions[0].Payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sourceHasMinus := slices.ContainsFunc(realization.Connections, func(connection RealizationConnection) bool {
+		return connection.ID == "sense_source_side" &&
+			slices.Contains(connection.Endpoints, RealizationEndpoint{Instance: "current_monitor", Function: "IN_MINUS"})
+	})
+	loadHasPlus := slices.ContainsFunc(realization.Connections, func(connection RealizationConnection) bool {
+		return connection.ID == "sense_load_side" &&
+			slices.Contains(connection.Endpoints, RealizationEndpoint{Instance: "current_monitor", Function: "IN_PLUS"})
+	})
+	if !sourceHasMinus || !loadHasPlus {
+		t.Fatalf("switched-load current-sense polarity = %#v", realization.Connections)
+	}
+}
+
+func TestCatalogProviderSizesCurrentSenseFromMinimumLoadResistance(t *testing.T) {
+	provider, err := NewCatalogProvider(loadArchitectureCatalog(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	request := ProviderRequest{Capability: "current_sensing", Ports: []RoleContract{
+		providerRole("input", "analog_voltage", "sink", -16, 16),
+		providerRole("output", "analog_voltage", "source", 0, 5),
+		providerRole("power", "power", "sink", 16.2, 19.8),
+		providerRole("reference", "reference", "bidirectional", 0, 0),
+	}, Constraints: []Constraint{
+		constraintNumber("continuous_output_power", "minimum", 15, "W", 0),
+		constraintNumber("load_impedance", "target", 6, "Ohm", 100.0/3),
+	}}
+	expansions, err := provider.Expand(context.Background(), request)
+	if err != nil || len(expansions) == 0 {
+		t.Fatalf("current-sensing expansions=%d err=%v", len(expansions), err)
+	}
+	required := math.Sqrt(2 * 15.0 / 4)
+	found := false
+	for _, calculation := range expansions[0].Calculations {
+		if calculation.ID != "current_sense_transfer" {
+			continue
+		}
+		for _, input := range calculation.Inputs {
+			if input.Name == "full_scale_current" && math.Abs(input.Value-required) <= 1e-9 {
+				found = true
+			}
+		}
+	}
+	if !found {
+		t.Fatalf("current-sense calculation was not sized from the minimum load resistance: %#v", expansions[0].Calculations)
 	}
 }
 
@@ -422,6 +708,9 @@ func TestCatalogProviderUsesDefaultOffHighSideSwitchForLowStartupOutput(t *testi
 	}
 	seenOutput := false
 	for _, binding := range realization.PortBindings {
+		if binding.Role == "input" {
+			t.Fatalf("high-side input must be provided by a series transition, got scalar binding %#v", binding)
+		}
 		if (binding.Role == "power" || binding.Role == "load_power") && (binding.Instance != "high_side_switch" || binding.Function != "SOURCE") {
 			t.Fatalf("high-side power binding = %#v", binding)
 		}
@@ -451,7 +740,7 @@ func TestCatalogProviderGenericCapabilityMutations(t *testing.T) {
 		{name: "adjustable_regulator_in_range", request: regulatorProviderRequest(5.5, 3.3, 0.25)},
 		{name: "adjustable_regulator_input_out_of_range", request: regulatorProviderRequest(50, 5, 0.25), wantError: true},
 		{name: "filter_in_range", request: filterProviderRequest(5, 2000)},
-		{name: "filter_supply_out_of_range", request: filterProviderRequest(50, 2000), wantError: true},
+		{name: "filter_supply_out_of_range", request: filterProviderRequest(100, 2000), wantError: true},
 		{name: "translator_in_range", request: translatorProviderRequest(3.3, 1.8)},
 		{name: "translator_low_domain_out_of_range", request: translatorProviderRequest(3.3, 1.2), wantError: true},
 		{name: "controller_in_range", request: participantProviderRequest("programmable_controller", "sensor_bus", 3.3)},
@@ -478,6 +767,56 @@ func TestCatalogProviderGenericCapabilityMutations(t *testing.T) {
 				t.Fatal(err)
 			}
 		})
+	}
+}
+
+func TestCatalogProviderRequiresReviewedDynamicSwitchEvidenceForElectrothermalLoad(t *testing.T) {
+	catalog := loadArchitectureCatalog(t)
+	provider, err := NewCatalogProvider(catalog)
+	if err != nil {
+		t.Fatal(err)
+	}
+	request := loadSwitchProviderRequest(30, 4)
+	request.Constraints = append(request.Constraints, requiredConstraint("analysis_electrothermal"))
+
+	expansions, err := provider.Expand(context.Background(), request)
+	if err != nil || len(expansions) == 0 {
+		t.Fatalf("dynamic load-switch expansions = %#v, %v", expansions, err)
+	}
+	switchID := ""
+	for _, component := range expansions[0].Components {
+		if component.InstanceID == "mosfet" {
+			switchID = component.CatalogID
+			break
+		}
+	}
+	for _, record := range catalog.Records {
+		if record.ID == switchID && recordHasDynamicElectrothermalEvidence(record) {
+			return
+		}
+	}
+	t.Fatalf("dynamic load switch selected %q without reviewed thermal-RC and transient-SOA evidence", switchID)
+}
+
+func TestCatalogProviderPublishesSelectedPartSourceCapacity(t *testing.T) {
+	provider, err := NewCatalogProvider(loadArchitectureCatalog(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	expansions, err := provider.Expand(context.Background(), regulatorProviderRequest(5.5, 3.3, 0.25))
+	if err != nil || len(expansions) == 0 {
+		t.Fatalf("regulator expansions = %#v, %v", expansions, err)
+	}
+	for _, expansion := range expansions {
+		outputIndex := slices.IndexFunc(expansion.OfferedPorts, func(port RoleContract) bool {
+			return port.Role == "output"
+		})
+		if outputIndex < 0 || expansion.OfferedPorts[outputIndex].Contract.CurrentCapacityA == nil {
+			t.Fatalf("output capacity missing from %#v", expansion)
+		}
+		if *expansion.OfferedPorts[outputIndex].Contract.CurrentCapacityA <= 0.25 {
+			t.Fatalf("output capacity = %g A, want selected catalog rating above requested load", *expansion.OfferedPorts[outputIndex].Contract.CurrentCapacityA)
+		}
 	}
 }
 
@@ -549,6 +888,35 @@ func TestCatalogProviderUsesRatedReverseBlockingPowerPathWhenRequired(t *testing
 		})
 	}) {
 		t.Fatalf("reverse-blocking output is not connected: %#v", realization.Connections)
+	}
+}
+
+func TestCatalogProviderVoltageQualifiesShuntTransientClamp(t *testing.T) {
+	provider, err := NewCatalogProvider(loadArchitectureCatalog(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	protected := providerRole("protected", "switched_load", "source", 18, 30)
+	current := 4.0
+	protected.Contract.RequiredCurrentCapacityA = &current
+	expansions, err := provider.Expand(context.Background(), ProviderRequest{
+		Capability: "transient_protection",
+		Ports: []RoleContract{
+			protected,
+			providerRole("reference", "reference", "bidirectional", 0, 0),
+		},
+	})
+	if err != nil || len(expansions) == 0 {
+		t.Fatalf("expansions = %#v err = %v", expansions, err)
+	}
+	realization, err := DecodeFragmentRealization(expansions[0].Payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.ContainsFunc(realization.Instances, func(instance RealizationInstance) bool {
+		return instance.CatalogID == "protection.littelfuse.smcj33ca.smc"
+	}) {
+		t.Fatalf("30 V protected node did not select its voltage-qualified pulse clamp: %#v", realization.Instances)
 	}
 }
 
@@ -1309,7 +1677,7 @@ func TestCatalogProviderKeepsClassABNegativeRailDistinctFromReference(t *testing
 		providerRole("output", "analog_voltage", "source", -1, 1),
 		providerRole("positive_power", "power", "sink", 15, 15),
 		providerRole("negative_power", "power", "sink", -15, -15),
-	}, Constraints: []Constraint{constraintBool("thermal_tracking", "required", true)}}
+	}}
 	biasExpansions, err := provider.Expand(context.Background(), biasRequest)
 	if err != nil || len(biasExpansions) == 0 {
 		t.Fatalf("bias Expand() = %#v, %v", biasExpansions, err)
@@ -1336,6 +1704,188 @@ func TestCatalogProviderKeepsClassABNegativeRailDistinctFromReference(t *testing
 		if instance.ID == "bias_enable_inverter" || instance.ID == "bias_clamp" || instance.ID == "enable_resistor" {
 			t.Fatalf("always-on Class AB bias contains a dead enable/clamp device: %#v", biasRealization.Instances)
 		}
+	}
+}
+
+func TestCatalogProviderSelectsSignalAmplifierForProjectedPowerSwing(t *testing.T) {
+	provider, err := NewCatalogProvider(loadArchitectureCatalog(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	request := ProviderRequest{Capability: "signal_amplification", Ports: []RoleContract{
+		providerRole("input", "analog_voltage", "sink", -16, 16),
+		providerRole("output", "analog_voltage", "source", -16, 16),
+		providerRole("positive_power", "power", "sink", 16.2, 19.8),
+		providerRole("negative_power", "power", "sink", -19.8, -16.2),
+		providerRole("reference", "reference", "bidirectional", 0, 0),
+	}, Constraints: []Constraint{
+		constraintNumber("continuous_output_power", "minimum", 15, "W", 0),
+		constraintNumber("load_impedance", "target", 6, "Ohm", 100.0/3),
+	}}
+	expansions, err := provider.Expand(context.Background(), request)
+	if err != nil || len(expansions) == 0 {
+		t.Fatalf("Expand() = %#v, %v", expansions, err)
+	}
+	realization, err := DecodeFragmentRealization(expansions[0].Payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.ContainsFunc(realization.Instances, func(instance RealizationInstance) bool {
+		return instance.ID == "gain_amplifier" && instance.CatalogID == "opamp.ti.opa992idbvr.sot23_5"
+	}) {
+		t.Fatalf("power-swing-constrained signal amplifier did not select reviewed rail-headroom evidence: %#v", realization.Instances)
+	}
+	if !slices.ContainsFunc(expansions[0].Calculations, func(calculation CalculationEvidence) bool {
+		required, requiredOK := calculationOutput(calculation, "required_peak_output")
+		return calculation.ID == "signal_amplifier_output_swing" &&
+			requiredOK && math.Abs(required-math.Sqrt(2*15*8)) <= 1e-9
+	}) {
+		t.Fatalf("power-swing-constrained signal amplifier lacks output-swing evidence: %#v", expansions[0].Calculations)
+	}
+}
+
+func TestCatalogProviderAddsResponseDrivenClassABCurrentLimiting(t *testing.T) {
+	provider, err := NewCatalogProvider(loadArchitectureCatalog(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	request := ProviderRequest{Capability: "class_ab_output_stage", Ports: []RoleContract{
+		providerRole("input", "analog_voltage", "sink", -2, 2),
+		providerRole("output", "analog_voltage", "source", -16, 16),
+		providerRole("positive_power", "power", "sink", 16.2, 19.8),
+		providerRole("negative_power", "power", "sink", -19.8, -16.2),
+		providerRole("reference", "reference", "bidirectional", 0, 0),
+	}, Constraints: []Constraint{
+		constraintNumber("load_impedance", "target", 6, "ohm", 100.0/3),
+		constraintNumber("continuous_output_power", "minimum", 15, "W", 0),
+		constraintNumber("protection_response_time", "maximum", .001, "s", 0),
+	}}
+	expansions, err := provider.Expand(context.Background(), request)
+	if err != nil || len(expansions) == 0 {
+		t.Fatalf("Expand() = %#v, %v", expansions, err)
+	}
+	realization, err := DecodeFragmentRealization(expansions[0].Payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for id, catalogID := range map[string]string{
+		"upper_current_limiter_1": "bjt.onsemi.mje253g.to225",
+		"lower_current_limiter_1": "bjt.onsemi.mje243g.to225",
+	} {
+		if !slices.ContainsFunc(realization.Instances, func(instance RealizationInstance) bool {
+			return instance.ID == id && instance.CatalogID == catalogID
+		}) {
+			t.Fatalf("response-driven Class AB output omitted %s: %#v", id, realization.Instances)
+		}
+	}
+	if !slices.ContainsFunc(expansions[0].Calculations, func(calculation CalculationEvidence) bool {
+		responseTime, responseOK := calculationOutput(calculation, "response_time")
+		currentLimit, currentOK := calculationOutput(calculation, "current_limit")
+		worstRequiredPeakCurrent := math.Sqrt(2*15*8) / 4
+		return calculation.ID == "class_ab_current_limit_response" &&
+			responseOK && responseTime <= .001 &&
+			currentOK && currentLimit > worstRequiredPeakCurrent && currentLimit <= 8.1
+	}) {
+		t.Fatalf("response-driven Class AB output lacks normal-load headroom and bounded response evidence: %#v", expansions[0].Calculations)
+	}
+	if !slices.ContainsFunc(realization.RepairVariables, func(variable RealizationRepairVariable) bool {
+		return variable.ID == "class_ab_current_limit_sense_resistance" &&
+			len(variable.Instances) >= 2 &&
+			slices.ContainsFunc(variable.Effects, func(effect RealizationRepairEffect) bool {
+				return effect.Analysis == simmodel.AnalysisElectrothermal &&
+					effect.Metric == "transient_soa_margin" &&
+					effect.Direction == "metric_increases"
+			})
+	}) {
+		t.Fatalf("response-driven Class AB output lacks bounded current-limit repair: %#v", realization.RepairVariables)
+	}
+}
+
+func TestCatalogProviderCompensatesUnityGainClassABLoopWhenStabilityIsRequired(t *testing.T) {
+	provider, err := NewCatalogProvider(loadArchitectureCatalog(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	request := ProviderRequest{Capability: "class_ab_output_stage", Ports: []RoleContract{
+		providerRole("input", "analog_voltage", "sink", -2, 2),
+		providerRole("output", "analog_voltage", "source", -16, 16),
+		providerRole("positive_power", "power", "sink", 16.2, 19.8),
+		providerRole("negative_power", "power", "sink", -19.8, -16.2),
+		providerRole("reference", "reference", "bidirectional", 0, 0),
+	}, Constraints: []Constraint{
+		constraintNumber("load_impedance", "target", 6, "ohm", 100.0/3),
+		constraintNumber("continuous_output_power", "minimum", 15, "W", 0),
+		constraintNumber("phase_margin", "minimum", 50, "deg", 0),
+	}}
+	expansions, err := provider.Expand(context.Background(), request)
+	if err != nil || len(expansions) == 0 {
+		t.Fatalf("Expand() = %#v, %v", expansions, err)
+	}
+	realization, err := DecodeFragmentRealization(expansions[0].Payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, id := range []string{"feedback_upper", "feedback_compensation"} {
+		if !slices.ContainsFunc(realization.Instances, func(instance RealizationInstance) bool {
+			return instance.ID == id
+		}) {
+			t.Fatalf("stability-constrained unity Class-AB output omitted %s: %#v", id, realization.Instances)
+		}
+	}
+	if slices.ContainsFunc(realization.Instances, func(instance RealizationInstance) bool {
+		return instance.ID == "feedback_lower"
+	}) {
+		t.Fatalf("unity Class-AB compensation introduced finite DC noise gain: %#v", realization.Instances)
+	}
+	if !slices.ContainsFunc(realization.Instances, func(instance RealizationInstance) bool {
+		return instance.ID == "voltage_driver" && instance.CatalogID == "opamp.ti.opa992idbvr.sot23_5"
+	}) {
+		t.Fatalf("stability-constrained Class-AB voltage driver lacks reviewed supply-span and output-swing headroom: %#v", realization.Instances)
+	}
+	if !slices.ContainsFunc(realization.RepairVariables, func(variable RealizationRepairVariable) bool {
+		return variable.ID == "class_ab_feedback_compensation" &&
+			slices.ContainsFunc(variable.Effects, func(effect RealizationRepairEffect) bool {
+				return effect.Analysis == simmodel.AnalysisStability &&
+					effect.Metric == "phase_margin" &&
+					effect.Direction == "metric_increases"
+			})
+	}) {
+		t.Fatalf("stability-constrained Class-AB output lacks bounded compensation repair: %#v", realization.RepairVariables)
+	}
+}
+
+func TestCatalogProviderDoesNotTreatClassABSignalInputAsEnable(t *testing.T) {
+	provider, err := NewCatalogProvider(loadArchitectureCatalog(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	request := ProviderRequest{Capability: "class_ab_bias_control", Ports: []RoleContract{
+		providerRole("input", "analog_voltage", "sink", -2, 2),
+		providerRole("output", "analog_voltage", "source", -2, 2),
+		providerRole("reference", "reference", "bidirectional", 0, 0),
+	}}
+	expansions, err := provider.Expand(context.Background(), request)
+	if err != nil || len(expansions) == 0 {
+		t.Fatalf("Expand() = %#v, %v", expansions, err)
+	}
+	realization, err := DecodeFragmentRealization(expansions[0].Payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, instance := range realization.Instances {
+		switch instance.ID {
+		case "bias_enable_inverter", "bias_clamp", "enable_resistor", "inverter_pullup":
+			t.Fatalf("analog signal input created digital enable hardware: %#v", realization.Instances)
+		}
+	}
+	inputBinding := slices.IndexFunc(realization.PortBindings, func(binding RealizationPortBinding) bool {
+		return binding.Role == "input" && binding.Instance == "signal_path" && binding.Function == "A"
+	})
+	outputBinding := slices.IndexFunc(realization.PortBindings, func(binding RealizationPortBinding) bool {
+		return binding.Role == "output" && binding.Instance == "signal_path" && binding.Function == "B"
+	})
+	if inputBinding < 0 || outputBinding < 0 {
+		t.Fatalf("analog bias signal path bindings = %#v", realization.PortBindings)
 	}
 }
 
@@ -1480,6 +2030,219 @@ func TestCatalogProviderSizesOutputFuseFromBehavioralPowerAndLoad(t *testing.T) 
 	}
 }
 
+func TestCatalogProviderOutputFuseIncludesDownstreamSupportCurrent(t *testing.T) {
+	provider, err := NewCatalogProvider(loadArchitectureCatalog(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	request := ProviderRequest{Capability: "output_protection", Ports: []RoleContract{
+		providerRole("input", "power", "sink", 4.85, 5.15),
+		providerRole("output", "power", "source", 4.85, 5.15),
+		providerRole("reference", "reference", "bidirectional", 0, 0),
+	}}
+	request.Ports[1].Contract.RequiredCurrentCapacityA = float64Pointer(2)
+	expansions, err := provider.Expand(context.Background(), request)
+	if err != nil || len(expansions) == 0 {
+		t.Fatalf("Expand() = %#v, %v", expansions, err)
+	}
+	realization, err := DecodeFragmentRealization(expansions[0].Payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.ContainsFunc(realization.Instances, func(instance RealizationInstance) bool {
+		return instance.ID == "output_fuse" && instance.CatalogID == "fuse.littelfuse.0437003wr.1206"
+	}) {
+		t.Fatalf("series fuse did not include its downstream support current and minimize cold resistance within the smallest adequate current tier: %#v", realization.Instances)
+	}
+}
+
+func TestCatalogProviderUsesReviewedControlledDisconnectForOutputProtection(t *testing.T) {
+	provider, err := NewCatalogProvider(loadArchitectureCatalog(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	request := ProviderRequest{Capability: "output_protection", Ports: []RoleContract{
+		providerRole("control", "digital_logic", "sink", 0, 3.3),
+		providerRole("input", "power", "sink", 4.85, 5.15),
+		providerRole("output", "power", "source", 4.85, 5.15),
+		providerRole("reference", "reference", "bidirectional", 0, 0),
+	}, Constraints: []Constraint{
+		constraintNumber("overcurrent_limit", "maximum", 0.8, "A", 0),
+	}}
+	expansions, err := provider.Expand(context.Background(), request)
+	if err != nil || len(expansions) == 0 {
+		t.Fatalf("Expand() = %#v, %v", expansions, err)
+	}
+	realization, err := DecodeFragmentRealization(expansions[0].Payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if expansions[0].ID != "controlled_high_side_output_protection" || !slices.ContainsFunc(realization.Instances, func(instance RealizationInstance) bool {
+		return instance.ID == "output_disconnect" && instance.CatalogID == "mosfet.aos.aod21357.to252"
+	}) {
+		t.Fatalf("controlled output protection = %#v", realization)
+	}
+	for role, target := range map[string]RealizationEndpoint{
+		"control": {Instance: "disconnect_control_series", Function: "A"},
+		"input":   {Instance: "output_disconnect", Function: "SOURCE"},
+	} {
+		if !slices.ContainsFunc(realization.PortBindings, func(binding RealizationPortBinding) bool {
+			return binding.Role == role && binding.Instance == target.Instance && binding.Function == target.Function
+		}) {
+			t.Fatalf("%s binding absent from %#v", role, realization.PortBindings)
+		}
+	}
+	if slices.ContainsFunc(realization.PortBindings, func(binding RealizationPortBinding) bool { return binding.Role == "output" }) ||
+		len(realization.SeriesTransitions) != 1 ||
+		realization.SeriesTransitions[0].Role != "output" ||
+		realization.SeriesTransitions[0].Input != (RealizationEndpoint{Instance: "output_disconnect", Function: "SOURCE"}) ||
+		realization.SeriesTransitions[0].Output != (RealizationEndpoint{Instance: "output_fuse", Function: "B"}) {
+		t.Fatalf("controlled output protection does not preserve its source-to-protected series path: %#v", realization)
+	}
+}
+
+func TestBindRolesDoesNotInventCatalogFunctions(t *testing.T) {
+	bindings := bindRoles([]RoleContract{
+		providerRole("input", "power", "sink", 4.75, 5.25),
+		providerRole("fault", "digital_logic", "source", 0, 5.25),
+	}, "device", map[string]string{"input": "VIN"})
+	if len(bindings) != 1 || bindings[0].Role != "input" || bindings[0].Function != "VIN" {
+		t.Fatalf("bindRoles invented an unmapped catalog function: %#v", bindings)
+	}
+}
+
+func TestCatalogProviderRealizesSensedFaultOutputProtectionRoles(t *testing.T) {
+	provider, err := NewCatalogProvider(loadArchitectureCatalog(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	request := ProviderRequest{Capability: "output_protection", Ports: []RoleContract{
+		providerRole("input", "power", "sink", 4.85, 5.15),
+		providerRole("output", "power", "source", 4.85, 5.15),
+		providerRole("sense", "analog_voltage", "sink", 0, 5.15),
+		providerRole("fault", "digital_logic", "source", 0, 5.15),
+		providerRole("reference", "reference", "bidirectional", 0, 0),
+	}, Constraints: []Constraint{
+		constraintNumber("overcurrent_limit", "maximum", 2, "A", 0),
+	}}
+	expansions, err := provider.Expand(context.Background(), request)
+	if err != nil || len(expansions) < 2 {
+		t.Fatalf("sensed output-protection expansions=%d err=%v", len(expansions), err)
+	}
+	for _, expansion := range expansions {
+		realization, decodeErr := DecodeFragmentRealization(expansion.Payload)
+		if decodeErr != nil {
+			t.Fatal(decodeErr)
+		}
+		roles := map[string]bool{}
+		for _, binding := range realization.PortBindings {
+			roles[binding.Role] = true
+			if binding.Function == "SENSE" || binding.Function == "FAULT" {
+				t.Fatalf("%s invented catalog function in %#v", expansion.ID, binding)
+			}
+		}
+		for _, transition := range realization.SeriesTransitions {
+			roles[transition.Role] = true
+		}
+		for _, role := range []string{"input", "output", "sense", "fault", "reference"} {
+			if !roles[role] {
+				t.Fatalf("%s omitted role %s: %#v", expansion.ID, role, realization)
+			}
+		}
+	}
+}
+
+func TestCatalogProviderRealizesCurrentLimitCommandInterlockRoles(t *testing.T) {
+	provider, err := NewCatalogProvider(loadArchitectureCatalog(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	request := ProviderRequest{Capability: "safety_interlock", Ports: []RoleContract{
+		providerRole("command", "digital_logic", "sink", 0, 5.25),
+		providerRole("sense", "analog_voltage", "sink", 0, 5.25),
+		providerRole("control", "analog_control", "source", 0, 5.25),
+		providerRole("fault", "digital_logic", "source", 0, 5.25),
+		providerRole("reference", "reference", "bidirectional", 0, 0),
+	}}
+	expansions, err := provider.Expand(context.Background(), request)
+	if err != nil || len(expansions) == 0 {
+		t.Fatalf("current-limit interlock expansions=%d err=%v", len(expansions), err)
+	}
+	if expansions[0].ID != "current_limit_command_interlock" {
+		t.Fatalf("current-limit interlock id = %q", expansions[0].ID)
+	}
+	realization, err := DecodeFragmentRealization(expansions[0].Payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	roles := map[string]bool{}
+	for _, binding := range realization.PortBindings {
+		roles[binding.Role] = true
+		switch binding.Function {
+		case "COMMAND", "CONTROL", "FAULT", "SENSE":
+			t.Fatalf("interlock invented catalog function in %#v", binding)
+		}
+	}
+	for _, role := range []string{"command", "control", "fault", "sense", "reference"} {
+		if !roles[role] {
+			t.Fatalf("interlock omitted role %s: %#v", role, realization)
+		}
+	}
+	latchInstance := false
+	for _, instance := range realization.Instances {
+		if instance.ID == "fault_latch_feedback" && instance.Value == "39k" && instance.Usage == "threshold_divider" {
+			latchInstance = true
+		}
+	}
+	latchNets := map[string]bool{}
+	for _, connection := range realization.Connections {
+		for _, endpoint := range connection.Endpoints {
+			if endpoint.Instance == "fault_latch_feedback" {
+				latchNets[connection.ID+"\x00"+endpoint.Function] = true
+			}
+		}
+	}
+	if !latchInstance ||
+		!latchNets["interlock_fault_output\x00A"] ||
+		!latchNets["interlock_sense_threshold\x00B"] {
+		t.Fatalf("interlock fault latch is incomplete: instances=%#v connections=%#v", realization.Instances, realization.Connections)
+	}
+}
+
+func TestCatalogProviderControlledDisconnectFuseMeetsOutputDropBudget(t *testing.T) {
+	provider, err := NewCatalogProvider(loadArchitectureCatalog(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	request := ProviderRequest{Capability: "output_protection", Ports: []RoleContract{
+		providerRole("control", "digital_logic", "sink", 0, 3.3),
+		providerRole("input", "power", "sink", 3.2, 3.4),
+		providerRole("output", "power", "source", 3.2, 3.4),
+		providerRole("reference", "reference", "bidirectional", 0, 0),
+	}, Constraints: []Constraint{
+		constraintNumber("dc_voltage", "target", 3.3, "V", 3.030303),
+		constraintNumber("overcurrent_limit", "maximum", 0.6, "A", 0),
+	}}
+	expansions, err := provider.Expand(context.Background(), request)
+	if err != nil || len(expansions) == 0 {
+		t.Fatalf("Expand() = %#v, %v", expansions, err)
+	}
+	realization, err := DecodeFragmentRealization(expansions[0].Payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.ContainsFunc(realization.Instances, func(instance RealizationInstance) bool {
+		return instance.ID == "output_disconnect" && instance.CatalogID == "mosfet.aos.ao3401.sot23"
+	}) {
+		t.Fatalf("3.3 V controlled output did not select a gate-compatible low-resistance disconnect: %#v", realization.Instances)
+	}
+	if !slices.ContainsFunc(realization.Instances, func(instance RealizationInstance) bool {
+		return instance.ID == "output_fuse" && instance.CatalogID == "fuse.littelfuse.0437003wr.1206"
+	}) {
+		t.Fatalf("3.3 V controlled output did not select a voltage-drop-qualified fuse: %#v", realization.Instances)
+	}
+}
+
 func TestCatalogProviderRaisesOutputTVSWorkingVoltageFromPortContract(t *testing.T) {
 	provider, err := NewCatalogProvider(loadArchitectureCatalog(t))
 	if err != nil {
@@ -1537,6 +2300,34 @@ func TestCatalogProviderBroadensRelayTechnologyWhenPreferredRelayIsUnderrated(t 
 		return instance.ID == "relay_coil_series" && instance.Value == "30"
 	}) {
 		t.Fatalf("startup-isolation relay lacks minimum-rail operate-current margin: %#v", realization.Instances)
+	}
+}
+
+func TestCatalogProviderSizesAutomaticMuteRelayFromBehavioralLoadCurrent(t *testing.T) {
+	provider, err := NewCatalogProvider(loadArchitectureCatalog(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	request := ProviderRequest{Capability: "mute_control", Ports: []RoleContract{
+		providerRole("protected", "protected_output", "sink", -19.8, 19.8),
+		providerRole("power", "power", "sink", 16.2, 19.8),
+		providerRole("reference", "reference", "bidirectional", 0, 0),
+	}, Constraints: []Constraint{
+		constraintNumber("continuous_output_power", "minimum", 15, "W", 0),
+		constraintNumber("load_impedance", "target", 4, "ohm", 0),
+	}}
+	expansions, err := provider.Expand(context.Background(), request)
+	if err != nil || len(expansions) == 0 {
+		t.Fatalf("Expand() = %#v, %v", expansions, err)
+	}
+	realization, err := DecodeFragmentRealization(expansions[0].Payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.ContainsFunc(realization.Instances, func(instance RealizationInstance) bool {
+		return instance.ID == "mute_relay" && instance.CatalogID == "relay.omron.g5q_1a.dc12"
+	}) {
+		t.Fatalf("15 W / 4 ohm automatic mute did not select a peak-current-qualified relay: %#v", realization.Instances)
 	}
 }
 

@@ -152,6 +152,37 @@ func TestPropagatePowerFlagsAcrossSeriesPowerLimiters(t *testing.T) {
 	}
 }
 
+func TestPropagatePowerFlagsFromInternalOutputAcrossTwoTerminalSeriesPath(t *testing.T) {
+	document := Document{Nets: []Net{
+		{Name: "SW", Role: NetRoleSignal, Endpoints: []Endpoint{
+			{Component: "converter", SelectorKind: SelectorFunction, Selector: "SW"},
+			{Component: "inductor", SelectorKind: SelectorFunction, Selector: "A"},
+		}},
+		{Name: "VOUT", Role: NetRolePower, Endpoints: []Endpoint{
+			{Component: "inductor", SelectorKind: SelectorFunction, Selector: "B"},
+			{Component: "shunt", SelectorKind: SelectorFunction, Selector: "A"},
+			{Component: "regulator_bias", SelectorKind: SelectorFunction, Selector: "VIN"},
+		}},
+		{Name: "VOUT_SENSED", Role: NetRolePower, Endpoints: []Endpoint{
+			{Component: "shunt", SelectorKind: SelectorFunction, Selector: "B"},
+			{Component: "monitor", SelectorKind: SelectorFunction, Selector: "VCC"},
+		}},
+	}}
+	selected := map[string]ResolvedComponent{
+		"converter":      {Functions: []ResolvedFunction{{Function: "SW", Electrical: "power_out"}}},
+		"inductor":       {Functions: []ResolvedFunction{{Function: "A"}, {Function: "B"}}},
+		"shunt":          {Functions: []ResolvedFunction{{Function: "A"}, {Function: "B"}}},
+		"regulator_bias": {Functions: []ResolvedFunction{{Function: "VIN", Electrical: "power_in"}}},
+		"monitor":        {Functions: []ResolvedFunction{{Function: "VCC", Electrical: "power_in"}}},
+	}
+
+	propagatePowerFlagsAcrossSeriesPowerLimiters(&document, selected, nil)
+
+	if len(document.PowerFlags) != 2 || document.PowerFlags[0].Net != "VOUT" || document.PowerFlags[1].Net != "VOUT_SENSED" {
+		t.Fatalf("power flags = %#v, want internally driven VOUT path in deterministic order", document.PowerFlags)
+	}
+}
+
 func TestSeriesPowerLimiterPropagationRejectsSignalAndMultiPowerNetPaths(t *testing.T) {
 	document := Document{
 		Nets: []Net{

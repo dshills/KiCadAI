@@ -208,8 +208,10 @@ type SimulationHarnessDevice struct {
 func (resolver *Resolver) ResolveSimulationPlanWithHarness(intent simmodel.Intent, resolved ResolvedDocument, harness []SimulationHarnessDevice) (simmodel.Plan, []reports.Issue) {
 	connections := resolvedSimulationConnections(resolved)
 	nodes := make([]simmodel.NodeEvidence, 0, len(resolved.Nets))
+	nodeNames := make(map[string]bool, len(resolved.Nets))
 	for _, net := range resolved.Nets {
 		nodes = append(nodes, simmodel.NodeEvidence{Name: net.Intent.Name, Role: string(net.Intent.Role), VoltageDomain: net.Intent.VoltageDomain})
+		nodeNames[net.Intent.Name] = true
 	}
 	evidence := make([]simmodel.ComponentEvidence, 0, len(resolved.Components)+len(harness))
 	for _, component := range resolved.Components {
@@ -236,11 +238,20 @@ func (resolver *Resolver) ResolveSimulationPlanWithHarness(intent simmodel.Inten
 			issues = append(issues, graphIssue(CodeSimulationInvalid, path+".catalog_id", "simulation harness component is absent from the immutable catalog"))
 			continue
 		}
+		for _, connection := range device.Connections {
+			if connection.Net != "" && !nodeNames[connection.Net] {
+				nodeNames[connection.Net] = true
+				nodes = append(nodes, simmodel.NodeEvidence{Name: connection.Net, Role: "simulation_harness"})
+			}
+		}
 		evidence = append(evidence, componentSimulationEvidence(
 			device.InstanceID, device.CatalogID, record.Family, "", device.ValueSI, device.HasValueSI,
 			record.SimulationModels, append([]simmodel.ConnectionEvidence(nil), device.Connections...), nil, record,
 		)...)
 	}
+	slices.SortStableFunc(nodes, func(left, right simmodel.NodeEvidence) int {
+		return strings.Compare(left.Name, right.Name)
+	})
 	if reports.HasBlockingIssue(issues) {
 		return simmodel.Plan{}, finalizeGraphIssues(issues)
 	}

@@ -64,7 +64,7 @@ func solveThermalAnalysis(plan Plan, analysis Analysis) (AnalysisResult, []Diagn
 		entry := DeviceResult{Component: device.Component, DissipationW: normalizedMNAFloat(dissipation)}
 		parameters := namedValueMap(device.ModelParameters)
 		maximum, hasMaximum := namedValue(parameters, "max_temperature_c")
-		theta, reference, hasTheta := resolvedThermalPath(parameters, analysis.Conditions, ambient)
+		theta, reference, hasTheta := resolvedThermalPath(device.ThermalModel, parameters, analysis.Conditions, ambient)
 		if hasTheta != hasMaximum {
 			return result, []Diagnostic{{Path: "analyses." + analysis.ID + ".devices." + device.Component, Message: "steady-state thermal evidence requires both thermal_resistance_c_per_w and max_temperature_c", Suggestion: "select a reviewed package model with a complete thermal path"}}
 		}
@@ -143,11 +143,11 @@ func deviceDissipationByComponent(devices []DeviceResult) map[string]float64 {
 
 func thermalDeviceSupportsDissipation(device ResolvedDevice) bool {
 	switch device.PrimitiveModel {
-	case PrimitiveResistorV1, PrimitiveFuseClosedStateV1, PrimitiveDiodeShockleyV1, PrimitiveBidirectionalTVSV1,
+	case PrimitiveResistorV1, PrimitiveFuseClosedStateV1, PrimitiveFuseI2TClearingV1, PrimitiveDiodeShockleyV1, PrimitiveBidirectionalTVSV1,
 		PrimitiveNMOSSwitchV1, PrimitivePMOSSwitchV1, PrimitiveReverseBlockingLoadSwitchV1,
 		PrimitiveBJTNPNV1, PrimitiveBJTPNPV1,
 		PrimitiveOpAmpV1, PrimitiveComparatorOpenCollectorV1,
-		PrimitiveAdjustableLinearRegulatorV1, PrimitiveFixedLinearRegulatorV1, PrimitiveFloatingAdjustableRegulatorV1,
+		PrimitiveAdjustableLinearRegulatorV1, PrimitiveFixedLinearRegulatorV1, PrimitiveSynchronousBuckRegulatorV1, PrimitiveFloatingAdjustableRegulatorV1,
 		PrimitiveProgrammableCurrentSourceV1, PrimitiveShuntVoltageReferenceV1,
 		PrimitiveBidirectionalOpenDrainTranslatorV1, PrimitiveBidirectionalOpenDrainIsolatorV1,
 		PrimitiveMCUStaticSupplyLoadV1, PrimitiveSensorStaticSupplyLoadV1:
@@ -161,7 +161,7 @@ func thermalDeviceResult(device ResolvedDevice, analysis Analysis, ambient, diss
 	entry := DeviceResult{Component: device.Component, DissipationW: normalizedMNAFloat(dissipation)}
 	parameters := namedValueMap(device.ModelParameters)
 	maximum, hasMaximum := namedValue(parameters, "max_temperature_c")
-	theta, reference, hasTheta := resolvedThermalPath(parameters, analysis.Conditions, ambient)
+	theta, reference, hasTheta := resolvedThermalPath(device.ThermalModel, parameters, analysis.Conditions, ambient)
 	if hasTheta != hasMaximum {
 		return DeviceResult{}, &Diagnostic{Path: "analyses." + analysis.ID + ".devices." + device.Component, Message: "steady-state thermal evidence requires both thermal_resistance_c_per_w and max_temperature_c", Suggestion: "select a reviewed package model with a complete thermal path"}
 	}
@@ -182,6 +182,9 @@ func thermalDeviceResult(device ResolvedDevice, analysis Analysis, ambient, diss
 }
 
 func thermalDeviceDissipation(plan Plan, device ResolvedDevice, system mnaSystem, solution []complex128) (float64, bool) {
+	if dissipation, ok := synchronousBuckDissipation(device, system, solution); ok {
+		return dissipation, true
+	}
 	if dissipation, ok := adjustableLinearRegulatorDissipation(device, system, solution); ok {
 		return dissipation, true
 	}
@@ -197,7 +200,7 @@ func thermalDeviceDissipation(plan Plan, device ResolvedDevice, system mnaSystem
 	case PrimitiveResistorV1:
 		delta := voltage(terminals["A"]) - voltage(terminals["B"])
 		return delta * delta / *device.ValueSI, true
-	case PrimitiveFuseClosedStateV1:
+	case PrimitiveFuseClosedStateV1, PrimitiveFuseI2TClearingV1:
 		delta := voltage(terminals["A"]) - voltage(terminals["B"])
 		return delta * delta / namedValueMap(device.ModelParameters)["cold_resistance_ohm"], true
 	case PrimitiveShuntVoltageReferenceV1:
@@ -266,22 +269,36 @@ func thermalDeviceDissipation(plan Plan, device ResolvedDevice, system mnaSystem
 }
 
 func thermalAssertionValue(result AnalysisResult, assertion Assertion) (float64, *Diagnostic) {
-	if len(result.Points) != 1 {
+	if result.Kind == AnalysisThermal && len(result.Points) != 1 {
 		return 0, advancedAssertionDiagnostic(assertion, "steady-state thermal result must contain exactly one operating point")
 	}
-	for _, device := range result.Points[0].Devices {
-		if device.Component != assertion.Component {
-			continue
-		}
-		switch assertion.Quantity {
-		case QuantityDeviceDissipationW:
-			return device.DissipationW, nil
-		case QuantityJunctionTemperatureC:
-			if device.JunctionTemperatureC == nil {
-				return 0, &Diagnostic{Path: "assertions." + assertion.AnalysisID + "." + assertion.Component, Message: "junction-temperature assertion lacks a complete catalog-backed thermal path", Suggestion: "select a reviewed component model with thermal resistance and maximum temperature evidence"}
+	actual := math.Inf(-1)
+	found := false
+	for _, point := range result.Points {
+		for _, device := range point.Devices {
+			if device.Component != assertion.Component {
+				continue
 			}
-			return *device.JunctionTemperatureC, nil
+			switch assertion.Quantity {
+			case QuantityDeviceDissipationW:
+				actual = math.Max(actual, device.DissipationW)
+				found = true
+			case QuantityJunctionTemperatureC:
+				if device.JunctionTemperatureC == nil {
+					return 0, &Diagnostic{Path: "assertions." + assertion.AnalysisID + "." + assertion.Component, Message: "junction-temperature assertion lacks a complete catalog-backed thermal path", Suggestion: "select a reviewed component model with thermal resistance and maximum temperature evidence"}
+				}
+				actual = math.Max(actual, *device.JunctionTemperatureC)
+				found = true
+			case QuantityTransientSOAMargin:
+				if !found || device.TransientSOAMargin < actual {
+					actual = device.TransientSOAMargin
+				}
+				found = true
+			}
 		}
+	}
+	if found {
+		return normalizedMNAFloat(actual), nil
 	}
 	return 0, &Diagnostic{Path: "assertions." + assertion.AnalysisID + "." + assertion.Component, Message: "thermal assertion did not resolve to a dissipative device result"}
 }
@@ -291,7 +308,24 @@ func namedValue(values map[string]float64, name string) (float64, bool) {
 	return value, exists
 }
 
-func resolvedThermalPath(parameters map[string]float64, conditions []NamedValue, ambient float64) (float64, float64, bool) {
+func resolvedThermalPath(thermal *ThermalRCNetwork, parameters map[string]float64, conditions []NamedValue, ambient float64) (float64, float64, bool) {
+	if thermal != nil {
+		totalResistance := 0.0
+		for _, stage := range thermal.Stages {
+			totalResistance += stage.ThermalResistanceCPerW
+		}
+		if finite(totalResistance) && totalResistance > 0 {
+			switch thermal.Reference {
+			case "junction_to_ambient":
+				return totalResistance, ambient, true
+			case "junction_to_case":
+				caseTemperature, hasCase := namedValue(namedValueMap(conditions), "case_temperature_c")
+				if hasCase {
+					return totalResistance, caseTemperature, true
+				}
+			}
+		}
+	}
 	if theta, exists := namedValue(parameters, "thermal_resistance_c_per_w"); exists {
 		return theta, ambient, true
 	}

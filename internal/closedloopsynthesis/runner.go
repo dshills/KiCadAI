@@ -45,7 +45,7 @@ func Run(ctx context.Context, input Input, evaluator Evaluator, policy Policy) R
 		}
 		return strings.Compare(left.Fingerprint, right.Fingerprint)
 	})
-	if input.Requirement.Version == architecturesearch.VersionV4 {
+	if hierarchicalRequirement(input.Requirement) {
 		report.Backtracking = &ClosedLoopBacktrackingEvidence{
 			Schema:        "kicadai.closed-loop-backtracking.v1",
 			Strategy:      "architecture_priority_then_complete_fresh_evaluation",
@@ -295,7 +295,8 @@ func validateModelDecisions(requirement architecturesearch.Requirement, decision
 			for _, diagnostic := range simmodel.ValidateCatalogEvidence(decision.Family, []simmodel.CatalogEvidence{decision.Claim}) {
 				diagnostics = append(diagnostics, Diagnostic{Path: path + ".claim." + diagnostic.Path, Message: diagnostic.Message, Suggestion: diagnostic.Suggestion})
 			}
-			for _, diagnostic := range simmodel.ValidateRequiredModelProvenance(decision.Provenance, decision.RequiredAnalyses) {
+			provenanceAnalyses := modelDecisionProvenanceAnalyses(decision)
+			for _, diagnostic := range simmodel.ValidateRequiredModelProvenance(decision.Provenance, provenanceAnalyses) {
 				diagnostics = append(diagnostics, Diagnostic{Path: path + "." + diagnostic.Path, Message: diagnostic.Message, Suggestion: diagnostic.Suggestion})
 			}
 			for _, analysis := range decision.RequiredAnalyses {
@@ -321,6 +322,19 @@ func validateModelDecisions(requirement architecturesearch.Requirement, decision
 	return normalized, uses, diagnostics
 }
 
+func modelDecisionProvenanceAnalyses(decision ModelDecision) []string {
+	var analyses []string
+	for _, analysis := range decision.RequiredAnalyses {
+		if decision.Provenance != nil && slices.Contains(decision.Provenance.AllowedAnalyses, analysis) {
+			analyses = append(analyses, analysis)
+			continue
+		}
+		analyses = append(analyses, simmodel.CatalogAnalysisDependencies(decision.Claim.ModelID, []string{analysis})...)
+	}
+	slices.Sort(analyses)
+	return slices.Compact(analyses)
+}
+
 func validateInput(input Input, evaluator Evaluator, policy Policy, requirementHashError error) []Diagnostic {
 	var diagnostics []Diagnostic
 	if evaluator == nil {
@@ -331,8 +345,9 @@ func validateInput(input Input, evaluator Evaluator, policy Policy, requirementH
 	} else {
 		v3 := input.Requirement.Version == architecturesearch.VersionV3 && input.Requirement.Schema == architecturesearch.SchemaIDV3
 		v4 := input.Requirement.Version == architecturesearch.VersionV4 && input.Requirement.Schema == architecturesearch.SchemaIDV4
-		if !v3 && !v4 {
-			diagnostics = append(diagnostics, Diagnostic{Path: "requirement", Message: "closed-loop synthesis requires the v3 or v4 behavioral requirement schema"})
+		v5 := input.Requirement.Version == architecturesearch.VersionV5 && input.Requirement.Schema == architecturesearch.SchemaIDV5
+		if !v3 && !v4 && !v5 {
+			diagnostics = append(diagnostics, Diagnostic{Path: "requirement", Message: "closed-loop synthesis requires the v3, v4, or v5 behavioral requirement schema"})
 		}
 	}
 	if !validHash(input.CatalogHash) || !validHash(input.FormulaLibraryHash) || !validHash(input.ModelRegistryHash) {
@@ -352,7 +367,7 @@ func validateInput(input Input, evaluator Evaluator, policy Policy, requirementH
 			diagnostics = append(diagnostics, Diagnostic{Path: path + ".fingerprint", Message: "candidate fingerprint must be a unique lowercase SHA-256 value"})
 		}
 		seen[candidate.Fingerprint] = true
-		if input.Requirement.Version == architecturesearch.VersionV4 {
+		if hierarchicalRequirement(input.Requirement) {
 			if candidate.Priority < 0 || seenPriorities[candidate.Priority] {
 				diagnostics = append(diagnostics, Diagnostic{Path: path + ".priority", Message: "V4 candidate priority must be unique and nonnegative"})
 			}
@@ -375,6 +390,11 @@ func validateInput(input Input, evaluator Evaluator, policy Policy, requirementH
 	}
 	slices.SortStableFunc(diagnostics, compareDiagnostics)
 	return diagnostics
+}
+
+func hierarchicalRequirement(requirement architecturesearch.Requirement) bool {
+	return (requirement.Version == architecturesearch.VersionV4 && requirement.Schema == architecturesearch.SchemaIDV4) ||
+		(requirement.Version == architecturesearch.VersionV5 && requirement.Schema == architecturesearch.SchemaIDV5)
 }
 
 func validateVariables(path string, variables []Variable, policy Policy) []Diagnostic {
@@ -549,7 +569,7 @@ func matchingRepairDiagnosis(variable Variable, delta float64, diagnoses []Diagn
 
 func validRepairAnalysis(analysis string) bool {
 	switch analysis {
-	case simmodel.AnalysisDCOperatingPoint, simmodel.AnalysisACSweep, simmodel.AnalysisTransient, simmodel.AnalysisNoise, simmodel.AnalysisStability, simmodel.AnalysisStartup, simmodel.AnalysisDistortion, simmodel.AnalysisThermal:
+	case simmodel.AnalysisDCOperatingPoint, simmodel.AnalysisACSweep, simmodel.AnalysisTransient, simmodel.AnalysisNoise, simmodel.AnalysisStability, simmodel.AnalysisStartup, simmodel.AnalysisDistortion, simmodel.AnalysisThermal, simmodel.AnalysisElectrothermal:
 		return true
 	default:
 		return false
@@ -830,7 +850,8 @@ func compareDiagnostics(left, right Diagnostic) int {
 
 func allowedVariableKind(kind string) bool {
 	switch kind {
-	case "passive_value", "bias", "gain", "filter", "compensation", "protection", "catalog_variant_index":
+	case "passive_value", "bias", "gain", "filter", "compensation", "protection", "catalog_variant_index",
+		"gate_damping", "current_limit", "thermal_path", "protection_timing":
 		return true
 	default:
 		return false

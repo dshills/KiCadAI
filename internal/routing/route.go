@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math"
+	"sort"
 	"strings"
 
 	"kicadai/internal/kicadfiles"
@@ -127,7 +128,12 @@ func RouteRequestContext(ctx context.Context, request Request) Result {
 		var fallbackViaOccupancy Occupancy
 		fallbackReady := false
 		netAccess := clonePadAccessPoints(access)
-		for pairIndex, pair := range plan.Pairs {
+		pairs := plan.Pairs
+		constrainedEndpointAccess := searchRequest.Strategy.NetOrder == NetOrderConstrainedEndpointAccessV1
+		if constrainedEndpointAccess {
+			pairs = prioritizeCrowdedSMDPadPairs(pairs, searchRequest)
+		}
+		for pairIndex, pair := range pairs {
 			if pairIndex%routePairContextCheckInterval == 0 {
 				if err := ctx.Err(); err != nil {
 					result.Status = StatusBlocked
@@ -138,8 +144,24 @@ func RouteRequestContext(ctx context.Context, request Request) Result {
 			if netFailed {
 				break
 			}
-			pairAccess := filterPhysicalEndpointAccess(netAccess, searchRequest, plan.Net.Name, []Endpoint{pair.From, pair.To})
-			path, routeIssues := routePairPath(ctx, searchRequest, pairAccess, occupancy, viaOccupancy, plan.Net.Name, pair)
+			pairAccess := netAccess
+			var forcedEndpointVias map[endpointID]float64
+			if constrainedEndpointAccess {
+				pairAccess, forcedEndpointVias = applyCrowdedSMDPadViaAccess(netAccess, searchRequest, []Endpoint{pair.From, pair.To})
+			}
+			pairAccess = filterPhysicalEndpointAccess(pairAccess, searchRequest, plan.Net.Name, []Endpoint{pair.From, pair.To})
+			pairRequest := searchRequest
+			pairViaRules := netRequest.Rules
+			pairViaOccupancy := viaOccupancy
+			pairUsedCrowdedVias := len(forcedEndpointVias) != 0
+			if pairUsedCrowdedVias {
+				pairRequest.Rules = crowdedEndpointViaRules(pairRequest.Rules, forcedEndpointVias)
+				pairViaRules = crowdedEndpointViaRules(pairViaRules, forcedEndpointVias)
+				if candidate, err := BuildViaOccupancy(pairRequest, plan.Net.Name); err == nil {
+					pairViaOccupancy = candidate
+				}
+			}
+			path, routeIssues := routePairPathWithForcedEndpointVias(ctx, pairRequest, pairAccess, occupancy, pairViaOccupancy, plan.Net.Name, pair, forcedEndpointVias)
 			route.SearchNodes += path.SearchNodes
 			result.Metrics.SearchNodes += path.SearchNodes
 			if path.SearchLimitHit {
@@ -169,6 +191,7 @@ func RouteRequestContext(ctx context.Context, request Request) Result {
 				if len(edgeIssues) == 0 {
 					path = edgePath
 					routeIssues = nil
+					pairUsedCrowdedVias = false
 				}
 			}
 			neckdownWidthMM := netRequest.Rules.NeckdownWidthMM
@@ -194,6 +217,7 @@ func RouteRequestContext(ctx context.Context, request Request) Result {
 							path = fallbackPath
 							routeIssues = nil
 							netAccess = fallbackAccess
+							pairUsedCrowdedVias = false
 							neckdownWidthMM = fallbackRequest.Rules.TraceWidthMM
 							neckdownLengthMM = pcbrules.DefaultPowerNeckdownLengthMM
 						}
@@ -241,7 +265,10 @@ func RouteRequestContext(ctx context.Context, request Request) Result {
 				failed = true
 				break
 			}
-			vias := BuildViasFromPath(path, netRequest.Rules)
+			if !pairUsedCrowdedVias {
+				pairViaRules = netRequest.Rules
+			}
+			vias := BuildViasFromPath(path, pairViaRules)
 			route.Segments = append(route.Segments, segments...)
 			route.Vias = append(route.Vias, vias...)
 			netSegmentCount += len(segments)
@@ -523,21 +550,17 @@ func expandSMDPadEdgeAccess(access PadAccess, request Request, endpoints []Endpo
 				{YMM: -pad.Size.HeightMM / 2},
 				{YMM: pad.Size.HeightMM / 2},
 			}
+			accessRotationDeg := component.Position.RotationDeg + pad.RotationDeg
 			for _, layer := range padAccessLayers(pad, routableLayers) {
 				for index, offset := range physicalOffsets {
+					physicalX, physicalY := kicadfiles.RotateBoardLocalXY(offset.XMM, offset.YMM, accessRotationDeg)
+					physicalPoint := Point{XMM: center.XMM + physicalX, YMM: center.YMM + physicalY}
 					searchOffset := searchOffsets[index]
-					searchX, searchY := kicadfiles.RotateBoardLocalXY(searchOffset.XMM, searchOffset.YMM, component.Position.RotationDeg)
-					searchPoint := Point{
-						XMM: center.XMM + searchX,
-						YMM: center.YMM + searchY,
-					}
-					physicalX, physicalY := kicadfiles.RotateBoardLocalXY(offset.XMM, offset.YMM, component.Position.RotationDeg)
+					searchX, searchY := kicadfiles.RotateBoardLocalXY(searchOffset.XMM, searchOffset.YMM, accessRotationDeg)
+					searchPoint := Point{XMM: center.XMM + searchX, YMM: center.YMM + searchY}
 					expanded.AccessPoints[key] = append(expanded.AccessPoints[key], AccessPoint{
-						Endpoint: Endpoint{Ref: component.Ref, Pin: pad.Name},
-						Point: Point{
-							XMM: center.XMM + physicalX,
-							YMM: center.YMM + physicalY,
-						},
+						Endpoint:    Endpoint{Ref: component.Ref, Pin: pad.Name},
+						Point:       physicalPoint,
 						SearchPoint: &searchPoint,
 						Layer:       layer,
 					})
@@ -546,6 +569,258 @@ func expandSMDPadEdgeAccess(access PadAccess, request Request, endpoints []Endpo
 		}
 	}
 	return expanded
+}
+
+func smdPadEscapeMargin(rules Rules) float64 {
+	defaults := DefaultRules()
+	gridMM := rules.GridMM
+	if gridMM <= 0 || math.IsNaN(gridMM) || math.IsInf(gridMM, 0) {
+		gridMM = defaults.GridMM
+	}
+	traceWidthMM := rules.TraceWidthMM
+	if traceWidthMM <= 0 || math.IsNaN(traceWidthMM) || math.IsInf(traceWidthMM, 0) {
+		traceWidthMM = defaults.TraceWidthMM
+	}
+	clearanceMM := rules.ClearanceMM
+	if clearanceMM <= 0 || math.IsNaN(clearanceMM) || math.IsInf(clearanceMM, 0) {
+		clearanceMM = defaults.ClearanceMM
+	}
+	viaDiameterMM := rules.ViaDiameterMM
+	if viaDiameterMM <= 0 || math.IsNaN(viaDiameterMM) || math.IsInf(viaDiameterMM, 0) {
+		viaDiameterMM = defaults.ViaDiameterMM
+	}
+	viaClearanceMM := rules.ViaClearanceMM
+	if viaClearanceMM <= 0 || math.IsNaN(viaClearanceMM) || math.IsInf(viaClearanceMM, 0) {
+		viaClearanceMM = defaults.ViaClearanceMM
+	}
+	return max(gridMM, clearanceMM+traceWidthMM/2, viaClearanceMM+viaDiameterMM/2)
+}
+
+type crowdedSMDPadSide struct {
+	axisX bool
+	sign  float64
+}
+
+func applyCrowdedSMDPadViaAccess(access PadAccess, request Request, endpoints []Endpoint) (PadAccess, map[endpointID]float64) {
+	if len(routableLayerNames(request.Board.Layers)) < 2 || request.Rules.MaxViasPerNet < 2 {
+		return access, nil
+	}
+	adjusted := clonePadAccessPoints(access)
+	forced := map[endpointID]float64{}
+	for _, endpoint := range endpoints {
+		for _, component := range request.Components {
+			if !strings.EqualFold(strings.TrimSpace(component.Ref), strings.TrimSpace(endpoint.Ref)) {
+				continue
+			}
+			for _, pad := range component.Pads {
+				if !strings.EqualFold(strings.TrimSpace(pad.Name), strings.TrimSpace(endpoint.Pin)) {
+					continue
+				}
+				points, viaDiameterMM, ok := crowdedSMDPadViaAccessPoints(component, pad, request)
+				if !ok {
+					continue
+				}
+				key := endpointKey(endpoint.Ref, endpoint.Pin)
+				adjusted.AccessPoints[key] = points
+				forced[key] = viaDiameterMM
+			}
+		}
+	}
+	if len(forced) == 0 {
+		return access, nil
+	}
+	return adjusted, forced
+}
+
+func prioritizeCrowdedSMDPadPairs(pairs []EndpointPair, request Request) []EndpointPair {
+	if len(pairs) < 2 || len(routableLayerNames(request.Board.Layers)) < 2 || request.Rules.MaxViasPerNet < 2 {
+		return pairs
+	}
+	crowded := map[endpointID]bool{}
+	for _, component := range request.Components {
+		for _, pad := range component.Pads {
+			if _, _, ok := crowdedSMDPadViaAccessPoints(component, pad, request); ok {
+				crowded[endpointKey(component.Ref, pad.Name)] = true
+			}
+		}
+	}
+	if len(crowded) == 0 {
+		return pairs
+	}
+	rank := func(pair EndpointPair) int {
+		rank := 0
+		if crowded[endpointKey(pair.From.Ref, pair.From.Pin)] {
+			rank++
+		}
+		if crowded[endpointKey(pair.To.Ref, pair.To.Pin)] {
+			rank++
+		}
+		return rank
+	}
+	prioritized := append([]EndpointPair(nil), pairs...)
+	sort.SliceStable(prioritized, func(i, j int) bool {
+		return rank(prioritized[i]) > rank(prioritized[j])
+	})
+	return prioritized
+}
+
+func crowdedSMDPadViaAccessPoints(component Component, pad Pad, request Request) ([]AccessPoint, float64, bool) {
+	side, rawAxisX, ok := crowdedSMDPadSideFor(pad)
+	if !ok {
+		return nil, 0, false
+	}
+	accessPitchMM := 2*request.Rules.GridMM + request.Rules.TraceWidthMM
+	if accessPitchMM <= 0 || min(pad.Size.WidthMM, pad.Size.HeightMM) > accessPitchMM+distanceEpsilon {
+		return nil, 0, false
+	}
+	viaAccessPitchMM := request.Rules.ViaDiameterMM + request.Rules.ClearanceMM
+	if viaAccessPitchMM <= 0 {
+		defaults := DefaultRules()
+		viaAccessPitchMM = defaults.ViaDiameterMM + defaults.ClearanceMM
+	}
+	type peer struct {
+		pad   Pad
+		along float64
+	}
+	var peers []peer
+	for _, candidate := range component.Pads {
+		candidateSide, _, candidateOK := crowdedSMDPadSideFor(candidate)
+		if !candidateOK || candidateSide != side || min(candidate.Size.WidthMM, candidate.Size.HeightMM) > accessPitchMM+distanceEpsilon {
+			continue
+		}
+		along := candidate.Position.XMM
+		if side.axisX {
+			along = candidate.Position.YMM
+		}
+		peers = append(peers, peer{pad: candidate, along: along})
+	}
+	sort.SliceStable(peers, func(i, j int) bool {
+		if !distanceEqual(peers[i].along, peers[j].along) {
+			return peers[i].along < peers[j].along
+		}
+		return endpointLess(Endpoint{Ref: component.Ref, Pin: peers[i].pad.Name}, Endpoint{Ref: component.Ref, Pin: peers[j].pad.Name})
+	})
+	index := -1
+	adjacentForeign := false
+	for peerIndex, candidate := range peers {
+		if strings.EqualFold(strings.TrimSpace(candidate.pad.Name), strings.TrimSpace(pad.Name)) {
+			index = peerIndex
+			continue
+		}
+		if sameOccupancyNet(candidate.pad.Net, pad.Net) {
+			continue
+		}
+		along := pad.Position.XMM
+		if side.axisX {
+			along = pad.Position.YMM
+		}
+		if math.Abs(candidate.along-along) <= viaAccessPitchMM+distanceEpsilon {
+			adjacentForeign = true
+		}
+	}
+	if index < 0 || !adjacentForeign {
+		return nil, 0, false
+	}
+	stagger := index
+	if side.sign < 0 {
+		stagger++
+	}
+	stagger %= 2
+	halfSpanMM := pad.Size.HeightMM / 2
+	edgeOffset := Point{YMM: side.sign * halfSpanMM}
+	if rawAxisX {
+		halfSpanMM = pad.Size.WidthMM / 2
+		edgeOffset = Point{XMM: side.sign * halfSpanMM}
+	}
+	rotationDeg := component.Position.RotationDeg + pad.RotationDeg
+	edgeX, edgeY := kicadfiles.RotateBoardLocalXY(edgeOffset.XMM, edgeOffset.YMM, rotationDeg)
+	center := absolutePadPoint(component, pad.Position)
+	grid := NewGrid(Point{}, request.Rules.GridMM)
+	layers := padAccessLayers(pad, routableLayerNames(request.Board.Layers))
+	if len(layers) == 0 {
+		return nil, 0, false
+	}
+	columns := []int{stagger, 1 - stagger}
+	points := make([]AccessPoint, 0, len(columns))
+	minViaDiameterMM := 0.0
+	for _, column := range columns {
+		viaDiameterMM := request.Rules.ViaDiameterMM
+		if request.Rules.TraceWidthMM > 0 {
+			viaDiameterMM = min(viaDiameterMM, 2*request.Rules.TraceWidthMM)
+		}
+		escapeDistanceMM := max(request.Rules.GridMM, request.Rules.ClearanceMM+viaDiameterMM/2) +
+			float64(column)*(viaDiameterMM+request.Rules.ClearanceMM)
+		searchOffset := Point{YMM: side.sign * (halfSpanMM + escapeDistanceMM)}
+		if rawAxisX {
+			searchOffset = Point{XMM: side.sign * (halfSpanMM + escapeDistanceMM)}
+		}
+		searchX, searchY := kicadfiles.RotateBoardLocalXY(searchOffset.XMM, searchOffset.YMM, rotationDeg)
+		searchPoint := Point{XMM: center.XMM + searchX, YMM: center.YMM + searchY}
+		searchPoint = grid.ToPoint(grid.ToGrid(searchPoint, 0))
+		probe := Segment{Start: searchPoint, End: searchPoint}
+		for _, candidate := range peers {
+			if strings.EqualFold(strings.TrimSpace(candidate.pad.Name), strings.TrimSpace(pad.Name)) || sameOccupancyNet(candidate.pad.Net, pad.Net) {
+				continue
+			}
+			clearanceMM := request.Rules.ClearanceMM
+			if candidate.pad.Clearance != nil {
+				clearanceMM = max(clearanceMM, *candidate.pad.Clearance)
+			}
+			distanceMM := segmentShapeDistance(probe, padRect(component, candidate.pad))
+			viaDiameterMM = min(viaDiameterMM, 2*(distanceMM-clearanceMM-distanceEpsilon))
+		}
+		if viaDiameterMM <= request.Rules.TraceWidthMM+distanceEpsilon {
+			continue
+		}
+		points = append(points, AccessPoint{
+			Endpoint:    Endpoint{Ref: component.Ref, Pin: pad.Name},
+			Point:       Point{XMM: center.XMM + edgeX, YMM: center.YMM + edgeY},
+			SearchPoint: &searchPoint,
+			Layer:       layers[0],
+		})
+		if minViaDiameterMM == 0 || viaDiameterMM < minViaDiameterMM {
+			minViaDiameterMM = viaDiameterMM
+		}
+	}
+	return points, minViaDiameterMM, len(points) != 0
+}
+
+func crowdedEndpointViaRules(rules Rules, diameters map[endpointID]float64) Rules {
+	diameterMM := rules.ViaDiameterMM
+	for _, candidate := range diameters {
+		if candidate > 0 && (diameterMM <= 0 || candidate < diameterMM) {
+			diameterMM = candidate
+		}
+	}
+	if diameterMM <= 0 || diameterMM >= rules.ViaDiameterMM {
+		return rules
+	}
+	ratio := 0.5
+	if rules.ViaDiameterMM > 0 && rules.ViaDrillMM > 0 {
+		ratio = rules.ViaDrillMM / rules.ViaDiameterMM
+	}
+	rules.ViaDiameterMM = diameterMM
+	rules.ViaDrillMM = min(rules.ViaDrillMM, diameterMM*ratio)
+	return rules
+}
+
+func crowdedSMDPadSideFor(pad Pad) (crowdedSMDPadSide, bool, bool) {
+	if pad.Type != PadSMD || strings.TrimSpace(pad.Net) == "" || math.Abs(pad.Size.WidthMM-pad.Size.HeightMM) <= distanceEpsilon {
+		return crowdedSMDPadSide{}, false, false
+	}
+	rawAxisX := pad.Size.WidthMM > pad.Size.HeightMM
+	axisX := rawAxisX
+	if int(math.Round(pad.RotationDeg/90))%2 != 0 {
+		axisX = !axisX
+	}
+	position := pad.Position.YMM
+	if axisX {
+		position = pad.Position.XMM
+	}
+	if math.Abs(position) <= distanceEpsilon {
+		return crowdedSMDPadSide{}, false, false
+	}
+	return crowdedSMDPadSide{axisX: axisX, sign: math.Copysign(1, position)}, rawAxisX, true
 }
 
 func filterPhysicalEndpointAccess(access PadAccess, request Request, netName string, endpoints []Endpoint) PadAccess {
@@ -582,6 +857,29 @@ func filterPhysicalEndpointAccess(access PadAccess, request Request, netName str
 				}
 				if !clear {
 					break
+				}
+			}
+			if clear && point.SearchPoint != nil {
+				for _, obstacle := range request.Obstacles {
+					if obstacle.Layer != "" && normalizeLayer(obstacle.Layer) != normalizeLayer(point.Layer) {
+						continue
+					}
+					clearanceMM := max(request.Rules.ClearanceMM, obstacle.Clearance)
+					if segmentShapeDistance(probe, obstacle.Geometry)-probe.WidthMM/2 < clearanceMM-distanceEpsilon {
+						clear = false
+						break
+					}
+				}
+			}
+			if clear && point.SearchPoint != nil {
+				for _, copper := range request.Existing {
+					if sameOccupancyNet(copper.Net, netName) || copper.Layer != "" && normalizeLayer(copper.Layer) != normalizeLayer(point.Layer) {
+						continue
+					}
+					if segmentShapeDistance(probe, copper.Geometry)-probe.WidthMM/2 < request.Rules.ClearanceMM-distanceEpsilon {
+						clear = false
+						break
+					}
 				}
 			}
 			if clear {
@@ -673,6 +971,13 @@ func routePairPath(ctx context.Context, request Request, access PadAccess, occup
 		return routeSingleLayerPath(ctx, request, access, occupancy, netName, pair, request.Rules.PreferLayer)
 	}
 	return routeTwoLayerPath(ctx, request, access, occupancy, viaOccupancy, netName, pair)
+}
+
+func routePairPathWithForcedEndpointVias(ctx context.Context, request Request, access PadAccess, occupancy Occupancy, viaOccupancy Occupancy, netName string, pair EndpointPair, forced map[endpointID]float64) (GridPath, []reports.Issue) {
+	if len(forced) == 0 || request.Strategy.Mode == ModeSingleLayer {
+		return routePairPath(ctx, request, access, occupancy, viaOccupancy, netName, pair)
+	}
+	return routeTwoLayerPathWithForcedEndpointVias(ctx, request, access, occupancy, viaOccupancy, netName, pair, forced)
 }
 
 func applyEffectiveRule(rules Rules, effective pcbrules.EffectiveRule) Rules {

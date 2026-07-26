@@ -57,6 +57,27 @@ func TestBehavioralVoltageAssertionUsesObservedDomainReference(t *testing.T) {
 	}
 }
 
+func TestEventVoltageAssertionUsesDeclaredTargetDomainReference(t *testing.T) {
+	requirement := closedLoopTestRequirement()
+	requirement.Schema = architecturesearch.SchemaIDV5
+	requirement.Version = architecturesearch.VersionV5
+	requirement.Requirements.Domains = append(requirement.Requirements.Domains, architecturesearch.Domain{ID: "ground", Kind: "reference"})
+	requirement.Requirements.Ports[0].Domain = "ground"
+	requirement.Requirements.BehavioralRequirements[0].Observation = architecturesearch.Observation{Kind: "event", ID: "output_step"}
+	requirement.Requirements.OperatingCases[0].Events = []architecturesearch.OperatingEvent{{
+		ID: "output_step", Kind: "load_step", Target: architecturesearch.Observation{Kind: "port", ID: requirement.Requirements.Ports[0].ID},
+	}}
+	reference, required := behavioralObservationReferenceNode(
+		requirement,
+		requirement.Requirements.BehavioralRequirements[0].ID,
+		requirement.Requirements.OperatingCases[0].ID,
+		[]SemanticBinding{{Kind: "domain", ID: "ground", Target: "GND"}},
+	)
+	if !required || reference != "GND" {
+		t.Fatalf("event reference = %q, %t", reference, required)
+	}
+}
+
 func TestSourceSweepExcitationScalePreservesSemanticConnectorPolarity(t *testing.T) {
 	plan := simmodel.Plan{Devices: []simmodel.ResolvedDevice{{
 		Component:      "input",
@@ -132,7 +153,8 @@ func TestStabilityObservationResolvesUniqueUpstreamOpAmpThroughProtection(t *tes
 	plan := simmodel.Plan{GroundNode: "GND", Devices: []simmodel.ResolvedDevice{
 		{Component: "amplifier", PrimitiveModel: simmodel.PrimitiveOpAmpV1, Terminals: []simmodel.TerminalBinding{{Terminal: "OUT", Net: "AMP_OUT"}}},
 		{Component: "other", PrimitiveModel: simmodel.PrimitiveOpAmpV1, Terminals: []simmodel.TerminalBinding{{Terminal: "OUT", Net: "OTHER_OUT"}}},
-		{Component: "output_fuse", PrimitiveModel: simmodel.PrimitiveFuseClosedStateV1, Terminals: []simmodel.TerminalBinding{{Terminal: "A", Net: "AMP_OUT"}, {Terminal: "B", Net: "OUTPUT"}}},
+		{Component: "output_disconnect", PrimitiveModel: simmodel.PrimitivePMOSSwitchV1, Terminals: []simmodel.TerminalBinding{{Terminal: "SOURCE", Net: "AMP_OUT"}, {Terminal: "DRAIN", Net: "PROTECTED"}}},
+		{Component: "output_fuse", PrimitiveModel: simmodel.PrimitiveFuseClosedStateV1, Terminals: []simmodel.TerminalBinding{{Terminal: "A", Net: "PROTECTED"}, {Terminal: "B", Net: "OUTPUT"}}},
 		{Component: "pulldown", PrimitiveModel: simmodel.PrimitiveResistorV1, Terminals: []simmodel.TerminalBinding{{Terminal: "A", Net: "OUTPUT"}, {Terminal: "B", Net: "GND"}}},
 	}}
 
@@ -152,6 +174,59 @@ func TestStabilityObservationFailsClosedForAmbiguousPassiveFanIn(t *testing.T) {
 
 	if node, ok := stabilityObservationNode(plan, "OUTPUT"); ok || node != "" {
 		t.Fatalf("stability node = %q, %v; want ambiguous failure", node, ok)
+	}
+}
+
+func TestStabilityObservationResolvesSynchronousBuckThroughProtection(t *testing.T) {
+	plan := simmodel.Plan{GroundNode: "GND", Devices: []simmodel.ResolvedDevice{
+		{Component: "controller", PrimitiveModel: simmodel.PrimitiveSynchronousBuckRegulatorV1, Terminals: []simmodel.TerminalBinding{{Terminal: "SW", Net: "SW"}}},
+		{Component: "inductor", PrimitiveModel: simmodel.PrimitiveInductorTransientV1, Terminals: []simmodel.TerminalBinding{{Terminal: "A", Net: "SW"}, {Terminal: "B", Net: "BUCK_OUT"}}},
+		{Component: "output_fuse", PrimitiveModel: simmodel.PrimitiveFuseClosedStateV1, Terminals: []simmodel.TerminalBinding{{Terminal: "A", Net: "BUCK_OUT"}, {Terminal: "B", Net: "OUTPUT"}}},
+	}}
+
+	node, ok := stabilityObservationNode(plan, "OUTPUT")
+	if !ok || node != "BUCK_OUT" {
+		t.Fatalf("buck stability node = %q, %v; want BUCK_OUT, true", node, ok)
+	}
+}
+
+func TestStabilityObservationDoesNotTraverseSeriesMOSFETGate(t *testing.T) {
+	plan := simmodel.Plan{GroundNode: "GND", Devices: []simmodel.ResolvedDevice{
+		{Component: "controller", PrimitiveModel: simmodel.PrimitiveSynchronousBuckRegulatorV1, Terminals: []simmodel.TerminalBinding{{Terminal: "SW", Net: "SW"}}},
+		{Component: "inductor", PrimitiveModel: simmodel.PrimitiveInductorTransientV1, Terminals: []simmodel.TerminalBinding{{Terminal: "A", Net: "SW"}, {Terminal: "B", Net: "BUCK_OUT"}}},
+		{Component: "disconnect", PrimitiveModel: simmodel.PrimitivePMOSSwitchV1, Terminals: []simmodel.TerminalBinding{{Terminal: "SOURCE", Net: "BUCK_OUT"}, {Terminal: "DRAIN", Net: "PROTECTED"}, {Terminal: "GATE", Net: "GATE"}}},
+		{Component: "output_fuse", PrimitiveModel: simmodel.PrimitiveFuseClosedStateV1, Terminals: []simmodel.TerminalBinding{{Terminal: "A", Net: "PROTECTED"}, {Terminal: "B", Net: "OUTPUT"}}},
+		{Component: "gate_drive", PrimitiveModel: simmodel.PrimitiveResistorV1, Terminals: []simmodel.TerminalBinding{{Terminal: "A", Net: "GATE"}, {Terminal: "B", Net: "SERVO_OUT"}}},
+		{Component: "servo", PrimitiveModel: simmodel.PrimitiveOpAmpV1, Terminals: []simmodel.TerminalBinding{{Terminal: "OUT", Net: "SERVO_OUT"}}},
+	}}
+
+	node, ok := stabilityObservationNode(plan, "OUTPUT")
+	if !ok || node != "BUCK_OUT" {
+		t.Fatalf("stability node = %q, %v; want BUCK_OUT without traversing the series switch gate", node, ok)
+	}
+}
+
+func TestSequenceResponseTargetUsesDependentPublicRail(t *testing.T) {
+	requirement := architecturesearch.Requirement{Requirements: architecturesearch.Requirements{
+		Objectives: []architecturesearch.Objective{
+			{
+				Capability: "rail_sequencing",
+				Bindings:   []architecturesearch.Binding{{Role: "rail_a", Signal: "rail_a"}, {Role: "rail_b", Signal: "rail_b"}, {Role: "state", Signal: "sequence_state"}},
+			},
+			{
+				Capability: "output_protection",
+				Bindings:   []architecturesearch.Binding{{Role: "input", Signal: "rail_b"}, {Role: "output", Port: "output_b"}},
+			},
+		},
+	}}
+	target, ok := sequenceResponseTarget(requirement, []SemanticBinding{
+		{Kind: "signal", ID: "rail_a", Target: "RAIL_A"},
+		{Kind: "signal", ID: "rail_b", Target: "RAIL_B"},
+		{Kind: "signal", ID: "sequence_state", Target: "SEQUENCE_STATE"},
+		{Kind: "port", ID: "output_b", Target: "OUTPUT_B"},
+	})
+	if !ok || target != "OUTPUT_B" {
+		t.Fatalf("sequence response target = %q, %v; want OUTPUT_B, true", target, ok)
 	}
 }
 
@@ -261,12 +336,274 @@ func TestTransimpedanceFailsClosedForAmbiguousLoadCurrentExcitation(t *testing.T
 	}
 }
 
+func TestDynamicStressAndEfficiencyMetricsResolveToStructuredEvidence(t *testing.T) {
+	load := OperatingHarnessComponentID("load_current", "OUT")
+	plan := simmodel.Plan{Devices: []simmodel.ResolvedDevice{
+		{
+			Component: "supply", PrimitiveModel: simmodel.PrimitiveVoltageSourceV1,
+			Terminals: []simmodel.TerminalBinding{{Terminal: "POSITIVE", Net: "VIN"}, {Terminal: "NEGATIVE", Net: "GND"}},
+		},
+		{
+			Component: load, PrimitiveModel: simmodel.PrimitiveCurrentSourceV1,
+			Terminals: []simmodel.TerminalBinding{{Terminal: "POSITIVE", Net: "OUT"}, {Terminal: "NEGATIVE", Net: "GND"}},
+		},
+	}}
+	operating := []SimulationOperatingBinding{{Axis: "load_current", Target: "OUT", Kind: OperatingLoadCurrent, Component: load}}
+
+	efficiency, diagnostic := resolvedAssertionBinding(
+		PlannedAssertion{RequirementID: "efficiency", Metric: "conversion_efficiency", Target: "circuit"},
+		"", []string{"VIN"}, operating, plan, architecturesearch.Requirement{}, nil,
+	)
+	if diagnostic != nil || len(efficiency.Prototypes) != 1 {
+		t.Fatalf("conversion-efficiency binding = %#v diagnostic=%#v", efficiency, diagnostic)
+	}
+	efficiencyPrototype := efficiency.Prototypes[0]
+	if efficiencyPrototype.Quantity != simmodel.QuantityConversionEfficiencyPct ||
+		efficiencyPrototype.Component != load ||
+		!slices.Equal(efficiencyPrototype.Components, []string{"supply"}) {
+		t.Fatalf("conversion-efficiency prototype = %#v", efficiencyPrototype)
+	}
+
+	current, diagnostic := resolvedAssertionBinding(
+		PlannedAssertion{RequirementID: "current", Metric: "peak_device_current", Target: "OUT"},
+		"", nil, operating, plan, architecturesearch.Requirement{}, nil,
+	)
+	if diagnostic != nil || len(current.Prototypes) != 1 ||
+		current.Prototypes[0].Quantity != simmodel.QuantityPeakAbsDeviceCurrentA ||
+		current.Prototypes[0].Component != load {
+		t.Fatalf("peak-current binding = %#v diagnostic=%#v", current, diagnostic)
+	}
+}
+
+func TestProtectionResponseObservesResolvedInterlockControl(t *testing.T) {
+	maximum := 1e-3
+	analysisPlan := AnalysisPlan{
+		Bindings: []SemanticBinding{
+			{Kind: "port", ID: "load", Target: "SWITCHED_LOAD"},
+			{Kind: "port", ID: "fault", Target: "FAULT_STATE"},
+			{Kind: "signal", ID: "limited_drive", Target: "PROTECTION_CONTROL"},
+		},
+		Analyses: []PlannedAnalysis{{ID: "fault_transient", Kind: simmodel.AnalysisTransient, OperatingCase: "faulted"}},
+		Events:   []PlannedEvent{{ID: "overload", OperatingCase: "faulted", Target: "SWITCHED_LOAD"}},
+		Assertions: []PlannedAssertion{{
+			RequirementID: "fault_response", AnalysisID: "fault_transient", OperatingCase: "faulted",
+			Metric: "protection_response_time", Target: "event:overload", Max: &maximum, Unit: "s",
+		}},
+	}
+	plans := map[string]simmodel.Plan{
+		simmodel.AnalysisTransient: {
+			Nodes:    []string{"SWITCHED_LOAD", "FAULT_STATE", "PROTECTION_CONTROL"},
+			Analyses: []simmodel.Analysis{{ID: "transient", Kind: simmodel.AnalysisTransient, TimeStepS: 1e-5, DurationS: .01}},
+		},
+	}
+	requirement := architecturesearch.Requirement{Requirements: architecturesearch.Requirements{Objectives: []architecturesearch.Objective{{
+		ID: "limit", Capability: "safety_interlock", Bindings: []architecturesearch.Binding{
+			{Role: "sense", Signal: "current_feedback", Direction: "sink"},
+			{Role: "control", Signal: "limited_drive", Direction: "source"},
+			{Role: "fault", Port: "fault", Direction: "source"},
+		},
+	}}}}
+
+	_, assertions, _, diagnostics := BuildResolvedSimulationContracts(requirement, analysisPlan, plans)
+	if len(diagnostics) != 0 || len(assertions) != 1 || len(assertions[0].Prototypes) != 1 {
+		t.Fatalf("protection-response contracts = %#v diagnostics=%#v", assertions, diagnostics)
+	}
+	if prototype := assertions[0].Prototypes[0]; prototype.Node != "PROTECTION_CONTROL" || prototype.Quantity != simmodel.QuantityResponseTimeS {
+		t.Fatalf("protection-response prototype = %#v", prototype)
+	}
+}
+
+func TestProtectionResponseObservesAffectedProtectedPathWhenControlIsInternal(t *testing.T) {
+	maximum := 1e-3
+	analysisPlan := AnalysisPlan{
+		Bindings: []SemanticBinding{
+			{Kind: "signal", ID: "protected_drive", Target: "PROTECTED_DRIVE"},
+			{Kind: "port", ID: "load", Target: "LOAD"},
+		},
+		Analyses: []PlannedAnalysis{{ID: "fault_transient", Kind: simmodel.AnalysisTransient, OperatingCase: "faulted"}},
+		Events:   []PlannedEvent{{ID: "overload", OperatingCase: "faulted", Target: "LOAD"}},
+		Assertions: []PlannedAssertion{{
+			RequirementID: "fault_response", AnalysisID: "fault_transient", OperatingCase: "faulted",
+			Metric: "protection_response_time", Target: "event:overload", Max: &maximum, Unit: "s",
+		}},
+	}
+	requirement := architecturesearch.Requirement{Requirements: architecturesearch.Requirements{Objectives: []architecturesearch.Objective{{
+		ID: "protect", Capability: "output_protection", Bindings: []architecturesearch.Binding{
+			{Role: "input", Signal: "protected_drive", Direction: "sink"},
+			{Role: "output", Port: "load", Direction: "source"},
+		},
+	}}}}
+	plans := map[string]simmodel.Plan{
+		simmodel.AnalysisTransient: {
+			Nodes:    []string{"PROTECTED_DRIVE", "LOAD"},
+			Analyses: []simmodel.Analysis{{ID: "transient", Kind: simmodel.AnalysisTransient, TimeStepS: 1e-5, DurationS: .01}},
+		},
+	}
+
+	_, assertions, _, diagnostics := BuildResolvedSimulationContracts(requirement, analysisPlan, plans)
+	if len(diagnostics) != 0 || len(assertions) != 1 || len(assertions[0].Prototypes) != 1 {
+		t.Fatalf("protection-response contracts = %#v diagnostics=%#v", assertions, diagnostics)
+	}
+	if prototype := assertions[0].Prototypes[0]; prototype.Node != "PROTECTED_DRIVE" || prototype.Quantity != simmodel.QuantityResponseTimeS {
+		t.Fatalf("protection-response prototype = %#v", prototype)
+	}
+}
+
+func TestProtectionResponseRejectsAmbiguousInterlockControls(t *testing.T) {
+	maximum := 1e-3
+	analysisPlan := AnalysisPlan{
+		Bindings: []SemanticBinding{
+			{Kind: "port", ID: "load", Target: "SWITCHED_LOAD"},
+			{Kind: "signal", ID: "drive_a", Target: "CONTROL_A"},
+			{Kind: "signal", ID: "drive_b", Target: "CONTROL_B"},
+		},
+		Analyses: []PlannedAnalysis{{ID: "fault_transient", Kind: simmodel.AnalysisTransient, OperatingCase: "faulted"}},
+		Events:   []PlannedEvent{{ID: "overload", OperatingCase: "faulted", Target: "SWITCHED_LOAD"}},
+		Assertions: []PlannedAssertion{{
+			RequirementID: "fault_response", AnalysisID: "fault_transient", OperatingCase: "faulted",
+			Metric: "protection_response_time", Target: "event:overload", Max: &maximum, Unit: "s",
+		}},
+	}
+	requirement := architecturesearch.Requirement{Requirements: architecturesearch.Requirements{Objectives: []architecturesearch.Objective{
+		{ID: "limit_a", Capability: "safety_interlock", Bindings: []architecturesearch.Binding{{Role: "control", Signal: "drive_a", Direction: "source"}}},
+		{ID: "limit_b", Capability: "safety_interlock", Bindings: []architecturesearch.Binding{{Role: "control", Signal: "drive_b", Direction: "source"}}},
+	}}}
+	plans := map[string]simmodel.Plan{
+		simmodel.AnalysisTransient: {
+			Nodes:    []string{"SWITCHED_LOAD", "CONTROL_A", "CONTROL_B"},
+			Analyses: []simmodel.Analysis{{ID: "transient", Kind: simmodel.AnalysisTransient, TimeStepS: 1e-5, DurationS: .01}},
+		},
+	}
+
+	_, _, _, diagnostics := BuildResolvedSimulationContracts(requirement, analysisPlan, plans)
+	if len(diagnostics) != 1 || diagnostics[0].Message != "protection-response event requires exactly one resolved protection control or affected protected path" {
+		t.Fatalf("ambiguous protection-response diagnostics = %#v", diagnostics)
+	}
+}
+
+func TestProtectionResponseRejectsAmbiguousAffectedProtectedPaths(t *testing.T) {
+	maximum := 1e-3
+	analysisPlan := AnalysisPlan{
+		Bindings: []SemanticBinding{
+			{Kind: "signal", ID: "drive_a", Target: "DRIVE_A"},
+			{Kind: "signal", ID: "drive_b", Target: "DRIVE_B"},
+			{Kind: "port", ID: "load", Target: "LOAD"},
+		},
+		Analyses: []PlannedAnalysis{{ID: "fault_transient", Kind: simmodel.AnalysisTransient, OperatingCase: "faulted"}},
+		Events:   []PlannedEvent{{ID: "overload", OperatingCase: "faulted", Target: "LOAD"}},
+		Assertions: []PlannedAssertion{{
+			RequirementID: "fault_response", AnalysisID: "fault_transient", OperatingCase: "faulted",
+			Metric: "protection_response_time", Target: "event:overload", Max: &maximum, Unit: "s",
+		}},
+	}
+	requirement := architecturesearch.Requirement{Requirements: architecturesearch.Requirements{Objectives: []architecturesearch.Objective{
+		{ID: "protect_a", Capability: "output_protection", Bindings: []architecturesearch.Binding{
+			{Role: "input", Signal: "drive_a", Direction: "sink"},
+			{Role: "output", Port: "load", Direction: "source"},
+		}},
+		{ID: "protect_b", Capability: "output_protection", Bindings: []architecturesearch.Binding{
+			{Role: "input", Signal: "drive_b", Direction: "sink"},
+			{Role: "output", Port: "load", Direction: "source"},
+		}},
+	}}}
+	plans := map[string]simmodel.Plan{
+		simmodel.AnalysisTransient: {
+			Nodes:    []string{"DRIVE_A", "DRIVE_B", "LOAD"},
+			Analyses: []simmodel.Analysis{{ID: "transient", Kind: simmodel.AnalysisTransient, TimeStepS: 1e-5, DurationS: .01}},
+		},
+	}
+
+	_, _, _, diagnostics := BuildResolvedSimulationContracts(requirement, analysisPlan, plans)
+	if len(diagnostics) != 1 || diagnostics[0].Message != "protection-response event requires exactly one resolved protection control or affected protected path" {
+		t.Fatalf("ambiguous protection-response diagnostics = %#v", diagnostics)
+	}
+}
+
+func TestEventDrivenMuteDoesNotRequireSeparateControlOverride(t *testing.T) {
+	requirement := architecturesearch.Requirement{Requirements: architecturesearch.Requirements{
+		Domains: []architecturesearch.Domain{
+			{ID: "audio", Kind: "supply"},
+			{ID: "ground", Kind: "reference"},
+		},
+		Ports: []architecturesearch.Port{{ID: "output", Domain: "audio"}},
+		OperatingCases: []architecturesearch.OperatingCase{{
+			ID: "startup", Events: []architecturesearch.OperatingEvent{{
+				ID: "startup", Target: architecturesearch.Observation{Kind: "port", ID: "output"},
+			}},
+		}},
+		BehavioralRequirements: []architecturesearch.BehavioralRequirement{{
+			ID: "startup_mute", Observation: architecturesearch.Observation{Kind: "event", ID: "startup"},
+			OperatingCases: []string{"startup"},
+		}},
+	}}
+	binding, diagnostic := resolvedAssertionBinding(
+		PlannedAssertion{RequirementID: "startup_mute", OperatingCase: "startup", Metric: "muted_output_voltage", Target: "OUT"},
+		"", nil, nil, simmodel.Plan{Nodes: []string{"OUT", "GND"}}, requirement,
+		[]SemanticBinding{{Kind: "domain", ID: "ground", Target: "GND"}},
+	)
+	if diagnostic != nil || len(binding.Prototypes) != 1 || len(binding.ExcitationOverrides) != 0 {
+		t.Fatalf("event-driven mute binding = %#v diagnostic=%#v", binding, diagnostic)
+	}
+}
+
+func TestEventDrivenMuteMeasuresSemanticProtectedOutput(t *testing.T) {
+	requirement := architecturesearch.Requirement{Requirements: architecturesearch.Requirements{
+		Domains: []architecturesearch.Domain{{ID: "ground", Kind: "reference"}, {ID: "audio", Kind: "supply"}},
+		Ports:   []architecturesearch.Port{{ID: "output", Domain: "audio"}},
+		Objectives: []architecturesearch.Objective{{
+			Capability: "mute_control",
+			Bindings:   []architecturesearch.Binding{{Role: "protected", Port: "output"}},
+		}},
+		OperatingCases: []architecturesearch.OperatingCase{{
+			ID: "startup", Events: []architecturesearch.OperatingEvent{{
+				ID: "startup", Target: architecturesearch.Observation{Kind: "circuit", ID: "circuit"},
+			}},
+		}},
+		BehavioralRequirements: []architecturesearch.BehavioralRequirement{{
+			ID: "mute", Observation: architecturesearch.Observation{Kind: "event", ID: "startup"},
+			OperatingCases: []string{"startup"},
+		}},
+	}}
+	maximum := .1
+	analysisPlan := AnalysisPlan{
+		Bindings: []SemanticBinding{
+			{Kind: "port", ID: "output", Target: "AUDIO_OUT"},
+			{Kind: "domain", ID: "ground", Target: "GND"},
+		},
+		Analyses: []PlannedAnalysis{{ID: "startup_transient", Kind: simmodel.AnalysisTransient, OperatingCase: "startup"}},
+		Events:   []PlannedEvent{{ID: "startup", OperatingCase: "startup", Target: "circuit"}},
+		Assertions: []PlannedAssertion{{
+			RequirementID: "mute", AnalysisID: "startup_transient", OperatingCase: "startup",
+			Metric: "muted_output_voltage", Target: "event:startup", Max: &maximum, Unit: "V",
+		}},
+	}
+	plans := map[string]simmodel.Plan{simmodel.AnalysisTransient: {
+		Nodes:    []string{"AUDIO_OUT", "GND"},
+		Analyses: []simmodel.Analysis{{ID: "transient", Kind: simmodel.AnalysisTransient, TimeStepS: 1e-3, DurationS: 1}},
+	}}
+
+	_, assertions, _, diagnostics := BuildResolvedSimulationContracts(requirement, analysisPlan, plans)
+	if len(diagnostics) != 0 || len(assertions) != 1 || len(assertions[0].Prototypes) != 1 ||
+		assertions[0].Prototypes[0].Node != "AUDIO_OUT" {
+		t.Fatalf("event-driven mute contracts = %#v diagnostics=%#v", assertions, diagnostics)
+	}
+}
+
 func TestModelParameterAllUsesRegisteredWorstCaseExpansion(t *testing.T) {
 	analysisPlan := AnalysisPlan{Corners: []PlannedCorner{{ID: "model", Assignments: []CornerAssignment{{Axis: "model_parameter", Target: "circuit", Selection: "all"}}}}}
 	diagnostics := []Diagnostic{}
 	bindings := resolvedOperatingBindings(analysisPlan, map[string]simmodel.Plan{"dc": {}}, &diagnostics)
 	if len(diagnostics) != 0 || len(bindings) != 1 || bindings[0].Kind != OperatingWorstCase {
 		t.Fatalf("model-parameter bindings = %#v diagnostics=%#v", bindings, diagnostics)
+	}
+}
+
+func TestCoolingModeUsesRegisteredWorstCaseExpansion(t *testing.T) {
+	analysisPlan := AnalysisPlan{Corners: []PlannedCorner{{ID: "cooling", Assignments: []CornerAssignment{{Axis: "cooling_mode", Target: "circuit", Selection: "blocked_airflow"}}}}}
+	diagnostics := []Diagnostic{}
+	bindings := resolvedOperatingBindings(analysisPlan, map[string]simmodel.Plan{"thermal": {}}, &diagnostics)
+	if len(diagnostics) != 0 || len(bindings) != 1 || bindings[0].Kind != OperatingWorstCase {
+		t.Fatalf("cooling-mode bindings = %#v diagnostics=%#v", bindings, diagnostics)
 	}
 }
 
@@ -278,12 +615,40 @@ func TestResolvedLoadCurrentBindingSpansDrivenAndPhysicalStartupLoads(t *testing
 		{ID: "maximum", Assignments: []CornerAssignment{{Axis: "load_current", Target: "LOAD", Value: &maximum}}},
 	}}
 	plans := map[string]simmodel.Plan{
-		simmodel.AnalysisDCOperatingPoint: {Devices: []simmodel.ResolvedDevice{{Component: component, Family: "current_source", PrimitiveModel: simmodel.PrimitiveCurrentSourceV1, Terminals: []simmodel.TerminalBinding{{Terminal: "NEGATIVE", Net: "LOAD"}}}}},
-		simmodel.AnalysisStartup:          {Devices: []simmodel.ResolvedDevice{{Component: component, Family: "resistor", PrimitiveModel: simmodel.PrimitiveResistorV1, ValueSI: &resistance, Terminals: []simmodel.TerminalBinding{{Terminal: "B", Net: "LOAD"}}}}},
+		simmodel.AnalysisDCOperatingPoint: {
+			Devices:  []simmodel.ResolvedDevice{{Component: component, Family: "current_source", PrimitiveModel: simmodel.PrimitiveCurrentSourceV1, Terminals: []simmodel.TerminalBinding{{Terminal: "NEGATIVE", Net: "LOAD"}}}},
+			Analyses: []simmodel.Analysis{{Excitations: []simmodel.SourceExcitation{{Component: "supply", DCValue: 12}}}},
+		},
+		simmodel.AnalysisStartup: {
+			Devices:  []simmodel.ResolvedDevice{{Component: component, Family: "resistor", PrimitiveModel: simmodel.PrimitiveResistorV1, ValueSI: &resistance, Terminals: []simmodel.TerminalBinding{{Terminal: "B", Net: "LOAD"}}}},
+			Analyses: []simmodel.Analysis{{Excitations: []simmodel.SourceExcitation{{Component: "supply", DCValue: 12}}}},
+		},
 	}
 	var diagnostics []Diagnostic
 	bindings := resolvedOperatingBindings(analysisPlan, plans, &diagnostics)
-	if len(diagnostics) != 0 || len(bindings) != 1 || bindings[0].Kind != OperatingLoadCurrent || bindings[0].Component != component || bindings[0].Scale != 12 {
+	if len(diagnostics) != 0 || len(bindings) != 1 || bindings[0].Kind != OperatingLoadCurrent || bindings[0].Component != component ||
+		bindings[0].Scale != 12 || bindings[0].ReferenceComponent != "supply" {
+		t.Fatalf("bindings = %#v diagnostics=%#v", bindings, diagnostics)
+	}
+}
+
+func TestResolvedLoadInductanceBindingUsesCatalogBackedHarness(t *testing.T) {
+	value := 80e-3
+	component := OperatingHarnessComponentID("load_inductance", "LOAD")
+	analysisPlan := AnalysisPlan{Corners: []PlannedCorner{{ID: "inductive", Assignments: []CornerAssignment{{
+		Axis: "load_inductance", Target: "LOAD", Value: &value,
+	}}}}}
+	plans := map[string]simmodel.Plan{
+		simmodel.AnalysisElectrothermal: {Devices: []simmodel.ResolvedDevice{{
+			Component: component, Family: "inductor", PrimitiveModel: simmodel.PrimitiveInductorTransientV1,
+			Terminals: []simmodel.TerminalBinding{{Terminal: "A", Net: "SERIES_LOAD"}, {Terminal: "B", Net: "GND"}},
+		}}},
+	}
+	var diagnostics []Diagnostic
+
+	bindings := resolvedOperatingBindings(analysisPlan, plans, &diagnostics)
+	if len(diagnostics) != 0 || len(bindings) != 1 ||
+		bindings[0].Kind != OperatingDeviceValueSI || bindings[0].Component != component {
 		t.Fatalf("bindings = %#v diagnostics=%#v", bindings, diagnostics)
 	}
 }
@@ -298,6 +663,23 @@ func TestSupplySourceComponentsResolveEverySemanticRailAndExcludeSignalSources(t
 	components, ok := supplySourceComponents(plan, []string{"VN", "VP"})
 	if !ok || len(components) != 2 || components[0] != "negative_supply" || components[1] != "positive_supply" {
 		t.Fatalf("supply source components = %#v, %v", components, ok)
+	}
+}
+
+func TestSemanticSupplyNodesIncludeOnlyExternallySourcedRails(t *testing.T) {
+	requirement := architecturesearch.Requirement{Requirements: architecturesearch.Requirements{Domains: []architecturesearch.Domain{
+		{ID: "input", Kind: "supply", Source: "external"},
+		{ID: "regulated", Kind: "supply", Source: "input"},
+		{ID: "ground", Kind: "reference", Source: "external"},
+	}}}
+	bindings := []SemanticBinding{
+		{Kind: "domain", ID: "input", Target: "VIN"},
+		{Kind: "domain", ID: "regulated", Target: "VOUT"},
+		{Kind: "domain", ID: "ground", Target: "GND"},
+	}
+
+	if nodes := semanticSupplyNodes(requirement, bindings); !slices.Equal(nodes, []string{"VIN"}) {
+		t.Fatalf("semantic supply nodes = %#v", nodes)
 	}
 }
 

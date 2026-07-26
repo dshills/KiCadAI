@@ -149,14 +149,14 @@ type planEndpoint struct {
 }
 
 func BuildSystemPlan(requirement Requirement, candidate CandidateResult) (SystemPlan, *candidateValidation) {
-	if requirement.Version != VersionV4 {
+	if !supportsSystemPlanning(requirement) {
 		return SystemPlan{}, nil
 	}
 	requirementHash, err := CanonicalHash(requirement)
 	if err != nil {
 		return SystemPlan{}, &candidateValidation{
 			Code: CodeHierarchyUnproven, Path: "candidate.system_plan",
-			Message: "hash normalized V4 requirement: " + err.Error(),
+			Message: "hash normalized hierarchical requirement: " + err.Error(),
 		}
 	}
 	plan := SystemPlan{
@@ -253,15 +253,15 @@ func BuildSystemPlan(requirement Requirement, candidate CandidateResult) (System
 	return plan, nil
 }
 
-// ValidateSystemPlan verifies generated V4 evidence at every persistence or
+// ValidateSystemPlan verifies generated V4/V5 evidence at every persistence or
 // orchestration boundary. It intentionally accepts no repair or inference.
 func ValidateSystemPlan(requirement Requirement, candidateFingerprint string, plan SystemPlan) error {
-	if requirement.Version != VersionV4 || requirement.Schema != SchemaIDV4 {
-		return fmt.Errorf("system-plan validation requires a V4 requirement")
+	if !supportsSystemPlanning(requirement) {
+		return fmt.Errorf("system-plan validation requires a V4 or V5 requirement")
 	}
 	requirementHash, err := CanonicalHash(requirement)
 	if err != nil {
-		return fmt.Errorf("hash V4 requirement: %w", err)
+		return fmt.Errorf("hash hierarchical requirement: %w", err)
 	}
 	if plan.Schema != SystemPlanSchema || plan.RequirementHash != requirementHash ||
 		plan.CandidateFingerprint != candidateFingerprint || plan.PlanHash == "" {
@@ -637,6 +637,15 @@ func buildSharedResourcePlan(requirement Requirement, blocks []HierarchyBlock, i
 			if connection.CurrentDemandA != nil {
 				demand += *connection.CurrentDemandA
 				hasDemand = true
+			}
+			if canonicalIdentifier(domain.Source) != "external" &&
+				connection.CurrentCapacityA != nil &&
+				(resource.CapacityA == nil || *connection.CurrentCapacityA > *resource.CapacityA) {
+				resource.CapacityA = float64Pointer(*connection.CurrentCapacityA)
+				resource.Evidence = ContractEvidence{
+					Confidence: EvidenceRuleInferred,
+					Sources:    []string{"kicadai:selected-generated-domain-source-capacity"},
+				}
 			}
 			resource.Dependencies = append(resource.Dependencies, connection.ID)
 		}

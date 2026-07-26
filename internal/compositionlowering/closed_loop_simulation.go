@@ -53,6 +53,7 @@ type ArchitectureVariableBinding struct {
 	Kind                 string                      `json:"kind"`
 	Function             string                      `json:"function,omitempty"`
 	Component            string                      `json:"component,omitempty"`
+	Components           []string                    `json:"components,omitempty"`
 	Parameter            string                      `json:"parameter,omitempty"`
 	Unit                 string                      `json:"unit,omitempty"`
 	VariantChoices       []ArchitectureVariantChoice `json:"variant_choices,omitempty"`
@@ -136,6 +137,7 @@ func SynthesizeClosedLoop(
 	}
 	report.SelectedCircuitHash = request.ExplicitCircuit.ResolutionHash
 	request.ExplicitCircuit.ClosedLoop = &report
+	request.ExplicitCircuit.RoutingPolicy = designworkflow.ExplicitRoutingPolicyConstrainedEndpointAccessV1
 	if validationDiagnostics := closedloopsynthesis.ValidatePromotionReport(report, request.ExplicitCircuit.CatalogHash); len(validationDiagnostics) != 0 {
 		return ClosedLoopPromotion{Report: report, Resolved: resolvedCandidate.Resolved, Request: request}, closedLoopReportIssues("closed_loop.promotion", validationDiagnostics)
 	}
@@ -176,10 +178,30 @@ func providerRepairVariables(search architecturesearch.SearchResult) ([]ClosedLo
 					effects = append(effects, closedloopsynthesis.RepairEffect{Analysis: effect.Analysis, Metric: effect.Metric, Direction: effect.Direction})
 				}
 				variables = append(variables, closedloopsynthesis.Variable{ID: variableID, Kind: repair.Kind, Value: repair.Value, AllowedValues: append([]float64(nil), repair.AllowedValues...), Effects: effects})
-				bindings = append(bindings, ArchitectureVariableBinding{
-					CandidateFingerprint: candidate.Fingerprint, VariableID: variableID, Kind: ArchitectureVariableComponentValue,
-					Component: safeID(prefix + "__" + repair.Instance), Unit: repair.Unit,
-				})
+				targets := append([]string(nil), repair.Instances...)
+				if repair.Instance != "" {
+					targets = append(targets, repair.Instance)
+				}
+				for targetIndex := range targets {
+					targets[targetIndex] = safeID(prefix + "__" + targets[targetIndex])
+				}
+				slices.Sort(targets)
+				targets = slices.Compact(targets)
+				bindingKind, parameter := ArchitectureVariableComponentValue, ""
+				if repair.Kind == "thermal_path" {
+					bindingKind = ArchitectureVariableModelParameter
+					parameter = "thermal_path_resistance_c_per_w"
+				}
+				binding := ArchitectureVariableBinding{
+					CandidateFingerprint: candidate.Fingerprint, VariableID: variableID, Kind: bindingKind,
+					Parameter: parameter, Unit: repair.Unit,
+				}
+				if len(targets) == 1 {
+					binding.Component = targets[0]
+				} else {
+					binding.Components = targets
+				}
+				bindings = append(bindings, binding)
 			}
 		}
 		if len(variables) != 0 {
@@ -236,8 +258,10 @@ func BuildClosedLoopInput(requirement architecturesearch.Requirement, search arc
 	var diagnostics []closedloopsynthesis.Diagnostic
 	v3 := requirement.Schema == architecturesearch.SchemaIDV3 && requirement.Version == architecturesearch.VersionV3
 	v4 := requirement.Schema == architecturesearch.SchemaIDV4 && requirement.Version == architecturesearch.VersionV4
-	if !v3 && !v4 {
-		diagnostics = append(diagnostics, closedloopsynthesis.Diagnostic{Path: "requirement", Message: "behavioral closed-loop integration requires a v3 or v4 requirement"})
+	v5 := requirement.Schema == architecturesearch.SchemaIDV5 && requirement.Version == architecturesearch.VersionV5
+	hierarchical := v4 || v5
+	if !v3 && !hierarchical {
+		diagnostics = append(diagnostics, closedloopsynthesis.Diagnostic{Path: "requirement", Message: "behavioral closed-loop integration requires a v3, v4, or v5 requirement"})
 	}
 	requirementHash, err := architecturesearch.CanonicalHash(architecturesearch.Normalize(requirement))
 	if err != nil || requirementHash != search.RequirementHash {
@@ -260,9 +284,9 @@ func BuildClosedLoopInput(requirement architecturesearch.Requirement, search arc
 	}
 	retained = append(retained, search.Alternatives...)
 	priorityByFingerprint := map[string]int{}
-	if v4 {
+	if hierarchical {
 		if search.Backtracking == nil || len(search.Backtracking.CandidateOrder) != len(retained) {
-			diagnostics = append(diagnostics, closedloopsynthesis.Diagnostic{Path: "search.backtracking", Message: "V4 closed-loop integration requires complete architecture backtracking evidence"})
+			diagnostics = append(diagnostics, closedloopsynthesis.Diagnostic{Path: "search.backtracking", Message: "hierarchical closed-loop integration requires complete architecture backtracking evidence"})
 		} else {
 			for index, fingerprint := range search.Backtracking.CandidateOrder {
 				priorityByFingerprint[fingerprint] = index
@@ -270,7 +294,7 @@ func BuildClosedLoopInput(requirement architecturesearch.Requirement, search arc
 		}
 	}
 	slices.SortStableFunc(retained, func(left, right architecturesearch.CandidateResult) int {
-		if v4 {
+		if hierarchical {
 			leftPriority, leftExists := priorityByFingerprint[left.Fingerprint]
 			rightPriority, rightExists := priorityByFingerprint[right.Fingerprint]
 			if leftExists && rightExists && leftPriority != rightPriority {
@@ -287,14 +311,14 @@ func BuildClosedLoopInput(requirement architecturesearch.Requirement, search arc
 		}
 		seen[candidate.Fingerprint] = true
 		priority := 0
-		if v4 {
+		if hierarchical {
 			var exists bool
 			priority, exists = priorityByFingerprint[candidate.Fingerprint]
 			if !exists {
-				diagnostics = append(diagnostics, closedloopsynthesis.Diagnostic{Path: fmt.Sprintf("search.candidates[%d].priority", index), Message: "retained V4 candidate is absent from architecture backtracking order"})
+				diagnostics = append(diagnostics, closedloopsynthesis.Diagnostic{Path: fmt.Sprintf("search.candidates[%d].priority", index), Message: "retained hierarchical candidate is absent from architecture backtracking order"})
 			}
 			if candidate.SystemPlan == nil {
-				diagnostics = append(diagnostics, closedloopsynthesis.Diagnostic{Path: fmt.Sprintf("search.candidates[%d].system_plan", index), Message: "retained V4 candidate lacks its generated system plan"})
+				diagnostics = append(diagnostics, closedloopsynthesis.Diagnostic{Path: fmt.Sprintf("search.candidates[%d].system_plan", index), Message: "retained hierarchical candidate lacks its generated system plan"})
 			}
 		}
 		input.Candidates = append(input.Candidates, closedloopsynthesis.Candidate{
@@ -333,6 +357,10 @@ func (resolver ArchitectureSimulationPlanResolver) ResolveSimulationPlans(ctx co
 	if err != nil {
 		return nil, fmt.Errorf("resolve operating harness: %w", err)
 	}
+	dynamicHarness, err := operatingHarnessDevices(resolver.Requirement, lowered.Evidence.SemanticBindings, resolved.Simulation, simmodel.AnalysisTransient)
+	if err != nil {
+		return nil, fmt.Errorf("resolve dynamic operating harness: %w", err)
+	}
 	dcHarness, err := operatingHarnessDevices(resolver.Requirement, lowered.Evidence.SemanticBindings, resolved.Simulation, simmodel.AnalysisDCOperatingPoint)
 	if err != nil {
 		return nil, fmt.Errorf("resolve DC operating harness: %w", err)
@@ -350,7 +378,7 @@ func (resolver ArchitectureSimulationPlanResolver) ResolveSimulationPlans(ctx co
 		inputStimulusHarness = &stimulusHarness
 	}
 	resolveWorkflow := func(kind string, intent simmodel.Intent) (simmodel.Plan, []reports.Issue) {
-		selectedHarness := operatingHarnessForAnalysis(kind, harness, dcHarness, startupHarness)
+		selectedHarness := operatingHarnessForAnalysis(kind, harness, dynamicHarness, dcHarness, startupHarness)
 		workflowHarness := append([]operatingHarnessDevice(nil), selectedHarness...)
 		if analysisUsesBehavioralInputStimulus(kind) && inputStimulusHarness != nil {
 			workflowHarness = append(workflowHarness, *inputStimulusHarness)
@@ -399,7 +427,13 @@ func (resolver ArchitectureSimulationPlanResolver) ResolveSimulationPlans(ctx co
 		if defaultErr != nil {
 			return defaultErr
 		}
-		stimulated, stimulusErr := configureBehavioralTransientStimulus(defaulted, kind, transientStimulus, hasTransientStimulus)
+		loadStepped, loadStepErr := configureBehavioralLoadCurrentStep(
+			resolver.Requirement, kind, defaulted, dynamicHarness, !hasTransientStimulus,
+		)
+		if loadStepErr != nil {
+			return loadStepErr
+		}
+		stimulated, stimulusErr := configureBehavioralTransientStimulus(loadStepped, kind, transientStimulus, hasTransientStimulus)
 		if stimulusErr != nil {
 			return stimulusErr
 		}
@@ -722,7 +756,11 @@ func behavioralTransientStimulusForRequirement(requirement architecturesearch.Re
 		}
 		if periodic {
 			for _, behavior := range requirement.Requirements.BehavioralRequirements {
-				if behavior.Analysis == simmodel.AnalysisTransient && behavior.Metric != "output_swing" && behavior.Metric != "output_power" && behavior.Metric != "muted_output_voltage" {
+				if behavior.Analysis == simmodel.AnalysisTransient &&
+					behavior.Observation.Kind != "event" &&
+					behavior.Metric != "output_swing" &&
+					behavior.Metric != "output_power" &&
+					behavior.Metric != "muted_output_voltage" {
 					periodic = false
 					break
 				}
@@ -739,7 +777,7 @@ func behavioralTransientStimulusForRequirement(requirement architecturesearch.Re
 }
 
 func configureBehavioralTransientStimulus(plan simmodel.Plan, kind string, stimulus behavioralTransientStimulus, available bool) (simmodel.Plan, error) {
-	if kind != simmodel.AnalysisTransient || !available {
+	if (kind != simmodel.AnalysisTransient && kind != simmodel.AnalysisElectrothermal) || !available {
 		return plan, nil
 	}
 	source, ok := uniquePlanSourceAtNode(plan, stimulus.Node)
@@ -859,12 +897,14 @@ func transientStimulusHarnessDevice(requirement architecturesearch.Requirement, 
 	}, nil
 }
 
-func operatingHarnessForAnalysis(kind string, ordinary, dc, startup []operatingHarnessDevice) []operatingHarnessDevice {
+func operatingHarnessForAnalysis(kind string, ordinary, dynamic, dc, startup []operatingHarnessDevice) []operatingHarnessDevice {
 	switch kind {
 	case simmodel.AnalysisDCOperatingPoint:
 		return dc
 	case simmodel.AnalysisStartup:
 		return startup
+	case simmodel.AnalysisTransient, simmodel.AnalysisElectrothermal:
+		return dynamic
 	default:
 		return ordinary
 	}
@@ -884,6 +924,9 @@ type operatingHarnessDevice struct {
 	Source          bool
 	DefaultValue    float64
 	HasDefaultValue bool
+	InitialValue    float64
+	HasInitialValue bool
+	TransientEdge   bool
 }
 
 func operatingHarnessDevices(requirement architecturesearch.Requirement, bindings []closedloopsynthesis.SemanticBinding, resolvedPlan *simmodel.Plan, analysisKind string) ([]operatingHarnessDevice, error) {
@@ -891,7 +934,7 @@ func operatingHarnessDevices(requirement architecturesearch.Requirement, binding
 	for _, operatingCase := range requirement.Requirements.OperatingCases {
 		for _, condition := range operatingCase.Conditions {
 			switch condition.Axis {
-			case "load_current", "load_resistance", "load_capacitance":
+			case "load_current", "load_resistance", "load_capacitance", "load_inductance":
 				loadConditions = append(loadConditions, condition)
 			}
 		}
@@ -905,6 +948,19 @@ func operatingHarnessDevices(requirement architecturesearch.Requirement, binding
 	if err != nil {
 		return nil, err
 	}
+	eventHarness, err := voltageEventHarnessDevices(requirement, targets, ground, resolvedPlan, analysisKind)
+	if err != nil {
+		return nil, err
+	}
+	controlHarness = append(controlHarness, eventHarness...)
+	eventHarness, err = resistanceEventHarnessDevices(requirement, targets, resolvedPlan, analysisKind)
+	if err != nil {
+		return nil, err
+	}
+	controlHarness = append(controlHarness, eventHarness...)
+	slices.SortStableFunc(controlHarness, func(left, right operatingHarnessDevice) int {
+		return strings.Compare(left.Device.InstanceID, right.Device.InstanceID)
+	})
 	if len(loadConditions) == 0 {
 		return controlHarness, nil
 	}
@@ -916,29 +972,25 @@ func operatingHarnessDevices(requirement architecturesearch.Requirement, binding
 	for _, entry := range result {
 		seen[entry.Device.InstanceID] = true
 	}
+	inductiveTargets := map[string]bool{}
+	currentTargets := map[string]bool{}
+	for _, condition := range loadConditions {
+		if condition.Axis != "load_inductance" && condition.Axis != "load_current" {
+			continue
+		}
+		if target, ok := operatingConditionSemanticTarget(condition, targets); ok {
+			if condition.Axis == "load_inductance" {
+				inductiveTargets[target] = true
+			} else {
+				currentTargets[target] = true
+			}
+		}
+	}
 	for _, condition := range loadConditions {
 		var catalogID string
 		var terminals [2]string
 		source := false
 		startupLoadResistance := 0.0
-		switch condition.Axis {
-		case "load_current":
-			catalogID, terminals, source = "source.current.connector.1x02", [2]string{"POSITIVE", "NEGATIVE"}, true
-			if analysisKind == simmodel.AnalysisStartup {
-				var resistanceErr error
-				startupLoadResistance, resistanceErr = startupLoadResistanceOhm(requirement, condition)
-				if resistanceErr != nil {
-					return nil, resistanceErr
-				}
-				catalogID, terminals, source = "resistor.generic.0603", [2]string{"A", "B"}, false
-			}
-		case "load_resistance":
-			catalogID, terminals = "resistor.generic.0603", [2]string{"A", "B"}
-		case "load_capacitance":
-			catalogID, terminals = "capacitor.ceramic.0603", [2]string{"A", "B"}
-		default:
-			continue
-		}
 		target, ok := operatingConditionSemanticTarget(condition, targets)
 		if !ok {
 			return nil, fmt.Errorf("%s target %q does not resolve to a semantic net", condition.Axis, condition.Target)
@@ -950,17 +1002,46 @@ func operatingHarnessDevices(requirement architecturesearch.Requirement, binding
 		if target == loadReference {
 			return nil, fmt.Errorf("%s target %q does not resolve to a non-reference semantic net", condition.Axis, condition.Target)
 		}
+		switch condition.Axis {
+		case "load_current":
+			catalogID, terminals, source = "source.current.connector.1x02", [2]string{"POSITIVE", "NEGATIVE"}, true
+			if analysisKind == simmodel.AnalysisStartup || analysisKind == simmodel.AnalysisElectrothermal {
+				var resistanceErr error
+				startupLoadResistance, resistanceErr = startupLoadResistanceOhm(requirement, condition)
+				if resistanceErr != nil {
+					return nil, resistanceErr
+				}
+				catalogID, terminals, source = "resistor.generic.0603", [2]string{"A", "B"}, false
+			}
+		case "load_resistance":
+			catalogID, terminals = "resistor.generic.0603", [2]string{"A", "B"}
+		case "load_capacitance":
+			catalogID, terminals = "capacitor.ceramic.0603", [2]string{"A", "B"}
+		case "load_inductance":
+			catalogID, terminals = "load.inductive.external.1x02", [2]string{"A", "B"}
+		default:
+			continue
+		}
 		instanceID := closedloopsynthesis.OperatingHarnessComponentID(condition.Axis, target)
 		if seen[instanceID] {
 			continue
 		}
 		seen[instanceID] = true
 		positive, negative := target, loadReference
-		if condition.Axis == "load_current" {
+		if condition.Axis == "load_current" || condition.Axis == "load_inductance" {
 			var endpointErr error
 			positive, negative, endpointErr = loadCurrentHarnessEndpoints(requirement, condition, targets, target, loadReference, resolvedPlan, analysisKind)
 			if endpointErr != nil {
 				return nil, endpointErr
+			}
+		}
+		if inductiveTargets[target] && currentTargets[target] {
+			seriesNode := operatingHarnessSeriesNode(target)
+			switch condition.Axis {
+			case "load_current":
+				negative = seriesNode
+			case "load_inductance":
+				positive = seriesNode
 			}
 		}
 		device := circuitgraph.SimulationHarnessDevice{
@@ -980,6 +1061,7 @@ func operatingHarnessDevices(requirement architecturesearch.Requirement, binding
 		entry := operatingHarnessDevice{Device: device, Source: source}
 		if condition.Axis == "load_current" {
 			entry.DefaultValue, entry.HasDefaultValue = maximumPositiveOperatingValue(condition)
+			entry.InitialValue, entry.HasInitialValue = minimumNonnegativeOperatingValue(condition)
 		}
 		result = append(result, entry)
 	}
@@ -987,6 +1069,226 @@ func operatingHarnessDevices(requirement architecturesearch.Requirement, binding
 		return strings.Compare(left.Device.InstanceID, right.Device.InstanceID)
 	})
 	return result, nil
+}
+
+func operatingHarnessSeriesNode(target string) string {
+	digest := sha256.Sum256([]byte("operating_harness_series\x00" + target))
+	return "SIMULATION_HARNESS_SERIES_" + strings.ToUpper(hex.EncodeToString(digest[:8]))
+}
+
+func voltageEventHarnessDevices(requirement architecturesearch.Requirement, targets map[string]string, ground string, resolvedPlan *simmodel.Plan, analysisKind string) ([]operatingHarnessDevice, error) {
+	if analysisKind != simmodel.AnalysisTransient && analysisKind != simmodel.AnalysisElectrothermal {
+		return nil, nil
+	}
+	byTarget := map[string]operatingHarnessDevice{}
+	for _, operatingCase := range requirement.Requirements.OperatingCases {
+		for _, event := range operatingCase.Events {
+			if event.Target.Kind == "" || event.Target.ID == "" {
+				continue
+			}
+			if event.Kind != "short_circuit" && event.Unit != "V" {
+				continue
+			}
+			target := targets[event.Target.Kind+"\x00"+event.Target.ID]
+			if target == "" {
+				return nil, fmt.Errorf("%s event target %q does not resolve to a semantic net", event.Kind, event.Target.ID)
+			}
+			if target == ground {
+				return nil, fmt.Errorf("%s event target %q resolves to the reference net", event.Kind, event.Target.ID)
+			}
+			if event.Kind == "short_circuit" {
+				if ground == "" {
+					return nil, fmt.Errorf("short-circuit event target %q requires one resolved reference domain", event.Target.ID)
+				}
+				instanceID := closedloopsynthesis.OperatingHarnessComponentID("short_circuit", target)
+				entry := operatingHarnessDevice{Device: circuitgraph.SimulationHarnessDevice{
+					InstanceID: instanceID,
+					CatalogID:  "resistor.generic.0603",
+					ValueSI:    closedloopsynthesis.ShortCircuitHarnessOpenResistanceOhm,
+					HasValueSI: true,
+					Connections: []simmodel.ConnectionEvidence{
+						{Function: "A", Net: target},
+						{Function: "B", Net: ground},
+					},
+				}}
+				byTarget["short_circuit\x00"+target] = entry
+				continue
+			}
+			if event.Initial == nil || !finiteArchitectureValue(*event.Initial) {
+				return nil, fmt.Errorf("synthesized voltage-event harness for %q requires a finite explicit initial value", event.Target.ID)
+			}
+			harnessTarget := target
+			defaultValue := *event.Initial
+			if controlTarget, ok := railLossControlTarget(requirement, event, targets); ok {
+				harnessTarget = controlTarget
+				defaultValue = 0
+			}
+			if harnessTarget == ground {
+				return nil, fmt.Errorf("voltage event target %q resolves its control to the reference net", event.Target.ID)
+			}
+			if resolvedPlan != nil && planHasVoltageSourceAtNode(*resolvedPlan, harnessTarget) {
+				continue
+			}
+			if ground == "" {
+				return nil, fmt.Errorf("voltage event target %q requires one resolved reference domain", event.Target.ID)
+			}
+			instanceID := closedloopsynthesis.OperatingHarnessComponentID("voltage_event", target)
+			entry := operatingHarnessDevice{
+				Source: true, DefaultValue: defaultValue, HasDefaultValue: true,
+				Device: circuitgraph.SimulationHarnessDevice{
+					InstanceID: instanceID,
+					CatalogID:  "source.voltage.connector.1x02",
+					Connections: []simmodel.ConnectionEvidence{
+						{Function: "POSITIVE", Net: harnessTarget},
+						{Function: "NEGATIVE", Net: ground},
+					},
+				},
+			}
+			key := "voltage_event\x00" + target
+			if existing, ok := byTarget[key]; ok {
+				if existing.DefaultValue != entry.DefaultValue {
+					return nil, fmt.Errorf("voltage events on semantic net %q require one consistent explicit initial value", target)
+				}
+				continue
+			}
+			byTarget[key] = entry
+		}
+	}
+	result := make([]operatingHarnessDevice, 0, len(byTarget))
+	for _, entry := range byTarget {
+		result = append(result, entry)
+	}
+	slices.SortStableFunc(result, func(left, right operatingHarnessDevice) int {
+		return strings.Compare(left.Device.InstanceID, right.Device.InstanceID)
+	})
+	return result, nil
+}
+
+func resistanceEventHarnessDevices(requirement architecturesearch.Requirement, targets map[string]string, resolvedPlan *simmodel.Plan, analysisKind string) ([]operatingHarnessDevice, error) {
+	if analysisKind != simmodel.AnalysisTransient && analysisKind != simmodel.AnalysisElectrothermal {
+		return nil, nil
+	}
+	byTarget := map[string]operatingHarnessDevice{}
+	for _, operatingCase := range requirement.Requirements.OperatingCases {
+		for _, event := range operatingCase.Events {
+			if !strings.EqualFold(event.Unit, "Ohm") || event.Target.Kind == "" || event.Target.ID == "" {
+				continue
+			}
+			target := targets[event.Target.Kind+"\x00"+event.Target.ID]
+			if target == "" {
+				return nil, fmt.Errorf("resistance event target %q does not resolve to a semantic net", event.Target.ID)
+			}
+			reference, ok := operatingConditionReferenceTarget(
+				requirement,
+				architecturesearch.OperatingCondition{Target: event.Target.ID},
+				targets,
+			)
+			if !ok || reference == "" || reference == target {
+				return nil, fmt.Errorf("resistance event target %q does not resolve to a distinct reference net", event.Target.ID)
+			}
+			if event.Initial == nil || !finiteArchitectureValue(*event.Initial) || *event.Initial <= 0 {
+				return nil, fmt.Errorf("resistance event target %q requires a positive finite initial resistance", event.Target.ID)
+			}
+			reusesCurrentLoad := false
+			for _, candidateCase := range requirement.Requirements.OperatingCases {
+				for _, condition := range candidateCase.Conditions {
+					if condition.Axis != "load_current" {
+						continue
+					}
+					if currentTarget, currentOK := operatingConditionSemanticTarget(condition, targets); currentOK && currentTarget == target {
+						reusesCurrentLoad = true
+						break
+					}
+				}
+				if reusesCurrentLoad {
+					break
+				}
+			}
+			if reusesCurrentLoad {
+				continue
+			}
+			instanceID := closedloopsynthesis.OperatingHarnessComponentID("load_resistance", target)
+			if resolvedPlan != nil && slices.ContainsFunc(resolvedPlan.Devices, func(device simmodel.ResolvedDevice) bool {
+				return device.Component == instanceID && device.Family == "resistor"
+			}) {
+				continue
+			}
+			entry := operatingHarnessDevice{
+				DefaultValue: *event.Initial, HasDefaultValue: true,
+				Device: circuitgraph.SimulationHarnessDevice{
+					InstanceID: instanceID, CatalogID: "resistor.generic.0603",
+					ValueSI: *event.Initial, HasValueSI: true,
+					Connections: []simmodel.ConnectionEvidence{
+						{Function: "A", Net: target},
+						{Function: "B", Net: reference},
+					},
+				},
+			}
+			if existing, exists := byTarget[target]; exists {
+				if entry.Device.ValueSI > existing.Device.ValueSI {
+					existing.DefaultValue = entry.DefaultValue
+					existing.Device.ValueSI = entry.Device.ValueSI
+					byTarget[target] = existing
+				}
+				continue
+			}
+			byTarget[target] = entry
+		}
+	}
+	result := make([]operatingHarnessDevice, 0, len(byTarget))
+	for _, entry := range byTarget {
+		result = append(result, entry)
+	}
+	slices.SortStableFunc(result, func(left, right operatingHarnessDevice) int {
+		return strings.Compare(left.Device.InstanceID, right.Device.InstanceID)
+	})
+	return result, nil
+}
+
+func railLossControlTarget(requirement architecturesearch.Requirement, event architecturesearch.OperatingEvent, targets map[string]string) (string, bool) {
+	if event.Kind != "rail_loss" {
+		return "", false
+	}
+	var candidates []string
+	for _, objective := range requirement.Requirements.Objectives {
+		if objective.Capability != "output_protection" {
+			continue
+		}
+		matchesOutput := false
+		for _, binding := range objective.Bindings {
+			if binding.Role != "output" {
+				continue
+			}
+			matchesOutput = event.Target.Kind == "port" && binding.Port == event.Target.ID ||
+				event.Target.Kind == "signal" && binding.Signal == event.Target.ID
+		}
+		if !matchesOutput {
+			continue
+		}
+		for _, binding := range objective.Bindings {
+			if binding.Role != "control" {
+				continue
+			}
+			target := ""
+			if binding.Port != "" {
+				target = targets["port\x00"+binding.Port]
+			} else if binding.Signal != "" {
+				target = targets["signal\x00"+binding.Signal]
+			}
+			if target != "" {
+				candidates = append(candidates, target)
+			}
+		}
+	}
+	slices.Sort(candidates)
+	return uniqueResolvedTarget(slices.Compact(candidates))
+}
+
+func uniqueResolvedTarget(values []string) (string, bool) {
+	if len(values) != 1 || values[0] == "" {
+		return "", false
+	}
+	return values[0], true
 }
 
 func participantControlOutputHarnessDevices(requirement architecturesearch.Requirement, targets map[string]string, ground string, resolvedPlan *simmodel.Plan, analysisKind string) ([]operatingHarnessDevice, error) {
@@ -1048,6 +1350,7 @@ func participantControlOutputHarnessDevices(requirement architecturesearch.Requi
 			seen[instanceID] = true
 			result = append(result, operatingHarnessDevice{
 				Source: true, DefaultValue: high, HasDefaultValue: true,
+				TransientEdge: analysisKind == simmodel.AnalysisTransient,
 				Device: circuitgraph.SimulationHarnessDevice{
 					InstanceID: instanceID,
 					CatalogID:  "source.voltage.connector.1x02",
@@ -1079,7 +1382,7 @@ func startupLoadResistanceOhm(requirement architecturesearch.Requirement, condit
 		candidatePower := ""
 		for _, binding := range objective.Bindings {
 			matchesOutput = matchesOutput || ((binding.Role == "output" || binding.Role == "load") && binding.Port == condition.Target)
-			if (binding.Role == "power" || binding.Role == "load_power") && binding.Port != "" {
+			if (binding.Role == "input" || binding.Role == "power" || binding.Role == "load_power") && binding.Port != "" {
 				candidatePower = binding.Port
 			}
 		}
@@ -1145,13 +1448,17 @@ func loadCurrentHarnessEndpoints(requirement architecturesearch.Requirement, con
 			if (binding.Role == "output" || binding.Role == "load") && binding.Port == condition.Target {
 				matchesOutput = true
 			}
-			if (binding.Role == "power" || binding.Role == "load_power") && binding.Port != "" {
+			if (binding.Role == "input" || binding.Role == "power" || binding.Role == "load_power") && binding.Port != "" {
 				powerPort = binding.Port
 			}
 		}
 		if matchesOutput && powerPort != "" {
 			if power := targets["port\x00"+powerPort]; power != "" && power != target {
 				sensedPower, err := loadCurrentSenseDownstreamNode(requirement, powerPort, power, plan)
+				if err != nil {
+					return "", "", err
+				}
+				sensedLoad, err := loadCurrentSenseDownstreamNode(requirement, condition.Target, target, plan)
 				if err != nil {
 					return "", "", err
 				}
@@ -1166,7 +1473,7 @@ func loadCurrentHarnessEndpoints(requirement architecturesearch.Requirement, con
 				if highSideSwitchSpansNodes(plan, sensedPower, target) {
 					return target, ground, nil
 				}
-				return sensedPower, target, nil
+				return sensedPower, sensedLoad, nil
 			}
 		}
 	}
@@ -1326,6 +1633,16 @@ func maximumPositiveOperatingValue(condition architecturesearch.OperatingConditi
 	return maximum, maximum > 0
 }
 
+func minimumNonnegativeOperatingValue(condition architecturesearch.OperatingCondition) (float64, bool) {
+	minimum := math.Inf(1)
+	for _, candidate := range []*float64{condition.Min, condition.Max} {
+		if candidate != nil && finiteArchitectureValue(*candidate) && *candidate >= 0 && *candidate < minimum {
+			minimum = *candidate
+		}
+	}
+	return minimum, !math.IsInf(minimum, 1)
+}
+
 func addOperatingHarnessExcitations(intent *simmodel.Intent, harness []operatingHarnessDevice) {
 	for analysisIndex := range intent.Analyses {
 		analysis := &intent.Analyses[analysisIndex]
@@ -1341,14 +1658,15 @@ func addOperatingHarnessExcitations(intent *simmodel.Intent, harness []operating
 			excitation := simmodel.SourceExcitation{Component: entry.Device.InstanceID}
 			if entry.HasDefaultValue {
 				excitation.DCValue = entry.DefaultValue
-				if analysis.Kind == simmodel.AnalysisTransient && analysis.TimeStepS > 0 && analysis.DurationS >= 4*analysis.TimeStepS {
-					excitation.DCValue = 0
-					excitation.PulseInitialValue = 0
-					excitation.PulseValue = entry.DefaultValue
-					excitation.PulseDelayS = 2 * analysis.TimeStepS
-					excitation.PulseWidthS = analysis.DurationS
-					excitation.PulsePeriodS = analysis.DurationS + analysis.TimeStepS
-				}
+			}
+			if entry.TransientEdge && analysis.Kind == simmodel.AnalysisTransient &&
+				analysis.TimeStepS > 0 && analysis.DurationS >= 4*analysis.TimeStepS {
+				excitation.DCValue = 0
+				excitation.PulseInitialValue = 0
+				excitation.PulseValue = entry.DefaultValue
+				excitation.PulseDelayS = 2 * analysis.TimeStepS
+				excitation.PulseWidthS = analysis.DurationS
+				excitation.PulsePeriodS = analysis.DurationS + analysis.TimeStepS
 			}
 			analysis.Excitations = append(analysis.Excitations, excitation)
 		}
@@ -1356,6 +1674,81 @@ func addOperatingHarnessExcitations(intent *simmodel.Intent, harness []operating
 			return strings.Compare(left.Component, right.Component)
 		})
 	}
+}
+
+func configureBehavioralLoadCurrentStep(
+	requirement architecturesearch.Requirement,
+	kind string,
+	plan simmodel.Plan,
+	harness []operatingHarnessDevice,
+	allow bool,
+) (simmodel.Plan, error) {
+	if !allow || kind != simmodel.AnalysisTransient {
+		return plan, nil
+	}
+	currentControlledObservations := map[string]bool{}
+	for _, behavior := range requirement.Requirements.BehavioralRequirements {
+		if behavior.Metric == "dc_current" {
+			currentControlledObservations[behavior.Observation.Kind+"\x00"+behavior.Observation.ID] = true
+		}
+	}
+	needsEdge := false
+	for _, behavior := range requirement.Requirements.BehavioralRequirements {
+		if behavior.Analysis != kind {
+			continue
+		}
+		switch behavior.Metric {
+		case "rise_time", "fall_time", "settling_time", "response_time":
+			if !currentControlledObservations[behavior.Observation.Kind+"\x00"+behavior.Observation.ID] {
+				needsEdge = true
+			}
+		}
+	}
+	if !needsEdge {
+		return plan, nil
+	}
+	var candidates []operatingHarnessDevice
+	for _, entry := range harness {
+		if !entry.Source || entry.Device.CatalogID != "source.current.connector.1x02" ||
+			!entry.HasInitialValue || !entry.HasDefaultValue ||
+			!finiteArchitectureValue(entry.InitialValue) || !finiteArchitectureValue(entry.DefaultValue) ||
+			entry.InitialValue == entry.DefaultValue {
+			continue
+		}
+		candidates = append(candidates, entry)
+	}
+	if len(candidates) == 0 {
+		return plan, nil
+	}
+	if len(candidates) != 1 {
+		return simmodel.Plan{}, fmt.Errorf("behavioral load-current edge requires exactly one bounded current-load harness")
+	}
+	clone := simmodel.ClonePlan(plan)
+	source := candidates[0]
+	configured := false
+	for analysisIndex := range clone.Analyses {
+		analysis := &clone.Analyses[analysisIndex]
+		if analysis.Kind != kind || analysis.TimeStepS <= 0 || analysis.DurationS <= analysis.TimeStepS {
+			continue
+		}
+		for excitationIndex := range analysis.Excitations {
+			excitation := &analysis.Excitations[excitationIndex]
+			if excitation.Component != source.Device.InstanceID {
+				continue
+			}
+			excitation.DCValue = 0
+			excitation.PulseInitialValue = source.InitialValue
+			excitation.PulseValue = source.DefaultValue
+			excitation.PulseDelayS = analysis.TimeStepS
+			excitation.PulseWidthS = analysis.DurationS
+			excitation.PulsePeriodS = 2 * analysis.DurationS
+			configured = true
+		}
+	}
+	if !configured {
+		return simmodel.Plan{}, fmt.Errorf("behavioral load-current edge has no resolved current-source excitation")
+	}
+	return clone, nil
 }
 
 func planScopedToAnalysis(plan simmodel.Plan, kind string) simmodel.Plan {
@@ -1426,6 +1819,16 @@ func modelBoundedACSweep(plan simmodel.Plan, analysis simmodel.Analysis) simmode
 			}
 			minimumPole = math.Min(minimumPole, transition/beta)
 			maximumBandwidth = math.Max(maximumBandwidth, transition)
+		case simmodel.PrimitiveSynchronousBuckRegulatorV1:
+			controlPole, poleOK := simulationModelParameter(device.ModelParameters, "control_pole_hz")
+			switchingFrequency, switchingOK := simulationModelParameter(device.ModelParameters, "switching_frequency_hz")
+			if poleOK && controlPole > 0 {
+				minimumPole = math.Min(minimumPole, controlPole)
+				maximumBandwidth = math.Max(maximumBandwidth, controlPole)
+			}
+			if switchingOK && switchingFrequency > 0 {
+				maximumBandwidth = math.Max(maximumBandwidth, switchingFrequency)
+			}
 		}
 	}
 	if finiteArchitectureValue(minimumPole) && minimumPole > 0 {
@@ -1469,7 +1872,7 @@ func simulationModelParameter(parameters []simmodel.NamedValue, name string) (fl
 func derivedGraphWorkflowIntent(requirement architecturesearch.Requirement, base simmodel.Plan, kind, primaryInputNode string, inputSourceFallback ...string) (simmodel.Intent, error) {
 	modelID := base.ModelID
 	switch kind {
-	case simmodel.AnalysisTransient, simmodel.AnalysisStartup, simmodel.AnalysisDistortion:
+	case simmodel.AnalysisTransient, simmodel.AnalysisElectrothermal, simmodel.AnalysisStartup, simmodel.AnalysisDistortion:
 		modelID = simmodel.ModelTransientCircuitV1
 	case simmodel.AnalysisNoise, simmodel.AnalysisStability, simmodel.AnalysisACSweep:
 		modelID = simmodel.ModelLinearCircuitMNAV1
@@ -1524,8 +1927,11 @@ func derivedGraphWorkflowIntent(requirement architecturesearch.Requirement, base
 			analysis.Excitations = append(analysis.Excitations, simmodel.SourceExcitation{Component: component, ACMagnitude: 1})
 		}
 	}
-	if kind == simmodel.AnalysisTransient || kind == simmodel.AnalysisStartup {
+	if kind == simmodel.AnalysisTransient || kind == simmodel.AnalysisElectrothermal || kind == simmodel.AnalysisStartup {
 		analysis.DurationS, analysis.TimeStepS = behavioralDynamicGrid(requirement, base, kind)
+		if kind == simmodel.AnalysisElectrothermal {
+			analysis.Conditions = []simmodel.NamedValue{{Name: "ambient_temperature_c", Value: 25}}
+		}
 		if kind == simmodel.AnalysisTransient {
 			for _, behavior := range requirement.Requirements.BehavioralRequirements {
 				if behavior.Analysis != simmodel.AnalysisTransient || (behavior.Metric != "output_swing" && behavior.Metric != "output_power") {
@@ -1550,7 +1956,7 @@ func derivedGraphWorkflowIntent(requirement architecturesearch.Requirement, base
 			}
 		}
 		analysis.DurationS, analysis.TimeStepS = boundedBehavioralDynamicGrid(analysis.DurationS, analysis.TimeStepS, behavioralDynamicMaxSteps)
-		if kind == simmodel.AnalysisTransient {
+		if kind == simmodel.AnalysisTransient && !requirementHasElectricalTransientEvent(requirement) {
 			if err := configureAutonomousTransientSupplyStep(requirement, base, &analysis); err != nil {
 				return simmodel.Intent{}, err
 			}
@@ -1588,7 +1994,7 @@ func derivedGraphWorkflowIntent(requirement architecturesearch.Requirement, base
 	case simmodel.AnalysisDistortion:
 		assertion.Quantity = simmodel.QuantityTHDPercent
 		assertion.Min = 0
-	case simmodel.AnalysisThermal:
+	case simmodel.AnalysisThermal, simmodel.AnalysisElectrothermal:
 		assertion.Node = ""
 		assertion.Quantity = simmodel.QuantityJunctionTemperatureC
 		for _, device := range base.Devices {
@@ -1723,7 +2129,7 @@ func derivedBehavioralDistortionAnalysis(requirement architecturesearch.Requirem
 	}
 	amplitude, ok := behavioralInputAmplitudeForGain(requirement, positiveBehavioralNominal, voltageGuard)
 	if !ok {
-		return simmodel.Analysis{}, fmt.Errorf("distortion analysis requires a bounded output-swing or output-power requirement and voltage-gain requirement")
+		return simmodel.Analysis{}, fmt.Errorf("distortion analysis requires a bounded output-swing or output-power requirement")
 	}
 	frequency := behavioralDistortionFrequency(requirement)
 	analysis.StartFrequencyHz, analysis.StopFrequencyHz, analysis.Points = 0, 0, 0
@@ -1779,11 +2185,19 @@ func behavioralInputAmplitudeForGain(requirement architecturesearch.Requirement,
 			}
 		}
 	}
+	if gain == 0 && (outputPeak > 0 || outputPower > 0) {
+		// When the public behavior leaves input amplitude and voltage gain
+		// unconstrained, excite the candidate at the requested output amplitude.
+		// This is a deterministic unity nominal convention, not proof of unity:
+		// the resolved transient/distortion assertions still measure the actual
+		// candidate response and reject a topology that misses the requirement.
+		gain = 1
+	}
 	if gain <= 0 || !finiteArchitectureValue(gain) {
 		return 0, false
 	}
 	if outputPeak <= 0 && outputPower > 0 {
-		loadResistance := math.Inf(1)
+		loadResistance := 0.0
 		for _, operatingCase := range requirement.Requirements.OperatingCases {
 			for _, condition := range operatingCase.Conditions {
 				if condition.Axis != "load_resistance" {
@@ -1791,7 +2205,7 @@ func behavioralInputAmplitudeForGain(requirement architecturesearch.Requirement,
 				}
 				for _, candidate := range []*float64{condition.Min, condition.Max} {
 					if candidate != nil && *candidate > 0 {
-						loadResistance = math.Min(loadResistance, *candidate)
+						loadResistance = math.Max(loadResistance, *candidate)
 					}
 				}
 			}
@@ -1954,6 +2368,22 @@ func deviceHasThermalPath(device simmodel.ResolvedDevice) bool {
 		switch parameter.Name {
 		case "thermal_resistance_c_per_w", "junction_to_ambient_c_per_w", "junction_to_case_c_per_w":
 			return true
+		}
+	}
+	return false
+}
+
+func requirementHasElectricalTransientEvent(requirement architecturesearch.Requirement) bool {
+	for _, operatingCase := range requirement.Requirements.OperatingCases {
+		for _, event := range operatingCase.Events {
+			switch event.Unit {
+			case "V", "A", "Ohm":
+				return true
+			case "ratio":
+				if event.Kind == "startup" || event.Kind == "shutdown" {
+					return true
+				}
+			}
 		}
 	}
 	return false
@@ -2167,13 +2597,13 @@ func validArchitectureVariableBinding(binding ArchitectureVariableBinding) bool 
 	}
 	switch binding.Kind {
 	case ArchitectureVariableFunctionParameter:
-		return binding.Function != "" && binding.Parameter != "" && binding.Component == "" && len(binding.VariantChoices) == 0
+		return binding.Function != "" && binding.Parameter != "" && binding.Component == "" && len(binding.Components) == 0 && len(binding.VariantChoices) == 0
 	case ArchitectureVariableComponentValue:
-		return binding.Component != "" && binding.Function == "" && binding.Parameter == "" && len(binding.VariantChoices) == 0
+		return architectureVariableHasComponentTargets(binding) && binding.Function == "" && binding.Parameter == "" && len(binding.VariantChoices) == 0
 	case ArchitectureVariableModelParameter:
-		return binding.Component != "" && binding.Function == "" && binding.Parameter != "" && len(binding.VariantChoices) == 0
+		return architectureVariableHasComponentTargets(binding) && binding.Function == "" && binding.Parameter != "" && len(binding.VariantChoices) == 0
 	case ArchitectureVariableCatalogVariant:
-		if binding.Component == "" || binding.Function != "" || binding.Parameter != "" || binding.Unit != "" || len(binding.VariantChoices) < 2 {
+		if binding.Component == "" || len(binding.Components) != 0 || binding.Function != "" || binding.Parameter != "" || binding.Unit != "" || len(binding.VariantChoices) < 2 {
 			return false
 		}
 		previous := math.Inf(-1)
@@ -2187,6 +2617,11 @@ func validArchitectureVariableBinding(binding ArchitectureVariableBinding) bool 
 	default:
 		return false
 	}
+}
+
+func architectureVariableHasComponentTargets(binding ArchitectureVariableBinding) bool {
+	return (binding.Component != "" && len(binding.Components) == 0) ||
+		(binding.Component == "" && len(binding.Components) > 1)
 }
 
 func applyArchitectureFunctionVariables(document *circuitgraph.Document, state closedloopsynthesis.CandidateState, bindings map[string]ArchitectureVariableBinding) error {
@@ -2221,10 +2656,14 @@ func applyArchitectureComponentVariables(document *circuitgraph.Document, state 
 		if binding.Kind == ArchitectureVariableFunctionParameter {
 			continue
 		}
-		found := false
+		targets := append([]string(nil), binding.Components...)
+		if binding.Component != "" {
+			targets = append(targets, binding.Component)
+		}
+		found := map[string]bool{}
 		for componentIndex := range document.Components {
 			component := &document.Components[componentIndex]
-			if component.ID != binding.Component {
+			if !slices.Contains(targets, component.ID) {
 				continue
 			}
 			switch binding.Kind {
@@ -2242,11 +2681,10 @@ func applyArchitectureComponentVariables(document *circuitgraph.Document, state 
 			default:
 				return fmt.Errorf("unsupported architecture variable binding kind")
 			}
-			found = true
-			break
+			found[component.ID] = true
 		}
-		if !found {
-			return fmt.Errorf("component repair target %s is absent", binding.Component)
+		if len(found) != len(targets) {
+			return fmt.Errorf("one or more component repair targets are absent")
 		}
 	}
 	return nil

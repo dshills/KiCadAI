@@ -3,6 +3,7 @@ package architecturesearch
 import (
 	"encoding/json"
 	"math"
+	"strings"
 )
 
 type railSequenceDelay struct {
@@ -21,6 +22,31 @@ func validatePowerSequenceConstraint(requirement Requirement, selections []Fragm
 		return GlobalCheck{}, &candidateValidation{Code: CodePowerSequenceUnproven, Path: path, Message: message}
 	}
 	switch constraint.Name {
+	case "startup_order", "shutdown_order":
+		beforeAnchor, afterAnchor, ok := orderedRailAnchors(requirement, constraint)
+		if constraint.Relation != "required" || !ok {
+			return reject("rail order requires a canonical '<rail>_before_<rail>' pair")
+		}
+		proof, proofOK := supervisedRailSequenceProof(selections)
+		if !proofOK {
+			return reject("selected rail sequencer lacks topology-bound startup and shutdown evidence")
+		}
+		expectedBefore, expectedAfter := proof.railAAnchor, proof.railBAnchor
+		orderOutput := "startup_order_role_a_before_role_b"
+		delay := proof.startupDelayS
+		if constraint.Name == "shutdown_order" {
+			expectedBefore, expectedAfter = proof.railBAnchor, proof.railAAnchor
+			orderOutput = "shutdown_order_role_b_before_role_a"
+			delay = proof.shutdownDelayS
+		}
+		if beforeAnchor != expectedBefore || afterAnchor != expectedAfter || proof.outputs[orderOutput] < 1 || !finitePositive(delay) {
+			return reject("selected rail-sequencer direction does not prove the requested rail order")
+		}
+		return GlobalCheck{
+			Code: CodePowerSequenceUnproven, Path: path,
+			Message:  "selected topology and bounded timing evidence prove the requested rail order",
+			Required: float64Pointer(0), Observed: float64Pointer(delay), Margin: float64Pointer(delay),
+		}, nil
 	case "rail_sequence_before":
 		var signals []string
 		if (constraint.Relation != "required" && constraint.Relation != "before") || json.Unmarshal(constraint.Value, &signals) != nil || len(signals) != 2 {
@@ -73,6 +99,107 @@ func validatePowerSequenceConstraint(requirement Requirement, selections []Fragm
 	default:
 		return reject("unsupported power-sequence constraint")
 	}
+}
+
+type railSequenceProof struct {
+	railAAnchor    string
+	railBAnchor    string
+	startupDelayS  float64
+	shutdownDelayS float64
+	outputs        map[string]float64
+}
+
+func orderedRailAnchors(requirement Requirement, constraint Constraint) (string, string, bool) {
+	var order string
+	if json.Unmarshal(constraint.Value, &order) != nil {
+		return "", "", false
+	}
+	parts := strings.Split(order, "_before_")
+	if len(parts) != 2 || canonicalIdentifier(parts[0]) == "" || canonicalIdentifier(parts[1]) == "" {
+		return "", "", false
+	}
+	before, beforeOK := railOrderAnchor(requirement, parts[0])
+	after, afterOK := railOrderAnchor(requirement, parts[1])
+	return before, after, beforeOK && afterOK && before != after
+}
+
+func railOrderAnchor(requirement Requirement, token string) (string, bool) {
+	token = canonicalIdentifier(token)
+	for _, signal := range requirement.Requirements.Signals {
+		if canonicalIdentifier(signal.ID) == token {
+			return signalAnchor(signal.ID), true
+		}
+	}
+	for _, domain := range requirement.Requirements.Domains {
+		if canonicalIdentifier(domain.ID) != token {
+			continue
+		}
+		for _, signal := range requirement.Requirements.Signals {
+			if canonicalIdentifier(signal.ID) == canonicalIdentifier(domain.Source) {
+				return signalAnchor(signal.ID), true
+			}
+		}
+		return domainAnchor(domain.ID), true
+	}
+	for _, port := range requirement.Requirements.Ports {
+		if canonicalIdentifier(port.ID) == token {
+			return externalAnchor(port.ID), true
+		}
+	}
+	return "", false
+}
+
+func supervisedRailSequenceProof(selections []FragmentSelection) (railSequenceProof, bool) {
+	for _, selection := range selections {
+		if canonicalIdentifier(selection.Capability) != "rail_sequencing" {
+			continue
+		}
+		realization, err := DecodeFragmentRealization(selection.Payload)
+		if err != nil || canonicalIdentifier(realization.Capability) != "rail_sequencing" {
+			continue
+		}
+		roles := map[string]RealizationPortBinding{}
+		for _, binding := range realization.PortBindings {
+			roles[canonicalIdentifier(binding.Role)] = binding
+		}
+		if roles["rail_a"].Instance == "" || roles["rail_b"].Instance == "" ||
+			roles["enable"].Instance == "" || roles["state"].Instance == "" ||
+			roles["reference"].Instance == "" ||
+			(roles["rail_a"].Instance == roles["rail_b"].Instance && roles["rail_a"].Function == roles["rail_b"].Function) {
+			continue
+		}
+		anchors := map[string]string{}
+		for _, port := range selection.Ports {
+			anchors[canonicalIdentifier(port.Role)] = port.Anchor
+		}
+		if anchors["rail_a"] == "" || anchors["rail_b"] == "" || anchors["rail_a"] == anchors["rail_b"] {
+			continue
+		}
+		outputs := map[string]float64{}
+		for _, calculation := range selection.Calculations {
+			if calculation.FormulaID != FormulaRCSequenceDelay || !calculation.Pass {
+				continue
+			}
+			for _, output := range calculation.NominalOutputs {
+				if finiteNumbers(output.Value) {
+					outputs[output.Name] = output.Value
+				}
+			}
+		}
+		startupDelayS := outputs["startup_sequence_delay"]
+		shutdownDelayS := outputs["shutdown_sequence_delay"]
+		if outputs["startup_order_role_a_before_role_b"] < 1 ||
+			outputs["shutdown_order_role_b_before_role_a"] < 1 ||
+			!finitePositive(startupDelayS) || !finitePositive(shutdownDelayS) {
+			continue
+		}
+		return railSequenceProof{
+			railAAnchor: anchors["rail_a"], railBAnchor: anchors["rail_b"],
+			startupDelayS: startupDelayS, shutdownDelayS: shutdownDelayS,
+			outputs: outputs,
+		}, true
+	}
+	return railSequenceProof{}, false
 }
 
 func railStartupTime(requirement Requirement, selections []FragmentSelection, signal string) (float64, bool) {

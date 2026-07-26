@@ -142,6 +142,161 @@
       "verification": {"confidence": "verified", "sources": ["https://www.ti.com/lit/ds/symlink/opa134.pdf", "kicad-symbols:Amplifier_Operational:OPA134", "kicad-footprints:Package_SO:SOIC-8_3.9x4.9mm_P1.27mm"], "resolver_checked": true, "pinmap_checked": true, "notes": ["TI SBOS058B marks pins 1, 5, and 8 NC. KiCad's legacy OPA134 symbol retains offset-trim names on pins 1 and 8, so those functions map to pads 1 and 8 and remain explicitly unconnected; hidden NC maps to pad 5."], "tests": ["catalog_audio_power_opamp_evidence"]}
     },
     {
+      "id": "opamp.ti.opa992idbvr.sot23_5",
+      "family": "opamp",
+      "name": "TI OPA992IDBVR 40 V rail-to-rail operational amplifier",
+      "description": "Active single-channel 40 V rail-to-rail input/output op-amp with reviewed output swing, bandwidth, thermal, and SOT-23-5 pin-map evidence.",
+      "generic": false,
+      "manufacturer": "Texas Instruments",
+      "mpn": "OPA992IDBVR",
+      "lifecycle": "active",
+      "tags": ["analog", "audio", "dual_supply", "gain_stage", "high_voltage", "opamp", "rail_to_rail", "single", "sot23_5"],
+      "ratings": [{"kind": "supply_voltage", "min": "2.7", "max": "40", "unit": "V"}, {"kind": "supply_current", "max": "2.98", "unit": "mA"}, {"kind": "output_current", "max": "0.065", "unit": "A"}],
+      "values": [{"kind": "input_offset_voltage", "max": "0.0012", "unit": "V"}],
+      "temperature": {"min": "-40", "max": "125", "unit": "C"},
+      "companions": [{"id": "opamp.decoupling_capacitor", "family": "capacitor", "role": "decoupling_capacitor", "required": true, "recipes": [{"id": "supply_bypass", "family": "capacitor", "role": "decoupling_capacitor", "package": "0603", "value_kind": "capacitance", "value": "100n", "min_voltage_v": 50, "minimum_confidence": "rule_inferred", "required_functions": ["A", "B"], "connections": [{"function": "A", "parent_function": "V_PLUS"}, {"function": "B", "parent_function": "V_MINUS"}]}], "description": "Place a low-inductance bypass capacitor directly across the OPA992 supply pins."}],
+      "simulation_models": [{
+        "model_id": "mna_opamp_single_pole_v1",
+        "parameters": [
+          {"name": "dc_open_loop_gain", "value": 12589254.117942},
+          {"name": "gain_bandwidth_hz", "value": 10600000},
+          {"name": "input_voltage_noise_density_v_sqrt_hz", "value": 7e-9},
+          {"name": "junction_to_ambient_c_per_w", "value": 185.4},
+          {"name": "max_temperature_c", "value": 150},
+          {"name": "output_high_margin_v", "value": 0.3},
+          {"name": "output_low_margin_v", "value": 0.3},
+          {"name": "quiescent_current_a", "value": 0.00298},
+          {"name": "supply_max_v", "value": 40},
+          {"name": "supply_min_v", "value": 2.7}
+        ],
+        "uncertainties": [{"target": "model_parameters.dc_open_loop_gain", "source": "ti:opa992:sbosa10f:open_loop_gain_40v_envelope", "nominal": 12589254.117942, "minimum": 1000000, "maximum": 12589254.117942}]
+      }],
+      "opamp_evidence": {
+        "intended_roles": ["input_buffer", "gain_stage", "small_signal_driver", "voltage_follower"],
+        "supply_mode": "dual_supply",
+        "output_drive_status": "proven",
+        "load_compatibility_status": "proven",
+        "gain_bandwidth_status": "proven",
+        "stability_status": "proven",
+        "input_common_mode_status": "proven",
+        "output_swing_status": "proven",
+        "noise_status": "proven",
+        "distortion_status": "proven",
+        "supply_voltage": {"minimum": 2.7, "maximum": 40, "unit": "V", "conditions": "TI SBOSA10F recommended total supply-voltage range"},
+        "input_common_mode": {"negative_rail_headroom_v": 0, "positive_rail_headroom_v": 0, "conditions": "Specified rail-to-rail common-mode voltage range"},
+        "output_swing": {"negative_rail_headroom_v": 0.3, "positive_rail_headroom_v": 0.3, "conditions": "Maximum specified positive and negative rail headroom at 40 V total supply and 2 kohm load"},
+        "output_current": {"value": 0.065, "unit": "A", "temperature_c": 25, "conditions": "Typical short-circuit output-current magnitude; normal operation remains circuit-validated"},
+        "gain_bandwidth": {"value": 10600000, "unit": "Hz", "conditions": "Typical gain-bandwidth product"},
+        "slew_rate": {"value": 32000000, "unit": "V/s", "conditions": "Typical large-signal slew rate at 40 V total supply"},
+        "voltage_noise_density": {"value": 7e-9, "unit": "V/sqrt(Hz)", "frequency_hz": 1000, "temperature_c": 25, "conditions": "Typical input voltage-noise density"},
+        "max_junction_temperature_c": 150,
+        "junction_to_ambient_c_per_w": 185.4,
+        "fabrication_proof": true,
+        "fabrication_candidate_blocks": false,
+        "review_note": "TI SBOSA10F tables 4-1 and 5-1 through 5-7 provide the reviewed DBV pin map, operating limits, thermal resistance, output swing, bandwidth, slew, noise, and current evidence."
+      },
+      "placement_hints": [{"kind": "near", "target": "decoupling_capacitor", "value": "3", "unit": "mm", "description": "Keep the rail bypass loop short."}],
+      "symbols": [{"symbol_id": "Amplifier_Operational:LMV321", "function_pins": [{"function": "OUT", "symbol_pin": "1", "electrical": "output", "required": true}, {"function": "V_MINUS", "symbol_pin": "2", "electrical": "power_in", "required": true}, {"function": "IN_PLUS", "symbol_pin": "3", "electrical": "input", "required": true}, {"function": "IN_MINUS", "symbol_pin": "4", "electrical": "input", "required": true}, {"function": "V_PLUS", "symbol_pin": "5", "electrical": "power_in", "required": true}], "verification": {"confidence": "verified", "sources": ["https://www.ti.com/lit/ds/symlink/opa992.pdf", "datasheet-pinmap:ti:OPA992-DBV", "pin-compatible-kicad-symbol:Amplifier_Operational:LMV321:OPA992-DBV"], "pinmap_checked": true}}],
+      "packages": [{"id": "sot23_5", "name": "SOT-23-5 DBV", "footprint_id": "Package_TO_SOT_SMD:SOT-23-5", "package_type": "sot23_5", "mpn": "OPA992IDBVR", "lifecycle": "active", "pinmap_id": "Amplifier_Operational:LMV321|Package_TO_SOT_SMD:SOT-23-5", "pad_functions": [{"function": "OUT", "pad": "1"}, {"function": "V_MINUS", "pad": "2"}, {"function": "IN_PLUS", "pad": "3"}, {"function": "IN_MINUS", "pad": "4"}, {"function": "V_PLUS", "pad": "5"}], "dimensions_mm": {"width": 2.9, "height": 1.6}, "height_mm": 1.45, "verification": {"confidence": "verified", "sources": ["https://www.ti.com/lit/ds/symlink/opa992.pdf", "kicad-footprint:Package_TO_SOT_SMD:SOT-23-5"], "pinmap_checked": true}}],
+      "verification": {"confidence": "verified", "sources": ["https://www.ti.com/lit/ds/symlink/opa992.pdf", "kicad-symbols:Amplifier_Operational:LMV321", "kicad-footprints:Package_TO_SOT_SMD:SOT-23-5"], "resolver_checked": true, "pinmap_checked": true, "notes": ["TI SBOSA10F Figure 4-1 maps DBV pins 1 OUT, 2 V-, 3 IN+, 4 IN-, and 5 V+; the installed KiCad LMV321 symbol and SOT-23-5 footprint use the same functions."], "tests": ["catalog_audio_power_high_voltage_rail_to_rail_opamp_evidence"]}
+    },
+    {
+      "id": "opamp.ti.opa551pa.dip8",
+      "family": "opamp",
+      "name": "TI OPA551PA high-voltage power operational amplifier",
+      "description": "Active unity-gain-stable 60 V operational amplifier with reviewed high-current, thermal, noise, distortion, and PDIP-8 pin-map evidence.",
+      "generic": false,
+      "manufacturer": "Texas Instruments",
+      "mpn": "OPA551PA",
+      "lifecycle": "active",
+      "tags": ["audio", "dual_supply", "gain_stage", "high_voltage", "opamp", "power_opamp", "single", "through_hole"],
+      "ratings": [{"kind": "supply_voltage", "min": "8", "max": "60", "unit": "V"}, {"kind": "supply_current", "max": "10", "unit": "mA"}, {"kind": "output_current", "max": "0.2", "unit": "A"}],
+      "values": [{"kind": "input_offset_voltage", "max": "0.005", "unit": "V"}],
+      "temperature": {"min": "-40", "max": "125", "unit": "C"},
+      "companions": [
+        {"id": "opamp.decoupling_capacitor", "family": "capacitor", "role": "decoupling_capacitor", "required": true, "description": "Place low-inductance bypass capacitors directly between each supply and the signal-star return."},
+        {"id": "opamp.opa551_unused_pins", "family": "opamp", "role": "unused_pin_policy", "required": true, "no_connects": ["NC_1", "NC_5", "THERMAL_FLAG"], "description": "Leave the two PDIP no-connect pins and unused thermal-shutdown flag explicitly unconnected."}
+      ],
+      "simulation_models": [{
+        "model_id": "mna_opamp_single_pole_v1",
+        "parameters": [
+          {"name": "dc_open_loop_gain", "value": 1995262.314969},
+          {"name": "gain_bandwidth_hz", "value": 3000000},
+          {"name": "input_voltage_noise_density_v_sqrt_hz", "value": 1.4e-8},
+          {"name": "junction_to_ambient_c_per_w", "value": 44.1},
+          {"name": "max_temperature_c", "value": 150},
+          {"name": "output_high_margin_v", "value": 3.5},
+          {"name": "output_low_margin_v", "value": 3.5},
+          {"name": "quiescent_current_a", "value": 0.01},
+          {"name": "supply_max_v", "value": 60},
+          {"name": "supply_min_v", "value": 8}
+        ],
+        "uncertainties": [{"target": "model_parameters.dc_open_loop_gain", "source": "ti:opa551:sbos100b:open_loop_gain_temperature_envelope", "nominal": 1995262.314969, "minimum": 100000, "maximum": 1995262.314969}]
+      }],
+      "opamp_evidence": {
+        "intended_roles": ["gain_stage", "small_signal_driver", "voltage_follower"],
+        "supply_mode": "dual_supply",
+        "output_drive_status": "proven",
+        "load_compatibility_status": "proven",
+        "gain_bandwidth_status": "proven",
+        "stability_status": "proven",
+        "input_common_mode_status": "proven",
+        "output_swing_status": "proven",
+        "noise_status": "proven",
+        "distortion_status": "proven",
+        "supply_voltage": {"minimum": 8, "maximum": 60, "unit": "V", "conditions": "TI SBOS100B recommended total supply-voltage range"},
+        "input_common_mode": {"negative_rail_headroom_v": 2.5, "positive_rail_headroom_v": 2.5, "conditions": "TI SBOS100B specified common-mode range at plus/minus 30 V"},
+        "output_swing": {"negative_rail_headroom_v": 3.5, "positive_rail_headroom_v": 3.5, "conditions": "Worst specified rail headroom at 200 mA over minus 40 to 125 degrees C"},
+        "output_current": {"value": 0.2, "unit": "A", "conditions": "Maximum continuous DC output current, subject to package dissipation and circuit-level SOA validation"},
+        "gain_bandwidth": {"value": 3000000, "unit": "Hz", "conditions": "OPA551 typical gain-bandwidth product"},
+        "slew_rate": {"value": 15000000, "unit": "V/s", "conditions": "OPA551 typical unity-gain slew rate"},
+        "voltage_noise_density": {"value": 1.4e-8, "unit": "V/sqrt(Hz)", "frequency_hz": 1000, "temperature_c": 25, "conditions": "Typical input voltage-noise density"},
+        "max_junction_temperature_c": 150,
+        "junction_to_ambient_c_per_w": 44.1,
+        "fabrication_proof": true,
+        "fabrication_candidate_blocks": false,
+        "review_note": "TI SBOS100B supplies the reviewed electrical, pin, package, thermal, current-limit, and stability evidence. The compact single-pole model is conservative and circuit-level loading, dissipation, transient SOA, and loop stability remain mandatory gates."
+      },
+      "placement_hints": [{"kind": "near", "target": "decoupling_capacitor", "value": "3", "unit": "mm", "description": "Keep both high-voltage rail bypass loops short."}],
+      "symbols": [{
+        "symbol_id": "Amplifier_Operational:OPA551P",
+        "function_pins": [
+          {"function": "NC_1", "symbol_pin": "1"},
+          {"function": "IN_MINUS", "symbol_pin": "2", "electrical": "input", "required": true},
+          {"function": "IN_PLUS", "symbol_pin": "3", "electrical": "input", "required": true},
+          {"function": "V_MINUS", "symbol_pin": "4", "electrical": "power_in", "required": true},
+          {"function": "NC_5", "symbol_pin": "5"},
+          {"function": "OUT", "symbol_pin": "6", "electrical": "output", "required": true},
+          {"function": "V_PLUS", "symbol_pin": "7", "electrical": "power_in", "required": true},
+          {"function": "THERMAL_FLAG", "symbol_pin": "8", "electrical": "output"}
+        ],
+        "verification": {"confidence": "verified", "sources": ["https://www.ti.com/lit/ds/symlink/opa551.pdf", "kicad-symbols:Amplifier_Operational:OPA551P"], "pinmap_checked": true}
+      }],
+      "packages": [{
+        "id": "dip8",
+        "name": "PDIP-8 7.62 mm row spacing",
+        "footprint_id": "Package_DIP:DIP-8_W7.62mm",
+        "package_type": "dip8",
+        "mpn": "OPA551PA",
+        "lifecycle": "active",
+        "pinmap_id": "Amplifier_Operational:OPA551P|Package_DIP:DIP-8_W7.62mm",
+        "pad_functions": [
+          {"function": "NC_1", "pad": "1"},
+          {"function": "IN_MINUS", "pad": "2"},
+          {"function": "IN_PLUS", "pad": "3"},
+          {"function": "V_MINUS", "pad": "4"},
+          {"function": "NC_5", "pad": "5"},
+          {"function": "OUT", "pad": "6"},
+          {"function": "V_PLUS", "pad": "7"},
+          {"function": "THERMAL_FLAG", "pad": "8"}
+        ],
+        "dimensions_mm": {"width": 10.16, "height": 9.14},
+        "height_mm": 4.83,
+        "verification": {"confidence": "verified", "sources": ["https://www.ti.com/lit/ds/symlink/opa551.pdf", "kicad-footprints:Package_DIP:DIP-8_W7.62mm"], "pinmap_checked": true}
+      }],
+      "verification": {"confidence": "verified", "sources": ["https://www.ti.com/lit/ds/symlink/opa551.pdf", "kicad-symbols:Amplifier_Operational:OPA551P", "kicad-footprints:Package_DIP:DIP-8_W7.62mm"], "resolver_checked": true, "pinmap_checked": true, "notes": ["Reviewed against TI SBOS100B pages 3 through 6 and the installed KiCad OPA551P symbol and DIP-8 footprint."], "tests": ["catalog_audio_power_high_voltage_opamp_evidence"]}
+    },
+    {
       "id": "bjt.onsemi.d44h11g.to220",
       "family": "bjt",
       "name": "onsemi D44H11G NPN audio power transistor",
@@ -164,6 +319,67 @@
           {"name": "max_temperature_c", "value": 150},
           {"name": "junction_to_ambient_c_per_w", "value": 62.5},
           {"name": "junction_to_case_c_per_w", "value": 1.8}
+        ],
+        "thermal_model": {
+          "reference": "junction_to_case",
+          "boundary_assumption": "onsemi D44H/D reviewed package junction-to-case resistance; a selected external thermal path must close the case boundary",
+          "stages": [
+            {
+              "thermal_resistance_c_per_w": 1.8,
+              "thermal_capacitance_j_per_c": 0.0555555555555556,
+              "cooling_coupling": "fixed"
+            }
+          ]
+        },
+        "transient_soa": [
+          {
+            "pulse_duration_s": 0.00001,
+            "case_temperature_c": 70,
+            "points": [
+              {"voltage_v": 5, "current_a": 10},
+              {"voltage_v": 10, "current_a": 6},
+              {"voltage_v": 20, "current_a": 2.5},
+              {"voltage_v": 30, "current_a": 1.25},
+              {"voltage_v": 50, "current_a": 0.55},
+              {"voltage_v": 80, "current_a": 0.2}
+            ]
+          },
+          {
+            "pulse_duration_s": 0.0001,
+            "case_temperature_c": 70,
+            "points": [
+              {"voltage_v": 5, "current_a": 8},
+              {"voltage_v": 10, "current_a": 4.5},
+              {"voltage_v": 20, "current_a": 1.8},
+              {"voltage_v": 30, "current_a": 0.85},
+              {"voltage_v": 50, "current_a": 0.35},
+              {"voltage_v": 80, "current_a": 0.13}
+            ]
+          },
+          {
+            "pulse_duration_s": 0.001,
+            "case_temperature_c": 70,
+            "points": [
+              {"voltage_v": 5, "current_a": 6},
+              {"voltage_v": 10, "current_a": 3},
+              {"voltage_v": 20, "current_a": 1.1},
+              {"voltage_v": 30, "current_a": 0.5},
+              {"voltage_v": 50, "current_a": 0.2},
+              {"voltage_v": 80, "current_a": 0.09}
+            ]
+          },
+          {
+            "dc": true,
+            "case_temperature_c": 70,
+            "points": [
+              {"voltage_v": 5, "current_a": 5},
+              {"voltage_v": 10, "current_a": 2},
+              {"voltage_v": 20, "current_a": 0.75},
+              {"voltage_v": 30, "current_a": 0.35},
+              {"voltage_v": 50, "current_a": 0.15},
+              {"voltage_v": 80, "current_a": 0.08}
+            ]
+          }
         ]
       }],
       "tags": ["audio", "bjt", "driver", "linear", "npn", "power_output", "to220"],
@@ -189,6 +405,24 @@
         "power_dissipation": {"value": 70, "unit": "W", "temperature_c": 25, "conditions": "case temperature 25 C"},
         "max_junction_temperature_c": 150, "junction_to_case_c_per_w": 1.8, "junction_to_ambient_c_per_w": 62.5,
         "soa": [
+          {"voltage_v": 5, "current_a": 10, "pulse_duration_s": 0.00001, "case_temperature_c": 70},
+          {"voltage_v": 10, "current_a": 6, "pulse_duration_s": 0.00001, "case_temperature_c": 70},
+          {"voltage_v": 20, "current_a": 2.5, "pulse_duration_s": 0.00001, "case_temperature_c": 70},
+          {"voltage_v": 30, "current_a": 1.25, "pulse_duration_s": 0.00001, "case_temperature_c": 70},
+          {"voltage_v": 50, "current_a": 0.55, "pulse_duration_s": 0.00001, "case_temperature_c": 70},
+          {"voltage_v": 80, "current_a": 0.2, "pulse_duration_s": 0.00001, "case_temperature_c": 70},
+          {"voltage_v": 5, "current_a": 8, "pulse_duration_s": 0.0001, "case_temperature_c": 70},
+          {"voltage_v": 10, "current_a": 4.5, "pulse_duration_s": 0.0001, "case_temperature_c": 70},
+          {"voltage_v": 20, "current_a": 1.8, "pulse_duration_s": 0.0001, "case_temperature_c": 70},
+          {"voltage_v": 30, "current_a": 0.85, "pulse_duration_s": 0.0001, "case_temperature_c": 70},
+          {"voltage_v": 50, "current_a": 0.35, "pulse_duration_s": 0.0001, "case_temperature_c": 70},
+          {"voltage_v": 80, "current_a": 0.13, "pulse_duration_s": 0.0001, "case_temperature_c": 70},
+          {"voltage_v": 5, "current_a": 6, "pulse_duration_s": 0.001, "case_temperature_c": 70},
+          {"voltage_v": 10, "current_a": 3, "pulse_duration_s": 0.001, "case_temperature_c": 70},
+          {"voltage_v": 20, "current_a": 1.1, "pulse_duration_s": 0.001, "case_temperature_c": 70},
+          {"voltage_v": 30, "current_a": 0.5, "pulse_duration_s": 0.001, "case_temperature_c": 70},
+          {"voltage_v": 50, "current_a": 0.2, "pulse_duration_s": 0.001, "case_temperature_c": 70},
+          {"voltage_v": 80, "current_a": 0.09, "pulse_duration_s": 0.001, "case_temperature_c": 70},
           {"voltage_v": 5, "current_a": 5, "dc": true, "case_temperature_c": 70},
           {"voltage_v": 10, "current_a": 2, "dc": true, "case_temperature_c": 70},
           {"voltage_v": 20, "current_a": 0.75, "dc": true, "case_temperature_c": 70},
@@ -199,11 +433,11 @@
         "secondary_breakdown_status": "proven", "linear_mode_status": "proven",
         "mounting_assumptions": "Free-air operation uses the manufacturer's 62.5 C/W junction-to-ambient maximum; higher dissipation requires an explicit case-to-ambient assembly.",
         "bjt": {"gain_minimum": 40, "gain_test_current_a": 4, "transition_frequency_hz": 50000000},
-        "fabrication_proof": true, "review_note": "Source: onsemi D44H/D Rev. 14; conservative DC points lie within Figure 9 for D44H/45H10,11 at TC at most 70 C."
+        "fabrication_proof": true, "review_note": "Source: onsemi D44H/D Rev. 14; conservative 10 us, 100 us, 1 ms, and DC boundaries lie within Figure 9 for D44H/45H10,11 at TC at most 70 C."
       },
       "symbols": [{"symbol_id": "Transistor_BJT:Q_NPN_BCE", "function_pins": [{"function": "BASE", "symbol_pin": "1", "required": true}, {"function": "COLLECTOR", "symbol_pin": "2", "required": true}, {"function": "EMITTER", "symbol_pin": "3", "required": true}], "verification": {"confidence": "verified", "sources": ["https://www.onsemi.com/download/data-sheet/pdf/d44h-d.pdf", "kicad-symbols:Transistor_BJT:Q_NPN_BCE"], "pinmap_checked": true}}],
       "packages": [{"id": "to220_3", "name": "TO-220-3", "footprint_id": "Package_TO_SOT_THT:TO-220-3_Vertical", "package_type": "to220", "mpn": "D44H11G", "lifecycle": "active", "pinmap_id": "Transistor_BJT:Q_NPN_BCE|Package_TO_SOT_THT:TO-220-3_Vertical", "pad_functions": [{"function": "BASE", "pad": "1"}, {"function": "COLLECTOR", "pad": "2"}, {"function": "EMITTER", "pad": "3"}], "dimensions_mm": {"width": 10.28, "height": 4.82}, "height_mm": 15.75, "verification": {"confidence": "verified", "sources": ["https://www.onsemi.com/download/data-sheet/pdf/d44h-d.pdf", "kicad-footprint:Package_TO_SOT_THT:TO-220-3_Vertical"], "pinmap_checked": true}}],
-      "derating_rules": [{"kind": "thermal", "description": "Validate the selected ambient or case thermal path at the declared dissipation."}, {"kind": "safe_operating_area", "description": "Interpolate only inside the conservative catalog DC SOA boundary."}],
+      "derating_rules": [{"kind": "thermal", "description": "Validate the selected ambient or case thermal path at the declared dissipation."}, {"kind": "safe_operating_area", "description": "Interpolate only inside the conservative catalog duration-specific or DC SOA boundary."}],
       "placement_hints": [{"kind": "thermal_edge", "target": "board_edge", "description": "Preserve copper area and optional heatsink mounting access."}],
       "verification": {"confidence": "verified", "sources": ["https://www.onsemi.com/download/data-sheet/pdf/d44h-d.pdf", "kicad-symbols:Transistor_BJT:Q_NPN_BCE", "kicad-footprint:Package_TO_SOT_THT:TO-220-3_Vertical"], "resolver_checked": true, "pinmap_checked": true, "tests": ["catalog_audio_power_semiconductor_evidence"]}
     },
@@ -230,6 +464,67 @@
           {"name": "max_temperature_c", "value": 150},
           {"name": "junction_to_ambient_c_per_w", "value": 62.5},
           {"name": "junction_to_case_c_per_w", "value": 1.8}
+        ],
+        "thermal_model": {
+          "reference": "junction_to_case",
+          "boundary_assumption": "onsemi D44H/D reviewed package junction-to-case resistance; a selected external thermal path must close the case boundary",
+          "stages": [
+            {
+              "thermal_resistance_c_per_w": 1.8,
+              "thermal_capacitance_j_per_c": 0.0555555555555556,
+              "cooling_coupling": "fixed"
+            }
+          ]
+        },
+        "transient_soa": [
+          {
+            "pulse_duration_s": 0.00001,
+            "case_temperature_c": 70,
+            "points": [
+              {"voltage_v": 5, "current_a": 10},
+              {"voltage_v": 10, "current_a": 6},
+              {"voltage_v": 20, "current_a": 2.5},
+              {"voltage_v": 30, "current_a": 1.25},
+              {"voltage_v": 50, "current_a": 0.55},
+              {"voltage_v": 80, "current_a": 0.2}
+            ]
+          },
+          {
+            "pulse_duration_s": 0.0001,
+            "case_temperature_c": 70,
+            "points": [
+              {"voltage_v": 5, "current_a": 8},
+              {"voltage_v": 10, "current_a": 4.5},
+              {"voltage_v": 20, "current_a": 1.8},
+              {"voltage_v": 30, "current_a": 0.85},
+              {"voltage_v": 50, "current_a": 0.35},
+              {"voltage_v": 80, "current_a": 0.13}
+            ]
+          },
+          {
+            "pulse_duration_s": 0.001,
+            "case_temperature_c": 70,
+            "points": [
+              {"voltage_v": 5, "current_a": 6},
+              {"voltage_v": 10, "current_a": 3},
+              {"voltage_v": 20, "current_a": 1.1},
+              {"voltage_v": 30, "current_a": 0.5},
+              {"voltage_v": 50, "current_a": 0.2},
+              {"voltage_v": 80, "current_a": 0.09}
+            ]
+          },
+          {
+            "dc": true,
+            "case_temperature_c": 70,
+            "points": [
+              {"voltage_v": 5, "current_a": 5},
+              {"voltage_v": 10, "current_a": 2},
+              {"voltage_v": 20, "current_a": 0.75},
+              {"voltage_v": 30, "current_a": 0.35},
+              {"voltage_v": 50, "current_a": 0.15},
+              {"voltage_v": 80, "current_a": 0.08}
+            ]
+          }
         ]
       }],
       "tags": ["audio", "bjt", "driver", "linear", "pnp", "power_output", "to220"],
@@ -255,6 +550,24 @@
         "power_dissipation": {"value": 70, "unit": "W", "temperature_c": 25, "conditions": "case temperature 25 C"},
         "max_junction_temperature_c": 150, "junction_to_case_c_per_w": 1.8, "junction_to_ambient_c_per_w": 62.5,
         "soa": [
+          {"voltage_v": 5, "current_a": 10, "pulse_duration_s": 0.00001, "case_temperature_c": 70},
+          {"voltage_v": 10, "current_a": 6, "pulse_duration_s": 0.00001, "case_temperature_c": 70},
+          {"voltage_v": 20, "current_a": 2.5, "pulse_duration_s": 0.00001, "case_temperature_c": 70},
+          {"voltage_v": 30, "current_a": 1.25, "pulse_duration_s": 0.00001, "case_temperature_c": 70},
+          {"voltage_v": 50, "current_a": 0.55, "pulse_duration_s": 0.00001, "case_temperature_c": 70},
+          {"voltage_v": 80, "current_a": 0.2, "pulse_duration_s": 0.00001, "case_temperature_c": 70},
+          {"voltage_v": 5, "current_a": 8, "pulse_duration_s": 0.0001, "case_temperature_c": 70},
+          {"voltage_v": 10, "current_a": 4.5, "pulse_duration_s": 0.0001, "case_temperature_c": 70},
+          {"voltage_v": 20, "current_a": 1.8, "pulse_duration_s": 0.0001, "case_temperature_c": 70},
+          {"voltage_v": 30, "current_a": 0.85, "pulse_duration_s": 0.0001, "case_temperature_c": 70},
+          {"voltage_v": 50, "current_a": 0.35, "pulse_duration_s": 0.0001, "case_temperature_c": 70},
+          {"voltage_v": 80, "current_a": 0.13, "pulse_duration_s": 0.0001, "case_temperature_c": 70},
+          {"voltage_v": 5, "current_a": 6, "pulse_duration_s": 0.001, "case_temperature_c": 70},
+          {"voltage_v": 10, "current_a": 3, "pulse_duration_s": 0.001, "case_temperature_c": 70},
+          {"voltage_v": 20, "current_a": 1.1, "pulse_duration_s": 0.001, "case_temperature_c": 70},
+          {"voltage_v": 30, "current_a": 0.5, "pulse_duration_s": 0.001, "case_temperature_c": 70},
+          {"voltage_v": 50, "current_a": 0.2, "pulse_duration_s": 0.001, "case_temperature_c": 70},
+          {"voltage_v": 80, "current_a": 0.09, "pulse_duration_s": 0.001, "case_temperature_c": 70},
           {"voltage_v": 5, "current_a": 5, "dc": true, "case_temperature_c": 70},
           {"voltage_v": 10, "current_a": 2, "dc": true, "case_temperature_c": 70},
           {"voltage_v": 20, "current_a": 0.75, "dc": true, "case_temperature_c": 70},
@@ -265,11 +578,11 @@
         "secondary_breakdown_status": "proven", "linear_mode_status": "proven",
         "mounting_assumptions": "Free-air operation uses the manufacturer's 62.5 C/W junction-to-ambient maximum; higher dissipation requires an explicit case-to-ambient assembly.",
         "bjt": {"gain_minimum": 40, "gain_test_current_a": 4, "transition_frequency_hz": 40000000},
-        "fabrication_proof": true, "review_note": "Source: onsemi D44H/D Rev. 14; conservative DC points lie within Figure 9 for D44H/45H10,11 at TC at most 70 C."
+        "fabrication_proof": true, "review_note": "Source: onsemi D44H/D Rev. 14; conservative 10 us, 100 us, 1 ms, and DC boundaries lie within Figure 9 for D44H/45H10,11 at TC at most 70 C."
       },
       "symbols": [{"symbol_id": "Transistor_BJT:Q_PNP_BCE", "function_pins": [{"function": "BASE", "symbol_pin": "1", "required": true}, {"function": "COLLECTOR", "symbol_pin": "2", "required": true}, {"function": "EMITTER", "symbol_pin": "3", "required": true}], "verification": {"confidence": "verified", "sources": ["https://www.onsemi.com/download/data-sheet/pdf/d44h-d.pdf", "kicad-symbols:Transistor_BJT:Q_PNP_BCE"], "pinmap_checked": true}}],
       "packages": [{"id": "to220_3", "name": "TO-220-3", "footprint_id": "Package_TO_SOT_THT:TO-220-3_Vertical", "package_type": "to220", "mpn": "D45H11G", "lifecycle": "active", "pinmap_id": "Transistor_BJT:Q_PNP_BCE|Package_TO_SOT_THT:TO-220-3_Vertical", "pad_functions": [{"function": "BASE", "pad": "1"}, {"function": "COLLECTOR", "pad": "2"}, {"function": "EMITTER", "pad": "3"}], "dimensions_mm": {"width": 10.28, "height": 4.82}, "height_mm": 15.75, "verification": {"confidence": "verified", "sources": ["https://www.onsemi.com/download/data-sheet/pdf/d44h-d.pdf", "kicad-footprint:Package_TO_SOT_THT:TO-220-3_Vertical"], "pinmap_checked": true}}],
-      "derating_rules": [{"kind": "thermal", "description": "Validate the selected ambient or case thermal path at the declared dissipation."}, {"kind": "safe_operating_area", "description": "Interpolate only inside the conservative catalog DC SOA boundary."}],
+      "derating_rules": [{"kind": "thermal", "description": "Validate the selected ambient or case thermal path at the declared dissipation."}, {"kind": "safe_operating_area", "description": "Interpolate only inside the conservative catalog duration-specific or DC SOA boundary."}],
       "placement_hints": [{"kind": "thermal_edge", "target": "board_edge", "description": "Preserve copper area and optional heatsink mounting access."}],
       "verification": {"confidence": "verified", "sources": ["https://www.onsemi.com/download/data-sheet/pdf/d44h-d.pdf", "kicad-symbols:Transistor_BJT:Q_PNP_BCE", "kicad-footprint:Package_TO_SOT_THT:TO-220-3_Vertical"], "resolver_checked": true, "pinmap_checked": true, "tests": ["catalog_audio_power_semiconductor_evidence"]}
     },
@@ -405,6 +718,7 @@
       "tolerances": [{"kind": "resistance", "max": "5", "unit": "%"}],
       "temperature": {"min": "-55", "max": "250", "unit": "C"},
       "derating_rules": [{"kind": "thermal", "description": "Use at most 3 W at 40 C and 2.5 W at 70 C, then apply the AC-series linear derating curve."}],
+      "simulation_models": [{"model_id": "mna_resistor_v1"}],
       "resistor_evidence": {
         "technology": "flameproof cement-coated wirewound",
         "nominal_resistance": {"value": 0.22, "unit": "ohm", "conditions": "AC03 ordered value at 20 C"},
@@ -468,6 +782,7 @@
       "tolerances": [{"kind": "resistance", "max": "5", "unit": "%"}],
       "temperature": {"min": "-55", "max": "250", "unit": "C"},
       "derating_rules": [{"kind": "thermal", "description": "Use at most 3 W at 40 C and 2.5 W at 70 C, then apply the AC-series linear derating curve."}],
+      "simulation_models": [{"model_id": "mna_resistor_v1"}],
       "resistor_evidence": {
         "technology": "flameproof cement-coated wirewound",
         "nominal_resistance": {"value": 10, "unit": "ohm", "conditions": "AC03 ordered value at 20 C"},
@@ -575,7 +890,18 @@
           {"name": "max_collector_emitter_voltage_v", "value": 250},
           {"name": "max_temperature_c", "value": 150},
           {"name": "junction_to_case_c_per_w", "value": 0.83}
-        ]
+        ],
+        "thermal_model": {
+          "reference": "junction_to_case",
+          "boundary_assumption": "onsemi NJW0281/D reviewed package junction-to-case resistance; a selected external thermal path must close the case boundary",
+          "stages": [
+            {
+              "thermal_resistance_c_per_w": 0.83,
+              "thermal_capacitance_j_per_c": 0.12,
+              "cooling_coupling": "fixed"
+            }
+          ]
+        }
       }],
       "tags": ["audio", "bjt", "npn", "power_output", "to3p", "linear"],
       "ratings": [
@@ -686,7 +1012,18 @@
           {"name": "max_collector_emitter_voltage_v", "value": 250},
           {"name": "max_temperature_c", "value": 150},
           {"name": "junction_to_case_c_per_w", "value": 0.83}
-        ]
+        ],
+        "thermal_model": {
+          "reference": "junction_to_case",
+          "boundary_assumption": "onsemi NJW0281/D reviewed package junction-to-case resistance; a selected external thermal path must close the case boundary",
+          "stages": [
+            {
+              "thermal_resistance_c_per_w": 0.83,
+              "thermal_capacitance_j_per_c": 0.12,
+              "cooling_coupling": "fixed"
+            }
+          ]
+        }
       }],
       "tags": ["audio", "bjt", "pnp", "power_output", "to3p", "linear"],
       "ratings": [

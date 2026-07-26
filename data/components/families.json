@@ -14,6 +14,7 @@
     {"id": "fuse", "name": "Fuse", "description": "Resettable and one-time overcurrent protection devices."},
     {"id": "isolated_converter", "name": "Isolated DC/DC Converter", "description": "Galvanically isolated single- and dual-output power converter modules."},
     {"id": "isolator", "name": "Digital Isolator", "description": "Galvanic digital and bus isolation devices with explicit side-specific supplies and references."},
+    {"id": "inductor", "name": "Inductor", "description": "Energy-storage and filtering inductors with reviewed inductance, winding resistance, rated current, and saturation current."},
     {"id": "led", "name": "LED", "description": "Indicator light-emitting diodes."},
     {"id": "level_translator", "name": "Logic Level Translator", "description": "Multi-domain digital level translators and bidirectional bus translators."},
     {"id": "logic_buffer", "name": "Logic Buffer", "description": "Digital logic buffers and Schmitt-trigger endpoint drivers."},

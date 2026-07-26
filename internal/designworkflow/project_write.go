@@ -107,7 +107,8 @@ func WriteProject(ctx context.Context, request *Request, plan *BlockPlanResult, 
 		SuppressPinmapWarnings:          opts.LibraryIndex != nil,
 		SuppressExplicitPinSymbolErrors: opts.LibraryIndex != nil,
 		DefaultNetClassClearance:        kicadfiles.MM(projectNetClassClearanceMM(routed, placed)),
-		MinimumThroughHoleDiameter:      kicadfiles.MM(projectMinimumThroughHoleDiameterMM(placed)),
+		MinimumViaDiameter:              kicadfiles.MM(projectMinimumViaDiameterMM(tx.Operations)),
+		MinimumThroughHoleDiameter:      kicadfiles.MM(projectMinimumThroughHoleDiameterMM(placed, tx.Operations)),
 		// Routing was computed against transaction pads; resolver hydration here
 		// would move anchors after routes have already been generated.
 		PreserveFootprintGeometry: opts.PreserveFootprintGeometry,

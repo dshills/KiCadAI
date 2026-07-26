@@ -320,7 +320,7 @@ func TestApplyCanPreserveTransactionFootprintGeometryWithResolver(t *testing.T) 
 	  {"op":"add_symbol","ref":"J1","library_id":"Connector:Conn_01x02","at":{"x_mm":10,"y_mm":10},"pins":[{"number":"1"},{"number":"2"}]},
 	  {"op":"assign_footprint","ref":"J1","footprint_id":"Connector_Test:TH_1x02"},
 	  {"op":"place_footprint","ref":"J1","footprint_id":"Connector_Test:TH_1x02","at":{"x_mm":20,"y_mm":20},"pads":[
-	    {"name":"1","type":"smd","shape":"rect","x_mm":-1,"y_mm":0,"size_x_mm":1,"size_y_mm":1},
+	    {"name":"1","type":"smd","shape":"rect","x_mm":-1,"y_mm":0,"size_x_mm":1,"size_y_mm":1,"layers":["B.Cu"]},
 	    {"name":"2","type":"smd","shape":"rect","x_mm":1,"y_mm":0,"size_x_mm":1,"size_y_mm":1}
 	  ]},
 	  {"op":"write_project"}
@@ -341,10 +341,24 @@ func TestApplyCanPreserveTransactionFootprintGeometryWithResolver(t *testing.T) 
 			t.Fatalf("transaction footprint geometry was not preserved: %#v", board.Footprints[0].Pads)
 		}
 	}
+	if got := board.Footprints[0].Pads[0].Layers; len(got) != 1 || got[0] != kicadfiles.LayerBCu {
+		t.Fatalf("transaction pad layers were not preserved: %#v", got)
+	}
 	for _, marker := range []string{"(fp_text", "(fp_line", "(fp_curve", "(model"} {
 		if !strings.Contains(board.Footprints[0].Raw, marker) {
 			t.Fatalf("resolver non-pad footprint geometry missing %q:\n%s", marker, board.Footprints[0].Raw)
 		}
+	}
+}
+
+func TestImportedPadLayersCanonicalizeDrilledPadsAndPreserveSMDLayer(t *testing.T) {
+	drilled := importedPadLayers(PadSpec{Type: "thru_hole", Layers: []string{"*.Cu"}}, kicadfiles.LayerFCu)
+	if len(drilled) != 2 || drilled[0] != kicadfiles.LayerAllCu || drilled[1] != kicadfiles.LayerAllMask {
+		t.Fatalf("drilled pad layers = %#v, want through copper and mask", drilled)
+	}
+	backSMD := importedPadLayers(PadSpec{Type: "smd", Layers: []string{"B.Cu"}}, kicadfiles.LayerFCu)
+	if len(backSMD) != 1 || backSMD[0] != kicadfiles.LayerBCu {
+		t.Fatalf("back SMD pad layers = %#v, want explicit B.Cu", backSMD)
 	}
 }
 

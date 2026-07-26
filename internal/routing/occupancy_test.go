@@ -56,6 +56,55 @@ func TestBuildOccupancyBlocksOtherNetPadButNotCurrentNetPad(t *testing.T) {
 	}
 }
 
+func TestBuildOccupancyDoesNotRoundRectClearanceToAdjacentGridCell(t *testing.T) {
+	request := minimalRequest()
+	request.Rules.GridMM = 0.25
+	request.Rules.TraceWidthMM = 0.2
+	request.Rules.ClearanceMM = 0.2
+	request.Components = []Component{{
+		Ref:      "U1",
+		Position: Placement{XMM: 10, YMM: 10, Layer: "F.Cu"},
+		Pads: []Pad{{
+			Ref: "U1", Name: "1", Net: "OTHER", Shape: PadRect, Type: PadSMD,
+			Size: Size{WidthMM: 1, HeightMM: 0.25}, Layers: []string{"F.Cu"},
+		}},
+	}}
+
+	occupancy := mustBuildOccupancy(t, request, "SIG")
+	near := occupancy.Grid.ToGrid(Point{XMM: 10, YMM: 10.25}, 0)
+	if !occupancy.BlockedCell(near) {
+		t.Fatal("grid cell inside physical trace-to-pad clearance should be blocked")
+	}
+	clear := occupancy.Grid.ToGrid(Point{XMM: 10, YMM: 10.5}, 0)
+	if occupancy.BlockedCell(clear) {
+		t.Fatal("grid cell beyond physical trace-to-pad clearance was blocked by rounded bounds")
+	}
+}
+
+func TestBuildViaOccupancyUsesCircularClearanceAtRectCorners(t *testing.T) {
+	request := minimalRequest()
+	request.Rules.GridMM = 0.25
+	request.Rules.ClearanceMM = 0.2
+	request.Rules.ViaDiameterMM = 0.6
+	request.Components = []Component{{
+		Ref:      "U1",
+		Position: Placement{XMM: 10, YMM: 10, Layer: "F.Cu"},
+		Pads: []Pad{{
+			Ref: "U1", Name: "1", Net: "OTHER", Shape: PadRect, Type: PadSMD,
+			Size: Size{WidthMM: 1, HeightMM: 0.25}, Layers: []string{"F.Cu"},
+		}},
+	}}
+
+	occupancy, err := BuildViaOccupancy(request, "SIG")
+	if err != nil {
+		t.Fatal(err)
+	}
+	diagonal := occupancy.Grid.ToGrid(Point{XMM: 9, YMM: 10.5}, 0)
+	if occupancy.BlockedCell(diagonal) {
+		t.Fatal("via center outside circular corner clearance was blocked by rectangular inflation")
+	}
+}
+
 func TestBuildOccupancyHonorsForeignPadClearanceOverride(t *testing.T) {
 	request := minimalRequest()
 	request.Rules.GridMM = 0.25

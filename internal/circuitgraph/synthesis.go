@@ -609,25 +609,37 @@ func propagatePowerFlagsAcrossHighSideSwitches(document *Document, selected map[
 	}
 }
 
-// propagatePowerFlagsAcrossSeriesPowerLimiters carries an established external
-// power-drive declaration through a selected two-terminal current limiter.
-// KiCad correctly treats passive series elements as unable to drive a rail, but
-// the external source on the other side still drives the downstream power net.
-// Requiring exactly two power-role nets prevents propagation through shunts,
-// dividers, signal limiters, and multi-terminal protection networks.
+// propagatePowerFlagsAcrossSeriesPowerLimiters carries proven power drive
+// through deterministic two-terminal series paths. Drive may originate at an
+// explicit external PWR_FLAG or at a catalog-backed power_out pin. KiCad does
+// not infer drive through passive inductors, shunts, fuses, or limiters, so a
+// downstream power rail otherwise produces a false undriven-power error.
+//
+// Generic propagation requires exactly two connected nets and a power target.
+// An internal source may cross one non-power switch node into a power rail;
+// otherwise both nets must be ordinary single-ended power nets. Explicit
+// current limiters retain support for signed power rails. Signal targets and
+// multi-net components remain ineligible, preventing propagation through
+// dividers and multi-terminal protection networks.
 func propagatePowerFlagsAcrossSeriesPowerLimiters(document *Document, selected map[string]ResolvedComponent, usageByComponent map[string]string) {
 	flagged := make(map[string]bool, len(document.PowerFlags))
 	queue := make([]string, 0, len(document.PowerFlags))
+	queued := map[string]bool{}
 	for _, flag := range document.PowerFlags {
 		flagged[flag.Net] = true
 		queue = append(queue, flag.Net)
+		queued[flag.Net] = true
+	}
+	for _, net := range document.Nets {
+		if netHasInternalPowerOutput(net, selected) && !queued[net.Name] {
+			queue = append(queue, net.Name)
+			queued[net.Name] = true
+		}
 	}
 
 	componentIDs := make([]string, 0, len(selected))
 	for componentID := range selected {
-		if strings.EqualFold(strings.TrimSpace(usageByComponent[componentID]), "current_limit") {
-			componentIDs = append(componentIDs, componentID)
-		}
+		componentIDs = append(componentIDs, componentID)
 	}
 	slices.Sort(componentIDs)
 
@@ -635,9 +647,6 @@ func propagatePowerFlagsAcrossSeriesPowerLimiters(document *Document, selected m
 	for _, componentID := range componentIDs {
 		netNames := make([]string, 0, 2)
 		for _, net := range document.Nets {
-			if net.Role != NetRolePower && net.Role != NetRolePowerPos && net.Role != NetRolePowerNeg {
-				continue
-			}
 			if slices.ContainsFunc(net.Endpoints, func(endpoint Endpoint) bool {
 				return endpoint.Component == componentID && endpoint.SelectorKind == SelectorFunction
 			}) {
@@ -645,6 +654,18 @@ func propagatePowerFlagsAcrossSeriesPowerLimiters(document *Document, selected m
 			}
 		}
 		if len(netNames) != 2 || netNames[0] == netNames[1] {
+			continue
+		}
+		left, right := netByName(document.Nets, netNames[0]), netByName(document.Nets, netNames[1])
+		if left == nil || right == nil {
+			continue
+		}
+		explicitLimiter := strings.EqualFold(strings.TrimSpace(usageByComponent[componentID]), "current_limit")
+		ordinaryPowerPair := left.Role == NetRolePower && right.Role == NetRolePower
+		internalOutputTransition := (netHasInternalPowerOutput(*left, selected) && right.Role == NetRolePower) ||
+			(netHasInternalPowerOutput(*right, selected) && left.Role == NetRolePower)
+		signedLimiterPair := explicitLimiter && validPowerFlagNetRole(left.Role) && validPowerFlagNetRole(right.Role)
+		if !ordinaryPowerPair && !internalOutputTransition && !signedLimiterPair {
 			continue
 		}
 		adjacent[netNames[0]] = append(adjacent[netNames[0]], netNames[1])
@@ -660,12 +681,15 @@ func propagatePowerFlagsAcrossSeriesPowerLimiters(document *Document, selected m
 				continue
 			}
 			target := netByName(document.Nets, targetName)
-			if target == nil || netHasInternalPowerOutput(*target, selected) {
+			if target == nil || !validPowerFlagNetRole(target.Role) || netHasInternalPowerOutput(*target, selected) {
 				continue
 			}
 			document.PowerFlags = append(document.PowerFlags, PowerFlag{Net: targetName})
 			flagged[targetName] = true
-			queue = append(queue, targetName)
+			if !queued[targetName] {
+				queue = append(queue, targetName)
+				queued[targetName] = true
+			}
 		}
 	}
 }

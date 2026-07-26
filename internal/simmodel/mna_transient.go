@@ -13,10 +13,16 @@ const (
 	// farther than nonlinearMaxIterations*nonlinearMaxNodeUpdateV. Keep the
 	// trusted 250 mV damping bound, but give a step enough deterministic work
 	// to traverse the full supported 30 V control/load envelope.
-	transientMaxNewtonIterations             = 512
-	transientSourceContinuationStages        = 4
+	transientMaxNewtonIterations = 256
+	// Source continuation also observes the 250 mV bounded update scale for
+	// the supported 5 V control envelope. This avoids asking the first
+	// continuation stage to cross several nonlinear switch regions at once.
+	transientSourceContinuationStages        = 20
 	transientMaxNewtonAttemptsPerObservation = 2 * (1 + transientSourceContinuationStages)
 	transientActiveLimitContinuationStepV    = 1
+	bjtStateSeedDeviceLimit                  = 4
+	transientBJTSeedProbeInterval            = 256
+	transientPreferredBJTSeedIterations      = 32
 	maxClockPhaseCycles                      = 1e9
 )
 
@@ -33,37 +39,78 @@ func solveTransientAnalysis(plan Plan, analysis Analysis) (AnalysisResult, []Dia
 			break
 		}
 	}
-	initialAnalysis := transientDCAnalysis(analysis, 0)
-	// The trusted DC initializer applies global source/gmin continuation and
-	// ends at nonlinearFinalGmin, exactly the conductance used by later steps.
-	system, solution, initialEvidence, diagnostic := solveNonlinearDC(plan, initialAnalysis)
-	if diagnostic != nil {
-		diagnostic.Path = "analyses." + analysis.ID + ".initial_condition." + diagnostic.Path
-		diagnostic.Message = "deterministic transient initial condition failed: " + diagnostic.Message
-		return result, []Diagnostic{*diagnostic}
-	}
-	initialEvidence.InitialCondition = "bounded_nonlinear_dc_v1"
-	if transientSourcesInitiallyZero(analysis) {
-		// A pulsed power-up workflow has no energized DC operating point at t=0.
-		// Preserve the resolved matrix/labels but start all algebraic and dynamic
-		// unknowns at zero so regulated rails cannot be precharged by a model's
-		// nominal reference before its input source turns on.
-		solution = make([]complex128, len(solution))
-		initialEvidence.InitialCondition = "zero_energy_transient_v1"
+	// The point labeled t=0 is the left-hand state at the observation
+	// boundary. This preserves an explicit initial sample for events whose
+	// trigger is exactly zero; the first positive grid point applies them.
+	initialTimeS := -analysis.TimeStepS
+	initialAnalysis := transientDCAnalysis(analysis, initialTimeS)
+	initialPlan := planWithAnalysisOverrides(plan, initialAnalysis)
+	initialPlan = planWithRequestedAnalysis(initialPlan, initialAnalysis)
+	zeroEnergyInitialState := transientPowerSourcesZeroAtTime(plan, analysis, initialTimeS)
+	var system mnaSystem
+	var solution []complex128
+	var initialEvidence SolverEvidence
+	var diagnostic *Diagnostic
+	if zeroEnergyInitialState {
+		// A power-source event that starts at zero has no energized operating
+		// point. Constant-current load harnesses and independent control
+		// sources must not drive unpowered rails negative or precharge them.
+		var initialDiagnostics []Diagnostic
+		system, initialDiagnostics = buildTransientTemplate(plan, analysis)
+		if len(initialDiagnostics) != 0 {
+			return result, prefixTransientDiagnostics(analysis.ID, 0, 0, initialDiagnostics)
+		}
+		solution = make([]complex128, len(system.rhs))
+		initialEvidence = SolverEvidence{
+			Method: "zero_energy_transient_v1", InitialCondition: "explicit_zero_power_source_event",
+		}
+	} else {
+		// The trusted DC initializer applies global source/gmin continuation and
+		// ends at nonlinearFinalGmin, exactly the conductance used by later steps.
+		system, solution, initialEvidence, diagnostic = solveNonlinearDC(initialPlan, initialAnalysis)
+		if diagnostic != nil {
+			diagnostic.Path = "analyses." + analysis.ID + ".initial_condition." + diagnostic.Path
+			diagnostic.Message = "deterministic transient initial condition failed: " + diagnostic.Message
+			return result, []Diagnostic{*diagnostic}
+		}
+		initialEvidence.InitialCondition = "bounded_nonlinear_dc_v1"
 	}
 	initialEvidence.TotalIterations = initialEvidence.Iterations
 	initialEvidence.MaxIterationsPerStep = transientMaxNewtonIterations
 	initialEvidence.MaxTotalIterations = maxTransientWork
-	initialStates, _, initialStateDiagnostic := resolvedActiveDeviceStates(plan, system, solution)
-	if initialStateDiagnostic != nil {
-		return result, []Diagnostic{*initialStateDiagnostic}
+	initialStates := map[string]float64{}
+	if !zeroEnergyInitialState {
+		var initialStateDiagnostic *Diagnostic
+		initialStates, _, initialStateDiagnostic = resolvedActiveDeviceStates(initialPlan, system, solution)
+		if initialStateDiagnostic != nil {
+			return result, []Diagnostic{*initialStateDiagnostic}
+		}
 	}
-	if diagnostics := validateTransientOperatingLimits(plan, system, solution, initialStates, transientSourcesInitiallyZero(analysis), 0, nil); len(diagnostics) != 0 {
-		return result, prefixTransientDiagnostics(analysis.ID, 0, 0, diagnostics)
+	_, initialLimitDiagnostics := validateTransientOperatingLimits(initialPlan, system, solution, initialStates, true, 0, nil, nil)
+	if len(initialLimitDiagnostics) != 0 && !zeroEnergyInitialState {
+		if boundedSystem, boundedSolution, boundedEvidence, ok := solveBoundedTransientInitialCondition(
+			initialPlan,
+			initialAnalysis,
+			solution,
+		); ok {
+			if _, diagnostics := validateTransientOperatingLimits(initialPlan, boundedSystem, boundedSolution, initialStates, true, 0, nil, nil); len(diagnostics) == 0 {
+				system, solution = boundedSystem, boundedSolution
+				initialEvidence.Method = "bounded_nonlinear_dc_with_operating_limits_v1"
+				initialEvidence.Iterations += boundedEvidence.Iterations
+				initialEvidence.TotalIterations = initialEvidence.Iterations
+				initialEvidence.FinalMaxUpdateV = boundedEvidence.FinalMaxUpdateV
+				initialEvidence.FinalMaxCurrentUpdateA = boundedEvidence.FinalMaxCurrentUpdateA
+				initialEvidence.FinalMaxResidual = boundedEvidence.FinalMaxResidual
+				initialLimitDiagnostics = nil
+			}
+		}
+	}
+	if len(initialLimitDiagnostics) != 0 {
+		return result, prefixTransientDiagnostics(analysis.ID, 0, 0, initialLimitDiagnostics)
 	}
 	result.Points = append(result.Points, AnalysisPoint{
 		TimeS: 0, Nodes: nodeResults(plan, system, solution),
-		Devices: transientObservationDeviceResults(plan, analysis, initialAnalysis, system, solution, nil, 0, 0, solution, nil),
+		Devices: transientObservationDeviceResults(initialPlan, analysis, initialAnalysis, system, solution, nil, nil, 0, 0, solution, nil),
 		Solver:  &initialEvidence,
 	})
 	history := [][]complex128{append([]complex128(nil), solution...)}
@@ -77,26 +124,123 @@ func solveTransientAnalysis(plan Plan, analysis Analysis) (AnalysisResult, []Dia
 	base := cloneMNASystem(template)
 	workspace := cloneMNASystem(template)
 	fuseSurgeI2t := map[string]float64{}
+	openFuses := map[string]bool{}
+	preferBJTVoltageSeed := false
+	preferredBJTVoltageSeedSteps := 0
+	preferredBJTVoltageSeed := -1
 	for step := 1; step <= steps; step++ {
 		// Derive time directly from the integer grid index; never accumulate it.
 		timeS := float64(step) * analysis.TimeStepS
-		comparatorStates, fixedOutputClamps, diagnostics := prepareTransientBase(&base, template, plan, analysis, step, timeS, solution, history)
+		comparatorStates, fixedOutputClamps, diagnostics := prepareTransientBase(&base, template, plan, analysis, step, timeS, solution, history, openFuses)
 		if len(diagnostics) != 0 {
 			return result, prefixTransientDiagnostics(analysis.ID, step, timeS, diagnostics)
 		}
 		guess := transientInitialGuess(analysis, timeS, solution, history)
 		var evidence SolverEvidence
 		previousSolution := solution
-		system, solution, evidence, diagnostic = solveTransientStep(base, plan.Devices, devices, previousSolution, guess, &workspace, false, fixedOutputClamps)
+		if preferBJTVoltageSeed && preferredBJTVoltageSeedSteps >= transientBJTSeedProbeInterval {
+			preferBJTVoltageSeed = false
+			preferredBJTVoltageSeedSteps = 0
+		}
+		if preferBJTVoltageSeed {
+			var seeded bool
+			var preferredEvidence SolverEvidence
+			system, solution, preferredEvidence, seeded, preferredBJTVoltageSeed = solveTransientStepByBJTVoltageSeed(
+				base, plan.Devices, devices, previousSolution, previousSolution, &workspace, fixedOutputClamps, preferredBJTVoltageSeed,
+			)
+			if seeded {
+				evidence = preferredEvidence
+				preferredBJTVoltageSeedSteps++
+				diagnostic = nil
+			} else {
+				preferBJTVoltageSeed = false
+				preferredBJTVoltageSeedSteps = 0
+				preferredBJTVoltageSeed = -1
+				system, solution, evidence, diagnostic = solveTransientStep(
+					base, plan.Devices, devices, previousSolution, guess, &workspace, false, fixedOutputClamps,
+				)
+				evidence.Iterations += preferredEvidence.Iterations
+				evidence.TotalIterations = evidence.Iterations
+			}
+		} else {
+			system, solution, evidence, diagnostic = solveTransientStep(
+				base, plan.Devices, devices, previousSolution, guess, &workspace, false, fixedOutputClamps,
+			)
+		}
 		totalIterations += evidence.Iterations
 		if diagnostic != nil {
-			priorBase := cloneMNASystem(template)
-			_, _, priorDiagnostics := prepareTransientBase(&priorBase, template, plan, analysis, step-1, timeS-analysis.TimeStepS, previousSolution, history)
-			if len(priorDiagnostics) == 0 {
+			var seedEvidence SolverEvidence
+			var seeded bool
+			system, solution, seedEvidence, seeded, preferredBJTVoltageSeed = solveTransientStepByBJTVoltageSeed(
+				base, plan.Devices, devices, previousSolution, previousSolution, &workspace, fixedOutputClamps, preferredBJTVoltageSeed,
+			)
+			if !seeded {
+				var stateEvidence SolverEvidence
+				system, solution, stateEvidence, seeded = solveTransientStepByBJTStateSeed(
+					base, plan.Devices, devices, previousSolution, previousSolution, &workspace, fixedOutputClamps,
+				)
+				seedEvidence.Iterations += stateEvidence.Iterations
+				seedEvidence.TotalIterations = seedEvidence.Iterations
+				seedEvidence.FinalMaxUpdateV = stateEvidence.FinalMaxUpdateV
+				seedEvidence.FinalMaxCurrentUpdateA = stateEvidence.FinalMaxCurrentUpdateA
+				seedEvidence.FinalMaxResidual = stateEvidence.FinalMaxResidual
+				if seeded {
+					seedEvidence.Method = stateEvidence.Method
+				}
+			}
+			totalIterations += seedEvidence.Iterations
+			if seeded {
+				evidence = seedEvidence
+				preferBJTVoltageSeed = seedEvidence.Method == "backward_euler_bounded_bjt_voltage_seed_v1"
+				preferredBJTVoltageSeedSteps = 0
+				diagnostic = nil
+			}
+		}
+		if diagnostic != nil {
+			priorBase, priorDiagnostics, prepared := prepareAcceptedPriorTransientBase(
+				template, plan, analysis, step, timeS, history, openFuses,
+			)
+			if prepared && len(priorDiagnostics) == 0 {
 				var continuationEvidence SolverEvidence
 				system, solution, continuationEvidence, diagnostic = solveTransientStepWithSourceContinuation(priorBase, base, plan.Devices, devices, previousSolution, &workspace, fixedOutputClamps)
 				totalIterations += continuationEvidence.Iterations
 				evidence = continuationEvidence
+			}
+		}
+		if diagnostic != nil && transientAcceptedSubstepsApplicable(plan) {
+			var predictorEvidence SolverEvidence
+			var predicted bool
+			system, solution, predictorEvidence, predicted = solveTransientStepBySubstepPredictor(
+				plan, analysis, timeS, plan.Devices, devices, previousSolution,
+				&workspace, openFuses,
+			)
+			totalIterations += predictorEvidence.Iterations
+			if predicted {
+				evidence = predictorEvidence
+				diagnostic = nil
+			}
+		}
+		if diagnostic != nil {
+			seedAnalysis := transientDCAnalysis(analysis, timeS)
+			seedPlan := planWithAnalysisOverrides(plan, seedAnalysis)
+			seedPlan = planWithRequestedAnalysis(seedPlan, seedAnalysis)
+			_, seed, seedEvidence, seedDiagnostic := solveNonlinearDC(seedPlan, seedAnalysis)
+			totalIterations += seedEvidence.Iterations
+			if seedDiagnostic == nil && len(seed) == len(previousSolution) {
+				var reseedEvidence SolverEvidence
+				system, solution, reseedEvidence, diagnostic = solveTransientStep(
+					base, plan.Devices, devices, previousSolution, seed, &workspace, false, fixedOutputClamps,
+				)
+				totalIterations += reseedEvidence.Iterations
+				reseedEvidence.Method = "backward_euler_bounded_dc_reseed_v1"
+				evidence = reseedEvidence
+				if diagnostic != nil {
+					diagnostic.Message = "instantaneous-DC reseed failed to close the bounded dynamic step: " + diagnostic.Message
+				}
+			} else if seedDiagnostic != nil {
+				diagnostic.Message += "; instantaneous-DC reseed unavailable: " + seedDiagnostic.Message
+			} else {
+				diagnostic.Message += fmt.Sprintf("; instantaneous-DC reseed returned %d unknowns for a %d-unknown dynamic system", len(seed), len(previousSolution))
 			}
 		}
 		evidence.InitialCondition = "previous_accepted_state"
@@ -112,20 +256,57 @@ func solveTransientAnalysis(plan Plan, analysis Analysis) (AnalysisResult, []Dia
 		if totalIterations > maxTransientWork {
 			return result, []Diagnostic{{Path: fmt.Sprintf("analyses.%s.points[%d].work", analysis.ID, step), Message: fmt.Sprintf("transient solve exceeded bounded total work limit %d", maxTransientWork), Suggestion: "reduce the bounded observation duration or partition the analysis"}}
 		}
-		if diagnostics := validateTransientOperatingLimits(plan, system, solution, comparatorStates, transientSourcesZeroAtTime(analysis, timeS), analysis.TimeStepS, fuseSurgeI2t); len(diagnostics) != 0 {
-			return result, prefixTransientDiagnostics(analysis.ID, step, timeS, diagnostics)
+		openedFuses, diagnostics := validateTransientOperatingLimits(plan, system, solution, comparatorStates, true, analysis.TimeStepS, fuseSurgeI2t, openFuses)
+		if len(diagnostics) != 0 && transientAcceptedSubstepsApplicable(plan) {
+			var predictorEvidence SolverEvidence
+			var predicted bool
+			system, solution, predictorEvidence, predicted = solveTransientStepBySubstepPredictor(
+				plan, analysis, timeS, plan.Devices, devices, previousSolution,
+				&workspace, openFuses,
+			)
+			totalIterations += predictorEvidence.Iterations
+			if !predicted {
+				return result, prefixTransientDiagnostics(analysis.ID, step, timeS, diagnostics)
+			}
+			evidence = predictorEvidence
+			openedFuses = nil
 		}
 		result.Points = append(result.Points, AnalysisPoint{
 			TimeS: normalizedMNAFloat(timeS), Nodes: nodeResults(plan, system, solution),
 			Devices: transientObservationDeviceResults(
-				plan, analysis, analysis, system, solution, comparatorStates,
+				plan, analysis, analysis, system, solution, comparatorStates, openFuses,
 				step, timeS, previousSolution, history,
 			),
 			Solver: &evidence,
 		})
+		for _, component := range openedFuses {
+			openFuses[component] = true
+		}
 		history = append(history, append([]complex128(nil), solution...))
 	}
 	return result, nil
+}
+
+func prepareAcceptedPriorTransientBase(
+	template mnaSystem,
+	plan Plan,
+	analysis Analysis,
+	step int,
+	timeS float64,
+	history [][]complex128,
+	openFuses map[string]bool,
+) (mnaSystem, []Diagnostic, bool) {
+	if step <= 1 || len(history) < 2 {
+		return mnaSystem{}, nil, false
+	}
+	priorBase := cloneMNASystem(template)
+	priorState := history[len(history)-2]
+	priorHistory := history[:len(history)-1]
+	_, _, diagnostics := prepareTransientBase(
+		&priorBase, template, plan, analysis, step-1, timeS-analysis.TimeStepS,
+		priorState, priorHistory, openFuses,
+	)
+	return priorBase, diagnostics, true
 }
 
 func transientObservationDeviceResults(
@@ -135,6 +316,7 @@ func transientObservationDeviceResults(
 	system mnaSystem,
 	solution []complex128,
 	comparatorStates map[string]float64,
+	openFuses map[string]bool,
 	step int,
 	timeS float64,
 	previous []complex128,
@@ -146,14 +328,32 @@ func transientObservationDeviceResults(
 	var digitalOutputStates map[string]bool
 	var digitalOutputEnabled map[string]bool
 	switch evaluation.Kind {
-	case AnalysisTransient, AnalysisStartup:
+	case AnalysisTransient, AnalysisElectrothermal, AnalysisStartup:
 		digitalOutputStates, digitalOutputEnabled = transientDigitalOutputStates(
 			plan, evaluation, &system, step, timeS, previous, history,
 		)
 	}
-	return electricalDeviceResultsWithComparatorStates(
-		plan, evaluation, 0, system, solution, comparatorStates, digitalOutputStates, digitalOutputEnabled,
+	if evaluation.Kind == AnalysisTransient || evaluation.Kind == AnalysisElectrothermal {
+		plan = planWithTransientValueEvents(plan, evaluation, timeS)
+	}
+	results := electricalDeviceResultsWithComparatorStates(
+		plan, evaluation, 0, system, solution, comparatorStates, digitalOutputStates, digitalOutputEnabled, openFuses,
 	)
+	sourceCurrents := make(map[string]float64)
+	for _, device := range plan.Devices {
+		if device.PrimitiveModel == PrimitiveCurrentSourceV1 {
+			sourceCurrents[device.Component] = transientIndependentSourceValue(evaluation, device.Component, timeS)
+		}
+	}
+	for index := range results {
+		current, ok := sourceCurrents[results[index].Component]
+		if !ok {
+			continue
+		}
+		results[index].CurrentA = normalizedMNAFloat(current)
+		results[index].CurrentMagnitudeA = normalizedMNAFloat(math.Abs(current))
+	}
+	return results
 }
 
 func transientDigitalOutputStates(
@@ -180,20 +380,86 @@ func transientDigitalOutputStates(
 	return states, enabled
 }
 
-func transientSourcesInitiallyZero(analysis Analysis) bool {
-	return transientSourcesZeroAtTime(analysis, 0)
-}
-
-func transientSourcesZeroAtTime(analysis Analysis, timeS float64) bool {
+func transientPowerSourcesZeroAtTime(plan Plan, analysis Analysis, timeS float64) bool {
 	if len(analysis.Excitations) == 0 {
 		return false
 	}
+	allSourcesZero := true
 	for _, excitation := range analysis.Excitations {
+		if math.Abs(transientExcitationValue(analysis, excitation.Component, timeS)) > 1e-15 {
+			allSourcesZero = false
+			break
+		}
+	}
+	if allSourcesZero {
+		return true
+	}
+	powerInputs := transientPowerInputNets(plan)
+	if len(powerInputs) == 0 {
+		return false
+	}
+	found := false
+	for _, excitation := range analysis.Excitations {
+		deviceIndex := slices.IndexFunc(plan.Devices, func(device ResolvedDevice) bool {
+			return device.Component == excitation.Component
+		})
+		if deviceIndex < 0 {
+			continue
+		}
+		device := plan.Devices[deviceIndex]
+		terminals := terminalMap(device)
+		positive, negative := "", ""
+		switch device.PrimitiveModel {
+		case PrimitiveVoltageSourceV1:
+			positive, negative = terminals["POSITIVE"], terminals["NEGATIVE"]
+		case PrimitiveConnectorVoltageSourceV1:
+			positive, negative = terminals["PIN_1"], terminals["PIN_2"]
+		default:
+			continue
+		}
+		if !powerInputs[positive] && !powerInputs[negative] {
+			continue
+		}
+		found = true
 		if math.Abs(transientExcitationValue(analysis, excitation.Component, timeS)) > 1e-15 {
 			return false
 		}
 	}
-	return true
+	return found
+}
+
+func transientPowerInputNets(plan Plan) map[string]bool {
+	nets := map[string]bool{}
+	for _, device := range plan.Devices {
+		terminals := terminalMap(device)
+		var names []string
+		switch device.PrimitiveModel {
+		case PrimitiveSynchronousBuckRegulatorV1:
+			names = []string{"PVIN"}
+		case PrimitiveAdjustableLinearRegulatorV1, PrimitiveFixedLinearRegulatorV1:
+			names = []string{"VIN"}
+		case PrimitiveFloatingAdjustableRegulatorV1, PrimitiveProgrammableCurrentSourceV1:
+			names = []string{"VIN", "IN"}
+		case PrimitiveOpAmpV1, PrimitiveComparatorOpenCollectorV1:
+			names = []string{"V_PLUS"}
+		case PrimitiveCurrentSenseAmplifierV1:
+			names = []string{"VCC"}
+		case PrimitiveSingleOutputIsolatedConverterV1, PrimitiveDualOutputIsolatedConverterV1:
+			names = []string{"VIN"}
+		case PrimitiveMCUStaticSupplyLoadV1, PrimitiveSensorStaticSupplyLoadV1:
+			names = []string{"POWER"}
+		case PrimitiveFixedClockSourceV1, PrimitiveResistorProgrammedClockSourceV1:
+			names = []string{"VDD"}
+		case PrimitiveCMOSBufferV1:
+			names = []string{"VCC"}
+		}
+		for _, name := range names {
+			if net := terminals[name]; net != "" && net != plan.GroundNode {
+				nets[net] = true
+			}
+		}
+	}
+	return nets
 }
 
 // solveStartupAnalysis applies every bounded DC source after a canonical
@@ -220,7 +486,7 @@ func solveStartupAnalysis(plan Plan, analysis Analysis) (AnalysisResult, []Diagn
 	result.Points = append(result.Points, AnalysisPoint{
 		Nodes: nodeResults(plan, template, previous),
 		Devices: transientObservationDeviceResults(
-			plan, analysis, analysis, template, previous, nil, 0, 0, previous, history,
+			plan, analysis, analysis, template, previous, nil, nil, 0, 0, previous, history,
 		),
 		Solver: &initialEvidence,
 	})
@@ -230,9 +496,10 @@ func solveStartupAnalysis(plan Plan, analysis Analysis) (AnalysisResult, []Diagn
 	workspace := cloneMNASystem(template)
 	totalIterations := 0
 	fuseSurgeI2t := map[string]float64{}
+	openFuses := map[string]bool{}
 	for step := 1; step <= steps; step++ {
 		timeS := float64(step) * analysis.TimeStepS
-		comparatorStates, fixedOutputClamps, diagnostics := prepareTransientBase(&base, template, plan, analysis, step, timeS, previous, history)
+		comparatorStates, fixedOutputClamps, diagnostics := prepareTransientBase(&base, template, plan, analysis, step, timeS, previous, history, openFuses)
 		if len(diagnostics) != 0 {
 			return result, prefixTransientDiagnostics(analysis.ID, step, timeS, diagnostics)
 		}
@@ -249,21 +516,53 @@ func solveStartupAnalysis(plan Plan, analysis Analysis) (AnalysisResult, []Diagn
 			diagnostic.Message = fmt.Sprintf("startup solve failed at step %d, time %.12g s: %s", step, timeS, diagnostic.Message)
 			return result, []Diagnostic{*diagnostic}
 		}
-		if diagnostics := validateTransientOperatingLimits(plan, system, solution, comparatorStates, true, analysis.TimeStepS, fuseSurgeI2t); len(diagnostics) != 0 {
+		openedFuses, diagnostics := validateTransientOperatingLimits(plan, system, solution, comparatorStates, true, analysis.TimeStepS, fuseSurgeI2t, openFuses)
+		if len(diagnostics) != 0 {
 			return result, prefixTransientDiagnostics(analysis.ID, step, timeS, diagnostics)
 		}
 		result.Points = append(result.Points, AnalysisPoint{
 			TimeS: normalizedMNAFloat(timeS), Nodes: nodeResults(plan, system, solution),
 			Devices: transientObservationDeviceResults(
-				plan, analysis, analysis, system, solution, comparatorStates,
+				plan, analysis, analysis, system, solution, comparatorStates, openFuses,
 				step, timeS, previous, history,
 			),
 			Solver: &evidence,
 		})
+		for _, component := range openedFuses {
+			openFuses[component] = true
+		}
 		previous = solution
 		history = append(history, append([]complex128(nil), solution...))
 	}
 	return result, nil
+}
+
+func solveBoundedTransientInitialCondition(
+	plan Plan,
+	analysis Analysis,
+	initialSolution []complex128,
+) (mnaSystem, []complex128, SolverEvidence, bool) {
+	stage := nonlinearContinuation[len(nonlinearContinuation)-1]
+	base, diagnostics := buildNonlinearBaseSystem(plan, analysis, stage, nil)
+	if len(diagnostics) != 0 {
+		return mnaSystem{}, nil, SolverEvidence{}, false
+	}
+	workspace := cloneMNASystem(base)
+	guess := append([]complex128(nil), initialSolution...)
+	system, solution, evidence, diagnostic := solveTransientStep(
+		base,
+		plan.Devices,
+		compileNonlinearDevices(plan),
+		initialSolution,
+		guess,
+		&workspace,
+		false,
+		nil,
+	)
+	if diagnostic != nil {
+		return mnaSystem{}, nil, evidence, false
+	}
+	return system, solution, evidence, true
 }
 
 func peakAbsVoltage(result AnalysisResult, assertion Assertion) (float64, *Diagnostic) {
@@ -308,8 +607,25 @@ func periodicSteadyStatePoints(result AnalysisResult) []AnalysisPoint {
 
 func transientDCAnalysis(analysis Analysis, timeS float64) Analysis {
 	dc := Analysis{ID: analysis.ID, Kind: AnalysisDCOperatingPoint, Excitations: append([]SourceExcitation(nil), analysis.Excitations...)}
+	dc.Conditions = append([]NamedValue(nil), analysis.Conditions...)
+	dc.DeviceOverrides = append([]DeviceOverride(nil), analysis.DeviceOverrides...)
 	for index := range dc.Excitations {
-		dc.Excitations[index].DCValue = transientSourceValue(dc.Excitations[index], timeS, analysis.TimeStepS)
+		// A periodic source has no unique instantaneous DC operating point.
+		// Initialize its dynamic waveform around the declared DC bias instead
+		// of freezing the sample immediately before the observation boundary
+		// into capacitor and inductor history. Pulsed sources still resolve
+		// their left-hand boundary value so power and event transitions retain
+		// their deterministic pre-trigger state.
+		if dc.Excitations[index].SineFrequencyHz <= 0 {
+			dc.Excitations[index].DCValue = transientSourceValue(dc.Excitations[index], timeS, analysis.TimeStepS)
+		}
+		dc.Excitations[index].DCValue = transientSourceEventValue(
+			analysis.SourceValueEvents,
+			dc.Excitations[index].Component,
+			timeS,
+			analysis.TimeStepS,
+			dc.Excitations[index].DCValue,
+		)
 		dc.Excitations[index].ACMagnitude = 0
 		dc.Excitations[index].ACPhaseDeg = 0
 		dc.Excitations[index].PulseInitialValue = 0
@@ -321,7 +637,125 @@ func transientDCAnalysis(analysis Analysis, timeS float64) Analysis {
 		dc.Excitations[index].SineFrequencyHz = 0
 		dc.Excitations[index].SinePhaseDeg = 0
 	}
+	for _, event := range analysis.DeviceValueEvents {
+		value, applies := transientDeviceEventValue(event, timeS, analysis.TimeStepS)
+		if !applies {
+			continue
+		}
+		override := DeviceOverride{Component: event.Component, ValueSI: &value}
+		for _, existing := range dc.DeviceOverrides {
+			if existing.Component == event.Component {
+				override.ModelParameters = append([]NamedValue(nil), existing.ModelParameters...)
+				break
+			}
+		}
+		dc.DeviceOverrides = setTransientDeviceOverride(dc.DeviceOverrides, override)
+	}
+	for _, event := range analysis.ConditionValueEvents {
+		value, applies := transientConditionEventValue(event, timeS, analysis.TimeStepS)
+		if applies {
+			dc.Conditions = setTransientCondition(dc.Conditions, event.Name, value)
+		}
+	}
 	return dc
+}
+
+func transientSourceEventValue(events []SourceValueEvent, component string, timeS, timeStepS, fallback float64) float64 {
+	value := fallback
+	for _, event := range events {
+		if event.Component != component {
+			continue
+		}
+		eventValue, terminal := transientEventValue(timeS, timeStepS, event.TriggerTimeS, event.DurationS, event.Initial, event.Applied, event.Recovered)
+		value = eventValue
+		if terminal {
+			break
+		}
+	}
+	return value
+}
+
+func transientDeviceValue(events []DeviceValueEvent, component string, timeS, timeStepS, fallback float64) float64 {
+	value := fallback
+	for _, event := range events {
+		if event.Component != component {
+			continue
+		}
+		eventValue, terminal := transientEventValue(timeS, timeStepS, event.TriggerTimeS, event.DurationS, event.InitialSI, event.AppliedSI, event.RecoveredSI)
+		value = eventValue
+		if terminal {
+			break
+		}
+	}
+	return value
+}
+
+func transientDeviceEventValue(event DeviceValueEvent, timeS, timeStepS float64) (float64, bool) {
+	value, _ := transientEventValue(timeS, timeStepS, event.TriggerTimeS, event.DurationS, event.InitialSI, event.AppliedSI, event.RecoveredSI)
+	return value, true
+}
+
+func transientConditionEventValue(event ConditionValueEvent, timeS, timeStepS float64) (float64, bool) {
+	value, _ := transientEventValue(timeS, timeStepS, event.TriggerTimeS, event.DurationS, event.Initial, event.Applied, event.Recovered)
+	return value, true
+}
+
+// transientEventValue returns terminal when the requested time is inside or
+// before this event. After a completed event, callers continue so a later
+// non-overlapping event on the same target can take precedence.
+func transientEventValue(timeS, timeStepS, trigger, duration, initial, applied float64, recovered *float64) (value float64, terminal bool) {
+	tolerance := math.Max(timeStepS, math.Abs(timeS)) * 1e-12
+	if timeS+tolerance < trigger {
+		return initial, true
+	}
+	if timeS < trigger+duration-tolerance {
+		return applied, true
+	}
+	if recovered != nil {
+		return *recovered, false
+	}
+	return applied, false
+}
+
+func setTransientDeviceOverride(overrides []DeviceOverride, replacement DeviceOverride) []DeviceOverride {
+	result := append([]DeviceOverride(nil), overrides...)
+	for index := range result {
+		if result[index].Component == replacement.Component {
+			result[index] = replacement
+			return result
+		}
+	}
+	result = append(result, replacement)
+	slices.SortStableFunc(result, func(left, right DeviceOverride) int { return strings.Compare(left.Component, right.Component) })
+	return result
+}
+
+func setTransientCondition(conditions []NamedValue, name string, value float64) []NamedValue {
+	result := append([]NamedValue(nil), conditions...)
+	for index := range result {
+		if result[index].Name == name {
+			result[index].Value = value
+			return result
+		}
+	}
+	result = append(result, NamedValue{Name: name, Value: value})
+	return normalizeNamedValues(result)
+}
+
+func planWithTransientValueEvents(plan Plan, analysis Analysis, timeS float64) Plan {
+	if len(analysis.DeviceValueEvents) == 0 {
+		return plan
+	}
+	clone := ClonePlan(plan)
+	for index := range clone.Devices {
+		device := &clone.Devices[index]
+		if device.ValueSI == nil {
+			continue
+		}
+		value := transientDeviceValue(analysis.DeviceValueEvents, device.Component, timeS, analysis.TimeStepS, *device.ValueSI)
+		device.ValueSI = &value
+	}
+	return clone
 }
 
 func transientSourceValue(excitation SourceExcitation, timeS, timeStepS float64) float64 {
@@ -428,6 +862,13 @@ func buildTransientTemplate(plan Plan, analysis Analysis) (mnaSystem, []Diagnost
 		case PrimitiveCapacitorTransientV1:
 			conductance := *device.ValueSI / analysis.TimeStepS
 			stampAdmittance(&system, terminals["A"], terminals["B"], complex(conductance, 0))
+		case PrimitiveInductorTransientV1:
+			branch := system.branchIndex[device.Component]
+			system.matrix[branch][branch] -= complex(*device.ValueSI/analysis.TimeStepS, 0)
+		case PrimitiveNMOSSwitchV1, PrimitivePMOSSwitchV1:
+			for _, capacitor := range mosfetDynamicCapacitors(device, analysis.Kind) {
+				stampAdmittance(&system, capacitor.a, capacitor.b, complex(capacitor.capacitanceF/analysis.TimeStepS, 0))
+			}
 		case PrimitiveBidirectionalTVSV1:
 			conductance := namedValueMap(device.ModelParameters)["junction_capacitance_f"] / analysis.TimeStepS
 			stampAdmittance(&system, terminals["ANODE"], terminals["CATHODE"], complex(conductance, 0))
@@ -460,6 +901,25 @@ func buildTransientTemplate(plan Plan, analysis Analysis) (mnaSystem, []Diagnost
 			parameters := namedValueMap(device.ModelParameters)
 			system.rhs[system.branchIndex[device.Component]] -= complex(parameters["output_voltage_v"], 0)
 			stampCurrentSource(&system, terminals["VIN"], terminals["GND"], complex(-parameters["quiescent_current_a"], 0))
+		case PrimitiveSynchronousBuckRegulatorV1:
+			parameters := namedValueMap(device.ModelParameters)
+			branch := system.branchIndex[device.Component]
+			// The DC builder may legitimately disable an unpowered buck. A
+			// transient template still needs the catalog controller equation
+			// because later event/startup steps can energize it.
+			resetSynchronousBuckControlEquation(
+				&system,
+				device.Component,
+				terminals,
+				synchronousBuckTransconductance(parameters, 0),
+				parameters["reference_voltage_v"],
+			)
+			system.rhs[branch] -= complex(parameters["reference_voltage_v"], 0)
+			historyCoefficient := 1 / (2 * math.Pi * parameters["control_pole_hz"] * parameters["control_transconductance_s"] * analysis.TimeStepS)
+			system.matrix[branch][branch] += complex(historyCoefficient, 0)
+			// The empirical conversion-efficiency branch owns controller
+			// operating current; no independent electrical source is removed
+			// from this reusable transient template.
 		case PrimitiveFloatingAdjustableRegulatorV1:
 			parameters := namedValueMap(device.ModelParameters)
 			reference := parameters["polarity"] * parameters["reference_voltage_v"]
@@ -496,24 +956,30 @@ func buildTransientTemplate(plan Plan, analysis Analysis) (mnaSystem, []Diagnost
 	return system, nil
 }
 
-func prepareTransientBase(base *mnaSystem, template mnaSystem, plan Plan, analysis Analysis, step int, timeS float64, previous []complex128, history [][]complex128) (map[string]float64, map[string]bool, []Diagnostic) {
+func prepareTransientBase(base *mnaSystem, template mnaSystem, plan Plan, analysis Analysis, step int, timeS float64, previous []complex128, history [][]complex128, openFuses map[string]bool) (map[string]float64, map[string]bool, []Diagnostic) {
 	resetMNASystem(base, template)
 	comparatorStates := map[string]float64{}
 	fixedOutputClamps := map[string]bool{}
 	for _, device := range plan.Devices {
 		terminals := terminalMap(device)
 		switch device.PrimitiveModel {
-		case PrimitiveVoltageSourceV1, PrimitiveConnectorVoltageSourceV1:
-			value := transientExcitationValue(analysis, device.Component, timeS)
-			if analysis.Kind == AnalysisStartup {
-				value *= startupSourceRampScale(analysis, timeS)
+		case PrimitiveResistorV1:
+			value := transientDeviceValue(analysis.DeviceValueEvents, device.Component, timeS, analysis.TimeStepS, *device.ValueSI)
+			if value != *device.ValueSI {
+				delta := 1/value - 1/(*device.ValueSI)
+				stampAdmittance(base, terminals["A"], terminals["B"], complex(delta, 0))
 			}
+		case PrimitiveFuseI2TClearingV1:
+			if openFuses[device.Component] {
+				parameters := namedValueMap(device.ModelParameters)
+				delta := 1/parameters["open_resistance_ohm"] - 1/parameters["cold_resistance_ohm"]
+				stampAdmittance(base, terminals["A"], terminals["B"], complex(delta, 0))
+			}
+		case PrimitiveVoltageSourceV1, PrimitiveConnectorVoltageSourceV1:
+			value := transientIndependentSourceValue(analysis, device.Component, timeS)
 			base.rhs[base.branchIndex[device.Component]] += complex(value, 0)
 		case PrimitiveCurrentSourceV1:
-			value := transientExcitationValue(analysis, device.Component, timeS)
-			if analysis.Kind == AnalysisStartup {
-				value *= startupSourceRampScale(analysis, timeS)
-			}
+			value := transientIndependentSourceValue(analysis, device.Component, timeS)
 			stampCurrentSource(base, terminals["POSITIVE"], terminals["NEGATIVE"], complex(value, 0))
 		case PrimitiveFixedClockSourceV1, PrimitiveResistorProgrammedClockSourceV1:
 			parameters := namedValueMap(device.ModelParameters)
@@ -553,6 +1019,16 @@ func prepareTransientBase(base *mnaSystem, template mnaSystem, plan Plan, analys
 			conductance := *device.ValueSI / analysis.TimeStepS
 			previousVoltage := nonlinearNodeVoltage(base, previous, terminals["A"]) - nonlinearNodeVoltage(base, previous, terminals["B"])
 			stampCurrentSource(base, terminals["A"], terminals["B"], complex(-conductance*previousVoltage, 0))
+		case PrimitiveInductorTransientV1:
+			branch := base.branchIndex[device.Component]
+			previousCurrent := real(previous[branch])
+			base.rhs[branch] -= complex(*device.ValueSI/analysis.TimeStepS*previousCurrent, 0)
+		case PrimitiveNMOSSwitchV1, PrimitivePMOSSwitchV1:
+			for _, capacitor := range mosfetDynamicCapacitors(device, analysis.Kind) {
+				conductance := capacitor.capacitanceF / analysis.TimeStepS
+				previousVoltage := nonlinearNodeVoltage(base, previous, capacitor.a) - nonlinearNodeVoltage(base, previous, capacitor.b)
+				stampCurrentSource(base, capacitor.a, capacitor.b, complex(-conductance*previousVoltage, 0))
+			}
 		case PrimitiveRelayNormallyOpenV1:
 			parameters := namedValueMap(device.ModelParameters)
 			coilVoltage := nonlinearNodeVoltage(base, previous, terminals["COIL_A"]) - nonlinearNodeVoltage(base, previous, terminals["COIL_B"])
@@ -658,6 +1134,37 @@ func prepareTransientBase(base *mnaSystem, template mnaSystem, plan Plan, analys
 			if !powerTransition {
 				stampCurrentSource(base, terminals["VIN"], terminals["GND"], complex(parameters["quiescent_current_a"], 0))
 			}
+		case PrimitiveSynchronousBuckRegulatorV1:
+			parameters := namedValueMap(device.ModelParameters)
+			branch := base.branchIndex[device.Component]
+			templateRatio := parameters["nominal_output_voltage_v"] /
+				parameters["nominal_input_voltage_v"] /
+				parameters["conversion_efficiency_fraction"]
+			outputV := parameters["nominal_output_voltage_v"]
+			if outputNet, ok := synchronousBuckOutputNet(plan, device); ok {
+				outputV = math.Abs(
+					nonlinearNodeVoltage(base, previous, outputNet) -
+						nonlinearNodeVoltage(base, previous, terminals["PGND"]),
+				)
+			}
+			actualRatio := synchronousBuckInputCurrentRatioForOutput(plan, analysis, device, timeS, outputV)
+			adjustSynchronousBuckInputCurrentRatio(base, device, actualRatio-templateRatio)
+			inputV := synchronousBuckInputVoltage(plan, analysis, device, timeS)
+			enableV := nonlinearNodeVoltage(base, previous, terminals["EN"]) -
+				nonlinearNodeVoltage(base, previous, terminals["AGND"])
+			if enable, enableKnown := transientKnownNodeVoltage(plan, analysis, terminals["EN"], timeS); enableKnown {
+				if ground, groundKnown := transientKnownNodeVoltage(plan, analysis, terminals["AGND"], timeS); groundKnown {
+					enableV = enable - ground
+				}
+			}
+			powerTransition := inputV < parameters["min_input_voltage_v"] || enableV < parameters["enable_threshold_v"]
+			if powerTransition {
+				disableTransientBranch(base, device.Component)
+				continue
+			}
+			reference := parameters["reference_voltage_v"] * synchronousBuckSoftStartScale(plan, analysis, device, timeS)
+			historyCoefficient := 1 / (2 * math.Pi * parameters["control_pole_hz"] * parameters["control_transconductance_s"] * analysis.TimeStepS)
+			base.rhs[branch] += complex(reference+historyCoefficient*real(previous[branch]), 0)
 		case PrimitiveFloatingAdjustableRegulatorV1:
 			parameters := namedValueMap(device.ModelParameters)
 			reference := parameters["polarity"] * parameters["reference_voltage_v"]
@@ -826,10 +1333,24 @@ func startupSourceRampScale(analysis Analysis, timeS float64) float64 {
 func transientExcitationValue(analysis Analysis, component string, timeS float64) float64 {
 	for _, excitation := range analysis.Excitations {
 		if excitation.Component == component {
-			return transientSourceValue(excitation, timeS, analysis.TimeStepS)
+			return transientSourceEventValue(
+				analysis.SourceValueEvents,
+				component,
+				timeS,
+				analysis.TimeStepS,
+				transientSourceValue(excitation, timeS, analysis.TimeStepS),
+			)
 		}
 	}
 	return 0
+}
+
+func transientIndependentSourceValue(analysis Analysis, component string, timeS float64) float64 {
+	value := transientExcitationValue(analysis, component, timeS)
+	if analysis.Kind == AnalysisStartup {
+		value *= startupSourceRampScale(analysis, timeS)
+	}
+	return value
 }
 
 func clockSourceHigh(device ResolvedDevice, system *mnaSystem, analysis Analysis, timeS float64, state []complex128) bool {
@@ -1031,43 +1552,340 @@ func solveTransientStep(base mnaSystem, resolvedDevices []ResolvedDevice, device
 	return mnaSystem{}, nil, retryEvidence, retryDiagnostic
 }
 
+func solveTransientStepByBJTStateSeed(
+	base mnaSystem,
+	resolvedDevices []ResolvedDevice,
+	devices []compiledNonlinearDevice,
+	previous []complex128,
+	initial []complex128,
+	workspace *mnaSystem,
+	fixedOutputClamps map[string]bool,
+) (mnaSystem, []complex128, SolverEvidence, bool) {
+	var components []string
+	for _, device := range devices {
+		if device.primitive == PrimitiveBJTNPNV1 || device.primitive == PrimitiveBJTPNPV1 {
+			components = append(components, device.component)
+		}
+	}
+	slices.Sort(components)
+	if len(components) == 0 || len(components) > bjtStateSeedDeviceLimit || len(initial) != len(base.rhs) {
+		return mnaSystem{}, nil, SolverEvidence{}, false
+	}
+	total := SolverEvidence{Method: "backward_euler_bounded_bjt_state_seed_v1"}
+	for mask := 0; mask < 1<<len(components); mask++ {
+		states := make(map[string]float64, len(components))
+		for index, component := range components {
+			states[component] = float64((mask >> index) & 1)
+		}
+		forced := compiledDevicesWithForcedBJTStates(devices, states)
+		forcedGuess := append([]complex128(nil), initial...)
+		_, seed, seedEvidence, seedDiagnostic := solveTransientStepInternal(
+			base, resolvedDevices, forced, previous, forcedGuess, workspace, false, fixedOutputClamps, true,
+		)
+		total.Iterations += seedEvidence.Iterations
+		if seedDiagnostic != nil {
+			continue
+		}
+		system, solution, evidence, diagnostic := solveTransientStep(
+			base, resolvedDevices, devices, previous, seed, workspace, false, fixedOutputClamps,
+		)
+		total.Iterations += evidence.Iterations
+		total.TotalIterations = total.Iterations
+		total.FinalMaxUpdateV = evidence.FinalMaxUpdateV
+		total.FinalMaxCurrentUpdateA = evidence.FinalMaxCurrentUpdateA
+		total.FinalMaxResidual = evidence.FinalMaxResidual
+		if diagnostic == nil {
+			return system, solution, total, true
+		}
+	}
+	total.TotalIterations = total.Iterations
+	return mnaSystem{}, nil, total, false
+}
+
+func compiledDevicesWithForcedBJTStates(devices []compiledNonlinearDevice, states map[string]float64) []compiledNonlinearDevice {
+	clone := make([]compiledNonlinearDevice, len(devices))
+	for index, device := range devices {
+		clone[index] = device
+		clone[index].parameters = make(map[string]float64, len(device.parameters)+1)
+		for name, value := range device.parameters {
+			clone[index].parameters[name] = value
+		}
+		if device.primitive == PrimitiveBJTNPNV1 || device.primitive == PrimitiveBJTPNPV1 {
+			clone[index].parameters[parameterForcedBJTState] = states[device.component]
+		}
+	}
+	return clone
+}
+
+func solveTransientStepByBJTVoltageSeed(
+	base mnaSystem,
+	resolvedDevices []ResolvedDevice,
+	devices []compiledNonlinearDevice,
+	previous []complex128,
+	initial []complex128,
+	workspace *mnaSystem,
+	fixedOutputClamps map[string]bool,
+	preferredSeed int,
+) (mnaSystem, []complex128, SolverEvidence, bool, int) {
+	total := SolverEvidence{Method: "backward_euler_bounded_bjt_voltage_seed_v1"}
+	seeds := transientBJTVoltageSeeds(resolvedDevices, &base, initial)
+	order := make([]int, 0, len(seeds))
+	if preferredSeed >= 0 && preferredSeed < len(seeds) {
+		order = append(order, preferredSeed)
+	}
+	for index := range seeds {
+		if index != preferredSeed {
+			order = append(order, index)
+		}
+	}
+	if preferredSeed >= 0 && preferredSeed < len(seeds) && len(seeds) > 1 {
+		order = append(order, preferredSeed)
+	}
+	for orderIndex, seedIndex := range order {
+		seed := seeds[seedIndex]
+		maxIterations := transientMaxNewtonIterations
+		if seedIndex == preferredSeed && orderIndex == 0 && len(seeds) > 1 {
+			maxIterations = transientPreferredBJTSeedIterations
+		}
+		system, solution, evidence, diagnostic := solveTransientStepInternalWithLimit(
+			base, resolvedDevices, devices, previous, seed, workspace, true, fixedOutputClamps, true, maxIterations,
+		)
+		total.Iterations += evidence.Iterations
+		total.TotalIterations = total.Iterations
+		total.FinalMaxUpdateV = evidence.FinalMaxUpdateV
+		total.FinalMaxCurrentUpdateA = evidence.FinalMaxCurrentUpdateA
+		total.FinalMaxResidual = evidence.FinalMaxResidual
+		if diagnostic == nil {
+			return system, solution, total, true, seedIndex
+		}
+	}
+	return mnaSystem{}, nil, total, false, -1
+}
+
+func transientBJTVoltageSeeds(resolvedDevices []ResolvedDevice, system *mnaSystem, previous []complex128) [][]complex128 {
+	var devices []ResolvedDevice
+	for _, device := range resolvedDevices {
+		if device.PrimitiveModel == PrimitiveBJTNPNV1 || device.PrimitiveModel == PrimitiveBJTPNPV1 {
+			devices = append(devices, device)
+		}
+	}
+	if len(devices) == 0 || len(devices) > bjtStateSeedDeviceLimit || system == nil || len(previous) != len(system.rhs) {
+		return nil
+	}
+	slices.SortStableFunc(devices, func(left, right ResolvedDevice) int {
+		return strings.Compare(left.Component, right.Component)
+	})
+	seeds := make([][]complex128, 0, 1<<len(devices))
+	for state := 0; state < 1<<len(devices); state++ {
+		seed := append([]complex128(nil), previous...)
+		for index, device := range devices {
+			terminals := terminalMap(device)
+			emitter := nonlinearNodeVoltage(system, seed, terminals["EMITTER"])
+			base, collector := emitter, nonlinearNodeVoltage(system, seed, terminals["COLLECTOR"])
+			if state&(1<<index) != 0 {
+				polarity := 1.0
+				if device.PrimitiveModel == PrimitiveBJTPNPV1 {
+					polarity = -1
+				}
+				base = emitter + polarity*.72
+				collector = emitter + polarity*.1
+			}
+			setTransientNodeSeed(system, seed, terminals["BASE"], base)
+			setTransientNodeSeed(system, seed, terminals["COLLECTOR"], collector)
+		}
+		seeds = append(seeds, seed)
+	}
+	return seeds
+}
+
+func setTransientNodeSeed(system *mnaSystem, solution []complex128, node string, value float64) {
+	if system == nil {
+		return
+	}
+	if index, exists := system.nodeIndex[node]; exists && index >= 0 && index < len(solution) {
+		solution[index] = complex(value, 0)
+	}
+}
+
 func solveTransientStepWithSourceContinuation(priorBase, finalBase mnaSystem, resolvedDevices []ResolvedDevice, devices []compiledNonlinearDevice, previous []complex128, workspace *mnaSystem, fixedOutputClamps map[string]bool) (mnaSystem, []complex128, SolverEvidence, *Diagnostic) {
 	guess := append([]complex128(nil), previous...)
-	total := SolverEvidence{Method: "backward_euler_bounded_source_continuation_v1"}
+	total := SolverEvidence{Method: "backward_euler_bounded_system_continuation_v1"}
+	usedBJTSeed := false
 	var system mnaSystem
 	for stage := 1; stage <= transientSourceContinuationStages; stage++ {
-		scale := float64(stage) / transientSourceContinuationStages
+		fraction := float64(stage) / transientSourceContinuationStages
+		scale := fraction
 		stageBase := cloneMNASystem(finalBase)
+		for row := range stageBase.matrix {
+			for column := range stageBase.matrix[row] {
+				stageBase.matrix[row][column] = priorBase.matrix[row][column] +
+					(finalBase.matrix[row][column]-priorBase.matrix[row][column])*complex(scale, 0)
+			}
+		}
 		for index := range stageBase.rhs {
 			stageBase.rhs[index] = priorBase.rhs[index] + (finalBase.rhs[index]-priorBase.rhs[index])*complex(scale, 0)
 		}
 		var evidence SolverEvidence
 		var diagnostic *Diagnostic
-		system, guess, evidence, diagnostic = solveTransientStep(stageBase, resolvedDevices, devices, previous, guess, workspace, false, fixedOutputClamps)
+		stageGuess := append([]complex128(nil), guess...)
+		system, guess, evidence, diagnostic = solveTransientStep(stageBase, resolvedDevices, devices, previous, stageGuess, workspace, false, fixedOutputClamps)
 		total.Iterations += evidence.Iterations
 		total.TotalIterations = total.Iterations
 		total.FinalMaxUpdateV = evidence.FinalMaxUpdateV
 		total.FinalMaxCurrentUpdateA = evidence.FinalMaxCurrentUpdateA
 		total.FinalMaxResidual = evidence.FinalMaxResidual
 		if diagnostic != nil {
-			diagnostic.Message = fmt.Sprintf("source-continuation stage %d/%d failed: %s", stage, transientSourceContinuationStages, diagnostic.Message)
+			var seeded bool
+			system, guess, evidence, seeded, _ = solveTransientStepByBJTVoltageSeed(
+				stageBase, resolvedDevices, devices, previous, stageGuess, workspace, fixedOutputClamps, -1,
+			)
+			if !seeded {
+				var stateEvidence SolverEvidence
+				system, guess, stateEvidence, seeded = solveTransientStepByBJTStateSeed(
+					stageBase, resolvedDevices, devices, previous, stageGuess, workspace, fixedOutputClamps,
+				)
+				evidence.Iterations += stateEvidence.Iterations
+				evidence.TotalIterations = evidence.Iterations
+				evidence.FinalMaxUpdateV = stateEvidence.FinalMaxUpdateV
+				evidence.FinalMaxCurrentUpdateA = stateEvidence.FinalMaxCurrentUpdateA
+				evidence.FinalMaxResidual = stateEvidence.FinalMaxResidual
+				if seeded {
+					evidence.Method = stateEvidence.Method
+				}
+			}
+			total.Iterations += evidence.Iterations
+			total.TotalIterations = total.Iterations
+			total.FinalMaxUpdateV = evidence.FinalMaxUpdateV
+			total.FinalMaxCurrentUpdateA = evidence.FinalMaxCurrentUpdateA
+			total.FinalMaxResidual = evidence.FinalMaxResidual
+			if seeded {
+				usedBJTSeed = true
+				diagnostic = nil
+			}
+		}
+		if diagnostic != nil {
+			diagnostic.Message = fmt.Sprintf("system-continuation stage %d/%d failed: %s", stage, transientSourceContinuationStages, diagnostic.Message)
 			return mnaSystem{}, nil, total, diagnostic
 		}
+	}
+	if usedBJTSeed {
+		total.Method = "backward_euler_bounded_system_continuation_bjt_state_seed_v1"
 	}
 	return system, guess, total, nil
 }
 
+func solveTransientStepBySubstepPredictor(
+	plan Plan,
+	analysis Analysis,
+	timeS float64,
+	resolvedDevices []ResolvedDevice,
+	devices []compiledNonlinearDevice,
+	previous []complex128,
+	workspace *mnaSystem,
+	openFuses map[string]bool,
+) (mnaSystem, []complex128, SolverEvidence, bool) {
+	total := SolverEvidence{Method: "backward_euler_bounded_accepted_substeps_v1"}
+	for _, divisions := range []int{16, 32, 64} {
+		predictorAnalysis := analysis
+		predictorAnalysis.TimeStepS = analysis.TimeStepS / float64(divisions)
+		template, diagnostics := buildTransientTemplate(plan, predictorAnalysis)
+		if len(diagnostics) != 0 {
+			continue
+		}
+		predictorPrevious := append([]complex128(nil), previous...)
+		predictorHistory := [][]complex128{append([]complex128(nil), previous...)}
+		predictorWorkspace := cloneMNASystem(template)
+		var predictorSystem mnaSystem
+		predicted := true
+		predictorFuseSurgeI2t := map[string]float64{}
+		predictorOpenFuses := cloneTransientFuseStates(openFuses)
+		for substep := 1; substep <= divisions; substep++ {
+			substepTime := timeS - analysis.TimeStepS + float64(substep)*predictorAnalysis.TimeStepS
+			base := cloneMNASystem(template)
+			predictorStates, predictorClamps, prepareDiagnostics := prepareTransientBase(
+				&base, template, plan, predictorAnalysis, substep, substepTime,
+				predictorPrevious, predictorHistory, predictorOpenFuses,
+			)
+			if len(prepareDiagnostics) != 0 {
+				predicted = false
+				break
+			}
+			guess := append([]complex128(nil), predictorPrevious...)
+			predictorSystem, predictorSolution, evidence, diagnostic := solveTransientStep(
+				base, resolvedDevices, devices, predictorPrevious, guess,
+				&predictorWorkspace, false, predictorClamps,
+			)
+			total.Iterations += evidence.Iterations
+			if diagnostic != nil {
+				var seeded bool
+				predictorSystem, predictorSolution, evidence, seeded, _ = solveTransientStepByBJTVoltageSeed(
+					base, resolvedDevices, devices, predictorPrevious, predictorPrevious,
+					&predictorWorkspace, predictorClamps, -1,
+				)
+				total.Iterations += evidence.Iterations
+				if !seeded {
+					predicted = false
+					break
+				}
+			}
+			opened, limitDiagnostics := validateTransientOperatingLimits(
+				plan, predictorSystem, predictorSolution, predictorStates, true,
+				predictorAnalysis.TimeStepS, predictorFuseSurgeI2t, predictorOpenFuses,
+			)
+			if len(limitDiagnostics) != 0 || len(opened) != 0 {
+				predicted = false
+				break
+			}
+			predictorPrevious = predictorSolution
+			predictorHistory = append(predictorHistory, append([]complex128(nil), predictorSolution...))
+		}
+		if !predicted {
+			continue
+		}
+		total.TotalIterations = total.Iterations
+		total.TimeSteps = divisions
+		return predictorSystem, predictorPrevious, total, true
+	}
+	total.TotalIterations = total.Iterations
+	return mnaSystem{}, nil, total, false
+}
+
+func transientAcceptedSubstepsApplicable(plan Plan) bool {
+	for _, device := range plan.Devices {
+		switch device.PrimitiveModel {
+		case PrimitiveOpAmpV1, PrimitiveCurrentSenseAmplifierV1, PrimitiveSynchronousBuckRegulatorV1:
+			return true
+		}
+	}
+	return false
+}
+
+func cloneTransientFuseStates(source map[string]bool) map[string]bool {
+	clone := make(map[string]bool, len(source))
+	for component, open := range source {
+		clone[component] = open
+	}
+	return clone
+}
+
 func solveTransientStepInternal(base mnaSystem, resolvedDevices []ResolvedDevice, devices []compiledNonlinearDevice, previous, guess []complex128, workspace *mnaSystem, selectiveNodeDamping bool, fixedOutputClamps map[string]bool, allowMOSFETActiveSet bool) (mnaSystem, []complex128, SolverEvidence, *Diagnostic) {
+	return solveTransientStepInternalWithLimit(
+		base, resolvedDevices, devices, previous, guess, workspace, selectiveNodeDamping, fixedOutputClamps, allowMOSFETActiveSet, transientMaxNewtonIterations,
+	)
+}
+
+func solveTransientStepInternalWithLimit(base mnaSystem, resolvedDevices []ResolvedDevice, devices []compiledNonlinearDevice, previous, guess []complex128, workspace *mnaSystem, selectiveNodeDamping bool, fixedOutputClamps map[string]bool, allowMOSFETActiveSet bool, maxIterations int) (mnaSystem, []complex128, SolverEvidence, *Diagnostic) {
 	system := workspace
 	constrainedBase := cloneMNASystem(base)
 	outputLimits := map[string]transientOutputLimitState{}
 	branchLimits := map[int]float64{}
 	deferredOutputLimits := map[string]bool{}
 	deferredBranchLimits := map[int]bool{}
+	stickyBranchLimits := map[int]bool{}
 	seenLimitStates := map[string]bool{transientActiveLimitSolverStateKey(resolvedDevices, outputLimits, branchLimits, deferredOutputLimits, deferredBranchLimits): true}
 	evidence := SolverEvidence{Method: "backward_euler_bounded_newton_v1"}
 	largestUpdateLabel, largestCurrentUpdateLabel, largestResidualLabel := "unknown", "unknown", "unknown"
-	for iteration := 1; iteration <= transientMaxNewtonIterations; iteration++ {
+	for iteration := 1; iteration <= maxIterations; iteration++ {
 		resetMNASystem(&constrainedBase, base)
 		applyTransientActiveLimits(&constrainedBase, resolvedDevices, outputLimits, branchLimits)
 		resetMNASystem(system, constrainedBase)
@@ -1150,18 +1968,16 @@ func solveTransientStepInternal(base mnaSystem, resolvedDevices []ResolvedDevice
 		evidence.FinalMaxCurrentUpdateA = normalizedMNAFloat(maxAppliedCurrentUpdate)
 		evidence.FinalMaxResidual = normalizedMNAFloat(maxResidual)
 		if nonlinearIterationConverged(maxAppliedUpdate, maxAppliedCurrentUpdate, maxResidual) {
-			nextOutputLimits, nextBranchLimits, activeLimitChanged := advanceTransientActiveLimitState(base, resolvedDevices, guess, outputLimits, branchLimits, fixedOutputClamps)
+			nextOutputLimits, nextBranchLimits, activeLimitChanged := advanceTransientActiveLimitState(
+				base, resolvedDevices, guess, outputLimits, branchLimits, fixedOutputClamps, stickyBranchLimits,
+			)
 			if activeLimitChanged {
-				for component := range outputLimits {
-					if _, remainsLimited := nextOutputLimits[component]; !remainsLimited {
-						deferredOutputLimits[component] = true
-					}
-				}
-				for branch := range branchLimits {
-					if _, remainsLimited := nextBranchLimits[branch]; !remainsLimited {
-						deferredBranchLimits[branch] = true
-					}
-				}
+				recordReleasedTransientActiveLimits(
+					base,
+					outputLimits, nextOutputLimits,
+					branchLimits, nextBranchLimits,
+					deferredOutputLimits, deferredBranchLimits,
+				)
 				for component := range nextOutputLimits {
 					if _, wasLimited := outputLimits[component]; !wasLimited {
 						delete(deferredOutputLimits, component)
@@ -1175,6 +1991,19 @@ func solveTransientStepInternal(base mnaSystem, resolvedDevices []ResolvedDevice
 				currentStateKey := transientActiveLimitStateKey(resolvedDevices, outputLimits, branchLimits)
 				stateKey := transientActiveLimitSolverStateKey(resolvedDevices, nextOutputLimits, nextBranchLimits, deferredOutputLimits, deferredBranchLimits)
 				if seenLimitStates[stateKey] {
+					stabilizedBranch := false
+					for branch := range nextBranchLimits {
+						if _, wasLimited := branchLimits[branch]; wasLimited {
+							continue
+						}
+						stickyBranchLimits[branch] = true
+						stabilizedBranch = true
+					}
+					if stabilizedBranch {
+						seedTransientOutputLimitGuess(base, resolvedDevices, guess, outputLimits, nextOutputLimits)
+						outputLimits, branchLimits = nextOutputLimits, nextBranchLimits
+						continue
+					}
 					return mnaSystem{}, nil, evidence, &Diagnostic{Path: "devices", Message: "bounded transient output/current-limit states did not converge (current " + currentStateKey + ", repeated " + stateKey + ")", Suggestion: "correct ambiguous feedback, reduce the bounded observation step, or select compatible reviewed dynamic models"}
 				}
 				seenLimitStates[stateKey] = true
@@ -1185,7 +2014,7 @@ func solveTransientStepInternal(base mnaSystem, resolvedDevices []ResolvedDevice
 			return *system, guess, evidence, nil
 		}
 	}
-	diagnostic := &Diagnostic{Path: "convergence", Message: fmt.Sprintf("fixed backward-Euler Newton solve did not converge within %d iterations; active limits %s; largest voltage update %s %.12g V, largest current update %s %.12g A, largest normalized residual %s %.12g", transientMaxNewtonIterations, transientActiveLimitStateKey(resolvedDevices, outputLimits, branchLimits), largestUpdateLabel, evidence.FinalMaxUpdateV, largestCurrentUpdateLabel, evidence.FinalMaxCurrentUpdateA, largestResidualLabel, evidence.FinalMaxResidual), Suggestion: "reduce the bounded observation step, add a catalog-backed bias path, or correct incompatible source and switching conditions"}
+	diagnostic := &Diagnostic{Path: "convergence", Message: fmt.Sprintf("fixed backward-Euler Newton solve did not converge within %d iterations; active limits %s; largest voltage update %s %.12g V, largest current update %s %.12g A, largest normalized residual %s %.12g", maxIterations, transientActiveLimitStateKey(resolvedDevices, outputLimits, branchLimits), largestUpdateLabel, evidence.FinalMaxUpdateV, largestCurrentUpdateLabel, evidence.FinalMaxCurrentUpdateA, largestResidualLabel, evidence.FinalMaxResidual), Suggestion: "reduce the bounded observation step, add a catalog-backed bias path, or correct incompatible source and switching conditions"}
 	if allowMOSFETActiveSet {
 		if activeSystem, activeSolution, activeEvidence, ok := solveTransientStepByMOSFETActiveSet(base, resolvedDevices, devices, previous, workspace, selectiveNodeDamping, fixedOutputClamps); ok {
 			activeEvidence.Iterations += evidence.Iterations
@@ -1196,10 +2025,48 @@ func solveTransientStepInternal(base mnaSystem, resolvedDevices []ResolvedDevice
 	return mnaSystem{}, nil, evidence, diagnostic
 }
 
+func recordReleasedTransientActiveLimits(
+	base mnaSystem,
+	outputLimits, nextOutputLimits map[string]transientOutputLimitState,
+	branchLimits, nextBranchLimits map[int]float64,
+	deferredOutputLimits map[string]bool,
+	deferredBranchLimits map[int]bool,
+) {
+	for component, state := range outputLimits {
+		if _, remainsLimited := nextOutputLimits[component]; remainsLimited {
+			continue
+		}
+		// A physical rail clamp is deferred after release so it cannot be
+		// selected again before the restored control equation moves inward.
+		// An interior continuation root is only a synthetic equation-solving
+		// clamp: releasing it must leave the physical output envelope eligible.
+		if state.side != 0 {
+			deferredOutputLimits[component] = true
+		} else {
+			delete(deferredOutputLimits, component)
+		}
+		if branch, exists := base.branchIndex[component]; exists {
+			// A branch limit deferred only to let the same controlled output
+			// reach a physical rail becomes eligible again as soon as that
+			// output clamp releases. Carrying the deferral forward would
+			// permit a later above-limit solution.
+			delete(deferredBranchLimits, branch)
+		}
+	}
+	for branch := range branchLimits {
+		if _, remainsLimited := nextBranchLimits[branch]; !remainsLimited {
+			deferredBranchLimits[branch] = true
+		}
+	}
+}
+
 func solveTransientStepByMOSFETActiveSet(base mnaSystem, resolvedDevices []ResolvedDevice, devices []compiledNonlinearDevice, previous []complex128, workspace *mnaSystem, selectiveNodeDamping bool, fixedOutputClamps map[string]bool) (mnaSystem, []complex128, SolverEvidence, bool) {
 	var switches []string
 	for _, device := range devices {
 		if device.primitive == PrimitiveNMOSSwitchV1 || device.primitive == PrimitivePMOSSwitchV1 {
+			if device.parameters["gate_threshold_max_v"] > 0 {
+				continue
+			}
 			switches = append(switches, device.component)
 		}
 	}
@@ -1271,6 +2138,8 @@ func applyTransientActiveLimits(system *mnaSystem, devices []ResolvedDevice, out
 			stampTransientRelativeOutputClamp(system, device.Component, terminals["OUT"], "", state.value)
 		case PrimitiveCurrentSenseAmplifierV1:
 			stampTransientRelativeOutputClamp(system, device.Component, terminals["OUT"], terminals["GND_A"], state.value)
+		case PrimitiveSynchronousBuckRegulatorV1:
+			stampTransientRelativeOutputClamp(system, device.Component, terminals["SW"], terminals["PGND"], state.value)
 		}
 	}
 	branches := make([]int, 0, len(branchLimits))
@@ -1292,6 +2161,12 @@ func addViolatedTransientActiveLimit(base mnaSystem, devices []ResolvedDevice, s
 		if fixedOutputClamps[device.Component] || deferredOutputLimits[device.Component] {
 			continue
 		}
+		branch := -1
+		branchLimited := false
+		if candidateBranch, exists := base.branchIndex[device.Component]; exists {
+			branch = candidateBranch
+			_, branchLimited = branchLimits[branch]
+		}
 		if _, limited := outputLimits[device.Component]; limited {
 			continue
 		}
@@ -1304,15 +2179,33 @@ func addViolatedTransientActiveLimit(base mnaSystem, devices []ResolvedDevice, s
 		case output < minimum-tolerance:
 			next := cloneTransientOutputLimits(outputLimits)
 			next[device.Component] = transientOutputLimitState{side: -1, value: minimum}
-			return next, branchLimits, true
+			nextBranches := branchLimits
+			if branchLimited {
+				nextBranches = cloneTransientBranchLimits(branchLimits)
+				delete(nextBranches, branch)
+				if deferredBranchLimits != nil {
+					deferredBranchLimits[branch] = true
+				}
+			}
+			return next, nextBranches, true
 		case output > maximum+tolerance:
 			next := cloneTransientOutputLimits(outputLimits)
 			next[device.Component] = transientOutputLimitState{side: 1, value: maximum}
-			return next, branchLimits, true
+			nextBranches := branchLimits
+			if branchLimited {
+				nextBranches = cloneTransientBranchLimits(branchLimits)
+				delete(nextBranches, branch)
+				if deferredBranchLimits != nil {
+					deferredBranchLimits[branch] = true
+				}
+			}
+			return next, nextBranches, true
 		}
 	}
 	for _, device := range devices {
-		for _, candidate := range transientBranchLimitCandidates(base, device) {
+		mainBranch, hasMainBranch := base.branchIndex[device.Component]
+		_, outputLimited := outputLimits[device.Component]
+		for _, candidate := range transientBranchLimitCandidates(base, devices, device) {
 			if candidate.limit <= 0 || candidate.branch >= len(solution) || deferredBranchLimits[candidate.branch] {
 				continue
 			}
@@ -1321,19 +2214,38 @@ func addViolatedTransientActiveLimit(base mnaSystem, devices []ResolvedDevice, s
 			}
 			current := real(solution[candidate.branch])
 			if math.Abs(current) > candidate.limit*(1+1e-9) {
+				if outputLimited && hasMainBranch && candidate.branch == mainBranch {
+					state := outputLimits[device.Component]
+					if device.PrimitiveModel == PrimitiveSynchronousBuckRegulatorV1 && state.value <= mnaPivotTolerance {
+						if deferredBranchLimits != nil {
+							deferredBranchLimits[candidate.branch] = true
+						}
+						continue
+					}
+				}
+				nextOutputLimits := outputLimits
+				if outputLimited && hasMainBranch && candidate.branch == mainBranch {
+					nextOutputLimits = cloneTransientOutputLimits(outputLimits)
+					delete(nextOutputLimits, device.Component)
+				}
 				next := cloneTransientBranchLimits(branchLimits)
 				next[candidate.branch] = math.Copysign(candidate.limit, current)
-				return outputLimits, next, true
+				return nextOutputLimits, next, true
 			}
 		}
 	}
 	return outputLimits, branchLimits, false
 }
 
-func advanceTransientActiveLimitState(base mnaSystem, devices []ResolvedDevice, solution []complex128, outputLimits map[string]transientOutputLimitState, branchLimits map[int]float64, fixedOutputClamps map[string]bool) (map[string]transientOutputLimitState, map[int]float64, bool) {
+func advanceTransientActiveLimitState(base mnaSystem, devices []ResolvedDevice, solution []complex128, outputLimits map[string]transientOutputLimitState, branchLimits map[int]float64, fixedOutputClamps map[string]bool, stickyBranchLimits map[int]bool) (map[string]transientOutputLimitState, map[int]float64, bool) {
 	for _, device := range devices {
 		if fixedOutputClamps[device.Component] {
 			continue
+		}
+		if branch, exists := base.branchIndex[device.Component]; exists {
+			if _, limited := branchLimits[branch]; limited {
+				continue
+			}
 		}
 		minimum, maximum, output, clampTolerance, outputDevice := transientOutputLimitObservation(base, device, solution)
 		if !outputDevice || minimum >= maximum {
@@ -1412,7 +2324,13 @@ func advanceTransientActiveLimitState(base mnaSystem, devices []ResolvedDevice, 
 				return next, branchLimits, true
 			case 0:
 				if math.Abs(residual) <= residualTolerance {
-					continue
+					// The continuation clamp has located an interior root of
+					// the original control equation. Release the synthetic
+					// voltage clamp so the restored equation can expose and
+					// enforce any independent branch-current limit.
+					next := cloneTransientOutputLimits(outputLimits)
+					delete(next, device.Component)
+					return next, branchLimits, true
 				}
 				lower, upper := state.lower, state.upper
 				lowerResidual, upperResidual := state.lowerResidual, state.upperResidual
@@ -1446,12 +2364,20 @@ func advanceTransientActiveLimitState(base mnaSystem, devices []ResolvedDevice, 
 	}
 
 	for _, device := range devices {
-		for _, candidate := range transientBranchLimitCandidates(base, device) {
+		mainBranch, hasMainBranch := base.branchIndex[device.Component]
+		_, outputLimited := outputLimits[device.Component]
+		for _, candidate := range transientBranchLimitCandidates(base, devices, device) {
 			if candidate.limit <= 0 || candidate.branch >= len(solution) {
+				continue
+			}
+			if outputLimited && hasMainBranch && candidate.branch == mainBranch {
 				continue
 			}
 			state, limited := branchLimits[candidate.branch]
 			if limited {
+				if stickyBranchLimits[candidate.branch] {
+					continue
+				}
 				residual := transientBranchEquationResidual(base, candidate.branch, solution)
 				if residual*math.Copysign(1, state) < -nonlinearClampConsistencyV {
 					next := cloneTransientBranchLimits(branchLimits)
@@ -1472,20 +2398,38 @@ func advanceTransientActiveLimitState(base mnaSystem, devices []ResolvedDevice, 
 }
 
 func transientOutputLimitObservation(base mnaSystem, device ResolvedDevice, solution []complex128) (minimum, maximum, output, clampTolerance float64, ok bool) {
-	terminals := terminalMap(device)
-	parameters := namedValueMap(device.ModelParameters)
 	switch device.PrimitiveModel {
 	case PrimitiveOpAmpV1:
+		terminals := terminalMap(device)
 		positive := nonlinearNodeVoltage(&base, solution, terminals["V_PLUS"])
 		negative := nonlinearNodeVoltage(&base, solution, terminals["V_MINUS"])
-		return negative + parameters["output_low_margin_v"], positive - parameters["output_high_margin_v"], nonlinearNodeVoltage(&base, solution, terminals["OUT"]), nonlinearClampConsistencyV, true
+		return negative + transientModelParameter(device.ModelParameters, "output_low_margin_v"),
+			positive - transientModelParameter(device.ModelParameters, "output_high_margin_v"),
+			nonlinearNodeVoltage(&base, solution, terminals["OUT"]), nonlinearClampConsistencyV, true
 	case PrimitiveCurrentSenseAmplifierV1:
+		terminals := terminalMap(device)
 		ground := nonlinearNodeVoltage(&base, solution, terminals["GND_A"])
 		supply := nonlinearNodeVoltage(&base, solution, terminals["VCC"]) - ground
-		return parameters["output_low_margin_v"], supply - parameters["output_high_margin_v"], nonlinearNodeVoltage(&base, solution, terminals["OUT"]) - ground, mnaPivotTolerance, true
+		return transientModelParameter(device.ModelParameters, "output_low_margin_v"),
+			supply - transientModelParameter(device.ModelParameters, "output_high_margin_v"),
+			nonlinearNodeVoltage(&base, solution, terminals["OUT"]) - ground, mnaPivotTolerance, true
+	case PrimitiveSynchronousBuckRegulatorV1:
+		terminals := terminalMap(device)
+		ground := nonlinearNodeVoltage(&base, solution, terminals["PGND"])
+		input := nonlinearNodeVoltage(&base, solution, terminals["PVIN"]) - ground
+		return 0, math.Max(0, input), nonlinearNodeVoltage(&base, solution, terminals["SW"]) - ground, mnaPivotTolerance, true
 	default:
 		return 0, 0, 0, 0, false
 	}
+}
+
+func transientModelParameter(parameters []NamedValue, name string) float64 {
+	for _, parameter := range parameters {
+		if parameter.Name == name {
+			return parameter.Value
+		}
+	}
+	return 0
 }
 
 type transientBranchLimitCandidate struct {
@@ -1493,22 +2437,27 @@ type transientBranchLimitCandidate struct {
 	limit  float64
 }
 
-func transientBranchLimitCandidates(base mnaSystem, device ResolvedDevice) []transientBranchLimitCandidate {
-	parameters := namedValueMap(device.ModelParameters)
+func transientBranchLimitCandidates(base mnaSystem, devices []ResolvedDevice, device ResolvedDevice) []transientBranchLimitCandidate {
 	switch device.PrimitiveModel {
 	case PrimitiveAdjustableLinearRegulatorV1, PrimitiveFixedLinearRegulatorV1, PrimitiveFloatingAdjustableRegulatorV1:
 		branch, exists := base.branchIndex[device.Component]
 		if !exists {
 			return nil
 		}
-		return []transientBranchLimitCandidate{{branch: branch, limit: parameters["max_load_current_a"]}}
+		return []transientBranchLimitCandidate{{branch: branch, limit: transientModelParameter(device.ModelParameters, "max_load_current_a")}}
+	case PrimitiveSynchronousBuckRegulatorV1:
+		branch, exists := base.branchIndex[device.Component]
+		if !exists {
+			return nil
+		}
+		return []transientBranchLimitCandidate{{branch: branch, limit: transientModelParameter(device.ModelParameters, "peak_current_limit_a")}}
 	case PrimitiveDualOutputIsolatedConverterV1:
 		return []transientBranchLimitCandidate{
-			{branch: base.multiBranchIndex[mnaBranchKey{component: device.Component, terminal: "VOUT_PLUS"}], limit: parameters["positive_max_output_current_a"]},
-			{branch: base.multiBranchIndex[mnaBranchKey{component: device.Component, terminal: "VOUT_MINUS"}], limit: parameters["negative_max_output_current_a"]},
+			{branch: base.multiBranchIndex[mnaBranchKey{component: device.Component, terminal: "VOUT_PLUS"}], limit: transientModelParameter(device.ModelParameters, "positive_max_output_current_a")},
+			{branch: base.multiBranchIndex[mnaBranchKey{component: device.Component, terminal: "VOUT_MINUS"}], limit: transientModelParameter(device.ModelParameters, "negative_max_output_current_a")},
 		}
 	case PrimitiveSingleOutputIsolatedConverterV1:
-		return []transientBranchLimitCandidate{{branch: base.branchIndex[device.Component], limit: parameters["max_output_current_a"]}}
+		return []transientBranchLimitCandidate{{branch: base.branchIndex[device.Component], limit: transientModelParameter(device.ModelParameters, "max_output_current_a")}}
 	default:
 		return nil
 	}
@@ -1613,8 +2562,18 @@ func transientActiveLimitSolverStateKey(devices []ResolvedDevice, outputLimits m
 	return key.String()
 }
 
-func validateTransientOperatingLimits(plan Plan, system mnaSystem, solution []complex128, comparatorStates map[string]float64, allowPowerTransition bool, timeStepS float64, fuseSurgeI2t map[string]float64) []Diagnostic {
-	diagnostics := validateNonlinearOperatingLimitsWithComparatorStates(plan, system, solution, comparatorStates, allowPowerTransition)
+func validateTransientOperatingLimits(
+	plan Plan,
+	system mnaSystem,
+	solution []complex128,
+	comparatorStates map[string]float64,
+	allowPowerTransition bool,
+	timeStepS float64,
+	fuseSurgeI2t map[string]float64,
+	openFuses map[string]bool,
+) ([]string, []Diagnostic) {
+	diagnostics := validateNonlinearOperatingLimitsWithComparatorStates(plan, system, solution, comparatorStates, allowPowerTransition, true)
+	var openedFuses []string
 	for _, device := range plan.Devices {
 		terminals := terminalMap(device)
 		parameters := namedValueMap(device.ModelParameters)
@@ -1637,15 +2596,51 @@ func validateTransientOperatingLimits(plan Plan, system mnaSystem, solution []co
 			if fuseSurgeI2t[device.Component] > meltingI2t {
 				diagnostics = append(diagnostics, Diagnostic{Path: path, Message: fmt.Sprintf("fuse excess-current integral %.12g A^2s exceeds catalog-backed nominal melting I2t %.12g A^2s", fuseSurgeI2t[device.Component], meltingI2t), Suggestion: "reduce transient current, select a fuse with sufficient reviewed surge capacity, or use a registered time-current clearing model"})
 			}
+		case PrimitiveFuseI2TClearingV1:
+			voltage := nonlinearNodeVoltage(&system, solution, terminals["A"]) - nonlinearNodeVoltage(&system, solution, terminals["B"])
+			if math.Abs(voltage) > parameters["max_voltage_v"] {
+				diagnostics = append(diagnostics, Diagnostic{
+					Path:       "devices." + device.Component + ".operating_limit",
+					Message:    fmt.Sprintf("cleared fuse voltage %.12g V exceeds catalog-backed limit %.12g V", math.Abs(voltage), parameters["max_voltage_v"]),
+					Suggestion: "reduce the applied voltage or select a fuse with a sufficient reviewed interrupting-voltage rating",
+				})
+			}
+			if openFuses[device.Component] || timeStepS <= 0 || fuseSurgeI2t == nil {
+				continue
+			}
+			current := math.Abs(voltage / parameters["cold_resistance_ohm"])
+			rated := parameters["rated_current_a"]
+			if current <= rated {
+				// Nominal melting I2t is a bounded pulse-energy claim, not an
+				// indefinite thermal accumulator. A sub-rated interval ends the
+				// contiguous overcurrent pulse; long-term heating still belongs
+				// to a catalog time-current/thermal model.
+				fuseSurgeI2t[device.Component] = 0
+				continue
+			}
+			fuseSurgeI2t[device.Component] += (current*current - rated*rated) * timeStepS
+			if fuseSurgeI2t[device.Component] >= parameters["nominal_melting_i2t_a2s"] {
+				openedFuses = append(openedFuses, device.Component)
+			}
 		case PrimitiveCapacitorTransientV1:
 			voltage := nonlinearNodeVoltage(&system, solution, terminals["A"]) - nonlinearNodeVoltage(&system, solution, terminals["B"])
 			limit := parameters["max_voltage_v"]
 			if math.Abs(voltage) > limit {
 				diagnostics = append(diagnostics, Diagnostic{Path: "devices." + device.Component + ".operating_limit", Message: fmt.Sprintf("capacitor voltage %.12g V exceeds catalog-backed limit %.12g V", math.Abs(voltage), limit), Suggestion: "reduce applied voltage or select a suitably rated reviewed capacitor"})
 			}
+		case PrimitiveInductorTransientV1:
+			current := math.Abs(real(solution[system.branchIndex[device.Component]]))
+			rated := parameters["rated_current_a"]
+			saturation := parameters["saturation_current_a"]
+			if current > saturation {
+				diagnostics = append(diagnostics, Diagnostic{Path: "devices." + device.Component + ".operating_limit", Message: fmt.Sprintf("inductor current %.12g A exceeds catalog-backed saturation current %.12g A", current, saturation), Suggestion: "reduce peak current or select a reviewed inductor with sufficient saturation current"})
+			} else if current > rated {
+				diagnostics = append(diagnostics, Diagnostic{Path: "devices." + device.Component + ".operating_limit", Message: fmt.Sprintf("inductor current %.12g A exceeds catalog-backed rated current %.12g A", current, rated), Suggestion: "reduce RMS current or select a reviewed inductor with sufficient current rating"})
+			}
 		}
 	}
-	return diagnostics
+	slices.Sort(openedFuses)
+	return slices.Compact(openedFuses), diagnostics
 }
 
 func prefixTransientDiagnostics(analysisID string, step int, timeS float64, diagnostics []Diagnostic) []Diagnostic {

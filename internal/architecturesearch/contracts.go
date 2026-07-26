@@ -200,7 +200,7 @@ func ContractFromRequirementSignal(requirement Requirement, signalID, direction 
 	domain := requirementDomain(normalized, signal.Domain)
 	contract := PortContract{
 		ID: signal.ID, Kind: signal.Kind, Direction: direction, Domain: signal.Domain,
-		Voltage: domainVoltageRange(domain), MinimumEvidence: minimumEvidence,
+		Voltage: signalVoltageRange(normalized, *signal, domain), MinimumEvidence: minimumEvidence,
 	}
 	if signal.Protocol != nil {
 		protocol := *signal.Protocol
@@ -241,6 +241,46 @@ func ContractFromRequirementSignal(requirement Requirement, signalID, direction 
 		}
 	}
 	return NormalizePortContract(contract), nil
+}
+
+func signalVoltageRange(requirement Requirement, signal Signal, domain Domain) NumericRange {
+	signalKind := canonicalIdentifier(signal.Kind)
+	if signalKind == "power" {
+		return domainVoltageRange(domain)
+	}
+	if domain.Kind == "supply" {
+		voltage := domainVoltageRange(domain)
+		if voltage.Minimum == nil || voltage.Maximum == nil {
+			return voltage
+		}
+		if *voltage.Minimum >= 0 {
+			return NumericRange{Minimum: float64Pointer(0), Maximum: cloneFloat64(voltage.Maximum)}
+		}
+		if *voltage.Maximum <= 0 {
+			return NumericRange{Minimum: cloneFloat64(voltage.Minimum), Maximum: float64Pointer(0)}
+		}
+		return voltage
+	}
+	if domain.Kind != "reference" || (signalKind != "analog_control" && signalKind != "analog_voltage" && signalKind != "differential_analog") {
+		return domainVoltageRange(domain)
+	}
+	// A reference domain defines the signal's datum, not a fixed 0 V
+	// amplitude. Until a producer is selected, accept the complete voltage
+	// envelope already declared by the behavior-level power domains. Search
+	// later refines each consumer to the selected producer's proven range.
+	minimum, maximum := 0.0, 0.0
+	for _, candidate := range requirement.Requirements.Domains {
+		if candidate.Kind == "reference" {
+			continue
+		}
+		voltage := domainVoltageRange(candidate)
+		if voltage.Minimum == nil || voltage.Maximum == nil {
+			continue
+		}
+		minimum = math.Min(minimum, *voltage.Minimum)
+		maximum = math.Max(maximum, *voltage.Maximum)
+	}
+	return NumericRange{Minimum: float64Pointer(minimum), Maximum: float64Pointer(maximum)}
 }
 
 func ContractFromBinding(requirement Requirement, binding Binding, minimumEvidence EvidenceConfidence) (PortContract, []reports.Issue) {

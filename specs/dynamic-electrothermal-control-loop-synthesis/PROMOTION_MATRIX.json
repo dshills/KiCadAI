@@ -1,0 +1,72 @@
+{
+  "schema_version": "kicadai.external-review-matrix.v1",
+  "scenarios": [
+    {
+      "id": "stable_reactive_load_line_driver",
+      "review_equivalent": "behavior-only feedback line driver with a reactive load and declared loop-stability margins",
+      "lane": "requirement",
+      "fixture": "internal/architecturesearch/testdata/dynamic_electrothermal_control_loop_corpus/stable_reactive_load_line_driver.json",
+      "board": {"mode": "synthesized", "layers": 2},
+      "expected_status": "pass",
+      "required_artifacts": ["design-request.json", "transaction.json", "workflow-result.json", "validation-summary.json", "design-promotion.json", "manifest.json", "normalized-requirement.json", "architecture-search.json", "closed-loop-synthesis.json", "simulation.json"],
+      "internal_gates": ["architecture_search", "component_evidence", "simulation", "routing", "connectivity", "route_completion", "writer_correctness", "round_trip", "deterministic_repeat"],
+      "optional_kicad_gates": ["erc", "strict_drc", "writer_correctness", "round_trip"]
+    },
+    {
+      "id": "precision_analog_servo_supply",
+      "review_equivalent": "behavior-only compensated analog servo supply with bounded loop and transient requirements",
+      "lane": "requirement",
+      "fixture": "internal/architecturesearch/testdata/dynamic_electrothermal_control_loop_corpus/precision_analog_servo_supply.json",
+      "board": {"mode": "synthesized", "layers": 2},
+      "expected_status": "pass",
+      "required_artifacts": ["design-request.json", "transaction.json", "workflow-result.json", "validation-summary.json", "design-promotion.json", "manifest.json", "normalized-requirement.json", "architecture-search.json", "closed-loop-synthesis.json", "simulation.json"],
+      "internal_gates": ["architecture_search", "component_evidence", "simulation", "routing", "connectivity", "route_completion", "writer_correctness", "round_trip", "deterministic_repeat"],
+      "optional_kicad_gates": ["erc", "strict_drc", "writer_correctness", "round_trip"]
+    },
+    {
+      "id": "efficient_step_down_power_stage",
+      "review_equivalent": "behavior-only synchronous step-down converter with stability, efficiency, thermal, and transient limits",
+      "lane": "requirement",
+      "fixture": "internal/architecturesearch/testdata/dynamic_electrothermal_control_loop_corpus/efficient_step_down_power_stage.json",
+      "board": {"mode": "synthesized", "layers": 2},
+      "expected_status": "pass",
+      "required_artifacts": ["design-request.json", "transaction.json", "workflow-result.json", "validation-summary.json", "design-promotion.json", "manifest.json", "normalized-requirement.json", "architecture-search.json", "closed-loop-synthesis.json", "simulation.json"],
+      "internal_gates": ["architecture_search", "component_evidence", "simulation", "routing", "connectivity", "route_completion", "writer_correctness", "round_trip", "deterministic_repeat"],
+      "optional_kicad_gates": ["erc", "strict_drc", "writer_correctness", "round_trip"]
+    },
+    {
+      "id": "protected_inductive_actuator_driver",
+      "review_equivalent": "behavior-only protected inductive-load switch with turn-off, overload, thermal, and transient-SOA evidence",
+      "lane": "requirement",
+      "fixture": "internal/architecturesearch/testdata/dynamic_electrothermal_control_loop_corpus/protected_inductive_actuator_driver.json",
+      "board": {"mode": "synthesized", "layers": 2},
+      "expected_status": "pass",
+      "required_artifacts": ["design-request.json", "transaction.json", "workflow-result.json", "validation-summary.json", "design-promotion.json", "manifest.json", "normalized-requirement.json", "architecture-search.json", "closed-loop-synthesis.json", "simulation.json"],
+      "internal_gates": ["architecture_search", "component_evidence", "simulation", "routing", "connectivity", "route_completion", "writer_correctness", "round_trip", "deterministic_repeat"],
+      "optional_kicad_gates": ["erc", "strict_drc", "writer_correctness", "round_trip"]
+    },
+    {
+      "id": "class_ab_dynamic_output_stage",
+      "review_equivalent": "behavior-only Class-AB output stage with reactive loading, thermal transients, faults, and protection response",
+      "lane": "requirement",
+      "fixture": "internal/architecturesearch/testdata/dynamic_electrothermal_control_loop_corpus/class_ab_dynamic_output_stage.json",
+      "board": {"mode": "synthesized", "layers": 2},
+      "expected_status": "pass",
+      "required_artifacts": ["design-request.json", "transaction.json", "workflow-result.json", "validation-summary.json", "design-promotion.json", "manifest.json", "normalized-requirement.json", "architecture-search.json", "closed-loop-synthesis.json", "simulation.json"],
+      "internal_gates": ["architecture_search", "component_evidence", "simulation", "routing", "connectivity", "route_completion", "writer_correctness", "round_trip", "deterministic_repeat"],
+      "optional_kicad_gates": ["erc", "strict_drc", "writer_correctness", "round_trip"]
+    },
+    {
+      "id": "sequenced_dual_rail_controller",
+      "review_equivalent": "behavior-only dual-rail sequencer with startup, shutdown, rail-loss, and transient-protection requirements",
+      "lane": "requirement",
+      "fixture": "internal/architecturesearch/testdata/dynamic_electrothermal_control_loop_corpus/sequenced_dual_rail_controller.json",
+      "board": {"mode": "synthesized", "layers": 2},
+      "expected_status": "pass",
+      "required_artifacts": ["design-request.json", "transaction.json", "workflow-result.json", "validation-summary.json", "design-promotion.json", "manifest.json", "normalized-requirement.json", "architecture-search.json", "closed-loop-synthesis.json", "simulation.json"],
+      "internal_gates": ["architecture_search", "component_evidence", "simulation", "routing", "connectivity", "route_completion", "writer_correctness", "round_trip", "deterministic_repeat"],
+      "optional_kicad_gates": ["erc", "strict_drc", "writer_correctness", "round_trip"]
+    }
+  ],
+  "negative_cases": []
+}

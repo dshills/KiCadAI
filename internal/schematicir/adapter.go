@@ -856,6 +856,22 @@ func (state *adapterState) appendNets(tx *transactions.Transaction) {
 					toLabelAt = nil
 				}
 			}
+			fromAnchor, fromAnchorOK := state.portEndpointAnchor(fromIR)
+			toAnchor, toAnchorOK := state.portEndpointAnchor(toIR)
+			if fromAnchorOK && toAnchorOK && fromAnchor == toAnchor {
+				// Some reviewed symbols expose several physical pins at one
+				// electrical anchor (for example, parallel switch pins). Keep
+				// the connect operations so every pin receives the net, but do
+				// not emit duplicate label stubs or zero-length wires at the
+				// shared anchor.
+				value := false
+				useLabels = &value
+				waypoints = nil
+				fromLabelAt = nil
+				toLabelAt = nil
+				skipFromLabel = false
+				skipToLabel = false
+			}
 			payload := transactions.ConnectOperation{
 				Op:                 transactions.OpConnect,
 				From:               from,

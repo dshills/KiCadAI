@@ -157,24 +157,34 @@ func Search(ctx context.Context, requirement Requirement, registry *Registry, op
 					}
 					continue
 				}
+				branchRemaining := cloneSearchObligations(remaining)
+				refinedRemaining, refinement := refineObligationsFromSelectedSources(branchRemaining, selection.Ports)
+				if refinement != nil {
+					accumulator.reject(refinement.Code, refinement.Path, provider.descriptor.ID, expansion.ID, refinement.Message)
+					continue
+				}
 				componentCount := selectedComponentCount(state.Selections) + len(selection.Components)
 				componentLimit := minInt(policy.MaxComponents, normalized.Requirements.Constraints.MaxComponents)
 				if componentCount > componentLimit {
 					accumulator.reject(CodeLimitExceeded, obligation.Path, provider.descriptor.ID, expansion.ID, fmt.Sprintf("candidate component count %d exceeds limit %d", componentCount, componentLimit))
 					continue
 				}
-				if len(remaining)+len(children) > policy.MaxUnresolvedObligations {
+				if len(refinedRemaining)+len(children) > policy.MaxUnresolvedObligations {
 					accumulator.reject(CodeLimitExceeded, obligation.Path, provider.descriptor.ID, expansion.ID, "candidate exceeds unresolved-obligation limit")
 					continue
 				}
-				candidateSelections := append(append([]FragmentSelection(nil), state.Selections...), selection)
+				candidateSelections := make([]FragmentSelection, 0, len(state.Selections)+1)
+				candidateSelections = append(candidateSelections, state.Selections...)
+				candidateSelections = append(candidateSelections, selection)
 				if area := selectedAreaMM2(candidateSelections); area > normalized.Requirements.Constraints.MaxWidthMM*normalized.Requirements.Constraints.MaxHeightMM {
 					accumulator.reject(CodeLimitExceeded, obligation.Path, provider.descriptor.ID, expansion.ID, "candidate area estimate exceeds board-area limit")
 					continue
 				}
 				namespacedChildren := namespaceChildren(obligation, provider.descriptor, expansion, children)
 				accumulator.recordObligations(namespacedChildren)
-				candidateObligations := append(append([]searchObligation(nil), remaining...), namespacedChildren...)
+				candidateObligations := make([]searchObligation, 0, len(refinedRemaining)+len(namespacedChildren))
+				candidateObligations = append(candidateObligations, refinedRemaining...)
+				candidateObligations = append(candidateObligations, namespacedChildren...)
 				next := normalizeSearchState(searchState{Depth: state.Depth + 1, Obligations: candidateObligations, Selections: candidateSelections})
 				key := searchStateKey(next)
 				if accumulator.visited[key] {
@@ -247,7 +257,7 @@ func (accumulator *searchAccumulator) finish() SearchResult {
 	limit := minInt(len(accumulator.complete), accumulator.policy.MaxCompleteCandidates)
 	retained := retainTopologicallyDiverseCandidates(accumulator.complete, limit)
 	selected := retained[0]
-	if accumulator.requirement.Version == VersionV4 {
+	if supportsSystemPlanning(accumulator.requirement) {
 		backtracking := BuildBacktrackingEvidence(retained)
 		if err := ValidateBacktrackingEvidence(backtracking, retained); err != nil {
 			accumulator.result.Status = SearchFailed
@@ -406,6 +416,9 @@ func (accumulator *searchAccumulator) finalizeCoverage() {
 }
 
 func requirementPolicyVersion(requirement Requirement) string {
+	if requirement.Version == VersionV5 {
+		return PolicyVersionV5
+	}
 	if requirement.Version == VersionV4 {
 		return PolicyVersionV4
 	}
@@ -451,6 +464,25 @@ func initialSearchObligations(requirement Requirement, minimumEvidence EvidenceC
 		for _, binding := range objective.Bindings {
 			contract, contractIssues := ContractFromBinding(requirement, binding, minimumEvidence)
 			issues = append(issues, contractIssues...)
+			if binding.Direction == "" && (binding.Role == "input" || binding.Role == "sense" || binding.Role == "protected") {
+				// Input/sense/protected roles consume or passively observe an
+				// endpoint. They are not another producer merely because the
+				// public circuit port itself is externally sourced.
+				contract.Direction = "sink"
+				contract.Evidence = ContractEvidence{Confidence: EvidenceRuleInferred, Sources: []string{"kicadai:objective-consumer-role"}}
+				contract = NormalizePortContract(contract)
+			}
+			if objective.Capability == "rail_sequencing" && (binding.Role == "rail_a" || binding.Role == "rail_b") {
+				// Sequencing rail roles are high-impedance observations, not
+				// declarations that the sequencing circuit consumes the full
+				// downstream rail budget.
+				contract.Direction = "sink"
+				contract.CurrentDemandA = nil
+				contract.MaximumCurrentDemandA = nil
+				contract.RequiredCurrentCapacityA = nil
+				contract.Evidence = ContractEvidence{Confidence: EvidenceRuleInferred, Sources: []string{"kicadai:high-impedance-rail-monitor"}}
+				contract = NormalizePortContract(contract)
+			}
 			anchor := externalAnchor(binding.Port)
 			if binding.Signal != "" {
 				anchor = signalAnchor(binding.Signal)
@@ -474,7 +506,8 @@ func initialSearchObligations(requirement Requirement, minimumEvidence EvidenceC
 
 func inferredUpstreamPowerRole(requirement Requirement, objective Objective, ports []RoleContract, minimumEvidence EvidenceConfidence) (RoleContract, bool) {
 	for _, port := range ports {
-		if port.Role == "power" || port.Role == "positive_power" {
+		if port.Role == "power" || port.Role == "positive_power" ||
+			(port.Contract.Kind == "power" && port.Contract.Direction == "sink") {
 			return RoleContract{}, false
 		}
 	}
@@ -485,7 +518,7 @@ func inferredUpstreamPowerRole(requirement Requirement, objective Objective, por
 			break
 		}
 	}
-	if !requiresProtectedStartup {
+	if !requiresProtectedStartup && !activeCapabilityRequiresPower(objective.Capability) {
 		return RoleContract{}, false
 	}
 	type candidate struct {
@@ -509,9 +542,6 @@ func inferredUpstreamPowerRole(requirement Requirement, objective Objective, por
 				continue
 			}
 			for _, binding := range upstream.Bindings {
-				if binding.Role != "power" && binding.Role != "positive_power" {
-					continue
-				}
 				contract, issues := ContractFromBinding(requirement, binding, minimumEvidence)
 				if len(issues) != 0 || contract.Kind != "power" || contract.Voltage.Maximum == nil || *contract.Voltage.Maximum <= 0 {
 					continue
@@ -522,6 +552,18 @@ func inferredUpstreamPowerRole(requirement Requirement, objective Objective, por
 				}
 				candidates = append(candidates, candidate{anchor: anchor, contract: contract})
 			}
+		}
+	}
+	if len(candidates) == 0 {
+		for _, port := range requirement.Requirements.Ports {
+			if port.Kind != "power" || port.Direction != "sink" {
+				continue
+			}
+			contract, contractIssues := ContractFromRequirementPort(requirement, port.ID, minimumEvidence)
+			if len(contractIssues) != 0 || contract.Voltage.Maximum == nil || *contract.Voltage.Maximum <= 0 {
+				continue
+			}
+			candidates = append(candidates, candidate{anchor: externalAnchor(port.ID), contract: contract})
 		}
 	}
 	slices.SortStableFunc(candidates, func(left, right candidate) int {
@@ -538,6 +580,17 @@ func inferredUpstreamPowerRole(requirement Requirement, objective Objective, por
 	contract.Direction = "sink"
 	contract.Evidence = ContractEvidence{Confidence: EvidenceRuleInferred, Sources: []string{"kicadai:upstream-protected-startup-power"}}
 	return RoleContract{Role: "power", Anchor: candidates[0].anchor, Contract: NormalizePortContract(contract)}, true
+}
+
+func activeCapabilityRequiresPower(capability string) bool {
+	switch canonicalIdentifier(capability) {
+	case "analog_servo_control", "current_sensing", "fault_indication", "frequency_filter",
+		"instrumentation_amplification", "signal_amplification",
+		"mute_control", "threshold_detection":
+		return true
+	default:
+		return false
+	}
 }
 
 func inferredSignalReferenceRole(requirement Requirement, objective Objective, ports []RoleContract, minimumEvidence EvidenceConfidence) (RoleContract, bool) {
@@ -785,7 +838,7 @@ func normalizeSearchState(state searchState) searchState {
 		slices.SortStableFunc(obligation.Ports, compareRoleContracts)
 		normalizeConstraints(obligation.Constraints)
 	}
-	slices.SortStableFunc(state.Obligations, compareSearchObligations)
+	state.Obligations = orderSearchObligationsBySignalFlow(state.Obligations)
 	for index := range state.Selections {
 		state.Selections[index] = normalizeFragmentSelection(state.Selections[index])
 	}
@@ -793,6 +846,121 @@ func normalizeSearchState(state searchState) searchState {
 		return strings.Compare(left.ObligationPath, right.ObligationPath)
 	})
 	return state
+}
+
+func orderSearchObligationsBySignalFlow(obligations []searchObligation) []searchObligation {
+	ordered := append([]searchObligation(nil), obligations...)
+	slices.SortStableFunc(ordered, compareSearchObligations)
+	if len(ordered) < 2 {
+		return ordered
+	}
+	indegree := make([]int, len(ordered))
+	edges := make([]map[int]bool, len(ordered))
+	for producerIndex, producer := range ordered {
+		for _, output := range producer.Ports {
+			if output.Anchor == "" || output.Contract.Direction != "source" {
+				continue
+			}
+			for consumerIndex, consumer := range ordered {
+				if producerIndex == consumerIndex {
+					continue
+				}
+				for _, input := range consumer.Ports {
+					if input.Anchor != output.Anchor || input.Contract.Direction != "sink" {
+						continue
+					}
+					if edges[producerIndex] == nil {
+						edges[producerIndex] = map[int]bool{}
+					}
+					if !edges[producerIndex][consumerIndex] {
+						edges[producerIndex][consumerIndex] = true
+						indegree[consumerIndex]++
+					}
+				}
+			}
+		}
+	}
+	result := make([]searchObligation, 0, len(ordered))
+	emitted := make([]bool, len(ordered))
+	for len(result) < len(ordered) {
+		next := -1
+		for index := range ordered {
+			if !emitted[index] && indegree[index] == 0 {
+				next = index
+				break
+			}
+		}
+		if next < 0 {
+			// Cyclic behavioral dependencies cannot be topologically ordered.
+			// Retain the normalized lexical order for the unresolved cycle.
+			for index := range ordered {
+				if !emitted[index] {
+					result = append(result, ordered[index])
+				}
+			}
+			break
+		}
+		emitted[next] = true
+		result = append(result, ordered[next])
+		for consumer := range edges[next] {
+			indegree[consumer]--
+		}
+	}
+	return result
+}
+
+func refineObligationsFromSelectedSources(obligations []searchObligation, selected []RoleContract) ([]searchObligation, *candidateValidation) {
+	// The caller transfers ownership of a fully branch-local clone.
+	refined := obligations
+	for _, source := range selected {
+		if source.Anchor == "" || source.Contract.Direction != "source" {
+			continue
+		}
+		for obligationIndex := range refined {
+			for portIndex := range refined[obligationIndex].Ports {
+				sink := &refined[obligationIndex].Ports[portIndex]
+				if sink.Anchor != source.Anchor || sink.Contract.Direction != "sink" {
+					continue
+				}
+				report := ConnectPorts(source.Contract, sink.Contract)
+				if !report.Compatible {
+					for _, check := range report.Checks {
+						if check.Status == ContractCheckReject {
+							return nil, &candidateValidation{
+								Code:    check.Code,
+								Path:    refined[obligationIndex].Path + ".ports." + sink.Role + "." + check.Path,
+								Message: "selected upstream source is incompatible with the dependent input: " + check.Message,
+							}
+						}
+					}
+					return nil, &candidateValidation{
+						Code:    CodeContractInvalid,
+						Path:    refined[obligationIndex].Path + ".ports." + sink.Role,
+						Message: "selected upstream source is incompatible with the dependent input",
+					}
+				}
+				sink.Contract.Voltage = NumericRange{
+					Minimum: cloneFloat64(source.Contract.Voltage.Minimum),
+					Maximum: cloneFloat64(source.Contract.Voltage.Maximum),
+				}
+				sink.Contract.Evidence = source.Contract.Evidence
+			}
+		}
+	}
+	return refined, nil
+}
+
+func cloneSearchObligations(source []searchObligation) []searchObligation {
+	clone := make([]searchObligation, len(source))
+	for index := range source {
+		clone[index] = source[index]
+		// RoleContract and Constraint values are treated as immutable except
+		// by branch refinement. Copy every mutable collection before a branch
+		// can replace a nested port contract or normalize constraints.
+		clone[index].Ports = append([]RoleContract(nil), source[index].Ports...)
+		clone[index].Constraints = cloneConstraints(source[index].Constraints)
+	}
+	return clone
 }
 
 type candidateValidation struct {
@@ -856,7 +1024,7 @@ func candidateFromState(state searchState, requirement Requirement) (CandidateRe
 		}
 	}
 	candidate := CandidateResult{Fingerprint: fingerprint, Score: score, Selections: selections, GlobalChecks: globalChecks}
-	if requirement.Version == VersionV4 {
+	if supportsSystemPlanning(requirement) {
 		systemPlan, validation := BuildSystemPlan(requirement, candidate)
 		if validation != nil {
 			return CandidateResult{}, validation
@@ -864,6 +1032,11 @@ func candidateFromState(state searchState, requirement Requirement) (CandidateRe
 		candidate.SystemPlan = &systemPlan
 	}
 	return candidate, nil
+}
+
+func supportsSystemPlanning(requirement Requirement) bool {
+	return (requirement.Version == VersionV4 && requirement.Schema == SchemaIDV4) ||
+		(requirement.Version == VersionV5 && requirement.Schema == SchemaIDV5)
 }
 
 func validateCandidateGlobal(requirement Requirement, selections []FragmentSelection) ([]GlobalCheck, *candidateValidation) {
@@ -960,6 +1133,24 @@ func validateCandidateGlobal(requirement Requirement, selections []FragmentSelec
 		if domain.MaxCurrentA == nil {
 			return nil, &candidateValidation{Code: CodeGlobalCurrentUnknown, Path: path, Message: "supply domain lacks maximum-current evidence"}
 		}
+		budget := *domain.MaxCurrentA
+		if canonicalIdentifier(domain.Source) != "external" {
+			// For a generated rail, max_current_a is the required delivered
+			// load. The selected catalog source may intentionally provide more
+			// capacity so its own protection, monitoring, and bias circuits do
+			// not steal from that delivered load. External sources retain their
+			// declared hard ceiling.
+			for _, selection := range selections {
+				for _, port := range selection.Ports {
+					if port.Contract.Domain == domain.ID &&
+						port.Contract.Kind == "power" &&
+						port.Contract.Direction == "source" &&
+						port.Contract.CurrentCapacityA != nil {
+						budget = math.Max(budget, *port.Contract.CurrentCapacityA)
+					}
+				}
+			}
+		}
 		var demand float64
 		var sinks int
 		for _, selection := range selections {
@@ -977,22 +1168,22 @@ func validateCandidateGlobal(requirement Requirement, selections []FragmentSelec
 		if sinks == 0 {
 			continue
 		}
-		margin := *domain.MaxCurrentA - demand
+		margin := budget - demand
 		if margin < 0 {
-			return nil, &candidateValidation{Code: CodeGlobalCurrentExceeded, Path: path, Message: fmt.Sprintf("aggregate domain demand %.9g A exceeds domain limit %.9g A", demand, *domain.MaxCurrentA)}
+			return nil, &candidateValidation{Code: CodeGlobalCurrentExceeded, Path: path, Message: fmt.Sprintf("aggregate domain demand %.9g A exceeds proven domain capacity %.9g A", demand, budget)}
 		}
 		if requireHeadroom {
-			if *domain.MaxCurrentA <= 0 {
+			if budget <= 0 {
 				return nil, &candidateValidation{Code: CodeGlobalCurrentUnknown, Path: path, Message: "supply headroom requires a positive maximum-current budget"}
 			}
-			observedPercent := margin / *domain.MaxCurrentA * 100
+			observedPercent := margin / budget * 100
 			if observedPercent < headroomPercent {
 				return nil, &candidateValidation{Code: CodeGlobalCurrentExceeded, Path: path, Message: fmt.Sprintf("supply headroom %.9g%% is below required %.9g%%", observedPercent, headroomPercent)}
 			}
 			worstHeadroom = math.Min(worstHeadroom, observedPercent)
 			hasHeadroomEvidence = true
 		}
-		checks = append(checks, GlobalCheck{Code: CodeGlobalCurrentExceeded, Path: path, Message: "aggregate supply-domain current demand is within the declared budget", Required: float64Pointer(demand), Observed: float64Pointer(*domain.MaxCurrentA), Margin: float64Pointer(margin)})
+		checks = append(checks, GlobalCheck{Code: CodeGlobalCurrentExceeded, Path: path, Message: "aggregate supply-domain current demand is within the proven source capacity", Required: float64Pointer(demand), Observed: float64Pointer(budget), Margin: float64Pointer(margin)})
 	}
 
 	componentCount := selectedComponentCount(selections)
@@ -1079,7 +1270,7 @@ func validateCandidateGlobal(requirement Requirement, selections []FragmentSelec
 				return nil, &candidateValidation{Code: CodeGlobalConstraintUnproven, Path: path, Message: "galvanic reference separation is not proven by distinct selected domains"}
 			}
 			checks = append(checks, GlobalCheck{Code: CodeGlobalConstraintUnproven, Path: path, Message: "selected isolation boundaries keep references in distinct voltage domains", Required: float64Pointer(1), Observed: float64Pointer(1), Margin: float64Pointer(0)})
-		case "rail_sequence_before", "rail_sequence_delay", "startup_monotonic", "startup_inrush_current":
+		case "rail_sequence_before", "rail_sequence_delay", "startup_monotonic", "startup_inrush_current", "startup_order", "shutdown_order":
 			check, validation := validatePowerSequenceConstraint(requirement, selections, constraint, path)
 			if validation != nil {
 				return nil, validation

@@ -299,6 +299,7 @@ func TestVerifiedSpeakerPowerFootprintTemplatesPreservePadContracts(t *testing.T
 		{"Capacitor_THT:CP_Radial_D5.0mm_P2.50mm", []string{"1", "2"}, true},
 		{"Capacitor_THT:CP_Radial_D6.3mm_P2.50mm", []string{"1", "2"}, true},
 		{"Capacitor_THT:CP_Radial_D8.0mm_P3.50mm", []string{"1", "2"}, true},
+		{"Capacitor_THT:CP_Radial_D12.5mm_P5.00mm", []string{"1", "2"}, true},
 		{"Capacitor_Tantalum_SMD:CP_EIA-3216-18_Kemet-A", []string{"1", "2"}, false},
 		{"Diode_SMD:D_SMB", []string{"1", "2"}, false},
 		{"Resistor_THT:R_Axial_DIN0411_L9.9mm_D3.6mm_P15.24mm_Horizontal", []string{"1", "2"}, true},
@@ -339,11 +340,13 @@ func TestVerifiedSpeakerPowerFootprintTemplatesMatchInstalledKiCadLibraries(t *t
 		"Capacitor_THT:CP_Radial_D5.0mm_P2.50mm",
 		"Capacitor_THT:CP_Radial_D6.3mm_P2.50mm",
 		"Capacitor_THT:CP_Radial_D8.0mm_P3.50mm",
+		"Capacitor_THT:CP_Radial_D12.5mm_P5.00mm",
 		"Capacitor_Tantalum_SMD:CP_EIA-3216-18_Kemet-A",
 		"Connector_PinHeader_2.54mm:PinHeader_1x02_P2.54mm_Vertical",
 		"Connector_PinHeader_2.54mm:PinHeader_1x04_P2.54mm_Vertical",
 		"Diode_SMD:D_SOD-123",
 		"Diode_SMD:D_SMB",
+		"Package_SO:MSOP-16-1EP_3x4.039mm_P0.5mm_EP1.651x2.845mm_ThermalVias",
 		"Package_SO:SOIC-8_3.9x4.9mm_P1.27mm",
 		"Package_SO:VSSOP-8_2.3x2mm_P0.5mm",
 		"Package_SO:VSSOP-8_3x3mm_P0.65mm",
@@ -450,12 +453,15 @@ func TestSOT223TemplateMapsDuplicatePinTwoPads(t *testing.T) {
 
 func TestVerifiedPadTemplatesCoverAdversarialPowerFootprints(t *testing.T) {
 	tests := map[string]int{
-		"Diode_SMD:D_SMC":                                      2,
-		"Package_TO_SOT_SMD:SOT-89-3":                          4,
-		"Package_TO_SOT_SMD:TO-252-3_TabPin2":                  8,
-		"Resistor_SMD:R_2512_6332Metric":                       2,
-		"Converter_DCDC:Converter_DCDC_Murata_MEE1SxxxxSC_THT": 4,
-		"Converter_DCDC:Converter_DCDC_TRACO_TEL12-xxxx_THT":   5,
+		"Diode_SMD:D_SMC":                      2,
+		"Inductor_SMD:L_Sunlord_MWSA1206S-220": 2,
+		"Package_TO_SOT_SMD:SOT-89-3":          4,
+		"Package_TO_SOT_SMD:TO-252-3_TabPin2":  8,
+		"Package_DFN_QFN:Texas_RNP0030B_WQFN-30-1EP_4x6mm_P0.5mm_EP1.8x4.5mm_ThermalVias": 47,
+		"Package_SO:MSOP-16-1EP_3x4.039mm_P0.5mm_EP1.651x2.845mm_ThermalVias":             28,
+		"Resistor_SMD:R_2512_6332Metric":                                                  2,
+		"Converter_DCDC:Converter_DCDC_Murata_MEE1SxxxxSC_THT":                            4,
+		"Converter_DCDC:Converter_DCDC_TRACO_TEL12-xxxx_THT":                              5,
 	}
 	for footprintID, padCount := range tests {
 		t.Run(footprintID, func(t *testing.T) {
@@ -472,6 +478,48 @@ func TestVerifiedPadTemplatesCoverAdversarialPowerFootprints(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestVerifiedBuckPowerTemplatesMatchKiCadLibraryGeometry(t *testing.T) {
+	qfn, ok := verifiedPadTemplate("Package_DFN_QFN:Texas_RNP0030B_WQFN-30-1EP_4x6mm_P0.5mm_EP1.8x4.5mm_ThermalVias")
+	if !ok {
+		t.Fatal("missing Texas RNP0030B WQFN template")
+	}
+	if qfn.Bounds != verifiedCourtyardBoundsFromExtents(-2.63, -3.63, 2.63, 3.63) {
+		t.Fatalf("WQFN bounds = %#v", qfn.Bounds)
+	}
+	if !reflect.DeepEqual(qfn.Pads[0], smdPad("1", -1.8625, -2.5, 1.025, .25, "roundrect")) ||
+		!reflect.DeepEqual(qfn.Pads[29], smdPad("30", -.75, -2.9875, .25, .775, "roundrect")) {
+		t.Fatalf("WQFN perimeter pads do not match KiCad: pin1=%#v pin30=%#v", qfn.Pads[0], qfn.Pads[29])
+	}
+	if duplicated := duplicatePadTemplateNames(qfn.Pads); len(duplicated) != 16 {
+		t.Fatalf("WQFN duplicate exposed-pad members = %d, want 16", len(duplicated))
+	}
+
+	msop, ok := verifiedPadTemplate("Package_SO:MSOP-16-1EP_3x4.039mm_P0.5mm_EP1.651x2.845mm_ThermalVias")
+	if !ok {
+		t.Fatal("missing Analog Devices MSE MSOP-16 template")
+	}
+	if msop.Bounds != verifiedCourtyardBoundsFromExtents(-3.13, -2.27, 3.13, 2.27) {
+		t.Fatalf("MSOP-16 bounds = %#v", msop.Bounds)
+	}
+	if !reflect.DeepEqual(msop.Pads[4], smdPad("1", -2.15, -1.75, 1.45, .3, "roundrect")) ||
+		!reflect.DeepEqual(msop.Pads[19], smdPad("16", 2.15, -1.75, 1.45, .3, "roundrect")) {
+		t.Fatalf("MSOP-16 perimeter pads do not match KiCad: pin1=%#v pin16=%#v", msop.Pads[4], msop.Pads[19])
+	}
+	if duplicated := duplicatePadTemplateNames(msop.Pads); len(duplicated) != 10 {
+		t.Fatalf("MSOP-16 duplicate paste/exposed-pad members = %d, want 10", len(duplicated))
+	}
+
+	inductor, ok := verifiedPadTemplate("Inductor_SMD:L_Sunlord_MWSA1206S-220")
+	if !ok {
+		t.Fatal("missing Sunlord MWSA1206S template")
+	}
+	if inductor.Bounds != verifiedCourtyardBoundsFromExtents(-7.5, -6.55, 7.5, 6.55) ||
+		!reflect.DeepEqual(inductor.Pads[0], smdPad("1", -5.625, 0, 3.25, 5.5, "roundrect")) ||
+		!reflect.DeepEqual(inductor.Pads[1], smdPad("2", 5.625, 0, 3.25, 5.5, "roundrect")) {
+		t.Fatalf("Sunlord template does not match KiCad: %#v", inductor)
 	}
 }
 

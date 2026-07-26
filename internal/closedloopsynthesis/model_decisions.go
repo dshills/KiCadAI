@@ -72,7 +72,11 @@ func ResolvePlanModelDecisions(plan simmodel.Plan, registry modelprovenance.Regi
 		decision.Provenance = &provenance
 		decision.Status = "used"
 		decision.Reason = "resolved catalog model has reviewed provenance for every consumed analysis behavior"
-		decision.RequiredAnalyses = append([]string(nil), dependencyAnalyses...)
+		for _, analysis := range required {
+			if len(simmodel.CatalogAnalysisDependencies(dependency.Claim.ModelID, []string{analysis})) != 0 {
+				decision.RequiredAnalyses = append(decision.RequiredAnalyses, analysis)
+			}
+		}
 		decisions = append(decisions, decision)
 	}
 	slices.SortStableFunc(decisions, compareModelDecisions)

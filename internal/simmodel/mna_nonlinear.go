@@ -41,6 +41,11 @@ func nonlinearOperatingVoltageTolerance(maximum float64) float64 {
 	return 10 * nonlinearResidualFloorUpdateV * math.Max(1, math.Abs(maximum))
 }
 
+func outsideNonlinearOperatingRange(value, minimum, maximum float64) bool {
+	tolerance := nonlinearOperatingVoltageTolerance(math.Max(math.Abs(minimum), math.Abs(maximum)))
+	return value < minimum-tolerance || value > maximum+tolerance
+}
+
 type continuationStage struct {
 	sourceScale float64
 	gmin        float64
@@ -111,6 +116,8 @@ func solveNonlinearDCFromWarmState(plan Plan, analysis Analysis, initial map[str
 			if fallbackSystem, fallbackSolution, fallbackEvidence, fallbackStates, ok := solveNonlinearDCByCenteredOpAmpSeed(plan, analysis, states); ok {
 				system, solution, evidence, states, diagnostic = fallbackSystem, fallbackSolution, fallbackEvidence, fallbackStates, nil
 			} else if fallbackSystem, fallbackSolution, fallbackEvidence, ok := solveNonlinearDCByMOSFETActiveSet(plan, analysis, states); ok {
+				system, solution, evidence, diagnostic = fallbackSystem, fallbackSolution, fallbackEvidence, nil
+			} else if fallbackSystem, fallbackSolution, fallbackEvidence, ok := solveNonlinearDCByBJTStateSeed(plan, analysis, states); ok {
 				system, solution, evidence, diagnostic = fallbackSystem, fallbackSolution, fallbackEvidence, nil
 			} else if fallbackSystem, fallbackSolution, fallbackEvidence, fallbackStates, ok := solveNonlinearDCByComparatorActiveSet(plan, analysis, states); ok {
 				system, solution, evidence, states, diagnostic = fallbackSystem, fallbackSolution, fallbackEvidence, fallbackStates, nil
@@ -402,10 +409,10 @@ func activeDeviceStateSolutionConsistent(plan Plan, system mnaSystem, solution [
 
 func advanceActiveDeviceState(plan Plan, current, resolved map[string]float64) map[string]float64 {
 	next := cloneOpAmpClamps(current)
-	for priority := 0; priority < 2; priority++ {
+	for priority := 0; priority < 3; priority++ {
 		for _, device := range plan.Devices {
 			linearOutput := device.PrimitiveModel == PrimitiveOpAmpV1 || device.PrimitiveModel == PrimitiveCurrentSenseAmplifierV1
-			if priority == 0 && !linearOutput || priority == 1 && device.PrimitiveModel != PrimitiveComparatorOpenCollectorV1 {
+			if activeDeviceTransitionPriority(device.PrimitiveModel) != priority {
 				continue
 			}
 			currentValue, currentExists := current[device.Component]
@@ -430,6 +437,22 @@ func advanceActiveDeviceState(plan Plan, current, resolved map[string]float64) m
 		}
 	}
 	return next
+}
+
+func activeDeviceTransitionPriority(primitive string) int {
+	switch primitive {
+	case PrimitiveCurrentSenseAmplifierV1:
+		// Settle measurement front ends before controllers that consume their
+		// bounded outputs. This prevents component ordering from deciding a
+		// coupled sensor/controller active-set branch.
+		return 0
+	case PrimitiveOpAmpV1:
+		return 1
+	case PrimitiveComparatorOpenCollectorV1:
+		return 2
+	default:
+		return 3
+	}
 }
 
 func activeDeviceStateValueEqual(left, right float64) bool {
@@ -484,6 +507,8 @@ func solveNonlinearDCForComparatorStateWithInitial(plan Plan, analysis Analysis,
 	}
 	evidence := SolverEvidence{Method: method, SourceStages: len(stages)}
 	stages = append([]continuationStage(nil), stages...)
+	bjtSeedAttempts := map[string]int{}
+	bjtSeedWithoutLineSearch := false
 	for stageIndex := 0; stageIndex < len(stages); {
 		stage := stages[stageIndex]
 		baseSystem, diagnostics := buildNonlinearBaseSystem(plan, analysis, stage, comparatorStates)
@@ -542,7 +567,7 @@ func solveNonlinearDCForComparatorStateWithInitial(plan Plan, analysis Analysis,
 			if maxNodeUpdate > nonlinearMaxNodeUpdateV && !piecewiseLinearRegionStable(devices, &system, guess, candidate) {
 				damping = nonlinearMaxNodeUpdateV / maxNodeUpdate
 			}
-			if requiresNonlinearLineSearch(devices) {
+			if requiresNonlinearLineSearch(devices) && !bjtSeedWithoutLineSearch {
 				priorResidual, _ := nonlinearResidual(baseSystem, devices, guess)
 				trial := make([]complex128, len(guess))
 				for {
@@ -592,6 +617,7 @@ func solveNonlinearDCForComparatorStateWithInitial(plan Plan, analysis Analysis,
 				stages = append([]continuationStage(nil), nonlinearContinuation...)
 				guess = nil
 				stageIndex = 0
+				bjtSeedWithoutLineSearch = false
 				evidence.Method = "bounded_newton_direct_warm_start_with_source_gmin_fallback_v1"
 				evidence.SourceStages = stageAttemptOffset + len(stages)
 				continue
@@ -601,7 +627,18 @@ func solveNonlinearDCForComparatorStateWithInitial(plan Plan, analysis Analysis,
 				copy(stages[stageIndex+1:], stages[stageIndex:])
 				stages[stageIndex] = midpoint
 				guess = stageInitialGuess
+				bjtSeedWithoutLineSearch = false
 				evidence.SourceStages = stageAttemptOffset + len(stages)
+				continue
+			}
+			stageKey := fmt.Sprintf("%.12g/%.12g/%.12g", stage.sourceScale, stage.gmin, stage.gainScale)
+			seeds := transientBJTVoltageSeeds(plan.Devices, &baseSystem, stageInitialGuess)
+			if attempt := bjtSeedAttempts[stageKey]; attempt < len(seeds) {
+				bjtSeedAttempts[stageKey] = attempt + 1
+				guess = seeds[attempt]
+				bjtSeedWithoutLineSearch = true
+				evidence.Method = "bounded_newton_source_gmin_bjt_voltage_seed_v1"
+				evidence.SourceStages++
 				continue
 			}
 			voltageContext := nonlinearUnknownContext(plan, largestUpdateLabel)
@@ -614,6 +651,7 @@ func solveNonlinearDCForComparatorStateWithInitial(plan Plan, analysis Analysis,
 			}
 		}
 		stageIndex++
+		bjtSeedWithoutLineSearch = false
 	}
 	return finalSystem, guess, evidence, nil
 }
@@ -654,6 +692,44 @@ func solveNonlinearDCByMOSFETActiveSet(plan Plan, analysis Analysis, activeState
 		evidence.TotalIterations = total.Iterations
 		return system, solution, evidence, true
 	}
+	return mnaSystem{}, nil, total, false
+}
+
+func solveNonlinearDCByBJTStateSeed(plan Plan, analysis Analysis, activeStates map[string]float64) (mnaSystem, []complex128, SolverEvidence, bool) {
+	var transistors []string
+	for _, device := range plan.Devices {
+		if device.PrimitiveModel == PrimitiveBJTNPNV1 || device.PrimitiveModel == PrimitiveBJTPNPV1 {
+			transistors = append(transistors, device.Component)
+		}
+	}
+	slices.Sort(transistors)
+	if len(transistors) == 0 || len(transistors) > bjtStateSeedDeviceLimit {
+		return mnaSystem{}, nil, SolverEvidence{}, false
+	}
+	total := SolverEvidence{Method: "bounded_newton_bjt_state_seed_v1", MaxIterationsPerStep: nonlinearMaxIterations}
+	for mask := 0; mask < 1<<len(transistors); mask++ {
+		forcedStates := cloneOpAmpClamps(activeStates)
+		for index, component := range transistors {
+			forcedStates[component] = float64((mask >> index) & 1)
+		}
+		_, seed, seedEvidence, seedDiagnostic := solveNonlinearDCForComparatorStateWithInitial(plan, analysis, forcedStates, nil)
+		total.SourceStages += seedEvidence.SourceStages
+		total.Iterations += seedEvidence.Iterations
+		if seedDiagnostic != nil {
+			continue
+		}
+		system, solution, evidence, diagnostic := solveNonlinearDCForComparatorStateWithInitial(plan, analysis, activeStates, seed)
+		total.SourceStages += evidence.SourceStages
+		total.Iterations += evidence.Iterations
+		total.TotalIterations = total.Iterations
+		total.FinalMaxUpdateV = evidence.FinalMaxUpdateV
+		total.FinalMaxCurrentUpdateA = evidence.FinalMaxCurrentUpdateA
+		total.FinalMaxResidual = evidence.FinalMaxResidual
+		if diagnostic == nil {
+			return system, solution, total, true
+		}
+	}
+	total.TotalIterations = total.Iterations
 	return mnaSystem{}, nil, total, false
 }
 
@@ -715,8 +791,18 @@ func mosfetActiveSetConsistent(plan Plan, system mnaSystem, solution []complex12
 		parameters := namedValueMap(device.ModelParameters)
 		gate := nonlinearNodeVoltage(&system, solution, terminals["GATE"])
 		source := nonlinearNodeVoltage(&system, solution, terminals["SOURCE"])
-		resolvedOn := mosfetSwitchOn(device.PrimitiveModel, gate, source, parameters["gate_on_voltage_v"])
-		if resolvedOn != (state >= .5) {
+		control := mosfetPolarity(device.PrimitiveModel) * (gate - source)
+		if state >= .5 {
+			if control < parameters["gate_on_voltage_v"] {
+				return false
+			}
+			continue
+		}
+		offBoundary := parameters["gate_on_voltage_v"]
+		if threshold := parameters["gate_threshold_max_v"]; threshold > 0 && threshold < offBoundary {
+			offBoundary = threshold
+		}
+		if control > offBoundary {
 			return false
 		}
 	}
@@ -743,8 +829,13 @@ func nonlinearContinuationMidpoint(stages []continuationStage, stageIndex int) (
 func requiresNonlinearLineSearch(devices []compiledNonlinearDevice) bool {
 	for _, device := range devices {
 		switch device.primitive {
-		case PrimitiveDiodeShockleyV1, PrimitiveUnidirectionalZenerV1, PrimitiveBidirectionalTVSV1, PrimitiveBJTNPNV1, PrimitiveBJTPNPV1:
+		case PrimitiveDiodeShockleyV1, PrimitiveUnidirectionalZenerV1, PrimitiveBidirectionalTVSV1,
+			PrimitiveBJTNPNV1, PrimitiveBJTPNPV1:
 			return true
+		case PrimitiveNMOSSwitchV1, PrimitivePMOSSwitchV1:
+			if device.parameters["gate_threshold_max_v"] > 0 {
+				return true
+			}
 		}
 	}
 	return false
@@ -912,6 +1003,11 @@ func compileNonlinearDevicesWithStates(plan Plan, states map[string]float64) []c
 				parameters[parameterForcedMOSFETState] = state
 			}
 		}
+		if device.PrimitiveModel == PrimitiveBJTNPNV1 || device.PrimitiveModel == PrimitiveBJTPNPV1 {
+			if state, exists := states[device.Component]; exists {
+				parameters[parameterForcedBJTState] = state
+			}
+		}
 		if device.PrimitiveModel == PrimitiveBidirectionalOpenDrainIsolatorV1 {
 			resolveIsolatedOpenDrainDrivers(plan, device, parameters)
 		}
@@ -1003,7 +1099,7 @@ func resolvedActiveDeviceStates(plan Plan, system mnaSystem, solution []complex1
 		switch device.PrimitiveModel {
 		case PrimitiveComparatorOpenCollectorV1:
 			supply := nonlinearNodeVoltage(&system, solution, terminals["V_PLUS"]) - nonlinearNodeVoltage(&system, solution, terminals["V_MINUS"])
-			if supply < parameters["supply_min_v"] || supply > parameters["supply_max_v"] {
+			if outsideNonlinearOperatingRange(supply, parameters["supply_min_v"], parameters["supply_max_v"]) {
 				return states, key.String(), &Diagnostic{Path: "devices." + device.Component + ".supply", Message: fmt.Sprintf("DC supply %.12g V is outside catalog-backed range %.12g..%.12g V", supply, parameters["supply_min_v"], parameters["supply_max_v"]), Suggestion: "adjust source conditions or select a compatible catalog comparator"}
 			}
 			if comparatorOn(device, system, solution) {
@@ -1017,7 +1113,7 @@ func resolvedActiveDeviceStates(plan Plan, system mnaSystem, solution []complex1
 			negative := nonlinearNodeVoltage(&system, solution, terminals["V_MINUS"])
 			positive := nonlinearNodeVoltage(&system, solution, terminals["V_PLUS"])
 			supply := positive - negative
-			if supply < parameters["supply_min_v"] || supply > parameters["supply_max_v"] {
+			if outsideNonlinearOperatingRange(supply, parameters["supply_min_v"], parameters["supply_max_v"]) {
 				return states, key.String(), &Diagnostic{Path: "devices." + device.Component + ".supply", Message: fmt.Sprintf("DC supply %.12g V is outside catalog-backed range %.12g..%.12g V", supply, parameters["supply_min_v"], parameters["supply_max_v"]), Suggestion: "adjust source conditions or select a compatible catalog op-amp"}
 			}
 			minimum := negative + parameters["output_low_margin_v"]
@@ -1037,7 +1133,7 @@ func resolvedActiveDeviceStates(plan Plan, system mnaSystem, solution []complex1
 			}
 		case PrimitiveCurrentSenseAmplifierV1:
 			supply, minimum, maximum, desired := currentSenseOperatingState(device, system, solution)
-			if supply < parameters["supply_min_v"] || supply > parameters["supply_max_v"] {
+			if outsideNonlinearOperatingRange(supply, parameters["supply_min_v"], parameters["supply_max_v"]) {
 				return states, key.String(), &Diagnostic{Path: "devices." + device.Component + ".supply", Message: fmt.Sprintf("DC supply %.12g V is outside catalog-backed range %.12g..%.12g V", supply, parameters["supply_min_v"], parameters["supply_max_v"]), Suggestion: "adjust source conditions or select a compatible catalog current-sense amplifier"}
 			}
 			tolerance := mnaPivotTolerance * math.Max(1, math.Max(math.Abs(minimum), math.Abs(maximum)))
@@ -1272,18 +1368,36 @@ func stampNonlinearZener(system *mnaSystem, device compiledNonlinearDevice, gues
 }
 
 func mosfetSwitchConductance(device compiledNonlinearDevice, system *mnaSystem, solution []complex128) float64 {
+	conductance, _ := mosfetSwitchConductanceAndGradient(device, system, solution)
+	return conductance
+}
+
+func mosfetSwitchConductanceAndGradient(device compiledNonlinearDevice, system *mnaSystem, solution []complex128) (float64, float64) {
 	if state, forced := device.parameters[parameterForcedMOSFETState]; forced {
 		if state >= .5 {
-			return 1 / device.parameters["on_resistance_ohm"]
+			return 1 / device.parameters["on_resistance_ohm"], 0
 		}
-		return 0
+		return 0, 0
 	}
 	gate := nonlinearNodeVoltage(system, solution, device.terminals["GATE"])
 	source := nonlinearNodeVoltage(system, solution, device.terminals["SOURCE"])
-	if device.polarity*(gate-source) < device.parameters["gate_on_voltage_v"] {
-		return 0
+	control := device.polarity * (gate - source)
+	onVoltage := device.parameters["gate_on_voltage_v"]
+	threshold := device.parameters["gate_threshold_max_v"]
+	if threshold > 0 && threshold < onVoltage {
+		if control <= threshold {
+			return 0, 0
+		}
+		if control >= onVoltage {
+			return 1 / device.parameters["on_resistance_ohm"], 0
+		}
+		width := onVoltage - threshold
+		return (control - threshold) / (width * device.parameters["on_resistance_ohm"]), 1 / (width * device.parameters["on_resistance_ohm"])
 	}
-	return 1 / device.parameters["on_resistance_ohm"]
+	if control < onVoltage {
+		return 0, 0
+	}
+	return 1 / device.parameters["on_resistance_ohm"], 0
 }
 
 func mosfetPolarity(primitive string) float64 {
@@ -1298,11 +1412,54 @@ func mosfetSwitchOn(primitive string, gate, source, threshold float64) bool {
 }
 
 func stampNonlinearMOSFETSwitch(system *mnaSystem, device compiledNonlinearDevice, guess []complex128) {
-	conductance := mosfetSwitchConductance(device, system, guess)
+	conductance, controlGradient := mosfetSwitchConductanceAndGradient(device, system, guess)
 	if conductance == 0 {
 		return
 	}
-	stampAdmittance(system, device.terminals["DRAIN"], device.terminals["SOURCE"], complex(conductance, 0))
+	drain := device.terminals["DRAIN"]
+	source := device.terminals["SOURCE"]
+	gate := device.terminals["GATE"]
+	if controlGradient == 0 {
+		stampAdmittance(system, drain, source, complex(conductance, 0))
+		return
+	}
+	drainVoltage := nonlinearNodeVoltage(system, guess, drain)
+	sourceVoltage := nonlinearNodeVoltage(system, guess, source)
+	gateVoltage := nonlinearNodeVoltage(system, guess, gate)
+	drainSourceVoltage := drainVoltage - sourceVoltage
+	drainDerivative := conductance
+	gateDerivative := controlGradient * device.polarity * drainSourceVoltage
+	sourceDerivative := -conductance - gateDerivative
+	current := conductance * drainSourceVoltage
+	offset := current - drainDerivative*drainVoltage - gateDerivative*gateVoltage - sourceDerivative*sourceVoltage
+	stampThreeTerminalCurrentLinearization(system, drain, source, gate, drainDerivative, sourceDerivative, gateDerivative, offset)
+}
+
+func stampThreeTerminalCurrentLinearization(system *mnaSystem, positive, negative, control string, positiveDerivative, negativeDerivative, controlDerivative, offset float64) {
+	derivatives := []struct {
+		node  string
+		value float64
+	}{
+		{node: positive, value: positiveDerivative},
+		{node: negative, value: negativeDerivative},
+		{node: control, value: controlDerivative},
+	}
+	if row, exists := system.nodeIndex[positive]; exists {
+		for _, derivative := range derivatives {
+			if column, columnExists := system.nodeIndex[derivative.node]; columnExists {
+				system.matrix[row][column] += complex(derivative.value, 0)
+			}
+		}
+		system.rhs[row] -= complex(offset, 0)
+	}
+	if row, exists := system.nodeIndex[negative]; exists {
+		for _, derivative := range derivatives {
+			if column, columnExists := system.nodeIndex[derivative.node]; columnExists {
+				system.matrix[row][column] -= complex(derivative.value, 0)
+			}
+		}
+		system.rhs[row] += complex(offset, 0)
+	}
 }
 
 func thermalVoltage(parameters map[string]float64) float64 {
@@ -1371,6 +1528,13 @@ func stampNonlinearBJT(system *mnaSystem, device compiledNonlinearDevice, guess 
 	voltages := [3]float64{}
 	for index, node := range nodes {
 		voltages[index] = nonlinearNodeVoltage(system, guess, node)
+	}
+	if state, forced := device.parameters[parameterForcedBJTState]; forced {
+		if state < .5 {
+			return
+		}
+		voltages[0] = voltages[2] + device.polarity*.68
+		voltages[1] = voltages[2] + device.polarity*.2
 	}
 	currents, jacobian := bjtCurrentsAndJacobian(voltages[0], voltages[1], voltages[2], device.parameters, device.polarity)
 	for row, rowNode := range nodes {
@@ -1484,10 +1648,10 @@ func nonlinearResidual(base mnaSystem, devices []compiledNonlinearDevice, soluti
 }
 
 func validateNonlinearOperatingLimits(plan Plan, system mnaSystem, solution []complex128) []Diagnostic {
-	return validateNonlinearOperatingLimitsWithComparatorStates(plan, system, solution, nil, false)
+	return validateNonlinearOperatingLimitsWithComparatorStates(plan, system, solution, nil, false, false)
 }
 
-func validateNonlinearOperatingLimitsWithComparatorStates(plan Plan, system mnaSystem, solution []complex128, comparatorStates map[string]float64, allowPowerTransition bool) []Diagnostic {
+func validateNonlinearOperatingLimitsWithComparatorStates(plan Plan, system mnaSystem, solution []complex128, comparatorStates map[string]float64, allowPowerTransition bool, allowPulseRatings bool) []Diagnostic {
 	diagnostics := validateResolvedOperatingLimits(plan, system, solution, allowPowerTransition)
 	for _, device := range plan.Devices {
 		parameters := namedValueMap(device.ModelParameters)
@@ -1496,8 +1660,13 @@ func validateNonlinearOperatingLimitsWithComparatorStates(plan Plan, system mnaS
 		case PrimitiveDiodeShockleyV1:
 			voltage := nonlinearNodeVoltage(&system, solution, terminals["ANODE"]) - nonlinearNodeVoltage(&system, solution, terminals["CATHODE"])
 			current, _ := diodeCurrentAndGradient(voltage, parameters)
-			if current > parameters["max_forward_current_a"] {
-				diagnostics = append(diagnostics, Diagnostic{Path: "devices." + device.Component + ".operating_limit", Message: fmt.Sprintf("diode forward current %.12g A exceeds catalog-backed limit %.12g A", current, parameters["max_forward_current_a"]), Suggestion: "increase series resistance, reduce source voltage, or select a suitably rated reviewed diode"})
+			currentLimit := parameters["max_forward_current_a"]
+			limitKind := "continuous"
+			if pulseLimit, ok := parameters["max_pulse_current_a"]; allowPulseRatings && ok && pulseLimit > currentLimit {
+				currentLimit, limitKind = pulseLimit, "pulse"
+			}
+			if current > currentLimit {
+				diagnostics = append(diagnostics, Diagnostic{Path: "devices." + device.Component + ".operating_limit", Message: fmt.Sprintf("diode forward current %.12g A exceeds catalog-backed %s limit %.12g A", current, limitKind, currentLimit), Suggestion: "increase series resistance, reduce source voltage, or select a suitably rated reviewed diode"})
 			}
 			if -voltage > parameters["max_reverse_voltage_v"] {
 				diagnostics = append(diagnostics, Diagnostic{Path: "devices." + device.Component + ".operating_limit", Message: fmt.Sprintf("diode reverse voltage %.12g V exceeds catalog-backed limit %.12g V", -voltage, parameters["max_reverse_voltage_v"]), Suggestion: "reduce reverse voltage or select a suitably rated reviewed diode"})

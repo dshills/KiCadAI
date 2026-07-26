@@ -49,9 +49,10 @@ type LoadOptions struct {
 }
 
 type catalogFile struct {
-	Version  string             `json:"version,omitempty"`
-	Families []FamilyDefinition `json:"families,omitempty"`
-	Records  []ComponentRecord  `json:"records,omitempty"`
+	Version      string              `json:"version,omitempty"`
+	Families     []FamilyDefinition  `json:"families,omitempty"`
+	Records      []ComponentRecord   `json:"records,omitempty"`
+	ThermalPaths []ThermalPathRecord `json:"thermal_paths,omitempty"`
 }
 
 func LoadCatalog(ctx context.Context, opts LoadOptions) (*Catalog, error) {
@@ -127,6 +128,7 @@ func loadCatalogFiles(ctx context.Context, source string, files []string, readFi
 		}
 		catalog.Families = append(catalog.Families, partial.Families...)
 		catalog.Records = append(catalog.Records, partial.Records...)
+		catalog.ThermalPaths = append(catalog.ThermalPaths, partial.ThermalPaths...)
 	}
 	SortCatalog(catalog)
 	catalog.Diagnostics = append(catalog.Diagnostics, ValidateCatalog(catalog).Issues...)
@@ -217,12 +219,59 @@ func ValidateCatalog(catalog *Catalog) reports.Result {
 			})
 		}
 	}
+	issues = append(issues, validateThermalPaths(catalog.ThermalPaths)...)
 	issues = append(issues, validateEquivalenceGroups(equivalenceGroups)...)
 	sortIssues(issues)
 	return reports.ResultWithIssues("component validate", map[string]any{
 		"family_count": len(catalog.Families),
 		"record_count": len(catalog.Records),
 	}, issues, nil)
+}
+
+func validateThermalPaths(paths []ThermalPathRecord) []reports.Issue {
+	var issues []reports.Issue
+	seen := map[string]bool{}
+	for index, record := range paths {
+		path := fmt.Sprintf("thermal_paths[%d]", index)
+		if record.ID == "" || record.ID != strings.TrimSpace(record.ID) || seen[record.ID] {
+			issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, path+".id", "thermal path identity is required, canonical, and unique"))
+		}
+		seen[record.ID] = true
+		if strings.TrimSpace(record.Manufacturer) == "" || strings.TrimSpace(record.MPN) == "" || strings.TrimSpace(record.InterfaceMaterial) == "" {
+			issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, path, "thermal path requires concrete heatsink and interface identities"))
+		}
+		issues = append(issues, validateLifecycle(path+".lifecycle", record.Lifecycle)...)
+		if len(record.CompatiblePackages) == 0 {
+			issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, path+".compatible_packages", "thermal path requires at least one compatible package"))
+		}
+		packageSeen := map[string]bool{}
+		for packageIndex, packageType := range record.CompatiblePackages {
+			if strings.TrimSpace(packageType) == "" || packageType != strings.TrimSpace(packageType) || packageSeen[packageType] {
+				issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, fmt.Sprintf("%s.compatible_packages[%d]", path, packageIndex), "thermal path package identity is invalid or duplicated"))
+			}
+			packageSeen[packageType] = true
+		}
+		if !finitePositive(record.CaseToSinkCPerW) || !finitePositive(record.NaturalSinkToAmbientCPerW) ||
+			!finitePositive(record.SinkThermalCapacitanceJPerC) || record.MaximumSharedDevices < 1 || record.MaximumSharedDevices > 64 {
+			issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, path, "thermal path requires finite positive natural-convection resistance, interface resistance, heat capacity, and a bounded shared-device count"))
+		}
+		if record.ForcedSinkToAmbientCPerW != 0 || record.ForcedAirflowLFM != 0 {
+			if !finitePositive(record.ForcedSinkToAmbientCPerW) || !finitePositive(record.ForcedAirflowLFM) ||
+				record.ForcedSinkToAmbientCPerW >= record.NaturalSinkToAmbientCPerW {
+				issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, path, "forced-air thermal evidence requires positive airflow and lower resistance than natural convection"))
+			}
+		}
+		if record.ReviewStatus != "reviewed" || strings.TrimSpace(record.ReviewNote) == "" {
+			issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, path+".review_status", "thermal path must be reviewed with an auditable note"))
+		}
+		if issue, ok := ValidateConfidenceIssue(path+".verification.confidence", record.Verification.Confidence); ok {
+			issues = append(issues, issue)
+		}
+		if record.Verification.Confidence != ConfidenceVerified || len(record.Verification.Sources) == 0 {
+			issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, path+".verification", "thermal path requires verified source evidence"))
+		}
+	}
+	return issues
 }
 
 func validateThermalEvidence(path string, evidence *ThermalEvidence) []reports.Issue {

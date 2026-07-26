@@ -100,6 +100,144 @@
       "verification": {"confidence": "verified", "sources": ["https://www.ti.com/lit/ds/symlink/ina240.pdf", "datasheet-pinmap:TI:INA240A3D", "kicad-footprint:Package_SO:SOIC-8_3.9x4.9mm_P1.27mm"], "resolver_checked": true, "pinmap_checked": true}
     },
     {
+      "id": "current_sensor.ti.ina168na.sot23_5",
+      "family": "current_sensor",
+      "name": "TI INA168 60 V micropower current-shunt monitor",
+      "description": "Micropower high-side current-shunt monitor with a current output programmed by an external load resistor; this reviewed 50 kOhm configuration realizes 10 V/V voltage gain.",
+      "generic": false,
+      "manufacturer": "Texas Instruments",
+      "mpn": "INA168NA/3K",
+      "lifecycle": "active",
+      "simulation_models": [{
+        "model_id": "mna_current_sense_amplifier_single_pole_v1",
+        "parameters": [
+          {"name": "gain_v_per_v", "value": 10},
+          {"name": "bandwidth_hz", "value": 80000},
+          {"name": "input_offset_voltage_v", "value": 0},
+          {"name": "supply_min_v", "value": 2.7},
+          {"name": "supply_max_v", "value": 60},
+          {"name": "common_mode_min_v", "value": 2.7},
+          {"name": "common_mode_max_v", "value": 60},
+          {"name": "output_low_margin_v", "value": 0},
+          {"name": "output_high_margin_v", "value": 1},
+          {"name": "quiescent_current_a", "value": 0.00006}
+        ],
+        "uncertainties": [
+          {"target": "model_parameters.gain_v_per_v", "source": "TI INA168 Rev. G transconductance over temperature with 50 kOhm output load", "nominal": 10, "minimum": 9.8, "maximum": 10.2},
+          {"target": "model_parameters.input_offset_voltage_v", "source": "TI INA168 Rev. G output offset over temperature referred through the reviewed gain", "nominal": 0, "minimum": -0.002, "maximum": 0.002}
+        ]
+      }],
+      "tags": ["10_v_per_v", "current_sense", "high_side", "micropower", "precision", "sot23_5"],
+      "values": [
+        {"kind": "gain", "typ": "10", "unit": "V/V"},
+        {"kind": "gain_error", "max": "2", "unit": "%"},
+        {"kind": "input_offset_voltage", "max": "2000", "unit": "uV"},
+        {"kind": "output_load_resistance", "typ": "50000", "unit": "Ohm"}
+      ],
+      "ratings": [
+        {"kind": "supply_voltage", "min": "2.7", "max": "60", "unit": "V"},
+        {"kind": "supply_current", "max": "0.06", "unit": "mA"},
+        {"kind": "common_mode_voltage", "min": "2.7", "max": "60", "unit": "V"},
+        {"kind": "bandwidth", "max": "80000", "unit": "Hz"}
+      ],
+      "temperature": {"min": "-40", "max": "125", "unit": "C"},
+      "symbols": [{
+        "symbol_id": "Amplifier_Current:INA168",
+        "function_pins": [
+          {"function": "OUT", "symbol_pin": "1", "electrical": "output", "required": true},
+          {"function": "GND_A", "symbol_pin": "2", "electrical": "power_in", "required": true},
+          {"function": "IN_PLUS", "symbol_pin": "3", "electrical": "input", "required": true},
+          {"function": "IN_MINUS", "symbol_pin": "4", "electrical": "input", "required": true},
+          {"function": "VCC", "symbol_pin": "5", "electrical": "power_in", "required": true}
+        ],
+        "verification": {"confidence": "verified", "sources": ["https://www.ti.com/lit/ds/symlink/ina168.pdf", "kicad-symbols:Amplifier_Current:INA168"], "pinmap_checked": true}
+      }],
+      "packages": [{
+        "id": "sot23_5", "name": "SOT-23-5 DBV", "footprint_id": "Package_TO_SOT_SMD:SOT-23-5", "package_type": "sot23_5", "mpn": "INA168NA/3K", "lifecycle": "active",
+        "pinmap_id": "Amplifier_Current:INA168|Package_TO_SOT_SMD:SOT-23-5",
+        "pad_functions": [
+          {"function": "OUT", "pad": "1"},
+          {"function": "GND_A", "pad": "2"},
+          {"function": "IN_PLUS", "pad": "3"},
+          {"function": "IN_MINUS", "pad": "4"},
+          {"function": "VCC", "pad": "5"}
+        ],
+        "dimensions_mm": {"width": 3.0, "height": 2.9},
+        "height_mm": 1.45,
+        "verification": {"confidence": "verified", "sources": ["https://www.ti.com/lit/ds/symlink/ina168.pdf", "kicad-footprint:Package_TO_SOT_SMD:SOT-23-5"], "pinmap_checked": true}
+      }],
+      "verification": {"confidence": "verified", "sources": ["https://www.ti.com/lit/ds/symlink/ina168.pdf", "datasheet-pinmap:TI:INA168NA", "kicad-footprint:Package_TO_SOT_SMD:SOT-23-5"], "resolver_checked": true, "pinmap_checked": true, "notes": ["TI specifies 2.7 V to 60 V operation, 60 uA maximum quiescent current over temperature, 200 uA/V nominal output transconductance, 2 percent maximum transconductance error over temperature, and 2 mV maximum output offset. A reviewed 50 kOhm output load converts the current output to 10 V/V voltage gain. The 80 kHz model bandwidth is conservative between the published 800 kHz result at 5 kOhm and 32 kHz result at 125 kOhm. The single physical ground pin uses the current-sense primitive's reviewed ground-referenced defaults for absent reference and secondary-ground terminals."]}
+    },
+    {
+      "id": "current_sensor.ti.ina149d.soic8",
+      "family": "current_sensor",
+      "name": "TI INA149 high-common-mode difference amplifier",
+      "description": "Unity-gain precision difference amplifier for bidirectional shunt sensing across bipolar load paths; the conservative single-5-V model retains the specified -20 V to 25 V common-mode range.",
+      "generic": false,
+      "manufacturer": "Texas Instruments",
+      "mpn": "INA149AIDR",
+      "lifecycle": "active",
+      "simulation_models": [{
+        "model_id": "mna_current_sense_amplifier_single_pole_v1",
+        "parameters": [
+          {"name": "gain_v_per_v", "value": 1},
+          {"name": "bandwidth_hz", "value": 500000},
+          {"name": "input_offset_voltage_v", "value": 0},
+          {"name": "supply_min_v", "value": 4},
+          {"name": "supply_max_v", "value": 5.5},
+          {"name": "common_mode_min_v", "value": -20},
+          {"name": "common_mode_max_v", "value": 25},
+          {"name": "output_low_margin_v", "value": 1.5},
+          {"name": "output_high_margin_v", "value": 1.5},
+          {"name": "quiescent_current_a", "value": 0.0011}
+        ],
+        "uncertainties": [
+          {"target": "model_parameters.gain_v_per_v", "source": "TI INA149 Rev. B maximum initial gain error", "nominal": 1, "minimum": 0.9998, "maximum": 1.0002},
+          {"target": "model_parameters.input_offset_voltage_v", "source": "TI INA149 Rev. B maximum initial offset", "nominal": 0, "minimum": -0.0011, "maximum": 0.0011}
+        ]
+      }],
+      "tags": ["bipolar", "bipolar_common_mode", "current_sense", "difference_amplifier", "precision", "soic8", "unity_gain"],
+      "values": [
+        {"kind": "gain", "typ": "1", "unit": "V/V"},
+        {"kind": "gain_error", "max": "0.02", "unit": "%"},
+        {"kind": "input_offset_voltage", "max": "1100", "unit": "uV"},
+        {"kind": "reference_ratio", "typ": "0.5", "unit": "ratio"}
+      ],
+      "ratings": [
+        {"kind": "supply_voltage", "min": "4", "max": "5.5", "unit": "V"},
+        {"kind": "supply_current", "max": "1.1", "unit": "mA"},
+        {"kind": "common_mode_voltage", "min": "-20", "max": "25", "unit": "V"},
+        {"kind": "bandwidth", "max": "500000", "unit": "Hz"}
+      ],
+      "temperature": {"min": "-40", "max": "125", "unit": "C"},
+      "companions": [{"id": "current_sensor.ina149_nc", "family": "current_sensor", "role": "unused_pin_policy", "required": true, "no_connects": ["NC"], "description": "Leave INA149 pin 8 unconnected."}],
+      "symbols": [{
+        "symbol_id": "Amplifier_Instrumentation:INA128",
+        "function_pins": [
+          {"function": "REF_B", "symbol_pin": "1", "required": true},
+          {"function": "IN_MINUS", "symbol_pin": "2", "electrical": "input", "required": true},
+          {"function": "IN_PLUS", "symbol_pin": "3", "electrical": "input", "required": true},
+          {"function": "GND_A", "symbol_pin": "4", "electrical": "power_in", "required": true},
+          {"function": "REF_A", "symbol_pin": "5", "required": true},
+          {"function": "OUT", "symbol_pin": "6", "electrical": "output", "required": true},
+          {"function": "V_PLUS", "symbol_pin": "7", "electrical": "power_in", "required": true},
+          {"function": "NC", "symbol_pin": "8"}
+        ],
+        "verification": {"confidence": "verified", "sources": ["https://www.ti.com/lit/ds/symlink/ina149.pdf", "pin-compatible-kicad-symbol:Amplifier_Instrumentation:INA128"], "pinmap_checked": true}
+      }],
+      "packages": [{
+        "id": "soic8", "name": "SOIC-8", "footprint_id": "Package_SO:SOIC-8_3.9x4.9mm_P1.27mm", "package_type": "soic8", "mpn": "INA149AIDR", "lifecycle": "active",
+        "pinmap_id": "Amplifier_Instrumentation:INA128|Package_SO:SOIC-8_3.9x4.9mm_P1.27mm",
+        "pad_functions": [
+          {"function": "REF_B", "pad": "1"}, {"function": "IN_MINUS", "pad": "2"}, {"function": "IN_PLUS", "pad": "3"}, {"function": "GND_A", "pad": "4"},
+          {"function": "REF_A", "pad": "5"}, {"function": "OUT", "pad": "6"}, {"function": "V_PLUS", "pad": "7"}, {"function": "NC", "pad": "8"}
+        ],
+        "dimensions_mm": {"width": 6.0, "height": 4.9},
+        "verification": {"confidence": "verified", "sources": ["https://www.ti.com/lit/ds/symlink/ina149.pdf", "kicad-footprint:Package_SO:SOIC-8_3.9x4.9mm_P1.27mm"], "pinmap_checked": true}
+      }],
+      "verification": {"confidence": "verified", "sources": ["https://www.ti.com/lit/ds/symlink/ina149.pdf", "datasheet-pinmap:TI:INA149", "kicad-footprint:Package_SO:SOIC-8_3.9x4.9mm_P1.27mm"], "resolver_checked": true, "pinmap_checked": true, "notes": ["TI SBOS579B specifies unity gain, 500 kHz bandwidth, -20 V to 25 V common-mode operation from a single 5 V supply, dual reference inputs, and SOIC-8 pinout. The installed INA128 symbol is used only as a pin-position-compatible graphical carrier; catalog function-to-pin mappings are authoritative."]}
+    },
+    {
       "id": "resistor.vishay.wslt2512r0100dea.2512",
       "family": "resistor",
       "name": "Vishay WSLT2512 10 mOhm 0.5% current shunt",

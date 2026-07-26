@@ -97,3 +97,28 @@ func TestFragmentRealizationRejectsDuplicateSeriesRole(t *testing.T) {
 		t.Fatal("DecodeFragmentRealization() accepted duplicate direct and series role bindings")
 	}
 }
+
+func TestFragmentRealizationAllowsSeriesPathEndpointToBindDifferentRole(t *testing.T) {
+	payload, err := MarshalFragmentRealization(FragmentRealization{
+		Capability: "output_protection",
+		Instances: []RealizationInstance{
+			{ID: "relay", CatalogID: "relay.example", Usage: "controlled_output_disconnect"},
+			{ID: "fuse", CatalogID: "fuse.example", Usage: "overcurrent_limit"},
+		},
+		PortBindings: []RealizationPortBinding{{Role: "input", Instance: "relay", Function: "CONTACT_IN"}},
+		SeriesTransitions: []RealizationSeriesTransition{{
+			Role: "output", Input: RealizationEndpoint{Instance: "relay", Function: "CONTACT_IN"}, Output: RealizationEndpoint{Instance: "fuse", Function: "B"},
+		}},
+		Connections: []RealizationConnection{{
+			ID: "series_path", Role: "protected_output",
+			Endpoints: []RealizationEndpoint{{Instance: "relay", Function: "CONTACT_OUT"}, {Instance: "fuse", Function: "A"}},
+		}},
+	})
+	if err != nil {
+		t.Fatalf("MarshalFragmentRealization() error = %v", err)
+	}
+	realization, err := DecodeFragmentRealization(payload)
+	if err != nil || len(realization.SeriesTransitions) != 1 {
+		t.Fatalf("DecodeFragmentRealization() = %#v, %v", realization, err)
+	}
+}

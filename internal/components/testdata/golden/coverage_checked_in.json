@@ -1,16 +1,16 @@
 {
-  "record_count": 136,
-  "family_count": 28,
+  "record_count": 149,
+  "family_count": 29,
   "confidence_counts": {
     "blocked": 1,
     "library_derived": 0,
     "placeholder": 3,
     "rule_inferred": 6,
-    "verified": 126
+    "verified": 139
   },
   "alternative_coverage": {
-    "concrete_records": 105,
-    "generic_fallback_records": 31,
+    "concrete_records": 117,
+    "generic_fallback_records": 32,
     "equivalence_groups": 23
   },
   "families": [
@@ -46,11 +46,11 @@
     {
       "family": "capacitor",
       "defined": true,
-      "record_count": 13,
-      "concrete_records": 9,
+      "record_count": 14,
+      "concrete_records": 10,
       "generic_fallback_records": 4,
       "equivalence_groups": 3,
-      "verified_records": 10,
+      "verified_records": 11,
       "library_derived_records": 0,
       "rule_inferred_records": 3,
       "placeholder_records": 0,
@@ -73,6 +73,7 @@
         "capacitor.murata.grm21br61a106ke19l.0805",
         "capacitor.murata.grm21br71h104ka01l.0805",
         "capacitor.panasonic.eeufr1a151.radial",
+        "capacitor.panasonic.eeufr1a682l.radial",
         "capacitor.panasonic.eeufr1c221.radial",
         "capacitor.panasonic.eeufr1c471.radial",
         "capacitor.panasonic.eeufr1v221.radial",
@@ -192,16 +193,18 @@
     {
       "family": "current_sensor",
       "defined": true,
-      "record_count": 1,
-      "concrete_records": 1,
+      "record_count": 3,
+      "concrete_records": 3,
       "generic_fallback_records": 0,
       "equivalence_groups": 0,
-      "verified_records": 1,
+      "verified_records": 3,
       "library_derived_records": 0,
       "rule_inferred_records": 0,
       "placeholder_records": 0,
       "blocked_records": 0,
       "record_ids": [
+        "current_sensor.ti.ina149d.soic8",
+        "current_sensor.ti.ina168na.sot23_5",
         "current_sensor.ti.ina240a3d.soic8"
       ]
     },
@@ -258,11 +261,11 @@
     {
       "family": "fuse",
       "defined": true,
-      "record_count": 3,
-      "concrete_records": 2,
+      "record_count": 5,
+      "concrete_records": 4,
       "generic_fallback_records": 1,
       "equivalence_groups": 0,
-      "verified_records": 2,
+      "verified_records": 4,
       "library_derived_records": 0,
       "rule_inferred_records": 1,
       "placeholder_records": 0,
@@ -272,8 +275,28 @@
       ],
       "record_ids": [
         "fuse.generic.1206",
+        "fuse.littelfuse.0437003wr.1206",
         "fuse.littelfuse.0483002dr.1206",
+        "fuse.littelfuse.0483003dr.1206",
         "fuse.littelfuse.0483_500dr.1206"
+      ]
+    },
+    {
+      "family": "inductor",
+      "defined": true,
+      "record_count": 3,
+      "concrete_records": 2,
+      "generic_fallback_records": 1,
+      "equivalence_groups": 0,
+      "verified_records": 3,
+      "library_derived_records": 0,
+      "rule_inferred_records": 0,
+      "placeholder_records": 0,
+      "blocked_records": 0,
+      "record_ids": [
+        "inductor.sunlord.mwsa1206s_150mt",
+        "inductor.sunlord.mwsa1206s_220mt",
+        "load.inductive.external.1x02"
       ]
     },
     {
@@ -423,11 +446,11 @@
     {
       "family": "opamp",
       "defined": true,
-      "record_count": 5,
-      "concrete_records": 4,
+      "record_count": 7,
+      "concrete_records": 6,
       "generic_fallback_records": 1,
       "equivalence_groups": 0,
-      "verified_records": 4,
+      "verified_records": 6,
       "library_derived_records": 0,
       "rule_inferred_records": 0,
       "placeholder_records": 1,
@@ -442,17 +465,19 @@
         "opamp.ti.lm358.soic8",
         "opamp.ti.lmv321.sot23_5",
         "opamp.ti.opa134ua.soic8",
-        "opamp.ti.opa197id.soic8"
+        "opamp.ti.opa197id.soic8",
+        "opamp.ti.opa551pa.dip8",
+        "opamp.ti.opa992idbvr.sot23_5"
       ]
     },
     {
       "family": "protection",
       "defined": true,
-      "record_count": 5,
-      "concrete_records": 4,
+      "record_count": 6,
+      "concrete_records": 5,
       "generic_fallback_records": 1,
       "equivalence_groups": 1,
-      "verified_records": 5,
+      "verified_records": 6,
       "library_derived_records": 0,
       "rule_inferred_records": 0,
       "placeholder_records": 0,
@@ -464,6 +489,7 @@
       "record_ids": [
         "protection.littelfuse.smbj18ca.smb",
         "protection.littelfuse.smbj20ca.smb",
+        "protection.littelfuse.smcj33ca.smc",
         "protection.nexperia.pesd5v0s1ba.sod_323",
         "protection.ti.tps22917dbv.sot23_6",
         "protection.tvs.usb_5v_unidirectional"
@@ -472,11 +498,11 @@
     {
       "family": "regulator",
       "defined": true,
-      "record_count": 9,
-      "concrete_records": 9,
+      "record_count": 11,
+      "concrete_records": 11,
       "generic_fallback_records": 0,
       "equivalence_groups": 1,
-      "verified_records": 9,
+      "verified_records": 11,
       "library_derived_records": 0,
       "rule_inferred_records": 0,
       "placeholder_records": 0,
@@ -488,6 +514,7 @@
         "regulator.linear.ap2127r_3v3.sot89"
       ],
       "record_ids": [
+        "regulator.analog_devices.lt8610mse.msop16",
         "regulator.linear.ams1117_3v3.sot223",
         "regulator.linear.ap2112k_3v3.sot23_5",
         "regulator.linear.ap2127k_adj.sot23_5",
@@ -496,6 +523,7 @@
         "regulator.ti.lm317t.to220",
         "regulator.ti.lm337imp.sot223",
         "regulator.ti.lm337t.to220",
+        "regulator.ti.lm76002rnp.wqfn30",
         "regulator.ti.lm7705mme.vssop8"
       ]
     },

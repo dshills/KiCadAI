@@ -58,9 +58,10 @@ type nodeMetadata struct {
 }
 
 type pendingPortBinding struct {
-	node     string
-	anchor   string
-	metadata nodeMetadata
+	node      string
+	anchor    string
+	direction string
+	metadata  nodeMetadata
 }
 
 type pendingSeriesTransition struct {
@@ -85,15 +86,16 @@ func Lower(requirement architecturesearch.Requirement, search architecturesearch
 	}
 	var systemPlan *architecturesearch.SystemPlan
 	var backtracking *architecturesearch.BacktrackingEvidence
-	if requirement.Version == architecturesearch.VersionV4 {
+	if (requirement.Version == architecturesearch.VersionV4 && requirement.Schema == architecturesearch.SchemaIDV4) ||
+		(requirement.Version == architecturesearch.VersionV5 && requirement.Schema == architecturesearch.SchemaIDV5) {
 		if search.Selected.SystemPlan == nil {
-			return Result{}, issues("search.selected.system_plan", "V4 composition lowering requires a persisted system plan")
+			return Result{}, issues("search.selected.system_plan", "hierarchical composition lowering requires a persisted system plan")
 		}
 		if err := architecturesearch.ValidateSystemPlan(requirement, search.Selected.Fingerprint, *search.Selected.SystemPlan); err != nil {
 			return Result{}, issues("search.selected.system_plan", err.Error())
 		}
 		if search.Backtracking == nil {
-			return Result{}, issues("search.backtracking", "V4 composition lowering requires deterministic architecture backtracking evidence")
+			return Result{}, issues("search.backtracking", "hierarchical composition lowering requires deterministic architecture backtracking evidence")
 		}
 		if err := validateRetainedBacktracking(search); err != nil {
 			return Result{}, issues("search.backtracking", err.Error())
@@ -165,9 +167,18 @@ func Lower(requirement architecturesearch.Requirement, search architecturesearch
 			if instance.Near != "" {
 				near = localIDs[instance.Near]
 			}
+			parameters := make([]circuitgraph.Parameter, 0, len(instance.Parameters))
+			for _, parameter := range instance.Parameters {
+				value := parameter.Value
+				parameters = append(parameters, circuitgraph.Parameter{
+					Name:  parameter.Name,
+					Value: circuitgraph.ParameterValue{Number: &value},
+				})
+			}
 			intent.Functions = append(intent.Functions, circuitgraph.FunctionRequirement{
 				ID: id, Role: componentRole(instance.CatalogID, instance.Usage), ComponentID: instance.CatalogID,
-				Value: instance.Value, RequiredFunctions: append([]string(nil), instance.RequiredFunctions...), Usage: instance.Usage,
+				Value: instance.Value, Parameters: parameters,
+				RequiredFunctions: append([]string(nil), instance.RequiredFunctions...), Usage: instance.Usage,
 				Near: near, MaxDistanceMM: instance.MaxDistanceMM,
 			})
 			for _, function := range instance.RequiredFunctions {
@@ -206,7 +217,9 @@ func Lower(requirement architecturesearch.Requirement, search architecturesearch
 			if binding.NetRole != "" {
 				bindingMetadata.role = lowerNetRole(binding.NetRole)
 			}
-			bindingsByAnchor[anchor] = append(bindingsByAnchor[anchor], pendingPortBinding{node: function, anchor: anchor, metadata: bindingMetadata})
+			bindingsByAnchor[anchor] = append(bindingsByAnchor[anchor], pendingPortBinding{
+				node: function, anchor: anchor, direction: port.Contract.Direction, metadata: bindingMetadata,
+			})
 			anchorBindingCounts[anchor]++
 			if strings.HasPrefix(port.Anchor, "participant:") {
 				if participantPorts[port.Anchor] == nil {
@@ -236,26 +249,38 @@ func Lower(requirement architecturesearch.Requirement, search architecturesearch
 	slices.Sort(transitionAnchors)
 	for _, anchor := range transitionAnchors {
 		transitions := transitionsByAnchor[anchor]
-		if len(transitions) != 1 {
-			return Result{}, issues(transitions[0].path, "multiple series transitions on one anchor require an explicit ordered-chain contract")
-		}
-		transition := transitions[0]
-		if transition.contract.Direction != "sink" && transition.contract.Direction != "source" {
-			return Result{}, issues(transition.path, "series transition requires a directed source or sink contract")
+		slices.SortStableFunc(transitions, func(left, right pendingSeriesTransition) int {
+			return strings.Compare(left.path, right.path)
+		})
+		for _, transition := range transitions {
+			if transition.contract.Direction != "sink" && transition.contract.Direction != "source" {
+				return Result{}, issues(transition.path, "series transition requires a directed source or sink contract")
+			}
 		}
 		loadSide := anchor + ":series_load"
-		mergeMetadata(metadata, anchor, transition.metadata)
-		mergeMetadata(metadata, loadSide, transition.metadata)
-		if transition.contract.Direction == "sink" {
-			union.join(transition.input, anchor)
-			union.join(transition.output, loadSide)
-		} else {
-			union.join(transition.input, loadSide)
-			union.join(transition.output, anchor)
+		boundaries := make([]string, len(transitions)+1)
+		boundaries[0], boundaries[len(boundaries)-1] = anchor, loadSide
+		for index := 1; index < len(boundaries)-1; index++ {
+			boundaries[index] = fmt.Sprintf("%s:series_%03d", anchor, index)
+		}
+		for index, transition := range transitions {
+			mergeMetadata(metadata, boundaries[index], transition.metadata)
+			mergeMetadata(metadata, boundaries[index+1], transition.metadata)
+			if transition.contract.Direction == "sink" {
+				union.join(transition.input, boundaries[index])
+				union.join(transition.output, boundaries[index+1])
+				continue
+			}
+			union.join(transition.output, boundaries[index])
+			union.join(transition.input, boundaries[index+1])
 		}
 		for _, binding := range bindingsByAnchor[anchor] {
-			union.join(binding.node, loadSide)
-			mergeMetadata(metadata, loadSide, binding.metadata)
+			boundary := loadSide
+			if binding.direction == "source" {
+				boundary = anchor
+			}
+			union.join(binding.node, boundary)
+			mergeMetadata(metadata, boundary, binding.metadata)
 		}
 		delete(bindingsByAnchor, anchor)
 	}
@@ -279,7 +304,13 @@ func Lower(requirement architecturesearch.Requirement, search architecturesearch
 		}
 		external := anchorNode("external:"+port.ID, "")
 		domain := anchorNode("domain:"+port.Domain, "")
-		union.join(external, domain)
+		// A declared series transition proves that this physical interface is
+		// intentionally separated from the domain's source-side rail. Joining
+		// it back to the voltage-domain anchor would bypass the reviewed fuse,
+		// relay, shunt, or blocking element.
+		if len(transitionsByAnchor[external]) == 0 {
+			union.join(external, domain)
+		}
 		if _, ok := externalNodes[port.ID]; !ok {
 			return Result{}, issues("requirements.ports."+port.ID, "external power or reference port was not lowered")
 		}
@@ -645,13 +676,15 @@ func lowerConnections(union *disjointSet, actual map[string]circuitgraph.Functio
 
 func lowerSemanticBindings(requirement architecturesearch.Requirement, union *disjointSet, connectionNames map[string]string, externalNodes map[string]string) []closedloopsynthesis.SemanticBinding {
 	var bindings []closedloopsynthesis.SemanticBinding
-	appendBinding := func(kind, id, node string) {
+	appendBinding := func(kind, id, node string) bool {
 		if node == "" {
-			return
+			return false
 		}
 		if target := connectionNames[union.find(node)]; target != "" {
 			bindings = append(bindings, closedloopsynthesis.SemanticBinding{Kind: kind, ID: id, Target: target})
+			return true
 		}
+		return false
 	}
 	for _, port := range requirement.Requirements.Ports {
 		appendBinding("port", port.ID, externalNodes[port.ID])
@@ -660,7 +693,27 @@ func lowerSemanticBindings(requirement architecturesearch.Requirement, union *di
 		appendBinding("signal", signal.ID, anchorNode("signal:"+signal.ID, ""))
 	}
 	for _, domain := range requirement.Requirements.Domains {
-		appendBinding("domain", domain.ID, anchorNode("domain:"+domain.ID, ""))
+		if appendBinding("domain", domain.ID, anchorNode("domain:"+domain.ID, "")) {
+			continue
+		}
+		// A series transition intentionally keeps the external source-side
+		// interface separate from its post-transition domain anchor. Preserve
+		// the semantic supply binding by using the unique externally supplied
+		// power/reference port in that domain without electrically rejoining
+		// the two sides of the transition.
+		var candidates []string
+		for _, port := range requirement.Requirements.Ports {
+			if port.Domain != domain.ID || (port.Kind != "power" && port.Kind != "reference") || port.Direction == "source" {
+				continue
+			}
+			node := externalNodes[port.ID]
+			if node != "" && connectionNames[union.find(node)] != "" {
+				candidates = append(candidates, node)
+			}
+		}
+		if len(candidates) == 1 {
+			appendBinding("domain", domain.ID, candidates[0])
+		}
 	}
 	for _, participant := range requirement.Requirements.Participants {
 		for _, port := range participant.RequiredPorts {

@@ -28,7 +28,7 @@ func effectiveObjectiveConstraints(requirement Requirement, objective Objective)
 	derived := make([]Constraint, 0, len(requirement.Requirements.BehavioralRequirements)*2)
 	cones := make(map[string]map[string]bool, len(requirement.Requirements.BehavioralRequirements))
 	for _, behavior := range requirement.Requirements.BehavioralRequirements {
-		cone := upstreamObjectiveCone(requirement, behavior.Observation)
+		cone := upstreamBehavioralObjectiveCone(requirement, behavior.Observation)
 		cones[behavior.ID] = cone
 		if !cone[objective.ID] {
 			continue
@@ -49,6 +49,12 @@ func effectiveObjectiveConstraints(requirement Requirement, objective Objective)
 		}
 		behaviorConstraints := constraintsFromBehavior(behavior)
 		derived = append(derived, behaviorConstraints...)
+		if eventConstraint, ok := eventScopedBehaviorConstraint(requirement, behavior); ok {
+			derived = append(derived, eventConstraint)
+		}
+		if durationConstraint, ok := eventScopedDurationConstraint(requirement, behavior); ok {
+			derived = append(derived, durationConstraint)
+		}
 		for _, role := range objectiveRolesForObservation(requirement, objective, behavior.Observation) {
 			derived = append(derived, roleScopedConstraints(role, behaviorConstraints)...)
 		}
@@ -66,6 +72,13 @@ func effectiveObjectiveConstraints(requirement Requirement, objective Objective)
 		for _, condition := range operatingCase.Conditions {
 			observation := observationForOperatingTarget(requirement, condition.Target)
 			roles := objectiveRolesForObservation(requirement, objective, observation)
+			var sharedPowerDomainRoles []string
+			if condition.Axis == "load_current" {
+				sharedPowerDomainRoles = objectiveRolesForPowerDomainObservation(requirement, objective, observation)
+				roles = append(roles, sharedPowerDomainRoles...)
+				slices.Sort(roles)
+				roles = slices.Compact(roles)
+			}
 			if condition.Axis == "supply_voltage" {
 				roles = objectiveRolesForSupplyTarget(requirement, objective, condition.Target)
 				if len(roles) == 0 {
@@ -75,10 +88,10 @@ func effectiveObjectiveConstraints(requirement Requirement, objective Objective)
 				key := observation.Kind + "\x00" + observation.ID
 				cone, exists := conditionCones[key]
 				if !exists {
-					cone = upstreamObjectiveCone(requirement, observation)
+					cone = upstreamBehavioralObjectiveCone(requirement, observation)
 					conditionCones[key] = cone
 				}
-				if !cone[objective.ID] {
+				if !cone[objective.ID] && len(sharedPowerDomainRoles) == 0 {
 					continue
 				}
 			}
@@ -86,6 +99,43 @@ func effectiveObjectiveConstraints(requirement Requirement, objective Objective)
 			derived = append(derived, conditionConstraints...)
 			for _, role := range roles {
 				derived = append(derived, roleScopedConstraints(role, conditionConstraints)...)
+			}
+		}
+		for _, event := range operatingCase.Events {
+			if event.Unit != "A" || event.Target.Kind == "" || event.Target.ID == "" {
+				continue
+			}
+			if event.Applied == nil {
+				continue
+			}
+			peak := math.Abs(*event.Applied)
+			if event.Initial != nil {
+				peak = math.Max(peak, math.Abs(*event.Initial))
+			}
+			if event.Recovered != nil {
+				peak = math.Max(peak, math.Abs(*event.Recovered))
+			}
+			for _, behavior := range requirement.Requirements.BehavioralRequirements {
+				if behavior.Metric != "peak_device_current" || behavior.Max == nil ||
+					behavior.Observation.Kind != event.Target.Kind || behavior.Observation.ID != event.Target.ID ||
+					(len(behavior.OperatingCases) > 0 && !slices.Contains(behavior.OperatingCases, operatingCase.ID)) {
+					continue
+				}
+				peak = math.Min(peak, math.Abs(*behavior.Max))
+			}
+			if peak <= 0 {
+				continue
+			}
+			observation := Observation{Kind: event.Target.Kind, ID: event.Target.ID}
+			cone := upstreamBehavioralObjectiveCone(requirement, observation)
+			roles := objectiveRolesForPowerDomainObservation(requirement, objective, observation)
+			if !cone[objective.ID] && len(roles) == 0 {
+				continue
+			}
+			stress := numericProjectedConstraint("transient_load_current", "minimum", peak, event.Unit, nil)
+			derived = append(derived, stress)
+			for _, role := range roles {
+				derived = append(derived, roleScopedConstraints(role, []Constraint{stress})...)
 			}
 		}
 	}
@@ -99,6 +149,110 @@ func effectiveObjectiveConstraints(requirement Requirement, objective Objective)
 	}
 
 	return mergeProjectedConstraints(constraints, derived)
+}
+
+func eventScopedDurationConstraint(requirement Requirement, behavior BehavioralRequirement) (Constraint, bool) {
+	if behavior.Observation.Kind != "event" || behavior.Metric != "transient_soa_margin" {
+		return Constraint{}, false
+	}
+	operatingCases := make(map[string]bool, len(behavior.OperatingCases))
+	for _, operatingCase := range behavior.OperatingCases {
+		operatingCases[operatingCase] = true
+	}
+	durationS := 0.0
+	found := false
+	for _, operatingCase := range requirement.Requirements.OperatingCases {
+		if len(operatingCases) != 0 && !operatingCases[operatingCase.ID] {
+			continue
+		}
+		for _, event := range operatingCase.Events {
+			if event.ID != behavior.Observation.ID || event.DurationS <= 0 {
+				continue
+			}
+			durationS = math.Max(durationS, event.DurationS)
+			found = true
+		}
+	}
+	if !found {
+		return Constraint{}, false
+	}
+	return targetConstraint("transient_soa_duration", durationS, "s", 0), true
+}
+
+func eventScopedBehaviorConstraint(requirement Requirement, behavior BehavioralRequirement) (Constraint, bool) {
+	if behavior.Observation.Kind != "event" {
+		return Constraint{}, false
+	}
+	constraint, ok := boundedConstraint(behavior.Metric, behavior.Min, behavior.Max, behavior.Unit)
+	if !ok {
+		return Constraint{}, false
+	}
+	eventKind := ""
+	for _, operatingCase := range requirement.Requirements.OperatingCases {
+		for _, event := range operatingCase.Events {
+			if event.ID != behavior.Observation.ID {
+				continue
+			}
+			if eventKind != "" && eventKind != event.Kind {
+				return Constraint{}, false
+			}
+			eventKind = event.Kind
+		}
+	}
+	eventKind = derivedSemanticIdentifier(eventKind)
+	if eventKind == "" {
+		return Constraint{}, false
+	}
+	name := eventKind + "_" + derivedSemanticIdentifier(behavior.Metric)
+	if behavior.Metric == "sequence_delay" {
+		name = eventKind + "_delay"
+	}
+	return renamedConstraint(constraint, name), true
+}
+
+func objectiveRolesForPowerDomainObservation(requirement Requirement, objective Objective, observation Observation) []string {
+	domain, ok := observationPowerDomain(requirement, observation)
+	if !ok {
+		return nil
+	}
+	var roles []string
+	for _, binding := range objective.Bindings {
+		bindingDomain, bindingOK := powerBindingDomain(requirement, binding)
+		if bindingOK && bindingDomain == domain && binding.Role != "" {
+			roles = append(roles, binding.Role)
+		}
+	}
+	slices.Sort(roles)
+	return slices.Compact(roles)
+}
+
+func observationPowerDomain(requirement Requirement, observation Observation) (string, bool) {
+	switch observation.Kind {
+	case "port":
+		for _, port := range requirement.Requirements.Ports {
+			if port.ID != observation.ID || port.Domain == "" {
+				continue
+			}
+			for _, domain := range requirement.Requirements.Domains {
+				if domain.ID == port.Domain && domain.Kind == "supply" {
+					return port.Domain, true
+				}
+			}
+		}
+	case "signal":
+		for _, signal := range requirement.Requirements.Signals {
+			if signal.ID == observation.ID && signal.Kind == "power" && signal.Domain != "" {
+				return signal.Domain, true
+			}
+		}
+	case "domain":
+		for _, domain := range requirement.Requirements.Domains {
+			if domain.ID == observation.ID && domain.Kind == "supply" {
+				return domain.ID, true
+			}
+		}
+	}
+	return "", false
 }
 
 func objectiveRolesForSupplyTarget(requirement Requirement, objective Objective, target string) []string {
@@ -314,11 +468,14 @@ func constraintsFromOperatingCondition(condition OperatingCondition) []Constrain
 		if condition.Max == nil || *condition.Max <= 0 {
 			return nil
 		}
-		tolerance := operatingRangeTolerance(condition.Min, condition.Max)
+		load, ok := boundedConstraint("load_current", condition.Min, condition.Max, condition.Unit)
+		if !ok {
+			return nil
+		}
 		return []Constraint{
-			targetConstraint("load_current", *condition.Max, condition.Unit, tolerance),
-			targetConstraint("full_scale_current", *condition.Max, condition.Unit, tolerance),
-			targetConstraint("output_current", *condition.Max, condition.Unit, tolerance),
+			load,
+			numericProjectedConstraint("full_scale_current", "minimum", *condition.Max, condition.Unit, nil),
+			numericProjectedConstraint("output_current", "minimum", *condition.Max, condition.Unit, nil),
 		}
 	case "load_capacitance":
 		constraint, ok := boundedConstraint("load_capacitance", condition.Min, condition.Max, condition.Unit)
@@ -400,22 +557,89 @@ func renamedConstraint(constraint Constraint, name string) Constraint {
 
 func mergeProjectedConstraints(explicit, derived []Constraint) []Constraint {
 	result := cloneConstraints(explicit)
-	seen := make(map[string]bool, len(explicit)+len(derived))
+	explicitNames := make(map[string]bool, len(explicit))
 	for _, constraint := range explicit {
-		seen[constraint.Name] = true
+		explicitNames[constraint.Name] = true
 	}
+	derivedIndices := make(map[string]int, len(derived))
 	for _, constraint := range derived {
-		if seen[constraint.Name] {
+		if explicitNames[constraint.Name] {
 			continue
 		}
-		seen[constraint.Name] = true
+		if index, exists := derivedIndices[constraint.Name]; exists {
+			if merged, ok := mergeDerivedConstraintEnvelope(result[index], constraint); ok {
+				result[index] = merged
+			}
+			continue
+		}
+		derivedIndices[constraint.Name] = len(result)
 		result = append(result, constraint)
 	}
 	normalizeConstraints(result)
 	return result
 }
 
+func mergeDerivedConstraintEnvelope(left, right Constraint) (Constraint, bool) {
+	if left.Name == "" || left.Name != right.Name || left.Unit != right.Unit || left.Relation != right.Relation {
+		return Constraint{}, false
+	}
+	leftValue, _, leftOK := projectedNumericValue(left)
+	rightValue, _, rightOK := projectedNumericValue(right)
+	if !leftOK || !rightOK {
+		return Constraint{}, false
+	}
+	switch left.Relation {
+	case "minimum":
+		return numericProjectedConstraint(left.Name, left.Relation, math.Max(leftValue, rightValue), left.Unit, nil), true
+	case "maximum":
+		return numericProjectedConstraint(left.Name, left.Relation, math.Min(leftValue, rightValue), left.Unit, nil), true
+	case "target":
+		leftTolerance, rightTolerance := 0.0, 0.0
+		if left.TolerancePercent != nil {
+			leftTolerance = *left.TolerancePercent
+		}
+		if right.TolerancePercent != nil {
+			rightTolerance = *right.TolerancePercent
+		}
+		leftRadius := math.Abs(leftValue) * leftTolerance / 100
+		rightRadius := math.Abs(rightValue) * rightTolerance / 100
+		leftMinimum, leftMaximum := leftValue-leftRadius, leftValue+leftRadius
+		rightMinimum, rightMaximum := rightValue-rightRadius, rightValue+rightRadius
+		if leftMaximum < rightMinimum || rightMaximum < leftMinimum {
+			// Derived targets are appended from most-local to most-public.
+			// Disjoint intervals can represent distinct semantic domains (for
+			// example a conditioned detector threshold and its external input
+			// threshold), so retain the first instead of inventing a midpoint.
+			return left, true
+		}
+		minimum := math.Min(leftMinimum, rightMinimum)
+		maximum := math.Max(leftMaximum, rightMaximum)
+		center := (minimum + maximum) / 2
+		if center == 0 {
+			return left, true
+		}
+		tolerance := 100 * math.Abs(maximum-minimum) / (2 * math.Abs(center))
+		if tolerance > 100 {
+			return left, true
+		}
+		return numericProjectedConstraint(left.Name, left.Relation, center, left.Unit, &tolerance), true
+	default:
+		return Constraint{}, false
+	}
+}
+
 func upstreamObjectiveCone(requirement Requirement, observation Observation) map[string]bool {
+	if observation.Kind == "event" {
+		// An event assertion measures the complete candidate response to a
+		// declared disturbance. The disturbance may enter at an input or load
+		// while the measured recovery depends on downstream and feedback
+		// objectives, so every objective must see the behavior-level contract.
+		result := make(map[string]bool, len(requirement.Requirements.Objectives))
+		for _, objective := range requirement.Requirements.Objectives {
+			result[objective.ID] = true
+		}
+		return result
+	}
 	frontier := observationEndpoints(requirement, observation)
 	result := map[string]bool{}
 	for len(frontier) != 0 {
@@ -435,6 +659,59 @@ func upstreamObjectiveCone(requirement Requirement, observation Observation) map
 		}
 	}
 	return result
+}
+
+// upstreamBehavioralObjectiveCone follows only inputs that can carry the
+// observed physical behavior. Supervisory, bias, reference, and supply
+// dependencies still participate in hierarchy and composition, but they must
+// not project an output voltage, load, gain, or timing bound into sibling
+// signal or power paths.
+func upstreamBehavioralObjectiveCone(requirement Requirement, observation Observation) map[string]bool {
+	if observation.Kind == "event" {
+		return upstreamObjectiveCone(requirement, observation)
+	}
+	frontier := observationEndpoints(requirement, observation)
+	result := map[string]bool{}
+	for len(frontier) != 0 {
+		endpoint := frontier[0]
+		frontier = frontier[1:]
+		for _, objective := range requirement.Requirements.Objectives {
+			if result[objective.ID] || !objectiveProducesEndpoint(requirement, objective, endpoint) {
+				continue
+			}
+			result[objective.ID] = true
+			frontier = append(frontier, behavioralObjectiveInputEndpoints(requirement, objective)...)
+		}
+	}
+	if observation.Kind == "circuit" {
+		for _, objective := range requirement.Requirements.Objectives {
+			result[objective.ID] = true
+		}
+	}
+	return result
+}
+
+func behavioralObjectiveInputEndpoints(requirement Requirement, objective Objective) []string {
+	var endpoints []string
+	for _, binding := range objective.Bindings {
+		switch binding.Role {
+		case "bias", "control", "enable", "fault", "interlock", "negative_power", "permit", "positive_power", "power", "reference", "trip":
+			continue
+		}
+		if binding.Signal != "" && (binding.Direction == "sink" || binding.Direction == "bidirectional") {
+			endpoints = append(endpoints, "signal:"+binding.Signal)
+			continue
+		}
+		if binding.Port == "" {
+			continue
+		}
+		port, ok := requirementPort(requirement, binding.Port)
+		if ok && (port.Direction == "sink" || port.Direction == "bidirectional") {
+			endpoints = append(endpoints, "port:"+binding.Port)
+		}
+	}
+	slices.Sort(endpoints)
+	return endpoints
 }
 
 func observationEndpoints(requirement Requirement, observation Observation) []string {

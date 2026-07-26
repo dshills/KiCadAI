@@ -491,14 +491,69 @@ func orderComponentsForRequiredProximity(components []Component, rules []Proximi
 	for scc := range componentsBySCC {
 		remaining[scc] = struct{}{}
 	}
+	preferred := make(map[int]struct{}, len(componentsBySCC))
+	sccArea := make([]float64, len(componentsBySCC))
+	for scc, refs := range componentsBySCC {
+		for _, ref := range refs {
+			component := byRef[ref]
+			sccArea[scc] = math.Max(sccArea[scc], component.Bounds.WidthMM*component.Bounds.HeightMM)
+		}
+	}
+	sccClusterArea := append([]float64(nil), sccArea...)
+	for sourceSCC, targets := range sccEdges {
+		for targetSCC := range targets {
+			sccClusterArea[sourceSCC] += sccArea[targetSCC]
+		}
+	}
 	ordered := make([]Component, 0, len(components))
 	for len(remaining) > 0 {
 		selected := -1
+		selectPreferred := false
+		selectFixed := false
+		for scc := range remaining {
+			if indegree[scc] == 0 && byRef[componentsBySCC[scc][0]].Fixed {
+				selectFixed = true
+				break
+			}
+		}
+		for scc := range preferred {
+			if _, exists := remaining[scc]; exists && indegree[scc] == 0 &&
+				(!selectFixed || byRef[componentsBySCC[scc][0]].Fixed) {
+				selectPreferred = true
+				break
+			}
+		}
+		selectAnchor := false
+		if !selectPreferred {
+			for scc := range remaining {
+				if indegree[scc] == 0 &&
+					(!selectFixed || byRef[componentsBySCC[scc][0]].Fixed) &&
+					len(sccEdges[scc]) != 0 {
+					selectAnchor = true
+					break
+				}
+			}
+		}
 		for scc := range remaining {
 			if indegree[scc] != 0 {
 				continue
 			}
-			if selected < 0 || baseIndex[componentsBySCC[scc][0]] < baseIndex[componentsBySCC[selected][0]] {
+			if selectFixed && !byRef[componentsBySCC[scc][0]].Fixed {
+				continue
+			}
+			_, isPreferred := preferred[scc]
+			if selectPreferred && !isPreferred {
+				continue
+			}
+			if selectAnchor && len(sccEdges[scc]) == 0 {
+				continue
+			}
+			if selected < 0 ||
+				selectPreferred && (sccArea[scc] > sccArea[selected] ||
+					sccArea[scc] == sccArea[selected] && baseIndex[componentsBySCC[scc][0]] < baseIndex[componentsBySCC[selected][0]]) ||
+				selectAnchor && (sccClusterArea[scc] > sccClusterArea[selected] ||
+					sccClusterArea[scc] == sccClusterArea[selected] && baseIndex[componentsBySCC[scc][0]] < baseIndex[componentsBySCC[selected][0]]) ||
+				!selectPreferred && !selectAnchor && baseIndex[componentsBySCC[scc][0]] < baseIndex[componentsBySCC[selected][0]] {
 				selected = scc
 			}
 		}
@@ -509,8 +564,16 @@ func orderComponentsForRequiredProximity(components []Component, rules []Proximi
 			ordered = append(ordered, byRef[ref])
 		}
 		delete(remaining, selected)
+		delete(preferred, selected)
 		for targetSCC := range sccEdges[selected] {
 			indegree[targetSCC]--
+			if indegree[targetSCC] == 0 {
+				source := byRef[componentsBySCC[selected][0]]
+				target := byRef[componentsBySCC[targetSCC][0]]
+				if source.Fixed == target.Fixed {
+					preferred[targetSCC] = struct{}{}
+				}
+			}
 		}
 	}
 	return ordered
@@ -673,6 +736,14 @@ func candidatePlacements(component Component, componentRef string, request Reque
 						recordCandidateRejection(scoring, component, componentRef, candidateResult.Position, index, CandidateRejectOutsideBoard, "candidate is outside usable board area")
 						continue
 					}
+					if reserve, required := requiredProximityAnchorReservation(component, componentRef, request, usable); required &&
+						(candidateResult.Position.XMM-reserve < usable.Min.XMM ||
+							candidateResult.Position.XMM+reserve > usable.Max.XMM ||
+							candidateResult.Position.YMM-reserve < usable.Min.YMM ||
+							candidateResult.Position.YMM+reserve > usable.Max.YMM) {
+						recordCandidateRejection(scoring, component, componentRef, candidateResult.Position, index, CandidateRejectProximity, "candidate leaves insufficient board area for its required proximity cluster")
+						continue
+					}
 					if !component.Fixed && component.Edge != EdgeNone && !edgeConstraintSatisfied(request.Board, component, candidateResult.Position, component.Edge, edgeTolerance) {
 						recordCandidateRejection(scoring, component, componentRef, candidateResult.Position, index, CandidateRejectEdge, "candidate does not satisfy edge constraint")
 						continue
@@ -748,6 +819,51 @@ func candidatePlacements(component Component, componentRef string, request Reque
 		candidates = candidates[:maxCandidates]
 	}
 	return candidates
+}
+
+func requiredProximityAnchorReservation(component Component, componentRef string, request Request, usable Rect) (float64, bool) {
+	if component.Edge != EdgeNone {
+		return 0, false
+	}
+	componentRef = normalizeRef(componentRef)
+	targets := map[string]struct{}{}
+	for _, rule := range request.ProximityRules {
+		if !rule.Required || rule.MaxDistanceMM <= 0 || normalizeRef(rule.AnchorRef) != componentRef {
+			continue
+		}
+		for _, targetRef := range rule.TargetRefs {
+			targetRef = normalizeRef(targetRef)
+			if targetRef != "" && targetRef != componentRef {
+				targets[targetRef] = struct{}{}
+			}
+		}
+	}
+	if len(targets) < 2 {
+		return 0, false
+	}
+	spacing := request.Rules.ComponentSpacingMM
+	if spacing <= 0 {
+		spacing = DefaultRules().ComponentSpacingMM
+	}
+	componentsByRef := componentsByNormalizedRef(request.Components)
+	totalArea := (component.Bounds.WidthMM + spacing) * (component.Bounds.HeightMM + spacing)
+	maximumDimension := max(component.Bounds.WidthMM, component.Bounds.HeightMM)
+	for targetRef := range targets {
+		target, exists := componentsByRef[targetRef]
+		if !exists || target.Bounds.WidthMM <= 0 || target.Bounds.HeightMM <= 0 {
+			return 0, false
+		}
+		totalArea += (target.Bounds.WidthMM + spacing) * (target.Bounds.HeightMM + spacing)
+		maximumDimension = max(maximumDimension, target.Bounds.WidthMM, target.Bounds.HeightMM)
+	}
+	if totalArea <= 0 {
+		return 0, false
+	}
+	reserve := max(math.Sqrt(totalArea)/2, maximumDimension/2) + spacing
+	if 2*reserve > usable.Max.XMM-usable.Min.XMM || 2*reserve > usable.Max.YMM-usable.Min.YMM {
+		return 0, false
+	}
+	return reserve, true
 }
 
 func appendRequiredProximityCandidateSamples(component Component, componentRef string, request Request, placedByRef map[string]PlacementResult, usable Rect, grid float64, xCount int, yCount int, xIndices []int, yIndices []int) ([]int, []int) {

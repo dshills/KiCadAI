@@ -368,6 +368,12 @@ func (provider *CatalogProvider) expandConstantCurrentRegulation(ctx context.Con
 		switch bindings[index].Role {
 		case "input":
 			bindings[index].Instance, bindings[index].Function = inputSwitch.selected.InstanceID, "SOURCE"
+		case "power":
+			// The search layer may add a generic power role alongside an
+			// explicit input role. Bind it to a distinct endpoint on the same
+			// source-side net so lowering preserves the default-off series
+			// switch instead of inventing a nonexistent regulator POWER pin.
+			bindings[index].Instance, bindings[index].Function = "gate_pullup", "A"
 		case "output":
 			bindings[index].Instance, bindings[index].Function = outputProgramEndpointID, "B"
 		case "reference":
@@ -1216,6 +1222,20 @@ func catalogSimulationParameterForModelNonNegative(record components.ComponentRe
 		}
 		for _, parameter := range model.Parameters {
 			if parameter.Name == name && parameter.Value >= 0 && finiteNumbers(parameter.Value) {
+				return parameter.Value, true
+			}
+		}
+	}
+	return 0, false
+}
+
+func catalogSimulationParameterForModelFinite(record components.ComponentRecord, modelID, name string) (float64, bool) {
+	for _, model := range record.SimulationModels {
+		if model.ModelID != modelID {
+			continue
+		}
+		for _, parameter := range model.Parameters {
+			if parameter.Name == name && finiteNumbers(parameter.Value) {
 				return parameter.Value, true
 			}
 		}

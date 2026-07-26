@@ -104,7 +104,7 @@ func TestGoldenVerifiedActiveSelections(t *testing.T) {
 		{
 			name: "select_opamp.json",
 			request: SelectionRequest{
-				Query:             Query{Text: "ti", Family: "opamp", Package: "sot23_5"},
+				Query:             Query{Text: "LMV321IDBVR", Family: "opamp", Package: "sot23_5"},
 				Acceptance:        AcceptanceConnectivity,
 				RequiredRatings:   []RequiredRating{{Kind: "supply_voltage", Value: "3.3", Unit: "V"}},
 				RequiredFunctions: []string{"IN_PLUS", "IN_MINUS", "OUT"},

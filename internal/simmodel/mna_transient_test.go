@@ -9,6 +9,197 @@ import (
 	"testing"
 )
 
+func TestTransientSourceAndDeviceValueEventsExecuteDeterministically(t *testing.T) {
+	intent := Intent{
+		ModelID: ModelTransientCircuitV1,
+		Analyses: []Analysis{{
+			ID: "events", Kind: AnalysisTransient, DurationS: .2, TimeStepS: .1,
+			Excitations: []SourceExcitation{{Component: "source", DCValue: 1}},
+			SourceValueEvents: []SourceValueEvent{{
+				ID: "source_step", Component: "source", TriggerTimeS: .1, DurationS: .1,
+				Initial: 1, Applied: 2,
+			}},
+			DeviceValueEvents: []DeviceValueEvent{{
+				ID: "load_step", Component: "load", TriggerTimeS: .1, DurationS: .1,
+				InitialSI: 1000, AppliedSI: 500,
+			}},
+		}},
+		Assertions: []Assertion{{AnalysisID: "events", Node: "OUT", Quantity: QuantityVoltageV, TimeS: .2, Min: 1.999, Max: 2.001}},
+	}
+	components := []ComponentEvidence{
+		voltageSourceEvidence("source", "OUT", "GND"),
+		resistorEvidence("load", 1000, "OUT", "GND"),
+	}
+	plan, diagnostics := ResolveWithTopology(intent, "catalog", "catalog-hash", components, []NodeEvidence{{Name: "GND", Role: "ground"}, {Name: "OUT"}})
+	if len(diagnostics) != 0 {
+		t.Fatalf("resolve value-event plan: %#v", diagnostics)
+	}
+	report, diagnostics := Evaluate(plan)
+	if len(diagnostics) != 0 || report.Status != "pass" {
+		t.Fatalf("value-event report=%#v diagnostics=%#v", report, diagnostics)
+	}
+	last := report.Analyses[0].Points[len(report.Analyses[0].Points)-1]
+	loadCurrent := 0.0
+	for _, device := range last.Devices {
+		if device.Component == "load" {
+			loadCurrent = math.Abs(device.CurrentA)
+		}
+	}
+	if math.Abs(loadCurrent-.004) > 1e-9 {
+		t.Fatalf("event-applied load current = %.12g A, want 0.004 A", loadCurrent)
+	}
+	replay, replayDiagnostics := Evaluate(ClonePlan(plan))
+	if len(replayDiagnostics) != 0 || !reflect.DeepEqual(report, replay) {
+		t.Fatalf("value-event replay differs: diagnostics=%#v", replayDiagnostics)
+	}
+}
+
+func TestTransientCurrentSourceObservationsUseInstantaneousExcitation(t *testing.T) {
+	analysis := Analysis{
+		ID: "load_event", Kind: AnalysisTransient, DurationS: .2, TimeStepS: .1,
+		Excitations: []SourceExcitation{
+			{Component: "supply", DCValue: 5},
+			{Component: "load", DCValue: 1},
+		},
+		SourceValueEvents: []SourceValueEvent{{
+			ID: "load_step", Component: "load", TriggerTimeS: .1, DurationS: .1,
+			Initial: 1, Applied: 2,
+		}},
+	}
+	plan := Plan{
+		GroundNode: "GND",
+		Nodes:      []string{"GND", "OUT"},
+		Devices: []ResolvedDevice{
+			{
+				Component: "supply", PrimitiveModel: PrimitiveVoltageSourceV1,
+				Terminals: []TerminalBinding{{Terminal: "POSITIVE", Net: "OUT"}, {Terminal: "NEGATIVE", Net: "GND"}},
+			},
+			{
+				Component: "load", PrimitiveModel: PrimitiveCurrentSourceV1,
+				Terminals: []TerminalBinding{{Terminal: "POSITIVE", Net: "OUT"}, {Terminal: "NEGATIVE", Net: "GND"}},
+			},
+		},
+	}
+	result, diagnostics := solveTransientAnalysis(plan, analysis)
+	if len(diagnostics) != 0 {
+		t.Fatalf("transient diagnostics = %#v", diagnostics)
+	}
+	want := []float64{1, 2, 2}
+	if len(result.Points) != len(want) {
+		t.Fatalf("transient point count = %d, want %d", len(result.Points), len(want))
+	}
+	for pointIndex, point := range result.Points {
+		found := false
+		for _, device := range point.Devices {
+			if device.Component != "load" {
+				continue
+			}
+			found = true
+			if device.CurrentA != want[pointIndex] || device.CurrentMagnitudeA != want[pointIndex] {
+				t.Fatalf("load observation at point %d = %#v, want current %.12g A", pointIndex, device, want[pointIndex])
+			}
+		}
+		if !found {
+			t.Fatalf("load observation missing at point %d", pointIndex)
+		}
+	}
+}
+
+func TestTransientEventAtZeroRetainsInitialBoundarySample(t *testing.T) {
+	intent := Intent{
+		ModelID: ModelTransientCircuitV1,
+		Analyses: []Analysis{{
+			ID: "startup", Kind: AnalysisTransient, DurationS: .2, TimeStepS: .1,
+			Excitations: []SourceExcitation{{Component: "source", DCValue: 1}},
+			SourceValueEvents: []SourceValueEvent{{
+				ID: "power_up", Component: "source", TriggerTimeS: 0, DurationS: .2,
+				Initial: 0, Applied: 1,
+			}},
+		}},
+		Assertions: []Assertion{{AnalysisID: "startup", Node: "OUT", Quantity: QuantityVoltageV, TimeS: .2, Min: .999, Max: 1.001}},
+	}
+	plan, diagnostics := ResolveWithTopology(intent, "catalog", "catalog-hash",
+		[]ComponentEvidence{voltageSourceEvidence("source", "OUT", "GND"), resistorEvidence("load", 1000, "OUT", "GND")},
+		[]NodeEvidence{{Name: "GND", Role: "ground"}, {Name: "OUT"}},
+	)
+	if len(diagnostics) != 0 {
+		t.Fatalf("resolve diagnostics=%#v", diagnostics)
+	}
+	report, diagnostics := Evaluate(plan)
+	if len(diagnostics) != 0 || report.Status != "pass" {
+		t.Fatalf("report=%#v diagnostics=%#v", report, diagnostics)
+	}
+	points := report.Analyses[0].Points
+	if len(points) != 3 {
+		t.Fatalf("boundary points=%#v", points)
+	}
+	initialV, initialOK := analysisNodeMagnitude(points[0], "OUT")
+	appliedV, appliedOK := analysisNodeMagnitude(points[1], "OUT")
+	if !initialOK || !appliedOK || initialV != 0 || appliedV < .999 {
+		t.Fatalf("boundary points=%#v", points)
+	}
+}
+
+func TestTransientConditionValueEventAppliesAndRecovers(t *testing.T) {
+	recovered := 1.0
+	analysis := Analysis{
+		ID: "thermal_event", Kind: AnalysisElectrothermal, DurationS: .3, TimeStepS: .1,
+		Excitations: []SourceExcitation{{Component: "source", DCValue: 1}},
+		Conditions:  []NamedValue{{Name: "ambient_temperature_c", Value: 25}, {Name: "thermal_resistance_scale", Value: 1}},
+		ConditionValueEvents: []ConditionValueEvent{{
+			ID: "blocked_airflow", Name: "thermal_resistance_scale", TriggerTimeS: .1, DurationS: .1,
+			Initial: 1, Applied: 3, Recovered: &recovered,
+		}},
+	}
+	for _, test := range []struct {
+		time float64
+		want float64
+	}{{0, 1}, {.1, 3}, {.2, 1}} {
+		resolved := transientDCAnalysis(analysis, test.time)
+		if got := namedValueMap(resolved.Conditions)["thermal_resistance_scale"]; got != test.want {
+			t.Fatalf("thermal scale at %.1f s = %g, want %g", test.time, got, test.want)
+		}
+	}
+}
+
+func TestTransientDCAnalysisInitializesSineAtDeclaredDCBias(t *testing.T) {
+	analysis := Analysis{
+		TimeStepS: 1.0 / 32_000,
+		Excitations: []SourceExcitation{{
+			Component:       "signal",
+			DCValue:         .25,
+			SineAmplitude:   1,
+			SineFrequencyHz: 1000,
+			SinePhaseDeg:    180,
+		}},
+	}
+	resolved := transientDCAnalysis(analysis, -analysis.TimeStepS)
+	if got := resolved.Excitations[0].DCValue; got != .25 {
+		t.Fatalf("periodic initial DC value = %.12g, want declared bias 0.25", got)
+	}
+	if resolved.Excitations[0].SineAmplitude != 0 || resolved.Excitations[0].SineFrequencyHz != 0 {
+		t.Fatalf("periodic source was not reduced to DC: %#v", resolved.Excitations[0])
+	}
+}
+
+func TestTransientDCAnalysisPreservesPulseLeftHandBoundary(t *testing.T) {
+	analysis := Analysis{
+		TimeStepS: .1,
+		Excitations: []SourceExcitation{{
+			Component:         "supply",
+			PulseInitialValue: 0,
+			PulseValue:        5,
+			PulseDelayS:       0,
+			PulseWidthS:       .5,
+			PulsePeriodS:      1,
+		}},
+	}
+	resolved := transientDCAnalysis(analysis, -analysis.TimeStepS)
+	if got := resolved.Excitations[0].DCValue; got != 0 {
+		t.Fatalf("pulse left-hand initial DC value = %.12g, want 0", got)
+	}
+}
+
 func TestPeriodicTransientMeasurementsUseSettledTwoCycleWindow(t *testing.T) {
 	result := AnalysisResult{Kind: AnalysisTransient, FundamentalFrequencyHz: 1}
 	for index := 0; index <= 12; index++ {
@@ -108,6 +299,98 @@ func TestTransientPeriodicZeroCrossingUsesOperatingPointSeed(t *testing.T) {
 	}
 }
 
+func TestAcceptedPriorTransientBaseUsesPrecedingHistoryState(t *testing.T) {
+	inductance := 1.0
+	plan := Plan{
+		GroundNode: "GND",
+		Nodes:      []string{"GND", "LOAD"},
+		Devices: []ResolvedDevice{{
+			Component: "load_inductor", PrimitiveModel: PrimitiveInductorTransientV1,
+			ValueSI:   &inductance,
+			Terminals: []TerminalBinding{{Terminal: "A", Net: "LOAD"}, {Terminal: "B", Net: "GND"}},
+		}},
+	}
+	analysis := Analysis{ID: "history", Kind: AnalysisTransient, DurationS: .2, TimeStepS: .1}
+	template, diagnostics := buildTransientTemplate(plan, analysis)
+	if len(diagnostics) != 0 {
+		t.Fatalf("template diagnostics = %#v", diagnostics)
+	}
+	branch := template.branchIndex["load_inductor"]
+	older := make([]complex128, len(template.rhs))
+	accepted := make([]complex128, len(template.rhs))
+	older[branch] = 2
+	accepted[branch] = 7
+	base, diagnostics, prepared := prepareAcceptedPriorTransientBase(
+		template, plan, analysis, 2, .2, [][]complex128{older, accepted}, nil,
+	)
+	if !prepared || len(diagnostics) != 0 {
+		t.Fatalf("prepared=%v diagnostics=%#v", prepared, diagnostics)
+	}
+	if got, want := real(base.rhs[branch]), -20.0; math.Abs(got-want) > 1e-12 {
+		t.Fatalf("prior inductor history rhs = %.12g, want %.12g", got, want)
+	}
+	if _, _, prepared := prepareAcceptedPriorTransientBase(template, plan, analysis, 1, .1, [][]complex128{older}, nil); prepared {
+		t.Fatal("first transient observation incorrectly claimed a reconstructable prior step")
+	}
+}
+
+func TestTransientAcceptedSubstepsCloseOriginalObservationTime(t *testing.T) {
+	plan := resolveTransientSwitchPlan(t, 25)
+	analysis := plan.Analyses[0]
+	initialAnalysis := transientDCAnalysis(analysis, 0)
+	initialPlan := planWithRequestedAnalysis(plan, initialAnalysis)
+	_, initial, _, diagnostic := solveNonlinearDC(initialPlan, initialAnalysis)
+	if diagnostic != nil {
+		t.Fatalf("initial operating point: %#v", diagnostic)
+	}
+	template, diagnostics := buildTransientTemplate(plan, analysis)
+	if len(diagnostics) != 0 {
+		t.Fatalf("template diagnostics = %#v", diagnostics)
+	}
+	const step = 50
+	timeS := float64(step) * analysis.TimeStepS
+	base := cloneMNASystem(template)
+	_, _, diagnostics = prepareTransientBase(
+		&base, template, plan, analysis, step, timeS,
+		initial, [][]complex128{append([]complex128(nil), initial...)}, nil,
+	)
+	if len(diagnostics) != 0 {
+		t.Fatalf("prepare diagnostics = %#v", diagnostics)
+	}
+	devices := compileNonlinearDevices(plan)
+	predictorWorkspace := cloneMNASystem(template)
+	predictedSystem, predictedSolution, evidence, predicted := solveTransientStepBySubstepPredictor(
+		plan, analysis, timeS, plan.Devices, devices, initial,
+		&predictorWorkspace, nil,
+	)
+	if !predicted || evidence.Method != "backward_euler_bounded_accepted_substeps_v1" || evidence.TimeSteps < 2 {
+		t.Fatalf("predicted=%v evidence=%#v", predicted, evidence)
+	}
+	predictedOut := nonlinearNodeVoltage(&predictedSystem, predictedSolution, "OUT")
+	if math.IsNaN(predictedOut) || math.IsInf(predictedOut, 0) {
+		t.Fatalf("accepted substep output is non-finite: %.12g", predictedOut)
+	}
+}
+
+func TestTransientAcceptedSubstepsApplyOnlyToBoundedDynamicOutputPlans(t *testing.T) {
+	legacy := resolveTransientSwitchPlan(t, 25)
+	if transientAcceptedSubstepsApplicable(legacy) {
+		t.Fatal("legacy switched-load transient unexpectedly enabled accepted substeps")
+	}
+	for _, primitive := range []string{
+		PrimitiveOpAmpV1,
+		PrimitiveCurrentSenseAmplifierV1,
+		PrimitiveSynchronousBuckRegulatorV1,
+	} {
+		bounded := legacy
+		bounded.Devices = append([]ResolvedDevice(nil), legacy.Devices...)
+		bounded.Devices[0].PrimitiveModel = primitive
+		if !transientAcceptedSubstepsApplicable(bounded) {
+			t.Fatalf("%s transient did not enable accepted substeps", primitive)
+		}
+	}
+}
+
 func TestTransientOutputLimitGuessInterpolatesBracketSolutions(t *testing.T) {
 	base := mnaSystem{nodeIndex: map[string]int{"OUT": 0, "OTHER": 1}}
 	devices := []ResolvedDevice{{Component: "amp", PrimitiveModel: PrimitiveOpAmpV1, Terminals: []TerminalBinding{{Terminal: "OUT", Net: "OUT"}}}}
@@ -119,6 +402,267 @@ func TestTransientOutputLimitGuessInterpolatesBracketSolutions(t *testing.T) {
 	seedTransientOutputLimitGuess(base, devices, guess, nil, next)
 	if guess[0] != 2.5 || guess[1] != 5 {
 		t.Fatalf("interpolated transient output-limit guess = %#v", guess)
+	}
+}
+
+func TestTransientBranchLimitReleasesOnlyWhenControlEquationTurnsInward(t *testing.T) {
+	device := ResolvedDevice{
+		Component:      "limited_source",
+		PrimitiveModel: PrimitiveSynchronousBuckRegulatorV1,
+		ModelParameters: []NamedValue{
+			{Name: "peak_current_limit_a", Value: 3.4},
+		},
+	}
+	tests := []struct {
+		name        string
+		state       float64
+		residual    float64
+		wantRelease bool
+	}{
+		{name: "positive_limit_releases", state: 3.4, residual: -0.5, wantRelease: true},
+		{name: "positive_limit_remains", state: 3.4, residual: 0.5},
+		{name: "negative_limit_releases", state: -3.4, residual: 0.5, wantRelease: true},
+		{name: "negative_limit_remains", state: -3.4, residual: -0.5},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			base := mnaSystem{
+				matrix:      [][]complex128{{0}},
+				rhs:         []complex128{complex(-test.residual, 0)},
+				branchIndex: map[string]int{device.Component: 0},
+			}
+			_, next, changed := advanceTransientActiveLimitState(
+				base,
+				[]ResolvedDevice{device},
+				[]complex128{0},
+				nil,
+				map[int]float64{0: test.state},
+				nil,
+				nil,
+			)
+			_, remainsLimited := next[0]
+			if changed != test.wantRelease || remainsLimited == test.wantRelease {
+				t.Fatalf("changed=%t remains_limited=%t want_release=%t", changed, remainsLimited, test.wantRelease)
+			}
+		})
+	}
+}
+
+func TestTransientStickyBranchLimitDoesNotRepeatAnInfeasibleRelease(t *testing.T) {
+	device := ResolvedDevice{
+		Component:      "limited_source",
+		PrimitiveModel: PrimitiveSynchronousBuckRegulatorV1,
+		ModelParameters: []NamedValue{
+			{Name: "peak_current_limit_a", Value: 3.4},
+		},
+	}
+	base := mnaSystem{
+		matrix:      [][]complex128{{0}},
+		rhs:         []complex128{.5},
+		branchIndex: map[string]int{device.Component: 0},
+	}
+	_, next, changed := advanceTransientActiveLimitState(
+		base,
+		[]ResolvedDevice{device},
+		[]complex128{0},
+		nil,
+		map[int]float64{0: 3.4},
+		nil,
+		map[int]bool{0: true},
+	)
+	if changed || next[0] != 3.4 {
+		t.Fatalf("sticky branch limit changed=%t next=%#v", changed, next)
+	}
+}
+
+func TestTransientInteriorOutputContinuationReleasesForIndependentCurrentLimit(t *testing.T) {
+	device := ResolvedDevice{
+		Component:      "regulated_source",
+		PrimitiveModel: PrimitiveSynchronousBuckRegulatorV1,
+		Terminals: []TerminalBinding{
+			{Terminal: "PVIN", Net: "IN"},
+			{Terminal: "PGND", Net: "GND"},
+			{Terminal: "SW", Net: "SW"},
+		},
+	}
+	base := mnaSystem{
+		matrix:      make([][]complex128, 3),
+		rhs:         make([]complex128, 3),
+		nodeIndex:   map[string]int{"IN": 0, "SW": 1},
+		branchIndex: map[string]int{device.Component: 2},
+	}
+	for index := range base.matrix {
+		base.matrix[index] = make([]complex128, 3)
+	}
+	outputLimits := map[string]transientOutputLimitState{
+		device.Component: {value: 5, lower: 5, upper: 5},
+	}
+	next, _, changed := advanceTransientActiveLimitState(
+		base,
+		[]ResolvedDevice{device},
+		[]complex128{12, 5, 0},
+		outputLimits,
+		nil,
+		nil,
+		nil,
+	)
+	if !changed {
+		t.Fatal("interior continuation root was not released")
+	}
+	if _, remainsLimited := next[device.Component]; remainsLimited {
+		t.Fatalf("interior continuation clamp remains active: %#v", next)
+	}
+}
+
+func TestReleasedInteriorContinuationKeepsPhysicalEnvelopeEligible(t *testing.T) {
+	base := mnaSystem{branchIndex: map[string]int{"regulated_source": 3}}
+	outputLimits := map[string]transientOutputLimitState{
+		"regulated_source": {value: 5, lower: 5, upper: 5},
+	}
+	deferredOutputLimits := map[string]bool{"regulated_source": true}
+	deferredBranchLimits := map[int]bool{3: true}
+
+	recordReleasedTransientActiveLimits(
+		base,
+		outputLimits, nil,
+		nil, nil,
+		deferredOutputLimits, deferredBranchLimits,
+	)
+
+	if deferredOutputLimits["regulated_source"] {
+		t.Fatal("synthetic interior continuation release deferred the physical output envelope")
+	}
+	if deferredBranchLimits[3] {
+		t.Fatal("branch limit did not become eligible after the output continuation released")
+	}
+}
+
+func TestTransientCurrentLimitSupersedesOutputClampOnSharedControlEquation(t *testing.T) {
+	device := ResolvedDevice{
+		Component:      "regulated_source",
+		PrimitiveModel: PrimitiveSynchronousBuckRegulatorV1,
+		ModelParameters: []NamedValue{
+			{Name: "peak_current_limit_a", Value: 3.4},
+		},
+		Terminals: []TerminalBinding{
+			{Terminal: "PVIN", Net: "IN"},
+			{Terminal: "PGND", Net: "GND"},
+			{Terminal: "SW", Net: "SW"},
+		},
+	}
+	base := mnaSystem{
+		nodeIndex:   map[string]int{"IN": 0, "SW": 1},
+		branchIndex: map[string]int{device.Component: 2},
+	}
+	outputLimits := map[string]transientOutputLimitState{
+		device.Component: {side: 1, value: 12},
+	}
+	solution := []complex128{12, 12, 22}
+
+	nextOutputLimits, nextBranchLimits, changed := addViolatedTransientActiveLimit(
+		base,
+		[]ResolvedDevice{device},
+		solution,
+		outputLimits,
+		nil,
+		nil,
+		nil,
+		nil,
+	)
+	if !changed {
+		t.Fatal("expected the overcurrent state to replace the output clamp")
+	}
+	if _, limited := nextOutputLimits[device.Component]; limited {
+		t.Fatal("output clamp remained active on the shared control equation")
+	}
+	if got := nextBranchLimits[2]; got != 3.4 {
+		t.Fatalf("branch limit = %.12g A, want 3.4 A", got)
+	}
+
+	nextOutputLimits, nextBranchLimits, changed = addViolatedTransientActiveLimit(
+		base,
+		[]ResolvedDevice{device},
+		[]complex128{12, 13, 3.4},
+		nextOutputLimits,
+		nextBranchLimits,
+		nil,
+		nil,
+		nil,
+	)
+	if !changed || nextOutputLimits[device.Component].value != 12 {
+		t.Fatalf("changed=%t output limits=%#v; physical high clamp did not replace infeasible current clamp", changed, nextOutputLimits)
+	}
+	if _, limited := nextBranchLimits[2]; limited {
+		t.Fatal("infeasible current clamp remained active with the physical output clamp")
+	}
+}
+
+func TestTransientPhysicalOutputEnvelopeSupersedesInfeasibleCurrentClamp(t *testing.T) {
+	device := ResolvedDevice{
+		Component:      "buck",
+		PrimitiveModel: PrimitiveSynchronousBuckRegulatorV1,
+		Terminals: []TerminalBinding{
+			{Terminal: "PVIN", Net: "IN"},
+			{Terminal: "PGND", Net: "GND"},
+			{Terminal: "SW", Net: "SW"},
+		},
+	}
+	base := mnaSystem{
+		nodeIndex:   map[string]int{"SW": 0, "IN": 1},
+		branchIndex: map[string]int{device.Component: 2},
+	}
+	deferredBranches := map[int]bool{}
+	nextOutputs, nextBranches, changed := addViolatedTransientActiveLimit(
+		base,
+		[]ResolvedDevice{device},
+		[]complex128{-3.4, 12, 3.5},
+		nil,
+		map[int]float64{2: 3.5},
+		nil,
+		nil,
+		deferredBranches,
+	)
+	if !changed || nextOutputs[device.Component].value != 0 {
+		t.Fatalf("changed=%t output limits=%#v; want 0 V physical clamp", changed, nextOutputs)
+	}
+	if _, limited := nextBranches[2]; limited || !deferredBranches[2] {
+		t.Fatalf("branch limits=%#v deferred=%#v; infeasible current clamp was not deferred", nextBranches, deferredBranches)
+	}
+}
+
+func TestTransientBuckLowRailDefersPeakLimitDuringFreewheel(t *testing.T) {
+	device := ResolvedDevice{
+		Component:      "buck",
+		PrimitiveModel: PrimitiveSynchronousBuckRegulatorV1,
+		ModelParameters: []NamedValue{
+			{Name: "peak_current_limit_a", Value: 3.5},
+		},
+		Terminals: []TerminalBinding{
+			{Terminal: "PVIN", Net: "IN"},
+			{Terminal: "PGND", Net: "GND"},
+			{Terminal: "SW", Net: "SW"},
+		},
+	}
+	base := mnaSystem{
+		nodeIndex:   map[string]int{"SW": 0, "IN": 1},
+		branchIndex: map[string]int{device.Component: 2},
+	}
+	outputLimits := map[string]transientOutputLimitState{
+		device.Component: {side: -1, value: 0},
+	}
+	deferredBranches := map[int]bool{}
+	nextOutputs, nextBranches, changed := addViolatedTransientActiveLimit(
+		base,
+		[]ResolvedDevice{device},
+		[]complex128{0, 12, 3.6},
+		outputLimits,
+		nil,
+		nil,
+		nil,
+		deferredBranches,
+	)
+	if changed || nextOutputs[device.Component].value != 0 || len(nextBranches) != 0 || !deferredBranches[2] {
+		t.Fatalf("changed=%t outputs=%#v branches=%#v deferred=%#v", changed, nextOutputs, nextBranches, deferredBranches)
 	}
 }
 
@@ -299,6 +843,52 @@ func TestTransientBoundsClaimsAndOperatingLimitsFailClosed(t *testing.T) {
 	}
 }
 
+func TestNormalizeDynamicGridPreservesEventBoundaries(t *testing.T) {
+	analysis := Analysis{
+		ID: "extended", Kind: AnalysisTransient, DurationS: 0.5, TimeStepS: 0.0001,
+		SourceValueEvents: []SourceValueEvent{
+			{ID: "startup", Component: "supply", TriggerTimeS: 0, DurationS: 0.1, Initial: 0, Applied: 12},
+			{ID: "shutdown", Component: "supply", TriggerTimeS: 0.4, DurationS: 0.1, Initial: 12, Applied: 0},
+		},
+		DeviceValueEvents: []DeviceValueEvent{
+			{ID: "load", Component: "load", TriggerTimeS: 0.2, DurationS: 0.05, InitialSI: 100, AppliedSI: 10},
+		},
+	}
+	if !NormalizeDynamicGrid(&analysis) {
+		t.Fatal("expected an aligned bounded grid")
+	}
+	if steps := int(math.Round(analysis.DurationS / analysis.TimeStepS)); steps != 1000 {
+		t.Fatalf("steps = %d, want 1000 (one hundred samples across the shortest event)", steps)
+	}
+	for _, value := range []float64{0.1, 0.2, 0.05, 0.25, 0.4, 0.5} {
+		if !onTransientGrid(value, analysis.TimeStepS) {
+			t.Fatalf("%g is not on normalized grid %g", value, analysis.TimeStepS)
+		}
+	}
+}
+
+func TestNormalizeDynamicGridCoarsensFastBaseStepToAlignedEventGrid(t *testing.T) {
+	analysis := Analysis{
+		ID: "inductive_fault", Kind: AnalysisElectrothermal,
+		DurationS: 0.08, TimeStepS: 5e-8,
+		DeviceValueEvents: []DeviceValueEvent{{
+			ID: "short", Component: "load", TriggerTimeS: 0.07, DurationS: 0.01,
+			InitialSI: 8, AppliedSI: 0.01,
+		}},
+	}
+	if !NormalizeDynamicGrid(&analysis) {
+		t.Fatal("fast base grid did not coarsen to a bounded aligned event grid")
+	}
+	if steps := int(math.Round(analysis.DurationS / analysis.TimeStepS)); steps != 800 {
+		t.Fatalf("steps = %d, want 800 (one hundred samples across the 10 ms event)", steps)
+	}
+	for _, landmark := range []float64{0.07, 0.01, 0.08} {
+		if !onTransientGrid(landmark, analysis.TimeStepS) {
+			t.Fatalf("%g is not on normalized grid %g", landmark, analysis.TimeStepS)
+		}
+	}
+}
+
 func TestTransientRejectsProviderSolverAndTopologyFieldsByContract(t *testing.T) {
 	intent := transientSwitchIntent()
 	data, err := json.Marshal(intent)
@@ -412,5 +1002,46 @@ func transientPNPComponents() []ComponentEvidence {
 		resistorEvidence("base", 10000, "DRIVE", "BASE"), resistorEvidence("collector", 1000, "OUT", "GND"),
 		{InstanceID: "load", CatalogID: "capacitor.ceramic.0603", Family: "capacitor", ValueSI: 100e-9, HasValueSI: true, ModelClaims: []CatalogEvidence{{ModelID: PrimitiveCapacitorTransientV1, Parameters: []NamedValue{{Name: "max_voltage_v", Value: 25}}}}, Connections: []ConnectionEvidence{{Function: "A", Net: "OUT"}, {Function: "B", Net: "GND"}}},
 		{InstanceID: "q1", CatalogID: "reviewed-pnp", Family: "bjt", ModelClaims: []CatalogEvidence{{ModelID: PrimitiveBJTPNPV1, Parameters: bjtParameters(.2, 40)}}, Connections: []ConnectionEvidence{{Function: "BASE", Net: "BASE"}, {Function: "COLLECTOR", Net: "OUT"}, {Function: "EMITTER", Net: "VCC"}}},
+	}
+}
+
+func TestTransientZeroEnergyRecognizesAllZeroIndependentSources(t *testing.T) {
+	plan := Plan{
+		GroundNode: "GND",
+		Devices: []ResolvedDevice{
+			{
+				Component: "supply", PrimitiveModel: PrimitiveConnectorVoltageSourceV1,
+				Terminals: []TerminalBinding{{Terminal: "PIN_1", Net: "VCC"}, {Terminal: "PIN_2", Net: "GND"}},
+			},
+			{
+				Component: "regulator", PrimitiveModel: PrimitiveFixedLinearRegulatorV1,
+				Terminals: []TerminalBinding{{Terminal: "VIN", Net: "SWITCHED"}, {Terminal: "GND", Net: "GND"}},
+			},
+		},
+	}
+	analysis := Analysis{
+		Kind: AnalysisTransient, TimeStepS: 1e-6,
+		Excitations: []SourceExcitation{{
+			Component: "supply", PulseInitialValue: 0, PulseValue: 5,
+			PulseDelayS: 2e-6, PulseWidthS: 10e-6, PulsePeriodS: 20e-6,
+		}},
+	}
+	if !transientPowerSourcesZeroAtTime(plan, analysis, -analysis.TimeStepS) {
+		t.Fatal("all-zero independent-source boundary was not recognized as zero energy")
+	}
+
+	plan.Devices = append(plan.Devices, ResolvedDevice{
+		Component: "control", PrimitiveModel: PrimitiveVoltageSourceV1,
+		Terminals: []TerminalBinding{{Terminal: "POSITIVE", Net: "CONTROL"}, {Terminal: "NEGATIVE", Net: "GND"}},
+	})
+	plan.Devices[1].Terminals[0].Net = "VCC"
+	analysis.Excitations = append(analysis.Excitations, SourceExcitation{Component: "control", DCValue: 3.3})
+	if !transientPowerSourcesZeroAtTime(plan, analysis, -analysis.TimeStepS) {
+		t.Fatal("active control source prevented zero-power initialization")
+	}
+	analysis.Excitations[0].DCValue = 5
+	analysis.Excitations[0].PulsePeriodS = 0
+	if transientPowerSourcesZeroAtTime(plan, analysis, -analysis.TimeStepS) {
+		t.Fatal("energized power source was classified as zero energy")
 	}
 }

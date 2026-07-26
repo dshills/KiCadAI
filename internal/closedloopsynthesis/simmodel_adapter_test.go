@@ -93,6 +93,19 @@ func TestSimModelEvaluatorFailsClosedWithoutIndependentProvenanceRegistry(t *tes
 	}
 }
 
+func TestSimulationResolutionAllowsEquivalentRequirementsToShareEvidence(t *testing.T) {
+	resolution, err := (dividerSimulationResolver{}).ResolveSimulation(context.Background(), CandidateState{})
+	if err != nil {
+		t.Fatalf("resolve simulation: %v", err)
+	}
+	resolution.Measurements = append(resolution.Measurements, SimulationMeasurementLink{
+		RequirementID: "equivalent_output", OperatingCase: "nominal", Assertion: 0,
+	})
+	if diagnostics := validateSimulationResolution(resolution); len(diagnostics) != 0 {
+		t.Fatalf("shared deterministic assertion evidence diagnostics = %#v", diagnostics)
+	}
+}
+
 func TestReplaySimulationEvidenceRequiresExactDeterministicTranscript(t *testing.T) {
 	registry, diagnostics := modelprovenance.LoadDefault()
 	if len(diagnostics) != 0 {
@@ -109,6 +122,19 @@ func TestReplaySimulationEvidenceRequiresExactDeterministicTranscript(t *testing
 	}
 	if replayDiagnostics := ReplaySimulationEvidence(*evaluation.Simulation); len(replayDiagnostics) != 0 {
 		t.Fatalf("replay diagnostics = %#v", replayDiagnostics)
+	}
+	parallel := cloneSimulationEvidence(evaluation.Simulation)
+	parallel.Resolution.Plans = []simmodel.Plan{
+		simmodel.ClonePlan(parallel.Resolution.Plan),
+		simmodel.ClonePlan(parallel.Resolution.Plan),
+	}
+	parallel.Resolution.Plan = simmodel.Plan{}
+	parallel.Reports = []simmodel.Report{
+		simmodel.CloneReport(parallel.Reports[0]),
+		simmodel.CloneReport(parallel.Reports[0]),
+	}
+	if replayDiagnostics := ReplaySimulationEvidence(*parallel); len(replayDiagnostics) != 0 {
+		t.Fatalf("ordered parallel replay diagnostics = %#v", replayDiagnostics)
 	}
 	evaluation.Simulation.Reports[0].Status = "tampered"
 	if replayDiagnostics := ReplaySimulationEvidence(*evaluation.Simulation); len(replayDiagnostics) == 0 {
@@ -215,9 +241,15 @@ func TestSimulationEvidenceRetainsOnlyAssertionObservables(t *testing.T) {
 
 func TestWorstLinkedAssertionSelectsWorstCornerDeterministically(t *testing.T) {
 	plan := simmodel.Plan{Assertions: []simmodel.Assertion{{Min: 4.5, Max: 5.5}, {Min: 4.5, Max: 5.5}, {Min: 4.5, Max: 5.5}}}
-	report := simmodel.Report{Assertions: []simmodel.AssertionResult{{Actual: 5}, {Actual: 4.6}, {Actual: 5.4}}}
+	report := simmodel.Report{
+		Assertions: []simmodel.AssertionResult{{Actual: 5}, {Actual: 4.6}, {Actual: 5.4}},
+		Corners: []simmodel.CornerResult{
+			{ID: "nominal", Assertions: []simmodel.AssertionResult{{Actual: 5}, {Actual: 4.6}, {Actual: 5.4}}},
+			{ID: "minimum", Assertions: []simmodel.AssertionResult{{Actual: 4.4}, {Actual: 5}, {Actual: 5}}},
+		},
+	}
 	worst, err := worstLinkedAssertion(plan, report, []int{0, 1, 2})
-	if err != nil || worst.Actual != 4.6 {
+	if err != nil || worst.Actual != 4.4 {
 		t.Fatalf("worst linked assertion = %#v err=%v", worst, err)
 	}
 	if diagnostics := validateSimulationResolution(SimulationResolution{Plan: simmodel.Plan{}, Measurements: []SimulationMeasurementLink{{RequirementID: "r", OperatingCase: "c", Assertions: []int{1, 0}}}}); len(diagnostics) == 0 {

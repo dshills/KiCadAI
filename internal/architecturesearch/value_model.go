@@ -17,6 +17,7 @@ const (
 	FormulaFeedbackDivider   = "feedback_divider"
 	FormulaFeedbackBias      = "feedback_divider_bias_current"
 	FormulaRCPole            = "rc_pole"
+	FormulaRCSequenceDelay   = "rc_sequence_delay"
 	FormulaSallenKeyLowPass  = "sallen_key_low_pass"
 	FormulaHysteresis        = "comparator_hysteresis"
 	FormulaGateDrive         = "gate_drive"
@@ -118,6 +119,7 @@ func FormulaLibraryHash() string {
 		{ID: FormulaCurrentSense, Revision: FormulaRevision},
 		{ID: FormulaHysteresis, Revision: FormulaRevision},
 		{ID: FormulaRCPole, Revision: FormulaRevision},
+		{ID: FormulaRCSequenceDelay, Revision: FormulaRevision},
 		{ID: FormulaRatingMargin, Revision: FormulaRevision},
 		{ID: FormulaSallenKeyLowPass, Revision: FormulaRevision},
 	}

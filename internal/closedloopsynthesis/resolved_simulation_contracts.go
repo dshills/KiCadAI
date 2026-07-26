@@ -36,6 +36,7 @@ func BuildResolvedSimulationContracts(requirement architecturesearch.Requirement
 	referenceNode, _ := primaryInputReference(requirement, analysisPlan.Bindings)
 	supplyNodes := semanticSupplyNodes(requirement, analysisPlan.Bindings)
 	operatingBindings := resolvedOperatingBindings(analysisPlan, plans, &diagnostics)
+	operatingBindings = appendEventSupplyBindings(operatingBindings, supplyNodes, plans, &diagnostics)
 	seenAssertions := map[string]bool{}
 	for _, assertion := range analysisPlan.Assertions {
 		key := assertion.Metric + "\x00" + assertion.Target
@@ -43,7 +44,41 @@ func BuildResolvedSimulationContracts(requirement architecturesearch.Requirement
 			continue
 		}
 		seenAssertions[key] = true
-		binding, diagnostic := resolvedAssertionBinding(assertion, referenceNode, supplyNodes, operatingBindings, plans[assertionAnalysisKind(analysisPlan, assertion.AnalysisID)], requirement, analysisPlan.Bindings)
+		resolvedAssertion := assertion
+		if strings.HasPrefix(assertion.Target, "event:") {
+			eventID := strings.TrimPrefix(assertion.Target, "event:")
+			eventTarget, exists := plannedEventTarget(analysisPlan.Events, eventID, assertion.OperatingCase)
+			if !exists {
+				diagnostics = append(diagnostics, Diagnostic{Path: "assertions." + assertion.RequirementID, Message: "event assertion lacks a planned target in its operating case"})
+				continue
+			}
+			if assertion.Metric == "sequence_delay" {
+				sequenceTarget, ok := sequenceResponseTarget(requirement, analysisPlan.Bindings)
+				if !ok {
+					diagnostics = append(diagnostics, Diagnostic{Path: "assertions." + assertion.RequirementID, Message: "sequence-delay event requires exactly one resolved dependent rail or sequencer state output"})
+					continue
+				}
+				eventTarget = sequenceTarget
+			}
+			if assertion.Metric == "protection_response_time" {
+				protectionTarget, ok := protectionResponseTarget(requirement, analysisPlan.Bindings, eventTarget)
+				if !ok {
+					diagnostics = append(diagnostics, Diagnostic{Path: "assertions." + assertion.RequirementID, Message: "protection-response event requires exactly one resolved protection control or affected protected path"})
+					continue
+				}
+				eventTarget = protectionTarget
+			}
+			if assertion.Metric == "muted_output_voltage" {
+				muteTarget, ok := muteResponseTarget(requirement, analysisPlan.Bindings)
+				if !ok {
+					diagnostics = append(diagnostics, Diagnostic{Path: "assertions." + assertion.RequirementID, Message: "event-driven mute measurement requires exactly one resolved protected output"})
+					continue
+				}
+				eventTarget = muteTarget
+			}
+			resolvedAssertion.Target = eventTarget
+		}
+		binding, diagnostic := resolvedAssertionBinding(resolvedAssertion, referenceNode, supplyNodes, operatingBindings, plans[assertionAnalysisKind(analysisPlan, assertion.AnalysisID)], requirement, analysisPlan.Bindings)
 		if diagnostic != nil {
 			diagnostics = append(diagnostics, *diagnostic)
 			continue
@@ -70,6 +105,180 @@ func BuildResolvedSimulationContracts(requirement architecturesearch.Requirement
 		return nil, nil, nil, diagnostics
 	}
 	return templates, assertionBindings, operatingBindings, nil
+}
+
+func appendEventSupplyBindings(bindings []SimulationOperatingBinding, supplyNodes []string, plans map[string]simmodel.Plan, diagnostics *[]Diagnostic) []SimulationOperatingBinding {
+	boundTargets := map[string]bool{}
+	for _, binding := range bindings {
+		if binding.Kind == OperatingSourceDCValue {
+			boundTargets[binding.Target] = true
+		}
+	}
+	for _, target := range supplyNodes {
+		if boundTargets[target] {
+			continue
+		}
+		component, ok := uniqueVoltageSourceAcrossPlans(plans, target)
+		if !ok {
+			*diagnostics = append(*diagnostics, Diagnostic{Path: "events.supplies." + target, Message: "external supply event target is missing or ambiguous"})
+			continue
+		}
+		bindings = append(bindings, SimulationOperatingBinding{
+			Axis: eventSupplyAxis, Target: target, Kind: OperatingSourceDCValue, Component: component,
+		})
+	}
+	slices.SortStableFunc(bindings, func(left, right SimulationOperatingBinding) int {
+		if order := strings.Compare(left.Axis, right.Axis); order != 0 {
+			return order
+		}
+		return strings.Compare(left.Target, right.Target)
+	})
+	return bindings
+}
+
+func plannedEventTarget(events []PlannedEvent, eventID, operatingCase string) (string, bool) {
+	for _, event := range events {
+		if event.ID == eventID && event.OperatingCase == operatingCase {
+			return event.Target, true
+		}
+	}
+	return "", false
+}
+
+func sequenceResponseTarget(requirement architecturesearch.Requirement, bindings []SemanticBinding) (string, bool) {
+	var railTargets, stateTargets []string
+	for _, objective := range requirement.Requirements.Objectives {
+		if objective.Capability != "rail_sequencing" {
+			continue
+		}
+		for _, binding := range objective.Bindings {
+			if target := semanticBindingTarget(bindings, binding); target != "" {
+				switch binding.Role {
+				case "rail_b":
+					if downstream := downstreamPublicResponseTargets(requirement, binding, bindings); len(downstream) != 0 {
+						railTargets = append(railTargets, downstream...)
+					} else {
+						railTargets = append(railTargets, target)
+					}
+				case "state":
+					stateTargets = append(stateTargets, target)
+				}
+			}
+		}
+	}
+	slices.Sort(railTargets)
+	if target, ok := uniqueString(slices.Compact(railTargets)); ok {
+		return target, true
+	}
+	slices.Sort(stateTargets)
+	return uniqueString(slices.Compact(stateTargets))
+}
+
+func protectionResponseTarget(requirement architecturesearch.Requirement, bindings []SemanticBinding, eventTarget string) (string, bool) {
+	var targets []string
+	hasInterlock := false
+	for _, objective := range requirement.Requirements.Objectives {
+		if objective.Capability != "safety_interlock" {
+			continue
+		}
+		hasInterlock = true
+		for _, binding := range objective.Bindings {
+			if binding.Direction != "source" {
+				continue
+			}
+			switch binding.Role {
+			case "control", "drive", "enable", "output", "permit":
+				if target := semanticBindingTarget(bindings, binding); target != "" {
+					targets = append(targets, target)
+				}
+			}
+		}
+	}
+	slices.Sort(targets)
+	if hasInterlock {
+		return uniqueString(slices.Compact(targets))
+	}
+
+	if target, ok := sequenceResponseTarget(requirement, bindings); ok {
+		return target, true
+	}
+
+	for _, objective := range requirement.Requirements.Objectives {
+		if objective.Capability != "output_protection" {
+			continue
+		}
+		var inputs, outputs []string
+		for _, binding := range objective.Bindings {
+			target := semanticBindingTarget(bindings, binding)
+			if target == "" {
+				continue
+			}
+			switch binding.Role {
+			case "input":
+				inputs = append(inputs, target)
+			case "output", "protected":
+				outputs = append(outputs, target)
+			}
+		}
+		if slices.Contains(outputs, eventTarget) {
+			targets = append(targets, inputs...)
+		} else if slices.Contains(inputs, eventTarget) {
+			targets = append(targets, outputs...)
+		}
+	}
+	slices.Sort(targets)
+	return uniqueString(slices.Compact(targets))
+}
+
+func downstreamPublicResponseTargets(requirement architecturesearch.Requirement, source architecturesearch.Binding, bindings []SemanticBinding) []string {
+	var targets []string
+	for _, objective := range requirement.Requirements.Objectives {
+		consumesSource := false
+		for _, binding := range objective.Bindings {
+			if binding.Role == "input" && sameSemanticEndpoint(binding, source) {
+				consumesSource = true
+				break
+			}
+		}
+		if !consumesSource {
+			continue
+		}
+		for _, binding := range objective.Bindings {
+			if binding.Role != "output" || binding.Port == "" {
+				continue
+			}
+			if target := semanticBindingTarget(bindings, binding); target != "" {
+				targets = append(targets, target)
+			}
+		}
+	}
+	slices.Sort(targets)
+	return slices.Compact(targets)
+}
+
+func sameSemanticEndpoint(left, right architecturesearch.Binding) bool {
+	return left.Port != "" && left.Port == right.Port ||
+		left.Signal != "" && left.Signal == right.Signal ||
+		left.Participant != "" && left.Participant == right.Participant && left.ParticipantPort != "" && left.ParticipantPort == right.ParticipantPort
+}
+
+func muteResponseTarget(requirement architecturesearch.Requirement, bindings []SemanticBinding) (string, bool) {
+	var candidates []string
+	for _, objective := range requirement.Requirements.Objectives {
+		if objective.Capability != "mute_control" {
+			continue
+		}
+		for _, binding := range objective.Bindings {
+			switch binding.Role {
+			case "protected", "output":
+				if target := semanticBindingTarget(bindings, binding); target != "" {
+					candidates = append(candidates, target)
+				}
+			}
+		}
+	}
+	slices.Sort(candidates)
+	return uniqueString(slices.Compact(candidates))
 }
 
 func configureThresholdSweep(analysisPlan AnalysisPlan, plans map[string]simmodel.Plan, referenceNode string, templates []SimulationAnalysisTemplate) *Diagnostic {
@@ -346,11 +555,20 @@ func resolvedAssertionBinding(assertion PlannedAssertion, referenceNode string, 
 		prototype.Quantity, prototype.ReferenceNode = simmodel.QuantityCutoffFrequencyHz, referenceNode
 	case "integrated_output_noise":
 		prototype.Quantity = simmodel.QuantityIntegratedNoiseVRMS
-	case "phase_margin":
-		prototype.Quantity = simmodel.QuantityPhaseMarginDeg
+	case "phase_margin", "gain_margin", "loop_crossover_frequency", "closed_loop_peaking":
+		switch assertion.Metric {
+		case "phase_margin":
+			prototype.Quantity = simmodel.QuantityPhaseMarginDeg
+		case "gain_margin":
+			prototype.Quantity = simmodel.QuantityGainMarginDB
+		case "loop_crossover_frequency":
+			prototype.Quantity = simmodel.QuantityLoopCrossoverHz
+		case "closed_loop_peaking":
+			prototype.Quantity = simmodel.QuantityClosedLoopPeakingDB
+		}
 		loopNode, ok := stabilityObservationNode(plan, assertion.Target)
 		if !ok {
-			return binding, &Diagnostic{Path: "assertions." + assertion.RequirementID, Message: "phase margin target does not resolve through a unique passive output path to a trusted op-amp or emitter-degenerated BJT loop"}
+			return binding, &Diagnostic{Path: "assertions." + assertion.RequirementID, Message: "stability target does not resolve through a unique passive output path to a trusted op-amp or emitter-degenerated BJT loop"}
 		}
 		prototype.Node = loopNode
 	case "rise_time":
@@ -361,13 +579,31 @@ func resolvedAssertionBinding(assertion PlannedAssertion, referenceNode string, 
 		prototype.Quantity = simmodel.QuantitySettlingTimeS
 	case "response_time":
 		prototype.Quantity = simmodel.QuantityResponseTimeS
+	case "protection_response_time", "protection_recovery_time", "sequence_delay":
+		prototype.Quantity = simmodel.QuantityResponseTimeS
+	case "overshoot_voltage":
+		prototype.Quantity = simmodel.QuantityOvershootVoltageV
+	case "peak_to_peak_ripple":
+		prototype.Quantity = simmodel.QuantityOutputSwingVPP
+	case "peak_device_voltage":
+		prototype.Quantity, binding.BoundsMode = simmodel.QuantityPeakAbsVoltageV, AssertionBoundsAbsolute
+	case "peak_device_current":
+		component, ok := uniqueOperatingLoadForTarget(operatingBindings, assertion.Target)
+		if !ok {
+			component, ok = uniqueLoadComponent(plan, assertion.Target)
+		}
+		if !ok {
+			return binding, &Diagnostic{Path: "assertions." + assertion.RequirementID, Message: "peak device-current measurement requires one resolved operating load component"}
+		}
+		prototype.Node, prototype.Component, prototype.Quantity = "", component, simmodel.QuantityPeakAbsDeviceCurrentA
 	case "muted_output_voltage":
 		prototype.Quantity, binding.BoundsMode = simmodel.QuantityPeakAbsVoltageV, AssertionBoundsAbsolute
 		override, ok := resolvedMuteExcitationOverride(requirement, semanticBindings, plan)
-		if !ok {
+		if ok {
+			binding.ExcitationOverrides = []SimulationExcitationOverride{override}
+		} else if !behaviorObservesEvent(requirement, assertion.RequirementID, assertion.OperatingCase) {
 			return binding, &Diagnostic{Path: "assertions." + assertion.RequirementID, Message: "muted-output measurement requires one resolved active-high mute-control source"}
 		}
-		binding.ExcitationOverrides = []SimulationExcitationOverride{override}
 	case "output_swing":
 		prototype.Quantity = simmodel.QuantityOutputSwingVPP
 	case "startup_output_voltage":
@@ -383,12 +619,40 @@ func resolvedAssertionBinding(assertion PlannedAssertion, referenceNode string, 
 			binding.Prototypes = append(binding.Prototypes, simmodel.Assertion{Component: component, Quantity: simmodel.QuantityJunctionTemperatureC})
 		}
 		return binding, nil
+	case "peak_junction_temperature":
+		components := dynamicThermalComponentsForTarget(plan, assertion.Target, false)
+		if len(components) == 0 {
+			return binding, &Diagnostic{Path: "assertions." + assertion.RequirementID, Message: "peak junction temperature target has no reviewed dynamic thermal RC component"}
+		}
+		for _, component := range components {
+			binding.Prototypes = append(binding.Prototypes, simmodel.Assertion{Component: component, Quantity: simmodel.QuantityJunctionTemperatureC})
+		}
+		return binding, nil
+	case "transient_soa_margin":
+		components := dynamicThermalComponentsForTarget(plan, assertion.Target, true)
+		if len(components) == 0 {
+			return binding, &Diagnostic{Path: "assertions." + assertion.RequirementID, Message: "transient SOA target has no reviewed time-dependent SOA component"}
+		}
+		for _, component := range components {
+			binding.Prototypes = append(binding.Prototypes, simmodel.Assertion{Component: component, Quantity: simmodel.QuantityTransientSOAMargin})
+		}
+		return binding, nil
 	case "output_power":
 		component, ok := uniqueLoadComponent(plan, assertion.Target)
 		if !ok {
 			return binding, &Diagnostic{Path: "assertions." + assertion.RequirementID, Message: "output power requires exactly one resolved load component"}
 		}
 		prototype.Quantity, prototype.Component = simmodel.QuantityOutputPowerW, component
+	case "conversion_efficiency":
+		component, ok := uniqueOperatingLoadForTarget(operatingBindings, assertion.Target)
+		if !ok {
+			return binding, &Diagnostic{Path: "assertions." + assertion.RequirementID, Message: "conversion efficiency requires exactly one resolved operating load component"}
+		}
+		components, ok := supplySourceComponents(plan, supplyNodes)
+		if !ok {
+			return binding, &Diagnostic{Path: "assertions." + assertion.RequirementID, Message: "conversion efficiency requires one catalog-backed source for every resolved supply domain"}
+		}
+		prototype.Node, prototype.Component, prototype.Components, prototype.Quantity = "", component, components, simmodel.QuantityConversionEfficiencyPct
 	case "dc_current", "quiescent_current":
 		if assertion.Metric == "quiescent_current" && assertion.Target == "circuit" {
 			components, ok := supplySourceComponents(plan, supplyNodes)
@@ -416,8 +680,8 @@ func resolvedAssertionBinding(assertion PlannedAssertion, referenceNode string, 
 		return binding, &Diagnostic{Path: "assertions." + assertion.RequirementID, Message: "behavioral metric has no registered structured simulation binding"}
 	}
 	switch assertion.Metric {
-	case "dc_voltage", "output_high_voltage", "rise_time", "fall_time", "settling_time", "response_time", "muted_output_voltage", "output_swing", "startup_output_voltage":
-		localReference, required := behavioralObservationReferenceNode(requirement, assertion.RequirementID, semanticBindings)
+	case "dc_voltage", "output_high_voltage", "rise_time", "fall_time", "settling_time", "response_time", "muted_output_voltage", "output_swing", "startup_output_voltage", "overshoot_voltage", "peak_to_peak_ripple", "peak_device_voltage":
+		localReference, required := behavioralObservationReferenceNode(requirement, assertion.RequirementID, assertion.OperatingCase, semanticBindings)
 		if required && (localReference == "" || localReference == prototype.Node) {
 			return binding, &Diagnostic{Path: "assertions." + assertion.RequirementID, Message: "voltage-domain behavior requires one distinct resolved reference-domain node"}
 		}
@@ -427,7 +691,69 @@ func resolvedAssertionBinding(assertion PlannedAssertion, referenceNode string, 
 	return binding, nil
 }
 
-func behavioralObservationReferenceNode(requirement architecturesearch.Requirement, requirementID string, semanticBindings []SemanticBinding) (string, bool) {
+func behaviorObservesEvent(requirement architecturesearch.Requirement, requirementID, operatingCase string) bool {
+	for _, behavior := range requirement.Requirements.BehavioralRequirements {
+		if behavior.ID != requirementID || behavior.Observation.Kind != "event" {
+			continue
+		}
+		return slices.Contains(behavior.OperatingCases, operatingCase)
+	}
+	return false
+}
+
+func dynamicThermalComponentsForTarget(plan simmodel.Plan, target string, requireSOA bool) []string {
+	matches := func(device simmodel.ResolvedDevice) bool {
+		if requireSOA {
+			return len(device.TransientSOA) != 0
+		}
+		return device.ThermalModel != nil
+	}
+	if target == "circuit" {
+		var result []string
+		for _, device := range plan.Devices {
+			if matches(device) {
+				result = append(result, device.Component)
+			}
+		}
+		slices.Sort(result)
+		return slices.Compact(result)
+	}
+	frontier := []string{target}
+	visited := map[string]bool{target: true}
+	for depth := 0; depth < 8 && len(frontier) != 0; depth++ {
+		var result, next []string
+		for _, net := range frontier {
+			for _, device := range plan.Devices {
+				if !deviceTouchesNet(device, net) {
+					continue
+				}
+				if matches(device) {
+					result = append(result, device.Component)
+					continue
+				}
+				if !stabilityPassivePathPrimitive(device.PrimitiveModel) {
+					continue
+				}
+				for _, terminal := range device.Terminals {
+					if terminal.Net == "" || visited[terminal.Net] {
+						continue
+					}
+					visited[terminal.Net] = true
+					next = append(next, terminal.Net)
+				}
+			}
+		}
+		if len(result) != 0 {
+			slices.Sort(result)
+			return slices.Compact(result)
+		}
+		slices.Sort(next)
+		frontier = slices.Compact(next)
+	}
+	return nil
+}
+
+func behavioralObservationReferenceNode(requirement architecturesearch.Requirement, requirementID, operatingCase string, semanticBindings []SemanticBinding) (string, bool) {
 	var observation architecturesearch.Observation
 	found := false
 	for _, behavior := range requirement.Requirements.BehavioralRequirements {
@@ -438,6 +764,24 @@ func behavioralObservationReferenceNode(requirement architecturesearch.Requireme
 	}
 	if !found || observation.Kind == "circuit" {
 		return "", false
+	}
+	if observation.Kind == "event" {
+		found = false
+		for _, candidate := range requirement.Requirements.OperatingCases {
+			if candidate.ID != operatingCase {
+				continue
+			}
+			for _, event := range candidate.Events {
+				if event.ID == observation.ID {
+					observation, found = event.Target, true
+					break
+				}
+			}
+			break
+		}
+		if !found || observation.Kind == "circuit" {
+			return "", !found
+		}
 	}
 	domainID := ""
 	switch observation.Kind {
@@ -555,6 +899,23 @@ func uniqueOperatingSourceForAxis(bindings []SimulationOperatingBinding, axis st
 	return uniqueString(slices.Compact(candidates))
 }
 
+func uniqueOperatingLoadForTarget(bindings []SimulationOperatingBinding, target string) (string, bool) {
+	var candidates []string
+	for _, binding := range bindings {
+		if binding.Axis != "load_current" && binding.Axis != "load_resistance" {
+			continue
+		}
+		if target != "" && target != "circuit" && binding.Target != target {
+			continue
+		}
+		if binding.Component != "" {
+			candidates = append(candidates, binding.Component)
+		}
+	}
+	slices.Sort(candidates)
+	return uniqueString(slices.Compact(candidates))
+}
+
 func semanticSupplyNodes(requirement architecturesearch.Requirement, bindings []SemanticBinding) []string {
 	targets := make(map[string]string, len(bindings))
 	for _, binding := range bindings {
@@ -562,7 +923,7 @@ func semanticSupplyNodes(requirement architecturesearch.Requirement, bindings []
 	}
 	var nodes []string
 	for _, domain := range requirement.Requirements.Domains {
-		if domain.Kind != "supply" {
+		if domain.Kind != "supply" || domain.Source != "external" {
 			continue
 		}
 		if target := targets["domain\x00"+domain.ID]; target != "" {
@@ -756,9 +1117,14 @@ func stabilityObservationNode(plan simmodel.Plan, target string) (string, bool) 
 	frontier := []string{target}
 	var bjtFallbacks []string
 	for len(frontier) != 0 {
-		var opAmpOutputs, bjtOutputs []string
+		var opAmpOutputs, buckOutputs, bjtOutputs []string
 		for _, net := range frontier {
 			for _, device := range plan.Devices {
+				if device.PrimitiveModel == simmodel.PrimitiveSynchronousBuckRegulatorV1 {
+					if output, ok := synchronousBuckObservationNode(plan, device); ok && output == net {
+						buckOutputs = append(buckOutputs, output)
+					}
+				}
 				for _, terminal := range device.Terminals {
 					if terminal.Net != net {
 						continue
@@ -775,6 +1141,9 @@ func stabilityObservationNode(plan simmodel.Plan, target string) (string, bool) 
 		if len(opAmpOutputs) != 0 {
 			return uniqueString(opAmpOutputs)
 		}
+		if len(buckOutputs) != 0 {
+			return uniqueString(buckOutputs)
+		}
 		if len(bjtOutputs) != 0 {
 			// A complementary compound output can expose both driver
 			// collectors at the observed node while its controlling op-amp is
@@ -786,12 +1155,8 @@ func stabilityObservationNode(plan simmodel.Plan, target string) (string, bool) 
 		var next []string
 		for _, net := range frontier {
 			for _, device := range plan.Devices {
-				candidateNets := []string{}
-				if stabilityPassivePathPrimitive(device.PrimitiveModel) && deviceTouchesNet(device, net) {
-					for _, terminal := range device.Terminals {
-						candidateNets = append(candidateNets, terminal.Net)
-					}
-				} else {
+				candidateNets := stabilityPassivePathNets(device, net)
+				if len(candidateNets) == 0 {
 					candidateNets = stabilityActiveOutputPathNets(device, net)
 				}
 				for _, candidateNet := range candidateNets {
@@ -807,6 +1172,73 @@ func stabilityObservationNode(plan simmodel.Plan, target string) (string, bool) 
 		frontier = next
 	}
 	return uniqueString(bjtFallbacks)
+}
+
+func stabilityPassivePathNets(device simmodel.ResolvedDevice, net string) []string {
+	if !stabilityPassivePathPrimitive(device.PrimitiveModel) || !deviceTouchesNet(device, net) {
+		return nil
+	}
+	terminals := map[string]string{}
+	for _, terminal := range device.Terminals {
+		terminals[terminal.Terminal] = terminal.Net
+	}
+	switch device.PrimitiveModel {
+	case simmodel.PrimitiveNMOSSwitchV1, simmodel.PrimitivePMOSSwitchV1:
+		switch net {
+		case terminals["DRAIN"]:
+			return []string{terminals["SOURCE"]}
+		case terminals["SOURCE"]:
+			return []string{terminals["DRAIN"]}
+		default:
+			return nil
+		}
+	case simmodel.PrimitiveRelayClosedV1, simmodel.PrimitiveRelayNormallyOpenV1:
+		switch net {
+		case terminals["CONTACT_IN"]:
+			return []string{terminals["CONTACT_OUT"]}
+		case terminals["CONTACT_OUT"]:
+			return []string{terminals["CONTACT_IN"]}
+		default:
+			return nil
+		}
+	default:
+		var result []string
+		for _, terminal := range device.Terminals {
+			result = append(result, terminal.Net)
+		}
+		return result
+	}
+}
+
+func synchronousBuckObservationNode(plan simmodel.Plan, controller simmodel.ResolvedDevice) (string, bool) {
+	switchNode := ""
+	for _, terminal := range controller.Terminals {
+		if terminal.Terminal == "SW" {
+			switchNode = terminal.Net
+			break
+		}
+	}
+	if switchNode == "" {
+		return "", false
+	}
+	var outputs []string
+	for _, device := range plan.Devices {
+		if device.PrimitiveModel != simmodel.PrimitiveInductorTransientV1 {
+			continue
+		}
+		terminals := map[string]string{}
+		for _, terminal := range device.Terminals {
+			terminals[terminal.Terminal] = terminal.Net
+		}
+		switch {
+		case terminals["A"] == switchNode && terminals["B"] != "":
+			outputs = append(outputs, terminals["B"])
+		case terminals["B"] == switchNode && terminals["A"] != "":
+			outputs = append(outputs, terminals["A"])
+		}
+	}
+	slices.Sort(outputs)
+	return uniqueString(slices.Compact(outputs))
 }
 
 func stabilityActiveOutputPathNets(device simmodel.ResolvedDevice, net string) []string {
@@ -872,8 +1304,11 @@ func stabilityPassivePathPrimitive(primitive string) bool {
 		simmodel.PrimitiveFuseClosedStateV1,
 		simmodel.PrimitiveRelayClosedV1,
 		simmodel.PrimitiveRelayNormallyOpenV1,
+		simmodel.PrimitiveNMOSSwitchV1,
+		simmodel.PrimitivePMOSSwitchV1,
 		simmodel.PrimitiveCapacitorV1,
 		simmodel.PrimitiveCapacitorTransientV1,
+		simmodel.PrimitiveInductorTransientV1,
 		simmodel.PrimitiveBidirectionalTVSV1,
 		simmodel.PrimitiveUnidirectionalZenerV1,
 		simmodel.PrimitiveDiodeShockleyV1:
@@ -897,7 +1332,7 @@ func resolvedOperatingBindings(analysisPlan AnalysisPlan, plans map[string]simmo
 			switch assignment.Axis {
 			case "ambient_temperature":
 				binding.Kind, binding.Parameter = OperatingAnalysisCondition, "ambient_temperature_c"
-			case "tolerance", "model_parameter":
+			case "cooling_mode", "tolerance", "model_parameter":
 				binding.Kind = OperatingWorstCase
 			case "supply_voltage", "input_amplitude":
 				component, ok := uniqueVoltageSourceAcrossPlans(plans, assignment.Target)
@@ -906,6 +1341,13 @@ func resolvedOperatingBindings(analysisPlan AnalysisPlan, plans map[string]simmo
 					continue
 				}
 				binding.Kind, binding.Component = OperatingSourceDCValue, component
+			case "input_frequency":
+				component, ok := uniqueVoltageSourceAcrossPlans(plans, assignment.Target)
+				if !ok {
+					*diagnostics = append(*diagnostics, Diagnostic{Path: "corners." + corner.ID + ".input_frequency", Message: "operating input-frequency target is missing or ambiguous"})
+					continue
+				}
+				binding.Kind, binding.Component = OperatingSourceFrequencyHz, component
 			case "load_current":
 				component := OperatingHarnessComponentID(assignment.Axis, assignment.Target)
 				maximum, maximumOK := maximumOperatingAssignment(analysisPlan, assignment.Axis, assignment.Target)
@@ -918,9 +1360,10 @@ func resolvedOperatingBindings(analysisPlan AnalysisPlan, plans map[string]simmo
 					continue
 				}
 				binding.Kind, binding.Component, binding.Scale = OperatingLoadCurrent, component, scale
+				binding.ReferenceComponent, _ = resolvedLoadCurrentReference(plans, scale)
 			case "load_resistance":
 				component := OperatingHarnessComponentID(assignment.Axis, assignment.Target)
-				if !deviceComponentAcrossPlans(plans, component, assignment.Target, "resistor") {
+				if !deviceComponentFamilyAcrossPlans(plans, component, "resistor") {
 					var ok bool
 					component, ok = uniqueDeviceAcrossPlans(plans, assignment.Target, "resistor")
 					if !ok {
@@ -931,11 +1374,22 @@ func resolvedOperatingBindings(analysisPlan AnalysisPlan, plans map[string]simmo
 				binding.Kind, binding.Component = OperatingDeviceValueSI, component
 			case "load_capacitance":
 				component := OperatingHarnessComponentID(assignment.Axis, assignment.Target)
-				if !deviceComponentAcrossPlans(plans, component, assignment.Target, "capacitor") {
+				if !deviceComponentFamilyAcrossPlans(plans, component, "capacitor") {
 					var ok bool
 					component, ok = uniqueDeviceAcrossPlans(plans, assignment.Target, "capacitor")
 					if !ok {
 						*diagnostics = append(*diagnostics, Diagnostic{Path: "corners." + corner.ID + ".load_capacitance", Message: "load capacitance target is missing or ambiguous"})
+						continue
+					}
+				}
+				binding.Kind, binding.Component = OperatingDeviceValueSI, component
+			case "load_inductance":
+				component := OperatingHarnessComponentID(assignment.Axis, assignment.Target)
+				if !deviceComponentFamilyAcrossPlans(plans, component, "inductor") {
+					var ok bool
+					component, ok = uniqueDeviceAcrossPlans(plans, assignment.Target, "inductor")
+					if !ok {
+						*diagnostics = append(*diagnostics, Diagnostic{Path: "corners." + corner.ID + ".load_inductance", Message: "load inductance target is missing or ambiguous"})
 						continue
 					}
 				}
@@ -1011,6 +1465,35 @@ func resolvedLoadCurrentScale(plans map[string]simmodel.Plan, component string, 
 		}
 	}
 	return scale, ""
+}
+
+func resolvedLoadCurrentReference(plans map[string]simmodel.Plan, scale float64) (string, bool) {
+	if !finiteClosedLoopBound(scale) || scale <= 0 {
+		return "", false
+	}
+	keys := make([]string, 0, len(plans))
+	for key := range plans {
+		keys = append(keys, key)
+	}
+	slices.Sort(keys)
+	reference := ""
+	for _, key := range keys {
+		var candidates []string
+		for _, analysis := range plans[key].Analyses {
+			for _, excitation := range analysis.Excitations {
+				if math.Abs(math.Abs(excitation.DCValue)-scale) <= 1e-12*math.Max(1, scale) {
+					candidates = append(candidates, excitation.Component)
+				}
+			}
+		}
+		slices.Sort(candidates)
+		candidates = slices.Compact(candidates)
+		if len(candidates) != 1 || reference != "" && reference != candidates[0] {
+			return "", false
+		}
+		reference = candidates[0]
+	}
+	return reference, reference != ""
 }
 
 // OperatingHarnessComponentID gives every operating axis/semantic target one
@@ -1153,14 +1636,14 @@ func uniqueDeviceAcrossPlans(plans map[string]simmodel.Plan, target, family stri
 	return uniqueString(candidates)
 }
 
-func deviceComponentAcrossPlans(plans map[string]simmodel.Plan, component, target, family string) bool {
+func deviceComponentFamilyAcrossPlans(plans map[string]simmodel.Plan, component, family string) bool {
 	if len(plans) == 0 || component == "" {
 		return false
 	}
 	for _, plan := range plans {
 		found := false
 		for _, device := range plan.Devices {
-			if device.Component == component && device.Family == family && deviceTouchesNet(device, target) {
+			if device.Component == component && device.Family == family {
 				found = true
 				break
 			}

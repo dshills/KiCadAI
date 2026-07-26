@@ -1,0 +1,92 @@
+{
+  "schema": "kicadai.open-set-requirement.v5",
+  "version": 5,
+  "project": {
+    "name": "sequenced_dual_rail_controller",
+    "title": "Sequenced dual-rail controller",
+    "description": "Generate and supervise two dependent rails with bounded startup order, load-step response, rail-loss containment, and safe shutdown."
+  },
+  "requirements": {
+    "domains": [
+      {"id": "ground", "kind": "reference", "nominal_voltage_v": 0, "source": "external"},
+      {"id": "input_12v", "kind": "supply", "min_voltage_v": 10.8, "nominal_voltage_v": 12, "max_voltage_v": 13.2, "max_current_a": 2, "source": "external"},
+      {"id": "rail_3v3", "kind": "supply", "min_voltage_v": 3.2, "nominal_voltage_v": 3.3, "max_voltage_v": 3.4, "max_current_a": 0.6, "source": "rail_3v3_signal"},
+      {"id": "rail_5v", "kind": "supply", "min_voltage_v": 4.85, "nominal_voltage_v": 5, "max_voltage_v": 5.15, "max_current_a": 1, "source": "rail_5v_signal"}
+    ],
+    "ports": [
+      {"id": "enable", "kind": "digital_logic", "direction": "sink", "domain": "rail_3v3"},
+      {"id": "fault", "kind": "digital_logic", "direction": "source", "domain": "rail_3v3"},
+      {"id": "ground", "kind": "reference", "direction": "bidirectional", "domain": "ground"},
+      {"id": "input_power", "kind": "power", "direction": "sink", "domain": "input_12v"},
+      {"id": "output_3v3", "kind": "power", "direction": "source", "domain": "rail_3v3"},
+      {"id": "output_5v", "kind": "power", "direction": "source", "domain": "rail_5v"}
+    ],
+    "signals": [
+      {"id": "rail_3v3_signal", "kind": "power", "domain": "rail_3v3"},
+      {"id": "rail_5v_signal", "kind": "power", "domain": "rail_5v"},
+      {"id": "sequence_state", "kind": "digital_logic", "domain": "rail_3v3"}
+    ],
+    "objectives": [
+      {"id": "generate_3v3", "capability": "voltage_regulation", "bindings": [{"role": "input", "port": "input_power"}, {"role": "output", "signal": "rail_3v3_signal", "direction": "source"}, {"role": "reference", "port": "ground"}]},
+      {"id": "generate_5v", "capability": "voltage_regulation", "bindings": [{"role": "input", "port": "input_power"}, {"role": "output", "signal": "rail_5v_signal", "direction": "source"}, {"role": "reference", "port": "ground"}]},
+      {"id": "sequence", "capability": "rail_sequencing", "bindings": [{"role": "enable", "port": "enable"}, {"role": "rail_a", "signal": "rail_3v3_signal", "direction": "sink"}, {"role": "rail_b", "signal": "rail_5v_signal", "direction": "sink"}, {"role": "state", "signal": "sequence_state", "direction": "source"}, {"role": "reference", "port": "ground"}]},
+      {"id": "protect_3v3", "capability": "output_protection", "bindings": [{"role": "input", "signal": "rail_3v3_signal", "direction": "sink"}, {"role": "output", "port": "output_3v3"}, {"role": "control", "signal": "sequence_state", "direction": "sink"}, {"role": "reference", "port": "ground"}]},
+      {"id": "protect_5v", "capability": "output_protection", "bindings": [{"role": "input", "signal": "rail_5v_signal", "direction": "sink"}, {"role": "output", "port": "output_5v"}, {"role": "control", "signal": "sequence_state", "direction": "sink"}, {"role": "reference", "port": "ground"}]},
+      {"id": "report_fault", "capability": "fault_indication", "bindings": [{"role": "state", "signal": "sequence_state", "direction": "sink"}, {"role": "output", "port": "fault"}, {"role": "reference", "port": "ground"}]}
+    ],
+    "system_constraints": [
+      {"name": "startup_order", "relation": "required", "value": "rail_3v3_before_rail_5v"},
+      {"name": "shutdown_order", "relation": "required", "value": "rail_5v_before_rail_3v3"}
+    ],
+    "operating_cases": [
+      {
+        "id": "normal_sequence",
+        "conditions": [
+          {"axis": "ambient_temperature", "target": "circuit", "min": -20, "max": 70, "unit": "degC"},
+          {"axis": "load_current", "target": "output_3v3", "min": 0.02, "max": 0.6, "unit": "A"},
+          {"axis": "load_current", "target": "output_5v", "min": 0.02, "max": 1, "unit": "A"},
+          {"axis": "supply_voltage", "target": "input_12v", "min": 10.8, "max": 13.2, "unit": "V"},
+          {"axis": "tolerance", "target": "all_components", "selection": "minimum_nominal_maximum"}
+        ],
+        "events": [
+          {"id": "startup", "kind": "startup", "target": {"kind": "domain", "id": "input_12v"}, "trigger_time_s": 0, "duration_s": 0.1, "initial": 0, "applied": 12, "unit": "V"},
+          {"id": "dual_load_step", "kind": "load_step", "target": {"kind": "circuit", "id": "circuit"}, "trigger_time_s": 0.2, "duration_s": 0.05, "initial": 0.04, "applied": 1.6, "recovered": 0.04, "unit": "A"},
+          {"id": "shutdown", "kind": "shutdown", "target": {"kind": "domain", "id": "input_12v"}, "trigger_time_s": 0.4, "duration_s": 0.1, "initial": 12, "applied": 0, "unit": "V"}
+        ]
+      },
+      {
+        "id": "rail_loss_fault",
+        "conditions": [
+          {"axis": "ambient_temperature", "target": "circuit", "min": 25, "max": 85, "unit": "degC"},
+          {"axis": "load_current", "target": "output_5v", "min": 0.5, "max": 1, "unit": "A"}
+        ],
+        "events": [
+          {"id": "rail_loss", "kind": "rail_loss", "target": {"kind": "port", "id": "output_3v3"}, "trigger_time_s": 0.05, "duration_s": 0.05, "initial": 3.3, "applied": 0, "recovered": 3.3, "unit": "V"}
+        ]
+      }
+    ],
+    "behavioral_requirements": [
+      {"id": "rail_3v3_voltage", "metric": "dc_voltage", "analysis": "dc_operating_point", "observation": {"kind": "port", "id": "output_3v3"}, "min": 3.2, "max": 3.4, "unit": "V", "operating_cases": ["normal_sequence"], "critical": true},
+      {"id": "rail_5v_voltage", "metric": "dc_voltage", "analysis": "dc_operating_point", "observation": {"kind": "port", "id": "output_5v"}, "min": 4.85, "max": 5.15, "unit": "V", "operating_cases": ["normal_sequence"], "critical": true},
+      {"id": "rail_3v3_phase_margin", "metric": "phase_margin", "analysis": "stability", "observation": {"kind": "port", "id": "output_3v3"}, "min": 45, "unit": "deg", "operating_cases": ["normal_sequence"], "critical": true},
+      {"id": "rail_5v_phase_margin", "metric": "phase_margin", "analysis": "stability", "observation": {"kind": "port", "id": "output_5v"}, "min": 45, "unit": "deg", "operating_cases": ["normal_sequence"], "critical": true},
+      {"id": "sequence_delay", "metric": "sequence_delay", "analysis": "transient", "observation": {"kind": "event", "id": "startup"}, "min": 0.002, "max": 0.02, "unit": "s", "operating_cases": ["normal_sequence"], "critical": true},
+      {"id": "shutdown_delay", "metric": "sequence_delay", "analysis": "transient", "observation": {"kind": "event", "id": "shutdown"}, "min": 0.001, "max": 0.02, "unit": "s", "operating_cases": ["normal_sequence"], "critical": true},
+      {"id": "rail_loss_response", "metric": "protection_response_time", "analysis": "transient", "observation": {"kind": "event", "id": "rail_loss"}, "max": 0.002, "unit": "s", "operating_cases": ["rail_loss_fault"], "critical": true},
+      {"id": "regulator_temperature", "metric": "peak_junction_temperature", "analysis": "electrothermal", "observation": {"kind": "circuit", "id": "circuit"}, "max": 125, "unit": "degC", "operating_cases": ["normal_sequence", "rail_loss_fault"], "critical": true}
+    ],
+    "constraints": {"max_components": 48, "max_width_mm": 95, "max_height_mm": 70}
+  },
+  "acceptance": {
+    "require_erc": true, "require_strict_drc": true, "require_complete_routing": true, "require_connectivity": true,
+    "require_writer_correctness": true, "require_round_trip_zero_diff": true, "require_deterministic_replay": true,
+    "require_contract_composition": true, "require_global_reasoning": true, "require_coverage_accounting": true,
+    "require_alternatives": true, "require_fail_closed": true, "require_simulation": true, "require_all_corners": true,
+    "require_model_provenance": true, "require_closed_loop_evidence": true, "require_hierarchical_decomposition": true,
+    "require_interface_contracts": true, "require_shared_resource_planning": true, "require_deterministic_backtracking": true,
+    "require_physical_partitioning": true, "require_end_to_end_traceability": true,
+    "require_dynamic_model_provenance": true, "require_return_ratio_evidence": true,
+    "require_dynamic_electrothermal_evidence": true, "require_event_coverage": true,
+    "require_dynamic_architecture_selection": true, "require_bounded_dynamic_repair": true
+  }
+}

@@ -1,0 +1,70 @@
+{
+  "schema": "kicadai.dynamic-electrothermal-control-loop-baseline.v1",
+  "version": 1,
+  "recorded_at": "2026-07-25",
+  "baseline_revision": "6289ec7a791ba5d34272766419ce60a7eb159b40",
+  "corpus_manifest_sha256": "6558d500373c74cffe44dffacc062a7ab30f7b1ec603ce1f5923869809d7658d",
+  "production_requirement_schema": "kicadai.open-set-requirement.v4",
+  "held_out_requirement_schema": "kicadai.open-set-requirement.v5",
+  "summary": {
+    "fixtures": 6,
+    "decoded": 0,
+    "dynamic_models_resolved": 0,
+    "return_ratio_loops_proven": 0,
+    "event_sets_proven": 0,
+    "electrothermal_trajectories_proven": 0,
+    "transient_soa_boundaries_proven": 0,
+    "dynamic_alternative_selections": 0,
+    "bounded_dynamic_repairs": 0,
+    "complete_passes": 0
+  },
+  "results": [
+    {
+      "id": "class_ab_dynamic_output_stage",
+      "status": "blocked",
+      "code": "ARCHITECTURE_SCHEMA_INVALID",
+      "stage": "strict_decode"
+    },
+    {
+      "id": "efficient_step_down_power_stage",
+      "status": "blocked",
+      "code": "ARCHITECTURE_SCHEMA_INVALID",
+      "stage": "strict_decode"
+    },
+    {
+      "id": "precision_analog_servo_supply",
+      "status": "blocked",
+      "code": "ARCHITECTURE_SCHEMA_INVALID",
+      "stage": "strict_decode"
+    },
+    {
+      "id": "protected_inductive_actuator_driver",
+      "status": "blocked",
+      "code": "ARCHITECTURE_SCHEMA_INVALID",
+      "stage": "strict_decode"
+    },
+    {
+      "id": "sequenced_dual_rail_controller",
+      "status": "blocked",
+      "code": "ARCHITECTURE_SCHEMA_INVALID",
+      "stage": "strict_decode"
+    },
+    {
+      "id": "stable_reactive_load_line_driver",
+      "status": "blocked",
+      "code": "ARCHITECTURE_SCHEMA_INVALID",
+      "stage": "strict_decode"
+    }
+  ],
+  "missing_generated_evidence": [
+    "reviewed_dynamic_model_provenance",
+    "derived_return_ratio_loops",
+    "gain_margin_and_crossover",
+    "event_coverage",
+    "coupled_electrothermal_trajectory",
+    "time_dependent_soa_margin",
+    "dynamic_candidate_rejection_and_selection",
+    "bounded_dynamic_repair",
+    "dynamic_requirement_to_kicad_traceability"
+  ]
+}

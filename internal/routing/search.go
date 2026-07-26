@@ -106,6 +106,10 @@ func routeSingleLayerPath(ctx context.Context, request Request, access PadAccess
 }
 
 func routeTwoLayerPath(ctx context.Context, request Request, access PadAccess, occupancy Occupancy, viaOccupancy Occupancy, netName string, pair EndpointPair) (GridPath, []reports.Issue) {
+	return routeTwoLayerPathWithForcedEndpointVias(ctx, request, access, occupancy, viaOccupancy, netName, pair, nil)
+}
+
+func routeTwoLayerPathWithForcedEndpointVias(ctx context.Context, request Request, access PadAccess, occupancy Occupancy, viaOccupancy Occupancy, netName string, pair EndpointPair, forced map[endpointID]float64) (GridPath, []reports.Issue) {
 	layers := normalizedSearchLayers(request.Board.Layers)
 	rules := normalizedSearchRules(request.Rules)
 	if rules.AllowVias != nil && !*rules.AllowVias {
@@ -146,11 +150,6 @@ func routeTwoLayerPath(ctx context.Context, request Request, access PadAccess, o
 		layerNames[index] = normalizeLayer(layerName)
 	}
 	sort.Ints(layerIDs)
-	starts := accessCoordsOnLayers(access, occupancy.Grid, pair.From, layerIndexes, layerNames)
-	targets := accessCoordsOnLayers(access, occupancy.Grid, pair.To, layerIndexes, layerNames)
-	if len(layerIDs) == 0 || len(starts) == 0 || len(targets) == 0 {
-		return GridPath{}, []reports.Issue{routeFailureIssue(netName, pair, "endpoint pair has no two-layer routing access")}
-	}
 	innerLayers := map[int]bool{}
 	for layerID, layerName := range layerNames {
 		normalizedName := strings.ToUpper(strings.TrimSpace(layerName))
@@ -158,6 +157,28 @@ func routeTwoLayerPath(ctx context.Context, request Request, access PadAccess, o
 			innerLayers[layerID] = true
 		}
 	}
+	starts := accessCoordsOnLayers(access, occupancy.Grid, pair.From, layerIndexes, layerNames)
+	targets := accessCoordsOnLayers(access, occupancy.Grid, pair.To, layerIndexes, layerNames)
+	var startOuterByInner map[GridCoord]GridCoord
+	var targetOuterByInner map[GridCoord]GridCoord
+	_, forcedFrom := forced[endpointKey(pair.From.Ref, pair.From.Pin)]
+	_, forcedTo := forced[endpointKey(pair.To.Ref, pair.To.Pin)]
+	if forcedFrom {
+		starts, startOuterByInner = forcedEndpointAlternateAccessCoords(access, occupancy, viaOccupancy, pair.From, layerIndexes, layerNames)
+	}
+	if forcedTo {
+		targets, targetOuterByInner = forcedEndpointAlternateAccessCoords(access, occupancy, viaOccupancy, pair.To, layerIndexes, layerNames)
+	}
+	if len(layerIDs) == 0 || len(starts) == 0 || len(targets) == 0 {
+		return GridPath{}, []reports.Issue{routeFailureIssue(netName, pair, "endpoint pair has no two-layer routing access")}
+	}
+	if forcedFrom {
+		rules.MaxViasPerNet--
+	}
+	if forcedTo {
+		rules.MaxViasPerNet--
+	}
+	rules.MaxViasPerNet = max(0, rules.MaxViasPerNet)
 	path, searchNodes, found, canceled := astarSearchMultiLayer(ctx, occupancy, viaOccupancy, starts, targets, rules, layerIDs, true, innerLayers)
 	if canceled {
 		return GridPath{}, []reports.Issue{routeCanceledIssue(ctx.Err())}
@@ -173,6 +194,20 @@ func routeTwoLayerPath(ctx context.Context, request Request, access PadAccess, o
 				"no legal two-layer path found",
 				nearestObstacleSummary(occupancy, starts, targets),
 			)}
+	}
+	if forcedFrom {
+		outer, ok := startOuterByInner[path[0]]
+		if !ok {
+			return GridPath{}, []reports.Issue{routeFailureIssue(netName, pair, "forced source dogbone transition was not retained")}
+		}
+		path = append([]GridCoord{outer}, path...)
+	}
+	if forcedTo {
+		outer, ok := targetOuterByInner[path[len(path)-1]]
+		if !ok {
+			return GridPath{}, []reports.Issue{routeFailureIssue(netName, pair, "forced target dogbone transition was not retained")}
+		}
+		path = append(path, outer)
 	}
 	points := make([]Point, 0, len(path))
 	for _, coord := range path {
@@ -312,6 +347,9 @@ func astarSearchMultiLayer(ctx context.Context, occupancy Occupancy, viaOccupanc
 		if known, ok := bestCost[current]; ok && currentNode.G > known+distanceEpsilon {
 			continue
 		}
+		if astarStateDominatedByLowerViaCount(bestCost, current, currentNode.G) {
+			continue
+		}
 		searchNodes++
 		if _, ok := targetSet[current.Coord]; ok {
 			return reconstructGridPath(current, cameFrom), searchNodes, true, false
@@ -326,6 +364,9 @@ func astarSearchMultiLayer(ctx context.Context, occupancy Occupancy, viaOccupanc
 			}
 			tentative := currentNode.G + stepCost
 			if existing, ok := bestCost[neighbor]; ok && !distanceLess(tentative, existing) {
+				continue
+			}
+			if astarStateDominatedByLowerViaCount(bestCost, neighbor, tentative) {
 				continue
 			}
 			bestCost[neighbor] = tentative
@@ -358,6 +399,9 @@ func astarSearchMultiLayer(ctx context.Context, occupancy Occupancy, viaOccupanc
 				if existing, ok := bestCost[neighbor]; ok && !distanceLess(tentative, existing) {
 					continue
 				}
+				if astarStateDominatedByLowerViaCount(bestCost, neighbor, tentative) {
+					continue
+				}
 				bestCost[neighbor] = tentative
 				cameFrom[neighbor] = current
 				heap.Push(&open, &astarNode{
@@ -371,6 +415,17 @@ func astarSearchMultiLayer(ctx context.Context, occupancy Occupancy, viaOccupanc
 		}
 	}
 	return nil, searchNodes, false, false
+}
+
+func astarStateDominatedByLowerViaCount(bestCost map[astarState]float64, candidate astarState, candidateCost float64) bool {
+	for vias := 0; vias < candidate.Vias; vias++ {
+		dominator := candidate
+		dominator.Vias = vias
+		if cost, ok := bestCost[dominator]; ok && !distanceLess(candidateCost, cost) {
+			return true
+		}
+	}
+	return false
 }
 
 func accessCoordsOnLayer(access PadAccess, grid Grid, endpoint Endpoint, layerName string, layerIndex int) []GridCoord {
@@ -419,6 +474,40 @@ func accessCoordsOnLayers(access PadAccess, grid Grid, endpoint Endpoint, layerI
 	}
 	sortGridCoords(coords)
 	return coords
+}
+
+func forcedEndpointAlternateAccessCoords(access PadAccess, occupancy Occupancy, viaOccupancy Occupancy, endpoint Endpoint, layerIndexes map[string]int, layerNames map[int]string) ([]GridCoord, map[GridCoord]GridCoord) {
+	points, ok := AccessPointsForEndpoint(access, endpoint)
+	if !ok {
+		return nil, nil
+	}
+	var coords []GridCoord
+	outerByInner := map[GridCoord]GridCoord{}
+	seen := map[GridCoord]bool{}
+	for _, point := range points {
+		outerLayer, ok := layerIndexes[normalizeLayer(point.Layer)]
+		if !ok {
+			continue
+		}
+		outer := occupancy.Grid.ToGrid(accessSearchPoint(point), outerLayer)
+		if occupancy.BlockedCell(outer) {
+			continue
+		}
+		for alternateLayer := range layerNames {
+			if alternateLayer == outerLayer {
+				continue
+			}
+			alternate := GridCoord{X: outer.X, Y: outer.Y, Layer: alternateLayer}
+			if seen[alternate] || !routableViaSpan(viaOccupancy, outer, alternate) {
+				continue
+			}
+			seen[alternate] = true
+			coords = append(coords, alternate)
+			outerByInner[alternate] = outer
+		}
+	}
+	sortGridCoords(coords)
+	return coords, outerByInner
 }
 
 func accessSearchPoint(access AccessPoint) Point {

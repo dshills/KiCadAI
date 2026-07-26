@@ -261,6 +261,50 @@
         "verification": {"confidence": "verified", "sources": ["builtin_pinmap:Connector_Generic:Conn_01x02"], "pinmap_checked": true}
       }],
       "verification": {"confidence": "verified", "sources": ["curated_seed_catalog", "builtin_pinmap:Connector_Generic:Conn_01x02"], "pinmap_checked": true}
+    },
+    {
+      "id": "load.inductive.external.1x02",
+      "family": "inductor",
+      "name": "Parameterized external inductive load",
+      "description": "Catalog-backed two-terminal testbench load whose inductance is supplied by a bounded operating condition; it is never added to the physical circuit graph or writer request.",
+      "generic": true,
+      "lifecycle": "active",
+      "tags": ["external_load", "inductive", "simulation_load", "testbench"],
+      "simulation_models": [{
+        "model_id": "mna_inductor_transient_be_v1",
+        "parameters": [
+          {"name": "series_resistance_ohm", "value": 0.001},
+          {"name": "rated_current_a", "value": 100},
+          {"name": "saturation_current_a", "value": 100}
+        ]
+      }],
+      "symbols": [{
+        "symbol_id": "Connector_Generic:Conn_01x02",
+        "function_pins": [
+          {"function": "A", "symbol_pin": "1", "required": true},
+          {"function": "B", "symbol_pin": "2", "required": true}
+        ],
+        "verification": {"confidence": "verified", "sources": ["builtin_pinmap:Connector_Generic:Conn_01x02"], "pinmap_checked": true}
+      }],
+      "packages": [{
+        "id": "vertical",
+        "name": "External load connector",
+        "footprint_id": "Connector_PinHeader_2.54mm:PinHeader_1x02_P2.54mm_Vertical",
+        "package_type": "pin_header_1x02",
+        "pinmap_id": "Connector_Generic:Conn_01x02|Connector_PinHeader_2.54mm:PinHeader_1x02_P2.54mm_Vertical",
+        "pad_functions": [
+          {"function": "A", "pad": "1"},
+          {"function": "B", "pad": "2"}
+        ],
+        "verification": {"confidence": "verified", "sources": ["builtin_pinmap:Connector_Generic:Conn_01x02"], "pinmap_checked": true}
+      }],
+      "verification": {
+        "confidence": "verified",
+        "sources": ["kicadai:bounded-external-load-contract", "builtin_pinmap:Connector_Generic:Conn_01x02"],
+        "resolver_checked": true,
+        "pinmap_checked": true,
+        "notes": ["Inductance is an immutable public operating-case input; the conservative 1 mOhm series term prevents an ideal algebraic loop without claiming a specific actuator winding."]
+      }
     }
   ]
 }

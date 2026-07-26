@@ -592,6 +592,53 @@ func validProviderDescriptor(id string, capabilities ...string) ProviderDescript
 	return ProviderDescriptor{ID: id, Revision: "1.0.0", Capabilities: capabilities, Evidence: ContractEvidence{Confidence: EvidenceVerified, Sources: []string{"synthetic_provider_contract"}}}
 }
 
+func TestSearchObligationCloneIsolatesBranchRefinement(t *testing.T) {
+	originalMinimum := 1.0
+	originalMaximum := 2.0
+	tolerance := 1.0
+	original := []searchObligation{{
+		Path:       "objective:consumer",
+		Capability: "consumer",
+		Ports: []RoleContract{{
+			Role: "input", Anchor: "shared",
+			Contract: PortContract{
+				ID: "sink", Kind: "analog_voltage", Direction: "sink", Domain: "ground",
+				Voltage: NumericRange{
+					Minimum: &originalMinimum,
+					Maximum: &originalMaximum,
+				},
+				Evidence:        ContractEvidence{Confidence: EvidenceVerified, Sources: []string{"original"}},
+				MinimumEvidence: EvidenceRuleInferred,
+			},
+		}},
+		Constraints: []Constraint{{
+			Name: "target", Value: json.RawMessage(`1`),
+			TolerancePercent: &tolerance,
+		}},
+	}}
+	branch := cloneSearchObligations(original)
+	sourceMinimum, sourceMaximum := 1.2, 1.8
+	refined, validation := refineObligationsFromSelectedSources(branch, []RoleContract{{
+		Anchor: "shared",
+		Contract: PortContract{
+			ID: "source", Kind: "analog_voltage", Direction: "source", Domain: "ground",
+			Voltage:  NumericRange{Minimum: &sourceMinimum, Maximum: &sourceMaximum},
+			Evidence: ContractEvidence{Confidence: EvidenceVerified, Sources: []string{"selected"}},
+		},
+	}})
+	if validation != nil {
+		t.Fatalf("refine branch: %#v", validation)
+	}
+	refined[0].Constraints[0].Value[0] = '2'
+	*refined[0].Constraints[0].TolerancePercent = 5
+	if *original[0].Ports[0].Contract.Voltage.Minimum != 1 ||
+		original[0].Ports[0].Contract.Evidence.Sources[0] != "original" ||
+		string(original[0].Constraints[0].Value) != "1" ||
+		*original[0].Constraints[0].TolerancePercent != 1 {
+		t.Fatalf("branch refinement mutated sibling obligation: %#v", original[0])
+	}
+}
+
 func cloneRoleContracts(ports []RoleContract) []RoleContract {
 	encoded, _ := json.Marshal(ports)
 	var cloned []RoleContract

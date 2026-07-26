@@ -73,17 +73,8 @@ func SelectFeasibleTransientSourceEdge(plan Plan, sourceComponent string, initia
 		candidate.DCSweep = nil
 		return solveCenteredBiasPoint(plan, candidate)
 	}
-	initialPoint, initialDiagnostics := test(initialV)
-	finalPoint, finalDiagnostics := test(finalV)
-	if len(initialDiagnostics) == 0 && len(finalDiagnostics) == 0 {
-		initialLoss := transientEndpointSemiconductorLoss(plan, initialPoint)
-		finalLoss := transientEndpointSemiconductorLoss(plan, finalPoint)
-		tolerance := mnaPivotTolerance * math.Max(1, math.Max(initialLoss, finalLoss))
-		if finalLoss+tolerance < initialLoss {
-			return finalV, initialV, nil
-		}
-		return initialV, finalV, nil
-	}
+	_, initialDiagnostics := test(initialV)
+	_, finalDiagnostics := test(finalV)
 	if len(initialDiagnostics) == 0 {
 		return initialV, finalV, nil
 	}
@@ -100,7 +91,7 @@ func SelectFeasibleTransientSourceEdge(plan Plan, sourceComponent string, initia
 func hasTransientEndpointLossDevice(plan Plan) bool {
 	for _, device := range plan.Devices {
 		switch device.PrimitiveModel {
-		case PrimitiveFuseClosedStateV1, PrimitiveBidirectionalTVSV1,
+		case PrimitiveFuseClosedStateV1, PrimitiveFuseI2TClearingV1, PrimitiveBidirectionalTVSV1,
 			PrimitiveUnidirectionalZenerV1, PrimitiveDiodeShockleyV1,
 			PrimitiveNMOSSwitchV1, PrimitivePMOSSwitchV1, PrimitiveReverseBlockingLoadSwitchV1,
 			PrimitiveBJTNPNV1, PrimitiveBJTPNPV1:
@@ -108,24 +99,6 @@ func hasTransientEndpointLossDevice(plan Plan) bool {
 		}
 	}
 	return false
-}
-
-func transientEndpointSemiconductorLoss(plan Plan, point AnalysisPoint) float64 {
-	models := make(map[string]string, len(plan.Devices))
-	for _, device := range plan.Devices {
-		models[device.Component] = device.PrimitiveModel
-	}
-	total := 0.0
-	for _, device := range point.Devices {
-		switch models[device.Component] {
-		case PrimitiveFuseClosedStateV1, PrimitiveBidirectionalTVSV1,
-			PrimitiveUnidirectionalZenerV1, PrimitiveDiodeShockleyV1,
-			PrimitiveNMOSSwitchV1, PrimitivePMOSSwitchV1, PrimitiveReverseBlockingLoadSwitchV1,
-			PrimitiveBJTNPNV1, PrimitiveBJTPNPV1:
-			total += math.Abs(device.VoltageV) * device.CurrentMagnitudeA
-		}
-	}
-	return normalizedMNAFloat(total)
 }
 
 // SelectThermallyFeasibleSourceBias chooses the semantic input state that
@@ -512,7 +485,7 @@ func centeredBiasMargin(plan Plan, point AnalysisPoint) (float64, bool, string) 
 			low := (output - (negative + parameters["output_low_margin_v"])) / span
 			high := ((positive - parameters["output_high_margin_v"]) - output) / span
 			record(fmt.Sprintf("%s (output %.12g V, allowed %.12g..%.12g V)", device.Component, output, negative+parameters["output_low_margin_v"], positive-parameters["output_high_margin_v"]), math.Min(low, high))
-		case PrimitiveFuseClosedStateV1:
+		case PrimitiveFuseClosedStateV1, PrimitiveFuseI2TClearingV1:
 			result, exists := devices[device.Component]
 			if !exists {
 				continue

@@ -207,8 +207,9 @@ func TestCloneReportPointLimitAndValueOnlySchemaGuard(t *testing.T) {
 			"Corners": true, "Sensitivity": true,
 		}},
 		{value: ResolvedBinding{}, handled: map[string]bool{"ValueSI": true, "ModelParameters": true}},
-		{value: ResolvedDevice{}, handled: map[string]bool{"ValueSI": true, "ModelParameters": true, "Terminals": true}},
-		{value: AnalysisResult{}, handled: map[string]bool{"Points": true}},
+		{value: ResolvedDevice{}, handled: map[string]bool{"ValueSI": true, "ModelParameters": true, "ThermalModel": true, "TransientSOA": true, "Terminals": true}},
+		{value: AnalysisResult{}, handled: map[string]bool{"ControlLoops": true, "Points": true}},
+		{value: ControlLoop{}, handled: map[string]bool{"Members": true, "NetPath": true}},
 		{value: AssertionResult{}, handled: map[string]bool{"Components": true}},
 		{value: CornerResult{}, handled: map[string]bool{"Assignments": true, "Assertions": true}},
 		{value: AnalysisPoint{}, handled: map[string]bool{"Nodes": true, "Devices": true, "Solver": true}},
@@ -262,7 +263,7 @@ func TestSupportedAnalysisKindsDescribeExecutableRegistryPaths(t *testing.T) {
 		{ModelRCLowpassACV1, []string{AnalysisACSweep}},
 		{ModelLinearCircuitMNAV1, []string{AnalysisACSweep, AnalysisDCOperatingPoint, AnalysisNoise, AnalysisStability, AnalysisThermal}},
 		{ModelNonlinearCircuitDCV1, []string{AnalysisDCOperatingPoint, AnalysisThermal}},
-		{ModelTransientCircuitV1, []string{AnalysisDCOperatingPoint, AnalysisDistortion, AnalysisStartup, AnalysisThermal, AnalysisTransient}},
+		{ModelTransientCircuitV1, []string{AnalysisDCOperatingPoint, AnalysisDistortion, AnalysisElectrothermal, AnalysisStartup, AnalysisThermal, AnalysisTransient}},
 	}
 	for _, test := range tests {
 		if got := SupportedAnalysisKinds(test.model); !slices.Equal(got, test.want) {
@@ -280,7 +281,7 @@ func TestSupportedAnalysisKindsDescribeExecutableRegistryPaths(t *testing.T) {
 }
 
 func TestSupportsCatalogAnalysisRecognizesGraphPrimitivesWithoutOverclaiming(t *testing.T) {
-	for _, analysis := range []string{AnalysisACSweep, AnalysisDCOperatingPoint, AnalysisNoise, AnalysisStability, AnalysisThermal, AnalysisTransient} {
+	for _, analysis := range []string{AnalysisACSweep, AnalysisDCOperatingPoint, AnalysisElectrothermal, AnalysisNoise, AnalysisStability, AnalysisThermal, AnalysisTransient} {
 		if !SupportsCatalogAnalysis(PrimitiveResistorV1, analysis) {
 			t.Fatalf("resistor primitive should support %s through a graph workflow", analysis)
 		}

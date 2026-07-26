@@ -8,6 +8,30 @@ import (
 func validateResolvedOperatingLimits(plan Plan, system mnaSystem, solution []complex128, allowPowerTransition bool) []Diagnostic {
 	var diagnostics []Diagnostic
 	for _, device := range plan.Devices {
+		if device.PrimitiveModel == PrimitiveSynchronousBuckRegulatorV1 {
+			parameters := namedValueMap(device.ModelParameters)
+			terminals := terminalMap(device)
+			ground := real(solvedNodeVoltage(system, solution, terminals["PGND"]))
+			input := real(solvedNodeVoltage(system, solution, terminals["PVIN"])) - ground
+			switchVoltage := real(solvedNodeVoltage(system, solution, terminals["SW"])) - ground
+			enable := real(solvedNodeVoltage(system, solution, terminals["EN"])) -
+				real(solvedNodeVoltage(system, solution, terminals["AGND"]))
+			path := "devices." + device.Component
+			powerTransition := allowPowerTransition && (input < parameters["min_input_voltage_v"] || enable < parameters["enable_threshold_v"])
+			if !powerTransition && (input < parameters["min_input_voltage_v"] || input > parameters["max_input_voltage_v"]) {
+				diagnostics = append(diagnostics, Diagnostic{Path: path + ".input_voltage", Message: fmt.Sprintf("synchronous buck input %.12g V is outside catalog-backed range %.12g..%.12g V", input, parameters["min_input_voltage_v"], parameters["max_input_voltage_v"]), Suggestion: "adjust the source conditions or select a compatible reviewed switching regulator"})
+			}
+			if !powerTransition && (switchVoltage < -mnaPivotTolerance || switchVoltage > input+mnaPivotTolerance) {
+				diagnostics = append(diagnostics, Diagnostic{Path: path + ".switch_voltage", Message: fmt.Sprintf("averaged synchronous buck switch node %.12g V is outside the realizable 0..%.12g V envelope", switchVoltage, input), Suggestion: "adjust compensation, load, or select a compatible reviewed switching regulator"})
+			}
+			branch, exists := system.branchIndex[device.Component]
+			if !exists || branch >= len(solution) {
+				diagnostics = append(diagnostics, Diagnostic{Path: path + ".output_current", Message: "synchronous buck controlled-current branch is absent from the solved topology"})
+			} else if current := math.Abs(real(solution[branch])); !powerTransition && switchVoltage > mnaPivotTolerance && current > parameters["peak_current_limit_a"]+mnaPivotTolerance {
+				diagnostics = append(diagnostics, Diagnostic{Path: path + ".output_current", Message: fmt.Sprintf("synchronous buck current %.12g A exceeds catalog-backed peak limit %.12g A", current, parameters["peak_current_limit_a"]), Suggestion: "reduce load current or select a compatible reviewed switching regulator"})
+			}
+			continue
+		}
 		if device.PrimitiveModel == PrimitiveFuseClosedStateV1 {
 			parameters := namedValueMap(device.ModelParameters)
 			terminals := terminalMap(device)
@@ -35,15 +59,16 @@ func validateResolvedOperatingLimits(plan Plan, system mnaSystem, solution []com
 			output := real(solvedNodeVoltage(system, solution, terminals["OUT"])) - ground
 			path := "devices." + device.Component
 			powerTransition := allowPowerTransition && supply < parameters["supply_min_v"]
-			if !powerTransition && (supply < parameters["supply_min_v"] || supply > parameters["supply_max_v"]) {
+			if !powerTransition && outsideNonlinearOperatingRange(supply, parameters["supply_min_v"], parameters["supply_max_v"]) {
 				diagnostics = append(diagnostics, Diagnostic{Path: path + ".supply", Message: fmt.Sprintf("current-sense amplifier supply %.12g V is outside catalog-backed range %.12g..%.12g V", supply, parameters["supply_min_v"], parameters["supply_max_v"]), Suggestion: "adjust the source conditions or select a compatible reviewed current sensor"})
 			}
-			if !powerTransition && (commonMode < parameters["common_mode_min_v"] || commonMode > parameters["common_mode_max_v"]) {
+			if !powerTransition && outsideNonlinearOperatingRange(commonMode, parameters["common_mode_min_v"], parameters["common_mode_max_v"]) {
 				diagnostics = append(diagnostics, Diagnostic{Path: path + ".common_mode", Message: fmt.Sprintf("current-sense amplifier common-mode voltage %.12g V is outside catalog-backed range %.12g..%.12g V", commonMode, parameters["common_mode_min_v"], parameters["common_mode_max_v"]), Suggestion: "adjust the sensed rail or select a compatible reviewed current sensor"})
 			}
 			minimumOutput := parameters["output_low_margin_v"]
 			maximumOutput := supply - parameters["output_high_margin_v"]
-			if !powerTransition && (output < minimumOutput || output > maximumOutput) {
+			outputTolerance := nonlinearOperatingVoltageTolerance(math.Max(math.Abs(minimumOutput), math.Abs(maximumOutput)))
+			if !powerTransition && (output < minimumOutput-outputTolerance || output > maximumOutput+outputTolerance) {
 				diagnostics = append(diagnostics, Diagnostic{Path: path + ".output", Message: fmt.Sprintf("current-sense amplifier output %.12g V is outside catalog-backed range %.12g..%.12g V", output, minimumOutput, maximumOutput), Suggestion: "reduce shunt voltage or gain, adjust reference bias, or select a compatible reviewed current sensor"})
 			}
 			continue

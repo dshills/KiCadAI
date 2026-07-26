@@ -40,6 +40,282 @@ func TestRouteRequestRejectsEndpointAccessBlockedByForeignPad(t *testing.T) {
 	}
 }
 
+func TestExpandSMDPadEdgeAccessComposesPadRotation(t *testing.T) {
+	request := singleLayerSearchRequest()
+	request.Components = []Component{{
+		Ref:      "U1",
+		Position: Placement{XMM: 10, YMM: 10, Layer: "F.Cu"},
+		Pads: []Pad{{
+			Ref: "U1", Name: "1", Net: "SIG", Position: Point{},
+			RotationDeg: 90, Shape: PadRoundedRect, Type: PadSMD,
+			Size: Size{WidthMM: 0.25, HeightMM: 0.875}, Layers: []string{"F.Cu"},
+		}},
+	}}
+	request.Rules.GridMM = 0.25
+	request.Rules.TraceWidthMM = 0.25
+	request.Rules.ClearanceMM = 0.2
+	request.Rules.ViaDiameterMM = 0.6
+	request.Rules.ViaClearanceMM = 0.2
+	endpoint := Endpoint{Ref: "U1", Pin: "1"}
+
+	expanded := expandSMDPadEdgeAccess(BuildPadAccess(request), request, []Endpoint{endpoint})
+	points, ok := AccessPointsForEndpoint(expanded, endpoint)
+	if !ok {
+		t.Fatal("rotated SMD endpoint has no access")
+	}
+	minX, maxX := math.Inf(1), math.Inf(-1)
+	minY, maxY := math.Inf(1), math.Inf(-1)
+	searchPoints := 0
+	for _, point := range points {
+		if point.SearchPoint == nil {
+			continue
+		}
+		searchPoints++
+		minX = min(minX, point.SearchPoint.XMM)
+		maxX = max(maxX, point.SearchPoint.XMM)
+		minY = min(minY, point.SearchPoint.YMM)
+		maxY = max(maxY, point.SearchPoint.YMM)
+	}
+	if searchPoints != 4 ||
+		math.Abs(minX-9.5625) > 1e-9 || math.Abs(maxX-10.4375) > 1e-9 ||
+		math.Abs(minY-9.875) > 1e-9 || math.Abs(maxY-10.125) > 1e-9 {
+		t.Fatalf("rotated edge search bounds = x[%g,%g] y[%g,%g] across %d points", minX, maxX, minY, maxY, searchPoints)
+	}
+}
+
+func TestCrowdedSMDPadViaAccessStaggersAndFitsAdjacentPitch(t *testing.T) {
+	request := minimalRequest()
+	request.Board.Layers = []Layer{
+		{Name: "F.Cu", Kind: LayerCopper, Routable: true},
+		{Name: "In1.Cu", Kind: LayerCopper, Routable: true},
+		{Name: "In2.Cu", Kind: LayerCopper, Routable: true},
+		{Name: "B.Cu", Kind: LayerCopper, Routable: true},
+	}
+	request.Rules.GridMM = 0.25
+	request.Rules.TraceWidthMM = 0.2
+	request.Rules.ClearanceMM = 0.2
+	request.Rules.ViaDiameterMM = 0.7
+	request.Rules.ViaDrillMM = 0.35
+	request.Rules.MaxViasPerNet = 4
+	request.Components = []Component{{
+		Ref: "U1", Position: Placement{XMM: 10, YMM: 10, Layer: "F.Cu"},
+		Pads: []Pad{
+			{Ref: "U1", Name: "1", Net: "A", Position: Point{XMM: 2, YMM: 0}, Shape: PadRect, Type: PadSMD, Size: Size{WidthMM: 1, HeightMM: 0.25}, Layers: []string{"F.Cu"}},
+			{Ref: "U1", Name: "2", Net: "B", Position: Point{XMM: 2, YMM: 0.5}, Shape: PadRect, Type: PadSMD, Size: Size{WidthMM: 1, HeightMM: 0.25}, Layers: []string{"F.Cu"}},
+		},
+	}}
+	endpoints := []Endpoint{{Ref: "U1", Pin: "1"}, {Ref: "U1", Pin: "2"}}
+
+	adjusted, diameters := applyCrowdedSMDPadViaAccess(BuildPadAccess(request), request, endpoints)
+	if len(diameters) != 2 {
+		t.Fatalf("forced endpoint vias = %#v, want both crowded pads", diameters)
+	}
+	first, firstOK := AccessPointsForEndpoint(adjusted, endpoints[0])
+	second, secondOK := AccessPointsForEndpoint(adjusted, endpoints[1])
+	if !firstOK || !secondOK || len(first) != 2 || len(second) != 2 || first[0].SearchPoint == nil || second[0].SearchPoint == nil {
+		t.Fatalf("staggered access = first %#v second %#v", first, second)
+	}
+	if math.Abs(first[0].SearchPoint.XMM-second[0].SearchPoint.XMM) < 0.5 {
+		t.Fatalf("dogbone columns were not staggered: first=%#v second=%#v", first[0], second[0])
+	}
+	rules := crowdedEndpointViaRules(request.Rules, diameters)
+	if math.Abs(rules.ViaDiameterMM-0.4) > 1e-9 || math.Abs(rules.ViaDrillMM-0.2) > 1e-9 {
+		t.Fatalf("crowded endpoint via rules = %#v, want trace-derived 0.4/0.2mm after physical clearance proof", rules)
+	}
+}
+
+func TestCrowdedSMDPadViaAccessSupportsTwoLayerDogbone(t *testing.T) {
+	request := minimalRequest()
+	request.Board.Layers = []Layer{
+		{Name: "F.Cu", Kind: LayerCopper, Routable: true},
+		{Name: "B.Cu", Kind: LayerCopper, Routable: true},
+	}
+	request.Rules.GridMM = 0.25
+	request.Rules.TraceWidthMM = 0.2
+	request.Rules.ClearanceMM = 0.2
+	request.Rules.ViaDiameterMM = 0.7
+	request.Rules.ViaDrillMM = 0.35
+	request.Rules.MaxViasPerNet = 2
+	request.Components = []Component{{
+		Ref: "U1", Position: Placement{XMM: 10, YMM: 10, Layer: "F.Cu"},
+		Pads: []Pad{
+			{Ref: "U1", Name: "1", Net: "A", Position: Point{XMM: 2, YMM: 0}, Shape: PadRect, Type: PadSMD, Size: Size{WidthMM: 1, HeightMM: 0.25}, Layers: []string{"F.Cu"}},
+			{Ref: "U1", Name: "2", Net: "B", Position: Point{XMM: 2, YMM: 0.5}, Shape: PadRect, Type: PadSMD, Size: Size{WidthMM: 1, HeightMM: 0.25}, Layers: []string{"F.Cu"}},
+		},
+	}}
+	endpoint := Endpoint{Ref: "U1", Pin: "1"}
+
+	adjusted, diameters := applyCrowdedSMDPadViaAccess(BuildPadAccess(request), request, []Endpoint{endpoint})
+	points, ok := AccessPointsForEndpoint(adjusted, endpoint)
+	if len(diameters) != 1 || !ok || len(points) != 2 || points[0].SearchPoint == nil || points[1].SearchPoint == nil {
+		t.Fatalf("two-layer crowded dogbone = points %#v diameters %#v", points, diameters)
+	}
+}
+
+func TestCrowdedSMDPadViaAccessDoesNotForceOrdinaryPitchPowerPad(t *testing.T) {
+	request := minimalRequest()
+	request.Board.Layers = []Layer{
+		{Name: "F.Cu", Kind: LayerCopper, Routable: true},
+		{Name: "B.Cu", Kind: LayerCopper, Routable: true},
+	}
+	request.Rules.GridMM = 0.25
+	request.Rules.TraceWidthMM = 0.8
+	request.Rules.ClearanceMM = 0.2
+	request.Rules.ViaDiameterMM = 0.7
+	request.Rules.ViaDrillMM = 0.35
+	request.Rules.MaxViasPerNet = 2
+	request.Components = []Component{{
+		Ref: "U1", Position: Placement{XMM: 10, YMM: 10, Layer: "F.Cu"},
+		Pads: []Pad{
+			{Ref: "U1", Name: "1", Net: "POWER", Position: Point{XMM: 2, YMM: 0}, Shape: PadRect, Type: PadSMD, Size: Size{WidthMM: 1, HeightMM: 0.6}, Layers: []string{"F.Cu"}},
+			{Ref: "U1", Name: "2", Net: "OTHER", Position: Point{XMM: 2, YMM: 0.95}, Shape: PadRect, Type: PadSMD, Size: Size{WidthMM: 1, HeightMM: 0.6}, Layers: []string{"F.Cu"}},
+		},
+	}}
+	endpoint := Endpoint{Ref: "U1", Pin: "1"}
+	access := BuildPadAccess(request)
+
+	adjusted, diameters := applyCrowdedSMDPadViaAccess(access, request, []Endpoint{endpoint})
+	if len(diameters) != 0 {
+		t.Fatalf("forced endpoint vias = %#v, want ordinary-pitch pad to retain normal access", diameters)
+	}
+	got, gotOK := AccessPointsForEndpoint(adjusted, endpoint)
+	want, wantOK := AccessPointsForEndpoint(access, endpoint)
+	if !gotOK || !wantOK || !reflect.DeepEqual(got, want) {
+		t.Fatalf("ordinary-pitch access = %#v, want unchanged %#v", got, want)
+	}
+}
+
+func TestPrioritizeCrowdedSMDPadPairsPreservesOtherBranchOrder(t *testing.T) {
+	request := minimalRequest()
+	request.Board.Layers = []Layer{
+		{Name: "F.Cu", Kind: LayerCopper, Routable: true},
+		{Name: "In1.Cu", Kind: LayerCopper, Routable: true},
+		{Name: "In2.Cu", Kind: LayerCopper, Routable: true},
+		{Name: "B.Cu", Kind: LayerCopper, Routable: true},
+	}
+	request.Rules.GridMM = 0.25
+	request.Rules.TraceWidthMM = 0.2
+	request.Rules.ClearanceMM = 0.2
+	request.Rules.ViaDiameterMM = 0.7
+	request.Rules.MaxViasPerNet = 4
+	request.Components = []Component{{
+		Ref: "U1",
+		Pads: []Pad{
+			{Ref: "U1", Name: "1", Net: "SIG", Position: Point{XMM: 2, YMM: 0}, Shape: PadRect, Type: PadSMD, Size: Size{WidthMM: 1, HeightMM: 0.25}, Layers: []string{"F.Cu"}},
+			{Ref: "U1", Name: "2", Net: "OTHER", Position: Point{XMM: 2, YMM: 0.5}, Shape: PadRect, Type: PadSMD, Size: Size{WidthMM: 1, HeightMM: 0.25}, Layers: []string{"F.Cu"}},
+		},
+	}}
+	ordinaryFirst := EndpointPair{From: Endpoint{Ref: "R1", Pin: "1"}, To: Endpoint{Ref: "R2", Pin: "1"}}
+	crowded := EndpointPair{From: Endpoint{Ref: "R2", Pin: "1"}, To: Endpoint{Ref: "U1", Pin: "1"}}
+	ordinaryLast := EndpointPair{From: Endpoint{Ref: "R2", Pin: "1"}, To: Endpoint{Ref: "C1", Pin: "1"}}
+
+	got := prioritizeCrowdedSMDPadPairs([]EndpointPair{ordinaryFirst, crowded, ordinaryLast}, request)
+	want := []EndpointPair{crowded, ordinaryFirst, ordinaryLast}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("prioritized pairs = %#v, want %#v", got, want)
+	}
+}
+
+func TestRouteRequestTransitionsCrowdedSMDPadAtPitchSafeDogbone(t *testing.T) {
+	request := minimalRequest()
+	request.Board.WidthMM = 30
+	request.Board.HeightMM = 20
+	request.Board.Layers = []Layer{
+		{Name: "F.Cu", Kind: LayerCopper, Routable: true},
+		{Name: "In1.Cu", Kind: LayerCopper, Routable: true},
+		{Name: "In2.Cu", Kind: LayerCopper, Routable: true},
+		{Name: "B.Cu", Kind: LayerCopper, Routable: true},
+	}
+	request.Rules.GridMM = 0.25
+	request.Rules.TraceWidthMM = 0.2
+	request.Rules.ClearanceMM = 0.2
+	request.Rules.ViaDiameterMM = 0.7
+	request.Rules.ViaDrillMM = 0.35
+	request.Rules.MaxSearchNodes = 100000
+	request.Rules.MaxViasPerNet = 4
+	request.Strategy.Mode = ModeTwoLayer
+	request.Strategy.NetOrder = NetOrderConstrainedEndpointAccessV1
+	request.Components = []Component{
+		{
+			Ref: "U1", Position: Placement{XMM: 5, YMM: 10, Layer: "F.Cu"},
+			Pads: []Pad{
+				{Ref: "U1", Name: "1", Net: "SIG", Position: Point{XMM: 2, YMM: 0}, Shape: PadRect, Type: PadSMD, Size: Size{WidthMM: 1, HeightMM: 0.25}, Layers: []string{"F.Cu"}},
+				{Ref: "U1", Name: "2", Net: "OTHER", Position: Point{XMM: 2, YMM: 0.5}, Shape: PadRect, Type: PadSMD, Size: Size{WidthMM: 1, HeightMM: 0.25}, Layers: []string{"F.Cu"}},
+			},
+		},
+		{
+			Ref: "J1", Position: Placement{XMM: 25, YMM: 10, Layer: "F.Cu"},
+			Pads: []Pad{{Ref: "J1", Name: "1", Net: "SIG", Shape: PadRect, Type: PadSMD, Size: Size{WidthMM: 1, HeightMM: 1}, Layers: []string{"F.Cu"}}},
+		},
+	}
+	request.Nets = []Net{{Name: "SIG", Role: NetSignal, Endpoints: []Endpoint{{Ref: "U1", Pin: "1"}, {Ref: "J1", Pin: "1"}}}}
+
+	result := RouteRequest(request)
+	if result.Status != StatusRouted || len(result.Routes) != 1 {
+		t.Fatalf("crowded dogbone route = %#v", result)
+	}
+	foundPitchSafeVia := false
+	for _, via := range result.Routes[0].Vias {
+		if math.Abs(via.DiameterMM-0.4) <= 1e-9 && math.Abs(via.DrillMM-0.2) <= 1e-9 {
+			foundPitchSafeVia = true
+		}
+	}
+	if !foundPitchSafeVia {
+		t.Fatalf("vias = %#v, want pitch-derived crowded endpoint transition", result.Routes[0].Vias)
+	}
+}
+
+func TestRouteRequestUsesAlternateCrowdedSMDPadDogboneWhenPreferredColumnIsBlocked(t *testing.T) {
+	request := minimalRequest()
+	request.Board.WidthMM = 30
+	request.Board.HeightMM = 20
+	request.Board.Layers = []Layer{
+		{Name: "F.Cu", Kind: LayerCopper, Routable: true},
+		{Name: "B.Cu", Kind: LayerCopper, Routable: true},
+	}
+	request.Rules.GridMM = 0.25
+	request.Rules.TraceWidthMM = 0.2
+	request.Rules.ClearanceMM = 0.2
+	request.Rules.ViaDiameterMM = 0.7
+	request.Rules.ViaDrillMM = 0.35
+	request.Rules.MaxSearchNodes = 100000
+	request.Rules.MaxViasPerNet = 4
+	request.Strategy.Mode = ModeTwoLayer
+	request.Strategy.NetOrder = NetOrderConstrainedEndpointAccessV1
+	request.Components = []Component{
+		{
+			Ref: "U1", Position: Placement{XMM: 5, YMM: 10, Layer: "F.Cu"},
+			Pads: []Pad{
+				{Ref: "U1", Name: "1", Net: "OTHER", Position: Point{XMM: 2, YMM: 0}, Shape: PadRect, Type: PadSMD, Size: Size{WidthMM: 1, HeightMM: 0.25}, Layers: []string{"F.Cu"}},
+				{Ref: "U1", Name: "2", Net: "SIG", Position: Point{XMM: 2, YMM: 0.5}, Shape: PadRect, Type: PadSMD, Size: Size{WidthMM: 1, HeightMM: 0.25}, Layers: []string{"F.Cu"}},
+			},
+		},
+		{
+			Ref: "X1", Position: Placement{XMM: 8.5, YMM: 10.5, Layer: "F.Cu"},
+			Pads: []Pad{{Ref: "X1", Name: "1", Net: "BLOCK", Shape: PadRect, Type: PadSMD, Size: Size{WidthMM: 0.2, HeightMM: 0.2}, Layers: []string{"F.Cu"}}},
+		},
+		{
+			Ref: "J1", Position: Placement{XMM: 25, YMM: 10.5, Layer: "F.Cu"},
+			Pads: []Pad{{Ref: "J1", Name: "1", Net: "SIG", Shape: PadRect, Type: PadSMD, Size: Size{WidthMM: 1, HeightMM: 1}, Layers: []string{"F.Cu"}}},
+		},
+	}
+	request.Nets = []Net{{Name: "SIG", Role: NetSignal, Endpoints: []Endpoint{{Ref: "U1", Pin: "2"}, {Ref: "J1", Pin: "1"}}}}
+
+	result := RouteRequest(request)
+	if result.Status != StatusRouted || len(result.Routes) != 1 {
+		t.Fatalf("alternate crowded dogbone route = %#v", result)
+	}
+	foundAlternateVia := false
+	for _, via := range result.Routes[0].Vias {
+		if math.Abs(via.At.XMM-8.0) <= 1e-9 && math.Abs(via.At.YMM-10.5) <= 1e-9 {
+			foundAlternateVia = true
+		}
+	}
+	if !foundAlternateVia {
+		t.Fatalf("vias = %#v, want alternate pitch-safe dogbone at (8.0, 10.5)", result.Routes[0].Vias)
+	}
+}
+
 func TestRouteRequestReusesDuplicatePadAccessAcrossNetBranches(t *testing.T) {
 	request := singleLayerSearchRequest()
 	request.Components = []Component{

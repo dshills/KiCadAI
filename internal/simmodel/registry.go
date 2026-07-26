@@ -140,7 +140,7 @@ func SupportedAnalysisKinds(modelID string) []string {
 	case ModelLinearCircuitMNAV1:
 		return []string{AnalysisACSweep, AnalysisDCOperatingPoint, AnalysisNoise, AnalysisStability, AnalysisThermal}
 	case ModelTransientCircuitV1:
-		return []string{AnalysisDCOperatingPoint, AnalysisDistortion, AnalysisStartup, AnalysisThermal, AnalysisTransient}
+		return []string{AnalysisDCOperatingPoint, AnalysisDistortion, AnalysisElectrothermal, AnalysisStartup, AnalysisThermal, AnalysisTransient}
 	case ModelNonlinearCircuitDCV1:
 		return []string{AnalysisDCOperatingPoint, AnalysisThermal}
 	default:
@@ -169,10 +169,16 @@ func SupportsCatalogAnalysis(modelID, kind string) bool {
 	}
 	switch strings.TrimSpace(kind) {
 	case AnalysisACSweep, AnalysisNoise, AnalysisStability:
+		if primitive.ID == PrimitiveInductorTransientV1 {
+			return true
+		}
 		return !primitive.Transient
 	case AnalysisDCOperatingPoint, AnalysisThermal:
+		if primitive.ID == PrimitiveInductorTransientV1 {
+			return true
+		}
 		return !primitive.Transient
-	case AnalysisDistortion, AnalysisStartup, AnalysisTransient:
+	case AnalysisDistortion, AnalysisElectrothermal, AnalysisStartup, AnalysisTransient:
 		return primitive.Family != "capacitor" || primitive.Transient
 	default:
 		return false
@@ -192,7 +198,12 @@ func CatalogAnalysisDependencies(modelID string, workflowAnalyses []string) []st
 	dependencies := make([]string, 0, len(workflowAnalyses))
 	for _, analysis := range workflowAnalyses {
 		analysis = strings.TrimSpace(analysis)
-		if memorylessNonlinearPrimitive(modelID) && (analysis == AnalysisACSweep || analysis == AnalysisNoise || analysis == AnalysisStability) {
+		if analysis == AnalysisElectrothermal {
+			// Catalog provenance reviews the electrical primitive's transient
+			// behavior. The claim-bound thermal RC and SOA payload is validated
+			// separately and retained in the resolved plan.
+			analysis = AnalysisTransient
+		} else if memorylessNonlinearPrimitive(modelID) && (analysis == AnalysisACSweep || analysis == AnalysisNoise || analysis == AnalysisStability) {
 			analysis = AnalysisDCOperatingPoint
 		} else if analysis == AnalysisNoise && idealNoiseBoundaryPrimitive(modelID) {
 			analysis = AnalysisACSweep
@@ -259,6 +270,7 @@ func ValidateCatalogEvidence(family string, evidence []CatalogEvidence) []Diagno
 			}
 			diagnostics = append(diagnostics, validatePrimitiveParameters(path+".parameters", primitive, claim.Parameters)...)
 			diagnostics = append(diagnostics, validateCatalogUncertainties(path+".uncertainties", claim, primitive.CatalogParameters, primitive.Source)...)
+			diagnostics = append(diagnostics, validateDynamicCatalogEvidence(path, primitive, claim)...)
 			continue
 		}
 		if model.GraphMNA {
@@ -287,6 +299,108 @@ func ValidateCatalogEvidence(family string, evidence []CatalogEvidence) []Diagno
 			parameterRules = append(parameterRules, role.CatalogParameters...)
 		}
 		diagnostics = append(diagnostics, validateCatalogUncertainties(path+".uncertainties", claim, parameterRules, false)...)
+	}
+	return diagnostics
+}
+
+func validateDynamicCatalogEvidence(path string, primitive primitiveDefinition, claim CatalogEvidence) []Diagnostic {
+	var diagnostics []Diagnostic
+	if claim.ThermalModel != nil {
+		thermalPath := path + ".thermal_model"
+		if !primitive.ThermalRC {
+			diagnostics = append(diagnostics, Diagnostic{Path: thermalPath, Message: "trusted primitive does not support a dynamic thermal RC claim"})
+		} else {
+			thermal := claim.ThermalModel
+			if thermal.Reference != "junction_to_ambient" && thermal.Reference != "junction_to_case" {
+				diagnostics = append(diagnostics, Diagnostic{Path: thermalPath + ".reference", Message: "thermal RC reference must be junction_to_ambient or junction_to_case"})
+			}
+			if strings.TrimSpace(thermal.BoundaryAssumption) == "" || thermal.BoundaryAssumption != strings.TrimSpace(thermal.BoundaryAssumption) || len(thermal.BoundaryAssumption) > 512 {
+				diagnostics = append(diagnostics, Diagnostic{Path: thermalPath + ".boundary_assumption", Message: "thermal RC model requires a bounded canonical boundary assumption"})
+			}
+			if len(thermal.Stages) == 0 || len(thermal.Stages) > 8 {
+				diagnostics = append(diagnostics, Diagnostic{Path: thermalPath + ".stages", Message: "thermal RC model requires 1..8 finite Foster stages"})
+			}
+			previousTimeConstant := 0.0
+			totalResistance := 0.0
+			for index, stage := range thermal.Stages {
+				stagePath := fmt.Sprintf("%s.stages[%d]", thermalPath, index)
+				if !finite(stage.ThermalResistanceCPerW) || stage.ThermalResistanceCPerW <= 0 || stage.ThermalResistanceCPerW > 1e6 {
+					diagnostics = append(diagnostics, Diagnostic{Path: stagePath + ".thermal_resistance_c_per_w", Message: "thermal resistance must be finite and within (0, 1e6] C/W"})
+				}
+				if !finite(stage.ThermalCapacitanceJPerC) || stage.ThermalCapacitanceJPerC <= 0 || stage.ThermalCapacitanceJPerC > 1e12 {
+					diagnostics = append(diagnostics, Diagnostic{Path: stagePath + ".thermal_capacitance_j_per_c", Message: "thermal capacitance must be finite and within (0, 1e12] J/C"})
+				}
+				if stage.CoolingCoupling != "" && stage.CoolingCoupling != "fixed" && stage.CoolingCoupling != "ambient_cooling" {
+					diagnostics = append(diagnostics, Diagnostic{Path: stagePath + ".cooling_coupling", Message: "thermal stage cooling coupling must be fixed or ambient_cooling"})
+				}
+				timeConstant := stage.ThermalResistanceCPerW * stage.ThermalCapacitanceJPerC
+				if index != 0 && (!finite(timeConstant) || timeConstant <= previousTimeConstant) {
+					diagnostics = append(diagnostics, Diagnostic{Path: stagePath, Message: "thermal RC stages must be canonically ordered by strictly increasing time constant"})
+				}
+				previousTimeConstant = timeConstant
+				totalResistance += stage.ThermalResistanceCPerW
+			}
+			if !finite(totalResistance) || totalResistance > 1e6 {
+				diagnostics = append(diagnostics, Diagnostic{Path: thermalPath + ".stages", Message: "thermal RC total resistance exceeds the trusted bound"})
+			}
+		}
+	}
+	if len(claim.TransientSOA) != 0 {
+		soaPath := path + ".transient_soa"
+		if !primitive.TransientSOA {
+			diagnostics = append(diagnostics, Diagnostic{Path: soaPath, Message: "trusted primitive does not support a transient SOA claim"})
+		}
+		if len(claim.TransientSOA) > 16 {
+			diagnostics = append(diagnostics, Diagnostic{Path: soaPath, Message: "transient SOA supports at most 16 reviewed envelopes"})
+		}
+		previousBasis := -1.0
+		previousTemperature := math.Inf(-1)
+		for index, envelope := range claim.TransientSOA {
+			envelopePath := fmt.Sprintf("%s[%d]", soaPath, index)
+			if envelope.DC == (envelope.PulseDurationS != nil) {
+				diagnostics = append(diagnostics, Diagnostic{Path: envelopePath, Message: "transient SOA envelope requires exactly one of dc or pulse_duration_s"})
+			}
+			basis := math.Inf(1)
+			if envelope.PulseDurationS != nil {
+				basis = *envelope.PulseDurationS
+				if !finite(basis) || basis <= 0 || basis > maxTransientDurationS {
+					diagnostics = append(diagnostics, Diagnostic{Path: envelopePath + ".pulse_duration_s", Message: "SOA pulse duration must be finite and within the executable transient duration"})
+				}
+			}
+			if !finite(envelope.CaseTemperatureC) || envelope.CaseTemperatureC < -273.15 || envelope.CaseTemperatureC > 1000 {
+				diagnostics = append(diagnostics, Diagnostic{Path: envelopePath + ".case_temperature_c", Message: "SOA case temperature must be finite and physically bounded"})
+			}
+			if basis < previousBasis || (basis == previousBasis && envelope.CaseTemperatureC <= previousTemperature) {
+				diagnostics = append(diagnostics, Diagnostic{Path: envelopePath, Message: "SOA envelopes must be unique and canonically ordered by duration then case temperature"})
+			}
+			if basis != previousBasis {
+				previousTemperature = math.Inf(-1)
+			}
+			previousBasis = basis
+			previousTemperature = envelope.CaseTemperatureC
+			if len(envelope.Points) < 2 || len(envelope.Points) > 32 {
+				diagnostics = append(diagnostics, Diagnostic{Path: envelopePath + ".points", Message: "SOA envelope requires 2..32 voltage/current boundary points"})
+			}
+			previousVoltage := 0.0
+			previousCurrent := math.Inf(1)
+			for pointIndex, point := range envelope.Points {
+				pointPath := fmt.Sprintf("%s.points[%d]", envelopePath, pointIndex)
+				if !finite(point.VoltageV) || point.VoltageV <= 0 || point.VoltageV > 1e6 {
+					diagnostics = append(diagnostics, Diagnostic{Path: pointPath + ".voltage_v", Message: "SOA voltage must be finite and within (0, 1e6] V"})
+				}
+				if !finite(point.CurrentA) || point.CurrentA <= 0 || point.CurrentA > 1e6 {
+					diagnostics = append(diagnostics, Diagnostic{Path: pointPath + ".current_a", Message: "SOA current must be finite and within (0, 1e6] A"})
+				}
+				if pointIndex != 0 && point.VoltageV <= previousVoltage {
+					diagnostics = append(diagnostics, Diagnostic{Path: pointPath + ".voltage_v", Message: "SOA voltage must increase within an envelope"})
+				}
+				if pointIndex != 0 && point.CurrentA > previousCurrent {
+					diagnostics = append(diagnostics, Diagnostic{Path: pointPath + ".current_a", Message: "SOA current must not increase with voltage"})
+				}
+				previousVoltage = point.VoltageV
+				previousCurrent = point.CurrentA
+			}
+		}
 	}
 	return diagnostics
 }
@@ -351,7 +465,7 @@ func validateModelProvenance(path string, provenance ModelProvenance, requiredAn
 
 func registeredAnalysisKind(kind string) bool {
 	switch kind {
-	case AnalysisDCOperatingPoint, AnalysisACSweep, AnalysisTransient, AnalysisNoise, AnalysisStability, AnalysisStartup, AnalysisDistortion, AnalysisThermal:
+	case AnalysisDCOperatingPoint, AnalysisACSweep, AnalysisTransient, AnalysisNoise, AnalysisStability, AnalysisStartup, AnalysisDistortion, AnalysisThermal, AnalysisElectrothermal:
 		return true
 	default:
 		return false

@@ -37,6 +37,7 @@ type ApplyOptions struct {
 	SuppressExplicitPinSymbolErrors bool
 	PreserveFootprintGeometry       bool
 	DefaultNetClassClearance        kicadfiles.IU
+	MinimumViaDiameter              kicadfiles.IU
 	MinimumThroughHoleDiameter      kicadfiles.IU
 	LibraryIndex                    *libraryresolver.LibraryIndex
 	LibraryIssues                   []reports.Issue
@@ -569,6 +570,7 @@ func builderFromTransaction(tx Transaction, opts ApplyOptions) (*designapi.Build
 			Paper:                      paper,
 			CopperLayers:               opts.CopperLayers,
 			DefaultNetClassClearance:   opts.DefaultNetClassClearance,
+			MinimumViaDiameter:         opts.MinimumViaDiameter,
 			MinimumThroughHoleDiameter: opts.MinimumThroughHoleDiameter,
 			LibraryIndex:               opts.LibraryIndex,
 			TextVariables:              payload.TextVariables,
@@ -722,7 +724,21 @@ func applyOperation(builder *designapi.Builder, op Operation, opts ApplyOptions)
 			if pad.Net != nil {
 				net = *pad.Net
 			}
-			pads = append(pads, designapi.PadSpec{Name: pad.Name, Type: pad.Type, Shape: pad.Shape, Offset: point(pad.XMM, pad.YMM), Rotation: kicadfiles.Angle(pad.RotationDeg), Size: padSize(pad), Drill: kicadfiles.MM(pad.DrillMM), Net: net})
+			var layers []kicadfiles.BoardLayer
+			if len(pad.Layers) > 0 {
+				layers = importedPadLayers(pad, boardLayer(payload.Layer))
+			}
+			pads = append(pads, designapi.PadSpec{
+				Name:     pad.Name,
+				Type:     pad.Type,
+				Shape:    pad.Shape,
+				Offset:   point(pad.XMM, pad.YMM),
+				Rotation: kicadfiles.Angle(pad.RotationDeg),
+				Size:     padSize(pad),
+				Drill:    kicadfiles.MM(pad.DrillMM),
+				Layers:   layers,
+				Net:      net,
+			})
 		}
 		placeOptions := designapi.PlaceFootprintOptions{
 			Position:                      point(payload.At.XMM, payload.At.YMM),
@@ -1071,6 +1087,13 @@ func padLayersFor(padType string, footprintLayer kicadfiles.BoardLayer) []kicadf
 }
 
 func importedPadLayers(spec PadSpec, footprintLayer kicadfiles.BoardLayer) []kicadfiles.BoardLayer {
+	switch strings.TrimSpace(spec.Type) {
+	case "thru_hole", "np_thru_hole":
+		// KiCad requires drilled pads to span through copper and mask layers.
+		// Hydrated transaction geometry may retain only the electrical copper
+		// layers, so canonicalize the serialization-only mask complement here.
+		return padLayersFor(spec.Type, footprintLayer)
+	}
 	if len(spec.Layers) == 0 {
 		return padLayersFor(firstNonEmpty(spec.Type, "smd"), footprintLayer)
 	}

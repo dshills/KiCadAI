@@ -13,17 +13,18 @@ import (
 )
 
 const (
-	CodeSchemaInvalid        reports.Code = "ARCHITECTURE_SCHEMA_INVALID"
-	CodeLimitExceeded        reports.Code = "ARCHITECTURE_LIMIT_EXCEEDED"
-	CodeIdentityDuplicate    reports.Code = "ARCHITECTURE_IDENTITY_DUPLICATE"
-	CodeDomainInvalid        reports.Code = "ARCHITECTURE_DOMAIN_INVALID"
-	CodePortInvalid          reports.Code = "ARCHITECTURE_PORT_INVALID"
-	CodeSignalInvalid        reports.Code = "ARCHITECTURE_SIGNAL_INVALID"
-	CodeBindingUnresolved    reports.Code = "ARCHITECTURE_BINDING_UNRESOLVED"
-	CodeConstraintInvalid    reports.Code = "ARCHITECTURE_CONSTRAINT_INVALID"
-	CodeAcceptanceInvalid    reports.Code = "ARCHITECTURE_ACCEPTANCE_INVALID"
-	CodeOperatingCaseInvalid reports.Code = "ARCHITECTURE_OPERATING_CASE_INVALID"
-	CodeBehaviorInvalid      reports.Code = "ARCHITECTURE_BEHAVIOR_INVALID"
+	CodeSchemaInvalid         reports.Code = "ARCHITECTURE_SCHEMA_INVALID"
+	CodeLimitExceeded         reports.Code = "ARCHITECTURE_LIMIT_EXCEEDED"
+	CodeIdentityDuplicate     reports.Code = "ARCHITECTURE_IDENTITY_DUPLICATE"
+	CodeDomainInvalid         reports.Code = "ARCHITECTURE_DOMAIN_INVALID"
+	CodePortInvalid           reports.Code = "ARCHITECTURE_PORT_INVALID"
+	CodeSignalInvalid         reports.Code = "ARCHITECTURE_SIGNAL_INVALID"
+	CodeBindingUnresolved     reports.Code = "ARCHITECTURE_BINDING_UNRESOLVED"
+	CodeConstraintInvalid     reports.Code = "ARCHITECTURE_CONSTRAINT_INVALID"
+	CodeAcceptanceInvalid     reports.Code = "ARCHITECTURE_ACCEPTANCE_INVALID"
+	CodeOperatingCaseInvalid  reports.Code = "ARCHITECTURE_OPERATING_CASE_INVALID"
+	CodeOperatingEventInvalid reports.Code = "ARCHITECTURE_OPERATING_EVENT_INVALID"
+	CodeBehaviorInvalid       reports.Code = "ARCHITECTURE_BEHAVIOR_INVALID"
 )
 
 var semanticIDPattern = regexp.MustCompile(`^[a-z][a-z0-9_]{0,63}$`)
@@ -60,6 +61,7 @@ type requirementValidator struct {
 	portsByID        map[string]Port
 	signalsByID      map[string]Signal
 	participantsByID map[string]Participant
+	eventsByID       map[string]string
 }
 
 func (validator *requirementValidator) add(code reports.Code, path, message string) {
@@ -71,8 +73,9 @@ func (validator *requirementValidator) header() {
 	v2 := validator.requirement.Schema == SchemaIDV2 && validator.requirement.Version == VersionV2
 	v3 := validator.requirement.Schema == SchemaIDV3 && validator.requirement.Version == VersionV3
 	v4 := validator.requirement.Schema == SchemaIDV4 && validator.requirement.Version == VersionV4
-	if !v1 && !v2 && !v3 && !v4 {
-		validator.add(CodeSchemaInvalid, "schema", fmt.Sprintf("schema/version must be %q/%d, %q/%d, %q/%d, or %q/%d", SchemaID, Version, SchemaIDV2, VersionV2, SchemaIDV3, VersionV3, SchemaIDV4, VersionV4))
+	v5 := validator.requirement.Schema == SchemaIDV5 && validator.requirement.Version == VersionV5
+	if !v1 && !v2 && !v3 && !v4 && !v5 {
+		validator.add(CodeSchemaInvalid, "schema", fmt.Sprintf("schema/version must be %q/%d, %q/%d, %q/%d, %q/%d, or %q/%d", SchemaID, Version, SchemaIDV2, VersionV2, SchemaIDV3, VersionV3, SchemaIDV4, VersionV4, SchemaIDV5, VersionV5))
 	}
 	project := validator.requirement.Project
 	if !validSemanticID(project.Name) {
@@ -345,6 +348,7 @@ func (validator *requirementValidator) objectives() {
 
 func (validator *requirementValidator) operatingCases() {
 	cases := validator.requirement.Requirements.OperatingCases
+	validator.eventsByID = map[string]string{}
 	if !supportsBehavioralVerification(validator.requirement.Version) {
 		if len(cases) != 0 || len(validator.requirement.Requirements.BehavioralRequirements) != 0 {
 			validator.add(CodeSchemaInvalid, "requirements", "operating_cases and behavioral_requirements require the v3 or v4 schema")
@@ -378,26 +382,77 @@ func (validator *requirementValidator) operatingCases() {
 			seenConditions[key] = true
 			validator.operatingCondition(conditionPath, condition)
 		}
+		if !supportsDynamicVerification(validator.requirement.Version) {
+			if len(operatingCase.Events) != 0 {
+				validator.add(CodeSchemaInvalid, path+".events", "operating events require the v5 schema")
+			}
+			continue
+		}
+		validator.limit(path+".events", len(operatingCase.Events), MaxCaseEvents)
+		if len(operatingCase.Events) == 0 {
+			validator.add(CodeOperatingEventInvalid, path+".events", "v5 operating case requires at least one event")
+		}
+		for eventIndex, event := range operatingCase.Events {
+			eventPath := fmt.Sprintf("%s.events[%d]", path, eventIndex)
+			if previousCase, exists := validator.eventsByID[event.ID]; exists {
+				validator.add(CodeIdentityDuplicate, eventPath+".id", "event id is duplicated in operating case "+previousCase)
+			} else {
+				validator.eventsByID[event.ID] = operatingCase.ID
+			}
+			validator.operatingEvent(eventPath, event)
+		}
+	}
+	validator.limit("requirements.operating_cases.events", len(validator.eventsByID), MaxOperatingEvents)
+}
+
+func (validator *requirementValidator) operatingEvent(path string, event OperatingEvent) {
+	if !validSemanticID(event.ID) {
+		validator.add(CodeOperatingEventInvalid, path+".id", "event id must be a normalized semantic identifier")
+	}
+	if !slices.Contains(registeredOperatingEventKinds, event.Kind) {
+		validator.add(CodeOperatingEventInvalid, path+".kind", "unsupported operating event kind")
+	}
+	validator.behaviorObservation(path+".target", event.Target)
+	if event.Target.Kind == "event" {
+		validator.add(CodeOperatingEventInvalid, path+".target.kind", "an operating event cannot target another event")
+	}
+	if !finiteInRange(event.TriggerTimeS, 0, 1e6) {
+		validator.add(CodeOperatingEventInvalid, path+".trigger_time_s", "event trigger time must be finite, nonnegative, and bounded")
+	}
+	if !finiteInRange(event.DurationS, 1e-12, 1e6) {
+		validator.add(CodeOperatingEventInvalid, path+".duration_s", "event duration must be finite, positive, and bounded")
+	}
+	if event.Applied == nil {
+		validator.add(CodeOperatingEventInvalid, path+".applied", "event applied value is required")
+	}
+	validator.optionalNumber(CodeOperatingEventInvalid, path+".initial", event.Initial, -1e15, 1e15)
+	validator.optionalNumber(CodeOperatingEventInvalid, path+".applied", event.Applied, -1e15, 1e15)
+	validator.optionalNumber(CodeOperatingEventInvalid, path+".recovered", event.Recovered, -1e15, 1e15)
+	if !eventKindAllowsUnit(event.Kind, event.Unit) {
+		validator.add(CodeOperatingEventInvalid, path+".unit", "event kind does not support canonical unit "+event.Unit)
 	}
 }
 
 func (validator *requirementValidator) operatingCondition(path string, condition OperatingCondition) {
-	expectedUnit, selectionAxis := operatingAxisContract(condition.Axis)
+	expectedUnit, selectionAxis := operatingAxisContractForVersion(condition.Axis, validator.requirement.Version)
 	if expectedUnit == "" && !selectionAxis {
 		validator.add(CodeOperatingCaseInvalid, path+".axis", "unsupported operating condition axis")
 		return
 	}
-	if !validator.semanticTargetExists(condition.Target) {
-		validator.add(CodeBindingUnresolved, path+".target", "operating condition references an unknown semantic target")
-	}
 	if selectionAxis {
+		if !validator.operatingSelectionTargetExists(condition.Axis, condition.Target) {
+			validator.add(CodeBindingUnresolved, path+".target", "operating condition references an unknown semantic or aggregate target")
+		}
 		if condition.Min != nil || condition.Max != nil || condition.Unit != "" {
 			validator.add(CodeOperatingCaseInvalid, path, "selection corner axes cannot declare numeric bounds or units")
 		}
-		if condition.Selection != "all" && condition.Selection != "nominal" && condition.Selection != "minimum" && condition.Selection != "maximum" {
-			validator.add(CodeOperatingCaseInvalid, path+".selection", "corner selection must be all, nominal, minimum, or maximum")
+		if !validOperatingSelection(condition.Axis, condition.Selection) {
+			validator.add(CodeOperatingCaseInvalid, path+".selection", "corner selection is unsupported for this operating axis")
 		}
 		return
+	}
+	if !validator.semanticTargetExists(condition.Target) {
+		validator.add(CodeBindingUnresolved, path+".target", "operating condition references an unknown semantic target")
 	}
 	if condition.Selection != "" {
 		validator.add(CodeOperatingCaseInvalid, path+".selection", "numeric operating axes cannot declare a corner selection")
@@ -412,6 +467,25 @@ func (validator *requirementValidator) operatingCondition(path string, condition
 	validator.optionalNumber(CodeOperatingCaseInvalid, path+".max", condition.Max, -1e15, 1e15)
 	if condition.Min != nil && condition.Max != nil && *condition.Min > *condition.Max {
 		validator.add(CodeOperatingCaseInvalid, path, "operating condition minimum exceeds maximum")
+	}
+}
+
+func (validator *requirementValidator) operatingSelectionTargetExists(axis, target string) bool {
+	if validator.semanticTargetExists(target) {
+		return true
+	}
+	return axis == "tolerance" && (target == "all_components" || target == "all_passives")
+}
+
+func validOperatingSelection(axis, selection string) bool {
+	switch axis {
+	case "cooling_mode":
+		return selection == "all" || selection == "nominal" || selection == "blocked_airflow"
+	case "tolerance":
+		return selection == "all" || selection == "nominal" || selection == "minimum" ||
+			selection == "maximum" || selection == "minimum_nominal_maximum"
+	default:
+		return selection == "all" || selection == "nominal" || selection == "minimum" || selection == "maximum"
 	}
 }
 
@@ -437,7 +511,7 @@ func (validator *requirementValidator) behavioralRequirements() {
 			validator.add(CodeIdentityDuplicate, path+".id", "behavioral requirement id is duplicated")
 		}
 		seen[behavior.ID] = true
-		expectedAnalysis, expectedUnit, knownMetric := behavioralMetricContract(behavior.Metric)
+		expectedAnalysis, expectedUnit, knownMetric := behavioralMetricContractForVersion(behavior.Metric, validator.requirement.Version)
 		if !knownMetric {
 			validator.add(CodeBehaviorInvalid, path+".metric", "unsupported behavioral metric")
 		} else {
@@ -467,6 +541,8 @@ func (validator *requirementValidator) behavioralRequirements() {
 				validator.add(CodeBindingUnresolved, casePath, "behavioral requirement references an unknown operating case")
 			} else if seenCases[caseID] {
 				validator.add(CodeIdentityDuplicate, casePath, "behavioral operating case is duplicated")
+			} else if behavior.Observation.Kind == "event" && validator.eventsByID[behavior.Observation.ID] != caseID {
+				validator.add(CodeBindingUnresolved, casePath, "event observation must be evaluated in the operating case that declares the event")
 			}
 			seenCases[caseID] = true
 		}
@@ -491,8 +567,14 @@ func (validator *requirementValidator) behaviorObservation(path string, observat
 		if observation.ID != "circuit" {
 			validator.add(CodeBehaviorInvalid, path+".id", "whole-circuit observation id must be circuit")
 		}
+	case "event":
+		if !supportsDynamicVerification(validator.requirement.Version) {
+			validator.add(CodeBehaviorInvalid, path+".kind", "event observations require the v5 schema")
+		} else if _, exists := validator.eventsByID[observation.ID]; !exists {
+			validator.add(CodeBindingUnresolved, path+".id", "behavior observation references an unknown event")
+		}
 	default:
-		validator.add(CodeBehaviorInvalid, path+".kind", "observation kind must be port, signal, domain, or circuit")
+		validator.add(CodeBehaviorInvalid, path+".kind", "observation kind must be port, signal, domain, circuit, or event")
 	}
 }
 
@@ -512,8 +594,12 @@ func (validator *requirementValidator) semanticTargetExists(target string) bool 
 
 func (validator *requirementValidator) boardLimits() {
 	limits := validator.requirement.Requirements.Constraints
-	if limits.MaxComponents <= 0 || limits.MaxComponents > MaxComponents {
-		validator.add(CodeLimitExceeded, "requirements.constraints.max_components", fmt.Sprintf("max_components must be between 1 and %d", MaxComponents))
+	maximumComponents := MaxComponents
+	if validator.requirement.Version == VersionV5 {
+		maximumComponents = MaxComponentsV5
+	}
+	if limits.MaxComponents <= 0 || limits.MaxComponents > maximumComponents {
+		validator.add(CodeLimitExceeded, "requirements.constraints.max_components", fmt.Sprintf("max_components must be between 1 and %d", maximumComponents))
 	}
 	if !finiteInRange(limits.MaxWidthMM, 0.01, MaxBoardDimensionMM) {
 		validator.add(CodeLimitExceeded, "requirements.constraints.max_width_mm", "max_width_mm must be finite, positive, and within policy bounds")
@@ -581,7 +667,7 @@ func (validator *requirementValidator) acceptance() {
 			}{"require_closed_loop_evidence", acceptance.RequireClosedLoopEvidence},
 		)
 	}
-	if validator.requirement.Version == VersionV4 {
+	if validator.requirement.Version == VersionV4 || validator.requirement.Version == VersionV5 {
 		required = append(required,
 			struct {
 				path  string
@@ -609,6 +695,34 @@ func (validator *requirementValidator) acceptance() {
 			}{"require_end_to_end_traceability", acceptance.RequireEndToEndTraceability},
 		)
 	}
+	if supportsDynamicVerification(validator.requirement.Version) {
+		required = append(required,
+			struct {
+				path  string
+				value bool
+			}{"require_dynamic_model_provenance", acceptance.RequireDynamicModelProvenance},
+			struct {
+				path  string
+				value bool
+			}{"require_return_ratio_evidence", acceptance.RequireReturnRatioEvidence},
+			struct {
+				path  string
+				value bool
+			}{"require_dynamic_electrothermal_evidence", acceptance.RequireDynamicElectrothermalEvidence},
+			struct {
+				path  string
+				value bool
+			}{"require_event_coverage", acceptance.RequireEventCoverage},
+			struct {
+				path  string
+				value bool
+			}{"require_dynamic_architecture_selection", acceptance.RequireDynamicArchitectureSelection},
+			struct {
+				path  string
+				value bool
+			}{"require_bounded_dynamic_repair", acceptance.RequireBoundedDynamicRepair},
+		)
+	}
 	for _, gate := range required {
 		if !gate.value {
 			validator.add(CodeAcceptanceInvalid, "acceptance."+gate.path, "open-set schema requires this fail-closed acceptance gate")
@@ -630,7 +744,7 @@ func (validator *requirementValidator) constraints(path string, constraints []Co
 		if !allowedRelation(constraint.Relation) {
 			validator.add(CodeConstraintInvalid, constraintPath+".relation", "unsupported constraint relation")
 		}
-		if constraint.Unit != "" && !allowedUnit(constraint.Unit) {
+		if constraint.Unit != "" && !allowedUnitForVersion(constraint.Unit, validator.requirement.Version) {
 			validator.add(CodeConstraintInvalid, constraintPath+".unit", "unsupported or non-canonical unit")
 		}
 		if constraint.TolerancePercent != nil {
@@ -654,7 +768,15 @@ func (validator *requirementValidator) constraintValue(path string, constraint C
 	}
 	switch constraint.Relation {
 	case "required":
-		if required, ok := value.(bool); !ok || !required {
+		if required, ok := value.(bool); ok && required {
+			break
+		}
+		if validator.requirement.Version == VersionV5 {
+			if required, ok := value.(string); ok && validSemanticID(required) {
+				break
+			}
+		}
+		{
 			validator.add(CodeConstraintInvalid, path, "required relation must have boolean value true")
 		}
 	case "range":
@@ -779,12 +901,20 @@ func allowedUnit(value string) bool {
 	return slices.Contains(registeredCanonicalUnits, value)
 }
 
+func allowedUnitForVersion(value string, version int) bool {
+	return allowedUnit(value) || (version == VersionV5 && slices.Contains(registeredDynamicCanonicalUnits, value))
+}
+
 func supportsTypedSignals(version int) bool {
-	return version == VersionV2 || version == VersionV3 || version == VersionV4
+	return version == VersionV2 || version == VersionV3 || version == VersionV4 || version == VersionV5
 }
 
 func supportsBehavioralVerification(version int) bool {
-	return version == VersionV3 || version == VersionV4
+	return version == VersionV3 || version == VersionV4 || version == VersionV5
+}
+
+func supportsDynamicVerification(version int) bool {
+	return version == VersionV5
 }
 
 func validConstraintScalar(value any) bool {

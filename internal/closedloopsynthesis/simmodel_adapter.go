@@ -79,17 +79,16 @@ func (evaluator SimModelEvaluator) Evaluate(ctx context.Context, state Candidate
 	// Provenance is derived after trusted resolution. Any resolver-supplied
 	// decisions are replaced so they cannot become promotion evidence.
 	resolution.ModelDecisions = modelDecisions
-	reports := make([]simmodel.Report, len(plans))
-	for index, plan := range plans {
-		report, diagnostics := simmodel.Evaluate(simmodel.ClonePlan(plan))
-		if len(diagnostics) != 0 && !onlyAssertionFailures(report, diagnostics) {
+	reports, planDiagnostics := evaluateTrustedSimulationPlans(plans)
+	for index, diagnostics := range planDiagnostics {
+		if len(diagnostics) != 0 && !onlyAssertionFailures(reports[index], diagnostics) {
+			plan := plans[index]
 			analysisKinds := make([]string, 0, len(plan.Analyses))
 			for _, analysis := range plan.Analyses {
 				analysisKinds = append(analysisKinds, analysis.Kind)
 			}
 			return Evaluation{}, fmt.Errorf("trusted simulation plan %d (%s: %s) failed: %s", index, plan.ModelID, strings.Join(analysisKinds, ","), joinSimModelDiagnostics(diagnostics))
 		}
-		reports[index] = report
 	}
 	measurements := make([]Measurement, 0, len(resolution.Measurements))
 	for _, link := range resolution.Measurements {
@@ -116,6 +115,18 @@ func (evaluator SimModelEvaluator) Evaluate(ctx context.Context, state Candidate
 	}, nil
 }
 
+func evaluateTrustedSimulationPlans(plans []simmodel.Plan) ([]simmodel.Report, [][]simmodel.Diagnostic) {
+	reports := make([]simmodel.Report, len(plans))
+	diagnostics := make([][]simmodel.Diagnostic, len(plans))
+	// simmodel owns the bounded parallelism for a plan's worst-case corners and
+	// analyses. Evaluating independent plans serially prevents those nested
+	// worker pools from multiplying the CPU and memory work budget.
+	for index := range plans {
+		reports[index], diagnostics[index] = simmodel.Evaluate(simmodel.ClonePlan(plans[index]))
+	}
+	return reports, diagnostics
+}
+
 func validateSimulationResolution(resolution SimulationResolution) []Diagnostic {
 	var diagnostics []Diagnostic
 	plans := resolutionPlans(resolution)
@@ -131,7 +142,6 @@ func validateSimulationResolution(resolution SimulationResolution) []Diagnostic 
 		}
 	}
 	seenBehavior := map[string]bool{}
-	seenAssertion := map[string]bool{}
 	for index, link := range resolution.Measurements {
 		path := fmt.Sprintf("measurements[%d]", index)
 		if strings.TrimSpace(link.RequirementID) == "" || strings.TrimSpace(link.OperatingCase) == "" {
@@ -160,17 +170,12 @@ func validateSimulationResolution(resolution SimulationResolution) []Diagnostic 
 			}
 			previous := -1
 			for _, assertion := range set.Assertions {
-				assertionKey := fmt.Sprintf("%d:%d", set.Plan, assertion)
 				if assertion < 0 || assertion >= len(plans[set.Plan].Assertions) {
 					diagnostics = append(diagnostics, Diagnostic{Path: setPath + ".assertions", Message: "simulation assertion set references an out-of-range assertion"})
 				}
 				if assertion <= previous {
 					diagnostics = append(diagnostics, Diagnostic{Path: setPath + ".assertions", Message: "simulation assertion indices must be unique and canonically ordered"})
 				}
-				if seenAssertion[assertionKey] {
-					diagnostics = append(diagnostics, Diagnostic{Path: setPath + ".assertions", Message: "simulation assertion is mapped more than once"})
-				}
-				seenAssertion[assertionKey] = true
 				previous = assertion
 			}
 			previousPlan = set.Plan
@@ -296,14 +301,28 @@ func worstLinkedAssertion(plan simmodel.Plan, report simmodel.Report, indices []
 		if index < 0 || index >= len(plan.Assertions) || index >= len(report.Assertions) {
 			return simmodel.AssertionResult{}, fmt.Errorf("simulation measurement assertion index %d is outside plan/report bounds %d/%d", index, len(plan.Assertions), len(report.Assertions))
 		}
+		for cornerIndex, corner := range report.Corners {
+			if index >= len(corner.Assertions) {
+				return simmodel.AssertionResult{}, fmt.Errorf("simulation measurement assertion index %d is outside corner %d assertion bounds %d", index, cornerIndex, len(corner.Assertions))
+			}
+		}
 	}
 	worst := report.Assertions[indices[0]]
 	worstMargin := linkedAssertionMargin(plan.Assertions[indices[0]], worst.Actual)
-	for _, index := range indices[1:] {
-		candidate := report.Assertions[index]
-		margin := linkedAssertionMargin(plan.Assertions[index], candidate.Actual)
-		if margin < worstMargin {
-			worst, worstMargin = candidate, margin
+	for _, index := range indices {
+		if index != indices[0] {
+			candidate := report.Assertions[index]
+			margin := linkedAssertionMargin(plan.Assertions[index], candidate.Actual)
+			if margin < worstMargin {
+				worst, worstMargin = candidate, margin
+			}
+		}
+		for _, corner := range report.Corners {
+			candidate := corner.Assertions[index]
+			margin := linkedAssertionMargin(plan.Assertions[index], candidate.Actual)
+			if margin < worstMargin {
+				worst, worstMargin = candidate, margin
+			}
 		}
 	}
 	return worst, nil
