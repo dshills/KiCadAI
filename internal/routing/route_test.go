@@ -118,6 +118,23 @@ func TestCrowdedSMDPadViaAccessStaggersAndFitsAdjacentPitch(t *testing.T) {
 	if math.Abs(first[0].SearchPoint.XMM-second[0].SearchPoint.XMM) < 0.5 {
 		t.Fatalf("dogbone columns were not staggered: first=%#v second=%#v", first[0], second[0])
 	}
+	attempts := crowdedSMDPadViaAccessAttempts(adjusted, diameters)
+	if len(attempts) != 4 {
+		t.Fatalf("crowded access attempts = %d, want preferred plus three bounded alternate combinations", len(attempts))
+	}
+	for attemptIndex, attempt := range attempts {
+		for _, endpoint := range endpoints {
+			points, ok := AccessPointsForEndpoint(attempt, endpoint)
+			if !ok || len(points) != 1 {
+				t.Fatalf("attempt %d endpoint %#v access = %#v", attemptIndex, endpoint, points)
+			}
+		}
+	}
+	preferredFirst, _ := AccessPointsForEndpoint(attempts[0], endpoints[0])
+	preferredSecond, _ := AccessPointsForEndpoint(attempts[0], endpoints[1])
+	if *preferredFirst[0].SearchPoint != *first[0].SearchPoint || *preferredSecond[0].SearchPoint != *second[0].SearchPoint {
+		t.Fatalf("first attempt did not retain deterministic stagger: %#v", attempts[0])
+	}
 	rules := crowdedEndpointViaRules(request.Rules, diameters)
 	if math.Abs(rules.ViaDiameterMM-0.4) > 1e-9 || math.Abs(rules.ViaDrillMM-0.2) > 1e-9 {
 		t.Fatalf("crowded endpoint via rules = %#v, want trace-derived 0.4/0.2mm after physical clearance proof", rules)
@@ -777,6 +794,35 @@ func TestAutomaticEndpointNeckdownAppliesToWideCurrentCarryingNets(t *testing.T)
 		if rules.NeckdownWidthMM != 0.25 || rules.NeckdownLengthMM != pcbrules.DefaultPowerNeckdownLengthMM {
 			t.Fatalf("role %s rules = %#v", role, rules)
 		}
+	}
+}
+
+func TestCrowdedPowerPadTriggersAutomaticEndpointNeckdownAtNominalWidth(t *testing.T) {
+	request := minimalRequest()
+	request.Board.Layers = []Layer{
+		{Name: "F.Cu", Kind: LayerCopper, Routable: true},
+		{Name: "B.Cu", Kind: LayerCopper, Routable: true},
+	}
+	request.Rules.GridMM = 0.25
+	request.Rules.TraceWidthMM = 0.3
+	request.Rules.ClearanceMM = 0.2
+	request.Rules.ViaDiameterMM = 0.7
+	request.Rules.MaxViasPerNet = 2
+	request.Components = []Component{{
+		Ref: "U1", Position: Placement{XMM: 10, YMM: 10, Layer: "F.Cu"},
+		Pads: []Pad{
+			{Ref: "U1", Name: "1", Net: "POWER", Position: Point{XMM: 2, YMM: 0}, Shape: PadRect, Type: PadSMD, Size: Size{WidthMM: 1.45, HeightMM: 0.3}, Layers: []string{"F.Cu"}},
+			{Ref: "U1", Name: "2", Net: "OTHER", Position: Point{XMM: 2, YMM: 0.5}, Shape: PadRect, Type: PadSMD, Size: Size{WidthMM: 1.45, HeightMM: 0.3}, Layers: []string{"F.Cu"}},
+		},
+	}}
+	net := Net{Name: "POWER", Role: NetPower, Endpoints: []Endpoint{{Ref: "U1", Pin: "1"}}}
+
+	if !netHasNarrowEndpoint(request, net) {
+		t.Fatal("crowded nominal-width power pad did not request endpoint neckdown")
+	}
+	rules := applyAutomaticEndpointNeckdown(request.Rules, net.Role, netHasNarrowEndpoint(request, net))
+	if rules.NeckdownWidthMM != pcbrules.DefaultPowerNeckdownWidthMM {
+		t.Fatalf("crowded endpoint neckdown = %#v", rules)
 	}
 }
 

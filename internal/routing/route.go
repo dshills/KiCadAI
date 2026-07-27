@@ -146,8 +146,14 @@ func RouteRequestContext(ctx context.Context, request Request) Result {
 			}
 			pairAccess := netAccess
 			var forcedEndpointVias map[endpointID]float64
+			var crowdedAccessAlternates []PadAccess
 			if constrainedEndpointAccess {
 				pairAccess, forcedEndpointVias = applyCrowdedSMDPadViaAccess(netAccess, searchRequest, []Endpoint{pair.From, pair.To})
+				if len(forcedEndpointVias) != 0 {
+					candidates := crowdedSMDPadViaAccessAttempts(pairAccess, forcedEndpointVias)
+					pairAccess = candidates[0]
+					crowdedAccessAlternates = candidates[1:]
+				}
 			}
 			pairAccess = filterPhysicalEndpointAccess(pairAccess, searchRequest, plan.Net.Name, []Endpoint{pair.From, pair.To})
 			pairRequest := searchRequest
@@ -167,6 +173,24 @@ func RouteRequestContext(ctx context.Context, request Request) Result {
 			if path.SearchLimitHit {
 				route.SearchLimitHit = true
 				result.Metrics.MaxSearchNodesHit = true
+			}
+			if len(routeIssues) != 0 {
+				for _, alternateAccess := range crowdedAccessAlternates {
+					alternateAccess = filterPhysicalEndpointAccess(alternateAccess, pairRequest, plan.Net.Name, []Endpoint{pair.From, pair.To})
+					alternatePath, alternateIssues := routePairPathWithForcedEndpointVias(ctx, pairRequest, alternateAccess, occupancy, pairViaOccupancy, plan.Net.Name, pair, forcedEndpointVias)
+					route.SearchNodes += alternatePath.SearchNodes
+					result.Metrics.SearchNodes += alternatePath.SearchNodes
+					if alternatePath.SearchLimitHit {
+						route.SearchLimitHit = true
+						result.Metrics.MaxSearchNodesHit = true
+					}
+					path = alternatePath
+					routeIssues = alternateIssues
+					if len(alternateIssues) == 0 {
+						pairAccess = alternateAccess
+						break
+					}
+				}
 			}
 			if len(routeIssues) == 0 {
 				netAccess = pairAccess
@@ -188,9 +212,9 @@ func RouteRequestContext(ctx context.Context, request Request) Result {
 				// route succeeds, endpoint validation narrows each endpoint back to
 				// the single physical access point actually used.
 				netAccess = edgeAccess
+				path = edgePath
+				routeIssues = edgeIssues
 				if len(edgeIssues) == 0 {
-					path = edgePath
-					routeIssues = nil
 					pairUsedCrowdedVias = false
 				}
 			}
@@ -215,12 +239,12 @@ func RouteRequestContext(ctx context.Context, request Request) Result {
 						result.Metrics.SearchNodes += fallbackPath.SearchNodes
 						if len(fallbackIssues) == 0 {
 							path = fallbackPath
-							routeIssues = nil
 							netAccess = fallbackAccess
 							pairUsedCrowdedVias = false
 							neckdownWidthMM = fallbackRequest.Rules.TraceWidthMM
 							neckdownLengthMM = pcbrules.DefaultPowerNeckdownLengthMM
 						}
+						routeIssues = fallbackIssues
 					}
 				}
 			}
@@ -630,6 +654,52 @@ func applyCrowdedSMDPadViaAccess(access PadAccess, request Request, endpoints []
 		return access, nil
 	}
 	return adjusted, forced
+}
+
+func crowdedSMDPadViaAccessAttempts(access PadAccess, forced map[endpointID]float64) []PadAccess {
+	keys := make([]endpointID, 0, len(forced))
+	for key := range forced {
+		keys = append(keys, key)
+	}
+	sort.Slice(keys, func(i, j int) bool {
+		return endpointLess(
+			Endpoint{Ref: keys[i].Ref, Pin: keys[i].Pin},
+			Endpoint{Ref: keys[j].Ref, Pin: keys[j].Pin},
+		)
+	})
+	alternateKeys := make([]endpointID, 0, len(keys))
+	for _, key := range keys {
+		if len(access.AccessPoints[key]) > 1 {
+			alternateKeys = append(alternateKeys, key)
+		}
+	}
+	// Route planning supplies one endpoint pair, so there are normally at most
+	// two alternate-bearing keys. Retain that hard bound defensively if this
+	// helper is reused with a broader endpoint set.
+	if len(alternateKeys) > 2 {
+		alternateKeys = alternateKeys[:2]
+	}
+	attemptCount := 1 << len(alternateKeys)
+	attempts := make([]PadAccess, 0, attemptCount)
+	for mask := 0; mask < attemptCount; mask++ {
+		candidate := clonePadAccessPoints(access)
+		for _, key := range keys {
+			points := access.AccessPoints[key]
+			if len(points) == 0 {
+				continue
+			}
+			selected := 0
+			for alternateIndex, alternateKey := range alternateKeys {
+				if key == alternateKey && mask&(1<<alternateIndex) != 0 {
+					selected = 1
+					break
+				}
+			}
+			candidate.AccessPoints[key] = []AccessPoint{points[selected]}
+		}
+		attempts = append(attempts, candidate)
+	}
+	return attempts
 }
 
 func prioritizeCrowdedSMDPadPairs(pairs []EndpointPair, request Request) []EndpointPair {
@@ -1047,6 +1117,11 @@ func netHasNarrowEndpoint(request Request, net Net) bool {
 				minimumPadDimensionMM := min(pad.Size.WidthMM, pad.Size.HeightMM)
 				if minimumPadDimensionMM > 0 && minimumPadDimensionMM+distanceEpsilon < request.Rules.TraceWidthMM {
 					return true
+				}
+				if len(routableLayerNames(request.Board.Layers)) >= 2 && request.Rules.MaxViasPerNet >= 2 {
+					if _, _, crowded := crowdedSMDPadViaAccessPoints(component, pad, request); crowded {
+						return true
+					}
 				}
 			}
 		}

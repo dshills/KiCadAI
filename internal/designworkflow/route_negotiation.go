@@ -56,7 +56,7 @@ func routeWithFailedNetFirstNegotiationUsing(ctx context.Context, request routin
 		stateIndex := bestRouteNegotiationStateIndex(frontier)
 		state := frontier[stateIndex]
 		frontier = append(frontier[:stateIndex], frontier[stateIndex+1:]...)
-		for _, netName := range blockingRoutingIssueNets(state.result.Issues, request.Nets) {
+		for _, netName := range routeNegotiationCandidateNets(state.result, request.Nets) {
 			if summary.Attempts >= attemptLimit || ctx != nil && ctx.Err() != nil {
 				break
 			}
@@ -106,6 +106,38 @@ func routeWithFailedNetFirstNegotiationUsing(ctx context.Context, request routin
 	summary.SearchLimitedNets = sortedSearchLimitedNets(searchLimited)
 	summary.SelectedNetOrder = routeResultNetOrder(best)
 	return best, summary
+}
+
+func routeNegotiationCandidateNets(result routing.Result, nets []routing.Net) []string {
+	candidates := blockingRoutingIssueNets(result.Issues, nets)
+	known := make(map[string]string, len(nets))
+	for _, net := range nets {
+		known[interBlockSummaryNetKey(net.Name)] = net.Name
+	}
+	seen := make(map[string]struct{}, len(candidates))
+	for _, netName := range candidates {
+		seen[interBlockSummaryNetKey(netName)] = struct{}{}
+	}
+	// A route that eventually succeeds only after exhausting its search budget
+	// is also direct evidence of an unstable sequential ordering. Trying that
+	// net earlier can select a compact path before it becomes a blocker for the
+	// net that ultimately fails.
+	for _, route := range result.Routes {
+		if !route.SearchLimitHit {
+			continue
+		}
+		key := interBlockSummaryNetKey(route.Net)
+		netName, ok := known[key]
+		if !ok {
+			continue
+		}
+		if _, exists := seen[key]; exists {
+			continue
+		}
+		seen[key] = struct{}{}
+		candidates = append(candidates, netName)
+	}
+	return candidates
 }
 
 func failedNetFirstNegotiationAttemptLimit(request routing.Request) int {

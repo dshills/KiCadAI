@@ -2,6 +2,7 @@ package designworkflow
 
 import (
 	"context"
+	"slices"
 	"testing"
 
 	"kicadai/internal/reports"
@@ -56,6 +57,40 @@ func TestFailedNetNegotiationExpandsExhaustedSearchBudgetOnce(t *testing.T) {
 	result, summary := routeWithFailedNetFirstNegotiationUsing(context.Background(), request, route)
 	if result.Status != routing.StatusRouted || calls != 3 || summary.Attempts != 3 {
 		t.Fatalf("result=%#v calls=%d summary=%#v", result, calls, summary)
+	}
+}
+
+func TestFailedNetNegotiationPromotesSuccessfulSearchLimitedBlocker(t *testing.T) {
+	request := routing.Request{
+		Rules: routing.Rules{MaxSearchNodes: 100},
+		Nets:  []routing.Net{{Name: "A"}, {Name: "B"}, {Name: "C"}},
+	}
+	calls := 0
+	route := func(_ context.Context, candidate routing.Request) routing.Result {
+		calls++
+		for _, net := range candidate.Nets {
+			if net.Name == "B" && net.OrderFirst {
+				return routing.Result{Status: routing.StatusRouted, Metrics: routing.Metrics{RoutedNetCount: 3}}
+			}
+		}
+		return routing.Result{
+			Status: routing.StatusPartial,
+			Routes: []routing.Route{
+				{Net: "A", Status: routing.RouteStatusRouted},
+				{Net: "B", Status: routing.RouteStatusRouted, SearchLimitHit: true},
+				{Net: "C", Status: routing.RouteStatusFailed},
+			},
+			Metrics: routing.Metrics{RoutedNetCount: 2, FailedNetCount: 1, MaxSearchNodesHit: true},
+			Issues:  []reports.Issue{{Severity: reports.SeverityBlocked, Nets: []string{"C"}}},
+		}
+	}
+
+	result, summary := routeWithFailedNetFirstNegotiationUsing(context.Background(), request, route)
+	if result.Status != routing.StatusRouted || calls != 3 || summary.Attempts != 3 {
+		t.Fatalf("result=%#v calls=%d summary=%#v", result, calls, summary)
+	}
+	if !slices.Contains(summary.PromotedNets, "B") {
+		t.Fatalf("promoted nets = %#v, want search-limited blocker B", summary.PromotedNets)
 	}
 }
 
