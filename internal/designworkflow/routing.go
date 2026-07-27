@@ -1380,7 +1380,7 @@ func canceledRoutingStageResult(ctx context.Context) (RoutingStageResult, bool) 
 }
 
 func postProcessRouteOperations(operations []transactions.Operation, placed *PlacementStageResult, physical physicalPadRoutingContext, physicalEvidence InterBlockContactEvidence) ([]transactions.Operation, []reports.Issue) {
-	operations, _ = dedupeSameNetRouteViasWithEvidence(operations)
+	operations, _, _ = dedupeSameNetRouteViasWithEvidence(operations)
 	operations, viaReducedRoutes, issues := removeRedundantRouteViasAtPlatedPadsWithContext(operations, placed, physical)
 	if viaReducedRoutes == nil {
 		viaReducedRoutes = map[int]struct{}{}
@@ -1644,7 +1644,9 @@ type routeLayerJunction struct {
 // ensureRouteLayerJunctionVias closes the transaction-level gap between route
 // phases. If same-net copper from multiple layers meets at one exact route
 // vertex, KiCad requires a plated transition unless a plated pad provides it.
-// The caller may remove redundant vias at plated pads after this pass.
+// The caller may remove redundant vias at plated pads after this pass. The
+// returned count is the net number of materialized junction vias retained after
+// nearby same-net transitions are merged for emitted hole clearance.
 func ensureRouteLayerJunctionVias(operations []transactions.Operation, rules routing.Rules) ([]transactions.Operation, int, []reports.Issue) {
 	decoded := decodeRouteOperations(operations)
 	contactRoutesByNet, _ := decodeInterBlockRouteOperationsFromDecoded(decoded)
@@ -1786,9 +1788,15 @@ func ensureRouteLayerJunctionVias(operations []transactions.Operation, rules rou
 			continue
 		}
 		repaired[operationIndex].Raw = raw
+		decoded[operationIndex].operation.Raw = raw
+		decoded[operationIndex].payload = payload
 		added += len(viasByOperation[operationIndex])
 	}
-	return repaired, added, issues
+	if added == 0 {
+		return repaired, 0, issues
+	}
+	repaired, _, removed := dedupeSameNetRouteViasDecoded(repaired, decoded)
+	return repaired, max(0, added-removed), issues
 }
 
 func routeLayerJunctionAlreadyConnected(junction *routeLayerJunction, graph interBlockContactGraph) bool {
@@ -5488,19 +5496,23 @@ func transactionRouteOperations(operations []routing.Operation) []transactions.O
 }
 
 func dedupeSameNetRouteVias(operations []transactions.Operation) []transactions.Operation {
-	out, _ := dedupeSameNetRouteViasWithEvidence(operations)
+	out, _, _ := dedupeSameNetRouteViasWithEvidence(operations)
 	return out
 }
 
-func dedupeSameNetRouteViasWithEvidence(operations []transactions.Operation) ([]transactions.Operation, map[int]struct{}) {
+func dedupeSameNetRouteViasWithEvidence(operations []transactions.Operation) ([]transactions.Operation, map[int]struct{}, int) {
 	if len(operations) == 0 {
-		return nil, nil
+		return nil, nil, 0
 	}
-	routes := decodeRouteOperations(operations)
+	return dedupeSameNetRouteViasDecoded(operations, decodeRouteOperations(operations))
+}
+
+func dedupeSameNetRouteViasDecoded(operations []transactions.Operation, routes []decodedRouteOperation) ([]transactions.Operation, map[int]struct{}, int) {
 	snapPoints := sameNetViaSnapPoints(routes)
 	seen := map[routeViaPointKey]struct{}{}
 	out := make([]transactions.Operation, 0, len(operations))
 	reduced := map[int]struct{}{}
+	removed := 0
 	for operationIndex, route := range routes {
 		operation := route.operation
 		if !route.decoded {
@@ -5527,6 +5539,7 @@ func dedupeSameNetRouteViasWithEvidence(operations []transactions.Operation) ([]
 			key := sameNetViaPointKey(payload.NetName, via.At, via.Layers)
 			if _, exists := seen[key]; exists {
 				changed = true
+				removed++
 				continue
 			}
 			seen[key] = struct{}{}
@@ -5551,7 +5564,7 @@ func dedupeSameNetRouteViasWithEvidence(operations []transactions.Operation) ([]
 		}
 		out = append(out, operation)
 	}
-	return out, reduced
+	return out, reduced, removed
 }
 
 type decodedRouteOperation struct {

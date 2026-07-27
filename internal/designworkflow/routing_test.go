@@ -110,6 +110,41 @@ func TestEnsureRouteLayerJunctionViasCompletesSameNetLayerTransition(t *testing.
 	}
 }
 
+func TestEnsureRouteLayerJunctionViasMergesNearbySameNetTransition(t *testing.T) {
+	existingVia := transactions.Point{XMM: 4.25, YMM: 2}
+	junction := transactions.Point{XMM: 4, YMM: 2}
+	operations := []transactions.Operation{
+		mustRouteOperation(t, transactions.RouteOperation{
+			Op: transactions.OpRoute, NetName: "SIG",
+			Vias: []transactions.RouteViaSpec{{
+				At: existingVia, DiameterMM: 0.6, DrillMM: 0.3,
+				Layers: []string{"F.Cu", "In2.Cu"},
+			}},
+		}),
+		mustRouteOperation(t, transactions.RouteOperation{
+			Op: transactions.OpRoute, NetName: "SIG", Layer: "In1.Cu", WidthMM: 0.2,
+			Points: []transactions.Point{{XMM: 1, YMM: 2}, junction},
+		}),
+		mustRouteOperation(t, transactions.RouteOperation{
+			Op: transactions.OpRoute, NetName: "SIG", Layer: "F.Cu", WidthMM: 0.2,
+			Points: []transactions.Point{junction, {XMM: 7, YMM: 2}},
+		}),
+	}
+
+	repaired, added, issues := ensureRouteLayerJunctionVias(operations, routing.Rules{ViaDiameterMM: 0.6, ViaDrillMM: 0.3})
+	if reports.HasBlockingIssue(issues) || added != 0 {
+		t.Fatalf("nearby transition completion added=%d issues=%#v", added, issues)
+	}
+	if got := routeViaCountForRoutingTest(t, repaired, "SIG"); got != 1 {
+		t.Fatalf("SIG via count = %d, want nearby same-net transitions merged", got)
+	}
+	routes := requireRouteOperationsForNet(t, repaired, "SIG")
+	if !pointsNearlyEqual(routes[1].Points[len(routes[1].Points)-1], existingVia) ||
+		!pointsNearlyEqual(routes[2].Points[0], existingVia) {
+		t.Fatalf("layer junction did not move with retained via: %#v", routes)
+	}
+}
+
 func TestEnsureRouteLayerJunctionViasBatchesMultipleTransitionsOnOneOperation(t *testing.T) {
 	operations := []transactions.Operation{
 		mustRouteOperation(t, transactions.RouteOperation{
