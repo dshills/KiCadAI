@@ -15,7 +15,11 @@ import (
 	"kicadai/internal/simmodel"
 )
 
-const maxPersistedAnalysisPoints = 512
+// maxPersistedAnalysisPointsPerReport bounds persisted waveform samples across
+// one report. Reports with more than half this many non-empty analyses retain
+// both endpoints for every analysis, so the effective budget grows only by the
+// minimum needed to preserve those boundaries.
+const maxPersistedAnalysisPointsPerReport = 256
 
 // SimulationResolver is the trusted boundary between a candidate state and a
 // fully resolved simulation plan. Implementations must apply every variable,
@@ -351,16 +355,23 @@ func onlyAssertionFailures(report simmodel.Report, diagnostics []simmodel.Diagno
 
 func simulationEvidenceHash(resolution SimulationResolution, reports []simmodel.Report) (string, error) {
 	for reportIndex := range reports {
-		for analysisIndex := range reports[reportIndex].Analyses {
-			if len(reports[reportIndex].Analyses[analysisIndex].Points) > maxPersistedAnalysisPoints {
-				return "", fmt.Errorf(
-					"reports[%d].analyses[%d].points has %d entries, exceeds canonical persistence limit %d",
-					reportIndex,
-					analysisIndex,
-					len(reports[reportIndex].Analyses[analysisIndex].Points),
-					maxPersistedAnalysisPoints,
-				)
+		pointCount := 0
+		nonEmptyAnalyses := 0
+		for _, analysis := range reports[reportIndex].Analyses {
+			count := len(analysis.Points)
+			pointCount += count
+			if count != 0 {
+				nonEmptyAnalyses++
 			}
+		}
+		pointBudget := max(maxPersistedAnalysisPointsPerReport, 2*nonEmptyAnalyses)
+		if pointCount > pointBudget {
+			return "", fmt.Errorf(
+				"reports[%d].analyses have %d points, exceeds canonical persistence budget %d",
+				reportIndex,
+				pointCount,
+				pointBudget,
+			)
 		}
 	}
 	payload := struct {
@@ -417,11 +428,24 @@ func cloneSimulationReports(source []simmodel.Report) []simmodel.Report {
 	for reportIndex := range source {
 		clone[reportIndex] = simmodel.CloneReportWithAnalysisPointLimit(
 			source[reportIndex],
-			maxPersistedAnalysisPoints,
+			persistedAnalysisPointLimit(source[reportIndex]),
 		)
 		retainAssertionObservables(&clone[reportIndex])
 	}
 	return clone
+}
+
+func persistedAnalysisPointLimit(report simmodel.Report) int {
+	nonEmptyAnalyses := 0
+	for _, analysis := range report.Analyses {
+		if len(analysis.Points) != 0 {
+			nonEmptyAnalyses++
+		}
+	}
+	if nonEmptyAnalyses == 0 {
+		return maxPersistedAnalysisPointsPerReport
+	}
+	return max(2, maxPersistedAnalysisPointsPerReport/nonEmptyAnalyses)
 }
 
 func retainAssertionObservables(report *simmodel.Report) {

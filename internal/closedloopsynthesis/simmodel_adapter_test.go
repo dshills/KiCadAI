@@ -155,8 +155,8 @@ func TestSimulationEvidenceCompactsDenseAnalysesDeterministically(t *testing.T) 
 	}}
 	compact := cloneSimulationReports(reports)
 	got := compact[0].Analyses[0].Points
-	if len(got) != maxPersistedAnalysisPoints {
-		t.Fatalf("persisted points = %d, want %d", len(got), maxPersistedAnalysisPoints)
+	if len(got) != maxPersistedAnalysisPointsPerReport {
+		t.Fatalf("persisted points = %d, want %d", len(got), maxPersistedAnalysisPointsPerReport)
 	}
 	if got[0].TimeS != 0 || got[len(got)-1].TimeS != 1999 {
 		t.Fatalf("persisted point endpoints = %g..%g, want 0..1999", got[0].TimeS, got[len(got)-1].TimeS)
@@ -184,6 +184,50 @@ func TestSimulationEvidenceCompactsDenseAnalysesDeterministically(t *testing.T) 
 	}
 	if tamperedHash == compactHash {
 		t.Fatal("tampered persisted point did not change canonical evidence hash")
+	}
+}
+
+func TestSimulationEvidenceCompactsDenseAnalysesToReportBudgetDeterministically(t *testing.T) {
+	const analysisCount = 20
+	points := make([]simmodel.AnalysisPoint, 2000)
+	for index := range points {
+		points[index] = simmodel.AnalysisPoint{TimeS: float64(index)}
+	}
+	report := simmodel.Report{Analyses: make([]simmodel.AnalysisResult, analysisCount)}
+	for index := range report.Analyses {
+		report.Analyses[index] = simmodel.AnalysisResult{
+			ID:     fmt.Sprintf("transient_%02d", index),
+			Points: points,
+		}
+	}
+
+	compact := cloneSimulationReports([]simmodel.Report{report})
+	wantPerAnalysis := max(2, maxPersistedAnalysisPointsPerReport/analysisCount)
+	totalPoints := 0
+	for index := range compact[0].Analyses {
+		got := compact[0].Analyses[index].Points
+		totalPoints += len(got)
+		if len(got) != wantPerAnalysis {
+			t.Fatalf("analysis %d persisted points = %d, want %d", index, len(got), wantPerAnalysis)
+		}
+		if got[0].TimeS != 0 || got[len(got)-1].TimeS != 1999 {
+			t.Fatalf("analysis %d persisted point endpoints = %g..%g, want 0..1999", index, got[0].TimeS, got[len(got)-1].TimeS)
+		}
+	}
+	if totalPoints > maxPersistedAnalysisPointsPerReport {
+		t.Fatalf("persisted report points = %d, budget %d", totalPoints, maxPersistedAnalysisPointsPerReport)
+	}
+	if _, err := simulationEvidenceHash(SimulationResolution{}, []simmodel.Report{report}); err == nil {
+		t.Fatal("dense multi-analysis report bypassed the canonical persistence boundary")
+	}
+	compactHash, err := simulationEvidenceHash(SimulationResolution{}, compact)
+	if err != nil {
+		t.Fatalf("hash compact multi-analysis report: %v", err)
+	}
+	replayed := cloneSimulationReports([]simmodel.Report{report})
+	replayedHash, err := simulationEvidenceHash(SimulationResolution{}, replayed)
+	if err != nil || replayedHash != compactHash {
+		t.Fatalf("multi-analysis persistence replay hash = %s, %v; want %s", replayedHash, err, compactHash)
 	}
 }
 
