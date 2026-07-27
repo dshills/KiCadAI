@@ -538,6 +538,7 @@ func TestPruneRouteViasWithoutTwoLayerContactRemovesInvalidatedTransition(t *tes
 func TestPruneRouteViasWithoutTwoLayerContactPreservesTransitionsAndPadAccess(t *testing.T) {
 	transitionPoint := transactions.Point{XMM: 5, YMM: 2}
 	padAccessPoint := transactions.Point{XMM: 8, YMM: 4}
+	padCenter := transactions.Point{XMM: 8.5, YMM: 4}
 	operations := []transactions.Operation{
 		mustRouteOperation(t, transactions.RouteOperation{
 			Op: transactions.OpRoute, NetName: "SIG", Layer: "F.Cu", WidthMM: 0.2,
@@ -550,15 +551,15 @@ func TestPruneRouteViasWithoutTwoLayerContactPreservesTransitionsAndPadAccess(t 
 			Op: transactions.OpRoute, NetName: "SIG", Layer: "B.Cu", WidthMM: 0.2,
 			Points: []transactions.Point{transitionPoint, {XMM: 8, YMM: 2}, padAccessPoint},
 			Vias: []transactions.RouteViaSpec{{
-				At: padAccessPoint, DiameterMM: 0.6, DrillMM: 0.3, Layers: []string{"F.Cu", "B.Cu"},
+				At: padAccessPoint, DiameterMM: 0.7, DrillMM: 0.3, Layers: []string{"F.Cu", "B.Cu"},
 			}},
 		}),
 	}
 	physical := physicalPadRoutingContext{
 		valid: true,
 		resolver: PlacedPadEndpointResolver{sorted: []PlacedPadEndpoint{{
-			Ref: "U1", Pad: "1", NetName: "SIG", Point: padAccessPoint,
-			Layer: "F.Cu", Layers: []string{"F.Cu"}, PadWidthMM: 0.5, PadHeightMM: 0.5,
+			Ref: "U1", Pad: "1", NetName: "SIG", Point: padCenter,
+			Layer: "F.Cu", Layers: []string{"F.Cu"}, PadWidthMM: 0.6, PadHeightMM: 0.6,
 		}}},
 	}
 

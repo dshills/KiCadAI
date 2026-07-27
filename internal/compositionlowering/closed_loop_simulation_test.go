@@ -2282,6 +2282,9 @@ func classABDynamicPlanSetForTest(t *testing.T) closedloopsynthesis.FreshSimulat
 }
 
 func TestClassABDynamicPerformancePlansPass(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping exhaustive Class-AB dynamic performance sweep in short mode")
+	}
 	planSet := classABDynamicPlanSetForTest(t)
 	resolution, diagnostics := closedloopsynthesis.CompileSimulationResolution(
 		planSet.AnalysisPlan,

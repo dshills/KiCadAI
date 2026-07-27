@@ -1122,7 +1122,7 @@ func pruneRouteViasWithoutTwoLayerContact(operations []transactions.Operation, p
 			}
 			for _, layer := range via.Layers {
 				layer = canonicalCopperLayer(layer)
-				if layer != "" && routeEndpointContactsSameNetPad(padsByNet[routeNetKey(payload.NetName)], payload.NetName, layer, via.At) {
+				if layer != "" && routeViaContactsSameNetPad(padsByNet[routeNetKey(payload.NetName)], layer, via) {
 					contactLayers[layer] = struct{}{}
 				}
 			}
@@ -2366,6 +2366,28 @@ func routeEndpointContactsSameNetPad(pads []PlacedPadEndpoint, netName, layer st
 		}
 		radius := math.Hypot(math.Max(0, pad.PadWidthMM), math.Max(0, pad.PadHeightMM))/2 + interBlockContactToleranceMM
 		if radius > interBlockContactToleranceMM && pointDistanceMM(endpoint, pad.Point) <= radius {
+			return true
+		}
+	}
+	return false
+}
+
+// routeViaContactsSameNetPad conservatively preserves a via whenever its
+// copper extent can overlap a same-net pad on the requested layer. The pad's
+// circumscribed radius avoids false removals for rotated and non-circular pads;
+// later physical validation remains responsible for exact connectivity.
+func routeViaContactsSameNetPad(pads []PlacedPadEndpoint, layer string, via transactions.RouteViaSpec) bool {
+	viaRadius := math.Max(0, via.DiameterMM) / 2
+	for _, pad := range pads {
+		if !localRoutePadAppliesToLayer(pad, layer) {
+			continue
+		}
+		padRadius := math.Hypot(math.Max(0, pad.PadWidthMM), math.Max(0, pad.PadHeightMM)) / 2
+		if padRadius <= 0 {
+			// Missing physical dimensions are not evidence of pad copper.
+			continue
+		}
+		if pointDistanceMM(via.At, pad.Point) <= padRadius+viaRadius+interBlockContactToleranceMM {
 			return true
 		}
 	}
