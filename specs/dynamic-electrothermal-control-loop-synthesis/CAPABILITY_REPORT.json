@@ -1,0 +1,67 @@
+{
+  "schema": "kicadai.dynamic-electrothermal-control-loop-capability.v1",
+  "source_commit": "a79e7c43143f187784ea1adc0d54f394bad23416",
+  "status": "pass",
+  "summary": {
+    "fixtures": 6,
+    "complete_passes": 6,
+    "dynamic_alternative_selection_cases": 2,
+    "bounded_dynamic_repair_cases": 2
+  },
+  "local_validation": {
+    "full_short_suite": "pass",
+    "protected_usb_kicad_regressions": "pass",
+    "clean_promotion_roots": 2,
+    "scenario_executions_per_root": 2,
+    "bundle_sha256": "7fe88156d7f34d8c40ef62ece3d617b3fa42fc2d42391a0750312f861ec9025c",
+    "bundle_file_count": 418,
+    "normalized_differences": 0
+  },
+  "scenarios": [
+    {
+      "id": "stable_reactive_load_line_driver",
+      "status": "pass",
+      "normalized_sha256": "94d648e4f92f17c6609bf31a3d049fe245ee7aa745324107656331ef5f03faea"
+    },
+    {
+      "id": "precision_analog_servo_supply",
+      "status": "pass",
+      "normalized_sha256": "a9d47e7aa87d31dfc029a4d1cf90f86d7b9319e352e688ee2f2bc9307456b14b"
+    },
+    {
+      "id": "efficient_step_down_power_stage",
+      "status": "pass",
+      "normalized_sha256": "dbbe21dbb650267c524975038257017a54f1ff03027915e9a98fd405ffcab52a"
+    },
+    {
+      "id": "protected_inductive_actuator_driver",
+      "status": "pass",
+      "normalized_sha256": "d277521fa999083057b26113e73b9428347a8264834fec19b1ae03a2a2c5f6ca"
+    },
+    {
+      "id": "class_ab_dynamic_output_stage",
+      "status": "pass",
+      "normalized_sha256": "d98f94dfc22c51d2216eb6099ee727fd8ef14d6bf3296a49cd9f658e8487394b"
+    },
+    {
+      "id": "sequenced_dual_rail_controller",
+      "status": "pass",
+      "normalized_sha256": "589e4a8bc0bb5acfae84b5cf3a7982d929da5e02c348b54ea06ab29df07a7180"
+    }
+  ],
+  "gates": {
+    "reviewed_model_provenance": "pass",
+    "loop_identification_and_return_ratio": "pass",
+    "corner_complete_stability": "pass",
+    "dynamic_electrothermal": "pass",
+    "event_and_protection_response": "pass",
+    "dynamic_search_and_repair": "pass",
+    "traceability": "pass",
+    "routing_and_connectivity": "pass",
+    "writer_correctness": "pass",
+    "installed_kicad_erc": "pass",
+    "installed_kicad_strict_drc": "pass",
+    "round_trip": "pass",
+    "deterministic_replay": "pass"
+  }
+}
