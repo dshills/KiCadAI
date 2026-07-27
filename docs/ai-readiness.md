@@ -140,8 +140,8 @@ obligations with deterministic alternatives and rationale.
 
 All 10 adversarial circuits pass component, rating, value, tolerance, lowering,
 writer, round-trip, connectivity, routing, clean installed-KiCad ERC, and strict
-DRC gates. This is measured readiness inside the installed 111-component
-generic graph contract as of 2026-07-21;
+DRC gates. The current public capability snapshot exposes 149 catalog
+components through the generic graph contract as of 2026-07-27;
 unknown capabilities, insufficient evidence, incompatible domains, unsafe
 startup, and exceeded budgets fail closed. It does not establish unrestricted
 natural-language intent, arbitrary topology or parts, RF/high-speed design,
@@ -157,6 +157,38 @@ protected USB-C LED and I2C evidence. This moves readiness from structural
 composition to measured closed-loop selection inside the checked-in catalog;
 unknown topologies, arbitrary parts/models, RF, mains, and general dense-board
 routing remain fail-closed boundaries.
+
+## Dynamic Electrothermal And Control-Loop Synthesis
+
+The V5 behavior-only corpus adds six previously unsupported dynamic systems:
+reactive-load feedback amplification, analog servo regulation, switching power
+conversion, protected inductive switching, Class-AB thermal/load-fault
+behavior, and multi-rail sequencing. Requirements provide behavior, operating
+corners, events, thermal environment, and safety margins without prescribing
+implementation details.
+
+Reviewed model provenance, connectivity-derived loop identity, deterministic
+return-ratio evidence, declared-corner stability, coupled electrothermal
+transients, transient SOA, protection response, candidate alternatives, and
+bounded repairs are hash-bound through lowering and promotion. Two cases reject
+a statically acceptable candidate and select a dynamically safe alternative.
+All six cases pass two executions in each of two independent local
+clean-checkout roots, with identical 418-file bundles, clean ERC, strict DRC,
+complete routing/connectivity, writer correctness, zero round-trip
+differences, and deterministic replay.
+
+This expands measured readiness beyond static bounds, but only for reviewed
+primitives, events, models, and work budgets. Unknown control ICs, arbitrary
+converter topologies, unreviewed thermal assemblies, RF/high-speed behavior,
+mains safety, and high-energy protection outside the modeled envelope remain
+unsupported.
+
+Authoritative evidence:
+
+- [specification](../specs/dynamic-electrothermal-control-loop-synthesis/SPEC.md);
+- [completion audit](../specs/dynamic-electrothermal-control-loop-synthesis/AUDIT.md);
+  and
+- [capability report](../specs/dynamic-electrothermal-control-loop-synthesis/CAPABILITY_REPORT.json).
 
 ## Behavioral Intent Compilation
 
@@ -198,9 +230,10 @@ ADC settling.
 All four designs pass deterministic offline replay and the installed-KiCad
 ERC, strict DRC, route/connectivity, writer, and zero-difference round-trip
 gates. Ten reordered negative cases retain stable typed failure codes. This
-promotes the modeled slice only; unreviewed converter/control-loop behavior,
-isolation, RF/high-speed interfaces, arbitrary parts, and high-energy thermal
-or protection claims remain unsupported.
+promotes the modeled slice only; converter/control-loop behavior outside the
+reviewed V5 model and event envelope, isolation, RF/high-speed interfaces,
+arbitrary parts, and high-energy thermal or protection claims remain
+unsupported.
 
 ## Held-Out Capability Expansion
 
@@ -260,6 +293,10 @@ access.
 Run `make hierarchical-promotion-bundle` to reproduce the six-system
 hierarchical matrix through the same locked toolchain, two-run comparison, and
 standalone verifier.
+
+Run `make dynamic-electrothermal-promotion-bundle` to reproduce the six-circuit
+V5 matrix, including two executions per scenario, installed-KiCad gates,
+normalized comparison, and the content-addressed capability evidence.
 
 This strengthens provenance and reproducibility for records already inside the
 verified capability envelope. It does not promote an unverified matrix record,

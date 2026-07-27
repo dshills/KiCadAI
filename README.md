@@ -96,6 +96,16 @@ path.
   and requirement-to-KiCad traceability. All six pass the complete offline and
   installed-KiCad two-run promotion gates. This is a bounded catalog-backed
   envelope, not unrestricted arbitrary-circuit generation.
+- A frozen six-circuit V5 corpus now adds dynamic electrothermal and
+  control-loop synthesis for reactive-load feedback amplification, analog
+  servo regulation, switching conversion, protected inductive switching,
+  Class-AB load/fault behavior, and sequenced dual rails. Reviewed catalog
+  models drive deterministic return-ratio, corner, event, electrothermal,
+  transient-SOA, protection, candidate-selection, and bounded-repair evidence.
+  Every case passes the complete local KiCad promotion lane, and two
+  independent clean roots produce the same 418-file content-addressed bundle.
+  See the
+  [completion audit](specs/dynamic-electrothermal-control-loop-synthesis/AUDIT.md).
 - Arbitrary electronics generation is not yet guaranteed. Generic graphs fail
   closed on unknown parts, pins, ratings, placement, or routing capability.
 - MCU synthesis is limited to verified catalog records and modeled electrical

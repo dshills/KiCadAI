@@ -1,7 +1,8 @@
 # Project Status
 
-Last verified: 2026-07-23 by the complete repository suite, the external-review
-ladder, and the clean-checkout installed-KiCad promotion corpus.
+Last verified: 2026-07-27 by the complete local short suite, protected USB-C
+installed-KiCad regressions, and two independent clean-checkout dynamic
+electrothermal promotion bundles.
 
 The six-circuit independent external review is now a release-blocking,
 machine-readable regression ladder. Its fixes cover atomic composed placement,
@@ -30,10 +31,10 @@ differences, and equal normalized outputs.
 The result is a `sha256-<manifest-digest>` bundle containing immutable
 toolchain, command, request, project, validation, and comparison evidence. Its
 standalone verifier checks the full inventory and semantic gate contract
-without KiCad or network access. The configured `Installed KiCad Promotion`
-workflow reruns the same command and publishes the verified bundle as a
-commit-named Actions artifact. Ordinary push and pull-request CI remains
-offline.
+without KiCad or network access. Local clean-checkout execution is the
+authoritative development and promotion gate. Existing automatic workflows may
+rerun repository checks independently, but they are not started, inspected, or
+awaited as part of the local closeout loop.
 
 This makes the supported evidence reproducible; it does not expand the
 supported circuit, part, simulation, routing, or fabrication envelope.
@@ -221,6 +222,40 @@ The [specification](../specs/hierarchical-multi-domain-synthesis/SPEC.md) and
 define the measured boundary. Unsupported capabilities, missing
 safety-relevant evidence, and exhausted bounded search still fail closed.
 
+### Dynamic Electrothermal And Control-Loop Synthesis
+
+A frozen six-circuit V5 corpus extends behavioral synthesis into dynamic
+feedback, power-control, thermal, fault, and protection evidence without
+providing topology, parts, equations, models, nets, pins, coordinates, layers,
+or routes. It covers a reactive-load line driver, precision analog servo
+supply, efficient step-down stage, protected inductive actuator driver,
+Class-AB dynamic output stage, and sequenced dual-rail controller.
+
+The implementation resolves reviewed, hash-bound electrical and thermal
+models; derives feedback loops and return ratio from connectivity; evaluates
+declared supply, load, temperature, tolerance, parasitic, and operating-mode
+corners; couples transient electrical loss into finite thermal networks; and
+checks event response, protection, recovery, and transient SOA. Dynamic
+evidence participates in deterministic candidate rejection/ranking and bounded
+repair while immutable safety requirements remain enforced. Two cases prove a
+statically acceptable favorite can be rejected in favor of a dynamically safe
+alternative.
+
+All six circuits pass local simulation, internal validation, routing,
+connectivity, writer correctness, clean installed-KiCad ERC, strict DRC, and
+zero-difference round trips. Two independent clean roots, with two executions
+per scenario, produced the same 418-file content-addressed bundle and zero
+normalized differences. Run `make dynamic-electrothermal-promotion-bundle`
+from an unmodified checkout to reproduce that evidence. See the
+[specification](../specs/dynamic-electrothermal-control-loop-synthesis/SPEC.md),
+[audit](../specs/dynamic-electrothermal-control-loop-synthesis/AUDIT.md), and
+[capability report](../specs/dynamic-electrothermal-control-loop-synthesis/CAPABILITY_REPORT.json).
+
+This proves dynamic reasoning inside the reviewed catalog/model envelope. It
+does not qualify arbitrary control ICs, converter families, thermal
+assemblies, protection devices, RF/high-speed behavior, mains safety, or
+unreviewed component substitutions.
+
 ### Schematic Readability
 
 Generated schematics use deterministic role, stage, and lane classification;
@@ -357,13 +392,13 @@ envelope remain unsupported.
 
 ## Remaining Direction
 
-The next closure step is to expand genuinely unsupported mixed-signal and
-power-control primitive/model families, especially dynamic electrothermal and
-control-loop evidence that static bounds cannot prove. Broader clock/fanout,
-programming-load, converter, isolation, and high-energy protection coverage,
-catalog-independent part qualification, and denser-board physical synthesis
-remain important. Unknown behavior must continue to produce a stable
-capability gap instead of guessed implementation detail.
+Dynamic electrothermal and control-loop synthesis is now complete for the
+frozen V5 envelope. The next closure step is broader clock/fanout and
+programming-load evidence, followed by converter, isolation, and high-energy
+protection families outside the current model registry. Catalog-independent
+part qualification, denser-board physical synthesis, and evaluation over novel
+behavior-only requests remain important. Unknown behavior must continue to
+produce a stable capability gap instead of guessed implementation detail.
 
 See the [Roadmap](../specs/ROADMAP.md) for prioritized work and the
 [Development Reference](development.md) for repository-level limitations and

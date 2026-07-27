@@ -1,6 +1,6 @@
 # KiCadAI Roadmap
 
-Date: 2026-07-25
+Date: 2026-07-27
 
 This roadmap replaces the older roadmap and gap analysis now archived as
 `specs/OLD_ROADMAP.md` and `specs/OLD_ROADMAP_GAP.md`.
@@ -254,6 +254,15 @@ from validation feedback to safe automatic repair.
   `branches_attempted`, `branches_completed`, `graph_component_count`,
   `missing_required_endpoints`, `complete_groups`, `partial_groups`, and
   `blocked_groups`.
+- Dynamic electrothermal and control-loop synthesis now promotes a frozen
+  six-circuit V5 behavior-only corpus spanning reactive-load feedback,
+  precision servo control, switching conversion, protected inductive loads,
+  Class-AB dynamic faults, and dual-rail sequencing. Reviewed model
+  provenance, connectivity-derived return ratio, declared-corner stability,
+  coupled electrothermal transients, transient SOA, event/protection response,
+  deterministic alternative selection, and bounded repair feed the normal
+  physical workflow. All six pass local installed-KiCad promotion, and two
+  independent clean roots produce the same 418-file content-addressed bundle.
 - README and focused docs for current CLI capabilities.
 
 ### Still Not Ready
@@ -1059,6 +1068,17 @@ correctness, zero normalized round trips, and replay. The next expansion must
 come from a neutral held-out unsupported behavior or model family; this remains
 a bounded envelope rather than arbitrary generation.
 
+Dynamic electrothermal and control-loop synthesis now adds the V5 evidence
+layer that static global bounds could not prove. A six-circuit behavior-only
+corpus covers reactive-load feedback, analog servo regulation, switching power,
+protected inductive switching, Class-AB load/fault behavior, and multi-rail
+sequencing. Search uses reviewed electrical/thermal models, derived loop and
+return-ratio evidence, declared stability corners, coupled transient
+electrothermal/SOA results, explicit event/protection coverage, and bounded
+generic repair. Two cases select a dynamically safe alternative after rejecting
+a statically acceptable favorite. Every case passes two executions in each of
+two independent local clean roots with identical normalized bundle evidence.
+
 Structured semantic mapping is now implemented for target, bus, and supply
 intent:
 
@@ -1166,23 +1186,26 @@ The five-requirement open-set milestone, the 10-circuit adversarial
 multi-function milestone, simulation-grounded v3 synthesis, the
 uncertainty-aware behavioral intent compiler, and the first held-out capability
 expansion are complete. Generic standalone clock generation subsequently closed
-the frozen benchmark at 12/12. The V4 hierarchical multi-domain milestone now
+the frozen benchmark at 12/12. The V4 hierarchical multi-domain milestone
 derives hierarchy, boundary contracts, shared-resource plans, complete-candidate
 backtracking, physical partitions, and end-to-end traceability; all six frozen
-systems pass offline and installed-KiCad two-run promotion.
+systems pass offline and installed-KiCad two-run promotion. The V5 dynamic
+electrothermal/control-loop milestone is also complete: all six circuits pass
+two clean local promotion roots with identical content-addressed evidence.
 
-1. Add dynamic electrothermal and control-loop evidence where static global
-   bounds cannot prove startup, SOA, stability, or transient protection.
-2. Broaden clock/fanout and programming-load evidence beyond the completed
+1. Broaden clock/fanout and programming-load evidence beyond the completed
    power/interface corpus while retaining stable unsupported outcomes.
-3. Generalize bounded placement-routing correction from observed
+2. Generalize bounded placement-routing correction from observed
    failures without introducing fixture-identity logic.
-4. Expand catalog-independent part qualification, calculated rating, and
+3. Expand catalog-independent part qualification, calculated rating, and
    fabrication evidence before claiming broader
    autonomous or fabrication-ready coverage.
-5. Add active learning/evaluation over novel behavior-only requests so new
+4. Add active learning/evaluation over novel behavior-only requests so new
    capability gaps are ranked by reusable family impact rather than fixture
    identity.
+5. Extend reviewed dynamic models into additional converter, isolation, and
+   high-energy protection families without weakening fail-closed model,
+   convergence, SOA, or event-coverage requirements.
 
 ## Definition Of Autonomous Ready
 
