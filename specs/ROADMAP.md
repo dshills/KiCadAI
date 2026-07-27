@@ -34,6 +34,14 @@ from validation feedback to safe automatic repair.
 
 ### Implemented Foundations
 
+- Deterministic pre-mutation capability assessment for normalized creation
+  requests. Domain, architecture, component/model, physical, and verification
+  claims link to reproducible evidence and classify the request as `supported`,
+  `experimental`, or `unsupported`. Experimental generation requires explicit
+  opt-in and is ineligible for fabrication-ready or promotion-pass claims;
+  unsupported generation returns structured gaps without project mutation.
+  Workflow checkpoints can only preserve or reduce confidence, and the final
+  assessment is embedded in workflow, promotion, and manifest artifacts.
 - Clean-checkout KiCad promotion with an exact `make promotion-bundle`
   reproduction command, a checksum-pinned KiCad 10.0.3 toolchain lock,
   manifest-driven two-run execution, strict normalized comparison,

@@ -14,6 +14,7 @@ import (
 	"testing"
 
 	"kicadai/internal/architecturesearch"
+	"kicadai/internal/capabilitygate"
 	"kicadai/internal/circuitgraph"
 	"kicadai/internal/closedloopsynthesis"
 	"kicadai/internal/components"
@@ -585,6 +586,13 @@ func runFrozenPromotionAt(t *testing.T, corpusRoot string, expectedCount int, ar
 			search := architecturesearch.Search(context.Background(), requirement, registry, architecturesearch.SearchOptions{CatalogHash: resolver.CatalogHash()})
 			if search.Status != architecturesearch.SearchSelected {
 				t.Fatalf("search status = %s issues=%#v rejections=%#v", search.Status, search.Issues, search.Rejections)
+			}
+			assessment, assessmentErr := capabilitygate.AssessArchitecture(requirement, search, false)
+			if assessmentErr != nil {
+				t.Fatalf("capability assessment: %v", assessmentErr)
+			}
+			if assessment.Classification != capabilitygate.ClassificationSupported {
+				t.Fatalf("promoted architecture capability = %s gaps=%#v risks=%#v evidence=%#v", assessment.Classification, assessment.Gaps, assessment.Risks, assessment.Evidence)
 			}
 			var request designworkflow.Request
 			var resolved circuitgraph.ResolvedDocument

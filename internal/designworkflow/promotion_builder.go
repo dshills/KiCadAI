@@ -7,6 +7,7 @@ import (
 	"sort"
 	"strings"
 
+	"kicadai/internal/capabilitygate"
 	"kicadai/internal/kicadfiles/checks"
 	"kicadai/internal/reports"
 )
@@ -41,6 +42,7 @@ func BuildInternalPromotionReport(fixture PromotionFixture, result WorkflowResul
 	}
 	builder.collectWorkflowIssues()
 	builder.addMetadataGate()
+	builder.addCapabilityGate()
 	builder.addStageGate()
 	builder.addSchematicElectricalGate()
 	builder.addWriterGate()
@@ -51,6 +53,38 @@ func BuildInternalPromotionReport(fixture PromotionFixture, result WorkflowResul
 	builder.addPhysicalGate()
 	builder.addArtifactGate()
 	return builder.report()
+}
+
+func (builder *promotionReportBuilder) addCapabilityGate() {
+	if builder.result.Capability == nil {
+		builder.gates = append(builder.gates, PromotionGate{
+			ID: "capability", Status: PromotionGateStatusNotRun,
+			Summary: "workflow did not carry a capability assessment",
+		})
+		return
+	}
+	assessment := builder.result.Capability
+	status := PromotionGateStatusPass
+	var issueCodes []string
+	switch assessment.Classification {
+	case capabilitygate.ClassificationExperimental:
+		status = PromotionGateStatusWarn
+		issueCodes = append(issueCodes, builder.addSyntheticIssue(
+			"capability_experimental", reports.SeverityWarning, StageCapabilityAssessment,
+			"experimental generation cannot be promoted to fabrication-ready pass",
+		))
+	case capabilitygate.ClassificationUnsupported:
+		status = PromotionGateStatusFailed
+		issueCodes = append(issueCodes, builder.addSyntheticIssue(
+			"capability_unsupported", reports.SeverityBlocked, StageCapabilityAssessment,
+			"workflow is outside the validated capability envelope",
+		))
+	}
+	builder.gates = append(builder.gates, PromotionGate{
+		ID: "capability", Status: status,
+		RequiredFor: []PromotionReadiness{PromotionReadinessCandidate, PromotionReadinessPass},
+		IssueCodes:  issueCodes, Summary: "capability assessment " + string(assessment.Classification),
+	})
 }
 
 type promotionReportBuilder struct {
@@ -376,6 +410,7 @@ func (builder *promotionReportBuilder) report() PromotionReport {
 		Artifacts:        artifacts,
 		KiCadVersion:     kicadVersion,
 		ExternalEvidence: externalEvidence,
+		Capability:       builder.result.Capability,
 	})
 }
 

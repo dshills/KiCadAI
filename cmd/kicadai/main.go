@@ -241,6 +241,7 @@ type cliOptions struct {
 	aiBackground                bool
 	outputFormat                string
 	strictDraft                 bool
+	experimental                bool
 	name                        string
 	seed                        string
 	libVCC                      string
@@ -460,6 +461,7 @@ func parse(args []string, stderr io.Writer) (cliOptions, string, error) {
 	flags.BoolVar(&opts.aiBackground, "ai-background", false, "use OpenAI background polling")
 	flags.StringVar(&opts.outputFormat, "format", "json", "output format: json or text")
 	flags.BoolVar(&opts.strictDraft, "strict", false, "treat blocking draft clarifications as command errors")
+	flags.BoolVar(&opts.experimental, "experimental", false, "explicitly authorize experimental generation without fabrication-ready status")
 	flags.StringVar(&opts.name, "name", "", "project/design name")
 	flags.StringVar(&opts.seed, "seed", "", "deterministic generation seed")
 	flags.StringVar(&opts.libVCC, "lib-vcc", defaultLibraryIDVCC, "VCC symbol library ID")
@@ -4150,10 +4152,11 @@ func designCreateOptions(ctx context.Context, opts cliOptions, checkOpts checks.
 		return designworkflow.CreateOptions{}, fmt.Errorf("component source directory must be a project-relative path without parent traversal")
 	}
 	createOpts := designworkflow.CreateOptions{
-		OutputDir:   opts.output,
-		Overwrite:   opts.overwrite,
-		Seed:        opts.seed,
-		SkipRouting: opts.skipRouting,
+		OutputDir:         opts.output,
+		Overwrite:         opts.overwrite,
+		Seed:              opts.seed,
+		SkipRouting:       opts.skipRouting,
+		ExperimentalOptIn: opts.experimental,
 		Components: designworkflow.ComponentSelectionOptions{
 			CatalogDir: opts.catalogDir,
 			SourceDir:  opts.sourceDir,

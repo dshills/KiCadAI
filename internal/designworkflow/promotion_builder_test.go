@@ -5,9 +5,55 @@ import (
 	"strings"
 	"testing"
 
+	"kicadai/internal/capabilitygate"
 	"kicadai/internal/kicadfiles/checks"
 	"kicadai/internal/reports"
 )
+
+func TestBuildPromotionReportCapsExperimentalWorkflowAtCandidate(t *testing.T) {
+	assessment, err := capabilitygate.Assess(capabilitygate.Input{
+		Stage:             "architecture_selection",
+		ExperimentalOptIn: true,
+		Requirements: []capabilitygate.Requirement{{
+			Kind: capabilitygate.RequirementArchitecture, ID: "new_topology", EvidenceIDs: []string{"provider"},
+		}},
+		Evidence: []capabilitygate.Evidence{{
+			ID: "provider", Kind: "provider", Status: capabilitygate.EvidenceInferred,
+			Source: "provider://new_topology",
+		}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	fixture := PromotionFixture{
+		ID: "experimental", Request: "experimental.json", DeclaredReadiness: PromotionReadinessPass,
+		Acceptance:        AcceptanceConnectivity,
+		ExpectedArtifacts: []string{".kicadai/transaction.json"},
+		ExpectedStages: []StageName{
+			StageBlockPlanning, StageWriterCorrect, StageValidation, StageRouting, StageFabricationReady,
+		},
+	}
+	result := BuildWorkflowResult(ProjectSummary{Name: "experimental"}, AcceptanceFabricationCandidate, []StageResult{
+		{Name: StageBlockPlanning, Status: StageStatusOK},
+		{Name: StageWriterCorrect, Status: StageStatusOK, Artifacts: []reports.Artifact{{
+			Path: ".kicadai/transaction.json", Kind: reports.ArtifactValidationReport,
+		}}},
+		{Name: StageValidation, Status: StageStatusOK},
+		{Name: StageRouting, Status: StageStatusOK, Summary: map[string]any{
+			"route_connectivity": LocalRouteConnectivitySummary{RoutesAttempted: 1, EndpointContactsProven: 2},
+		}},
+		{Name: StageFabricationReady, Status: StageStatusOK},
+	})
+	result.Capability = &assessment
+
+	report := BuildInternalPromotionReport(fixture, result)
+	if report.AchievedReadiness != PromotionReadinessCandidate || report.Status != PromotionStatusWarn {
+		t.Fatalf("experimental promotion = readiness %q status %q gates=%#v", report.AchievedReadiness, report.Status, report.Gates)
+	}
+	if report.Capability == nil || report.Capability.Hash != assessment.Hash {
+		t.Fatalf("promotion report capability = %#v", report.Capability)
+	}
+}
 
 func TestBuildInternalPromotionReportCandidate(t *testing.T) {
 	fixture := PromotionFixture{

@@ -17,6 +17,17 @@ structured intent, deterministic planning, component and block selection,
 schematic and PCB realization, placement, routing, writer validation, and
 optional KiCad-backed checks.
 
+Every normalized creation request now passes a deterministic capability gate
+before filesystem mutation. Requests are classified as `supported`,
+`experimental`, or `unsupported` from linked architecture, catalog, model,
+physical, and verification evidence. Supported requests proceed normally;
+experimental requests require explicit `--experimental` authorization and can
+never receive fabrication-ready or promotion-pass status; unsupported requests
+return stable actionable gaps without writing a project. The assessment is
+re-evaluated monotonically through downstream workflow stages and embedded in
+workflow, promotion, and manifest evidence. See
+[Capability-Aware Generation Gate](capability-gating.md).
+
 ## Production-Capable Foundations
 
 ### Reproducible Promotion Evidence

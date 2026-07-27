@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"kicadai/internal/atomicfile"
+	"kicadai/internal/capabilitygate"
 	"kicadai/internal/reports"
 )
 
@@ -19,17 +20,18 @@ const RelativePath = ".kicadai/manifest.json"
 const SchemaVersion = "kicadai.manifest.v2"
 
 type Manifest struct {
-	SchemaVersion    string             `json:"schema_version"`
-	CreationLane     string             `json:"creation_lane,omitempty"`
-	ProjectName      string             `json:"project_name"`
-	GeneratorVersion string             `json:"generator_version"`
-	Operations       []OperationSummary `json:"operations"`
-	Artifacts        []reports.Artifact `json:"artifacts"`
-	FileHashes       map[string]string  `json:"file_hashes"`
-	Provenance       *ProvenanceRef     `json:"provenance,omitempty"`
-	AILane           *AILaneSummary     `json:"ai_lane,omitempty"`
-	Evidence         []EvidenceArtifact `json:"evidence,omitempty"`
-	ExternalEvidence []ExternalArtifact `json:"external_evidence,omitempty"`
+	SchemaVersion    string                     `json:"schema_version"`
+	CreationLane     string                     `json:"creation_lane,omitempty"`
+	ProjectName      string                     `json:"project_name"`
+	GeneratorVersion string                     `json:"generator_version"`
+	Operations       []OperationSummary         `json:"operations"`
+	Artifacts        []reports.Artifact         `json:"artifacts"`
+	FileHashes       map[string]string          `json:"file_hashes"`
+	Provenance       *ProvenanceRef             `json:"provenance,omitempty"`
+	AILane           *AILaneSummary             `json:"ai_lane,omitempty"`
+	Evidence         []EvidenceArtifact         `json:"evidence,omitempty"`
+	ExternalEvidence []ExternalArtifact         `json:"external_evidence,omitempty"`
+	Capability       *capabilitygate.Assessment `json:"capability,omitempty"`
 }
 
 // EvidenceArtifact identifies one lane-neutral creation artifact and binds its
@@ -88,6 +90,11 @@ func Write(root string, manifest Manifest) (reports.Artifact, error) {
 	}
 	if strings.TrimSpace(manifest.SchemaVersion) == "" {
 		manifest.SchemaVersion = SchemaVersion
+	}
+	if manifest.Capability != nil {
+		if err := capabilitygate.Validate(*manifest.Capability); err != nil {
+			return reports.Artifact{}, fmt.Errorf("invalid capability assessment: %w", err)
+		}
 	}
 	if manifest.FileHashes == nil {
 		manifest.FileHashes = map[string]string{}
@@ -148,6 +155,11 @@ func Read(root string) (Manifest, Status, error) {
 	var manifest Manifest
 	if err := json.Unmarshal(data, &manifest); err != nil {
 		return Manifest{}, Status{Present: true, Path: filepath.ToSlash(path), Stale: true, Issues: []string{err.Error()}}, err
+	}
+	if manifest.Capability != nil {
+		if err := capabilitygate.Validate(*manifest.Capability); err != nil {
+			return manifest, Status{Present: true, Path: filepath.ToSlash(path), Stale: true, Issues: []string{err.Error()}}, err
+		}
 	}
 	status := Status{Present: true, Path: filepath.ToSlash(path)}
 	absRoot, err := filepath.Abs(root)

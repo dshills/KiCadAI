@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"kicadai/internal/architecturesearch"
+	"kicadai/internal/capabilitygate"
 	"kicadai/internal/circuitgraph"
 	"kicadai/internal/closedloopsynthesis"
 	"kicadai/internal/components"
@@ -72,6 +73,13 @@ func runRequirement(ctx context.Context, opts cliOptions, stdout io.Writer) erro
 	}
 
 	search := architecturesearch.Search(ctx, requirement, registry, architecturesearch.SearchOptions{CatalogHash: resolver.CatalogHash()})
+	assessment, assessmentErr := capabilitygate.AssessArchitecture(requirement, search, opts.experimental)
+	if assessmentErr != nil {
+		return writeRequirementFailure(stdout, reports.Issue{
+			Code: designworkflow.CodeCapabilityAssessmentInvalid, Severity: reports.SeverityError,
+			Path: "capability", Message: assessmentErr.Error(),
+		})
+	}
 	if search.Status != architecturesearch.SearchSelected || search.Selected == nil {
 		issues := append([]reports.Issue(nil), search.Issues...)
 		if len(issues) == 0 {
@@ -80,7 +88,15 @@ func runRequirement(ctx context.Context, opts cliOptions, stdout io.Writer) erro
 				Path: "architecture", Message: "behavior-only architecture search did not select a complete candidate",
 			})
 		}
-		return writeRequirementIssues(stdout, issues)
+		return writeRequirementCapabilityIssues(stdout, assessment, issues)
+	}
+	if assessment.Classification == capabilitygate.ClassificationExperimental && !assessment.ExperimentalOptIn {
+		return writeRequirementCapabilityIssues(stdout, assessment, []reports.Issue{{
+			Code: designworkflow.CodeCapabilityExperimentalOptIn, Severity: reports.SeverityBlocked,
+			Path:       "capability.experimental_opt_in",
+			Message:    "selected architecture is experimental and requires explicit authorization before generation",
+			Suggestion: "rerun with --experimental; the result will not be fabrication-ready",
+		}})
 	}
 	promotion, promotionIssues := compositionlowering.SynthesizeClosedLoop(
 		ctx,
@@ -94,13 +110,51 @@ func runRequirement(ctx context.Context, opts cliOptions, stdout io.Writer) erro
 		closedloopsynthesis.DefaultPolicy(),
 	)
 	if reports.HasBlockingIssue(promotionIssues) || promotion.Report.Status != "pass" {
+		failed, reassessErr := capabilitygate.Reassess(assessment, capabilitygate.CheckpointInput{
+			Stage: "closed_loop_synthesis",
+			Gaps: []capabilitygate.Gap{{
+				Code: "CAPABILITY_CLOSED_LOOP_FAILED", Kind: capabilitygate.RequirementModel,
+				ID: "closed_loop_synthesis", Stage: "closed_loop_synthesis",
+				Reason: "closed-loop synthesis did not produce passing model-backed evidence",
+				Action: "add the missing model provenance or relax unsupported behavioral bounds",
+			}},
+		})
+		if reassessErr != nil {
+			return writeRequirementFailure(stdout, reports.Issue{
+				Code: designworkflow.CodeCapabilityAssessmentInvalid, Severity: reports.SeverityError,
+				Path: "capability.closed_loop_synthesis", Message: reassessErr.Error(),
+			})
+		}
+		assessment = failed
 		if len(promotionIssues) == 0 {
 			promotionIssues = append(promotionIssues, reports.Issue{
 				Code: reports.CodeValidationFailed, Severity: reports.SeverityBlocked,
 				Path: "closed_loop", Message: "closed-loop synthesis did not select a passing architecture",
 			})
 		}
-		return writeRequirementIssues(stdout, promotionIssues)
+		return writeRequirementCapabilityIssues(stdout, assessment, promotionIssues)
+	}
+	closedLoopDigest, err := capabilitygate.Digest(promotion.Report)
+	if err != nil {
+		return writeRequirementFailure(stdout, reports.Issue{
+			Code: designworkflow.CodeCapabilityAssessmentInvalid, Severity: reports.SeverityError,
+			Path: "capability.closed_loop_synthesis", Message: err.Error(),
+		})
+	}
+	assessment, err = capabilitygate.Reassess(assessment, capabilitygate.CheckpointInput{
+		Stage: "closed_loop_synthesis",
+		Evidence: []capabilitygate.Evidence{{
+			ID: "closed-loop:" + closedLoopDigest[:16], Kind: "closed_loop_synthesis",
+			Status: capabilitygate.EvidenceVerified, Source: "closed-loop://promotion",
+			Digest: closedLoopDigest, Stage: "closed_loop_synthesis",
+			Description: "deterministic model-backed closed-loop synthesis report",
+		}},
+	})
+	if err != nil {
+		return writeRequirementFailure(stdout, reports.Issue{
+			Code: designworkflow.CodeCapabilityAssessmentInvalid, Severity: reports.SeverityError,
+			Path: "capability.closed_loop_synthesis", Message: err.Error(),
+		})
 	}
 
 	checkOpts, err := checkOptions(opts)
@@ -111,6 +165,8 @@ func runRequirement(ctx context.Context, opts cliOptions, stdout io.Writer) erro
 	if err != nil {
 		return writeRequirementFailure(stdout, reports.Issue{Code: reports.CodeInvalidArgument, Severity: reports.SeverityError, Path: "mode", Message: err.Error()})
 	}
+	createOpts.ExperimentalOptIn = opts.experimental
+	createOpts.InitialCapabilityAssessment = &assessment
 	workflow := designworkflow.Create(ctx, promotion.Request, createOpts)
 	promotionFixture, err := designPromotionFixture(opts, promotion.Request, workflow)
 	if err != nil {
@@ -182,4 +238,15 @@ func writeRequirementIssues(stdout io.Writer, issues []reports.Issue) error {
 		return err
 	}
 	return errors.New("requirement create reported blocking issues")
+}
+
+func writeRequirementCapabilityIssues(stdout io.Writer, assessment capabilitygate.Assessment, issues []reports.Issue) error {
+	data := struct {
+		Capability capabilitygate.Assessment `json:"capability"`
+	}{Capability: assessment}
+	result := reports.ResultWithIssues("requirement.create", data, issues, nil)
+	if err := writeReportJSON(stdout, result); err != nil {
+		return err
+	}
+	return errors.New("requirement create reported capability blockers")
 }

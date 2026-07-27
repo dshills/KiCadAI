@@ -95,7 +95,13 @@ type Bundle struct {
 // GatesFromWorkflow returns the stable lane-neutral gate projection for a
 // workflow, including promotion when it has been evaluated.
 func GatesFromWorkflow(workflow designworkflow.WorkflowResult) []Gate {
-	gates := make([]Gate, 0, len(workflow.Stages)+1)
+	gates := make([]Gate, 0, len(workflow.Stages)+2)
+	if workflow.Capability != nil {
+		gates = append(gates, Gate{
+			Name: "capability", Status: string(workflow.Capability.Classification),
+			Rationale: "capability assessment " + workflow.Capability.Hash,
+		})
+	}
 	for _, stage := range workflow.Stages {
 		rationale := "workflow stage completed with status " + string(stage.Status)
 		if stage.Status == designworkflow.StageStatusSkipped {
@@ -199,6 +205,7 @@ func Write(root string, bundle Bundle) ([]reports.Artifact, []reports.Issue) {
 	current.ExternalEvidence = externalArtifacts
 	current.Evidence = evidence
 	current.AILane = bundle.AILane
+	current.Capability = bundle.Workflow.Capability
 	manifestArtifact, err := manifest.Write(root, current)
 	if err != nil {
 		return nil, []reports.Issue{rollbackIssue(manifest.RelativePath, err, backups)}

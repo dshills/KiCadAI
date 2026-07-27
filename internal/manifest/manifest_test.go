@@ -6,8 +6,40 @@ import (
 	"path/filepath"
 	"testing"
 
+	"kicadai/internal/capabilitygate"
 	"kicadai/internal/reports"
 )
+
+func TestManifestPersistsCapabilityAssessment(t *testing.T) {
+	digest, err := capabilitygate.Digest("verified capability evidence")
+	if err != nil {
+		t.Fatal(err)
+	}
+	assessment, err := capabilitygate.Assess(capabilitygate.Input{
+		Stage: "verification",
+		Requirements: []capabilitygate.Requirement{{
+			Kind: capabilitygate.RequirementVerification, ID: "strict_drc", EvidenceIDs: []string{"drc"},
+		}},
+		Evidence: []capabilitygate.Evidence{{
+			ID: "drc", Kind: "kicad_drc", Status: capabilitygate.EvidenceVerified,
+			Source: "kicad-cli://drc", Digest: digest,
+		}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	root := t.TempDir()
+	if _, err := Write(root, Manifest{ProjectName: "demo", Capability: &assessment}); err != nil {
+		t.Fatal(err)
+	}
+	roundTripped, status, err := Read(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if status.Stale || roundTripped.Capability == nil || roundTripped.Capability.Hash != assessment.Hash {
+		t.Fatalf("round-tripped capability=%#v status=%#v", roundTripped.Capability, status)
+	}
+}
 
 func TestWriteReadManifestAndDetectStale(t *testing.T) {
 	root := t.TempDir()

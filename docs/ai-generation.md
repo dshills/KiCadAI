@@ -5,6 +5,15 @@ structured intent, then hands that validated intent to the deterministic
 planner, schematic writer, placement/routing workflow, and KiCad checks. The
 provider never emits KiCad S-expressions or route geometry directly.
 
+Before any project mutation, the normalized request is classified as
+`supported`, `experimental`, or `unsupported` from reproducible capability
+evidence. Experimental generation requires the explicit `--experimental`
+global flag and cannot become fabrication-ready or promotion `pass`;
+unsupported requests return structured gaps without writing a project. The
+assessment is carried through architecture, component, simulation, routing,
+writer, and KiCad checkpoints. See
+[Capability-Aware Generation Gate](capability-gating.md).
+
 ## Provider Modes
 
 KiCadAI exposes three fail-closed provider paths:

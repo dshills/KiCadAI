@@ -17,6 +17,13 @@ path.
   tested.
 - Structured intent can generate supported designs through planning, component
   selection, schematic/PCB realization, placement, routing, and validation.
+- Every normalized creation request is deterministically classified as
+  `supported`, `experimental`, or `unsupported` before project mutation.
+  Experimental generation requires explicit `--experimental` opt-in and is
+  barred from fabrication-ready and promotion-pass claims; unsupported
+  requests fail closed with evidence-linked diagnostics. Assessments are
+  re-evaluated through later workflow stages and embedded in workflow,
+  promotion, and manifest artifacts.
 - Ordinary behavior-first requests can enter through the uncertainty-aware
   `intent compile` trust boundary. It accounts for every source statement,
   asks the minimum blocking clarification, records stable capability gaps, and

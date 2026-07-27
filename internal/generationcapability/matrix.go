@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"slices"
 
+	"kicadai/internal/capabilitygate"
 	"kicadai/internal/circuitgraph"
 	"kicadai/internal/components"
 )
@@ -41,6 +42,9 @@ type Capability struct {
 // an AI provider must obey for this installation.
 type Document struct {
 	Capabilities          []Capability                                 `json:"capabilities"`
+	AssessmentSchema      string                                       `json:"assessment_schema"`
+	AssessmentPolicy      string                                       `json:"assessment_policy"`
+	Classifications       []capabilitygate.Classification              `json:"classifications"`
 	GenericGraphContract  json.RawMessage                              `json:"generic_graph_contract"`
 	FunctionLevelContract circuitgraph.FunctionLevelCapabilityDocument `json:"function_level_contract"`
 	GenericRepairContract RepairContract                               `json:"generic_repair_contract"`
@@ -135,6 +139,9 @@ func BuildDocument(catalog *components.Catalog) (Document, error) {
 	}
 	document := Document{
 		Capabilities:          All(),
+		AssessmentSchema:      capabilitygate.AssessmentSchema,
+		AssessmentPolicy:      capabilitygate.AssessmentPolicyVersion,
+		Classifications:       []capabilitygate.Classification{capabilitygate.ClassificationSupported, capabilitygate.ClassificationExperimental, capabilitygate.ClassificationUnsupported},
 		GenericGraphContract:  json.RawMessage(genericContract),
 		FunctionLevelContract: circuitgraph.FunctionLevelCapabilities(),
 		GenericRepairContract: RepairContract{PatchSchema: circuitgraph.PatchSchemaID, SupportedOperations: []string{"replace_component", "replace_endpoint", "replace_pcb_region"}, Policy: "preflight reports candidates but never applies them"},

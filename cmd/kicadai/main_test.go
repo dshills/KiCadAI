@@ -2233,6 +2233,17 @@ func TestParseDesignAllowPartialSetsExplicitFlag(t *testing.T) {
 	}
 }
 
+func TestParseExperimentalRequiresExplicitGlobalOptIn(t *testing.T) {
+	var stderr bytes.Buffer
+	opts, command, err := parse([]string{"--experimental", "design", "create", "--request", "request.json", "--output", "out"}, &stderr)
+	if err != nil {
+		t.Fatalf("parse experimental flag: %v", err)
+	}
+	if command != "design" || !opts.experimental {
+		t.Fatalf("command=%q experimental=%v", command, opts.experimental)
+	}
+}
+
 func TestParseDesignRepairApplyImpliesRepair(t *testing.T) {
 	opts, command, err := parse([]string{"--repair-apply", "design", "create"}, io.Discard)
 	if err != nil {

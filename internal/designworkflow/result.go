@@ -4,30 +4,32 @@ import (
 	"cmp"
 	"slices"
 
+	"kicadai/internal/capabilitygate"
 	"kicadai/internal/reports"
 )
 
 type StageName string
 
 const (
-	StageParseRequest        StageName = "parse_request"
-	StageLibraryContext      StageName = "library_context"
-	StageBlockPlanning       StageName = "block_planning"
-	StageComponentSelection  StageName = "component_selection"
-	StageSchematic           StageName = "schematic"
-	StageSchematicElectrical StageName = "schematic_electrical"
-	StagePCBRealization      StageName = "pcb_realization"
-	StageSchematicToPCB      StageName = "schematic_to_pcb"
-	StagePlacement           StageName = "placement"
-	StageRouting             StageName = "routing"
-	StageProjectWrite        StageName = "project_write"
-	StageWriterCorrect       StageName = "writer_correctness"
-	StageValidation          StageName = "validation"
-	StageValidationRepair    StageName = "validation_repair"
-	StageKiCadChecks         StageName = "kicad_checks"
-	StageSimulation          StageName = "simulation"
-	StageFabricationReady    StageName = "fabrication_readiness"
-	StageFeedback            StageName = "feedback"
+	StageParseRequest         StageName = "parse_request"
+	StageCapabilityAssessment StageName = "capability_assessment"
+	StageLibraryContext       StageName = "library_context"
+	StageBlockPlanning        StageName = "block_planning"
+	StageComponentSelection   StageName = "component_selection"
+	StageSchematic            StageName = "schematic"
+	StageSchematicElectrical  StageName = "schematic_electrical"
+	StagePCBRealization       StageName = "pcb_realization"
+	StageSchematicToPCB       StageName = "schematic_to_pcb"
+	StagePlacement            StageName = "placement"
+	StageRouting              StageName = "routing"
+	StageProjectWrite         StageName = "project_write"
+	StageWriterCorrect        StageName = "writer_correctness"
+	StageValidation           StageName = "validation"
+	StageValidationRepair     StageName = "validation_repair"
+	StageKiCadChecks          StageName = "kicad_checks"
+	StageSimulation           StageName = "simulation"
+	StageFabricationReady     StageName = "fabrication_readiness"
+	StageFeedback             StageName = "feedback"
 )
 
 type StageStatus string
@@ -51,11 +53,12 @@ const (
 )
 
 type WorkflowResult struct {
-	Project    ProjectSummary    `json:"project"`
-	Acceptance AcceptanceResult  `json:"acceptance"`
-	Stages     []StageResult     `json:"stages"`
-	Feedback   Feedback          `json:"feedback"`
-	Promotion  *PromotionSummary `json:"promotion,omitempty"`
+	Project    ProjectSummary             `json:"project"`
+	Acceptance AcceptanceResult           `json:"acceptance"`
+	Capability *capabilitygate.Assessment `json:"capability,omitempty"`
+	Stages     []StageResult              `json:"stages"`
+	Feedback   Feedback                   `json:"feedback"`
+	Promotion  *PromotionSummary          `json:"promotion,omitempty"`
 }
 
 type ProjectSummary struct {

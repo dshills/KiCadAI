@@ -47,6 +47,13 @@ Use `--format text` only for commands that expose a human-readable summary.
 The legacy `--json` flag remains accepted as a compatibility alias for
 `--format json`.
 
+Use the global `--experimental` flag only to authorize a request classified as
+experimental by the capability gate. Without it, generation stops before
+filesystem mutation. With it, normal validation still runs, but the result is
+ineligible for fabrication-ready status and promotion `pass`. Unsupported
+requests cannot be overridden. See
+[Capability-Aware Generation Gate](capability-gating.md).
+
 JSON mode writes exactly one JSON document to stdout on both success and
 failure. Logs and tool diagnostics use stderr, so stdout can be passed directly
 to a JSON decoder. When a command has more than 128 issues, the envelope emits

@@ -9,6 +9,12 @@ roadmaps, and dated review material.
 
 ## Latest Completed Milestone
 
+- [Capability-aware confidence gating](capability-aware-confidence-gating/SPEC.md)
+  - deterministic supported, experimental, and unsupported request policy with
+    reproducible evidence links and fabrication-claim controls.
+- [Implementation plan](capability-aware-confidence-gating/PLAN.md)
+  - pre-mutation gating, monotonic reassessment, artifact integration, and
+    local/KiCad acceptance phases.
 - [Held-out capability expansion](held-out-capability-expansion/SPEC.md)
   - frozen behavior-only benchmark and generic capability-expansion contract.
 - [Implementation plan](held-out-capability-expansion/PLAN.md)
@@ -23,6 +29,10 @@ roadmaps, and dated review material.
 Subdirectories group feature specs and plans by area. Prefer adding new work to
 the relevant subdirectory instead of adding loose historical files at the root.
 
+- [Capability-aware confidence gating specification](capability-aware-confidence-gating/SPEC.md)
+  and [plan](capability-aware-confidence-gating/PLAN.md)
+  - define the evidence-derived runtime boundary, explicit experimental opt-in,
+    fail-closed refusal, monotonic checkpoints, and promotion/manifest contract.
 - [Held-out capability expansion specification](held-out-capability-expansion/SPEC.md)
   - freezes a twelve-case behavior-only benchmark across six domains and the
     fifteen-stage promotion contract.

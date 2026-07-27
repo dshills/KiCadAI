@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"kicadai/internal/blocks"
+	"kicadai/internal/capabilitygate"
 	"kicadai/internal/fabrication"
 	"kicadai/internal/libraryresolver"
 	"kicadai/internal/repair"
@@ -19,21 +20,23 @@ import (
 )
 
 type CreateOptions struct {
-	OutputDir     string
-	Overwrite     bool
-	Seed          string
-	SkipRouting   bool
-	Components    ComponentSelectionOptions
-	Placement     PlacementOptions
-	Routing       RoutingOptions
-	Validation    ValidationOptions
-	KiCadChecks   KiCadCheckOptions
-	Writer        writercorrectness.Options
-	Fabrication   *fabrication.Options
-	Repair        repair.Options
-	PostRepair    repair.PostValidationOptions
-	BlockRegistry blocks.Registry
-	LibraryIndex  *libraryresolver.LibraryIndex
+	OutputDir                   string
+	Overwrite                   bool
+	Seed                        string
+	SkipRouting                 bool
+	ExperimentalOptIn           bool
+	InitialCapabilityAssessment *capabilitygate.Assessment
+	Components                  ComponentSelectionOptions
+	Placement                   PlacementOptions
+	Routing                     RoutingOptions
+	Validation                  ValidationOptions
+	KiCadChecks                 KiCadCheckOptions
+	Writer                      writercorrectness.Options
+	Fabrication                 *fabrication.Options
+	Repair                      repair.Options
+	PostRepair                  repair.PostValidationOptions
+	BlockRegistry               blocks.Registry
+	LibraryIndex                *libraryresolver.LibraryIndex
 }
 
 func Create(ctx context.Context, request Request, opts CreateOptions) WorkflowResult {
@@ -47,13 +50,38 @@ func Create(ctx context.Context, request Request, opts CreateOptions) WorkflowRe
 		opts.LibraryIndex = &opts.Writer.LibraryIndex
 	}
 	normalized := NormalizeRequest(request)
+	assessment, err := assessCreateRequest(ctx, normalized, opts)
+	if err != nil {
+		stage := NewStageResult(StageCapabilityAssessment, []reports.Issue{{
+			Code: CodeCapabilityAssessmentInvalid, Severity: reports.SeverityBlocked,
+			Path: "capability", Message: "build capability assessment: " + err.Error(),
+			Suggestion: "repair the capability evidence and retry",
+		}})
+		stages := append([]StageResult{stage}, skippedWorkflowStages("capability assessment did not complete", createPipelineStages...)...)
+		return BuildWorkflowResult(ProjectSummary{Name: normalized.Name, OutputDir: opts.OutputDir}, normalized.Validation.Acceptance, stages)
+	}
+	if gateIssues := capabilityGateIssues(assessment); len(gateIssues) != 0 {
+		stage := NewStageResult(StageCapabilityAssessment, gateIssues)
+		stage.Summary = map[string]any{
+			"classification":      assessment.Classification,
+			"experimental_opt_in": assessment.ExperimentalOptIn,
+			"assessment_hash":     assessment.Hash,
+		}
+		stages := append([]StageResult{stage}, skippedWorkflowStages("capability gate refused project generation", createPipelineStages...)...)
+		result := BuildWorkflowResult(ProjectSummary{Name: normalized.Name, OutputDir: opts.OutputDir}, normalized.Validation.Acceptance, stages)
+		result.Capability = &assessment
+		return result
+	}
+	finish := func(result WorkflowResult) WorkflowResult {
+		return applyWorkflowCapability(result, assessment)
+	}
 	if normalized.ExplicitCircuit != nil {
-		return createExplicitCircuit(ctx, normalized, opts)
+		return finish(createExplicitCircuit(ctx, normalized, opts))
 	}
 	plan := PlanBlocks(ctx, opts.BlockRegistry, normalized)
 	stages := []StageResult{plan.Stage}
 	if workflowStageBlocked(plan.Stage) {
-		return blockedCreateResult(normalized, opts, stages, StageBlockPlanning, "block planning did not complete")
+		return finish(blockedCreateResult(normalized, opts, stages, StageBlockPlanning, "block planning did not complete"))
 	}
 	componentSelections := SelectWorkflowComponents(ctx, opts.BlockRegistry, plan, opts.Components)
 	if !workflowStageBlocked(componentSelections.Stage) {
@@ -65,29 +93,29 @@ func Create(ctx context.Context, request Request, opts CreateOptions) WorkflowRe
 	}
 	stages = append(stages, componentSelections.Stage)
 	if workflowStageBlocked(componentSelections.Stage) {
-		return blockedCreateResult(normalized, opts, stages, StageComponentSelection, "component selection did not complete")
+		return finish(blockedCreateResult(normalized, opts, stages, StageComponentSelection, "component selection did not complete"))
 	}
 	schematicStage := schematicStageFromPlan(plan)
 	stages = append(stages, schematicStage)
 	if workflowStageBlocked(schematicStage) {
-		return blockedCreateResult(normalized, opts, stages, StageSchematic, "schematic generation did not complete")
+		return finish(blockedCreateResult(normalized, opts, stages, StageSchematic, "schematic generation did not complete"))
 	}
 	schematicElectricalStage := SchematicElectricalStage(plan)
 	stages = append(stages, schematicElectricalStage)
 	if workflowStageBlocked(schematicElectricalStage) {
-		return blockedCreateResult(normalized, opts, stages, StageSchematicElectrical, "schematic electrical rules did not pass")
+		return finish(blockedCreateResult(normalized, opts, stages, StageSchematicElectrical, "schematic electrical rules did not pass"))
 	}
 	fragments := RealizePCBFragments(ctx, opts.BlockRegistry, plan)
 	stages = append(stages, fragments.Stage)
 	if workflowStageBlocked(fragments.Stage) {
-		return blockedCreateResult(normalized, opts, stages, StagePCBRealization, "PCB realization did not complete")
+		return finish(blockedCreateResult(normalized, opts, stages, StagePCBRealization, "PCB realization did not complete"))
 	}
 	placementOpts := placementOptionsForCreate(opts, componentSelections.Selections)
 	placed := PlaceFragments(ctx, normalized, fragments, placementOpts)
 	placementStageIndex := len(stages)
 	stages = append(stages, placed.Stage)
 	if workflowStageBlocked(placed.Stage) {
-		return blockedCreateResult(normalized, opts, stages, StagePlacement, "placement did not complete")
+		return finish(blockedCreateResult(normalized, opts, stages, StagePlacement, "placement did not complete"))
 	}
 	routingOpts := opts.Routing
 	routingOpts.ComponentSelections = componentSelections.Selections
@@ -97,7 +125,7 @@ func Create(ctx context.Context, request Request, opts CreateOptions) WorkflowRe
 	stages[placementStageIndex] = placed.Stage
 	stages = append(stages, routed.Stage)
 	if workflowStageBlocked(routed.Stage) {
-		return blockedCreateResult(normalized, opts, stages, StageRouting, "routing did not complete")
+		return finish(blockedCreateResult(normalized, opts, stages, StageRouting, "routing did not complete"))
 	}
 	written := WriteProject(ctx, &normalized, &plan, &placed, &routed, ProjectWriteOptions{
 		OutputDir:                 opts.OutputDir,
@@ -108,7 +136,7 @@ func Create(ctx context.Context, request Request, opts CreateOptions) WorkflowRe
 	})
 	stages = append(stages, written.Stage)
 	if workflowStageBlocked(written.Stage) {
-		return blockedCreateResult(normalized, opts, stages, StageProjectWrite, "project write did not complete")
+		return finish(blockedCreateResult(normalized, opts, stages, StageProjectWrite, "project write did not complete"))
 	}
 	writerChecked := CheckWriterCorrectnessWithOptions(ctx, &written, opts.Writer)
 	stages = append(stages, writerChecked.Stage)
@@ -120,7 +148,7 @@ func Create(ctx context.Context, request Request, opts CreateOptions) WorkflowRe
 		if repairStageShouldRun(opts.Repair, groups) {
 			stages = append(stages, repairStageForGroups(ctx, &normalized, written, groups, opts))
 		}
-		return BuildWorkflowResult(ProjectSummary{Name: normalized.Name, OutputDir: opts.OutputDir}, normalized.Validation.Acceptance, stages)
+		return finish(BuildWorkflowResult(ProjectSummary{Name: normalized.Name, OutputDir: opts.OutputDir}, normalized.Validation.Acceptance, stages))
 	}
 	validationOpts, kicadCheckOpts := createValidationOptions(normalized, opts)
 	validated := ValidateProject(ctx, &normalized, &written, validationOpts)
@@ -163,7 +191,7 @@ func Create(ctx context.Context, request Request, opts CreateOptions) WorkflowRe
 			stages = append(stages, repairStageForGroups(ctx, &normalized, written, groups, opts))
 		}
 	}
-	return BuildWorkflowResult(ProjectSummary{Name: normalized.Name, OutputDir: opts.OutputDir}, normalized.Validation.Acceptance, stages)
+	return finish(BuildWorkflowResult(ProjectSummary{Name: normalized.Name, OutputDir: opts.OutputDir}, normalized.Validation.Acceptance, stages))
 }
 
 func createValidationOptions(request Request, opts CreateOptions) (ValidationOptions, KiCadCheckOptions) {

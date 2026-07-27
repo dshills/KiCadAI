@@ -9,6 +9,9 @@ This directory holds the detailed reference material that used to live in the pr
 - [CLI Reference](cli-reference.md): command overview, KiCad IPC setup, and direct generation commands.
 - [AI Generation](ai-generation.md): behavioral, bounded, and generic provider
   setup, reproducible KiCad-backed lanes, evidence, and failure behavior.
+- [Capability-Aware Generation Gate](capability-gating.md): supported,
+  experimental, and unsupported decisions; evidence links; opt-in behavior;
+  monotonic reassessment; and promotion rules.
 - [Intent Planning And AI Workflow](intent-planning.md): uncertainty-aware
   behavioral compilation, structured intent, rationale reports, semantic
   synthesis, and current AI workflow limits.

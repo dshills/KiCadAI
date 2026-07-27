@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"kicadai/internal/capabilitygate"
 	"kicadai/internal/reports"
 )
 
@@ -55,23 +56,24 @@ const (
 
 // PromotionReport is the normalized report emitted for a KiCad-backed design fixture.
 type PromotionReport struct {
-	ID                 string                `json:"id"`
-	Request            string                `json:"request,omitempty"`
-	Tier               string                `json:"tier,omitempty"`
-	DeclaredReadiness  PromotionReadiness    `json:"declared_readiness"`
-	AchievedReadiness  PromotionReadiness    `json:"achieved_readiness"`
-	Acceptance         AcceptanceLevel       `json:"acceptance,omitempty"`
-	Status             PromotionStatus       `json:"status"`
-	MatchesExpectation bool                  `json:"matches_expectation"`
-	Summary            string                `json:"summary,omitempty"`
-	Gates              []PromotionGate       `json:"gates"`
-	Stages             PromotionStageReport  `json:"stages,omitempty"`
-	Issues             []PromotionIssue      `json:"issues,omitempty"`
-	NextActions        []PromotionNextAction `json:"next_actions,omitempty"`
-	Artifacts          []PromotionArtifact   `json:"artifacts,omitempty"`
-	KiCadVersion       string                `json:"kicad_version,omitempty"`
-	ExternalEvidence   string                `json:"external_evidence,omitempty"`
-	GeneratedAt        string                `json:"generated_at,omitempty"`
+	ID                 string                     `json:"id"`
+	Request            string                     `json:"request,omitempty"`
+	Tier               string                     `json:"tier,omitempty"`
+	DeclaredReadiness  PromotionReadiness         `json:"declared_readiness"`
+	AchievedReadiness  PromotionReadiness         `json:"achieved_readiness"`
+	Acceptance         AcceptanceLevel            `json:"acceptance,omitempty"`
+	Status             PromotionStatus            `json:"status"`
+	MatchesExpectation bool                       `json:"matches_expectation"`
+	Summary            string                     `json:"summary,omitempty"`
+	Gates              []PromotionGate            `json:"gates"`
+	Stages             PromotionStageReport       `json:"stages,omitempty"`
+	Issues             []PromotionIssue           `json:"issues,omitempty"`
+	NextActions        []PromotionNextAction      `json:"next_actions,omitempty"`
+	Artifacts          []PromotionArtifact        `json:"artifacts,omitempty"`
+	KiCadVersion       string                     `json:"kicad_version,omitempty"`
+	ExternalEvidence   string                     `json:"external_evidence,omitempty"`
+	GeneratedAt        string                     `json:"generated_at,omitempty"`
+	Capability         *capabilitygate.Assessment `json:"capability,omitempty"`
 }
 
 // PromotionGate records one promotion check and the readiness levels it affects.
@@ -153,6 +155,11 @@ func (report PromotionReport) Validate() error {
 	if report.GeneratedAt != "" {
 		if _, err := time.Parse(time.RFC3339, report.GeneratedAt); err != nil {
 			return fmt.Errorf("promotion generated_at must be RFC3339: %w", err)
+		}
+	}
+	if report.Capability != nil {
+		if err := capabilitygate.Validate(*report.Capability); err != nil {
+			return fmt.Errorf("invalid capability assessment: %w", err)
 		}
 	}
 	if !promotionStatusBypassesReadiness(report.Status) {
