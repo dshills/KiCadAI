@@ -2,6 +2,7 @@ package placement
 
 import (
 	"context"
+	"fmt"
 	"math"
 	"reflect"
 	"slices"
@@ -500,6 +501,53 @@ func TestOrderComponentsForRequiredProximityPrioritizesReadyConstrainedCluster(t
 	got := []string{ordered[0].Ref, ordered[1].Ref, ordered[2].Ref}
 	if !slices.Equal(got, []string{"ANCHOR", "TARGET", "UNRELATED"}) {
 		t.Fatalf("order = %#v, want constrained cluster reserved before unrelated movable parts", got)
+	}
+}
+
+func TestOrderComponentsForRequiredProximityDeterministicallyOrdersEquivalentClusters(t *testing.T) {
+	dimensions := []Bounds{
+		{WidthMM: 8.13, HeightMM: 5.27},
+		{WidthMM: 1.07, HeightMM: 1.31},
+		{WidthMM: 4.19, HeightMM: 3.23},
+		{WidthMM: 2.29, HeightMM: 7.37},
+	}
+	components := []Component{
+		{Ref: "A1", Bounds: Bounds{WidthMM: 3.17, HeightMM: 2.61}},
+		{Ref: "A2", Bounds: Bounds{WidthMM: 3.17, HeightMM: 2.61}},
+	}
+	var firstTargets []string
+	var secondTargets []string
+	for index, bounds := range dimensions {
+		firstRef := fmt.Sprintf("A1_T%d", index)
+		secondRef := fmt.Sprintf("A2_T%d", index)
+		components = append(components,
+			Component{Ref: firstRef, Bounds: bounds},
+			Component{Ref: secondRef, Bounds: bounds},
+		)
+		firstTargets = append(firstTargets, firstRef)
+		secondTargets = append(secondTargets, secondRef)
+	}
+	rules := []ProximityRule{
+		{AnchorRef: "A1", TargetRefs: firstTargets, MaxDistanceMM: 4, Required: true},
+		{AnchorRef: "A2", TargetRefs: secondTargets, MaxDistanceMM: 4, Required: true},
+	}
+	baseline := orderComponentsForRequiredProximity(components, rules)
+	want := make([]string, len(baseline))
+	for index := range baseline {
+		want[index] = baseline[index].Ref
+	}
+	if want[0] != "A1" {
+		t.Fatalf("equivalent cluster order starts with %q, want stable base-priority A1", want[0])
+	}
+	for iteration := 0; iteration < 1000; iteration++ {
+		ordered := orderComponentsForRequiredProximity(components, rules)
+		got := make([]string, len(ordered))
+		for index := range ordered {
+			got[index] = ordered[index].Ref
+		}
+		if !slices.Equal(got, want) {
+			t.Fatalf("equivalent cluster order iteration %d = %#v, want %#v", iteration, got, want)
+		}
 	}
 }
 

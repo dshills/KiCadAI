@@ -500,8 +500,18 @@ func orderComponentsForRequiredProximity(components []Component, rules []Proximi
 		}
 	}
 	sccClusterArea := append([]float64(nil), sccArea...)
-	for sourceSCC, targets := range sccEdges {
+	var targetSCCs []int
+	for sourceSCC := range sccClusterArea {
+		targets := sccEdges[sourceSCC]
+		if len(targets) == 0 {
+			continue
+		}
+		targetSCCs = targetSCCs[:0]
 		for targetSCC := range targets {
+			targetSCCs = append(targetSCCs, targetSCC)
+		}
+		slices.Sort(targetSCCs)
+		for _, targetSCC := range targetSCCs {
 			sccClusterArea[sourceSCC] += sccArea[targetSCC]
 		}
 	}
