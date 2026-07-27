@@ -2074,6 +2074,19 @@ func trimDisconnectedRouteTailsAtSameNetPadsDecoded(operations []transactions.Op
 		}
 	}
 	repaired := append([]transactions.Operation(nil), operations...)
+	viaPointsByNet := make(map[string]map[routeCoordKey]struct{})
+	for _, operation := range decoded {
+		if !operation.decoded {
+			continue
+		}
+		netKey := interBlockSummaryNetKey(operation.payload.NetName)
+		for _, via := range operation.payload.Vias {
+			if viaPointsByNet[netKey] == nil {
+				viaPointsByNet[netKey] = map[routeCoordKey]struct{}{}
+			}
+			viaPointsByNet[netKey][routePointKey(via.At)] = struct{}{}
+		}
+	}
 	for rawNetName, routes := range decodedByNet {
 		netKey := interBlockSummaryNetKey(rawNetName)
 		pads := padsByNet[netKey]
@@ -2099,6 +2112,7 @@ func trimDisconnectedRouteTailsAtSameNetPadsDecoded(operations []transactions.Op
 				}
 				endpoint := payload.Points[endpointIndex]
 				if routePayloadHasViaAt(payload, endpoint) ||
+					sameNetRouteViaAt(viaPointsByNet[netKey], endpoint) ||
 					routeEndpointContactsSameNetPad(pads, payload.NetName, payload.Layer, endpoint) ||
 					len(graph.copperOwnersAt(endpoint, payload.Layer, interBlockContactToleranceMM, route.SourceIndex)) != 0 {
 					continue
@@ -2134,6 +2148,14 @@ func trimDisconnectedRouteTailsAtSameNetPadsDecoded(operations []transactions.Op
 		}
 	}
 	return repaired, summary
+}
+
+func sameNetRouteViaAt(viaPoints map[routeCoordKey]struct{}, point transactions.Point) bool {
+	if len(viaPoints) == 0 {
+		return false
+	}
+	_, ok := viaPoints[routePointKey(point)]
+	return ok
 }
 
 func routeEndpointContactsSameNetPad(pads []PlacedPadEndpoint, netName, layer string, endpoint transactions.Point) bool {

@@ -199,6 +199,14 @@ func TestTrimDisconnectedRouteTailAtSameNetPad(t *testing.T) {
 		t.Fatalf("connected tail was trimmed: %#v", preservedDecoded[1].payload.Points)
 	}
 
+	separateVia := append([]transactions.Operation(nil), operations...)
+	separateVia = append(separateVia, transactions.NewOperation(transactions.OpRoute, []byte(`{"op":"route","net_name":"SIG","vias":[{"at":{"x_mm":1,"y_mm":2},"diameter_mm":0.6,"drill_mm":0.3,"layers":["F.Cu","B.Cu"]}]}`)))
+	preserved = trimDisconnectedRouteTailsAtSameNetPads(separateVia, physical)
+	preservedDecoded = decodeRouteOperations(preserved)
+	if !reflect.DeepEqual(preservedDecoded[1].payload.Points, decodeRouteOperations(operations)[1].payload.Points) {
+		t.Fatalf("tail terminating at a same-net via in another operation was trimmed: %#v", preservedDecoded[1].payload.Points)
+	}
+
 	endpointPadPhysical := physical
 	endpointPadPhysical.resolver.sorted = append(
 		append([]PlacedPadEndpoint(nil), physical.resolver.sorted...),
