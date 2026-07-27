@@ -202,12 +202,62 @@ func TestLowerInterfacesDoesNotDuplicateReferencePortOnItsOwnReturnNet(t *testin
 		Domains: []architecturesearch.Domain{{ID: "gnd", Kind: "reference"}},
 		Ports:   []architecturesearch.Port{{ID: "ground", Kind: "reference", Direction: "bidirectional", Domain: "gnd"}},
 	}}
-	interfaces, _ := lowerInterfaces(requirement, newDisjointSet(), map[string]circuitgraph.FunctionalEndpoint{}, map[string]nodeMetadata{})
+	interfaces, _ := lowerInterfaces(requirement, newDisjointSet(), map[string]circuitgraph.FunctionalEndpoint{}, map[string]nodeMetadata{}, nil)
 	if len(interfaces) != 1 || len(interfaces[0].Signals) != 1 {
 		t.Fatalf("interfaces = %#v, want one physical reference signal", interfaces)
 	}
 	if interfaces[0].Signals[0].Role != circuitgraph.NetRoleGround || interfaces[0].Signals[0].Name == "return" {
 		t.Fatalf("reference signal = %#v", interfaces[0].Signals[0])
+	}
+}
+
+func TestLowerInterfacesUsesBehavioralFlowForBoundarySourceAndObservation(t *testing.T) {
+	requirement := architecturesearch.Requirement{Requirements: architecturesearch.Requirements{
+		Ports: []architecturesearch.Port{
+			{ID: "upstream", Kind: "digital_logic", Direction: "source"},
+			{ID: "downstream", Kind: "digital_logic", Direction: "sink"},
+		},
+		Objectives: []architecturesearch.Objective{{
+			Bindings: []architecturesearch.Binding{
+				{Role: "side_a", Port: "upstream"},
+				{Role: "side_b", Port: "downstream"},
+			},
+		}},
+		BehavioralRequirements: []architecturesearch.BehavioralRequirement{{
+			Observation: architecturesearch.Observation{Kind: "port", ID: "downstream"},
+		}},
+	}}
+	interfaces, _ := lowerInterfaces(requirement, newDisjointSet(), map[string]circuitgraph.FunctionalEndpoint{}, map[string]nodeMetadata{}, nil)
+	roles := map[string]circuitgraph.InterfaceRole{}
+	for _, candidate := range interfaces {
+		roles[candidate.ID] = candidate.Role
+	}
+	if roles["upstream"] != circuitgraph.InterfaceDigitalIn || roles["downstream"] != circuitgraph.InterfaceDigitalOut {
+		t.Fatalf("behavioral interface roles = %#v, want input stimulus and passive output observation", roles)
+	}
+}
+
+func TestLowerInterfacesTreatsParticipantDrivenObservationAsPassiveOutput(t *testing.T) {
+	requirement := architecturesearch.Requirement{Requirements: architecturesearch.Requirements{
+		Ports: []architecturesearch.Port{{ID: "observed", Kind: "digital_bus", Direction: "source"}},
+		Participants: []architecturesearch.Participant{{
+			ID: "controller", RequiredPorts: []architecturesearch.ParticipantPort{{
+				ID: "debug", Kind: "digital_bus", Direction: "bidirectional",
+			}},
+		}},
+		Objectives: []architecturesearch.Objective{{
+			Bindings: []architecturesearch.Binding{
+				{Role: "side_a", Port: "observed"},
+				{Role: "side_b", Participant: "controller", ParticipantPort: "debug"},
+			},
+		}},
+		BehavioralRequirements: []architecturesearch.BehavioralRequirement{{
+			Observation: architecturesearch.Observation{Kind: "port", ID: "observed"},
+		}},
+	}}
+	interfaces, _ := lowerInterfaces(requirement, newDisjointSet(), map[string]circuitgraph.FunctionalEndpoint{}, map[string]nodeMetadata{}, nil)
+	if len(interfaces) != 1 || interfaces[0].Role != circuitgraph.InterfaceDigitalOut {
+		t.Fatalf("participant-driven interface = %#v, want passive digital output", interfaces)
 	}
 }
 
@@ -236,7 +286,7 @@ func TestLowerInterfacesJoinsPowerPortReturnAnchorToReferenceDomain(t *testing.T
 		},
 	}}
 	union := newDisjointSet()
-	lowerInterfaces(requirement, union, map[string]circuitgraph.FunctionalEndpoint{}, map[string]nodeMetadata{})
+	lowerInterfaces(requirement, union, map[string]circuitgraph.FunctionalEndpoint{}, map[string]nodeMetadata{}, nil)
 	returnAnchor := anchorNode("external:input_power", "return")
 	referenceAnchor := anchorNode("domain:gnd", "")
 	if union.find(returnAnchor) != union.find(referenceAnchor) {
@@ -256,7 +306,7 @@ func TestLowerInterfacesSelectsMatchingReferenceDomainForIsolatedPowerPorts(t *t
 		},
 	}}
 	union := newDisjointSet()
-	lowerInterfaces(requirement, union, map[string]circuitgraph.FunctionalEndpoint{}, map[string]nodeMetadata{})
+	lowerInterfaces(requirement, union, map[string]circuitgraph.FunctionalEndpoint{}, map[string]nodeMetadata{}, nil)
 	for power, reference := range map[string]string{"host_power": "host_ground", "remote_power": "remote_ground"} {
 		if union.find(anchorNode("external:"+power, "return")) != union.find(anchorNode("domain:"+reference, "")) {
 			t.Fatalf("%s return is not joined to matching reference domain %s", power, reference)
@@ -276,13 +326,13 @@ func TestLowerInterfacesSelectsDeterministicPrimaryBusLaneForSemanticBinding(t *
 		}},
 	}}
 	nodes := map[string]string{}
-	_, nodes = lowerInterfaces(requirement, newDisjointSet(), map[string]circuitgraph.FunctionalEndpoint{}, map[string]nodeMetadata{})
+	_, nodes = lowerInterfaces(requirement, newDisjointSet(), map[string]circuitgraph.FunctionalEndpoint{}, map[string]nodeMetadata{}, nil)
 	if nodes["bus"] != interfaceNode("bus", "sda") {
 		t.Fatalf("primary bus binding = %q, want deterministic first lane", nodes["bus"])
 	}
 }
 
-func TestLowerSemanticBindingsExposeScalarParticipantPorts(t *testing.T) {
+func TestLowerSemanticBindingsExposeScalarAndRepresentativeBusParticipantPorts(t *testing.T) {
 	requirement := architecturesearch.Requirement{Requirements: architecturesearch.Requirements{
 		Participants: []architecturesearch.Participant{{
 			ID: "controller", RequiredPorts: []architecturesearch.ParticipantPort{
@@ -293,9 +343,16 @@ func TestLowerSemanticBindingsExposeScalarParticipantPorts(t *testing.T) {
 	}}
 	union := newDisjointSet()
 	control := anchorNode("participant:controller:enable", "")
+	busLane := anchorNode("participant:controller:bus", "channel_01")
 	union.add(control)
-	bindings := lowerSemanticBindings(requirement, union, map[string]string{union.find(control): "CONTROL"}, nil)
-	if len(bindings) != 1 || bindings[0].Kind != "participant_port" || bindings[0].ID != "controller.enable" || bindings[0].Target != "CONTROL" {
+	union.add(busLane)
+	bindings := lowerSemanticBindings(requirement, union, map[string]string{
+		union.find(control): "CONTROL",
+		union.find(busLane): "BUS_01",
+	}, nil)
+	if len(bindings) != 2 ||
+		bindings[0].Kind != "participant_port" || bindings[0].ID != "controller.bus" || bindings[0].Target != "BUS_01" ||
+		bindings[1].Kind != "participant_port" || bindings[1].ID != "controller.enable" || bindings[1].Target != "CONTROL" {
 		t.Fatalf("participant semantic bindings = %#v", bindings)
 	}
 }

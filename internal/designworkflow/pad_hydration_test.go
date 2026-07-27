@@ -2,6 +2,7 @@ package designworkflow
 
 import (
 	"context"
+	"math"
 	"os"
 	"reflect"
 	"strconv"
@@ -169,6 +170,81 @@ func TestVerifiedPadTemplateUsesPackageSpecificRowPinOrder(t *testing.T) {
 	}
 	if soic.Bounds.WidthMM < 6.6 {
 		t.Fatalf("SOIC bounds too narrow: %#v", soic.Bounds)
+	}
+}
+
+func TestVerifiedStandardTSSOPTemplateMatchesKiCadGeometry(t *testing.T) {
+	template, ok := verifiedPadTemplate("Package_SO:TSSOP-14_4.4x5mm_P0.65mm")
+	if !ok || len(template.Pads) != 14 {
+		t.Fatalf("TSSOP-14 template = %#v, ok=%t", template, ok)
+	}
+	if first := template.Pads[0]; first.Name != "1" || math.Abs(first.XMM+2.8625) > 1e-12 ||
+		math.Abs(first.YMM+1.95) > 1e-12 || first.WidthMM != 1.475 || first.HeightMM != 0.4 {
+		t.Fatalf("TSSOP-14 first pad does not match KiCad geometry: %#v", first)
+	}
+	if last := template.Pads[len(template.Pads)-1]; last.Name != "8" ||
+		math.Abs(last.XMM-2.8625) > 1e-12 || math.Abs(last.YMM-1.95) > 1e-12 {
+		t.Fatalf("TSSOP-14 final pad does not preserve dual-row numbering: %#v", last)
+	}
+	if math.Abs(template.Bounds.WidthMM-7.2) > 1e-12 || math.Abs(template.Bounds.HeightMM-5.4) > 1e-12 {
+		t.Fatalf("TSSOP-14 bounds = %#v, want 7.2 x 5.4 mm", template.Bounds)
+	}
+}
+
+func TestVerifiedStandardSOICTemplatesMatchKiCadGeometry(t *testing.T) {
+	tests := []struct {
+		name        string
+		footprintID string
+		pinCount    int
+		first       placement.PadSummary
+		firstRight  placement.PadSummary
+		last        placement.PadSummary
+		bounds      placement.Bounds
+	}{
+		{
+			name:        "narrow",
+			footprintID: "Package_SO:SOIC-14_3.9x8.7mm_P1.27mm",
+			pinCount:    14,
+			first:       smdPad("1", -2.475, -3.81, 1.95, 0.6, "roundrect"),
+			firstRight:  smdPad("8", 2.475, 3.81, 1.95, 0.6, "roundrect"),
+			last:        smdPad("14", 2.475, -3.81, 1.95, 0.6, "roundrect"),
+			bounds:      verifiedCourtyardBounds(7.4, 9.2, 3.7, 4.6),
+		},
+		{
+			name:        "wide",
+			footprintID: "Package_SO:SOIC-16W_7.5x10.3mm_P1.27mm",
+			pinCount:    16,
+			first:       smdPad("1", -4.65, -4.445, 2.05, 0.6, "roundrect"),
+			firstRight:  smdPad("9", 4.65, 4.445, 2.05, 0.6, "roundrect"),
+			last:        smdPad("16", 4.65, -4.445, 2.05, 0.6, "roundrect"),
+			bounds:      verifiedCourtyardBounds(11.86, 10.8, 5.93, 5.4),
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			template, ok := verifiedPadTemplate(test.footprintID)
+			if !ok || len(template.Pads) != test.pinCount {
+				t.Fatalf("SOIC template = %#v, ok=%t", template, ok)
+			}
+			if first := template.Pads[0]; !reflect.DeepEqual(first, test.first) {
+				t.Fatalf("first SOIC pad = %#v, want %#v", first, test.first)
+			}
+			if firstRight := template.Pads[test.pinCount/2]; !reflect.DeepEqual(firstRight, test.firstRight) {
+				t.Fatalf("first right-side SOIC pad = %#v, want %#v", firstRight, test.firstRight)
+			}
+			if last := template.Pads[len(template.Pads)-1]; !reflect.DeepEqual(last, test.last) {
+				t.Fatalf("last SOIC pad = %#v, want %#v", last, test.last)
+			}
+			if !reflect.DeepEqual(template.Bounds, test.bounds) {
+				t.Fatalf("SOIC bounds = %#v, want %#v", template.Bounds, test.bounds)
+			}
+		})
+	}
+}
+
+func TestVerifiedStandardSOICTemplateFailsClosedWhenNameDoesNotEncodeVerifiedVariant(t *testing.T) {
+	if _, ok := standardSOICTemplate("Package_SO:SOIC-16W_5.3x10.2mm_P1.27mm"); ok {
+		t.Fatal("unverified SOIC lead geometry should remain unsupported")
 	}
 }
 
@@ -347,6 +423,7 @@ func TestVerifiedSpeakerPowerFootprintTemplatesMatchInstalledKiCadLibraries(t *t
 		"Diode_SMD:D_SOD-123",
 		"Diode_SMD:D_SMB",
 		"Package_SO:MSOP-16-1EP_3x4.039mm_P0.5mm_EP1.651x2.845mm_ThermalVias",
+		"Package_SO:HTSSOP-16-1EP_4.4x5mm_P0.65mm_EP3.4x5mm_Mask2.66x2.46mm_ThermalVias",
 		"Package_SO:SOIC-8_3.9x4.9mm_P1.27mm",
 		"Package_SO:VSSOP-8_2.3x2mm_P0.5mm",
 		"Package_SO:VSSOP-8_3x3mm_P0.65mm",
@@ -366,6 +443,8 @@ func TestVerifiedSpeakerPowerFootprintTemplatesMatchInstalledKiCadLibraries(t *t
 		"Package_TO_SOT_THT:TO-126-3_Vertical",
 		"Package_TO_SOT_THT:TO-3P-3_Vertical",
 		"Relay_THT:Relay_SPST_Omron-G5Q-1A",
+		"Converter_DCDC:Converter_DCDC_TRACO_TSR-1_THT",
+		"Converter_DCDC:Converter_DCDC_TRACO_TRI10_Single_THT",
 	} {
 		t.Run(footprintID, func(t *testing.T) {
 			template, ok := verifiedPadTemplate(footprintID)
@@ -462,6 +541,9 @@ func TestVerifiedPadTemplatesCoverAdversarialPowerFootprints(t *testing.T) {
 		"Resistor_SMD:R_2512_6332Metric":                                                  2,
 		"Converter_DCDC:Converter_DCDC_Murata_MEE1SxxxxSC_THT":                            4,
 		"Converter_DCDC:Converter_DCDC_TRACO_TEL12-xxxx_THT":                              5,
+		"Converter_DCDC:Converter_DCDC_TRACO_TSR-1_THT":                                   3,
+		"Converter_DCDC:Converter_DCDC_TRACO_TRI10_Single_THT":                            5,
+		"Package_SO:HTSSOP-16-1EP_4.4x5mm_P0.65mm_EP3.4x5mm_Mask2.66x2.46mm_ThermalVias":  33,
 	}
 	for footprintID, padCount := range tests {
 		t.Run(footprintID, func(t *testing.T) {
@@ -520,6 +602,61 @@ func TestVerifiedBuckPowerTemplatesMatchKiCadLibraryGeometry(t *testing.T) {
 		!reflect.DeepEqual(inductor.Pads[0], smdPad("1", -5.625, 0, 3.25, 5.5, "roundrect")) ||
 		!reflect.DeepEqual(inductor.Pads[1], smdPad("2", 5.625, 0, 3.25, 5.5, "roundrect")) {
 		t.Fatalf("Sunlord template does not match KiCad: %#v", inductor)
+	}
+}
+
+func TestVerifiedProtectedConverterTemplatesMatchKiCadLibraryGeometry(t *testing.T) {
+	htssop, ok := verifiedPadTemplate("Package_SO:HTSSOP-16-1EP_4.4x5mm_P0.65mm_EP3.4x5mm_Mask2.66x2.46mm_ThermalVias")
+	if !ok {
+		t.Fatal("missing TI HTSSOP-16 exposed-pad template")
+	}
+	if htssop.Bounds != verifiedCourtyardBoundsFromExtents(-3.9, -2.75, 3.9, 2.75) {
+		t.Fatalf("HTSSOP-16 bounds = %#v", htssop.Bounds)
+	}
+	if !reflect.DeepEqual(htssop.Pads[3], smdPad("1", -2.8625, -2.275, 1.575, .4, "roundrect")) ||
+		!reflect.DeepEqual(htssop.Pads[18], smdPad("16", 2.8625, -2.275, 1.575, .4, "roundrect")) {
+		t.Fatalf("HTSSOP-16 perimeter pads do not match KiCad: pin1=%#v pin16=%#v", htssop.Pads[3], htssop.Pads[18])
+	}
+	if duplicated := duplicatePadTemplateNames(htssop.Pads); len(duplicated) != 15 {
+		t.Fatalf("HTSSOP-16 duplicate aperture/exposed-pad members = %d, want 15", len(duplicated))
+	}
+	hydrated := hydratePadsFromVerifiedTemplate("U1", "Package_SO:HTSSOP-16-1EP_4.4x5mm_P0.65mm_EP3.4x5mm_Mask2.66x2.46mm_ThermalVias")
+	if hydrated.Entry.Source != PadHydrationSourceVerifiedTemplate || len(hydrated.Pads) != 30 || len(hydrated.Issues) != 0 {
+		t.Fatalf("HTSSOP-16 routing hydration = %#v, pads=%d issues=%#v", hydrated.Entry, len(hydrated.Pads), hydrated.Issues)
+	}
+
+	tsr, ok := verifiedPadTemplate("Converter_DCDC:Converter_DCDC_TRACO_TSR-1_THT")
+	if !ok {
+		t.Fatal("missing TRACO TSR-1 template")
+	}
+	wantTSR := verifiedPadTemplateRecord{
+		Bounds: verifiedCourtyardBoundsFromExtents(-3.55, -5.85, 8.65, 2.25),
+		Pads: []placement.PadSummary{
+			throughHolePad("1", 0, 0, 1.5, 2.5, 1, "rect"),
+			throughHolePad("2", 2.54, 0, 1.5, 2.5, 1, "oval"),
+			throughHolePad("3", 5.08, 0, 1.5, 2.5, 1, "oval"),
+		},
+	}
+	if !reflect.DeepEqual(tsr, wantTSR) {
+		t.Fatalf("TSR-1 template does not match KiCad: %#v", tsr)
+	}
+
+	tri10, ok := verifiedPadTemplate("Converter_DCDC:Converter_DCDC_TRACO_TRI10_Single_THT")
+	if !ok {
+		t.Fatal("missing TRACO TRI10 template")
+	}
+	wantTRI10 := verifiedPadTemplateRecord{
+		Bounds: verifiedCourtyardBoundsFromExtents(-3.29, -2.61, 18.51, 30.69),
+		Pads: []placement.PadSummary{
+			throughHolePad("1", 0, 0, 1.9, 1.9, 1.1, "roundrect"),
+			throughHolePad("12", 0, 27.94, 1.9, 1.9, 1.1, "circle"),
+			throughHolePad("13", 15.22, 27.94, 1.9, 1.9, 1.1, "circle"),
+			throughHolePad("23", 15.22, 2.54, 1.9, 1.9, 1.1, "circle"),
+			throughHolePad("24", 15.22, 0, 1.9, 1.9, 1.1, "circle"),
+		},
+	}
+	if !reflect.DeepEqual(tri10, wantTRI10) {
+		t.Fatalf("TRI10 template does not match KiCad: %#v", tri10)
 	}
 }
 

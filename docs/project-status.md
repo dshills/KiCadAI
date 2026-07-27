@@ -1,8 +1,8 @@
 # Project Status
 
-Last verified: 2026-07-27 by the complete local short suite, protected USB-C
-installed-KiCad regressions, and two independent clean-checkout dynamic
-electrothermal promotion bundles.
+Last verified: 2026-07-27 by the complete local short suite, the five-case
+open-world offline and installed-KiCad promotion corpora, protected USB-C
+regressions, and independent clean-checkout promotion bundles.
 
 The six-circuit independent external review is now a release-blocking,
 machine-readable regression ladder. Its fixes cover atomic composed placement,
@@ -38,6 +38,10 @@ awaited as part of the local closeout loop.
 
 This makes the supported evidence reproducible; it does not expand the
 supported circuit, part, simulation, routing, or fabrication envelope.
+
+The open-world capability matrix uses the same content-addressed bundle
+contract. Run `make open-world-capability-promotion-bundle` from an unmodified
+checkout to reproduce its five newly promoted held-out cases.
 
 ### KiCad File Generation
 
@@ -177,6 +181,31 @@ across analog, power, digital, MCU, sensor, and mixed-signal domains. Inputs
 contain no topology, components, nets, pins, coordinates, layers, or routes.
 The initial installed-KiCad baseline passed 5/12 cases and ranked unsupported
 families before production changes.
+
+### Open-World Capability Evaluation
+
+A separate frozen discovery/held-out pair measures unfamiliar behavior-only
+requirements without topology, part, pin, net, coordinate, route, provider, or
+expected-outcome hints. The evaluator publishes deterministic case outcomes,
+normalized failure clusters, safety/reuse ranking, affected-case lookup, and
+baseline-to-final verification.
+
+The untouched held-out baseline contained 1 ready, 1 clarification, 8
+unsupported, 1 ambiguous, and 1 budget-exhausted case. Gap-driven generic
+expansion promotes five cases, producing 6 ready, 1 clarification, and 5
+unsupported cases. The promoted set spans clock fanout/loading, MCU debug
+electrical loading and shared-pin arbitration, unidirectional push-pull
+translation with partial-power-down behavior, asymmetric functional isolation,
+and protected isolated conversion with startup, shutdown, thermal, inrush, and
+fault evidence.
+
+Each promoted case passes deterministic architecture/component selection,
+applicable simulation and safety assertions, lowering, routing/connectivity,
+writer correctness, clean installed-KiCad ERC, strict DRC, zero normalized
+round-trip differences, and byte-identical replay. Unsupported cases retain
+stable fail-closed identities; the largest remaining cluster is broader bus
+buffering/level translation. See the
+[completion audit](../specs/open-world-capability-evaluation/AUDIT.md).
 
 The original expansion report passes 11/12 with the same evaluator and gate
 profile. Constant-current regulation passes in power-output, MCU-peripheral,

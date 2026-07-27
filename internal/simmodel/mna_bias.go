@@ -93,7 +93,7 @@ func hasTransientEndpointLossDevice(plan Plan) bool {
 		switch device.PrimitiveModel {
 		case PrimitiveFuseClosedStateV1, PrimitiveFuseI2TClearingV1, PrimitiveBidirectionalTVSV1,
 			PrimitiveUnidirectionalZenerV1, PrimitiveDiodeShockleyV1,
-			PrimitiveNMOSSwitchV1, PrimitivePMOSSwitchV1, PrimitiveReverseBlockingLoadSwitchV1,
+			PrimitiveNMOSSwitchV1, PrimitivePMOSSwitchV1, PrimitiveReverseBlockingLoadSwitchV1, PrimitiveCurrentLimitingEFuseV1,
 			PrimitiveBJTNPNV1, PrimitiveBJTPNPV1:
 			return true
 		}

@@ -284,6 +284,46 @@
       }
     },
     {
+      "catalog_id": "capacitor.panasonic.eeufr1h220.radial",
+      "family": "capacitor",
+      "model_id": "mna_capacitor_transient_be_v1",
+      "provenance": {
+        "source": "https://industrial.panasonic.com/cdbs/www-data/pdf/RDF0000/ABA0000C1259.pdf",
+        "revision": "panasonic:FR-A:EEUFR1H220:2026-07",
+        "sha256": "19f725a7b01f981f33aeb7446e16f61398116168eea4ac05a70e2146bee8c049",
+        "review_status": "reviewed",
+        "allowed_analyses": [
+          "dc_operating_point",
+          "distortion",
+          "startup",
+          "thermal",
+          "transient"
+        ],
+        "min_temperature_c": -40,
+        "max_temperature_c": 105
+      }
+    },
+    {
+      "catalog_id": "capacitor.panasonic.eeufr1h220.radial",
+      "family": "capacitor",
+      "model_id": "mna_capacitor_v1",
+      "provenance": {
+        "source": "https://industrial.panasonic.com/cdbs/www-data/pdf/RDF0000/ABA0000C1259.pdf",
+        "revision": "panasonic:FR-A:EEUFR1H220:2026-07",
+        "sha256": "ef0b29d721870e25f9e49b43cfbcf2510a7136e6ba50da1ad0da0c7b1360d226",
+        "review_status": "reviewed",
+        "allowed_analyses": [
+          "ac_sweep",
+          "dc_operating_point",
+          "noise",
+          "stability",
+          "thermal"
+        ],
+        "min_temperature_c": -40,
+        "max_temperature_c": 105
+      }
+    },
+    {
       "catalog_id": "capacitor.panasonic.eeufr1a682l.radial",
       "family": "capacitor",
       "model_id": "mna_capacitor_v1",
@@ -622,6 +662,62 @@
       "provenance": {
         "source": "https://content.kemet.com/datasheets/KEM_C1095_MIL-PRF-32535.pdf",
         "revision": "KEMET MIL-PRF-32535 C0G data sheet C1095, reviewed 2026-07-24",
+        "sha256": "fa3f2e5de7f34219b8f1fc7438ba14793c99a4d789173cf53db1045f42accca8",
+        "review_status": "reviewed",
+        "allowed_analyses": [
+          "ac_sweep"
+        ],
+        "min_temperature_c": -55,
+        "max_temperature_c": 125
+      }
+    },
+    {
+      "catalog_id": "capacitor.murata.gcm21br71h105ka03l.0805",
+      "family": "capacitor",
+      "model_id": "mna_capacitor_transient_be_v1",
+      "provenance": {
+        "source": "https://search.murata.co.jp/Ceramy/image/img/A01X/G101/ENG/GCM21BR71H105KA03-01A.pdf",
+        "revision": "Murata GCM21BR71H105KA03 reference sheet dated 2024-11-28, reviewed 2026-07-27",
+        "sha256": "19f725a7b01f981f33aeb7446e16f61398116168eea4ac05a70e2146bee8c049",
+        "review_status": "reviewed",
+        "allowed_analyses": [
+          "dc_operating_point",
+          "distortion",
+          "startup",
+          "thermal",
+          "transient"
+        ],
+        "min_temperature_c": -55,
+        "max_temperature_c": 125
+      }
+    },
+    {
+      "catalog_id": "capacitor.murata.gcm21br71h105ka03l.0805",
+      "family": "capacitor",
+      "model_id": "mna_capacitor_v1",
+      "provenance": {
+        "source": "kicadai:trusted-simulation-registry",
+        "revision": "kicadai.trusted-simulation-registry.v1",
+        "sha256": "ef0b29d721870e25f9e49b43cfbcf2510a7136e6ba50da1ad0da0c7b1360d226",
+        "review_status": "reviewed",
+        "allowed_analyses": [
+          "ac_sweep",
+          "dc_operating_point",
+          "noise",
+          "stability",
+          "thermal"
+        ],
+        "min_temperature_c": -55,
+        "max_temperature_c": 125
+      }
+    },
+    {
+      "catalog_id": "capacitor.murata.gcm21br71h105ka03l.0805",
+      "family": "capacitor",
+      "model_id": "rc_lowpass_ac_v1",
+      "provenance": {
+        "source": "kicadai:trusted-simulation-registry",
+        "revision": "kicadai.trusted-simulation-registry.v1",
         "sha256": "fa3f2e5de7f34219b8f1fc7438ba14793c99a4d789173cf53db1045f42accca8",
         "review_status": "reviewed",
         "allowed_analyses": [
@@ -1223,6 +1319,62 @@
       }
     },
     {
+      "catalog_id": "isolated_converter.traco.tec3_2411ui.sip8",
+      "family": "isolated_converter",
+      "model_id": "mna_protected_isolated_converter_v1",
+      "provenance": {
+        "source": "https://www.tracopower.com/products/tec3ui.pdf",
+        "revision": "TRACO TEC 3UI datasheet, reviewed July 27, 2026",
+        "sha256": "e9bab20323ac6c2432c27e9b8c90b552c2db900f4177ea36a309b1701c2a2c63",
+        "review_status": "reviewed",
+        "allowed_analyses": ["dc_operating_point", "startup", "thermal", "transient"],
+        "min_temperature_c": -40,
+        "max_temperature_c": 80
+      }
+    },
+    {
+      "catalog_id": "isolated_converter.traco.tec3_2412ui.sip8",
+      "family": "isolated_converter",
+      "model_id": "mna_protected_isolated_converter_v1",
+      "provenance": {
+        "source": "https://www.tracopower.com/products/tec3ui.pdf",
+        "revision": "TRACO TEC 3UI datasheet, reviewed July 27, 2026",
+        "sha256": "e9bab20323ac6c2432c27e9b8c90b552c2db900f4177ea36a309b1701c2a2c63",
+        "review_status": "reviewed",
+        "allowed_analyses": ["dc_operating_point", "startup", "thermal", "transient"],
+        "min_temperature_c": -40,
+        "max_temperature_c": 80
+      }
+    },
+    {
+      "catalog_id": "isolated_converter.traco.tri10_1212.dip24",
+      "family": "isolated_converter",
+      "model_id": "mna_protected_isolated_converter_v1",
+      "provenance": {
+        "source": "https://www.tracopower.com/products/tri10.pdf",
+        "revision": "TRACO TRI 10 datasheet, revised April 15, 2026",
+        "sha256": "e9bab20323ac6c2432c27e9b8c90b552c2db900f4177ea36a309b1701c2a2c63",
+        "review_status": "reviewed",
+        "allowed_analyses": ["dc_operating_point", "startup", "thermal", "transient"],
+        "min_temperature_c": -40,
+        "max_temperature_c": 85
+      }
+    },
+    {
+      "catalog_id": "isolated_converter.traco.tri10_2412.dip24",
+      "family": "isolated_converter",
+      "model_id": "mna_protected_isolated_converter_v1",
+      "provenance": {
+        "source": "https://www.tracopower.com/products/tri10.pdf",
+        "revision": "TRACO TRI 10 datasheet, revised April 15, 2026",
+        "sha256": "e9bab20323ac6c2432c27e9b8c90b552c2db900f4177ea36a309b1701c2a2c63",
+        "review_status": "reviewed",
+        "allowed_analyses": ["dc_operating_point", "startup", "thermal", "transient"],
+        "min_temperature_c": -40,
+        "max_temperature_c": 85
+      }
+    },
+    {
       "catalog_id": "isolated_converter.traco.tel12_1222.dip16",
       "family": "isolated_converter",
       "model_id": "mna_dual_output_isolated_converter_v1",
@@ -1297,6 +1449,20 @@
       "provenance": {
         "source": "https://ww1.microchip.com/downloads/en/DeviceDoc/Atmel-7810-Automotive-Microcontrollers-ATmega328P_Datasheet.pdf",
         "revision": "ATmega328P complete datasheet; reviewed catalog maximum supply-current envelope",
+        "sha256": "8bbd6f7610b0568484cb58ba6f915fdcb5d716986839a41c2cff525def6bb159",
+        "review_status": "reviewed",
+        "allowed_analyses": ["ac_sweep", "dc_operating_point", "distortion", "noise", "stability", "startup", "thermal", "transient"],
+        "min_temperature_c": -40,
+        "max_temperature_c": 85
+      }
+    },
+    {
+      "catalog_id": "mcu.st.stm32g031k8t6.lqfp32",
+      "family": "mcu",
+      "model_id": "mna_mcu_static_supply_load_v1",
+      "provenance": {
+        "source": "https://www.st.com/resource/en/datasheet/stm32g031k8.pdf",
+        "revision": "DS12992 Rev 4, June 2025; reviewed absolute maximum VDD/VDDA current envelope",
         "sha256": "8bbd6f7610b0568484cb58ba6f915fdcb5d716986839a41c2cff525def6bb159",
         "review_status": "reviewed",
         "allowed_analyses": ["ac_sweep", "dc_operating_point", "distortion", "noise", "stability", "startup", "thermal", "transient"],
@@ -1411,6 +1577,26 @@
       }
     },
     {
+      "catalog_id": "level_translator.ti.sn74axc8t245pwr.tssop24",
+      "family": "level_translator",
+      "model_id": "mna_direction_controlled_translator_v1",
+      "provenance": {
+        "source": "https://www.ti.com/lit/ds/symlink/sn74axc8t245.pdf",
+        "revision": "SCES875C, revised January 2024; source PDF SHA-256 6cf4003c438c0546fb86f0932613896197dd19a75bdb307f385eb6e75535126e",
+        "sha256": "f491a22ca5666a563e3804aef23dce828720dc8da4205460352c9a5d46a44721",
+        "review_status": "reviewed",
+        "allowed_analyses": [
+          "ac_sweep",
+          "dc_operating_point",
+          "startup",
+          "thermal",
+          "transient"
+        ],
+        "min_temperature_c": -40,
+        "max_temperature_c": 125
+      }
+    },
+    {
       "catalog_id": "level_translator.ti.txs0102dcu.vssop8",
       "family": "level_translator",
       "model_id": "mna_bidirectional_open_drain_translator_v1",
@@ -1420,6 +1606,26 @@
         "sha256": "1dc318309c5f8e29d2f7bb907cb670f859947aa43b456c71d28a3d6300f7fc26",
         "review_status": "reviewed",
         "allowed_analyses": [
+          "dc_operating_point",
+          "startup",
+          "thermal",
+          "transient"
+        ],
+        "min_temperature_c": -40,
+        "max_temperature_c": 85
+      }
+    },
+    {
+      "catalog_id": "level_translator.ti.txs0104epw.tssop14",
+      "family": "level_translator",
+      "model_id": "mna_push_pull_translator_v1",
+      "provenance": {
+        "source": "https://www.ti.com/lit/ds/symlink/txs0104e.pdf",
+        "revision": "SCES651K, revised October 2023; source PDF SHA-256 2330f1b04460e582745ce291057f6152cd3709dd06dfe87f8cf51e2a38a5f94b",
+        "sha256": "b6bcd1c4a29c714a62e0e001d3692bc321442e2fde3875d00208696cfead10c5",
+        "review_status": "reviewed",
+        "allowed_analyses": [
+          "ac_sweep",
           "dc_operating_point",
           "startup",
           "thermal",
@@ -1445,6 +1651,25 @@
           "transient"
         ],
         "min_temperature_c": -40,
+        "max_temperature_c": 125
+      }
+    },
+    {
+      "catalog_id": "isolator.ti.iso7741fdw.soic16w",
+      "family": "isolator",
+      "model_id": "mna_push_pull_digital_isolator_v1",
+      "provenance": {
+        "source": "https://www.ti.com/lit/ds/symlink/iso7741.pdf",
+        "revision": "SLLSEP4J, revised October 2024; ISO7741FDW reviewed operating and isolation limits",
+        "sha256": "1560a97df709574769d978fc5df4aa96dce1c83623b873ba350350e63b409f3b",
+        "review_status": "reviewed",
+        "allowed_analyses": [
+          "dc_operating_point",
+          "startup",
+          "thermal",
+          "transient"
+        ],
+        "min_temperature_c": -55,
         "max_temperature_c": 125
       }
     },
@@ -1589,6 +1814,25 @@
         "source": "https://www.ti.com/lit/ds/symlink/tps22917.pdf",
         "revision": "TI TPS22917 SLVSDW8B, revised December 2021, reviewed 2026-07-25",
         "sha256": "983edeaa5de32b1d5094221a21e79baaefa7250e4e9ce28901d67436f1585a2e",
+        "review_status": "reviewed",
+        "allowed_analyses": [
+          "dc_operating_point",
+          "startup",
+          "thermal",
+          "transient"
+        ],
+        "min_temperature_c": -40,
+        "max_temperature_c": 125
+      }
+    },
+    {
+      "catalog_id": "protection.ti.tps26600pwp.htssop16",
+      "family": "protection",
+      "model_id": "mna_current_limiting_efuse_v1",
+      "provenance": {
+        "source": "https://www.ti.com/lit/ds/symlink/tps2660.pdf",
+        "revision": "TI TPS2660 SLVSDG2G, revised December 2019, reviewed July 27, 2026",
+        "sha256": "05ae9d917af3b1e4e9328d94bf741c192d21fe14c39eeb5d515f317e26e7e161",
         "review_status": "reviewed",
         "allowed_analyses": [
           "dc_operating_point",
@@ -2674,6 +2918,20 @@
         "allowed_analyses": ["dc_operating_point", "startup", "transient"],
         "min_temperature_c": -40,
         "max_temperature_c": 125
+      }
+    },
+    {
+      "catalog_id": "regulator.traco.tsr1_24120.sip3",
+      "family": "regulator",
+      "model_id": "mna_fixed_step_down_module_v1",
+      "provenance": {
+        "source": "https://www.tracopower.com/tsr1-datasheet",
+        "revision": "TRACO TSR 1 datasheet, revised April 15, 2026",
+        "sha256": "80a9db64a5b6832763d099a91df8016c13601e94f3478a14b7a080715619773b",
+        "review_status": "reviewed",
+        "allowed_analyses": ["dc_operating_point", "startup", "thermal", "transient"],
+        "min_temperature_c": -40,
+        "max_temperature_c": 85
       }
     },
     {

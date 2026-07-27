@@ -10,6 +10,7 @@ import (
 	"path"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -1040,12 +1041,33 @@ func validateTranslatorEvidence(path string, evidence *TranslatorEvidence) []rep
 	issues = append(issues, validateEvidenceRange(path+".side_a_voltage", evidence.SideAVoltage, true)...)
 	issues = append(issues, validateEvidenceRange(path+".side_b_voltage", evidence.SideBVoltage, true)...)
 	issues = append(issues, validateEvidenceMeasurement(path+".maximum_frequency", evidence.MaximumFrequency, true)...)
+	issues = append(issues, validateEvidenceMeasurement(path+".maximum_open_drain_frequency", evidence.MaximumOpenDrainFrequency, true)...)
+	issues = append(issues, validateEvidenceMeasurement(path+".maximum_push_pull_frequency", evidence.MaximumPushPullFrequency, true)...)
 	issues = append(issues, validateEvidenceMeasurement(path+".startup_time", evidence.StartupTime, evidence.FabricationProof)...)
-	if evidence.SideAVoltage == nil || evidence.SideBVoltage == nil || evidence.MaximumFrequency == nil {
+	if evidence.SideAVoltage == nil || evidence.SideBVoltage == nil ||
+		evidence.MaximumFrequency == nil && evidence.MaximumOpenDrainFrequency == nil && evidence.MaximumPushPullFrequency == nil {
 		issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, path, "translator evidence requires both voltage ranges and maximum frequency"))
 	}
 	if strings.TrimSpace(evidence.StartupState) == "" {
 		issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, path+".startup_state", "translator evidence requires a startup state"))
+	}
+	if slices.Contains(evidence.Directions, "direction_controlled") {
+		if len(evidence.ControlFunctions) == 0 {
+			issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, path+".control_functions", "direction-controlled translator evidence requires control functions"))
+		}
+		for index, function := range evidence.ControlFunctions {
+			if issue, ok := validateTrimmedMetadata(fmt.Sprintf("%s.control_functions[%d]", path, index), function, "translator control function"); ok {
+				issues = append(issues, issue)
+			}
+		}
+		if evidence.DirectionChangePolicy != "outputs_disabled" {
+			issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, path+".direction_change_policy", "direction-controlled translator evidence requires outputs_disabled direction changes"))
+		}
+		switch evidence.EnableActiveLevel {
+		case "low", "high":
+		default:
+			issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, path+".enable_active_level", "direction-controlled translator evidence requires a low or high enable active level"))
+		}
 	}
 	if evidence.FabricationProof && (!evidence.PartialPowerDown || evidence.StartupTime == nil) {
 		issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, path, "fabrication-oriented translator evidence requires partial-power-down and startup-time proof"))

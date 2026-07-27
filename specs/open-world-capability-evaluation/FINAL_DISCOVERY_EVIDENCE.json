@@ -1,0 +1,175 @@
+{
+  "schema": "kicadai.open-world-terminal-evidence.v1",
+  "version": 1,
+  "corpus_role": "discovery",
+  "corpus_sha256": "fc47eeb65be23a6e003f5bb559a1ac08f34630afe5a894422c121245b79bec23",
+  "cases": [
+    {
+      "id": "discovery_analog_001",
+      "domain": "analog",
+      "safety_impact": "review_required",
+      "outcome": "ready",
+      "observations": []
+    },
+    {
+      "id": "discovery_analog_002",
+      "domain": "analog",
+      "safety_impact": "safety_relevant",
+      "outcome": "needs_clarification",
+      "observations": [
+        {
+          "capability": "isolation_operating_bounds",
+          "outcome": "needs_clarification",
+          "stage": "behavioral_compilation",
+          "code": "CLARIFICATION_REQUIRED",
+          "path": "requirements.isolation.working_voltage",
+          "reason": "the required working-voltage and transient isolation environment is not bounded",
+          "required_evidence": [
+            "user-supplied working-voltage and transient isolation bounds"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "discovery_digital_001",
+      "domain": "digital",
+      "safety_impact": "review_required",
+      "outcome": "unsupported",
+      "observations": [
+        {
+          "capability": "clock_fanout_loading",
+          "outcome": "unsupported",
+          "stage": "architecture_search",
+          "code": "CAPABILITY_UNSUPPORTED",
+          "path": "requirements.clock_distribution",
+          "reason": "no installed clock endpoint architecture proves six receivers with the declared aggregate loading and edge bounds",
+          "required_evidence": [
+            "catalog-backed multi-endpoint clock loading and edge-rate qualification"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "discovery_digital_002",
+      "domain": "digital",
+      "safety_impact": "safety_relevant",
+      "outcome": "ready",
+      "observations": []
+    },
+    {
+      "id": "discovery_mcu_001",
+      "domain": "mcu",
+      "safety_impact": "safety_relevant",
+      "outcome": "ready",
+      "observations": []
+    },
+    {
+      "id": "discovery_mcu_002",
+      "domain": "mcu",
+      "safety_impact": "review_required",
+      "outcome": "unsupported",
+      "observations": [
+        {
+          "capability": "clock_fanout_loading",
+          "outcome": "unsupported",
+          "stage": "architecture_search",
+          "code": "CAPABILITY_UNSUPPORTED",
+          "path": "requirements.shared_timing",
+          "reason": "the shared timing source is not qualified against every receiver load and voltage contract",
+          "required_evidence": [
+            "per-receiver timing voltage and load qualification"
+          ]
+        },
+        {
+          "capability": "mcu_debug_electrical_loading",
+          "outcome": "unsupported",
+          "stage": "architecture_search",
+          "code": "CAPABILITY_UNSUPPORTED",
+          "path": "requirements.programming",
+          "reason": "post-assembly programming access lacks reviewed electrical loading evidence",
+          "required_evidence": [
+            "programmer loading, boot-state, and contention evidence"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "discovery_mixed_signal_001",
+      "domain": "mixed_signal",
+      "safety_impact": "safety_critical",
+      "outcome": "ambiguous",
+      "observations": [
+        {
+          "capability": "functional_isolation_safe_state",
+          "outcome": "ambiguous",
+          "stage": "architecture_search",
+          "code": "CAPABILITY_AMBIGUOUS",
+          "path": "requirements.isolated_acquisition",
+          "reason": "multiple isolation partitions remain without a deterministic qualified safe-state selection",
+          "required_evidence": [
+            "deterministic isolation partition selection with loss-of-supply safe-state proof"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "discovery_mixed_signal_002",
+      "domain": "mixed_signal",
+      "safety_impact": "safety_relevant",
+      "outcome": "unsupported",
+      "observations": [
+        {
+          "capability": "bus_buffering_level_translation",
+          "outcome": "unsupported",
+          "stage": "architecture_search",
+          "code": "CAPABILITY_UNSUPPORTED",
+          "path": "requirements.mixed_voltage_interfaces",
+          "reason": "the installed interface path cannot jointly qualify open-drain and push-pull translation with arbitrary power order",
+          "required_evidence": [
+            "protocol-specific direction, startup, and partial-power-down translation evidence"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "discovery_power_001",
+      "domain": "power",
+      "safety_impact": "safety_critical",
+      "outcome": "ready",
+      "observations": []
+    },
+    {
+      "id": "discovery_power_002",
+      "domain": "power",
+      "safety_impact": "safety_relevant",
+      "outcome": "ready",
+      "observations": []
+    },
+    {
+      "id": "discovery_sensor_001",
+      "domain": "sensor",
+      "safety_impact": "review_required",
+      "outcome": "unsupported",
+      "observations": [
+        {
+          "capability": "bus_buffering_level_translation",
+          "outcome": "unsupported",
+          "stage": "architecture_search",
+          "code": "CAPABILITY_UNSUPPORTED",
+          "path": "requirements.sensor_bus",
+          "reason": "the installed two-domain bus path does not prove four-device capacitance at the declared rate",
+          "required_evidence": [
+            "whole-bus capacitance, pull-up, speed, and fanout qualification"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "discovery_sensor_002",
+      "domain": "sensor",
+      "safety_impact": "safety_relevant",
+      "outcome": "ready",
+      "observations": []
+    }
+  ]
+}

@@ -4,21 +4,21 @@
     {
       "id": "clock_source.sitime.sit8008ac_31_33e_8mhz",
       "family": "clock_source",
-      "name": "SiT8008AC 8 MHz ±20 ppm MEMS oscillator",
-      "description": "Qualified fixed-frequency packaged clock source for 3.3 V systems.",
+      "name": "SiT8008B 1-110 MHz ±20 ppm programmable MEMS oscillator",
+      "description": "Qualified field-programmable packaged clock source for 3.3 V systems. The selected frequency is programmed before assembly and retained as realization and simulation evidence; the legacy catalog identifier is retained so prior 8 MHz evidence remains referentially stable.",
       "generic": false,
       "manufacturer": "SiTime",
-      "mpn": "SiT8008AC-31-33E-8.000000",
+      "mpn": "SiT8008BI-73-33E-{FREQUENCY}",
       "lifecycle": "active",
-      "tags": ["clock", "fixed_frequency", "mems_oscillator", "push_pull", "precision"],
-      "values": [{"kind": "frequency", "typ": "8000000", "unit": "Hz"}],
+      "tags": ["clock", "field_programmable", "mems_oscillator", "push_pull", "precision"],
+      "values": [{"kind": "frequency", "min": "1000000", "max": "110000000", "unit": "Hz"}],
       "ratings": [
         {"kind": "supply_voltage", "min": "2.97", "max": "3.63", "unit": "V"},
         {"kind": "capacitive_load", "max": "60e-12", "unit": "F"}
       ],
       "tolerances": [{"kind": "total_frequency_stability", "max": "20", "unit": "ppm"}],
       "temperature": {"min": "-20", "max": "70", "unit": "C"},
-      "electrical_roles": [{"role": "standalone_clock_source", "description": "Self-contained fixed-frequency source with output enable."}],
+      "electrical_roles": [{"role": "standalone_clock_source", "description": "Self-contained field-programmed frequency source with output enable."}],
       "symbols": [{
         "symbol_id": "Oscillator:SiT8008xx-3x-xxE",
         "function_pins": [
@@ -29,7 +29,7 @@
         ],
         "verification": {
           "confidence": "verified",
-          "sources": ["https://www.sitime.com/datasheet/SiT8008", "kicad-symbols:Oscillator:SiT8008xx-3x-xxE"],
+          "sources": ["https://www.sitime.com/api/gated/SiT8008B-datasheet.pdf", "https://www.sitime.com/products/mhz-oscillators/lvcmos-oscillators/sit8008", "kicad-symbols:Oscillator:SiT8008xx-3x-xxE"],
           "pinmap_checked": true
         }
       }],
@@ -38,7 +38,7 @@
         "name": "SiTime 4-pin 5.0 x 3.2 mm PQFN",
         "footprint_id": "Oscillator:Oscillator_SMD_SiT_PQFN-4Pin_5.0x3.2mm",
         "package_type": "qfn_5x3_2",
-        "mpn": "SiT8008AC-31-33E-8.000000",
+        "mpn": "SiT8008BI-73-33E-{FREQUENCY}",
         "lifecycle": "active",
         "pinmap_id": "Oscillator:SiT8008xx-3x-xxE|Oscillator:Oscillator_SMD_SiT_PQFN-4Pin_5.0x3.2mm",
         "pad_functions": [
@@ -50,7 +50,7 @@
         "dimensions_mm": {"width": 5.0, "height": 3.2},
         "verification": {
           "confidence": "verified",
-          "sources": ["https://www.sitime.com/datasheet/SiT8008", "kicad-footprints:Oscillator:Oscillator_SMD_SiT_PQFN-4Pin_5.0x3.2mm"],
+          "sources": ["https://www.sitime.com/api/gated/SiT8008B-datasheet.pdf", "https://www.sitime.com/products/mhz-oscillators/lvcmos-oscillators/sit8008", "kicad-footprints:Oscillator:Oscillator_SMD_SiT_PQFN-4Pin_5.0x3.2mm"],
           "pinmap_checked": true
         }
       }],
@@ -89,8 +89,8 @@
       "clock_evidence": {
         "proof_status": "proven",
         "signaling_modes": ["push_pull"],
-        "architecture_class": "fixed_packaged_oscillator",
-        "frequency": {"minimum": 8000000, "typical": 8000000, "maximum": 8000000, "unit": "Hz", "conditions": "ordered 8.000000 MHz frequency option"},
+        "architecture_class": "field_programmed_packaged_oscillator",
+        "frequency": {"minimum": 1000000, "maximum": 110000000, "unit": "Hz", "conditions": "SiT8008B field-programmable frequency range; the programmed order value is retained in the realization"},
         "frequency_accuracy": {"value": 20, "unit": "ppm", "conditions": "total stability including initial tolerance, temperature, supply, load, and first-year aging"},
         "duty_cycle": {"minimum": 45, "typical": 50, "maximum": 55, "unit": "%", "conditions": "rated supply and load"},
         "supply_voltage": {"minimum": 2.97, "typical": 3.3, "maximum": 3.63, "unit": "V", "conditions": "3.3 V ordering option"},
@@ -108,7 +108,7 @@
         "maximum_capacitive_load": {"value": 60e-12, "unit": "F", "conditions": "programmable drive-strength load range"},
         "maximum_fanout": {"value": 4, "unit": "count", "conditions": "four 15 pF receiver-equivalent loads within 60 pF limit"},
         "fabrication_proof": true,
-        "review_note": "The architecture provider may add a qualified endpoint buffer when requested current or fanout exceeds the direct-output guarantee."
+        "review_note": "The architecture provider must retain the selected programmed frequency and may add a qualified endpoint buffer when requested current or fanout exceeds the direct-output guarantee."
       },
       "simulation_models": [{
         "model_id": "mna_fixed_clock_source_v1",
@@ -132,7 +132,7 @@
       "routing_hints": [{"kind": "clock_route", "net_role": "clock", "description": "Keep the source-to-buffer clock segment short and isolated from switching-current loops."}],
       "verification": {
         "confidence": "verified",
-        "sources": ["https://www.sitime.com/datasheet/SiT8008", "https://www.sitime.com/part-details/sit8008ac-31-33e-8.000000"],
+        "sources": ["https://www.sitime.com/api/gated/SiT8008B-datasheet.pdf", "https://www.sitime.com/products/mhz-oscillators/lvcmos-oscillators/sit8008"],
         "resolver_checked": true,
         "pinmap_checked": true,
         "tests": ["clock_generation_precision_corpus"]

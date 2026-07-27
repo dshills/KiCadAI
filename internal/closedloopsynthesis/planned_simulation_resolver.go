@@ -91,6 +91,7 @@ type SimulationOperatingBinding struct {
 	ReferenceComponent string  `json:"reference_component,omitempty"`
 	Parameter          string  `json:"parameter,omitempty"`
 	Scale              float64 `json:"scale,omitempty"`
+	Offset             float64 `json:"offset,omitempty"`
 }
 
 type PlannedSimulationResolver struct {
@@ -1256,9 +1257,21 @@ func applyCurrentEventBinding(analysis *simmodel.Analysis, plan simmodel.Plan, e
 	if sourceExcitationIndex(*analysis, binding.Component) >= 0 {
 		initial := sourceExcitationDCValue(*analysis, binding.Component)
 		if event.Initial != nil {
-			initial = *event.Initial
+			var ok bool
+			initial, ok = physicalLoadCurrent(binding, *event.Initial)
+			if !ok {
+				return false, &Diagnostic{Path: event.ID, Message: "initial current event is below the catalog-backed parallel support load"}
+			}
 		}
-		return appendSourceValueEvent(analysis, event, binding.Component, initial, event.Applied, cloneOptionalFloat(event.Recovered))
+		applied, ok := physicalLoadCurrent(binding, event.Applied)
+		if !ok {
+			return false, &Diagnostic{Path: event.ID, Message: "applied current event is below the catalog-backed parallel support load"}
+		}
+		recovered, ok := physicalLoadCurrentOptional(binding, event.Recovered)
+		if !ok {
+			return false, &Diagnostic{Path: event.ID, Message: "recovered current event is below the catalog-backed parallel support load"}
+		}
+		return appendSourceValueEvent(analysis, event, binding.Component, initial, applied, recovered)
 	}
 	if binding.Kind != OperatingLoadCurrent || binding.Scale <= 0 {
 		return false, nil
@@ -1271,15 +1284,27 @@ func applyCurrentEventBinding(analysis *simmodel.Analysis, plan simmodel.Plan, e
 	if event.Initial != nil {
 		initialCurrent = *event.Initial
 	}
+	initialCurrent, ok = physicalLoadCurrent(binding, initialCurrent)
+	if !ok {
+		return false, &Diagnostic{Path: event.ID, Message: "initial current event is below the catalog-backed parallel support load"}
+	}
+	appliedCurrent, ok := physicalLoadCurrent(binding, event.Applied)
+	if !ok {
+		return false, &Diagnostic{Path: event.ID, Message: "applied current event is below the catalog-backed parallel support load"}
+	}
+	recoveredCurrent, ok := physicalLoadCurrentOptional(binding, event.Recovered)
+	if !ok {
+		return false, &Diagnostic{Path: event.ID, Message: "recovered current event is below the catalog-backed parallel support load"}
+	}
 	initial, ok := equivalentLoadResistance(scale, initialCurrent)
 	if !ok {
 		return false, &Diagnostic{Path: event.ID, Message: "current event cannot be represented by the resolved equivalent physical load"}
 	}
-	applied, ok := equivalentLoadResistance(scale, event.Applied)
+	applied, ok := equivalentLoadResistance(scale, appliedCurrent)
 	if !ok {
 		return false, &Diagnostic{Path: event.ID, Message: "applied current event exceeds the resolved equivalent physical-load range"}
 	}
-	recovered, ok := equivalentLoadResistanceOptional(scale, event.Recovered)
+	recovered, ok := equivalentLoadResistanceOptional(scale, recoveredCurrent)
 	if !ok {
 		return false, &Diagnostic{Path: event.ID, Message: "recovered current event exceeds the resolved equivalent physical-load range"}
 	}
@@ -1288,7 +1313,7 @@ func applyCurrentEventBinding(analysis *simmodel.Analysis, plan simmodel.Plan, e
 
 func resolvedLoadCurrent(analysis simmodel.Analysis, plan simmodel.Plan, binding SimulationOperatingBinding) (float64, bool) {
 	if sourceExcitationIndex(analysis, binding.Component) >= 0 {
-		current := sourceExcitationDCValue(analysis, binding.Component)
+		current := semanticLoadCurrent(binding, sourceExcitationDCValue(analysis, binding.Component))
 		return current, finite(current) && current >= 0
 	}
 	if binding.Kind != OperatingLoadCurrent || binding.Scale <= 0 {
@@ -1302,8 +1327,34 @@ func resolvedLoadCurrent(analysis simmodel.Analysis, plan simmodel.Plan, binding
 	if resistance <= 0 {
 		return 0, false
 	}
-	current := scale / resistance
+	current := semanticLoadCurrent(binding, scale/resistance)
 	return current, finite(current) && current >= 0
+}
+
+func physicalLoadCurrent(binding SimulationOperatingBinding, semantic float64) (float64, bool) {
+	if !finite(semantic) || !finite(binding.Offset) {
+		return 0, false
+	}
+	physical := semantic + binding.Offset
+	if physical < 0 && physical >= -1e-12*math.Max(1, math.Abs(semantic)) {
+		physical = 0
+	}
+	return physical, physical >= 0 && finite(physical)
+}
+
+func physicalLoadCurrentOptional(binding SimulationOperatingBinding, semantic *float64) (*float64, bool) {
+	if semantic == nil {
+		return nil, true
+	}
+	physical, ok := physicalLoadCurrent(binding, *semantic)
+	if !ok {
+		return nil, false
+	}
+	return &physical, true
+}
+
+func semanticLoadCurrent(binding SimulationOperatingBinding, physical float64) float64 {
+	return physical - binding.Offset
 }
 
 func resolvedLoadResistanceScale(analysis simmodel.Analysis, binding SimulationOperatingBinding) (float64, bool) {
@@ -1655,15 +1706,15 @@ func planHasAutonomousTransientDevice(plan simmodel.Plan) bool {
 func validOperatingBinding(binding SimulationOperatingBinding) bool {
 	switch binding.Kind {
 	case OperatingSourceDCValue, OperatingSourceFrequencyHz, OperatingDeviceValueSI:
-		return binding.Component != "" && binding.ReferenceComponent == "" && binding.Parameter == "" && binding.Scale == 0
+		return binding.Component != "" && binding.ReferenceComponent == "" && binding.Parameter == "" && binding.Scale == 0 && binding.Offset == 0
 	case OperatingLoadCurrent:
-		return binding.Component != "" && binding.Parameter == "" && finite(binding.Scale) && binding.Scale >= 0
+		return binding.Component != "" && binding.Parameter == "" && finite(binding.Scale) && binding.Scale >= 0 && finite(binding.Offset)
 	case OperatingModelParameter:
-		return binding.Component != "" && binding.ReferenceComponent == "" && binding.Parameter != "" && binding.Scale == 0
+		return binding.Component != "" && binding.ReferenceComponent == "" && binding.Parameter != "" && binding.Scale == 0 && binding.Offset == 0
 	case OperatingAnalysisCondition:
-		return binding.Component == "" && binding.ReferenceComponent == "" && binding.Parameter != "" && binding.Scale == 0
+		return binding.Component == "" && binding.ReferenceComponent == "" && binding.Parameter != "" && binding.Scale == 0 && binding.Offset == 0
 	case OperatingWorstCase:
-		return binding.Component == "" && binding.ReferenceComponent == "" && binding.Parameter == "" && binding.Scale == 0
+		return binding.Component == "" && binding.ReferenceComponent == "" && binding.Parameter == "" && binding.Scale == 0 && binding.Offset == 0
 	default:
 		return false
 	}
@@ -1681,13 +1732,21 @@ func applyOperatingAssignment(analysis *simmodel.Analysis, plan *simmodel.Plan, 
 		if assignment.Value == nil {
 			return &Diagnostic{Path: binding.Axis, Message: "source operating binding requires a numeric corner"}
 		}
+		physicalValue := *assignment.Value
+		if binding.Kind == OperatingLoadCurrent {
+			var ok bool
+			physicalValue, ok = physicalLoadCurrent(binding, *assignment.Value)
+			if !ok {
+				return &Diagnostic{Path: binding.Axis, Message: "load-current corner is below the catalog-backed parallel support load"}
+			}
+		}
 		for index := range analysis.Excitations {
 			if analysis.Excitations[index].Component == binding.Component {
 				if binding.Axis == "load_current" {
 					if delay, width, period, ok := operatingPulseWindow(*analysis, binding.Component); ok {
 						analysis.Excitations[index].DCValue = 0
 						analysis.Excitations[index].PulseInitialValue = 0
-						analysis.Excitations[index].PulseValue = *assignment.Value
+						analysis.Excitations[index].PulseValue = physicalValue
 						analysis.Excitations[index].PulseDelayS = delay
 						analysis.Excitations[index].PulseWidthS = width
 						analysis.Excitations[index].PulsePeriodS = period
@@ -1695,9 +1754,9 @@ func applyOperatingAssignment(analysis *simmodel.Analysis, plan *simmodel.Plan, 
 					}
 				}
 				if analysis.Excitations[index].PulsePeriodS != 0 {
-					analysis.Excitations[index].PulseValue = *assignment.Value
+					analysis.Excitations[index].PulseValue = physicalValue
 				} else {
-					analysis.Excitations[index].DCValue = *assignment.Value
+					analysis.Excitations[index].DCValue = physicalValue
 				}
 				return nil
 			}
@@ -1707,7 +1766,7 @@ func applyOperatingAssignment(analysis *simmodel.Analysis, plan *simmodel.Plan, 
 				if device.Component != binding.Component || device.Family != "resistor" || device.ValueSI == nil {
 					continue
 				}
-				if *assignment.Value < 0 || !finite(*assignment.Value) || binding.Scale <= 0 {
+				if physicalValue < 0 || !finite(physicalValue) || binding.Scale <= 0 {
 					return &Diagnostic{Path: binding.Axis, Message: "equivalent load-current resistance requires a finite nonnegative current and positive resolved voltage scale"}
 				}
 				scale := binding.Scale
@@ -1719,8 +1778,8 @@ func applyOperatingAssignment(analysis *simmodel.Analysis, plan *simmodel.Plan, 
 					scale = reference
 				}
 				resistance := maxCompiledAssertionBound
-				if *assignment.Value > 0 {
-					resistance = scale / *assignment.Value
+				if physicalValue > 0 {
+					resistance = scale / physicalValue
 				}
 				if !finite(resistance) || resistance <= 0 || resistance > maxCompiledAssertionBound {
 					return &Diagnostic{Path: binding.Axis, Message: "equivalent load-current resistance exceeds the trusted numeric range"}

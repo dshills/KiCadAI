@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 
@@ -20,7 +21,7 @@ func TestStandaloneClockGenerationSelectsDistinctCatalogBackedArchitectures(t *t
 		t.Fatal(issues)
 	}
 	wantArchitectures := map[string]string{
-		"precision_logic_clock": "buffered_fixed_packaged_oscillator",
+		"precision_logic_clock": "buffered_field_programmed_packaged_oscillator",
 		"relaxed_logic_clock":   "buffered_resistor_programmed_relaxation_oscillator",
 	}
 	for id, wantArchitecture := range wantArchitectures {
@@ -150,6 +151,64 @@ func TestStandaloneClockGenerationSelectsDistinctCatalogBackedArchitectures(t *t
 				}
 			}
 		})
+	}
+}
+
+func TestStandaloneClockGenerationUsesQualifiedDirectDriveWhenBufferLoadIsExceeded(t *testing.T) {
+	contents, err := os.ReadFile(filepath.Join("testdata", "standalone_clock_generation_corpus", "precision_logic_clock.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	requirement, decodeIssues := DecodeStrict(bytes.NewReader(contents))
+	if len(decodeIssues) != 0 {
+		t.Fatal(decodeIssues)
+	}
+	replaceClockConstraint(&requirement, targetConstraint("output_frequency", 1_000_000, "Hz", 0.01))
+	replaceClockConstraint(&requirement, constraintNumber("clock_fanout", "minimum", 3, "", 0))
+	setClockOperatingBounds(&requirement, "load_capacitance", 54e-12, 54e-12)
+	for index := range requirement.Requirements.Ports {
+		port := &requirement.Requirements.Ports[index]
+		if port.ID != "clock" {
+			continue
+		}
+		port.Electrical.FrequencyMaxHz = float64Pointer(1_000_000)
+		port.Electrical.MaxSourceCurrentMA = float64Pointer(4)
+		port.Protocol.MaxFrequencyHz = 1_000_000
+	}
+	for index := range requirement.Requirements.BehavioralRequirements {
+		behavior := &requirement.Requirements.BehavioralRequirements[index]
+		if behavior.Metric == "rise_time" || behavior.Metric == "fall_time" {
+			maximum := 120e-9
+			behavior.Max = &maximum
+		}
+	}
+	registry, registryIssues := NewCatalogRegistry(loadArchitectureCatalog(t))
+	if len(registryIssues) != 0 {
+		t.Fatal(registryIssues)
+	}
+	result := Search(context.Background(), requirement, registry, SearchOptions{CatalogHash: registry.Hash()})
+	if result.Status != SearchSelected || result.Selected == nil || len(result.Selected.Selections) != 1 {
+		t.Fatalf("direct-drive search = status %s, issues %#v, rejections %#v", result.Status, result.Issues, result.Rejections)
+	}
+	selection := result.Selected.Selections[0]
+	if selection.ExpansionID != "direct_field_programmed_packaged_oscillator" {
+		t.Fatalf("direct-drive expansion = %q", selection.ExpansionID)
+	}
+	realization, err := DecodeFragmentRealization(selection.Payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if slices.ContainsFunc(realization.Instances, func(instance RealizationInstance) bool {
+		return instance.Usage == "clock_buffer"
+	}) {
+		t.Fatalf("direct-drive realization contains a buffer: %#v", realization.Instances)
+	}
+	sourceIndex := slices.IndexFunc(realization.Instances, func(instance RealizationInstance) bool {
+		return instance.Usage == "standalone_clock_source"
+	})
+	if sourceIndex < 0 || realization.Instances[sourceIndex].Value != "1000000" ||
+		!slices.Contains(realization.Instances[sourceIndex].Parameters, RealizationParameter{Name: "frequency_hz", Value: 1_000_000, Unit: "Hz"}) {
+		t.Fatalf("programmed source evidence = %#v", realization.Instances)
 	}
 }
 

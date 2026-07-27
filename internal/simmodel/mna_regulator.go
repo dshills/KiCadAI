@@ -8,6 +8,24 @@ import (
 func validateResolvedOperatingLimits(plan Plan, system mnaSystem, solution []complex128, allowPowerTransition bool) []Diagnostic {
 	var diagnostics []Diagnostic
 	for _, device := range plan.Devices {
+		if device.PrimitiveModel == PrimitiveFixedBuckModuleV1 {
+			parameters := namedValueMap(device.ModelParameters)
+			terminals := terminalMap(device)
+			ground := real(solvedNodeVoltage(system, solution, terminals["GND"]))
+			input := real(solvedNodeVoltage(system, solution, terminals["VIN"])) - ground
+			path := "devices." + device.Component
+			powerTransition := allowPowerTransition && input < parameters["input_min_v"]
+			if !powerTransition && (input < parameters["input_min_v"] || input > parameters["input_max_v"]) {
+				diagnostics = append(diagnostics, Diagnostic{Path: path + ".input_voltage", Message: fmt.Sprintf("fixed step-down module input %.12g V is outside catalog-backed range %.12g..%.12g V", input, parameters["input_min_v"], parameters["input_max_v"]), Suggestion: "adjust the source conditions or select a compatible reviewed fixed step-down module"})
+			}
+			branch, exists := system.branchIndex[device.Component]
+			if !exists || branch >= len(solution) {
+				diagnostics = append(diagnostics, Diagnostic{Path: path + ".output_current", Message: "fixed step-down module output-current branch is absent from the solved topology"})
+			} else if current := math.Abs(real(solution[branch])); !powerTransition && current > parameters["max_output_current_a"]+mnaOperatingCurrentTolerance(parameters["max_output_current_a"]) {
+				diagnostics = append(diagnostics, Diagnostic{Path: path + ".output_current", Message: fmt.Sprintf("fixed step-down module current %.12g A exceeds catalog-backed maximum %.12g A", current, parameters["max_output_current_a"]), Suggestion: "reduce output load or select a compatible reviewed fixed step-down module"})
+			}
+			continue
+		}
 		if device.PrimitiveModel == PrimitiveSynchronousBuckRegulatorV1 {
 			parameters := namedValueMap(device.ModelParameters)
 			terminals := terminalMap(device)
@@ -141,7 +159,7 @@ func validateResolvedOperatingLimits(plan Plan, system mnaSystem, solution []com
 			}
 			continue
 		}
-		if device.PrimitiveModel == PrimitiveSingleOutputIsolatedConverterV1 {
+		if device.PrimitiveModel == PrimitiveSingleOutputIsolatedConverterV1 || device.PrimitiveModel == PrimitiveProtectedIsolatedConverterV1 {
 			parameters := namedValueMap(device.ModelParameters)
 			terminals := terminalMap(device)
 			input := real(solvedNodeVoltage(system, solution, terminals["VIN_PLUS"]) - solvedNodeVoltage(system, solution, terminals["VIN_MINUS"]))
@@ -153,7 +171,7 @@ func validateResolvedOperatingLimits(plan Plan, system mnaSystem, solution []com
 			branch, exists := system.branchIndex[device.Component]
 			if !exists || branch >= len(solution) {
 				diagnostics = append(diagnostics, Diagnostic{Path: path + ".output_current", Message: "single-output isolated converter output-current branch is absent from the solved topology"})
-			} else if current := math.Abs(real(solution[branch])); current > parameters["max_output_current_a"] {
+			} else if current := math.Abs(real(solution[branch])); current > parameters["max_output_current_a"]+mnaOperatingCurrentTolerance(parameters["max_output_current_a"]) {
 				diagnostics = append(diagnostics, Diagnostic{Path: path + ".output_current", Message: fmt.Sprintf("single-output isolated converter current %.12g A exceeds catalog-backed maximum %.12g A", current, parameters["max_output_current_a"]), Suggestion: "reduce output load or select a compatible reviewed isolated converter"})
 			}
 			continue
@@ -180,7 +198,7 @@ func validateResolvedOperatingLimits(plan Plan, system mnaSystem, solution []com
 					diagnostics = append(diagnostics, Diagnostic{Path: path + "." + output.label + "_output_current", Message: "dual-output isolated converter output-current branch is absent from the solved topology"})
 					continue
 				}
-				if current := math.Abs(real(solution[branch])); !powerTransition && current > parameters[output.limit] {
+				if current := math.Abs(real(solution[branch])); !powerTransition && current > parameters[output.limit]+mnaOperatingCurrentTolerance(parameters[output.limit]) {
 					diagnostics = append(diagnostics, Diagnostic{Path: path + "." + output.label + "_output_current", Message: fmt.Sprintf("dual-output isolated converter %s output current %.12g A exceeds catalog-backed limit %.12g A", output.label, current, parameters[output.limit]), Suggestion: "reduce load current or select a compatible reviewed isolated converter"})
 				}
 			}
@@ -226,6 +244,10 @@ func validateResolvedOperatingLimits(plan Plan, system mnaSystem, solution []com
 		}
 	}
 	return diagnostics
+}
+
+func mnaOperatingCurrentTolerance(limit float64) float64 {
+	return 1e-9 * math.Max(1, math.Abs(limit))
 }
 
 func mnaBranchIsDisabled(system mnaSystem, component string) bool {

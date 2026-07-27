@@ -315,7 +315,7 @@ func TestCatalogAnalysisDependenciesKeepNoiseSourcesExplicitAndMapIdealBoundarie
 	for _, model := range []string{
 		PrimitiveComparatorOpenCollectorV1, PrimitiveDiodeShockleyV1, PrimitiveUnidirectionalZenerV1,
 		PrimitiveBidirectionalTVSV1, PrimitiveNMOSSwitchV1, PrimitivePMOSSwitchV1,
-		PrimitiveReverseBlockingLoadSwitchV1, PrimitiveMCUStaticSupplyLoadV1,
+		PrimitiveReverseBlockingLoadSwitchV1, PrimitiveCurrentLimitingEFuseV1, PrimitiveMCUStaticSupplyLoadV1,
 		PrimitiveSensorStaticSupplyLoadV1, PrimitiveBJTNPNV1, PrimitiveBJTPNPV1,
 	} {
 		if got := CatalogAnalysisDependencies(model, []string{AnalysisACSweep, AnalysisNoise, AnalysisStability}); !slices.Equal(got, []string{AnalysisDCOperatingPoint}) {

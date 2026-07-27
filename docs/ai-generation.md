@@ -759,6 +759,15 @@ switching, and split supplies pass the offline and installed-KiCad two-run
 gates. Run `make hierarchical-promotion-bundle` from an unmodified checkout to
 reproduce the matrix.
 
+The open-world evaluation adds a stricter breadth signal than curated
+all-passing corpora. Its frozen held-out set begins at 1/12 ready and improves
+to 6/12 through reusable clock, debug, push-pull translation, functional
+isolation, and protected isolated-power capabilities. The other six cases are
+not relabeled: one still needs user-owned isolation bounds and five remain
+unsupported with stable clustered reasons. Run
+`make open-world-capability-promotion-bundle` to reproduce the five physical
+promotions.
+
 The generic contract removes the architectural requirement for one provider
 schema per topology and its function form removes the requirement for the AI to
 enumerate pins, support components, or physical implementation details. It does
@@ -767,7 +776,9 @@ is limited to catalog-backed registered capabilities, bounded physical
 constraints, deterministic placement, and the explicit-circuit router. Six
 promoted explicit topology classes, eight held-out function-level circuits,
 and six hierarchical systems now pass. This is meaningful breadth evidence,
-not proof of arbitrary electronics. Dense boards, unregistered circuit
+not proof of arbitrary electronics. The open-world result shows measurable
+generalization progress while also quantifying the remaining boundary. Dense
+boards, unregistered circuit
 behavior, high-speed and RF constraints, comprehensive analog performance,
 high-energy thermal/safe-operating-area analysis, and fabrication release
 still require additional evidence.

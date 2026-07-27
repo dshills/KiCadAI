@@ -296,6 +296,76 @@ func TestReverseBlockingLoadSwitchConductsForwardAndLimitsBackfeed(t *testing.T)
 	})
 }
 
+func TestCurrentLimitingEFuseRegulatesOverloadAtProgrammedLimit(t *testing.T) {
+	intent := Intent{
+		ModelID: ModelNonlinearCircuitDCV1,
+		Analyses: []Analysis{{
+			ID:          "bias",
+			Kind:        AnalysisDCOperatingPoint,
+			Excitations: []SourceExcitation{{Component: "supply", DCValue: 24}},
+		}},
+		Assertions: []Assertion{
+			{AnalysisID: "bias", Node: "VOUT", Quantity: QuantityVoltageV, Min: 14.39, Max: 14.41},
+			{AnalysisID: "bias", Component: "efuse", Quantity: QuantityDeviceCurrentA, Min: .2999, Max: .3001},
+		},
+	}
+	components := []ComponentEvidence{
+		voltageSourceEvidence("supply", "VIN", "GND"),
+		resistorEvidence("load", 48, "VOUT", "GND"),
+		{
+			InstanceID: "efuse", CatalogID: "protection.test.current_limiting_efuse", Family: "protection",
+			ModelClaims: []CatalogEvidence{{ModelID: PrimitiveCurrentLimitingEFuseV1, Parameters: currentLimitingEFuseParameters()}},
+			Connections: []ConnectionEvidence{
+				{Function: "VIN", Net: "VIN"}, {Function: "VOUT", Net: "VOUT"},
+				{Function: "RTN", Net: "GND"}, {Function: "SHDN", Net: "VIN"},
+			},
+		},
+	}
+	plan, diagnostics := ResolveWithTopology(intent, "test", "hash", components, []NodeEvidence{{Name: "GND", Role: "ground"}, {Name: "VIN"}, {Name: "VOUT"}})
+	if len(diagnostics) != 0 {
+		t.Fatalf("resolve diagnostics=%+v", diagnostics)
+	}
+	report, diagnostics := Evaluate(plan)
+	if len(diagnostics) != 0 || report.Status != "pass" {
+		t.Fatalf("report=%+v diagnostics=%+v", report, diagnostics)
+	}
+}
+
+func TestCurrentLimitingEFuseUsesOnResistanceBelowLimit(t *testing.T) {
+	intent := Intent{
+		ModelID: ModelNonlinearCircuitDCV1,
+		Analyses: []Analysis{{
+			ID:          "bias",
+			Kind:        AnalysisDCOperatingPoint,
+			Excitations: []SourceExcitation{{Component: "supply", DCValue: 24}},
+		}},
+		Assertions: []Assertion{
+			{AnalysisID: "bias", Node: "VOUT", Quantity: QuantityVoltageV, Min: 23.96, Max: 23.97},
+			{AnalysisID: "bias", Component: "efuse", Quantity: QuantityDeviceCurrentA, Min: .2395, Max: .2397},
+		},
+	}
+	components := []ComponentEvidence{
+		voltageSourceEvidence("supply", "VIN", "GND"),
+		resistorEvidence("load", 100, "VOUT", "GND"),
+		{
+			InstanceID: "efuse", CatalogID: "protection.test.current_limiting_efuse", Family: "protection",
+			ModelClaims: []CatalogEvidence{{ModelID: PrimitiveCurrentLimitingEFuseV1, Parameters: currentLimitingEFuseParameters()}},
+			Connections: []ConnectionEvidence{
+				{Function: "VIN", Net: "VIN"}, {Function: "VOUT", Net: "VOUT"},
+				{Function: "RTN", Net: "GND"}, {Function: "SHDN", Net: "VIN"},
+			},
+		},
+	}
+	plan, diagnostics := ResolveWithTopology(intent, "test", "hash", components, []NodeEvidence{{Name: "GND", Role: "ground"}, {Name: "VIN"}, {Name: "VOUT"}})
+	if len(diagnostics) != 0 {
+		t.Fatalf("resolve diagnostics=%+v", diagnostics)
+	}
+	report, diagnostics := Evaluate(plan)
+	if len(diagnostics) != 0 || report.Status != "pass" {
+		t.Fatalf("report=%+v diagnostics=%+v", report, diagnostics)
+	}
+}
+
 func TestNonlinearDCNPNAndPNPBias(t *testing.T) {
 	for _, test := range []struct {
 		name       string
@@ -453,6 +523,205 @@ func TestBidirectionalOpenDrainTranslatorPreservesHighRailsAndPropagatesLow(t *t
 	report, diagnostics := Evaluate(plan)
 	if len(diagnostics) != 0 || report.Status != "pass" {
 		t.Fatalf("translator report=%+v diagnostics=%+v", report, diagnostics)
+	}
+}
+
+func TestPushPullTranslatorPropagatesLogicWithoutJoiningSupplyDomains(t *testing.T) {
+	intent := Intent{
+		ModelID: ModelNonlinearCircuitDCV1,
+		Analyses: []Analysis{{ID: "logic", Kind: AnalysisDCOperatingPoint, Excitations: []SourceExcitation{
+			{Component: "low_supply", DCValue: 1.8}, {Component: "high_supply", DCValue: 3.3},
+			{Component: "high_input_1", DCValue: 1.8}, {Component: "low_input_2", DCValue: 0},
+			{Component: "high_input_3", DCValue: 1.8}, {Component: "low_input_4", DCValue: 0},
+		}}},
+		Assertions: []Assertion{
+			{AnalysisID: "logic", Node: "B1", Quantity: QuantityVoltageV, Min: 3.2, Max: 3.31},
+			{AnalysisID: "logic", Node: "B2", Quantity: QuantityVoltageV, Min: 0, Max: .4},
+			{AnalysisID: "logic", Node: "VCCA", Quantity: QuantityVoltageV, Min: 1.79, Max: 1.81},
+			{AnalysisID: "logic", Node: "VCCB", Quantity: QuantityVoltageV, Min: 3.29, Max: 3.31},
+		},
+	}
+	components := []ComponentEvidence{
+		voltageSourceEvidence("low_supply", "VCCA", "GND"),
+		voltageSourceEvidence("high_supply", "VCCB", "GND"),
+		voltageSourceEvidence("high_input_1", "A1", "GND"),
+		voltageSourceEvidence("low_input_2", "A2", "GND"),
+		voltageSourceEvidence("high_input_3", "A3", "GND"),
+		voltageSourceEvidence("low_input_4", "A4", "GND"),
+		resistorEvidence("b1_load", 1e6, "B1", "GND"),
+		resistorEvidence("b2_load", 10000, "VCCB", "B2"),
+		resistorEvidence("b3_load", 1e6, "B3", "GND"),
+		resistorEvidence("b4_load", 10000, "VCCB", "B4"),
+		pushPullTranslatorEvidence("translator", "VCCA", 1),
+	}
+	nodes := []NodeEvidence{{Name: "GND", Role: "ground"}, {Name: "VCCA"}, {Name: "VCCB"}, {Name: "A1"}, {Name: "A2"}, {Name: "A3"}, {Name: "A4"}, {Name: "B1"}, {Name: "B2"}, {Name: "B3"}, {Name: "B4"}}
+	plan, diagnostics := ResolveWithTopology(intent, "test", "catalog-hash", components, nodes)
+	if len(diagnostics) != 0 {
+		t.Fatalf("push-pull translator resolve diagnostics=%+v", diagnostics)
+	}
+	report, diagnostics := Evaluate(plan)
+	if len(diagnostics) != 0 || report.Status != "pass" {
+		t.Fatalf("push-pull translator report=%+v diagnostics=%+v", report, diagnostics)
+	}
+}
+
+func TestPushPullTranslatorDisabledStateIsHighImpedance(t *testing.T) {
+	intent := Intent{
+		ModelID: ModelNonlinearCircuitDCV1,
+		Analyses: []Analysis{{ID: "disabled", Kind: AnalysisDCOperatingPoint, Excitations: []SourceExcitation{
+			{Component: "low_supply", DCValue: 1.8}, {Component: "high_supply", DCValue: 3.3},
+			{Component: "input_1", DCValue: 1.8}, {Component: "input_2", DCValue: 0},
+			{Component: "input_3", DCValue: 1.8}, {Component: "input_4", DCValue: 0},
+			{Component: "disabled", DCValue: 0},
+		}}},
+		Assertions: []Assertion{{AnalysisID: "disabled", Node: "B1", Quantity: QuantityVoltageV, Min: 1.08, Max: 1.12}},
+	}
+	components := []ComponentEvidence{
+		voltageSourceEvidence("low_supply", "VCCA", "GND"),
+		voltageSourceEvidence("high_supply", "VCCB", "GND"),
+		voltageSourceEvidence("input_1", "A1", "GND"),
+		voltageSourceEvidence("input_2", "A2", "GND"),
+		voltageSourceEvidence("input_3", "A3", "GND"),
+		voltageSourceEvidence("input_4", "A4", "GND"),
+		voltageSourceEvidence("disabled", "OE", "GND"),
+		resistorEvidence("b1_upper", 10000, "VCCB", "B1"),
+		resistorEvidence("b1_lower", 5000, "B1", "GND"),
+		resistorEvidence("b2_load", 10000, "B2", "GND"),
+		resistorEvidence("b3_load", 10000, "B3", "GND"),
+		resistorEvidence("b4_load", 10000, "B4", "GND"),
+		pushPullTranslatorEvidence("translator", "OE", 1),
+	}
+	nodes := []NodeEvidence{{Name: "GND", Role: "ground"}, {Name: "VCCA"}, {Name: "VCCB"}, {Name: "OE"}, {Name: "A1"}, {Name: "A2"}, {Name: "A3"}, {Name: "A4"}, {Name: "B1"}, {Name: "B2"}, {Name: "B3"}, {Name: "B4"}}
+	plan, diagnostics := ResolveWithTopology(intent, "test", "catalog-hash", components, nodes)
+	if len(diagnostics) != 0 {
+		t.Fatalf("disabled translator resolve diagnostics=%+v", diagnostics)
+	}
+	report, diagnostics := Evaluate(plan)
+	if len(diagnostics) != 0 || report.Status != "pass" {
+		t.Fatalf("disabled translator report=%+v diagnostics=%+v", report, diagnostics)
+	}
+}
+
+func TestDirectionControlledTranslatorSupportsBothDirectionGroups(t *testing.T) {
+	intent := Intent{
+		ModelID: ModelNonlinearCircuitDCV1,
+		Analyses: []Analysis{{ID: "logic", Kind: AnalysisDCOperatingPoint, Excitations: []SourceExcitation{
+			{Component: "vcca_supply", DCValue: 1.8}, {Component: "vccb_supply", DCValue: 3.3},
+			{Component: "enabled", DCValue: 0}, {Component: "dir1_high", DCValue: 1.8}, {Component: "dir2_low", DCValue: 0},
+			{Component: "a1_high", DCValue: 1.8}, {Component: "a2_low", DCValue: 0}, {Component: "a3_low", DCValue: 0}, {Component: "a4_low", DCValue: 0},
+			{Component: "b5_high", DCValue: 3.3}, {Component: "b6_low", DCValue: 0}, {Component: "b7_low", DCValue: 0}, {Component: "b8_low", DCValue: 0},
+		}}},
+		Assertions: []Assertion{
+			{AnalysisID: "logic", Node: "B1", Quantity: QuantityVoltageV, Min: 3.28, Max: 3.31},
+			{AnalysisID: "logic", Node: "B2", Quantity: QuantityVoltageV, Min: 0, Max: .01},
+			{AnalysisID: "logic", Node: "A5", Quantity: QuantityVoltageV, Min: 1.79, Max: 1.81},
+			{AnalysisID: "logic", Node: "A6", Quantity: QuantityVoltageV, Min: 0, Max: .01},
+		},
+	}
+	components := []ComponentEvidence{
+		voltageSourceEvidence("vcca_supply", "VCCA", "GND"), voltageSourceEvidence("vccb_supply", "VCCB", "GND"),
+		voltageSourceEvidence("enabled", "OE", "GND"), voltageSourceEvidence("dir1_high", "DIR1", "GND"), voltageSourceEvidence("dir2_low", "DIR2", "GND"),
+		voltageSourceEvidence("a1_high", "A1", "GND"), voltageSourceEvidence("a2_low", "A2", "GND"),
+		voltageSourceEvidence("a3_low", "A3", "GND"), voltageSourceEvidence("a4_low", "A4", "GND"),
+		voltageSourceEvidence("b5_high", "B5", "GND"), voltageSourceEvidence("b6_low", "B6", "GND"),
+		voltageSourceEvidence("b7_low", "B7", "GND"), voltageSourceEvidence("b8_low", "B8", "GND"),
+		directionControlledTranslatorEvidence("transceiver", "OE"),
+	}
+	for channel := 1; channel <= 4; channel++ {
+		components = append(components, resistorEvidence(fmt.Sprintf("b%d_load", channel), 1e6, fmt.Sprintf("B%d", channel), "GND"))
+	}
+	for channel := 5; channel <= 8; channel++ {
+		components = append(components, resistorEvidence(fmt.Sprintf("a%d_load", channel), 1e6, fmt.Sprintf("A%d", channel), "GND"))
+	}
+	nodes := []NodeEvidence{{Name: "GND", Role: "ground"}, {Name: "VCCA"}, {Name: "VCCB"}, {Name: "OE"}, {Name: "DIR1"}, {Name: "DIR2"}}
+	for channel := 1; channel <= directionControlledTranslatorChannels; channel++ {
+		nodes = append(nodes, NodeEvidence{Name: fmt.Sprintf("A%d", channel)}, NodeEvidence{Name: fmt.Sprintf("B%d", channel)})
+	}
+	plan, diagnostics := ResolveWithTopology(intent, "test", "catalog-hash", components, nodes)
+	if len(diagnostics) != 0 {
+		t.Fatalf("direction-controlled translator resolve diagnostics=%+v", diagnostics)
+	}
+	report, diagnostics := Evaluate(plan)
+	if len(diagnostics) != 0 || report.Status != "pass" {
+		t.Fatalf("direction-controlled translator report=%+v diagnostics=%+v", report, diagnostics)
+	}
+}
+
+func TestDirectionControlledTranslatorDisabledStateIsHighImpedance(t *testing.T) {
+	intent := Intent{
+		ModelID: ModelNonlinearCircuitDCV1,
+		Analyses: []Analysis{{ID: "disabled", Kind: AnalysisDCOperatingPoint, Excitations: []SourceExcitation{
+			{Component: "vcca_supply", DCValue: 1.8}, {Component: "vccb_supply", DCValue: 3.3},
+			{Component: "disabled", DCValue: 1.8}, {Component: "dir1_high", DCValue: 1.8}, {Component: "dir2_low", DCValue: 0},
+		}}},
+		Assertions: []Assertion{{AnalysisID: "disabled", Node: "B1", Quantity: QuantityVoltageV, Min: 1.08, Max: 1.12}},
+	}
+	components := []ComponentEvidence{
+		voltageSourceEvidence("vcca_supply", "VCCA", "GND"), voltageSourceEvidence("vccb_supply", "VCCB", "GND"),
+		voltageSourceEvidence("disabled", "OE", "GND"), voltageSourceEvidence("dir1_high", "DIR1", "GND"), voltageSourceEvidence("dir2_low", "DIR2", "GND"),
+		resistorEvidence("b1_upper", 10000, "VCCB", "B1"), resistorEvidence("b1_lower", 5000, "B1", "GND"),
+		directionControlledTranslatorEvidence("transceiver", "OE"),
+	}
+	nodes := []NodeEvidence{{Name: "GND", Role: "ground"}, {Name: "VCCA"}, {Name: "VCCB"}, {Name: "OE"}, {Name: "DIR1"}, {Name: "DIR2"}}
+	for channel := 1; channel <= directionControlledTranslatorChannels; channel++ {
+		nodes = append(nodes, NodeEvidence{Name: fmt.Sprintf("A%d", channel)}, NodeEvidence{Name: fmt.Sprintf("B%d", channel)})
+	}
+	plan, diagnostics := ResolveWithTopology(intent, "test", "catalog-hash", components, nodes)
+	if len(diagnostics) != 0 {
+		t.Fatalf("disabled direction-controlled translator resolve diagnostics=%+v", diagnostics)
+	}
+	report, diagnostics := Evaluate(plan)
+	if len(diagnostics) != 0 || report.Status != "pass" {
+		t.Fatalf("disabled direction-controlled translator report=%+v diagnostics=%+v", report, diagnostics)
+	}
+}
+
+func TestPushPullDigitalIsolatorPropagatesBothDirectionsAndDisablesHighImpedance(t *testing.T) {
+	intent := Intent{
+		ModelID: ModelNonlinearCircuitDCV1,
+		Analyses: []Analysis{
+			{ID: "enabled", Kind: AnalysisDCOperatingPoint, Excitations: []SourceExcitation{
+				{Component: "supply_1", DCValue: 3.3}, {Component: "supply_2", DCValue: 3.3},
+				{Component: "enable_1", DCValue: 3.3}, {Component: "enable_2", DCValue: 3.3},
+				{Component: "ina1", DCValue: 3.3}, {Component: "ina2", DCValue: 0}, {Component: "ina3", DCValue: 0}, {Component: "inb4", DCValue: 3.3},
+			}},
+			{ID: "disabled", Kind: AnalysisDCOperatingPoint, Excitations: []SourceExcitation{
+				{Component: "supply_1", DCValue: 3.3}, {Component: "supply_2", DCValue: 3.3},
+				{Component: "enable_1", DCValue: 0}, {Component: "enable_2", DCValue: 0},
+				{Component: "ina1", DCValue: 3.3}, {Component: "ina2", DCValue: 0}, {Component: "ina3", DCValue: 0}, {Component: "inb4", DCValue: 3.3},
+			}},
+		},
+		Assertions: []Assertion{
+			{AnalysisID: "enabled", Node: "OUTB1", ReferenceNode: "GND2", Quantity: QuantityVoltageV, Min: 3.28, Max: 3.31},
+			{AnalysisID: "enabled", Node: "OUTA4", ReferenceNode: "GND1", Quantity: QuantityVoltageV, Min: 3.28, Max: 3.31},
+			{AnalysisID: "disabled", Node: "OUTB1", ReferenceNode: "GND2", Quantity: QuantityVoltageV, Min: 3.28, Max: 3.31},
+			{AnalysisID: "disabled", Node: "OUTA4", ReferenceNode: "GND1", Quantity: QuantityVoltageV, Min: 3.28, Max: 3.31},
+		},
+	}
+	components := []ComponentEvidence{
+		voltageSourceEvidence("supply_1", "VDD1", "GND1"), voltageSourceEvidence("supply_2", "VDD2", "GND2"),
+		voltageSourceEvidence("enable_1", "EN1", "GND1"), voltageSourceEvidence("enable_2", "EN2", "GND2"),
+		voltageSourceEvidence("ina1", "INA1", "GND1"), voltageSourceEvidence("ina2", "INA2", "GND1"),
+		voltageSourceEvidence("ina3", "INA3", "GND1"), voltageSourceEvidence("inb4", "INB4", "GND2"),
+		resistorEvidence("outb1_load", 1e6, "OUTB1", "VDD2"), resistorEvidence("outb2_load", 1e6, "OUTB2", "GND2"),
+		resistorEvidence("outb3_load", 1e6, "OUTB3", "GND2"), resistorEvidence("outa4_load", 1e6, "OUTA4", "VDD1"),
+		pushPullIsolatorEvidence("isolator"),
+	}
+	nodes := []NodeEvidence{
+		{Name: "GND1", Role: "ground", VoltageDomain: "side_1"}, {Name: "GND2", Role: "ground", VoltageDomain: "side_2"},
+		{Name: "VDD1", VoltageDomain: "side_1"}, {Name: "VDD2", VoltageDomain: "side_2"},
+		{Name: "EN1", VoltageDomain: "side_1"}, {Name: "EN2", VoltageDomain: "side_2"},
+		{Name: "INA1", VoltageDomain: "side_1"}, {Name: "INA2", VoltageDomain: "side_1"}, {Name: "INA3", VoltageDomain: "side_1"},
+		{Name: "INB4", VoltageDomain: "side_2"}, {Name: "OUTB1", VoltageDomain: "side_2"}, {Name: "OUTB2", VoltageDomain: "side_2"},
+		{Name: "OUTB3", VoltageDomain: "side_2"}, {Name: "OUTA4", VoltageDomain: "side_1"},
+	}
+	plan, diagnostics := ResolveWithTopology(intent, "test", "catalog-hash", components, nodes)
+	if len(diagnostics) != 0 {
+		t.Fatalf("push-pull isolator resolve diagnostics=%+v", diagnostics)
+	}
+	report, diagnostics := Evaluate(plan)
+	if len(diagnostics) != 0 || report.Status != "pass" {
+		t.Fatalf("push-pull isolator report=%+v diagnostics=%+v", report, diagnostics)
 	}
 }
 
@@ -675,7 +944,7 @@ func TestNonlinearIterationConvergenceAcceptsOnlyResidualBoundedNumericalFloor(t
 	}
 }
 
-func TestIntrinsicSourceContinuationScalesProgrammableCurrentAndShuntReferenceSources(t *testing.T) {
+func TestIntrinsicSourceContinuationScalesRegisteredInternalSources(t *testing.T) {
 	plan := Plan{Devices: []ResolvedDevice{
 		{
 			PrimitiveModel: PrimitiveProgrammableCurrentSourceV1,
@@ -689,18 +958,53 @@ func TestIntrinsicSourceContinuationScalesProgrammableCurrentAndShuntReferenceSo
 			PrimitiveModel:  PrimitiveShuntVoltageReferenceV1,
 			ModelParameters: []NamedValue{{Name: "output_voltage_v", Value: 1.25}, {Name: "min_bias_current_a", Value: 10e-6}},
 		},
+		{
+			PrimitiveModel: PrimitiveFixedBuckModuleV1,
+			ModelParameters: []NamedValue{
+				{Name: "output_voltage_v", Value: 12},
+				{Name: "input_current_reference_voltage_v", Value: 24},
+			},
+		},
+		{
+			PrimitiveModel: PrimitiveProtectedIsolatedConverterV1,
+			ModelParameters: []NamedValue{
+				{Name: "output_voltage_v", Value: 12},
+				{Name: "input_min_v", Value: 9},
+			},
+		},
+		{
+			PrimitiveModel: PrimitiveCurrentLimitingEFuseV1,
+			ModelParameters: []NamedValue{
+				{Name: "input_min_v", Value: 4.2},
+				{Name: "input_max_v", Value: 60},
+				{Name: "enable_high_voltage_v", Value: .94},
+			},
+		},
 	}}
 	scaled := planWithIntrinsicSourceContinuationScale(plan, .2)
 	currentParameters := namedValueMap(scaled.Devices[0].ModelParameters)
 	referenceParameters := namedValueMap(scaled.Devices[1].ModelParameters)
+	buckParameters := namedValueMap(scaled.Devices[2].ModelParameters)
+	converterParameters := namedValueMap(scaled.Devices[3].ModelParameters)
+	efuseParameters := namedValueMap(scaled.Devices[4].ModelParameters)
 	if math.Abs(currentParameters["reference_current_a"]-2e-6) > 1e-15 ||
 		math.Abs(currentParameters["offset_voltage_v"]-.0008) > 1e-15 ||
 		currentParameters["min_headroom_v"] != 1.65 ||
 		math.Abs(referenceParameters["output_voltage_v"]-.25) > 1e-15 ||
-		referenceParameters["min_bias_current_a"] != 10e-6 {
-		t.Fatalf("scaled source parameters = %#v %#v", currentParameters, referenceParameters)
+		referenceParameters["min_bias_current_a"] != 10e-6 ||
+		math.Abs(buckParameters["output_voltage_v"]-2.4) > 1e-15 ||
+		buckParameters["input_current_reference_voltage_v"] != 24 ||
+		math.Abs(converterParameters["output_voltage_v"]-2.4) > 1e-15 ||
+		converterParameters["input_min_v"] != 9 ||
+		math.Abs(efuseParameters["input_min_v"]-.84) > 1e-15 ||
+		math.Abs(efuseParameters["enable_high_voltage_v"]-.188) > 1e-15 ||
+		efuseParameters["input_max_v"] != 60 {
+		t.Fatalf("scaled source parameters = %#v %#v %#v %#v %#v", currentParameters, referenceParameters, buckParameters, converterParameters, efuseParameters)
 	}
-	if namedValueMap(plan.Devices[0].ModelParameters)["reference_current_a"] != 10e-6 {
+	if namedValueMap(plan.Devices[0].ModelParameters)["reference_current_a"] != 10e-6 ||
+		namedValueMap(plan.Devices[2].ModelParameters)["output_voltage_v"] != 12 ||
+		namedValueMap(plan.Devices[3].ModelParameters)["output_voltage_v"] != 12 ||
+		namedValueMap(plan.Devices[4].ModelParameters)["input_min_v"] != 4.2 {
 		t.Fatal("source continuation mutated the original plan")
 	}
 }
@@ -749,6 +1053,107 @@ func openDrainTranslatorParameters() []NamedValue {
 		{Name: "max_channel_current_a", Value: .05},
 		{Name: "vcca_quiescent_current_a", Value: 2.4e-6}, {Name: "vccb_quiescent_current_a", Value: 12e-6},
 		{Name: "max_temperature_c", Value: 150}, {Name: "junction_to_ambient_c_per_w", Value: 239.8},
+	}
+}
+
+func pushPullTranslatorParameters(direction float64) []NamedValue {
+	return []NamedValue{
+		{Name: "vcca_min_v", Value: 1.65}, {Name: "vcca_max_v", Value: 3.6},
+		{Name: "vccb_min_v", Value: 2.3}, {Name: "vccb_max_v", Value: 5.5},
+		{Name: "input_low_max_v", Value: .15}, {Name: "input_high_headroom_v", Value: .2},
+		{Name: "input_high_headroom_a_v", Value: .2}, {Name: "input_high_headroom_b_v", Value: .4},
+		{Name: "enable_high_ratio", Value: .65}, {Name: "direction", Value: direction},
+		{Name: "output_low_resistance_ohm", Value: 400}, {Name: "output_high_resistance_ohm", Value: 16500},
+		{Name: "output_off_resistance_ohm", Value: 2.75e6},
+		{Name: "max_sink_current_a", Value: .001}, {Name: "max_source_current_a", Value: .00002},
+		{Name: "max_transient_sink_current_a", Value: .05}, {Name: "max_transient_source_current_a", Value: .05},
+		{Name: "vcca_quiescent_current_a", Value: 2.4e-6}, {Name: "vccb_quiescent_current_a", Value: 12e-6},
+		{Name: "max_temperature_c", Value: 150}, {Name: "junction_to_ambient_c_per_w", Value: 120.1},
+	}
+}
+
+func TestPushPullTranslatorUsesPortSpecificHighThresholds(t *testing.T) {
+	parameters := map[string]float64{
+		"input_high_headroom_v":   .3,
+		"input_high_headroom_a_v": .2,
+		"input_high_headroom_b_v": .4,
+	}
+	if got := pushPullTranslatorInputHeadroom(parameters, "A"); got != .2 {
+		t.Fatalf("A-port high headroom = %v, want 0.2", got)
+	}
+	if got := pushPullTranslatorInputHeadroom(parameters, "B"); got != .4 {
+		t.Fatalf("B-port high headroom = %v, want 0.4", got)
+	}
+}
+
+func pushPullTranslatorEvidence(id, enableNet string, direction float64) ComponentEvidence {
+	connections := []ConnectionEvidence{
+		{Function: "VCCA", Net: "VCCA"}, {Function: "VCCB", Net: "VCCB"},
+		{Function: "GND", Net: "GND"}, {Function: "OE", Net: enableNet},
+	}
+	for channel := 1; channel <= pushPullTranslatorChannels; channel++ {
+		connections = append(connections,
+			ConnectionEvidence{Function: fmt.Sprintf("A%d", channel), Net: fmt.Sprintf("A%d", channel)},
+			ConnectionEvidence{Function: fmt.Sprintf("B%d", channel), Net: fmt.Sprintf("B%d", channel)},
+		)
+	}
+	return ComponentEvidence{
+		InstanceID: id, CatalogID: "translator", Family: "level_translator",
+		ModelClaims: []CatalogEvidence{{ModelID: PrimitivePushPullTranslatorV1, Parameters: pushPullTranslatorParameters(direction)}},
+		Connections: connections,
+	}
+}
+
+func directionControlledTranslatorParameters() []NamedValue {
+	return []NamedValue{
+		{Name: "vcca_min_v", Value: .65}, {Name: "vcca_max_v", Value: 3.6},
+		{Name: "vccb_min_v", Value: .65}, {Name: "vccb_max_v", Value: 3.6},
+		{Name: "input_low_ratio", Value: .2}, {Name: "input_high_ratio", Value: .7},
+		{Name: "control_low_ratio", Value: .2}, {Name: "control_high_ratio", Value: .7},
+		{Name: "output_low_resistance_ohm", Value: 2000}, {Name: "output_high_resistance_ohm", Value: 2000},
+		{Name: "output_off_resistance_ohm", Value: 450000},
+		{Name: "max_sink_current_a", Value: .00005}, {Name: "max_source_current_a", Value: .00005},
+		{Name: "vcca_quiescent_current_a", Value: .00004}, {Name: "vccb_quiescent_current_a", Value: .000038},
+		{Name: "max_temperature_c", Value: 150}, {Name: "junction_to_ambient_c_per_w", Value: 92},
+	}
+}
+
+func directionControlledTranslatorEvidence(id, enableNet string) ComponentEvidence {
+	connections := []ConnectionEvidence{
+		{Function: "VCCA", Net: "VCCA"}, {Function: "VCCB", Net: "VCCB"}, {Function: "GND", Net: "GND"},
+		{Function: "OE", Net: enableNet}, {Function: "DIR1", Net: "DIR1"}, {Function: "DIR2", Net: "DIR2"},
+	}
+	for channel := 1; channel <= directionControlledTranslatorChannels; channel++ {
+		connections = append(connections,
+			ConnectionEvidence{Function: fmt.Sprintf("A%d", channel), Net: fmt.Sprintf("A%d", channel)},
+			ConnectionEvidence{Function: fmt.Sprintf("B%d", channel), Net: fmt.Sprintf("B%d", channel)},
+		)
+	}
+	return ComponentEvidence{
+		InstanceID: id, CatalogID: "transceiver", Family: "level_translator",
+		ModelClaims: []CatalogEvidence{{ModelID: PrimitiveDirectionControlledTranslatorV1, Parameters: directionControlledTranslatorParameters()}},
+		Connections: connections,
+	}
+}
+
+func pushPullIsolatorEvidence(id string) ComponentEvidence {
+	parameters := []NamedValue{
+		{Name: "supply_min_v", Value: 2.25}, {Name: "supply_max_v", Value: 5.5},
+		{Name: "input_low_ratio", Value: .3}, {Name: "input_high_ratio", Value: .7}, {Name: "enable_high_ratio", Value: .7},
+		{Name: "output_low_resistance_ohm", Value: 100}, {Name: "output_high_resistance_ohm", Value: 100},
+		{Name: "output_off_resistance_ohm", Value: 1e9}, {Name: "max_output_current_a", Value: .004},
+		{Name: "side_1_quiescent_current_a", Value: .0015}, {Name: "side_2_quiescent_current_a", Value: .0015},
+		{Name: "isolation_resistance_ohm", Value: 1e12}, {Name: "isolation_working_voltage_v", Value: 1000},
+		{Name: "max_temperature_c", Value: 150}, {Name: "junction_to_ambient_c_per_w", Value: 80},
+	}
+	connections := []ConnectionEvidence{}
+	for _, function := range []string{"INA1", "INA2", "INA3", "INB4", "OUTB1", "OUTB2", "OUTB3", "OUTA4", "VDD1", "GND1", "VDD2", "GND2", "EN1", "EN2"} {
+		connections = append(connections, ConnectionEvidence{Function: function, Net: function})
+	}
+	return ComponentEvidence{
+		InstanceID: id, CatalogID: "isolator", Family: "isolator",
+		ModelClaims: []CatalogEvidence{{ModelID: PrimitivePushPullDigitalIsolatorV1, Parameters: parameters}},
+		Connections: connections,
 	}
 }
 
@@ -812,6 +1217,18 @@ func reverseBlockingLoadSwitchParameters() []NamedValue {
 		{Name: "max_output_current_a", Value: 2}, {Name: "max_output_voltage_v", Value: 5.5},
 		{Name: "quiescent_current_a", Value: 1.2e-6}, {Name: "max_temperature_c", Value: 125},
 		{Name: "junction_to_ambient_c_per_w", Value: 183},
+	}
+}
+
+func currentLimitingEFuseParameters() []NamedValue {
+	return []NamedValue{
+		{Name: "input_min_v", Value: 4.2}, {Name: "input_max_v", Value: 60},
+		{Name: "enable_high_voltage_v", Value: .94}, {Name: "on_resistance_ohm", Value: .15},
+		{Name: "programmed_current_limit_a", Value: .3}, {Name: "minimum_current_limit_a", Value: .285},
+		{Name: "maximum_current_limit_a", Value: .315}, {Name: "reverse_leakage_current_a", Value: 66e-6},
+		{Name: "max_output_voltage_v", Value: 60}, {Name: "maximum_output_slew_v_per_s", Value: 1000},
+		{Name: "quiescent_current_a", Value: 390e-6}, {Name: "max_temperature_c", Value: 125},
+		{Name: "junction_to_ambient_c_per_w", Value: 38.6},
 	}
 }
 

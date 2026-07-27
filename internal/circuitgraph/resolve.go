@@ -177,10 +177,7 @@ func (resolver *Resolver) Resolve(ctx context.Context, document Document) (Resol
 
 func resolveSimulation(intent simmodel.Intent, resolved ResolvedDocument) (simmodel.Plan, []reports.Issue) {
 	connections := resolvedSimulationConnections(resolved)
-	nodes := make([]simmodel.NodeEvidence, 0, len(resolved.Nets))
-	for _, net := range resolved.Nets {
-		nodes = append(nodes, simmodel.NodeEvidence{Name: net.Intent.Name, Role: string(net.Intent.Role), VoltageDomain: net.Intent.VoltageDomain})
-	}
+	nodes := resolvedSimulationNodes(resolved)
 	evidence := make([]simmodel.ComponentEvidence, 0, len(resolved.Components))
 	for _, component := range resolved.Components {
 		value, hasValue := components.ParseEngineeringValue(component.Instance.Value)
@@ -207,11 +204,10 @@ type SimulationHarnessDevice struct {
 // to one simulation workflow while preserving the immutable physical design.
 func (resolver *Resolver) ResolveSimulationPlanWithHarness(intent simmodel.Intent, resolved ResolvedDocument, harness []SimulationHarnessDevice) (simmodel.Plan, []reports.Issue) {
 	connections := resolvedSimulationConnections(resolved)
-	nodes := make([]simmodel.NodeEvidence, 0, len(resolved.Nets))
-	nodeNames := make(map[string]bool, len(resolved.Nets))
-	for _, net := range resolved.Nets {
-		nodes = append(nodes, simmodel.NodeEvidence{Name: net.Intent.Name, Role: string(net.Intent.Role), VoltageDomain: net.Intent.VoltageDomain})
-		nodeNames[net.Intent.Name] = true
+	nodes := resolvedSimulationNodes(resolved)
+	nodeNames := make(map[string]bool, len(nodes))
+	for _, node := range nodes {
+		nodeNames[node.Name] = true
 	}
 	evidence := make([]simmodel.ComponentEvidence, 0, len(resolved.Components)+len(harness))
 	for _, component := range resolved.Components {
@@ -267,31 +263,17 @@ func resolvedSimulationConnections(resolved ResolvedDocument) map[string][]simmo
 	seen := map[string]struct{}{}
 	for _, net := range resolved.Nets {
 		for _, endpoint := range net.Endpoints {
-			names := []string{endpoint.Function}
-			for _, function := range functionsByComponent[endpoint.Intent.Component] {
-				if !strings.EqualFold(function.Function, endpoint.Function) {
-					continue
-				}
-				names = append(names, function.Aliases...)
-				break
-			}
-			for _, name := range names {
-				name = strings.TrimSpace(name)
-				if name == "" {
-					continue
-				}
-				key := strings.ToLower(endpoint.Intent.Component) + "\x00" +
-					strings.ToLower(endpoint.Intent.Unit) + "\x00" +
-					strings.ToLower(name) + "\x00" + strings.ToLower(net.Intent.Name)
-				if _, exists := seen[key]; exists {
-					continue
-				}
-				seen[key] = struct{}{}
-				connections[endpoint.Intent.Component] = append(connections[endpoint.Intent.Component], simmodel.ConnectionEvidence{
-					Function: name, UnitID: endpoint.Intent.Unit, Net: net.Intent.Name,
-				})
-			}
+			appendResolvedSimulationConnection(connections, seen, functionsByComponent, endpoint, net.Intent.Name)
 		}
+	}
+	for _, endpoint := range resolved.NoConnects {
+		appendResolvedSimulationConnection(
+			connections,
+			seen,
+			functionsByComponent,
+			endpoint,
+			simulationNoConnectNodeName(endpoint),
+		)
 	}
 	for component := range connections {
 		slices.SortStableFunc(connections[component], func(left, right simmodel.ConnectionEvidence) int {
@@ -305,6 +287,68 @@ func resolvedSimulationConnections(resolved ResolvedDocument) map[string][]simmo
 		})
 	}
 	return connections
+}
+
+func appendResolvedSimulationConnection(
+	connections map[string][]simmodel.ConnectionEvidence,
+	seen map[string]struct{},
+	functionsByComponent map[string][]ResolvedFunction,
+	endpoint ResolvedEndpoint,
+	netName string,
+) {
+	names := []string{endpoint.Function}
+	for _, function := range functionsByComponent[endpoint.Intent.Component] {
+		if !strings.EqualFold(function.Function, endpoint.Function) {
+			continue
+		}
+		names = append(names, function.Aliases...)
+		break
+	}
+	for _, name := range names {
+		name = strings.TrimSpace(name)
+		if name == "" {
+			continue
+		}
+		key := strings.ToLower(endpoint.Intent.Component) + "\x00" +
+			strings.ToLower(endpoint.Intent.Unit) + "\x00" +
+			strings.ToLower(name) + "\x00" + strings.ToLower(netName)
+		if _, exists := seen[key]; exists {
+			continue
+		}
+		seen[key] = struct{}{}
+		connections[endpoint.Intent.Component] = append(connections[endpoint.Intent.Component], simmodel.ConnectionEvidence{
+			Function: name, UnitID: endpoint.Intent.Unit, Net: netName,
+		})
+	}
+}
+
+func resolvedSimulationNodes(resolved ResolvedDocument) []simmodel.NodeEvidence {
+	nodes := make([]simmodel.NodeEvidence, 0, len(resolved.Nets)+len(resolved.NoConnects))
+	for _, net := range resolved.Nets {
+		nodes = append(nodes, simmodel.NodeEvidence{Name: net.Intent.Name, Role: string(net.Intent.Role), VoltageDomain: net.Intent.VoltageDomain})
+	}
+	for _, endpoint := range resolved.NoConnects {
+		nodes = append(nodes, simmodel.NodeEvidence{Name: simulationNoConnectNodeName(endpoint), Role: "no_connect"})
+	}
+	slices.SortStableFunc(nodes, func(left, right simmodel.NodeEvidence) int {
+		return strings.Compare(left.Name, right.Name)
+	})
+	return nodes
+}
+
+func simulationNoConnectNodeName(endpoint ResolvedEndpoint) string {
+	// Length-prefix each field so distinct tuples cannot collapse through the
+	// separator sanitization performed by stableGeneratedID.
+	source := fmt.Sprintf(
+		"%d_%s_%d_%s_%d_%s",
+		len(endpoint.Intent.Component), endpoint.Intent.Component,
+		len(endpoint.Intent.Unit), endpoint.Intent.Unit,
+		len(endpoint.Function), endpoint.Function,
+	)
+	return stableGeneratedID(
+		"simulation_nc",
+		source,
+	)
 }
 
 func resolveSimulationEvidence(intent simmodel.Intent, resolved ResolvedDocument, evidence []simmodel.ComponentEvidence, nodes []simmodel.NodeEvidence) (simmodel.Plan, []reports.Issue) {

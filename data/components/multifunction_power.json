@@ -33,6 +33,69 @@
       "verification": {"confidence": "verified", "sources": ["https://www.ti.com/lit/ds/symlink/tps22917.pdf", "datasheet-pinmap:TI:TPS22917DBV", "kicad-footprint:Package_TO_SOT_SMD:SOT-23-6"], "resolver_checked": true, "pinmap_checked": true, "notes": ["TI specifies full-time reverse-current blocking, 1 V to 5.5 V operation, 2 A maximum continuous current, and 120 mOhm typical on-resistance at 1.8 V."]}
     },
     {
+      "id": "protection.ti.tps26600pwp.htssop16",
+      "family": "protection",
+      "name": "TI TPS26600 programmable industrial eFuse",
+      "description": "4.2 V to 60 V industrial eFuse with adjustable 0.1 A to 2.23 A current limiting, controlled output ramp, reverse-polarity protection, external overvoltage cutoff, and low-IQ shutdown.",
+      "generic": false,
+      "manufacturer": "Texas Instruments",
+      "mpn": "TPS26600PWPR",
+      "lifecycle": "active",
+      "simulation_models": [{"model_id": "mna_current_limiting_efuse_v1", "parameters": [
+        {"name": "input_min_v", "value": 4.2},
+        {"name": "input_max_v", "value": 60},
+        {"name": "enable_high_voltage_v", "value": 0.94},
+        {"name": "on_resistance_ohm", "value": 0.15},
+        {"name": "programmed_current_limit_a", "value": 0.1},
+        {"name": "minimum_current_limit_a", "value": 0.085},
+        {"name": "maximum_current_limit_a", "value": 0.115},
+        {"name": "reverse_leakage_current_a", "value": 0.000066},
+        {"name": "max_output_voltage_v", "value": 60},
+        {"name": "maximum_output_slew_v_per_s", "value": 15000},
+        {"name": "quiescent_current_a", "value": 0.00039},
+        {"name": "max_temperature_c", "value": 125},
+        {"name": "junction_to_ambient_c_per_w", "value": 38.6}
+      ]}],
+      "tags": ["adjustable_current_limit", "efuse", "hot_swap", "inrush_control", "overvoltage_cutoff", "reverse_polarity", "shutdown", "htssop16"],
+      "values": [{"kind": "on_resistance", "typ": "150", "unit": "mOhm"}, {"kind": "quiescent_current", "max": "390", "unit": "uA"}, {"kind": "current_limit_programming_constant", "typ": "12000", "unit": "A*Ohm"}],
+      "ratings": [
+        {"kind": "supply_voltage", "min": "4.2", "max": "60", "unit": "V"},
+        {"kind": "continuous_current", "max": "2", "unit": "A"},
+        {"kind": "programmable_current_limit", "min": "0.1", "max": "2.23", "unit": "A"},
+        {"kind": "external_overvoltage_threshold", "max": "55", "unit": "V"},
+        {"kind": "reverse_leakage_current", "max": "66", "unit": "uA"}
+      ],
+      "temperature": {"min": "-40", "max": "125", "unit": "C"},
+      "companions": [{"id": "tps26600.optional_monitoring", "family": "protection", "role": "unused_pin_policy", "required": true, "no_connects": ["NC4", "IMON", "NC13", "FLT"], "description": "Leave the optional monitor, fault, and no-connect functions open when the realization does not expose monitoring."}],
+      "symbols": [{"symbol_id": "Power_Management:TPS26600PWP", "function_pins": [
+        {"function": "VIN", "symbol_pin": "1", "electrical": "power_in", "required": true},
+        {"function": "VIN_AUX", "symbol_pin": "2", "electrical": "power_in", "required": true},
+        {"function": "UVLO", "symbol_pin": "3", "electrical": "input", "required": true},
+        {"function": "NC4", "symbol_pin": "4", "electrical": "no_connect"},
+        {"function": "OVP", "symbol_pin": "5", "electrical": "input", "required": true},
+        {"function": "MODE", "symbol_pin": "6", "electrical": "input", "required": true},
+        {"function": "SHDN", "symbol_pin": "7", "electrical": "input", "required": true},
+        {"function": "RTN", "symbol_pin": "8", "electrical": "power_in", "required": true},
+        {"function": "GND", "symbol_pin": "9", "electrical": "power_in", "required": true},
+        {"function": "IMON", "symbol_pin": "10", "electrical": "output"},
+        {"function": "ILIM", "symbol_pin": "11", "electrical": "passive", "required": true},
+        {"function": "DVDT", "symbol_pin": "12", "electrical": "passive", "required": true},
+        {"function": "NC13", "symbol_pin": "13", "electrical": "no_connect"},
+        {"function": "FLT", "symbol_pin": "14", "electrical": "open_collector"},
+        {"function": "VOUT", "symbol_pin": "15", "electrical": "power_out", "required": true},
+        {"function": "VOUT_AUX", "symbol_pin": "16", "electrical": "power_out", "required": true},
+        {"function": "RTN_EP", "symbol_pin": "17", "electrical": "power_in", "required": true}
+      ], "verification": {"confidence": "verified", "sources": ["https://www.ti.com/lit/ds/symlink/tps2660.pdf", "kicad-symbols:Power_Management:TPS26600PWP"], "pinmap_checked": true}}],
+      "packages": [{"id": "htssop16", "name": "HTSSOP-16 PWP with exposed pad", "footprint_id": "Package_SO:HTSSOP-16-1EP_4.4x5mm_P0.65mm_EP3.4x5mm_Mask2.66x2.46mm_ThermalVias", "package_type": "htssop16", "mpn": "TPS26600PWPR", "lifecycle": "active", "pinmap_id": "Power_Management:TPS26600PWP|Package_SO:HTSSOP-16-1EP_4.4x5mm_P0.65mm_EP3.4x5mm_Mask2.66x2.46mm_ThermalVias", "pad_functions": [
+        {"function": "VIN", "pad": "1"}, {"function": "VIN_AUX", "pad": "2"}, {"function": "UVLO", "pad": "3"}, {"function": "NC4", "pad": "4"},
+        {"function": "OVP", "pad": "5"}, {"function": "MODE", "pad": "6"}, {"function": "SHDN", "pad": "7"}, {"function": "RTN", "pad": "8"},
+        {"function": "GND", "pad": "9"}, {"function": "IMON", "pad": "10"}, {"function": "ILIM", "pad": "11"}, {"function": "DVDT", "pad": "12"},
+        {"function": "NC13", "pad": "13"}, {"function": "FLT", "pad": "14"}, {"function": "VOUT", "pad": "15"}, {"function": "VOUT_AUX", "pad": "16"},
+        {"function": "RTN_EP", "pad": "17"}
+      ], "dimensions_mm": {"width": 6.4, "height": 5.0}, "height_mm": 1.2, "verification": {"confidence": "verified", "sources": ["https://www.ti.com/lit/ds/symlink/tps2660.pdf", "kicad-footprint:Package_SO:HTSSOP-16-1EP_4.4x5mm_P0.65mm_EP3.4x5mm_Mask2.66x2.46mm_ThermalVias"], "pinmap_checked": true}}],
+      "verification": {"confidence": "verified", "sources": ["https://www.ti.com/lit/ds/symlink/tps2660.pdf", "kicad-symbols:Power_Management:TPS26600PWP", "kicad-footprint:Package_SO:HTSSOP-16-1EP_4.4x5mm_P0.65mm_EP3.4x5mm_Mask2.66x2.46mm_ThermalVias"], "resolver_checked": true, "pinmap_checked": true, "notes": ["Current-limit bounds use TI guaranteed 0.085 A to 0.115 A limits at 120 kOhm and are recomputed conservatively when the provider selects RILIM.", "External OVP is limited to 55 V and must be programmed above the design input envelope.", "The exposed pad is electrically tied to RTN and requires the reviewed thermal-via footprint."]}
+    },
+    {
       "id": "current_sensor.ti.ina240a3d.soic8",
       "family": "current_sensor",
       "name": "TI INA240A3 100 V/V current-sense amplifier",
@@ -255,6 +318,168 @@
       "verification": {"confidence": "verified", "sources": ["https://www.vishay.com/doc/?30121=", "datasheet-pinmap:Vishay:WSLT2512", "kicad-footprint:Resistor_SMD:R_2512_6332Metric"], "resolver_checked": true, "pinmap_checked": true}
     },
     {
+      "id": "isolated_converter.traco.tec3_2411ui.sip8",
+      "family": "isolated_converter",
+      "name": "TRACO Power TEC 3-2411UI protected isolated 5 V converter",
+      "description": "Three-watt 9 V to 75 V input regulated 5 V converter with remote shutdown, short-circuit protection, over-current limiting, under-voltage lockout, and 2 kV isolation.",
+      "generic": false,
+      "manufacturer": "TRACO Power",
+      "mpn": "TEC 3-2411UI",
+      "lifecycle": "active",
+      "simulation_models": [{"model_id": "mna_protected_isolated_converter_v1", "parameters": [
+        {"name": "input_min_v", "value": 9}, {"name": "input_max_v", "value": 75}, {"name": "input_current_reference_voltage_v", "value": 24},
+        {"name": "output_voltage_v", "value": 5}, {"name": "max_output_current_a", "value": 0.6},
+        {"name": "short_circuit_current_a", "value": 0.9}, {"name": "typical_inrush_current_a", "value": 12},
+        {"name": "soft_start_time_s", "value": 0.02}, {"name": "maximum_overshoot_ratio", "value": 0.05},
+        {"name": "efficiency_ratio", "value": 0.79}, {"name": "isolation_working_voltage_v", "value": 1000},
+        {"name": "isolation_resistance_ohm", "value": 1000000000},
+        {"name": "max_temperature_c", "value": 110}, {"name": "junction_to_ambient_c_per_w", "value": 45.2}
+      ]}],
+      "tags": ["protected", "regulated", "remote_shutdown", "short_circuit_protected", "wide_input", "isolated", "sip8"],
+      "values": [{"kind": "output_voltage", "typ": "5", "unit": "V"}, {"kind": "efficiency", "typ": "79", "unit": "%"}],
+      "ratings": [
+        {"kind": "input_voltage", "min": "9", "max": "75", "unit": "V"}, {"kind": "output_current", "max": "0.6", "unit": "A"},
+        {"kind": "isolation_voltage", "max": "2000", "unit": "V"}, {"kind": "isolation_working_voltage", "max": "1000", "unit": "V"},
+        {"kind": "short_circuit_current", "max": "0.9", "unit": "A"}, {"kind": "typical_inrush_current", "typ": "12", "unit": "A"}
+      ],
+      "temperature": {"min": "-40", "max": "80", "unit": "C"},
+      "companions": [{"id": "tec3.unused_pins", "family": "isolated_converter", "role": "unused_pin_policy", "required": true, "no_connects": ["NC5", "NC8"], "description": "Leave package pins 5 and 8 unconnected as required by the reviewed single-output pin map."}],
+      "symbols": [{"symbol_id": "Converter_DCDC:TEC3-2411UI", "function_pins": [
+        {"function": "VIN_MINUS", "symbol_pin": "1", "electrical": "power_in", "required": true},
+        {"function": "VIN_PLUS", "symbol_pin": "2", "electrical": "power_in", "required": true},
+        {"function": "REMOTE", "symbol_pin": "3", "electrical": "input", "required": true},
+        {"function": "NC5", "symbol_pin": "5", "electrical": "no_connect"},
+        {"function": "VOUT_PLUS", "symbol_pin": "6", "electrical": "power_out", "required": true},
+        {"function": "VOUT_MINUS", "symbol_pin": "7", "electrical": "power_out", "required": true},
+        {"function": "NC8", "symbol_pin": "8", "electrical": "no_connect"}
+      ], "verification": {"confidence": "verified", "sources": ["https://www.tracopower.com/tec3ui-datasheet", "kicad-symbols:Converter_DCDC:TEC3-2411UI"], "pinmap_checked": true}}],
+      "packages": [{"id": "sip8", "name": "TEC3UI SIP-8", "footprint_id": "Converter_DCDC:Converter_DCDC_TRACO_TEC3-24xxUI_THT", "package_type": "sip8", "mpn": "TEC 3-2411UI", "lifecycle": "active", "pinmap_id": "Converter_DCDC:TEC3-2411UI|Converter_DCDC:Converter_DCDC_TRACO_TEC3-24xxUI_THT", "pad_functions": [
+        {"function": "VIN_MINUS", "pad": "1"}, {"function": "VIN_PLUS", "pad": "2"}, {"function": "REMOTE", "pad": "3"},
+        {"function": "NC5", "pad": "5"}, {"function": "VOUT_PLUS", "pad": "6"}, {"function": "VOUT_MINUS", "pad": "7"}, {"function": "NC8", "pad": "8"}
+      ], "dimensions_mm": {"width": 9.1, "height": 21.8}, "height_mm": 12.2, "verification": {"confidence": "verified", "sources": ["https://www.tracopower.com/tec3ui-datasheet", "kicad-footprint:Converter_DCDC:Converter_DCDC_TRACO_TEC3-24xxUI_THT"], "pinmap_checked": true}}],
+      "verification": {"confidence": "verified", "sources": ["https://www.tracopower.com/products/tec3ui.pdf", "kicad-symbols:Converter_DCDC:TEC3-2411UI", "kicad-footprint:Converter_DCDC:Converter_DCDC_TRACO_TEC3-24xxUI_THT"], "resolver_checked": true, "pinmap_checked": true, "notes": ["The datasheet specifies 12 A as typical input inrush, not a guaranteed maximum; maximum-inrush requirements therefore require an independently bounded protection stage.", "The 45.2 K/W case-to-ambient value and 110 C maximum case temperature are modeled as the reviewed module thermal path; workload-specific EMC and isolation-spacing checks remain required."]}
+    },
+    {
+      "id": "isolated_converter.traco.tec3_2412ui.sip8",
+      "family": "isolated_converter",
+      "name": "TRACO Power TEC 3-2412UI protected isolated 12 V converter",
+      "description": "Three-watt 9 V to 75 V input regulated 12 V converter with remote shutdown, short-circuit protection, over-current limiting, under-voltage lockout, and 2 kV isolation.",
+      "generic": false,
+      "manufacturer": "TRACO Power",
+      "mpn": "TEC 3-2412UI",
+      "lifecycle": "active",
+      "simulation_models": [{"model_id": "mna_protected_isolated_converter_v1", "parameters": [
+        {"name": "input_min_v", "value": 9}, {"name": "input_max_v", "value": 75}, {"name": "input_current_reference_voltage_v", "value": 24},
+        {"name": "output_voltage_v", "value": 12}, {"name": "max_output_current_a", "value": 0.25},
+        {"name": "short_circuit_current_a", "value": 0.375}, {"name": "typical_inrush_current_a", "value": 12},
+        {"name": "soft_start_time_s", "value": 0.02}, {"name": "maximum_overshoot_ratio", "value": 0.05},
+        {"name": "efficiency_ratio", "value": 0.81}, {"name": "isolation_working_voltage_v", "value": 1000},
+        {"name": "isolation_resistance_ohm", "value": 1000000000},
+        {"name": "max_temperature_c", "value": 110}, {"name": "junction_to_ambient_c_per_w", "value": 45.2}
+      ]}],
+      "tags": ["protected", "regulated", "remote_shutdown", "short_circuit_protected", "wide_input", "isolated", "sip8"],
+      "values": [{"kind": "output_voltage", "typ": "12", "unit": "V"}, {"kind": "efficiency", "typ": "81", "unit": "%"}],
+      "ratings": [
+        {"kind": "input_voltage", "min": "9", "max": "75", "unit": "V"}, {"kind": "output_current", "max": "0.25", "unit": "A"},
+        {"kind": "isolation_voltage", "max": "2000", "unit": "V"}, {"kind": "isolation_working_voltage", "max": "1000", "unit": "V"},
+        {"kind": "short_circuit_current", "max": "0.375", "unit": "A"}, {"kind": "typical_inrush_current", "typ": "12", "unit": "A"}
+      ],
+      "temperature": {"min": "-40", "max": "80", "unit": "C"},
+      "companions": [{"id": "tec3.unused_pins", "family": "isolated_converter", "role": "unused_pin_policy", "required": true, "no_connects": ["NC5", "NC8"], "description": "Leave package pins 5 and 8 unconnected as required by the reviewed single-output pin map."}],
+      "symbols": [{"symbol_id": "Converter_DCDC:TEC3-2412UI", "function_pins": [
+        {"function": "VIN_MINUS", "symbol_pin": "1", "electrical": "power_in", "required": true},
+        {"function": "VIN_PLUS", "symbol_pin": "2", "electrical": "power_in", "required": true},
+        {"function": "REMOTE", "symbol_pin": "3", "electrical": "input", "required": true},
+        {"function": "NC5", "symbol_pin": "5", "electrical": "no_connect"},
+        {"function": "VOUT_PLUS", "symbol_pin": "6", "electrical": "power_out", "required": true},
+        {"function": "VOUT_MINUS", "symbol_pin": "7", "electrical": "power_out", "required": true},
+        {"function": "NC8", "symbol_pin": "8", "electrical": "no_connect"}
+      ], "verification": {"confidence": "verified", "sources": ["https://www.tracopower.com/tec3ui-datasheet", "kicad-symbols:Converter_DCDC:TEC3-2412UI"], "pinmap_checked": true}}],
+      "packages": [{"id": "sip8", "name": "TEC3UI SIP-8", "footprint_id": "Converter_DCDC:Converter_DCDC_TRACO_TEC3-24xxUI_THT", "package_type": "sip8", "mpn": "TEC 3-2412UI", "lifecycle": "active", "pinmap_id": "Converter_DCDC:TEC3-2412UI|Converter_DCDC:Converter_DCDC_TRACO_TEC3-24xxUI_THT", "pad_functions": [
+        {"function": "VIN_MINUS", "pad": "1"}, {"function": "VIN_PLUS", "pad": "2"}, {"function": "REMOTE", "pad": "3"},
+        {"function": "NC5", "pad": "5"}, {"function": "VOUT_PLUS", "pad": "6"}, {"function": "VOUT_MINUS", "pad": "7"}, {"function": "NC8", "pad": "8"}
+      ], "dimensions_mm": {"width": 9.1, "height": 21.8}, "height_mm": 12.2, "verification": {"confidence": "verified", "sources": ["https://www.tracopower.com/tec3ui-datasheet", "kicad-footprint:Converter_DCDC:Converter_DCDC_TRACO_TEC3-24xxUI_THT"], "pinmap_checked": true}}],
+      "verification": {"confidence": "verified", "sources": ["https://www.tracopower.com/products/tec3ui.pdf", "kicad-symbols:Converter_DCDC:TEC3-2412UI", "kicad-footprint:Converter_DCDC:Converter_DCDC_TRACO_TEC3-24xxUI_THT"], "resolver_checked": true, "pinmap_checked": true, "notes": ["The datasheet specifies 12 A as typical input inrush, not a guaranteed maximum; maximum-inrush requirements therefore require an independently bounded protection stage.", "The 45.2 K/W case-to-ambient value and 110 C maximum case temperature are modeled as the reviewed module thermal path; workload-specific EMC and isolation-spacing checks remain required."]}
+    },
+    {
+      "id": "isolated_converter.traco.tri10_1212.dip24",
+      "family": "isolated_converter",
+      "name": "TRACO Power TRI 10-1212 reinforced-isolation 12 V converter",
+      "description": "Ten-watt 9 V to 18 V input regulated 12 V converter with reinforced 1 kVAC working isolation, continuous short-circuit protection, and 5 kVAC production isolation test.",
+      "generic": false,
+      "manufacturer": "TRACO Power",
+      "mpn": "TRI 10-1212",
+      "lifecycle": "active",
+      "simulation_models": [{"model_id": "mna_protected_isolated_converter_v1", "parameters": [
+        {"name": "input_min_v", "value": 9}, {"name": "input_max_v", "value": 18}, {"name": "input_current_reference_voltage_v", "value": 12},
+        {"name": "output_voltage_v", "value": 12}, {"name": "max_output_current_a", "value": 0.833},
+        {"name": "short_circuit_current_a", "value": 1.5827},
+        {"name": "soft_start_time_s", "value": 0.06}, {"name": "maximum_overshoot_ratio", "value": 0.05},
+        {"name": "efficiency_ratio", "value": 0.86}, {"name": "isolation_working_voltage_v", "value": 1000},
+        {"name": "isolation_resistance_ohm", "value": 1000000000},
+        {"name": "max_temperature_c", "value": 105}, {"name": "junction_to_ambient_c_per_w", "value": 24.6}
+      ]}],
+      "tags": ["continuous_short_circuit", "dip24", "reinforced_isolation", "regulated", "ten_watt", "wide_input"],
+      "values": [{"kind": "output_voltage", "typ": "12", "unit": "V"}, {"kind": "efficiency", "typ": "86", "unit": "%"}],
+      "ratings": [
+        {"kind": "input_voltage", "min": "9", "max": "18", "unit": "V"}, {"kind": "output_current", "max": "0.833", "unit": "A"},
+        {"kind": "isolation_voltage", "max": "5000", "unit": "V"}, {"kind": "isolation_working_voltage", "max": "1000", "unit": "V"},
+        {"kind": "short_circuit_current", "max": "1.5827", "unit": "A"}
+      ],
+      "temperature": {"min": "-40", "max": "85", "unit": "C"},
+      "symbols": [{"symbol_id": "Converter_DCDC:TRI10-1212", "function_pins": [
+        {"function": "VIN_PLUS", "symbol_pin": "1", "electrical": "power_in", "required": true},
+        {"function": "VOUT_MINUS", "symbol_pin": "12", "electrical": "power_out", "required": true},
+        {"function": "VOUT_PLUS", "symbol_pin": "13", "electrical": "power_out", "required": true},
+        {"function": "VIN_MINUS", "symbol_pin": "23", "electrical": "power_in", "required": true},
+        {"function": "VIN_MINUS_AUX", "symbol_pin": "24", "electrical": "power_in", "required": true}
+      ], "verification": {"confidence": "verified", "sources": ["https://www.tracopower.com/products/tri10.pdf", "kicad-symbols:Converter_DCDC:TRI10-1212"], "pinmap_checked": true}}],
+      "packages": [{"id": "dip24", "name": "TRI 10 DIP-24", "footprint_id": "Converter_DCDC:Converter_DCDC_TRACO_TRI10_Single_THT", "package_type": "dip24", "mpn": "TRI 10-1212", "lifecycle": "active", "pinmap_id": "Converter_DCDC:TRI10-1212|Converter_DCDC:Converter_DCDC_TRACO_TRI10_Single_THT", "pad_functions": [
+        {"function": "VIN_PLUS", "pad": "1"}, {"function": "VOUT_MINUS", "pad": "12"}, {"function": "VOUT_PLUS", "pad": "13"},
+        {"function": "VIN_MINUS", "pad": "23"}, {"function": "VIN_MINUS_AUX", "pad": "24"}
+      ], "dimensions_mm": {"width": 31.8, "height": 20.3}, "height_mm": 12.0, "verification": {"confidence": "verified", "sources": ["https://www.tracopower.com/products/tri10.pdf", "kicad-footprint:Converter_DCDC:Converter_DCDC_TRACO_TRI10_Single_THT"], "pinmap_checked": true}}],
+      "verification": {"confidence": "verified", "sources": ["https://www.tracopower.com/products/tri10.pdf", "kicad-symbols:Converter_DCDC:TRI10-1212", "kicad-footprint:Converter_DCDC:Converter_DCDC_TRACO_TRI10_Single_THT"], "resolver_checked": true, "pinmap_checked": true, "notes": ["The effective 24.6 K/W module thermal path is conservatively derived from the datasheet's 10 W full-load operation through 65 C ambient, 105 C maximum case temperature, and 86% typical efficiency.", "The 1.5827 A short-circuit bound is the datasheet's 190% maximum current limit applied to the 0.833 A rated output.", "The converter has no remote-control pin; system shutdown must be implemented by an upstream reviewed protection stage."]}
+    },
+    {
+      "id": "isolated_converter.traco.tri10_2412.dip24",
+      "family": "isolated_converter",
+      "name": "TRACO Power TRI 10-2412 reinforced-isolation 12 V converter",
+      "description": "Ten-watt 18 V to 36 V input regulated 12 V converter with reinforced 1 kVAC working isolation, continuous short-circuit protection, and 5 kVAC production isolation test.",
+      "generic": false,
+      "manufacturer": "TRACO Power",
+      "mpn": "TRI 10-2412",
+      "lifecycle": "active",
+      "simulation_models": [{"model_id": "mna_protected_isolated_converter_v1", "parameters": [
+        {"name": "input_min_v", "value": 18}, {"name": "input_max_v", "value": 36}, {"name": "input_current_reference_voltage_v", "value": 24},
+        {"name": "output_voltage_v", "value": 12}, {"name": "max_output_current_a", "value": 0.833},
+        {"name": "short_circuit_current_a", "value": 1.5827},
+        {"name": "soft_start_time_s", "value": 0.06}, {"name": "maximum_overshoot_ratio", "value": 0.05},
+        {"name": "efficiency_ratio", "value": 0.87}, {"name": "isolation_working_voltage_v", "value": 1000},
+        {"name": "isolation_resistance_ohm", "value": 1000000000},
+        {"name": "max_temperature_c", "value": 105}, {"name": "junction_to_ambient_c_per_w", "value": 26.8}
+      ]}],
+      "tags": ["continuous_short_circuit", "dip24", "reinforced_isolation", "regulated", "ten_watt", "wide_input"],
+      "values": [{"kind": "output_voltage", "typ": "12", "unit": "V"}, {"kind": "efficiency", "typ": "87", "unit": "%"}],
+      "ratings": [
+        {"kind": "input_voltage", "min": "18", "max": "36", "unit": "V"}, {"kind": "output_current", "max": "0.833", "unit": "A"},
+        {"kind": "isolation_voltage", "max": "5000", "unit": "V"}, {"kind": "isolation_working_voltage", "max": "1000", "unit": "V"},
+        {"kind": "short_circuit_current", "max": "1.5827", "unit": "A"}
+      ],
+      "temperature": {"min": "-40", "max": "85", "unit": "C"},
+      "symbols": [{"symbol_id": "Converter_DCDC:TRI10-2412", "function_pins": [
+        {"function": "VIN_PLUS", "symbol_pin": "1", "electrical": "power_in", "required": true},
+        {"function": "VOUT_MINUS", "symbol_pin": "12", "electrical": "power_out", "required": true},
+        {"function": "VOUT_PLUS", "symbol_pin": "13", "electrical": "power_out", "required": true},
+        {"function": "VIN_MINUS", "symbol_pin": "23", "electrical": "power_in", "required": true},
+        {"function": "VIN_MINUS_AUX", "symbol_pin": "24", "electrical": "power_in", "required": true}
+      ], "verification": {"confidence": "verified", "sources": ["https://www.tracopower.com/products/tri10.pdf", "kicad-symbols:Converter_DCDC:TRI10-2412"], "pinmap_checked": true}}],
+      "packages": [{"id": "dip24", "name": "TRI 10 DIP-24", "footprint_id": "Converter_DCDC:Converter_DCDC_TRACO_TRI10_Single_THT", "package_type": "dip24", "mpn": "TRI 10-2412", "lifecycle": "active", "pinmap_id": "Converter_DCDC:TRI10-2412|Converter_DCDC:Converter_DCDC_TRACO_TRI10_Single_THT", "pad_functions": [
+        {"function": "VIN_PLUS", "pad": "1"}, {"function": "VOUT_MINUS", "pad": "12"}, {"function": "VOUT_PLUS", "pad": "13"},
+        {"function": "VIN_MINUS", "pad": "23"}, {"function": "VIN_MINUS_AUX", "pad": "24"}
+      ], "dimensions_mm": {"width": 31.8, "height": 20.3}, "height_mm": 12.0, "verification": {"confidence": "verified", "sources": ["https://www.tracopower.com/products/tri10.pdf", "kicad-footprint:Converter_DCDC:Converter_DCDC_TRACO_TRI10_Single_THT"], "pinmap_checked": true}}],
+      "verification": {"confidence": "verified", "sources": ["https://www.tracopower.com/products/tri10.pdf", "kicad-symbols:Converter_DCDC:TRI10-2412", "kicad-footprint:Converter_DCDC:Converter_DCDC_TRACO_TRI10_Single_THT"], "resolver_checked": true, "pinmap_checked": true, "notes": ["The effective 26.8 K/W module thermal path is conservatively derived from the datasheet's 10 W full-load operation through 65 C ambient, 105 C maximum case temperature, and 87% typical efficiency.", "The 1.5827 A short-circuit bound is the datasheet's 190% maximum current limit applied to the 0.833 A rated output.", "The converter has no remote-control pin; system shutdown must be implemented by an upstream reviewed protection stage."]}
+    },
+    {
       "id": "isolated_converter.murata.mee1s0505sc.sip4",
       "family": "isolated_converter",
       "name": "Murata MEE1S0505SC 1 W isolated 5 V converter",
@@ -368,6 +593,113 @@
       "symbols": [{"symbol_id": "Regulator_Linear:LM337_SOT223", "function_pins": [{"function": "ADJ", "symbol_pin": "1", "electrical": "input", "required": true}, {"function": "VIN", "symbol_pin": "2", "electrical": "power_in", "required": true}, {"function": "VOUT", "symbol_pin": "3", "electrical": "power_out", "required": true}], "verification": {"confidence": "verified", "sources": ["https://www.ti.com/lit/ds/symlink/lm337-n.pdf", "kicad-symbols:Regulator_Linear:LM337_SOT223"], "pinmap_checked": true}}],
       "packages": [{"id": "sot223", "name": "SOT-223-3 TabPin2", "footprint_id": "Package_TO_SOT_SMD:SOT-223-3_TabPin2", "package_type": "sot223", "mpn": "LM337IMP/NOPB", "lifecycle": "active", "pinmap_id": "Regulator_Linear:LM337_SOT223|Package_TO_SOT_SMD:SOT-223-3_TabPin2", "pad_functions": [{"function": "ADJ", "pad": "1"}, {"function": "VIN", "pad": "2"}, {"function": "VOUT", "pad": "3"}], "dimensions_mm": {"width": 6.5, "height": 3.5}, "height_mm": 1.8, "verification": {"confidence": "verified", "sources": ["https://www.ti.com/lit/ds/symlink/lm337-n.pdf", "kicad-footprint:Package_TO_SOT_SMD:SOT-223-3_TabPin2"], "pinmap_checked": true}}],
       "verification": {"confidence": "verified", "sources": ["https://www.ti.com/lit/ds/symlink/lm337-n.pdf", "datasheet-pinmap:TI:LM337IMP", "kicad-footprint:Package_TO_SOT_SMD:SOT-223-3_TabPin2"], "resolver_checked": true, "pinmap_checked": true}
+    },
+    {
+      "id": "isolator.ti.iso7741fdw.soic16w",
+      "family": "isolator",
+      "name": "TI ISO7741FDW reinforced quad-channel digital isolator",
+      "description": "Default-low, 100 Mbps, three-forward/one-reverse push-pull digital isolator with independent 2.25 V to 5.5 V supplies and a 1.5 kV rms reviewed working-isolation envelope.",
+      "generic": false,
+      "manufacturer": "Texas Instruments",
+      "mpn": "ISO7741FDWR",
+      "lifecycle": "active",
+      "simulation_models": [{"model_id": "mna_push_pull_digital_isolator_v1", "parameters": [
+        {"name": "supply_min_v", "value": 2.25},
+        {"name": "supply_max_v", "value": 5.5},
+        {"name": "input_low_ratio", "value": 0.3},
+        {"name": "input_high_ratio", "value": 0.7},
+        {"name": "enable_high_ratio", "value": 0.7},
+        {"name": "output_low_resistance_ohm", "value": 400},
+        {"name": "output_high_resistance_ohm", "value": 400},
+        {"name": "output_off_resistance_ohm", "value": 1000000000},
+        {"name": "max_output_current_a", "value": 0.001},
+        {"name": "side_1_quiescent_current_a", "value": 0.0018},
+        {"name": "side_2_quiescent_current_a", "value": 0.0018},
+        {"name": "isolation_resistance_ohm", "value": 1000000000000},
+        {"name": "isolation_working_voltage_v", "value": 1500},
+        {"name": "max_temperature_c", "value": 150},
+        {"name": "junction_to_ambient_c_per_w", "value": 83.4}
+      ]}],
+      "tags": ["100mbps", "default_low", "digital_isolator", "functional_isolation", "push_pull", "reinforced", "soic16w", "three_forward_one_reverse"],
+      "values": [
+        {"kind": "forward_channel_count", "typ": "3", "unit": "count"},
+        {"kind": "reverse_channel_count", "typ": "1", "unit": "count"},
+        {"kind": "clearance", "min": "8", "unit": "mm"},
+        {"kind": "creepage", "min": "8", "unit": "mm"}
+      ],
+      "ratings": [
+        {"kind": "side_a_supply_voltage", "min": "2.25", "max": "5.5", "unit": "V"},
+        {"kind": "side_b_supply_voltage", "min": "2.25", "max": "5.5", "unit": "V"},
+        {"kind": "data_rate", "max": "100000000", "unit": "Hz"},
+        {"kind": "output_current", "max": "0.001", "unit": "A"},
+        {"kind": "isolation_voltage", "max": "5000", "unit": "V"},
+        {"kind": "isolation_working_voltage", "max": "1500", "unit": "V"},
+        {"kind": "isolation_transient_voltage", "max": "8000", "unit": "V"},
+        {"kind": "clearance", "max": "8", "unit": "mm"},
+        {"kind": "creepage", "max": "8", "unit": "mm"}
+      ],
+      "temperature": {"min": "-55", "max": "125", "unit": "C"},
+      "symbols": [{
+        "symbol_id": "Connector_Generic:Conn_01x16",
+        "function_pins": [
+          {"function": "VDD1", "symbol_pin": "1", "electrical": "power_in", "required": true},
+          {"function": "GND1", "symbol_pin": "2", "electrical": "power_in", "required": true},
+          {"function": "INA1", "symbol_pin": "3", "electrical": "input", "required": true},
+          {"function": "INA2", "symbol_pin": "4", "electrical": "input", "required": true},
+          {"function": "INA3", "symbol_pin": "5", "electrical": "input", "required": true},
+          {"function": "OUTA4", "symbol_pin": "6", "electrical": "output", "required": true},
+          {"function": "EN1", "symbol_pin": "7", "electrical": "input", "required": true},
+          {"function": "GND1_AUX", "symbol_pin": "8", "electrical": "power_in", "required": true},
+          {"function": "GND2", "symbol_pin": "9", "electrical": "power_in", "required": true},
+          {"function": "EN2", "symbol_pin": "10", "electrical": "input", "required": true},
+          {"function": "INB4", "symbol_pin": "11", "electrical": "input", "required": true},
+          {"function": "OUTB3", "symbol_pin": "12", "electrical": "output", "required": true},
+          {"function": "OUTB2", "symbol_pin": "13", "electrical": "output", "required": true},
+          {"function": "OUTB1", "symbol_pin": "14", "electrical": "output", "required": true},
+          {"function": "GND2_AUX", "symbol_pin": "15", "electrical": "power_in", "required": true},
+          {"function": "VDD2", "symbol_pin": "16", "electrical": "power_in", "required": true}
+        ],
+        "verification": {"confidence": "verified", "sources": ["https://www.ti.com/lit/ds/symlink/iso7741.pdf", "kicad-symbols:Connector_Generic:Conn_01x16"], "pinmap_checked": true}
+      }],
+      "packages": [{
+        "id": "soic16w",
+        "name": "SOIC-16 wide body DW",
+        "footprint_id": "Package_SO:SOIC-16W_7.5x10.3mm_P1.27mm",
+        "package_type": "soic16w",
+        "mpn": "ISO7741FDWR",
+        "lifecycle": "active",
+        "pinmap_id": "Connector_Generic:Conn_01x16|Package_SO:SOIC-16W_7.5x10.3mm_P1.27mm",
+        "pad_functions": [
+          {"function": "VDD1", "pad": "1"}, {"function": "GND1", "pad": "2"},
+          {"function": "INA1", "pad": "3"}, {"function": "INA2", "pad": "4"},
+          {"function": "INA3", "pad": "5"}, {"function": "OUTA4", "pad": "6"},
+          {"function": "EN1", "pad": "7"}, {"function": "GND1_AUX", "pad": "8"},
+          {"function": "GND2", "pad": "9"}, {"function": "EN2", "pad": "10"},
+          {"function": "INB4", "pad": "11"}, {"function": "OUTB3", "pad": "12"},
+          {"function": "OUTB2", "pad": "13"}, {"function": "OUTB1", "pad": "14"},
+          {"function": "GND2_AUX", "pad": "15"}, {"function": "VDD2", "pad": "16"}
+        ],
+        "dimensions_mm": {"width": 10.3, "height": 10.3},
+        "height_mm": 2.65,
+        "verification": {"confidence": "verified", "sources": ["https://www.ti.com/lit/ds/symlink/iso7741.pdf", "kicad-footprint:Package_SO:SOIC-16W_7.5x10.3mm_P1.27mm"], "pinmap_checked": true}
+      }],
+      "verification": {
+        "confidence": "verified",
+        "sources": [
+          "https://www.ti.com/product/ISO7741",
+          "https://www.ti.com/lit/ds/symlink/iso7741.pdf",
+          "datasheet-pinmap:TI:ISO7741FDW",
+          "kicad-footprint:Package_SO:SOIC-16W_7.5x10.3mm_P1.27mm"
+        ],
+        "resolver_checked": true,
+        "pinmap_checked": true,
+        "notes": [
+          "The installed KiCad library has no ISO7741 symbol, so a generic numbered 16-pin symbol preserves the exact DW pin map.",
+          "The F suffix is required for the reviewed default-low behavior when an input-side supply or signal is absent; EN low instead makes the corresponding output side high impedance.",
+          "The reusable output-current envelope is limited to 1 mA so the model remains valid across the full 2.25 V to 5.5 V supply range.",
+          "Static quiescent load uses the published typical per-channel DC consumption as a bounded reduced-order thermal estimate; higher activity requires frequency-specific supply-current evidence."
+        ]
+      }
     },
     {
       "id": "isolator.analog_devices.adum1252arz.soic8",

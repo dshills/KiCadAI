@@ -1,0 +1,91 @@
+{
+  "schema": "kicadai.open-world-behavior-corpus.v1",
+  "version": 1,
+  "role": "discovery",
+  "cases": [
+    {
+      "id": "discovery_analog_001",
+      "domain": "analog",
+      "safety_impact": "review_required",
+      "prompt": "Acquire four analog channels from one sampling reference at 2 MHz. Each channel presents 12 pF maximum load, edges must settle within 80 ns, and channel-to-channel timing error must remain below 5 ns.",
+      "source_sha256": "190635b2d8e73e409c52955afbe6d311d0ff074439f3f48df4d33c247c650aff"
+    },
+    {
+      "id": "discovery_analog_002",
+      "domain": "analog",
+      "safety_impact": "safety_relevant",
+      "prompt": "Measure a grounded 0 to 2.5 V signal on circuitry powered from an independently isolated 5 V domain. Preserve 0.2 percent accuracy and prevent a single fault from bridging the two returns.",
+      "source_sha256": "006a4e59954b255acda5856029e33614db5a3dcc0edab7c0ddfcc68e9810ecc7"
+    },
+    {
+      "id": "discovery_digital_001",
+      "domain": "digital",
+      "safety_impact": "review_required",
+      "prompt": "Deliver one 25 MHz logic clock to six receivers. Total receiver loading is 42 pF, output rise time must remain between 2 ns and 6 ns, and all receivers must start in a defined inactive state.",
+      "source_sha256": "f80ea633a1db17daf14fe5ac5c362b7240bd0dcac7c6a76f707e6164bac45793"
+    },
+    {
+      "id": "discovery_digital_002",
+      "domain": "digital",
+      "safety_impact": "safety_relevant",
+      "prompt": "Exchange an eight-bit push-pull control word between 1.8 V and 3.3 V domains in either direction. Direction changes only while disabled, and neither side may be driven when its supply is absent.",
+      "source_sha256": "4604bb590c40980890c7a7e8fca001813b4d502d83eb79299817fcb657f5c681"
+    },
+    {
+      "id": "discovery_mcu_001",
+      "domain": "mcu",
+      "safety_impact": "safety_relevant",
+      "prompt": "Provide in-circuit firmware programming and debugging for a 3.3 V controller whose programming pins are shared with two application signals. Normal operation must not load those signals beyond 10 pF.",
+      "source_sha256": "964193e62df310d9ae0cd5cafe87480a6dfa70db1f03a0a1137dcddc1d85b918"
+    },
+    {
+      "id": "discovery_mcu_002",
+      "domain": "mcu",
+      "safety_impact": "review_required",
+      "prompt": "Run a controller and three peripherals from one 8 MHz timing source. The controller must remain programmable after assembly, and every timing input must meet its declared voltage and load limits.",
+      "source_sha256": "2b37c03d0fb36223c300fa22c666e789537795fea61000f1969f8806bbdc87c3"
+    },
+    {
+      "id": "discovery_mixed_signal_001",
+      "domain": "mixed_signal",
+      "safety_impact": "safety_critical",
+      "prompt": "Digitize a 0 to 20 mA industrial signal across a 1 kV functional isolation boundary. Maintain 12-bit effective resolution and enter a bounded safe output state after loss of either domain supply.",
+      "source_sha256": "474f1efe9b940b192cecd71224c734b4fae617d3fbff07e29af5c77ce61e2b8c"
+    },
+    {
+      "id": "discovery_mixed_signal_002",
+      "domain": "mixed_signal",
+      "safety_impact": "safety_relevant",
+      "prompt": "Connect a 1.8 V controller to a 3.3 V sensor bus and a 5 V interrupt source. Data is open-drain at 1 MHz, the interrupt is push-pull, and power-up order is not guaranteed.",
+      "source_sha256": "b7052289db0e37fa4166467917382cf2b2f99174cfd1a8865c28ad172955b94e"
+    },
+    {
+      "id": "discovery_power_001",
+      "domain": "power",
+      "safety_impact": "safety_critical",
+      "prompt": "Convert a 9 V to 30 V input into an isolated 5 V output supplying 400 mA. Limit startup overshoot to 5 percent, survive an output short, and keep the isolation boundary within reviewed working-voltage limits.",
+      "source_sha256": "02aee492b8206e69280dcf6d0e6ed2cf7859c3234608c40b2765dea42e73b697"
+    },
+    {
+      "id": "discovery_power_002",
+      "domain": "power",
+      "safety_impact": "safety_relevant",
+      "prompt": "Produce 1.2 V at 2 A from a 5 V source with at least 85 percent efficiency. The load can step from 0.2 A to 1.8 A in 2 microseconds and the output must recover within 150 microseconds.",
+      "source_sha256": "c12186d04c82905b9051502900db433ef2dace567b7b8c17c41437875e501922"
+    },
+    {
+      "id": "discovery_sensor_001",
+      "domain": "sensor",
+      "safety_impact": "review_required",
+      "prompt": "Read four open-drain environmental sensors at 400 kHz across 1.8 V and 3.3 V domains. The combined wiring and device capacitance is 310 pF and either domain may power up first.",
+      "source_sha256": "e0bf209d220f34c34ff07b5ddd255e86355f665cd633b1f36d6ae7f1d921ba18"
+    },
+    {
+      "id": "discovery_sensor_002",
+      "domain": "sensor",
+      "safety_impact": "safety_relevant",
+      "prompt": "Acquire a remote 3.3 V digital sensor over a 2 m cable at 10 MHz from a 1.8 V controller. Bound input current during supply loss and reject any solution that leaves signal direction undefined.",
+      "source_sha256": "82c3eb5a622987b3eda6c43d27445499cba8b23c7bcda40fba1cda0fe48022d7"
+    }
+  ]
+}

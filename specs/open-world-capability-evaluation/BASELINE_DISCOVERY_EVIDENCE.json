@@ -1,0 +1,211 @@
+{
+  "schema": "kicadai.open-world-terminal-evidence.v1",
+  "version": 1,
+  "corpus_role": "discovery",
+  "corpus_sha256": "fc47eeb65be23a6e003f5bb559a1ac08f34630afe5a894422c121245b79bec23",
+  "cases": [
+    {
+      "id": "discovery_analog_001",
+      "domain": "analog",
+      "safety_impact": "review_required",
+      "outcome": "unsupported",
+      "observations": [
+        {
+          "capability": "clock_fanout_loading",
+          "outcome": "unsupported",
+          "stage": "architecture_search",
+          "code": "CAPABILITY_UNSUPPORTED",
+          "path": "requirements.sample_clock",
+          "reason": "installed clock synthesis cannot qualify the requested aggregate receiver loading and settling contract",
+          "required_evidence": ["reviewed fanout partition and endpoint load qualification"]
+        }
+      ]
+    },
+    {
+      "id": "discovery_analog_002",
+      "domain": "analog",
+      "safety_impact": "safety_relevant",
+      "outcome": "needs_clarification",
+      "observations": [
+        {
+          "capability": "isolation_operating_bounds",
+          "outcome": "needs_clarification",
+          "stage": "behavioral_compilation",
+          "code": "CLARIFICATION_REQUIRED",
+          "path": "requirements.isolation.working_voltage",
+          "reason": "the required working-voltage and transient isolation environment is not bounded",
+          "required_evidence": ["user-supplied working-voltage and transient isolation bounds"]
+        }
+      ]
+    },
+    {
+      "id": "discovery_digital_001",
+      "domain": "digital",
+      "safety_impact": "review_required",
+      "outcome": "unsupported",
+      "observations": [
+        {
+          "capability": "clock_fanout_loading",
+          "outcome": "unsupported",
+          "stage": "architecture_search",
+          "code": "CAPABILITY_UNSUPPORTED",
+          "path": "requirements.clock_distribution",
+          "reason": "no installed clock endpoint architecture proves six receivers with the declared aggregate loading and edge bounds",
+          "required_evidence": ["catalog-backed multi-endpoint clock loading and edge-rate qualification"]
+        }
+      ]
+    },
+    {
+      "id": "discovery_digital_002",
+      "domain": "digital",
+      "safety_impact": "safety_relevant",
+      "outcome": "unsupported",
+      "observations": [
+        {
+          "capability": "bus_buffering_level_translation",
+          "outcome": "unsupported",
+          "stage": "architecture_search",
+          "code": "CAPABILITY_UNSUPPORTED",
+          "path": "requirements.control_bus",
+          "reason": "the installed translator path does not qualify an eight-bit direction-controlled partial-power-down bus",
+          "required_evidence": ["whole-bus direction, enable, voltage, channel-count, and partial-power-down evidence"]
+        }
+      ]
+    },
+    {
+      "id": "discovery_mcu_001",
+      "domain": "mcu",
+      "safety_impact": "safety_relevant",
+      "outcome": "unsupported",
+      "observations": [
+        {
+          "capability": "mcu_debug_electrical_loading",
+          "outcome": "unsupported",
+          "stage": "architecture_search",
+          "code": "CAPABILITY_UNSUPPORTED",
+          "path": "requirements.programming_debug",
+          "reason": "MCU pin assignment does not yet prove connected-tool loading, unpowered-target behavior, and shared-pin arbitration",
+          "required_evidence": ["catalog-backed tool connector loads and shared-pin contention qualification"]
+        }
+      ]
+    },
+    {
+      "id": "discovery_mcu_002",
+      "domain": "mcu",
+      "safety_impact": "review_required",
+      "outcome": "unsupported",
+      "observations": [
+        {
+          "capability": "clock_fanout_loading",
+          "outcome": "unsupported",
+          "stage": "architecture_search",
+          "code": "CAPABILITY_UNSUPPORTED",
+          "path": "requirements.shared_timing",
+          "reason": "the shared timing source is not qualified against every receiver load and voltage contract",
+          "required_evidence": ["per-receiver timing voltage and load qualification"]
+        },
+        {
+          "capability": "mcu_debug_electrical_loading",
+          "outcome": "unsupported",
+          "stage": "architecture_search",
+          "code": "CAPABILITY_UNSUPPORTED",
+          "path": "requirements.programming",
+          "reason": "post-assembly programming access lacks reviewed electrical loading evidence",
+          "required_evidence": ["programmer loading, boot-state, and contention evidence"]
+        }
+      ]
+    },
+    {
+      "id": "discovery_mixed_signal_001",
+      "domain": "mixed_signal",
+      "safety_impact": "safety_critical",
+      "outcome": "ambiguous",
+      "observations": [
+        {
+          "capability": "functional_isolation_safe_state",
+          "outcome": "ambiguous",
+          "stage": "architecture_search",
+          "code": "CAPABILITY_AMBIGUOUS",
+          "path": "requirements.isolated_acquisition",
+          "reason": "multiple isolation partitions remain without a deterministic qualified safe-state selection",
+          "required_evidence": ["deterministic isolation partition selection with loss-of-supply safe-state proof"]
+        }
+      ]
+    },
+    {
+      "id": "discovery_mixed_signal_002",
+      "domain": "mixed_signal",
+      "safety_impact": "safety_relevant",
+      "outcome": "unsupported",
+      "observations": [
+        {
+          "capability": "bus_buffering_level_translation",
+          "outcome": "unsupported",
+          "stage": "architecture_search",
+          "code": "CAPABILITY_UNSUPPORTED",
+          "path": "requirements.mixed_voltage_interfaces",
+          "reason": "the installed interface path cannot jointly qualify open-drain and push-pull translation with arbitrary power order",
+          "required_evidence": ["protocol-specific direction, startup, and partial-power-down translation evidence"]
+        }
+      ]
+    },
+    {
+      "id": "discovery_power_001",
+      "domain": "power",
+      "safety_impact": "safety_critical",
+      "outcome": "budget_exhausted",
+      "observations": [
+        {
+          "capability": "converter_dynamic_fault_qualification",
+          "outcome": "budget_exhausted",
+          "stage": "architecture_search",
+          "code": "SEARCH_BUDGET_EXHAUSTED",
+          "path": "requirements.isolated_power",
+          "reason": "bounded search ended before a converter chain proved startup, short-circuit, and isolation constraints",
+          "required_evidence": ["qualified isolated converter candidate within deterministic search budget"]
+        }
+      ]
+    },
+    {
+      "id": "discovery_power_002",
+      "domain": "power",
+      "safety_impact": "safety_relevant",
+      "outcome": "ready",
+      "observations": []
+    },
+    {
+      "id": "discovery_sensor_001",
+      "domain": "sensor",
+      "safety_impact": "review_required",
+      "outcome": "unsupported",
+      "observations": [
+        {
+          "capability": "bus_buffering_level_translation",
+          "outcome": "unsupported",
+          "stage": "architecture_search",
+          "code": "CAPABILITY_UNSUPPORTED",
+          "path": "requirements.sensor_bus",
+          "reason": "the installed two-domain bus path does not prove four-device capacitance at the declared rate",
+          "required_evidence": ["whole-bus capacitance, pull-up, speed, and fanout qualification"]
+        }
+      ]
+    },
+    {
+      "id": "discovery_sensor_002",
+      "domain": "sensor",
+      "safety_impact": "safety_relevant",
+      "outcome": "unsupported",
+      "observations": [
+        {
+          "capability": "bus_buffering_level_translation",
+          "outcome": "unsupported",
+          "stage": "architecture_search",
+          "code": "CAPABILITY_UNSUPPORTED",
+          "path": "requirements.remote_sensor_interface",
+          "reason": "no installed interface path proves cable loading, explicit direction, and unpowered-controller current",
+          "required_evidence": ["directional level translation with cable-load and partial-power-down qualification"]
+        }
+      ]
+    }
+  ]
+}

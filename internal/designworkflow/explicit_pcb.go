@@ -242,11 +242,23 @@ func RouteExplicitCircuit(ctx context.Context, request Request, placed Placement
 				result.Status = routing.StatusBlocked
 			}
 		}
+		if !reports.HasBlockingIssue(junctionIssues) {
+			var holeClearanceIssues []reports.Issue
+			operations, holeClearanceIssues = repairRouteTransitionPadHoleClearance(routingRequest, operations, &placed)
+			issues = append(issues, holeClearanceIssues...)
+			result.Issues = append(result.Issues, holeClearanceIssues...)
+			junctionIssues = append(junctionIssues, holeClearanceIssues...)
+			if reports.HasBlockingIssue(holeClearanceIssues) {
+				result.Status = routing.StatusBlocked
+			}
+		}
 		if reports.HasBlockingIssue(junctionIssues) {
 			result.Status = routing.StatusBlocked
 		}
 	}
 	operations, endpointTailCleanup := trimDisconnectedRouteTailsAtSameNetPadsWithSummary(operations, newPhysicalPadRoutingContext(&placed))
+	operations = compactRouteOperationGeometry(operations)
+	operations, danglingRouteViasPruned := pruneRouteViasWithoutTwoLayerContact(operations, newPhysicalPadRoutingContext(&placed))
 	operations = compactRouteOperationGeometry(operations)
 	if request.Validation.RequireDRC {
 		finalClearanceRequest := routingRequest
@@ -277,6 +289,7 @@ func RouteExplicitCircuit(ctx context.Context, request Request, placed Placement
 		"physical_clearance_after_repair": clearanceBlockersAfter, "physical_clearance_deferred_drc": clearanceDeferredToDRC,
 		"layer_transition_vias_added": layerTransitionViasAdded,
 		"route_endpoint_tail_cleanup": endpointTailCleanup,
+		"dangling_route_vias_pruned":  danglingRouteViasPruned,
 		"return_path_evidence":        returnPathEvidence,
 	}
 	if result.Status != routing.StatusRouted && stage.Status == StageStatusOK {

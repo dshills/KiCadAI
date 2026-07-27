@@ -1033,6 +1033,50 @@ func TestMNADualOutputIsolatedConverterDrivesBothRailsAndEnforcesCatalogLimits(t
 	}
 }
 
+func TestMNAIsolatedConverterUsesIndependentSecondaryReferenceGauge(t *testing.T) {
+	parameters := []NamedValue{
+		{Name: "input_min_v", Value: 9}, {Name: "input_max_v", Value: 18},
+		{Name: "output_voltage_v", Value: 12}, {Name: "max_output_current_a", Value: .5},
+		{Name: "soft_start_time_s", Value: 0},
+	}
+	components := []ComponentEvidence{
+		voltageSourceEvidence("supply", "VIN", "PRIMARY_GROUND"),
+		{
+			InstanceID: "converter", CatalogID: "converter", Family: "isolated_converter",
+			ModelClaims: []CatalogEvidence{{ModelID: PrimitiveSingleOutputIsolatedConverterV1, Parameters: parameters}},
+			Connections: []ConnectionEvidence{
+				{Function: "VIN_PLUS", Net: "VIN"}, {Function: "VIN_MINUS", Net: "PRIMARY_GROUND"},
+				{Function: "VOUT_PLUS", Net: "VOUT"}, {Function: "VOUT_MINUS", Net: "SECONDARY_GROUND"},
+			},
+		},
+		resistorEvidence("load", 120, "VOUT", "SECONDARY_GROUND"),
+	}
+	intent := Intent{
+		ModelID: ModelLinearCircuitMNAV1,
+		Analyses: []Analysis{{
+			ID: "dc", Kind: AnalysisDCOperatingPoint,
+			Excitations: []SourceExcitation{{Component: "supply", DCValue: 12}},
+		}},
+		Assertions: []Assertion{{
+			AnalysisID: "dc", Node: "VOUT", Quantity: QuantityVoltageV, Min: 11.999, Max: 12.001,
+		}},
+	}
+	nodes := []NodeEvidence{
+		{Name: "PRIMARY_GROUND", Role: "ground"},
+		{Name: "SECONDARY_GROUND", Role: "ground"},
+		{Name: "VIN", Role: "power"},
+		{Name: "VOUT", Role: "power"},
+	}
+	plan, diagnostics := ResolveWithTopology(intent, "catalog", "catalog-hash", components, nodes)
+	if len(diagnostics) != 0 {
+		t.Fatalf("resolve independently referenced isolated converter: %#v", diagnostics)
+	}
+	report, diagnostics := Evaluate(plan)
+	if len(diagnostics) != 0 || report.Status != "pass" {
+		t.Fatalf("independently referenced isolated converter report = %#v diagnostics=%#v", report, diagnostics)
+	}
+}
+
 func TestMNACurrentSenseAmplifierClampsToCatalogOutputRange(t *testing.T) {
 	for _, test := range []struct {
 		name      string
@@ -1241,6 +1285,68 @@ func TestMNAFixedRegulatorEnforcesOutputAndThermalPath(t *testing.T) {
 	report, diagnostics := Evaluate(plan)
 	if len(diagnostics) != 0 || report.Status != "pass" {
 		t.Fatalf("fixed regulator report = %#v diagnostics=%#v", report, diagnostics)
+	}
+}
+
+func TestMNAFixedBuckModulePowersProtectedIsolatedConverter(t *testing.T) {
+	intent := Intent{
+		ModelID: ModelLinearCircuitMNAV1,
+		Analyses: []Analysis{
+			{ID: "operating_point", Kind: AnalysisDCOperatingPoint, Excitations: []SourceExcitation{{Component: "supply", DCValue: 24}}},
+			{ID: "thermal", Kind: AnalysisThermal, Excitations: []SourceExcitation{{Component: "supply", DCValue: 24}}, Conditions: []NamedValue{{Name: "ambient_temperature_c", Value: 70}}},
+		},
+		Assertions: []Assertion{
+			{AnalysisID: "operating_point", Node: "VOUT", ReferenceNode: "SECONDARY_GROUND", Quantity: QuantityVoltageV, Min: 11.999, Max: 12.001},
+			{AnalysisID: "operating_point", Components: []string{"supply"}, Quantity: QuantityTotalSupplyCurrentA, Min: .1529, Max: .1531},
+			{AnalysisID: "thermal", Component: "pre_regulator", Quantity: QuantityJunctionTemperatureC, Min: 77.34, Max: 77.35},
+			{AnalysisID: "thermal", Component: "isolated_converter", Quantity: QuantityJunctionTemperatureC, Min: 82.01, Max: 82.02},
+		},
+	}
+	buckParameters := []NamedValue{
+		{Name: "input_min_v", Value: 15}, {Name: "input_max_v", Value: 36},
+		{Name: "input_current_reference_voltage_v", Value: 24},
+		{Name: "output_voltage_v", Value: 12}, {Name: "max_output_current_a", Value: 1},
+		{Name: "conversion_efficiency_fraction", Value: .95}, {Name: "soft_start_time_s", Value: 0},
+		{Name: "max_temperature_c", Value: 85}, {Name: "junction_to_ambient_c_per_w", Value: 40},
+	}
+	converterParameters := []NamedValue{
+		{Name: "input_min_v", Value: 9}, {Name: "input_max_v", Value: 18},
+		{Name: "input_current_reference_voltage_v", Value: 12},
+		{Name: "output_voltage_v", Value: 12}, {Name: "max_output_current_a", Value: .833},
+		{Name: "short_circuit_current_a", Value: 1.5827}, {Name: "soft_start_time_s", Value: .06},
+		{Name: "maximum_overshoot_ratio", Value: .05}, {Name: "efficiency_ratio", Value: .86},
+		{Name: "isolation_working_voltage_v", Value: 1000}, {Name: "isolation_resistance_ohm", Value: 1e9},
+		{Name: "max_temperature_c", Value: 105}, {Name: "junction_to_ambient_c_per_w", Value: 24.6},
+	}
+	components := []ComponentEvidence{
+		voltageSourceEvidence("supply", "VIN", "PRIMARY_GROUND"),
+		{
+			InstanceID: "pre_regulator", CatalogID: "pre_regulator", Family: "regulator",
+			ModelClaims: []CatalogEvidence{{ModelID: PrimitiveFixedBuckModuleV1, Parameters: buckParameters}},
+			Connections: []ConnectionEvidence{{Function: "VIN", Net: "VIN"}, {Function: "VOUT", Net: "INTERMEDIATE"}, {Function: "GND", Net: "PRIMARY_GROUND"}},
+		},
+		{
+			InstanceID: "isolated_converter", CatalogID: "isolated_converter", Family: "isolated_converter",
+			ModelClaims: []CatalogEvidence{{ModelID: PrimitiveProtectedIsolatedConverterV1, Parameters: converterParameters}},
+			Connections: []ConnectionEvidence{
+				{Function: "VIN_PLUS", Net: "INTERMEDIATE"}, {Function: "VIN_MINUS", Net: "PRIMARY_GROUND"},
+				{Function: "VOUT_PLUS", Net: "VOUT"}, {Function: "VOUT_MINUS", Net: "SECONDARY_GROUND"},
+			},
+		},
+		resistorEvidence("load", 48, "VOUT", "SECONDARY_GROUND"),
+	}
+	nodes := []NodeEvidence{
+		{Name: "PRIMARY_GROUND", Role: "ground"}, {Name: "VIN", Role: "power_pos"},
+		{Name: "INTERMEDIATE", Role: "power_pos"}, {Name: "VOUT", Role: "power_pos"},
+		{Name: "SECONDARY_GROUND", Role: "isolated_ground"},
+	}
+	plan, diagnostics := ResolveWithTopology(intent, "catalog", "catalog-hash", components, nodes)
+	if len(diagnostics) != 0 {
+		t.Fatalf("fixed buck module resolution diagnostics = %#v", diagnostics)
+	}
+	report, diagnostics := Evaluate(plan)
+	if len(diagnostics) != 0 || report.Status != "pass" {
+		t.Fatalf("fixed buck module report = %#v diagnostics=%#v", report, diagnostics)
 	}
 }
 

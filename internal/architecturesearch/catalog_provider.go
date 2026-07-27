@@ -56,6 +56,8 @@ var catalogProviderCapabilities = []string{
 type CatalogProvider struct {
 	catalog            *components.Catalog
 	alternativeRecords []components.ComponentRecord
+	familyRecords      map[string][]components.ComponentRecord
+	translatorRecords  []components.ComponentRecord
 }
 
 func NewCatalogProvider(catalog *components.Catalog) (*CatalogProvider, error) {
@@ -66,7 +68,28 @@ func NewCatalogProvider(catalog *components.Catalog) (*CatalogProvider, error) {
 	slices.SortFunc(alternativeRecords, func(left, right components.ComponentRecord) int {
 		return strings.Compare(left.ID, right.ID)
 	})
-	return &CatalogProvider{catalog: catalog, alternativeRecords: alternativeRecords}, nil
+	familyRecords := map[string][]components.ComponentRecord{}
+	for _, record := range alternativeRecords {
+		familyRecords[record.Family] = append(familyRecords[record.Family], record)
+	}
+	translatorRecords := slices.Clone(familyRecords["level_translator"])
+	slices.SortStableFunc(translatorRecords, func(left, right components.ComponentRecord) int {
+		leftChannels, rightChannels := 0, 0
+		if left.Translator != nil {
+			leftChannels = left.Translator.ChannelCount
+		}
+		if right.Translator != nil {
+			rightChannels = right.Translator.ChannelCount
+		}
+		if leftChannels != rightChannels {
+			return leftChannels - rightChannels
+		}
+		return strings.Compare(left.ID, right.ID)
+	})
+	return &CatalogProvider{
+		catalog: catalog, alternativeRecords: alternativeRecords,
+		familyRecords: familyRecords, translatorRecords: translatorRecords,
+	}, nil
 }
 
 func NewCatalogRegistry(catalog *components.Catalog) (*Registry, []reports.Issue) {
@@ -116,7 +139,9 @@ func (provider *CatalogProvider) Expand(ctx context.Context, request ProviderReq
 		}
 		return provider.expandFilter(ctx, request)
 	case "logic_level_translation":
-		if _, legacy := namedConstraint(request.Constraints, "signaling_mode"); !legacy {
+		if mode := optionalMCUConstraintString(request.Constraints, "signaling_mode"); mode == "push_pull" {
+			return provider.expandPushPullTranslator(ctx, request)
+		} else if mode == "" {
 			return provider.expandGenericTranslator(ctx, request)
 		}
 		return provider.expandTranslator(ctx, request)
@@ -1131,10 +1156,20 @@ func translatorEvidenceSupports(record components.ComponentRecord, low, high flo
 		}
 		return (bounds.Minimum == nil || value >= *bounds.Minimum) && (bounds.Maximum == nil || value <= *bounds.Maximum)
 	}
-	if !containsVoltage(evidence.SideAVoltage, low) || !containsVoltage(evidence.SideBVoltage, high) || evidence.MaximumFrequency == nil {
+	if !containsVoltage(evidence.SideAVoltage, low) || !containsVoltage(evidence.SideBVoltage, high) {
 		return false
 	}
-	maximumFrequency, ok := convertCatalogUnit(evidence.MaximumFrequency.Value, evidence.MaximumFrequency.Unit, "Hz")
+	frequencyEvidence := evidence.MaximumFrequency
+	switch {
+	case strings.EqualFold(mode, "open_drain") && evidence.MaximumOpenDrainFrequency != nil:
+		frequencyEvidence = evidence.MaximumOpenDrainFrequency
+	case strings.EqualFold(mode, "push_pull") && evidence.MaximumPushPullFrequency != nil:
+		frequencyEvidence = evidence.MaximumPushPullFrequency
+	}
+	if frequencyEvidence == nil {
+		return false
+	}
+	maximumFrequency, ok := convertCatalogUnit(frequencyEvidence.Value, frequencyEvidence.Unit, "Hz")
 	return ok && maximumFrequency >= frequency
 }
 
@@ -1172,7 +1207,7 @@ func (provider *CatalogProvider) expandSingleComponent(ctx context.Context, requ
 		}
 		bindings := mcuRealizationBindings(request.Ports, selection.selected.InstanceID, assignment, selection.record)
 		connections := mcuSupplyConnections(selection)
-		parts, connections, err := provider.expandMCUSupport(ctx, selection, assignment, connections)
+		parts, connections, err := provider.expandMCUSupport(ctx, request, selection, assignment, connections)
 		if err != nil {
 			return nil, err
 		}

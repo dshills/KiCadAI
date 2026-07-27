@@ -252,6 +252,20 @@ var primitiveRegistry = []primitiveDefinition{
 		},
 	},
 	{
+		ID: PrimitiveFixedBuckModuleV1, Family: "regulator", Terminals: []string{"VIN", "VOUT", "GND"},
+		CatalogParameters: []valueRule{
+			{Name: "input_min_v", Positive: true, Minimum: .01, Maximum: 1000},
+			{Name: "input_max_v", Positive: true, Minimum: .01, Maximum: 1000},
+			{Name: "input_current_reference_voltage_v", Positive: true, Minimum: .01, Maximum: 1000},
+			{Name: "output_voltage_v", Positive: true, Minimum: .01, Maximum: 1000},
+			{Name: "max_output_current_a", Positive: true, Minimum: 1e-9, Maximum: 1e4},
+			{Name: "conversion_efficiency_fraction", Positive: true, Minimum: .01, Maximum: 1},
+			{Name: "soft_start_time_s", Nonnegative: true, Maximum: 10},
+			{Name: "max_temperature_c", Maximum: 1000},
+			{Name: "junction_to_ambient_c_per_w", Positive: true, Maximum: 1e6},
+		},
+	},
+	{
 		ID: PrimitiveSynchronousBuckRegulatorV1, Family: "regulator",
 		Terminals: []string{"PVIN", "SW", "FB", "AGND", "PGND", "EN"},
 		ThermalRC: true, TransientSOA: true,
@@ -328,6 +342,25 @@ var primitiveRegistry = []primitiveDefinition{
 		},
 	},
 	{
+		ID: PrimitiveProtectedIsolatedConverterV1, Family: "isolated_converter", Terminals: []string{"VIN_PLUS", "VIN_MINUS", "VOUT_PLUS", "VOUT_MINUS"},
+		CatalogParameters: []valueRule{
+			{Name: "input_min_v", Positive: true, Maximum: 1000},
+			{Name: "input_max_v", Positive: true, Maximum: 1000},
+			{Name: "input_current_reference_voltage_v", Optional: true, Positive: true, Maximum: 1000},
+			{Name: "output_voltage_v", Positive: true, Minimum: .01, Maximum: 1000},
+			{Name: "max_output_current_a", Positive: true, Minimum: 1e-9, Maximum: 1e4},
+			{Name: "short_circuit_current_a", Positive: true, Minimum: 1e-9, Maximum: 1e4},
+			{Name: "typical_inrush_current_a", Optional: true, Positive: true, Minimum: 1e-9, Maximum: 1e4},
+			{Name: "soft_start_time_s", Nonnegative: true, Maximum: 10},
+			{Name: "maximum_overshoot_ratio", Nonnegative: true, Maximum: 1},
+			{Name: "efficiency_ratio", Positive: true, Maximum: 1},
+			{Name: "isolation_working_voltage_v", Positive: true, Maximum: 1e6},
+			{Name: "isolation_resistance_ohm", Positive: true, Minimum: 1, Maximum: 1e18},
+			{Name: "max_temperature_c", Maximum: 1000},
+			{Name: "junction_to_ambient_c_per_w", Positive: true, Maximum: 1e6},
+		},
+	},
+	{
 		ID: PrimitiveDualOutputIsolatedConverterV1, Family: "isolated_converter", Terminals: []string{"VIN_PLUS", "VIN_MINUS", "COMMON", "VOUT_PLUS", "VOUT_MINUS"},
 		CatalogParameters: []valueRule{
 			{Name: "input_min_v", Positive: true, Maximum: 1000},
@@ -358,6 +391,56 @@ var primitiveRegistry = []primitiveDefinition{
 		},
 	},
 	{
+		ID: PrimitivePushPullTranslatorV1, Family: "level_translator",
+		Terminals: []string{"A1", "A2", "A3", "A4", "B1", "B2", "B3", "B4", "VCCA", "VCCB", "GND", "OE"}, Nonlinear: true,
+		CatalogParameters: []valueRule{
+			{Name: "vcca_min_v", Positive: true, Maximum: 1000},
+			{Name: "vcca_max_v", Positive: true, Maximum: 1000},
+			{Name: "vccb_min_v", Positive: true, Maximum: 1000},
+			{Name: "vccb_max_v", Positive: true, Maximum: 1000},
+			{Name: "input_low_max_v", Positive: true, Maximum: 100},
+			{Name: "input_high_headroom_v", Positive: true, Maximum: 100},
+			{Name: "input_high_headroom_a_v", Optional: true, Positive: true, Maximum: 100},
+			{Name: "input_high_headroom_b_v", Optional: true, Positive: true, Maximum: 100},
+			{Name: "enable_high_ratio", Positive: true, Maximum: 1},
+			{Name: "direction", Minimum: -1, Maximum: 1},
+			{Name: "output_low_resistance_ohm", Positive: true, Minimum: 1e-6, Maximum: 1e12},
+			{Name: "output_high_resistance_ohm", Positive: true, Minimum: 1e-6, Maximum: 1e12},
+			{Name: "output_off_resistance_ohm", Positive: true, Minimum: 1, Maximum: 1e15},
+			{Name: "max_sink_current_a", Positive: true, Minimum: 1e-9, Maximum: 1e4},
+			{Name: "max_source_current_a", Positive: true, Minimum: 1e-9, Maximum: 1e4},
+			{Name: "max_transient_sink_current_a", Optional: true, Positive: true, Minimum: 1e-9, Maximum: 1e4},
+			{Name: "max_transient_source_current_a", Optional: true, Positive: true, Minimum: 1e-9, Maximum: 1e4},
+			{Name: "vcca_quiescent_current_a", Nonnegative: true, Maximum: 100},
+			{Name: "vccb_quiescent_current_a", Nonnegative: true, Maximum: 100},
+			{Name: "max_temperature_c", Optional: true, Maximum: 1000},
+			{Name: "junction_to_ambient_c_per_w", Optional: true, Positive: true, Maximum: 1e6},
+		},
+	},
+	{
+		ID: PrimitiveDirectionControlledTranslatorV1, Family: "level_translator",
+		Terminals: []string{"A1", "A2", "A3", "A4", "A5", "A6", "A7", "A8", "B1", "B2", "B3", "B4", "B5", "B6", "B7", "B8", "VCCA", "VCCB", "GND", "OE", "DIR1", "DIR2"}, Nonlinear: true,
+		CatalogParameters: []valueRule{
+			{Name: "vcca_min_v", Positive: true, Maximum: 1000},
+			{Name: "vcca_max_v", Positive: true, Maximum: 1000},
+			{Name: "vccb_min_v", Positive: true, Maximum: 1000},
+			{Name: "vccb_max_v", Positive: true, Maximum: 1000},
+			{Name: "input_low_ratio", Positive: true, Maximum: 1},
+			{Name: "input_high_ratio", Positive: true, Maximum: 1},
+			{Name: "control_low_ratio", Positive: true, Maximum: 1},
+			{Name: "control_high_ratio", Positive: true, Maximum: 1},
+			{Name: "output_low_resistance_ohm", Positive: true, Minimum: 1e-6, Maximum: 1e12},
+			{Name: "output_high_resistance_ohm", Positive: true, Minimum: 1e-6, Maximum: 1e12},
+			{Name: "output_off_resistance_ohm", Positive: true, Minimum: 1, Maximum: 1e15},
+			{Name: "max_sink_current_a", Positive: true, Minimum: 1e-9, Maximum: 1e4},
+			{Name: "max_source_current_a", Positive: true, Minimum: 1e-9, Maximum: 1e4},
+			{Name: "vcca_quiescent_current_a", Nonnegative: true, Maximum: 100},
+			{Name: "vccb_quiescent_current_a", Nonnegative: true, Maximum: 100},
+			{Name: "max_temperature_c", Optional: true, Maximum: 1000},
+			{Name: "junction_to_ambient_c_per_w", Optional: true, Positive: true, Maximum: 1e6},
+		},
+	},
+	{
 		ID: PrimitiveBidirectionalOpenDrainIsolatorV1, Family: "isolator", Terminals: []string{"SDA1", "SCL1", "SDA2", "SCL2", "VDD1", "GND1", "VDD2", "GND2"}, Nonlinear: true,
 		CatalogParameters: []valueRule{
 			{Name: "side_a_min_v", Positive: true, Maximum: 1000},
@@ -376,6 +459,24 @@ var primitiveRegistry = []primitiveDefinition{
 		},
 	},
 	{
+		ID: PrimitivePushPullDigitalIsolatorV1, Family: "isolator",
+		Terminals: []string{"INA1", "INA2", "INA3", "INB4", "OUTB1", "OUTB2", "OUTB3", "OUTA4", "VDD1", "GND1", "VDD2", "GND2", "EN1", "EN2"}, Nonlinear: true,
+		CatalogParameters: []valueRule{
+			{Name: "supply_min_v", Positive: true, Maximum: 1000}, {Name: "supply_max_v", Positive: true, Maximum: 1000},
+			{Name: "input_low_ratio", Positive: true, Maximum: 1}, {Name: "input_high_ratio", Positive: true, Maximum: 1},
+			{Name: "enable_high_ratio", Positive: true, Maximum: 1},
+			{Name: "output_low_resistance_ohm", Positive: true, Minimum: 1e-6, Maximum: 1e12},
+			{Name: "output_high_resistance_ohm", Positive: true, Minimum: 1e-6, Maximum: 1e12},
+			{Name: "output_off_resistance_ohm", Positive: true, Minimum: 1, Maximum: 1e15},
+			{Name: "max_output_current_a", Positive: true, Minimum: 1e-9, Maximum: 1e4},
+			{Name: "side_1_quiescent_current_a", Nonnegative: true, Maximum: 100},
+			{Name: "side_2_quiescent_current_a", Nonnegative: true, Maximum: 100},
+			{Name: "isolation_resistance_ohm", Positive: true, Minimum: 1, Maximum: 1e18},
+			{Name: "isolation_working_voltage_v", Positive: true, Maximum: 1e6},
+			{Name: "max_temperature_c", Maximum: 1000}, {Name: "junction_to_ambient_c_per_w", Positive: true, Maximum: 1e6},
+		},
+	},
+	{
 		ID: PrimitiveReverseBlockingLoadSwitchV1, Family: "protection", Terminals: []string{"VIN", "VOUT", "GND", "ON"}, Nonlinear: true,
 		CatalogParameters: []valueRule{
 			{Name: "input_min_v", Positive: true, Minimum: .01, Maximum: 1e6},
@@ -386,6 +487,24 @@ var primitiveRegistry = []primitiveDefinition{
 			{Name: "reverse_leakage_current_a", Positive: true, Minimum: 1e-15, Maximum: 1e4},
 			{Name: "max_output_current_a", Positive: true, Minimum: 1e-9, Maximum: 1e4},
 			{Name: "max_output_voltage_v", Positive: true, Minimum: .01, Maximum: 1e6},
+			{Name: "quiescent_current_a", Nonnegative: true, Maximum: 100},
+			{Name: "max_temperature_c", Optional: true, Maximum: 1000},
+			{Name: "junction_to_ambient_c_per_w", Optional: true, Positive: true, Maximum: 1e6},
+		},
+	},
+	{
+		ID: PrimitiveCurrentLimitingEFuseV1, Family: "protection", Terminals: []string{"VIN", "VOUT", "RTN", "SHDN"}, Nonlinear: true,
+		CatalogParameters: []valueRule{
+			{Name: "input_min_v", Positive: true, Minimum: .01, Maximum: 1e6},
+			{Name: "input_max_v", Positive: true, Minimum: .01, Maximum: 1e6},
+			{Name: "enable_high_voltage_v", Positive: true, Minimum: .01, Maximum: 1e6},
+			{Name: "on_resistance_ohm", Positive: true, Minimum: 1e-6, Maximum: 1e12},
+			{Name: "programmed_current_limit_a", Positive: true, Minimum: 1e-9, Maximum: 1e4},
+			{Name: "maximum_current_limit_a", Positive: true, Minimum: 1e-9, Maximum: 1e4},
+			{Name: "minimum_current_limit_a", Positive: true, Minimum: 1e-9, Maximum: 1e4},
+			{Name: "reverse_leakage_current_a", Positive: true, Minimum: 1e-15, Maximum: 1e4},
+			{Name: "max_output_voltage_v", Positive: true, Minimum: .01, Maximum: 1e6},
+			{Name: "maximum_output_slew_v_per_s", Positive: true, Minimum: 1e-9, Maximum: 1e15},
 			{Name: "quiescent_current_a", Nonnegative: true, Maximum: 100},
 			{Name: "max_temperature_c", Optional: true, Maximum: 1000},
 			{Name: "junction_to_ambient_c_per_w", Optional: true, Positive: true, Maximum: 1e6},
@@ -1375,6 +1494,18 @@ func validatePrimitiveParameters(path string, primitive primitiveDefinition, par
 			diagnostics = append(diagnostics, Diagnostic{Path: path, Message: "synchronous buck peak_current_limit_a must not be below max_output_current_a"})
 		}
 	}
+	if primitive.ID == PrimitiveFixedBuckModuleV1 {
+		if values["input_max_v"] <= values["input_min_v"] {
+			diagnostics = append(diagnostics, Diagnostic{Path: path, Message: "fixed step-down module input_max_v must exceed input_min_v"})
+		}
+		if values["input_current_reference_voltage_v"] < values["input_min_v"] ||
+			values["input_current_reference_voltage_v"] > values["input_max_v"] {
+			diagnostics = append(diagnostics, Diagnostic{Path: path, Message: "fixed step-down module input-current reference must be within its input range"})
+		}
+		if values["output_voltage_v"] >= values["input_min_v"] {
+			diagnostics = append(diagnostics, Diagnostic{Path: path, Message: "fixed step-down module output_voltage_v must be below input_min_v"})
+		}
+	}
 	if primitive.ID == PrimitiveFloatingAdjustableRegulatorV1 && math.Abs(values["polarity"]) != 1 {
 		diagnostics = append(diagnostics, Diagnostic{Path: path, Message: "floating adjustable regulator polarity must be -1 or 1"})
 	}
@@ -1383,6 +1514,18 @@ func validatePrimitiveParameters(path string, primitive primitiveDefinition, par
 	}
 	if primitive.ID == PrimitiveSingleOutputIsolatedConverterV1 && values["input_max_v"] <= values["input_min_v"] {
 		diagnostics = append(diagnostics, Diagnostic{Path: path, Message: "single-output isolated converter input_max_v must exceed input_min_v"})
+	}
+	if primitive.ID == PrimitiveProtectedIsolatedConverterV1 {
+		if values["input_max_v"] <= values["input_min_v"] {
+			diagnostics = append(diagnostics, Diagnostic{Path: path, Message: "protected isolated converter input_max_v must exceed input_min_v"})
+		}
+		if reference := values["input_current_reference_voltage_v"]; reference != 0 &&
+			(reference < values["input_min_v"] || reference > values["input_max_v"]) {
+			diagnostics = append(diagnostics, Diagnostic{Path: path, Message: "protected isolated converter input-current reference must be within its input range"})
+		}
+		if values["short_circuit_current_a"] < values["max_output_current_a"] {
+			diagnostics = append(diagnostics, Diagnostic{Path: path, Message: "protected isolated converter short-circuit limit must not be below rated output current"})
+		}
 	}
 	if primitive.ID == PrimitiveNMOSSwitchV1 || primitive.ID == PrimitivePMOSSwitchV1 {
 		input := values["input_capacitance_f"]
@@ -1405,12 +1548,55 @@ func validatePrimitiveParameters(path string, primitive primitiveDefinition, par
 			diagnostics = append(diagnostics, Diagnostic{Path: path, Message: "level-translator off resistance must exceed on resistance"})
 		}
 	}
+	if primitive.ID == PrimitivePushPullTranslatorV1 {
+		if values["vcca_max_v"] <= values["vcca_min_v"] || values["vccb_max_v"] <= values["vccb_min_v"] {
+			diagnostics = append(diagnostics, Diagnostic{Path: path, Message: "push-pull translator supply maxima must exceed their corresponding minima"})
+		}
+		if math.Abs(values["direction"]) != 1 {
+			diagnostics = append(diagnostics, Diagnostic{Path: path, Message: "push-pull translator direction must be -1 or 1"})
+		}
+		if values["input_low_max_v"]+pushPullTranslatorInputHeadroom(values, "A") >= values["vcca_min_v"] ||
+			values["input_low_max_v"]+pushPullTranslatorInputHeadroom(values, "B") >= values["vccb_min_v"] {
+			diagnostics = append(diagnostics, Diagnostic{Path: path, Message: "push-pull translator logic thresholds overlap at the minimum supply"})
+		}
+		if values["output_off_resistance_ohm"] <= math.Max(values["output_low_resistance_ohm"], values["output_high_resistance_ohm"]) {
+			diagnostics = append(diagnostics, Diagnostic{Path: path, Message: "push-pull translator off resistance must exceed enabled output resistance"})
+		}
+		if transient := values["max_transient_sink_current_a"]; transient != 0 && transient < values["max_sink_current_a"] {
+			diagnostics = append(diagnostics, Diagnostic{Path: path, Message: "push-pull translator transient sink-current limit must not be below its static limit"})
+		}
+		if transient := values["max_transient_source_current_a"]; transient != 0 && transient < values["max_source_current_a"] {
+			diagnostics = append(diagnostics, Diagnostic{Path: path, Message: "push-pull translator transient source-current limit must not be below its static limit"})
+		}
+	}
+	if primitive.ID == PrimitiveDirectionControlledTranslatorV1 {
+		if values["vcca_max_v"] <= values["vcca_min_v"] || values["vccb_max_v"] <= values["vccb_min_v"] {
+			diagnostics = append(diagnostics, Diagnostic{Path: path, Message: "direction-controlled translator supply maxima must exceed their corresponding minima"})
+		}
+		if values["input_low_ratio"] >= values["input_high_ratio"] || values["control_low_ratio"] >= values["control_high_ratio"] {
+			diagnostics = append(diagnostics, Diagnostic{Path: path, Message: "direction-controlled translator low logic ratios must be below high logic ratios"})
+		}
+		if values["output_off_resistance_ohm"] <= math.Max(values["output_low_resistance_ohm"], values["output_high_resistance_ohm"]) {
+			diagnostics = append(diagnostics, Diagnostic{Path: path, Message: "direction-controlled translator off resistance must exceed enabled output resistance"})
+		}
+	}
 	if primitive.ID == PrimitiveBidirectionalOpenDrainIsolatorV1 {
 		if values["side_a_max_v"] <= values["side_a_min_v"] || values["side_b_max_v"] <= values["side_b_min_v"] {
 			diagnostics = append(diagnostics, Diagnostic{Path: path, Message: "isolator supply maxima must exceed their corresponding minima"})
 		}
 		if values["output_off_resistance_ohm"] <= values["output_on_resistance_ohm"] {
 			diagnostics = append(diagnostics, Diagnostic{Path: path, Message: "isolator off resistance must exceed on resistance"})
+		}
+	}
+	if primitive.ID == PrimitivePushPullDigitalIsolatorV1 {
+		if values["supply_max_v"] <= values["supply_min_v"] {
+			diagnostics = append(diagnostics, Diagnostic{Path: path, Message: "push-pull isolator supply maximum must exceed its minimum"})
+		}
+		if values["input_low_ratio"] >= values["input_high_ratio"] {
+			diagnostics = append(diagnostics, Diagnostic{Path: path, Message: "push-pull isolator low input ratio must be below its high input ratio"})
+		}
+		if values["output_off_resistance_ohm"] <= math.Max(values["output_low_resistance_ohm"], values["output_high_resistance_ohm"]) {
+			diagnostics = append(diagnostics, Diagnostic{Path: path, Message: "push-pull isolator off resistance must exceed enabled output resistance"})
 		}
 	}
 	if primitive.ID == PrimitiveReverseBlockingLoadSwitchV1 {
@@ -1422,6 +1608,21 @@ func validatePrimitiveParameters(path string, primitive primitiveDefinition, par
 		}
 		if values["reverse_blocking_release_voltage_v"] >= values["max_output_voltage_v"] {
 			diagnostics = append(diagnostics, Diagnostic{Path: path, Message: "reverse-blocking release voltage must be below max_output_voltage_v"})
+		}
+	}
+	if primitive.ID == PrimitiveCurrentLimitingEFuseV1 {
+		if values["input_max_v"] <= values["input_min_v"] {
+			diagnostics = append(diagnostics, Diagnostic{Path: path, Message: "current-limiting eFuse input_max_v must exceed input_min_v"})
+		}
+		if values["enable_high_voltage_v"] > values["input_max_v"] {
+			diagnostics = append(diagnostics, Diagnostic{Path: path, Message: "current-limiting eFuse enable threshold must not exceed input_max_v"})
+		}
+		if values["max_output_voltage_v"] > values["input_max_v"] {
+			diagnostics = append(diagnostics, Diagnostic{Path: path, Message: "current-limiting eFuse max_output_voltage_v must not exceed input_max_v"})
+		}
+		if values["minimum_current_limit_a"] > values["programmed_current_limit_a"] ||
+			values["programmed_current_limit_a"] > values["maximum_current_limit_a"] {
+			diagnostics = append(diagnostics, Diagnostic{Path: path, Message: "current-limiting eFuse programmed current must lie inside its minimum..maximum tolerance envelope"})
 		}
 	}
 	if (primitive.ID == PrimitiveMCUStaticSupplyLoadV1 || primitive.ID == PrimitiveSensorStaticSupplyLoadV1) &&
@@ -1669,11 +1870,11 @@ func isolatedReferenceNodes(components []ComponentEvidence) map[string]bool {
 		terminals := []string{}
 		for _, claim := range component.ModelClaims {
 			switch claim.ModelID {
-			case PrimitiveSingleOutputIsolatedConverterV1:
+			case PrimitiveSingleOutputIsolatedConverterV1, PrimitiveProtectedIsolatedConverterV1:
 				terminals = append(terminals, "VIN_MINUS", "VOUT_MINUS")
 			case PrimitiveDualOutputIsolatedConverterV1:
 				terminals = append(terminals, "VIN_MINUS", "COMMON")
-			case PrimitiveBidirectionalOpenDrainIsolatorV1:
+			case PrimitiveBidirectionalOpenDrainIsolatorV1, PrimitivePushPullDigitalIsolatorV1:
 				terminals = append(terminals, "GND1", "GND2")
 			}
 		}

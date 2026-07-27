@@ -436,7 +436,7 @@ func transientPowerInputNets(plan Plan) map[string]bool {
 		switch device.PrimitiveModel {
 		case PrimitiveSynchronousBuckRegulatorV1:
 			names = []string{"PVIN"}
-		case PrimitiveAdjustableLinearRegulatorV1, PrimitiveFixedLinearRegulatorV1:
+		case PrimitiveAdjustableLinearRegulatorV1, PrimitiveFixedLinearRegulatorV1, PrimitiveFixedBuckModuleV1:
 			names = []string{"VIN"}
 		case PrimitiveFloatingAdjustableRegulatorV1, PrimitiveProgrammableCurrentSourceV1:
 			names = []string{"VIN", "IN"}
@@ -444,7 +444,7 @@ func transientPowerInputNets(plan Plan) map[string]bool {
 			names = []string{"V_PLUS"}
 		case PrimitiveCurrentSenseAmplifierV1:
 			names = []string{"VCC"}
-		case PrimitiveSingleOutputIsolatedConverterV1, PrimitiveDualOutputIsolatedConverterV1:
+		case PrimitiveSingleOutputIsolatedConverterV1, PrimitiveProtectedIsolatedConverterV1, PrimitiveDualOutputIsolatedConverterV1:
 			names = []string{"VIN"}
 		case PrimitiveMCUStaticSupplyLoadV1, PrimitiveSensorStaticSupplyLoadV1:
 			names = []string{"POWER"}
@@ -901,6 +901,9 @@ func buildTransientTemplate(plan Plan, analysis Analysis) (mnaSystem, []Diagnost
 			parameters := namedValueMap(device.ModelParameters)
 			system.rhs[system.branchIndex[device.Component]] -= complex(parameters["output_voltage_v"], 0)
 			stampCurrentSource(&system, terminals["VIN"], terminals["GND"], complex(-parameters["quiescent_current_a"], 0))
+		case PrimitiveFixedBuckModuleV1:
+			parameters := namedValueMap(device.ModelParameters)
+			system.rhs[system.branchIndex[device.Component]] -= complex(parameters["output_voltage_v"], 0)
 		case PrimitiveSynchronousBuckRegulatorV1:
 			parameters := namedValueMap(device.ModelParameters)
 			branch := system.branchIndex[device.Component]
@@ -932,7 +935,7 @@ func buildTransientTemplate(plan Plan, analysis Analysis) (mnaSystem, []Diagnost
 			stampCurrentSource(&system, terminals["IN"], terminals["SET"], complex(-parameters["reference_current_a"], 0))
 		case PrimitiveShuntVoltageReferenceV1:
 			system.rhs[system.branchIndex[device.Component]] -= complex(namedValueMap(device.ModelParameters)["output_voltage_v"], 0)
-		case PrimitiveSingleOutputIsolatedConverterV1:
+		case PrimitiveSingleOutputIsolatedConverterV1, PrimitiveProtectedIsolatedConverterV1:
 			system.rhs[system.branchIndex[device.Component]] -= complex(namedValueMap(device.ModelParameters)["output_voltage_v"], 0)
 		case PrimitiveDualOutputIsolatedConverterV1:
 			parameters := namedValueMap(device.ModelParameters)
@@ -1134,6 +1137,20 @@ func prepareTransientBase(base *mnaSystem, template mnaSystem, plan Plan, analys
 			if !powerTransition {
 				stampCurrentSource(base, terminals["VIN"], terminals["GND"], complex(parameters["quiescent_current_a"], 0))
 			}
+		case PrimitiveFixedBuckModuleV1:
+			parameters := namedValueMap(device.ModelParameters)
+			input := nonlinearNodeVoltage(base, previous, terminals["VIN"]) -
+				nonlinearNodeVoltage(base, previous, terminals["GND"])
+			output := parameters["output_voltage_v"]
+			powerTransition := input < parameters["input_min_v"] ||
+				analysis.Kind == AnalysisStartup && startupSourceRampScale(analysis, timeS) < 1
+			if powerTransition {
+				disableTransientBranch(base, device.Component)
+				continue
+			} else if analysis.Kind == AnalysisStartup && parameters["soft_start_time_s"] > 0 {
+				output *= math.Min(1, timeS/parameters["soft_start_time_s"])
+			}
+			base.rhs[base.branchIndex[device.Component]] += complex(output, 0)
 		case PrimitiveSynchronousBuckRegulatorV1:
 			parameters := namedValueMap(device.ModelParameters)
 			branch := base.branchIndex[device.Component]
@@ -1216,12 +1233,16 @@ func prepareTransientBase(base *mnaSystem, template mnaSystem, plan Plan, analys
 			}
 			base.rhs[base.multiBranchIndex[mnaBranchKey{component: device.Component, terminal: "VOUT_PLUS"}]] += complex(positive, 0)
 			base.rhs[base.multiBranchIndex[mnaBranchKey{component: device.Component, terminal: "VOUT_MINUS"}]] += complex(negative, 0)
-		case PrimitiveSingleOutputIsolatedConverterV1:
+		case PrimitiveSingleOutputIsolatedConverterV1, PrimitiveProtectedIsolatedConverterV1:
 			parameters := namedValueMap(device.ModelParameters)
+			input := nonlinearNodeVoltage(base, previous, terminals["VIN_PLUS"]) -
+				nonlinearNodeVoltage(base, previous, terminals["VIN_MINUS"])
 			output := parameters["output_voltage_v"]
-			powerTransition := analysis.Kind == AnalysisStartup && startupSourceRampScale(analysis, timeS) < 1
+			powerTransition := input < parameters["input_min_v"] ||
+				analysis.Kind == AnalysisStartup && startupSourceRampScale(analysis, timeS) < 1
 			if powerTransition {
-				output = 0
+				disableTransientBranch(base, device.Component)
+				continue
 			} else if analysis.Kind == AnalysisStartup && parameters["soft_start_time_s"] > 0 {
 				output *= math.Min(1, timeS/parameters["soft_start_time_s"])
 			}
@@ -2445,6 +2466,12 @@ func transientBranchLimitCandidates(base mnaSystem, devices []ResolvedDevice, de
 			return nil
 		}
 		return []transientBranchLimitCandidate{{branch: branch, limit: transientModelParameter(device.ModelParameters, "max_load_current_a")}}
+	case PrimitiveFixedBuckModuleV1:
+		branch, exists := base.branchIndex[device.Component]
+		if !exists {
+			return nil
+		}
+		return []transientBranchLimitCandidate{{branch: branch, limit: transientModelParameter(device.ModelParameters, "max_output_current_a")}}
 	case PrimitiveSynchronousBuckRegulatorV1:
 		branch, exists := base.branchIndex[device.Component]
 		if !exists {
@@ -2456,7 +2483,7 @@ func transientBranchLimitCandidates(base mnaSystem, devices []ResolvedDevice, de
 			{branch: base.multiBranchIndex[mnaBranchKey{component: device.Component, terminal: "VOUT_PLUS"}], limit: transientModelParameter(device.ModelParameters, "positive_max_output_current_a")},
 			{branch: base.multiBranchIndex[mnaBranchKey{component: device.Component, terminal: "VOUT_MINUS"}], limit: transientModelParameter(device.ModelParameters, "negative_max_output_current_a")},
 		}
-	case PrimitiveSingleOutputIsolatedConverterV1:
+	case PrimitiveSingleOutputIsolatedConverterV1, PrimitiveProtectedIsolatedConverterV1:
 		return []transientBranchLimitCandidate{{branch: base.branchIndex[device.Component], limit: transientModelParameter(device.ModelParameters, "max_output_current_a")}}
 	default:
 		return nil

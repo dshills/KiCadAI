@@ -16,16 +16,36 @@ func TestInterfaceTranslatorAndADCEvidenceNormalizeDeterministically(t *testing.
 	record.Translator = validTranslatorEvidence()
 	record.Translator.SignalingModes = []string{"push_pull", "open_drain"}
 	record.Translator.Directions = []string{"unidirectional", "bidirectional"}
+	record.Translator.ControlFunctions = []string{"output_enable", "direction_group_1"}
 	record.ADC = validADCEvidence()
 	SortCatalog(&catalog)
 	if !slices.Equal(record.Interface.SignalingModes, []string{"open_drain", "push_pull"}) ||
 		!slices.Equal(record.Interface.Directions, []string{"bidirectional", "source"}) ||
 		!slices.Equal(record.Translator.SignalingModes, []string{"open_drain", "push_pull"}) ||
-		!slices.Equal(record.Translator.Directions, []string{"bidirectional", "unidirectional"}) {
+		!slices.Equal(record.Translator.Directions, []string{"bidirectional", "unidirectional"}) ||
+		!slices.Equal(record.Translator.ControlFunctions, []string{"direction_group_1", "output_enable"}) {
 		t.Fatalf("interface evidence was not normalized: %#v %#v", record.Interface, record.Translator)
 	}
 	if result := ValidateCatalog(&catalog); !result.OK {
 		t.Fatalf("valid interface evidence issues = %#v", result.Issues)
+	}
+}
+
+func TestDirectionControlledTranslatorEvidenceFailsClosedWithoutControlPolicy(t *testing.T) {
+	catalog := validCatalog()
+	evidence := validTranslatorEvidence()
+	evidence.Directions = []string{"direction_controlled"}
+	evidence.SignalingModes = []string{"push_pull"}
+	catalog.Records[0].Translator = evidence
+	result := ValidateCatalog(&catalog)
+	for _, path := range []string{
+		"records[0].translator_evidence.control_functions",
+		"records[0].translator_evidence.direction_change_policy",
+		"records[0].translator_evidence.enable_active_level",
+	} {
+		if !slices.ContainsFunc(result.Issues, func(issue reports.Issue) bool { return issue.Path == path }) {
+			t.Fatalf("missing direction-control issue %s in %#v", path, result.Issues)
+		}
 	}
 }
 

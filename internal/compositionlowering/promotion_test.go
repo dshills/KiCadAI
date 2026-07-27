@@ -174,6 +174,42 @@ func TestDynamicElectrothermalControlLoopCorpusOptionalKiCadPromotion(t *testing
 	)
 }
 
+func TestOpenWorldCapabilityPromotionCorpusPassesOfflineWorkflow(t *testing.T) {
+	requireLongPromotionTest(t)
+	runFrozenPromotionAt(
+		t,
+		filepath.Join("..", "architecturesearch", "testdata", "open_world_capability_promotion"),
+		5,
+		"KICADAI_OPEN_WORLD_CAPABILITY_ARTIFACT_DIR",
+		"",
+		libraryresolver.LibraryIndex{},
+	)
+}
+
+func TestOpenWorldCapabilityPromotionCorpusOptionalKiCadPromotion(t *testing.T) {
+	requireLongPromotionTest(t)
+	cli := os.Getenv("KICADAI_KICAD_CLI")
+	if cli == "" {
+		t.Skip("set KICADAI_KICAD_CLI to run the KiCad-backed open-world capability corpus")
+	}
+	roots, rootIssues := libraryresolver.ResolveRoots()
+	if roots.SymbolsRoot == "" || roots.FootprintsRoot == "" {
+		t.Skipf("installed KiCad libraries are required: %#v", rootIssues)
+	}
+	index, loadIssues := libraryresolver.Load(context.Background(), roots, libraryresolver.LoadOptions{})
+	if len(index.Symbols) == 0 || len(index.Footprints) == 0 {
+		t.Fatalf("installed library index is empty: %#v", loadIssues)
+	}
+	runFrozenPromotionAt(
+		t,
+		filepath.Join("..", "architecturesearch", "testdata", "open_world_capability_promotion"),
+		5,
+		"KICADAI_OPEN_WORLD_CAPABILITY_ARTIFACT_DIR",
+		cli,
+		index,
+	)
+}
+
 func TestHeldOutConstantCurrentCorpusPassesOfflineWorkflow(t *testing.T) {
 	requireLongPromotionTest(t)
 	corpusRoot, count := heldOutCapabilityFamilyCorpus(t, "constant_current_regulation")
@@ -729,8 +765,14 @@ func closedLoopResolutionFailureSummary(
 			lines = append(lines, fmt.Sprintf("%s resolution: %v", candidate.Fingerprint, err))
 			continue
 		}
+		harnessSummary := ""
+		if harness, harnessErr := operatingHarnessDevices(requirement, resolved.Lowered.Evidence.SemanticBindings, resolved.Resolved.Simulation, simmodel.AnalysisTransient); harnessErr != nil {
+			harnessSummary = "error:" + harnessErr.Error()
+		} else {
+			harnessSummary = closedLoopOperatingHarnessSummary(harness)
+		}
 		lines = append(lines, fmt.Sprintf(
-			"%s synthesis simulation: status=%s model=%s reason=%s resolved_plan=%t claims=%s devices=%s",
+			"%s synthesis simulation: status=%s model=%s reason=%s resolved_plan=%t claims=%s devices=%s excitations=%s harness=%s",
 			candidate.Fingerprint,
 			resolved.SynthesisReport.Simulation.Status,
 			resolved.SynthesisReport.Simulation.ModelID,
@@ -738,9 +780,44 @@ func closedLoopResolutionFailureSummary(
 			resolved.Resolved.Simulation != nil,
 			closedLoopComponentClaimSummary(resolved.Resolved),
 			closedLoopResolvedDeviceSummary(resolved.Resolved),
+			closedLoopExcitationSummary(resolved.Resolved),
+			harnessSummary,
 		))
 	}
 	return strings.Join(lines, "\n")
+}
+
+func closedLoopExcitationSummary(resolved circuitgraph.ResolvedDocument) string {
+	if resolved.Simulation == nil {
+		return ""
+	}
+	var entries []string
+	for _, analysis := range resolved.Simulation.Analyses {
+		for _, excitation := range analysis.Excitations {
+			entries = append(entries, fmt.Sprintf(
+				"%s:%s:dc=%.9g:pulse=%.9g->%.9g",
+				analysis.ID, excitation.Component, excitation.DCValue, excitation.PulseInitialValue, excitation.PulseValue,
+			))
+		}
+	}
+	slices.Sort(entries)
+	return strings.Join(entries, ",")
+}
+
+func closedLoopOperatingHarnessSummary(harness []operatingHarnessDevice) string {
+	var entries []string
+	for _, entry := range harness {
+		var connections []string
+		for _, connection := range entry.Device.Connections {
+			connections = append(connections, connection.Function+"="+connection.Net)
+		}
+		entries = append(entries, fmt.Sprintf(
+			"%s:%s:source=%t:default=%.9g:edge=%t:%v",
+			entry.Device.InstanceID, entry.Device.CatalogID, entry.Source, entry.DefaultValue, entry.TransientEdge, connections,
+		))
+	}
+	slices.Sort(entries)
+	return strings.Join(entries, ",")
 }
 
 func closedLoopResolvedDeviceSummary(resolved circuitgraph.ResolvedDocument) string {

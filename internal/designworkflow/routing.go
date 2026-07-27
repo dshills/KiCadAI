@@ -335,11 +335,18 @@ func RoutePlacement(ctx context.Context, request Request, fragments PCBFragmentR
 	operations, physicalClearanceRepairIssues, physicalClearanceBlockersBeforeRepair, physicalClearanceBlockersAfterRepair, physicalClearanceMM := finalizeEmittedRoutePhysicalClearanceWhenRequired(request.Validation.RequireDRC, routingRequest, operations)
 	physicalClearanceRepairIssues, physicalClearanceDeferredToDRC := deferPhysicalClearanceIssuesToRequiredDRC(request.Validation.RequireDRC, physicalClearanceRepairIssues)
 	issues = append(issues, physicalClearanceRepairIssues...)
+	if request.Validation.RequireDRC {
+		var holeClearanceIssues []reports.Issue
+		operations, holeClearanceIssues = repairRouteTransitionPadHoleClearance(routingRequest, operations, &placed)
+		issues = append(issues, holeClearanceIssues...)
+	}
 	// Clearance repair may expand endpoint-access geometry after the ordinary
 	// route post-processing pass. Finish by removing only free-space tails that
 	// extend beyond a same-net pad; shortening copper cannot create a new
 	// foreign-copper clearance violation.
 	operations, endpointTailCleanup := trimDisconnectedRouteTailsAtSameNetPadsWithSummary(operations, physicalContext)
+	operations = compactRouteOperationGeometry(operations)
+	operations, danglingRouteViasPruned := pruneRouteViasWithoutTwoLayerContact(operations, physicalContext)
 	operations = compactRouteOperationGeometry(operations)
 	stage := NewStageResult(StageRouting, issues)
 	stage.Issues = cloneIssues(issues)
@@ -360,6 +367,7 @@ func RoutePlacement(ctx context.Context, request Request, fragments PCBFragmentR
 		"route_tree_access":                SummarizeRouteTreeEndpointAccess(routeTreeAccess),
 		"route_tree_contact_graph":         routeTreeContactGraph,
 		"route_endpoint_tail_cleanup":      endpointTailCleanup,
+		"dangling_route_vias_pruned":       danglingRouteViasPruned,
 		"physical_pad_routing":             physicalPadRouting,
 		"residual_physical_route_trees":    residualTreeExecution.Summary,
 		"pre_tree_route_operations":        len(preTreeRouteOperations),
@@ -572,6 +580,120 @@ func repairRouteTransitionViaClearance(request routing.Request, operations []tra
 		}
 	}
 	return repaired, nil
+}
+
+const minimumRouteHoleToHoleClearanceMM = 0.25
+
+type routeDrilledPadHole struct {
+	point   transactions.Point
+	drillMM float64
+}
+
+// repairRouteTransitionPadHoleClearance applies the board writer's minimum
+// drill-to-drill rule before KiCad DRC. A transition and every attached
+// same-net vertex move together on the deterministic routing grid, and a move
+// is accepted only when it reduces hole conflicts without worsening any
+// existing routing validation or copper-clearance result.
+func repairRouteTransitionPadHoleClearance(request routing.Request, operations []transactions.Operation, placed *PlacementStageResult) ([]transactions.Operation, []reports.Issue) {
+	holes := placedRouteDrilledPadHoles(placed)
+	if len(holes) == 0 {
+		return operations, nil
+	}
+	repaired := append([]transactions.Operation(nil), operations...)
+	maxRepairs := len(emittedRouteTransitionVias(repaired))
+	for attempt := 0; attempt < maxRepairs; attempt++ {
+		transitions := emittedRouteTransitionVias(repaired)
+		baselineHoleConflicts := routeTransitionPadHoleConflictCount(transitions, holes)
+		if baselineHoleConflicts == 0 {
+			return dedupeSameNetRouteVias(repaired), nil
+		}
+		routes := routingRoutesFromOperations(repaired)
+		baselinePhysical := blockingIssueCount(routing.ValidatePhysicalClearance(request, routes))
+		baselineValidation := blockingIssueCount(routing.ValidateResult(request, routing.Result{Status: routing.StatusRouted, Routes: routes}).Issues)
+		progress := false
+		for _, transition := range transitions {
+			if routeViaPadHoleConflictCount(transition.via, holes) == 0 {
+				continue
+			}
+			for _, candidatePoint := range routeTransitionViaCandidates(request, transition.via) {
+				candidate, ok := moveRouteTransitionVia(repaired, transition, candidatePoint)
+				if !ok {
+					continue
+				}
+				candidateTransitions := emittedRouteTransitionVias(candidate)
+				if routeTransitionPadHoleConflictCount(candidateTransitions, holes) >= baselineHoleConflicts {
+					continue
+				}
+				candidateRoutes := routingRoutesFromOperations(candidate)
+				if blockingIssueCount(routing.ValidatePhysicalClearance(request, candidateRoutes)) > baselinePhysical ||
+					blockingIssueCount(routing.ValidateResult(request, routing.Result{Status: routing.StatusRouted, Routes: candidateRoutes}).Issues) > baselineValidation {
+					continue
+				}
+				repaired = candidate
+				progress = true
+				break
+			}
+			if progress {
+				break
+			}
+			return repaired, []reports.Issue{{
+				Code:       reports.CodeValidationFailed,
+				Severity:   reports.SeverityBlocked,
+				Path:       fmt.Sprintf("operations[%d].vias[%d]", transition.operationIndex, transition.viaIndex),
+				Message:    fmt.Sprintf("layer-transition via at (%.6g,%.6g) on net %s has no drill-clearance-safe grid relocation", transition.via.At.XMM, transition.via.At.YMM, transition.netName),
+				Nets:       []string{transition.netName},
+				Suggestion: "reroute the layer transition away from drilled footprint pads",
+			}}
+		}
+		if !progress {
+			break
+		}
+	}
+	return dedupeSameNetRouteVias(repaired), nil
+}
+
+func placedRouteDrilledPadHoles(placed *PlacementStageResult) []routeDrilledPadHole {
+	if placed == nil || placed.Stage.Status == StageStatusBlocked {
+		return nil
+	}
+	positions := placementPositions(placed)
+	var holes []routeDrilledPadHole
+	for componentIndex := range placed.Request.Components {
+		component := &placed.Request.Components[componentIndex]
+		position, ok := positions[strings.ToUpper(strings.TrimSpace(component.Ref))]
+		if !ok {
+			continue
+		}
+		for _, pad := range component.Pads {
+			if pad.DrillMM <= 0 || math.IsNaN(pad.DrillMM) || math.IsInf(pad.DrillMM, 0) {
+				continue
+			}
+			point := absolutePadPoint(position, pad)
+			holes = append(holes, routeDrilledPadHole{
+				point: transactions.Point{XMM: point.XMM, YMM: point.YMM}, drillMM: pad.DrillMM,
+			})
+		}
+	}
+	return holes
+}
+
+func routeTransitionPadHoleConflictCount(transitions []emittedRouteTransitionVia, holes []routeDrilledPadHole) int {
+	conflicts := 0
+	for _, transition := range transitions {
+		conflicts += routeViaPadHoleConflictCount(transition.via, holes)
+	}
+	return conflicts
+}
+
+func routeViaPadHoleConflictCount(via transactions.RouteViaSpec, holes []routeDrilledPadHole) int {
+	conflicts := 0
+	for _, hole := range holes {
+		requiredCenterDistance := via.DrillMM/2 + hole.drillMM/2 + minimumRouteHoleToHoleClearanceMM
+		if requiredCenterDistance > 0 && pointDistanceMM(via.At, hole.point) < requiredCenterDistance-1e-6 {
+			conflicts++
+		}
+	}
+	return conflicts
 }
 
 // repairEmittedRoutePhysicalClearance validates the complete cross-phase
@@ -960,6 +1082,67 @@ func emittedRouteTransitionVias(operations []transactions.Operation) []emittedRo
 		}
 	}
 	return transitions
+}
+
+// pruneRouteViasWithoutTwoLayerContact removes transitions invalidated by
+// later route rewrites. A plated through-via is useful only when the final
+// emitted copper contacts it on at least two layers. Same-net SMD and
+// through-hole pads count as copper contacts so endpoint-access vias survive,
+// while a stale via left on a single-layer track does not.
+func pruneRouteViasWithoutTwoLayerContact(operations []transactions.Operation, physical physicalPadRoutingContext) ([]transactions.Operation, int) {
+	decoded := decodeRouteOperations(operations)
+	padsByNet := map[string][]PlacedPadEndpoint{}
+	if physical.valid {
+		for _, pad := range physical.resolver.Endpoints() {
+			netKey := routeNetKey(pad.NetName)
+			if netKey != "" {
+				padsByNet[netKey] = append(padsByNet[netKey], pad)
+			}
+		}
+	}
+	repaired := append([]transactions.Operation(nil), operations...)
+	removed := 0
+	for operationIndex, route := range decoded {
+		if !route.decoded || len(route.payload.Vias) == 0 {
+			continue
+		}
+		payload := route.payload
+		retained := make([]transactions.RouteViaSpec, 0, len(payload.Vias))
+		for _, via := range payload.Vias {
+			contactLayers := map[string]struct{}{}
+			for _, candidate := range decoded {
+				if !candidate.decoded || routeNetKey(candidate.payload.NetName) != routeNetKey(payload.NetName) {
+					continue
+				}
+				layer := canonicalCopperLayer(candidate.payload.Layer)
+				if layer == "" || !routeViaOnTransactionPolyline(via, candidate.payload.Points) {
+					continue
+				}
+				contactLayers[layer] = struct{}{}
+			}
+			for _, layer := range via.Layers {
+				layer = canonicalCopperLayer(layer)
+				if layer != "" && routeEndpointContactsSameNetPad(padsByNet[routeNetKey(payload.NetName)], payload.NetName, layer, via.At) {
+					contactLayers[layer] = struct{}{}
+				}
+			}
+			if len(contactLayers) < 2 {
+				removed++
+				continue
+			}
+			retained = append(retained, via)
+		}
+		if len(retained) == len(payload.Vias) {
+			continue
+		}
+		payload.Vias = retained
+		raw, err := json.Marshal(payload)
+		if err != nil {
+			continue
+		}
+		repaired[operationIndex].Raw = raw
+	}
+	return repaired, removed
 }
 
 func routingRoutesWithoutVia(routes []routing.Route, netName string, via transactions.RouteViaSpec) []routing.Route {
@@ -1943,9 +2126,14 @@ func removeRedundantRouteViasAtPlatedPadsWithContext(operations []transactions.O
 		return operations, nil, nil
 	}
 	resolver := physical.resolver
+	positions := placementPositions(placed)
 	var targets []platedPadViaTarget
 	for _, component := range placed.Request.Components {
 		refKey := strings.ToUpper(strings.TrimSpace(component.Ref))
+		position, positioned := positions[refKey]
+		if !positioned {
+			continue
+		}
 		routingNames := routingPadNames(component.Pads)
 		for padIndex, pad := range component.Pads {
 			padType := strings.ToLower(strings.TrimSpace(pad.Type))
@@ -1954,9 +2142,14 @@ func removeRedundantRouteViasAtPlatedPadsWithContext(operations []transactions.O
 			}
 			padKey := strings.ToUpper(strings.TrimSpace(routingNames[padIndex]))
 			endpoint, ok := resolver.ResolveNormalized(refKey, padKey)
-			if !ok || strings.TrimSpace(endpoint.NetName) == "" {
+			netName := strings.TrimSpace(pad.Net)
+			if netName == "" && ok {
+				netName = strings.TrimSpace(endpoint.NetName)
+			}
+			if netName == "" {
 				continue
 			}
+			point := absolutePadPoint(position, pad)
 			widthMM := math.Max(pad.WidthMM, pad.DrillMM)
 			heightMM := math.Max(pad.HeightMM, pad.DrillMM)
 			containmentRadius := math.Min(widthMM, heightMM) / 2
@@ -1968,8 +2161,8 @@ func removeRedundantRouteViasAtPlatedPadsWithContext(operations []transactions.O
 				searchRadius = math.Max(widthMM, heightMM) / 2
 			}
 			targets = append(targets, platedPadViaTarget{
-				netName: endpoint.NetName, point: endpoint.Point, radiusMM: searchRadius,
-				widthMM: widthMM, heightMM: heightMM, rotationDeg: endpoint.ComponentRotation + pad.RotationDeg, shape: pad.Shape,
+				netName: netName, point: transactions.Point{XMM: point.XMM, YMM: point.YMM}, radiusMM: searchRadius,
+				widthMM: widthMM, heightMM: heightMM, rotationDeg: position.RotationDeg + pad.RotationDeg, shape: pad.Shape,
 			})
 		}
 	}

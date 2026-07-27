@@ -29,6 +29,18 @@ func TestValidateMCUEvidenceRejectsUnmappedPhysicalFunction(t *testing.T) {
 	assertIssueCode(t, result.Issues, CodeInvalidMetadata)
 }
 
+func TestValidateMCUEvidenceRequiresProgrammingElectricalContract(t *testing.T) {
+	catalog := validMCUCatalog()
+	catalog.Records[0].MCU.ProgrammingInterfaces[0].Electrical = nil
+	result := ValidateCatalog(&catalog)
+	for _, issue := range result.Issues {
+		if issue.Path == "records[0].mcu_evidence.programming_interfaces[0].electrical" {
+			return
+		}
+	}
+	t.Fatalf("missing programming electrical evidence was accepted: %+v", result.Issues)
+}
+
 func TestValidateMCUEvidenceRequiresPinDomainsForIndependentRails(t *testing.T) {
 	catalog := validMCUCatalog()
 	catalog.Records[0].MCU.SupplyDomains = append(catalog.Records[0].MCU.SupplyDomains, MCUSupplyDomain{
@@ -88,8 +100,16 @@ func validMCUCatalog() Catalog {
 					{Function: "PA0", GPIO: "PA0", ElectricalModes: []string{"open_drain", "push_pull"}, AlternateFunctions: []MCUAlternateFunction{{Kind: "uart", Instance: "uart1", Signal: "tx"}, {Kind: "i2c", Instance: "i2c1", Signal: "sda", Mode: "open_drain"}}},
 					{Function: "PA1", GPIO: "PA1", ElectricalModes: []string{"open_drain", "push_pull"}, AlternateFunctions: []MCUAlternateFunction{{Kind: "uart", Instance: "uart1", Signal: "rx"}, {Kind: "i2c", Instance: "i2c1", Signal: "scl", Mode: "open_drain"}}},
 				},
-				ProgrammingInterfaces: []MCUProgrammingInterface{{ID: "serial", Kind: "serial", Signals: []MCUInterfaceSignal{{Signal: "tx", PinFunction: "PA0"}, {Signal: "rx", PinFunction: "PA1"}}}},
-				ClockOptions:          []MCUClockOption{{ID: "external", Kind: "external", MaximumHz: 16_000_000}, {ID: "internal", Kind: "internal", MaximumHz: 8_000_000, Default: true}},
+				ProgrammingInterfaces: []MCUProgrammingInterface{{
+					ID: "serial", Kind: "serial",
+					Signals: []MCUInterfaceSignal{{Signal: "tx", PinFunction: "PA0"}, {Signal: "rx", PinFunction: "PA1"}},
+					Electrical: &MCUProgrammingElectricalEvidence{
+						MaximumConnectedCapacitance: &EvidenceMeasurement{Value: 10e-12, Unit: "F", Conditions: "test allowance"},
+						SeriesIsolationResistance:   &EvidenceRange{Minimum: float64MCUPointer(22), Maximum: float64MCUPointer(100), Unit: "Ohm", Conditions: "test range"},
+						UnpoweredTargetPolicy:       "unsupported", SharedPinPolicy: "reset_arbitrated", DefaultState: "inactive before reset entry",
+					},
+				}},
+				ClockOptions: []MCUClockOption{{ID: "external", Kind: "external", MaximumHz: 16_000_000}, {ID: "internal", Kind: "internal", MaximumHz: 8_000_000, Default: true}},
 				CurrentBudget: &MCUCurrentBudget{
 					MaximumSourcePerPinMA: float64MCUPointer(20), MaximumSinkPerPinMA: float64MCUPointer(20), MaximumAggregateMA: float64MCUPointer(80),
 				},

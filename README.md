@@ -106,6 +106,15 @@ path.
   independent clean roots produce the same 418-file content-addressed bundle.
   See the
   [completion audit](specs/dynamic-electrothermal-control-loop-synthesis/AUDIT.md).
+- A separate identity-neutral open-world evaluation freezes discovery and
+  held-out behavior-only requirements across six domains, records stable
+  failure clusters, and uses those clusters to drive reusable capability
+  expansion. Held-out readiness improves from 1/12 to 6/12 without changing
+  corpus membership: five newly ready cases cover clock fanout, translated MCU
+  debug, push-pull sensor translation, functional isolation, and protected
+  isolated power. All five pass the complete local installed-KiCad lane and
+  deterministic replay. See the
+  [open-world audit](specs/open-world-capability-evaluation/AUDIT.md).
 - Arbitrary electronics generation is not yet guaranteed. Generic graphs fail
   closed on unknown parts, pins, ratings, placement, or routing capability.
 - MCU synthesis is limited to verified catalog records and modeled electrical

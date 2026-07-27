@@ -144,12 +144,13 @@ func deviceDissipationByComponent(devices []DeviceResult) map[string]float64 {
 func thermalDeviceSupportsDissipation(device ResolvedDevice) bool {
 	switch device.PrimitiveModel {
 	case PrimitiveResistorV1, PrimitiveFuseClosedStateV1, PrimitiveFuseI2TClearingV1, PrimitiveDiodeShockleyV1, PrimitiveBidirectionalTVSV1,
-		PrimitiveNMOSSwitchV1, PrimitivePMOSSwitchV1, PrimitiveReverseBlockingLoadSwitchV1,
+		PrimitiveNMOSSwitchV1, PrimitivePMOSSwitchV1, PrimitiveReverseBlockingLoadSwitchV1, PrimitiveCurrentLimitingEFuseV1,
 		PrimitiveBJTNPNV1, PrimitiveBJTPNPV1,
 		PrimitiveOpAmpV1, PrimitiveComparatorOpenCollectorV1,
-		PrimitiveAdjustableLinearRegulatorV1, PrimitiveFixedLinearRegulatorV1, PrimitiveSynchronousBuckRegulatorV1, PrimitiveFloatingAdjustableRegulatorV1,
+		PrimitiveAdjustableLinearRegulatorV1, PrimitiveFixedLinearRegulatorV1, PrimitiveFixedBuckModuleV1, PrimitiveSynchronousBuckRegulatorV1, PrimitiveFloatingAdjustableRegulatorV1,
 		PrimitiveProgrammableCurrentSourceV1, PrimitiveShuntVoltageReferenceV1,
-		PrimitiveBidirectionalOpenDrainTranslatorV1, PrimitiveBidirectionalOpenDrainIsolatorV1,
+		PrimitiveProtectedIsolatedConverterV1,
+		PrimitiveBidirectionalOpenDrainTranslatorV1, PrimitivePushPullTranslatorV1, PrimitiveDirectionControlledTranslatorV1, PrimitiveBidirectionalOpenDrainIsolatorV1, PrimitivePushPullDigitalIsolatorV1,
 		PrimitiveMCUStaticSupplyLoadV1, PrimitiveSensorStaticSupplyLoadV1:
 		return true
 	default:
@@ -191,7 +192,16 @@ func thermalDeviceDissipation(plan Plan, device ResolvedDevice, system mnaSystem
 	if dissipation, ok := openDrainTranslatorDissipation(device, system, solution); ok {
 		return dissipation, true
 	}
+	if dissipation, ok := pushPullTranslatorDissipation(device, system, solution); ok {
+		return dissipation, true
+	}
+	if dissipation, ok := directionControlledTranslatorDissipation(device, system, solution); ok {
+		return dissipation, true
+	}
 	if dissipation, ok := openDrainIsolatorDissipation(plan, device, system, solution); ok {
+		return dissipation, true
+	}
+	if dissipation, ok := pushPullIsolatorDissipation(device, system, solution); ok {
 		return dissipation, true
 	}
 	terminals := terminalMap(device)
@@ -210,6 +220,22 @@ func thermalDeviceDissipation(plan Plan, device ResolvedDevice, system mnaSystem
 		}
 		delta := voltage(terminals["CATHODE"]) - voltage(terminals["ANODE"])
 		return math.Abs(delta * real(solution[branch])), true
+	case PrimitiveProtectedIsolatedConverterV1:
+		branch, exists := system.branchIndex[device.Component]
+		if !exists {
+			return 0, true
+		}
+		parameters := namedValueMap(device.ModelParameters)
+		outputPower := math.Abs((voltage(terminals["VOUT_PLUS"]) - voltage(terminals["VOUT_MINUS"])) * real(solution[branch]))
+		return outputPower * (1/parameters["efficiency_ratio"] - 1), true
+	case PrimitiveFixedBuckModuleV1:
+		branch, exists := system.branchIndex[device.Component]
+		if !exists {
+			return 0, true
+		}
+		parameters := namedValueMap(device.ModelParameters)
+		outputPower := math.Abs((voltage(terminals["VOUT"]) - voltage(terminals["GND"])) * real(solution[branch]))
+		return outputPower * (1/parameters["conversion_efficiency_fraction"] - 1), true
 	case PrimitiveDiodeShockleyV1:
 		delta := voltage(terminals["ANODE"]) - voltage(terminals["CATHODE"])
 		current, _ := diodeCurrentAndGradient(delta, namedValueMap(device.ModelParameters))
@@ -230,6 +256,15 @@ func thermalDeviceDissipation(plan Plan, device ResolvedDevice, system mnaSystem
 			primitive: device.PrimitiveModel, terminals: terminals, parameters: namedValueMap(device.ModelParameters), polarity: 1,
 		}, &system, solution)
 		return delta * delta * conductance, true
+	case PrimitiveCurrentLimitingEFuseV1:
+		delta := voltage(terminals["VIN"]) - voltage(terminals["VOUT"])
+		current, _ := currentLimitingEFuseCurrentAndGradient(
+			compiledNonlinearDevice{
+				primitive: device.PrimitiveModel, terminals: terminals, parameters: namedValueMap(device.ModelParameters), polarity: 1,
+			},
+			&system, solution,
+		)
+		return math.Abs(delta * current), true
 	case PrimitiveBJTNPNV1, PrimitiveBJTPNPV1:
 		polarity := 1.0
 		if device.PrimitiveModel == PrimitiveBJTPNPV1 {

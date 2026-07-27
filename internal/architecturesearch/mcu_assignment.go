@@ -25,6 +25,7 @@ const (
 	CodeMCUAggregateCurrent        reports.Code = "MCU_AGGREGATE_CURRENT_EXCEEDED"
 	CodeMCUPeripheralLoading       reports.Code = "MCU_PERIPHERAL_LOADING_EXCEEDED"
 	CodeMCUClockFrequency          reports.Code = "MCU_CLOCK_FREQUENCY_UNAVAILABLE"
+	CodeMCUProgrammingLoad         reports.Code = "MCU_PROGRAMMING_LOAD_UNSUPPORTED"
 )
 
 type mcuRoleDemand struct {
@@ -181,6 +182,8 @@ func canonicalMCUPeripheralKind(value string) string {
 		return "uart"
 	case "spi":
 		return "spi"
+	case "swd", "swd_host", "swd_target":
+		return "swd"
 	default:
 		return strings.ToLower(strings.TrimSpace(value))
 	}
@@ -275,11 +278,32 @@ func solveMCUAssignment(record components.ComponentRecord, demands []mcuRoleDema
 	slices.SortStableFunc(normalizedDemands, compareMCUDemands)
 	assignment := mcuAssignment{ProgrammingInterface: programming, ClockOption: clock}
 	used := map[string]bool{}
+	var applicationDemands []mcuRoleDemand
+	for _, demand := range normalizedDemands {
+		programmingPins, matched, err := mcuProgrammingDemandAssignments(record.MCU.Pins, packagePads, programming, demand)
+		if err != nil {
+			return mcuAssignment{}, err
+		}
+		if !matched {
+			applicationDemands = append(applicationDemands, demand)
+			continue
+		}
+		for _, pin := range programmingPins {
+			if used[pin.Function] {
+				return mcuAssignment{}, &mcuAssignmentError{
+					Code: CodeMCUPinAssignmentImpossible, Role: demand.Role,
+					Text: "multiple programming/debug roles require the same physical interface pins",
+				}
+			}
+			used[pin.Function] = true
+			assignment.Pins = append(assignment.Pins, pin)
+		}
+	}
 	search := &mcuAssignmentSearch{}
-	if !solveMCUDemands(record.MCU.Pins, packagePads, normalizedDemands, 0, reserved, used, &assignment.Pins, search) {
+	if !solveMCUDemands(record.MCU.Pins, packagePads, applicationDemands, 0, reserved, used, &assignment.Pins, search) {
 		role := ""
-		if len(normalizedDemands) > 0 {
-			role = normalizedDemands[0].Role
+		if len(applicationDemands) > 0 {
+			role = applicationDemands[0].Role
 		}
 		text := "no conflict-free physical-pin assignment satisfies all roles"
 		if search.exhausted {
@@ -297,6 +321,60 @@ func solveMCUAssignment(record components.ComponentRecord, demands []mcuRoleDema
 		return strings.Compare(left.Function, right.Function)
 	})
 	return assignment, nil
+}
+
+func mcuProgrammingDemandAssignments(
+	pins []components.MCUPinEvidence,
+	pads map[string]string,
+	programming components.MCUProgrammingInterface,
+	demand mcuRoleDemand,
+) ([]mcuPinAssignment, bool, error) {
+	demandKind := canonicalMCUPeripheralKind(demand.Kind)
+	interfaceKind := canonicalMCUPeripheralKind(programming.Kind)
+	interfaceID := canonicalMCUPeripheralKind(programming.ID)
+	if demandKind == "" || demandKind != interfaceKind && demandKind != interfaceID {
+		return nil, false, nil
+	}
+	pinsByFunction := make(map[string]components.MCUPinEvidence, len(pins))
+	for _, pin := range pins {
+		pinsByFunction[canonicalIdentifier(pin.Function)] = pin
+	}
+	assignments := make([]mcuPinAssignment, 0, len(programming.Signals))
+	for _, signal := range programming.Signals {
+		pin, ok := pinsByFunction[canonicalIdentifier(signal.PinFunction)]
+		if !ok {
+			return nil, true, &mcuAssignmentError{
+				Code: CodeMCUProgrammingUnavailable, Role: demand.Role,
+				Text: "selected programming interface references a pin absent from normalized MCU evidence",
+			}
+		}
+		if !mcuPinModeCompatible(pin, demand) {
+			return nil, true, &mcuAssignmentError{
+				Code: CodeMCUProgrammingUnavailable, Role: demand.Role,
+				Text: "selected programming interface pin does not satisfy the requested electrical direction and mode",
+			}
+		}
+		packagePad, padOK := pads[signal.PinFunction]
+		if !padOK || strings.TrimSpace(packagePad) == "" {
+			return nil, true, &mcuAssignmentError{
+				Code: CodeMCUProgrammingUnavailable, Role: demand.Role,
+				Text: "selected programming interface references a function absent from the selected package pin map",
+			}
+		}
+		assignments = append(assignments, mcuPinAssignment{
+			Role: demand.Role, Lane: canonicalIdentifier(signal.Signal),
+			Kind: "programming", Instance: programming.ID, Signal: signal.Signal,
+			Function: signal.PinFunction, PackagePad: packagePad,
+		})
+	}
+	if len(assignments) == 0 {
+		return nil, true, &mcuAssignmentError{
+			Code: CodeMCUProgrammingUnavailable, Role: demand.Role,
+			Text: "selected programming interface has no normalized signal mapping",
+		}
+	}
+	slices.SortStableFunc(assignments, compareMCUPinAssignments)
+	return assignments, true, nil
 }
 
 func validateMCUAssignmentElectrical(record components.ComponentRecord, request ProviderRequest, assignment mcuAssignment) error {
@@ -401,7 +479,69 @@ func validateMCUAssignmentElectrical(record components.ComponentRecord, request 
 			return &mcuAssignmentError{Code: CodeMCUPeripheralLoading, Text: fmt.Sprintf("I2C %.9g ohm pull-up with %.9g pF models %.9g ns rise time, exceeding %.9g ns at %.9g Hz", i2cPullupOhm, maximumPF, modeledRiseTimeS*1e9, riseTimeLimitS*1e9, frequency)}
 		}
 	}
+	if err := validateMCUProgrammingElectrical(request, assignment); err != nil {
+		return err
+	}
 	return nil
+}
+
+func validateMCUProgrammingElectrical(request ProviderRequest, assignment mcuAssignment) error {
+	evidence := assignment.ProgrammingInterface.Electrical
+	if evidence == nil || evidence.MaximumConnectedCapacitance == nil || evidence.SeriesIsolationResistance == nil {
+		return &mcuAssignmentError{Code: CodeMCUProgrammingLoad, Text: "selected programming interface lacks reviewed electrical loading evidence"}
+	}
+	maximumCapacitance, capacitanceOK := clockMeasurement(evidence.MaximumConnectedCapacitance, "F")
+	if !capacitanceOK || maximumCapacitance <= 0 {
+		return &mcuAssignmentError{Code: CodeMCUProgrammingLoad, Text: "selected programming interface has invalid connected-capacitance evidence"}
+	}
+	if requestedCapacitance, _, ok := firstNumericConstraint(
+		request.Constraints, "programming_load_capacitance", "debug_load_capacitance",
+	); ok && requestedCapacitance > maximumCapacitance {
+		return &mcuAssignmentError{
+			Code: CodeMCUProgrammingLoad,
+			Text: fmt.Sprintf("requested programming load %.9g F exceeds reviewed limit %.9g F", requestedCapacitance, maximumCapacitance),
+		}
+	}
+	if required, present := optionalMCUConstraintBool(request.Constraints, "programmer_connected_while_unpowered", "debugger_connected_while_unpowered"); present && required &&
+		evidence.UnpoweredTargetPolicy != "high_impedance_qualified" {
+		return &mcuAssignmentError{Code: CodeMCUProgrammingLoad, Text: "selected programming interface does not qualify a connected tool while the target is unpowered"}
+	}
+	if required, present := optionalMCUConstraintBool(request.Constraints, "programming_pins_shared", "debug_pins_shared"); present && required &&
+		evidence.SharedPinPolicy != "series_isolated" && evidence.SharedPinPolicy != "reset_arbitrated" {
+		return &mcuAssignmentError{Code: CodeMCUProgrammingLoad, Text: "selected programming interface does not qualify shared-pin arbitration"}
+	}
+	if programmerVoltage, _, ok := firstNumericConstraint(request.Constraints, "programmer_voltage", "debugger_voltage"); ok && programmerVoltage > 0 {
+		targetVoltage := roleVoltageMaximum(request.Ports, "power")
+		if targetVoltage <= 0 {
+			targetVoltage = roleVoltageMaximum(request.Ports, "supply")
+		}
+		if targetVoltage <= 0 {
+			for _, port := range request.Ports {
+				if port.Contract.Kind != "reference" {
+					targetVoltage = math.Max(targetVoltage, numericMaximum(port.Contract.Voltage))
+				}
+			}
+		}
+		if targetVoltage <= 0 || math.Abs(programmerVoltage-targetVoltage) > 0.05*math.Max(programmerVoltage, targetVoltage) {
+			return &mcuAssignmentError{Code: CodeMCUProgrammingLoad, Text: "programmer and target voltage domains require a qualified translation stage"}
+		}
+	}
+	return nil
+}
+
+func optionalMCUConstraintBool(constraints []Constraint, names ...string) (bool, bool) {
+	for _, name := range names {
+		constraint, ok := namedConstraint(constraints, name)
+		if !ok {
+			continue
+		}
+		var value bool
+		if constraint.Relation != "required" || json.Unmarshal(constraint.Value, &value) != nil {
+			return false, true
+		}
+		return value, true
+	}
+	return false, false
 }
 
 func mcuPinSupplyMaximum(evidence *components.MCUEvidence, pin components.MCUPinEvidence) (float64, bool) {
@@ -877,7 +1017,7 @@ func mcuComponentSearchMatch(record components.ComponentRecord, variant componen
 
 func dominantMCURejectionCode(codes []reports.Code) reports.Code {
 	priority := []reports.Code{
-		CodeMCUCapabilityUnavailable, CodeMCUProgrammingUnavailable,
+		CodeMCUCapabilityUnavailable, CodeMCUProgrammingLoad, CodeMCUProgrammingUnavailable,
 		CodeMCUClockUnavailable, CodeMCUClockFrequency, CodeMCUVoltageDomainMismatch,
 		CodeMCUPinCurrentExceeded, CodeMCUAggregateCurrent, CodeMCUPeripheralLoading,
 		CodeMCUPinAssignmentImpossible,
@@ -901,8 +1041,19 @@ func mcuRealizationBindings(ports []RoleContract, instance string, assignment mc
 	for _, port := range ports {
 		pins := byRole[port.Role]
 		if len(pins) > 0 {
-			for _, pin := range pins {
-				bindings = append(bindings, RealizationPortBinding{Role: port.Role, Lane: pin.Lane, Instance: instance, Function: pin.Function})
+			programmingBus := slices.ContainsFunc(pins, func(pin mcuPinAssignment) bool { return pin.Kind == "programming" }) &&
+				!slices.ContainsFunc(pins, func(pin mcuPinAssignment) bool { return pin.Kind != "programming" })
+			for index, pin := range pins {
+				compositionLane := pin.Lane
+				if programmingBus {
+					// Programming signal identity remains in pin.Signal and
+					// pin.Lane. The external/participant contract is an unnamed
+					// digital bus, so its physical composition lanes are
+					// deterministic ordinals shared with generic translators
+					// and headers.
+					compositionLane = fmt.Sprintf("channel_%02d", index+1)
+				}
+				bindings = append(bindings, RealizationPortBinding{Role: port.Role, Lane: compositionLane, Instance: instance, Function: pin.Function})
 			}
 			continue
 		}
@@ -985,7 +1136,7 @@ func mcuSupplyGroups(evidence *components.MCUEvidence) []mcuSupplyGroup {
 	return groups
 }
 
-func (provider *CatalogProvider) expandMCUSupport(ctx context.Context, parent catalogPart, assignment mcuAssignment, connections []RealizationConnection) ([]catalogPart, []RealizationConnection, error) {
+func (provider *CatalogProvider) expandMCUSupport(ctx context.Context, request ProviderRequest, parent catalogPart, assignment mcuAssignment, connections []RealizationConnection) ([]catalogPart, []RealizationConnection, error) {
 	parts := []catalogPart{parent}
 	companions := slices.Clone(parent.record.Companions)
 	slices.SortStableFunc(companions, func(left, right components.CompanionRequirement) int {
@@ -995,6 +1146,14 @@ func (provider *CatalogProvider) expandMCUSupport(ctx context.Context, parent ca
 		return strings.Compare(left.Role, right.Role)
 	})
 	for _, companion := range companions {
+		if strings.EqualFold(companion.Role, "programming_header") && requiresMCUProgrammingPhysicalIsolation(request) {
+			var err error
+			parts, connections, err = provider.expandMCUProgrammingHeader(ctx, parent, assignment, companion, parts, connections)
+			if err != nil {
+				return nil, nil, err
+			}
+			continue
+		}
 		// Unconditional companions are expanded by circuitgraph synthesis after
 		// composition lowering. Only selection-dependent policies belong here,
 		// because the downstream function intent does not carry the chosen
@@ -1040,6 +1199,91 @@ func (provider *CatalogProvider) expandMCUSupport(ctx context.Context, parent ca
 					connections = appendMCUSupportConnection(connections, parent, parentFunction, RealizationEndpoint{Instance: instanceID, Function: connection.Function})
 				}
 			}
+		}
+	}
+	return parts, connections, nil
+}
+
+func requiresMCUProgrammingPhysicalIsolation(request ProviderRequest) bool {
+	for _, name := range []string{
+		"programming_load_capacitance", "debug_load_capacitance",
+		"programming_pins_shared", "debug_pins_shared",
+		"programmer_connected_while_unpowered", "debugger_connected_while_unpowered",
+		"programmer_voltage", "debugger_voltage",
+	} {
+		if _, exists := namedConstraint(request.Constraints, name); exists {
+			return true
+		}
+	}
+	return false
+}
+
+func (provider *CatalogProvider) expandMCUProgrammingHeader(
+	ctx context.Context,
+	parent catalogPart,
+	assignment mcuAssignment,
+	companion components.CompanionRequirement,
+	parts []catalogPart,
+	connections []RealizationConnection,
+) ([]catalogPart, []RealizationConnection, error) {
+	electrical := assignment.ProgrammingInterface.Electrical
+	if !companion.Required || electrical == nil || electrical.SeriesIsolationResistance == nil {
+		return nil, nil, fmt.Errorf("required MCU programming header %s lacks reviewed series-isolation evidence", companion.ID)
+	}
+	minimum := electrical.SeriesIsolationResistance.Minimum
+	if minimum == nil || !finitePositive(*minimum) {
+		return nil, nil, fmt.Errorf("required MCU programming header %s has invalid series-isolation bounds", companion.ID)
+	}
+	signalFunctions := map[string]bool{}
+	for _, signal := range assignment.ProgrammingInterface.Signals {
+		signalFunctions[canonicalIdentifier(signal.PinFunction)] = true
+	}
+	recipes := slices.Clone(companion.Recipes)
+	slices.SortStableFunc(recipes, func(left, right components.CompanionPartRecipe) int { return strings.Compare(left.ID, right.ID) })
+	for _, recipe := range recipes {
+		minimumConfidence := recipe.MinimumConfidence
+		if minimumConfidence == "" {
+			minimumConfidence = components.ConfidenceRuleInferred
+		}
+		selection, result := components.Select(ctx, provider.catalog, components.SelectionRequest{
+			Query: components.Query{
+				Family: recipe.Family, Package: recipe.Package, ValueKind: recipe.ValueKind,
+				Value: recipe.Value, MinVoltageV: recipe.MinVoltageV, MinimumConfidence: minimumConfidence, Limit: 64,
+			},
+			Acceptance: components.AcceptanceStructural, RequiredFunctions: recipe.RequiredFunctions,
+			AllowAlternatives: true,
+		})
+		if !result.OK {
+			return nil, nil, fmt.Errorf("select MCU programming header %s/%s: %v", companion.ID, recipe.ID, result.Issues)
+		}
+		headerID := boundedMCUIdentifier("support_" + companion.ID + "_" + recipe.ID)
+		evidence := componentEvidence(selection.Component, selection.Variant.Verification.Confidence)
+		header := catalogPart{
+			selected: SelectedComponent{InstanceID: headerID, CatalogID: selection.Candidate.ComponentID, VariantID: selection.Candidate.VariantID, Evidence: evidence.Confidence},
+			record:   selection.Component, usage: companion.Role, evidence: evidence,
+		}
+		parts = append(parts, header)
+		for _, connection := range recipe.Connections {
+			parentFunction := mcuSupportParentFunction(connection.ParentFunction, assignment, "")
+			if !signalFunctions[canonicalIdentifier(parentFunction)] {
+				connections = appendMCUSupportConnection(connections, parent, parentFunction, RealizationEndpoint{Instance: headerID, Function: connection.Function})
+				continue
+			}
+			resistorID := boundedMCUIdentifier("support_" + companion.ID + "_" + recipe.ID + "_" + connection.Function + "_isolation")
+			var err error
+			parts, err = provider.appendPassiveParts(ctx, parts, []passivePart{
+				{resistorID, "resistor", "programming_series_isolation", engineeringValue(*minimum, "Ohm")},
+			})
+			if err != nil {
+				return nil, nil, err
+			}
+			connections = appendMCUSupportConnection(connections, parent, parentFunction, RealizationEndpoint{Instance: resistorID, Function: "A"})
+			connections = append(connections, semanticNet(
+				boundedMCUIdentifier("programming_"+recipe.ID+"_"+connection.Function),
+				"control",
+				RealizationEndpoint{Instance: resistorID, Function: "B"},
+				RealizationEndpoint{Instance: headerID, Function: connection.Function},
+			))
 		}
 	}
 	return parts, connections, nil

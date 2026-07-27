@@ -1417,6 +1417,271 @@ func TestParticipantControlOutputHarnessIsAssertedExceptDuringStartup(t *testing
 	}
 }
 
+func TestParticipantBehavioralOutputHarnessDrivesOppositeObservedBoundary(t *testing.T) {
+	requirement := architecturesearch.Requirement{Requirements: architecturesearch.Requirements{
+		Domains: []architecturesearch.Domain{
+			{ID: "target_1v8", Kind: "supply", NominalVoltageV: 1.8},
+			{ID: "ground", Kind: "reference"},
+		},
+		Ports: []architecturesearch.Port{{
+			ID: "host_debug", Kind: "digital_bus", Direction: "source",
+		}},
+		Participants: []architecturesearch.Participant{{
+			ID: "controller", Domain: "target_1v8",
+			RequiredPorts: []architecturesearch.ParticipantPort{{
+				ID: "debug", Kind: "digital_bus", Direction: "bidirectional",
+				Protocol: &architecturesearch.Protocol{Name: "swd", Mode: "push_pull"},
+			}},
+		}},
+		Objectives: []architecturesearch.Objective{{
+			Capability: "logic_level_translation",
+			Bindings: []architecturesearch.Binding{
+				{Role: "side_a", Port: "host_debug"},
+				{Role: "side_b", Participant: "controller", ParticipantPort: "debug"},
+			},
+		}},
+		BehavioralRequirements: []architecturesearch.BehavioralRequirement{{
+			ID: "edge", Metric: "rise_time", Analysis: simmodel.AnalysisTransient,
+			Observation: architecturesearch.Observation{Kind: "port", ID: "host_debug"},
+		}},
+	}}
+	bindings := []closedloopsynthesis.SemanticBinding{
+		{Kind: "domain", ID: "ground", Target: "GND"},
+		{Kind: "port", ID: "host_debug", Target: "HOST"},
+		{Kind: "participant_port", ID: "controller.debug", Target: "TARGET"},
+	}
+	if stimulus, ok := behavioralTransientStimulusForRequirement(requirement, bindings); ok {
+		t.Fatalf("external stimulus must be suppressed when the opposite participant is the behavioral source: %#v", stimulus)
+	}
+	transient, err := operatingHarnessDevices(requirement, bindings, nil, simmodel.AnalysisTransient)
+	if err != nil {
+		t.Fatal(err)
+	}
+	startup, err := operatingHarnessDevices(requirement, bindings, nil, simmodel.AnalysisStartup)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(transient) != 1 || !transient[0].Source || !transient[0].TransientEdge ||
+		transient[0].DefaultValue != 1.8 || len(transient[0].Device.Connections) != 2 ||
+		transient[0].Device.Connections[0].Net != "TARGET" || transient[0].Device.Connections[1].Net != "GND" {
+		t.Fatalf("participant behavioral transient harness = %#v", transient)
+	}
+	if len(startup) != 1 || startup[0].DefaultValue != 0 || startup[0].TransientEdge {
+		t.Fatalf("participant behavioral startup harness = %#v", startup)
+	}
+}
+
+func TestBehavioralPrimaryInputIgnoresControlOnlyPort(t *testing.T) {
+	requirement := architecturesearch.Requirement{Requirements: architecturesearch.Requirements{
+		Ports: []architecturesearch.Port{{
+			ID: "shutdown", Kind: "digital_logic", Direction: "sink",
+		}},
+		Objectives: []architecturesearch.Objective{{
+			Capability: "voltage_regulation",
+			Bindings:   []architecturesearch.Binding{{Role: "shutdown", Port: "shutdown"}},
+		}},
+		BehavioralRequirements: []architecturesearch.BehavioralRequirement{{
+			Analysis:    simmodel.AnalysisThermal,
+			Observation: architecturesearch.Observation{Kind: "domain", ID: "output"},
+		}},
+	}}
+	bindings := []closedloopsynthesis.SemanticBinding{{Kind: "port", ID: "shutdown", Target: "SHUTDOWN"}}
+	if port, node, ok := behavioralPrimaryInputPort(requirement, bindings); ok {
+		t.Fatalf("control-only port was selected as primary signal input: port=%#v node=%q", port, node)
+	}
+}
+
+func TestBehavioralStartupDefaultsDigitalInputsLowWithoutChangingPower(t *testing.T) {
+	requirement := architecturesearch.Requirement{Requirements: architecturesearch.Requirements{
+		Ports: []architecturesearch.Port{
+			{ID: "command", Kind: "digital_logic", Electrical: &architecturesearch.Electrical{DefaultState: "Inactive"}},
+			{ID: "power", Kind: "power"},
+		},
+	}}
+	bindings := []closedloopsynthesis.SemanticBinding{
+		{Kind: "port", ID: "command", Target: "COMMAND"},
+		{Kind: "port", ID: "power", Target: "VCC"},
+	}
+	plan := simmodel.Plan{
+		Devices: []simmodel.ResolvedDevice{
+			{Component: "command_source", PrimitiveModel: simmodel.PrimitiveConnectorVoltageSourceV1, Terminals: []simmodel.TerminalBinding{{Terminal: "PIN_1", Net: "COMMAND"}, {Terminal: "PIN_2", Net: "GND"}}},
+			{Component: "power_source", PrimitiveModel: simmodel.PrimitiveConnectorVoltageSourceV1, Terminals: []simmodel.TerminalBinding{{Terminal: "PIN_1", Net: "VCC"}, {Terminal: "PIN_2", Net: "GND"}}},
+		},
+		Analyses: []simmodel.Analysis{{
+			Kind: simmodel.AnalysisStartup,
+			Excitations: []simmodel.SourceExcitation{
+				{Component: "command_source", DCValue: 3.3, PulseValue: 3.3},
+				{Component: "power_source", DCValue: 3.3, PulseValue: 3.3},
+			},
+		}},
+	}
+	got := simmodel.ClonePlan(plan)
+	if err := configureBehavioralStartupInputState(&got, simmodel.AnalysisStartup, requirement, behavioralDomainNominalVoltageIndex(requirement), bindings); err != nil {
+		t.Fatal(err)
+	}
+	if got.Analyses[0].Excitations[0].DCValue != 0 || got.Analyses[0].Excitations[0].PulseValue != 0 {
+		t.Fatalf("startup digital input = %#v, want inactive low", got.Analyses[0].Excitations[0])
+	}
+	if got.Analyses[0].Excitations[1].DCValue != 3.3 || got.Analyses[0].Excitations[1].PulseValue != 3.3 {
+		t.Fatalf("startup power source changed = %#v", got.Analyses[0].Excitations[1])
+	}
+}
+
+func TestBehavioralStartupDeassertsActiveLowControlHigh(t *testing.T) {
+	nominal := 1.8
+	requirement := architecturesearch.Requirement{Requirements: architecturesearch.Requirements{
+		Domains: []architecturesearch.Domain{{ID: "logic", NominalVoltageV: nominal}},
+		Ports: []architecturesearch.Port{{
+			ID: "enable", Kind: "digital_logic", Domain: "logic",
+			Electrical: &architecturesearch.Electrical{MaxVoltageV: &nominal, DefaultState: "inactive"},
+		}},
+	}}
+	bindings := []closedloopsynthesis.SemanticBinding{{Kind: "port", ID: "enable", Target: "OE"}}
+	plan := simmodel.Plan{
+		Devices: []simmodel.ResolvedDevice{
+			{
+				Component: "enable_source", PrimitiveModel: simmodel.PrimitiveConnectorVoltageSourceV1,
+				Terminals: []simmodel.TerminalBinding{{Terminal: "PIN_1", Net: "OE"}, {Terminal: "PIN_2", Net: "GND"}},
+			},
+			{
+				Component: "translator", PrimitiveModel: simmodel.PrimitiveDirectionControlledTranslatorV1,
+				Terminals: []simmodel.TerminalBinding{{Terminal: "OE", Net: "OE"}},
+			},
+		},
+		Analyses: []simmodel.Analysis{{
+			ID: "startup", Kind: simmodel.AnalysisStartup,
+			Excitations: []simmodel.SourceExcitation{{Component: "enable_source", PulseValue: 1}},
+		}},
+	}
+	if err := configureBehavioralStartupInputState(&plan, simmodel.AnalysisStartup, requirement, behavioralDomainNominalVoltageIndex(requirement), bindings); err != nil {
+		t.Fatal(err)
+	}
+	if excitation := plan.Analyses[0].Excitations[0]; excitation.DCValue != nominal || excitation.PulseValue != 0 {
+		t.Fatalf("active-low inactive startup source = %#v, want steady %.12g V", excitation, nominal)
+	}
+}
+
+func TestBehavioralTransferControlsUseAnalysisSpecificSupplyForParticipantSource(t *testing.T) {
+	requirement := architecturesearch.Requirement{Requirements: architecturesearch.Requirements{
+		Ports: []architecturesearch.Port{
+			{ID: "target", Kind: "digital_bus"},
+			{ID: "enable", Kind: "digital_logic"},
+			{ID: "direction", Kind: "digital_logic"},
+		},
+		Participants: []architecturesearch.Participant{{
+			ID: "host", RequiredPorts: []architecturesearch.ParticipantPort{{
+				ID: "debug", Kind: "digital_bus", Direction: "bidirectional",
+			}},
+		}},
+		Objectives: []architecturesearch.Objective{{
+			Capability: "logic_level_translation",
+			Bindings: []architecturesearch.Binding{
+				{Role: "side_a", Participant: "host", ParticipantPort: "debug"},
+				{Role: "side_b", Port: "target"},
+				{Role: "enable", Port: "enable"},
+				{Role: "direction_control", Port: "direction"},
+			},
+		}},
+		BehavioralRequirements: []architecturesearch.BehavioralRequirement{{
+			Analysis:    simmodel.AnalysisTransient,
+			Observation: architecturesearch.Observation{Kind: "port", ID: "target"},
+		}},
+	}}
+	bindings := []closedloopsynthesis.SemanticBinding{
+		{Kind: "port", ID: "target", Target: "TARGET"},
+		{Kind: "port", ID: "enable", Target: "OE"},
+		{Kind: "port", ID: "direction", Target: "DIR"},
+		{Kind: "participant_port", ID: "host.debug", Target: "HOST"},
+	}
+	plan := simmodel.Plan{
+		Devices: []simmodel.ResolvedDevice{
+			{Component: "vcca_source", PrimitiveModel: simmodel.PrimitiveConnectorVoltageSourceV1, Terminals: []simmodel.TerminalBinding{{Terminal: "PIN_1", Net: "VCCA"}, {Terminal: "PIN_2", Net: "GND"}}},
+			{Component: "enable_source", PrimitiveModel: simmodel.PrimitiveConnectorVoltageSourceV1, Terminals: []simmodel.TerminalBinding{{Terminal: "PIN_1", Net: "GND"}, {Terminal: "PIN_2", Net: "OE"}}},
+			{Component: "direction_source", PrimitiveModel: simmodel.PrimitiveConnectorVoltageSourceV1, Terminals: []simmodel.TerminalBinding{{Terminal: "PIN_1", Net: "GND"}, {Terminal: "PIN_2", Net: "DIR"}}},
+			{Component: "translator", PrimitiveModel: simmodel.PrimitiveDirectionControlledTranslatorV1, Terminals: []simmodel.TerminalBinding{
+				{Terminal: "A1", Net: "HOST"}, {Terminal: "B1", Net: "TARGET"},
+				{Terminal: "VCCA", Net: "VCCA"}, {Terminal: "OE", Net: "OE"},
+				{Terminal: "DIR1", Net: "DIR"}, {Terminal: "DIR2", Net: "DIR"},
+			}},
+		},
+		Analyses: []simmodel.Analysis{
+			{
+				ID:   "first",
+				Kind: simmodel.AnalysisTransient,
+				Excitations: []simmodel.SourceExcitation{
+					{Component: "vcca_source", DCValue: 3.3},
+					{Component: "enable_source", DCValue: -1.8, PulseValue: 1.8, PulsePeriodS: 1e-3},
+					{Component: "direction_source", DCValue: -1.8, ACMagnitude: 1, ACPhaseDeg: 45},
+				},
+			},
+			{
+				ID:   "second",
+				Kind: simmodel.AnalysisTransient,
+				Excitations: []simmodel.SourceExcitation{
+					{Component: "vcca_source", DCValue: 5},
+					{Component: "enable_source", DCValue: -3.3, SineAmplitude: 1, SineFrequencyHz: 1000},
+					{Component: "direction_source", DCValue: -3.3, PulseValue: 3.3, PulsePeriodS: 2e-3},
+				},
+			},
+		},
+	}
+	got := simmodel.ClonePlan(plan)
+	err := configureBehavioralTransferControls(&got, simmodel.AnalysisTransient, requirement, bindings)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for index := range got.Analyses {
+		if got.Analyses[index].Excitations[1].DCValue != 0 {
+			t.Fatalf("analysis %d active-low enable source = %#v, want zero", index, got.Analyses[index].Excitations[1])
+		}
+		wantDirection := []float64{-3.3, -5}[index]
+		if got.Analyses[index].Excitations[2].DCValue != wantDirection {
+			t.Fatalf("analysis %d A-to-B direction source = %#v, want %.12g", index, got.Analyses[index].Excitations[2], wantDirection)
+		}
+	}
+	if plan.Analyses[0].Excitations[1].DCValue != -1.8 {
+		t.Fatal("transfer control configuration mutated the input plan")
+	}
+	if got.Analyses[0].Excitations[1].PulseValue != 0 ||
+		got.Analyses[0].Excitations[2].ACMagnitude != 0 ||
+		got.Analyses[1].Excitations[1].SineAmplitude != 0 ||
+		got.Analyses[1].Excitations[2].PulseValue != 0 {
+		t.Fatalf("transfer controls retain active waveform drive: %#v", got.Analyses)
+	}
+	if got.Analyses[0].Excitations[1].PulsePeriodS != 1e-3 ||
+		got.Analyses[0].Excitations[2].ACPhaseDeg != 45 ||
+		got.Analyses[1].Excitations[1].SineFrequencyHz != 1000 ||
+		got.Analyses[1].Excitations[2].PulsePeriodS != 2e-3 {
+		t.Fatalf("transfer control configuration discarded waveform provenance: %#v", got.Analyses)
+	}
+}
+
+func TestPlanSourceNodeVoltageUsesRequestedAnalysis(t *testing.T) {
+	plan := simmodel.Plan{
+		Devices: []simmodel.ResolvedDevice{{
+			Component:      "supply",
+			PrimitiveModel: simmodel.PrimitiveConnectorVoltageSourceV1,
+			Terminals: []simmodel.TerminalBinding{
+				{Terminal: "PIN_1", Net: "VCC"},
+				{Terminal: "PIN_2", Net: "GND"},
+			},
+		}},
+		Analyses: []simmodel.Analysis{
+			{ID: "first", Excitations: []simmodel.SourceExcitation{{Component: "supply", DCValue: 3.3}}},
+			{ID: "second", Excitations: []simmodel.SourceExcitation{{Component: "supply", DCValue: 5}}},
+		},
+	}
+	if voltage, ok := planSourceNodeVoltageForAnalysis(&plan, 0, "VCC"); !ok || voltage != 3.3 {
+		t.Fatalf("first-analysis voltage = %.12g, %t; want 3.3, true", voltage, ok)
+	}
+	if voltage, ok := planSourceNodeVoltageForAnalysis(&plan, 1, "VCC"); !ok || voltage != 5 {
+		t.Fatalf("second-analysis voltage = %.12g, %t; want 5, true", voltage, ok)
+	}
+	if voltage, ok := planSourceNodeVoltageForAnalysis(&plan, 2, "VCC"); ok {
+		t.Fatalf("out-of-range analysis voltage = %.12g, true; want false", voltage)
+	}
+}
+
 func TestLoadCurrentHarnessUsesGroundReferencedPhysicalLoadForHighSideSwitch(t *testing.T) {
 	minimum, maximum := 0.0, 2.0
 	requirement := architecturesearch.Requirement{Requirements: architecturesearch.Requirements{
@@ -1434,6 +1699,103 @@ func TestLoadCurrentHarnessUsesGroundReferencedPhysicalLoadForHighSideSwitch(t *
 	connections := devices[0].Device.Connections
 	if connections[0].Net != "SWITCHED" || connections[1].Net != "GND" {
 		t.Fatalf("high-side load-current connections = %#v", connections)
+	}
+}
+
+func TestOperatingLoadUsesExplicitObjectiveReferenceAcrossIsolationBoundary(t *testing.T) {
+	minimum, maximum := 0.02, 0.25
+	requirement := architecturesearch.Requirement{Requirements: architecturesearch.Requirements{
+		Domains: []architecturesearch.Domain{
+			{ID: "primary_power", Kind: "supply"},
+			{ID: "secondary_power", Kind: "supply"},
+			{ID: "primary_return", Kind: "reference"},
+			{ID: "secondary_return", Kind: "reference"},
+		},
+		Ports: []architecturesearch.Port{
+			{ID: "input", Kind: "power", Domain: "primary_power"},
+			{ID: "output", Kind: "power", Domain: "secondary_power"},
+			{ID: "secondary_return", Kind: "reference", Domain: "secondary_return"},
+		},
+		Signals: []architecturesearch.Signal{{ID: "regulated", Kind: "power", Domain: "secondary_power"}},
+		Objectives: []architecturesearch.Objective{{
+			Capability: "voltage_regulation",
+			Bindings: []architecturesearch.Binding{
+				{Role: "input", Port: "input"},
+				{Role: "output", Signal: "regulated"},
+				{Role: "reference", Port: "secondary_return"},
+			},
+		}, {
+			Capability: "transient_protection",
+			Bindings: []architecturesearch.Binding{
+				{Role: "input", Signal: "regulated"},
+				{Role: "output", Port: "output"},
+				{Role: "reference", Port: "secondary_return"},
+			},
+		}},
+		OperatingCases: []architecturesearch.OperatingCase{{Conditions: []architecturesearch.OperatingCondition{{
+			Axis: "load_current", Target: "secondary_power", Min: &minimum, Max: &maximum, Unit: "A",
+		}}}},
+	}}
+	bindings := []closedloopsynthesis.SemanticBinding{
+		{Kind: "domain", ID: "primary_return", Target: "PRIMARY_GROUND"},
+		{Kind: "domain", ID: "secondary_return", Target: "SECONDARY_GROUND"},
+		{Kind: "domain", ID: "secondary_power", Target: "OUTPUT"},
+	}
+	harness, err := operatingHarnessDevices(requirement, bindings, nil, simmodel.AnalysisDCOperatingPoint)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(harness) != 1 {
+		t.Fatalf("load harness = %#v", harness)
+	}
+	connections := harness[0].Device.Connections
+	if connections[0].Net != "OUTPUT" || connections[1].Net != "SECONDARY_GROUND" {
+		t.Fatalf("isolated load endpoints = %#v, want output-to-secondary-return", connections)
+	}
+}
+
+func TestOperatingLoadBudgetsCatalogBackedParallelSupportCurrent(t *testing.T) {
+	minimum, maximum := .02, .25
+	requirement := architecturesearch.Requirement{Requirements: architecturesearch.Requirements{
+		Domains: []architecturesearch.Domain{
+			{ID: "rail", Kind: "supply", NominalVoltageV: 12},
+			{ID: "return", Kind: "reference"},
+		},
+		Ports: []architecturesearch.Port{
+			{ID: "output", Kind: "power", Domain: "rail"},
+			{ID: "return", Kind: "reference", Domain: "return"},
+		},
+		Objectives: []architecturesearch.Objective{{
+			Capability: "voltage_regulation",
+			Bindings: []architecturesearch.Binding{
+				{Role: "output", Port: "output"},
+				{Role: "reference", Port: "return"},
+			},
+		}},
+		OperatingCases: []architecturesearch.OperatingCase{{Conditions: []architecturesearch.OperatingCondition{{
+			Axis: "load_current", Target: "rail", Min: &minimum, Max: &maximum, Unit: "A",
+		}}}},
+	}}
+	bindings := []closedloopsynthesis.SemanticBinding{
+		{Kind: "domain", ID: "rail", Target: "OUTPUT"},
+		{Kind: "domain", ID: "return", Target: "GROUND"},
+	}
+	resistance := 240_000.0
+	plan := simmodel.Plan{Devices: []simmodel.ResolvedDevice{{
+		Component: "discharge", PrimitiveModel: simmodel.PrimitiveResistorV1, ValueSI: &resistance,
+		Terminals: []simmodel.TerminalBinding{{Terminal: "A", Net: "OUTPUT"}, {Terminal: "B", Net: "GROUND"}},
+	}}}
+	harness, err := operatingHarnessDevices(requirement, bindings, &plan, simmodel.AnalysisDCOperatingPoint)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(harness) != 1 {
+		t.Fatalf("load harness = %#v", harness)
+	}
+	wantSupport := 12 / resistance
+	if math.Abs(harness[0].DefaultValue-(maximum-wantSupport)) > 1e-15 ||
+		math.Abs(harness[0].InitialValue-(minimum-wantSupport)) > 1e-15 {
+		t.Fatalf("budgeted load-current harness = %#v, want total-load corners less %.12g A support", harness[0], wantSupport)
 	}
 }
 

@@ -154,6 +154,91 @@
       }
     },
     {
+      "id": "regulator.traco.tsr1_24120.sip3",
+      "family": "regulator",
+      "name": "TRACO Power TSR 1-24120 fixed 12 V step-down module",
+      "description": "Integrated non-isolated 15 V to 36 V, 1 A fixed 12 V buck module with internal filter capacitors, short-circuit protection, and a reviewed external input-capacitor requirement above 32 V.",
+      "generic": false,
+      "manufacturer": "TRACO Power",
+      "mpn": "TSR 1-24120",
+      "lifecycle": "active",
+      "tags": ["buck", "fixed_output", "integrated_module", "non_isolated", "short_circuit_protected", "sip3", "switching"],
+      "values": [
+        {"kind": "output_voltage", "typ": "12", "unit": "V"},
+        {"kind": "efficiency", "min": "92", "typ": "95", "unit": "%"},
+        {"kind": "required_input_capacitance", "min": "22", "unit": "uF"}
+      ],
+      "ratings": [
+        {"kind": "input_voltage", "min": "15", "max": "36", "unit": "V"},
+        {"kind": "output_current", "max": "1", "unit": "A"},
+        {"kind": "output_voltage_accuracy", "max": "2", "unit": "%"},
+        {"kind": "input_capacitor_threshold_voltage", "max": "32", "unit": "V"}
+      ],
+      "temperature": {"min": "-40", "max": "85", "unit": "C"},
+      "simulation_models": [{
+        "model_id": "mna_fixed_step_down_module_v1",
+        "parameters": [
+          {"name": "input_min_v", "value": 15},
+          {"name": "input_max_v", "value": 36},
+          {"name": "input_current_reference_voltage_v", "value": 24},
+          {"name": "output_voltage_v", "value": 12},
+          {"name": "max_output_current_a", "value": 1},
+          {"name": "conversion_efficiency_fraction", "value": 0.92},
+          {"name": "soft_start_time_s", "value": 0},
+          {"name": "max_temperature_c", "value": 150},
+          {"name": "junction_to_ambient_c_per_w", "value": 142}
+        ]
+      }],
+      "symbols": [{
+        "symbol_id": "Converter_DCDC:TSR_1-24120",
+        "function_pins": [
+          {"function": "VIN", "symbol_pin": "1", "electrical": "power_in", "required": true},
+          {"function": "GND", "symbol_pin": "2", "electrical": "power_in", "required": true},
+          {"function": "VOUT", "symbol_pin": "3", "electrical": "power_out", "required": true}
+        ],
+        "verification": {
+          "confidence": "verified",
+          "sources": ["https://www.tracopower.com/tsr1-datasheet", "kicad-symbols:Converter_DCDC:TSR_1-24120"],
+          "pinmap_checked": true
+        }
+      }],
+      "packages": [{
+        "id": "sip3",
+        "name": "TRACO TSR 1 SIP-3",
+        "footprint_id": "Converter_DCDC:Converter_DCDC_TRACO_TSR-1_THT",
+        "package_type": "sip3",
+        "mpn": "TSR 1-24120",
+        "lifecycle": "active",
+        "pinmap_id": "Converter_DCDC:TSR_1-24120|Converter_DCDC:Converter_DCDC_TRACO_TSR-1_THT",
+        "pad_functions": [
+          {"function": "VIN", "pad": "1"},
+          {"function": "GND", "pad": "2"},
+          {"function": "VOUT", "pad": "3"}
+        ],
+        "dimensions_mm": {"width": 11.7, "height": 7.5},
+        "height_mm": 10.1,
+        "verification": {
+          "confidence": "verified",
+          "sources": ["https://www.tracopower.com/tsr1-datasheet", "kicad-footprint:Converter_DCDC:Converter_DCDC_TRACO_TSR-1_THT"],
+          "pinmap_checked": true
+        }
+      }],
+      "verification": {
+        "confidence": "verified",
+        "sources": [
+          "https://www.tracopower.com/tsr1-datasheet",
+          "kicad-pinmap:Converter_DCDC:TSR_1-24120|Converter_DCDC:Converter_DCDC_TRACO_TSR-1_THT"
+        ],
+        "resolver_checked": true,
+        "pinmap_checked": true,
+        "notes": [
+          "The 92% efficiency boundary is the reviewed worst endpoint for the 12 V model over its 15 V to 36 V input range; the manufacturer lists 95% at minimum input.",
+          "A 22 uF, 50 V input capacitor is mandatory above 32 V and is therefore required unconditionally by the protected cascade provider.",
+          "The 142 K/W conservative internal-temperature path is derived from full-load operation through 60 C ambient, the 150 C thermal-shutdown boundary, and 95% nominal conversion efficiency."
+        ]
+      }
+    },
+    {
       "id": "regulator.analog_devices.lt8610mse.msop16",
       "family": "regulator",
       "name": "Analog Devices LT8610MSE 42 V 2.5 A micropower synchronous buck regulator",

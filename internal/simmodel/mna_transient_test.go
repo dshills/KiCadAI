@@ -54,6 +54,69 @@ func TestTransientSourceAndDeviceValueEventsExecuteDeterministically(t *testing.
 	}
 }
 
+func TestPushPullDigitalIsolatorFailsSafeLowAfterEitherSourceSupplyLoss(t *testing.T) {
+	intent := Intent{
+		ModelID: ModelTransientCircuitV1,
+		Analyses: []Analysis{
+			{
+				ID: "side_1_lost", Kind: AnalysisTransient, DurationS: 2e-6, TimeStepS: 100e-9,
+				Excitations: []SourceExcitation{
+					{Component: "supply_1", DCValue: 3.3}, {Component: "supply_2", DCValue: 3.3},
+					{Component: "enable_1", DCValue: 3.3}, {Component: "enable_2", DCValue: 3.3},
+					{Component: "ina1", DCValue: 3.3}, {Component: "ina2", DCValue: 0},
+					{Component: "ina3", DCValue: 0}, {Component: "inb4", DCValue: 3.3},
+				},
+				SourceValueEvents: []SourceValueEvent{{
+					ID: "remove_side_1_supply", Component: "supply_1",
+					TriggerTimeS: 500e-9, DurationS: 1.5e-6, Initial: 3.3, Applied: 0,
+				}},
+			},
+			{
+				ID: "side_2_lost", Kind: AnalysisTransient, DurationS: 2e-6, TimeStepS: 100e-9,
+				Excitations: []SourceExcitation{
+					{Component: "supply_1", DCValue: 3.3}, {Component: "supply_2", DCValue: 3.3},
+					{Component: "enable_1", DCValue: 3.3}, {Component: "enable_2", DCValue: 3.3},
+					{Component: "ina1", DCValue: 3.3}, {Component: "ina2", DCValue: 0},
+					{Component: "ina3", DCValue: 0}, {Component: "inb4", DCValue: 3.3},
+				},
+				SourceValueEvents: []SourceValueEvent{{
+					ID: "remove_side_2_supply", Component: "supply_2",
+					TriggerTimeS: 500e-9, DurationS: 1.5e-6, Initial: 3.3, Applied: 0,
+				}},
+			},
+		},
+		Assertions: []Assertion{
+			{AnalysisID: "side_1_lost", Node: "OUTB1", ReferenceNode: "GND2", Quantity: QuantityVoltageV, TimeS: 2e-6, Min: 0, Max: .01},
+			{AnalysisID: "side_2_lost", Node: "OUTA4", ReferenceNode: "GND1", Quantity: QuantityVoltageV, TimeS: 2e-6, Min: 0, Max: .01},
+		},
+	}
+	components := []ComponentEvidence{
+		voltageSourceEvidence("supply_1", "VDD1", "GND1"), voltageSourceEvidence("supply_2", "VDD2", "GND2"),
+		voltageSourceEvidence("enable_1", "EN1", "GND1"), voltageSourceEvidence("enable_2", "EN2", "GND2"),
+		voltageSourceEvidence("ina1", "INA1", "GND1"), voltageSourceEvidence("ina2", "INA2", "GND1"),
+		voltageSourceEvidence("ina3", "INA3", "GND1"), voltageSourceEvidence("inb4", "INB4", "GND2"),
+		resistorEvidence("outb1_pullup", 1e6, "OUTB1", "VDD2"), resistorEvidence("outb2_load", 1e6, "OUTB2", "GND2"),
+		resistorEvidence("outb3_load", 1e6, "OUTB3", "GND2"), resistorEvidence("outa4_pullup", 1e6, "OUTA4", "VDD1"),
+		pushPullIsolatorEvidence("isolator"),
+	}
+	nodes := []NodeEvidence{
+		{Name: "GND1", Role: "ground", VoltageDomain: "side_1"}, {Name: "GND2", Role: "ground", VoltageDomain: "side_2"},
+		{Name: "VDD1", VoltageDomain: "side_1"}, {Name: "VDD2", VoltageDomain: "side_2"},
+		{Name: "EN1", VoltageDomain: "side_1"}, {Name: "EN2", VoltageDomain: "side_2"},
+		{Name: "INA1", VoltageDomain: "side_1"}, {Name: "INA2", VoltageDomain: "side_1"}, {Name: "INA3", VoltageDomain: "side_1"},
+		{Name: "INB4", VoltageDomain: "side_2"}, {Name: "OUTB1", VoltageDomain: "side_2"}, {Name: "OUTB2", VoltageDomain: "side_2"},
+		{Name: "OUTB3", VoltageDomain: "side_2"}, {Name: "OUTA4", VoltageDomain: "side_1"},
+	}
+	plan, diagnostics := ResolveWithTopology(intent, "test", "catalog-hash", components, nodes)
+	if len(diagnostics) != 0 {
+		t.Fatalf("push-pull isolator supply-loss resolve diagnostics=%+v", diagnostics)
+	}
+	report, diagnostics := Evaluate(plan)
+	if len(diagnostics) != 0 || report.Status != "pass" {
+		t.Fatalf("push-pull isolator supply-loss report=%+v diagnostics=%+v", report, diagnostics)
+	}
+}
+
 func TestTransientCurrentSourceObservationsUseInstantaneousExcitation(t *testing.T) {
 	analysis := Analysis{
 		ID: "load_event", Kind: AnalysisTransient, DurationS: .2, TimeStepS: .1,

@@ -484,9 +484,14 @@ type TranslatorEvidence struct {
 	SideAVoltage               *EvidenceRange       `json:"side_a_voltage,omitempty"`
 	SideBVoltage               *EvidenceRange       `json:"side_b_voltage,omitempty"`
 	MaximumFrequency           *EvidenceMeasurement `json:"maximum_frequency,omitempty"`
+	MaximumOpenDrainFrequency  *EvidenceMeasurement `json:"maximum_open_drain_frequency,omitempty"`
+	MaximumPushPullFrequency   *EvidenceMeasurement `json:"maximum_push_pull_frequency,omitempty"`
 	StartupTime                *EvidenceMeasurement `json:"startup_time,omitempty"`
 	PartialPowerDown           bool                 `json:"partial_power_down,omitempty"`
 	StartupState               string               `json:"startup_state,omitempty"`
+	ControlFunctions           []string             `json:"control_functions,omitempty"`
+	DirectionChangePolicy      string               `json:"direction_change_policy,omitempty"`
+	EnableActiveLevel          string               `json:"enable_active_level,omitempty"`
 	FabricationProof           bool                 `json:"fabrication_proof,omitempty"`
 	FabricationCandidateBlocks bool                 `json:"fabrication_candidate_blocks,omitempty"`
 	ReviewNote                 string               `json:"review_note,omitempty"`
@@ -994,6 +999,7 @@ func sortRecord(record *ComponentRecord) {
 	if record.Translator != nil {
 		sort.Strings(record.Translator.SignalingModes)
 		sort.Strings(record.Translator.Directions)
+		sort.Strings(record.Translator.ControlFunctions)
 	}
 	sort.SliceStable(record.PlacementHints, func(i, j int) bool {
 		if record.PlacementHints[i].Kind == record.PlacementHints[j].Kind {

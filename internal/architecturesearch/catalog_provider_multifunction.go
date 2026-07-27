@@ -461,6 +461,13 @@ func catalogUncertaintyMaximum(record components.ComponentRecord, target string,
 }
 
 func (provider *CatalogProvider) expandIsolatedRegulator(ctx context.Context, request ProviderRequest) ([]ProviderExpansion, error) {
+	protectedExpansions, protectedErr := provider.expandProtectedIsolatedConverter(ctx, request)
+	if protectedErr == nil && len(protectedExpansions) != 0 {
+		return protectedExpansions, nil
+	}
+	if protectedIsolatedConversionRequested(request) && protectedErr != nil {
+		return nil, protectedErr
+	}
 	output, tolerance, ok := firstNumericConstraint(request.Constraints, "output_voltage")
 	if !ok || output <= 0 {
 		return nil, fmt.Errorf("isolated voltage regulation requires a positive output target")
@@ -537,12 +544,33 @@ func (provider *CatalogProvider) expandIsolatedRegulator(ctx context.Context, re
 }
 
 func (provider *CatalogProvider) expandGenericTranslator(ctx context.Context, request ProviderRequest) ([]ProviderExpansion, error) {
+	protocol, mode, direction, err := translatedProtocolContract(request.Ports)
+	if err != nil {
+		return nil, err
+	}
 	frequency := maximumProtocolFrequency(request.Ports)
 	if frequency <= 0 {
 		frequency, _, _ = firstNumericConstraint(request.Constraints, "bus_frequency")
 	}
 	if frequency <= 0 {
 		return nil, &interfaceSynthesisError{code: CodeInterfaceTranslationUnavailable, message: "logic translation requires protocol frequency evidence"}
+	}
+	if mode == "push_pull" {
+		projected, cloneErr := cloneProviderRequest(request)
+		if cloneErr != nil {
+			return nil, cloneErr
+		}
+		projected.Constraints = mergeProjectedConstraints(projected.Constraints, []Constraint{
+			stringConstraint("protocol", "equal", protocol),
+			stringConstraint("signaling_mode", "equal", mode),
+			stringConstraint("direction", "equal", direction),
+			boolConstraint("unpowered_backfeed_prevention", "required"),
+			numericConstraint("bus_frequency", "minimum", frequency, "Hz", 0),
+		})
+		return provider.expandPushPullTranslator(ctx, projected)
+	}
+	if protocol != "i2c" || mode != "open_drain" || direction != "bidirectional" {
+		return nil, &interfaceSynthesisError{code: CodeInterfaceTranslationUnavailable, message: "installed generic translation does not support the requested protocol, signaling mode, and direction"}
 	}
 	legacy, err := cloneProviderRequest(request)
 	if err != nil {
@@ -556,6 +584,32 @@ func (provider *CatalogProvider) expandGenericTranslator(ctx context.Context, re
 		numericConstraint("bus_frequency", "minimum", frequency, "Hz", 0),
 	})
 	return provider.expandTranslator(ctx, legacy)
+}
+
+func translatedProtocolContract(ports []RoleContract) (string, string, string, error) {
+	protocol, mode := "", ""
+	direction := "unidirectional"
+	for _, port := range ports {
+		if port.Contract.Protocol == nil {
+			continue
+		}
+		currentProtocol := canonicalIdentifier(port.Contract.Protocol.Name)
+		currentMode := canonicalIdentifier(port.Contract.Protocol.Mode)
+		if currentProtocol == "" || currentMode == "" {
+			continue
+		}
+		if protocol != "" && protocol != currentProtocol || mode != "" && mode != currentMode {
+			return "", "", "", &interfaceSynthesisError{code: CodeInterfaceTranslationUnavailable, message: "logic translation requires one consistent protocol and signaling mode"}
+		}
+		protocol, mode = currentProtocol, currentMode
+		if port.Contract.Direction == "bidirectional" {
+			direction = "bidirectional"
+		}
+	}
+	if protocol == "" || mode == "" {
+		return "", "", "", &interfaceSynthesisError{code: CodeInterfaceTranslationUnavailable, message: "logic translation requires explicit protocol and signaling-mode evidence"}
+	}
+	return protocol, mode, direction, nil
 }
 
 func (provider *CatalogProvider) expandGenericFilter(ctx context.Context, request ProviderRequest) ([]ProviderExpansion, error) {
@@ -1051,11 +1105,18 @@ func (provider *CatalogProvider) expandTransientProtection(ctx context.Context, 
 		return provider.expandReverseBlockingTransientProtection(ctx, request)
 	}
 	var ratings []components.RequiredRating
-	protectedVoltageV := roleVoltageMaximum(request.Ports, "protected")
+	protectedVoltageV := max(
+		roleVoltageMaximum(request.Ports, "protected"),
+		roleVoltageMaximum(request.Ports, "input"),
+		roleVoltageMaximum(request.Ports, "output"),
+	)
 	if protectedVoltageV > 0 {
 		ratings = append(ratings, components.RequiredRating{Kind: "working_voltage", Value: numericString(protectedVoltageV), Unit: "V"})
 	}
-	protectedCurrentA := max(requiredRoleCurrentA(request.Ports, "protected"), maximumRoleCurrentDemandA(request.Ports, "protected"))
+	protectedCurrentA := 0.0
+	for _, role := range []string{"protected", "input", "output"} {
+		protectedCurrentA = max(protectedCurrentA, requiredRoleCurrentA(request.Ports, role), maximumRoleCurrentDemandA(request.Ports, role))
+	}
 	if protectedCurrentA > 0 {
 		ratings = append(ratings, components.RequiredRating{Kind: "pulse_current", Value: numericString(protectedCurrentA), Unit: "A"})
 	}
@@ -4728,6 +4789,9 @@ func (provider *CatalogProvider) expandSplitSupply(ctx context.Context, request 
 }
 
 func (provider *CatalogProvider) expandGalvanicIsolation(ctx context.Context, request ProviderRequest) ([]ProviderExpansion, error) {
+	if pushPullFunctionalIsolationRequested(request) {
+		return provider.expandPushPullFunctionalIsolation(ctx, request)
+	}
 	isolationRequired, _, ok := firstNumericConstraint(request.Constraints, "isolation_voltage")
 	if !ok || isolationRequired <= 0 {
 		return nil, fmt.Errorf("galvanic isolation requires an isolation-voltage bound")

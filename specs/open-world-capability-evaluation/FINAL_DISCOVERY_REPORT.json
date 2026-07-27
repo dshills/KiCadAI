@@ -1,0 +1,487 @@
+{
+  "schema": "kicadai.open-world-capability-evaluation.v1",
+  "policy_version": "open-world-ranking-policy-v1",
+  "corpus_role": "discovery",
+  "corpus_sha256": "fc47eeb65be23a6e003f5bb559a1ac08f34630afe5a894422c121245b79bec23",
+  "registry_version": "open_world_capability_impact_v1",
+  "registry_sha256": "e9bc0070b02666adf75452793454ec3124aa9d0f1bd7b4cdfd4b608cb5f5e1a0",
+  "case_count": 12,
+  "outcome_counts": [
+    {
+      "key": "ready",
+      "count": 6
+    },
+    {
+      "key": "needs_clarification",
+      "count": 1
+    },
+    {
+      "key": "unsupported",
+      "count": 4
+    },
+    {
+      "key": "ambiguous",
+      "count": 1
+    },
+    {
+      "key": "budget_exhausted",
+      "count": 0
+    }
+  ],
+  "domain_outcome_counts": [
+    {
+      "domain": "analog",
+      "outcome": "ready",
+      "count": 1
+    },
+    {
+      "domain": "analog",
+      "outcome": "needs_clarification",
+      "count": 1
+    },
+    {
+      "domain": "analog",
+      "outcome": "unsupported",
+      "count": 0
+    },
+    {
+      "domain": "analog",
+      "outcome": "ambiguous",
+      "count": 0
+    },
+    {
+      "domain": "analog",
+      "outcome": "budget_exhausted",
+      "count": 0
+    },
+    {
+      "domain": "power",
+      "outcome": "ready",
+      "count": 2
+    },
+    {
+      "domain": "power",
+      "outcome": "needs_clarification",
+      "count": 0
+    },
+    {
+      "domain": "power",
+      "outcome": "unsupported",
+      "count": 0
+    },
+    {
+      "domain": "power",
+      "outcome": "ambiguous",
+      "count": 0
+    },
+    {
+      "domain": "power",
+      "outcome": "budget_exhausted",
+      "count": 0
+    },
+    {
+      "domain": "mcu",
+      "outcome": "ready",
+      "count": 1
+    },
+    {
+      "domain": "mcu",
+      "outcome": "needs_clarification",
+      "count": 0
+    },
+    {
+      "domain": "mcu",
+      "outcome": "unsupported",
+      "count": 1
+    },
+    {
+      "domain": "mcu",
+      "outcome": "ambiguous",
+      "count": 0
+    },
+    {
+      "domain": "mcu",
+      "outcome": "budget_exhausted",
+      "count": 0
+    },
+    {
+      "domain": "sensor",
+      "outcome": "ready",
+      "count": 1
+    },
+    {
+      "domain": "sensor",
+      "outcome": "needs_clarification",
+      "count": 0
+    },
+    {
+      "domain": "sensor",
+      "outcome": "unsupported",
+      "count": 1
+    },
+    {
+      "domain": "sensor",
+      "outcome": "ambiguous",
+      "count": 0
+    },
+    {
+      "domain": "sensor",
+      "outcome": "budget_exhausted",
+      "count": 0
+    },
+    {
+      "domain": "digital",
+      "outcome": "ready",
+      "count": 1
+    },
+    {
+      "domain": "digital",
+      "outcome": "needs_clarification",
+      "count": 0
+    },
+    {
+      "domain": "digital",
+      "outcome": "unsupported",
+      "count": 1
+    },
+    {
+      "domain": "digital",
+      "outcome": "ambiguous",
+      "count": 0
+    },
+    {
+      "domain": "digital",
+      "outcome": "budget_exhausted",
+      "count": 0
+    },
+    {
+      "domain": "mixed_signal",
+      "outcome": "ready",
+      "count": 0
+    },
+    {
+      "domain": "mixed_signal",
+      "outcome": "needs_clarification",
+      "count": 0
+    },
+    {
+      "domain": "mixed_signal",
+      "outcome": "unsupported",
+      "count": 1
+    },
+    {
+      "domain": "mixed_signal",
+      "outcome": "ambiguous",
+      "count": 1
+    },
+    {
+      "domain": "mixed_signal",
+      "outcome": "budget_exhausted",
+      "count": 0
+    }
+  ],
+  "cases": [
+    {
+      "id": "discovery_analog_001",
+      "domain": "analog",
+      "safety_impact": "review_required",
+      "outcome": "ready",
+      "observations": []
+    },
+    {
+      "id": "discovery_analog_002",
+      "domain": "analog",
+      "safety_impact": "safety_relevant",
+      "outcome": "needs_clarification",
+      "observations": [
+        {
+          "capability": "isolation_operating_bounds",
+          "outcome": "needs_clarification",
+          "stage": "behavioral_compilation",
+          "code": "CLARIFICATION_REQUIRED",
+          "path": "requirements.isolation.working_voltage",
+          "reason": "the required working-voltage and transient isolation environment is not bounded",
+          "required_evidence": [
+            "user-supplied working-voltage and transient isolation bounds"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "discovery_digital_001",
+      "domain": "digital",
+      "safety_impact": "review_required",
+      "outcome": "unsupported",
+      "observations": [
+        {
+          "capability": "clock_fanout_loading",
+          "outcome": "unsupported",
+          "stage": "architecture_search",
+          "code": "CAPABILITY_UNSUPPORTED",
+          "path": "requirements.clock_distribution",
+          "reason": "no installed clock endpoint architecture proves six receivers with the declared aggregate loading and edge bounds",
+          "required_evidence": [
+            "catalog-backed multi-endpoint clock loading and edge-rate qualification"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "discovery_digital_002",
+      "domain": "digital",
+      "safety_impact": "safety_relevant",
+      "outcome": "ready",
+      "observations": []
+    },
+    {
+      "id": "discovery_mcu_001",
+      "domain": "mcu",
+      "safety_impact": "safety_relevant",
+      "outcome": "ready",
+      "observations": []
+    },
+    {
+      "id": "discovery_mcu_002",
+      "domain": "mcu",
+      "safety_impact": "review_required",
+      "outcome": "unsupported",
+      "observations": [
+        {
+          "capability": "clock_fanout_loading",
+          "outcome": "unsupported",
+          "stage": "architecture_search",
+          "code": "CAPABILITY_UNSUPPORTED",
+          "path": "requirements.shared_timing",
+          "reason": "the shared timing source is not qualified against every receiver load and voltage contract",
+          "required_evidence": [
+            "per-receiver timing voltage and load qualification"
+          ]
+        },
+        {
+          "capability": "mcu_debug_electrical_loading",
+          "outcome": "unsupported",
+          "stage": "architecture_search",
+          "code": "CAPABILITY_UNSUPPORTED",
+          "path": "requirements.programming",
+          "reason": "post-assembly programming access lacks reviewed electrical loading evidence",
+          "required_evidence": [
+            "programmer loading, boot-state, and contention evidence"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "discovery_mixed_signal_001",
+      "domain": "mixed_signal",
+      "safety_impact": "safety_critical",
+      "outcome": "ambiguous",
+      "observations": [
+        {
+          "capability": "functional_isolation_safe_state",
+          "outcome": "ambiguous",
+          "stage": "architecture_search",
+          "code": "CAPABILITY_AMBIGUOUS",
+          "path": "requirements.isolated_acquisition",
+          "reason": "multiple isolation partitions remain without a deterministic qualified safe-state selection",
+          "required_evidence": [
+            "deterministic isolation partition selection with loss-of-supply safe-state proof"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "discovery_mixed_signal_002",
+      "domain": "mixed_signal",
+      "safety_impact": "safety_relevant",
+      "outcome": "unsupported",
+      "observations": [
+        {
+          "capability": "bus_buffering_level_translation",
+          "outcome": "unsupported",
+          "stage": "architecture_search",
+          "code": "CAPABILITY_UNSUPPORTED",
+          "path": "requirements.mixed_voltage_interfaces",
+          "reason": "the installed interface path cannot jointly qualify open-drain and push-pull translation with arbitrary power order",
+          "required_evidence": [
+            "protocol-specific direction, startup, and partial-power-down translation evidence"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "discovery_power_001",
+      "domain": "power",
+      "safety_impact": "safety_critical",
+      "outcome": "ready",
+      "observations": []
+    },
+    {
+      "id": "discovery_power_002",
+      "domain": "power",
+      "safety_impact": "safety_relevant",
+      "outcome": "ready",
+      "observations": []
+    },
+    {
+      "id": "discovery_sensor_001",
+      "domain": "sensor",
+      "safety_impact": "review_required",
+      "outcome": "unsupported",
+      "observations": [
+        {
+          "capability": "bus_buffering_level_translation",
+          "outcome": "unsupported",
+          "stage": "architecture_search",
+          "code": "CAPABILITY_UNSUPPORTED",
+          "path": "requirements.sensor_bus",
+          "reason": "the installed two-domain bus path does not prove four-device capacitance at the declared rate",
+          "required_evidence": [
+            "whole-bus capacitance, pull-up, speed, and fanout qualification"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "discovery_sensor_002",
+      "domain": "sensor",
+      "safety_impact": "safety_relevant",
+      "outcome": "ready",
+      "observations": []
+    }
+  ],
+  "ranked_failure_clusters": [
+    {
+      "rank": 1,
+      "key": "unsupported:architecture_search:bus_buffering_level_translation:CAPABILITY_UNSUPPORTED",
+      "outcome": "unsupported",
+      "stage": "architecture_search",
+      "capability": "bus_buffering_level_translation",
+      "code": "CAPABILITY_UNSUPPORTED",
+      "frequency_score": 2,
+      "safety_score": 4,
+      "reuse_score": 4,
+      "domain_count": 2,
+      "cases": [
+        "discovery_mixed_signal_002",
+        "discovery_sensor_001"
+      ],
+      "domains": [
+        "mixed_signal",
+        "sensor"
+      ],
+      "downstream_reuse": [
+        "digital_interface",
+        "mcu_subsystem",
+        "mixed_signal_acquisition",
+        "sensor_bus"
+      ],
+      "required_evidence": [
+        "protocol-specific direction, startup, and partial-power-down translation evidence",
+        "whole-bus capacitance, pull-up, speed, and fanout qualification"
+      ]
+    },
+    {
+      "rank": 2,
+      "key": "unsupported:architecture_search:clock_fanout_loading:CAPABILITY_UNSUPPORTED",
+      "outcome": "unsupported",
+      "stage": "architecture_search",
+      "capability": "clock_fanout_loading",
+      "code": "CAPABILITY_UNSUPPORTED",
+      "frequency_score": 2,
+      "safety_score": 2,
+      "reuse_score": 3,
+      "domain_count": 2,
+      "cases": [
+        "discovery_digital_001",
+        "discovery_mcu_002"
+      ],
+      "domains": [
+        "digital",
+        "mcu"
+      ],
+      "downstream_reuse": [
+        "digital_interface",
+        "mcu_timing",
+        "sensor_sampling"
+      ],
+      "required_evidence": [
+        "catalog-backed multi-endpoint clock loading and edge-rate qualification",
+        "per-receiver timing voltage and load qualification"
+      ]
+    },
+    {
+      "rank": 3,
+      "key": "ambiguous:architecture_search:functional_isolation_safe_state:CAPABILITY_AMBIGUOUS",
+      "outcome": "ambiguous",
+      "stage": "architecture_search",
+      "capability": "functional_isolation_safe_state",
+      "code": "CAPABILITY_AMBIGUOUS",
+      "frequency_score": 1,
+      "safety_score": 5,
+      "reuse_score": 3,
+      "domain_count": 1,
+      "cases": [
+        "discovery_mixed_signal_001"
+      ],
+      "domains": [
+        "mixed_signal"
+      ],
+      "downstream_reuse": [
+        "industrial_io",
+        "isolated_power",
+        "mixed_signal_acquisition"
+      ],
+      "required_evidence": [
+        "deterministic isolation partition selection with loss-of-supply safe-state proof"
+      ]
+    },
+    {
+      "rank": 4,
+      "key": "needs_clarification:behavioral_compilation:isolation_operating_bounds:CLARIFICATION_REQUIRED",
+      "outcome": "needs_clarification",
+      "stage": "behavioral_compilation",
+      "capability": "isolation_operating_bounds",
+      "code": "CLARIFICATION_REQUIRED",
+      "frequency_score": 1,
+      "safety_score": 3,
+      "reuse_score": 0,
+      "domain_count": 1,
+      "cases": [
+        "discovery_analog_002"
+      ],
+      "domains": [
+        "analog"
+      ],
+      "downstream_reuse": [],
+      "required_evidence": [
+        "user-supplied working-voltage and transient isolation bounds"
+      ]
+    },
+    {
+      "rank": 5,
+      "key": "unsupported:architecture_search:mcu_debug_electrical_loading:CAPABILITY_UNSUPPORTED",
+      "outcome": "unsupported",
+      "stage": "architecture_search",
+      "capability": "mcu_debug_electrical_loading",
+      "code": "CAPABILITY_UNSUPPORTED",
+      "frequency_score": 1,
+      "safety_score": 1,
+      "reuse_score": 3,
+      "domain_count": 1,
+      "cases": [
+        "discovery_mcu_002"
+      ],
+      "domains": [
+        "mcu"
+      ],
+      "downstream_reuse": [
+        "manufacturing_test",
+        "mcu_subsystem",
+        "shared_pin_arbitration"
+      ],
+      "required_evidence": [
+        "programmer loading, boot-state, and contention evidence"
+      ]
+    }
+  ]
+}

@@ -92,6 +92,75 @@
       "verification": {"confidence": "verified", "sources": ["curated_seed_catalog", "curated_part:Murata:GRM21BR71H104KA01L", "builtin_pinmap:Device:C"], "pinmap_checked": true, "notes": ["Voltage derating remains design-specific."]}
     },
     {
+      "id": "capacitor.murata.gcm21br71h105ka03l.0805",
+      "family": "capacitor",
+      "name": "Murata GCM21BR71H105KA03L 1uF 50V 0805 capacitor",
+      "description": "Concrete automotive X7R 1 uF 50 V 0805 ceramic capacitor for higher-voltage bypass service.",
+      "generic": false,
+      "manufacturer": "Murata",
+      "mpn": "GCM21BR71H105KA03L",
+      "lifecycle": "active",
+      "equivalence": {"group": "capacitor.1u.0805.50v", "role": "preferred"},
+      "tags": ["passive", "smd", "0805", "ceramic", "1u", "50v", "x7r", "aec_q200"],
+      "values": [{"kind": "capacitance", "typ": "1u", "unit": "F"}],
+      "ratings": [{"kind": "voltage", "max": "50", "unit": "V"}],
+      "tolerances": [{"kind": "capacitance", "typ": "10", "unit": "%"}],
+      "temperature": {"min": "-55", "max": "125", "unit": "C"},
+      "simulation_models": [
+        {"model_id": "mna_capacitor_v1"},
+        {"model_id": "mna_capacitor_transient_be_v1", "parameters": [{"name": "max_voltage_v", "value": 50}]},
+        {"model_id": "rc_lowpass_ac_v1"}
+      ],
+      "capacitor_evidence": {
+        "dielectric": "X7R",
+        "nominal_capacitance": "1u",
+        "capacitance_unit": "F",
+        "voltage_rating": "50",
+        "voltage_unit": "V",
+        "dc_bias_review": "review_required",
+        "effective_capacitance_review": "review_required",
+        "esr_review": "unknown",
+        "technology": "automotive multilayer ceramic",
+        "polarity": "nonpolar",
+        "capacitance_tolerance_percent": 10,
+        "fabrication_candidate_blocks": true,
+        "review_note": "Murata proves nominal capacitance, voltage rating, X7R temperature behavior, dimensions, tolerance, and AEC-Q200 series status. Effective capacitance and ESR remain application-specific and block unreviewed stability-critical use."
+      },
+      "symbols": [{
+        "symbol_id": "Device:C",
+        "function_pins": [
+          {"function": "A", "symbol_pin": "1", "required": true},
+          {"function": "B", "symbol_pin": "2", "required": true}
+        ],
+        "verification": {"confidence": "verified", "sources": ["builtin_pinmap:Device:C", "https://search.murata.co.jp/Ceramy/image/img/A01X/G101/ENG/GCM21BR71H105KA03-01A.pdf"], "pinmap_checked": true}
+      }],
+      "packages": [{
+        "id": "0805",
+        "name": "0805 SMD",
+        "footprint_id": "Capacitor_SMD:C_0805_2012Metric",
+        "package_type": "0805",
+        "pinmap_id": "Device:C|Capacitor_SMD:C_0805_2012Metric",
+        "pad_functions": [
+          {"function": "A", "pad": "1"},
+          {"function": "B", "pad": "2"}
+        ],
+        "dimensions_mm": {"width": 2.0, "height": 1.25},
+        "height_mm": 1.4,
+        "verification": {"confidence": "verified", "sources": ["https://search.murata.co.jp/Ceramy/image/img/A01X/G101/ENG/GCM21BR71H105KA03-01A.pdf", "kicad-footprint:Capacitor_SMD:C_0805_2012Metric"], "pinmap_checked": true}
+      }],
+      "verification": {
+        "confidence": "verified",
+        "sources": [
+          "https://search.murata.co.jp/Ceramy/image/img/A01X/G101/ENG/GCM21BR71H105KA03-01A.pdf",
+          "https://www.murata.com/-/media/webrenewal/tool/library/common-pdf/dynamic-model/component-list-d-mlcc-2504.ashx?cvid=20250523010405000000&la=en",
+          "kicad-pinmap:Device:C|Capacitor_SMD:C_0805_2012Metric"
+        ],
+        "resolver_checked": true,
+        "pinmap_checked": true,
+        "notes": ["Voltage rating is catalog-backed; effective capacitance and ESR remain design-specific."]
+      }
+    },
+    {
       "id": "capacitor.panasonic.eeufr1a151.radial",
       "family": "capacitor",
       "name": "Panasonic EEUFR1A151 150uF 10V radial electrolytic capacitor",
@@ -158,6 +227,81 @@
         "confidence": "verified",
         "sources": [
           "https://industrial.panasonic.com/cdbs/www-data/pdf/RDF0000/ABA0000C1259.pdf",
+          "kicad-pinmap:Device:C_Polarized|Capacitor_THT:CP_Radial_D5.0mm_P2.00mm"
+        ],
+        "resolver_checked": true,
+        "pinmap_checked": true,
+        "tests": ["catalog_passive_value_binding", "catalog_library_validation"]
+      }
+    },
+    {
+      "id": "capacitor.panasonic.eeufr1h220.radial",
+      "family": "capacitor",
+      "name": "Panasonic EEUFR1H220 22uF 50V radial electrolytic capacitor",
+      "description": "Concrete polarized 22 uF, 50 V low-impedance radial aluminum electrolytic capacitor for high-voltage input bypass and bulk decoupling.",
+      "generic": false,
+      "manufacturer": "Panasonic",
+      "mpn": "EEUFR1H220",
+      "lifecycle": "active",
+      "tags": ["passive", "through_hole", "radial", "polarized", "electrolytic", "low_impedance", "22u", "50v"],
+      "values": [{"kind": "capacitance", "typ": "22u", "unit": "F"}],
+      "ratings": [
+        {"kind": "voltage", "max": "50", "unit": "V"},
+        {"kind": "ripple_current", "max": "0.25", "unit": "A"}
+      ],
+      "tolerances": [{"kind": "capacitance", "typ": "20", "unit": "%"}],
+      "temperature": {"min": "-40", "max": "105", "unit": "C"},
+      "simulation_models": [
+        {"model_id": "mna_capacitor_v1"},
+        {"model_id": "mna_capacitor_transient_be_v1", "parameters": [{"name": "max_voltage_v", "value": 50}]}
+      ],
+      "capacitor_evidence": {
+        "dielectric": "aluminum_electrolytic",
+        "nominal_capacitance": "22u",
+        "capacitance_unit": "F",
+        "voltage_rating": "50",
+        "voltage_unit": "V",
+        "dc_bias_review": "not_applicable",
+        "effective_capacitance_review": "proven",
+        "esr_review": "proven",
+        "technology": "aluminum_electrolytic",
+        "polarity": "polarized",
+        "capacitance_tolerance_percent": 20,
+        "esr": {"value": 0.34, "unit": "ohm", "frequency_hz": 100000, "temperature_c": 20, "conditions": "manufacturer maximum impedance used as a conservative ESR bound"},
+        "ripple_current": {"value": 0.25, "unit": "A_rms", "frequency_hz": 100000, "temperature_c": 105, "conditions": "manufacturer rated ripple current"},
+        "endurance_hours": 5000,
+        "endurance_temperature_c": 105,
+        "fabrication_proof": true,
+        "fabrication_candidate_blocks": false,
+        "review_note": "Manufacturer-backed capacitance, tolerance, voltage, impedance, ripple current, endurance, dimensions, polarity, and lead pitch; circuit validation must still enforce applied-voltage, ripple, temperature, and lifetime margins."
+      },
+      "symbols": [{
+        "symbol_id": "Device:C_Polarized",
+        "function_pins": [
+          {"function": "POSITIVE", "symbol_pin": "1", "polarity": "positive", "required": true, "aliases": ["A", "+"]},
+          {"function": "NEGATIVE", "symbol_pin": "2", "polarity": "negative", "required": true, "aliases": ["B", "-"]}
+        ],
+        "verification": {"confidence": "verified", "sources": ["kicad-symbol:Device:C_Polarized", "https://industrial.panasonic.com/cdbs/www-data/pdf/RDF0000/ABA0000C1259.pdf"], "pinmap_checked": true}
+      }],
+      "packages": [{
+        "id": "radial_d5_p2",
+        "name": "Radial 5 mm, 2.0 mm pitch",
+        "footprint_id": "Capacitor_THT:CP_Radial_D5.0mm_P2.00mm",
+        "package_type": "radial",
+        "pinmap_id": "Device:C_Polarized|Capacitor_THT:CP_Radial_D5.0mm_P2.00mm",
+        "pad_functions": [
+          {"function": "POSITIVE", "pad": "1", "polarity": "positive", "aliases": ["A", "+"]},
+          {"function": "NEGATIVE", "pad": "2", "polarity": "negative", "aliases": ["B", "-"]}
+        ],
+        "dimensions_mm": {"width": 5.0, "height": 5.0},
+        "height_mm": 11.0,
+        "verification": {"confidence": "verified", "sources": ["kicad-footprint:Capacitor_THT:CP_Radial_D5.0mm_P2.00mm", "https://industrial.panasonic.com/cdbs/www-data/pdf/RDF0000/ABA0000C1259.pdf"], "pinmap_checked": true}
+      }],
+      "verification": {
+        "confidence": "verified",
+        "sources": [
+          "https://industrial.panasonic.com/cdbs/www-data/pdf/RDF0000/ABA0000C1259.pdf",
+          "https://industrial.panasonic.com/ww/products/pt/aluminum-cap-lead/models/EEUFR1H220",
           "kicad-pinmap:Device:C_Polarized|Capacitor_THT:CP_Radial_D5.0mm_P2.00mm"
         ],
         "resolver_checked": true,

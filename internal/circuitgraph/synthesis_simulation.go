@@ -234,16 +234,39 @@ func configuredSimulationModels(selection ResolvedComponent) []simmodel.CatalogE
 		models[index] = simmodel.CloneCatalogEvidence(model)
 		for parameterIndex := range models[index].Parameters {
 			name := models[index].Parameters[parameterIndex].Name
-			configured := synthesisParameterString(selection.Instance.Parameters, name)
-			value, parsed := components.ParseEngineeringValue(configured)
-			if configured != "" && parsed && !math.IsNaN(value) && !math.IsInf(value, 0) {
+			value, configured := synthesisSimulationParameter(selection.Instance.Parameters, name)
+			if configured {
 				models[index].Parameters[parameterIndex].Value = value
 			}
 		}
 		models[index].Parameters = catalogBackedSimulationParameters(models[index], selection.Record)
 		models[index].ThermalModel = configuredThermalPath(selection.Instance.Parameters, models[index].ThermalModel)
 	}
+	if selection.Record.Family == "connector" &&
+		(selection.Instance.Role == RoleConnector || selection.Instance.Role == RoleOutputConnector) {
+		models = slices.DeleteFunc(models, func(model simmodel.CatalogEvidence) bool {
+			return model.ModelID == simmodel.PrimitiveConnectorVoltageSourceV1
+		})
+	}
 	return models
+}
+
+func synthesisSimulationParameter(parameters []Parameter, name string) (float64, bool) {
+	for _, parameter := range parameters {
+		if !strings.EqualFold(parameter.Name, name) {
+			continue
+		}
+		if parameter.Value.Number != nil {
+			value := *parameter.Value.Number
+			return value, !math.IsNaN(value) && !math.IsInf(value, 0)
+		}
+		if parameter.Value.String != nil {
+			value, ok := components.ParseEngineeringValue(strings.TrimSpace(*parameter.Value.String))
+			return value, ok && !math.IsNaN(value) && !math.IsInf(value, 0)
+		}
+		return 0, false
+	}
+	return 0, false
 }
 
 func configuredThermalPath(parameters []Parameter, intrinsic *simmodel.ThermalRCNetwork) *simmodel.ThermalRCNetwork {

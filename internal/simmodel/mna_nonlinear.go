@@ -515,6 +515,10 @@ func solveNonlinearDCForComparatorStateWithInitial(plan Plan, analysis Analysis,
 		if len(diagnostics) != 0 {
 			return mnaSystem{}, nil, evidence, &diagnostics[0]
 		}
+		devices = compileNonlinearDevicesWithStates(
+			planWithIntrinsicSourceContinuationScale(plan, stage.sourceScale),
+			comparatorStates,
+		)
 		if len(guess) == 0 {
 			guess = make([]complex128, len(baseSystem.rhs))
 		} else if len(guess) != len(baseSystem.rhs) {
@@ -861,9 +865,15 @@ func maxNonlinearControlVoltageUpdate(devices []compiledNonlinearDevice, system 
 			voltageUpdate(device.terminals["BASE"], device.terminals["COLLECTOR"])
 		case PrimitiveNMOSSwitchV1, PrimitivePMOSSwitchV1:
 			voltageUpdate(device.terminals["GATE"], device.terminals["SOURCE"])
-		case PrimitiveReverseBlockingLoadSwitchV1:
-			voltageUpdate(device.terminals["VIN"], device.terminals["GND"])
-			voltageUpdate(device.terminals["ON"], device.terminals["GND"])
+		case PrimitiveReverseBlockingLoadSwitchV1, PrimitiveCurrentLimitingEFuseV1:
+			control := "ON"
+			reference := "GND"
+			if device.primitive == PrimitiveCurrentLimitingEFuseV1 {
+				control = "SHDN"
+				reference = "RTN"
+			}
+			voltageUpdate(device.terminals["VIN"], device.terminals[reference])
+			voltageUpdate(device.terminals[control], device.terminals[reference])
 			voltageUpdate(device.terminals["VOUT"], device.terminals["VIN"])
 		case PrimitiveMCUStaticSupplyLoadV1, PrimitiveSensorStaticSupplyLoadV1:
 			voltageUpdate(device.terminals["POWER"], device.terminals["GROUND"])
@@ -946,6 +956,22 @@ func piecewiseLinearRegionStable(devices []compiledNonlinearDevice, system *mnaS
 			if region(before) != region(after) {
 				return false
 			}
+		case PrimitiveCurrentLimitingEFuseV1:
+			region := func(solution []complex128) [3]bool {
+				vin := nonlinearNodeVoltage(system, solution, device.terminals["VIN"])
+				vout := nonlinearNodeVoltage(system, solution, device.terminals["VOUT"])
+				reference := nonlinearNodeVoltage(system, solution, device.terminals["RTN"])
+				enable := nonlinearNodeVoltage(system, solution, device.terminals["SHDN"])
+				forward := (vin - vout) / device.parameters["on_resistance_ohm"]
+				return [3]bool{
+					vin-reference >= device.parameters["input_min_v"],
+					enable-reference >= device.parameters["enable_high_voltage_v"],
+					forward >= device.parameters["programmed_current_limit_a"],
+				}
+			}
+			if region(before) != region(after) {
+				return false
+			}
 		case PrimitiveMCUStaticSupplyLoadV1, PrimitiveSensorStaticSupplyLoadV1:
 			region := func(solution []complex128) int {
 				voltage := nonlinearNodeVoltage(system, solution, device.terminals["POWER"]) -
@@ -988,9 +1014,11 @@ func compileNonlinearDevicesWithStates(plan Plan, states map[string]float64) []c
 			polarity = 1
 		case PrimitiveBJTPNPV1:
 			polarity = -1
-		case PrimitiveBidirectionalOpenDrainTranslatorV1, PrimitiveBidirectionalOpenDrainIsolatorV1:
+		case PrimitiveBidirectionalOpenDrainTranslatorV1, PrimitivePushPullTranslatorV1, PrimitiveDirectionControlledTranslatorV1, PrimitiveBidirectionalOpenDrainIsolatorV1, PrimitivePushPullDigitalIsolatorV1:
 			polarity = 1
 		case PrimitiveReverseBlockingLoadSwitchV1:
+			polarity = 1
+		case PrimitiveCurrentLimitingEFuseV1:
 			polarity = 1
 		case PrimitiveMCUStaticSupplyLoadV1, PrimitiveSensorStaticSupplyLoadV1:
 			polarity = 1
@@ -1063,6 +1091,19 @@ func planWithIntrinsicSourceContinuationScale(plan Plan, scale float64) Plan {
 		case PrimitiveShuntVoltageReferenceV1:
 			for parameterIndex := range device.ModelParameters {
 				if device.ModelParameters[parameterIndex].Name == "output_voltage_v" {
+					device.ModelParameters[parameterIndex].Value *= scale
+				}
+			}
+		case PrimitiveFixedBuckModuleV1, PrimitiveProtectedIsolatedConverterV1:
+			for parameterIndex := range device.ModelParameters {
+				if device.ModelParameters[parameterIndex].Name == "output_voltage_v" {
+					device.ModelParameters[parameterIndex].Value *= scale
+				}
+			}
+		case PrimitiveCurrentLimitingEFuseV1:
+			for parameterIndex := range device.ModelParameters {
+				switch device.ModelParameters[parameterIndex].Name {
+				case "input_min_v", "enable_high_voltage_v":
 					device.ModelParameters[parameterIndex].Value *= scale
 				}
 			}
@@ -1184,10 +1225,18 @@ func stampCompiledNonlinearDevices(system *mnaSystem, devices []compiledNonlinea
 			stampNonlinearBJT(system, device, guess)
 		case PrimitiveBidirectionalOpenDrainTranslatorV1:
 			stampNonlinearOpenDrainTranslator(system, device, guess)
+		case PrimitivePushPullTranslatorV1:
+			stampNonlinearPushPullTranslator(system, device, guess)
+		case PrimitiveDirectionControlledTranslatorV1:
+			stampNonlinearDirectionControlledTranslator(system, device, guess)
 		case PrimitiveBidirectionalOpenDrainIsolatorV1:
 			stampNonlinearOpenDrainIsolator(system, device, guess)
+		case PrimitivePushPullDigitalIsolatorV1:
+			stampNonlinearPushPullIsolator(system, device, guess)
 		case PrimitiveReverseBlockingLoadSwitchV1:
 			stampNonlinearReverseBlockingLoadSwitch(system, device, guess)
+		case PrimitiveCurrentLimitingEFuseV1:
+			stampNonlinearCurrentLimitingEFuse(system, device, guess)
 		case PrimitiveMCUStaticSupplyLoadV1, PrimitiveSensorStaticSupplyLoadV1:
 			stampNonlinearStaticSupplyLoad(system, device, guess)
 		}
@@ -1217,6 +1266,9 @@ func stampSmallSignalNonlinearDevicesExcept(system *mnaSystem, devices []compile
 			stampAdmittance(system, device.terminals["DRAIN"], device.terminals["SOURCE"], complex(conductance, 0))
 		case PrimitiveReverseBlockingLoadSwitchV1:
 			conductance := reverseBlockingLoadSwitchConductance(device, operatingSystem, operatingPoint)
+			stampAdmittance(system, device.terminals["VIN"], device.terminals["VOUT"], complex(conductance, 0))
+		case PrimitiveCurrentLimitingEFuseV1:
+			_, conductance := currentLimitingEFuseCurrentAndGradient(device, operatingSystem, operatingPoint)
 			stampAdmittance(system, device.terminals["VIN"], device.terminals["VOUT"], complex(conductance, 0))
 		case PrimitiveMCUStaticSupplyLoadV1, PrimitiveSensorStaticSupplyLoadV1:
 			voltage := nonlinearNodeVoltage(operatingSystem, operatingPoint, device.terminals["POWER"]) -
@@ -1265,6 +1317,68 @@ func stampSmallSignalNonlinearDevicesExcept(system *mnaSystem, devices []compile
 				power   string
 				minimum string
 				current string
+			}{
+				{power: "VCCA", minimum: "vcca_min_v", current: "vcca_quiescent_current_a"},
+				{power: "VCCB", minimum: "vccb_min_v", current: "vccb_quiescent_current_a"},
+			} {
+				voltage := nonlinearNodeVoltage(operatingSystem, operatingPoint, device.terminals[supply.power]) -
+					nonlinearNodeVoltage(operatingSystem, operatingPoint, device.terminals["GND"])
+				_, conductance := boundedSupplyLoadCurrentAndGradient(voltage, device.parameters[supply.minimum], device.parameters[supply.current])
+				stampAdmittance(system, device.terminals[supply.power], device.terminals["GND"], complex(conductance, 0))
+			}
+		case PrimitivePushPullTranslatorV1:
+			_, outputPrefix, outputSupply := pushPullTranslatorDirection(device)
+			enabled := pushPullTranslatorEnabled(device, operatingSystem, operatingPoint)
+			for channel := 1; channel <= pushPullTranslatorChannels; channel++ {
+				output := device.terminals[fmt.Sprintf("%s%d", outputPrefix, channel)]
+				reference := device.terminals["GND"]
+				resistance := device.parameters["output_off_resistance_ohm"]
+				if high, valid := pushPullTranslatorInputState(device, operatingSystem, operatingPoint, channel); enabled && valid {
+					resistance = device.parameters["output_low_resistance_ohm"]
+					if high {
+						reference = device.terminals[outputSupply]
+						resistance = device.parameters["output_high_resistance_ohm"]
+					}
+				}
+				stampAdmittance(system, output, reference, complex(1/resistance, 0))
+			}
+			for _, supply := range []struct {
+				power   string
+				minimum string
+				current string
+			}{
+				{power: "VCCA", minimum: "vcca_min_v", current: "vcca_quiescent_current_a"},
+				{power: "VCCB", minimum: "vccb_min_v", current: "vccb_quiescent_current_a"},
+			} {
+				voltage := nonlinearNodeVoltage(operatingSystem, operatingPoint, device.terminals[supply.power]) -
+					nonlinearNodeVoltage(operatingSystem, operatingPoint, device.terminals["GND"])
+				_, conductance := boundedSupplyLoadCurrentAndGradient(voltage, device.parameters[supply.minimum], device.parameters[supply.current])
+				stampAdmittance(system, device.terminals[supply.power], device.terminals["GND"], complex(conductance, 0))
+			}
+		case PrimitiveDirectionControlledTranslatorV1:
+			for channel := 1; channel <= directionControlledTranslatorChannels; channel++ {
+				output, reference, resistance, active := directionControlledTranslatorOutputState(device, operatingSystem, operatingPoint, channel)
+				if active {
+					stampAdmittance(system, output, reference, complex(1/resistance, 0))
+					continue
+				}
+				for _, prefix := range []string{"A", "B"} {
+					stampAdmittance(system, device.terminals[fmt.Sprintf("%s%d", prefix, channel)], device.terminals["GND"], complex(1/resistance, 0))
+				}
+			}
+		case PrimitivePushPullDigitalIsolatorV1:
+			for _, channel := range pushPullIsolatorChannels {
+				reference, resistance, _, _ := pushPullIsolatorOutputState(device, operatingSystem, operatingPoint, channel)
+				stampAdmittance(system, device.terminals[channel.output], device.terminals[reference], complex(1/resistance, 0))
+			}
+			for _, side := range []string{"1", "2"} {
+				voltage := nonlinearNodeVoltage(operatingSystem, operatingPoint, device.terminals["VDD"+side]) -
+					nonlinearNodeVoltage(operatingSystem, operatingPoint, device.terminals["GND"+side])
+				_, conductance := boundedSupplyLoadCurrentAndGradient(voltage, device.parameters["supply_min_v"], device.parameters["side_"+side+"_quiescent_current_a"])
+				stampAdmittance(system, device.terminals["VDD"+side], device.terminals["GND"+side], complex(conductance, 0))
+			}
+			for _, supply := range []struct {
+				power, minimum, current string
 			}{
 				{power: "VCCA", minimum: "vcca_min_v", current: "vcca_quiescent_current_a"},
 				{power: "VCCB", minimum: "vccb_min_v", current: "vccb_quiescent_current_a"},
@@ -1599,6 +1713,8 @@ func nonlinearResidual(base mnaSystem, devices []compiledNonlinearDevice, soluti
 			}
 		case PrimitiveReverseBlockingLoadSwitchV1:
 			addReverseBlockingLoadSwitchResidual(residuals, base, device, solution)
+		case PrimitiveCurrentLimitingEFuseV1:
+			addCurrentLimitingEFuseResidual(residuals, base, device, solution)
 		case PrimitiveMCUStaticSupplyLoadV1, PrimitiveSensorStaticSupplyLoadV1:
 			addStaticSupplyLoadResidual(residuals, base, device, solution)
 		case PrimitiveUnidirectionalZenerV1:
@@ -1633,8 +1749,14 @@ func nonlinearResidual(base mnaSystem, devices []compiledNonlinearDevice, soluti
 			}
 		case PrimitiveBidirectionalOpenDrainTranslatorV1:
 			addOpenDrainTranslatorResidual(residuals, base, device, solution)
+		case PrimitivePushPullTranslatorV1:
+			addPushPullTranslatorResidual(residuals, base, device, solution)
+		case PrimitiveDirectionControlledTranslatorV1:
+			addDirectionControlledTranslatorResidual(residuals, base, device, solution)
 		case PrimitiveBidirectionalOpenDrainIsolatorV1:
 			addOpenDrainIsolatorResidual(residuals, base, device, solution)
+		case PrimitivePushPullDigitalIsolatorV1:
+			addPushPullIsolatorResidual(residuals, base, device, solution)
 		}
 	}
 	maximum, label := 0.0, "unknown"
@@ -1694,6 +1816,8 @@ func validateNonlinearOperatingLimitsWithComparatorStates(plan Plan, system mnaS
 			}
 		case PrimitiveReverseBlockingLoadSwitchV1:
 			diagnostics = append(diagnostics, validateReverseBlockingLoadSwitchOperatingLimits(device, system, solution)...)
+		case PrimitiveCurrentLimitingEFuseV1:
+			diagnostics = append(diagnostics, validateCurrentLimitingEFuseOperatingLimits(device, system, solution)...)
 		case PrimitiveMCUStaticSupplyLoadV1, PrimitiveSensorStaticSupplyLoadV1:
 			diagnostics = append(diagnostics, validateStaticSupplyLoadOperatingLimits(device, system, solution, allowPowerTransition)...)
 		case PrimitiveBidirectionalTVSV1:
@@ -1736,8 +1860,14 @@ func validateNonlinearOperatingLimitsWithComparatorStates(plan Plan, system mnaS
 			}
 		case PrimitiveBidirectionalOpenDrainTranslatorV1:
 			diagnostics = append(diagnostics, validateOpenDrainTranslatorOperatingLimits(device, system, solution, allowPowerTransition)...)
+		case PrimitivePushPullTranslatorV1:
+			diagnostics = append(diagnostics, validatePushPullTranslatorOperatingLimits(device, system, solution, allowPowerTransition, allowPulseRatings)...)
+		case PrimitiveDirectionControlledTranslatorV1:
+			diagnostics = append(diagnostics, validateDirectionControlledTranslatorOperatingLimits(device, system, solution, allowPowerTransition)...)
 		case PrimitiveBidirectionalOpenDrainIsolatorV1:
 			diagnostics = append(diagnostics, validateOpenDrainIsolatorOperatingLimits(plan, device, system, solution, allowPowerTransition)...)
+		case PrimitivePushPullDigitalIsolatorV1:
+			diagnostics = append(diagnostics, validatePushPullIsolatorOperatingLimits(device, system, solution, allowPowerTransition)...)
 		}
 	}
 	return diagnostics

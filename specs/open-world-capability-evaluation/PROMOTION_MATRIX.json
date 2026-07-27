@@ -1,0 +1,61 @@
+{
+  "schema_version": "kicadai.external-review-matrix.v1",
+  "scenarios": [
+    {
+      "id": "heldout_analog_clock_fanout",
+      "review_equivalent": "behavior-only clock source with bounded fanout, aggregate capacitive loading, edge rate, startup, and jitter",
+      "lane": "requirement",
+      "fixture": "internal/architecturesearch/testdata/open_world_capability_promotion/heldout_analog_clock_fanout.json",
+      "board": {"mode": "synthesized", "layers": 2},
+      "expected_status": "pass",
+      "required_artifacts": ["design-request.json", "transaction.json", "workflow-result.json", "validation-summary.json", "design-promotion.json", "manifest.json", "normalized-requirement.json", "architecture-search.json", "closed-loop-synthesis.json", "simulation.json"],
+      "internal_gates": ["architecture_search", "component_evidence", "simulation", "routing", "connectivity", "route_completion", "writer_correctness", "round_trip", "deterministic_repeat"],
+      "optional_kicad_gates": ["erc", "strict_drc", "writer_correctness", "round_trip"]
+    },
+    {
+      "id": "heldout_sensor_push_pull_translation",
+      "review_equivalent": "behavior-only unidirectional push-pull sensor translation with bounded voltage domains, speed, startup, and partial-power-down behavior",
+      "lane": "requirement",
+      "fixture": "internal/architecturesearch/testdata/open_world_capability_promotion/heldout_sensor_push_pull_translation.json",
+      "board": {"mode": "synthesized", "layers": 2},
+      "expected_status": "pass",
+      "required_artifacts": ["design-request.json", "transaction.json", "workflow-result.json", "validation-summary.json", "design-promotion.json", "manifest.json", "normalized-requirement.json", "architecture-search.json", "closed-loop-synthesis.json", "simulation.json"],
+      "internal_gates": ["architecture_search", "component_evidence", "simulation", "routing", "connectivity", "route_completion", "writer_correctness", "round_trip", "deterministic_repeat"],
+      "optional_kicad_gates": ["erc", "strict_drc", "writer_correctness", "round_trip"]
+    },
+    {
+      "id": "heldout_mcu_translated_debug",
+      "review_equivalent": "behavior-only translated MCU debug connection with reviewed loading, reset entry, shared-pin arbitration, startup, and direction control",
+      "lane": "requirement",
+      "fixture": "internal/architecturesearch/testdata/open_world_capability_promotion/heldout_mcu_translated_debug.json",
+      "board": {"mode": "synthesized", "layers": 2},
+      "expected_status": "pass",
+      "required_artifacts": ["design-request.json", "transaction.json", "workflow-result.json", "validation-summary.json", "design-promotion.json", "manifest.json", "normalized-requirement.json", "architecture-search.json", "closed-loop-synthesis.json", "simulation.json"],
+      "internal_gates": ["architecture_search", "component_evidence", "simulation", "routing", "connectivity", "route_completion", "writer_correctness", "round_trip", "deterministic_repeat"],
+      "optional_kicad_gates": ["erc", "strict_drc", "writer_correctness", "round_trip"]
+    },
+    {
+      "id": "heldout_mixed_signal_functional_isolation",
+      "review_equivalent": "behavior-only asymmetric push-pull functional isolation with safe default state and bounded voltage, frequency, channel, working-voltage, transient, clearance, and creepage contracts",
+      "lane": "requirement",
+      "fixture": "internal/architecturesearch/testdata/open_world_capability_promotion/heldout_mixed_signal_functional_isolation.json",
+      "board": {"mode": "synthesized", "layers": 2},
+      "expected_status": "pass",
+      "required_artifacts": ["design-request.json", "transaction.json", "workflow-result.json", "validation-summary.json", "design-promotion.json", "manifest.json", "normalized-requirement.json", "architecture-search.json", "closed-loop-synthesis.json", "simulation.json"],
+      "internal_gates": ["architecture_search", "component_evidence", "simulation", "routing", "connectivity", "route_completion", "writer_correctness", "round_trip", "deterministic_repeat"],
+      "optional_kicad_gates": ["erc", "strict_drc", "writer_correctness", "round_trip"]
+    },
+    {
+      "id": "heldout_power_protected_isolated_12v",
+      "review_equivalent": "behavior-only protected isolated power conversion with bounded input range, output load, inrush, startup, shutdown discharge, isolation, thermal, and transient behavior",
+      "lane": "requirement",
+      "fixture": "internal/architecturesearch/testdata/open_world_capability_promotion/heldout_power_protected_isolated_12v.json",
+      "board": {"mode": "synthesized", "layers": 2},
+      "expected_status": "pass",
+      "required_artifacts": ["design-request.json", "transaction.json", "workflow-result.json", "validation-summary.json", "design-promotion.json", "manifest.json", "normalized-requirement.json", "architecture-search.json", "closed-loop-synthesis.json", "simulation.json"],
+      "internal_gates": ["architecture_search", "component_evidence", "simulation", "routing", "connectivity", "route_completion", "writer_correctness", "round_trip", "deterministic_repeat"],
+      "optional_kicad_gates": ["erc", "strict_drc", "writer_correctness", "round_trip"]
+    }
+  ],
+  "negative_cases": []
+}

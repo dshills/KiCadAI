@@ -834,6 +834,9 @@ func behavioralReferenceDomain(requirement architecturesearch.Requirement, domai
 	if len(references) == 1 {
 		return references[0], true
 	}
+	if reference, ok := objectiveOutputReferenceDomain(requirement, domainID); ok {
+		return reference, true
+	}
 	domainTokens := behavioralDomainTokens(domainID)
 	best, bestScore, ambiguous := "", 0, false
 	for _, reference := range references {
@@ -846,6 +849,63 @@ func behavioralReferenceDomain(requirement architecturesearch.Requirement, domai
 		}
 	}
 	return best, bestScore > 0 && !ambiguous
+}
+
+func objectiveOutputReferenceDomain(requirement architecturesearch.Requirement, domainID string) (string, bool) {
+	portDomains := make(map[string]string, len(requirement.Requirements.Ports))
+	referencePorts := map[string]string{}
+	for _, port := range requirement.Requirements.Ports {
+		portDomains[port.ID] = port.Domain
+		if port.Kind == "reference" {
+			referencePorts[port.ID] = port.Domain
+		}
+	}
+	signalDomains := make(map[string]string, len(requirement.Requirements.Signals))
+	for _, signal := range requirement.Requirements.Signals {
+		signalDomains[signal.ID] = signal.Domain
+	}
+	candidates := map[string]bool{}
+	for _, objective := range requirement.Requirements.Objectives {
+		producesDomain := false
+		for _, binding := range objective.Bindings {
+			bindingDomain := portDomains[binding.Port]
+			if binding.Signal != "" {
+				bindingDomain = signalDomains[binding.Signal]
+			}
+			if bindingDomain != domainID {
+				continue
+			}
+			switch binding.Role {
+			case "output", "load", "protected", "side_a", "side_b":
+				producesDomain = true
+			default:
+				producesDomain = binding.Direction == "source"
+			}
+			if producesDomain {
+				break
+			}
+		}
+		if !producesDomain {
+			continue
+		}
+		for _, binding := range objective.Bindings {
+			switch binding.Role {
+			case "reference", "ground", "return":
+			default:
+				continue
+			}
+			if referenceDomain := referencePorts[binding.Port]; referenceDomain != "" {
+				candidates[referenceDomain] = true
+			}
+		}
+	}
+	if len(candidates) != 1 {
+		return "", false
+	}
+	for candidate := range candidates {
+		return candidate, true
+	}
+	return "", false
 }
 
 func behavioralDomainTokens(value string) []string {
@@ -1351,7 +1411,7 @@ func resolvedOperatingBindings(analysisPlan AnalysisPlan, plans map[string]simmo
 			case "load_current":
 				component := OperatingHarnessComponentID(assignment.Axis, assignment.Target)
 				maximum, maximumOK := maximumOperatingAssignment(analysisPlan, assignment.Axis, assignment.Target)
-				scale, scaleIssue := resolvedLoadCurrentScale(plans, component, maximum)
+				scale, offset, scaleIssue := resolvedLoadCurrentTransfer(plans, component, maximum)
 				if !maximumOK || scaleIssue != "" {
 					if !maximumOK {
 						scaleIssue = "declared current corners have no positive finite maximum"
@@ -1359,7 +1419,7 @@ func resolvedOperatingBindings(analysisPlan AnalysisPlan, plans map[string]simmo
 					*diagnostics = append(*diagnostics, Diagnostic{Path: "corners." + corner.ID + ".load_current", Message: "catalog-backed current load or its equivalent physical-load scale is missing or ambiguous: " + scaleIssue})
 					continue
 				}
-				binding.Kind, binding.Component, binding.Scale = OperatingLoadCurrent, component, scale
+				binding.Kind, binding.Component, binding.Scale, binding.Offset = OperatingLoadCurrent, component, scale, offset
 				binding.ReferenceComponent, _ = resolvedLoadCurrentReference(plans, scale)
 			case "load_resistance":
 				component := OperatingHarnessComponentID(assignment.Axis, assignment.Target)
@@ -1422,21 +1482,43 @@ func maximumOperatingAssignment(plan AnalysisPlan, axis, target string) (float64
 	return maximum, finiteClosedLoopBound(maximum) && maximum > 0
 }
 
-// resolvedLoadCurrentScale proves that every analysis plan represents the same
-// semantic current load either as an independently driven current source or as
-// a startup-safe physical resistance. The latter is derived at the maximum
-// declared current, so R*I recovers the deterministic voltage scale used to
-// compile every current corner without embedding a topology-specific formula
-// in provider output.
-func resolvedLoadCurrentScale(plans map[string]simmodel.Plan, component string, maximumCurrent float64) (float64, string) {
+// resolvedLoadCurrentTransfer proves the affine mapping from a semantic total
+// rail current to the independently driven physical harness load. Catalog-backed
+// parallel support current is already present in the plan, so it appears as a
+// negative offset. Startup-safe resistance plans must recover the same voltage
+// scale from the residual maximum current.
+func resolvedLoadCurrentTransfer(plans map[string]simmodel.Plan, component string, maximumCurrent float64) (float64, float64, string) {
 	if !finiteClosedLoopBound(maximumCurrent) || maximumCurrent <= 0 {
-		return 0, "maximum current is not positive and finite"
+		return 0, 0, "maximum current is not positive and finite"
 	}
 	keys := make([]string, 0, len(plans))
 	for key := range plans {
 		keys = append(keys, key)
 	}
 	slices.Sort(keys)
+	physicalMaximum := 0.0
+	for _, key := range keys {
+		for _, device := range plans[key].Devices {
+			if device.Component != component || device.Family != "current_source" {
+				continue
+			}
+			candidate, ok := maximumLoadSourceExcitation(plans[key], component)
+			if !ok {
+				return 0, 0, "current-source load has no finite nonnegative excitation in " + key
+			}
+			if physicalMaximum != 0 && math.Abs(candidate-physicalMaximum) > 1e-12*math.Max(1, math.Abs(physicalMaximum)) {
+				return 0, 0, "physical load-current maxima disagree across analysis plans"
+			}
+			physicalMaximum = candidate
+		}
+	}
+	if physicalMaximum == 0 {
+		physicalMaximum = maximumCurrent
+	}
+	offset := physicalMaximum - maximumCurrent
+	if !finiteClosedLoopBound(offset) || physicalMaximum <= 0 {
+		return 0, 0, "resolved physical load-current maximum is not positive and finite"
+	}
 	scale := 0.0
 	for _, key := range keys {
 		found := false
@@ -1446,25 +1528,48 @@ func resolvedLoadCurrentScale(plans map[string]simmodel.Plan, component string, 
 			}
 			switch device.Family {
 			case "current_source":
+				candidate, ok := maximumLoadSourceExcitation(plans[key], component)
+				if !ok || math.Abs(candidate-physicalMaximum) > 1e-12*math.Max(1, math.Abs(physicalMaximum)) {
+					return 0, 0, "physical load-current maximum is missing or inconsistent in " + key
+				}
 				found = true
 			case "resistor":
 				if device.ValueSI == nil || !finiteClosedLoopBound(*device.ValueSI) || *device.ValueSI <= 0 {
-					return 0, "startup load resistance is not positive and finite in " + key
+					return 0, 0, "startup load resistance is not positive and finite in " + key
 				}
-				candidate := *device.ValueSI * maximumCurrent
+				candidate := *device.ValueSI * physicalMaximum
 				if scale != 0 && math.Abs(candidate-scale) > 1e-12*math.Max(1, math.Abs(scale)) {
-					return 0, "physical load voltage scales disagree across analysis plans"
+					return 0, 0, "physical load voltage scales disagree across analysis plans"
 				}
 				scale, found = candidate, true
 			default:
-				return 0, "load component " + component + " has unsupported family " + device.Family + " in " + key
+				return 0, 0, "load component " + component + " has unsupported family " + device.Family + " in " + key
 			}
 		}
 		if !found {
-			return 0, "load component " + component + " is absent from " + key
+			return 0, 0, "load component " + component + " is absent from " + key
 		}
 	}
-	return scale, ""
+	return scale, offset, ""
+}
+
+func maximumLoadSourceExcitation(plan simmodel.Plan, component string) (float64, bool) {
+	maximum := math.Inf(-1)
+	found := false
+	for _, analysis := range plan.Analyses {
+		for _, excitation := range analysis.Excitations {
+			if excitation.Component != component {
+				continue
+			}
+			for _, candidate := range []float64{excitation.DCValue, excitation.PulseInitialValue, excitation.PulseValue} {
+				if finiteClosedLoopBound(candidate) && candidate >= 0 {
+					maximum = math.Max(maximum, candidate)
+					found = true
+				}
+			}
+		}
+	}
+	return maximum, found
 }
 
 func resolvedLoadCurrentReference(plans map[string]simmodel.Plan, scale float64) (string, bool) {

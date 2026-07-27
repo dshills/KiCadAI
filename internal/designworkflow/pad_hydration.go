@@ -2,6 +2,8 @@ package designworkflow
 
 import (
 	"fmt"
+	"math"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -219,6 +221,11 @@ type verifiedPadTemplateRecord struct {
 	Pads   []placement.PadSummary
 }
 
+var (
+	standardTSSOPFootprintPattern = regexp.MustCompile(`^Package_SO:TSSOP-([0-9]+)_([0-9.]+)x([0-9.]+)mm_P([0-9.]+)mm$`)
+	standardSOICFootprintPattern  = regexp.MustCompile(`^Package_SO:SOIC-([0-9]+)(W?)_([0-9.]+)x([0-9.]+)mm_P([0-9.]+)mm$`)
+)
+
 func verifiedPadTemplate(footprintID string) (verifiedPadTemplateRecord, bool) {
 	footprintID = strings.TrimSpace(footprintID)
 	const pinHeaderPrefix = "Connector_PinHeader_2.54mm:PinHeader_1x"
@@ -228,6 +235,12 @@ func verifiedPadTemplate(footprintID string) (verifiedPadTemplateRecord, bool) {
 		if count, err := strconv.Atoi(countText); err == nil && count > 0 {
 			return pinHeaderTemplate(count), true
 		}
+	}
+	if template, ok := standardTSSOPTemplate(footprintID); ok {
+		return template, true
+	}
+	if template, ok := standardSOICTemplate(footprintID); ok {
+		return template, true
 	}
 	switch footprintID {
 	case "Resistor_SMD:R_0603_1608Metric":
@@ -387,6 +400,22 @@ func verifiedPadTemplate(footprintID string) (verifiedPadTemplateRecord, bool) {
 			throughHolePad("16", 10.16, 0, 2, 1.5, 0.7, "oval"),
 		}
 		return verifiedPadTemplateRecord{Bounds: verifiedCourtyardBoundsFromExtents(-2.02, -3.25, 12.18, 21.05), Pads: pads}, true
+	case "Converter_DCDC:Converter_DCDC_TRACO_TSR-1_THT":
+		pads := []placement.PadSummary{
+			throughHolePad("1", 0, 0, 1.5, 2.5, 1, "rect"),
+			throughHolePad("2", 2.54, 0, 1.5, 2.5, 1, "oval"),
+			throughHolePad("3", 5.08, 0, 1.5, 2.5, 1, "oval"),
+		}
+		return verifiedPadTemplateRecord{Bounds: verifiedCourtyardBoundsFromExtents(-3.55, -5.85, 8.65, 2.25), Pads: pads}, true
+	case "Converter_DCDC:Converter_DCDC_TRACO_TRI10_Single_THT":
+		pads := []placement.PadSummary{
+			throughHolePad("1", 0, 0, 1.9, 1.9, 1.1, "roundrect"),
+			throughHolePad("12", 0, 27.94, 1.9, 1.9, 1.1, "circle"),
+			throughHolePad("13", 15.22, 27.94, 1.9, 1.9, 1.1, "circle"),
+			throughHolePad("23", 15.22, 2.54, 1.9, 1.9, 1.1, "circle"),
+			throughHolePad("24", 15.22, 0, 1.9, 1.9, 1.1, "circle"),
+		}
+		return verifiedPadTemplateRecord{Bounds: verifiedCourtyardBoundsFromExtents(-3.29, -2.61, 18.51, 30.69), Pads: pads}, true
 	case "Connector_USB:USB_C_Receptacle_GCT_USB4125-xx-x_6P_TopMnt_Horizontal":
 		return usbCGCTUSB4125PowerOnlyTemplate(), true
 	case "Connector_USB:USB_C_Receptacle_HRO_TYPE-C-31-M-12":
@@ -509,6 +538,8 @@ func verifiedPadTemplate(footprintID string) (verifiedPadTemplateRecord, bool) {
 		return verifiedPadTemplateRecord{Bounds: verifiedCourtyardBounds(7.4, 5.4, 3.7, 2.7), Pads: pads}, true
 	case "Package_SO:MSOP-16-1EP_3x4.039mm_P0.5mm_EP1.651x2.845mm_ThermalVias":
 		return analogMSOP16ExposedPadTemplate(), true
+	case "Package_SO:HTSSOP-16-1EP_4.4x5mm_P0.65mm_EP3.4x5mm_Mask2.66x2.46mm_ThermalVias":
+		return tiHTSSOP16ExposedPadTemplate(), true
 	case "Package_SO:VSSOP-8_2.3x2mm_P0.5mm":
 		pads := []placement.PadSummary{
 			smdPad("1", -1.4, -0.75, 1.25, 0.35, "roundrect"),
@@ -563,6 +594,122 @@ func verifiedPadTemplate(footprintID string) (verifiedPadTemplateRecord, bool) {
 	default:
 		return verifiedPadTemplateRecord{}, false
 	}
+}
+
+func standardTSSOPTemplate(footprintID string) (verifiedPadTemplateRecord, bool) {
+	match := standardTSSOPFootprintPattern.FindStringSubmatch(footprintID)
+	if len(match) != 5 {
+		return verifiedPadTemplateRecord{}, false
+	}
+	pinCount, pinErr := strconv.Atoi(match[1])
+	bodyWidth, widthErr := strconv.ParseFloat(match[2], 64)
+	bodyHeight, heightErr := strconv.ParseFloat(match[3], 64)
+	pitch, pitchErr := strconv.ParseFloat(match[4], 64)
+	if pinErr != nil || widthErr != nil || heightErr != nil || pitchErr != nil ||
+		pinCount < 4 || pinCount > 64 || pinCount%2 != 0 ||
+		bodyWidth <= 0 || bodyHeight <= 0 || pitch <= 0 {
+		return verifiedPadTemplateRecord{}, false
+	}
+	half := pinCount / 2
+	leftNames := make([]string, half)
+	rightNames := make([]string, half)
+	for index := 0; index < half; index++ {
+		leftNames[index] = strconv.Itoa(index + 1)
+		rightNames[index] = strconv.Itoa(pinCount - index)
+	}
+	const (
+		standardPadLengthMM       = 1.475
+		standardBodyToPadSpanMM   = 1.325
+		minimumStandardPadWidthMM = 0.25
+	)
+	padWidth := math.Max(minimumStandardPadWidthMM, pitch-0.25)
+	return rowPadTemplate(
+		bodyWidth+standardBodyToPadSpanMM,
+		bodyHeight,
+		pitch,
+		standardPadLengthMM,
+		padWidth,
+		leftNames,
+		rightNames,
+	), true
+}
+
+func standardSOICTemplate(footprintID string) (verifiedPadTemplateRecord, bool) {
+	match := standardSOICFootprintPattern.FindStringSubmatch(footprintID)
+	if len(match) != 6 {
+		return verifiedPadTemplateRecord{}, false
+	}
+	pinCount, pinErr := strconv.Atoi(match[1])
+	bodyWidth, widthErr := strconv.ParseFloat(match[3], 64)
+	bodyHeight, heightErr := strconv.ParseFloat(match[4], 64)
+	pitch, pitchErr := strconv.ParseFloat(match[5], 64)
+	if pinErr != nil || widthErr != nil || heightErr != nil || pitchErr != nil ||
+		pinCount < 4 || pinCount > 64 || pinCount%2 != 0 ||
+		bodyWidth <= 0 || bodyHeight <= 0 || pitch <= 0 {
+		return verifiedPadTemplateRecord{}, false
+	}
+
+	// These two JEDEC SOIC variants have stable geometry in KiCad's generated
+	// Package_SO library. Other SOIC names do not encode enough lead geometry
+	// to reconstruct their pads faithfully, so leave them fail-closed.
+	var centerSpan, padLength float64
+	switch {
+	case match[2] == "" && nearlyEqual(bodyWidth, 3.9) && nearlyEqual(pitch, 1.27):
+		centerSpan = 4.95
+		padLength = 1.95
+	case match[2] == "W" && nearlyEqual(bodyWidth, 7.5) && nearlyEqual(pitch, 1.27):
+		centerSpan = 9.3
+		padLength = 2.05
+	default:
+		return verifiedPadTemplateRecord{}, false
+	}
+
+	half := pinCount / 2
+	pads := make([]placement.PadSummary, 0, pinCount)
+	for index := 0; index < half; index++ {
+		pads = append(pads, smdPad(
+			strconv.Itoa(index+1),
+			-centerSpan/2,
+			rowPadY(index, half, pitch),
+			padLength,
+			0.6,
+			"roundrect",
+		))
+	}
+	for index := 0; index < half; index++ {
+		pads = append(pads, smdPad(
+			strconv.Itoa(half+index+1),
+			centerSpan/2,
+			rowPadY(half-1-index, half, pitch),
+			padLength,
+			0.6,
+			"roundrect",
+		))
+	}
+	const padWidth = 0.6
+	template := verifiedPadTemplateRecord{Pads: pads}
+	padEnvelopeWidth := centerSpan + padLength
+	padEnvelopeHeight := float64(half-1)*pitch + padWidth
+	template.Bounds = centeredOutwardCourtyardBounds(
+		math.Max(bodyWidth, padEnvelopeWidth),
+		math.Max(bodyHeight, padEnvelopeHeight),
+	)
+	return template, true
+}
+
+func centeredOutwardCourtyardBounds(envelopeWidth, envelopeHeight float64) placement.Bounds {
+	const courtyardClearanceMM = 0.25
+	outward := func(envelope float64) float64 {
+		half := envelope/2 + courtyardClearanceMM
+		return math.Ceil((half-1e-12)*100) / 100
+	}
+	halfWidth := outward(envelopeWidth)
+	halfHeight := outward(envelopeHeight)
+	return verifiedCourtyardBounds(2*halfWidth, 2*halfHeight, halfWidth, halfHeight)
+}
+
+func nearlyEqual(left, right float64) bool {
+	return math.Abs(left-right) < 1e-9
 }
 
 func throughHoleRowTemplate(xPositions []float64, names []string, widthMM, heightMM, drillMM float64, shapes []string, bodyWidthMM, bodyHeightMM float64) verifiedPadTemplateRecord {
@@ -720,6 +867,69 @@ func analogMSOP16ExposedPadTemplate() verifiedPadTemplateRecord {
 		Bounds: verifiedCourtyardBoundsFromExtents(-3.13, -2.27, 3.13, 2.27),
 		Pads:   pads,
 	}
+}
+
+func tiHTSSOP16ExposedPadTemplate() verifiedPadTemplateRecord {
+	pads := []placement.PadSummary{
+		{Name: "", YMM: -.615, WidthMM: 2.14, HeightMM: .99, Type: "smd", Shape: "roundrect", Layers: []string{"F.Paste"}},
+		{Name: "", WidthMM: 2.66, HeightMM: 2.46, Type: "smd", Shape: "rect", Layers: []string{"F.Mask"}},
+		{Name: "", YMM: .615, WidthMM: 2.14, HeightMM: .99, Type: "smd", Shape: "roundrect", Layers: []string{"F.Paste"}},
+	}
+	yPositions := []float64{-2.275, -1.625, -.975, -.325, .325, .975, 1.625, 2.275}
+	for number := 1; number <= 8; number++ {
+		pads = append(pads, smdPad(
+			strconv.Itoa(number),
+			-2.8625,
+			yPositions[number-1],
+			1.575,
+			.4,
+			"roundrect",
+		))
+	}
+	for number := 9; number <= 16; number++ {
+		pads = append(pads, smdPad(
+			strconv.Itoa(number),
+			2.8625,
+			yPositions[16-number],
+			1.575,
+			.4,
+			"roundrect",
+		))
+	}
+	for _, xMM := range []float64{-1.2, 0} {
+		for _, yMM := range []float64{-1.8, -.6, .6, 1.8} {
+			if xMM == 0 && yMM > -.6 {
+				continue
+			}
+			pads = append(pads, placement.PadSummary{
+				Name: "17", XMM: xMM, YMM: yMM, WidthMM: .5, HeightMM: .5,
+				Type: "thru_hole", Shape: "circle", DrillMM: .2, Layers: []string{"*.Cu"},
+			})
+		}
+	}
+	pads = append(pads,
+		placement.PadSummary{
+			Name: "17", WidthMM: 2.9, HeightMM: 4.1,
+			Type: "smd", Shape: "rect", Layers: []string{"B.Cu"},
+		},
+		placement.PadSummary{
+			Name: "17", WidthMM: 3.4, HeightMM: 5,
+			Type: "smd", Shape: "rect", Layers: []string{"F.Cu"},
+		},
+	)
+	for _, yMM := range []float64{.6, 1.8} {
+		pads = append(pads, placement.PadSummary{
+			Name: "17", YMM: yMM, WidthMM: .5, HeightMM: .5,
+			Type: "thru_hole", Shape: "circle", DrillMM: .2, Layers: []string{"*.Cu"},
+		})
+	}
+	for _, yMM := range []float64{-1.8, -.6, .6, 1.8} {
+		pads = append(pads, placement.PadSummary{
+			Name: "17", XMM: 1.2, YMM: yMM, WidthMM: .5, HeightMM: .5,
+			Type: "thru_hole", Shape: "circle", DrillMM: .2, Layers: []string{"*.Cu"},
+		})
+	}
+	return verifiedPadTemplateRecord{Bounds: verifiedCourtyardBoundsFromExtents(-3.9, -2.75, 3.9, 2.75), Pads: pads}
 }
 
 func sunlordMWSA1206STemplate() verifiedPadTemplateRecord {

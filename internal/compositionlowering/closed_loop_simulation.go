@@ -413,10 +413,17 @@ func (resolver ArchitectureSimulationPlanResolver) ResolveSimulationPlans(ctx co
 	slices.Sort(kinds)
 	result := make(map[string]simmodel.Plan, len(kinds))
 	centeredBiasCache := make(map[string]simmodel.CenteredBiasSelection)
+	domainNominalVoltages := behavioralDomainNominalVoltageIndex(resolver.Requirement)
 	recordPlan := func(kind string, plan simmodel.Plan) error {
 		plan = planScopedToAnalysis(plan, kind)
 		if kind == simmodel.AnalysisACSweep && len(plan.Analyses) == 1 {
 			plan.Analyses[0] = behavioralBoundedACSweep(resolver.Requirement, modelBoundedACSweep(plan, plan.Analyses[0]))
+		}
+		if err := configureBehavioralStartupInputState(&plan, kind, resolver.Requirement, domainNominalVoltages, lowered.Evidence.SemanticBindings); err != nil {
+			return err
+		}
+		if err := configureBehavioralTransferControls(&plan, kind, resolver.Requirement, lowered.Evidence.SemanticBindings); err != nil {
+			return err
 		}
 		centered, centerErr := centerBehavioralInputBiasCached(plan, kind, primaryInputNode, centeredBiasCache)
 		if centerErr != nil {
@@ -504,6 +511,369 @@ func (resolver ArchitectureSimulationPlanResolver) ResolveSimulationPlans(ctx co
 	return result, nil
 }
 
+func configureBehavioralStartupInputState(plan *simmodel.Plan, kind string, requirement architecturesearch.Requirement, domainNominalVoltages map[string]float64, bindings []closedloopsynthesis.SemanticBinding) error {
+	if kind != simmodel.AnalysisStartup {
+		return nil
+	}
+	targets := map[string]string{}
+	for _, binding := range bindings {
+		if binding.Kind == "port" {
+			targets[binding.ID] = binding.Target
+		}
+	}
+	activeLevels, err := behavioralControlActiveLevelIndex(plan)
+	if err != nil {
+		return err
+	}
+	sourceValues := map[string]float64{}
+	for _, port := range requirement.Requirements.Ports {
+		switch port.Kind {
+		case "digital_logic", "digital_bus", "analog_control":
+		default:
+			continue
+		}
+		target, exists := targets[port.ID]
+		if !exists || target == "" {
+			continue
+		}
+		value, apply := behavioralStartupPortVoltage(activeLevels, domainNominalVoltages, port, target)
+		if !apply {
+			continue
+		}
+		source, ok := uniquePlanSourceAtNode(plan, target)
+		if !ok {
+			continue
+		}
+		polarity, ok := voltageSourcePolarityAtNode(plan, source, target)
+		if !ok {
+			continue
+		}
+		if err := addBehavioralControlNodeValue(sourceValues, source, value*polarity); err != nil {
+			return err
+		}
+	}
+	if len(sourceValues) == 0 {
+		return nil
+	}
+	for analysisIndex := range plan.Analyses {
+		applied := map[string]int{}
+		for excitationIndex := range plan.Analyses[analysisIndex].Excitations {
+			excitation := &plan.Analyses[analysisIndex].Excitations[excitationIndex]
+			value, exists := sourceValues[excitation.Component]
+			if !exists {
+				continue
+			}
+			setSourceSteadyDC(excitation, value)
+			applied[excitation.Component]++
+		}
+		for source := range sourceValues {
+			if applied[source] != 1 {
+				return fmt.Errorf(
+					"behavioral startup source %q occurs %d times in resolved analysis %q; want exactly once",
+					source, applied[source], simulationAnalysisLabel(plan.Analyses[analysisIndex]),
+				)
+			}
+		}
+	}
+	return nil
+}
+
+func behavioralDomainNominalVoltageIndex(requirement architecturesearch.Requirement) map[string]float64 {
+	domainNominalVoltages := make(map[string]float64, len(requirement.Requirements.Domains))
+	for _, domain := range requirement.Requirements.Domains {
+		domainNominalVoltages[domain.ID] = domain.NominalVoltageV
+	}
+	return domainNominalVoltages
+}
+
+func behavioralStartupPortVoltage(activeLevels map[string]string, domainNominalVoltages map[string]float64, port architecturesearch.Port, node string) (float64, bool) {
+	state := "inactive"
+	if port.Electrical != nil && strings.TrimSpace(port.Electrical.DefaultState) != "" {
+		state = strings.ToLower(strings.TrimSpace(port.Electrical.DefaultState))
+	}
+	activeLevel, control := activeLevels[node]
+	wantHigh := false
+	switch state {
+	case "low":
+	case "high":
+		wantHigh = true
+	case "inactive", "deasserted", "released":
+		wantHigh = control && activeLevel == "low"
+	case "active", "asserted":
+		if control {
+			wantHigh = activeLevel == "high"
+		} else {
+			wantHigh = true
+		}
+	default:
+		return 0, false
+	}
+	if !wantHigh {
+		return 0, true
+	}
+	if port.Electrical != nil && port.Electrical.NominalVoltageV != nil &&
+		finiteArchitectureValue(*port.Electrical.NominalVoltageV) && *port.Electrical.NominalVoltageV > 0 {
+		return *port.Electrical.NominalVoltageV, true
+	}
+	if nominal := domainNominalVoltages[port.Domain]; finiteArchitectureValue(nominal) && nominal > 0 {
+		return nominal, true
+	}
+	if port.Electrical != nil && port.Electrical.MaxVoltageV != nil &&
+		finiteArchitectureValue(*port.Electrical.MaxVoltageV) && *port.Electrical.MaxVoltageV > 0 {
+		return *port.Electrical.MaxVoltageV, true
+	}
+	return 0, false
+}
+
+func behavioralControlActiveLevelIndex(plan *simmodel.Plan) (map[string]string, error) {
+	activeLevels := map[string]string{}
+	for _, device := range plan.Devices {
+		level, node := "", ""
+		switch device.PrimitiveModel {
+		case simmodel.PrimitiveDirectionControlledTranslatorV1:
+			level, node = "low", resolvedDeviceTerminalNet(device, "OE")
+		case simmodel.PrimitiveBidirectionalOpenDrainTranslatorV1, simmodel.PrimitivePushPullTranslatorV1:
+			level, node = "high", resolvedDeviceTerminalNet(device, "OE")
+		case simmodel.PrimitiveReverseBlockingLoadSwitchV1:
+			level, node = "high", resolvedDeviceTerminalNet(device, "ON")
+		case simmodel.PrimitiveCurrentLimitingEFuseV1:
+			level, node = "high", resolvedDeviceTerminalNet(device, "SHDN")
+		}
+		if level == "" || node == "" {
+			continue
+		}
+		if existing := activeLevels[node]; existing != "" && existing != level {
+			return nil, fmt.Errorf(
+				"behavioral startup control node %q has conflicting active levels %q and %q",
+				node, existing, level,
+			)
+		}
+		activeLevels[node] = level
+	}
+	return activeLevels, nil
+}
+
+type behavioralControlState struct {
+	fixedValue    float64
+	referenceNode string
+}
+
+type resolvedBehavioralControl struct {
+	node     string
+	source   string
+	polarity float64
+	state    behavioralControlState
+}
+
+func configureBehavioralTransferControls(plan *simmodel.Plan, kind string, requirement architecturesearch.Requirement, bindings []closedloopsynthesis.SemanticBinding) error {
+	if !analysisUsesParticipantBehavioralStimulus(kind) {
+		return nil
+	}
+	targets := map[string]string{}
+	for _, binding := range bindings {
+		targets[binding.Kind+"\x00"+binding.ID] = binding.Target
+	}
+	nodeStates := map[string]behavioralControlState{}
+	translatorsByControls := directionControlledTranslatorControlIndex(*plan)
+	for _, objective := range requirement.Requirements.Objectives {
+		if objective.Capability != "logic_level_translation" {
+			continue
+		}
+		roles := map[string]architecturesearch.Binding{}
+		for _, binding := range objective.Bindings {
+			roles[binding.Role] = binding
+		}
+		enableNode := targets["port\x00"+roles["enable"].Port]
+		directionNode := targets["port\x00"+roles["direction_control"].Port]
+		if enableNode == "" || directionNode == "" {
+			continue
+		}
+		for _, behavior := range requirement.Requirements.BehavioralRequirements {
+			if behavior.Analysis != kind || behavior.Observation.Kind != "port" {
+				continue
+			}
+			observedRole := ""
+			for _, role := range []string{"side_a", "side_b"} {
+				if roles[role].Port == behavior.Observation.ID {
+					observedRole = role
+					break
+				}
+			}
+			if observedRole == "" {
+				continue
+			}
+			opposite := roles[oppositeBehavioralBindingRole(observedRole)]
+			if opposite.Participant == "" || opposite.ParticipantPort == "" {
+				continue
+			}
+			device, ok := directionControlledTranslatorForControls(translatorsByControls, enableNode, directionNode)
+			if !ok {
+				return fmt.Errorf(
+					"translated behavioral transfer objective %q requires one resolved direction-controlled translator at enable node %q and direction node %q",
+					objective.ID, enableNode, directionNode,
+				)
+			}
+			// The primitive contract is active-low OE. DIR low transfers B to A;
+			// DIR high transfers A to B. Startup remains fail-safe and is
+			// intentionally handled separately.
+			if err := addBehavioralControlState(nodeStates, enableNode, behavioralControlState{}); err != nil {
+				return err
+			}
+			directionState := behavioralControlState{}
+			if observedRole == "side_b" {
+				directionState.referenceNode = resolvedDeviceTerminalNet(device, "VCCA")
+				if directionState.referenceNode == "" {
+					return fmt.Errorf("direction-controlled A-to-B transfer objective %q requires a resolved VCCA terminal", objective.ID)
+				}
+			}
+			if err := addBehavioralControlState(nodeStates, directionNode, directionState); err != nil {
+				return err
+			}
+		}
+	}
+	if len(nodeStates) == 0 {
+		return nil
+	}
+	nodes := make([]string, 0, len(nodeStates))
+	for node := range nodeStates {
+		nodes = append(nodes, node)
+	}
+	slices.Sort(nodes)
+	controls := make([]resolvedBehavioralControl, 0, len(nodes))
+	for _, node := range nodes {
+		source, ok := uniquePlanSourceAtNode(plan, node)
+		if !ok {
+			return fmt.Errorf("behavioral transfer control at %q requires exactly one catalog-backed source", node)
+		}
+		polarity, ok := voltageSourcePolarityAtNode(plan, source, node)
+		if !ok {
+			return fmt.Errorf("behavioral transfer control at %q requires a catalog-backed voltage source", node)
+		}
+		controls = append(controls, resolvedBehavioralControl{
+			node: node, source: source, polarity: polarity, state: nodeStates[node],
+		})
+	}
+	for analysisIndex := range plan.Analyses {
+		sourceValues := map[string]float64{}
+		for _, control := range controls {
+			value := control.state.fixedValue
+			if control.state.referenceNode != "" {
+				var valueOK bool
+				value, valueOK = planSourceNodeVoltageForAnalysis(plan, analysisIndex, control.state.referenceNode)
+				if !valueOK || !finiteArchitectureValue(value) || value <= 0 {
+					return fmt.Errorf(
+						"direction-controlled A-to-B transfer requires one positive resolved VCCA source in analysis %q",
+						simulationAnalysisLabel(plan.Analyses[analysisIndex]),
+					)
+				}
+			}
+			if err := addBehavioralControlNodeValue(sourceValues, control.source, value*control.polarity); err != nil {
+				return err
+			}
+		}
+		applied := map[string]int{}
+		for excitationIndex := range plan.Analyses[analysisIndex].Excitations {
+			excitation := &plan.Analyses[analysisIndex].Excitations[excitationIndex]
+			value, exists := sourceValues[excitation.Component]
+			if !exists {
+				continue
+			}
+			// Behavioral direction and enable states are steady controls. Clear
+			// active waveform amplitudes while retaining timing/frequency
+			// metadata as traceable source provenance.
+			setSourceSteadyDC(excitation, value)
+			applied[excitation.Component]++
+		}
+		for source := range sourceValues {
+			if applied[source] != 1 {
+				return fmt.Errorf(
+					"behavioral transfer control source %q occurs %d times in resolved analysis %q; want exactly once",
+					source, applied[source], simulationAnalysisLabel(plan.Analyses[analysisIndex]),
+				)
+			}
+		}
+	}
+	return nil
+}
+
+func setSourceSteadyDC(excitation *simmodel.SourceExcitation, value float64) {
+	// SourceExcitation's active waveform families are AC, pulse, and sine.
+	// Their amplitude/value fields are all cleared here; phase, frequency,
+	// and timing fields are inert without an amplitude and remain provenance.
+	excitation.DCValue = value
+	excitation.ACMagnitude = 0
+	excitation.PulseInitialValue = 0
+	excitation.PulseValue = 0
+	excitation.SineAmplitude = 0
+}
+
+func simulationAnalysisLabel(analysis simmodel.Analysis) string {
+	if analysis.ID != "" {
+		return analysis.ID
+	}
+	return analysis.Kind
+}
+
+func addBehavioralControlState(states map[string]behavioralControlState, node string, state behavioralControlState) error {
+	if existing, exists := states[node]; exists && existing != state {
+		return fmt.Errorf("behavioral transfer requires conflicting control states at %q", node)
+	}
+	states[node] = state
+	return nil
+}
+
+func directionControlledTranslatorControlIndex(plan simmodel.Plan) map[string][]simmodel.ResolvedDevice {
+	index := map[string][]simmodel.ResolvedDevice{}
+	for _, device := range plan.Devices {
+		if device.PrimitiveModel != simmodel.PrimitiveDirectionControlledTranslatorV1 ||
+			resolvedDeviceTerminalNet(device, "DIR1") != resolvedDeviceTerminalNet(device, "DIR2") {
+			continue
+		}
+		key := resolvedDeviceTerminalNet(device, "OE") + "\x00" + resolvedDeviceTerminalNet(device, "DIR1")
+		index[key] = append(index[key], device)
+	}
+	return index
+}
+
+func directionControlledTranslatorForControls(index map[string][]simmodel.ResolvedDevice, enableNode, directionNode string) (simmodel.ResolvedDevice, bool) {
+	matches := index[enableNode+"\x00"+directionNode]
+	if len(matches) != 1 {
+		return simmodel.ResolvedDevice{}, false
+	}
+	return matches[0], true
+}
+
+func addBehavioralControlNodeValue(values map[string]float64, key string, value float64) error {
+	if existing, exists := values[key]; exists && math.Abs(existing-value) > 1e-12 {
+		return fmt.Errorf("behavioral transfer requires conflicting control states at %q", key)
+	}
+	values[key] = value
+	return nil
+}
+
+func planSourceNodeVoltageForAnalysis(plan *simmodel.Plan, analysisIndex int, node string) (float64, bool) {
+	if analysisIndex < 0 || analysisIndex >= len(plan.Analyses) {
+		return 0, false
+	}
+	source, ok := uniquePlanSourceAtNode(plan, node)
+	if !ok {
+		return 0, false
+	}
+	polarity, ok := voltageSourcePolarityAtNode(plan, source, node)
+	if !ok {
+		return 0, false
+	}
+	value := 0.0
+	occurrences := 0
+	for _, excitation := range plan.Analyses[analysisIndex].Excitations {
+		if excitation.Component == source {
+			value = excitation.DCValue * polarity
+			occurrences++
+		}
+	}
+	return value, occurrences == 1
+}
+
 func (resolver ArchitectureSimulationPlanResolver) resolveArchitectureCandidate(ctx context.Context, state closedloopsynthesis.CandidateState) (resolvedArchitectureCandidate, error) {
 	if resolver.GraphResolver == nil {
 		return resolvedArchitectureCandidate{}, fmt.Errorf("circuit-graph resolver is required")
@@ -586,7 +956,7 @@ func centerBehavioralInputBiasCached(plan simmodel.Plan, kind, primaryInputNode 
 	if !hasOpAmp && kind != simmodel.AnalysisThermal {
 		return plan, nil
 	}
-	source, ok := uniquePlanSourceAtNode(plan, primaryInputNode)
+	source, ok := uniquePlanSourceAtNode(&plan, primaryInputNode)
 	if !ok {
 		return plan, nil
 	}
@@ -684,6 +1054,13 @@ type behavioralTransientStimulus struct {
 	PeriodicFrequencyHz float64
 }
 
+type behavioralParticipantStimulus struct {
+	Participant  architecturesearch.Participant
+	Port         architecturesearch.ParticipantPort
+	ObservedPort string
+	SemanticID   string
+}
+
 func configureBehavioralMuteState(plan simmodel.Plan, kind string, control closedloopsynthesis.SimulationExcitationOverride, available bool) (simmodel.Plan, error) {
 	if !available || kind == simmodel.AnalysisStartup {
 		return plan, nil
@@ -712,6 +1089,9 @@ func behavioralTransientStimulusForRequirement(requirement architecturesearch.Re
 		}
 	}
 	if !requiresStimulus {
+		return behavioralTransientStimulus{}, false
+	}
+	if behavioralStimulusProvidedByParticipant(requirement) {
 		return behavioralTransientStimulus{}, false
 	}
 	port, node, ok := behavioralPrimaryInputPort(requirement, bindings)
@@ -780,11 +1160,11 @@ func configureBehavioralTransientStimulus(plan simmodel.Plan, kind string, stimu
 	if (kind != simmodel.AnalysisTransient && kind != simmodel.AnalysisElectrothermal) || !available {
 		return plan, nil
 	}
-	source, ok := uniquePlanSourceAtNode(plan, stimulus.Node)
+	source, ok := uniquePlanSourceAtNode(&plan, stimulus.Node)
 	if !ok {
 		return simmodel.Plan{}, fmt.Errorf("transient stimulus %q requires exactly one catalog-backed source at its resolved semantic input", stimulus.SemanticID)
 	}
-	polarity, ok := voltageSourcePolarityAtNode(plan, source, stimulus.Node)
+	polarity, ok := voltageSourcePolarityAtNode(&plan, source, stimulus.Node)
 	if !ok {
 		return simmodel.Plan{}, fmt.Errorf("transient stimulus %q requires a catalog-backed voltage source at its resolved semantic input", stimulus.SemanticID)
 	}
@@ -826,7 +1206,7 @@ func configureBehavioralTransientStimulus(plan simmodel.Plan, kind string, stimu
 	return simmodel.Plan{}, fmt.Errorf("transient stimulus %q has no resolved source excitation", stimulus.SemanticID)
 }
 
-func voltageSourcePolarityAtNode(plan simmodel.Plan, component, node string) (float64, bool) {
+func voltageSourcePolarityAtNode(plan *simmodel.Plan, component, node string) (float64, bool) {
 	for _, device := range plan.Devices {
 		if device.Component != component {
 			continue
@@ -948,6 +1328,11 @@ func operatingHarnessDevices(requirement architecturesearch.Requirement, binding
 	if err != nil {
 		return nil, err
 	}
+	behavioralHarness, err := participantBehavioralOutputHarnessDevices(requirement, targets, resolvedPlan, analysisKind)
+	if err != nil {
+		return nil, err
+	}
+	controlHarness = append(controlHarness, behavioralHarness...)
 	eventHarness, err := voltageEventHarnessDevices(requirement, targets, ground, resolvedPlan, analysisKind)
 	if err != nil {
 		return nil, err
@@ -991,6 +1376,7 @@ func operatingHarnessDevices(requirement architecturesearch.Requirement, binding
 		var terminals [2]string
 		source := false
 		startupLoadResistance := 0.0
+		loadCurrentMaximum, loadCurrentMinimum := 0.0, 0.0
 		target, ok := operatingConditionSemanticTarget(condition, targets)
 		if !ok {
 			return nil, fmt.Errorf("%s target %q does not resolve to a semantic net", condition.Axis, condition.Target)
@@ -1044,6 +1430,33 @@ func operatingHarnessDevices(requirement architecturesearch.Requirement, binding
 				positive = seriesNode
 			}
 		}
+		if condition.Axis == "load_current" {
+			var maximumOK, minimumOK bool
+			loadCurrentMaximum, maximumOK = maximumPositiveOperatingValue(condition)
+			loadCurrentMinimum, minimumOK = minimumNonnegativeOperatingValue(condition)
+			if !maximumOK || !minimumOK {
+				return nil, fmt.Errorf("load_current target %q requires bounded nonnegative current corners", condition.Target)
+			}
+			supportCurrent, supportErr := parallelOperatingSupportCurrent(requirement, condition, resolvedPlan, positive, negative)
+			if supportErr != nil {
+				return nil, supportErr
+			}
+			if supportCurrent > loadCurrentMinimum+1e-12 {
+				return nil, fmt.Errorf("load_current target %q has %.12g A of catalog-backed parallel support load, above its %.12g A minimum total-load corner", condition.Target, supportCurrent, loadCurrentMinimum)
+			}
+			loadCurrentMaximum -= supportCurrent
+			loadCurrentMinimum -= supportCurrent
+			if loadCurrentMaximum <= 0 {
+				return nil, fmt.Errorf("load_current target %q leaves no positive external-load budget after catalog-backed parallel support loads", condition.Target)
+			}
+			if !source {
+				nominalVoltage, voltageOK := operatingConditionNominalVoltage(requirement, condition)
+				if !voltageOK || !finiteArchitectureValue(nominalVoltage) || nominalVoltage <= 0 {
+					return nil, fmt.Errorf("load_current target %q requires a positive nominal domain voltage", condition.Target)
+				}
+				startupLoadResistance = nominalVoltage / loadCurrentMaximum
+			}
+		}
 		device := circuitgraph.SimulationHarnessDevice{
 			InstanceID: instanceID, CatalogID: catalogID,
 			Connections: []simmodel.ConnectionEvidence{{Function: terminals[0], Net: positive}, {Function: terminals[1], Net: negative}},
@@ -1060,8 +1473,8 @@ func operatingHarnessDevices(requirement architecturesearch.Requirement, binding
 		}
 		entry := operatingHarnessDevice{Device: device, Source: source}
 		if condition.Axis == "load_current" {
-			entry.DefaultValue, entry.HasDefaultValue = maximumPositiveOperatingValue(condition)
-			entry.InitialValue, entry.HasInitialValue = minimumNonnegativeOperatingValue(condition)
+			entry.DefaultValue, entry.HasDefaultValue = loadCurrentMaximum, true
+			entry.InitialValue, entry.HasInitialValue = loadCurrentMinimum, true
 		}
 		result = append(result, entry)
 	}
@@ -1069,6 +1482,75 @@ func operatingHarnessDevices(requirement architecturesearch.Requirement, binding
 		return strings.Compare(left.Device.InstanceID, right.Device.InstanceID)
 	})
 	return result, nil
+}
+
+func parallelOperatingSupportCurrent(
+	requirement architecturesearch.Requirement,
+	condition architecturesearch.OperatingCondition,
+	plan *simmodel.Plan,
+	positive, negative string,
+) (float64, error) {
+	if plan == nil {
+		return 0, nil
+	}
+	voltage, voltageOK, total := 0.0, false, 0.0
+	requireVoltage := func() (float64, error) {
+		if !voltageOK {
+			voltage, voltageOK = operatingConditionNominalVoltage(requirement, condition)
+		}
+		if !voltageOK {
+			return 0, fmt.Errorf("load_current target %q requires a positive nominal domain voltage to budget parallel support loads", condition.Target)
+		}
+		return voltage, nil
+	}
+	for _, device := range plan.Devices {
+		terminals := map[string]string{}
+		for _, terminal := range device.Terminals {
+			terminals[terminal.Terminal] = terminal.Net
+		}
+		spans := func(first, second string) bool {
+			return terminals[first] == positive && terminals[second] == negative ||
+				terminals[first] == negative && terminals[second] == positive
+		}
+		switch device.PrimitiveModel {
+		case simmodel.PrimitiveResistorV1:
+			if device.ValueSI != nil && *device.ValueSI > 0 && spans("A", "B") {
+				operatingVoltage, err := requireVoltage()
+				if err != nil {
+					return 0, err
+				}
+				total += operatingVoltage / *device.ValueSI
+			}
+		case simmodel.PrimitiveBidirectionalTVSV1:
+			if !spans("CATHODE", "ANODE") {
+				continue
+			}
+			operatingVoltage, err := requireVoltage()
+			if err != nil {
+				return 0, err
+			}
+			breakdown, breakdownOK := simulationModelParameter(device.ModelParameters, "breakdown_voltage_v")
+			offResistance, resistanceOK := simulationModelParameter(device.ModelParameters, "off_resistance_ohm")
+			if !breakdownOK || !resistanceOK || breakdown <= operatingVoltage || offResistance <= 0 {
+				return 0, fmt.Errorf("load_current target %q has an unbounded or active parallel transient clamp at its nominal voltage", condition.Target)
+			}
+			total += operatingVoltage / offResistance
+		}
+	}
+	return total, nil
+}
+
+func operatingConditionNominalVoltage(requirement architecturesearch.Requirement, condition architecturesearch.OperatingCondition) (float64, bool) {
+	domainID, ok := operatingConditionTargetDomain(requirement, condition.Target)
+	if !ok {
+		return 0, false
+	}
+	for _, domain := range requirement.Requirements.Domains {
+		if domain.ID == domainID && finiteArchitectureValue(domain.NominalVoltageV) && domain.NominalVoltageV > 0 {
+			return domain.NominalVoltageV, true
+		}
+	}
+	return 0, false
 }
 
 func operatingHarnessSeriesNode(target string) string {
@@ -1368,6 +1850,168 @@ func participantControlOutputHarnessDevices(requirement architecturesearch.Requi
 	return result, nil
 }
 
+func participantBehavioralOutputHarnessDevices(requirement architecturesearch.Requirement, targets map[string]string, resolvedPlan *simmodel.Plan, analysisKind string) ([]operatingHarnessDevice, error) {
+	domains := make(map[string]architecturesearch.Domain, len(requirement.Requirements.Domains))
+	for _, domain := range requirement.Requirements.Domains {
+		domains[domain.ID] = domain
+	}
+	seen := map[string]bool{}
+	var result []operatingHarnessDevice
+	for _, stimulus := range behavioralParticipantStimuli(requirement) {
+		target := targets["participant_port\x00"+stimulus.SemanticID]
+		if target == "" {
+			return nil, fmt.Errorf("behavioral participant output %q does not resolve to a semantic net", stimulus.SemanticID)
+		}
+		referenceDomain := referenceDomainForPower(requirement, stimulus.Participant.Domain)
+		if referenceDomain == "" {
+			referenceDomain = firstReferenceDomain(requirement)
+		}
+		ground := targets["domain\x00"+referenceDomain]
+		if ground == "" || target == ground {
+			return nil, fmt.Errorf("behavioral participant output %q requires a distinct resolved reference domain", stimulus.SemanticID)
+		}
+		if resolvedPlan != nil && planHasVoltageSourceAtNode(*resolvedPlan, target) {
+			continue
+		}
+		instanceID := closedloopsynthesis.OperatingHarnessComponentID("participant_output", stimulus.SemanticID)
+		if seen[instanceID] {
+			continue
+		}
+		high := domains[stimulus.Participant.Domain].NominalVoltageV
+		if !finiteArchitectureValue(high) || high <= 0 {
+			return nil, fmt.Errorf("behavioral participant output %q requires a positive nominal domain voltage", stimulus.SemanticID)
+		}
+		if analysisKind == simmodel.AnalysisStartup {
+			high = 0
+		}
+		seen[instanceID] = true
+		result = append(result, operatingHarnessDevice{
+			Source: true, DefaultValue: high, HasDefaultValue: true,
+			TransientEdge: analysisKind == simmodel.AnalysisTransient || analysisKind == simmodel.AnalysisElectrothermal,
+			Device: circuitgraph.SimulationHarnessDevice{
+				InstanceID: instanceID,
+				CatalogID:  "source.voltage.connector.1x02",
+				Connections: []simmodel.ConnectionEvidence{
+					{Function: "POSITIVE", Net: target},
+					{Function: "NEGATIVE", Net: ground},
+				},
+			},
+		})
+	}
+	slices.SortStableFunc(result, func(left, right operatingHarnessDevice) int {
+		return strings.Compare(left.Device.InstanceID, right.Device.InstanceID)
+	})
+	return result, nil
+}
+
+func behavioralStimulusProvidedByParticipant(requirement architecturesearch.Requirement) bool {
+	stimuli := behavioralParticipantStimuli(requirement)
+	if len(stimuli) == 0 {
+		return false
+	}
+	provided := make(map[string]bool, len(stimuli))
+	for _, stimulus := range stimuli {
+		provided[stimulus.ObservedPort] = true
+	}
+	foundObservation := false
+	for _, behavior := range requirement.Requirements.BehavioralRequirements {
+		if !analysisUsesParticipantBehavioralStimulus(behavior.Analysis) || behavior.Observation.Kind != "port" {
+			continue
+		}
+		foundObservation = true
+		if !provided[behavior.Observation.ID] {
+			return false
+		}
+	}
+	return foundObservation
+}
+
+func behavioralParticipantStimuli(requirement architecturesearch.Requirement) []behavioralParticipantStimulus {
+	observed := map[string]bool{}
+	for _, behavior := range requirement.Requirements.BehavioralRequirements {
+		if analysisUsesParticipantBehavioralStimulus(behavior.Analysis) && behavior.Observation.Kind == "port" {
+			observed[behavior.Observation.ID] = true
+		}
+	}
+	participants := make(map[string]architecturesearch.Participant, len(requirement.Requirements.Participants))
+	for _, participant := range requirement.Requirements.Participants {
+		participants[participant.ID] = participant
+	}
+	seen := map[string]bool{}
+	var result []behavioralParticipantStimulus
+	for _, objective := range requirement.Requirements.Objectives {
+		for _, observedBinding := range objective.Bindings {
+			if observedBinding.Port == "" || !observed[observedBinding.Port] {
+				continue
+			}
+			oppositeRole := oppositeBehavioralBindingRole(observedBinding.Role)
+			if oppositeRole == "" {
+				continue
+			}
+			for _, binding := range objective.Bindings {
+				if binding.Role != oppositeRole || binding.Participant == "" || binding.ParticipantPort == "" {
+					continue
+				}
+				participant, ok := participants[binding.Participant]
+				if !ok {
+					continue
+				}
+				for _, port := range participant.RequiredPorts {
+					if port.ID != binding.ParticipantPort ||
+						(port.Direction != "source" && port.Direction != "bidirectional") ||
+						(port.Kind != "digital_logic" && port.Kind != "digital_bus") ||
+						(port.Protocol != nil && strings.TrimSpace(port.Protocol.Mode) != "" && !strings.EqualFold(strings.TrimSpace(port.Protocol.Mode), "push_pull")) {
+						continue
+					}
+					semanticID := participant.ID + "." + port.ID
+					key := observedBinding.Port + "\x00" + semanticID
+					if seen[key] {
+						continue
+					}
+					seen[key] = true
+					result = append(result, behavioralParticipantStimulus{
+						Participant: participant, Port: port, ObservedPort: observedBinding.Port, SemanticID: semanticID,
+					})
+				}
+			}
+		}
+	}
+	slices.SortStableFunc(result, func(left, right behavioralParticipantStimulus) int {
+		if order := strings.Compare(left.ObservedPort, right.ObservedPort); order != 0 {
+			return order
+		}
+		return strings.Compare(left.SemanticID, right.SemanticID)
+	})
+	return result
+}
+
+func analysisUsesParticipantBehavioralStimulus(analysis string) bool {
+	return analysis == simmodel.AnalysisTransient || analysis == simmodel.AnalysisElectrothermal
+}
+
+func oppositeBehavioralBindingRole(role string) string {
+	switch role {
+	case "input":
+		return "output"
+	case "output":
+		return "input"
+	case "side_a":
+		return "side_b"
+	case "side_b":
+		return "side_a"
+	case "side_a_forward":
+		return "side_b_forward"
+	case "side_b_forward":
+		return "side_a_forward"
+	case "side_a_reverse":
+		return "side_b_reverse"
+	case "side_b_reverse":
+		return "side_a_reverse"
+	default:
+		return ""
+	}
+}
+
 func startupLoadResistanceOhm(requirement architecturesearch.Requirement, condition architecturesearch.OperatingCondition) (float64, error) {
 	current, ok := maximumPositiveOperatingValue(condition)
 	if !ok {
@@ -1581,6 +2225,12 @@ func operatingConditionReferenceTarget(requirement architecturesearch.Requiremen
 	if !ok {
 		return "", false
 	}
+	if referenceID, ok := objectiveReferenceDomainForOperatingLoad(requirement, domainID); ok {
+		target := targets["domain\x00"+referenceID]
+		if target != "" {
+			return target, true
+		}
+	}
 	for _, domain := range requirement.Requirements.Domains {
 		if domain.ID != domainID {
 			continue
@@ -1591,6 +2241,52 @@ func operatingConditionReferenceTarget(requirement architecturesearch.Requiremen
 		}
 		target := targets["domain\x00"+referenceID]
 		return target, target != ""
+	}
+	return "", false
+}
+
+func objectiveReferenceDomainForOperatingLoad(requirement architecturesearch.Requirement, powerDomain string) (string, bool) {
+	portDomains := make(map[string]string, len(requirement.Requirements.Ports))
+	referencePorts := map[string]string{}
+	for _, port := range requirement.Requirements.Ports {
+		portDomains[port.ID] = port.Domain
+		if port.Kind == "reference" {
+			referencePorts[port.ID] = port.Domain
+		}
+	}
+	signalDomains := make(map[string]string, len(requirement.Requirements.Signals))
+	for _, signal := range requirement.Requirements.Signals {
+		signalDomains[signal.ID] = signal.Domain
+	}
+	candidates := map[string]bool{}
+	for _, objective := range requirement.Requirements.Objectives {
+		touchesDomain := false
+		for _, binding := range objective.Bindings {
+			if binding.Port != "" && portDomains[binding.Port] == powerDomain ||
+				binding.Signal != "" && signalDomains[binding.Signal] == powerDomain {
+				touchesDomain = true
+				break
+			}
+		}
+		if !touchesDomain {
+			continue
+		}
+		for _, binding := range objective.Bindings {
+			switch binding.Role {
+			case "reference", "ground", "return":
+			default:
+				continue
+			}
+			if referenceDomain := referencePorts[binding.Port]; referenceDomain != "" {
+				candidates[referenceDomain] = true
+			}
+		}
+	}
+	if len(candidates) != 1 {
+		return "", false
+	}
+	for candidate := range candidates {
+		return candidate, true
 	}
 	return "", false
 }
@@ -1907,7 +2603,7 @@ func derivedGraphWorkflowIntent(requirement architecturesearch.Requirement, base
 	}
 	if kind == simmodel.AnalysisACSweep {
 		analysis = behavioralBoundedACSweep(requirement, analysis)
-		component, ok := uniquePlanSourceAtNode(base, primaryInputNode)
+		component, ok := uniquePlanSourceAtNode(&base, primaryInputNode)
 		if !ok && len(inputSourceFallback) != 0 && inputSourceFallback[0] != "" {
 			component, ok = inputSourceFallback[0], true
 		}
@@ -2112,7 +2808,7 @@ func simulationAnalysisHasDynamicExcitation(analysis simmodel.Analysis) bool {
 }
 
 func derivedBehavioralDistortionAnalysis(requirement architecturesearch.Requirement, base simmodel.Plan, analysis simmodel.Analysis, primaryInputNode string, voltageGuard float64, inputSourceFallback ...string) (simmodel.Analysis, error) {
-	component, ok := uniquePlanSourceAtNode(base, primaryInputNode)
+	component, ok := uniquePlanSourceAtNode(&base, primaryInputNode)
 	fallback := false
 	if !ok && len(inputSourceFallback) != 0 && inputSourceFallback[0] != "" {
 		component, ok, fallback = inputSourceFallback[0], true, true
@@ -2122,7 +2818,7 @@ func derivedBehavioralDistortionAnalysis(requirement architecturesearch.Requirem
 	}
 	polarity := 1.0
 	if !fallback {
-		polarity, ok = voltageSourcePolarityAtNode(base, component, primaryInputNode)
+		polarity, ok = voltageSourcePolarityAtNode(&base, component, primaryInputNode)
 	}
 	if !ok {
 		return simmodel.Analysis{}, fmt.Errorf("distortion analysis requires a catalog-backed voltage source at the resolved primary input")
@@ -2283,6 +2979,7 @@ func behavioralPrimaryInputPort(requirement architecturesearch.Requirement, bind
 			continue
 		}
 		ingress, roleScore := port.Direction == "sink", 0
+		controlOnly, hasNonControlBinding := false, false
 		for _, objective := range requirement.Requirements.Objectives {
 			boundToPort, inputRole, producesSignal, consumesSignal := false, false, false, false
 			for _, binding := range objective.Bindings {
@@ -2292,8 +2989,12 @@ func behavioralPrimaryInputPort(requirement architecturesearch.Requirement, bind
 					case "input", "signal", "sense":
 						inputRole = true
 						roleScore = max(roleScore, 5)
-					case "control", "enable", "mute", "bias":
+						hasNonControlBinding = true
+					case "control", "enable", "mute", "bias", "shutdown", "direction_control":
+						controlOnly = true
 						roleScore = min(roleScore, -5)
+					default:
+						hasNonControlBinding = true
 					}
 				}
 				if binding.Signal == "" || signalKinds[binding.Signal] == "power" || signalKinds[binding.Signal] == "reference" {
@@ -2309,6 +3010,9 @@ func behavioralPrimaryInputPort(requirement architecturesearch.Requirement, bind
 			if boundToPort && (producesSignal && !consumesSignal || port.Direction == "bidirectional" && inputRole) {
 				ingress = true
 			}
+		}
+		if controlOnly && !hasNonControlBinding {
+			continue
 		}
 		if !ingress {
 			continue
@@ -2337,7 +3041,7 @@ func behavioralPrimaryInputPort(requirement architecturesearch.Requirement, bind
 	return candidates[0].port, candidates[0].node, true
 }
 
-func uniquePlanSourceAtNode(plan simmodel.Plan, node string) (string, bool) {
+func uniquePlanSourceAtNode(plan *simmodel.Plan, node string) (string, bool) {
 	if node == "" {
 		return "", false
 	}

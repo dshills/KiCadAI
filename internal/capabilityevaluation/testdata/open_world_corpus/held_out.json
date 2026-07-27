@@ -1,0 +1,91 @@
+{
+  "schema": "kicadai.open-world-behavior-corpus.v1",
+  "version": 1,
+  "role": "held_out",
+  "cases": [
+    {
+      "id": "heldout_analog_001",
+      "domain": "analog",
+      "safety_impact": "review_required",
+      "prompt": "Drive three simultaneous sample inputs from one 1 MHz timing reference. Each input adds 18 pF and every sample edge must settle monotonically within 120 ns.",
+      "source_sha256": "97b5b5e307b58bbebe9b2c3ff050d8ca0e5a027508ab8388d2506c6565b91d0c"
+    },
+    {
+      "id": "heldout_analog_002",
+      "domain": "analog",
+      "safety_impact": "safety_critical",
+      "prompt": "Transfer a precision control value across a functional isolation boundary while keeping the two returns independent. A single loss-of-power event must force the receiving side to a bounded safe value.",
+      "source_sha256": "965eb13f68f4d6c459ccc76fb1d8db1f2e4e9c6e57cc1b74b2f1b48925f8e5e6"
+    },
+    {
+      "id": "heldout_digital_001",
+      "domain": "digital",
+      "safety_impact": "review_required",
+      "prompt": "Distribute a 12 MHz clock to one controller and four logic receivers with 55 pF aggregate loading. Bound edge rate, startup state, and receiver voltage compatibility.",
+      "source_sha256": "aff1ae792c2c8842a5d7b3dfc4c4956b9086bd42ae50cab8b02cc0b24a023a3d"
+    },
+    {
+      "id": "heldout_digital_002",
+      "domain": "digital",
+      "safety_impact": "safety_relevant",
+      "prompt": "Carry reset, interrupt, and enable signals between 1.2 V and 3.3 V domains. Reset and enable are one-way, interrupt may be open-drain, and neither side may back-power the other.",
+      "source_sha256": "00435d902aaf2ebe77a5a5fd0de3a5f12e42d1965a7051aa4b5456f51c1fc5ec"
+    },
+    {
+      "id": "heldout_mcu_001",
+      "domain": "mcu",
+      "safety_impact": "safety_relevant",
+      "prompt": "Support two-wire programming and runtime debugging for a low-power controller. The same pins serve application GPIO after startup and the external tool may remain connected while the target is unpowered.",
+      "source_sha256": "a9f5ee51d445b30176aa8053ec6ff1a2b14dfa52440cf0a19c9d73f7248cee31"
+    },
+    {
+      "id": "heldout_mcu_002",
+      "domain": "mcu",
+      "safety_impact": "review_required",
+      "prompt": "Provide a four-signal debug connection for a 1.8 V controller while a 3.3 V host is attached. Preserve boot-state requirements and prevent contention with shared application functions.",
+      "source_sha256": "d763fa3ea21dd863faefa6f9e021316ba5e46f016f6934add01d73838b1504ab"
+    },
+    {
+      "id": "heldout_mixed_signal_001",
+      "domain": "mixed_signal",
+      "safety_impact": "safety_critical",
+      "prompt": "Send a 16-bit control value and return a fault indication across a 1 kV functional isolation boundary. Both sides can start independently and any missing supply must produce a defined safe state.",
+      "source_sha256": "5b1386f7a9cc234ab2695b8a4c16479b430e673fee5053aa84f908e7d63f2c23"
+    },
+    {
+      "id": "heldout_mixed_signal_002",
+      "domain": "mixed_signal",
+      "safety_impact": "safety_relevant",
+      "prompt": "Acquire a 5 V serial sensor from a 1.8 V controller at 8 MHz while also accepting a 3.3 V open-drain alarm. Enforce direction, loading, supply-loss, and startup-state limits.",
+      "source_sha256": "4638b5124aad945aadd28d9bbb00b043c3e2b8699bf6079b81ed9e135e3f4fd9"
+    },
+    {
+      "id": "heldout_power_001",
+      "domain": "power",
+      "safety_impact": "safety_critical",
+      "prompt": "Generate an isolated 12 V rail at 250 mA from a 24 V industrial source. Limit inrush, tolerate output short circuit, and discharge the output below 2 V within 500 ms after shutdown.",
+      "source_sha256": "6c0b0d3a1e6c336bd24295311889205eb098f582044adf643d33f3c1d218efd1"
+    },
+    {
+      "id": "heldout_power_002",
+      "domain": "power",
+      "safety_impact": "safety_relevant",
+      "prompt": "Generate 1.8 V at 1.5 A from a 3.3 V source. Hold deviation within 4 percent during a 1 A load step and prove junction temperature and transient current remain within reviewed limits.",
+      "source_sha256": "f6b6e69ddf23cd3cd0f82040e0c654766722689a0f0e99aa0c9a51154eb87079"
+    },
+    {
+      "id": "heldout_sensor_001",
+      "domain": "sensor",
+      "safety_impact": "review_required",
+      "prompt": "Connect six open-drain sensors split between 1.8 V and 3.3 V supplies at 1 MHz. Aggregate bus capacitance is 360 pF and disconnected sensor branches must not disable the remaining bus.",
+      "source_sha256": "0dcbbbe874ebb0fb7e2fb1e27ac6b86f237f01af3779b0956b65724d562ea006"
+    },
+    {
+      "id": "heldout_sensor_002",
+      "domain": "sensor",
+      "safety_impact": "safety_relevant",
+      "prompt": "Read a 5 V push-pull motion sensor from a 1.8 V controller over a 1 m cable at 4 MHz. The controller may be unpowered while the sensor remains active.",
+      "source_sha256": "56093a96413bb0aa1fbfc16995fbc6ee3f7e9a5771eb0306aa1a4dbb95406c47"
+    }
+  ]
+}

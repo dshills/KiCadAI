@@ -220,7 +220,7 @@ func memorylessNonlinearPrimitive(modelID string) bool {
 	switch strings.TrimSpace(modelID) {
 	case PrimitiveComparatorOpenCollectorV1, PrimitiveBidirectionalTVSV1,
 		PrimitiveUnidirectionalZenerV1, PrimitiveDiodeShockleyV1,
-		PrimitiveNMOSSwitchV1, PrimitivePMOSSwitchV1, PrimitiveReverseBlockingLoadSwitchV1,
+		PrimitiveNMOSSwitchV1, PrimitivePMOSSwitchV1, PrimitiveReverseBlockingLoadSwitchV1, PrimitiveCurrentLimitingEFuseV1,
 		PrimitiveMCUStaticSupplyLoadV1, PrimitiveSensorStaticSupplyLoadV1,
 		PrimitiveBJTNPNV1, PrimitiveBJTPNPV1:
 		return true
@@ -232,9 +232,9 @@ func memorylessNonlinearPrimitive(modelID string) bool {
 func idealNoiseBoundaryPrimitive(modelID string) bool {
 	switch strings.TrimSpace(modelID) {
 	case PrimitiveVoltageSourceV1, PrimitiveConnectorVoltageSourceV1, PrimitiveCurrentSourceV1,
-		PrimitiveAdjustableLinearRegulatorV1, PrimitiveFixedLinearRegulatorV1,
+		PrimitiveAdjustableLinearRegulatorV1, PrimitiveFixedLinearRegulatorV1, PrimitiveFixedBuckModuleV1,
 		PrimitiveFloatingAdjustableRegulatorV1, PrimitiveProgrammableCurrentSourceV1,
-		PrimitiveShuntVoltageReferenceV1, PrimitiveSingleOutputIsolatedConverterV1, PrimitiveDualOutputIsolatedConverterV1,
+		PrimitiveShuntVoltageReferenceV1, PrimitiveSingleOutputIsolatedConverterV1, PrimitiveProtectedIsolatedConverterV1, PrimitiveDualOutputIsolatedConverterV1,
 		PrimitiveFixedClockSourceV1, PrimitiveResistorProgrammedClockSourceV1:
 		return true
 	default:

@@ -263,6 +263,15 @@ from validation feedback to safe automatic repair.
   deterministic alternative selection, and bounded repair feed the normal
   physical workflow. All six pass local installed-KiCad promotion, and two
   independent clean roots produce the same 418-file content-addressed bundle.
+- Open-world capability evaluation now freezes separate discovery and held-out
+  behavior-only corpora, ranks normalized failure clusters by frequency,
+  safety, and downstream reuse, and verifies improvement without mutating the
+  baseline. Held-out readiness improves from 1/12 to 6/12 through reusable
+  clock-fanout, translated-debug, push-pull translation, functional-isolation,
+  and protected isolated-power support. All five promoted cases pass local
+  installed-KiCad ERC/strict DRC, routing/connectivity, writer correctness,
+  zero-difference round trip, deterministic replay, and content-addressed
+  promotion. Stable unsupported outcomes remain explicit.
 - README and focused docs for current CLI capabilities.
 
 ### Still Not Ready

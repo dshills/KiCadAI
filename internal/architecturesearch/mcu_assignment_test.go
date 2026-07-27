@@ -81,6 +81,64 @@ func TestSolveMCUAssignmentUsesGPIOForAVRSPICardSelect(t *testing.T) {
 	}
 }
 
+func TestSolveMCUAssignmentBindsProgrammingPortToSelectedInterface(t *testing.T) {
+	record := architectureMCURecord(t, "mcu.st.stm32g031k8t6.lqfp32")
+	request := ProviderRequest{Capability: "programmable_controller", Ports: []RoleContract{
+		providerRole("debug", "digital_bus", "bidirectional", 0, 1.8),
+	}}
+	request.Ports[0].Contract.Protocol = &Protocol{Name: "swd_target", Mode: "push_pull", MaxFrequencyHz: 4_000_000}
+	assignment, err := solveMCUAssignment(record, mcuDemandsFromRequest(request), "swd", "internal_hsi_pll")
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := map[string]string{"reset": "PF2", "swclk": "PA14", "swdio": "PA13"}
+	for _, pin := range assignment.Pins {
+		if expected, ok := want[pin.Lane]; ok {
+			if pin.Function != expected || pin.Kind != "programming" || pin.Instance != "swd" {
+				t.Fatalf("programming binding %s = %#v, want function %s", pin.Lane, pin, expected)
+			}
+			delete(want, pin.Lane)
+		}
+	}
+	if len(want) != 0 {
+		t.Fatalf("selected SWD mapping omitted lanes %#v: %#v", want, assignment.Pins)
+	}
+	compositionLanes := map[string]string{}
+	for _, binding := range mcuRealizationBindings(request.Ports, "controller", assignment, record) {
+		compositionLanes[binding.Function] = binding.Lane
+	}
+	if !reflect.DeepEqual(compositionLanes, map[string]string{
+		"PF2": "channel_01", "PA14": "channel_02", "PA13": "channel_03",
+	}) {
+		t.Fatalf("SWD semantic signals did not map to deterministic unnamed-bus lanes: %#v", compositionLanes)
+	}
+}
+
+func TestMCUProgrammingAssignmentRequiresSelectedPackagePad(t *testing.T) {
+	record := architectureMCURecord(t, "mcu.st.stm32g031k8t6.lqfp32")
+	programming := record.MCU.ProgrammingInterfaces[0]
+	for _, candidate := range record.MCU.ProgrammingInterfaces {
+		if candidate.ID == "swd" {
+			programming = candidate
+			break
+		}
+	}
+	pads := mcuPackagePads(record)
+	delete(pads, programming.Signals[0].PinFunction)
+	assignments, matched, err := mcuProgrammingDemandAssignments(
+		record.MCU.Pins, pads, programming,
+		mcuRoleDemand{Role: "debug", Kind: "swd", Direction: "bidirectional", Mode: "push_pull"},
+	)
+	if !matched || err == nil || len(assignments) != 0 {
+		t.Fatalf("missing programming pad = assignments %#v, matched %t, error %v", assignments, matched, err)
+	}
+	var assignmentErr *mcuAssignmentError
+	if !errors.As(err, &assignmentErr) || assignmentErr.Code != CodeMCUProgrammingUnavailable ||
+		!strings.Contains(assignmentErr.Text, "package pin map") {
+		t.Fatalf("missing programming pad error = %#v", err)
+	}
+}
+
 func TestMCUPinModeCompatibleRequiresPushPullForAnySource(t *testing.T) {
 	inputOnly := components.MCUPinEvidence{ElectricalModes: []string{"input"}}
 	if mcuPinModeCompatible(inputOnly, mcuRoleDemand{Kind: "uart", Direction: "source"}) {

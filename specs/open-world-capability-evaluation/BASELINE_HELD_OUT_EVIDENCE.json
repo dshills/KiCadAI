@@ -1,0 +1,211 @@
+{
+  "schema": "kicadai.open-world-terminal-evidence.v1",
+  "version": 1,
+  "corpus_role": "held_out",
+  "corpus_sha256": "36bd42c317ce58d525fc5537c0eaae438ff9c911188107cc08d621b74c468725",
+  "cases": [
+    {
+      "id": "heldout_analog_001",
+      "domain": "analog",
+      "safety_impact": "review_required",
+      "outcome": "unsupported",
+      "observations": [
+        {
+          "capability": "clock_fanout_loading",
+          "outcome": "unsupported",
+          "stage": "architecture_search",
+          "code": "CAPABILITY_UNSUPPORTED",
+          "path": "requirements.sample_clock",
+          "reason": "the sample fanout lacks aggregate loading and monotonic-settling qualification",
+          "required_evidence": ["reviewed endpoint loading and settling evidence"]
+        }
+      ]
+    },
+    {
+      "id": "heldout_analog_002",
+      "domain": "analog",
+      "safety_impact": "safety_critical",
+      "outcome": "needs_clarification",
+      "observations": [
+        {
+          "capability": "isolation_operating_bounds",
+          "outcome": "needs_clarification",
+          "stage": "behavioral_compilation",
+          "code": "CLARIFICATION_REQUIRED",
+          "path": "requirements.isolation.precision",
+          "reason": "the required transfer accuracy and isolation working voltage are not bounded",
+          "required_evidence": ["user-supplied precision and working-voltage bounds"]
+        }
+      ]
+    },
+    {
+      "id": "heldout_digital_001",
+      "domain": "digital",
+      "safety_impact": "review_required",
+      "outcome": "unsupported",
+      "observations": [
+        {
+          "capability": "clock_fanout_loading",
+          "outcome": "unsupported",
+          "stage": "architecture_search",
+          "code": "CAPABILITY_UNSUPPORTED",
+          "path": "requirements.clock_distribution",
+          "reason": "no installed clock endpoint architecture proves five receivers and 55 pF aggregate loading",
+          "required_evidence": ["catalog-backed fanout and aggregate-load qualification"]
+        }
+      ]
+    },
+    {
+      "id": "heldout_digital_002",
+      "domain": "digital",
+      "safety_impact": "safety_relevant",
+      "outcome": "unsupported",
+      "observations": [
+        {
+          "capability": "bus_buffering_level_translation",
+          "outcome": "unsupported",
+          "stage": "architecture_search",
+          "code": "CAPABILITY_UNSUPPORTED",
+          "path": "requirements.control_signals",
+          "reason": "the mixed-direction signal group lacks protocol-specific translation and back-power proof",
+          "required_evidence": ["per-signal direction, default-state, and partial-power-down evidence"]
+        }
+      ]
+    },
+    {
+      "id": "heldout_mcu_001",
+      "domain": "mcu",
+      "safety_impact": "safety_relevant",
+      "outcome": "unsupported",
+      "observations": [
+        {
+          "capability": "mcu_debug_electrical_loading",
+          "outcome": "unsupported",
+          "stage": "architecture_search",
+          "code": "CAPABILITY_UNSUPPORTED",
+          "path": "requirements.programming_debug",
+          "reason": "connected-tool loading and unpowered-target behavior are not qualified for the shared application pins",
+          "required_evidence": ["debug-tool loading, target-off current, and shared-pin arbitration evidence"]
+        }
+      ]
+    },
+    {
+      "id": "heldout_mcu_002",
+      "domain": "mcu",
+      "safety_impact": "review_required",
+      "outcome": "unsupported",
+      "observations": [
+        {
+          "capability": "bus_buffering_level_translation",
+          "outcome": "unsupported",
+          "stage": "architecture_search",
+          "code": "CAPABILITY_UNSUPPORTED",
+          "path": "requirements.debug_voltage_domain",
+          "reason": "the attached host and target voltage domains lack qualified directional translation",
+          "required_evidence": ["directional partial-power-down translation evidence"]
+        },
+        {
+          "capability": "mcu_debug_electrical_loading",
+          "outcome": "unsupported",
+          "stage": "architecture_search",
+          "code": "CAPABILITY_UNSUPPORTED",
+          "path": "requirements.debug_shared_pins",
+          "reason": "boot-state and shared-function contention are not electrically qualified",
+          "required_evidence": ["boot, reset, loading, and shared-pin contention evidence"]
+        }
+      ]
+    },
+    {
+      "id": "heldout_mixed_signal_001",
+      "domain": "mixed_signal",
+      "safety_impact": "safety_critical",
+      "outcome": "ambiguous",
+      "observations": [
+        {
+          "capability": "functional_isolation_safe_state",
+          "outcome": "ambiguous",
+          "stage": "architecture_search",
+          "code": "CAPABILITY_AMBIGUOUS",
+          "path": "requirements.isolated_control_fault",
+          "reason": "multiple isolation partitions remain without deterministic safe-state qualification",
+          "required_evidence": ["deterministic bidirectional isolation and supply-loss safe-state proof"]
+        }
+      ]
+    },
+    {
+      "id": "heldout_mixed_signal_002",
+      "domain": "mixed_signal",
+      "safety_impact": "safety_relevant",
+      "outcome": "unsupported",
+      "observations": [
+        {
+          "capability": "bus_buffering_level_translation",
+          "outcome": "unsupported",
+          "stage": "architecture_search",
+          "code": "CAPABILITY_UNSUPPORTED",
+          "path": "requirements.sensor_alarm_interfaces",
+          "reason": "the installed interface path cannot jointly qualify push-pull serial and open-drain alarm translation",
+          "required_evidence": ["protocol-specific direction, loading, startup, and partial-power-down evidence"]
+        }
+      ]
+    },
+    {
+      "id": "heldout_power_001",
+      "domain": "power",
+      "safety_impact": "safety_critical",
+      "outcome": "budget_exhausted",
+      "observations": [
+        {
+          "capability": "converter_dynamic_fault_qualification",
+          "outcome": "budget_exhausted",
+          "stage": "architecture_search",
+          "code": "SEARCH_BUDGET_EXHAUSTED",
+          "path": "requirements.isolated_power",
+          "reason": "bounded search ended before inrush, short-circuit, and shutdown discharge were jointly proven",
+          "required_evidence": ["qualified converter and protection chain within deterministic search budget"]
+        }
+      ]
+    },
+    {
+      "id": "heldout_power_002",
+      "domain": "power",
+      "safety_impact": "safety_relevant",
+      "outcome": "ready",
+      "observations": []
+    },
+    {
+      "id": "heldout_sensor_001",
+      "domain": "sensor",
+      "safety_impact": "review_required",
+      "outcome": "unsupported",
+      "observations": [
+        {
+          "capability": "bus_buffering_level_translation",
+          "outcome": "unsupported",
+          "stage": "architecture_search",
+          "code": "CAPABILITY_UNSUPPORTED",
+          "path": "requirements.segmented_sensor_bus",
+          "reason": "the installed bus path does not qualify branch isolation with 360 pF aggregate capacitance",
+          "required_evidence": ["segmented bus capacitance, branch isolation, pull-up, and speed evidence"]
+        }
+      ]
+    },
+    {
+      "id": "heldout_sensor_002",
+      "domain": "sensor",
+      "safety_impact": "safety_relevant",
+      "outcome": "unsupported",
+      "observations": [
+        {
+          "capability": "bus_buffering_level_translation",
+          "outcome": "unsupported",
+          "stage": "architecture_search",
+          "code": "CAPABILITY_UNSUPPORTED",
+          "path": "requirements.remote_motion_sensor",
+          "reason": "no installed interface path proves cable loading and target-off input current",
+          "required_evidence": ["directional translation with cable-load and partial-power-down qualification"]
+        }
+      ]
+    }
+  ]
+}

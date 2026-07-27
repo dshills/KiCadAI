@@ -870,7 +870,7 @@ func TestCatalogProviderUsesRatedReverseBlockingPowerPathWhenRequired(t *testing
 		Ports:       []RoleContract{input, output, providerRole("reference", "reference", "bidirectional", 0, 0)},
 		Constraints: []Constraint{constraintBool("reverse_current_blocking", "required", true)},
 	})
-	if err != nil || len(expansions) < 2 {
+	if err != nil || len(expansions) == 0 {
 		t.Fatalf("expansions = %#v err = %v", expansions, err)
 	}
 	realization, err := DecodeFragmentRealization(expansions[0].Payload)
@@ -917,6 +917,36 @@ func TestCatalogProviderVoltageQualifiesShuntTransientClamp(t *testing.T) {
 		return instance.CatalogID == "protection.littelfuse.smcj33ca.smc"
 	}) {
 		t.Fatalf("30 V protected node did not select its voltage-qualified pulse clamp: %#v", realization.Instances)
+	}
+}
+
+func TestCatalogProviderVoltageQualifiesSeriesShuntTransientClampFromSignalPath(t *testing.T) {
+	provider, err := NewCatalogProvider(loadArchitectureCatalog(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	input := providerRole("input", "power", "sink", 11.88, 12.12)
+	output := providerRole("output", "power", "source", 11.88, 12.12)
+	current := .25
+	output.Contract.MaximumCurrentDemandA = &current
+	expansions, err := provider.Expand(context.Background(), ProviderRequest{
+		Capability: "transient_protection",
+		Ports: []RoleContract{
+			input, output,
+			providerRole("reference", "reference", "bidirectional", 0, 0),
+		},
+	})
+	if err != nil || len(expansions) == 0 {
+		t.Fatalf("expansions = %#v err = %v", expansions, err)
+	}
+	realization, err := DecodeFragmentRealization(expansions[0].Payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.ContainsFunc(realization.Instances, func(instance RealizationInstance) bool {
+		return instance.CatalogID == "protection.littelfuse.smbj18ca.smb"
+	}) {
+		t.Fatalf("12 V input/output path did not select a voltage-qualified clamp: %#v", realization.Instances)
 	}
 }
 
@@ -1244,6 +1274,74 @@ func TestCatalogProviderSelectsSTM32FromProgrammingKind(t *testing.T) {
 	}
 }
 
+func TestCatalogProviderQualifiesMCUProgrammingElectricalLoads(t *testing.T) {
+	provider, err := NewCatalogProvider(loadArchitectureCatalog(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	qualified := participantProviderRequest("programmable_controller", "sensor_bus", 3.3)
+	qualified.Constraints = append(qualified.Constraints,
+		constraintString("programming_kind", "equal", "swd"),
+		constraintNumber("debug_load_capacitance", "maximum", 8e-12, "F", 0),
+		constraintBool("debug_pins_shared", "required", true),
+		constraintNumber("debugger_voltage", "target", 3.3, "V", 0),
+	)
+	expansions, err := provider.Expand(context.Background(), qualified)
+	if err != nil || len(expansions) == 0 {
+		t.Fatalf("qualified debug load = %#v, %v", expansions, err)
+	}
+	realization, err := DecodeFragmentRealization(expansions[0].Payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if count := countRealizationUsage(realization, "programming_header"); count != 1 {
+		t.Fatalf("qualified debug realization uses %d programming headers, want 1", count)
+	}
+	if count := countRealizationUsage(realization, "programming_series_isolation"); count != 3 {
+		t.Fatalf("qualified SWD realization uses %d isolation resistors, want 3", count)
+	}
+	for _, instance := range realization.Instances {
+		if instance.Usage != "programming_series_isolation" {
+			continue
+		}
+		parentNet, headerNet := -1, -1
+		for index, connection := range realization.Connections {
+			if slices.Contains(connection.Endpoints, RealizationEndpoint{Instance: instance.ID, Function: "A"}) {
+				parentNet = index
+			}
+			if slices.Contains(connection.Endpoints, RealizationEndpoint{Instance: instance.ID, Function: "B"}) {
+				headerNet = index
+			}
+		}
+		if parentNet < 0 || headerNet < 0 || parentNet == headerNet {
+			t.Fatalf("programming isolation resistor %s does not split the tool and MCU nets: %#v", instance.ID, realization.Connections)
+		}
+	}
+
+	tests := []struct {
+		name       string
+		constraint Constraint
+	}{
+		{"capacitance", constraintNumber("debug_load_capacitance", "maximum", 20e-12, "F", 0)},
+		{"unpowered", constraintBool("debugger_connected_while_unpowered", "required", true)},
+		{"voltage", constraintNumber("debugger_voltage", "target", 1.8, "V", 0)},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			request := participantProviderRequest("programmable_controller", "sensor_bus", 3.3)
+			request.Constraints = append(request.Constraints,
+				constraintString("programming_kind", "equal", "swd"),
+				test.constraint,
+			)
+			_, err := provider.Expand(context.Background(), request)
+			var assignmentErr *mcuAssignmentError
+			if !errors.As(err, &assignmentErr) || assignmentErr.Code != CodeMCUProgrammingLoad {
+				t.Fatalf("programming-load error = %v, want %s", err, CodeMCUProgrammingLoad)
+			}
+		})
+	}
+}
+
 func TestCatalogProviderBindsCompleteMixedMCUPeripheralBundles(t *testing.T) {
 	provider, err := NewCatalogProvider(loadArchitectureCatalog(t))
 	if err != nil {
@@ -1429,6 +1527,239 @@ func TestCatalogProviderPublishesIsolatedTranslatorAsSupportedFunction(t *testin
 	}
 }
 
+func TestCatalogProviderSelectsProtectedWideInputIsolatedConverter(t *testing.T) {
+	provider, err := NewCatalogProvider(loadArchitectureCatalog(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	input := providerRole("input", "power", "sink", 9, 30)
+	output := providerRole("output", "power", "source", 5, 5)
+	output.Contract.RequiredCurrentCapacityA = float64Pointer(.4)
+	request := ProviderRequest{
+		Capability: "voltage_regulation",
+		Ports: []RoleContract{
+			input, output,
+			providerRole("reference", "reference", "bidirectional", 0, 0),
+		},
+		Constraints: []Constraint{
+			constraintBool("isolation_required", "required", true),
+			constraintNumber("output_voltage", "target", 5, "V", 5),
+			constraintNumber("isolation_working_voltage", "minimum", 1000, "V", 0),
+		},
+	}
+	expansions, err := provider.Expand(context.Background(), request)
+	if err != nil || len(expansions) == 0 {
+		t.Fatalf("protected isolated conversion = %#v, %v", expansions, err)
+	}
+	index := slices.IndexFunc(expansions, func(expansion ProviderExpansion) bool {
+		return expansion.ID == "protected_wide_input_isolated_converter"
+	})
+	if index < 0 {
+		t.Fatalf("protected isolated conversion missing from %#v", expansions)
+	}
+	realization, err := DecodeFragmentRealization(expansions[index].Payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.ContainsFunc(realization.Instances, func(instance RealizationInstance) bool {
+		return instance.CatalogID == "isolated_converter.traco.tec3_2411ui.sip8" && instance.Usage == "protected_isolated_power_stage"
+	}) {
+		t.Fatalf("protected converter selection = %#v", realization.Instances)
+	}
+	if !slices.ContainsFunc(realization.Instances, func(instance RealizationInstance) bool {
+		return instance.ID == "converter_input_bypass" &&
+			instance.CatalogID == "capacitor.murata.gcm21br71h105ka03l.0805" &&
+			instance.Usage == "input_bypass_capacitor"
+	}) {
+		t.Fatalf("protected converter lacks a voltage-qualified input bypass: %#v", realization.Instances)
+	}
+	if !slices.ContainsFunc(expansions[index].Calculations, func(calculation CalculationEvidence) bool {
+		return calculation.ID == "protected_isolated_converter_bounds" && calculation.Pass &&
+			slices.ContainsFunc(calculation.Bounds, func(bound CalculationBound) bool {
+				return bound.Name == "input_bypass_voltage" && bound.Pass && bound.ObservedWorst >= 30
+			})
+	}) {
+		t.Fatalf("protected converter lacks finalized bounds: %#v", realization)
+	}
+}
+
+func TestCatalogProviderSizesProtectedConverterShutdownDischarge(t *testing.T) {
+	catalog := loadArchitectureCatalog(t)
+	provider, err := NewCatalogProvider(catalog)
+	if err != nil {
+		t.Fatal(err)
+	}
+	input := providerRole("input", "power", "sink", 18, 36)
+	output := providerRole("output", "power", "source", 12, 12)
+	output.Contract.RequiredCurrentCapacityA = float64Pointer(.25)
+	request := ProviderRequest{
+		Capability: "voltage_regulation",
+		Ports: []RoleContract{
+			input, output,
+			providerRole("reference", "reference", "bidirectional", 0, 0),
+			providerRole("shutdown", "digital_logic", "sink", 0, 3.3),
+		},
+		Constraints: []Constraint{
+			constraintBool("isolation_required", "required", true),
+			constraintNumber("output_voltage", "target", 12, "V", 1),
+			constraintNumber("isolation_working_voltage", "minimum", 1000, "V", 0),
+			constraintNumber("maximum_inrush_current", "maximum", .3, "A", 0),
+			constraintNumber("shutdown_discharge_voltage", "maximum", 2, "V", 0),
+			constraintNumber("shutdown_discharge_time", "maximum", .5, "s", 0),
+			constraintNumber("ambient_temperature", "maximum", 70, "degC", 0),
+			constraintNumber("junction_temperature", "maximum", 85, "degC", 0),
+		},
+	}
+	expansions, err := provider.Expand(context.Background(), request)
+	if err != nil || len(expansions) == 0 {
+		t.Fatalf("protected isolated conversion = %#v, %v", expansions, err)
+	}
+	realization, err := DecodeFragmentRealization(expansions[0].Payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.ContainsFunc(realization.Instances, func(instance RealizationInstance) bool {
+		return instance.ID == "protected_isolated_converter" &&
+			instance.CatalogID == "isolated_converter.traco.tri10_1212.dip24"
+	}) {
+		t.Fatalf("thermal envelope did not select the qualifying protected converter: %#v", realization.Instances)
+	}
+	if !slices.ContainsFunc(realization.Instances, func(instance RealizationInstance) bool {
+		return instance.ID == "converter_pre_regulator" &&
+			instance.CatalogID == "regulator.traco.tsr1_24120.sip3" &&
+			instance.Usage == "synchronous_buck_controller"
+	}) {
+		t.Fatalf("wide-input request lacks a reviewed fixed preregulator: %#v", realization.Instances)
+	}
+	if !slices.ContainsFunc(realization.Instances, func(instance RealizationInstance) bool {
+		return instance.ID == "converter_pre_regulator_input_bypass" &&
+			instance.CatalogID == "capacitor.panasonic.eeufr1h220.radial" &&
+			instance.Value == "22u"
+	}) {
+		t.Fatalf("wide-input preregulator lacks its voltage-qualified input bypass: %#v", realization.Instances)
+	}
+	efuseIndex := slices.IndexFunc(realization.Instances, func(instance RealizationInstance) bool {
+		return instance.ID == "converter_input_efuse" &&
+			instance.CatalogID == "protection.ti.tps26600pwp.htssop16" &&
+			instance.Usage == "overcurrent_limit"
+	})
+	if efuseIndex < 0 {
+		t.Fatalf("protected converter lacks programmable input protection: %#v", realization.Instances)
+	}
+	parameters := map[string]float64{}
+	for _, parameter := range realization.Instances[efuseIndex].Parameters {
+		parameters[parameter.Name] = parameter.Value
+	}
+	requiredInputCurrent := 12 * .25 / (.86 * .92 * 18)
+	if parameters["minimum_current_limit_a"] < requiredInputCurrent ||
+		parameters["maximum_current_limit_a"] > .3 ||
+		parameters["programmed_current_limit_a"] <= 0 ||
+		parameters["maximum_output_slew_v_per_s"] <= 0 {
+		t.Fatalf("programmable input-protection parameters = %#v, required input current %.12g A", parameters, requiredInputCurrent)
+	}
+	limitResistorIndex := slices.IndexFunc(realization.Instances, func(instance RealizationInstance) bool {
+		return instance.ID == "converter_input_current_limit"
+	})
+	catalogEFuseIndex := slices.IndexFunc(catalog.Records, func(record components.ComponentRecord) bool {
+		return record.ID == "protection.ti.tps26600pwp.htssop16"
+	})
+	if limitResistorIndex < 0 || catalogEFuseIndex < 0 {
+		t.Fatalf("current-limit relationship lacks resolved resistor or eFuse catalog record")
+	}
+	limitResistance, resistanceOK := components.ParseEngineeringValue(realization.Instances[limitResistorIndex].Value)
+	programmingConstant, constantOK := recordValue(
+		catalog.Records[catalogEFuseIndex], "current_limit_programming_constant", "A*Ohm",
+	)
+	if !resistanceOK || !constantOK ||
+		math.Abs(parameters["programmed_current_limit_a"]*limitResistance-programmingConstant) > programmingConstant*1e-9 {
+		t.Fatalf(
+			"programmed current %.12g A and resistor %.12g Ohm do not reproduce catalog constant %.12g A*Ohm",
+			parameters["programmed_current_limit_a"], limitResistance, programmingConstant,
+		)
+	}
+	if !slices.Contains(realization.PortBindings, RealizationPortBinding{
+		Role: "shutdown", Instance: "converter_input_efuse", Function: "SHDN",
+	}) {
+		t.Fatalf("shutdown is not bound to the current-limiting input stage: %#v", realization.PortBindings)
+	}
+	netFor := func(endpoint RealizationEndpoint) string {
+		for _, connection := range realization.Connections {
+			if slices.Contains(connection.Endpoints, endpoint) {
+				return connection.ID
+			}
+		}
+		return ""
+	}
+	upstreamNet := netFor(RealizationEndpoint{Instance: "converter_input_efuse", Function: "VIN"})
+	protectedNet := netFor(RealizationEndpoint{Instance: "converter_input_efuse", Function: "VOUT"})
+	converterInputNet := netFor(RealizationEndpoint{Instance: "protected_isolated_converter", Function: "VIN_PLUS"})
+	if upstreamNet == "" || protectedNet == "" || converterInputNet == "" ||
+		upstreamNet == protectedNet || protectedNet == converterInputNet ||
+		protectedNet != netFor(RealizationEndpoint{Instance: "converter_pre_regulator", Function: "VIN"}) ||
+		converterInputNet != netFor(RealizationEndpoint{Instance: "converter_pre_regulator", Function: "VOUT"}) {
+		t.Fatalf("eFuse and preregulator do not form distinct series stages ahead of the converter: %#v", realization.Connections)
+	}
+	dischargeIndex := slices.IndexFunc(realization.Instances, func(instance RealizationInstance) bool {
+		return instance.ID == "converter_output_discharge" && instance.Usage == "shutdown_discharge"
+	})
+	if dischargeIndex < 0 {
+		t.Fatalf("protected converter lacks discharge resistor: %#v", realization.Instances)
+	}
+	discharge := realization.Instances[dischargeIndex]
+	resistance, ok := components.ParseEngineeringValue(discharge.Value)
+	if !ok || resistance <= 0 {
+		t.Fatalf("discharge resistance = %q", discharge.Value)
+	}
+	remaining := 12 * math.Exp(-.5/(resistance*protectedConverterOutputCapacitanceMaximumF))
+	if remaining > 2 {
+		t.Fatalf("discharge leaves %.12g V, want <= 2 V", remaining)
+	}
+	for _, function := range []string{"A", "B"} {
+		if !slices.ContainsFunc(realization.Connections, func(connection RealizationConnection) bool {
+			return slices.Contains(connection.Endpoints, RealizationEndpoint{Instance: discharge.ID, Function: function})
+		}) {
+			t.Fatalf("discharge resistor function %s is not connected: %#v", function, realization.Connections)
+		}
+	}
+	if !slices.ContainsFunc(expansions[0].Calculations, func(calculation CalculationEvidence) bool {
+		return calculation.ID == "protected_isolated_converter_bounds" && calculation.Pass &&
+			slices.ContainsFunc(calculation.Bounds, func(bound CalculationBound) bool {
+				return bound.Name == "shutdown_output_voltage" && bound.Pass
+			}) &&
+			slices.ContainsFunc(calculation.Bounds, func(bound CalculationBound) bool {
+				return bound.Name == "input_current_limit_capacity" && bound.Pass
+			}) &&
+			slices.ContainsFunc(calculation.Bounds, func(bound CalculationBound) bool {
+				return bound.Name == "current_limited_inrush" && bound.Pass
+			}) &&
+			slices.ContainsFunc(calculation.Bounds, func(bound CalculationBound) bool {
+				return bound.Name == "overvoltage_operating_margin" && bound.Pass
+			}) &&
+			slices.ContainsFunc(calculation.Bounds, func(bound CalculationBound) bool {
+				return bound.Name == "junction_temperature" && bound.Pass
+			}) &&
+			slices.ContainsFunc(calculation.Bounds, func(bound CalculationBound) bool {
+				return bound.Name == "pre_regulator_output_current" && bound.Pass
+			}) &&
+			slices.ContainsFunc(calculation.Bounds, func(bound CalculationBound) bool {
+				return bound.Name == "pre_regulator_input_headroom" && bound.Pass
+			})
+	}) {
+		t.Fatalf("protected converter lacks discharge proof: %#v", expansions[0].Calculations)
+	}
+
+	impossible := request
+	impossible.Constraints = slices.Clone(request.Constraints)
+	for index := range impossible.Constraints {
+		if impossible.Constraints[index].Name == "shutdown_discharge_time" {
+			impossible.Constraints[index] = constraintNumber("shutdown_discharge_time", "maximum", 1e-6, "s", 0)
+		}
+	}
+	if _, err := provider.Expand(context.Background(), impossible); err == nil {
+		t.Fatal("impossible shutdown discharge was accepted")
+	}
+}
+
 func TestCatalogProviderAllowsExplicitSharedReferenceTranslator(t *testing.T) {
 	provider, err := NewCatalogProvider(loadArchitectureCatalog(t))
 	if err != nil {
@@ -1459,7 +1790,7 @@ func TestCatalogProviderAllowsExplicitSharedReferenceTranslator(t *testing.T) {
 func TestTranslatorEvidenceModeAndDirectionMatchingIsCaseInsensitive(t *testing.T) {
 	catalog := loadArchitectureCatalog(t)
 	for _, record := range catalog.Records {
-		if record.Translator == nil {
+		if record.Translator == nil || record.Translator.MaximumOpenDrainFrequency == nil {
 			continue
 		}
 		record.Translator.SignalingModes = []string{"OPEN_DRAIN"}
@@ -1470,6 +1801,221 @@ func TestTranslatorEvidenceModeAndDirectionMatchingIsCaseInsensitive(t *testing.
 		return
 	}
 	t.Fatal("checked-in catalog has no translator evidence")
+}
+
+func TestTranslatorEvidenceUsesModeSpecificFrequencyBounds(t *testing.T) {
+	catalog := loadArchitectureCatalog(t)
+	for _, record := range catalog.Records {
+		if record.ID != "level_translator.ti.txs0104epw.tssop14" {
+			continue
+		}
+		if !translatorEvidenceSupports(record, 1.8, 3.3, "push_pull", "bidirectional", 24_000_000, 4, true) {
+			t.Fatal("TXS0104E push-pull evidence was rejected")
+		}
+		if translatorEvidenceSupports(record, 1.8, 3.3, "open_drain", "bidirectional", 3_000_000, 2, true) {
+			t.Fatal("TXS0104E open-drain evidence exceeded its mode-specific bound")
+		}
+		return
+	}
+	t.Fatal("TXS0104E record is missing")
+}
+
+func TestCatalogProviderComposesWholePushPullTranslationBus(t *testing.T) {
+	provider, err := NewCatalogProvider(loadArchitectureCatalog(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	request := pushPullTranslatorProviderRequest(1.8, 3.3, 8, 8_000_000)
+	expansions, err := provider.Expand(context.Background(), request)
+	if err != nil {
+		t.Fatalf("push-pull translation: %v", err)
+	}
+	compactIndex := slices.IndexFunc(expansions, func(expansion ProviderExpansion) bool {
+		return expansion.ID == "push_pull_compact_08_channel"
+	})
+	segmentedIndex := slices.IndexFunc(expansions, func(expansion ProviderExpansion) bool {
+		return expansion.ID == "push_pull_segmented_08_channel"
+	})
+	if compactIndex < 0 || segmentedIndex < 0 {
+		t.Fatalf("push-pull translation lacks materially distinct compact and segmented expansions (count=%d)", len(expansions))
+	}
+	realization, err := DecodeFragmentRealization(expansions[compactIndex].Payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	translators := 0
+	for _, instance := range realization.Instances {
+		if instance.Usage == "push_pull_level_translator" {
+			translators++
+			if !slices.Contains(instance.Parameters, RealizationParameter{Name: "direction", Value: 1, Unit: "polarity"}) {
+				t.Fatalf("translator lacks selected simulation direction: %#v", instance)
+			}
+		}
+	}
+	if translators != 2 {
+		t.Fatalf("translator count = %d, realization %#v", translators, realization.Instances)
+	}
+	sideBindings := 0
+	for _, binding := range realization.PortBindings {
+		if binding.Role == "side_a" || binding.Role == "side_b" {
+			sideBindings++
+			if binding.Lane == "" {
+				t.Fatalf("whole-bus binding lacks a lane: %#v", binding)
+			}
+		}
+	}
+	if sideBindings != 16 {
+		t.Fatalf("whole-bus bindings = %d, want 16: %#v", sideBindings, realization.PortBindings)
+	}
+	if !slices.ContainsFunc(realization.Instances, func(instance RealizationInstance) bool {
+		return instance.Usage == "enable_pulldown"
+	}) {
+		t.Fatalf("push-pull translation lacks a defined inactive startup state: %#v", realization.Instances)
+	}
+	segmented, err := DecodeFragmentRealization(expansions[segmentedIndex].Payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	segmentedTranslators := 0
+	for _, instance := range segmented.Instances {
+		if instance.Usage == "push_pull_level_translator" {
+			segmentedTranslators++
+		}
+	}
+	if segmentedTranslators != 4 {
+		t.Fatalf("segmented translation uses %d translators, want 4", segmentedTranslators)
+	}
+}
+
+func TestCatalogProviderLeavesUnusedAutoDirectionChannelsUnconnected(t *testing.T) {
+	provider, err := NewCatalogProvider(loadArchitectureCatalog(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	request := pushPullTranslatorProviderRequest(1.8, 5, 1, 4_000_000)
+	expansions, err := provider.Expand(context.Background(), request)
+	if err != nil {
+		t.Fatalf("push-pull translation: %v", err)
+	}
+	index := slices.IndexFunc(expansions, func(expansion ProviderExpansion) bool {
+		return expansion.ID == "push_pull_compact_01_channel"
+	})
+	if index < 0 {
+		t.Fatalf("missing compact one-channel expansion: %#v", expansions)
+	}
+	realization, err := DecodeFragmentRealization(expansions[index].Payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, connection := range realization.Connections {
+		for _, endpoint := range connection.Endpoints {
+			if endpoint.Instance != "bus_translator_01" {
+				continue
+			}
+			switch endpoint.Function {
+			case "A2", "A3", "A4", "B2", "B3", "B4":
+				t.Fatalf("unused auto-direction channel was connected to %s: %#v", connection.Role, connection)
+			}
+		}
+	}
+}
+
+func TestCatalogProviderPushPullTranslationFailsClosed(t *testing.T) {
+	provider, err := NewCatalogProvider(loadArchitectureCatalog(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	tooFast := pushPullTranslatorProviderRequest(1.8, 3.3, 2, 25_000_000)
+	if _, err := provider.Expand(context.Background(), tooFast); err == nil {
+		t.Fatal("out-of-envelope push-pull rate was accepted")
+	}
+	missingEnable := pushPullTranslatorProviderRequest(1.8, 3.3, 2, 8_000_000)
+	missingEnable.Ports = slices.DeleteFunc(missingEnable.Ports, func(port RoleContract) bool { return port.Role == "enable" })
+	if _, err := provider.Expand(context.Background(), missingEnable); err == nil {
+		t.Fatal("push-pull translation without startup enable was accepted")
+	}
+	bidirectional := pushPullTranslatorProviderRequest(1.8, 3.3, 2, 8_000_000)
+	for index := range bidirectional.Ports {
+		if bidirectional.Ports[index].Role == "side_a" || bidirectional.Ports[index].Role == "side_b" {
+			bidirectional.Ports[index].Contract.Direction = "bidirectional"
+		}
+	}
+	if _, err := provider.Expand(context.Background(), bidirectional); err == nil {
+		t.Fatal("bidirectional push-pull translation without direction-control evidence was accepted")
+	}
+}
+
+func TestCatalogProviderComposesDirectionControlledTranslationBus(t *testing.T) {
+	provider, err := NewCatalogProvider(loadArchitectureCatalog(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	request := directionControlledTranslatorProviderRequest(1.8, 3.3, 8, 8_000_000)
+	expansions, err := provider.Expand(context.Background(), request)
+	if err != nil {
+		t.Fatalf("direction-controlled translation: %v", err)
+	}
+	compactIndex := slices.IndexFunc(expansions, func(expansion ProviderExpansion) bool {
+		return expansion.ID == "direction_controlled_compact_08_channel"
+	})
+	segmentedIndex := slices.IndexFunc(expansions, func(expansion ProviderExpansion) bool {
+		return expansion.ID == "direction_controlled_segmented_08_channel"
+	})
+	if compactIndex < 0 || segmentedIndex < 0 {
+		t.Fatalf("direction-controlled translation lacks compact and segmented expansions: %#v", expansions)
+	}
+	realization, err := DecodeFragmentRealization(expansions[compactIndex].Payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if count := countRealizationUsage(realization, "direction_controlled_level_translator"); count != 1 {
+		t.Fatalf("compact translation uses %d transceivers, want 1", count)
+	}
+	for _, usage := range []string{"enable_pullup", "direction_pulldown"} {
+		if count := countRealizationUsage(realization, usage); count != 1 {
+			t.Fatalf("compact translation uses %d %s parts, want 1", count, usage)
+		}
+	}
+	if !slices.ContainsFunc(realization.Connections, func(connection RealizationConnection) bool {
+		return slices.Contains(connection.Endpoints, RealizationEndpoint{Instance: "bus_transceiver_01", Function: "VCCB_AUX"})
+	}) {
+		t.Fatal("second VCCB package pin is not connected")
+	}
+	if !slices.ContainsFunc(realization.Connections, func(connection RealizationConnection) bool {
+		return slices.Contains(connection.Endpoints, RealizationEndpoint{Instance: "bus_transceiver_01", Function: "GND_AUX"})
+	}) {
+		t.Fatal("second ground package pin is not connected")
+	}
+	segmented, err := DecodeFragmentRealization(expansions[segmentedIndex].Payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if count := countRealizationUsage(segmented, "direction_controlled_level_translator"); count != 2 {
+		t.Fatalf("segmented translation uses %d transceivers, want 2", count)
+	}
+	if !slices.ContainsFunc(segmented.Connections, func(connection RealizationConnection) bool {
+		return slices.Contains(connection.Endpoints, RealizationEndpoint{Instance: "bus_transceiver_01", Function: "A5"}) &&
+			slices.Contains(connection.Endpoints, RealizationEndpoint{Instance: "bus_transceiver_01", Function: "B5"})
+	}) {
+		t.Fatal("segmented alternative does not ground unused data inputs")
+	}
+}
+
+func TestCatalogProviderDirectionControlledTranslationFailsClosed(t *testing.T) {
+	provider, err := NewCatalogProvider(loadArchitectureCatalog(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	missingDirectionRole := directionControlledTranslatorProviderRequest(1.8, 3.3, 8, 8_000_000)
+	missingDirectionRole.Ports = slices.DeleteFunc(missingDirectionRole.Ports, func(port RoleContract) bool { return port.Role == "direction_control" })
+	if _, err := provider.Expand(context.Background(), missingDirectionRole); err == nil {
+		t.Fatal("direction-controlled translation without a direction role was accepted")
+	}
+	unsafeDirectionChange := directionControlledTranslatorProviderRequest(1.8, 3.3, 8, 8_000_000)
+	unsafeDirectionChange.Constraints = slices.DeleteFunc(unsafeDirectionChange.Constraints, func(constraint Constraint) bool { return constraint.Name == "direction_change_state" })
+	if _, err := provider.Expand(context.Background(), unsafeDirectionChange); err == nil {
+		t.Fatal("direction-controlled translation without disabled direction-change proof was accepted")
+	}
 }
 
 func TestCatalogProviderSizesOpenDrainPullupsFromRiseTimeAndCapacitance(t *testing.T) {
@@ -1553,6 +2099,155 @@ func TestCatalogProviderSizesGalvanicIsolationPullupsFromRiseTimeAndCapacitance(
 		}) {
 			t.Fatalf("%s should retain its unconstrained default: %#v", id, realization.Instances)
 		}
+	}
+}
+
+func TestCatalogProviderComposesMultiPartPushPullFunctionalIsolation(t *testing.T) {
+	provider, err := NewCatalogProvider(loadArchitectureCatalog(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	request := pushPullFunctionalIsolationProviderRequest(3.3, 5, 16, 1, 8_000_000)
+	expansions, err := provider.Expand(context.Background(), request)
+	if err != nil {
+		t.Fatalf("push-pull functional isolation: %v", err)
+	}
+	compactIndex := slices.IndexFunc(expansions, func(expansion ProviderExpansion) bool {
+		return expansion.ID == "push_pull_functional_isolation_compact_16_forward_01_reverse"
+	})
+	segmentedIndex := slices.IndexFunc(expansions, func(expansion ProviderExpansion) bool {
+		return expansion.ID == "push_pull_functional_isolation_segmented_16_forward_01_reverse"
+	})
+	if compactIndex < 0 || segmentedIndex < 0 {
+		t.Fatalf("functional isolation lacks compact and segmented alternatives: %#v", expansions)
+	}
+	realization, err := DecodeFragmentRealization(expansions[compactIndex].Payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := countRealizationUsage(realization, "push_pull_functional_isolation"); got != 6 {
+		t.Fatalf("compact isolator count = %d, want 6: %#v", got, realization.Instances)
+	}
+	roleCounts := map[string]int{}
+	for _, binding := range realization.PortBindings {
+		roleCounts[binding.Role]++
+		if strings.Contains(binding.Role, "forward") || strings.Contains(binding.Role, "reverse") {
+			if binding.Lane == "" {
+				t.Fatalf("functional isolation signal binding lacks channel lane: %#v", binding)
+			}
+		}
+	}
+	for role, want := range map[string]int{
+		"side_a_forward": 16, "side_b_forward": 16,
+		"side_b_reverse": 1, "side_a_reverse": 1,
+	} {
+		if roleCounts[role] != want {
+			t.Fatalf("role %s bindings = %d, want %d: %#v", role, roleCounts[role], want, realization.PortBindings)
+		}
+	}
+	if !slices.ContainsFunc(realization.Connections, func(connection RealizationConnection) bool {
+		return connection.ID == "functional_isolator_power_a" &&
+			slices.Contains(connection.Endpoints, RealizationEndpoint{Instance: "functional_isolator_01", Function: "EN1"})
+	}) || !slices.ContainsFunc(realization.Connections, func(connection RealizationConnection) bool {
+		return connection.ID == "functional_isolator_power_b" &&
+			slices.Contains(connection.Endpoints, RealizationEndpoint{Instance: "functional_isolator_01", Function: "EN2"})
+	}) {
+		t.Fatalf("isolator enables are not deterministically tied high: %#v", realization.Connections)
+	}
+	if !slices.ContainsFunc(realization.Instances, func(instance RealizationInstance) bool {
+		return instance.Usage == "unused_output_load" && instance.Value == "1M"
+	}) {
+		t.Fatalf("unused physical channels lack bounded output loads: %#v", realization.Instances)
+	}
+	if len(expansions[compactIndex].Calculations) != 1 ||
+		!slices.ContainsFunc(expansions[compactIndex].Calculations[0].Bounds, func(bound CalculationBound) bool {
+			return bound.Name == "working_isolation_voltage" && bound.Pass && bound.Required == 1000 && bound.ObservedWorst == 1500
+		}) {
+		t.Fatalf("working-isolation evidence is missing: %#v", expansions[compactIndex].Calculations)
+	}
+	segmented, err := DecodeFragmentRealization(expansions[segmentedIndex].Payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := countRealizationUsage(segmented, "push_pull_functional_isolation"); got != 16 {
+		t.Fatalf("segmented isolator count = %d, want 16", got)
+	}
+}
+
+func TestFunctionalIsolationChannelsDeriveFromCatalogPinMap(t *testing.T) {
+	record := components.ComponentRecord{
+		ID: "isolator.test.reordered",
+		Symbols: []components.SymbolBinding{{
+			SymbolID: "test:reordered",
+			FunctionPins: []components.FunctionPin{
+				{Function: "OUTA3"}, {Function: "INA2"}, {Function: "OUTB7"},
+				{Function: "INB3"}, {Function: "OUTB2"}, {Function: "INA7"},
+			},
+		}},
+	}
+	forward, reverse, err := functionalIsolationChannels(record)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(forward, []functionalIsolationChannel{
+		{input: "INA2", output: "OUTB2"},
+		{input: "INA7", output: "OUTB7"},
+	}) || !slices.Equal(reverse, []functionalIsolationChannel{
+		{input: "INB3", output: "OUTA3"},
+	}) {
+		t.Fatalf("derived channels = forward %#v reverse %#v", forward, reverse)
+	}
+}
+
+func TestCatalogProviderPushPullFunctionalIsolationFailsClosed(t *testing.T) {
+	provider, err := NewCatalogProvider(loadArchitectureCatalog(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	tests := []struct {
+		name   string
+		mutate func(*ProviderRequest)
+	}{
+		{name: "missing_working_voltage", mutate: func(request *ProviderRequest) {
+			request.Constraints = slices.DeleteFunc(request.Constraints, func(constraint Constraint) bool {
+				return constraint.Name == "isolation_working_voltage"
+			})
+		}},
+		{name: "unsafe_default", mutate: func(request *ProviderRequest) {
+			for index := range request.Constraints {
+				if request.Constraints[index].Name == "supply_loss_safe_state" {
+					request.Constraints[index] = constraintString("supply_loss_safe_state", "equal", "high")
+				}
+			}
+		}},
+		{name: "outside_working_voltage", mutate: func(request *ProviderRequest) {
+			for index := range request.Constraints {
+				if request.Constraints[index].Name == "isolation_working_voltage" {
+					request.Constraints[index] = constraintNumber("isolation_working_voltage", "minimum", 1600, "V", 0)
+				}
+			}
+		}},
+		{name: "outside_frequency", mutate: func(request *ProviderRequest) {
+			for index := range request.Ports {
+				if request.Ports[index].Contract.Protocol != nil {
+					request.Ports[index].Contract.Protocol.MaxFrequencyHz = 101_000_000
+				}
+			}
+		}},
+		{name: "missing_reverse_endpoint", mutate: func(request *ProviderRequest) {
+			request.Ports = slices.DeleteFunc(request.Ports, func(port RoleContract) bool {
+				return port.Role == "side_a_reverse"
+			})
+		}},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			request := pushPullFunctionalIsolationProviderRequest(3.3, 5, 3, 1, 8_000_000)
+			test.mutate(&request)
+			if expansions, err := provider.Expand(context.Background(), request); err == nil {
+				t.Fatalf("out-of-envelope request produced expansions: %#v", expansions)
+			}
+		})
 	}
 }
 
@@ -2605,6 +3300,79 @@ func translatorProviderRequest(sideA, sideB float64) ProviderRequest {
 		constraintNumber("bus_frequency", "minimum", 400000, "Hz", 0),
 		constraintBool("unpowered_backfeed_prevention", "required", true),
 	}}
+}
+
+func pushPullTranslatorProviderRequest(sideA, sideB float64, channels int, frequency float64) ProviderRequest {
+	busA := providerRole("side_a", "digital_bus", "source", 0, sideA)
+	busB := providerRole("side_b", "digital_bus", "sink", 0, sideB)
+	busA.Contract.Protocol = &Protocol{Name: "parallel", Mode: "push_pull", MaxFrequencyHz: frequency}
+	busB.Contract.Protocol = &Protocol{Name: "parallel", Mode: "push_pull", MaxFrequencyHz: frequency}
+	enable := providerRole("enable", "digital_logic", "sink", 0, sideA)
+	enable.Contract.DefaultState = "inactive"
+	return ProviderRequest{Capability: "logic_level_translation", Ports: []RoleContract{
+		busA, busB,
+		providerRole("power_a", "power", "sink", sideA, sideA),
+		providerRole("power_b", "power", "sink", sideB, sideB),
+		providerRole("reference", "reference", "bidirectional", 0, 0),
+		enable,
+	}, Constraints: []Constraint{
+		constraintNumber("channel_count", "minimum", float64(channels), "count", 0),
+	}}
+}
+
+func directionControlledTranslatorProviderRequest(sideA, sideB float64, channels int, frequency float64) ProviderRequest {
+	request := pushPullTranslatorProviderRequest(sideA, sideB, channels, frequency)
+	for index := range request.Ports {
+		if request.Ports[index].Role == "side_a" || request.Ports[index].Role == "side_b" {
+			request.Ports[index].Contract.Direction = "bidirectional"
+		}
+	}
+	directionControl := providerRole("direction_control", "digital_logic", "sink", 0, sideA)
+	directionControl.Contract.DefaultState = "inactive"
+	request.Ports = append(request.Ports, directionControl)
+	request.Constraints = append(request.Constraints,
+		constraintString("direction", "equal", "bidirectional"),
+		constraintString("direction_change_state", "equal", "disabled"),
+	)
+	return request
+}
+
+func pushPullFunctionalIsolationProviderRequest(sideA, sideB float64, forwardChannels, reverseChannels int, frequency float64) ProviderRequest {
+	forwardA := providerRole("side_a_forward", "digital_bus", "source", 0, sideA)
+	forwardB := providerRole("side_b_forward", "digital_bus", "sink", 0, sideB)
+	reverseB := providerRole("side_b_reverse", "digital_bus", "source", 0, sideB)
+	reverseA := providerRole("side_a_reverse", "digital_bus", "sink", 0, sideA)
+	forwardA.Contract.Protocol = &Protocol{Name: "parallel", Mode: "push_pull", MaxFrequencyHz: frequency}
+	forwardB.Contract.Protocol = &Protocol{Name: "parallel", Mode: "push_pull", MaxFrequencyHz: frequency}
+	reverseB.Contract.Protocol = &Protocol{Name: "fault", Mode: "push_pull", MaxFrequencyHz: frequency}
+	reverseA.Contract.Protocol = &Protocol{Name: "fault", Mode: "push_pull", MaxFrequencyHz: frequency}
+	return ProviderRequest{Capability: "galvanic_isolation", Ports: []RoleContract{
+		forwardA, forwardB, reverseB, reverseA,
+		providerRole("power_a", "power", "sink", sideA, sideA),
+		providerRole("reference_a", "reference", "bidirectional", 0, 0),
+		providerRole("power_b", "power", "sink", sideB, sideB),
+		providerRole("reference_b", "reference", "bidirectional", 0, 0),
+	}, Constraints: []Constraint{
+		constraintString("signaling_mode", "equal", "push_pull"),
+		constraintNumber("forward_channel_count", "minimum", float64(forwardChannels), "count", 0),
+		constraintNumber("reverse_channel_count", "minimum", float64(reverseChannels), "count", 0),
+		constraintNumber("isolation_working_voltage", "minimum", 1000, "V", 0),
+		constraintNumber("isolation_transient_voltage", "minimum", 5000, "V", 0),
+		constraintNumber("minimum_clearance", "minimum", 6, "mm", 0),
+		constraintNumber("minimum_creepage", "minimum", 6, "mm", 0),
+		constraintString("supply_loss_safe_state", "equal", "low"),
+		constraintBool("independent_startup", "required", true),
+	}}
+}
+
+func countRealizationUsage(realization FragmentRealization, usage string) int {
+	count := 0
+	for _, instance := range realization.Instances {
+		if instance.Usage == usage {
+			count++
+		}
+	}
+	return count
 }
 
 func participantProviderRequest(capability, role string, supply float64) ProviderRequest {

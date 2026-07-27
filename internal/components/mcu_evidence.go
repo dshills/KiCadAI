@@ -56,9 +56,18 @@ type MCUAlternateFunction struct {
 }
 
 type MCUProgrammingInterface struct {
-	ID      string               `json:"id"`
-	Kind    string               `json:"kind"`
-	Signals []MCUInterfaceSignal `json:"signals"`
+	ID         string                            `json:"id"`
+	Kind       string                            `json:"kind"`
+	Signals    []MCUInterfaceSignal              `json:"signals"`
+	Electrical *MCUProgrammingElectricalEvidence `json:"electrical,omitempty"`
+}
+
+type MCUProgrammingElectricalEvidence struct {
+	MaximumConnectedCapacitance *EvidenceMeasurement `json:"maximum_connected_capacitance,omitempty"`
+	SeriesIsolationResistance   *EvidenceRange       `json:"series_isolation_resistance,omitempty"`
+	UnpoweredTargetPolicy       string               `json:"unpowered_target_policy"`
+	SharedPinPolicy             string               `json:"shared_pin_policy"`
+	DefaultState                string               `json:"default_state"`
 }
 
 type MCUInterfaceSignal struct {
@@ -270,6 +279,29 @@ func validateMCUEvidence(path string, record *ComponentRecord) []reports.Issue {
 			if _, ok := knownFunctions[signal.PinFunction]; !ok {
 				issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, signalPath+".pin_function", "programming signal function is not mapped by both symbol and package: "+signal.PinFunction))
 			}
+		}
+		if programming.Electrical == nil {
+			issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, interfacePath+".electrical", "MCU programming interface requires reviewed electrical loading evidence"))
+			continue
+		}
+		electrical := programming.Electrical
+		if electrical.MaximumConnectedCapacitance == nil || electrical.SeriesIsolationResistance == nil {
+			issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, interfacePath+".electrical", "MCU programming interface requires capacitance and series-isolation bounds"))
+		}
+		issues = append(issues, validateEvidenceMeasurement(interfacePath+".electrical.maximum_connected_capacitance", electrical.MaximumConnectedCapacitance, true)...)
+		issues = append(issues, validateEvidenceRange(interfacePath+".electrical.series_isolation_resistance", electrical.SeriesIsolationResistance, true)...)
+		switch electrical.UnpoweredTargetPolicy {
+		case "unsupported", "series_current_limited", "high_impedance_qualified":
+		default:
+			issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, interfacePath+".electrical.unpowered_target_policy", "MCU programming interface has an invalid unpowered-target policy"))
+		}
+		switch electrical.SharedPinPolicy {
+		case "dedicated", "series_isolated", "reset_arbitrated":
+		default:
+			issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, interfacePath+".electrical.shared_pin_policy", "MCU programming interface has an invalid shared-pin policy"))
+		}
+		if strings.TrimSpace(electrical.DefaultState) == "" {
+			issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, interfacePath+".electrical.default_state", "MCU programming interface requires a default-state policy"))
 		}
 	}
 	if len(evidence.ProgrammingInterfaces) == 0 {

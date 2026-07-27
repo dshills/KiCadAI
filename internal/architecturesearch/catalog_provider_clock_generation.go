@@ -2,6 +2,7 @@ package architecturesearch
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math"
 	"slices"
@@ -87,6 +88,12 @@ func (provider *CatalogProvider) expandClockGeneration(ctx context.Context, requ
 	if err != nil {
 		return nil, err
 	}
+	if choice.modelID == simmodel.PrimitiveFixedClockSourceV1 {
+		choice.source.value = engineeringValue(requirements.frequencyHz, "Hz")
+		choice.source.parameters = append(choice.source.parameters, RealizationParameter{
+			Name: "frequency_hz", Value: requirements.frequencyHz, Unit: "Hz",
+		})
+	}
 
 	buffer, err := provider.selectComponentWithTemperature(ctx, "logic_buffer", "", []components.RequiredRating{
 		{Kind: "supply_voltage", Value: numericString(requirements.supplyMinimumV), Unit: "V"},
@@ -96,6 +103,10 @@ func (provider *CatalogProvider) expandClockGeneration(ctx context.Context, requ
 		{Kind: "fanout", Value: numericString(requirements.minimumFanout), Unit: "count"},
 	}, true, requirements.temperature)
 	if err != nil {
+		direct, directErr := provider.expandDirectClockGeneration(ctx, request, requirements, choice)
+		if directErr == nil {
+			return direct, nil
+		}
 		withoutFanout, fanoutErr := provider.selectComponentWithTemperature(ctx, "logic_buffer", "", []components.RequiredRating{
 			{Kind: "supply_voltage", Value: numericString(requirements.supplyMinimumV), Unit: "V"},
 			{Kind: "supply_voltage", Value: numericString(requirements.supplyMaximumV), Unit: "V"},
@@ -110,6 +121,10 @@ func (provider *CatalogProvider) expandClockGeneration(ctx context.Context, requ
 			{Kind: "supply_voltage", Value: numericString(requirements.supplyMaximumV), Unit: "V"},
 		}, true, requirements.temperature)
 		if loadErr == nil && withoutLoad.record.ID != "" {
+			var classifiedError *clockGenerationError
+			if errors.As(directErr, &classifiedError) {
+				return nil, directErr
+			}
 			return nil, clockUnsupported(CodeClockLoadingUnsupported, "no qualified clock endpoint buffer satisfies the requested current and capacitive loading")
 		}
 		return nil, fmt.Errorf("clock endpoint-buffer selection failed: %w", err)
@@ -159,7 +174,7 @@ func (provider *CatalogProvider) expandClockGeneration(ctx context.Context, requ
 			endpoint(sourceBypass, "B"), endpoint(bufferBypass, "B")),
 	}
 
-	if choice.architectureClass == "fixed_packaged_oscillator" {
+	if choice.modelID == simmodel.PrimitiveFixedClockSourceV1 {
 		connections[1].Endpoints = append(connections[1].Endpoints, endpoint(choice.source, "ENABLE"))
 	} else {
 		timing := choice.timingResistor
@@ -245,6 +260,237 @@ func (provider *CatalogProvider) expandClockGeneration(ctx context.Context, requ
 		return nil, err
 	}
 	return append(expansions, alternative), nil
+}
+
+func (provider *CatalogProvider) expandDirectClockGeneration(
+	ctx context.Context,
+	request ProviderRequest,
+	requirements clockGenerationRequirements,
+	choice clockArchitectureChoice,
+) ([]ProviderExpansion, error) {
+	evidence := choice.source.record.Clock
+	if evidence == nil || !evidence.FabricationProof {
+		return nil, clockUnsupported(CodeClockLoadingUnsupported, "clock source lacks direct-drive fabrication evidence")
+	}
+	outputCurrent, currentOK := clockMeasurement(evidence.OutputCurrent, "A")
+	outputResistance, resistanceOK := clockMeasurement(evidence.OutputImpedance, "Ohm")
+	_, unloadedEdgeMaximum, edgeOK := clockEvidenceRange(evidence.EdgeTime, "s")
+	maximumFrequency, frequencyOK := clockMeasurement(evidence.MaximumFrequency, "Hz")
+	maximumLoad, loadOK := clockMeasurement(evidence.MaximumCapacitiveLoad, "F")
+	maximumFanout, fanoutOK := clockMeasurement(evidence.MaximumFanout, "count")
+	outputHigh, highOK := clockMeasurement(evidence.OutputHighVoltage, "V")
+	outputLow, lowOK := clockMeasurement(evidence.OutputLowVoltage, "V")
+	supplyCurrent, supplyOK := clockMeasurement(evidence.SupplyCurrent, "A")
+	if !currentOK || !resistanceOK || !edgeOK || !frequencyOK || !loadOK ||
+		!fanoutOK || !highOK || !lowOK || !supplyOK {
+		return nil, clockUnsupported(CodeClockLoadingUnsupported, "clock source lacks complete direct-drive electrical evidence")
+	}
+	switch {
+	case requirements.minimumFanout > maximumFanout:
+		return nil, clockUnsupported(CodeClockFanoutUnsupported, "clock source direct-drive fanout is insufficient")
+	case requirements.maximumLoadF > maximumLoad || requirements.requiredOutputCurrentA > outputCurrent:
+		return nil, clockUnsupported(CodeClockLoadingUnsupported, "clock source direct-drive current or capacitive loading is insufficient")
+	case requirements.frequencyHz > maximumFrequency:
+		return nil, clockUnsupported(CodeClockFrequencyUnsupported, "clock source direct-drive frequency is unsupported")
+	}
+	// Add the independently bounded intrinsic and 10%-to-90% RC edge times
+	// linearly; 2.2*R*C is the first-order 10%-to-90% rise time. This is a
+	// deliberate deterministic worst-case upper bound: an RSS estimate would
+	// be less conservative without evidence that the two bounds are
+	// statistically independent.
+	loadedEdgeMaximum := unloadedEdgeMaximum + 2.2*outputResistance*requirements.maximumLoadF
+	if loadedEdgeMaximum > requirements.maximumRiseTimeS || loadedEdgeMaximum > requirements.maximumFallTimeS {
+		return nil, clockUnsupported(CodeClockEdgeUnsupported, "clock source direct-drive loaded edge time exceeds the requested bound")
+	}
+	outputHighWorst := math.Min(outputHigh, requirements.supplyMinimumV-outputResistance*requirements.requiredOutputCurrentA)
+	if outputHighWorst < requirements.minimumOutputHighV {
+		return nil, clockUnsupported(CodeClockLoadingUnsupported, "clock source direct-drive high-level margin is insufficient")
+	}
+	if supplyCurrent > requirements.maximumSupplyCurrentA {
+		return nil, clockUnsupported(CodeClockLoadingUnsupported, "clock source direct-drive supply-current budget is insufficient")
+	}
+	requiredBypassF := outputCurrent * loadedEdgeMaximum / clockBypassAllowableDroopV
+	if requiredBypassF > clockBypassCapacitanceF {
+		return nil, clockUnsupported(CodeClockLoadingUnsupported, "clock source direct-drive bypass requirement exceeds the reviewed local bypass")
+	}
+
+	bypass, err := provider.selectPassiveComponentWithRatings(ctx, "capacitor", "capacitance", "100n", []components.RequiredRating{
+		{Kind: "voltage", Value: numericString(requirements.supplyMaximumV), Unit: "V"},
+	})
+	if err != nil {
+		return nil, fmt.Errorf("clock direct-drive bypass selection failed: %w", err)
+	}
+	choice.source.selected.InstanceID, choice.source.usage = "clock_source", "standalone_clock_source"
+	bypass.value = engineeringValue(clockBypassCapacitanceF, "F")
+	bypass.selected.InstanceID, bypass.usage = "clock_source_bypass", "decoupling_capacitor"
+	bypass.near, bypass.maxDistanceMM = "clock_source", 2
+	parts := []catalogPart{choice.source, bypass}
+	connections := []RealizationConnection{
+		semanticNet("clock_power", "power", endpoint(choice.source, "VDD"), endpoint(bypass, "A")),
+		semanticNet("clock_reference", "reference", endpoint(choice.source, "GND"), endpoint(bypass, "B")),
+	}
+	if choice.modelID == simmodel.PrimitiveFixedClockSourceV1 {
+		connections[0].Endpoints = append(connections[0].Endpoints, endpoint(choice.source, "ENABLE"))
+	} else {
+		timing := choice.timingResistor
+		if timing.record.ID == "" {
+			return nil, fmt.Errorf("clock direct-drive timing-resistor selection lacks catalog evidence")
+		}
+		timing.selected.InstanceID, timing.usage = "clock_timing_resistor", "timing_resistor"
+		timing.value = engineeringValue(choice.timingResistance, "Ohm")
+		timing.near, timing.maxDistanceMM = "clock_source", 2
+		parts = append(parts, timing)
+		connections = append(connections,
+			semanticNet("clock_timing", "timing", endpoint(choice.source, "SET"), endpoint(timing, "A")),
+		)
+		connections[1].Endpoints = append(connections[1].Endpoints, endpoint(choice.source, "DIV"), endpoint(timing, "B"))
+	}
+	bindings := bindRoles(request.Ports, choice.source.selected.InstanceID, map[string]string{
+		"output": "OUT", "power": "VDD", "reference": "GND",
+	})
+	for index := range bindings {
+		if bindings[index].Role == "output" {
+			bindings[index].NetRole = "clock"
+		}
+	}
+	calculation, err := directClockGenerationCalculation(
+		requirements, choice, outputCurrent, outputResistance, maximumLoad, maximumFanout,
+		maximumFrequency, outputHighWorst, outputLow, loadedEdgeMaximum, supplyCurrent,
+	)
+	if err != nil {
+		return nil, err
+	}
+	expansions, err := provider.expansion(
+		request, "direct_"+choice.architectureClass, parts, bindings, connections,
+		[]CalculationEvidence{calculation}, 0,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	const terminationResistance = 10.0
+	terminatedEdge := unloadedEdgeMaximum + 2.2*(outputResistance+terminationResistance)*requirements.maximumLoadF
+	terminatedHigh := math.Min(
+		outputHigh,
+		requirements.supplyMinimumV-(outputResistance+terminationResistance)*requirements.requiredOutputCurrentA,
+	)
+	if terminatedEdge > requirements.maximumRiseTimeS || terminatedEdge > requirements.maximumFallTimeS ||
+		terminatedHigh < requirements.minimumOutputHighV {
+		return expansions, nil
+	}
+	terminatedParts, err := provider.appendPassiveParts(ctx, parts, []passivePart{{
+		"clock_source_termination", "resistor", "source_termination", engineeringValue(terminationResistance, "Ohm"),
+	}})
+	if err != nil {
+		return expansions, nil
+	}
+	for index := range terminatedParts {
+		if terminatedParts[index].selected.InstanceID == "clock_source_termination" {
+			terminatedParts[index].near, terminatedParts[index].maxDistanceMM = "clock_source", 3
+		}
+	}
+	terminatedBindings := slices.Clone(bindings)
+	for index := range terminatedBindings {
+		if terminatedBindings[index].Role == "output" {
+			terminatedBindings[index].Instance = "clock_source_termination"
+			terminatedBindings[index].Function = "B"
+		}
+	}
+	terminatedConnections := slices.Clone(connections)
+	terminatedConnections = append(terminatedConnections,
+		semanticNet(
+			"clock_source_output", "clock",
+			endpoint(choice.source, "OUT"), passiveEndpoint("clock_source_termination", "A"),
+		),
+	)
+	terminatedCalculation, err := directClockGenerationCalculation(
+		requirements, choice, outputCurrent, outputResistance+terminationResistance,
+		maximumLoad, maximumFanout, maximumFrequency, terminatedHigh, outputLow,
+		terminatedEdge, supplyCurrent,
+	)
+	if err != nil {
+		return expansions, nil
+	}
+	terminated, err := provider.expansion(
+		request, "direct_"+choice.architectureClass+"_source_terminated",
+		terminatedParts, terminatedBindings, terminatedConnections,
+		[]CalculationEvidence{terminatedCalculation}, 0,
+	)
+	if err != nil {
+		return expansions, nil
+	}
+	return append(expansions, terminated...), nil
+}
+
+func directClockGenerationCalculation(
+	requirements clockGenerationRequirements,
+	choice clockArchitectureChoice,
+	outputCurrent, outputResistance, maximumLoad, maximumFanout, maximumFrequency,
+	outputHigh, outputLow, edgeTime, supplyCurrent float64,
+) (CalculationEvidence, error) {
+	requiredBypassF := outputCurrent * edgeTime / clockBypassAllowableDroopV
+	bounds := []CalculationBound{
+		maximumBound("frequency_accuracy", requirements.frequencyTolerancePct, choice.accuracyPercent, "%"),
+		maximumBound("rms_jitter", requirements.maximumRMSJitterS, choice.jitterS, "s"),
+		minimumBound("output_current", requirements.requiredOutputCurrentA, outputCurrent, "A"),
+		minimumBound("capacitive_load", requirements.maximumLoadF, maximumLoad, "F"),
+		minimumBound("fanout", requirements.minimumFanout, maximumFanout, "count"),
+		maximumBound("supply_current", requirements.maximumSupplyCurrentA, supplyCurrent, "A"),
+		minimumBound("local_bypass_capacitance", requiredBypassF, clockBypassCapacitanceF, "F"),
+		minimumBound("output_high_voltage", requirements.minimumOutputHighV, outputHigh, "V"),
+		maximumBound("rise_time", requirements.maximumRiseTimeS, edgeTime, "s"),
+		maximumBound("fall_time", requirements.maximumFallTimeS, edgeTime, "s"),
+		minimumBound("maximum_frequency", requirements.frequencyHz, maximumFrequency, "Hz"),
+	}
+	if requirements.dutyConstrained {
+		bounds = append(bounds,
+			minimumBound("duty_cycle_minimum", requirements.dutyCyclePct*(1-requirements.dutyTolerancePct/100), choice.dutyMinimumPercent, "%"),
+			maximumBound("duty_cycle_maximum", requirements.dutyCyclePct*(1+requirements.dutyTolerancePct/100), choice.dutyMaximumPercent, "%"),
+		)
+	}
+	if requirements.startupConstrained {
+		bounds = append(bounds, maximumBound("startup_time", requirements.maximumStartupS, choice.startupS, "s"))
+	}
+	worstMargin, pass := normalizedBoundsMargin(bounds)
+	if !pass {
+		return CalculationEvidence{}, clockUnsupported(CodeClockLoadingUnsupported, "clock source direct-drive calculation did not close every bound")
+	}
+	evidence := CalculationEvidence{
+		ID: "clock_generation_worst_case", FormulaID: FormulaRatingMargin, FormulaRevision: FormulaRevision,
+		Inputs: []NamedQuantity{
+			{Name: "target_frequency", Value: requirements.frequencyHz, Unit: "Hz"},
+			{Name: "supply_minimum", Value: requirements.supplyMinimumV, Unit: "V"},
+			{Name: "supply_maximum", Value: requirements.supplyMaximumV, Unit: "V"},
+			{Name: "load_capacitance", Value: requirements.maximumLoadF, Unit: "F"},
+			{Name: "fanout", Value: requirements.minimumFanout, Unit: "count"},
+			{Name: "temperature_span_from_25c", Value: requirements.temperatureSpanFrom25C, Unit: "degC"},
+			{Name: "endpoint_buffer_stages", Value: 0, Unit: "count"},
+		},
+		NominalOutputs: []NamedQuantity{
+			{Name: "frequency", Value: choice.frequencyHz, Unit: "Hz"},
+			{Name: "timing_resistance", Value: choice.timingResistance, Unit: "Ohm"},
+			{Name: "output_high_voltage", Value: outputHigh, Unit: "V"},
+			{Name: "output_low_voltage", Value: outputLow, Unit: "V"},
+			{Name: "edge_time", Value: edgeTime, Unit: "s"},
+			{Name: "supply_current", Value: supplyCurrent, Unit: "A"},
+			{Name: "local_bypass_capacitance", Value: clockBypassCapacitanceF, Unit: "F"},
+		},
+		Corners: clockGenerationCorners(
+			requirements, choice, outputResistance, outputLow, edgeTime, supplyCurrent,
+		),
+		Bounds: bounds, CornerEvaluations: 8, WorstMargin: worstMargin, Pass: true,
+	}
+	if choice.timingResistance > 0 {
+		evidence.Inputs = append(evidence.Inputs,
+			NamedQuantity{Name: "timing_resistance_tolerance", Value: choice.timingTolerancePct, Unit: "%"},
+			NamedQuantity{Name: "timing_resistance_tempco", Value: choice.timingTempcoPPM, Unit: "ppm/C"},
+		)
+	}
+	finalized, err := FinalizeCalculation(evidence)
+	if err != nil {
+		return CalculationEvidence{}, fmt.Errorf("direct clock-generation calculation finalization failed: %w", err)
+	}
+	return finalized, nil
 }
 
 func clockRequirements(request ProviderRequest) (clockGenerationRequirements, error) {
@@ -369,6 +615,7 @@ func (provider *CatalogProvider) selectClockArchitecture(ctx context.Context, re
 			continue
 		}
 		if modelID := clockModelID(record); modelID == simmodel.PrimitiveFixedClockSourceV1 &&
+			evidence.ArchitectureClass != "field_programmed_packaged_oscillator" &&
 			(frequencyMinimum != frequencyMaximum || math.Abs(requirements.frequencyHz-frequencyMinimum) > 1e-9*requirements.frequencyHz) {
 			continue
 		}

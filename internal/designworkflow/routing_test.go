@@ -513,6 +513,125 @@ func TestEmittedRouteTransitionViasRecognizesInteriorVertices(t *testing.T) {
 	}
 }
 
+func TestPruneRouteViasWithoutTwoLayerContactRemovesInvalidatedTransition(t *testing.T) {
+	viaPoint := transactions.Point{XMM: 5, YMM: 2}
+	operations := []transactions.Operation{
+		mustRouteOperation(t, transactions.RouteOperation{
+			Op: transactions.OpRoute, NetName: "SIG", Layer: "F.Cu", WidthMM: 0.2,
+			Points: []transactions.Point{{XMM: 1, YMM: 2}, viaPoint, {XMM: 8, YMM: 2}},
+			Vias: []transactions.RouteViaSpec{{
+				At: viaPoint, DiameterMM: 0.6, DrillMM: 0.3, Layers: []string{"F.Cu", "B.Cu"},
+			}},
+		}),
+	}
+
+	repaired, removed := pruneRouteViasWithoutTwoLayerContact(operations, physicalPadRoutingContext{})
+	if removed != 1 || routeViaCountForRoutingTest(t, repaired, "SIG") != 0 {
+		t.Fatalf("removed=%d routes=%#v, want stale single-layer via removed", removed, decodeRouteOperations(repaired))
+	}
+	again, againRemoved := pruneRouteViasWithoutTwoLayerContact(repaired, physicalPadRoutingContext{})
+	if againRemoved != 0 || !reflect.DeepEqual(repaired, again) {
+		t.Fatalf("second pruning removed=%d operations=%#v, want deterministic fixed point", againRemoved, again)
+	}
+}
+
+func TestPruneRouteViasWithoutTwoLayerContactPreservesTransitionsAndPadAccess(t *testing.T) {
+	transitionPoint := transactions.Point{XMM: 5, YMM: 2}
+	padAccessPoint := transactions.Point{XMM: 8, YMM: 4}
+	operations := []transactions.Operation{
+		mustRouteOperation(t, transactions.RouteOperation{
+			Op: transactions.OpRoute, NetName: "SIG", Layer: "F.Cu", WidthMM: 0.2,
+			Points: []transactions.Point{{XMM: 1, YMM: 2}, transitionPoint},
+			Vias: []transactions.RouteViaSpec{{
+				At: transitionPoint, DiameterMM: 0.6, DrillMM: 0.3, Layers: []string{"F.Cu", "B.Cu"},
+			}},
+		}),
+		mustRouteOperation(t, transactions.RouteOperation{
+			Op: transactions.OpRoute, NetName: "SIG", Layer: "B.Cu", WidthMM: 0.2,
+			Points: []transactions.Point{transitionPoint, {XMM: 8, YMM: 2}, padAccessPoint},
+			Vias: []transactions.RouteViaSpec{{
+				At: padAccessPoint, DiameterMM: 0.6, DrillMM: 0.3, Layers: []string{"F.Cu", "B.Cu"},
+			}},
+		}),
+	}
+	physical := physicalPadRoutingContext{
+		valid: true,
+		resolver: PlacedPadEndpointResolver{sorted: []PlacedPadEndpoint{{
+			Ref: "U1", Pad: "1", NetName: "SIG", Point: padAccessPoint,
+			Layer: "F.Cu", Layers: []string{"F.Cu"}, PadWidthMM: 0.5, PadHeightMM: 0.5,
+		}}},
+	}
+
+	repaired, removed := pruneRouteViasWithoutTwoLayerContact(operations, physical)
+	if removed != 0 || routeViaCountForRoutingTest(t, repaired, "SIG") != 2 {
+		t.Fatalf("removed=%d routes=%#v, want layer transition and SMD endpoint-access via preserved", removed, decodeRouteOperations(repaired))
+	}
+}
+
+func TestRepairRouteTransitionPadHoleClearanceMovesAttachedCopperDeterministically(t *testing.T) {
+	viaPoint := transactions.Point{XMM: 5, YMM: 5}
+	operations := []transactions.Operation{
+		mustRouteOperation(t, transactions.RouteOperation{
+			Op: transactions.OpRoute, NetName: "SIG", Layer: "F.Cu", WidthMM: 0.2,
+			Points: []transactions.Point{{XMM: 2, YMM: 5}, viaPoint},
+			Vias: []transactions.RouteViaSpec{{
+				At: viaPoint, DiameterMM: 0.7, DrillMM: 0.35, Layers: []string{"F.Cu", "B.Cu"},
+			}},
+		}),
+		mustRouteOperation(t, transactions.RouteOperation{
+			Op: transactions.OpRoute, NetName: "SIG", Layer: "B.Cu", WidthMM: 0.2,
+			Points: []transactions.Point{viaPoint, {XMM: 8, YMM: 5}},
+		}),
+	}
+	request := routing.Request{
+		Board: routing.Board{WidthMM: 20, HeightMM: 20, Layers: []routing.Layer{
+			{Name: "F.Cu", Kind: routing.LayerCopper, Routable: true},
+			{Name: "B.Cu", Kind: routing.LayerCopper, Routable: true},
+		}},
+		Rules: routing.Rules{
+			GridMM: 0.25, TraceWidthMM: 0.2, ClearanceMM: 0.2,
+			ViaDiameterMM: 0.7, ViaDrillMM: 0.35, ViaClearanceMM: 0.2,
+		},
+	}
+	placed := simplePlacedPads()
+	placed.Request.Components[0].Pads = []placement.PadSummary{{
+		Name: "1", Net: "OTHER", XMM: 0.3, YMM: -5, WidthMM: 0.5, HeightMM: 0.5,
+		Type: "thru_hole", Shape: "circle", DrillMM: 0.2, Layers: []string{"*.Cu"},
+	}}
+
+	repaired, issues := repairRouteTransitionPadHoleClearance(request, operations, &placed)
+	if reports.HasBlockingIssue(issues) {
+		t.Fatalf("hole-clearance repair issues = %#v", issues)
+	}
+	transitions := emittedRouteTransitionVias(repaired)
+	holes := placedRouteDrilledPadHoles(&placed)
+	if len(transitions) != 1 || sameRoutePoint(transitions[0].via.At, viaPoint) ||
+		routeTransitionPadHoleConflictCount(transitions, holes) != 0 {
+		t.Fatalf("repaired transitions=%#v holes=%#v", transitions, holes)
+	}
+	decoded := decodeRouteOperations(repaired)
+	if !sameRoutePoint(decoded[0].payload.Points[len(decoded[0].payload.Points)-1], transitions[0].via.At) ||
+		!sameRoutePoint(decoded[1].payload.Points[0], transitions[0].via.At) {
+		t.Fatalf("attached copper did not move with transition: %#v", decoded)
+	}
+	again, againIssues := repairRouteTransitionPadHoleClearance(request, operations, &placed)
+	if reports.HasBlockingIssue(againIssues) || !reflect.DeepEqual(repaired, again) {
+		t.Fatalf("repair is not deterministic: issues=%#v first=%#v second=%#v", againIssues, repaired, again)
+	}
+}
+
+func TestPlacedRouteDrilledPadHolesPreservesRepeatedPadNumbers(t *testing.T) {
+	placed := simplePlacedPads()
+	placed.Request.Components[0].Pads = []placement.PadSummary{
+		{Name: "17", XMM: 0, YMM: 0, DrillMM: 0.2},
+		{Name: "17", XMM: 0.8, YMM: 0, DrillMM: 0.2},
+	}
+	holes := placedRouteDrilledPadHoles(&placed)
+	if len(holes) != 2 || sameRoutePoint(holes[0].point, holes[1].point) {
+		t.Fatalf("drilled holes = %#v, want both repeated-number physical pad instances", holes)
+	}
+}
+
 func TestRepairAcuteRouteOperationJunctionsAcrossGeneratedPhases(t *testing.T) {
 	operations := []transactions.Operation{
 		mustRouteOperation(t, transactions.RouteOperation{

@@ -123,16 +123,20 @@ func Lower(requirement architecturesearch.Requirement, search architecturesearch
 		intent.PowerDomains = append(intent.PowerDomains, lowerDomain(domain))
 	}
 
-	union := newDisjointSet()
-	actual := map[string]circuitgraph.FunctionalEndpoint{}
-	metadata := map[string]nodeMetadata{}
-	interfaces, externalNodes := lowerInterfaces(requirement, union, actual, metadata)
-	intent.Interfaces = interfaces
-
 	selections := append([]architecturesearch.FragmentSelection(nil), search.Selected.Selections...)
 	slices.SortStableFunc(selections, func(left, right architecturesearch.FragmentSelection) int {
 		return strings.Compare(left.ObligationPath, right.ObligationPath)
 	})
+	externalLanes, err := selectedExternalBindingLanes(selections)
+	if err != nil {
+		return Result{}, issues("search.selected.selections", err.Error())
+	}
+	union := newDisjointSet()
+	actual := map[string]circuitgraph.FunctionalEndpoint{}
+	metadata := map[string]nodeMetadata{}
+	interfaces, externalNodes := lowerInterfaces(requirement, union, actual, metadata, externalLanes)
+	intent.Interfaces = interfaces
+
 	selectionEvidence := make([]string, 0, len(selections))
 	instanceIDs := map[string]bool{}
 	bindingsByAnchor := map[string][]pendingPortBinding{}
@@ -579,19 +583,79 @@ func lowerDomain(domain architecturesearch.Domain) circuitgraph.PowerDomainInten
 	return result
 }
 
-func lowerInterfaces(requirement architecturesearch.Requirement, union *disjointSet, actual map[string]circuitgraph.FunctionalEndpoint, metadata map[string]nodeMetadata) ([]circuitgraph.InterfaceRequirement, map[string]string) {
+func selectedExternalBindingLanes(selections []architecturesearch.FragmentSelection) (map[string][]string, error) {
+	lanes := map[string][]string{}
+	for _, selection := range selections {
+		realization, err := architecturesearch.DecodeFragmentRealization(selection.Payload)
+		if err != nil {
+			return nil, err
+		}
+		ports := make(map[string]architecturesearch.RoleContract, len(selection.Ports))
+		for _, port := range selection.Ports {
+			ports[port.Role] = port
+		}
+		for _, binding := range realization.PortBindings {
+			port, ok := ports[binding.Role]
+			if !ok || !strings.HasPrefix(port.Anchor, "external:") {
+				continue
+			}
+			lanes[port.Anchor] = append(lanes[port.Anchor], binding.Lane)
+		}
+		for _, transition := range realization.SeriesTransitions {
+			port, ok := ports[transition.Role]
+			if !ok || !strings.HasPrefix(port.Anchor, "external:") {
+				continue
+			}
+			lanes[port.Anchor] = append(lanes[port.Anchor], transition.Lane)
+		}
+	}
+	for anchor := range lanes {
+		slices.Sort(lanes[anchor])
+		lanes[anchor] = slices.Compact(lanes[anchor])
+	}
+	return lanes, nil
+}
+
+func lowerInterfaces(
+	requirement architecturesearch.Requirement,
+	union *disjointSet,
+	actual map[string]circuitgraph.FunctionalEndpoint,
+	metadata map[string]nodeMetadata,
+	selectedLanes map[string][]string,
+) ([]circuitgraph.InterfaceRequirement, map[string]string) {
 	result := make([]circuitgraph.InterfaceRequirement, 0, len(requirement.Requirements.Ports))
 	nodes := map[string]string{}
+	behavioralRoles := behavioralInterfaceRoles(requirement)
 	for _, port := range requirement.Requirements.Ports {
 		primaryRole := portNetRole(port)
 		candidate := circuitgraph.InterfaceRequirement{ID: port.ID, Role: interfaceRole(port)}
+		if role, ok := behavioralRoles[port.ID]; ok {
+			candidate.Role = role
+		}
 		lanes := []string{"", "return"}
 		signals := []circuitgraph.InterfaceSignal{{Name: interfaceSignalName(port), Role: primaryRole}, {Name: "return", Role: circuitgraph.NetRoleGround}}
-		if primaryRole == circuitgraph.NetRoleGround {
+		if bound, ok := selectedLanes["external:"+port.ID]; ok && len(bound) > 0 {
+			lanes = append([]string(nil), bound...)
+			signals = make([]circuitgraph.InterfaceSignal, 0, len(lanes)+1)
+			for _, lane := range lanes {
+				name := lane
+				role := primaryRole
+				if name == "" {
+					name = interfaceSignalName(port)
+				}
+				if lane == "return" {
+					role = circuitgraph.NetRoleGround
+				}
+				signals = append(signals, circuitgraph.InterfaceSignal{Name: name, Role: role})
+			}
+			if primaryRole != circuitgraph.NetRoleGround && !slices.Contains(lanes, "return") {
+				lanes = append(lanes, "return")
+				signals = append(signals, circuitgraph.InterfaceSignal{Name: "return", Role: circuitgraph.NetRoleGround})
+			}
+		} else if primaryRole == circuitgraph.NetRoleGround {
 			lanes = []string{""}
 			signals = signals[:1]
-		}
-		if port.Kind == "digital_bus" && port.Protocol != nil && port.Protocol.Name == "i2c" {
+		} else if port.Kind == "digital_bus" && port.Protocol != nil && port.Protocol.Name == "i2c" {
 			lanes = []string{"sda", "scl"}
 			signals = []circuitgraph.InterfaceSignal{{Name: "sda", Role: circuitgraph.NetRoleSignal}, {Name: "scl", Role: circuitgraph.NetRoleSignal}}
 		}
@@ -624,6 +688,100 @@ func lowerInterfaces(requirement architecturesearch.Requirement, union *disjoint
 		}
 	}
 	return result, nodes
+}
+
+func behavioralInterfaceRoles(requirement architecturesearch.Requirement) map[string]circuitgraph.InterfaceRole {
+	const (
+		behavioralInput = 1 << iota
+		behavioralOutput
+	)
+	directions := map[string]int{}
+	observed := map[string]bool{}
+	for _, behavior := range requirement.Requirements.BehavioralRequirements {
+		if behavior.Observation.Kind == "port" {
+			observed[behavior.Observation.ID] = true
+		}
+	}
+	participants := map[string]architecturesearch.Participant{}
+	for _, participant := range requirement.Requirements.Participants {
+		participants[participant.ID] = participant
+	}
+	for _, objective := range requirement.Requirements.Objectives {
+		for _, observation := range objective.Bindings {
+			if observation.Port == "" || !observed[observation.Port] {
+				continue
+			}
+			opposite := oppositeBehavioralBindingRole(observation.Role)
+			if opposite == "" {
+				continue
+			}
+			for _, stimulus := range objective.Bindings {
+				if stimulus.Role != opposite {
+					continue
+				}
+				if stimulus.Port != "" {
+					directions[stimulus.Port] |= behavioralInput
+					directions[observation.Port] |= behavioralOutput
+					continue
+				}
+				if stimulus.Participant == "" || stimulus.ParticipantPort == "" {
+					continue
+				}
+				participant, ok := participants[stimulus.Participant]
+				if !ok {
+					continue
+				}
+				for _, port := range participant.RequiredPorts {
+					if port.ID == stimulus.ParticipantPort && (port.Direction == "source" || port.Direction == "bidirectional") {
+						directions[observation.Port] |= behavioralOutput
+						break
+					}
+				}
+			}
+		}
+	}
+	ports := map[string]architecturesearch.Port{}
+	for _, port := range requirement.Requirements.Ports {
+		ports[port.ID] = port
+	}
+	result := map[string]circuitgraph.InterfaceRole{}
+	for id, direction := range directions {
+		port, ok := ports[id]
+		if !ok {
+			continue
+		}
+		switch direction {
+		case behavioralInput:
+			result[id] = directionalInterfaceRole(port, true)
+		case behavioralOutput:
+			result[id] = directionalInterfaceRole(port, false)
+		default:
+			result[id] = interfaceRole(port)
+		}
+	}
+	return result
+}
+
+func directionalInterfaceRole(port architecturesearch.Port, input bool) circuitgraph.InterfaceRole {
+	switch port.Kind {
+	case "power", "reference":
+		if input {
+			return circuitgraph.InterfacePowerInput
+		}
+		return circuitgraph.InterfacePowerOutput
+	case "switched_load":
+		return circuitgraph.InterfacePowerOutput
+	case "analog_voltage", "differential_analog", "analog_current", "analog_control":
+		if input {
+			return circuitgraph.InterfaceAnalogInput
+		}
+		return circuitgraph.InterfaceAnalogOut
+	default:
+		if input {
+			return circuitgraph.InterfaceDigitalIn
+		}
+		return circuitgraph.InterfaceDigitalOut
+	}
 }
 
 // A power signal denotes the rail of its declared domain. Joining the semantic
@@ -718,6 +876,17 @@ func lowerSemanticBindings(requirement architecturesearch.Requirement, union *di
 	for _, participant := range requirement.Requirements.Participants {
 		for _, port := range participant.RequiredPorts {
 			if port.Kind == "digital_bus" {
+				prefix := anchorNode("participant:"+participant.ID+":"+port.ID, "") + ":"
+				var candidates []string
+				for node := range union.parent {
+					if strings.HasPrefix(node, prefix) && connectionNames[union.find(node)] != "" {
+						candidates = append(candidates, node)
+					}
+				}
+				slices.Sort(candidates)
+				if len(candidates) > 0 {
+					appendBinding("participant_port", participant.ID+"."+port.ID, candidates[0])
+				}
 				continue
 			}
 			appendBinding("participant_port", participant.ID+"."+port.ID, anchorNode("participant:"+participant.ID+":"+port.ID, ""))

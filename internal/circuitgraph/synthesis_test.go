@@ -76,15 +76,57 @@ func TestApplyRegulatorParameterConstraintsMergesOutputCurrent(t *testing.T) {
 
 func TestConfiguredSimulationModelsOverlaysMatchingInstanceParameters(t *testing.T) {
 	output := "3.3V"
+	direction := -1.0
 	selection := ResolvedComponent{
-		Instance: Component{Parameters: []Parameter{{Name: "output_voltage_v", Value: ParameterValue{String: &output}}}},
+		Instance: Component{Parameters: []Parameter{
+			{Name: "output_voltage_v", Value: ParameterValue{String: &output}},
+			{Name: "direction", Value: ParameterValue{Number: &direction}},
+		}},
 		Record: components.ComponentRecord{SimulationModels: []simmodel.CatalogEvidence{{
-			ModelID: "test_model", Parameters: []simmodel.NamedValue{{Name: "output_voltage_v", Value: .8}, {Name: "unchanged", Value: 2}},
+			ModelID: "test_model", Parameters: []simmodel.NamedValue{
+				{Name: "output_voltage_v", Value: .8},
+				{Name: "direction", Value: 1},
+				{Name: "unchanged", Value: 2},
+			},
 		}}},
 	}
 	models := configuredSimulationModels(selection)
-	if len(models) != 1 || models[0].Parameters[0].Value != 3.3 || models[0].Parameters[1].Value != 2 {
+	values := map[string]float64{}
+	if len(models) == 1 {
+		for _, parameter := range models[0].Parameters {
+			values[parameter.Name] = parameter.Value
+		}
+	}
+	if len(models) != 1 ||
+		values["output_voltage_v"] != 3.3 ||
+		values["direction"] != -1 ||
+		values["unchanged"] != 2 {
 		t.Fatalf("configured models = %#v", models)
+	}
+}
+
+func TestConfiguredSimulationModelsMakesTypedOutputAndBidirectionalConnectorsPassive(t *testing.T) {
+	record := components.ComponentRecord{
+		Family: "connector",
+		SimulationModels: []simmodel.CatalogEvidence{{
+			ModelID: simmodel.PrimitiveConnectorVoltageSourceV1,
+		}},
+	}
+	for _, role := range []ComponentRole{RoleOutputConnector, RoleConnector} {
+		models := configuredSimulationModels(ResolvedComponent{
+			Instance: Component{Role: role},
+			Record:   record,
+		})
+		if len(models) != 0 {
+			t.Fatalf("%s connector models = %#v, want passive boundary", role, models)
+		}
+	}
+	models := configuredSimulationModels(ResolvedComponent{
+		Instance: Component{Role: RoleInputConnector},
+		Record:   record,
+	})
+	if len(models) != 1 || models[0].ModelID != simmodel.PrimitiveConnectorVoltageSourceV1 {
+		t.Fatalf("input connector models = %#v, want catalog-backed source", models)
 	}
 }
 

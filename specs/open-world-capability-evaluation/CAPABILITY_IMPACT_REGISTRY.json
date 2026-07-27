@@ -1,0 +1,46 @@
+{
+  "version": "open_world_capability_impact_v1",
+  "records": [
+    {
+      "capability": "bus_buffering_level_translation",
+      "consumers": [
+        "digital_interface",
+        "mcu_subsystem",
+        "mixed_signal_acquisition",
+        "sensor_bus"
+      ]
+    },
+    {
+      "capability": "clock_fanout_loading",
+      "consumers": [
+        "digital_interface",
+        "mcu_timing",
+        "sensor_sampling"
+      ]
+    },
+    {
+      "capability": "converter_dynamic_fault_qualification",
+      "consumers": [
+        "isolated_power",
+        "mcu_power_tree",
+        "sensor_frontend"
+      ]
+    },
+    {
+      "capability": "functional_isolation_safe_state",
+      "consumers": [
+        "industrial_io",
+        "isolated_power",
+        "mixed_signal_acquisition"
+      ]
+    },
+    {
+      "capability": "mcu_debug_electrical_loading",
+      "consumers": [
+        "manufacturing_test",
+        "mcu_subsystem",
+        "shared_pin_arbitration"
+      ]
+    }
+  ]
+}

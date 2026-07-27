@@ -78,6 +78,40 @@ func TestEventVoltageAssertionUsesDeclaredTargetDomainReference(t *testing.T) {
 	}
 }
 
+func TestBehavioralReferenceUsesProducingObjectiveAcrossIsolationBoundary(t *testing.T) {
+	requirement := architecturesearch.Requirement{Requirements: architecturesearch.Requirements{
+		Domains: []architecturesearch.Domain{
+			{ID: "primary_power", Kind: "supply"},
+			{ID: "secondary_power", Kind: "supply"},
+			{ID: "primary_return", Kind: "reference"},
+			{ID: "secondary_return", Kind: "reference"},
+		},
+		Ports: []architecturesearch.Port{
+			{ID: "input", Kind: "power", Domain: "primary_power"},
+			{ID: "secondary_return", Kind: "reference", Domain: "secondary_return"},
+		},
+		Signals: []architecturesearch.Signal{{ID: "regulated", Kind: "power", Domain: "secondary_power"}},
+		Objectives: []architecturesearch.Objective{{
+			Capability: "voltage_regulation",
+			Bindings: []architecturesearch.Binding{
+				{Role: "input", Port: "input"},
+				{Role: "output", Signal: "regulated", Direction: "source"},
+				{Role: "reference", Port: "secondary_return"},
+			},
+		}},
+		BehavioralRequirements: []architecturesearch.BehavioralRequirement{{
+			ID: "rail", Observation: architecturesearch.Observation{Kind: "signal", ID: "regulated"},
+		}},
+	}}
+	reference, required := behavioralObservationReferenceNode(requirement, "rail", "", []SemanticBinding{
+		{Kind: "domain", ID: "primary_return", Target: "PRIMARY_GROUND"},
+		{Kind: "domain", ID: "secondary_return", Target: "SECONDARY_GROUND"},
+	})
+	if !required || reference != "SECONDARY_GROUND" {
+		t.Fatalf("isolated behavioral reference = %q, %t; want secondary return", reference, required)
+	}
+}
+
 func TestSourceSweepExcitationScalePreservesSemanticConnectorPolarity(t *testing.T) {
 	plan := simmodel.Plan{Devices: []simmodel.ResolvedDevice{{
 		Component:      "input",
@@ -617,7 +651,7 @@ func TestResolvedLoadCurrentBindingSpansDrivenAndPhysicalStartupLoads(t *testing
 	plans := map[string]simmodel.Plan{
 		simmodel.AnalysisDCOperatingPoint: {
 			Devices:  []simmodel.ResolvedDevice{{Component: component, Family: "current_source", PrimitiveModel: simmodel.PrimitiveCurrentSourceV1, Terminals: []simmodel.TerminalBinding{{Terminal: "NEGATIVE", Net: "LOAD"}}}},
-			Analyses: []simmodel.Analysis{{Excitations: []simmodel.SourceExcitation{{Component: "supply", DCValue: 12}}}},
+			Analyses: []simmodel.Analysis{{Excitations: []simmodel.SourceExcitation{{Component: component, DCValue: maximum}, {Component: "supply", DCValue: 12}}}},
 		},
 		simmodel.AnalysisStartup: {
 			Devices:  []simmodel.ResolvedDevice{{Component: component, Family: "resistor", PrimitiveModel: simmodel.PrimitiveResistorV1, ValueSI: &resistance, Terminals: []simmodel.TerminalBinding{{Terminal: "B", Net: "LOAD"}}}},
@@ -629,6 +663,41 @@ func TestResolvedLoadCurrentBindingSpansDrivenAndPhysicalStartupLoads(t *testing
 	if len(diagnostics) != 0 || len(bindings) != 1 || bindings[0].Kind != OperatingLoadCurrent || bindings[0].Component != component ||
 		bindings[0].Scale != 12 || bindings[0].ReferenceComponent != "supply" {
 		t.Fatalf("bindings = %#v diagnostics=%#v", bindings, diagnostics)
+	}
+}
+
+func TestResolvedLoadCurrentBindingPreservesCatalogBackedParallelSupportLoad(t *testing.T) {
+	semanticMaximum, physicalMaximum := 0.25, 0.24994
+	resistance := 12 / physicalMaximum
+	component := OperatingHarnessComponentID("load_current", "LOAD")
+	analysisPlan := AnalysisPlan{Corners: []PlannedCorner{{ID: "maximum", Assignments: []CornerAssignment{{
+		Axis: "load_current", Target: "LOAD", Value: &semanticMaximum,
+	}}}}}
+	plans := map[string]simmodel.Plan{
+		simmodel.AnalysisDCOperatingPoint: {
+			Devices: []simmodel.ResolvedDevice{{
+				Component: component, Family: "current_source", PrimitiveModel: simmodel.PrimitiveCurrentSourceV1,
+			}},
+			Analyses: []simmodel.Analysis{{Excitations: []simmodel.SourceExcitation{
+				{Component: component, DCValue: physicalMaximum},
+				{Component: "supply", DCValue: 12},
+			}}},
+		},
+		simmodel.AnalysisStartup: {
+			Devices: []simmodel.ResolvedDevice{{
+				Component: component, Family: "resistor", PrimitiveModel: simmodel.PrimitiveResistorV1, ValueSI: &resistance,
+			}},
+			Analyses: []simmodel.Analysis{{Excitations: []simmodel.SourceExcitation{{Component: "supply", DCValue: 12}}}},
+		},
+	}
+	var diagnostics []Diagnostic
+	bindings := resolvedOperatingBindings(analysisPlan, plans, &diagnostics)
+	if len(diagnostics) != 0 || len(bindings) != 1 {
+		t.Fatalf("bindings = %#v diagnostics=%#v", bindings, diagnostics)
+	}
+	if math.Abs(bindings[0].Offset-(physicalMaximum-semanticMaximum)) > 1e-15 ||
+		math.Abs(bindings[0].Scale-12) > 1e-12 || bindings[0].ReferenceComponent != "supply" {
+		t.Fatalf("catalog-backed load transfer = %#v", bindings[0])
 	}
 }
 

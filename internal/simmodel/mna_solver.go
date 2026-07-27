@@ -321,6 +321,9 @@ func electricalDeviceResultsWithComparatorStates(
 		case PrimitiveFixedLinearRegulatorV1:
 			voltage = solvedNodeVoltage(system, solution, terminals["VOUT"]) - solvedNodeVoltage(system, solution, terminals["GND"])
 			current = solution[system.branchIndex[device.Component]]
+		case PrimitiveFixedBuckModuleV1:
+			voltage = solvedNodeVoltage(system, solution, terminals["VOUT"]) - solvedNodeVoltage(system, solution, terminals["GND"])
+			current = solution[system.branchIndex[device.Component]]
 		case PrimitiveSynchronousBuckRegulatorV1:
 			var resolved bool
 			voltage, current, resolved = synchronousBuckDeviceResult(device, system, solution)
@@ -352,6 +355,9 @@ func electricalDeviceResultsWithComparatorStates(
 		case PrimitiveSingleOutputIsolatedConverterV1:
 			voltage = solvedNodeVoltage(system, solution, terminals["VOUT_PLUS"]) - solvedNodeVoltage(system, solution, terminals["VOUT_MINUS"])
 			current = solution[system.branchIndex[device.Component]]
+		case PrimitiveProtectedIsolatedConverterV1:
+			voltage = solvedNodeVoltage(system, solution, terminals["VOUT_PLUS"]) - solvedNodeVoltage(system, solution, terminals["VOUT_MINUS"])
+			current = solution[system.branchIndex[device.Component]]
 		case PrimitiveBidirectionalOpenDrainTranslatorV1:
 			parameters := namedValueMap(device.ModelParameters)
 			compiled := compiledNonlinearDevice{primitive: device.PrimitiveModel, terminals: terminals, parameters: parameters}
@@ -365,6 +371,21 @@ func electricalDeviceResultsWithComparatorStates(
 				}
 				maximumCurrent = math.Max(maximumCurrent, math.Abs((a-b)/resistance))
 			}
+			voltage, current = complex(maximumVoltage, 0), complex(maximumCurrent, 0)
+		case PrimitivePushPullTranslatorV1:
+			parameters := namedValueMap(device.ModelParameters)
+			compiled := compiledNonlinearDevice{primitive: device.PrimitiveModel, terminals: terminals, parameters: parameters}
+			maximumVoltage, maximumCurrent := pushPullTranslatorMaximumOutput(compiled, system, solution)
+			voltage, current = complex(maximumVoltage, 0), complex(maximumCurrent, 0)
+		case PrimitivePushPullDigitalIsolatorV1:
+			parameters := namedValueMap(device.ModelParameters)
+			compiled := compiledNonlinearDevice{primitive: device.PrimitiveModel, terminals: terminals, parameters: parameters}
+			maximumVoltage, maximumCurrent := pushPullIsolatorMaximumOutput(compiled, system, solution)
+			voltage, current = complex(maximumVoltage, 0), complex(maximumCurrent, 0)
+		case PrimitiveDirectionControlledTranslatorV1:
+			parameters := namedValueMap(device.ModelParameters)
+			compiled := compiledNonlinearDevice{primitive: device.PrimitiveModel, terminals: terminals, parameters: parameters}
+			maximumVoltage, maximumCurrent := directionControlledTranslatorMaximumOutput(compiled, system, solution)
 			voltage, current = complex(maximumVoltage, 0), complex(maximumCurrent, 0)
 		case PrimitiveBidirectionalOpenDrainIsolatorV1:
 			parameters := namedValueMap(device.ModelParameters)
@@ -404,6 +425,13 @@ func electricalDeviceResultsWithComparatorStates(
 			voltage = solvedNodeVoltage(system, solution, terminals["VIN"]) - solvedNodeVoltage(system, solution, terminals["VOUT"])
 			conductance := reverseBlockingLoadSwitchConductance(compiledNonlinearDevice{primitive: device.PrimitiveModel, terminals: terminals, parameters: namedValueMap(device.ModelParameters), polarity: 1}, &system, solution)
 			current = voltage * complex(conductance, 0)
+		case PrimitiveCurrentLimitingEFuseV1:
+			voltage = solvedNodeVoltage(system, solution, terminals["VIN"]) - solvedNodeVoltage(system, solution, terminals["VOUT"])
+			value, _ := currentLimitingEFuseCurrentAndGradient(
+				compiledNonlinearDevice{primitive: device.PrimitiveModel, terminals: terminals, parameters: namedValueMap(device.ModelParameters), polarity: 1},
+				&system, solution,
+			)
+			current = complex(value, 0)
 		case PrimitiveBJTNPNV1, PrimitiveBJTPNPV1:
 			polarity := 1.0
 			if device.PrimitiveModel == PrimitiveBJTPNPV1 {
@@ -610,8 +638,9 @@ func buildMNASystemWithPreparedOperatingPoint(
 func buildMNASystemWithOpAmpClamps(plan Plan, analysis Analysis, frequency float64, opAmpClamps map[string]float64) (mnaSystem, []Diagnostic) {
 	nodeIndex := make(map[string]int, len(plan.Nodes)-1)
 	labels := make([]string, 0, len(plan.Nodes)+len(plan.Devices))
+	referenceNodes := mnaReferenceNodes(plan)
 	for _, node := range plan.Nodes {
-		if node == plan.GroundNode {
+		if referenceNodes[node] {
 			continue
 		}
 		nodeIndex[node] = len(labels)
@@ -620,7 +649,7 @@ func buildMNASystemWithOpAmpClamps(plan Plan, analysis Analysis, frequency float
 	branchIndex := map[string]int{}
 	multiBranchIndex := map[mnaBranchKey]int{}
 	for _, device := range plan.Devices {
-		if device.PrimitiveModel == PrimitiveVoltageSourceV1 || device.PrimitiveModel == PrimitiveConnectorVoltageSourceV1 || device.PrimitiveModel == PrimitiveInductorTransientV1 || device.PrimitiveModel == PrimitiveOpAmpV1 || device.PrimitiveModel == PrimitiveCurrentSenseAmplifierV1 || device.PrimitiveModel == PrimitiveAdjustableLinearRegulatorV1 || device.PrimitiveModel == PrimitiveFixedLinearRegulatorV1 || device.PrimitiveModel == PrimitiveSynchronousBuckRegulatorV1 || device.PrimitiveModel == PrimitiveFloatingAdjustableRegulatorV1 || device.PrimitiveModel == PrimitiveProgrammableCurrentSourceV1 || device.PrimitiveModel == PrimitiveShuntVoltageReferenceV1 || device.PrimitiveModel == PrimitiveSingleOutputIsolatedConverterV1 {
+		if device.PrimitiveModel == PrimitiveVoltageSourceV1 || device.PrimitiveModel == PrimitiveConnectorVoltageSourceV1 || device.PrimitiveModel == PrimitiveInductorTransientV1 || device.PrimitiveModel == PrimitiveOpAmpV1 || device.PrimitiveModel == PrimitiveCurrentSenseAmplifierV1 || device.PrimitiveModel == PrimitiveAdjustableLinearRegulatorV1 || device.PrimitiveModel == PrimitiveFixedLinearRegulatorV1 || device.PrimitiveModel == PrimitiveFixedBuckModuleV1 || device.PrimitiveModel == PrimitiveSynchronousBuckRegulatorV1 || device.PrimitiveModel == PrimitiveFloatingAdjustableRegulatorV1 || device.PrimitiveModel == PrimitiveProgrammableCurrentSourceV1 || device.PrimitiveModel == PrimitiveShuntVoltageReferenceV1 || device.PrimitiveModel == PrimitiveSingleOutputIsolatedConverterV1 || device.PrimitiveModel == PrimitiveProtectedIsolatedConverterV1 {
 			branchIndex[device.Component] = len(labels)
 			labels = append(labels, "branch_current:"+device.Component)
 		}
@@ -755,6 +784,19 @@ func buildMNASystemWithOpAmpClamps(plan Plan, analysis Analysis, frequency float
 			}
 			stampFixedLinearRegulator(&system, device.Component, terminals, complex(output, 0))
 			stampCurrentSource(&system, terminals["VIN"], terminals["GND"], complex(quiescent, 0))
+		case PrimitiveFixedBuckModuleV1:
+			parameters := namedValueMap(device.ModelParameters)
+			output := parameters["output_voltage_v"]
+			if smallSignalAnalysis(analysis.Kind) {
+				output = 0
+			}
+			stampFixedBuckModule(
+				&system,
+				device.Component,
+				terminals,
+				output,
+				fixedBuckModuleInputCurrentRatio(parameters),
+			)
 		case PrimitiveSynchronousBuckRegulatorV1:
 			parameters := namedValueMap(device.ModelParameters)
 			reference := parameters["reference_voltage_v"]
@@ -826,19 +868,45 @@ func buildMNASystemWithOpAmpClamps(plan Plan, analysis Analysis, frequency float
 				output = 0
 			}
 			stampVoltageSource(&system, device.Component, terminals["VOUT_PLUS"], terminals["VOUT_MINUS"], complex(output, 0))
+		case PrimitiveProtectedIsolatedConverterV1:
+			parameters := namedValueMap(device.ModelParameters)
+			output := parameters["output_voltage_v"]
+			if smallSignalAnalysis(analysis.Kind) {
+				output = 0
+			}
+			stampProtectedIsolatedConverter(
+				&system,
+				device.Component,
+				terminals,
+				output,
+				protectedIsolatedConverterInputCurrentRatio(parameters),
+			)
 		case PrimitiveBidirectionalOpenDrainTranslatorV1:
 			// Channel state and supply-current envelopes are stamped by the
 			// bounded nonlinear solver.
+		case PrimitivePushPullTranslatorV1:
+			// Digital output state and supply-current envelopes are stamped by
+			// the bounded nonlinear solver.
+		case PrimitiveDirectionControlledTranslatorV1:
+			// Direction, output state, and partial-power-down behavior are
+			// stamped by the bounded nonlinear solver.
+		case PrimitivePushPullDigitalIsolatorV1:
+			// Directional fail-safe outputs and supply currents are stamped by
+			// the bounded nonlinear solver.
 		case PrimitiveBidirectionalOpenDrainIsolatorV1:
 			parameters := namedValueMap(device.ModelParameters)
 			if !smallSignalAnalysis(analysis.Kind) {
 				stampCurrentSource(&system, terminals["VDD1"], terminals["GND1"], complex(parameters["side_a_quiescent_current_a"], 0))
 				stampCurrentSource(&system, terminals["VDD2"], terminals["GND2"], complex(parameters["side_b_quiescent_current_a"], 0))
 			}
-		case PrimitiveReverseBlockingLoadSwitchV1:
+		case PrimitiveReverseBlockingLoadSwitchV1, PrimitiveCurrentLimitingEFuseV1:
 			if !smallSignalAnalysis(analysis.Kind) {
 				parameters := namedValueMap(device.ModelParameters)
-				stampCurrentSource(&system, terminals["VIN"], terminals["GND"], complex(parameters["quiescent_current_a"], 0))
+				reference := terminals["GND"]
+				if device.PrimitiveModel == PrimitiveCurrentLimitingEFuseV1 {
+					reference = terminals["RTN"]
+				}
+				stampCurrentSource(&system, terminals["VIN"], reference, complex(parameters["quiescent_current_a"], 0))
 			}
 		case PrimitiveNMOSSwitchV1, PrimitivePMOSSwitchV1:
 			if smallSignalAnalysis(analysis.Kind) {
@@ -861,6 +929,30 @@ func buildMNASystemWithOpAmpClamps(plan Plan, analysis Analysis, frequency float
 		return mnaSystem{}, []Diagnostic{*diagnostic}
 	}
 	return system, nil
+}
+
+func mnaReferenceNodes(plan Plan) map[string]bool {
+	references := map[string]bool{plan.GroundNode: true}
+	for _, device := range plan.Devices {
+		var terminals []string
+		switch device.PrimitiveModel {
+		case PrimitiveSingleOutputIsolatedConverterV1, PrimitiveProtectedIsolatedConverterV1:
+			terminals = []string{"VIN_MINUS", "VOUT_MINUS"}
+		case PrimitiveDualOutputIsolatedConverterV1:
+			terminals = []string{"VIN_MINUS", "COMMON"}
+		case PrimitiveBidirectionalOpenDrainIsolatorV1, PrimitivePushPullDigitalIsolatorV1:
+			terminals = []string{"GND1", "GND2"}
+		default:
+			continue
+		}
+		bindings := terminalMap(device)
+		for _, terminal := range terminals {
+			if node := bindings[terminal]; node != "" {
+				references[node] = true
+			}
+		}
+	}
+	return references
 }
 
 type dynamicCapacitor struct {

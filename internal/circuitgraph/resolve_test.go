@@ -10,6 +10,7 @@ import (
 
 	"kicadai/internal/components"
 	"kicadai/internal/reports"
+	"kicadai/internal/simmodel"
 )
 
 func TestComponentSelectionRequestBindsImplicitTypedValueToInstanceValue(t *testing.T) {
@@ -56,6 +57,56 @@ func TestResolvedSimulationConnectionsPreserveFunctionAliases(t *testing.T) {
 		if got[function] != net {
 			t.Fatalf("connection %s = %q, want %q; all=%#v", function, got[function], net, connections)
 		}
+	}
+}
+
+func TestResolvedSimulationConnectionsRepresentNoConnectsAsIsolatedNodes(t *testing.T) {
+	noConnectA := ResolvedEndpoint{
+		Intent:   Endpoint{Component: "translator", SelectorKind: SelectorFunction, Selector: "A2"},
+		Function: "A2",
+	}
+	noConnectB := ResolvedEndpoint{
+		Intent:   Endpoint{Component: "translator", SelectorKind: SelectorFunction, Selector: "B2"},
+		Function: "B2",
+	}
+	resolved := ResolvedDocument{
+		Components: []ResolvedComponent{{
+			Instance: Component{ID: "translator"},
+			Functions: []ResolvedFunction{
+				{Function: "A2", Aliases: []string{"SIDE_A_2"}},
+				{Function: "B2", Aliases: []string{"SIDE_B_2"}},
+			},
+		}},
+		NoConnects: []ResolvedEndpoint{noConnectA, noConnectB},
+	}
+	connections := resolvedSimulationConnections(resolved)["translator"]
+	got := map[string]string{}
+	for _, connection := range connections {
+		got[connection.Function] = connection.Net
+	}
+	aNode := simulationNoConnectNodeName(noConnectA)
+	bNode := simulationNoConnectNodeName(noConnectB)
+	if aNode == bNode || got["A2"] != aNode || got["SIDE_A_2"] != aNode || got["B2"] != bNode || got["SIDE_B_2"] != bNode {
+		t.Fatalf("no-connect simulation topology = %#v", connections)
+	}
+	nodes := resolvedSimulationNodes(resolved)
+	if !slices.Contains(nodes, simmodel.NodeEvidence{Name: aNode, Role: "no_connect"}) ||
+		!slices.Contains(nodes, simmodel.NodeEvidence{Name: bNode, Role: "no_connect"}) {
+		t.Fatalf("simulation nodes = %#v", nodes)
+	}
+}
+
+func TestSimulationNoConnectNodeNamePreservesTupleBoundaries(t *testing.T) {
+	first := ResolvedEndpoint{
+		Intent:   Endpoint{Component: "a_b", Unit: "c"},
+		Function: "d",
+	}
+	second := ResolvedEndpoint{
+		Intent:   Endpoint{Component: "a", Unit: "b_c"},
+		Function: "d",
+	}
+	if firstName, secondName := simulationNoConnectNodeName(first), simulationNoConnectNodeName(second); firstName == secondName {
+		t.Fatalf("distinct no-connect tuples collapsed to %q", firstName)
 	}
 }
 

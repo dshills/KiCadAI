@@ -44,6 +44,36 @@ func TestLoadCurrentCornerUsesEquivalentStartupResistance(t *testing.T) {
 	}
 }
 
+func TestLoadCurrentCornerAppliesCatalogBackedParallelSupportOffset(t *testing.T) {
+	semanticMaximum, supportCurrent := 0.25, 60e-6
+	physicalMaximum := semanticMaximum - supportCurrent
+	binding := SimulationOperatingBinding{
+		Axis: "load_current", Kind: OperatingLoadCurrent, Component: "load",
+		Scale: 12, Offset: -supportCurrent,
+	}
+	t.Run("current_source", func(t *testing.T) {
+		analysis := simmodel.Analysis{Excitations: []simmodel.SourceExcitation{{Component: "load"}}}
+		if diagnostic := applyOperatingAssignment(&analysis, &simmodel.Plan{}, binding, CornerAssignment{Value: &semanticMaximum}); diagnostic != nil {
+			t.Fatal(diagnostic)
+		}
+		if math.Abs(analysis.Excitations[0].DCValue-physicalMaximum) > 1e-15 {
+			t.Fatalf("physical source current = %.12g, want %.12g", analysis.Excitations[0].DCValue, physicalMaximum)
+		}
+	})
+	t.Run("startup_resistance", func(t *testing.T) {
+		baseResistance := 12 / physicalMaximum
+		plan := simmodel.Plan{Devices: []simmodel.ResolvedDevice{{Component: "load", Family: "resistor", ValueSI: &baseResistance}}}
+		analysis := simmodel.Analysis{Kind: simmodel.AnalysisStartup}
+		if diagnostic := applyOperatingAssignment(&analysis, &plan, binding, CornerAssignment{Value: &semanticMaximum}); diagnostic != nil {
+			t.Fatal(diagnostic)
+		}
+		if len(analysis.DeviceOverrides) != 1 || analysis.DeviceOverrides[0].ValueSI == nil ||
+			math.Abs(*analysis.DeviceOverrides[0].ValueSI-baseResistance) > 1e-12 {
+			t.Fatalf("startup load override = %#v, want %.12g ohm", analysis.DeviceOverrides, baseResistance)
+		}
+	})
+}
+
 func TestLoadCurrentCornerTracksResolvedSupplyCorner(t *testing.T) {
 	baseResistance := 8.0
 	plan := simmodel.Plan{Devices: []simmodel.ResolvedDevice{{Component: "load", Family: "resistor", ValueSI: &baseResistance}}}
