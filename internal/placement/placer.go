@@ -699,10 +699,16 @@ func candidatePlacements(component Component, componentRef string, request Reque
 	rotations := componentRotations(component)
 	layers := candidateLayers(component, request.Rules)
 	maxCandidates := request.Rules.MaxCandidatesPerPart
+	clusterReserve, requiresClusterReserve := requiredProximityAnchorReservation(component, componentRef, request, usable)
+	var clusterObstacles []PlacementResult
+	if requiresClusterReserve {
+		clusterObstacles = requiredProximityAnchorReservationObstacles(componentRef, request, placedByRef)
+	}
 	advancedContext := newAdvancedCandidateScoringContext(component, componentRef, request, placedByRef, advancedRequestContext)
 	candidates := make([]placementCandidate, 0, maxCandidates)
 	xCount := max(1, int(math.Floor((usable.Max.XMM-usable.Min.XMM)/grid))+1)
 	yCount := max(1, int(math.Floor((usable.Max.YMM-usable.Min.YMM)/grid))+1)
+	clusterBlockedCenters := requiredProximityAnchorReservationBlockedCenters(clusterReserve, clusterObstacles, usable, grid, xCount, yCount)
 	variantsPerPoint := max(1, len(rotations)*len(layers))
 	axisSamples := max(7, int(math.Ceil(math.Sqrt(float64(maxCandidates)/float64(variantsPerPoint)))))
 	xIndices := edgeAwareSampledIndices(component, rotations, component.Edge, true, usable.Min.XMM, usable.Max.XMM, edgeInset, edgeSpan, grid, xCount, axisSamples)
@@ -736,13 +742,18 @@ func candidatePlacements(component Component, componentRef string, request Reque
 						recordCandidateRejection(scoring, component, componentRef, candidateResult.Position, index, CandidateRejectOutsideBoard, "candidate is outside usable board area")
 						continue
 					}
-					if reserve, required := requiredProximityAnchorReservation(component, componentRef, request, usable); required &&
-						(candidateResult.Position.XMM-reserve < usable.Min.XMM ||
-							candidateResult.Position.XMM+reserve > usable.Max.XMM ||
-							candidateResult.Position.YMM-reserve < usable.Min.YMM ||
-							candidateResult.Position.YMM+reserve > usable.Max.YMM) {
-						recordCandidateRejection(scoring, component, componentRef, candidateResult.Position, index, CandidateRejectProximity, "candidate leaves insufficient board area for its required proximity cluster")
-						continue
+					if requiresClusterReserve {
+						if candidateResult.Position.XMM-clusterReserve < usable.Min.XMM ||
+							candidateResult.Position.XMM+clusterReserve > usable.Max.XMM ||
+							candidateResult.Position.YMM-clusterReserve < usable.Min.YMM ||
+							candidateResult.Position.YMM+clusterReserve > usable.Max.YMM {
+							recordCandidateRejection(scoring, component, componentRef, candidateResult.Position, index, CandidateRejectProximity, "candidate leaves insufficient board area for its required proximity cluster")
+							continue
+						}
+						if peerRef := clusterBlockedCenters[proximityClusterCell{x: xIndex, y: yIndex}]; peerRef != "" {
+							recordCandidateRejection(scoring, component, componentRef, candidateResult.Position, index, CandidateRejectProximity, "candidate proximity-cluster reserve overlaps committed component "+peerRef, peerRef)
+							continue
+						}
 					}
 					if !component.Fixed && component.Edge != EdgeNone && !edgeConstraintSatisfied(request.Board, component, candidateResult.Position, component.Edge, edgeTolerance) {
 						recordCandidateRejection(scoring, component, componentRef, candidateResult.Position, index, CandidateRejectEdge, "candidate does not satisfy edge constraint")
@@ -864,6 +875,65 @@ func requiredProximityAnchorReservation(component Component, componentRef string
 		return 0, false
 	}
 	return reserve, true
+}
+
+func requiredProximityAnchorReservationObstacles(componentRef string, request Request, placedByRef map[string]PlacementResult) []PlacementResult {
+	componentRef = normalizeRef(componentRef)
+	targets := map[string]struct{}{}
+	for _, rule := range request.ProximityRules {
+		if !rule.Required || rule.MaxDistanceMM <= 0 || normalizeRef(rule.AnchorRef) != componentRef {
+			continue
+		}
+		for _, targetRef := range rule.TargetRefs {
+			targetRef = normalizeRef(targetRef)
+			if targetRef != "" && targetRef != componentRef {
+				targets[targetRef] = struct{}{}
+			}
+		}
+	}
+	refs := make([]string, 0, len(placedByRef))
+	for ref := range placedByRef {
+		refs = append(refs, ref)
+	}
+	sort.Strings(refs)
+	obstacles := make([]PlacementResult, 0, len(refs))
+	for _, ref := range refs {
+		if _, target := targets[normalizeRef(ref)]; target {
+			continue
+		}
+		obstacles = append(obstacles, placedByRef[ref])
+	}
+	return obstacles
+}
+
+type proximityClusterCell struct {
+	x int
+	y int
+}
+
+func requiredProximityAnchorReservationBlockedCenters(reserve float64, obstacles []PlacementResult, usable Rect, grid float64, xCount, yCount int) map[proximityClusterCell]string {
+	if reserve <= 0 || len(obstacles) == 0 || grid <= 0 || xCount <= 0 || yCount <= 0 {
+		return nil
+	}
+	blocked := map[proximityClusterCell]string{}
+	const gridIndexEpsilon = 1e-9
+	for _, obstacle := range obstacles {
+		minX := int(math.Ceil((obstacle.Bounds.Min.XMM-reserve-usable.Min.XMM)/grid - gridIndexEpsilon))
+		maxX := int(math.Floor((obstacle.Bounds.Max.XMM+reserve-usable.Min.XMM)/grid + gridIndexEpsilon))
+		minY := int(math.Ceil((obstacle.Bounds.Min.YMM-reserve-usable.Min.YMM)/grid - gridIndexEpsilon))
+		maxY := int(math.Floor((obstacle.Bounds.Max.YMM+reserve-usable.Min.YMM)/grid + gridIndexEpsilon))
+		minX, maxX = max(0, minX), min(xCount-1, maxX)
+		minY, maxY = max(0, minY), min(yCount-1, maxY)
+		for x := minX; x <= maxX; x++ {
+			for y := minY; y <= maxY; y++ {
+				cell := proximityClusterCell{x: x, y: y}
+				if _, exists := blocked[cell]; !exists {
+					blocked[cell] = obstacle.Ref
+				}
+			}
+		}
+	}
+	return blocked
 }
 
 func appendRequiredProximityCandidateSamples(component Component, componentRef string, request Request, placedByRef map[string]PlacementResult, usable Rect, grid float64, xCount int, yCount int, xIndices []int, yIndices []int) ([]int, []int) {

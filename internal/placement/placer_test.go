@@ -557,6 +557,71 @@ func TestPlaceReservesBoardAreaAroundRequiredProximityAnchor(t *testing.T) {
 	}
 }
 
+func TestRequiredProximityAnchorReservationAvoidsCommittedComponents(t *testing.T) {
+	request := Request{
+		ProximityRules: []ProximityRule{
+			{ID: "first", AnchorRef: "U2", TargetRefs: []string{"C1"}, MaxDistanceMM: 3, Required: true},
+			{ID: "second", AnchorRef: "U2", TargetRefs: []string{"C2"}, MaxDistanceMM: 3, Required: true},
+		},
+	}
+	placed := map[string]PlacementResult{
+		"u1": {Ref: "U1", Bounds: Rect{Min: Point{XMM: 8, YMM: 8}, Max: Point{XMM: 12, YMM: 12}}},
+	}
+	obstacles := requiredProximityAnchorReservationObstacles("U2", request, placed)
+	blocked := requiredProximityAnchorReservationBlockedCenters(5, obstacles, Rect{Min: Point{}, Max: Point{XMM: 20, YMM: 20}}, 1, 21, 21)
+	if ref := blocked[proximityClusterCell{x: 10, y: 10}]; ref != "U1" {
+		t.Fatalf("reservation conflict = %q, want deterministic U1 conflict", ref)
+	}
+
+	placed = map[string]PlacementResult{
+		"c1": {Ref: "C1", Bounds: Rect{Min: Point{XMM: 8, YMM: 8}, Max: Point{XMM: 12, YMM: 12}}},
+	}
+	obstacles = requiredProximityAnchorReservationObstacles("U2", request, placed)
+	blocked = requiredProximityAnchorReservationBlockedCenters(5, obstacles, Rect{Min: Point{}, Max: Point{XMM: 20, YMM: 20}}, 1, 21, 21)
+	if ref := blocked[proximityClusterCell{x: 10, y: 10}]; ref != "" {
+		t.Fatalf("required target must be allowed inside its anchor reservation: %q", ref)
+	}
+}
+
+func TestPlaceKeepsRequiredClusterReserveClearOfCommittedComponents(t *testing.T) {
+	request := Request{
+		Board: BoardPlacementArea{WidthMM: 60, HeightMM: 40, MarginMM: 1},
+		Rules: DefaultRules(),
+		Components: []Component{
+			{
+				Ref: "FIXED", FootprintID: "Test:Fixed", Bounds: Bounds{WidthMM: 16, HeightMM: 14, Source: BoundsExplicit},
+				Fixed: true, Position: &Placement{XMM: 15, YMM: 15, Layer: "F.Cu"},
+			},
+			{Ref: "ANCHOR", FootprintID: "Test:U", Bounds: Bounds{WidthMM: 6, HeightMM: 5, Source: BoundsExplicit}},
+			{Ref: "LARGE", FootprintID: "Test:L", Bounds: Bounds{WidthMM: 14, HeightMM: 12, Source: BoundsExplicit}},
+			{Ref: "BULK", FootprintID: "Test:C", Bounds: Bounds{WidthMM: 8, HeightMM: 8, Source: BoundsExplicit}},
+		},
+		ProximityRules: []ProximityRule{
+			{ID: "large", AnchorRef: "ANCHOR", TargetRefs: []string{"LARGE"}, MaxDistanceMM: 4, Required: true},
+			{ID: "bulk", AnchorRef: "ANCHOR", TargetRefs: []string{"BULK"}, MaxDistanceMM: 4, Required: true},
+		},
+	}
+
+	result := Place(request)
+	if result.Status != StatusPlaced {
+		t.Fatalf("placement = %#v", result)
+	}
+	byRef := map[string]PlacementResult{}
+	for _, placed := range result.Placements {
+		byRef[placed.Ref] = placed
+	}
+	usable := BoardUsableRect(request.Board, request.Rules)
+	reserve, required := requiredProximityAnchorReservation(request.Components[1], "ANCHOR", request, usable)
+	anchor := byRef["ANCHOR"]
+	reservation := Rect{
+		Min: Point{XMM: anchor.Position.XMM - reserve, YMM: anchor.Position.YMM - reserve},
+		Max: Point{XMM: anchor.Position.XMM + reserve, YMM: anchor.Position.YMM + reserve},
+	}
+	if !required || reservation.Intersects(byRef["FIXED"].Bounds) {
+		t.Fatalf("anchor reserve %#v overlaps committed component %#v", reservation, byRef["FIXED"].Bounds)
+	}
+}
+
 func TestOrderComponentsForRequiredProximityPreservesFixedPlacementBoundary(t *testing.T) {
 	components := []Component{
 		{Ref: "ANCHOR", Fixed: true},
