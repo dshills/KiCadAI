@@ -1,8 +1,9 @@
 # Project Status
 
-Last verified: 2026-07-27 by the complete local short suite, the five-case
-open-world offline and installed-KiCad promotion corpora, protected USB-C
-regressions, and independent clean-checkout promotion bundles.
+Last verified: 2026-07-28 by the complete local short suite, the five-case
+open-world installed-KiCad promotion corpus, protected USB-C LED and I2C
+regressions, the ESP32 minimal-system fixture, and independent clean-checkout
+promotion bundles.
 
 The six-circuit independent external review is now a release-blocking,
 machine-readable regression ladder. Its fixes cover atomic composed placement,
@@ -27,6 +28,19 @@ return stable actionable gaps without writing a project. The assessment is
 re-evaluated monotonically through downstream workflow stages and embedded in
 workflow, promotion, and manifest evidence. See
 [Capability-Aware Generation Gate](capability-gating.md).
+
+Unsupported is now actionable without becoming permissive. The
+evidence-driven capability-expansion path deterministically maps typed gaps
+from electrically different domains into reusable architecture, component,
+model, physical, routing, or verification needs. It accepts only bounded,
+hash-verified, explicitly claimed source records; keeps every generated
+provider or registry artifact experimental; generates representative and
+adversarial promotion cases; and seals results into a content-addressed
+review-ready bundle. Promotion requires an explicit approval bound to that
+bundle and explicit mutation authorization. Fresh behavior-only requirements
+can load the resulting supported registry with `--capability-registry`; the
+original failed request remains unsupported and no request-specific exception
+is installed.
 
 ## Production-Capable Foundations
 
@@ -437,8 +451,11 @@ frozen V5 envelope. The next closure step is broader clock/fanout and
 programming-load evidence, followed by converter, isolation, and high-energy
 protection families outside the current model registry. Catalog-independent
 part qualification, denser-board physical synthesis, and evaluation over novel
-behavior-only requests remain important. Unknown behavior must continue to
-produce a stable capability gap instead of guessed implementation detail.
+behavior-only requests remain important. Those gaps can now produce
+deterministic expansion proposals, but they still require real engineering
+sources, representative simulation/workflow/KiCad evidence, and review before
+entering the supported registry. Unknown behavior must continue to produce a
+stable capability gap instead of guessed implementation detail.
 
 See the [Roadmap](../specs/ROADMAP.md) for prioritized work and the
 [Development Reference](development.md) for repository-level limitations and

@@ -63,6 +63,27 @@ reach at most `candidate`; unsupported evidence blocks promotion.
 
 ## Promoting a new capability
 
+The evidence-driven expansion pipeline turns an unsupported assessment into
+reviewable work without changing that assessment or weakening its gate:
+
+1. `Plan` deterministically classifies every typed gap as architecture,
+   component, model, physical-rule, routing, or verification work.
+2. `BuildCandidate` ingests bounded local source bytes, verifies declared
+   SHA-256 digests and need claims, and places generic artifacts and
+   declarative providers in an `experimental` candidate registry.
+3. `GenerateCases` creates one representative and four fail-closed adversarial
+   cases for every need. `BuildBundle` remains `experimental` until the exact
+   case/gate inventory passes.
+4. A passing bundle becomes `review_ready`, never `supported`.
+5. `Promote` requires explicit mutation authorization and an approval bound to
+   the exact bundle hash before it can update the supported registry.
+
+Source locators, filenames, AI assertions, and unverified hashes are not proof.
+Missing, conflicting, irrelevant, fabricated, or incompletely licensed model
+evidence is rejected. Provider contracts advertise only reviewed electrical
+bounds; a fresh request cannot define the bounds that supposedly satisfy it.
+Candidate and review-ready packages are never fabrication-ready.
+
 A capability becomes supported by adding generic metadata and reproducible
 evidence, not a fixture-name exception:
 
@@ -79,3 +100,6 @@ evidence, not a fixture-name exception:
 The current promoted and compositionally supported corpora classify as
 `supported`. Unknown providers, components, pins, models, physical
 capabilities, or required verification remain fail-closed.
+
+The artifact schemas and invariants are specified in
+[Evidence-Driven Capability Expansion](../specs/evidence-driven-capability-expansion/SPEC.md).

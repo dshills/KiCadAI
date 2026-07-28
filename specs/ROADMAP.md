@@ -42,6 +42,14 @@ from validation feedback to safe automatic repair.
   unsupported generation returns structured gaps without project mutation.
   Workflow checkpoints can only preserve or reduce confidence, and the final
   assessment is embedded in workflow, promotion, and manifest artifacts.
+- Evidence-driven capability expansion converts immutable unsupported
+  assessments into byte-stable reusable need plans; ingests bounded,
+  hash-verified source and artifact payloads into an experimental quarantine;
+  generates representative and adversarial cases; and requires complete
+  simulation, workflow, installed-KiCad, writer, routing, connectivity, and
+  round-trip evidence before producing a review-ready bundle. Only an explicit
+  hash-bound approval and mutation may update the supported registry used by a
+  fresh requirement.
 - Clean-checkout KiCad promotion with an exact `make promotion-bundle`
   reproduction command, a checksum-pinned KiCad 10.0.3 toolchain lock,
   manifest-driven two-run execution, strict normalized comparison,
@@ -1217,9 +1225,9 @@ two clean local promotion roots with identical content-addressed evidence.
 3. Expand catalog-independent part qualification, calculated rating, and
    fabrication evidence before claiming broader
    autonomous or fabrication-ready coverage.
-4. Add active learning/evaluation over novel behavior-only requests so new
-   capability gaps are ranked by reusable family impact rather than fixture
-   identity.
+4. Feed novel behavior-only evaluations into the evidence-driven expansion
+   planner so capability gaps are ranked by reusable family impact, then source
+   and promote only the highest-value packages with independent evidence.
 5. Extend reviewed dynamic models into additional converter, isolation, and
    high-energy protection families without weakening fail-closed model,
    convergence, SOA, or event-coverage requirements.

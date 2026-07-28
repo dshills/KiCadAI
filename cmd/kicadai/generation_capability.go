@@ -12,13 +12,16 @@ import (
 )
 
 func runGenerationCapability(ctx context.Context, opts cliOptions, stdout io.Writer) error {
+	if len(opts.commandArgs) > 0 && strings.TrimSpace(opts.commandArgs[0]) == "expansion" {
+		return runCapabilityExpansion(ctx, opts, stdout)
+	}
 	if len(opts.commandArgs) == 0 || strings.TrimSpace(opts.commandArgs[0]) != "generation" {
 		issue := reports.Issue{
 			Code:       reports.CodeInvalidArgument,
 			Severity:   reports.SeverityError,
 			Path:       "capability",
-			Message:    "capability requires subcommand: generation",
-			Suggestion: "run kicadai capability generation --json",
+			Message:    "capability requires subcommand: generation or expansion",
+			Suggestion: "run kicadai capability generation --json or kicadai capability expansion plan --request <assessment.json>",
 		}
 		return writeReportFailure(stdout, "capability", issue)
 	}

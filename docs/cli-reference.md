@@ -220,6 +220,65 @@ limits, and unsupported claims. The complete provider-free workflow is in
 Unsupported graph data must be treated as a fail-closed preflight result; no
 KiCad project should be written after a blocking diagnostic.
 
+### Evidence-Driven Capability Expansion
+
+Use an unsupported `kicadai.capability-assessment.v1` artifact to produce a
+byte-stable expansion plan:
+
+```sh
+kicadai \
+  --request ./unsupported-assessment.json \
+  --output ./expansion-plan.json \
+  capability expansion plan
+```
+
+Candidate and bundle build requests are strict local JSON manifests. Candidate
+source entries name local files and their expected SHA-256; source bytes are
+bounded and re-hashed during ingestion. Source files must resolve inside the
+candidate manifest directory, including after symlink resolution. Candidate
+ingestion permits at most 512 sources, 8 MiB each, and 64 MiB in aggregate. The
+schemas and complete fields are in
+the [capability-expansion specification](../specs/evidence-driven-capability-expansion/SPEC.md).
+
+```sh
+kicadai \
+  --request ./candidate-build-request.json \
+  --output ./candidate-registry.json \
+  capability expansion candidate
+
+kicadai \
+  --request ./bundle-build-request.json \
+  --output ./promotion-bundle.json \
+  capability expansion bundle
+```
+
+Promotion is the only mutation step. `--request` is the exact review-ready
+bundle, `--file` is the hash-bound approval, `--target` is an optional existing
+supported registry, and `--execute` is mandatory:
+
+```sh
+kicadai \
+  --request ./promotion-bundle.json \
+  --file ./promotion-approval.json \
+  --target ./supported-capabilities.json \
+  --output ./supported-capabilities.next.json \
+  --execute \
+  capability expansion promote
+```
+
+Candidate and review-ready artifacts are not fabrication-ready. Missing,
+conflicting, irrelevant, fabricated, or incomplete evidence fails closed. A
+promoted declarative architecture provider can be used by a fresh behavior-only
+request without replacing the built-in catalog provider:
+
+```sh
+kicadai \
+  --request ./fresh-requirement.json \
+  --capability-registry ./supported-capabilities.next.json \
+  --output ./out/fresh-requirement \
+  requirement create
+```
+
 ### Generic Circuit Preflight
 
 Agents can validate a `generic-circuit-v1` graph before invoking a provider or

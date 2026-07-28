@@ -105,6 +105,29 @@ source, installed capabilities, prior proposal, and prior compilation. See
 [Intent Planning](intent-planning.md#behavioral-intent-compilation) and the
 [compiler audit](../specs/uncertainty-aware-behavioral-intent-compilation/AUDIT.md).
 
+An `unsupported` compilation or downstream capability assessment is not
+silently retried with invented engineering detail. Its
+`kicadai.capability-assessment.v1` artifact can instead enter the
+evidence-driven expansion workflow:
+
+```sh
+kicadai \
+  --request ./unsupported-assessment.json \
+  --output ./expansion-plan.json \
+  capability expansion plan
+```
+
+The resulting plan describes reusable architecture, component, model,
+physical-rule, routing, or verification work. Source and artifact payloads are
+locally re-hashed into an experimental candidate; generated representative and
+adversarial cases define the full promotion gate inventory. Even complete
+passing evidence produces only a review-ready bundle. Support requires a
+separate exact-hash approval plus `capability expansion promote --execute`, and
+a fresh request opts into the reviewed registry with
+`--capability-registry`. See
+[Capability-Aware Generation Gate](capability-gating.md#promoting-a-new-capability)
+for the trust boundary.
+
 The offline generic-composition acceptance corpus exercises the checked-in RC
 filter and transistor-switch graphs through strict decode, catalog resolution,
 schematic/electrical checks, deterministic placement, routing, project writing,

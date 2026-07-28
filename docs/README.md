@@ -11,7 +11,8 @@ This directory holds the detailed reference material that used to live in the pr
   setup, reproducible KiCad-backed lanes, evidence, and failure behavior.
 - [Capability-Aware Generation Gate](capability-gating.md): supported,
   experimental, and unsupported decisions; evidence links; opt-in behavior;
-  monotonic reassessment; and promotion rules.
+  monotonic reassessment; deterministic evidence-driven expansion proposals;
+  and hash-bound promotion rules.
 - [Intent Planning And AI Workflow](intent-planning.md): uncertainty-aware
   behavioral compilation, structured intent, rationale reports, semantic
   synthesis, and current AI workflow limits.

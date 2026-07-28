@@ -24,6 +24,14 @@ path.
   requests fail closed with evidence-linked diagnostics. Assessments are
   re-evaluated through later workflow stages and embedded in workflow,
   promotion, and manifest artifacts.
+- Unsupported assessments can now be converted into deterministic,
+  content-addressed expansion plans. Source-backed component, model, physical,
+  verification, and declarative architecture additions remain quarantined as
+  `experimental`; automatic representative/adversarial cases and the complete
+  workflow/KiCad gate contract produce a review-ready bundle only after every
+  result passes. An exact-hash approval and explicit mutation command are
+  required to update the supported-capability registry, which behavior-only
+  requirement generation can load for fresh requests.
 - Ordinary behavior-first requests can enter through the uncertainty-aware
   `intent compile` trust boundary. It accounts for every source statement,
   asks the minimum blocking clarification, records stable capability gaps, and

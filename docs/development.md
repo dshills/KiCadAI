@@ -102,6 +102,10 @@ Key packages:
   reporting, and executable requirement compilation.
 - `internal/architecturesearch`: installed semantic capability discovery and
   deterministic bounded architecture selection.
+- `internal/capabilityexpansion`: deterministic unsupported-gap planning,
+  bounded source ingestion, quarantined candidate registries, generated
+  representative/adversarial promotion cases, hash-bound review bundles, and
+  explicit supported-registry promotion.
 - `internal/compositionlowering`: strict v3 requirement lowering and the
   frozen open-set, adversarial, and simulation-grounded promotion corpora.
 - `internal/kiapi`: live KiCad IPC client and transport boundary.

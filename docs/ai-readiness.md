@@ -201,6 +201,30 @@ one minimal blocking question; unavailable behavior produces a stable
 capability-gap record. This evidence measures the registered envelope and does
 not promote unsupported matrix records implicitly.
 
+## Evidence-Driven Capability Expansion
+
+An unsupported assessment can now produce a deterministic expansion plan
+without being reclassified. Gap kinds are mapped to reusable architecture,
+component, model, physical-rule, routing, and verification needs. Candidate
+registries accept only bounded content-addressed sources whose explicit claims
+and source kinds satisfy those needs; component and simulation-model proposals
+remain quarantined alongside reviewed declarative provider contracts.
+
+Each need automatically receives a representative case plus missing,
+conflicting, irrelevant, and fabricated-evidence adversarial cases. A promotion
+bundle stays `experimental` until source integrity, deterministic replay,
+simulation, workflow, installed-KiCad ERC/strict DRC, connectivity, route
+completion, writer correctness, and zero-diff round trip all pass. Passing
+changes the bundle only to `review_ready`. A hash-bound review approval and
+explicit registry mutation are still required for support, and fresh held-out
+requests must select the promoted capability through the normal typed provider
+interface.
+
+This closes the process gap between “we know this is unsupported” and “we can
+propose the generic evidence needed to support it.” It does not make arbitrary
+unknown circuits safe or allow an AI to invent component ratings, models,
+physical rules, or validation results.
+
 ## Generic MCU Subsystems
 
 The behavior-driven catalog lane now selects among three verified controller

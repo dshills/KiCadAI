@@ -62,7 +62,7 @@ Usage:
 
 Commands:
   capabilities  Report detected KiCad API capabilities
-	capability    Report AI generation capability contracts
+  capability    Report generation contracts and manage evidence-driven capability expansion
   config        Print resolved connection configuration
   documents     List open KiCad documents
   draw-led-demo Execute the LED indicator schematic plan when supported
@@ -108,6 +108,7 @@ Global flags:
   --output string        Output project directory for generation commands
   --target string        Project, schematic, or PCB target for repair commands
   --request string       Structured request JSON path for generator commands
+  --capability-registry string Reviewed supported-capability registry for requirement generation
   --text string          Natural-language intent text
   --file string          Natural-language intent text file
   --prompt string        AI-provider natural-language design request
@@ -226,6 +227,7 @@ type cliOptions struct {
 	output                      string
 	target                      string
 	requestPath                 string
+	capabilityRegistry          string
 	intentText                  string
 	intentFile                  string
 	aiPrompt                    string
@@ -248,7 +250,7 @@ type cliOptions struct {
 	libGND                      string
 	libResistor                 string
 	libLED                      string
-	execute                     bool
+	execute                     bool // explicit authorization for mutation commands
 	withPCB                     bool
 	overwrite                   bool
 	allowImportedApply          bool
@@ -446,6 +448,7 @@ func parse(args []string, stderr io.Writer) (cliOptions, string, error) {
 	flags.StringVar(&opts.output, "output", "", "output project directory")
 	flags.StringVar(&opts.target, "target", "", "repair target project or file")
 	flags.StringVar(&opts.requestPath, "request", "", "structured request JSON path")
+	flags.StringVar(&opts.capabilityRegistry, "capability-registry", "", "reviewed supported-capability registry for requirement generation")
 	flags.StringVar(&opts.intentText, "text", "", "natural-language intent text")
 	flags.StringVar(&opts.intentFile, "file", "", "natural-language intent text file")
 	flags.StringVar(&opts.aiPrompt, "prompt", "", "AI-provider natural-language design request")
@@ -468,7 +471,7 @@ func parse(args []string, stderr io.Writer) (cliOptions, string, error) {
 	flags.StringVar(&opts.libGND, "lib-gnd", defaultLibraryIDGND, "GND symbol library ID")
 	flags.StringVar(&opts.libResistor, "lib-resistor", defaultLibraryIDResistor, "resistor symbol library ID")
 	flags.StringVar(&opts.libLED, "lib-led", defaultLibraryIDLED, "LED symbol library ID")
-	flags.BoolVar(&opts.execute, "execute", false, "execute mutation command")
+	flags.BoolVar(&opts.execute, "execute", false, "explicitly authorize a mutation command")
 	flags.BoolVar(&opts.withPCB, "with-pcb", false, "include PCB output")
 	flags.BoolVar(&opts.overwrite, "overwrite", false, "overwrite existing project directory")
 	flags.BoolVar(&opts.allowImportedApply, "allow-imported-apply", false, "allow transaction apply to mutate an existing imported project")

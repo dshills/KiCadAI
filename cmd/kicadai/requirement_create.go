@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"kicadai/internal/architecturesearch"
+	"kicadai/internal/capabilityexpansion"
 	"kicadai/internal/capabilitygate"
 	"kicadai/internal/circuitgraph"
 	"kicadai/internal/closedloopsynthesis"
@@ -51,7 +52,7 @@ func runRequirement(ctx context.Context, opts cliOptions, stdout io.Writer) erro
 	if err != nil {
 		return writeRequirementFailure(stdout, reports.Issue{Code: reports.CodeValidationFailed, Severity: reports.SeverityError, Path: "catalog", Message: err.Error()})
 	}
-	registry, registryIssues := architecturesearch.NewCatalogRegistry(catalog)
+	registry, registryIssues := loadRequirementArchitectureRegistry(catalog, opts.capabilityRegistry)
 	if reports.HasBlockingIssue(registryIssues) {
 		return writeRequirementIssues(stdout, registryIssues)
 	}
@@ -223,6 +224,43 @@ func runRequirement(ctx context.Context, opts cliOptions, stdout io.Writer) erro
 		return errors.New("requirement create reported blocking issues")
 	}
 	return nil
+}
+
+func loadRequirementArchitectureRegistry(catalog *components.Catalog, supportedRegistryPath string) (*architecturesearch.Registry, []reports.Issue) {
+	catalogProvider, err := architecturesearch.NewCatalogProvider(catalog)
+	if err != nil {
+		return nil, []reports.Issue{{
+			Code: reports.CodeValidationFailed, Severity: reports.SeverityError,
+			Path: "providers.catalog", Message: err.Error(),
+		}}
+	}
+	providers := []architecturesearch.FragmentProvider{catalogProvider}
+	supportedRegistryPath = strings.TrimSpace(supportedRegistryPath)
+	if supportedRegistryPath != "" {
+		supported, decodeErr := decodeCapabilityArtifactFile(
+			supportedRegistryPath,
+			capabilityexpansion.DecodeSupportedRegistry,
+		)
+		if decodeErr != nil {
+			code := reports.CodeValidationFailed
+			if errors.Is(decodeErr, os.ErrNotExist) {
+				code = reports.CodeMissingFile
+			}
+			return nil, []reports.Issue{{
+				Code: code, Severity: reports.SeverityError,
+				Path: supportedRegistryPath, Message: decodeErr.Error(),
+			}}
+		}
+		promoted, providerErr := capabilityexpansion.Providers(supported)
+		if providerErr != nil {
+			return nil, []reports.Issue{{
+				Code: reports.CodeValidationFailed, Severity: reports.SeverityError,
+				Path: supportedRegistryPath, Message: providerErr.Error(),
+			}}
+		}
+		providers = append(providers, promoted...)
+	}
+	return architecturesearch.NewRegistry(providers...)
 }
 
 func writeRequirementFailure(stdout io.Writer, issue reports.Issue) error {
