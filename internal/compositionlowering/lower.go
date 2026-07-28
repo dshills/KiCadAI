@@ -1079,6 +1079,8 @@ func componentRole(catalogID, usage string) circuitgraph.ComponentRole {
 		return circuitgraph.RoleSensor
 	case "clock_source":
 		return circuitgraph.RoleOscillator
+	case "crystal":
+		return circuitgraph.RoleOscillator
 	case "mcu", "opamp", "comparator", "level_translator", "logic_buffer":
 		return circuitgraph.RoleIC
 	default:

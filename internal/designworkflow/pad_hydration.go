@@ -257,6 +257,14 @@ func verifiedPadTemplate(footprintID string) (verifiedPadTemplateRecord, bool) {
 		"LED_SMD:LED_0805_2012Metric",
 		"Diode_SMD:D_SOD-323":
 		return twoPadTemplate(2.0, 1.25, 0.7, 0.8, 1.2), true
+	case "Crystal:Crystal_SMD_5032-2Pin_5.0x3.2mm":
+		return verifiedPadTemplateRecord{
+			Bounds: verifiedCourtyardBoundsFromExtents(-3.1, -2.1, 3.1, 2.1),
+			Pads: []placement.PadSummary{
+				smdPad("1", -1.85, 0, 2.0, 2.4, "roundrect"),
+				smdPad("2", 1.85, 0, 2.0, 2.4, "roundrect"),
+			},
+		}, true
 	case "Resistor_SMD:R_1206_3216Metric":
 		return twoPadTemplate(3.2, 1.6, 1.2, 1.2, 2.4), true
 	case "Resistor_SMD:R_2512_6332Metric":

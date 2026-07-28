@@ -3,6 +3,7 @@ package architecturesearch
 import (
 	"encoding/json"
 	"errors"
+	"math"
 	"reflect"
 	"slices"
 	"strings"
@@ -340,8 +341,26 @@ func TestValidateMCUAssignmentRejectsClockAndI2CLoading(t *testing.T) {
 		t.Fatal(err)
 	}
 	assertMCUElectricalCode(t, validateMCUAssignmentElectrical(record, request, assignment), CodeMCUClockFrequency)
+	request.Constraints = []Constraint{constraintNumber("clock_frequency", "target", assignment.ClockOption.MaximumHz*0.995, "Hz", 1)}
+	assertMCUElectricalCode(t, validateMCUAssignmentElectrical(record, request, assignment), CodeMCUClockFrequency)
 	request.Constraints = []Constraint{constraintNumber("bus_capacitance", "maximum", 500, "pF", 0)}
 	assertMCUElectricalCode(t, validateMCUAssignmentElectrical(record, request, assignment), CodeMCUPeripheralLoading)
+}
+
+func TestMCUProgrammingTargetVoltageRangeAllowsEquivalentParsedValues(t *testing.T) {
+	ports := []RoleContract{
+		providerRole("signal_a", "digital", "bidirectional", 3.0, 3.3),
+		providerRole("signal_b", "digital", "bidirectional", 3.1, 3.3+0.5e-3),
+	}
+	minimum, maximum, ok := mcuProgrammingTargetVoltageRange(ports)
+	if !ok || math.Abs(minimum-3.1) > 1e-12 || math.Abs(maximum-3.3) > 1e-12 {
+		t.Fatalf("compatible voltage-range intersection = %.9g..%.9g, %t", minimum, maximum, ok)
+	}
+
+	ports[1] = providerRole("signal_b", "digital", "bidirectional", 3.302, 3.5)
+	if _, _, ok := mcuProgrammingTargetVoltageRange(ports); ok {
+		t.Fatal("disjoint voltage ranges were accepted")
+	}
 }
 
 func architectureMCURecord(t *testing.T, id string) components.ComponentRecord {

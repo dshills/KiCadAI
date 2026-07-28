@@ -1,6 +1,6 @@
 # KiCadAI Roadmap
 
-Date: 2026-07-27
+Date: 2026-07-28
 
 This roadmap replaces the older roadmap and gap analysis now archived as
 `specs/OLD_ROADMAP.md` and `specs/OLD_ROADMAP_GAP.md`.
@@ -155,6 +155,12 @@ from validation feedback to safe automatic repair.
   support networks. A neutral three-case corpus reaches deterministic replay
   and installed-KiCad ERC, strict DRC, route/connectivity, writer, and zero-diff
   round-trip gates.
+- Behavior-driven controller clock/programming synthesis with deterministic
+  concrete crystal selection, calculated load capacitors, retained
+  drive/stability/startup bounds, and first-class programming frequency,
+  loading, voltage, reset/boot-entry, and shared-pin isolation evidence. Frozen
+  external-crystal ISP and integrated-clock UART cases pass the full local
+  installed-KiCad lane; unpowered-target SWD remains a stable unsupported case.
 - Uncertainty-aware behavioral intent compilation above the strict v3
   requirement contract. `intent compile` accepts behavior, interfaces,
   operating conditions, tolerances, and safety constraints without accepting
@@ -1230,8 +1236,9 @@ systems pass offline and installed-KiCad two-run promotion. The V5 dynamic
 electrothermal/control-loop milestone is also complete: all six circuits pass
 two clean local promotion roots with identical content-addressed evidence.
 
-1. Broaden clock/fanout and programming-load evidence beyond the completed
-   power/interface corpus while retaining stable unsupported outcomes.
+1. Derive MCU power integrity and decoupling from behavior-level transient
+   demand, startup, brownout, noise, and domain constraints, while retaining
+   stable unsupported outcomes for incomplete evidence.
 2. Generalize bounded placement-routing correction from observed
    failures without introducing fixture-identity logic.
 3. Expand catalog-independent part qualification, calculated rating, and

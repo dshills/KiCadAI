@@ -1213,11 +1213,11 @@ func (provider *CatalogProvider) expandSingleComponent(ctx context.Context, requ
 		}
 		bindings := mcuRealizationBindings(request.Ports, selection.selected.InstanceID, assignment, selection.record)
 		connections := mcuSupplyConnections(selection)
-		parts, connections, err := provider.expandMCUSupport(ctx, request, selection, assignment, connections)
+		parts, connections, calculations, err := provider.expandMCUSupport(ctx, request, selection, assignment, connections)
 		if err != nil {
 			return nil, err
 		}
-		return provider.expansion(request, usage, parts, bindings, connections, nil, 0)
+		return provider.expansion(request, usage, parts, bindings, connections, calculations, 0)
 	}
 	selection, err := provider.selectComponent(ctx, family, searchText, ratings, true)
 	if err != nil {
@@ -2087,7 +2087,7 @@ func (provider *CatalogProvider) selectPassiveComponentWithRatings(ctx context.C
 	evidence := componentEvidence(selection.Component, selection.Candidate.Confidence)
 	return catalogPart{
 		selected: SelectedComponent{InstanceID: canonicalIdentifier(family), CatalogID: selection.Component.ID, VariantID: selection.Variant.ID, Evidence: evidence.Confidence},
-		record:   selection.Component, usage: canonicalIdentifier(family), evidence: evidence,
+		record:   selection.Component, usage: canonicalIdentifier(family), value: value, evidence: evidence,
 	}, nil
 }
 
@@ -3740,29 +3740,61 @@ func firstRecordFunction(record components.ComponentRecord, candidates ...string
 	return ""
 }
 
+type catalogScaledUnit struct {
+	base  string
+	scale float64
+}
+
+// catalogScaledUnits includes explicit, electrically unambiguous casing
+// variants seen in catalog sources. Prefix case remains significant where it
+// distinguishes milli from mega, so ambiguous spellings such as "mhz" and
+// "mohm" deliberately fail closed.
+var catalogScaledUnits = map[string]catalogScaledUnit{
+	"Hz": {base: "Hz", scale: 1}, "hz": {base: "Hz", scale: 1},
+	"GHz": {base: "Hz", scale: 1e9}, "ghz": {base: "Hz", scale: 1e9},
+	"MHz": {base: "Hz", scale: 1e6},
+	"kHz": {base: "Hz", scale: 1e3}, "khz": {base: "Hz", scale: 1e3}, "KHz": {base: "Hz", scale: 1e3}, "KHZ": {base: "Hz", scale: 1e3},
+	"mHz": {base: "Hz", scale: 1e-3},
+	"Ohm": {base: "Ohm", scale: 1}, "ohm": {base: "Ohm", scale: 1},
+	"mOhm": {base: "Ohm", scale: 1e-3},
+	"kOhm": {base: "Ohm", scale: 1e3}, "kohm": {base: "Ohm", scale: 1e3}, "KOhm": {base: "Ohm", scale: 1e3},
+	"MOhm": {base: "Ohm", scale: 1e6},
+	"F":    {base: "F", scale: 1}, "f": {base: "F", scale: 1},
+	"pF": {base: "F", scale: 1e-12}, "pf": {base: "F", scale: 1e-12},
+	"nF": {base: "F", scale: 1e-9}, "nf": {base: "F", scale: 1e-9},
+	"uF": {base: "F", scale: 1e-6}, "uf": {base: "F", scale: 1e-6}, "µF": {base: "F", scale: 1e-6}, "µf": {base: "F", scale: 1e-6}, "μF": {base: "F", scale: 1e-6}, "μf": {base: "F", scale: 1e-6},
+	"mF": {base: "F", scale: 1e-3},
+	"W":  {base: "W", scale: 1}, "w": {base: "W", scale: 1},
+	"uW": {base: "W", scale: 1e-6}, "uw": {base: "W", scale: 1e-6}, "µW": {base: "W", scale: 1e-6}, "µw": {base: "W", scale: 1e-6}, "μW": {base: "W", scale: 1e-6}, "μw": {base: "W", scale: 1e-6},
+	"mW": {base: "W", scale: 1e-3},
+	"kW": {base: "W", scale: 1e3}, "kw": {base: "W", scale: 1e3}, "KW": {base: "W", scale: 1e3},
+	"A": {base: "A", scale: 1}, "a": {base: "A", scale: 1}, "mA": {base: "A", scale: 1e-3},
+	"V": {base: "V", scale: 1}, "v": {base: "V", scale: 1}, "mV": {base: "V", scale: 1e-3},
+	"C": {base: "C", scale: 1}, "c": {base: "C", scale: 1}, "nC": {base: "C", scale: 1e-9},
+}
+
+var catalogAmbiguousUnits = map[string]struct{}{
+	"mhz":  {},
+	"mohm": {},
+}
+
 func convertCatalogUnit(value float64, from, to string) (float64, bool) {
-	if strings.EqualFold(from, to) {
+	from, to = strings.TrimSpace(from), strings.TrimSpace(to)
+	if _, ambiguous := catalogAmbiguousUnits[from]; ambiguous {
+		return 0, false
+	}
+	if _, ambiguous := catalogAmbiguousUnits[to]; ambiguous {
+		return 0, false
+	}
+	if from == to {
 		return value, true
 	}
-	if from == "mA" && to == "A" {
-		return value / 1000, true
+	fromUnit, fromOK := catalogScaledUnits[from]
+	toUnit, toOK := catalogScaledUnits[to]
+	if !fromOK || !toOK || fromUnit.base != toUnit.base {
+		return 0, false
 	}
-	if from == "A" && to == "mA" {
-		return value * 1000, true
-	}
-	if from == "mV" && to == "V" {
-		return value / 1000, true
-	}
-	if from == "V" && to == "mV" {
-		return value * 1000, true
-	}
-	if from == "nC" && to == "C" {
-		return value * 1e-9, true
-	}
-	if from == "C" && to == "nC" {
-		return value * 1e9, true
-	}
-	return 0, false
+	return value * fromUnit.scale / toUnit.scale, true
 }
 
 func numericString(value float64) string {

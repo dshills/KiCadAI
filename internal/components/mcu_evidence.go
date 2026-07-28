@@ -65,6 +65,7 @@ type MCUProgrammingInterface struct {
 type MCUProgrammingElectricalEvidence struct {
 	MaximumConnectedCapacitance *EvidenceMeasurement `json:"maximum_connected_capacitance,omitempty"`
 	SeriesIsolationResistance   *EvidenceRange       `json:"series_isolation_resistance,omitempty"`
+	MaximumFrequency            *EvidenceMeasurement `json:"maximum_frequency,omitempty"`
 	UnpoweredTargetPolicy       string               `json:"unpowered_target_policy"`
 	SharedPinPolicy             string               `json:"shared_pin_policy"`
 	DefaultState                string               `json:"default_state"`
@@ -76,12 +77,14 @@ type MCUInterfaceSignal struct {
 }
 
 type MCUClockOption struct {
-	ID        string   `json:"id"`
-	Kind      string   `json:"kind"`
-	MinimumHz float64  `json:"minimum_hz,omitempty"`
-	MaximumHz float64  `json:"maximum_hz"`
-	Pins      []string `json:"pins,omitempty"`
-	Default   bool     `json:"default,omitempty"`
+	ID                   string   `json:"id"`
+	Kind                 string   `json:"kind"`
+	MinimumHz            float64  `json:"minimum_hz,omitempty"`
+	MaximumHz            float64  `json:"maximum_hz"`
+	Pins                 []string `json:"pins,omitempty"`
+	MaximumCrystalDriveW *float64 `json:"maximum_crystal_drive_w,omitempty"`
+	MaximumStartupS      *float64 `json:"maximum_startup_s,omitempty"`
+	Default              bool     `json:"default,omitempty"`
 }
 
 type MCUBootConstraint struct {
@@ -285,11 +288,18 @@ func validateMCUEvidence(path string, record *ComponentRecord) []reports.Issue {
 			continue
 		}
 		electrical := programming.Electrical
-		if electrical.MaximumConnectedCapacitance == nil || electrical.SeriesIsolationResistance == nil {
-			issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, interfacePath+".electrical", "MCU programming interface requires capacitance and series-isolation bounds"))
+		if electrical.MaximumConnectedCapacitance == nil || electrical.SeriesIsolationResistance == nil || electrical.MaximumFrequency == nil {
+			issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, interfacePath+".electrical", "MCU programming interface requires capacitance, series-isolation, and maximum-frequency bounds"))
 		}
-		issues = append(issues, validateEvidenceMeasurement(interfacePath+".electrical.maximum_connected_capacitance", electrical.MaximumConnectedCapacitance, true)...)
-		issues = append(issues, validateEvidenceRange(interfacePath+".electrical.series_isolation_resistance", electrical.SeriesIsolationResistance, true)...)
+		if electrical.MaximumConnectedCapacitance != nil {
+			issues = append(issues, validateEvidenceMeasurement(interfacePath+".electrical.maximum_connected_capacitance", electrical.MaximumConnectedCapacitance, true)...)
+		}
+		if electrical.SeriesIsolationResistance != nil {
+			issues = append(issues, validateEvidenceRange(interfacePath+".electrical.series_isolation_resistance", electrical.SeriesIsolationResistance, true)...)
+		}
+		if electrical.MaximumFrequency != nil {
+			issues = append(issues, validateEvidenceMeasurement(interfacePath+".electrical.maximum_frequency", electrical.MaximumFrequency, true)...)
+		}
 		switch electrical.UnpoweredTargetPolicy {
 		case "unsupported", "series_current_limited", "high_impedance_qualified":
 		default:
@@ -325,6 +335,13 @@ func validateMCUEvidence(path string, record *ComponentRecord) []reports.Issue {
 			if _, ok := knownFunctions[function]; !ok {
 				issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, clockPath+".pins", "MCU clock function is not mapped by both symbol and package: "+function))
 			}
+		}
+		if strings.Contains(strings.ToLower(clock.Kind), "external_crystal") {
+			if len(clock.Pins) != 2 || clock.MaximumCrystalDriveW == nil || clock.MaximumStartupS == nil {
+				issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, clockPath, "external-crystal MCU clock options require two pins, maximum drive, and startup evidence"))
+			}
+			issues = append(issues, validateOptionalPositiveMCU(clockPath+".maximum_crystal_drive_w", clock.MaximumCrystalDriveW)...)
+			issues = append(issues, validateOptionalPositiveMCU(clockPath+".maximum_startup_s", clock.MaximumStartupS)...)
 		}
 	}
 	if len(evidence.ClockOptions) == 0 || defaultClocks != 1 {

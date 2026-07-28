@@ -305,6 +305,30 @@ func TestHeldOutClockGenerationCorpusOptionalKiCadPromotion(t *testing.T) {
 	runFrozenPromotionAt(t, corpusRoot, count, "KICADAI_CLOCK_GENERATION_ARTIFACT_DIR", cli, index)
 }
 
+func TestClockProgrammingSynthesisCorpusPassesOfflineWorkflow(t *testing.T) {
+	requireLongPromotionTest(t)
+	corpusRoot, count := clockProgrammingSupportedCorpus(t)
+	runFrozenPromotionAt(t, corpusRoot, count, "KICADAI_CLOCK_PROGRAMMING_ARTIFACT_DIR", "", libraryresolver.LibraryIndex{})
+}
+
+func TestClockProgrammingSynthesisCorpusOptionalKiCadPromotion(t *testing.T) {
+	requireLongPromotionTest(t)
+	cli := os.Getenv("KICADAI_KICAD_CLI")
+	if cli == "" {
+		t.Skip("set KICADAI_KICAD_CLI to run the KiCad-backed clock/programming synthesis corpus")
+	}
+	roots, rootIssues := libraryresolver.ResolveRoots()
+	if roots.SymbolsRoot == "" || roots.FootprintsRoot == "" {
+		t.Skipf("installed KiCad libraries are required: %#v", rootIssues)
+	}
+	index, loadIssues := libraryresolver.Load(context.Background(), roots, libraryresolver.LoadOptions{})
+	if len(index.Symbols) == 0 || len(index.Footprints) == 0 {
+		t.Fatalf("installed library index is empty: %#v", loadIssues)
+	}
+	corpusRoot, count := clockProgrammingSupportedCorpus(t)
+	runFrozenPromotionAt(t, corpusRoot, count, "KICADAI_CLOCK_PROGRAMMING_ARTIFACT_DIR", cli, index)
+}
+
 func TestFrozenBehavioralIntentHeldOutReadyCorpusPassesOfflineWorkflow(t *testing.T) {
 	requireLongPromotionTest(t)
 	corpusRoot, count := behavioralIntentHeldOutReadyCorpus(t)
@@ -363,6 +387,44 @@ func TestHierarchicalMultiDomainCorpusOptionalKiCadPromotion(t *testing.T) {
 		cli,
 		index,
 	)
+}
+
+func clockProgrammingSupportedCorpus(t *testing.T) (string, int) {
+	t.Helper()
+	type manifestCase struct {
+		File           string `json:"file"`
+		ExpectedStatus string `json:"expected_status"`
+	}
+	var manifest struct {
+		Cases []manifestCase `json:"cases"`
+	}
+	sourceRoot := filepath.Join("..", "architecturesearch", "testdata", "clock_programming_synthesis_corpus")
+	data, err := os.ReadFile(filepath.Join(sourceRoot, "manifest.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := json.Unmarshal(data, &manifest); err != nil {
+		t.Fatal(err)
+	}
+	root := t.TempDir()
+	count := 0
+	for _, fixture := range manifest.Cases {
+		if fixture.ExpectedStatus != string(architecturesearch.SearchSelected) {
+			continue
+		}
+		body, err := os.ReadFile(filepath.Join(sourceRoot, fixture.File))
+		if err != nil {
+			t.Fatalf("read clock/programming requirement %s: %v", fixture.File, err)
+		}
+		if err := os.WriteFile(filepath.Join(root, filepath.Base(fixture.File)), body, 0o644); err != nil {
+			t.Fatal(err)
+		}
+		count++
+	}
+	if count == 0 {
+		t.Fatal("clock/programming synthesis corpus has no supported fixtures")
+	}
+	return root, count
 }
 
 func heldOutCapabilityFamilyCorpus(t *testing.T, family string) (string, int) {

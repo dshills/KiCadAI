@@ -747,6 +747,15 @@ interrupt bundles to physical functions deterministically and expands the
 selected record's power, reset, boot, programming, and clock companions. A
 three-request neutral corpus validates this lane without target names.
 
+External-crystal choices are no longer fixed companion recipes: synthesis
+requires bounded stray capacitance and startup intent, selects a concrete
+verified crystal, calculates both load capacitors, and retains frequency,
+stability, drive, load-error, and startup evidence. Programming support now
+retains maximum frequency, connected load, programmer/target voltage, reset or
+boot entry, and shared-pin isolation/edge bounds. A separate frozen corpus
+passes external-crystal ISP and integrated-clock UART through local
+installed-KiCad promotion and rejects unpowered-target SWD.
+
 For power and mixed-signal interfaces, the architecture provider can now build
 a deterministic rail graph, aggregate bounded loads and quiescent demand,
 apply regulator dropout/efficiency/startup/thermal evidence, derive stability

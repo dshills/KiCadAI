@@ -45,6 +45,11 @@ path.
   alternate-function pins deterministically, and add catalog-declared power,
   reset, programming, boot, and optional clock support. Three neutral requests
   reach the full installed-KiCad promotion lane without naming their target.
+- Behavior-driven clock/programming synthesis now calculates verified external
+  crystal load networks, bounds crystal drive/stability/startup, and records
+  programming frequency, loading, voltage, reset/boot entry, and shared-pin
+  isolation evidence. External-crystal ISP and integrated-clock UART cases pass
+  the local installed-KiCad lane; unsupported unpowered SWD fails closed.
 - The provider-backed natural-language lane retains two promoted bounded
   profiles and adds a catalog-resolved circuit graph contract with either an
   explicit graph or strict function-level intent. Function intent names

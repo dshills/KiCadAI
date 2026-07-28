@@ -1145,9 +1145,24 @@ func TestCatalogUnitConversionIsSymmetricForSupportedScaledUnits(t *testing.T) {
 		value    float64
 		from, to string
 		want     float64
-	}{{0.15, "A", "mA", 150}, {150, "mA", "A", 0.15}, {3.3, "V", "mV", 3300}, {3300, "mV", "V", 3.3}, {2e-9, "C", "nC", 2}, {2, "nC", "C", 2e-9}}
+		ok       bool
+	}{
+		{0.15, "A", "mA", 150, true}, {150, "mA", "A", 0.15, true},
+		{3.3, "V", "mV", 3300, true}, {3300, "mV", "V", 3.3, true},
+		{2e-9, "C", "nC", 2, true}, {2, "nC", "C", 2e-9, true},
+		{16, "MHz", "Hz", 16e6, true}, {16, "mhz", "Hz", 0, false}, {16, "mhz", "mhz", 0, false},
+		{22, "pf", "F", 22e-12, true}, {22e-12, "F", "pF", 22, true}, {4.7, "μF", "F", 4.7e-6, true},
+		{4.7, "KHz", "Hz", 4.7e3, true}, {4.7, "kohm", "Ohm", 4.7e3, true}, {4.7, "mohm", "mohm", 0, false},
+		{1, "mHz", "MHz", 1e-9, true},
+	}
 	for _, test := range tests {
 		got, ok := convertCatalogUnit(test.value, test.from, test.to)
+		if !test.ok {
+			if ok {
+				t.Fatalf("ambiguous convertCatalogUnit(%g, %q, %q) unexpectedly succeeded with %g", test.value, test.from, test.to, got)
+			}
+			continue
+		}
 		if !ok || math.Abs(got-test.want) > math.Max(1e-15, math.Abs(test.want)*1e-12) {
 			t.Fatalf("convertCatalogUnit(%g, %q, %q) = %g, %t; want %g", test.value, test.from, test.to, got, ok, test.want)
 		}
@@ -1290,6 +1305,12 @@ func TestCatalogProviderQualifiesMCUProgrammingElectricalLoads(t *testing.T) {
 	if err != nil || len(expansions) == 0 {
 		t.Fatalf("qualified debug load = %#v, %v", expansions, err)
 	}
+	if !slices.ContainsFunc(expansions[0].Calculations, func(calculation CalculationEvidence) bool {
+		return calculation.ID == "mcu_programming_interface_worst_case" &&
+			calculation.Pass && calculation.Hash != "" && len(calculation.Bounds) >= 7
+	}) {
+		t.Fatalf("qualified debug expansion lacks finalized programming-interface evidence: %#v", expansions[0].Calculations)
+	}
 	realization, err := DecodeFragmentRealization(expansions[0].Payload)
 	if err != nil {
 		t.Fatal(err)
@@ -1425,7 +1446,12 @@ func TestCatalogProviderDerivesConditionalMCUSupportNetworks(t *testing.T) {
 	if pullupConnections != 3 {
 		t.Fatalf("I2C pull-up nets connected to controller = %d, want 3: %#v", pullupConnections, internalRealization.Connections)
 	}
-	request.Constraints = append(request.Constraints, constraintString("clock_source", "equal", "external_hse"))
+	request.Constraints = append(request.Constraints,
+		constraintString("clock_source", "equal", "external_hse"),
+		constraintNumber("clock_frequency", "target", 16_000_000, "Hz", 0.1),
+		constraintNumber("crystal_stray_capacitance", "maximum", 7e-12, "F", 0),
+		constraintNumber("maximum_clock_startup_time", "maximum", 0.02, "s", 0),
+	)
 	external, err := provider.Expand(context.Background(), request)
 	if err != nil || len(external) < 1 {
 		t.Fatalf("external-clock expansion = %#v, %v", external, err)
@@ -1434,7 +1460,44 @@ func TestCatalogProviderDerivesConditionalMCUSupportNetworks(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	assertMCUSupportUsages(t, externalRealization, map[string]bool{"clock": false, "load_capacitor": false})
+	assertMCUSupportUsages(t, externalRealization, map[string]bool{"external_crystal_resonator": false, "load_capacitor": false})
+	if !slices.ContainsFunc(external[0].Calculations, func(calculation CalculationEvidence) bool {
+		if calculation.ID != "mcu_external_crystal_worst_case" ||
+			!calculation.Pass || calculation.Hash == "" || len(calculation.Bounds) < 4 {
+			return false
+		}
+		return slices.ContainsFunc(calculation.NominalOutputs, func(output NamedQuantity) bool {
+			return output.Name == "selected_load_capacitor_each" && math.Abs(output.Value-22e-12) < 1e-18
+		}) && slices.ContainsFunc(calculation.NominalOutputs, func(output NamedQuantity) bool {
+			return output.Name == "effective_load_capacitance" && math.Abs(output.Value-18e-12) < 1e-18
+		})
+	}) {
+		t.Fatalf("external clock lacks finalized load, drive, accuracy, and startup evidence: %#v", external[0].Calculations)
+	}
+	loadCapacitors := 0
+	for _, instance := range externalRealization.Instances {
+		if instance.Usage == "load_capacitor" {
+			loadCapacitors++
+			if instance.Value != "22p" {
+				t.Fatalf("external crystal load capacitor = %q, want calculated 22p", instance.Value)
+			}
+		}
+	}
+	if loadCapacitors != 2 {
+		t.Fatalf("external crystal load capacitors = %d, want 2", loadCapacitors)
+	}
+
+	missingStray := participantProviderRequest("programmable_controller", "sensor_bus", 3.3)
+	missingStray.Constraints = append(missingStray.Constraints,
+		constraintString("programming_kind", "equal", "swd"),
+		constraintString("clock_source", "equal", "external_hse"),
+		constraintNumber("clock_frequency", "target", 16_000_000, "Hz", 0.1),
+	)
+	_, err = provider.Expand(context.Background(), missingStray)
+	var assignmentErr *mcuAssignmentError
+	if !errors.As(err, &assignmentErr) || assignmentErr.Code != CodeMCUClockUnavailable {
+		t.Fatalf("missing crystal stray-capacitance evidence error = %v, want %s", err, CodeMCUClockUnavailable)
+	}
 }
 
 func assertMCUSupportUsages(t *testing.T, realization FragmentRealization, want map[string]bool) {

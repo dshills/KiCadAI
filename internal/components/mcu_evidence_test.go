@@ -106,6 +106,7 @@ func validMCUCatalog() Catalog {
 					Electrical: &MCUProgrammingElectricalEvidence{
 						MaximumConnectedCapacitance: &EvidenceMeasurement{Value: 10e-12, Unit: "F", Conditions: "test allowance"},
 						SeriesIsolationResistance:   &EvidenceRange{Minimum: float64MCUPointer(22), Maximum: float64MCUPointer(100), Unit: "Ohm", Conditions: "test range"},
+						MaximumFrequency:            &EvidenceMeasurement{Value: 1e6, Unit: "Hz", Conditions: "test ceiling"},
 						UnpoweredTargetPolicy:       "unsupported", SharedPinPolicy: "reset_arbitrated", DefaultState: "inactive before reset entry",
 					},
 				}},

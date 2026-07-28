@@ -381,10 +381,11 @@ func validateMCUAssignmentElectrical(record components.ComponentRecord, request 
 	if record.MCU == nil {
 		return &mcuAssignmentError{Code: CodeMCUPinAssignmentImpossible, Text: "candidate has no normalized MCU evidence"}
 	}
-	if minimum, maximum, ok := firstNumericConstraint(request.Constraints, "clock_frequency", "cpu_clock_frequency"); ok {
-		required := math.Max(minimum, maximum)
-		if required > assignment.ClockOption.MaximumHz {
-			return &mcuAssignmentError{Code: CodeMCUClockFrequency, Text: fmt.Sprintf("required clock %.9g Hz exceeds selected clock maximum %.9g Hz", required, assignment.ClockOption.MaximumHz)}
+	if target, tolerancePct, ok := firstNumericConstraint(request.Constraints, "clock_frequency", "cpu_clock_frequency"); ok {
+		requiredMinimum := target * (1 - tolerancePct/100)
+		requiredMaximum := target * (1 + tolerancePct/100)
+		if tolerancePct < 0 || requiredMinimum < assignment.ClockOption.MinimumHz || requiredMaximum > assignment.ClockOption.MaximumHz {
+			return &mcuAssignmentError{Code: CodeMCUClockFrequency, Text: fmt.Sprintf("required clock envelope %.9g..%.9g Hz is outside selected clock range %.9g..%.9g Hz", requiredMinimum, requiredMaximum, assignment.ClockOption.MinimumHz, assignment.ClockOption.MaximumHz)}
 		}
 	}
 	pinsByFunction := map[string]components.MCUPinEvidence{}
@@ -511,18 +512,10 @@ func validateMCUProgrammingElectrical(request ProviderRequest, assignment mcuAss
 		return &mcuAssignmentError{Code: CodeMCUProgrammingLoad, Text: "selected programming interface does not qualify shared-pin arbitration"}
 	}
 	if programmerVoltage, _, ok := firstNumericConstraint(request.Constraints, "programmer_voltage", "debugger_voltage"); ok && programmerVoltage > 0 {
-		targetVoltage := roleVoltageMaximum(request.Ports, "power")
-		if targetVoltage <= 0 {
-			targetVoltage = roleVoltageMaximum(request.Ports, "supply")
-		}
-		if targetVoltage <= 0 {
-			for _, port := range request.Ports {
-				if port.Contract.Kind != "reference" {
-					targetVoltage = math.Max(targetVoltage, numericMaximum(port.Contract.Voltage))
-				}
-			}
-		}
-		if targetVoltage <= 0 || math.Abs(programmerVoltage-targetVoltage) > 0.05*math.Max(programmerVoltage, targetVoltage) {
+		// Keep assignment fail-fast while sharing target-domain extraction with
+		// the detailed worst-case calculation performed during expansion.
+		targetMinimum, targetMaximum, voltageRangeOK := mcuProgrammingTargetVoltageRange(request.Ports)
+		if !voltageRangeOK || programmerVoltage < targetMinimum || programmerVoltage > targetMaximum {
 			return &mcuAssignmentError{Code: CodeMCUProgrammingLoad, Text: "programmer and target voltage domains require a qualified translation stage"}
 		}
 	}
@@ -1136,8 +1129,17 @@ func mcuSupplyGroups(evidence *components.MCUEvidence) []mcuSupplyGroup {
 	return groups
 }
 
-func (provider *CatalogProvider) expandMCUSupport(ctx context.Context, request ProviderRequest, parent catalogPart, assignment mcuAssignment, connections []RealizationConnection) ([]catalogPart, []RealizationConnection, error) {
+func (provider *CatalogProvider) expandMCUSupport(ctx context.Context, request ProviderRequest, parent catalogPart, assignment mcuAssignment, connections []RealizationConnection) ([]catalogPart, []RealizationConnection, []CalculationEvidence, error) {
 	parts := []catalogPart{parent}
+	var calculations []CalculationEvidence
+	var err error
+	parts, connections, clockCalculation, err := provider.expandMCUExternalCrystal(ctx, request, parent, assignment, parts, connections)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	if clockCalculation.ID != "" {
+		calculations = append(calculations, clockCalculation)
+	}
 	companions := slices.Clone(parent.record.Companions)
 	slices.SortStableFunc(companions, func(left, right components.CompanionRequirement) int {
 		if order := strings.Compare(left.ID, right.ID); order != 0 {
@@ -1147,11 +1149,13 @@ func (provider *CatalogProvider) expandMCUSupport(ctx context.Context, request P
 	})
 	for _, companion := range companions {
 		if strings.EqualFold(companion.Role, "programming_header") && requiresMCUProgrammingPhysicalIsolation(request) {
-			var err error
 			parts, connections, err = provider.expandMCUProgrammingHeader(ctx, parent, assignment, companion, parts, connections)
 			if err != nil {
-				return nil, nil, err
+				return nil, nil, nil, err
 			}
+			continue
+		}
+		if strings.EqualFold(companion.Role, "clock_network") && isExternalCrystalClock(assignment.ClockOption) {
 			continue
 		}
 		// Unconditional companions are expanded by circuitgraph synthesis after
@@ -1163,7 +1167,7 @@ func (provider *CatalogProvider) expandMCUSupport(ctx context.Context, request P
 			continue
 		}
 		if len(companion.Recipes) == 0 {
-			return nil, nil, fmt.Errorf("required MCU companion %s has no catalog recipe", companion.ID)
+			return nil, nil, nil, fmt.Errorf("required MCU companion %s has no catalog recipe", companion.ID)
 		}
 		recipes := slices.Clone(companion.Recipes)
 		slices.SortStableFunc(recipes, func(left, right components.CompanionPartRecipe) int { return strings.Compare(left.ID, right.ID) })
@@ -1182,7 +1186,7 @@ func (provider *CatalogProvider) expandMCUSupport(ctx context.Context, request P
 					AllowAlternatives: true,
 				})
 				if !result.OK {
-					return nil, nil, fmt.Errorf("select MCU companion %s/%s: %v", companion.ID, recipe.ID, result.Issues)
+					return nil, nil, nil, fmt.Errorf("select MCU companion %s/%s: %v", companion.ID, recipe.ID, result.Issues)
 				}
 				instanceID := boundedMCUIdentifier("support_" + companion.ID + "_" + target + "_" + recipe.ID)
 				evidence := componentEvidence(selection.Component, selection.Variant.Verification.Confidence)
@@ -1194,14 +1198,19 @@ func (provider *CatalogProvider) expandMCUSupport(ctx context.Context, request P
 				for _, connection := range recipe.Connections {
 					parentFunction := mcuSupportParentFunction(connection.ParentFunction, assignment, target)
 					if strings.HasPrefix(strings.ToLower(parentFunction), "peripheral:") {
-						return nil, nil, fmt.Errorf("MCU companion %s/%s references an unassigned peripheral role %s", companion.ID, recipe.ID, connection.ParentFunction)
+						return nil, nil, nil, fmt.Errorf("MCU companion %s/%s references an unassigned peripheral role %s", companion.ID, recipe.ID, connection.ParentFunction)
 					}
 					connections = appendMCUSupportConnection(connections, parent, parentFunction, RealizationEndpoint{Instance: instanceID, Function: connection.Function})
 				}
 			}
 		}
 	}
-	return parts, connections, nil
+	programmingCalculation, err := mcuProgrammingCalculation(request, assignment)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	calculations = append(calculations, programmingCalculation)
+	return parts, connections, calculations, nil
 }
 
 func requiresMCUProgrammingPhysicalIsolation(request ProviderRequest) bool {

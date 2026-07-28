@@ -1,0 +1,43 @@
+{
+  "schema": "kicadai.clock-programming-synthesis-corpus.v1",
+  "version": 1,
+  "base_commit": "bbea7d11172ec149f7d140e1413a07ca0c18ea63",
+  "authoring_policy": "Behavior-level requirements only; no fixture identities, selected part IDs, placement coordinates, or topology shortcuts.",
+  "cases": [
+    {
+      "id": "external_crystal_isp",
+      "file": "external_crystal_isp.json",
+      "sha256": "1d5231d6bf445bb691cb06f5af5015e303f4b473bb49f2b8e0093f220c2c5f4f",
+      "features": ["crystal", "calculated_load", "isp", "reset", "shared_pin_isolation"],
+      "expected_status": "selected"
+    },
+    {
+      "id": "uart_bootloader",
+      "file": "uart_bootloader.json",
+      "sha256": "3f00315643a78d4f003d3b3d527ff7ae2e887f708539a2371639053f93a2c99c",
+      "features": ["integrated_crystal", "uart_bootloader", "reset_entry", "shared_pin_isolation"],
+      "expected_status": "selected"
+    },
+    {
+      "id": "unsupported_unpowered_swd",
+      "file": "unsupported_unpowered_swd.json",
+      "sha256": "0efdb32e32c85815c68355fe36f07a8715ae418d5a81ed810366f68dbad033ce",
+      "features": ["swd", "unpowered_target", "fail_closed"],
+      "expected_status": "unsupported"
+    }
+  ],
+  "inherited_frozen_evidence": [
+    {
+      "feature": "canned_oscillator",
+      "requirement": "../standalone_clock_generation_corpus/precision_logic_clock.json"
+    },
+    {
+      "feature": "buffered_fanout",
+      "requirement": "../open_world_capability_promotion/heldout_analog_clock_fanout.json"
+    },
+    {
+      "feature": "mixed_voltage_programming",
+      "requirement": "../open_world_capability_promotion/heldout_mcu_translated_debug.json"
+    }
+  ]
+}

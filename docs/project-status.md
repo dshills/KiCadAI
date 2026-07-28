@@ -18,6 +18,14 @@ structured intent, deterministic planning, component and block selection,
 schematic and PCB realization, placement, routing, writer validation, and
 optional KiCad-backed checks.
 
+Behavior-driven controller support now includes calculated external-crystal
+networks and first-class programming-interface electrical evidence. A frozen
+corpus proves calculated external-crystal ISP and integrated-clock UART
+bootloader designs through the full local installed-KiCad lane, while SWD with
+an unpowered target fails closed. See the
+[specification](../specs/behavior-driven-clock-programming/SPEC.md) and
+[completion audit](../specs/behavior-driven-clock-programming/AUDIT.md).
+
 Every normalized creation request now passes a deterministic capability gate
 before filesystem mutation. Requests are classified as `supported`,
 `experimental`, or `unsupported` from linked architecture, catalog, model,

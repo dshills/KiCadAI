@@ -355,6 +355,29 @@ func TestVerifiedSiTOscillatorTemplateMatchesKiCadFootprint(t *testing.T) {
 	}
 }
 
+func TestVerified5032CrystalTemplateMatchesKiCadFootprint(t *testing.T) {
+	template, ok := verifiedPadTemplate("Crystal:Crystal_SMD_5032-2Pin_5.0x3.2mm")
+	if !ok {
+		t.Fatal("missing 5032 crystal template")
+	}
+	if got := padTemplateNames(template.Pads); !reflect.DeepEqual(got, []string{"1", "2"}) {
+		t.Fatalf("5032 crystal pad order = %#v", got)
+	}
+	wantCenters := []placement.Point{{XMM: -1.85}, {XMM: 1.85}}
+	for index, pad := range template.Pads {
+		if pad.XMM != wantCenters[index].XMM || pad.YMM != 0 ||
+			pad.WidthMM != 2.0 || pad.HeightMM != 2.4 || pad.Type != "smd" ||
+			pad.Shape != "roundrect" ||
+			!reflect.DeepEqual(pad.Layers, []string{"F.Cu", "F.Mask", "F.Paste"}) {
+			t.Fatalf("5032 crystal pad[%d] = %#v, want center %#v and verified SMD geometry", index, pad, wantCenters[index])
+		}
+	}
+	wantBounds := verifiedCourtyardBoundsFromExtents(-3.1, -2.1, 3.1, 2.1)
+	if !reflect.DeepEqual(template.Bounds, wantBounds) {
+		t.Fatalf("5032 crystal bounds = %#v, want %#v", template.Bounds, wantBounds)
+	}
+}
+
 func TestVerifiedBMP280PadTemplateMatchesKiCadFootprint(t *testing.T) {
 	template, ok := verifiedPadTemplate("Package_LGA:Bosch_LGA-8_2x2.5mm_P0.65mm_ClockwisePinNumbering")
 	if !ok {

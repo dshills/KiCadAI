@@ -50,6 +50,24 @@ type FunctionUnit struct {
 
 var functionCapabilities = []FunctionCapability{
 	{
+		Name: "load_capacitor", Description: "Provide a catalog-qualified load capacitor for a passive resonator or oscillator network.", SupportedRoles: []ComponentRole{RoleCapacitor},
+		EndpointRoles: []FunctionEndpointCapability{
+			{Role: "crystal", Functions: []string{"A", "B"}, Required: false, Description: "Crystal-side capacitor terminal."},
+			{Role: "return", Functions: []string{"A", "B"}, Required: false, Description: "Reference-return capacitor terminal."},
+		},
+		ProvenReadiness: AcceptanceERCDRC,
+		Limitations:     []string{"load capacitance, board stray capacitance, tolerance, startup, and crystal drive require explicit calculation"},
+	},
+	{
+		Name: "external_crystal_resonator", Description: "Select a passive crystal resonator for a controller's differential crystal-driver pins.", SupportedRoles: []ComponentRole{RoleOscillator},
+		EndpointRoles: []FunctionEndpointCapability{
+			{Role: "input", Functions: []string{"XTAL_1"}, Required: true, Description: "First resonator terminal connected to the controller oscillator input."},
+			{Role: "output", Functions: []string{"XTAL_2"}, Required: true, Description: "Second resonator terminal connected to the controller oscillator output."},
+		},
+		ProvenReadiness: AcceptanceERCDRC,
+		Limitations:     []string{"frequency, load capacitance, drive level, startup, tolerance, and environmental margins require explicit catalog and calculation evidence"},
+	},
+	{
 		Name: "adjustable_linear_regulator", Description: "Select an adjustable linear regulator and derive its reviewed feedback network.", SupportedRoles: []ComponentRole{RoleRegulator},
 		RequiredParameters: []FunctionParameter{{Name: "output_voltage_v", ValueKind: "string", Unit: "V", Description: "Requested nominal output voltage."}},
 		OptionalParameters: []FunctionParameter{{Name: "maximum_output_current_ma", ValueKind: "string", Unit: "mA", Description: "Required output-current rating."}},
