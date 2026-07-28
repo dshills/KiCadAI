@@ -279,6 +279,54 @@ func TestVerifiedDIP4TemplateMatchesStandardDualInlinePinOrder(t *testing.T) {
 	}
 }
 
+func TestVerifiedDIP8TemplateMatchesKiCadGeometry(t *testing.T) {
+	template, ok := verifiedPadTemplate("Package_DIP:DIP-8_W7.62mm")
+	if !ok {
+		t.Fatal("missing DIP-8 template")
+	}
+	if got := padTemplateNames(template.Pads); !reflect.DeepEqual(got, []string{"1", "2", "3", "4", "5", "6", "7", "8"}) {
+		t.Fatalf("DIP-8 pad order = %#v", got)
+	}
+	wantPositions := []placement.Point{
+		{XMM: 0, YMM: 0},
+		{XMM: 0, YMM: 2.54},
+		{XMM: 0, YMM: 5.08},
+		{XMM: 0, YMM: 7.62},
+		{XMM: 7.62, YMM: 7.62},
+		{XMM: 7.62, YMM: 5.08},
+		{XMM: 7.62, YMM: 2.54},
+		{XMM: 7.62, YMM: 0},
+	}
+	for index, pad := range template.Pads {
+		if !nearlyEqual(pad.XMM, wantPositions[index].XMM) || !nearlyEqual(pad.YMM, wantPositions[index].YMM) {
+			t.Fatalf("DIP-8 pad[%d] position = (%v, %v), want %#v", index, pad.XMM, pad.YMM, wantPositions[index])
+		}
+		wantShape := "circle"
+		if index == 0 {
+			wantShape = "roundrect"
+		}
+		if pad.Type != "thru_hole" || pad.Shape != wantShape ||
+			!nearlyEqual(pad.WidthMM, 1.6) || !nearlyEqual(pad.HeightMM, 1.6) || !nearlyEqual(pad.DrillMM, 0.8) ||
+			!reflect.DeepEqual(pad.Layers, []string{"*.Cu", "*.Mask"}) {
+			t.Fatalf("DIP-8 pad[%d] geometry = %#v", index, pad)
+		}
+	}
+	wantBounds := verifiedCourtyardBoundsFromExtents(-1.06, -1.52, 8.67, 9.14)
+	if !reflect.DeepEqual(template.Bounds, wantBounds) {
+		t.Fatalf("DIP-8 bounds = %#v, want %#v", template.Bounds, wantBounds)
+	}
+}
+
+func TestStandardDIPTemplateRejectsInvalidGeometry(t *testing.T) {
+	bounds := verifiedCourtyardBoundsFromExtents(-1.06, -1.52, 8.67, 9.14)
+	if _, ok := standardDIPTemplate(5, 7.62, bounds); ok {
+		t.Fatal("odd DIP pin count should be rejected")
+	}
+	if _, ok := standardDIPTemplate(8, 0, bounds); ok {
+		t.Fatal("non-positive DIP row spacing should be rejected")
+	}
+}
+
 func TestVerifiedSiTOscillatorTemplateMatchesKiCadFootprint(t *testing.T) {
 	template, ok := verifiedPadTemplate("Oscillator:Oscillator_SMD_SiT_PQFN-4Pin_5.0x3.2mm")
 	if !ok {

@@ -349,15 +349,9 @@ func verifiedPadTemplate(footprintID string) (verifiedPadTemplateRecord, bool) {
 		template.Bounds = verifiedCourtyardBounds(16, 5.75, 2.55, 3.25)
 		return template, true
 	case "Package_DIP:DIP-4_W7.62mm":
-		return verifiedPadTemplateRecord{
-			Bounds: verifiedCourtyardBoundsFromExtents(-1.06, -1.52, 8.67, 4.07),
-			Pads: []placement.PadSummary{
-				throughHolePad("1", 0, 0, 1.6, 1.6, 0.8, "roundrect"),
-				throughHolePad("2", 0, 2.54, 1.6, 1.6, 0.8, "circle"),
-				throughHolePad("3", 7.62, 2.54, 1.6, 1.6, 0.8, "circle"),
-				throughHolePad("4", 7.62, 0, 1.6, 1.6, 0.8, "circle"),
-			},
-		}, true
+		return standardDIPTemplate(4, 7.62, verifiedCourtyardBoundsFromExtents(-1.06, -1.52, 8.67, 4.07))
+	case "Package_DIP:DIP-8_W7.62mm":
+		return standardDIPTemplate(8, 7.62, verifiedCourtyardBoundsFromExtents(-1.06, -1.52, 8.67, 9.14))
 	case "Oscillator:Oscillator_SMD_SiT_PQFN-4Pin_5.0x3.2mm":
 		return verifiedPadTemplateRecord{
 			Bounds: verifiedCourtyardBoundsFromExtents(-3, -2.16, 3, 2.16),
@@ -710,6 +704,33 @@ func centeredOutwardCourtyardBounds(envelopeWidth, envelopeHeight float64) place
 
 func nearlyEqual(left, right float64) bool {
 	return math.Abs(left-right) < 1e-9
+}
+
+// standardDIPTemplate emits KiCad's standard 2.54 mm DIP pad geometry with
+// counter-clockwise U-shaped numbering; callers supply the verified row spacing
+// and courtyard for the exact footprint variant they accept.
+func standardDIPTemplate(pinCount int, rowSpacingMM float64, bounds placement.Bounds) (verifiedPadTemplateRecord, bool) {
+	if pinCount < 4 || pinCount%2 != 0 || rowSpacingMM <= 0 {
+		return verifiedPadTemplateRecord{}, false
+	}
+	const (
+		pitchMM   = 2.54
+		padSizeMM = 1.6
+		drillMM   = 0.8
+	)
+	half := pinCount / 2
+	pads := make([]placement.PadSummary, 0, pinCount)
+	for index := 0; index < half; index++ {
+		shape := "circle"
+		if index == 0 {
+			shape = "roundrect"
+		}
+		pads = append(pads, throughHolePad(strconv.Itoa(index+1), 0, float64(index)*pitchMM, padSizeMM, padSizeMM, drillMM, shape))
+	}
+	for index := 0; index < half; index++ {
+		pads = append(pads, throughHolePad(strconv.Itoa(half+index+1), rowSpacingMM, float64(half-index-1)*pitchMM, padSizeMM, padSizeMM, drillMM, "circle"))
+	}
+	return verifiedPadTemplateRecord{Bounds: bounds, Pads: pads}, true
 }
 
 func throughHoleRowTemplate(xPositions []float64, names []string, widthMM, heightMM, drillMM float64, shapes []string, bodyWidthMM, bodyHeightMM float64) verifiedPadTemplateRecord {
