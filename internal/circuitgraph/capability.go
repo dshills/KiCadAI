@@ -46,6 +46,7 @@ func ProviderCapabilityContext(catalog *components.Catalog, maxBytes int) (strin
 		Rules: []string{
 			"Use only listed component IDs and variant IDs, or constrained catalog queries.",
 			"When family is omitted, use the component ID prefix before the first period.",
+			"When a variant package is omitted, use its variant ID as the package.",
 			"Use listed logical functions or verified symbol pins for net endpoints.",
 			"For components with listed units, declare the used units on the component and qualify every endpoint with its unit ID.",
 			"Put nominal resistance, capacitance, frequency, and similar design values in component value or query; do not repeat them as required ratings.",
@@ -106,7 +107,11 @@ func ProviderCapabilityContext(catalog *components.Catalog, maxBytes int) (strin
 		}
 		sort.SliceStable(entry.Units, func(i, j int) bool { return entry.Units[i].ID < entry.Units[j].ID })
 		for _, variant := range record.Packages {
-			entry.Variants = append(entry.Variants, providerCapabilityVariant{ID: variant.ID, Package: variant.PackageType})
+			entryVariant := providerCapabilityVariant{ID: variant.ID}
+			if variant.PackageType != variant.ID {
+				entryVariant.Package = variant.PackageType
+			}
+			entry.Variants = append(entry.Variants, entryVariant)
 		}
 		sort.SliceStable(entry.Variants, func(i, j int) bool { return entry.Variants[i].ID < entry.Variants[j].ID })
 		capability.Components = append(capability.Components, entry)

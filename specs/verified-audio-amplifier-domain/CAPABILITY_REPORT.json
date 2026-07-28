@@ -5,7 +5,7 @@
   "evidence_records": {
     "bjt.onsemi.mmbt3904.sot23": "5749887a9e7d723d4837238b3e81306952c1f9153bfdc5b039b93c34d314065d",
     "capacitor.panasonic.eeufr1c221.radial": "a0bc40e3974fbe8bd4a30d29023a4fe28777eb41acd0228cee0e4081392b6947",
-    "mosfet.vishay.irfp240.to247": "712d8670a5eccd12d63da1c06604423dc081f93b34b426180833e54a05b699b6",
+    "mosfet.vishay.irfp240.to247": "36b982ad3384ca925de5d77a190c67687d784549553f54595ef77895fbe6a34d",
     "opamp.ti.lmv321.sot23_5": "b754fa1be4a7e5b7cb3ab88f0ab5d7b47e94ed2b18339f2b8951b7ca210927b3"
   },
   "positive_cases": [

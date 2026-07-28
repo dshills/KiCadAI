@@ -79,3 +79,35 @@ func TestProviderCapabilityContextElidesDerivableFamilies(t *testing.T) {
 		}
 	}
 }
+
+func TestProviderCapabilityContextElidesDerivableVariantPackages(t *testing.T) {
+	catalog := loadGraphCatalog(t)
+	capabilityJSON, err := ProviderCapabilityContext(catalog, 64<<10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var capability providerCapability
+	if err := json.Unmarshal([]byte(capabilityJSON), &capability); err != nil {
+		t.Fatal(err)
+	}
+	recordsByID := make(map[string]components.ComponentRecord, len(catalog.Records))
+	for _, record := range catalog.Records {
+		recordsByID[record.ID] = record
+	}
+	for _, component := range capability.Components {
+		record := recordsByID[component.ID]
+		variantsByID := make(map[string]components.PackageVariant, len(record.Packages))
+		for _, variant := range record.Packages {
+			variantsByID[variant.ID] = variant
+		}
+		for _, variant := range component.Variants {
+			recordVariant := variantsByID[variant.ID]
+			if recordVariant.PackageType == recordVariant.ID && variant.Package != "" {
+				t.Fatalf("component %q variant %q repeats derivable package %q", component.ID, variant.ID, variant.Package)
+			}
+			if recordVariant.PackageType != recordVariant.ID && variant.Package != recordVariant.PackageType {
+				t.Fatalf("component %q variant %q package = %q, want non-derivable package %q", component.ID, variant.ID, variant.Package, recordVariant.PackageType)
+			}
+		}
+	}
+}

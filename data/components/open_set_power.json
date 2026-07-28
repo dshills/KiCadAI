@@ -10,7 +10,7 @@
       "manufacturer": "Alpha and Omega Semiconductor",
       "mpn": "AO3400A",
       "lifecycle": "active",
-      "tags": ["logic_level", "low_side_switch", "low_voltage_gate_drive", "mosfet", "n_channel", "sot23"],
+      "tags": ["ao3400", "ao3400a", "logic_level", "low_side_switch", "low_voltage_gate_drive", "mosfet", "n_channel", "sot23"],
       "values": [
         {"kind": "on_resistance", "max": "48", "unit": "mOhm"},
         {"kind": "on_resistance_gate_voltage", "typ": "2.5", "unit": "V"},
@@ -23,6 +23,27 @@
         {"kind": "power_dissipation", "max": "1.4", "unit": "W"}
       ],
       "temperature": {"min": "-55", "max": "150", "unit": "C"},
+      "power_semiconductor_evidence": {
+        "device_class": "mosfet",
+        "polarity": "n_channel",
+        "max_voltage": {"value": 30, "unit": "V", "conditions": "VGS=0"},
+        "continuous_current": {"value": 5.7, "unit": "A", "temperature_c": 25, "conditions": "manufacturer test-board boundary"},
+        "power_dissipation": {"value": 1.4, "unit": "W", "temperature_c": 25, "conditions": "manufacturer test-board boundary"},
+        "max_junction_temperature_c": 150,
+        "secondary_breakdown_status": "not_applicable",
+        "linear_mode_status": "review_required",
+        "mosfet": {
+          "rds_on_ohm": 0.048,
+          "rds_on_gate_voltage_v": 2.5,
+          "threshold_minimum_v": 0.65,
+          "threshold_maximum_v": 1.45,
+          "total_gate_charge_c": 7e-9,
+          "body_diode_status": "proven",
+          "gate_protection_status": "review_required"
+        },
+        "fabrication_proof": false,
+        "review_note": "Identity, G-S-D pad order, and low-voltage gate-drive resistance are reviewed; applied PCB thermal boundary and SOA remain fabrication gates."
+      },
       "simulation_models": [{
         "model_id": "mna_nmos_guaranteed_switch_v1",
         "parameters": [

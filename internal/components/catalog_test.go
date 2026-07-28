@@ -507,6 +507,95 @@ func TestCheckedInCatalogRequestedNPNExpansion(t *testing.T) {
 	}
 }
 
+func TestCheckedInCatalogRequestedNChannelMOSFETExpansion(t *testing.T) {
+	catalog, err := LoadCatalog(context.Background(), LoadOptions{CatalogDir: checkedInCatalogDir(t)})
+	if err != nil {
+		t.Fatalf("load checked-in catalog: %v", err)
+	}
+
+	tests := []struct {
+		query    string
+		id       string
+		mpn      string
+		pkgType  string
+		symbolID string
+		pinOrder []string
+	}{
+		{query: "IRF3205", id: "mosfet.infineon.irf3205pbf.to220", mpn: "IRF3205PBF", pkgType: "to220", symbolID: "Transistor_FET:Q_NMOS_GDS", pinOrder: []string{"GATE", "DRAIN", "SOURCE"}},
+		{query: "IRFZ44", id: "mosfet.vishay.irfz44pbf.to220", mpn: "IRFZ44PbF", pkgType: "to220", symbolID: "Transistor_FET:Q_NMOS_GDS", pinOrder: []string{"GATE", "DRAIN", "SOURCE"}},
+		{query: "2N7000", id: "mosfet.onsemi.2n7000ta.to92", mpn: "2N7000TA", pkgType: "to92", symbolID: "Transistor_FET:Q_NMOS_SGD", pinOrder: []string{"SOURCE", "GATE", "DRAIN"}},
+		{query: "BS170", id: "mosfet.onsemi.bs170.to92", mpn: "BS170", pkgType: "to92", symbolID: "Transistor_FET:Q_NMOS_DGS", pinOrder: []string{"DRAIN", "GATE", "SOURCE"}},
+		{query: "IRF120", id: "mosfet.infineon.irf120ewsa1.to3", mpn: "IRF120EWSA1", pkgType: "to3", symbolID: "Transistor_FET:Q_NMOS_GSD", pinOrder: []string{"GATE", "SOURCE", "DRAIN"}},
+		{query: "IRF510", id: "mosfet.vishay.irf510pbf.to220", mpn: "IRF510PbF", pkgType: "to220", symbolID: "Transistor_FET:Q_NMOS_GDS", pinOrder: []string{"GATE", "DRAIN", "SOURCE"}},
+		{query: "IRF520", id: "mosfet.vishay.irf520pbf.to220", mpn: "IRF520PbF", pkgType: "to220", symbolID: "Transistor_FET:Q_NMOS_GDS", pinOrder: []string{"GATE", "DRAIN", "SOURCE"}},
+		{query: "IRF530", id: "mosfet.vishay.irf530pbf.to220", mpn: "IRF530PbF", pkgType: "to220", symbolID: "Transistor_FET:Q_NMOS_GDS", pinOrder: []string{"GATE", "DRAIN", "SOURCE"}},
+		{query: "IRF540", id: "mosfet.vishay.irf540pbf.to220", mpn: "IRF540PbF", pkgType: "to220", symbolID: "Transistor_FET:Q_NMOS_GDS", pinOrder: []string{"GATE", "DRAIN", "SOURCE"}},
+		{query: "IRF610", id: "mosfet.vishay.irf610pbf.to220", mpn: "IRF610PbF", pkgType: "to220", symbolID: "Transistor_FET:Q_NMOS_GDS", pinOrder: []string{"GATE", "DRAIN", "SOURCE"}},
+		{query: "IRF640", id: "mosfet.vishay.irf640pbf.to220", mpn: "IRF640PbF", pkgType: "to220", symbolID: "Transistor_FET:Q_NMOS_GDS", pinOrder: []string{"GATE", "DRAIN", "SOURCE"}},
+		{query: "IRFP240", id: "mosfet.vishay.irfp240.to247", mpn: "IRFP240PbF", pkgType: "to247_3", symbolID: "Transistor_FET:Q_NMOS_GDS", pinOrder: []string{"GATE", "DRAIN", "SOURCE"}},
+		{query: "IRF740", id: "mosfet.vishay.irf740pbf.to220", mpn: "IRF740PbF", pkgType: "to220", symbolID: "Transistor_FET:Q_NMOS_GDS", pinOrder: []string{"GATE", "DRAIN", "SOURCE"}},
+		{query: "IRF840", id: "mosfet.vishay.irf840pbf.to220", mpn: "IRF840PbF", pkgType: "to220", symbolID: "Transistor_FET:Q_NMOS_GDS", pinOrder: []string{"GATE", "DRAIN", "SOURCE"}},
+		{query: "AO3400", id: "mosfet.aos.ao3400a.sot23", mpn: "AO3400A", pkgType: "sot23", symbolID: "Transistor_FET:Q_NMOS_GSD", pinOrder: []string{"GATE", "SOURCE", "DRAIN"}},
+		{query: "BSS138", id: "mosfet.onsemi.bss138_g.sot23", mpn: "BSS138-G", pkgType: "sot23", symbolID: "Transistor_FET:Q_NMOS_GSD", pinOrder: []string{"GATE", "SOURCE", "DRAIN"}},
+	}
+	if len(tests) != 16 {
+		t.Fatalf("requested N-channel MOSFET coverage = %d, want 16", len(tests))
+	}
+
+	for _, test := range tests {
+		record := requireCatalogRecord(t, catalog, test.id)
+		if record.MPN != test.mpn || record.Generic || record.Verification.Confidence != ConfidenceVerified {
+			t.Fatalf("%s identity = MPN:%q generic:%v verification:%#v", test.query, record.MPN, record.Generic, record.Verification)
+		}
+		if record.PowerSemiconductor == nil || record.PowerSemiconductor.DeviceClass != "mosfet" ||
+			record.PowerSemiconductor.Polarity != "n_channel" || record.PowerSemiconductor.FabricationProof {
+			t.Fatalf("%s power evidence = %#v", test.query, record.PowerSemiconductor)
+		}
+		if record.PowerSemiconductor.LinearModeStatus != "review_required" {
+			t.Fatalf("%s linear-mode status = %q, want review_required", test.query, record.PowerSemiconductor.LinearModeStatus)
+		}
+		if len(record.Symbols) != 1 || record.Symbols[0].SymbolID != test.symbolID {
+			t.Fatalf("%s symbol binding = %#v", test.query, record.Symbols)
+		}
+		if len(record.Packages) != 1 || record.Packages[0].PackageType != test.pkgType {
+			t.Fatalf("%s package binding = %#v", test.query, record.Packages)
+		}
+		ratingKinds := make(map[string]struct{}, len(record.Ratings))
+		for _, rating := range record.Ratings {
+			ratingKinds[rating.Kind] = struct{}{}
+		}
+		for _, kind := range []string{"drain_source_voltage", "drain_current", "power_dissipation"} {
+			if _, ok := ratingKinds[kind]; !ok {
+				t.Fatalf("%s ratings lack normalized %s key: %#v", test.query, kind, record.Ratings)
+			}
+		}
+		symbolPins := make(map[string]string, len(record.Symbols[0].FunctionPins))
+		for _, pin := range record.Symbols[0].FunctionPins {
+			symbolPins[pin.SymbolPin] = pin.Function
+		}
+		packagePads := make(map[string]string, len(record.Packages[0].PadFunctions))
+		for _, pad := range record.Packages[0].PadFunctions {
+			packagePads[pad.Pad] = pad.Function
+		}
+		for index, function := range test.pinOrder {
+			number := string(rune('1' + index))
+			if symbolPins[number] != function || packagePads[number] != function {
+				t.Fatalf("%s pin %s = symbol:%q pad:%q, want %q", test.query, number, symbolPins[number], packagePads[number], function)
+			}
+		}
+
+		selection, result := Select(context.Background(), catalog, SelectionRequest{
+			Query:             Query{Text: test.query, Family: "mosfet", Package: test.pkgType},
+			Acceptance:        AcceptanceConnectivity,
+			RequiredFunctions: []string{"GATE", "DRAIN", "SOURCE"},
+			RequireConcrete:   true,
+		})
+		if !result.OK || selection.Component.ID != test.id {
+			t.Fatalf("select %s = component:%q issues:%#v", test.query, selection.Component.ID, result.Issues)
+		}
+	}
+}
+
 func TestCheckedInCatalogRequestedPNPExpansion(t *testing.T) {
 	catalog, err := LoadCatalog(context.Background(), LoadOptions{CatalogDir: checkedInCatalogDir(t)})
 	if err != nil {

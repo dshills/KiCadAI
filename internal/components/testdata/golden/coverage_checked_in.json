@@ -1,15 +1,15 @@
 {
-  "record_count": 222,
+  "record_count": 236,
   "family_count": 33,
   "confidence_counts": {
     "blocked": 1,
     "library_derived": 1,
     "placeholder": 7,
     "rule_inferred": 6,
-    "verified": 207
+    "verified": 221
   },
   "alternative_coverage": {
-    "concrete_records": 184,
+    "concrete_records": 198,
     "generic_fallback_records": 38,
     "equivalence_groups": 24
   },
@@ -559,11 +559,11 @@
     {
       "family": "mosfet",
       "defined": true,
-      "record_count": 9,
-      "concrete_records": 9,
+      "record_count": 23,
+      "concrete_records": 23,
       "generic_fallback_records": 0,
       "equivalence_groups": 0,
-      "verified_records": 9,
+      "verified_records": 23,
       "library_derived_records": 0,
       "rule_inferred_records": 0,
       "placeholder_records": 0,
@@ -573,11 +573,25 @@
         "mosfet.aos.ao3401.sot23",
         "mosfet.aos.aod21357.to252",
         "mosfet.aos.aoss21311c.sot23",
+        "mosfet.infineon.irf120ewsa1.to3",
+        "mosfet.infineon.irf3205pbf.to220",
         "mosfet.infineon.irlz44n.to220",
+        "mosfet.onsemi.2n7000ta.to92",
+        "mosfet.onsemi.bs170.to92",
+        "mosfet.onsemi.bss138_g.sot23",
         "mosfet.onsemi.fqp47p06.to220",
         "mosfet.onsemi.rfd16n05lsm.to252",
+        "mosfet.vishay.irf510pbf.to220",
+        "mosfet.vishay.irf520pbf.to220",
+        "mosfet.vishay.irf530pbf.to220",
+        "mosfet.vishay.irf540pbf.to220",
+        "mosfet.vishay.irf610pbf.to220",
+        "mosfet.vishay.irf640pbf.to220",
+        "mosfet.vishay.irf740pbf.to220",
+        "mosfet.vishay.irf840pbf.to220",
         "mosfet.vishay.irfp240.to247",
-        "mosfet.vishay.irfp9240.to247"
+        "mosfet.vishay.irfp9240.to247",
+        "mosfet.vishay.irfz44pbf.to220"
       ]
     },
     {

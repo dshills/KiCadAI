@@ -1121,7 +1121,7 @@
       "manufacturer": "Vishay Siliconix",
       "mpn": "IRFP240PbF",
       "lifecycle": "active",
-      "tags": ["audio_review", "mosfet", "n_channel", "power_output", "to247"],
+      "tags": ["audio_review", "irfp240", "irfp240pbf", "mosfet", "n_channel", "power_output", "to247"],
       "ratings": [{"kind": "drain_source_voltage", "max": "200", "unit": "V"}, {"kind": "drain_current", "max": "20", "unit": "A"}, {"kind": "power_dissipation", "max": "150", "unit": "W"}],
       "temperature": {"min": "-55", "max": "150", "unit": "C"},
       "companions": [{"id": "amplifier.output_gate_stopper", "family": "resistor", "role": "gate_stopper", "required": true, "applies_to": ["class_ab_output", "class_a_output"], "description": "A calculated local gate-stopper resistor is required for power MOSFET amplifier use."}],
