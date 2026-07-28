@@ -1555,6 +1555,28 @@
       }
     },
     {
+      "catalog_id": "opamp.renesas.ca3140ez.dip8",
+      "family": "opamp",
+      "model_id": "mna_opamp_single_pole_v1",
+      "provenance": {
+        "source": "https://www.renesas.com/en/document/dst/ca3140-ca3140a-datasheet",
+        "revision": "Renesas FN957 Rev.10.01, revised February 2026",
+        "sha256": "75004d4df8a0b335690ea7437bad887c16e5ca39f46c10e8345c70045b3ce0d5",
+        "review_status": "reviewed",
+        "allowed_analyses": [
+          "ac_sweep",
+          "dc_operating_point",
+          "noise",
+          "stability",
+          "startup",
+          "thermal",
+          "transient"
+        ],
+        "min_temperature_c": -55,
+        "max_temperature_c": 125
+      }
+    },
+    {
       "catalog_id": "opamp.ti.lm358.soic8",
       "family": "opamp",
       "model_id": "mna_opamp_single_pole_v1",
@@ -1692,6 +1714,29 @@
       }
     },
     {
+      "catalog_id": "opamp.ti.lm4562ma.soic8",
+      "family": "opamp",
+      "model_id": "mna_opamp_single_pole_v1",
+      "provenance": {
+        "source": "https://www.ti.com/lit/ds/symlink/lm4562.pdf",
+        "revision": "TI SNAS326K",
+        "sha256": "75004d4df8a0b335690ea7437bad887c16e5ca39f46c10e8345c70045b3ce0d5",
+        "review_status": "reviewed",
+        "allowed_analyses": [
+          "ac_sweep",
+          "dc_operating_point",
+          "distortion",
+          "noise",
+          "stability",
+          "startup",
+          "thermal",
+          "transient"
+        ],
+        "min_temperature_c": -40,
+        "max_temperature_c": 85
+      }
+    },
+    {
       "catalog_id": "opamp.ti.lmv321.sot23_5",
       "family": "opamp",
       "model_id": "mna_opamp_single_pole_v1",
@@ -1712,6 +1757,29 @@
         ],
         "min_temperature_c": -40,
         "max_temperature_c": 125
+      }
+    },
+    {
+      "catalog_id": "opamp.ti.ne5532dr.soic8",
+      "family": "opamp",
+      "model_id": "mna_opamp_single_pole_v1",
+      "provenance": {
+        "source": "https://www.ti.com/lit/ds/symlink/ne5532.pdf",
+        "revision": "TI SLOS075K, revised December 2025",
+        "sha256": "75004d4df8a0b335690ea7437bad887c16e5ca39f46c10e8345c70045b3ce0d5",
+        "review_status": "reviewed",
+        "allowed_analyses": [
+          "ac_sweep",
+          "dc_operating_point",
+          "distortion",
+          "noise",
+          "stability",
+          "startup",
+          "thermal",
+          "transient"
+        ],
+        "min_temperature_c": 0,
+        "max_temperature_c": 70
       }
     },
     {
@@ -1758,6 +1826,29 @@
         ],
         "min_temperature_c": -40,
         "max_temperature_c": 125
+      }
+    },
+    {
+      "catalog_id": "opamp.ti.opa2134ua.soic8",
+      "family": "opamp",
+      "model_id": "mna_opamp_single_pole_v1",
+      "provenance": {
+        "source": "https://www.ti.com/lit/ds/symlink/opa2134.pdf",
+        "revision": "TI SBOS058B, revised November 2024",
+        "sha256": "75004d4df8a0b335690ea7437bad887c16e5ca39f46c10e8345c70045b3ce0d5",
+        "review_status": "reviewed",
+        "allowed_analyses": [
+          "ac_sweep",
+          "dc_operating_point",
+          "distortion",
+          "noise",
+          "stability",
+          "startup",
+          "thermal",
+          "transient"
+        ],
+        "min_temperature_c": -40,
+        "max_temperature_c": 85
       }
     },
     {

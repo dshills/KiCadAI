@@ -294,6 +294,95 @@ func TestCheckedInCatalogLM358MultiUnitEvidence(t *testing.T) {
 	}
 }
 
+func TestCheckedInCatalogAudioOpAmpExpansion(t *testing.T) {
+	catalog, err := LoadCatalog(context.Background(), LoadOptions{CatalogDir: checkedInCatalogDir(t)})
+	if err != nil {
+		t.Fatalf("load checked-in catalog: %v", err)
+	}
+
+	ca3140 := requireCatalogRecord(t, catalog, "opamp.renesas.ca3140ez.dip8")
+	if ca3140.MPN != "CA3140EZ" || ca3140.Verification.Confidence != ConfidenceVerified ||
+		ca3140.OpAmp == nil || !ca3140.OpAmp.FabricationCandidateBlocks ||
+		ca3140.OpAmp.DistortionStatus != "review_required" {
+		t.Fatalf("CA3140 identity or review boundary = identity:%#v evidence:%#v", ca3140.Verification, ca3140.OpAmp)
+	}
+	requireSymbolFunctions(t, ca3140, "Amplifier_Operational:CA3140", []string{
+		"IN_MINUS", "IN_PLUS", "OFFSET_NULL_1", "OFFSET_NULL_2", "OUT", "STROBE", "V_MINUS", "V_PLUS",
+	})
+	requirePackagePads(t, ca3140, "dip8", []string{
+		"IN_MINUS", "IN_PLUS", "OFFSET_NULL_1", "OFFSET_NULL_2", "OUT", "STROBE", "V_MINUS", "V_PLUS",
+	})
+
+	for _, test := range []struct {
+		id               string
+		mpn              string
+		symbolID         string
+		fabricationProof bool
+	}{
+		{id: "opamp.ti.lm4562ma.soic8", mpn: "LM4562MA/NOPB", symbolID: "Amplifier_Operational:LM4562", fabricationProof: true},
+		{id: "opamp.ti.ne5532dr.soic8", mpn: "NE5532DR", symbolID: "Amplifier_Operational:NE5532"},
+		{id: "opamp.ti.opa2134ua.soic8", mpn: "OPA2134UA", symbolID: "Amplifier_Operational:OPA2134", fabricationProof: true},
+	} {
+		record := requireCatalogRecord(t, catalog, test.id)
+		if record.MPN != test.mpn || record.Verification.Confidence != ConfidenceVerified ||
+			record.OpAmp == nil || record.OpAmp.FabricationProof != test.fabricationProof ||
+			len(record.SimulationModels) != 1 || record.SimulationModels[0].ModelID != "mna_opamp_single_pole_v1" {
+			t.Fatalf("%s identity or evidence = MPN:%q verification:%#v opamp:%#v models:%#v", test.id, record.MPN, record.Verification, record.OpAmp, record.SimulationModels)
+		}
+		wantUnits := map[string]struct {
+			unit     int
+			unitType SymbolUnitType
+			required bool
+			pins     []string
+		}{
+			"A": {unit: 1, unitType: SymbolUnitFunctional, pins: []string{"1", "2", "3"}},
+			"B": {unit: 2, unitType: SymbolUnitFunctional, pins: []string{"5", "6", "7"}},
+			"P": {unit: 3, unitType: SymbolUnitPower, required: true, pins: []string{"4", "8"}},
+		}
+		if len(record.Symbols) != len(wantUnits) {
+			t.Fatalf("%s symbol units = %d, want %d", test.id, len(record.Symbols), len(wantUnits))
+		}
+		for _, symbol := range record.Symbols {
+			want, exists := wantUnits[symbol.UnitID]
+			if !exists || symbol.SymbolID != test.symbolID || symbol.Unit != want.unit ||
+				symbol.UnitType != want.unitType || symbol.RequiredUnit != want.required {
+				t.Fatalf("%s unexpected symbol unit %#v", test.id, symbol)
+			}
+			pins := make([]string, 0, len(symbol.FunctionPins))
+			for _, pin := range symbol.FunctionPins {
+				pins = append(pins, pin.SymbolPin)
+			}
+			slices.Sort(pins)
+			if !slices.Equal(pins, want.pins) {
+				t.Fatalf("%s unit %s pins = %v, want %v", test.id, symbol.UnitID, pins, want.pins)
+			}
+		}
+		requirePackagePads(t, record, "soic8", []string{"IN_MINUS", "IN_PLUS", "OUT", "V_MINUS", "V_PLUS"})
+	}
+
+	for _, test := range []struct {
+		id      string
+		mpn     string
+		pkgType string
+	}{
+		{id: "opamp.renesas.ca3140ez.dip8", mpn: "CA3140EZ", pkgType: "dip8"},
+		{id: "opamp.ti.lm4562ma.soic8", mpn: "LM4562MA/NOPB", pkgType: "soic8"},
+		{id: "opamp.ti.ne5532dr.soic8", mpn: "NE5532DR", pkgType: "soic8"},
+		{id: "opamp.ti.opa2134ua.soic8", mpn: "OPA2134UA", pkgType: "soic8"},
+	} {
+		selection, result := Select(context.Background(), catalog, SelectionRequest{
+			Query:             Query{Text: test.mpn, Family: "opamp", Package: test.pkgType},
+			Acceptance:        AcceptanceConnectivity,
+			RequiredFunctions: []string{"IN_PLUS", "IN_MINUS", "OUT", "V_PLUS", "V_MINUS"},
+			RequireConcrete:   true,
+			RequireCompanions: true,
+		})
+		if !result.OK || selection.Component.ID != test.id {
+			t.Fatalf("select %s = component:%q issues:%#v", test.mpn, selection.Component.ID, result.Issues)
+		}
+	}
+}
+
 func TestCheckedInCatalogBJTLibraryIdentityIsConsistent(t *testing.T) {
 	catalog, err := LoadCatalog(context.Background(), LoadOptions{CatalogDir: checkedInCatalogDir(t)})
 	if err != nil {

@@ -1,0 +1,524 @@
+{
+  "version": "0.1.0",
+  "records": [
+    {
+      "id": "opamp.renesas.ca3140ez.dip8",
+      "family": "opamp",
+      "name": "Renesas CA3140EZ BiMOS operational amplifier",
+      "description": "Active single-channel MOSFET-input, bipolar-output operational amplifier with reviewed single-supply, auxiliary-pin, and PDIP-8 evidence.",
+      "generic": false,
+      "manufacturer": "Renesas Electronics",
+      "mpn": "CA3140EZ",
+      "lifecycle": "active",
+      "tags": ["analog", "bimos", "fet_input", "gain_stage", "opamp", "single", "through_hole"],
+      "ratings": [
+        {"kind": "supply_voltage", "min": "4", "max": "36", "unit": "V"},
+        {"kind": "supply_current", "max": "6", "unit": "mA"},
+        {"kind": "output_current", "max": "0.01", "unit": "A"}
+      ],
+      "values": [{"kind": "input_offset_voltage", "max": "0.015", "unit": "V"}],
+      "temperature": {"min": "-55", "max": "125", "unit": "C"},
+      "companions": [
+        {
+          "id": "opamp.decoupling_capacitor",
+          "family": "capacitor",
+          "role": "decoupling_capacitor",
+          "required": true,
+          "description": "Place a low-inductance bypass capacitor directly across the CA3140 supply pins."
+        },
+        {
+          "id": "opamp.ca3140_auxiliary_pins",
+          "family": "opamp",
+          "role": "unused_pin_policy",
+          "required": true,
+          "no_connects": ["OFFSET_NULL_1", "OFFSET_NULL_2", "STROBE"],
+          "description": "Leave offset-null and strobe open when their optional functions are unused; do not silently map them as generic no-connect pads."
+        }
+      ],
+      "simulation_models": [{
+        "model_id": "mna_opamp_single_pole_v1",
+        "parameters": [
+          {"name": "dc_open_loop_gain", "value": 100000},
+          {"name": "gain_bandwidth_hz", "value": 4500000},
+          {"name": "input_voltage_noise_density_v_sqrt_hz", "value": 4e-8},
+          {"name": "junction_to_ambient_c_per_w", "value": 115},
+          {"name": "max_temperature_c", "value": 150},
+          {"name": "output_high_margin_v", "value": 2},
+          {"name": "output_low_margin_v", "value": 0.2},
+          {"name": "quiescent_current_a", "value": 0.006},
+          {"name": "supply_max_v", "value": 36},
+          {"name": "supply_min_v", "value": 4}
+        ]
+      }],
+      "opamp_evidence": {
+        "intended_roles": ["input_buffer", "gain_stage", "voltage_follower", "comparator"],
+        "supply_mode": "single_supply",
+        "output_drive_status": "proven",
+        "load_compatibility_status": "proven",
+        "gain_bandwidth_status": "proven",
+        "stability_status": "proven",
+        "input_common_mode_status": "proven",
+        "output_swing_status": "proven",
+        "noise_status": "proven",
+        "distortion_status": "review_required",
+        "supply_voltage": {"minimum": 4, "maximum": 36, "unit": "V", "conditions": "Renesas FN957 operating range for single- or dual-supply operation"},
+        "input_common_mode": {"negative_rail_headroom_v": 0, "positive_rail_headroom_v": 2.5, "conditions": "Conservative rail-referenced abstraction of the FN957 common-mode tables; the input can extend 0.5 V below V-"},
+        "output_swing": {"negative_rail_headroom_v": 1, "positive_rail_headroom_v": 3, "conditions": "Conservative FN957 bound at plus/minus 15 V with a 2 kohm load"},
+        "output_current": {"value": 0.01, "unit": "A", "temperature_c": 25, "conditions": "FN957 five-volt design-guidance source-current value; short-circuit values are not used as normal drive ratings"},
+        "gain_bandwidth": {"value": 4500000, "unit": "Hz", "conditions": "Typical gain-bandwidth product at plus/minus 15 V"},
+        "slew_rate": {"value": 9000000, "unit": "V/s", "conditions": "Typical slew rate at plus/minus 15 V"},
+        "voltage_noise_density": {"value": 4e-8, "unit": "V/sqrt(Hz)", "frequency_hz": 1000, "temperature_c": 25, "conditions": "Typical equivalent input-noise density from FN957"},
+        "max_junction_temperature_c": 150,
+        "junction_to_ambient_c_per_w": 115,
+        "fabrication_candidate_blocks": true,
+        "review_note": "Renesas FN957 Rev.10.01 proves identity, limits, unity-gain compensation, electrical behavior, auxiliary pins, and PDIP thermal data. Distortion and the applied load/stability margin remain circuit-level fabrication gates."
+      },
+      "placement_hints": [{"kind": "near", "target": "decoupling_capacitor", "value": "3", "unit": "mm", "description": "Keep the supply bypass loop short."}],
+      "symbols": [{
+        "symbol_id": "Amplifier_Operational:CA3140",
+        "function_pins": [
+          {"function": "OFFSET_NULL_1", "symbol_pin": "1"},
+          {"function": "IN_MINUS", "symbol_pin": "2", "electrical": "input", "required": true},
+          {"function": "IN_PLUS", "symbol_pin": "3", "electrical": "input", "required": true},
+          {"function": "V_MINUS", "symbol_pin": "4", "electrical": "power_in", "required": true},
+          {"function": "OFFSET_NULL_2", "symbol_pin": "5"},
+          {"function": "OUT", "symbol_pin": "6", "electrical": "output", "required": true},
+          {"function": "V_PLUS", "symbol_pin": "7", "electrical": "power_in", "required": true},
+          {"function": "STROBE", "symbol_pin": "8", "electrical": "input"}
+        ],
+        "verification": {
+          "confidence": "verified",
+          "sources": ["https://www.renesas.com/en/document/dst/ca3140-ca3140a-datasheet", "kicad-symbols:Amplifier_Operational:CA3140"],
+          "pinmap_checked": true
+        }
+      }],
+      "packages": [{
+        "id": "dip8",
+        "name": "PDIP-8 7.62 mm row spacing",
+        "footprint_id": "Package_DIP:DIP-8_W7.62mm",
+        "package_type": "dip8",
+        "mpn": "CA3140EZ",
+        "lifecycle": "active",
+        "pinmap_id": "Amplifier_Operational:CA3140|Package_DIP:DIP-8_W7.62mm",
+        "pad_functions": [
+          {"function": "OFFSET_NULL_1", "pad": "1"},
+          {"function": "IN_MINUS", "pad": "2"},
+          {"function": "IN_PLUS", "pad": "3"},
+          {"function": "V_MINUS", "pad": "4"},
+          {"function": "OFFSET_NULL_2", "pad": "5"},
+          {"function": "OUT", "pad": "6"},
+          {"function": "V_PLUS", "pad": "7"},
+          {"function": "STROBE", "pad": "8"}
+        ],
+        "dimensions_mm": {"width": 9.7, "height": 6.6},
+        "height_mm": 3.94,
+        "verification": {
+          "confidence": "verified",
+          "sources": ["https://www.renesas.com/en/document/dst/ca3140-ca3140a-datasheet", "kicad-footprints:Package_DIP:DIP-8_W7.62mm"],
+          "pinmap_checked": true
+        }
+      }],
+      "verification": {
+        "confidence": "verified",
+        "sources": ["https://www.renesas.com/en/document/dst/ca3140-ca3140a-datasheet", "kicad-symbols:Amplifier_Operational:CA3140", "kicad-footprints:Package_DIP:DIP-8_W7.62mm"],
+        "resolver_checked": true,
+        "pinmap_checked": true,
+        "tests": ["catalog_audio_opamp_expansion"]
+      }
+    },
+    {
+      "id": "opamp.ti.lm4562ma.soic8",
+      "family": "opamp",
+      "name": "TI LM4562MA/NOPB dual high-fidelity audio operational amplifier",
+      "description": "Active dual-channel low-noise audio op-amp with reviewed drive, distortion, capacitive-load, thermal, multi-unit, and SOIC-8 evidence.",
+      "generic": false,
+      "manufacturer": "Texas Instruments",
+      "mpn": "LM4562MA/NOPB",
+      "lifecycle": "active",
+      "tags": ["audio", "dual", "gain_stage", "high_fidelity", "low_distortion", "low_noise", "multi_unit", "opamp", "soic8"],
+      "ratings": [
+        {"kind": "supply_voltage", "min": "5", "max": "34", "unit": "V"},
+        {"kind": "supply_current", "max": "12", "unit": "mA"},
+        {"kind": "output_current", "max": "0.023", "unit": "A"}
+      ],
+      "values": [{"kind": "input_offset_voltage", "max": "0.0007", "unit": "V"}],
+      "temperature": {"min": "-40", "max": "85", "unit": "C"},
+      "companions": [{
+        "id": "opamp.decoupling_capacitor",
+        "family": "capacitor",
+        "role": "decoupling_capacitor",
+        "required": true,
+        "description": "Place low-inductance local bypass capacitors at the LM4562 supply pins."
+      }],
+      "simulation_models": [{
+        "model_id": "mna_opamp_single_pole_v1",
+        "parameters": [
+          {"name": "dc_open_loop_gain", "value": 10000000},
+          {"name": "gain_bandwidth_hz", "value": 55000000},
+          {"name": "input_voltage_noise_density_v_sqrt_hz", "value": 2.7e-9},
+          {"name": "junction_to_ambient_c_per_w", "value": 145},
+          {"name": "max_temperature_c", "value": 150},
+          {"name": "output_high_margin_v", "value": 2},
+          {"name": "output_low_margin_v", "value": 2},
+          {"name": "quiescent_current_a", "value": 0.012},
+          {"name": "supply_max_v", "value": 34},
+          {"name": "supply_min_v", "value": 5}
+        ]
+      }],
+      "opamp_evidence": {
+        "intended_roles": ["input_buffer", "gain_stage", "voltage_follower", "small_signal_driver"],
+        "supply_mode": "dual_supply",
+        "output_drive_status": "proven",
+        "load_compatibility_status": "proven",
+        "gain_bandwidth_status": "proven",
+        "stability_status": "proven",
+        "input_common_mode_status": "proven",
+        "output_swing_status": "proven",
+        "noise_status": "proven",
+        "distortion_status": "proven",
+        "supply_voltage": {"minimum": 5, "maximum": 34, "unit": "V", "conditions": "TI SNAS326K operating range of plus/minus 2.5 V through plus/minus 17 V"},
+        "input_common_mode": {"negative_rail_headroom_v": 2, "positive_rail_headroom_v": 2, "conditions": "SNAS326K guaranteed input common-mode range"},
+        "output_swing": {"negative_rail_headroom_v": 2.5, "positive_rail_headroom_v": 2.5, "conditions": "Guaranteed output swing with a 600 ohm load at plus/minus 15 V"},
+        "output_current": {"value": 0.023, "unit": "A", "temperature_c": 25, "conditions": "Guaranteed output-current magnitude with a 600 ohm load"},
+        "gain_bandwidth": {"value": 55000000, "unit": "Hz", "conditions": "Typical gain-bandwidth product"},
+        "slew_rate": {"value": 15000000, "unit": "V/s", "conditions": "Guaranteed minimum slew-rate magnitude"},
+        "voltage_noise_density": {"value": 2.7e-9, "unit": "V/sqrt(Hz)", "frequency_hz": 1000, "temperature_c": 25, "conditions": "Typical input voltage-noise density"},
+        "max_junction_temperature_c": 150,
+        "junction_to_ambient_c_per_w": 145,
+        "fabrication_proof": true,
+        "fabrication_candidate_blocks": false,
+        "review_note": "TI SNAS326K provides the reviewed electrical, audio, load, package, and thermal evidence. Applied gain, source impedance, decoupling, output loading, and thermal rise remain circuit-level gates."
+      },
+      "placement_hints": [{"kind": "near", "target": "decoupling_capacitor", "value": "3", "unit": "mm", "description": "Keep both rail bypass loops short."}],
+      "symbols": [
+        {
+          "symbol_id": "Amplifier_Operational:LM4562",
+          "unit": 1,
+          "unit_id": "A",
+          "unit_type": "functional",
+          "function_pins": [
+            {"function": "OUT", "symbol_pin": "1", "electrical": "output", "required": true, "aliases": ["CHANNEL_1_OUT"]},
+            {"function": "IN_MINUS", "symbol_pin": "2", "electrical": "input", "required": true, "aliases": ["CHANNEL_1_IN_MINUS"]},
+            {"function": "IN_PLUS", "symbol_pin": "3", "electrical": "input", "required": true, "aliases": ["CHANNEL_1_IN_PLUS"]}
+          ],
+          "verification": {"confidence": "verified", "sources": ["https://www.ti.com/lit/ds/symlink/lm4562.pdf", "kicad-symbols:Amplifier_Operational:LM4562"], "pinmap_checked": true}
+        },
+        {
+          "symbol_id": "Amplifier_Operational:LM4562",
+          "unit": 2,
+          "unit_id": "B",
+          "unit_type": "functional",
+          "function_pins": [
+            {"function": "IN_PLUS", "symbol_pin": "5", "electrical": "input", "required": true, "aliases": ["CHANNEL_2_IN_PLUS"]},
+            {"function": "IN_MINUS", "symbol_pin": "6", "electrical": "input", "required": true, "aliases": ["CHANNEL_2_IN_MINUS"]},
+            {"function": "OUT", "symbol_pin": "7", "electrical": "output", "required": true, "aliases": ["CHANNEL_2_OUT"]}
+          ],
+          "verification": {"confidence": "verified", "sources": ["https://www.ti.com/lit/ds/symlink/lm4562.pdf", "kicad-symbols:Amplifier_Operational:LM4562"], "pinmap_checked": true}
+        },
+        {
+          "symbol_id": "Amplifier_Operational:LM4562",
+          "unit": 3,
+          "unit_id": "P",
+          "unit_type": "power",
+          "required_unit": true,
+          "function_pins": [
+            {"function": "V_MINUS", "symbol_pin": "4", "electrical": "power_in", "required": true},
+            {"function": "V_PLUS", "symbol_pin": "8", "electrical": "power_in", "required": true}
+          ],
+          "verification": {"confidence": "verified", "sources": ["https://www.ti.com/lit/ds/symlink/lm4562.pdf", "kicad-symbols:Amplifier_Operational:LM4562"], "pinmap_checked": true}
+        }
+      ],
+      "packages": [{
+        "id": "soic8",
+        "name": "SOIC-8 3.9 x 4.9 mm P1.27 mm",
+        "footprint_id": "Package_SO:SOIC-8_3.9x4.9mm_P1.27mm",
+        "package_type": "soic8",
+        "mpn": "LM4562MA/NOPB",
+        "lifecycle": "active",
+        "pinmap_id": "Amplifier_Operational:LM4562|Package_SO:SOIC-8_3.9x4.9mm_P1.27mm",
+        "pad_functions": [
+          {"function": "OUT", "pad": "1", "aliases": ["CHANNEL_1_OUT"]},
+          {"function": "IN_MINUS", "pad": "2", "aliases": ["CHANNEL_1_IN_MINUS"]},
+          {"function": "IN_PLUS", "pad": "3", "aliases": ["CHANNEL_1_IN_PLUS"]},
+          {"function": "V_MINUS", "pad": "4"},
+          {"function": "IN_PLUS", "pad": "5", "aliases": ["CHANNEL_2_IN_PLUS"]},
+          {"function": "IN_MINUS", "pad": "6", "aliases": ["CHANNEL_2_IN_MINUS"]},
+          {"function": "OUT", "pad": "7", "aliases": ["CHANNEL_2_OUT"]},
+          {"function": "V_PLUS", "pad": "8"}
+        ],
+        "dimensions_mm": {"width": 6, "height": 4.9},
+        "height_mm": 1.75,
+        "verification": {"confidence": "verified", "sources": ["https://www.ti.com/lit/ds/symlink/lm4562.pdf", "kicad-footprints:Package_SO:SOIC-8_3.9x4.9mm_P1.27mm"], "pinmap_checked": true}
+      }],
+      "verification": {
+        "confidence": "verified",
+        "sources": ["https://www.ti.com/lit/ds/symlink/lm4562.pdf", "kicad-symbols:Amplifier_Operational:LM4562", "kicad-footprints:Package_SO:SOIC-8_3.9x4.9mm_P1.27mm"],
+        "resolver_checked": true,
+        "pinmap_checked": true,
+        "tests": ["catalog_audio_opamp_expansion"]
+      }
+    },
+    {
+      "id": "opamp.ti.ne5532dr.soic8",
+      "family": "opamp",
+      "name": "TI NE5532DR dual low-noise audio operational amplifier",
+      "description": "Active dual-channel bipolar audio op-amp with reviewed low-noise, unity-gain, thermal, multi-unit, and SOIC-8 evidence.",
+      "generic": false,
+      "manufacturer": "Texas Instruments",
+      "mpn": "NE5532DR",
+      "lifecycle": "active",
+      "tags": ["audio", "bipolar_input", "dual", "gain_stage", "low_noise", "multi_unit", "opamp", "soic8"],
+      "ratings": [
+        {"kind": "supply_voltage", "min": "10", "max": "30", "unit": "V"},
+        {"kind": "supply_current", "max": "16", "unit": "mA"},
+        {"kind": "output_current", "max": "0.038", "unit": "A"}
+      ],
+      "values": [{"kind": "input_offset_voltage", "max": "0.005", "unit": "V"}],
+      "temperature": {"min": "0", "max": "70", "unit": "C"},
+      "companions": [{
+        "id": "opamp.decoupling_capacitor",
+        "family": "capacitor",
+        "role": "decoupling_capacitor",
+        "required": true,
+        "description": "Place low-inductance local bypass capacitors at the NE5532 supply pins."
+      }],
+      "simulation_models": [{
+        "model_id": "mna_opamp_single_pole_v1",
+        "parameters": [
+          {"name": "dc_open_loop_gain", "value": 100000},
+          {"name": "gain_bandwidth_hz", "value": 12000000},
+          {"name": "input_voltage_noise_density_v_sqrt_hz", "value": 5e-9},
+          {"name": "junction_to_ambient_c_per_w", "value": 97},
+          {"name": "max_temperature_c", "value": 150},
+          {"name": "output_high_margin_v", "value": 3},
+          {"name": "output_low_margin_v", "value": 3},
+          {"name": "quiescent_current_a", "value": 0.016},
+          {"name": "supply_max_v", "value": 30},
+          {"name": "supply_min_v", "value": 10}
+        ]
+      }],
+      "opamp_evidence": {
+        "intended_roles": ["input_buffer", "gain_stage", "voltage_follower", "small_signal_driver"],
+        "supply_mode": "dual_supply",
+        "output_drive_status": "proven",
+        "load_compatibility_status": "proven",
+        "gain_bandwidth_status": "proven",
+        "stability_status": "proven",
+        "input_common_mode_status": "proven",
+        "output_swing_status": "review_required",
+        "noise_status": "proven",
+        "distortion_status": "review_required",
+        "supply_voltage": {"minimum": 10, "maximum": 30, "unit": "V", "conditions": "TI SLOS075K recommended plus/minus 5 V through plus/minus 15 V operation"},
+        "input_common_mode": {"negative_rail_headroom_v": 2, "positive_rail_headroom_v": 2, "conditions": "Typical common-mode range at plus/minus 15 V"},
+        "output_current": {"value": 0.038, "unit": "A", "temperature_c": 25, "conditions": "Typical short-circuit current; normal output loading remains circuit-validated"},
+        "gain_bandwidth": {"value": 12000000, "unit": "Hz", "conditions": "Typical unity-gain bandwidth in SLOS075K"},
+        "slew_rate": {"value": 5000000, "unit": "V/s", "conditions": "Typical unity-gain slew rate in SLOS075K"},
+        "voltage_noise_density": {"value": 5e-9, "unit": "V/sqrt(Hz)", "frequency_hz": 1000, "temperature_c": 25, "conditions": "Typical equivalent input-noise density"},
+        "max_junction_temperature_c": 150,
+        "junction_to_ambient_c_per_w": 97,
+        "fabrication_candidate_blocks": true,
+        "review_note": "TI SLOS075K proves the active DR identity, supplies, bandwidth, noise, current, temperature, unity-gain compensation, package, and pin map. The compact model retains a conservative legacy output-swing abstraction because Revision K removed that specification; applied swing and distortion therefore remain fabrication gates."
+      },
+      "placement_hints": [{"kind": "near", "target": "decoupling_capacitor", "value": "3", "unit": "mm", "description": "Keep both rail bypass loops short."}],
+      "symbols": [
+        {
+          "symbol_id": "Amplifier_Operational:NE5532",
+          "unit": 1,
+          "unit_id": "A",
+          "unit_type": "functional",
+          "function_pins": [
+            {"function": "OUT", "symbol_pin": "1", "electrical": "output", "required": true, "aliases": ["CHANNEL_1_OUT"]},
+            {"function": "IN_MINUS", "symbol_pin": "2", "electrical": "input", "required": true, "aliases": ["CHANNEL_1_IN_MINUS"]},
+            {"function": "IN_PLUS", "symbol_pin": "3", "electrical": "input", "required": true, "aliases": ["CHANNEL_1_IN_PLUS"]}
+          ],
+          "verification": {"confidence": "verified", "sources": ["https://www.ti.com/lit/ds/symlink/ne5532.pdf", "kicad-symbols:Amplifier_Operational:NE5532"], "pinmap_checked": true}
+        },
+        {
+          "symbol_id": "Amplifier_Operational:NE5532",
+          "unit": 2,
+          "unit_id": "B",
+          "unit_type": "functional",
+          "function_pins": [
+            {"function": "IN_PLUS", "symbol_pin": "5", "electrical": "input", "required": true, "aliases": ["CHANNEL_2_IN_PLUS"]},
+            {"function": "IN_MINUS", "symbol_pin": "6", "electrical": "input", "required": true, "aliases": ["CHANNEL_2_IN_MINUS"]},
+            {"function": "OUT", "symbol_pin": "7", "electrical": "output", "required": true, "aliases": ["CHANNEL_2_OUT"]}
+          ],
+          "verification": {"confidence": "verified", "sources": ["https://www.ti.com/lit/ds/symlink/ne5532.pdf", "kicad-symbols:Amplifier_Operational:NE5532"], "pinmap_checked": true}
+        },
+        {
+          "symbol_id": "Amplifier_Operational:NE5532",
+          "unit": 3,
+          "unit_id": "P",
+          "unit_type": "power",
+          "required_unit": true,
+          "function_pins": [
+            {"function": "V_MINUS", "symbol_pin": "4", "electrical": "power_in", "required": true},
+            {"function": "V_PLUS", "symbol_pin": "8", "electrical": "power_in", "required": true}
+          ],
+          "verification": {"confidence": "verified", "sources": ["https://www.ti.com/lit/ds/symlink/ne5532.pdf", "kicad-symbols:Amplifier_Operational:NE5532"], "pinmap_checked": true}
+        }
+      ],
+      "packages": [{
+        "id": "soic8",
+        "name": "SOIC-8 3.9 x 4.9 mm P1.27 mm",
+        "footprint_id": "Package_SO:SOIC-8_3.9x4.9mm_P1.27mm",
+        "package_type": "soic8",
+        "mpn": "NE5532DR",
+        "lifecycle": "active",
+        "pinmap_id": "Amplifier_Operational:NE5532|Package_SO:SOIC-8_3.9x4.9mm_P1.27mm",
+        "pad_functions": [
+          {"function": "OUT", "pad": "1", "aliases": ["CHANNEL_1_OUT"]},
+          {"function": "IN_MINUS", "pad": "2", "aliases": ["CHANNEL_1_IN_MINUS"]},
+          {"function": "IN_PLUS", "pad": "3", "aliases": ["CHANNEL_1_IN_PLUS"]},
+          {"function": "V_MINUS", "pad": "4"},
+          {"function": "IN_PLUS", "pad": "5", "aliases": ["CHANNEL_2_IN_PLUS"]},
+          {"function": "IN_MINUS", "pad": "6", "aliases": ["CHANNEL_2_IN_MINUS"]},
+          {"function": "OUT", "pad": "7", "aliases": ["CHANNEL_2_OUT"]},
+          {"function": "V_PLUS", "pad": "8"}
+        ],
+        "dimensions_mm": {"width": 6, "height": 4.9},
+        "height_mm": 1.75,
+        "verification": {"confidence": "verified", "sources": ["https://www.ti.com/lit/ds/symlink/ne5532.pdf", "kicad-footprints:Package_SO:SOIC-8_3.9x4.9mm_P1.27mm"], "pinmap_checked": true}
+      }],
+      "verification": {
+        "confidence": "verified",
+        "sources": ["https://www.ti.com/lit/ds/symlink/ne5532.pdf", "kicad-symbols:Amplifier_Operational:NE5532", "kicad-footprints:Package_SO:SOIC-8_3.9x4.9mm_P1.27mm"],
+        "resolver_checked": true,
+        "pinmap_checked": true,
+        "tests": ["catalog_audio_opamp_expansion"]
+      }
+    },
+    {
+      "id": "opamp.ti.opa2134ua.soic8",
+      "family": "opamp",
+      "name": "TI OPA2134UA dual SoundPlus audio operational amplifier",
+      "description": "Active dual-channel FET-input audio op-amp with reviewed drive, distortion, thermal, multi-unit, and SOIC-8 evidence.",
+      "generic": false,
+      "manufacturer": "Texas Instruments",
+      "mpn": "OPA2134UA",
+      "lifecycle": "active",
+      "tags": ["audio", "dual", "fet_input", "gain_stage", "low_distortion", "multi_unit", "opamp", "soic8"],
+      "ratings": [
+        {"kind": "supply_voltage", "min": "5", "max": "36", "unit": "V"},
+        {"kind": "supply_current", "max": "10", "unit": "mA"},
+        {"kind": "output_current", "max": "0.03", "unit": "A"}
+      ],
+      "values": [{"kind": "input_offset_voltage", "max": "0.0035", "unit": "V"}],
+      "temperature": {"min": "-40", "max": "85", "unit": "C"},
+      "companions": [{
+        "id": "opamp.decoupling_capacitor",
+        "family": "capacitor",
+        "role": "decoupling_capacitor",
+        "required": true,
+        "description": "Place low-inductance local bypass capacitors at the OPA2134 supply pins."
+      }],
+      "simulation_models": [{
+        "model_id": "mna_opamp_single_pole_v1",
+        "parameters": [
+          {"name": "dc_open_loop_gain", "value": 1000000},
+          {"name": "gain_bandwidth_hz", "value": 8000000},
+          {"name": "input_voltage_noise_density_v_sqrt_hz", "value": 8e-9},
+          {"name": "junction_to_ambient_c_per_w", "value": 160},
+          {"name": "max_temperature_c", "value": 150},
+          {"name": "output_high_margin_v", "value": 1.5},
+          {"name": "output_low_margin_v", "value": 1.2},
+          {"name": "quiescent_current_a", "value": 0.01},
+          {"name": "supply_max_v", "value": 36},
+          {"name": "supply_min_v", "value": 5}
+        ]
+      }],
+      "opamp_evidence": {
+        "intended_roles": ["input_buffer", "gain_stage", "voltage_follower", "small_signal_driver"],
+        "supply_mode": "dual_supply",
+        "output_drive_status": "proven",
+        "load_compatibility_status": "proven",
+        "gain_bandwidth_status": "proven",
+        "stability_status": "proven",
+        "input_common_mode_status": "proven",
+        "output_swing_status": "proven",
+        "noise_status": "proven",
+        "distortion_status": "proven",
+        "supply_voltage": {"minimum": 5, "maximum": 36, "unit": "V", "conditions": "TI SBOS058B total supply-voltage range"},
+        "input_common_mode": {"negative_rail_headroom_v": 2.5, "positive_rail_headroom_v": 3.5, "conditions": "SBOS058B specified common-mode range at plus/minus 15 V"},
+        "output_swing": {"negative_rail_headroom_v": 1.2, "positive_rail_headroom_v": 1.5, "conditions": "SBOS058B output swing with a 2 kohm load"},
+        "output_current": {"value": 0.03, "unit": "A", "temperature_c": 25, "conditions": "Conservative magnitude from the specified sourcing and sinking short-circuit limits; normal loading remains circuit-validated"},
+        "gain_bandwidth": {"value": 8000000, "unit": "Hz", "conditions": "Typical gain-bandwidth product"},
+        "slew_rate": {"value": 20000000, "unit": "V/s", "conditions": "Typical large-signal slew rate"},
+        "voltage_noise_density": {"value": 8e-9, "unit": "V/sqrt(Hz)", "frequency_hz": 1000, "temperature_c": 25, "conditions": "Typical input voltage-noise density"},
+        "max_junction_temperature_c": 150,
+        "junction_to_ambient_c_per_w": 160,
+        "fabrication_proof": true,
+        "fabrication_candidate_blocks": false,
+        "review_note": "TI SBOS058B provides the reviewed dual-channel electrical, audio, package, and thermal evidence. Applied gain, source impedance matching, decoupling, output loading, and temperature rise remain circuit-level gates."
+      },
+      "placement_hints": [{"kind": "near", "target": "decoupling_capacitor", "value": "3", "unit": "mm", "description": "Keep both rail bypass loops short."}],
+      "symbols": [
+        {
+          "symbol_id": "Amplifier_Operational:OPA2134",
+          "unit": 1,
+          "unit_id": "A",
+          "unit_type": "functional",
+          "function_pins": [
+            {"function": "OUT", "symbol_pin": "1", "electrical": "output", "required": true, "aliases": ["CHANNEL_1_OUT"]},
+            {"function": "IN_MINUS", "symbol_pin": "2", "electrical": "input", "required": true, "aliases": ["CHANNEL_1_IN_MINUS"]},
+            {"function": "IN_PLUS", "symbol_pin": "3", "electrical": "input", "required": true, "aliases": ["CHANNEL_1_IN_PLUS"]}
+          ],
+          "verification": {"confidence": "verified", "sources": ["https://www.ti.com/lit/ds/symlink/opa2134.pdf", "kicad-symbols:Amplifier_Operational:OPA2134"], "pinmap_checked": true}
+        },
+        {
+          "symbol_id": "Amplifier_Operational:OPA2134",
+          "unit": 2,
+          "unit_id": "B",
+          "unit_type": "functional",
+          "function_pins": [
+            {"function": "IN_PLUS", "symbol_pin": "5", "electrical": "input", "required": true, "aliases": ["CHANNEL_2_IN_PLUS"]},
+            {"function": "IN_MINUS", "symbol_pin": "6", "electrical": "input", "required": true, "aliases": ["CHANNEL_2_IN_MINUS"]},
+            {"function": "OUT", "symbol_pin": "7", "electrical": "output", "required": true, "aliases": ["CHANNEL_2_OUT"]}
+          ],
+          "verification": {"confidence": "verified", "sources": ["https://www.ti.com/lit/ds/symlink/opa2134.pdf", "kicad-symbols:Amplifier_Operational:OPA2134"], "pinmap_checked": true}
+        },
+        {
+          "symbol_id": "Amplifier_Operational:OPA2134",
+          "unit": 3,
+          "unit_id": "P",
+          "unit_type": "power",
+          "required_unit": true,
+          "function_pins": [
+            {"function": "V_MINUS", "symbol_pin": "4", "electrical": "power_in", "required": true},
+            {"function": "V_PLUS", "symbol_pin": "8", "electrical": "power_in", "required": true}
+          ],
+          "verification": {"confidence": "verified", "sources": ["https://www.ti.com/lit/ds/symlink/opa2134.pdf", "kicad-symbols:Amplifier_Operational:OPA2134"], "pinmap_checked": true}
+        }
+      ],
+      "packages": [{
+        "id": "soic8",
+        "name": "SOIC-8 3.9 x 4.9 mm P1.27 mm",
+        "footprint_id": "Package_SO:SOIC-8_3.9x4.9mm_P1.27mm",
+        "package_type": "soic8",
+        "mpn": "OPA2134UA",
+        "lifecycle": "active",
+        "pinmap_id": "Amplifier_Operational:OPA2134|Package_SO:SOIC-8_3.9x4.9mm_P1.27mm",
+        "pad_functions": [
+          {"function": "OUT", "pad": "1", "aliases": ["CHANNEL_1_OUT"]},
+          {"function": "IN_MINUS", "pad": "2", "aliases": ["CHANNEL_1_IN_MINUS"]},
+          {"function": "IN_PLUS", "pad": "3", "aliases": ["CHANNEL_1_IN_PLUS"]},
+          {"function": "V_MINUS", "pad": "4"},
+          {"function": "IN_PLUS", "pad": "5", "aliases": ["CHANNEL_2_IN_PLUS"]},
+          {"function": "IN_MINUS", "pad": "6", "aliases": ["CHANNEL_2_IN_MINUS"]},
+          {"function": "OUT", "pad": "7", "aliases": ["CHANNEL_2_OUT"]},
+          {"function": "V_PLUS", "pad": "8"}
+        ],
+        "dimensions_mm": {"width": 6, "height": 4.9},
+        "height_mm": 1.75,
+        "verification": {"confidence": "verified", "sources": ["https://www.ti.com/lit/ds/symlink/opa2134.pdf", "kicad-footprints:Package_SO:SOIC-8_3.9x4.9mm_P1.27mm"], "pinmap_checked": true}
+      }],
+      "verification": {
+        "confidence": "verified",
+        "sources": ["https://www.ti.com/lit/ds/symlink/opa2134.pdf", "kicad-symbols:Amplifier_Operational:OPA2134", "kicad-footprints:Package_SO:SOIC-8_3.9x4.9mm_P1.27mm"],
+        "resolver_checked": true,
+        "pinmap_checked": true,
+        "tests": ["catalog_audio_opamp_expansion"]
+      }
+    }
+  ]
+}

@@ -1,15 +1,15 @@
 {
-  "record_count": 171,
+  "record_count": 175,
   "family_count": 33,
   "confidence_counts": {
     "blocked": 1,
     "library_derived": 1,
     "placeholder": 7,
     "rule_inferred": 6,
-    "verified": 156
+    "verified": 160
   },
   "alternative_coverage": {
-    "concrete_records": 133,
+    "concrete_records": 137,
     "generic_fallback_records": 38,
     "equivalence_groups": 24
   },
@@ -536,11 +536,11 @@
     {
       "family": "opamp",
       "defined": true,
-      "record_count": 7,
-      "concrete_records": 6,
+      "record_count": 11,
+      "concrete_records": 10,
       "generic_fallback_records": 1,
       "equivalence_groups": 0,
-      "verified_records": 6,
+      "verified_records": 10,
       "library_derived_records": 0,
       "rule_inferred_records": 0,
       "placeholder_records": 1,
@@ -552,10 +552,14 @@
       ],
       "record_ids": [
         "opamp.generic.single.lmv321",
+        "opamp.renesas.ca3140ez.dip8",
         "opamp.ti.lm358.soic8",
+        "opamp.ti.lm4562ma.soic8",
         "opamp.ti.lmv321.sot23_5",
+        "opamp.ti.ne5532dr.soic8",
         "opamp.ti.opa134ua.soic8",
         "opamp.ti.opa197id.soic8",
+        "opamp.ti.opa2134ua.soic8",
         "opamp.ti.opa551pa.dip8",
         "opamp.ti.opa992idbvr.sot23_5"
       ]

@@ -475,12 +475,21 @@ func (provider *CatalogProvider) selectProvenADCBuffer(ratings []components.Requ
 	var candidates []candidate
 	for _, record := range provider.catalog.Records {
 		evidence := record.OpAmp
+		var stability *components.OpAmpLoadStability
+		if evidence != nil {
+			stability = evidence.CapacitiveLoadStability
+		}
 		if record.Family != "opamp" || record.Generic || evidence == nil || !recordSupportsRatings(record, ratings) ||
 			evidence.OutputDriveStatus != "proven" || evidence.LoadCompatibilityStatus != "proven" ||
 			evidence.GainBandwidthStatus != "proven" || evidence.StabilityStatus != "proven" ||
 			evidence.InputCommonModeStatus != "proven" || evidence.OutputSwingStatus != "proven" || evidence.NoiseStatus != "proven" ||
 			evidence.SlewRate == nil || evidence.OutputCurrent == nil || evidence.VoltageNoiseDensity == nil ||
-			evidence.MaxJunctionTemperatureC == nil || evidence.JunctionToAmbientCPerW == nil || evidence.CapacitiveLoadStability == nil ||
+			evidence.MaxJunctionTemperatureC == nil || evidence.JunctionToAmbientCPerW == nil ||
+			// ADC sample-capacitor drive is a narrower role than general op-amp use. It
+			// requires complete, quantified isolation and phase-margin evidence.
+			stability == nil || stability.DirectLoadMaximum == nil || stability.IsolatedLoadMaximum == nil ||
+			stability.IsolationResistance == nil || stability.IsolationResistance.Minimum == nil || stability.IsolationResistance.Maximum == nil ||
+			stability.MinimumPhaseMarginDeg == nil ||
 			!recordHasFunction(record, "IN_PLUS") || !recordHasFunction(record, "IN_MINUS") || !recordHasFunction(record, "OUT") || !recordHasFunction(record, "V_PLUS") || !recordHasFunction(record, "V_MINUS") {
 			continue
 		}

@@ -166,7 +166,9 @@ func TestCatalogProviderSelectsProvenBufferedADCDrive(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !slices.ContainsFunc(realization.Instances, func(instance RealizationInstance) bool { return instance.ID == "adc_buffer" }) ||
+	if !slices.ContainsFunc(realization.Instances, func(instance RealizationInstance) bool {
+		return instance.ID == "adc_buffer" && instance.CatalogID == "opamp.ti.opa197id.soic8"
+	}) ||
 		!slices.ContainsFunc(expansions[0].Calculations, func(calculation CalculationEvidence) bool {
 			return calculation.ID == "buffered_adc_drive_settling" && calculation.Pass
 		}) {
