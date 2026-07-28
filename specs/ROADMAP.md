@@ -461,6 +461,13 @@ USB-C power-only, and protection parts. It includes:
   SHT31-DIS, including typed supply/address/mode/interrupt/unused-pin evidence,
   exact built-in pinmaps, deterministic component selection, and fail-closed
   profile matching;
+- a transistor-tester catalog slice with exact verified G5V-1 DC5, ULN2803A,
+  ADS1115IDGSR, MCP4725A0T-E/CH, BD139-16, and CD74HC4053E identities and
+  pinmaps. Generic ESP32, ADC, DAC, and OLED breakout records remain
+  draft-only placeholders until the actual purchased modules provide header
+  and mechanical evidence;
+- a neutral, structural-only three-terminal test connector that does not infer
+  transistor pin roles;
 - an NPN TO-220 power-output BJT placeholder that is blocked by default
   until pinout, package, thermal, Safe Operating Area (SOA), and layout
   constraints are modeled;
@@ -498,6 +505,11 @@ USB-C power-only, and protection parts. It includes:
   selected; current support is local snapshot JSON only.
 - Replace remaining structural placeholders where verified concrete parts are
   needed.
+- Promote the provisional transistor-tester plug-in modules only from evidence
+  captured from the actual boards: readable identity, header order, pull-ups
+  and straps, dimensions, and mounting holes. Add the actual ZIF/test socket
+  mechanical identity and confirm the G5V-1 coil case marking before a physical
+  build selects it.
 - Promote blocked output-stage and high-power records only after pinout,
   thermal, SOA, and layout constraints are represented and tested.
 - Improve MCU function names from generic GPIO placeholders to datasheet port

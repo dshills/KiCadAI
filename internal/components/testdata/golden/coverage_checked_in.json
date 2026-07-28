@@ -1,27 +1,47 @@
 {
-  "record_count": 160,
-  "family_count": 29,
+  "record_count": 171,
+  "family_count": 33,
   "confidence_counts": {
     "blocked": 1,
-    "library_derived": 0,
-    "placeholder": 3,
+    "library_derived": 1,
+    "placeholder": 7,
     "rule_inferred": 6,
-    "verified": 150
+    "verified": 156
   },
   "alternative_coverage": {
-    "concrete_records": 127,
-    "generic_fallback_records": 33,
+    "concrete_records": 133,
+    "generic_fallback_records": 38,
     "equivalence_groups": 24
   },
   "families": [
     {
+      "family": "adc",
+      "defined": true,
+      "record_count": 2,
+      "concrete_records": 1,
+      "generic_fallback_records": 1,
+      "equivalence_groups": 0,
+      "verified_records": 1,
+      "library_derived_records": 0,
+      "rule_inferred_records": 0,
+      "placeholder_records": 1,
+      "blocked_records": 0,
+      "missing_resolver_evidence": [
+        "adc.module.ads1115.i2c.provisional"
+      ],
+      "record_ids": [
+        "adc.module.ads1115.i2c.provisional",
+        "adc.ti.ads1115idgsr.vssop10"
+      ]
+    },
+    {
       "family": "bjt",
       "defined": true,
-      "record_count": 11,
-      "concrete_records": 10,
+      "record_count": 12,
+      "concrete_records": 11,
       "generic_fallback_records": 1,
       "equivalence_groups": 4,
-      "verified_records": 10,
+      "verified_records": 11,
       "library_derived_records": 0,
       "rule_inferred_records": 0,
       "placeholder_records": 0,
@@ -40,7 +60,8 @@
         "bjt.onsemi.njw0302g.to3p",
         "bjt.onsemi.pzt3904t1g.sot223",
         "bjt.onsemi.pzt3906t1g.sot223",
-        "bjt.placeholder.npn_power_output.to220"
+        "bjt.placeholder.npn_power_output.to220",
+        "bjt.st.bd139_16.to126"
       ]
     },
     {
@@ -118,12 +139,12 @@
     {
       "family": "connector",
       "defined": true,
-      "record_count": 12,
+      "record_count": 13,
       "concrete_records": 5,
-      "generic_fallback_records": 7,
+      "generic_fallback_records": 8,
       "equivalence_groups": 5,
       "verified_records": 12,
-      "library_derived_records": 0,
+      "library_derived_records": 1,
       "rule_inferred_records": 0,
       "placeholder_records": 0,
       "blocked_records": 0,
@@ -153,7 +174,8 @@
         "connector.samtec.tsw_103_07_l_s.1x03",
         "connector.samtec.tsw_104_07_l_s.1x04",
         "connector.samtec.tsw_105_07_l_s.1x05",
-        "connector.samtec.tsw_106_07_l_s.1x06"
+        "connector.samtec.tsw_106_07_l_s.1x06",
+        "connector.transistor_test_socket.generic.1x03"
       ]
     },
     {
@@ -232,6 +254,26 @@
       ]
     },
     {
+      "family": "dac",
+      "defined": true,
+      "record_count": 2,
+      "concrete_records": 1,
+      "generic_fallback_records": 1,
+      "equivalence_groups": 0,
+      "verified_records": 1,
+      "library_derived_records": 0,
+      "rule_inferred_records": 0,
+      "placeholder_records": 1,
+      "blocked_records": 0,
+      "missing_resolver_evidence": [
+        "dac.module.mcp4725.i2c.provisional"
+      ],
+      "record_ids": [
+        "dac.microchip.mcp4725a0t_e_ch.sot23_6",
+        "dac.module.mcp4725.i2c.provisional"
+      ]
+    },
+    {
       "family": "diode",
       "defined": true,
       "record_count": 9,
@@ -260,6 +302,41 @@
         "diode.schottky.generic",
         "diode.signal.generic",
         "diode.tvs_unidirectional.generic"
+      ]
+    },
+    {
+      "family": "display",
+      "defined": true,
+      "record_count": 1,
+      "concrete_records": 0,
+      "generic_fallback_records": 1,
+      "equivalence_groups": 0,
+      "verified_records": 0,
+      "library_derived_records": 0,
+      "rule_inferred_records": 0,
+      "placeholder_records": 1,
+      "blocked_records": 0,
+      "missing_resolver_evidence": [
+        "display.module.ssd1306.i2c.128x64.provisional"
+      ],
+      "record_ids": [
+        "display.module.ssd1306.i2c.128x64.provisional"
+      ]
+    },
+    {
+      "family": "driver",
+      "defined": true,
+      "record_count": 1,
+      "concrete_records": 1,
+      "generic_fallback_records": 0,
+      "equivalence_groups": 0,
+      "verified_records": 1,
+      "library_derived_records": 0,
+      "rule_inferred_records": 0,
+      "placeholder_records": 0,
+      "blocked_records": 0,
+      "record_ids": [
+        "driver.st.uln2803a.dip18"
       ]
     },
     {
@@ -410,22 +487,24 @@
     {
       "family": "mcu",
       "defined": true,
-      "record_count": 4,
+      "record_count": 5,
       "concrete_records": 3,
-      "generic_fallback_records": 1,
+      "generic_fallback_records": 2,
       "equivalence_groups": 0,
       "verified_records": 3,
       "library_derived_records": 0,
       "rule_inferred_records": 0,
-      "placeholder_records": 1,
+      "placeholder_records": 2,
       "blocked_records": 0,
       "missing_resolver_evidence": [
         "mcu.microchip.atmega328p_a.tqfp32",
+        "mcu.module.esp32_devkitc_compatible.38pin.provisional",
         "mcu.placeholder.avr_minimal_tqfp32"
       ],
       "record_ids": [
         "mcu.espressif.esp32_wroom_32e",
         "mcu.microchip.atmega328p_a.tqfp32",
+        "mcu.module.esp32_devkitc_compatible.38pin.provisional",
         "mcu.placeholder.avr_minimal_tqfp32",
         "mcu.st.stm32g031k8t6.lqfp32"
       ]
@@ -543,17 +622,18 @@
     {
       "family": "relay",
       "defined": true,
-      "record_count": 2,
-      "concrete_records": 2,
+      "record_count": 3,
+      "concrete_records": 3,
       "generic_fallback_records": 0,
       "equivalence_groups": 0,
-      "verified_records": 2,
+      "verified_records": 3,
       "library_derived_records": 0,
       "rule_inferred_records": 0,
       "placeholder_records": 0,
       "blocked_records": 0,
       "record_ids": [
         "relay.omron.g5q_1a.dc12",
+        "relay.omron.g5v_1.dc5",
         "relay.panasonic.aqy212gh.dip4"
       ]
     },
@@ -633,11 +713,11 @@
     {
       "family": "switch",
       "defined": true,
-      "record_count": 1,
-      "concrete_records": 1,
+      "record_count": 2,
+      "concrete_records": 2,
       "generic_fallback_records": 0,
       "equivalence_groups": 0,
-      "verified_records": 1,
+      "verified_records": 2,
       "library_derived_records": 0,
       "rule_inferred_records": 0,
       "placeholder_records": 0,
@@ -646,7 +726,8 @@
         "switch.omron.b3u_1000p"
       ],
       "record_ids": [
-        "switch.omron.b3u_1000p"
+        "switch.omron.b3u_1000p",
+        "switch.ti.cd74hc4053e.dip16"
       ]
     },
     {

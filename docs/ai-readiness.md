@@ -140,8 +140,9 @@ obligations with deterministic alternatives and rationale.
 
 All 10 adversarial circuits pass component, rating, value, tolerance, lowering,
 writer, round-trip, connectivity, routing, clean installed-KiCad ERC, and strict
-DRC gates. The current public capability snapshot exposes 149 catalog
-components through the generic graph contract as of 2026-07-27;
+DRC gates. The current catalog contains 171 records across 33 families as of
+2026-07-28, including 156 verified records. The generic graph contract exposes
+the supported subset of those records;
 unknown capabilities, insufficient evidence, incompatible domains, unsafe
 startup, and exceeded budgets fail closed. It does not establish unrestricted
 natural-language intent, arbitrary topology or parts, RF/high-speed design,

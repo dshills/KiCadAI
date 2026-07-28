@@ -1,0 +1,1074 @@
+{
+  "version": "0.1.0",
+  "records": [
+    {
+      "id": "relay.omron.g5v_1.dc5",
+      "family": "relay",
+      "name": "Omron G5V-1 DC5 SPDT signal relay",
+      "description": "Exact 5 V, 1 Form C through-hole relay record. Inventory selection requires the relay case to be marked 5 VDC; other coil markings are different catalog variants.",
+      "generic": false,
+      "manufacturer": "Omron",
+      "mpn": "G5V-1 DC5",
+      "lifecycle": "active",
+      "tags": ["5v_coil", "normally_open", "relay", "spdt", "through_hole", "transistor_tester"],
+      "values": [
+        {"kind": "coil_voltage", "typ": "5", "unit": "V"},
+        {"kind": "coil_current", "typ": "30", "unit": "mA"},
+        {"kind": "coil_resistance", "typ": "167", "unit": "ohm"}
+      ],
+      "ratings": [
+        {"kind": "coil_power", "typ": "0.15", "unit": "W"},
+        {"kind": "contact_carry_current", "max": "2", "unit": "A"},
+        {"kind": "contact_current_dc", "max": "1", "unit": "A"},
+        {"kind": "contact_voltage_dc", "max": "60", "unit": "V"}
+      ],
+      "temperature": {"min": "-40", "max": "70", "unit": "C"},
+      "electrical_roles": [
+        {"role": "relay_coil", "description": "COIL_A and COIL_B energize the non-polarized 5 V coil."},
+        {"role": "normally_open_contact", "description": "COMMON connects to NORMALLY_OPEN only while the coil is energized."},
+        {"role": "normally_closed_contact", "description": "COMMON connects to NORMALLY_CLOSED while the coil is de-energized."}
+      ],
+      "companions": [
+        {
+          "id": "relay.coil_driver",
+          "family": "driver",
+          "role": "relay_driver",
+          "required": true,
+          "description": "Use a rated low-side driver. If the driver has integrated suppression diodes, its clamp common must connect to the relay supply; otherwise provide an external flyback clamp."
+        }
+      ],
+      "selection_rules": [
+        {
+          "kind": "inventory_marking",
+          "expression": "relay case marking must identify 5 VDC before this exact record is selected",
+          "description": "The G5V-1 family has several coil voltages with different current and resistance."
+        },
+        {
+          "kind": "initial_contact_policy",
+          "expression": "use COMMON and NORMALLY_OPEN; leave NORMALLY_CLOSED unconnected unless requested",
+          "description": "Transistor Tester V1 begins with the normally-open contact."
+        }
+      ],
+      "symbols": [
+        {
+          "symbol_id": "Relay:G5V-1",
+          "function_pins": [
+            {"function": "NORMALLY_CLOSED", "symbol_pin": "1", "electrical": "passive"},
+            {"function": "COIL_A", "symbol_pin": "2", "electrical": "passive", "required": true},
+            {"function": "COMMON", "symbol_pin": "5", "electrical": "passive", "required": true},
+            {"function": "COMMON", "symbol_pin": "6", "electrical": "passive", "required": true},
+            {"function": "COIL_B", "symbol_pin": "9", "electrical": "passive", "required": true},
+            {"function": "NORMALLY_OPEN", "symbol_pin": "10", "electrical": "passive", "required": true}
+          ],
+          "pinmap_id": "Relay:G5V-1|Relay_THT:Relay_SPDT_Omron_G5V-1",
+          "verification": {
+            "confidence": "verified",
+            "sources": [
+              "https://omronfs.omron.com/en_US/ecb/products/pdf/en-g5v_1.pdf",
+              "kicad-symbols:Relay:G5V-1",
+              "builtin_pinmap:Relay:G5V-1"
+            ],
+            "pinmap_checked": true
+          }
+        }
+      ],
+      "packages": [
+        {
+          "id": "g5v_1_tht",
+          "name": "Omron G5V-1 through-hole",
+          "footprint_id": "Relay_THT:Relay_SPDT_Omron_G5V-1",
+          "package_type": "relay_spdt_tht",
+          "mpn": "G5V-1 DC5",
+          "lifecycle": "active",
+          "pinmap_id": "Relay:G5V-1|Relay_THT:Relay_SPDT_Omron_G5V-1",
+          "pad_functions": [
+            {"function": "NORMALLY_CLOSED", "pad": "1"},
+            {"function": "COIL_A", "pad": "2"},
+            {"function": "COMMON", "pad": "5"},
+            {"function": "COMMON", "pad": "6"},
+            {"function": "COIL_B", "pad": "9"},
+            {"function": "NORMALLY_OPEN", "pad": "10"}
+          ],
+          "dimensions_mm": {"width": 12.5, "height": 7.5},
+          "height_mm": 10,
+          "verification": {
+            "confidence": "verified",
+            "sources": [
+              "https://omronfs.omron.com/en_US/ecb/products/pdf/en-g5v_1.pdf",
+              "kicad-footprints:Relay_THT:Relay_SPDT_Omron_G5V-1",
+              "builtin_pinmap:Relay:G5V-1"
+            ],
+            "pinmap_checked": true
+          }
+        }
+      ],
+      "verification": {
+        "confidence": "verified",
+        "sources": [
+          "https://components.omron.com/us-en/products/relays/G5V-1",
+          "https://omronfs.omron.com/en_US/ecb/products/pdf/en-g5v_1.pdf",
+          "kicad-symbols:Relay:G5V-1",
+          "kicad-footprints:Relay_THT:Relay_SPDT_Omron_G5V-1",
+          "builtin_pinmap:Relay:G5V-1"
+        ],
+        "resolver_checked": true,
+        "pinmap_checked": true,
+        "tests": ["catalog_transistor_tester_relay_evidence"],
+        "notes": ["This verifies the G5V-1 DC5 catalog variant, not the marking on any physical relay in the user's inventory."]
+      }
+    },
+    {
+      "id": "driver.st.uln2803a.dip18",
+      "family": "driver",
+      "name": "STMicroelectronics ULN2803A eight-channel Darlington driver",
+      "description": "Active-production DIP-18 eight-channel low-side Darlington array with integral suppression diodes and directly opposed input/output pins.",
+      "generic": false,
+      "manufacturer": "STMicroelectronics",
+      "mpn": "ULN2803A",
+      "lifecycle": "active",
+      "tags": ["darlington", "dip18", "eight_channel", "flyback_diode", "relay_driver", "through_hole", "transistor_tester"],
+      "values": [{"kind": "input_resistance", "typ": "2.7k", "unit": "ohm"}],
+      "ratings": [
+        {"kind": "input_voltage", "max": "30", "unit": "V"},
+        {"kind": "output_current_continuous", "max": "500", "unit": "mA"},
+        {"kind": "output_current_peak", "max": "600", "unit": "mA"},
+        {"kind": "output_voltage", "max": "50", "unit": "V"}
+      ],
+      "electrical_roles": [
+        {"role": "low_side_driver", "description": "Each IN_n drives the correspondingly numbered open-collector OUT_n."},
+        {"role": "relay_driver", "description": "A channel can drive a relay coil when its current, voltage, duty-cycle, and thermal limits are satisfied."},
+        {"role": "flyback_clamp_common", "description": "COM is the common cathode connection of the eight integral suppression diodes and must connect to the inductive-load supply when those clamps are used."},
+        {"role": "common_emitter_ground", "description": "GND is the shared emitter return for every Darlington channel."}
+      ],
+      "selection_rules": [
+        {
+          "kind": "channel_pairing",
+          "expression": "IN_1=OUT_1;IN_2=OUT_2;IN_3=OUT_3;IN_4=OUT_4;IN_5=OUT_5;IN_6=OUT_6;IN_7=OUT_7;IN_8=OUT_8",
+          "description": "Channel identity is semantic even though DIP output pin numbers run in reverse order."
+        },
+        {
+          "kind": "inductive_clamp",
+          "expression": "COM=relay_supply when integrated flyback diodes are relied upon",
+          "description": "Leaving COM open also leaves the integral suppression diodes unavailable."
+        }
+      ],
+      "symbols": [
+        {
+          "symbol_id": "Transistor_Array:ULN2803A",
+          "function_pins": [
+            {"function": "IN_1", "symbol_pin": "1", "electrical": "input", "required": true},
+            {"function": "IN_2", "symbol_pin": "2", "electrical": "input"},
+            {"function": "IN_3", "symbol_pin": "3", "electrical": "input"},
+            {"function": "IN_4", "symbol_pin": "4", "electrical": "input"},
+            {"function": "IN_5", "symbol_pin": "5", "electrical": "input"},
+            {"function": "IN_6", "symbol_pin": "6", "electrical": "input"},
+            {"function": "IN_7", "symbol_pin": "7", "electrical": "input"},
+            {"function": "IN_8", "symbol_pin": "8", "electrical": "input"},
+            {"function": "GND", "symbol_pin": "9", "electrical": "power_in", "required": true},
+            {"function": "COM", "symbol_pin": "10", "electrical": "passive", "required": true},
+            {"function": "OUT_8", "symbol_pin": "11", "electrical": "open_collector"},
+            {"function": "OUT_7", "symbol_pin": "12", "electrical": "open_collector"},
+            {"function": "OUT_6", "symbol_pin": "13", "electrical": "open_collector"},
+            {"function": "OUT_5", "symbol_pin": "14", "electrical": "open_collector"},
+            {"function": "OUT_4", "symbol_pin": "15", "electrical": "open_collector"},
+            {"function": "OUT_3", "symbol_pin": "16", "electrical": "open_collector"},
+            {"function": "OUT_2", "symbol_pin": "17", "electrical": "open_collector"},
+            {"function": "OUT_1", "symbol_pin": "18", "electrical": "open_collector", "required": true}
+          ],
+          "pinmap_id": "Transistor_Array:ULN2803A|Package_DIP:DIP-18_W7.62mm",
+          "verification": {
+            "confidence": "verified",
+            "sources": [
+              "https://www.st.com/resource/en/datasheet/uln2801a.pdf",
+              "kicad-symbols:Transistor_Array:ULN2803A",
+              "builtin_pinmap:Transistor_Array:ULN2803A"
+            ],
+            "pinmap_checked": true
+          }
+        }
+      ],
+      "packages": [
+        {
+          "id": "dip18",
+          "name": "PDIP-18 7.62 mm",
+          "footprint_id": "Package_DIP:DIP-18_W7.62mm",
+          "package_type": "dip18",
+          "mpn": "ULN2803A",
+          "lifecycle": "active",
+          "pinmap_id": "Transistor_Array:ULN2803A|Package_DIP:DIP-18_W7.62mm",
+          "pad_functions": [
+            {"function": "IN_1", "pad": "1"}, {"function": "IN_2", "pad": "2"},
+            {"function": "IN_3", "pad": "3"}, {"function": "IN_4", "pad": "4"},
+            {"function": "IN_5", "pad": "5"}, {"function": "IN_6", "pad": "6"},
+            {"function": "IN_7", "pad": "7"}, {"function": "IN_8", "pad": "8"},
+            {"function": "GND", "pad": "9"}, {"function": "COM", "pad": "10"},
+            {"function": "OUT_8", "pad": "11"}, {"function": "OUT_7", "pad": "12"},
+            {"function": "OUT_6", "pad": "13"}, {"function": "OUT_5", "pad": "14"},
+            {"function": "OUT_4", "pad": "15"}, {"function": "OUT_3", "pad": "16"},
+            {"function": "OUT_2", "pad": "17"}, {"function": "OUT_1", "pad": "18"}
+          ],
+          "dimensions_mm": {"width": 23.24, "height": 8.5},
+          "verification": {
+            "confidence": "verified",
+            "sources": [
+              "https://www.st.com/resource/en/datasheet/uln2801a.pdf",
+              "kicad-footprints:Package_DIP:DIP-18_W7.62mm",
+              "builtin_pinmap:Transistor_Array:ULN2803A"
+            ],
+            "pinmap_checked": true
+          }
+        }
+      ],
+      "verification": {
+        "confidence": "verified",
+        "sources": [
+          "https://www.st.com/en/interfaces-and-transceivers/uln2803a.html",
+          "https://www.st.com/resource/en/datasheet/uln2801a.pdf",
+          "kicad-symbols:Transistor_Array:ULN2803A",
+          "kicad-footprints:Package_DIP:DIP-18_W7.62mm",
+          "builtin_pinmap:Transistor_Array:ULN2803A"
+        ],
+        "resolver_checked": true,
+        "pinmap_checked": true,
+        "tests": ["catalog_uln2803_channel_pairing"]
+      }
+    },
+    {
+      "id": "adc.ti.ads1115idgsr.vssop10",
+      "family": "adc",
+      "name": "Texas Instruments ADS1115IDGSR 16-bit I2C ADC",
+      "description": "Bare ADS1115 IC in the DGS VSSOP-10 package. Breakout-board pull-ups, address straps, header order, and mechanics are not implied.",
+      "generic": false,
+      "manufacturer": "Texas Instruments",
+      "mpn": "ADS1115IDGSR",
+      "lifecycle": "active",
+      "tags": ["16_bit", "adc", "i2c", "vssop10"],
+      "ratings": [
+        {"kind": "supply_voltage", "min": "2.0", "max": "5.5", "unit": "V"},
+        {"kind": "sample_rate", "max": "860", "unit": "SPS"}
+      ],
+      "adc_evidence": {
+        "proof_status": "proven",
+        "maximum_frequency": {"value": 860, "unit": "SPS", "conditions": "maximum output data rate"},
+        "fabrication_proof": false,
+        "review_note": "The delta-sigma input settling limit depends on data rate, gain, source impedance, and external filtering; no single fabricated source-impedance limit is claimed."
+      },
+      "companions": [
+        {
+          "id": "adc.decoupling_capacitor",
+          "family": "capacitor",
+          "role": "decoupling_capacitor",
+          "required": true,
+          "description": "Place a reviewed local bypass capacitor between VDD and GND."
+        },
+        {
+          "id": "adc.i2c_pullups",
+          "family": "resistor",
+          "role": "i2c_pullup",
+          "required": true,
+          "description": "The bare IC does not provide bus pull-ups; size one SDA/SCL pull-up set for the complete bus."
+        }
+      ],
+      "selection_rules": [
+        {
+          "kind": "i2c_address",
+          "expression": "ADDR=GND:0x48;ADDR=VDD:0x49;ADDR=SDA:0x4A;ADDR=SCL:0x4B",
+          "description": "ADDR must be tied to one of the four documented nodes."
+        },
+        {
+          "kind": "analog_input_absolute_maximum",
+          "expression": "GND-0.3V < AINx < VDD+0.3V",
+          "description": "PGA full scale does not override the input-pin absolute voltage limits."
+        }
+      ],
+      "symbols": [
+        {
+          "symbol_id": "Analog_ADC:ADS1115IDGS",
+          "function_pins": [
+            {"function": "ADDR", "symbol_pin": "1", "electrical": "input", "required": true},
+            {"function": "ALERT_RDY", "symbol_pin": "2", "electrical": "open_collector"},
+            {"function": "GND", "symbol_pin": "3", "electrical": "power_in", "required": true},
+            {"function": "AIN0", "symbol_pin": "4", "electrical": "input"},
+            {"function": "AIN1", "symbol_pin": "5", "electrical": "input"},
+            {"function": "AIN2", "symbol_pin": "6", "electrical": "input"},
+            {"function": "AIN3", "symbol_pin": "7", "electrical": "input"},
+            {"function": "VDD", "symbol_pin": "8", "electrical": "power_in", "required": true},
+            {"function": "SDA", "symbol_pin": "9", "electrical": "bidirectional", "required": true},
+            {"function": "SCL", "symbol_pin": "10", "electrical": "input", "required": true}
+          ],
+          "pinmap_id": "Analog_ADC:ADS1115IDGS|Package_SO:TSSOP-10_3x3mm_P0.5mm",
+          "verification": {
+            "confidence": "verified",
+            "sources": [
+              "https://www.ti.com/lit/ds/symlink/ads1115.pdf",
+              "kicad-symbols:Analog_ADC:ADS1115IDGS",
+              "builtin_pinmap:Analog_ADC:ADS1115IDGS"
+            ],
+            "pinmap_checked": true
+          }
+        }
+      ],
+      "packages": [
+        {
+          "id": "vssop10",
+          "name": "DGS VSSOP-10 3x3 mm P0.5",
+          "footprint_id": "Package_SO:TSSOP-10_3x3mm_P0.5mm",
+          "package_type": "vssop10",
+          "mpn": "ADS1115IDGSR",
+          "lifecycle": "active",
+          "pinmap_id": "Analog_ADC:ADS1115IDGS|Package_SO:TSSOP-10_3x3mm_P0.5mm",
+          "pad_functions": [
+            {"function": "ADDR", "pad": "1"}, {"function": "ALERT_RDY", "pad": "2"},
+            {"function": "GND", "pad": "3"}, {"function": "AIN0", "pad": "4"},
+            {"function": "AIN1", "pad": "5"}, {"function": "AIN2", "pad": "6"},
+            {"function": "AIN3", "pad": "7"}, {"function": "VDD", "pad": "8"},
+            {"function": "SDA", "pad": "9"}, {"function": "SCL", "pad": "10"}
+          ],
+          "dimensions_mm": {"width": 3, "height": 3},
+          "verification": {
+            "confidence": "verified",
+            "sources": [
+              "https://www.ti.com/lit/ds/symlink/ads1115.pdf",
+              "kicad-footprints:Package_SO:TSSOP-10_3x3mm_P0.5mm",
+              "builtin_pinmap:Analog_ADC:ADS1115IDGS"
+            ],
+            "pinmap_checked": true
+          }
+        }
+      ],
+      "verification": {
+        "confidence": "verified",
+        "sources": [
+          "https://www.ti.com/product/ADS1115",
+          "https://www.ti.com/lit/ds/symlink/ads1115.pdf",
+          "kicad-symbols:Analog_ADC:ADS1115IDGS",
+          "kicad-footprints:Package_SO:TSSOP-10_3x3mm_P0.5mm",
+          "builtin_pinmap:Analog_ADC:ADS1115IDGS"
+        ],
+        "resolver_checked": true,
+        "pinmap_checked": true,
+        "tests": ["catalog_ads1115_bare_ic_evidence"]
+      }
+    },
+    {
+      "id": "dac.microchip.mcp4725a0t_e_ch.sot23_6",
+      "family": "dac",
+      "name": "Microchip MCP4725A0T-E/CH 12-bit I2C DAC",
+      "description": "Bare A0-address-option MCP4725 IC in SOT-23-6. Breakout-board pull-ups, header order, level shifting, and mechanics are not implied.",
+      "generic": false,
+      "manufacturer": "Microchip Technology",
+      "mpn": "MCP4725A0T-E/CH",
+      "lifecycle": "nrnd",
+      "tags": ["12_bit", "dac", "i2c", "sot23_6"],
+      "ratings": [
+        {"kind": "supply_voltage", "min": "2.7", "max": "5.5", "unit": "V"},
+        {"kind": "i2c_frequency", "max": "3.4", "unit": "MHz"},
+        {"kind": "output_current_short_circuit", "max": "24", "unit": "mA"}
+      ],
+      "interface_evidence": {
+        "proof_status": "proven",
+        "signaling_modes": ["open_drain"],
+        "directions": ["bidirectional"],
+        "voltage": {"minimum": 2.7, "maximum": 5.5, "unit": "V", "conditions": "VDD operating range"},
+        "maximum_frequency": {"value": 3400000, "unit": "Hz", "conditions": "I2C high-speed mode"},
+        "fabrication_proof": false,
+        "review_note": "This interface evidence describes the bare IC; any breakout-board pull-ups or level shifting require separate module evidence."
+      },
+      "companions": [
+        {
+          "id": "dac.decoupling_capacitor",
+          "family": "capacitor",
+          "role": "decoupling_capacitor",
+          "required": true,
+          "description": "Place a reviewed local bypass capacitor between VDD and GND."
+        },
+        {
+          "id": "dac.i2c_pullups",
+          "family": "resistor",
+          "role": "i2c_pullup",
+          "required": true,
+          "description": "The bare IC requires system-level SDA/SCL pull-ups."
+        }
+      ],
+      "selection_rules": [
+        {
+          "kind": "i2c_address",
+          "expression": "A0=GND:0x60;A0=VDD:0x61",
+          "description": "The A0 ordering option hard-wires A2:A1=00; the external A0 pin selects the low address bit."
+        },
+        {
+          "kind": "output_range",
+          "expression": "VOUT=(code/4096)*VDD; nominal code range 0..4095",
+          "description": "The DAC reference is VDD, so output range and accuracy track the selected supply."
+        }
+      ],
+      "symbols": [
+        {
+          "symbol_id": "Analog_DAC:MCP4725xxx-xCH",
+          "function_pins": [
+            {"function": "VOUT", "symbol_pin": "1", "electrical": "output", "required": true},
+            {"function": "GND", "symbol_pin": "2", "electrical": "power_in", "required": true},
+            {"function": "VDD", "symbol_pin": "3", "electrical": "power_in", "required": true},
+            {"function": "SDA", "symbol_pin": "4", "electrical": "bidirectional", "required": true},
+            {"function": "SCL", "symbol_pin": "5", "electrical": "input", "required": true},
+            {"function": "A0", "symbol_pin": "6", "electrical": "input", "required": true}
+          ],
+          "pinmap_id": "Analog_DAC:MCP4725xxx-xCH|Package_TO_SOT_SMD:SOT-23-6",
+          "verification": {
+            "confidence": "verified",
+            "sources": [
+              "https://ww1.microchip.com/downloads/en/DeviceDoc/MCP4725-Data-Sheet-20002039E.pdf",
+              "kicad-symbols:Analog_DAC:MCP4725xxx-xCH",
+              "builtin_pinmap:Analog_DAC:MCP4725xxx-xCH"
+            ],
+            "pinmap_checked": true
+          }
+        }
+      ],
+      "packages": [
+        {
+          "id": "sot23_6",
+          "name": "SOT-23-6",
+          "footprint_id": "Package_TO_SOT_SMD:SOT-23-6",
+          "package_type": "sot23_6",
+          "mpn": "MCP4725A0T-E/CH",
+          "lifecycle": "nrnd",
+          "pinmap_id": "Analog_DAC:MCP4725xxx-xCH|Package_TO_SOT_SMD:SOT-23-6",
+          "pad_functions": [
+            {"function": "VOUT", "pad": "1"}, {"function": "GND", "pad": "2"},
+            {"function": "VDD", "pad": "3"}, {"function": "SDA", "pad": "4"},
+            {"function": "SCL", "pad": "5"}, {"function": "A0", "pad": "6"}
+          ],
+          "verification": {
+            "confidence": "verified",
+            "sources": [
+              "https://ww1.microchip.com/downloads/en/DeviceDoc/MCP4725-Data-Sheet-20002039E.pdf",
+              "kicad-footprints:Package_TO_SOT_SMD:SOT-23-6",
+              "builtin_pinmap:Analog_DAC:MCP4725xxx-xCH"
+            ],
+            "pinmap_checked": true
+          }
+        }
+      ],
+      "verification": {
+        "confidence": "verified",
+        "sources": [
+          "https://www.microchip.com/en-us/product/MCP4725",
+          "https://ww1.microchip.com/downloads/en/DeviceDoc/MCP4725-Data-Sheet-20002039E.pdf",
+          "kicad-symbols:Analog_DAC:MCP4725xxx-xCH",
+          "kicad-footprints:Package_TO_SOT_SMD:SOT-23-6",
+          "builtin_pinmap:Analog_DAC:MCP4725xxx-xCH"
+        ],
+        "resolver_checked": true,
+        "pinmap_checked": true,
+        "tests": ["catalog_mcp4725_bare_ic_evidence"],
+        "notes": ["Microchip marks MCP4725 not recommended for new designs; inventory use is supported, while new designs should consider a qualified successor."]
+      }
+    },
+    {
+      "id": "bjt.st.bd139_16.to126",
+      "family": "bjt",
+      "name": "STMicroelectronics BD139-16 NPN transistor",
+      "description": "Exact ST gain-group -16 NPN transistor in SOT-32/TO-126 with manufacturer-verified emitter-collector-base pin order.",
+      "generic": false,
+      "manufacturer": "STMicroelectronics",
+      "mpn": "BD139-16",
+      "lifecycle": "active",
+      "tags": ["audio", "bd139", "npn", "series_pass", "through_hole", "to126"],
+      "ratings": [
+        {"kind": "collector_base_voltage", "max": "80", "unit": "V"},
+        {"kind": "collector_emitter_voltage", "max": "80", "unit": "V"},
+        {"kind": "collector_current", "max": "1.5", "unit": "A"},
+        {"kind": "collector_peak_current", "max": "3", "unit": "A"},
+        {"kind": "power_dissipation_case_25c", "max": "12.5", "unit": "W"},
+        {"kind": "power_dissipation_ambient_25c", "max": "1.25", "unit": "W"}
+      ],
+      "temperature": {"min": "-65", "max": "150", "unit": "C"},
+      "power_semiconductor_evidence": {
+        "device_class": "bjt",
+        "polarity": "npn",
+        "max_voltage": {"value": 80, "unit": "V", "conditions": "VCEO, base open"},
+        "continuous_current": {"value": 1.5, "unit": "A", "conditions": "absolute maximum collector current"},
+        "peak_current": {"value": 3, "unit": "A", "conditions": "absolute maximum peak collector current"},
+        "power_dissipation": {"value": 12.5, "unit": "W", "conditions": "case temperature at or below 25 C"},
+        "max_junction_temperature_c": 150,
+        "junction_to_case_c_per_w": 10,
+        "junction_to_ambient_c_per_w": 100,
+        "secondary_breakdown_status": "review_required",
+        "linear_mode_status": "review_required",
+        "mounting_assumptions": "Quoted 12.5 W rating is case-temperature limited; an actual series-pass design requires heatsink, bias, SOA, and thermal-coupling analysis.",
+        "bjt": {
+          "gain_minimum": 100,
+          "gain_test_current_a": 0.15
+        },
+        "fabrication_proof": false,
+        "review_note": "Pinout and headline ratings are verified. The graph-only datasheet SOA has not been normalized into a fabrication claim."
+      },
+      "symbols": [
+        {
+          "symbol_id": "Transistor_BJT:BD139",
+          "function_pins": [
+            {"function": "EMITTER", "symbol_pin": "1", "electrical": "passive", "required": true},
+            {"function": "COLLECTOR", "symbol_pin": "2", "electrical": "passive", "required": true},
+            {"function": "BASE", "symbol_pin": "3", "electrical": "input", "required": true}
+          ],
+          "pinmap_id": "Transistor_BJT:BD139|Package_TO_SOT_THT:TO-126-3_Vertical",
+          "verification": {
+            "confidence": "verified",
+            "sources": [
+              "https://www.st.com/resource/en/datasheet/bd139.pdf",
+              "kicad-symbols:Transistor_BJT:BD139",
+              "builtin_pinmap:Transistor_BJT:BD139"
+            ],
+            "pinmap_checked": true
+          }
+        }
+      ],
+      "packages": [
+        {
+          "id": "to126",
+          "name": "SOT-32 / TO-126 vertical",
+          "footprint_id": "Package_TO_SOT_THT:TO-126-3_Vertical",
+          "package_type": "to126",
+          "mpn": "BD139-16",
+          "lifecycle": "active",
+          "pinmap_id": "Transistor_BJT:BD139|Package_TO_SOT_THT:TO-126-3_Vertical",
+          "pad_functions": [
+            {"function": "EMITTER", "pad": "1"},
+            {"function": "COLLECTOR", "pad": "2"},
+            {"function": "BASE", "pad": "3"}
+          ],
+          "verification": {
+            "confidence": "verified",
+            "sources": [
+              "https://www.st.com/resource/en/datasheet/bd139.pdf",
+              "kicad-footprints:Package_TO_SOT_THT:TO-126-3_Vertical",
+              "builtin_pinmap:Transistor_BJT:BD139"
+            ],
+            "pinmap_checked": true
+          }
+        }
+      ],
+      "verification": {
+        "confidence": "verified",
+        "sources": [
+          "https://www.st.com/en/power-transistors/bd139.html",
+          "https://www.st.com/resource/en/datasheet/bd139.pdf",
+          "kicad-symbols:Transistor_BJT:BD139",
+          "kicad-footprints:Package_TO_SOT_THT:TO-126-3_Vertical",
+          "builtin_pinmap:Transistor_BJT:BD139"
+        ],
+        "resolver_checked": true,
+        "pinmap_checked": true,
+        "tests": ["catalog_bd139_exact_pinmap"]
+      }
+    },
+    {
+      "id": "switch.ti.cd74hc4053e.dip16",
+      "family": "switch",
+      "name": "Texas Instruments CD74HC4053E triple analog multiplexer",
+      "description": "Triple 2:1 bidirectional analog switch in PDIP-16 with break-before-make switching. This part is for the future hybrid switching design, not relay-based V1.",
+      "generic": false,
+      "manufacturer": "Texas Instruments",
+      "mpn": "CD74HC4053E",
+      "lifecycle": "nrnd",
+      "tags": ["analog_mux", "dip16", "spdt", "through_hole", "triple"],
+      "ratings": [
+        {"kind": "supply_voltage_vcc_vee", "max": "10", "unit": "V"},
+        {"kind": "channel_current_continuous", "max": "25", "unit": "mA"},
+        {"kind": "on_resistance_vcc_vee_4_5v", "typ": "70", "unit": "ohm"}
+      ],
+      "electrical_roles": [
+        {"role": "analog_switch_x", "description": "A selects X0 or X1 onto common X."},
+        {"role": "analog_switch_y", "description": "B selects Y0 or Y1 onto common Y."},
+        {"role": "analog_switch_z", "description": "C selects Z0 or Z1 onto common Z."},
+        {"role": "global_inhibit", "description": "INHIBIT high opens all three switches."}
+      ],
+      "selection_rules": [
+        {
+          "kind": "channel_selection",
+          "expression": "A:X0/X1;B:Y0/Y1;C:Z0/Z1;INHIBIT=high opens all channels",
+          "description": "The three address inputs control independently named switch sections."
+        },
+        {
+          "kind": "analog_range",
+          "expression": "VEE <= X/X0/X1/Y/Y0/Y1/Z/Z0/Z1 <= VCC",
+          "description": "Analog signals must remain inside the powered switch rails."
+        }
+      ],
+      "symbols": [
+        {
+          "symbol_id": "4xxx:4053",
+          "function_pins": [
+            {"function": "Y1", "symbol_pin": "1", "electrical": "passive"},
+            {"function": "Y0", "symbol_pin": "2", "electrical": "passive"},
+            {"function": "Z1", "symbol_pin": "3", "electrical": "passive"},
+            {"function": "Z", "symbol_pin": "4", "electrical": "passive"},
+            {"function": "Z0", "symbol_pin": "5", "electrical": "passive"},
+            {"function": "INHIBIT", "symbol_pin": "6", "electrical": "input", "required": true},
+            {"function": "VEE", "symbol_pin": "7", "electrical": "power_in", "required": true},
+            {"function": "GND", "symbol_pin": "8", "electrical": "power_in", "required": true},
+            {"function": "C", "symbol_pin": "9", "electrical": "input", "required": true},
+            {"function": "B", "symbol_pin": "10", "electrical": "input", "required": true},
+            {"function": "A", "symbol_pin": "11", "electrical": "input", "required": true},
+            {"function": "X0", "symbol_pin": "12", "electrical": "passive"},
+            {"function": "X1", "symbol_pin": "13", "electrical": "passive"},
+            {"function": "X", "symbol_pin": "14", "electrical": "passive"},
+            {"function": "Y", "symbol_pin": "15", "electrical": "passive"},
+            {"function": "VCC", "symbol_pin": "16", "electrical": "power_in", "required": true}
+          ],
+          "pinmap_id": "4xxx:4053|Package_DIP:DIP-16_W7.62mm",
+          "verification": {
+            "confidence": "verified",
+            "sources": [
+              "https://www.ti.com/lit/ds/symlink/cd74hc4053.pdf",
+              "kicad-symbols:4xxx:4053",
+              "builtin_pinmap:4xxx:4053"
+            ],
+            "pinmap_checked": true
+          }
+        }
+      ],
+      "packages": [
+        {
+          "id": "dip16",
+          "name": "PDIP-16 7.62 mm",
+          "footprint_id": "Package_DIP:DIP-16_W7.62mm",
+          "package_type": "dip16",
+          "mpn": "CD74HC4053E",
+          "lifecycle": "nrnd",
+          "pinmap_id": "4xxx:4053|Package_DIP:DIP-16_W7.62mm",
+          "pad_functions": [
+            {"function": "Y1", "pad": "1"}, {"function": "Y0", "pad": "2"},
+            {"function": "Z1", "pad": "3"}, {"function": "Z", "pad": "4"},
+            {"function": "Z0", "pad": "5"}, {"function": "INHIBIT", "pad": "6"},
+            {"function": "VEE", "pad": "7"}, {"function": "GND", "pad": "8"},
+            {"function": "C", "pad": "9"}, {"function": "B", "pad": "10"},
+            {"function": "A", "pad": "11"}, {"function": "X0", "pad": "12"},
+            {"function": "X1", "pad": "13"}, {"function": "X", "pad": "14"},
+            {"function": "Y", "pad": "15"}, {"function": "VCC", "pad": "16"}
+          ],
+          "dimensions_mm": {"width": 19.3, "height": 6.35},
+          "verification": {
+            "confidence": "verified",
+            "sources": [
+              "https://www.ti.com/lit/ds/symlink/cd74hc4053.pdf",
+              "kicad-footprints:Package_DIP:DIP-16_W7.62mm",
+              "builtin_pinmap:4xxx:4053"
+            ],
+            "pinmap_checked": true
+          }
+        }
+      ],
+      "verification": {
+        "confidence": "verified",
+        "sources": [
+          "https://www.ti.com/product/CD74HC4053/part-details/CD74HC4053E",
+          "https://www.ti.com/lit/ds/symlink/cd74hc4053.pdf",
+          "kicad-symbols:4xxx:4053",
+          "kicad-footprints:Package_DIP:DIP-16_W7.62mm",
+          "builtin_pinmap:4xxx:4053"
+        ],
+        "resolver_checked": true,
+        "pinmap_checked": true,
+        "tests": ["catalog_cd74hc4053_exact_pinmap"],
+        "notes": ["Texas Instruments marks the PDIP CD74HC4053E not recommended for new designs."]
+      }
+    },
+    {
+      "id": "connector.transistor_test_socket.generic.1x03",
+      "family": "connector",
+      "name": "Generic three-terminal transistor test socket",
+      "description": "Structurally verified 1x3 through-hole interface with neutral terminal names. Replace it with the exact ZIF socket or fixture before mechanical or fabrication promotion.",
+      "generic": true,
+      "lifecycle": "unknown",
+      "tags": ["1x3", "socket", "through_hole", "transistor_tester"],
+      "electrical_roles": [
+        {"role": "unknown_transistor_terminal", "description": "TERMINAL_1, TERMINAL_2, and TERMINAL_3 intentionally carry no base/collector/emitter assumption."}
+      ],
+      "symbols": [
+        {
+          "symbol_id": "Connector_Generic:Conn_01x03",
+          "function_pins": [
+            {"function": "TERMINAL_1", "symbol_pin": "1", "electrical": "passive", "required": true},
+            {"function": "TERMINAL_2", "symbol_pin": "2", "electrical": "passive", "required": true},
+            {"function": "TERMINAL_3", "symbol_pin": "3", "electrical": "passive", "required": true}
+          ],
+          "verification": {
+            "confidence": "library_derived",
+            "sources": ["kicad-symbols:Connector_Generic:Conn_01x03", "builtin_pinmap:Connector_Generic:Conn_01x03"],
+            "pinmap_checked": true
+          }
+        }
+      ],
+      "packages": [
+        {
+          "id": "generic_1x03",
+          "name": "Generic 1x03 2.54 mm vertical header surrogate",
+          "footprint_id": "Connector_PinHeader_2.54mm:PinHeader_1x03_P2.54mm_Vertical",
+          "package_type": "pin_header_1x03",
+          "pinmap_id": "Connector_Generic:Conn_01x03|Connector_PinHeader_2.54mm:PinHeader_1x03_P2.54mm_Vertical",
+          "pad_functions": [
+            {"function": "TERMINAL_1", "pad": "1"},
+            {"function": "TERMINAL_2", "pad": "2"},
+            {"function": "TERMINAL_3", "pad": "3"}
+          ],
+          "verification": {
+            "confidence": "library_derived",
+            "sources": ["kicad-footprints:Connector_PinHeader_2.54mm:PinHeader_1x03_P2.54mm_Vertical", "builtin_pinmap:Connector_Generic:Conn_01x03"],
+            "pinmap_checked": true
+          }
+        }
+      ],
+      "verification": {
+        "confidence": "library_derived",
+        "sources": [
+          "user_supplied:transistor_tester_v1:2026-07-28",
+          "kicad-symbols:Connector_Generic:Conn_01x03",
+          "kicad-footprints:Connector_PinHeader_2.54mm:PinHeader_1x03_P2.54mm_Vertical",
+          "builtin_pinmap:Connector_Generic:Conn_01x03"
+        ],
+        "resolver_checked": true,
+        "pinmap_checked": true,
+        "tests": ["catalog_transistor_socket_neutral_roles"],
+        "notes": ["This is not evidence for any particular ZIF socket body, row spacing, retention mechanism, or mounting geometry."]
+      }
+    },
+    {
+      "id": "mcu.module.esp32_devkitc_compatible.38pin.provisional",
+      "family": "mcu",
+      "name": "Provisional generic 38-pin ESP32-DevKitC-compatible board",
+      "description": "Schematic-draft surrogate for common CP2102 boards carrying ESP-32D/ESP-32S-style module markings. Header order and physical geometry must be checked against the actual HiLetgo board before connectivity or PCB use.",
+      "generic": true,
+      "lifecycle": "unknown",
+      "tags": ["38_pin", "cp2102", "dev_board", "esp32", "provisional", "schematic_only"],
+      "properties": [
+        {"name": "Reference Header Layout", "value": "Espressif ESP32-DevKitC V4 J2/J3"},
+        {"name": "Actual Board Header Order", "value": "UNVERIFIED"},
+        {"name": "Actual Board Dimensions", "value": "UNVERIFIED"},
+        {"name": "USB Interface", "value": "CP2102 reported by user; board marking not yet captured"}
+      ],
+      "selection_rules": [
+        {
+          "kind": "physical_identity",
+          "expression": "actual board photographs, header labels, row spacing, outline, and mounting features required",
+          "description": "DevKitC-compatible boards are not mechanically universal."
+        },
+        {
+          "kind": "power_source_exclusivity",
+          "expression": "use exactly one of USB, 5V header, or 3V3 header power",
+          "description": "The reference DevKitC documentation warns against simultaneous power sources."
+        },
+        {
+          "kind": "input_only",
+          "expression": "SENSOR_VP,SENSOR_VN,GPIO34,GPIO35",
+          "description": "These ESP32 functions must not receive generated output roles."
+        },
+        {
+          "kind": "flash_reserved",
+          "expression": "GPIO6,GPIO7,GPIO8,GPIO9,GPIO10,GPIO11 are exposed but reserved for module flash",
+          "description": "Reference-board D0/D1/D2/D3/CMD/CLK header pins are not general-purpose design resources."
+        }
+      ],
+      "symbols": [
+        {
+          "symbol_id": "Connector_Generic:Conn_02x19_Odd_Even",
+          "function_pins": [
+            {"function": "3V3", "symbol_pin": "1"},
+            {"function": "GND", "symbol_pin": "2", "required": true},
+            {"function": "EN", "symbol_pin": "3", "required": true},
+            {"function": "GPIO23", "symbol_pin": "4"},
+            {"function": "SENSOR_VP", "symbol_pin": "5"},
+            {"function": "GPIO22", "symbol_pin": "6"},
+            {"function": "SENSOR_VN", "symbol_pin": "7"},
+            {"function": "TX0", "symbol_pin": "8", "aliases": ["GPIO1"]},
+            {"function": "GPIO34", "symbol_pin": "9"},
+            {"function": "RX0", "symbol_pin": "10", "aliases": ["GPIO3"]},
+            {"function": "GPIO35", "symbol_pin": "11"},
+            {"function": "GPIO21", "symbol_pin": "12"},
+            {"function": "GPIO32", "symbol_pin": "13"},
+            {"function": "GND", "symbol_pin": "14"},
+            {"function": "GPIO33", "symbol_pin": "15"},
+            {"function": "GPIO19", "symbol_pin": "16"},
+            {"function": "GPIO25", "symbol_pin": "17"},
+            {"function": "GPIO18", "symbol_pin": "18"},
+            {"function": "GPIO26", "symbol_pin": "19"},
+            {"function": "GPIO5", "symbol_pin": "20"},
+            {"function": "GPIO27", "symbol_pin": "21"},
+            {"function": "GPIO17", "symbol_pin": "22"},
+            {"function": "GPIO14", "symbol_pin": "23"},
+            {"function": "GPIO16", "symbol_pin": "24"},
+            {"function": "GPIO12", "symbol_pin": "25"},
+            {"function": "GPIO4", "symbol_pin": "26"},
+            {"function": "GND", "symbol_pin": "27"},
+            {"function": "GPIO0", "symbol_pin": "28"},
+            {"function": "GPIO13", "symbol_pin": "29"},
+            {"function": "GPIO2", "symbol_pin": "30"},
+            {"function": "GPIO9", "symbol_pin": "31", "aliases": ["D2"]},
+            {"function": "GPIO15", "symbol_pin": "32"},
+            {"function": "GPIO10", "symbol_pin": "33", "aliases": ["D3"]},
+            {"function": "GPIO8", "symbol_pin": "34", "aliases": ["D1"]},
+            {"function": "GPIO11", "symbol_pin": "35", "aliases": ["CMD"]},
+            {"function": "GPIO7", "symbol_pin": "36", "aliases": ["D0"]},
+            {"function": "5V", "symbol_pin": "37"},
+            {"function": "GPIO6", "symbol_pin": "38", "aliases": ["CLK"]}
+          ],
+          "verification": {
+            "confidence": "placeholder",
+            "sources": [
+              "user_supplied:transistor_tester_v1:2026-07-28",
+              "https://docs.espressif.com/projects/esp-dev-kits/en/latest/esp32/esp32-devkitc/user_guide.html",
+              "kicad-symbols:Connector_Generic:Conn_02x19_Odd_Even"
+            ],
+            "notes": ["Pin numbers are a schematic surrogate for the reference J2/J3 row order, not a verified HiLetgo header identity."]
+          }
+        }
+      ],
+      "packages": [
+        {
+          "id": "schematic_surrogate",
+          "name": "Non-mechanical 2x19 header surrogate",
+          "footprint_id": "Connector_PinHeader_2.54mm:PinHeader_2x19_P2.54mm_Vertical",
+          "package_type": "schematic_surrogate_2x19",
+          "pad_functions": [
+            {"function": "3V3", "pad": "1"}, {"function": "GND", "pad": "2"},
+            {"function": "EN", "pad": "3"}, {"function": "GPIO23", "pad": "4"},
+            {"function": "SENSOR_VP", "pad": "5"}, {"function": "GPIO22", "pad": "6"},
+            {"function": "SENSOR_VN", "pad": "7"}, {"function": "TX0", "pad": "8"},
+            {"function": "GPIO34", "pad": "9"}, {"function": "RX0", "pad": "10"},
+            {"function": "GPIO35", "pad": "11"}, {"function": "GPIO21", "pad": "12"},
+            {"function": "GPIO32", "pad": "13"}, {"function": "GND", "pad": "14"},
+            {"function": "GPIO33", "pad": "15"}, {"function": "GPIO19", "pad": "16"},
+            {"function": "GPIO25", "pad": "17"}, {"function": "GPIO18", "pad": "18"},
+            {"function": "GPIO26", "pad": "19"}, {"function": "GPIO5", "pad": "20"},
+            {"function": "GPIO27", "pad": "21"}, {"function": "GPIO17", "pad": "22"},
+            {"function": "GPIO14", "pad": "23"}, {"function": "GPIO16", "pad": "24"},
+            {"function": "GPIO12", "pad": "25"}, {"function": "GPIO4", "pad": "26"},
+            {"function": "GND", "pad": "27"}, {"function": "GPIO0", "pad": "28"},
+            {"function": "GPIO13", "pad": "29"}, {"function": "GPIO2", "pad": "30"},
+            {"function": "GPIO9", "pad": "31"}, {"function": "GPIO15", "pad": "32"},
+            {"function": "GPIO10", "pad": "33"}, {"function": "GPIO8", "pad": "34"},
+            {"function": "GPIO11", "pad": "35"}, {"function": "GPIO7", "pad": "36"},
+            {"function": "5V", "pad": "37"}, {"function": "GPIO6", "pad": "38"}
+          ],
+          "verification": {
+            "confidence": "placeholder",
+            "sources": ["kicad-footprints:Connector_PinHeader_2.54mm:PinHeader_2x19_P2.54mm_Vertical"],
+            "notes": ["This footprint is deliberately not the development-board footprint and must never be used for PCB placement."]
+          }
+        }
+      ],
+      "verification": {
+        "confidence": "placeholder",
+        "sources": [
+          "user_supplied:transistor_tester_v1:2026-07-28",
+          "https://docs.espressif.com/projects/esp-dev-kits/en/latest/esp32/esp32-devkitc/user_guide.html"
+        ],
+        "tests": ["catalog_esp32_devkit_provisional_boundary"],
+        "notes": ["The exact HiLetgo revision, module, USB-UART chip, header order, dimensions, and row spacing remain unverified."]
+      }
+    },
+    {
+      "id": "adc.module.ads1115.i2c.provisional",
+      "family": "adc",
+      "name": "Provisional ADS1115 I2C ADC module",
+      "description": "Logical schematic interface for an unidentified ADS1115 plug-in module. It is not connectivity-ready until the actual board header order, address straps, pull-ups, supply circuit, and mechanics are captured.",
+      "generic": true,
+      "lifecycle": "unknown",
+      "tags": ["ads1115", "breakout", "i2c", "module", "provisional"],
+      "properties": [
+        {"name": "Actual Header Order", "value": "UNVERIFIED"},
+        {"name": "Installed SDA/SCL Pull-ups", "value": "UNVERIFIED"},
+        {"name": "Address Strap Behavior", "value": "UNVERIFIED"},
+        {"name": "Module Dimensions", "value": "UNVERIFIED"}
+      ],
+      "selection_rules": [
+        {
+          "kind": "promotion_boundary",
+          "expression": "require board photos or purchasing record plus continuity-checked header order before connectivity use",
+          "description": "ADS1115 breakout layouts are not universal."
+        }
+      ],
+      "symbols": [
+        {
+          "symbol_id": "Connector_Generic:Conn_01x10",
+          "function_pins": [
+            {"function": "VDD", "symbol_pin": "1", "required": true},
+            {"function": "GND", "symbol_pin": "2", "required": true},
+            {"function": "SDA", "symbol_pin": "3", "required": true},
+            {"function": "SCL", "symbol_pin": "4", "required": true},
+            {"function": "ADDR", "symbol_pin": "5"},
+            {"function": "ALERT_RDY", "symbol_pin": "6"},
+            {"function": "AIN0", "symbol_pin": "7"},
+            {"function": "AIN1", "symbol_pin": "8"},
+            {"function": "AIN2", "symbol_pin": "9"},
+            {"function": "AIN3", "symbol_pin": "10"}
+          ],
+          "verification": {
+            "confidence": "placeholder",
+            "sources": ["user_supplied:transistor_tester_v1:2026-07-28", "kicad-symbols:Connector_Generic:Conn_01x10"],
+            "notes": ["Pin sequence is logical only and is not the physical module header order."]
+          }
+        }
+      ],
+      "packages": [
+        {
+          "id": "logical_1x10",
+          "name": "Logical 1x10 header surrogate",
+          "footprint_id": "Connector_PinHeader_2.54mm:PinHeader_1x10_P2.54mm_Vertical",
+          "package_type": "schematic_surrogate_1x10",
+          "pad_functions": [
+            {"function": "VDD", "pad": "1"}, {"function": "GND", "pad": "2"},
+            {"function": "SDA", "pad": "3"}, {"function": "SCL", "pad": "4"},
+            {"function": "ADDR", "pad": "5"}, {"function": "ALERT_RDY", "pad": "6"},
+            {"function": "AIN0", "pad": "7"}, {"function": "AIN1", "pad": "8"},
+            {"function": "AIN2", "pad": "9"}, {"function": "AIN3", "pad": "10"}
+          ],
+          "verification": {
+            "confidence": "placeholder",
+            "sources": ["kicad-footprints:Connector_PinHeader_2.54mm:PinHeader_1x10_P2.54mm_Vertical"],
+            "notes": ["This is not a module footprint."]
+          }
+        }
+      ],
+      "verification": {
+        "confidence": "placeholder",
+        "sources": ["user_supplied:transistor_tester_v1:2026-07-28", "https://www.ti.com/lit/ds/symlink/ads1115.pdf"],
+        "tests": ["catalog_measurement_modules_fail_closed"],
+        "notes": ["The verified bare IC record is adc.ti.ads1115idgsr.vssop10; it does not establish this module's board-level behavior."]
+      }
+    },
+    {
+      "id": "dac.module.mcp4725.i2c.provisional",
+      "family": "dac",
+      "name": "Provisional MCP4725 I2C DAC module",
+      "description": "Logical schematic interface for an unidentified MCP4725 plug-in module. Header order, installed pull-ups, address option, output terminal, and mechanics remain unverified. A0 is intentionally optional because an unidentified module may strap it internally or may not expose it.",
+      "generic": true,
+      "lifecycle": "unknown",
+      "tags": ["breakout", "dac", "i2c", "mcp4725", "module", "provisional"],
+      "properties": [
+        {"name": "Actual Header Order", "value": "UNVERIFIED"},
+        {"name": "Default I2C Address", "value": "UNVERIFIED"},
+        {"name": "Installed SDA/SCL Pull-ups", "value": "UNVERIFIED"},
+        {"name": "Module Dimensions", "value": "UNVERIFIED"}
+      ],
+      "selection_rules": [
+        {
+          "kind": "promotion_boundary",
+          "expression": "require board photos or purchasing record plus continuity-checked header order before connectivity use",
+          "description": "MCP4725 breakout address options and board circuitry vary."
+        },
+        {
+          "kind": "provisional_output_range",
+          "expression": "bare IC VOUT is proportional to VDD; module-level range must be measured or sourced",
+          "description": "Do not inherit bare-IC behavior through unknown level shifting or output circuitry."
+        }
+      ],
+      "symbols": [
+        {
+          "symbol_id": "Connector_Generic:Conn_01x06",
+          "function_pins": [
+            {"function": "VDD", "symbol_pin": "1", "required": true},
+            {"function": "GND", "symbol_pin": "2", "required": true},
+            {"function": "SDA", "symbol_pin": "3", "required": true},
+            {"function": "SCL", "symbol_pin": "4", "required": true},
+            {"function": "VOUT", "symbol_pin": "5", "required": true},
+            {"function": "A0", "symbol_pin": "6"}
+          ],
+          "verification": {
+            "confidence": "placeholder",
+            "sources": ["user_supplied:transistor_tester_v1:2026-07-28", "kicad-symbols:Connector_Generic:Conn_01x06"],
+            "notes": ["Pin sequence is logical only and is not the physical module header order."]
+          }
+        }
+      ],
+      "packages": [
+        {
+          "id": "logical_1x06",
+          "name": "Logical 1x06 header surrogate",
+          "footprint_id": "Connector_PinHeader_2.54mm:PinHeader_1x06_P2.54mm_Vertical",
+          "package_type": "schematic_surrogate_1x06",
+          "pad_functions": [
+            {"function": "VDD", "pad": "1"}, {"function": "GND", "pad": "2"},
+            {"function": "SDA", "pad": "3"}, {"function": "SCL", "pad": "4"},
+            {"function": "VOUT", "pad": "5"}, {"function": "A0", "pad": "6"}
+          ],
+          "verification": {
+            "confidence": "placeholder",
+            "sources": ["kicad-footprints:Connector_PinHeader_2.54mm:PinHeader_1x06_P2.54mm_Vertical"],
+            "notes": ["This is not a module footprint."]
+          }
+        }
+      ],
+      "verification": {
+        "confidence": "placeholder",
+        "sources": ["user_supplied:transistor_tester_v1:2026-07-28", "https://ww1.microchip.com/downloads/en/DeviceDoc/MCP4725-Data-Sheet-20002039E.pdf"],
+        "tests": ["catalog_measurement_modules_fail_closed"],
+        "notes": ["The verified bare IC record is dac.microchip.mcp4725a0t_e_ch.sot23_6; it does not establish this module's board-level behavior."]
+      }
+    },
+    {
+      "id": "display.module.ssd1306.i2c.128x64.provisional",
+      "family": "display",
+      "name": "Provisional SSD1306 128x64 I2C OLED module",
+      "description": "Logical four-wire interface for an unidentified SSD1306-class 128x64 OLED module. Resolution, address, header order, supply circuitry, dimensions, and mounting holes require actual-board evidence. WARNING: common modules use both GND-VCC and VCC-GND orders; never wire this logical sequence to hardware without checking the actual board because reversed power can destroy the module.",
+      "generic": true,
+      "lifecycle": "unknown",
+      "tags": ["128x64", "display", "i2c", "oled", "provisional", "ssd1306"],
+      "properties": [
+        {"name": "Display Size", "value": "UNVERIFIED"},
+        {"name": "Resolution", "value": "PROVISIONAL 128x64"},
+        {"name": "Default I2C Address", "value": "UNVERIFIED; commonly 0x3C"},
+        {"name": "Actual Header Order", "value": "UNVERIFIED"},
+        {"name": "Module Dimensions", "value": "UNVERIFIED"},
+        {"name": "Mounting Holes", "value": "UNVERIFIED"}
+      ],
+      "selection_rules": [
+        {
+          "kind": "promotion_boundary",
+          "expression": "require controller marking, resolution, address strap, header order, supply range, outline, and mounting-hole evidence",
+          "description": "Four-pin SSD1306 modules are electrically and mechanically variable, including commonly reversed GND/VCC header order."
+        }
+      ],
+      "symbols": [
+        {
+          "symbol_id": "Connector_Generic:Conn_01x04",
+          "function_pins": [
+            {"function": "VCC", "symbol_pin": "1", "required": true},
+            {"function": "GND", "symbol_pin": "2", "required": true},
+            {"function": "SDA", "symbol_pin": "3", "required": true},
+            {"function": "SCL", "symbol_pin": "4", "required": true}
+          ],
+          "verification": {
+            "confidence": "placeholder",
+            "sources": ["user_supplied:transistor_tester_v1:2026-07-28", "kicad-symbols:Connector_Generic:Conn_01x04"],
+            "notes": ["Pin sequence is logical only and is not the physical module header order. Do not connect power from this sequence; common boards reverse GND and VCC."]
+          }
+        }
+      ],
+      "packages": [
+        {
+          "id": "logical_1x04",
+          "name": "Logical 1x04 header surrogate",
+          "footprint_id": "Connector_PinHeader_2.54mm:PinHeader_1x04_P2.54mm_Vertical",
+          "package_type": "schematic_surrogate_1x04",
+          "pad_functions": [
+            {"function": "VCC", "pad": "1"}, {"function": "GND", "pad": "2"},
+            {"function": "SDA", "pad": "3"}, {"function": "SCL", "pad": "4"}
+          ],
+          "verification": {
+            "confidence": "placeholder",
+            "sources": ["kicad-footprints:Connector_PinHeader_2.54mm:PinHeader_1x04_P2.54mm_Vertical"],
+            "notes": ["This is not a module footprint."]
+          }
+        }
+      ],
+      "verification": {
+        "confidence": "placeholder",
+        "sources": ["user_supplied:transistor_tester_v1:2026-07-28"],
+        "tests": ["catalog_measurement_modules_fail_closed"],
+        "notes": ["No exact module manufacturer, board revision, controller marking, or mechanical drawing has been provided."]
+      }
+    }
+  ]
+}

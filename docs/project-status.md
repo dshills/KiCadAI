@@ -339,6 +339,11 @@ low-voltage amplifier components, the ATmega328P-A, ESP32-WROOM-32E, and
 STM32G031K8T6. MCU records include normalized physical pins, alternate
 functions, supply domains, programming interfaces, clocks, boot constraints,
 and current budgets.
+The catalog now also contains exact, KiCad-resolvable G5V-1 DC5, ULN2803A,
+ADS1115IDGSR, MCP4725A0T-E/CH, BD139-16, and CD74HC4053E records for a
+transistor-tester path. Unknown ESP32, ADC, DAC, and OLED plug-in boards are
+represented only by draft placeholders; they cannot pass connectivity or
+fabrication gates until their actual headers and mechanics are captured.
 Generated schematic symbols can carry
 component identity, manufacturer, MPN, confidence, lifecycle, rating, and
 pinmap evidence.

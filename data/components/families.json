@@ -1,6 +1,7 @@
 {
   "version": "0.1.0",
   "families": [
+    {"id": "adc", "name": "Analog-to-Digital Converter", "description": "Standalone ADC devices and reviewed converter modules."},
     {"id": "bjt", "name": "Bipolar Junction Transistor", "description": "Small-signal and power BJT devices."},
     {"id": "capacitor", "name": "Capacitor", "description": "Charge storage and decoupling components."},
     {"id": "clock_source", "name": "Clock Source", "description": "Packaged and programmed standalone clock generators with quantitative timing evidence."},
@@ -10,7 +11,10 @@
     {"id": "current_regulator", "name": "Current Regulator", "description": "Catalog-backed active devices that regulate a programmed output current across a bounded compliance range."},
     {"id": "current_source", "name": "Independent Current Source Port", "description": "Board input port with trusted independent-current analysis semantics."},
     {"id": "crystal", "name": "Crystal", "description": "Quartz crystals and resonators for timing circuits."},
+    {"id": "dac", "name": "Digital-to-Analog Converter", "description": "Standalone DAC devices and reviewed converter modules."},
     {"id": "diode", "name": "Diode", "description": "Signal, rectifier, Schottky, and TVS diode families."},
+    {"id": "display", "name": "Display Module", "description": "Display controllers and complete display modules with explicit electrical and physical interfaces."},
+    {"id": "driver", "name": "Load Driver", "description": "Multi-channel transistor arrays and other catalog-backed load drivers."},
     {"id": "fuse", "name": "Fuse", "description": "Resettable and one-time overcurrent protection devices."},
     {"id": "isolated_converter", "name": "Isolated DC/DC Converter", "description": "Galvanically isolated single- and dual-output power converter modules."},
     {"id": "isolator", "name": "Digital Isolator", "description": "Galvanic digital and bus isolation devices with explicit side-specific supplies and references."},

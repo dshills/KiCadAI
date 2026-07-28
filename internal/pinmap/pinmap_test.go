@@ -173,6 +173,31 @@ func TestBuiltinsIncludeExpandedI2CSensorPinmaps(t *testing.T) {
 	}
 }
 
+func TestBuiltinsIncludeTransistorTesterPinmaps(t *testing.T) {
+	want := map[string]int{
+		mappingKey("Relay:G5V-1", "Relay_THT:Relay_SPDT_Omron_G5V-1"):              6,
+		mappingKey("Transistor_Array:ULN2803A", "Package_DIP:DIP-18_W7.62mm"):      18,
+		mappingKey("Analog_ADC:ADS1115IDGS", "Package_SO:TSSOP-10_3x3mm_P0.5mm"):   10,
+		mappingKey("Analog_DAC:MCP4725xxx-xCH", "Package_TO_SOT_SMD:SOT-23-6"):     6,
+		mappingKey("Transistor_BJT:BD139", "Package_TO_SOT_THT:TO-126-3_Vertical"): 3,
+		mappingKey("4xxx:4053", "Package_DIP:DIP-16_W7.62mm"):                      16,
+	}
+	for _, entry := range Builtins() {
+		key := mappingKey(entry.Symbol, entry.Footprint)
+		count, ok := want[key]
+		if !ok {
+			continue
+		}
+		if len(entry.Pins) != count {
+			t.Fatalf("%s pin count = %d, want %d", key, len(entry.Pins), count)
+		}
+		delete(want, key)
+	}
+	if len(want) != 0 {
+		t.Fatalf("missing transistor-tester pinmaps: %#v", want)
+	}
+}
+
 func TestBuiltinsReturnsDeepCopy(t *testing.T) {
 	entries := Builtins()
 	entries[0].Pins[0].SymbolPin = "mutated"

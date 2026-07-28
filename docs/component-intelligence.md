@@ -127,6 +127,31 @@ unsupported power devices:
   blocked-by-default NPN TO-220 power-output placeholder that requires pinout,
   package, thermal, Safe Operating Area (SOA), and layout-constraint evidence
   before promotion.
+- A transistor-tester component slice with verified Omron G5V-1 DC5 relay,
+  ST ULN2803A DIP-18 driver, TI ADS1115IDGSR ADC, Microchip
+  MCP4725A0T-E/CH DAC, ST BD139-16 transistor, and TI CD74HC4053E analog
+  multiplexer records. Exact symbol, footprint, and pin mappings are checked;
+  the BD139 record deliberately leaves linear-mode SOA and heatsinking as
+  design-level review obligations.
+
+## Provisional Plug-In Modules
+
+The catalog also carries draft-only records for a generic 38-pin
+ESP32-DevKitC-compatible board and ADS1115, MCP4725, and SSD1306 I2C breakout
+modules. These records make expected logical functions and missing evidence
+visible without pretending that similarly named marketplace boards share a
+physical header order or footprint.
+
+Their `placeholder` confidence is intentional: they cannot satisfy structural,
+connectivity, ERC/DRC, or fabrication-candidate acceptance. Connector
+footprints on these records are logical schematic surrogates and must not be
+placed on a PCB as module footprints. Promotion requires evidence from the
+actual board: both-side identification, header order, installed pull-ups or
+address straps, dimensions, and mounting-hole locations.
+
+The generic three-terminal transistor test connector is separately modeled as
+`library_derived` and structural-only. Its functions remain `TERMINAL_1`
+through `TERMINAL_3`; it never assumes B/C/E or G/D/S ordering.
 
 Concrete records carry manufacturer, MPN, lifecycle status, symbol bindings,
 footprints, pad-function mappings, and rating/value metadata. Generic records
