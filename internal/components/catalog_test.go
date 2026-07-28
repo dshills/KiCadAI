@@ -596,6 +596,86 @@ func TestCheckedInCatalogRequestedNChannelMOSFETExpansion(t *testing.T) {
 	}
 }
 
+func TestCheckedInCatalogRequestedPChannelMOSFETExpansion(t *testing.T) {
+	catalog, err := LoadCatalog(context.Background(), LoadOptions{CatalogDir: checkedInCatalogDir(t)})
+	if err != nil {
+		t.Fatalf("load checked-in catalog: %v", err)
+	}
+
+	tests := []struct {
+		query     string
+		id        string
+		mpn       string
+		pkgType   string
+		symbolID  string
+		pinOrder  []string
+		lifecycle string
+	}{
+		{query: "IRF9540", id: "mosfet.vishay.irf9540pbf.to220", mpn: "IRF9540PbF", pkgType: "to220", symbolID: "Transistor_FET:Q_PMOS_GDS", pinOrder: []string{"GATE", "DRAIN", "SOURCE"}, lifecycle: "active"},
+		{query: "FQD8P10", id: "mosfet.onsemi.fqd8p10tm.to252", mpn: "FQD8P10TM", pkgType: "to252", symbolID: "Transistor_FET:Q_PMOS_GDS", pinOrder: []string{"GATE", "DRAIN", "SOURCE"}, lifecycle: "active"},
+		{query: "IRFP9240", id: "mosfet.vishay.irfp9240.to247", mpn: "IRFP9240PbF", pkgType: "to247_3", symbolID: "Transistor_FET:Q_PMOS_GDS", pinOrder: []string{"GATE", "DRAIN", "SOURCE"}, lifecycle: "active"},
+		{query: "BS250", id: "mosfet.diodes.bs250p.to92", mpn: "BS250P", pkgType: "to92", symbolID: "Transistor_FET:Q_PMOS_SGD", pinOrder: []string{"SOURCE", "GATE", "DRAIN"}, lifecycle: "nrnd"},
+		{query: "IRF4905", id: "mosfet.infineon.irf4905pbf.to220", mpn: "IRF4905PBF", pkgType: "to220", symbolID: "Transistor_FET:Q_PMOS_GDS", pinOrder: []string{"GATE", "DRAIN", "SOURCE"}, lifecycle: "active"},
+	}
+	if len(tests) != 5 {
+		t.Fatalf("requested P-channel MOSFET coverage = %d, want 5", len(tests))
+	}
+
+	for _, test := range tests {
+		record := requireCatalogRecord(t, catalog, test.id)
+		if record.MPN != test.mpn || record.Generic || record.Lifecycle != test.lifecycle ||
+			record.Verification.Confidence != ConfidenceVerified {
+			t.Fatalf("%s identity = MPN:%q generic:%v lifecycle:%q verification:%#v", test.query, record.MPN, record.Generic, record.Lifecycle, record.Verification)
+		}
+		if record.PowerSemiconductor == nil || record.PowerSemiconductor.DeviceClass != "mosfet" ||
+			record.PowerSemiconductor.Polarity != "p_channel" || record.PowerSemiconductor.FabricationProof {
+			t.Fatalf("%s power evidence = %#v", test.query, record.PowerSemiconductor)
+		}
+		if record.PowerSemiconductor.LinearModeStatus != "review_required" {
+			t.Fatalf("%s linear-mode status = %q, want review_required", test.query, record.PowerSemiconductor.LinearModeStatus)
+		}
+		if len(record.Symbols) != 1 || record.Symbols[0].SymbolID != test.symbolID {
+			t.Fatalf("%s symbol binding = %#v", test.query, record.Symbols)
+		}
+		if len(record.Packages) != 1 || record.Packages[0].PackageType != test.pkgType {
+			t.Fatalf("%s package binding = %#v", test.query, record.Packages)
+		}
+		ratingKinds := make(map[string]struct{}, len(record.Ratings))
+		for _, rating := range record.Ratings {
+			ratingKinds[rating.Kind] = struct{}{}
+		}
+		for _, kind := range []string{"drain_source_voltage", "drain_current", "power_dissipation"} {
+			if _, ok := ratingKinds[kind]; !ok {
+				t.Fatalf("%s ratings lack normalized %s key: %#v", test.query, kind, record.Ratings)
+			}
+		}
+		symbolPins := make(map[string]string, len(record.Symbols[0].FunctionPins))
+		for _, pin := range record.Symbols[0].FunctionPins {
+			symbolPins[pin.SymbolPin] = pin.Function
+		}
+		packagePads := make(map[string]string, len(record.Packages[0].PadFunctions))
+		for _, pad := range record.Packages[0].PadFunctions {
+			packagePads[pad.Pad] = pad.Function
+		}
+		for index, function := range test.pinOrder {
+			number := string(rune('1' + index))
+			if symbolPins[number] != function || packagePads[number] != function {
+				t.Fatalf("%s pin %s = symbol:%q pad:%q, want %q", test.query, number, symbolPins[number], packagePads[number], function)
+			}
+		}
+
+		selection, result := Select(context.Background(), catalog, SelectionRequest{
+			Query:             Query{Text: test.query, Family: "mosfet", Package: test.pkgType},
+			Acceptance:        AcceptanceConnectivity,
+			RequiredFunctions: []string{"GATE", "DRAIN", "SOURCE"},
+			RequireConcrete:   true,
+		})
+		if !result.OK || selection.Component.ID != test.id {
+			t.Fatalf("select %s = component:%q issues:%#v", test.query, selection.Component.ID, result.Issues)
+		}
+	}
+}
+
 func TestCheckedInCatalogRequestedPNPExpansion(t *testing.T) {
 	catalog, err := LoadCatalog(context.Background(), LoadOptions{CatalogDir: checkedInCatalogDir(t)})
 	if err != nil {

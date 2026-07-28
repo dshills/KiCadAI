@@ -584,7 +584,10 @@ func (provider *CatalogProvider) expandHighSideLoadSwitch(ctx context.Context, r
 	if requiresDynamicElectrothermalModel(request.Constraints) {
 		selection, err = provider.selectComponentWithDynamicEvidence(ctx, "mosfet", "p_channel", unclampedRatings, true, temperatureRequirement)
 	} else {
-		selection, err = provider.selectComponentMinimizingRatingsWithTemperature(ctx, "mosfet", "p_channel", unclampedRatings, true, temperatureRequirement, []string{"drain_source_voltage", "drain_current"})
+		selection, err = provider.selectComponentMinimizingModelParameterWithTemperature(
+			ctx, "mosfet", "p_channel", unclampedRatings, true, temperatureRequirement, nil,
+			simmodel.PrimitivePMOSSwitchV1, "on_resistance_ohm", map[string]float64{"gate_on_voltage_v": voltage},
+		)
 	}
 	gateClampRequired := err != nil
 	if err != nil {
@@ -593,7 +596,10 @@ func (provider *CatalogProvider) expandHighSideLoadSwitch(ctx context.Context, r
 		if requiresDynamicElectrothermalModel(request.Constraints) {
 			selection, err = provider.selectComponentWithDynamicEvidence(ctx, "mosfet", "p_channel", baseRatings, true, temperatureRequirement)
 		} else {
-			selection, err = provider.selectComponentMinimizingRatingsWithTemperature(ctx, "mosfet", "p_channel", baseRatings, true, temperatureRequirement, []string{"drain_source_voltage", "drain_current"})
+			selection, err = provider.selectComponentMinimizingModelParameterWithTemperature(
+				ctx, "mosfet", "p_channel", baseRatings, true, temperatureRequirement, nil,
+				simmodel.PrimitivePMOSSwitchV1, "on_resistance_ohm", map[string]float64{"gate_on_voltage_v": voltage},
+			)
 		}
 	}
 	if err != nil {
