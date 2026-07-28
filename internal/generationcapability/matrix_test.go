@@ -6,6 +6,7 @@ import (
 	"reflect"
 	"testing"
 
+	"kicadai/internal/aiprovider"
 	"kicadai/internal/components"
 )
 
@@ -68,5 +69,42 @@ func TestBuildDocumentIncludesGenericCatalogContract(t *testing.T) {
 	}
 	if _, err := ProviderCapabilityContext(catalog, 1); err == nil {
 		t.Fatal("expected capability size limit failure")
+	}
+}
+
+func TestCheckedInCatalogFitsProviderCapabilityLimitWithoutOmissions(t *testing.T) {
+	catalog, err := components.LoadCatalog(context.Background(), components.LoadOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	providerContext, err := ProviderCapabilityContext(catalog, aiprovider.MaxCapabilityBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(providerContext) > aiprovider.MaxCapabilityBytes {
+		t.Fatalf("provider context is %d bytes, limit is %d", len(providerContext), aiprovider.MaxCapabilityBytes)
+	}
+
+	var document Document
+	if err := json.Unmarshal([]byte(providerContext), &document); err != nil {
+		t.Fatal(err)
+	}
+	var graphContract struct {
+		Components []struct {
+			ID  string `json:"id"`
+			MPN string `json:"mpn"`
+		} `json:"components"`
+	}
+	if err := json.Unmarshal(document.GenericGraphContract, &graphContract); err != nil {
+		t.Fatal(err)
+	}
+	if len(graphContract.Components) != len(catalog.Records) {
+		t.Fatalf("provider component count = %d, catalog record count = %d", len(graphContract.Components), len(catalog.Records))
+	}
+	for index, record := range catalog.Records {
+		got := graphContract.Components[index]
+		if got.ID != record.ID || got.MPN != record.MPN {
+			t.Fatalf("provider component %d = %#v, want id=%q mpn=%q", index, got, record.ID, record.MPN)
+		}
 	}
 }

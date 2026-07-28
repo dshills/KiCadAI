@@ -995,6 +995,7 @@ func recordValueSpecificity(record ComponentRecord, query Query) int {
 
 func scoreCandidate(record ComponentRecord, variant PackageVariant, query Query) int {
 	score := confidenceRank(weakerConfidence(record.Verification.Confidence, variant.Verification.Confidence)) * 100
+	score += recordTextSpecificity(record, variant, query.Text)
 	if query.Family != "" && record.Family == query.Family {
 		score += 20
 	}
@@ -1008,6 +1009,25 @@ func scoreCandidate(record ComponentRecord, variant PackageVariant, query Query)
 		score += 3 + recordToleranceSpecificity(record, query)
 	}
 	return score
+}
+
+func recordTextSpecificity(record ComponentRecord, variant PackageVariant, queryText string) int {
+	queryText = strings.TrimSpace(queryText)
+	if queryText == "" {
+		return 0
+	}
+	if strings.EqualFold(strings.TrimSpace(record.ID), queryText) ||
+		strings.EqualFold(strings.TrimSpace(record.MPN), queryText) ||
+		strings.EqualFold(strings.TrimSpace(record.Name), queryText) ||
+		strings.EqualFold(strings.TrimSpace(variant.MPN), queryText) {
+		return 40
+	}
+	for _, tag := range record.Tags {
+		if strings.EqualFold(strings.TrimSpace(tag), queryText) {
+			return 30
+		}
+	}
+	return 0
 }
 
 func recordToleranceSpecificity(record ComponentRecord, query Query) int {

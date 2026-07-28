@@ -1,15 +1,15 @@
 {
-  "record_count": 175,
+  "record_count": 201,
   "family_count": 33,
   "confidence_counts": {
     "blocked": 1,
     "library_derived": 1,
     "placeholder": 7,
     "rule_inferred": 6,
-    "verified": 160
+    "verified": 186
   },
   "alternative_coverage": {
-    "concrete_records": 137,
+    "concrete_records": 163,
     "generic_fallback_records": 38,
     "equivalence_groups": 24
   },
@@ -37,11 +37,11 @@
     {
       "family": "bjt",
       "defined": true,
-      "record_count": 12,
-      "concrete_records": 11,
+      "record_count": 38,
+      "concrete_records": 37,
       "generic_fallback_records": 1,
       "equivalence_groups": 4,
-      "verified_records": 11,
+      "verified_records": 37,
       "library_derived_records": 0,
       "rule_inferred_records": 0,
       "placeholder_records": 0,
@@ -50,18 +50,44 @@
         "bjt.placeholder.npn_power_output.to220"
       ],
       "record_ids": [
+        "bjt.diotec.bc337.to92",
+        "bjt.microchip.2n2222a.to18",
+        "bjt.microchip.2n3019.to39",
+        "bjt.nexperia.bc109c.to18",
+        "bjt.onsemi.2n3904.to92",
+        "bjt.onsemi.bc546btf.to92",
+        "bjt.onsemi.bc547bta.to92",
+        "bjt.onsemi.bc548bta.to92",
+        "bjt.onsemi.bc549bta.to92",
+        "bjt.onsemi.bc550bta.to92",
         "bjt.onsemi.d44h11g.to220",
         "bjt.onsemi.d45h11g.to220",
         "bjt.onsemi.mje243g.to225",
         "bjt.onsemi.mje253g.to225",
+        "bjt.onsemi.mje3055tg.to220",
+        "bjt.onsemi.mjl4281ag.to264",
         "bjt.onsemi.mmbt3904.sot23",
         "bjt.onsemi.mmbt3906.sot23",
         "bjt.onsemi.njw0281g.to3p",
         "bjt.onsemi.njw0302g.to3p",
         "bjt.onsemi.pzt3904t1g.sot223",
         "bjt.onsemi.pzt3906t1g.sot223",
+        "bjt.onsemi.tip31cg.to220",
+        "bjt.onsemi.tip41cg.to220",
         "bjt.placeholder.npn_power_output.to220",
-        "bjt.st.bd139_16.to126"
+        "bjt.renesas.2sc945a.to92",
+        "bjt.st.2n5551.to92",
+        "bjt.st.2sd882.to126",
+        "bjt.st.bd139_16.to126",
+        "bjt.st.bd241.to220",
+        "bjt.st.bd241c.to220",
+        "bjt.st.bd437.to126",
+        "bjt.toshiba.2sc1815.to92",
+        "bjt.toshiba.2sc3421_y.to126",
+        "bjt.toshiba.2sc5200.to3p",
+        "bjt.toshiba.2sd718.to3p",
+        "bjt.unisonic.s8050.to92",
+        "bjt.unisonic.s9013.to92"
       ]
     },
     {

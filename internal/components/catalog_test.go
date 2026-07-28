@@ -412,6 +412,101 @@ func TestCheckedInCatalogBJTLibraryIdentityIsConsistent(t *testing.T) {
 	}
 }
 
+func TestCheckedInCatalogRequestedNPNExpansion(t *testing.T) {
+	catalog, err := LoadCatalog(context.Background(), LoadOptions{CatalogDir: checkedInCatalogDir(t)})
+	if err != nil {
+		t.Fatalf("load checked-in catalog: %v", err)
+	}
+
+	tests := []struct {
+		query    string
+		id       string
+		mpn      string
+		pkgType  string
+		symbolID string
+		pinOrder []string
+	}{
+		{query: "2N2222", id: "bjt.microchip.2n2222a.to18", mpn: "2N2222A", pkgType: "to18", symbolID: "Transistor_BJT:Q_NPN_EBC", pinOrder: []string{"EMITTER", "BASE", "COLLECTOR"}},
+		{query: "2N3019", id: "bjt.microchip.2n3019.to39", mpn: "2N3019", pkgType: "to39", symbolID: "Transistor_BJT:Q_NPN_EBC", pinOrder: []string{"EMITTER", "BASE", "COLLECTOR"}},
+		{query: "2N3904", id: "bjt.onsemi.2n3904.to92", mpn: "2N3904", pkgType: "to92", symbolID: "Transistor_BJT:2N3904", pinOrder: []string{"EMITTER", "BASE", "COLLECTOR"}},
+		{query: "2N5551", id: "bjt.st.2n5551.to92", mpn: "2N5551", pkgType: "to92", symbolID: "Transistor_BJT:Q_NPN_EBC", pinOrder: []string{"EMITTER", "BASE", "COLLECTOR"}},
+		{query: "2SC3421-Y", id: "bjt.toshiba.2sc3421_y.to126", mpn: "2SC3421-Y", pkgType: "to126", symbolID: "Transistor_BJT:Q_NPN_ECB", pinOrder: []string{"EMITTER", "COLLECTOR", "BASE"}},
+		{query: "2SC5200", id: "bjt.toshiba.2sc5200.to3p", mpn: "2SC5200", pkgType: "to3p", symbolID: "Transistor_BJT:Q_NPN_BCE", pinOrder: []string{"BASE", "COLLECTOR", "EMITTER"}},
+		{query: "2SD718", id: "bjt.toshiba.2sd718.to3p", mpn: "2SD718", pkgType: "to3p", symbolID: "Transistor_BJT:Q_NPN_BCE", pinOrder: []string{"BASE", "COLLECTOR", "EMITTER"}},
+		{query: "2SD882", id: "bjt.st.2sd882.to126", mpn: "2SD882", pkgType: "to126", symbolID: "Transistor_BJT:Q_NPN_ECB", pinOrder: []string{"EMITTER", "COLLECTOR", "BASE"}},
+		{query: "BC109C", id: "bjt.nexperia.bc109c.to18", mpn: "BC109C", pkgType: "to18", symbolID: "Transistor_BJT:BC109", pinOrder: []string{"EMITTER", "BASE", "COLLECTOR"}},
+		{query: "BC337", id: "bjt.diotec.bc337.to92", mpn: "BC337", pkgType: "to92", symbolID: "Transistor_BJT:BC337", pinOrder: []string{"COLLECTOR", "BASE", "EMITTER"}},
+		{query: "BC546BTF", id: "bjt.onsemi.bc546btf.to92", mpn: "BC546BTF", pkgType: "to92", symbolID: "Transistor_BJT:BC546", pinOrder: []string{"COLLECTOR", "BASE", "EMITTER"}},
+		{query: "BC547", id: "bjt.onsemi.bc547bta.to92", mpn: "BC547BTA", pkgType: "to92", symbolID: "Transistor_BJT:BC547", pinOrder: []string{"COLLECTOR", "BASE", "EMITTER"}},
+		{query: "BC548", id: "bjt.onsemi.bc548bta.to92", mpn: "BC548BTA", pkgType: "to92", symbolID: "Transistor_BJT:BC548", pinOrder: []string{"COLLECTOR", "BASE", "EMITTER"}},
+		{query: "BC549", id: "bjt.onsemi.bc549bta.to92", mpn: "BC549BTA", pkgType: "to92", symbolID: "Transistor_BJT:BC549", pinOrder: []string{"COLLECTOR", "BASE", "EMITTER"}},
+		{query: "BC550", id: "bjt.onsemi.bc550bta.to92", mpn: "BC550BTA", pkgType: "to92", symbolID: "Transistor_BJT:BC550", pinOrder: []string{"COLLECTOR", "BASE", "EMITTER"}},
+		{query: "BD139", id: "bjt.st.bd139_16.to126", mpn: "BD139-16", pkgType: "to126", symbolID: "Transistor_BJT:BD139", pinOrder: []string{"EMITTER", "COLLECTOR", "BASE"}},
+		{query: "BD241", id: "bjt.st.bd241.to220", mpn: "BD241", pkgType: "to220", symbolID: "Transistor_BJT:Q_NPN_BCE", pinOrder: []string{"BASE", "COLLECTOR", "EMITTER"}},
+		{query: "BD241C", id: "bjt.st.bd241c.to220", mpn: "BD241C", pkgType: "to220", symbolID: "Transistor_BJT:Q_NPN_BCE", pinOrder: []string{"BASE", "COLLECTOR", "EMITTER"}},
+		{query: "BD437", id: "bjt.st.bd437.to126", mpn: "BD437", pkgType: "to126", symbolID: "Transistor_BJT:BD437", pinOrder: []string{"EMITTER", "COLLECTOR", "BASE"}},
+		{query: "C1815", id: "bjt.toshiba.2sc1815.to92", mpn: "2SC1815", pkgType: "to92", symbolID: "Transistor_BJT:2SC1815", pinOrder: []string{"EMITTER", "COLLECTOR", "BASE"}},
+		{query: "C945", id: "bjt.renesas.2sc945a.to92", mpn: "2SC945A", pkgType: "to92", symbolID: "Transistor_BJT:Q_NPN_ECB", pinOrder: []string{"EMITTER", "COLLECTOR", "BASE"}},
+		{query: "MJE3055T", id: "bjt.onsemi.mje3055tg.to220", mpn: "MJE3055TG", pkgType: "to220", symbolID: "Transistor_BJT:Q_NPN_BCE", pinOrder: []string{"BASE", "COLLECTOR", "EMITTER"}},
+		{query: "MJL4281A", id: "bjt.onsemi.mjl4281ag.to264", mpn: "MJL4281AG", pkgType: "to264", symbolID: "Transistor_BJT:Q_NPN_BCE", pinOrder: []string{"BASE", "COLLECTOR", "EMITTER"}},
+		{query: "S8050", id: "bjt.unisonic.s8050.to92", mpn: "S8050", pkgType: "to92", symbolID: "Transistor_BJT:S8050", pinOrder: []string{"EMITTER", "BASE", "COLLECTOR"}},
+		{query: "S9013", id: "bjt.unisonic.s9013.to92", mpn: "S9013", pkgType: "to92", symbolID: "Transistor_BJT:Q_NPN_EBC", pinOrder: []string{"EMITTER", "BASE", "COLLECTOR"}},
+		{query: "TIP31C", id: "bjt.onsemi.tip31cg.to220", mpn: "TIP31CG", pkgType: "to220", symbolID: "Transistor_BJT:Q_NPN_BCE", pinOrder: []string{"BASE", "COLLECTOR", "EMITTER"}},
+		{query: "TIP41C", id: "bjt.onsemi.tip41cg.to220", mpn: "TIP41CG", pkgType: "to220", symbolID: "Transistor_BJT:TIP41C", pinOrder: []string{"BASE", "COLLECTOR", "EMITTER"}},
+	}
+	if len(tests) != 27 {
+		t.Fatalf("requested NPN coverage = %d, want 27", len(tests))
+	}
+
+	for _, test := range tests {
+		record := requireCatalogRecord(t, catalog, test.id)
+		if record.MPN != test.mpn || record.Generic || record.Verification.Confidence != ConfidenceVerified {
+			t.Fatalf("%s identity = MPN:%q generic:%v verification:%#v", test.query, record.MPN, record.Generic, record.Verification)
+		}
+		if record.PowerSemiconductor == nil || record.PowerSemiconductor.DeviceClass != "bjt" ||
+			record.PowerSemiconductor.Polarity != "npn" || record.PowerSemiconductor.FabricationProof {
+			t.Fatalf("%s power evidence = %#v", test.query, record.PowerSemiconductor)
+		}
+		if len(record.Symbols) != 1 || record.Symbols[0].SymbolID != test.symbolID {
+			t.Fatalf("%s symbol binding = %#v", test.query, record.Symbols)
+		}
+		if len(record.Packages) != 1 || record.Packages[0].PackageType != test.pkgType {
+			t.Fatalf("%s package binding = %#v", test.query, record.Packages)
+		}
+		ratingKinds := make(map[string]struct{}, len(record.Ratings))
+		for _, rating := range record.Ratings {
+			ratingKinds[rating.Kind] = struct{}{}
+		}
+		if _, ok := ratingKinds["power_dissipation"]; !ok {
+			t.Fatalf("%s ratings lack normalized power_dissipation key: %#v", test.query, record.Ratings)
+		}
+		symbolPins := make(map[string]string, len(record.Symbols[0].FunctionPins))
+		for _, pin := range record.Symbols[0].FunctionPins {
+			symbolPins[pin.SymbolPin] = pin.Function
+		}
+		packagePads := make(map[string]string, len(record.Packages[0].PadFunctions))
+		for _, pad := range record.Packages[0].PadFunctions {
+			packagePads[pad.Pad] = pad.Function
+		}
+		for index, function := range test.pinOrder {
+			number := string(rune('1' + index))
+			if symbolPins[number] != function || packagePads[number] != function {
+				t.Fatalf("%s pin %s = symbol:%q pad:%q, want %q", test.query, number, symbolPins[number], packagePads[number], function)
+			}
+		}
+
+		selection, result := Select(context.Background(), catalog, SelectionRequest{
+			Query:             Query{Text: test.query, Family: "bjt", Package: test.pkgType},
+			Acceptance:        AcceptanceConnectivity,
+			RequiredFunctions: []string{"BASE", "COLLECTOR", "EMITTER"},
+			RequireConcrete:   true,
+		})
+		if !result.OK || selection.Component.ID != test.id {
+			t.Fatalf("select %s = component:%q issues:%#v", test.query, selection.Component.ID, result.Issues)
+		}
+	}
+}
+
 func TestCheckedInCatalogAudioPowerSemiconductorEvidence(t *testing.T) {
 	catalog, err := LoadCatalog(context.Background(), LoadOptions{CatalogDir: checkedInCatalogDir(t)})
 	if err != nil {

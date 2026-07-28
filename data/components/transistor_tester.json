@@ -480,6 +480,7 @@
         {"kind": "collector_emitter_voltage", "max": "80", "unit": "V"},
         {"kind": "collector_current", "max": "1.5", "unit": "A"},
         {"kind": "collector_peak_current", "max": "3", "unit": "A"},
+        {"kind": "power_dissipation", "max": "12.5", "unit": "W"},
         {"kind": "power_dissipation_case_25c", "max": "12.5", "unit": "W"},
         {"kind": "power_dissipation_ambient_25c", "max": "1.25", "unit": "W"}
       ],

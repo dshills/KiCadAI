@@ -16,14 +16,13 @@ type providerCapability struct {
 }
 
 type providerCapabilityComponent struct {
-	ID           string                       `json:"id"`
-	Family       string                       `json:"family"`
-	Manufacturer string                       `json:"manufacturer,omitempty"`
-	MPN          string                       `json:"mpn,omitempty"`
-	Values       []components.ValueConstraint `json:"values,omitempty"`
-	Variants     []providerCapabilityVariant  `json:"variants"`
-	Functions    []string                     `json:"functions"`
-	Units        []providerCapabilityUnit     `json:"units,omitempty"`
+	ID        string                       `json:"id"`
+	Family    string                       `json:"family"`
+	MPN       string                       `json:"mpn,omitempty"`
+	Values    []components.ValueConstraint `json:"values,omitempty"`
+	Variants  []providerCapabilityVariant  `json:"variants"`
+	Functions []string                     `json:"functions"`
+	Units     []providerCapabilityUnit     `json:"units,omitempty"`
 }
 
 type providerCapabilityUnit struct {
@@ -61,7 +60,7 @@ func ProviderCapabilityContext(catalog *components.Catalog, maxBytes int) (strin
 	records := append([]components.ComponentRecord(nil), catalog.Records...)
 	sort.SliceStable(records, func(i, j int) bool { return records[i].ID < records[j].ID })
 	for _, record := range records {
-		entry := providerCapabilityComponent{ID: record.ID, Family: record.Family, Manufacturer: record.Manufacturer, MPN: record.MPN, Values: append([]components.ValueConstraint(nil), record.Values...)}
+		entry := providerCapabilityComponent{ID: record.ID, Family: record.Family, MPN: record.MPN, Values: append([]components.ValueConstraint(nil), record.Values...)}
 		functionSet := map[string]struct{}{}
 		unitFunctionSets := map[string]map[string]struct{}{}
 		unitsByID := map[string]providerCapabilityUnit{}

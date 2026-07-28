@@ -5,7 +5,7 @@
   "name": "TI LMV321 single op-amp SOT-23-5",
   "footprint_id": "Package_TO_SOT_SMD:SOT-23-5",
   "confidence": "verified",
-  "score": 530,
+  "score": 570,
   "reasons": [
     "family",
     "package"
