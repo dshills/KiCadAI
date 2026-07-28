@@ -1,6 +1,7 @@
 package circuitgraph
 
 import (
+	"encoding/json"
 	"strings"
 	"testing"
 
@@ -49,6 +50,32 @@ func TestProviderCapabilityContextIncludesNamedUnitFunctions(t *testing.T) {
 	for _, want := range []string{`"units":[{"id":"A","type":"functional","required":true`, `"functions":["IN_MINUS","IN_PLUS","OUT","V_MINUS","V_PLUS"]`} {
 		if !strings.Contains(capability, want) {
 			t.Fatalf("capability missing %s: %s", want, capability)
+		}
+	}
+}
+
+func TestProviderCapabilityContextElidesDerivableFamilies(t *testing.T) {
+	catalog := loadGraphCatalog(t)
+	capabilityJSON, err := ProviderCapabilityContext(catalog, 64<<10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var capability providerCapability
+	if err := json.Unmarshal([]byte(capabilityJSON), &capability); err != nil {
+		t.Fatal(err)
+	}
+	recordsByID := make(map[string]components.ComponentRecord, len(catalog.Records))
+	for _, record := range catalog.Records {
+		recordsByID[record.ID] = record
+	}
+	for _, component := range capability.Components {
+		record := recordsByID[component.ID]
+		idFamily, _, _ := strings.Cut(record.ID, ".")
+		if idFamily == record.Family && component.Family != "" {
+			t.Fatalf("component %q repeats derivable family %q", component.ID, component.Family)
+		}
+		if idFamily != record.Family && component.Family != record.Family {
+			t.Fatalf("component %q family = %q, want non-derivable family %q", component.ID, component.Family, record.Family)
 		}
 	}
 }

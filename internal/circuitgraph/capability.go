@@ -17,7 +17,7 @@ type providerCapability struct {
 
 type providerCapabilityComponent struct {
 	ID        string                       `json:"id"`
-	Family    string                       `json:"family"`
+	Family    string                       `json:"family,omitempty"`
 	MPN       string                       `json:"mpn,omitempty"`
 	Values    []components.ValueConstraint `json:"values,omitempty"`
 	Variants  []providerCapabilityVariant  `json:"variants"`
@@ -28,7 +28,7 @@ type providerCapabilityComponent struct {
 type providerCapabilityUnit struct {
 	ID        string                    `json:"id"`
 	Type      components.SymbolUnitType `json:"type"`
-	Required  bool                      `json:"required"`
+	Required  bool                      `json:"required,omitempty"`
 	Functions []string                  `json:"functions"`
 }
 
@@ -45,6 +45,7 @@ func ProviderCapabilityContext(catalog *components.Catalog, maxBytes int) (strin
 		Schema: ProviderProfileID,
 		Rules: []string{
 			"Use only listed component IDs and variant IDs, or constrained catalog queries.",
+			"When family is omitted, use the component ID prefix before the first period.",
 			"Use listed logical functions or verified symbol pins for net endpoints.",
 			"For components with listed units, declare the used units on the component and qualify every endpoint with its unit ID.",
 			"Put nominal resistance, capacitance, frequency, and similar design values in component value or query; do not repeat them as required ratings.",
@@ -57,10 +58,17 @@ func ProviderCapabilityContext(catalog *components.Catalog, maxBytes int) (strin
 			"Prefer bounded PCB regions for left-to-right placement; do not use hard PCB edge constraints unless the prompt explicitly requires an edge-mounted part.",
 		},
 	}
-	records := append([]components.ComponentRecord(nil), catalog.Records...)
-	sort.SliceStable(records, func(i, j int) bool { return records[i].ID < records[j].ID })
+	records := make([]*components.ComponentRecord, len(catalog.Records))
+	for index := range catalog.Records {
+		records[index] = &catalog.Records[index]
+	}
+	sort.Slice(records, func(i, j int) bool { return records[i].ID < records[j].ID })
 	for _, record := range records {
-		entry := providerCapabilityComponent{ID: record.ID, Family: record.Family, MPN: record.MPN, Values: append([]components.ValueConstraint(nil), record.Values...)}
+		entry := providerCapabilityComponent{ID: record.ID, MPN: record.MPN, Values: append([]components.ValueConstraint(nil), record.Values...)}
+		idFamily, _, _ := strings.Cut(record.ID, ".")
+		if idFamily != record.Family {
+			entry.Family = record.Family
+		}
 		functionSet := map[string]struct{}{}
 		unitFunctionSets := map[string]map[string]struct{}{}
 		unitsByID := map[string]providerCapabilityUnit{}

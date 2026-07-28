@@ -1,0 +1,2966 @@
+{
+  "version": "0.1.0",
+  "records": [
+    {
+      "id": "bjt.unisonic.s9012.to92",
+      "family": "bjt",
+      "name": "Unisonic S9012 PNP audio transistor",
+      "description": "PNP small-signal output transistor for low-power class-B audio stages, complementary to S9013.",
+      "generic": false,
+      "manufacturer": "Unisonic Technologies",
+      "mpn": "S9012",
+      "lifecycle": "unknown",
+      "tags": [
+        "s9012",
+        "9012",
+        "audio",
+        "small_signal",
+        "bjt",
+        "pnp",
+        "through_hole",
+        "to92"
+      ],
+      "ratings": [
+        {
+          "kind": "collector_emitter_voltage",
+          "max": "25",
+          "unit": "V"
+        },
+        {
+          "kind": "collector_current",
+          "max": "0.5",
+          "unit": "A"
+        },
+        {
+          "kind": "power_dissipation",
+          "max": "0.625",
+          "unit": "W"
+        }
+      ],
+      "power_semiconductor_evidence": {
+        "device_class": "bjt",
+        "polarity": "pnp",
+        "complementary_group": "unisonic_s9012_s9013",
+        "max_voltage": {
+          "value": 25,
+          "unit": "V",
+          "conditions": "VCEO absolute maximum"
+        },
+        "continuous_current": {
+          "value": 0.5,
+          "unit": "A",
+          "conditions": "absolute maximum collector current"
+        },
+        "power_dissipation": {
+          "value": 0.625,
+          "unit": "W",
+          "temperature_c": 25,
+          "conditions": "ambient-temperature rating"
+        },
+        "max_junction_temperature_c": 150,
+        "secondary_breakdown_status": "review_required",
+        "linear_mode_status": "review_required",
+        "bjt": {},
+        "fabrication_proof": false,
+        "review_note": "Identity, lead order, and headline limits are verified; applied SOA and thermal assembly remain fabrication gates."
+      },
+      "symbols": [
+        {
+          "symbol_id": "Transistor_BJT:Q_PNP_EBC",
+          "function_pins": [
+            {
+              "function": "EMITTER",
+              "symbol_pin": "1",
+              "required": true
+            },
+            {
+              "function": "BASE",
+              "symbol_pin": "2",
+              "required": true
+            },
+            {
+              "function": "COLLECTOR",
+              "symbol_pin": "3",
+              "required": true
+            }
+          ],
+          "pinmap_id": "Transistor_BJT:Q_PNP_EBC|Package_TO_SOT_THT:TO-92_Inline",
+          "verification": {
+            "confidence": "verified",
+            "sources": [
+              "https://www.unisonic.com.tw/uploadfiles/836/part_no_pdf/9012.pdf",
+              "kicad-symbols:Transistor_BJT:Q_PNP_EBC"
+            ],
+            "pinmap_checked": true
+          }
+        }
+      ],
+      "packages": [
+        {
+          "id": "to92",
+          "name": "TO-92 inline",
+          "footprint_id": "Package_TO_SOT_THT:TO-92_Inline",
+          "package_type": "to92",
+          "mpn": "S9012",
+          "lifecycle": "unknown",
+          "pinmap_id": "Transistor_BJT:Q_PNP_EBC|Package_TO_SOT_THT:TO-92_Inline",
+          "pad_functions": [
+            {
+              "function": "EMITTER",
+              "pad": "1"
+            },
+            {
+              "function": "BASE",
+              "pad": "2"
+            },
+            {
+              "function": "COLLECTOR",
+              "pad": "3"
+            }
+          ],
+          "verification": {
+            "confidence": "verified",
+            "sources": [
+              "https://www.unisonic.com.tw/uploadfiles/836/part_no_pdf/9012.pdf",
+              "kicad-footprint:Package_TO_SOT_THT:TO-92_Inline"
+            ],
+            "pinmap_checked": true
+          }
+        }
+      ],
+      "verification": {
+        "confidence": "verified",
+        "sources": [
+          "https://www.unisonic.com.tw/uploadfiles/836/part_no_pdf/9012.pdf",
+          "kicad-symbols:Transistor_BJT:Q_PNP_EBC",
+          "kicad-footprint:Package_TO_SOT_THT:TO-92_Inline"
+        ],
+        "resolver_checked": true,
+        "pinmap_checked": true,
+        "tests": [
+          "catalog_requested_pnp_expansion"
+        ]
+      }
+    },
+    {
+      "id": "bjt.onsemi.ss8550dta.to92",
+      "family": "bjt",
+      "name": "onsemi SS8550DTA PNP output transistor",
+      "description": "Active SS8550-family 1.5 A PNP transistor for low-voltage switching and complementary audio output service.",
+      "generic": false,
+      "manufacturer": "onsemi",
+      "mpn": "SS8550DTA",
+      "lifecycle": "active",
+      "tags": [
+        "ss8550",
+        "ss8550dta",
+        "audio",
+        "switching",
+        "bjt",
+        "pnp",
+        "through_hole",
+        "to92"
+      ],
+      "ratings": [
+        {
+          "kind": "collector_emitter_voltage",
+          "max": "25",
+          "unit": "V"
+        },
+        {
+          "kind": "collector_current",
+          "max": "1.5",
+          "unit": "A"
+        },
+        {
+          "kind": "power_dissipation",
+          "max": "1",
+          "unit": "W"
+        }
+      ],
+      "power_semiconductor_evidence": {
+        "device_class": "bjt",
+        "polarity": "pnp",
+        "complementary_group": "onsemi_ss8050_ss8550",
+        "max_voltage": {
+          "value": 25,
+          "unit": "V",
+          "conditions": "VCEO absolute maximum"
+        },
+        "continuous_current": {
+          "value": 1.5,
+          "unit": "A",
+          "conditions": "absolute maximum collector current"
+        },
+        "power_dissipation": {
+          "value": 1,
+          "unit": "W",
+          "temperature_c": 25,
+          "conditions": "ambient-temperature rating"
+        },
+        "max_junction_temperature_c": 150,
+        "secondary_breakdown_status": "review_required",
+        "linear_mode_status": "review_required",
+        "bjt": {},
+        "fabrication_proof": false,
+        "review_note": "Identity, lead order, and headline limits are verified; applied SOA and thermal assembly remain fabrication gates."
+      },
+      "symbols": [
+        {
+          "symbol_id": "Transistor_BJT:Q_PNP_EBC",
+          "function_pins": [
+            {
+              "function": "EMITTER",
+              "symbol_pin": "1",
+              "required": true
+            },
+            {
+              "function": "BASE",
+              "symbol_pin": "2",
+              "required": true
+            },
+            {
+              "function": "COLLECTOR",
+              "symbol_pin": "3",
+              "required": true
+            }
+          ],
+          "pinmap_id": "Transistor_BJT:Q_PNP_EBC|Package_TO_SOT_THT:TO-92_Inline",
+          "verification": {
+            "confidence": "verified",
+            "sources": [
+              "https://www.onsemi.com/pdf/datasheet/ss8550-d.pdf",
+              "kicad-symbols:Transistor_BJT:Q_PNP_EBC"
+            ],
+            "pinmap_checked": true
+          }
+        }
+      ],
+      "packages": [
+        {
+          "id": "to92",
+          "name": "TO-92 inline",
+          "footprint_id": "Package_TO_SOT_THT:TO-92_Inline",
+          "package_type": "to92",
+          "mpn": "SS8550DTA",
+          "lifecycle": "active",
+          "pinmap_id": "Transistor_BJT:Q_PNP_EBC|Package_TO_SOT_THT:TO-92_Inline",
+          "pad_functions": [
+            {
+              "function": "EMITTER",
+              "pad": "1"
+            },
+            {
+              "function": "BASE",
+              "pad": "2"
+            },
+            {
+              "function": "COLLECTOR",
+              "pad": "3"
+            }
+          ],
+          "verification": {
+            "confidence": "verified",
+            "sources": [
+              "https://www.onsemi.com/pdf/datasheet/ss8550-d.pdf",
+              "kicad-footprint:Package_TO_SOT_THT:TO-92_Inline"
+            ],
+            "pinmap_checked": true
+          }
+        }
+      ],
+      "verification": {
+        "confidence": "verified",
+        "sources": [
+          "https://www.onsemi.com/pdf/datasheet/ss8550-d.pdf",
+          "kicad-symbols:Transistor_BJT:Q_PNP_EBC",
+          "kicad-footprint:Package_TO_SOT_THT:TO-92_Inline"
+        ],
+        "resolver_checked": true,
+        "pinmap_checked": true,
+        "tests": [
+          "catalog_requested_pnp_expansion"
+        ]
+      }
+    },
+    {
+      "id": "bjt.diotec.bc558.to92",
+      "family": "bjt",
+      "name": "Diotec BC558 PNP general-purpose transistor",
+      "description": "Active BC558 family PNP transistor for low-voltage amplification and switching.",
+      "generic": false,
+      "manufacturer": "Diotec Semiconductor",
+      "mpn": "BC558",
+      "lifecycle": "active",
+      "tags": [
+        "bc558",
+        "small_signal",
+        "amplifier",
+        "bjt",
+        "pnp",
+        "through_hole",
+        "to92"
+      ],
+      "ratings": [
+        {
+          "kind": "collector_emitter_voltage",
+          "max": "30",
+          "unit": "V"
+        },
+        {
+          "kind": "collector_current",
+          "max": "0.1",
+          "unit": "A"
+        },
+        {
+          "kind": "power_dissipation",
+          "max": "0.5",
+          "unit": "W"
+        }
+      ],
+      "power_semiconductor_evidence": {
+        "device_class": "bjt",
+        "polarity": "pnp",
+        "max_voltage": {
+          "value": 30,
+          "unit": "V",
+          "conditions": "VCEO absolute maximum"
+        },
+        "continuous_current": {
+          "value": 0.1,
+          "unit": "A",
+          "conditions": "absolute maximum collector current"
+        },
+        "power_dissipation": {
+          "value": 0.5,
+          "unit": "W",
+          "temperature_c": 25,
+          "conditions": "ambient-temperature rating"
+        },
+        "max_junction_temperature_c": 150,
+        "secondary_breakdown_status": "review_required",
+        "linear_mode_status": "review_required",
+        "bjt": {},
+        "fabrication_proof": false,
+        "review_note": "Identity, lead order, and headline limits are verified; applied SOA and thermal assembly remain fabrication gates."
+      },
+      "symbols": [
+        {
+          "symbol_id": "Transistor_BJT:BC558",
+          "function_pins": [
+            {
+              "function": "COLLECTOR",
+              "symbol_pin": "1",
+              "required": true
+            },
+            {
+              "function": "BASE",
+              "symbol_pin": "2",
+              "required": true
+            },
+            {
+              "function": "EMITTER",
+              "symbol_pin": "3",
+              "required": true
+            }
+          ],
+          "pinmap_id": "Transistor_BJT:BC558|Package_TO_SOT_THT:TO-92_Inline",
+          "verification": {
+            "confidence": "verified",
+            "sources": [
+              "https://diotec.com/tl_files/diotec/files/pdf/datasheets/bc556.pdf",
+              "kicad-symbols:Transistor_BJT:BC558"
+            ],
+            "pinmap_checked": true
+          }
+        }
+      ],
+      "packages": [
+        {
+          "id": "to92",
+          "name": "TO-92 inline",
+          "footprint_id": "Package_TO_SOT_THT:TO-92_Inline",
+          "package_type": "to92",
+          "mpn": "BC558",
+          "lifecycle": "active",
+          "pinmap_id": "Transistor_BJT:BC558|Package_TO_SOT_THT:TO-92_Inline",
+          "pad_functions": [
+            {
+              "function": "COLLECTOR",
+              "pad": "1"
+            },
+            {
+              "function": "BASE",
+              "pad": "2"
+            },
+            {
+              "function": "EMITTER",
+              "pad": "3"
+            }
+          ],
+          "verification": {
+            "confidence": "verified",
+            "sources": [
+              "https://diotec.com/tl_files/diotec/files/pdf/datasheets/bc556.pdf",
+              "kicad-footprint:Package_TO_SOT_THT:TO-92_Inline"
+            ],
+            "pinmap_checked": true
+          }
+        }
+      ],
+      "verification": {
+        "confidence": "verified",
+        "sources": [
+          "https://diotec.com/tl_files/diotec/files/pdf/datasheets/bc556.pdf",
+          "kicad-symbols:Transistor_BJT:BC558",
+          "kicad-footprint:Package_TO_SOT_THT:TO-92_Inline"
+        ],
+        "resolver_checked": true,
+        "pinmap_checked": true,
+        "tests": [
+          "catalog_requested_pnp_expansion"
+        ]
+      }
+    },
+    {
+      "id": "bjt.onsemi.ksb772.to126",
+      "family": "bjt",
+      "name": "onsemi KSB772 PNP power transistor",
+      "description": "Legacy 3 A PNP transistor in TO-126 for low-voltage driver and output stages.",
+      "generic": false,
+      "manufacturer": "onsemi",
+      "mpn": "KSB772",
+      "lifecycle": "obsolete",
+      "tags": [
+        "ksb772",
+        "driver",
+        "power",
+        "bjt",
+        "pnp",
+        "through_hole",
+        "to126"
+      ],
+      "ratings": [
+        {
+          "kind": "collector_emitter_voltage",
+          "max": "30",
+          "unit": "V"
+        },
+        {
+          "kind": "collector_current",
+          "max": "3",
+          "unit": "A"
+        },
+        {
+          "kind": "power_dissipation",
+          "max": "10",
+          "unit": "W"
+        }
+      ],
+      "power_semiconductor_evidence": {
+        "device_class": "bjt",
+        "polarity": "pnp",
+        "max_voltage": {
+          "value": 30,
+          "unit": "V",
+          "conditions": "VCEO absolute maximum"
+        },
+        "continuous_current": {
+          "value": 3,
+          "unit": "A",
+          "conditions": "absolute maximum collector current"
+        },
+        "power_dissipation": {
+          "value": 10,
+          "unit": "W",
+          "temperature_c": 25,
+          "conditions": "case-temperature rating"
+        },
+        "max_junction_temperature_c": 150,
+        "secondary_breakdown_status": "review_required",
+        "linear_mode_status": "review_required",
+        "bjt": {},
+        "fabrication_proof": false,
+        "review_note": "Legacy identity and lead order are modeled for reproduction; source authentication, applied SOA, and thermal design remain mandatory."
+      },
+      "symbols": [
+        {
+          "symbol_id": "Transistor_BJT:Q_PNP_ECB",
+          "function_pins": [
+            {
+              "function": "EMITTER",
+              "symbol_pin": "1",
+              "required": true
+            },
+            {
+              "function": "COLLECTOR",
+              "symbol_pin": "2",
+              "required": true
+            },
+            {
+              "function": "BASE",
+              "symbol_pin": "3",
+              "required": true
+            }
+          ],
+          "pinmap_id": "Transistor_BJT:Q_PNP_ECB|Package_TO_SOT_THT:TO-126-3_Vertical",
+          "verification": {
+            "confidence": "verified",
+            "sources": [
+              "https://www.onsemi.com/download/data-sheet/pdf/ksb772-d.pdf",
+              "kicad-symbols:Transistor_BJT:Q_PNP_ECB"
+            ],
+            "pinmap_checked": true
+          }
+        }
+      ],
+      "packages": [
+        {
+          "id": "to126",
+          "name": "TO-126 vertical",
+          "footprint_id": "Package_TO_SOT_THT:TO-126-3_Vertical",
+          "package_type": "to126",
+          "mpn": "KSB772",
+          "lifecycle": "obsolete",
+          "pinmap_id": "Transistor_BJT:Q_PNP_ECB|Package_TO_SOT_THT:TO-126-3_Vertical",
+          "pad_functions": [
+            {
+              "function": "EMITTER",
+              "pad": "1"
+            },
+            {
+              "function": "COLLECTOR",
+              "pad": "2"
+            },
+            {
+              "function": "BASE",
+              "pad": "3"
+            }
+          ],
+          "verification": {
+            "confidence": "verified",
+            "sources": [
+              "https://www.onsemi.com/download/data-sheet/pdf/ksb772-d.pdf",
+              "kicad-footprint:Package_TO_SOT_THT:TO-126-3_Vertical"
+            ],
+            "pinmap_checked": true
+          }
+        }
+      ],
+      "verification": {
+        "confidence": "verified",
+        "sources": [
+          "https://www.onsemi.com/download/data-sheet/pdf/ksb772-d.pdf",
+          "kicad-symbols:Transistor_BJT:Q_PNP_ECB",
+          "kicad-footprint:Package_TO_SOT_THT:TO-126-3_Vertical"
+        ],
+        "resolver_checked": true,
+        "pinmap_checked": true,
+        "tests": [
+          "catalog_requested_pnp_expansion"
+        ]
+      }
+    },
+    {
+      "id": "bjt.onsemi.2n3906.to92",
+      "family": "bjt",
+      "name": "onsemi 2N3906 PNP general-purpose transistor",
+      "description": "Active 2N3906 PNP transistor for small-signal amplification and switching.",
+      "generic": false,
+      "manufacturer": "onsemi",
+      "mpn": "2N3906",
+      "lifecycle": "active",
+      "tags": [
+        "2n3906",
+        "small_signal",
+        "amplifier",
+        "switching",
+        "bjt",
+        "pnp",
+        "through_hole",
+        "to92"
+      ],
+      "ratings": [
+        {
+          "kind": "collector_emitter_voltage",
+          "max": "40",
+          "unit": "V"
+        },
+        {
+          "kind": "collector_current",
+          "max": "0.2",
+          "unit": "A"
+        },
+        {
+          "kind": "power_dissipation",
+          "max": "0.625",
+          "unit": "W"
+        }
+      ],
+      "power_semiconductor_evidence": {
+        "device_class": "bjt",
+        "polarity": "pnp",
+        "complementary_group": "onsemi_2n3904_2n3906",
+        "max_voltage": {
+          "value": 40,
+          "unit": "V",
+          "conditions": "VCEO absolute maximum"
+        },
+        "continuous_current": {
+          "value": 0.2,
+          "unit": "A",
+          "conditions": "absolute maximum collector current"
+        },
+        "power_dissipation": {
+          "value": 0.625,
+          "unit": "W",
+          "temperature_c": 25,
+          "conditions": "ambient-temperature rating"
+        },
+        "max_junction_temperature_c": 150,
+        "secondary_breakdown_status": "review_required",
+        "linear_mode_status": "review_required",
+        "bjt": {},
+        "fabrication_proof": false,
+        "review_note": "Identity, lead order, and headline limits are verified; applied SOA and thermal assembly remain fabrication gates."
+      },
+      "symbols": [
+        {
+          "symbol_id": "Transistor_BJT:2N3906",
+          "function_pins": [
+            {
+              "function": "EMITTER",
+              "symbol_pin": "1",
+              "required": true
+            },
+            {
+              "function": "BASE",
+              "symbol_pin": "2",
+              "required": true
+            },
+            {
+              "function": "COLLECTOR",
+              "symbol_pin": "3",
+              "required": true
+            }
+          ],
+          "pinmap_id": "Transistor_BJT:2N3906|Package_TO_SOT_THT:TO-92_Inline",
+          "verification": {
+            "confidence": "verified",
+            "sources": [
+              "https://www.onsemi.com/download/data-sheet/pdf/2n3906-d.pdf",
+              "kicad-symbols:Transistor_BJT:2N3906"
+            ],
+            "pinmap_checked": true
+          }
+        }
+      ],
+      "packages": [
+        {
+          "id": "to92",
+          "name": "TO-92 inline",
+          "footprint_id": "Package_TO_SOT_THT:TO-92_Inline",
+          "package_type": "to92",
+          "mpn": "2N3906",
+          "lifecycle": "active",
+          "pinmap_id": "Transistor_BJT:2N3906|Package_TO_SOT_THT:TO-92_Inline",
+          "pad_functions": [
+            {
+              "function": "EMITTER",
+              "pad": "1"
+            },
+            {
+              "function": "BASE",
+              "pad": "2"
+            },
+            {
+              "function": "COLLECTOR",
+              "pad": "3"
+            }
+          ],
+          "verification": {
+            "confidence": "verified",
+            "sources": [
+              "https://www.onsemi.com/download/data-sheet/pdf/2n3906-d.pdf",
+              "kicad-footprint:Package_TO_SOT_THT:TO-92_Inline"
+            ],
+            "pinmap_checked": true
+          }
+        }
+      ],
+      "verification": {
+        "confidence": "verified",
+        "sources": [
+          "https://www.onsemi.com/download/data-sheet/pdf/2n3906-d.pdf",
+          "kicad-symbols:Transistor_BJT:2N3906",
+          "kicad-footprint:Package_TO_SOT_THT:TO-92_Inline"
+        ],
+        "resolver_checked": true,
+        "pinmap_checked": true,
+        "tests": [
+          "catalog_requested_pnp_expansion"
+        ]
+      }
+    },
+    {
+      "id": "bjt.diotec.bc327.to92",
+      "family": "bjt",
+      "name": "Diotec BC327 PNP transistor",
+      "description": "Active 800 mA PNP transistor for general-purpose switching, amplification, and driver stages.",
+      "generic": false,
+      "manufacturer": "Diotec Semiconductor",
+      "mpn": "BC327",
+      "lifecycle": "active",
+      "tags": [
+        "bc327",
+        "driver",
+        "small_signal",
+        "bjt",
+        "pnp",
+        "through_hole",
+        "to92"
+      ],
+      "ratings": [
+        {
+          "kind": "collector_emitter_voltage",
+          "max": "45",
+          "unit": "V"
+        },
+        {
+          "kind": "collector_current",
+          "max": "0.8",
+          "unit": "A"
+        },
+        {
+          "kind": "power_dissipation",
+          "max": "0.625",
+          "unit": "W"
+        }
+      ],
+      "power_semiconductor_evidence": {
+        "device_class": "bjt",
+        "polarity": "pnp",
+        "complementary_group": "diotec_bc337_bc327",
+        "max_voltage": {
+          "value": 45,
+          "unit": "V",
+          "conditions": "VCEO absolute maximum"
+        },
+        "continuous_current": {
+          "value": 0.8,
+          "unit": "A",
+          "conditions": "absolute maximum collector current"
+        },
+        "power_dissipation": {
+          "value": 0.625,
+          "unit": "W",
+          "temperature_c": 25,
+          "conditions": "ambient-temperature rating"
+        },
+        "max_junction_temperature_c": 150,
+        "secondary_breakdown_status": "review_required",
+        "linear_mode_status": "review_required",
+        "bjt": {},
+        "fabrication_proof": false,
+        "review_note": "Identity, lead order, and headline limits are verified; applied SOA and thermal assembly remain fabrication gates."
+      },
+      "symbols": [
+        {
+          "symbol_id": "Transistor_BJT:BC327",
+          "function_pins": [
+            {
+              "function": "COLLECTOR",
+              "symbol_pin": "1",
+              "required": true
+            },
+            {
+              "function": "BASE",
+              "symbol_pin": "2",
+              "required": true
+            },
+            {
+              "function": "EMITTER",
+              "symbol_pin": "3",
+              "required": true
+            }
+          ],
+          "pinmap_id": "Transistor_BJT:BC327|Package_TO_SOT_THT:TO-92_Inline",
+          "verification": {
+            "confidence": "verified",
+            "sources": [
+              "https://diotec.com/tl_files/diotec/files/pdf/datasheets/bc327.pdf",
+              "kicad-symbols:Transistor_BJT:BC327"
+            ],
+            "pinmap_checked": true
+          }
+        }
+      ],
+      "packages": [
+        {
+          "id": "to92",
+          "name": "TO-92 inline",
+          "footprint_id": "Package_TO_SOT_THT:TO-92_Inline",
+          "package_type": "to92",
+          "mpn": "BC327",
+          "lifecycle": "active",
+          "pinmap_id": "Transistor_BJT:BC327|Package_TO_SOT_THT:TO-92_Inline",
+          "pad_functions": [
+            {
+              "function": "COLLECTOR",
+              "pad": "1"
+            },
+            {
+              "function": "BASE",
+              "pad": "2"
+            },
+            {
+              "function": "EMITTER",
+              "pad": "3"
+            }
+          ],
+          "verification": {
+            "confidence": "verified",
+            "sources": [
+              "https://diotec.com/tl_files/diotec/files/pdf/datasheets/bc327.pdf",
+              "kicad-footprint:Package_TO_SOT_THT:TO-92_Inline"
+            ],
+            "pinmap_checked": true
+          }
+        }
+      ],
+      "verification": {
+        "confidence": "verified",
+        "sources": [
+          "https://diotec.com/tl_files/diotec/files/pdf/datasheets/bc327.pdf",
+          "kicad-symbols:Transistor_BJT:BC327",
+          "kicad-footprint:Package_TO_SOT_THT:TO-92_Inline"
+        ],
+        "resolver_checked": true,
+        "pinmap_checked": true,
+        "tests": [
+          "catalog_requested_pnp_expansion"
+        ]
+      }
+    },
+    {
+      "id": "bjt.onsemi.bc557bta.to92",
+      "family": "bjt",
+      "name": "onsemi BC557BTA / BC557 PNP transistor",
+      "description": "Active B-gain BC557 implementation for general-purpose low-noise amplification and switching.",
+      "generic": false,
+      "manufacturer": "onsemi",
+      "mpn": "BC557BTA",
+      "lifecycle": "active",
+      "tags": [
+        "bc557",
+        "bc557bta",
+        "small_signal",
+        "amplifier",
+        "bjt",
+        "pnp",
+        "through_hole",
+        "to92"
+      ],
+      "ratings": [
+        {
+          "kind": "collector_emitter_voltage",
+          "max": "45",
+          "unit": "V"
+        },
+        {
+          "kind": "collector_current",
+          "max": "0.1",
+          "unit": "A"
+        },
+        {
+          "kind": "power_dissipation",
+          "max": "0.5",
+          "unit": "W"
+        }
+      ],
+      "power_semiconductor_evidence": {
+        "device_class": "bjt",
+        "polarity": "pnp",
+        "max_voltage": {
+          "value": 45,
+          "unit": "V",
+          "conditions": "VCEO absolute maximum"
+        },
+        "continuous_current": {
+          "value": 0.1,
+          "unit": "A",
+          "conditions": "absolute maximum collector current"
+        },
+        "power_dissipation": {
+          "value": 0.5,
+          "unit": "W",
+          "temperature_c": 25,
+          "conditions": "ambient-temperature rating"
+        },
+        "max_junction_temperature_c": 150,
+        "secondary_breakdown_status": "review_required",
+        "linear_mode_status": "review_required",
+        "bjt": {},
+        "fabrication_proof": false,
+        "review_note": "Identity, lead order, and headline limits are verified; applied SOA and thermal assembly remain fabrication gates."
+      },
+      "symbols": [
+        {
+          "symbol_id": "Transistor_BJT:BC557",
+          "function_pins": [
+            {
+              "function": "COLLECTOR",
+              "symbol_pin": "1",
+              "required": true
+            },
+            {
+              "function": "BASE",
+              "symbol_pin": "2",
+              "required": true
+            },
+            {
+              "function": "EMITTER",
+              "symbol_pin": "3",
+              "required": true
+            }
+          ],
+          "pinmap_id": "Transistor_BJT:BC557|Package_TO_SOT_THT:TO-92_Inline",
+          "verification": {
+            "confidence": "verified",
+            "sources": [
+              "https://www.onsemi.com/pdf/datasheet/bc556bta-d.pdf",
+              "kicad-symbols:Transistor_BJT:BC557"
+            ],
+            "pinmap_checked": true
+          }
+        }
+      ],
+      "packages": [
+        {
+          "id": "to92",
+          "name": "TO-92 inline",
+          "footprint_id": "Package_TO_SOT_THT:TO-92_Inline",
+          "package_type": "to92",
+          "mpn": "BC557BTA",
+          "lifecycle": "active",
+          "pinmap_id": "Transistor_BJT:BC557|Package_TO_SOT_THT:TO-92_Inline",
+          "pad_functions": [
+            {
+              "function": "COLLECTOR",
+              "pad": "1"
+            },
+            {
+              "function": "BASE",
+              "pad": "2"
+            },
+            {
+              "function": "EMITTER",
+              "pad": "3"
+            }
+          ],
+          "verification": {
+            "confidence": "verified",
+            "sources": [
+              "https://www.onsemi.com/pdf/datasheet/bc556bta-d.pdf",
+              "kicad-footprint:Package_TO_SOT_THT:TO-92_Inline"
+            ],
+            "pinmap_checked": true
+          }
+        }
+      ],
+      "verification": {
+        "confidence": "verified",
+        "sources": [
+          "https://www.onsemi.com/pdf/datasheet/bc556bta-d.pdf",
+          "kicad-symbols:Transistor_BJT:BC557",
+          "kicad-footprint:Package_TO_SOT_THT:TO-92_Inline"
+        ],
+        "resolver_checked": true,
+        "pinmap_checked": true,
+        "tests": [
+          "catalog_requested_pnp_expansion"
+        ]
+      }
+    },
+    {
+      "id": "bjt.unisonic.s9015.to92",
+      "family": "bjt",
+      "name": "Unisonic S9015 low-noise PNP transistor",
+      "description": "Low-current PNP transistor for small-signal and low-noise amplifier stages.",
+      "generic": false,
+      "manufacturer": "Unisonic Technologies",
+      "mpn": "S9015",
+      "lifecycle": "unknown",
+      "tags": [
+        "s9015",
+        "9015",
+        "small_signal",
+        "low_noise",
+        "bjt",
+        "pnp",
+        "through_hole",
+        "to92"
+      ],
+      "ratings": [
+        {
+          "kind": "collector_emitter_voltage",
+          "max": "45",
+          "unit": "V"
+        },
+        {
+          "kind": "collector_current",
+          "max": "0.1",
+          "unit": "A"
+        },
+        {
+          "kind": "power_dissipation",
+          "max": "0.45",
+          "unit": "W"
+        }
+      ],
+      "power_semiconductor_evidence": {
+        "device_class": "bjt",
+        "polarity": "pnp",
+        "max_voltage": {
+          "value": 45,
+          "unit": "V",
+          "conditions": "VCEO absolute maximum"
+        },
+        "continuous_current": {
+          "value": 0.1,
+          "unit": "A",
+          "conditions": "absolute maximum collector current"
+        },
+        "power_dissipation": {
+          "value": 0.45,
+          "unit": "W",
+          "temperature_c": 25,
+          "conditions": "ambient-temperature rating"
+        },
+        "max_junction_temperature_c": 150,
+        "secondary_breakdown_status": "review_required",
+        "linear_mode_status": "review_required",
+        "bjt": {},
+        "fabrication_proof": false,
+        "review_note": "Identity, lead order, and headline limits are verified; applied SOA and thermal assembly remain fabrication gates."
+      },
+      "symbols": [
+        {
+          "symbol_id": "Transistor_BJT:Q_PNP_EBC",
+          "function_pins": [
+            {
+              "function": "EMITTER",
+              "symbol_pin": "1",
+              "required": true
+            },
+            {
+              "function": "BASE",
+              "symbol_pin": "2",
+              "required": true
+            },
+            {
+              "function": "COLLECTOR",
+              "symbol_pin": "3",
+              "required": true
+            }
+          ],
+          "pinmap_id": "Transistor_BJT:Q_PNP_EBC|Package_TO_SOT_THT:TO-92_Inline",
+          "verification": {
+            "confidence": "verified",
+            "sources": [
+              "https://www.unisonic.com.tw/uploadfiles/836/part_no_pdf/9015.pdf",
+              "kicad-symbols:Transistor_BJT:Q_PNP_EBC"
+            ],
+            "pinmap_checked": true
+          }
+        }
+      ],
+      "packages": [
+        {
+          "id": "to92",
+          "name": "TO-92 inline",
+          "footprint_id": "Package_TO_SOT_THT:TO-92_Inline",
+          "package_type": "to92",
+          "mpn": "S9015",
+          "lifecycle": "unknown",
+          "pinmap_id": "Transistor_BJT:Q_PNP_EBC|Package_TO_SOT_THT:TO-92_Inline",
+          "pad_functions": [
+            {
+              "function": "EMITTER",
+              "pad": "1"
+            },
+            {
+              "function": "BASE",
+              "pad": "2"
+            },
+            {
+              "function": "COLLECTOR",
+              "pad": "3"
+            }
+          ],
+          "verification": {
+            "confidence": "verified",
+            "sources": [
+              "https://www.unisonic.com.tw/uploadfiles/836/part_no_pdf/9015.pdf",
+              "kicad-footprint:Package_TO_SOT_THT:TO-92_Inline"
+            ],
+            "pinmap_checked": true
+          }
+        }
+      ],
+      "verification": {
+        "confidence": "verified",
+        "sources": [
+          "https://www.unisonic.com.tw/uploadfiles/836/part_no_pdf/9015.pdf",
+          "kicad-symbols:Transistor_BJT:Q_PNP_EBC",
+          "kicad-footprint:Package_TO_SOT_THT:TO-92_Inline"
+        ],
+        "resolver_checked": true,
+        "pinmap_checked": true,
+        "tests": [
+          "catalog_requested_pnp_expansion"
+        ]
+      }
+    },
+    {
+      "id": "bjt.toshiba.2sa1015.to92",
+      "family": "bjt",
+      "name": "Toshiba 2SA1015 / A1015 PNP audio transistor",
+      "description": "Legacy Japanese PNP small-signal audio transistor with E-C-B lead order, complementary to 2SC1815.",
+      "generic": false,
+      "manufacturer": "Toshiba",
+      "mpn": "2SA1015",
+      "lifecycle": "obsolete",
+      "tags": [
+        "a1015",
+        "2sa1015",
+        "audio",
+        "small_signal",
+        "bjt",
+        "pnp",
+        "through_hole",
+        "to92"
+      ],
+      "ratings": [
+        {
+          "kind": "collector_emitter_voltage",
+          "max": "50",
+          "unit": "V"
+        },
+        {
+          "kind": "collector_current",
+          "max": "0.15",
+          "unit": "A"
+        },
+        {
+          "kind": "power_dissipation",
+          "max": "0.4",
+          "unit": "W"
+        }
+      ],
+      "power_semiconductor_evidence": {
+        "device_class": "bjt",
+        "polarity": "pnp",
+        "complementary_group": "toshiba_2sc1815_2sa1015",
+        "max_voltage": {
+          "value": 50,
+          "unit": "V",
+          "conditions": "VCEO absolute maximum"
+        },
+        "continuous_current": {
+          "value": 0.15,
+          "unit": "A",
+          "conditions": "absolute maximum collector current"
+        },
+        "power_dissipation": {
+          "value": 0.4,
+          "unit": "W",
+          "temperature_c": 25,
+          "conditions": "ambient-temperature rating"
+        },
+        "max_junction_temperature_c": 150,
+        "secondary_breakdown_status": "review_required",
+        "linear_mode_status": "review_required",
+        "bjt": {},
+        "fabrication_proof": false,
+        "review_note": "Legacy identity and lead order are modeled for reproduction; source authentication, applied SOA, and thermal design remain mandatory."
+      },
+      "symbols": [
+        {
+          "symbol_id": "Transistor_BJT:2SA1015",
+          "function_pins": [
+            {
+              "function": "EMITTER",
+              "symbol_pin": "1",
+              "required": true
+            },
+            {
+              "function": "COLLECTOR",
+              "symbol_pin": "2",
+              "required": true
+            },
+            {
+              "function": "BASE",
+              "symbol_pin": "3",
+              "required": true
+            }
+          ],
+          "pinmap_id": "Transistor_BJT:2SA1015|Package_TO_SOT_THT:TO-92_Inline",
+          "verification": {
+            "confidence": "verified",
+            "sources": [
+              "https://toshiba.semicon-storage.com/info/catalog_en_20060101_ALQ00221.pdf?did=10156",
+              "kicad-symbols:Transistor_BJT:2SA1015"
+            ],
+            "pinmap_checked": true
+          }
+        }
+      ],
+      "packages": [
+        {
+          "id": "to92",
+          "name": "TO-92 inline",
+          "footprint_id": "Package_TO_SOT_THT:TO-92_Inline",
+          "package_type": "to92",
+          "mpn": "2SA1015",
+          "lifecycle": "obsolete",
+          "pinmap_id": "Transistor_BJT:2SA1015|Package_TO_SOT_THT:TO-92_Inline",
+          "pad_functions": [
+            {
+              "function": "EMITTER",
+              "pad": "1"
+            },
+            {
+              "function": "COLLECTOR",
+              "pad": "2"
+            },
+            {
+              "function": "BASE",
+              "pad": "3"
+            }
+          ],
+          "verification": {
+            "confidence": "verified",
+            "sources": [
+              "https://toshiba.semicon-storage.com/info/catalog_en_20060101_ALQ00221.pdf?did=10156",
+              "kicad-footprint:Package_TO_SOT_THT:TO-92_Inline"
+            ],
+            "pinmap_checked": true
+          }
+        }
+      ],
+      "verification": {
+        "confidence": "verified",
+        "sources": [
+          "https://toshiba.semicon-storage.com/info/catalog_en_20060101_ALQ00221.pdf?did=10156",
+          "kicad-symbols:Transistor_BJT:2SA1015",
+          "kicad-footprint:Package_TO_SOT_THT:TO-92_Inline"
+        ],
+        "resolver_checked": true,
+        "pinmap_checked": true,
+        "tests": [
+          "catalog_requested_pnp_expansion"
+        ]
+      }
+    },
+    {
+      "id": "bjt.onsemi.mje2955tg.to220",
+      "family": "bjt",
+      "name": "onsemi MJE2955TG / MJE2955T PNP power transistor",
+      "description": "Active 10 A PNP TO-220 transistor for general-purpose power amplification and switching.",
+      "generic": false,
+      "manufacturer": "onsemi",
+      "mpn": "MJE2955TG",
+      "lifecycle": "active",
+      "tags": [
+        "mje2955t",
+        "mje2955tg",
+        "power",
+        "driver",
+        "bjt",
+        "pnp",
+        "through_hole",
+        "to220"
+      ],
+      "ratings": [
+        {
+          "kind": "collector_emitter_voltage",
+          "max": "60",
+          "unit": "V"
+        },
+        {
+          "kind": "collector_current",
+          "max": "10",
+          "unit": "A"
+        },
+        {
+          "kind": "power_dissipation",
+          "max": "75",
+          "unit": "W"
+        }
+      ],
+      "power_semiconductor_evidence": {
+        "device_class": "bjt",
+        "polarity": "pnp",
+        "complementary_group": "onsemi_mje3055t_mje2955t",
+        "max_voltage": {
+          "value": 60,
+          "unit": "V",
+          "conditions": "VCEO absolute maximum"
+        },
+        "continuous_current": {
+          "value": 10,
+          "unit": "A",
+          "conditions": "absolute maximum collector current"
+        },
+        "power_dissipation": {
+          "value": 75,
+          "unit": "W",
+          "temperature_c": 25,
+          "conditions": "case-temperature rating"
+        },
+        "max_junction_temperature_c": 150,
+        "secondary_breakdown_status": "review_required",
+        "linear_mode_status": "review_required",
+        "bjt": {},
+        "fabrication_proof": false,
+        "review_note": "Identity, lead order, and headline limits are verified; applied SOA and thermal assembly remain fabrication gates."
+      },
+      "symbols": [
+        {
+          "symbol_id": "Transistor_BJT:Q_PNP_BCE",
+          "function_pins": [
+            {
+              "function": "BASE",
+              "symbol_pin": "1",
+              "required": true
+            },
+            {
+              "function": "COLLECTOR",
+              "symbol_pin": "2",
+              "required": true
+            },
+            {
+              "function": "EMITTER",
+              "symbol_pin": "3",
+              "required": true
+            }
+          ],
+          "pinmap_id": "Transistor_BJT:Q_PNP_BCE|Package_TO_SOT_THT:TO-220-3_Vertical",
+          "verification": {
+            "confidence": "verified",
+            "sources": [
+              "https://www.onsemi.com/download/data-sheet/pdf/mje2955t-d.pdf",
+              "kicad-symbols:Transistor_BJT:Q_PNP_BCE"
+            ],
+            "pinmap_checked": true
+          }
+        }
+      ],
+      "packages": [
+        {
+          "id": "to220",
+          "name": "TO-220-3 vertical",
+          "footprint_id": "Package_TO_SOT_THT:TO-220-3_Vertical",
+          "package_type": "to220",
+          "mpn": "MJE2955TG",
+          "lifecycle": "active",
+          "pinmap_id": "Transistor_BJT:Q_PNP_BCE|Package_TO_SOT_THT:TO-220-3_Vertical",
+          "pad_functions": [
+            {
+              "function": "BASE",
+              "pad": "1"
+            },
+            {
+              "function": "COLLECTOR",
+              "pad": "2"
+            },
+            {
+              "function": "EMITTER",
+              "pad": "3"
+            }
+          ],
+          "verification": {
+            "confidence": "verified",
+            "sources": [
+              "https://www.onsemi.com/download/data-sheet/pdf/mje2955t-d.pdf",
+              "kicad-footprint:Package_TO_SOT_THT:TO-220-3_Vertical"
+            ],
+            "pinmap_checked": true
+          }
+        }
+      ],
+      "verification": {
+        "confidence": "verified",
+        "sources": [
+          "https://www.onsemi.com/download/data-sheet/pdf/mje2955t-d.pdf",
+          "kicad-symbols:Transistor_BJT:Q_PNP_BCE",
+          "kicad-footprint:Package_TO_SOT_THT:TO-220-3_Vertical"
+        ],
+        "resolver_checked": true,
+        "pinmap_checked": true,
+        "tests": [
+          "catalog_requested_pnp_expansion"
+        ]
+      }
+    },
+    {
+      "id": "bjt.diotec.bc556.to92",
+      "family": "bjt",
+      "name": "Diotec BC556 PNP high-voltage small-signal transistor",
+      "description": "Active 65 V BC556-family PNP transistor for signal processing, switching, and amplification.",
+      "generic": false,
+      "manufacturer": "Diotec Semiconductor",
+      "mpn": "BC556",
+      "lifecycle": "active",
+      "tags": [
+        "bc556",
+        "small_signal",
+        "high_voltage",
+        "bjt",
+        "pnp",
+        "through_hole",
+        "to92"
+      ],
+      "ratings": [
+        {
+          "kind": "collector_emitter_voltage",
+          "max": "65",
+          "unit": "V"
+        },
+        {
+          "kind": "collector_current",
+          "max": "0.1",
+          "unit": "A"
+        },
+        {
+          "kind": "power_dissipation",
+          "max": "0.5",
+          "unit": "W"
+        }
+      ],
+      "power_semiconductor_evidence": {
+        "device_class": "bjt",
+        "polarity": "pnp",
+        "max_voltage": {
+          "value": 65,
+          "unit": "V",
+          "conditions": "VCEO absolute maximum"
+        },
+        "continuous_current": {
+          "value": 0.1,
+          "unit": "A",
+          "conditions": "absolute maximum collector current"
+        },
+        "power_dissipation": {
+          "value": 0.5,
+          "unit": "W",
+          "temperature_c": 25,
+          "conditions": "ambient-temperature rating"
+        },
+        "max_junction_temperature_c": 150,
+        "secondary_breakdown_status": "review_required",
+        "linear_mode_status": "review_required",
+        "bjt": {},
+        "fabrication_proof": false,
+        "review_note": "Identity, lead order, and headline limits are verified; applied SOA and thermal assembly remain fabrication gates."
+      },
+      "symbols": [
+        {
+          "symbol_id": "Transistor_BJT:BC556",
+          "function_pins": [
+            {
+              "function": "COLLECTOR",
+              "symbol_pin": "1",
+              "required": true
+            },
+            {
+              "function": "BASE",
+              "symbol_pin": "2",
+              "required": true
+            },
+            {
+              "function": "EMITTER",
+              "symbol_pin": "3",
+              "required": true
+            }
+          ],
+          "pinmap_id": "Transistor_BJT:BC556|Package_TO_SOT_THT:TO-92_Inline",
+          "verification": {
+            "confidence": "verified",
+            "sources": [
+              "https://diotec.com/tl_files/diotec/files/pdf/datasheets/bc556.pdf",
+              "kicad-symbols:Transistor_BJT:BC556"
+            ],
+            "pinmap_checked": true
+          }
+        }
+      ],
+      "packages": [
+        {
+          "id": "to92",
+          "name": "TO-92 inline",
+          "footprint_id": "Package_TO_SOT_THT:TO-92_Inline",
+          "package_type": "to92",
+          "mpn": "BC556",
+          "lifecycle": "active",
+          "pinmap_id": "Transistor_BJT:BC556|Package_TO_SOT_THT:TO-92_Inline",
+          "pad_functions": [
+            {
+              "function": "COLLECTOR",
+              "pad": "1"
+            },
+            {
+              "function": "BASE",
+              "pad": "2"
+            },
+            {
+              "function": "EMITTER",
+              "pad": "3"
+            }
+          ],
+          "verification": {
+            "confidence": "verified",
+            "sources": [
+              "https://diotec.com/tl_files/diotec/files/pdf/datasheets/bc556.pdf",
+              "kicad-footprint:Package_TO_SOT_THT:TO-92_Inline"
+            ],
+            "pinmap_checked": true
+          }
+        }
+      ],
+      "verification": {
+        "confidence": "verified",
+        "sources": [
+          "https://diotec.com/tl_files/diotec/files/pdf/datasheets/bc556.pdf",
+          "kicad-symbols:Transistor_BJT:BC556",
+          "kicad-footprint:Package_TO_SOT_THT:TO-92_Inline"
+        ],
+        "resolver_checked": true,
+        "pinmap_checked": true,
+        "tests": [
+          "catalog_requested_pnp_expansion"
+        ]
+      }
+    },
+    {
+      "id": "bjt.onsemi.bc556btf.to92",
+      "family": "bjt",
+      "name": "onsemi BC556BTF concrete implementation for requested BC556BTG family",
+      "description": "Current lead-free B-gain TO-92 implementation of the requested BC556BTG ordering family; procurement must use the concrete BTF suffix.",
+      "generic": false,
+      "manufacturer": "onsemi",
+      "mpn": "BC556BTF",
+      "lifecycle": "active",
+      "tags": [
+        "bc556btg",
+        "bc556btf",
+        "bc556b",
+        "small_signal",
+        "high_voltage",
+        "bjt",
+        "pnp",
+        "through_hole",
+        "to92"
+      ],
+      "ratings": [
+        {
+          "kind": "collector_emitter_voltage",
+          "max": "65",
+          "unit": "V"
+        },
+        {
+          "kind": "collector_current",
+          "max": "0.1",
+          "unit": "A"
+        },
+        {
+          "kind": "power_dissipation",
+          "max": "0.5",
+          "unit": "W"
+        }
+      ],
+      "power_semiconductor_evidence": {
+        "device_class": "bjt",
+        "polarity": "pnp",
+        "max_voltage": {
+          "value": 65,
+          "unit": "V",
+          "conditions": "VCEO absolute maximum"
+        },
+        "continuous_current": {
+          "value": 0.1,
+          "unit": "A",
+          "conditions": "absolute maximum collector current"
+        },
+        "power_dissipation": {
+          "value": 0.5,
+          "unit": "W",
+          "temperature_c": 25,
+          "conditions": "ambient-temperature rating"
+        },
+        "max_junction_temperature_c": 150,
+        "secondary_breakdown_status": "review_required",
+        "linear_mode_status": "review_required",
+        "bjt": {},
+        "fabrication_proof": false,
+        "review_note": "Identity, lead order, and headline limits are verified; applied SOA and thermal assembly remain fabrication gates."
+      },
+      "symbols": [
+        {
+          "symbol_id": "Transistor_BJT:BC556",
+          "function_pins": [
+            {
+              "function": "COLLECTOR",
+              "symbol_pin": "1",
+              "required": true
+            },
+            {
+              "function": "BASE",
+              "symbol_pin": "2",
+              "required": true
+            },
+            {
+              "function": "EMITTER",
+              "symbol_pin": "3",
+              "required": true
+            }
+          ],
+          "pinmap_id": "Transistor_BJT:BC556|Package_TO_SOT_THT:TO-92_Inline",
+          "verification": {
+            "confidence": "verified",
+            "sources": [
+              "https://www.onsemi.com/download/data-sheet/pdf/bc556b-d.pdf",
+              "kicad-symbols:Transistor_BJT:BC556"
+            ],
+            "pinmap_checked": true
+          }
+        }
+      ],
+      "packages": [
+        {
+          "id": "to92",
+          "name": "TO-92 inline",
+          "footprint_id": "Package_TO_SOT_THT:TO-92_Inline",
+          "package_type": "to92",
+          "mpn": "BC556BTF",
+          "lifecycle": "active",
+          "pinmap_id": "Transistor_BJT:BC556|Package_TO_SOT_THT:TO-92_Inline",
+          "pad_functions": [
+            {
+              "function": "COLLECTOR",
+              "pad": "1"
+            },
+            {
+              "function": "BASE",
+              "pad": "2"
+            },
+            {
+              "function": "EMITTER",
+              "pad": "3"
+            }
+          ],
+          "verification": {
+            "confidence": "verified",
+            "sources": [
+              "https://www.onsemi.com/download/data-sheet/pdf/bc556b-d.pdf",
+              "kicad-footprint:Package_TO_SOT_THT:TO-92_Inline"
+            ],
+            "pinmap_checked": true
+          }
+        }
+      ],
+      "verification": {
+        "confidence": "verified",
+        "sources": [
+          "https://www.onsemi.com/download/data-sheet/pdf/bc556b-d.pdf",
+          "kicad-symbols:Transistor_BJT:BC556",
+          "kicad-footprint:Package_TO_SOT_THT:TO-92_Inline"
+        ],
+        "resolver_checked": true,
+        "pinmap_checked": true,
+        "tests": [
+          "catalog_requested_pnp_expansion"
+        ]
+      }
+    },
+    {
+      "id": "bjt.microchip.2n4033.to39",
+      "family": "bjt",
+      "name": "Microchip 2N4033 PNP switching transistor",
+      "description": "In-production MIL-qualified 80 V, 1 A PNP switching transistor in a hermetic TO-39 outline.",
+      "generic": false,
+      "manufacturer": "Microchip Technology",
+      "mpn": "2N4033",
+      "lifecycle": "active",
+      "tags": [
+        "2n4033",
+        "switching",
+        "hermetic",
+        "bjt",
+        "pnp",
+        "through_hole",
+        "to39"
+      ],
+      "ratings": [
+        {
+          "kind": "collector_emitter_voltage",
+          "max": "80",
+          "unit": "V"
+        },
+        {
+          "kind": "collector_current",
+          "max": "1",
+          "unit": "A"
+        },
+        {
+          "kind": "power_dissipation",
+          "max": "0.8",
+          "unit": "W"
+        }
+      ],
+      "power_semiconductor_evidence": {
+        "device_class": "bjt",
+        "polarity": "pnp",
+        "max_voltage": {
+          "value": 80,
+          "unit": "V",
+          "conditions": "VCEO absolute maximum"
+        },
+        "continuous_current": {
+          "value": 1,
+          "unit": "A",
+          "conditions": "absolute maximum collector current"
+        },
+        "power_dissipation": {
+          "value": 0.8,
+          "unit": "W",
+          "temperature_c": 25,
+          "conditions": "ambient-temperature rating"
+        },
+        "max_junction_temperature_c": 200,
+        "secondary_breakdown_status": "review_required",
+        "linear_mode_status": "review_required",
+        "bjt": {},
+        "fabrication_proof": false,
+        "review_note": "Identity, lead order, and headline limits are verified; applied SOA and thermal assembly remain fabrication gates."
+      },
+      "symbols": [
+        {
+          "symbol_id": "Transistor_BJT:Q_PNP_EBC",
+          "function_pins": [
+            {
+              "function": "EMITTER",
+              "symbol_pin": "1",
+              "required": true
+            },
+            {
+              "function": "BASE",
+              "symbol_pin": "2",
+              "required": true
+            },
+            {
+              "function": "COLLECTOR",
+              "symbol_pin": "3",
+              "required": true
+            }
+          ],
+          "pinmap_id": "Transistor_BJT:Q_PNP_EBC|Package_TO_SOT_THT:TO-39-3",
+          "verification": {
+            "confidence": "verified",
+            "sources": [
+              "https://www.microchip.com/en-us/product/2n4033-transistor",
+              "kicad-symbols:Transistor_BJT:Q_PNP_EBC"
+            ],
+            "pinmap_checked": true
+          }
+        }
+      ],
+      "packages": [
+        {
+          "id": "to39",
+          "name": "TO-39 / TO-5 three-lead metal can",
+          "footprint_id": "Package_TO_SOT_THT:TO-39-3",
+          "package_type": "to39",
+          "mpn": "2N4033",
+          "lifecycle": "active",
+          "pinmap_id": "Transistor_BJT:Q_PNP_EBC|Package_TO_SOT_THT:TO-39-3",
+          "pad_functions": [
+            {
+              "function": "EMITTER",
+              "pad": "1"
+            },
+            {
+              "function": "BASE",
+              "pad": "2"
+            },
+            {
+              "function": "COLLECTOR",
+              "pad": "3"
+            }
+          ],
+          "verification": {
+            "confidence": "verified",
+            "sources": [
+              "https://www.microchip.com/en-us/product/2n4033-transistor",
+              "kicad-footprint:Package_TO_SOT_THT:TO-39-3"
+            ],
+            "pinmap_checked": true
+          }
+        }
+      ],
+      "verification": {
+        "confidence": "verified",
+        "sources": [
+          "https://www.microchip.com/en-us/product/2n4033-transistor",
+          "kicad-symbols:Transistor_BJT:Q_PNP_EBC",
+          "kicad-footprint:Package_TO_SOT_THT:TO-39-3"
+        ],
+        "resolver_checked": true,
+        "pinmap_checked": true,
+        "tests": [
+          "catalog_requested_pnp_expansion"
+        ]
+      }
+    },
+    {
+      "id": "bjt.st.bd140.to126",
+      "family": "bjt",
+      "name": "STMicroelectronics BD140 PNP audio driver transistor",
+      "description": "Active 80 V PNP SOT-32/TO-126 transistor for audio amplifier and driver stages, complementary to BD139.",
+      "generic": false,
+      "manufacturer": "STMicroelectronics",
+      "mpn": "BD140",
+      "lifecycle": "active",
+      "tags": [
+        "bd140",
+        "audio",
+        "driver",
+        "bjt",
+        "pnp",
+        "through_hole",
+        "to126"
+      ],
+      "ratings": [
+        {
+          "kind": "collector_emitter_voltage",
+          "max": "80",
+          "unit": "V"
+        },
+        {
+          "kind": "collector_current",
+          "max": "1.5",
+          "unit": "A"
+        },
+        {
+          "kind": "power_dissipation",
+          "max": "12.5",
+          "unit": "W"
+        }
+      ],
+      "power_semiconductor_evidence": {
+        "device_class": "bjt",
+        "polarity": "pnp",
+        "complementary_group": "st_bd139_bd140",
+        "max_voltage": {
+          "value": 80,
+          "unit": "V",
+          "conditions": "VCEO absolute maximum"
+        },
+        "continuous_current": {
+          "value": 1.5,
+          "unit": "A",
+          "conditions": "absolute maximum collector current"
+        },
+        "power_dissipation": {
+          "value": 12.5,
+          "unit": "W",
+          "temperature_c": 25,
+          "conditions": "case-temperature rating"
+        },
+        "max_junction_temperature_c": 150,
+        "secondary_breakdown_status": "review_required",
+        "linear_mode_status": "review_required",
+        "bjt": {},
+        "fabrication_proof": false,
+        "review_note": "Identity, lead order, and headline limits are verified; applied SOA and thermal assembly remain fabrication gates."
+      },
+      "symbols": [
+        {
+          "symbol_id": "Transistor_BJT:BD140",
+          "function_pins": [
+            {
+              "function": "EMITTER",
+              "symbol_pin": "1",
+              "required": true
+            },
+            {
+              "function": "COLLECTOR",
+              "symbol_pin": "2",
+              "required": true
+            },
+            {
+              "function": "BASE",
+              "symbol_pin": "3",
+              "required": true
+            }
+          ],
+          "pinmap_id": "Transistor_BJT:BD140|Package_TO_SOT_THT:TO-126-3_Vertical",
+          "verification": {
+            "confidence": "verified",
+            "sources": [
+              "https://www.st.com/resource/en/datasheet/bd140.pdf",
+              "kicad-symbols:Transistor_BJT:BD140"
+            ],
+            "pinmap_checked": true
+          }
+        }
+      ],
+      "packages": [
+        {
+          "id": "to126",
+          "name": "TO-126 vertical",
+          "footprint_id": "Package_TO_SOT_THT:TO-126-3_Vertical",
+          "package_type": "to126",
+          "mpn": "BD140",
+          "lifecycle": "active",
+          "pinmap_id": "Transistor_BJT:BD140|Package_TO_SOT_THT:TO-126-3_Vertical",
+          "pad_functions": [
+            {
+              "function": "EMITTER",
+              "pad": "1"
+            },
+            {
+              "function": "COLLECTOR",
+              "pad": "2"
+            },
+            {
+              "function": "BASE",
+              "pad": "3"
+            }
+          ],
+          "verification": {
+            "confidence": "verified",
+            "sources": [
+              "https://www.st.com/resource/en/datasheet/bd140.pdf",
+              "kicad-footprint:Package_TO_SOT_THT:TO-126-3_Vertical"
+            ],
+            "pinmap_checked": true
+          }
+        }
+      ],
+      "verification": {
+        "confidence": "verified",
+        "sources": [
+          "https://www.st.com/resource/en/datasheet/bd140.pdf",
+          "kicad-symbols:Transistor_BJT:BD140",
+          "kicad-footprint:Package_TO_SOT_THT:TO-126-3_Vertical"
+        ],
+        "resolver_checked": true,
+        "pinmap_checked": true,
+        "tests": [
+          "catalog_requested_pnp_expansion"
+        ]
+      }
+    },
+    {
+      "id": "bjt.onsemi.tip32cg.to220",
+      "family": "bjt",
+      "name": "onsemi TIP32CG / TIP32C PNP power transistor",
+      "description": "Active 100 V, 3 A PNP TO-220 transistor for medium-power linear and switching service.",
+      "generic": false,
+      "manufacturer": "onsemi",
+      "mpn": "TIP32CG",
+      "lifecycle": "active",
+      "tags": [
+        "tip32c",
+        "tip32cg",
+        "power",
+        "driver",
+        "bjt",
+        "pnp",
+        "through_hole",
+        "to220"
+      ],
+      "ratings": [
+        {
+          "kind": "collector_emitter_voltage",
+          "max": "100",
+          "unit": "V"
+        },
+        {
+          "kind": "collector_current",
+          "max": "3",
+          "unit": "A"
+        },
+        {
+          "kind": "power_dissipation",
+          "max": "40",
+          "unit": "W"
+        }
+      ],
+      "power_semiconductor_evidence": {
+        "device_class": "bjt",
+        "polarity": "pnp",
+        "complementary_group": "onsemi_tip31c_tip32c",
+        "max_voltage": {
+          "value": 100,
+          "unit": "V",
+          "conditions": "VCEO absolute maximum"
+        },
+        "continuous_current": {
+          "value": 3,
+          "unit": "A",
+          "conditions": "absolute maximum collector current"
+        },
+        "power_dissipation": {
+          "value": 40,
+          "unit": "W",
+          "temperature_c": 25,
+          "conditions": "case-temperature rating"
+        },
+        "max_junction_temperature_c": 150,
+        "secondary_breakdown_status": "review_required",
+        "linear_mode_status": "review_required",
+        "bjt": {},
+        "fabrication_proof": false,
+        "review_note": "Identity, lead order, and headline limits are verified; applied SOA and thermal assembly remain fabrication gates."
+      },
+      "symbols": [
+        {
+          "symbol_id": "Transistor_BJT:Q_PNP_BCE",
+          "function_pins": [
+            {
+              "function": "BASE",
+              "symbol_pin": "1",
+              "required": true
+            },
+            {
+              "function": "COLLECTOR",
+              "symbol_pin": "2",
+              "required": true
+            },
+            {
+              "function": "EMITTER",
+              "symbol_pin": "3",
+              "required": true
+            }
+          ],
+          "pinmap_id": "Transistor_BJT:Q_PNP_BCE|Package_TO_SOT_THT:TO-220-3_Vertical",
+          "verification": {
+            "confidence": "verified",
+            "sources": [
+              "https://www.onsemi.com/download/data-sheet/pdf/tip32c-d.pdf",
+              "kicad-symbols:Transistor_BJT:Q_PNP_BCE"
+            ],
+            "pinmap_checked": true
+          }
+        }
+      ],
+      "packages": [
+        {
+          "id": "to220",
+          "name": "TO-220-3 vertical",
+          "footprint_id": "Package_TO_SOT_THT:TO-220-3_Vertical",
+          "package_type": "to220",
+          "mpn": "TIP32CG",
+          "lifecycle": "active",
+          "pinmap_id": "Transistor_BJT:Q_PNP_BCE|Package_TO_SOT_THT:TO-220-3_Vertical",
+          "pad_functions": [
+            {
+              "function": "BASE",
+              "pad": "1"
+            },
+            {
+              "function": "COLLECTOR",
+              "pad": "2"
+            },
+            {
+              "function": "EMITTER",
+              "pad": "3"
+            }
+          ],
+          "verification": {
+            "confidence": "verified",
+            "sources": [
+              "https://www.onsemi.com/download/data-sheet/pdf/tip32c-d.pdf",
+              "kicad-footprint:Package_TO_SOT_THT:TO-220-3_Vertical"
+            ],
+            "pinmap_checked": true
+          }
+        }
+      ],
+      "verification": {
+        "confidence": "verified",
+        "sources": [
+          "https://www.onsemi.com/download/data-sheet/pdf/tip32c-d.pdf",
+          "kicad-symbols:Transistor_BJT:Q_PNP_BCE",
+          "kicad-footprint:Package_TO_SOT_THT:TO-220-3_Vertical"
+        ],
+        "resolver_checked": true,
+        "pinmap_checked": true,
+        "tests": [
+          "catalog_requested_pnp_expansion"
+        ]
+      }
+    },
+    {
+      "id": "bjt.onsemi.tip42cg.to220",
+      "family": "bjt",
+      "name": "onsemi TIP42CG / TIP42C PNP power transistor",
+      "description": "Active 100 V, 6 A PNP TO-220 transistor for power amplification and switching.",
+      "generic": false,
+      "manufacturer": "onsemi",
+      "mpn": "TIP42CG",
+      "lifecycle": "active",
+      "tags": [
+        "tip42c",
+        "tip42cg",
+        "power",
+        "driver",
+        "bjt",
+        "pnp",
+        "through_hole",
+        "to220"
+      ],
+      "ratings": [
+        {
+          "kind": "collector_emitter_voltage",
+          "max": "100",
+          "unit": "V"
+        },
+        {
+          "kind": "collector_current",
+          "max": "6",
+          "unit": "A"
+        },
+        {
+          "kind": "power_dissipation",
+          "max": "65",
+          "unit": "W"
+        }
+      ],
+      "power_semiconductor_evidence": {
+        "device_class": "bjt",
+        "polarity": "pnp",
+        "complementary_group": "onsemi_tip41c_tip42c",
+        "max_voltage": {
+          "value": 100,
+          "unit": "V",
+          "conditions": "VCEO absolute maximum"
+        },
+        "continuous_current": {
+          "value": 6,
+          "unit": "A",
+          "conditions": "absolute maximum collector current"
+        },
+        "power_dissipation": {
+          "value": 65,
+          "unit": "W",
+          "temperature_c": 25,
+          "conditions": "case-temperature rating"
+        },
+        "max_junction_temperature_c": 150,
+        "secondary_breakdown_status": "review_required",
+        "linear_mode_status": "review_required",
+        "bjt": {},
+        "fabrication_proof": false,
+        "review_note": "Identity, lead order, and headline limits are verified; applied SOA and thermal assembly remain fabrication gates."
+      },
+      "symbols": [
+        {
+          "symbol_id": "Transistor_BJT:TIP42C",
+          "function_pins": [
+            {
+              "function": "BASE",
+              "symbol_pin": "1",
+              "required": true
+            },
+            {
+              "function": "COLLECTOR",
+              "symbol_pin": "2",
+              "required": true
+            },
+            {
+              "function": "EMITTER",
+              "symbol_pin": "3",
+              "required": true
+            }
+          ],
+          "pinmap_id": "Transistor_BJT:TIP42C|Package_TO_SOT_THT:TO-220-3_Vertical",
+          "verification": {
+            "confidence": "verified",
+            "sources": [
+              "https://www.onsemi.com/download/data-sheet/pdf/tip42c-d.pdf",
+              "kicad-symbols:Transistor_BJT:TIP42C"
+            ],
+            "pinmap_checked": true
+          }
+        }
+      ],
+      "packages": [
+        {
+          "id": "to220",
+          "name": "TO-220-3 vertical",
+          "footprint_id": "Package_TO_SOT_THT:TO-220-3_Vertical",
+          "package_type": "to220",
+          "mpn": "TIP42CG",
+          "lifecycle": "active",
+          "pinmap_id": "Transistor_BJT:TIP42C|Package_TO_SOT_THT:TO-220-3_Vertical",
+          "pad_functions": [
+            {
+              "function": "BASE",
+              "pad": "1"
+            },
+            {
+              "function": "COLLECTOR",
+              "pad": "2"
+            },
+            {
+              "function": "EMITTER",
+              "pad": "3"
+            }
+          ],
+          "verification": {
+            "confidence": "verified",
+            "sources": [
+              "https://www.onsemi.com/download/data-sheet/pdf/tip42c-d.pdf",
+              "kicad-footprint:Package_TO_SOT_THT:TO-220-3_Vertical"
+            ],
+            "pinmap_checked": true
+          }
+        }
+      ],
+      "verification": {
+        "confidence": "verified",
+        "sources": [
+          "https://www.onsemi.com/download/data-sheet/pdf/tip42c-d.pdf",
+          "kicad-symbols:Transistor_BJT:TIP42C",
+          "kicad-footprint:Package_TO_SOT_THT:TO-220-3_Vertical"
+        ],
+        "resolver_checked": true,
+        "pinmap_checked": true,
+        "tests": [
+          "catalog_requested_pnp_expansion"
+        ]
+      }
+    },
+    {
+      "id": "bjt.toshiba.2sa1358_y.to126",
+      "family": "bjt",
+      "name": "Toshiba 2SA1358-Y PNP audio driver transistor",
+      "description": "Historical Y-gain PNP audio driver with Japanese E-C-B TO-126 lead order, complementary to 2SC3421-Y.",
+      "generic": false,
+      "manufacturer": "Toshiba",
+      "mpn": "2SA1358-Y",
+      "lifecycle": "obsolete",
+      "tags": [
+        "2sa1358",
+        "2sa1358-y",
+        "audio",
+        "driver",
+        "high_voltage",
+        "bjt",
+        "pnp",
+        "through_hole",
+        "to126"
+      ],
+      "ratings": [
+        {
+          "kind": "collector_emitter_voltage",
+          "max": "120",
+          "unit": "V"
+        },
+        {
+          "kind": "collector_current",
+          "max": "1",
+          "unit": "A"
+        },
+        {
+          "kind": "power_dissipation",
+          "max": "10",
+          "unit": "W"
+        }
+      ],
+      "power_semiconductor_evidence": {
+        "device_class": "bjt",
+        "polarity": "pnp",
+        "complementary_group": "toshiba_2sc3421_2sa1358",
+        "max_voltage": {
+          "value": 120,
+          "unit": "V",
+          "conditions": "VCEO absolute maximum"
+        },
+        "continuous_current": {
+          "value": 1,
+          "unit": "A",
+          "conditions": "absolute maximum collector current"
+        },
+        "power_dissipation": {
+          "value": 10,
+          "unit": "W",
+          "temperature_c": 25,
+          "conditions": "case-temperature rating"
+        },
+        "max_junction_temperature_c": 150,
+        "secondary_breakdown_status": "review_required",
+        "linear_mode_status": "review_required",
+        "bjt": {},
+        "fabrication_proof": false,
+        "review_note": "Legacy identity and lead order are modeled for reproduction; source authentication, applied SOA, and thermal design remain mandatory."
+      },
+      "symbols": [
+        {
+          "symbol_id": "Transistor_BJT:Q_PNP_ECB",
+          "function_pins": [
+            {
+              "function": "EMITTER",
+              "symbol_pin": "1",
+              "required": true
+            },
+            {
+              "function": "COLLECTOR",
+              "symbol_pin": "2",
+              "required": true
+            },
+            {
+              "function": "BASE",
+              "symbol_pin": "3",
+              "required": true
+            }
+          ],
+          "pinmap_id": "Transistor_BJT:Q_PNP_ECB|Package_TO_SOT_THT:TO-126-3_Vertical",
+          "verification": {
+            "confidence": "verified",
+            "sources": [
+              "https://toshiba.semicon-storage.com/us/semiconductor/product/bipolar-transistors/detail.2SA1358.html",
+              "kicad-symbols:Transistor_BJT:Q_PNP_ECB"
+            ],
+            "pinmap_checked": true
+          }
+        }
+      ],
+      "packages": [
+        {
+          "id": "to126",
+          "name": "TO-126 vertical",
+          "footprint_id": "Package_TO_SOT_THT:TO-126-3_Vertical",
+          "package_type": "to126",
+          "mpn": "2SA1358-Y",
+          "lifecycle": "obsolete",
+          "pinmap_id": "Transistor_BJT:Q_PNP_ECB|Package_TO_SOT_THT:TO-126-3_Vertical",
+          "pad_functions": [
+            {
+              "function": "EMITTER",
+              "pad": "1"
+            },
+            {
+              "function": "COLLECTOR",
+              "pad": "2"
+            },
+            {
+              "function": "BASE",
+              "pad": "3"
+            }
+          ],
+          "verification": {
+            "confidence": "verified",
+            "sources": [
+              "https://toshiba.semicon-storage.com/us/semiconductor/product/bipolar-transistors/detail.2SA1358.html",
+              "kicad-footprint:Package_TO_SOT_THT:TO-126-3_Vertical"
+            ],
+            "pinmap_checked": true
+          }
+        }
+      ],
+      "verification": {
+        "confidence": "verified",
+        "sources": [
+          "https://toshiba.semicon-storage.com/us/semiconductor/product/bipolar-transistors/detail.2SA1358.html",
+          "kicad-symbols:Transistor_BJT:Q_PNP_ECB",
+          "kicad-footprint:Package_TO_SOT_THT:TO-126-3_Vertical"
+        ],
+        "resolver_checked": true,
+        "pinmap_checked": true,
+        "tests": [
+          "catalog_requested_pnp_expansion"
+        ]
+      }
+    },
+    {
+      "id": "bjt.toshiba.2sb688.to3p",
+      "family": "bjt",
+      "name": "Toshiba 2SB688 PNP audio power transistor",
+      "description": "Legacy 120 V, 8 A PNP audio-output transistor in TO-3P, complementary to 2SD718.",
+      "generic": false,
+      "manufacturer": "Toshiba",
+      "mpn": "2SB688",
+      "lifecycle": "obsolete",
+      "tags": [
+        "2sb688",
+        "audio",
+        "power",
+        "output",
+        "bjt",
+        "pnp",
+        "through_hole",
+        "to3p"
+      ],
+      "ratings": [
+        {
+          "kind": "collector_emitter_voltage",
+          "max": "120",
+          "unit": "V"
+        },
+        {
+          "kind": "collector_current",
+          "max": "8",
+          "unit": "A"
+        },
+        {
+          "kind": "power_dissipation",
+          "max": "80",
+          "unit": "W"
+        }
+      ],
+      "power_semiconductor_evidence": {
+        "device_class": "bjt",
+        "polarity": "pnp",
+        "complementary_group": "toshiba_2sd718_2sb688",
+        "max_voltage": {
+          "value": 120,
+          "unit": "V",
+          "conditions": "VCEO absolute maximum"
+        },
+        "continuous_current": {
+          "value": 8,
+          "unit": "A",
+          "conditions": "absolute maximum collector current"
+        },
+        "power_dissipation": {
+          "value": 80,
+          "unit": "W",
+          "temperature_c": 25,
+          "conditions": "case-temperature rating"
+        },
+        "max_junction_temperature_c": 150,
+        "secondary_breakdown_status": "review_required",
+        "linear_mode_status": "review_required",
+        "bjt": {},
+        "fabrication_proof": false,
+        "review_note": "Legacy identity and lead order are modeled for reproduction; source authentication, applied SOA, and thermal design remain mandatory."
+      },
+      "symbols": [
+        {
+          "symbol_id": "Transistor_BJT:Q_PNP_BCE",
+          "function_pins": [
+            {
+              "function": "BASE",
+              "symbol_pin": "1",
+              "required": true
+            },
+            {
+              "function": "COLLECTOR",
+              "symbol_pin": "2",
+              "required": true
+            },
+            {
+              "function": "EMITTER",
+              "symbol_pin": "3",
+              "required": true
+            }
+          ],
+          "pinmap_id": "Transistor_BJT:Q_PNP_BCE|Package_TO_SOT_THT:TO-3P-3_Vertical",
+          "verification": {
+            "confidence": "verified",
+            "sources": [
+              "https://toshiba.semicon-storage.com/us/semiconductor/product/bipolar-transistors/detail.2SB688.html",
+              "kicad-symbols:Transistor_BJT:Q_PNP_BCE"
+            ],
+            "pinmap_checked": true
+          }
+        }
+      ],
+      "packages": [
+        {
+          "id": "to3p",
+          "name": "TO-3P three-lead vertical",
+          "footprint_id": "Package_TO_SOT_THT:TO-3P-3_Vertical",
+          "package_type": "to3p",
+          "mpn": "2SB688",
+          "lifecycle": "obsolete",
+          "pinmap_id": "Transistor_BJT:Q_PNP_BCE|Package_TO_SOT_THT:TO-3P-3_Vertical",
+          "pad_functions": [
+            {
+              "function": "BASE",
+              "pad": "1"
+            },
+            {
+              "function": "COLLECTOR",
+              "pad": "2"
+            },
+            {
+              "function": "EMITTER",
+              "pad": "3"
+            }
+          ],
+          "verification": {
+            "confidence": "verified",
+            "sources": [
+              "https://toshiba.semicon-storage.com/us/semiconductor/product/bipolar-transistors/detail.2SB688.html",
+              "kicad-footprint:Package_TO_SOT_THT:TO-3P-3_Vertical"
+            ],
+            "pinmap_checked": true
+          }
+        }
+      ],
+      "verification": {
+        "confidence": "verified",
+        "sources": [
+          "https://toshiba.semicon-storage.com/us/semiconductor/product/bipolar-transistors/detail.2SB688.html",
+          "kicad-symbols:Transistor_BJT:Q_PNP_BCE",
+          "kicad-footprint:Package_TO_SOT_THT:TO-3P-3_Vertical"
+        ],
+        "resolver_checked": true,
+        "pinmap_checked": true,
+        "tests": [
+          "catalog_requested_pnp_expansion"
+        ]
+      }
+    },
+    {
+      "id": "bjt.onsemi.2n5401ybu.to92",
+      "family": "bjt",
+      "name": "onsemi 2N5401YBU / 2N5401 high-voltage PNP transistor",
+      "description": "Active 150 V PNP TO-92 transistor for high-voltage small-signal amplifier stages.",
+      "generic": false,
+      "manufacturer": "onsemi",
+      "mpn": "2N5401YBU",
+      "lifecycle": "active",
+      "tags": [
+        "2n5401",
+        "2n5401ybu",
+        "small_signal",
+        "high_voltage",
+        "bjt",
+        "pnp",
+        "through_hole",
+        "to92"
+      ],
+      "ratings": [
+        {
+          "kind": "collector_emitter_voltage",
+          "max": "150",
+          "unit": "V"
+        },
+        {
+          "kind": "collector_current",
+          "max": "0.6",
+          "unit": "A"
+        },
+        {
+          "kind": "power_dissipation",
+          "max": "0.625",
+          "unit": "W"
+        }
+      ],
+      "power_semiconductor_evidence": {
+        "device_class": "bjt",
+        "polarity": "pnp",
+        "max_voltage": {
+          "value": 150,
+          "unit": "V",
+          "conditions": "VCEO absolute maximum"
+        },
+        "continuous_current": {
+          "value": 0.6,
+          "unit": "A",
+          "conditions": "absolute maximum collector current"
+        },
+        "power_dissipation": {
+          "value": 0.625,
+          "unit": "W",
+          "temperature_c": 25,
+          "conditions": "ambient-temperature rating"
+        },
+        "max_junction_temperature_c": 150,
+        "secondary_breakdown_status": "review_required",
+        "linear_mode_status": "review_required",
+        "bjt": {},
+        "fabrication_proof": false,
+        "review_note": "Identity, lead order, and headline limits are verified; applied SOA and thermal assembly remain fabrication gates."
+      },
+      "symbols": [
+        {
+          "symbol_id": "Transistor_BJT:Q_PNP_EBC",
+          "function_pins": [
+            {
+              "function": "EMITTER",
+              "symbol_pin": "1",
+              "required": true
+            },
+            {
+              "function": "BASE",
+              "symbol_pin": "2",
+              "required": true
+            },
+            {
+              "function": "COLLECTOR",
+              "symbol_pin": "3",
+              "required": true
+            }
+          ],
+          "pinmap_id": "Transistor_BJT:Q_PNP_EBC|Package_TO_SOT_THT:TO-92_Inline",
+          "verification": {
+            "confidence": "verified",
+            "sources": [
+              "https://www.onsemi.com/download/data-sheet/pdf/2n5401-d.pdf",
+              "kicad-symbols:Transistor_BJT:Q_PNP_EBC"
+            ],
+            "pinmap_checked": true
+          }
+        }
+      ],
+      "packages": [
+        {
+          "id": "to92",
+          "name": "TO-92 inline",
+          "footprint_id": "Package_TO_SOT_THT:TO-92_Inline",
+          "package_type": "to92",
+          "mpn": "2N5401YBU",
+          "lifecycle": "active",
+          "pinmap_id": "Transistor_BJT:Q_PNP_EBC|Package_TO_SOT_THT:TO-92_Inline",
+          "pad_functions": [
+            {
+              "function": "EMITTER",
+              "pad": "1"
+            },
+            {
+              "function": "BASE",
+              "pad": "2"
+            },
+            {
+              "function": "COLLECTOR",
+              "pad": "3"
+            }
+          ],
+          "verification": {
+            "confidence": "verified",
+            "sources": [
+              "https://www.onsemi.com/download/data-sheet/pdf/2n5401-d.pdf",
+              "kicad-footprint:Package_TO_SOT_THT:TO-92_Inline"
+            ],
+            "pinmap_checked": true
+          }
+        }
+      ],
+      "verification": {
+        "confidence": "verified",
+        "sources": [
+          "https://www.onsemi.com/download/data-sheet/pdf/2n5401-d.pdf",
+          "kicad-symbols:Transistor_BJT:Q_PNP_EBC",
+          "kicad-footprint:Package_TO_SOT_THT:TO-92_Inline"
+        ],
+        "resolver_checked": true,
+        "pinmap_checked": true,
+        "tests": [
+          "catalog_requested_pnp_expansion"
+        ]
+      }
+    },
+    {
+      "id": "bjt.toshiba.2sa1943.to3p",
+      "family": "bjt",
+      "name": "Toshiba 2SA1943 PNP audio output transistor",
+      "description": "High-power PNP audio-output transistor in TO-3P(L), complementary to 2SC5200.",
+      "generic": false,
+      "manufacturer": "Toshiba",
+      "mpn": "2SA1943",
+      "lifecycle": "nrnd",
+      "tags": [
+        "2sa1943",
+        "audio",
+        "power",
+        "output",
+        "bjt",
+        "pnp",
+        "through_hole",
+        "to3p"
+      ],
+      "ratings": [
+        {
+          "kind": "collector_emitter_voltage",
+          "max": "230",
+          "unit": "V"
+        },
+        {
+          "kind": "collector_current",
+          "max": "15",
+          "unit": "A"
+        },
+        {
+          "kind": "power_dissipation",
+          "max": "150",
+          "unit": "W"
+        }
+      ],
+      "power_semiconductor_evidence": {
+        "device_class": "bjt",
+        "polarity": "pnp",
+        "complementary_group": "toshiba_2sc5200_2sa1943",
+        "max_voltage": {
+          "value": 230,
+          "unit": "V",
+          "conditions": "VCEO absolute maximum"
+        },
+        "continuous_current": {
+          "value": 15,
+          "unit": "A",
+          "conditions": "absolute maximum collector current"
+        },
+        "peak_current": {
+          "value": 30,
+          "unit": "A",
+          "conditions": "manufacturer pulse limit"
+        },
+        "power_dissipation": {
+          "value": 150,
+          "unit": "W",
+          "temperature_c": 25,
+          "conditions": "case-temperature rating"
+        },
+        "max_junction_temperature_c": 150,
+        "secondary_breakdown_status": "review_required",
+        "linear_mode_status": "review_required",
+        "bjt": {},
+        "fabrication_proof": false,
+        "review_note": "Identity, lead order, and headline limits are verified; applied SOA and thermal assembly remain fabrication gates."
+      },
+      "symbols": [
+        {
+          "symbol_id": "Transistor_BJT:Q_PNP_BCE",
+          "function_pins": [
+            {
+              "function": "BASE",
+              "symbol_pin": "1",
+              "required": true
+            },
+            {
+              "function": "COLLECTOR",
+              "symbol_pin": "2",
+              "required": true
+            },
+            {
+              "function": "EMITTER",
+              "symbol_pin": "3",
+              "required": true
+            }
+          ],
+          "pinmap_id": "Transistor_BJT:Q_PNP_BCE|Package_TO_SOT_THT:TO-3P-3_Vertical",
+          "verification": {
+            "confidence": "verified",
+            "sources": [
+              "https://toshiba.semicon-storage.com/us/semiconductor/product/bipolar-transistors/detail.2SA1943.html",
+              "kicad-symbols:Transistor_BJT:Q_PNP_BCE"
+            ],
+            "pinmap_checked": true
+          }
+        }
+      ],
+      "packages": [
+        {
+          "id": "to3p",
+          "name": "TO-3P three-lead vertical",
+          "footprint_id": "Package_TO_SOT_THT:TO-3P-3_Vertical",
+          "package_type": "to3p",
+          "mpn": "2SA1943",
+          "lifecycle": "nrnd",
+          "pinmap_id": "Transistor_BJT:Q_PNP_BCE|Package_TO_SOT_THT:TO-3P-3_Vertical",
+          "pad_functions": [
+            {
+              "function": "BASE",
+              "pad": "1"
+            },
+            {
+              "function": "COLLECTOR",
+              "pad": "2"
+            },
+            {
+              "function": "EMITTER",
+              "pad": "3"
+            }
+          ],
+          "verification": {
+            "confidence": "verified",
+            "sources": [
+              "https://toshiba.semicon-storage.com/us/semiconductor/product/bipolar-transistors/detail.2SA1943.html",
+              "kicad-footprint:Package_TO_SOT_THT:TO-3P-3_Vertical"
+            ],
+            "pinmap_checked": true
+          }
+        }
+      ],
+      "verification": {
+        "confidence": "verified",
+        "sources": [
+          "https://toshiba.semicon-storage.com/us/semiconductor/product/bipolar-transistors/detail.2SA1943.html",
+          "kicad-symbols:Transistor_BJT:Q_PNP_BCE",
+          "kicad-footprint:Package_TO_SOT_THT:TO-3P-3_Vertical"
+        ],
+        "resolver_checked": true,
+        "pinmap_checked": true,
+        "tests": [
+          "catalog_requested_pnp_expansion"
+        ]
+      }
+    },
+    {
+      "id": "bjt.onsemi.mjl4302ag.to264",
+      "family": "bjt",
+      "name": "onsemi MJL4302AG / MJL4302A PNP audio power transistor",
+      "description": "Active 350 V, 15 A PNP audio-output transistor in TO-264, complementary to MJL4281A.",
+      "generic": false,
+      "manufacturer": "onsemi",
+      "mpn": "MJL4302AG",
+      "lifecycle": "active",
+      "tags": [
+        "mjl4302a",
+        "mjl4302ag",
+        "audio",
+        "power",
+        "output",
+        "bjt",
+        "pnp",
+        "through_hole",
+        "to264"
+      ],
+      "ratings": [
+        {
+          "kind": "collector_emitter_voltage",
+          "max": "350",
+          "unit": "V"
+        },
+        {
+          "kind": "collector_current",
+          "max": "15",
+          "unit": "A"
+        },
+        {
+          "kind": "power_dissipation",
+          "max": "230",
+          "unit": "W"
+        }
+      ],
+      "power_semiconductor_evidence": {
+        "device_class": "bjt",
+        "polarity": "pnp",
+        "complementary_group": "onsemi_mjl4281a_mjl4302a",
+        "max_voltage": {
+          "value": 350,
+          "unit": "V",
+          "conditions": "VCEO absolute maximum"
+        },
+        "continuous_current": {
+          "value": 15,
+          "unit": "A",
+          "conditions": "absolute maximum collector current"
+        },
+        "peak_current": {
+          "value": 30,
+          "unit": "A",
+          "conditions": "manufacturer pulse limit"
+        },
+        "power_dissipation": {
+          "value": 230,
+          "unit": "W",
+          "temperature_c": 25,
+          "conditions": "case-temperature rating"
+        },
+        "max_junction_temperature_c": 150,
+        "junction_to_case_c_per_w": 0.54,
+        "secondary_breakdown_status": "review_required",
+        "linear_mode_status": "review_required",
+        "bjt": {},
+        "fabrication_proof": false,
+        "review_note": "Identity, lead order, and headline limits are verified; applied SOA and thermal assembly remain fabrication gates."
+      },
+      "symbols": [
+        {
+          "symbol_id": "Transistor_BJT:Q_PNP_BCE",
+          "function_pins": [
+            {
+              "function": "BASE",
+              "symbol_pin": "1",
+              "required": true
+            },
+            {
+              "function": "COLLECTOR",
+              "symbol_pin": "2",
+              "required": true
+            },
+            {
+              "function": "EMITTER",
+              "symbol_pin": "3",
+              "required": true
+            }
+          ],
+          "pinmap_id": "Transistor_BJT:Q_PNP_BCE|Package_TO_SOT_THT:TO-264-3_Vertical",
+          "verification": {
+            "confidence": "verified",
+            "sources": [
+              "https://www.onsemi.com/download/data-sheet/pdf/mjl4281a-d.pdf",
+              "kicad-symbols:Transistor_BJT:Q_PNP_BCE"
+            ],
+            "pinmap_checked": true
+          }
+        }
+      ],
+      "packages": [
+        {
+          "id": "to264",
+          "name": "TO-264-3 vertical",
+          "footprint_id": "Package_TO_SOT_THT:TO-264-3_Vertical",
+          "package_type": "to264",
+          "mpn": "MJL4302AG",
+          "lifecycle": "active",
+          "pinmap_id": "Transistor_BJT:Q_PNP_BCE|Package_TO_SOT_THT:TO-264-3_Vertical",
+          "pad_functions": [
+            {
+              "function": "BASE",
+              "pad": "1"
+            },
+            {
+              "function": "COLLECTOR",
+              "pad": "2"
+            },
+            {
+              "function": "EMITTER",
+              "pad": "3"
+            }
+          ],
+          "verification": {
+            "confidence": "verified",
+            "sources": [
+              "https://www.onsemi.com/download/data-sheet/pdf/mjl4281a-d.pdf",
+              "kicad-footprint:Package_TO_SOT_THT:TO-264-3_Vertical"
+            ],
+            "pinmap_checked": true
+          }
+        }
+      ],
+      "verification": {
+        "confidence": "verified",
+        "sources": [
+          "https://www.onsemi.com/download/data-sheet/pdf/mjl4281a-d.pdf",
+          "kicad-symbols:Transistor_BJT:Q_PNP_BCE",
+          "kicad-footprint:Package_TO_SOT_THT:TO-264-3_Vertical"
+        ],
+        "resolver_checked": true,
+        "pinmap_checked": true,
+        "tests": [
+          "catalog_requested_pnp_expansion"
+        ]
+      }
+    }
+  ]
+}
