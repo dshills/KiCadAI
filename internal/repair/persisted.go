@@ -3,16 +3,13 @@ package repair
 import (
 	"context"
 	"fmt"
-	"io"
 	"os"
 	"path"
 	"path/filepath"
-	"runtime"
 	"sort"
 	"strings"
-	"time"
-	"unicode/utf8"
 
+	"kicadai/internal/atomicfile"
 	"kicadai/internal/inspect"
 	"kicadai/internal/libraryresolver"
 	"kicadai/internal/manifest"
@@ -178,7 +175,7 @@ func applyPersistedBundle(ctx context.Context, targetPath string, bundle Bundle,
 		result.Status = StatusBlocked
 		return finalizePersistedResult(result)
 	}
-	applyResult, artifacts, issues := replayGeneratedTransaction(ctx, tx, outputDir, opts)
+	applyResult, artifacts, pendingCommit, issues := replayGeneratedTransaction(ctx, tx, outputDir, opts)
 	applyIssues := append([]reports.Issue(nil), applyResult.Issues...)
 	result.Artifacts = appendArtifacts(result.Artifacts, artifacts)
 	result.Issues = appendIssues(result.Issues, issues, applyIssues)
@@ -189,6 +186,12 @@ func applyPersistedBundle(ctx context.Context, targetPath string, bundle Bundle,
 		result.Validation = append(result.Validation, zoneRefillValidation.PostApplyValidation())
 		result.ZoneRefill = &zoneRefillValidation
 		if reports.HasBlockingIssue(zoneRefillValidation.Issues) {
+			if pendingCommit != nil {
+				if rollbackErr := pendingCommit.Rollback(); rollbackErr != nil {
+					result.Issues = append(result.Issues, persistedIssue(reports.CodeValidationFailed, "output.rollback", rollbackErr.Error()))
+				}
+				pendingCommit = nil
+			}
 			collectPostValidationEvidence(&result, result.Validation)
 			return finalizePersistedValidationResult(result, bundle.StageIssues)
 		}
@@ -196,10 +199,27 @@ func applyPersistedBundle(ctx context.Context, targetPath string, bundle Bundle,
 			artifact, err := refreshGeneratedManifest(outputDir)
 			if err != nil {
 				result.Issues = append(result.Issues, persistedIssue(reports.CodeValidationFailed, "manifest", err.Error()))
+				if pendingCommit != nil {
+					if rollbackErr := pendingCommit.Rollback(); rollbackErr != nil {
+						result.Issues = append(result.Issues, persistedIssue(reports.CodeValidationFailed, "output.rollback", rollbackErr.Error()))
+					}
+					pendingCommit = nil
+				}
 				collectPostValidationEvidence(&result, result.Validation)
 				return finalizePersistedValidationResult(result, bundle.StageIssues)
 			}
 			result.Artifacts = appendArtifacts(result.Artifacts, []reports.Artifact{artifact})
+			if pendingCommit != nil {
+				if err := pendingCommit.AdoptCurrent(); err != nil {
+					result.Issues = append(result.Issues, persistedIssue(reports.CodeValidationFailed, "output.post_process", err.Error()))
+					if rollbackErr := pendingCommit.Rollback(); rollbackErr != nil {
+						result.Issues = append(result.Issues, persistedIssue(reports.CodeValidationFailed, "output.rollback", rollbackErr.Error()))
+					}
+					pendingCommit = nil
+					collectPostValidationEvidence(&result, result.Validation)
+					return finalizePersistedValidationResult(result, bundle.StageIssues)
+				}
+			}
 		}
 	}
 	postValidators := append(BuiltInPostApplyValidators(opts.PostValidation), opts.PostValidators...)
@@ -210,7 +230,23 @@ func applyPersistedBundle(ctx context.Context, targetPath string, bundle Bundle,
 		Apply:       applyResult,
 	}, postValidators)...)
 	collectPostValidationEvidence(&result, result.Validation)
-	return finalizePersistedValidationResult(result, bundle.StageIssues)
+	finalized := finalizePersistedValidationResult(result, bundle.StageIssues)
+	if pendingCommit == nil {
+		return finalized
+	}
+	if finalized.Delta.Worsened || finalized.Convergence.Worse {
+		rollbackErr := pendingCommit.Rollback()
+		result.Issues = append(result.Issues, persistedIssue(reports.CodeValidationFailed, "post_validation", "post-apply validation worsened; restored the prior project"))
+		if rollbackErr != nil {
+			result.Issues = append(result.Issues, persistedIssue(reports.CodeValidationFailed, "output.rollback", rollbackErr.Error()))
+		}
+		return finalizePersistedValidationResult(result, bundle.StageIssues)
+	}
+	if commitErr := pendingCommit.Commit(); commitErr != nil {
+		result.Issues = append(result.Issues, persistedIssue(reports.CodeValidationFailed, "output.commit", commitErr.Error()))
+		return finalizePersistedValidationResult(result, bundle.StageIssues)
+	}
+	return finalized
 }
 
 func refreshGeneratedManifest(outputDir string) (reports.Artifact, error) {
@@ -526,17 +562,17 @@ func appendIssues(base []reports.Issue, groups ...[]reports.Issue) []reports.Iss
 	return out
 }
 
-func replayGeneratedTransaction(ctx context.Context, tx transactions.Transaction, outputDir string, opts PersistedApplyOptions) (transactions.ApplyResult, []reports.Artifact, []reports.Issue) {
+func replayGeneratedTransaction(ctx context.Context, tx transactions.Transaction, outputDir string, opts PersistedApplyOptions) (transactions.ApplyResult, []reports.Artifact, *persistedOutputCommit, []reports.Issue) {
 	if err := ctx.Err(); err != nil {
-		return transactions.ApplyResult{}, nil, []reports.Issue{contextIssue(err)}
+		return transactions.ApplyResult{}, nil, nil, []reports.Issue{contextIssue(err)}
 	}
 	existing, err := existingProjectDir(outputDir)
 	if err != nil {
-		return transactions.ApplyResult{}, nil, []reports.Issue{persistedIssue(reports.CodeValidationFailed, "output", err.Error())}
+		return transactions.ApplyResult{}, nil, nil, []reports.Issue{persistedIssue(reports.CodeValidationFailed, "output", err.Error())}
 	}
 	if !existing {
 		if err := ctx.Err(); err != nil {
-			return transactions.ApplyResult{}, nil, []reports.Issue{contextIssue(err)}
+			return transactions.ApplyResult{}, nil, nil, []reports.Issue{contextIssue(err)}
 		}
 		apply := transactions.Apply(tx, transactions.ApplyOptions{
 			OutputDir:     outputDir,
@@ -545,15 +581,15 @@ func replayGeneratedTransaction(ctx context.Context, tx transactions.Transaction
 			LibraryIndex:  opts.LibraryIndex,
 			LibraryIssues: opts.LibraryIssues,
 		})
-		return apply, apply.Artifacts, nil
+		return apply, apply.Artifacts, nil, nil
 	}
 	stage, err := createReplayStage(outputDir)
 	if err != nil {
-		return transactions.ApplyResult{}, nil, []reports.Issue{persistedIssue(reports.CodeValidationFailed, "output", err.Error())}
+		return transactions.ApplyResult{}, nil, nil, []reports.Issue{persistedIssue(reports.CodeValidationFailed, "output", err.Error())}
 	}
 	defer os.RemoveAll(stage)
 	if err := ctx.Err(); err != nil {
-		return transactions.ApplyResult{}, nil, []reports.Issue{contextIssue(err)}
+		return transactions.ApplyResult{}, nil, nil, []reports.Issue{contextIssue(err)}
 	}
 	apply := transactions.Apply(tx, transactions.ApplyOptions{
 		OutputDir:     stage,
@@ -564,77 +600,119 @@ func replayGeneratedTransaction(ctx context.Context, tx transactions.Transaction
 	})
 	if reports.HasBlockingIssue(apply.Issues) {
 		apply.Artifacts = nil
-		return apply, nil, nil
+		return apply, nil, nil, nil
 	}
 	if err := ctx.Err(); err != nil {
-		return apply, nil, []reports.Issue{contextIssue(err)}
+		return apply, nil, nil, []reports.Issue{contextIssue(err)}
 	}
-	artifacts, err := replaceGeneratedOutput(stage, outputDir, apply.Artifacts)
+	artifacts, pending, err := replaceGeneratedOutput(stage, outputDir, apply.Artifacts)
 	if err != nil {
-		return apply, nil, []reports.Issue{persistedIssue(reports.CodeValidationFailed, "output", err.Error())}
+		return apply, nil, nil, []reports.Issue{persistedIssue(reports.CodeValidationFailed, "output", err.Error())}
 	}
 	apply.Artifacts = artifacts
-	return apply, artifacts, nil
+	return apply, artifacts, pending, nil
 }
 
-func replaceGeneratedOutput(stage string, outputDir string, produced []reports.Artifact) ([]reports.Artifact, error) {
+type persistedOutputCommit struct {
+	group   *atomicfile.Group
+	release func()
+	closed  bool
+}
+
+func (commit *persistedOutputCommit) Commit() error {
+	if commit == nil || commit.closed {
+		return nil
+	}
+	commit.closed = true
+	err := commit.group.Commit()
+	commit.release()
+	return err
+}
+
+func (commit *persistedOutputCommit) Rollback() error {
+	if commit == nil || commit.closed {
+		return nil
+	}
+	commit.closed = true
+	err := commit.group.Rollback()
+	commit.release()
+	return err
+}
+
+func (commit *persistedOutputCommit) AdoptCurrent() error {
+	if commit == nil || commit.closed {
+		return nil
+	}
+	return commit.group.AdoptCurrent()
+}
+
+func replaceGeneratedOutput(stage string, outputDir string, produced []reports.Artifact) ([]reports.Artifact, *persistedOutputCommit, error) {
+	return replaceGeneratedOutputWithOptions(stage, outputDir, produced, atomicfile.GroupOptions{})
+}
+
+func replaceGeneratedOutputWithOptions(stage string, outputDir string, produced []reports.Artifact, groupOptions atomicfile.GroupOptions) ([]reports.Artifact, *persistedOutputCommit, error) {
 	if err := os.MkdirAll(outputDir, 0o755); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	releaseLock, err := transactions.AcquireProjectApplyLock(outputDir)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	defer releaseLock()
-	marker, err := writeRepairMarker(outputDir)
+	mutations, artifacts, err := generatedOutputMutations(stage, outputDir, produced)
 	if err != nil {
-		return nil, err
+		releaseLock()
+		return nil, nil, err
 	}
-	defer os.Remove(marker)
+	groupOptions.Root = outputDir
+	group, err := atomicfile.BeginGroup(mutations, groupOptions)
+	if err != nil {
+		releaseLock()
+		return nil, nil, err
+	}
+	return artifacts, &persistedOutputCommit{group: group, release: releaseLock}, nil
+}
+
+func generatedOutputMutations(stage string, outputDir string, produced []reports.Artifact) ([]atomicfile.Mutation, []reports.Artifact, error) {
+	mutations := make([]atomicfile.Mutation, 0, len(produced))
 	artifacts := make([]reports.Artifact, 0, len(produced))
-	var manifestArtifacts []reports.Artifact
+	producedRels := map[string]bool{}
 	for _, artifact := range produced {
 		if strings.TrimSpace(artifact.Path) == "" {
 			continue
 		}
-		rel, err := artifactRel(stage, artifact)
+		source := artifactSourcePath(stage, artifact)
+		rel, err := artifactRelFromSource(stage, source, artifact.Path)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
-		if filepath.ToSlash(rel) == manifest.RelativePath {
-			manifestArtifacts = append(manifestArtifacts, artifact)
-			continue
+		relSlash := filepath.ToSlash(rel)
+		if producedRels[relSlash] {
+			return nil, nil, fmt.Errorf("duplicate generated artifact: %s", relSlash)
 		}
-		copied, err := copyProducedArtifact(stage, outputDir, artifact)
+		producedRels[relSlash] = true
+		info, err := os.Stat(source)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
+		if !info.Mode().IsRegular() {
+			return nil, nil, fmt.Errorf("directory artifact copy is not supported: %s", artifact.Path)
+		}
+		data, err := os.ReadFile(source)
+		if err != nil {
+			return nil, nil, err
+		}
+		target := filepath.Join(outputDir, filepath.FromSlash(relSlash))
+		mutations = append(mutations, atomicfile.Mutation{Path: target, Data: data, Mode: info.Mode().Perm()})
+		copied := artifact
+		copied.Path = filepath.ToSlash(target)
 		artifacts = append(artifacts, copied)
 	}
-	if err := removeStaleGeneratedFiles(stage, outputDir); err != nil {
-		return nil, err
+	stale, err := staleGeneratedMutations(outputDir, producedRels)
+	if err != nil {
+		return nil, nil, err
 	}
-	for _, artifact := range manifestArtifacts {
-		copied, err := copyProducedArtifact(stage, outputDir, artifact)
-		if err != nil {
-			return nil, err
-		}
-		artifacts = append(artifacts, copied)
-	}
-	return artifacts, nil
-}
-
-func writeRepairMarker(outputDir string) (string, error) {
-	path := filepath.Join(outputDir, ".kicadai", "repair-in-progress")
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return "", err
-	}
-	return path, os.WriteFile(path, []byte("repair apply in progress\n"), 0o644)
-}
-
-func artifactRel(stage string, artifact reports.Artifact) (string, error) {
-	source := artifactSourcePath(stage, artifact)
-	return artifactRelFromSource(stage, source, artifact.Path)
+	mutations = append(mutations, stale...)
+	return mutations, artifacts, nil
 }
 
 func artifactRelFromSource(stage string, source string, artifactPath string) (string, error) {
@@ -649,31 +727,6 @@ func artifactRelFromSource(stage string, source string, artifactPath string) (st
 	return rel, nil
 }
 
-func copyProducedArtifact(stage string, outputDir string, artifact reports.Artifact) (reports.Artifact, error) {
-	source := artifactSourcePath(stage, artifact)
-	rel, err := artifactRelFromSource(stage, source, artifact.Path)
-	if err != nil {
-		return reports.Artifact{}, err
-	}
-	target := filepath.Join(outputDir, rel)
-	if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
-		return reports.Artifact{}, err
-	}
-	info, err := os.Stat(source)
-	if err != nil {
-		return reports.Artifact{}, err
-	}
-	if info.IsDir() {
-		return reports.Artifact{}, fmt.Errorf("directory artifact copy is not supported: %s", artifact.Path)
-	}
-	if err := atomicCopyFile(target, source, info.Mode().Perm()); err != nil {
-		return reports.Artifact{}, err
-	}
-	copied := artifact
-	copied.Path = filepath.ToSlash(target)
-	return copied, nil
-}
-
 func artifactSourcePath(stage string, artifact reports.Artifact) string {
 	source := filepath.FromSlash(artifact.Path)
 	if filepath.IsAbs(source) {
@@ -682,79 +735,52 @@ func artifactSourcePath(stage string, artifact reports.Artifact) string {
 	return filepath.Join(stage, source)
 }
 
-func removeStaleGeneratedFiles(stage string, outputDir string) error {
+func staleGeneratedMutations(outputDir string, produced map[string]bool) ([]atomicfile.Mutation, error) {
 	previous, status, err := manifest.Read(outputDir)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if !status.Present {
-		return nil
+		return nil, nil
 	}
-	managedDirs := map[string]struct{}{}
 	previousFiles := map[string]struct{}{manifest.RelativePath: {}}
 	for rel := range previous.FileHashes {
 		previousFiles[filepath.ToSlash(rel)] = struct{}{}
 	}
+	rels := make([]string, 0, len(previousFiles))
 	for rel := range previousFiles {
+		rels = append(rels, rel)
+	}
+	sort.Strings(rels)
+	var mutations []atomicfile.Mutation
+	for _, rel := range rels {
 		if !safeManifestRel(rel) {
-			return fmt.Errorf("unsafe generated manifest path: %s", rel)
+			return nil, fmt.Errorf("unsafe generated manifest path: %s", rel)
 		}
-		if !managedGeneratedFile(rel) {
+		if !managedGeneratedFile(rel) || produced[filepath.ToSlash(rel)] || reservedMutationPath(rel) {
 			continue
-		}
-		if _, err := os.Stat(filepath.Join(stage, filepath.FromSlash(rel))); err == nil {
-			continue
-		} else if !os.IsNotExist(err) {
-			return err
 		}
 		target := filepath.Join(outputDir, filepath.FromSlash(rel))
-		if err := os.RemoveAll(target); err != nil && !os.IsNotExist(err) {
-			return err
-		}
-		for dir := filepath.Dir(target); childDir(outputDir, dir); dir = filepath.Dir(dir) {
-			if _, ok := managedDirs[dir]; ok {
-				break
+		if info, err := os.Stat(target); err == nil {
+			if !info.Mode().IsRegular() {
+				return nil, fmt.Errorf("stale generated target is not a regular file: %s", rel)
 			}
-			relDir, err := filepath.Rel(outputDir, dir)
-			if err != nil {
-				break
-			}
-			if managedGeneratedDir(relDir) {
-				managedDirs[dir] = struct{}{}
-			}
-		}
-	}
-	dirs := make([]string, 0, len(managedDirs))
-	for dir := range managedDirs {
-		dirs = append(dirs, dir)
-	}
-	sort.Slice(dirs, func(i, j int) bool {
-		return len(dirs[i]) > len(dirs[j])
-	})
-	for _, dir := range dirs {
-		entries, err := os.ReadDir(dir)
-		if err != nil {
-			if os.IsNotExist(err) {
-				continue
-			}
-			return err
-		}
-		if len(entries) > 0 {
+			mutations = append(mutations, atomicfile.Mutation{Path: target, Delete: true, Mode: info.Mode().Perm()})
+		} else if os.IsNotExist(err) {
 			continue
-		}
-		if err := os.Remove(dir); err != nil && !os.IsNotExist(err) {
-			return err
+		} else {
+			return nil, err
 		}
 	}
-	return nil
+	return mutations, nil
 }
 
-func childDir(base string, target string) bool {
-	rel, err := filepath.Rel(base, target)
-	if err != nil {
-		return false
-	}
-	return rel != "." && rel != ".." && !strings.HasPrefix(filepath.ToSlash(rel), "../")
+func reservedMutationPath(rel string) bool {
+	slash := filepath.ToSlash(rel)
+	return slash == atomicfile.JournalRelativePath ||
+		slash == atomicfile.MutationLockRelativePath ||
+		slash == transactions.ApplyLockFileName ||
+		strings.HasPrefix(slash, ".kicadai/repair-stage-")
 }
 
 func managedGeneratedFile(rel string) bool {
@@ -781,109 +807,9 @@ func safeManifestRel(rel string) bool {
 	return clean != ".." && !strings.HasPrefix(filepath.ToSlash(clean), "../")
 }
 
-func managedGeneratedDir(rel string) bool {
-	return managedGeneratedPath(rel)
-}
-
 func managedGeneratedPath(rel string) bool {
 	slash := strings.ToLower(filepath.ToSlash(rel))
 	return slash == ".kicadai" || strings.HasPrefix(slash, ".kicadai/")
-}
-
-func atomicCopyFile(path string, source string, perm os.FileMode) error {
-	input, err := os.Open(source)
-	if err != nil {
-		return err
-	}
-	defer input.Close()
-	dir := filepath.Dir(path)
-	if dir == "" {
-		dir = "."
-	}
-	base := filepath.Base(path)
-	if len(base) > 180 {
-		ext := filepath.Ext(base)
-		stem := strings.TrimSuffix(base, ext)
-		if len(ext) > 40 {
-			ext = truncateRunes(ext, 40)
-		}
-		limit := 180 - len(ext)
-		if limit < 20 {
-			limit = 20
-		}
-		if len(stem) > limit {
-			stem = truncateRunes(stem, limit)
-		}
-		base = stem + ext
-	}
-	file, err := os.CreateTemp(dir, "."+base+".tmp-*")
-	if err != nil {
-		return err
-	}
-	tempName := file.Name()
-	closed := false
-	removeTemp := true
-	defer func() {
-		if !closed {
-			_ = file.Close()
-		}
-		if removeTemp {
-			_ = os.Remove(tempName)
-		}
-	}()
-	if _, err := io.Copy(file, input); err != nil {
-		return err
-	}
-	if err := file.Chmod(perm); err != nil {
-		return err
-	}
-	if err := file.Sync(); err != nil {
-		return err
-	}
-	if err := file.Close(); err != nil {
-		return err
-	}
-	closed = true
-	if err := renameWithRetry(tempName, path); err != nil {
-		return err
-	}
-	removeTemp = false
-	return nil
-}
-
-func renameWithRetry(oldPath string, newPath string) error {
-	var err error
-	err = os.Rename(oldPath, newPath)
-	if err == nil || runtime.GOOS != "windows" {
-		return err
-	}
-	for attempt := 0; attempt < 2; attempt++ {
-		time.Sleep(time.Duration(attempt+1) * 50 * time.Millisecond)
-		if err = os.Rename(oldPath, newPath); err == nil {
-			return nil
-		}
-	}
-	return err
-}
-
-func truncateRunes(value string, maxBytes int) string {
-	if len(value) <= maxBytes {
-		return value
-	}
-	out := make([]rune, 0, maxBytes)
-	total := 0
-	for _, r := range value {
-		size := utf8.RuneLen(r)
-		if size < 0 {
-			size = 1
-		}
-		if total+size > maxBytes {
-			break
-		}
-		out = append(out, r)
-		total += size
-	}
-	return string(out)
 }
 
 func requiresOverwrite(outputDir string) (bool, error) {

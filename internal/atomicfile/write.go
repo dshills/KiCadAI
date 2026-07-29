@@ -2,12 +2,8 @@
 package atomicfile
 
 import (
-	"errors"
 	"os"
 	"path/filepath"
-	"runtime"
-	"syscall"
-	"time"
 )
 
 // Write replaces path with data using a temporary file in the same directory.
@@ -45,43 +41,8 @@ func Write(path string, data []byte, mode os.FileMode) error {
 		return err
 	}
 	committed = true
-	if runtime.GOOS != "windows" {
-		if err := syncDirectory(filepath.Dir(path)); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func syncDirectory(path string) (err error) {
-	directory, err := os.Open(path)
-	if err != nil {
-		return err
-	}
-	defer func() {
-		if closeErr := directory.Close(); err == nil && closeErr != nil {
-			err = closeErr
-		}
-	}()
-	if err := directory.Sync(); err != nil && !errors.Is(err, syscall.EINVAL) && !errors.Is(err, syscall.ENOTSUP) && !errors.Is(err, syscall.ENOSYS) {
+	if err := syncDirectory(filepath.Dir(path)); err != nil {
 		return err
 	}
 	return nil
-}
-
-func replace(source string, destination string) error {
-	attempts := 1
-	if runtime.GOOS == "windows" {
-		attempts = 6
-	}
-	var err error
-	for attempt := 0; attempt < attempts; attempt++ {
-		if err = os.Rename(source, destination); err == nil {
-			return nil
-		}
-		if attempt+1 < attempts {
-			time.Sleep(time.Duration(attempt+1) * 20 * time.Millisecond)
-		}
-	}
-	return err
 }

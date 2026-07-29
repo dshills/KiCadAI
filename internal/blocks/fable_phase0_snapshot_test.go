@@ -1,6 +1,7 @@
 package blocks
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -67,7 +68,7 @@ func TestFablePhase0NormalizedBlockOperationSnapshots(t *testing.T) {
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
 			registry := NewBuiltinRegistry()
-			output, issues := registry.Instantiate(t.Context(), testCase.request)
+			output, issues := registry.Instantiate(context.Background(), testCase.request)
 			if reports.HasBlockingIssue(issues) {
 				t.Fatalf("instantiate issues = %#v", issues)
 			}

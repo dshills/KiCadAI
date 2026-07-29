@@ -1,15 +1,19 @@
 package transactions
 
 import (
+	"bytes"
 	"crypto/sha1"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
-	"runtime"
+	"sort"
 	"strconv"
 	"strings"
 
+	"kicadai/internal/atomicfile"
 	"kicadai/internal/kicadfiles"
 	kicaddesign "kicadai/internal/kicadfiles/design"
 	"kicadai/internal/kicadfiles/designapi"
@@ -516,37 +520,7 @@ func operationSummariesForApply(tx Transaction) []manifest.OperationSummary {
 }
 
 func writeFileAtomic(path string, data []byte, perm os.FileMode) error {
-	dir := filepath.Dir(path)
-	base := filepath.Base(path)
-	if runes := []rune(base); len(runes) > 128 {
-		base = string(runes[:128])
-	}
-	tmp, err := os.CreateTemp(dir, "."+base+".tmp-*")
-	if err != nil {
-		return err
-	}
-	tmpPath := tmp.Name()
-	closed := false
-	defer func() {
-		if !closed {
-			_ = tmp.Close()
-		}
-		_ = os.Remove(tmpPath)
-	}()
-	if _, err := tmp.Write(data); err != nil {
-		return err
-	}
-	if err := tmp.Chmod(perm); err != nil {
-		return err
-	}
-	if err := tmp.Sync(); err != nil {
-		return err
-	}
-	if err := tmp.Close(); err != nil {
-		return err
-	}
-	closed = true
-	return os.Rename(tmpPath, path)
+	return atomicfile.Write(path, data, perm)
 }
 
 func builderFromTransaction(tx Transaction, opts ApplyOptions) (*designapi.Builder, error) {
@@ -1120,7 +1094,7 @@ func writeImportedProject(root string, base string, design kicaddesign.Design, s
 		normalizeImportedSchematic(design.Schematic)
 		path := filepath.Join(root, base+".kicad_sch")
 		file := design.Schematic
-		writes = append(writes, importedProjectWrite{path: path, write: func(f *os.File) error { return schematic.Write(f, *file) }})
+		writes = append(writes, importedProjectWrite{path: path, write: func(writer io.Writer) error { return schematic.Write(writer, *file) }})
 		artifacts = append(artifacts, reports.Artifact{Kind: reports.ArtifactSchematic, Path: filepath.ToSlash(path)})
 	}
 	if pcbDirty {
@@ -1130,7 +1104,7 @@ func writeImportedProject(root string, base string, design kicaddesign.Design, s
 		normalizeImportedPCB(design.PCB)
 		path := filepath.Join(root, base+".kicad_pcb")
 		file := design.PCB
-		writes = append(writes, importedProjectWrite{path: path, write: func(f *os.File) error { return pcb.Write(f, *file) }})
+		writes = append(writes, importedProjectWrite{path: path, write: func(writer io.Writer) error { return pcb.Write(writer, *file) }})
 		artifacts = append(artifacts, reports.Artifact{Kind: reports.ArtifactPCB, Path: filepath.ToSlash(path)})
 	}
 	if err := writeImportedProjectFilesAtomic(writes); err != nil {
@@ -1141,84 +1115,73 @@ func writeImportedProject(root string, base string, design kicaddesign.Design, s
 
 type importedProjectWrite struct {
 	path  string
-	write func(*os.File) error
-}
-
-type stagedImportedProjectWrite struct {
-	target      string
-	temp        string
-	backup      string
-	hadOriginal bool
+	write func(io.Writer) error
 }
 
 func writeImportedProjectFilesAtomic(writes []importedProjectWrite) error {
 	if len(writes) == 0 {
 		return nil
 	}
-	staged := make([]stagedImportedProjectWrite, 0, len(writes))
-	cleanup := true
-	defer func() {
-		if cleanup {
-			for _, file := range staged {
-				_ = os.Remove(file.temp)
-			}
-		}
-	}()
+	root := filepath.Dir(writes[0].path)
+	mutations := make([]atomicfile.Mutation, 0, len(writes))
 	for _, write := range writes {
-		temp, err := renderImportedProjectTempFile(write.path, write.write)
-		if err != nil {
+		var rendered bytes.Buffer
+		if err := write.write(&rendered); err != nil {
 			return err
 		}
-		staged = append(staged, stagedImportedProjectWrite{target: write.path, temp: temp})
-	}
-	for _, file := range staged {
-		if err := validateStagedImportedProjectWrite(file); err != nil {
+		mode := os.FileMode(0o644)
+		if info, err := os.Stat(write.path); err == nil {
+			mode = info.Mode().Perm()
+		} else if !os.IsNotExist(err) {
 			return err
 		}
+		mutations = append(mutations, atomicfile.Mutation{Path: write.path, Data: rendered.Bytes(), Mode: mode})
 	}
-	for i := range staged {
-		if err := backupImportedProjectTarget(&staged[i]); err != nil {
-			restoreImportedProjectBackups(staged[:i])
-			return err
-		}
-	}
-	for i, file := range staged {
-		if err := os.Rename(file.temp, file.target); err != nil {
-			rollbackImportedProjectWrites(staged[:i])
-			restoreImportedProjectBackups(staged[i:])
-			return err
-		}
-	}
-	if err := syncImportedProjectDirs(staged); err != nil {
-		rollbackImportedProjectWrites(staged)
+	group, err := atomicfile.BeginGroup(mutations, atomicfile.GroupOptions{
+		Root: root,
+		ValidateStaged: func(stagedByTarget map[string]string) error {
+			targets := make([]string, 0, len(stagedByTarget))
+			for target := range stagedByTarget {
+				targets = append(targets, target)
+			}
+			sort.Strings(targets)
+			for _, target := range targets {
+				if err := validateStagedImportedProjectWrite(target, stagedByTarget[target]); err != nil {
+					return err
+				}
+			}
+			return nil
+		},
+	})
+	if err != nil {
 		return err
 	}
-	for _, file := range staged {
-		if file.backup != "" {
-			_ = os.Remove(file.backup)
+	if err := validateImportedProjectReadback(root); err != nil {
+		if rollbackErr := group.Rollback(); rollbackErr != nil {
+			return errors.Join(err, fmt.Errorf("rollback imported project: %w", rollbackErr))
 		}
+		return err
 	}
-	cleanup = false
-	return nil
+	return group.Commit()
 }
 
-func validateStagedImportedProjectWrite(file stagedImportedProjectWrite) error {
+func validateStagedImportedProjectWrite(target string, stagedPath string) error {
 	// Re-read the live source at the last pre-replacement boundary. The design
 	// held by applyImported has already been mutated, so using it as the source
 	// would hide substitutions and would not protect against an externally
 	// changed target.
-	if _, err := os.Stat(file.target); os.IsNotExist(err) {
+	if _, err := os.Stat(target); os.IsNotExist(err) {
 		return nil
 	} else if err != nil {
 		return err
 	}
-	switch filepath.Ext(file.target) {
+	switch filepath.Ext(target) {
 	case ".kicad_pcb":
-		source, err := pcb.ReadFile(file.target)
+		source, err := pcb.ReadFile(target)
 		if err != nil {
 			return fmt.Errorf("read imported PCB preservation source: %w", err)
 		}
-		staged, err := pcb.ReadFile(file.temp)
+		staged, err := pcb.ReadFile(stagedPath)
 		if err != nil {
 			return fmt.Errorf("read staged imported PCB: %w", err)
 		}
@@ -1226,11 +1189,11 @@ func validateStagedImportedProjectWrite(file stagedImportedProjectWrite) error {
 			return err
 		}
 	case ".kicad_sch":
-		source, err := schematic.ReadFile(file.target)
+		source, err := schematic.ReadFile(target)
 		if err != nil {
 			return fmt.Errorf("read imported schematic preservation source: %w", err)
 		}
-		staged, err := schematic.ReadFile(file.temp)
+		staged, err := schematic.ReadFile(stagedPath)
 		if err != nil {
 			return fmt.Errorf("read staged imported schematic: %w", err)
 		}
@@ -1239,118 +1202,6 @@ func validateStagedImportedProjectWrite(file stagedImportedProjectWrite) error {
 		}
 	}
 	return nil
-}
-
-func backupImportedProjectTarget(file *stagedImportedProjectWrite) error {
-	if _, err := os.Stat(file.target); os.IsNotExist(err) {
-		return nil
-	} else if err != nil {
-		return err
-	}
-	tmp, err := os.CreateTemp(filepath.Dir(file.target), "."+filepath.Base(file.target)+".backup-*")
-	if err != nil {
-		return err
-	}
-	backupPath := tmp.Name()
-	if err := tmp.Close(); err != nil {
-		_ = os.Remove(backupPath)
-		return err
-	}
-	if err := os.Rename(file.target, backupPath); err != nil {
-		_ = os.Remove(backupPath)
-		return err
-	}
-	file.backup = backupPath
-	file.hadOriginal = true
-	return nil
-}
-
-func rollbackImportedProjectWrites(files []stagedImportedProjectWrite) {
-	for i := len(files) - 1; i >= 0; i-- {
-		file := files[i]
-		if file.hadOriginal {
-			_ = os.Rename(file.backup, file.target)
-		} else {
-			_ = os.Remove(file.target)
-		}
-	}
-}
-
-func restoreImportedProjectBackups(files []stagedImportedProjectWrite) {
-	for i := len(files) - 1; i >= 0; i-- {
-		file := files[i]
-		if file.hadOriginal {
-			_ = os.Rename(file.backup, file.target)
-		}
-	}
-}
-
-func syncImportedProjectDirs(files []stagedImportedProjectWrite) error {
-	if runtime.GOOS == "windows" {
-		return nil
-	}
-	seen := map[string]struct{}{}
-	for _, file := range files {
-		dir := filepath.Dir(file.target)
-		if _, ok := seen[dir]; ok {
-			continue
-		}
-		seen[dir] = struct{}{}
-		handle, err := os.Open(dir)
-		if err != nil {
-			return err
-		}
-		if err := handle.Sync(); err != nil {
-			_ = handle.Close()
-			return err
-		}
-		if err := handle.Close(); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func renderImportedProjectTempFile(path string, write func(*os.File) error) (string, error) {
-	dir := filepath.Dir(path)
-	mode := os.FileMode(0o644)
-	if info, err := os.Stat(path); err == nil {
-		mode = info.Mode().Perm()
-	} else if !os.IsNotExist(err) {
-		return "", err
-	}
-	tmp, err := os.CreateTemp(dir, "."+filepath.Base(path)+".tmp-*")
-	if err != nil {
-		return "", err
-	}
-	closed := false
-	defer func() {
-		if !closed {
-			_ = tmp.Close()
-		}
-	}()
-	tmpPath := tmp.Name()
-	cleanup := true
-	defer func() {
-		if cleanup {
-			_ = os.Remove(tmpPath)
-		}
-	}()
-	if err := write(tmp); err != nil {
-		return "", err
-	}
-	if err := tmp.Chmod(mode); err != nil {
-		return "", err
-	}
-	if err := tmp.Sync(); err != nil {
-		return "", err
-	}
-	if err := tmp.Close(); err != nil {
-		return "", err
-	}
-	closed = true
-	cleanup = false
-	return tmpPath, nil
 }
 
 func normalizeImportedSchematic(file *schematic.SchematicFile) {
@@ -1431,117 +1282,43 @@ func normalizeImportedPCB(board *pcb.PCBFile) {
 }
 
 func writeSchematicAtomic(path string, file schematic.SchematicFile) error {
-	return writeAtomic(path, func(f *os.File) error { return schematic.Write(f, file) })
+	return writeAtomic(path, func(writer io.Writer) error { return schematic.Write(writer, file) })
 }
 
 func writePCBAtomic(path string, file pcb.PCBFile) error {
-	return writeAtomic(path, func(f *os.File) error { return pcb.Write(f, file) })
+	return writeAtomic(path, func(writer io.Writer) error { return pcb.Write(writer, file) })
 }
 
-func writeAtomic(path string, write func(*os.File) error) error {
-	dir := filepath.Dir(path)
+func writeAtomic(path string, write func(io.Writer) error) error {
 	mode := os.FileMode(0o644)
 	if info, err := os.Stat(path); err == nil {
 		mode = info.Mode().Perm()
 	} else if !os.IsNotExist(err) {
 		return err
 	}
-	tmp, err := os.CreateTemp(dir, "."+filepath.Base(path)+".tmp-*")
-	if err != nil {
+	var rendered bytes.Buffer
+	if err := write(&rendered); err != nil {
 		return err
 	}
-	tmpPath := tmp.Name()
-	cleanup := true
-	defer func() {
-		if cleanup {
-			_ = os.Remove(tmpPath)
-		}
-	}()
-	if err := write(tmp); err != nil {
-		_ = tmp.Close()
-		return err
-	}
-	_ = tmp.Chmod(mode)
-	if err := tmp.Sync(); err != nil {
-		_ = tmp.Close()
-		return err
-	}
-	if err := tmp.Close(); err != nil {
-		return err
-	}
-	if err := os.Rename(tmpPath, path); err != nil {
-		return err
-	}
-	cleanup = false
-	return nil
+	return atomicfile.Write(path, rendered.Bytes(), mode)
 }
 
 func AcquireProjectApplyLock(root string) (func(), error) {
 	lockPath := filepath.Join(root, applyLockFileName)
-	file, err := createApplyLock(lockPath)
+	lock, err := atomicfile.AcquireLock(lockPath)
 	if err != nil {
-		if !os.IsExist(err) {
-			return nil, err
+		if errors.Is(err, atomicfile.ErrLockHeld) {
+			return nil, fmt.Errorf("project apply lock already exists: %s: %w", lockPath, err)
 		}
-		if stale, staleErr := removeStaleApplyLock(lockPath); staleErr != nil {
-			return nil, staleErr
-		} else if !stale {
-			return nil, fmt.Errorf("project apply lock already exists: %s", lockPath)
-		}
-		file, err = createApplyLock(lockPath)
-		if err != nil {
-			if os.IsExist(err) {
-				return nil, fmt.Errorf("project apply lock already exists: %s", lockPath)
-			}
-			return nil, err
-		}
-	}
-	if _, err := fmt.Fprintf(file, "pid=%d\n", os.Getpid()); err != nil {
-		_ = file.Close()
-		_ = os.Remove(lockPath)
 		return nil, err
 	}
-	if err := file.Close(); err != nil {
-		_ = os.Remove(lockPath)
-		return nil, err
+	if err := atomicfile.RecoverGroup(root); err != nil {
+		_ = lock.Release()
+		return nil, fmt.Errorf("recover project mutation: %w", err)
 	}
 	return func() {
-		_ = os.Remove(lockPath)
+		_ = lock.Release()
 	}, nil
-}
-
-func createApplyLock(lockPath string) (*os.File, error) {
-	return os.OpenFile(lockPath, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600)
-}
-
-func removeStaleApplyLock(lockPath string) (bool, error) {
-	data, err := os.ReadFile(lockPath)
-	if err != nil {
-		return false, err
-	}
-	pid, ok := parseApplyLockPID(string(data))
-	if !ok || processAlive(pid) {
-		return false, nil
-	}
-	if err := os.Remove(lockPath); err != nil && !os.IsNotExist(err) {
-		return false, err
-	}
-	return true, nil
-}
-
-func parseApplyLockPID(contents string) (int, bool) {
-	for _, line := range strings.Split(contents, "\n") {
-		key, value, ok := strings.Cut(strings.TrimSpace(line), "=")
-		if !ok || key != "pid" {
-			continue
-		}
-		pid, err := strconv.Atoi(strings.TrimSpace(value))
-		if err != nil || pid <= 0 {
-			return 0, false
-		}
-		return pid, true
-	}
-	return 0, false
 }
 
 func applyIssue(index int, err error) reports.Issue {

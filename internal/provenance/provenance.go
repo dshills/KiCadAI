@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"kicadai/internal/atomicfile"
 	"kicadai/internal/manifest"
 	"kicadai/internal/reports"
 	"kicadai/internal/transactions"
@@ -131,7 +132,7 @@ func Write(root string, provenance TransactionProvenance) (reports.Artifact, err
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return reports.Artifact{}, err
 	}
-	if err := atomicWriteFile(path, data, 0o644); err != nil {
+	if err := atomicfile.Write(path, data, 0o644); err != nil {
 		return reports.Artifact{}, err
 	}
 	return reports.Artifact{Kind: reports.ArtifactValidationReport, Path: RelativePath, Description: "KiCadAI generated transaction provenance"}, nil
@@ -199,38 +200,4 @@ func AbsPath(root string, rel string) (string, error) {
 
 func issue(path string, message string) reports.Issue {
 	return reports.Issue{Code: reports.CodeInvalidArgument, Severity: reports.SeverityBlocked, Path: path, Message: message}
-}
-
-func atomicWriteFile(path string, data []byte, perm os.FileMode) error {
-	dir := filepath.Dir(path)
-	base := filepath.Base(path)
-	if len(base) > 128 {
-		base = base[:128]
-	}
-	file, err := os.CreateTemp(dir, "."+base+".tmp-*")
-	if err != nil {
-		return err
-	}
-	tempName := file.Name()
-	closed := false
-	defer func() {
-		if !closed {
-			_ = file.Close()
-		}
-		_ = os.Remove(tempName)
-	}()
-	if _, err := file.Write(data); err != nil {
-		return err
-	}
-	if err := file.Chmod(perm); err != nil {
-		return err
-	}
-	if err := file.Sync(); err != nil {
-		return err
-	}
-	if err := file.Close(); err != nil {
-		return err
-	}
-	closed = true
-	return os.Rename(tempName, path)
 }

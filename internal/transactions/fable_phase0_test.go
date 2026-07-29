@@ -1,27 +1,43 @@
 package transactions
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
+
+	"kicadai/internal/atomicfile"
 )
 
-func TestFableH6ReproductionBackupStepRemovesLiveImportedFile(t *testing.T) {
-	target := filepath.Join(t.TempDir(), "demo.kicad_pcb")
+func TestFableH6ImportedCommitNeverRemovesLiveFileBeforeReplacement(t *testing.T) {
+	root := t.TempDir()
+	target := filepath.Join(root, "demo.kicad_pcb")
 	if err := os.WriteFile(target, []byte("original"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	staged := stagedImportedProjectWrite{target: target}
-	if err := backupImportedProjectTarget(&staged); err != nil {
+	_, err := atomicfile.BeginGroup([]atomicfile.Mutation{
+		{Path: target, Data: []byte("replacement"), Mode: 0o644},
+	}, atomicfile.GroupOptions{
+		Root:            root,
+		PreserveOnError: true,
+		Fault: func(transition atomicfile.Transition) error {
+			if transition == atomicfile.TransitionReplacement {
+				return errors.New("simulated process interruption")
+			}
+			return nil
+		},
+	})
+	if err == nil {
+		t.Fatal("expected injected interruption")
+	}
+	if _, statErr := os.Stat(target); statErr != nil {
+		t.Fatalf("live target was missing at an observable commit boundary: %v", statErr)
+	}
+	release, err := AcquireProjectApplyLock(root)
+	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := os.Stat(target); !os.IsNotExist(err) {
-		t.Fatalf("live target remains present after backup step: %v", err)
-	}
-	if staged.backup == "" {
-		t.Fatal("backup path was not recorded")
-	}
-	restoreImportedProjectBackups([]stagedImportedProjectWrite{staged})
+	release()
 	restored, err := os.ReadFile(target)
 	if err != nil {
 		t.Fatalf("read restored target: %v", err)
@@ -31,7 +47,7 @@ func TestFableH6ReproductionBackupStepRemovesLiveImportedFile(t *testing.T) {
 	}
 }
 
-func TestFableH7ReproductionReleaseRemovesReplacementLock(t *testing.T) {
+func TestFableH7ReleaseCannotRemoveReplacementOwnerLock(t *testing.T) {
 	root := t.TempDir()
 	release, err := AcquireProjectApplyLock(root)
 	if err != nil {
@@ -45,7 +61,11 @@ func TestFableH7ReproductionReleaseRemovesReplacementLock(t *testing.T) {
 		t.Fatal(err)
 	}
 	release()
-	if _, err := os.Stat(lockPath); !os.IsNotExist(err) {
-		t.Fatalf("release retained a replacement owner's lock: %v", err)
+	replacement, err := os.ReadFile(lockPath)
+	if err != nil {
+		t.Fatalf("release removed a replacement owner's lock: %v", err)
+	}
+	if string(replacement) != "pid=999999\nowner=replacement\n" {
+		t.Fatalf("replacement lock changed: %q", replacement)
 	}
 }

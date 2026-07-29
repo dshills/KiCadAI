@@ -307,6 +307,11 @@ func TestApplyPersistedBundlePostValidationRepeatedBlockingIsBlocked(t *testing.
 
 func TestApplyPersistedBundlePostValidationWorsenedIssueCountBlocks(t *testing.T) {
 	output, bundle := persistedOutlineFixture(t)
+	boardPath := filepath.Join(output, "demo.kicad_pcb")
+	before, err := os.ReadFile(boardPath)
+	if err != nil {
+		t.Fatal(err)
+	}
 	result := ApplyPersistedBundle(output, bundle, PersistedApplyOptions{
 		Execute:        true,
 		Overwrite:      true,
@@ -321,6 +326,16 @@ func TestApplyPersistedBundlePostValidationWorsenedIssueCountBlocks(t *testing.T
 	})
 	if result.Status != StatusBlocked {
 		t.Fatalf("expected blocked validation result, got %#v", result)
+	}
+	after, err := os.ReadFile(boardPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(after) != string(before) {
+		t.Fatalf("worsened validation did not restore prior board:\nbefore=%s\nafter=%s", before, after)
+	}
+	if !containsIssueMessage(result.Issues, "restored the prior project") {
+		t.Fatalf("rollback was not reported: %#v", result.Issues)
 	}
 }
 

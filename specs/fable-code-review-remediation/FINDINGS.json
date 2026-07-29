@@ -104,33 +104,33 @@
       "id": "H6",
       "severity": "high",
       "package": "internal/transactions",
-      "disposition": "reproduced_pending",
+      "disposition": "closed",
       "implementation_phase": 4,
       "reproduction": {
-        "test": "TestFableH6ReproductionBackupStepRemovesLiveImportedFile",
+        "test": "TestFableH6ImportedCommitNeverRemovesLiveFileBeforeReplacement",
         "path": "internal/transactions/fable_phase0_test.go",
-        "command": "go test ./internal/transactions -run '^TestFableH6ReproductionBackupStepRemovesLiveImportedFile$' -count=1"
+        "command": "go test ./internal/transactions -run '^TestFableH6ImportedCommitNeverRemovesLiveFileBeforeReplacement$' -count=1"
       },
       "affected_capabilities": ["imported_project_write", "multi_file_durability"],
       "historical_evidence": "atomic individual-file writes do not prove recoverable group commit",
-      "current_evidence": "pending Phase 4 recoverable group commit",
-      "closing_commit": null
+      "current_evidence": "reverified by same-directory staging, retained copy backups, synced group journal, hash-checked rollback, and deterministic interruption recovery",
+      "closing_commit": "Make project mutation recoverable"
     },
     {
       "id": "H7",
       "severity": "high",
       "package": "internal/transactions",
-      "disposition": "reproduced_pending",
+      "disposition": "closed",
       "implementation_phase": 4,
       "reproduction": {
-        "test": "TestFableH7ReproductionReleaseRemovesReplacementLock",
+        "test": "TestFableH7ReleaseCannotRemoveReplacementOwnerLock",
         "path": "internal/transactions/fable_phase0_test.go",
-        "command": "go test ./internal/transactions -run '^TestFableH7ReproductionReleaseRemovesReplacementLock$' -count=1"
+        "command": "go test ./internal/transactions -run '^TestFableH7ReleaseCannotRemoveReplacementOwnerLock$' -count=1"
       },
       "affected_capabilities": ["project_apply_lock", "concurrent_mutation_exclusion"],
       "historical_evidence": "existing-lock tests do not prove lock ownership during stale recovery or release",
-      "current_evidence": "pending Phase 4 ownership-safe locking",
-      "closing_commit": null
+      "current_evidence": "reverified by nonce ownership, token-checked takeover and release, process identity, and advisory-lock concurrency tests",
+      "closing_commit": "Make project mutation recoverable"
     },
     {
       "id": "H8",
@@ -168,17 +168,17 @@
       "id": "H10",
       "severity": "high",
       "package": "internal/repair",
-      "disposition": "reproduced_pending",
+      "disposition": "closed",
       "implementation_phase": 4,
       "reproduction": {
-        "test": "TestFableH10ReproductionFailedReplacementLeavesMixedOutputWithoutMarker",
+        "test": "TestFableH10InterruptedReplacementRecoversAllOldWithJournal",
         "path": "internal/repair/fable_phase0_test.go",
-        "command": "go test ./internal/repair -run '^TestFableH10ReproductionFailedReplacementLeavesMixedOutputWithoutMarker$' -count=1"
+        "command": "go test ./internal/repair -run '^TestFableH10InterruptedReplacementRecoversAllOldWithJournal$' -count=1"
       },
       "affected_capabilities": ["persisted_repair_apply", "multi_file_durability", "repair_recovery"],
       "historical_evidence": "individual atomic copies do not prove rollback or retained interruption evidence",
-      "current_evidence": "pending Phase 4 recoverable group commit and rollback",
-      "closing_commit": null
+      "current_evidence": "reverified by the shared journaled group commit, retained interruption evidence, post-validation rollback, and all-old recovery proof",
+      "closing_commit": "Make project mutation recoverable"
     },
     {
       "id": "H11",

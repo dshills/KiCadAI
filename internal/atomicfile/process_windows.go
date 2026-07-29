@@ -1,12 +1,10 @@
 //go:build windows
 
-package transactions
+package atomicfile
 
 import "syscall"
 
-const (
-	windowsProcessQueryLimitedInformation = 0x1000
-)
+const windowsProcessQueryLimitedInformation = 0x1000
 
 func processAlive(pid int) bool {
 	if pid <= 0 {

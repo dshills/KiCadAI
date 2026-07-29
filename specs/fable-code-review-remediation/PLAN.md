@@ -1,7 +1,7 @@
 # Fable Code Review Remediation Plan
 
 Date: 2026-07-29
-Status: In progress (Phases 0–3 complete)
+Status: In progress (Phases 0–4 complete)
 Baseline commit: `7c7fd9c0`
 Source review: [`../FABLE_CODE_REVIEW_07_29_26.md`](../FABLE_CODE_REVIEW_07_29_26.md)
 
@@ -13,7 +13,8 @@ Source review: [`../FABLE_CODE_REVIEW_07_29_26.md`](../FABLE_CODE_REVIEW_07_29_2
 | 1. Electrical topology correctness | Complete locally | Catalog-aware topology projection covers diode/BJT functions, supply/output ports, and exported port contact; AC op-amp feedback references midpoint bias and preserves supported gain within 2%; block verification, design workflow, writer/round-trip checks, and the installed-KiCad amplifier/ESP32/USB-C fixture matrix pass. The structurally verified diode-string blocks retain their explicit unsupported quiescent-current/fabrication claims. |
 | 2. Honest acceptance, repair, and CLI results | Complete locally | Transactions reject mutation after `write_project` and late footprint assignment; footprint repair inserts before placement/write; persisted repairs retain originating issues unless supported post-mutation validation proves them absent; required KiCad evidence fails closed; unsupported required retry DRC policy is rejected; blocking place/route/repair/check reports return errors. Focused suites, full `go test -short ./...`, lint, writer/round-trip tests, and the installed-KiCad amplifier/ESP32/USB-C fixture matrix pass. |
 | 3. Imported KiCad preservation | Complete locally | PCB and schematic readers inventory fully modeled, safely raw-preserved, and mutation-unsupported constructs. Imported board metadata, custom paper, setup/plot data, footprint metadata/text/models/unknown children, schematic presentation nodes, and keepouts survive read-modify-write. Duplicate singleton constructs fail closed. Staged output is internally re-read and compared with source preservation evidence before any live replacement. Focused reader, round-trip, transaction, and unchanged-source refusal tests pass. |
-| 4–9 | Proposed | Not started. |
+| 4. Recoverable project mutation | Complete locally | Imported apply and persisted repair share a same-directory, hash-verified group commit with retained rollback data, a synced state journal, deterministic startup recovery, ownership-token locks, advisory locking where portable, and Windows replacement via `MoveFileExW`. Transition fault tests prove recovery to all-old or all-new, and worsened repair validation restores the prior project. |
+| 5–9 | Proposed | Not started. |
 
 ## 1. Goal
 
@@ -398,6 +399,18 @@ Ensure imported projects are never silently rewritten through a lossy model.
 
 Findings: `H6`, `H7`, `H10`; related transaction/infrastructure Medium and Low
 findings.
+
+Status: Complete locally. The shared `internal/atomicfile` group commit stages
+and syncs every member, validates staged content, records prior and replacement
+hashes in a synced journal, replaces through the platform abstraction, verifies
+the committed state, and retains rollback data until application validation
+succeeds. Startup recovery rolls incomplete states back and completes cleanup
+for validated commits. Imported apply and persisted repair use this primitive;
+repair holds the project lock through post-apply validation and restores the
+prior project when evidence worsens. Token-checked locks prevent stale takeover
+and release races, with process-start identity on Linux and advisory locking on
+Unix. Deterministic fault tests cover every required transition, and the
+Windows implementation cross-compiles with an overwrite-replacement test.
 
 ### Objective
 

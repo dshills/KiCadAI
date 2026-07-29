@@ -1,6 +1,6 @@
 //go:build !windows
 
-package transactions
+package atomicfile
 
 import "syscall"
 

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"slices"
@@ -995,7 +996,7 @@ func TestValidateStagedImportedProjectWriteRejectsSubstitutionBeforeLiveWrite(t 
 	if err := os.WriteFile(temp, staged, 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if err := validateStagedImportedProjectWrite(stagedImportedProjectWrite{target: target, temp: temp}); err == nil ||
+	if err := validateStagedImportedProjectWrite(target, temp); err == nil ||
 		!strings.Contains(err.Error(), "general was substituted") {
 		t.Fatalf("expected staged substitution rejection, got %v", err)
 	}
@@ -1085,8 +1086,8 @@ func TestWriteAtomicPreservesExistingPermissions(t *testing.T) {
 	if err := os.WriteFile(path, []byte("old"), 0o640); err != nil {
 		t.Fatal(err)
 	}
-	if err := writeAtomic(path, func(f *os.File) error {
-		_, err := f.WriteString("new")
+	if err := writeAtomic(path, func(writer io.Writer) error {
+		_, err := io.WriteString(writer, "new")
 		return err
 	}); err != nil {
 		t.Fatal(err)
