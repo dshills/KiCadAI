@@ -12,8 +12,8 @@ import (
 )
 
 var fablePhase0DesignTransactionDigests = map[string]string{
-	"class_ab_headphone_protected":   "b69fbb69dab12affbe184c4d1a92484725b3543c12410262aed44f116a362004",
-	"class_ab_speaker_10w_protected": "0338c2cf16392948def41d948e73bec817797f6579ef3b468754d954296db44a",
+	"class_ab_headphone_protected":   "c6601ddc366202f9b5ada37eefa61ba81bcd5ec032de073ca7179960d7d71148",
+	"class_ab_speaker_10w_protected": "1f6c6fb6b24bc344d26850ba640414bf06cb3b3669b79c9be942dc9694b38bdf",
 	"usb_c_led_indicator_protected":  "5e9a90251632bd37a4781e7ddbd87f14fa9929f40400b79091ac22c80db72842",
 	"usb_c_i2c_sensor_3v3_protected": "a697e4afb24974a7c5d142c6d18a579f1beda3c917d8b708d60a5b1c0797e0f0",
 }

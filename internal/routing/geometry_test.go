@@ -85,10 +85,10 @@ func TestRectHelpers(t *testing.T) {
 
 func TestUsableBoardRectIncludesMarginAndEdgeClearance(t *testing.T) {
 	board := Board{WidthMM: 20, HeightMM: 10, MarginMM: 1}
-	rules := Rules{EdgeClearanceMM: 0.5}
+	rules := Rules{EdgeClearanceMM: 0.5, TraceWidthMM: 0.2}
 
 	got := UsableBoardRect(board, rules)
-	want := Rect{Min: Point{XMM: 1.5, YMM: 1.5}, Max: Point{XMM: 18.5, YMM: 8.5}}
+	want := Rect{Min: Point{XMM: 1.6, YMM: 1.6}, Max: Point{XMM: 18.4, YMM: 8.4}}
 	if got != want {
 		t.Fatalf("usable = %#v, want %#v", got, want)
 	}

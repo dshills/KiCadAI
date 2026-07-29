@@ -735,6 +735,7 @@ func prioritizeCrowdedSMDPadPairs(pairs []EndpointPair, request Request) []Endpo
 }
 
 func crowdedSMDPadViaAccessPoints(component Component, pad Pad, request Request) ([]AccessPoint, float64, bool) {
+	clearances := newClearancePolicy(request)
 	side, rawAxisX, ok := crowdedSMDPadSideFor(pad)
 	if !ok {
 		return nil, 0, false
@@ -743,10 +744,10 @@ func crowdedSMDPadViaAccessPoints(component Component, pad Pad, request Request)
 	if accessPitchMM <= 0 || min(pad.Size.WidthMM, pad.Size.HeightMM) > accessPitchMM+distanceEpsilon {
 		return nil, 0, false
 	}
-	viaAccessPitchMM := request.Rules.ViaDiameterMM + request.Rules.ClearanceMM
+	viaAccessPitchMM := request.Rules.ViaDiameterMM + request.Rules.ViaClearanceMM
 	if viaAccessPitchMM <= 0 {
 		defaults := DefaultRules()
-		viaAccessPitchMM = defaults.ViaDiameterMM + defaults.ClearanceMM
+		viaAccessPitchMM = defaults.ViaDiameterMM + defaults.ViaClearanceMM
 	}
 	type peer struct {
 		pad   Pad
@@ -818,8 +819,8 @@ func crowdedSMDPadViaAccessPoints(component Component, pad Pad, request Request)
 		if request.Rules.TraceWidthMM > 0 {
 			viaDiameterMM = min(viaDiameterMM, 2*request.Rules.TraceWidthMM)
 		}
-		escapeDistanceMM := max(request.Rules.GridMM, request.Rules.ClearanceMM+viaDiameterMM/2) +
-			float64(column)*(viaDiameterMM+request.Rules.ClearanceMM)
+		escapeDistanceMM := max(request.Rules.GridMM, request.Rules.ViaClearanceMM+viaDiameterMM/2) +
+			float64(column)*(viaDiameterMM+request.Rules.ViaClearanceMM)
 		searchOffset := Point{YMM: side.sign * (halfSpanMM + escapeDistanceMM)}
 		if rawAxisX {
 			searchOffset = Point{XMM: side.sign * (halfSpanMM + escapeDistanceMM)}
@@ -832,10 +833,7 @@ func crowdedSMDPadViaAccessPoints(component Component, pad Pad, request Request)
 			if strings.EqualFold(strings.TrimSpace(candidate.pad.Name), strings.TrimSpace(pad.Name)) || sameOccupancyNet(candidate.pad.Net, pad.Net) {
 				continue
 			}
-			clearanceMM := request.Rules.ClearanceMM
-			if candidate.pad.Clearance != nil {
-				clearanceMM = max(clearanceMM, *candidate.pad.Clearance)
-			}
+			clearanceMM := clearances.pad(pad.Net, clearanceObjectVia, candidate.pad)
 			distanceMM := segmentShapeDistance(probe, padRect(component, candidate.pad))
 			viaDiameterMM = min(viaDiameterMM, 2*(distanceMM-clearanceMM-distanceEpsilon))
 		}
@@ -894,6 +892,7 @@ func crowdedSMDPadSideFor(pad Pad) (crowdedSMDPadSide, bool, bool) {
 }
 
 func filterPhysicalEndpointAccess(access PadAccess, request Request, netName string, endpoints []Endpoint) PadAccess {
+	clearances := newClearancePolicy(request)
 	filtered := clonePadAccessPoints(access)
 	for _, endpoint := range endpoints {
 		key := endpointKey(endpoint.Ref, endpoint.Pin)
@@ -916,10 +915,7 @@ func filterPhysicalEndpointAccess(access PadAccess, request Request, netName str
 					if sameOccupancyNet(pad.Net, netName) || !padAppliesToCopperLayer(pad, point.Layer, request.Board.Layers) {
 						continue
 					}
-					clearanceMM := request.Rules.ClearanceMM
-					if pad.Clearance != nil {
-						clearanceMM = max(clearanceMM, *pad.Clearance)
-					}
+					clearanceMM := clearances.pad(netName, clearanceObjectTrace, pad)
 					if segmentShapeDistance(probe, padRect(component, pad))-probe.WidthMM/2 < clearanceMM-distanceEpsilon {
 						clear = false
 						break
@@ -934,7 +930,7 @@ func filterPhysicalEndpointAccess(access PadAccess, request Request, netName str
 					if obstacle.Layer != "" && normalizeLayer(obstacle.Layer) != normalizeLayer(point.Layer) {
 						continue
 					}
-					clearanceMM := max(request.Rules.ClearanceMM, obstacle.Clearance)
+					clearanceMM := clearances.obstacle(netName, clearanceObjectTrace, obstacle)
 					if segmentShapeDistance(probe, obstacle.Geometry)-probe.WidthMM/2 < clearanceMM-distanceEpsilon {
 						clear = false
 						break
@@ -943,10 +939,11 @@ func filterPhysicalEndpointAccess(access PadAccess, request Request, netName str
 			}
 			if clear && point.SearchPoint != nil {
 				for _, copper := range request.Existing {
-					if sameOccupancyNet(copper.Net, netName) || copper.Layer != "" && normalizeLayer(copper.Layer) != normalizeLayer(point.Layer) {
+					if sameOccupancyNet(copper.Net, netName) || !existingCopperAppliesToLayer(copper, point.Layer) {
 						continue
 					}
-					if segmentShapeDistance(probe, copper.Geometry)-probe.WidthMM/2 < request.Rules.ClearanceMM-distanceEpsilon {
+					clearanceMM := clearances.pair(netName, clearanceObjectTrace, copper.Net, existingCopperKind(copper.Kind))
+					if segmentShapeDistance(probe, copper.Geometry)-probe.WidthMM/2 < clearanceMM-distanceEpsilon {
 						clear = false
 						break
 					}
@@ -963,6 +960,13 @@ func filterPhysicalEndpointAccess(access PadAccess, request Request, netName str
 		filtered.AccessPoints[key] = safe
 	}
 	return filtered
+}
+
+func existingCopperAppliesToLayer(copper ExistingCopper, layer string) bool {
+	if copper.Kind == CopperVia || strings.TrimSpace(copper.Layer) == "" {
+		return true
+	}
+	return normalizeLayer(copper.Layer) == normalizeLayer(layer)
 }
 
 func pinPathEndpointAccess(access *PadAccess, path GridPath, endpoint Endpoint, pointIndex int) bool {

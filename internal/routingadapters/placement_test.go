@@ -33,6 +33,10 @@ func TestRequestFromPlacementBuildsRoutingRequest(t *testing.T) {
 	if request.Rules.NetClasses["signal"].TraceWidthMM == 0 || request.Rules.NetClasses["power"].TraceWidthMM == 0 {
 		t.Fatalf("missing default routing net classes: %#v", request.Rules.NetClasses)
 	}
+	wantMargin := routingBoardMarginMM(placementRequest.Board.MarginMM, request.Rules)
+	if request.Board.MarginMM != wantMargin {
+		t.Fatalf("routing board margin = %v, want adapted physical envelope %v", request.Board.MarginMM, wantMargin)
+	}
 }
 
 func TestRequestFromPlacementBuildsFourLayerRoutingBoard(t *testing.T) {
@@ -65,6 +69,26 @@ func TestRequestFromPlacementBuildsFourLayerRoutingBoard(t *testing.T) {
 	}
 	if len(request.Obstacles) != len(wantLayers) {
 		t.Fatalf("wildcard keepout obstacles = %#v, want one per copper layer", request.Obstacles)
+	}
+}
+
+func TestRequestFromPlacementBuildsSixLayerRoutingBoard(t *testing.T) {
+	got := routingCopperLayers(6)
+	want := []string{"F.Cu", "In1.Cu", "In2.Cu", "In3.Cu", "In4.Cu", "B.Cu"}
+	if len(got) != len(want) {
+		t.Fatalf("layers = %#v, want %#v", got, want)
+	}
+	for index := range want {
+		if got[index].Name != want[index] {
+			t.Fatalf("layer %d = %q, want %q", index, got[index].Name, want[index])
+		}
+	}
+}
+
+func TestRoutingCopperLayersSupportsSingleLayerBoard(t *testing.T) {
+	got := routingCopperLayers(1)
+	if len(got) != 1 || got[0].Name != "F.Cu" {
+		t.Fatalf("layers = %#v, want one front copper layer", got)
 	}
 }
 

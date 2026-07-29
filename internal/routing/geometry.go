@@ -55,6 +55,24 @@ func (grid Grid) ToGrid(point Point, layer int) GridCoord {
 	}
 }
 
+func (grid Grid) ToGridInwardMin(point Point, layer int) GridCoord {
+	gridMM := grid.spacingMM()
+	return GridCoord{
+		X:     int(math.Ceil((point.XMM-grid.Origin.XMM)/gridMM - distanceEpsilon)),
+		Y:     int(math.Ceil((point.YMM-grid.Origin.YMM)/gridMM - distanceEpsilon)),
+		Layer: layer,
+	}
+}
+
+func (grid Grid) ToGridInwardMax(point Point, layer int) GridCoord {
+	gridMM := grid.spacingMM()
+	return GridCoord{
+		X:     int(math.Floor((point.XMM-grid.Origin.XMM)/gridMM + distanceEpsilon)),
+		Y:     int(math.Floor((point.YMM-grid.Origin.YMM)/gridMM + distanceEpsilon)),
+		Layer: layer,
+	}
+}
+
 func (grid Grid) ToPoint(coord GridCoord) Point {
 	gridMM := grid.spacingMM()
 	return Point{
@@ -141,7 +159,11 @@ func BoardRect(board Board) Rect {
 }
 
 func UsableBoardRect(board Board, rules Rules) Rect {
-	margin := board.MarginMM + rules.EdgeClearanceMM
+	return usableBoardRectForRadius(board, rules, rules.TraceWidthMM/2)
+}
+
+func usableBoardRectForRadius(board Board, rules Rules, copperRadiusMM float64) Rect {
+	margin := board.MarginMM + rules.EdgeClearanceMM + max(0, copperRadiusMM)
 	minX := margin
 	maxX := board.WidthMM - margin
 	if minX > maxX {

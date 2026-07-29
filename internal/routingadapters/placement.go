@@ -22,6 +22,7 @@ const (
 func RequestFromPlacement(placementRequest placement.Request, placementResult placement.Result) (routing.Request, []reports.Issue) {
 	issues := []reports.Issue{}
 	boardLayers := routingCopperLayers(placementRequest.Board.Layers)
+	defaultRules := routing.DefaultRules()
 	placements := map[string]placement.PlacementResult{}
 	for _, placed := range placementResult.Placements {
 		if placed.Ref != "" && placed.Reason == "" {
@@ -33,10 +34,10 @@ func RequestFromPlacement(placementRequest placement.Request, placementResult pl
 			Origin:   routing.Point{XMM: placementRequest.Board.Origin.XMM, YMM: placementRequest.Board.Origin.YMM},
 			WidthMM:  placementRequest.Board.WidthMM,
 			HeightMM: placementRequest.Board.HeightMM,
-			MarginMM: placementRequest.Board.MarginMM,
+			MarginMM: routingBoardMarginMM(placementRequest.Board.MarginMM, defaultRules),
 			Layers:   boardLayers,
 		},
-		Rules:    routing.DefaultRules(),
+		Rules:    defaultRules,
 		Strategy: routing.Strategy{Mode: routing.ModeTwoLayer, TreatZonesAs: routing.ZoneObstacle, AllowPartial: true},
 		Seed:     placementRequest.Seed,
 	}
@@ -115,13 +116,22 @@ func RequestFromPlacement(placementRequest placement.Request, placementResult pl
 	return request, issues
 }
 
+func routingBoardMarginMM(placementMarginMM float64, rules routing.Rules) float64 {
+	// Placement margin is a total physical edge envelope. Routing represents
+	// that same envelope as board margin + edge clearance + moving copper
+	// radius, so remove the rule-owned terms when adapting between models.
+	maxTraceRadiusMM := max(defaultSignalTraceWidthMM, defaultPowerTraceWidthMM) / 2
+	return max(0, placementMarginMM-rules.EdgeClearanceMM-maxTraceRadiusMM)
+}
+
 func routingCopperLayers(count int) []routing.Layer {
 	layers := []routing.Layer{{Name: "F.Cu", Kind: routing.LayerCopper, Routable: true}}
-	if count == 4 {
-		layers = append(layers,
-			routing.Layer{Name: "In1.Cu", Kind: routing.LayerCopper, Routable: true},
-			routing.Layer{Name: "In2.Cu", Kind: routing.LayerCopper, Routable: true},
-		)
+	if count == 1 {
+		return layers
+	}
+	count = max(count, 2)
+	for index := 1; index <= count-2; index++ {
+		layers = append(layers, routing.Layer{Name: fmt.Sprintf("In%d.Cu", index), Kind: routing.LayerCopper, Routable: true})
 	}
 	return append(layers, routing.Layer{Name: "B.Cu", Kind: routing.LayerCopper, Routable: true})
 }

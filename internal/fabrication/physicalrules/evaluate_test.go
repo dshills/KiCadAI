@@ -610,6 +610,31 @@ func TestFootprintCourtyardBoundsUsesKiCadCanvasRotation(t *testing.T) {
 	}
 }
 
+func TestTransformedPadBoundsUsesKiCadCanvasRotation(t *testing.T) {
+	footprint := pcbfiles.Footprint{Position: point(10, 10), Rotation: 20, Layer: kicadfiles.LayerFCu}
+	pad := pcbfiles.Pad{
+		Position: point(2, 1),
+		Rotation: 30,
+		Size:     point(4, 1),
+	}
+
+	got := transformedPadBounds(&footprint, footprintTransform(&footprint), &pad)
+	var want rectBounds
+	for _, corner := range []struct{ x, y float64 }{
+		{x: -2, y: -0.5},
+		{x: -2, y: 0.5},
+		{x: 2, y: -0.5},
+		{x: 2, y: 0.5},
+	} {
+		x, y := kicadfiles.RotateBoardLocalXY(corner.x, corner.y, 30)
+		local := point(2+x, 1+y)
+		want = includeRectPoint(want, transformFootprintPoint(&footprint, local))
+	}
+	if got != want {
+		t.Fatalf("bounds = %#v, want KiCad canvas-rotation bounds %#v", got, want)
+	}
+}
+
 func TestEvaluateBoardAcceptsTriangularLineOutline(t *testing.T) {
 	board := physicalRuleTestBoard()
 	board.Drawings = []pcbfiles.Drawing{
@@ -859,6 +884,20 @@ func TestEvaluateBoardBlocksCourtyardOverlap(t *testing.T) {
 	report := EvaluateBoard(&board, &project, Options{})
 
 	assertCheckStatus(t, report, CheckCourtyardOverlap, StatusBlocked)
+}
+
+func TestEvaluateBoardAllowsOppositeSideCourtyardOverlap(t *testing.T) {
+	board := physicalRuleTestBoard()
+	second := board.Footprints[0]
+	second.UUID = kicadfiles.UUID("20000000-0000-4000-8000-000000000004")
+	second.Reference = "U2"
+	second.Layer = kicadfiles.LayerBCu
+	board.Footprints = append(board.Footprints, second)
+
+	project := physicalRuleTestProject()
+	report := EvaluateBoard(&board, &project, Options{})
+
+	assertCheckStatus(t, report, CheckCourtyardOverlap, StatusPass)
 }
 
 func TestEvaluateBoardBlocksCourtyardSpacingViolation(t *testing.T) {

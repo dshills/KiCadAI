@@ -61,7 +61,9 @@ func TestClearanceIssuesDetectsLongShallowDiagonalViolation(t *testing.T) {
 			Net: "composition_net_017", Layer: "B.Cu", Start: Point{XMM: 15.25, YMM: 7.75}, End: Point{XMM: 50.25, YMM: 7.75}, WidthMM: 0.2,
 		}}},
 	}
-	if issues := clearanceIssues(routes, 0.2); len(issues) == 0 {
+	request := minimalRequest()
+	request.Rules.ClearanceMM = 0.2
+	if issues := clearanceIssues(request, routes); len(issues) == 0 {
 		t.Fatal("long shallow diagonal clearance violation was not detected")
 	}
 }
@@ -282,12 +284,90 @@ func TestValidateResultDetectsViaToViaClearanceViolation(t *testing.T) {
 	assertValidationIssue(t, report, "via clearance violation with net B")
 }
 
+func TestValidateResultUsesDeclaredViaClearance(t *testing.T) {
+	request := singleLayerSearchRequest()
+	request.Rules.ClearanceMM = 0.1
+	request.Rules.ViaClearanceMM = 0.4
+	result := Result{Routes: []Route{
+		{Net: "A", Status: RouteStatusRouted, Segments: []Segment{{Net: "A", Layer: "F.Cu", Start: Point{XMM: 2, YMM: 5}, End: Point{XMM: 8, YMM: 5}, WidthMM: 0.2}}},
+		{Net: "B", Status: RouteStatusRouted, Vias: []Via{{Net: "B", At: Point{XMM: 5, YMM: 5.75}, DiameterMM: 0.6, DrillMM: 0.3, Layers: []string{"F.Cu", "B.Cu"}}}},
+	}}
+
+	report := ValidateResult(request, result)
+	assertValidationIssue(t, report, "segment clearance violation with via on net B")
+}
+
+func TestValidateResultAcceptsExactDeclaredViaClearance(t *testing.T) {
+	request := singleLayerSearchRequest()
+	request.Rules.ClearanceMM = 0.1
+	request.Rules.ViaClearanceMM = 0.4
+	result := Result{Routes: []Route{
+		{Net: "A", Status: RouteStatusRouted, Segments: []Segment{{Net: "A", Layer: "F.Cu", Start: Point{XMM: 2, YMM: 5}, End: Point{XMM: 8, YMM: 5}, WidthMM: 0.2}}},
+		{Net: "B", Status: RouteStatusRouted, Vias: []Via{{Net: "B", At: Point{XMM: 5, YMM: 5.8}, DiameterMM: 0.6, DrillMM: 0.3, Layers: []string{"F.Cu", "B.Cu"}}}},
+	}}
+
+	if report := ValidateResult(request, result); len(report.Issues) != 0 {
+		t.Fatalf("exact declared via clearance produced issues: %#v", report.Issues)
+	}
+}
+
+func TestValidateResultChecksCopperShapeAtBoardEdge(t *testing.T) {
+	request := minimalRequest()
+	request.Nets = []Net{{Name: "SIG"}}
+	request.Rules.EdgeClearanceMM = 0.25
+	result := Result{Routes: []Route{{
+		Net: "SIG", Status: RouteStatusRouted,
+		Segments: []Segment{{Net: "SIG", Layer: "F.Cu", Start: Point{XMM: 0.3, YMM: 2}, End: Point{XMM: 5, YMM: 2}, WidthMM: 0.2}},
+	}}}
+	assertValidationIssue(t, ValidateResult(request, result), "segment copper violates board-edge clearance")
+
+	result.Routes[0].Segments[0].Start.XMM = 0.35
+	if report := ValidateResult(request, result); len(report.Issues) != 0 {
+		t.Fatalf("exact board-edge clearance produced issues: %#v", report.Issues)
+	}
+}
+
+func TestValidateResultChecksFullTraceGeometryAgainstObstacle(t *testing.T) {
+	request := minimalRequest()
+	request.Rules.ClearanceMM = 0.2
+	request.Obstacles = []Obstacle{{
+		Layer: "F.Cu",
+		Geometry: Shape{Rect: &Rect{
+			Min: Point{XMM: 4, YMM: 4},
+			Max: Point{XMM: 6, YMM: 6},
+		}},
+	}}
+	result := Result{Routes: []Route{{
+		Net: "SIG", Status: RouteStatusRouted,
+		Segments: []Segment{{Net: "SIG", Layer: "F.Cu", Start: Point{XMM: 2, YMM: 3.75}, End: Point{XMM: 8, YMM: 3.75}, WidthMM: 0.2}},
+	}}}
+	assertValidationIssue(t, ValidateResult(request, result), "segment violates obstacle clearance")
+}
+
+func TestEffectivePairClearanceUsesConservativeNetRules(t *testing.T) {
+	request := minimalRequest()
+	request.Nets = []Net{{Name: "A", Class: "fine"}, {Name: "B", Class: "power"}}
+	request.Rules.NetClasses = map[string]NetClass{
+		"fine":  {ClearanceMM: 0.1, ViaClearanceMM: 0.2},
+		"power": {ClearanceMM: 0.3, ViaClearanceMM: 0.5},
+	}
+	clearances := newClearancePolicy(request)
+	if got := clearances.pair("A", clearanceObjectTrace, "B", clearanceObjectTrace); got != 0.3 {
+		t.Fatalf("trace pair clearance = %v, want 0.3", got)
+	}
+	if got := clearances.pair("A", clearanceObjectTrace, "B", clearanceObjectVia); got != 0.5 {
+		t.Fatalf("trace-via pair clearance = %v, want 0.5", got)
+	}
+}
+
 func TestClearanceIssuesAcceptsExactDeclaredGap(t *testing.T) {
 	routes := []Route{
 		{Net: "A", Segments: []Segment{{Net: "A", Layer: "F.CU", Start: Point{XMM: 1, YMM: 1}, End: Point{XMM: 5, YMM: 1}, WidthMM: 0.3}}},
 		{Net: "B", Segments: []Segment{{Net: "B", Layer: "F.CU", Start: Point{XMM: 1, YMM: 1.5}, End: Point{XMM: 5, YMM: 1.5}, WidthMM: 0.3}}},
 	}
-	if issues := clearanceIssues(routes, 0.2); len(issues) != 0 {
+	request := minimalRequest()
+	request.Rules.ClearanceMM = 0.2
+	if issues := clearanceIssues(request, routes); len(issues) != 0 {
 		t.Fatalf("exact declared clearance produced issues: %#v", issues)
 	}
 }

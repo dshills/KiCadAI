@@ -28,14 +28,14 @@
       "id": "class_ab_headphone_protected",
       "kind": "design_transaction",
       "source": "examples/design/kicad-backed/class_ab_headphone_protected.json",
-      "sha256": "b69fbb69dab12affbe184c4d1a92484725b3543c12410262aed44f116a362004",
+      "sha256": "c6601ddc366202f9b5ada37eefa61ba81bcd5ec032de073ca7179960d7d71148",
       "verification": "go test ./internal/designworkflow -run 'TestDesignExamplesOptionalKiCadBackedTier/class_ab_headphone_protected$' -count=1"
     },
     {
       "id": "class_ab_speaker_10w_protected",
       "kind": "design_transaction",
       "source": "examples/design/kicad-backed/class_ab_speaker_10w_protected.json",
-      "sha256": "0338c2cf16392948def41d948e73bec817797f6579ef3b468754d954296db44a",
+      "sha256": "1f6c6fb6b24bc344d26850ba640414bf06cb3b3669b79c9be942dc9694b38bdf",
       "verification": "go test ./internal/designworkflow -run 'TestDesignExamplesOptionalKiCadBackedTier/class_ab_speaker_10w_protected$' -count=1"
     },
     {

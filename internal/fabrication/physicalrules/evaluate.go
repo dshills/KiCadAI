@@ -986,7 +986,7 @@ func evaluateCourtyardSilkscreen(board *pcbfiles.PCBFile, bounds boardBounds, op
 		footprint := &board.Footprints[footprintIndex]
 		courtyard, ok := footprintCourtyardBounds(footprint)
 		if ok {
-			courtyards = append(courtyards, courtyardBounds{Reference: footprint.Reference, Bounds: courtyard})
+			courtyards = append(courtyards, courtyardBounds{Reference: footprint.Reference, Side: footprint.Layer, Bounds: courtyard})
 		} else if footprintNeedsCourtyard(footprint) {
 			missingCourtyardCount++
 			addRef(missingCourtyardRefs, footprint.Reference)
@@ -1323,17 +1323,13 @@ func transformedPadBounds(footprint *pcbfiles.Footprint, transform transform2D, 
 	}
 	halfX := float64(pad.Size.X) / 2
 	halfY := float64(pad.Size.Y) / 2
-	padRadians := float64(pad.Rotation) * math.Pi / 180
-	padCosine := math.Cos(padRadians)
-	padSine := math.Sin(padRadians)
 	for _, corner := range []struct{ x, y float64 }{
 		{-halfX, -halfY},
 		{-halfX, halfY},
 		{halfX, -halfY},
 		{halfX, halfY},
 	} {
-		rotatedX := corner.x*padCosine - corner.y*padSine
-		rotatedY := corner.x*padSine + corner.y*padCosine
+		rotatedX, rotatedY := kicadfiles.RotateBoardLocalXY(corner.x, corner.y, float64(pad.Rotation))
 		local := kicadfiles.Point{
 			X: pad.Position.X + kicadfiles.IU(math.Round(rotatedX)),
 			Y: pad.Position.Y + kicadfiles.IU(math.Round(rotatedY)),
@@ -1460,6 +1456,7 @@ type rectBounds struct {
 
 type courtyardBounds struct {
 	Reference string
+	Side      kicadfiles.BoardLayer
 	Bounds    rectBounds
 }
 
@@ -2642,10 +2639,10 @@ func footprintTransform(footprint *pcbfiles.Footprint) transform2D {
 	// angles rotate counter-clockwise on the canvas.  Negating the angle keeps
 	// physical-rule geometry in the same convention as placement, routing, and
 	// connectivity (local +X maps to board -Y at +90 degrees).
-	radians := -float64(footprint.Rotation) * math.Pi / 180
+	cosine, sine := kicadfiles.RotateBoardLocalXY(1, 0, float64(footprint.Rotation))
 	return transform2D{
-		Cosine:  math.Cos(radians),
-		Sine:    math.Sin(radians),
+		Cosine:  cosine,
+		Sine:    sine,
 		MirrorX: footprint.Layer == kicadfiles.LayerBCu,
 	}
 }
@@ -2686,17 +2683,13 @@ func padInside(bounds boardBounds, transform transform2D, footprint *pcbfiles.Fo
 	}
 	halfX := float64(pad.Size.X) / 2
 	halfY := float64(pad.Size.Y) / 2
-	padRadians := float64(pad.Rotation) * math.Pi / 180
-	padCosine := math.Cos(padRadians)
-	padSine := math.Sin(padRadians)
 	for _, corner := range []struct{ x, y float64 }{
 		{-halfX, -halfY},
 		{-halfX, halfY},
 		{halfX, -halfY},
 		{halfX, halfY},
 	} {
-		rotatedX := corner.x*padCosine - corner.y*padSine
-		rotatedY := corner.x*padSine + corner.y*padCosine
+		rotatedX, rotatedY := kicadfiles.RotateBoardLocalXY(corner.x, corner.y, float64(pad.Rotation))
 		local := kicadfiles.Point{
 			X: pad.Position.X + kicadfiles.IU(math.Round(rotatedX)),
 			Y: pad.Position.Y + kicadfiles.IU(math.Round(rotatedY)),
@@ -2712,16 +2705,12 @@ func padInside(bounds boardBounds, transform transform2D, footprint *pcbfiles.Fo
 func ovalPadInside(bounds boardBounds, transform transform2D, footprint *pcbfiles.Footprint, pad *pcbfiles.Pad) bool {
 	halfX := float64(pad.Size.X) / 2
 	halfY := float64(pad.Size.Y) / 2
-	padRadians := float64(pad.Rotation) * math.Pi / 180
-	padCosine := math.Cos(padRadians)
-	padSine := math.Sin(padRadians)
 	const samples = 16
 	for index := 0; index < samples; index++ {
 		angle := 2 * math.Pi * float64(index) / samples
 		x := halfX * math.Cos(angle)
 		y := halfY * math.Sin(angle)
-		rotatedX := x*padCosine - y*padSine
-		rotatedY := x*padSine + y*padCosine
+		rotatedX, rotatedY := kicadfiles.RotateBoardLocalXY(x, y, float64(pad.Rotation))
 		local := kicadfiles.Point{
 			X: pad.Position.X + kicadfiles.IU(math.Round(rotatedX)),
 			Y: pad.Position.Y + kicadfiles.IU(math.Round(rotatedY)),
@@ -2937,6 +2926,9 @@ func courtyardSpacingViolations(courtyards []courtyardBounds, minSpacingMM float
 	count := 0
 	for i := 0; i < len(courtyards); i++ {
 		for j := i + 1; j < len(courtyards); j++ {
+			if courtyards[i].Side != courtyards[j].Side {
+				continue
+			}
 			if rectsOverlap(courtyards[i].Bounds, courtyards[j].Bounds) || rectDistanceMM(courtyards[i].Bounds, courtyards[j].Bounds) < minSpacingMM {
 				count++
 				overlapRefs[courtyards[i].Reference] = struct{}{}
@@ -2980,18 +2972,16 @@ func silkscreenTextInsideBoard(bounds boardBounds, footprint *pcbfiles.Footprint
 	height := kicadfiles.MM(1.0)
 	halfWidth := float64(width) / 2
 	halfHeight := float64(height) / 2
-	radians := float64(text.Rotation) * math.Pi / 180
-	cosine := math.Cos(radians)
-	sine := math.Sin(radians)
 	for _, corner := range []struct{ x, y float64 }{
 		{-halfWidth, -halfHeight},
 		{-halfWidth, halfHeight},
 		{halfWidth, -halfHeight},
 		{halfWidth, halfHeight},
 	} {
+		rotatedX, rotatedY := kicadfiles.RotateBoardLocalXY(corner.x, corner.y, float64(text.Rotation))
 		local := kicadfiles.Point{
-			X: text.Position.X + kicadfiles.IU(math.Round(corner.x*cosine-corner.y*sine)),
-			Y: text.Position.Y + kicadfiles.IU(math.Round(corner.x*sine+corner.y*cosine)),
+			X: text.Position.X + kicadfiles.IU(math.Round(rotatedX)),
+			Y: text.Position.Y + kicadfiles.IU(math.Round(rotatedY)),
 		}
 		if !pointInsideBoard(bounds, transformFootprintPoint(footprint, local)) {
 			return false

@@ -1,7 +1,7 @@
 # Fable Code Review Remediation Plan
 
 Date: 2026-07-29
-Status: In progress (Phases 0–4 complete)
+Status: In progress (Phases 0–5 complete)
 Baseline commit: `7c7fd9c0`
 Source review: [`../FABLE_CODE_REVIEW_07_29_26.md`](../FABLE_CODE_REVIEW_07_29_26.md)
 
@@ -14,7 +14,8 @@ Source review: [`../FABLE_CODE_REVIEW_07_29_26.md`](../FABLE_CODE_REVIEW_07_29_2
 | 2. Honest acceptance, repair, and CLI results | Complete locally | Transactions reject mutation after `write_project` and late footprint assignment; footprint repair inserts before placement/write; persisted repairs retain originating issues unless supported post-mutation validation proves them absent; required KiCad evidence fails closed; unsupported required retry DRC policy is rejected; blocking place/route/repair/check reports return errors. Focused suites, full `go test -short ./...`, lint, writer/round-trip tests, and the installed-KiCad amplifier/ESP32/USB-C fixture matrix pass. |
 | 3. Imported KiCad preservation | Complete locally | PCB and schematic readers inventory fully modeled, safely raw-preserved, and mutation-unsupported constructs. Imported board metadata, custom paper, setup/plot data, footprint metadata/text/models/unknown children, schematic presentation nodes, and keepouts survive read-modify-write. Duplicate singleton constructs fail closed. Staged output is internally re-read and compared with source preservation evidence before any live replacement. Focused reader, round-trip, transaction, and unchanged-source refusal tests pass. |
 | 4. Recoverable project mutation | Complete locally | Imported apply and persisted repair share a same-directory, hash-verified group commit with retained rollback data, a synced state journal, deterministic startup recovery, ownership-token locks, advisory locking where portable, and Windows replacement via `MoveFileExW`. Transition fault tests prove recovery to all-old or all-new, and worsened repair validation restores the prior project. |
-| 5–9 | Proposed | Not started. |
+| 5. Routing and DFM geometry | Complete locally | One effective object-pair clearance policy now drives trace/via search and validation. Trace half-width and via radius constrain inward-quantized board-edge eligibility; final validation independently checks copper-to-edge and full-shape obstacle clearance. `ViaClearanceMM`, conservative net-class pairing, KiCad pad rotation, side-aware courtyards, and arbitrary copper-layer adaptation have focused boundary coverage. Protected USB-C fixtures retain clean installed-KiCad evidence. |
+| 6–9 | Proposed | Not started. |
 
 ## 1. Goal
 

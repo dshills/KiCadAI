@@ -81,6 +81,19 @@ func TestBuildOccupancyDoesNotRoundRectClearanceToAdjacentGridCell(t *testing.T)
 	}
 }
 
+func TestPointWithinRectSubEpsilonClearanceIsContinuousWithZero(t *testing.T) {
+	rect := Rect{Min: Point{XMM: 1, YMM: 1}, Max: Point{XMM: 2, YMM: 2}}
+	if !pointWithinRectClearance(Point{XMM: 2, YMM: 1.5}, rect, 0) {
+		t.Fatal("point on the rectangle boundary should be blocked")
+	}
+	if pointWithinRectClearance(Point{XMM: 2 + distanceEpsilon/2, YMM: 1.5}, rect, 0) {
+		t.Fatal("zero clearance should not expand the rectangle")
+	}
+	if pointWithinRectClearance(Point{XMM: 2 + distanceEpsilon/2, YMM: 1.5}, rect, distanceEpsilon/2) {
+		t.Fatal("sub-epsilon clearance should behave continuously with zero")
+	}
+}
+
 func TestBuildViaOccupancyUsesCircularClearanceAtRectCorners(t *testing.T) {
 	request := minimalRequest()
 	request.Rules.GridMM = 0.25
@@ -157,6 +170,63 @@ func TestBuildViaOccupancyBlocksFinePitchForeignPadClearance(t *testing.T) {
 	coord := occupancy.Grid.ToGrid(Point{XMM: 31.5, YMM: 21.5}, layerIndexes[normalizeLayer("F.Cu")])
 	if !occupancy.BlockedCell(coord) {
 		t.Fatalf("fine-pitch via cell %#v was not blocked by the adjacent unconnected pad", coord)
+	}
+}
+
+func TestViaPadSearchAndValidationAgreeAtGridBoundaries(t *testing.T) {
+	tests := []struct {
+		name          string
+		gridMM        float64
+		viaDiameterMM float64
+		clearanceMM   float64
+	}{
+		{name: "fine", gridMM: 0.05, viaDiameterMM: 0.4, clearanceMM: 0.15},
+		{name: "default", gridMM: 0.1, viaDiameterMM: 0.6, clearanceMM: 0.4},
+		{name: "coarse", gridMM: 0.25, viaDiameterMM: 0.5, clearanceMM: 0.25},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			request := minimalRequest()
+			request.Rules.GridMM = test.gridMM
+			request.Rules.ClearanceMM = 0.05
+			request.Rules.ViaClearanceMM = test.clearanceMM
+			request.Rules.ViaDiameterMM = test.viaDiameterMM
+			request.Components = []Component{{
+				Ref: "U1", Position: Placement{XMM: 10, YMM: 10, Layer: "F.Cu"},
+				Pads: []Pad{{
+					Ref: "U1", Name: "1", Net: "OTHER", Shape: PadRect, Type: PadSMD,
+					Size: Size{WidthMM: 1, HeightMM: 1}, Layers: []string{"F.Cu"},
+				}},
+			}}
+			occupancy, err := BuildViaOccupancy(request, "SIG")
+			if err != nil {
+				t.Fatal(err)
+			}
+			exactX := 10 + 0.5 + test.viaDiameterMM/2 + test.clearanceMM
+			exact := occupancy.Grid.ToGrid(Point{XMM: exactX, YMM: 10}, 0)
+			inside := occupancy.Grid.ToGrid(Point{XMM: exactX - test.gridMM, YMM: 10}, 0)
+			if occupancy.BlockedCell(exact) {
+				t.Fatalf("exact-clearance cell %#v is blocked", exact)
+			}
+			if !occupancy.BlockedCell(inside) {
+				t.Fatalf("one-grid-inside cell %#v is routable", inside)
+			}
+
+			exactRoute := []Route{{Net: "SIG", Vias: []Via{{
+				Net: "SIG", At: occupancy.Grid.ToPoint(exact), DiameterMM: test.viaDiameterMM,
+				DrillMM: test.viaDiameterMM / 2, Layers: []string{"F.Cu", "B.Cu"},
+			}}}}
+			if issues := ValidatePhysicalClearance(request, exactRoute); len(issues) != 0 {
+				t.Fatalf("exact-clearance route issues = %#v", issues)
+			}
+			insideRoute := []Route{{Net: "SIG", Vias: []Via{{
+				Net: "SIG", At: occupancy.Grid.ToPoint(inside), DiameterMM: test.viaDiameterMM,
+				DrillMM: test.viaDiameterMM / 2, Layers: []string{"F.Cu", "B.Cu"},
+			}}}}
+			if issues := ValidatePhysicalClearance(request, insideRoute); len(issues) == 0 {
+				t.Fatal("one-grid-inside route passed validation")
+			}
+		})
 	}
 }
 
@@ -272,6 +342,22 @@ func TestBuildOccupancyBlocksOtherNetGeneratedCopper(t *testing.T) {
 	}
 }
 
+func TestBuildOccupancyTreatsExistingViaAsThroughStack(t *testing.T) {
+	request := minimalRequest()
+	request.Rules.GridMM = 1
+	request.Existing = []ExistingCopper{{
+		Kind: CopperVia, Net: "OTHER", Layer: "F.Cu",
+		Geometry: Shape{Rect: &Rect{Min: Point{XMM: 4, YMM: 4}, Max: Point{XMM: 6, YMM: 6}}},
+	}}
+
+	occupancy := mustBuildOccupancy(t, request, "SIG")
+	for layer := 0; layer < 2; layer++ {
+		if !occupancy.BlockedCell(GridCoord{X: 5, Y: 5, Layer: layer}) {
+			t.Fatalf("existing via did not block copper layer %d", layer)
+		}
+	}
+}
+
 func TestBuildOccupancyZonePolicies(t *testing.T) {
 	request := minimalRequest()
 	request.Rules.GridMM = 1
@@ -329,6 +415,22 @@ func TestBuildOccupancyIsLayerAware(t *testing.T) {
 	}
 }
 
+func TestBuildOccupancyAppliesUnlayeredObstacleToEveryCopperLayer(t *testing.T) {
+	request := minimalRequest()
+	request.Rules.GridMM = 1
+	request.Obstacles = []Obstacle{{
+		Kind:     ObstacleKeepout,
+		Geometry: Shape{Rect: &Rect{Min: Point{XMM: 4, YMM: 4}, Max: Point{XMM: 6, YMM: 6}}},
+	}}
+
+	occupancy := mustBuildOccupancy(t, request, "SIG")
+	for layer := 0; layer < 2; layer++ {
+		if !occupancy.BlockedCell(GridCoord{X: 5, Y: 5, Layer: layer}) {
+			t.Fatalf("unlayered obstacle did not block copper layer %d", layer)
+		}
+	}
+}
+
 func TestBuildOccupancyFailsClosedForDuplicateLayers(t *testing.T) {
 	request := minimalRequest()
 	request.Board.Layers = append(request.Board.Layers, Layer{Name: " f.cu ", Kind: LayerCopper, Routable: true})
@@ -346,6 +448,15 @@ func TestBuildOccupancyRejectsHugeGrid(t *testing.T) {
 
 	if _, err := BuildOccupancy(request, "SIG"); err == nil {
 		t.Fatal("expected huge occupancy grid error")
+	}
+}
+
+func TestBuildOccupancyFailsClosedForInvalidNetRule(t *testing.T) {
+	request := minimalRequest()
+	request.Nets = []Net{{Name: "SIG", Class: "missing"}}
+
+	if _, err := BuildOccupancy(request, "SIG"); err == nil {
+		t.Fatal("expected invalid net rule to block occupancy construction")
 	}
 }
 

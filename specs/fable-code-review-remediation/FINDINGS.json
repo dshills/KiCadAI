@@ -216,33 +216,33 @@
       "id": "H13",
       "severity": "high",
       "package": "internal/routing",
-      "disposition": "reproduced_pending",
+      "disposition": "closed",
       "implementation_phase": 5,
       "reproduction": {
-        "test": "TestFableH13ReproductionUsableBoardRectIgnoresTraceRadius",
+        "test": "TestFableH13BoardEdgeIncludesTraceRadius",
         "path": "internal/routing/fable_phase0_test.go",
-        "command": "go test ./internal/routing -run '^TestFableH13ReproductionUsableBoardRectIgnoresTraceRadius$' -count=1"
+        "command": "go test ./internal/routing -run '^TestFableH13BoardEdge' -count=1"
       },
       "affected_capabilities": ["routing_edge_clearance", "fabrication_candidate_for_edge_routed_designs"],
       "historical_evidence": "routing completion does not prove copper-edge clearance for centerlines near Edge.Cuts",
-      "current_evidence": "pending Phase 5 width-aware edge geometry and validation backstop",
-      "closing_commit": null
+      "current_evidence": "trace and via radii now constrain conservatively inward-quantized edge occupancy, and final result validation independently rejects copper shapes inside the declared board-edge clearance",
+      "closing_commit": "Enforce physical routing clearances"
     },
     {
       "id": "H14",
       "severity": "high",
       "package": "internal/routing",
-      "disposition": "reproduced_pending",
+      "disposition": "closed",
       "implementation_phase": 5,
       "reproduction": {
-        "test": "TestFableH14ReproductionViaOccupancyIgnoresViaClearance",
+        "test": "TestFableH14ViaOccupancyUsesViaClearance",
         "path": "internal/routing/fable_phase0_test.go",
-        "command": "go test ./internal/routing -run '^TestFableH14ReproductionViaOccupancyIgnoresViaClearance$' -count=1"
+        "command": "go test ./internal/routing -run '^TestFableH14ViaOccupancyUsesViaClearance$' -count=1"
       },
       "affected_capabilities": ["routing_via_clearance", "net_class_enforcement"],
       "historical_evidence": "routing and validation evidence is not sufficient for rules where via_clearance_mm exceeds trace clearance",
-      "current_evidence": "pending Phase 5 shared via-clearance enforcement",
-      "closing_commit": null
+      "current_evidence": "one effective pair-clearance policy enforces via clearance in occupancy, pad/obstacle checks, trace-via and via-via validation, including net-class and per-net overrides",
+      "closing_commit": "Enforce physical routing clearances"
     },
     {
       "id": "H15",

@@ -34,38 +34,42 @@ type gridPoint struct {
 func BuildOccupancy(request Request, currentNet string) (Occupancy, error) {
 	request = cloneRequest(request)
 	NormalizeRequest(&request)
-	return buildOccupancy(request, currentNet, request.Rules.TraceWidthMM/2)
+	return buildOccupancy(request, currentNet, clearanceObjectTrace, request.Rules.TraceWidthMM/2, newClearancePolicy(request))
 }
 
 func BuildViaOccupancy(request Request, currentNet string) (Occupancy, error) {
 	request = cloneRequest(request)
 	NormalizeRequest(&request)
-	return buildOccupancy(request, currentNet, request.Rules.ViaDiameterMM/2)
+	return buildOccupancy(request, currentNet, clearanceObjectVia, request.Rules.ViaDiameterMM/2, newClearancePolicy(request))
 }
 
 func BuildTraceAndViaOccupancy(request Request, currentNet string) (Occupancy, Occupancy, error) {
 	request = cloneRequest(request)
 	NormalizeRequest(&request)
-	traceOccupancy, err := buildOccupancy(request, currentNet, request.Rules.TraceWidthMM/2)
+	clearances := newClearancePolicy(request)
+	traceOccupancy, err := buildOccupancy(request, currentNet, clearanceObjectTrace, request.Rules.TraceWidthMM/2, clearances)
 	if err != nil {
 		return Occupancy{}, Occupancy{}, err
 	}
-	viaOccupancy, err := buildOccupancy(request, currentNet, request.Rules.ViaDiameterMM/2)
+	viaOccupancy, err := buildOccupancy(request, currentNet, clearanceObjectVia, request.Rules.ViaDiameterMM/2, clearances)
 	if err != nil {
 		return Occupancy{}, Occupancy{}, err
 	}
 	return traceOccupancy, viaOccupancy, nil
 }
 
-func buildOccupancy(request Request, currentNet string, movingCopperRadiusMM float64) (Occupancy, error) {
+func buildOccupancy(request Request, currentNet string, movingKind clearanceObjectKind, movingCopperRadiusMM float64, clearances *clearancePolicy) (Occupancy, error) {
 	currentNetKey := strings.TrimSpace(currentNet)
+	if ruleIssue, blocked := clearances.firstBlockingIssue(); blocked {
+		return Occupancy{}, fmt.Errorf("resolve routing clearance policy: %s", ruleIssue.Message)
+	}
 	grid := NewGrid(Point{}, request.Rules.GridMM)
 	occupancy := Occupancy{Grid: grid, Layers: map[int]*LayerOccupancy{}}
 	layerIndexes, err := LayerIndexes(request.Board.Layers)
 	if err != nil {
 		return occupancy, err
 	}
-	usable := UsableBoardRect(request.Board, request.Rules)
+	usable := usableBoardRectForRadius(request.Board, request.Rules, movingCopperRadiusMM)
 	board := BoardRect(request.Board)
 	for _, layer := range request.Board.Layers {
 		if layer.Kind != LayerCopper {
@@ -78,7 +82,16 @@ func buildOccupancy(request Request, currentNet string, movingCopperRadiusMM flo
 		occupancy.blockOutsideUsable(layerIndex, board, usable)
 	}
 	for _, obstacle := range request.Obstacles {
-		occupancy.addShape(layerIndexes, obstacle.Layer, obstacle.Geometry, obstacle.Clearance+movingCopperRadiusMM, obstacle)
+		clearanceMM := clearances.obstacle(currentNetKey, movingKind, obstacle)
+		if strings.TrimSpace(obstacle.Layer) == "" {
+			for _, layer := range request.Board.Layers {
+				if layer.Kind == LayerCopper {
+					occupancy.addShape(layerIndexes, layer.Name, obstacle.Geometry, clearanceMM+movingCopperRadiusMM, obstacle)
+				}
+			}
+			continue
+		}
+		occupancy.addShape(layerIndexes, obstacle.Layer, obstacle.Geometry, clearanceMM+movingCopperRadiusMM, obstacle)
 	}
 	for _, copper := range request.Existing {
 		if copper.Kind == CopperZone {
@@ -98,18 +111,25 @@ func buildOccupancy(request Request, currentNet string, movingCopperRadiusMM flo
 			kind = ObstacleZone
 			source = "zone"
 		}
-		obstacle := Obstacle{Kind: kind, Layer: copper.Layer, Geometry: copper.Geometry, Clearance: request.Rules.ClearanceMM, Source: source}
-		occupancy.addShape(layerIndexes, copper.Layer, copper.Geometry, request.Rules.ClearanceMM+movingCopperRadiusMM, obstacle)
+		clearanceMM := clearances.pair(currentNetKey, movingKind, copper.Net, existingCopperKind(copper.Kind))
+		obstacle := Obstacle{Kind: kind, Layer: copper.Layer, Geometry: copper.Geometry, Clearance: clearanceMM, Source: source}
+		if copper.Kind == CopperVia {
+			for _, layer := range request.Board.Layers {
+				if layer.Kind == LayerCopper {
+					obstacle.Layer = layer.Name
+					occupancy.addShape(layerIndexes, layer.Name, copper.Geometry, clearanceMM+movingCopperRadiusMM, obstacle)
+				}
+			}
+			continue
+		}
+		occupancy.addShape(layerIndexes, copper.Layer, copper.Geometry, clearanceMM+movingCopperRadiusMM, obstacle)
 	}
 	for _, component := range request.Components {
 		for _, pad := range component.Pads {
 			if sameOccupancyNet(pad.Net, currentNetKey) {
 				continue
 			}
-			clearanceMM := request.Rules.ClearanceMM
-			if pad.Clearance != nil {
-				clearanceMM = max(clearanceMM, *pad.Clearance)
-			}
+			clearanceMM := clearances.pad(currentNetKey, movingKind, pad)
 			obstacle := Obstacle{Kind: ObstacleOtherNetPad, Geometry: padRect(component, pad), Clearance: clearanceMM, Source: component.Ref + "." + pad.Name}
 			for _, layer := range padAccessLayers(pad, routableLayerNames(request.Board.Layers)) {
 				obstacle.Layer = layer
@@ -197,16 +217,23 @@ func (occupancy *Occupancy) addShape(layerIndexes map[string]int, layer string, 
 
 func pointWithinRectClearance(point Point, rect Rect, clearanceMM float64) bool {
 	rect = normalizeRect(rect)
+	if rect.ContainsPoint(point) {
+		return true
+	}
 	dx := max(rect.Min.XMM-point.XMM, 0, point.XMM-rect.Max.XMM)
 	dy := max(rect.Min.YMM-point.YMM, 0, point.YMM-rect.Max.YMM)
-	return math.Hypot(dx, dy) <= clearanceMM
+	effectiveClearanceMM := max(0, clearanceMM-distanceEpsilon)
+	if effectiveClearanceMM == 0 {
+		return false
+	}
+	return math.Hypot(dx, dy) < effectiveClearanceMM
 }
 
 func (occupancy *Occupancy) blockOutsideUsable(layerIndex int, board Rect, usable Rect) {
 	boardMin := occupancy.Grid.ToGrid(board.Min, layerIndex)
 	boardMax := occupancy.Grid.ToGrid(board.Max, layerIndex)
-	usableMin := occupancy.Grid.ToGrid(usable.Min, layerIndex)
-	usableMax := occupancy.Grid.ToGrid(usable.Max, layerIndex)
+	usableMin := occupancy.Grid.ToGridInwardMin(usable.Min, layerIndex)
+	usableMax := occupancy.Grid.ToGridInwardMax(usable.Max, layerIndex)
 	obstacleIndex := occupancy.addObstacle(Obstacle{Kind: ObstacleBoardEdge, Source: "board_edge"})
 	occupancy.blockRect(layerIndex, boardMin.X, boardMin.Y, boardMax.X, usableMin.Y-1, obstacleIndex)
 	occupancy.blockRect(layerIndex, boardMin.X, usableMax.Y+1, boardMax.X, boardMax.Y, obstacleIndex)
@@ -377,10 +404,11 @@ func pointWithinPolygonClearance(point Point, polygon []Point, clearanceMM float
 	if pointInPolygon(point, polygon) {
 		return true
 	}
-	if clearanceMM <= 0 {
+	effectiveClearanceMM := max(0, clearanceMM-distanceEpsilon)
+	if effectiveClearanceMM == 0 {
 		return false
 	}
-	return distanceToPolygon(point, polygon) <= clearanceMM
+	return distanceToPolygon(point, polygon) < effectiveClearanceMM
 }
 
 func distanceToPolygon(point Point, polygon []Point) float64 {
