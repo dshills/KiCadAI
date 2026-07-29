@@ -492,11 +492,7 @@ func TestFunctionLevelCorpusCapabilityReportMatchesAuthoritativeEvidence(t *test
 		t.Fatalf("capability report header = %#v", capability)
 	}
 	catalog := loadGraphCatalog(t)
-	wantCatalogHash := hashGraphValue(struct {
-		Version  string                        `json:"version"`
-		Records  []components.ComponentRecord  `json:"records"`
-		Families []components.FamilyDefinition `json:"families"`
-	}{Version: catalog.Version, Records: catalog.Records, Families: catalog.Families})
+	wantCatalogHash := catalogHash(catalog)
 	if capability.CatalogSHA256 != wantCatalogHash || len(capability.LibrarySHA256) != 64 || len(capability.RoundTripSHA256) != 64 {
 		t.Fatalf("capability provenance hashes are stale or incomplete: catalog=%s want=%s library=%d round_trip=%d", capability.CatalogSHA256, wantCatalogHash, len(capability.LibrarySHA256), len(capability.RoundTripSHA256))
 	}
@@ -572,11 +568,7 @@ func regenerateFunctionCapabilityReport(t *testing.T, capability functionCapabil
 	t.Helper()
 	catalog := loadGraphCatalog(t)
 	capability.GeneratedAt = manifest.FrozenAt
-	capability.CatalogSHA256 = hashGraphValue(struct {
-		Version  string                        `json:"version"`
-		Records  []components.ComponentRecord  `json:"records"`
-		Families []components.FamilyDefinition `json:"families"`
-	}{Version: catalog.Version, Records: catalog.Records, Families: catalog.Families})
+	capability.CatalogSHA256 = catalogHash(catalog)
 	capability.GateProfile["simulation"] = "pass"
 	capability.Circuits = nil
 	capability.Aggregate = functionCapabilityReportAggregate{

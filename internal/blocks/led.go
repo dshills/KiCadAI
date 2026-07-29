@@ -231,14 +231,8 @@ func sortedUnitMultipliers(multipliers []unitMultiplier) []unitMultiplier {
 
 func normalizeUnitLiteral(text string, suffix string, multipliers []unitMultiplier) string {
 	text = strings.ReplaceAll(text, " ", "")
-	aliases := map[string]string{
-		"ohms": "Ω",
-		"Ohms": "Ω",
-		"ohm":  "Ω",
-		"Ohm":  "Ω",
-	}
-	for alias, replacement := range aliases {
-		text = strings.ReplaceAll(text, alias, replacement)
+	for _, alias := range []string{"ohms", "Ohms", "ohm", "Ohm"} {
+		text = strings.ReplaceAll(text, alias, "Ω")
 	}
 	if suffix == "Ω" {
 		text = normalizeResistanceNotation(text, multipliers)

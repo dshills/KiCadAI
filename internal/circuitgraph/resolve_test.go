@@ -615,11 +615,23 @@ func TestResolverCatalogHashIgnoresTopLevelCatalogOrder(t *testing.T) {
 	other.ID = "amplifier.dual.other"
 	first.Records = append(first.Records, other)
 	first.Families = append(first.Families, components.FamilyDefinition{ID: "other", Name: "Other"})
+	first.ThermalPaths = []components.ThermalPathRecord{{ID: "sink-b"}, {ID: "sink-a"}}
 	second := cloneCatalog(t, first)
 	second.Records[0], second.Records[1] = second.Records[1], second.Records[0]
 	second.Families[0], second.Families[1] = second.Families[1], second.Families[0]
+	second.ThermalPaths[0], second.ThermalPaths[1] = second.ThermalPaths[1], second.ThermalPaths[0]
 	if left, right := NewResolver(ResolveOptions{Catalog: first}).catalogHash, NewResolver(ResolveOptions{Catalog: second}).catalogHash; left == "" || left != right {
 		t.Fatalf("catalog hashes = %q, %q", left, right)
+	}
+}
+
+func TestResolverCatalogHashIncludesThermalPaths(t *testing.T) {
+	first := minimalResolvedCatalog()
+	first.ThermalPaths = []components.ThermalPathRecord{{ID: "sink", NaturalSinkToAmbientCPerW: 10}}
+	second := cloneCatalog(t, first)
+	second.ThermalPaths[0].NaturalSinkToAmbientCPerW = 11
+	if left, right := NewResolver(ResolveOptions{Catalog: first}).catalogHash, NewResolver(ResolveOptions{Catalog: second}).catalogHash; left == "" || left == right {
+		t.Fatalf("thermal catalog hashes = %q, %q", left, right)
 	}
 }
 
@@ -838,9 +850,10 @@ func cloneCatalog(t *testing.T, catalog *components.Catalog) *components.Catalog
 	t.Helper()
 	clone := &components.Catalog{
 		Version: catalog.Version, GeneratedAt: catalog.GeneratedAt,
-		Records:     append([]components.ComponentRecord(nil), catalog.Records...),
-		Families:    append([]components.FamilyDefinition(nil), catalog.Families...),
-		Diagnostics: append([]reports.Issue(nil), catalog.Diagnostics...),
+		Records:      append([]components.ComponentRecord(nil), catalog.Records...),
+		Families:     append([]components.FamilyDefinition(nil), catalog.Families...),
+		ThermalPaths: append([]components.ThermalPathRecord(nil), catalog.ThermalPaths...),
+		Diagnostics:  append([]reports.Issue(nil), catalog.Diagnostics...),
 	}
 	for index := range clone.Records {
 		clone.Records[index].Packages = append([]components.PackageVariant(nil), catalog.Records[index].Packages...)

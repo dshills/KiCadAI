@@ -172,7 +172,13 @@ func ValidateInterBlockRouteEndpointContacts(candidates []InterBlockRouteCandida
 	targetsByNet := interBlockContactTargetsByNet(evidence.Targets)
 	operationsByNet, operationIssues := decodeInterBlockRouteOperations(operations)
 	evidence.Issues = append(evidence.Issues, operationIssues...)
-	for netName, targets := range targetsByNet {
+	netNames := make([]string, 0, len(targetsByNet))
+	for netName := range targetsByNet {
+		netNames = append(netNames, netName)
+	}
+	slices.Sort(netNames)
+	for _, netName := range netNames {
+		targets := targetsByNet[netName]
 		routeOperations := operationsByNet[netName]
 		if len(routeOperations) == 0 {
 			for _, target := range targets {

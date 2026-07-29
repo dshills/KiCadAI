@@ -164,8 +164,6 @@ func TestParseLeadingEngineeringNumber(t *testing.T) {
 		{value: "2u", want: 0.000002},
 		{value: "2µ", want: 0.000002},
 		{value: "2μ", want: 0.000002},
-		{value: "10 units", want: 10},
-		{value: "10 max", want: 10},
 		{value: "4k7", want: 4700},
 		{value: "1kΩ", want: 1000},
 		{value: "2R2", want: 2.2},
@@ -180,6 +178,14 @@ func TestParseLeadingEngineeringNumber(t *testing.T) {
 		}
 		if math.Abs(got-tt.want) > math.Abs(tt.want)*1e-12 {
 			t.Fatalf("parseLeadingEngineeringNumber(%q) = %g, want %g", tt.value, got, tt.want)
+		}
+	}
+}
+
+func TestParseLeadingEngineeringNumberRejectsUnknownSuffix(t *testing.T) {
+	for _, value := range []string{"100nX", "10 units", "10 max"} {
+		if _, ok := parseLeadingEngineeringNumber(value); ok {
+			t.Fatalf("parseLeadingEngineeringNumber(%q) accepted an unknown suffix", value)
 		}
 	}
 }

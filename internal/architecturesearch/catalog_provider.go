@@ -963,8 +963,15 @@ func (provider *CatalogProvider) expandFilter(ctx context.Context, request Provi
 }
 
 func (provider *CatalogProvider) expandTranslator(ctx context.Context, request ProviderRequest) ([]ProviderExpansion, error) {
-	for name, value := range map[string]string{"protocol": "i2c", "signaling_mode": "open_drain", "direction": "bidirectional"} {
-		if err := requireString(request.Constraints, name, "equal", value); err != nil {
+	for _, constraint := range []struct {
+		name  string
+		value string
+	}{
+		{name: "direction", value: "bidirectional"},
+		{name: "protocol", value: "i2c"},
+		{name: "signaling_mode", value: "open_drain"},
+	} {
+		if err := requireString(request.Constraints, constraint.name, "equal", constraint.value); err != nil {
 			return nil, err
 		}
 	}

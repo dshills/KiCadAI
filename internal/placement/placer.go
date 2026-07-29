@@ -1084,7 +1084,13 @@ func candidateTranslatedKeepoutConflict(component Component, candidate Placement
 			if !strings.EqualFold(strings.TrimSpace(keepout.GroupID), strings.TrimSpace(group.ID)) || keepout.Optional {
 				continue
 			}
-			for _, placed := range placedByRef {
+			placedRefs := make([]string, 0, len(placedByRef))
+			for ref := range placedByRef {
+				placedRefs = append(placedRefs, ref)
+			}
+			slices.Sort(placedRefs)
+			for _, ref := range placedRefs {
+				placed := placedByRef[ref]
 				if keepoutExemptsRef(keepout, placed.Ref) || !keepoutAppliesToLayer(keepout, placed.Position.Layer) {
 					continue
 				}

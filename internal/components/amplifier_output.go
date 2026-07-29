@@ -60,15 +60,28 @@ func SelectAmplifierOutputPair(ctx context.Context, catalog *Catalog, request Am
 	if request.DeviceClass == "mosfet" {
 		upperPolarity, lowerPolarity = "n_channel", "p_channel"
 	}
-	upper, upperIssues := selectAmplifierOutputPolarity(catalog, upperPolarity, request, requiredRatings)
-	lower, lowerIssues := selectAmplifierOutputPolarity(catalog, lowerPolarity, request, requiredRatings)
-	issues = append(issues, upperIssues...)
-	issues = append(issues, lowerIssues...)
+	upperCandidates, upperRejected := selectAmplifierOutputPolarityCandidates(catalog, upperPolarity, request, requiredRatings)
+	lowerCandidates, lowerRejected := selectAmplifierOutputPolarityCandidates(catalog, lowerPolarity, request, requiredRatings)
+	if len(upperCandidates) == 0 {
+		issues = append(issues, amplifierOutputPolarityIssues(upperPolarity, request.Application, upperRejected)...)
+	}
+	if len(lowerCandidates) == 0 {
+		issues = append(issues, amplifierOutputPolarityIssues(lowerPolarity, request.Application, lowerRejected)...)
+	}
+	upper, lower, paired := bestComplementaryOutputPair(upperCandidates, lowerCandidates)
+	if !paired && len(upperCandidates) != 0 && len(lowerCandidates) != 0 {
+		upper, lower = upperCandidates[0], lowerCandidates[0]
+		issues = append(issues, NewIssue(CodeAmplifierOutputUnsupported, reports.SeverityBlocked, "amplifier_output.complementary_group", "no jointly valid output devices share a complementary group"))
+	}
 	pair := AmplifierOutputPair{DeviceClass: request.DeviceClass, Upper: upper, Lower: lower, EstimatedPeakMA: estimatedPeakMA}
 	if request.DeviceClass == "bjt" {
 		pair.NPN, pair.PNP = upper, lower
 	}
-	issues = append(issues, validateComplementaryOutputPair(pair)...)
+	issues = append(issues, upper.Warnings...)
+	issues = append(issues, lower.Warnings...)
+	if paired {
+		issues = append(issues, validateComplementaryOutputPair(pair)...)
+	}
 	return pair, reports.ResultWithIssues("amplifier output pair select", pair, issues, nil)
 }
 
@@ -140,10 +153,11 @@ func amplifierOutputRequiredRatings(request AmplifierOutputPairRequest) ([]Requi
 	return []RequiredRating{{Kind: "collector_emitter_voltage", Value: strconv.FormatFloat(supplyValue, 'g', 8, 64), Unit: "V"}, {Kind: "collector_current", Value: formatMilliAmp(peakCurrentMA), Unit: "mA"}}, formatMilliAmp(peakCurrentMA), nil
 }
 
-func selectAmplifierOutputPolarity(catalog *Catalog, polarity string, request AmplifierOutputPairRequest, ratings []RequiredRating) (Selection, []reports.Issue) {
+func selectAmplifierOutputPolarityCandidates(catalog *Catalog, polarity string, request AmplifierOutputPairRequest, ratings []RequiredRating) ([]Selection, []CandidateRejection) {
 	catalog.mu.RLock()
 	defer catalog.mu.RUnlock()
 	candidates := catalog.amplifierOutputIndex[polarity]
+	var accepted []Selection
 	var rejected []CandidateRejection
 	for _, candidate := range candidates {
 		if candidate.Record < 0 || candidate.Record >= len(catalog.Records) {
@@ -173,19 +187,55 @@ func selectAmplifierOutputPolarity(catalog *Catalog, polarity string, request Am
 			continue
 		}
 		warnings := nonBlockingIssues(issues)
-		return Selection{
+		accepted = append(accepted, Selection{
 			Candidate: candidate.Candidate,
 			Component: *record,
 			Variant:   *variant,
 			Warnings:  warnings,
 			Rejected:  rejected,
-		}, warnings
+		})
 	}
-	issues := []reports.Issue{NewIssue(CodeComponentNotFound, reports.SeverityBlocked, "amplifier_output."+polarity, "no supported "+polarity+" "+request.Application+" output device satisfies requested ratings")}
+	return accepted, rejected
+}
+
+func amplifierOutputPolarityIssues(polarity string, application string, rejected []CandidateRejection) []reports.Issue {
+	issues := []reports.Issue{NewIssue(CodeComponentNotFound, reports.SeverityBlocked, "amplifier_output."+polarity, "no supported "+polarity+" "+application+" output device satisfies requested ratings")}
 	for _, rejection := range rejected {
 		issues = append(issues, rejection.Issues...)
 	}
-	return Selection{Rejected: rejected}, issues
+	return issues
+}
+
+func bestComplementaryOutputPair(uppers []Selection, lowers []Selection) (Selection, Selection, bool) {
+	var bestUpper Selection
+	var bestLower Selection
+	bestScore := 0
+	found := false
+	for _, upper := range uppers {
+		if upper.Component.AmplifierOutput == nil {
+			continue
+		}
+		upperGroup := strings.TrimSpace(upper.Component.AmplifierOutput.ComplementaryGroup)
+		if upperGroup == "" {
+			continue
+		}
+		for _, lower := range lowers {
+			if lower.Component.AmplifierOutput == nil ||
+				!strings.EqualFold(upperGroup, strings.TrimSpace(lower.Component.AmplifierOutput.ComplementaryGroup)) {
+				continue
+			}
+			score := upper.Candidate.Score + lower.Candidate.Score
+			if !found || score > bestScore ||
+				score == bestScore && amplifierOutputPairKey(upper, lower) < amplifierOutputPairKey(bestUpper, bestLower) {
+				bestUpper, bestLower, bestScore, found = upper, lower, score, true
+			}
+		}
+	}
+	return bestUpper, bestLower, found
+}
+
+func amplifierOutputPairKey(upper Selection, lower Selection) string {
+	return upper.Component.ID + "\x00" + upper.Variant.ID + "\x00" + lower.Component.ID + "\x00" + lower.Variant.ID
 }
 
 func validateComplementaryOutputPair(pair AmplifierOutputPair) []reports.Issue {

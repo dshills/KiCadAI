@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"kicadai/internal/atomicfile"
@@ -167,7 +168,13 @@ func Read(root string) (Manifest, Status, error) {
 		return manifest, Status{Present: true, Path: filepath.ToSlash(path), Stale: true, Issues: []string{err.Error()}}, err
 	}
 	checkProvenanceRef(absRoot, manifest, &status)
-	for rel, want := range manifest.FileHashes {
+	hashPaths := make([]string, 0, len(manifest.FileHashes))
+	for rel := range manifest.FileHashes {
+		hashPaths = append(hashPaths, rel)
+	}
+	slices.Sort(hashPaths)
+	for _, rel := range hashPaths {
+		want := manifest.FileHashes[rel]
 		if manifest.Provenance != nil && rel == manifest.Provenance.TransactionPath {
 			continue
 		}

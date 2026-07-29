@@ -248,33 +248,33 @@
       "id": "H15",
       "severity": "high",
       "package": "internal/components",
-      "disposition": "reproduced_pending",
+      "disposition": "closed",
       "implementation_phase": 6,
       "reproduction": {
-        "test": "TestFableH15ReproductionEquivalentSIPrefixesFailExactMatch",
+        "test": "TestFableH15CanonicalEngineeringValuesMatchEquivalentSIPrefixes",
         "path": "internal/components/fable_phase0_test.go",
-        "command": "go test ./internal/components -run '^TestFableH15ReproductionEquivalentSIPrefixesFailExactMatch$' -count=1"
+        "command": "go test ./internal/components -run '^TestFableH15CanonicalEngineeringValuesMatchEquivalentSIPrefixes$' -count=1"
       },
       "affected_capabilities": ["component_value_selection", "engineering_value_equivalence"],
       "historical_evidence": "component coverage does not prove equivalent SI-prefix query spellings",
-      "current_evidence": "pending Phase 6 canonical engineering-quantity comparison",
-      "closing_commit": null
+      "current_evidence": "exact rational SI normalization matches equivalent capacitance spellings and rejects unknown suffixes; selection continues across same-kind constraints",
+      "closing_commit": "Canonicalize component and lowering behavior"
     },
     {
       "id": "H16",
       "severity": "high",
       "package": "internal/compositionlowering",
-      "disposition": "reproduced_pending",
+      "disposition": "closed",
       "implementation_phase": 6,
       "reproduction": {
-        "test": "TestFableH16ReproductionMetadataMergeIsEncounterOrderDependent",
+        "test": "TestFableH16MetadataMergeIsOrderIndependent",
         "path": "internal/compositionlowering/fable_phase0_test.go",
-        "command": "go test ./internal/compositionlowering -run '^TestFableH16ReproductionMetadataMergeIsEncounterOrderDependent$' -count=1"
+        "command": "go test ./internal/compositionlowering -run '^TestFableH16MetadataMergeIsOrderIndependent$' -count=1"
       },
       "affected_capabilities": ["deterministic_lowering", "resolution_hash", "promotion_replay"],
       "historical_evidence": "deterministic corpora do not cover conflicting non-empty domains merged from map iteration",
-      "current_evidence": "pending Phase 6 stable-member-order merge",
-      "closing_commit": null
+      "current_evidence": "lowering sorts union members and resolves conflicting non-empty domains canonically; an eight-process replay proves identical connection output",
+      "closing_commit": "Canonicalize component and lowering behavior"
     },
     {
       "id": "H17",

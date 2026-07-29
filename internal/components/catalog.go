@@ -157,6 +157,7 @@ func ValidateCatalog(catalog *Catalog) reports.Result {
 	}
 	seen := map[string]int{}
 	equivalenceGroups := map[string][]equivalenceMember{}
+	complementaryGroups := map[string][]complementaryMember{}
 	for i := range catalog.Records {
 		record := &catalog.Records[i]
 		path := fmt.Sprintf("records[%d]", i)
@@ -202,6 +203,13 @@ func ValidateCatalog(catalog *Catalog) reports.Result {
 		issues = append(issues, validateMCUEvidence(path+".mcu_evidence", record)...)
 		issues = append(issues, validateAmplifierOutputEvidence(path+".amplifier_output_evidence", record)...)
 		issues = append(issues, validatePowerSemiconductorEvidence(path+".power_semiconductor_evidence", record)...)
+		if record.AmplifierOutput != nil && record.PowerSemiconductor != nil {
+			amplifierGroup := normalizeMetadata(record.AmplifierOutput.ComplementaryGroup)
+			powerGroup := normalizeMetadata(record.PowerSemiconductor.ComplementaryGroup)
+			if amplifierGroup != "" && powerGroup != "" && amplifierGroup != powerGroup {
+				issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, path+".amplifier_output_evidence.complementary_group", "amplifier-output and power-semiconductor complementary groups must agree"))
+			}
+		}
 		issues = append(issues, validateThermalEvidence(path+".thermal_evidence", record.Thermal)...)
 		for _, diagnostic := range simmodel.ValidateCatalogEvidence(record.Family, record.SimulationModels) {
 			issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, path+"."+diagnostic.Path, diagnostic.Message))
@@ -219,9 +227,16 @@ func ValidateCatalog(catalog *Catalog) reports.Result {
 				signature: equivalenceSignatureForRecord(*record),
 			})
 		}
+		if record.Verification.Confidence != ConfidenceBlocked {
+			group, member, ok := complementaryMetadata(path, record)
+			if ok {
+				complementaryGroups[group] = append(complementaryGroups[group], member)
+			}
+		}
 	}
 	issues = append(issues, validateThermalPaths(catalog.ThermalPaths)...)
 	issues = append(issues, validateEquivalenceGroups(equivalenceGroups)...)
+	issues = append(issues, validateComplementaryGroups(complementaryGroups)...)
 	sortIssues(issues)
 	return reports.ResultWithIssues("component validate", map[string]any{
 		"family_count": len(catalog.Families),
@@ -317,6 +332,13 @@ type equivalenceMember struct {
 	recordID  string
 	role      EquivalenceRole
 	signature string
+}
+
+type complementaryMember struct {
+	path        string
+	recordID    string
+	deviceClass string
+	polarity    string
 }
 
 func readCatalogFile(path string) (catalogFile, []reports.Issue) {
@@ -1493,6 +1515,68 @@ func validateEquivalenceGroups(groups map[string][]equivalenceMember) []reports.
 			if member.signature != preferredSignature {
 				issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, member.path+".equivalence.group", "equivalence group "+group+" contains incompatible family, package, or value metadata"))
 			}
+		}
+	}
+	return issues
+}
+
+func complementaryMetadata(path string, record *ComponentRecord) (string, complementaryMember, bool) {
+	if record == nil {
+		return "", complementaryMember{}, false
+	}
+	if evidence := record.AmplifierOutput; evidence != nil && strings.TrimSpace(evidence.ComplementaryGroup) != "" {
+		group := normalizeMetadata(evidence.ComplementaryGroup)
+		return group, complementaryMember{
+			path:        path + ".amplifier_output_evidence.complementary_group",
+			recordID:    record.ID,
+			deviceClass: strings.ToLower(strings.TrimSpace(evidence.DeviceClass)),
+			polarity:    strings.ToLower(strings.TrimSpace(evidence.Polarity)),
+		}, true
+	}
+	if evidence := record.PowerSemiconductor; evidence != nil && strings.TrimSpace(evidence.ComplementaryGroup) != "" {
+		group := normalizeMetadata(evidence.ComplementaryGroup)
+		return group, complementaryMember{
+			path:        path + ".power_semiconductor_evidence.complementary_group",
+			recordID:    record.ID,
+			deviceClass: strings.ToLower(strings.TrimSpace(evidence.DeviceClass)),
+			polarity:    strings.ToLower(strings.TrimSpace(evidence.Polarity)),
+		}, true
+	}
+	return "", complementaryMember{}, false
+}
+
+func validateComplementaryGroups(groups map[string][]complementaryMember) []reports.Issue {
+	var issues []reports.Issue
+	groupNames := make([]string, 0, len(groups))
+	for group := range groups {
+		groupNames = append(groupNames, group)
+	}
+	slices.Sort(groupNames)
+	for _, group := range groupNames {
+		members := groups[group]
+		slices.SortFunc(members, func(left, right complementaryMember) int {
+			return strings.Compare(left.recordID, right.recordID)
+		})
+		classes := map[string]bool{}
+		polarities := map[string]bool{}
+		for _, member := range members {
+			classes[member.deviceClass] = true
+			polarities[member.polarity] = true
+		}
+		valid := len(classes) == 1
+		switch members[0].deviceClass {
+		case "bjt":
+			valid = valid && polarities["npn"] && polarities["pnp"]
+		case "mosfet":
+			valid = valid && polarities["n_channel"] && polarities["p_channel"]
+		default:
+			valid = false
+		}
+		if valid {
+			continue
+		}
+		for _, member := range members {
+			issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, member.path, "complementary group "+group+" must contain a symmetric device-class pair"))
 		}
 	}
 	return issues

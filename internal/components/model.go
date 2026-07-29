@@ -3,11 +3,9 @@ package components
 import (
 	"math"
 	"sort"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
-	"unicode/utf8"
 
 	"kicadai/internal/domain"
 	"kicadai/internal/reports"
@@ -1153,54 +1151,11 @@ func compareConstraintSortKeys(a constraintSortKey, b constraintSortKey) int {
 }
 
 func parseLeadingEngineeringNumber(value string) (float64, bool) {
-	value = strings.TrimSpace(value)
-	if value == "" {
+	quantity, ok := parseEngineeringQuantity(value, "")
+	if !ok {
 		return 0, false
 	}
-	if len(value) > maxEngineeringValueLength {
-		return 0, false
-	}
-	if number, ok := parseEmbeddedEngineeringNumber(value); ok {
-		return number, true
-	}
-	end := scanLeadingFloat(value)
-	if end <= 0 {
-		return 0, false
-	}
-	number, err := strconv.ParseFloat(value[:end], 64)
-	if err != nil {
-		return 0, false
-	}
-	multiplier := 1.0
-	suffix := strings.TrimSpace(value[end:])
-	if suffix != "" {
-		r, _ := utf8.DecodeRuneInString(suffix)
-		if validEngineeringSuffix(suffix) {
-			switch r {
-			case 'f':
-				multiplier = 1e-15
-			case 'p':
-				multiplier = 1e-12
-			case 'n':
-				multiplier = 1e-9
-			case 'u', 'µ', 'μ':
-				multiplier = 1e-6
-			case 'm':
-				multiplier = 1e-3
-			case 'k', 'K':
-				multiplier = 1e3
-			case 'M':
-				multiplier = 1e6
-			case 'G':
-				multiplier = 1e9
-			case 'T':
-				multiplier = 1e12
-			case 'P':
-				multiplier = 1e15
-			}
-		}
-	}
-	number *= multiplier
+	number, _ := quantity.value.Float64()
 	if math.IsNaN(number) || math.IsInf(number, 0) {
 		return 0, false
 	}
@@ -1211,49 +1166,6 @@ func parseLeadingEngineeringNumber(value string) (float64, bool) {
 // its base-unit numeric value.
 func ParseEngineeringValue(value string) (float64, bool) {
 	return parseLeadingEngineeringNumber(value)
-}
-
-func parseEmbeddedEngineeringNumber(value string) (float64, bool) {
-	runes := []rune(value)
-	for i := 1; i < len(runes)-1; i++ {
-		if !isEmbeddedEngineeringMarker(runes[i]) {
-			continue
-		}
-		if !asciiDigitRune(runes[i-1]) || !asciiDigitRune(runes[i+1]) {
-			continue
-		}
-		left := string(runes[:i])
-		rightEnd := i + 1
-		for rightEnd < len(runes) && asciiDigitRune(runes[rightEnd]) {
-			rightEnd++
-		}
-		right := string(runes[i+1 : rightEnd])
-		number, err := strconv.ParseFloat(left+"."+right, 64)
-		if err != nil {
-			return 0, false
-		}
-		number *= engineeringMultiplier(runes[i])
-		if math.IsNaN(number) || math.IsInf(number, 0) {
-			return 0, false
-		}
-		return number, true
-	}
-	return 0, false
-}
-
-func validEngineeringSuffix(suffix string) bool {
-	if suffix == "" {
-		return false
-	}
-	r, size := utf8.DecodeRuneInString(suffix)
-	if !isEngineeringPrefix(r) {
-		return false
-	}
-	rest := strings.TrimSpace(suffix[size:])
-	if rest == "" {
-		return true
-	}
-	return isElectricalUnitSuffix(rest)
 }
 
 func isEngineeringPrefix(r rune) bool {
@@ -1269,49 +1181,8 @@ func isEmbeddedEngineeringMarker(r rune) bool {
 	return isEngineeringPrefix(r) || r == 'R' || r == 'r'
 }
 
-func engineeringMultiplier(r rune) float64 {
-	switch r {
-	case 'f':
-		return 1e-15
-	case 'p':
-		return 1e-12
-	case 'n':
-		return 1e-9
-	case 'u', 'µ', 'μ':
-		return 1e-6
-	case 'm':
-		return 1e-3
-	case 'k', 'K':
-		return 1e3
-	case 'M':
-		return 1e6
-	case 'G':
-		return 1e9
-	case 'T':
-		return 1e12
-	case 'P':
-		return 1e15
-	default:
-		return 1
-	}
-}
-
 func asciiDigitRune(r rune) bool {
 	return r >= '0' && r <= '9'
-}
-
-func isElectricalUnitSuffix(suffix string) bool {
-	switch strings.ToLower(strings.TrimSpace(suffix)) {
-	case "a", "amp", "amps", "ampere", "amperes",
-		"f", "farad", "farads",
-		"h", "henry", "henries", "hz",
-		"v", "volt", "volts",
-		"w", "watt", "watts",
-		"o", "ohm", "ohms", "r", "s", "siemens", "ω":
-		return true
-	default:
-		return false
-	}
 }
 
 func scanLeadingFloat(value string) int {

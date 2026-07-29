@@ -488,6 +488,7 @@
       "power_semiconductor_evidence": {
         "device_class": "bjt",
         "polarity": "npn",
+        "complementary_group": "st_bd139_bd140",
         "max_voltage": {"value": 80, "unit": "V", "conditions": "VCEO, base open"},
         "continuous_current": {"value": 1.5, "unit": "A", "conditions": "absolute maximum collector current"},
         "peak_current": {"value": 3, "unit": "A", "conditions": "absolute maximum peak collector current"},

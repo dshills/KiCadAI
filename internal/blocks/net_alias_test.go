@@ -1,6 +1,9 @@
 package blocks
 
-import "testing"
+import (
+	"slices"
+	"testing"
+)
 
 func TestResolveCompositionNetAliasesMapsConnectedPortsToCanonicalNet(t *testing.T) {
 	resolutions, issues := ResolveCompositionNetAliases(CompositionRequest{
@@ -26,6 +29,25 @@ func TestResolveCompositionNetAliasesMapsConnectedPortsToCanonicalNet(t *testing
 		if got[local] != canonical {
 			t.Fatalf("resolution[%s] = %q, want %q in %#v", local, got[local], canonical, got)
 		}
+	}
+}
+
+func TestResolveCompositionNetAliasesReturnsCanonicalOrder(t *testing.T) {
+	resolutions, issues := ResolveCompositionNetAliases(CompositionRequest{
+		Connections: []CompositionConnection{
+			{From: PortRef{InstanceID: "z", Port: "OUT"}, To: PortRef{InstanceID: "y", Port: "IN"}, NetAlias: "Z_NET"},
+			{From: PortRef{InstanceID: "b", Port: "OUT"}, To: PortRef{InstanceID: "a", Port: "IN"}, NetAlias: "A_NET"},
+		},
+	})
+	if len(issues) != 0 {
+		t.Fatalf("resolve aliases: %#v", issues)
+	}
+	localNets := make([]string, len(resolutions))
+	for index, resolution := range resolutions {
+		localNets[index] = resolution.LocalNet
+	}
+	if !slices.IsSorted(localNets) {
+		t.Fatalf("alias resolutions are not canonical: %#v", resolutions)
 	}
 }
 

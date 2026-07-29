@@ -2,6 +2,7 @@ package blocks
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 
 	"kicadai/internal/reports"
@@ -85,6 +86,18 @@ func ResolveCompositionNetAliases(request CompositionRequest) ([]CompositionNetA
 	for _, resolution := range resolutionByLocal {
 		resolutions = append(resolutions, resolution)
 	}
+	slices.SortFunc(resolutions, func(left, right CompositionNetAliasResolution) int {
+		if order := strings.Compare(left.LocalNet, right.LocalNet); order != 0 {
+			return order
+		}
+		if order := strings.Compare(left.CanonicalNet, right.CanonicalNet); order != 0 {
+			return order
+		}
+		if order := strings.Compare(left.InstanceID, right.InstanceID); order != 0 {
+			return order
+		}
+		return strings.Compare(left.Port, right.Port)
+	})
 	return resolutions, nil
 }
 

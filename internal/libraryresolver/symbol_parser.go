@@ -74,7 +74,13 @@ func IndexSymbolsContext(ctx context.Context, inventory LibraryInventory) (map[s
 		}
 	}
 	records = resolveCrossFileInheritedSymbols(records)
-	for _, record := range records {
+	recordIDs := make([]string, 0, len(records))
+	for id := range records {
+		recordIDs = append(recordIDs, id)
+	}
+	sort.Strings(recordIDs)
+	for _, id := range recordIDs {
+		record := records[id]
 		issues = append(issues, record.Diagnostics...)
 	}
 	if issue, ok := contextIssue(ctx); ok {

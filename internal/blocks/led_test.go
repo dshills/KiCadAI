@@ -140,15 +140,19 @@ func TestLEDIndicatorRejectsEmptyFootprint(t *testing.T) {
 
 func TestParseResistanceUnits(t *testing.T) {
 	for value, want := range map[string]float64{
-		"10":   10,
-		"10Ω":  10,
-		"10uΩ": 0.00001,
-		"10kΩ": 10000,
-		"4k7":  4700,
-		"4k7Ω": 4700,
-		"4u7":  0.0000047,
-		"4µ7":  0.0000047,
-		"4R7":  4.7,
+		"10":     10,
+		"10Ω":    10,
+		"10uΩ":   0.00001,
+		"10kΩ":   10000,
+		"4k7":    4700,
+		"4k7Ω":   4700,
+		"4u7":    0.0000047,
+		"4µ7":    0.0000047,
+		"4R7":    4.7,
+		"47ohm":  47,
+		"47Ohm":  47,
+		"47ohms": 47,
+		"47Ohms": 47,
 	} {
 		got, ok := parseUnit(value, "Ω", resistanceMultipliers())
 		if !ok || math.Abs(got-want) > 1e-12 {

@@ -1020,17 +1020,22 @@ func parseUnitSelector(value string) (int, bool, bool) {
 func catalogHash(catalog *components.Catalog) string {
 	families := append([]components.FamilyDefinition(nil), catalog.Families...)
 	records := append([]components.ComponentRecord(nil), catalog.Records...)
+	thermalPaths := append([]components.ThermalPathRecord(nil), catalog.ThermalPaths...)
 	slices.SortStableFunc(families, func(left, right components.FamilyDefinition) int {
 		return strings.Compare(left.ID, right.ID)
 	})
 	slices.SortStableFunc(records, func(left, right components.ComponentRecord) int {
 		return strings.Compare(left.ID, right.ID)
 	})
+	slices.SortStableFunc(thermalPaths, func(left, right components.ThermalPathRecord) int {
+		return strings.Compare(left.ID, right.ID)
+	})
 	return hashGraphValue(struct {
-		Version  string                        `json:"version"`
-		Families []components.FamilyDefinition `json:"families"`
-		Records  []components.ComponentRecord  `json:"records"`
-	}{Version: catalog.Version, Families: families, Records: records})
+		Version      string                         `json:"version"`
+		Families     []components.FamilyDefinition  `json:"families"`
+		Records      []components.ComponentRecord   `json:"records"`
+		ThermalPaths []components.ThermalPathRecord `json:"thermal_paths"`
+	}{Version: catalog.Version, Families: families, Records: records, ThermalPaths: thermalPaths})
 }
 
 func libraryEvidenceHash(options ResolveOptions) string {

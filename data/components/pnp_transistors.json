@@ -181,7 +181,6 @@
       "power_semiconductor_evidence": {
         "device_class": "bjt",
         "polarity": "pnp",
-        "complementary_group": "onsemi_ss8050_ss8550",
         "max_voltage": {
           "value": 25,
           "unit": "V",
@@ -460,6 +459,7 @@
       "power_semiconductor_evidence": {
         "device_class": "bjt",
         "polarity": "pnp",
+        "complementary_group": "st_2sd882_2sb772",
         "max_voltage": {
           "value": 30,
           "unit": "V",

@@ -929,9 +929,11 @@ func recordMeetsTolerance(record ComponentRecord, query Query) bool {
 		got, ok := parseToleranceValue(value, constraint.Unit)
 		want, wantOK := normalizeToleranceValue(query.MaximumTolerance, unit)
 		if !ok || !wantOK {
-			return false
+			continue
 		}
-		return got <= want
+		if got <= want {
+			return true
+		}
 	}
 	return false
 }
@@ -962,17 +964,28 @@ func recordHasValue(record ComponentRecord, kind string, value string) bool {
 		if value == "" {
 			return true
 		}
-		want, ok := parseValueWithUnit(value, constraint.Unit)
+		want, ok := parseEngineeringQuantity(value, constraint.Unit)
 		if !ok {
 			return false
 		}
 		if constraint.Typ != "" {
-			got, ok := parseValueWithUnit(constraint.Typ, constraint.Unit)
-			return ok && got == want
+			got, ok := parseEngineeringQuantity(constraint.Typ, constraint.Unit)
+			if ok && quantitiesEqual(got, want) {
+				return true
+			}
+			continue
 		}
-		min, minOK := parseValueWithUnit(constraint.Min, constraint.Unit)
-		max, maxOK := parseValueWithUnit(constraint.Max, constraint.Unit)
-		return (!minOK || want >= min) && (!maxOK || want <= max)
+		min, minOK := parseEngineeringQuantity(constraint.Min, constraint.Unit)
+		max, maxOK := parseEngineeringQuantity(constraint.Max, constraint.Unit)
+		if minOK && (min.dimension != want.dimension || want.value.Cmp(min.value) < 0) {
+			continue
+		}
+		if maxOK && (max.dimension != want.dimension || want.value.Cmp(max.value) > 0) {
+			continue
+		}
+		if minOK || maxOK {
+			return true
+		}
 	}
 	return false
 }
@@ -1177,12 +1190,16 @@ func recordVariantKey(recordID string, variantID string) string {
 func requiredRatingIssues(record ComponentRecord, ratings []RequiredRating) []reports.Issue {
 	var issues []reports.Issue
 	for _, required := range ratings {
-		ok, found := recordSatisfiesRating(record, required)
-		if !found {
+		match := recordSatisfiesRating(record, required)
+		if !match.requestValid {
+			issues = append(issues, NewIssue(reports.CodeInvalidArgument, reports.SeverityBlocked, "component."+record.ID+".ratings."+required.Kind, "requested component rating value is invalid: "+required.Value+" "+required.Unit))
+			continue
+		}
+		if !match.found {
 			issues = append(issues, NewIssue(CodeComponentRatingMissing, reports.SeverityBlocked, "component."+record.ID+".ratings."+required.Kind, "component is missing requested rating "+required.Kind))
 			continue
 		}
-		if !ok {
+		if !match.satisfied {
 			issues = append(issues, NewIssue(CodeComponentRatingTooLow, reports.SeverityBlocked, "component."+record.ID+".ratings."+required.Kind, "component rating does not satisfy requested "+required.Kind))
 		}
 	}
@@ -1203,10 +1220,16 @@ func requiredFunctionIssues(record ComponentRecord, functions []string) []report
 	return issues
 }
 
-func recordSatisfiesRating(record ComponentRecord, required RequiredRating) (bool, bool) {
-	want, ok := parseValueWithUnit(required.Value, required.Unit)
+type ratingMatch struct {
+	satisfied    bool
+	found        bool
+	requestValid bool
+}
+
+func recordSatisfiesRating(record ComponentRecord, required RequiredRating) ratingMatch {
+	want, ok := parseEngineeringQuantity(required.Value, required.Unit)
 	if !ok {
-		return false, true
+		return ratingMatch{}
 	}
 	found := false
 	ledFamily := isLEDFamily(record.Family)
@@ -1215,29 +1238,38 @@ func recordSatisfiesRating(record ComponentRecord, required RequiredRating) (boo
 			continue
 		}
 		found = true
+		min, minOK := parseEngineeringQuantity(rating.Min, rating.Unit)
+		max, maxOK := parseEngineeringQuantity(rating.Max, rating.Unit)
+		typ, typOK := parseEngineeringQuantity(rating.Typ, rating.Unit)
+		if minOK && min.dimension != want.dimension ||
+			maxOK && max.dimension != want.dimension ||
+			typOK && typ.dimension != want.dimension {
+			continue
+		}
 		if rating.Min != "" {
-			minValue, ok := parseValueWithUnit(rating.Min, rating.Unit)
-			if ok && want < minValue {
+			if !minOK {
 				continue
 			}
 		}
 		if rating.Max != "" {
-			maxValue, ok := parseValueWithUnit(rating.Max, rating.Unit)
-			if ok && want > maxValue {
+			if !maxOK || want.value.Cmp(max.value) > 0 {
 				continue
 			}
-			if ok {
-				return true, true
+			if minOK && want.value.Cmp(min.value) < 0 {
+				continue
 			}
+			return ratingMatch{satisfied: true, found: true, requestValid: true}
 		}
 		if rating.Typ != "" {
-			typValue, ok := parseValueWithUnit(rating.Typ, rating.Unit)
-			if ok && typValue >= want {
-				return true, true
+			if typOK && typ.value.Cmp(want.value) >= 0 {
+				return ratingMatch{satisfied: true, found: true, requestValid: true}
 			}
 		}
+		if minOK && want.value.Cmp(min.value) <= 0 {
+			return ratingMatch{satisfied: true, found: true, requestValid: true}
+		}
 	}
-	return false, found
+	return ratingMatch{found: found, requestValid: true}
 }
 
 func ratingKindMatches(ledFamily bool, actual string, required string) bool {

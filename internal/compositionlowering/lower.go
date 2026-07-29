@@ -819,7 +819,13 @@ func lowerConnections(union *disjointSet, actual map[string]circuitgraph.Functio
 			return nil, nil, issues(nodes[0], "semantic endpoint is disconnected after composition")
 		}
 		combined := nodeMetadata{role: circuitgraph.NetRoleSignal}
-		for node := range union.members(root) {
+		members := union.members(root)
+		memberNames := make([]string, 0, len(members))
+		for node := range members {
+			memberNames = append(memberNames, node)
+		}
+		slices.Sort(memberNames)
+		for _, node := range memberNames {
 			combined = combineMetadata(combined, metadata[node])
 		}
 		connection := circuitgraph.FunctionConnection{Name: fmt.Sprintf("composition_net_%03d", index+1), Role: combined.role, VoltageDomain: combined.domain, CurrentMA: combined.current}
@@ -1133,7 +1139,7 @@ func combineMetadata(left, right nodeMetadata) nodeMetadata {
 	if netRoleRank(right.role) > netRoleRank(result.role) {
 		result.role = right.role
 	}
-	if result.domain == "" {
+	if result.domain == "" || right.domain != "" && right.domain < result.domain {
 		result.domain = right.domain
 	}
 	if right.current > result.current {
