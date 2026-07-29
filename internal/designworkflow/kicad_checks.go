@@ -16,8 +16,8 @@ type KiCadCheckOptions struct {
 	Timeout    time.Duration
 	RequireERC bool
 	RequireDRC bool
-	// EnforceRequirements makes a missing KiCad CLI fatal. When false, a
-	// request-level ERC/DRC requirement remains pending external evidence.
+	// EnforceRequirements is deprecated and has no effect. A requested ERC or
+	// DRC check always fails closed when the CLI or its evidence is unavailable.
 	EnforceRequirements bool
 	KeepArtifacts       bool
 	ArtifactDir         string
@@ -61,21 +61,14 @@ func RunKiCadChecks(ctx context.Context, request *Request, write *ProjectWriteRe
 	}
 	cli, err := checks.DiscoverCLI(opts.KiCadCLI)
 	if err != nil {
-		severity := reports.SeverityWarning
-		if opts.EnforceRequirements {
-			severity = reports.SeverityBlocked
-		}
 		stage := NewStageResult(StageKiCadChecks, []reports.Issue{{
-			Code:       reports.CodeSkippedExternalTool,
-			Severity:   severity,
+			Code:       reports.CodeKiCadCLIFailed,
+			Severity:   reports.SeverityBlocked,
 			Path:       "kicad_cli",
 			Message:    err.Error(),
 			Suggestion: "set --kicad-cli or KICADAI_KICAD_CLI to run KiCad ERC/DRC checks",
 		}})
 		stage.Summary = map[string]any{"reason": "kicad-cli unavailable"}
-		if !opts.EnforceRequirements {
-			stage.Status = StageStatusSkipped
-		}
 		return KiCadCheckStageResult{Stage: stage}
 	}
 
@@ -235,20 +228,13 @@ func workflowCheckResultWithIssues(result checks.CheckResult, err error) (checks
 	if result.ToolErrorKind != checks.ToolErrorNone {
 		issues = append(issues, reports.Issue{
 			Code:       reports.CodeKiCadCLIFailed,
-			Severity:   workflowCheckToolErrorSeverity(result),
+			Severity:   reports.SeverityError,
 			Path:       result.TargetPath,
 			Message:    workflowCheckToolErrorMessage(result, err),
 			Suggestion: workflowCheckToolErrorSuggestion(result),
 		})
 	}
 	return result, issues, workflowCheckArtifacts(result)
-}
-
-func workflowCheckToolErrorSeverity(result checks.CheckResult) reports.Severity {
-	if workflowCheckToolErrorHasNoFindingDRCInstability(result) {
-		return reports.SeverityWarning
-	}
-	return reports.SeverityError
 }
 
 func workflowCheckToolErrorHasNoFindingDRCInstability(result checks.CheckResult) bool {

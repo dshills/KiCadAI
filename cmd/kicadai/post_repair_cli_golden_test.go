@@ -762,7 +762,7 @@ func TestRepairExportBundleCLIMalformedRequest(t *testing.T) {
 	}
 }
 
-func TestRepairApplyFromExportedBundleUsesHydratedTransaction(t *testing.T) {
+func TestRepairApplyFromExportedBundleFailsClosedWithoutPadNetEvidence(t *testing.T) {
 	root := t.TempDir()
 	outputDir := filepath.Join(root, "target")
 	_ = writePostRepairCleanBundle(t, root, outputDir)
@@ -789,10 +789,10 @@ func TestRepairApplyFromExportedBundleUsesHydratedTransaction(t *testing.T) {
 		t.Fatalf("exported bundle hydrated transaction operations missing: %#v", bundle.Transaction)
 	}
 	applied := runPostRepairTargetApplyCLI(t, outputDir, exportedBundlePath)
-	if !applied.OK {
-		t.Fatalf("apply from hydrated export ok=false: %#v", applied)
+	if applied.OK {
+		t.Fatalf("apply without pad-net evidence unexpectedly succeeded: %#v", applied)
 	}
-	if applied.Data.Status != repair.StatusRepaired {
-		t.Fatalf("apply from hydrated export = %#v, want status %q", applied, repair.StatusRepaired)
+	if applied.Data.Status != repair.StatusBlocked || len(applied.Issues) == 0 {
+		t.Fatalf("apply from hydrated export = %#v, want blocked status with originating issue", applied)
 	}
 }

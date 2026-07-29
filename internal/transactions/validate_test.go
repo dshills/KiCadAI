@@ -132,6 +132,43 @@ func TestValidateReportsOperationIndex(t *testing.T) {
 	}
 }
 
+func TestValidateRejectsMutationAfterWriteProject(t *testing.T) {
+	result := Validate(mustParse(t, `{"operations":[
+	  {"op":"create_project","name":"demo"},
+	  {"op":"write_project"},
+	  {"op":"assign_footprint","ref":"R1","footprint_id":"Resistor_SMD:R_0805_2012Metric"}
+	]}`))
+	if !hasIssuePath(result.Issues, "operations[2].op") {
+		t.Fatalf("post-write mutation was not rejected: %#v", result.Issues)
+	}
+	if result.Issues[0].OperationID == "" {
+		t.Fatalf("phase issue missing operation identity: %#v", result.Issues)
+	}
+}
+
+func TestValidateRejectsMultipleWriteProjectOperations(t *testing.T) {
+	result := Validate(mustParse(t, `{"operations":[
+	  {"op":"create_project","name":"demo"},
+	  {"op":"write_project"},
+	  {"op":"write_project"}
+	]}`))
+	if !hasIssuePath(result.Issues, "operations[2].op") {
+		t.Fatalf("duplicate write was not rejected: %#v", result.Issues)
+	}
+}
+
+func TestValidateRejectsFootprintAssignmentAfterPlacement(t *testing.T) {
+	result := Validate(mustParse(t, `{"operations":[
+	  {"op":"create_project","name":"demo"},
+	  {"op":"place_footprint","ref":"R1","footprint_id":"Resistor_SMD:R_0805_2012Metric","at":{"x_mm":1,"y_mm":1}},
+	  {"op":"assign_footprint","ref":"R1","footprint_id":"Resistor_SMD:R_0805_2012Metric"},
+	  {"op":"write_project"}
+	]}`))
+	if !hasIssuePath(result.Issues, "operations[2].op") {
+		t.Fatalf("late footprint assignment was not rejected: %#v", result.Issues)
+	}
+}
+
 func TestValidateOperationIDsStableAcrossReorder(t *testing.T) {
 	first := Validate(mustParse(t, `{"operations":[
 	  {"op":"add_symbol","ref":"R1","library_id":"Device:R","at":{"x_mm":0,"y_mm":0}},

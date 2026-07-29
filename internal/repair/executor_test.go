@@ -50,6 +50,30 @@ func TestExecutorMissingFootprintApplyAddsOperation(t *testing.T) {
 	}
 }
 
+func TestExecutorMissingFootprintInsertsAssignmentBeforeWrite(t *testing.T) {
+	tx := transactions.Transaction{Operations: []transactions.Operation{
+		mustRepairOperation(t, transactions.OpWriteProject, transactions.WriteProjectOperation{Op: transactions.OpWriteProject}, ""),
+	}}
+	got := NewExecutor(ExecutionContext{
+		Transaction: &tx,
+		Footprints: map[string]FootprintEvidence{
+			"R1": {Ref: "R1", FootprintID: "Resistor_SMD:R_0805_2012Metric", Verified: true},
+		},
+	}).Execute(Attempt{
+		Action: ActionAssignFootprint,
+		Issue:  reports.Issue{Code: reports.CodeMissingFootprint, Refs: []string{"R1"}},
+	})
+	if got.Status != StatusRepaired || len(tx.Operations) != 2 {
+		t.Fatalf("attempt = %#v tx = %#v", got, tx)
+	}
+	if tx.Operations[0].Op != transactions.OpAssignFootprint || tx.Operations[1].Op != transactions.OpWriteProject {
+		t.Fatalf("footprint assignment must precede write_project: %#v", tx.Operations)
+	}
+	if validation := transactions.Validate(tx); len(validation.Issues) != 0 {
+		t.Fatalf("repaired transaction is invalid: %#v", validation.Issues)
+	}
+}
+
 func TestExecutorNormalizesFootprintEvidenceKeys(t *testing.T) {
 	tx := transactions.Transaction{}
 	got := NewExecutor(ExecutionContext{

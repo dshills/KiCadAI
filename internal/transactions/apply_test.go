@@ -735,8 +735,8 @@ func TestApplyGeneratedOverwriteRejectsExistingApplyLock(t *testing.T) {
 func TestApplyRejectsLateCreateProject(t *testing.T) {
 	tx := mustParse(t, `{"operations":[{"op":"write_project"},{"op":"create_project","name":"demo"}]}`)
 	result := Apply(tx, ApplyOptions{OutputDir: t.TempDir()})
-	if len(result.Issues) == 0 || result.Issues[0].Path != "operations[0].op" {
-		t.Fatalf("expected first create_project issue: %#v", result.Issues)
+	if len(result.Issues) == 0 || result.Issues[0].Path != "operations[1].op" {
+		t.Fatalf("expected late create_project phase issue: %#v", result.Issues)
 	}
 }
 

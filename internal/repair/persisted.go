@@ -266,8 +266,67 @@ func (validator *persistedRepairValidator) ValidateAttempt(attempt Attempt, curr
 		validator.remaining = append([]reports.Issue(nil), issues...)
 		return issues
 	}
+	if !repairAttemptResolvedByTransaction(*validator.transaction, attempt) {
+		validator.remaining = append([]reports.Issue(nil), current...)
+		return append([]reports.Issue(nil), validator.remaining...)
+	}
 	validator.remaining = removeAttemptedIssue(current, attempt.Issue)
 	return append([]reports.Issue(nil), validator.remaining...)
+}
+
+func repairAttemptResolvedByTransaction(tx transactions.Transaction, attempt Attempt) bool {
+	switch attempt.Action {
+	case ActionAssignFootprint:
+		refs := normalizedIssueRefs(attempt.Issue)
+		if len(refs) == 0 {
+			return false
+		}
+		assigned := map[string]bool{}
+		for _, operation := range tx.Operations {
+			if operation.Op == transactions.OpWriteProject {
+				break
+			}
+			if operation.Op != transactions.OpAssignFootprint {
+				continue
+			}
+			ref := normalizeRef(operation.Ref)
+			if ref == "" {
+				continue
+			}
+			assigned[ref] = true
+		}
+		for _, ref := range refs {
+			if !assigned[ref] {
+				return false
+			}
+		}
+		return true
+	case ActionGenerateOutline:
+		for _, operation := range tx.Operations {
+			if operation.Op == transactions.OpWriteProject {
+				break
+			}
+			if operation.Op == transactions.OpSetBoardOutline {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func normalizedIssueRefs(issue reports.Issue) []string {
+	refs := make([]string, 0, len(issue.Refs))
+	seen := map[string]bool{}
+	for _, ref := range issue.Refs {
+		normalized := normalizeRef(ref)
+		if normalized == "" || seen[normalized] {
+			continue
+		}
+		seen[normalized] = true
+		refs = append(refs, normalized)
+	}
+	sort.Strings(refs)
+	return refs
 }
 
 func normalizeRepairStageManifestArtifacts(outputDir string, artifacts []reports.Artifact) []reports.Artifact {

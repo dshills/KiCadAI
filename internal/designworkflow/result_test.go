@@ -1,9 +1,11 @@
 package designworkflow
 
 import (
+	"encoding/json"
 	"strings"
 	"testing"
 
+	"kicadai/internal/kicadfiles/checks"
 	"kicadai/internal/reports"
 )
 
@@ -56,7 +58,7 @@ func TestAchievedAcceptanceWithKiCadChecks(t *testing.T) {
 		NewStageResult(StagePlacement, nil),
 		NewStageResult(StageRouting, nil),
 		NewStageResult(StageValidation, nil),
-		NewStageResult(StageKiCadChecks, nil),
+		passedKiCadAcceptanceStage(),
 	})
 	if result.Acceptance.Achieved != AcceptanceERCDRC {
 		t.Fatalf("achieved = %q", result.Acceptance.Achieved)
@@ -73,7 +75,7 @@ func TestAchievedAcceptanceAllowsFabricationCandidate(t *testing.T) {
 		NewStageResult(StagePlacement, nil),
 		NewStageResult(StageRouting, nil),
 		NewStageResult(StageValidation, nil),
-		NewStageResult(StageKiCadChecks, nil),
+		passedKiCadAcceptanceStage(),
 		NewStageResult(StageFabricationReady, nil),
 	})
 	if result.Acceptance.Achieved != AcceptanceFabricationCandidate || !result.Acceptance.FabricationReady {
@@ -88,7 +90,7 @@ func TestAchievedAcceptanceBlocksFabricationCandidateWithoutReadiness(t *testing
 		NewStageResult(StagePlacement, nil),
 		NewStageResult(StageRouting, nil),
 		NewStageResult(StageValidation, nil),
-		NewStageResult(StageKiCadChecks, nil),
+		passedKiCadAcceptanceStage(),
 		NewStageResult(StageFabricationReady, []reports.Issue{{
 			Code:     reports.CodeValidationFailed,
 			Severity: reports.SeverityError,
@@ -98,6 +100,54 @@ func TestAchievedAcceptanceBlocksFabricationCandidateWithoutReadiness(t *testing
 	if result.Acceptance.Achieved != AcceptanceERCDRC || result.Acceptance.FabricationReady {
 		t.Fatalf("acceptance = %#v", result.Acceptance)
 	}
+}
+
+func TestAchievedAcceptanceRejectsMissingOrCrashedKiCadEvidence(t *testing.T) {
+	stage := NewStageResult(StageKiCadChecks, nil)
+	stage.Summary = map[string]any{
+		promotionKiCadERCSummaryKey: checks.CheckResult{Kind: checks.CheckKindERC, Status: checks.CheckStatusPass, ReportPath: "demo-erc.json"},
+		promotionKiCadDRCSummaryKey: checks.CheckResult{Kind: checks.CheckKindDRC, Status: checks.CheckStatusError, ToolErrorKind: checks.ToolErrorNoOutputCrash},
+	}
+	result := BuildWorkflowResult(ProjectSummary{Name: "demo"}, AcceptanceERCDRC, []StageResult{
+		NewStageResult(StageSchematic, nil),
+		NewStageResult(StageValidation, nil),
+		stage,
+	})
+	if result.Acceptance.Achieved != AcceptanceConnectivity {
+		t.Fatalf("achieved = %q, want connectivity without readable DRC evidence", result.Acceptance.Achieved)
+	}
+}
+
+func TestAchievedAcceptanceAcceptsJSONRoundTrippedKiCadEvidence(t *testing.T) {
+	original := passedKiCadAcceptanceStage()
+	payload, err := json.Marshal(original)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var decoded StageResult
+	if err := json.Unmarshal(payload, &decoded); err != nil {
+		t.Fatal(err)
+	}
+	stages := []StageResult{
+		NewStageResult(StageSchematic, nil),
+		NewStageResult(StagePCBRealization, nil),
+		NewStageResult(StagePlacement, nil),
+		NewStageResult(StageRouting, nil),
+		NewStageResult(StageValidation, nil),
+		decoded,
+	}
+	if got := AchievedAcceptance(AcceptanceERCDRC, stages); got != AcceptanceERCDRC {
+		t.Fatalf("AchievedAcceptance() = %q, want %q", got, AcceptanceERCDRC)
+	}
+}
+
+func passedKiCadAcceptanceStage() StageResult {
+	stage := NewStageResult(StageKiCadChecks, nil)
+	stage.Summary = map[string]any{
+		promotionKiCadERCSummaryKey: checks.CheckResult{Kind: checks.CheckKindERC, Status: checks.CheckStatusPass, ReportPath: "demo-erc.json"},
+		promotionKiCadDRCSummaryKey: checks.CheckResult{Kind: checks.CheckKindDRC, Status: checks.CheckStatusPass, ReportPath: "demo-drc.json"},
+	}
+	return stage
 }
 
 func TestRetryScopeForExternalCheckIssue(t *testing.T) {

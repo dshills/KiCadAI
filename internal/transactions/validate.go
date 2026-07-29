@@ -68,8 +68,52 @@ func Validate(tx Transaction) ValidationResult {
 		})
 		result.Issues = append(result.Issues, validateOperation(op)...)
 	}
+	result.Issues = append(result.Issues, validateOperationPhases(tx.Operations)...)
 	AnnotateIssueOperationIDs(result.Issues, plannedOperations)
 	return result
+}
+
+func validateOperationPhases(operations []Operation) []reports.Issue {
+	var issues []reports.Issue
+	writeIndex := -1
+	placedRefs := map[string]bool{}
+	for index, operation := range operations {
+		switch operation.Op {
+		case OpCreateProject:
+			if index != 0 {
+				issues = append(issues, issue(reports.CodeInvalidArgument, fmt.Sprintf("operations[%d].op", index), "create_project must be the first transaction operation"))
+			}
+		case OpWriteProject:
+			if writeIndex >= 0 {
+				issues = append(issues, issue(reports.CodeInvalidArgument, fmt.Sprintf("operations[%d].op", index), "write_project may appear only once"))
+				continue
+			}
+			writeIndex = index
+		case OpPlaceFootprint:
+			if ref := normalizeOperationRef(operation.Ref); ref != "" {
+				placedRefs[ref] = true
+			}
+			if writeIndex >= 0 {
+				issues = append(issues, issue(reports.CodeInvalidArgument, fmt.Sprintf("operations[%d].op", index), string(operation.Op)+" is a mutation operation and must precede write_project"))
+			}
+		case OpAssignFootprint:
+			if ref := normalizeOperationRef(operation.Ref); ref != "" && placedRefs[ref] {
+				issues = append(issues, issue(reports.CodeInvalidArgument, fmt.Sprintf("operations[%d].op", index), "assign_footprint must precede place_footprint for "+strings.TrimSpace(operation.Ref)))
+			}
+			if writeIndex >= 0 {
+				issues = append(issues, issue(reports.CodeInvalidArgument, fmt.Sprintf("operations[%d].op", index), string(operation.Op)+" is a mutation operation and must precede write_project"))
+			}
+		default:
+			if writeIndex >= 0 {
+				issues = append(issues, issue(reports.CodeInvalidArgument, fmt.Sprintf("operations[%d].op", index), string(operation.Op)+" is a mutation operation and must precede write_project"))
+			}
+		}
+	}
+	return issues
+}
+
+func normalizeOperationRef(ref string) string {
+	return strings.ToUpper(strings.TrimSpace(ref))
 }
 
 func plannedOperationIdentity(op Operation) PlannedOperation {

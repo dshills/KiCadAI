@@ -1034,6 +1034,8 @@ func validateRoutingRetryPolicy(policy RoutingRetryPolicySpec) []reports.Issue {
 	}
 	if policy.DRCPolicy != "" && normalizeRetryDRCPolicy(policy.DRCPolicy) != policy.DRCPolicy {
 		issues = append(issues, issue("routing_retry.drc_policy", "unsupported routing retry DRC policy "+string(policy.DRCPolicy)))
+	} else if policy.DRCPolicy == RetryDRCPolicyRequired {
+		issues = append(issues, issue("routing_retry.drc_policy", "routing retry DRC policy required is unavailable until every production retry attempt is checked and ranked from DRC evidence"))
 	}
 	for index, category := range policy.AllowedHintCategories {
 		if !validPlacementRetryHintCategory(category) {

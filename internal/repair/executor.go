@@ -127,8 +127,13 @@ func (executor *Executor) assignFootprint(attempt Attempt) Attempt {
 		attempt.Operations = []string{"assign_footprint " + evidence.Ref + " " + evidence.FootprintID}
 		return executor.revalidate(attempt)
 	}
-	executor.Context.Transaction.Operations = append(executor.Context.Transaction.Operations, operation)
-	executor.assignIndex[refKey] = append(executor.assignIndex[refKey], len(executor.Context.Transaction.Operations)-1)
+	executor.Context.Transaction.Operations = insertBeforeRefOperationOrWrite(
+		executor.Context.Transaction.Operations,
+		operation,
+		transactions.OpPlaceFootprint,
+		evidence.Ref,
+	)
+	executor.rebuildIndexes()
 	attempt.Status = StatusRepaired
 	attempt.Message = "assigned verified footprint"
 	attempt.Operations = []string{"assign_footprint " + evidence.Ref + " " + evidence.FootprintID}
@@ -398,6 +403,24 @@ func insertBeforeWrite(operations []transactions.Operation, operation transactio
 	inserted := false
 	for _, existing := range operations {
 		if !inserted && existing.Op == transactions.OpWriteProject {
+			out = append(out, operation)
+			inserted = true
+		}
+		out = append(out, existing)
+	}
+	if !inserted {
+		out = append(out, operation)
+	}
+	return out
+}
+
+func insertBeforeRefOperationOrWrite(operations []transactions.Operation, operation transactions.Operation, beforeKind transactions.OperationKind, ref string) []transactions.Operation {
+	targetRef := normalizeRef(ref)
+	out := make([]transactions.Operation, 0, len(operations)+1)
+	inserted := false
+	for _, existing := range operations {
+		if !inserted && (existing.Op == transactions.OpWriteProject ||
+			(existing.Op == beforeKind && normalizeRef(operationRef(existing)) == targetRef)) {
 			out = append(out, operation)
 			inserted = true
 		}

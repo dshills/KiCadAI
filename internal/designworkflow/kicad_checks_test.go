@@ -31,12 +31,12 @@ func TestRunKiCadChecksBlocksWhenRequiredCLIMissing(t *testing.T) {
 	}
 }
 
-func TestRunKiCadChecksLeavesRequestEvidencePendingWhenCLIUnavailable(t *testing.T) {
+func TestRunKiCadChecksBlocksRequestEvidenceWhenCLIUnavailable(t *testing.T) {
 	request := Request{Validation: ValidationSpec{RequireDRC: true}}
 	write := ProjectWriteResult{}
 
 	result := RunKiCadChecks(context.Background(), &request, &write, KiCadCheckOptions{KiCadCLI: filepath.Join(t.TempDir(), "missing-kicad-cli")})
-	if result.Stage.Status != StageStatusSkipped || len(result.Stage.Issues) != 1 || result.Stage.Issues[0].Severity != reports.SeverityWarning {
+	if result.Stage.Status != StageStatusBlocked || len(result.Stage.Issues) != 1 || !result.Stage.Issues[0].Blocking() || result.Stage.Issues[0].Code != reports.CodeKiCadCLIFailed {
 		t.Fatalf("stage = %#v", result.Stage)
 	}
 }
@@ -65,6 +65,29 @@ func TestRunKiCadChecksWithFakeCLIPasses(t *testing.T) {
 	}
 	if result.ERC.ProjectContext != "full" || result.DRC.ProjectContext != "full" {
 		t.Fatalf("checks did not use project context: ERC=%q DRC=%q", result.ERC.ProjectContext, result.DRC.ProjectContext)
+	}
+}
+
+func TestRunKiCadChecksCanceledContextCannotProduceAcceptanceEvidence(t *testing.T) {
+	request, write := writeValidationFixture(t)
+	request.Validation.RequireERC = true
+	request.Validation.RequireDRC = true
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	result := RunKiCadChecks(ctx, &request, &write, KiCadCheckOptions{
+		KiCadCLI: fakeKiCadCheckCLI(t),
+	})
+	if result.Stage.Status != StageStatusBlocked || !reports.HasBlockingIssue(result.Stage.Issues) {
+		t.Fatalf("canceled KiCad checks must block: %#v", result.Stage)
+	}
+	workflow := BuildWorkflowResult(ProjectSummary{Name: "demo"}, AcceptanceERCDRC, []StageResult{
+		NewStageResult(StageSchematic, nil),
+		NewStageResult(StageValidation, nil),
+		result.Stage,
+	})
+	if workflow.Acceptance.Achieved == AcceptanceERCDRC {
+		t.Fatalf("canceled checks produced ERC/DRC acceptance: %#v", workflow.Acceptance)
 	}
 }
 
@@ -119,7 +142,7 @@ func TestKiCadCheckTargetPrefersProjectRoot(t *testing.T) {
 	}
 }
 
-func TestWorkflowCheckResultWithIssuesDowngradesZeroFindingToolError(t *testing.T) {
+func TestWorkflowCheckResultWithIssuesBlocksZeroFindingToolError(t *testing.T) {
 	result := checks.CheckResult{
 		Kind:          checks.CheckKindDRC,
 		Status:        checks.CheckStatusError,
@@ -133,8 +156,8 @@ func TestWorkflowCheckResultWithIssuesDowngradesZeroFindingToolError(t *testing.
 	if len(issues) != 1 {
 		t.Fatalf("issues = %#v, want one tool issue", issues)
 	}
-	if issues[0].Code != reports.CodeKiCadCLIFailed || issues[0].Severity != reports.SeverityWarning {
-		t.Fatalf("issue = %#v, want warning KiCad CLI failure", issues[0])
+	if issues[0].Code != reports.CodeKiCadCLIFailed || !issues[0].Blocking() {
+		t.Fatalf("issue = %#v, want blocking KiCad CLI failure", issues[0])
 	}
 	if !strings.Contains(issues[0].Suggestion, "exited before writing a report") {
 		t.Fatalf("suggestion = %q, want no-output crash guidance", issues[0].Suggestion)

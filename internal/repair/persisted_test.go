@@ -61,11 +61,19 @@ func TestApplyPersistedBundleAssignsFootprintBeforeReplay(t *testing.T) {
 	output := filepath.Join(t.TempDir(), "demo")
 	tx := persistedBaseTransaction(t, "demo",
 		mustRepairOperation(t, transactions.OpAddSymbol, transactions.AddSymbolOperation{Op: transactions.OpAddSymbol, Ref: "R1", LibraryID: "Device:R", At: transactions.Point{XMM: 10, YMM: 10}, Pins: []transactions.PinSpec{{Number: "1"}, {Number: "2"}}}, "R1"),
-		mustRepairOperation(t, transactions.OpAssignFootprint, transactions.AssignFootprintOperation{Op: transactions.OpAssignFootprint, Ref: "R1", FootprintID: "Resistor_SMD:R_0603_1608Metric"}, "R1"),
 		mustRepairOperation(t, transactions.OpPlaceFootprint, transactions.PlaceFootprintOperation{Op: transactions.OpPlaceFootprint, Ref: "R1", FootprintID: "Resistor_SMD:R_0603_1608Metric", At: transactions.Point{XMM: 20, YMM: 20}}, "R1"),
 		mustRepairOperation(t, transactions.OpWriteProject, transactions.WriteProjectOperation{Op: transactions.OpWriteProject}, ""),
 	)
-	initial := transactions.Apply(tx, transactions.ApplyOptions{OutputDir: output})
+	initialTx := tx.Clone()
+	initialAssignment := mustRepairOperation(t, transactions.OpAssignFootprint, transactions.AssignFootprintOperation{
+		Op:          transactions.OpAssignFootprint,
+		Ref:         "R1",
+		FootprintID: "Resistor_SMD:R_0603_1608Metric",
+	}, "R1")
+	initialOperations := append([]transactions.Operation(nil), initialTx.Operations[:2]...)
+	initialOperations = append(initialOperations, initialAssignment)
+	initialTx.Operations = append(initialOperations, initialTx.Operations[2:]...)
+	initial := transactions.Apply(initialTx, transactions.ApplyOptions{OutputDir: output})
 	if len(initial.Issues) != 0 {
 		t.Fatalf("initial apply issues: %#v", initial.Issues)
 	}
@@ -99,6 +107,18 @@ func TestApplyPersistedBundleAssignsFootprintBeforeReplay(t *testing.T) {
 	}
 	if !strings.Contains(string(data), "Resistor_SMD:R_0805_2012Metric") {
 		t.Fatalf("persisted schematic missing footprint assignment:\n%s", data)
+	}
+}
+
+func TestPersistedRepairValidatorRetainsIssueWithoutObservedTransactionProof(t *testing.T) {
+	tx := persistedBaseTransaction(t, "demo",
+		mustRepairOperation(t, transactions.OpWriteProject, transactions.WriteProjectOperation{Op: transactions.OpWriteProject}, ""),
+	)
+	issue := reports.Issue{Code: reports.CodeInvalidNetAssignment, Refs: []string{"J1"}}
+	validator := &persistedRepairValidator{transaction: &tx, remaining: []reports.Issue{issue}}
+	remaining := validator.ValidateAttempt(Attempt{Action: ActionRegeneratePadNets, Issue: issue}, []reports.Issue{issue})
+	if len(remaining) != 1 || !sameRepairIssue(remaining[0], issue) {
+		t.Fatalf("unproven repair removed originating issue: %#v", remaining)
 	}
 }
 

@@ -2358,6 +2358,88 @@ func TestRunPlaceRequestRequiresRequestPath(t *testing.T) {
 	}
 }
 
+func TestRunPlaceAndRouteRequestsReturnErrorWithBlockingJSON(t *testing.T) {
+	for _, test := range []struct {
+		name    string
+		command string
+		pretty  bool
+	}{
+		{name: "place_compact", command: "place"},
+		{name: "place_pretty", command: "place", pretty: true},
+		{name: "route_compact", command: "route"},
+		{name: "route_pretty", command: "route", pretty: true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			request := filepath.Join(t.TempDir(), "request.json")
+			if err := os.WriteFile(request, []byte(`{}`), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			args := []string{"--json", "--request", request}
+			if test.pretty {
+				args = append(args, "--pretty")
+			}
+			args = append(args, test.command, "request")
+			var stdout bytes.Buffer
+			var stderr bytes.Buffer
+			if err := run(args, &stdout, &stderr); err == nil {
+				t.Fatalf("%s returned success for blocking report: %s", test.command, stdout.String())
+			}
+			var report reports.Result
+			if err := json.Unmarshal(stdout.Bytes(), &report); err != nil {
+				t.Fatalf("decode %s report: %v\n%s", test.command, err, stdout.String())
+			}
+			if report.OK {
+				t.Fatalf("%s report unexpectedly ok: %#v", test.command, report)
+			}
+		})
+	}
+}
+
+func TestRunCheckReturnsErrorWhenConfiguredKiCadCLIIsMissing(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	missing := filepath.Join(t.TempDir(), "missing-kicad-cli")
+	err := run([]string{"--json", "--kicad-cli", missing, "check", "drc", "demo.kicad_pcb"}, &stdout, &stderr)
+	if err == nil {
+		t.Fatalf("check returned success without KiCad CLI: %s", stdout.String())
+	}
+	var report reports.Result
+	if decodeErr := json.Unmarshal(stdout.Bytes(), &report); decodeErr != nil {
+		t.Fatalf("decode check report: %v\n%s", decodeErr, stdout.String())
+	}
+	if report.OK || !reports.HasBlockingIssue(report.Issues) {
+		t.Fatalf("missing CLI report must be blocking: %#v", report)
+	}
+}
+
+func TestRunRepairPlanReturnsErrorForPartialPlan(t *testing.T) {
+	groups := []repair.StageIssues{{Stage: "validation", Issues: []reports.Issue{
+		{Code: reports.CodeMissingFootprint, Severity: reports.SeverityError, Refs: []string{"R1"}, Message: "missing footprint"},
+		{Code: reports.CodeUnsupportedOperation, Severity: reports.SeverityError, Message: "unsupported repair"},
+	}}}
+	data, err := json.Marshal(groups)
+	if err != nil {
+		t.Fatal(err)
+	}
+	request := filepath.Join(t.TempDir(), "issues.json")
+	if err := os.WriteFile(request, data, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	err = run([]string{"--json", "--request", request, "repair", "plan"}, &stdout, &stderr)
+	if err == nil {
+		t.Fatalf("partial repair plan returned success: %s", stdout.String())
+	}
+	var report reports.Result
+	if decodeErr := json.Unmarshal(stdout.Bytes(), &report); decodeErr != nil {
+		t.Fatalf("decode repair report: %v\n%s", decodeErr, stdout.String())
+	}
+	if report.OK {
+		t.Fatalf("partial repair report unexpectedly ok: %#v", report)
+	}
+}
+
 func TestRunUnknownCommandReturnsUsage(t *testing.T) {
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
@@ -3636,7 +3718,7 @@ func TestRunRoundTripSkipsWhenKiCadCLIUnavailable(t *testing.T) {
 	}
 }
 
-func TestRunCheckSkipsWhenKiCadCLIUnavailable(t *testing.T) {
+func TestRunCheckFailsWhenKiCadCLIUnavailable(t *testing.T) {
 	t.Setenv("KICADAI_KICAD_CLI", filepath.Join(t.TempDir(), "missing-kicad-cli"))
 	path := filepath.Join(t.TempDir(), "demo.kicad_sch")
 	if err := os.WriteFile(path, []byte(`(kicad_sch)`), 0o644); err != nil {
@@ -3646,15 +3728,14 @@ func TestRunCheckSkipsWhenKiCadCLIUnavailable(t *testing.T) {
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
 	err := run([]string{"--json", "check", "erc", path}, &stdout, &stderr)
-	if err != nil {
-		t.Fatalf("skip should not fail command: %v", err)
+	if err == nil {
+		t.Fatalf("required check should fail without CLI: %s", stdout.String())
 	}
 	output := stdout.String()
 	for _, want := range []string{
-		`"ok": true`,
+		`"ok": false`,
 		`"command": "check"`,
-		`"code": "SKIPPED_EXTERNAL_TOOL"`,
-		`"status": "skipped"`,
+		`"code": "KICAD_CLI_FAILED"`,
 	} {
 		if !strings.Contains(output, want) {
 			t.Fatalf("output missing %q:\n%s", want, output)

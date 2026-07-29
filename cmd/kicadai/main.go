@@ -2422,7 +2422,14 @@ func runPlace(opts cliOptions, stdout io.Writer) error {
 		result := placement.Place(request)
 		quality := placement.BuildQualityReport(request, result)
 		result.Quality = &quality
-		return writeReportJSON(stdout, reports.ResultWithIssues("place", result, result.Issues, nil))
+		report := reports.ResultWithIssues("place", result, result.Issues, nil)
+		if err := writeCLIReportJSON(stdout, report, opts.prettyOutput); err != nil {
+			return err
+		}
+		if !report.OK {
+			return errors.New("place request reported blocking issues")
+		}
+		return nil
 	default:
 		return writeReportFailure(stdout, "place", reports.Issue{
 			Code:     reports.CodeInvalidArgument,
@@ -2484,10 +2491,13 @@ func runRoute(opts cliOptions, stdout io.Writer) error {
 		}
 		result := routing.RouteRequest(request)
 		report := reports.ResultWithIssues("route", result, result.Issues, nil)
-		if opts.prettyOutput {
-			return writePrettyReportJSON(stdout, report)
+		if err := writeCLIReportJSON(stdout, report, opts.prettyOutput); err != nil {
+			return err
 		}
-		return writeReportJSON(stdout, report)
+		if !report.OK {
+			return errors.New("route request reported blocking issues")
+		}
+		return nil
 	default:
 		return writeReportFailure(stdout, "route", reports.Issue{
 			Code:     reports.CodeInvalidArgument,
@@ -2553,7 +2563,7 @@ func runCheckCommand(ctx context.Context, opts cliOptions, stdout io.Writer) err
 			Message:  err.Error(),
 		})
 	}
-	cli, skippedIssue, err := checkCLI(opts)
+	cli, err := checkCLI(opts)
 	if err != nil {
 		return writeReportFailure(stdout, "check", reports.Issue{
 			Code:     reports.CodeKiCadCLIFailed,
@@ -2561,14 +2571,6 @@ func runCheckCommand(ctx context.Context, opts cliOptions, stdout io.Writer) err
 			Path:     "check.kicad_cli",
 			Message:  err.Error(),
 		})
-	}
-	if skippedIssue != nil {
-		report := checkCommandReport{Target: filepath.ToSlash(target), Checks: []checks.CheckResult{{
-			TargetPath: filepath.ToSlash(target),
-			Status:     checks.CheckStatusSkipped,
-		}}}
-		result := reports.ResultWithIssues("check", report, []reports.Issue{*skippedIssue}, nil)
-		return writeReportJSON(stdout, result)
 	}
 
 	report := checkCommandReport{Target: filepath.ToSlash(target), Checks: []checks.CheckResult{}}
@@ -4305,21 +4307,8 @@ func checkOptions(opts cliOptions) (checks.Options, error) {
 	return checkOpts, nil
 }
 
-func checkCLI(opts cliOptions) (checks.KiCadCLI, *reports.Issue, error) {
-	cli, err := checks.DiscoverCLI(opts.kicadCLI)
-	if err != nil {
-		if strings.TrimSpace(opts.kicadCLI) != "" {
-			return checks.KiCadCLI{}, nil, err
-		}
-		issue := reports.Issue{
-			Code:     reports.CodeSkippedExternalTool,
-			Severity: reports.SeverityWarning,
-			Path:     "check.kicad_cli",
-			Message:  err.Error(),
-		}
-		return checks.KiCadCLI{}, &issue, nil
-	}
-	return cli, nil, nil
+func checkCLI(opts cliOptions) (checks.KiCadCLI, error) {
+	return checks.DiscoverCLI(opts.kicadCLI)
 }
 
 func runCheckERC(ctx context.Context, cli checks.KiCadCLI, target string, opts checks.Options) (checks.CheckResult, []reports.Issue, []reports.Artifact) {
@@ -5220,8 +5209,8 @@ func runRepairCommand(opts cliOptions, stdout io.Writer) error {
 	if err := writeReportJSON(stdout, result); err != nil {
 		return err
 	}
-	if plan.Status == repair.StatusBlocked {
-		return fmt.Errorf("repair %s blocked", opts.commandArgs[0])
+	if !result.OK || plan.Status == repair.StatusBlocked || plan.Status == repair.StatusPartial {
+		return fmt.Errorf("repair %s did not fully succeed", opts.commandArgs[0])
 	}
 	return nil
 }
@@ -5310,8 +5299,8 @@ func runRepairTargetCommand(opts cliOptions, stdout io.Writer) error {
 		if err := writeReportJSON(stdout, result); err != nil {
 			return err
 		}
-		if apply.Status == repair.StatusBlocked || reports.HasBlockingIssue(apply.Issues) {
-			return fmt.Errorf("repair apply blocked")
+		if !result.OK || apply.Status == repair.StatusBlocked || apply.Status == repair.StatusPartial {
+			return fmt.Errorf("repair apply did not fully succeed")
 		}
 		return nil
 	default:
@@ -5945,6 +5934,13 @@ func writeJSON(stdout io.Writer, value any) error {
 
 func writeReportJSON(stdout io.Writer, result reports.Result) error {
 	return reports.WriteJSON(stdout, result)
+}
+
+func writeCLIReportJSON(stdout io.Writer, result reports.Result, pretty bool) error {
+	if pretty {
+		return writePrettyReportJSON(stdout, result)
+	}
+	return writeReportJSON(stdout, result)
 }
 
 func writePrettyReportJSON(stdout io.Writer, result reports.Result) error {

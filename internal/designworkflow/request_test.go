@@ -239,6 +239,17 @@ func TestValidateRequestRejectsInvalidRoutingRetryPolicy(t *testing.T) {
 	assertIssuePath(t, issues, "routing_retry.allowed_hint_categories[0]")
 }
 
+func TestValidateRequestRejectsUnenforcedRequiredRetryDRCPolicy(t *testing.T) {
+	request := validRequest()
+	request.RoutingRetry = RoutingRetryPolicySpec{
+		Enabled:     true,
+		MaxAttempts: 2,
+		DRCPolicy:   RetryDRCPolicyRequired,
+	}
+	issues := ValidateRequest(request)
+	assertIssuePath(t, issues, "routing_retry.drc_policy")
+}
+
 func TestNormalizeRequestExternalEndpoints(t *testing.T) {
 	request := validRequest()
 	request.ExternalEndpoints = []ExternalEndpointSpec{{

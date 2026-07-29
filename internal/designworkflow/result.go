@@ -3,8 +3,10 @@ package designworkflow
 import (
 	"cmp"
 	"slices"
+	"strings"
 
 	"kicadai/internal/capabilitygate"
+	"kicadai/internal/kicadfiles/checks"
 	"kicadai/internal/reports"
 )
 
@@ -201,6 +203,10 @@ func AchievedAcceptance(requested AcceptanceLevel, stages []StageResult) Accepta
 			blocked[stage.Name] = struct{}{}
 			continue
 		}
+		if stage.Name == StageKiCadChecks && requestedAtLeast(requested, AcceptanceERCDRC) && !kiCadAcceptanceEvidenceComplete(stage) {
+			blocked[stage.Name] = struct{}{}
+			continue
+		}
 		completed[stage.Name] = struct{}{}
 	}
 	_, completedKiCadChecks := completed[StageKiCadChecks]
@@ -229,6 +235,55 @@ func AchievedAcceptance(requested AcceptanceLevel, stages []StageResult) Accepta
 	default:
 		return minAcceptance(requested, AcceptanceStructural)
 	}
+}
+
+func kiCadAcceptanceEvidenceComplete(stage StageResult) bool {
+	if stage.Summary == nil {
+		return false
+	}
+	evidence, ok := decodeKiCadAcceptanceEvidence(stage.Summary)
+	if !ok {
+		return false
+	}
+	for _, result := range []checks.CheckResult{evidence.ERC, evidence.DRC} {
+		if result.Status != checks.CheckStatusPass || strings.TrimSpace(result.ReportPath) == "" {
+			return false
+		}
+	}
+	return true
+}
+
+type kiCadAcceptanceEvidence struct {
+	ERC checks.CheckResult
+	DRC checks.CheckResult
+}
+
+func decodeKiCadAcceptanceEvidence(summary map[string]any) (kiCadAcceptanceEvidence, bool) {
+	erc, ercOK := decodeKiCadAcceptanceCheck(summary[promotionKiCadERCSummaryKey])
+	drc, drcOK := decodeKiCadAcceptanceCheck(summary[promotionKiCadDRCSummaryKey])
+	if !ercOK || !drcOK {
+		return kiCadAcceptanceEvidence{}, false
+	}
+	return kiCadAcceptanceEvidence{ERC: erc, DRC: drc}, true
+}
+
+func decodeKiCadAcceptanceCheck(value any) (checks.CheckResult, bool) {
+	if result, ok := promotionKiCadCheckResult(value); ok {
+		return result, true
+	}
+	fields, ok := value.(map[string]any)
+	if !ok {
+		return checks.CheckResult{}, false
+	}
+	status, ok := fields["status"].(string)
+	if !ok {
+		return checks.CheckResult{}, false
+	}
+	reportPath, _ := fields["report_path"].(string)
+	return checks.CheckResult{
+		Status:     checks.CheckStatus(status),
+		ReportPath: reportPath,
+	}, true
 }
 
 func AcceptanceSatisfied(requested AcceptanceLevel, achieved AcceptanceLevel) bool {
