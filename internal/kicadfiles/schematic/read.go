@@ -47,7 +47,20 @@ func Read(data []byte) (SchematicFile, error) {
 		file.UUID = kicadfiles.UUID(node.ListValue(1))
 	}
 	if node, ok := root.Child("paper"); ok {
-		file.Paper = kicadfiles.Paper{Name: node.ListValue(1)}
+		file.RawPaper = strings.TrimSpace(node.Raw)
+		file.Paper = readSchematicPaper(node)
+		file.Preservation = append(file.Preservation, kicadfiles.PreservationCapability{
+			Path: "paper", Family: "paper", Strategy: kicadfiles.PreservationRaw,
+			Reason: "paper kind and custom dimensions are retained verbatim",
+		})
+	}
+	if node, ok := root.Child("title_block"); ok {
+		file.RawTitleBlock = strings.TrimSpace(node.Raw)
+		file.TitleBlock = readSchematicTitleBlock(node)
+		file.Preservation = append(file.Preservation, kicadfiles.PreservationCapability{
+			Path: "title_block", Family: "title_block", Strategy: kicadfiles.PreservationRaw,
+			Reason: "title metadata is retained verbatim",
+		})
 	}
 	for i, child := range root.Children {
 		if i == 0 {
@@ -69,11 +82,21 @@ func Read(data []byte) (SchematicFile, error) {
 		case "hierarchical_label":
 			file.Labels = append(file.Labels, readLabel(child, LabelHierarchical))
 		case "junction":
-			file.Junctions = append(file.Junctions, Junction{UUID: readUUID(child), Position: readAtPoint(child)})
+			file.Junctions = append(file.Junctions, Junction{Raw: strings.TrimSpace(child.Raw), UUID: readUUID(child), Position: readAtPoint(child)})
+			file.Preservation = append(file.Preservation, kicadfiles.PreservationCapability{
+				Path: fmt.Sprintf("junctions[%d]", len(file.Junctions)-1), Family: "junction", Strategy: kicadfiles.PreservationRaw,
+				Reason: "junction diameter and color are retained verbatim",
+			})
 		case "no_connect":
 			file.NoConnects = append(file.NoConnects, NoConnect{UUID: readUUID(child), Position: readAtPoint(child)})
 		case "sheet":
-			file.Sheets = append(file.Sheets, readSheet(child))
+			sheet := readSheet(child)
+			sheet.Raw = strings.TrimSpace(child.Raw)
+			file.Sheets = append(file.Sheets, sheet)
+			file.Preservation = append(file.Preservation, kicadfiles.PreservationCapability{
+				Path: fmt.Sprintf("sheets[%d]", len(file.Sheets)-1), Family: "sheet", Strategy: kicadfiles.PreservationRaw,
+				Reason: "sheet flags, properties, pins, and effects are retained verbatim",
+			})
 		case "lib_symbols":
 			file.LibSymbols = readLibSymbols(child)
 		case "sheet_instances":
@@ -83,11 +106,57 @@ func Read(data []byte) (SchematicFile, error) {
 		default:
 			if child.Head() != "" {
 				file.RawItems = append(file.RawItems, rawItem(child, i))
+				file.Preservation = append(file.Preservation, kicadfiles.PreservationCapability{
+					Path: fmt.Sprintf("raw_items[%d]", len(file.RawItems)-1), Family: child.Head(), Strategy: kicadfiles.PreservationRaw,
+					Reason: "unmodeled schematic item is retained verbatim in item order",
+				})
 			}
+		}
+	}
+	file.Preservation = append(file.Preservation, kicadfiles.PreservationCapability{
+		Path: "symbols", Family: "symbol", Strategy: kicadfiles.PreservationFullyModeled,
+		Reason: "supported symbol fields and flags are parsed and rendered",
+	})
+	for _, family := range []string{"version", "generator", "generator_version", "uuid", "paper", "title_block", "lib_symbols", "sheet_instances"} {
+		if count := len(root.ChildrenByHead(family)); count > 1 {
+			file.Preservation = append(file.Preservation, kicadfiles.PreservationCapability{
+				Path: family, Family: family, Strategy: kicadfiles.PreservationUnsupported,
+				Reason: fmt.Sprintf("duplicate singleton node (%d occurrences)", count),
+			})
 		}
 	}
 	recoverEmbeddedSymbolGeometry(&file)
 	return file, nil
+}
+
+func readSchematicPaper(node sexpr.ParsedNode) kicadfiles.Paper {
+	paper := kicadfiles.Paper{Name: node.ListValue(1)}
+	if width, ok := node.FloatValue(2); ok {
+		paper.Width = kicadfiles.MM(width)
+	}
+	if height, ok := node.FloatValue(3); ok {
+		paper.Height = kicadfiles.MM(height)
+	}
+	return paper
+}
+
+func readSchematicTitleBlock(node sexpr.ParsedNode) kicadfiles.TitleBlock {
+	var title kicadfiles.TitleBlock
+	for _, child := range node.Children[1:] {
+		switch child.Head() {
+		case "title":
+			title.Title = child.ListValue(1)
+		case "date":
+			title.Date = child.ListValue(1)
+		case "rev":
+			title.Revision = child.ListValue(1)
+		case "company":
+			title.Company = child.ListValue(1)
+		case "comment":
+			title.Comments = append(title.Comments, child.ListValue(2))
+		}
+	}
+	return title
 }
 
 func recoverEmbeddedSymbolGeometry(file *SchematicFile) {

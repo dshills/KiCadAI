@@ -122,6 +122,9 @@ func validatePreservedNodeAnchorGraph(preserved []PreservedNode) kicadfiles.Vali
 }
 
 func nodeRootToken(node sexpr.Node) string {
+	if raw, ok := node.(sexpr.Raw); ok {
+		return rawRootToken(string(raw))
+	}
 	list, ok := node.(sexpr.List)
 	if !ok || len(list) == 0 {
 		return ""

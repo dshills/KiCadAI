@@ -442,6 +442,9 @@ func TestCloneSchematicFileAccountsForEveryField(t *testing.T) {
 		"Texts":                  {},
 		"Sheets":                 {},
 		"RawItems":               {},
+		"Preservation":           {},
+		"RawPaper":               {},
+		"RawTitleBlock":          {},
 		"Instances":              {},
 		"SheetInstances":         {},
 		"OmitRootSheetInstances": {},
@@ -484,6 +487,7 @@ func TestClonePCBFootprintAccountsForEveryField(t *testing.T) {
 		"Pads":                          {},
 		"Graphics":                      {},
 		"Models":                        {},
+		"Preserved":                     {},
 		"EmbeddedFonts":                 {},
 		"DuplicatePadNumbersAreJumpers": {},
 	}

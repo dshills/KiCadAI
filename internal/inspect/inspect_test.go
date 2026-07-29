@@ -174,8 +174,11 @@ func TestPCBSummaryUsesReader(t *testing.T) {
 	if summary.FootprintCount != 1 || summary.PadCount != 1 || summary.TrackCount != 1 || summary.ViaCount != 1 || summary.ZoneCount != 1 {
 		t.Fatalf("unexpected PCB counts: %#v", summary)
 	}
-	if len(summary.Unsupported) != 1 || summary.Unsupported[0].Kind != "future_widget" {
-		t.Fatalf("unexpected unsupported nodes: %#v", summary.Unsupported)
+	if len(summary.Unsupported) != 0 {
+		t.Fatalf("raw-preserved node reported unsupported: %#v", summary.Unsupported)
+	}
+	if len(summary.PreservationOnly) != 1 || summary.PreservationOnly[0].Kind != "future_widget" {
+		t.Fatalf("unexpected preservation-only nodes: %#v", summary.PreservationOnly)
 	}
 	if summary.Preservation == nil || summary.Preservation.Summary.PreservationOnly != 1 {
 		t.Fatalf("expected PCB preservation report, got %#v", summary.Preservation)
@@ -308,8 +311,8 @@ func TestSchematicSummaryReportsUnsupportedAndTruncates(t *testing.T) {
 	if !summary.Truncated || len(summary.Symbols) != inspectSampleLimit {
 		t.Fatalf("expected truncated symbols, got %#v", summary)
 	}
-	if len(summary.Unsupported) != 1 || summary.Unsupported[0].Kind != "rule_area" {
-		t.Fatalf("expected unsupported rule_area, got %#v", summary.Unsupported)
+	if len(summary.Unsupported) != 0 {
+		t.Fatalf("raw-preserved rule_area reported unsupported: %#v", summary.Unsupported)
 	}
 	if len(summary.PreservationOnly) != 1 || summary.PreservationOnly[0].Kind != "rule_area" {
 		t.Fatalf("expected preservation-only rule_area, got %#v", summary.PreservationOnly)

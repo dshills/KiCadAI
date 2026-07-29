@@ -1,7 +1,7 @@
 # Fable Code Review Remediation Plan
 
 Date: 2026-07-29
-Status: In progress (Phases 0–2 complete)
+Status: In progress (Phases 0–3 complete)
 Baseline commit: `7c7fd9c0`
 Source review: [`../FABLE_CODE_REVIEW_07_29_26.md`](../FABLE_CODE_REVIEW_07_29_26.md)
 
@@ -12,7 +12,8 @@ Source review: [`../FABLE_CODE_REVIEW_07_29_26.md`](../FABLE_CODE_REVIEW_07_29_2
 | 0. Reproductions and evidence boundaries | Complete locally | [`FINDINGS.json`](FINDINGS.json) records every `C1`–`H17` owner, reproduction, capability impact, disposition, implementation phase, and closing receipt. [`TRANSACTION_SNAPSHOTS.json`](TRANSACTION_SNAPSHOTS.json) freezes three normalized block-operation digests and four protected design-transaction digests. [`BASELINE.md`](BASELINE.md) records tool versions and the local validation ladder. Closed Phase 1–2 findings retain their historical invalidation; pending findings have deterministic characterization or fault-injection tests and no closing commit. |
 | 1. Electrical topology correctness | Complete locally | Catalog-aware topology projection covers diode/BJT functions, supply/output ports, and exported port contact; AC op-amp feedback references midpoint bias and preserves supported gain within 2%; block verification, design workflow, writer/round-trip checks, and the installed-KiCad amplifier/ESP32/USB-C fixture matrix pass. The structurally verified diode-string blocks retain their explicit unsupported quiescent-current/fabrication claims. |
 | 2. Honest acceptance, repair, and CLI results | Complete locally | Transactions reject mutation after `write_project` and late footprint assignment; footprint repair inserts before placement/write; persisted repairs retain originating issues unless supported post-mutation validation proves them absent; required KiCad evidence fails closed; unsupported required retry DRC policy is rejected; blocking place/route/repair/check reports return errors. Focused suites, full `go test -short ./...`, lint, writer/round-trip tests, and the installed-KiCad amplifier/ESP32/USB-C fixture matrix pass. |
-| 3–9 | Proposed | Not started. |
+| 3. Imported KiCad preservation | Complete locally | PCB and schematic readers inventory fully modeled, safely raw-preserved, and mutation-unsupported constructs. Imported board metadata, custom paper, setup/plot data, footprint metadata/text/models/unknown children, schematic presentation nodes, and keepouts survive read-modify-write. Duplicate singleton constructs fail closed. Staged output is internally re-read and compared with source preservation evidence before any live replacement. Focused reader, round-trip, transaction, and unchanged-source refusal tests pass. |
+| 4–9 | Proposed | Not started. |
 
 ## 1. Goal
 

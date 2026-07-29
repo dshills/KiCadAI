@@ -11,6 +11,20 @@ import (
 
 func Validate(board PCBFile) error {
 	var errs kicadfiles.ValidationErrors
+	for _, section := range []struct {
+		field  string
+		family string
+		raw    string
+	}{
+		{"raw_general", "general", board.RawGeneral},
+		{"raw_paper", "paper", board.RawPaper},
+		{"raw_title_block", "title_block", board.RawTitleBlock},
+		{"raw_setup", "setup", board.RawSetup},
+	} {
+		if strings.TrimSpace(section.raw) != "" {
+			errs = append(errs, validatePreservedFragment(section.field, section.family, section.raw)...)
+		}
+	}
 	if board.Version == "" {
 		errs = append(errs, fieldError("version", "required"))
 	} else if _, err := strconv.ParseInt(string(board.Version), 10, 64); err != nil {
@@ -286,6 +300,16 @@ func validateFootprint(index int, footprint Footprint, netCodes map[int]struct{}
 			errs = append(errs, fieldError(indexed(prefix("models"), modelIndex, "path"), "required"))
 		}
 	}
+	modeledChildren := map[string]bool{
+		"layer": true, "uuid": true, "at": true, "descr": footprint.Description != "",
+		"tags": footprint.Tags != "", "property": len(footprint.Properties)+len(footprint.MetadataProperties) > 0,
+		"path": footprint.Path != "", "sheetname": footprint.SheetName != "", "sheetfile": footprint.SheetFile != "",
+		"units": len(footprint.Units) > 0, "attr": len(footprint.Attributes) > 0,
+		"net_tie_pad_groups": len(footprint.NetTiePadGroups) > 0, "fp_text": len(footprint.Texts) > 0,
+		"pad": len(footprint.Pads) > 0, "model": len(footprint.Models) > 0,
+		"embedded_fonts": footprint.EmbeddedFonts != nil,
+	}
+	errs = append(errs, validateNestedPreserved(prefix("preserved"), footprint.Preserved, modeledChildren)...)
 	return errs
 }
 
@@ -780,6 +804,42 @@ func validateZone(index int, zone Zone, netCodes map[int]struct{}, netNames map[
 	}
 	if zone.Fill.IslandAreaMin < 0 {
 		errs = append(errs, fieldError(prefix("fill.island_area_min"), "must be non-negative"))
+	}
+	modeledChildren := map[string]bool{
+		"net": zone.Keepout == nil, "net_name": zone.Keepout == nil, "layers": true, "uuid": true,
+		"name": zone.Name != "", "hatch": true, "priority": zone.Priority > 0,
+		"connect_pads": true, "min_thickness": true, "filled_areas_thickness": true,
+		"keepout": zone.Keepout != nil, "fill": true, "polygon": len(zone.Polygons) > 0,
+		"filled_polygon": len(zone.FilledPolygons) > 0, "attr": len(zone.Attributes) > 0,
+	}
+	errs = append(errs, validateNestedPreserved(prefix("preserved"), zone.Preserved, modeledChildren)...)
+	return errs
+}
+
+func validateNestedPreserved(collection string, preserved []PreservedNode, modeled map[string]bool) kicadfiles.ValidationErrors {
+	var errs kicadfiles.ValidationErrors
+	for i, node := range preserved {
+		family := strings.TrimSpace(node.Family)
+		errs = append(errs, validatePreservedFragment(indexed(collection, i, "raw"), family, node.Raw)...)
+		if modeled[family] {
+			errs = append(errs, fieldError(indexed(collection, i, "family"), "must not duplicate modeled child "+family))
+		}
+	}
+	errs = append(errs, validatePreservedNodeAnchorGraph(preserved)...)
+	return errs
+}
+
+func validatePreservedFragment(field, family, raw string) kicadfiles.ValidationErrors {
+	var errs kicadfiles.ValidationErrors
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return append(errs, fieldError(field, "required"))
+	}
+	if !sexpr.ValidRaw(raw) {
+		return append(errs, fieldError(field, "invalid s-expression syntax"))
+	}
+	if family = strings.TrimSpace(family); family != "" && rawRootToken(raw) != family {
+		errs = append(errs, fieldError(field, "preserved raw node must match family "+family))
 	}
 	return errs
 }

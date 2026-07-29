@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"kicadai/internal/kicadfiles"
@@ -58,6 +59,40 @@ func TestKiCadCLIValidatesCorrectnessFixturePCB(t *testing.T) {
 
 	runKiCadCLI(t, cli, "pcb", "upgrade", "--force", boardPath)
 	runKiCadCLIDRC(t, cli, boardPath, true)
+}
+
+func TestKiCadCLIRoundTripsImportedPreservationFixture(t *testing.T) {
+	if os.Getenv("KICADAI_RUN_KICAD_CLI") != "1" {
+		t.Skip("set KICADAI_RUN_KICAD_CLI=1 to run KiCad CLI validation")
+	}
+	cli, ok := findKiCadCLI()
+	if !ok {
+		t.Skip("kicad-cli not found")
+	}
+	boardPath := writeKiCadCLIBoardFixture(t, "imported_preservation", readFableImportedPCB(t))
+	runKiCadCLI(t, cli, "pcb", "upgrade", "--force", boardPath)
+	upgraded, err := ReadFile(boardPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if upgraded.General.Thickness != kicadfiles.MM(1.0) || upgraded.TitleBlock.Title != "Fable preservation fixture" {
+		t.Fatalf("KiCad changed imported board metadata: %#v %#v", upgraded.General, upgraded.TitleBlock)
+	}
+	if len(upgraded.Footprints) != 1 || len(upgraded.Footprints[0].Texts) != 1 || len(upgraded.Footprints[0].Models) != 1 {
+		t.Fatalf("KiCad changed imported footprint metadata: %#v", upgraded.Footprints)
+	}
+	if len(upgraded.Zones) != 1 || upgraded.Zones[0].Keepout == nil {
+		t.Fatalf("KiCad changed keepout semantic family: %#v", upgraded.Zones)
+	}
+	data, err := os.ReadFile(boardPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, fragment := range []string{"solder_mask_margin", "zone_connect"} {
+		if !strings.Contains(string(data), fragment) {
+			t.Fatalf("KiCad round trip dropped %s:\n%s", fragment, data)
+		}
+	}
 }
 
 func writeKiCadCLIBoardFixture(t *testing.T, name string, board PCBFile) string {

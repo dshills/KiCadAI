@@ -998,6 +998,7 @@ func updateImportedFootprint(footprint *pcb.Footprint, generator kicadfiles.IDGe
 		for i := range footprint.Properties {
 			if footprint.Properties[i].Name == "Value" {
 				footprint.Properties[i].Value = footprint.Value
+				footprint.Properties[i].Raw = ""
 			}
 		}
 	}
@@ -1170,6 +1171,11 @@ func writeImportedProjectFilesAtomic(writes []importedProjectWrite) error {
 		}
 		staged = append(staged, stagedImportedProjectWrite{target: write.path, temp: temp})
 	}
+	for _, file := range staged {
+		if err := validateStagedImportedProjectWrite(file); err != nil {
+			return err
+		}
+	}
 	for i := range staged {
 		if err := backupImportedProjectTarget(&staged[i]); err != nil {
 			restoreImportedProjectBackups(staged[:i])
@@ -1193,6 +1199,45 @@ func writeImportedProjectFilesAtomic(writes []importedProjectWrite) error {
 		}
 	}
 	cleanup = false
+	return nil
+}
+
+func validateStagedImportedProjectWrite(file stagedImportedProjectWrite) error {
+	// Re-read the live source at the last pre-replacement boundary. The design
+	// held by applyImported has already been mutated, so using it as the source
+	// would hide substitutions and would not protect against an externally
+	// changed target.
+	if _, err := os.Stat(file.target); os.IsNotExist(err) {
+		return nil
+	} else if err != nil {
+		return err
+	}
+	switch filepath.Ext(file.target) {
+	case ".kicad_pcb":
+		source, err := pcb.ReadFile(file.target)
+		if err != nil {
+			return fmt.Errorf("read imported PCB preservation source: %w", err)
+		}
+		staged, err := pcb.ReadFile(file.temp)
+		if err != nil {
+			return fmt.Errorf("read staged imported PCB: %w", err)
+		}
+		if err := pcb.ValidatePreservedMutation(source, staged); err != nil {
+			return err
+		}
+	case ".kicad_sch":
+		source, err := schematic.ReadFile(file.target)
+		if err != nil {
+			return fmt.Errorf("read imported schematic preservation source: %w", err)
+		}
+		staged, err := schematic.ReadFile(file.temp)
+		if err != nil {
+			return fmt.Errorf("read staged imported schematic: %w", err)
+		}
+		if err := schematic.ValidatePreservedMutation(source, staged); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 

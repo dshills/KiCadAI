@@ -43,12 +43,37 @@ func Read(data []byte) (PCBFile, error) {
 	if node, ok := root.Child("generator_version"); ok {
 		board.GeneratorVersion = node.ListValue(1)
 	}
+	if node, ok := root.Child("general"); ok {
+		board.RawGeneral = strings.TrimSpace(node.Raw)
+		board.Preservation = append(board.Preservation, rawPreservation("general", "general", "board fabrication metadata is retained verbatim"))
+		if thickness, ok := node.Child("thickness"); ok {
+			if value, ok := thickness.FloatValue(1); ok {
+				board.General.Thickness = kicadfiles.MM(value)
+			}
+		}
+		if legacy, ok := node.Child("legacy_teardrops"); ok {
+			board.General.LegacyTeardrops = legacy.ListValue(1) == "yes"
+		}
+	}
 	if node, ok := root.Child("paper"); ok {
-		board.Paper = kicadfiles.Paper{Name: node.ListValue(1)}
+		board.RawPaper = strings.TrimSpace(node.Raw)
+		board.Preservation = append(board.Preservation, rawPreservation("paper", "paper", "paper kind and custom dimensions are retained verbatim"))
+		board.Paper = readPaper(node)
+	}
+	if node, ok := root.Child("title_block"); ok {
+		board.RawTitleBlock = strings.TrimSpace(node.Raw)
+		board.Preservation = append(board.Preservation, rawPreservation("title_block", "title_block", "title metadata is retained verbatim"))
+		board.TitleBlock = readTitleBlock(node)
+	}
+	if node, ok := root.Child("setup"); ok {
+		board.RawSetup = strings.TrimSpace(node.Raw)
+		board.Preservation = append(board.Preservation, rawPreservation("setup", "setup", "stackup, mask, and plot settings are retained verbatim"))
+		readSetup(node, &board.Setup)
 	}
 	if layers, ok := root.Child("layers"); ok {
 		board.Layers = readLayers(layers)
 	}
+	previousFamily := ""
 	for i, child := range root.Children {
 		if i == 0 {
 			continue
@@ -58,7 +83,7 @@ func Read(data []byte) (PCBFile, error) {
 			code, _ := child.FloatValue(1)
 			board.Nets = append(board.Nets, Net{Code: int(code), Name: child.ListValue(2)})
 		case "footprint":
-			board.Footprints = append(board.Footprints, readFootprint(child))
+			board.Footprints = append(board.Footprints, readFootprint(child, &board.Preservation, len(board.Footprints)))
 		case "segment":
 			board.Tracks = append(board.Tracks, readTrack(child))
 		case "arc":
@@ -68,16 +93,92 @@ func Read(data []byte) (PCBFile, error) {
 		case "gr_line", "gr_rect", "gr_circle", "gr_arc", "gr_poly", "gr_text":
 			board.Drawings = append(board.Drawings, readDrawing(child))
 		case "zone":
-			board.Zones = append(board.Zones, readZone(child))
+			board.Zones = append(board.Zones, readZone(child, &board.Preservation, len(board.Zones)))
 		case "version", "generator", "generator_version", "general", "paper", "title_block", "layers", "setup":
 		default:
 			if child.Head() != "" {
-				board.Preserved = append(board.Preserved, PreservedNode{Family: child.Head(), Raw: strings.TrimSpace(child.Raw)})
+				board.Preserved = append(board.Preserved, PreservedNode{Family: child.Head(), Raw: strings.TrimSpace(child.Raw), After: previousFamily})
+				board.Preservation = append(board.Preservation, rawPreservation("preserved."+child.Head(), child.Head(), "unknown top-level node is spliced back verbatim"))
 			}
+		}
+		if child.Head() != "" {
+			previousFamily = child.Head()
+		}
+	}
+	board.Preservation = append(board.Preservation, kicadfiles.PreservationCapability{
+		Path: "layers", Family: "layers", Strategy: kicadfiles.PreservationFullyModeled,
+		Reason: "layer number, name, kind, and display name are parsed and rendered",
+	})
+	for _, family := range []string{"general", "paper", "title_block", "layers", "setup"} {
+		if count := len(root.ChildrenByHead(family)); count > 1 {
+			board.Preservation = append(board.Preservation, kicadfiles.PreservationCapability{
+				Path:     family,
+				Family:   family,
+				Strategy: kicadfiles.PreservationUnsupported,
+				Reason:   fmt.Sprintf("duplicate singleton node (%d occurrences)", count),
+			})
 		}
 	}
 	resolvePCBNetReferences(&board)
 	return board, nil
+}
+
+func rawPreservation(path, family, reason string) kicadfiles.PreservationCapability {
+	return kicadfiles.PreservationCapability{Path: path, Family: family, Strategy: kicadfiles.PreservationRaw, Reason: reason}
+}
+
+func readPaper(node sexpr.ParsedNode) kicadfiles.Paper {
+	paper := kicadfiles.Paper{Name: node.ListValue(1)}
+	if width, ok := node.FloatValue(2); ok {
+		paper.Width = kicadfiles.MM(width)
+	}
+	if height, ok := node.FloatValue(3); ok {
+		paper.Height = kicadfiles.MM(height)
+	}
+	return paper
+}
+
+func readTitleBlock(node sexpr.ParsedNode) kicadfiles.TitleBlock {
+	var title kicadfiles.TitleBlock
+	for _, child := range node.Children[1:] {
+		switch child.Head() {
+		case "title":
+			title.Title = child.ListValue(1)
+		case "date":
+			title.Date = child.ListValue(1)
+		case "rev":
+			title.Revision = child.ListValue(1)
+		case "company":
+			title.Company = child.ListValue(1)
+		case "comment":
+			title.Comments = append(title.Comments, child.ListValue(2))
+		}
+	}
+	return title
+}
+
+func readSetup(node sexpr.ParsedNode, setup *PCBSetup) {
+	if setup == nil {
+		return
+	}
+	if clearance, ok := node.Child("pad_to_mask_clearance"); ok {
+		if value, ok := clearance.FloatValue(1); ok {
+			setup.PadToMaskClearance = kicadfiles.MM(value)
+		}
+	}
+	if width, ok := node.Child("solder_mask_min_width"); ok {
+		if value, ok := width.FloatValue(1); ok {
+			setup.SolderMaskMinWidth = kicadfiles.MM(value)
+		}
+	}
+	if stackup, ok := node.Child("stackup"); ok {
+		setup.HasStackup = true
+		if thickness, ok := stackup.Child("thickness"); ok {
+			if value, ok := thickness.FloatValue(1); ok {
+				setup.Stackup.Thickness = kicadfiles.MM(value)
+			}
+		}
+	}
 }
 
 func readLayers(node sexpr.ParsedNode) []LayerDefinition {
@@ -89,7 +190,7 @@ func readLayers(node sexpr.ParsedNode) []LayerDefinition {
 	return layers
 }
 
-func readFootprint(node sexpr.ParsedNode) Footprint {
+func readFootprint(node sexpr.ParsedNode, capabilities *[]kicadfiles.PreservationCapability, index int) Footprint {
 	fp := Footprint{Raw: strings.TrimSpace(node.Raw), LibraryID: node.ListValue(1), UUID: readPCBUUID(node), Position: readPCBAtPoint(node)}
 	if at, ok := node.Child("at"); ok {
 		if rotation, ok := at.FloatValue(3); ok {
@@ -102,6 +203,15 @@ func readFootprint(node sexpr.ParsedNode) Footprint {
 	if path, ok := node.Child("path"); ok {
 		fp.Path = path.ListValue(1)
 	}
+	if descr, ok := node.Child("descr"); ok {
+		fp.Description = descr.ListValue(1)
+	}
+	if tags, ok := node.Child("tags"); ok {
+		fp.Tags = tags.ListValue(1)
+	}
+	if locked, ok := node.Child("locked"); ok {
+		fp.Locked = locked.ListValue(1) == "yes" || locked.ListValue(1) == ""
+	}
 	if attributes, ok := node.Child("attr"); ok {
 		for _, attribute := range attributes.Children[1:] {
 			if value := strings.TrimSpace(attribute.Value()); value != "" {
@@ -112,7 +222,16 @@ func readFootprint(node sexpr.ParsedNode) Footprint {
 	for _, property := range node.ChildrenByHead("property") {
 		name := property.ListValue(1)
 		value := property.ListValue(2)
-		fp.Properties = append(fp.Properties, FootprintProperty{Name: name, Value: value, Position: readPCBAtPoint(property), UUID: readPCBUUID(property)})
+		parsedProperty := FootprintProperty{Raw: strings.TrimSpace(property.Raw), Name: name, Value: value, Position: readPCBAtPoint(property), UUID: readPCBUUID(property)}
+		if at, ok := property.Child("at"); ok {
+			parsedProperty.Rotation, _ = readAngle(at, 3)
+		}
+		parsedProperty.Hide = childYes(property, "hide")
+		parsedProperty.Unlocked = childYes(property, "unlocked")
+		if effects, ok := property.Child("effects"); ok {
+			parsedProperty.Effects = readTextEffects(effects)
+		}
+		fp.Properties = append(fp.Properties, parsedProperty)
 		if layer, ok := property.Child("layer"); ok {
 			fp.Properties[len(fp.Properties)-1].Layer = kicadfiles.BoardLayer(layer.ListValue(1))
 		}
@@ -128,13 +247,101 @@ func readFootprint(node sexpr.ParsedNode) Footprint {
 		parsed.Rotation = normalizedFootprintAngle(parsed.Rotation - fp.Rotation)
 		fp.Pads = append(fp.Pads, parsed)
 	}
+	previousFamily := ""
 	for _, child := range node.Children {
 		switch child.Head() {
 		case "fp_line", "fp_rect", "fp_circle", "fp_arc", "fp_poly":
 			fp.Graphics = append(fp.Graphics, FootprintGraphic(readDrawing(child)))
+		case "fp_text":
+			fp.Texts = append(fp.Texts, readFootprintText(child))
+		case "model":
+			fp.Models = append(fp.Models, readModel3D(child))
+		case "", "footprint", "layer", "uuid", "at", "descr", "tags", "property", "path", "sheetname", "sheetfile", "units", "attr", "net_tie_pad_groups", "duplicate_pad_numbers_are_jumpers", "pad", "embedded_fonts", "locked":
+		default:
+			raw := strings.TrimSpace(child.Raw)
+			fp.Preserved = append(fp.Preserved, PreservedNode{Family: child.Head(), Raw: raw, After: previousFamily})
+			*capabilities = append(*capabilities, rawPreservation(fmt.Sprintf("footprints[%d].%s", index, child.Head()), child.Head(), "unmodeled footprint child is spliced back verbatim"))
+		}
+		if child.Head() != "" {
+			previousFamily = child.Head()
 		}
 	}
 	return fp
+}
+
+func readAngle(node sexpr.ParsedNode, position int) (kicadfiles.Angle, bool) {
+	value, ok := node.FloatValue(position)
+	return kicadfiles.Angle(value), ok
+}
+
+func childYes(node sexpr.ParsedNode, name string) bool {
+	child, ok := node.Child(name)
+	return ok && (child.ListValue(1) == "yes" || child.ListValue(1) == "")
+}
+
+func readTextEffects(node sexpr.ParsedNode) TextEffects {
+	var effects TextEffects
+	if font, ok := node.Child("font"); ok {
+		if size, ok := font.Child("size"); ok {
+			x, xOK := size.FloatValue(1)
+			y, yOK := size.FloatValue(2)
+			if xOK && yOK {
+				effects.FontSize = kicadfiles.Point{X: kicadfiles.MM(x), Y: kicadfiles.MM(y)}
+			}
+		}
+		if thickness, ok := font.Child("thickness"); ok {
+			if value, ok := thickness.FloatValue(1); ok {
+				effects.FontThickness = kicadfiles.MM(value)
+			}
+		} else {
+			effects.OmitFontThickness = true
+		}
+	}
+	if justify, ok := node.Child("justify"); ok {
+		for _, child := range justify.Children[1:] {
+			effects.Justify = append(effects.Justify, child.Value())
+		}
+	}
+	return effects
+}
+
+func readFootprintText(node sexpr.ParsedNode) FootprintText {
+	text := FootprintText{Raw: strings.TrimSpace(node.Raw), Kind: node.ListValue(1), Text: node.ListValue(2), Position: readPCBAtPoint(node), UUID: readPCBUUID(node)}
+	if at, ok := node.Child("at"); ok {
+		text.Rotation, _ = readAngle(at, 3)
+	}
+	if layer, ok := node.Child("layer"); ok {
+		text.Layer = kicadfiles.BoardLayer(layer.ListValue(1))
+	}
+	if effects, ok := node.Child("effects"); ok {
+		text.Effects = readTextEffects(effects)
+	}
+	return text
+}
+
+func readModel3D(node sexpr.ParsedNode) Model3D {
+	model := Model3D{Raw: strings.TrimSpace(node.Raw), Path: node.ListValue(1)}
+	if offset, ok := node.Child("offset"); ok {
+		model.Offset = readXYZ(offset)
+	}
+	if scale, ok := node.Child("scale"); ok {
+		model.Scale = readXYZ(scale)
+	}
+	if rotate, ok := node.Child("rotate"); ok {
+		model.Rotate = readXYZ(rotate)
+	}
+	return model
+}
+
+func readXYZ(node sexpr.ParsedNode) XYZ {
+	xyz, ok := node.Child("xyz")
+	if !ok {
+		return XYZ{}
+	}
+	x, _ := xyz.FloatValue(1)
+	y, _ := xyz.FloatValue(2)
+	z, _ := xyz.FloatValue(3)
+	return XYZ{X: x, Y: y, Z: z}
 }
 
 func readPad(node sexpr.ParsedNode) Pad {
@@ -262,7 +469,7 @@ func readDrawing(node sexpr.ParsedNode) Drawing {
 	return drawing
 }
 
-func readZone(node sexpr.ParsedNode) Zone {
+func readZone(node sexpr.ParsedNode, capabilities *[]kicadfiles.PreservationCapability, index int) Zone {
 	zone := Zone{Raw: strings.TrimSpace(node.Raw), UUID: readPCBUUID(node)}
 	if net, ok := node.Child("net"); ok {
 		zone.NetCode, zone.NetName = readPCBNetRef(net)
@@ -275,6 +482,8 @@ func readZone(node sexpr.ParsedNode) Zone {
 	}
 	if layers, ok := node.Child("layers"); ok {
 		zone.Layers = readPCBLayerList(layers)
+	} else if layer, ok := node.Child("layer"); ok {
+		zone.Layers = []kicadfiles.BoardLayer{kicadfiles.BoardLayer(layer.ListValue(1))}
 	}
 	if priority, ok := node.Child("priority"); ok {
 		value, _ := priority.FloatValue(1)
@@ -296,6 +505,22 @@ func readZone(node sexpr.ParsedNode) Zone {
 		value, _ := minThickness.FloatValue(1)
 		zone.MinThickness = kicadfiles.MM(value)
 	}
+	if filledAreas, ok := node.Child("filled_areas_thickness"); ok {
+		zone.FilledAreasThickness = filledAreas.ListValue(1) == "yes"
+	}
+	if keepout, ok := node.Child("keepout"); ok {
+		zone.Keepout = &ZoneKeepout{
+			Tracks:     childValue(keepout, "tracks"),
+			Vias:       childValue(keepout, "vias"),
+			Pads:       childValue(keepout, "pads"),
+			CopperPour: childValue(keepout, "copperpour"),
+			Footprints: childValue(keepout, "footprints"),
+		}
+		*capabilities = append(*capabilities, kicadfiles.PreservationCapability{
+			Path: fmt.Sprintf("zones[%d].keepout", index), Family: "keepout",
+			Strategy: kicadfiles.PreservationFullyModeled, Reason: "keepout permissions are parsed and rendered as a keepout",
+		})
+	}
 	if fill, ok := node.Child("fill"); ok {
 		zone.Fill = readZoneFill(fill)
 	}
@@ -309,7 +534,32 @@ func readZone(node sexpr.ParsedNode) Zone {
 		}
 		zone.FilledPolygons = append(zone.FilledPolygons, filled)
 	}
+	previousFamily := ""
+	for _, child := range node.Children {
+		switch child.Head() {
+		case "", "zone", "net", "net_name", "layer", "layers", "uuid", "name", "hatch", "priority", "connect_pads", "min_thickness", "filled_areas_thickness", "fill", "keepout", "polygon", "filled_polygon":
+		case "attr":
+			raw := strings.TrimSpace(child.Raw)
+			zone.Preserved = append(zone.Preserved, PreservedNode{Family: child.Head(), Raw: raw, After: previousFamily})
+			*capabilities = append(*capabilities, rawPreservation(fmt.Sprintf("zones[%d].attr", index), "attr", "rule-area attributes are spliced back verbatim"))
+		default:
+			raw := strings.TrimSpace(child.Raw)
+			zone.Preserved = append(zone.Preserved, PreservedNode{Family: child.Head(), Raw: raw, After: previousFamily})
+			*capabilities = append(*capabilities, rawPreservation(fmt.Sprintf("zones[%d].%s", index, child.Head()), child.Head(), "unmodeled zone child is spliced back verbatim"))
+		}
+		if child.Head() != "" {
+			previousFamily = child.Head()
+		}
+	}
 	return zone
+}
+
+func childValue(node sexpr.ParsedNode, name string) string {
+	child, ok := node.Child(name)
+	if !ok {
+		return ""
+	}
+	return child.ListValue(1)
 }
 
 func readPCBUUID(node sexpr.ParsedNode) kicadfiles.UUID {

@@ -17,8 +17,8 @@ func TestPreservationFixtureCorpus(t *testing.T) {
 		wantUnsupportedKinds map[string]int
 	}{
 		{name: "clean_project", wantScope: preservation.ScopeImported},
-		{name: "schematic_raw", wantScope: preservation.ScopeImported, wantPreservationOnly: 1, wantUnsupportedKinds: map[string]int{"rule_area": 1}},
-		{name: "pcb_preserved", wantScope: preservation.ScopeImported, wantPreservationOnly: 1, wantUnsupportedKinds: map[string]int{"future_widget": 1}},
+		{name: "schematic_raw", wantScope: preservation.ScopeImported, wantPreservationOnly: 1},
+		{name: "pcb_preserved", wantScope: preservation.ScopeImported, wantPreservationOnly: 1},
 	}
 	for _, test := range tests {
 		test := test

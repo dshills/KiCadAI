@@ -1,6 +1,7 @@
 package transactions
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -933,7 +934,7 @@ func TestApplyImportedBlocksUnsafeMutationWithoutWriting(t *testing.T) {
   (generator "kicadai")
   (uuid "11111111-1111-5111-8111-111111111111")
   (paper A4)
-  (rule_area (uuid "22222222-2222-5222-8222-222222222222"))
+  (paper A3)
 )`, `(kicad_pcb (version 20260206) (generator "pcbnew") (paper "A4") (layers (0 "F.Cu" signal)) (setup))`)
 	schematicPath := filepath.Join(dir, "demo.kicad_sch")
 	before, err := os.ReadFile(schematicPath)
@@ -954,6 +955,56 @@ func TestApplyImportedBlocksUnsafeMutationWithoutWriting(t *testing.T) {
 	}
 	if string(before) != string(after) {
 		t.Fatalf("blocked apply changed schematic:\nbefore=%s\nafter=%s", before, after)
+	}
+}
+
+func TestApplyImportedPreservesSupportedRawSchematicContent(t *testing.T) {
+	dir := writeImportedApplyProject(t, `(kicad_sch
+  (version 20260306)
+  (generator "kicadai")
+  (uuid "11111111-1111-5111-8111-111111111111")
+  (paper A4)
+  (rule_area (uuid "22222222-2222-5222-8222-222222222222"))
+)`, `(kicad_pcb (version 20260206) (generator "pcbnew") (paper "A4") (layers (0 "F.Cu" signal)) (setup))`)
+	tx := mustParse(t, `{"operations":[
+	  {"op":"add_symbol","ref":"R1","library_id":"Device:R","at":{"x_mm":10,"y_mm":10}},
+	  {"op":"write_project"}
+	]}`)
+	result := Apply(tx, ApplyOptions{OutputDir: dir, AllowImportedMutation: true})
+	if len(result.Issues) != 0 {
+		t.Fatalf("unexpected issues: %#v", result.Issues)
+	}
+	data, err := os.ReadFile(filepath.Join(dir, "demo.kicad_sch"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(data), `(rule_area (uuid "22222222-2222-5222-8222-222222222222"))`) {
+		t.Fatalf("raw schematic item was not preserved:\n%s", data)
+	}
+}
+
+func TestValidateStagedImportedProjectWriteRejectsSubstitutionBeforeLiveWrite(t *testing.T) {
+	dir := t.TempDir()
+	target := filepath.Join(dir, "demo.kicad_pcb")
+	source := []byte(`(kicad_pcb (version 20260206) (generator "pcbnew") (generator_version "10.0.3") (general (thickness 1.0)) (paper "A4") (layers (0 "F.Cu" signal) (2 "B.Cu" signal)) (setup))`)
+	staged := []byte(`(kicad_pcb (version 20260206) (generator "pcbnew") (generator_version "10.0.3") (general (thickness 1.6)) (paper "A4") (layers (0 "F.Cu" signal) (2 "B.Cu" signal)) (setup))`)
+	if err := os.WriteFile(target, source, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	temp := filepath.Join(dir, ".demo.kicad_pcb.tmp-test")
+	if err := os.WriteFile(temp, staged, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := validateStagedImportedProjectWrite(stagedImportedProjectWrite{target: target, temp: temp}); err == nil ||
+		!strings.Contains(err.Error(), "general was substituted") {
+		t.Fatalf("expected staged substitution rejection, got %v", err)
+	}
+	after, err := os.ReadFile(target)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(source, after) {
+		t.Fatalf("staged validation changed live source:\nbefore=%s\nafter=%s", source, after)
 	}
 }
 

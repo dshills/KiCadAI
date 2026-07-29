@@ -23,9 +23,14 @@ type PCBFile struct {
 	Zones                []Zone
 	Dimensions           []Dimension
 	Preserved            []PreservedNode
+	Preservation         []kicadfiles.PreservationCapability
 	TitleBlock           kicadfiles.TitleBlock
 	EmbeddedFonts        *bool
 	RequireClosedOutline bool
+	RawGeneral           string
+	RawPaper             string
+	RawTitleBlock        string
+	RawSetup             string
 }
 
 type PreservedNode struct {
@@ -139,12 +144,14 @@ type Footprint struct {
 	Pads               []Pad
 	Graphics           []FootprintGraphic
 	Models             []Model3D
+	Preserved          []PreservedNode
 	EmbeddedFonts      *bool
 	// KiCad 10 writes this flag explicitly on saved footprints.
 	DuplicatePadNumbersAreJumpers *bool
 }
 
 type FootprintText struct {
+	Raw      string
 	UUID     kicadfiles.UUID
 	Kind     string
 	Text     string
@@ -155,6 +162,7 @@ type FootprintText struct {
 }
 
 type FootprintProperty struct {
+	Raw      string
 	UUID     kicadfiles.UUID
 	Name     string
 	Value    string
@@ -184,6 +192,7 @@ type TextEffects struct {
 }
 
 type Model3D struct {
+	Raw    string
 	Path   string
 	Offset XYZ
 	Scale  XYZ
@@ -341,6 +350,7 @@ type Zone struct {
 	Fill                 ZoneFillSettings
 	Keepout              *ZoneKeepout
 	Attributes           []ZoneAttribute
+	Preserved            []PreservedNode
 }
 
 type ZoneKeepout struct {

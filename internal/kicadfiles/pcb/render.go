@@ -54,18 +54,32 @@ func render(board PCBFile) (sexpr.List, error) {
 	if err != nil {
 		return nil, err
 	}
+	generalNode := sexpr.Node(renderGeneral(board.General))
+	if strings.TrimSpace(board.RawGeneral) != "" {
+		generalNode = sexpr.R(board.RawGeneral)
+	}
+	paperNode := sexpr.Node(sexpr.L(sexpr.A("paper"), sexpr.S(strings.TrimSpace(board.Paper.Name))))
+	if strings.TrimSpace(board.RawPaper) != "" {
+		paperNode = sexpr.R(board.RawPaper)
+	}
 	nodes := []sexpr.Node{
 		sexpr.A("kicad_pcb"),
 		sexpr.L(sexpr.A("version"), sexpr.I(version)),
 		sexpr.L(sexpr.A("generator"), sexpr.S(strings.TrimSpace(board.Generator))),
 		sexpr.L(sexpr.A("generator_version"), sexpr.S(strings.TrimSpace(board.GeneratorVersion))),
-		renderGeneral(board.General),
-		sexpr.L(sexpr.A("paper"), sexpr.S(strings.TrimSpace(board.Paper.Name))),
+		generalNode,
+		paperNode,
 	}
-	if title := renderTitleBlock(board.TitleBlock); len(title) > 1 {
+	if strings.TrimSpace(board.RawTitleBlock) != "" {
+		nodes = append(nodes, sexpr.R(board.RawTitleBlock))
+	} else if title := renderTitleBlock(board.TitleBlock); len(title) > 1 {
 		nodes = append(nodes, title)
 	}
-	nodes = append(nodes, renderLayers(board.Layers), renderSetup(board.Setup))
+	setupNode := sexpr.Node(renderSetup(board.Setup))
+	if strings.TrimSpace(board.RawSetup) != "" {
+		setupNode = sexpr.R(board.RawSetup)
+	}
+	nodes = append(nodes, renderLayers(board.Layers), setupNode)
 	netNames := netNameMap(board.Nets)
 	layerNumbers := layerNumberMap(board.Layers)
 	footprints := sortedFootprints(board.Footprints)
@@ -278,6 +292,7 @@ func renderFootprintLibraryModule(footprint *Footprint, name string) sexpr.List 
 	for _, model := range footprint.Models {
 		nodes = append(nodes, renderModel3D(model))
 	}
+	nodes = insertPreservedNodes(nodes, footprint.Preserved)
 	return sexpr.L(nodes...)
 }
 
@@ -368,6 +383,7 @@ func renderFootprint(footprint Footprint, netNames map[int]string) sexpr.List {
 	for _, model := range footprint.Models {
 		nodes = append(nodes, renderModel3D(model))
 	}
+	nodes = insertPreservedNodes(nodes, footprint.Preserved)
 	return sexpr.L(nodes...)
 }
 
@@ -465,7 +481,10 @@ func renderFootprintUnits(units []FootprintUnit) sexpr.List {
 	return sexpr.L(nodes...)
 }
 
-func renderFootprintProperty(property FootprintProperty) sexpr.List {
+func renderFootprintProperty(property FootprintProperty) sexpr.Node {
+	if strings.TrimSpace(property.Raw) != "" {
+		return sexpr.R(property.Raw)
+	}
 	nodes := []sexpr.Node{
 		sexpr.A("property"),
 		sexpr.S(property.Name),
@@ -514,7 +533,10 @@ func renderEffects(effects TextEffects) sexpr.List {
 	return sexpr.L(nodes...)
 }
 
-func renderModel3D(model Model3D) sexpr.List {
+func renderModel3D(model Model3D) sexpr.Node {
+	if strings.TrimSpace(model.Raw) != "" {
+		return sexpr.R(model.Raw)
+	}
 	return sexpr.L(
 		sexpr.A("model"),
 		sexpr.S(model.Path),
@@ -541,7 +563,10 @@ func defaultScale(value XYZ) XYZ {
 	return value
 }
 
-func renderFootprintText(text FootprintText) sexpr.List {
+func renderFootprintText(text FootprintText) sexpr.Node {
+	if strings.TrimSpace(text.Raw) != "" {
+		return sexpr.R(text.Raw)
+	}
 	effects := text.Effects
 	if effects.FontSize == (kicadfiles.Point{}) && effects.FontThickness == 0 {
 		effects.FontSize = kicadfiles.Point{X: kicadfiles.MM(1.27), Y: kicadfiles.MM(1.27)}
@@ -856,6 +881,7 @@ func renderZone(zone Zone, netNames map[int]string) sexpr.List {
 	for _, polygon := range zone.FilledPolygons {
 		nodes = append(nodes, sexpr.L(sexpr.A("filled_polygon"), sexpr.L(sexpr.A("layer"), sexpr.S(string(polygon.Layer))), renderPoints(polygon.Points)))
 	}
+	nodes = insertPreservedNodes(nodes, zone.Preserved)
 	return sexpr.L(nodes...)
 }
 

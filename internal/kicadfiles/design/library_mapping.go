@@ -177,6 +177,12 @@ func cloneDesignForMapping(design Design) Design {
 	if design.PCB != nil {
 		pcbClone := *design.PCB
 		pcbClone.Footprints = clonePCBFootprints(design.PCB.Footprints)
+		pcbClone.Preserved = append([]pcb.PreservedNode(nil), design.PCB.Preserved...)
+		pcbClone.Preservation = append([]kicadfiles.PreservationCapability(nil), design.PCB.Preservation...)
+		pcbClone.Zones = append([]pcb.Zone(nil), design.PCB.Zones...)
+		for i := range pcbClone.Zones {
+			pcbClone.Zones[i].Preserved = append([]pcb.PreservedNode(nil), design.PCB.Zones[i].Preserved...)
+		}
 		clone.PCB = &pcbClone
 	}
 	clone.SymbolTables = append([]library.TableEntry(nil), design.SymbolTables...)
@@ -219,6 +225,7 @@ func clonePCBFootprint(footprint pcb.Footprint) pcb.Footprint {
 		footprint.Graphics[i] = cloneFootprintGraphic(footprint.Graphics[i])
 	}
 	footprint.Models = append([]pcb.Model3D(nil), footprint.Models...)
+	footprint.Preserved = append([]pcb.PreservedNode(nil), footprint.Preserved...)
 	footprint.EmbeddedFonts = clonePtr(footprint.EmbeddedFonts)
 	footprint.DuplicatePadNumbersAreJumpers = clonePtr(footprint.DuplicatePadNumbersAreJumpers)
 	return footprint
@@ -300,6 +307,7 @@ func cloneSchematicFile(file *schematic.SchematicFile) *schematic.SchematicFile 
 		clone.Sheets[i].Instances = append([]schematic.SheetInstance(nil), clone.Sheets[i].Instances...)
 	}
 	clone.RawItems = append([]schematic.RawSchematicItem(nil), file.RawItems...)
+	clone.Preservation = append([]kicadfiles.PreservationCapability(nil), file.Preservation...)
 	clone.Instances = append([]schematic.SymbolInstance(nil), file.Instances...)
 	clone.SheetInstances = append([]schematic.SheetInstance(nil), file.SheetInstances...)
 	clone.OmitRootSheetInstances = file.OmitRootSheetInstances

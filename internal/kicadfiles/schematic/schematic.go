@@ -33,6 +33,9 @@ type SchematicFile struct {
 	Texts            []Text
 	Sheets           []Sheet
 	RawItems         []RawSchematicItem
+	Preservation     []kicadfiles.PreservationCapability
+	RawPaper         string
+	RawTitleBlock    string
 	// Instances is retained for compatibility with early generators. KiCad 10
 	// output renders per-symbol instances from SchematicSymbol.Instances.
 	Instances []SymbolInstance
@@ -161,6 +164,7 @@ type BusEntry struct {
 }
 
 type Text struct {
+	Raw      string
 	UUID     kicadfiles.UUID
 	Value    string
 	Position kicadfiles.Point
@@ -200,6 +204,7 @@ const (
 )
 
 type Junction struct {
+	Raw      string
 	UUID     kicadfiles.UUID
 	Position kicadfiles.Point
 	Diameter kicadfiles.IU
@@ -227,6 +232,7 @@ const connectivityNearMissDistance = kicadfiles.IU(254000)
 const generatedConnectivityGrid = kicadfiles.IU(1270000)
 
 type Sheet struct {
+	Raw              string
 	UUID             kicadfiles.UUID
 	Name             string
 	Filename         string
@@ -1129,9 +1135,15 @@ func render(schematic SchematicFile) (sexpr.List, error) {
 	}
 	nodes = append(nodes,
 		sexpr.L(sexpr.A("uuid"), sexpr.S(string(schematic.UUID))),
-		sexpr.L(sexpr.A("paper"), sexpr.S(strings.TrimSpace(schematic.Paper.Name))),
 	)
-	if title := renderTitleBlock(schematic.TitleBlock); len(title) > 1 {
+	if strings.TrimSpace(schematic.RawPaper) != "" {
+		nodes = append(nodes, sexpr.R(schematic.RawPaper))
+	} else {
+		nodes = append(nodes, sexpr.L(sexpr.A("paper"), sexpr.S(strings.TrimSpace(schematic.Paper.Name))))
+	}
+	if strings.TrimSpace(schematic.RawTitleBlock) != "" {
+		nodes = append(nodes, sexpr.R(schematic.RawTitleBlock))
+	} else if title := renderTitleBlock(schematic.TitleBlock); len(title) > 1 {
 		nodes = append(nodes, title)
 	}
 	// KiCad's schematic writer emits lib_symbols even when the cache is empty.
@@ -1155,7 +1167,11 @@ func renderItems(schematic SchematicFile) ([]renderItem, error) {
 		len(schematic.Sheets) + len(schematic.RawItems)
 	items := make([]renderItem, 0, itemCount)
 	for _, junction := range schematic.Junctions {
-		items = append(items, newRenderItem(schematicItemJunction, junction.UUID, renderJunction(junction)))
+		node := sexpr.Node(renderJunction(junction))
+		if strings.TrimSpace(junction.Raw) != "" {
+			node = sexpr.R(junction.Raw)
+		}
+		items = append(items, newRenderItem(schematicItemJunction, junction.UUID, node))
 	}
 	for _, noConnect := range schematic.NoConnects {
 		items = append(items, newRenderItem(schematicItemNoConnect, noConnect.UUID, renderNoConnect(noConnect)))
@@ -1183,7 +1199,11 @@ func renderItems(schematic SchematicFile) ([]renderItem, error) {
 		items = append(items, newRenderItem(schematicItemSymbol, symbol.UUID, renderSymbol(symbol)))
 	}
 	for _, sheet := range schematic.Sheets {
-		items = append(items, newRenderItem(schematicItemSheet, sheet.UUID, renderSheet(sheet)))
+		node := sexpr.Node(renderSheet(sheet))
+		if strings.TrimSpace(sheet.Raw) != "" {
+			node = sexpr.R(sheet.Raw)
+		}
+		items = append(items, newRenderItem(schematicItemSheet, sheet.UUID, node))
 	}
 	for i, raw := range schematic.RawItems {
 		effectiveKind := raw.effectiveKind()

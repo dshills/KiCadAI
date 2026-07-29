@@ -8,6 +8,7 @@ import (
 	"sort"
 	"strings"
 
+	"kicadai/internal/kicadfiles"
 	pcbfiles "kicadai/internal/kicadfiles/pcb"
 	schematicfiles "kicadai/internal/kicadfiles/schematic"
 	"kicadai/internal/manifest"
@@ -160,8 +161,8 @@ func PCBContext(ctx context.Context, path string) (PCBSummary, error) {
 		return PCBSummary{}, err
 	}
 	layerUsage := map[string]int{}
-	unsupported := pcbUnsupported(board.Preserved)
-	preservationOnly := pcbUnsupported(board.Preserved)
+	unsupported := preservationCapabilityNodes(board.Preservation, kicadfiles.PreservationUnsupported)
+	preservationOnly := preservationOnlyCapabilityNodes(board.Preservation)
 	objectCounts := map[string]int{
 		"footprint": len(board.Footprints),
 		"segment":   len(board.Tracks) + len(board.TrackArcs),
@@ -263,8 +264,8 @@ func SchematicContext(ctx context.Context, path string) (SchematicSummary, error
 		Truncated:        truncated,
 		ObjectCounts:     objectCounts,
 		InspectionDepth:  "structured",
-		Unsupported:      schematicUnsupported(file.RawItems),
-		PreservationOnly: schematicUnsupported(file.RawItems),
+		Unsupported:      preservationCapabilityNodes(file.Preservation, kicadfiles.PreservationUnsupported),
+		PreservationOnly: preservationOnlyCapabilityNodes(file.Preservation),
 		Issues:           []reports.Issue{},
 	}
 	preservationReport := preservationForSchematic(summary)
@@ -386,22 +387,40 @@ func schematicSymbolRefs(file schematicfiles.SchematicFile) []string {
 	return values
 }
 
-func schematicUnsupported(items []schematicfiles.RawSchematicItem) []UnsupportedNode {
+func preservationCapabilityNodes(capabilities []kicadfiles.PreservationCapability, strategy kicadfiles.PreservationStrategy) []UnsupportedNode {
 	counts := map[string]int{}
-	for _, item := range items {
-		kind := string(item.Kind)
+	for _, capability := range capabilities {
+		if capability.Strategy != strategy {
+			continue
+		}
+		kind := strings.TrimSpace(capability.Family)
 		if kind == "" {
-			kind = "raw_item"
+			kind = "unknown"
 		}
 		counts[kind]++
 	}
 	return unsupportedNodes(counts)
 }
 
-func pcbUnsupported(items []pcbfiles.PreservedNode) []UnsupportedNode {
+func preservationOnlyCapabilityNodes(capabilities []kicadfiles.PreservationCapability) []UnsupportedNode {
 	counts := map[string]int{}
-	for _, item := range items {
-		kind := item.Family
+	for _, capability := range capabilities {
+		if capability.Strategy != kicadfiles.PreservationRaw {
+			continue
+		}
+		// PreservationOnly is the legacy inspection risk category, not a count
+		// of every raw-backed reader capability. Standard metadata sections and
+		// modeled objects with raw presentation backups are mutation-safe under
+		// the source/staged preservation comparator, so reporting them here
+		// would incorrectly make generated projects read-only.
+		path := strings.TrimSpace(capability.Path)
+		if !strings.HasPrefix(path, "preserved.") &&
+			!strings.HasPrefix(path, "raw_items[") &&
+			!strings.HasPrefix(path, "footprints[") &&
+			!strings.HasPrefix(path, "zones[") {
+			continue
+		}
+		kind := strings.TrimSpace(capability.Family)
 		if kind == "" {
 			kind = "unknown"
 		}

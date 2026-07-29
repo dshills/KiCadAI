@@ -56,49 +56,49 @@
       "id": "H3",
       "severity": "high",
       "package": "internal/kicadfiles/pcb",
-      "disposition": "reproduced_pending",
+      "disposition": "closed",
       "implementation_phase": 3,
       "reproduction": {
-        "test": "TestFableH3ReproductionImportedBoardMetadataIsReset",
+        "test": "TestFableH3ImportedBoardMetadataIsPreserved",
         "path": "internal/kicadfiles/pcb/fable_phase0_test.go",
-        "command": "go test ./internal/kicadfiles/pcb -run '^TestFableH3ReproductionImportedBoardMetadataIsReset$' -count=1"
+        "command": "go test ./internal/kicadfiles/pcb -run '^TestFableH3ImportedBoardMetadataIsPreserved$' -count=1"
       },
       "affected_capabilities": ["imported_pcb_mutation", "fabrication_metadata_preservation"],
       "historical_evidence": "not valid for imported projects containing non-default general, setup, or title_block nodes",
-      "current_evidence": "pending Phase 3 preservation guard",
-      "closing_commit": null
+      "current_evidence": "reverified by raw-preserved general, custom paper, title block, stackup, mask, and plot settings plus staged source/output substitution comparison",
+      "closing_commit": "Guard imported KiCad preservation"
     },
     {
       "id": "H4",
       "severity": "high",
       "package": "internal/kicadfiles/pcb",
-      "disposition": "reproduced_pending",
+      "disposition": "closed",
       "implementation_phase": 3,
       "reproduction": {
-        "test": "TestFableH4ReproductionImportedFootprintChildrenAreDropped",
+        "test": "TestFableH4ImportedFootprintChildrenArePreserved",
         "path": "internal/kicadfiles/pcb/fable_phase0_test.go",
-        "command": "go test ./internal/kicadfiles/pcb -run '^TestFableH4ReproductionImportedFootprintChildrenAreDropped$' -count=1"
+        "command": "go test ./internal/kicadfiles/pcb -run '^TestFableH4ImportedFootprintChildrenArePreserved$' -count=1"
       },
       "affected_capabilities": ["imported_pcb_mutation", "footprint_metadata_preservation"],
       "historical_evidence": "not valid for footprints containing unmodeled text, models, descriptions, tags, locks, or margins",
-      "current_evidence": "pending Phase 3 preservation guard",
-      "closing_commit": null
+      "current_evidence": "reverified for footprint description, tags, lock state, rotated properties with effects, text, models, and raw-preserved margin and zone-connect children",
+      "closing_commit": "Guard imported KiCad preservation"
     },
     {
       "id": "H5",
       "severity": "high",
       "package": "internal/kicadfiles/pcb",
-      "disposition": "reproduced_pending",
+      "disposition": "closed",
       "implementation_phase": 3,
       "reproduction": {
-        "test": "TestFableH5ReproductionImportedKeepoutBecomesCopperZone",
+        "test": "TestFableH5ImportedKeepoutRemainsKeepout",
         "path": "internal/kicadfiles/pcb/fable_phase0_test.go",
-        "command": "go test ./internal/kicadfiles/pcb -run '^TestFableH5ReproductionImportedKeepoutBecomesCopperZone$' -count=1"
+        "command": "go test ./internal/kicadfiles/pcb -run '^TestFableH5ImportedKeepoutRemainsKeepout$' -count=1"
       },
       "affected_capabilities": ["imported_pcb_mutation", "keepout_preservation", "strict_drc_continuity"],
       "historical_evidence": "not valid for imported rule-area or keepout zones",
-      "current_evidence": "pending Phase 3 preservation guard",
-      "closing_commit": null
+      "current_evidence": "reverified by explicit keepout-permission parsing, keepout rendering, semantic-family comparison, and round-trip proof",
+      "closing_commit": "Guard imported KiCad preservation"
     },
     {
       "id": "H6",

@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 
+	"kicadai/internal/kicadfiles"
 	kicaddesign "kicadai/internal/kicadfiles/design"
 	"kicadai/internal/libraryresolver"
 	"kicadai/internal/preservation"
@@ -493,10 +494,10 @@ func touchesDesign(kind OperationKind) bool {
 }
 
 func hasUnsupportedImportedContent(design kicaddesign.Design) bool {
-	if design.Schematic != nil && len(design.Schematic.RawItems) > 0 {
+	if design.Schematic != nil && kicadfiles.HasUnsupportedPreservation(design.Schematic.Preservation) {
 		return true
 	}
-	if design.PCB != nil && len(design.PCB.Preserved) > 0 {
+	if design.PCB != nil && kicadfiles.HasUnsupportedPreservation(design.PCB.Preservation) {
 		return true
 	}
 	return false
