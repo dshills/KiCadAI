@@ -779,6 +779,7 @@ func validateCapacitorEvidence(path string, generic bool, evidence *CapacitorEvi
 		{path: path + ".dc_bias_review", value: evidence.DCBiasReview, label: "DC-bias review"},
 		{path: path + ".effective_capacitance_review", value: evidence.EffectiveCapacitanceReview, label: "effective-capacitance review"},
 		{path: path + ".esr_review", value: evidence.ESRReview, label: "ESR review"},
+		{path: path + ".voltage_derating_review", value: evidence.VoltageDeratingReview, label: "voltage-derating review"},
 	} {
 		issues = append(issues, validateReviewStatus(status.path, status.value, status.label)...)
 	}
@@ -791,6 +792,10 @@ func validateCapacitorEvidence(path string, generic bool, evidence *CapacitorEvi
 	}
 	if evidence.CapacitanceTolerancePct != nil && (*evidence.CapacitanceTolerancePct <= 0 || *evidence.CapacitanceTolerancePct > 100) {
 		issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, path+".capacitance_tolerance_percent", "capacitance tolerance must be greater than zero and at most 100 percent"))
+	}
+	if evidence.MaximumVoltageUseRatio != nil &&
+		(!finitePositive(*evidence.MaximumVoltageUseRatio) || *evidence.MaximumVoltageUseRatio > 1) {
+		issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, path+".maximum_voltage_use_ratio", "maximum voltage use ratio must be greater than zero and at most one"))
 	}
 	issues = append(issues, validateEvidenceMeasurement(path+".esr", evidence.ESR, evidence.FabricationProof)...)
 	issues = append(issues, validateEvidenceMeasurement(path+".ripple_current", evidence.RippleCurrent, evidence.FabricationProof)...)
@@ -820,6 +825,8 @@ func validateCapacitorEvidence(path string, generic bool, evidence *CapacitorEvi
 			missing bool
 		}{
 			{suffix: "capacitance_tolerance_percent", missing: evidence.CapacitanceTolerancePct == nil},
+			{suffix: "voltage_derating_review", missing: strings.TrimSpace(evidence.VoltageDeratingReview) == ""},
+			{suffix: "maximum_voltage_use_ratio", missing: evidence.MaximumVoltageUseRatio == nil},
 			{suffix: "esr", missing: evidence.ESR == nil},
 			{suffix: "ripple_current", missing: evidence.RippleCurrent == nil},
 			{suffix: "endurance_hours", missing: evidence.EnduranceHours == nil},

@@ -1,9 +1,10 @@
 # Project Status
 
-Last verified: 2026-07-28 by the complete local short suite, the five-case
-open-world installed-KiCad promotion corpus, protected USB-C LED and I2C
-regressions, the ESP32 minimal-system fixture, and independent clean-checkout
-promotion bundles.
+Last verified: 2026-07-28 by the complete local short suite; the three-case MCU
+power-integrity, three-case neutral MCU, two-case clock/programming, and
+four-case power/interface installed-KiCad corpora; protected USB-C LED and I2C,
+ESP32 minimal-system, Class-A, and Class-AB fixture regressions; and independent
+clean-checkout promotion bundles.
 
 The six-circuit independent external review is now a release-blocking,
 machine-readable regression ladder. Its fixes cover atomic composed placement,
@@ -25,6 +26,19 @@ bootloader designs through the full local installed-KiCad lane, while SWD with
 an unpowered target fails closed. See the
 [specification](../specs/behavior-driven-clock-programming/SPEC.md) and
 [completion audit](../specs/behavior-driven-clock-programming/AUDIT.md).
+
+Controller power support is also calculation-backed for the verified
+ATmega328P-A, ESP32-WROOM-32E, and STM32G031K8T6 records. Per-rail evidence
+drives source-drop, brownout, local-noise, and bulk-ripple budgets; capacitor
+selection requires concrete tolerance, effective capacitance, ESR, ripple,
+voltage-derating, temperature, pin-map, package, and fabrication evidence. The
+generator emits one local capacitor per MCU supply domain and one bulk
+capacitor per rail group with finalized calculations and placement bounds.
+Three target-free cases pass the full local installed-KiCad lane, while
+unreviewed transients, exceeded brownout budgets, and unqualified temperatures
+produce stable unsupported results. See the
+[specification](../specs/behavior-driven-mcu-power-integrity/SPEC.md) and
+[completion audit](../specs/behavior-driven-mcu-power-integrity/AUDIT.md).
 
 Every normalized creation request now passes a deterministic capability gate
 before filesystem mutation. Requests are classified as `supported`,

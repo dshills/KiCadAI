@@ -26,6 +26,10 @@ const (
 	CodeMCUPeripheralLoading       reports.Code = "MCU_PERIPHERAL_LOADING_EXCEEDED"
 	CodeMCUClockFrequency          reports.Code = "MCU_CLOCK_FREQUENCY_UNAVAILABLE"
 	CodeMCUProgrammingLoad         reports.Code = "MCU_PROGRAMMING_LOAD_UNSUPPORTED"
+	CodeMCUPowerIntegrityEvidence  reports.Code = "MCU_POWER_INTEGRITY_EVIDENCE_MISSING"
+	CodeMCUPowerIntegrityDomain    reports.Code = "MCU_POWER_INTEGRITY_DOMAIN_UNMAPPED"
+	CodeMCUPowerIntegrityBudget    reports.Code = "MCU_POWER_INTEGRITY_BUDGET_EXCEEDED"
+	CodeMCUDecouplingUnavailable   reports.Code = "MCU_DECOUPLING_CAPACITOR_UNAVAILABLE"
 )
 
 type mcuRoleDemand struct {
@@ -1140,6 +1144,11 @@ func (provider *CatalogProvider) expandMCUSupport(ctx context.Context, request P
 	if clockCalculation.ID != "" {
 		calculations = append(calculations, clockCalculation)
 	}
+	parts, connections, powerCalculations, err := provider.expandMCUPowerIntegrity(ctx, request, parent, parts, connections)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	calculations = append(calculations, powerCalculations...)
 	companions := slices.Clone(parent.record.Companions)
 	slices.SortStableFunc(companions, func(left, right components.CompanionRequirement) int {
 		if order := strings.Compare(left.ID, right.ID); order != 0 {

@@ -23,6 +23,7 @@ type MCUEvidence struct {
 	ClockOptions          []MCUClockOption          `json:"clock_options"`
 	BootConstraints       []MCUBootConstraint       `json:"boot_constraints,omitempty"`
 	CurrentBudget         *MCUCurrentBudget         `json:"current_budget,omitempty"`
+	PowerIntegrity        []MCUPowerIntegrity       `json:"power_integrity,omitempty"`
 	ReviewNote            string                    `json:"review_note"`
 }
 
@@ -102,6 +103,20 @@ type MCUCurrentBudget struct {
 	MaximumSupplyMA       *float64 `json:"maximum_supply_ma,omitempty"`
 }
 
+type MCUPowerIntegrity struct {
+	RailGroup               string               `json:"rail_group"`
+	StartupCurrent          *EvidenceMeasurement `json:"startup_current,omitempty"`
+	TransientCurrentStep    *EvidenceMeasurement `json:"transient_current_step,omitempty"`
+	TransientDuration       *EvidenceMeasurement `json:"transient_duration,omitempty"`
+	LocalTransientDuration  *EvidenceMeasurement `json:"local_transient_duration,omitempty"`
+	MaximumRipple           *EvidenceMeasurement `json:"maximum_ripple,omitempty"`
+	MaximumNoise            *EvidenceMeasurement `json:"maximum_noise,omitempty"`
+	BrownoutThreshold       *EvidenceMeasurement `json:"brownout_threshold,omitempty"`
+	MaximumSourceImpedance  *EvidenceMeasurement `json:"maximum_source_impedance,omitempty"`
+	LocalPlacementMaximumMM *EvidenceMeasurement `json:"local_placement_maximum,omitempty"`
+	BulkPlacementMaximumMM  *EvidenceMeasurement `json:"bulk_placement_maximum,omitempty"`
+}
+
 func sortMCUEvidence(evidence *MCUEvidence) {
 	if evidence == nil {
 		return
@@ -148,6 +163,9 @@ func sortMCUEvidence(evidence *MCUEvidence) {
 			return left.State < right.State
 		}
 		return left.PinFunction < right.PinFunction
+	})
+	sort.SliceStable(evidence.PowerIntegrity, func(i, j int) bool {
+		return evidence.PowerIntegrity[i].RailGroup < evidence.PowerIntegrity[j].RailGroup
 	})
 }
 
@@ -263,6 +281,51 @@ func validateMCUEvidence(path string, record *ComponentRecord) []reports.Issue {
 		issues = append(issues, validateOptionalPositiveMCU(path+".current_budget.maximum_aggregate_ma", evidence.CurrentBudget.MaximumAggregateMA)...)
 		issues = append(issues, validateOptionalPositiveMCU(path+".current_budget.typical_supply_ma", evidence.CurrentBudget.TypicalSupplyMA)...)
 		issues = append(issues, validateOptionalPositiveMCU(path+".current_budget.maximum_supply_ma", evidence.CurrentBudget.MaximumSupplyMA)...)
+	}
+	seenPowerIntegrity := map[string]struct{}{}
+	for i, power := range evidence.PowerIntegrity {
+		powerPath := fmt.Sprintf("%s.power_integrity[%d]", path, i)
+		groupID := strings.TrimSpace(power.RailGroup)
+		if groupID == "" || power.RailGroup != groupID {
+			issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, powerPath+".rail_group", "MCU power-integrity rail group must be present and trimmed"))
+		} else if _, exists := domainGroups[groupID]; !exists {
+			issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, powerPath+".rail_group", "MCU power-integrity evidence references an unknown rail group: "+groupID))
+		} else if _, duplicate := seenPowerIntegrity[groupID]; duplicate {
+			issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, powerPath+".rail_group", "duplicate MCU power-integrity rail group: "+groupID))
+		}
+		seenPowerIntegrity[groupID] = struct{}{}
+		for suffix, measurement := range map[string]struct {
+			value *EvidenceMeasurement
+			unit  string
+		}{
+			"startup_current":          {power.StartupCurrent, "A"},
+			"transient_current_step":   {power.TransientCurrentStep, "A"},
+			"transient_duration":       {power.TransientDuration, "s"},
+			"local_transient_duration": {power.LocalTransientDuration, "s"},
+			"maximum_ripple":           {power.MaximumRipple, "V"},
+			"maximum_noise":            {power.MaximumNoise, "V"},
+			"brownout_threshold":       {power.BrownoutThreshold, "V"},
+			"maximum_source_impedance": {power.MaximumSourceImpedance, "Ohm"},
+			"local_placement_maximum":  {power.LocalPlacementMaximumMM, "mm"},
+			"bulk_placement_maximum":   {power.BulkPlacementMaximumMM, "mm"},
+		} {
+			measurementPath := powerPath + "." + suffix
+			if measurement.value == nil {
+				issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, measurementPath, "MCU power-integrity evidence requires this measurement"))
+				continue
+			}
+			issues = append(issues, validateEvidenceMeasurement(measurementPath, measurement.value, true)...)
+			if measurement.value.Unit != measurement.unit {
+				issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, measurementPath+".unit", "MCU power-integrity evidence requires unit "+measurement.unit))
+			}
+		}
+	}
+	if record.Verification.Confidence == ConfidenceVerified {
+		for groupID := range domainGroups {
+			if _, exists := seenPowerIntegrity[groupID]; !exists {
+				issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, path+".power_integrity", "verified MCU evidence requires power-integrity evidence for rail group "+groupID))
+			}
+		}
 	}
 	seenProgramming := map[string]struct{}{}
 	for i, programming := range evidence.ProgrammingInterfaces {

@@ -1730,6 +1730,16 @@ func TestValidateCatalogCapacitorEvidenceRejectsMalformedMetadata(t *testing.T) 
 			path: "records[0].capacitor_evidence.voltage_rating",
 		},
 		{
+			name: "invalid maximum voltage use ratio",
+			mutate: func(record *ComponentRecord) {
+				ratio := 1.1
+				record.Capacitor = &CapacitorEvidence{
+					MaximumVoltageUseRatio: &ratio,
+				}
+			},
+			path: "records[0].capacitor_evidence.maximum_voltage_use_ratio",
+		},
+		{
 			name: "generic fabrication proof",
 			mutate: func(record *ComponentRecord) {
 				record.Capacitor = &CapacitorEvidence{

@@ -110,6 +110,26 @@ func TestEnsureRouteLayerJunctionViasCompletesSameNetLayerTransition(t *testing.
 	}
 }
 
+func TestEnsureRouteLayerJunctionViasRejectsDisallowedTransition(t *testing.T) {
+	operations := []transactions.Operation{
+		mustRouteOperation(t, transactions.RouteOperation{
+			NetName: "SIG", Layer: "F.Cu", WidthMM: 0.25,
+			Points: []transactions.Point{{XMM: 1, YMM: 2}, {XMM: 4, YMM: 2}},
+		}),
+		mustRouteOperation(t, transactions.RouteOperation{
+			NetName: "SIG", Layer: "B.Cu", WidthMM: 0.25,
+			Points: []transactions.Point{{XMM: 4, YMM: 2}, {XMM: 7, YMM: 2}},
+		}),
+	}
+	deny := false
+	repaired, added, issues := ensureRouteLayerJunctionVias(operations, routing.Rules{
+		AllowVias: &deny, ViaDiameterMM: 0.6, ViaDrillMM: 0.3,
+	})
+	if added != 0 || !reflect.DeepEqual(repaired, operations) || len(issues) != 1 || issues[0].Code != reports.CodeRouteContactLayerMismatch || !issues[0].Blocking() {
+		t.Fatalf("disallowed junction result: added=%d issues=%#v repaired=%#v", added, issues, repaired)
+	}
+}
+
 func TestEnsureRouteLayerJunctionViasMergesNearbySameNetTransition(t *testing.T) {
 	existingVia := transactions.Point{XMM: 4.25, YMM: 2}
 	junction := transactions.Point{XMM: 4, YMM: 2}
@@ -294,16 +314,26 @@ func TestRepairEmittedRoutePhysicalClearanceDetoursCrossPhaseCopperAndForeignPad
 
 func TestDeferPhysicalClearanceIssuesOnlyWhenStrictDRCIsRequired(t *testing.T) {
 	input := []reports.Issue{{Code: reports.CodeValidationFailed, Severity: reports.SeverityBlocked, Message: "conservative clearance"}}
-	offline, count := deferPhysicalClearanceIssuesToRequiredDRC(false, input)
+	offline, count := deferPhysicalClearanceIssuesToRequiredDRC(false, false, input)
 	if count != 0 || !reports.HasBlockingIssue(offline) {
 		t.Fatalf("offline issues = %#v count=%d, want blocking", offline, count)
 	}
-	external, count := deferPhysicalClearanceIssuesToRequiredDRC(true, input)
+	external, count := deferPhysicalClearanceIssuesToRequiredDRC(true, false, input)
 	if count != 1 || len(external) != 0 {
 		t.Fatalf("external issues = %#v count=%d, want one finding delegated only to DRC evidence", external, count)
 	}
 	if input[0].Severity != reports.SeverityBlocked {
 		t.Fatalf("input mutated: %#v", input)
+	}
+
+	conflict := []reports.Issue{{Code: reports.CodeRouteCopperConflict, Severity: reports.SeverityBlocked, Message: "crossing"}}
+	delegated, count := deferPhysicalClearanceIssuesToRequiredDRC(true, false, conflict)
+	if count != 1 || len(delegated) != 0 {
+		t.Fatalf("ordinary strict-DRC conflict = %#v count=%d, want delegated", delegated, count)
+	}
+	retained, count := deferPhysicalClearanceIssuesToRequiredDRC(true, true, conflict)
+	if count != 0 || !reports.HasBlockingIssue(retained) {
+		t.Fatalf("correction-enabled conflict = %#v count=%d, want retained blocker", retained, count)
 	}
 }
 

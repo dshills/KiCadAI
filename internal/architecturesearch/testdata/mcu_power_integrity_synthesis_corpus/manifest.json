@@ -1,0 +1,52 @@
+{
+  "schema": "kicadai.mcu-power-integrity-synthesis-corpus.v1",
+  "version": 1,
+  "base_commit": "6aa9606e3fcd3b224debae299164bfd4d810fb23",
+  "authoring_policy": "Behavior-level requirements only; no fixture identities, selected part IDs, capacitor values, placement coordinates, topology shortcuts, or catalog-specific constraints.",
+  "cases": [
+    {
+      "id": "atmega_mixed_domain_transient",
+      "file": "atmega_mixed_domain_transient.json",
+      "sha256": "48af392e4dc008b65082438ac7c705cd3e706a3ea2d2efc0a467e9b95328fe46",
+      "features": ["atmega328p", "multi_domain_local", "shared_bulk", "temperature_qualification"],
+      "expected_status": "selected"
+    },
+    {
+      "id": "esp32_wireless_transient",
+      "file": "esp32_wireless_transient.json",
+      "sha256": "91d13d3fe5016064aff2db936fa7e4caed5d3388d283534678016d2d4e472be7",
+      "features": ["esp32", "startup_source_drop", "high_current_transient", "bulk_energy"],
+      "expected_status": "selected"
+    },
+    {
+      "id": "stm32_debug_transient",
+      "file": "stm32_debug_transient.json",
+      "sha256": "7c1bc7a689410d1e0073bca9fb2142935c4d5dc7067a7da56299d34e4d62e327",
+      "features": ["stm32g031", "swd", "local_noise", "brownout_budget"],
+      "expected_status": "selected"
+    }
+  ],
+  "adversarial_mutations": [
+    {
+      "id": "unreviewed_transient",
+      "base_case": "stm32_debug_transient.json",
+      "constraint": "mcu_transient_current_step",
+      "value": 0.5,
+      "expected_rejection": "MCU_POWER_INTEGRITY_EVIDENCE_MISSING"
+    },
+    {
+      "id": "brownout_budget_exceeded",
+      "base_case": "stm32_debug_transient.json",
+      "constraint": "mcu_brownout_voltage",
+      "value": 3.3,
+      "expected_rejection": "MCU_POWER_INTEGRITY_BUDGET_EXCEEDED"
+    },
+    {
+      "id": "temperature_unqualified",
+      "base_case": "stm32_debug_transient.json",
+      "constraint": "ambient_temperature_maximum",
+      "value": 125,
+      "expected_rejection": "MCU_DECOUPLING_CAPACITOR_UNAVAILABLE"
+    }
+  ]
+}

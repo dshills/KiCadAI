@@ -14,6 +14,7 @@ import (
 	"kicadai/internal/placement"
 	"kicadai/internal/reports"
 	"kicadai/internal/routing"
+	"kicadai/internal/transactions"
 )
 
 const AutonomousCorrectionSchemaV1 = "kicadai.autonomous-correction.v1"
@@ -30,6 +31,7 @@ const (
 	CorrectionSameNetBranchMerge              AutonomousCorrectionCategory = "same_net_branch_merge"
 	CorrectionRequiredNetDisconnectedEndpoint AutonomousCorrectionCategory = "required_net_disconnected_endpoint"
 	CorrectionRoutingRegionExhaustion         AutonomousCorrectionCategory = "routing_region_exhaustion"
+	CorrectionForeignNetCrossing              AutonomousCorrectionCategory = "foreign_net_crossing"
 	CorrectionUnsupportedGeometry             AutonomousCorrectionCategory = "unsupported_geometry"
 )
 
@@ -43,6 +45,9 @@ type AutonomousCorrectionDiagnostic struct {
 	Path              string                       `json:"path,omitempty"`
 	Refs              []string                     `json:"refs,omitempty"`
 	Nets              []string                     `json:"nets,omitempty"`
+	OperationIDs      []string                     `json:"operation_ids,omitempty"`
+	OperationIndexes  []int                        `json:"operation_indexes,omitempty"`
+	OperationScope    string                       `json:"operation_scope,omitempty"`
 	Evidence          []string                     `json:"evidence,omitempty"`
 	AutomaticAction   bool                         `json:"automatic_action"`
 	UnsupportedReason string                       `json:"unsupported_reason,omitempty"`
@@ -56,18 +61,21 @@ const (
 	CorrectionActionImproveEndpointFanout    AutonomousCorrectionActionKind = "improve_endpoint_fanout"
 	CorrectionActionReduceEndpointDistance   AutonomousCorrectionActionKind = "reduce_endpoint_distance"
 	CorrectionActionRebuildRouteTree         AutonomousCorrectionActionKind = "rebuild_route_tree"
+	CorrectionActionRerouteAffectedNets      AutonomousCorrectionActionKind = "reroute_affected_nets"
 	CorrectionActionReorderRouteTreeBranches AutonomousCorrectionActionKind = "reorder_route_tree_branches"
 	CorrectionActionInsertLayerTransition    AutonomousCorrectionActionKind = "insert_layer_transition"
 )
 
 type AutonomousCorrectionAction struct {
-	Kind          AutonomousCorrectionActionKind `json:"kind"`
-	Category      AutonomousCorrectionCategory   `json:"category"`
-	Refs          []string                       `json:"refs,omitempty"`
-	Nets          []string                       `json:"nets,omitempty"`
-	PlacementHint PlacementRetryHintCategory     `json:"placement_hint,omitempty"`
-	Authorized    bool                           `json:"authorized"`
-	Reason        string                         `json:"reason,omitempty"`
+	Kind             AutonomousCorrectionActionKind `json:"kind"`
+	Category         AutonomousCorrectionCategory   `json:"category"`
+	Refs             []string                       `json:"refs,omitempty"`
+	Nets             []string                       `json:"nets,omitempty"`
+	OperationIDs     []string                       `json:"operation_ids,omitempty"`
+	OperationIndexes []int                          `json:"operation_indexes,omitempty"`
+	PlacementHint    PlacementRetryHintCategory     `json:"placement_hint,omitempty"`
+	Authorized       bool                           `json:"authorized"`
+	Reason           string                         `json:"reason,omitempty"`
 }
 
 type AutonomousCorrectionPlan struct {
@@ -77,6 +85,7 @@ type AutonomousCorrectionPlan struct {
 	RetryKey             string                           `json:"retry_key,omitempty"`
 	InvariantFingerprint string                           `json:"invariant_fingerprint,omitempty"`
 	PlacementStateHash   string                           `json:"placement_state_hash,omitempty"`
+	RouteStateHash       string                           `json:"route_state_hash,omitempty"`
 	Diagnostics          []AutonomousCorrectionDiagnostic `json:"diagnostics,omitempty"`
 	Actions              []AutonomousCorrectionAction     `json:"actions,omitempty"`
 	Authorized           bool                             `json:"authorized"`
@@ -87,6 +96,7 @@ type AutonomousCorrectionPlanOptions struct {
 	Attempt          int
 	MaxAttempts      int
 	AppliedRetryKeys []string
+	RouteOperations  []transactions.Operation
 }
 
 type AutonomousCorrectionApplication struct {
@@ -97,6 +107,13 @@ type AutonomousCorrectionApplication struct {
 	InvariantFingerprintAfter    string                   `json:"invariant_fingerprint_after,omitempty"`
 	PlacementInvariantBefore     string                   `json:"placement_invariant_before,omitempty"`
 	PlacementInvariantAfter      string                   `json:"placement_invariant_after,omitempty"`
+	RouteStateHashBefore         string                   `json:"route_state_hash_before,omitempty"`
+	RouteStateHashAfter          string                   `json:"route_state_hash_after,omitempty"`
+	RoutePreservationBefore      string                   `json:"route_preservation_before,omitempty"`
+	RoutePreservationAfter       string                   `json:"route_preservation_after,omitempty"`
+	AffectedNets                 []string                 `json:"affected_nets,omitempty"`
+	ReplacedOperationCount       int                      `json:"replaced_operation_count,omitempty"`
+	PreservedOperationCount      int                      `json:"preserved_operation_count,omitempty"`
 	Adjustment                   PlacementRetryAdjustment `json:"adjustment,omitempty"`
 	ValidationIssues             []reports.Issue          `json:"validation_issues,omitempty"`
 	ProtectedInvariantsPreserved bool                     `json:"protected_invariants_preserved"`
@@ -138,24 +155,26 @@ type AutonomousCorrectionReport struct {
 }
 
 const (
-	CorrectionStopNotGeneric                = "not_generic_circuit"
-	CorrectionStopNotRequired               = "correction_not_required"
-	CorrectionStopBudgetExhausted           = "budget_exhausted"
-	CorrectionStopUnsupportedDiagnostic     = "unsupported_diagnostic"
-	CorrectionStopAmbiguousDiagnostics      = "ambiguous_diagnostics"
-	CorrectionStopFixedConstraintConflict   = "fixed_constraint_conflict"
-	CorrectionStopRepeatedRetryKey          = "repeated_retry_key"
-	CorrectionStopPlanNotAuthorized         = "plan_not_authorized"
-	CorrectionStopInvariantMismatch         = "invariant_mismatch"
-	CorrectionStopNoSafeAdjustment          = "no_safe_adjustment"
-	CorrectionStopAdjustedRequestInvalid    = "adjusted_request_invalid"
-	CorrectionStopContextCanceled           = "context_canceled"
-	CorrectionStopRepeatedPlacementState    = "repeated_placement_state"
-	CorrectionStopNonImprovingRetry         = "non_improving_retry"
-	CorrectionStopMaxAttempts               = "max_attempts"
-	CorrectionStopRouted                    = "routed"
-	CorrectionStopDRCRegression             = "drc_regression"
-	CorrectionStopBoardValidationRegression = "board_validation_regression"
+	CorrectionStopNotGeneric                  = "not_generic_circuit"
+	CorrectionStopNotRequired                 = "correction_not_required"
+	CorrectionStopBudgetExhausted             = "budget_exhausted"
+	CorrectionStopUnsupportedDiagnostic       = "unsupported_diagnostic"
+	CorrectionStopAmbiguousDiagnostics        = "ambiguous_diagnostics"
+	CorrectionStopFixedConstraintConflict     = "fixed_constraint_conflict"
+	CorrectionStopRepeatedRetryKey            = "repeated_retry_key"
+	CorrectionStopPlanNotAuthorized           = "plan_not_authorized"
+	CorrectionStopInvariantMismatch           = "invariant_mismatch"
+	CorrectionStopNoSafeAdjustment            = "no_safe_adjustment"
+	CorrectionStopAdjustedRequestInvalid      = "adjusted_request_invalid"
+	CorrectionStopContextCanceled             = "context_canceled"
+	CorrectionStopRepeatedPlacementState      = "repeated_placement_state"
+	CorrectionStopNonImprovingRetry           = "non_improving_retry"
+	CorrectionStopRouteOperationScopeMismatch = "route_operation_scope_mismatch"
+	CorrectionStopRouteReplacementInvalid     = "route_replacement_invalid"
+	CorrectionStopMaxAttempts                 = "max_attempts"
+	CorrectionStopRouted                      = "routed"
+	CorrectionStopDRCRegression               = "drc_regression"
+	CorrectionStopBoardValidationRegression   = "board_validation_regression"
 )
 
 // PlanAutonomousCorrection is pure: it derives an authorized plan without
@@ -185,6 +204,9 @@ func PlanAutonomousCorrection(request Request, placementRequest placement.Reques
 	}
 	plan.InvariantFingerprint = fingerprint
 	plan.PlacementStateHash = placementStateHash(placements)
+	if len(opts.RouteOperations) != 0 {
+		plan.RouteStateHash = autonomousCorrectionRouteStateHash(opts.RouteOperations)
+	}
 	blocking := blockingAutonomousCorrectionDiagnostics(plan.Diagnostics)
 	if len(blocking) == 0 {
 		plan.StopReason = CorrectionStopNotRequired
@@ -211,6 +233,10 @@ func PlanAutonomousCorrection(request Request, placementRequest placement.Reques
 	}
 	if autonomousCorrectionActionsFixed(placementRequest.Components, plan.Actions) {
 		plan.StopReason = CorrectionStopFixedConstraintConflict
+		return plan, nil
+	}
+	if autonomousCorrectionHasRoutingActions(plan.Actions) && !autonomousCorrectionRoutingScopeMatches(plan.Actions, opts.RouteOperations) {
+		plan.StopReason = CorrectionStopRouteOperationScopeMismatch
 		return plan, nil
 	}
 	actionKinds := make([]string, 0, len(plan.Actions))
@@ -294,9 +320,11 @@ func autonomousCorrectionActionsForDiagnostic(diagnostic AutonomousCorrectionDia
 
 func autonomousCorrectionActionForDiagnostic(diagnostic AutonomousCorrectionDiagnostic) AutonomousCorrectionAction {
 	action := AutonomousCorrectionAction{
-		Category: diagnostic.Category,
-		Refs:     slices.Clone(diagnostic.Refs),
-		Nets:     slices.Clone(diagnostic.Nets),
+		Category:         diagnostic.Category,
+		Refs:             slices.Clone(diagnostic.Refs),
+		Nets:             slices.Clone(diagnostic.Nets),
+		OperationIDs:     slices.Clone(diagnostic.OperationIDs),
+		OperationIndexes: slices.Clone(diagnostic.OperationIndexes),
 	}
 	switch diagnostic.Category {
 	case CorrectionComponentOverlap:
@@ -323,9 +351,11 @@ func autonomousCorrectionActionForDiagnostic(diagnostic AutonomousCorrectionDiag
 			action.Kind, action.PlacementHint, action.Authorized = CorrectionActionAdjustRelativeSpacing, PlacementRetryIncreaseSpacing, true
 		}
 	case CorrectionRouteTreeBranchOrder:
-		action.Kind, action.Reason = CorrectionActionReorderRouteTreeBranches, "route-tree branch reordering is reserved for a future correction contract"
+		action.Kind, action.Authorized, action.Reason = CorrectionActionReorderRouteTreeBranches, true, "rebuild the affected route tree with deterministic alternate branch order"
 	case CorrectionMissingLayerTransition:
-		action.Kind, action.Reason = CorrectionActionInsertLayerTransition, "layer-transition insertion is not authorized in v1"
+		action.Kind, action.Authorized, action.Reason = CorrectionActionInsertLayerTransition, true, "insert a legal same-net transition or selectively rebuild the affected net"
+	case CorrectionForeignNetCrossing:
+		action.Kind, action.Authorized, action.Reason = CorrectionActionRerouteAffectedNets, true, "selectively rebuild only the operation-correlated conflicting nets"
 	default:
 		action.Reason = "no deterministic correction is authorized for this geometry"
 	}
@@ -338,6 +368,9 @@ func normalizeAutonomousCorrectionActions(actions []AutonomousCorrectionAction) 
 	for _, action := range actions {
 		action.Refs = correctionSortedStrings(action.Refs)
 		action.Nets = correctionSortedStrings(action.Nets)
+		action.OperationIDs = correctionSortedStrings(action.OperationIDs)
+		slices.Sort(action.OperationIndexes)
+		action.OperationIndexes = slices.Compact(action.OperationIndexes)
 		key := autonomousCorrectionActionKey(action)
 		if _, exists := seen[key]; exists {
 			continue
@@ -355,7 +388,13 @@ func normalizeAutonomousCorrectionActions(actions []AutonomousCorrectionAction) 
 		if value := slices.Compare(left.Refs, right.Refs); value != 0 {
 			return value
 		}
-		return slices.Compare(left.Nets, right.Nets)
+		if value := slices.Compare(left.Nets, right.Nets); value != 0 {
+			return value
+		}
+		if value := slices.Compare(left.OperationIDs, right.OperationIDs); value != 0 {
+			return value
+		}
+		return slices.Compare(left.OperationIndexes, right.OperationIndexes)
 	})
 	return result
 }
@@ -372,6 +411,12 @@ func autonomousCorrectionActionKey(action AutonomousCorrectionAction) string {
 	writeHashBytes(hash, []byte("nets:"+strconv.Itoa(len(action.Nets))))
 	for _, net := range action.Nets {
 		writeHashBytes(hash, []byte(net))
+	}
+	for _, operationID := range action.OperationIDs {
+		writeHashBytes(hash, []byte(operationID))
+	}
+	for _, operationIndex := range action.OperationIndexes {
+		writeHashBytes(hash, []byte(strconv.Itoa(operationIndex)))
 	}
 	return hex.EncodeToString(hash.Sum(nil))
 }
@@ -403,7 +448,7 @@ func autonomousCorrectionActionsFixed(components []placement.Component, actions 
 		return true
 	}
 	for _, action := range actions {
-		if action.Kind == CorrectionActionRebuildRouteTree {
+		if autonomousCorrectionRoutingAction(action.Kind) {
 			continue
 		}
 		if len(action.Refs) == 0 {
@@ -709,19 +754,31 @@ func AutonomousCorrectionEvidence(request Request, workflow WorkflowResult) (Aut
 // stable correction taxonomy. Messages and suggestions are intentionally not
 // copied because provider or external-tool text is not correction evidence.
 func BuildAutonomousCorrectionDiagnostics(placementIssues, routingIssues []reports.Issue) []AutonomousCorrectionDiagnostic {
+	return buildAutonomousCorrectionDiagnostics(placementIssues, routingIssues, nil)
+}
+
+// BuildAutonomousCorrectionDiagnosticsForRouting correlates routing failures
+// with the current generated route-operation slice. The correlation is
+// recomputed for every attempt so persisted indexes never authorize mutation
+// of a later routing result.
+func BuildAutonomousCorrectionDiagnosticsForRouting(placementIssues []reports.Issue, routed RoutingStageResult) []AutonomousCorrectionDiagnostic {
+	return buildAutonomousCorrectionDiagnostics(placementIssues, routed.Stage.Issues, autonomousCorrectionRouteOperationTraces(routed.Operations))
+}
+
+func buildAutonomousCorrectionDiagnostics(placementIssues, routingIssues []reports.Issue, routeTraces []autonomousCorrectionRouteOperationTrace) []AutonomousCorrectionDiagnostic {
 	diagnostics := make([]AutonomousCorrectionDiagnostic, 0, len(placementIssues)+len(routingIssues))
 	for _, issue := range placementIssues {
-		diagnostics = append(diagnostics, autonomousCorrectionDiagnostic("placement", issue))
+		diagnostics = append(diagnostics, autonomousCorrectionDiagnostic("placement", issue, nil))
 	}
 	for _, issue := range routingIssues {
-		diagnostics = append(diagnostics, autonomousCorrectionDiagnostic("routing", issue))
+		diagnostics = append(diagnostics, autonomousCorrectionDiagnostic("routing", issue, routeTraces))
 	}
 	diagnostics = dedupeAutonomousCorrectionDiagnostics(diagnostics)
 	slices.SortFunc(diagnostics, compareAutonomousCorrectionDiagnostic)
 	return diagnostics
 }
 
-func autonomousCorrectionDiagnostic(source string, issue reports.Issue) AutonomousCorrectionDiagnostic {
+func autonomousCorrectionDiagnostic(source string, issue reports.Issue, routeTraces []autonomousCorrectionRouteOperationTrace) AutonomousCorrectionDiagnostic {
 	sourceDiagnostic := routing.DiagnosticForIssue(issue)
 	category := autonomousCorrectionCategory(issue, sourceDiagnostic)
 	diagnostic := AutonomousCorrectionDiagnostic{
@@ -736,6 +793,15 @@ func autonomousCorrectionDiagnostic(source string, issue reports.Issue) Autonomo
 		Nets:           correctionSortedStrings(issue.Nets),
 		Evidence:       autonomousCorrectionEvidence(issue, sourceDiagnostic),
 	}
+	if source == "routing" && len(routeTraces) != 0 {
+		diagnostic.OperationIDs, diagnostic.OperationIndexes, diagnostic.OperationScope = correlateAutonomousCorrectionRouteOperations(issue, routeTraces)
+		diagnostic.Nets = correctionSortedStrings(append(diagnostic.Nets, correctionTraceNetsForIndexes(diagnostic.OperationIndexes, routeTraces)...))
+		if len(issue.Nets) == 0 && len(diagnostic.Nets) != 0 {
+			scopedIssue := issue
+			scopedIssue.Nets = slices.Clone(diagnostic.Nets)
+			diagnostic.OperationIDs, diagnostic.OperationIndexes, diagnostic.OperationScope = correlateAutonomousCorrectionRouteOperations(scopedIssue, routeTraces)
+		}
+	}
 	diagnostic.AutomaticAction, diagnostic.UnsupportedReason = autonomousCorrectionSupport(diagnostic)
 	return diagnostic
 }
@@ -748,6 +814,8 @@ func autonomousCorrectionCategory(issue reports.Issue, diagnostic routing.Repair
 		return CorrectionBlockedEscapeDirection
 	case reports.CodeRouteContactLayerMismatch:
 		return CorrectionMissingLayerTransition
+	case reports.CodeRouteCopperConflict:
+		return CorrectionForeignNetCrossing
 	case reports.CodeRouteContactAmbiguous, reports.CodeRouteContactUnsupported:
 		return CorrectionUnsupportedGeometry
 	case reports.CodeRouteGraphIncomplete:
@@ -765,7 +833,12 @@ func autonomousCorrectionCategory(issue reports.Issue, diagnostic routing.Repair
 		return CorrectionBlockedEscapeDirection
 	case routing.RepairLayerAccess, routing.RepairViaPolicy:
 		return CorrectionMissingLayerTransition
-	case routing.RepairRouteSearch, routing.RepairClearance, routing.RepairLengthPolicy:
+	case routing.RepairClearance:
+		if len(correctionSortedStrings(issue.Nets)) >= 2 {
+			return CorrectionForeignNetCrossing
+		}
+		return CorrectionRoutingRegionExhaustion
+	case routing.RepairRouteSearch, routing.RepairLengthPolicy:
 		return CorrectionRoutingRegionExhaustion
 	case routing.RepairConnectivity:
 		return CorrectionRequiredNetDisconnectedEndpoint
@@ -792,9 +865,20 @@ func autonomousCorrectionSupport(diagnostic AutonomousCorrectionDiagnostic) (boo
 		}
 		return false, "disconnected endpoint correction requires an unambiguous source category, net, and endpoint refs"
 	case CorrectionRouteTreeBranchOrder:
-		return false, "route-tree branch reordering is reserved for a future correction contract"
+		if autonomousCorrectionDiagnosticHasRoutingScope(diagnostic) {
+			return true, ""
+		}
+		return false, "route-tree branch reordering requires operation-correlated affected nets"
 	case CorrectionMissingLayerTransition:
-		return false, "layer-transition insertion and relocation are not authorized in v1"
+		if autonomousCorrectionDiagnosticHasRoutingScope(diagnostic) {
+			return true, ""
+		}
+		return false, "layer-transition correction requires operation-correlated affected nets"
+	case CorrectionForeignNetCrossing:
+		if len(diagnostic.Nets) >= 2 && autonomousCorrectionDiagnosticHasRoutingScope(diagnostic) {
+			return true, ""
+		}
+		return false, "foreign-net crossing repair requires two operation-correlated affected nets"
 	default:
 		return false, "no deterministic correction is authorized for this geometry"
 	}
@@ -880,6 +964,15 @@ func autonomousCorrectionDiagnosticKey(diagnostic AutonomousCorrectionDiagnostic
 	for _, net := range diagnostic.Nets {
 		writeHashBytes(hash, []byte(net))
 	}
+	writeHashBytes(hash, []byte("operation_ids:"+strconv.Itoa(len(diagnostic.OperationIDs))))
+	for _, operationID := range diagnostic.OperationIDs {
+		writeHashBytes(hash, []byte(operationID))
+	}
+	writeHashBytes(hash, []byte("operation_indexes:"+strconv.Itoa(len(diagnostic.OperationIndexes))))
+	for _, operationIndex := range diagnostic.OperationIndexes {
+		writeHashBytes(hash, []byte(strconv.Itoa(operationIndex)))
+	}
+	writeHashBytes(hash, []byte(diagnostic.OperationScope))
 	return hex.EncodeToString(hash.Sum(nil))
 }
 
@@ -905,7 +998,16 @@ func compareAutonomousCorrectionDiagnostic(left, right AutonomousCorrectionDiagn
 	if value := slices.Compare(left.Refs, right.Refs); value != 0 {
 		return value
 	}
-	return slices.Compare(left.Nets, right.Nets)
+	if value := slices.Compare(left.Nets, right.Nets); value != 0 {
+		return value
+	}
+	if value := slices.Compare(left.OperationIDs, right.OperationIDs); value != 0 {
+		return value
+	}
+	if value := slices.Compare(left.OperationIndexes, right.OperationIndexes); value != 0 {
+		return value
+	}
+	return cmp.Compare(left.OperationScope, right.OperationScope)
 }
 
 type autonomousCorrectionClosedLoopBinding struct {
@@ -1005,6 +1107,15 @@ func AutonomousCorrectionRetryKey(diagnostics []AutonomousCorrectionDiagnostic, 
 		for _, net := range diagnostic.Nets {
 			writeHashBytes(hash, []byte("net:"+net))
 		}
+		writeHashBytes(hash, []byte("operation_ids:"+strconv.Itoa(len(diagnostic.OperationIDs))))
+		for _, operationID := range diagnostic.OperationIDs {
+			writeHashBytes(hash, []byte("operation_id:"+operationID))
+		}
+		writeHashBytes(hash, []byte("operation_indexes:"+strconv.Itoa(len(diagnostic.OperationIndexes))))
+		for _, operationIndex := range diagnostic.OperationIndexes {
+			writeHashBytes(hash, []byte("operation_index:"+strconv.Itoa(operationIndex)))
+		}
+		writeHashBytes(hash, []byte("operation_scope:"+diagnostic.OperationScope))
 	}
 	writeHashBytes(hash, []byte("actions:"+strconv.Itoa(len(actionKinds))))
 	for _, action := range actionKinds {

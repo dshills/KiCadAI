@@ -45,6 +45,7 @@ const (
 	CodeRouteContactUnsupported   Code = "ROUTE_CONTACT_UNSUPPORTED_GEOMETRY"
 	CodeRouteGraphIncomplete      Code = "ROUTE_GRAPH_INCOMPLETE"
 	CodeRouteCompletionPartial    Code = "ROUTE_COMPLETION_PARTIAL"
+	CodeRouteCopperConflict       Code = "ROUTE_COPPER_CONFLICT"
 	CodeFixedNetSkipped           Code = "FIXED_NET_SKIPPED"
 	CodeMissingNetClass           Code = "MISSING_NET_CLASS"
 	CodeAIProviderConfiguration   Code = "AI_PROVIDER_CONFIGURATION"

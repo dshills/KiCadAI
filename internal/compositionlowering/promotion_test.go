@@ -329,6 +329,30 @@ func TestClockProgrammingSynthesisCorpusOptionalKiCadPromotion(t *testing.T) {
 	runFrozenPromotionAt(t, corpusRoot, count, "KICADAI_CLOCK_PROGRAMMING_ARTIFACT_DIR", cli, index)
 }
 
+func TestMCUPowerIntegritySynthesisCorpusPassesOfflineWorkflow(t *testing.T) {
+	requireLongPromotionTest(t)
+	corpusRoot, count := mcuPowerIntegritySupportedCorpus(t)
+	runFrozenPromotionAt(t, corpusRoot, count, "KICADAI_MCU_POWER_INTEGRITY_ARTIFACT_DIR", "", libraryresolver.LibraryIndex{})
+}
+
+func TestMCUPowerIntegritySynthesisCorpusOptionalKiCadPromotion(t *testing.T) {
+	requireLongPromotionTest(t)
+	cli := os.Getenv("KICADAI_KICAD_CLI")
+	if cli == "" {
+		t.Skip("set KICADAI_KICAD_CLI to run the KiCad-backed MCU power-integrity synthesis corpus")
+	}
+	roots, rootIssues := libraryresolver.ResolveRoots()
+	if roots.SymbolsRoot == "" || roots.FootprintsRoot == "" {
+		t.Skipf("installed KiCad libraries are required: %#v", rootIssues)
+	}
+	index, loadIssues := libraryresolver.Load(context.Background(), roots, libraryresolver.LoadOptions{})
+	if len(index.Symbols) == 0 || len(index.Footprints) == 0 {
+		t.Fatalf("installed library index is empty: %#v", loadIssues)
+	}
+	corpusRoot, count := mcuPowerIntegritySupportedCorpus(t)
+	runFrozenPromotionAt(t, corpusRoot, count, "KICADAI_MCU_POWER_INTEGRITY_ARTIFACT_DIR", cli, index)
+}
+
 func TestFrozenBehavioralIntentHeldOutReadyCorpusPassesOfflineWorkflow(t *testing.T) {
 	requireLongPromotionTest(t)
 	corpusRoot, count := behavioralIntentHeldOutReadyCorpus(t)
@@ -423,6 +447,44 @@ func clockProgrammingSupportedCorpus(t *testing.T) (string, int) {
 	}
 	if count == 0 {
 		t.Fatal("clock/programming synthesis corpus has no supported fixtures")
+	}
+	return root, count
+}
+
+func mcuPowerIntegritySupportedCorpus(t *testing.T) (string, int) {
+	t.Helper()
+	type manifestCase struct {
+		File           string `json:"file"`
+		ExpectedStatus string `json:"expected_status"`
+	}
+	var manifest struct {
+		Cases []manifestCase `json:"cases"`
+	}
+	sourceRoot := filepath.Join("..", "architecturesearch", "testdata", "mcu_power_integrity_synthesis_corpus")
+	data, err := os.ReadFile(filepath.Join(sourceRoot, "manifest.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := json.Unmarshal(data, &manifest); err != nil {
+		t.Fatal(err)
+	}
+	root := t.TempDir()
+	count := 0
+	for _, fixture := range manifest.Cases {
+		if fixture.ExpectedStatus != string(architecturesearch.SearchSelected) {
+			continue
+		}
+		body, err := os.ReadFile(filepath.Join(sourceRoot, fixture.File))
+		if err != nil {
+			t.Fatalf("read MCU power-integrity requirement %s: %v", fixture.File, err)
+		}
+		if err := os.WriteFile(filepath.Join(root, filepath.Base(fixture.File)), body, 0o644); err != nil {
+			t.Fatal(err)
+		}
+		count++
+	}
+	if count == 0 {
+		t.Fatal("MCU power-integrity synthesis corpus has no supported fixtures")
 	}
 	return root, count
 }

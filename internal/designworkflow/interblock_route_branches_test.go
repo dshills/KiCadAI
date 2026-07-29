@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"math"
+	"slices"
 	"strings"
 	"testing"
 
@@ -455,6 +456,27 @@ func TestRouteTreeBranchesWithFailuresFirstPreservesRelativeOrder(t *testing.T) 
 	}
 }
 
+func TestRouteTreeBranchesCanonicalEndpointOrderIsIdentityNeutral(t *testing.T) {
+	branches := []InterBlockRouteTreeBranch{
+		{Index: 7, StartEndpointID: "zeta", EndEndpointID: "beta"},
+		{Index: 4, StartEndpointID: "alpha", EndEndpointID: "gamma"},
+		{Index: 2, StartEndpointID: "beta", EndEndpointID: "alpha"},
+		{Index: 1, StartEndpointID: "alpha", EndEndpointID: "beta"},
+	}
+	original := slices.Clone(branches)
+	ordered := routeTreeBranchesCanonicalEndpointOrder(branches)
+	got := make([]int, len(ordered))
+	for index, branch := range ordered {
+		got[index] = branch.Index
+	}
+	if want := []int{1, 2, 4, 7}; !slices.Equal(got, want) {
+		t.Fatalf("canonical endpoint order = %#v, want %#v", got, want)
+	}
+	if !slices.Equal(branches, original) {
+		t.Fatal("canonical ordering mutated input branches")
+	}
+}
+
 func TestRouteInterBlockTreeBranchesDoesNotEmitCopperForFailedBranch(t *testing.T) {
 	group := routeTreeTestGroup("SIG",
 		InterBlockRouteEndpoint{Ref: "J1", Pin: "1"},
@@ -483,6 +505,36 @@ func TestRouteInterBlockTreeBranchesDoesNotEmitCopperForFailedBranch(t *testing.
 	}
 	if len(result.Operations) != 0 || len(result.ExistingCopper) != 0 {
 		t.Fatalf("operations=%#v existing=%#v, want no failed partial copper", result.Operations, result.ExistingCopper)
+	}
+	if result.OrderAttempts != 1 {
+		t.Fatalf("order attempts = %d, want duplicate one-branch retry orders suppressed", result.OrderAttempts)
+	}
+	if want := []int{0}; !slices.Equal(result.SelectedOrder, want) {
+		t.Fatalf("selected order = %#v, want %#v", result.SelectedOrder, want)
+	}
+}
+
+func TestInterBlockBranchRoutingResultBetterPrefersRecoveredTree(t *testing.T) {
+	blocked := InterBlockBranchRoutingResult{
+		SelectedOrder: []int{8, 3},
+		Branches: []InterBlockBranchRoutingEvidence{
+			{BranchIndex: 8, Status: routing.StatusRouted},
+			{BranchIndex: 3, Status: routing.StatusBlocked},
+		},
+		Issues: []reports.Issue{{Severity: reports.SeverityBlocked}},
+	}
+	recovered := InterBlockBranchRoutingResult{
+		SelectedOrder: []int{3, 8},
+		Branches: []InterBlockBranchRoutingEvidence{
+			{BranchIndex: 3, Status: routing.StatusRouted},
+			{BranchIndex: 8, Status: routing.StatusRouted},
+		},
+	}
+	if !interBlockBranchRoutingResultBetter(recovered, blocked) {
+		t.Fatalf("recovered tree = %#v, want it to outrank blocked baseline %#v", recovered, blocked)
+	}
+	if interBlockBranchRoutingResultBetter(blocked, recovered) {
+		t.Fatalf("blocked baseline = %#v, must not outrank recovered tree %#v", blocked, recovered)
 	}
 }
 

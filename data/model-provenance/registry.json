@@ -344,6 +344,46 @@
       }
     },
     {
+      "catalog_id": "capacitor.kemet.t520t476m006ate040.case_t",
+      "family": "capacitor",
+      "model_id": "mna_capacitor_transient_be_v1",
+      "provenance": {
+        "source": "https://search.kemet.com/download/specsheet/T520T476M006ATE040",
+        "revision": "kemet:T520:T520T476M006ATE040:2026-07",
+        "sha256": "19f725a7b01f981f33aeb7446e16f61398116168eea4ac05a70e2146bee8c049",
+        "review_status": "reviewed",
+        "allowed_analyses": [
+          "dc_operating_point",
+          "distortion",
+          "startup",
+          "thermal",
+          "transient"
+        ],
+        "min_temperature_c": -55,
+        "max_temperature_c": 105
+      }
+    },
+    {
+      "catalog_id": "capacitor.kemet.t520t476m006ate040.case_t",
+      "family": "capacitor",
+      "model_id": "mna_capacitor_v1",
+      "provenance": {
+        "source": "https://search.kemet.com/download/specsheet/T520T476M006ATE040",
+        "revision": "kemet:T520:T520T476M006ATE040:2026-07",
+        "sha256": "ef0b29d721870e25f9e49b43cfbcf2510a7136e6ba50da1ad0da0c7b1360d226",
+        "review_status": "reviewed",
+        "allowed_analyses": [
+          "ac_sweep",
+          "dc_operating_point",
+          "noise",
+          "stability",
+          "thermal"
+        ],
+        "min_temperature_c": -55,
+        "max_temperature_c": 105
+      }
+    },
+    {
       "catalog_id": "capacitor.kemet.t491a475k025at.case_a",
       "family": "capacitor",
       "model_id": "mna_capacitor_transient_be_v1",

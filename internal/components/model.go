@@ -354,6 +354,8 @@ type CapacitorEvidence struct {
 	DCBiasReview               string               `json:"dc_bias_review,omitempty"`
 	EffectiveCapacitanceReview string               `json:"effective_capacitance_review,omitempty"`
 	ESRReview                  string               `json:"esr_review,omitempty"`
+	VoltageDeratingReview      string               `json:"voltage_derating_review,omitempty"`
+	MaximumVoltageUseRatio     *float64             `json:"maximum_voltage_use_ratio,omitempty"`
 	Technology                 string               `json:"technology,omitempty"`
 	Polarity                   string               `json:"polarity,omitempty"`
 	CapacitanceTolerancePct    *float64             `json:"capacitance_tolerance_percent,omitempty"`

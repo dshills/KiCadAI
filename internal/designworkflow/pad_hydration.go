@@ -283,6 +283,15 @@ func verifiedPadTemplate(footprintID string) (verifiedPadTemplateRecord, bool) {
 			{Name: "2", XMM: 1.3525, WidthMM: 1.415, HeightMM: 1.39, Type: "smd", Shape: "roundrect", Layers: []string{"F.Cu", "F.Mask", "F.Paste"}},
 		}
 		return verifiedPadTemplateRecord{Bounds: verifiedCourtyardBounds(4.62, 2.1, 2.31, 1.05), Pads: pads}, true
+	case "Capacitor_Tantalum_SMD:CP_EIA-3528-12_Kemet-T":
+		pads := []placement.PadSummary{
+			smdPad("1", -1.54, 0, 1.34, 2.39, "roundrect"),
+			smdPad("2", 1.54, 0, 1.34, 2.39, "roundrect"),
+		}
+		return verifiedPadTemplateRecord{
+			Bounds: verifiedCourtyardBoundsFromExtents(-2.46, -1.65, 2.46, 1.65),
+			Pads:   pads,
+		}, true
 	case "Capacitor_SMD:C_0603_1608Metric":
 		return twoPadTemplate(1.6, 0.8, 0.6, 0.6, 1.0), true
 	case "Capacitor_THT:C_Rect_L7.2mm_W3.0mm_P5.00mm_FKS2_FKP2_MKS2_MKP2":

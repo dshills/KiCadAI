@@ -37,6 +37,8 @@ const routeTreeAccessDedupeUnitsPerMM = 1e6
 
 type InterBlockBranchRoutingResult struct {
 	NetName        string                            `json:"net_name"`
+	OrderAttempts  int                               `json:"order_attempts,omitempty"`
+	SelectedOrder  []int                             `json:"selected_order,omitempty"`
 	Branches       []InterBlockBranchRoutingEvidence `json:"branches,omitempty"`
 	Operations     []transactions.Operation          `json:"operations,omitempty"`
 	ExistingCopper []routing.ExistingCopper          `json:"existing_copper,omitempty"`
@@ -129,6 +131,7 @@ func RouteInterBlockTreeBranches(ctx context.Context, base routing.Request, grou
 
 func RouteInterBlockTreeBranchesWithAccess(ctx context.Context, base routing.Request, group InterBlockRouteGroup, tree InterBlockRouteTree, access []RouteTreeEndpointAccess) InterBlockBranchRoutingResult {
 	baseline := routeInterBlockTreeBranchesWithAccessOrder(ctx, base, group, tree, access, nil)
+	baseline.OrderAttempts = 1
 	if ctx != nil && ctx.Err() != nil {
 		return baseline
 	}
@@ -138,22 +141,75 @@ func RouteInterBlockTreeBranchesWithAccess(ctx context.Context, base routing.Req
 			failed[branch.BranchIndex] = struct{}{}
 		}
 	}
-	if len(failed) == 0 || len(failed) == len(tree.Branches) {
+	if len(failed) == 0 {
 		return baseline
 	}
 	cache := routeTreeAccessCandidateCache{}
 	ordered := routeTreeBranchesForRoutingWithAccess(tree.Branches, access, tree.NetName, cache)
 	selected := baseline
+	attempts := 1
+	seenOrders := map[string]struct{}{
+		routeTreeBranchOrderKey(baseline.SelectedOrder): {},
+	}
 	for _, retryOrder := range [][]InterBlockRouteTreeBranch{
 		routeTreeBranchesWithFailuresLast(ordered, failed),
 		routeTreeBranchesWithFailuresFirst(ordered, failed),
+		routeTreeBranchesCanonicalEndpointOrder(tree.Branches),
 	} {
+		orderKey := routeTreeBranchOrderKey(routeTreeBranchIndexes(retryOrder))
+		if _, seen := seenOrders[orderKey]; seen {
+			continue
+		}
+		seenOrders[orderKey] = struct{}{}
 		retry := routeInterBlockTreeBranchesWithAccessOrder(ctx, base, group, tree, access, retryOrder)
+		attempts++
 		if interBlockBranchRoutingResultBetter(retry, selected) {
 			selected = retry
 		}
 	}
+	selected.OrderAttempts = attempts
 	return selected
+}
+
+func routeTreeBranchIndexes(branches []InterBlockRouteTreeBranch) []int {
+	indexes := make([]int, len(branches))
+	for index, branch := range branches {
+		indexes[index] = branch.Index
+	}
+	return indexes
+}
+
+func routeTreeBranchOrderKey(indexes []int) string {
+	var builder strings.Builder
+	for index, branchIndex := range indexes {
+		if index > 0 {
+			builder.WriteByte(',')
+		}
+		builder.WriteString(fmt.Sprintf("%d", branchIndex))
+	}
+	return builder.String()
+}
+
+func routeTreeBranchesCanonicalEndpointOrder(branches []InterBlockRouteTreeBranch) []InterBlockRouteTreeBranch {
+	ordered := slices.Clone(branches)
+	slices.SortFunc(ordered, func(left, right InterBlockRouteTreeBranch) int {
+		leftStart, leftEnd := left.StartEndpointID, left.EndEndpointID
+		if leftEnd < leftStart {
+			leftStart, leftEnd = leftEnd, leftStart
+		}
+		rightStart, rightEnd := right.StartEndpointID, right.EndEndpointID
+		if rightEnd < rightStart {
+			rightStart, rightEnd = rightEnd, rightStart
+		}
+		if value := cmp.Compare(leftStart, rightStart); value != 0 {
+			return value
+		}
+		if value := cmp.Compare(leftEnd, rightEnd); value != 0 {
+			return value
+		}
+		return cmp.Compare(left.Index, right.Index)
+	})
+	return ordered
 }
 
 func routeInterBlockTreeBranchesWithAccessOrder(ctx context.Context, base routing.Request, group InterBlockRouteGroup, tree InterBlockRouteTree, access []RouteTreeEndpointAccess, orderedBranches []InterBlockRouteTreeBranch) InterBlockBranchRoutingResult {
@@ -173,6 +229,7 @@ func routeInterBlockTreeBranchesWithAccessOrder(ctx context.Context, base routin
 	} else {
 		orderedBranches = slices.Clone(orderedBranches)
 	}
+	result.SelectedOrder = routeTreeBranchIndexes(orderedBranches)
 	mergeAuditBase := routeTreeMergeAuditBaseForRequest(base, tree.NetName, preferSameNetCopperMerge)
 	for branchPosition, branch := range orderedBranches {
 		evidence := InterBlockBranchRoutingEvidence{

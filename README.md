@@ -50,6 +50,15 @@ path.
   programming frequency, loading, voltage, reset/boot entry, and shared-pin
   isolation evidence. External-crystal ISP and integrated-clock UART cases pass
   the local installed-KiCad lane; unsupported unpowered SWD fails closed.
+- Behavior-driven MCU power-integrity synthesis now replaces fixed decoupling
+  recipes for verified ATmega328P-A, ESP32-WROOM-32E, and STM32G031K8T6
+  selections. It derives source drop, brownout headroom, ESR and capacitive
+  droop from startup/transient behavior, qualifies concrete capacitors for
+  tolerance, voltage derating, ripple, and temperature, emits one local
+  network per supply domain plus shared bulk support per rail group, and
+  records finalized calculation evidence. Three target-free held-out cases
+  pass the complete local installed-KiCad lane; evidence, budget, and
+  temperature gaps fail closed.
 - The provider-backed natural-language lane retains two promoted bounded
   profiles and adds a catalog-resolved circuit graph contract with either an
   explicit graph or strict function-level intent. Function intent names

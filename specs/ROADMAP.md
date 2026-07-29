@@ -1,6 +1,6 @@
 # KiCadAI Roadmap
 
-Date: 2026-07-28
+Date: 2026-07-29
 
 This roadmap replaces the older roadmap and gap analysis now archived as
 `specs/OLD_ROADMAP.md` and `specs/OLD_ROADMAP_GAP.md`.
@@ -137,6 +137,12 @@ from validation feedback to safe automatic repair.
   attempt 2 with clean KiCad ERC/DRC, writer correctness, and normalized
   round-trip evidence; the existing provider-backed promotion suite remains
   in a passing state.
+- Completed milestone: deterministic dense-board correction extends that loop
+  with route-operation correlation, affected-net-only replacement,
+  byte-preservation of unrelated copper, deterministic route-tree branch
+  ordering, and legal layer-transition repair. The contracts, phased plan, and
+  local acceptance evidence are recorded in
+  `specs/deterministic-dense-board-correction/`.
 - Function-level synthesis for `generic-circuit-v1`: strict function,
   interface, operating-domain, semantic-connectivity, and bounded-constraint
   intent lowers deterministically to the explicit graph without provider pins,
@@ -1236,18 +1242,23 @@ systems pass offline and installed-KiCad two-run promotion. The V5 dynamic
 electrothermal/control-loop milestone is also complete: all six circuits pass
 two clean local promotion roots with identical content-addressed evidence.
 
-1. Derive MCU power integrity and decoupling from behavior-level transient
-   demand, startup, brownout, noise, and domain constraints, while retaining
-   stable unsupported outcomes for incomplete evidence.
-2. Generalize bounded placement-routing correction from observed
+Behavior-driven MCU power-integrity synthesis is now complete for the verified
+ATmega328P-A, ESP32-WROOM-32E, and STM32G031K8T6 envelope. Target-free
+requirements derive source drop, brownout headroom, ESR and capacitive droop,
+temperature and voltage qualification, local per-domain support, and shared
+bulk support. Three held-out cases pass the complete local installed-KiCad
+lane, and adversarial evidence, budget, and qualification gaps fail closed
+with stable diagnostics.
+
+1. Generalize bounded placement-routing correction from observed
    failures without introducing fixture-identity logic.
-3. Expand catalog-independent part qualification, calculated rating, and
+2. Expand catalog-independent part qualification, calculated rating, and
    fabrication evidence before claiming broader
    autonomous or fabrication-ready coverage.
-4. Feed novel behavior-only evaluations into the evidence-driven expansion
+3. Feed novel behavior-only evaluations into the evidence-driven expansion
    planner so capability gaps are ranked by reusable family impact, then source
    and promote only the highest-value packages with independent evidence.
-5. Extend reviewed dynamic models into additional converter, isolation, and
+4. Extend reviewed dynamic models into additional converter, isolation, and
    high-energy protection families without weakening fail-closed model,
    convergence, SOA, or event-coverage requirements.
 

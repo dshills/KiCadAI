@@ -63,6 +63,8 @@
         "dc_bias_review": "not_applicable",
         "effective_capacitance_review": "proven",
         "esr_review": "proven",
+        "voltage_derating_review": "proven",
+        "maximum_voltage_use_ratio": 0.8,
         "technology": "low-ESR aluminum electrolytic",
         "polarity": "polarized",
         "capacitance_tolerance_percent": 20,

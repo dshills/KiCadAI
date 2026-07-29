@@ -1,15 +1,15 @@
 {
-  "record_count": 240,
+  "record_count": 241,
   "family_count": 33,
   "confidence_counts": {
     "blocked": 1,
     "library_derived": 1,
     "placeholder": 7,
     "rule_inferred": 6,
-    "verified": 225
+    "verified": 226
   },
   "alternative_coverage": {
-    "concrete_records": 202,
+    "concrete_records": 203,
     "generic_fallback_records": 38,
     "equivalence_groups": 24
   },
@@ -114,11 +114,11 @@
     {
       "family": "capacitor",
       "defined": true,
-      "record_count": 16,
-      "concrete_records": 12,
+      "record_count": 17,
+      "concrete_records": 13,
       "generic_fallback_records": 4,
       "equivalence_groups": 4,
-      "verified_records": 13,
+      "verified_records": 14,
       "library_derived_records": 0,
       "rule_inferred_records": 3,
       "placeholder_records": 0,
@@ -137,6 +137,7 @@
         "capacitor.electrolytic.radial",
         "capacitor.kemet.mil-prf-32535.c0g.1210.e12.1p0",
         "capacitor.kemet.t491a475k025at.case_a",
+        "capacitor.kemet.t520t476m006ate040.case_t",
         "capacitor.murata.gcm21br71h105ka03l.0805",
         "capacitor.murata.grm188r71h104ka93d.0603",
         "capacitor.murata.grm21br61a106ke19l.0805",

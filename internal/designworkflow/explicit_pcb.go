@@ -275,7 +275,11 @@ func RouteExplicitCircuit(ctx context.Context, request Request, placed Placement
 	if reports.HasBlockingIssue(returnPathIssues) {
 		result.Status = routing.StatusBlocked
 	}
-	clearanceIssues, clearanceDeferredToDRC := deferPhysicalClearanceIssuesToRequiredDRC(request.Validation.RequireDRC, clearanceIssues)
+	clearanceIssues, clearanceDeferredToDRC := deferPhysicalClearanceIssuesToRequiredDRC(
+		request.Validation.RequireDRC,
+		IsGenericAutonomousCorrectionRequest(request),
+		clearanceIssues,
+	)
 	issues = append(issues, clearanceIssues...)
 	result.Issues = append(result.Issues, clearanceIssues...)
 	if reports.HasBlockingIssue(clearanceIssues) {

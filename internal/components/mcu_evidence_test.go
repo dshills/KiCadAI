@@ -41,6 +41,30 @@ func TestValidateMCUEvidenceRequiresProgrammingElectricalContract(t *testing.T) 
 	t.Fatalf("missing programming electrical evidence was accepted: %+v", result.Issues)
 }
 
+func TestValidateMCUEvidenceRequiresPowerIntegrityForEveryRailGroup(t *testing.T) {
+	catalog := validMCUCatalog()
+	catalog.Records[0].MCU.PowerIntegrity = nil
+	result := ValidateCatalog(&catalog)
+	for _, issue := range result.Issues {
+		if issue.Path == "records[0].mcu_evidence.power_integrity" {
+			return
+		}
+	}
+	t.Fatalf("missing power-integrity evidence was accepted: %+v", result.Issues)
+}
+
+func TestValidateMCUEvidenceRejectsIncompletePowerIntegrity(t *testing.T) {
+	catalog := validMCUCatalog()
+	catalog.Records[0].MCU.PowerIntegrity[0].TransientCurrentStep = nil
+	result := ValidateCatalog(&catalog)
+	for _, issue := range result.Issues {
+		if issue.Path == "records[0].mcu_evidence.power_integrity[0].transient_current_step" {
+			return
+		}
+	}
+	t.Fatalf("incomplete power-integrity evidence was accepted: %+v", result.Issues)
+}
+
 func TestValidateMCUEvidenceRequiresPinDomainsForIndependentRails(t *testing.T) {
 	catalog := validMCUCatalog()
 	catalog.Records[0].MCU.SupplyDomains = append(catalog.Records[0].MCU.SupplyDomains, MCUSupplyDomain{
@@ -114,11 +138,28 @@ func validMCUCatalog() Catalog {
 				CurrentBudget: &MCUCurrentBudget{
 					MaximumSourcePerPinMA: float64MCUPointer(20), MaximumSinkPerPinMA: float64MCUPointer(20), MaximumAggregateMA: float64MCUPointer(80),
 				},
+				PowerIntegrity: []MCUPowerIntegrity{{
+					RailGroup:               "main",
+					StartupCurrent:          mcuMeasurement(0.02, "A"),
+					TransientCurrentStep:    mcuMeasurement(0.01, "A"),
+					TransientDuration:       mcuMeasurement(50e-6, "s"),
+					LocalTransientDuration:  mcuMeasurement(1e-6, "s"),
+					MaximumRipple:           mcuMeasurement(0.1, "V"),
+					MaximumNoise:            mcuMeasurement(0.04, "V"),
+					BrownoutThreshold:       mcuMeasurement(1.7, "V"),
+					MaximumSourceImpedance:  mcuMeasurement(0.2, "Ohm"),
+					LocalPlacementMaximumMM: mcuMeasurement(3, "mm"),
+					BulkPlacementMaximumMM:  mcuMeasurement(10, "mm"),
+				}},
 				ReviewNote: "Test-only evidence.",
 			},
 			Verification: VerificationRecord{Confidence: ConfidenceVerified},
 		}},
 	}
+}
+
+func mcuMeasurement(value float64, unit string) *EvidenceMeasurement {
+	return &EvidenceMeasurement{Value: value, Unit: unit, Conditions: "test conditions"}
 }
 
 func float64MCUPointer(value float64) *float64 {

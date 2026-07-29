@@ -2506,7 +2506,10 @@ func catalogPartsAreaMM2(parts []catalogPart) float64 {
 }
 
 func (provider *CatalogProvider) catalogAlternativePart(original catalogPart) (catalogPart, bool) {
-	if provider.catalog == nil || strings.TrimSpace(original.value) == "" {
+	// Parameters bind selected physical ratings or calculated values to this
+	// exact part. A value-compatible substitution is not safe unless the
+	// provider reruns those calculations for the alternative.
+	if provider.catalog == nil || strings.TrimSpace(original.value) == "" || len(original.parameters) > 0 {
 		return catalogPart{}, false
 	}
 	requiredFunctions := catalogRecordFunctions(original.record)

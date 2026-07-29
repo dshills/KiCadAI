@@ -30,10 +30,11 @@ type RoutingOptions struct {
 }
 
 type RoutingStageResult struct {
-	Request    routing.Request          `json:"request"`
-	Result     routing.Result           `json:"result"`
-	Operations []transactions.Operation `json:"operations,omitempty"`
-	Stage      StageResult              `json:"stage"`
+	Request           routing.Request          `json:"request"`
+	CorrectionRequest routing.Request          `json:"-"`
+	Result            routing.Result           `json:"result"`
+	Operations        []transactions.Operation `json:"operations,omitempty"`
+	Stage             StageResult              `json:"stage"`
 }
 
 const interBlockRouteSnapMaxDistanceMM = 0.75
@@ -245,6 +246,7 @@ func RoutePlacement(ctx context.Context, request Request, fragments PCBFragmentR
 			selectiveLocalRouteObstacles = existingCopperFromAllRouteOperations(localOperations, routeBranchDefaultLayer(routingRequest.Board), routingRequest.Rules)
 		}
 	}
+	correctionRoutingRequest := routingRequest
 	baseContactOperations := slices.Concat(localOperations, anchorOperations)
 	physicalContext := newPhysicalPadRoutingContext(&placed)
 	physicalCandidates := physicalContext.candidates
@@ -333,7 +335,11 @@ func RoutePlacement(ctx context.Context, request Request, fragments PCBFragmentR
 	operations, routePostProcessIssues = postProcessRouteOperations(operations, &placed, physicalContext, physicalContactEvidence)
 	issues = append(issues, routePostProcessIssues...)
 	operations, physicalClearanceRepairIssues, physicalClearanceBlockersBeforeRepair, physicalClearanceBlockersAfterRepair, physicalClearanceMM := finalizeEmittedRoutePhysicalClearanceWhenRequired(request.Validation.RequireDRC, routingRequest, operations)
-	physicalClearanceRepairIssues, physicalClearanceDeferredToDRC := deferPhysicalClearanceIssuesToRequiredDRC(request.Validation.RequireDRC, physicalClearanceRepairIssues)
+	physicalClearanceRepairIssues, physicalClearanceDeferredToDRC := deferPhysicalClearanceIssuesToRequiredDRC(
+		request.Validation.RequireDRC,
+		IsGenericAutonomousCorrectionRequest(request),
+		physicalClearanceRepairIssues,
+	)
 	issues = append(issues, physicalClearanceRepairIssues...)
 	if request.Validation.RequireDRC {
 		var holeClearanceIssues []reports.Issue
@@ -393,7 +399,7 @@ func RoutePlacement(ctx context.Context, request Request, fragments PCBFragmentR
 		stage.Summary["quality_score"] = result.Quality.Score.Overall
 		stage.Summary["route_reports"] = len(result.Quality.NetReports)
 	}
-	return RoutingStageResult{Request: routingRequest, Result: result, Operations: operations, Stage: stage}
+	return RoutingStageResult{Request: routingRequest, CorrectionRequest: correctionRoutingRequest, Result: result, Operations: operations, Stage: stage}
 }
 
 // finalizeEmittedRoutePhysicalClearance is the shared last copper-geometry
@@ -421,9 +427,10 @@ func finalizeEmittedRoutePhysicalClearanceWhenRequired(requireDRC bool, request 
 
 // deferPhysicalClearanceIssuesToRequiredDRC keeps offline workflows fail-closed
 // while allowing the authoritative installed-KiCad DRC to decide conservative
-// internal geometry findings. Strict-DRC workflows retain the delegated count
-// in stage evidence instead of reporting findings that KiCad may disprove.
-func deferPhysicalClearanceIssuesToRequiredDRC(requireDRC bool, issues []reports.Issue) ([]reports.Issue, int) {
+// internal geometry findings. Correction-enabled workflows retain structured
+// cross-net conflicts long enough for the bounded retry loop; other strict-DRC
+// workflows retain only the delegated count in stage evidence.
+func deferPhysicalClearanceIssuesToRequiredDRC(requireDRC bool, retainCorrectableConflicts bool, issues []reports.Issue) ([]reports.Issue, int) {
 	deferred := cloneIssues(issues)
 	if !requireDRC {
 		return deferred, 0
@@ -432,6 +439,10 @@ func deferPhysicalClearanceIssuesToRequiredDRC(requireDRC bool, issues []reports
 	retained := deferred[:0]
 	for _, issue := range deferred {
 		if issue.Blocking() {
+			if retainCorrectableConflicts && issue.Code == reports.CodeRouteCopperConflict {
+				retained = append(retained, issue)
+				continue
+			}
 			count++
 			continue
 		}
@@ -1904,6 +1915,17 @@ func ensureRouteLayerJunctionVias(operations []transactions.Operation, rules rou
 	})
 	if len(keys) == 0 {
 		return operations, 0, nil
+	}
+	if rules.AllowVias != nil && !*rules.AllowVias || rules.AllowBackLayer != nil && !*rules.AllowBackLayer || len(rules.AllowedLayers) == 1 {
+		nets := make([]string, 0, len(keys))
+		for _, key := range keys {
+			nets = append(nets, junctions[key].net)
+		}
+		return operations, 0, []reports.Issue{{
+			Code: reports.CodeRouteContactLayerMismatch, Severity: reports.SeverityBlocked,
+			Path: "routing.layer_junctions", Message: "same-net copper changes layers where the resolved routing policy does not permit a plated transition",
+			Nets: sortedUniqueStrings(nets), Suggestion: "reroute the net on an allowed layer without changing the resolved layer or via policy",
+		}}
 	}
 	defaults := routing.DefaultRules()
 	diameterMM := rules.ViaDiameterMM

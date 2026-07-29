@@ -3,6 +3,8 @@ package routing
 import (
 	"fmt"
 	"math"
+	"slices"
+	"sort"
 
 	"kicadai/internal/reports"
 )
@@ -136,7 +138,7 @@ func validatePhysicalClearanceForNet(request Request, routes []Route, netName st
 						continue
 					}
 					if segmentDistance(segment, other)-segment.WidthMM/2-other.WidthMM/2 < request.Rules.ClearanceMM-distanceEpsilon {
-						issues = append(issues, routeValidationIssue(route.Net, reports.CodeValidationFailed, fmt.Sprintf(
+						issues = append(issues, routeCopperConflictIssue(route.Net, otherRoute.Net, fmt.Sprintf(
 							"segment clearance violation with net %s: %s to %s crosses %s to %s",
 							otherRoute.Net, formatClearancePoint(segment.Start), formatClearancePoint(segment.End), formatClearancePoint(other.Start), formatClearancePoint(other.End),
 						)))
@@ -147,7 +149,7 @@ func validatePhysicalClearanceForNet(request Request, routes []Route, netName st
 						continue
 					}
 					if distancePointToSegment(via.At, segment.Start, segment.End)-via.DiameterMM/2-segment.WidthMM/2 < request.Rules.ClearanceMM-distanceEpsilon {
-						issues = append(issues, routeValidationIssue(route.Net, reports.CodeValidationFailed, "segment clearance violation with via on net "+otherRoute.Net))
+						issues = append(issues, routeCopperConflictIssue(route.Net, otherRoute.Net, "segment clearance violation with via on net "+otherRoute.Net))
 					}
 				}
 			}
@@ -180,7 +182,7 @@ func validatePhysicalClearanceForNet(request Request, routes []Route, netName st
 						continue
 					}
 					if distancePointToSegment(via.At, segment.Start, segment.End)-via.DiameterMM/2-segment.WidthMM/2 < request.Rules.ClearanceMM-distanceEpsilon {
-						issues = append(issues, routeValidationIssue(route.Net, reports.CodeValidationFailed, "via clearance violation with segment on net "+otherRoute.Net))
+						issues = append(issues, routeCopperConflictIssue(route.Net, otherRoute.Net, "via clearance violation with segment on net "+otherRoute.Net))
 					}
 				}
 				for _, other := range otherRoute.Vias {
@@ -188,7 +190,7 @@ func validatePhysicalClearanceForNet(request Request, routes []Route, netName st
 						continue
 					}
 					if pointDistance(via.At, other.At)-via.DiameterMM/2-other.DiameterMM/2 < request.Rules.ClearanceMM-distanceEpsilon {
-						issues = append(issues, routeValidationIssue(route.Net, reports.CodeValidationFailed, "via clearance violation with net "+otherRoute.Net))
+						issues = append(issues, routeCopperConflictIssue(route.Net, otherRoute.Net, "via clearance violation with net "+otherRoute.Net))
 					}
 				}
 			}
@@ -388,6 +390,16 @@ func ValidateResult(request Request, result Result) ValidationReport {
 
 func routeValidationIssue(netName string, code reports.Code, message string) reports.Issue {
 	return reports.Issue{Code: code, Severity: reports.SeverityBlocked, Message: message, Nets: []string{netName}}
+}
+
+func routeCopperConflictIssue(leftNet, rightNet, message string) reports.Issue {
+	nets := []string{leftNet, rightNet}
+	sort.Strings(nets)
+	nets = slices.Compact(nets)
+	return reports.Issue{
+		Code: reports.CodeRouteCopperConflict, Severity: reports.SeverityBlocked,
+		Message: message, Nets: nets,
+	}
 }
 
 func segmentIntersectsShape(segment Segment, shape Shape) bool {
@@ -625,7 +637,7 @@ func clearanceIssues(routes []Route, clearanceMM float64) []reports.Issue {
 				}
 				copperClearance := segmentDistance(left.Segment, right.Segment) - left.Segment.WidthMM/2 - right.Segment.WidthMM/2
 				if copperClearance < clearanceMM-distanceEpsilon {
-					issues = append(issues, routeValidationIssue(left.Net, reports.CodeValidationFailed, fmt.Sprintf(
+					issues = append(issues, routeCopperConflictIssue(left.Net, right.Net, fmt.Sprintf(
 						"segment clearance violation with net %s: %s to %s crosses %s to %s",
 						right.Net, formatClearancePoint(left.Segment.Start), formatClearancePoint(left.Segment.End), formatClearancePoint(right.Segment.Start), formatClearancePoint(right.Segment.End),
 					)))
@@ -641,7 +653,7 @@ func clearanceIssues(routes []Route, clearanceMM float64) []reports.Issue {
 			}
 			copperClearance := distancePointToSegment(via.Via.At, segment.Segment.Start, segment.Segment.End) - via.Via.DiameterMM/2 - segment.Segment.WidthMM/2
 			if copperClearance < clearanceMM-distanceEpsilon {
-				issues = append(issues, routeValidationIssue(segment.Net, reports.CodeValidationFailed, "segment clearance violation with via on net "+via.Net))
+				issues = append(issues, routeCopperConflictIssue(segment.Net, via.Net, "segment clearance violation with via on net "+via.Net))
 			}
 		}
 	}
@@ -653,7 +665,7 @@ func clearanceIssues(routes []Route, clearanceMM float64) []reports.Issue {
 			}
 			copperClearance := pointDistance(left.Via.At, right.Via.At) - left.Via.DiameterMM/2 - right.Via.DiameterMM/2
 			if copperClearance < clearanceMM-distanceEpsilon {
-				issues = append(issues, routeValidationIssue(left.Net, reports.CodeValidationFailed, "via clearance violation with net "+right.Net))
+				issues = append(issues, routeCopperConflictIssue(left.Net, right.Net, "via clearance violation with net "+right.Net))
 			}
 		}
 	}

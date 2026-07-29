@@ -110,7 +110,7 @@ func maybeRetryPlacementRoutingWithRouter(ctx context.Context, request Request, 
 			summary.StopReason = CorrectionStopContextCanceled
 			break
 		}
-		if currentRouted.Result.Status == routing.StatusRouted {
+		if currentRouted.Result.Status == routing.StatusRouted && !reports.HasBlockingIssue(currentRouted.Stage.Issues) {
 			summary.StopReason = CorrectionStopRouted
 			break
 		}
@@ -119,10 +119,14 @@ func maybeRetryPlacementRoutingWithRouter(ctx context.Context, request Request, 
 		var adjustment PlacementRetryAdjustment
 		var correctionPlan *AutonomousCorrectionPlan
 		var correctionApplication *AutonomousCorrectionApplication
+		var nextPlaced PlacementStageResult
+		var nextRouted RoutingStageResult
+		routeOnlyApplied := false
 		if correctionReport != nil {
-			diagnostics := BuildAutonomousCorrectionDiagnostics(currentPlaced.Stage.Issues, currentRouted.Stage.Issues)
+			diagnostics := BuildAutonomousCorrectionDiagnosticsForRouting(currentPlaced.Stage.Issues, currentRouted)
 			plan, err := PlanAutonomousCorrection(request, currentPlaced.Request, currentPlaced.Result.Placements, diagnostics, AutonomousCorrectionPlanOptions{
 				Attempt: attempt, MaxAttempts: policy.MaxAttempts, AppliedRetryKeys: correctionReport.AppliedRetryKeys,
+				RouteOperations: currentRouted.Operations,
 			})
 			correctionPlan = &plan
 			if err != nil {
@@ -135,24 +139,45 @@ func maybeRetryPlacementRoutingWithRouter(ctx context.Context, request Request, 
 				correctionReport.AttemptHistory = append(correctionReport.AttemptHistory, autonomousCorrectionUnmaterializedAttempt(attempt, "plan_rejected", correctionPlan, nil, currentPlaced))
 				break
 			}
-			adjusted, application, err := ApplyAutonomousCorrectionPlan(request, currentPlaced.Request, currentPlaced.Result.Placements, plan, correctionReport.AppliedRetryKeys)
-			correctionApplication = &application
-			if err != nil {
-				summary.StopReason = "correction_apply_error"
-				correctionApplication.StopReason = summary.StopReason
-				correctionApplication.ProtectedInvariantsPreserved = false
-				correctionReport.AttemptHistory = append(correctionReport.AttemptHistory, autonomousCorrectionUnmaterializedAttempt(attempt, "application_failed", correctionPlan, correctionApplication, currentPlaced))
-				break
+			if autonomousCorrectionOnlyRoutingActions(plan.Actions) {
+				selective, application, err := ApplyAutonomousRoutingCorrectionPlan(ctx, request, currentRouted, plan, correctionReport.AppliedRetryKeys)
+				correctionApplication = &application
+				if err != nil {
+					summary.StopReason = "correction_apply_error"
+					correctionApplication.StopReason = summary.StopReason
+					correctionApplication.ProtectedInvariantsPreserved = false
+					correctionReport.AttemptHistory = append(correctionReport.AttemptHistory, autonomousCorrectionUnmaterializedAttempt(attempt, "application_failed", correctionPlan, correctionApplication, currentPlaced))
+					break
+				}
+				if !application.Applied {
+					summary.StopReason = application.StopReason
+					correctionReport.AttemptHistory = append(correctionReport.AttemptHistory, autonomousCorrectionUnmaterializedAttempt(attempt, "application_rejected", correctionPlan, correctionApplication, currentPlaced))
+					break
+				}
+				nextPlaced = currentPlaced
+				nextRouted = selective
+				routeOnlyApplied = true
+				correctionReport.AppliedRetryKeys = append(correctionReport.AppliedRetryKeys, plan.RetryKey)
+			} else {
+				adjusted, application, err := ApplyAutonomousCorrectionPlan(request, currentPlaced.Request, currentPlaced.Result.Placements, plan, correctionReport.AppliedRetryKeys)
+				correctionApplication = &application
+				if err != nil {
+					summary.StopReason = "correction_apply_error"
+					correctionApplication.StopReason = summary.StopReason
+					correctionApplication.ProtectedInvariantsPreserved = false
+					correctionReport.AttemptHistory = append(correctionReport.AttemptHistory, autonomousCorrectionUnmaterializedAttempt(attempt, "application_failed", correctionPlan, correctionApplication, currentPlaced))
+					break
+				}
+				if !application.Applied {
+					summary.StopReason = application.StopReason
+					correctionReport.AttemptHistory = append(correctionReport.AttemptHistory, autonomousCorrectionUnmaterializedAttempt(attempt, "application_rejected", correctionPlan, correctionApplication, currentPlaced))
+					break
+				}
+				adjustedRequest = adjusted
+				adjustment = application.Adjustment
+				correctionReport.AppliedRetryKeys = append(correctionReport.AppliedRetryKeys, plan.RetryKey)
+				hints = autonomousCorrectionPlacementHints(plan.Actions)
 			}
-			if !application.Applied {
-				summary.StopReason = application.StopReason
-				correctionReport.AttemptHistory = append(correctionReport.AttemptHistory, autonomousCorrectionUnmaterializedAttempt(attempt, "application_rejected", correctionPlan, correctionApplication, currentPlaced))
-				break
-			}
-			adjustedRequest = adjusted
-			adjustment = application.Adjustment
-			correctionReport.AppliedRetryKeys = append(correctionReport.AppliedRetryKeys, plan.RetryKey)
-			hints = autonomousCorrectionPlacementHints(plan.Actions)
 		} else {
 			diagnostics := routing.DiagnosticsForResult(currentRouted.Result)
 			hints = filterPlacementRetryHints(BuildPlacementRetryHints(diagnostics, currentPlaced.Result.Quality), policy)
@@ -175,34 +200,64 @@ func maybeRetryPlacementRoutingWithRouter(ctx context.Context, request Request, 
 			summary.StopReason = "no_safe_adjustment"
 			break
 		}
-		nextPlaced := placeAdjustedRequest(ctx, adjustedRequest)
-		preserveRetryPlacementEvidence(&nextPlaced.Stage, currentPlaced.Stage)
-		if workflowStageBlocked(nextPlaced.Stage) {
-			summary.StopReason = "placement_blocked"
-			failedAttempt := placementRoutingRetryAttemptSummary{
-				Attempt:         attempt,
-				Placement:       nextPlaced.Stage.Summary,
-				RetryAdjustment: PlacementRetryAdjustmentSummary(adjustment),
-				RegressionFlags: retryPlacementIssueFlags(nextPlaced.Stage.Issues),
+		if !routeOnlyApplied {
+			nextPlaced = placeAdjustedRequest(ctx, adjustedRequest)
+			preserveRetryPlacementEvidence(&nextPlaced.Stage, currentPlaced.Stage)
+			if workflowStageBlocked(nextPlaced.Stage) {
+				summary.StopReason = "placement_blocked"
+				failedAttempt := placementRoutingRetryAttemptSummary{
+					Attempt:         attempt,
+					Placement:       nextPlaced.Stage.Summary,
+					RetryAdjustment: PlacementRetryAdjustmentSummary(adjustment),
+					RegressionFlags: retryPlacementIssueFlags(nextPlaced.Stage.Issues),
+				}
+				failedAttempt.EligibleRefCount = adjustment.EligibleRefs
+				failedAttempt.BlockedRefCount = adjustment.BlockedRefs
+				summary.AttemptHistory = append(summary.AttemptHistory, normalizePlacementRoutingRetryAttempt(failedAttempt))
+				if correctionReport != nil {
+					correctionReport.AttemptHistory = append(correctionReport.AttemptHistory, autonomousCorrectionAttemptForResult(attempt, correctionPlan, correctionApplication, nextPlaced, RoutingStageResult{}))
+				}
+				break
 			}
-			failedAttempt.EligibleRefCount = adjustment.EligibleRefs
-			failedAttempt.BlockedRefCount = adjustment.BlockedRefs
-			summary.AttemptHistory = append(summary.AttemptHistory, normalizePlacementRoutingRetryAttempt(failedAttempt))
-			if correctionReport != nil {
-				correctionReport.AttemptHistory = append(correctionReport.AttemptHistory, autonomousCorrectionAttemptForResult(attempt, correctionPlan, correctionApplication, nextPlaced, RoutingStageResult{}))
+			stateHash := placementStateHash(nextPlaced.Result.Placements)
+			if _, ok := seenStates[stateHash]; ok {
+				summary.StopReason = CorrectionStopRepeatedPlacementState
+				if correctionReport != nil {
+					correctionReport.AttemptHistory = append(correctionReport.AttemptHistory, autonomousCorrectionAttemptForResult(attempt, correctionPlan, correctionApplication, nextPlaced, RoutingStageResult{}))
+				}
+				break
 			}
-			break
+			seenStates[stateHash] = struct{}{}
+			nextPlaced, nextRouted = routeNext(nextPlaced)
+			if correctionReport != nil && correctionPlan != nil && len(currentRouted.Operations) != 0 {
+				baseRequest := nextRouted.CorrectionRequest
+				if len(baseRequest.Nets) == 0 {
+					baseRequest = nextRouted.Request
+				}
+				affectedNets := autonomousCorrectionPlacementAffectedNets(*correctionPlan, baseRequest, currentPlaced.Result.Placements, nextPlaced.Result.Placements)
+				selective, ok := preserveAutonomousCorrectionUnaffectedRoutes(currentRouted, nextRouted, affectedNets)
+				if !ok {
+					nextRouted = currentRouted
+					if correctionApplication != nil {
+						correctionApplication.StopReason = CorrectionStopRouteReplacementInvalid
+						correctionApplication.ProtectedInvariantsPreserved = false
+					}
+				} else {
+					nextRouted = selective
+					if correctionApplication != nil {
+						affectedSet := make(map[string]struct{}, len(affectedNets))
+						for _, net := range affectedNets {
+							affectedSet[net] = struct{}{}
+						}
+						correctionApplication.AffectedNets = slices.Clone(affectedNets)
+						correctionApplication.RouteStateHashBefore = autonomousCorrectionRouteStateHash(currentRouted.Operations)
+						correctionApplication.RouteStateHashAfter = autonomousCorrectionRouteStateHash(nextRouted.Operations)
+						correctionApplication.RoutePreservationBefore = autonomousCorrectionRouteStateHash(autonomousCorrectionPreservedOperations(currentRouted.Operations, affectedSet))
+						correctionApplication.RoutePreservationAfter = autonomousCorrectionRouteStateHash(autonomousCorrectionPreservedOperations(nextRouted.Operations, affectedSet))
+					}
+				}
+			}
 		}
-		stateHash := placementStateHash(nextPlaced.Result.Placements)
-		if _, ok := seenStates[stateHash]; ok {
-			summary.StopReason = CorrectionStopRepeatedPlacementState
-			if correctionReport != nil {
-				correctionReport.AttemptHistory = append(correctionReport.AttemptHistory, autonomousCorrectionAttemptForResult(attempt, correctionPlan, correctionApplication, nextPlaced, RoutingStageResult{}))
-			}
-			break
-		}
-		seenStates[stateHash] = struct{}{}
-		nextPlaced, nextRouted := routeNext(nextPlaced)
 		if correctionReport != nil {
 			correctionReport.AttemptHistory = append(correctionReport.AttemptHistory, autonomousCorrectionAttemptForResult(attempt, correctionPlan, correctionApplication, nextPlaced, nextRouted))
 		}

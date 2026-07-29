@@ -549,6 +549,11 @@ func verifiedTransferPadSpecs(footprintID string, hints map[string]string) ([]tr
 		"LED_SMD:LED_0805_2012Metric",
 		"Diode_SMD:D_SOD-323":
 		return twoTransferPads(1.15, 1.45, 2.0, hints), true
+	case "Capacitor_Tantalum_SMD:CP_EIA-3528-12_Kemet-T":
+		return []transactions.PadSpec{
+			transferPadSpec("1", -1.54, 0, 1.34, 2.39, hints),
+			transferPadSpec("2", 1.54, 0, 1.34, 2.39, hints),
+		}, true
 	case "Diode_SMD:D_SOD-123":
 		return twoTransferPads(1.35, 1.55, 3.0, hints), true
 	case "Fuse:Fuse_1206_3216Metric":

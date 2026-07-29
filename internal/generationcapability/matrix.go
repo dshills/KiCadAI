@@ -71,14 +71,14 @@ var capabilities = []Capability{
 		InputContract: circuitgraph.SchemaID,
 		Supports: []string{
 			"catalog-resolved components, packages, symbols, and pin functions",
-			"up to 512 components, 1024 nets, and 512 endpoints per net",
+			"limits: 512 components, 1024 nets, 512 endpoints per net",
 			"explicit multi-unit component identities and required power units",
 			"relative schematic layout intent and bounded PCB placement regions",
-			"deterministic placement and ordered route-tree execution for proven graph shapes",
+			"deterministic placement and ordered routes for graph shapes",
 		},
 		Limitations: []string{
 			"ambiguous catalog resolution, unsupported pin functions, and incomplete graph intent fail closed",
-			"not a free-form electronics language or a guarantee for arbitrary dense, high-speed, RF, or analog circuits",
+			"not free-form or guaranteed for arbitrary dense, high-speed, RF, or analog circuits",
 			"routing is bounded and does not implement general rip-up-and-reroute",
 			"analog performance, thermal behavior, and fabrication suitability require explicit evidence or review",
 		},

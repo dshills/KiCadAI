@@ -2,12 +2,14 @@ package designworkflow
 
 import (
 	"context"
+	"reflect"
 	"testing"
 	"time"
 
 	"kicadai/internal/placement"
 	"kicadai/internal/reports"
 	"kicadai/internal/routing"
+	"kicadai/internal/transactions"
 )
 
 func TestAutonomousCorrectionLoopStopsWhenCorrectionNotRequired(t *testing.T) {
@@ -104,6 +106,47 @@ func TestAutonomousCorrectionLoopStopsAtBudgetWithBestAttempt(t *testing.T) {
 	}
 	if report.StopReason != CorrectionStopMaxAttempts || report.SelectedAttempt != 2 || len(report.AttemptHistory) != 2 || !report.AttemptHistory[1].Selected {
 		t.Fatalf("budget report = %#v", report)
+	}
+}
+
+func TestAutonomousCorrectionLoopAppliesRoutingOnlyPlanWithoutCallingPlacerRouter(t *testing.T) {
+	request, placed, _ := genericCorrectionLoopFixture()
+	operations := []transactions.Operation{
+		correctionRouteOperation(t, "ALPHA", 0, 2, 10, 18, 10),
+		correctionRouteOperation(t, "BETA", 1, 10, 4, 10, 18),
+		correctionRouteOperation(t, "DECOY", 2, 2, 2, 18, 2),
+	}
+	routingRequest := correctionSelectiveRoutingRequest()
+	issues := routing.ValidatePhysicalClearance(routingRequest, routingRoutesFromOperations(operations))
+	if len(issues) == 0 {
+		t.Fatal("routing-only loop fixture is not initially blocked")
+	}
+	routed := RoutingStageResult{
+		Request: routingRequest,
+		Result: routing.Result{Status: routing.StatusBlocked, Metrics: routing.Metrics{
+			NetCount: 3, RoutedNetCount: 1, FailedNetCount: 2,
+		}},
+		Operations: operations,
+		Stage:      NewStageResult(StageRouting, issues),
+	}
+	callbackCalls := 0
+	_, selected, summary := maybeRetryPlacementRoutingWithRouter(correctionLoopTestContext(t), request, placed, routed, request.RoutingRetry, func(next PlacementStageResult) (PlacementStageResult, RoutingStageResult) {
+		callbackCalls++
+		return next, routed
+	})
+	if callbackCalls != 0 {
+		t.Fatalf("routing-only correction invoked full placement/router callback %d times", callbackCalls)
+	}
+	if summary.StopReason != CorrectionStopRouted || summary.SelectedAttempt != 2 || summary.Attempts != 2 || summary.Applied != 1 {
+		t.Fatalf("routing-only retry summary = %#v", summary)
+	}
+	report := correctionReportFromRoutingStage(t, selected)
+	if report.SelectedAttempt != 2 || len(report.AttemptHistory) != 2 || report.AttemptHistory[1].Application == nil || !report.AttemptHistory[1].Application.Applied {
+		t.Fatalf("routing-only correction report = %#v", report)
+	}
+	preserved := autonomousCorrectionPreservedOperations(selected.Operations, map[string]struct{}{"ALPHA": {}, "BETA": {}})
+	if len(preserved) != 1 || !reflect.DeepEqual(preserved[0], operations[2]) {
+		t.Fatalf("routing-only loop changed decoy route: %#v", preserved)
 	}
 }
 

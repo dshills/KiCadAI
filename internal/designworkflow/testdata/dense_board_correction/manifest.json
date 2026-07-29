@@ -1,0 +1,53 @@
+{
+  "schema": "kicadai.dense-board-correction-corpus.v1",
+  "cases": [
+    {
+      "name": "orthogonal_three_net_crossing",
+      "issue": "copper_conflict",
+      "expect_applied": true,
+      "components": [
+        {"ref": "P11", "net": "TRACE_A", "x_mm": 2, "y_mm": 10, "layer": "F.Cu"},
+        {"ref": "P12", "net": "TRACE_A", "x_mm": 18, "y_mm": 10, "layer": "F.Cu"},
+        {"ref": "P21", "net": "TRACE_B", "x_mm": 10, "y_mm": 4, "layer": "F.Cu"},
+        {"ref": "P22", "net": "TRACE_B", "x_mm": 10, "y_mm": 18, "layer": "F.Cu"},
+        {"ref": "P31", "net": "UNCHANGED", "x_mm": 2, "y_mm": 2, "layer": "F.Cu"},
+        {"ref": "P32", "net": "UNCHANGED", "x_mm": 18, "y_mm": 2, "layer": "F.Cu"}
+      ],
+      "operations": [
+        {"net": "TRACE_A", "layer": "F.Cu", "points": [[2, 10], [18, 10]]},
+        {"net": "TRACE_B", "layer": "F.Cu", "points": [[10, 4], [10, 18]]},
+        {"net": "UNCHANGED", "layer": "F.Cu", "points": [[2, 2], [18, 2]]}
+      ]
+    },
+    {
+      "name": "two_layer_missing_junction",
+      "issue": "missing_transition",
+      "expect_applied": true,
+      "components": [
+        {"ref": "Q11", "net": "LAYERED", "x_mm": 2, "y_mm": 12, "layer": "F.Cu"},
+        {"ref": "Q12", "net": "LAYERED", "x_mm": 18, "y_mm": 12, "layer": "B.Cu"},
+        {"ref": "Q21", "net": "BYSTANDER", "x_mm": 2, "y_mm": 3, "layer": "F.Cu"},
+        {"ref": "Q22", "net": "BYSTANDER", "x_mm": 18, "y_mm": 3, "layer": "F.Cu"}
+      ],
+      "operations": [
+        {"net": "LAYERED", "layer": "F.Cu", "points": [[2, 12], [11, 12]]},
+        {"net": "LAYERED", "layer": "B.Cu", "points": [[11, 12], [18, 12]]},
+        {"net": "BYSTANDER", "layer": "F.Cu", "points": [[2, 3], [18, 3]]}
+      ]
+    },
+    {
+      "name": "transition_forbidden_by_policy",
+      "issue": "missing_transition",
+      "allow_vias": false,
+      "expect_applied": false,
+      "components": [
+        {"ref": "R91", "net": "LOCKED_LAYER", "x_mm": 3, "y_mm": 14, "layer": "F.Cu"},
+        {"ref": "R92", "net": "LOCKED_LAYER", "x_mm": 17, "y_mm": 14, "layer": "B.Cu"}
+      ],
+      "operations": [
+        {"net": "LOCKED_LAYER", "layer": "F.Cu", "points": [[3, 14], [9, 14]]},
+        {"net": "LOCKED_LAYER", "layer": "B.Cu", "points": [[9, 14], [17, 14]]}
+      ]
+    }
+  ]
+}
