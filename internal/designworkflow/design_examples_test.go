@@ -270,6 +270,7 @@ func TestDesignExamplesOptionalKiCadBackedTier(t *testing.T) {
 					ArtifactDir:   filepath.Join(outputDir, ".kicadai", "checks"),
 				},
 			})
+			assertFablePhase0DesignTransactionSnapshot(t, metadata.ID, outputDir)
 			if metadata.ID == "sensor_bmp280_breakout" {
 				assertDesignExampleBMP280Readability(t, result, outputDir)
 			}

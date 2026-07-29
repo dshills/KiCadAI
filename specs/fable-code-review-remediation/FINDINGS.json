@@ -1,0 +1,296 @@
+{
+  "schema": "kicadai.fable-remediation-findings.v1",
+  "review_baseline": "7c7fd9c0",
+  "capture_base": "8eeaf5ca",
+  "captured": "2026-07-29",
+  "findings": [
+    {
+      "id": "C1",
+      "severity": "critical",
+      "package": "internal/blocks",
+      "disposition": "closed",
+      "implementation_phase": 1,
+      "reproduction": {
+        "test": "TestClassABOutputStageInstantiation",
+        "path": "internal/blocks/class_ab_output_test.go",
+        "command": "go test ./internal/blocks -run '^TestClassABOutputStageInstantiation$' -count=1"
+      },
+      "affected_capabilities": ["class_ab_output_stage", "protected_class_ab_amplifiers"],
+      "historical_evidence": "invalid before e3b1a258: operation-count tests did not prove diode polarity",
+      "current_evidence": "reverified by catalog-function topology projection and normalized operation snapshot",
+      "closing_commit": "e3b1a258"
+    },
+    {
+      "id": "H1",
+      "severity": "high",
+      "package": "internal/blocks",
+      "disposition": "closed",
+      "implementation_phase": 1,
+      "reproduction": {
+        "test": "TestOpAmpGainStageACCouplingPreservesGainAndMidpointAcrossSupportedValues",
+        "path": "internal/blocks/opamp_test.go",
+        "command": "go test ./internal/blocks -run '^TestOpAmpGainStageACCouplingPreservesGainAndMidpointAcrossSupportedValues$' -count=1"
+      },
+      "affected_capabilities": ["opamp_gain_stage_ac_coupled", "single_supply_amplifiers"],
+      "historical_evidence": "invalid before e3b1a258: AC gain checks did not prove a unity DC operating point",
+      "current_evidence": "reverified for supported gains with midpoint DC output and two-percent AC gain tolerance",
+      "closing_commit": "e3b1a258"
+    },
+    {
+      "id": "H2",
+      "severity": "high",
+      "package": "internal/blocks",
+      "disposition": "closed",
+      "implementation_phase": 1,
+      "reproduction": {
+        "test": "TestAmplifierBiasNetworkInstantiatesDiodeString",
+        "path": "internal/blocks/amplifier_bias_network_test.go",
+        "command": "go test ./internal/blocks -run '^TestAmplifierBiasNetworkInstantiatesDiodeString$' -count=1"
+      },
+      "affected_capabilities": ["amplifier_bias_network", "protected_class_ab_amplifiers"],
+      "historical_evidence": "invalid before e3b1a258: net-name presence did not prove DRIVER_OUT port contact",
+      "current_evidence": "reverified by explicit port and catalog-function net projection",
+      "closing_commit": "e3b1a258"
+    },
+    {
+      "id": "H3",
+      "severity": "high",
+      "package": "internal/kicadfiles/pcb",
+      "disposition": "reproduced_pending",
+      "implementation_phase": 3,
+      "reproduction": {
+        "test": "TestFableH3ReproductionImportedBoardMetadataIsReset",
+        "path": "internal/kicadfiles/pcb/fable_phase0_test.go",
+        "command": "go test ./internal/kicadfiles/pcb -run '^TestFableH3ReproductionImportedBoardMetadataIsReset$' -count=1"
+      },
+      "affected_capabilities": ["imported_pcb_mutation", "fabrication_metadata_preservation"],
+      "historical_evidence": "not valid for imported projects containing non-default general, setup, or title_block nodes",
+      "current_evidence": "pending Phase 3 preservation guard",
+      "closing_commit": null
+    },
+    {
+      "id": "H4",
+      "severity": "high",
+      "package": "internal/kicadfiles/pcb",
+      "disposition": "reproduced_pending",
+      "implementation_phase": 3,
+      "reproduction": {
+        "test": "TestFableH4ReproductionImportedFootprintChildrenAreDropped",
+        "path": "internal/kicadfiles/pcb/fable_phase0_test.go",
+        "command": "go test ./internal/kicadfiles/pcb -run '^TestFableH4ReproductionImportedFootprintChildrenAreDropped$' -count=1"
+      },
+      "affected_capabilities": ["imported_pcb_mutation", "footprint_metadata_preservation"],
+      "historical_evidence": "not valid for footprints containing unmodeled text, models, descriptions, tags, locks, or margins",
+      "current_evidence": "pending Phase 3 preservation guard",
+      "closing_commit": null
+    },
+    {
+      "id": "H5",
+      "severity": "high",
+      "package": "internal/kicadfiles/pcb",
+      "disposition": "reproduced_pending",
+      "implementation_phase": 3,
+      "reproduction": {
+        "test": "TestFableH5ReproductionImportedKeepoutBecomesCopperZone",
+        "path": "internal/kicadfiles/pcb/fable_phase0_test.go",
+        "command": "go test ./internal/kicadfiles/pcb -run '^TestFableH5ReproductionImportedKeepoutBecomesCopperZone$' -count=1"
+      },
+      "affected_capabilities": ["imported_pcb_mutation", "keepout_preservation", "strict_drc_continuity"],
+      "historical_evidence": "not valid for imported rule-area or keepout zones",
+      "current_evidence": "pending Phase 3 preservation guard",
+      "closing_commit": null
+    },
+    {
+      "id": "H6",
+      "severity": "high",
+      "package": "internal/transactions",
+      "disposition": "reproduced_pending",
+      "implementation_phase": 4,
+      "reproduction": {
+        "test": "TestFableH6ReproductionBackupStepRemovesLiveImportedFile",
+        "path": "internal/transactions/fable_phase0_test.go",
+        "command": "go test ./internal/transactions -run '^TestFableH6ReproductionBackupStepRemovesLiveImportedFile$' -count=1"
+      },
+      "affected_capabilities": ["imported_project_write", "multi_file_durability"],
+      "historical_evidence": "atomic individual-file writes do not prove recoverable group commit",
+      "current_evidence": "pending Phase 4 recoverable group commit",
+      "closing_commit": null
+    },
+    {
+      "id": "H7",
+      "severity": "high",
+      "package": "internal/transactions",
+      "disposition": "reproduced_pending",
+      "implementation_phase": 4,
+      "reproduction": {
+        "test": "TestFableH7ReproductionReleaseRemovesReplacementLock",
+        "path": "internal/transactions/fable_phase0_test.go",
+        "command": "go test ./internal/transactions -run '^TestFableH7ReproductionReleaseRemovesReplacementLock$' -count=1"
+      },
+      "affected_capabilities": ["project_apply_lock", "concurrent_mutation_exclusion"],
+      "historical_evidence": "existing-lock tests do not prove lock ownership during stale recovery or release",
+      "current_evidence": "pending Phase 4 ownership-safe locking",
+      "closing_commit": null
+    },
+    {
+      "id": "H8",
+      "severity": "high",
+      "package": "internal/repair",
+      "disposition": "closed",
+      "implementation_phase": 2,
+      "reproduction": {
+        "test": "TestExecutorMissingFootprintInsertsAssignmentBeforeWrite",
+        "path": "internal/repair/executor_test.go",
+        "command": "go test ./internal/repair -run '^TestExecutorMissingFootprintInsertsAssignmentBeforeWrite$' -count=1"
+      },
+      "affected_capabilities": ["footprint_assignment_repair", "repair_replay"],
+      "historical_evidence": "invalid before 8eeaf5ca: attempted assignment could follow write_project",
+      "current_evidence": "reverified by transaction ordering and persisted replay",
+      "closing_commit": "8eeaf5ca"
+    },
+    {
+      "id": "H9",
+      "severity": "high",
+      "package": "internal/repair",
+      "disposition": "closed",
+      "implementation_phase": 2,
+      "reproduction": {
+        "test": "TestPersistedRepairValidatorRetainsIssueWithoutObservedTransactionProof",
+        "path": "internal/repair/persisted_test.go",
+        "command": "go test ./internal/repair -run '^TestPersistedRepairValidatorRetainsIssueWithoutObservedTransactionProof$' -count=1"
+      },
+      "affected_capabilities": ["persisted_repair_status", "repair_promotion_evidence"],
+      "historical_evidence": "invalid before 8eeaf5ca: attempted issues were removed without proof",
+      "current_evidence": "reverified fail-closed for supported transaction repairs; unproven repairs retain the issue",
+      "closing_commit": "8eeaf5ca"
+    },
+    {
+      "id": "H10",
+      "severity": "high",
+      "package": "internal/repair",
+      "disposition": "reproduced_pending",
+      "implementation_phase": 4,
+      "reproduction": {
+        "test": "TestFableH10ReproductionFailedReplacementLeavesMixedOutputWithoutMarker",
+        "path": "internal/repair/fable_phase0_test.go",
+        "command": "go test ./internal/repair -run '^TestFableH10ReproductionFailedReplacementLeavesMixedOutputWithoutMarker$' -count=1"
+      },
+      "affected_capabilities": ["persisted_repair_apply", "multi_file_durability", "repair_recovery"],
+      "historical_evidence": "individual atomic copies do not prove rollback or retained interruption evidence",
+      "current_evidence": "pending Phase 4 recoverable group commit and rollback",
+      "closing_commit": null
+    },
+    {
+      "id": "H11",
+      "severity": "high",
+      "package": "internal/designworkflow",
+      "disposition": "closed",
+      "implementation_phase": 2,
+      "reproduction": {
+        "test": "TestAchievedAcceptanceRejectsMissingOrCrashedKiCadEvidence",
+        "path": "internal/designworkflow/result_test.go",
+        "command": "go test ./internal/designworkflow -run '^TestAchievedAcceptanceRejectsMissingOrCrashedKiCadEvidence$' -count=1"
+      },
+      "affected_capabilities": ["erc_drc_acceptance", "strict_drc_evidence"],
+      "historical_evidence": "invalid before 8eeaf5ca when DRC exited without a readable report",
+      "current_evidence": "reverified fail-closed, including JSON-round-tripped acceptance summaries",
+      "closing_commit": "8eeaf5ca"
+    },
+    {
+      "id": "H12",
+      "severity": "high",
+      "package": "internal/designworkflow",
+      "disposition": "closed",
+      "implementation_phase": 2,
+      "reproduction": {
+        "test": "TestValidateRequestRejectsUnenforcedRequiredRetryDRCPolicy",
+        "path": "internal/designworkflow/request_test.go",
+        "command": "go test ./internal/designworkflow -run '^TestValidateRequestRejectsUnenforcedRequiredRetryDRCPolicy$' -count=1"
+      },
+      "affected_capabilities": ["placement_routing_retry", "per_attempt_drc_ranking"],
+      "historical_evidence": "required retry DRC was accepted without production enforcement",
+      "current_evidence": "policy is rejected until production per-attempt DRC evidence exists",
+      "closing_commit": "8eeaf5ca"
+    },
+    {
+      "id": "H13",
+      "severity": "high",
+      "package": "internal/routing",
+      "disposition": "reproduced_pending",
+      "implementation_phase": 5,
+      "reproduction": {
+        "test": "TestFableH13ReproductionUsableBoardRectIgnoresTraceRadius",
+        "path": "internal/routing/fable_phase0_test.go",
+        "command": "go test ./internal/routing -run '^TestFableH13ReproductionUsableBoardRectIgnoresTraceRadius$' -count=1"
+      },
+      "affected_capabilities": ["routing_edge_clearance", "fabrication_candidate_for_edge_routed_designs"],
+      "historical_evidence": "routing completion does not prove copper-edge clearance for centerlines near Edge.Cuts",
+      "current_evidence": "pending Phase 5 width-aware edge geometry and validation backstop",
+      "closing_commit": null
+    },
+    {
+      "id": "H14",
+      "severity": "high",
+      "package": "internal/routing",
+      "disposition": "reproduced_pending",
+      "implementation_phase": 5,
+      "reproduction": {
+        "test": "TestFableH14ReproductionViaOccupancyIgnoresViaClearance",
+        "path": "internal/routing/fable_phase0_test.go",
+        "command": "go test ./internal/routing -run '^TestFableH14ReproductionViaOccupancyIgnoresViaClearance$' -count=1"
+      },
+      "affected_capabilities": ["routing_via_clearance", "net_class_enforcement"],
+      "historical_evidence": "routing and validation evidence is not sufficient for rules where via_clearance_mm exceeds trace clearance",
+      "current_evidence": "pending Phase 5 shared via-clearance enforcement",
+      "closing_commit": null
+    },
+    {
+      "id": "H15",
+      "severity": "high",
+      "package": "internal/components",
+      "disposition": "reproduced_pending",
+      "implementation_phase": 6,
+      "reproduction": {
+        "test": "TestFableH15ReproductionEquivalentSIPrefixesFailExactMatch",
+        "path": "internal/components/fable_phase0_test.go",
+        "command": "go test ./internal/components -run '^TestFableH15ReproductionEquivalentSIPrefixesFailExactMatch$' -count=1"
+      },
+      "affected_capabilities": ["component_value_selection", "engineering_value_equivalence"],
+      "historical_evidence": "component coverage does not prove equivalent SI-prefix query spellings",
+      "current_evidence": "pending Phase 6 canonical engineering-quantity comparison",
+      "closing_commit": null
+    },
+    {
+      "id": "H16",
+      "severity": "high",
+      "package": "internal/compositionlowering",
+      "disposition": "reproduced_pending",
+      "implementation_phase": 6,
+      "reproduction": {
+        "test": "TestFableH16ReproductionMetadataMergeIsEncounterOrderDependent",
+        "path": "internal/compositionlowering/fable_phase0_test.go",
+        "command": "go test ./internal/compositionlowering -run '^TestFableH16ReproductionMetadataMergeIsEncounterOrderDependent$' -count=1"
+      },
+      "affected_capabilities": ["deterministic_lowering", "resolution_hash", "promotion_replay"],
+      "historical_evidence": "deterministic corpora do not cover conflicting non-empty domains merged from map iteration",
+      "current_evidence": "pending Phase 6 stable-member-order merge",
+      "closing_commit": null
+    },
+    {
+      "id": "H17",
+      "severity": "high",
+      "package": "cmd/kicadai",
+      "disposition": "closed",
+      "implementation_phase": 2,
+      "reproduction": {
+        "test": "TestRunPlaceAndRouteRequestsReturnErrorWithBlockingJSON",
+        "path": "cmd/kicadai/main_test.go",
+        "command": "go test ./cmd/kicadai -run '^TestRunPlaceAndRouteRequestsReturnErrorWithBlockingJSON$' -count=1"
+      },
+      "affected_capabilities": ["place_cli_automation", "route_cli_automation"],
+      "historical_evidence": "invalid before 8eeaf5ca: ok=false reports could exit zero",
+      "current_evidence": "reverified for place and route, compact and pretty JSON",
+      "closing_commit": "8eeaf5ca"
+    }
+  ]
+}

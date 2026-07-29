@@ -1,0 +1,56 @@
+{
+  "schema": "kicadai.fable-transaction-snapshots.v1",
+  "capture_base": "8eeaf5ca",
+  "normalization": "Block receipts hash JSON-marshaled operation arrays. Design receipts hash the compact JSON transaction object inside .kicadai/transaction.json after replacing write_project.output_dir with <OUTPUT> and excluding provenance wrapper fields.",
+  "snapshots": [
+    {
+      "id": "class_ab_output_stage",
+      "kind": "block_operations",
+      "source": "internal/blocks/fable_phase0_snapshot_test.go",
+      "sha256": "d824d0412999b11a6934ecaf604a27c5e84b6baf8be99265890d7296fb57c95a",
+      "verification": "go test ./internal/blocks -run '^TestFablePhase0NormalizedBlockOperationSnapshots/class_ab_output_stage$' -count=1"
+    },
+    {
+      "id": "opamp_gain_stage_ac_coupled",
+      "kind": "block_operations",
+      "source": "internal/blocks/fable_phase0_snapshot_test.go",
+      "sha256": "4fe32b2af1268bf9974e48bbccc3a7fdb790d83217c96f3f6fe83ab4b16d85e2",
+      "verification": "go test ./internal/blocks -run '^TestFablePhase0NormalizedBlockOperationSnapshots/opamp_gain_stage_ac_coupled$' -count=1"
+    },
+    {
+      "id": "amplifier_bias_network",
+      "kind": "block_operations",
+      "source": "internal/blocks/fable_phase0_snapshot_test.go",
+      "sha256": "67976ddbbbc1a15a8f1819f1f914c6bbe1e1c174fb3be4e08f0c4370c4111acf",
+      "verification": "go test ./internal/blocks -run '^TestFablePhase0NormalizedBlockOperationSnapshots/amplifier_bias_network$' -count=1"
+    },
+    {
+      "id": "class_ab_headphone_protected",
+      "kind": "design_transaction",
+      "source": "examples/design/kicad-backed/class_ab_headphone_protected.json",
+      "sha256": "b69fbb69dab12affbe184c4d1a92484725b3543c12410262aed44f116a362004",
+      "verification": "go test ./internal/designworkflow -run 'TestDesignExamplesOptionalKiCadBackedTier/class_ab_headphone_protected$' -count=1"
+    },
+    {
+      "id": "class_ab_speaker_10w_protected",
+      "kind": "design_transaction",
+      "source": "examples/design/kicad-backed/class_ab_speaker_10w_protected.json",
+      "sha256": "0338c2cf16392948def41d948e73bec817797f6579ef3b468754d954296db44a",
+      "verification": "go test ./internal/designworkflow -run 'TestDesignExamplesOptionalKiCadBackedTier/class_ab_speaker_10w_protected$' -count=1"
+    },
+    {
+      "id": "usb_c_led_indicator_protected",
+      "kind": "design_transaction",
+      "source": "examples/design/kicad-backed/usb_c_led_indicator_protected.json",
+      "sha256": "5e9a90251632bd37a4781e7ddbd87f14fa9929f40400b79091ac22c80db72842",
+      "verification": "go test ./internal/designworkflow -run 'TestDesignExamplesOptionalKiCadBackedTier/usb_c_led_indicator_protected$' -count=1"
+    },
+    {
+      "id": "usb_c_i2c_sensor_3v3_protected",
+      "kind": "design_transaction",
+      "source": "examples/design/kicad-backed/usb_c_i2c_sensor_3v3_protected.json",
+      "sha256": "a697e4afb24974a7c5d142c6d18a579f1beda3c917d8b708d60a5b1c0797e0f0",
+      "verification": "go test ./internal/designworkflow -run 'TestDesignExamplesOptionalKiCadBackedTier/usb_c_i2c_sensor_3v3_protected$' -count=1"
+    }
+  ]
+}
