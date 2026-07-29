@@ -299,14 +299,6 @@ func amplifierBiasNetworkHintPoints(definition BlockDefinition) map[string]trans
 }
 
 func appendAmplifierBiasNetworkConnections(definition BlockDefinition, instanceID string, refs map[string]string, operations *[]transactions.Operation, issues *[]reports.Issue) []string {
-	portsByNet := map[string]string{
-		"bias_p":  "BIAS_P",
-		"driver":  "DRIVER_OUT",
-		"bias_n":  "BIAS_N",
-		"vcc":     "VCC",
-		"vee":     "VEE",
-		"amp_out": "AMP_OUT",
-	}
 	nets := make([]string, 0, len(definition.Nets))
 	for _, net := range definition.Nets {
 		netName := InstanceNetName(instanceID, net.NameTemplate)
@@ -315,7 +307,11 @@ func appendAmplifierBiasNetworkConnections(definition BlockDefinition, instanceI
 			continue
 		}
 		previousRef := instanceID
-		previousPin := portsByNet[net.NameTemplate]
+		previousPin := matchingBlockPortName(definition.Ports, net.NameTemplate)
+		if net.Visibility == "exported" && previousPin == "" {
+			*issues = append(*issues, blockIssue("nets."+net.NameTemplate, "exported net has no matching block port"))
+			continue
+		}
 		for index, pin := range net.Pins {
 			ref := refs[pin.ComponentRole]
 			if ref == "" {
@@ -330,4 +326,14 @@ func appendAmplifierBiasNetworkConnections(definition BlockDefinition, instanceI
 		}
 	}
 	return nets
+}
+
+func matchingBlockPortName(ports []BlockPort, netTemplate string) string {
+	netTemplate = strings.TrimSpace(netTemplate)
+	for _, port := range ports {
+		if strings.EqualFold(strings.TrimSpace(port.Name), netTemplate) {
+			return port.Name
+		}
+	}
+	return ""
 }

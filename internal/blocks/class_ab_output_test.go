@@ -54,17 +54,38 @@ func TestClassABOutputStageDefinitionContract(t *testing.T) {
 			t.Fatalf("driver net should enter through routed physical pads, not a redundant virtual-port stub: %#v", route)
 		}
 	}
+	routesByID := map[string]PCBLocalRoute{}
+	for _, route := range definition.PCBRealization.LocalRoutes {
+		routesByID[route.ID] = route
+	}
+	for _, expected := range []struct {
+		routeID string
+		from    RouteEndpoint
+		to      RouteEndpoint
+	}{
+		{"diode_upper_feed", RouteEndpoint{ComponentRole: "upper_bias_feed", Pin: "2"}, RouteEndpoint{ComponentRole: "bias_upper", Pin: "2"}},
+		{"diode_driver_join", RouteEndpoint{ComponentRole: "bias_upper", Pin: "1"}, RouteEndpoint{ComponentRole: "bias_lower", Pin: "2"}},
+		{"diode_lower_feed", RouteEndpoint{ComponentRole: "bias_lower", Pin: "1"}, RouteEndpoint{ComponentRole: "lower_bias_feed", Pin: "1"}},
+	} {
+		route := routesByID[expected.routeID]
+		if route.From != expected.from || route.To != expected.to {
+			t.Fatalf("route %s endpoints = %#v -> %#v, want %#v -> %#v", expected.routeID, route.From, route.To, expected.from, expected.to)
+		}
+	}
 }
 
 func TestClassABOutputStageInstantiation(t *testing.T) {
 	registry := NewBuiltinRegistry()
+	params := map[string]any{
+		"supply_voltage":            "9V",
+		"load_impedance":            "32Ω",
+		"upper_output_component_id": "bjt.onsemi.mmbt3904.sot23",
+		"lower_output_component_id": "bjt.onsemi.mmbt3906.sot23",
+	}
 	output, issues := registry.Instantiate(context.Background(), BlockRequest{
 		BlockID:    classABOutputStageID,
 		InstanceID: "hp_out",
-		Params: map[string]any{
-			"supply_voltage": "9V",
-			"load_impedance": "32Ω",
-		},
+		Params:     params,
 	})
 	if len(issues) != 0 {
 		t.Fatalf("instantiate issues = %#v", issues)
@@ -84,6 +105,34 @@ func TestClassABOutputStageInstantiation(t *testing.T) {
 	if labels := classABLabels(t, output.Operations); len(labels) != 0 {
 		t.Fatalf("class AB output stage should not emit decorative standalone labels: %#v", labels)
 	}
+	definition, ok := registry.GetBlock(classABOutputStageID)
+	if !ok {
+		t.Fatalf("missing block %s", classABOutputStageID)
+	}
+	topology := projectBlockTopology(t, definition, "hp_out", params, output.Operations)
+	upperDrive := InstanceNetName("hp_out", "upper_drive")
+	driver := InstanceNetName("hp_out", "driver_out")
+	lowerDrive := InstanceNetName("hp_out", "lower_drive")
+	upperEmitter := InstanceNetName("hp_out", "upper_emitter")
+	lowerEmitter := InstanceNetName("hp_out", "lower_emitter")
+	ampOut := InstanceNetName("hp_out", "amp_out")
+	vcc := InstanceNetName("hp_out", "vcc")
+	vee := InstanceNetName("hp_out", "vee")
+	topology.requireFunctionNet(t, "bias_upper", "ANODE", upperDrive)
+	topology.requireFunctionNet(t, "bias_upper", "CATHODE", driver)
+	topology.requireFunctionNet(t, "bias_lower", "ANODE", driver)
+	topology.requireFunctionNet(t, "bias_lower", "CATHODE", lowerDrive)
+	topology.requireFunctionNet(t, "upper_output", "BASE", upperDrive)
+	topology.requireFunctionNet(t, "upper_output", "EMITTER", upperEmitter)
+	topology.requireFunctionNet(t, "upper_output", "COLLECTOR", vcc)
+	topology.requireFunctionNet(t, "lower_output", "BASE", lowerDrive)
+	topology.requireFunctionNet(t, "lower_output", "EMITTER", lowerEmitter)
+	topology.requireFunctionNet(t, "lower_output", "COLLECTOR", vee)
+	topology.requirePortNet(t, "DRIVER_OUT", driver)
+	topology.requirePortNet(t, "VCC", vcc)
+	topology.requirePortNet(t, "VEE", vee)
+	topology.requirePortNet(t, "AMP_OUT", ampOut)
+	topology.requirePortNet(t, "LOAD_REF", InstanceNetName("hp_out", "load_ref"))
 }
 
 func TestClassABOutputStageBlocksSpeakerLoad(t *testing.T) {

@@ -32,7 +32,8 @@ func instantiateOpAmpGainStage(definition BlockDefinition, request BlockRequest,
 		issues = append(issues, reports.Issue{Code: reports.CodeUnsupportedOperation, Severity: reports.SeverityBlocked, Path: "params.opamp_symbol", Message: "opamp_gain_stage currently supports only the LMV321 pin-role template"})
 	}
 	singleSupply := boolParam(params, "single_supply", true)
-	if !singleSupply && stringParam(params, "input_coupling") == "ac" {
+	inputCoupling := stringParam(params, "input_coupling")
+	if !singleSupply && inputCoupling == "ac" {
 		issues = append(issues, reports.Issue{Code: reports.CodeUnsupportedOperation, Severity: reports.SeverityBlocked, Path: "params.input_coupling", Message: "ac input coupling currently requires single_supply bias generation"})
 	}
 	opampFootprint := stringParam(params, "opamp_footprint")
@@ -88,7 +89,8 @@ func instantiateOpAmpGainStage(definition BlockDefinition, request BlockRequest,
 	feedbackNet := InstanceNetName(request.InstanceID, "feedback")
 	vccNet := InstanceNetName(request.InstanceID, "vcc")
 	gndNet := InstanceNetName(request.InstanceID, "gnd")
-	if stringParam(params, "input_coupling") == "dc" {
+	biasNet := InstanceNetName(request.InstanceID, "bias")
+	if inputCoupling == "dc" {
 		appendConnectOperation(&operations, &issuesOut, request.InstanceID, "IN", opampRef, lmv321Pins.INP, inNet)
 	}
 	if !includeOutputResistor {
@@ -97,7 +99,11 @@ func instantiateOpAmpGainStage(definition BlockDefinition, request BlockRequest,
 	appendConnectOperation(&operations, &issuesOut, opampRef, lmv321Pins.VCC, request.InstanceID, "VCC", vccNet)
 	appendConnectOperation(&operations, &issuesOut, opampRef, lmv321Pins.VEE, request.InstanceID, "GND", gndNet)
 	appendConnectOperation(&operations, &issuesOut, rgRef, "1", opampRef, lmv321Pins.INN, feedbackNet)
-	appendConnectOperation(&operations, &issuesOut, rgRef, "2", opampRef, lmv321Pins.VEE, gndNet)
+	if inputCoupling == "ac" {
+		appendConnectOperation(&operations, &issuesOut, rgRef, "2", opampRef, lmv321Pins.INP, biasNet)
+	} else {
+		appendConnectOperation(&operations, &issuesOut, rgRef, "2", opampRef, lmv321Pins.VEE, gndNet)
+	}
 	appendConnectOperation(&operations, &issuesOut, rfRef, "1", opampRef, lmv321Pins.OUT, opampOutputNet)
 	appendConnectOperation(&operations, &issuesOut, rfRef, "2", opampRef, lmv321Pins.INN, feedbackNet)
 	appendConnectOperation(&operations, &issuesOut, decouplingRef, "1", opampRef, lmv321Pins.VCC, vccNet)
@@ -108,7 +114,7 @@ func instantiateOpAmpGainStage(definition BlockDefinition, request BlockRequest,
 	if includeOutputResistor {
 		nets = append(nets, opampOutputNet)
 	}
-	if stringParam(params, "input_coupling") == "ac" {
+	if inputCoupling == "ac" {
 		refs, nets, operations = appendOpAmpBiasNetwork(request.InstanceID, allocator, feedbackFootprint, opampRef, refs, nets, operations, &issuesOut)
 	}
 	if includeOutputResistor {

@@ -82,8 +82,8 @@
         "name": "hp_out_driver_out",
         "visibility": "exported",
         "pins": [
-          {"role": "bias_upper", "pin": "2"},
-          {"role": "bias_lower", "pin": "1"}
+          {"role": "bias_upper", "pin": "1"},
+          {"role": "bias_lower", "pin": "2"}
         ]
       },
       {
@@ -91,7 +91,7 @@
         "visibility": "local",
         "pins": [
           {"role": "upper_bias_feed", "pin": "2"},
-          {"role": "bias_upper", "pin": "1"},
+          {"role": "bias_upper", "pin": "2"},
           {"role": "upper_output", "pin": "1"}
         ]
       },
@@ -99,7 +99,7 @@
         "name": "hp_out_lower_drive",
         "visibility": "exported",
         "pins": [
-          {"role": "bias_lower", "pin": "2"},
+          {"role": "bias_lower", "pin": "1"},
           {"role": "lower_output", "pin": "1"},
           {"role": "lower_bias_feed", "pin": "1"}
         ]

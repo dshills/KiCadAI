@@ -41,6 +41,24 @@ func TestAmplifierBiasNetworkInstantiatesDiodeString(t *testing.T) {
 	if len(validation.Issues) != 0 {
 		t.Fatalf("transaction validation issues = %#v", validation.Issues)
 	}
+	definition, ok := registry.GetBlock("amplifier_bias_network")
+	if !ok {
+		t.Fatal("missing amplifier_bias_network definition")
+	}
+	topology := projectBlockTopology(t, definition, "bias", output.Instance.Params, output.Operations)
+	upper := InstanceNetName("bias", "bias_p")
+	driver := InstanceNetName("bias", "driver_out")
+	lower := InstanceNetName("bias", "bias_n")
+	topology.requirePortNet(t, "BIAS_P", upper)
+	topology.requirePortNet(t, "DRIVER_OUT", driver)
+	topology.requirePortNet(t, "BIAS_N", lower)
+	topology.requirePortNet(t, "VCC", InstanceNetName("bias", "vcc"))
+	topology.requirePortNet(t, "VEE", InstanceNetName("bias", "vee"))
+	topology.requirePortNet(t, "AMP_OUT", InstanceNetName("bias", "amp_out"))
+	topology.requireFunctionNet(t, "bias_upper", "ANODE", upper)
+	topology.requireFunctionNet(t, "bias_upper", "CATHODE", driver)
+	topology.requireFunctionNet(t, "bias_lower", "ANODE", driver)
+	topology.requireFunctionNet(t, "bias_lower", "CATHODE", lower)
 }
 
 func TestAmplifierBiasNetworkBlocksUnsupportedVariants(t *testing.T) {

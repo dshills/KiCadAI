@@ -2,9 +2,11 @@ package blocks
 
 import (
 	"context"
+	"fmt"
 	"math"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -69,6 +71,71 @@ func TestOpAmpGainStageACCouplingAddsBiasNetwork(t *testing.T) {
 	if got := output.Instance.Nets; len(got) != 6 || got[5] != "amp_bias" {
 		t.Fatalf("nets = %#v", got)
 	}
+	definition, ok := registry.GetBlock("opamp_gain_stage")
+	if !ok {
+		t.Fatal("missing opamp gain stage definition")
+	}
+	topology := projectBlockTopology(t, definition, "amp", output.Instance.Params, output.Operations)
+	biasNet := InstanceNetName("amp", "bias")
+	topology.requirePinNet(t, "opamp", lmv321Pins.INP, biasNet)
+	topology.requirePinNet(t, "gain_to_ground", "2", biasNet)
+	emittedGain, outputDCFraction := opAmpACGainAndDCFraction(t, topology)
+	if math.Abs(emittedGain-2) > 1e-12 {
+		t.Fatalf("AC small-signal gain = %g, want 2", emittedGain)
+	}
+	if math.Abs(outputDCFraction-0.5) > 1e-12 {
+		t.Fatalf("AC-coupled DC output fraction = %g, want midpoint 0.5", outputDCFraction)
+	}
+}
+
+func TestOpAmpGainStageACCouplingPreservesGainAndMidpointAcrossSupportedValues(t *testing.T) {
+	registry := NewBuiltinRegistry()
+	definition, ok := registry.GetBlock("opamp_gain_stage")
+	if !ok {
+		t.Fatal("missing opamp gain stage definition")
+	}
+	for _, gain := range []float64{2, 3, 10} {
+		t.Run(fmt.Sprintf("gain_%g", gain), func(t *testing.T) {
+			output, issues := registry.Instantiate(context.Background(), BlockRequest{
+				BlockID:    "opamp_gain_stage",
+				InstanceID: "amp",
+				Params: map[string]any{
+					"gain":           gain,
+					"input_coupling": "ac",
+				},
+			})
+			if reports.HasBlockingIssue(issues) {
+				t.Fatalf("issues = %#v", issues)
+			}
+			topology := projectBlockTopology(t, definition, "amp", output.Instance.Params, output.Operations)
+			emittedGain, outputDCFraction := opAmpACGainAndDCFraction(t, topology)
+			if relativeError := math.Abs(emittedGain-gain) / gain; relativeError > 0.02 {
+				t.Fatalf("AC small-signal gain = %g, want %g within 2%%", emittedGain, gain)
+			}
+			if math.Abs(outputDCFraction-0.5) > 1e-12 {
+				t.Fatalf("AC-coupled DC output fraction = %g, want midpoint 0.5", outputDCFraction)
+			}
+		})
+	}
+}
+
+func opAmpACGainAndDCFraction(t *testing.T, topology projectedBlockTopology) (float64, float64) {
+	t.Helper()
+	biasTop, topOK := parseUnit(topology.symbolsByRole["bias_top"].Value, "Ω", resistanceMultipliers())
+	biasBottom, bottomOK := parseUnit(topology.symbolsByRole["bias_bottom"].Value, "Ω", resistanceMultipliers())
+	rg, rgOK := parseUnit(topology.symbolsByRole["gain_to_ground"].Value, "Ω", resistanceMultipliers())
+	rf, rfOK := parseUnit(topology.symbolsByRole["feedback"].Value, "Ω", resistanceMultipliers())
+	if !topOK || !bottomOK || !rgOK || !rfOK || biasTop <= 0 || biasBottom <= 0 || rg <= 0 || rf <= 0 {
+		t.Fatalf("invalid emitted AC-coupled resistor values: top=%g bottom=%g rg=%g rf=%g", biasTop, biasBottom, rg, rf)
+	}
+	midpointFraction := biasBottom / (biasTop + biasBottom)
+	if math.Abs(midpointFraction-0.5) > 1e-12 {
+		t.Fatalf("bias divider fraction = %g, want 0.5", midpointFraction)
+	}
+	vPlus := midpointFraction
+	feedbackReference := midpointFraction
+	outputDCFraction := feedbackReference + (vPlus-feedbackReference)*(1+rf/rg)
+	return 1 + rf/rg, outputDCFraction
 }
 
 func TestOpAmpGainStageACCouplingRealizesPCBInputRoles(t *testing.T) {
@@ -96,6 +163,15 @@ func TestOpAmpGainStageACCouplingRealizesPCBInputRoles(t *testing.T) {
 			t.Fatalf("role refs = %#v, missing %s", realized.RoleRefs, role)
 		}
 	}
+	if !realizedRouteExists(realized, "gain_bias") {
+		t.Fatalf("routes = %#v, missing AC gain_bias reference", realized.LocalRoutes)
+	}
+	if realizedRouteExists(realized, "gain_ground") {
+		t.Fatalf("routes = %#v, AC coupling must not ground the gain reference", realized.LocalRoutes)
+	}
+	if !slices.Contains(realized.Validation.RequiredRoutes, "gain_bias") || slices.Contains(realized.Validation.RequiredRoutes, "gain_ground") {
+		t.Fatalf("required routes = %#v, want only active AC gain reference", realized.Validation.RequiredRoutes)
+	}
 }
 
 func TestOpAmpGainStageDCCouplingRealizesPCBInputRoute(t *testing.T) {
@@ -117,6 +193,15 @@ func TestOpAmpGainStageDCCouplingRealizesPCBInputRoute(t *testing.T) {
 	}
 	if !realizedRouteExists(realized, "dc_input") {
 		t.Fatalf("routes = %#v, missing dc_input", realized.LocalRoutes)
+	}
+	if !realizedRouteExists(realized, "gain_ground") {
+		t.Fatalf("routes = %#v, missing DC gain_ground reference", realized.LocalRoutes)
+	}
+	if realizedRouteExists(realized, "gain_bias") {
+		t.Fatalf("routes = %#v, DC coupling must not emit gain_bias", realized.LocalRoutes)
+	}
+	if !slices.Contains(realized.Validation.RequiredRoutes, "gain_ground") || slices.Contains(realized.Validation.RequiredRoutes, "gain_bias") {
+		t.Fatalf("required routes = %#v, want only active DC gain reference", realized.Validation.RequiredRoutes)
 	}
 }
 

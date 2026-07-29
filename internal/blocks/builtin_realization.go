@@ -336,7 +336,8 @@ func opAmpGainStagePCBRealization() *PCBRealization {
 			{ID: "output_resistor_output", NetTemplate: "out", From: RouteEndpoint{ComponentRole: "output_resistor", Pin: "2"}, To: RouteEndpoint{Port: "OUT"}, Layer: "F.Cu", WidthMM: 0.3, Required: true, DisableEntryAnchorVia: true, When: RealizationWhen{Params: map[string]any{"include_output_resistor": true}}},
 			{ID: "feedback_loop", NetTemplate: "feedback", From: RouteEndpoint{ComponentRole: "feedback", Pin: "2"}, To: RouteEndpoint{ComponentRole: "opamp", Pin: lmv321Pins.INN}, Waypoints: []RelativePoint{{XMM: -3.4, YMM: -4.5}, {XMM: 2.5, YMM: -4.5}, {XMM: 2.5, YMM: 0.95}}, Layer: "B.Cu", WidthMM: 0.25, Required: true},
 			{ID: "gain_reference", NetTemplate: "feedback", From: RouteEndpoint{ComponentRole: "gain_to_ground", Pin: "1"}, To: RouteEndpoint{ComponentRole: "opamp", Pin: lmv321Pins.INN}, Waypoints: []RelativePoint{{XMM: 6, YMM: 4}, {XMM: 6, YMM: 1.5}, {XMM: 2.5, YMM: 1.5}, {XMM: 2.5, YMM: 0.95}}, Layer: "B.Cu", WidthMM: 0.25, Required: true},
-			{ID: "gain_ground", NetTemplate: "gnd", From: RouteEndpoint{ComponentRole: "gain_to_ground", Pin: "2"}, To: RouteEndpoint{ComponentRole: "opamp", Pin: lmv321Pins.VEE}, Waypoints: []RelativePoint{{XMM: 6, YMM: 4}, {XMM: 6, YMM: 8}, {XMM: -4, YMM: 8}, {XMM: -4, YMM: 0}}, Layer: "F.Cu", WidthMM: 0.25, Required: true},
+			{ID: "gain_ground", NetTemplate: "gnd", From: RouteEndpoint{ComponentRole: "gain_to_ground", Pin: "2"}, To: RouteEndpoint{ComponentRole: "opamp", Pin: lmv321Pins.VEE}, Waypoints: []RelativePoint{{XMM: 6, YMM: 4}, {XMM: 6, YMM: 8}, {XMM: -4, YMM: 8}, {XMM: -4, YMM: 0}}, Layer: "F.Cu", WidthMM: 0.25, Required: true, When: RealizationWhen{Params: map[string]any{"input_coupling": "dc"}}},
+			{ID: "gain_bias", NetTemplate: "bias", From: RouteEndpoint{ComponentRole: "gain_to_ground", Pin: "2"}, To: RouteEndpoint{ComponentRole: "bias_bottom", Pin: "1"}, Waypoints: []RelativePoint{{XMM: 6, YMM: 4}, {XMM: -9, YMM: 4}, {XMM: -9, YMM: 1.8}}, Layer: "F.Cu", WidthMM: 0.25, Required: true, When: RealizationWhen{Params: map[string]any{"input_coupling": "ac"}}},
 			{ID: "supply_decoupling", NetTemplate: "vcc", From: RouteEndpoint{ComponentRole: "decoupling_capacitor", Pin: "1"}, To: RouteEndpoint{ComponentRole: "opamp", Pin: lmv321Pins.VCC}, Layer: "F.Cu", WidthMM: 0.3, Required: true},
 			{ID: "supply_decoupling_return", NetTemplate: "gnd", From: RouteEndpoint{ComponentRole: "decoupling_capacitor", Pin: "2"}, To: RouteEndpoint{ComponentRole: "opamp", Pin: lmv321Pins.VEE}, Waypoints: []RelativePoint{{XMM: 5, YMM: 0}}, Layer: "F.Cu", WidthMM: 0.3, Required: true},
 		},
@@ -348,7 +349,7 @@ func opAmpGainStagePCBRealization() *PCBRealization {
 			{ID: "opamp_output_min_width", Kind: "high_current_width", Category: PCBConstraintCurrentPath, NetTemplate: "out", AppliesTo: []string{"output_resistor"}, MinWidthMM: 0.5, Description: "Classify headphone/output paths for wider copper until load-current evidence proves a smaller width."},
 			{ID: "opamp_thermal_edge_preference", Kind: "thermal_region", Category: PCBConstraintThermalKeepout, AppliesTo: []string{"opamp", "output_resistor"}, ClearanceMM: 1, Description: "Prefer output-drive heat sources near board edge or copper-spread regions for later thermal review."},
 		},
-		Validation: PCBValidationExpectations{RequiredNets: []string{"in", "out", "feedback", "vcc", "gnd"}, RequiredRoutes: []string{"feedback_output", "feedback_loop", "gain_reference", "gain_ground", "supply_decoupling"}},
+		Validation: PCBValidationExpectations{RequiredNets: []string{"in", "out", "feedback", "bias", "vcc", "gnd"}, RequiredRoutes: []string{"feedback_output", "feedback_loop", "gain_reference", "gain_ground", "gain_bias", "supply_decoupling"}},
 	}
 }
 

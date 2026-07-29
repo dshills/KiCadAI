@@ -58,9 +58,9 @@ func classABOutputStageDefinition() BlockDefinition {
 		Components:     classABOutputStageComponents(),
 		PCBRealization: classABOutputStagePCBRealization(),
 		Nets: []BlockNet{
-			{NameTemplate: "upper_drive", Visibility: "local", Role: "upper_output_drive", Pins: []NetPin{{ComponentRole: "upper_bias_feed", Pin: "2"}, {ComponentRole: "bias_upper", Pin: "1"}, {ComponentRole: "upper_output", Pin: "1"}}},
-			{NameTemplate: "driver_out", Visibility: "exported", Role: "driver_output", Pins: []NetPin{{ComponentRole: "bias_upper", Pin: "2"}, {ComponentRole: "bias_lower", Pin: "1"}}},
-			{NameTemplate: "lower_drive", Visibility: "exported", Role: "lower_output_drive", Pins: []NetPin{{ComponentRole: "bias_lower", Pin: "2"}, {ComponentRole: "lower_output", Pin: "1"}, {ComponentRole: "lower_bias_feed", Pin: "1"}}},
+			{NameTemplate: "upper_drive", Visibility: "local", Role: "upper_output_drive", Pins: []NetPin{{ComponentRole: "upper_bias_feed", Pin: "2"}, {ComponentRole: "bias_upper", Pin: "2"}, {ComponentRole: "upper_output", Pin: "1"}}},
+			{NameTemplate: "driver_out", Visibility: "exported", Role: "driver_output", Pins: []NetPin{{ComponentRole: "bias_upper", Pin: "1"}, {ComponentRole: "bias_lower", Pin: "2"}}},
+			{NameTemplate: "lower_drive", Visibility: "exported", Role: "lower_output_drive", Pins: []NetPin{{ComponentRole: "bias_lower", Pin: "1"}, {ComponentRole: "lower_output", Pin: "1"}, {ComponentRole: "lower_bias_feed", Pin: "1"}}},
 			{NameTemplate: "upper_emitter", Visibility: "local", Role: "upper_emitter_resistor_input", Pins: []NetPin{{ComponentRole: "upper_output", Pin: "2"}, {ComponentRole: "upper_emitter_resistor", Pin: "1"}}},
 			{NameTemplate: "lower_emitter", Visibility: "local", Role: "lower_emitter_resistor_input", Pins: []NetPin{{ComponentRole: "lower_output", Pin: "2"}, {ComponentRole: "lower_emitter_resistor", Pin: "1"}}},
 			{NameTemplate: "amp_out", Visibility: "exported", Role: "amplifier_output", Pins: []NetPin{{ComponentRole: "upper_emitter_resistor", Pin: "2"}, {ComponentRole: "lower_emitter_resistor", Pin: "2"}}},
@@ -135,11 +135,11 @@ func classABOutputStagePCBRealization() *PCBRealization {
 			{ID: "output_pair", ComponentRoles: []string{"upper_output", "lower_output", "upper_emitter_resistor", "lower_emitter_resistor"}, AnchorRole: "upper_output", Bounds: &RelativeBounds{MinXMM: 8, MinYMM: -7, MaxXMM: 21, MaxYMM: 7}, Description: "Keep complementary output devices and emitter resistors symmetric around the amplifier output node."},
 		},
 		LocalRoutes: []PCBLocalRoute{
-			{ID: "diode_upper_feed", NetTemplate: "upper_drive", From: RouteEndpoint{ComponentRole: "upper_bias_feed", Pin: "2"}, To: RouteEndpoint{ComponentRole: "bias_upper", Pin: "1"}, Layer: "B.Cu", WidthMM: 0.25, Required: true, When: diodeString},
-			{ID: "diode_upper_output_drive", NetTemplate: "upper_drive", From: RouteEndpoint{ComponentRole: "bias_upper", Pin: "1"}, To: RouteEndpoint{ComponentRole: "upper_output", Pin: "1"}, Waypoints: []RelativePoint{{XMM: 4.8, YMM: -5.8}, {XMM: 10.05, YMM: -5.8}}, Layer: "B.Cu", WidthMM: 0.25, Required: true, When: diodeString},
-			{ID: "diode_driver_join", NetTemplate: "driver_out", From: RouteEndpoint{ComponentRole: "bias_upper", Pin: "2"}, To: RouteEndpoint{ComponentRole: "bias_lower", Pin: "1"}, Waypoints: []RelativePoint{{XMM: 8, YMM: -3}, {XMM: 8, YMM: 0}, {XMM: 3.5, YMM: 0}, {XMM: 3.5, YMM: 3}}, Layer: "B.Cu", WidthMM: 0.25, Required: true, When: diodeString},
-			{ID: "diode_lower_output_drive", NetTemplate: "lower_drive", From: RouteEndpoint{ComponentRole: "bias_lower", Pin: "2"}, To: RouteEndpoint{ComponentRole: "lower_output", Pin: "1"}, Waypoints: []RelativePoint{{XMM: 7.2, YMM: 5.8}, {XMM: 10.05, YMM: 5.8}}, Layer: "B.Cu", WidthMM: 0.25, Required: true, When: diodeString},
-			{ID: "diode_lower_feed", NetTemplate: "lower_drive", From: RouteEndpoint{ComponentRole: "bias_lower", Pin: "2"}, To: RouteEndpoint{ComponentRole: "lower_bias_feed", Pin: "1"}, Waypoints: []RelativePoint{{XMM: 7.2, YMM: 5.8}, {XMM: 1.4, YMM: 5.8}}, Layer: "B.Cu", WidthMM: 0.25, Required: true, When: diodeString},
+			{ID: "diode_upper_feed", NetTemplate: "upper_drive", From: RouteEndpoint{ComponentRole: "upper_bias_feed", Pin: "2"}, To: RouteEndpoint{ComponentRole: "bias_upper", Pin: "2"}, Layer: "B.Cu", WidthMM: 0.25, Required: true, When: diodeString},
+			{ID: "diode_upper_output_drive", NetTemplate: "upper_drive", From: RouteEndpoint{ComponentRole: "bias_upper", Pin: "2"}, To: RouteEndpoint{ComponentRole: "upper_output", Pin: "1"}, Waypoints: []RelativePoint{{XMM: 4.8, YMM: -5.8}, {XMM: 10.05, YMM: -5.8}}, Layer: "B.Cu", WidthMM: 0.25, Required: true, When: diodeString},
+			{ID: "diode_driver_join", NetTemplate: "driver_out", From: RouteEndpoint{ComponentRole: "bias_upper", Pin: "1"}, To: RouteEndpoint{ComponentRole: "bias_lower", Pin: "2"}, Waypoints: []RelativePoint{{XMM: 8, YMM: -3}, {XMM: 8, YMM: 0}, {XMM: 3.5, YMM: 0}, {XMM: 3.5, YMM: 3}}, Layer: "B.Cu", WidthMM: 0.25, Required: true, When: diodeString},
+			{ID: "diode_lower_output_drive", NetTemplate: "lower_drive", From: RouteEndpoint{ComponentRole: "bias_lower", Pin: "1"}, To: RouteEndpoint{ComponentRole: "lower_output", Pin: "1"}, Waypoints: []RelativePoint{{XMM: 7.2, YMM: 5.8}, {XMM: 10.05, YMM: 5.8}}, Layer: "B.Cu", WidthMM: 0.25, Required: true, When: diodeString},
+			{ID: "diode_lower_feed", NetTemplate: "lower_drive", From: RouteEndpoint{ComponentRole: "bias_lower", Pin: "1"}, To: RouteEndpoint{ComponentRole: "lower_bias_feed", Pin: "1"}, Waypoints: []RelativePoint{{XMM: 7.2, YMM: 5.8}, {XMM: 1.4, YMM: 5.8}}, Layer: "B.Cu", WidthMM: 0.25, Required: true, When: diodeString},
 			{ID: "multiplier_upper_feed", NetTemplate: "upper_drive", From: RouteEndpoint{ComponentRole: "upper_bias_feed", Pin: "2"}, To: RouteEndpoint{ComponentRole: "bias_multiplier", Pin: "3"}, Layer: "F.Cu", WidthMM: 0.25, Required: true, When: vbeMultiplier},
 			{ID: "multiplier_upper_output_drive", NetTemplate: "upper_drive", From: RouteEndpoint{ComponentRole: "bias_multiplier", Pin: "3"}, To: RouteEndpoint{ComponentRole: "upper_output", Pin: "1"}, Layer: "F.Cu", WidthMM: 0.25, Required: true, When: vbeMultiplier},
 			{ID: "multiplier_upper_resistor", NetTemplate: "upper_drive", From: RouteEndpoint{ComponentRole: "bias_multiplier", Pin: "3"}, To: RouteEndpoint{ComponentRole: "bias_multiplier_upper", Pin: "1"}, Layer: "F.Cu", WidthMM: 0.25, Required: true, When: vbeMultiplier},
@@ -469,12 +469,12 @@ func instantiateClassABOutputStage(definition BlockDefinition, request BlockRequ
 		appendConnectOperation(&operations, &issues, refs["bias_multiplier"], "2", refs["bias_multiplier_lower"], "2", lowerDriveNet)
 		appendConnectOperation(&operations, &issues, refs["bias_multiplier"], "2", refs["lower_bias_feed"], "1", lowerDriveNet)
 	} else {
-		appendConnectOperation(&operations, &issues, refs["bias_upper"], "1", refs["upper_output"], "1", upperDriveNet)
-		appendConnectOperation(&operations, &issues, refs["upper_bias_feed"], "2", refs["bias_upper"], "1", upperDriveNet)
-		appendConnectOperation(&operations, &issues, request.InstanceID, "DRIVER_OUT", refs["bias_upper"], "2", driverNet)
-		appendConnectOperation(&operations, &issues, refs["bias_upper"], "2", refs["bias_lower"], "1", driverNet)
-		appendConnectOperation(&operations, &issues, refs["bias_lower"], "2", refs["lower_output"], "1", lowerDriveNet)
-		appendConnectOperation(&operations, &issues, refs["bias_lower"], "2", refs["lower_bias_feed"], "1", lowerDriveNet)
+		appendConnectOperation(&operations, &issues, refs["bias_upper"], "2", refs["upper_output"], "1", upperDriveNet)
+		appendConnectOperation(&operations, &issues, refs["upper_bias_feed"], "2", refs["bias_upper"], "2", upperDriveNet)
+		appendConnectOperation(&operations, &issues, request.InstanceID, "DRIVER_OUT", refs["bias_upper"], "1", driverNet)
+		appendConnectOperation(&operations, &issues, refs["bias_upper"], "1", refs["bias_lower"], "2", driverNet)
+		appendConnectOperation(&operations, &issues, refs["bias_lower"], "1", refs["lower_output"], "1", lowerDriveNet)
+		appendConnectOperation(&operations, &issues, refs["bias_lower"], "1", refs["lower_bias_feed"], "1", lowerDriveNet)
 	}
 	appendConnectOperation(&operations, &issues, refs["upper_output"], "2", refs["upper_emitter_resistor"], "1", upperEmitterNet)
 	appendConnectOperation(&operations, &issues, refs["lower_output"], "2", refs["lower_emitter_resistor"], "1", lowerEmitterNet)

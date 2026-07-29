@@ -29,6 +29,13 @@ roadmaps, and dated review material.
 Subdirectories group feature specs and plans by area. Prefer adding new work to
 the relevant subdirectory instead of adding loose historical files at the root.
 
+- [July 29 Fable code review](FABLE_CODE_REVIEW_07_29_26.md)
+  - independent full-repository review identifying circuit-topology,
+    imported-project safety, acceptance, durability, routing, and determinism
+    defects.
+- [Fable code review remediation plan](fable-code-review-remediation/PLAN.md)
+  - phases every Critical and High finding through local regression, generic
+    correction, installed-KiCad validation, Prism review, and closeout.
 - [Capability-aware confidence gating specification](capability-aware-confidence-gating/SPEC.md)
   and [plan](capability-aware-confidence-gating/PLAN.md)
   - define the evidence-derived runtime boundary, explicit experimental opt-in,

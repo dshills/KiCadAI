@@ -56,6 +56,51 @@ func TestClassABSpeakerPowerStageInstantiatesTenWattEnvelope(t *testing.T) {
 	if validation := transactions.Validate(transactions.Transaction{Operations: output.Operations}); len(validation.Issues) != 0 {
 		t.Fatalf("transaction validation issues = %#v", validation.Issues)
 	}
+	definition, ok := registry.GetBlock(classABSpeakerPowerStageID)
+	if !ok {
+		t.Fatalf("missing block %s", classABSpeakerPowerStageID)
+	}
+	topology := projectBlockTopology(t, definition, "speaker_power", output.Instance.Params, output.Operations)
+	upperSource := InstanceNetName("speaker_power", "upper_drive_source")
+	upperMid := InstanceNetName("speaker_power", "upper_bias_mid")
+	driver := InstanceNetName("speaker_power", "driver_center")
+	lowerMid := InstanceNetName("speaker_power", "lower_bias_mid")
+	lowerSource := InstanceNetName("speaker_power", "lower_drive_source")
+	for _, expected := range []struct {
+		role    string
+		anode   string
+		cathode string
+	}{
+		{"bias_diode_1", upperSource, upperMid},
+		{"bias_diode_2", upperMid, driver},
+		{"bias_diode_3", driver, lowerMid},
+		{"bias_diode_4", lowerMid, lowerSource},
+	} {
+		topology.requireFunctionNet(t, expected.role, "ANODE", expected.anode)
+		topology.requireFunctionNet(t, expected.role, "CATHODE", expected.cathode)
+	}
+	topology.requirePortNet(t, "DRIVER_OUT", driver)
+	topology.requirePortNet(t, "VCC", InstanceNetName("speaker_power", "vcc"))
+	topology.requirePortNet(t, "VEE", InstanceNetName("speaker_power", "vee"))
+	topology.requirePortNet(t, "RAW_OUT", InstanceNetName("speaker_power", "raw_out"))
+	topology.requirePortNet(t, "POWER_STAR", InstanceNetName("speaker_power", "power_star"))
+	for _, expected := range []struct {
+		role      string
+		base      string
+		collector string
+		emitter   string
+	}{
+		{"upper_driver", InstanceNetName("speaker_power", "upper_drive"), InstanceNetName("speaker_power", "vcc"), InstanceNetName("speaker_power", "upper_power_base")},
+		{"lower_driver", InstanceNetName("speaker_power", "lower_drive"), InstanceNetName("speaker_power", "vee"), InstanceNetName("speaker_power", "lower_power_base")},
+		{"upper_output", InstanceNetName("speaker_power", "upper_power_base"), InstanceNetName("speaker_power", "vcc"), InstanceNetName("speaker_power", "upper_sense")},
+		{"lower_output", InstanceNetName("speaker_power", "lower_power_base"), InstanceNetName("speaker_power", "vee"), InstanceNetName("speaker_power", "lower_sense")},
+		{"upper_current_limit", InstanceNetName("speaker_power", "upper_sense"), InstanceNetName("speaker_power", "upper_drive"), InstanceNetName("speaker_power", "raw_out")},
+		{"lower_current_limit", InstanceNetName("speaker_power", "lower_sense"), InstanceNetName("speaker_power", "lower_drive"), InstanceNetName("speaker_power", "raw_out")},
+	} {
+		topology.requireFunctionNet(t, expected.role, "BASE", expected.base)
+		topology.requireFunctionNet(t, expected.role, "COLLECTOR", expected.collector)
+		topology.requireFunctionNet(t, expected.role, "EMITTER", expected.emitter)
+	}
 }
 
 func TestClassABSpeakerPowerStageBlocksUnderpoweredEnvelope(t *testing.T) {
