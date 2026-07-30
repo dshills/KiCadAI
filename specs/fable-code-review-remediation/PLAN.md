@@ -1,7 +1,7 @@
 # Fable Code Review Remediation Plan
 
 Date: 2026-07-29
-Status: In progress (Phases 0–8 complete)
+Status: Complete locally (Phases 0–9 complete)
 Baseline commit: `7c7fd9c0`
 Source review: [`../FABLE_CODE_REVIEW_07_29_26.md`](../FABLE_CODE_REVIEW_07_29_26.md)
 
@@ -18,7 +18,7 @@ Source review: [`../FABLE_CODE_REVIEW_07_29_26.md`](../FABLE_CODE_REVIEW_07_29_2
 | 6. Component values and lowering determinism | Complete locally | Canonical value encoding, op-amp clamp comparison, deterministic condition events, stable explicit-net ordering, and order-independent lowering are closed by commit `1f8e34b7`. |
 | 7. Workflow, capability, architecture, and connectivity | Complete locally | [`PHASE7_AUDIT.md`](PHASE7_AUDIT.md) records the five focused closing commits, repository-wide local validation, installed-KiCad evidence, and Prism disposition. |
 | 8. Simulation and protection physics | Complete locally | [`PHASE8_AUDIT.md`](PHASE8_AUDIT.md) records transactional fuse I²t state, corrected SOA timing/evidence, deterministic tolerance identity, analytic/refinement tests, local validation, installed-KiCad amplifier evidence, and the bounded promotion-fixture routing limitation. |
-| 9. Durability tooling and repository health | Proposed | Not started. |
+| 9. Durability tooling and repository health | Complete locally | [`PHASE9_AUDIT.md`](PHASE9_AUDIT.md) records atomic-write and promotion CLI coverage, enforced `errcheck` and correctness-focused `staticcheck`, the bounded local race target, consolidated Go caches, confirmed generated-artifact cleanup, Go 1.23-compatible dependency updates, the complete local validation matrix, installed-KiCad fixture preservation, and Prism disposition. |
 
 ## 1. Goal
 
@@ -697,6 +697,9 @@ the declared datasheet quantities.
 `Correct protection simulation state`
 
 ## 14. Phase 9 — Durability Tooling and Repository Health
+
+Status: complete on 2026-07-30. Implementation and local acceptance evidence are
+recorded in `PHASE9_AUDIT.md`.
 
 ### Objective
 
