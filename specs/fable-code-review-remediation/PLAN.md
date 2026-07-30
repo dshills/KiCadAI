@@ -1,7 +1,7 @@
 # Fable Code Review Remediation Plan
 
 Date: 2026-07-29
-Status: In progress (Phases 0–5 complete)
+Status: In progress (Phases 0–8 complete)
 Baseline commit: `7c7fd9c0`
 Source review: [`../FABLE_CODE_REVIEW_07_29_26.md`](../FABLE_CODE_REVIEW_07_29_26.md)
 
@@ -15,7 +15,10 @@ Source review: [`../FABLE_CODE_REVIEW_07_29_26.md`](../FABLE_CODE_REVIEW_07_29_2
 | 3. Imported KiCad preservation | Complete locally | PCB and schematic readers inventory fully modeled, safely raw-preserved, and mutation-unsupported constructs. Imported board metadata, custom paper, setup/plot data, footprint metadata/text/models/unknown children, schematic presentation nodes, and keepouts survive read-modify-write. Duplicate singleton constructs fail closed. Staged output is internally re-read and compared with source preservation evidence before any live replacement. Focused reader, round-trip, transaction, and unchanged-source refusal tests pass. |
 | 4. Recoverable project mutation | Complete locally | Imported apply and persisted repair share a same-directory, hash-verified group commit with retained rollback data, a synced state journal, deterministic startup recovery, ownership-token locks, advisory locking where portable, and Windows replacement via `MoveFileExW`. Transition fault tests prove recovery to all-old or all-new, and worsened repair validation restores the prior project. |
 | 5. Routing and DFM geometry | Complete locally | One effective object-pair clearance policy now drives trace/via search and validation. Trace half-width and via radius constrain inward-quantized board-edge eligibility; final validation independently checks copper-to-edge and full-shape obstacle clearance. `ViaClearanceMM`, conservative net-class pairing, KiCad pad rotation, side-aware courtyards, and arbitrary copper-layer adaptation have focused boundary coverage. Protected USB-C fixtures retain clean installed-KiCad evidence. |
-| 6–9 | Proposed | Not started. |
+| 6. Component values and lowering determinism | Complete locally | Canonical value encoding, op-amp clamp comparison, deterministic condition events, stable explicit-net ordering, and order-independent lowering are closed by commit `1f8e34b7`. |
+| 7. Workflow, capability, architecture, and connectivity | Complete locally | [`PHASE7_AUDIT.md`](PHASE7_AUDIT.md) records the five focused closing commits, repository-wide local validation, installed-KiCad evidence, and Prism disposition. |
+| 8. Simulation and protection physics | Complete locally | [`PHASE8_AUDIT.md`](PHASE8_AUDIT.md) records transactional fuse I²t state, corrected SOA timing/evidence, deterministic tolerance identity, analytic/refinement tests, local validation, installed-KiCad amplifier evidence, and the bounded promotion-fixture routing limitation. |
+| 9. Durability tooling and repository health | Proposed | Not started. |
 
 ## 1. Goal
 
@@ -651,6 +654,9 @@ or create incorrect connectivity.
 Use one focused commit per work stream rather than one cross-package commit.
 
 ## 13. Phase 8 — Correct Simulation and Protection Physics
+
+Status: complete on 2026-07-30. Implementation and local acceptance evidence are
+recorded in `PHASE8_AUDIT.md`.
 
 ### Objective
 

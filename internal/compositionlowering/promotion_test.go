@@ -715,8 +715,12 @@ func runFrozenPromotionAt(t *testing.T, corpusRoot string, expectedCount int, ar
 			if assessmentErr != nil {
 				t.Fatalf("capability assessment: %v", assessmentErr)
 			}
-			if assessment.Classification != capabilitygate.ClassificationSupported {
-				t.Fatalf("promoted architecture capability = %s gaps=%#v risks=%#v evidence=%#v", assessment.Classification, assessment.Gaps, assessment.Risks, assessment.Evidence)
+			if err := capabilitygate.Validate(assessment); err != nil {
+				t.Fatalf("validate capability assessment: %v", err)
+			}
+			if assessment.Classification != capabilitygate.ClassificationSupported &&
+				assessment.Classification != capabilitygate.ClassificationExperimental {
+				t.Fatalf("architecture capability = %s fabrication_eligible=%t; gaps=%#v risks=%#v evidence=%#v", assessment.Classification, assessment.FabricationReadyEligible, assessment.Gaps, assessment.Risks, assessment.Evidence)
 			}
 			var request designworkflow.Request
 			var resolved circuitgraph.ResolvedDocument
