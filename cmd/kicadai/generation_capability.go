@@ -6,7 +6,6 @@ import (
 	"io"
 	"strings"
 
-	"kicadai/internal/components"
 	"kicadai/internal/generationcapability"
 	"kicadai/internal/reports"
 )
@@ -32,12 +31,7 @@ func runGenerationCapability(ctx context.Context, opts cliOptions, stdout io.Wri
 		}
 	}
 
-	// The built-in catalog makes this command usable from any working directory.
-	catalogDir := opts.catalogDir
-	if strings.TrimSpace(catalogDir) == components.DefaultCatalogDir {
-		catalogDir = ""
-	}
-	catalog, err := components.LoadCatalog(ctx, components.LoadOptions{CatalogDir: catalogDir})
+	catalog, err := loadComponentCatalog(ctx, opts.catalogDir)
 	if err != nil {
 		issue := reports.Issue{Code: reports.CodeValidationFailed, Severity: reports.SeverityError, Path: "catalog", Message: fmt.Sprintf("load generation catalog: %v", err)}
 		return writeReportFailure(stdout, "capability", issue)

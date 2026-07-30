@@ -13,7 +13,6 @@ import (
 	"strings"
 
 	"kicadai/internal/circuitgraph"
-	"kicadai/internal/components"
 	"kicadai/internal/creationevidence"
 	"kicadai/internal/designworkflow"
 	"kicadai/internal/generationcapability"
@@ -673,11 +672,7 @@ func parseCircuitPreflightArgs(opts *cliOptions) *reports.Issue {
 func evaluateCircuitPreflight(ctx context.Context, opts cliOptions) circuitPreflightEvaluation {
 	data := circuitPreflightData{InputPath: opts.requestPath, SchematicIssues: []reports.Issue{}, Gates: []circuitPreflightGate{}, RepairOptions: []circuitgraph.RepairOption{}}
 	result := circuitPreflightEvaluation{Data: data, Issues: []reports.Issue{}}
-	catalogDir := opts.catalogDir
-	if strings.TrimSpace(catalogDir) == components.DefaultCatalogDir {
-		catalogDir = ""
-	}
-	catalog, err := components.LoadCatalog(ctx, components.LoadOptions{CatalogDir: catalogDir})
+	catalog, err := loadComponentCatalog(ctx, opts.catalogDir)
 	if err != nil {
 		result.Issues = []reports.Issue{{Code: reports.CodeValidationFailed, Severity: reports.SeverityError, Path: "catalog", Message: err.Error()}}
 		return result

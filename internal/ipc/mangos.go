@@ -49,6 +49,10 @@ func newMangosSocket(timeout TimeoutConfig) (mangos.Socket, error) {
 		_ = socket.Close()
 		return nil, &ConnectionError{Op: "set receive timeout", Cause: err}
 	}
+	if err := socket.SetOption(mangos.OptionRetryTime, time.Duration(0)); err != nil {
+		_ = socket.Close()
+		return nil, &ConnectionError{Op: "disable automatic request retry", Cause: err}
+	}
 
 	return socket, nil
 }
@@ -112,6 +116,18 @@ func (t *MangosTransport) Request(ctx context.Context, payload []byte) ([]byte, 
 	endpoint := t.endpoint
 	t.stateMu.Unlock()
 
+	requestDone := make(chan struct{})
+	if ctx.Done() != nil {
+		go func() {
+			select {
+			case <-ctx.Done():
+				t.closeSocketAfterInterruptedRequest(socket)
+			case <-requestDone:
+			}
+		}()
+	}
+	defer close(requestDone)
+
 	sendDeadline, err := effectiveDeadline(ctx, t.timeout.SendTimeout)
 	if err != nil {
 		return nil, err
@@ -133,6 +149,9 @@ func (t *MangosTransport) Request(ctx context.Context, payload []byte) ([]byte, 
 
 	if err := socket.Send(payload); err != nil {
 		t.closeSocketAfterInterruptedRequest(socket)
+		if ctxErr := ctx.Err(); ctxErr != nil {
+			return nil, ctxErr
+		}
 		return nil, &ConnectionError{Endpoint: endpoint, Op: "send", Cause: err}
 	}
 
@@ -163,6 +182,9 @@ func (t *MangosTransport) Request(ctx context.Context, payload []byte) ([]byte, 
 	response, err := socket.Recv()
 	if err != nil {
 		t.closeSocketAfterInterruptedRequest(socket)
+		if ctxErr := ctx.Err(); ctxErr != nil {
+			return nil, ctxErr
+		}
 		return nil, &ConnectionError{Endpoint: endpoint, Op: "receive", Cause: err}
 	}
 

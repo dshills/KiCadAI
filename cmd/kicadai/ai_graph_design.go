@@ -12,7 +12,6 @@ import (
 
 	"kicadai/internal/aiprovider"
 	"kicadai/internal/circuitgraph"
-	"kicadai/internal/components"
 	"kicadai/internal/designworkflow"
 	"kicadai/internal/generationcapability"
 	"kicadai/internal/intentplanner"
@@ -40,7 +39,7 @@ func runAIGenericCircuitCreate(ctx context.Context, opts cliOptions, prompt, pro
 	if createOpts.LibraryIndex == nil {
 		return writeDesignFailure(stdout, reports.Issue{Code: reports.CodeInvalidArgument, Severity: reports.SeverityError, Path: "library", Message: "generic circuit profile requires --symbols-root and --footprints-root or a populated --library-cache"})
 	}
-	catalog, err := components.LoadCatalog(ctx, components.LoadOptions{CatalogDir: opts.catalogDir})
+	catalog, err := loadComponentCatalog(ctx, opts.catalogDir)
 	if err != nil {
 		return writeDesignFailure(stdout, reports.Issue{Code: reports.CodeInvalidArgument, Severity: reports.SeverityError, Path: "catalog_dir", Message: err.Error()})
 	}

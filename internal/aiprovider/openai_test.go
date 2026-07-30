@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestOpenAIProviderSendsStrictResponsesRequest(t *testing.T) {
@@ -123,12 +124,75 @@ func TestOpenAIProviderPollsBackgroundResponse(t *testing.T) {
 		}
 	})
 	provider, _ := newOpenAIProvider(OpenAIOptions{APIKey: "test-key", HTTPClient: client, Background: true}, openAIResponsesEndpoint)
+	provider.pollInitial = time.Millisecond
+	provider.pollMaximum = 2 * time.Millisecond
 	result, err := provider.GenerateIntent(context.Background(), openAITestRequest("x"))
 	if err != nil {
 		t.Fatalf("generate in background: %v", err)
 	}
 	if result.ResponseID != "resp_test" || requests != 2 {
 		t.Fatalf("result=%#v requests=%d", result, requests)
+	}
+}
+
+func TestOpenAIProviderStreamingLimitScalesWithTokenLimit(t *testing.T) {
+	client := clientWithRoundTrip(func(_ *http.Request) (*http.Response, error) {
+		padding := strings.Repeat("event: response.output_text.delta\ndata: {\"delta\":\"x\"}\n\n", 40000)
+		event := padding + "event: response.completed\ndata: {\"type\":\"response.completed\",\"response\":" + openAIResponseJSON(t, validEnvelope) + "}\n\n"
+		if len(event) <= MaxResponseBytes {
+			t.Fatalf("stream fixture = %d bytes, want above fixed envelope limit", len(event))
+		}
+		response := jsonHTTPResponse(http.StatusOK, event)
+		response.Header.Set("Content-Type", "text/event-stream")
+		return response, nil
+	})
+	provider, _ := newOpenAIProvider(OpenAIOptions{APIKey: "test-key", HTTPClient: client}, openAIResponsesEndpoint)
+	request := openAITestRequest("x")
+	request.MaxOutputTokens = DefaultGenericOutputTokens
+	if _, err := provider.GenerateIntent(context.Background(), request); err != nil {
+		t.Fatalf("token-bounded stream was rejected: %v", err)
+	}
+}
+
+func TestOpenAIProviderBackgroundPollingRetriesTransientFailures(t *testing.T) {
+	requests := 0
+	client := clientWithRoundTrip(func(request *http.Request) (*http.Response, error) {
+		requests++
+		switch requests {
+		case 1:
+			return jsonHTTPResponse(http.StatusOK, `{"id":"resp_background","status":"queued"}`), nil
+		case 2:
+			return jsonHTTPResponse(http.StatusTooManyRequests, `{"error":{"code":"rate_limit"}}`), nil
+		case 3:
+			return jsonHTTPResponse(http.StatusBadGateway, `{"error":{"code":"upstream"}}`), nil
+		default:
+			return jsonHTTPResponse(http.StatusOK, openAIResponseJSON(t, validEnvelope)), nil
+		}
+	})
+	provider, _ := newOpenAIProvider(OpenAIOptions{APIKey: "test-key", HTTPClient: client, Background: true}, openAIResponsesEndpoint)
+	provider.pollInitial = time.Millisecond
+	provider.pollMaximum = 2 * time.Millisecond
+	provider.pollTimeout = 100 * time.Millisecond
+	result, err := provider.GenerateIntent(context.Background(), openAITestRequest("x"))
+	if err != nil {
+		t.Fatalf("background transient retry failed: %v", err)
+	}
+	if result.ResponseID != "resp_test" || requests != 4 {
+		t.Fatalf("result=%#v requests=%d", result, requests)
+	}
+}
+
+func TestOpenAIProviderBackgroundPollingHasOverallDeadline(t *testing.T) {
+	client := clientWithRoundTrip(func(_ *http.Request) (*http.Response, error) {
+		return jsonHTTPResponse(http.StatusOK, `{"id":"resp_background","status":"in_progress"}`), nil
+	})
+	provider, _ := newOpenAIProvider(OpenAIOptions{APIKey: "test-key", HTTPClient: client, Background: true}, openAIResponsesEndpoint)
+	provider.pollInitial = time.Millisecond
+	provider.pollMaximum = 2 * time.Millisecond
+	provider.pollTimeout = 10 * time.Millisecond
+	_, err := provider.GenerateIntent(context.Background(), openAITestRequest("x"))
+	if ErrorCodeOf(err) != ErrorTimeout {
+		t.Fatalf("background deadline error = %v code=%q", err, ErrorCodeOf(err))
 	}
 }
 

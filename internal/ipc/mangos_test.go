@@ -11,6 +11,9 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"go.nanomsg.org/mangos/v3/protocol/rep"
+	_ "go.nanomsg.org/mangos/v3/transport/inproc"
 )
 
 const testTransportTimeout = 100 * time.Millisecond
@@ -105,6 +108,47 @@ func TestMangosTransportHonorsCanceledContext(t *testing.T) {
 	}
 	if _, err := transport.Request(ctx, []byte("request")); !errors.Is(err, context.Canceled) {
 		t.Fatalf("Request error = %v, want %v", err, context.Canceled)
+	}
+}
+
+func TestMangosTransportCancelsBlockedRequestWithoutDeadline(t *testing.T) {
+	endpoint := "inproc://" + strings.ReplaceAll(t.Name(), "/", "-")
+	server, err := rep.NewSocket()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer server.Close()
+	if err := server.Listen(endpoint); err != nil {
+		t.Fatal(err)
+	}
+	transport, err := NewMangosTransport(TimeoutConfig{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer transport.Close()
+	if err := transport.Dial(context.Background(), endpoint); err != nil {
+		t.Fatal(err)
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	result := make(chan error, 1)
+	go func() {
+		_, requestErr := transport.Request(ctx, []byte("request"))
+		result <- requestErr
+	}()
+	time.Sleep(20 * time.Millisecond)
+	cancel()
+
+	select {
+	case err := <-result:
+		if !errors.Is(err, context.Canceled) {
+			t.Fatalf("blocked request error = %v, want context canceled", err)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("blocked request ignored context cancellation")
+	}
+	if err := transport.Dial(context.Background(), endpoint); err != nil {
+		t.Fatalf("transport did not recreate socket after interruption: %v", err)
 	}
 }
 

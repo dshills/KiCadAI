@@ -364,15 +364,15 @@ func (a app) run(args []string, stdout io.Writer, stderr io.Writer) error {
 		fmt.Fprint(stdout, usage)
 		return nil
 	case "capabilities":
-		return a.runCapabilities(opts, stdout)
+		return a.runCapabilities(ctx, opts, stdout)
 	case "capability":
 		return runGenerationCapability(ctx, opts, stdout)
 	case "config":
 		return runConfig(opts, stdout)
 	case "documents":
-		return a.runDocuments(opts, stdout)
+		return a.runDocuments(ctx, opts, stdout)
 	case "draw-led-demo":
-		return a.runDrawLEDDemo(opts, stdout)
+		return a.runDrawLEDDemo(ctx, opts, stdout)
 	case "generate-led-demo", "generate-project":
 		return a.runGenerateLEDDemo(opts, stdout)
 	case "inspect":
@@ -398,9 +398,9 @@ func (a app) run(args []string, stdout io.Writer, stderr io.Writer) error {
 	case "writer":
 		return runWriterCommand(ctx, opts, stdout)
 	case "roundtrip":
-		return runRoundTrip(opts, stdout)
+		return runRoundTripContext(ctx, opts, stdout)
 	case "pinmap":
-		return runPinmap(opts, stdout)
+		return runPinmapContext(ctx, opts, stdout)
 	case "place":
 		return runPlace(opts, stdout)
 	case "route":
@@ -408,9 +408,9 @@ func (a app) run(args []string, stdout io.Writer, stderr io.Writer) error {
 	case "repair":
 		return runRepairCommand(opts, stdout)
 	case "schematic-ir":
-		return runSchematicIR(opts, stdout)
+		return runSchematicIRContext(ctx, opts, stdout)
 	case "transaction":
-		return runTransaction(opts, stdout)
+		return runTransactionContext(ctx, opts, stdout)
 	case "export":
 		return runExport(ctx, opts, stdout)
 	case "fabrication":
@@ -422,9 +422,9 @@ func (a app) run(args []string, stdout io.Writer, stderr io.Writer) error {
 	case "plan-led-demo":
 		return a.runPlanLEDDemo(opts, stdout)
 	case "ping":
-		return a.runPing(opts, stdout)
+		return a.runPing(ctx, opts, stdout)
 	case "version":
-		return a.runVersion(opts, stdout)
+		return a.runVersion(ctx, opts, stdout)
 	default:
 		return fmt.Errorf("unknown command %q\n\n%s", command, usage)
 	}
@@ -1698,7 +1698,7 @@ func runComponent(ctx context.Context, opts cliOptions, stdout io.Writer) error 
 			Message:  "component requires a subcommand",
 		})
 	}
-	catalog, err := components.LoadCatalog(ctx, components.LoadOptions{CatalogDir: opts.catalogDir})
+	catalog, err := loadComponentCatalog(ctx, opts.catalogDir)
 	if err != nil {
 		return writeReportFailure(stdout, "component", reports.Issue{
 			Code:     reports.CodeInvalidArgument,
@@ -2315,7 +2315,7 @@ func validateFabricationProfilePath(path string) (fabricationProfileValidateResu
 	return fabricationProfileValidateResult{Path: filepath.ToSlash(absolute), Summary: profileSummary(summary, profile), Profile: profile}, summary.Issues
 }
 
-func runPinmap(opts cliOptions, stdout io.Writer) error {
+func runPinmapContext(ctx context.Context, opts cliOptions, stdout io.Writer) error {
 	if !opts.jsonOutput {
 		return fmt.Errorf("pinmap requires --format json")
 	}
@@ -2332,7 +2332,7 @@ func runPinmap(opts cliOptions, stdout io.Writer) error {
 		target := opts.commandArgs[1]
 		validateOptions := pinmap.ValidateOptions{}
 		if pinmapShouldUseLibraryResolver(opts) {
-			index, issues := libraryresolver.Load(context.Background(), libraryRootsFromOptions(opts), libraryresolver.LoadOptions{
+			index, issues := libraryresolver.Load(ctx, libraryRootsFromOptions(opts), libraryresolver.LoadOptions{
 				CachePath: opts.libraryCache,
 				Refresh:   opts.refreshLibraryCache,
 			})
@@ -4417,7 +4417,7 @@ type roundTripCheck struct {
 	SummaryPath        string                 `json:"summary_path,omitempty"`
 }
 
-func runRoundTrip(opts cliOptions, stdout io.Writer) error {
+func runRoundTripContext(parent context.Context, opts cliOptions, stdout io.Writer) error {
 	if !opts.jsonOutput {
 		return fmt.Errorf("roundtrip requires --format json")
 	}
@@ -4478,7 +4478,10 @@ func runRoundTrip(opts cliOptions, stdout io.Writer) error {
 		result := reports.ResultWithIssues("roundtrip", report, []reports.Issue{*skippedIssue}, nil)
 		return writeReportJSON(stdout, result)
 	}
-	ctx := context.Background()
+	ctx := parent
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	if rtOpts.Timeout > 0 {
 		var cancel context.CancelFunc
 		ctx, cancel = context.WithTimeout(ctx, rtOpts.Timeout)
@@ -4550,7 +4553,7 @@ type schematicIRSummary struct {
 	OperationCount int `json:"operation_count,omitempty"`
 }
 
-func runSchematicIR(opts cliOptions, stdout io.Writer) error {
+func runSchematicIRContext(ctx context.Context, opts cliOptions, stdout io.Writer) error {
 	if !opts.jsonOutput {
 		return fmt.Errorf("schematic-ir requires --format json")
 	}
@@ -4599,7 +4602,7 @@ func runSchematicIR(opts cliOptions, stdout io.Writer) error {
 			case "transaction", "write":
 				normalized := schematicir.NormalizeLayoutIntent(document)
 				data.Summary = schematicIRDocumentSummary(normalized)
-				libraryIndex, libraryIssues := schematicIRLibraryIndex(context.Background(), opts, normalized)
+				libraryIndex, libraryIssues := schematicIRLibraryIndex(ctx, opts, normalized)
 				issues = append(issues, libraryIssues...)
 				var tx transactions.Transaction
 				var adapterIssues []reports.Issue
@@ -4729,7 +4732,7 @@ func writeSchematicIRResult(stdout io.Writer, command string, data schematicIRCL
 	return nil
 }
 
-func runTransaction(opts cliOptions, stdout io.Writer) error {
+func runTransactionContext(ctx context.Context, opts cliOptions, stdout io.Writer) error {
 	if !opts.jsonOutput {
 		return fmt.Errorf("transaction requires --format json")
 	}
@@ -4754,7 +4757,7 @@ func runTransaction(opts cliOptions, stdout io.Writer) error {
 	subcommand := opts.commandArgs[0]
 	switch subcommand {
 	case "from-schematic":
-		return runTransactionFromSchematic(opts, stdout)
+		return runTransactionFromSchematicContext(ctx, opts, stdout)
 	case "validate":
 		if len(opts.commandArgs) < 2 {
 			issue := reports.Issue{
@@ -4828,12 +4831,10 @@ func runTransaction(opts cliOptions, stdout io.Writer) error {
 		}
 		planOptions := transactions.PlanOptions{RequireLibraryValidation: true}
 		if transactionShouldUseLibraryResolver(opts) {
-			ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 			index, issues := libraryresolver.Load(ctx, libraryRootsFromOptions(opts), libraryresolver.LoadOptions{
 				CachePath: opts.libraryCache,
 				Refresh:   opts.refreshLibraryCache,
 			})
-			stop()
 			planOptions.LibraryIndex = &index
 			planOptions.LibraryIssues = issues
 		}
@@ -4883,12 +4884,10 @@ func runTransaction(opts cliOptions, stdout io.Writer) error {
 		}
 		applyOptions := transactions.ApplyOptions{OutputDir: outputDir, Overwrite: opts.overwrite, Seed: opts.seed, AllowImportedMutation: opts.allowImportedApply}
 		if transactionShouldUseLibraryResolver(opts) {
-			ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 			index, issues := libraryresolver.Load(ctx, libraryRootsFromOptions(opts), libraryresolver.LoadOptions{
 				CachePath: opts.libraryCache,
 				Refresh:   opts.refreshLibraryCache,
 			})
-			stop()
 			applyOptions.LibraryIndex = &index
 			applyOptions.LibraryIssues = issues
 		}
@@ -4915,7 +4914,7 @@ func runTransaction(opts cliOptions, stdout io.Writer) error {
 	}
 }
 
-func runTransactionFromSchematic(opts cliOptions, stdout io.Writer) error {
+func runTransactionFromSchematicContext(ctx context.Context, opts cliOptions, stdout io.Writer) error {
 	if len(opts.commandArgs) < 2 {
 		issue := reports.Issue{
 			Code:     reports.CodeInvalidArgument,
@@ -4945,8 +4944,6 @@ func runTransactionFromSchematic(opts cliOptions, stdout io.Writer) error {
 	transferOptions := schematicpcb.Options{}
 	var libraryIssues []reports.Issue
 	if transactionShouldUseLibraryResolver(opts) {
-		ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
-		defer stop()
 		index, issues := libraryresolver.Load(ctx, libraryRootsFromOptions(opts), libraryresolver.LoadOptions{
 			CachePath: opts.libraryCache,
 			Refresh:   opts.refreshLibraryCache,
@@ -5506,8 +5503,8 @@ func runConfig(opts cliOptions, stdout io.Writer) error {
 	return nil
 }
 
-func (a app) runPing(opts cliOptions, stdout io.Writer) error {
-	resolved, client, ctx, cancel, err := a.connect(opts)
+func (a app) runPing(parent context.Context, opts cliOptions, stdout io.Writer) error {
+	resolved, client, ctx, cancel, err := a.connect(parent, opts)
 	if err != nil {
 		return writeProbeFailure(opts, stdout, resolved, err)
 	}
@@ -5539,8 +5536,8 @@ func (a app) runPing(opts cliOptions, stdout io.Writer) error {
 	return nil
 }
 
-func (a app) runVersion(opts cliOptions, stdout io.Writer) error {
-	resolved, client, ctx, cancel, err := a.connect(opts)
+func (a app) runVersion(parent context.Context, opts cliOptions, stdout io.Writer) error {
+	resolved, client, ctx, cancel, err := a.connect(parent, opts)
 	if err != nil {
 		return writeProbeFailure(opts, stdout, resolved, err)
 	}
@@ -5576,13 +5573,13 @@ func (a app) runVersion(opts cliOptions, stdout io.Writer) error {
 	return nil
 }
 
-func (a app) runDocuments(opts cliOptions, stdout io.Writer) error {
+func (a app) runDocuments(parent context.Context, opts cliOptions, stdout io.Writer) error {
 	documentType, err := kiapi.ParseDocumentType(opts.documentType)
 	if err != nil {
 		return err
 	}
 
-	resolved, client, ctx, cancel, err := a.connect(opts)
+	resolved, client, ctx, cancel, err := a.connect(parent, opts)
 	if err != nil {
 		return writeProbeFailure(opts, stdout, resolved, err)
 	}
@@ -5625,8 +5622,8 @@ func (a app) runDocuments(opts cliOptions, stdout io.Writer) error {
 	return nil
 }
 
-func (a app) runCapabilities(opts cliOptions, stdout io.Writer) error {
-	resolved, client, ctx, cancel, err := a.connect(opts)
+func (a app) runCapabilities(parent context.Context, opts cliOptions, stdout io.Writer) error {
+	resolved, client, ctx, cancel, err := a.connect(parent, opts)
 	if err != nil {
 		return writeProbeFailure(opts, stdout, resolved, err)
 	}
@@ -5691,7 +5688,7 @@ func (a app) runPlanLEDDemo(opts cliOptions, stdout io.Writer) error {
 	return nil
 }
 
-func (a app) runDrawLEDDemo(opts cliOptions, stdout io.Writer) error {
+func (a app) runDrawLEDDemo(parent context.Context, opts cliOptions, stdout io.Writer) error {
 	if !opts.execute {
 		err := fmt.Errorf("draw-led-demo requires --execute")
 		return writeAutomationError(opts, stdout, err)
@@ -5702,7 +5699,7 @@ func (a app) runDrawLEDDemo(opts cliOptions, stdout io.Writer) error {
 		return writeAutomationError(opts, stdout, err)
 	}
 
-	resolved, client, ctx, cancel, err := a.connect(opts)
+	resolved, client, ctx, cancel, err := a.connect(parent, opts)
 	if err != nil {
 		return writeProbeFailure(opts, stdout, resolved, err)
 	}
@@ -5867,7 +5864,7 @@ type documentsResult struct {
 	Error      string           `json:"error,omitempty"`
 }
 
-func (a app) connect(opts cliOptions) (config.Config, apiClient, context.Context, context.CancelFunc, error) {
+func (a app) connect(parent context.Context, opts cliOptions) (config.Config, apiClient, context.Context, context.CancelFunc, error) {
 	resolved, err := resolveConfig(opts)
 	if err != nil {
 		return config.Config{}, nil, nil, nil, err
@@ -5877,7 +5874,10 @@ func (a app) connect(opts cliOptions) (config.Config, apiClient, context.Context
 	if timeoutMS <= 0 {
 		timeoutMS = config.DefaultTimeoutMS
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeoutMS)*time.Millisecond)
+	if parent == nil {
+		parent = context.Background()
+	}
+	ctx, cancel := context.WithTimeout(parent, time.Duration(timeoutMS)*time.Millisecond)
 	client, err := a.newClient(ctx, resolved)
 	if err != nil {
 		cancel()

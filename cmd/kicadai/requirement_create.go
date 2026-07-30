@@ -48,7 +48,7 @@ func runRequirement(ctx context.Context, opts cliOptions, stdout io.Writer) erro
 		return writeRequirementIssues(stdout, decodeIssues)
 	}
 
-	catalog, err := components.LoadCatalog(ctx, components.LoadOptions{CatalogDir: opts.catalogDir})
+	catalog, err := loadComponentCatalog(ctx, opts.catalogDir)
 	if err != nil {
 		return writeRequirementFailure(stdout, reports.Issue{Code: reports.CodeValidationFailed, Severity: reports.SeverityError, Path: "catalog", Message: err.Error()})
 	}

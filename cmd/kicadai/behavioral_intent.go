@@ -54,7 +54,7 @@ func runBehavioralIntentCompile(ctx context.Context, opts cliOptions, stdout io.
 	if len(prompt) > aiprovider.MaxPromptBytes {
 		return writeBehavioralIntentFailure(stdout, reports.Issue{Code: reports.CodeInvalidArgument, Severity: reports.SeverityError, Path: "text", Message: fmt.Sprintf("intent text exceeds %d-byte provider limit", aiprovider.MaxPromptBytes)})
 	}
-	catalog, err := components.LoadCatalog(ctx, components.LoadOptions{CatalogDir: opts.catalogDir})
+	catalog, err := loadComponentCatalog(ctx, opts.catalogDir)
 	if err != nil {
 		return writeBehavioralIntentFailure(stdout, reports.Issue{Code: reports.CodeInvalidArgument, Severity: reports.SeverityError, Path: "catalog_dir", Message: err.Error()})
 	}

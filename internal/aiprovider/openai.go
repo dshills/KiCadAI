@@ -21,6 +21,11 @@ const (
 	defaultOpenAIModel      = "gpt-5.6"
 	openAIHTTPTimeout       = 2 * time.Minute
 	EnvAIMaxOutputTokens    = "KICADAI_AI_MAX_OUTPUT_TOKENS"
+	backgroundPollTimeout   = 5 * time.Minute
+	backgroundPollInitial   = 500 * time.Millisecond
+	backgroundPollMaximum   = 5 * time.Second
+	backgroundPollRetries   = 4
+	streamingBytesPerToken  = 128
 )
 
 const openAIInstructions = `You convert one user request into the supplied KiCadAI intent JSON schema.
@@ -43,6 +48,10 @@ type OpenAIProvider struct {
 	endpoint        string
 	background      bool
 	maxOutputTokens int
+	pollTimeout     time.Duration
+	pollInitial     time.Duration
+	pollMaximum     time.Duration
+	pollRetries     int
 }
 
 func NewOpenAIProvider(options OpenAIOptions) (*OpenAIProvider, error) {
@@ -90,7 +99,12 @@ func newOpenAIProvider(options OpenAIOptions, endpoint string) (*OpenAIProvider,
 	if client == nil {
 		client = &http.Client{Timeout: openAIHTTPTimeout}
 	}
-	return &OpenAIProvider{apiKey: apiKey, model: model, httpClient: client, endpoint: endpoint, background: options.Background, maxOutputTokens: options.MaxOutputTokens}, nil
+	return &OpenAIProvider{
+		apiKey: apiKey, model: model, httpClient: client, endpoint: endpoint,
+		background: options.Background, maxOutputTokens: options.MaxOutputTokens,
+		pollTimeout: backgroundPollTimeout, pollInitial: backgroundPollInitial,
+		pollMaximum: backgroundPollMaximum, pollRetries: backgroundPollRetries,
+	}, nil
 }
 
 func (provider *OpenAIProvider) Name() string {
@@ -186,7 +200,9 @@ func (provider *OpenAIProvider) GenerateIntent(ctx context.Context, request Gene
 		return GenerateResult{}, newProviderError(ErrorTransport, "OpenAI request failed", err)
 	}
 	defer response.Body.Close()
-	responseBody, err := readLimitedResponse(response.Body)
+	streaming := strings.Contains(strings.ToLower(response.Header.Get("Content-Type")), "text/event-stream")
+	responseLimit := openAIResponseByteLimit(maxOutputTokens, streaming)
+	responseBody, err := readLimitedResponse(response.Body, responseLimit)
 	if err != nil {
 		return GenerateResult{}, err
 	}
@@ -194,12 +210,12 @@ func (provider *OpenAIProvider) GenerateIntent(ctx context.Context, request Gene
 		return GenerateResult{}, openAIStatusError(response.StatusCode, responseBody)
 	}
 	if provider.background {
-		responseBody, err = provider.waitForBackgroundResponse(ctx, responseBody)
+		responseBody, err = provider.waitForBackgroundResponse(ctx, responseBody, openAIResponseByteLimit(maxOutputTokens, false))
 		if err != nil {
 			return GenerateResult{}, err
 		}
 	}
-	if strings.Contains(strings.ToLower(response.Header.Get("Content-Type")), "text/event-stream") {
+	if streaming {
 		responseBody, err = finalOpenAISSEPayload(responseBody)
 		if err != nil {
 			return GenerateResult{}, err
@@ -226,9 +242,11 @@ func validOpenAISchemaName(value string) bool {
 	return true
 }
 
-func (provider *OpenAIProvider) waitForBackgroundResponse(ctx context.Context, data []byte) ([]byte, error) {
-	ticker := time.NewTicker(time.Second)
-	defer ticker.Stop()
+func (provider *OpenAIProvider) waitForBackgroundResponse(ctx context.Context, data []byte, responseLimit int) ([]byte, error) {
+	pollCtx, cancel := context.WithTimeout(ctx, provider.pollTimeout)
+	defer cancel()
+	delay := provider.pollInitial
+	transientFailures := 0
 	for {
 		var status struct {
 			ID     string `json:"id"`
@@ -250,24 +268,37 @@ func (provider *OpenAIProvider) waitForBackgroundResponse(ctx context.Context, d
 		default:
 			return nil, newProviderError(ErrorIncomplete, "OpenAI background response has unsupported status "+status.Status, nil)
 		}
+		timer := time.NewTimer(delay)
 		select {
-		case <-ctx.Done():
-			return nil, newProviderError(ErrorTimeout, "OpenAI background response timed out", ctx.Err())
-		case <-ticker.C:
+		case <-pollCtx.Done():
+			timer.Stop()
+			return nil, newProviderError(ErrorTimeout, "OpenAI background response timed out", pollCtx.Err())
+		case <-timer.C:
 		}
-		var responseStatus int
-		var err error
-		data, responseStatus, err = provider.pollBackgroundResponse(ctx, status.ID)
+		polled, responseStatus, err := provider.pollBackgroundResponse(pollCtx, status.ID, responseLimit)
 		if err != nil {
+			if ErrorCodeOf(err) == ErrorTransport && transientFailures < provider.pollRetries {
+				transientFailures++
+				delay = nextBackgroundPollDelay(delay, provider.pollMaximum)
+				continue
+			}
 			return nil, err
 		}
-		if responseStatus < http.StatusOK || responseStatus >= http.StatusMultipleChoices {
-			return nil, openAIStatusError(responseStatus, data)
+		if backgroundPollRetryableStatus(responseStatus) && transientFailures < provider.pollRetries {
+			transientFailures++
+			delay = nextBackgroundPollDelay(delay, provider.pollMaximum)
+			continue
 		}
+		if responseStatus < http.StatusOK || responseStatus >= http.StatusMultipleChoices {
+			return nil, openAIStatusError(responseStatus, polled)
+		}
+		data = polled
+		transientFailures = 0
+		delay = nextBackgroundPollDelay(delay, provider.pollMaximum)
 	}
 }
 
-func (provider *OpenAIProvider) pollBackgroundResponse(ctx context.Context, responseID string) ([]byte, int, error) {
+func (provider *OpenAIProvider) pollBackgroundResponse(ctx context.Context, responseID string, responseLimit int) ([]byte, int, error) {
 	request, err := http.NewRequestWithContext(ctx, http.MethodGet, provider.endpoint+"/"+url.PathEscape(responseID), nil)
 	if err != nil {
 		return nil, 0, newProviderError(ErrorConfiguration, "create OpenAI background poll request", err)
@@ -282,16 +313,33 @@ func (provider *OpenAIProvider) pollBackgroundResponse(ctx context.Context, resp
 		return nil, 0, newProviderError(ErrorTransport, "OpenAI background poll failed", err)
 	}
 	defer response.Body.Close()
-	data, err := readLimitedResponse(response.Body)
+	data, err := readLimitedResponse(response.Body, responseLimit)
 	if err != nil {
 		return nil, response.StatusCode, err
 	}
 	return data, response.StatusCode, nil
 }
 
+func nextBackgroundPollDelay(current, maximum time.Duration) time.Duration {
+	if current <= 0 {
+		return time.Millisecond
+	}
+	if maximum <= 0 || current >= maximum {
+		return current
+	}
+	if current > maximum/2 {
+		return maximum
+	}
+	return current * 2
+}
+
+func backgroundPollRetryableStatus(status int) bool {
+	return status == http.StatusTooManyRequests || status >= http.StatusInternalServerError
+}
+
 func finalOpenAISSEPayload(data []byte) ([]byte, error) {
 	scanner := bufio.NewScanner(bytes.NewReader(data))
-	scanner.Buffer(make([]byte, 64*1024), MaxResponseBytes)
+	scanner.Buffer(make([]byte, 64*1024), len(data)+1)
 	event := ""
 	var terminal []byte
 	for scanner.Scan() {
@@ -325,14 +373,28 @@ func finalOpenAISSEPayload(data []byte) ([]byte, error) {
 	return terminal, nil
 }
 
-func readLimitedResponse(reader io.Reader) ([]byte, error) {
-	limited := io.LimitReader(reader, MaxResponseBytes+1)
+func openAIResponseByteLimit(maxOutputTokens int, streaming bool) int {
+	if !streaming || maxOutputTokens <= 0 {
+		return MaxResponseBytes
+	}
+	streamingLimit := maxOutputTokens * streamingBytesPerToken
+	if streamingLimit < MaxResponseBytes {
+		return MaxResponseBytes
+	}
+	return streamingLimit
+}
+
+func readLimitedResponse(reader io.Reader, limit int) ([]byte, error) {
+	if limit <= 0 {
+		limit = MaxResponseBytes
+	}
+	limited := io.LimitReader(reader, int64(limit)+1)
 	data, err := io.ReadAll(limited)
 	if err != nil {
 		return nil, newProviderError(ErrorTransport, "read OpenAI response", err)
 	}
-	if len(data) > MaxResponseBytes {
-		return nil, newProviderError(ErrorMalformed, fmt.Sprintf("OpenAI response exceeds %d-byte limit", MaxResponseBytes), nil)
+	if len(data) > limit {
+		return nil, newProviderError(ErrorMalformed, fmt.Sprintf("OpenAI response exceeds %d-byte limit", limit), nil)
 	}
 	return data, nil
 }
