@@ -66,6 +66,48 @@ func TestFromDesignGeneratesFallbackNetHintsForUnlabeledConnections(t *testing.T
 	}
 }
 
+func TestFromDesignUnionsJunctionlessWireTJoint(t *testing.T) {
+	design := transferFixtureDesign()
+	trueValue := true
+	design.Schematic.Symbols = append(design.Schematic.Symbols, schematic.SchematicSymbol{
+		LibraryID: "Connector:Conn_01x02",
+		Reference: "J3",
+		Value:     "TAP",
+		Position:  kicadfiles.Point{X: kicadfiles.MM(25), Y: kicadfiles.MM(20)},
+		OnBoard:   &trueValue,
+		Properties: []schematic.Property{
+			{Name: "Reference", Value: "J3"},
+			{Name: "Value", Value: "TAP"},
+			{Name: "Footprint", Value: "Connector_Test:TH_1x02"},
+		},
+	})
+	design.Schematic.Wires = append(design.Schematic.Wires, schematic.Wire{Points: []kicadfiles.Point{
+		{X: kicadfiles.MM(25), Y: kicadfiles.MM(20)},
+		{X: kicadfiles.MM(25), Y: kicadfiles.MM(10)},
+	}})
+
+	result := FromDesign(design, Options{LibraryIndex: pointerToLibraryIndex(transferFixtureLibraryIndex())})
+	if len(result.Issues) != 0 {
+		t.Fatalf("issues = %#v", result.Issues)
+	}
+	for _, operation := range result.Transaction.Operations {
+		if operation.Op != transactions.OpPlaceFootprint {
+			continue
+		}
+		var place transactions.PlaceFootprintOperation
+		if err := json.Unmarshal(operation.Raw, &place); err != nil {
+			t.Fatal(err)
+		}
+		if place.Ref == "J3" {
+			if len(place.Pads) == 0 || place.Pads[0].Net == nil || *place.Pads[0].Net != "BUS_A" {
+				t.Fatalf("junction-less T-joint net hint = %#v", place.Pads)
+			}
+			return
+		}
+	}
+	t.Fatal("J3 placement not found")
+}
+
 func TestFromDesignIncludesHiddenPinsInNetHints(t *testing.T) {
 	design := transferFixtureDesign()
 	index := transferFixtureLibraryIndex()
@@ -578,4 +620,8 @@ func transferFixtureLibraryIndex() libraryresolver.LibraryIndex {
 			},
 		},
 	}
+}
+
+func pointerToLibraryIndex(index libraryresolver.LibraryIndex) *libraryresolver.LibraryIndex {
+	return &index
 }

@@ -78,6 +78,18 @@ func TestNormalizeDiagnosticsSortsAndBounds(t *testing.T) {
 	}
 }
 
+func TestNormalizeDiagnosticsDeduplicatesBeforeBounding(t *testing.T) {
+	duplicate := Diagnostic{Severity: SeverityError, Code: "wire_crossing", NetName: "A", Message: "wire contacts unrelated net B"}
+	got := NormalizeDiagnostics([]Diagnostic{
+		duplicate,
+		{Severity: SeverityWarning, Code: "text_overlap", Message: "text overlaps"},
+		duplicate,
+	}, 2)
+	if len(got) != 2 || got[0].Code != "wire_crossing" || got[1].Code != "text_overlap" {
+		t.Fatalf("deduplicated diagnostics = %#v", got)
+	}
+}
+
 func TestNormalizeDiagnosticsAddsRuleRepairGuidance(t *testing.T) {
 	got := NormalizeDiagnostics([]Diagnostic{{
 		Severity: SeverityError,

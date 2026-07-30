@@ -255,6 +255,22 @@ func TestRouteRejectsUnrelatedPinAnchor(t *testing.T) {
 	}
 }
 
+func TestScoreRouteRejectsDifferentNetEndpointContact(t *testing.T) {
+	points := []kicadfiles.Point{
+		{X: kicadfiles.MM(20), Y: kicadfiles.MM(20)},
+		{X: kicadfiles.MM(40), Y: kicadfiles.MM(20)},
+	}
+	existing := WireSegment{
+		NetName: "B",
+		From:    kicadfiles.Point{X: kicadfiles.MM(40), Y: kicadfiles.MM(20)},
+		To:      kicadfiles.Point{X: kicadfiles.MM(40), Y: kicadfiles.MM(40)},
+	}
+	_, clean := scoreRoute(points, "A", Endpoint{}, Endpoint{}, Result{Wires: []WireSegment{existing}}, Request{Sheet: testSheet()})
+	if clean {
+		t.Fatal("route ending on a different net endpoint was accepted")
+	}
+}
+
 func TestSameNameNetFragmentsShareAllowedPinAnchors(t *testing.T) {
 	components := []PlacedComponent{
 		{Component: Component{Ref: "A", Pins: []Pin{{Number: "1"}}}, PlacedAt: kicadfiles.Point{X: kicadfiles.MM(20), Y: kicadfiles.MM(20)}},

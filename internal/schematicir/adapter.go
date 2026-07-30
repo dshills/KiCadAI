@@ -43,10 +43,11 @@ func ToTransactionWithLibraryIndex(document Document, index *libraryresolver.Lib
 }
 
 func toTransaction(document Document, index *libraryresolver.LibraryIndex) (transactions.Transaction, []reports.Issue) {
-	document = NormalizeLayoutIntent(document)
-	if issues := validateDefaulted(document); len(issues) != 0 {
+	defaulted := applyDefaults(document, true)
+	if issues := validateDefaulted(defaulted); len(issues) != 0 {
 		return transactions.Transaction{}, issues
 	}
+	document = NormalizeLayoutIntent(defaulted)
 
 	state, issues := newAdapterState(document, index)
 	if len(issues) != 0 {
@@ -82,19 +83,20 @@ func ToProjectTransactionWithLibraryIndex(document Document, index *libraryresol
 // used when writing an oversized schematic. Callers that own their project
 // write operation can use it without adding a second write_project operation.
 func HierarchyForProject(document Document, index *libraryresolver.LibraryIndex) (*transactions.SchematicHierarchy, []reports.Issue) {
-	document = NormalizeLayoutIntent(document)
-	if issues := validateDefaulted(document); len(issues) != 0 {
+	defaulted := applyDefaults(document, true)
+	if issues := validateDefaulted(defaulted); len(issues) != 0 {
 		return nil, issues
 	}
+	document = NormalizeLayoutIntent(defaulted)
 	return schematicHierarchy(document, index)
 }
 
 func toProjectTransaction(document Document, index *libraryresolver.LibraryIndex) (transactions.Transaction, []reports.Issue) {
-	document = NormalizeLayoutIntent(document)
 	tx, issues := toTransaction(document, index)
 	if reports.HasBlockingIssue(issues) {
 		return tx, issues
 	}
+	document = NormalizeLayoutIntent(document)
 	hierarchy, hierarchyIssues := schematicHierarchy(document, index)
 	issues = append(issues, hierarchyIssues...)
 	if reports.HasBlockingIssue(hierarchyIssues) {

@@ -41,14 +41,14 @@ func Validate(result Result, request Request) Result {
 		}
 		for otherIndex := index + 1; otherIndex < len(result.Wires); otherIndex++ {
 			other := result.Wires[otherIndex]
-			if other.NetName == "" || other.NetName == wire.NetName || !wireSegmentsCross(wire, other) {
+			if other.NetName == "" || other.NetName == wire.NetName || !wireSegmentsElectricallyContact(wire, other) {
 				continue
 			}
 			result.Diagnostics = append(result.Diagnostics, Diagnostic{
-				Severity: SeverityWarning,
+				Severity: SeverityError,
 				Code:     "wire_crossing",
 				NetName:  wire.NetName,
-				Message:  fmt.Sprintf("wire crosses unrelated net %s", other.NetName),
+				Message:  fmt.Sprintf("wire contacts unrelated net %s", other.NetName),
 			})
 		}
 		if pin, overlaps := unrelatedPinForWire(wire, wire.NetName, result, request); overlaps {

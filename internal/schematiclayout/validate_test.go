@@ -29,6 +29,36 @@ func TestValidateRejectsDiagonalWire(t *testing.T) {
 	}
 }
 
+func TestValidateRejectsDifferentNetEndpointContactAndCollinearOverlap(t *testing.T) {
+	tests := []struct {
+		name  string
+		wires []WireSegment
+	}{
+		{
+			name: "shared endpoint",
+			wires: []WireSegment{
+				{NetName: "A", From: kicadfiles.Point{X: kicadfiles.MM(20), Y: kicadfiles.MM(20)}, To: kicadfiles.Point{X: kicadfiles.MM(40), Y: kicadfiles.MM(20)}},
+				{NetName: "B", From: kicadfiles.Point{X: kicadfiles.MM(40), Y: kicadfiles.MM(20)}, To: kicadfiles.Point{X: kicadfiles.MM(40), Y: kicadfiles.MM(40)}},
+			},
+		},
+		{
+			name: "collinear overlap",
+			wires: []WireSegment{
+				{NetName: "A", From: kicadfiles.Point{X: kicadfiles.MM(20), Y: kicadfiles.MM(20)}, To: kicadfiles.Point{X: kicadfiles.MM(50), Y: kicadfiles.MM(20)}},
+				{NetName: "B", From: kicadfiles.Point{X: kicadfiles.MM(40), Y: kicadfiles.MM(20)}, To: kicadfiles.Point{X: kicadfiles.MM(60), Y: kicadfiles.MM(20)}},
+			},
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			validated := Validate(Result{Wires: test.wires}, Request{Sheet: testSheet(), Rules: DefaultRules(ProfileBasic)})
+			if !hasDiagnostic(validated.Diagnostics, "wire_crossing", SeverityError) {
+				t.Fatalf("diagnostics = %#v, want electrical-contact error", validated.Diagnostics)
+			}
+		})
+	}
+}
+
 func TestValidateRejectsWireThroughSymbol(t *testing.T) {
 	result := Result{
 		Components: []PlacedComponent{{Component: Component{Ref: "U1", Role: "opamp"}, PlacedAt: kicadfiles.Point{X: kicadfiles.MM(50), Y: kicadfiles.MM(50)}}},

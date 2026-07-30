@@ -422,6 +422,14 @@ func NormalizeDiagnostics(diagnostics []Diagnostic, limit int) []Diagnostic {
 	sort.SliceStable(diagnostics, func(i, j int) bool {
 		return compareDiagnostics(diagnostics[i], diagnostics[j]) < 0
 	})
+	compacted := diagnostics[:0]
+	for _, diagnostic := range diagnostics {
+		if len(compacted) != 0 && compareDiagnostics(compacted[len(compacted)-1], diagnostic) == 0 {
+			continue
+		}
+		compacted = append(compacted, diagnostic)
+	}
+	diagnostics = compacted
 	if limit > 0 && len(diagnostics) > limit {
 		return append([]Diagnostic(nil), diagnostics[:limit]...)
 	}

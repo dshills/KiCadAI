@@ -899,6 +899,21 @@ func TestToTransactionRejectsInvalidIR(t *testing.T) {
 	}
 }
 
+func TestToTransactionRejectsConflictingDuplicateNetBeforeNormalization(t *testing.T) {
+	doc := validLEDDocument()
+	conflict := doc.Circuit.Nets[0]
+	conflict.Role = NetRoleSignal
+	doc.Circuit.Nets = append(doc.Circuit.Nets, conflict)
+
+	tx, issues := ToTransaction(doc)
+	if len(issues) == 0 || !schematicIRIssueContains(issues, "circuit.nets[3].name") {
+		t.Fatalf("expected duplicate net conflict, got %#v", issues)
+	}
+	if len(tx.Operations) != 0 {
+		t.Fatalf("expected no operations for conflicting duplicate net, got %d", len(tx.Operations))
+	}
+}
+
 func TestToTransactionRejectsInvalidUnit(t *testing.T) {
 	doc := validLEDDocument()
 	doc.Circuit.Components[1].Unit = "A"

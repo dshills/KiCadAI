@@ -408,7 +408,7 @@ func scoreRoute(points []kicadfiles.Point, netName string, from, to Endpoint, re
 			if existing.NetName == netName {
 				continue
 			}
-			if wireSegmentsCross(segment, existing) {
+			if wireSegmentsElectricallyContact(segment, existing) {
 				score += routeHardPenalty
 				clean = false
 			}
@@ -532,6 +532,10 @@ func wireSegmentsCross(first, second WireSegment) bool {
 		}
 	}
 	return true
+}
+
+func wireSegmentsElectricallyContact(first, second WireSegment) bool {
+	return segmentsIntersect(first.From, first.To, second.From, second.To)
 }
 
 func firstRoutableEndpoint(net Net, anchors map[Endpoint]kicadfiles.Point) (int, kicadfiles.Point, bool) {

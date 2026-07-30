@@ -381,6 +381,12 @@ func inferFilePinNetHints(isRoot bool, netPrefix string, file schematic.Schemati
 		graph.ensure(pointKey(anchor.Point))
 		addTerminal(anchor.Point)
 	}
+	for _, wire := range file.Wires {
+		for _, point := range wire.Points {
+			graph.ensure(pointKey(point))
+			addTerminal(point)
+		}
+	}
 	terminalIndex := newTerminalIndex(terminals)
 	for _, wire := range file.Wires {
 		for i := 0; i < len(wire.Points)-1; i++ {
