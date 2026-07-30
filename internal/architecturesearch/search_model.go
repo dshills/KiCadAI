@@ -146,7 +146,9 @@ type CandidateScore struct {
 	ComponentCount       int      `json:"component_count"`
 	FragmentCount        int      `json:"fragment_count"`
 	QuiescentPowerW      *float64 `json:"quiescent_power_w,omitempty"`
+	QuiescentPowerParts  int      `json:"quiescent_power_fragments"`
 	AreaMM2              *float64 `json:"area_mm2,omitempty"`
+	AreaParts            int      `json:"area_fragments"`
 	Fingerprint          string   `json:"fingerprint"`
 }
 

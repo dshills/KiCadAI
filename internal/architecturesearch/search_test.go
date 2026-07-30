@@ -85,6 +85,57 @@ func TestRegistryAndSearchAreDeterministicUnderProviderRequestAndExpansionOrder(
 	}
 }
 
+func TestCandidateMetricsDoNotTreatPartialAccountingAsTotals(t *testing.T) {
+	requirement := Requirement{
+		Version: VersionV2,
+		Requirements: Requirements{
+			Constraints: BoardLimits{MaxWidthMM: 100, MaxHeightMM: 100, MaxComponents: 10},
+		},
+	}
+	selections := []FragmentSelection{
+		{ObligationPath: "objective:first", Metrics: ExpansionMetrics{QuiescentPowerW: float64Pointer(0.001)}},
+		{ObligationPath: "objective:second"},
+	}
+	candidate, validation := candidateFromState(searchState{Selections: selections}, requirement)
+	if validation != nil {
+		t.Fatal(validation)
+	}
+	if candidate.Score.QuiescentPowerW != nil || candidate.Score.QuiescentPowerParts != 1 || candidate.Score.FragmentCount != 2 {
+		t.Fatalf("partial power accounting was presented as a total: %#v", candidate.Score)
+	}
+
+	selections[0].Metrics.AreaMM2 = float64Pointer(1)
+	candidate, validation = candidateFromState(searchState{Selections: selections}, requirement)
+	if validation != nil {
+		t.Fatal(validation)
+	}
+	if candidate.Score.AreaMM2 != nil || candidate.Score.AreaParts != 1 || candidate.Score.UnprovenNonSafety != 2 {
+		t.Fatalf("partial area accounting was presented as a total: %#v", candidate.Score)
+	}
+	for _, check := range candidate.GlobalChecks {
+		if check.Path == "candidate.board.area" {
+			t.Fatalf("partial area accounting produced a passing board-area check: %#v", check)
+		}
+	}
+}
+
+func TestNormalizeSearchStateCachesKeyAndReturnsEncodingErrors(t *testing.T) {
+	state, err := normalizeSearchState(searchState{Obligations: []searchObligation{{Path: "objective:test", Capability: "test"}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if state.key == "" {
+		t.Fatal("normalized search state did not cache its canonical key")
+	}
+	_, err = normalizeSearchState(searchState{Selections: []FragmentSelection{{
+		ObligationPath: "objective:test",
+		Payload:        json.RawMessage("{"),
+	}}})
+	if err == nil {
+		t.Fatal("invalid state payload encoding error was swallowed")
+	}
+}
+
 func TestRetainedFrontierPrefersSemanticTopologyDiversityOverPartVariants(t *testing.T) {
 	direct := func(catalogID, value string) json.RawMessage {
 		payload, err := MarshalFragmentRealization(FragmentRealization{

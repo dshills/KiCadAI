@@ -119,17 +119,21 @@ func ContractFromRequirementPort(requirement Requirement, portID string, minimum
 	if issues := Validate(normalized); len(issues) != 0 {
 		return PortContract{}, issues
 	}
+	return contractFromRequirementPort(normalized, portID, minimumEvidence)
+}
+
+func contractFromRequirementPort(requirement Requirement, portID string, minimumEvidence EvidenceConfidence) (PortContract, []reports.Issue) {
 	var port *Port
-	for index := range normalized.Requirements.Ports {
-		if normalized.Requirements.Ports[index].ID == canonicalIdentifier(portID) {
-			port = &normalized.Requirements.Ports[index]
+	for index := range requirement.Requirements.Ports {
+		if requirement.Requirements.Ports[index].ID == canonicalIdentifier(portID) {
+			port = &requirement.Requirements.Ports[index]
 			break
 		}
 	}
 	if port == nil {
 		return PortContract{}, []reports.Issue{architectureIssue(CodeBindingUnresolved, "requirements.ports", "cannot build contract for unknown port "+portID)}
 	}
-	domain := requirementDomain(normalized, port.Domain)
+	domain := requirementDomain(requirement, port.Domain)
 	contract := PortContract{
 		ID: port.ID, Kind: port.Kind, Direction: port.Direction, Domain: port.Domain,
 		Voltage:         domainVoltageRange(domain),
@@ -185,22 +189,26 @@ func ContractFromRequirementSignal(requirement Requirement, signalID, direction 
 	if issues := Validate(normalized); len(issues) != 0 {
 		return PortContract{}, issues
 	}
+	return contractFromRequirementSignal(normalized, signalID, direction, minimumEvidence)
+}
+
+func contractFromRequirementSignal(requirement Requirement, signalID, direction string, minimumEvidence EvidenceConfidence) (PortContract, []reports.Issue) {
 	signalID = canonicalIdentifier(signalID)
 	direction = canonicalIdentifier(direction)
 	var signal *Signal
-	for index := range normalized.Requirements.Signals {
-		if normalized.Requirements.Signals[index].ID == signalID {
-			signal = &normalized.Requirements.Signals[index]
+	for index := range requirement.Requirements.Signals {
+		if requirement.Requirements.Signals[index].ID == signalID {
+			signal = &requirement.Requirements.Signals[index]
 			break
 		}
 	}
 	if signal == nil || !allowedDirection(direction) {
 		return PortContract{}, []reports.Issue{architectureIssue(CodeBindingUnresolved, "requirements.signals", "cannot build directed contract for signal "+signalID)}
 	}
-	domain := requirementDomain(normalized, signal.Domain)
+	domain := requirementDomain(requirement, signal.Domain)
 	contract := PortContract{
 		ID: signal.ID, Kind: signal.Kind, Direction: direction, Domain: signal.Domain,
-		Voltage: signalVoltageRange(normalized, *signal, domain), MinimumEvidence: minimumEvidence,
+		Voltage: signalVoltageRange(requirement, *signal, domain), MinimumEvidence: minimumEvidence,
 	}
 	if signal.Protocol != nil {
 		protocol := *signal.Protocol
@@ -288,21 +296,25 @@ func ContractFromBinding(requirement Requirement, binding Binding, minimumEviden
 	if issues := Validate(normalized); len(issues) != 0 {
 		return PortContract{}, issues
 	}
+	return contractFromBinding(normalized, binding, minimumEvidence)
+}
+
+func contractFromBinding(requirement Requirement, binding Binding, minimumEvidence EvidenceConfidence) (PortContract, []reports.Issue) {
 	binding.Port = canonicalIdentifier(binding.Port)
 	binding.Signal = canonicalIdentifier(binding.Signal)
 	binding.Direction = canonicalIdentifier(binding.Direction)
 	binding.Participant = canonicalIdentifier(binding.Participant)
 	binding.ParticipantPort = canonicalIdentifier(binding.ParticipantPort)
 	if binding.Port != "" && binding.Signal == "" && binding.Direction == "" && binding.Participant == "" && binding.ParticipantPort == "" {
-		return ContractFromRequirementPort(normalized, binding.Port, minimumEvidence)
+		return contractFromRequirementPort(requirement, binding.Port, minimumEvidence)
 	}
 	if binding.Signal != "" && binding.Direction != "" && binding.Port == "" && binding.Participant == "" && binding.ParticipantPort == "" {
-		return ContractFromRequirementSignal(normalized, binding.Signal, binding.Direction, minimumEvidence)
+		return contractFromRequirementSignal(requirement, binding.Signal, binding.Direction, minimumEvidence)
 	}
 	if binding.Port != "" || binding.Signal != "" || binding.Direction != "" || binding.Participant == "" || binding.ParticipantPort == "" {
 		return PortContract{}, []reports.Issue{architectureIssue(CodeBindingUnresolved, "binding", "binding must select exactly one external, participant, or directed signal endpoint")}
 	}
-	return contractFromParticipantPort(normalized, binding.Participant, binding.ParticipantPort, minimumEvidence, true)
+	return contractFromParticipantPort(requirement, binding.Participant, binding.ParticipantPort, minimumEvidence, true)
 }
 
 func contractFromParticipantPort(requirement Requirement, participantID, portID string, minimumEvidence EvidenceConfidence, oppositeEndpoint bool) (PortContract, []reports.Issue) {

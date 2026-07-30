@@ -27,6 +27,7 @@ type searchState struct {
 	Depth       int
 	Obligations []searchObligation
 	Selections  []FragmentSelection
+	key         string
 }
 
 type searchAccumulator struct {
@@ -75,9 +76,12 @@ func Search(ctx context.Context, requirement Requirement, registry *Registry, op
 		visited: map[string]bool{}, obligations: map[string]string{},
 	}
 	accumulator.recordObligations(obligations)
-	initial := normalizeSearchState(searchState{Obligations: obligations})
-	initialKey := searchStateKey(initial)
-	accumulator.visited[initialKey] = true
+	initial, err := normalizeSearchState(searchState{Obligations: obligations})
+	if err != nil {
+		accumulator.result.Issues = []reports.Issue{architectureIssue(CodeProviderExpansionInvalid, "search.initial_state", "encode initial search state: "+err.Error())}
+		return accumulator.finish()
+	}
+	accumulator.visited[initial.key] = true
 	frontier := []searchState{initial}
 	accumulator.result.Consumption.MaximumFrontier = 1
 
@@ -88,7 +92,7 @@ func Search(ctx context.Context, requirement Requirement, registry *Registry, op
 			return accumulator.finish()
 		}
 		slices.SortStableFunc(frontier, func(left, right searchState) int {
-			return strings.Compare(searchStateKey(left), searchStateKey(right))
+			return strings.Compare(left.key, right.key)
 		})
 		state := frontier[0]
 		frontier = frontier[1:]
@@ -176,7 +180,8 @@ func Search(ctx context.Context, requirement Requirement, registry *Registry, op
 				candidateSelections := make([]FragmentSelection, 0, len(state.Selections)+1)
 				candidateSelections = append(candidateSelections, state.Selections...)
 				candidateSelections = append(candidateSelections, selection)
-				if area := selectedAreaMM2(candidateSelections); area > normalized.Requirements.Constraints.MaxWidthMM*normalized.Requirements.Constraints.MaxHeightMM {
+				area, areaParts := selectedAreaMM2(candidateSelections)
+				if areaParts == len(candidateSelections) && area > normalized.Requirements.Constraints.MaxWidthMM*normalized.Requirements.Constraints.MaxHeightMM {
 					accumulator.reject(CodeLimitExceeded, obligation.Path, provider.descriptor.ID, expansion.ID, "candidate area estimate exceeds board-area limit")
 					continue
 				}
@@ -185,12 +190,15 @@ func Search(ctx context.Context, requirement Requirement, registry *Registry, op
 				candidateObligations := make([]searchObligation, 0, len(refinedRemaining)+len(namespacedChildren))
 				candidateObligations = append(candidateObligations, refinedRemaining...)
 				candidateObligations = append(candidateObligations, namespacedChildren...)
-				next := normalizeSearchState(searchState{Depth: state.Depth + 1, Obligations: candidateObligations, Selections: candidateSelections})
-				key := searchStateKey(next)
-				if accumulator.visited[key] {
+				next, err := normalizeSearchState(searchState{Depth: state.Depth + 1, Obligations: candidateObligations, Selections: candidateSelections})
+				if err != nil {
+					accumulator.reject(CodeProviderExpansionInvalid, obligation.Path, provider.descriptor.ID, expansion.ID, "encode search state: "+err.Error())
 					continue
 				}
-				accumulator.visited[key] = true
+				if accumulator.visited[next.key] {
+					continue
+				}
+				accumulator.visited[next.key] = true
 				frontier = append(frontier, next)
 				generatedForObligation++
 				accumulator.result.Consumption.GeneratedStates++
@@ -542,7 +550,7 @@ func inferredUpstreamPowerRole(requirement Requirement, objective Objective, por
 				continue
 			}
 			for _, binding := range upstream.Bindings {
-				contract, issues := ContractFromBinding(requirement, binding, minimumEvidence)
+				contract, issues := contractFromBinding(requirement, binding, minimumEvidence)
 				if len(issues) != 0 || contract.Kind != "power" || contract.Voltage.Maximum == nil || *contract.Voltage.Maximum <= 0 {
 					continue
 				}
@@ -559,7 +567,7 @@ func inferredUpstreamPowerRole(requirement Requirement, objective Objective, por
 			if port.Kind != "power" || port.Direction != "sink" {
 				continue
 			}
-			contract, contractIssues := ContractFromRequirementPort(requirement, port.ID, minimumEvidence)
+			contract, contractIssues := contractFromRequirementPort(requirement, port.ID, minimumEvidence)
 			if len(contractIssues) != 0 || contract.Voltage.Maximum == nil || *contract.Voltage.Maximum <= 0 {
 				continue
 			}
@@ -827,7 +835,7 @@ func normalizeFragmentSelection(selection FragmentSelection) FragmentSelection {
 	return selection
 }
 
-func normalizeSearchState(state searchState) searchState {
+func normalizeSearchState(state searchState) (searchState, error) {
 	for index := range state.Obligations {
 		obligation := &state.Obligations[index]
 		obligation.Capability = canonicalIdentifier(obligation.Capability)
@@ -845,7 +853,13 @@ func normalizeSearchState(state searchState) searchState {
 	slices.SortStableFunc(state.Selections, func(left, right FragmentSelection) int {
 		return strings.Compare(left.ObligationPath, right.ObligationPath)
 	})
-	return state
+	encoded, err := json.Marshal(state)
+	if err != nil {
+		return searchState{}, err
+	}
+	sum := sha256.Sum256(encoded)
+	state.key = hex.EncodeToString(sum[:])
+	return state, nil
 }
 
 func orderSearchObligationsBySignalFlow(obligations []searchObligation) []searchObligation {
@@ -988,7 +1002,8 @@ func candidateFromState(state searchState, requirement Requirement) (CandidateRe
 	sum := sha256.Sum256(encoded)
 	fingerprint := hex.EncodeToString(sum[:])
 	score := CandidateScore{EvidenceRank: confidenceRank(EvidenceVerified), Fingerprint: fingerprint}
-	var marginKnown, powerKnown, areaKnown bool
+	var marginKnown bool
+	powerTotal, areaTotal := 0.0, 0.0
 	for _, selection := range selections {
 		score.UnprovenNonSafety += selection.Metrics.UnprovenNonSafety
 		score.CatalogSubstitutions += selection.Metrics.CatalogSubstitutions
@@ -1009,19 +1024,23 @@ func candidateFromState(state searchState, requirement Requirement) (CandidateRe
 			}
 		}
 		if selection.Metrics.QuiescentPowerW != nil {
-			if !powerKnown {
-				score.QuiescentPowerW = float64Pointer(0)
-				powerKnown = true
-			}
-			*score.QuiescentPowerW += *selection.Metrics.QuiescentPowerW
+			powerTotal += *selection.Metrics.QuiescentPowerW
+			score.QuiescentPowerParts++
 		}
 		if selection.Metrics.AreaMM2 != nil {
-			if !areaKnown {
-				score.AreaMM2 = float64Pointer(0)
-				areaKnown = true
-			}
-			*score.AreaMM2 += *selection.Metrics.AreaMM2
+			areaTotal += *selection.Metrics.AreaMM2
+			score.AreaParts++
 		}
+	}
+	if score.QuiescentPowerParts == score.FragmentCount {
+		score.QuiescentPowerW = float64Pointer(powerTotal)
+	} else if score.QuiescentPowerParts != 0 {
+		score.UnprovenNonSafety++
+	}
+	if score.AreaParts == score.FragmentCount {
+		score.AreaMM2 = float64Pointer(areaTotal)
+	} else if score.AreaParts != 0 {
+		score.UnprovenNonSafety++
 	}
 	candidate := CandidateResult{Fingerprint: fingerprint, Score: score, Selections: selections, GlobalChecks: globalChecks}
 	if supportsSystemPlanning(requirement) {
@@ -1192,13 +1211,15 @@ func validateCandidateGlobal(requirement Requirement, selections []FragmentSelec
 		return nil, &candidateValidation{Code: CodeGlobalConstraintUnproven, Path: "candidate.board.component_count", Message: "selected component count exceeds the board limit"}
 	}
 	checks = append(checks, GlobalCheck{Code: CodeGlobalConstraintUnproven, Path: "candidate.board.component_count", Message: "selected component count is within the board limit", Required: float64Pointer(float64(requirement.Requirements.Constraints.MaxComponents)), Observed: float64Pointer(float64(componentCount)), Margin: float64Pointer(componentMargin)})
-	if area := selectedAreaMM2(selections); area > 0 {
-		available := requirement.Requirements.Constraints.MaxWidthMM * requirement.Requirements.Constraints.MaxHeightMM
-		margin := available - area
-		if margin < 0 {
-			return nil, &candidateValidation{Code: CodeGlobalConstraintUnproven, Path: "candidate.board.area", Message: "selected component area exceeds the board envelope"}
+	if area, areaParts := selectedAreaMM2(selections); areaParts != 0 {
+		if areaParts == len(selections) {
+			available := requirement.Requirements.Constraints.MaxWidthMM * requirement.Requirements.Constraints.MaxHeightMM
+			margin := available - area
+			if margin < 0 {
+				return nil, &candidateValidation{Code: CodeGlobalConstraintUnproven, Path: "candidate.board.area", Message: "selected component area exceeds the board envelope"}
+			}
+			checks = append(checks, GlobalCheck{Code: CodeGlobalConstraintUnproven, Path: "candidate.board.area", Message: "selected component area is within the board envelope", Required: float64Pointer(available), Observed: float64Pointer(area), Margin: float64Pointer(margin)})
 		}
-		checks = append(checks, GlobalCheck{Code: CodeGlobalConstraintUnproven, Path: "candidate.board.area", Message: "selected component area is within the board envelope", Required: float64Pointer(available), Observed: float64Pointer(area), Margin: float64Pointer(margin)})
 	}
 
 	if len(selections) != 0 {
@@ -1716,12 +1737,6 @@ func compareRoleContracts(left, right RoleContract) int {
 	return strings.Compare(left.Anchor, right.Anchor)
 }
 
-func searchStateKey(state searchState) string {
-	encoded, _ := json.Marshal(state)
-	sum := sha256.Sum256(encoded)
-	return hex.EncodeToString(sum[:])
-}
-
 func cloneConstraints(constraints []Constraint) []Constraint {
 	result := make([]Constraint, len(constraints))
 	for index, constraint := range constraints {
@@ -1783,14 +1798,16 @@ func selectedComponentCount(selections []FragmentSelection) int {
 	return count
 }
 
-func selectedAreaMM2(selections []FragmentSelection) float64 {
+func selectedAreaMM2(selections []FragmentSelection) (float64, int) {
 	area := 0.0
+	reported := 0
 	for _, selection := range selections {
 		if selection.Metrics.AreaMM2 != nil {
 			area += *selection.Metrics.AreaMM2
+			reported++
 		}
 	}
-	return area
+	return area, reported
 }
 
 func validOptionalNonnegative(value *float64) bool {
