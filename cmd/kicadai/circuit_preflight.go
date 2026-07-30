@@ -275,7 +275,7 @@ func runCircuitPatch(ctx context.Context, opts cliOptions, stdout io.Writer) err
 	if err != nil {
 		return writeCircuitPatchResult(stdout, data, []reports.Issue{{Code: reports.CodeMissingFile, Severity: reports.SeverityError, Path: patchPath, Message: err.Error()}})
 	}
-	defer patchInput.Close()
+	defer func() { _ = patchInput.Close() }()
 	patch, issues := circuitgraph.DecodePatchStrict(patchInput)
 	data.NormalizedPatchOperations = append([]circuitgraph.PatchOperation(nil), patch.Operations...)
 	if reports.HasBlockingIssue(issues) {
@@ -358,12 +358,14 @@ func evaluatePatchedCircuitPreflight(ctx context.Context, opts cliOptions, graph
 		return circuitPreflightEvaluation{Data: circuitPreflightData{InputPath: opts.requestPath}, Issues: []reports.Issue{{Code: reports.CodeValidationFailed, Severity: reports.SeverityError, Path: "graph", Message: err.Error()}}}
 	}
 	temporaryPath := file.Name()
-	defer os.Remove(temporaryPath)
+	defer func() { _ = os.Remove(temporaryPath) }()
 	if _, err := file.Write(encoded); err != nil {
-		file.Close()
+		_ = file.Close()
 		return circuitPreflightEvaluation{Data: circuitPreflightData{InputPath: opts.requestPath}, Issues: []reports.Issue{{Code: reports.CodeValidationFailed, Severity: reports.SeverityError, Path: "graph", Message: err.Error()}}}
 	}
-	file.Close()
+	if err := file.Close(); err != nil {
+		return circuitPreflightEvaluation{Data: circuitPreflightData{InputPath: opts.requestPath}, Issues: []reports.Issue{{Code: reports.CodeValidationFailed, Severity: reports.SeverityError, Path: "graph", Message: err.Error()}}}
+	}
 	opts.requestPath = temporaryPath
 	evaluation := evaluateCircuitPreflight(ctx, opts)
 	evaluation.Data.InputPath = inputPath
@@ -400,9 +402,9 @@ func writeCircuitPatchGraph(path string, contents []byte) error {
 		return err
 	}
 	temporaryPath := temporary.Name()
-	defer os.Remove(temporaryPath)
+	defer func() { _ = os.Remove(temporaryPath) }()
 	if _, err = temporary.Write(append(contents, '\n')); err != nil {
-		temporary.Close()
+		_ = temporary.Close()
 		return err
 	}
 	if err = temporary.Close(); err != nil {
@@ -693,7 +695,7 @@ func evaluateCircuitPreflight(ctx context.Context, opts cliOptions) circuitPrefl
 		result.Issues = []reports.Issue{{Code: reports.CodeMissingFile, Severity: reports.SeverityError, Path: opts.requestPath, Message: err.Error()}}
 		return result
 	}
-	defer contents.Close()
+	defer func() { _ = contents.Close() }()
 	graph, issues := circuitgraph.DecodeStrict(contents)
 	result.Data.Gates = append(result.Data.Gates, preflightGate("strict_decode", issues, designworkflow.StageParseRequest))
 	result.Data.Graph = &graph

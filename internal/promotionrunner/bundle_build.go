@@ -361,13 +361,13 @@ func copyRegularFile(source, destination string) error {
 	if err != nil {
 		return err
 	}
-	defer input.Close()
+	defer func() { _ = input.Close() }()
 	output, err := createExclusiveFile(destination)
 	if err != nil {
 		return err
 	}
 	if _, err := io.Copy(output, input); err != nil {
-		output.Close()
+		_ = output.Close()
 		return err
 	}
 	return output.Close()
@@ -387,11 +387,11 @@ func openRegularFile(path string) (*os.File, error) {
 	}
 	openedInfo, err := file.Stat()
 	if err != nil {
-		file.Close()
+		_ = file.Close()
 		return nil, err
 	}
 	if !openedInfo.Mode().IsRegular() || !os.SameFile(info, openedInfo) {
-		file.Close()
+		_ = file.Close()
 		return nil, fmt.Errorf("%q changed while it was being opened", path)
 	}
 	return file, nil
@@ -402,7 +402,7 @@ func readRegularFile(path string, limit int64) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 	limited := &io.LimitedReader{R: file, N: limit + 1}
 	value, err := io.ReadAll(limited)
 	if err != nil {
@@ -475,7 +475,7 @@ func bundleReference(root, path string) (BundleReference, error) {
 	if err != nil {
 		return BundleReference{}, err
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 	hash := sha256.New()
 	size, err := io.Copy(hash, file)
 	if err != nil {

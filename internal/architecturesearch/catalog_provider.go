@@ -1039,7 +1039,7 @@ func (provider *CatalogProvider) expandTranslator(ctx context.Context, request P
 	if err != nil {
 		return nil, err
 	}
-	functions := map[string]string{}
+	var functions map[string]string
 	if isolated {
 		functions = map[string]string{
 			"side_a_sda": "SDA1", "side_a_scl": "SCL1", "side_b_sda": "SDA2", "side_b_scl": "SCL2",

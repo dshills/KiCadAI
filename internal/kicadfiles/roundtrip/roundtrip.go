@@ -392,7 +392,7 @@ func systemUnifiedDiff(aName, bName, a, b string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	defer os.RemoveAll(dir)
+	defer func() { _ = os.RemoveAll(dir) }()
 
 	aPath := filepath.Join(dir, "a")
 	bPath := filepath.Join(dir, "b")

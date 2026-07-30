@@ -33,3 +33,29 @@ func TestWriteReplacesExistingAndAppliesMode(t *testing.T) {
 		t.Fatalf("temporary files remain: %v", matches)
 	}
 }
+
+func TestWriteCleansTemporaryFileWhenReplacementFails(t *testing.T) {
+	root := t.TempDir()
+	destination := filepath.Join(root, "destination")
+	if err := os.Mkdir(destination, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := Write(destination, []byte("replacement"), 0o640); err == nil {
+		t.Fatal("Write succeeded while replacing a directory")
+	}
+	info, err := os.Stat(destination)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !info.IsDir() {
+		t.Fatalf("failed replacement changed destination: mode=%v", info.Mode())
+	}
+	matches, err := filepath.Glob(filepath.Join(root, ".atomic-*.tmp"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(matches) != 0 {
+		t.Fatalf("temporary files remain after failed replacement: %v", matches)
+	}
+}

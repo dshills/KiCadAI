@@ -75,7 +75,7 @@ func (w ArtifactWorkspace) CopyFile(src string, rel string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("open input: %w", err)
 	}
-	defer in.Close()
+	defer func() { _ = in.Close() }()
 	out, err := os.OpenFile(dst, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o644)
 	if err != nil {
 		return "", fmt.Errorf("create artifact copy: %w", err)

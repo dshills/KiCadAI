@@ -310,8 +310,7 @@ func (provider *CatalogProvider) expandConstantCurrentRegulation(ctx context.Con
 	}
 	setResistance = preferred.SetResistanceOhm
 	dividerUpperResistance = preferred.DividerUpperResistanceOhm
-	setVoltageNominal, setVoltageMinimum, setVoltageMaximum = preferred.SetVoltageNominalV, preferred.SetVoltageMinimumV, preferred.SetVoltageMaximumV
-	outputResistance, outputTrimResistance, designCurrent := preferred.OutputResistanceOhm, preferred.OutputTrimResistanceOhm, preferred.DesignCurrentA
+	outputResistance, outputTrimResistance := preferred.OutputResistanceOhm, preferred.OutputTrimResistanceOhm
 	for index := range passives {
 		switch passives[index].id {
 		case "output_program":
@@ -1109,15 +1108,13 @@ func currentRegulatorCalculation(request currentRegulatorCalculationRequest) (Ca
 		for _, offset := range []float64{request.OffsetVoltageMinimumV, request.OffsetVoltageMaximumV} {
 			for _, setScale := range []float64{1 - setTolerance, 1 + setTolerance} {
 				for _, outputScale := range []float64{1 - outputTolerance, 1 + outputTolerance} {
-					setVoltage := request.SetVoltageNominalV
+					setVoltage := referenceCurrent * request.SetResistanceOhm * setScale
 					if request.PrecisionMode {
 						if setScale < 1 {
 							setVoltage = request.SetVoltageMinimumV
 						} else {
 							setVoltage = request.SetVoltageMaximumV
 						}
-					} else {
-						setVoltage = referenceCurrent * request.SetResistanceOhm * setScale
 					}
 					outputResistance := request.OutputResistanceOhm * outputScale
 					outputCurrent := (setVoltage+offset)/outputResistance + referenceCurrent

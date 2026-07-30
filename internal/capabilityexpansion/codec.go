@@ -90,13 +90,13 @@ func WriteArtifact(path string, value any) error {
 		return err
 	}
 	tempName := temp.Name()
-	defer os.Remove(tempName)
+	defer func() { _ = os.Remove(tempName) }()
 	if _, err := temp.Write(data); err != nil {
-		temp.Close()
+		_ = temp.Close()
 		return err
 	}
 	if err := temp.Chmod(0o644); err != nil {
-		temp.Close()
+		_ = temp.Close()
 		return err
 	}
 	if err := temp.Close(); err != nil {

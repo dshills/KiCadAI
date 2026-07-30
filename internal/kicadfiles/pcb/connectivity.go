@@ -450,7 +450,7 @@ func buildConnectivitySegmentIndex(anchors []connectivityAnchor) connectivitySeg
 		if index[anchor.netCode] == nil {
 			index[anchor.netCode] = map[connectivityCell][]int{}
 		}
-		cells := []connectivityCell{}
+		var cells []connectivityCell
 		if anchor.hasArc {
 			cells = arcCells(anchor.arcStart, anchor.arcMid, anchor.arcEnd)
 		} else {

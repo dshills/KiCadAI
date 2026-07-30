@@ -85,7 +85,7 @@ func FromDesign(design kicaddesign.Design, opts Options) Result {
 	result.SymbolCount = symbolCount(files)
 	result.AssignedCount = len(components)
 	result.RequiresLibraries = opts.LibraryIndex == nil
-	netHints := map[string]map[string]string{}
+	var netHints map[string]map[string]string
 	if opts.LibraryIndex != nil {
 		netHints = inferPinNetHints(files, components, *opts.LibraryIndex, &result)
 	} else {

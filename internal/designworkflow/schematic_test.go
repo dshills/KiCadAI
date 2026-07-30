@@ -63,6 +63,7 @@ func TestApplySchematicPropagatesPlanFailure(t *testing.T) {
 }
 
 func TestApplySchematicChecksContext(t *testing.T) {
+	//nolint:staticcheck // This regression intentionally proves nil-context rejection.
 	result := ApplySchematic(nil, BlockPlanResult{Stage: NewStageResult(StageBlockPlanning, nil)}, SchematicApplyOptions{OutputDir: t.TempDir()})
 	if !reports.HasBlockingIssue(result.Stage.Issues) {
 		t.Fatalf("issues = %#v, want context issue", result.Stage.Issues)

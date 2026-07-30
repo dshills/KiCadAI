@@ -175,7 +175,7 @@ func writeAtomic(path string, data []byte) error {
 		return err
 	}
 	name := file.Name()
-	defer os.Remove(name)
+	defer func() { _ = os.Remove(name) }()
 	if err := file.Chmod(0o644); err != nil {
 		return errors.Join(err, file.Close())
 	}

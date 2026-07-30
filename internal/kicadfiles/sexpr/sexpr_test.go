@@ -69,7 +69,7 @@ func TestRenderFloatFormatting(t *testing.T) {
 		want  string
 	}{
 		{name: "plain", value: F(1.25), want: "1.25\n"},
-		{name: "negative zero", value: F(-0.0), want: "0\n"},
+		{name: "negative zero", value: F(math.Copysign(0, -1)), want: "0\n"},
 		{name: "fixed not exponent", value: F(0.00000012), want: "0.00000012\n"},
 	}
 

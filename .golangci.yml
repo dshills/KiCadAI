@@ -4,10 +4,35 @@ run:
   timeout: 5m
   tests: true
 
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0
+
 linters:
   default: none
   enable:
+    - errcheck
     - govet
+    - staticcheck
+  settings:
+    staticcheck:
+      # Phase 9 starts with correctness-focused checks. Simplification and
+      # style families remain outside the enforced trust-boundary policy.
+      checks:
+        - SA1*
+        - SA2*
+        - SA3*
+        - SA4*
+        - SA5*
+        - SA6*
+        - SA9*
   exclusions:
     paths:
       - internal/kiapi/gen
+    rules:
+      # Tests may intentionally ignore teardown-only Close errors, but all
+      # other test setup and mutation errors remain enforced.
+      - path: _test\.go
+        text: Error return value of `.*\.Close` is not checked
+        linters:
+          - errcheck

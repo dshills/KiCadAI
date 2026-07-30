@@ -349,6 +349,7 @@ func TestInstantiateReportsCanceledContext(t *testing.T) {
 
 func TestInstantiateReportsNilContext(t *testing.T) {
 	registry := NewBuiltinRegistry()
+	//nolint:staticcheck // This regression intentionally proves nil-context rejection.
 	_, issues := registry.Instantiate(nil, BlockRequest{BlockID: "led_indicator", InstanceID: "status"})
 	if len(issues) != 1 || issues[0].Code != reports.CodeValidationFailed || issues[0].Message != "context is required" {
 		t.Fatalf("issues = %#v", issues)

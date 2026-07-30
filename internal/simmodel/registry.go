@@ -373,9 +373,6 @@ func validateDynamicCatalogEvidence(path string, primitive primitiveDefinition, 
 			if basis < previousBasis || (basis == previousBasis && envelope.CaseTemperatureC <= previousTemperature) {
 				diagnostics = append(diagnostics, Diagnostic{Path: envelopePath, Message: "SOA envelopes must be unique and canonically ordered by duration then case temperature"})
 			}
-			if basis != previousBasis {
-				previousTemperature = math.Inf(-1)
-			}
 			previousBasis = basis
 			previousTemperature = envelope.CaseTemperatureC
 			if len(envelope.Points) < 2 || len(envelope.Points) > 32 {

@@ -325,8 +325,7 @@ func TestLowerInterfacesSelectsDeterministicPrimaryBusLaneForSemanticBinding(t *
 			Protocol: &architecturesearch.Protocol{Name: "i2c", Mode: "open_drain"},
 		}},
 	}}
-	nodes := map[string]string{}
-	_, nodes = lowerInterfaces(requirement, newDisjointSet(), map[string]circuitgraph.FunctionalEndpoint{}, map[string]nodeMetadata{}, nil)
+	_, nodes := lowerInterfaces(requirement, newDisjointSet(), map[string]circuitgraph.FunctionalEndpoint{}, map[string]nodeMetadata{}, nil)
 	if nodes["bus"] != interfaceNode("bus", "sda") {
 		t.Fatalf("primary bus binding = %q, want deterministic first lane", nodes["bus"])
 	}

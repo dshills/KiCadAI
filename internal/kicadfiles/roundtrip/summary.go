@@ -20,7 +20,7 @@ func SummarizePCB(path string) (Summary, error) {
 	if err != nil {
 		return Summary{}, fmt.Errorf("open PCB summary input: %w", err)
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 	reader := bufio.NewReader(file)
 	sections := map[string]int{}
 	depth := 0

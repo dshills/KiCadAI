@@ -262,7 +262,7 @@ func appendFabricationCheckEvidence(ctx context.Context, targetRoot string, opts
 		result.Issues = append(result.Issues, reports.Issue{Code: reports.CodeValidationFailed, Severity: reports.SeverityError, Path: "fabrication/checks", Message: err.Error()})
 		return writes
 	}
-	defer os.RemoveAll(artifactRoot)
+	defer func() { _ = os.RemoveAll(artifactRoot) }()
 	checkOptions := checks.Options{KeepArtifacts: true, ArtifactDir: artifactRoot}
 	cli := checks.KiCadCLI{Path: opts.KiCadCLI}
 	for _, item := range []struct {

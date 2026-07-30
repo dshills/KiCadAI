@@ -51,7 +51,7 @@ func CommitPreparedDirectory(root, prepared string, overwrite bool) (WriteResult
 	if err != nil {
 		return WriteResult{}, fmt.Errorf("acquire project commit lock: %w", err)
 	}
-	defer lock.Close()
+	defer func() { _ = lock.Close() }()
 	if err := recoverDirectoryCommit(target, journalPath, backupPath); err != nil {
 		return WriteResult{}, err
 	}

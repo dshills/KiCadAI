@@ -199,7 +199,7 @@ func (provider *OpenAIProvider) GenerateIntent(ctx context.Context, request Gene
 		}
 		return GenerateResult{}, newProviderError(ErrorTransport, "OpenAI request failed", err)
 	}
-	defer response.Body.Close()
+	defer func() { _ = response.Body.Close() }()
 	streaming := strings.Contains(strings.ToLower(response.Header.Get("Content-Type")), "text/event-stream")
 	responseLimit := openAIResponseByteLimit(maxOutputTokens, streaming)
 	responseBody, err := readLimitedResponse(response.Body, responseLimit)
@@ -312,7 +312,7 @@ func (provider *OpenAIProvider) pollBackgroundResponse(ctx context.Context, resp
 		}
 		return nil, 0, newProviderError(ErrorTransport, "OpenAI background poll failed", err)
 	}
-	defer response.Body.Close()
+	defer func() { _ = response.Body.Close() }()
 	data, err := readLimitedResponse(response.Body, responseLimit)
 	if err != nil {
 		return nil, response.StatusCode, err

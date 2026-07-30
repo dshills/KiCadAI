@@ -111,13 +111,15 @@ func (resolver PlannedSimulationResolver) ResolveSimulation(ctx context.Context,
 	templates := resolver.Templates
 	assertionBindings := resolver.Assertions
 	operatingBindings := resolver.OperatingBindings
-	var err error
 	if dynamic, ok := resolver.Base.(FreshSimulationPlanSetResolver); ok {
 		planSet, resolveErr := dynamic.ResolveSimulationPlanSet(ctx, cloneState(state))
 		if resolveErr != nil {
 			return SimulationResolution{}, resolveErr
 		}
-		plans, analysisPlan = planSet.Plans, planSet.AnalysisPlan
+		for id, plan := range planSet.Plans {
+			plans[id] = plan
+		}
+		analysisPlan = planSet.AnalysisPlan
 		if len(planSet.Templates) != 0 {
 			templates = planSet.Templates
 		}
@@ -128,9 +130,12 @@ func (resolver PlannedSimulationResolver) ResolveSimulation(ctx context.Context,
 			operatingBindings = planSet.OperatingBindings
 		}
 	} else {
-		plans, err = resolver.Base.ResolveSimulationPlans(ctx, cloneState(state))
+		resolvedPlans, err := resolver.Base.ResolveSimulationPlans(ctx, cloneState(state))
 		if err != nil {
 			return SimulationResolution{}, err
+		}
+		for id, plan := range resolvedPlans {
+			plans[id] = plan
 		}
 	}
 	resolution, diagnostics := CompileSimulationResolution(analysisPlan, plans, templates, assertionBindings, operatingBindings)

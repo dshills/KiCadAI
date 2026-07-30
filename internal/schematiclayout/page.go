@@ -64,7 +64,6 @@ func pageCandidates(requested Sheet) []Sheet {
 			if (kicadfiles.MM(paper.width) == requested.Width && kicadfiles.MM(paper.height) == requested.Height) ||
 				(kicadfiles.MM(paper.height) == requested.Width && kicadfiles.MM(paper.width) == requested.Height) {
 				start = index
-				name = paper.name
 				break
 			}
 		}

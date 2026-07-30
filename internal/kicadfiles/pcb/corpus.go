@@ -59,7 +59,7 @@ func scanCorpusFile(path string) (CorpusReport, error) {
 	if err != nil {
 		return report, err
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 	return report, scanPCBFileInto(file, &report)
 }
 

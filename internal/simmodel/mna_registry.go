@@ -912,10 +912,6 @@ func validateMNAIntent(intent Intent, components map[string]string) []Diagnostic
 				if gridValid {
 					totalDynamicWork += work
 				}
-			} else if model.Transient {
-				// A transient-capable graph can still perform the legacy DC thermal
-				// operating point. This keeps one resolved device set usable for both
-				// quiescent and periodically driven thermal contracts.
 			}
 		default:
 			diagnostics = append(diagnostics, Diagnostic{Path: path + ".kind", Message: "analysis kind is not supported by graph MNA", Suggestion: "use dc_operating_point, ac_sweep, or transient in its dedicated workflow"})

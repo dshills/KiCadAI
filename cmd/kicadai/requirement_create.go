@@ -42,7 +42,7 @@ func runRequirement(ctx context.Context, opts cliOptions, stdout io.Writer) erro
 	if err != nil {
 		return writeRequirementFailure(stdout, reports.Issue{Code: reports.CodeMissingFile, Severity: reports.SeverityError, Path: opts.requestPath, Message: err.Error()})
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 	requirement, decodeIssues := architecturesearch.DecodeStrict(file)
 	if reports.HasBlockingIssue(decodeIssues) {
 		return writeRequirementIssues(stdout, decodeIssues)

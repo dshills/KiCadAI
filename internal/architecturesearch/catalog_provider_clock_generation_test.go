@@ -75,13 +75,6 @@ func TestStandaloneClockGenerationSelectsDistinctCatalogBackedArchitectures(t *t
 			instances := make(map[string]RealizationInstance, len(realization.Instances))
 			for _, instance := range realization.Instances {
 				instances[instance.ID] = instance
-				if instance.Near != "" {
-					if _, ok := instances[instance.Near]; !ok {
-						// Realizations are canonically sorted, so the target may
-						// appear later; validate all references below.
-						continue
-					}
-				}
 			}
 			for _, instance := range realization.Instances {
 				if instance.Near != "" {

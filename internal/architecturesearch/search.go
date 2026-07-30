@@ -125,7 +125,6 @@ func Search(ctx context.Context, requirement Requirement, registry *Registry, op
 			accumulator.reject(CodeCapabilityUnsupported, obligation.Path, "", "", "no registered provider supplies capability "+obligation.Capability)
 			continue
 		}
-		generatedForObligation := 0
 		for _, provider := range providers {
 			request := providerRequestFor(obligation, normalized.Requirements.Constraints)
 			expansions, err := provider.provider.Expand(ctx, request)
@@ -200,12 +199,8 @@ func Search(ctx context.Context, requirement Requirement, registry *Registry, op
 				}
 				accumulator.visited[next.key] = true
 				frontier = append(frontier, next)
-				generatedForObligation++
 				accumulator.result.Consumption.GeneratedStates++
 			}
-		}
-		if generatedForObligation == 0 {
-			// Detailed provider rejections already explain why the branch ended.
 		}
 		if len(frontier) > accumulator.result.Consumption.MaximumFrontier {
 			accumulator.result.Consumption.MaximumFrontier = len(frontier)

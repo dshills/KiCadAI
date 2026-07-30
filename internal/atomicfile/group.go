@@ -190,7 +190,7 @@ func BeginGroup(mutations []Mutation, options GroupOptions) (*Group, error) {
 }
 
 // RecoverGroup resolves an interrupted group before a new writer starts.
-func RecoverGroup(root string) error {
+func RecoverGroup(root string) (resultErr error) {
 	normalized, err := normalizedRoot(root)
 	if err != nil {
 		return err
@@ -202,7 +202,9 @@ func RecoverGroup(root string) error {
 	if err != nil {
 		return err
 	}
-	defer lock.Release()
+	defer func() {
+		resultErr = errors.Join(resultErr, lock.Release())
+	}()
 	group := &Group{
 		root:        normalized,
 		journalPath: filepath.Join(normalized, filepath.FromSlash(JournalRelativePath)),
@@ -713,7 +715,7 @@ func copyToTemporary(source string, directory string, pattern string, mode os.Fi
 	if err != nil {
 		return "", err
 	}
-	defer input.Close()
+	defer func() { _ = input.Close() }()
 	output, err := os.CreateTemp(directory, pattern)
 	if err != nil {
 		return "", err
@@ -754,7 +756,7 @@ func hashFile(path string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 	hash := sha256.New()
 	if _, err := io.Copy(hash, file); err != nil {
 		return "", err

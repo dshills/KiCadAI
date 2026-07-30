@@ -150,11 +150,12 @@ Equivalent direct command:
 go test ./...
 ```
 
-If your environment blocks the default Go build cache location, use a writable
-temporary cache:
+The Makefile keeps Go build, module, and lint caches under one ignored root,
+`.cache/go/`. Override that single optional location when the repository is
+read-only or when an ephemeral cache is preferred:
 
 ```sh
-GOCACHE="$(mktemp -d)" go test ./...
+make GO_CACHE_ROOT=/tmp/kicadai-go-cache test
 ```
 
 Coverage:
@@ -210,7 +211,12 @@ Local equivalents of the bounded CI tiers are:
 ```sh
 make GO_TEST_FLAGS=-short test
 make COVER_TEST_FLAGS=-short coverage-check
+make race-short
 ```
+
+`make race-short` is intentionally local-only. It runs the race detector over
+the concurrent IPC, atomic locking, provider, and transaction trust boundary
+without adding GitHub execution to acceptance.
 
 Run one frozen promotion corpus exactly and fail if the named test is absent:
 

@@ -370,7 +370,7 @@ func loadBehavioralFollowUpExecution(opts cliOptions) (*behavioralFollowUpExecut
 	if err != nil {
 		return nil, fmt.Errorf("open follow-up: %w", err)
 	}
-	defer followUpFile.Close()
+	defer func() { _ = followUpFile.Close() }()
 	followUp, issues := behavioralintent.DecodeFollowUpStrict(followUpFile)
 	if reports.HasBlockingIssue(issues) {
 		return nil, errors.New(issues[0].Message)
@@ -380,7 +380,7 @@ func loadBehavioralFollowUpExecution(opts cliOptions) (*behavioralFollowUpExecut
 	if err != nil {
 		return nil, fmt.Errorf("open prior behavioral proposal: %w", err)
 	}
-	defer proposalFile.Close()
+	defer func() { _ = proposalFile.Close() }()
 	priorProposal, proposalIssues := behavioralintent.DecodeProposalStrict(proposalFile)
 	if reports.HasBlockingIssue(proposalIssues) {
 		return nil, errors.New(proposalIssues[0].Message)
@@ -397,7 +397,7 @@ func decodeBehavioralArtifact(path string, destination any) error {
 	if err != nil {
 		return err
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 	decoder := json.NewDecoder(io.LimitReader(file, behavioralintent.MaxProposalBytes+1))
 	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(destination); err != nil {

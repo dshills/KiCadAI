@@ -361,8 +361,8 @@ func (a app) run(args []string, stdout io.Writer, stderr io.Writer) error {
 
 	switch command {
 	case "", "help":
-		fmt.Fprint(stdout, usage)
-		return nil
+		_, err := fmt.Fprint(stdout, usage)
+		return err
 	case "capabilities":
 		return a.runCapabilities(ctx, opts, stdout)
 	case "capability":
@@ -2409,7 +2409,7 @@ func runPlace(opts cliOptions, stdout io.Writer) error {
 				Message:  err.Error(),
 			})
 		}
-		defer file.Close()
+		defer func() { _ = file.Close() }()
 		var request placement.Request
 		if err := json.NewDecoder(file).Decode(&request); err != nil {
 			return writeReportFailure(stdout, "place", reports.Issue{
@@ -2471,7 +2471,7 @@ func runRoute(opts cliOptions, stdout io.Writer) error {
 				Message:  err.Error(),
 			})
 		}
-		defer file.Close()
+		defer func() { _ = file.Close() }()
 		var request routing.Request
 		if err := json.NewDecoder(file).Decode(&request); err != nil {
 			return writeReportFailure(stdout, "route", reports.Issue{
@@ -2906,8 +2906,12 @@ func writeLocalArtifact(path string, data []byte, overwrite bool) *reports.Issue
 	if err != nil {
 		return &reports.Issue{Code: reports.CodeInvalidArgument, Severity: reports.SeverityError, Path: path, Message: err.Error()}
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 	if _, err := file.Write(data); err != nil {
+		_ = file.Close()
+		return &reports.Issue{Code: reports.CodeInvalidArgument, Severity: reports.SeverityError, Path: path, Message: err.Error()}
+	}
+	if err := file.Close(); err != nil {
 		return &reports.Issue{Code: reports.CodeInvalidArgument, Severity: reports.SeverityError, Path: path, Message: err.Error()}
 	}
 	return nil
@@ -3769,7 +3773,7 @@ func loadIntentPlan(opts cliOptions) (intentplanner.PlanResult, []reports.Issue,
 		issue := reports.Issue{Code: reports.CodeMissingFile, Severity: reports.SeverityError, Path: opts.requestPath, Message: err.Error()}
 		return intentplanner.PlanResult{}, []reports.Issue{issue}, nil
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 	request, issues := intentplanner.DecodeRequestStrict(file)
 	if reports.HasBlockingIssue(issues) {
 		return intentplanner.PlanResult{}, issues, nil
@@ -3797,7 +3801,7 @@ func runIntentPlan(ctx context.Context, opts cliOptions, stdout io.Writer, subco
 	if err != nil {
 		return writeReportFailure(stdout, "intent", reports.Issue{Code: reports.CodeMissingFile, Severity: reports.SeverityError, Path: opts.requestPath, Message: err.Error()})
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 	request, issues := intentplanner.DecodeRequestStrict(file)
 	if reports.HasBlockingIssue(issues) {
 		result := reports.ResultWithIssues("intent", nil, issues, nil)
@@ -3913,7 +3917,7 @@ func runDesignCreate(ctx context.Context, opts cliOptions, stdout io.Writer) err
 	if err != nil {
 		return writeDesignFailure(stdout, reports.Issue{Code: reports.CodeMissingFile, Severity: reports.SeverityError, Path: opts.requestPath, Message: err.Error()})
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 	request, issues := designworkflow.DecodeRequestStrict(file)
 	if reports.HasBlockingIssue(issues) {
 		result := reports.ResultWithIssues("design", nil, issues, nil)
@@ -4707,7 +4711,7 @@ func loadSchematicIRDocument(path string) (schematicir.Document, []reports.Issue
 			Message:  err.Error(),
 		}}
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 	document, issues := schematicir.DecodeStrict(file)
 	return document, issues
 }
@@ -5496,10 +5500,18 @@ func runConfig(opts cliOptions, stdout io.Writer) error {
 		return writeJSON(stdout, resolved.Redacted())
 	}
 
-	fmt.Fprintf(stdout, "socket_path: %s\n", resolved.SocketPath)
-	fmt.Fprintf(stdout, "client_name: %s\n", resolved.ClientName)
-	fmt.Fprintf(stdout, "timeout_ms: %d\n", resolved.TimeoutMS)
-	fmt.Fprintf(stdout, "token: %s\n", resolved.Redacted().Token)
+	if _, err := fmt.Fprintf(stdout, "socket_path: %s\n", resolved.SocketPath); err != nil {
+		return err
+	}
+	if _, err := fmt.Fprintf(stdout, "client_name: %s\n", resolved.ClientName); err != nil {
+		return err
+	}
+	if _, err := fmt.Fprintf(stdout, "timeout_ms: %d\n", resolved.TimeoutMS); err != nil {
+		return err
+	}
+	if _, err := fmt.Fprintf(stdout, "token: %s\n", resolved.Redacted().Token); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -5509,7 +5521,7 @@ func (a app) runPing(parent context.Context, opts cliOptions, stdout io.Writer) 
 		return writeProbeFailure(opts, stdout, resolved, err)
 	}
 	defer cancel()
-	defer client.Close()
+	defer func() { _ = client.Close() }()
 
 	err = client.Ping(ctx)
 	result := probeResult{
@@ -5531,8 +5543,12 @@ func (a app) runPing(parent context.Context, opts cliOptions, stdout io.Writer) 
 		return err
 	}
 
-	fmt.Fprintf(stdout, "reachable: true\n")
-	fmt.Fprintf(stdout, "socket_path: %s\n", resolved.SocketPath)
+	if _, err := fmt.Fprintln(stdout, "reachable: true"); err != nil {
+		return err
+	}
+	if _, err := fmt.Fprintf(stdout, "socket_path: %s\n", resolved.SocketPath); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -5542,7 +5558,7 @@ func (a app) runVersion(parent context.Context, opts cliOptions, stdout io.Write
 		return writeProbeFailure(opts, stdout, resolved, err)
 	}
 	defer cancel()
-	defer client.Close()
+	defer func() { _ = client.Close() }()
 
 	version, err := client.GetVersion(ctx)
 	result := probeResult{
@@ -5568,8 +5584,12 @@ func (a app) runVersion(parent context.Context, opts cliOptions, stdout io.Write
 		return errors.New("KiCad version response did not include version details")
 	}
 
-	fmt.Fprintf(stdout, "reachable: true\n")
-	fmt.Fprintf(stdout, "kicad_version: %s\n", result.Version.FullVersion)
+	if _, err := fmt.Fprintln(stdout, "reachable: true"); err != nil {
+		return err
+	}
+	if _, err := fmt.Fprintf(stdout, "kicad_version: %s\n", result.Version.FullVersion); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -5584,7 +5604,7 @@ func (a app) runDocuments(parent context.Context, opts cliOptions, stdout io.Wri
 		return writeProbeFailure(opts, stdout, resolved, err)
 	}
 	defer cancel()
-	defer client.Close()
+	defer func() { _ = client.Close() }()
 
 	documents, err := client.GetOpenDocuments(ctx, documentType)
 	result := documentsResult{
@@ -5628,7 +5648,7 @@ func (a app) runCapabilities(parent context.Context, opts cliOptions, stdout io.
 		return writeProbeFailure(opts, stdout, resolved, err)
 	}
 	defer cancel()
-	defer client.Close()
+	defer func() { _ = client.Close() }()
 
 	version, err := client.GetVersion(ctx)
 	if err != nil {
@@ -5704,7 +5724,7 @@ func (a app) runDrawLEDDemo(parent context.Context, opts cliOptions, stdout io.W
 		return writeProbeFailure(opts, stdout, resolved, err)
 	}
 	defer cancel()
-	defer client.Close()
+	defer func() { _ = client.Close() }()
 
 	version, err := client.GetVersion(ctx)
 	if err != nil {
@@ -5808,13 +5828,21 @@ func (a app) runGenerateLEDDemo(opts cliOptions, stdout io.Writer) error {
 	if opts.jsonOutput {
 		return writeJSON(stdout, result)
 	}
-	fmt.Fprintf(stdout, "project_name: %s\n", result.ProjectName)
-	fmt.Fprintf(stdout, "project_dir: %s\n", result.ProjectDir)
+	if _, err := fmt.Fprintf(stdout, "project_name: %s\n", result.ProjectName); err != nil {
+		return err
+	}
+	if _, err := fmt.Fprintf(stdout, "project_dir: %s\n", result.ProjectDir); err != nil {
+		return err
+	}
 	for _, file := range result.WrittenFiles {
-		fmt.Fprintf(stdout, "written: %s\n", file)
+		if _, err := fmt.Fprintf(stdout, "written: %s\n", file); err != nil {
+			return err
+		}
 	}
 	for _, warning := range result.Warnings {
-		fmt.Fprintf(stdout, "warning: %s\n", warning)
+		if _, err := fmt.Fprintf(stdout, "warning: %s\n", warning); err != nil {
+			return err
+		}
 	}
 	return nil
 }

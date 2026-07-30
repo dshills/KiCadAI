@@ -6,6 +6,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -18,10 +19,15 @@ import (
 const defaultLockPath = "toolchain/kicad-promotion.lock.json"
 
 func main() {
-	if err := run(os.Args[1:]); err != nil {
-		fmt.Fprintln(os.Stderr, "kicadai-promotion:", err)
-		os.Exit(1)
+	os.Exit(execute(os.Args[1:], os.Stderr))
+}
+
+func execute(arguments []string, stderr io.Writer) int {
+	if err := run(arguments); err != nil {
+		_, _ = fmt.Fprintln(stderr, "kicadai-promotion:", err)
+		return 1
 	}
+	return 0
 }
 
 func run(arguments []string) error {

@@ -71,7 +71,7 @@ func BootstrapToolchain(ctx context.Context, document Document, options Bootstra
 	if err != nil {
 		return Evidence{}, fmt.Errorf("create bootstrap workspace: %w", err)
 	}
-	defer os.RemoveAll(temporary)
+	defer func() { _ = os.RemoveAll(temporary) }()
 	archivePath := filepath.Join(temporary, "toolchain.dmg")
 	if err := DownloadVerified(ctx, options.Client, platform.Bootstrap, archivePath); err != nil {
 		return Evidence{}, err
@@ -98,7 +98,7 @@ func DownloadVerified(ctx context.Context, client *http.Client, distribution Boo
 	if err != nil {
 		return fmt.Errorf("download bootstrap distribution: %w", err)
 	}
-	defer response.Body.Close()
+	defer func() { _ = response.Body.Close() }()
 	if response.StatusCode != http.StatusOK {
 		return fmt.Errorf("download bootstrap distribution: HTTP %s", response.Status)
 	}

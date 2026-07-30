@@ -37,7 +37,7 @@ func loadCache(path string, roots LibraryRoots, inventory LibraryInventory, curr
 		}
 		return LibraryIndex{}, []reports.Issue{cacheIssue("read cache: " + err.Error())}, false
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 	var cache libraryCacheFile
 	if err := json.NewDecoder(file).Decode(&cache); err != nil {
 		return LibraryIndex{}, []reports.Issue{cacheIssue("read cache: " + err.Error())}, false

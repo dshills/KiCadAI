@@ -587,7 +587,7 @@ func replayGeneratedTransaction(ctx context.Context, tx transactions.Transaction
 	if err != nil {
 		return transactions.ApplyResult{}, nil, nil, []reports.Issue{persistedIssue(reports.CodeValidationFailed, "output", err.Error())}
 	}
-	defer os.RemoveAll(stage)
+	defer func() { _ = os.RemoveAll(stage) }()
 	if err := ctx.Err(); err != nil {
 		return transactions.ApplyResult{}, nil, nil, []reports.Issue{contextIssue(err)}
 	}

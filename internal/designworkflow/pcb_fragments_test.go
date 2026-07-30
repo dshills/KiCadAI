@@ -360,6 +360,7 @@ func TestRealizePCBFragmentsSkipsAfterPlanFailure(t *testing.T) {
 }
 
 func TestRealizePCBFragmentsRequiresContext(t *testing.T) {
+	//nolint:staticcheck // This regression intentionally proves nil-context rejection.
 	result := RealizePCBFragments(nil, blocks.NewBuiltinRegistry(), BlockPlanResult{})
 	if !reports.HasBlockingIssue(result.Stage.Issues) {
 		t.Fatalf("issues = %#v, want context issue", result.Stage.Issues)

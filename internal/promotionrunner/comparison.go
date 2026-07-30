@@ -201,7 +201,7 @@ func inventoryFile(path, relative, destination string, context normalizationCont
 	if err != nil {
 		return NormalizedFile{}, err
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 	if !strings.HasSuffix(relative, ".json") && !isKiCadFile(relative) {
 		hash := sha256.New()
 		writer := io.Writer(hash)
@@ -216,7 +216,7 @@ func inventoryFile(path, relative, destination string, context normalizationCont
 		size, err := io.Copy(writer, file)
 		if err != nil {
 			if output != nil {
-				output.Close()
+				_ = output.Close()
 			}
 			return NormalizedFile{}, err
 		}
@@ -257,13 +257,13 @@ func inventoryFile(path, relative, destination string, context normalizationCont
 		limited := &io.LimitedReader{R: file, N: limit + 1}
 		if err := normalizeJSONReader(limited, counter, context); err != nil {
 			if output != nil {
-				output.Close()
+				_ = output.Close()
 			}
 			return NormalizedFile{}, err
 		}
 		if limited.N == 0 {
 			if output != nil {
-				output.Close()
+				_ = output.Close()
 			}
 			return NormalizedFile{}, fmt.Errorf("parse-required file grew beyond normalization limit %d", limit)
 		}
@@ -310,7 +310,7 @@ func writeExclusiveFile(path string, value []byte) error {
 		return err
 	}
 	if _, err := file.Write(value); err != nil {
-		file.Close()
+		_ = file.Close()
 		return err
 	}
 	return file.Close()
@@ -332,7 +332,7 @@ func readBoundedFile(path string, limit int64) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 	info, err := file.Stat()
 	if err != nil {
 		return nil, err

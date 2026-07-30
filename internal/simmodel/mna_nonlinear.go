@@ -337,8 +337,11 @@ func solveLinearOpAmpByBisection(plan Plan, analysis Analysis, current, resolved
 			}
 			if math.Signbit(midResidual) == math.Signbit(lowerResidual) {
 				lower, lowerResidual, lowerSolution = midpoint, midResidual, midSolution
-			} else {
+			} else if math.Signbit(midResidual) == math.Signbit(upperResidual) {
 				upper, upperResidual, upperSolution = midpoint, midResidual, midSolution
+			} else {
+				evidence.Method = fmt.Sprintf("bisection lost residual bracket lower=%.12g midpoint=%.12g upper=%.12g", lowerResidual, midResidual, upperResidual)
+				return mnaSystem{}, nil, evidence, nil, false
 			}
 		}
 		evidence.Method = "iteration bound"

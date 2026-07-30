@@ -207,7 +207,7 @@ func decodeCapabilityArtifactFile[T any](path string, decode func(io.Reader) (T,
 	if err != nil {
 		return value, err
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 	return decode(file)
 }
 
@@ -217,7 +217,7 @@ func decodeCapabilityFile[T any](path string) (T, error) {
 	if err != nil {
 		return value, err
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 	content, err := io.ReadAll(io.LimitReader(file, maxCapabilityRequestBytes+1))
 	if err != nil {
 		return value, err
@@ -242,7 +242,7 @@ func readCapabilitySource(path string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 	content, err := io.ReadAll(io.LimitReader(file, maxCapabilitySourceBytes+1))
 	if err != nil {
 		return nil, err

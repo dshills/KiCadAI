@@ -72,7 +72,7 @@ func (w ArtifactWorkspace) CopyInput(src string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("open input: %w", err)
 	}
-	defer in.Close()
+	defer func() { _ = in.Close() }()
 	dst, out, err := w.createUniqueFile(name)
 	if err != nil {
 		return "", fmt.Errorf("create artifact copy: %w", err)

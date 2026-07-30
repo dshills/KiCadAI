@@ -151,14 +151,14 @@ func (set projectEndpointSet) find(endpoint projectEndpointKey) projectEndpointK
 	if endpoint.ref == "" || endpoint.pin == "" {
 		return endpoint
 	}
-	parent, ok := set.parent[endpoint]
+	_, ok := set.parent[endpoint]
 	if !ok {
 		set.parent[endpoint] = endpoint
 		return endpoint
 	}
 	root := endpoint
 	for {
-		parent = set.parent[root]
+		parent := set.parent[root]
 		if parent == root {
 			break
 		}

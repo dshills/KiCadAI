@@ -441,14 +441,14 @@ func (set portDisjointSet) union(a PortRef, b PortRef) {
 }
 
 func (set portDisjointSet) find(value PortRef) PortRef {
-	parent, ok := set.parent[value]
+	_, ok := set.parent[value]
 	if !ok {
 		set.parent[value] = value
 		return value
 	}
 	root := value
 	for {
-		parent = set.parent[root]
+		parent := set.parent[root]
 		if parent == root {
 			break
 		}

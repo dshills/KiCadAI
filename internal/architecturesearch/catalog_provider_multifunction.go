@@ -4360,11 +4360,6 @@ func (provider *CatalogProvider) expandResistiveClassAAmplification(ctx context.
 		minimumCollector := swing / (2 * stageQuiescent)
 		collectorIdeal = math.Min(collectorIdeal, minimumCollector*1.01)
 	}
-	effectiveCollector := collectorIdeal
-	if hasLoadRange {
-		minimumEffective := collectorIdeal * minimumLoad / (collectorIdeal + minimumLoad)
-		effectiveCollector = minimumEffective
-	}
 	transistorDissipation := stageQuiescent * math.Max(supplyMaximum-stageQuiescent*collectorIdeal-.65, .1)
 	thermalRequirement := thermalRequirementFromConstraints(request.Constraints, transistorDissipation)
 	transistor, err := provider.selectComponentWithThermal(ctx, "bjt", "NPN audio", []components.RequiredRating{
@@ -4407,7 +4402,7 @@ func (provider *CatalogProvider) expandResistiveClassAAmplification(ctx context.
 			return nil, fmt.Errorf("Class-A distortion and swing targets exceed the bounded resistive-load headroom")
 		}
 	}
-	effectiveCollector = collectorIdeal
+	effectiveCollector := collectorIdeal
 	if hasLoadRange {
 		minimumEffective := collectorIdeal * minimumLoad / (collectorIdeal + minimumLoad)
 		effectiveCollector = minimumEffective
