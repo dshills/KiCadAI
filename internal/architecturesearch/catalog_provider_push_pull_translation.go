@@ -29,8 +29,12 @@ func (provider *CatalogProvider) expandPushPullTranslator(ctx context.Context, r
 	if err := requireBool(request.Constraints, "unpowered_backfeed_prevention", "required", true); err != nil {
 		return nil, err
 	}
-	if !slices.ContainsFunc(request.Ports, func(port RoleContract) bool { return port.Role == "enable" }) {
+	enableIndex := slices.IndexFunc(request.Ports, func(port RoleContract) bool { return port.Role == "enable" })
+	if enableIndex < 0 {
 		return nil, &interfaceSynthesisError{code: CodeInterfaceTranslationUnavailable, message: "push-pull translation requires an enable role with a defined inactive startup state"}
+	}
+	if canonicalIdentifier(request.Ports[enableIndex].Contract.DefaultState) != "inactive" {
+		return nil, &interfaceSynthesisError{code: CodeInterfaceTranslationUnavailable, message: "push-pull translation requires the enable role to be inactive at startup"}
 	}
 	frequency, err := pushPullTranslationFrequency(request)
 	if err != nil {

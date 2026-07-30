@@ -305,6 +305,24 @@ evidence. See the
 [hierarchical specification](../specs/hierarchical-multi-domain-synthesis/SPEC.md)
 and [promotion matrix](../specs/hierarchical-multi-domain-synthesis/PROMOTION_MATRIX.json).
 
+## Protocol-Aware Bus Synthesis
+
+The registered architecture lane now handles behavior-only I2C, SMBus, SPI,
+and UART buffering and level translation. It covers solved open-drain pull-ups,
+whole-bus and per-segment loading, independent branch translation,
+mixed-direction push-pull channel groups, reversed voltage domains, inactive
+startup, partial-power isolation, hot-plug containment, and explicit
+contention policy.
+
+Four frozen requirements pass deterministic architecture search, trusted-model
+closed-loop evaluation, lowering, routing/connectivity, writer and round-trip
+checks, and local installed-KiCad ERC/strict DRC twice. Eleven negative
+conditions fail closed. This closes a measured architecture cluster but does
+not add USB, Ethernet, LVDS, CAN/RS-485, RF, or transmission-line signoff.
+See the
+[specification](../specs/protocol-aware-bus-synthesis/SPEC.md) and
+[promotion matrix](../specs/protocol-aware-bus-synthesis/PROMOTION_MATRIX.json).
+
 ## Reproducible Promotion Evidence
 
 Run `make promotion-bundle` from an unmodified checkout to reproduce the

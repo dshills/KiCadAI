@@ -281,6 +281,28 @@ func TestStandaloneClockGenerationCorpusOptionalKiCadPromotion(t *testing.T) {
 	runFrozenPromotionAt(t, filepath.Join("..", "architecturesearch", "testdata", "standalone_clock_generation_corpus"), 2, "KICADAI_CLOCK_GENERATION_ARTIFACT_DIR", cli, index)
 }
 
+func TestProtocolAwareBusCorpusPassesOfflineWorkflow(t *testing.T) {
+	requireLongPromotionTest(t)
+	runFrozenPromotionAt(t, filepath.Join("..", "architecturesearch", "testdata", "protocol_aware_bus_corpus"), 4, "KICADAI_PROTOCOL_BUS_ARTIFACT_DIR", "", libraryresolver.LibraryIndex{})
+}
+
+func TestProtocolAwareBusCorpusOptionalKiCadPromotion(t *testing.T) {
+	requireLongPromotionTest(t)
+	cli := os.Getenv("KICADAI_KICAD_CLI")
+	if cli == "" {
+		t.Skip("set KICADAI_KICAD_CLI to run the KiCad-backed protocol-aware bus corpus")
+	}
+	roots, rootIssues := libraryresolver.ResolveRoots()
+	if roots.SymbolsRoot == "" || roots.FootprintsRoot == "" {
+		t.Skipf("installed KiCad libraries are required: %#v", rootIssues)
+	}
+	index, loadIssues := libraryresolver.Load(context.Background(), roots, libraryresolver.LoadOptions{})
+	if len(index.Symbols) == 0 || len(index.Footprints) == 0 {
+		t.Fatalf("installed library index is empty: %#v", loadIssues)
+	}
+	runFrozenPromotionAt(t, filepath.Join("..", "architecturesearch", "testdata", "protocol_aware_bus_corpus"), 4, "KICADAI_PROTOCOL_BUS_ARTIFACT_DIR", cli, index)
+}
+
 func TestHeldOutClockGenerationCorpusPassesOfflineWorkflow(t *testing.T) {
 	requireLongPromotionTest(t)
 	corpusRoot, count := heldOutCapabilityFamilyCorpus(t, "clock_generation")

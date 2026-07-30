@@ -676,7 +676,8 @@ func configureBehavioralTransferControls(plan *simmodel.Plan, kind string, requi
 	nodeStates := map[string]behavioralControlState{}
 	translatorsByControls := directionControlledTranslatorControlIndex(*plan)
 	for _, objective := range requirement.Requirements.Objectives {
-		if objective.Capability != "logic_level_translation" {
+		if objective.Capability != "logic_level_translation" &&
+			objective.Capability != "bus_buffering_level_translation" {
 			continue
 		}
 		roles := map[string]architecturesearch.Binding{}

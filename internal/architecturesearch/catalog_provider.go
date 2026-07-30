@@ -15,7 +15,7 @@ import (
 )
 
 const (
-	catalogProviderRevision         = "1.0.0"
+	catalogProviderRevision         = "1.1.0"
 	thresholdReferenceResistanceOhm = 10_000.0
 	catalogRatingDeratingFactor     = 0.8
 	lowVoltageGateDriveCeilingV     = 5.5
@@ -23,6 +23,7 @@ const (
 
 var catalogProviderCapabilities = []string{
 	"analog_servo_control",
+	"bus_buffering_level_translation",
 	"class_a_amplification",
 	"class_ab_bias_control",
 	"class_ab_output_stage",
@@ -145,6 +146,8 @@ func (provider *CatalogProvider) Expand(ctx context.Context, request ProviderReq
 			return provider.expandGenericTranslator(ctx, request)
 		}
 		return provider.expandTranslator(ctx, request)
+	case "bus_buffering_level_translation":
+		return provider.expandProtocolAwareBus(ctx, request)
 	case "signal_termination":
 		return provider.expandSourceTermination(ctx, request, false)
 	case "clock_conditioning":
@@ -968,12 +971,15 @@ func (provider *CatalogProvider) expandTranslator(ctx context.Context, request P
 		value string
 	}{
 		{name: "direction", value: "bidirectional"},
-		{name: "protocol", value: "i2c"},
 		{name: "signaling_mode", value: "open_drain"},
 	} {
 		if err := requireString(request.Constraints, constraint.name, "equal", constraint.value); err != nil {
 			return nil, err
 		}
+	}
+	protocol := optionalMCUConstraintString(request.Constraints, "protocol")
+	if protocol != "i2c" && protocol != "smbus" {
+		return nil, &interfaceSynthesisError{code: CodeInterfaceTranslationUnavailable, message: "open-drain translation requires an explicit I2C or SMBus protocol"}
 	}
 	if err := requireBool(request.Constraints, "unpowered_backfeed_prevention", "required", true); err != nil {
 		return nil, err

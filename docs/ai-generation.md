@@ -809,6 +809,18 @@ unsupported with stable clustered reasons. Run
 `make open-world-capability-promotion-bundle` to reproduce the five physical
 promotions.
 
+Protocol-aware bus synthesis adds a separate frozen behavior-only corpus for
+I2C, SMBus, SPI, and UART. It selects ordinary open-drain, segmented
+open-drain, fixed push-pull, or mixed-direction push-pull translation from
+electrical contracts; solves trunk and branch pull-ups; accounts for aggregate
+loading and shared supplies; and requires explicit partial-power, hot-plug,
+contention, and startup behavior. All four cases pass two-run offline and local
+installed-KiCad promotion with clean ERC, strict DRC, complete
+routing/connectivity, writer correctness, and zero round-trip differences.
+Unsafe or incomplete safety contracts fail closed. See the
+[specification](../specs/protocol-aware-bus-synthesis/SPEC.md) and
+[promotion matrix](../specs/protocol-aware-bus-synthesis/PROMOTION_MATRIX.json).
+
 The generic contract removes the architectural requirement for one provider
 schema per topology and its function form removes the requirement for the AI to
 enumerate pins, support components, or physical implementation details. It does

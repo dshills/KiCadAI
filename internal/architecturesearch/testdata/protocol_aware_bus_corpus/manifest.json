@@ -1,0 +1,50 @@
+{
+  "schema": "kicadai.protocol-aware-bus-corpus.v1",
+  "version": 1,
+  "base_commit": "75feb87401d7aebebf1ecb9ebd3ba76ac5efdd24",
+  "frozen_at": "2026-07-30",
+  "requirement_schema": "kicadai.open-set-requirement.v3",
+  "authoring_policy": "Behavior-only requests may state interfaces, voltage domains, protocol semantics, loading, timing, partial-power, startup, and isolation behavior. They may not state components, packages, pins, nets, topology families, models, coordinates, layers, routes, providers, repairs, or expected architecture identities.",
+  "cases": [
+    {
+      "id": "i2c_partial_power",
+      "family": "open_drain_translation",
+      "protocol": "i2c",
+      "prompt": "Create a 400 kHz bidirectional open-drain control bus between 3.3 V and 1.8 V domains. Either domain may be unpowered, the bus load is at most 80 pF, and rise time must not exceed 300 ns.",
+      "prompt_sha256": "816d7c7d9fd75a08bdb585dd18cd6e61e23d531e3740bb09f22075ada7bdb131",
+      "requirement_file": "i2c_partial_power.json",
+      "requirement_sha256": "e6734e9c7301e2cdf6e695cb1608edd8101b837fa1c5704f5b34df976363daad",
+      "safety_critical": true
+    },
+    {
+      "id": "segmented_smbus",
+      "family": "segmented_open_drain_translation",
+      "protocol": "smbus",
+      "prompt": "Connect six independently isolatable 3.3 V SMBus branches to a 1.8 V controller trunk at 1 MHz. The aggregate load is 360 pF, the trunk is 30 pF, each branch is 55 pF, rise time is 120 ns, and an unpowered branch must not disturb the trunk.",
+      "prompt_sha256": "3d5dfec22c7e96cda4544c38aa0dd2426639780ddd5346b2af680ae590d51629",
+      "requirement_file": "segmented_smbus.json",
+      "requirement_sha256": "36aa73b9384944b56ab703d4e1f234fb77966d2bc9b8672adfdd01949a224f36",
+      "safety_critical": true
+    },
+    {
+      "id": "spi_mixed_direction",
+      "family": "mixed_direction_push_pull_translation",
+      "protocol": "spi",
+      "prompt": "Translate an 8 MHz push-pull synchronous serial link between 1.8 V and 3.3 V. Two lanes travel toward the peripheral, one returns to the controller, startup is inactive, and either side may be unpowered without back-power.",
+      "prompt_sha256": "9ab5b9548dc3fe609cd17f9b42287b8d4ea18ce5fcbf12f2d0d4b717beec1fba",
+      "requirement_file": "spi_mixed_direction.json",
+      "requirement_sha256": "2af496e86e77c10524beb1187687c96492e11248c8ba829dafe4bdbb8a9f77f8",
+      "safety_critical": true
+    },
+    {
+      "id": "uart_inactive_partial_power",
+      "family": "inactive_safe_push_pull_translation",
+      "protocol": "uart",
+      "prompt": "Translate a 2 MHz push-pull asynchronous serial link in both directions between 3.3 V and 1.8 V. Preserve the inactive state at startup and isolate either unpowered side.",
+      "prompt_sha256": "ddea9fbf15b03bb41d206040e7c26d4e50f4992f85310f034e3feefd0fac5c54",
+      "requirement_file": "uart_inactive_partial_power.json",
+      "requirement_sha256": "a216d21baf6f3f50a88ad29bc0cf5cab73bb8a9a9c65c0061b8f1f31f6598323",
+      "safety_critical": true
+    }
+  ]
+}

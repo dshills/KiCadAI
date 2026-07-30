@@ -144,6 +144,14 @@ path.
   isolated power. All five pass the complete local installed-KiCad lane and
   deterministic replay. See the
   [open-world audit](specs/open-world-capability-evaluation/AUDIT.md).
+- A frozen four-case protocol-aware bus corpus now covers I2C, SMBus, SPI, and
+  UART translation, including whole-bus loading, solved pull-ups, six
+  independently isolated branches, mixed push-pull directions, reversed
+  voltage domains, inactive startup, partial-power, hot-plug, and contention
+  requirements. All four pass the complete local installed-KiCad two-run lane;
+  eleven unsafe or incomplete variants fail closed. See the
+  [specification](specs/protocol-aware-bus-synthesis/SPEC.md) and
+  [promotion matrix](specs/protocol-aware-bus-synthesis/PROMOTION_MATRIX.json).
 - Arbitrary electronics generation is not yet guaranteed. Generic graphs fail
   closed on unknown parts, pins, ratings, placement, or routing capability.
 - MCU synthesis is limited to verified catalog records and modeled electrical

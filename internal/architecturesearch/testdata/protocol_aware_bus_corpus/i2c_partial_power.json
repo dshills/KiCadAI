@@ -1,0 +1,109 @@
+{
+  "schema": "kicadai.open-set-requirement.v3",
+  "version": 3,
+  "project": {
+    "name": "i2c_partial_power",
+    "title": "Partial-power mixed-voltage control bus",
+    "description": "Translate a bidirectional 400-kilohertz open-drain control bus from a 3.3-volt host to a 1.8-volt peripheral and prevent back-powering when either side is unpowered."
+  },
+  "requirements": {
+    "domains": [
+      {"id": "host_3v3", "kind": "supply", "min_voltage_v": 3.13, "nominal_voltage_v": 3.3, "max_voltage_v": 3.47, "max_current_a": 0.1, "source": "external"},
+      {"id": "target_1v8", "kind": "supply", "min_voltage_v": 1.71, "nominal_voltage_v": 1.8, "max_voltage_v": 1.89, "max_current_a": 0.1, "source": "external"},
+      {"id": "ground", "kind": "reference", "nominal_voltage_v": 0, "source": "external"}
+    ],
+    "ports": [
+      {
+        "id": "host_bus",
+        "kind": "digital_bus",
+        "direction": "bidirectional",
+        "domain": "host_3v3",
+        "electrical": {"min_voltage_v": 0, "max_voltage_v": 3.3, "frequency_max_hz": 400000, "default_state": "inactive"},
+        "protocol": {"name": "i2c", "mode": "open_drain", "max_frequency_hz": 400000}
+      },
+      {
+        "id": "target_bus",
+        "kind": "digital_bus",
+        "direction": "bidirectional",
+        "domain": "target_1v8",
+        "electrical": {"min_voltage_v": 0, "max_voltage_v": 1.8, "frequency_max_hz": 400000, "default_state": "inactive"},
+        "protocol": {"name": "i2c", "mode": "open_drain", "max_frequency_hz": 400000}
+      },
+      {"id": "host_power", "kind": "power", "direction": "sink", "domain": "host_3v3"},
+      {"id": "target_power", "kind": "power", "direction": "sink", "domain": "target_1v8"},
+      {"id": "ground", "kind": "reference", "direction": "bidirectional", "domain": "ground"}
+    ],
+    "objectives": [
+      {
+        "id": "condition_control_bus",
+        "capability": "bus_buffering_level_translation",
+        "bindings": [
+          {"role": "side_a", "port": "host_bus"},
+          {"role": "side_b", "port": "target_bus"},
+          {"role": "power_a", "port": "host_power"},
+          {"role": "power_b", "port": "target_power"},
+          {"role": "reference", "port": "ground"}
+        ],
+        "constraints": [
+          {"name": "protocol", "relation": "equal", "value": "i2c"},
+          {"name": "signaling_mode", "relation": "equal", "value": "open_drain"},
+          {"name": "direction", "relation": "equal", "value": "bidirectional"},
+          {"name": "bus_frequency", "relation": "minimum", "value": 400000, "unit": "Hz"},
+          {"name": "load_capacitance", "relation": "maximum", "value": 8e-11, "unit": "F"},
+          {"name": "rise_time", "relation": "maximum", "value": 3e-7, "unit": "s"},
+          {"name": "unpowered_backfeed_prevention", "relation": "required", "value": true},
+          {"name": "hot_plug_isolation", "relation": "required", "value": true},
+          {"name": "contention_policy", "relation": "equal", "value": "wired_low"}
+        ]
+      }
+    ],
+    "operating_cases": [
+      {
+        "id": "normal",
+        "conditions": [
+          {"axis": "supply_voltage", "target": "host_3v3", "min": 3.13, "max": 3.47, "unit": "V"},
+          {"axis": "supply_voltage", "target": "target_1v8", "min": 1.71, "max": 1.89, "unit": "V"},
+          {"axis": "load_capacitance", "target": "target_bus", "min": 2e-11, "max": 8e-11, "unit": "F"}
+        ]
+      },
+      {
+        "id": "target_unpowered",
+        "conditions": [
+          {"axis": "supply_voltage", "target": "host_3v3", "min": 3.13, "max": 3.47, "unit": "V"},
+          {"axis": "supply_voltage", "target": "target_1v8", "min": 0, "max": 0, "unit": "V"}
+        ]
+      }
+    ],
+    "behavioral_requirements": [
+      {
+        "id": "target_off_safe",
+        "metric": "startup_output_voltage",
+        "analysis": "startup",
+        "observation": {"kind": "port", "id": "target_bus"},
+        "max": 0.2,
+        "unit": "V",
+        "operating_cases": ["target_unpowered"],
+        "critical": true
+      }
+    ],
+    "constraints": {"max_components": 12, "max_width_mm": 45, "max_height_mm": 35}
+  },
+  "acceptance": {
+    "require_erc": true,
+    "require_strict_drc": true,
+    "require_complete_routing": true,
+    "require_connectivity": true,
+    "require_writer_correctness": true,
+    "require_round_trip_zero_diff": true,
+    "require_deterministic_replay": true,
+    "require_contract_composition": true,
+    "require_global_reasoning": true,
+    "require_coverage_accounting": true,
+    "require_alternatives": true,
+    "require_fail_closed": true,
+    "require_simulation": true,
+    "require_all_corners": true,
+    "require_model_provenance": true,
+    "require_closed_loop_evidence": true
+  }
+}

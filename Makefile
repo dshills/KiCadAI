@@ -1,6 +1,6 @@
 .DEFAULT_GOAL := help
 
-.PHONY: help build install test test-one race-short review-matrix promotion-bundle held-out-promotion-bundle hierarchical-promotion-bundle dynamic-electrothermal-promotion-bundle open-world-capability-promotion-bundle lint coverage coverage-check run-help refresh-kicad-proto proto proto-check
+.PHONY: help build install test test-one race-short review-matrix promotion-bundle held-out-promotion-bundle hierarchical-promotion-bundle dynamic-electrothermal-promotion-bundle open-world-capability-promotion-bundle protocol-aware-bus-promotion-bundle lint coverage coverage-check run-help refresh-kicad-proto proto proto-check
 
 BIN_DIR := $(CURDIR)/bin
 BIN := $(BIN_DIR)/kicadai
@@ -32,6 +32,8 @@ DYNAMIC_ELECTROTHERMAL_PROMOTION_ROOT ?= $(CURDIR)/.tmp/dynamic-electrothermal-p
 DYNAMIC_ELECTROTHERMAL_PROMOTION_MATRIX ?= $(CURDIR)/specs/dynamic-electrothermal-control-loop-synthesis/PROMOTION_MATRIX.json
 OPEN_WORLD_CAPABILITY_PROMOTION_ROOT ?= $(CURDIR)/.tmp/open-world-capability-promotion
 OPEN_WORLD_CAPABILITY_PROMOTION_MATRIX ?= $(CURDIR)/specs/open-world-capability-evaluation/PROMOTION_MATRIX.json
+PROTOCOL_AWARE_BUS_PROMOTION_ROOT ?= $(CURDIR)/.tmp/protocol-aware-bus-promotion
+PROTOCOL_AWARE_BUS_PROMOTION_MATRIX ?= $(CURDIR)/specs/protocol-aware-bus-synthesis/PROMOTION_MATRIX.json
 
 help:
 	@printf "KiCadAI targets:\n"
@@ -46,6 +48,7 @@ help:
 	@printf "  make hierarchical-promotion-bundle Reproduce and verify the hierarchical multi-domain bundle\n"
 	@printf "  make dynamic-electrothermal-promotion-bundle Reproduce and verify the dynamic electrothermal bundle\n"
 	@printf "  make open-world-capability-promotion-bundle Reproduce and verify the open-world capability bundle\n"
+	@printf "  make protocol-aware-bus-promotion-bundle Reproduce and verify the protocol-aware bus bundle\n"
 	@printf "  make lint            Run gofmt, go vet, and golangci-lint when installed\n"
 	@printf "  make coverage        Generate coverage profiles\n"
 	@printf "  make coverage-check  Enforce coverage threshold (COVERAGE_THRESHOLD=%s)\n" "$(COVERAGE_THRESHOLD)"
@@ -125,6 +128,15 @@ dynamic-electrothermal-promotion-bundle:
 open-world-capability-promotion-bundle:
 	PROMOTION_ROOT="$(OPEN_WORLD_CAPABILITY_PROMOTION_ROOT)" \
 	PROMOTION_MATRIX="$(OPEN_WORLD_CAPABILITY_PROMOTION_MATRIX)" \
+	PROMOTION_CACHE_DIR="$(PROMOTION_CACHE_DIR)" \
+	PROMOTION_SCENARIO_TIMEOUT="$(PROMOTION_SCENARIO_TIMEOUT)" \
+	GOCACHE="$(GOCACHE_DIR)" \
+	GOMODCACHE="$(GOMODCACHE_DIR)" \
+	./scripts/clean-checkout-promotion.sh
+
+protocol-aware-bus-promotion-bundle:
+	PROMOTION_ROOT="$(PROTOCOL_AWARE_BUS_PROMOTION_ROOT)" \
+	PROMOTION_MATRIX="$(PROTOCOL_AWARE_BUS_PROMOTION_MATRIX)" \
 	PROMOTION_CACHE_DIR="$(PROMOTION_CACHE_DIR)" \
 	PROMOTION_SCENARIO_TIMEOUT="$(PROMOTION_SCENARIO_TIMEOUT)" \
 	GOCACHE="$(GOCACHE_DIR)" \

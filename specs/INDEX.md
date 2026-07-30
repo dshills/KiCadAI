@@ -56,6 +56,13 @@ the relevant subdirectory instead of adding loose historical files at the root.
 - [Held-out capability expansion completion audit](held-out-capability-expansion/AUDIT.md)
   - binds the generic implementation, final report, regression gates,
     clean-checkout receipts, review, and delivery evidence.
+- [Protocol-aware bus synthesis specification](protocol-aware-bus-synthesis/SPEC.md),
+  [plan](protocol-aware-bus-synthesis/PLAN.md), and
+  [promotion matrix](protocol-aware-bus-synthesis/PROMOTION_MATRIX.json), with
+  the [completion audit](protocol-aware-bus-synthesis/AUDIT.md)
+  - define behavior-only I2C, SMBus, SPI, and UART buffering/translation,
+    whole-bus loading, partial-power, hot-plug, contention, branch isolation,
+    mixed-direction composition, and local installed-KiCad promotion.
 - [External review mitigation specification](external-review-mitigation/SPEC.md)
   - closes the confirmed placement, stock-library, CLI, discoverability, and
     evidence-artifact findings from the 2026-07-21 independent review.

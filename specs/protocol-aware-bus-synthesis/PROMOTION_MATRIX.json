@@ -1,0 +1,62 @@
+{
+  "schema_version": "kicadai.external-review-matrix.v1",
+  "scenarios": [
+    {
+      "id": "i2c_partial_power_translation",
+      "review_equivalent": "behavior-only bidirectional open-drain translation with solved pull-ups and either-side partial-power isolation",
+      "lane": "requirement",
+      "fixture": "internal/architecturesearch/testdata/protocol_aware_bus_corpus/i2c_partial_power.json",
+      "board": {"mode": "synthesized", "layers": 2},
+      "expected_status": "pass",
+      "required_artifacts": ["design-request.json", "transaction.json", "workflow-result.json", "validation-summary.json", "design-promotion.json", "manifest.json", "normalized-requirement.json", "architecture-search.json", "closed-loop-synthesis.json", "simulation.json"],
+      "internal_gates": ["architecture_search", "component_evidence", "simulation", "routing", "connectivity", "route_completion", "writer_correctness", "round_trip", "deterministic_repeat"],
+      "optional_kicad_gates": ["erc", "strict_drc", "writer_correctness", "round_trip"]
+    },
+    {
+      "id": "segmented_smbus_branch_isolation",
+      "review_equivalent": "behavior-only six-branch open-drain bus with whole-bus loading, independent translation, and unpowered-branch isolation",
+      "lane": "requirement",
+      "fixture": "internal/architecturesearch/testdata/protocol_aware_bus_corpus/segmented_smbus.json",
+      "board": {"mode": "synthesized", "layers": 2},
+      "expected_status": "pass",
+      "required_artifacts": ["design-request.json", "transaction.json", "workflow-result.json", "validation-summary.json", "design-promotion.json", "manifest.json", "normalized-requirement.json", "architecture-search.json", "closed-loop-synthesis.json", "simulation.json"],
+      "internal_gates": ["architecture_search", "component_evidence", "simulation", "routing", "connectivity", "route_completion", "writer_correctness", "round_trip", "deterministic_repeat"],
+      "optional_kicad_gates": ["erc", "strict_drc", "writer_correctness", "round_trip"]
+    },
+    {
+      "id": "spi_mixed_direction_translation",
+      "review_equivalent": "behavior-only mixed-direction synchronous push-pull bus with shared-domain accounting and partial-power isolation",
+      "lane": "requirement",
+      "fixture": "internal/architecturesearch/testdata/protocol_aware_bus_corpus/spi_mixed_direction.json",
+      "board": {"mode": "synthesized", "layers": 2},
+      "expected_status": "pass",
+      "required_artifacts": ["design-request.json", "transaction.json", "workflow-result.json", "validation-summary.json", "design-promotion.json", "manifest.json", "normalized-requirement.json", "architecture-search.json", "closed-loop-synthesis.json", "simulation.json"],
+      "internal_gates": ["architecture_search", "component_evidence", "simulation", "routing", "connectivity", "route_completion", "writer_correctness", "round_trip", "deterministic_repeat"],
+      "optional_kicad_gates": ["erc", "strict_drc", "writer_correctness", "round_trip"]
+    },
+    {
+      "id": "uart_inactive_partial_power_translation",
+      "review_equivalent": "behavior-only bidirectional asynchronous push-pull link with inactive startup and either-side isolation",
+      "lane": "requirement",
+      "fixture": "internal/architecturesearch/testdata/protocol_aware_bus_corpus/uart_inactive_partial_power.json",
+      "board": {"mode": "synthesized", "layers": 2},
+      "expected_status": "pass",
+      "required_artifacts": ["design-request.json", "transaction.json", "workflow-result.json", "validation-summary.json", "design-promotion.json", "manifest.json", "normalized-requirement.json", "architecture-search.json", "closed-loop-synthesis.json", "simulation.json"],
+      "internal_gates": ["architecture_search", "component_evidence", "simulation", "routing", "connectivity", "route_completion", "writer_correctness", "round_trip", "deterministic_repeat"],
+      "optional_kicad_gates": ["erc", "strict_drc", "writer_correctness", "round_trip"]
+    }
+  ],
+  "negative_cases": [
+    {"id": "missing_partial_power_evidence"},
+    {"id": "missing_hot_plug_isolation"},
+    {"id": "unsafe_contention_policy"},
+    {"id": "active_enable_at_startup"},
+    {"id": "missing_branch_isolation"},
+    {"id": "inconsistent_aggregate_load"},
+    {"id": "receiver_segment_undercount"},
+    {"id": "missing_segment_role"},
+    {"id": "unsupported_segment_count"},
+    {"id": "impossible_rise_time"},
+    {"id": "ambiguous_mixed_direction"}
+  ]
+}
