@@ -329,25 +329,22 @@ func candidateHash(candidate CandidateRegistry) (string, error) {
 func GenerateCases(plan ExpansionPlan) []GeneratedCase {
 	var cases []GeneratedCase
 	for _, need := range plan.Needs {
-		for _, spec := range []struct {
-			kind GeneratedCaseKind
-			pass bool
-		}{
-			{CaseRepresentative, true},
-			{CaseMissingEvidence, false},
-			{CaseConflictingEvidence, false},
-			{CaseIrrelevantEvidence, false},
-			{CaseFabricatedEvidence, false},
+		for _, kind := range []GeneratedCaseKind{
+			CaseRepresentative,
+			CaseMissingEvidence,
+			CaseConflictingEvidence,
+			CaseIrrelevantEvidence,
+			CaseFabricatedEvidence,
 		} {
 			gates := []string{"source_integrity", "candidate_registry", "deterministic_replay"}
-			if spec.kind == CaseRepresentative {
+			if kind == CaseRepresentative {
 				gates = append(gates, need.RequiredPromotionGates...)
 			} else {
 				gates = append(gates, "fail_closed_rejection")
 			}
 			cases = append(cases, GeneratedCase{
-				ID: need.ID + ":" + string(spec.kind), NeedID: need.ID,
-				Kind: spec.kind, ExpectedPass: spec.pass,
+				ID: need.ID + ":" + string(kind), NeedID: need.ID,
+				Kind:          kind,
 				RequiredGates: normalizedStrings(gates),
 			})
 		}

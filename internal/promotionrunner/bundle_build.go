@@ -298,6 +298,9 @@ func validatePromotionEvidence(raw json.RawMessage, kicadVersion string) error {
 		document.AchievedReadiness != designworkflow.PromotionReadinessPass {
 		return errors.New("promotion evidence is not an applicable pass")
 	}
+	if err := document.PromotionReport.Validate(); err != nil {
+		return fmt.Errorf("invalid promotion report: %w", err)
+	}
 	if document.KiCadVersion != kicadVersion {
 		return fmt.Errorf("promotion KiCad version %q does not match %q", document.KiCadVersion, kicadVersion)
 	}

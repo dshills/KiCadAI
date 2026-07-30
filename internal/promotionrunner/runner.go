@@ -15,7 +15,6 @@ import (
 	"time"
 
 	"kicadai/internal/creationevidence"
-	"kicadai/internal/designworkflow"
 	"kicadai/internal/promotiontoolchain"
 )
 
@@ -88,7 +87,10 @@ func writeComparison(path string, comparison Comparison) error {
 }
 
 func runScenario(parent context.Context, scenario Scenario, run int, toolchain promotiontoolchain.Evidence, options Options, binary string) (RunResult, error) {
-	lane, _ := LaneFor(scenario.Lane)
+	lane, err := LaneFor(scenario.Lane)
+	if err != nil {
+		return RunResult{}, fmt.Errorf("resolve scenario lane %q: %w", scenario.Lane, err)
+	}
 	runRoot := filepath.Join(options.OutputRoot, "scenarios", scenario.ID, fmt.Sprintf("run-%d", run))
 	project := filepath.Join(runRoot, "project")
 	if err := os.MkdirAll(filepath.Join(runRoot, "home"), 0o755); err != nil {
@@ -156,35 +158,8 @@ func runScenario(parent context.Context, scenario Scenario, run int, toolchain p
 	if err != nil {
 		return RunResult{}, err
 	}
-	var promotion creationevidence.DesignPromotionDocument
-	if err := decodeStrictJSON(promotionBytes, &promotion); err != nil {
-		return RunResult{}, fmt.Errorf("decode promotion report: %w", err)
-	}
-	if promotion.Status != designworkflow.PromotionStatusPass {
-		return RunResult{}, fmt.Errorf("promotion status is %q", promotion.Status)
-	}
-	if promotion.KiCadVersion != toolchain.KiCadVersion {
-		return RunResult{}, fmt.Errorf("promotion KiCad version %q does not match toolchain %q", promotion.KiCadVersion, toolchain.KiCadVersion)
-	}
-	if validateErr := promotion.PromotionReport.Validate(); validateErr != nil {
-		return RunResult{}, fmt.Errorf("invalid promotion report: %w", validateErr)
-	}
-	requiredGates := make(map[string]bool, len(strictGateContract.Promotion))
-	for _, gate := range strictGateContract.Promotion {
-		requiredGates[gate] = false
-	}
-	for _, gate := range promotion.Gates {
-		if len(gate.RequiredFor) > 0 && gate.Status != designworkflow.PromotionGateStatusPass {
-			return RunResult{}, fmt.Errorf("required promotion gate %q is %q", gate.ID, gate.Status)
-		}
-		if _, required := requiredGates[gate.ID]; required && gate.Status == designworkflow.PromotionGateStatusPass {
-			requiredGates[gate.ID] = true
-		}
-	}
-	for gate, passed := range requiredGates {
-		if !passed {
-			return RunResult{}, fmt.Errorf("required promotion gate %q did not pass", gate)
-		}
+	if err := validatePromotionEvidence(promotionBytes, toolchain.KiCadVersion); err != nil {
+		return RunResult{}, err
 	}
 	return RunResult{
 		Scenario: scenario.ID, Run: run, Project: project,

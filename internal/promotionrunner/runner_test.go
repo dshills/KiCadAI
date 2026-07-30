@@ -152,6 +152,23 @@ func validPromotionDocument(t *testing.T) []byte {
 	return encoded
 }
 
+func TestValidatePromotionEvidenceRejectsDuplicateGateIDs(t *testing.T) {
+	var document creationevidence.DesignPromotionDocument
+	if err := json.Unmarshal(validPromotionDocument(t), &document); err != nil {
+		t.Fatal(err)
+	}
+	document.Gates = append(document.Gates, document.Gates[0])
+	encoded, err := json.Marshal(document)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = validatePromotionEvidence(encoded, document.KiCadVersion)
+	if err == nil || !strings.Contains(err.Error(), `duplicate promotion gate id "connectivity"`) {
+		t.Fatalf("expected duplicate gate rejection, got %v", err)
+	}
+}
+
 func fakePromotionCLI(t *testing.T, promotion []byte) string {
 	t.Helper()
 	path := filepath.Join(t.TempDir(), "kicadai")

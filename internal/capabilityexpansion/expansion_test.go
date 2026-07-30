@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"slices"
+	"strings"
 	"testing"
 
 	"kicadai/internal/architecturesearch"
@@ -269,6 +270,34 @@ func TestComponentAndModelEvidenceRemainQuarantinedUntilPromotion(t *testing.T) 
 				t.Fatal("experimental package unexpectedly promoted")
 			}
 		})
+	}
+}
+
+func TestGeneratedCasesEncodeAdversarialOutcomeAsRequiredGate(t *testing.T) {
+	plan := ExpansionPlan{
+		Needs: []ExpansionNeed{{
+			ID:                     "need-1",
+			RequiredPromotionGates: []string{"physical_verification"},
+		}},
+	}
+	cases := GenerateCases(plan)
+	encoded, err := json.Marshal(cases)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(encoded), "expected_pass") {
+		t.Fatalf("generated cases retain dead expected_pass contract: %s", encoded)
+	}
+	for _, generated := range cases {
+		if generated.Kind == CaseRepresentative {
+			if !slices.Contains(generated.RequiredGates, "physical_verification") {
+				t.Fatalf("representative case missing promotion gate: %#v", generated)
+			}
+			continue
+		}
+		if !slices.Contains(generated.RequiredGates, "fail_closed_rejection") {
+			t.Fatalf("adversarial case missing rejection gate: %#v", generated)
+		}
 	}
 }
 

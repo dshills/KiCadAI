@@ -62,7 +62,7 @@ func TestAssessArchitectureFailsClosedForUnsupportedSearch(t *testing.T) {
 	}
 }
 
-func TestAssessArchitectureSeparatesVerifiedSelectionFromInferredConfidence(t *testing.T) {
+func TestAssessArchitectureKeepsInferredComponentExperimental(t *testing.T) {
 	requirement := architecturesearch.Requirement{
 		Schema: architecturesearch.SchemaID, Version: architecturesearch.Version,
 		Project: architecturesearch.Project{Name: "test"},
@@ -88,19 +88,19 @@ func TestAssessArchitectureSeparatesVerifiedSelectionFromInferredConfidence(t *t
 	if err != nil {
 		t.Fatal(err)
 	}
-	if assessment.Classification != ClassificationSupported {
+	if assessment.Classification != ClassificationExperimental || assessment.FabricationReadyEligible {
 		t.Fatalf("classification=%q gaps=%#v", assessment.Classification, assessment.Gaps)
 	}
-	var verifiedSelection, inferredConfidence bool
+	var inferredSelection, inferredConfidence bool
 	for _, evidence := range assessment.Evidence {
-		if evidence.Kind == "catalog_component" && evidence.Status == EvidenceVerified {
-			verifiedSelection = true
+		if evidence.Kind == "catalog_component" && evidence.Status == EvidenceInferred && !evidence.Advisory {
+			inferredSelection = true
 		}
 		if evidence.Kind == "catalog_component_confidence" && evidence.Status == EvidenceInferred && evidence.Advisory {
 			inferredConfidence = true
 		}
 	}
-	if !verifiedSelection || !inferredConfidence {
+	if !inferredSelection || !inferredConfidence {
 		t.Fatalf("selection/confidence distinction missing: %#v", assessment.Evidence)
 	}
 	if len(assessment.Risks) < 2 {

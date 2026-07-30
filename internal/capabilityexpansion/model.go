@@ -136,7 +136,6 @@ type GeneratedCase struct {
 	ID            string            `json:"id"`
 	NeedID        string            `json:"need_id"`
 	Kind          GeneratedCaseKind `json:"kind"`
-	ExpectedPass  bool              `json:"expected_pass"`
 	RequiredGates []string          `json:"required_gates"`
 }
 

@@ -123,15 +123,8 @@ func AssessArchitecture(requirement architecturesearch.Requirement, search archi
 			}
 			componentEvidenceID := "component:" + stableCapabilityID(component.CatalogID, component.VariantID, component.InstanceID)
 			componentStatus := architectureEvidenceStatus(component.Evidence)
-			selectionStatus := componentStatus
-			if componentStatus == EvidenceInferred {
-				// The search result and catalog hash reproducibly verify the selected
-				// identity, package, and pin mapping. Inferred catalog confidence is
-				// a distinct claim which remains visible for downstream verification.
-				selectionStatus = EvidenceVerified
-			}
 			input.Evidence = append(input.Evidence, Evidence{
-				ID: componentEvidenceID, Kind: "catalog_component", Status: selectionStatus,
+				ID: componentEvidenceID, Kind: "catalog_component", Status: componentStatus,
 				Source: "catalog://" + component.CatalogID + optionalPathSegment(component.VariantID),
 				Digest: componentDigest, Stage: "component_selection",
 				Description: "catalog-backed component and package selection",
