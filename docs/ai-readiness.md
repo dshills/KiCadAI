@@ -323,6 +323,33 @@ See the
 [specification](../specs/protocol-aware-bus-synthesis/SPEC.md) and
 [promotion matrix](../specs/protocol-aware-bus-synthesis/PROMOTION_MATRIX.json).
 
+## Evidence-Backed Component Onboarding
+
+Unfamiliar parts no longer require an immediate hand edit to the checked-in
+catalog. Behavior-only requirements and immutable manufacturer documents can
+produce identity-neutral, content-addressed candidate artifacts. Provider
+extraction remains untrusted: exact source excerpts, values and units,
+conflicts, ratings, temperature, derating, package, pin-to-pad mappings,
+licenses, and registered model provenance are all revalidated
+deterministically.
+
+The candidate is quarantined and can run only in an isolated evaluation
+catalog. It becomes a supported overlay after independent exact-hash approval
+and two identical passing runs of executable simulation, connectivity, route
+completion, writer correctness, round trip, ERC, and strict DRC. The frozen
+corpus contains seven unfamiliar identities across op-amp, transistor,
+regulator, converter, sensor, logic, and interface families; no corpus MPN or
+component ID appears in production Go.
+
+This advances component readiness from “catalog additions are entirely
+manual” to “source-backed proposals can be qualified automatically under
+registered family and model semantics.” It does not infer new simulation
+physics, create unknown package geometry, waive missing manufacturer data, or
+approve a part for fabrication. See the
+[specification](../specs/evidence-backed-component-onboarding/SPEC.md),
+[plan](../specs/evidence-backed-component-onboarding/PLAN.md), and
+[promotion matrix](../specs/evidence-backed-component-onboarding/PROMOTION_MATRIX.json).
+
 ## Reproducible Promotion Evidence
 
 Run `make promotion-bundle` from an unmodified checkout to reproduce the
@@ -340,6 +367,12 @@ standalone verifier.
 Run `make dynamic-electrothermal-promotion-bundle` to reproduce the six-circuit
 V5 matrix, including two executions per scenario, installed-KiCad gates,
 normalized comparison, and the content-addressed capability evidence.
+
+Run `make component-onboarding-promotion-bundle` with
+`KICADAI_KICAD_CLI`, `KICADAI_SYMBOLS_ROOT`, and
+`KICADAI_FOOTPRINTS_ROOT` set to reproduce the seven unfamiliar-part cases in
+two clean source snapshots and compare 56 canonical KiCad/simulation
+artifacts.
 
 This strengthens provenance and reproducibility for records already inside the
 verified capability envelope. It does not promote an unverified matrix record,

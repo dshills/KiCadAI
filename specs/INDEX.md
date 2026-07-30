@@ -63,6 +63,14 @@ the relevant subdirectory instead of adding loose historical files at the root.
   - define behavior-only I2C, SMBus, SPI, and UART buffering/translation,
     whole-bus loading, partial-power, hot-plug, contention, branch isolation,
     mixed-direction composition, and local installed-KiCad promotion.
+- [Evidence-backed component onboarding specification](evidence-backed-component-onboarding/SPEC.md),
+  [plan](evidence-backed-component-onboarding/PLAN.md),
+  [promotion matrix](evidence-backed-component-onboarding/PROMOTION_MATRIX.json),
+  and [completion audit](evidence-backed-component-onboarding/AUDIT.md)
+  - define identity-neutral manufacturer-document ingestion, deterministic
+    claim/pin/package/model validation, quarantine, exact-hash approval,
+    supported overlays, and two-clean-root installed-KiCad promotion for seven
+    unfamiliar component families.
 - [External review mitigation specification](external-review-mitigation/SPEC.md)
   - closes the confirmed placement, stock-library, CLI, discoverability, and
     evidence-artifact findings from the 2026-07-21 independent review.

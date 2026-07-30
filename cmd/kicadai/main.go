@@ -71,7 +71,7 @@ Commands:
   generate      Generate projects from structured requests
   block         List, inspect, and validate built-in circuit blocks
   fabrication   List, show, and validate fabrication profiles
-  component     List, inspect, select, validate, and report component catalog records
+  component     List, select, onboard, promote, and validate component catalog records
 	  circuit       Preflight or create projects from strict generic circuit graphs
   requirement   Create projects from strict behavior-only requirements
   check         Run KiCad CLI ERC/DRC checks
@@ -283,6 +283,7 @@ type cliOptions struct {
 	libraryCache                string
 	refreshLibraryCache         bool
 	catalogDir                  string
+	componentOverlay            string
 	sourceDir                   string
 	componentFamily             string
 	componentPackage            string
@@ -504,6 +505,7 @@ func parse(args []string, stderr io.Writer) (cliOptions, string, error) {
 	flags.StringVar(&opts.libraryCache, "library-cache", os.Getenv(libraryresolver.EnvLibraryCache), "library resolver cache file path")
 	flags.BoolVar(&opts.refreshLibraryCache, "refresh-library-cache", false, "rebuild library resolver cache")
 	flags.StringVar(&opts.catalogDir, "catalog-dir", components.DefaultCatalogDir, "component catalog directory")
+	flags.StringVar(&opts.componentOverlay, "component-overlay", "", "approved component/model overlay artifact")
 	flags.StringVar(&opts.sourceDir, "source-dir", "", "component lifecycle/availability source directory")
 	flags.StringVar(&opts.componentFamily, "family", "", "component family filter")
 	flags.StringVar(&opts.componentPackage, "package", "", "component package filter")
@@ -1698,7 +1700,7 @@ func runComponent(ctx context.Context, opts cliOptions, stdout io.Writer) error 
 			Message:  "component requires a subcommand",
 		})
 	}
-	catalog, err := loadComponentCatalog(ctx, opts.catalogDir)
+	catalog, err := loadComponentCatalogForOptions(ctx, opts)
 	if err != nil {
 		return writeReportFailure(stdout, "component", reports.Issue{
 			Code:     reports.CodeInvalidArgument,
@@ -1717,6 +1719,12 @@ func runComponent(ctx context.Context, opts cliOptions, stdout io.Writer) error 
 		}
 	}
 	switch subcommand {
+	case "onboard":
+		return runComponentOnboard(ctx, opts, stdout, catalog)
+	case "promote":
+		return runComponentOnboardingPromote(ctx, opts, stdout, catalog)
+	case "overlay-validate":
+		return runComponentOverlayValidate(ctx, opts, stdout)
 	case "list":
 		return writeComponentResult(stdout, map[string]any{
 			"families": catalog.Families,
@@ -4237,6 +4245,14 @@ func designCreateOptions(ctx context.Context, opts cliOptions, checkOpts checks.
 		createOpts.Fabrication.LibraryIndex = index
 		createOpts.Fabrication.HasLibraryIndex = true
 		createOpts.Fabrication.LibraryIssues = libraryIssues
+	}
+	if strings.TrimSpace(opts.componentOverlay) != "" {
+		catalog, err := loadComponentCatalogForOptions(ctx, opts)
+		if err != nil {
+			return designworkflow.CreateOptions{}, fmt.Errorf("load component overlay: %w", err)
+		}
+		createOpts.Components.Catalog = catalog
+		createOpts.Components.CatalogDir = ""
 	}
 	if opts.routeAllowPartialSet {
 		createOpts.Routing.AllowPartial = &opts.routeAllowPartial

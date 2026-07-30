@@ -62,6 +62,15 @@ func runCheck(ctx context.Context, runner Runner, cli KiCadCLI, kind CheckKind, 
 	result := runner.Run(runCtx, prepared.WorkingDir, cli.Path, args...)
 	cancelRun()
 	findings, parserIssues, units := parseReportIfPresent(kind, reportPath)
+	if shouldRetryDRCNoOutputCrash(kind, result, parserIssues, findings, reportPath) && ctx.Err() == nil {
+		firstDuration := result.Duration
+		_ = os.Remove(reportPath)
+		retryCtx, cancelRetry := contextWithTimeout(ctx, opts.Timeout)
+		result = runner.Run(retryCtx, prepared.WorkingDir, cli.Path, args...)
+		cancelRetry()
+		result.Duration += firstDuration
+		findings, parserIssues, units = parseReportIfPresent(kind, reportPath)
+	}
 	if units == "" {
 		units = opts.Units
 	}
@@ -99,6 +108,19 @@ func runCheck(ctx context.Context, runner Runner, cli KiCadCLI, kind CheckKind, 
 		return check, fmt.Errorf("%s check failed with exit code %d", kind, result.ExitCode)
 	}
 	return check, nil
+}
+
+func shouldRetryDRCNoOutputCrash(
+	kind CheckKind,
+	result CommandResult,
+	parserIssues []ParserIssue,
+	findings []CheckFinding,
+	reportPath string,
+) bool {
+	return kind == CheckKindDRC && result.Err != nil &&
+		len(parserIssues) == 0 && len(findings) == 0 &&
+		!hasNonWhitespace(result.Stdout) && !hasNonWhitespace(result.Stderr) &&
+		!reportFileExists(reportPath)
 }
 
 func checkArgs(kind CheckKind, units string, reportPath string, inputPath string) []string {
@@ -281,25 +303,29 @@ func discoverProjectCheckFile(projectDir string, kind CheckKind) (string, error)
 		return "", fmt.Errorf("no %s file found in %s", ext, projectDir)
 	}
 	sort.Strings(matches)
-	if kind == CheckKindERC {
-		projectFiles, err := filepath.Glob(filepath.Join(projectDir, "*.kicad_pro"))
-		if err != nil {
-			return "", err
+	entries, err := os.ReadDir(projectDir)
+	if err != nil {
+		return "", err
+	}
+	projectFiles := make([]string, 0, len(entries))
+	for _, entry := range entries {
+		if !entry.IsDir() && filepath.Ext(entry.Name()) == ".kicad_pro" {
+			projectFiles = append(projectFiles, filepath.Join(projectDir, entry.Name()))
 		}
-		sort.Strings(projectFiles)
-		for _, projectFile := range projectFiles {
-			projectName := strings.TrimSuffix(filepath.Base(projectFile), ".kicad_pro")
-			candidate := filepath.Join(projectDir, projectName+ext)
-			for _, match := range matches {
-				if match == candidate {
-					return match, nil
-				}
-			}
-		}
+	}
+	sort.Strings(projectFiles)
+	for _, projectFile := range projectFiles {
+		projectName := strings.TrimSuffix(filepath.Base(projectFile), ".kicad_pro")
+		candidate := filepath.Join(projectDir, projectName+ext)
 		for _, match := range matches {
-			if filepath.Dir(match) == filepath.Clean(projectDir) {
+			if match == candidate {
 				return match, nil
 			}
+		}
+	}
+	for _, match := range matches {
+		if filepath.Dir(match) == filepath.Clean(projectDir) {
+			return match, nil
 		}
 	}
 	base := filepath.Base(filepath.Clean(projectDir))
@@ -336,7 +362,7 @@ func copyProjectContext(workspace ArtifactWorkspace, projectDir string, rootName
 
 func shouldSkipProjectDir(name string) bool {
 	switch strings.ToLower(name) {
-	case ".git", ".kicadai", "reports", "fabrication", "gerbers", "plot", "plots", "shapes3d", "backup", "backups":
+	case ".evidence", ".git", ".kicadai", "reports", "fabrication", "gerbers", "plot", "plots", "shapes3d", "backup", "backups":
 		return true
 	default:
 		return false

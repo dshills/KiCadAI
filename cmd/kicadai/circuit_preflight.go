@@ -674,7 +674,7 @@ func parseCircuitPreflightArgs(opts *cliOptions) *reports.Issue {
 func evaluateCircuitPreflight(ctx context.Context, opts cliOptions) circuitPreflightEvaluation {
 	data := circuitPreflightData{InputPath: opts.requestPath, SchematicIssues: []reports.Issue{}, Gates: []circuitPreflightGate{}, RepairOptions: []circuitgraph.RepairOption{}}
 	result := circuitPreflightEvaluation{Data: data, Issues: []reports.Issue{}}
-	catalog, err := loadComponentCatalog(ctx, opts.catalogDir)
+	catalog, err := loadComponentCatalogForOptions(ctx, opts)
 	if err != nil {
 		result.Issues = []reports.Issue{{Code: reports.CodeValidationFailed, Severity: reports.SeverityError, Path: "catalog", Message: err.Error()}}
 		return result

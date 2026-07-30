@@ -821,6 +821,51 @@ Unsafe or incomplete safety contracts fail closed. See the
 [specification](../specs/protocol-aware-bus-synthesis/SPEC.md) and
 [promotion matrix](../specs/protocol-aware-bus-synthesis/PROMOTION_MATRIX.json).
 
+Evidence-backed component onboarding removes another fixed-catalog bottleneck
+without allowing provider output to become trusted catalog data. A request
+contains behavior, required functions, ratings, temperature, analyses,
+packages, and derating—not a manufacturer, MPN, KiCad identity, or model ID.
+The extractor may propose those values only from content-addressed
+manufacturer documents. Deterministic validation then checks exact excerpts,
+value/unit anchoring, conflicts, license and publisher provenance, ordinary
+catalog eligibility, installed symbol pins and footprint pads, and registered
+model compatibility.
+
+Candidates remain in an isolated in-memory evaluation catalog. Promotion needs
+an independent approval bound to the exact candidate hash and two
+hash-identical passing runs of simulation, connectivity, route completion,
+writer correctness, zero-difference round trip, ERC, and strict DRC. Only the
+resulting supported overlay can be loaded by component selection,
+behavioral-intent capability context, architecture search, closed-loop
+simulation, and project creation.
+
+The CLI exposes the trust boundary explicitly:
+
+```sh
+kicadai --format json \
+  --symbols-root "$KICAD_SYMBOLS_ROOT" \
+  --footprints-root "$KICAD_FOOTPRINTS_ROOT" \
+  --request onboarding-request.json \
+  --file reviewed-extraction.json \
+  --output candidate.json \
+  component onboard
+
+kicadai --format json --execute \
+  --symbols-root "$KICAD_SYMBOLS_ROOT" \
+  --footprints-root "$KICAD_FOOTPRINTS_ROOT" \
+  --request candidate.json \
+  --file promotion-request.json \
+  --output supported-overlay.json \
+  component promote
+```
+
+Use `--component-overlay supported-overlay.json` on later intent, requirement,
+component, or design commands. Tampered, quarantined, duplicated, or
+model-conflicting overlays fail closed. The
+[specification](../specs/evidence-backed-component-onboarding/SPEC.md) and
+[promotion matrix](../specs/evidence-backed-component-onboarding/PROMOTION_MATRIX.json)
+define the exact contract.
+
 The generic contract removes the architectural requirement for one provider
 schema per topology and its function form removes the requirement for the AI to
 enumerate pins, support components, or physical implementation details. It does

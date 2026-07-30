@@ -48,7 +48,7 @@ func runRequirement(ctx context.Context, opts cliOptions, stdout io.Writer) erro
 		return writeRequirementIssues(stdout, decodeIssues)
 	}
 
-	catalog, err := loadComponentCatalog(ctx, opts.catalogDir)
+	catalog, err := loadComponentCatalogForOptions(ctx, opts)
 	if err != nil {
 		return writeRequirementFailure(stdout, reports.Issue{Code: reports.CodeValidationFailed, Severity: reports.SeverityError, Path: "catalog", Message: err.Error()})
 	}
@@ -57,16 +57,12 @@ func runRequirement(ctx context.Context, opts cliOptions, stdout io.Writer) erro
 		return writeRequirementIssues(stdout, registryIssues)
 	}
 	resolver := circuitgraph.NewResolver(circuitgraph.ResolveOptions{Catalog: catalog, CatalogID: "checked-in"})
-	provenance, provenanceDiagnostics := modelprovenance.LoadDefault()
-	if len(provenanceDiagnostics) != 0 {
-		issues := make([]reports.Issue, 0, len(provenanceDiagnostics))
-		for _, diagnostic := range provenanceDiagnostics {
-			issues = append(issues, reports.Issue{
-				Code: reports.CodeValidationFailed, Severity: reports.SeverityBlocked,
-				Path: filepath.ToSlash(filepath.Join("model_provenance", diagnostic.Path)), Message: diagnostic.Message,
-			})
-		}
-		return writeRequirementIssues(stdout, issues)
+	provenance, err := loadComponentModelsForOptions(ctx, opts)
+	if err != nil {
+		return writeRequirementFailure(stdout, reports.Issue{
+			Code: reports.CodeValidationFailed, Severity: reports.SeverityBlocked,
+			Path: "model_provenance", Message: err.Error(),
+		})
 	}
 	modelRegistryHash, err := modelprovenance.Hash(provenance)
 	if err != nil {

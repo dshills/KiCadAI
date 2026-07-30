@@ -152,6 +152,18 @@ path.
   eleven unsafe or incomplete variants fail closed. See the
   [specification](specs/protocol-aware-bus-synthesis/SPEC.md) and
   [promotion matrix](specs/protocol-aware-bus-synthesis/PROMOTION_MATRIX.json).
+- Evidence-backed component onboarding can now turn behavior requirements and
+  immutable manufacturer documents into quarantined component/model
+  candidates without putting the unfamiliar part identity in production code.
+  Exact excerpts, ratings, temperature, derating, package, symbol-pin,
+  footprint-pad, model, license, and provenance claims are validated
+  deterministically. Promotion requires exact-hash review plus two identical
+  simulation, connectivity, routing, writer, round-trip, ERC, and strict-DRC
+  runs. A frozen seven-family corpus covers an op-amp, transistor, regulator,
+  converter, sensor, logic device, and interface part; all seven pass in two
+  clean source roots. Run `make component-onboarding-promotion-bundle` with the
+  installed KiCad environment to reproduce it. See the
+  [specification](specs/evidence-backed-component-onboarding/SPEC.md).
 - Arbitrary electronics generation is not yet guaranteed. Generic graphs fail
   closed on unknown parts, pins, ratings, placement, or routing capability.
 - MCU synthesis is limited to verified catalog records and modeled electrical

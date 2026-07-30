@@ -254,6 +254,31 @@ stable fail-closed identities; the largest remaining cluster is broader bus
 buffering/level translation. See the
 [completion audit](../specs/open-world-capability-evaluation/AUDIT.md).
 
+### Evidence-Backed Component Onboarding
+
+KiCadAI can now propose support for an unfamiliar component from behavior
+requirements plus immutable manufacturer documents. The production path is
+identity-neutral. It validates content hashes, publishers, revisions,
+licenses, exact excerpts, value/unit anchoring, claim conflicts, ratings,
+temperature, derating, KiCad symbol pins, footprint pads, and registered
+simulation-model provenance before ranking candidates.
+
+Candidates remain quarantined and cannot enter ordinary selection until an
+independent review approves the exact hash and two normalized runs pass
+simulation, connectivity, route completion, writer correctness, zero-difference
+round trip, ERC, and strict DRC. Approved component/model overlays are consumed
+by component selection, behavioral intent, architecture search, closed-loop
+simulation, and design creation without mutating the embedded catalogs.
+
+A frozen identity-neutral corpus covers unfamiliar op-amp, transistor,
+regulator, converter, sensor, logic, and interface parts. All seven pass the
+installed-KiCad lane twice in each of two clean source roots; 56 canonical
+project and simulation artifacts compare identically. The milestone expands
+parts within already registered family/model semantics. Unknown physics,
+unlicensed models, absent package geometry, incomplete evidence, and
+fabrication approval remain fail-closed. See the
+[component-onboarding audit](../specs/evidence-backed-component-onboarding/AUDIT.md).
+
 The original expansion report passes 11/12 with the same evaluator and gate
 profile. Constant-current regulation passes in power-output, MCU-peripheral,
 and sensor-excitation contexts. Precision rectification passes alone and

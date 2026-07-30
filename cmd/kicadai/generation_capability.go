@@ -31,7 +31,7 @@ func runGenerationCapability(ctx context.Context, opts cliOptions, stdout io.Wri
 		}
 	}
 
-	catalog, err := loadComponentCatalog(ctx, opts.catalogDir)
+	catalog, err := loadComponentCatalogForOptions(ctx, opts)
 	if err != nil {
 		issue := reports.Issue{Code: reports.CodeValidationFailed, Severity: reports.SeverityError, Path: "catalog", Message: fmt.Sprintf("load generation catalog: %v", err)}
 		return writeReportFailure(stdout, "capability", issue)

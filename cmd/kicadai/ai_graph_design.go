@@ -39,7 +39,7 @@ func runAIGenericCircuitCreate(ctx context.Context, opts cliOptions, prompt, pro
 	if createOpts.LibraryIndex == nil {
 		return writeDesignFailure(stdout, reports.Issue{Code: reports.CodeInvalidArgument, Severity: reports.SeverityError, Path: "library", Message: "generic circuit profile requires --symbols-root and --footprints-root or a populated --library-cache"})
 	}
-	catalog, err := loadComponentCatalog(ctx, opts.catalogDir)
+	catalog, err := loadComponentCatalogForOptions(ctx, opts)
 	if err != nil {
 		return writeDesignFailure(stdout, reports.Issue{Code: reports.CodeInvalidArgument, Severity: reports.SeverityError, Path: "catalog_dir", Message: err.Error()})
 	}

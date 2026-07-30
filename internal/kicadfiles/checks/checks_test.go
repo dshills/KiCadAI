@@ -61,6 +61,37 @@ func TestRunDRCWithRunnerMissingReportIsToolError(t *testing.T) {
 	}
 }
 
+func TestRunDRCWithRunnerRetriesOneNoOutputCrash(t *testing.T) {
+	dir := t.TempDir()
+	board := filepath.Join(dir, "demo.kicad_pcb")
+	writeCheckTestFile(t, board, "(kicad_pcb)")
+	calls := 0
+	runner := fakeRunner{
+		version: "10.0.3",
+		run: func(_ context.Context, _ string, _ string, args ...string) CommandResult {
+			calls++
+			if calls == 1 {
+				return CommandResult{Args: args, ExitCode: -1, Duration: time.Millisecond, Err: fmt.Errorf("signal: abort trap")}
+			}
+			report := argAfter(args, "--output")
+			if err := os.WriteFile(report, []byte(`{"$schema":"https://schemas.kicad.org/drc.v1.json","coordinate_units":"mm","violations":[],"unconnected_items":[]}`), 0o644); err != nil {
+				t.Fatalf("write report: %v", err)
+			}
+			return CommandResult{Args: args, ExitCode: 0, Duration: time.Millisecond}
+		},
+	}
+	result, err := RunDRCWithRunner(context.Background(), runner, KiCadCLI{Path: "/bin/kicad-cli"}, board, Options{})
+	if err != nil {
+		t.Fatalf("RunDRCWithRunner() error = %v", err)
+	}
+	if calls != 2 || result.Status != CheckStatusPass || result.ToolErrorKind != ToolErrorNone {
+		t.Fatalf("bounded retry result = %#v calls=%d", result, calls)
+	}
+	if result.DurationMS != 2 {
+		t.Fatalf("retry duration = %d ms, want cumulative 2 ms", result.DurationMS)
+	}
+}
+
 func TestRunDRCWithRunnerClassifiesMissingReportWithOutput(t *testing.T) {
 	dir := t.TempDir()
 	board := filepath.Join(dir, "demo.kicad_pcb")
@@ -130,6 +161,8 @@ func TestRunDRCProjectCopiesContext(t *testing.T) {
 	writeCheckTestFile(t, filepath.Join(dir, "demo.kicad_sch"), "(kicad_sch)")
 	writeCheckTestFile(t, filepath.Join(dir, "sym-lib-table"), "(sym_lib_table)")
 	writeCheckTestFile(t, filepath.Join(dir, ".kicadai", "checks", "old", "demo.kicad_pcb"), "(kicad_pcb)")
+	writeCheckTestFile(t, filepath.Join(dir, ".evidence", "writer", "demo.kicad_pro"), "{}")
+	writeCheckTestFile(t, filepath.Join(dir, ".evidence", "writer", "demo.kicad_pcb"), "(kicad_pcb)")
 	runner := fakeRunner{
 		version: "10.0.3",
 		run: func(_ context.Context, workingDir string, _ string, args ...string) CommandResult {
@@ -139,6 +172,9 @@ func TestRunDRCProjectCopiesContext(t *testing.T) {
 			}
 			if strings.Contains(filepath.ToSlash(input), "/.kicadai/") {
 				t.Fatalf("input copied nested KiCadAI artifact context: %q", input)
+			}
+			if strings.Contains(filepath.ToSlash(input), "/.evidence/") {
+				t.Fatalf("input copied nested evidence artifact context: %q", input)
 			}
 			report := argAfter(args, "--output")
 			if err := os.WriteFile(report, []byte(`{"coordinate_units":"mm","violations":[]}`), 0o644); err != nil {
@@ -162,6 +198,21 @@ func TestDiscoverProjectERCUsesProjectRootSchematic(t *testing.T) {
 	root := filepath.Join(dir, "usb_sensor.kicad_sch")
 	writeCheckTestFile(t, root, "(kicad_sch)")
 	writeCheckTestFile(t, filepath.Join(dir, "sch", "0-0-0.kicad_sch"), "(kicad_sch)")
+
+	got, err := discoverProjectCheckFile(dir, CheckKindERC)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != root {
+		t.Fatalf("ERC schematic = %q, want project-paired root %q", got, root)
+	}
+}
+
+func TestDiscoverProjectERCAcceptsGlobMetacharactersInDirectory(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "project[1]")
+	writeCheckTestFile(t, filepath.Join(dir, "controller.kicad_pro"), "{}")
+	root := filepath.Join(dir, "controller.kicad_sch")
+	writeCheckTestFile(t, root, "(kicad_sch)")
 
 	got, err := discoverProjectCheckFile(dir, CheckKindERC)
 	if err != nil {

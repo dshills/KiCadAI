@@ -54,7 +54,7 @@ func runBehavioralIntentCompile(ctx context.Context, opts cliOptions, stdout io.
 	if len(prompt) > aiprovider.MaxPromptBytes {
 		return writeBehavioralIntentFailure(stdout, reports.Issue{Code: reports.CodeInvalidArgument, Severity: reports.SeverityError, Path: "text", Message: fmt.Sprintf("intent text exceeds %d-byte provider limit", aiprovider.MaxPromptBytes)})
 	}
-	catalog, err := loadComponentCatalog(ctx, opts.catalogDir)
+	catalog, err := loadComponentCatalogForOptions(ctx, opts)
 	if err != nil {
 		return writeBehavioralIntentFailure(stdout, reports.Issue{Code: reports.CodeInvalidArgument, Severity: reports.SeverityError, Path: "catalog_dir", Message: err.Error()})
 	}
@@ -62,7 +62,11 @@ func runBehavioralIntentCompile(ctx context.Context, opts cliOptions, stdout io.
 	if reports.HasBlockingIssue(registryIssues) {
 		return writeBehavioralIntentFailure(stdout, registryIssues[0])
 	}
-	capabilities, err := installedBehavioralCapabilities(catalog, registry)
+	models, err := loadComponentModelsForOptions(ctx, opts)
+	if err != nil {
+		return writeBehavioralIntentFailure(stdout, reports.Issue{Code: reports.CodeAIProviderConfiguration, Severity: reports.SeverityError, Path: "provider.capabilities.models", Message: err.Error()})
+	}
+	capabilities, err := installedBehavioralCapabilitiesWithModels(catalog, registry, models)
 	if err != nil {
 		return writeBehavioralIntentFailure(stdout, reports.Issue{Code: reports.CodeAIProviderConfiguration, Severity: reports.SeverityError, Path: "provider.capabilities", Message: err.Error()})
 	}
@@ -119,10 +123,6 @@ func runBehavioralIntentCompile(ctx context.Context, opts cliOptions, stdout io.
 	var designRequest *designworkflow.Request
 	var synthesisIssues []reports.Issue
 	if compilation.Status == behavioralintent.StatusReady && compilation.Requirement != nil && search != nil {
-		models, diagnostics := modelprovenance.LoadDefault()
-		if len(diagnostics) != 0 {
-			return writeBehavioralIntentFailure(stdout, reports.Issue{Code: reports.CodeAIProviderConfiguration, Severity: reports.SeverityError, Path: "provider.capabilities.models", Message: diagnostics[0].Message})
-		}
 		modelHash, err := modelprovenance.Hash(models)
 		if err != nil || modelHash != installed.ModelRegistrySHA256 {
 			return writeBehavioralIntentFailure(stdout, reports.Issue{Code: reports.CodeAIProviderConfiguration, Severity: reports.SeverityError, Path: "provider.capabilities.models", Message: "executing model registry does not match the installed capability snapshot"})
@@ -169,15 +169,23 @@ func runBehavioralIntentCompile(ctx context.Context, opts cliOptions, stdout io.
 }
 
 func installedBehavioralCapabilities(catalog *components.Catalog, registry *architecturesearch.Registry) (json.RawMessage, error) {
+	models, diagnostics := modelprovenance.LoadDefault()
+	if len(diagnostics) != 0 {
+		return nil, fmt.Errorf("load trusted model registry: %s: %s", diagnostics[0].Path, diagnostics[0].Message)
+	}
+	return installedBehavioralCapabilitiesWithModels(catalog, registry, models)
+}
+
+func installedBehavioralCapabilitiesWithModels(
+	catalog *components.Catalog,
+	registry *architecturesearch.Registry,
+	models modelprovenance.Registry,
+) (json.RawMessage, error) {
 	architectureCapabilities, err := architecturesearch.EncodeSemanticCapabilities(registry, 0)
 	if err != nil {
 		return nil, err
 	}
 	catalogHash := circuitgraph.NewResolver(circuitgraph.ResolveOptions{Catalog: catalog}).CatalogHash()
-	models, diagnostics := modelprovenance.LoadDefault()
-	if len(diagnostics) != 0 {
-		return nil, fmt.Errorf("load trusted model registry: %s: %s", diagnostics[0].Path, diagnostics[0].Message)
-	}
 	modelHash, err := modelprovenance.Hash(models)
 	if err != nil {
 		return nil, err

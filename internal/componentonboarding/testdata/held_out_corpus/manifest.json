@@ -1,0 +1,96 @@
+{
+  "schema": "kicadai.component-onboarding-held-out-corpus.v1",
+  "cases": [
+    {
+      "id": "converter_unfamiliar",
+      "category": "converter",
+      "template_id": "isolated_converter.murata.mee1s0505sc.sip4",
+      "candidate_id": "isolated_converter.corpus.cx410.sip4",
+      "manufacturer": "Corpus Power",
+      "mpn": "CX410",
+      "rating_kind": "output_current",
+      "rating_value": "0.1",
+      "rating_unit": "A",
+      "analysis": "dc_operating_point",
+      "functions": ["VIN_MINUS", "VIN_PLUS", "VOUT_MINUS", "VOUT_PLUS"]
+    },
+    {
+      "id": "interface_unfamiliar",
+      "category": "interface",
+      "template_id": "level_translator.ti.txs0102dcu.vssop8",
+      "candidate_id": "level_translator.corpus.ix720.vssop8",
+      "manufacturer": "Corpus Interface",
+      "mpn": "IX720",
+      "rating_kind": "vcca_supply_voltage",
+      "rating_value": "2.5",
+      "rating_unit": "V",
+      "analysis": "dc_operating_point",
+      "functions": ["A1", "A2", "B1", "B2", "GND", "OE", "VCCA", "VCCB"]
+    },
+    {
+      "id": "logic_unfamiliar",
+      "category": "logic",
+      "template_id": "logic_buffer.ti.sn74lvc1g17dbv",
+      "candidate_id": "logic_buffer.corpus.lx330.sot23_5",
+      "manufacturer": "Corpus Logic",
+      "mpn": "LX330",
+      "rating_kind": "supply_voltage",
+      "rating_value": "4",
+      "rating_unit": "V",
+      "analysis": "transient",
+      "functions": ["GND", "IN", "OUT", "VCC"]
+    },
+    {
+      "id": "opamp_unfamiliar",
+      "category": "opamp",
+      "template_id": "opamp.ti.lmv321.sot23_5",
+      "candidate_id": "opamp.corpus.ax101.sot23_5",
+      "manufacturer": "Corpus Analog",
+      "mpn": "AX101",
+      "rating_kind": "supply_voltage",
+      "rating_value": "4",
+      "rating_unit": "V",
+      "analysis": "dc_operating_point",
+      "functions": ["IN_MINUS", "IN_PLUS", "OUT", "V_MINUS", "V_PLUS"]
+    },
+    {
+      "id": "regulator_unfamiliar",
+      "category": "regulator",
+      "template_id": "regulator.linear.ams1117_3v3.sot223",
+      "candidate_id": "regulator.corpus.rx550.sot223",
+      "manufacturer": "Corpus Power",
+      "mpn": "RX550",
+      "rating_kind": "input_voltage",
+      "rating_value": "8",
+      "rating_unit": "V",
+      "analysis": "dc_operating_point",
+      "functions": ["GND", "VIN", "VOUT"]
+    },
+    {
+      "id": "sensor_unfamiliar",
+      "category": "sensor",
+      "template_id": "sensor.bosch.bme280.lga8",
+      "candidate_id": "sensor.corpus.sx260.lga8",
+      "manufacturer": "Corpus Sensors",
+      "mpn": "SX260",
+      "rating_kind": "supply_voltage",
+      "rating_value": "2.5",
+      "rating_unit": "V",
+      "analysis": "dc_operating_point",
+      "functions": ["CSB", "SCL", "SDA", "SDO", "VDD", "VDDIO"]
+    },
+    {
+      "id": "transistor_unfamiliar",
+      "category": "transistor",
+      "template_id": "bjt.onsemi.mmbt3904.sot23",
+      "candidate_id": "bjt.corpus.qx240.sot23",
+      "manufacturer": "Corpus Discrete",
+      "mpn": "QX240",
+      "rating_kind": "collector_emitter_voltage",
+      "rating_value": "20",
+      "rating_unit": "V",
+      "analysis": "dc_operating_point",
+      "functions": ["BASE", "COLLECTOR", "EMITTER"]
+    }
+  ]
+}
