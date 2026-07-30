@@ -593,6 +593,9 @@ Remove spelling-dependent selection and map-order-dependent circuit identity.
 
 ## 12. Phase 7 — Close Remaining Workflow, Capability, and Schematic Medium Risk
 
+Status: complete on 2026-07-30. Implementation and local acceptance evidence are
+recorded in `PHASE7_AUDIT.md`.
+
 ### Objective
 
 Resolve the Medium findings that can misstate capability, drop required work,
