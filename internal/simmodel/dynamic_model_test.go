@@ -265,7 +265,7 @@ func TestElectrothermalTransientIntegratesReviewedThermalRCAndSOA(t *testing.T) 
 			break
 		}
 	}
-	if switchResult.JunctionTemperatureC == nil || *switchResult.JunctionTemperatureC <= 25 || switchResult.TransientSOAMargin < 5 {
+	if switchResult.JunctionTemperatureC == nil || *switchResult.JunctionTemperatureC <= 25 || !switchResult.TransientSOAEvaluated || switchResult.TransientSOAMargin < 5 {
 		t.Fatalf("electrothermal switch result = %#v", switchResult)
 	}
 	replay, replayDiagnostics := Evaluate(ClonePlan(plan))
@@ -340,9 +340,9 @@ func TestTransientSOAPulseClockTracksOnlyDCUnsafeExcursion(t *testing.T) {
 	}
 
 	excursion = transientSOAExcursion{}
-	for step := 1; step <= 11; step++ {
+	for step := 1; step <= 10; step++ {
 		margin, excursion, diagnostic = transientSOAObservationMargin(device, excursion, 100e-6, 25, 10, 1)
-		wantDuration := float64(step-1) * 100e-6
+		wantDuration := float64(step) * 100e-6
 		if diagnostic != nil || math.Abs(margin-2) > 1e-12 || math.Abs(excursion.durationS-wantDuration) > 1e-15 || !excursion.active {
 			t.Fatalf("pulse step %d = margin %.12g excursion %#v diagnostic %#v", step, margin, excursion, diagnostic)
 		}
@@ -355,6 +355,22 @@ func TestTransientSOAPulseClockTracksOnlyDCUnsafeExcursion(t *testing.T) {
 	margin, excursion, diagnostic = transientSOAObservationMargin(device, excursion, 100e-6, 25, 10, .25)
 	if diagnostic != nil || margin != 2 || excursion != (transientSOAExcursion{}) {
 		t.Fatalf("DC-safe recovery = margin %.12g excursion %#v diagnostic %#v", margin, excursion, diagnostic)
+	}
+}
+
+func TestTransientSOAAssertionFailsClosedWithoutEvaluatedEvidence(t *testing.T) {
+	result := AnalysisResult{
+		ID: "event", Kind: AnalysisElectrothermal,
+		Points: []AnalysisPoint{{Devices: []DeviceResult{{Component: "switch", TransientSOAMargin: 0}}}},
+	}
+	assertion := Assertion{AnalysisID: "event", Component: "switch", Quantity: QuantityTransientSOAMargin}
+	if _, diagnostic := thermalAssertionValue(result, assertion); diagnostic == nil || !strings.Contains(diagnostic.Message, "lacks reviewed physical SOA evidence") {
+		t.Fatalf("missing-SOA assertion diagnostic = %#v", diagnostic)
+	}
+	result.Points[0].Devices[0].TransientSOAEvaluated = true
+	result.Points[0].Devices[0].TransientSOAMargin = 2
+	if value, diagnostic := thermalAssertionValue(result, assertion); diagnostic != nil || value != 2 {
+		t.Fatalf("evaluated SOA assertion = %.12g diagnostic %#v", value, diagnostic)
 	}
 }
 

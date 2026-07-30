@@ -325,6 +325,9 @@ func thermalAssertionValue(result AnalysisResult, assertion Assertion) (float64,
 				actual = math.Max(actual, *device.JunctionTemperatureC)
 				found = true
 			case QuantityTransientSOAMargin:
+				if !device.TransientSOAEvaluated {
+					return 0, &Diagnostic{Path: "assertions." + assertion.AnalysisID + "." + assertion.Component, Message: "transient SOA assertion lacks reviewed physical SOA evidence", Suggestion: "select a component model with a reviewed transient SOA envelope covering the event"}
+				}
 				if !found || device.TransientSOAMargin < actual {
 					actual = device.TransientSOAMargin
 				}

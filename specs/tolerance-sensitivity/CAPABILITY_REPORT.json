@@ -22,9 +22,9 @@
       "plan_sha256": "65720795055e85a4641db3c1d12bd3af281bdb8d865f34ce461d48dc58b9e332",
       "catalog_evidence_sha256": "669e99be2d679c6386aa595d74c44643b512cd36b2133647baab8722ba26b3b5",
       "nominal_report_sha256": "c43a6bde3641c7dda2bac34dc69c1c1a09c850c08060423ddcf0e57b1fa91770",
-      "worst_report_sha256": "9532e7ada7b6cf2df9e1ec2c630b267d83a8f294fa629d9f70753bea767479bd",
+      "worst_report_sha256": "33d8fc3711fa346063a82fffdab4d5c284bcc52e0ef3ee7349b3764c4c53f21f",
       "dominant_sensitivity": {
-        "assertion": "output_voltage_v",
+        "assertion": "output_voltage_v#3.25..3.35",
         "target": "bindings.regulator.model_parameters.output_voltage_v",
         "corner": "bindings.regulator.model_parameters.output_voltage_v=3.27",
         "margin": 0.020000000000000018
@@ -41,9 +41,9 @@
       "plan_sha256": "c5730af864537814e958b2fd2c86781ab71e670926786ace7a0fd1346851593b",
       "catalog_evidence_sha256": "dc45c85d5eee5d1f0a9058860ddf2c4942467c60c63afb50125aec62bdb93909",
       "nominal_report_sha256": "a08cb8db94e12c3cc06fae986a5001d979f9352d9fde3b55af8872c6fdecd262",
-      "worst_report_sha256": "5f7f5ca76dc97f4bf3b91c13db81aacec84eb4c879c5e403a200e031aed415e1",
+      "worst_report_sha256": "a2b90b672f6c42fb6766dbe89fc895d6d6aa216869c469362178aca118ccf956",
       "dominant_sensitivity": {
-        "assertion": "output_voltage_v",
+        "assertion": "output_voltage_v#3.25..3.35",
         "target": "bindings.regulator.model_parameters.output_voltage_v",
         "corner": "bindings.regulator.model_parameters.output_voltage_v=3.2",
         "margin": -0.04999999999999982
@@ -57,9 +57,9 @@
       "plan_sha256": "dcb96340daf54c1d6e6bbc50c1119b1549c4c6c83db795d17f8d72e7d519ee7a",
       "catalog_evidence_sha256": "07db7c95ecd5c18b5f5bd69d4294e02716e532d75f30090896724a1fe5b91630",
       "nominal_report_sha256": "0df6f211c6e7d2b143e876296446c551d4201b78faf63e4f6228bb1fde85afb0",
-      "worst_report_sha256": "92ebcd72338612138b17ed1e6000a54b28504c0d8673f462a4e171008a672d17",
+      "worst_report_sha256": "4110bc3f89f1e09ce12ad604c1113b488dfe84b62c4c01062ec8a81dc7057b06",
       "dominant_sensitivity": {
-        "assertion": "output_voltage_v",
+        "assertion": "output_voltage_v#2.47..2.53",
         "target": "bindings.lower_resistor.value_si",
         "corner": "bindings.lower_resistor.value_si=9900,bindings.upper_resistor.value_si=10000",
         "margin": 0.017437185929647825
@@ -76,9 +76,9 @@
       "plan_sha256": "9e64ebbc5020cad90f5fd2ab2b92b06321e8f4e1afeb7d4a939cab0f71fddb74",
       "catalog_evidence_sha256": "07db7c95ecd5c18b5f5bd69d4294e02716e532d75f30090896724a1fe5b91630",
       "nominal_report_sha256": "1f5e80545679d5d21ae82b07a6c24ecc68e4d26d3ce0b36c01627c420e297040",
-      "worst_report_sha256": "8213a790e9381300a6ef08c381501ccaf745d2b08d47f3bf498adc58a6765247",
+      "worst_report_sha256": "3414455e8713b6b6efcd07f268303d7c2519f999ded57102b2c3ad325062d5ff",
       "dominant_sensitivity": {
-        "assertion": "output_voltage_v",
+        "assertion": "output_voltage_v#2.49..2.51",
         "target": "bindings.lower_resistor.value_si",
         "corner": "bindings.lower_resistor.value_si=9900,bindings.upper_resistor.value_si=10000",
         "margin": -0.002562814070352193
@@ -92,9 +92,9 @@
       "plan_sha256": "c066ac0d8bb379a418fd3c920bf81bbfece7dec27e9d2d44afe1ff163bdf5aee",
       "catalog_evidence_sha256": "ac90a2f5b0964961f2b9d7c121d4b2d18c8d0293369439016e6845617dcf2c89",
       "nominal_report_sha256": "f72b095b319953ab1dde2c0c6e2f4e18fcf417d2bcf54dd243b49dc459f9ae29",
-      "worst_report_sha256": "8ced8281b14ef982a04d36ba8bea0503dcf014c0fede19c7e69fa77f55fb8d6e",
+      "worst_report_sha256": "66c9e3e99d2ebc8beab4fc9f03b05abb07811cca984797847aba05b0129b47d4",
       "dominant_sensitivity": {
-        "assertion": "cutoff_frequency_hz",
+        "assertion": "cutoff_frequency_hz#140..180",
         "target": "bindings.capacitor.value_si",
         "corner": "bindings.capacitor.value_si=9e-08,bindings.resistor.value_si=10000",
         "margin": 3.161174342338512
@@ -111,9 +111,9 @@
       "plan_sha256": "51466fc768fe77cdc68627ea295367cbeb9a4846ab59544a65b86229176089b2",
       "catalog_evidence_sha256": "ac90a2f5b0964961f2b9d7c121d4b2d18c8d0293369439016e6845617dcf2c89",
       "nominal_report_sha256": "affdda4bf4885d379e4b1f6afc106440be5bf81f8786b1fc2f5e930e87bfee0f",
-      "worst_report_sha256": "64c148084b537957663eda408689cc6319a8b9963be1e5e738914d0f8e31cfb7",
+      "worst_report_sha256": "c6a6fb6d371bd0e43cc1c76b8426b8eeddf1bd35ccaf176b556c0b926ca3a92e",
       "dominant_sensitivity": {
-        "assertion": "cutoff_frequency_hz",
+        "assertion": "cutoff_frequency_hz#150..170",
         "target": "bindings.capacitor.value_si",
         "corner": "bindings.capacitor.value_si=9e-08,bindings.resistor.value_si=10000",
         "margin": -6.838825657661488
@@ -126,10 +126,10 @@
       "worst_case_status": "pass",
       "plan_sha256": "693443d6161e05d56d395dfcf1945c2a83831d4deae548ebeb3f671910c1fef4",
       "catalog_evidence_sha256": "65aa2f7ff47a79f6fc7b5728c0e9897860771dd8bd38afa38c4d9f204fabd1c4",
-      "nominal_report_sha256": "40412c562baeee197c6fad8e8550fc5839ac80863b4f0592fba1529c944d626a",
-      "worst_report_sha256": "6b11c97de15d3d506dee311deffbb8a52eba0b41437fc7f07d6eff50ea11e736",
+      "nominal_report_sha256": "cf10b999d6611bba21bdb03176088485e0afb0373d7b85093635e4ca5c796741",
+      "worst_report_sha256": "22808e92ff02e8f6d4c28b5da419ac3d6f786d0cb7207c190a3a78b2d6fd2c3a",
       "dominant_sensitivity": {
-        "assertion": "bias.COLLECTOR...voltage_v@0/0",
+        "assertion": "bias.COLLECTOR...voltage_v@0/0#3..5",
         "target": "devices.q1.model_parameters.forward_beta",
         "corner": "devices.q1.model_parameters.forward_beta=80,devices.q1.model_parameters.junction_temperature_k=300.15",
         "margin": 0.7408203744908226
@@ -145,10 +145,10 @@
       "failure_taxonomy": "assertion_out_of_bounds",
       "plan_sha256": "64eeec9d3c63a742f945683bfe2d3ef76e1900aacc2089ead424890bea985aca",
       "catalog_evidence_sha256": "65aa2f7ff47a79f6fc7b5728c0e9897860771dd8bd38afa38c4d9f204fabd1c4",
-      "nominal_report_sha256": "09d6c2166bb20d564ac5433f07ba048a41e39d43f342f3f74b7ef8cd809fe8f6",
-      "worst_report_sha256": "6d4e8eb4b2e7ed1a65fe0e42cebc2620bad24a592c0d0834de7d1d56597e884d",
+      "nominal_report_sha256": "e04ea4628ac83eb90a38e6289be4d016c994fe39e252a3ca0c2127335af21950",
+      "worst_report_sha256": "f9c7c4938bcfada027c1d4e2e1f7bf240422ace48d245fff915bae012b085d40",
       "dominant_sensitivity": {
-        "assertion": "bias.COLLECTOR...voltage_v@0/0",
+        "assertion": "bias.COLLECTOR...voltage_v@0/0#3.9..4.4",
         "target": "devices.q1.model_parameters.forward_beta",
         "corner": "devices.q1.model_parameters.forward_beta=120,devices.q1.model_parameters.junction_temperature_k=300.15",
         "margin": -0.008595851476586258
@@ -161,10 +161,10 @@
       "worst_case_status": "pass",
       "plan_sha256": "0657d19d2dd9ccbc530eb09c7e1654072c9d5fb7b8201a9120b6f06dfbdde970",
       "catalog_evidence_sha256": "41761971e03df5f213a337c5f34047f5275432060bea713aa8980913b375f862",
-      "nominal_report_sha256": "cb8721a16deb27c6a7cacd200470932a3182b0ef07758968a9e1eb5a675079c5",
-      "worst_report_sha256": "b9ec2759d2f203b161a5446f682ca7904d1fd9394d471376aa2ca7c67aca4170",
+      "nominal_report_sha256": "62baf4886816a22eb1f7f44ed8a350384c4eb5db3e49354e735c75e809ec6f7d",
+      "worst_report_sha256": "c66d13fdca1dc6d65032b5c3ee4ec5b9e5573333e49e50c57d6465a3622c2aae",
       "dominant_sensitivity": {
-        "assertion": "gain.OUT...voltage_v@0/0",
+        "assertion": "gain.OUT...voltage_v@0/0#0.99997..1",
         "target": "devices.opamp.model_parameters.dc_open_loop_gain",
         "corner": "devices.opamp.model_parameters.dc_open_loop_gain=150000",
         "margin": 0.0000066666222225952865
@@ -180,10 +180,10 @@
       "failure_taxonomy": "assertion_out_of_bounds",
       "plan_sha256": "47cbbb4207e52f947ab8731b32b4e8fe4d6a654fe7f4095fd87ff10d748b475c",
       "catalog_evidence_sha256": "41761971e03df5f213a337c5f34047f5275432060bea713aa8980913b375f862",
-      "nominal_report_sha256": "76fe1eb4fdbe1665fb0edae8e1fb1c03a80a4bb9f36c940136bedc698acedcad",
-      "worst_report_sha256": "2740cd3b5cacf6dcf29a154d68321f9ee4bc3b7b292b05ab6eac38d2dd5957a0",
+      "nominal_report_sha256": "a8c8b2a2ca5cbcfd09deaf191be295172cd9ddafe7b435ac3c0def7268e2432c",
+      "worst_report_sha256": "c3402f1b03b7f59780cc59f00a770bdbf4e5a502628ca9ec2244dff8b936830b",
       "dominant_sensitivity": {
-        "assertion": "gain.OUT...voltage_v@0/0",
+        "assertion": "gain.OUT...voltage_v@0/0#0.999985..1",
         "target": "devices.opamp.model_parameters.dc_open_loop_gain",
         "corner": "devices.opamp.model_parameters.dc_open_loop_gain=50000",
         "margin": -0.000004999600007882243
@@ -196,10 +196,10 @@
       "worst_case_status": "pass",
       "plan_sha256": "2cb380682b16a58944268d427b727aa48c8a41489f135d32ed74a681891974f3",
       "catalog_evidence_sha256": "95a6a766c4f99ea410cee124b6e37f8b7e5bfc9f4af7699c29f8a1b09157ec3e",
-      "nominal_report_sha256": "28713f48373e1d593542340b105c40e8288792d1db546905f39f586ba30a66b3",
-      "worst_report_sha256": "216594b076fbcbe9cc00810c4f63562b2e25017b1b2af90a028d0a6288cee8ed",
+      "nominal_report_sha256": "edbcccd802be7bb1bf3db19c14447bdc9bc7949b7ad48c67bdf36a2cfa343df4",
+      "worst_report_sha256": "2ec95bb41e0bd1c8bfd6a3d7e14f6879c3f634c4276824e6cadb7dd477283c17",
       "dominant_sensitivity": {
-        "assertion": "decision.OUT...voltage_v@0/0",
+        "assertion": "decision.OUT...voltage_v@0/0#4.89..4.91",
         "target": "analyses.decision.excitations.threshold.dc_value",
         "corner": "analyses.decision.excitations.threshold.dc_value=2.4",
         "margin": 0.009999999999999787
@@ -215,10 +215,10 @@
       "failure_taxonomy": "assertion_out_of_bounds",
       "plan_sha256": "648ae154622d75321ecbc9774ff422a58c1e49faeb953fe7395045bd79af9e92",
       "catalog_evidence_sha256": "95a6a766c4f99ea410cee124b6e37f8b7e5bfc9f4af7699c29f8a1b09157ec3e",
-      "nominal_report_sha256": "1d40eebf27dff35cfada68b36dedb23f1bc991fe87855c3512ad1b55d639b886",
-      "worst_report_sha256": "e9de66ea863afe47a10ac2364a9d7064eb3698ca679ec3928b99054296071016",
+      "nominal_report_sha256": "acc735996aa0725363942c0f4420f6cc383559d3cf08a82680a470226e2bd7af",
+      "worst_report_sha256": "da46a020bf0c063acac9be493729441413c509b67445bd667eb1a932518f29f8",
       "dominant_sensitivity": {
-        "assertion": "decision.OUT...voltage_v@0/0",
+        "assertion": "decision.OUT...voltage_v@0/0#4.89..4.91",
         "target": "analyses.decision.excitations.threshold.dc_value",
         "corner": "analyses.decision.excitations.threshold.dc_value=2.6",
         "margin": -4.79
@@ -231,10 +231,10 @@
       "worst_case_status": "pass",
       "plan_sha256": "9bf7f29fff90334867d4b35a84ad0307231829ac894e418297bb8969a53d64a6",
       "catalog_evidence_sha256": "a40e3ba0d568d88042e692f593e5b13a5649a69627378ae446145214e534cd8f",
-      "nominal_report_sha256": "69a7e185ef3ac3bc5c93c3080e772c5e65f67c1cc0e30e03422b1b4db9e176ac",
-      "worst_report_sha256": "952fc0a390a59a044d5ed32334d2d5b84ea7eeb566fbab8e3ed1635065b11382",
+      "nominal_report_sha256": "9739afe96c079286f7d8ef65d9f810af579dbaa54a482635f0de1e805ef87f5e",
+      "worst_report_sha256": "0d6b3eef1143810909fa74387201416f847a562912642b01e6806397f200997a",
       "dominant_sensitivity": {
-        "assertion": "bias.OUT...voltage_v@0/0",
+        "assertion": "bias.OUT...voltage_v@0/0#0.45..1",
         "target": "environment.temperature",
         "corner": "analyses.bias.excitations.supply.dc_value=5,devices.clamp.model_parameters.junction_temperature_k=358.15,devices.limit.value_si=1000",
         "margin": 0.13507667540510865
@@ -250,10 +250,10 @@
       "failure_taxonomy": "assertion_out_of_bounds",
       "plan_sha256": "072b49a668449ff268430e24d7728c3ee14602213d3eecb23cfb4af57ae5a95f",
       "catalog_evidence_sha256": "a40e3ba0d568d88042e692f593e5b13a5649a69627378ae446145214e534cd8f",
-      "nominal_report_sha256": "de3d33b0a220c163d641b97535564424645e435a7999d825ea033761c7b91175",
-      "worst_report_sha256": "2d9a4d008ee6664a26494e6bc7f76736593298aae2fc0e31aaf39d26c424ef16",
+      "nominal_report_sha256": "101be3fd3e3268120b8b65eb18100989f9bfaecf08561382afb218204d201826",
+      "worst_report_sha256": "ea51e36e0bb636586eec5659784edab083aa9dbd4631e5b68f28b7d1eb71b9a7",
       "dominant_sensitivity": {
-        "assertion": "bias.OUT...voltage_v@0/0",
+        "assertion": "bias.OUT...voltage_v@0/0#0.63..0.7",
         "target": "environment.temperature",
         "corner": "analyses.bias.excitations.supply.dc_value=5,devices.clamp.model_parameters.junction_temperature_k=358.15,devices.limit.value_si=1000",
         "margin": -0.044923324594891345

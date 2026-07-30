@@ -421,10 +421,9 @@ func TestTransientAcceptedSubstepsCloseOriginalObservationTime(t *testing.T) {
 		t.Fatalf("prepare diagnostics = %#v", diagnostics)
 	}
 	devices := compileNonlinearDevices(plan)
-	predictorWorkspace := cloneMNASystem(template)
-	predictedSystem, predictedSolution, evidence, predicted := solveTransientStepBySubstepPredictor(
+	predictedSystem, predictedSolution, evidence, _, predicted := solveTransientStepBySubstepPredictor(
 		plan, analysis, timeS, plan.Devices, devices, initial,
-		&predictorWorkspace, nil,
+		nil, nil,
 	)
 	if !predicted || evidence.Method != "backward_euler_bounded_accepted_substeps_v1" || evidence.TimeSteps < 2 {
 		t.Fatalf("predicted=%v evidence=%#v", predicted, evidence)
@@ -432,6 +431,80 @@ func TestTransientAcceptedSubstepsCloseOriginalObservationTime(t *testing.T) {
 	predictedOut := nonlinearNodeVoltage(&predictedSystem, predictedSolution, "OUT")
 	if math.IsNaN(predictedOut) || math.IsInf(predictedOut, 0) {
 		t.Fatalf("accepted substep output is non-finite: %.12g", predictedOut)
+	}
+}
+
+func TestTransientFuseI2TUsesAnalyticCurrentSquaredPulseEnergy(t *testing.T) {
+	const (
+		ratedCurrentA = 1.0
+		pulseCurrentA = 2.0
+		meltingI2TA2S = 0.0037
+	)
+	analyticTripTime := meltingI2TA2S / (pulseCurrentA * pulseCurrentA)
+	previousError := math.Inf(1)
+	for _, timeStep := range []float64{0.0004, 0.0002, 0.00005} {
+		state := transientFuseI2TState{}
+		elapsed := 0.0
+		for state.integralA2S < meltingI2TA2S {
+			state = advanceTransientFuseI2T(state, pulseCurrentA, ratedCurrentA, timeStep)
+			elapsed += timeStep
+		}
+		errorS := elapsed - analyticTripTime
+		if errorS < -1e-15 || errorS > timeStep+1e-15 {
+			t.Fatalf("step %.12g trip time %.12g does not bound analytic %.12g", timeStep, elapsed, analyticTripTime)
+		}
+		if errorS > previousError+1e-15 {
+			t.Fatalf("trip-time error grew under refinement: %.12g > %.12g", errorS, previousError)
+		}
+		previousError = errorS
+	}
+}
+
+func TestTransientFuseI2TAtRatingHoldsAndBelowRatingRecovers(t *testing.T) {
+	state := transientFuseI2TState{integralA2S: 0.002}
+	atRating := advanceTransientFuseI2T(state, 1, 1, 10)
+	if atRating != state {
+		t.Fatalf("at-rated interval changed contiguous-pulse state: %#v", atRating)
+	}
+	belowRating := advanceTransientFuseI2T(state, 0.999, 1, 0.001)
+	if belowRating != (transientFuseI2TState{}) {
+		t.Fatalf("below-rated recovery did not reset state: %#v", belowRating)
+	}
+}
+
+func TestTransientFuseI2TSplitStepMatchesUnsplitAndPreservesAcceptedHistory(t *testing.T) {
+	accepted := map[string]transientFuseI2TState{"F1": {integralA2S: 0.001}}
+	rejected := cloneTransientFuseI2TStates(accepted)
+	rejected["F1"] = advanceTransientFuseI2T(rejected["F1"], 2, 1, 0.001)
+	if accepted["F1"].integralA2S != 0.001 {
+		t.Fatalf("rejected trajectory mutated accepted history: %#v", accepted)
+	}
+
+	unsplit := advanceTransientFuseI2T(accepted["F1"], 2, 1, 0.001)
+	split := accepted["F1"]
+	for range 4 {
+		split = advanceTransientFuseI2T(split, 2, 1, 0.00025)
+	}
+	if math.Abs(split.integralA2S-unsplit.integralA2S) > 1e-15 {
+		t.Fatalf("split integral %.12g differs from unsplit %.12g", split.integralA2S, unsplit.integralA2S)
+	}
+	if split.integralA2S <= accepted["F1"].integralA2S {
+		t.Fatalf("predictor trajectory discarded pre-existing history: accepted=%#v split=%#v", accepted["F1"], split)
+	}
+}
+
+func TestCommitTransientFuseStepAdvancesHistoryAndOpensClearedFuses(t *testing.T) {
+	accepted := map[string]transientFuseI2TState{"F1": {integralA2S: 0.001}}
+	candidate := cloneTransientFuseI2TStates(accepted)
+	candidate["F1"] = advanceTransientFuseI2T(candidate["F1"], 2, 1, 0.001)
+	openFuses := map[string]bool{}
+
+	committed := commitTransientFuseStep(candidate, openFuses, []string{"F1"})
+	if committed["F1"] != candidate["F1"] || !openFuses["F1"] {
+		t.Fatalf("committed history/topology = %#v %#v", committed, openFuses)
+	}
+	if accepted["F1"].integralA2S != 0.001 {
+		t.Fatalf("candidate commit mutated prior accepted history: %#v", accepted)
 	}
 }
 

@@ -26,6 +26,28 @@ const (
 	maxClockPhaseCycles                      = 1e9
 )
 
+// transientFuseI2TState tracks one contiguous overload pulse. Datasheet
+// nominal melting I²t is integral(I² dt), so above-rated samples contribute
+// their full current-squared energy. A below-rated sample ends the pulse and
+// resets the state; exactly rated current neither heats this pulse model nor
+// claims recovery. This deliberate hard boundary means solver chatter below
+// the rating also ends the pulse. Long-term cooling, thermal memory, or
+// behavior near that boundary requires a separately reviewed time-current or
+// thermal fuse model.
+type transientFuseI2TState struct {
+	integralA2S float64
+}
+
+func advanceTransientFuseI2T(state transientFuseI2TState, currentA, ratedCurrentA, timeStepS float64) transientFuseI2TState {
+	if currentA < ratedCurrentA {
+		return transientFuseI2TState{}
+	}
+	if currentA > ratedCurrentA && timeStepS > 0 {
+		state.integralA2S += currentA * currentA * timeStepS
+	}
+	return state
+}
+
 func solveTransientAnalysis(plan Plan, analysis Analysis) (AnalysisResult, []Diagnostic) {
 	plan = resolveProgrammedClockFrequencies(plan)
 	if diagnostics := validateClockPhaseResolution(plan, analysis); len(diagnostics) != 0 {
@@ -123,7 +145,7 @@ func solveTransientAnalysis(plan Plan, analysis Analysis) (AnalysisResult, []Dia
 	}
 	base := cloneMNASystem(template)
 	workspace := cloneMNASystem(template)
-	fuseSurgeI2t := map[string]float64{}
+	fuseI2TStates := map[string]transientFuseI2TState{}
 	openFuses := map[string]bool{}
 	preferBJTVoltageSeed := false
 	preferredBJTVoltageSeedSteps := 0
@@ -138,6 +160,8 @@ func solveTransientAnalysis(plan Plan, analysis Analysis) (AnalysisResult, []Dia
 		guess := transientInitialGuess(analysis, timeS, solution, history)
 		var evidence SolverEvidence
 		previousSolution := solution
+		predictorValidated := false
+		var predictorFuseStates map[string]transientFuseI2TState
 		if preferBJTVoltageSeed && preferredBJTVoltageSeedSteps >= transientBJTSeedProbeInterval {
 			preferBJTVoltageSeed = false
 			preferredBJTVoltageSeedSteps = 0
@@ -210,13 +234,14 @@ func solveTransientAnalysis(plan Plan, analysis Analysis) (AnalysisResult, []Dia
 		if diagnostic != nil && transientAcceptedSubstepsApplicable(plan) {
 			var predictorEvidence SolverEvidence
 			var predicted bool
-			system, solution, predictorEvidence, predicted = solveTransientStepBySubstepPredictor(
+			system, solution, predictorEvidence, predictorFuseStates, predicted = solveTransientStepBySubstepPredictor(
 				plan, analysis, timeS, plan.Devices, devices, previousSolution,
-				&workspace, openFuses,
+				openFuses, fuseI2TStates,
 			)
 			totalIterations += predictorEvidence.Iterations
 			if predicted {
 				evidence = predictorEvidence
+				predictorValidated = true
 				diagnostic = nil
 			}
 		}
@@ -256,19 +281,28 @@ func solveTransientAnalysis(plan Plan, analysis Analysis) (AnalysisResult, []Dia
 		if totalIterations > maxTransientWork {
 			return result, []Diagnostic{{Path: fmt.Sprintf("analyses.%s.points[%d].work", analysis.ID, step), Message: fmt.Sprintf("transient solve exceeded bounded total work limit %d", maxTransientWork), Suggestion: "reduce the bounded observation duration or partition the analysis"}}
 		}
-		openedFuses, diagnostics := validateTransientOperatingLimits(plan, system, solution, comparatorStates, true, analysis.TimeStepS, fuseSurgeI2t, openFuses)
+		candidateFuseStates := cloneTransientFuseI2TStates(fuseI2TStates)
+		var openedFuses []string
+		diagnostics = nil
+		if predictorValidated {
+			candidateFuseStates = predictorFuseStates
+		} else {
+			openedFuses, diagnostics = validateTransientOperatingLimits(plan, system, solution, comparatorStates, true, analysis.TimeStepS, candidateFuseStates, openFuses)
+		}
 		if len(diagnostics) != 0 && transientAcceptedSubstepsApplicable(plan) {
 			var predictorEvidence SolverEvidence
 			var predicted bool
-			system, solution, predictorEvidence, predicted = solveTransientStepBySubstepPredictor(
+			var predictedFuseStates map[string]transientFuseI2TState
+			system, solution, predictorEvidence, predictedFuseStates, predicted = solveTransientStepBySubstepPredictor(
 				plan, analysis, timeS, plan.Devices, devices, previousSolution,
-				&workspace, openFuses,
+				openFuses, fuseI2TStates,
 			)
 			totalIterations += predictorEvidence.Iterations
 			if !predicted {
 				return result, prefixTransientDiagnostics(analysis.ID, step, timeS, diagnostics)
 			}
 			evidence = predictorEvidence
+			candidateFuseStates = predictedFuseStates
 			openedFuses = nil
 		}
 		result.Points = append(result.Points, AnalysisPoint{
@@ -279,9 +313,7 @@ func solveTransientAnalysis(plan Plan, analysis Analysis) (AnalysisResult, []Dia
 			),
 			Solver: &evidence,
 		})
-		for _, component := range openedFuses {
-			openFuses[component] = true
-		}
+		fuseI2TStates = commitTransientFuseStep(candidateFuseStates, openFuses, openedFuses)
 		history = append(history, append([]complex128(nil), solution...))
 	}
 	return result, nil
@@ -495,7 +527,7 @@ func solveStartupAnalysis(plan Plan, analysis Analysis) (AnalysisResult, []Diagn
 	base := cloneMNASystem(template)
 	workspace := cloneMNASystem(template)
 	totalIterations := 0
-	fuseSurgeI2t := map[string]float64{}
+	fuseI2TStates := map[string]transientFuseI2TState{}
 	openFuses := map[string]bool{}
 	for step := 1; step <= steps; step++ {
 		timeS := float64(step) * analysis.TimeStepS
@@ -516,7 +548,8 @@ func solveStartupAnalysis(plan Plan, analysis Analysis) (AnalysisResult, []Diagn
 			diagnostic.Message = fmt.Sprintf("startup solve failed at step %d, time %.12g s: %s", step, timeS, diagnostic.Message)
 			return result, []Diagnostic{*diagnostic}
 		}
-		openedFuses, diagnostics := validateTransientOperatingLimits(plan, system, solution, comparatorStates, true, analysis.TimeStepS, fuseSurgeI2t, openFuses)
+		candidateFuseStates := cloneTransientFuseI2TStates(fuseI2TStates)
+		openedFuses, diagnostics := validateTransientOperatingLimits(plan, system, solution, comparatorStates, true, analysis.TimeStepS, candidateFuseStates, openFuses)
 		if len(diagnostics) != 0 {
 			return result, prefixTransientDiagnostics(analysis.ID, step, timeS, diagnostics)
 		}
@@ -528,9 +561,7 @@ func solveStartupAnalysis(plan Plan, analysis Analysis) (AnalysisResult, []Diagn
 			),
 			Solver: &evidence,
 		})
-		for _, component := range openedFuses {
-			openFuses[component] = true
-		}
+		fuseI2TStates = commitTransientFuseStep(candidateFuseStates, openFuses, openedFuses)
 		previous = solution
 		history = append(history, append([]complex128(nil), solution...))
 	}
@@ -1802,9 +1833,9 @@ func solveTransientStepBySubstepPredictor(
 	resolvedDevices []ResolvedDevice,
 	devices []compiledNonlinearDevice,
 	previous []complex128,
-	workspace *mnaSystem,
 	openFuses map[string]bool,
-) (mnaSystem, []complex128, SolverEvidence, bool) {
+	acceptedFuseStates map[string]transientFuseI2TState,
+) (mnaSystem, []complex128, SolverEvidence, map[string]transientFuseI2TState, bool) {
 	total := SolverEvidence{Method: "backward_euler_bounded_accepted_substeps_v1"}
 	for _, divisions := range []int{16, 32, 64} {
 		predictorAnalysis := analysis
@@ -1818,8 +1849,8 @@ func solveTransientStepBySubstepPredictor(
 		predictorWorkspace := cloneMNASystem(template)
 		var predictorSystem mnaSystem
 		predicted := true
-		predictorFuseSurgeI2t := map[string]float64{}
-		predictorOpenFuses := cloneTransientFuseStates(openFuses)
+		predictorFuseStates := cloneTransientFuseI2TStates(acceptedFuseStates)
+		predictorOpenFuses := cloneTransientOpenFuseStates(openFuses)
 		for substep := 1; substep <= divisions; substep++ {
 			substepTime := timeS - analysis.TimeStepS + float64(substep)*predictorAnalysis.TimeStepS
 			base := cloneMNASystem(template)
@@ -1851,7 +1882,7 @@ func solveTransientStepBySubstepPredictor(
 			}
 			opened, limitDiagnostics := validateTransientOperatingLimits(
 				plan, predictorSystem, predictorSolution, predictorStates, true,
-				predictorAnalysis.TimeStepS, predictorFuseSurgeI2t, predictorOpenFuses,
+				predictorAnalysis.TimeStepS, predictorFuseStates, predictorOpenFuses,
 			)
 			if len(limitDiagnostics) != 0 || len(opened) != 0 {
 				predicted = false
@@ -1865,10 +1896,10 @@ func solveTransientStepBySubstepPredictor(
 		}
 		total.TotalIterations = total.Iterations
 		total.TimeSteps = divisions
-		return predictorSystem, predictorPrevious, total, true
+		return predictorSystem, predictorPrevious, total, predictorFuseStates, true
 	}
 	total.TotalIterations = total.Iterations
-	return mnaSystem{}, nil, total, false
+	return mnaSystem{}, nil, total, nil, false
 }
 
 func transientAcceptedSubstepsApplicable(plan Plan) bool {
@@ -1881,12 +1912,30 @@ func transientAcceptedSubstepsApplicable(plan Plan) bool {
 	return false
 }
 
-func cloneTransientFuseStates(source map[string]bool) map[string]bool {
+func cloneTransientOpenFuseStates(source map[string]bool) map[string]bool {
 	clone := make(map[string]bool, len(source))
 	for component, open := range source {
 		clone[component] = open
 	}
 	return clone
+}
+
+func cloneTransientFuseI2TStates(source map[string]transientFuseI2TState) map[string]transientFuseI2TState {
+	clone := make(map[string]transientFuseI2TState, len(source))
+	for component, state := range source {
+		clone[component] = state
+	}
+	return clone
+}
+
+// commitTransientFuseStep is called only after a solved and validated point is
+// recorded. It advances both accepted fuse history and the topology used by
+// the next point; rejected coarse steps and predictor attempts never call it.
+func commitTransientFuseStep(candidate map[string]transientFuseI2TState, openFuses map[string]bool, openedFuses []string) map[string]transientFuseI2TState {
+	for _, component := range openedFuses {
+		openFuses[component] = true
+	}
+	return candidate
 }
 
 func solveTransientStepInternal(base mnaSystem, resolvedDevices []ResolvedDevice, devices []compiledNonlinearDevice, previous, guess []complex128, workspace *mnaSystem, selectiveNodeDamping bool, fixedOutputClamps map[string]bool, allowMOSFETActiveSet bool) (mnaSystem, []complex128, SolverEvidence, *Diagnostic) {
@@ -2596,7 +2645,7 @@ func validateTransientOperatingLimits(
 	comparatorStates map[string]float64,
 	allowPowerTransition bool,
 	timeStepS float64,
-	fuseSurgeI2t map[string]float64,
+	fuseI2TStates map[string]transientFuseI2TState,
 	openFuses map[string]bool,
 ) ([]string, []Diagnostic) {
 	diagnostics := validateNonlinearOperatingLimitsWithComparatorStates(plan, system, solution, comparatorStates, allowPowerTransition, true)
@@ -2607,21 +2656,20 @@ func validateTransientOperatingLimits(
 		switch device.PrimitiveModel {
 		case PrimitiveFuseClosedStateV1:
 			meltingI2t, hasSurgeEvidence := parameters["nominal_melting_i2t_a2s"]
-			if !hasSurgeEvidence || meltingI2t <= 0 || timeStepS <= 0 || fuseSurgeI2t == nil {
+			if !hasSurgeEvidence || meltingI2t <= 0 || timeStepS <= 0 || fuseI2TStates == nil {
 				continue
 			}
 			voltage := nonlinearNodeVoltage(&system, solution, terminals["A"]) - nonlinearNodeVoltage(&system, solution, terminals["B"])
 			current := math.Abs(voltage / parameters["cold_resistance_ohm"])
 			rated := parameters["rated_current_a"]
-			if current > rated {
-				fuseSurgeI2t[device.Component] += (current*current - rated*rated) * timeStepS
-			}
+			state := advanceTransientFuseI2T(fuseI2TStates[device.Component], current, rated, timeStepS)
+			fuseI2TStates[device.Component] = state
 			path := "devices." + device.Component + ".operating_limit"
 			diagnostics = slices.DeleteFunc(diagnostics, func(diagnostic Diagnostic) bool {
 				return diagnostic.Path == path && strings.HasPrefix(diagnostic.Message, "fuse current ")
 			})
-			if fuseSurgeI2t[device.Component] > meltingI2t {
-				diagnostics = append(diagnostics, Diagnostic{Path: path, Message: fmt.Sprintf("fuse excess-current integral %.12g A^2s exceeds catalog-backed nominal melting I2t %.12g A^2s", fuseSurgeI2t[device.Component], meltingI2t), Suggestion: "reduce transient current, select a fuse with sufficient reviewed surge capacity, or use a registered time-current clearing model"})
+			if state.integralA2S >= meltingI2t {
+				diagnostics = append(diagnostics, Diagnostic{Path: path, Message: fmt.Sprintf("fuse current-squared integral %.12g A^2s exceeds catalog-backed nominal melting I2t %.12g A^2s", state.integralA2S, meltingI2t), Suggestion: "reduce transient current, select a fuse with sufficient reviewed surge capacity, or use a registered time-current clearing model"})
 			}
 		case PrimitiveFuseI2TClearingV1:
 			voltage := nonlinearNodeVoltage(&system, solution, terminals["A"]) - nonlinearNodeVoltage(&system, solution, terminals["B"])
@@ -2632,21 +2680,14 @@ func validateTransientOperatingLimits(
 					Suggestion: "reduce the applied voltage or select a fuse with a sufficient reviewed interrupting-voltage rating",
 				})
 			}
-			if openFuses[device.Component] || timeStepS <= 0 || fuseSurgeI2t == nil {
+			if openFuses[device.Component] || timeStepS <= 0 || fuseI2TStates == nil {
 				continue
 			}
 			current := math.Abs(voltage / parameters["cold_resistance_ohm"])
 			rated := parameters["rated_current_a"]
-			if current <= rated {
-				// Nominal melting I2t is a bounded pulse-energy claim, not an
-				// indefinite thermal accumulator. A sub-rated interval ends the
-				// contiguous overcurrent pulse; long-term heating still belongs
-				// to a catalog time-current/thermal model.
-				fuseSurgeI2t[device.Component] = 0
-				continue
-			}
-			fuseSurgeI2t[device.Component] += (current*current - rated*rated) * timeStepS
-			if fuseSurgeI2t[device.Component] >= parameters["nominal_melting_i2t_a2s"] {
+			state := advanceTransientFuseI2T(fuseI2TStates[device.Component], current, rated, timeStepS)
+			fuseI2TStates[device.Component] = state
+			if state.integralA2S >= parameters["nominal_melting_i2t_a2s"] {
 				openedFuses = append(openedFuses, device.Component)
 			}
 		case PrimitiveCapacitorTransientV1:

@@ -131,6 +131,7 @@ func solveElectrothermalAnalysis(plan Plan, analysis Analysis) (AnalysisResult, 
 				}
 				soaExcursions[device.Component] = excursion
 				observation.TransientSOAMargin = normalizedMNAFloat(margin)
+				observation.TransientSOAEvaluated = true
 				if margin < 1 {
 					return result, []Diagnostic{{
 						Path:       fmt.Sprintf("analyses.%s.points[%d].devices.%s.transient_soa", analysis.ID, pointIndex, device.Component),
@@ -194,13 +195,11 @@ func transientSOAObservationMargin(device ResolvedDevice, prior transientSOAExcu
 		margin, diagnostic := transientSOAMargin(device, 0, boundaryTemperature, voltage, current)
 		return margin, transientSOAExcursion{active: true}, diagnostic
 	}
-	excursion := transientSOAExcursion{active: true}
-	elapsedForEnvelope := math.SmallestNonzeroFloat64
+	excursion := transientSOAExcursion{durationS: timeStep, active: true}
 	if prior.active {
 		excursion.durationS = prior.durationS + timeStep
-		elapsedForEnvelope = excursion.durationS
 	}
-	margin, diagnostic := transientSOAMargin(device, elapsedForEnvelope, boundaryTemperature, voltage, current)
+	margin, diagnostic := transientSOAMargin(device, excursion.durationS, boundaryTemperature, voltage, current)
 	return margin, excursion, diagnostic
 }
 

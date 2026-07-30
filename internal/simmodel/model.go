@@ -536,13 +536,14 @@ type AnalysisPoint struct {
 }
 
 type DeviceResult struct {
-	Component            string   `json:"component"`
-	VoltageV             float64  `json:"voltage_v,omitempty"`
-	CurrentA             float64  `json:"current_a,omitempty"`
-	CurrentMagnitudeA    float64  `json:"current_magnitude_a,omitempty"`
-	DissipationW         float64  `json:"dissipation_w"`
-	JunctionTemperatureC *float64 `json:"junction_temperature_c,omitempty"`
-	TransientSOAMargin   float64  `json:"transient_soa_margin_ratio,omitempty"`
+	Component             string   `json:"component"`
+	VoltageV              float64  `json:"voltage_v,omitempty"`
+	CurrentA              float64  `json:"current_a,omitempty"`
+	CurrentMagnitudeA     float64  `json:"current_magnitude_a,omitempty"`
+	DissipationW          float64  `json:"dissipation_w"`
+	JunctionTemperatureC  *float64 `json:"junction_temperature_c,omitempty"`
+	TransientSOAMargin    float64  `json:"transient_soa_margin_ratio,omitempty"`
+	TransientSOAEvaluated bool     `json:"transient_soa_evaluated,omitempty"`
 }
 
 // SolverEvidence records bounded deterministic nonlinear work without
@@ -727,12 +728,13 @@ func cloneAnalysisPoints(source []AnalysisPoint, limit int) []AnalysisPoint {
 		for deviceIndex := range clone[index].Devices {
 			sourceDevice := source[sourceIndex].Devices[deviceIndex]
 			clone[index].Devices[deviceIndex] = DeviceResult{
-				Component:          sourceDevice.Component,
-				VoltageV:           sourceDevice.VoltageV,
-				CurrentA:           sourceDevice.CurrentA,
-				CurrentMagnitudeA:  sourceDevice.CurrentMagnitudeA,
-				DissipationW:       sourceDevice.DissipationW,
-				TransientSOAMargin: sourceDevice.TransientSOAMargin,
+				Component:             sourceDevice.Component,
+				VoltageV:              sourceDevice.VoltageV,
+				CurrentA:              sourceDevice.CurrentA,
+				CurrentMagnitudeA:     sourceDevice.CurrentMagnitudeA,
+				DissipationW:          sourceDevice.DissipationW,
+				TransientSOAMargin:    sourceDevice.TransientSOAMargin,
+				TransientSOAEvaluated: sourceDevice.TransientSOAEvaluated,
 			}
 			if source[sourceIndex].Devices[deviceIndex].JunctionTemperatureC != nil {
 				value := *source[sourceIndex].Devices[deviceIndex].JunctionTemperatureC

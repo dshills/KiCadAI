@@ -148,12 +148,12 @@ func TestCatalogJunctionTemperaturesShareOneEnvironmentalCorner(t *testing.T) {
 		t.Fatalf("groups=%#v", groups)
 	}
 	corners := deterministicCorners(uncertainties)
-	if len(corners) != 4 {
-		t.Fatalf("corners=%d, want 4", len(corners))
+	if len(corners) != 2 {
+		t.Fatalf("corners=%d, want 2 unique endpoints", len(corners))
 	}
 	unique, resultIndex := uniqueCornerEvaluationPlan(corners)
-	if len(unique) != 2 || !reflect.DeepEqual(resultIndex, []int{0, 1, 0, 1}) {
-		t.Fatalf("unique corner evaluation plan = %d %#v, want two solved endpoints reused by four report entries", len(unique), resultIndex)
+	if len(unique) != 2 || !reflect.DeepEqual(resultIndex, []int{0, 1}) {
+		t.Fatalf("unique corner evaluation plan = %d %#v, want two unique report endpoints", len(unique), resultIndex)
 	}
 	for _, corner := range corners {
 		first := corner[0].Value
@@ -169,6 +169,15 @@ func TestCatalogJunctionTemperaturesShareOneEnvironmentalCorner(t *testing.T) {
 	nonoverlapping[len(nonoverlapping)-1].Maximum = 422
 	if diagnostics := validateUncertainties(nonoverlapping); len(diagnostics) == 0 || !strings.Contains(diagnostics[0].Message, "do not overlap") {
 		t.Fatalf("nonoverlapping environmental ranges accepted: %#v", diagnostics)
+	}
+}
+
+func TestAssertionIdentityIncludesBounds(t *testing.T) {
+	base := AssertionResult{Metric: "gain", AnalysisID: "ac", Quantity: QuantityVoltageGainRatio, Min: 9, Max: 11}
+	changed := base
+	changed.Min = 8
+	if assertionID(base) == assertionID(changed) {
+		t.Fatalf("assertions with different bounds alias: %q", assertionID(base))
 	}
 }
 

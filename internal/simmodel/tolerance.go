@@ -287,10 +287,24 @@ func deterministicCorners(uncertainties []Uncertainty) [][]NamedValue {
 				return mask&(1<<groupIndex) != 0
 			}))
 		}
-		return result
+		return uniqueCornerAssignments(result)
 	}
 	result = append(result, pairwiseCoveringCorners(uncertainties, groups)...)
-	return result
+	return uniqueCornerAssignments(result)
+}
+
+func uniqueCornerAssignments(corners [][]NamedValue) [][]NamedValue {
+	unique := make([][]NamedValue, 0, len(corners))
+	seen := make(map[string]struct{}, len(corners))
+	for _, corner := range corners {
+		id := cornerID(corner)
+		if _, exists := seen[id]; exists {
+			continue
+		}
+		seen[id] = struct{}{}
+		unique = append(unique, corner)
+	}
+	return unique
 }
 
 func pairwiseCoveringCorners(uncertainties []Uncertainty, groups []uncertaintyGroup) [][]NamedValue {
@@ -497,10 +511,11 @@ func trimTarget(target, prefix, suffix string) (string, bool) {
 func floatPointer(value float64) *float64 { return &value }
 
 func assertionID(assertion AssertionResult) string {
-	if assertion.Metric != "" {
-		return assertion.Metric
+	base := assertion.Metric
+	if base == "" {
+		base = assertion.AnalysisID + "." + assertion.Node + "." + assertion.Component + "." + strings.Join(assertion.Components, "\x1f") + "." + assertion.Quantity + fmt.Sprintf("@%.12g/%.12g", assertion.FrequencyHz, assertion.TimeS)
 	}
-	return assertion.AnalysisID + "." + assertion.Node + "." + assertion.Component + "." + strings.Join(assertion.Components, "\x1f") + "." + assertion.Quantity + fmt.Sprintf("@%.12g/%.12g", assertion.FrequencyHz, assertion.TimeS)
+	return base + fmt.Sprintf("#%.12g..%.12g", assertion.Min, assertion.Max)
 }
 
 func assertionMargin(assertion AssertionResult) float64 {
