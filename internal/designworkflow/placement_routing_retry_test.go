@@ -317,6 +317,19 @@ func TestPlacementRoutingRetrySummaryJSONKeepsExistingFields(t *testing.T) {
 	}
 }
 
+func TestAutonomousRouteCorrectionSummaryDescribesRouteWork(t *testing.T) {
+	plan := &AutonomousCorrectionPlan{Actions: []AutonomousCorrectionAction{
+		{Kind: CorrectionActionRerouteAffectedNets, Nets: []string{"VCC", "GND"}},
+		{Kind: CorrectionActionRebuildRouteTree, Nets: []string{"GND"}},
+	}}
+	application := &AutonomousCorrectionApplication{Applied: true, AffectedNets: []string{"VCC"}}
+	got := autonomousRouteCorrectionSummary(plan, application)
+	want := "applied routing correction: actions=rebuild_route_tree,reroute_affected_nets nets=GND,VCC"
+	if got != want {
+		t.Fatalf("route correction summary = %q, want %q", got, want)
+	}
+}
+
 func TestPlacementStateHashIgnoresFixedComponents(t *testing.T) {
 	placements := []placement.PlacementResult{
 		{Ref: "J1", Fixed: true, Position: placement.Placement{XMM: 1, YMM: 1}},

@@ -220,6 +220,7 @@ func builtinVerificationRoot() string {
 func contextualizeEvidenceLoadIssues(issues []reports.Issue) []reports.Issue {
 	contextualized := make([]reports.Issue, 0, len(issues))
 	for _, issue := range issues {
+		issue.Code = CodeBlockEvidenceLoadFailed
 		issue.Severity = reports.SeverityWarning
 		if issue.Path == "" {
 			issue.Path = "block_verification"

@@ -7,6 +7,7 @@ import (
 	"math"
 	"slices"
 	"strconv"
+	"strings"
 
 	"kicadai/internal/placement"
 	"kicadai/internal/reports"
@@ -265,6 +266,9 @@ func maybeRetryPlacementRoutingWithRouter(ctx context.Context, request Request, 
 		summary.Applied++
 		ensureStageSummary(&nextRouted.Stage)
 		adjustmentSummary := PlacementRetryAdjustmentSummary(adjustment)
+		if routeOnlyApplied {
+			adjustmentSummary = autonomousRouteCorrectionSummary(correctionPlan, correctionApplication)
+		}
 		nextRouted.Stage.Summary["retry_adjustment"] = adjustmentSummary
 		attemptSummary := placementRoutingAttemptSummaryForResult(attempt, &currentRouted, &nextPlaced, nextRouted, adjustmentSummary)
 		attemptSummary.Placement = nextPlaced.Stage.Summary
@@ -303,6 +307,26 @@ func maybeRetryPlacementRoutingWithRouter(ctx context.Context, request Request, 
 	finalizeAutonomousCorrectionReport(correctionReport, request, summary)
 	attachAutonomousCorrectionReport(&bestRouted.Stage, correctionReport)
 	return bestPlaced, bestRouted, summary
+}
+
+func autonomousRouteCorrectionSummary(plan *AutonomousCorrectionPlan, application *AutonomousCorrectionApplication) string {
+	if plan == nil || application == nil || !application.Applied {
+		return "no safe routing correction applied"
+	}
+	kinds := make([]string, 0, len(plan.Actions))
+	nets := slices.Clone(application.AffectedNets)
+	for _, action := range plan.Actions {
+		kind := string(action.Kind)
+		if kind != "" && !slices.Contains(kinds, kind) {
+			kinds = append(kinds, kind)
+		}
+		nets = append(nets, action.Nets...)
+	}
+	slices.Sort(kinds)
+	kinds = slices.Compact(kinds)
+	slices.Sort(nets)
+	nets = slices.Compact(nets)
+	return "applied routing correction: actions=" + strings.Join(kinds, ",") + " nets=" + strings.Join(nets, ",")
 }
 
 func retryPlacementIssueFlags(issues []reports.Issue) []string {

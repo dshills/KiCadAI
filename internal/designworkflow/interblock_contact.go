@@ -164,7 +164,7 @@ func BuildInterBlockContactTargets(candidates []InterBlockRouteCandidate, placed
 			}
 		}
 	}
-	return evidence
+	return normalizeInterBlockContactEvidence(evidence)
 }
 
 func ValidateInterBlockRouteEndpointContacts(candidates []InterBlockRouteCandidate, operations []transactions.Operation, placed *PlacementStageResult) InterBlockContactEvidence {
@@ -210,6 +210,52 @@ func ValidateInterBlockRouteEndpointContacts(candidates []InterBlockRouteCandida
 			}
 		}
 	}
+	return normalizeInterBlockContactEvidence(evidence)
+}
+
+func normalizeInterBlockContactEvidence(evidence InterBlockContactEvidence) InterBlockContactEvidence {
+	slices.SortFunc(evidence.Targets, func(left, right InterBlockContactTarget) int {
+		if compare := strings.Compare(left.Path, right.Path); compare != 0 {
+			return compare
+		}
+		if compare := strings.Compare(left.NetName, right.NetName); compare != 0 {
+			return compare
+		}
+		if compare := strings.Compare(left.EndpointID, right.EndpointID); compare != 0 {
+			return compare
+		}
+		if compare := strings.Compare(left.Ref, right.Ref); compare != 0 {
+			return compare
+		}
+		if compare := strings.Compare(left.Pad, right.Pad); compare != 0 {
+			return compare
+		}
+		return 0
+	})
+	slices.SortFunc(evidence.Proofs, func(left, right InterBlockContactProof) int {
+		if compare := strings.Compare(left.Target.Path, right.Target.Path); compare != 0 {
+			return compare
+		}
+		if compare := strings.Compare(left.NetName, right.NetName); compare != 0 {
+			return compare
+		}
+		if compare := strings.Compare(left.Target.EndpointID, right.Target.EndpointID); compare != 0 {
+			return compare
+		}
+		return strings.Compare(left.OperationID, right.OperationID)
+	})
+	slices.SortFunc(evidence.Issues, func(left, right reports.Issue) int {
+		if compare := strings.Compare(left.Path, right.Path); compare != 0 {
+			return compare
+		}
+		if compare := strings.Compare(string(left.Code), string(right.Code)); compare != 0 {
+			return compare
+		}
+		if compare := strings.Compare(string(left.Severity), string(right.Severity)); compare != 0 {
+			return compare
+		}
+		return strings.Compare(left.Message, right.Message)
+	})
 	return evidence
 }
 

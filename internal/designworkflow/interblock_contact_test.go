@@ -116,6 +116,26 @@ func TestInterBlockContactProofJSONStable(t *testing.T) {
 	}
 }
 
+func TestInterBlockContactEvidenceOrderingIsCanonical(t *testing.T) {
+	evidence := normalizeInterBlockContactEvidence(InterBlockContactEvidence{
+		Targets: []InterBlockContactTarget{
+			{NetName: "Z", EndpointID: "2", Path: "z"},
+			{NetName: "A", EndpointID: "1", Path: "a"},
+		},
+		Proofs: []InterBlockContactProof{
+			{NetName: "Z", Target: InterBlockContactTarget{EndpointID: "2", Path: "z"}},
+			{NetName: "A", Target: InterBlockContactTarget{EndpointID: "1", Path: "a"}},
+		},
+		Issues: []reports.Issue{
+			{Path: "z", Code: reports.CodeValidationFailed, Message: "z"},
+			{Path: "a", Code: reports.CodeInvalidArgument, Message: "a"},
+		},
+	})
+	if evidence.Targets[0].NetName != "A" || evidence.Proofs[0].NetName != "A" || evidence.Issues[0].Path != "a" {
+		t.Fatalf("evidence ordering is not canonical: %#v", evidence)
+	}
+}
+
 func TestValidateInterBlockRouteEndpointContactsProvesDirectHit(t *testing.T) {
 	placed := interBlockContactPlaced("SIG", "SIG")
 	candidates := []InterBlockRouteCandidate{{

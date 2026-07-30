@@ -367,8 +367,11 @@ func TestFabricationBlockReadinessReportRequiresVerifiedEvidence(t *testing.T) {
 
 	missing := verified
 	missing.Summary = map[string]any{"block_evidence": []BlockEvidenceSummary{{BlockID: "speaker_opamp_driver", Status: "missing"}}}
-	if data, err := fabricationBlockReadinessReport(missing); err != nil || len(data) != 0 {
-		t.Fatalf("missing evidence produced readiness report: %s", data)
+	if data, err := fabricationBlockReadinessReport(missing); err == nil || len(data) != 0 {
+		t.Fatalf("missing evidence did not fail closed: data=%s err=%v", data, err)
+	}
+	if data, err := fabricationBlockReadinessReport(StageResult{}); err == nil || len(data) != 0 {
+		t.Fatalf("absent evidence did not fail closed: data=%s err=%v", data, err)
 	}
 }
 

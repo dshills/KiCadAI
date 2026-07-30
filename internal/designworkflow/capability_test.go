@@ -67,6 +67,31 @@ func TestCapabilityAssessmentRequiresOptInForUnpromotedBlock(t *testing.T) {
 	}
 }
 
+func TestCapabilityAssessmentFailsClosedWhenBlockEvidenceCannotLoad(t *testing.T) {
+	t.Setenv("KICADAI_BLOCK_VERIFICATION_ROOT", filepath.Join(t.TempDir(), "missing"))
+	definition, ok := blocks.NewBuiltinRegistry().GetBlock("led_indicator")
+	if !ok {
+		t.Fatal("missing led_indicator definition")
+	}
+	definition.ID = "evidence_load_failure_indicator"
+	registry := blocks.NewRegistry([]blocks.BlockDefinition{definition})
+	request := Request{Name: "evidence-load-failure", Blocks: []BlockInstanceSpec{{ID: "status", BlockID: definition.ID}}}
+
+	assessment, err := assessBlockRequestCapability(context.Background(), registry, request, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if assessment.Classification != capabilitygate.ClassificationUnsupported {
+		t.Fatalf("classification = %q, want unsupported: %#v", assessment.Classification, assessment)
+	}
+	if len(assessment.Gaps) == 0 || assessment.Gaps[0].Reason == "" {
+		t.Fatalf("assessment did not retain evidence-load failure: %#v", assessment)
+	}
+	if len(assessment.Evidence) == 0 || assessment.Evidence[0].Description == "" {
+		t.Fatalf("assessment did not retain typed evidence-load diagnostic: %#v", assessment)
+	}
+}
+
 func TestCreateRefusesUnsupportedRequestBeforeFilesystemMutation(t *testing.T) {
 	outputDir := filepath.Join(t.TempDir(), "must-not-exist")
 	request := Request{

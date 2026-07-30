@@ -27,6 +27,16 @@ func TestStageStatusForIssues(t *testing.T) {
 	}
 }
 
+func TestNewStageResultDefensivelyCopiesIssues(t *testing.T) {
+	issues := []reports.Issue{{Code: reports.CodeValidationFailed, Severity: reports.SeverityWarning, Message: "original"}}
+	stage := NewStageResult(StagePlacement, issues)
+	issues[0].Message = "mutated"
+	issues = append(issues, reports.Issue{Message: "later"})
+	if len(stage.Issues) != 1 || stage.Issues[0].Message != "original" {
+		t.Fatalf("stage issues alias mutable accumulator: %#v", stage.Issues)
+	}
+}
+
 func TestBuildWorkflowResultComputesFeedback(t *testing.T) {
 	result := BuildWorkflowResult(ProjectSummary{Name: "demo"}, AcceptanceConnectivity, []StageResult{
 		NewStageResult(StageSchematic, nil),

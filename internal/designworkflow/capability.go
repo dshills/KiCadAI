@@ -14,6 +14,7 @@ const (
 	CodeCapabilityUnsupported       reports.Code = "CAPABILITY_UNSUPPORTED"
 	CodeCapabilityExperimentalOptIn reports.Code = "CAPABILITY_EXPERIMENTAL_OPT_IN_REQUIRED"
 	CodeCapabilityAssessmentInvalid reports.Code = "CAPABILITY_ASSESSMENT_INVALID"
+	CodeBlockEvidenceLoadFailed     reports.Code = "BLOCK_EVIDENCE_LOAD_FAILED"
 )
 
 func assessCreateRequest(ctx context.Context, request Request, opts CreateOptions) (capabilitygate.Assessment, error) {
@@ -49,7 +50,33 @@ func assessBlockRequestCapability(ctx context.Context, registry blocks.Registry,
 		})
 		return capabilitygate.Assess(input)
 	}
-	evidenceSummaries, _ := blockEvidenceForRequest(ctx, registry, request)
+	evidenceSummaries, evidenceIssues := blockEvidenceForRequest(ctx, registry, request)
+	loadIssueIndex := 0
+	for _, issue := range evidenceIssues {
+		if issue.Code != CodeBlockEvidenceLoadFailed {
+			input.Risks = append(input.Risks, capabilitygate.Risk{
+				Code: string(issue.Code), Stage: string(StageBlockPlanning),
+				Summary: issue.Message, Mitigation: firstNonEmpty(issue.Suggestion, "repair block verification evidence"),
+			})
+			continue
+		}
+		index := loadIssueIndex
+		loadIssueIndex++
+		evidenceID := fmt.Sprintf("block-evidence-load:%d", index)
+		input.Evidence = append(input.Evidence, capabilitygate.Evidence{
+			ID: evidenceID, Kind: "block_verification", Status: capabilitygate.EvidenceFailed,
+			Source: "block-verification://load", Stage: string(StageBlockPlanning),
+			Description: issue.Message,
+		})
+		input.Requirements = append(input.Requirements, capabilitygate.Requirement{
+			Kind: capabilitygate.RequirementArchitecture, ID: evidenceID, EvidenceIDs: []string{evidenceID},
+		})
+		input.Gaps = append(input.Gaps, capabilitygate.Gap{
+			Code: string(CodeCapabilityUnsupported), Kind: capabilitygate.RequirementArchitecture,
+			ID: evidenceID, Stage: string(StageBlockPlanning), Reason: issue.Message,
+			Action: firstNonEmpty(issue.Suggestion, "restore reproducible block verification evidence"),
+		})
+	}
 	evidenceByInstance := make(map[string]BlockEvidenceSummary, len(evidenceSummaries))
 	for _, summary := range evidenceSummaries {
 		evidenceByInstance[summary.InstanceID] = summary

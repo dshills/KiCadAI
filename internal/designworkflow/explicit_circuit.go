@@ -20,7 +20,7 @@ func createExplicitCircuit(ctx context.Context, request Request, opts CreateOpti
 	planning.Summary = map[string]any{"mode": "explicit_circuit", "component_count": explicitComponentCount(request)}
 	stages := []StageResult{planning}
 	if workflowStageBlocked(planning) {
-		stages = append(stages, skippedWorkflowStages("explicit circuit validation did not complete", StageComponentSelection, StageSchematic, StageSchematicElectrical, StagePCBRealization, StagePlacement, StageRouting, StageProjectWrite, StageWriterCorrect, StageValidation, StageKiCadChecks)...)
+		stages = appendSkippedCreateStages(stages, StageBlockPlanning, "explicit circuit validation did not complete")
 		return BuildWorkflowResult(project, request.Validation.Acceptance, stages)
 	}
 
@@ -40,7 +40,7 @@ func createExplicitCircuit(ctx context.Context, request Request, opts CreateOpti
 	}
 	stages = append(stages, selection)
 	if workflowStageBlocked(selection) {
-		stages = append(stages, skippedWorkflowStages("explicit component library resolution did not complete", StageSchematic, StageSchematicElectrical, StagePCBRealization, StagePlacement, StageRouting, StageProjectWrite, StageWriterCorrect, StageValidation, StageKiCadChecks)...)
+		stages = appendSkippedCreateStages(stages, StageComponentSelection, "explicit component library resolution did not complete")
 		return BuildWorkflowResult(project, request.Validation.Acceptance, stages)
 	}
 
@@ -49,14 +49,14 @@ func createExplicitCircuit(ctx context.Context, request Request, opts CreateOpti
 	schematic.Summary = map[string]any{"operation_count": len(schematicTx.Operations), "mode": "schematic_ir"}
 	stages = append(stages, schematic)
 	if workflowStageBlocked(schematic) {
-		stages = append(stages, skippedWorkflowStages("explicit schematic generation did not complete", StageSchematicElectrical, StagePCBRealization, StagePlacement, StageRouting, StageProjectWrite, StageWriterCorrect, StageValidation, StageKiCadChecks)...)
+		stages = appendSkippedCreateStages(stages, StageSchematic, "explicit schematic generation did not complete")
 		return BuildWorkflowResult(project, request.Validation.Acceptance, stages)
 	}
 
 	electrical := schematicElectricalStageFromTransaction(schematicTx)
 	stages = append(stages, electrical)
 	if workflowStageBlocked(electrical) {
-		stages = append(stages, skippedWorkflowStages("schematic electrical rules did not pass", StagePCBRealization, StagePlacement, StageRouting, StageProjectWrite, StageWriterCorrect, StageValidation, StageKiCadChecks)...)
+		stages = appendSkippedCreateStages(stages, StageSchematicElectrical, "schematic electrical rules did not pass")
 		return BuildWorkflowResult(project, request.Validation.Acceptance, stages)
 	}
 
@@ -69,7 +69,7 @@ func createExplicitCircuit(ctx context.Context, request Request, opts CreateOpti
 	placementStageIndex := len(stages)
 	stages = append(stages, placed.Stage)
 	if workflowStageBlocked(placed.Stage) {
-		stages = append(stages, skippedWorkflowStages("explicit placement did not complete", StageRouting, StageProjectWrite, StageWriterCorrect, StageValidation, StageKiCadChecks)...)
+		stages = appendSkippedCreateStages(stages, StagePlacement, "explicit placement did not complete")
 		return BuildWorkflowResult(project, request.Validation.Acceptance, stages)
 	}
 	routingOpts := opts.Routing
@@ -79,7 +79,7 @@ func createExplicitCircuit(ctx context.Context, request Request, opts CreateOpti
 	stages[placementStageIndex] = placed.Stage
 	stages = append(stages, routed.Stage)
 	if workflowStageBlocked(routed.Stage) {
-		stages = append(stages, skippedWorkflowStages("explicit routing did not complete", StageProjectWrite, StageWriterCorrect, StageValidation, StageKiCadChecks)...)
+		stages = appendSkippedCreateStages(stages, StageRouting, "explicit routing did not complete")
 		return BuildWorkflowResult(project, request.Validation.Acceptance, stages)
 	}
 	hierarchy, hierarchyIssues := explicitCircuitHierarchy(request, opts.LibraryIndex)
@@ -88,20 +88,20 @@ func createExplicitCircuit(ctx context.Context, request Request, opts CreateOpti
 	if reports.HasBlockingIssue(projectTxIssues) {
 		writeStage := NewStageResult(StageProjectWrite, projectTxIssues)
 		stages = append(stages, writeStage)
-		stages = append(stages, skippedWorkflowStages("explicit project transaction did not complete", StageWriterCorrect, StageValidation, StageKiCadChecks)...)
+		stages = appendSkippedCreateStages(stages, StageProjectWrite, "explicit project transaction did not complete")
 		return BuildWorkflowResult(project, request.Validation.Acceptance, stages)
 	}
 
 	written := writeExplicitCircuitProject(ctx, request, tx, placed, routed, opts)
 	stages = append(stages, written.Stage)
 	if workflowStageBlocked(written.Stage) {
-		stages = append(stages, skippedWorkflowStages("project write did not complete", StageWriterCorrect, StageValidation, StageKiCadChecks)...)
+		stages = appendSkippedCreateStages(stages, StageProjectWrite, "project write did not complete")
 		return BuildWorkflowResult(project, request.Validation.Acceptance, stages)
 	}
 	writerChecked := CheckWriterCorrectnessWithOptions(ctx, &written, opts.Writer)
 	stages = append(stages, writerChecked.Stage)
 	if workflowStageBlocked(writerChecked.Stage) {
-		stages = append(stages, skippedWorkflowStages("writer correctness check did not complete", StageValidation, StageKiCadChecks)...)
+		stages = appendSkippedCreateStages(stages, StageWriterCorrect, "writer correctness check did not complete")
 		return BuildWorkflowResult(project, request.Validation.Acceptance, stages)
 	}
 	validationOpts, kicadOpts := createValidationOptions(request, opts)

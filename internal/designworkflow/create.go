@@ -227,7 +227,7 @@ func placementOptionsForCreate(opts CreateOptions, selections []ComponentSelecti
 func fabricationBlockReadinessReport(plan StageResult) ([]byte, error) {
 	evidence, ok := plan.Summary["block_evidence"].([]BlockEvidenceSummary)
 	if !ok || len(evidence) == 0 {
-		return nil, nil
+		return nil, fmt.Errorf("block verification evidence is unavailable")
 	}
 	type gate struct {
 		ID     string `json:"id"`
@@ -241,7 +241,7 @@ func fabricationBlockReadinessReport(plan StageResult) ([]byte, error) {
 	}{Status: "pass", AchievedReadiness: "pass", MatchesExpectation: true}
 	for _, item := range evidence {
 		if item.Status != "verified" {
-			return nil, nil
+			return nil, fmt.Errorf("block %q verification evidence status is %q, want verified", firstNonEmpty(item.InstanceID, item.BlockID), item.Status)
 		}
 		report.Gates = append(report.Gates, gate{ID: firstNonEmpty(item.InstanceID, item.BlockID), Status: "pass"})
 	}

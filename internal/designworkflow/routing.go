@@ -9,7 +9,6 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"time"
 
 	"kicadai/internal/blocks"
 	"kicadai/internal/placement"
@@ -46,8 +45,6 @@ const localRouteEntryAnchorSource = "pcb_realization.entry_anchor"
 const localRouteEndpointDogboneOperationRef = "local_route.endpoint_dogbone"
 
 const localRouteRebuildMaxRouterCalls = 256
-
-const localRouteRebuildMaxDuration = 30 * time.Second
 
 const (
 	defaultLocalRouteTopLayer    = "F.Cu"
@@ -2807,9 +2804,9 @@ func rebuildMovedLocalRouteOperations(ctx context.Context, base routing.Request,
 	if ctx == nil {
 		ctx = context.Background()
 	}
-	rebuildContext, cancelRebuild := context.WithTimeout(ctx, localRouteRebuildMaxDuration)
-	defer cancelRebuild()
-	ctx = rebuildContext
+	// Exploration is bounded by deterministic strategy and router-call budgets.
+	// The caller context is the outer cancellation/deadline boundary; adding an
+	// internal wall-clock cutoff would make identical inputs machine-dependent.
 	type rebuildJob struct {
 		index      int
 		authored   transactions.RouteOperation

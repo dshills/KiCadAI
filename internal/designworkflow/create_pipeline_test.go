@@ -25,3 +25,17 @@ func TestSkippedCreateStagesRejectsUnknownStage(t *testing.T) {
 		t.Fatalf("unknown stage skipped stages = %#v, want nil", stages)
 	}
 }
+
+func TestExplicitAndBlockCreateUseSameBaseStageContract(t *testing.T) {
+	for index, failed := range createPipelineStages {
+		stages := appendSkippedCreateStages(nil, failed, "characterization")
+		got := make([]StageName, 0, len(stages))
+		for _, stage := range stages {
+			got = append(got, stage.Name)
+		}
+		want := createPipelineStages[index+1:]
+		if !slices.Equal(got, want) {
+			t.Fatalf("after %s stages = %v, want shared contract %v", failed, got, want)
+		}
+	}
+}

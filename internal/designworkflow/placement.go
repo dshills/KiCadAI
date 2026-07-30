@@ -120,6 +120,8 @@ func PlaceFragments(ctx context.Context, request Request, fragments PCBFragmentR
 	result := placement.PlaceContext(ctx, placementRequest)
 	placementRequest.Keepouts = placement.TranslatedKeepoutsForPlacements(placementRequest, result.Placements)
 	issues = append(issues, result.Issues...)
+	// Issue collection is complete here. NewStageResult clones the accumulator;
+	// callers rely on that defensive copy remaining independent.
 	stage := NewStageResult(StagePlacement, issues)
 	mobilitySummary := placement.MobilitySummaryForComponents(placementRequest.Components)
 	stage.Summary = map[string]any{
@@ -142,7 +144,6 @@ func PlaceFragments(ctx context.Context, request Request, fragments PCBFragmentR
 		stage.Summary["component_hints"] = componentHintResult.Evidence
 		stage.Summary["component_hint_summary"] = SummarizeComponentHints(componentHintResult.Evidence)
 	}
-	stage.Issues = issues
 	if result.Status != placement.StatusPlaced && stage.Status == StageStatusOK {
 		stage.Status = StageStatusWarning
 	}

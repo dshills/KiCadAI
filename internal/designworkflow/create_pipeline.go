@@ -26,6 +26,10 @@ func skippedCreateStages(failed StageName, reason string) []StageResult {
 	return nil
 }
 
+func appendSkippedCreateStages(stages []StageResult, failed StageName, reason string) []StageResult {
+	return append(stages, skippedCreateStages(failed, reason)...)
+}
+
 func blockedCreateResult(request Request, opts CreateOptions, stages []StageResult, failed StageName, reason string) WorkflowResult {
 	stages = append(stages, skippedCreateStages(failed, reason)...)
 	return BuildWorkflowResult(ProjectSummary{Name: request.Name, OutputDir: opts.OutputDir}, request.Validation.Acceptance, stages)
