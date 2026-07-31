@@ -558,6 +558,49 @@ incompatible, and numerically unbounded systems fail closed. This remains
 bounded functional evidence, not arbitrary SPICE compatibility, parasitic,
 thermal, tolerance, SOA, or fabrication signoff.
 
+## Primitive Open-Topology Generation
+
+`open-topology create` is the provider-independent behavior-to-KiCad lane. The
+input is a strict `kicadai.open-topology-requirement.v1` document containing
+only external ports/domains, operating cases/events, measurable assertions,
+limits, board bounds, and acceptance gates. Component IDs, values, internal
+nets, topology labels, models, coordinates, routes, repair instructions, and
+provider/block selections are rejected.
+
+The command derives a primitive inventory from the checked-in component catalog
+and model-provenance registry, searches canonical graphs and catalog-valid
+values under explicit count budgets, evaluates every required case through the
+trusted simulator, and may apply one generic graph delta at a time in response
+to topology-neutral diagnoses. A passing graph is lowered into the normal
+design workflow and generated twice under `run-1/` and `run-2/`. Promotion
+requires routing/connectivity, writer correctness, installed-KiCad ERC, strict
+DRC, zero-difference round trip, and identical raw project hashes.
+
+```sh
+kicadai --json --overwrite \
+  --request ./requirement.json \
+  --output ./out/open-topology \
+  --catalog-dir ./data/components \
+  --symbols-root /path/to/kicad-symbols \
+  --footprints-root /path/to/kicad-footprints \
+  --kicad-cli /path/to/kicad-cli \
+  open-topology create
+```
+
+The compact JSON result reports status, stop reason, policy and evidence hashes,
+budget consumption, selected topology, replay status, project hash, and
+artifact references. Full evidence is written to:
+
+```text
+out/open-topology/.kicadai/open-topology-synthesis.json
+out/open-topology/.kicadai/open-topology-promotion.json
+```
+
+The current frozen benchmark passes six of eight cases. Two bounded searches
+fail closed with `OPEN_TOPOLOGY_REPAIR_EXHAUSTED`; they are not silently mapped
+to registered functional providers. See the
+[completion audit](../specs/simulation-guided-open-topology-synthesis/AUDIT.md).
+
 ## Generic Placement And Routing Correction
 
 After a `generic-circuit-v1` graph strict-decodes, resolves through the trusted
@@ -739,6 +782,12 @@ contains 12 paraphrase groups: 12 ready prompts representing six unique
 supported contracts, four clarification prompts, and eight unsupported
 prompts. All six supported contracts pass deterministic replay and installed-
 KiCad promotion.
+
+Open-topology generation is broader than provider selection but still bounded.
+Its measured envelope is six passing circuits across three active-family
+groups, not arbitrary electronics. Unknown models, missing catalog/package or
+rating evidence, unsupported analyses, exhausted graph/value/repair budgets,
+and failed physical gates remain blocking outcomes.
 
 For programmable-controller objectives, the catalog provider can now choose a
 verified ATmega328P-A, ESP32-WROOM-32E, or STM32G031K8T6 from capability and

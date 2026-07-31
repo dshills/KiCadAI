@@ -11,14 +11,15 @@ import (
 )
 
 const (
-	maxMNAUnknowns              = 256
-	maxOpAmpActiveSetIterations = 32
-	maxMNAMatrixValue           = 1e15
-	maxMNASolutionValue         = 1e12
-	mnaPivotTolerance           = 1e-12
-	mnaResidualTolerance        = 1e-8
-	maxMNAAnalysisWorkers       = 4
-	mnaUnobservedReferenceS     = 1e-9
+	maxMNAUnknowns               = 256
+	maxOpAmpActiveSetIterations  = 32
+	maxMNAMatrixValue            = 1e15
+	maxMNASolutionValue          = 1e12
+	mnaPivotTolerance            = 1e-12
+	mnaEliminationPivotTolerance = 1e-15
+	mnaResidualTolerance         = 1e-8
+	maxMNAAnalysisWorkers        = 4
+	mnaUnobservedReferenceS      = 1e-9
 )
 
 type mnaSystem struct {
@@ -1166,8 +1167,8 @@ func solveMNA(system mnaSystem) ([]complex128, *Diagnostic) {
 				pivot = row
 			}
 		}
-		if pivot < 0 || bestRatio < mnaPivotTolerance {
-			return nil, &Diagnostic{Path: "unknowns." + system.unknownLabels[column], Message: "MNA matrix is singular or numerically ill-conditioned at this unknown", Suggestion: "connect the floating node, add a catalog-backed DC path, verify source constraints, or correct incompatible feedback"}
+		if pivot < 0 || bestRatio < mnaEliminationPivotTolerance {
+			return nil, &Diagnostic{Path: "unknowns." + system.unknownLabels[column], Message: fmt.Sprintf("MNA matrix is singular or numerically ill-conditioned at this unknown (scaled pivot %.12g)", bestRatio), Suggestion: "connect the floating node, add a catalog-backed DC path, verify source constraints, or correct incompatible feedback"}
 		}
 		if pivot != column {
 			matrix[column], matrix[pivot] = matrix[pivot], matrix[column]
@@ -1628,13 +1629,18 @@ func assertionValue(results []AnalysisResult, assertion Assertion) (float64, *Di
 		if result.Kind == AnalysisDistortion && assertion.Quantity == QuantityTHDPercent {
 			return totalHarmonicDistortion(result, assertion)
 		}
-		if (result.Kind == AnalysisThermal || result.Kind == AnalysisElectrothermal) && (assertion.Quantity == QuantityDeviceDissipationW || assertion.Quantity == QuantityJunctionTemperatureC || assertion.Quantity == QuantityTransientSOAMargin) {
+		if (result.Kind == AnalysisThermal || result.Kind == AnalysisElectrothermal) &&
+			(assertion.Quantity == QuantityDeviceDissipationW ||
+				assertion.Quantity == QuantityJunctionTemperatureC ||
+				assertion.Quantity == QuantityTransientSOAMargin ||
+				assertion.Quantity == QuantityMaximumJunctionTemperatureC ||
+				assertion.Quantity == QuantityMinimumTransientSOAMargin) {
 			return thermalAssertionValue(result, assertion)
 		}
 		if result.Kind == AnalysisACSweep && (assertion.Quantity == QuantityVoltageGainRatio || assertion.Quantity == QuantityCutoffFrequencyHz || assertion.Quantity == QuantityBandwidthHz) {
 			return acDerivedValue(result, assertion)
 		}
-		if (result.Kind == AnalysisTransient || result.Kind == AnalysisElectrothermal) &&
+		if (result.Kind == AnalysisTransient || result.Kind == AnalysisStartup || result.Kind == AnalysisElectrothermal) &&
 			(assertion.Quantity == QuantityPeakAbsVoltageV ||
 				assertion.Quantity == QuantityPeakAbsDeviceVoltageV ||
 				assertion.Quantity == QuantityPeakAbsDeviceCurrentA ||
@@ -1649,7 +1655,19 @@ func assertionValue(results []AnalysisResult, assertion Assertion) (float64, *Di
 		if result.Kind == AnalysisDCOperatingPoint && (assertion.Quantity == QuantityDeviceCurrentA || assertion.Quantity == QuantityTotalSupplyCurrentA || assertion.Quantity == QuantityTransimpedanceOhm) {
 			return dcDeviceValue(result, assertion)
 		}
-		if result.Kind == AnalysisDCOperatingPoint && (assertion.Quantity == QuantityThresholdVoltageV || assertion.Quantity == QuantityThresholdCurrentA || assertion.Quantity == QuantityHysteresisVoltageV) {
+		if result.Kind == AnalysisDCOperatingPoint &&
+			(assertion.Quantity == QuantityDCSweepVoltageSpanV ||
+				assertion.Quantity == QuantityDCSweepDeviceSlopeAperV) {
+			return dcSweepSpanOrSlope(result, assertion)
+		}
+		if result.Kind == AnalysisDCOperatingPoint &&
+			(assertion.Quantity == QuantityThresholdVoltageV ||
+				assertion.Quantity == QuantityThresholdCurrentA ||
+				assertion.Quantity == QuantityHysteresisVoltageV ||
+				assertion.Quantity == QuantityRisingThresholdVoltageV ||
+				assertion.Quantity == QuantityFallingThresholdVoltageV ||
+				assertion.Quantity == QuantityLowerThresholdVoltageV ||
+				assertion.Quantity == QuantityUpperThresholdVoltageV) {
 			return dcSweepDerivedValue(result, assertion)
 		}
 		for _, point := range result.Points {

@@ -9,12 +9,15 @@ import (
 )
 
 const (
-	EnvelopeSchemaV1   = "kicadai.ai.intent.v1"
-	MaxPromptBytes     = 1 << 20
-	MaxResponseBytes   = 2 << 20
-	MaxDiagnostics     = 8
-	MaxDiagnosticLen   = 512
-	MaxCapabilityBytes = 64 << 10
+	EnvelopeSchemaV1 = "kicadai.ai.intent.v1"
+	MaxPromptBytes   = 1 << 20
+	MaxResponseBytes = 2 << 20
+	MaxDiagnostics   = 8
+	MaxDiagnosticLen = 512
+	// Keep capability context bounded independently from the free-form prompt,
+	// while allowing the evidence-backed catalog to grow without dropping
+	// records from the provider contract.
+	MaxCapabilityBytes = 128 << 10
 
 	DefaultReferenceOutputTokens = 8192
 	DefaultGenericOutputTokens   = 32768

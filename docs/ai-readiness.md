@@ -140,8 +140,8 @@ obligations with deterministic alternatives and rationale.
 
 All 10 adversarial circuits pass component, rating, value, tolerance, lowering,
 writer, round-trip, connectivity, routing, clean installed-KiCad ERC, and strict
-DRC gates. The current catalog contains 171 records across 33 families as of
-2026-07-28, including 156 verified records. The generic graph contract exposes
+DRC gates. The current catalog contains 248 records across 33 families as of
+2026-07-30, including 233 verified records. The generic graph contract exposes
 the supported subset of those records;
 unknown capabilities, insufficient evidence, incompatible domains, unsafe
 startup, and exceeded budgets fail closed. It does not establish unrestricted
@@ -158,6 +158,34 @@ protected USB-C LED and I2C evidence. This moves readiness from structural
 composition to measured closed-loop selection inside the checked-in catalog;
 unknown topologies, arbitrary parts/models, RF, mains, and general dense-board
 routing remain fail-closed boundaries.
+
+## Open-Topology Primitive Synthesis
+
+The open-topology lane no longer requires architecture search to select a
+registered functional fragment. It accepts the strict
+`kicadai.open-topology-requirement.v1` behavior contract, derives semantic
+external nodes, and searches canonical terminal-level graphs using only
+catalog/model-backed primitive components. Search and repair are deterministic,
+count-budgeted, and independent of fixture identity, topology names, expected
+values, coordinates, or block-family providers.
+
+The frozen eight-case benchmark covers regulated current, regulated voltage,
+signal gating, load control, hysteresis, active frequency response, sensor
+conditioning, and dual-threshold monitoring. Six cases pass all declared
+nominal, tolerance, temperature, startup, event, fault, thermal/SOA, and
+frequency-domain assertions and then pass two identical installed-KiCad
+workflows. Two cases exhaust their bounded repair budget with stable
+diagnostics. At least three active-family groups are selected, two cases retain
+multiple topologies, two selections follow failed simulation, and two passing
+graphs require a recorded topology change.
+
+This is the first measured evidence that KiCadAI can discover a valid circuit
+inside a bounded primitive design space. It remains an experimental envelope,
+not a claim of unrestricted analog synthesis, arbitrary parts or models,
+RF/high-speed design, mains/high-energy safety, dense-board routing, or
+fabrication release. See the
+[completion audit](../specs/simulation-guided-open-topology-synthesis/AUDIT.md)
+and [promotion matrix](../specs/simulation-guided-open-topology-synthesis/PROMOTION_MATRIX.json).
 
 ## Dynamic Electrothermal And Control-Loop Synthesis
 

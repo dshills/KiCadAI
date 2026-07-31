@@ -74,6 +74,7 @@ Commands:
   component     List, select, onboard, promote, and validate component catalog records
 	  circuit       Preflight or create projects from strict generic circuit graphs
   requirement   Create projects from strict behavior-only requirements
+  open-topology Discover and promote primitive circuits from behavior-only requirements
   check         Run KiCad CLI ERC/DRC checks
   design        Create AI design workflow projects
   writer        Check generated writer correctness
@@ -390,6 +391,8 @@ func (a app) run(args []string, stdout io.Writer, stderr io.Writer) error {
 		return runCircuit(ctx, opts, stdout)
 	case "requirement":
 		return runRequirement(ctx, opts, stdout)
+	case "open-topology":
+		return runOpenTopology(ctx, opts, stdout)
 	case "check":
 		return runCheckCommand(ctx, opts, stdout)
 	case "design":

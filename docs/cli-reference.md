@@ -111,6 +111,13 @@ kicadai --prompt-file ./examples/ai/generic_rc_filter/prompt.txt \
   --require-erc --require-drc --require-kicad-roundtrip \
   --strict-diffs --strict-unrouted \
   --output ./out/ai_generic_rc --overwrite design create
+kicadai --request ./behavior-only-requirement.json \
+  --output ./out/open-topology --overwrite \
+  --catalog-dir ./data/components \
+  --symbols-root /path/to/kicad-symbols \
+  --footprints-root /path/to/kicad-footprints \
+  --kicad-cli /path/to/kicad-cli \
+  open-topology create
 kicadai --request ./examples/schematic-ir/led_indicator.json schematic-ir validate
 kicadai --request ./examples/schematic-ir/led_indicator.json schematic-ir normalize
 kicadai --request ./examples/schematic-ir/led_indicator.json schematic-ir transaction
@@ -125,6 +132,24 @@ kicadai --request ./examples/design/led_indicator.json --output ./out/led_indica
 kicadai --execute --overwrite --target ./out/led_indicator --request ./out/led_indicator/.kicadai/repair-bundle.json repair apply
 kicadai --feedback transaction validate ./examples/transactions/invalid_feedback.json
 ```
+
+### Open-Topology Synthesis
+
+`open-topology create` accepts only
+`kicadai.open-topology-requirement.v1`. It rejects component, topology, model,
+internal-net, value, geometry, route, provider, and repair instructions. The
+command derives accepted primitives from the configured catalog and model
+registry, runs deterministic bounded topology/value search and trusted
+simulation, and promotes only a passing graph through the normal KiCad
+workflow twice.
+
+`--request`, `--output`, `--symbols-root`, and `--footprints-root` are required.
+An installed `kicad-cli` must be discoverable or supplied with
+`--kicad-cli`. `--overwrite` applies independently to the generated `run-1`
+and `run-2` roots. Full evidence is retained as
+`.kicadai/open-topology-synthesis.json` and
+`.kicadai/open-topology-promotion.json`; stdout returns a compact summary and
+artifact list.
 
 ### Provider-Backed Design Creation
 

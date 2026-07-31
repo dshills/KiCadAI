@@ -1,0 +1,188 @@
+{
+  "schema": "kicadai.open-topology-promotion-matrix.v1",
+  "version": 1,
+  "measured_at": "2026-07-30",
+  "base_commit": "8965a304fec2f0aae85ec57b830793204e8455df",
+  "manifest_sha256": "90a530d044693daa1a41669d26f867fd8b2a55d9e4e666e1f41a42f891e95835",
+  "policy": {
+    "max_expanded_states": 2000,
+    "max_generated_graphs": 50000,
+    "max_primitive_instances": 20,
+    "max_internal_nodes": 24,
+    "max_candidate_simulations": 50000,
+    "max_corner_evaluations": 200000,
+    "max_value_trials": 256,
+    "max_topology_repairs": 32,
+    "max_retained_candidates": 16,
+    "max_diagnostic_samples": 32
+  },
+  "summary": {
+    "total_cases": 8,
+    "simulation_passes": 6,
+    "physical_promotions": 6,
+    "stable_exhaustions": 2,
+    "primitive_active_families": 3,
+    "multiple_topology_cases_minimum": 2,
+    "selected_after_failed_simulation_minimum": 2,
+    "selected_graph_changing_repairs": 2
+  },
+  "promotion_gates": [
+    "strict_requirement_decode",
+    "primitive_only_provenance",
+    "bounded_topology_search",
+    "bounded_value_search",
+    "trusted_simulation",
+    "generic_graph_repair",
+    "schematic_electrical",
+    "placement",
+    "routing",
+    "connectivity",
+    "writer_correctness",
+    "installed_kicad_erc",
+    "installed_kicad_strict_drc",
+    "zero_difference_round_trip",
+    "clean_root_replay"
+  ],
+  "cases": [
+    {
+      "id": "adjustable_current_output",
+      "requirement_sha256": "da755a36570f3c0ddfdabd9c804234ced306b464bdbbf50201b36b3ffe297575",
+      "synthesis_status": "passed",
+      "stop_reason": "passed",
+      "synthesis_hash": "a9b3a4d3de670b0f79cd5cd2ee10486c96609d8017f6412b0036b3f370ba1028",
+      "topology_hash": "85214f14301c080e917502c84cfaf0c2f95ecca90891609de19c25c8fab53007",
+      "physical_hash": "082f1d9329c5a3413978436229c45275e0b00fdcc4ab85187a4c56e6362dce26",
+      "project_hash": "57d4cf611bd868b6b1a501816bb99c3a80eee0f8a9ff4e6a006dd151c090499e",
+      "consumption": {
+        "candidate_simulations": 30,
+        "corner_evaluations": 1040,
+        "value_trials": 1,
+        "topology_repairs": 0
+      },
+      "physical_promotion": "passed",
+      "replay_identical": true
+    },
+    {
+      "id": "adjustable_voltage_regulation",
+      "requirement_sha256": "53c48d84a154e9fa51d911e1ac306b68fe4717aaf16f1f30be89d4b6a557818c",
+      "synthesis_status": "exhausted",
+      "stop_reason": "search_exhausted",
+      "diagnostic_code": "OPEN_TOPOLOGY_REPAIR_EXHAUSTED",
+      "synthesis_hash": "e8e503ea662259c9ce273429b6055764e60ff1d0d29b9bd5ea9986a47169e3d3",
+      "consumption": {
+        "candidate_simulations": 232,
+        "corner_evaluations": 633,
+        "value_trials": 198,
+        "topology_repairs": 32
+      },
+      "physical_promotion": "not_run",
+      "replay_identical": true
+    },
+    {
+      "id": "audio_mute",
+      "requirement_sha256": "7b82c31458b5d05bcf0e3e3ed3ec2d0a1ac76e87112480dc41ddbf5b4c4a65c6",
+      "synthesis_status": "passed",
+      "stop_reason": "passed",
+      "synthesis_hash": "ccb8b21d3aa7e2a7d07ba6db442e014cb94b3eb365025a2bcaafbc5e6de11256",
+      "topology_hash": "5aa5911951fec2a15729d6b0918e92c8d6de9fea7f200d28af02aaa1aa80e4fc",
+      "physical_hash": "6e611b53503912bcd1c0a9c71b87500f0b2118d42dba23aeb35fbf284c3efa37",
+      "project_hash": "5e2cca37b2347b918a52859ac964f8cfc3618cd51ca360c7665c1a9719e99525",
+      "consumption": {
+        "candidate_simulations": 21,
+        "corner_evaluations": 1638,
+        "value_trials": 1,
+        "topology_repairs": 0
+      },
+      "physical_promotion": "passed",
+      "replay_identical": true
+    },
+    {
+      "id": "ground_referenced_load_control",
+      "requirement_sha256": "12a6545ee01b95822fff8736f3f6308d8bb68450d683fa58b0a06bdebb6a5e11",
+      "synthesis_status": "passed",
+      "stop_reason": "passed",
+      "synthesis_hash": "022684d8eea708556fa31dddf6b89a9194b464c1c59f51965be336737e54f350",
+      "topology_hash": "4bcc3f2dc56520a2ba8339cd8016e9154a24fb3026049f0de65db0f5f6fb8d23",
+      "physical_hash": "64c5ec4be9c376a274ac9754fe8c49af695c85d784f749c7bb0017132aa1e261",
+      "project_hash": "2ffde98def686b0c590cfa94053ef10f75c08f0ce9bb3ef3d7596166d455e662",
+      "consumption": {
+        "candidate_simulations": 32,
+        "corner_evaluations": 2419,
+        "value_trials": 2,
+        "topology_repairs": 0
+      },
+      "physical_promotion": "passed",
+      "replay_identical": true
+    },
+    {
+      "id": "hysteretic_detector",
+      "requirement_sha256": "d9638f2c9bd7863e0f7fc88b382b5f66020cf55a11a359cc7a751f3ab7c74a8b",
+      "synthesis_status": "passed",
+      "stop_reason": "passed",
+      "synthesis_hash": "255f61038c3ff4285d71c8e3b199935890932d326ee865c7bd357184ec218b6d",
+      "topology_hash": "cde549677b77c5f04c39051bcc8abcc48f1cdd99fd908a41e97b5865f329549b",
+      "physical_hash": "2aad48fa47d7675e469c3726a7db256e4ad061bfb4de0d6dcc2841c1b4e75257",
+      "project_hash": "93ecdcdff596976392422a1efb888160e33d0f28049f13d19e07b183a6f65c8b",
+      "consumption": {
+        "candidate_simulations": 153,
+        "corner_evaluations": 3116,
+        "value_trials": 64,
+        "topology_repairs": 0
+      },
+      "physical_promotion": "passed",
+      "replay_identical": true
+    },
+    {
+      "id": "powered_lowpass",
+      "requirement_sha256": "775e70c0bf1f52ae58bacc49cb4fb72a5819dd68a73fda9c424464cacdd86399",
+      "synthesis_status": "passed",
+      "stop_reason": "passed",
+      "synthesis_hash": "96b83262e85c11a3ae6697ae4b56a329614222b8fcb38177c647f8b01d27ca28",
+      "topology_hash": "f79a8e779397fbf72b01775e42eece053070ba4cdd938776a968700a647db2b9",
+      "physical_hash": "360b134ce82d5ca9cc4acaeba078b8daded7406a29517ea0601ac6e70f27b19a",
+      "project_hash": "74a4d2bf2582705a39ca95d7e44df662757f36f31101754b48908eef583381d3",
+      "consumption": {
+        "candidate_simulations": 85,
+        "corner_evaluations": 2192,
+        "value_trials": 37,
+        "topology_repairs": 6
+      },
+      "physical_promotion": "passed",
+      "replay_identical": true
+    },
+    {
+      "id": "sensor_conditioner",
+      "requirement_sha256": "c565570c12273e508c6db6afd1eec45cb89b15df58b997999f31d5c29ee38b21",
+      "synthesis_status": "passed",
+      "stop_reason": "passed",
+      "synthesis_hash": "654bf416c4559de63f63c61d8d94d9eb8d74196940897c8319fa87676a116ed1",
+      "topology_hash": "26d2669d062e86503bcad39e38a184dbf7da7bde26e8bd4c0b7f61da070790b0",
+      "physical_hash": "5cec03e8912ff5d14e3b78852667e7b2f072422f3055a3d608bdec298a840f6c",
+      "project_hash": "011d1c2cb231e6b75c88a6c77430287e4a2b21338788d8b42d7527264dd36d6c",
+      "consumption": {
+        "candidate_simulations": 83,
+        "corner_evaluations": 2018,
+        "value_trials": 39,
+        "topology_repairs": 6
+      },
+      "physical_promotion": "passed",
+      "replay_identical": true
+    },
+    {
+      "id": "voltage_window_monitor",
+      "requirement_sha256": "a31c72172e1de76d25cd98e20e783676c349af9f777517170e46d906e736dd5f",
+      "synthesis_status": "exhausted",
+      "stop_reason": "search_exhausted",
+      "diagnostic_code": "OPEN_TOPOLOGY_REPAIR_EXHAUSTED",
+      "synthesis_hash": "60caafa33369b80a797f76be93b226a9fa6703bc056c642a45cac3ca4ad646d7",
+      "consumption": {
+        "candidate_simulations": 283,
+        "corner_evaluations": 4287,
+        "value_trials": 231,
+        "topology_repairs": 32
+      },
+      "physical_promotion": "not_run",
+      "replay_identical": true
+    }
+  ]
+}

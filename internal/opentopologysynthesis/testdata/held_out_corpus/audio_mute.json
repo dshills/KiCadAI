@@ -1,0 +1,51 @@
+{
+  "schema": "kicadai.open-topology-requirement.v1",
+  "version": 1,
+  "project": {
+    "name": "audio_mute",
+    "title": "Audio muting signal path",
+    "description": "Pass a line-level audio signal when enabled, strongly attenuate it when muted, and avoid an excessive output transient during state changes."
+  },
+  "requirements": {
+    "domains": [
+      {"id": "ground", "kind": "reference", "nominal_voltage_v": 0, "source": "external"},
+      {"id": "supply", "kind": "supply", "min_voltage_v": 10.8, "nominal_voltage_v": 12, "max_voltage_v": 13.2, "max_current_a": 0.04, "source": "external"}
+    ],
+    "ports": [
+      {"id": "ground", "kind": "reference", "direction": "bidirectional", "domain": "ground"},
+      {"id": "power", "kind": "power", "direction": "sink", "domain": "supply"},
+      {"id": "audio_input", "kind": "analog_voltage", "direction": "sink", "domain": "ground", "electrical": {"min_voltage_v": -1, "nominal_voltage_v": 0, "max_voltage_v": 1, "input_impedance_min_ohm": 20000}},
+      {"id": "mute_control", "kind": "digital", "direction": "sink", "domain": "ground", "electrical": {"min_voltage_v": 0, "max_voltage_v": 5, "default_state": "high"}},
+      {"id": "audio_output", "kind": "analog_voltage", "direction": "source", "domain": "ground", "electrical": {"min_voltage_v": -1.2, "nominal_voltage_v": 0, "max_voltage_v": 1.2}}
+    ],
+    "operating_cases": [
+      {"id": "enabled", "conditions": [{"axis": "input_voltage", "target": "mute_control", "min": 0, "max": 0.3, "unit": "V"}, {"axis": "load_resistance", "target": "audio_output", "min": 10000, "max": 100000, "unit": "ohm"}]},
+      {"id": "muted", "conditions": [{"axis": "input_voltage", "target": "mute_control", "min": 4.5, "max": 5, "unit": "V"}, {"axis": "load_resistance", "target": "audio_output", "min": 10000, "max": 100000, "unit": "ohm"}]},
+      {"id": "transition", "conditions": [{"axis": "input_voltage", "target": "audio_input", "min": 0, "max": 0, "unit": "V"}], "events": [{"id": "mute_change", "kind": "input_step", "target": "mute_control", "trigger_time_s": 0.01, "initial": 0, "applied": 5, "unit": "V"}]}
+    ],
+    "behavioral_requirements": [
+      {"id": "enabled_transfer", "metric": "voltage_gain", "analysis": "ac_sweep", "excitation": {"kind": "port", "id": "audio_input"}, "observation": {"kind": "port", "id": "audio_output"}, "min": 0.95, "max": 1.05, "unit": "ratio", "operating_cases": ["enabled"]},
+      {"id": "muted_transfer", "metric": "voltage_gain", "analysis": "ac_sweep", "excitation": {"kind": "port", "id": "audio_input"}, "observation": {"kind": "port", "id": "audio_output"}, "max": 0.01, "unit": "ratio", "operating_cases": ["muted"]},
+      {"id": "enabled_distortion", "metric": "thd", "analysis": "distortion", "excitation": {"kind": "port", "id": "audio_input"}, "observation": {"kind": "port", "id": "audio_output"}, "max": 0.005, "unit": "ratio", "frequency_hz": 1000, "operating_cases": ["enabled"]},
+      {"id": "switching_transient", "metric": "peak_voltage", "analysis": "transient", "excitation": {"kind": "port", "id": "mute_control"}, "observation": {"kind": "port", "id": "audio_output"}, "max": 0.05, "unit": "V", "operating_cases": ["transition"]},
+      {"id": "startup_muted", "metric": "startup_output_voltage", "analysis": "startup", "observation": {"kind": "port", "id": "audio_output"}, "min": -0.05, "max": 0.05, "unit": "V", "operating_cases": ["muted"], "critical": true}
+    ],
+    "constraints": {"max_components": 14, "max_width_mm": 55, "max_height_mm": 40}
+  },
+  "acceptance": {
+    "require_primitive_only": true,
+    "require_topology_search": true,
+    "require_simulation": true,
+    "require_all_corners": true,
+    "require_model_provenance": true,
+    "require_closed_loop_evidence": true,
+    "require_complete_routing": true,
+    "require_connectivity": true,
+    "require_writer_correctness": true,
+    "require_round_trip_zero_diff": true,
+    "require_erc": true,
+    "require_strict_drc": true,
+    "require_deterministic_replay": true,
+    "require_fail_closed": true
+  }
+}

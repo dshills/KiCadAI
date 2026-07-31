@@ -138,16 +138,16 @@ AI generation coverage gaps are tracked in `data/ai-readiness/`; see
 
 ## Testing
 
-Normal tests do not require KiCad:
+The bounded local suite does not require KiCad:
 
 ```sh
-make test
+make GO_TEST_FLAGS=-short test
 ```
 
 Equivalent direct command:
 
 ```sh
-go test ./...
+go test -short ./... -timeout 20m
 ```
 
 The Makefile keeps Go build, module, and lint caches under one ignored root,
@@ -155,7 +155,7 @@ The Makefile keeps Go build, module, and lint caches under one ignored root,
 read-only or when an ephemeral cache is preferred:
 
 ```sh
-make GO_CACHE_ROOT=/tmp/kicadai-go-cache test
+make GO_CACHE_ROOT=/tmp/kicadai-go-cache GO_TEST_FLAGS=-short test
 ```
 
 Coverage:
@@ -176,6 +176,12 @@ adversarial-multi-function, and simulation-grounded—run in separate matrix
 jobs through `make test-one`. This keeps the coverage job bounded while still
 requiring those three established end-to-end corpora on pull requests and
 pushes to `main`.
+
+Do not use one monolithic non-short `go test ./...` result as the promotion
+receipt. Several long corpora share `internal/compositionlowering` and can
+exceed a package timeout when serialized. Run the bounded suite plus the named
+`make test-one` lanes, using `KICADAI_PROMOTION_SHARD` where the workflow matrix
+declares shards. This preserves every case and matches the required workflow.
 The independent external-review ladder is also a required job. Run its six
 positive scenarios and four fail-closed cases twice with:
 

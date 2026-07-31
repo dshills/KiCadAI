@@ -712,6 +712,62 @@
       }
     },
     {
+      "catalog_id": "capacitor.kemet.c1210k153f5eml.1210",
+      "family": "capacitor",
+      "model_id": "mna_capacitor_transient_be_v1",
+      "provenance": {
+        "source": "https://content.kemet.com/datasheets/KEM_C1095_MIL-PRF-32535.pdf",
+        "revision": "KEMET MIL-PRF-32535 C0G data sheet C1095, 15 nF 1% 50 V 1210 ordering table reviewed 2026-07-30",
+        "sha256": "19f725a7b01f981f33aeb7446e16f61398116168eea4ac05a70e2146bee8c049",
+        "review_status": "reviewed",
+        "allowed_analyses": [
+          "dc_operating_point",
+          "distortion",
+          "startup",
+          "thermal",
+          "transient"
+        ],
+        "min_temperature_c": -55,
+        "max_temperature_c": 125
+      }
+    },
+    {
+      "catalog_id": "capacitor.kemet.c1210k153f5eml.1210",
+      "family": "capacitor",
+      "model_id": "mna_capacitor_v1",
+      "provenance": {
+        "source": "https://content.kemet.com/datasheets/KEM_C1095_MIL-PRF-32535.pdf",
+        "revision": "KEMET MIL-PRF-32535 C0G data sheet C1095, 15 nF 1% 50 V 1210 ordering table reviewed 2026-07-30",
+        "sha256": "ef0b29d721870e25f9e49b43cfbcf2510a7136e6ba50da1ad0da0c7b1360d226",
+        "review_status": "reviewed",
+        "allowed_analyses": [
+          "ac_sweep",
+          "dc_operating_point",
+          "noise",
+          "stability",
+          "thermal"
+        ],
+        "min_temperature_c": -55,
+        "max_temperature_c": 125
+      }
+    },
+    {
+      "catalog_id": "capacitor.kemet.c1210k153f5eml.1210",
+      "family": "capacitor",
+      "model_id": "rc_lowpass_ac_v1",
+      "provenance": {
+        "source": "https://content.kemet.com/datasheets/KEM_C1095_MIL-PRF-32535.pdf",
+        "revision": "KEMET MIL-PRF-32535 C0G data sheet C1095, 15 nF 1% 50 V 1210 ordering table reviewed 2026-07-30",
+        "sha256": "fa3f2e5de7f34219b8f1fc7438ba14793c99a4d789173cf53db1045f42accca8",
+        "review_status": "reviewed",
+        "allowed_analyses": [
+          "ac_sweep"
+        ],
+        "min_temperature_c": -55,
+        "max_temperature_c": 125
+      }
+    },
+    {
       "catalog_id": "capacitor.murata.gcm21br71h105ka03l.0805",
       "family": "capacitor",
       "model_id": "mna_capacitor_transient_be_v1",
@@ -2516,6 +2572,20 @@
       }
     },
     {
+      "catalog_id": "resistor.vishay.cpf3.10r.0p1.axial",
+      "family": "resistor",
+      "model_id": "mna_resistor_v1",
+      "provenance": {
+        "source": "https://www.vishay.com/docs/31021/cpf.pdf",
+        "revision": "vishay:CPF3:31021:2025-05-26",
+        "sha256": "ed2413ddd37969961f8ad017ba272c18c42228660e14a5757b6b788f4326cf61",
+        "review_status": "reviewed",
+        "allowed_analyses": ["ac_sweep", "dc_operating_point", "distortion", "noise", "stability", "startup", "thermal", "transient"],
+        "min_temperature_c": -65,
+        "max_temperature_c": 230
+      }
+    },
+    {
       "catalog_id": "resistor.vishay.pr02.1k00.2w",
       "family": "resistor",
       "model_id": "mna_resistor_v1",
@@ -2614,6 +2684,20 @@
       }
     },
     {
+      "catalog_id": "resistor.vishay.tnpw0805.4k99.0p1",
+      "family": "resistor",
+      "model_id": "mna_resistor_v1",
+      "provenance": {
+        "source": "https://www.vishay.com/docs/28758/tnpw_e3.pdf",
+        "revision": "vishay:TNPW-e3:2025-01",
+        "sha256": "ed2413ddd37969961f8ad017ba272c18c42228660e14a5757b6b788f4326cf61",
+        "review_status": "reviewed",
+        "allowed_analyses": ["ac_sweep", "dc_operating_point", "distortion", "noise", "stability", "startup", "thermal", "transient"],
+        "min_temperature_c": -55,
+        "max_temperature_c": 175
+      }
+    },
+    {
       "catalog_id": "resistor.vishay.tnpw0805.10k0.0p1",
       "family": "resistor",
       "model_id": "mna_resistor_v1",
@@ -2643,6 +2727,62 @@
     },
     {
       "catalog_id": "resistor.vishay.tnpw0805.12k5.0p1",
+      "family": "resistor",
+      "model_id": "mna_resistor_v1",
+      "provenance": {
+        "source": "https://www.vishay.com/docs/28758/tnpw_e3.pdf",
+        "revision": "vishay:TNPW-e3:2025-01",
+        "sha256": "ed2413ddd37969961f8ad017ba272c18c42228660e14a5757b6b788f4326cf61",
+        "review_status": "reviewed",
+        "allowed_analyses": ["ac_sweep", "dc_operating_point", "distortion", "noise", "stability", "startup", "thermal", "transient"],
+        "min_temperature_c": -55,
+        "max_temperature_c": 175
+      }
+    },
+    {
+      "catalog_id": "resistor.vishay.tnpw0805.13k3.0p1",
+      "family": "resistor",
+      "model_id": "mna_resistor_v1",
+      "provenance": {
+        "source": "https://www.vishay.com/docs/28758/tnpw_e3.pdf",
+        "revision": "vishay:TNPW-e3:2025-01",
+        "sha256": "ed2413ddd37969961f8ad017ba272c18c42228660e14a5757b6b788f4326cf61",
+        "review_status": "reviewed",
+        "allowed_analyses": ["ac_sweep", "dc_operating_point", "distortion", "noise", "stability", "startup", "thermal", "transient"],
+        "min_temperature_c": -55,
+        "max_temperature_c": 175
+      }
+    },
+    {
+      "catalog_id": "resistor.vishay.tnpw0805.15k0.0p1",
+      "family": "resistor",
+      "model_id": "mna_resistor_v1",
+      "provenance": {
+        "source": "https://www.vishay.com/docs/28758/tnpw_e3.pdf",
+        "revision": "vishay:TNPW-e3:2025-01",
+        "sha256": "ed2413ddd37969961f8ad017ba272c18c42228660e14a5757b6b788f4326cf61",
+        "review_status": "reviewed",
+        "allowed_analyses": ["ac_sweep", "dc_operating_point", "distortion", "noise", "stability", "startup", "thermal", "transient"],
+        "min_temperature_c": -55,
+        "max_temperature_c": 175
+      }
+    },
+    {
+      "catalog_id": "resistor.vishay.tnpw0805.90k9.0p1",
+      "family": "resistor",
+      "model_id": "mna_resistor_v1",
+      "provenance": {
+        "source": "https://www.vishay.com/docs/28758/tnpw_e3.pdf",
+        "revision": "vishay:TNPW-e3:2025-01",
+        "sha256": "ed2413ddd37969961f8ad017ba272c18c42228660e14a5757b6b788f4326cf61",
+        "review_status": "reviewed",
+        "allowed_analyses": ["ac_sweep", "dc_operating_point", "distortion", "noise", "stability", "startup", "thermal", "transient"],
+        "min_temperature_c": -55,
+        "max_temperature_c": 175
+      }
+    },
+    {
+      "catalog_id": "resistor.vishay.tnpw0805.169k.0p1",
       "family": "resistor",
       "model_id": "mna_resistor_v1",
       "provenance": {

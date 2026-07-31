@@ -390,21 +390,49 @@ func dcDeviceValue(result AnalysisResult, assertion Assertion) (float64, *Diagno
 }
 
 func dcSweepDerivedValue(result AnalysisResult, assertion Assertion) (float64, *Diagnostic) {
-	forward, diagnostic := dcSweepTransition(result, assertion, dcSweepForward)
-	if diagnostic != nil {
-		return 0, diagnostic
+	switch assertion.Quantity {
+	case QuantityFallingThresholdVoltageV:
+		return dcSweepTransition(result, assertion, dcSweepReverse)
+	case QuantityLowerThresholdVoltageV, QuantityUpperThresholdVoltageV:
+		transitions, diagnostic := dcSweepTransitions(result, assertion, dcSweepForward)
+		if diagnostic != nil {
+			return 0, diagnostic
+		}
+		if len(transitions) < 2 {
+			return 0, advancedAssertionDiagnostic(assertion, "ordered threshold assertion requires at least two unambiguous decision transitions")
+		}
+		if assertion.Quantity == QuantityLowerThresholdVoltageV {
+			return normalizedMNAFloat(transitions[0]), nil
+		}
+		return normalizedMNAFloat(transitions[len(transitions)-1]), nil
+	default:
+		forward, diagnostic := dcSweepTransition(result, assertion, dcSweepForward)
+		if diagnostic != nil {
+			return 0, diagnostic
+		}
+		if assertion.Quantity != QuantityHysteresisVoltageV {
+			return forward, nil
+		}
+		reverse, diagnostic := dcSweepTransition(result, assertion, dcSweepReverse)
+		if diagnostic != nil {
+			return 0, diagnostic
+		}
+		return normalizedMNAFloat(math.Abs(forward - reverse)), nil
 	}
-	if assertion.Quantity != QuantityHysteresisVoltageV {
-		return forward, nil
-	}
-	reverse, diagnostic := dcSweepTransition(result, assertion, dcSweepReverse)
-	if diagnostic != nil {
-		return 0, diagnostic
-	}
-	return normalizedMNAFloat(math.Abs(forward - reverse)), nil
 }
 
 func dcSweepTransition(result AnalysisResult, assertion Assertion, direction string) (float64, *Diagnostic) {
+	transitions, diagnostic := dcSweepTransitions(result, assertion, direction)
+	if diagnostic != nil {
+		return 0, diagnostic
+	}
+	if len(transitions) != 1 {
+		return 0, advancedAssertionDiagnostic(assertion, "DC sweep must contain exactly one unambiguous decision transition in each required direction")
+	}
+	return normalizedMNAFloat(transitions[0]), nil
+}
+
+func dcSweepTransitions(result AnalysisResult, assertion Assertion, direction string) ([]float64, *Diagnostic) {
 	type sample struct {
 		sweep  float64
 		output float64
@@ -427,9 +455,9 @@ func dcSweepTransition(result AnalysisResult, assertion Assertion, direction str
 	}
 	if len(samples) < 3 || !finite(minimum) || !finite(maximum) || maximum-minimum <= 1e-9*math.Max(1, math.Max(math.Abs(minimum), math.Abs(maximum))) {
 		if len(samples) >= 3 && finite(minimum) && finite(maximum) {
-			return censoredDCSweepAssertionValue(minimumSweep, maximumSweep, assertion), nil
+			return []float64{censoredDCSweepAssertionValue(minimumSweep, maximumSweep, assertion)}, nil
 		}
-		return 0, advancedAssertionDiagnostic(assertion, fmt.Sprintf("DC sweep output does not contain enough finite decision samples (samples=%d, output_min=%.12g, output_max=%.12g)", len(samples), minimum, maximum))
+		return nil, advancedAssertionDiagnostic(assertion, fmt.Sprintf("DC sweep output does not contain enough finite decision samples (samples=%d, output_min=%.12g, output_max=%.12g)", len(samples), minimum, maximum))
 	}
 	midpoint := minimum + .5*(maximum-minimum)
 	transitions := make([]float64, 0, 1)
@@ -449,10 +477,51 @@ func dcSweepTransition(result AnalysisResult, assertion Assertion, direction str
 			transitions = append(transitions, left.sweep+fraction*(right.sweep-left.sweep))
 		}
 	}
-	if len(transitions) != 1 {
-		return 0, advancedAssertionDiagnostic(assertion, "DC sweep must contain exactly one unambiguous decision transition in each required direction")
+	return transitions, nil
+}
+
+func dcSweepSpanOrSlope(result AnalysisResult, assertion Assertion) (float64, *Diagnostic) {
+	minimumSweep, maximumSweep := math.Inf(1), math.Inf(-1)
+	minimumValue, maximumValue := 0.0, 0.0
+	minimumObserved, maximumObserved := math.Inf(1), math.Inf(-1)
+	found := false
+	for _, point := range result.Points {
+		if point.Sweep != "" && point.Sweep != dcSweepForward {
+			continue
+		}
+		value, valueFound := 0.0, false
+		switch assertion.Quantity {
+		case QuantityDCSweepVoltageSpanV:
+			value, valueFound = analysisNodeReal(point, assertion.Node)
+		case QuantityDCSweepDeviceSlopeAperV:
+			for _, device := range point.Devices {
+				if device.Component == assertion.Component {
+					value, valueFound = device.CurrentMagnitudeA, true
+					break
+				}
+			}
+		}
+		if !valueFound {
+			continue
+		}
+		minimumObserved = math.Min(minimumObserved, value)
+		maximumObserved = math.Max(maximumObserved, value)
+		if !found || point.SweepValue < minimumSweep {
+			minimumSweep, minimumValue = point.SweepValue, value
+		}
+		if !found || point.SweepValue > maximumSweep {
+			maximumSweep, maximumValue = point.SweepValue, value
+		}
+		found = true
 	}
-	return normalizedMNAFloat(transitions[0]), nil
+	if !found || !finite(minimumSweep) || !finite(maximumSweep) || maximumSweep-minimumSweep <= 1e-15 {
+		return 0, advancedAssertionDiagnostic(assertion, "DC sweep span/slope assertion requires two finite solved sweep endpoints")
+	}
+	if assertion.Quantity == QuantityDCSweepVoltageSpanV {
+		return normalizedMNAFloat(maximumObserved - minimumObserved), nil
+	}
+	slope := math.Abs(maximumValue-minimumValue) / (maximumSweep - minimumSweep)
+	return normalizedMNAFloat(slope), nil
 }
 
 func censoredDCSweepAssertionValue(minimumSweep, maximumSweep float64, assertion Assertion) float64 {

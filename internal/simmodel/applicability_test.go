@@ -19,6 +19,9 @@ func TestApplicableGraphModelRequiresCompleteTrustedTopology(t *testing.T) {
 	if model, ok, reason := ApplicableGraphModelForAnalysis(nonlinear, AnalysisACSweep); !ok || model != ModelLinearCircuitMNAV1 {
 		t.Fatalf("nonlinear small-signal applicability = %q, %t, %s", model, ok, reason)
 	}
+	if model, ok, reason := ApplicableGraphModelForAnalysis(nonlinear, AnalysisDCOperatingPoint); !ok || model != ModelNonlinearCircuitDCV1 {
+		t.Fatalf("nonlinear DC applicability = %q, %t, %s", model, ok, reason)
+	}
 	mixed := append([]ComponentEvidence(nil), nonlinear...)
 	mixed = append(mixed, ComponentEvidence{InstanceID: "amplifier", Family: "opamp", ModelClaims: []CatalogEvidence{{ModelID: PrimitiveOpAmpV1}}, Connections: []ConnectionEvidence{{Function: "OUT", Net: "VCC"}}})
 	if model, ok, _ := ApplicableGraphModel(mixed); !ok || model != ModelNonlinearCircuitDCV1 {

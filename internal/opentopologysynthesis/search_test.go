@@ -1,0 +1,928 @@
+package opentopologysynthesis
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"math"
+	"path/filepath"
+	"slices"
+	"strings"
+	"testing"
+)
+
+func TestPrimitiveTopologySearchIsBoundedDeterministicAndProviderIndependent(t *testing.T) {
+	requirement := testOpenTopologyRequirement(t, "powered_lowpass.json")
+	inventory := testSearchInventory()
+	policy := DefaultPolicy()
+	policy.MaxExpandedStates = 600
+	policy.MaxGeneratedGraphs = 6_000
+	policy.MaxPrimitiveInstances = 6
+	policy.MaxInternalNodes = 2
+	policy.MaxRetainedCandidates = 6
+
+	first := SearchPrimitiveTopologies(context.Background(), requirement, inventory, policy)
+	if first.Status != TopologySearchCandidates || len(first.Candidates) < 2 || len(first.Candidates) > policy.MaxRetainedCandidates {
+		t.Fatalf("first search status/candidates = %s/%d, consumption=%#v issues=%#v", first.Status, len(first.Candidates), first.Consumption, first.Issues)
+	}
+	if first.RequirementHash == "" || first.InventoryHash != inventory.Hash ||
+		first.Consumption.ExpandedStates <= 0 ||
+		first.Consumption.GeneratedGraphs <= 0 ||
+		first.Consumption.CompleteGraphs < len(first.Candidates) {
+		t.Fatalf("search identity/consumption = %#v", first.Consumption)
+	}
+	dominanceRecorded := false
+	for _, rejection := range first.Rejections {
+		if rejection.Code == "dominated_topology" && rejection.Count > 0 && len(rejection.Samples) > 0 {
+			dominanceRecorded = true
+		}
+	}
+	if !dominanceRecorded && first.Consumption.ExpandedStates > 1 {
+		t.Fatal("multi-state search did not record a canonical dominance proof")
+	}
+	topologies := map[string]bool{}
+	for _, candidate := range first.Candidates {
+		if candidate.Fingerprint == "" || candidate.TopologyHash == "" || topologies[candidate.TopologyHash] {
+			t.Fatalf("candidate identity is empty or duplicate: %#v", candidate)
+		}
+		topologies[candidate.TopologyHash] = true
+		if issues := ValidateCompleteGraph(candidate.Graph, inventory, GraphLimits{
+			MaxPrimitiveInstances: policy.MaxPrimitiveInstances,
+			MaxInternalNodes:      policy.MaxInternalNodes,
+		}); len(issues) != 0 {
+			t.Fatalf("candidate %s is not complete: %#v", candidate.Fingerprint, issues)
+		}
+		if len(candidate.Operations) == 0 {
+			t.Fatalf("candidate %s lacks operation evidence", candidate.Fingerprint)
+		}
+		for index, operation := range candidate.Operations {
+			if operation.Number != index+1 || operation.BeforeHash == "" || operation.AfterHash == "" ||
+				(operation.Kind != "add_primitive" &&
+					operation.Kind != "add_internal_node" &&
+					operation.Kind != "redirect_terminal") {
+				t.Fatalf("candidate %s invalid operation: %#v", candidate.Fingerprint, operation)
+			}
+		}
+	}
+
+	second := SearchPrimitiveTopologies(context.Background(), requirement, inventory, policy)
+	firstJSON, err := json.Marshal(first)
+	if err != nil {
+		t.Fatal(err)
+	}
+	secondJSON, err := json.Marshal(second)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(firstJSON, secondJSON) {
+		t.Fatalf("repeated search differs:\n%s\n%s", firstJSON, secondJSON)
+	}
+
+	reordered := inventory
+	reordered.Primitives = append([]PrimitiveCandidate(nil), inventory.Primitives...)
+	slices.Reverse(reordered.Primitives)
+	third := SearchPrimitiveTopologies(context.Background(), requirement, reordered, policy)
+	thirdJSON, err := json.Marshal(third)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(firstJSON, thirdJSON) {
+		t.Fatalf("search depends on inventory order:\n%s\n%s", firstJSON, thirdJSON)
+	}
+
+	lower := strings.ToLower(string(firstJSON))
+	for _, prohibited := range []string{"provider_id", "expansion_id", "sallen", "schmitt", "common_emitter"} {
+		if strings.Contains(lower, prohibited) {
+			t.Fatalf("search evidence contains pre-authored identity %q", prohibited)
+		}
+	}
+}
+
+func TestBehaviorScoringRecognizesGenericBufferedTimeConstant(t *testing.T) {
+	requirement := testOpenTopologyRequirement(t, "powered_lowpass.json")
+	inventory, _ := testHeldOutSynthesisEnvironment(t)
+	representatives := topologyRepresentatives(requirement, inventory)
+	byKind := map[string]PrimitiveCandidate{}
+	for _, primitive := range representatives {
+		byKind[primitive.Kind] = primitive
+	}
+	opamp, opampFound := byKind["opamp"]
+	resistor, resistorFound := byKind["resistor"]
+	capacitor, capacitorFound := byKind["capacitor"]
+	if !opampFound || !resistorFound || !capacitorFound {
+		t.Fatalf("missing generic primitives: opamp=%t resistor=%t capacitor=%t",
+			opampFound, resistorFound, capacitorFound)
+	}
+	graph, issues := InitialGraph(requirement)
+	if len(issues) != 0 {
+		t.Fatalf("initial graph issues: %#v", issues)
+	}
+	beforeInternal := graph
+	graph = AddInternalNode(graph, "internal")
+	internal := requireAddedNodeID(t, beforeInternal, graph)
+	preferredPlacements := primitivePlacements(graph, opamp, maxPrimitivePlacementsPerKind)
+	foundPreferredPlacement := false
+	for _, placement := range preferredPlacements {
+		terminals := map[string]string{}
+		for _, connection := range placement {
+			terminals[connection.Terminal] = connection.Node
+		}
+		if terminals["IN_MINUS"] == internal &&
+			terminals["IN_PLUS"] == "port_ground" &&
+			terminals["OUT"] == "port_output" {
+			foundPreferredPlacement = true
+		}
+	}
+	if !foundPreferredPlacement {
+		t.Fatalf("generic endpoint preference omitted closed-loop placement: %#v", preferredPlacements)
+	}
+	graph = AddPrimitive(graph, opamp, nil, []TerminalConnection{
+		{Terminal: "IN_MINUS", Node: internal},
+		{Terminal: "IN_PLUS", Node: "port_ground"},
+		{Terminal: "OUT", Node: "port_output"},
+		{Terminal: "V_MINUS", Node: "port_ground"},
+		{Terminal: "V_PLUS", Node: "port_power"},
+	})
+	reactivePlacements := primitivePlacements(
+		graph,
+		capacitor,
+		maxPrimitivePlacementsPerKind,
+	)
+	foundFeedbackPlacement := false
+	for _, placement := range reactivePlacements {
+		if topologyPlacementBridgesActiveFeedback(graph, placement) {
+			foundFeedbackPlacement = true
+			break
+		}
+	}
+	if !foundFeedbackPlacement {
+		t.Fatalf(
+			"generic passive placement omitted active feedback branch: %#v",
+			reactivePlacements,
+		)
+	}
+	incidental := CloneGraph(graph)
+	incidental = AddPrimitive(
+		incidental,
+		resistor,
+		seedPrimitiveValue(resistor),
+		[]TerminalConnection{
+			{Terminal: "A", Node: internal},
+			{Terminal: "B", Node: "port_output"},
+		},
+	)
+	incidental = AddPrimitive(
+		incidental,
+		capacitor,
+		seedPrimitiveValue(capacitor),
+		[]TerminalConnection{
+			{Terminal: "A", Node: internal},
+			{Terminal: "B", Node: "port_power"},
+		},
+	)
+	incidental = AddPrimitive(
+		incidental,
+		resistor,
+		seedPrimitiveValue(resistor),
+		[]TerminalConnection{
+			{Terminal: "A", Node: "port_input"},
+			{Terminal: "B", Node: internal},
+		},
+	)
+	if gap := topologyBehaviorGap(
+		requirement,
+		incidental,
+		primitiveInventoryByKey(inventory),
+	); gap == 0 {
+		t.Fatal("rail-attached reactance falsely satisfied high-frequency attenuation")
+	}
+	graph = AddPrimitive(graph, resistor, seedPrimitiveValue(resistor), []TerminalConnection{
+		{Terminal: "A", Node: internal},
+		{Terminal: "B", Node: "port_output"},
+	})
+	graph = AddPrimitive(graph, capacitor, seedPrimitiveValue(capacitor), []TerminalConnection{
+		{Terminal: "A", Node: internal},
+		{Terminal: "B", Node: "port_output"},
+	})
+	graph = AddPrimitive(graph, resistor, seedPrimitiveValue(resistor), []TerminalConnection{
+		{Terminal: "A", Node: "port_input"},
+		{Terminal: "B", Node: internal},
+	})
+	if completeIssues := ValidateCompleteGraph(graph, inventory, GraphLimits{
+		MaxPrimitiveInstances: DefaultPolicy().MaxPrimitiveInstances,
+		MaxInternalNodes:      DefaultPolicy().MaxInternalNodes,
+	}); len(completeIssues) != 0 {
+		t.Fatalf("generic closed-loop time constant is incomplete: %#v", completeIssues)
+	}
+	if gap := topologyBehaviorGap(requirement, graph, primitiveInventoryByKey(inventory)); gap != 0 {
+		t.Fatalf("generic closed-loop time constant behavior gap = %d", gap)
+	}
+}
+
+func TestTopologyObligationsDerivePrimitiveThresholdNetworks(t *testing.T) {
+	inventory, _ := testHeldOutSynthesisEnvironment(t)
+	for _, test := range []struct {
+		fixture          string
+		decisionStages   int
+		resistorBranches int
+	}{
+		{fixture: "hysteretic_detector.json", decisionStages: 1, resistorBranches: 4},
+		{fixture: "voltage_window_monitor.json", decisionStages: 2, resistorBranches: 4},
+	} {
+		requirement := testOpenTopologyRequirement(t, test.fixture)
+		sequences := topologyObligationKindSequences(
+			requirement,
+			topologyRepresentatives(requirement, inventory),
+			128,
+		)
+		if len(sequences) == 0 {
+			t.Fatalf("%s produced no primitive obligation sequences", test.fixture)
+		}
+		for _, sequence := range sequences {
+			decisions, resistors := 0, 0
+			for _, primitive := range sequence {
+				if primitive.Kind == "comparator" || primitive.Kind == "opamp" {
+					decisions++
+				}
+				if primitive.Kind == "resistor" {
+					resistors++
+				}
+			}
+			if decisions != test.decisionStages || resistors != test.resistorBranches {
+				t.Fatalf(
+					"%s obligation counts = decisions:%d resistors:%d; want %d/%d",
+					test.fixture,
+					decisions,
+					resistors,
+					test.decisionStages,
+					test.resistorBranches,
+				)
+			}
+		}
+	}
+}
+
+func TestDecisionRelationshipSeedsConstructBoundedPrimitiveGraph(t *testing.T) {
+	requirement := testOpenTopologyRequirement(t, "hysteretic_detector.json")
+	inventory, _ := testHeldOutSynthesisEnvironment(t)
+	initial, issues := InitialGraph(requirement)
+	if len(issues) != 0 {
+		t.Fatalf("initial graph issues: %#v", issues)
+	}
+	hash, err := GraphHash(initial)
+	if err != nil {
+		t.Fatal(err)
+	}
+	topology, err := TopologyHash(initial)
+	if err != nil {
+		t.Fatal(err)
+	}
+	byKey := primitiveInventoryByKey(inventory)
+	state := topologySearchState{
+		graph:    initial,
+		hash:     hash,
+		topology: topology,
+		score:    scoreTopologyGraph(requirement, initial, byKey, hash),
+	}
+	policy := DefaultPolicy()
+	policy.MaxExpandedStates = 32
+	policy.MaxGeneratedGraphs = 256
+	candidates, consumption, rejections := topologyRelationshipSeeds(
+		context.Background(),
+		requirement,
+		inventory,
+		topologyRepresentatives(requirement, inventory),
+		byKey,
+		GraphLimits{
+			MaxPrimitiveInstances: policy.MaxPrimitiveInstances,
+			MaxInternalNodes:      policy.MaxInternalNodes,
+		},
+		policy,
+		state,
+	)
+	if len(candidates) == 0 {
+		t.Fatalf(
+			"decision relationship construction produced no candidates: consumption=%#v rejections=%#v",
+			consumption,
+			rejections,
+		)
+	}
+	foundRailDerived := false
+	foundStableReference := false
+	for _, candidate := range candidates {
+		if candidate.Score.BehaviorGap != 0 {
+			t.Fatalf("unexpected relationship candidate: score=%#v graph=%s", candidate.Score, testGraphTopologySummary(candidate.Graph))
+		}
+		if candidate.Score.InternalNodeCount == 2 &&
+			len(candidate.Graph.Instances) == 5 {
+			foundRailDerived = true
+		}
+		if candidate.Score.InternalNodeCount == 4 &&
+			len(candidate.Graph.Instances) == 8 {
+			for _, instance := range candidate.Graph.Instances {
+				if instance.Kind == "reference_diode" {
+					foundStableReference = true
+				}
+			}
+		}
+		if len(candidate.Operations) !=
+			candidate.Score.InternalNodeCount+len(candidate.Graph.Instances) {
+			t.Fatalf(
+				"relationship operation count = %d; want %d",
+				len(candidate.Operations),
+				candidate.Score.InternalNodeCount+len(candidate.Graph.Instances),
+			)
+		}
+		for index, operation := range candidate.Operations {
+			if operation.Number != index+1 ||
+				operation.BeforeHash == "" ||
+				operation.AfterHash == "" {
+				t.Fatalf("invalid relationship operation %d: %#v", index, operation)
+			}
+		}
+	}
+	if !foundRailDerived || !foundStableReference {
+		t.Fatalf(
+			"relationship candidates rail/stable = %t/%t; candidates=%d consumption=%#v rejections=%#v",
+			foundRailDerived,
+			foundStableReference,
+			len(candidates),
+			consumption,
+			rejections,
+		)
+	}
+}
+
+func TestConditionalTransferRelationshipSeedsConstructBoundedPrimitiveGraph(t *testing.T) {
+	requirement := testOpenTopologyRequirement(t, "audio_mute.json")
+	relationships := topologyConditionalTransferRelationships(requirement)
+	if len(relationships) != 1 ||
+		relationships[0].input != "audio_input" ||
+		relationships[0].output != "audio_output" ||
+		relationships[0].control != "mute_control" {
+		t.Fatalf("conditional transfer relationships = %#v", relationships)
+	}
+	inventory, _ := testHeldOutSynthesisEnvironment(t)
+	initial, issues := InitialGraph(requirement)
+	if len(issues) != 0 {
+		t.Fatalf("initial graph issues: %#v", issues)
+	}
+	hash, err := GraphHash(initial)
+	if err != nil {
+		t.Fatal(err)
+	}
+	topology, err := TopologyHash(initial)
+	if err != nil {
+		t.Fatal(err)
+	}
+	byKey := primitiveInventoryByKey(inventory)
+	state := topologySearchState{
+		graph:    initial,
+		hash:     hash,
+		topology: topology,
+		score:    scoreTopologyGraph(requirement, initial, byKey, hash),
+	}
+	policy := DefaultPolicy()
+	policy.MaxExpandedStates = 32
+	policy.MaxGeneratedGraphs = 256
+	candidates, consumption, rejections := topologyConditionalTransferRelationshipSeeds(
+		context.Background(),
+		requirement,
+		inventory,
+		topologyRepresentatives(requirement, inventory),
+		byKey,
+		GraphLimits{
+			MaxPrimitiveInstances: policy.MaxPrimitiveInstances,
+			MaxInternalNodes:      policy.MaxInternalNodes,
+		},
+		policy,
+		state,
+	)
+	if len(candidates) == 0 {
+		t.Fatalf(
+			"conditional transfer relationship produced no candidates: consumption=%#v rejections=%#v",
+			consumption,
+			rejections,
+		)
+	}
+	for _, candidate := range candidates {
+		counts := map[string]int{}
+		for _, instance := range candidate.Graph.Instances {
+			counts[instance.Kind]++
+		}
+		if candidate.Score.BehaviorGap != 0 ||
+			candidate.Score.InternalNodeCount != 2 ||
+			len(candidate.Graph.Instances) != 7 ||
+			counts["opamp"] != 1 ||
+			counts["n_channel_mosfet"] != 1 ||
+			counts["resistor"] != 3 ||
+			counts["capacitor"] != 2 {
+			t.Fatalf(
+				"unexpected conditional transfer relationship: score=%#v counts=%#v graph=%s",
+				candidate.Score,
+				counts,
+				testGraphTopologySummary(candidate.Graph),
+			)
+		}
+		if len(candidate.Operations) != 9 {
+			t.Fatalf("conditional transfer operations = %d; want 9", len(candidate.Operations))
+		}
+		plan := BuildValueSearchPlan(
+			requirement,
+			candidate.Graph,
+			inventory,
+			policy,
+		)
+		if plan.Status != ValuePlanReady {
+			t.Fatalf(
+				"conditional transfer value plan = %s: rejections=%#v issues=%#v",
+				plan.Status,
+				plan.Rejections,
+				plan.Issues,
+			)
+		}
+		foundBias, foundCoupling := false, false
+		for _, domain := range plan.Domains {
+			for _, scale := range domain.AnalyticScales {
+				foundBias = foundBias ||
+					(scale.Kind == "resistance" && testValueSIEqual(scale.ValueSI, 47_000))
+				foundCoupling = foundCoupling ||
+					(scale.Kind == "capacitance" && testValueSIEqual(scale.ValueSI, 4.7e-6))
+			}
+		}
+		if !foundBias || !foundCoupling {
+			t.Fatalf(
+				"conditional transfer scales bias/coupling = %t/%t: %#v",
+				foundBias,
+				foundCoupling,
+				plan.Domains,
+			)
+		}
+	}
+}
+
+func TestControlledSwitchRelationshipSeedsConstructBoundedPrimitiveGraph(t *testing.T) {
+	requirement := testOpenTopologyRequirement(t, "ground_referenced_load_control.json")
+	inventory, _ := testHeldOutSynthesisEnvironment(t)
+	initial, issues := InitialGraph(requirement)
+	if len(issues) != 0 {
+		t.Fatalf("initial graph issues: %#v", issues)
+	}
+	hash, err := GraphHash(initial)
+	if err != nil {
+		t.Fatal(err)
+	}
+	topology, err := TopologyHash(initial)
+	if err != nil {
+		t.Fatal(err)
+	}
+	byKey := primitiveInventoryByKey(inventory)
+	state := topologySearchState{
+		graph:    initial,
+		hash:     hash,
+		topology: topology,
+		score:    scoreTopologyGraph(requirement, initial, byKey, hash),
+	}
+	policy := DefaultPolicy()
+	policy.MaxExpandedStates = 32
+	policy.MaxGeneratedGraphs = 256
+	candidates, consumption, rejections := topologyControlledSwitchRelationshipSeeds(
+		context.Background(),
+		requirement,
+		inventory,
+		topologyRepresentatives(requirement, inventory),
+		byKey,
+		GraphLimits{
+			MaxPrimitiveInstances: policy.MaxPrimitiveInstances,
+			MaxInternalNodes:      policy.MaxInternalNodes,
+		},
+		policy,
+		state,
+	)
+	if len(candidates) == 0 {
+		t.Fatalf(
+			"controlled relationship construction produced no candidates: consumption=%#v rejections=%#v",
+			consumption,
+			rejections,
+		)
+	}
+	for _, candidate := range candidates {
+		counts := map[string]int{}
+		for _, instance := range candidate.Graph.Instances {
+			counts[instance.Kind]++
+		}
+		if candidate.Score.BehaviorGap != 0 ||
+			candidate.Score.InternalNodeCount != 2 ||
+			len(candidate.Graph.Instances) != 8 ||
+			counts["comparator"] != 1 ||
+			counts["n_channel_mosfet"] != 1 ||
+			counts["resistor"] != 4 ||
+			counts["capacitor"] != 1 ||
+			counts["clamp_diode"] != 1 {
+			t.Fatalf(
+				"unexpected controlled relationship: score=%#v counts=%#v graph=%s",
+				candidate.Score,
+				counts,
+				testGraphTopologySummary(candidate.Graph),
+			)
+		}
+		if len(candidate.Operations) != 10 {
+			t.Fatalf("controlled relationship operations = %d; want 10", len(candidate.Operations))
+		}
+		plan := BuildValueSearchPlan(
+			requirement,
+			candidate.Graph,
+			inventory,
+			policy,
+		)
+		if plan.Status != ValuePlanReady {
+			t.Fatalf(
+				"controlled relationship value plan = %s: rejections=%#v issues=%#v",
+				plan.Status,
+				plan.Rejections,
+				plan.Issues,
+			)
+		}
+		for _, domain := range plan.Domains {
+			foundAnchor := false
+			for _, scale := range domain.AnalyticScales {
+				if (domain.PrimitiveKind == "resistor" &&
+					scale.Kind == "resistance" &&
+					testValueSIEqual(scale.ValueSI, 10_000)) ||
+					(domain.PrimitiveKind == "capacitor" &&
+						scale.Kind == "capacitance" &&
+						testValueSIEqual(scale.ValueSI, 10e-9)) {
+					foundAnchor = true
+				}
+			}
+			if (domain.PrimitiveKind == "resistor" ||
+				domain.PrimitiveKind == "capacitor") &&
+				!foundAnchor {
+				t.Fatalf("interface domain lacks bounded analytic scale: %#v", domain)
+			}
+		}
+	}
+}
+
+func TestTransconductanceRelationshipSeedsConstructBoundedPrimitiveGraph(t *testing.T) {
+	requirement := testOpenTopologyRequirement(t, "adjustable_current_output.json")
+	inventory, _ := testHeldOutSynthesisEnvironment(t)
+	initial, issues := InitialGraph(requirement)
+	if len(issues) != 0 {
+		t.Fatalf("initial graph issues: %#v", issues)
+	}
+	hash, err := GraphHash(initial)
+	if err != nil {
+		t.Fatal(err)
+	}
+	topology, err := TopologyHash(initial)
+	if err != nil {
+		t.Fatal(err)
+	}
+	byKey := primitiveInventoryByKey(inventory)
+	state := topologySearchState{
+		graph:    initial,
+		hash:     hash,
+		topology: topology,
+		score:    scoreTopologyGraph(requirement, initial, byKey, hash),
+	}
+	policy := DefaultPolicy()
+	policy.MaxExpandedStates = 32
+	policy.MaxGeneratedGraphs = 256
+	candidates, consumption, rejections := topologyTransconductanceRelationshipSeeds(
+		context.Background(),
+		requirement,
+		inventory,
+		topologyRepresentatives(requirement, inventory),
+		byKey,
+		GraphLimits{
+			MaxPrimitiveInstances: policy.MaxPrimitiveInstances,
+			MaxInternalNodes:      policy.MaxInternalNodes,
+		},
+		policy,
+		state,
+	)
+	if len(candidates) == 0 {
+		t.Fatalf(
+			"transconductance relationship produced no candidates: consumption=%#v rejections=%#v",
+			consumption,
+			rejections,
+		)
+	}
+	for _, candidate := range candidates {
+		counts := map[string]int{}
+		for _, instance := range candidate.Graph.Instances {
+			counts[instance.Kind]++
+		}
+		if candidate.Score.BehaviorGap != 0 ||
+			candidate.Score.InternalNodeCount != 8 ||
+			len(candidate.Graph.Instances) != 13 ||
+			counts["opamp"] != 2 ||
+			counts["pnp_bjt"] != 2 ||
+			counts["resistor"] != 9 {
+			t.Fatalf(
+				"unexpected transconductance relationship: score=%#v counts=%#v graph=%s",
+				candidate.Score,
+				counts,
+				testGraphTopologySummary(candidate.Graph),
+			)
+		}
+		if len(candidate.Operations) != 21 {
+			t.Fatalf("transconductance relationship operations = %d; want 21", len(candidate.Operations))
+		}
+		plan := BuildValueSearchPlan(
+			requirement,
+			candidate.Graph,
+			inventory,
+			policy,
+		)
+		if plan.Status != ValuePlanReady {
+			t.Fatalf(
+				"transconductance value plan = %s: rejections=%#v issues=%#v",
+				plan.Status,
+				plan.Rejections,
+				plan.Issues,
+			)
+		}
+		foundSense, foundRatio := false, false
+		for _, domain := range plan.Domains {
+			for _, scale := range domain.AnalyticScales {
+				foundSense = foundSense ||
+					(scale.Kind == "resistance" && testValueSIEqual(scale.ValueSI, 10))
+				foundRatio = foundRatio ||
+					(scale.Kind == "resistance" && testValueSIEqual(scale.ValueSI, 10_000))
+			}
+		}
+		if !foundSense || !foundRatio {
+			t.Fatalf(
+				"transconductance value plan sense/ratio scales = %t/%t: %#v",
+				foundSense,
+				foundRatio,
+				plan.Domains,
+			)
+		}
+	}
+}
+
+func TestBehaviorScoringRejectsDegenerateDecisionFeedback(t *testing.T) {
+	requirement := testOpenTopologyRequirement(t, "hysteretic_detector.json")
+	if polarity := topologyDecisionPolarity(requirement); polarity != 1 {
+		t.Fatalf("bounded low-input/low-output decision polarity = %d; want non-inverting", polarity)
+	}
+	inventory, _ := testHeldOutSynthesisEnvironment(t)
+	byKind := map[string]PrimitiveCandidate{}
+	for _, primitive := range topologyRepresentatives(requirement, inventory) {
+		byKind[primitive.Kind] = primitive
+	}
+	comparator, comparatorFound := byKind["comparator"]
+	resistor, resistorFound := byKind["resistor"]
+	if !comparatorFound || !resistorFound {
+		t.Fatalf("missing decision primitives: comparator=%t resistor=%t", comparatorFound, resistorFound)
+	}
+	initial, issues := InitialGraph(requirement)
+	if len(issues) != 0 {
+		t.Fatalf("initial graph issues: %#v", issues)
+	}
+	preferred := AddInternalNode(initial, "internal")
+	reference := requireAddedNodeID(t, initial, preferred)
+	beforeSignal := preferred
+	preferred = AddInternalNode(preferred, "internal")
+	signal := requireAddedNodeID(t, beforeSignal, preferred)
+	foundTwoNodeDecisionPlacement := false
+	for _, placement := range primitivePlacements(preferred, comparator, maxPrimitivePlacementsPerKind) {
+		terminals := map[string]string{}
+		for _, connection := range placement {
+			terminals[connection.Terminal] = connection.Node
+		}
+		if terminals["IN_MINUS"] == reference &&
+			terminals["IN_PLUS"] == signal &&
+			terminals["OUT"] == "port_indication" {
+			foundTwoNodeDecisionPlacement = true
+			break
+		}
+	}
+	if !foundTwoNodeDecisionPlacement {
+		t.Fatal("generic placement ordering omitted a two-node decision stage")
+	}
+	preferred = AddPrimitive(preferred, comparator, nil, []TerminalConnection{
+		{Terminal: "IN_MINUS", Node: reference},
+		{Terminal: "IN_PLUS", Node: signal},
+		{Terminal: "OUT", Node: "port_indication"},
+		{Terminal: "V_MINUS", Node: "port_ground"},
+		{Terminal: "V_PLUS", Node: "port_power"},
+	})
+	desiredPassiveEdges := map[string]bool{
+		reference + "|port_ground":  false,
+		reference + "|port_power":   false,
+		signal + "|port_input":      false,
+		signal + "|port_indication": false,
+	}
+	for _, placement := range primitivePlacements(preferred, resistor, maxPrimitivePlacementsPerKind) {
+		left, right := placement[0].Node, placement[1].Node
+		if left > right {
+			left, right = right, left
+		}
+		key := left + "|" + right
+		if _, found := desiredPassiveEdges[key]; found {
+			desiredPassiveEdges[key] = true
+		}
+	}
+	for edge, found := range desiredPassiveEdges {
+		if !found {
+			t.Fatalf("generic placement ordering omitted decision-network edge %s", edge)
+		}
+	}
+	for _, nodes := range [][2]string{
+		{reference, "port_ground"},
+		{reference, "port_power"},
+		{signal, "port_input"},
+		{signal, "port_indication"},
+	} {
+		preferred = AddPrimitive(preferred, resistor, seedPrimitiveValue(resistor), []TerminalConnection{
+			{Terminal: "A", Node: nodes[0]},
+			{Terminal: "B", Node: nodes[1]},
+		})
+	}
+	if gap := topologyDecisionStageGap(preferred, 1, true, 1); gap != 0 {
+		t.Fatalf("rail-referenced decision-stage gap = %d nodes=%#v graph=%s", gap, preferred.Nodes, testGraphTopologySummary(preferred))
+	}
+	if gap := topologyBehaviorGap(
+		requirement,
+		preferred,
+		primitiveInventoryByKey(inventory),
+	); gap != 0 {
+		t.Fatalf("rail-referenced decision feedback behavior gap = %d", gap)
+	}
+
+	degenerate := AddPrimitive(initial, comparator, nil, []TerminalConnection{
+		{Terminal: "IN_MINUS", Node: "port_indication"},
+		{Terminal: "IN_PLUS", Node: "port_indication"},
+		{Terminal: "OUT", Node: "port_indication"},
+		{Terminal: "V_MINUS", Node: "port_ground"},
+		{Terminal: "V_PLUS", Node: "port_power"},
+	})
+	for _, nodes := range [][2]string{
+		{"port_input", "port_power"},
+		{"port_indication", "port_input"},
+		{"port_ground", "port_power"},
+	} {
+		degenerate = AddPrimitive(degenerate, resistor, seedPrimitiveValue(resistor), []TerminalConnection{
+			{Terminal: "A", Node: nodes[0]},
+			{Terminal: "B", Node: nodes[1]},
+		})
+	}
+	if gap := topologyBehaviorGap(
+		requirement,
+		degenerate,
+		primitiveInventoryByKey(inventory),
+	); gap == 0 {
+		t.Fatal("shorted decision terminals falsely satisfied threshold behavior")
+	}
+
+	railTied := AddPrimitive(initial, comparator, nil, []TerminalConnection{
+		{Terminal: "IN_MINUS", Node: "port_ground"},
+		{Terminal: "IN_PLUS", Node: "port_input"},
+		{Terminal: "OUT", Node: "port_indication"},
+		{Terminal: "V_MINUS", Node: "port_ground"},
+		{Terminal: "V_PLUS", Node: "port_power"},
+	})
+	for _, nodes := range [][2]string{
+		{"port_indication", "port_power"},
+		{"port_ground", "port_indication"},
+		{"port_ground", "port_input"},
+	} {
+		railTied = AddPrimitive(railTied, resistor, seedPrimitiveValue(resistor), []TerminalConnection{
+			{Terminal: "A", Node: nodes[0]},
+			{Terminal: "B", Node: nodes[1]},
+		})
+	}
+	if gap := topologyBehaviorGap(
+		requirement,
+		railTied,
+		primitiveInventoryByKey(inventory),
+	); gap == 0 {
+		t.Fatal("rail-tied decision input falsely satisfied intermediate threshold behavior")
+	}
+}
+
+func TestPrimitiveTopologySearchStopsOnBudgetsCancellationAndMissingInventory(t *testing.T) {
+	requirement := testOpenTopologyRequirement(t, "powered_lowpass.json")
+	inventory := testSearchInventory()
+
+	tiny := DefaultPolicy()
+	tiny.MaxExpandedStates = 1
+	tiny.MaxGeneratedGraphs = 1
+	tiny.MaxPrimitiveInstances = 3
+	tiny.MaxInternalNodes = 1
+	tiny.MaxRetainedCandidates = 2
+	exhausted := SearchPrimitiveTopologies(context.Background(), requirement, inventory, tiny)
+	if exhausted.Status != TopologySearchExhausted ||
+		!exhausted.Consumption.BudgetExhausted ||
+		len(exhausted.Issues) != 1 ||
+		exhausted.Issues[0].Code != CodeSearchExhausted {
+		t.Fatalf("budget result = status=%s consumption=%#v issues=%#v", exhausted.Status, exhausted.Consumption, exhausted.Issues)
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	canceled := SearchPrimitiveTopologies(ctx, requirement, inventory, DefaultPolicy())
+	if canceled.Status != TopologySearchCanceled ||
+		len(canceled.Issues) != 1 ||
+		canceled.Issues[0].Code != CodeCanceled {
+		t.Fatalf("canceled result = status=%s issues=%#v", canceled.Status, canceled.Issues)
+	}
+
+	unsupported := SearchPrimitiveTopologies(context.Background(), requirement, PrimitiveInventory{}, DefaultPolicy())
+	if unsupported.Status != TopologySearchUnsupported ||
+		len(unsupported.Issues) != 1 ||
+		unsupported.Issues[0].Code != CodePrimitiveUnavailable {
+		t.Fatalf("unsupported result = status=%s issues=%#v", unsupported.Status, unsupported.Issues)
+	}
+}
+
+func TestGenericPlacementGenerationUsesTerminalRoles(t *testing.T) {
+	graph := CandidateGraph{
+		Schema:  CandidateGraphSchema,
+		Version: CandidateGraphVersion,
+		Nodes: []GraphNode{
+			{ID: "ground", Scope: "external", SemanticKind: "port", SemanticID: "ground", Domain: "ground", Role: "reference"},
+			{ID: "input", Scope: "external", SemanticKind: "port", SemanticID: "input", Domain: "ground", Role: "input"},
+			{ID: "output", Scope: "external", SemanticKind: "port", SemanticID: "output", Domain: "ground", Role: "output"},
+			{ID: "supply", Scope: "external", SemanticKind: "port", SemanticID: "power", Domain: "supply", Role: "supply"},
+		},
+	}
+	inventory := testSearchInventory()
+	var opamp PrimitiveCandidate
+	for _, primitive := range inventory.Primitives {
+		if primitive.Kind == "opamp" {
+			opamp = primitive
+			break
+		}
+	}
+	placements := primitivePlacements(graph, opamp, 128)
+	if len(placements) == 0 {
+		t.Fatal("generic op-amp terminal placement produced no candidates")
+	}
+	for _, placement := range placements {
+		bindings := map[string]string{}
+		for _, connection := range placement {
+			bindings[connection.Terminal] = connection.Node
+		}
+		if bindings["V_PLUS"] != "supply" || bindings["V_MINUS"] != "ground" || bindings["OUT"] != "output" {
+			t.Fatalf("terminal role contract produced invalid placement: %#v", placement)
+		}
+	}
+}
+
+func requireAddedNodeID(
+	t *testing.T,
+	before CandidateGraph,
+	after CandidateGraph,
+) string {
+	t.Helper()
+	known := make(map[string]bool, len(before.Nodes))
+	for _, node := range before.Nodes {
+		known[node.ID] = true
+	}
+	added := ""
+	for _, node := range after.Nodes {
+		if known[node.ID] {
+			continue
+		}
+		if added != "" {
+			t.Fatalf("AddInternalNode added multiple nodes: %q and %q", added, node.ID)
+		}
+		added = node.ID
+	}
+	if len(after.Nodes) != len(before.Nodes)+1 || added == "" {
+		t.Fatalf(
+			"AddInternalNode node delta = %d with added node %q; want one",
+			len(after.Nodes)-len(before.Nodes),
+			added,
+		)
+	}
+	return added
+}
+
+func testValueSIEqual(actual, expected float64) bool {
+	tolerance := math.Max(math.Abs(expected)*1e-12, 1e-18)
+	return math.Abs(actual-expected) <= tolerance
+}
+
+func testOpenTopologyRequirement(t *testing.T, file string) Requirement {
+	t.Helper()
+	requirement, issues := DecodeStrict(bytes.NewReader(mustRead(t, filepath.Join(frozenCorpusRoot(), file))))
+	if len(issues) != 0 {
+		t.Fatalf("requirement decode issues: %#v", issues)
+	}
+	return requirement
+}
+
+func testSearchInventory() PrimitiveInventory {
+	inventory := testGraphInventory()
+	inventory.Hash = strings.Repeat("b", 64)
+	inventory.CatalogHash = strings.Repeat("c", 64)
+	inventory.ModelRegistryHash = strings.Repeat("d", 64)
+	inventory.PrimitiveRegistry = strings.Repeat("e", 64)
+	return inventory
+}

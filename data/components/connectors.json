@@ -332,7 +332,7 @@
       "id": "load.inductive.external.1x02",
       "family": "inductor",
       "name": "Parameterized external inductive load",
-      "description": "Catalog-backed two-terminal testbench load whose inductance is supplied by a bounded operating condition; it is never added to the physical circuit graph or writer request.",
+      "description": "Catalog-backed two-terminal testbench load whose inductance is supplied by a bounded operating condition and whose winding resistance may be conservatively derived from the declared supply/current envelope; it is never added to the physical circuit graph or writer request.",
       "generic": true,
       "lifecycle": "active",
       "tags": ["external_load", "inductive", "simulation_load", "testbench"],
@@ -369,7 +369,7 @@
         "sources": ["kicadai:bounded-external-load-contract", "builtin_pinmap:Connector_Generic:Conn_01x02"],
         "resolver_checked": true,
         "pinmap_checked": true,
-        "notes": ["Inductance is an immutable public operating-case input; the conservative 1 mOhm series term prevents an ideal algebraic loop without claiming a specific actuator winding."]
+        "notes": ["Inductance is an immutable public operating-case input. When the same controlled-current port has a bounded load-current envelope, the testbench derives winding resistance as nominal dominant-supply voltage divided by maximum declared load current; otherwise the conservative 1 mOhm series term only prevents an ideal algebraic loop."]
       }
     }
   ]

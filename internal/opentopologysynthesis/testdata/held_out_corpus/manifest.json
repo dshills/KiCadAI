@@ -1,0 +1,92 @@
+{
+  "schema": "kicadai.open-topology-held-out-corpus.v1",
+  "version": 1,
+  "base_commit": "8965a304fec2f0aae85ec57b830793204e8455df",
+  "frozen_at": "2026-07-30",
+  "requirement_schema": "kicadai.open-topology-requirement.v1",
+  "authoring_policy": "Behavior, external interfaces, operating cases, events, limits, and acceptance only. No identity, primitive family, topology, provider, model, values chosen by an implementation, internal connectivity, physical geometry, routing, or repair instructions.",
+  "stages": [
+    "integrity",
+    "schema",
+    "primitive_inventory",
+    "topology_search",
+    "value_search",
+    "simulation",
+    "diagnosis_repair",
+    "lowering",
+    "schematic",
+    "placement",
+    "routing",
+    "writer",
+    "erc",
+    "drc",
+    "round_trip",
+    "replay"
+  ],
+  "cases": [
+    {
+      "id": "adjustable_current_output",
+      "behavior_family": "regulated_current",
+      "requirement_file": "adjustable_current_output.json",
+      "requirement_sha256": "da755a36570f3c0ddfdabd9c804234ced306b464bdbbf50201b36b3ffe297575",
+      "required_analyses": ["dc_operating_point", "dc_sweep", "thermal", "transient"],
+      "safety_critical": true
+    },
+    {
+      "id": "adjustable_voltage_regulation",
+      "behavior_family": "regulated_voltage",
+      "requirement_file": "adjustable_voltage_regulation.json",
+      "requirement_sha256": "53c48d84a154e9fa51d911e1ac306b68fe4717aaf16f1f30be89d4b6a557818c",
+      "required_analyses": ["dc_operating_point", "dc_sweep", "startup", "thermal"],
+      "safety_critical": true
+    },
+    {
+      "id": "audio_mute",
+      "behavior_family": "signal_gating",
+      "requirement_file": "audio_mute.json",
+      "requirement_sha256": "7b82c31458b5d05bcf0e3e3ed3ec2d0a1ac76e87112480dc41ddbf5b4c4a65c6",
+      "required_analyses": ["ac_sweep", "distortion", "startup", "transient"],
+      "safety_critical": false
+    },
+    {
+      "id": "ground_referenced_load_control",
+      "behavior_family": "load_control",
+      "requirement_file": "ground_referenced_load_control.json",
+      "requirement_sha256": "12a6545ee01b95822fff8736f3f6308d8bb68450d683fa58b0a06bdebb6a5e11",
+      "required_analyses": ["dc_operating_point", "electrothermal", "startup", "transient"],
+      "safety_critical": true
+    },
+    {
+      "id": "hysteretic_detector",
+      "behavior_family": "threshold_memory",
+      "requirement_file": "hysteretic_detector.json",
+      "requirement_sha256": "d9638f2c9bd7863e0f7fc88b382b5f66020cf55a11a359cc7a751f3ab7c74a8b",
+      "required_analyses": ["dc_sweep", "startup", "transient"],
+      "safety_critical": true
+    },
+    {
+      "id": "powered_lowpass",
+      "behavior_family": "frequency_response",
+      "requirement_file": "powered_lowpass.json",
+      "requirement_sha256": "775e70c0bf1f52ae58bacc49cb4fb72a5819dd68a73fda9c424464cacdd86399",
+      "required_analyses": ["ac_sweep", "stability", "transient"],
+      "safety_critical": false
+    },
+    {
+      "id": "sensor_conditioner",
+      "behavior_family": "sensor_interface",
+      "requirement_file": "sensor_conditioner.json",
+      "requirement_sha256": "c565570c12273e508c6db6afd1eec45cb89b15df58b997999f31d5c29ee38b21",
+      "required_analyses": ["ac_sweep", "dc_operating_point", "noise", "stability"],
+      "safety_critical": true
+    },
+    {
+      "id": "voltage_window_monitor",
+      "behavior_family": "range_detection",
+      "requirement_file": "voltage_window_monitor.json",
+      "requirement_sha256": "a31c72172e1de76d25cd98e20e783676c349af9f777517170e46d906e736dd5f",
+      "required_analyses": ["dc_operating_point", "dc_sweep", "transient"],
+      "safety_critical": false
+    }
+  ]
+}

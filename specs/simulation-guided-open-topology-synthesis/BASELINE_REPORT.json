@@ -1,0 +1,22 @@
+{
+  "schema": "kicadai.open-topology-baseline.v1",
+  "version": 1,
+  "base_commit": "8965a304fec2f0aae85ec57b830793204e8455df",
+  "manifest_sha256": "90a530d044693daa1a41669d26f867fd8b2a55d9e4e666e1f41a42f891e95835",
+  "measured_at": "2026-07-30",
+  "summary": {
+    "total": 8,
+    "complete_passes": 0,
+    "fail_closed": 8
+  },
+  "cases": [
+    {"id": "adjustable_current_output", "status": "fail_closed", "stopped_at": "schema", "code": "ARCHITECTURE_SCHEMA_INVALID", "provider_bypass": false},
+    {"id": "adjustable_voltage_regulation", "status": "fail_closed", "stopped_at": "schema", "code": "ARCHITECTURE_SCHEMA_INVALID", "provider_bypass": false},
+    {"id": "audio_mute", "status": "fail_closed", "stopped_at": "schema", "code": "ARCHITECTURE_SCHEMA_INVALID", "provider_bypass": false},
+    {"id": "ground_referenced_load_control", "status": "fail_closed", "stopped_at": "schema", "code": "ARCHITECTURE_SCHEMA_INVALID", "provider_bypass": false},
+    {"id": "hysteretic_detector", "status": "fail_closed", "stopped_at": "schema", "code": "ARCHITECTURE_SCHEMA_INVALID", "provider_bypass": false},
+    {"id": "powered_lowpass", "status": "fail_closed", "stopped_at": "schema", "code": "ARCHITECTURE_SCHEMA_INVALID", "provider_bypass": false},
+    {"id": "sensor_conditioner", "status": "fail_closed", "stopped_at": "schema", "code": "ARCHITECTURE_SCHEMA_INVALID", "provider_bypass": false},
+    {"id": "voltage_window_monitor", "status": "fail_closed", "stopped_at": "schema", "code": "ARCHITECTURE_SCHEMA_INVALID", "provider_bypass": false}
+  ]
+}

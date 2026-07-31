@@ -164,8 +164,18 @@ path.
   clean source roots. Run `make component-onboarding-promotion-bundle` with the
   installed KiCad environment to reproduce it. See the
   [specification](specs/evidence-backed-component-onboarding/SPEC.md).
-- Arbitrary electronics generation is not yet guaranteed. Generic graphs fail
-  closed on unknown parts, pins, ratings, placement, or routing capability.
+- A separate open-topology lane now constructs primitive-component graphs
+  directly from strict behavior-only requirements instead of selecting a
+  pre-authored functional block. Six of eight frozen analog, power, and
+  mixed-signal requirements pass trusted simulation and the complete
+  installed-KiCad two-root promotion lane; two exhaust deterministic repair
+  budgets with stable diagnostics. The public
+  `kicadai open-topology create` command writes full search/simulation and
+  physical-promotion evidence while returning a compact JSON summary. See the
+  [completion audit](specs/simulation-guided-open-topology-synthesis/AUDIT.md).
+- Unrestricted electronics generation is not guaranteed. Open-topology and
+  generic graph paths fail closed on unknown behavior, parts, pins, models,
+  ratings, placement, routing, or exhausted search capability.
 - MCU synthesis is limited to verified catalog records and modeled electrical
   constraints. It does not infer arbitrary MCU pin data from KiCad symbols, and
   ESP32 variants, flash choices, RF optimization, and unverified external-bus

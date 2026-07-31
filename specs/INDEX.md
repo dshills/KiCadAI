@@ -9,6 +9,13 @@ roadmaps, and dated review material.
 
 ## Latest Completed Milestone
 
+- [Simulation-guided open-topology synthesis](simulation-guided-open-topology-synthesis/SPEC.md)
+  - primitive-only behavior-to-graph search, trusted simulation, generic
+    topology repair, and two-root KiCad promotion.
+- [Completion audit](simulation-guided-open-topology-synthesis/AUDIT.md)
+  and [promotion matrix](simulation-guided-open-topology-synthesis/PROMOTION_MATRIX.json)
+  - measured 0/8 to 6/8 progress, stable bounded exhaustions, replay hashes,
+    and preserved regression evidence.
 - [Capability-aware confidence gating](capability-aware-confidence-gating/SPEC.md)
   - deterministic supported, experimental, and unsupported request policy with
     reproducible evidence links and fabrication-claim controls.

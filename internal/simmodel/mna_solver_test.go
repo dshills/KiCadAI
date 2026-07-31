@@ -728,6 +728,29 @@ func TestSmallSignalReferenceOnlyAnchorsDisconnectedUnobservedComponent(t *testi
 	}
 }
 
+func TestMNASolverAcceptsConditionedSystemWithBoundedResidual(t *testing.T) {
+	const separation = 1e-13
+	system := mnaSystem{
+		matrix: [][]complex128{
+			{1, 1},
+			{1, 1 + separation},
+		},
+		rhs:           []complex128{2, 2 + separation},
+		unknownLabels: []string{"node:A", "branch_current:source"},
+		nodeIndex:     map[string]int{"A": 0},
+		branchIndex:   map[string]int{"source": 1},
+	}
+	solution, diagnostic := solveMNA(system)
+	if diagnostic != nil {
+		t.Fatalf("conditioned system diagnostic = %#v", diagnostic)
+	}
+	for index, value := range solution {
+		if math.Abs(real(value)-1) > 1e-3 || math.Abs(imag(value)) > 1e-12 {
+			t.Fatalf("solution[%d] = %v; want approximately 1", index, value)
+		}
+	}
+}
+
 func TestMNAOpAmpDCClampsOpenLoopComparatorToCatalogOutputRange(t *testing.T) {
 	intent := Intent{
 		ModelID: ModelLinearCircuitMNAV1,
@@ -1560,7 +1583,7 @@ func TestMNADistortionExtractsDeterministicHarmonics(t *testing.T) {
 			ID: "audio_thd", Kind: AnalysisDistortion, DurationS: .004, TimeStepS: 0.00003125,
 			Excitations: []SourceExcitation{{Component: "signal", SineAmplitude: 1, SineFrequencyHz: 1000}},
 		}},
-		Assertions: []Assertion{{AnalysisID: "audio_thd", Node: "OUT", Quantity: QuantityTHDPercent, Min: 0, Max: 1e-8}},
+		Assertions: []Assertion{{AnalysisID: "audio_thd", Node: "OUT", Quantity: QuantityTHDPercent, FrequencyHz: 1000, Min: 0, Max: 1e-8}},
 	}
 	components := []ComponentEvidence{
 		voltageSourceEvidence("signal", "OUT", "GND"),
@@ -1585,6 +1608,20 @@ func TestMNADistortionExtractsDeterministicHarmonics(t *testing.T) {
 	replay, replayDiagnostics := Evaluate(ClonePlan(plan))
 	if len(replayDiagnostics) != 0 || replay.Assertions[0].Actual != report.Assertions[0].Actual {
 		t.Fatalf("distortion replay = %#v diagnostics=%#v", replay, replayDiagnostics)
+	}
+
+	mismatched := intent
+	mismatched.Assertions = append([]Assertion(nil), intent.Assertions...)
+	mismatched.Assertions[0].FrequencyHz = 2000
+	if _, mismatchDiagnostics := ResolveWithTopology(
+		mismatched,
+		"catalog",
+		"catalog-hash",
+		components,
+		[]NodeEvidence{{Name: "GND", Role: "ground"}, {Name: "OUT"}},
+	); len(mismatchDiagnostics) == 0 ||
+		!strings.Contains(mismatchDiagnostics[0].Message, "distortion sine fundamental") {
+		t.Fatalf("mismatched THD frequency diagnostics = %#v", mismatchDiagnostics)
 	}
 }
 

@@ -1,0 +1,52 @@
+{
+  "schema": "kicadai.open-topology-requirement.v1",
+  "version": 1,
+  "project": {
+    "name": "ground_referenced_load_control",
+    "title": "Ground-referenced load control",
+    "description": "Control current through an externally powered inductive load from a logic input, default off at startup, and contain turn-off stress."
+  },
+  "requirements": {
+    "domains": [
+      {"id": "ground", "kind": "reference", "nominal_voltage_v": 0, "source": "external"},
+      {"id": "load_supply", "kind": "supply", "min_voltage_v": 10.8, "nominal_voltage_v": 12, "max_voltage_v": 13.2, "max_current_a": 1.2, "source": "external"},
+      {"id": "logic_supply", "kind": "supply", "min_voltage_v": 3, "nominal_voltage_v": 3.3, "max_voltage_v": 3.6, "max_current_a": 0.02, "source": "external"}
+    ],
+    "ports": [
+      {"id": "ground", "kind": "reference", "direction": "bidirectional", "domain": "ground"},
+      {"id": "load_power", "kind": "power", "direction": "sink", "domain": "load_supply"},
+      {"id": "logic_power", "kind": "power", "direction": "sink", "domain": "logic_supply"},
+      {"id": "control", "kind": "digital", "direction": "sink", "domain": "ground", "electrical": {"min_voltage_v": 0, "max_voltage_v": 3.6, "default_state": "low"}},
+      {"id": "load_return", "kind": "controlled_current", "direction": "sink", "domain": "ground", "electrical": {"max_current_a": 1}}
+    ],
+    "operating_cases": [
+      {"id": "energized", "conditions": [{"axis": "supply_voltage", "target": "load_supply", "min": 10.8, "max": 13.2, "unit": "V"}, {"axis": "input_voltage", "target": "control", "min": 3, "max": 3.6, "unit": "V"}, {"axis": "load_current", "target": "load_return", "min": 0.8, "max": 1, "unit": "A"}]},
+      {"id": "disabled", "conditions": [{"axis": "supply_voltage", "target": "load_supply", "min": 10.8, "max": 13.2, "unit": "V"}, {"axis": "input_voltage", "target": "control", "min": 0, "max": 0.3, "unit": "V"}]},
+      {"id": "turn_off", "conditions": [{"axis": "supply_voltage", "target": "load_supply", "min": 12, "max": 12, "unit": "V"}, {"axis": "load_inductance", "target": "load_return", "min": 0.05, "max": 0.05, "unit": "H"}], "events": [{"id": "disable", "kind": "input_step", "target": "control", "trigger_time_s": 0.002, "initial": 3.3, "applied": 0, "unit": "V"}]}
+    ],
+    "behavioral_requirements": [
+      {"id": "enabled_drop", "metric": "on_state_voltage", "analysis": "dc_operating_point", "observation": {"kind": "port", "id": "load_return"}, "max": 0.4, "unit": "V", "operating_cases": ["energized"]},
+      {"id": "disabled_leakage", "metric": "off_state_current", "analysis": "dc_operating_point", "observation": {"kind": "port", "id": "load_return"}, "max": 0.00001, "unit": "A", "operating_cases": ["disabled"]},
+      {"id": "startup_off", "metric": "startup_current", "analysis": "startup", "observation": {"kind": "port", "id": "load_return"}, "max": 0.001, "unit": "A", "operating_cases": ["disabled"], "critical": true},
+      {"id": "turn_off_peak", "metric": "peak_voltage", "analysis": "transient", "excitation": {"kind": "port", "id": "control"}, "observation": {"kind": "port", "id": "load_return"}, "max": 45, "unit": "V", "operating_cases": ["turn_off"], "critical": true},
+      {"id": "safe_operating_area", "metric": "soa_margin", "analysis": "electrothermal", "observation": {"kind": "circuit", "id": "minimum_soa_margin"}, "min": 1, "unit": "ratio", "operating_cases": ["energized", "turn_off"], "critical": true}
+    ],
+    "constraints": {"max_components": 12, "max_width_mm": 55, "max_height_mm": 40}
+  },
+  "acceptance": {
+    "require_primitive_only": true,
+    "require_topology_search": true,
+    "require_simulation": true,
+    "require_all_corners": true,
+    "require_model_provenance": true,
+    "require_closed_loop_evidence": true,
+    "require_complete_routing": true,
+    "require_connectivity": true,
+    "require_writer_correctness": true,
+    "require_round_trip_zero_diff": true,
+    "require_erc": true,
+    "require_strict_drc": true,
+    "require_deterministic_replay": true,
+    "require_fail_closed": true
+  }
+}

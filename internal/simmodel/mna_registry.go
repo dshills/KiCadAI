@@ -49,6 +49,25 @@ type primitiveDefinition struct {
 	TransientSOA      bool                `json:"transient_soa,omitempty"`
 }
 
+// PrimitiveDescriptor exposes the immutable terminal and analysis contract of
+// one trusted primitive without exposing its solver implementation.
+type PrimitiveDescriptor struct {
+	ID               string              `json:"id"`
+	Family           string              `json:"family"`
+	Terminals        []string            `json:"terminals"`
+	TerminalAliases  map[string][]string `json:"terminal_aliases,omitempty"`
+	TerminalDefaults map[string]string   `json:"terminal_defaults,omitempty"`
+	RequiresValueSI  bool                `json:"requires_value_si,omitempty"`
+	Source           bool                `json:"source,omitempty"`
+	Autonomous       bool                `json:"autonomous,omitempty"`
+	OpAmp            bool                `json:"op_amp,omitempty"`
+	Comparator       bool                `json:"comparator,omitempty"`
+	Nonlinear        bool                `json:"nonlinear,omitempty"`
+	Transient        bool                `json:"transient,omitempty"`
+	ThermalRC        bool                `json:"thermal_rc,omitempty"`
+	TransientSOA     bool                `json:"transient_soa,omitempty"`
+}
+
 var primitiveRegistry = []primitiveDefinition{
 	{ID: PrimitiveResistorV1, Family: "resistor", Terminals: []string{"A", "B"}, RequiresValueSI: true, CatalogParameters: thermalParameterRules()},
 	{
@@ -603,6 +622,40 @@ func PrimitiveModelIDs() []string {
 	return ids
 }
 
+// PrimitiveDescriptors returns defensive copies in canonical registry order.
+// Callers may use the descriptors for bounded graph construction, but model
+// equations and solver controls remain private to simmodel.
+func PrimitiveDescriptors() []PrimitiveDescriptor {
+	result := make([]PrimitiveDescriptor, 0, len(primitiveRegistry))
+	for _, primitive := range primitiveRegistry {
+		aliases := make(map[string][]string, len(primitive.TerminalAliases))
+		for terminal, values := range primitive.TerminalAliases {
+			aliases[terminal] = append([]string(nil), values...)
+		}
+		defaults := make(map[string]string, len(primitive.TerminalDefaults))
+		for terminal, value := range primitive.TerminalDefaults {
+			defaults[terminal] = value
+		}
+		result = append(result, PrimitiveDescriptor{
+			ID:               primitive.ID,
+			Family:           primitive.Family,
+			Terminals:        append([]string(nil), primitive.Terminals...),
+			TerminalAliases:  aliases,
+			TerminalDefaults: defaults,
+			RequiresValueSI:  primitive.RequiresValueSI,
+			Source:           primitive.Source,
+			Autonomous:       primitive.Autonomous,
+			OpAmp:            primitive.OpAmp,
+			Comparator:       primitive.Comparator,
+			Nonlinear:        primitive.Nonlinear,
+			Transient:        primitive.Transient,
+			ThermalRC:        primitive.ThermalRC,
+			TransientSOA:     primitive.TransientSOA,
+		})
+	}
+	return result
+}
+
 func clockSourceParameterRules(programmable bool) []valueRule {
 	rules := []valueRule{
 		{Name: "frequency_hz", Positive: true, Minimum: 1e-3, Maximum: 1e12, Optional: programmable},
@@ -754,6 +807,8 @@ func ApplicableGraphModel(components []ComponentEvidence) (string, bool, string)
 // compatible reviewed primitive.
 func ApplicableGraphModelForAnalysis(components []ComponentEvidence, analysisKind string) (string, bool, string) {
 	switch analysisKind {
+	case AnalysisDCOperatingPoint:
+		return applicableGraphModel(components, "", analysisKind)
 	case AnalysisACSweep:
 		return applicableGraphModel(components, ModelLinearCircuitMNAV1, analysisKind)
 	case AnalysisTransient, AnalysisElectrothermal, AnalysisStartup, AnalysisDistortion:
@@ -1088,8 +1143,11 @@ func validateMNAIntent(intent Intent, components map[string]string) []Diagnostic
 		if !nodeOptional && strings.TrimSpace(assertion.Node) == "" {
 			diagnostics = append(diagnostics, Diagnostic{Path: path + ".node", Message: "assertion node is required"})
 		}
-		componentRequired := kind == AnalysisThermal || kind == AnalysisElectrothermal ||
+		aggregateThermal := assertion.Quantity == QuantityMaximumJunctionTemperatureC ||
+			assertion.Quantity == QuantityMinimumTransientSOAMargin
+		componentRequired := ((kind == AnalysisThermal || kind == AnalysisElectrothermal) && !aggregateThermal) ||
 			assertion.Quantity == QuantityDeviceCurrentA ||
+			assertion.Quantity == QuantityDCSweepDeviceSlopeAperV ||
 			assertion.Quantity == QuantityTransimpedanceOhm ||
 			assertion.Quantity == QuantityOutputPowerW ||
 			assertion.Quantity == QuantityPeakAbsDeviceVoltageV ||
@@ -1101,9 +1159,11 @@ func validateMNAIntent(intent Intent, components map[string]string) []Diagnostic
 		if !componentRequired && assertion.Component != "" {
 			diagnostics = append(diagnostics, Diagnostic{Path: path + ".component", Message: "assertion quantity does not accept a component scope"})
 		}
-		componentsRequired := assertion.Quantity == QuantityTotalSupplyCurrentA || assertion.Quantity == QuantityConversionEfficiencyPct
+		componentsRequired := assertion.Quantity == QuantityTotalSupplyCurrentA ||
+			assertion.Quantity == QuantityConversionEfficiencyPct ||
+			aggregateThermal
 		if componentsRequired && (len(assertion.Components) == 0 || !slices.IsSorted(assertion.Components)) {
-			diagnostics = append(diagnostics, Diagnostic{Path: path + ".components", Message: "aggregate power/current assertion requires canonically ordered resolved components"})
+			diagnostics = append(diagnostics, Diagnostic{Path: path + ".components", Message: "aggregate assertion requires canonically ordered resolved components"})
 		}
 		for componentIndex, component := range assertion.Components {
 			if strings.TrimSpace(component) == "" || (componentIndex > 0 && assertion.Components[componentIndex-1] == component) {
@@ -1140,22 +1200,22 @@ func validateMNAIntent(intent Intent, components map[string]string) []Diagnostic
 				diagnostics = append(diagnostics, Diagnostic{Path: path + ".quantity", Message: "peak absolute voltage assertions require startup or transient analysis"})
 			}
 		case QuantityPeakAbsDeviceVoltageV, QuantityPeakAbsDeviceCurrentA:
-			if kind != AnalysisTransient && kind != AnalysisElectrothermal {
-				diagnostics = append(diagnostics, Diagnostic{Path: path + ".quantity", Message: "peak device-stress assertions require transient or electrothermal analysis"})
+			if kind != AnalysisTransient && kind != AnalysisStartup && kind != AnalysisElectrothermal {
+				diagnostics = append(diagnostics, Diagnostic{Path: path + ".quantity", Message: "peak device-stress assertions require transient, startup, or electrothermal analysis"})
 			}
 		case QuantityOvershootVoltageV:
-			if kind != AnalysisTransient {
-				diagnostics = append(diagnostics, Diagnostic{Path: path + ".quantity", Message: "overshoot assertions require transient analysis"})
+			if kind != AnalysisTransient && kind != AnalysisStartup {
+				diagnostics = append(diagnostics, Diagnostic{Path: path + ".quantity", Message: "overshoot assertions require transient or startup analysis"})
 			}
 		case QuantityTHDPercent:
 			if kind != AnalysisDistortion {
 				diagnostics = append(diagnostics, Diagnostic{Path: path + ".quantity", Message: "THD assertions require distortion analysis"})
 			}
-		case QuantityDeviceDissipationW, QuantityJunctionTemperatureC:
+		case QuantityDeviceDissipationW, QuantityJunctionTemperatureC, QuantityMaximumJunctionTemperatureC:
 			if kind != AnalysisThermal && kind != AnalysisElectrothermal {
 				diagnostics = append(diagnostics, Diagnostic{Path: path + ".quantity", Message: "device dissipation and junction-temperature assertions require thermal or electrothermal analysis"})
 			}
-		case QuantityTransientSOAMargin:
+		case QuantityTransientSOAMargin, QuantityMinimumTransientSOAMargin:
 			if kind != AnalysisElectrothermal {
 				diagnostics = append(diagnostics, Diagnostic{Path: path + ".quantity", Message: "transient SOA margin assertions require electrothermal analysis"})
 			}
@@ -1175,6 +1235,11 @@ func validateMNAIntent(intent Intent, components map[string]string) []Diagnostic
 			if kind != AnalysisDCOperatingPoint {
 				diagnostics = append(diagnostics, Diagnostic{Path: path + ".quantity", Message: "device-current/total-supply-current/transimpedance assertion requires DC operating-point analysis"})
 			}
+		case QuantityDCSweepVoltageSpanV, QuantityDCSweepDeviceSlopeAperV:
+			analysis, _ := analysisByID(intent.Analyses, assertion.AnalysisID)
+			if kind != AnalysisDCOperatingPoint || analysis.DCSweep == nil {
+				diagnostics = append(diagnostics, Diagnostic{Path: path + ".quantity", Message: "DC sweep span/slope assertion requires a bounded DC source sweep"})
+			}
 		case QuantityOutputPowerW:
 			if kind != AnalysisTransient {
 				diagnostics = append(diagnostics, Diagnostic{Path: path + ".quantity", Message: "output-power assertion requires transient analysis"})
@@ -1183,20 +1248,25 @@ func validateMNAIntent(intent Intent, components map[string]string) []Diagnostic
 			if kind != AnalysisTransient {
 				diagnostics = append(diagnostics, Diagnostic{Path: path + ".quantity", Message: "conversion-efficiency assertion requires transient analysis"})
 			}
-		case QuantityThresholdVoltageV, QuantityThresholdCurrentA, QuantityHysteresisVoltageV:
+		case QuantityThresholdVoltageV, QuantityThresholdCurrentA, QuantityHysteresisVoltageV,
+			QuantityRisingThresholdVoltageV, QuantityFallingThresholdVoltageV,
+			QuantityLowerThresholdVoltageV, QuantityUpperThresholdVoltageV:
 			analysis, _ := analysisByID(intent.Analyses, assertion.AnalysisID)
 			if kind != AnalysisDCOperatingPoint || analysis.DCSweep == nil {
 				diagnostics = append(diagnostics, Diagnostic{Path: path + ".quantity", Message: "threshold and hysteresis assertions require a bounded DC source sweep"})
 			} else {
 				family := components[analysis.DCSweep.Component]
-				if assertion.Quantity == QuantityThresholdVoltageV && family != "voltage_source" && family != "connector" {
+				voltageThreshold := assertion.Quantity != QuantityThresholdCurrentA
+				if voltageThreshold && family != "voltage_source" && family != "connector" {
 					diagnostics = append(diagnostics, Diagnostic{Path: path + ".quantity", Message: "voltage threshold requires a swept voltage source"})
 				}
 				if assertion.Quantity == QuantityThresholdCurrentA && family != "current_source" {
 					diagnostics = append(diagnostics, Diagnostic{Path: path + ".quantity", Message: "current threshold requires a swept current source"})
 				}
-				if assertion.Quantity == QuantityHysteresisVoltageV && (!analysis.DCSweep.Bidirectional || (family != "voltage_source" && family != "connector")) {
-					diagnostics = append(diagnostics, Diagnostic{Path: path + ".quantity", Message: "voltage hysteresis requires a bidirectional swept voltage source"})
+				requiresReverse := assertion.Quantity == QuantityHysteresisVoltageV ||
+					assertion.Quantity == QuantityFallingThresholdVoltageV
+				if requiresReverse && (!analysis.DCSweep.Bidirectional || (family != "voltage_source" && family != "connector")) {
+					diagnostics = append(diagnostics, Diagnostic{Path: path + ".quantity", Message: "falling threshold and voltage hysteresis require a bidirectional swept voltage source"})
 				}
 			}
 		default:
@@ -1209,7 +1279,29 @@ func validateMNAIntent(intent Intent, components map[string]string) []Diagnostic
 		if kind == AnalysisACSweep && !acPointQuantity && assertion.FrequencyHz != 0 {
 			diagnostics = append(diagnostics, Diagnostic{Path: path + ".frequency_hz", Message: "sweep-derived AC assertion cannot specify a frequency"})
 		}
-		if kind != AnalysisACSweep && assertion.FrequencyHz != 0 {
+		distortionPointQuantity :=
+			kind == AnalysisDistortion &&
+				assertion.Quantity == QuantityTHDPercent
+		if distortionPointQuantity && assertion.FrequencyHz != 0 {
+			analysis, _ := analysisByID(intent.Analyses, assertion.AnalysisID)
+			fundamental := 0.0
+			for _, excitation := range analysis.Excitations {
+				if hasSine(excitation) {
+					fundamental = excitation.SineFrequencyHz
+					break
+				}
+			}
+			if !finite(assertion.FrequencyHz) ||
+				assertion.FrequencyHz <= 0 ||
+				fundamental <= 0 ||
+				math.Abs(assertion.FrequencyHz-fundamental) >
+					math.Max(assertion.FrequencyHz, fundamental)*1e-12 {
+				diagnostics = append(diagnostics, Diagnostic{Path: path + ".frequency_hz", Message: "THD assertion frequency must match the resolved distortion sine fundamental"})
+			}
+		}
+		if kind != AnalysisACSweep &&
+			!distortionPointQuantity &&
+			assertion.FrequencyHz != 0 {
 			diagnostics = append(diagnostics, Diagnostic{Path: path + ".frequency_hz", Message: "derived and non-frequency assertions cannot specify a frequency"})
 		}
 		if kind == AnalysisTransient {
@@ -1771,9 +1863,9 @@ func validateMNAPlan(plan Plan) []Diagnostic {
 		if assertion.ReferenceNode != "" && !slices.Contains(plan.Nodes, assertion.ReferenceNode) {
 			diagnostics = append(diagnostics, Diagnostic{Path: fmt.Sprintf("assertions[%d].reference_node", index), Message: "assertion reference node is absent from resolved topology"})
 		}
-		if exists && (analysis.Kind == AnalysisThermal || analysis.Kind == AnalysisElectrothermal || assertion.Component != "") {
+		if exists && assertion.Component != "" {
 			if _, componentExists := deviceFamilies[assertion.Component]; !componentExists {
-				diagnostics = append(diagnostics, Diagnostic{Path: fmt.Sprintf("assertions[%d].component", index), Message: "thermal assertion references a component absent from resolved topology"})
+				diagnostics = append(diagnostics, Diagnostic{Path: fmt.Sprintf("assertions[%d].component", index), Message: "assertion references a component absent from resolved topology"})
 			}
 		}
 		if exists {

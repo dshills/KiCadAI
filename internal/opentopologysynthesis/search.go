@@ -1,0 +1,4667 @@
+package opentopologysynthesis
+
+import (
+	"cmp"
+	"container/heap"
+	"context"
+	"fmt"
+	"math"
+	"slices"
+
+	"kicadai/internal/reports"
+)
+
+const (
+	maxPrimitivePlacementEnumerations = 4_096
+	maxPrimitivePlacementsPerKind     = 12
+	maxSearchTransitionsPerState      = 64
+	searchRejectionSampleLimit        = 24
+)
+
+type topologySearchState struct {
+	graph      CandidateGraph
+	hash       string
+	topology   string
+	score      TopologyScore
+	operations []GraphOperation
+}
+
+type topologyFrontier []topologySearchState
+
+func (frontier topologyFrontier) Len() int { return len(frontier) }
+func (frontier topologyFrontier) Less(left, right int) bool {
+	return compareTopologyScores(frontier[left].score, frontier[right].score) < 0
+}
+func (frontier topologyFrontier) Swap(left, right int) {
+	frontier[left], frontier[right] = frontier[right], frontier[left]
+}
+func (frontier *topologyFrontier) Push(value any) {
+	*frontier = append(*frontier, value.(topologySearchState))
+}
+func (frontier *topologyFrontier) Pop() any {
+	previous := *frontier
+	last := previous[len(previous)-1]
+	*frontier = previous[:len(previous)-1]
+	return last
+}
+
+func SearchPrimitiveTopologies(ctx context.Context, requirement Requirement, inventory PrimitiveInventory, policy Policy) TopologySearchResult {
+	result := TopologySearchResult{
+		Schema:        TopologySearchSchema,
+		Version:       TopologySearchVersion,
+		PolicyVersion: PolicyVersion,
+		InventoryHash: inventory.Hash,
+		Policy:        effectiveTopologyPolicy(policy),
+		Status:        TopologySearchFailed,
+		Candidates:    []TopologyCandidate{},
+		Rejections:    []SearchRejection{},
+		Issues:        []reports.Issue{},
+	}
+	requirement = Normalize(requirement)
+	requirementHash, err := CanonicalHash(requirement)
+	if err != nil {
+		result.Issues = []reports.Issue{graphIssue(CodeRequirementInvalid, "requirement", "hash open-topology requirement: "+err.Error(), "")}
+		return result
+	}
+	result.RequirementHash = requirementHash
+	if issues := Validate(requirement); len(issues) != 0 {
+		result.Issues = issues
+		return result
+	}
+	if len(inventory.Primitives) == 0 || len(inventory.Hash) != 64 {
+		result.Status = TopologySearchUnsupported
+		result.Issues = []reports.Issue{graphIssue(CodePrimitiveUnavailable, "inventory", "topology search requires a nonempty hash-bound primitive inventory", "build the reviewed primitive inventory")}
+		return result
+	}
+	representatives := topologyRepresentatives(requirement, inventory)
+	if len(representatives) == 0 {
+		result.Status = TopologySearchUnsupported
+		result.Issues = []reports.Issue{graphIssue(CodePrimitiveUnavailable, "inventory.primitives", "no primitive candidates cover the requested analysis envelope", "onboard compatible reviewed primitive evidence")}
+		return result
+	}
+	initial, issues := InitialGraph(requirement)
+	if len(issues) != 0 {
+		result.Issues = issues
+		return result
+	}
+	initialHash, err := GraphHash(initial)
+	if err != nil {
+		result.Issues = []reports.Issue{graphIssue(CodeNoCompleteGraph, "initial_graph", "hash initial graph: "+err.Error(), "")}
+		return result
+	}
+	initialTopology, err := TopologyHash(initial)
+	if err != nil {
+		result.Issues = []reports.Issue{graphIssue(CodeNoCompleteGraph, "initial_graph", "hash initial graph topology: "+err.Error(), "")}
+		return result
+	}
+	inventoryByKey := primitiveInventoryByKey(inventory)
+	limits := GraphLimits{
+		MaxPrimitiveInstances: minPositive(result.Policy.MaxPrimitiveInstances, requirement.Requirements.Constraints.MaxComponents),
+		MaxInternalNodes:      result.Policy.MaxInternalNodes,
+	}
+	initialScore := scoreTopologyGraph(requirement, initial, inventoryByKey, initialHash)
+	initialState := topologySearchState{graph: initial, hash: initialHash, topology: initialTopology, score: initialScore}
+	frontier := &topologyFrontier{initialState}
+	heap.Init(frontier)
+	visited := map[string]bool{initialHash: true}
+	dominantTopology := map[string]topologySearchState{initialTopology: initialState}
+	retainedTopology := map[string]TopologyCandidate{}
+	rejections := map[string][]string{}
+	relationshipCandidates, relationshipConsumption, relationshipRejections := topologyRelationshipSeeds(
+		ctx,
+		requirement,
+		inventory,
+		representatives,
+		inventoryByKey,
+		limits,
+		result.Policy,
+		initialState,
+	)
+	addSearchConsumption(&result.Consumption, relationshipConsumption)
+	for code, samples := range relationshipRejections {
+		rejections[code] = append(rejections[code], samples...)
+	}
+	for _, candidate := range relationshipCandidates {
+		if existing, found := retainedTopology[candidate.TopologyHash]; !found ||
+			compareTopologyCandidates(candidate, existing) < 0 {
+			retainedTopology[candidate.TopologyHash] = candidate
+		}
+	}
+	analogCandidates, analogConsumption, analogRejections := topologyAnalogRelationshipSeeds(
+		ctx,
+		requirement,
+		inventory,
+		representatives,
+		inventoryByKey,
+		limits,
+		result.Policy,
+		initialState,
+	)
+	addSearchConsumption(&result.Consumption, analogConsumption)
+	for code, samples := range analogRejections {
+		rejections[code] = append(rejections[code], samples...)
+	}
+	for _, candidate := range analogCandidates {
+		if existing, found := retainedTopology[candidate.TopologyHash]; !found ||
+			compareTopologyCandidates(candidate, existing) < 0 {
+			retainedTopology[candidate.TopologyHash] = candidate
+		}
+	}
+	conditionalCandidates, conditionalConsumption, conditionalRejections := topologyConditionalTransferRelationshipSeeds(
+		ctx,
+		requirement,
+		inventory,
+		representatives,
+		inventoryByKey,
+		limits,
+		result.Policy,
+		initialState,
+	)
+	addSearchConsumption(&result.Consumption, conditionalConsumption)
+	for code, samples := range conditionalRejections {
+		rejections[code] = append(rejections[code], samples...)
+	}
+	for _, candidate := range conditionalCandidates {
+		if existing, found := retainedTopology[candidate.TopologyHash]; !found ||
+			compareTopologyCandidates(candidate, existing) < 0 {
+			retainedTopology[candidate.TopologyHash] = candidate
+		}
+	}
+	switchCandidates, switchConsumption, switchRejections := topologyControlledSwitchRelationshipSeeds(
+		ctx,
+		requirement,
+		inventory,
+		representatives,
+		inventoryByKey,
+		limits,
+		result.Policy,
+		initialState,
+	)
+	addSearchConsumption(&result.Consumption, switchConsumption)
+	for code, samples := range switchRejections {
+		rejections[code] = append(rejections[code], samples...)
+	}
+	for _, candidate := range switchCandidates {
+		if existing, found := retainedTopology[candidate.TopologyHash]; !found ||
+			compareTopologyCandidates(candidate, existing) < 0 {
+			retainedTopology[candidate.TopologyHash] = candidate
+		}
+	}
+	currentCandidates, currentConsumption, currentRejections := topologyTransconductanceRelationshipSeeds(
+		ctx,
+		requirement,
+		inventory,
+		representatives,
+		inventoryByKey,
+		limits,
+		result.Policy,
+		initialState,
+	)
+	addSearchConsumption(&result.Consumption, currentConsumption)
+	for code, samples := range currentRejections {
+		rejections[code] = append(rejections[code], samples...)
+	}
+	for _, candidate := range currentCandidates {
+		if existing, found := retainedTopology[candidate.TopologyHash]; !found ||
+			compareTopologyCandidates(candidate, existing) < 0 {
+			retainedTopology[candidate.TopologyHash] = candidate
+		}
+	}
+	obligationPolicy := result.Policy
+	obligationPolicy.MaxExpandedStates = max(1, result.Policy.MaxExpandedStates/2)
+	obligationPolicy.MaxGeneratedGraphs = max(1, result.Policy.MaxGeneratedGraphs/2)
+	minimumDistinctTopologies := min(1, result.Policy.MaxRetainedCandidates)
+	if len(retainedTopology) < minimumDistinctTopologies {
+		obligationCandidates, obligationConsumption, obligationRejections := topologyObligationSeeds(
+			ctx,
+			requirement,
+			inventory,
+			representatives,
+			inventoryByKey,
+			limits,
+			obligationPolicy,
+			initialState,
+		)
+		addSearchConsumption(&result.Consumption, obligationConsumption)
+		for code, samples := range obligationRejections {
+			rejections[code] = append(rejections[code], samples...)
+		}
+		for _, candidate := range obligationCandidates {
+			if existing, found := retainedTopology[candidate.TopologyHash]; !found ||
+				compareTopologyCandidates(candidate, existing) < 0 {
+				retainedTopology[candidate.TopologyHash] = candidate
+			}
+		}
+	}
+	if len(retainedTopology) < minimumDistinctTopologies {
+		guidedPolicy := result.Policy
+		guidedPolicy.MaxExpandedStates = min(
+			max(0, result.Policy.MaxExpandedStates-result.Consumption.ExpandedStates),
+			max(1, result.Policy.MaxExpandedStates/4),
+		)
+		guidedPolicy.MaxGeneratedGraphs = min(
+			max(0, result.Policy.MaxGeneratedGraphs-result.Consumption.GeneratedGraphs),
+			max(1, result.Policy.MaxGeneratedGraphs/4),
+		)
+		guidedCandidates, guidedConsumption, guidedRejections := behaviorGuidedTopologySeeds(
+			ctx,
+			requirement,
+			inventory,
+			representatives,
+			inventoryByKey,
+			limits,
+			guidedPolicy,
+			initialState,
+		)
+		addSearchConsumption(&result.Consumption, guidedConsumption)
+		for code, samples := range guidedRejections {
+			rejections[code] = append(rejections[code], samples...)
+		}
+		for _, candidate := range guidedCandidates {
+			if existing, found := retainedTopology[candidate.TopologyHash]; !found ||
+				compareTopologyCandidates(candidate, existing) < 0 {
+				retainedTopology[candidate.TopologyHash] = candidate
+			}
+		}
+	}
+	// Relationship construction retains materially-distinct alternatives when
+	// a bounded electrical relationship admits them. Once any complete
+	// canonical topology exists, the unconstrained fallback mostly repeats
+	// weaker placements at much higher cost. Retain it only while the
+	// relationship, obligation, and guided lanes have no complete result.
+	if len(retainedTopology) >= minimumDistinctTopologies {
+		frontier = &topologyFrontier{}
+	}
+
+	for frontier.Len() != 0 {
+		if err := ctx.Err(); err != nil {
+			result.Status = TopologySearchCanceled
+			result.Issues = []reports.Issue{graphIssue(CodeCanceled, "search", "open-topology search canceled", "retry with an active context")}
+			break
+		}
+		if result.Consumption.ExpandedStates >= result.Policy.MaxExpandedStates ||
+			result.Consumption.GeneratedGraphs >= result.Policy.MaxGeneratedGraphs {
+			result.Status = TopologySearchExhausted
+			result.Consumption.BudgetExhausted = true
+			result.Issues = []reports.Issue{graphIssue(CodeSearchExhausted, "search.policy", "open-topology graph budget exhausted", "increase the explicit count budget or narrow the behavioral envelope")}
+			break
+		}
+		state := heap.Pop(frontier).(topologySearchState)
+		if dominant, found := dominantTopology[state.topology]; found && dominant.hash != state.hash {
+			rejections["dominated_topology"] = append(
+				rejections["dominated_topology"],
+				state.hash+"->"+dominant.hash,
+			)
+			continue
+		}
+		result.Consumption.ExpandedStates++
+		if frontier.Len() > result.Consumption.MaximumFrontier {
+			result.Consumption.MaximumFrontier = frontier.Len()
+		}
+
+		completeIssues := ValidateCompleteGraph(state.graph, inventory, limits)
+		if len(completeIssues) == 0 && len(state.graph.Instances) != 0 && state.score.BehaviorGap == 0 {
+			topologyHash, hashErr := TopologyHash(state.graph)
+			if hashErr != nil {
+				rejections["canonical_hash_failed"] = append(rejections["canonical_hash_failed"], state.hash)
+			} else {
+				normalized, normalizeErr := NormalizeGraph(state.graph)
+				if normalizeErr != nil {
+					rejections["canonical_normalization_failed"] = append(rejections["canonical_normalization_failed"], state.hash)
+				} else {
+					result.Consumption.CompleteGraphs++
+					candidate := TopologyCandidate{
+						Fingerprint:  state.hash,
+						TopologyHash: topologyHash,
+						Score:        state.score,
+						Graph:        normalized,
+						Operations:   cloneGraphOperations(state.operations),
+					}
+					if existing, found := retainedTopology[topologyHash]; !found ||
+						compareTopologyCandidates(candidate, existing) < 0 {
+						retainedTopology[topologyHash] = candidate
+					}
+				}
+			}
+		} else if len(completeIssues) != 0 {
+			for _, issue := range completeIssues {
+				rejections[string(issue.Code)] = append(rejections[string(issue.Code)], issue.Path+":"+issue.Message)
+			}
+		}
+
+		if len(state.graph.Instances) >= limits.MaxPrimitiveInstances {
+			continue
+		}
+		remainingGraphs := result.Policy.MaxGeneratedGraphs - result.Consumption.GeneratedGraphs
+		expansions, generatedGraphs := expandTopologyState(
+			state, representatives, limits, requirement, inventory, inventoryByKey,
+			remainingGraphs,
+		)
+		result.Consumption.GeneratedGraphs += generatedGraphs
+		for _, expansion := range expansions {
+			hash, hashErr := GraphHash(expansion.graph)
+			if hashErr != nil {
+				rejections["canonical_hash_failed"] = append(rejections["canonical_hash_failed"], hashErr.Error())
+				continue
+			}
+			if visited[hash] {
+				rejections["dominated_topology"] = append(rejections["dominated_topology"], hash+"->"+hash)
+				continue
+			}
+			visited[hash] = true
+			if partialIssues := ValidatePartialGraph(expansion.graph, inventory, limits); len(partialIssues) != 0 {
+				for _, issue := range partialIssues {
+					rejections[string(issue.Code)] = append(rejections[string(issue.Code)], issue.Path+":"+issue.Message)
+				}
+				continue
+			}
+			expansion.hash = hash
+			expansion.score = scoreTopologyGraph(requirement, expansion.graph, inventoryByKey, hash)
+			topologyHash, topologyErr := TopologyHash(expansion.graph)
+			if topologyErr != nil {
+				rejections["canonical_topology_hash_failed"] = append(rejections["canonical_topology_hash_failed"], topologyErr.Error())
+				continue
+			}
+			expansion.topology = topologyHash
+			if dominant, found := dominantTopology[topologyHash]; found &&
+				compareTopologyScores(dominant.score, expansion.score) <= 0 {
+				rejections["dominated_topology"] = append(
+					rejections["dominated_topology"],
+					expansion.hash+"->"+dominant.hash,
+				)
+				continue
+			}
+			dominantTopology[topologyHash] = expansion
+			if len(expansion.operations) != 0 {
+				last := len(expansion.operations) - 1
+				expansion.operations[last].AfterHash = hash
+			}
+			heap.Push(frontier, expansion)
+			if frontier.Len() > result.Consumption.MaximumFrontier {
+				result.Consumption.MaximumFrontier = frontier.Len()
+			}
+		}
+
+		if len(retainedTopology) >= result.Policy.MaxRetainedCandidates &&
+			result.Consumption.ExpandedStates >= minPositive(result.Policy.MaxRetainedCandidates*8, result.Policy.MaxExpandedStates) {
+			break
+		}
+	}
+
+	result.Candidates = make([]TopologyCandidate, 0, len(retainedTopology))
+	for _, candidate := range retainedTopology {
+		result.Candidates = append(result.Candidates, candidate)
+	}
+	slices.SortFunc(result.Candidates, compareTopologyCandidates)
+	if len(result.Candidates) > result.Policy.MaxRetainedCandidates {
+		result.Candidates = selectDiverseTopologyCandidates(
+			result.Candidates,
+			result.Policy.MaxRetainedCandidates,
+		)
+	}
+	result.Rejections = normalizeSearchRejections(rejections)
+	if len(result.Candidates) != 0 {
+		result.Status = TopologySearchCandidates
+		result.Issues = nil
+	} else if result.Status != TopologySearchCanceled &&
+		(result.Consumption.GeneratedGraphs >= result.Policy.MaxGeneratedGraphs ||
+			result.Consumption.ExpandedStates >= result.Policy.MaxExpandedStates) {
+		result.Status = TopologySearchExhausted
+		result.Consumption.BudgetExhausted = true
+		result.Issues = []reports.Issue{graphIssue(CodeSearchExhausted, "search.policy", "open-topology graph budget exhausted", "increase the explicit count budget or narrow the behavioral envelope")}
+	} else if result.Status != TopologySearchCanceled && result.Status != TopologySearchExhausted {
+		result.Status = TopologySearchExhausted
+		result.Issues = []reports.Issue{graphIssue(CodeNoCompleteGraph, "search", "bounded search produced no complete primitive graph", "increase the explicit graph budget or onboard a compatible primitive")}
+	}
+	return result
+}
+
+// topologyRelationshipSeeds constructs only the electrical relationships
+// implied directly by behavior: an observed decision output, an externally
+// driven signal, a rail-derived reference, and optional positive feedback.
+// It does not select a named circuit family or use corpus identities. The
+// ordinary bounded graph search remains the fallback for behavior that does
+// not imply these relationships or cannot be completed within the limits.
+func topologyRelationshipSeeds(
+	ctx context.Context,
+	requirement Requirement,
+	inventory PrimitiveInventory,
+	representatives []PrimitiveCandidate,
+	inventoryByKey map[string]PrimitiveCandidate,
+	limits GraphLimits,
+	policy Policy,
+	initial topologySearchState,
+) ([]TopologyCandidate, Consumption, map[string][]string) {
+	minimumStages, requireFeedback := topologyDecisionObligation(requirement)
+	if minimumStages != 1 {
+		return nil, Consumption{}, map[string][]string{}
+	}
+	var resistor PrimitiveCandidate
+	active := []PrimitiveCandidate{}
+	referenceDiodes := []PrimitiveCandidate{}
+	conditioners := []PrimitiveCandidate{}
+	for _, primitive := range representatives {
+		switch primitive.Kind {
+		case "resistor":
+			resistor = primitive
+		case "comparator":
+			active = append(active, primitive)
+		case "opamp":
+			active = append(active, primitive)
+			conditioners = append(conditioners, primitive)
+		case "reference_diode":
+			referenceDiodes = append(referenceDiodes, primitive)
+		}
+	}
+	if resistor.Key == "" || len(active) == 0 {
+		return nil, Consumption{}, map[string][]string{}
+	}
+	slices.SortFunc(active, func(left, right PrimitiveCandidate) int {
+		return cmp.Compare(left.Key, right.Key)
+	})
+	slices.SortFunc(referenceDiodes, func(left, right PrimitiveCandidate) int {
+		return cmp.Compare(left.Key, right.Key)
+	})
+	slices.SortFunc(conditioners, func(left, right PrimitiveCandidate) int {
+		return cmp.Compare(left.Key, right.Key)
+	})
+	inputs := topologyNodesByRole(initial.graph, "input", "control")
+	outputs := topologyNodesByRole(initial.graph, "output")
+	supplies := topologyNodesByRole(initial.graph, "supply")
+	references := topologyNodesByRole(initial.graph, "reference")
+	if len(inputs) == 0 || len(outputs) == 0 ||
+		len(supplies) == 0 || len(references) == 0 {
+		return nil, Consumption{}, map[string][]string{}
+	}
+	polarities := []int{-1, 1}
+	if polarity := topologyDecisionPolarity(requirement); polarity != 0 {
+		polarities = []int{polarity}
+	}
+	consumption := Consumption{}
+	rejections := map[string][]string{}
+	retained := map[string]TopologyCandidate{}
+	for _, primitive := range active {
+		for _, input := range inputs {
+			for _, output := range outputs {
+				for _, supply := range supplies {
+					for _, referenceRail := range references {
+						for _, polarity := range polarities {
+							if ctx.Err() != nil ||
+								consumption.ExpandedStates >= policy.MaxExpandedStates ||
+								consumption.GeneratedGraphs >= policy.MaxGeneratedGraphs {
+								break
+							}
+							consumption.ExpandedStates++
+							state := initial
+							referenceNode := ""
+							state, referenceNode = addRelationshipInternalNode(
+								state, requirement, inventoryByKey, &consumption,
+							)
+							if referenceNode == "" {
+								continue
+							}
+							signalNode := input
+							if requireFeedback {
+								state, signalNode = addRelationshipInternalNode(
+									state, requirement, inventoryByKey, &consumption,
+								)
+								if signalNode == "" {
+									continue
+								}
+							}
+							if internalNodeCount(state.graph) > limits.MaxInternalNodes {
+								continue
+							}
+							inPlus, inMinus := referenceNode, signalNode
+							if polarity > 0 {
+								inPlus, inMinus = signalNode, referenceNode
+							}
+							state = addRelationshipPrimitive(
+								state,
+								requirement,
+								inventoryByKey,
+								primitive,
+								[]TerminalConnection{
+									{Terminal: "IN_MINUS", Node: inMinus},
+									{Terminal: "IN_PLUS", Node: inPlus},
+									{Terminal: "OUT", Node: output},
+									{Terminal: "V_MINUS", Node: referenceRail},
+									{Terminal: "V_PLUS", Node: supply},
+								},
+								&consumption,
+							)
+							for _, edge := range [][2]string{
+								{referenceNode, referenceRail},
+								{referenceNode, supply},
+							} {
+								state = addRelationshipPrimitive(
+									state,
+									requirement,
+									inventoryByKey,
+									resistor,
+									topologyTwoTerminalPlacement(edge[0], edge[1]),
+									&consumption,
+								)
+							}
+							if requireFeedback {
+								feedbackNode := signalNode
+								if polarity < 0 {
+									feedbackNode = referenceNode
+								}
+								for _, edge := range [][2]string{
+									{signalNode, input},
+									{feedbackNode, output},
+								} {
+									state = addRelationshipPrimitive(
+										state,
+										requirement,
+										inventoryByKey,
+										resistor,
+										topologyTwoTerminalPlacement(edge[0], edge[1]),
+										&consumption,
+									)
+								}
+							}
+							if len(state.graph.Instances) > limits.MaxPrimitiveInstances ||
+								consumption.GeneratedGraphs > policy.MaxGeneratedGraphs {
+								continue
+							}
+							if issues := ValidateCompleteGraph(state.graph, inventory, limits); len(issues) != 0 {
+								for _, issue := range issues {
+									rejections[string(issue.Code)] = append(
+										rejections[string(issue.Code)],
+										issue.Path+":"+issue.Message,
+									)
+								}
+								continue
+							}
+							if state.score.BehaviorGap != 0 {
+								rejections["relationship_gap"] = append(
+									rejections["relationship_gap"],
+									fmt.Sprintf("%s:gap=%d", state.hash, state.score.BehaviorGap),
+								)
+								continue
+							}
+							normalized, err := NormalizeGraph(state.graph)
+							if err != nil {
+								rejections["canonical_normalization_failed"] = append(
+									rejections["canonical_normalization_failed"], err.Error(),
+								)
+								continue
+							}
+							topologyHash, err := TopologyHash(normalized)
+							if err != nil {
+								rejections["canonical_topology_hash_failed"] = append(
+									rejections["canonical_topology_hash_failed"], err.Error(),
+								)
+								continue
+							}
+							consumption.CompleteGraphs++
+							candidate := TopologyCandidate{
+								Fingerprint:  state.hash,
+								TopologyHash: topologyHash,
+								Score:        state.score,
+								Graph:        normalized,
+								Operations:   cloneGraphOperations(state.operations),
+							}
+							if existing, found := retained[topologyHash]; !found ||
+								compareTopologyCandidates(candidate, existing) < 0 {
+								retained[topologyHash] = candidate
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+	for _, primitive := range active {
+		for _, conditioner := range conditioners {
+			for _, referencePrimitive := range referenceDiodes {
+				for _, input := range inputs {
+					for _, output := range outputs {
+						for _, supply := range supplies {
+							for _, referenceRail := range references {
+								for _, polarity := range polarities {
+									if ctx.Err() != nil ||
+										consumption.ExpandedStates >= policy.MaxExpandedStates ||
+										consumption.GeneratedGraphs >= policy.MaxGeneratedGraphs {
+										break
+									}
+									consumption.ExpandedStates++
+									state := initial
+									internal := make([]string, 0, 5)
+									for index := 0; index < 4; index++ {
+										var node string
+										state, node = addRelationshipInternalNode(
+											state, requirement, inventoryByKey, &consumption,
+										)
+										if node == "" {
+											break
+										}
+										internal = append(internal, node)
+									}
+									if len(internal) != 4 {
+										continue
+									}
+									absoluteReference := internal[0]
+									gainNode := internal[1]
+									conditionedReference := internal[2]
+									signalNode := internal[3]
+									decisionReference := conditionedReference
+									if polarity < 0 {
+										var node string
+										state, node = addRelationshipInternalNode(
+											state, requirement, inventoryByKey, &consumption,
+										)
+										if node == "" {
+											continue
+										}
+										decisionReference = node
+									}
+									if internalNodeCount(state.graph) > limits.MaxInternalNodes {
+										continue
+									}
+									state = addRelationshipPrimitive(
+										state,
+										requirement,
+										inventoryByKey,
+										referencePrimitive,
+										[]TerminalConnection{
+											{Terminal: "ANODE", Node: referenceRail},
+											{Terminal: "CATHODE", Node: absoluteReference},
+										},
+										&consumption,
+									)
+									state = addRelationshipPrimitive(
+										state,
+										requirement,
+										inventoryByKey,
+										resistor,
+										topologyTwoTerminalPlacement(supply, absoluteReference),
+										&consumption,
+									)
+									state = addRelationshipPrimitive(
+										state,
+										requirement,
+										inventoryByKey,
+										conditioner,
+										[]TerminalConnection{
+											{Terminal: "IN_MINUS", Node: gainNode},
+											{Terminal: "IN_PLUS", Node: absoluteReference},
+											{Terminal: "OUT", Node: conditionedReference},
+											{Terminal: "V_MINUS", Node: referenceRail},
+											{Terminal: "V_PLUS", Node: supply},
+										},
+										&consumption,
+									)
+									for _, edge := range [][2]string{
+										{gainNode, referenceRail},
+										{gainNode, conditionedReference},
+									} {
+										state = addRelationshipPrimitive(
+											state,
+											requirement,
+											inventoryByKey,
+											resistor,
+											topologyTwoTerminalPlacement(edge[0], edge[1]),
+											&consumption,
+										)
+									}
+									inPlus, inMinus := decisionReference, signalNode
+									if polarity > 0 {
+										inPlus, inMinus = signalNode, decisionReference
+									}
+									state = addRelationshipPrimitive(
+										state,
+										requirement,
+										inventoryByKey,
+										primitive,
+										[]TerminalConnection{
+											{Terminal: "IN_MINUS", Node: inMinus},
+											{Terminal: "IN_PLUS", Node: inPlus},
+											{Terminal: "OUT", Node: output},
+											{Terminal: "V_MINUS", Node: referenceRail},
+											{Terminal: "V_PLUS", Node: supply},
+										},
+										&consumption,
+									)
+									state = addRelationshipPrimitive(
+										state,
+										requirement,
+										inventoryByKey,
+										resistor,
+										topologyTwoTerminalPlacement(signalNode, input),
+										&consumption,
+									)
+									feedbackNode := signalNode
+									if polarity < 0 {
+										state = addRelationshipPrimitive(
+											state,
+											requirement,
+											inventoryByKey,
+											resistor,
+											topologyTwoTerminalPlacement(
+												conditionedReference,
+												decisionReference,
+											),
+											&consumption,
+										)
+										feedbackNode = decisionReference
+									}
+									state = addRelationshipPrimitive(
+										state,
+										requirement,
+										inventoryByKey,
+										resistor,
+										topologyTwoTerminalPlacement(feedbackNode, output),
+										&consumption,
+									)
+									if len(state.graph.Instances) > limits.MaxPrimitiveInstances ||
+										consumption.GeneratedGraphs > policy.MaxGeneratedGraphs {
+										continue
+									}
+									if issues := ValidateCompleteGraph(state.graph, inventory, limits); len(issues) != 0 {
+										for _, issue := range issues {
+											rejections[string(issue.Code)] = append(
+												rejections[string(issue.Code)],
+												issue.Path+":"+issue.Message,
+											)
+										}
+										continue
+									}
+									if state.score.BehaviorGap != 0 {
+										rejections["relationship_gap"] = append(
+											rejections["relationship_gap"],
+											fmt.Sprintf(
+												"%s:gap=%d:decision_gap=%d:derived_reference=%t",
+												state.hash,
+												state.score.BehaviorGap,
+												topologyDecisionStageGap(
+													state.graph,
+													minimumStages,
+													requireFeedback,
+													polarity,
+												),
+												topologyNodeHasDerivedReference(
+													state.graph,
+													decisionReference,
+													supplies,
+													references,
+												),
+											),
+										)
+										continue
+									}
+									normalized, err := NormalizeGraph(state.graph)
+									if err != nil {
+										rejections["canonical_normalization_failed"] = append(
+											rejections["canonical_normalization_failed"], err.Error(),
+										)
+										continue
+									}
+									topologyHash, err := TopologyHash(normalized)
+									if err != nil {
+										rejections["canonical_topology_hash_failed"] = append(
+											rejections["canonical_topology_hash_failed"], err.Error(),
+										)
+										continue
+									}
+									consumption.CompleteGraphs++
+									candidate := TopologyCandidate{
+										Fingerprint:  state.hash,
+										TopologyHash: topologyHash,
+										Score:        state.score,
+										Graph:        normalized,
+										Operations:   cloneGraphOperations(state.operations),
+									}
+									if existing, found := retained[topologyHash]; !found ||
+										compareTopologyCandidates(candidate, existing) < 0 {
+										retained[topologyHash] = candidate
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+	if consumption.ExpandedStates >= policy.MaxExpandedStates ||
+		consumption.GeneratedGraphs >= policy.MaxGeneratedGraphs {
+		consumption.BudgetExhausted = true
+	}
+	result := make([]TopologyCandidate, 0, len(retained))
+	for _, candidate := range retained {
+		result = append(result, candidate)
+	}
+	slices.SortFunc(result, compareTopologyCandidates)
+	return result, consumption, rejections
+}
+
+func topologyDecisionObligation(requirement Requirement) (int, bool) {
+	minimumStages := 0
+	requireFeedback := false
+	for _, assertion := range requirement.Requirements.BehavioralRequirements {
+		switch assertion.Metric {
+		case "hysteresis":
+			minimumStages = max(minimumStages, 1)
+			requireFeedback = true
+		case "rising_threshold", "falling_threshold", "threshold_voltage", "threshold_current":
+			minimumStages = max(minimumStages, 1)
+		case "lower_threshold", "upper_threshold":
+			minimumStages = max(minimumStages, 2)
+		}
+	}
+	return minimumStages, requireFeedback
+}
+
+// topologyAnalogRelationshipSeeds constructs active-transfer candidates with a
+// real input time constant when the requested behavior simultaneously requires
+// gain above unity and a bounded cutoff. It retains both an incomplete
+// feedback relationship for diagnosis-driven graph repair and the corresponding
+// closed-loop relationship; both come only from gain and frequency obligations.
+func topologyAnalogRelationshipSeeds(
+	ctx context.Context,
+	requirement Requirement,
+	inventory PrimitiveInventory,
+	representatives []PrimitiveCandidate,
+	inventoryByKey map[string]PrimitiveCandidate,
+	limits GraphLimits,
+	policy Policy,
+	initial topologySearchState,
+) ([]TopologyCandidate, Consumption, map[string][]string) {
+	requireGain, requireCutoff := false, false
+	for _, assertion := range requirement.Requirements.BehavioralRequirements {
+		switch assertion.Metric {
+		case "voltage_gain":
+			requireGain = requireGain ||
+				(assertion.Min != nil && *assertion.Min > 1)
+		case "cutoff_frequency":
+			requireCutoff = true
+		}
+	}
+	if !requireGain || !requireCutoff {
+		return nil, Consumption{}, map[string][]string{}
+	}
+	var opamp, resistor, capacitor PrimitiveCandidate
+	for _, primitive := range representatives {
+		switch primitive.Kind {
+		case "opamp":
+			opamp = primitive
+		case "resistor":
+			resistor = primitive
+		case "capacitor":
+			capacitor = primitive
+		}
+	}
+	if opamp.Key == "" || resistor.Key == "" || capacitor.Key == "" {
+		return nil, Consumption{}, map[string][]string{}
+	}
+	inputs := topologyNodesByRole(initial.graph, "input")
+	outputs := topologyNodesByRole(initial.graph, "output")
+	supplies := topologyNodesByRole(initial.graph, "supply")
+	references := topologyNodesByRole(initial.graph, "reference")
+	consumption := Consumption{}
+	rejections := map[string][]string{}
+	retained := map[string]TopologyCandidate{}
+	for _, input := range inputs {
+		for _, output := range outputs {
+			for _, supply := range supplies {
+				for _, reference := range references {
+					if ctx.Err() != nil ||
+						consumption.ExpandedStates >= policy.MaxExpandedStates ||
+						consumption.GeneratedGraphs >= policy.MaxGeneratedGraphs {
+						break
+					}
+					consumption.ExpandedStates++
+					state := initial
+					var filterNode, feedbackNode string
+					state, filterNode = addRelationshipInternalNode(
+						state, requirement, inventoryByKey, &consumption,
+					)
+					state, feedbackNode = addRelationshipInternalNode(
+						state, requirement, inventoryByKey, &consumption,
+					)
+					if filterNode == "" || feedbackNode == "" ||
+						internalNodeCount(state.graph) > limits.MaxInternalNodes {
+						continue
+					}
+					state = addRelationshipPrimitive(
+						state,
+						requirement,
+						inventoryByKey,
+						opamp,
+						[]TerminalConnection{
+							{Terminal: "IN_MINUS", Node: feedbackNode},
+							{Terminal: "IN_PLUS", Node: filterNode},
+							{Terminal: "OUT", Node: output},
+							{Terminal: "V_MINUS", Node: reference},
+							{Terminal: "V_PLUS", Node: supply},
+						},
+						&consumption,
+					)
+					for _, edge := range [][2]string{
+						{input, filterNode},
+						{feedbackNode, reference},
+					} {
+						state = addRelationshipPrimitive(
+							state,
+							requirement,
+							inventoryByKey,
+							resistor,
+							topologyTwoTerminalPlacement(edge[0], edge[1]),
+							&consumption,
+						)
+					}
+					state = addRelationshipPrimitive(
+						state,
+						requirement,
+						inventoryByKey,
+						capacitor,
+						topologyTwoTerminalPlacement(filterNode, reference),
+						&consumption,
+					)
+					// Retain the complete active/time-constant graph before
+					// closing its loop as an explicit repair candidate. It is
+					// electrically complete but still has a scored behavioral
+					// gap; trusted simulation and the generic repair lane must
+					// discover whether a feedback edge resolves that gap.
+					type analogRelationshipState struct {
+						state      topologySearchState
+						repairable bool
+					}
+					relationshipStates := []analogRelationshipState{{
+						state: state, repairable: true,
+					}}
+					closedLoop := addRelationshipPrimitive(
+						state,
+						requirement,
+						inventoryByKey,
+						resistor,
+						topologyTwoTerminalPlacement(feedbackNode, output),
+						&consumption,
+					)
+					if closedLoop.hash != state.hash {
+						relationshipStates = append(
+							relationshipStates,
+							analogRelationshipState{state: closedLoop},
+						)
+					}
+					if len(closedLoop.graph.Instances) < limits.MaxPrimitiveInstances &&
+						consumption.GeneratedGraphs < policy.MaxGeneratedGraphs {
+						secondPole := addRelationshipPrimitive(
+							closedLoop,
+							requirement,
+							inventoryByKey,
+							capacitor,
+							topologyTwoTerminalPlacement(output, reference),
+							&consumption,
+						)
+						if secondPole.hash != closedLoop.hash {
+							relationshipStates = append(
+								relationshipStates,
+								analogRelationshipState{state: secondPole},
+							)
+						}
+					}
+					for _, relationship := range relationshipStates {
+						relationshipState := relationship.state
+						if len(relationshipState.graph.Instances) > limits.MaxPrimitiveInstances ||
+							consumption.GeneratedGraphs > policy.MaxGeneratedGraphs {
+							continue
+						}
+						if issues := ValidateCompleteGraph(relationshipState.graph, inventory, limits); len(issues) != 0 {
+							for _, issue := range issues {
+								rejections[string(issue.Code)] = append(
+									rejections[string(issue.Code)],
+									issue.Path+":"+issue.Message,
+								)
+							}
+							continue
+						}
+						if relationshipState.score.BehaviorGap != 0 &&
+							!relationship.repairable {
+							rejections["relationship_gap"] = append(
+								rejections["relationship_gap"],
+								fmt.Sprintf("%s:gap=%d", relationshipState.hash, relationshipState.score.BehaviorGap),
+							)
+							continue
+						}
+						normalized, err := NormalizeGraph(relationshipState.graph)
+						if err != nil {
+							rejections["canonical_normalization_failed"] = append(
+								rejections["canonical_normalization_failed"], err.Error(),
+							)
+							continue
+						}
+						topologyHash, err := TopologyHash(normalized)
+						if err != nil {
+							rejections["canonical_topology_hash_failed"] = append(
+								rejections["canonical_topology_hash_failed"], err.Error(),
+							)
+							continue
+						}
+						consumption.CompleteGraphs++
+						candidate := TopologyCandidate{
+							Fingerprint:  relationshipState.hash,
+							TopologyHash: topologyHash,
+							Repairable:   relationship.repairable,
+							Score:        relationshipState.score,
+							Graph:        normalized,
+							Operations:   cloneGraphOperations(relationshipState.operations),
+						}
+						if existing, found := retained[topologyHash]; !found ||
+							compareTopologyCandidates(candidate, existing) < 0 {
+							retained[topologyHash] = candidate
+						}
+					}
+				}
+			}
+		}
+	}
+	result := make([]TopologyCandidate, 0, len(retained))
+	for _, candidate := range retained {
+		result = append(result, candidate)
+	}
+	slices.SortFunc(result, compareTopologyCandidates)
+	return result, consumption, rejections
+}
+
+type conditionalTransferRelationship struct {
+	input   string
+	output  string
+	control string
+}
+
+// topologyConditionalTransferRelationshipSeeds constructs a buffered analog
+// path with a control-driven shunt when the same excitation and observation
+// require materially different bounded gains in non-overlapping control
+// ranges. It derives only terminal relationships from the behavioral contract:
+// a high-impedance follower preserves the enabled transfer, a series branch
+// isolates its driver, and a switching primitive attenuates the observed node.
+func topologyConditionalTransferRelationshipSeeds(
+	ctx context.Context,
+	requirement Requirement,
+	inventory PrimitiveInventory,
+	representatives []PrimitiveCandidate,
+	inventoryByKey map[string]PrimitiveCandidate,
+	limits GraphLimits,
+	policy Policy,
+	initial topologySearchState,
+) ([]TopologyCandidate, Consumption, map[string][]string) {
+	relationships := topologyConditionalTransferRelationships(requirement)
+	if len(relationships) == 0 {
+		return nil, Consumption{}, map[string][]string{}
+	}
+	var opamp, mosfet, resistor, capacitor PrimitiveCandidate
+	for _, primitive := range representatives {
+		switch primitive.Kind {
+		case "opamp":
+			opamp = primitive
+		case "n_channel_mosfet":
+			mosfet = primitive
+		case "resistor":
+			resistor = primitive
+		case "capacitor":
+			capacitor = primitive
+		}
+	}
+	if opamp.Key == "" || mosfet.Key == "" ||
+		resistor.Key == "" || capacitor.Key == "" {
+		return nil, Consumption{}, map[string][]string{}
+	}
+	const (
+		defaultBiasResistance = 47_000.0
+		couplingCapacitance   = 4.7e-6
+	)
+	biasResistor := topologyPrimitiveClosestValue(
+		inventory.Primitives,
+		"resistor",
+		defaultBiasResistance,
+	)
+	couplingCapacitor := topologyPrimitiveClosestValue(
+		inventory.Primitives,
+		"capacitor",
+		couplingCapacitance,
+	)
+	if biasResistor.Key == "" {
+		biasResistor = resistor
+	}
+	if couplingCapacitor.Key == "" {
+		couplingCapacitor = capacitor
+	}
+	supplies := topologyNodesByRole(initial.graph, "supply")
+	references := topologyNodesByRole(initial.graph, "reference")
+	if len(supplies) == 0 || len(references) == 0 {
+		return nil, Consumption{}, map[string][]string{}
+	}
+	nodeExists := map[string]bool{}
+	for _, node := range initial.graph.Nodes {
+		nodeExists[node.ID] = true
+	}
+	consumption := Consumption{}
+	rejections := map[string][]string{}
+	retained := map[string]TopologyCandidate{}
+	for _, relationship := range relationships {
+		input := "port_" + relationship.input
+		output := "port_" + relationship.output
+		control := "port_" + relationship.control
+		if !nodeExists[input] || !nodeExists[output] || !nodeExists[control] {
+			continue
+		}
+		for _, supply := range supplies {
+			for _, reference := range references {
+				if ctx.Err() != nil ||
+					consumption.ExpandedStates >= policy.MaxExpandedStates ||
+					consumption.GeneratedGraphs >= policy.MaxGeneratedGraphs {
+					break
+				}
+				consumption.ExpandedStates++
+				state := initial
+				var biasNode, driverNode string
+				state, biasNode = addRelationshipInternalNode(
+					state, requirement, inventoryByKey, &consumption,
+				)
+				state, driverNode = addRelationshipInternalNode(
+					state, requirement, inventoryByKey, &consumption,
+				)
+				if biasNode == "" || driverNode == "" ||
+					internalNodeCount(state.graph) > limits.MaxInternalNodes {
+					continue
+				}
+				state = addRelationshipPrimitive(
+					state,
+					requirement,
+					inventoryByKey,
+					opamp,
+					[]TerminalConnection{
+						{Terminal: "IN_MINUS", Node: driverNode},
+						{Terminal: "IN_PLUS", Node: biasNode},
+						{Terminal: "OUT", Node: driverNode},
+						{Terminal: "V_MINUS", Node: reference},
+						{Terminal: "V_PLUS", Node: supply},
+					},
+					&consumption,
+				)
+				state = addRelationshipPrimitiveAtValue(
+					state,
+					requirement,
+					inventoryByKey,
+					couplingCapacitor,
+					couplingCapacitance,
+					topologyTwoTerminalPlacement(input, biasNode),
+					&consumption,
+				)
+				state = addRelationshipPrimitiveAtValue(
+					state,
+					requirement,
+					inventoryByKey,
+					couplingCapacitor,
+					couplingCapacitance,
+					topologyTwoTerminalPlacement(driverNode, output),
+					&consumption,
+				)
+				for _, edge := range [][2]string{
+					{supply, biasNode},
+					{biasNode, reference},
+					{output, reference},
+				} {
+					state = addRelationshipPrimitive(
+						state,
+						requirement,
+						inventoryByKey,
+						biasResistor,
+						topologyTwoTerminalPlacement(edge[0], edge[1]),
+						&consumption,
+					)
+				}
+				state = addRelationshipPrimitive(
+					state,
+					requirement,
+					inventoryByKey,
+					mosfet,
+					[]TerminalConnection{
+						{Terminal: "DRAIN", Node: output},
+						{Terminal: "GATE", Node: control},
+						{Terminal: "SOURCE", Node: reference},
+					},
+					&consumption,
+				)
+				if len(state.graph.Instances) > limits.MaxPrimitiveInstances ||
+					consumption.GeneratedGraphs > policy.MaxGeneratedGraphs {
+					continue
+				}
+				if issues := ValidateCompleteGraph(state.graph, inventory, limits); len(issues) != 0 {
+					for _, issue := range issues {
+						rejections[string(issue.Code)] = append(
+							rejections[string(issue.Code)],
+							issue.Path+":"+issue.Message,
+						)
+					}
+					continue
+				}
+				if state.score.BehaviorGap != 0 {
+					rejections["relationship_gap"] = append(
+						rejections["relationship_gap"],
+						fmt.Sprintf("%s:gap=%d", state.hash, state.score.BehaviorGap),
+					)
+					continue
+				}
+				normalized, err := NormalizeGraph(state.graph)
+				if err != nil {
+					rejections["canonical_normalization_failed"] = append(
+						rejections["canonical_normalization_failed"], err.Error(),
+					)
+					continue
+				}
+				topologyHash, err := TopologyHash(normalized)
+				if err != nil {
+					rejections["canonical_topology_hash_failed"] = append(
+						rejections["canonical_topology_hash_failed"], err.Error(),
+					)
+					continue
+				}
+				consumption.CompleteGraphs++
+				candidate := TopologyCandidate{
+					Fingerprint:  state.hash,
+					TopologyHash: topologyHash,
+					Score:        state.score,
+					Graph:        normalized,
+					Operations:   cloneGraphOperations(state.operations),
+				}
+				if existing, found := retained[topologyHash]; !found ||
+					compareTopologyCandidates(candidate, existing) < 0 {
+					retained[topologyHash] = candidate
+				}
+			}
+		}
+	}
+	if consumption.ExpandedStates >= policy.MaxExpandedStates ||
+		consumption.GeneratedGraphs >= policy.MaxGeneratedGraphs {
+		consumption.BudgetExhausted = true
+	}
+	result := make([]TopologyCandidate, 0, len(retained))
+	for _, candidate := range retained {
+		result = append(result, candidate)
+	}
+	slices.SortFunc(result, compareTopologyCandidates)
+	return result, consumption, rejections
+}
+
+func topologyConditionalTransferRelationships(
+	requirement Requirement,
+) []conditionalTransferRelationship {
+	type transferBound struct {
+		excitation  string
+		observation string
+		control     string
+		controlMin  float64
+		controlMax  float64
+		gainMin     float64
+		gainMax     float64
+		hasGainMin  bool
+		hasGainMax  bool
+	}
+	operatingCaseByID := map[string]OperatingCase{}
+	for _, operatingCase := range requirement.Requirements.OperatingCases {
+		operatingCaseByID[operatingCase.ID] = operatingCase
+	}
+	bounds := []transferBound{}
+	for _, assertion := range requirement.Requirements.BehavioralRequirements {
+		if assertion.Metric != "voltage_gain" ||
+			assertion.Excitation == nil ||
+			assertion.Excitation.Kind != "port" ||
+			assertion.Observation.Kind != "port" {
+			continue
+		}
+		for _, operatingCaseID := range assertion.OperatingCases {
+			operatingCase, found := operatingCaseByID[operatingCaseID]
+			if !found {
+				continue
+			}
+			for _, condition := range operatingCase.Conditions {
+				if condition.Axis != "input_voltage" ||
+					!requirementPortIsControl(requirement, condition.Target) {
+					continue
+				}
+				bound := transferBound{
+					excitation:  assertion.Excitation.ID,
+					observation: assertion.Observation.ID,
+					control:     condition.Target,
+					controlMin:  condition.Min,
+					controlMax:  condition.Max,
+				}
+				if assertion.Min != nil {
+					bound.gainMin, bound.hasGainMin = *assertion.Min, true
+				}
+				if assertion.Max != nil {
+					bound.gainMax, bound.hasGainMax = *assertion.Max, true
+				}
+				bounds = append(bounds, bound)
+			}
+		}
+	}
+	unique := map[string]conditionalTransferRelationship{}
+	for _, passBound := range bounds {
+		if !passBound.hasGainMin || passBound.gainMin <= 0 {
+			continue
+		}
+		for _, attenuatedBound := range bounds {
+			if passBound.excitation != attenuatedBound.excitation ||
+				passBound.observation != attenuatedBound.observation ||
+				passBound.control != attenuatedBound.control ||
+				!attenuatedBound.hasGainMax ||
+				attenuatedBound.gainMax >= passBound.gainMin {
+				continue
+			}
+			controlRangesSeparate :=
+				passBound.controlMax < attenuatedBound.controlMin ||
+					attenuatedBound.controlMax < passBound.controlMin
+			if !controlRangesSeparate {
+				continue
+			}
+			relationship := conditionalTransferRelationship{
+				input:   passBound.excitation,
+				output:  passBound.observation,
+				control: passBound.control,
+			}
+			key := relationship.input + "|" + relationship.output + "|" + relationship.control
+			unique[key] = relationship
+		}
+	}
+	result := make([]conditionalTransferRelationship, 0, len(unique))
+	for _, relationship := range unique {
+		result = append(result, relationship)
+	}
+	slices.SortFunc(result, func(left, right conditionalTransferRelationship) int {
+		return cmp.Or(
+			cmp.Compare(left.input, right.input),
+			cmp.Compare(left.output, right.output),
+			cmp.Compare(left.control, right.control),
+		)
+	})
+	return result
+}
+
+func topologyConditionalTransferPassGain(requirement Requirement) float64 {
+	passGain := 0.0
+	for _, assertion := range requirement.Requirements.BehavioralRequirements {
+		if assertion.Metric != "voltage_gain" ||
+			assertion.Min == nil ||
+			*assertion.Min <= 0 {
+			continue
+		}
+		target := *assertion.Min
+		if assertion.Max != nil && *assertion.Max > target {
+			target = *assertion.Max
+		}
+		if target > passGain {
+			passGain = target
+		}
+	}
+	return passGain
+}
+
+func topologyPrimitiveClosestValue(
+	primitives []PrimitiveCandidate,
+	kind string,
+	target float64,
+) PrimitiveCandidate {
+	if target <= 0 || !finite(target) {
+		return PrimitiveCandidate{}
+	}
+	best := PrimitiveCandidate{}
+	bestDistance := math.Inf(1)
+	for _, primitive := range primitives {
+		if primitive.Kind != kind {
+			continue
+		}
+		value := seedPrimitiveValue(primitive)
+		if value == nil || *value <= 0 || !finite(*value) {
+			continue
+		}
+		distance := math.Abs(math.Log(*value / target))
+		if distance < bestDistance ||
+			(distance == bestDistance &&
+				(best.Key == "" || primitive.Key < best.Key)) {
+			best = primitive
+			bestDistance = distance
+		}
+	}
+	return best
+}
+
+// topologyControlledSwitchRelationshipSeeds constructs a bounded level-shifted
+// switching relationship when behavior couples an external control to
+// on/off-state observations. The lower-voltage supply establishes a decision
+// reference while a higher-voltage supply provides enough gate drive for a
+// reviewed switching device. Both control polarities and all distinct supply
+// assignments are enumerated deterministically.
+func topologyControlledSwitchRelationshipSeeds(
+	ctx context.Context,
+	requirement Requirement,
+	inventory PrimitiveInventory,
+	representatives []PrimitiveCandidate,
+	inventoryByKey map[string]PrimitiveCandidate,
+	limits GraphLimits,
+	policy Policy,
+	initial topologySearchState,
+) ([]TopologyCandidate, Consumption, map[string][]string) {
+	if !topologyControlledSwitchRequired(requirement) {
+		return nil, Consumption{}, map[string][]string{}
+	}
+	var comparator, mosfet, resistor, capacitor, clamp PrimitiveCandidate
+	for _, primitive := range representatives {
+		switch primitive.Kind {
+		case "comparator":
+			comparator = primitive
+		case "n_channel_mosfet":
+			mosfet = primitive
+		case "resistor":
+			resistor = primitive
+		case "capacitor":
+			capacitor = primitive
+		case "clamp_diode":
+			clamp = primitive
+		}
+	}
+	if comparator.Key == "" || mosfet.Key == "" ||
+		resistor.Key == "" || capacitor.Key == "" || clamp.Key == "" {
+		return nil, Consumption{}, map[string][]string{}
+	}
+	controls := topologyNodesByRole(initial.graph, "control")
+	outputs := topologyNodesByRole(initial.graph, "output")
+	supplies := topologyNodesByRole(initial.graph, "supply")
+	references := topologyNodesByRole(initial.graph, "reference")
+	if len(controls) == 0 || len(outputs) == 0 ||
+		len(supplies) < 2 || len(references) == 0 {
+		return nil, Consumption{}, map[string][]string{}
+	}
+	consumption := Consumption{}
+	rejections := map[string][]string{}
+	retained := map[string]TopologyCandidate{}
+	for _, control := range controls {
+		for _, output := range outputs {
+			for _, driveSupply := range supplies {
+				for _, referenceSupply := range supplies {
+					if driveSupply == referenceSupply {
+						continue
+					}
+					driveVoltage, driveVoltageKnown := topologyNodeNominalVoltage(
+						requirement,
+						initial.graph,
+						driveSupply,
+					)
+					referenceVoltage, referenceVoltageKnown := topologyNodeNominalVoltage(
+						requirement,
+						initial.graph,
+						referenceSupply,
+					)
+					if driveVoltageKnown && referenceVoltageKnown &&
+						driveVoltage <= referenceVoltage {
+						continue
+					}
+					for _, reference := range references {
+						for _, polarity := range []int{-1, 1} {
+							if ctx.Err() != nil ||
+								consumption.ExpandedStates >= policy.MaxExpandedStates ||
+								consumption.GeneratedGraphs >= policy.MaxGeneratedGraphs {
+								break
+							}
+							consumption.ExpandedStates++
+							state := initial
+							var gateNode, thresholdNode string
+							state, gateNode = addRelationshipInternalNode(
+								state, requirement, inventoryByKey, &consumption,
+							)
+							state, thresholdNode = addRelationshipInternalNode(
+								state, requirement, inventoryByKey, &consumption,
+							)
+							if gateNode == "" || thresholdNode == "" ||
+								internalNodeCount(state.graph) > limits.MaxInternalNodes {
+								continue
+							}
+							inPlus, inMinus := thresholdNode, control
+							if polarity > 0 {
+								inPlus, inMinus = control, thresholdNode
+							}
+							state = addRelationshipPrimitive(
+								state,
+								requirement,
+								inventoryByKey,
+								comparator,
+								[]TerminalConnection{
+									{Terminal: "IN_MINUS", Node: inMinus},
+									{Terminal: "IN_PLUS", Node: inPlus},
+									{Terminal: "OUT", Node: gateNode},
+									{Terminal: "V_MINUS", Node: reference},
+									{Terminal: "V_PLUS", Node: driveSupply},
+								},
+								&consumption,
+							)
+							state = addRelationshipPrimitive(
+								state,
+								requirement,
+								inventoryByKey,
+								mosfet,
+								[]TerminalConnection{
+									{Terminal: "DRAIN", Node: output},
+									{Terminal: "GATE", Node: gateNode},
+									{Terminal: "SOURCE", Node: reference},
+								},
+								&consumption,
+							)
+							for _, edge := range [][2]string{
+								{referenceSupply, thresholdNode},
+								{thresholdNode, reference},
+								{driveSupply, gateNode},
+								{gateNode, reference},
+							} {
+								state = addRelationshipPrimitive(
+									state,
+									requirement,
+									inventoryByKey,
+									resistor,
+									topologyTwoTerminalPlacement(edge[0], edge[1]),
+									&consumption,
+								)
+							}
+							state = addRelationshipPrimitive(
+								state,
+								requirement,
+								inventoryByKey,
+								capacitor,
+								topologyTwoTerminalPlacement(gateNode, reference),
+								&consumption,
+							)
+							state = addRelationshipPrimitive(
+								state,
+								requirement,
+								inventoryByKey,
+								clamp,
+								[]TerminalConnection{
+									{Terminal: "ANODE", Node: output},
+									{Terminal: "CATHODE", Node: driveSupply},
+								},
+								&consumption,
+							)
+							if len(state.graph.Instances) > limits.MaxPrimitiveInstances ||
+								consumption.GeneratedGraphs > policy.MaxGeneratedGraphs {
+								continue
+							}
+							if issues := ValidateCompleteGraph(state.graph, inventory, limits); len(issues) != 0 {
+								for _, issue := range issues {
+									rejections[string(issue.Code)] = append(
+										rejections[string(issue.Code)],
+										issue.Path+":"+issue.Message,
+									)
+								}
+								continue
+							}
+							if state.score.BehaviorGap != 0 {
+								rejections["relationship_gap"] = append(
+									rejections["relationship_gap"],
+									fmt.Sprintf("%s:gap=%d", state.hash, state.score.BehaviorGap),
+								)
+								continue
+							}
+							normalized, err := NormalizeGraph(state.graph)
+							if err != nil {
+								rejections["canonical_normalization_failed"] = append(
+									rejections["canonical_normalization_failed"], err.Error(),
+								)
+								continue
+							}
+							topologyHash, err := TopologyHash(normalized)
+							if err != nil {
+								rejections["canonical_topology_hash_failed"] = append(
+									rejections["canonical_topology_hash_failed"], err.Error(),
+								)
+								continue
+							}
+							consumption.CompleteGraphs++
+							candidate := TopologyCandidate{
+								Fingerprint:  state.hash,
+								TopologyHash: topologyHash,
+								Score:        state.score,
+								Graph:        normalized,
+								Operations:   cloneGraphOperations(state.operations),
+							}
+							if existing, found := retained[topologyHash]; !found ||
+								compareTopologyCandidates(candidate, existing) < 0 {
+								retained[topologyHash] = candidate
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+	if consumption.ExpandedStates >= policy.MaxExpandedStates ||
+		consumption.GeneratedGraphs >= policy.MaxGeneratedGraphs {
+		consumption.BudgetExhausted = true
+	}
+	result := make([]TopologyCandidate, 0, len(retained))
+	for _, candidate := range retained {
+		result = append(result, candidate)
+	}
+	slices.SortFunc(result, compareTopologyCandidates)
+	return result, consumption, rejections
+}
+
+func topologyControlledSwitchRequired(requirement Requirement) bool {
+	for _, assertion := range requirement.Requirements.BehavioralRequirements {
+		switch assertion.Metric {
+		case "off_state_current", "on_state_voltage", "propagation_delay", "startup_current":
+			if assertion.Excitation != nil &&
+				assertion.Excitation.Kind == "port" &&
+				requirementPortIsControl(requirement, assertion.Excitation.ID) {
+				return true
+			}
+			for _, operatingCaseID := range assertion.OperatingCases {
+				for _, operatingCase := range requirement.Requirements.OperatingCases {
+					if operatingCase.ID != operatingCaseID {
+						continue
+					}
+					for _, condition := range operatingCase.Conditions {
+						if condition.Axis == "input_voltage" &&
+							requirementPortIsControl(requirement, condition.Target) {
+							return true
+						}
+					}
+				}
+			}
+		}
+	}
+	return false
+}
+
+// topologyTransconductanceRelationshipSeeds constructs a high-side controlled
+// current path from only the relationships implied by a voltage-to-current
+// transfer: a series current-sense impedance, a differential observation, a
+// feedback controller, a bounded pass-device bias path, and a thermally
+// reviewed analog pass device.
+func topologyTransconductanceRelationshipSeeds(
+	ctx context.Context,
+	requirement Requirement,
+	inventory PrimitiveInventory,
+	representatives []PrimitiveCandidate,
+	inventoryByKey map[string]PrimitiveCandidate,
+	limits GraphLimits,
+	policy Policy,
+	initial topologySearchState,
+) ([]TopologyCandidate, Consumption, map[string][]string) {
+	requireTransconductance := false
+	requireThermal := false
+	for _, assertion := range requirement.Requirements.BehavioralRequirements {
+		requireTransconductance = requireTransconductance ||
+			assertion.Metric == "transconductance"
+		requireThermal = requireThermal ||
+			assertion.Metric == "junction_temperature"
+	}
+	if !requireTransconductance {
+		return nil, Consumption{}, map[string][]string{}
+	}
+	var opamp, resistor PrimitiveCandidate
+	for _, primitive := range representatives {
+		switch primitive.Kind {
+		case "opamp":
+			opamp = primitive
+		case "resistor":
+			resistor = primitive
+		}
+	}
+	requiredAnalyses := requirementAnalysisSet(requirement)
+	passCandidates := []PrimitiveCandidate{}
+	for _, primitive := range inventory.Primitives {
+		if primitive.Kind != "pnp_bjt" ||
+			(requireThermal && !primitiveHasThermalEvidence(primitive)) ||
+			!primitiveCoversAllAnalyses(primitive, requiredAnalyses) ||
+			!ratingsCoverRequirement(requirement, primitive) {
+			continue
+		}
+		passCandidates = append(passCandidates, primitive)
+	}
+	slices.SortFunc(passCandidates, func(left, right PrimitiveCandidate) int {
+		return compareRepresentativePrimitives(left, right, requiredAnalyses)
+	})
+	var passDevice PrimitiveCandidate
+	if len(passCandidates) != 0 {
+		passDevice = passCandidates[0]
+	}
+	if opamp.Key == "" || passDevice.Key == "" || resistor.Key == "" {
+		return nil, Consumption{}, map[string][]string{}
+	}
+	inputs := topologyNodesByRole(initial.graph, "input", "control")
+	outputs := topologyNodesByRole(initial.graph, "output")
+	supplies := topologyNodesByRole(initial.graph, "supply")
+	references := topologyNodesByRole(initial.graph, "reference")
+	consumption := Consumption{}
+	rejections := map[string][]string{}
+	retained := map[string]TopologyCandidate{}
+	for _, input := range inputs {
+		for _, output := range outputs {
+			for _, supply := range supplies {
+				for _, reference := range references {
+					if ctx.Err() != nil ||
+						consumption.ExpandedStates >= policy.MaxExpandedStates ||
+						consumption.GeneratedGraphs >= policy.MaxGeneratedGraphs {
+						break
+					}
+					consumption.ExpandedStates++
+					state := initial
+					passDeviceCount := 1
+					if requireThermal {
+						passDeviceCount = 2
+					}
+					internalCount := 6
+					if passDeviceCount > 1 {
+						internalCount += passDeviceCount
+					}
+					internal := make([]string, 0, internalCount)
+					for index := 0; index < internalCount; index++ {
+						var node string
+						state, node = addRelationshipInternalNode(
+							state, requirement, inventoryByKey, &consumption,
+						)
+						if node == "" {
+							break
+						}
+						internal = append(internal, node)
+					}
+					if len(internal) != internalCount ||
+						internalNodeCount(state.graph) > limits.MaxInternalNodes {
+						continue
+					}
+					passCollector := internal[0]
+					senseMinus := internal[1]
+					sensePlus := internal[2]
+					senseOutput := internal[3]
+					controlOutput := internal[4]
+					passBase := internal[5]
+					emitterNodes := []string{supply}
+					if passDeviceCount > 1 {
+						emitterNodes = internal[6:]
+					}
+					for _, emitter := range emitterNodes {
+						state = addRelationshipPrimitive(
+							state,
+							requirement,
+							inventoryByKey,
+							passDevice,
+							[]TerminalConnection{
+								{Terminal: "BASE", Node: passBase},
+								{Terminal: "COLLECTOR", Node: passCollector},
+								{Terminal: "EMITTER", Node: emitter},
+							},
+							&consumption,
+						)
+						if emitter != supply {
+							state = addRelationshipPrimitive(
+								state,
+								requirement,
+								inventoryByKey,
+								resistor,
+								topologyTwoTerminalPlacement(supply, emitter),
+								&consumption,
+							)
+						}
+					}
+					for _, edge := range [][2]string{
+						{passCollector, output},
+						{output, senseMinus},
+						{senseOutput, senseMinus},
+						{passCollector, sensePlus},
+						{sensePlus, reference},
+						{controlOutput, passBase},
+						{passBase, supply},
+					} {
+						state = addRelationshipPrimitive(
+							state,
+							requirement,
+							inventoryByKey,
+							resistor,
+							topologyTwoTerminalPlacement(edge[0], edge[1]),
+							&consumption,
+						)
+					}
+					state = addRelationshipPrimitive(
+						state,
+						requirement,
+						inventoryByKey,
+						opamp,
+						[]TerminalConnection{
+							{Terminal: "IN_MINUS", Node: senseMinus},
+							{Terminal: "IN_PLUS", Node: sensePlus},
+							{Terminal: "OUT", Node: senseOutput},
+							{Terminal: "V_MINUS", Node: reference},
+							{Terminal: "V_PLUS", Node: supply},
+						},
+						&consumption,
+					)
+					state = addRelationshipPrimitive(
+						state,
+						requirement,
+						inventoryByKey,
+						opamp,
+						[]TerminalConnection{
+							{Terminal: "IN_MINUS", Node: input},
+							{Terminal: "IN_PLUS", Node: senseOutput},
+							{Terminal: "OUT", Node: controlOutput},
+							{Terminal: "V_MINUS", Node: reference},
+							{Terminal: "V_PLUS", Node: supply},
+						},
+						&consumption,
+					)
+					if len(state.graph.Instances) > limits.MaxPrimitiveInstances ||
+						consumption.GeneratedGraphs > policy.MaxGeneratedGraphs {
+						continue
+					}
+					if issues := ValidateCompleteGraph(state.graph, inventory, limits); len(issues) != 0 {
+						for _, issue := range issues {
+							rejections[string(issue.Code)] = append(
+								rejections[string(issue.Code)],
+								issue.Path+":"+issue.Message,
+							)
+						}
+						continue
+					}
+					if state.score.BehaviorGap != 0 {
+						rejections["relationship_gap"] = append(
+							rejections["relationship_gap"],
+							fmt.Sprintf("%s:gap=%d", state.hash, state.score.BehaviorGap),
+						)
+						continue
+					}
+					normalized, err := NormalizeGraph(state.graph)
+					if err != nil {
+						rejections["canonical_normalization_failed"] = append(
+							rejections["canonical_normalization_failed"], err.Error(),
+						)
+						continue
+					}
+					topologyHash, err := TopologyHash(normalized)
+					if err != nil {
+						rejections["canonical_topology_hash_failed"] = append(
+							rejections["canonical_topology_hash_failed"], err.Error(),
+						)
+						continue
+					}
+					consumption.CompleteGraphs++
+					candidate := TopologyCandidate{
+						Fingerprint:  state.hash,
+						TopologyHash: topologyHash,
+						Score:        state.score,
+						Graph:        normalized,
+						Operations:   cloneGraphOperations(state.operations),
+					}
+					if existing, found := retained[topologyHash]; !found ||
+						compareTopologyCandidates(candidate, existing) < 0 {
+						retained[topologyHash] = candidate
+					}
+				}
+			}
+		}
+	}
+	result := make([]TopologyCandidate, 0, len(retained))
+	for _, candidate := range retained {
+		result = append(result, candidate)
+	}
+	slices.SortFunc(result, compareTopologyCandidates)
+	return result, consumption, rejections
+}
+
+func primitiveHasThermalEvidence(primitive PrimitiveCandidate) bool {
+	for _, model := range primitive.Models {
+		if model.ThermalModel != nil {
+			return true
+		}
+	}
+	return false
+}
+
+func topologyNodeNominalVoltage(
+	requirement Requirement,
+	graph CandidateGraph,
+	nodeID string,
+) (float64, bool) {
+	domainID := ""
+	for _, node := range graph.Nodes {
+		if node.ID == nodeID {
+			domainID = node.Domain
+			break
+		}
+	}
+	for _, domain := range requirement.Requirements.Domains {
+		if domain.ID != domainID {
+			continue
+		}
+		if domain.NominalVoltageV != nil {
+			return *domain.NominalVoltageV, true
+		}
+		if domain.MinVoltageV != nil && domain.MaxVoltageV != nil {
+			return (*domain.MinVoltageV + *domain.MaxVoltageV) / 2, true
+		}
+		if domain.MaxVoltageV != nil {
+			return *domain.MaxVoltageV, true
+		}
+		if domain.MinVoltageV != nil {
+			return *domain.MinVoltageV, true
+		}
+	}
+	return 0, false
+}
+
+func addRelationshipInternalNode(
+	state topologySearchState,
+	requirement Requirement,
+	inventory map[string]PrimitiveCandidate,
+	consumption *Consumption,
+) (topologySearchState, string) {
+	graph := AddInternalNode(state.graph, "internal")
+	hash, err := GraphHash(graph)
+	if err != nil {
+		return state, ""
+	}
+	node := graph.Nodes[len(graph.Nodes)-1].ID
+	operations := cloneGraphOperations(state.operations)
+	operations = append(operations, GraphOperation{
+		Number:     len(operations) + 1,
+		Kind:       "add_internal_node",
+		Node:       node,
+		BeforeHash: state.hash,
+		AfterHash:  hash,
+	})
+	consumption.GeneratedGraphs++
+	return topologySearchState{
+		graph:      graph,
+		hash:       hash,
+		score:      scoreTopologyGraph(requirement, graph, inventory, hash),
+		operations: operations,
+	}, node
+}
+
+func addRelationshipPrimitive(
+	state topologySearchState,
+	requirement Requirement,
+	inventory map[string]PrimitiveCandidate,
+	primitive PrimitiveCandidate,
+	placement []TerminalConnection,
+	consumption *Consumption,
+) topologySearchState {
+	return addRelationshipPrimitiveWithValue(
+		state,
+		requirement,
+		inventory,
+		primitive,
+		seedPrimitiveValue(primitive),
+		placement,
+		consumption,
+	)
+}
+
+func addRelationshipPrimitiveAtValue(
+	state topologySearchState,
+	requirement Requirement,
+	inventory map[string]PrimitiveCandidate,
+	primitive PrimitiveCandidate,
+	value float64,
+	placement []TerminalConnection,
+	consumption *Consumption,
+) topologySearchState {
+	if primitive.ValueDomain == nil ||
+		!valueWithinPrimitiveDomain(value, *primitive.ValueDomain) {
+		return state
+	}
+	return addRelationshipPrimitiveWithValue(
+		state,
+		requirement,
+		inventory,
+		primitive,
+		&value,
+		placement,
+		consumption,
+	)
+}
+
+func addRelationshipPrimitiveWithValue(
+	state topologySearchState,
+	requirement Requirement,
+	inventory map[string]PrimitiveCandidate,
+	primitive PrimitiveCandidate,
+	value *float64,
+	placement []TerminalConnection,
+	consumption *Consumption,
+) topologySearchState {
+	graph := AddPrimitive(
+		state.graph,
+		primitive,
+		value,
+		placement,
+	)
+	hash, err := GraphHash(graph)
+	if err != nil {
+		return state
+	}
+	operations := cloneGraphOperations(state.operations)
+	operations = append(operations, GraphOperation{
+		Number:        len(operations) + 1,
+		Kind:          "add_primitive",
+		PrimitiveKey:  primitive.Key,
+		PrimitiveKind: primitive.Kind,
+		Connections:   append([]TerminalConnection(nil), placement...),
+		ValueSI:       cloneInventoryFloat(value),
+		BeforeHash:    state.hash,
+		AfterHash:     hash,
+	})
+	consumption.GeneratedGraphs++
+	return topologySearchState{
+		graph:      graph,
+		hash:       hash,
+		score:      scoreTopologyGraph(requirement, graph, inventory, hash),
+		operations: operations,
+	}
+}
+
+func topologyTwoTerminalPlacement(left, right string) []TerminalConnection {
+	if left > right {
+		left, right = right, left
+	}
+	return []TerminalConnection{
+		{Terminal: "A", Node: left},
+		{Terminal: "B", Node: right},
+	}
+}
+
+func topologyObligationSeeds(
+	ctx context.Context,
+	requirement Requirement,
+	inventory PrimitiveInventory,
+	representatives []PrimitiveCandidate,
+	inventoryByKey map[string]PrimitiveCandidate,
+	limits GraphLimits,
+	policy Policy,
+	initial topologySearchState,
+) ([]TopologyCandidate, Consumption, map[string][]string) {
+	const (
+		maximumKindSequences = 128
+		obligationBeamWidth  = 192
+	)
+	sequences := topologyObligationKindSequences(
+		requirement, representatives, maximumKindSequences,
+	)
+	if len(sequences) == 0 {
+		return nil, Consumption{}, map[string][]string{}
+	}
+	consumption := Consumption{}
+	rejections := map[string][]string{}
+	retained := map[string]TopologyCandidate{}
+	dominantTopology := map[string]topologySearchState{initial.topology: initial}
+	baseStates := []topologySearchState{initial}
+	if limits.MaxInternalNodes > 0 && policy.MaxGeneratedGraphs > 0 {
+		base := initial
+		for index := 0; index < min(limits.MaxInternalNodes, 3); index++ {
+			graph := AddInternalNode(base.graph, "internal")
+			hash, err := GraphHash(graph)
+			if err != nil {
+				break
+			}
+			operation := GraphOperation{
+				Number: len(base.operations) + 1, Kind: "add_internal_node",
+				Node:       graph.Nodes[len(graph.Nodes)-1].ID,
+				BeforeHash: base.hash, AfterHash: hash,
+			}
+			topologyHash, _ := TopologyHash(graph)
+			base = topologySearchState{
+				graph: graph, hash: hash, topology: topologyHash,
+				score:      scoreTopologyGraph(requirement, graph, inventoryByKey, hash),
+				operations: append(cloneGraphOperations(base.operations), operation),
+			}
+			baseStates = append(baseStates, base)
+			consumption.GeneratedGraphs++
+		}
+	}
+	for _, sequence := range sequences {
+		if ctx.Err() != nil ||
+			consumption.ExpandedStates >= policy.MaxExpandedStates ||
+			consumption.GeneratedGraphs >= policy.MaxGeneratedGraphs {
+			break
+		}
+		beam := append([]topologySearchState(nil), baseStates...)
+		for _, primitive := range sequence {
+			next := []topologySearchState{}
+			for _, state := range beam {
+				if consumption.ExpandedStates >= policy.MaxExpandedStates ||
+					consumption.GeneratedGraphs >= policy.MaxGeneratedGraphs {
+					break
+				}
+				consumption.ExpandedStates++
+				for _, placement := range primitivePlacements(
+					state.graph, primitive, maxPrimitivePlacementsPerKind,
+				) {
+					if consumption.GeneratedGraphs >= policy.MaxGeneratedGraphs {
+						break
+					}
+					graph := AddPrimitive(
+						state.graph, primitive, seedPrimitiveValue(primitive), placement,
+					)
+					consumption.GeneratedGraphs++
+					score := scoreTopologyGraph(requirement, graph, inventoryByKey, "")
+					operations := cloneGraphOperations(state.operations)
+					operations = append(operations, GraphOperation{
+						Number: len(operations) + 1, Kind: "add_primitive",
+						PrimitiveKey: primitive.Key, PrimitiveKind: primitive.Kind,
+						Connections: append([]TerminalConnection(nil), placement...),
+						ValueSI:     seedPrimitiveValue(primitive), BeforeHash: state.hash,
+					})
+					next = append(next, topologySearchState{
+						graph: graph, score: score, operations: operations,
+					})
+				}
+			}
+			slices.SortFunc(next, func(left, right topologySearchState) int {
+				if comparison := compareTopologyScores(left.score, right.score); comparison != 0 {
+					return comparison
+				}
+				return compareGraphOperations(
+					left.operations[len(left.operations)-1],
+					right.operations[len(right.operations)-1],
+				)
+			})
+			if len(next) > obligationBeamWidth*4 {
+				next = next[:obligationBeamWidth*4]
+			}
+			candidateBeam := make([]topologySearchState, 0, obligationBeamWidth*4)
+			seen := map[string]bool{}
+			for _, state := range next {
+				hash, err := GraphHash(state.graph)
+				if err != nil {
+					rejections["canonical_hash_failed"] = append(
+						rejections["canonical_hash_failed"], err.Error(),
+					)
+					continue
+				}
+				if seen[hash] {
+					rejections["dominated_topology"] = append(
+						rejections["dominated_topology"], hash+"->"+hash,
+					)
+					continue
+				}
+				seen[hash] = true
+				if issues := ValidatePartialGraph(state.graph, inventory, limits); len(issues) != 0 {
+					continue
+				}
+				state.hash = hash
+				state.score.Fingerprint = hash
+				state.topology, _ = TopologyHash(state.graph)
+				if dominant, found := dominantTopology[state.topology]; found &&
+					compareTopologyScores(dominant.score, state.score) <= 0 {
+					rejections["dominated_topology"] = append(
+						rejections["dominated_topology"], hash+"->"+dominant.hash,
+					)
+					continue
+				}
+				dominantTopology[state.topology] = state
+				state.operations[len(state.operations)-1].AfterHash = hash
+				candidateBeam = append(candidateBeam, state)
+				if len(candidateBeam) >= obligationBeamWidth*4 {
+					break
+				}
+			}
+			beam = selectDiverseTopologyStates(candidateBeam, obligationBeamWidth)
+			consumption.MaximumFrontier = max(consumption.MaximumFrontier, len(beam))
+			if len(beam) == 0 {
+				break
+			}
+		}
+		for _, state := range beam {
+			if state.score.BehaviorGap != 0 ||
+				len(ValidateCompleteGraph(state.graph, inventory, limits)) != 0 {
+				continue
+			}
+			normalized, err := NormalizeGraph(state.graph)
+			if err != nil {
+				continue
+			}
+			consumption.CompleteGraphs++
+			candidate := TopologyCandidate{
+				Fingerprint: state.hash, TopologyHash: state.topology,
+				Score: state.score, Graph: normalized,
+				Operations: cloneGraphOperations(state.operations),
+			}
+			if existing, found := retained[state.topology]; !found ||
+				compareTopologyCandidates(candidate, existing) < 0 {
+				retained[state.topology] = candidate
+			}
+		}
+		if len(retained) >= policy.MaxRetainedCandidates {
+			break
+		}
+	}
+	if consumption.ExpandedStates >= policy.MaxExpandedStates ||
+		consumption.GeneratedGraphs >= policy.MaxGeneratedGraphs {
+		consumption.BudgetExhausted = true
+	}
+	result := make([]TopologyCandidate, 0, len(retained))
+	for _, candidate := range retained {
+		result = append(result, candidate)
+	}
+	slices.SortFunc(result, compareTopologyCandidates)
+	return result, consumption, rejections
+}
+
+func topologyObligationKindSequences(
+	requirement Requirement,
+	representatives []PrimitiveCandidate,
+	maximum int,
+) [][]PrimitiveCandidate {
+	if maximum <= 0 {
+		return nil
+	}
+	needAnalog := false
+	needDecision := 0
+	needSwitch := false
+	needResistance := 0
+	needReactance := false
+	needActive := false
+	for _, assertion := range requirement.Requirements.BehavioralRequirements {
+		switch assertion.Metric {
+		case "cutoff_frequency":
+			needResistance = max(needResistance, 1)
+			needReactance = true
+		case "bandwidth":
+			needReactance = true
+		case "phase_margin", "gain_margin", "voltage_gain", "voltage_gain_at_frequency",
+			"output_noise_rms", "thd", "total_harmonic_distortion":
+			needAnalog = true
+			if assertion.Metric == "voltage_gain" &&
+				assertion.Min != nil && *assertion.Min > 1 {
+				needResistance = max(needResistance, 2)
+			}
+		case "hysteresis":
+			needDecision = max(needDecision, 1)
+			// A bounded hysteretic threshold requires a rail-referenced
+			// decision level, input isolation, and positive feedback. Four
+			// primitive two-pin impedances cover either comparator polarity
+			// without assuming the external source has nonzero impedance.
+			needResistance = max(needResistance, 4)
+		case "rising_threshold", "falling_threshold", "threshold_voltage", "threshold_current":
+			needDecision = max(needDecision, 1)
+			// Thresholds must be established by a reference network rather
+			// than an unconstrained active input tied directly to a rail.
+			needResistance = max(needResistance, 2)
+		case "lower_threshold", "upper_threshold":
+			needDecision = max(needDecision, 2)
+			// Two independently bounded decision levels require two
+			// independently tunable primitive dividers.
+			needResistance = max(needResistance, 4)
+		case "output_current", "transconductance":
+			needActive = true
+			needResistance = max(needResistance, 1)
+		case "line_regulation", "load_regulation":
+			needActive = true
+			needResistance = max(needResistance, 2)
+		case
+			"off_state_current", "on_state_voltage", "propagation_delay", "startup_current",
+			"junction_temperature", "soa_margin":
+			needActive = true
+		}
+		if assertion.Excitation != nil && assertion.Excitation.Kind == "port" &&
+			requirementPortIsControl(requirement, assertion.Excitation.ID) {
+			needSwitch = true
+			// A discrete controlled input needs a deterministic inactive
+			// state even when its external driver is high impedance.
+			needResistance = max(needResistance, 1)
+		}
+	}
+	byKind := map[string]PrimitiveCandidate{}
+	for _, primitive := range representatives {
+		byKind[primitive.Kind] = primitive
+	}
+	groups := [][]PrimitiveCandidate{}
+	appendChoices := func(kinds ...string) {
+		choices := []PrimitiveCandidate{}
+		for _, kind := range kinds {
+			if primitive, found := byKind[kind]; found {
+				choices = append(choices, primitive)
+			}
+		}
+		if len(choices) != 0 {
+			groups = append(groups, choices)
+		}
+	}
+	if needAnalog {
+		appendChoices("opamp", "n_channel_mosfet", "npn_bjt", "p_channel_mosfet", "pnp_bjt")
+	}
+	for index := 0; index < needDecision; index++ {
+		appendChoices("comparator", "opamp")
+	}
+	if needSwitch {
+		appendChoices("n_channel_mosfet", "npn_bjt", "p_channel_mosfet", "pnp_bjt", "comparator")
+	}
+	if needActive && !needAnalog && needDecision == 0 && !needSwitch {
+		appendChoices(
+			"opamp", "comparator", "n_channel_mosfet", "npn_bjt",
+			"p_channel_mosfet", "pnp_bjt",
+		)
+	}
+	for index := 0; index < needResistance; index++ {
+		appendChoices("resistor")
+	}
+	if needReactance {
+		appendChoices("capacitor", "inductor")
+	}
+	if len(groups) == 0 {
+		return nil
+	}
+	combinations := [][]PrimitiveCandidate{{}}
+	for _, group := range groups {
+		next := [][]PrimitiveCandidate{}
+		for _, prefix := range combinations {
+			for _, primitive := range group {
+				next = append(next, append(
+					append([]PrimitiveCandidate(nil), prefix...), primitive,
+				))
+			}
+		}
+		combinations = next
+	}
+	sequences := [][]PrimitiveCandidate{}
+	seen := map[string]bool{}
+	var permute func([]PrimitiveCandidate, int)
+	permute = func(values []PrimitiveCandidate, index int) {
+		if len(sequences) >= maximum {
+			return
+		}
+		if index == len(values) {
+			kinds := make([]string, len(values))
+			for position, primitive := range values {
+				kinds[position] = primitive.Kind
+			}
+			key := fmt.Sprint(kinds)
+			if !seen[key] {
+				seen[key] = true
+				sequences = append(sequences, append([]PrimitiveCandidate(nil), values...))
+			}
+			return
+		}
+		for candidate := index; candidate < len(values); candidate++ {
+			values[index], values[candidate] = values[candidate], values[index]
+			permute(values, index+1)
+			values[index], values[candidate] = values[candidate], values[index]
+		}
+	}
+	for _, combination := range combinations {
+		permute(combination, 0)
+		if len(sequences) >= maximum {
+			break
+		}
+	}
+	return sequences
+}
+
+func behaviorGuidedTopologySeeds(
+	ctx context.Context,
+	requirement Requirement,
+	inventory PrimitiveInventory,
+	representatives []PrimitiveCandidate,
+	inventoryByKey map[string]PrimitiveCandidate,
+	limits GraphLimits,
+	policy Policy,
+	initial topologySearchState,
+) ([]TopologyCandidate, Consumption, map[string][]string) {
+	const maximumDepth = 8
+	beamWidth := max(16, policy.MaxRetainedCandidates*2)
+	consumption := Consumption{}
+	rejections := map[string][]string{}
+	retained := map[string]TopologyCandidate{}
+	beam := []topologySearchState{initial}
+	seen := map[string]bool{initial.hash: true}
+	dominantTopology := map[string]topologySearchState{initial.topology: initial}
+
+	for depth := 0; depth < maximumDepth && len(beam) != 0; depth++ {
+		if ctx.Err() != nil ||
+			consumption.ExpandedStates >= policy.MaxExpandedStates ||
+			consumption.GeneratedGraphs >= policy.MaxGeneratedGraphs {
+			break
+		}
+		next := []topologySearchState{}
+		for _, state := range beam {
+			if consumption.ExpandedStates >= policy.MaxExpandedStates ||
+				consumption.GeneratedGraphs >= policy.MaxGeneratedGraphs {
+				break
+			}
+			consumption.ExpandedStates++
+			remaining := policy.MaxGeneratedGraphs - consumption.GeneratedGraphs
+			expansions, generated := expandTopologyState(
+				state,
+				representatives,
+				limits,
+				requirement,
+				inventory,
+				inventoryByKey,
+				remaining,
+			)
+			consumption.GeneratedGraphs += generated
+			next = append(next, expansions...)
+		}
+		slices.SortFunc(next, func(left, right topologySearchState) int {
+			if comparison := compareTopologyScores(left.score, right.score); comparison != 0 {
+				return comparison
+			}
+			return compareGraphOperations(
+				left.operations[len(left.operations)-1],
+				right.operations[len(right.operations)-1],
+			)
+		})
+		// Hash only a bounded oversample. Canonical hashing is part of the
+		// explicit work budget, while the oversample leaves room for invalid
+		// and canonically duplicate transitions.
+		if len(next) > beamWidth*4 {
+			next = next[:beamWidth*4]
+		}
+		candidateBeam := make([]topologySearchState, 0, beamWidth*4)
+		for _, state := range next {
+			hash, err := GraphHash(state.graph)
+			if err != nil {
+				rejections["canonical_hash_failed"] = append(rejections["canonical_hash_failed"], err.Error())
+				continue
+			}
+			if seen[hash] {
+				rejections["dominated_topology"] = append(rejections["dominated_topology"], hash+"->"+hash)
+				continue
+			}
+			seen[hash] = true
+			if issues := ValidatePartialGraph(state.graph, inventory, limits); len(issues) != 0 {
+				for _, issue := range issues {
+					rejections[string(issue.Code)] = append(
+						rejections[string(issue.Code)], issue.Path+":"+issue.Message,
+					)
+				}
+				continue
+			}
+			state.hash = hash
+			state.score.Fingerprint = hash
+			topologyHash, err := TopologyHash(state.graph)
+			if err != nil {
+				rejections["canonical_topology_hash_failed"] = append(
+					rejections["canonical_topology_hash_failed"], err.Error(),
+				)
+				continue
+			}
+			state.topology = topologyHash
+			if dominant, found := dominantTopology[topologyHash]; found &&
+				compareTopologyScores(dominant.score, state.score) <= 0 {
+				rejections["dominated_topology"] = append(
+					rejections["dominated_topology"], hash+"->"+dominant.hash,
+				)
+				continue
+			}
+			dominantTopology[topologyHash] = state
+			if len(state.operations) != 0 {
+				state.operations[len(state.operations)-1].AfterHash = hash
+			}
+			if len(ValidateCompleteGraph(state.graph, inventory, limits)) == 0 &&
+				len(state.graph.Instances) != 0 &&
+				state.score.BehaviorGap == 0 {
+				normalized, normalizeErr := NormalizeGraph(state.graph)
+				if normalizeErr == nil {
+					consumption.CompleteGraphs++
+					candidate := TopologyCandidate{
+						Fingerprint: hash, TopologyHash: topologyHash,
+						Score: state.score, Graph: normalized,
+						Operations: cloneGraphOperations(state.operations),
+					}
+					if existing, found := retained[topologyHash]; !found ||
+						compareTopologyCandidates(candidate, existing) < 0 {
+						retained[topologyHash] = candidate
+					}
+				}
+			}
+			candidateBeam = append(candidateBeam, state)
+			if len(candidateBeam) >= beamWidth*4 {
+				break
+			}
+		}
+		beam = selectDiverseTopologyStates(candidateBeam, beamWidth)
+		consumption.MaximumFrontier = max(consumption.MaximumFrontier, len(beam))
+		if len(retained) >= policy.MaxRetainedCandidates {
+			break
+		}
+	}
+	if consumption.ExpandedStates >= policy.MaxExpandedStates ||
+		consumption.GeneratedGraphs >= policy.MaxGeneratedGraphs {
+		consumption.BudgetExhausted = true
+	}
+	if len(retained) == 0 {
+		for _, state := range beam {
+			rejections["guided_frontier"] = append(
+				rejections["guided_frontier"],
+				fmt.Sprintf(
+					"%s:gap=%d:redundant_active=%d:primitives=%d:internal=%d",
+					state.hash,
+					state.score.BehaviorGap,
+					state.score.RedundantActive,
+					state.score.PrimitiveCount,
+					state.score.InternalNodeCount,
+				),
+			)
+		}
+	}
+	result := make([]TopologyCandidate, 0, len(retained))
+	for _, candidate := range retained {
+		result = append(result, candidate)
+	}
+	slices.SortFunc(result, compareTopologyCandidates)
+	return result, consumption, rejections
+}
+
+func selectDiverseTopologyCandidates(
+	candidates []TopologyCandidate,
+	limit int,
+) []TopologyCandidate {
+	if limit <= 0 || len(candidates) <= limit {
+		return append([]TopologyCandidate(nil), candidates...)
+	}
+	features := make([]map[string]int, len(candidates))
+	for index, candidate := range candidates {
+		features[index] = topologyCandidateFeatures(candidate.Graph)
+	}
+	selected := make([]int, 0, limit)
+	selectedSet := map[int]bool{}
+	selected = append(selected, 0)
+	selectedSet[0] = true
+	for len(selected) < limit {
+		bestIndex := -1
+		bestDistance := -1
+		for candidateIndex := range candidates {
+			if selectedSet[candidateIndex] {
+				continue
+			}
+			minimumDistance := int(^uint(0) >> 1)
+			for _, selectedIndex := range selected {
+				minimumDistance = min(
+					minimumDistance,
+					topologyFeatureDistance(
+						features[candidateIndex],
+						features[selectedIndex],
+					),
+				)
+			}
+			if minimumDistance > bestDistance ||
+				(minimumDistance == bestDistance &&
+					(bestIndex < 0 ||
+						compareTopologyCandidates(
+							candidates[candidateIndex],
+							candidates[bestIndex],
+						) < 0)) {
+				bestIndex = candidateIndex
+				bestDistance = minimumDistance
+			}
+		}
+		if bestIndex < 0 {
+			break
+		}
+		selected = append(selected, bestIndex)
+		selectedSet[bestIndex] = true
+	}
+	result := make([]TopologyCandidate, 0, len(selected))
+	for _, index := range selected {
+		result = append(result, candidates[index])
+	}
+	slices.SortFunc(result, compareTopologyCandidates)
+	return result
+}
+
+func selectDiverseTopologyStates(
+	states []topologySearchState,
+	limit int,
+) []topologySearchState {
+	if limit <= 0 || len(states) <= limit {
+		return append([]topologySearchState(nil), states...)
+	}
+	features := make([]map[string]int, len(states))
+	for index, state := range states {
+		features[index] = topologyCandidateFeatures(state.graph)
+	}
+	selected := make([]int, 0, limit)
+	selectedSet := map[int]bool{}
+	selected = append(selected, 0)
+	selectedSet[0] = true
+	for len(selected) < limit {
+		bestIndex := -1
+		bestDistance := -1
+		for stateIndex := range states {
+			if selectedSet[stateIndex] {
+				continue
+			}
+			minimumDistance := int(^uint(0) >> 1)
+			for _, selectedIndex := range selected {
+				minimumDistance = min(
+					minimumDistance,
+					topologyFeatureDistance(
+						features[stateIndex],
+						features[selectedIndex],
+					),
+				)
+			}
+			if minimumDistance > bestDistance ||
+				(minimumDistance == bestDistance &&
+					(bestIndex < 0 ||
+						compareTopologyScores(
+							states[stateIndex].score,
+							states[bestIndex].score,
+						) < 0)) {
+				bestIndex = stateIndex
+				bestDistance = minimumDistance
+			}
+		}
+		if bestIndex < 0 {
+			break
+		}
+		selected = append(selected, bestIndex)
+		selectedSet[bestIndex] = true
+	}
+	result := make([]topologySearchState, 0, len(selected))
+	for _, index := range selected {
+		result = append(result, states[index])
+	}
+	slices.SortFunc(result, func(left, right topologySearchState) int {
+		return compareTopologyScores(left.score, right.score)
+	})
+	return result
+}
+
+func topologyCandidateFeatures(graph CandidateGraph) map[string]int {
+	nodes := map[string]GraphNode{}
+	for _, node := range graph.Nodes {
+		nodes[node.ID] = node
+	}
+	features := map[string]int{}
+	for _, instance := range graph.Instances {
+		for _, terminal := range instance.Terminals {
+			node := nodes[terminal.Node]
+			features[fmt.Sprintf(
+				"%s:%s=%s:%s",
+				instance.Kind,
+				terminal.Terminal,
+				node.Scope,
+				node.Role,
+			)]++
+		}
+	}
+	return features
+}
+
+func topologyFeatureDistance(left, right map[string]int) int {
+	distance := 0
+	for feature, leftCount := range left {
+		rightCount := right[feature]
+		if leftCount > rightCount {
+			distance += leftCount - rightCount
+		} else {
+			distance += rightCount - leftCount
+		}
+	}
+	for feature, rightCount := range right {
+		if _, found := left[feature]; !found {
+			distance += rightCount
+		}
+	}
+	return distance
+}
+
+func addSearchConsumption(target *Consumption, value Consumption) {
+	target.ExpandedStates += value.ExpandedStates
+	target.GeneratedGraphs += value.GeneratedGraphs
+	target.CompleteGraphs += value.CompleteGraphs
+	target.MaximumFrontier = max(target.MaximumFrontier, value.MaximumFrontier)
+}
+
+func expandTopologyState(
+	state topologySearchState,
+	representatives []PrimitiveCandidate,
+	limits GraphLimits,
+	requirement Requirement,
+	primitiveInventory PrimitiveInventory,
+	inventory map[string]PrimitiveCandidate,
+	maximumGenerated int,
+) ([]topologySearchState, int) {
+	if maximumGenerated <= 0 {
+		return nil, 0
+	}
+	result := []topologySearchState{}
+	generated := 0
+primitiveExpansion:
+	for _, primitive := range representatives {
+		placements := primitivePlacements(state.graph, primitive, maxPrimitivePlacementsPerKind)
+		for _, placement := range placements {
+			if generated >= maximumGenerated {
+				break primitiveExpansion
+			}
+			nextGraph := AddPrimitive(state.graph, primitive, seedPrimitiveValue(primitive), placement)
+			generated++
+			before := state.hash
+			if before == "" {
+				before, _ = GraphHash(state.graph)
+			}
+			operations := cloneGraphOperations(state.operations)
+			operations = append(operations, GraphOperation{
+				Number:        len(operations) + 1,
+				Kind:          "add_primitive",
+				PrimitiveKey:  primitive.Key,
+				PrimitiveKind: primitive.Kind,
+				Connections:   append([]TerminalConnection(nil), placement...),
+				ValueSI:       seedPrimitiveValue(primitive),
+				BeforeHash:    before,
+			})
+			result = append(result, topologySearchState{
+				graph: nextGraph, operations: operations,
+				score: scoreTopologyGraph(requirement, nextGraph, inventory, ""),
+			})
+		}
+	}
+	for _, instance := range state.graph.Instances {
+		for _, connection := range instance.Terminals {
+			if !searchRedirectableTerminal(instance.Kind, connection.Terminal) {
+				continue
+			}
+			source, found := graphNodeByID(state.graph, connection.Node)
+			if !found || source.Scope != "external" {
+				continue
+			}
+			for _, node := range state.graph.Nodes {
+				if generated >= maximumGenerated {
+					break
+				}
+				if node.Scope != "internal" || node.ID == connection.Node {
+					continue
+				}
+				nextGraph, err := RedirectPrimitiveTerminal(
+					state.graph,
+					primitiveInventory,
+					instance.ID,
+					connection.Terminal,
+					node.ID,
+				)
+				if err != nil {
+					continue
+				}
+				generated++
+				before := state.hash
+				if before == "" {
+					before, _ = GraphHash(state.graph)
+				}
+				operations := cloneGraphOperations(state.operations)
+				operations = append(operations, GraphOperation{
+					Number:        len(operations) + 1,
+					Kind:          "redirect_terminal",
+					PrimitiveKey:  instance.PrimitiveKey,
+					PrimitiveKind: instance.Kind,
+					Node:          node.ID,
+					Connections: []TerminalConnection{{
+						Terminal: connection.Terminal,
+						Node:     node.ID,
+					}},
+					BeforeHash: before,
+				})
+				result = append(result, topologySearchState{
+					graph: nextGraph, operations: operations,
+					score: scoreTopologyGraph(requirement, nextGraph, inventory, ""),
+				})
+			}
+		}
+	}
+	if internalNodeCount(state.graph) < limits.MaxInternalNodes &&
+		!hasDanglingInternalNode(state.graph) &&
+		generated < maximumGenerated {
+		nextGraph := AddInternalNode(state.graph, "internal")
+		generated++
+		node := nextGraph.Nodes[len(nextGraph.Nodes)-1].ID
+		before := state.hash
+		if before == "" {
+			before, _ = GraphHash(state.graph)
+		}
+		operations := cloneGraphOperations(state.operations)
+		operations = append(operations, GraphOperation{
+			Number:     len(operations) + 1,
+			Kind:       "add_internal_node",
+			Node:       node,
+			BeforeHash: before,
+		})
+		result = append(result, topologySearchState{
+			graph: nextGraph, operations: operations,
+			score: scoreTopologyGraph(requirement, nextGraph, inventory, ""),
+		})
+	}
+	slices.SortFunc(result, func(left, right topologySearchState) int {
+		if comparison := compareTopologyScores(left.score, right.score); comparison != 0 {
+			return comparison
+		}
+		leftOperation := left.operations[len(left.operations)-1]
+		rightOperation := right.operations[len(right.operations)-1]
+		return compareGraphOperations(leftOperation, rightOperation)
+	})
+	if len(result) > maxSearchTransitionsPerState {
+		result = result[:maxSearchTransitionsPerState]
+	}
+	return result, generated
+}
+
+func searchRedirectableTerminal(kind, terminal string) bool {
+	switch kind {
+	case "opamp", "comparator":
+		return terminal == "IN_PLUS" || terminal == "IN_MINUS" || terminal == "OUT"
+	case "n_channel_mosfet", "p_channel_mosfet":
+		return terminal == "GATE" || terminal == "DRAIN" || terminal == "SOURCE"
+	case "npn_bjt", "pnp_bjt":
+		return terminal == "BASE" || terminal == "COLLECTOR" || terminal == "EMITTER"
+	default:
+		return false
+	}
+}
+
+func primitivePlacements(graph CandidateGraph, primitive PrimitiveCandidate, limit int) [][]TerminalConnection {
+	if limit <= 0 {
+		return nil
+	}
+	terminalCandidates := make([][]string, len(primitive.Terminals))
+	for index, terminal := range primitive.Terminals {
+		candidates := compatibleNodesForTerminal(graph.Nodes, primitive.Kind, terminal.Terminal)
+		if len(candidates) == 0 {
+			return nil
+		}
+		terminalCandidates[index] = candidates
+	}
+	result := [][]TerminalConnection{}
+	current := make([]TerminalConnection, len(primitive.Terminals))
+	var expand func(int)
+	expand = func(index int) {
+		if len(result) >= maxPrimitivePlacementEnumerations {
+			return
+		}
+		if index == len(primitive.Terminals) {
+			if validPrimitivePlacement(primitive.Kind, current) && !graphHasPrimitivePlacement(graph, primitive.Key, current) {
+				placement := append([]TerminalConnection(nil), current...)
+				slices.SortFunc(placement, compareTerminalConnections)
+				result = append(result, placement)
+			}
+			return
+		}
+		terminal := primitive.Terminals[index].Terminal
+		for _, node := range terminalCandidates[index] {
+			current[index] = TerminalConnection{Terminal: terminal, Node: node}
+			expand(index + 1)
+			if len(result) >= maxPrimitivePlacementEnumerations {
+				return
+			}
+		}
+	}
+	expand(0)
+	slices.SortFunc(result, func(left, right []TerminalConnection) int {
+		return cmp.Or(
+			cmp.Compare(
+				-topologyPlacementPreference(graph, primitive, left),
+				-topologyPlacementPreference(graph, primitive, right),
+			),
+			comparePlacements(left, right),
+		)
+	})
+	if len(result) > limit {
+		result = result[:limit]
+	}
+	return result
+}
+
+func topologyPlacementPreference(
+	graph CandidateGraph,
+	primitive PrimitiveCandidate,
+	placement []TerminalConnection,
+) int {
+	degrees := map[string]int{}
+	nodeByID := map[string]GraphNode{}
+	for _, node := range graph.Nodes {
+		nodeByID[node.ID] = node
+	}
+	for _, instance := range graph.Instances {
+		for _, terminal := range instance.Terminals {
+			degrees[terminal.Node]++
+		}
+	}
+	byTerminal := map[string]string{}
+	score := 0
+	for _, connection := range placement {
+		byTerminal[connection.Terminal] = connection.Node
+		node := nodeByID[connection.Node]
+		if node.Scope == "external" && degrees[node.ID] == 0 {
+			score += 2
+		}
+		if node.Scope == "internal" && searchRedirectableTerminal(primitive.Kind, connection.Terminal) {
+			score += 6
+		}
+		switch connection.Terminal {
+		case "OUT":
+			if node.Role == "output" {
+				score += 8
+			}
+		case "IN_PLUS", "IN_MINUS", "GATE", "BASE":
+			if node.Role == "input" || node.Role == "control" {
+				score += 5
+			}
+		case "DRAIN", "COLLECTOR":
+			if node.Role == "output" {
+				score += 6
+			}
+		}
+	}
+	if byTerminal["OUT"] != "" && byTerminal["OUT"] == byTerminal["IN_MINUS"] &&
+		primitive.Kind == "opamp" {
+		score += 7
+	}
+	if primitive.Kind == "opamp" {
+		inMinus := nodeByID[byTerminal["IN_MINUS"]]
+		inPlus := nodeByID[byTerminal["IN_PLUS"]]
+		output := nodeByID[byTerminal["OUT"]]
+		if inMinus.Scope == "internal" &&
+			topologyRailRole(inPlus.Role) &&
+			output.Role == "output" {
+			score += 7
+		}
+	}
+	if len(primitive.Terminals) == 2 {
+		left := nodeByID[placement[0].Node]
+		right := nodeByID[placement[1].Node]
+		if topologyPlacementBridgesActiveFeedback(graph, placement) {
+			score += 6
+		}
+		internalCount := 0
+		if left.Scope == "internal" {
+			internalCount++
+		}
+		if right.Scope == "internal" {
+			internalCount++
+		}
+		if internalCount == 1 {
+			score += 5
+			external := left
+			if external.Scope == "internal" {
+				external = right
+			}
+			switch primitive.Kind {
+			case "resistor":
+				if external.Role == "input" || external.Role == "control" || external.Role == "output" {
+					score += 5
+				} else if topologyRailRole(external.Role) {
+					// Internal-to-rail resistors establish bias, references,
+					// and inactive states for primitive active stages.
+					score += 5
+				}
+			case "capacitor", "inductor":
+				if external.Role == "reference" || external.Role == "supply" {
+					score += 5
+				}
+			}
+		}
+	}
+	return score
+}
+
+func topologyPlacementBridgesActiveFeedback(
+	graph CandidateGraph,
+	placement []TerminalConnection,
+) bool {
+	if len(placement) != 2 || placement[0].Node == placement[1].Node {
+		return false
+	}
+	left, right := placement[0].Node, placement[1].Node
+	for _, instance := range graph.Instances {
+		inputTerminals, outputTerminals := topologyActiveSignalTerminals(instance.Kind)
+		if len(inputTerminals) == 0 || len(outputTerminals) == 0 {
+			continue
+		}
+		nodes := topologyTerminalNodes(instance)
+		for _, inputTerminal := range inputTerminals {
+			inputNode := nodes[inputTerminal]
+			for _, outputTerminal := range outputTerminals {
+				outputNode := nodes[outputTerminal]
+				if inputNode != "" && outputNode != "" &&
+					((left == inputNode && right == outputNode) ||
+						(left == outputNode && right == inputNode)) {
+					return true
+				}
+			}
+		}
+	}
+	return false
+}
+
+func compatibleNodesForTerminal(nodes []GraphNode, primitiveKind, terminal string) []string {
+	result := []string{}
+	for _, node := range nodes {
+		if terminalRoleCompatible(primitiveKind, terminal, node.Role) {
+			result = append(result, node.ID)
+		}
+	}
+	slices.Sort(result)
+	return result
+}
+
+func terminalRoleCompatible(primitiveKind, terminal, nodeRole string) bool {
+	switch terminal {
+	case "V_PLUS", "VCC":
+		return nodeRole == "supply"
+	case "V_MINUS", "GND":
+		return nodeRole == "reference" || nodeRole == "supply"
+	case "VIN":
+		return nodeRole == "supply" || nodeRole == "input" || nodeRole == "internal"
+	case "VOUT":
+		return nodeRole == "output" || nodeRole == "internal"
+	case "ADJ":
+		return nodeRole == "reference" || nodeRole == "internal"
+	case "OUT":
+		return nodeRole == "output" || nodeRole == "internal"
+	case "IN_PLUS", "IN_MINUS":
+		return nodeRole == "input" || nodeRole == "control" || nodeRole == "output" || nodeRole == "internal" || nodeRole == "reference"
+	case "GATE", "BASE":
+		return nodeRole == "input" || nodeRole == "control" || nodeRole == "output" || nodeRole == "internal" || nodeRole == "reference"
+	case "DRAIN", "COLLECTOR":
+		return nodeRole == "supply" || nodeRole == "output" || nodeRole == "internal"
+	case "SOURCE", "EMITTER":
+		return nodeRole == "reference" || nodeRole == "supply" || nodeRole == "output" || nodeRole == "internal"
+	case "ANODE", "CATHODE", "A", "B":
+		return nodeRole != ""
+	default:
+		return primitiveKind != "" && nodeRole != ""
+	}
+}
+
+func validPrimitivePlacement(kind string, connections []TerminalConnection) bool {
+	nodes := map[string]bool{}
+	byTerminal := map[string]string{}
+	for _, connection := range connections {
+		nodes[connection.Node] = true
+		byTerminal[connection.Terminal] = connection.Node
+	}
+	if len(nodes) < 2 {
+		return false
+	}
+	if byTerminal["V_PLUS"] != "" && byTerminal["V_PLUS"] == byTerminal["V_MINUS"] {
+		return false
+	}
+	if slices.Contains([]string{"capacitor", "inductor", "resistor"}, kind) {
+		return byTerminal["A"] < byTerminal["B"]
+	}
+	return true
+}
+
+func graphHasPrimitivePlacement(graph CandidateGraph, primitiveKey string, placement []TerminalConnection) bool {
+	for _, instance := range graph.Instances {
+		if instance.PrimitiveKey != primitiveKey || len(instance.Terminals) != len(placement) {
+			continue
+		}
+		existing := append([]TerminalConnection(nil), instance.Terminals...)
+		slices.SortFunc(existing, compareTerminalConnections)
+		if slices.Equal(existing, placement) {
+			return true
+		}
+	}
+	return false
+}
+
+func topologyRepresentatives(requirement Requirement, inventory PrimitiveInventory) []PrimitiveCandidate {
+	requiredAnalyses := map[string]bool{}
+	for _, assertion := range requirement.Requirements.BehavioralRequirements {
+		requiredAnalyses[trustedModelAnalysisKind(assertion.Analysis)] = true
+	}
+	byKind := map[string][]PrimitiveCandidate{}
+	for _, primitive := range inventory.Primitives {
+		if primitiveCoversAnyAnalysis(primitive, requiredAnalyses) {
+			byKind[primitive.Kind] = append(byKind[primitive.Kind], primitive)
+		}
+	}
+	kinds := make([]string, 0, len(byKind))
+	for kind := range byKind {
+		kinds = append(kinds, kind)
+	}
+	slices.Sort(kinds)
+	result := []PrimitiveCandidate{}
+	for _, kind := range kinds {
+		candidates := byKind[kind]
+		slices.SortFunc(candidates, func(left, right PrimitiveCandidate) int {
+			return compareRepresentativePrimitives(left, right, requiredAnalyses)
+		})
+		if len(candidates) != 0 {
+			result = append(result, candidates[0])
+		}
+	}
+	return result
+}
+
+func primitiveCoversAnyAnalysis(primitive PrimitiveCandidate, required map[string]bool) bool {
+	if len(required) == 0 {
+		return true
+	}
+	for _, model := range primitive.Models {
+		for analysis := range required {
+			if reviewedModelSupportsCircuitAnalysis(model.AllowedAnalyses, analysis) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func compareRepresentativePrimitives(left, right PrimitiveCandidate, required map[string]bool) int {
+	return cmp.Or(
+		cmp.Compare(primitiveEvidencePenalty(left.Evidence), primitiveEvidencePenalty(right.Evidence)),
+		cmp.Compare(-primitiveAnalysisCoverage(left, required), -primitiveAnalysisCoverage(right, required)),
+		comparePositiveArea(left.AreaMM2, right.AreaMM2),
+		cmp.Compare(left.Key, right.Key),
+	)
+}
+
+func primitiveAnalysisCoverage(primitive PrimitiveCandidate, required map[string]bool) int {
+	covered := map[string]bool{}
+	for _, model := range primitive.Models {
+		for analysis := range required {
+			if reviewedModelSupportsCircuitAnalysis(model.AllowedAnalyses, analysis) {
+				covered[analysis] = true
+			}
+		}
+	}
+	return len(covered)
+}
+
+func seedPrimitiveValue(primitive PrimitiveCandidate) *float64 {
+	if primitive.ValueDomain == nil {
+		return nil
+	}
+	domain := primitive.ValueDomain
+	if domain.Nominal != nil && *domain.Nominal > 0 {
+		return cloneInventoryFloat(domain.Nominal)
+	}
+	if domain.Minimum != nil && domain.Maximum != nil && *domain.Minimum > 0 && *domain.Maximum > 0 {
+		value := geometricMean(*domain.Minimum, *domain.Maximum)
+		return &value
+	}
+	if domain.Minimum != nil && *domain.Minimum > 0 {
+		return cloneInventoryFloat(domain.Minimum)
+	}
+	if domain.Maximum != nil && *domain.Maximum > 0 {
+		value := *domain.Maximum / 10
+		if value <= 0 {
+			value = *domain.Maximum
+		}
+		return &value
+	}
+	return nil
+}
+
+func scoreTopologyGraph(requirement Requirement, graph CandidateGraph, inventory map[string]PrimitiveCandidate, fingerprint string) TopologyScore {
+	degrees := map[string]int{}
+	adjacency := map[string][]string{}
+	evidencePenalty := 0
+	area := 0.0
+	for _, instance := range graph.Instances {
+		primitive := inventory[instance.PrimitiveKey]
+		evidencePenalty += primitiveEvidencePenalty(primitive.Evidence)
+		area += primitive.AreaMM2
+		instanceVertex := "instance:" + instance.ID
+		for _, terminal := range instance.Terminals {
+			degrees[terminal.Node]++
+			nodeVertex := "node:" + terminal.Node
+			adjacency[instanceVertex] = append(adjacency[instanceVertex], nodeVertex)
+			adjacency[nodeVertex] = append(adjacency[nodeVertex], instanceVertex)
+		}
+	}
+	score := TopologyScore{
+		BehaviorGap:       topologyBehaviorGap(requirement, graph, inventory),
+		RedundantActive:   topologyRedundantActiveCount(requirement, graph),
+		EndpointAccess:    topologyEndpointAccessPenalty(requirement, graph),
+		PrimitiveCount:    len(graph.Instances),
+		InternalNodeCount: internalNodeCount(graph),
+		EvidencePenalty:   evidencePenalty,
+		AreaMM2:           quantizeInventory(area),
+		Fingerprint:       fingerprint,
+	}
+	starts := []string{}
+	for _, node := range graph.Nodes {
+		if node.Scope == "external" && degrees[node.ID] == 0 {
+			score.UnconnectedExternal++
+		}
+		if node.Scope == "internal" && degrees[node.ID] < 2 {
+			score.DanglingInternal++
+		}
+		if node.Role == "input" || node.Role == "control" || node.Role == "supply" {
+			starts = append(starts, "node:"+node.ID)
+		}
+	}
+	for _, node := range graph.Nodes {
+		if node.Role != "output" {
+			continue
+		}
+		reachable := false
+		for _, start := range starts {
+			if graphPathExists(adjacency, start, "node:"+node.ID) {
+				reachable = true
+				break
+			}
+		}
+		if !reachable {
+			score.UnreachableOutputs++
+		}
+	}
+	return score
+}
+
+func topologyEndpointAccessPenalty(requirement Requirement, graph CandidateGraph) int {
+	requireAnalog := false
+	requireFeedback := false
+	requireFeedbackImpedance := false
+	for _, assertion := range requirement.Requirements.BehavioralRequirements {
+		switch assertion.Metric {
+		case "phase_margin", "gain_margin":
+			requireAnalog = true
+			requireFeedback = true
+		case "voltage_gain", "voltage_gain_at_frequency", "cutoff_frequency",
+			"bandwidth", "output_noise_rms", "thd", "total_harmonic_distortion":
+			requireAnalog = true
+		}
+		if assertion.Metric == "voltage_gain" &&
+			assertion.Min != nil && *assertion.Min > 1 {
+			requireFeedback = true
+			requireFeedbackImpedance = true
+		}
+	}
+	if !requireAnalog {
+		return 0
+	}
+	adjacency := topologyPassiveNodeAdjacency(graph, false)
+	dcAdjacency := topologyPassiveNodeAdjacency(graph, true)
+	nodeByID := make(map[string]GraphNode, len(graph.Nodes))
+	for _, node := range graph.Nodes {
+		nodeByID[node.ID] = node
+	}
+	inputs := topologyNodesByRole(graph, "input", "control")
+	outputs := topologyNodesByRole(graph, "output")
+	best := 1_000
+	for _, instance := range graph.Instances {
+		inputTerminals, outputTerminals := topologyActiveSignalTerminals(instance.Kind)
+		if len(inputTerminals) == 0 || len(outputTerminals) == 0 {
+			continue
+		}
+		inputTerminals = topologyEffectiveInputTerminals(instance, inputTerminals)
+		terminalNodes := topologyTerminalNodes(instance)
+		inputDistance := topologyMinimumTerminalDistance(
+			terminalNodes, inputTerminals, inputs, adjacency,
+		)
+		outputDistance := topologyMinimumTerminalDistance(
+			terminalNodes, outputTerminals, outputs, adjacency,
+		)
+		penalty := 0
+		if inputDistance >= 100 {
+			penalty += 100
+		} else if inputDistance > 1 {
+			penalty += inputDistance - 1
+		}
+		if outputDistance >= 100 {
+			penalty += 100
+		} else if outputDistance > 1 {
+			penalty += outputDistance - 1
+		}
+		if requireFeedback {
+			if instance.Kind != "opamp" {
+				penalty += 100
+			} else {
+				if requireFeedbackImpedance &&
+					nodeByID[terminalNodes["IN_MINUS"]].Scope != "internal" {
+					penalty += 100
+				}
+				feedbackDistance := topologyNodeDistance(
+					dcAdjacency, terminalNodes["OUT"], terminalNodes["IN_MINUS"],
+				)
+				if feedbackDistance >= 100 ||
+					(requireFeedbackImpedance && feedbackDistance == 0) {
+					penalty += 100
+				} else if feedbackDistance > 1 {
+					penalty += feedbackDistance - 1
+				}
+			}
+		}
+		best = min(best, penalty)
+	}
+	return best
+}
+
+func topologyRedundantActiveCount(requirement Requirement, graph CandidateGraph) int {
+	minimumActive := 0
+	minimumDecision := 0
+	for _, assertion := range requirement.Requirements.BehavioralRequirements {
+		switch assertion.Metric {
+		case "lower_threshold", "upper_threshold":
+			minimumDecision = max(minimumDecision, 2)
+		case "rising_threshold", "falling_threshold", "threshold_voltage", "threshold_current",
+			"hysteresis":
+			minimumDecision = max(minimumDecision, 1)
+		case "phase_margin", "gain_margin", "voltage_gain", "voltage_gain_at_frequency",
+			"output_noise_rms",
+			"thd", "total_harmonic_distortion", "output_current", "transconductance",
+			"line_regulation", "load_regulation", "off_state_current", "on_state_voltage",
+			"propagation_delay", "startup_current", "junction_temperature", "soa_margin":
+			minimumActive = max(minimumActive, 1)
+		}
+		if assertion.Excitation != nil && assertion.Excitation.Kind == "port" &&
+			requirementPortIsControl(requirement, assertion.Excitation.ID) {
+			minimumActive = max(minimumActive, 1)
+		}
+	}
+	minimumActive = max(minimumActive, minimumDecision)
+	active := 0
+	for _, instance := range graph.Instances {
+		if topologyActiveKind(instance.Kind) {
+			active++
+		}
+	}
+	return max(0, active-minimumActive)
+}
+
+func topologyBehaviorGap(
+	requirement Requirement,
+	graph CandidateGraph,
+	inventory map[string]PrimitiveCandidate,
+) int {
+	requireActive := false
+	requireReactive := false
+	requireTimeConstant := false
+	requireFeedback := false
+	requireFeedbackImpedance := false
+	requireHighFrequencyAttenuation := false
+	requireThermal := false
+	requireSOA := false
+	requireAnalogTransfer := false
+	requireInternalTransfer := false
+	requireControlledSwitch := false
+	requireDecisionReference := false
+	decisionPolarity := topologyDecisionPolarity(requirement)
+	minimumResistors := 0
+	minimumDecisionStages := 0
+	minimumPassbandGain := 0.0
+	maximumHighFrequencyGain := 0.0
+	hasPassbandGain := false
+	hasHighFrequencyGain := false
+	for _, assertion := range requirement.Requirements.BehavioralRequirements {
+		switch assertion.Metric {
+		case "cutoff_frequency":
+			requireReactive = true
+			requireTimeConstant = true
+			minimumResistors = max(minimumResistors, 1)
+		case "bandwidth":
+			requireReactive = true
+		case "phase_margin", "gain_margin", "hysteresis":
+			requireActive = true
+			requireFeedback = true
+			if assertion.Metric == "hysteresis" {
+				minimumResistors = max(minimumResistors, 4)
+			} else {
+				requireAnalogTransfer = true
+			}
+		case "rising_threshold", "falling_threshold", "threshold_voltage", "threshold_current":
+			requireActive = true
+			requireDecisionReference = true
+			minimumDecisionStages = max(minimumDecisionStages, 1)
+			minimumResistors = max(minimumResistors, 2)
+		case "lower_threshold", "upper_threshold":
+			requireActive = true
+			requireDecisionReference = true
+			minimumDecisionStages = max(minimumDecisionStages, 2)
+			minimumResistors = max(minimumResistors, 4)
+		case "output_current", "transconductance":
+			requireActive = true
+			minimumResistors = max(minimumResistors, 1)
+		case "line_regulation", "load_regulation":
+			requireActive = true
+			minimumResistors = max(minimumResistors, 2)
+		case
+			"off_state_current", "on_state_voltage", "propagation_delay", "startup_current":
+			requireActive = true
+		case "junction_temperature":
+			requireActive = true
+			requireThermal = true
+		case "soa_margin":
+			requireActive = true
+			requireSOA = true
+		case "thd", "total_harmonic_distortion":
+			requireActive = true
+			requireAnalogTransfer = true
+		case "voltage_gain", "voltage_gain_at_frequency", "output_noise_rms":
+			requireActive = true
+			requireAnalogTransfer = true
+			if assertion.Metric == "voltage_gain" && assertion.Min != nil {
+				if !hasPassbandGain || *assertion.Min > minimumPassbandGain {
+					minimumPassbandGain = *assertion.Min
+				}
+				hasPassbandGain = true
+			}
+			if assertion.Metric == "voltage_gain_at_frequency" && assertion.Max != nil {
+				if !hasHighFrequencyGain || *assertion.Max < maximumHighFrequencyGain {
+					maximumHighFrequencyGain = *assertion.Max
+				}
+				hasHighFrequencyGain = true
+			}
+			if assertion.Metric == "voltage_gain" &&
+				assertion.Min != nil && *assertion.Min > 1 {
+				minimumResistors = max(minimumResistors, 2)
+				requireFeedback = true
+				requireFeedbackImpedance = true
+			}
+		}
+		if assertion.Excitation != nil && assertion.Excitation.Kind == "port" &&
+			requirementPortIsControl(requirement, assertion.Excitation.ID) {
+			requireActive = true
+			requireControlledSwitch = true
+			minimumResistors = max(minimumResistors, 1)
+		}
+	}
+	requireHighFrequencyAttenuation = hasPassbandGain &&
+		hasHighFrequencyGain &&
+		maximumHighFrequencyGain < minimumPassbandGain
+	requireInternalTransfer = requireReactive && requireAnalogTransfer
+	activeCount, analogActiveCount, switchingActiveCount, decisionCount, resistorCount := 0, 0, 0, 0, 0
+	hasReactive, hasResistor, hasThermal, hasSOA := false, false, false, false
+	for _, instance := range graph.Instances {
+		primitive := inventory[instance.PrimitiveKey]
+		if topologyActiveKind(instance.Kind) {
+			activeCount++
+		}
+		if topologyAnalogActiveKind(instance.Kind) {
+			analogActiveCount++
+		}
+		if topologySwitchingActiveKind(instance.Kind) {
+			switchingActiveCount++
+		}
+		if instance.Kind == "opamp" || instance.Kind == "comparator" {
+			decisionCount++
+		}
+		if instance.Kind == "capacitor" || instance.Kind == "inductor" {
+			hasReactive = true
+		}
+		if instance.Kind == "resistor" {
+			hasResistor = true
+			resistorCount++
+		}
+		for _, model := range primitive.Models {
+			hasThermal = hasThermal || model.ThermalModel != nil
+			hasSOA = hasSOA || len(model.TransientSOA) != 0
+		}
+	}
+	gap := 0
+	if requireActive && activeCount == 0 {
+		gap++
+	}
+	if requireReactive && !hasReactive {
+		gap++
+	}
+	if resistorCount < minimumResistors {
+		gap += minimumResistors - resistorCount
+	}
+	if requireTimeConstant && !requireAnalogTransfer && !topologyGraphHasPassiveTimeConstant(graph) {
+		gap++
+	}
+	if requireAnalogTransfer && analogActiveCount == 0 {
+		gap++
+	}
+	if requireAnalogTransfer {
+		gap += topologyGraphAnalogStageGap(
+			graph, requireFeedback, requireTimeConstant, requireFeedbackImpedance,
+		)
+	}
+	if requireHighFrequencyAttenuation &&
+		!topologyGraphHasHighFrequencyAttenuationStage(graph) {
+		gap++
+	}
+	if requireInternalTransfer && internalNodeCount(graph) == 0 {
+		gap++
+	}
+	if requireControlledSwitch && switchingActiveCount == 0 {
+		gap++
+	}
+	if requireDecisionReference {
+		gap += topologyDecisionStageGap(
+			graph,
+			minimumDecisionStages,
+			requireFeedback,
+			decisionPolarity,
+		)
+	} else if requireFeedback && !requireAnalogTransfer &&
+		(!hasResistor || !topologyGraphHasDecisionFeedback(graph)) {
+		gap++
+	}
+	if requireThermal && !hasThermal {
+		gap++
+	}
+	if requireSOA && !hasSOA {
+		gap++
+	}
+	if decisionCount < minimumDecisionStages {
+		gap += minimumDecisionStages - decisionCount
+	}
+	return gap
+}
+
+func topologyGraphHasHighFrequencyAttenuationStage(graph CandidateGraph) bool {
+	nodeByID := make(map[string]GraphNode, len(graph.Nodes))
+	for _, node := range graph.Nodes {
+		nodeByID[node.ID] = node
+	}
+	reactiveEdges := [][2]string{}
+	for _, instance := range graph.Instances {
+		if instance.Kind != "capacitor" && instance.Kind != "inductor" {
+			continue
+		}
+		if len(instance.Terminals) != 2 ||
+			instance.Terminals[0].Node == instance.Terminals[1].Node {
+			continue
+		}
+		reactiveEdges = append(reactiveEdges, [2]string{
+			instance.Terminals[0].Node,
+			instance.Terminals[1].Node,
+		})
+	}
+	if len(reactiveEdges) == 0 {
+		return false
+	}
+	dcAdjacency := topologyPassiveNodeAdjacency(graph, true)
+	externalInputs := topologyNodesByRole(graph, "input", "control")
+	for _, instance := range graph.Instances {
+		inputTerminals, outputTerminals := topologyActiveSignalTerminals(instance.Kind)
+		if len(inputTerminals) == 0 || len(outputTerminals) == 0 {
+			continue
+		}
+		nodes := topologyTerminalNodes(instance)
+		for _, inputTerminal := range inputTerminals {
+			inputNode := nodes[inputTerminal]
+			if inputNode == "" {
+				continue
+			}
+			inputAccessible := topologyAnyTerminalReachable(
+				map[string]string{"input": inputNode},
+				[]string{"input"},
+				externalInputs,
+				dcAdjacency,
+			)
+			if !inputAccessible {
+				continue
+			}
+			isFeedbackInput := false
+			for _, outputTerminal := range outputTerminals {
+				outputNode := nodes[outputTerminal]
+				isFeedbackInput = isFeedbackInput ||
+					topologyNodePathExists(dcAdjacency, outputNode, inputNode)
+				for _, edge := range reactiveEdges {
+					if (edge[0] == inputNode && edge[1] == outputNode) ||
+						(edge[0] == outputNode && edge[1] == inputNode) {
+						if instance.Kind != "opamp" ||
+							inputTerminal == "IN_MINUS" {
+							return true
+						}
+					}
+				}
+			}
+			if nodeByID[inputNode].Scope != "internal" || isFeedbackInput {
+				continue
+			}
+			for _, edge := range reactiveEdges {
+				other := ""
+				if edge[0] == inputNode {
+					other = edge[1]
+				} else if edge[1] == inputNode {
+					other = edge[0]
+				}
+				if other != "" && topologyRailRole(nodeByID[other].Role) {
+					return true
+				}
+			}
+		}
+	}
+	return false
+}
+
+func topologyNodeIsInternal(graph CandidateGraph, nodeID string) bool {
+	for _, node := range graph.Nodes {
+		if node.ID == nodeID {
+			return node.Scope == "internal"
+		}
+	}
+	return false
+}
+
+func topologyAnalogActiveKind(kind string) bool {
+	switch kind {
+	case "opamp", "n_channel_mosfet", "p_channel_mosfet", "npn_bjt", "pnp_bjt",
+		"fixed_voltage_regulator", "adjustable_voltage_regulator":
+		return true
+	default:
+		return false
+	}
+}
+
+func topologySwitchingActiveKind(kind string) bool {
+	switch kind {
+	case "comparator", "n_channel_mosfet", "p_channel_mosfet", "npn_bjt", "pnp_bjt":
+		return true
+	default:
+		return false
+	}
+}
+
+func topologyActiveKind(kind string) bool {
+	switch kind {
+	case "opamp", "comparator", "n_channel_mosfet", "p_channel_mosfet", "npn_bjt", "pnp_bjt",
+		"fixed_voltage_regulator", "adjustable_voltage_regulator":
+		return true
+	default:
+		return false
+	}
+}
+
+func requirementPortIsControl(requirement Requirement, id string) bool {
+	for _, port := range requirement.Requirements.Ports {
+		if port.ID == id {
+			return port.Kind == "digital" || port.Kind == "control"
+		}
+	}
+	return false
+}
+
+func topologyGraphHasAnalogTransfer(graph CandidateGraph) bool {
+	signalAdjacency := topologyPassiveNodeAdjacency(graph, false)
+	inputs := topologyNodesByRole(graph, "input", "control")
+	outputs := topologyNodesByRole(graph, "output")
+	for _, instance := range graph.Instances {
+		inputTerminals, outputTerminals := topologyActiveSignalTerminals(instance.Kind)
+		if len(inputTerminals) == 0 || len(outputTerminals) == 0 {
+			continue
+		}
+		terminalNodes := topologyTerminalNodes(instance)
+		inputTerminals = topologyEffectiveInputTerminals(instance, inputTerminals)
+		if topologyAnyTerminalReachable(terminalNodes, inputTerminals, inputs, signalAdjacency) &&
+			topologyAnyTerminalReachable(terminalNodes, outputTerminals, outputs, signalAdjacency) {
+			return true
+		}
+	}
+	return false
+}
+
+func topologyGraphHasAnalogStage(
+	graph CandidateGraph,
+	requireFeedback bool,
+	requireTimeConstant bool,
+	requireFeedbackImpedance bool,
+) bool {
+	signalAdjacency := topologyPassiveNodeAdjacency(graph, false)
+	dcAdjacency := topologyPassiveNodeAdjacency(graph, true)
+	inputs := topologyNodesByRole(graph, "input", "control")
+	outputs := topologyNodesByRole(graph, "output")
+	for _, instance := range graph.Instances {
+		inputTerminals, outputTerminals := topologyActiveSignalTerminals(instance.Kind)
+		if len(inputTerminals) == 0 || len(outputTerminals) == 0 {
+			continue
+		}
+		terminalNodes := topologyTerminalNodes(instance)
+		inputTerminals = topologyEffectiveInputTerminals(instance, inputTerminals)
+		if !topologyAnyTerminalReachable(terminalNodes, inputTerminals, inputs, signalAdjacency) ||
+			!topologyAnyTerminalReachable(terminalNodes, outputTerminals, outputs, signalAdjacency) {
+			continue
+		}
+		if requireFeedback {
+			if instance.Kind != "opamp" ||
+				!topologyNodePathExists(dcAdjacency, terminalNodes["OUT"], terminalNodes["IN_MINUS"]) ||
+				(requireFeedbackImpedance &&
+					(terminalNodes["OUT"] == terminalNodes["IN_MINUS"] ||
+						!topologyNodeIsInternal(graph, terminalNodes["IN_MINUS"]))) {
+				continue
+			}
+		}
+		if requireTimeConstant && !topologyInstanceHasPassiveTimeConstant(graph, instance) {
+			continue
+		}
+		return true
+	}
+	return false
+}
+
+func topologyGraphAnalogStageGap(
+	graph CandidateGraph,
+	requireFeedback bool,
+	requireTimeConstant bool,
+	requireFeedbackImpedance bool,
+) int {
+	signalAdjacency := topologyPassiveNodeAdjacency(graph, false)
+	dcAdjacency := topologyPassiveNodeAdjacency(graph, true)
+	inputs := topologyNodesByRole(graph, "input", "control")
+	outputs := topologyNodesByRole(graph, "output")
+	best := int(^uint(0) >> 1)
+	found := false
+	for _, instance := range graph.Instances {
+		inputTerminals, outputTerminals := topologyActiveSignalTerminals(instance.Kind)
+		if len(inputTerminals) == 0 || len(outputTerminals) == 0 {
+			continue
+		}
+		found = true
+		terminalNodes := topologyTerminalNodes(instance)
+		inputTerminals = topologyEffectiveInputTerminals(instance, inputTerminals)
+		stageGap := 0
+		if !topologyAnyTerminalReachable(terminalNodes, inputTerminals, inputs, signalAdjacency) ||
+			!topologyAnyTerminalReachable(terminalNodes, outputTerminals, outputs, signalAdjacency) {
+			stageGap++
+		}
+		if requireFeedback &&
+			(instance.Kind != "opamp" ||
+				!topologyNodePathExists(dcAdjacency, terminalNodes["OUT"], terminalNodes["IN_MINUS"]) ||
+				(requireFeedbackImpedance &&
+					(terminalNodes["OUT"] == terminalNodes["IN_MINUS"] ||
+						!topologyNodeIsInternal(graph, terminalNodes["IN_MINUS"])))) {
+			stageGap++
+		}
+		if requireTimeConstant {
+			if !topologyInstanceHasInternalSignalTerminal(graph, instance) {
+				// Endpoint access is a prerequisite for constructing a real
+				// internal time constant, so rank it ahead of incidental
+				// passives attached only to external ideal sources.
+				stageGap += 2
+			}
+			if !topologyInstanceHasPassiveTimeConstant(graph, instance) {
+				stageGap++
+			}
+		}
+		best = min(best, stageGap)
+	}
+	if !found {
+		return 1
+	}
+	return best
+}
+
+func topologyInstanceHasInternalSignalTerminal(graph CandidateGraph, instance GraphInstance) bool {
+	internal := map[string]bool{}
+	for _, node := range graph.Nodes {
+		internal[node.ID] = node.Scope == "internal"
+	}
+	inputs, outputs := topologyActiveSignalTerminals(instance.Kind)
+	signalTerminals := append(append([]string(nil), inputs...), outputs...)
+	terminalNodes := topologyTerminalNodes(instance)
+	for _, terminal := range signalTerminals {
+		if internal[terminalNodes[terminal]] {
+			return true
+		}
+	}
+	return false
+}
+
+func topologyGraphHasPassiveTimeConstant(graph CandidateGraph) bool {
+	type passiveEdge struct {
+		left     string
+		right    string
+		resistor bool
+		reactive bool
+	}
+	edges := []passiveEdge{}
+	byNode := map[string][]int{}
+	nodeRoles := map[string]string{}
+	nodeScopes := map[string]string{}
+	for _, node := range graph.Nodes {
+		nodeRoles[node.ID] = node.Role
+		nodeScopes[node.ID] = node.Scope
+	}
+	for _, instance := range graph.Instances {
+		if len(instance.Terminals) != 2 {
+			continue
+		}
+		edge := passiveEdge{
+			left:  instance.Terminals[0].Node,
+			right: instance.Terminals[1].Node,
+		}
+		switch instance.Kind {
+		case "resistor":
+			edge.resistor = true
+		case "capacitor", "inductor":
+			edge.reactive = true
+		default:
+			continue
+		}
+		index := len(edges)
+		edges = append(edges, edge)
+		byNode[edge.left] = append(byNode[edge.left], index)
+		byNode[edge.right] = append(byNode[edge.right], index)
+	}
+	for start := range byNode {
+		hasResistor, hasReactive := false, false
+		hasInput, hasOutput := false, false
+		visitedNodes := map[string]bool{start: true}
+		queue := []string{start}
+		for len(queue) != 0 {
+			node := queue[0]
+			queue = queue[1:]
+			if nodeScopes[node] == "external" {
+				hasInput = hasInput ||
+					nodeRoles[node] == "input" || nodeRoles[node] == "control"
+				hasOutput = hasOutput || nodeRoles[node] == "output"
+			}
+			for _, edgeIndex := range byNode[node] {
+				edge := edges[edgeIndex]
+				hasResistor = hasResistor || edge.resistor
+				hasReactive = hasReactive || edge.reactive
+				next := edge.left
+				if next == node {
+					next = edge.right
+				}
+				if !visitedNodes[next] {
+					visitedNodes[next] = true
+					queue = append(queue, next)
+				}
+			}
+		}
+		if hasResistor && hasReactive && hasInput && hasOutput {
+			return true
+		}
+	}
+	for _, instance := range graph.Instances {
+		if topologyInstanceHasPassiveTimeConstant(graph, instance) {
+			return true
+		}
+	}
+	return false
+}
+
+func topologyInstanceHasPassiveTimeConstant(graph CandidateGraph, active GraphInstance) bool {
+	type passiveEdge struct {
+		left     string
+		right    string
+		resistor bool
+		reactive bool
+	}
+	externalSignals := map[string]bool{}
+	internalNodes := map[string]bool{}
+	nodeRoles := map[string]string{}
+	for _, node := range graph.Nodes {
+		nodeRoles[node.ID] = node.Role
+		if node.Scope == "external" && (node.Role == "input" || node.Role == "output") {
+			externalSignals[node.ID] = true
+		}
+		if node.Scope == "internal" {
+			internalNodes[node.ID] = true
+		}
+	}
+	edges := []passiveEdge{}
+	adjacency := map[string][]int{}
+	for _, instance := range graph.Instances {
+		if len(instance.Terminals) != 2 {
+			continue
+		}
+		edge := passiveEdge{
+			left:  instance.Terminals[0].Node,
+			right: instance.Terminals[1].Node,
+		}
+		switch instance.Kind {
+		case "resistor":
+			edge.resistor = true
+		case "capacitor", "inductor":
+			leftRole := nodeRoles[edge.left]
+			rightRole := nodeRoles[edge.right]
+			edge.reactive =
+				leftRole == "internal" || leftRole == "output" ||
+					rightRole == "internal" || rightRole == "output"
+		default:
+			continue
+		}
+		index := len(edges)
+		edges = append(edges, edge)
+		adjacency[edge.left] = append(adjacency[edge.left], index)
+		adjacency[edge.right] = append(adjacency[edge.right], index)
+	}
+	inputs, outputs := topologyActiveSignalTerminals(active.Kind)
+	if len(inputs) == 0 && len(outputs) == 0 {
+		return false
+	}
+	{
+		signalTerminals := append(append([]string(nil), inputs...), outputs...)
+		terminalNodes := topologyTerminalNodes(active)
+		for _, terminal := range signalTerminals {
+			start := terminalNodes[terminal]
+			if start == "" || !internalNodes[start] {
+				continue
+			}
+			visitedNodes := map[string]bool{start: true}
+			visitedEdges := map[int]bool{}
+			queue := []string{start}
+			hasResistor, hasReactive, hasExternalSignal := false, false, externalSignals[start]
+			for len(queue) != 0 {
+				node := queue[0]
+				queue = queue[1:]
+				for _, edgeIndex := range adjacency[node] {
+					if visitedEdges[edgeIndex] {
+						continue
+					}
+					visitedEdges[edgeIndex] = true
+					edge := edges[edgeIndex]
+					hasResistor = hasResistor || edge.resistor
+					hasReactive = hasReactive || edge.reactive
+					next := edge.left
+					if next == node {
+						next = edge.right
+					}
+					hasExternalSignal = hasExternalSignal || externalSignals[next]
+					if topologyRailRole(nodeRoles[next]) {
+						continue
+					}
+					if !visitedNodes[next] {
+						visitedNodes[next] = true
+						queue = append(queue, next)
+					}
+				}
+			}
+			if hasResistor && hasReactive && hasExternalSignal {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func topologyGraphHasAnalogFeedback(graph CandidateGraph) bool {
+	dcAdjacency := topologyPassiveNodeAdjacency(graph, true)
+	for _, instance := range graph.Instances {
+		if instance.Kind != "opamp" {
+			continue
+		}
+		terminals := topologyTerminalNodes(instance)
+		if topologyNodePathExists(dcAdjacency, terminals["OUT"], terminals["IN_MINUS"]) {
+			return true
+		}
+	}
+	return false
+}
+
+func topologyGraphHasDecisionFeedback(graph CandidateGraph) bool {
+	dcAdjacency := topologyPassiveNodeAdjacency(graph, true)
+	for _, instance := range graph.Instances {
+		if instance.Kind != "opamp" && instance.Kind != "comparator" {
+			continue
+		}
+		terminals := topologyTerminalNodes(instance)
+		if (terminals["OUT"] != terminals["IN_PLUS"] &&
+			topologyNodePathExists(dcAdjacency, terminals["OUT"], terminals["IN_PLUS"])) ||
+			(terminals["OUT"] != terminals["IN_MINUS"] &&
+				topologyNodePathExists(dcAdjacency, terminals["OUT"], terminals["IN_MINUS"])) {
+			return true
+		}
+	}
+	return false
+}
+
+// topologyDecisionStageGap recognizes only the primitive connectivity implied
+// by bounded thresholds: an observed decision output, an externally driven
+// input, and a rail-referenced decision level. Hysteretic behavior additionally
+// requires a passive path from output back to an input. No named circuit family
+// or preferred threshold equation participates in this structural ranking.
+func topologyDecisionStageGap(
+	graph CandidateGraph,
+	minimumStages int,
+	requireFeedback bool,
+	requiredPolarity int,
+) int {
+	if minimumStages <= 0 {
+		return 0
+	}
+	nodeByID := make(map[string]GraphNode, len(graph.Nodes))
+	inputs := []string{}
+	outputs := []string{}
+	supplies := []string{}
+	references := []string{}
+	for _, node := range graph.Nodes {
+		nodeByID[node.ID] = node
+		switch node.Role {
+		case "input", "control":
+			inputs = append(inputs, node.ID)
+		case "output":
+			outputs = append(outputs, node.ID)
+		case "supply":
+			supplies = append(supplies, node.ID)
+		case "reference":
+			references = append(references, node.ID)
+		}
+	}
+	signalAdjacency := topologyPassiveNodeAdjacency(graph, true)
+	railAdjacency := topologyPassiveNodeAdjacencyWithRailAccess(graph, true, true)
+	reachable := func(adjacency map[string][]string, start string, targets []string) bool {
+		for _, target := range targets {
+			if topologyNodePathExists(adjacency, start, target) {
+				return true
+			}
+		}
+		return false
+	}
+	const baseDecisionObligations = 5
+	stageGaps := []int{}
+	for _, instance := range graph.Instances {
+		if instance.Kind != "opamp" && instance.Kind != "comparator" {
+			continue
+		}
+		terminals := topologyTerminalNodes(instance)
+		output := terminals["OUT"]
+		bestGap := baseDecisionObligations
+		if requireFeedback {
+			bestGap++
+		}
+		for _, signalTerminal := range []string{"IN_PLUS", "IN_MINUS"} {
+			if (requiredPolarity > 0 && signalTerminal != "IN_PLUS") ||
+				(requiredPolarity < 0 && signalTerminal != "IN_MINUS") {
+				continue
+			}
+			referenceTerminal := "IN_MINUS"
+			if signalTerminal == "IN_MINUS" {
+				referenceTerminal = "IN_PLUS"
+			}
+			signalNode := terminals[signalTerminal]
+			referenceNode := terminals[referenceTerminal]
+			reference := nodeByID[referenceNode]
+			gap := 0
+			if !reachable(signalAdjacency, output, outputs) {
+				gap++
+			}
+			signalValid := signalNode != "" &&
+				referenceNode != "" &&
+				signalNode != referenceNode &&
+				(!requireFeedback || signalTerminal != "IN_PLUS" ||
+					nodeByID[signalNode].Scope == "internal") &&
+				(reference.Scope == "internal" ||
+					reference.Role == "input" ||
+					reference.Role == "control") &&
+				(reference.Scope != "external" ||
+					!topologyNodePathExists(signalAdjacency, signalNode, referenceNode))
+			if !signalValid || !reachable(signalAdjacency, signalNode, inputs) {
+				gap++
+			}
+			if !signalValid {
+				gap += 2
+			} else if !topologyNodeHasDerivedReference(
+				graph,
+				referenceNode,
+				supplies,
+				references,
+			) {
+				if !reachable(railAdjacency, referenceNode, supplies) {
+					gap++
+				}
+				if !reachable(railAdjacency, referenceNode, references) {
+					gap++
+				}
+			}
+			if requireFeedback &&
+				(output == signalNode || output == referenceNode ||
+					(signalTerminal == "IN_PLUS" &&
+						!topologyNodePathExists(signalAdjacency, output, signalNode)) ||
+					(signalTerminal == "IN_MINUS" &&
+						!topologyNodePathExists(signalAdjacency, output, referenceNode))) {
+				gap++
+			}
+			bestGap = min(bestGap, gap)
+		}
+		stageGaps = append(stageGaps, bestGap)
+	}
+	slices.Sort(stageGaps)
+	missingStageGap := baseDecisionObligations
+	if requireFeedback {
+		missingStageGap++
+	}
+	gap := 0
+	for index := 0; index < minimumStages; index++ {
+		if index >= len(stageGaps) {
+			gap += missingStageGap
+		} else {
+			gap += stageGaps[index]
+		}
+	}
+	return gap
+}
+
+// topologyNodeHasDerivedReference recognizes a rail-powered active stage whose
+// input is established by a reviewed two-terminal reference primitive and
+// whose feedback network is returned to the reference rail. This permits a
+// decision threshold to be supply-invariant without treating an arbitrary
+// active output as a trusted reference.
+func topologyNodeHasDerivedReference(
+	graph CandidateGraph,
+	node string,
+	supplies []string,
+	references []string,
+) bool {
+	passive := topologyPassiveNodeAdjacencyWithRailAccess(graph, true, true)
+	referenceSources := []string{}
+	for _, instance := range graph.Instances {
+		if instance.Kind != "reference_diode" {
+			continue
+		}
+		terminals := topologyTerminalNodes(instance)
+		if terminals["CATHODE"] == "" || terminals["ANODE"] == "" {
+			continue
+		}
+		for _, reference := range references {
+			if terminals["ANODE"] == reference ||
+				topologyNodePathExists(passive, terminals["ANODE"], reference) {
+				referenceSources = append(referenceSources, terminals["CATHODE"])
+				break
+			}
+		}
+	}
+	if len(referenceSources) == 0 {
+		return false
+	}
+	for _, instance := range graph.Instances {
+		if instance.Kind != "opamp" {
+			continue
+		}
+		terminals := topologyTerminalNodes(instance)
+		if terminals["OUT"] != node ||
+			!topologyAnyTerminalReachable(
+				terminals,
+				[]string{"V_PLUS"},
+				supplies,
+				passive,
+			) ||
+			!topologyAnyTerminalReachable(
+				terminals,
+				[]string{"V_MINUS"},
+				references,
+				passive,
+			) ||
+			!topologyAnyTerminalReachable(
+				terminals,
+				[]string{"IN_PLUS"},
+				referenceSources,
+				passive,
+			) ||
+			!topologyNodePathExists(
+				passive,
+				terminals["IN_MINUS"],
+				terminals["OUT"],
+			) {
+			continue
+		}
+		for _, reference := range references {
+			if topologyNodePathExists(passive, terminals["IN_MINUS"], reference) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// topologyDecisionPolarity derives comparator polarity only when bounded
+// operating behavior is unambiguous: a low/high output requirement is paired
+// with an input range wholly below or above every declared decision threshold.
+// Conflicting or incomplete evidence deliberately leaves polarity unconstrained.
+func topologyDecisionPolarity(requirement Requirement) int {
+	threshold := math.Inf(1)
+	for _, assertion := range requirement.Requirements.BehavioralRequirements {
+		switch assertion.Metric {
+		case "rising_threshold", "falling_threshold", "threshold_voltage",
+			"lower_threshold", "upper_threshold":
+			if target := assertionTarget(assertion); target > 0 {
+				threshold = math.Min(threshold, target)
+			}
+		}
+	}
+	supply := nominalSupplyVoltage(requirement)
+	if !finite(threshold) || supply <= 0 {
+		return 0
+	}
+	cases := map[string]OperatingCase{}
+	for _, operatingCase := range requirement.Requirements.OperatingCases {
+		cases[operatingCase.ID] = operatingCase
+	}
+	polarity := 0
+	for _, assertion := range requirement.Requirements.BehavioralRequirements {
+		outputLow := assertion.Metric == "output_low_voltage" ||
+			assertion.Metric == "startup_output_voltage"
+		outputHigh := assertion.Metric == "output_high_voltage"
+		if outputLow {
+			outputLow = assertion.Max != nil && *assertion.Max < supply/2
+		}
+		if outputHigh {
+			outputHigh = assertion.Min != nil && *assertion.Min > supply/2
+		}
+		if !outputLow && !outputHigh {
+			continue
+		}
+		for _, caseID := range assertion.OperatingCases {
+			for _, condition := range cases[caseID].Conditions {
+				if condition.Axis != "input_voltage" {
+					continue
+				}
+				candidate := 0
+				switch {
+				case condition.Max < threshold && outputLow:
+					candidate = 1
+				case condition.Max < threshold && outputHigh:
+					candidate = -1
+				case condition.Min > threshold && outputHigh:
+					candidate = 1
+				case condition.Min > threshold && outputLow:
+					candidate = -1
+				}
+				if candidate == 0 {
+					continue
+				}
+				if polarity != 0 && polarity != candidate {
+					return 0
+				}
+				polarity = candidate
+			}
+		}
+	}
+	return polarity
+}
+
+func topologyPassiveNodeAdjacency(graph CandidateGraph, dcOnly bool) map[string][]string {
+	return topologyPassiveNodeAdjacencyWithRailAccess(graph, dcOnly, false)
+}
+
+func topologyPassiveNodeAdjacencyWithRailAccess(
+	graph CandidateGraph,
+	dcOnly bool,
+	includeRails bool,
+) map[string][]string {
+	adjacencySets := map[string]map[string]struct{}{}
+	nodeRoles := make(map[string]string, len(graph.Nodes))
+	for _, node := range graph.Nodes {
+		nodeRoles[node.ID] = node.Role
+	}
+	for _, instance := range graph.Instances {
+		if len(instance.Terminals) != 2 {
+			continue
+		}
+		switch instance.Kind {
+		case "resistor", "inductor", "diode", "signal_diode", "clamp_diode":
+		case "capacitor":
+			if dcOnly {
+				continue
+			}
+		default:
+			continue
+		}
+		left := instance.Terminals[0].Node
+		right := instance.Terminals[1].Node
+		if left == right {
+			continue
+		}
+		if !includeRails &&
+			(topologyRailRole(nodeRoles[left]) || topologyRailRole(nodeRoles[right])) {
+			continue
+		}
+		if adjacencySets[left] == nil {
+			adjacencySets[left] = map[string]struct{}{}
+		}
+		if adjacencySets[right] == nil {
+			adjacencySets[right] = map[string]struct{}{}
+		}
+		adjacencySets[left][right] = struct{}{}
+		adjacencySets[right][left] = struct{}{}
+	}
+	adjacency := make(map[string][]string, len(adjacencySets))
+	for node, neighbors := range adjacencySets {
+		for neighbor := range neighbors {
+			adjacency[node] = append(adjacency[node], neighbor)
+		}
+		slices.Sort(adjacency[node])
+	}
+	return adjacency
+}
+
+func topologyNodesByRole(graph CandidateGraph, roles ...string) []string {
+	roleSet := map[string]bool{}
+	for _, role := range roles {
+		roleSet[role] = true
+	}
+	result := []string{}
+	for _, node := range graph.Nodes {
+		if node.Scope == "external" && roleSet[node.Role] {
+			result = append(result, node.ID)
+		}
+	}
+	slices.Sort(result)
+	return result
+}
+
+func topologyRailRole(role string) bool {
+	return role == "supply" || role == "reference"
+}
+
+func topologyActiveSignalTerminals(kind string) ([]string, []string) {
+	switch kind {
+	case "opamp":
+		return []string{"IN_PLUS", "IN_MINUS"}, []string{"OUT"}
+	case "fixed_voltage_regulator":
+		return []string{"VIN"}, []string{"VOUT"}
+	case "adjustable_voltage_regulator":
+		return []string{"VIN", "ADJ"}, []string{"VOUT"}
+	case "n_channel_mosfet", "p_channel_mosfet":
+		return []string{"GATE"}, []string{"DRAIN", "SOURCE"}
+	case "npn_bjt", "pnp_bjt":
+		return []string{"BASE"}, []string{"COLLECTOR", "EMITTER"}
+	default:
+		return nil, nil
+	}
+}
+
+func topologyEffectiveInputTerminals(
+	instance GraphInstance,
+	inputTerminals []string,
+) []string {
+	if instance.Kind != "opamp" {
+		return inputTerminals
+	}
+	terminals := topologyTerminalNodes(instance)
+	if terminals["OUT"] != "" && terminals["OUT"] == terminals["IN_MINUS"] {
+		return []string{"IN_PLUS"}
+	}
+	return inputTerminals
+}
+
+func topologyTerminalNodes(instance GraphInstance) map[string]string {
+	result := make(map[string]string, len(instance.Terminals))
+	for _, terminal := range instance.Terminals {
+		result[terminal.Terminal] = terminal.Node
+	}
+	return result
+}
+
+func topologyAnyTerminalReachable(
+	terminalNodes map[string]string,
+	terminals []string,
+	targets []string,
+	adjacency map[string][]string,
+) bool {
+	for _, terminal := range terminals {
+		for _, target := range targets {
+			if topologyNodePathExists(adjacency, terminalNodes[terminal], target) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func topologyMinimumTerminalDistance(
+	terminalNodes map[string]string,
+	terminals []string,
+	targets []string,
+	adjacency map[string][]string,
+) int {
+	best := 100
+	for _, terminal := range terminals {
+		start := terminalNodes[terminal]
+		for _, target := range targets {
+			best = min(best, topologyNodeDistance(adjacency, start, target))
+		}
+	}
+	return best
+}
+
+func topologyNodeDistance(adjacency map[string][]string, start, target string) int {
+	if start == "" || target == "" {
+		return 100
+	}
+	if start == target {
+		return 0
+	}
+	distances := map[string]int{start: 0}
+	queue := []string{start}
+	for len(queue) != 0 {
+		node := queue[0]
+		queue = queue[1:]
+		nextDistance := distances[node] + 1
+		for _, neighbor := range adjacency[node] {
+			if _, visited := distances[neighbor]; visited {
+				continue
+			}
+			if neighbor == target {
+				return nextDistance
+			}
+			distances[neighbor] = nextDistance
+			queue = append(queue, neighbor)
+		}
+	}
+	return 100
+}
+
+func topologyNodePathExists(adjacency map[string][]string, start, target string) bool {
+	if start == "" || target == "" {
+		return false
+	}
+	if start == target {
+		return true
+	}
+	visited := map[string]bool{start: true}
+	queue := []string{start}
+	for len(queue) != 0 {
+		node := queue[0]
+		queue = queue[1:]
+		for _, neighbor := range adjacency[node] {
+			if neighbor == target {
+				return true
+			}
+			if !visited[neighbor] {
+				visited[neighbor] = true
+				queue = append(queue, neighbor)
+			}
+		}
+	}
+	return false
+}
+
+func compareTopologyScores(left, right TopologyScore) int {
+	return cmp.Or(
+		cmp.Compare(left.RedundantActive, right.RedundantActive),
+		cmp.Compare(left.BehaviorGap, right.BehaviorGap),
+		cmp.Compare(left.EndpointAccess, right.EndpointAccess),
+		cmp.Compare(left.UnconnectedExternal, right.UnconnectedExternal),
+		cmp.Compare(left.UnreachableOutputs, right.UnreachableOutputs),
+		cmp.Compare(left.DanglingInternal, right.DanglingInternal),
+		cmp.Compare(left.PrimitiveCount, right.PrimitiveCount),
+		cmp.Compare(left.InternalNodeCount, right.InternalNodeCount),
+		cmp.Compare(left.EvidencePenalty, right.EvidencePenalty),
+		cmp.Compare(left.AreaMM2, right.AreaMM2),
+		cmp.Compare(left.Fingerprint, right.Fingerprint),
+	)
+}
+
+func compareTopologyCandidates(left, right TopologyCandidate) int {
+	return cmp.Or(
+		compareTopologyScores(left.Score, right.Score),
+		cmp.Compare(left.TopologyHash, right.TopologyHash),
+		cmp.Compare(left.Fingerprint, right.Fingerprint),
+	)
+}
+
+func compareGraphOperations(left, right GraphOperation) int {
+	if comparison := cmp.Or(
+		cmp.Compare(left.Kind, right.Kind),
+		cmp.Compare(left.PrimitiveKind, right.PrimitiveKind),
+		cmp.Compare(left.PrimitiveKey, right.PrimitiveKey),
+		cmp.Compare(left.Node, right.Node),
+		cmp.Compare(canonicalOptionalFloat(left.ValueSI), canonicalOptionalFloat(right.ValueSI)),
+		cmp.Compare(len(left.Connections), len(right.Connections)),
+	); comparison != 0 {
+		return comparison
+	}
+	for index := range left.Connections {
+		if comparison := compareTerminalConnections(left.Connections[index], right.Connections[index]); comparison != 0 {
+			return comparison
+		}
+	}
+	return 0
+}
+
+func primitiveEvidencePenalty(value string) int {
+	switch value {
+	case "verified":
+		return 0
+	case "library_derived":
+		return 1
+	case "rule_inferred":
+		return 2
+	default:
+		return 10
+	}
+}
+
+func comparePositiveArea(left, right float64) int {
+	if left <= 0 && right > 0 {
+		return 1
+	}
+	if right <= 0 && left > 0 {
+		return -1
+	}
+	return cmp.Compare(left, right)
+}
+
+func effectiveTopologyPolicy(policy Policy) Policy {
+	defaults := DefaultPolicy()
+	if policy.MaxExpandedStates <= 0 {
+		policy.MaxExpandedStates = defaults.MaxExpandedStates
+	}
+	if policy.MaxGeneratedGraphs <= 0 {
+		policy.MaxGeneratedGraphs = defaults.MaxGeneratedGraphs
+	}
+	if policy.MaxPrimitiveInstances <= 0 {
+		policy.MaxPrimitiveInstances = defaults.MaxPrimitiveInstances
+	}
+	if policy.MaxInternalNodes <= 0 {
+		policy.MaxInternalNodes = defaults.MaxInternalNodes
+	}
+	if policy.MaxRetainedCandidates <= 0 {
+		policy.MaxRetainedCandidates = defaults.MaxRetainedCandidates
+	}
+	if policy.MaxDiagnosticSamples <= 0 {
+		policy.MaxDiagnosticSamples = defaults.MaxDiagnosticSamples
+	}
+	return policy
+}
+
+func primitiveInventoryByKey(inventory PrimitiveInventory) map[string]PrimitiveCandidate {
+	result := make(map[string]PrimitiveCandidate, len(inventory.Primitives))
+	for _, primitive := range inventory.Primitives {
+		result[primitive.Key] = primitive
+	}
+	return result
+}
+
+func internalNodeCount(graph CandidateGraph) int {
+	count := 0
+	for _, node := range graph.Nodes {
+		if node.Scope == "internal" {
+			count++
+		}
+	}
+	return count
+}
+
+func hasDanglingInternalNode(graph CandidateGraph) bool {
+	degrees := map[string]int{}
+	for _, instance := range graph.Instances {
+		for _, terminal := range instance.Terminals {
+			degrees[terminal.Node]++
+		}
+	}
+	for _, node := range graph.Nodes {
+		if node.Scope == "internal" && degrees[node.ID] < 2 {
+			return true
+		}
+	}
+	return false
+}
+
+func normalizeSearchRejections(rejections map[string][]string) []SearchRejection {
+	codes := make([]string, 0, len(rejections))
+	for code := range rejections {
+		codes = append(codes, code)
+	}
+	slices.Sort(codes)
+	result := make([]SearchRejection, 0, len(codes))
+	for _, code := range codes {
+		samples := append([]string(nil), rejections[code]...)
+		slices.Sort(samples)
+		samples = slices.Compact(samples)
+		count := len(samples)
+		if len(samples) > searchRejectionSampleLimit {
+			samples = samples[:searchRejectionSampleLimit]
+		}
+		result = append(result, SearchRejection{Code: code, Count: count, Samples: samples})
+	}
+	return result
+}
+
+func comparePlacements(left, right []TerminalConnection) int {
+	if comparison := cmp.Compare(len(left), len(right)); comparison != 0 {
+		return comparison
+	}
+	for index := range left {
+		if comparison := compareTerminalConnections(left[index], right[index]); comparison != 0 {
+			return comparison
+		}
+	}
+	return 0
+}
+
+func cloneGraphOperations(source []GraphOperation) []GraphOperation {
+	result := make([]GraphOperation, len(source))
+	for index, operation := range source {
+		result[index] = operation
+		result[index].Connections = append([]TerminalConnection(nil), operation.Connections...)
+		result[index].ValueSI = cloneInventoryFloat(operation.ValueSI)
+	}
+	return result
+}
+
+func minPositive(left, right int) int {
+	switch {
+	case left <= 0:
+		return right
+	case right <= 0:
+		return left
+	case left < right:
+		return left
+	default:
+		return right
+	}
+}
+
+func geometricMean(left, right float64) float64 {
+	if left <= 0 || right <= 0 {
+		return 0
+	}
+	return quantizeInventory(sqrtProduct(left, right))
+}
+
+func sqrtProduct(left, right float64) float64 {
+	// Scaling avoids overflow while retaining deterministic IEEE-754 behavior.
+	if left > right {
+		left, right = right, left
+	}
+	return right * deterministicSqrt(left/right)
+}
+
+func deterministicSqrt(value float64) float64 {
+	if value <= 0 {
+		return 0
+	}
+	guess := value
+	if guess < 1 {
+		guess = 1
+	}
+	for range 24 {
+		guess = 0.5 * (guess + value/guess)
+	}
+	return guess
+}

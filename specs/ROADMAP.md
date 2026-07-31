@@ -1250,15 +1250,30 @@ bulk support. Three held-out cases pass the complete local installed-KiCad
 lane, and adversarial evidence, budget, and qualification gaps fail closed
 with stable diagnostics.
 
-1. Generalize bounded placement-routing correction from observed
+Simulation-guided open-topology synthesis is now complete for its first frozen
+envelope. A primitive-only, provider-independent lane constructs canonical
+graphs from strict behavior-only requirements, performs bounded topology/value
+search and trusted simulation, applies generic graph-changing repair, and
+promotes passing graphs twice through the normal installed-KiCad workflow.
+Six of eight cases pass; the two remaining cases exhaust repair budgets
+deterministically. See the
+[completion audit](simulation-guided-open-topology-synthesis/AUDIT.md) and
+[promotion matrix](simulation-guided-open-topology-synthesis/PROMOTION_MATRIX.json).
+
+1. Expand the generic graph grammar, analytic seeds, and diagnosis-to-repair
+   operators until the remaining regulator and dual-threshold behaviors close
+   without fixture identity or named topology logic.
+2. Freeze a second, independently authored behavior-only corpus to measure
+   generalization outside the implementation-development distribution.
+3. Generalize bounded placement-routing correction from observed
    failures without introducing fixture-identity logic.
-2. Expand catalog-independent part qualification, calculated rating, and
+4. Expand catalog-independent part qualification, calculated rating, and
    fabrication evidence before claiming broader
    autonomous or fabrication-ready coverage.
-3. Feed novel behavior-only evaluations into the evidence-driven expansion
+5. Feed novel behavior-only evaluations into the evidence-driven expansion
    planner so capability gaps are ranked by reusable family impact, then source
    and promote only the highest-value packages with independent evidence.
-4. Extend reviewed dynamic models into additional converter, isolation, and
+6. Extend reviewed dynamic models into additional converter, isolation, and
    high-energy protection families without weakening fail-closed model,
    convergence, SOA, or event-coverage requirements.
 

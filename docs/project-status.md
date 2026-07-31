@@ -357,6 +357,32 @@ does not qualify arbitrary control ICs, converter families, thermal
 assemblies, protection devices, RF/high-speed behavior, mains safety, or
 unreviewed component substitutions.
 
+### Open-Topology Primitive Synthesis
+
+KiCadAI now has a production API and CLI lane that constructs primitive
+terminal-level circuit graphs from strict behavior-only requirements without
+selecting a named provider expansion or pre-authored block family. The lane
+derives its primitive inventory from accepted catalog, pin/pad, rating,
+package, value-domain, and model-provenance evidence; canonicalizes graph
+identity; performs deterministic bounded topology/value search; evaluates
+declared cases through the trusted simulator; and continues failed candidates
+through generic graph-changing repair.
+
+The frozen eight-case corpus passes six complete simulation and installed-KiCad
+promotions. The active filter and sensor conditioner each require a topology
+change after failed simulation. All six physical results pass schematic
+electrical checks, placement, routing/connectivity, writer correctness,
+installed-KiCad ERC, strict DRC, zero-difference round trip, and identical raw
+project hashes across two clean roots. The discrete regulator and
+voltage-window monitor remain stable `OPEN_TOPOLOGY_REPAIR_EXHAUSTED`
+outcomes.
+
+Use `kicadai open-topology create` for this lane. Full search and physical
+evidence are retained under `.kicadai/`; stdout contains bounded hashes,
+consumption, selected topology, status, replay, and artifact references. See
+the [completion audit](../specs/simulation-guided-open-topology-synthesis/AUDIT.md)
+and [promotion matrix](../specs/simulation-guided-open-topology-synthesis/PROMOTION_MATRIX.json).
+
 ### Schematic Readability
 
 Generated schematics use deterministic role, stage, and lane classification;
@@ -498,16 +524,18 @@ envelope remain unsupported.
 
 ## Remaining Direction
 
-Dynamic electrothermal and control-loop synthesis is now complete for the
-frozen V5 envelope. The next closure step is broader clock/fanout and
-programming-load evidence, followed by converter, isolation, and high-energy
-protection families outside the current model registry. Catalog-independent
-part qualification, denser-board physical synthesis, and evaluation over novel
-behavior-only requests remain important. Those gaps can now produce
-deterministic expansion proposals, but they still require real engineering
-sources, representative simulation/workflow/KiCad evidence, and review before
-entering the supported registry. Unknown behavior must continue to produce a
-stable capability gap instead of guessed implementation detail.
+Open-topology synthesis now proves discovery for six of eight frozen
+requirements. The next closure step is to generalize the search grammar and
+diagnosis-to-repair mapping until the remaining regulator and dual-threshold
+cases pass without fixture logic, then evaluate new identity-neutral corpora
+outside the development distribution. Broader clock/fanout,
+programming-load, converter, isolation, and high-energy protection models,
+catalog-independent part qualification, and denser-board physical synthesis
+remain important. Those gaps can produce deterministic expansion proposals,
+but they still require real engineering sources, representative
+simulation/workflow/KiCad evidence, and review before entering the supported
+registry. Unknown behavior must continue to produce a stable capability gap
+instead of guessed implementation detail.
 
 See the [Roadmap](../specs/ROADMAP.md) for prioritized work and the
 [Development Reference](development.md) for repository-level limitations and

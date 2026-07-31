@@ -73,6 +73,82 @@
       }
     },
     {
+      "id": "capacitor.kemet.c1210k153f5eml.1210",
+      "family": "capacitor",
+      "name": "KEMET C1210K153F5EML 15 nF 1% 50 V C0G capacitor",
+      "description": "Concrete 1210 C0G capacitor for precision timing, filtering, and low-loss analog networks.",
+      "manufacturer": "KEMET",
+      "mpn": "C1210K153F5EML",
+      "lifecycle": "active",
+      "tags": ["c0g", "filter", "precision", "capacitor", "1210", "15nf"],
+      "values": [{"kind": "capacitance", "typ": "15n", "unit": "F"}],
+      "ratings": [{"kind": "voltage", "max": "50", "unit": "V"}],
+      "tolerances": [{"kind": "capacitance", "max": "1", "unit": "%"}],
+      "temperature": {"min": "-55", "max": "125", "unit": "C"},
+      "simulation_models": [
+        {"model_id": "mna_capacitor_v1"},
+        {"model_id": "mna_capacitor_transient_be_v1", "parameters": [{"name": "max_voltage_v", "value": 50}]},
+        {"model_id": "rc_lowpass_ac_v1"}
+      ],
+      "capacitor_evidence": {
+        "dielectric": "C0G",
+        "nominal_capacitance": "15n",
+        "capacitance_unit": "F",
+        "voltage_rating": "50",
+        "voltage_unit": "V",
+        "dc_bias_review": "proven",
+        "effective_capacitance_review": "proven",
+        "esr_review": "proven",
+        "voltage_derating_review": "proven",
+        "maximum_voltage_use_ratio": 0.8,
+        "technology": "base metal electrode multilayer ceramic",
+        "polarity": "nonpolar",
+        "capacitance_tolerance_percent": 1,
+        "fabrication_candidate_blocks": false,
+        "review_note": "KEMET MIL-PRF-32535 ordering and selection tables prove the concrete C1210K153F5EML equivalent ordering code, 15 nF capacitance code 153, 1 percent tolerance code F, 50 V code 5, C0G code E, 1210 dimensions, and declared temperature range."
+      },
+      "symbols": [{
+        "symbol_id": "Device:C",
+        "function_pins": [
+          {"function": "A", "symbol_pin": "1", "required": true},
+          {"function": "B", "symbol_pin": "2", "required": true}
+        ],
+        "verification": {
+          "confidence": "verified",
+          "sources": ["https://content.kemet.com/datasheets/KEM_C1095_MIL-PRF-32535.pdf", "builtin_pinmap:Device:C"],
+          "pinmap_checked": true
+        }
+      }],
+      "packages": [{
+        "id": "1210",
+        "name": "1210 SMD",
+        "footprint_id": "Capacitor_SMD:C_1210_3225Metric",
+        "package_type": "1210",
+        "pinmap_id": "Device:C|Capacitor_SMD:C_1210_3225Metric",
+        "pad_functions": [
+          {"function": "A", "pad": "1"},
+          {"function": "B", "pad": "2"}
+        ],
+        "dimensions_mm": {"width": 3.2, "height": 2.5},
+        "height_mm": 2.8,
+        "verification": {
+          "confidence": "verified",
+          "sources": ["https://content.kemet.com/datasheets/KEM_C1095_MIL-PRF-32535.pdf", "kicad-footprint:Capacitor_SMD:C_1210_3225Metric"],
+          "pinmap_checked": true
+        }
+      }],
+      "verification": {
+        "confidence": "verified",
+        "sources": [
+          "https://content.kemet.com/datasheets/KEM_C1095_MIL-PRF-32535.pdf",
+          "kicad-pinmap:Device:C|Capacitor_SMD:C_1210_3225Metric"
+        ],
+        "resolver_checked": true,
+        "pinmap_checked": true,
+        "tests": ["catalog_precision_capacitor_binding"]
+      }
+    },
+    {
       "id": "resistor.vishay.tnpw1206.e192.0p1",
       "family": "resistor",
       "name": "Vishay TNPW1206 e3 E192 0.1% resistor series",
@@ -398,6 +474,26 @@
       "verification": {"confidence": "verified", "sources": ["https://www.vishay.com/docs/28758/tnpw_e3.pdf", "kicad-pinmap:Device:R|Resistor_SMD:R_0805_2012Metric"], "resolver_checked": true, "pinmap_checked": true, "tests": ["catalog_audio_precision_passive_evidence"]}
     },
     {
+      "id": "resistor.vishay.tnpw0805.4k99.0p1",
+      "family": "resistor",
+      "name": "Vishay TNPW08054K99BEEA 4.99 kOhm 0.1% resistor",
+      "description": "Concrete lead-free 0805 thin-film resistor for precision analog gain and feedback networks.",
+      "generic": false,
+      "manufacturer": "Vishay",
+      "mpn": "TNPW08054K99BEEA",
+      "lifecycle": "active",
+      "tags": ["analog", "precision", "feedback", "resistor", "thin_film", "0805"],
+      "values": [{"kind": "resistance", "typ": "4.99k", "unit": "ohm"}, {"kind": "temperature_coefficient", "max": "25", "unit": "ppm/C"}],
+      "ratings": [{"kind": "power", "max": "0.2", "unit": "W"}, {"kind": "voltage", "max": "150", "unit": "V"}],
+      "tolerances": [{"kind": "resistance", "max": "0.1", "unit": "%"}],
+      "temperature": {"min": "-55", "max": "175", "unit": "C"},
+      "simulation_models": [{"model_id": "mna_resistor_v1"}],
+      "resistor_evidence": {"technology": "AEC-Q200 lead-free thin film", "nominal_resistance": {"value": 4990, "unit": "ohm", "conditions": "ordered resistance at 20 C"}, "resistance_tolerance_percent": 0.1, "rated_power": {"value": 0.2, "unit": "W", "temperature_c": 70, "conditions": "conservative continuous free-air rating"}, "derated_power": {"value": 0.1, "unit": "W", "temperature_c": 125, "conditions": "conservative bound below the TNPW e3 derating curve"}, "maximum_element_temperature_c": 175, "pulse_status": "not_applicable", "fabrication_proof": true, "review_note": "TNPW e3 ordering code, E192 resistance range, 0.1 percent tolerance, voltage, temperature, and 0805 rating are bounded by the manufacturer series data."},
+      "symbols": [{"symbol_id": "Device:R", "function_pins": [{"function": "A", "symbol_pin": "1", "required": true}, {"function": "B", "symbol_pin": "2", "required": true}], "verification": {"confidence": "verified", "sources": ["https://www.vishay.com/docs/28758/tnpw_e3.pdf", "builtin_pinmap:Device:R"], "pinmap_checked": true}}],
+      "packages": [{"id": "0805", "name": "0805 SMD", "footprint_id": "Resistor_SMD:R_0805_2012Metric", "package_type": "0805", "mpn": "TNPW08054K99BEEA", "lifecycle": "active", "pinmap_id": "Device:R|Resistor_SMD:R_0805_2012Metric", "pad_functions": [{"function": "A", "pad": "1"}, {"function": "B", "pad": "2"}], "dimensions_mm": {"width": 2.0, "height": 1.25}, "height_mm": 0.6, "verification": {"confidence": "verified", "sources": ["https://www.vishay.com/docs/28758/tnpw_e3.pdf", "kicad-footprint:Resistor_SMD:R_0805_2012Metric"], "pinmap_checked": true}}],
+      "verification": {"confidence": "verified", "sources": ["https://www.vishay.com/docs/28758/tnpw_e3.pdf", "kicad-pinmap:Device:R|Resistor_SMD:R_0805_2012Metric"], "resolver_checked": true, "pinmap_checked": true, "tests": ["catalog_audio_precision_passive_evidence"]}
+    },
+    {
       "id": "resistor.vishay.tnpw0805.10k0.0p1",
       "family": "resistor",
       "name": "Vishay TNPW080510K0BEEA 10 kOhm 0.1% resistor",
@@ -455,6 +551,86 @@
       "resistor_evidence": {"technology": "AEC-Q200 lead-free thin film", "nominal_resistance": {"value": 12500, "unit": "ohm", "conditions": "ordered resistance at 20 C"}, "resistance_tolerance_percent": 0.1, "rated_power": {"value": 0.2, "unit": "W", "temperature_c": 70, "conditions": "conservative continuous free-air rating"}, "derated_power": {"value": 0.1, "unit": "W", "temperature_c": 125, "conditions": "conservative bound below the TNPW e3 derating curve"}, "maximum_element_temperature_c": 175, "pulse_status": "not_applicable", "fabrication_proof": true, "review_note": "TNPW e3 ordering code, range, tolerance, voltage, temperature, and 0805 rating are bounded by the manufacturer series data."},
       "symbols": [{"symbol_id": "Device:R", "function_pins": [{"function": "A", "symbol_pin": "1", "required": true}, {"function": "B", "symbol_pin": "2", "required": true}], "verification": {"confidence": "verified", "sources": ["https://www.vishay.com/docs/28758/tnpw_e3.pdf", "builtin_pinmap:Device:R"], "pinmap_checked": true}}],
       "packages": [{"id": "0805", "name": "0805 SMD", "footprint_id": "Resistor_SMD:R_0805_2012Metric", "package_type": "0805", "mpn": "TNPW080512K5BEEA", "lifecycle": "active", "pinmap_id": "Device:R|Resistor_SMD:R_0805_2012Metric", "pad_functions": [{"function": "A", "pad": "1"}, {"function": "B", "pad": "2"}], "dimensions_mm": {"width": 2.0, "height": 1.25}, "height_mm": 0.6, "verification": {"confidence": "verified", "sources": ["https://www.vishay.com/docs/28758/tnpw_e3.pdf", "kicad-footprint:Resistor_SMD:R_0805_2012Metric"], "pinmap_checked": true}}],
+      "verification": {"confidence": "verified", "sources": ["https://www.vishay.com/docs/28758/tnpw_e3.pdf", "kicad-pinmap:Device:R|Resistor_SMD:R_0805_2012Metric"], "resolver_checked": true, "pinmap_checked": true, "tests": ["catalog_audio_precision_passive_evidence"]}
+    },
+    {
+      "id": "resistor.vishay.tnpw0805.13k3.0p1",
+      "family": "resistor",
+      "name": "Vishay TNPW080513K3BEEA 13.3 kOhm 0.1% resistor",
+      "description": "Concrete lead-free 0805 thin-film resistor for precision analog reference scaling and feedback networks.",
+      "generic": false,
+      "manufacturer": "Vishay",
+      "mpn": "TNPW080513K3BEEA",
+      "lifecycle": "active",
+      "tags": ["analog", "precision", "reference", "feedback", "resistor", "thin_film", "0805"],
+      "values": [{"kind": "resistance", "typ": "13.3k", "unit": "ohm"}, {"kind": "temperature_coefficient", "max": "25", "unit": "ppm/C"}],
+      "ratings": [{"kind": "power", "max": "0.2", "unit": "W"}, {"kind": "voltage", "max": "150", "unit": "V"}],
+      "tolerances": [{"kind": "resistance", "max": "0.1", "unit": "%"}],
+      "temperature": {"min": "-55", "max": "175", "unit": "C"},
+      "simulation_models": [{"model_id": "mna_resistor_v1"}],
+      "resistor_evidence": {"technology": "AEC-Q200 lead-free thin film", "nominal_resistance": {"value": 13300, "unit": "ohm", "conditions": "ordered resistance at 20 C"}, "resistance_tolerance_percent": 0.1, "rated_power": {"value": 0.2, "unit": "W", "temperature_c": 70, "conditions": "conservative continuous free-air rating"}, "derated_power": {"value": 0.1, "unit": "W", "temperature_c": 125, "conditions": "conservative bound below the TNPW e3 derating curve"}, "maximum_element_temperature_c": 175, "pulse_status": "not_applicable", "fabrication_proof": true, "review_note": "TNPW e3 ordering code, E192 resistance range, 0.1 percent tolerance, voltage, temperature, and 0805 rating are bounded by the manufacturer series data."},
+      "symbols": [{"symbol_id": "Device:R", "function_pins": [{"function": "A", "symbol_pin": "1", "required": true}, {"function": "B", "symbol_pin": "2", "required": true}], "verification": {"confidence": "verified", "sources": ["https://www.vishay.com/docs/28758/tnpw_e3.pdf", "builtin_pinmap:Device:R"], "pinmap_checked": true}}],
+      "packages": [{"id": "0805", "name": "0805 SMD", "footprint_id": "Resistor_SMD:R_0805_2012Metric", "package_type": "0805", "mpn": "TNPW080513K3BEEA", "lifecycle": "active", "pinmap_id": "Device:R|Resistor_SMD:R_0805_2012Metric", "pad_functions": [{"function": "A", "pad": "1"}, {"function": "B", "pad": "2"}], "dimensions_mm": {"width": 2.0, "height": 1.25}, "height_mm": 0.6, "verification": {"confidence": "verified", "sources": ["https://www.vishay.com/docs/28758/tnpw_e3.pdf", "kicad-footprint:Resistor_SMD:R_0805_2012Metric"], "pinmap_checked": true}}],
+      "verification": {"confidence": "verified", "sources": ["https://www.vishay.com/docs/28758/tnpw_e3.pdf", "kicad-pinmap:Device:R|Resistor_SMD:R_0805_2012Metric"], "resolver_checked": true, "pinmap_checked": true, "tests": ["catalog_audio_precision_passive_evidence"]}
+    },
+    {
+      "id": "resistor.vishay.tnpw0805.15k0.0p1",
+      "family": "resistor",
+      "name": "Vishay TNPW080515K0BEEA 15 kOhm 0.1% resistor",
+      "description": "Concrete lead-free 0805 thin-film resistor for precision analog threshold and feedback networks.",
+      "generic": false,
+      "manufacturer": "Vishay",
+      "mpn": "TNPW080515K0BEEA",
+      "lifecycle": "active",
+      "tags": ["analog", "precision", "threshold", "feedback", "resistor", "thin_film", "0805"],
+      "values": [{"kind": "resistance", "typ": "15k", "unit": "ohm"}, {"kind": "temperature_coefficient", "max": "25", "unit": "ppm/C"}],
+      "ratings": [{"kind": "power", "max": "0.2", "unit": "W"}, {"kind": "voltage", "max": "150", "unit": "V"}],
+      "tolerances": [{"kind": "resistance", "max": "0.1", "unit": "%"}],
+      "temperature": {"min": "-55", "max": "175", "unit": "C"},
+      "simulation_models": [{"model_id": "mna_resistor_v1"}],
+      "resistor_evidence": {"technology": "AEC-Q200 lead-free thin film", "nominal_resistance": {"value": 15000, "unit": "ohm", "conditions": "ordered resistance at 20 C"}, "resistance_tolerance_percent": 0.1, "rated_power": {"value": 0.2, "unit": "W", "temperature_c": 70, "conditions": "conservative continuous free-air rating"}, "derated_power": {"value": 0.1, "unit": "W", "temperature_c": 125, "conditions": "conservative bound below the TNPW e3 derating curve"}, "maximum_element_temperature_c": 175, "pulse_status": "not_applicable", "fabrication_proof": true, "review_note": "TNPW e3 ordering code, E192 resistance range, 0.1 percent tolerance, voltage, temperature, and 0805 rating are bounded by the manufacturer series data."},
+      "symbols": [{"symbol_id": "Device:R", "function_pins": [{"function": "A", "symbol_pin": "1", "required": true}, {"function": "B", "symbol_pin": "2", "required": true}], "verification": {"confidence": "verified", "sources": ["https://www.vishay.com/docs/28758/tnpw_e3.pdf", "builtin_pinmap:Device:R"], "pinmap_checked": true}}],
+      "packages": [{"id": "0805", "name": "0805 SMD", "footprint_id": "Resistor_SMD:R_0805_2012Metric", "package_type": "0805", "mpn": "TNPW080515K0BEEA", "lifecycle": "active", "pinmap_id": "Device:R|Resistor_SMD:R_0805_2012Metric", "pad_functions": [{"function": "A", "pad": "1"}, {"function": "B", "pad": "2"}], "dimensions_mm": {"width": 2.0, "height": 1.25}, "height_mm": 0.6, "verification": {"confidence": "verified", "sources": ["https://www.vishay.com/docs/28758/tnpw_e3.pdf", "kicad-footprint:Resistor_SMD:R_0805_2012Metric"], "pinmap_checked": true}}],
+      "verification": {"confidence": "verified", "sources": ["https://www.vishay.com/docs/28758/tnpw_e3.pdf", "kicad-pinmap:Device:R|Resistor_SMD:R_0805_2012Metric"], "resolver_checked": true, "pinmap_checked": true, "tests": ["catalog_audio_precision_passive_evidence"]}
+    },
+    {
+      "id": "resistor.vishay.tnpw0805.90k9.0p1",
+      "family": "resistor",
+      "name": "Vishay TNPW080590K9BEEA 90.9 kOhm 0.1% resistor",
+      "description": "Concrete lead-free 0805 thin-film resistor for precision analog threshold and feedback networks.",
+      "generic": false,
+      "manufacturer": "Vishay",
+      "mpn": "TNPW080590K9BEEA",
+      "lifecycle": "active",
+      "tags": ["analog", "precision", "threshold", "feedback", "resistor", "thin_film", "0805"],
+      "values": [{"kind": "resistance", "typ": "90.9k", "unit": "ohm"}, {"kind": "temperature_coefficient", "max": "25", "unit": "ppm/C"}],
+      "ratings": [{"kind": "power", "max": "0.2", "unit": "W"}, {"kind": "voltage", "max": "150", "unit": "V"}],
+      "tolerances": [{"kind": "resistance", "max": "0.1", "unit": "%"}],
+      "temperature": {"min": "-55", "max": "175", "unit": "C"},
+      "simulation_models": [{"model_id": "mna_resistor_v1"}],
+      "resistor_evidence": {"technology": "AEC-Q200 lead-free thin film", "nominal_resistance": {"value": 90900, "unit": "ohm", "conditions": "ordered resistance at 20 C"}, "resistance_tolerance_percent": 0.1, "rated_power": {"value": 0.2, "unit": "W", "temperature_c": 70, "conditions": "conservative continuous free-air rating"}, "derated_power": {"value": 0.1, "unit": "W", "temperature_c": 125, "conditions": "conservative bound below the TNPW e3 derating curve"}, "maximum_element_temperature_c": 175, "pulse_status": "not_applicable", "fabrication_proof": true, "review_note": "TNPW e3 ordering code, E192 resistance range, 0.1 percent tolerance, voltage, temperature, and 0805 rating are bounded by the manufacturer series data."},
+      "symbols": [{"symbol_id": "Device:R", "function_pins": [{"function": "A", "symbol_pin": "1", "required": true}, {"function": "B", "symbol_pin": "2", "required": true}], "verification": {"confidence": "verified", "sources": ["https://www.vishay.com/docs/28758/tnpw_e3.pdf", "builtin_pinmap:Device:R"], "pinmap_checked": true}}],
+      "packages": [{"id": "0805", "name": "0805 SMD", "footprint_id": "Resistor_SMD:R_0805_2012Metric", "package_type": "0805", "mpn": "TNPW080590K9BEEA", "lifecycle": "active", "pinmap_id": "Device:R|Resistor_SMD:R_0805_2012Metric", "pad_functions": [{"function": "A", "pad": "1"}, {"function": "B", "pad": "2"}], "dimensions_mm": {"width": 2.0, "height": 1.25}, "height_mm": 0.6, "verification": {"confidence": "verified", "sources": ["https://www.vishay.com/docs/28758/tnpw_e3.pdf", "kicad-footprint:Resistor_SMD:R_0805_2012Metric"], "pinmap_checked": true}}],
+      "verification": {"confidence": "verified", "sources": ["https://www.vishay.com/docs/28758/tnpw_e3.pdf", "kicad-pinmap:Device:R|Resistor_SMD:R_0805_2012Metric"], "resolver_checked": true, "pinmap_checked": true, "tests": ["catalog_audio_precision_passive_evidence"]}
+    },
+    {
+      "id": "resistor.vishay.tnpw0805.169k.0p1",
+      "family": "resistor",
+      "name": "Vishay TNPW0805169KBEEA 169 kOhm 0.1% resistor",
+      "description": "Concrete lead-free 0805 thin-film resistor for precision analog threshold and feedback networks.",
+      "generic": false,
+      "manufacturer": "Vishay",
+      "mpn": "TNPW0805169KBEEA",
+      "lifecycle": "active",
+      "tags": ["analog", "precision", "threshold", "feedback", "resistor", "thin_film", "0805"],
+      "values": [{"kind": "resistance", "typ": "169k", "unit": "ohm"}, {"kind": "temperature_coefficient", "max": "25", "unit": "ppm/C"}],
+      "ratings": [{"kind": "power", "max": "0.2", "unit": "W"}, {"kind": "voltage", "max": "150", "unit": "V"}],
+      "tolerances": [{"kind": "resistance", "max": "0.1", "unit": "%"}],
+      "temperature": {"min": "-55", "max": "175", "unit": "C"},
+      "simulation_models": [{"model_id": "mna_resistor_v1"}],
+      "resistor_evidence": {"technology": "AEC-Q200 lead-free thin film", "nominal_resistance": {"value": 169000, "unit": "ohm", "conditions": "ordered resistance at 20 C"}, "resistance_tolerance_percent": 0.1, "rated_power": {"value": 0.2, "unit": "W", "temperature_c": 70, "conditions": "conservative continuous free-air rating"}, "derated_power": {"value": 0.1, "unit": "W", "temperature_c": 125, "conditions": "conservative bound below the TNPW e3 derating curve"}, "maximum_element_temperature_c": 175, "pulse_status": "not_applicable", "fabrication_proof": true, "review_note": "TNPW e3 ordering code, E192 resistance range, 0.1 percent tolerance, voltage, temperature, and 0805 rating are bounded by the manufacturer series data."},
+      "symbols": [{"symbol_id": "Device:R", "function_pins": [{"function": "A", "symbol_pin": "1", "required": true}, {"function": "B", "symbol_pin": "2", "required": true}], "verification": {"confidence": "verified", "sources": ["https://www.vishay.com/docs/28758/tnpw_e3.pdf", "builtin_pinmap:Device:R"], "pinmap_checked": true}}],
+      "packages": [{"id": "0805", "name": "0805 SMD", "footprint_id": "Resistor_SMD:R_0805_2012Metric", "package_type": "0805", "mpn": "TNPW0805169KBEEA", "lifecycle": "active", "pinmap_id": "Device:R|Resistor_SMD:R_0805_2012Metric", "pad_functions": [{"function": "A", "pad": "1"}, {"function": "B", "pad": "2"}], "dimensions_mm": {"width": 2.0, "height": 1.25}, "height_mm": 0.6, "verification": {"confidence": "verified", "sources": ["https://www.vishay.com/docs/28758/tnpw_e3.pdf", "kicad-footprint:Resistor_SMD:R_0805_2012Metric"], "pinmap_checked": true}}],
       "verification": {"confidence": "verified", "sources": ["https://www.vishay.com/docs/28758/tnpw_e3.pdf", "kicad-pinmap:Device:R|Resistor_SMD:R_0805_2012Metric"], "resolver_checked": true, "pinmap_checked": true, "tests": ["catalog_audio_precision_passive_evidence"]}
     },
     {
@@ -542,6 +718,37 @@
       "symbols": [{"symbol_id": "Device:C_Polarized", "function_pins": [{"function": "A", "symbol_pin": "1", "required": true}, {"function": "B", "symbol_pin": "2", "required": true}], "verification": {"confidence": "verified", "sources": ["https://content.kemet.com/datasheets/KEM_T2005_T491.pdf", "builtin_pinmap:Device:C_Polarized"], "pinmap_checked": true}}],
       "packages": [{"id": "eia_3216_18", "name": "EIA 3216-18 KEMET A case", "footprint_id": "Capacitor_Tantalum_SMD:CP_EIA-3216-18_Kemet-A", "package_type": "tantalum_case_a", "mpn": "T491A475K025AT", "lifecycle": "active", "pinmap_id": "Device:C_Polarized|Capacitor_Tantalum_SMD:CP_EIA-3216-18_Kemet-A", "pad_functions": [{"function": "A", "pad": "1"}, {"function": "B", "pad": "2"}], "dimensions_mm": {"width": 3.2, "height": 1.6}, "height_mm": 1.8, "verification": {"confidence": "verified", "sources": ["https://content.kemet.com/datasheets/KEM_T2005_T491.pdf", "kicad-footprint:Capacitor_Tantalum_SMD:CP_EIA-3216-18_Kemet-A"], "pinmap_checked": true}}],
       "verification": {"confidence": "verified", "sources": ["https://content.kemet.com/datasheets/KEM_T2005_T491.pdf", "kicad-pinmap:Device:C_Polarized|Capacitor_Tantalum_SMD:CP_EIA-3216-18_Kemet-A"], "resolver_checked": true, "pinmap_checked": true, "tests": ["catalog_audio_precision_passive_evidence"]}
+    },
+    {
+      "id": "resistor.vishay.cpf3.10r.0p1.axial",
+      "family": "resistor",
+      "name": "Vishay CPF3 10 ohm 0.1% 3 W metal-film resistor",
+      "description": "Concrete precision axial power resistor for bounded current sensing and other low-resistance feedback networks.",
+      "generic": false,
+      "manufacturer": "Vishay",
+      "mpn": "CPF310R000BE14",
+      "lifecycle": "active",
+      "tags": ["axial", "current_sense", "metal_film", "power", "precision", "resistor"],
+      "values": [{"kind": "resistance", "typ": "10", "unit": "ohm"}],
+      "ratings": [{"kind": "power", "max": "3", "unit": "W"}, {"kind": "voltage", "max": "500", "unit": "V"}],
+      "tolerances": [{"kind": "resistance", "max": "0.1", "unit": "%"}],
+      "temperature": {"min": "-65", "max": "230", "unit": "C"},
+      "derating_rules": [{"kind": "thermal", "description": "Rated for 3 W at 70 C and linearly derated to zero at the 230 C category limit."}],
+      "simulation_models": [{"model_id": "mna_resistor_v1"}],
+      "resistor_evidence": {
+        "technology": "precision flameproof nickel-chrome metal film",
+        "nominal_resistance": {"value": 10, "unit": "ohm", "conditions": "CPF3 10R000 ordering value"},
+        "resistance_tolerance_percent": 0.1,
+        "rated_power": {"value": 3, "unit": "W", "temperature_c": 70, "conditions": "manufacturer rated dissipation"},
+        "derated_power": {"value": 1.5, "unit": "W", "temperature_c": 150, "conditions": "linear manufacturer derating curve from 70 C to 230 C"},
+        "maximum_element_temperature_c": 230,
+        "pulse_status": "not_applicable",
+        "fabrication_proof": true,
+        "review_note": "The manufacturer ordering table proves CPF3, 10 ohm, 0.1 percent, 25 ppm/C, lead-free bulk packaging; the electrical and dimensional tables prove the declared power, voltage, temperature, and body bounds."
+      },
+      "symbols": [{"symbol_id": "Device:R", "function_pins": [{"function": "A", "symbol_pin": "1", "required": true}, {"function": "B", "symbol_pin": "2", "required": true}], "verification": {"confidence": "verified", "sources": ["https://www.vishay.com/docs/31021/cpf.pdf", "builtin_pinmap:Device:R"], "pinmap_checked": true}}],
+      "packages": [{"id": "axial_cpf3", "name": "CPF3 axial 14.1 x 4.57 mm", "footprint_id": "Resistor_THT:R_Axial_DIN0614_L14.3mm_D5.7mm_P25.40mm_Horizontal", "package_type": "axial_power", "mpn": "CPF310R000BE14", "lifecycle": "active", "pinmap_id": "Device:R|Resistor_THT:R_Axial_DIN0614_L14.3mm_D5.7mm_P25.40mm_Horizontal", "pad_functions": [{"function": "A", "pad": "1"}, {"function": "B", "pad": "2"}], "dimensions_mm": {"width": 25.4, "height": 5.7}, "height_mm": 5.7, "verification": {"confidence": "verified", "sources": ["https://www.vishay.com/docs/31021/cpf.pdf", "kicad-footprint:Resistor_THT:R_Axial_DIN0614_L14.3mm_D5.7mm_P25.40mm_Horizontal"], "pinmap_checked": true}}],
+      "verification": {"confidence": "verified", "sources": ["https://www.vishay.com/docs/31021/cpf.pdf", "kicad-pinmap:Device:R|Resistor_THT:R_Axial_DIN0614_L14.3mm_D5.7mm_P25.40mm_Horizontal"], "resolver_checked": true, "pinmap_checked": true, "tests": ["catalog_audio_precision_passive_evidence"]}
     },
     {
       "id": "diode.diodes.ddz5v1b_7.sod123",

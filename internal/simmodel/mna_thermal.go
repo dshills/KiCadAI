@@ -309,9 +309,16 @@ func thermalAssertionValue(result AnalysisResult, assertion Assertion) (float64,
 	}
 	actual := math.Inf(-1)
 	found := false
+	aggregateComponents := map[string]struct{}{}
+	for _, component := range assertion.Components {
+		aggregateComponents[component] = struct{}{}
+	}
 	for _, point := range result.Points {
 		for _, device := range point.Devices {
-			if device.Component != assertion.Component {
+			aggregate := assertion.Quantity == QuantityMaximumJunctionTemperatureC ||
+				assertion.Quantity == QuantityMinimumTransientSOAMargin
+			if (!aggregate && device.Component != assertion.Component) ||
+				(aggregate && !containsThermalAssertionComponent(aggregateComponents, device.Component)) {
 				continue
 			}
 			switch assertion.Quantity {
@@ -324,9 +331,23 @@ func thermalAssertionValue(result AnalysisResult, assertion Assertion) (float64,
 				}
 				actual = math.Max(actual, *device.JunctionTemperatureC)
 				found = true
+			case QuantityMaximumJunctionTemperatureC:
+				if device.JunctionTemperatureC == nil {
+					return 0, &Diagnostic{Path: "assertions." + assertion.AnalysisID + "." + device.Component, Message: "maximum junction-temperature assertion lacks a complete catalog-backed thermal path", Suggestion: "select reviewed component models with thermal resistance and maximum temperature evidence"}
+				}
+				actual = math.Max(actual, *device.JunctionTemperatureC)
+				found = true
 			case QuantityTransientSOAMargin:
 				if !device.TransientSOAEvaluated {
 					return 0, &Diagnostic{Path: "assertions." + assertion.AnalysisID + "." + assertion.Component, Message: "transient SOA assertion lacks reviewed physical SOA evidence", Suggestion: "select a component model with a reviewed transient SOA envelope covering the event"}
+				}
+				if !found || device.TransientSOAMargin < actual {
+					actual = device.TransientSOAMargin
+				}
+				found = true
+			case QuantityMinimumTransientSOAMargin:
+				if !device.TransientSOAEvaluated {
+					return 0, &Diagnostic{Path: "assertions." + assertion.AnalysisID + "." + device.Component, Message: "minimum transient SOA assertion lacks reviewed physical SOA evidence", Suggestion: "select reviewed component models with transient SOA envelopes covering the event"}
 				}
 				if !found || device.TransientSOAMargin < actual {
 					actual = device.TransientSOAMargin
@@ -339,6 +360,11 @@ func thermalAssertionValue(result AnalysisResult, assertion Assertion) (float64,
 		return normalizedMNAFloat(actual), nil
 	}
 	return 0, &Diagnostic{Path: "assertions." + assertion.AnalysisID + "." + assertion.Component, Message: "thermal assertion did not resolve to a dissipative device result"}
+}
+
+func containsThermalAssertionComponent(components map[string]struct{}, component string) bool {
+	_, exists := components[component]
+	return exists
 }
 
 func namedValue(values map[string]float64, name string) (float64, bool) {
