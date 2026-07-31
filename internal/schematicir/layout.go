@@ -25,6 +25,7 @@ func CloneLayout(layout Layout) Layout {
 		clone.Placements[index].SameColumnAs = append([]string(nil), placement.SameColumnAs...)
 		clone.Placements[index].SameRowAsPin = append([]EndpointRef(nil), placement.SameRowAsPin...)
 		clone.Placements[index].SameColumnAsPin = append([]EndpointRef(nil), placement.SameColumnAsPin...)
+		clone.Placements[index].CenterBetween = append([]string(nil), placement.CenterBetween...)
 	}
 	clone.Buses = make([]BusLayout, len(layout.Buses))
 	for index, bus := range layout.Buses {
@@ -83,6 +84,7 @@ func PlacementRelationCycle(placements []Placement, relation string) []string {
 					targets = append(targets, componentID)
 				}
 			}
+			targets = append(targets, placement.CenterBetween...)
 		default:
 			return nil
 		}
@@ -184,6 +186,7 @@ func NormalizeLayoutIntent(document Document) Document {
 	if len(generatedGroups) != 0 {
 		generated := make([]Group, 0, len(generatedGroups))
 		for _, group := range generatedGroups {
+			sort.Strings(group.Members)
 			generated = append(generated, *group)
 		}
 		sort.SliceStable(generated, func(left int, right int) bool {
@@ -195,7 +198,9 @@ func NormalizeLayoutIntent(document Document) Document {
 		groups = append(groups, generated...)
 	}
 	document.Layout.Groups = groups
+	explicitPlacementIntent := indexExplicitPlacementIntent(document.Layout.Placements)
 	document.Layout.Placements = normalizePlacements(document.Layout.Placements, document.Circuit.Components, componentGroup)
+	document.Layout.Placements = inferTopologyPlacements(document.Circuit, document.Layout.Placements, explicitPlacementIntent)
 	document.Layout.Buses = normalizeBusGeometry(document.Layout.Buses)
 	return document
 }
@@ -303,6 +308,7 @@ func normalizePlacements(existing []Placement, components []Component, component
 		placement.SameColumnAs = append([]string(nil), placement.SameColumnAs...)
 		placement.SameRowAsPin = append([]EndpointRef(nil), placement.SameRowAsPin...)
 		placement.SameColumnAsPin = append([]EndpointRef(nil), placement.SameColumnAsPin...)
+		placement.CenterBetween = append([]string(nil), placement.CenterBetween...)
 		sort.Strings(placement.Near)
 		sort.Strings(placement.Above)
 		sort.Strings(placement.RightOf)
@@ -310,6 +316,7 @@ func normalizePlacements(existing []Placement, components []Component, component
 		sort.Strings(placement.SameColumnAs)
 		sort.SliceStable(placement.SameRowAsPin, func(i, j int) bool { return placement.SameRowAsPin[i] < placement.SameRowAsPin[j] })
 		sort.SliceStable(placement.SameColumnAsPin, func(i, j int) bool { return placement.SameColumnAsPin[i] < placement.SameColumnAsPin[j] })
+		sort.Strings(placement.CenterBetween)
 		if placement.Target == "" {
 			continue
 		}

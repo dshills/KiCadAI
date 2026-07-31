@@ -15,8 +15,8 @@ circuit from the page alone.
 
 Each directory contains:
 
-- `source.json`: semantic circuit and relative layout intent, with no absolute
-  component coordinates;
+- `source.json`: semantic circuit connectivity and functional groups, with no
+  component placement recipes or absolute coordinates;
 - `generated/*.kicad_sch`: the generated KiCad schematic;
 - `generated/*.kicad_pro`: the matching KiCad project;
 - `generated/lib/` and `generated/sym-lib-table`, when present: local symbol
@@ -36,9 +36,9 @@ go run ./cmd/kicadai \
   --overwrite schematic-ir write
 ```
 
-The source files intentionally use `above`, `right_of`, `near`, `same_row_as`,
-`same_column_as`, and pin-alignment relationships. Signal entry and exit points
-use standard test-point terminals with visible conductors and local net names;
-external power domains use KiCad power flags so native ERC remains clean. This
-keeps the examples deterministic while expressing the visual convention rather
-than encoding fixture-specific page coordinates.
+KiCadAI derives row, column, branch, symmetry, rail, return, and endpoint
+alignment from each circuit graph. Signal entry and exit points use standard
+test-point terminals with visible conductors and local net names; external
+power domains use KiCad power flags so native ERC remains clean. The examples
+therefore exercise generic topology-aware layout instead of fixture-specific
+placement hints or page coordinates.

@@ -418,16 +418,20 @@ Required v1 semantics:
   target symbol anchor to a named `component.pin` connection anchor. These
   express a voltage-divider tap, collector output, or shunt branch precisely
   without hard-coded page coordinates.
+- `placements.center_between` accepts exactly two component IDs and centers
+  the target symbol between their columns. It is a generic symmetry primitive
+  for shared-tail, shared-return, and balanced branch structures.
 - A placement may declare at most one alignment anchor per axis across its
-  component and pin forms. Alignment cycles are rejected deterministically so
-  contradictory constraints cannot oscillate in the placement solver.
+  component, pin, and center-between forms. Alignment cycles are rejected
+  deterministically so contradictory constraints cannot oscillate in the
+  placement solver.
 - Layout precedence is deterministic:
   1. group `rank` defines global left-to-right order;
   2. lane rules define top/middle/bottom vertical bands;
   3. `placements.above`, `placements.right_of`,
      `placements.same_row_as`, `placements.same_column_as`,
-     `placements.same_row_as_pin`, and `placements.same_column_as_pin` enforce
-     relative ordering and alignment;
+     `placements.same_row_as_pin`, `placements.same_column_as_pin`, and
+     `placements.center_between` enforce relative ordering and alignment;
   4. `placements.near` defines local offsets inside or adjacent to the selected
      group;
   5. conflicting or circular `near` hints are non-binding heuristics; the

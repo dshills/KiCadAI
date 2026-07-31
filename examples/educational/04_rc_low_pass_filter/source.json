@@ -30,14 +30,7 @@
       {"id": "filter", "label": "RC filter", "role": "processing_stage", "members": ["series_resistor", "shunt_capacitor", "ground", "ground_flag"], "rank": 1},
       {"id": "output", "label": "Output", "role": "output_stage", "members": ["output"], "rank": 2, "side": "right"}
     ],
-    "placements": [
-      {"target": "input", "group": "input", "same_row_as_pin": ["series_resistor.1"]},
-      {"target": "series_resistor", "group": "filter", "right_of": ["input"], "above": ["shunt_capacitor"], "same_column_as": ["shunt_capacitor"]},
-      {"target": "shunt_capacitor", "group": "filter", "above": ["ground"]},
-      {"target": "ground", "group": "filter", "same_column_as": ["shunt_capacitor"]},
-      {"target": "ground_flag", "group": "filter", "right_of": ["ground"], "same_row_as": ["ground"]},
-      {"target": "output", "group": "output", "right_of": ["series_resistor"], "same_row_as_pin": ["series_resistor.2"]}
-    ],
+    "placements": [],
     "lanes": {"power": "top", "ground": "bottom", "signals": "middle"},
     "rules": {
       "positive_power_top": false,

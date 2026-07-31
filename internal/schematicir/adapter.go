@@ -541,7 +541,7 @@ func (state *adapterState) appendComponents(tx *transactions.Transaction) {
 			Rotation:   float64(rotation),
 			Mirror:     string(mirror),
 			Pins:       transactionPinsWithLibraryIndex(component, state.libraryIndex),
-			Properties: transactionSymbolPropertiesWithLayout(component, ref, state.textByID[component.ID]),
+			Properties: transactionSymbolPropertiesWithLayout(component, ref, state.textByID[component.ID], float64(rotation)),
 		}
 		state.appendOperation(tx, transactions.OpAddSymbol, payload, ref, "")
 		for _, pin := range component.Pins {
@@ -808,6 +808,8 @@ func (state *adapterState) appendNets(tx *transactions.Transaction) {
 		}
 		useLabelsValue := state.netLabelPreferences[net.Name]
 		useLabels := &useLabelsValue
+		hasLayoutRouteAnnotation := layoutHasRouteAnnotation(state.layoutResult, net.Name)
+		routeAnnotationAssigned := false
 		for pairIndex, pair := range pairs {
 			from, fromOK := state.transactionEndpoint(pair.from, fmt.Sprintf("circuit.nets[%d].route[%d].from", netIndex, pairIndex))
 			to, toOK := state.transactionEndpoint(pair.to, fmt.Sprintf("circuit.nets[%d].route[%d].to", netIndex, pairIndex))
@@ -840,8 +842,14 @@ func (state *adapterState) appendNets(tx *transactions.Transaction) {
 					}
 					waypoints = transactionPoints(points)
 					bendLabelAt = layoutBendLabelPoint(state.layoutResult, net.Name, hint.Points)
-					if bendLabelAt == nil && len(hint.Points) > 2 {
+					if bendLabelAt != nil {
+						routeAnnotationAssigned = true
+					}
+					if bendLabelAt == nil && !hasLayoutRouteAnnotation && !routeAnnotationAssigned && len(hint.Points) > 2 {
 						bendLabelAt = schematicRouteLabelFallbackPoint(state.layoutResult, net.Name, hint.Points)
+						if bendLabelAt != nil {
+							routeAnnotationAssigned = true
+						}
 					}
 				}
 			}
@@ -926,6 +934,15 @@ func (state *adapterState) appendNets(tx *transactions.Transaction) {
 			state.appendOperation(tx, transactions.OpConnect, payload, "", net.Name)
 		}
 	}
+}
+
+func layoutHasRouteAnnotation(result schematiclayout.Result, netName string) bool {
+	for _, label := range result.Labels {
+		if label.NetName == netName && label.RouteAnnotation {
+			return true
+		}
+	}
+	return false
 }
 
 func layoutBendLabelPoint(result schematiclayout.Result, netName string, points []kicadfiles.Point) *transactions.Point {
@@ -1881,6 +1898,7 @@ func schematicLayoutWithLibraryIndexAndPreferences(document Document, index *lib
 	componentsByID := indexComponentsByID(document.Circuit.Components)
 	powerFlagNeighbors := schematicPowerFlagNeighbors(document, componentsByID)
 	ordinalByID := schematicLayoutOrdinals(document)
+	netOrdinalByName := schematicLayoutNetOrdinals(document.Circuit.Nets)
 	rules := schematiclayout.DefaultRules(schematiclayout.ProfileStandard)
 	if document.Layout.Rules.MinComponentSpacingMM != nil {
 		rules.MinComponentSpacing = kicadfiles.MM(effectiveMinComponentSpacingMM(document))
@@ -1947,6 +1965,7 @@ func schematicLayoutWithLibraryIndexAndPreferences(document Document, index *lib
 			SameColumnAs:    append([]string(nil), placement.SameColumnAs...),
 			SameRowAsPin:    sameRowAsPin,
 			SameColumnAsPin: sameColumnAsPin,
+			CenterBetween:   append([]string(nil), placement.CenterBetween...),
 			Rotation:        kicadfiles.Angle(rotationByID[component.ID]),
 			Mirror:          schematiclayout.Mirror(mirrorByID[component.ID]),
 			Body:            geometry.Body,
@@ -1956,11 +1975,11 @@ func schematicLayoutWithLibraryIndexAndPreferences(document Document, index *lib
 			OriginalOrdinal: ordinalByID[component.ID],
 		})
 	}
-	for netIndex, net := range document.Circuit.Nets {
+	for _, net := range document.Circuit.Nets {
 		if documentNetIsBusMember(document, net.Name) {
 			continue
 		}
-		layoutNet := schematiclayout.Net{Name: net.Name, Role: string(net.Role), OriginalOrdinal: netIndex, PreferDirect: stateDocumentHasPortNet(document, net.Name)}
+		layoutNet := schematiclayout.Net{Name: net.Name, Role: string(net.Role), OriginalOrdinal: netOrdinalByName[net.Name], PreferDirect: stateDocumentHasPortNet(document, net.Name)}
 		if net.UseLabel != nil {
 			layoutNet.PreferredLabels = *net.UseLabel
 			layoutNet.EndpointLabels = *net.UseLabel
@@ -2149,6 +2168,24 @@ func schematicLayoutOrdinals(document Document) map[string]int {
 	for _, componentID := range remaining {
 		ordinals[componentID] = next
 		next++
+	}
+	return ordinals
+}
+
+func schematicLayoutNetOrdinals(nets []Net) map[string]int {
+	names := make([]string, 0, len(nets))
+	seen := map[string]struct{}{}
+	for _, net := range nets {
+		if _, exists := seen[net.Name]; exists {
+			continue
+		}
+		seen[net.Name] = struct{}{}
+		names = append(names, net.Name)
+	}
+	sort.Strings(names)
+	ordinals := make(map[string]int, len(names))
+	for index, name := range names {
+		ordinals[name] = index
 	}
 	return ordinals
 }
@@ -2859,9 +2896,15 @@ func transactionSymbolProperties(component Component) []transactions.SymbolPrope
 	return properties
 }
 
-func transactionSymbolPropertiesWithLayout(component Component, reference string, layout layoutTextPlacement) []transactions.SymbolProperty {
+func transactionSymbolPropertiesWithLayout(component Component, reference string, layout layoutTextPlacement, symbolRotation float64) []transactions.SymbolProperty {
 	properties := transactionSymbolProperties(component)
-	rotation := 0.0
+	// KiCad property angles are relative to the parent symbol transform. Cancel
+	// quarter-turn symbol rotation so generated reference and value fields stay
+	// horizontal and readable on the finished sheet.
+	rotation := math.Mod(360-symbolRotation, 360)
+	if rotation < 0 {
+		rotation += 360
+	}
 	doNotAutoplace := true
 	hideReference := component.Role == ComponentRolePowerSymbol || component.Role == ComponentRoleGroundSymbol
 	visible := []transactions.SymbolProperty{

@@ -84,6 +84,7 @@ type Component struct {
 	SameColumnAs    []string
 	SameRowAsPin    []Endpoint
 	SameColumnAsPin []Endpoint
+	CenterBetween   []string
 	Position        kicadfiles.Point
 	Fixed           bool
 	Rotation        kicadfiles.Angle
@@ -371,6 +372,7 @@ func NormalizeRequest(request Request) Request {
 		request.Components[index].SameColumnAs = append([]string(nil), request.Components[index].SameColumnAs...)
 		request.Components[index].SameRowAsPin = append([]Endpoint(nil), request.Components[index].SameRowAsPin...)
 		request.Components[index].SameColumnAsPin = append([]Endpoint(nil), request.Components[index].SameColumnAsPin...)
+		request.Components[index].CenterBetween = append([]string(nil), request.Components[index].CenterBetween...)
 		sort.Strings(request.Components[index].Near)
 		sort.Strings(request.Components[index].Above)
 		sort.Strings(request.Components[index].RightOf)
@@ -382,6 +384,7 @@ func NormalizeRequest(request Request) Request {
 		sort.SliceStable(request.Components[index].SameColumnAsPin, func(i, j int) bool {
 			return compareEndpoints(request.Components[index].SameColumnAsPin[i], request.Components[index].SameColumnAsPin[j]) < 0
 		})
+		sort.Strings(request.Components[index].CenterBetween)
 		sort.SliceStable(request.Components[index].Pins, func(i, j int) bool {
 			return comparePins(request.Components[index].Pins[i], request.Components[index].Pins[j]) < 0
 		})

@@ -205,11 +205,17 @@
         "near": [
           "r1"
         ],
+        "same_column_as_pin": [
+          "r1.2"
+        ],
         "orientation": "normal"
       },
       {
         "target": "input",
         "group": "input_stage",
+        "same_row_as_pin": [
+          "r1.1"
+        ],
         "orientation": "normal"
       },
       {
@@ -218,11 +224,17 @@
         "right_of": [
           "r1"
         ],
+        "same_row_as_pin": [
+          "r1.2"
+        ],
         "orientation": "normal"
       },
       {
         "target": "r1",
         "group": "filter_stage",
+        "above": [
+          "c1"
+        ],
         "right_of": [
           "input"
         ],

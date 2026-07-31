@@ -307,6 +307,7 @@ type Placement struct {
 	SameColumnAs    []string      `json:"same_column_as,omitempty"`
 	SameRowAsPin    []EndpointRef `json:"same_row_as_pin,omitempty"`
 	SameColumnAsPin []EndpointRef `json:"same_column_as_pin,omitempty"`
+	CenterBetween   []string      `json:"center_between,omitempty"`
 	Orientation     Orientation   `json:"orientation,omitempty"`
 	Mirror          Mirror        `json:"mirror,omitempty"`
 }

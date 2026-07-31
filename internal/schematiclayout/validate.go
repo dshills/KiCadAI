@@ -18,6 +18,7 @@ func Validate(result Result, request Request) Result {
 	result.Diagnostics = append([]Diagnostic(nil), result.Diagnostics...)
 	usable := UsableSheet(request.Sheet)
 	objects := validationObjects(result)
+	anchorIndex := newPinAnchorIndex(pinAnchors(result.Components))
 	for _, wire := range result.Wires {
 		if wire.From.X != wire.To.X && wire.From.Y != wire.To.Y {
 			result.Diagnostics = append(result.Diagnostics, Diagnostic{
@@ -52,7 +53,7 @@ func Validate(result Result, request Request) Result {
 				Message:  fmt.Sprintf("wire contacts unrelated net %s", other.NetName),
 			})
 		}
-		if pin, overlaps := unrelatedPinForWire(wire, wire.NetName, result, request); overlaps {
+		if pin, overlaps := unrelatedPinForWireIndexed(wire, wire.NetName, anchorIndex, request); overlaps {
 			result.Diagnostics = append(result.Diagnostics, Diagnostic{
 				Severity: SeverityError,
 				Code:     DiagnosticWirePinOverlap,
@@ -171,6 +172,16 @@ func relativePlacementDiagnostics(components []PlacedComponent, rules Rules) []D
 			}
 			if component.PlacedAt.X != anchor.X {
 				diagnostics = append(diagnostics, Diagnostic{Severity: SeverityError, Code: "same_pin_column_violation", Ref: component.Ref, Message: fmt.Sprintf("component must share a column with %s.%s", endpoint.Ref, endpoint.Pin), Repair: "align the component anchor with the named pin column or correct the same_column_as_pin relation"})
+			}
+		}
+		if len(component.CenterBetween) == 2 {
+			left, leftOK := byRef[component.CenterBetween[0]]
+			right, rightOK := byRef[component.CenterBetween[1]]
+			if leftOK && rightOK {
+				centerX := SnapIU(left.PlacedAt.X+(right.PlacedAt.X-left.PlacedAt.X)/2, rules.Grid)
+				if component.PlacedAt.X != centerX {
+					diagnostics = append(diagnostics, Diagnostic{Severity: SeverityError, Code: "center_between_violation", Ref: component.Ref, Message: fmt.Sprintf("component must be centered between %s and %s", component.CenterBetween[0], component.CenterBetween[1]), Repair: "center the component between the two named columns or correct the center_between relation"})
+				}
 			}
 		}
 	}

@@ -38,6 +38,9 @@ func buildPlacementGraph(request Request) placementGraph {
 			graph.addUndirected(component.Ref, left)
 			graph.addDirected(left, component.Ref)
 		}
+		for _, centered := range component.CenterBetween {
+			graph.addUndirected(component.Ref, centered)
+		}
 	}
 	for _, net := range request.Nets {
 		if containsRole(net.Role, "no_connect") {

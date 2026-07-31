@@ -42,6 +42,23 @@ func TestClassifyInfersFeedbackAndBias(t *testing.T) {
 	}
 }
 
+func TestClassifyPlacesFeedbackPassiveInReferenceLane(t *testing.T) {
+	request := Classify(Request{
+		Components: []Component{
+			{Ref: "U1", Role: "opamp", Pins: []Pin{{Number: "1"}, {Number: "2"}}},
+			{Ref: "R1", Role: "resistor", Pins: []Pin{{Number: "1"}, {Number: "2"}}},
+		},
+		Nets: []Net{{Name: "LOOP", Role: "feedback", Endpoints: []Endpoint{{Ref: "U1", Pin: "2"}, {Ref: "R1", Pin: "1"}}}},
+	})
+	lanes := map[string]Lane{}
+	for _, component := range request.Components {
+		lanes[component.Ref] = component.Lane
+	}
+	if lanes["R1"] != LaneReference || lanes["U1"] != LaneSignal {
+		t.Fatalf("feedback lanes = %#v", lanes)
+	}
+}
+
 func TestClassifyInfersNetRoles(t *testing.T) {
 	request := Classify(Request{Nets: []Net{
 		{Name: "GND"},

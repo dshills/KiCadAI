@@ -705,6 +705,28 @@ func TestToTransactionSupportsAllQuarterTurnOrientations(t *testing.T) {
 	}
 }
 
+func TestToTransactionKeepsGeneratedFieldsHorizontalOnRotatedSymbol(t *testing.T) {
+	doc := validLEDDocument()
+	doc.Layout.Placements = []Placement{{Target: "r_limit", Orientation: OrientationRotated90}}
+	tx, issues := ToTransaction(doc)
+	if len(issues) != 0 {
+		t.Fatalf("expected no issues, got %+v", issues)
+	}
+	for _, symbol := range decodeOperations[transactions.AddSymbolOperation](t, tx, transactions.OpAddSymbol) {
+		if symbol.Ref != "R1" {
+			continue
+		}
+		for _, name := range []string{"Reference", "Value"} {
+			property := symbolPropertyByName(t, symbol.Properties, name)
+			if property.Rotation == nil || *property.Rotation != 270 {
+				t.Fatalf("R1 %s property rotation = %#v, want 270-degree local compensation", name, property.Rotation)
+			}
+		}
+		return
+	}
+	t.Fatal("R1 symbol not emitted")
+}
+
 func TestToTransactionPropagatesSymbolMirror(t *testing.T) {
 	doc := validLEDDocument()
 	doc.Layout.Placements = []Placement{{Target: "r_limit", Mirror: MirrorX}}
@@ -879,14 +901,14 @@ func TestToTransactionAssignsFootprintsAndProperties(t *testing.T) {
 
 func TestTransactionSymbolPropertiesHidePowerReferences(t *testing.T) {
 	for _, role := range []ComponentRole{ComponentRolePowerSymbol, ComponentRoleGroundSymbol} {
-		properties := transactionSymbolPropertiesWithLayout(Component{Role: role, Value: "PWR_FLAG"}, "#FLG01", layoutTextPlacement{})
+		properties := transactionSymbolPropertiesWithLayout(Component{Role: role, Value: "PWR_FLAG"}, "#FLG01", layoutTextPlacement{}, 0)
 		for _, property := range properties {
 			if property.Name == "Reference" && !property.Hidden {
 				t.Fatalf("%s reference should be hidden: %+v", role, properties)
 			}
 		}
 	}
-	properties := transactionSymbolPropertiesWithLayout(Component{Role: ComponentRoleResistor, Value: "1k"}, "R1", layoutTextPlacement{})
+	properties := transactionSymbolPropertiesWithLayout(Component{Role: ComponentRoleResistor, Value: "1k"}, "R1", layoutTextPlacement{}, 0)
 	for _, property := range properties {
 		if property.Name == "Reference" && property.Hidden {
 			t.Fatalf("ordinary component reference should remain visible: %+v", properties)

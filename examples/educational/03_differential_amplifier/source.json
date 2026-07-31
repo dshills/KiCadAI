@@ -41,20 +41,7 @@
       {"id": "pair", "label": "Long-tailed pair", "role": "processing_stage", "members": ["collector_load_1", "collector_load_2", "transistor_1", "transistor_2", "tail_resistor", "ground", "ground_flag"], "rank": 1},
       {"id": "output", "label": "Output", "role": "output_stage", "members": ["output"], "rank": 2, "side": "right"}
     ],
-    "placements": [
-      {"target": "input_v1", "group": "inputs", "same_row_as": ["transistor_1"]},
-      {"target": "input_v2", "group": "inputs", "right_of": ["transistor_2"], "same_row_as": ["transistor_2"]},
-      {"target": "collector_load_1", "group": "pair", "above": ["transistor_1"], "same_column_as": ["transistor_1"]},
-      {"target": "collector_load_2", "group": "pair", "above": ["transistor_2"], "right_of": ["collector_load_1"], "same_row_as": ["collector_load_1"], "same_column_as": ["transistor_2"]},
-      {"target": "transistor_1", "group": "pair", "right_of": ["input_v1"], "above": ["tail_resistor"]},
-      {"target": "tail_resistor", "group": "pair", "right_of": ["transistor_1"], "above": ["ground"]},
-      {"target": "transistor_2", "group": "pair", "mirror": "y", "right_of": ["tail_resistor"], "same_row_as": ["transistor_1"], "above": ["tail_resistor"]},
-      {"target": "supply", "group": "supply", "above": ["collector_load_1", "collector_load_2"], "same_column_as": ["tail_resistor"]},
-      {"target": "supply_flag", "group": "supply", "right_of": ["supply"], "same_row_as": ["supply"]},
-      {"target": "ground", "group": "pair", "same_column_as": ["tail_resistor"]},
-      {"target": "ground_flag", "group": "pair", "right_of": ["ground"], "same_row_as": ["ground"]},
-      {"target": "output", "group": "output", "right_of": ["collector_load_2"], "same_row_as_pin": ["collector_load_2.2"]}
-    ],
+    "placements": [],
     "lanes": {"power": "top", "ground": "bottom", "signals": "middle"},
     "rules": {"positive_power_top": false, "ground_bottom": false, "center_on_page": true, "prefer_labels_for_long_nets": false, "avoid_wire_crossings": true, "min_group_spacing_mm": 8, "min_component_spacing_mm": 5}
   },

@@ -31,15 +31,7 @@
       {"id": "divider", "label": "Divider", "role": "processing_stage", "members": ["upper_resistor", "lower_resistor", "ground", "ground_flag"], "rank": 1},
       {"id": "output", "label": "Output", "role": "output_stage", "members": ["output"], "rank": 2, "side": "right"}
     ],
-    "placements": [
-      {"target": "input", "group": "input", "above": ["upper_resistor"], "same_column_as": ["upper_resistor"]},
-      {"target": "supply_flag", "group": "input", "right_of": ["input"], "same_row_as": ["input"]},
-      {"target": "upper_resistor", "group": "divider", "above": ["lower_resistor"], "same_column_as": ["lower_resistor"]},
-      {"target": "lower_resistor", "group": "divider", "above": ["ground"]},
-      {"target": "ground", "group": "divider", "same_column_as": ["lower_resistor"]},
-      {"target": "ground_flag", "group": "divider", "right_of": ["ground"], "same_row_as": ["ground"]},
-      {"target": "output", "group": "output", "right_of": ["lower_resistor"], "same_row_as_pin": ["upper_resistor.2"]}
-    ],
+    "placements": [],
     "lanes": {"power": "top", "ground": "bottom", "signals": "middle"},
     "rules": {"positive_power_top": false, "ground_bottom": false, "center_on_page": true, "prefer_labels_for_long_nets": false, "avoid_wire_crossings": true, "min_group_spacing_mm": 8, "min_component_spacing_mm": 5}
   },

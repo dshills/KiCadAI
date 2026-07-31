@@ -347,6 +347,25 @@ func TestPlaceBoundsContradictoryPinAlignment(t *testing.T) {
 	}
 }
 
+func TestPlaceCentersSharedTailBetweenMatchedColumns(t *testing.T) {
+	result := Place(Request{
+		Sheet: testSheet(),
+		Components: []Component{
+			{Ref: "Q1", Role: "transistor", FlowRank: 1, RankFixed: true},
+			{Ref: "Q2", Role: "transistor", FlowRank: 2, RankFixed: true, SameRowAs: []string{"Q1"}},
+			{Ref: "RTAIL", Role: "resistor", CenterBetween: []string{"Q1", "Q2"}, FlowRank: 1, RankFixed: true},
+		},
+	})
+	positions := placedPositions(result.Components)
+	want := SnapIU(positions["Q1"].X+(positions["Q2"].X-positions["Q1"].X)/2, DefaultRules(ProfileStandard).Grid)
+	if positions["RTAIL"].X != want {
+		t.Fatalf("tail x = %v, want midpoint %v from %#v", positions["RTAIL"].X, want, positions)
+	}
+	if hasDiagnostic(result.Diagnostics, "center_between_violation", SeverityError) {
+		t.Fatalf("center relation diagnostics = %#v", result.Diagnostics)
+	}
+}
+
 func placedPositions(components []PlacedComponent) map[string]kicadfiles.Point {
 	positions := map[string]kicadfiles.Point{}
 	for _, component := range components {

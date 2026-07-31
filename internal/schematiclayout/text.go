@@ -120,6 +120,23 @@ func chooseTextPosition(text string, origin kicadfiles.Point, body Rect, occupie
 			candidates = append(candidates, wideBottom, wideTop, wideRight, wideLeft)
 		}
 	}
+	// Fully connected symbols often have wires on every cardinal side. Keep the
+	// existing compact cardinal choices preferred, then try deterministic corner
+	// positions before accepting an overlap. This is especially useful for
+	// active devices whose base/gate, collector/drain, and emitter/source are all
+	// locally wired.
+	for multiplier := kicadfiles.IU(1); multiplier <= 3; multiplier++ {
+		cornerGap := gap * multiplier
+		topLeft := kicadfiles.Point{X: body.MinX - cornerGap - width, Y: body.MinY - cornerGap}
+		topRight := kicadfiles.Point{X: body.MaxX + cornerGap, Y: body.MinY - cornerGap}
+		bottomLeft := kicadfiles.Point{X: body.MinX - cornerGap - width, Y: body.MaxY + cornerGap + height}
+		bottomRight := kicadfiles.Point{X: body.MaxX + cornerGap, Y: body.MaxY + cornerGap + height}
+		if preferAbove {
+			candidates = append(candidates, topLeft, topRight, bottomLeft, bottomRight)
+		} else {
+			candidates = append(candidates, bottomRight, bottomLeft, topRight, topLeft)
+		}
+	}
 	for _, anchor := range candidates {
 		box := TextEstimate(text, anchor, 0, 0)
 		if !rectIntersectsAny(box, occupied) {

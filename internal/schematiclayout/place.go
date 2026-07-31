@@ -189,6 +189,24 @@ func enforceRelativePlacement(components []Component, positions map[string]kicad
 		}
 		for _, component := range components {
 			position, ok := positions[component.Ref]
+			if !ok || component.Fixed || len(component.CenterBetween) != 2 {
+				continue
+			}
+			left, leftOK := positions[component.CenterBetween[0]]
+			right, rightOK := positions[component.CenterBetween[1]]
+			if !leftOK || !rightOK {
+				continue
+			}
+			centerX := SnapIU(left.X+(right.X-left.X)/2, rules.Grid)
+			if position.X == centerX {
+				continue
+			}
+			position.X = centerX
+			positions[component.Ref] = position
+			changed = true
+		}
+		for _, component := range components {
+			position, ok := positions[component.Ref]
 			if !ok || component.Fixed {
 				continue
 			}
@@ -258,6 +276,13 @@ func relativePositionsSatisfied(components []Component, positions map[string]kic
 		for _, endpoint := range component.SameColumnAsPin {
 			anchor, ok := relativeEndpointAnchor(byRef, positions, endpoint)
 			if ok && positions[component.Ref].X != anchor.X {
+				return false
+			}
+		}
+		if len(component.CenterBetween) == 2 {
+			left, leftOK := positions[component.CenterBetween[0]]
+			right, rightOK := positions[component.CenterBetween[1]]
+			if leftOK && rightOK && positions[component.Ref].X != SnapIU(left.X+(right.X-left.X)/2, rules.Grid) {
 				return false
 			}
 		}

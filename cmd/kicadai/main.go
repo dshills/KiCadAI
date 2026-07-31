@@ -4664,7 +4664,12 @@ func runSchematicIRContext(ctx context.Context, opts cliOptions, stdout io.Write
 					data.Summary.OperationCount = len(tx.Operations)
 					issues = append(issues, validation.Issues...)
 					if subcommand == "write" && !reports.HasBlockingIssue(validation.Issues) {
-						apply := transactions.Apply(tx, transactions.ApplyOptions{OutputDir: opts.output, Overwrite: opts.overwrite, LibraryIndex: libraryIndex})
+						apply := transactions.Apply(tx, transactions.ApplyOptions{
+							OutputDir:             opts.output,
+							Overwrite:             opts.overwrite,
+							AllowImportedMutation: opts.allowImportedApply,
+							LibraryIndex:          libraryIndex,
+						})
 						issues = append(issues, apply.Issues...)
 					}
 				}

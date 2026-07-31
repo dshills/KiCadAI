@@ -24,28 +24,26 @@ func Route(request Request, result Result) Result {
 		if len(net.Endpoints) == 0 {
 			continue
 		}
-		startIndex, start, ok := firstRoutableEndpoint(net, anchors)
-		if !ok {
+		orderedEndpoints, missingEndpoints := orderedRoutableEndpoints(net, anchors)
+		if len(orderedEndpoints) == 0 {
 			result.Diagnostics = append(result.Diagnostics, Diagnostic{Severity: SeverityWarning, Code: "missing_pin_anchor", NetName: net.Name, Message: "net has no routable endpoint anchors"})
 			continue
 		}
-		fromEndpoint := net.Endpoints[startIndex]
-		if len(net.Endpoints) == 1 {
+		for _, endpoint := range missingEndpoints {
+			result.Diagnostics = append(result.Diagnostics, Diagnostic{Severity: SeverityWarning, Code: "missing_pin_anchor", NetName: net.Name, Ref: endpoint.Ref, Message: "net endpoint has no pin anchor"})
+		}
+		fromEndpoint := orderedEndpoints[0].endpoint
+		start := orderedEndpoints[0].anchor
+		if len(orderedEndpoints) == 1 {
 			if net.PreferredLabels {
 				appendEndpointLabel(&result, labeled, net.Name, fromEndpoint, start, request, rules)
 			}
 			continue
 		}
 		forceLabels := shouldUseLabels(net, anchors, request.Components, rules)
-		for toIndex, toEndpoint := range net.Endpoints {
-			if toIndex == startIndex {
-				continue
-			}
-			end, exists := anchors[toEndpoint]
-			if !exists {
-				result.Diagnostics = append(result.Diagnostics, Diagnostic{Severity: SeverityWarning, Code: "missing_pin_anchor", NetName: net.Name, Ref: toEndpoint.Ref, Message: "net endpoint has no pin anchor"})
-				continue
-			}
+		for _, orderedEndpoint := range orderedEndpoints[1:] {
+			toEndpoint := orderedEndpoint.endpoint
+			end := orderedEndpoint.anchor
 			if forceLabels {
 				fromLabel := appendEndpointLabel(&result, labeled, net.Name, fromEndpoint, start, request, rules)
 				toLabel := appendEndpointLabel(&result, labeled, net.Name, toEndpoint, end, request, rules)
@@ -103,6 +101,7 @@ func appendRouteAnnotation(result *Result, netName string, request Request, rule
 		midSegment bool
 	}
 	candidates := make([]candidate, 0)
+	fallbackCandidates := make([]candidate, 0)
 	for _, connection := range result.Connections {
 		if connection.NetName != netName || connection.UseLabels {
 			continue
@@ -133,17 +132,51 @@ func appendRouteAnnotation(result *Result, netName string, request Request, rule
 				clearRun:   manhattan(from, to),
 				midSegment: true,
 			})
+			segmentLength := manhattan(from, to)
+			for _, inset := range []kicadfiles.IU{rules.Grid, rules.Grid * 2} {
+				if inset <= 0 || segmentLength <= inset*2 {
+					continue
+				}
+				nearFrom, nearTo := from, to
+				switch {
+				case from.X == to.X:
+					direction := kicadfiles.IU(1)
+					if to.Y < from.Y {
+						direction = -1
+					}
+					nearFrom.Y += direction * inset
+					nearTo.Y -= direction * inset
+				case from.Y == to.Y:
+					direction := kicadfiles.IU(1)
+					if to.X < from.X {
+						direction = -1
+					}
+					nearFrom.X += direction * inset
+					nearTo.X -= direction * inset
+				default:
+					continue
+				}
+				fallbackCandidates = append(fallbackCandidates,
+					candidate{position: nearFrom, clearRun: segmentLength},
+					candidate{position: nearTo, clearRun: segmentLength},
+				)
+			}
 		}
 	}
-	sort.SliceStable(candidates, func(i, j int) bool {
-		if candidates[i].midSegment != candidates[j].midSegment {
-			return candidates[i].midSegment
+	compareCandidates := func(values []candidate) func(int, int) bool {
+		return func(i, j int) bool {
+			if values[i].midSegment != values[j].midSegment {
+				return values[i].midSegment
+			}
+			if values[i].clearRun != values[j].clearRun {
+				return values[i].clearRun > values[j].clearRun
+			}
+			return comparePoints(values[i].position, values[j].position) < 0
 		}
-		if candidates[i].clearRun != candidates[j].clearRun {
-			return candidates[i].clearRun > candidates[j].clearRun
-		}
-		return comparePoints(candidates[i].position, candidates[j].position) < 0
-	})
+	}
+	sort.SliceStable(candidates, compareCandidates(candidates))
+	sort.SliceStable(fallbackCandidates, compareCandidates(fallbackCandidates))
+	candidates = append(candidates, fallbackCandidates...)
 	if len(candidates) > rules.MaxRouteAnnotations {
 		candidates = candidates[:rules.MaxRouteAnnotations]
 	}
@@ -467,7 +500,7 @@ func routeConnectionPoints(netName string, from, to Endpoint, start, end kicadfi
 	}
 	scored := make([]scoredRoute, 0, len(candidates))
 	for _, candidate := range candidates {
-		score, clean := scoreRoute(candidate, netName, from, to, result, request)
+		score, clean := scoreRouteIndexed(candidate, netName, from, to, result, request, anchorIndex)
 		scored = append(scored, scoredRoute{points: candidate, score: score, clean: clean})
 	}
 	hasClean := false
@@ -479,7 +512,7 @@ func routeConnectionPoints(netName string, from, to Endpoint, start, end kicadfi
 	}
 	if !hasClean && allowGridFallback {
 		if points, ok := orthogonalGridRoute(netName, from, to, start, end, result, request, rules, anchorIndex); ok {
-			score, clean := scoreRoute(points, netName, from, to, result, request)
+			score, clean := scoreRouteIndexed(points, netName, from, to, result, request, anchorIndex)
 			scored = append(scored, scoredRoute{points: points, score: score, clean: clean})
 		}
 	}
@@ -670,7 +703,7 @@ func orthogonalGridRoute(netName string, from, to Endpoint, start, end kicadfile
 			edgeScore, scored := edgeScores[edge]
 			if !scored {
 				var clean bool
-				edgeScore, clean = scoreRoute([]kicadfiles.Point{edge.from, edge.to}, netName, from, to, result, request)
+				edgeScore, clean = scoreRouteIndexed([]kicadfiles.Point{edge.from, edge.to}, netName, from, to, result, request, anchorIndex)
 				if !clean {
 					blockedEdges[edge] = struct{}{}
 					continue
@@ -777,6 +810,7 @@ type pinAnchorCell struct {
 type pinAnchorIndex struct {
 	cellSize kicadfiles.IU
 	cells    map[pinAnchorCell][]indexedPinAnchor
+	all      []indexedPinAnchor
 }
 
 type indexedPinAnchor struct {
@@ -785,15 +819,16 @@ type indexedPinAnchor struct {
 }
 
 func newPinAnchorIndex(anchors map[Endpoint]kicadfiles.Point) pinAnchorIndex {
-	index := pinAnchorIndex{cellSize: kicadfiles.MM(25.4), cells: map[pinAnchorCell][]indexedPinAnchor{}}
+	all := sortedPinAnchors(anchors)
+	index := pinAnchorIndex{cellSize: kicadfiles.MM(25.4), cells: map[pinAnchorCell][]indexedPinAnchor{}, all: all}
 	seen := map[kicadfiles.Point]struct{}{}
-	for endpoint, anchor := range anchors {
-		if _, exists := seen[anchor]; exists {
+	for _, indexed := range all {
+		if _, exists := seen[indexed.point]; exists {
 			continue
 		}
-		seen[anchor] = struct{}{}
-		cell := pinAnchorCell{x: pinAnchorCellCoordinate(anchor.X, index.cellSize), y: pinAnchorCellCoordinate(anchor.Y, index.cellSize)}
-		index.cells[cell] = append(index.cells[cell], indexedPinAnchor{endpoint: endpoint, point: anchor})
+		seen[indexed.point] = struct{}{}
+		cell := pinAnchorCell{x: pinAnchorCellCoordinate(indexed.point.X, index.cellSize), y: pinAnchorCellCoordinate(indexed.point.Y, index.cellSize)}
+		index.cells[cell] = append(index.cells[cell], indexed)
 	}
 	for cell := range index.cells {
 		sort.Slice(index.cells[cell], func(i, j int) bool {
@@ -812,6 +847,26 @@ func newPinAnchorIndex(anchors map[Endpoint]kicadfiles.Point) pinAnchorIndex {
 		})
 	}
 	return index
+}
+
+func sortedPinAnchors(anchors map[Endpoint]kicadfiles.Point) []indexedPinAnchor {
+	indexed := make([]indexedPinAnchor, 0, len(anchors))
+	for endpoint, point := range anchors {
+		indexed = append(indexed, indexedPinAnchor{endpoint: endpoint, point: point})
+	}
+	sort.Slice(indexed, func(i, j int) bool {
+		if indexed[i].point.X != indexed[j].point.X {
+			return indexed[i].point.X < indexed[j].point.X
+		}
+		if indexed[i].point.Y != indexed[j].point.Y {
+			return indexed[i].point.Y < indexed[j].point.Y
+		}
+		if indexed[i].endpoint.Ref != indexed[j].endpoint.Ref {
+			return indexed[i].endpoint.Ref < indexed[j].endpoint.Ref
+		}
+		return indexed[i].endpoint.Pin < indexed[j].endpoint.Pin
+	})
+	return indexed
 }
 
 func (index pinAnchorIndex) query(minX, maxX, minY, maxY kicadfiles.IU) []indexedPinAnchor {
@@ -838,6 +893,10 @@ func pinAnchorCellCoordinate(value, cellSize kicadfiles.IU) int {
 }
 
 func scoreRoute(points []kicadfiles.Point, netName string, from, to Endpoint, result Result, request Request) (int64, bool) {
+	return scoreRouteIndexed(points, netName, from, to, result, request, newPinAnchorIndex(pinAnchors(result.Components)))
+}
+
+func scoreRouteIndexed(points []kicadfiles.Point, netName string, from, to Endpoint, result Result, request Request, anchorIndex pinAnchorIndex) (int64, bool) {
 	if len(points) < 2 || !pathOrthogonal(points) {
 		return routeHardPenalty * 4, false
 	}
@@ -870,7 +929,7 @@ func scoreRoute(points []kicadfiles.Point, netName string, from, to Endpoint, re
 				clean = false
 			}
 		}
-		if wirePassesUnrelatedPin(segment, netName, result, request) {
+		if wirePassesUnrelatedPinIndexed(segment, netName, anchorIndex, request) {
 			score += routeHardPenalty
 			clean = false
 		}
@@ -884,14 +943,22 @@ func wirePassesUnrelatedPin(segment WireSegment, netName string, result Result, 
 }
 
 func unrelatedPinForWire(segment WireSegment, netName string, result Result, request Request) (Endpoint, bool) {
+	return unrelatedPinForWireIndexed(segment, netName, newPinAnchorIndex(pinAnchors(result.Components)), request)
+}
+
+func wirePassesUnrelatedPinIndexed(segment WireSegment, netName string, anchorIndex pinAnchorIndex, request Request) bool {
+	_, ok := unrelatedPinForWireIndexed(segment, netName, anchorIndex, request)
+	return ok
+}
+
+func unrelatedPinForWireIndexed(segment WireSegment, netName string, anchorIndex pinAnchorIndex, request Request) (Endpoint, bool) {
 	endpoints := netEndpointSet(request, netName)
-	anchors := pinAnchors(result.Components)
-	for endpoint, anchor := range anchors {
-		if _, allowed := endpoints[endpoint]; allowed {
+	for _, indexed := range anchorIndex.all {
+		if _, allowed := endpoints[indexed.endpoint]; allowed {
 			continue
 		}
-		if pointOnSegment(segment.From, anchor, segment.To) {
-			return endpoint, true
+		if pointOnSegment(segment.From, indexed.point, segment.To) {
+			return indexed.endpoint, true
 		}
 	}
 	return Endpoint{}, false
@@ -1114,13 +1181,81 @@ func wireSegmentsElectricallyContact(first, second WireSegment) bool {
 	return segmentsIntersect(first.From, first.To, second.From, second.To)
 }
 
-func firstRoutableEndpoint(net Net, anchors map[Endpoint]kicadfiles.Point) (int, kicadfiles.Point, bool) {
-	for index, endpoint := range net.Endpoints {
-		if anchor, ok := anchors[endpoint]; ok {
-			return index, anchor, true
+type routableEndpoint struct {
+	endpoint Endpoint
+	anchor   kicadfiles.Point
+}
+
+// orderedRoutableEndpoints starts at a peripheral endpoint, then visits the
+// nearest remaining anchor. Routing multi-endpoint nets in caller order can
+// double back over an already emitted branch, producing overlapping KiCad
+// wire objects. This deterministic geometry-first traversal tends to visit a
+// branch point before continuing to the opposite edge of the net.
+func orderedRoutableEndpoints(net Net, anchors map[Endpoint]kicadfiles.Point) ([]routableEndpoint, []Endpoint) {
+	remaining := make([]routableEndpoint, 0, len(net.Endpoints))
+	missing := make([]Endpoint, 0)
+	for _, endpoint := range net.Endpoints {
+		anchor, ok := anchors[endpoint]
+		if !ok {
+			missing = append(missing, endpoint)
+			continue
+		}
+		remaining = append(remaining, routableEndpoint{endpoint: endpoint, anchor: anchor})
+	}
+	sort.SliceStable(missing, func(i, j int) bool {
+		if missing[i].Ref != missing[j].Ref {
+			return missing[i].Ref < missing[j].Ref
+		}
+		return missing[i].Pin < missing[j].Pin
+	})
+	if len(remaining) < 2 {
+		return remaining, missing
+	}
+	compareEndpoint := func(left, right routableEndpoint) int {
+		if value := comparePoints(left.anchor, right.anchor); value != 0 {
+			return value
+		}
+		if left.endpoint.Ref != right.endpoint.Ref {
+			return strings.Compare(left.endpoint.Ref, right.endpoint.Ref)
+		}
+		return strings.Compare(left.endpoint.Pin, right.endpoint.Pin)
+	}
+	sort.SliceStable(remaining, func(i, j int) bool { return compareEndpoint(remaining[i], remaining[j]) < 0 })
+	var sumX, sumY kicadfiles.IU
+	for _, candidate := range remaining {
+		sumX += candidate.anchor.X
+		sumY += candidate.anchor.Y
+	}
+	startIndex := 0
+	var greatestDistance kicadfiles.IU = -1
+	count := kicadfiles.IU(len(remaining))
+	for index, candidate := range remaining {
+		// Scaling by the endpoint count avoids fractional centroid coordinates
+		// while choosing a deterministic peripheral pin in linear time.
+		distance := absIU(count*candidate.anchor.X-sumX) + absIU(count*candidate.anchor.Y-sumY)
+		if distance > greatestDistance {
+			greatestDistance = distance
+			startIndex = index
 		}
 	}
-	return -1, kicadfiles.Point{}, false
+	ordered := make([]routableEndpoint, 0, len(remaining))
+	ordered = append(ordered, remaining[startIndex])
+	remaining = append(remaining[:startIndex], remaining[startIndex+1:]...)
+	for len(remaining) != 0 {
+		current := ordered[len(ordered)-1]
+		nearestIndex := 0
+		nearestDistance := manhattan(current.anchor, remaining[0].anchor)
+		for index := 1; index < len(remaining); index++ {
+			distance := manhattan(current.anchor, remaining[index].anchor)
+			if distance < nearestDistance || distance == nearestDistance && compareEndpoint(remaining[index], remaining[nearestIndex]) < 0 {
+				nearestIndex = index
+				nearestDistance = distance
+			}
+		}
+		ordered = append(ordered, remaining[nearestIndex])
+		remaining = append(remaining[:nearestIndex], remaining[nearestIndex+1:]...)
+	}
+	return ordered, missing
 }
 
 func Layout(request Request) Result {

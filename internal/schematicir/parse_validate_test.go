@@ -110,6 +110,15 @@ func TestValidateRejectsAmbiguousAndCyclicAlignmentAnchors(t *testing.T) {
 	}
 }
 
+func TestValidateRejectsMalformedCenterBetweenRelation(t *testing.T) {
+	doc := validLEDDocument()
+	doc.Layout.Placements = []Placement{{Target: "r_limit", CenterBetween: []string{"led"}}}
+	issues := Validate(doc)
+	if !schematicIRIssueContains(issues, "layout.placements[0].center_between") {
+		t.Fatalf("missing center_between cardinality issue: %#v", issues)
+	}
+}
+
 func TestDecodeStrictRejectsConflictingDuplicateNetBeforeMerge(t *testing.T) {
 	_, issues := DecodeStrict(strings.NewReader(`{
 		"schema":"kicadai.schematic.ir.v1",

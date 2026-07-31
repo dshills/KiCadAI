@@ -735,16 +735,6 @@
     (uuid "f35e7202-fe0c-56a1-8583-c70b616515f9")
   )
   (label
-    "+9V"
-    (at 163.83 100.33 0)
-    (effects
-      (font
-        (size 1.27 1.27)
-      )
-    )
-    (uuid "3f4d9664-e6c2-5892-ab8c-847b9ff83a5f")
-  )
-  (label
     "GND"
     (at 128.27 107.95 0)
     (effects
@@ -763,16 +753,6 @@
       )
     )
     (uuid "bb5ddd21-3838-5d1f-b93c-354ebd38743e")
-  )
-  (label
-    "GND"
-    (at 163.83 107.95 0)
-    (effects
-      (font
-        (size 1.27 1.27)
-      )
-    )
-    (uuid "f007f605-242e-5670-97de-18467df25536")
   )
   (symbol
     (lib_id "Connector_Generic:Conn_01x02")

@@ -774,36 +774,14 @@
   )
   (wire
     (pts
-      (xy 93.98 138.43)
       (xy 111.76 138.43)
-    )
-    (stroke
-      (width 0)
-      (type default)
-    )
-    (uuid "06f48520-2db0-5f9d-a0b4-d160ffa78ddb")
-  )
-  (wire
-    (pts
-      (xy 93.98 146.05)
       (xy 93.98 138.43)
     )
     (stroke
       (width 0)
       (type default)
     )
-    (uuid "0a6a8f08-c5ab-5845-aec5-832a25d39ab0")
-  )
-  (wire
-    (pts
-      (xy 93.98 187.96)
-      (xy 93.98 153.67)
-    )
-    (stroke
-      (width 0)
-      (type default)
-    )
-    (uuid "45b7e6f8-9d51-5457-8394-a415fc35c472")
+    (uuid "08db7cd8-1387-5f66-b267-64a794f9b119")
   )
   (wire
     (pts
@@ -818,6 +796,28 @@
   )
   (wire
     (pts
+      (xy 93.98 153.67)
+      (xy 93.98 187.96)
+    )
+    (stroke
+      (width 0)
+      (type default)
+    )
+    (uuid "77c0381b-9ebe-55e9-ac94-beaeabaff294")
+  )
+  (wire
+    (pts
+      (xy 93.98 130.81)
+      (xy 93.98 109.22)
+    )
+    (stroke
+      (width 0)
+      (type default)
+    )
+    (uuid "9b7af791-432b-572c-92b7-e6fadfe6afba")
+  )
+  (wire
+    (pts
       (xy 93.98 187.96)
       (xy 101.6 187.96)
     )
@@ -829,44 +829,24 @@
   )
   (wire
     (pts
-      (xy 93.98 109.22)
-      (xy 93.98 130.81)
+      (xy 93.98 138.43)
+      (xy 93.98 146.05)
     )
     (stroke
       (width 0)
       (type default)
     )
-    (uuid "eacaa1fc-8a91-56b7-a250-a6c3603be7dd")
-  )
-  (label
-    "GND"
-    (at 93.98 170.815 0)
-    (effects
-      (font
-        (size 1.27 1.27)
-      )
-    )
-    (uuid "14924a3d-d30c-5f2f-93b7-d4bd5397929c")
-  )
-  (label
-    "+9V"
-    (at 93.98 120.015 0)
-    (effects
-      (font
-        (size 1.27 1.27)
-      )
-    )
-    (uuid "4d7dae0d-2479-56e5-81aa-4ad668f7bc31")
+    (uuid "d0af2042-95a7-5888-a718-a42dae0db8c5")
   )
   (label
     "VOUT"
-    (at 93.98 142.24 0)
+    (at 101.6 138.43 0)
     (effects
       (font
         (size 1.27 1.27)
       )
     )
-    (uuid "608a8a7f-2bff-5f3d-a9db-360e38f6f0b6")
+    (uuid "65fe1f9a-ef02-5776-98ce-af6005f21341")
   )
   (symbol
     (lib_id "Connector:TestPoint")

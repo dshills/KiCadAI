@@ -484,6 +484,59 @@ func TestSameNameNetFragmentsShareAllowedPinAnchors(t *testing.T) {
 	}
 }
 
+func TestOrderedRoutableEndpointsUsesGeometryNotInputOrder(t *testing.T) {
+	anchors := map[Endpoint]kicadfiles.Point{
+		{Ref: "left", Pin: "1"}:   {X: kicadfiles.MM(10), Y: kicadfiles.MM(20)},
+		{Ref: "middle", Pin: "1"}: {X: kicadfiles.MM(20), Y: kicadfiles.MM(10)},
+		{Ref: "right", Pin: "1"}:  {X: kicadfiles.MM(30), Y: kicadfiles.MM(10)},
+	}
+	net := Net{Name: "BRANCH", Endpoints: []Endpoint{{Ref: "right", Pin: "1"}, {Ref: "left", Pin: "1"}, {Ref: "middle", Pin: "1"}}}
+	ordered, missing := orderedRoutableEndpoints(net, anchors)
+	if len(missing) != 0 || len(ordered) != 3 {
+		t.Fatalf("ordered=%#v missing=%#v", ordered, missing)
+	}
+	if ordered[0].endpoint.Ref != "left" || ordered[1].endpoint.Ref != "middle" || ordered[2].endpoint.Ref != "right" {
+		t.Fatalf("endpoint order = %#v", ordered)
+	}
+}
+
+func TestOrderedRoutableEndpointsVisitsBranchPointBeforeShunt(t *testing.T) {
+	anchors := map[Endpoint]kicadfiles.Point{
+		{Ref: "junction", Pin: "1"}: {X: kicadfiles.MM(10), Y: kicadfiles.MM(10)},
+		{Ref: "shunt", Pin: "1"}:    {X: kicadfiles.MM(10), Y: kicadfiles.MM(30)},
+		{Ref: "output", Pin: "1"}:   {X: kicadfiles.MM(40), Y: kicadfiles.MM(10)},
+	}
+	net := Net{Name: "BRANCH", Endpoints: []Endpoint{{Ref: "junction", Pin: "1"}, {Ref: "shunt", Pin: "1"}, {Ref: "output", Pin: "1"}}}
+	ordered, missing := orderedRoutableEndpoints(net, anchors)
+	if len(missing) != 0 || len(ordered) != 3 {
+		t.Fatalf("ordered=%#v missing=%#v", ordered, missing)
+	}
+	if ordered[0].endpoint.Ref != "output" || ordered[1].endpoint.Ref != "junction" || ordered[2].endpoint.Ref != "shunt" {
+		t.Fatalf("branch traversal = %#v", ordered)
+	}
+}
+
+func TestRouteAnnotationFallsBackFromBlockedMidpointToSegmentInset(t *testing.T) {
+	from := kicadfiles.Point{X: kicadfiles.MM(20), Y: kicadfiles.MM(30)}
+	to := kicadfiles.Point{X: kicadfiles.MM(40), Y: kicadfiles.MM(30)}
+	result := Result{
+		Components: []PlacedComponent{{
+			Component: Component{Ref: "blocker", Body: Rect{MinX: -kicadfiles.MM(2), MinY: -kicadfiles.MM(2), MaxX: kicadfiles.MM(2), MaxY: kicadfiles.MM(2)}, BodyKnown: true},
+			PlacedAt:  kicadfiles.Point{X: kicadfiles.MM(30), Y: kicadfiles.MM(30)},
+		}},
+		Connections: []RoutedConnection{{NetName: "SIGNAL", Points: []kicadfiles.Point{from, to}}},
+		Wires:       []WireSegment{{NetName: "SIGNAL", From: from, To: to}},
+	}
+	rules := DefaultRules(ProfileStandard)
+	appendRouteAnnotation(&result, "SIGNAL", Request{Sheet: testSheet()}, rules)
+	if len(result.Labels) != 1 || !result.Labels[0].RouteAnnotation {
+		t.Fatalf("route labels = %#v", result.Labels)
+	}
+	if result.Labels[0].Position == (kicadfiles.Point{X: kicadfiles.MM(30), Y: kicadfiles.MM(30)}) {
+		t.Fatalf("annotation stayed on blocked midpoint: %#v", result.Labels[0])
+	}
+}
+
 func resultComponentByRef(t *testing.T, components []PlacedComponent, ref string) PlacedComponent {
 	t.Helper()
 	for _, component := range components {

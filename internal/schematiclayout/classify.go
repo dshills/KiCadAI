@@ -24,7 +24,30 @@ func Classify(request Request) Request {
 			group.Stage = StageForRole(group.Role)
 		}
 	}
+	inferFeedbackLanes(&request)
 	return NormalizeRequest(request)
+}
+
+func inferFeedbackLanes(request *Request) {
+	componentIndexes := make(map[string]int, len(request.Components))
+	for index := range request.Components {
+		componentIndexes[request.Components[index].Ref] = index
+	}
+	for _, net := range request.Nets {
+		if !containsNormalizedRole(net.Role, "feedback", "sense") {
+			continue
+		}
+		for _, endpoint := range net.Endpoints {
+			index, exists := componentIndexes[endpoint.Ref]
+			if !exists {
+				continue
+			}
+			component := &request.Components[index]
+			if containsNormalizedRole(component.Role, "resistor", "capacitor", "feedback", "bias") {
+				component.Lane = LaneReference
+			}
+		}
+	}
 }
 
 func InferComponentRole(component Component) string {

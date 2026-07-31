@@ -5294,6 +5294,35 @@ func TestSchematicIRWriteCLI(t *testing.T) {
 	}
 }
 
+func TestSchematicIRWriteCLIForwardsReviewedImportedMutationApproval(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	requestPath := filepath.Join("..", "..", "examples", "schematic-ir", "led_indicator.json")
+	output := filepath.Join(t.TempDir(), "led_indicator")
+
+	if err := run([]string{"--request", requestPath, "--output", output, "schematic-ir", "write"}, &stdout, &stderr); err != nil {
+		t.Fatalf("initial schematic-ir write failed: %v\nstdout=%s\nstderr=%s", err, stdout.String(), stderr.String())
+	}
+	schematicPath := filepath.Join(output, "led_indicator.kicad_sch")
+	contents, err := os.ReadFile(schematicPath)
+	if err != nil {
+		t.Fatalf("read generated schematic: %v", err)
+	}
+	modified := bytes.Replace(contents, []byte(`(paper "A4")`), []byte(`(paper "A3")`), 1)
+	if bytes.Equal(modified, contents) {
+		t.Fatal("generated schematic did not contain the expected paper declaration")
+	}
+	if err := os.WriteFile(schematicPath, modified, 0o644); err != nil {
+		t.Fatalf("modify generated schematic: %v", err)
+	}
+
+	stdout.Reset()
+	stderr.Reset()
+	if err := run([]string{"--request", requestPath, "--output", output, "--overwrite", "--allow-imported-apply", "schematic-ir", "write"}, &stdout, &stderr); err != nil {
+		t.Fatalf("approved schematic-ir overwrite failed: %v\nstdout=%s\nstderr=%s", err, stdout.String(), stderr.String())
+	}
+}
+
 func TestSchematicIRWriteCLIUsesConfiguredSymbolResolver(t *testing.T) {
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer

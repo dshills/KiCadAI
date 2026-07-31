@@ -590,7 +590,7 @@ func validateLayout(document Document, componentPins map[string]map[string]struc
 		relations := []struct {
 			field   string
 			targets []string
-		}{{"near", placement.Near}, {"above", placement.Above}, {"right_of", placement.RightOf}, {"same_row_as", placement.SameRowAs}, {"same_column_as", placement.SameColumnAs}}
+		}{{"near", placement.Near}, {"above", placement.Above}, {"right_of", placement.RightOf}, {"same_row_as", placement.SameRowAs}, {"same_column_as", placement.SameColumnAs}, {"center_between", placement.CenterBetween}}
 		for _, relation := range relations {
 			seenTargets := map[string]struct{}{}
 			for targetIndex, target := range relation.targets {
@@ -632,8 +632,15 @@ func validateLayout(document Document, componentPins map[string]map[string]struc
 		if anchors := len(placement.SameRowAs) + len(placement.SameRowAsPin); anchors > 1 {
 			add(path+".same_row_as", "placement must declare at most one row-alignment anchor across same_row_as and same_row_as_pin")
 		}
-		if anchors := len(placement.SameColumnAs) + len(placement.SameColumnAsPin); anchors > 1 {
-			add(path+".same_column_as", "placement must declare at most one column-alignment anchor across same_column_as and same_column_as_pin")
+		centerAnchors := 0
+		if len(placement.CenterBetween) != 0 {
+			centerAnchors = 1
+			if len(placement.CenterBetween) != 2 {
+				add(path+".center_between", "center_between requires exactly two component targets")
+			}
+		}
+		if anchors := len(placement.SameColumnAs) + len(placement.SameColumnAsPin) + centerAnchors; anchors > 1 {
+			add(path+".same_column_as", "placement must declare at most one column-alignment anchor across same_column_as, same_column_as_pin, and center_between")
 		}
 	}
 	for _, relation := range []string{"above", "right_of"} {

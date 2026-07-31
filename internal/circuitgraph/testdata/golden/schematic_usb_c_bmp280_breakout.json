@@ -714,7 +714,7 @@
       {
         "target": "bulk",
         "group": "protection_stage",
-        "orientation": "rotated"
+        "orientation": "normal"
       },
       {
         "target": "cc1_rd",
@@ -729,12 +729,12 @@
       {
         "target": "reg_in_cap",
         "group": "regulator_stage",
-        "orientation": "rotated"
+        "orientation": "normal"
       },
       {
         "target": "reg_out_cap",
         "group": "regulator_stage",
-        "orientation": "rotated"
+        "orientation": "normal"
       },
       {
         "target": "scl_pullup",

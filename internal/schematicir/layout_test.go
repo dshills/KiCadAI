@@ -17,7 +17,7 @@ func TestNormalizeLayoutIntentAddsGroupsAndPlacements(t *testing.T) {
 	if got := groupsByID["inputs"].Members; len(got) != 1 || got[0] != "vin" {
 		t.Fatalf("input group members = %+v", got)
 	}
-	if got := groupsByID["signal"].Members; len(got) != 2 || got[0] != "r_limit" || got[1] != "led" {
+	if got := groupsByID["signal"].Members; len(got) != 2 || got[0] != "led" || got[1] != "r_limit" {
 		t.Fatalf("signal group members = %+v", got)
 	}
 	if len(normalized.Layout.Placements) != len(doc.Circuit.Components) {

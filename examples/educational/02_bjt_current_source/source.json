@@ -32,12 +32,7 @@
       {"id": "mirror", "label": "Mirror and load", "role": "processing_stage", "members": ["output_transistor", "load"], "rank": 2},
       {"id": "output", "label": "Output", "role": "output_stage", "members": ["output"], "rank": 3, "side": "right"}
     ],
-    "placements": [
-      {"target": "rset", "group": "reference", "above": ["reference_transistor"]},
-      {"target": "load", "group": "mirror", "above": ["output_transistor"], "right_of": ["rset"], "same_row_as": ["rset"]},
-      {"target": "reference_transistor", "group": "reference", "near": ["output_transistor"]},
-      {"target": "output_transistor", "group": "mirror", "near": ["reference_transistor"], "right_of": ["reference_transistor"], "same_row_as": ["reference_transistor"]}
-    ],
+    "placements": [],
     "lanes": {"power": "top", "ground": "bottom", "signals": "middle"},
     "rules": {"positive_power_top": true, "ground_bottom": true, "center_on_page": true, "prefer_labels_for_long_nets": false, "avoid_wire_crossings": true, "min_group_spacing_mm": 30, "min_component_spacing_mm": 20}
   },
