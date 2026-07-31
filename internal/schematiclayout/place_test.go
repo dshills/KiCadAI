@@ -120,6 +120,25 @@ func TestPlaceIsStableUnderInputPermutation(t *testing.T) {
 	}
 }
 
+func TestPlaceKeepsNearComponentsAdjacentWithinRank(t *testing.T) {
+	result := Place(Request{
+		Sheet: testSheet(),
+		Components: []Component{
+			{Ref: "J1", Role: "input_connector", FlowRank: 0, RankFixed: true, OriginalOrdinal: 0},
+			{Ref: "X1", Role: "component", FlowRank: 0, RankFixed: true, OriginalOrdinal: 1},
+			{Ref: "F1", Role: "boundary_annotation", FlowRank: 0, RankFixed: true, OriginalOrdinal: 2, Near: []string{"J1"}},
+			{Ref: "F2", Role: "boundary_annotation", FlowRank: 0, RankFixed: true, OriginalOrdinal: 3, Near: []string{"J1"}},
+		},
+	})
+	positions := placedPositions(result.Components)
+	if positions["F1"].Y != positions["J1"].Y || positions["F2"].Y != positions["J1"].Y {
+		t.Fatalf("annotation rows = %#v, want connector row sharing", positions)
+	}
+	if !(positions["F2"].X < positions["F1"].X && positions["F1"].X < positions["J1"].X) {
+		t.Fatalf("annotation x order = %#v, want deterministic side attachment", positions)
+	}
+}
+
 func TestPlaceKeepsComponentBodiesSeparated(t *testing.T) {
 	var components []Component
 	for index := 0; index < 12; index++ {

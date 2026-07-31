@@ -277,6 +277,30 @@ func TestReadPCBNetRefHandlesNumericOnlyNet(t *testing.T) {
 	}
 }
 
+func TestReadPaperHandlesShortAndPortraitForms(t *testing.T) {
+	tests := []struct {
+		input    string
+		name     string
+		width    kicadfiles.IU
+		height   kicadfiles.IU
+		portrait bool
+	}{
+		{input: `(paper "A4")`, name: "A4"},
+		{input: `(paper "A4" portrait)`, name: "A4", portrait: true},
+		{input: `(paper "User" 297 210 portrait)`, name: "User", width: kicadfiles.MM(297), height: kicadfiles.MM(210), portrait: true},
+	}
+	for _, test := range tests {
+		node, err := sexpr.Parse([]byte(test.input))
+		if err != nil {
+			t.Fatal(err)
+		}
+		got := readPaper(node)
+		if got.Name != test.name || got.Width != test.width || got.Height != test.height || got.Portrait != test.portrait {
+			t.Fatalf("readPaper(%s) = %#v", test.input, got)
+		}
+	}
+}
+
 func TestReadPadDrillHandlesOvalDrill(t *testing.T) {
 	node, err := sexpr.Parse([]byte(`(drill oval 0.5 0.8)`))
 	if err != nil {

@@ -229,6 +229,7 @@ type adapterState struct {
 	document            Document
 	libraryIndex        *libraryresolver.LibraryIndex
 	paper               string
+	paperPortrait       bool
 	refsByID            map[string]string
 	componentsByID      map[string]Component
 	unitsByID           map[string]int
@@ -302,7 +303,7 @@ func newAdapterState(document Document, index *libraryresolver.LibraryIndex) (*a
 		}
 	}
 	preflightIssues = append(preflightIssues, resolverRecordIssues(document, index)...)
-	netLabelPreferences := schematicNetLabelPreferences(document)
+	netLabelPreferences := schematicNetLabelPreferencesWithLibraryIndex(document, index)
 	layoutResult := schematicLayoutWithLibraryIndexAndPreferences(document, index, netLabelPreferences)
 	paper := layoutResult.Sheet.Name
 	if paper == "" {
@@ -313,6 +314,7 @@ func newAdapterState(document Document, index *libraryresolver.LibraryIndex) (*a
 		document:            document,
 		libraryIndex:        index,
 		paper:               paper,
+		paperPortrait:       layoutResult.Sheet.Width < layoutResult.Sheet.Height,
 		refsByID:            map[string]string{},
 		componentsByID:      indexComponentsByID(document.Circuit.Components),
 		unitsByID:           map[string]int{},
@@ -512,9 +514,10 @@ func readableLayoutDiagnosticAllowed(result schematiclayout.Result, code string)
 
 func (state *adapterState) appendCreateProject(tx *transactions.Transaction) {
 	payload := transactions.CreateProjectOperation{
-		Op:    transactions.OpCreateProject,
-		Name:  state.document.Metadata.Name,
-		Paper: state.paper,
+		Op:            transactions.OpCreateProject,
+		Name:          state.document.Metadata.Name,
+		Paper:         state.paper,
+		PaperPortrait: state.paperPortrait,
 	}
 	state.appendOperation(tx, transactions.OpCreateProject, payload, "", "")
 }
@@ -763,6 +766,10 @@ func layoutTextPlacements(result schematiclayout.Result) map[string]layoutTextPl
 }
 
 func (state *adapterState) appendNets(tx *transactions.Transaction) {
+	type endpointPair struct {
+		from EndpointRef
+		to   EndpointRef
+	}
 	for netIndex, net := range state.orderedNetsForEmission() {
 		if state.isBusMember(net.Name) {
 			continue
@@ -781,16 +788,37 @@ func (state *adapterState) appendNets(tx *transactions.Transaction) {
 		if !ok || len(mappedEndpoints) < 2 {
 			continue
 		}
+		pairs := make([]endpointPair, 0, len(mappedEndpoints)-1)
+		if len(mappedEndpoints) > 2 {
+			for _, connection := range state.layoutResult.Connections {
+				if connection.NetName != net.Name {
+					continue
+				}
+				pairs = append(pairs, endpointPair{
+					from: EndpointRef(connection.From.Ref + "." + connection.From.Pin),
+					to:   EndpointRef(connection.To.Ref + "." + connection.To.Pin),
+				})
+			}
+		}
+		if len(pairs) != len(mappedEndpoints)-1 {
+			pairs = pairs[:0]
+			for endpointIndex := 1; endpointIndex < len(net.Connect); endpointIndex++ {
+				pairs = append(pairs, endpointPair{from: net.Connect[endpointIndex-1], to: net.Connect[endpointIndex]})
+			}
+		}
 		useLabelsValue := state.netLabelPreferences[net.Name]
 		useLabels := &useLabelsValue
-		for endpointIndex := 1; endpointIndex < len(mappedEndpoints); endpointIndex++ {
-			from := mappedEndpoints[endpointIndex-1]
-			to := mappedEndpoints[endpointIndex]
+		for pairIndex, pair := range pairs {
+			from, fromOK := state.transactionEndpoint(pair.from, fmt.Sprintf("circuit.nets[%d].route[%d].from", netIndex, pairIndex))
+			to, toOK := state.transactionEndpoint(pair.to, fmt.Sprintf("circuit.nets[%d].route[%d].to", netIndex, pairIndex))
+			if !fromOK || !toOK {
+				continue
+			}
 			var waypoints []transactions.Point
-			var fromLabelAt, toLabelAt *transactions.Point
+			var fromLabelAt, toLabelAt, bendLabelAt *transactions.Point
 			layoutLabelsRequested := false
-			fromIR := net.Connect[endpointIndex-1]
-			toIR := net.Connect[endpointIndex]
+			fromIR := pair.from
+			toIR := pair.to
 			if hint, exists := state.routesByKey[schematicRouteKey(net.Name, fromIR, toIR)]; exists {
 				if hint.UseLabels {
 					layoutLabelsRequested = true
@@ -811,6 +839,10 @@ func (state *adapterState) appendNets(tx *transactions.Transaction) {
 						points = reversedLayoutPoints(points)
 					}
 					waypoints = transactionPoints(points)
+					bendLabelAt = layoutBendLabelPoint(state.layoutResult, net.Name, hint.Points)
+					if bendLabelAt == nil && len(hint.Points) > 2 {
+						bendLabelAt = schematicRouteLabelFallbackPoint(state.layoutResult, net.Name, hint.Points)
+					}
 				}
 			}
 			fromLabelAt = state.validLabelPointForEndpoint(net.Name, fromIR, fromLabelAt)
@@ -875,12 +907,16 @@ func (state *adapterState) appendNets(tx *transactions.Transaction) {
 				skipToLabel = false
 			}
 			payload := transactions.ConnectOperation{
-				Op:                 transactions.OpConnect,
-				From:               from,
-				To:                 to,
-				NetName:            net.Name,
-				UseLabels:          useLabels,
-				SuppressBendLabels: net.UseLabel != nil && !*net.UseLabel,
+				Op:        transactions.OpConnect,
+				From:      from,
+				To:        to,
+				NetName:   net.Name,
+				UseLabels: useLabels,
+				// A direct layout route is already a complete visible
+				// conductor. Do not let the writer re-introduce a label at
+				// every orthogonal bend merely to preserve the internal name.
+				SuppressBendLabels: useLabels != nil && !*useLabels,
+				BendLabelAt:        bendLabelAt,
 				SkipFromLabel:      skipFromLabel,
 				SkipToLabel:        skipToLabel,
 				Waypoints:          waypoints,
@@ -890,6 +926,118 @@ func (state *adapterState) appendNets(tx *transactions.Transaction) {
 			state.appendOperation(tx, transactions.OpConnect, payload, "", net.Name)
 		}
 	}
+}
+
+func layoutBendLabelPoint(result schematiclayout.Result, netName string, points []kicadfiles.Point) *transactions.Point {
+	if len(points) < 2 {
+		return nil
+	}
+	for _, label := range result.Labels {
+		if label.NetName != netName || !label.RouteAnnotation {
+			continue
+		}
+		for index := 1; index < len(points); index++ {
+			if !schematicPointOnSegment(label.Position, points[index-1], points[index]) {
+				continue
+			}
+			point := transactions.Point{
+				XMM: float64(label.Position.X) / 1_000_000,
+				YMM: float64(label.Position.Y) / 1_000_000,
+			}
+			return &point
+		}
+	}
+	return nil
+}
+
+func schematicPointOnSegment(point, start, end kicadfiles.Point) bool {
+	switch {
+	case start.X == end.X:
+		return point.X == start.X && betweenSchematicCoordinates(point.Y, start.Y, end.Y)
+	case start.Y == end.Y:
+		return point.Y == start.Y && betweenSchematicCoordinates(point.X, start.X, end.X)
+	default:
+		return false
+	}
+}
+
+func schematicRouteLabelFallbackPoint(result schematiclayout.Result, netName string, points []kicadfiles.Point) *transactions.Point {
+	if len(points) < 2 {
+		return nil
+	}
+	type candidate struct {
+		point  kicadfiles.Point
+		length kicadfiles.IU
+		index  int
+	}
+	var candidates []candidate
+	for index := 1; index < len(points); index++ {
+		dx := points[index].X - points[index-1].X
+		if dx < 0 {
+			dx = -dx
+		}
+		dy := points[index].Y - points[index-1].Y
+		if dy < 0 {
+			dy = -dy
+		}
+		length := dx + dy
+		if length == 0 {
+			continue
+		}
+		start, end := points[index-1], points[index]
+		candidates = append(candidates, candidate{
+			point: kicadfiles.Point{
+				X: start.X + (end.X-start.X)/2,
+				Y: start.Y + (end.Y-start.Y)/2,
+			},
+			length: length,
+			index:  index,
+		})
+	}
+	sort.SliceStable(candidates, func(i, j int) bool {
+		if candidates[i].length != candidates[j].length {
+			return candidates[i].length > candidates[j].length
+		}
+		return candidates[i].index < candidates[j].index
+	})
+	for _, candidate := range candidates {
+		contacts := 0
+		for _, wire := range result.Wires {
+			if wire.NetName == netName && schematicPointOnSegment(candidate.point, wire.From, wire.To) {
+				contacts++
+			}
+		}
+		if contacts == 1 && schematicRouteLabelPointClear(result, netName, candidate.point) {
+			return transactionPoint(&candidate.point)
+		}
+	}
+	return nil
+}
+
+func schematicRouteLabelPointClear(result schematiclayout.Result, netName string, point kicadfiles.Point) bool {
+	box := schematiclayout.TextEstimate(netName, point, 0, 0)
+	for _, component := range result.Components {
+		body := schematiclayout.TransformRect(schematiclayout.DefaultBodyFor(component), component.Rotation, component.Mirror).Translate(component.PlacedAt)
+		if box.Intersects(body) {
+			return false
+		}
+		for _, text := range []schematiclayout.TextBox{component.ReferenceText, component.ValueText} {
+			if !text.Box.Empty() && box.Intersects(text.Box.Translate(component.PlacedAt)) {
+				return false
+			}
+		}
+	}
+	for _, label := range result.Labels {
+		if box.Intersects(schematiclayout.TextEstimate(label.Text, label.Position, 0, 0)) {
+			return false
+		}
+	}
+	for _, wire := range result.Wires {
+		if wire.NetName != netName && schematiclayout.SegmentIntersectsRect(wire, box) {
+			return false
+		}
+	}
+	return true
 }
 
 func (state *adapterState) isBusMember(netName string) bool {
@@ -1280,9 +1428,13 @@ func (state *adapterState) netEmissionPriority(net Net) int {
 }
 
 func schematicNetLabelPreferences(document Document) map[string]bool {
+	return schematicNetLabelPreferencesWithLibraryIndex(document, nil)
+}
+
+func schematicNetLabelPreferencesWithLibraryIndex(document Document, index *libraryresolver.LibraryIndex) map[string]bool {
 	pinsByComponent := make(map[string]map[string]*Pin, len(document.Circuit.Components))
-	for index := range document.Circuit.Components {
-		component := &document.Circuit.Components[index]
+	for componentIndex := range document.Circuit.Components {
+		component := &document.Circuit.Components[componentIndex]
 		pins := make(map[string]*Pin, len(component.Pins))
 		for pinIndex := range component.Pins {
 			pins[component.Pins[pinIndex].Number] = &component.Pins[pinIndex]
@@ -1298,14 +1450,14 @@ func schematicNetLabelPreferences(document Document) map[string]bool {
 	}
 	preferences := make(map[string]bool, len(document.Circuit.Nets))
 	for _, net := range document.Circuit.Nets {
-		if value, ok := schematicNetLabelPreferenceFor(document, net, pinsByComponent, drivenPorts); ok {
+		if value, ok := schematicNetLabelPreferenceFor(document, net, pinsByComponent, drivenPorts, index); ok {
 			preferences[net.Name] = value
 		}
 	}
 	return preferences
 }
 
-func schematicNetLabelPreferenceFor(document Document, net Net, pinsByComponent map[string]map[string]*Pin, drivenPorts map[string]bool) (bool, bool) {
+func schematicNetLabelPreferenceFor(document Document, net Net, pinsByComponent map[string]map[string]*Pin, drivenPorts map[string]bool, index *libraryresolver.LibraryIndex) (bool, bool) {
 	if net.UseLabel != nil {
 		return *net.UseLabel, true
 	}
@@ -1317,7 +1469,7 @@ func schematicNetLabelPreferenceFor(document Document, net Net, pinsByComponent 
 	// Prefer explicit local labels for automatic routes touching those symbols
 	// until a family has KiCad-backed direct-wire calibration. Callers that
 	// explicitly request use_label:false retain that direct-only intent.
-	if schematicNetHasUncalibratedTransform(document, net) {
+	if schematicNetHasUnsafeTransform(document, net, index) {
 		return true, true
 	}
 	// Undriven passive-only nets use local labels instead of relying on a
@@ -1348,6 +1500,38 @@ func schematicNetHasUncalibratedTransform(document Document, net Net) bool {
 	for _, endpoint := range net.Connect {
 		componentID, _, ok := endpoint.Split()
 		if ok && (rotations[componentID] != 0 || mirrors[componentID] != MirrorNone) {
+			return true
+		}
+	}
+	return false
+}
+
+// schematicNetHasUnsafeTransform distinguishes unknown endpoint transforms
+// from resolver-backed quarter turns and mirrors. Resolver geometry supplies
+// the exact KiCad pin offsets that both layout and the writer transform, so it
+// can retain a continuous local route. Template-only transformed geometry
+// remains conservative and uses endpoint labels.
+func schematicNetHasUnsafeTransform(document Document, net Net, index *libraryresolver.LibraryIndex) bool {
+	if !schematicNetHasUncalibratedTransform(document, net) {
+		return false
+	}
+	if index == nil {
+		return true
+	}
+	components := indexComponentsByID(document.Circuit.Components)
+	rotations := layoutRotations(document)
+	mirrors := layoutMirrors(document)
+	for _, endpoint := range net.Connect {
+		componentID, _, ok := endpoint.Split()
+		if !ok || (rotations[componentID] == 0 && mirrors[componentID] == MirrorNone) {
+			continue
+		}
+		component, exists := components[componentID]
+		if !exists {
+			return true
+		}
+		record, resolved := libraryresolver.ResolveSymbol(*index, component.Symbol)
+		if !resolved || !resolverGeometryAuthoritative(record, component.Symbol) {
 			return true
 		}
 	}
@@ -1680,7 +1864,7 @@ func schematicLayout(document Document) schematiclayout.Result {
 }
 
 func schematicLayoutWithLibraryIndex(document Document, index *libraryresolver.LibraryIndex) schematiclayout.Result {
-	return schematicLayoutWithLibraryIndexAndPreferences(document, index, schematicNetLabelPreferences(document))
+	return schematicLayoutWithLibraryIndexAndPreferences(document, index, schematicNetLabelPreferencesWithLibraryIndex(document, index))
 }
 
 func schematicLayoutWithLibraryIndexAndPreferences(document Document, index *libraryresolver.LibraryIndex, netLabelPreferences map[string]bool) schematiclayout.Result {
@@ -1694,6 +1878,8 @@ func schematicLayoutWithLibraryIndexAndPreferences(document Document, index *lib
 	for _, placement := range document.Layout.Placements {
 		placementsByID[placement.Target] = placement
 	}
+	componentsByID := indexComponentsByID(document.Circuit.Components)
+	powerFlagNeighbors := schematicPowerFlagNeighbors(document, componentsByID)
 	ordinalByID := schematicLayoutOrdinals(document)
 	rules := schematiclayout.DefaultRules(schematiclayout.ProfileStandard)
 	if document.Layout.Rules.MinComponentSpacingMM != nil {
@@ -1724,6 +1910,17 @@ func schematicLayoutWithLibraryIndexAndPreferences(document Document, index *lib
 			}
 		}
 		geometry := schematicLayoutGeometry(component, index)
+		flowRank := group.Rank
+		rankFixed := group.ID != "" && !group.Inferred
+		if schematicComponentIsPowerFlag(component) {
+			flowRank = 0
+			rankFixed = true
+		}
+		near := append([]string(nil), placement.Near...)
+		if neighbor := powerFlagNeighbors[component.ID]; neighbor != "" && !stringSliceContains(near, neighbor) {
+			near = append(near, neighbor)
+			sort.Strings(near)
+		}
 		request.Components = append(request.Components, schematiclayout.Component{
 			Ref:             component.ID,
 			DisplayRef:      component.Ref,
@@ -1732,9 +1929,9 @@ func schematicLayoutWithLibraryIndexAndPreferences(document Document, index *lib
 			Role:            schematicLayoutComponentRole(component),
 			GroupID:         group.ID,
 			Stage:           schematicStageForGroup(group.Role),
-			FlowRank:        group.Rank,
-			RankFixed:       group.ID != "" && !group.Inferred,
-			Near:            append([]string(nil), placement.Near...),
+			FlowRank:        flowRank,
+			RankFixed:       rankFixed,
+			Near:            near,
 			Above:           append([]string(nil), placement.Above...),
 			RightOf:         append([]string(nil), placement.RightOf...),
 			Rotation:        kicadfiles.Angle(rotationByID[component.ID]),
@@ -1746,16 +1943,18 @@ func schematicLayoutWithLibraryIndexAndPreferences(document Document, index *lib
 			OriginalOrdinal: ordinalByID[component.ID],
 		})
 	}
-	for index, net := range document.Circuit.Nets {
+	for netIndex, net := range document.Circuit.Nets {
 		if documentNetIsBusMember(document, net.Name) {
 			continue
 		}
-		layoutNet := schematiclayout.Net{Name: net.Name, Role: string(net.Role), OriginalOrdinal: index, PreferDirect: stateDocumentHasPortNet(document, net.Name)}
+		layoutNet := schematiclayout.Net{Name: net.Name, Role: string(net.Role), OriginalOrdinal: netIndex, PreferDirect: stateDocumentHasPortNet(document, net.Name)}
 		if net.UseLabel != nil {
 			layoutNet.PreferredLabels = *net.UseLabel
+			layoutNet.EndpointLabels = *net.UseLabel
 			layoutNet.PreferDirect = !*net.UseLabel
 		} else if preference, ok := netLabelPreferences[net.Name]; ok {
 			layoutNet.PreferredLabels = preference
+			layoutNet.EndpointLabels = preference && schematicNetRequiresEndpointLabels(document, net, index, componentsByID)
 			layoutNet.PreferDirect = !preference
 		}
 		for _, endpoint := range net.Connect {
@@ -1793,9 +1992,104 @@ func schematicLayoutWithLibraryIndexAndPreferences(document Document, index *lib
 				Repair:   "retain label fallback or provide explicit route hints",
 			})
 			result = repaired
+			request = repairRequest
+		}
+	}
+	if document.Policy.Acceptance == AcceptanceReadable && document.Policy.Repair.AllowGroupSpacingAdjustment && layoutNeedsSpacingRepair(result) {
+		// Dense generated stages can leave no collision-free outward stub for a
+		// boundary label even though the topology and symbol geometry are
+		// otherwise valid. Search a small, deterministic sequence of spacing
+		// increments and retain the smallest candidate with the best diagnostic
+		// score. Page selection remains delegated to schematiclayout.Layout, so
+		// a larger sheet is used only when the repaired bounds require it.
+		best := result
+		bestStep := 0
+		minorGrid := request.Rules.MinorGrid
+		if minorGrid <= 0 {
+			minorGrid = kicadfiles.MM(1.27)
+		}
+		maxRepairPasses := request.Rules.MaxSpacingRepairs
+		if len(request.Components) > request.Rules.FullRepairComponents && maxRepairPasses > 1 {
+			maxRepairPasses = 1
+		}
+		for step := 1; step <= maxRepairPasses; step++ {
+			repairRequest := request
+			repairRules := request.Rules
+			repairRules.MinComponentSpacing += minorGrid * kicadfiles.IU(2*step)
+			repairRules.MinStageSpacing += minorGrid * kicadfiles.IU(4*step)
+			repairRules.MinGroupGutter += minorGrid * kicadfiles.IU(2*step)
+			repairRequest.Rules = repairRules
+			candidate := schematiclayout.Layout(repairRequest)
+			if layoutDiagnosticScore(candidate) < layoutDiagnosticScore(best) {
+				best = candidate
+				bestStep = step
+			}
+			if !layoutNeedsSpacingRepair(candidate) {
+				if layoutDiagnosticScore(candidate) <= layoutDiagnosticScore(best) {
+					best = candidate
+					bestStep = step
+				}
+				break
+			}
+		}
+		if bestStep > 0 {
+			best.Diagnostics = append(best.Diagnostics, schematiclayout.Diagnostic{
+				Severity: schematiclayout.SeverityInfo,
+				Code:     "readability_repair_spacing",
+				Message:  fmt.Sprintf("readable layout retry increased deterministic component spacing by %.2f mm", float64(minorGrid*kicadfiles.IU(2*bestStep))/1_000_000),
+				Repair:   "retain topology groups and collision-free boundary label clearance",
+			})
+			result = best
 		}
 	}
 	return result
+}
+
+func schematicNetRequiresEndpointLabels(document Document, net Net, index *libraryresolver.LibraryIndex, components map[string]Component) bool {
+	if stateDocumentHasPortNet(document, net.Name) {
+		return true
+	}
+	for _, endpoint := range net.Connect {
+		componentID, _, ok := endpoint.Split()
+		if !ok {
+			return true
+		}
+		switch components[componentID].Role {
+		case ComponentRoleConnector, ComponentRoleInputConnector, ComponentRoleOutputConnector:
+			return true
+		}
+	}
+	if schematicNetHasUnsafeTransform(document, net, index) {
+		return true
+	}
+	// Direct routes are only trustworthy when their final KiCad symbol
+	// geometry and anchors came from the resolver. Conservative/template-only
+	// geometry retains the old endpoint-label fallback rather than drawing a
+	// conductor through a symbol body.
+	if index == nil {
+		return true
+	}
+	for _, endpoint := range net.Connect {
+		componentID, _, ok := endpoint.Split()
+		if !ok {
+			return true
+		}
+		component, exists := components[componentID]
+		if !exists {
+			return true
+		}
+		geometry := schematicLayoutGeometry(component, index)
+		switch geometry.Source {
+		case schematiclayout.GeometrySourceExplicitBody,
+			schematiclayout.GeometrySourceExplicitPinEnvelope,
+			schematiclayout.GeometrySourceResolverGraphics,
+			schematiclayout.GeometrySourceResolverPinEnvelope,
+			schematiclayout.GeometrySourceEmbeddedTemplate:
+		default:
+			return true
+		}
+	}
+	return false
 }
 
 func effectiveMinComponentSpacingMM(document Document) float64 {
@@ -1843,6 +2137,12 @@ func schematicLayoutOrdinals(document Document) map[string]int {
 }
 
 func schematicLayoutComponentRole(component Component) string {
+	if schematicComponentIsPowerFlag(component) {
+		// ERC power flags are boundary annotations, not functional rail blocks.
+		// Keep them in the connector flow so they remain close to the rail
+		// entry instead of stretching the drawing to the top or bottom margin.
+		return "boundary_annotation"
+	}
 	if component.Role != ComponentRolePowerSymbol {
 		return string(component.Role)
 	}
@@ -1857,6 +2157,75 @@ func schematicLayoutComponentRole(component Component) string {
 	}
 }
 
+func schematicComponentIsPowerFlag(component Component) bool {
+	if component.Role != ComponentRolePowerSymbol && component.Role != ComponentRoleGroundSymbol {
+		return false
+	}
+	return strings.EqualFold(strings.TrimSpace(component.Value), "PWR_FLAG") ||
+		strings.EqualFold(strings.TrimSpace(component.Symbol), "power:PWR_FLAG")
+}
+
+func schematicPowerFlagNeighbors(document Document, components map[string]Component) map[string]string {
+	powerRailComponent := map[string]bool{}
+	for _, net := range document.Circuit.Nets {
+		switch net.Role {
+		case NetRolePower, NetRolePowerPos, NetRolePowerNeg:
+		default:
+			continue
+		}
+		for _, endpoint := range net.Connect {
+			componentID, _, ok := endpoint.Split()
+			if ok {
+				powerRailComponent[componentID] = true
+			}
+		}
+	}
+	neighbors := map[string]string{}
+	for _, net := range document.Circuit.Nets {
+		var flags, candidates []string
+		for _, endpoint := range net.Connect {
+			componentID, _, ok := endpoint.Split()
+			if !ok {
+				continue
+			}
+			component, exists := components[componentID]
+			if !exists {
+				continue
+			}
+			if schematicComponentIsPowerFlag(component) {
+				flags = append(flags, componentID)
+				continue
+			}
+			switch component.Role {
+			case ComponentRoleConnector, ComponentRoleInputConnector, ComponentRoleOutputConnector:
+				candidates = append(candidates, componentID)
+			}
+		}
+		if len(flags) == 0 || len(candidates) == 0 {
+			continue
+		}
+		sort.Strings(flags)
+		sort.Strings(candidates)
+		sort.SliceStable(candidates, func(i, j int) bool {
+			leftPower, rightPower := powerRailComponent[candidates[i]], powerRailComponent[candidates[j]]
+			if leftPower != rightPower {
+				return leftPower
+			}
+			leftRole, rightRole := components[candidates[i]].Role, components[candidates[j]].Role
+			leftInput := leftRole == ComponentRoleInputConnector || leftRole == ComponentRoleConnector
+			rightInput := rightRole == ComponentRoleInputConnector || rightRole == ComponentRoleConnector
+			if leftInput != rightInput {
+				return leftInput
+			}
+			return candidates[i] < candidates[j]
+		})
+		for _, flag := range flags {
+			neighbors[flag] = candidates[0]
+		}
+	}
+	return neighbors
+}
+
 func layoutNeedsLabelRepair(result schematiclayout.Result) bool {
 	for _, diagnostic := range result.Diagnostics {
 		if diagnostic.Severity != schematiclayout.SeverityError && diagnostic.Severity != schematiclayout.SeverityWarning {
@@ -1864,6 +2233,19 @@ func layoutNeedsLabelRepair(result schematiclayout.Result) bool {
 		}
 		switch diagnostic.Code {
 		case schematiclayout.DiagnosticWireCrossing, schematiclayout.DiagnosticWireSymbolOverlap, schematiclayout.DiagnosticWirePinOverlap, schematiclayout.DiagnosticTextWireOverlap:
+			return true
+		}
+	}
+	return false
+}
+
+func layoutNeedsSpacingRepair(result schematiclayout.Result) bool {
+	for _, diagnostic := range result.Diagnostics {
+		if diagnostic.Severity != schematiclayout.SeverityError && diagnostic.Severity != schematiclayout.SeverityWarning {
+			continue
+		}
+		switch diagnostic.Code {
+		case "label_placement_fallback", "label_overlap", "symbol_overlap", "text_symbol_overlap":
 			return true
 		}
 	}

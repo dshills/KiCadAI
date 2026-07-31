@@ -159,6 +159,9 @@ type ConnectOptions struct {
 	// SuppressBendLabels prevents automatic labels at orthogonal route bends
 	// when the caller explicitly chose local wiring.
 	SuppressBendLabels bool
+	// BendLabelAt requests exactly one local net annotation at a point on a
+	// direct route. It takes precedence over SuppressBendLabels.
+	BendLabelAt *kicadfiles.Point
 	// SkipFromLabel and SkipToLabel let a caller replace one endpoint's local
 	// label with a global or hierarchical label at the same anchor.
 	SkipFromLabel bool
@@ -772,9 +775,9 @@ func (builder *Builder) ConnectWithOptions(from, to Endpoint, netName string, op
 			builder.addSchematicLabelConnection(netName, to, end, start, toLabelAt)
 		}
 	} else if len(options.Waypoints) != 0 {
-		builder.addSchematicWirePointsWithOptions(netName, from, to, options.Waypoints, options.SuppressBendLabels)
+		builder.addSchematicWirePointsWithOptions(netName, from, to, options.Waypoints, options.SuppressBendLabels, options.BendLabelAt)
 	} else if options.UseLabels != nil {
-		builder.addSchematicWireWithOptions(netName, from, to, start, end, options.SuppressBendLabels)
+		builder.addSchematicWireWithOptions(netName, from, to, start, end, options.SuppressBendLabels, options.BendLabelAt)
 	} else if builder.schematicConnectionShouldUseDirectLabels(from, to, start, end) {
 		if err := builder.AddLabel(netName, start, schematic.LabelLocal); err != nil {
 			return err
@@ -1181,7 +1184,7 @@ func (builder *Builder) AddSchematicWireWithLabel(netName string, points []kicad
 	}
 	builder.design.ExpectedNets = appendUniqueNet(builder.design.ExpectedNets, netName)
 	builder.nets.EnsureNet(netName)
-	builder.addSchematicWirePointsWithOptions(netName, Endpoint{}, Endpoint{}, points, true)
+	builder.addSchematicWirePointsWithOptions(netName, Endpoint{}, Endpoint{}, points, true, nil)
 	if strings.TrimSpace(label) != "" {
 		position := points[len(points)-1]
 		if labelAt != nil {
@@ -1303,22 +1306,22 @@ func betweenSchematicInclusive(value kicadfiles.IU, a kicadfiles.IU, b kicadfile
 }
 
 func (builder *Builder) addSchematicWire(netName string, from, to Endpoint, start, end kicadfiles.Point) {
-	builder.addSchematicWireWithOptions(netName, from, to, start, end, false)
+	builder.addSchematicWireWithOptions(netName, from, to, start, end, false, nil)
 }
 
-func (builder *Builder) addSchematicWireWithOptions(netName string, from, to Endpoint, start, end kicadfiles.Point, suppressBendLabels bool) {
+func (builder *Builder) addSchematicWireWithOptions(netName string, from, to Endpoint, start, end kicadfiles.Point, suppressBendLabels bool, bendLabelAt *kicadfiles.Point) {
 	if builder == nil {
 		return
 	}
 	points := builder.orthogonalSchematicWirePoints(start, end)
-	builder.addSchematicWirePointsWithOptions(netName, from, to, points, suppressBendLabels)
+	builder.addSchematicWirePointsWithOptions(netName, from, to, points, suppressBendLabels, bendLabelAt)
 }
 
 func (builder *Builder) addSchematicWirePoints(netName string, from, to Endpoint, points []kicadfiles.Point) {
-	builder.addSchematicWirePointsWithOptions(netName, from, to, points, false)
+	builder.addSchematicWirePointsWithOptions(netName, from, to, points, false, nil)
 }
 
-func (builder *Builder) addSchematicWirePointsWithOptions(netName string, from, to Endpoint, points []kicadfiles.Point, suppressBendLabels bool) {
+func (builder *Builder) addSchematicWirePointsWithOptions(netName string, from, to Endpoint, points []kicadfiles.Point, suppressBendLabels bool, bendLabelAt *kicadfiles.Point) {
 	if builder == nil || len(points) < 2 {
 		return
 	}
@@ -1351,6 +1354,9 @@ func (builder *Builder) addSchematicWirePointsWithOptions(netName string, from, 
 				Position: points[index],
 			})
 		}
+		if bendLabelAt != nil {
+			continue
+		}
 		if suppressBendLabels || suppressBendLabelsForNet {
 			continue
 		}
@@ -1363,6 +1369,23 @@ func (builder *Builder) addSchematicWirePointsWithOptions(netName string, from, 
 			schematic.LabelLocal,
 			points[index],
 		))
+	}
+	if bendLabelAt != nil && !hasSchematicLabel(builder.design.Schematic.Labels, netName, *bendLabelAt) {
+		onRoute := false
+		for index := 0; index < len(points)-1; index++ {
+			if pointOnSchematicSegment(*bendLabelAt, points[index], points[index+1]) {
+				onRoute = true
+				break
+			}
+		}
+		if onRoute {
+			builder.design.Schematic.Labels = append(builder.design.Schematic.Labels, schematic.NewLabel(
+				builder.generator.New("root.schematic.label", netName, "route", formatPoint(*bendLabelAt)),
+				netName,
+				schematic.LabelLocal,
+				*bendLabelAt,
+			))
+		}
 	}
 }
 

@@ -73,7 +73,7 @@ func pageCandidates(requested Sheet) []Sheet {
 	}
 
 	landscape := requested.Width >= requested.Height
-	candidates := make([]Sheet, 0, len(standardPapers)-start)
+	candidates := make([]Sheet, 0, (len(standardPapers)-start)*2)
 	for _, paper := range standardPapers[start:] {
 		width, height := paper.width, paper.height
 		if !landscape {
@@ -87,6 +87,11 @@ func pageCandidates(requested Sheet) []Sheet {
 			candidate.Margin = kicadfiles.MM(10.16)
 		}
 		candidates = append(candidates, candidate)
+		alternate := candidate
+		alternate.Width, alternate.Height = candidate.Height, candidate.Width
+		if alternate.Width != candidate.Width || alternate.Height != candidate.Height {
+			candidates = append(candidates, alternate)
+		}
 	}
 	return candidates
 }

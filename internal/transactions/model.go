@@ -185,6 +185,7 @@ type CreateProjectOperation struct {
 	Op            OperationKind     `json:"op"`
 	Name          string            `json:"name"`
 	Paper         string            `json:"paper,omitempty"`
+	PaperPortrait bool              `json:"paper_portrait,omitempty"`
 	TextVariables map[string]string `json:"text_variables,omitempty"`
 }
 
@@ -227,6 +228,7 @@ type ConnectOperation struct {
 	NetName            string        `json:"net_name"`
 	UseLabels          *bool         `json:"use_labels,omitempty"`
 	SuppressBendLabels bool          `json:"suppress_bend_labels,omitempty"`
+	BendLabelAt        *Point        `json:"bend_label_at,omitempty"`
 	SkipFromLabel      bool          `json:"skip_from_label,omitempty"`
 	SkipToLabel        bool          `json:"skip_to_label,omitempty"`
 	Waypoints          []Point       `json:"waypoints,omitempty"`

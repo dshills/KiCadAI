@@ -384,7 +384,7 @@ func relayoutHierarchyChild(builder *Builder, child *schematic.SchematicFile, sh
 		}
 	}
 	request := schematiclayout.Request{
-		Sheet: schematiclayout.SheetForPaper(child.Paper.Name),
+		Sheet: schematiclayout.SheetForPaperOrientation(child.Paper.Name, child.Paper.Portrait),
 		Rules: schematiclayout.DefaultRules(schematiclayout.ProfileStandard),
 	}
 	for _, symbol := range child.Symbols {
@@ -463,7 +463,16 @@ func relayoutHierarchyChild(builder *Builder, child *schematic.SchematicFile, sh
 			}
 			return endpoints[i].Pin < endpoints[j].Pin
 		})
-		layoutNet := schematiclayout.Net{Name: netName, PreferredLabels: true, Endpoints: endpoints}
+		layoutNet := schematiclayout.Net{
+			Name:            netName,
+			PreferredLabels: true,
+			// Hierarchy relayout starts from writer-owned child symbols whose
+			// final endpoint calibration is not available to schematiclayout.
+			// Retain endpoint labels here until the hierarchy adapter can pass
+			// the same resolver-backed anchor proof as schematic IR.
+			EndpointLabels: true,
+			Endpoints:      endpoints,
+		}
 		layoutNet.Role = schematiclayout.InferNetRole(layoutNet)
 		request.Nets = append(request.Nets, layoutNet)
 	}
@@ -737,10 +746,17 @@ func fitHierarchyChild(child *schematic.SchematicFile) error {
 	papers := []string{"A5", "A4", "A3", "A2", "A1", "A0"}
 	selected := schematiclayout.SheetForPaper(papers[len(papers)-1])
 	for _, name := range papers {
-		candidate := schematiclayout.SheetForPaper(name)
-		usable := schematiclayout.UsableSheet(candidate)
-		if maxPoint.X-minPoint.X <= usable.Width() && maxPoint.Y-minPoint.Y <= usable.Height() {
-			selected = candidate
+		found := false
+		for _, portrait := range []bool{false, true} {
+			candidate := schematiclayout.SheetForPaperOrientation(name, portrait)
+			usable := schematiclayout.UsableSheet(candidate)
+			if maxPoint.X-minPoint.X <= usable.Width() && maxPoint.Y-minPoint.Y <= usable.Height() {
+				selected = candidate
+				found = true
+				break
+			}
+		}
+		if found {
 			break
 		}
 	}
@@ -748,7 +764,7 @@ func fitHierarchyChild(child *schematic.SchematicFile) error {
 	if maxPoint.X-minPoint.X > usable.Width() || maxPoint.Y-minPoint.Y > usable.Height() {
 		return fmt.Errorf("hierarchy child %s exceeds the largest supported schematic page", child.Filename)
 	}
-	child.Paper = kicadfiles.Paper{Name: selected.Name, Width: selected.Width, Height: selected.Height}
+	child.Paper = kicadfiles.Paper{Name: selected.Name, Width: selected.Width, Height: selected.Height, Portrait: selected.Height > selected.Width}
 	currentCenter := kicadfiles.Point{
 		X: (minPoint.X + maxPoint.X) / 2,
 		Y: (minPoint.Y + maxPoint.Y) / 2,

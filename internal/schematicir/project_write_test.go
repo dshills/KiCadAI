@@ -552,11 +552,11 @@ func TestSchematicIRWritesGeneratedArbitraryTopologyCorpus(t *testing.T) {
 					t.Fatalf("read %s: %v", path, readErr)
 				}
 				expectedPaper := "A4"
-				if seed%3 == 0 {
-					expectedPaper = "A3"
-				}
 				if file.Paper.Name != expectedPaper {
 					t.Fatalf("%s paper = %q, want topology-selected %s page", path, file.Paper.Name, expectedPaper)
+				}
+				if wantPortrait := seed%3 != 1; file.Paper.Portrait != wantPortrait {
+					t.Fatalf("%s portrait = %v, want topology-selected portrait=%v", path, file.Paper.Portrait, wantPortrait)
 				}
 				request, result := schematiclayout.AdaptSchematic(&file)
 				result = schematiclayout.Validate(result, request)

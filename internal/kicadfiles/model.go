@@ -53,9 +53,10 @@ func SchematicLibraryBounds(minPoint, maxPoint Point) (Point, Point) {
 }
 
 type Paper struct {
-	Name   string
-	Width  IU
-	Height IU
+	Name     string
+	Width    IU
+	Height   IU
+	Portrait bool
 }
 
 type TitleBlock struct {

@@ -205,9 +205,14 @@ func lowerCandidateDocument(
 			EvidenceSHA: connector.EvidenceSHA,
 		})
 	}
+	topologyNetRoles := physicalTopologyNetRoles(graph)
 	for _, node := range graph.Nodes {
+		netRole := physicalNetRole(node)
+		if inferred := topologyNetRoles[node.ID]; inferred != "" && netRole == circuitgraph.NetRoleSignal {
+			netRole = inferred
+		}
 		net := circuitgraph.Net{
-			Name: physicalNetName(node), Role: physicalNetRole(node),
+			Name: physicalNetName(node), Role: netRole,
 			Required: graphBool(true), VoltageDomain: node.Domain,
 			CurrentMA: physicalNodeCurrentMA(requirement, node),
 			Endpoints: []circuitgraph.Endpoint{},
@@ -262,6 +267,161 @@ func lowerCandidateDocument(
 	document.Schematic = physicalSchematicIntent(graph)
 	document.PCB = physicalPCBIntent(document.Project.Board, document.Components)
 	return document, bindings, reports.SortedIssues(issues)
+}
+
+// physicalTopologyNetRoles recognizes control-loop return paths from graph
+// connectivity rather than component or fixture names. A control input is a
+// feedback node when a passive-only path connects it back to an output of the
+// same active device. Those edges must not participate in forward-flow rank
+// assignment, otherwise a normal control loop collapses into one column.
+func physicalTopologyNetRoles(graph CandidateGraph) map[string]circuitgraph.NetRole {
+	passiveNeighbors := map[string]map[string]struct{}{}
+	for _, instance := range graph.Instances {
+		if !physicalPassiveKind(instance.Kind) {
+			continue
+		}
+		nodes := []string{}
+		for _, terminal := range instance.Terminals {
+			if terminal.Node != "" {
+				nodes = append(nodes, terminal.Node)
+			}
+		}
+		slices.Sort(nodes)
+		nodes = slices.Compact(nodes)
+		for left := 0; left < len(nodes); left++ {
+			for right := left + 1; right < len(nodes); right++ {
+				if passiveNeighbors[nodes[left]] == nil {
+					passiveNeighbors[nodes[left]] = map[string]struct{}{}
+				}
+				if passiveNeighbors[nodes[right]] == nil {
+					passiveNeighbors[nodes[right]] = map[string]struct{}{}
+				}
+				passiveNeighbors[nodes[left]][nodes[right]] = struct{}{}
+				passiveNeighbors[nodes[right]][nodes[left]] = struct{}{}
+			}
+		}
+	}
+	roles := map[string]circuitgraph.NetRole{}
+	for _, instance := range graph.Instances {
+		var controlInputs, outputs []string
+		for _, terminal := range instance.Terminals {
+			switch physicalTerminalFlow(terminal.Terminal) {
+			case "control_input":
+				controlInputs = append(controlInputs, terminal.Node)
+			case "output":
+				outputs = append(outputs, terminal.Node)
+			}
+		}
+		slices.Sort(controlInputs)
+		controlInputs = slices.Compact(controlInputs)
+		slices.Sort(outputs)
+		outputs = slices.Compact(outputs)
+		for _, input := range controlInputs {
+			if input == "" {
+				continue
+			}
+			for _, output := range outputs {
+				if output != "" && input != output && physicalPassiveReachable(input, output, passiveNeighbors) {
+					roles[input] = circuitgraph.NetRoleFeedback
+					break
+				}
+			}
+		}
+	}
+	return roles
+}
+
+func physicalPassiveKind(kind string) bool {
+	switch strings.ToLower(strings.TrimSpace(kind)) {
+	case "resistor", "capacitor", "inductor", "diode", "zener", "tvs":
+		return true
+	default:
+		return false
+	}
+}
+
+// physicalPassiveOrientations follows the conventional schematic distinction
+// between rail branches and forward/feedback paths. Two-terminal passives tied
+// to a supply or reference rail are vertical; passives carrying signal, bias,
+// or feedback flow are horizontal. The decision depends only on graph
+// topology and node roles, so new circuit families receive the same treatment
+// without named templates or placement coordinates.
+func physicalPassiveOrientations(graph CandidateGraph) map[string]string {
+	nodesByID := make(map[string]GraphNode, len(graph.Nodes))
+	for _, node := range graph.Nodes {
+		nodesByID[node.ID] = node
+	}
+	inferredRoles := physicalTopologyNetRoles(graph)
+	orientations := map[string]string{}
+	for _, instance := range graph.Instances {
+		if !physicalPassiveKind(instance.Kind) {
+			continue
+		}
+		nodes := map[string]struct{}{}
+		railBranch := false
+		for _, terminal := range instance.Terminals {
+			if terminal.Node == "" {
+				continue
+			}
+			nodes[terminal.Node] = struct{}{}
+			role := inferredRoles[terminal.Node]
+			if role == "" {
+				if node, ok := nodesByID[terminal.Node]; ok {
+					role = physicalNetRole(node)
+				}
+			}
+			switch role {
+			case circuitgraph.NetRolePower, circuitgraph.NetRolePowerPos, circuitgraph.NetRolePowerNeg,
+				circuitgraph.NetRoleGround, circuitgraph.NetRoleReturn:
+				railBranch = true
+			}
+		}
+		if len(nodes) < 2 {
+			continue
+		}
+		if railBranch {
+			orientations[instance.ID] = "normal"
+		} else {
+			orientations[instance.ID] = "rotated_90"
+		}
+	}
+	return orientations
+}
+
+func physicalTerminalFlow(terminal string) string {
+	switch strings.ToUpper(strings.TrimSpace(terminal)) {
+	case "IN_PLUS", "IN_MINUS", "INPUT", "BASE", "GATE", "FB", "FEEDBACK", "SENSE":
+		return "control_input"
+	case "OUT", "OUTPUT", "COLLECTOR", "EMITTER", "DRAIN", "SOURCE":
+		return "output"
+	default:
+		return ""
+	}
+}
+
+func physicalPassiveReachable(start, target string, neighbors map[string]map[string]struct{}) bool {
+	queue := []string{start}
+	seen := map[string]struct{}{start: {}}
+	for len(queue) != 0 {
+		current := queue[0]
+		queue = queue[1:]
+		next := make([]string, 0, len(neighbors[current]))
+		for candidate := range neighbors[current] {
+			next = append(next, candidate)
+		}
+		slices.Sort(next)
+		for _, candidate := range next {
+			if candidate == target {
+				return true
+			}
+			if _, exists := seen[candidate]; exists {
+				continue
+			}
+			seen[candidate] = struct{}{}
+			queue = append(queue, candidate)
+		}
+	}
+	return false
 }
 
 func selectPhysicalConnector(catalog *components.Catalog) (physicalConnectorSelection, bool) {
@@ -475,20 +635,38 @@ func physicalSchematicIntent(graph CandidateGraph) circuitgraph.SchematicIntent 
 	if len(inputs) != 0 {
 		groups = append(groups, circuitgraph.SchematicGroup{ID: "external_inputs", Label: "External Inputs", Role: "input_stage", Members: inputs, Rank: 0, Side: circuitgraph.SideLeft})
 	}
-	if len(core) != 0 {
-		groups = append(groups, circuitgraph.SchematicGroup{ID: "synthesized_core", Label: "Synthesized Core", Role: "processing_stage", Members: core, Rank: 1})
-	}
 	if len(outputs) != 0 {
-		groups = append(groups, circuitgraph.SchematicGroup{ID: "external_outputs", Label: "External Outputs", Role: "output_stage", Members: outputs, Rank: 2, Side: circuitgraph.SideRight})
+		groups = append(groups, circuitgraph.SchematicGroup{ID: "external_outputs", Label: "External Outputs", Role: "output_stage", Members: outputs, Rank: 4, Side: circuitgraph.SideRight})
+	}
+	coreRanks := physicalTopologyRanks(graph)
+	coreByRank := map[int][]string{}
+	for _, component := range core {
+		rank := coreRanks[component]
+		if rank < 1 || rank > 3 {
+			rank = 2
+		}
+		coreByRank[rank] = append(coreByRank[rank], component)
+	}
+	for rank := 1; rank <= 3; rank++ {
+		members := coreByRank[rank]
+		if len(members) == 0 {
+			continue
+		}
+		slices.Sort(members)
+		groups = append(groups, circuitgraph.SchematicGroup{
+			ID: "synthesized_stage_" + strconv.Itoa(rank), Label: "Synthesized Stage " + strconv.Itoa(rank),
+			Role: "processing_stage", Members: members, Rank: rank,
+		})
 	}
 	placements := []circuitgraph.SchematicPlacement{}
+	passiveOrientations := physicalPassiveOrientations(graph)
 	for _, group := range groups {
-		for index, component := range group.Members {
-			placement := circuitgraph.SchematicPlacement{Component: component, Group: group.ID, Orientation: "normal", Mirror: "none"}
-			if index > 0 {
-				placement.Near = group.Members[index-1]
-			}
-			placements = append(placements, placement)
+		for _, component := range group.Members {
+			placements = append(placements, circuitgraph.SchematicPlacement{
+				Component:   component,
+				Group:       group.ID,
+				Orientation: passiveOrientations[component],
+			})
 		}
 	}
 	return circuitgraph.SchematicIntent{
@@ -505,6 +683,97 @@ func physicalSchematicIntent(graph CandidateGraph) circuitgraph.SchematicIntent 
 		},
 		Hierarchy: circuitgraph.HierarchyPolicy{Mode: "flat"},
 	}
+}
+
+// physicalTopologyRanks projects the bipartite instance/net graph onto the
+// three conventional core columns between boundary input rank 0 and boundary
+// output rank 4. The projection uses only graph distance, so it applies to new
+// circuit families without named templates or instance-order assumptions.
+func physicalTopologyRanks(graph CandidateGraph) map[string]int {
+	neighbors := map[string]map[string]struct{}{}
+	nodeKey := func(id string) string { return "node:" + id }
+	instanceKey := func(id string) string { return "instance:" + id }
+	connect := func(left, right string) {
+		if neighbors[left] == nil {
+			neighbors[left] = map[string]struct{}{}
+		}
+		if neighbors[right] == nil {
+			neighbors[right] = map[string]struct{}{}
+		}
+		neighbors[left][right] = struct{}{}
+		neighbors[right][left] = struct{}{}
+	}
+	for _, instance := range graph.Instances {
+		for _, terminal := range instance.Terminals {
+			connect(instanceKey(instance.ID), nodeKey(terminal.Node))
+		}
+	}
+	var inputRoots, outputRoots []string
+	for _, node := range graph.Nodes {
+		if node.Scope != "external" || node.Role == "reference" {
+			continue
+		}
+		if node.Role == "output" {
+			outputRoots = append(outputRoots, nodeKey(node.ID))
+		} else {
+			inputRoots = append(inputRoots, nodeKey(node.ID))
+		}
+	}
+	inputDistance := physicalGraphDistances(inputRoots, neighbors)
+	outputDistance := physicalGraphDistances(outputRoots, neighbors)
+	ranks := map[string]int{}
+	for _, instance := range graph.Instances {
+		key := instanceKey(instance.ID)
+		fromInput, inputOK := inputDistance[key]
+		toOutput, outputOK := outputDistance[key]
+		switch {
+		case inputOK && outputOK && fromInput+toOutput > 0:
+			position := 2 * float64(fromInput) / float64(fromInput+toOutput)
+			ranks[instance.ID] = 1 + int(math.Round(position))
+		case inputOK:
+			ranks[instance.ID] = 1
+		case outputOK:
+			ranks[instance.ID] = 3
+		default:
+			ranks[instance.ID] = 2
+		}
+	}
+	return ranks
+}
+
+func physicalGraphDistances(roots []string, neighbors map[string]map[string]struct{}) map[string]int {
+	slices.Sort(roots)
+	roots = slices.Compact(roots)
+	orderedNeighbors := make(map[string][]string, len(neighbors))
+	for node, adjacent := range neighbors {
+		ordered := make([]string, 0, len(adjacent))
+		for candidate := range adjacent {
+			ordered = append(ordered, candidate)
+		}
+		slices.Sort(ordered)
+		orderedNeighbors[node] = ordered
+	}
+	distance := map[string]int{}
+	queue := []string{}
+	for _, root := range roots {
+		if root == "" {
+			continue
+		}
+		distance[root] = 0
+		queue = append(queue, root)
+	}
+	for len(queue) != 0 {
+		current := queue[0]
+		queue = queue[1:]
+		for _, candidate := range orderedNeighbors[current] {
+			if _, exists := distance[candidate]; exists {
+				continue
+			}
+			distance[candidate] = distance[current] + 1
+			queue = append(queue, candidate)
+		}
+	}
+	return distance
 }
 
 func physicalPCBIntent(board circuitgraph.Board, components []circuitgraph.Component) circuitgraph.PCBIntent {

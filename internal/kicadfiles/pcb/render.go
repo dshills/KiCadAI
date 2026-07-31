@@ -58,7 +58,11 @@ func render(board PCBFile) (sexpr.List, error) {
 	if strings.TrimSpace(board.RawGeneral) != "" {
 		generalNode = sexpr.R(board.RawGeneral)
 	}
-	paperNode := sexpr.Node(sexpr.L(sexpr.A("paper"), sexpr.S(strings.TrimSpace(board.Paper.Name))))
+	paperNodes := []sexpr.Node{sexpr.A("paper"), sexpr.S(strings.TrimSpace(board.Paper.Name))}
+	if board.Paper.Portrait {
+		paperNodes = append(paperNodes, sexpr.A("portrait"))
+	}
+	paperNode := sexpr.Node(sexpr.L(paperNodes...))
 	if strings.TrimSpace(board.RawPaper) != "" {
 		paperNode = sexpr.R(board.RawPaper)
 	}

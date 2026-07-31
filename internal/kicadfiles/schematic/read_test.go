@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"kicadai/internal/kicadfiles"
+	"kicadai/internal/kicadfiles/sexpr"
 )
 
 func TestReadSchematicWrittenByWriter(t *testing.T) {
@@ -43,6 +44,30 @@ func TestReadSchematicWrittenByWriter(t *testing.T) {
 	}
 	if resistor == nil || resistor.BodyBounds == nil {
 		t.Fatalf("known template body geometry not recovered: %#v", resistor)
+	}
+}
+
+func TestReadSchematicPaperHandlesShortAndPortraitForms(t *testing.T) {
+	tests := []struct {
+		input    string
+		name     string
+		width    kicadfiles.IU
+		height   kicadfiles.IU
+		portrait bool
+	}{
+		{input: `(paper "A4")`, name: "A4"},
+		{input: `(paper "A4" portrait)`, name: "A4", portrait: true},
+		{input: `(paper "User" 297 210 portrait)`, name: "User", width: kicadfiles.MM(297), height: kicadfiles.MM(210), portrait: true},
+	}
+	for _, test := range tests {
+		node, err := sexpr.Parse([]byte(test.input))
+		if err != nil {
+			t.Fatal(err)
+		}
+		got := readSchematicPaper(node)
+		if got.Name != test.name || got.Width != test.width || got.Height != test.height || got.Portrait != test.portrait {
+			t.Fatalf("readSchematicPaper(%s) = %#v", test.input, got)
+		}
 	}
 }
 

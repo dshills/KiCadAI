@@ -229,6 +229,24 @@ func TestBuilderConnectUsesOrthogonalSchematicWire(t *testing.T) {
 	}
 }
 
+func TestBuilderPlacesRequestedAnnotationWithinRouteSegment(t *testing.T) {
+	builder := newTestBuilder(t)
+	points := []kicadfiles.Point{
+		{X: kicadfiles.MM(20), Y: kicadfiles.MM(20)},
+		{X: kicadfiles.MM(80), Y: kicadfiles.MM(20)},
+	}
+	annotation := kicadfiles.Point{X: kicadfiles.MM(50), Y: kicadfiles.MM(20)}
+	builder.addSchematicWirePointsWithOptions("PASSIVE_LINK", Endpoint{}, Endpoint{}, points, true, &annotation)
+
+	if got := len(builder.design.Schematic.Labels); got != 1 {
+		t.Fatalf("label count = %d, want one route annotation", got)
+	}
+	label := builder.design.Schematic.Labels[0]
+	if label.Text != "PASSIVE_LINK" || label.Position != annotation {
+		t.Fatalf("route annotation = %#v, want PASSIVE_LINK at %v", label, annotation)
+	}
+}
+
 func TestBuilderRotatesExplicitSymbolPinAnchors(t *testing.T) {
 	builder := newTestBuilder(t)
 	position := kicadfiles.Point{X: kicadfiles.MM(50.8), Y: kicadfiles.MM(50.8)}

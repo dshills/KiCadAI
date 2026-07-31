@@ -34,6 +34,7 @@ import (
 const (
 	designExamplePlanningTimeout       = 15 * time.Second
 	designExampleReadinessExpectedFail = "expected_fail"
+	designExampleArtifactRootEnv       = "KICADAI_DESIGN_EXAMPLE_ARTIFACT_ROOT"
 )
 
 type designExampleMetadata struct {
@@ -2020,6 +2021,12 @@ func assertDesignExamplePromotionMatchesMetadata(t *testing.T, metadata designEx
 
 func designExamplePersistentOutputDir(t *testing.T, projectName string) string {
 	t.Helper()
+	if retainedRoot := strings.TrimSpace(os.Getenv(designExampleArtifactRootEnv)); retainedRoot != "" {
+		if err := os.MkdirAll(retainedRoot, 0o755); err != nil {
+			t.Fatalf("create retained design example root: %v", err)
+		}
+		return filepath.Join(retainedRoot, projectName)
+	}
 	dir, err := os.MkdirTemp("", "kicadai-design-example-*")
 	if err != nil {
 		t.Fatal(err)

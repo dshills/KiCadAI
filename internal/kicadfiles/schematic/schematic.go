@@ -1139,7 +1139,11 @@ func render(schematic SchematicFile) (sexpr.List, error) {
 	if strings.TrimSpace(schematic.RawPaper) != "" {
 		nodes = append(nodes, sexpr.R(schematic.RawPaper))
 	} else {
-		nodes = append(nodes, sexpr.L(sexpr.A("paper"), sexpr.S(strings.TrimSpace(schematic.Paper.Name))))
+		paperNodes := []sexpr.Node{sexpr.A("paper"), sexpr.S(strings.TrimSpace(schematic.Paper.Name))}
+		if schematic.Paper.Portrait {
+			paperNodes = append(paperNodes, sexpr.A("portrait"))
+		}
+		nodes = append(nodes, sexpr.L(paperNodes...))
 	}
 	if strings.TrimSpace(schematic.RawTitleBlock) != "" {
 		nodes = append(nodes, sexpr.R(schematic.RawTitleBlock))

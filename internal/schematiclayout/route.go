@@ -1,6 +1,7 @@
 package schematiclayout
 
 import (
+	"container/heap"
 	"math"
 	"sort"
 	"strconv"
@@ -18,7 +19,8 @@ func Route(request Request, result Result) Result {
 	anchors := pinAnchors(result.Components)
 	anchorIndex := newPinAnchorIndex(anchors)
 	labeled := map[string]kicadfiles.Point{}
-	for _, net := range request.Nets {
+	nets := orderedNetsForRouting(request.Nets, anchors, request.Components, rules)
+	for _, net := range nets {
 		if len(net.Endpoints) == 0 {
 			continue
 		}
@@ -35,7 +37,10 @@ func Route(request Request, result Result) Result {
 			continue
 		}
 		forceLabels := shouldUseLabels(net, anchors, request.Components, rules)
-		for _, toEndpoint := range net.Endpoints[startIndex+1:] {
+		for toIndex, toEndpoint := range net.Endpoints {
+			if toIndex == startIndex {
+				continue
+			}
 			end, exists := anchors[toEndpoint]
 			if !exists {
 				result.Diagnostics = append(result.Diagnostics, Diagnostic{Severity: SeverityWarning, Code: "missing_pin_anchor", NetName: net.Name, Ref: toEndpoint.Ref, Message: "net endpoint has no pin anchor"})
@@ -46,7 +51,7 @@ func Route(request Request, result Result) Result {
 				toLabel := appendEndpointLabel(&result, labeled, net.Name, toEndpoint, end, request, rules)
 				result.Connections = append(result.Connections, RoutedConnection{NetName: net.Name, From: fromEndpoint, To: toEndpoint, UseLabels: true, FromLabelAt: &fromLabel, ToLabelAt: &toLabel})
 			} else {
-				points, clean := routeConnectionPoints(net.Name, fromEndpoint, toEndpoint, start, end, result, request, rules, anchorIndex)
+				points, clean := routeConnectionPoints(net.Name, fromEndpoint, toEndpoint, start, end, result, request, rules, anchorIndex, net.PreferDirect || !rules.LabelFallbackEnabled)
 				if !clean && rules.LabelFallbackEnabled {
 					fromLabel := appendEndpointLabel(&result, labeled, net.Name, fromEndpoint, start, request, rules)
 					toLabel := appendEndpointLabel(&result, labeled, net.Name, toEndpoint, end, request, rules)
@@ -60,9 +65,223 @@ func Route(request Request, result Result) Result {
 			fromEndpoint = toEndpoint
 			start = end
 		}
+		if !forceLabels && net.PreferredLabels && !net.PreferDirect {
+			appendRouteAnnotation(&result, net.Name, request, rules)
+		}
 	}
+	result.Wires = compactWireSegments(result.Wires)
+	result.Junctions = append(result.Junctions, branchJunctions(result.Wires)...)
+	recordReadabilityMetrics(&result, request)
 	result = Validate(result, request)
 	return NormalizeResult(result, rules)
+}
+
+// orderedNetsForRouting reserves short endpoint-label stubs before laying
+// continuous local conductors. This lets direct routes see those stubs as
+// occupied geometry and route around them, instead of adding a late label
+// stub that electrically contacts an already-routed net.
+func orderedNetsForRouting(nets []Net, anchors map[Endpoint]kicadfiles.Point, components []Component, rules Rules) []Net {
+	ordered := append([]Net(nil), nets...)
+	labelFirst := func(net Net) bool {
+		return (len(net.Endpoints) == 1 && net.PreferredLabels) ||
+			shouldUseLabels(net, anchors, components, rules)
+	}
+	sort.SliceStable(ordered, func(i, j int) bool {
+		leftLabels, rightLabels := labelFirst(ordered[i]), labelFirst(ordered[j])
+		if leftLabels != rightLabels {
+			return leftLabels
+		}
+		return compareNets(ordered[i], ordered[j]) < 0
+	})
+	return ordered
+}
+
+func appendRouteAnnotation(result *Result, netName string, request Request, rules Rules) {
+	type candidate struct {
+		position   kicadfiles.Point
+		clearRun   kicadfiles.IU
+		midSegment bool
+	}
+	candidates := make([]candidate, 0)
+	for _, connection := range result.Connections {
+		if connection.NetName != netName || connection.UseLabels {
+			continue
+		}
+		for index := 1; index < len(connection.Points)-1; index++ {
+			candidates = append(candidates, candidate{
+				position: connection.Points[index],
+				clearRun: manhattan(connection.Points[index-1], connection.Points[index]) +
+					manhattan(connection.Points[index], connection.Points[index+1]),
+			})
+		}
+		for index := 1; index < len(connection.Points); index++ {
+			from, to := connection.Points[index-1], connection.Points[index]
+			position := from
+			switch {
+			case from.X == to.X:
+				position.Y = SnapIU(from.Y+(to.Y-from.Y)/2, rules.Grid)
+			case from.Y == to.Y:
+				position.X = SnapIU(from.X+(to.X-from.X)/2, rules.Grid)
+			default:
+				continue
+			}
+			if position == from || position == to {
+				continue
+			}
+			candidates = append(candidates, candidate{
+				position:   position,
+				clearRun:   manhattan(from, to),
+				midSegment: true,
+			})
+		}
+	}
+	sort.SliceStable(candidates, func(i, j int) bool {
+		if candidates[i].midSegment != candidates[j].midSegment {
+			return candidates[i].midSegment
+		}
+		if candidates[i].clearRun != candidates[j].clearRun {
+			return candidates[i].clearRun > candidates[j].clearRun
+		}
+		return comparePoints(candidates[i].position, candidates[j].position) < 0
+	})
+	if len(candidates) > rules.MaxRouteAnnotations {
+		candidates = candidates[:rules.MaxRouteAnnotations]
+	}
+	for _, candidate := range candidates {
+		box := TextEstimate(netName, candidate.position, 0, 0)
+		if !UsableSheet(request.Sheet).ContainsRect(box) || routeAnnotationCollides(box, candidate.position, netName, *result) {
+			continue
+		}
+		result.Labels = append(result.Labels, Label{
+			NetName:         netName,
+			Text:            netName,
+			Position:        candidate.position,
+			RouteAnnotation: true,
+		})
+		return
+	}
+}
+
+func routeAnnotationCollides(box Rect, position kicadfiles.Point, netName string, result Result) bool {
+	for _, component := range result.Components {
+		if box.Intersects(componentBody(component)) {
+			return true
+		}
+		for _, text := range []TextBox{component.ReferenceText, component.ValueText} {
+			if !text.Box.Empty() && box.Intersects(text.Box.Translate(component.PlacedAt)) {
+				return true
+			}
+		}
+	}
+	for _, label := range result.Labels {
+		if box.Intersects(TextEstimate(label.Text, label.Position, 0, 0)) {
+			return true
+		}
+	}
+	sameNetContacts := 0
+	for _, wire := range result.Wires {
+		if wire.NetName == netName {
+			if pointOnSegment(wire.From, position, wire.To) {
+				sameNetContacts++
+			}
+			continue
+		}
+		if pointOnSegment(wire.From, position, wire.To) || SegmentIntersectsRect(wire, box) {
+			return true
+		}
+	}
+	return sameNetContacts > 1
+}
+
+func recordReadabilityMetrics(result *Result, request Request) {
+	connectionsByNet := map[string][]RoutedConnection{}
+	for _, connection := range result.Connections {
+		connectionsByNet[connection.NetName] = append(connectionsByNet[connection.NetName], connection)
+	}
+	for _, net := range request.Nets {
+		role := normalizeRole(net.Role)
+		local := !net.EndpointLabels && len(net.Endpoints) < 8 &&
+			!containsNormalizedRole(role, "bus", "global", "cross_sheet")
+		connections := connectionsByNet[net.Name]
+		visible := len(connections) >= len(net.Endpoints)-1
+		for _, connection := range connections {
+			if connection.UseLabels || len(connection.Points) < 2 {
+				visible = false
+				break
+			}
+		}
+		if local && len(net.Endpoints) == 2 {
+			result.Report.LocalTwoPointNetCount++
+			if visible {
+				result.Report.ContinuousLocalNetCount++
+			}
+		}
+		if local && len(net.Endpoints) > 2 {
+			result.Report.LocalMultiPointNetCount++
+			if visible {
+				result.Report.RouteTreeNetCount++
+			}
+		}
+		if containsNormalizedRole(role, "feedback", "sense") {
+			result.Report.FeedbackPathCount++
+			if visible {
+				result.Report.VisibleFeedbackPathCount++
+			}
+		}
+	}
+	for _, label := range result.Labels {
+		if label.RouteAnnotation {
+			result.Report.NetAnnotationCount++
+		} else {
+			result.Report.EndpointLabelCount++
+		}
+	}
+	usable := UsableSheet(request.Sheet)
+	result.Report.UsablePageAreaMM2 = rectAreaMM2(usable)
+	result.Report.OccupiedAreaMM2 = rectAreaMM2(result.Report.OccupiedBounds)
+	if result.Report.UsablePageAreaMM2 > 0 {
+		result.Report.OccupiedPageRatio = result.Report.OccupiedAreaMM2 / result.Report.UsablePageAreaMM2
+		if result.Report.OccupiedPageRatio > 1 {
+			result.Report.OccupiedPageRatio = 1
+		}
+		result.Report.WhitespaceRatio = 1 - result.Report.OccupiedPageRatio
+	}
+	componentArea := 0.0
+	for _, component := range result.Components {
+		componentArea += rectAreaMM2(componentBody(component))
+	}
+	if result.Report.OccupiedAreaMM2 > 0 {
+		result.Report.ComponentDispersion = componentArea / result.Report.OccupiedAreaMM2
+	}
+	recordBoundaryPlacementMetrics(result, request.Rules)
+}
+
+func rectAreaMM2(rect Rect) float64 {
+	if rect.Empty() {
+		return 0
+	}
+	return float64(rect.MaxX-rect.MinX) / 1_000_000 * float64(rect.MaxY-rect.MinY) / 1_000_000
+}
+
+func recordBoundaryPlacementMetrics(result *Result, rules Rules) {
+	if result.Report.OccupiedBounds.Empty() {
+		return
+	}
+	tolerance := rules.BoundaryTolerance
+	for _, component := range result.Components {
+		role := normalizeRole(component.Role)
+		body := componentBody(component)
+		switch {
+		case containsNormalizedRole(role, "input_connector"):
+			if body.MinX-result.Report.OccupiedBounds.MinX > tolerance {
+				result.Report.BoundaryPlacementViolations++
+			}
+		case containsNormalizedRole(role, "output_connector"):
+			if result.Report.OccupiedBounds.MaxX-body.MaxX > tolerance {
+				result.Report.BoundaryPlacementViolations++
+			}
+		}
+	}
 }
 
 func appendEndpointLabel(result *Result, seen map[string]kicadfiles.Point, netName string, endpoint Endpoint, anchor kicadfiles.Point, request Request, rules Rules) kicadfiles.Point {
@@ -88,16 +307,16 @@ func labelStubPoint(netName string, endpoint Endpoint, anchor kicadfiles.Point, 
 		grid = kicadfiles.MM(1.27)
 	}
 	preferred := kicadfiles.Point{X: grid}
-	pinDirected := false
+	hasPinDirection := false
 	if direction, ok := endpointLabelDirection(endpoint, result.Components, grid); ok {
 		preferred = direction
-		pinDirected = true
+		hasPinDirection = true
 	}
 	for _, component := range result.Components {
 		if component.Ref != endpoint.Ref {
 			continue
 		}
-		if pinDirected {
+		if hasPinDirection {
 			break
 		}
 		body := componentBody(component)
@@ -120,20 +339,28 @@ func labelStubPoint(netName string, endpoint Endpoint, anchor kicadfiles.Point, 
 		break
 	}
 	directions := []kicadfiles.Point{preferred}
-	if !pinDirected {
-		directions = append(directions, kicadfiles.Point{X: grid}, kicadfiles.Point{X: -grid}, kicadfiles.Point{Y: -grid}, kicadfiles.Point{Y: grid})
-	}
-	for index := 1; index < len(directions); index++ {
+	alternatives := []kicadfiles.Point{{X: grid}, {X: -grid}, {Y: -grid}, {Y: grid}}
+	for _, direction := range alternatives {
 		for _, component := range result.Components {
 			if component.Ref == endpoint.Ref {
-				directions[index] = TransformPoint(directions[index], component.Rotation, component.Mirror)
+				direction = TransformPoint(direction, component.Rotation, component.Mirror)
 				break
 			}
 		}
+		duplicate := false
+		for _, existing := range directions {
+			if existing == direction {
+				duplicate = true
+				break
+			}
+		}
+		if !duplicate {
+			directions = append(directions, direction)
+		}
 	}
 	usable := UsableSheet(request.Sheet)
-	for _, scale := range []kicadfiles.IU{1, 2, 3, 4, 6, 8, 12, 16} {
-		for _, direction := range directions {
+	for _, direction := range directions {
+		for _, scale := range []kicadfiles.IU{1, 2, 3, 4, 6, 8, 12, 16} {
 			position := kicadfiles.Point{X: anchor.X + direction.X*scale, Y: anchor.Y + direction.Y*scale}
 			segment := WireSegment{NetName: netName, From: anchor, To: position}
 			labelBox := TextEstimate(netName, position, 0, 0)
@@ -231,7 +458,7 @@ func labelPlacementCollides(labelBox Rect, stub WireSegment, endpoint Endpoint, 
 	return false
 }
 
-func routeConnectionPoints(netName string, from, to Endpoint, start, end kicadfiles.Point, result Result, request Request, rules Rules, anchorIndex pinAnchorIndex) ([]kicadfiles.Point, bool) {
+func routeConnectionPoints(netName string, from, to Endpoint, start, end kicadfiles.Point, result Result, request Request, rules Rules, anchorIndex pinAnchorIndex, allowGridFallback bool) ([]kicadfiles.Point, bool) {
 	candidates := routeCandidates(start, end, result.Components, rules, anchorIndex)
 	type scoredRoute struct {
 		points []kicadfiles.Point
@@ -243,6 +470,19 @@ func routeConnectionPoints(netName string, from, to Endpoint, start, end kicadfi
 		score, clean := scoreRoute(candidate, netName, from, to, result, request)
 		scored = append(scored, scoredRoute{points: candidate, score: score, clean: clean})
 	}
+	hasClean := false
+	for _, route := range scored {
+		if route.clean {
+			hasClean = true
+			break
+		}
+	}
+	if !hasClean && allowGridFallback {
+		if points, ok := orthogonalGridRoute(netName, from, to, start, end, result, request, rules, anchorIndex); ok {
+			score, clean := scoreRoute(points, netName, from, to, result, request)
+			scored = append(scored, scoredRoute{points: points, score: score, clean: clean})
+		}
+	}
 	sort.SliceStable(scored, func(i, j int) bool {
 		if scored[i].score != scored[j].score {
 			return scored[i].score < scored[j].score
@@ -253,6 +493,223 @@ func routeConnectionPoints(netName string, from, to Endpoint, start, end kicadfi
 		return []kicadfiles.Point{start, end}, false
 	}
 	return scored[0].points, scored[0].clean
+}
+
+type routeGridState struct {
+	node      int
+	direction uint8
+}
+
+type routeGridItem struct {
+	state    routeGridState
+	distance int64
+	priority int64
+	point    kicadfiles.Point
+}
+
+type routeGridEdge struct {
+	from kicadfiles.Point
+	to   kicadfiles.Point
+}
+
+type routeGridHeap []routeGridItem
+
+func (items routeGridHeap) Len() int { return len(items) }
+func (items routeGridHeap) Less(i, j int) bool {
+	if items[i].priority != items[j].priority {
+		return items[i].priority < items[j].priority
+	}
+	if items[i].distance != items[j].distance {
+		return items[i].distance < items[j].distance
+	}
+	if cmp := comparePoints(items[i].point, items[j].point); cmp != 0 {
+		return cmp < 0
+	}
+	return items[i].state.direction < items[j].state.direction
+}
+func (items routeGridHeap) Swap(i, j int) { items[i], items[j] = items[j], items[i] }
+func (items *routeGridHeap) Push(value any) {
+	*items = append(*items, value.(routeGridItem))
+}
+func (items *routeGridHeap) Pop() any {
+	old := *items
+	last := old[len(old)-1]
+	*items = old[:len(old)-1]
+	return last
+}
+
+// orthogonalGridRoute is the bounded fallback for local routes that need more
+// than the common one- and two-bend candidates. Candidate tracks come only
+// from endpoints, obstacle clearances, and pin-access lanes. Dijkstra search
+// then finds the shortest clean orthogonal path with a deterministic bend
+// penalty; no circuit family or absolute coordinate is encoded.
+func orthogonalGridRoute(netName string, from, to Endpoint, start, end kicadfiles.Point, result Result, request Request, rules Rules, anchorIndex pinAnchorIndex) ([]kicadfiles.Point, bool) {
+	usable := UsableSheet(request.Sheet)
+	xSet := map[kicadfiles.IU]struct{}{start.X: {}, end.X: {}}
+	ySet := map[kicadfiles.IU]struct{}{start.Y: {}, end.Y: {}}
+	addX := func(value kicadfiles.IU) {
+		if value >= usable.MinX && value <= usable.MaxX {
+			xSet[value] = struct{}{}
+		}
+	}
+	addY := func(value kicadfiles.IU) {
+		if value >= usable.MinY && value <= usable.MaxY {
+			ySet[value] = struct{}{}
+		}
+	}
+	clearance := rules.MinTextSpacing
+	if clearance <= 0 {
+		clearance = kicadfiles.MM(2.54)
+	}
+	for _, component := range result.Components {
+		body := componentBody(component).Inflate(clearance)
+		addX(SnapIU(body.MinX, rules.Grid))
+		addX(SnapIU(body.MaxX, rules.Grid))
+		addY(SnapIU(body.MinY, rules.Grid))
+		addY(SnapIU(body.MaxY, rules.Grid))
+	}
+	pinLane := rules.Grid
+	if pinLane <= 0 {
+		pinLane = kicadfiles.MM(1.27)
+	}
+	for _, indexed := range anchorIndex.query(usable.MinX, usable.MaxX, usable.MinY, usable.MaxY) {
+		addX(indexed.point.X - pinLane)
+		addX(indexed.point.X + pinLane)
+		addY(indexed.point.Y - pinLane)
+		addY(indexed.point.Y + pinLane)
+	}
+	for _, wire := range result.Wires {
+		for _, point := range []kicadfiles.Point{wire.From, wire.To} {
+			addX(point.X - pinLane)
+			addX(point.X + pinLane)
+			addY(point.Y - pinLane)
+			addY(point.Y + pinLane)
+		}
+	}
+	xValues := make([]kicadfiles.IU, 0, len(xSet))
+	for value := range xSet {
+		xValues = append(xValues, value)
+	}
+	yValues := make([]kicadfiles.IU, 0, len(ySet))
+	for value := range ySet {
+		yValues = append(yValues, value)
+	}
+	sort.Slice(xValues, func(i, j int) bool { return xValues[i] < xValues[j] })
+	sort.Slice(yValues, func(i, j int) bool { return yValues[i] < yValues[j] })
+	if len(xValues) == 0 || len(yValues) == 0 || len(xValues)*len(yValues) > rules.MaxRouteGridNodes {
+		return nil, false
+	}
+	xIndex, yIndex := map[kicadfiles.IU]int{}, map[kicadfiles.IU]int{}
+	for index, value := range xValues {
+		xIndex[value] = index
+	}
+	for index, value := range yValues {
+		yIndex[value] = index
+	}
+	startX, startXOK := xIndex[start.X]
+	startY, startYOK := yIndex[start.Y]
+	endX, endXOK := xIndex[end.X]
+	endY, endYOK := yIndex[end.Y]
+	if !startXOK || !startYOK || !endXOK || !endYOK {
+		return nil, false
+	}
+	nodeFor := func(x, y int) int { return x*len(yValues) + y }
+	pointFor := func(node int) kicadfiles.Point {
+		return kicadfiles.Point{X: xValues[node/len(yValues)], Y: yValues[node%len(yValues)]}
+	}
+	startState := routeGridState{node: nodeFor(startX, startY)}
+	endNode := nodeFor(endX, endY)
+	distances := map[routeGridState]int64{startState: 0}
+	previous := map[routeGridState]routeGridState{}
+	queue := &routeGridHeap{{
+		state:    startState,
+		point:    start,
+		priority: int64(manhattan(start, end)),
+	}}
+	heap.Init(queue)
+	var final routeGridState
+	found := false
+	bendPenalty := int64(rules.RouteBendPenalty)
+	edgeScores := make(map[routeGridEdge]int64)
+	blockedEdges := make(map[routeGridEdge]struct{})
+	for queue.Len() != 0 {
+		item := heap.Pop(queue).(routeGridItem)
+		if current, ok := distances[item.state]; !ok || current != item.distance {
+			continue
+		}
+		if item.state.node == endNode {
+			final = item.state
+			found = true
+			break
+		}
+		x := item.state.node / len(yValues)
+		y := item.state.node % len(yValues)
+		type neighbor struct {
+			x, y      int
+			direction uint8
+		}
+		candidates := []neighbor{
+			{x: x - 1, y: y, direction: 1},
+			{x: x + 1, y: y, direction: 1},
+			{x: x, y: y - 1, direction: 2},
+			{x: x, y: y + 1, direction: 2},
+		}
+		for _, candidate := range candidates {
+			if candidate.x < 0 || candidate.x >= len(xValues) || candidate.y < 0 || candidate.y >= len(yValues) {
+				continue
+			}
+			nextNode := nodeFor(candidate.x, candidate.y)
+			nextPoint := pointFor(nextNode)
+			edge := routeGridEdge{from: item.point, to: nextPoint}
+			if comparePoints(edge.from, edge.to) > 0 {
+				edge.from, edge.to = edge.to, edge.from
+			}
+			if _, blocked := blockedEdges[edge]; blocked {
+				continue
+			}
+			edgeScore, scored := edgeScores[edge]
+			if !scored {
+				var clean bool
+				edgeScore, clean = scoreRoute([]kicadfiles.Point{edge.from, edge.to}, netName, from, to, result, request)
+				if !clean {
+					blockedEdges[edge] = struct{}{}
+					continue
+				}
+				edgeScores[edge] = edgeScore
+			}
+			distance := item.distance + edgeScore
+			if item.state.direction != 0 && item.state.direction != candidate.direction {
+				distance += bendPenalty
+			}
+			nextState := routeGridState{node: nextNode, direction: candidate.direction}
+			if current, exists := distances[nextState]; exists && current <= distance {
+				continue
+			}
+			distances[nextState] = distance
+			previous[nextState] = item.state
+			heap.Push(queue, routeGridItem{
+				state:    nextState,
+				distance: distance,
+				priority: distance + int64(manhattan(nextPoint, end)),
+				point:    nextPoint,
+			})
+		}
+	}
+	if !found {
+		return nil, false
+	}
+	var reversed []kicadfiles.Point
+	for state := final; ; state = previous[state] {
+		reversed = append(reversed, pointFor(state.node))
+		if state == startState {
+			break
+		}
+	}
+	points := make([]kicadfiles.Point, len(reversed))
+	for index := range reversed {
+		points[len(reversed)-1-index] = reversed[index]
+	}
+	return compactPointPath(points), true
 }
 
 func routeCandidates(start, end kicadfiles.Point, components []PlacedComponent, rules Rules, anchorIndex pinAnchorIndex) [][]kicadfiles.Point {
@@ -464,6 +921,125 @@ func segmentsForPoints(netName string, points []kicadfiles.Point) []WireSegment 
 	return segments
 }
 
+func compactWireSegments(wires []WireSegment) []WireSegment {
+	type wireKey struct {
+		net      string
+		from, to kicadfiles.Point
+	}
+	seen := make(map[wireKey]struct{}, len(wires))
+	compacted := make([]WireSegment, 0, len(wires))
+	for _, wire := range wires {
+		if wire.From == wire.To {
+			continue
+		}
+		from, to := wire.From, wire.To
+		if comparePoints(from, to) > 0 {
+			from, to = to, from
+		}
+		key := wireKey{net: wire.NetName, from: from, to: to}
+		if _, exists := seen[key]; exists {
+			continue
+		}
+		seen[key] = struct{}{}
+		wire.From, wire.To = from, to
+		compacted = append(compacted, wire)
+	}
+	return compacted
+}
+
+func branchJunctions(wires []WireSegment) []Junction {
+	candidates := map[kicadfiles.Point]struct{}{}
+	type netSegments struct {
+		horizontal []WireSegment
+		vertical   []WireSegment
+	}
+	segmentsByNet := map[string]*netSegments{}
+	for _, wire := range wires {
+		candidates[wire.From] = struct{}{}
+		candidates[wire.To] = struct{}{}
+		group := segmentsByNet[wire.NetName]
+		if group == nil {
+			group = &netSegments{}
+			segmentsByNet[wire.NetName] = group
+		}
+		if wire.From.Y == wire.To.Y {
+			group.horizontal = append(group.horizontal, wire)
+		} else if wire.From.X == wire.To.X {
+			group.vertical = append(group.vertical, wire)
+		}
+	}
+	for _, group := range segmentsByNet {
+		sort.Slice(group.vertical, func(i, j int) bool {
+			if group.vertical[i].From.X != group.vertical[j].From.X {
+				return group.vertical[i].From.X < group.vertical[j].From.X
+			}
+			return comparePoints(group.vertical[i].From, group.vertical[j].From) < 0
+		})
+		for _, horizontal := range group.horizontal {
+			minX, maxX := minIU(horizontal.From.X, horizontal.To.X), maxIU(horizontal.From.X, horizontal.To.X)
+			first := sort.Search(len(group.vertical), func(index int) bool {
+				return group.vertical[index].From.X >= minX
+			})
+			for index := first; index < len(group.vertical) && group.vertical[index].From.X <= maxX; index++ {
+				if point, ok := orthogonalIntersection(horizontal, group.vertical[index]); ok {
+					candidates[point] = struct{}{}
+				}
+			}
+		}
+	}
+	points := make([]kicadfiles.Point, 0, len(candidates))
+	for point := range candidates {
+		points = append(points, point)
+	}
+	sort.Slice(points, func(i, j int) bool { return comparePoints(points[i], points[j]) < 0 })
+	junctions := make([]Junction, 0)
+	for _, point := range points {
+		raysByNet := map[string]map[string]struct{}{}
+		for _, wire := range wires {
+			if !pointOnSegment(wire.From, point, wire.To) {
+				continue
+			}
+			rays := raysByNet[wire.NetName]
+			if rays == nil {
+				rays = map[string]struct{}{}
+				raysByNet[wire.NetName] = rays
+			}
+			if wire.From.X < point.X || wire.To.X < point.X {
+				rays["left"] = struct{}{}
+			}
+			if wire.From.X > point.X || wire.To.X > point.X {
+				rays["right"] = struct{}{}
+			}
+			if wire.From.Y < point.Y || wire.To.Y < point.Y {
+				rays["up"] = struct{}{}
+			}
+			if wire.From.Y > point.Y || wire.To.Y > point.Y {
+				rays["down"] = struct{}{}
+			}
+		}
+		for _, rays := range raysByNet {
+			if len(rays) >= 3 {
+				junctions = append(junctions, Junction{Position: point})
+				break
+			}
+		}
+	}
+	return junctions
+}
+
+func orthogonalIntersection(first, second WireSegment) (kicadfiles.Point, bool) {
+	firstHorizontal := first.From.Y == first.To.Y
+	secondHorizontal := second.From.Y == second.To.Y
+	if firstHorizontal == secondHorizontal {
+		return kicadfiles.Point{}, false
+	}
+	if !firstHorizontal {
+		first, second = second, first
+	}
+	point := kicadfiles.Point{X: second.From.X, Y: first.From.Y}
+	return point, pointOnSegment(first.From, point, first.To) && pointOnSegment(second.From, point, second.To)
+}
+
 func compactPointPath(points []kicadfiles.Point) []kicadfiles.Point {
 	compacted := make([]kicadfiles.Point, 0, len(points))
 	for _, point := range points {
@@ -559,6 +1135,9 @@ func Layout(request Request) Result {
 	var selectedRequest Request
 	selectedFound := false
 	for index, sheet := range candidates {
+		if selectedFound && sheet.Name != selected.Sheet.Name {
+			break
+		}
 		candidateRequest := request
 		candidateRequest.Sheet = sheet
 		candidate := Place(candidateRequest)
@@ -579,10 +1158,11 @@ func Layout(request Request) Result {
 		last = candidate
 		lastRequest = candidateRequest
 		if !hasPageOverflow(candidate) {
-			selected = candidate
-			selectedRequest = candidateRequest
-			selectedFound = true
-			break
+			if !selectedFound || layoutAspectMismatch(candidate) < layoutAspectMismatch(selected) {
+				selected = candidate
+				selectedRequest = candidateRequest
+				selectedFound = true
+			}
 		}
 	}
 	if selectedFound {
@@ -636,6 +1216,20 @@ func Layout(request Request) Result {
 	return NormalizeResult(last, request.Rules)
 }
 
+func layoutAspectMismatch(result Result) float64 {
+	usable := UsableSheet(result.Sheet)
+	occupied := result.Report.OccupiedBounds
+	if usable.Empty() || occupied.Empty() || usable.Height() == 0 || occupied.Height() == 0 {
+		return math.MaxFloat64
+	}
+	usableAspect := float64(usable.Width()) / float64(usable.Height())
+	occupiedAspect := float64(occupied.Width()) / float64(occupied.Height())
+	if usableAspect <= 0 || occupiedAspect <= 0 {
+		return math.MaxFloat64
+	}
+	return math.Abs(math.Log(usableAspect / occupiedAspect))
+}
+
 func finalizeLayoutCandidate(candidate Result, request Request) Result {
 	var textDiagnostics []Diagnostic
 	candidate.Components, textDiagnostics = reflowTextForWires(candidate.Components, candidate.Wires, candidate.Labels, request.Rules)
@@ -681,34 +1275,14 @@ func shouldUseLabels(net Net, anchors map[Endpoint]kicadfiles.Point, components 
 		return false
 	}
 	role := normalizeRole(net.Role)
-	if net.PreferredLabels || len(net.Endpoints) > 2 || containsNormalizedRole(role, "power", "ground", "bus", "negative_rail") {
+	if net.EndpointLabels || containsNormalizedRole(role, "cross_sheet", "global", "bus") {
 		return true
 	}
-	groupByRef := map[string]string{}
-	for _, component := range components {
-		groupByRef[component.Ref] = component.GroupID
-	}
-	groups := map[string]struct{}{}
-	for _, endpoint := range net.Endpoints {
-		if groupID := groupByRef[endpoint.Ref]; groupID != "" {
-			groups[groupID] = struct{}{}
-		}
-	}
-	if len(groups) > 1 {
+	// Very high fanout is the remaining local case where endpoint labels are
+	// clearer than a page-spanning tree. Ordinary three-to-seven endpoint
+	// power, feedback, and signal nets remain visibly wired.
+	if len(net.Endpoints) >= 8 {
 		return true
-	}
-	startIndex, start, ok := firstRoutableEndpoint(net, anchors)
-	if !ok {
-		return false
-	}
-	for _, endpoint := range net.Endpoints[startIndex+1:] {
-		end, ok := anchors[endpoint]
-		if !ok {
-			continue
-		}
-		if manhattan(start, end) > rules.LongWireThreshold {
-			return true
-		}
 	}
 	return false
 }

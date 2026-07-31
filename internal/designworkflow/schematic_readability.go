@@ -62,7 +62,7 @@ func schematicReadabilityLayout(operations []transactions.Operation) (schematicl
 				decodeErrors++
 				continue
 			}
-			request.Sheet = schematiclayout.SheetForPaper(payload.Paper)
+			request.Sheet = schematiclayout.SheetForPaperOrientation(payload.Paper, payload.PaperPortrait)
 		case transactions.OpAddSymbol:
 			var payload transactions.AddSymbolOperation
 			if err := json.Unmarshal(operation.Raw, &payload); err != nil {

@@ -69,3 +69,20 @@ func TestSheetForPaperOrientationReturnsPortraitSheet(t *testing.T) {
 		t.Fatalf("portrait A3 dimensions = %#v", sheet)
 	}
 }
+
+func TestLayoutChoosesPortraitBeforeEscalatingTallDrawing(t *testing.T) {
+	request := Request{
+		Sheet: SheetForPaper("A4"),
+		Rules: DefaultRules(ProfileStandard),
+	}
+	for index := 0; index < 9; index++ {
+		request.Components = append(request.Components, Component{
+			Ref: "R" + fmt.Sprint(index+1), Role: "resistor", Fixed: true,
+			Position: kicadfiles.Point{X: kicadfiles.MM(100), Y: kicadfiles.MM(30 + float64(index)*28)},
+		})
+	}
+	result := Layout(request)
+	if result.Sheet.Name != "A4" || result.Sheet.Width >= result.Sheet.Height {
+		t.Fatalf("tall drawing selected %#v, want A4 portrait before escalation", result.Sheet)
+	}
+}

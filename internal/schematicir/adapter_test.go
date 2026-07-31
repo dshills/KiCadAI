@@ -334,6 +334,95 @@ func TestToTransactionLabelsAutomaticNetAtTransformedSymbol(t *testing.T) {
 	}
 }
 
+func TestResolvedTransformDoesNotForceEndpointLabels(t *testing.T) {
+	doc := validLEDDocument()
+	doc.Layout.Placements = []Placement{{Target: "r_limit", Orientation: OrientationRotated90}}
+	index := &libraryresolver.LibraryIndex{Symbols: map[string]libraryresolver.SymbolRecord{
+		"Device:R": {
+			LibraryID: "Device:R",
+			Raw:       `(symbol "R")`,
+			Pins: []libraryresolver.SymbolPin{
+				{Number: "1", Position: kicadfiles.Point{X: kicadfiles.MM(-2.54)}},
+				{Number: "2", Position: kicadfiles.Point{X: kicadfiles.MM(2.54)}},
+			},
+		},
+		"Device:LED": {
+			LibraryID: "Device:LED",
+			Raw:       `(symbol "LED")`,
+			Pins: []libraryresolver.SymbolPin{
+				{Number: "1", Position: kicadfiles.Point{X: kicadfiles.MM(-2.54)}},
+				{Number: "2", Position: kicadfiles.Point{X: kicadfiles.MM(2.54)}},
+			},
+		},
+	}}
+
+	net := doc.Circuit.Nets[1]
+	if schematicNetHasUnsafeTransform(doc, net, index) {
+		t.Fatal("resolver-backed quarter turn was treated as unsafe")
+	}
+	preferences := schematicNetLabelPreferencesWithLibraryIndex(doc, index)
+	if !preferences[net.Name] {
+		t.Fatalf("%s lost its passive-net annotation preference", net.Name)
+	}
+	if schematicNetRequiresEndpointLabels(doc, net, index, indexComponentsByID(doc.Circuit.Components)) {
+		t.Fatalf("%s resolver-backed transform still forced endpoint-only labels", net.Name)
+	}
+}
+
+func TestSchematicRouteLabelFallbackUsesLongestSegment(t *testing.T) {
+	points := []kicadfiles.Point{
+		{X: kicadfiles.MM(10), Y: kicadfiles.MM(10)},
+		{X: kicadfiles.MM(20), Y: kicadfiles.MM(10)},
+		{X: kicadfiles.MM(20), Y: kicadfiles.MM(50)},
+	}
+	result := schematiclayout.Result{Wires: []schematiclayout.WireSegment{
+		{NetName: "TEST", From: points[0], To: points[1]},
+		{NetName: "TEST", From: points[1], To: points[2]},
+	}}
+	got := schematicRouteLabelFallbackPoint(result, "TEST", points)
+	if got == nil || got.XMM != 20 || got.YMM != 30 {
+		t.Fatalf("fallback annotation = %#v, want midpoint of longest route segment", got)
+	}
+}
+
+func TestSchematicPowerFlagUsesBoundaryAnnotationRole(t *testing.T) {
+	flag := Component{
+		ID: "flag", Ref: "#FLG01", Role: ComponentRolePowerSymbol,
+		Symbol: "power:PWR_FLAG", Value: "PWR_FLAG",
+	}
+	if got := schematicLayoutComponentRole(flag); got != "boundary_annotation" {
+		t.Fatalf("power-flag layout role = %q, want boundary annotation role", got)
+	}
+	lookalike := flag
+	lookalike.Value = "PWR_FLAG_STATUS"
+	lookalike.Symbol = "Device:TestPoint"
+	if schematicComponentIsPowerFlag(lookalike) {
+		t.Fatal("power-flag substring lookalike was classified as a real flag")
+	}
+}
+
+func TestSchematicPowerFlagsAttachToPowerEntryConnector(t *testing.T) {
+	doc := Document{Circuit: Circuit{
+		Components: []Component{
+			{ID: "power_input", Role: ComponentRoleInputConnector},
+			{ID: "signal_output", Role: ComponentRoleOutputConnector},
+			{ID: "power_flag", Role: ComponentRolePowerSymbol, Symbol: "power:PWR_FLAG", Value: "PWR_FLAG"},
+			{ID: "ground_flag", Role: ComponentRoleGroundSymbol, Symbol: "power:PWR_FLAG", Value: "PWR_FLAG"},
+		},
+		Nets: []Net{
+			{Name: "VCC", Role: NetRolePower, Connect: []EndpointRef{"power_input.1", "power_flag.1"}},
+			{Name: "GND", Role: NetRoleGround, Connect: []EndpointRef{"power_input.2", "signal_output.2", "ground_flag.1"}},
+		},
+	}}
+
+	neighbors := schematicPowerFlagNeighbors(doc, indexComponentsByID(doc.Circuit.Components))
+	for _, flag := range []string{"power_flag", "ground_flag"} {
+		if neighbors[flag] != "power_input" {
+			t.Fatalf("%s neighbor = %q, want power-entry connector", flag, neighbors[flag])
+		}
+	}
+}
+
 func TestPortEndpointSelectionFollowsDeclaredSide(t *testing.T) {
 	doc := validLEDDocument()
 	state, issues := newAdapterState(doc, nil)

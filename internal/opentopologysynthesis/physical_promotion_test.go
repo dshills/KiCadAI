@@ -141,12 +141,16 @@ func TestFrozenHeldOutCorpusOptionalKiCadPromotion(t *testing.T) {
 				)
 				return
 			}
+			outputRoot := t.TempDir()
+			if retained := strings.TrimSpace(os.Getenv("KICADAI_OPEN_TOPOLOGY_ARTIFACT_ROOT")); retained != "" {
+				outputRoot = filepath.Join(retained, strings.TrimSuffix(name, filepath.Ext(name)))
+			}
 			promotion := PromoteSynthesisRun(
 				ctx,
 				run,
 				environment,
 				PhysicalPromotionOptions{
-					OutputRoot:    t.TempDir(),
+					OutputRoot:    outputRoot,
 					KiCadCLI:      kicadCLI,
 					LibraryIndex:  &index,
 					Timeout:       2 * time.Minute,

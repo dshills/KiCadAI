@@ -196,14 +196,15 @@ from validation feedback to safe automatic repair.
   readback, symbol instance preservation, label shape/rotation preservation,
   and focused regression coverage.
 - Schematic layout readability foundation with deterministic role/stage/lane
-  classification, conservative readable schematic placement, orthogonal
-  schematic wire routing, label fallback for long/shared nets, overlap and
-  diagonal-wire diagnostics, design workflow readability evidence, wider
-  op-amp gain-stage block coordinates, and design API orthogonal schematic
-  connection emission. Checked-in simple examples now have standard readability
-  gates, amplifier examples have strict signal-flow/rail/feedback/orthogonal
-  wiring gates, and generated LED/op-amp workflow paths have summary regression
-  coverage.
+  classification, topology-derived forward/feedback ranks, role-derived
+  orientation, continuous local conductors, multi-endpoint route trees,
+  bounded orthogonal obstacle search, calibrated endpoint access, rail-entry
+  power-flag attachment, two-orientation page compaction, and quantitative
+  whitespace/dispersion/connectivity evidence.
+  Checked-in simple examples have standard readability gates, amplifier
+  examples have strict signal-flow/rail/feedback/orthogonal wiring gates, and
+  installed-KiCad generated current-source, op-amp, filter, and sensor paths
+  retain rendered evidence.
 - Schematic design/layout IR v1 foundation with strict JSON parsing,
   validation, deterministic layout-intent normalization, readable-acceptance
   gating, IR-to-transaction conversion, resolver-backed arbitrary symbol
@@ -337,10 +338,13 @@ loop confidence:
   Promotion reports now make missing or failed evidence explicit, but the
   current optional fixtures still need real ERC/DRC-clean runs before they can
   be promoted to `candidate` or `pass`;
-- schematic readability now has checked-in simple/amplifier example gates and
-  generated workflow evidence, but still needs broader example regeneration,
-  exact KiCad text-justification geometry, hierarchy/page splitting, and safe
-  imported-schematic layout mutation;
+- schematic readability now has topology-aware generated wiring, rendered
+  installed-KiCad evidence, checked-in simple/amplifier gates, quantitative
+  page and connectivity metrics, and deterministic page fitting. It still
+  needs composition-wide automatic topology inference, compact human-facing
+  references and off-page-origin repair for legacy block fixtures, broader
+  example regeneration, exact KiCad text-justification geometry,
+  hierarchy/page splitting, and safe imported-schematic layout mutation;
 - repair can persist generated-project changes, but imported-project mutation
   remains limited to explicitly preservation-reviewed cases;
 - fabrication export now provides conservative readiness gates with BOM/CPL

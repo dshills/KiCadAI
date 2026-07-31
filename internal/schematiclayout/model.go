@@ -51,6 +51,12 @@ type Rules struct {
 	MinStageSpacing      kicadfiles.IU
 	MinGroupGutter       kicadfiles.IU
 	LongWireThreshold    kicadfiles.IU
+	BoundaryTolerance    kicadfiles.IU
+	RouteBendPenalty     kicadfiles.IU
+	MaxRouteGridNodes    int
+	MaxRouteAnnotations  int
+	MaxSpacingRepairs    int
+	FullRepairComponents int
 	MaxDiagnostics       int
 	LabelFallbackEnabled bool
 	// LabelFallbackConfigured distinguishes an explicit false from the zero
@@ -129,6 +135,10 @@ type Net struct {
 	Role            string
 	Endpoints       []Endpoint
 	PreferredLabels bool
+	// EndpointLabels permits label-only connectivity between endpoint stubs.
+	// PreferredLabels alone means that the routed conductor should carry a
+	// human-readable net annotation; it must not hide a local conductor.
+	EndpointLabels  bool
 	PreferDirect    bool
 	OriginalOrdinal int
 }
@@ -203,10 +213,11 @@ type RoutedConnection struct {
 }
 
 type Label struct {
-	NetName  string
-	Text     string
-	Position kicadfiles.Point
-	Rotation kicadfiles.Angle
+	NetName         string
+	Text            string
+	Position        kicadfiles.Point
+	Rotation        kicadfiles.Angle
+	RouteAnnotation bool
 }
 
 type Junction struct {
@@ -230,29 +241,44 @@ const (
 )
 
 type Report struct {
-	Profile                  Profile                `json:"profile"`
-	Passed                   bool                   `json:"passed"`
-	SelectedPaper            string                 `json:"selected_paper,omitempty"`
-	PageEscalationCount      int                    `json:"page_escalation_count,omitempty"`
-	PartitionCount           int                    `json:"partition_count,omitempty"`
-	PartitionSplitGroupCount int                    `json:"partition_split_group_count,omitempty"`
-	CrossSheetNetCount       int                    `json:"cross_sheet_net_count,omitempty"`
-	ComponentCount           int                    `json:"component_count"`
-	GroupCount               int                    `json:"group_count"`
-	RoutedNetCount           int                    `json:"routed_net_count"`
-	LabelFallbackCount       int                    `json:"label_fallback_count"`
-	GeometrySourceCounts     map[GeometrySource]int `json:"geometry_source_counts,omitempty"`
-	OverlapCounts            map[string]int         `json:"overlap_counts,omitempty"`
-	DiagonalWireCount        int                    `json:"diagonal_wire_count"`
-	StageOrderViolationCount int                    `json:"stage_order_violation_count"`
-	PowerPlacementViolations int                    `json:"power_placement_violation_count"`
-	IslandCount              int                    `json:"island_count"`
-	RankCount                int                    `json:"rank_count"`
-	OccupiedBounds           Rect                   `json:"occupied_bounds"`
-	CenterOffset             kicadfiles.Point       `json:"center_offset"`
-	DiagnosticCount          int                    `json:"diagnostic_count"`
-	ErrorCount               int                    `json:"error_count"`
-	WarningCount             int                    `json:"warning_count"`
+	Profile                     Profile                `json:"profile"`
+	Passed                      bool                   `json:"passed"`
+	SelectedPaper               string                 `json:"selected_paper,omitempty"`
+	PageEscalationCount         int                    `json:"page_escalation_count,omitempty"`
+	PartitionCount              int                    `json:"partition_count,omitempty"`
+	PartitionSplitGroupCount    int                    `json:"partition_split_group_count,omitempty"`
+	CrossSheetNetCount          int                    `json:"cross_sheet_net_count,omitempty"`
+	ComponentCount              int                    `json:"component_count"`
+	GroupCount                  int                    `json:"group_count"`
+	RoutedNetCount              int                    `json:"routed_net_count"`
+	LabelFallbackCount          int                    `json:"label_fallback_count"`
+	LocalTwoPointNetCount       int                    `json:"local_two_point_net_count"`
+	ContinuousLocalNetCount     int                    `json:"continuous_local_net_count"`
+	LocalMultiPointNetCount     int                    `json:"local_multi_point_net_count"`
+	RouteTreeNetCount           int                    `json:"route_tree_net_count"`
+	EndpointLabelCount          int                    `json:"endpoint_label_count"`
+	NetAnnotationCount          int                    `json:"net_annotation_count"`
+	BranchJunctionCount         int                    `json:"branch_junction_count"`
+	FeedbackPathCount           int                    `json:"feedback_path_count"`
+	VisibleFeedbackPathCount    int                    `json:"visible_feedback_path_count"`
+	BoundaryPlacementViolations int                    `json:"boundary_placement_violation_count"`
+	UsablePageAreaMM2           float64                `json:"usable_page_area_mm2"`
+	OccupiedAreaMM2             float64                `json:"occupied_area_mm2"`
+	OccupiedPageRatio           float64                `json:"occupied_page_ratio"`
+	WhitespaceRatio             float64                `json:"whitespace_ratio"`
+	ComponentDispersion         float64                `json:"component_dispersion"`
+	GeometrySourceCounts        map[GeometrySource]int `json:"geometry_source_counts,omitempty"`
+	OverlapCounts               map[string]int         `json:"overlap_counts,omitempty"`
+	DiagonalWireCount           int                    `json:"diagonal_wire_count"`
+	StageOrderViolationCount    int                    `json:"stage_order_violation_count"`
+	PowerPlacementViolations    int                    `json:"power_placement_violation_count"`
+	IslandCount                 int                    `json:"island_count"`
+	RankCount                   int                    `json:"rank_count"`
+	OccupiedBounds              Rect                   `json:"occupied_bounds"`
+	CenterOffset                kicadfiles.Point       `json:"center_offset"`
+	DiagnosticCount             int                    `json:"diagnostic_count"`
+	ErrorCount                  int                    `json:"error_count"`
+	WarningCount                int                    `json:"warning_count"`
 }
 
 type TextBox struct {
@@ -315,6 +341,12 @@ func DefaultRules(profile Profile) Rules {
 		MinStageSpacing:         kicadfiles.MM(25.4),
 		MinGroupGutter:          kicadfiles.MM(12.7),
 		LongWireThreshold:       kicadfiles.MM(80),
+		BoundaryTolerance:       kicadfiles.MM(12.7),
+		RouteBendPenalty:        kicadfiles.MM(10),
+		MaxRouteGridNodes:       40_000,
+		MaxRouteAnnotations:     64,
+		MaxSpacingRepairs:       3,
+		FullRepairComponents:    64,
 		MaxDiagnostics:          100,
 		LabelFallbackEnabled:    profile != ProfileOff,
 		LabelFallbackConfigured: true,
@@ -338,6 +370,7 @@ func NormalizeRequest(request Request) Request {
 			return comparePins(request.Components[index].Pins[i], request.Components[index].Pins[j]) < 0
 		})
 	}
+	request.Nets = mergeNetFragments(request.Nets)
 	for index := range request.Nets {
 		request.Nets[index].Endpoints = append([]Endpoint(nil), request.Nets[index].Endpoints...)
 		sort.SliceStable(request.Nets[index].Endpoints, func(i, j int) bool {
@@ -354,6 +387,53 @@ func NormalizeRequest(request Request) Request {
 		return compareGroups(request.Groups[i], request.Groups[j]) < 0
 	})
 	return request
+}
+
+func mergeNetFragments(nets []Net) []Net {
+	merged := make(map[string]Net, len(nets))
+	order := make([]string, 0, len(nets))
+	for index, source := range nets {
+		key := source.Name
+		if key == "" {
+			key = fmt.Sprintf("\x00unnamed:%09d", index)
+		}
+		target, exists := merged[key]
+		if !exists {
+			target = source
+			target.Endpoints = nil
+			order = append(order, key)
+		} else {
+			if target.Role == "" || normalizeRole(target.Role) == "signal" {
+				if source.Role != "" && normalizeRole(source.Role) != "signal" {
+					target.Role = source.Role
+				}
+			}
+			target.PreferredLabels = target.PreferredLabels || source.PreferredLabels
+			target.EndpointLabels = target.EndpointLabels || source.EndpointLabels
+			target.PreferDirect = target.PreferDirect || source.PreferDirect
+			if source.OriginalOrdinal < target.OriginalOrdinal {
+				target.OriginalOrdinal = source.OriginalOrdinal
+			}
+		}
+		target.Endpoints = append(target.Endpoints, source.Endpoints...)
+		merged[key] = target
+	}
+	result := make([]Net, 0, len(order))
+	for _, key := range order {
+		net := merged[key]
+		seen := make(map[Endpoint]struct{}, len(net.Endpoints))
+		endpoints := net.Endpoints[:0]
+		for _, endpoint := range net.Endpoints {
+			if _, exists := seen[endpoint]; exists {
+				continue
+			}
+			seen[endpoint] = struct{}{}
+			endpoints = append(endpoints, endpoint)
+		}
+		net.Endpoints = endpoints
+		result = append(result, net)
+	}
+	return result
 }
 
 func NormalizeResult(result Result, rules Rules) Result {
@@ -458,24 +538,39 @@ func enrichDiagnosticRepairs(diagnostics []Diagnostic) []Diagnostic {
 
 func BuildReport(result Result, profile Profile) Report {
 	report := Report{
-		Profile:                  profile,
-		Passed:                   true,
-		SelectedPaper:            result.Report.SelectedPaper,
-		PageEscalationCount:      result.Report.PageEscalationCount,
-		PartitionCount:           result.Report.PartitionCount,
-		PartitionSplitGroupCount: result.Report.PartitionSplitGroupCount,
-		CrossSheetNetCount:       result.Report.CrossSheetNetCount,
-		ComponentCount:           len(result.Components),
-		GroupCount:               countGroups(result.Components),
-		RoutedNetCount:           countRoutedNets(result.Wires),
-		LabelFallbackCount:       len(result.Labels),
-		GeometrySourceCounts:     map[GeometrySource]int{},
-		OverlapCounts:            map[string]int{},
-		DiagnosticCount:          len(result.Diagnostics),
-		IslandCount:              result.Report.IslandCount,
-		RankCount:                result.Report.RankCount,
-		OccupiedBounds:           result.Report.OccupiedBounds,
-		CenterOffset:             result.Report.CenterOffset,
+		Profile:                     profile,
+		Passed:                      true,
+		SelectedPaper:               result.Report.SelectedPaper,
+		PageEscalationCount:         result.Report.PageEscalationCount,
+		PartitionCount:              result.Report.PartitionCount,
+		PartitionSplitGroupCount:    result.Report.PartitionSplitGroupCount,
+		CrossSheetNetCount:          result.Report.CrossSheetNetCount,
+		ComponentCount:              len(result.Components),
+		GroupCount:                  countGroups(result.Components),
+		RoutedNetCount:              countRoutedNets(result.Wires),
+		LabelFallbackCount:          len(result.Labels),
+		LocalTwoPointNetCount:       result.Report.LocalTwoPointNetCount,
+		ContinuousLocalNetCount:     result.Report.ContinuousLocalNetCount,
+		LocalMultiPointNetCount:     result.Report.LocalMultiPointNetCount,
+		RouteTreeNetCount:           result.Report.RouteTreeNetCount,
+		EndpointLabelCount:          result.Report.EndpointLabelCount,
+		NetAnnotationCount:          result.Report.NetAnnotationCount,
+		BranchJunctionCount:         len(result.Junctions),
+		FeedbackPathCount:           result.Report.FeedbackPathCount,
+		VisibleFeedbackPathCount:    result.Report.VisibleFeedbackPathCount,
+		BoundaryPlacementViolations: result.Report.BoundaryPlacementViolations,
+		UsablePageAreaMM2:           result.Report.UsablePageAreaMM2,
+		OccupiedAreaMM2:             result.Report.OccupiedAreaMM2,
+		OccupiedPageRatio:           result.Report.OccupiedPageRatio,
+		WhitespaceRatio:             result.Report.WhitespaceRatio,
+		ComponentDispersion:         result.Report.ComponentDispersion,
+		GeometrySourceCounts:        map[GeometrySource]int{},
+		OverlapCounts:               map[string]int{},
+		DiagnosticCount:             len(result.Diagnostics),
+		IslandCount:                 result.Report.IslandCount,
+		RankCount:                   result.Report.RankCount,
+		OccupiedBounds:              result.Report.OccupiedBounds,
+		CenterOffset:                result.Report.CenterOffset,
 	}
 	for _, wire := range result.Wires {
 		if wire.From.X != wire.To.X && wire.From.Y != wire.To.Y {
@@ -561,6 +656,24 @@ func normalizeRules(rules Rules) Rules {
 	}
 	if rules.LongWireThreshold <= 0 {
 		rules.LongWireThreshold = defaults.LongWireThreshold
+	}
+	if rules.BoundaryTolerance <= 0 {
+		rules.BoundaryTolerance = defaults.BoundaryTolerance
+	}
+	if rules.RouteBendPenalty <= 0 {
+		rules.RouteBendPenalty = defaults.RouteBendPenalty
+	}
+	if rules.MaxRouteGridNodes <= 0 {
+		rules.MaxRouteGridNodes = defaults.MaxRouteGridNodes
+	}
+	if rules.MaxRouteAnnotations <= 0 {
+		rules.MaxRouteAnnotations = defaults.MaxRouteAnnotations
+	}
+	if rules.MaxSpacingRepairs <= 0 {
+		rules.MaxSpacingRepairs = defaults.MaxSpacingRepairs
+	}
+	if rules.FullRepairComponents <= 0 {
+		rules.FullRepairComponents = defaults.FullRepairComponents
 	}
 	if rules.MaxDiagnostics < 0 {
 		rules.MaxDiagnostics = defaults.MaxDiagnostics

@@ -62,7 +62,7 @@ func sheetFromSchematic(file *schematic.SchematicFile) Sheet {
 	if file == nil {
 		return SheetForPaper("A4")
 	}
-	return SheetForPaper(file.Paper.Name)
+	return SheetForPaperOrientation(file.Paper.Name, file.Paper.Portrait)
 }
 
 func pinsFromSymbol(symbol schematic.SchematicSymbol) []Pin {

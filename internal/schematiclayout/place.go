@@ -321,9 +321,10 @@ func hasGroupBoundary(items []Component, sharedRankGroups map[string]bool) bool 
 }
 
 func placeLaneRows(items []Component, cells map[string]placementCell, rankX map[int]kicadfiles.IU, positions map[string]kicadfiles.Point, y kicadfiles.IU, rules Rules) kicadfiles.IU {
+	rowItems, attached := partitionAttachedAnnotations(items, cells)
 	rowByRank := map[int]int{}
 	rowHeight := map[int]kicadfiles.IU{}
-	for _, component := range items {
+	for _, component := range rowItems {
 		rank := cells[component.Ref].rank
 		row := rowByRank[rank]
 		rowByRank[rank]++
@@ -349,12 +350,13 @@ func placeLaneRows(items []Component, cells map[string]placementCell, rankX map[
 		y += height + rules.MinComponentSpacing
 	}
 	usedRows := map[int]int{}
-	for _, component := range items {
+	for _, component := range rowItems {
 		rank := cells[component.Ref].rank
 		row := usedRows[rank]
 		usedRows[rank]++
 		positions[component.Ref] = SnapPoint(kicadfiles.Point{X: rankX[rank], Y: rowY[row]}, rules.Grid)
 	}
+	placeAttachedAnnotations(attached, rowItems, positions, rules)
 	return y
 }
 
@@ -386,9 +388,10 @@ func placeGroupedRankRows(items []Component, cells map[string]placementCell, ran
 			}
 			return rankItems[i].Ref < rankItems[j].Ref
 		})
+		rowItems, attached := partitionAttachedAnnotations(rankItems, cells)
 		rankY := y
 		previousGroup := ""
-		for index, component := range rankItems {
+		for index, component := range rowItems {
 			group := groupedRankKey(component, sharedRankGroups)
 			if index != 0 && group != previousGroup {
 				rankY += rules.MinGroupGutter
@@ -402,11 +405,104 @@ func placeGroupedRankRows(items []Component, cells map[string]placementCell, ran
 			rankY += height + rules.MinComponentSpacing
 			previousGroup = group
 		}
+		placeAttachedAnnotations(attached, rowItems, positions, rules)
 		if rankY > endY {
 			endY = rankY
 		}
 	}
 	return endY
+}
+
+type attachedAnnotation struct {
+	component Component
+	targetRef string
+}
+
+func partitionAttachedAnnotations(items []Component, cells map[string]placementCell) ([]Component, []attachedAnnotation) {
+	byRef := make(map[string]Component, len(items))
+	for _, item := range items {
+		byRef[item.Ref] = item
+	}
+	var rows []Component
+	var attached []attachedAnnotation
+	for _, item := range items {
+		isAnnotation := containsNormalizedRole(normalizeRole(item.Role), "annotation")
+		if isAnnotation {
+			for _, targetRef := range item.Near {
+				target, exists := byRef[targetRef]
+				if !exists || targetRef == item.Ref || cells[target.Ref].rank != cells[item.Ref].rank {
+					continue
+				}
+				attached = append(attached, attachedAnnotation{component: item, targetRef: targetRef})
+				isAnnotation = false
+				break
+			}
+			if !isAnnotation {
+				continue
+			}
+		}
+		rows = append(rows, item)
+	}
+	return rows, attached
+}
+
+func placeAttachedAnnotations(attached []attachedAnnotation, rowItems []Component, positions map[string]kicadfiles.Point, rules Rules) {
+	components := make(map[string]Component, len(rowItems)+len(attached))
+	for _, component := range rowItems {
+		components[component.Ref] = component
+	}
+	for _, annotation := range attached {
+		components[annotation.component.Ref] = annotation.component
+	}
+	leftBounds := map[string]Rect{}
+	occupied := make([]Rect, 0, len(rowItems)+len(attached))
+	for _, component := range rowItems {
+		if position, exists := positions[component.Ref]; exists {
+			occupied = append(occupied, componentBoundsAt(component, position))
+		}
+	}
+	for _, annotation := range attached {
+		targetPosition, exists := positions[annotation.targetRef]
+		if !exists {
+			continue
+		}
+		targetBounds, exists := leftBounds[annotation.targetRef]
+		if !exists {
+			targetBounds = componentBoundsAt(components[annotation.targetRef], targetPosition)
+		}
+		localBounds := TransformRect(DefaultBodyFor(PlacedComponent{Component: annotation.component}), annotation.component.Rotation, annotation.component.Mirror)
+		preferred := SnapPoint(kicadfiles.Point{
+			X: targetBounds.MinX - rules.MinComponentSpacing - localBounds.MaxX,
+			Y: targetPosition.Y,
+		}, rules.Grid)
+		candidates := []kicadfiles.Point{
+			preferred,
+			SnapPoint(kicadfiles.Point{X: targetBounds.MaxX + rules.MinComponentSpacing - localBounds.MinX, Y: targetPosition.Y}, rules.Grid),
+			SnapPoint(kicadfiles.Point{X: targetPosition.X, Y: targetBounds.MinY - rules.MinComponentSpacing - localBounds.MaxY}, rules.Grid),
+			SnapPoint(kicadfiles.Point{X: targetPosition.X, Y: targetBounds.MaxY + rules.MinComponentSpacing - localBounds.MinY}, rules.Grid),
+		}
+		position := preferred
+		for _, candidate := range candidates {
+			bounds := componentBoundsAt(annotation.component, candidate)
+			collides := false
+			for _, other := range occupied {
+				if bounds.Intersects(other) {
+					collides = true
+					break
+				}
+			}
+			if !collides {
+				position = candidate
+				break
+			}
+		}
+		positions[annotation.component.Ref] = position
+		leftBounds[annotation.targetRef] = componentBoundsAt(annotation.component, position)
+		occupied = append(occupied, leftBounds[annotation.targetRef])
+		if leftBounds[annotation.targetRef].MinX > targetBounds.MinX {
+			leftBounds[annotation.targetRef] = targetBounds
+		}
+	}
 }
 
 func groupedRankKey(component Component, sharedRankGroups map[string]bool) string {

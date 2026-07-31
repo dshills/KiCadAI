@@ -135,6 +135,12 @@ func readPaper(node sexpr.ParsedNode) kicadfiles.Paper {
 	if height, ok := node.FloatValue(3); ok {
 		paper.Height = kicadfiles.MM(height)
 	}
+	if len(node.Children) > 2 {
+		paper.Portrait = strings.EqualFold(node.ListValue(2), "portrait")
+	}
+	if !paper.Portrait && len(node.Children) > 4 {
+		paper.Portrait = strings.EqualFold(node.ListValue(4), "portrait")
+	}
 	return paper
 }
 

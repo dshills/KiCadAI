@@ -532,10 +532,10 @@ func builderFromTransaction(tx Transaction, opts ApplyOptions) (*designapi.Build
 		if err := json.Unmarshal(op.Raw, &payload); err != nil {
 			return nil, err
 		}
-		paper := kicadfiles.Paper{Name: payload.Paper}
+		paper := kicadfiles.Paper{Name: payload.Paper, Portrait: payload.PaperPortrait}
 		if strings.TrimSpace(payload.Paper) != "" {
-			sheet := schematiclayout.SheetForPaper(payload.Paper)
-			paper = kicadfiles.Paper{Name: sheet.Name, Width: sheet.Width, Height: sheet.Height}
+			sheet := schematiclayout.SheetForPaperOrientation(payload.Paper, payload.PaperPortrait)
+			paper = kicadfiles.Paper{Name: sheet.Name, Width: sheet.Width, Height: sheet.Height, Portrait: payload.PaperPortrait}
 		}
 		return designapi.New(designapi.Options{
 			Name:                       payload.Name,
@@ -628,6 +628,7 @@ func applyOperation(builder *designapi.Builder, op Operation, opts ApplyOptions)
 		return nil, builder.ConnectWithOptions(endpoint(payload.From), endpoint(payload.To), payload.NetName, designapi.ConnectOptions{
 			UseLabels:          payload.UseLabels,
 			SuppressBendLabels: payload.SuppressBendLabels,
+			BendLabelAt:        optionalPoint(payload.BendLabelAt),
 			SkipFromLabel:      payload.SkipFromLabel,
 			SkipToLabel:        payload.SkipToLabel,
 			Waypoints:          waypoints,
