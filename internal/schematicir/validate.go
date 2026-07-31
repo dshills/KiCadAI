@@ -590,7 +590,7 @@ func validateLayout(document Document, componentPins map[string]map[string]struc
 		relations := []struct {
 			field   string
 			targets []string
-		}{{"near", placement.Near}, {"above", placement.Above}, {"right_of", placement.RightOf}}
+		}{{"near", placement.Near}, {"above", placement.Above}, {"right_of", placement.RightOf}, {"same_row_as", placement.SameRowAs}, {"same_column_as", placement.SameColumnAs}}
 		for _, relation := range relations {
 			seenTargets := map[string]struct{}{}
 			for targetIndex, target := range relation.targets {
@@ -605,8 +605,43 @@ func validateLayout(document Document, componentPins map[string]map[string]struc
 				seenTargets[target] = struct{}{}
 			}
 		}
+		pinRelations := []struct {
+			field     string
+			endpoints []EndpointRef
+		}{{"same_row_as_pin", placement.SameRowAsPin}, {"same_column_as_pin", placement.SameColumnAsPin}}
+		for _, relation := range pinRelations {
+			seenEndpoints := map[EndpointRef]struct{}{}
+			for endpointIndex, endpoint := range relation.endpoints {
+				endpointPath := fmt.Sprintf("%s.%s[%d]", path, relation.field, endpointIndex)
+				componentID, pin, ok := endpoint.Split()
+				if !ok {
+					add(endpointPath, "placement pin relation must use component.pin syntax")
+				} else if componentID == placement.Target {
+					add(endpointPath, "placement pin relation cannot reference its own target")
+				} else if pins, exists := componentPins[componentID]; !exists {
+					add(endpointPath, "placement pin relation references unknown component "+componentID)
+				} else if _, exists := pins[pin]; !exists {
+					add(endpointPath, "placement pin relation references unknown pin "+string(endpoint))
+				}
+				if _, duplicate := seenEndpoints[endpoint]; duplicate {
+					add(endpointPath, "placement pin relation contains duplicate endpoint "+string(endpoint))
+				}
+				seenEndpoints[endpoint] = struct{}{}
+			}
+		}
+		if anchors := len(placement.SameRowAs) + len(placement.SameRowAsPin); anchors > 1 {
+			add(path+".same_row_as", "placement must declare at most one row-alignment anchor across same_row_as and same_row_as_pin")
+		}
+		if anchors := len(placement.SameColumnAs) + len(placement.SameColumnAsPin); anchors > 1 {
+			add(path+".same_column_as", "placement must declare at most one column-alignment anchor across same_column_as and same_column_as_pin")
+		}
 	}
 	for _, relation := range []string{"above", "right_of"} {
+		if cycle := PlacementRelationCycle(document.Layout.Placements, relation); len(cycle) != 0 {
+			add("layout.placements", relation+" relation contains a cycle: "+FormatPlacementRelationCycle(cycle))
+		}
+	}
+	for _, relation := range []string{"row_alignment", "column_alignment"} {
 		if cycle := PlacementRelationCycle(document.Layout.Placements, relation); len(cycle) != 0 {
 			add("layout.placements", relation+" relation contains a cycle: "+FormatPlacementRelationCycle(cycle))
 		}

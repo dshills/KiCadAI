@@ -87,6 +87,29 @@ func TestValidateRejectsUnknownPlacementReferences(t *testing.T) {
 	}
 }
 
+func TestValidateRejectsAmbiguousAndCyclicAlignmentAnchors(t *testing.T) {
+	doc := validLEDDocument()
+	doc.Layout.Placements = []Placement{
+		{Target: "r_limit", SameRowAs: []string{"led"}, SameRowAsPin: []EndpointRef{"led.1"}},
+		{Target: "led", SameRowAsPin: []EndpointRef{"r_limit.1"}},
+	}
+
+	issues := Validate(doc)
+	if !schematicIRIssueContains(issues, "layout.placements[0].same_row_as") {
+		t.Fatalf("missing ambiguous row alignment issue: %#v", issues)
+	}
+	foundCycle := false
+	for _, issue := range issues {
+		if issue.Path == "layout.placements" && strings.Contains(issue.Message, "row_alignment relation contains a cycle") {
+			foundCycle = true
+			break
+		}
+	}
+	if !foundCycle {
+		t.Fatalf("missing row alignment cycle issue: %#v", issues)
+	}
+}
+
 func TestDecodeStrictRejectsConflictingDuplicateNetBeforeMerge(t *testing.T) {
 	_, issues := DecodeStrict(strings.NewReader(`{
 		"schema":"kicadai.schematic.ir.v1",

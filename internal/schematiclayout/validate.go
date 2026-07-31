@@ -2,6 +2,7 @@ package schematiclayout
 
 import (
 	"fmt"
+	"strings"
 
 	"kicadai/internal/kicadfiles"
 )
@@ -136,8 +137,53 @@ func relativePlacementDiagnostics(components []PlacedComponent, rules Rules) []D
 				diagnostics = append(diagnostics, Diagnostic{Severity: SeverityError, Code: "above_violation", Ref: component.Ref, Message: fmt.Sprintf("component must be above %s", targetRef), Repair: "increase vertical lane spacing or correct the above relation"})
 			}
 		}
+		for _, targetRef := range component.SameRowAs {
+			target, ok := byRef[targetRef]
+			if !ok {
+				continue
+			}
+			if component.PlacedAt.Y != target.PlacedAt.Y {
+				diagnostics = append(diagnostics, Diagnostic{Severity: SeverityError, Code: "same_row_violation", Ref: component.Ref, Message: fmt.Sprintf("component must share a row with %s", targetRef), Repair: "align the component anchors on a common row or correct the same_row_as relation"})
+			}
+		}
+		for _, targetRef := range component.SameColumnAs {
+			target, ok := byRef[targetRef]
+			if !ok {
+				continue
+			}
+			if component.PlacedAt.X != target.PlacedAt.X {
+				diagnostics = append(diagnostics, Diagnostic{Severity: SeverityError, Code: "same_column_violation", Ref: component.Ref, Message: fmt.Sprintf("component must share a column with %s", targetRef), Repair: "align the component anchors on a common column or correct the same_column_as relation"})
+			}
+		}
+		for _, endpoint := range component.SameRowAsPin {
+			anchor, ok := placedEndpointAnchor(byRef, endpoint)
+			if !ok {
+				continue
+			}
+			if component.PlacedAt.Y != anchor.Y {
+				diagnostics = append(diagnostics, Diagnostic{Severity: SeverityError, Code: "same_pin_row_violation", Ref: component.Ref, Message: fmt.Sprintf("component must share a row with %s.%s", endpoint.Ref, endpoint.Pin), Repair: "align the component anchor with the named pin row or correct the same_row_as_pin relation"})
+			}
+		}
+		for _, endpoint := range component.SameColumnAsPin {
+			anchor, ok := placedEndpointAnchor(byRef, endpoint)
+			if !ok {
+				continue
+			}
+			if component.PlacedAt.X != anchor.X {
+				diagnostics = append(diagnostics, Diagnostic{Severity: SeverityError, Code: "same_pin_column_violation", Ref: component.Ref, Message: fmt.Sprintf("component must share a column with %s.%s", endpoint.Ref, endpoint.Pin), Repair: "align the component anchor with the named pin column or correct the same_column_as_pin relation"})
+			}
+		}
 	}
 	return diagnostics
+}
+
+func placedEndpointAnchor(components map[string]PlacedComponent, endpoint Endpoint) (kicadfiles.Point, bool) {
+	component, ok := components[endpoint.Ref]
+	if !ok {
+		return kicadfiles.Point{}, false
+	}
+	anchor, ok := pinAnchors([]PlacedComponent{component})[endpoint]
+	return anchor, ok
 }
 
 // wireLeavesAttachedSymbol permits the short wire stub that exits a symbol
@@ -152,7 +198,7 @@ func wireLeavesAttachedSymbol(wire WireSegment, object ValidationObject, compone
 			break
 		}
 	}
-	if component == nil || len(component.Pins) == 0 {
+	if component == nil {
 		return false
 	}
 	anchors := pinAnchors([]PlacedComponent{*component})
@@ -166,6 +212,14 @@ func wireLeavesAttachedSymbol(wire WireSegment, object ValidationObject, compone
 		}
 		if !attached {
 			continue
+		}
+		// KiCad power glyphs are single-pin terminals. Some library bodies place
+		// the visible rail or ground graphic on the wire-facing side of the pin
+		// anchor, so a legal connection can geometrically overlap that glyph.
+		// Requiring the exact parsed pin anchor keeps unrelated pass-through wires
+		// subject to the normal body-crossing rule.
+		if isPowerTerminalComponent(component) {
+			return true
 		}
 		other := wire.To
 		if endpoint == wire.To {
@@ -182,6 +236,18 @@ func wireLeavesAttachedSymbol(wire WireSegment, object ValidationObject, compone
 		}
 	}
 	return false
+}
+
+func isPowerTerminalComponent(component *PlacedComponent) bool {
+	if strings.HasPrefix(strings.ToLower(strings.TrimSpace(component.LibraryID)), "power:") {
+		return true
+	}
+	switch strings.ToLower(strings.TrimSpace(component.Role)) {
+	case "power_symbol", "ground_symbol", "positive_rail", "negative_rail", "ground":
+		return true
+	default:
+		return false
+	}
 }
 
 func nonSymbolValidationObjects(objects []ValidationObject) []ValidationObject {

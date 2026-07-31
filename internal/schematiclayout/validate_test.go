@@ -74,6 +74,81 @@ func TestValidateRejectsWireThroughSymbol(t *testing.T) {
 	}
 }
 
+func TestValidateAcceptsWireEndingAtFallbackPinAnchor(t *testing.T) {
+	anchor := kicadfiles.Point{X: kicadfiles.MM(50.8), Y: kicadfiles.MM(50.8)}
+	result := Result{
+		Components: []PlacedComponent{{
+			Component: Component{
+				Ref:       "#PWR01",
+				LibraryID: "power:GND",
+				Body:      Rect{MinX: -kicadfiles.MM(2), MinY: 0, MaxX: kicadfiles.MM(2), MaxY: kicadfiles.MM(3)},
+				BodyKnown: true,
+			},
+			PlacedAt: anchor,
+		}},
+		Wires: []WireSegment{{
+			NetName: "GND",
+			From:    kicadfiles.Point{X: anchor.X, Y: kicadfiles.MM(40.64)},
+			To:      anchor,
+		}},
+	}
+	validated := Validate(result, Request{Sheet: testSheet(), Rules: DefaultRules(ProfileBasic)})
+	if hasDiagnostic(validated.Diagnostics, "wire_symbol_overlap", SeverityError) {
+		t.Fatalf("diagnostics = %#v, fallback pin anchor should accept the attached wire", validated.Diagnostics)
+	}
+}
+
+func TestValidateAcceptsWireEndingAtPowerGlyphPin(t *testing.T) {
+	anchor := kicadfiles.Point{X: kicadfiles.MM(50.8), Y: kicadfiles.MM(50.8)}
+	result := Result{
+		Components: []PlacedComponent{{
+			Component: Component{
+				Ref:       "#PWR01",
+				LibraryID: "power:GND",
+				Body:      Rect{MinX: -kicadfiles.MM(2), MinY: -kicadfiles.MM(3), MaxX: kicadfiles.MM(2), MaxY: 0},
+				BodyKnown: true,
+				Pins:      []Pin{{Number: "1"}},
+			},
+			PlacedAt: anchor,
+		}},
+		Wires: []WireSegment{{
+			NetName: "GND",
+			From:    kicadfiles.Point{X: anchor.X, Y: kicadfiles.MM(40.64)},
+			To:      anchor,
+		}},
+	}
+	validated := Validate(result, Request{Sheet: testSheet(), Rules: DefaultRules(ProfileBasic)})
+	if hasDiagnostic(validated.Diagnostics, "wire_symbol_overlap", SeverityError) {
+		t.Fatalf("diagnostics = %#v, power glyph pin should accept its attached wire", validated.Diagnostics)
+	}
+}
+
+func TestValidateAcceptsWireEndingAtRoleIdentifiedCustomPowerGlyph(t *testing.T) {
+	anchor := kicadfiles.Point{X: kicadfiles.MM(50.8), Y: kicadfiles.MM(50.8)}
+	result := Result{
+		Components: []PlacedComponent{{
+			Component: Component{
+				Ref:       "#PWR01",
+				LibraryID: "Custom:GND",
+				Role:      "ground_symbol",
+				Body:      Rect{MinX: -kicadfiles.MM(2), MinY: -kicadfiles.MM(3), MaxX: kicadfiles.MM(2), MaxY: 0},
+				BodyKnown: true,
+				Pins:      []Pin{{Number: "1"}},
+			},
+			PlacedAt: anchor,
+		}},
+		Wires: []WireSegment{{
+			NetName: "GND",
+			From:    kicadfiles.Point{X: anchor.X, Y: kicadfiles.MM(40.64)},
+			To:      anchor,
+		}},
+	}
+	validated := Validate(result, Request{Sheet: testSheet(), Rules: DefaultRules(ProfileBasic)})
+	if hasDiagnostic(validated.Diagnostics, "wire_symbol_overlap", SeverityError) {
+		t.Fatalf("diagnostics = %#v, role-identified custom power glyph should accept its attached wire", validated.Diagnostics)
+	}
+}
+
 func TestValidateWarnsForTextOverlap(t *testing.T) {
 	result := Result{Components: []PlacedComponent{{
 		Component: Component{

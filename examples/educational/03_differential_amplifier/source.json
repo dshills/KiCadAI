@@ -1,0 +1,65 @@
+{
+  "schema": "kicadai.schematic.ir.v1",
+  "version": 1,
+  "metadata": {
+    "name": "bjt_differential_amplifier",
+    "title": "BJT Differential Amplifier",
+    "description": "A matched NPN long-tailed pair that amplifies the voltage difference between V1 and V2.",
+    "paper": "A4"
+  },
+  "circuit": {
+    "components": [
+      {"id": "input_v1", "ref": "TP1", "role": "testpoint", "symbol": "Connector:TestPoint", "value": "V1", "footprint": "TestPoint:TestPoint_THTPad_D1.5mm_Drill0.7mm", "pins": [{"number": "1", "name": "V1", "offset_x_mm": 0, "offset_y_mm": 0}]},
+      {"id": "input_v2", "ref": "TP2", "role": "testpoint", "symbol": "Connector:TestPoint", "value": "V2", "footprint": "TestPoint:TestPoint_THTPad_D1.5mm_Drill0.7mm", "pins": [{"number": "1", "name": "V2", "offset_x_mm": 0, "offset_y_mm": 0}]},
+      {"id": "collector_load_1", "ref": "R1", "role": "resistor", "symbol": "Device:R", "value": "4.7k", "footprint": "Resistor_THT:R_Axial_DIN0207_L6.3mm_D2.5mm_P10.16mm_Horizontal", "pins": [{"number": "1"}, {"number": "2"}]},
+      {"id": "collector_load_2", "ref": "R2", "role": "resistor", "symbol": "Device:R", "value": "4.7k", "footprint": "Resistor_THT:R_Axial_DIN0207_L6.3mm_D2.5mm_P10.16mm_Horizontal", "pins": [{"number": "1"}, {"number": "2"}]},
+      {"id": "transistor_1", "ref": "Q1", "role": "bjt", "symbol": "Transistor_BJT:Q_NPN_CBE", "value": "BC547", "footprint": "Package_TO_SOT_THT:TO-92_Inline", "pins": [{"number": "1", "name": "C", "offset_x_mm": 2.54, "offset_y_mm": -5.08}, {"number": "2", "name": "B", "offset_x_mm": -5.08, "offset_y_mm": 0}, {"number": "3", "name": "E", "offset_x_mm": 2.54, "offset_y_mm": 5.08}]},
+      {"id": "transistor_2", "ref": "Q2", "role": "bjt", "symbol": "Transistor_BJT:Q_NPN_CBE", "value": "BC547", "footprint": "Package_TO_SOT_THT:TO-92_Inline", "pins": [{"number": "1", "name": "C", "offset_x_mm": 2.54, "offset_y_mm": -5.08}, {"number": "2", "name": "B", "offset_x_mm": -5.08, "offset_y_mm": 0}, {"number": "3", "name": "E", "offset_x_mm": 2.54, "offset_y_mm": 5.08}]},
+      {"id": "tail_resistor", "ref": "R3", "role": "resistor", "symbol": "Device:R", "value": "1k", "footprint": "Resistor_THT:R_Axial_DIN0207_L6.3mm_D2.5mm_P10.16mm_Horizontal", "pins": [{"number": "1"}, {"number": "2"}]},
+      {"id": "supply", "ref": "#PWR01", "role": "power_symbol", "symbol": "power:+9V", "value": "+9V", "pins": [{"number": "1", "name": "+9V", "offset_x_mm": 0, "offset_y_mm": 0}]},
+      {"id": "supply_flag", "ref": "#FLG01", "role": "power_symbol", "symbol": "power:PWR_FLAG", "value": "PWR_FLAG", "pins": [{"number": "1", "name": "PWR_FLAG", "offset_x_mm": 0, "offset_y_mm": 0}]},
+      {"id": "output", "ref": "TP3", "role": "testpoint", "symbol": "Connector:TestPoint", "value": "VOUT", "footprint": "TestPoint:TestPoint_THTPad_D1.5mm_Drill0.7mm", "pins": [{"number": "1", "name": "VOUT", "offset_x_mm": 0, "offset_y_mm": 0}]},
+      {"id": "ground", "ref": "#PWR02", "role": "ground_symbol", "symbol": "power:GND", "value": "GND", "pins": [{"number": "1", "name": "GND", "offset_x_mm": 0, "offset_y_mm": 0}]},
+      {"id": "ground_flag", "ref": "#FLG02", "role": "ground_symbol", "symbol": "power:PWR_FLAG", "value": "PWR_FLAG", "pins": [{"number": "1", "name": "PWR_FLAG", "offset_x_mm": 0, "offset_y_mm": 0}]}
+    ],
+    "nets": [
+      {"name": "+9V", "role": "power_pos", "connect": ["supply.1", "collector_load_1.1", "collector_load_2.1", "supply_flag.1"], "label": "+9V", "use_label": false},
+      {"name": "V1", "role": "signal", "connect": ["input_v1.1", "transistor_1.2"], "label": "V1"},
+      {"name": "V2", "role": "signal", "connect": ["input_v2.1", "transistor_2.2"], "label": "V2"},
+      {"name": "COLLECTOR_1", "role": "signal", "connect": ["collector_load_1.2", "transistor_1.1"], "label": "COLLECTOR 1"},
+      {"name": "VOUT", "role": "signal", "connect": ["collector_load_2.2", "transistor_2.1", "output.1"], "label": "VOUT"},
+      {"name": "TAIL", "role": "bias", "connect": ["transistor_1.3", "transistor_2.3", "tail_resistor.1"], "label": "TAIL"},
+      {"name": "GND", "role": "ground", "connect": ["tail_resistor.2", "ground.1", "ground_flag.1"], "label": "GND", "use_label": false}
+    ]
+  },
+  "layout": {
+    "flow": "left_to_right",
+    "origin": "centered",
+    "groups": [
+      {"id": "inputs", "label": "Differential inputs", "role": "input_stage", "members": ["input_v1", "input_v2"], "rank": 0, "side": "left"},
+      {"id": "supply", "label": "Supply", "role": "power_stage", "members": ["supply", "supply_flag"], "rank": 0, "side": "left"},
+      {"id": "pair", "label": "Long-tailed pair", "role": "processing_stage", "members": ["collector_load_1", "collector_load_2", "transistor_1", "transistor_2", "tail_resistor", "ground", "ground_flag"], "rank": 1},
+      {"id": "output", "label": "Output", "role": "output_stage", "members": ["output"], "rank": 2, "side": "right"}
+    ],
+    "placements": [
+      {"target": "input_v1", "group": "inputs", "same_row_as": ["transistor_1"]},
+      {"target": "input_v2", "group": "inputs", "right_of": ["transistor_2"], "same_row_as": ["transistor_2"]},
+      {"target": "collector_load_1", "group": "pair", "above": ["transistor_1"], "same_column_as": ["transistor_1"]},
+      {"target": "collector_load_2", "group": "pair", "above": ["transistor_2"], "right_of": ["collector_load_1"], "same_row_as": ["collector_load_1"], "same_column_as": ["transistor_2"]},
+      {"target": "transistor_1", "group": "pair", "right_of": ["input_v1"], "above": ["tail_resistor"]},
+      {"target": "tail_resistor", "group": "pair", "right_of": ["transistor_1"], "above": ["ground"]},
+      {"target": "transistor_2", "group": "pair", "mirror": "y", "right_of": ["tail_resistor"], "same_row_as": ["transistor_1"], "above": ["tail_resistor"]},
+      {"target": "supply", "group": "supply", "above": ["collector_load_1", "collector_load_2"], "same_column_as": ["tail_resistor"]},
+      {"target": "supply_flag", "group": "supply", "right_of": ["supply"], "same_row_as": ["supply"]},
+      {"target": "ground", "group": "pair", "same_column_as": ["tail_resistor"]},
+      {"target": "ground_flag", "group": "pair", "right_of": ["ground"], "same_row_as": ["ground"]},
+      {"target": "output", "group": "output", "right_of": ["collector_load_2"], "same_row_as_pin": ["collector_load_2.2"]}
+    ],
+    "lanes": {"power": "top", "ground": "bottom", "signals": "middle"},
+    "rules": {"positive_power_top": false, "ground_bottom": false, "center_on_page": true, "prefer_labels_for_long_nets": false, "avoid_wire_crossings": true, "min_group_spacing_mm": 8, "min_component_spacing_mm": 5}
+  },
+  "policy": {
+    "repair": {"allow_ref_assignment": false, "allow_label_insertion": true, "allow_group_spacing_adjustment": false, "allow_symbol_substitution": false, "allow_pin_guessing": false},
+    "acceptance": "readable"
+  }
+}

@@ -38,7 +38,7 @@ func TestNormalizeLayoutIntentPreservesExplicitGroupsAndPlacements(t *testing.T)
 		{ID: "front_panel", Label: "Front Panel", Role: GroupRoleInputStage, Members: []string{"vin"}, Rank: 7, Side: SideLeft},
 	}
 	doc.Layout.Placements = []Placement{
-		{Target: "vin", Group: "front_panel", Orientation: OrientationRotated},
+		{Target: "vin", Group: "front_panel", SameRowAs: []string{"led"}, SameColumnAs: []string{"r_limit"}, SameRowAsPin: []EndpointRef{"r_limit.2"}, SameColumnAsPin: []EndpointRef{"led.1"}, Orientation: OrientationRotated},
 	}
 
 	normalized := NormalizeLayoutIntent(doc)
@@ -49,6 +49,15 @@ func TestNormalizeLayoutIntentPreservesExplicitGroupsAndPlacements(t *testing.T)
 	placements := placementsByTarget(normalized.Layout.Placements)
 	if placements["vin"].Group != "front_panel" || placements["vin"].Orientation != OrientationRotated {
 		t.Fatalf("explicit placement was not preserved: %+v", placements["vin"])
+	}
+	if len(placements["vin"].SameRowAs) != 1 || placements["vin"].SameRowAs[0] != "led" {
+		t.Fatalf("same-row relation was not preserved: %+v", placements["vin"])
+	}
+	if len(placements["vin"].SameColumnAs) != 1 || placements["vin"].SameColumnAs[0] != "r_limit" {
+		t.Fatalf("same-column relation was not preserved: %+v", placements["vin"])
+	}
+	if len(placements["vin"].SameRowAsPin) != 1 || placements["vin"].SameRowAsPin[0] != "r_limit.2" || len(placements["vin"].SameColumnAsPin) != 1 || placements["vin"].SameColumnAsPin[0] != "led.1" {
+		t.Fatalf("pin alignment relations were not preserved: %+v", placements["vin"])
 	}
 	if placements["led"].Group == "" {
 		t.Fatalf("missing generated placement for LED: %+v", placements["led"])
@@ -124,6 +133,17 @@ func TestPlacementRelationCycleIsDeterministic(t *testing.T) {
 	}
 	if cycle := PlacementRelationCycle(placements, "near"); cycle != nil {
 		t.Fatalf("unsupported relation cycle = %#v", cycle)
+	}
+}
+
+func TestPlacementRelationCycleCombinesComponentAndPinAlignment(t *testing.T) {
+	placements := []Placement{
+		{Target: "a", SameRowAs: []string{"b"}},
+		{Target: "b", SameRowAsPin: []EndpointRef{"a.1"}},
+	}
+	cycle := PlacementRelationCycle(placements, "row_alignment")
+	if got := FormatPlacementRelationCycle(cycle); got != "a -> b -> a" {
+		t.Fatalf("row alignment cycle = %q", got)
 	}
 }
 

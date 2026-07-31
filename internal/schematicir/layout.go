@@ -21,6 +21,10 @@ func CloneLayout(layout Layout) Layout {
 		clone.Placements[index].Near = append([]string(nil), placement.Near...)
 		clone.Placements[index].Above = append([]string(nil), placement.Above...)
 		clone.Placements[index].RightOf = append([]string(nil), placement.RightOf...)
+		clone.Placements[index].SameRowAs = append([]string(nil), placement.SameRowAs...)
+		clone.Placements[index].SameColumnAs = append([]string(nil), placement.SameColumnAs...)
+		clone.Placements[index].SameRowAsPin = append([]EndpointRef(nil), placement.SameRowAsPin...)
+		clone.Placements[index].SameColumnAsPin = append([]EndpointRef(nil), placement.SameColumnAsPin...)
 	}
 	clone.Buses = make([]BusLayout, len(layout.Buses))
 	for index, bus := range layout.Buses {
@@ -65,6 +69,20 @@ func PlacementRelationCycle(placements []Placement, relation string) []string {
 			targets = placement.Above
 		case "right_of":
 			targets = placement.RightOf
+		case "row_alignment":
+			targets = append(targets, placement.SameRowAs...)
+			for _, endpoint := range placement.SameRowAsPin {
+				if componentID, _, ok := endpoint.Split(); ok {
+					targets = append(targets, componentID)
+				}
+			}
+		case "column_alignment":
+			targets = append(targets, placement.SameColumnAs...)
+			for _, endpoint := range placement.SameColumnAsPin {
+				if componentID, _, ok := endpoint.Split(); ok {
+					targets = append(targets, componentID)
+				}
+			}
 		default:
 			return nil
 		}
@@ -281,9 +299,17 @@ func normalizePlacements(existing []Placement, components []Component, component
 		placement.Near = append([]string(nil), placement.Near...)
 		placement.Above = append([]string(nil), placement.Above...)
 		placement.RightOf = append([]string(nil), placement.RightOf...)
+		placement.SameRowAs = append([]string(nil), placement.SameRowAs...)
+		placement.SameColumnAs = append([]string(nil), placement.SameColumnAs...)
+		placement.SameRowAsPin = append([]EndpointRef(nil), placement.SameRowAsPin...)
+		placement.SameColumnAsPin = append([]EndpointRef(nil), placement.SameColumnAsPin...)
 		sort.Strings(placement.Near)
 		sort.Strings(placement.Above)
 		sort.Strings(placement.RightOf)
+		sort.Strings(placement.SameRowAs)
+		sort.Strings(placement.SameColumnAs)
+		sort.SliceStable(placement.SameRowAsPin, func(i, j int) bool { return placement.SameRowAsPin[i] < placement.SameRowAsPin[j] })
+		sort.SliceStable(placement.SameColumnAsPin, func(i, j int) bool { return placement.SameColumnAsPin[i] < placement.SameColumnAsPin[j] })
 		if placement.Target == "" {
 			continue
 		}

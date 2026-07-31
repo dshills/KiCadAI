@@ -11,6 +11,7 @@ import (
 
 func TestEmbeddedSymbolTemplateRendersSupportedSeedSymbols(t *testing.T) {
 	tests := []string{
+		"Connector:TestPoint",
 		"Connector_Generic:Conn_01x02",
 		"Connector_Generic:Conn_01x03",
 		"kicadai:USB_C_Receptacle_PowerOnly_6P",
@@ -26,6 +27,7 @@ func TestEmbeddedSymbolTemplateRendersSupportedSeedSymbols(t *testing.T) {
 		"power:+3.3V",
 		"power:+3V3",
 		"power:+5V",
+		"power:+9V",
 		"power:+12V",
 		"power:-12V",
 		"power:PWR_FLAG",
@@ -53,6 +55,30 @@ func TestEmbeddedSymbolTemplateRendersSupportedSeedSymbols(t *testing.T) {
 				t.Fatalf("template output missing expected KiCad symbol body:\n%s", output)
 			}
 		})
+	}
+}
+
+func TestTestPointTemplateUsesOriginAnchorAndKiCadGraphic(t *testing.T) {
+	pins, ok := EmbeddedSymbolConnectionPinOffsets("Connector:TestPoint")
+	if !ok || len(pins) != 1 || pins[0].Offset != (kicadfiles.Point{}) {
+		t.Fatalf("TestPoint connection pins = %#v, want one origin anchor", pins)
+	}
+	template, ok := EmbeddedSymbolTemplate("Connector:TestPoint")
+	var rendered bytes.Buffer
+	if !ok || sexpr.Render(&rendered, template.Body) != nil || !strings.Contains(rendered.String(), "circle") {
+		t.Fatalf("TestPoint template does not contain the standard test-point graphic: %#v", template)
+	}
+}
+
+func TestGroundTemplateUsesOriginAnchorAndStandardGraphic(t *testing.T) {
+	pins, ok := EmbeddedSymbolConnectionPinOffsets("power:GND")
+	if !ok || len(pins) != 1 || pins[0].Offset != (kicadfiles.Point{}) {
+		t.Fatalf("GND connection pins = %#v, want one origin anchor", pins)
+	}
+	template, ok := EmbeddedSymbolTemplate("power:GND")
+	var rendered bytes.Buffer
+	if !ok || sexpr.Render(&rendered, template.Body) != nil || !strings.Contains(rendered.String(), "polyline") {
+		t.Fatalf("GND template does not contain the standard ground graphic: %#v", template)
 	}
 }
 

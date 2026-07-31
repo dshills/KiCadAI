@@ -1,0 +1,10 @@
+(sym_lib_table
+  (version 7)
+  (lib
+    (name "Transistor_BJT")
+    (type "KiCad")
+    (uri "${KIPRJMOD}/lib/kicadai_resolved_Transistor_BJT.kicad_sym")
+    (options "")
+    (descr "Resolver-backed symbols for Transistor_BJT")
+  )
+)

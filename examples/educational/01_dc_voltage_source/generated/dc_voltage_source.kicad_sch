@@ -1,0 +1,1073 @@
+(kicad_sch
+  (version 20260306)
+  (generator "eeschema")
+  (generator_version "10.0")
+  (uuid "3f6422fc-292f-53a9-9765-4c59e64d9655")
+  (paper "A4")
+  (lib_symbols
+    (symbol
+      "Device:Battery_Cell"
+      (pin_numbers
+        (hide yes)
+      )
+      (pin_names
+        (offset 0)
+        (hide yes)
+      )
+      (exclude_from_sim no)
+      (in_bom yes)
+      (on_board yes)
+      (in_pos_files yes)
+      (duplicate_pin_numbers_are_jumpers no)
+      (property
+        "Reference"
+        "BT"
+        (at 2.54 2.54 0)
+        (show_name no)
+        (do_not_autoplace no)
+        (effects
+          (font
+            (size 1.27 1.27)
+          )
+          (justify left)
+        )
+      )
+      (property
+        "Value"
+        "Battery_Cell"
+        (at 2.54 0 0)
+        (show_name no)
+        (do_not_autoplace no)
+        (effects
+          (font
+            (size 1.27 1.27)
+          )
+          (justify left)
+        )
+      )
+      (property
+        "Footprint"
+        ""
+        (at 0 1.524 90)
+        (show_name no)
+        (do_not_autoplace no)
+        (hide yes)
+        (effects
+          (font
+            (size 1.27 1.27)
+          )
+        )
+      )
+      (property
+        "Datasheet"
+        ""
+        (at 0 1.524 90)
+        (show_name no)
+        (do_not_autoplace no)
+        (hide yes)
+        (effects
+          (font
+            (size 1.27 1.27)
+          )
+        )
+      )
+      (property
+        "Description"
+        "Single-cell battery"
+        (at 0 0 0)
+        (show_name no)
+        (do_not_autoplace no)
+        (hide yes)
+        (effects
+          (font
+            (size 1.27 1.27)
+          )
+        )
+      )
+      (property
+        "Sim.Device"
+        "V"
+        (at 0 0 0)
+        (show_name no)
+        (do_not_autoplace no)
+        (hide yes)
+        (effects
+          (font
+            (size 1.27 1.27)
+          )
+        )
+      )
+      (property
+        "Sim.Type"
+        "DC"
+        (at 0 0 0)
+        (show_name no)
+        (do_not_autoplace no)
+        (hide yes)
+        (effects
+          (font
+            (size 1.27 1.27)
+          )
+        )
+      )
+      (property
+        "Sim.Pins"
+        "1=+ 2=-"
+        (at 0 0 0)
+        (show_name no)
+        (do_not_autoplace no)
+        (hide yes)
+        (effects
+          (font
+            (size 1.27 1.27)
+          )
+        )
+      )
+      (property
+        "ki_keywords"
+        "battery cell"
+        (at 0 0 0)
+        (show_name no)
+        (do_not_autoplace no)
+        (hide yes)
+        (effects
+          (font
+            (size 1.27 1.27)
+          )
+        )
+      )
+      (symbol
+        "Battery_Cell_0_1"
+        (rectangle
+          (start -2.286 1.778)
+          (end 2.286 1.524)
+          (stroke
+            (width 0)
+            (type default)
+          )
+          (fill
+            (type outline)
+          )
+        )
+        (rectangle
+          (start -1.524 1.016)
+          (end 1.524 0.508)
+          (stroke
+            (width 0)
+            (type default)
+          )
+          (fill
+            (type outline)
+          )
+        )
+        (polyline
+          (pts
+            (xy 0 1.778)
+            (xy 0 2.54)
+          )
+          (stroke
+            (width 0)
+            (type default)
+          )
+          (fill
+            (type none)
+          )
+        )
+        (polyline
+          (pts
+            (xy 0 0.762)
+            (xy 0 0)
+          )
+          (stroke
+            (width 0)
+            (type default)
+          )
+          (fill
+            (type none)
+          )
+        )
+        (polyline
+          (pts
+            (xy 0.762 3.048)
+            (xy 1.778 3.048)
+          )
+          (stroke
+            (width 0.254)
+            (type default)
+          )
+          (fill
+            (type none)
+          )
+        )
+        (polyline
+          (pts
+            (xy 1.27 3.556)
+            (xy 1.27 2.54)
+          )
+          (stroke
+            (width 0.254)
+            (type default)
+          )
+          (fill
+            (type none)
+          )
+        )
+      )
+      (symbol
+        "Battery_Cell_1_1"
+        (pin
+          passive
+          line
+          (at 0 5.08 270)
+          (length 2.54)
+          (name
+            "+"
+            (effects
+              (font
+                (size 1.27 1.27)
+              )
+            )
+          )
+          (number
+            "1"
+            (effects
+              (font
+                (size 1.27 1.27)
+              )
+            )
+          )
+        )
+        (pin
+          passive
+          line
+          (at 0 -2.54 90)
+          (length 2.54)
+          (name
+            "-"
+            (effects
+              (font
+                (size 1.27 1.27)
+              )
+            )
+          )
+          (number
+            "2"
+            (effects
+              (font
+                (size 1.27 1.27)
+              )
+            )
+          )
+        )
+      )
+      (embedded_fonts no)
+    )
+    (symbol
+      "Device:R"
+      (pin_numbers
+        (hide yes)
+      )
+      (pin_names
+        (offset 0)
+      )
+      (exclude_from_sim no)
+      (in_bom yes)
+      (on_board yes)
+      (in_pos_files yes)
+      (duplicate_pin_numbers_are_jumpers no)
+      (property
+        "Reference"
+        "R"
+        (at 2.032 0 90)
+        (show_name no)
+        (do_not_autoplace no)
+        (effects
+          (font
+            (size 1.27 1.27)
+          )
+        )
+      )
+      (property
+        "Value"
+        "R"
+        (at 0 0 90)
+        (show_name no)
+        (do_not_autoplace no)
+        (effects
+          (font
+            (size 1.27 1.27)
+          )
+        )
+      )
+      (property
+        "Footprint"
+        ""
+        (at -1.778 0 90)
+        (show_name no)
+        (do_not_autoplace no)
+        (hide yes)
+        (effects
+          (font
+            (size 1.27 1.27)
+          )
+        )
+      )
+      (property
+        "Datasheet"
+        ""
+        (at 0 0 0)
+        (show_name no)
+        (do_not_autoplace no)
+        (hide yes)
+        (effects
+          (font
+            (size 1.27 1.27)
+          )
+        )
+      )
+      (property
+        "Description"
+        "Resistor"
+        (at 0 0 0)
+        (show_name no)
+        (do_not_autoplace no)
+        (hide yes)
+        (effects
+          (font
+            (size 1.27 1.27)
+          )
+        )
+      )
+      (property
+        "ki_keywords"
+        "R res resistor"
+        (at 0 0 0)
+        (show_name no)
+        (do_not_autoplace no)
+        (hide yes)
+        (effects
+          (font
+            (size 1.27 1.27)
+          )
+        )
+      )
+      (property
+        "ki_fp_filters"
+        "R_*"
+        (at 0 0 0)
+        (show_name no)
+        (do_not_autoplace no)
+        (hide yes)
+        (effects
+          (font
+            (size 1.27 1.27)
+          )
+        )
+      )
+      (symbol
+        "R_0_1"
+        (rectangle
+          (start -1.016 -2.54)
+          (end 1.016 2.54)
+          (stroke
+            (width 0.254)
+            (type default)
+          )
+          (fill
+            (type none)
+          )
+        )
+      )
+      (symbol
+        "R_1_1"
+        (pin
+          passive
+          line
+          (at 0 3.81 270)
+          (length 1.27)
+          (name
+            ""
+            (effects
+              (font
+                (size 1.27 1.27)
+              )
+            )
+          )
+          (number
+            "1"
+            (effects
+              (font
+                (size 1.27 1.27)
+              )
+            )
+          )
+        )
+        (pin
+          passive
+          line
+          (at 0 -3.81 90)
+          (length 1.27)
+          (name
+            ""
+            (effects
+              (font
+                (size 1.27 1.27)
+              )
+            )
+          )
+          (number
+            "2"
+            (effects
+              (font
+                (size 1.27 1.27)
+              )
+            )
+          )
+        )
+      )
+      (embedded_fonts no)
+    )
+    (symbol
+      "Connector_Generic:Conn_01x02"
+      (pin_names
+        (offset 1.016)
+        (hide yes)
+      )
+      (exclude_from_sim no)
+      (in_bom yes)
+      (on_board yes)
+      (in_pos_files yes)
+      (duplicate_pin_numbers_are_jumpers no)
+      (property
+        "Reference"
+        "J"
+        (at 0 2.54 0)
+        (show_name no)
+        (do_not_autoplace no)
+        (effects
+          (font
+            (size 1.27 1.27)
+          )
+        )
+      )
+      (property
+        "Value"
+        "Conn_01x02"
+        (at 0 -5.08 0)
+        (show_name no)
+        (do_not_autoplace no)
+        (effects
+          (font
+            (size 1.27 1.27)
+          )
+        )
+      )
+      (property
+        "Footprint"
+        ""
+        (at 0 0 0)
+        (show_name no)
+        (do_not_autoplace no)
+        (hide yes)
+        (effects
+          (font
+            (size 1.27 1.27)
+          )
+        )
+      )
+      (property
+        "Datasheet"
+        ""
+        (at 0 0 0)
+        (show_name no)
+        (do_not_autoplace no)
+        (hide yes)
+        (effects
+          (font
+            (size 1.27 1.27)
+          )
+        )
+      )
+      (property
+        "Description"
+        "Generic connector, single row, 01x02, script generated (kicad-library-utils/schlib/autogen/connector/)"
+        (at 0 0 0)
+        (show_name no)
+        (do_not_autoplace no)
+        (hide yes)
+        (effects
+          (font
+            (size 1.27 1.27)
+          )
+        )
+      )
+      (property
+        "ki_keywords"
+        "connector"
+        (at 0 0 0)
+        (show_name no)
+        (do_not_autoplace no)
+        (hide yes)
+        (effects
+          (font
+            (size 1.27 1.27)
+          )
+        )
+      )
+      (property
+        "ki_fp_filters"
+        "Connector*:*_1x??_*"
+        (at 0 0 0)
+        (show_name no)
+        (do_not_autoplace no)
+        (hide yes)
+        (effects
+          (font
+            (size 1.27 1.27)
+          )
+        )
+      )
+      (symbol
+        "Conn_01x02_1_1"
+        (rectangle
+          (start -1.27 1.27)
+          (end 1.27 -3.81)
+          (stroke
+            (width 0.254)
+            (type default)
+          )
+          (fill
+            (type background)
+          )
+        )
+        (rectangle
+          (start -1.27 0.127)
+          (end 0 -0.127)
+          (stroke
+            (width 0.1524)
+            (type default)
+          )
+          (fill
+            (type none)
+          )
+        )
+        (rectangle
+          (start -1.27 -2.413)
+          (end 0 -2.667)
+          (stroke
+            (width 0.1524)
+            (type default)
+          )
+          (fill
+            (type none)
+          )
+        )
+        (pin
+          passive
+          line
+          (at -5.08 0 0)
+          (length 3.81)
+          (name
+            "Pin_1"
+            (effects
+              (font
+                (size 1.27 1.27)
+              )
+            )
+          )
+          (number
+            "1"
+            (effects
+              (font
+                (size 1.27 1.27)
+              )
+            )
+          )
+        )
+        (pin
+          passive
+          line
+          (at -5.08 -2.54 0)
+          (length 3.81)
+          (name
+            "Pin_2"
+            (effects
+              (font
+                (size 1.27 1.27)
+              )
+            )
+          )
+          (number
+            "2"
+            (effects
+              (font
+                (size 1.27 1.27)
+              )
+            )
+          )
+        )
+      )
+      (embedded_fonts no)
+    )
+  )
+  (junction
+    (at 109.22 107.95)
+    (diameter 0)
+    (color 0 0 0 0)
+    (uuid "0f4d93f8-006c-54f4-b19f-df59dcd88999")
+  )
+  (junction
+    (at 180.34 107.95)
+    (diameter 0)
+    (color 0 0 0 0)
+    (uuid "68b62c2b-491d-571e-959f-bd12fbbe9e76")
+  )
+  (junction
+    (at 147.32 100.33)
+    (diameter 0)
+    (color 0 0 0 0)
+    (uuid "7c1fbe3b-5335-5557-a6cf-3bc6a424c992")
+  )
+  (junction
+    (at 147.32 107.95)
+    (diameter 0)
+    (color 0 0 0 0)
+    (uuid "857219bf-cf54-561a-a257-66d905a483fc")
+  )
+  (junction
+    (at 109.22 100.33)
+    (diameter 0)
+    (color 0 0 0 0)
+    (uuid "93a1e5bd-afa5-53f9-9e4d-1fb943bfdc6d")
+  )
+  (junction
+    (at 180.34 100.33)
+    (diameter 0)
+    (color 0 0 0 0)
+    (uuid "fa2a7db6-6d46-5ccd-a39b-5f1868ddd5de")
+  )
+  (wire
+    (pts
+      (xy 109.22 99.06)
+      (xy 109.22 100.33)
+    )
+    (stroke
+      (width 0)
+      (type default)
+    )
+    (uuid "6c0c84e9-0ba4-5ebe-954b-6ab8537cf6a1")
+  )
+  (wire
+    (pts
+      (xy 109.22 100.33)
+      (xy 147.32 100.33)
+    )
+    (stroke
+      (width 0)
+      (type default)
+    )
+    (uuid "803ed37d-8539-5689-8b35-5eda528694b1")
+  )
+  (wire
+    (pts
+      (xy 147.32 107.95)
+      (xy 180.34 107.95)
+    )
+    (stroke
+      (width 0)
+      (type default)
+    )
+    (uuid "89a3c5da-1328-576c-821a-aab6949f0550")
+  )
+  (wire
+    (pts
+      (xy 180.34 100.33)
+      (xy 180.34 104.14)
+    )
+    (stroke
+      (width 0)
+      (type default)
+    )
+    (uuid "9ebfd157-c0ae-5cdd-9f96-2c4136234be9")
+  )
+  (wire
+    (pts
+      (xy 109.22 106.68)
+      (xy 109.22 107.95)
+    )
+    (stroke
+      (width 0)
+      (type default)
+    )
+    (uuid "cba74e9f-232d-5647-853a-5682e7943bef")
+  )
+  (wire
+    (pts
+      (xy 109.22 107.95)
+      (xy 147.32 107.95)
+    )
+    (stroke
+      (width 0)
+      (type default)
+    )
+    (uuid "ce48d509-64f0-5f0a-9773-c00fffdba3bc")
+  )
+  (wire
+    (pts
+      (xy 180.34 107.95)
+      (xy 180.34 106.68)
+    )
+    (stroke
+      (width 0)
+      (type default)
+    )
+    (uuid "de64d5fe-33be-54ef-af8b-25af923945bf")
+  )
+  (wire
+    (pts
+      (xy 147.32 100.33)
+      (xy 180.34 100.33)
+    )
+    (stroke
+      (width 0)
+      (type default)
+    )
+    (uuid "f35e7202-fe0c-56a1-8583-c70b616515f9")
+  )
+  (label
+    "+9V"
+    (at 163.83 100.33 0)
+    (effects
+      (font
+        (size 1.27 1.27)
+      )
+    )
+    (uuid "3f4d9664-e6c2-5892-ab8c-847b9ff83a5f")
+  )
+  (label
+    "GND"
+    (at 128.27 107.95 0)
+    (effects
+      (font
+        (size 1.27 1.27)
+      )
+    )
+    (uuid "476a6c66-08ad-5ca2-b2e7-dfd6e7cc29eb")
+  )
+  (label
+    "+9V"
+    (at 128.27 100.33 0)
+    (effects
+      (font
+        (size 1.27 1.27)
+      )
+    )
+    (uuid "bb5ddd21-3838-5d1f-b93c-354ebd38743e")
+  )
+  (label
+    "GND"
+    (at 163.83 107.95 0)
+    (effects
+      (font
+        (size 1.27 1.27)
+      )
+    )
+    (uuid "f007f605-242e-5670-97de-18467df25536")
+  )
+  (symbol
+    (lib_id "Connector_Generic:Conn_01x02")
+    (at 185.42 104.14 0)
+    (unit 1)
+    (body_style 1)
+    (exclude_from_sim no)
+    (in_bom yes)
+    (on_board yes)
+    (in_pos_files yes)
+    (dnp no)
+    (uuid "03d7d615-f8ab-515e-a3dc-132b79c44c6b")
+    (property
+      "Reference"
+      "J1"
+      (at 184.15 100.33 0)
+      (show_name no)
+      (do_not_autoplace yes)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Value"
+      "9 V OUTPUT"
+      (at 179.07 111.76 0)
+      (show_name no)
+      (do_not_autoplace yes)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Footprint"
+      "Connector_PinHeader_2.54mm:PinHeader_1x02_P2.54mm_Vertical"
+      (at 185.42 104.14 0)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Datasheet"
+      ""
+      (at 185.42 104.14 0)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Description"
+      ""
+      (at 185.42 104.14 0)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (pin
+      "1"
+      (uuid "df15eb2c-b37d-5f10-b1d4-00acf20c7ec0")
+    )
+    (pin
+      "2"
+      (uuid "a5a31212-29f3-5a93-a06d-074fd06fbf5e")
+    )
+    (instances
+      (project
+        "dc_voltage_source"
+        (path
+          "/03d7d615-f8ab-515e-a3dc-132b79c44c6b"
+          (reference "J1")
+          (unit 1)
+          (value "9 V OUTPUT")
+        )
+      )
+    )
+  )
+  (symbol
+    (lib_id "Device:Battery_Cell")
+    (at 109.22 104.14 0)
+    (unit 1)
+    (body_style 1)
+    (exclude_from_sim no)
+    (in_bom yes)
+    (on_board yes)
+    (in_pos_files yes)
+    (dnp no)
+    (uuid "47f94b7d-2a21-51d0-96db-93bf07a6c265")
+    (property
+      "Reference"
+      "BT1"
+      (at 100.584 102.997 0)
+      (show_name no)
+      (do_not_autoplace yes)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Value"
+      "9 V"
+      (at 114.046 102.997 0)
+      (show_name no)
+      (do_not_autoplace yes)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Footprint"
+      "Battery:BatteryHolder_Keystone_1060_1x2032"
+      (at 109.22 104.14 0)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Datasheet"
+      ""
+      (at 109.22 104.14 0)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Description"
+      ""
+      (at 109.22 104.14 0)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      private
+      "KiCadAI Symbol Geometry"
+      "resolver"
+      (at 0 0 0)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (pin
+      "1"
+      (uuid "5c37cbf9-3d14-5994-87a2-0e4836797b35")
+    )
+    (pin
+      "2"
+      (uuid "0363d728-0796-5053-879c-180faa8b66f8")
+    )
+    (instances
+      (project
+        "dc_voltage_source"
+        (path
+          "/47f94b7d-2a21-51d0-96db-93bf07a6c265"
+          (reference "BT1")
+          (unit 1)
+          (value "9 V")
+        )
+      )
+    )
+  )
+  (symbol
+    (lib_id "Device:R")
+    (at 147.32 104.14 0)
+    (unit 1)
+    (body_style 1)
+    (exclude_from_sim no)
+    (in_bom yes)
+    (on_board yes)
+    (in_pos_files yes)
+    (dnp no)
+    (uuid "5fd8ccb5-889b-531a-845a-a57fe26a1a32")
+    (property
+      "Reference"
+      "R1"
+      (at 146.05 99.06 0)
+      (show_name no)
+      (do_not_autoplace yes)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Value"
+      "1k"
+      (at 146.05 110.49 0)
+      (show_name no)
+      (do_not_autoplace yes)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Footprint"
+      "Resistor_THT:R_Axial_DIN0207_L6.3mm_D2.5mm_P10.16mm_Horizontal"
+      (at 147.32 104.14 0)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Datasheet"
+      ""
+      (at 147.32 104.14 0)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Description"
+      ""
+      (at 147.32 104.14 0)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (pin
+      "1"
+      (uuid "1d364dee-66d1-5eee-83a2-e4fb1519d526")
+    )
+    (pin
+      "2"
+      (uuid "79c9d9ee-5a24-5785-bc09-977180c0d8eb")
+    )
+    (instances
+      (project
+        "dc_voltage_source"
+        (path
+          "/5fd8ccb5-889b-531a-845a-a57fe26a1a32"
+          (reference "R1")
+          (unit 1)
+          (value "1k")
+        )
+      )
+    )
+  )
+  (sheet_instances
+    (path
+      "/"
+      (page "1")
+    )
+  )
+)

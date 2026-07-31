@@ -75,16 +75,20 @@ type Component struct {
 	Lane       Lane
 	// FlowRank is an optional left-to-right graph rank. RankFixed distinguishes
 	// an explicit rank of zero from an inferred rank.
-	FlowRank  int
-	RankFixed bool
-	Near      []string
-	Above     []string
-	RightOf   []string
-	Position  kicadfiles.Point
-	Fixed     bool
-	Rotation  kicadfiles.Angle
-	Mirror    Mirror
-	Body      Rect
+	FlowRank        int
+	RankFixed       bool
+	Near            []string
+	Above           []string
+	RightOf         []string
+	SameRowAs       []string
+	SameColumnAs    []string
+	SameRowAsPin    []Endpoint
+	SameColumnAsPin []Endpoint
+	Position        kicadfiles.Point
+	Fixed           bool
+	Rotation        kicadfiles.Angle
+	Mirror          Mirror
+	Body            Rect
 	// BodyKnown distinguishes an intentional pin-only symbol from a missing
 	// body geometry value that should use the role-based fallback.
 	BodyKnown       bool
@@ -363,9 +367,21 @@ func NormalizeRequest(request Request) Request {
 		request.Components[index].Near = append([]string(nil), request.Components[index].Near...)
 		request.Components[index].Above = append([]string(nil), request.Components[index].Above...)
 		request.Components[index].RightOf = append([]string(nil), request.Components[index].RightOf...)
+		request.Components[index].SameRowAs = append([]string(nil), request.Components[index].SameRowAs...)
+		request.Components[index].SameColumnAs = append([]string(nil), request.Components[index].SameColumnAs...)
+		request.Components[index].SameRowAsPin = append([]Endpoint(nil), request.Components[index].SameRowAsPin...)
+		request.Components[index].SameColumnAsPin = append([]Endpoint(nil), request.Components[index].SameColumnAsPin...)
 		sort.Strings(request.Components[index].Near)
 		sort.Strings(request.Components[index].Above)
 		sort.Strings(request.Components[index].RightOf)
+		sort.Strings(request.Components[index].SameRowAs)
+		sort.Strings(request.Components[index].SameColumnAs)
+		sort.SliceStable(request.Components[index].SameRowAsPin, func(i, j int) bool {
+			return compareEndpoints(request.Components[index].SameRowAsPin[i], request.Components[index].SameRowAsPin[j]) < 0
+		})
+		sort.SliceStable(request.Components[index].SameColumnAsPin, func(i, j int) bool {
+			return compareEndpoints(request.Components[index].SameColumnAsPin[i], request.Components[index].SameColumnAsPin[j]) < 0
+		})
 		sort.SliceStable(request.Components[index].Pins, func(i, j int) bool {
 			return comparePins(request.Components[index].Pins[i], request.Components[index].Pins[j]) < 0
 		})

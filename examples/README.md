@@ -2,9 +2,16 @@
 
 These examples are hand-authored KiCad project fixtures that range from a single LED indicator to a hierarchical sensor node. They are intended as small reference projects for the direct file writers and for AI-assisted schematic generation experiments.
 
-Only `01_led_indicator` currently has a matching Go generator. The remaining
-schematic examples are checked-in fixtures and should not be mechanically
-rewritten until dedicated generators exist for them.
+Generator-backed teaching circuits live under `examples/educational/`. That
+set includes a DC voltage source, BJT current source, BJT differential
+amplifier, RC low-pass filter, and voltage divider. Each directory preserves
+its Schematic Design IR source beside a reproducible KiCad project; see
+`examples/educational/README.md` for equations and regeneration instructions.
+
+Within the original numbered fixture set below, only `01_led_indicator`
+currently has a matching Go generator. The remaining numbered schematics are
+checked-in fixtures and should not be mechanically rewritten until dedicated
+generators exist for them.
 
 | Example | Focus |
 |---|---|

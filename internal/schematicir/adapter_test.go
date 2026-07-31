@@ -451,6 +451,19 @@ func TestReadableAcceptanceBlocksLayoutWarnings(t *testing.T) {
 	}
 }
 
+func TestSchematicLayoutReportsMalformedRelativeEndpointWhenValidationIsBypassed(t *testing.T) {
+	doc := validLEDDocument()
+	doc.Layout.Placements = []Placement{{Target: "led", SameRowAsPin: []EndpointRef{"malformed"}}}
+
+	result := schematicLayout(doc)
+	for _, diagnostic := range result.Diagnostics {
+		if diagnostic.Code == "invalid_relative_endpoint" && diagnostic.Ref == "led" && diagnostic.Severity == schematiclayout.SeverityError {
+			return
+		}
+	}
+	t.Fatalf("diagnostics = %#v, want invalid_relative_endpoint error", result.Diagnostics)
+}
+
 func TestToTransactionPreservesSharedReferenceUnits(t *testing.T) {
 	doc := *NewDocument()
 	doc.Metadata.Name = "dual_unit"
@@ -860,6 +873,23 @@ func TestToTransactionAssignsFootprintsAndProperties(t *testing.T) {
 			if !property.Hidden {
 				t.Fatalf("custom property %s should be hidden metadata: %+v", property.Name, property)
 			}
+		}
+	}
+}
+
+func TestTransactionSymbolPropertiesHidePowerReferences(t *testing.T) {
+	for _, role := range []ComponentRole{ComponentRolePowerSymbol, ComponentRoleGroundSymbol} {
+		properties := transactionSymbolPropertiesWithLayout(Component{Role: role, Value: "PWR_FLAG"}, "#FLG01", layoutTextPlacement{})
+		for _, property := range properties {
+			if property.Name == "Reference" && !property.Hidden {
+				t.Fatalf("%s reference should be hidden: %+v", role, properties)
+			}
+		}
+	}
+	properties := transactionSymbolPropertiesWithLayout(Component{Role: ComponentRoleResistor, Value: "1k"}, "R1", layoutTextPlacement{})
+	for _, property := range properties {
+		if property.Name == "Reference" && property.Hidden {
+			t.Fatalf("ordinary component reference should remain visible: %+v", properties)
 		}
 	}
 }

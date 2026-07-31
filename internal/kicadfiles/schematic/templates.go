@@ -180,16 +180,17 @@ var embeddedSymbolTemplates = map[string]embeddedTemplate{
 			"2": {Y: kicadfiles.MM(3.81)},
 		},
 	},
-	"connector:testpoint": {bodyName: "TestPoint", pinType: "passive", pins: []TemplatePin{{Number: "1", Offset: kicadfiles.Point{}}}},
+	"connector:testpoint": {bodyName: "TestPoint", pinType: "passive", pins: []TemplatePin{{Number: "1", Offset: kicadfiles.Point{}}}, rawBody: rawConnectorTestPointSymbol},
 	"power:+3.3v":         powerTemplate("+3.3V", 5.08),
 	"power:+3v3":          powerTemplate("+3V3", 5.08),
 	"power:+5v":           powerTemplate("+5V", 5.08),
+	"power:+9v":           {bodyName: "+9V", pinType: "power_in", power: true, pins: []TemplatePin{{Number: "1", Offset: kicadfiles.Point{}}}, rawBody: strings.ReplaceAll(rawPowerPlus12VSymbol, "+12V", "+9V")},
 	// These dual-rail symbols are embedded from the KiCad 10 library. Their
 	// source pin is at the symbol origin; using the legacy synthetic geometry
 	// creates library-mismatch ERC findings and puts power-net labels off-pin.
 	"power:+12v": {bodyName: "+12V", pinType: "power_in", power: true, pins: []TemplatePin{{Number: "1", Offset: kicadfiles.Point{}}}, rawBody: rawPowerPlus12VSymbol},
 	"power:-12v": {bodyName: "-12V", pinType: "power_in", power: true, pins: []TemplatePin{{Number: "1", Offset: kicadfiles.Point{}}}, rawBody: rawPowerMinus12VSymbol},
-	"power:gnd":  powerTemplate("GND", -5.08),
+	"power:gnd":  {bodyName: "GND", pinType: "power_in", power: true, pins: []TemplatePin{{Number: "1", Offset: kicadfiles.Point{}}}, rawBody: rawPowerGNDSymbol},
 	"power:pwr_flag": {
 		bodyName: "PWR_FLAG",
 		pinType:  "power_out",
@@ -1219,6 +1220,50 @@ func templatePinRotation(offset kicadfiles.Point) int64 {
 func templatePinMM(value kicadfiles.IU) float64 {
 	return float64(value) / 1_000_000
 }
+
+const rawPowerGNDSymbol = `(symbol "power:GND"
+	(power global)
+	(pin_numbers (hide yes))
+	(pin_names (offset 0) (hide yes))
+	(exclude_from_sim no)
+	(in_bom yes)
+	(on_board yes)
+	(in_pos_files yes)
+	(duplicate_pin_numbers_are_jumpers no)
+	(property "Reference" "#PWR" (at 0 -6.35 0) (show_name no) (do_not_autoplace no) (hide yes) (effects (font (size 1.27 1.27))))
+	(property "Value" "GND" (at 0 -3.81 0) (show_name no) (do_not_autoplace no) (effects (font (size 1.27 1.27))))
+	(property "Footprint" "" (at 0 0 0) (show_name no) (do_not_autoplace no) (hide yes) (effects (font (size 1.27 1.27))))
+	(property "Datasheet" "" (at 0 0 0) (show_name no) (do_not_autoplace no) (hide yes) (effects (font (size 1.27 1.27))))
+	(property "Description" "Power symbol creates a global label with name \"GND\" , ground" (at 0 0 0) (show_name no) (do_not_autoplace no) (hide yes) (effects (font (size 1.27 1.27))))
+	(property "ki_keywords" "global power" (at 0 0 0) (show_name no) (do_not_autoplace no) (hide yes) (effects (font (size 1.27 1.27))))
+	(symbol "GND_0_1"
+		(polyline (pts (xy 0 0) (xy 0 -1.27) (xy 1.27 -1.27) (xy 0 -2.54) (xy -1.27 -1.27) (xy 0 -1.27)) (stroke (width 0) (type default)) (fill (type none))))
+	(symbol "GND_1_1"
+		(pin power_in line (at 0 0 270) (length 0) (name "" (effects (font (size 1.27 1.27)))) (number "1" (effects (font (size 1.27 1.27))))))
+	(embedded_fonts no)
+)`
+
+const rawConnectorTestPointSymbol = `(symbol "Connector:TestPoint"
+	(pin_numbers (hide yes))
+	(pin_names (offset 0.762) (hide yes))
+	(exclude_from_sim no)
+	(in_bom yes)
+	(on_board yes)
+	(in_pos_files yes)
+	(duplicate_pin_numbers_are_jumpers no)
+	(property "Reference" "TP" (at 0 6.858 0) (show_name no) (do_not_autoplace no) (effects (font (size 1.27 1.27))))
+	(property "Value" "TestPoint" (at 0 5.08 0) (show_name no) (do_not_autoplace no) (effects (font (size 1.27 1.27))))
+	(property "Footprint" "" (at 5.08 0 0) (show_name no) (do_not_autoplace no) (hide yes) (effects (font (size 1.27 1.27))))
+	(property "Datasheet" "" (at 5.08 0 0) (show_name no) (do_not_autoplace no) (hide yes) (effects (font (size 1.27 1.27))))
+	(property "Description" "test point" (at 0 0 0) (show_name no) (do_not_autoplace no) (hide yes) (effects (font (size 1.27 1.27))))
+	(property "ki_keywords" "test point tp" (at 0 0 0) (show_name no) (do_not_autoplace no) (hide yes) (effects (font (size 1.27 1.27))))
+	(property "ki_fp_filters" "Pin* Test*" (at 0 0 0) (show_name no) (do_not_autoplace no) (hide yes) (effects (font (size 1.27 1.27))))
+	(symbol "TestPoint_0_1"
+		(circle (center 0 3.302) (radius 0.762) (stroke (width 0) (type default)) (fill (type none))))
+	(symbol "TestPoint_1_1"
+		(pin passive line (at 0 0 90) (length 2.54) (name "1" (effects (font (size 1.27 1.27)))) (number "1" (effects (font (size 1.27 1.27))))))
+	(embedded_fonts no)
+)`
 
 const rawPowerPlus12VSymbol = `(symbol "power:+12V"
 	(power global)

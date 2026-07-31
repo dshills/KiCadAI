@@ -1898,6 +1898,7 @@ func schematicLayoutWithLibraryIndexAndPreferences(document Document, index *lib
 		Rules:                 rules,
 		MaxComponentsPerSheet: document.Layout.MaxComponentsPerSheet,
 	}
+	var invalidPlacementEndpointDiagnostics []schematiclayout.Diagnostic
 	for _, component := range document.Circuit.Components {
 		placement := placementsByID[component.ID]
 		group := groupsByID[placement.Group]
@@ -1921,6 +1922,14 @@ func schematicLayoutWithLibraryIndexAndPreferences(document Document, index *lib
 			near = append(near, neighbor)
 			sort.Strings(near)
 		}
+		sameRowAsPin, invalidRowEndpoints := schematicLayoutEndpoints(placement.SameRowAsPin)
+		sameColumnAsPin, invalidColumnEndpoints := schematicLayoutEndpoints(placement.SameColumnAsPin)
+		for _, invalid := range invalidRowEndpoints {
+			invalidPlacementEndpointDiagnostics = append(invalidPlacementEndpointDiagnostics, schematiclayout.Diagnostic{Severity: schematiclayout.SeverityError, Code: "invalid_relative_endpoint", Ref: component.ID, Message: fmt.Sprintf("same_row_as_pin contains malformed endpoint %q", invalid), Repair: "use component.pin endpoint syntax"})
+		}
+		for _, invalid := range invalidColumnEndpoints {
+			invalidPlacementEndpointDiagnostics = append(invalidPlacementEndpointDiagnostics, schematiclayout.Diagnostic{Severity: schematiclayout.SeverityError, Code: "invalid_relative_endpoint", Ref: component.ID, Message: fmt.Sprintf("same_column_as_pin contains malformed endpoint %q", invalid), Repair: "use component.pin endpoint syntax"})
+		}
 		request.Components = append(request.Components, schematiclayout.Component{
 			Ref:             component.ID,
 			DisplayRef:      component.Ref,
@@ -1934,6 +1943,10 @@ func schematicLayoutWithLibraryIndexAndPreferences(document Document, index *lib
 			Near:            near,
 			Above:           append([]string(nil), placement.Above...),
 			RightOf:         append([]string(nil), placement.RightOf...),
+			SameRowAs:       append([]string(nil), placement.SameRowAs...),
+			SameColumnAs:    append([]string(nil), placement.SameColumnAs...),
+			SameRowAsPin:    sameRowAsPin,
+			SameColumnAsPin: sameColumnAsPin,
 			Rotation:        kicadfiles.Angle(rotationByID[component.ID]),
 			Mirror:          schematiclayout.Mirror(mirrorByID[component.ID]),
 			Body:            geometry.Body,
@@ -2041,6 +2054,10 @@ func schematicLayoutWithLibraryIndexAndPreferences(document Document, index *lib
 			})
 			result = best
 		}
+	}
+	if len(invalidPlacementEndpointDiagnostics) != 0 {
+		result.Diagnostics = append(result.Diagnostics, invalidPlacementEndpointDiagnostics...)
+		result = schematiclayout.NormalizeResult(result, rules)
 	}
 	return result
 }
@@ -2558,6 +2575,20 @@ func schematicLayoutPins(component Component, index *libraryresolver.LibraryInde
 	return pins
 }
 
+func schematicLayoutEndpoints(refs []EndpointRef) ([]schematiclayout.Endpoint, []EndpointRef) {
+	endpoints := make([]schematiclayout.Endpoint, 0, len(refs))
+	var invalid []EndpointRef
+	for _, ref := range refs {
+		componentID, pin, ok := ref.Split()
+		if !ok {
+			invalid = append(invalid, ref)
+			continue
+		}
+		endpoints = append(endpoints, schematiclayout.Endpoint{Ref: componentID, Pin: pin})
+	}
+	return endpoints, invalid
+}
+
 // schematicLayoutPinDirections retains the raw library pin's outward-facing
 // side while connections use KiCad-calibrated physical anchors. KiCad parses
 // raw library Y coordinates into schematic space inverted, hence the Y flip.
@@ -2832,8 +2863,9 @@ func transactionSymbolPropertiesWithLayout(component Component, reference string
 	properties := transactionSymbolProperties(component)
 	rotation := 0.0
 	doNotAutoplace := true
+	hideReference := component.Role == ComponentRolePowerSymbol || component.Role == ComponentRoleGroundSymbol
 	visible := []transactions.SymbolProperty{
-		{Name: "Reference", Value: reference, At: layout.reference, Rotation: &rotation, DoNotAutoplace: &doNotAutoplace},
+		{Name: "Reference", Value: reference, Hidden: hideReference, At: layout.reference, Rotation: &rotation, DoNotAutoplace: &doNotAutoplace},
 	}
 	value := component.Value
 	hiddenValue := false

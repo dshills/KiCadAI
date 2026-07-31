@@ -105,6 +105,8 @@ func enforceRelativePlacement(components []Component, positions map[string]kicad
 		targetRefs = append(targetRefs, targetRef)
 	}
 	sort.Strings(targetRefs)
+	// Keep direct Request callers safe even when they bypass schematic IR
+	// validation and provide contradictory or cyclic alignment constraints.
 	maxIterations := len(components) * 2
 	for iteration := 0; iteration < maxIterations; iteration++ {
 		changed := false
@@ -155,6 +157,60 @@ func enforceRelativePlacement(components []Component, positions map[string]kicad
 			}
 			changed = true
 		}
+		for _, component := range components {
+			position, ok := positions[component.Ref]
+			if !ok || component.Fixed {
+				continue
+			}
+			for _, targetRef := range component.SameRowAs {
+				targetPosition, targetOK := positions[targetRef]
+				if !targetOK || position.Y == targetPosition.Y {
+					continue
+				}
+				position.Y = targetPosition.Y
+				positions[component.Ref] = position
+				changed = true
+			}
+		}
+		for _, component := range components {
+			position, ok := positions[component.Ref]
+			if !ok || component.Fixed {
+				continue
+			}
+			for _, targetRef := range component.SameColumnAs {
+				targetPosition, targetOK := positions[targetRef]
+				if !targetOK || position.X == targetPosition.X {
+					continue
+				}
+				position.X = targetPosition.X
+				positions[component.Ref] = position
+				changed = true
+			}
+		}
+		for _, component := range components {
+			position, ok := positions[component.Ref]
+			if !ok || component.Fixed {
+				continue
+			}
+			for _, endpoint := range component.SameRowAsPin {
+				anchor, anchorOK := relativeEndpointAnchor(byRef, positions, endpoint)
+				if !anchorOK || position.Y == anchor.Y {
+					continue
+				}
+				position.Y = anchor.Y
+				positions[component.Ref] = position
+				changed = true
+			}
+			for _, endpoint := range component.SameColumnAsPin {
+				anchor, anchorOK := relativeEndpointAnchor(byRef, positions, endpoint)
+				if !anchorOK || position.X == anchor.X {
+					continue
+				}
+				position.X = anchor.X
+				positions[component.Ref] = position
+				changed = true
+			}
+		}
 		if !changed {
 			return true
 		}
@@ -181,8 +237,50 @@ func relativePositionsSatisfied(components []Component, positions map[string]kic
 				return false
 			}
 		}
+		for _, targetRef := range component.SameRowAs {
+			targetPosition, ok := positions[targetRef]
+			if ok && positions[component.Ref].Y != targetPosition.Y {
+				return false
+			}
+		}
+		for _, targetRef := range component.SameColumnAs {
+			targetPosition, ok := positions[targetRef]
+			if ok && positions[component.Ref].X != targetPosition.X {
+				return false
+			}
+		}
+		for _, endpoint := range component.SameRowAsPin {
+			anchor, ok := relativeEndpointAnchor(byRef, positions, endpoint)
+			if ok && positions[component.Ref].Y != anchor.Y {
+				return false
+			}
+		}
+		for _, endpoint := range component.SameColumnAsPin {
+			anchor, ok := relativeEndpointAnchor(byRef, positions, endpoint)
+			if ok && positions[component.Ref].X != anchor.X {
+				return false
+			}
+		}
 	}
 	return true
+}
+
+func relativeEndpointAnchor(components map[string]Component, positions map[string]kicadfiles.Point, endpoint Endpoint) (kicadfiles.Point, bool) {
+	component, ok := components[endpoint.Ref]
+	if !ok {
+		return kicadfiles.Point{}, false
+	}
+	position, ok := positions[endpoint.Ref]
+	if !ok {
+		return kicadfiles.Point{}, false
+	}
+	for _, pin := range component.Pins {
+		if pin.Number != endpoint.Pin {
+			continue
+		}
+		return schematic.CanonicalConnectionAnchor(position, pin.At, component.Rotation, schematic.SymbolMirror(component.Mirror)), true
+	}
+	return kicadfiles.Point{}, false
 }
 
 func snapAtLeast(value, grid kicadfiles.IU) kicadfiles.IU {

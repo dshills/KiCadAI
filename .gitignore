@@ -23,6 +23,7 @@ coverage.out
 **/.history/
 *.kicad_prl
 ~*.kicad_*.lck
+*.kicadai-lock
 examples/roundtrip_artifacts/
 examples/promotion_artifacts/
 examples/.generated/

@@ -1,0 +1,62 @@
+{
+  "schema": "kicadai.schematic.ir.v1",
+  "version": 1,
+  "metadata": {
+    "name": "rc_low_pass_filter",
+    "title": "First-Order RC Low-Pass Filter",
+    "description": "A 1 kOhm and 100 nF low-pass filter with a cutoff frequency near 1.59 kHz.",
+    "paper": "A4"
+  },
+  "circuit": {
+    "components": [
+      {"id": "input", "ref": "TP1", "role": "testpoint", "symbol": "Connector:TestPoint", "value": "VIN", "footprint": "TestPoint:TestPoint_THTPad_D1.5mm_Drill0.7mm", "pins": [{"number": "1", "name": "VIN", "offset_x_mm": 0, "offset_y_mm": 0}]},
+      {"id": "series_resistor", "ref": "R1", "role": "resistor", "symbol": "Device:R", "value": "1k", "footprint": "Resistor_THT:R_Axial_DIN0207_L6.3mm_D2.5mm_P10.16mm_Horizontal", "pins": [{"number": "1"}, {"number": "2"}]},
+      {"id": "shunt_capacitor", "ref": "C1", "role": "capacitor", "symbol": "Device:C", "value": "100nF", "footprint": "Capacitor_THT:C_Disc_D5.0mm_W2.5mm_P5.00mm", "pins": [{"number": "1"}, {"number": "2"}]},
+      {"id": "output", "ref": "TP2", "role": "testpoint", "symbol": "Connector:TestPoint", "value": "VOUT", "footprint": "TestPoint:TestPoint_THTPad_D1.5mm_Drill0.7mm", "pins": [{"number": "1", "name": "VOUT", "offset_x_mm": 0, "offset_y_mm": 0}]},
+      {"id": "ground", "ref": "#PWR01", "role": "ground_symbol", "symbol": "power:GND", "value": "GND", "pins": [{"number": "1", "name": "GND", "offset_x_mm": 0, "offset_y_mm": 0}]},
+      {"id": "ground_flag", "ref": "#FLG01", "role": "ground_symbol", "symbol": "power:PWR_FLAG", "value": "PWR_FLAG", "pins": [{"number": "1", "name": "PWR_FLAG", "offset_x_mm": 0, "offset_y_mm": 0}]}
+    ],
+    "nets": [
+      {"name": "VIN", "role": "signal", "connect": ["input.1", "series_resistor.1"], "label": "VIN"},
+      {"name": "VOUT", "role": "signal", "connect": ["shunt_capacitor.1", "series_resistor.2", "output.1"], "label": "VOUT"},
+      {"name": "GND", "role": "ground", "connect": ["shunt_capacitor.2", "ground.1", "ground_flag.1"], "label": "GND", "use_label": false}
+    ]
+  },
+  "layout": {
+    "flow": "left_to_right",
+    "origin": "centered",
+    "groups": [
+      {"id": "input", "label": "Input", "role": "input_stage", "members": ["input"], "rank": 0, "side": "left"},
+      {"id": "filter", "label": "RC filter", "role": "processing_stage", "members": ["series_resistor", "shunt_capacitor", "ground", "ground_flag"], "rank": 1},
+      {"id": "output", "label": "Output", "role": "output_stage", "members": ["output"], "rank": 2, "side": "right"}
+    ],
+    "placements": [
+      {"target": "input", "group": "input", "same_row_as_pin": ["series_resistor.1"]},
+      {"target": "series_resistor", "group": "filter", "right_of": ["input"], "above": ["shunt_capacitor"], "same_column_as": ["shunt_capacitor"]},
+      {"target": "shunt_capacitor", "group": "filter", "above": ["ground"]},
+      {"target": "ground", "group": "filter", "same_column_as": ["shunt_capacitor"]},
+      {"target": "ground_flag", "group": "filter", "right_of": ["ground"], "same_row_as": ["ground"]},
+      {"target": "output", "group": "output", "right_of": ["series_resistor"], "same_row_as_pin": ["series_resistor.2"]}
+    ],
+    "lanes": {"power": "top", "ground": "bottom", "signals": "middle"},
+    "rules": {
+      "positive_power_top": false,
+      "ground_bottom": false,
+      "center_on_page": true,
+      "prefer_labels_for_long_nets": false,
+      "avoid_wire_crossings": true,
+      "min_group_spacing_mm": 8,
+      "min_component_spacing_mm": 5
+    }
+  },
+  "policy": {
+    "repair": {
+      "allow_ref_assignment": false,
+      "allow_label_insertion": true,
+      "allow_group_spacing_adjustment": false,
+      "allow_symbol_substitution": false,
+      "allow_pin_guessing": false
+    },
+    "acceptance": "readable"
+  }
+}

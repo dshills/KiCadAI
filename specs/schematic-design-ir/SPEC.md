@@ -354,6 +354,10 @@ Layout intent describes how the schematic should read.
         "target": "regulator_ic",
         "group": "regulator",
         "near": ["input_cap", "output_cap"],
+        "same_row_as": ["input_cap"],
+		"same_column_as": ["bias_resistor"],
+		"same_row_as_pin": ["output_resistor.2"],
+		"same_column_as_pin": ["output_connector.1"],
         "orientation": "normal"
       }
     ]
@@ -401,14 +405,34 @@ Required v1 semantics:
 - `prefer_labels_for_long_nets` lets KiCadAI use labels instead of long wires.
 - `placements` are hints, not hard coordinates, unless `absolute` is added in a
   future version.
+- `placements.above` and `placements.right_of` impose minimum body separation
+  in the named direction.
+- `placements.same_row_as` aligns the target symbol anchor to the named
+  component's row. Combining it with `right_of` expresses matched horizontal
+  branches without absolute page coordinates. Self-references, duplicates,
+  and unknown component IDs are validation errors.
+- `placements.same_column_as` aligns the target symbol anchor to the named
+  component's column. Combining it with `above` expresses vertical dividers,
+  shunt branches, and supply stacks without absolute page coordinates.
+- `placements.same_row_as_pin` and `placements.same_column_as_pin` align the
+  target symbol anchor to a named `component.pin` connection anchor. These
+  express a voltage-divider tap, collector output, or shunt branch precisely
+  without hard-coded page coordinates.
+- A placement may declare at most one alignment anchor per axis across its
+  component and pin forms. Alignment cycles are rejected deterministically so
+  contradictory constraints cannot oscillate in the placement solver.
 - Layout precedence is deterministic:
   1. group `rank` defines global left-to-right order;
   2. lane rules define top/middle/bottom vertical bands;
-  3. `placements.near` defines local offsets inside or adjacent to the selected
+  3. `placements.above`, `placements.right_of`,
+     `placements.same_row_as`, `placements.same_column_as`,
+     `placements.same_row_as_pin`, and `placements.same_column_as_pin` enforce
+     relative ordering and alignment;
+  4. `placements.near` defines local offsets inside or adjacent to the selected
      group;
-  4. conflicting or circular `near` hints are non-binding heuristics; the
+  5. conflicting or circular `near` hints are non-binding heuristics; the
      deterministic fallback is first valid target by document order;
-  5. spacing rules may expand distances but must not reorder groups.
+  6. spacing rules may expand distances but must not reorder groups.
 - When a complete drawing cannot fit on one supported page, KiCadAI partitions
   it into hierarchy child sheets. Explicit groups remain intact when they fit a
   child page; an oversized group is split deterministically and reported as

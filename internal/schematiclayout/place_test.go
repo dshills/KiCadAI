@@ -286,6 +286,41 @@ func TestPlaceHonorsAboveAndRightOfRelations(t *testing.T) {
 	}
 }
 
+func TestPlaceHonorsRowColumnAndRightOfRelations(t *testing.T) {
+	rules := DefaultRules(ProfileStandard)
+	rules.MinComponentSpacing = kicadfiles.MM(1)
+	result := Place(Request{
+		Sheet: testSheet(),
+		Rules: rules,
+		Components: []Component{
+			{Ref: "Q1", Role: "transistor"},
+			{Ref: "Q2", Role: "transistor", RightOf: []string{"Q1"}, SameRowAs: []string{"Q1"}},
+			{Ref: "R1", Role: "resistor", Above: []string{"Q1"}, SameColumnAs: []string{"Q1"}, Pins: []Pin{{Number: "2", At: kicadfiles.Point{Y: kicadfiles.MM(3.81)}}}},
+			{Ref: "J1", Role: "output_connector", SameRowAsPin: []Endpoint{{Ref: "R1", Pin: "2"}}},
+		},
+	})
+	byRef := map[string]PlacedComponent{}
+	for _, component := range result.Components {
+		byRef[component.Ref] = component
+	}
+	if byRef["Q2"].PlacedAt.Y != byRef["Q1"].PlacedAt.Y {
+		t.Fatalf("Q2=%#v does not share Q1=%#v row", byRef["Q2"], byRef["Q1"])
+	}
+	if componentBody(byRef["Q2"]).MinX < componentBody(byRef["Q1"]).MaxX+rules.MinComponentSpacing {
+		t.Fatalf("Q2=%#v is not right of Q1=%#v", byRef["Q2"], byRef["Q1"])
+	}
+	if byRef["R1"].PlacedAt.X != byRef["Q1"].PlacedAt.X {
+		t.Fatalf("R1=%#v does not share Q1=%#v column", byRef["R1"], byRef["Q1"])
+	}
+	r1Pin := pinAnchors([]PlacedComponent{byRef["R1"]})[Endpoint{Ref: "R1", Pin: "2"}]
+	if byRef["J1"].PlacedAt.Y != r1Pin.Y {
+		t.Fatalf("J1=%#v does not share R1.2=%#v row", byRef["J1"], r1Pin)
+	}
+	if hasDiagnostic(result.Diagnostics, "same_row_violation", SeverityError) || hasDiagnostic(result.Diagnostics, "same_column_violation", SeverityError) || hasDiagnostic(result.Diagnostics, "same_pin_row_violation", SeverityError) || hasDiagnostic(result.Diagnostics, "right_of_violation", SeverityError) {
+		t.Fatalf("relative placement diagnostics = %#v", result.Diagnostics)
+	}
+}
+
 func TestPlaceReportsNonConvergingRelativeRelations(t *testing.T) {
 	result := Place(Request{
 		Sheet: testSheet(),
@@ -296,6 +331,19 @@ func TestPlaceReportsNonConvergingRelativeRelations(t *testing.T) {
 	})
 	if !hasDiagnostic(result.Diagnostics, "relative_placement_not_converged", SeverityError) {
 		t.Fatalf("diagnostics = %#v, want convergence error", result.Diagnostics)
+	}
+}
+
+func TestPlaceBoundsContradictoryPinAlignment(t *testing.T) {
+	result := Place(Request{
+		Sheet: testSheet(),
+		Components: []Component{
+			{Ref: "A", Role: "resistor", SameRowAsPin: []Endpoint{{Ref: "B", Pin: "1"}}, Pins: []Pin{{Number: "1", At: kicadfiles.Point{Y: kicadfiles.MM(2.54)}}}},
+			{Ref: "B", Role: "resistor", SameRowAsPin: []Endpoint{{Ref: "A", Pin: "1"}}, Pins: []Pin{{Number: "1", At: kicadfiles.Point{Y: kicadfiles.MM(2.54)}}}},
+		},
+	})
+	if !hasDiagnostic(result.Diagnostics, "relative_placement_not_converged", SeverityError) {
+		t.Fatalf("diagnostics = %#v, want bounded convergence error", result.Diagnostics)
 	}
 }
 

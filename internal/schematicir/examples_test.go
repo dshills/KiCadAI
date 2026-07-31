@@ -32,6 +32,50 @@ func TestSchematicIRExamples(t *testing.T) {
 	}
 }
 
+func TestEducationalSchematicExamples(t *testing.T) {
+	directories := []string{
+		"01_dc_voltage_source",
+		"02_bjt_current_source",
+		"03_differential_amplifier",
+		"04_rc_low_pass_filter",
+		"05_voltage_divider",
+	}
+	for _, directory := range directories {
+		t.Run(directory, func(t *testing.T) {
+			root := filepath.Join("..", "..", "examples", "educational", directory)
+			file, err := os.Open(filepath.Join(root, "source.json"))
+			if err != nil {
+				t.Fatalf("open educational example: %v", err)
+			}
+			document, issues := DecodeStrict(file)
+			if closeErr := file.Close(); closeErr != nil {
+				t.Fatalf("close educational example: %v", closeErr)
+			}
+			if len(issues) != 0 {
+				t.Fatalf("decode issues: %+v", issues)
+			}
+			if issues := Validate(document); len(issues) != 0 {
+				t.Fatalf("validation issues: %+v", issues)
+			}
+			normalized := NormalizeLayoutIntent(document)
+			if len(normalized.Layout.Placements) != len(normalized.Circuit.Components) {
+				t.Fatalf("placements = %d, components = %d", len(normalized.Layout.Placements), len(normalized.Circuit.Components))
+			}
+			if len(normalized.Circuit.Nets) == 0 {
+				t.Fatal("educational example must contain connected nets")
+			}
+			schematics, err := filepath.Glob(filepath.Join(root, "generated", "*.kicad_sch"))
+			if err != nil || len(schematics) != 1 {
+				t.Fatalf("generated schematics = %v, err = %v", schematics, err)
+			}
+			projects, err := filepath.Glob(filepath.Join(root, "generated", "*.kicad_pro"))
+			if err != nil || len(projects) != 1 {
+				t.Fatalf("generated projects = %v, err = %v", projects, err)
+			}
+		})
+	}
+}
+
 func testSchematicIRExample(t *testing.T, fileName string, minSymbols int, minConnects int, minFootprints int, minBuses int, minBusEntries int) {
 	t.Helper()
 	path := filepath.Join("..", "..", "examples", "schematic-ir", fileName)

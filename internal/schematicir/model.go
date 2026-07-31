@@ -298,13 +298,17 @@ type LayoutRules struct {
 }
 
 type Placement struct {
-	Target      string      `json:"target"`
-	Group       string      `json:"group,omitempty"`
-	Near        []string    `json:"near,omitempty"`
-	Above       []string    `json:"above,omitempty"`
-	RightOf     []string    `json:"right_of,omitempty"`
-	Orientation Orientation `json:"orientation,omitempty"`
-	Mirror      Mirror      `json:"mirror,omitempty"`
+	Target          string        `json:"target"`
+	Group           string        `json:"group,omitempty"`
+	Near            []string      `json:"near,omitempty"`
+	Above           []string      `json:"above,omitempty"`
+	RightOf         []string      `json:"right_of,omitempty"`
+	SameRowAs       []string      `json:"same_row_as,omitempty"`
+	SameColumnAs    []string      `json:"same_column_as,omitempty"`
+	SameRowAsPin    []EndpointRef `json:"same_row_as_pin,omitempty"`
+	SameColumnAsPin []EndpointRef `json:"same_column_as_pin,omitempty"`
+	Orientation     Orientation   `json:"orientation,omitempty"`
+	Mirror          Mirror        `json:"mirror,omitempty"`
 }
 
 type BusLayout struct {

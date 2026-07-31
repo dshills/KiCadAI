@@ -1,0 +1,34 @@
+{
+  "board": {
+    "design_settings": {}
+  },
+  "boards": [],
+  "component_class_settings": {},
+  "cvpcb": {},
+  "erc": {},
+  "libraries": {},
+  "meta": {
+    "version": 1
+  },
+  "net_settings": {
+    "classes": [
+      {
+        "name": "Default",
+        "clearance": 0.2,
+        "track_width": 0.25,
+        "via_diameter": 0.6,
+        "via_drill": 0.3
+      }
+    ]
+  },
+  "pcbnew": {},
+  "schematic": {},
+  "sheets": [
+    [
+      "3f6422fc-292f-53a9-9765-4c59e64d9655",
+      "Root"
+    ]
+  ],
+  "text_variables": {},
+  "time_domain_parameters": {}
+}

@@ -1,0 +1,36 @@
+{
+  "schema": "kicadai.schematic.ir.v1",
+  "version": 1,
+  "metadata": {
+    "name": "dc_voltage_source",
+    "title": "9 V DC Voltage Source",
+    "description": "A battery voltage source feeding an output connector and a 1 kOhm demonstration load.",
+    "paper": "A4"
+  },
+  "circuit": {
+    "components": [
+      {"id": "battery", "ref": "BT1", "role": "generic", "symbol": "Device:Battery_Cell", "value": "9 V", "footprint": "Battery:BatteryHolder_Keystone_1060_1x2032", "pins": [{"number": "1", "name": "+"}, {"number": "2", "name": "-"}]},
+      {"id": "load", "ref": "R1", "role": "resistor", "symbol": "Device:R", "value": "1k", "footprint": "Resistor_THT:R_Axial_DIN0207_L6.3mm_D2.5mm_P10.16mm_Horizontal", "pins": [{"number": "1"}, {"number": "2"}]},
+      {"id": "output", "ref": "J1", "role": "output_connector", "symbol": "Connector_Generic:Conn_01x02", "value": "9 V OUTPUT", "footprint": "Connector_PinHeader_2.54mm:PinHeader_1x02_P2.54mm_Vertical", "pins": [{"number": "1", "name": "+9V"}, {"number": "2", "name": "GND"}]}
+    ],
+    "nets": [
+      {"name": "+9V", "role": "power_pos", "connect": ["battery.1", "load.1", "output.1"], "label": "+9V", "use_label": false},
+      {"name": "GND", "role": "ground", "connect": ["battery.2", "load.2", "output.2"], "label": "GND", "use_label": false}
+    ]
+  },
+  "layout": {
+    "flow": "left_to_right",
+    "origin": "centered",
+    "groups": [
+      {"id": "source", "label": "Voltage source", "role": "power_stage", "members": ["battery"], "rank": 0, "side": "left"},
+      {"id": "load", "label": "Load", "role": "processing_stage", "members": ["load"], "rank": 1},
+      {"id": "output", "label": "Output", "role": "output_stage", "members": ["output"], "rank": 2, "side": "right"}
+    ],
+    "placements": [
+      {"target": "load", "group": "load"}
+    ],
+    "lanes": {"power": "top", "ground": "bottom", "signals": "middle"},
+    "rules": {"positive_power_top": true, "ground_bottom": true, "center_on_page": true, "prefer_labels_for_long_nets": false, "avoid_wire_crossings": true, "min_group_spacing_mm": 30, "min_component_spacing_mm": 20}
+  },
+  "policy": {"repair": {"allow_ref_assignment": false, "allow_label_insertion": true, "allow_group_spacing_adjustment": true, "allow_symbol_substitution": false, "allow_pin_guessing": false}, "acceptance": "readable"}
+}
