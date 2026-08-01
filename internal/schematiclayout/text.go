@@ -42,7 +42,7 @@ func placeComponentText(components []PlacedComponent, rules Rules) ([]PlacedComp
 // reflowTextForWires recomputes generated symbol fields after routing. Text
 // placement happens before routes exist, so a field that was clear of symbols
 // can otherwise end up on a power or ground wire.
-func reflowTextForWires(components []PlacedComponent, wires []WireSegment, labels []Label, rules Rules) ([]PlacedComponent, []Diagnostic) {
+func reflowTextForWires(components []PlacedComponent, wires []WireSegment, labels []Label, rules Rules, usable Rect) ([]PlacedComponent, []Diagnostic) {
 	placed := append([]PlacedComponent(nil), components...)
 	var diagnostics []Diagnostic
 	bodyByRef := map[string]Rect{}
@@ -72,13 +72,13 @@ func reflowTextForWires(components []PlacedComponent, wires []WireSegment, label
 			referenceText = component.Ref
 		}
 		var clean bool
-		component.ReferenceText, clean = chooseTextPosition(referenceText, component.PlacedAt, body, occupied, rules, true)
+		component.ReferenceText, clean = chooseTextPositionWithin(referenceText, component.PlacedAt, body, occupied, rules, true, usable)
 		if !clean {
 			diagnostics = append(diagnostics, Diagnostic{Severity: SeverityWarning, Code: "text_placement_fallback", Ref: component.Ref, Message: "reference field required crowded fallback placement"})
 		}
 		occupied = append(occupied, component.ReferenceText.Box.Translate(component.PlacedAt))
 		if component.Value != "" {
-			component.ValueText, clean = chooseTextPosition(component.Value, component.PlacedAt, body, occupied, rules, false)
+			component.ValueText, clean = chooseTextPositionWithin(component.Value, component.PlacedAt, body, occupied, rules, false, usable)
 			if !clean {
 				diagnostics = append(diagnostics, Diagnostic{Severity: SeverityWarning, Code: "text_placement_fallback", Ref: component.Ref, Message: "value field required crowded fallback placement"})
 			}
@@ -91,6 +91,10 @@ func reflowTextForWires(components []PlacedComponent, wires []WireSegment, label
 }
 
 func chooseTextPosition(text string, origin kicadfiles.Point, body Rect, occupied []Rect, rules Rules, preferAbove bool) (TextBox, bool) {
+	return chooseTextPositionWithin(text, origin, body, occupied, rules, preferAbove, Rect{})
+}
+
+func chooseTextPositionWithin(text string, origin kicadfiles.Point, body Rect, occupied []Rect, rules Rules, preferAbove bool, usable Rect) (TextBox, bool) {
 	gap := rules.MinTextSpacing
 	if gap <= 0 {
 		gap = kicadfiles.MM(2.54)
@@ -139,22 +143,58 @@ func chooseTextPosition(text string, origin kicadfiles.Point, body Rect, occupie
 	}
 	for _, anchor := range candidates {
 		box := TextEstimate(text, anchor, 0, 0)
-		if !rectIntersectsAny(box, occupied) {
+		if (usable.Empty() || usable.ContainsRect(box)) && !rectIntersectsAny(box, occupied) {
 			return localTextBox(text, origin, anchor, box), true
 		}
 	}
+	eligible := make([]kicadfiles.Point, 0, len(candidates))
+	for _, anchor := range candidates {
+		box := TextEstimate(text, anchor, 0, 0)
+		if usable.Empty() || usable.ContainsRect(box) {
+			eligible = append(eligible, anchor)
+		}
+	}
+	if len(eligible) == 0 && !usable.Empty() {
+		for _, anchor := range candidates {
+			fitted := fitTextAnchorToRect(text, anchor, usable)
+			if usable.ContainsRect(TextEstimate(text, fitted, 0, 0)) {
+				eligible = append(eligible, fitted)
+			}
+		}
+	}
+	if len(eligible) == 0 {
+		eligible = candidates
+	}
 	bestIndex := 0
-	bestScore := textOverlapScore(TextEstimate(text, candidates[0], 0, 0), occupied)
-	for index := 1; index < len(candidates); index++ {
-		score := textOverlapScore(TextEstimate(text, candidates[index], 0, 0), occupied)
+	bestScore := textOverlapScore(TextEstimate(text, eligible[0], 0, 0), occupied)
+	for index := 1; index < len(eligible); index++ {
+		score := textOverlapScore(TextEstimate(text, eligible[index], 0, 0), occupied)
 		if score < bestScore {
 			bestIndex = index
 			bestScore = score
 		}
 	}
-	anchor := candidates[bestIndex]
+	anchor := eligible[bestIndex]
 	box := TextEstimate(text, anchor, 0, 0)
 	return localTextBox(text, origin, anchor, box), false
+}
+
+func fitTextAnchorToRect(text string, anchor kicadfiles.Point, usable Rect) kicadfiles.Point {
+	box := TextEstimate(text, anchor, 0, 0)
+	if box.Width() > usable.Width() || box.Height() > usable.Height() {
+		return anchor
+	}
+	if box.MinX < usable.MinX {
+		anchor.X += usable.MinX - box.MinX
+	} else if box.MaxX > usable.MaxX {
+		anchor.X -= box.MaxX - usable.MaxX
+	}
+	if box.MinY < usable.MinY {
+		anchor.Y += usable.MinY - box.MinY
+	} else if box.MaxY > usable.MaxY {
+		anchor.Y -= box.MaxY - usable.MaxY
+	}
+	return anchor
 }
 
 func textOverlapScore(candidate Rect, occupied []Rect) int {

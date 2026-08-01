@@ -178,7 +178,7 @@ func TestValidateAcceptsSpacedObjects(t *testing.T) {
 func TestReflowTextForWiresAvoidsWireOverlap(t *testing.T) {
 	component := PlacedComponent{Component: Component{Ref: "F1", Value: "500mA", Role: "fuse"}, PlacedAt: kicadfiles.Point{X: kicadfiles.MM(50), Y: kicadfiles.MM(50)}}
 	wires := []WireSegment{{From: kicadfiles.Point{X: kicadfiles.MM(50), Y: kicadfiles.MM(55)}, To: kicadfiles.Point{X: kicadfiles.MM(50), Y: kicadfiles.MM(70)}}}
-	placed, diagnostics := reflowTextForWires([]PlacedComponent{component}, wires, nil, DefaultRules(ProfileStandard))
+	placed, diagnostics := reflowTextForWires([]PlacedComponent{component}, wires, nil, DefaultRules(ProfileStandard), UsableSheet(testSheet()))
 	if len(placed) != 1 {
 		t.Fatalf("placed = %#v", placed)
 	}
@@ -187,6 +187,32 @@ func TestReflowTextForWiresAvoidsWireOverlap(t *testing.T) {
 	}
 	if placed[0].ValueText.Box.Translate(placed[0].PlacedAt).Intersects(Rect{MinX: kicadfiles.MM(49), MinY: kicadfiles.MM(55), MaxX: kicadfiles.MM(51), MaxY: kicadfiles.MM(70)}) {
 		t.Fatalf("value text overlaps route: %#v", placed[0].ValueText)
+	}
+}
+
+func TestReflowTextForWiresKeepsGeneratedFieldsInsideUsableSheet(t *testing.T) {
+	component := PlacedComponent{
+		Component: Component{Ref: "Q1", Value: "LONG_COMPONENT_VALUE", Role: "transistor"},
+		PlacedAt:  kicadfiles.Point{X: kicadfiles.MM(282), Y: kicadfiles.MM(100)},
+	}
+	placed, _ := reflowTextForWires(
+		[]PlacedComponent{component},
+		nil,
+		nil,
+		DefaultRules(ProfileStandard),
+		UsableSheet(testSheet()),
+	)
+	if len(placed) != 1 {
+		t.Fatalf("placed = %#v", placed)
+	}
+	usable := UsableSheet(testSheet())
+	for name, field := range map[string]TextBox{
+		"reference": placed[0].ReferenceText,
+		"value":     placed[0].ValueText,
+	} {
+		if !usable.ContainsRect(field.Box.Translate(placed[0].PlacedAt)) {
+			t.Fatalf("%s field is outside usable sheet: %#v usable=%#v", name, field, usable)
+		}
 	}
 }
 

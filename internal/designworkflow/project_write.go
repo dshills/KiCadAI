@@ -107,6 +107,7 @@ func WriteProject(ctx context.Context, request *Request, plan *BlockPlanResult, 
 		SuppressPinmapWarnings:          opts.LibraryIndex != nil,
 		SuppressExplicitPinSymbolErrors: opts.LibraryIndex != nil,
 		DefaultNetClassClearance:        kicadfiles.MM(projectNetClassClearanceMM(routed, placed)),
+		MinimumCopperEdgeClearance:      kicadfiles.MM(projectMinimumCopperEdgeClearanceMM(routed)),
 		MinimumViaDiameter:              kicadfiles.MM(projectMinimumViaDiameterMM(tx.Operations)),
 		MinimumThroughHoleDiameter:      kicadfiles.MM(projectMinimumThroughHoleDiameterMM(placed, tx.Operations)),
 		// Routing was computed against transaction pads; resolver hydration here

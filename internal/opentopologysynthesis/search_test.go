@@ -137,7 +137,7 @@ func TestBehaviorScoringRecognizesGenericBufferedTimeConstant(t *testing.T) {
 	beforeInternal := graph
 	graph = AddInternalNode(graph, "internal")
 	internal := requireAddedNodeID(t, beforeInternal, graph)
-	preferredPlacements := primitivePlacements(graph, opamp, maxPrimitivePlacementsPerKind)
+	preferredPlacements := primitivePlacements(requirement, graph, opamp, maxPrimitivePlacementsPerKind)
 	foundPreferredPlacement := false
 	for _, placement := range preferredPlacements {
 		terminals := map[string]string{}
@@ -161,6 +161,7 @@ func TestBehaviorScoringRecognizesGenericBufferedTimeConstant(t *testing.T) {
 		{Terminal: "V_PLUS", Node: "port_power"},
 	})
 	reactivePlacements := primitivePlacements(
+		requirement,
 		graph,
 		capacitor,
 		maxPrimitivePlacementsPerKind,
@@ -681,6 +682,358 @@ func TestTransconductanceRelationshipSeedsConstructBoundedPrimitiveGraph(t *test
 	}
 }
 
+func TestTransimpedanceRelationshipSeedsConstructBoundedPrimitiveGraph(t *testing.T) {
+	requirement, issues := DecodeStrict(bytes.NewReader(mustRead(
+		t,
+		filepath.Join(architectureGeneralizationCorpusRoot(), "low_current_voltage_converter.json"),
+	)))
+	if len(issues) != 0 {
+		t.Fatalf("requirement decode issues: %#v", issues)
+	}
+	inventory, _ := testHeldOutSynthesisEnvironment(t)
+	initial, graphIssues := InitialGraph(requirement)
+	if len(graphIssues) != 0 {
+		t.Fatalf("initial graph issues: %#v", graphIssues)
+	}
+	hash, err := GraphHash(initial)
+	if err != nil {
+		t.Fatal(err)
+	}
+	topology, err := TopologyHash(initial)
+	if err != nil {
+		t.Fatal(err)
+	}
+	byKey := primitiveInventoryByKey(inventory)
+	state := topologySearchState{
+		graph: initial, hash: hash, topology: topology,
+		score: scoreTopologyGraph(requirement, initial, byKey, hash),
+	}
+	policy := DefaultPolicy()
+	policy.MaxExpandedStates = 32
+	policy.MaxGeneratedGraphs = 256
+	candidates, consumption, rejections := topologyTransimpedanceRelationshipSeeds(
+		context.Background(), requirement, inventory,
+		topologyRepresentatives(requirement, inventory), byKey,
+		GraphLimits{MaxPrimitiveInstances: policy.MaxPrimitiveInstances, MaxInternalNodes: policy.MaxInternalNodes},
+		policy, state,
+	)
+	if len(candidates) < 1 {
+		t.Fatalf("transimpedance relationship produced no candidates: consumption=%#v rejections=%#v", consumption, rejections)
+	}
+	for _, candidate := range candidates {
+		if candidate.Score.BehaviorGap != 0 || internalNodeCount(candidate.Graph) > 1 {
+			t.Fatalf("unexpected transimpedance score=%#v graph=%s", candidate.Score, testGraphTopologySummary(candidate.Graph))
+		}
+		counts := map[string]int{}
+		for _, instance := range candidate.Graph.Instances {
+			counts[instance.Kind]++
+		}
+		if counts["opamp"] != 1 || counts["resistor"] < 1 || counts["resistor"] > 2 || counts["capacitor"] > 1 {
+			t.Fatalf("unexpected transimpedance primitive counts=%#v graph=%s", counts, testGraphTopologySummary(candidate.Graph))
+		}
+		plan := BuildValueSearchPlan(requirement, candidate.Graph, inventory, policy)
+		if plan.Status != ValuePlanReady {
+			t.Fatalf("transimpedance value plan=%s rejections=%#v issues=%#v", plan.Status, plan.Rejections, plan.Issues)
+		}
+		foundFeedbackScale := false
+		seriesScaleTotal := 0.0
+		for _, domain := range plan.Domains {
+			for _, scale := range domain.AnalyticScales {
+				foundFeedbackScale = foundFeedbackScale ||
+					(domain.PrimitiveKind == "resistor" &&
+						(scale.ID == "topology:current_to_voltage:feedback_resistance" && testValueSIEqual(scale.ValueSI, 100_000)))
+				if domain.PrimitiveKind == "resistor" && scale.ID == "topology:current_to_voltage:series_feedback_resistance" {
+					seriesScaleTotal += scale.ValueSI
+				}
+			}
+		}
+		foundFeedbackScale = foundFeedbackScale || math.Abs(seriesScaleTotal-100_000) <= 5_000
+		if !foundFeedbackScale {
+			t.Fatalf("transimpedance value plan lacks 100 kohm feedback derivation: %#v", plan.Domains)
+		}
+	}
+}
+
+func TestFullWaveRelationshipSeedsConstructBoundedPrimitiveGraph(t *testing.T) {
+	requirement, issues := DecodeStrict(bytes.NewReader(mustRead(
+		t,
+		filepath.Join(architectureGeneralizationCorpusRoot(), "low_level_full_wave_transfer.json"),
+	)))
+	if len(issues) != 0 {
+		t.Fatalf("requirement decode issues: %#v", issues)
+	}
+	inventory, _ := testHeldOutSynthesisEnvironment(t)
+	initial, graphIssues := InitialGraph(requirement)
+	if len(graphIssues) != 0 {
+		t.Fatalf("initial graph issues: %#v", graphIssues)
+	}
+	hash, err := GraphHash(initial)
+	if err != nil {
+		t.Fatal(err)
+	}
+	topology, err := TopologyHash(initial)
+	if err != nil {
+		t.Fatal(err)
+	}
+	byKey := primitiveInventoryByKey(inventory)
+	state := topologySearchState{
+		graph: initial, hash: hash, topology: topology,
+		score: scoreTopologyGraph(requirement, initial, byKey, hash),
+	}
+	policy := DefaultPolicy()
+	policy.MaxExpandedStates = 32
+	policy.MaxGeneratedGraphs = 256
+	candidates, consumption, rejections := topologyFullWaveRelationshipSeeds(
+		context.Background(), requirement, inventory,
+		topologyRepresentatives(requirement, inventory), byKey,
+		GraphLimits{MaxPrimitiveInstances: policy.MaxPrimitiveInstances, MaxInternalNodes: policy.MaxInternalNodes},
+		policy, state,
+	)
+	if len(candidates) != 2 {
+		t.Fatalf("full-wave relationship produced %d candidates: consumption=%#v rejections=%#v", len(candidates), consumption, rejections)
+	}
+	foundCompensation := false
+	for _, candidate := range candidates {
+		if candidate.Score.BehaviorGap != 0 || internalNodeCount(candidate.Graph) != 7 {
+			t.Fatalf("unexpected full-wave score=%#v graph=%s", candidate.Score, testGraphTopologySummary(candidate.Graph))
+		}
+		counts := map[string]int{}
+		for _, instance := range candidate.Graph.Instances {
+			counts[instance.Kind]++
+		}
+		if counts["opamp"] != 2 || counts["signal_diode"] != 2 || counts["resistor"] != 9 || counts["capacitor"] > 1 {
+			t.Fatalf("unexpected full-wave primitive counts=%#v graph=%s", counts, testGraphTopologySummary(candidate.Graph))
+		}
+		plan := BuildValueSearchPlan(requirement, candidate.Graph, inventory, policy)
+		if plan.Status != ValuePlanReady {
+			t.Fatalf("full-wave value plan=%s rejections=%#v issues=%#v", plan.Status, plan.Rejections, plan.Issues)
+		}
+		values := map[float64]int{}
+		for _, domain := range plan.Domains {
+			for _, scale := range domain.AnalyticScales {
+				if domain.PrimitiveKind == "resistor" && strings.HasPrefix(scale.ID, "topology:full_wave_ratio:") {
+					values[scale.ValueSI]++
+				}
+				if domain.PrimitiveKind == "capacitor" && strings.HasPrefix(scale.ID, "topology:full_wave_compensation:") && testValueSIEqual(scale.ValueSI, 10e-12) {
+					foundCompensation = true
+				}
+			}
+		}
+		if values[169_000] != 2 || values[47_000] != 6 || values[1_000] != 1 {
+			t.Fatalf("unexpected full-wave resistor derivations=%#v", values)
+		}
+	}
+	if !foundCompensation {
+		t.Fatal("full-wave relationships lack a bounded feedback-compensation alternative")
+	}
+}
+
+func TestWindowRelationshipSeedsRetainBypassAlternative(t *testing.T) {
+	requirement, issues := DecodeStrict(bytes.NewReader(mustRead(
+		t,
+		filepath.Join(architectureGeneralizationCorpusRoot(), "dual_threshold_window_indicator.json"),
+	)))
+	if len(issues) != 0 {
+		t.Fatalf("requirement decode issues: %#v", issues)
+	}
+	inventory, _ := testHeldOutSynthesisEnvironment(t)
+	initial, graphIssues := InitialGraph(requirement)
+	if len(graphIssues) != 0 {
+		t.Fatalf("initial graph issues: %#v", graphIssues)
+	}
+	hash, err := GraphHash(initial)
+	if err != nil {
+		t.Fatal(err)
+	}
+	topology, err := TopologyHash(initial)
+	if err != nil {
+		t.Fatal(err)
+	}
+	byKey := primitiveInventoryByKey(inventory)
+	state := topologySearchState{
+		graph: initial, hash: hash, topology: topology,
+		score: scoreTopologyGraph(requirement, initial, byKey, hash),
+	}
+	policy := DefaultPolicy()
+	policy.MaxExpandedStates = 32
+	policy.MaxGeneratedGraphs = 256
+	candidates, consumption, rejections := topologyWindowRelationshipSeeds(
+		context.Background(), requirement, inventory,
+		topologyRepresentatives(requirement, inventory), byKey,
+		GraphLimits{MaxPrimitiveInstances: policy.MaxPrimitiveInstances, MaxInternalNodes: policy.MaxInternalNodes},
+		policy, state,
+	)
+	if len(candidates) != 2 {
+		t.Fatalf("window relationships=%d consumption=%#v rejections=%#v", len(candidates), consumption, rejections)
+	}
+	foundBypass := false
+	for _, candidate := range candidates {
+		if candidate.Score.BehaviorGap != 0 || internalNodeCount(candidate.Graph) != 8 {
+			t.Fatalf("unexpected window score=%#v graph=%s", candidate.Score, testGraphTopologySummary(candidate.Graph))
+		}
+		counts := map[string]int{}
+		for _, instance := range candidate.Graph.Instances {
+			counts[instance.Kind]++
+		}
+		if counts["comparator"] != 3 || counts["opamp"] != 2 || counts["reference_diode"] != 1 || counts["resistor"] != 9 || counts["capacitor"] > 1 {
+			t.Fatalf("unexpected window primitive counts=%#v graph=%s", counts, testGraphTopologySummary(candidate.Graph))
+		}
+		plan := BuildValueSearchPlan(requirement, candidate.Graph, inventory, policy)
+		if plan.Status != ValuePlanReady {
+			t.Fatalf("window value plan=%s rejections=%#v issues=%#v", plan.Status, plan.Rejections, plan.Issues)
+		}
+		for _, domain := range plan.Domains {
+			for _, scale := range domain.AnalyticScales {
+				if strings.HasPrefix(scale.ID, "topology:window_supply_bypass:") && testValueSIEqual(scale.ValueSI, 100e-9) {
+					foundBypass = true
+				}
+			}
+		}
+	}
+	if !foundBypass {
+		t.Fatal("window relationships lack a bounded local-bypass alternative")
+	}
+}
+
+func TestRegulatedVoltageRelationshipSeedsRetainBiasAlternative(t *testing.T) {
+	requirement, issues := DecodeStrict(bytes.NewReader(mustRead(
+		t,
+		filepath.Join(architectureGeneralizationCorpusRoot(), "regulated_low_voltage_output.json"),
+	)))
+	if len(issues) != 0 {
+		t.Fatalf("requirement decode issues: %#v", issues)
+	}
+	inventory, _ := testHeldOutSynthesisEnvironment(t)
+	initial, graphIssues := InitialGraph(requirement)
+	if len(graphIssues) != 0 {
+		t.Fatalf("initial graph issues: %#v", graphIssues)
+	}
+	hash, err := GraphHash(initial)
+	if err != nil {
+		t.Fatal(err)
+	}
+	topology, err := TopologyHash(initial)
+	if err != nil {
+		t.Fatal(err)
+	}
+	byKey := primitiveInventoryByKey(inventory)
+	state := topologySearchState{
+		graph: initial, hash: hash, topology: topology,
+		score: scoreTopologyGraph(requirement, initial, byKey, hash),
+	}
+	policy := DefaultPolicy()
+	policy.MaxExpandedStates = 32
+	policy.MaxGeneratedGraphs = 256
+	candidates, consumption, rejections := topologyRegulatedVoltageRelationshipSeeds(
+		context.Background(), requirement, inventory,
+		topologyRepresentatives(requirement, inventory), byKey,
+		GraphLimits{MaxPrimitiveInstances: policy.MaxPrimitiveInstances, MaxInternalNodes: policy.MaxInternalNodes},
+		policy, state,
+	)
+	if len(candidates) != 2 {
+		t.Fatalf("regulated-voltage relationships=%d consumption=%#v rejections=%#v", len(candidates), consumption, rejections)
+	}
+	foundBleeder := false
+	for _, candidate := range candidates {
+		if candidate.Score.BehaviorGap != 0 {
+			t.Fatalf("unexpected regulated-voltage score=%#v graph=%s", candidate.Score, testGraphTopologySummary(candidate.Graph))
+		}
+		plan := BuildValueSearchPlan(requirement, candidate.Graph, inventory, policy)
+		if plan.Status != ValuePlanReady {
+			t.Fatalf("regulated-voltage value plan=%s rejections=%#v issues=%#v", plan.Status, plan.Rejections, plan.Issues)
+		}
+		for _, domain := range plan.Domains {
+			for _, scale := range domain.AnalyticScales {
+				if strings.HasPrefix(scale.ID, "topology:regulated_pass_bleeder:") && testValueSIEqual(scale.ValueSI, 10_000) {
+					foundBleeder = true
+				}
+			}
+		}
+	}
+	if !foundBleeder {
+		t.Fatal("regulated-voltage relationships lack an emitter-referenced pass-device bias alternative")
+	}
+
+	outputOnly := requirement
+	outputOnly.Requirements.BehavioralRequirements = slices.DeleteFunc(
+		slices.Clone(requirement.Requirements.BehavioralRequirements),
+		func(assertion BehavioralAssertion) bool { return assertion.Metric != "output_voltage" },
+	)
+	state.score = scoreTopologyGraph(outputOnly, initial, byKey, hash)
+	outputOnlyCandidates, outputOnlyConsumption, outputOnlyRejections := topologyRegulatedVoltageRelationshipSeeds(
+		context.Background(), outputOnly, inventory,
+		topologyRepresentatives(outputOnly, inventory), byKey,
+		GraphLimits{MaxPrimitiveInstances: policy.MaxPrimitiveInstances, MaxInternalNodes: policy.MaxInternalNodes},
+		policy, state,
+	)
+	if len(outputOnlyCandidates) != 2 {
+		t.Fatalf("output-only regulated-voltage relationships=%d consumption=%#v rejections=%#v", len(outputOnlyCandidates), outputOnlyConsumption, outputOnlyRejections)
+	}
+}
+
+func TestBandpassRelationshipSeedsConstructBoundedPrimitiveGraph(t *testing.T) {
+	data := mustRead(t, filepath.Join(architectureGeneralizationCorpusRoot(), "selective_midband_transfer.json"))
+	requirement, issues := DecodeStrict(bytes.NewReader(data))
+	if len(issues) != 0 {
+		t.Fatalf("requirement decode issues: %#v", issues)
+	}
+	inventory, _ := testHeldOutSynthesisEnvironment(t)
+	initial, graphIssues := InitialGraph(requirement)
+	if len(graphIssues) != 0 {
+		t.Fatalf("initial graph issues: %#v", graphIssues)
+	}
+	hash, err := GraphHash(initial)
+	if err != nil {
+		t.Fatal(err)
+	}
+	topology, err := TopologyHash(initial)
+	if err != nil {
+		t.Fatal(err)
+	}
+	byKey := primitiveInventoryByKey(inventory)
+	state := topologySearchState{graph: initial, hash: hash, topology: topology, score: scoreTopologyGraph(requirement, initial, byKey, hash)}
+	policy := DefaultPolicy()
+	policy.MaxExpandedStates = 32
+	policy.MaxGeneratedGraphs = 256
+	candidates, consumption, rejections := topologyBandpassRelationshipSeeds(
+		context.Background(), requirement, inventory, topologyRepresentatives(requirement, inventory), byKey,
+		GraphLimits{MaxPrimitiveInstances: policy.MaxPrimitiveInstances, MaxInternalNodes: policy.MaxInternalNodes}, policy, state,
+	)
+	if len(candidates) < 2 {
+		t.Fatalf("bandpass relationships=%d consumption=%#v rejections=%#v", len(candidates), consumption, rejections)
+	}
+	foundCascade := false
+	for _, candidate := range candidates {
+		counts := map[string]int{}
+		for _, instance := range candidate.Graph.Instances {
+			counts[instance.Kind]++
+		}
+		if candidate.Score.BehaviorGap != 0 {
+			t.Fatalf("unexpected bandpass relationship score=%#v graph=%s", candidate.Score, testGraphTopologySummary(candidate.Graph))
+		}
+		plan := BuildValueSearchPlan(requirement, candidate.Graph, inventory, policy)
+		if plan.Status != ValuePlanReady {
+			t.Fatalf("bandpass value plan=%s rejections=%#v issues=%#v", plan.Status, plan.Rejections, plan.Issues)
+		}
+		foundLower, foundUpper := false, false
+		for _, domain := range plan.Domains {
+			for _, scale := range domain.AnalyticScales {
+				foundLower = foundLower || strings.Contains(scale.ID, "topology:bracketed_passband:lower_corner_")
+				foundUpper = foundUpper || strings.Contains(scale.ID, "topology:bracketed_passband:upper_corner_")
+			}
+		}
+		if counts["opamp"] == 4 && counts["resistor"] == 4 && counts["capacitor"] == 4 {
+			if !foundLower || !foundUpper {
+				t.Fatalf("cascaded bandpass value plan lacks derived corners lower=%t upper=%t", foundLower, foundUpper)
+			}
+			foundCascade = true
+		}
+	}
+	if !foundCascade {
+		t.Fatalf("bandpass relationships lack second-order lower/upper cascade: %#v", candidates)
+	}
+}
+
 func TestBehaviorScoringRejectsDegenerateDecisionFeedback(t *testing.T) {
 	requirement := testOpenTopologyRequirement(t, "hysteretic_detector.json")
 	if polarity := topologyDecisionPolarity(requirement); polarity != 1 {
@@ -706,7 +1059,7 @@ func TestBehaviorScoringRejectsDegenerateDecisionFeedback(t *testing.T) {
 	preferred = AddInternalNode(preferred, "internal")
 	signal := requireAddedNodeID(t, beforeSignal, preferred)
 	foundTwoNodeDecisionPlacement := false
-	for _, placement := range primitivePlacements(preferred, comparator, maxPrimitivePlacementsPerKind) {
+	for _, placement := range primitivePlacements(requirement, preferred, comparator, maxPrimitivePlacementsPerKind) {
 		terminals := map[string]string{}
 		for _, connection := range placement {
 			terminals[connection.Terminal] = connection.Node
@@ -734,7 +1087,7 @@ func TestBehaviorScoringRejectsDegenerateDecisionFeedback(t *testing.T) {
 		signal + "|port_input":      false,
 		signal + "|port_indication": false,
 	}
-	for _, placement := range primitivePlacements(preferred, resistor, maxPrimitivePlacementsPerKind) {
+	for _, placement := range primitivePlacements(requirement, preferred, resistor, maxPrimitivePlacementsPerKind) {
 		left, right := placement[0].Node, placement[1].Node
 		if left > right {
 			left, right = right, left
@@ -876,7 +1229,7 @@ func TestGenericPlacementGenerationUsesTerminalRoles(t *testing.T) {
 			break
 		}
 	}
-	placements := primitivePlacements(graph, opamp, 128)
+	placements := primitivePlacements(Requirement{}, graph, opamp, 128)
 	if len(placements) == 0 {
 		t.Fatal("generic op-amp terminal placement produced no candidates")
 	}
@@ -887,6 +1240,35 @@ func TestGenericPlacementGenerationUsesTerminalRoles(t *testing.T) {
 		}
 		if bindings["V_PLUS"] != "supply" || bindings["V_MINUS"] != "ground" || bindings["OUT"] != "output" {
 			t.Fatalf("terminal role contract produced invalid placement: %#v", placement)
+		}
+	}
+}
+
+func TestGenericPlacementPreservesDeclaredSupplyOrder(t *testing.T) {
+	data := mustRead(t, filepath.Join(architectureGeneralizationCorpusRoot(), "low_level_full_wave_transfer.json"))
+	requirement, issues := DecodeStrict(bytes.NewReader(data))
+	if len(issues) != 0 {
+		t.Fatalf("requirement decode issues: %#v", issues)
+	}
+	graph, graphIssues := InitialGraph(requirement)
+	if len(graphIssues) != 0 {
+		t.Fatalf("initial graph issues: %#v", graphIssues)
+	}
+	inventory, _ := testHeldOutSynthesisEnvironment(t)
+	var opamp PrimitiveCandidate
+	for _, primitive := range topologyRepresentatives(requirement, inventory) {
+		if primitive.Kind == "opamp" {
+			opamp = primitive
+			break
+		}
+	}
+	placements := primitivePlacements(requirement, graph, opamp, 256)
+	if len(placements) == 0 {
+		t.Fatal("dual-supply op-amp produced no valid placement")
+	}
+	for _, placement := range placements {
+		if !validPrimitiveSupplyOrder(requirement, graph, placement) {
+			t.Fatalf("placement reverses declared supply order: %#v", placement)
 		}
 	}
 }

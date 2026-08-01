@@ -17,6 +17,28 @@ const maximumTrustedOpenCircuitImpedanceOhm = 1e15
 const TransientResponseOnsetFraction = 0.1
 
 func acDerivedValue(result AnalysisResult, assertion Assertion) (float64, *Diagnostic) {
+	if assertion.Quantity == QuantityTransimpedanceOhm {
+		for _, point := range result.Points {
+			if math.Abs(point.FrequencyHz-assertion.FrequencyHz) > math.Max(1, math.Abs(point.FrequencyHz))*1e-12 {
+				continue
+			}
+			output, outputFound := analysisNodeMagnitude(point, assertion.Node)
+			current := 0.0
+			currentFound := false
+			for _, device := range point.Devices {
+				if device.Component == assertion.Component {
+					current = device.CurrentMagnitudeA
+					currentFound = true
+					break
+				}
+			}
+			if !outputFound || !currentFound || current <= 0 {
+				return 0, advancedAssertionDiagnostic(assertion, "AC transimpedance assertion requires a solved output voltage and nonzero excitation-source current")
+			}
+			return normalizedMNAFloat(output / current), nil
+		}
+		return 0, advancedAssertionDiagnostic(assertion, "AC transimpedance assertion frequency is absent from the solved sweep")
+	}
 	if assertion.Quantity == QuantityInputImpedanceOhm {
 		for _, point := range result.Points {
 			if math.Abs(point.FrequencyHz-assertion.FrequencyHz) > math.Max(1, math.Abs(point.FrequencyHz))*1e-12 {
@@ -74,9 +96,19 @@ func acDerivedValue(result AnalysisResult, assertion Assertion) (float64, *Diagn
 	gains := make([]float64, len(result.Points))
 	for index, point := range result.Points {
 		output, outputFound := analysisNodeMagnitude(point, assertion.Node)
-		reference, referenceFound := analysisNodeMagnitude(point, assertion.ReferenceNode)
+		reference, referenceFound := 0.0, false
+		if assertion.Component != "" {
+			for _, device := range point.Devices {
+				if device.Component == assertion.Component {
+					reference, referenceFound = device.CurrentMagnitudeA, true
+					break
+				}
+			}
+		} else {
+			reference, referenceFound = analysisNodeMagnitude(point, assertion.ReferenceNode)
+		}
 		if !outputFound || !referenceFound || reference <= 0 {
-			return 0, advancedAssertionDiagnostic(assertion, "cutoff/bandwidth assertion requires solved output and nonzero reference-node magnitudes")
+			return 0, advancedAssertionDiagnostic(assertion, "cutoff/bandwidth assertion requires solved output and nonzero voltage- or current-excitation magnitude")
 		}
 		gains[index] = output / reference
 	}

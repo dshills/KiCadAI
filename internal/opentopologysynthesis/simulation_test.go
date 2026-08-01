@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"math"
+	"path/filepath"
 	"testing"
 
 	"kicadai/internal/circuitgraph"
@@ -20,6 +21,48 @@ func TestThermalOutputStageDissipationRejectsUnboundedLoads(t *testing.T) {
 	}
 	if dissipation, bounded := thermalOutputStageDissipation(24, 10, 8); !bounded || !finite(dissipation) || dissipation <= 0 {
 		t.Fatalf("bounded load produced dissipation %v, bounded=%v", dissipation, bounded)
+	}
+}
+
+func TestBehavioralThermalTransferAndEventDurationAreBounded(t *testing.T) {
+	requirement, issues := DecodeStrict(bytes.NewReader(mustRead(
+		t,
+		filepath.Join(architectureGeneralizationCorpusRoot(), "regulated_low_voltage_output.json"),
+	)))
+	if len(issues) != 0 {
+		t.Fatalf("requirement decode issues: %#v", issues)
+	}
+	var lineCase, startupCase OperatingCase
+	var startupAssertion BehavioralAssertion
+	for _, operatingCase := range requirement.Requirements.OperatingCases {
+		switch operatingCase.ID {
+		case "line_and_load":
+			lineCase = operatingCase
+		case "startup":
+			startupCase = operatingCase
+		}
+	}
+	for _, assertion := range requirement.Requirements.BehavioralRequirements {
+		if assertion.Metric == "startup_overshoot" {
+			startupAssertion = assertion
+		}
+	}
+	if duration := dynamicDuration(startupAssertion, startupCase); duration < 0.01 {
+		t.Fatalf("event-driven startup duration=%g, want at least 0.01 s", duration)
+	}
+	maximum := 0.0
+	for _, corner := range operatingCaseCorners(lineCase) {
+		if dissipation, bounded := thermalBehavioralTransferDissipation(
+			requirement,
+			lineCase,
+			corner,
+			12,
+		); bounded {
+			maximum = math.Max(maximum, dissipation)
+		}
+	}
+	if maximum < 0.7 || maximum > 0.71 {
+		t.Fatalf("behavioral transfer dissipation=%g, want conservative 0.7 W", maximum)
 	}
 }
 
@@ -224,6 +267,7 @@ func TestHeldOutMetricsHaveGenericTrustedMeasurementContracts(t *testing.T) {
 		"thd",
 		"total_harmonic_distortion",
 		"transconductance",
+		"transimpedance",
 		"upper_threshold",
 		"voltage_gain",
 		"voltage_gain_at_frequency",
@@ -368,6 +412,59 @@ func TestLoadCurrentHarnessAndCrossCaseSweepAreCatalogBacked(t *testing.T) {
 	}
 	if !found {
 		t.Fatalf("load-current excitation is missing: %#v", excitations)
+	}
+}
+
+func TestAnalogCurrentInputHarnessUsesCatalogCurrentSource(t *testing.T) {
+	data := mustRead(t, filepath.Join(architectureGeneralizationCorpusRoot(), "low_current_voltage_converter.json"))
+	requirement, issues := DecodeStrict(bytes.NewReader(data))
+	if len(issues) != 0 {
+		t.Fatalf("requirement decode issues: %#v", issues)
+	}
+	inventory, environment := testHeldOutSynthesisEnvironment(t)
+	search := SearchPrimitiveTopologies(context.Background(), requirement, inventory, DefaultPolicy())
+	if len(search.Candidates) == 0 {
+		t.Fatalf("current-input search produced no candidate: %#v", search)
+	}
+	var assertion BehavioralAssertion
+	for _, candidate := range requirement.Requirements.BehavioralRequirements {
+		if candidate.Metric == "phase_margin" {
+			assertion = candidate
+			break
+		}
+	}
+	var operatingCase OperatingCase
+	for _, candidate := range requirement.Requirements.OperatingCases {
+		if candidate.ID == assertion.OperatingCases[0] {
+			operatingCase = candidate
+			break
+		}
+	}
+	corner := operatingCaseCorners(operatingCase)[0]
+	harness, _, diagnostics := simulationHarness(
+		requirement, assertion, operatingCase, corner,
+		search.Candidates[0].Graph, environment,
+	)
+	if len(diagnostics) != 0 {
+		t.Fatalf("current-input harness diagnostics: %#v", diagnostics)
+	}
+	sourceID := sourceInstanceForObservation(search.Candidates[0].Graph, Observation{Kind: "port", ID: "signal_current"})
+	found := false
+	for _, component := range harness {
+		if component.InstanceID != sourceID {
+			continue
+		}
+		found = component.Family == "current_source"
+		connections := map[string]string{}
+		for _, connection := range component.Connections {
+			connections[connection.Function] = connection.Net
+		}
+		if connections["POSITIVE"] != "port_ground" || connections["NEGATIVE"] != "port_signal_current" {
+			t.Fatalf("current-input source orientation = %#v", connections)
+		}
+	}
+	if !found {
+		t.Fatalf("current-input harness lacks catalog current source %q: %#v", sourceID, harness)
 	}
 }
 

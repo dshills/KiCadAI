@@ -37,6 +37,7 @@ type PageSettings struct {
 }
 
 type BoardDesignRules struct {
+	MinimumCopperEdgeClearance kicadfiles.IU
 	MinimumViaDiameter         kicadfiles.IU
 	MinimumThroughHoleDiameter kicadfiles.IU
 }
@@ -92,6 +93,9 @@ func Validate(project ProjectFile) error {
 	}
 	if project.BoardRules.MinimumThroughHoleDiameter < 0 {
 		errs = append(errs, fieldError("board_rules.minimum_through_hole_diameter", "must be non-negative"))
+	}
+	if project.BoardRules.MinimumCopperEdgeClearance < 0 {
+		errs = append(errs, fieldError("board_rules.minimum_copper_edge_clearance", "must be non-negative"))
 	}
 	if project.BoardRules.MinimumViaDiameter < 0 {
 		errs = append(errs, fieldError("board_rules.minimum_via_diameter", "must be non-negative"))
@@ -287,6 +291,9 @@ func newDocument(project ProjectFile) map[string]any {
 	}
 	designSettings := map[string]any{}
 	rules := map[string]any{}
+	if project.BoardRules.MinimumCopperEdgeClearance > 0 {
+		rules["min_copper_edge_clearance"] = mmNumber(project.BoardRules.MinimumCopperEdgeClearance)
+	}
 	if project.BoardRules.MinimumViaDiameter > 0 {
 		rules["min_via_diameter"] = mmNumber(project.BoardRules.MinimumViaDiameter)
 	}

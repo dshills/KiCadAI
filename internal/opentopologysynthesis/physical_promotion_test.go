@@ -1,6 +1,7 @@
 package opentopologysynthesis
 
 import (
+	"bytes"
 	"context"
 	"os"
 	"path/filepath"
@@ -169,10 +170,11 @@ func TestFrozenHeldOutCorpusOptionalKiCadPromotion(t *testing.T) {
 	policy.MaxTopologyRepairs = 32
 	policy.MaxCandidateSimulations = 50_000
 	policy.MaxCornerEvaluations = 200_000
-	passed := 0
+	passed, executed := 0, 0
 	for _, name := range testHeldOutRequirementNames() {
 		name := name
 		t.Run(name, func(t *testing.T) {
+			executed++
 			requirement := testOpenTopologyRequirement(t, name)
 			run := Synthesize(
 				ctx,
@@ -230,10 +232,16 @@ func TestFrozenHeldOutCorpusOptionalKiCadPromotion(t *testing.T) {
 			passed++
 		})
 	}
-	if passed < 6 {
+	if executed == 0 {
+		t.Skip("no held-out promotion subtests matched the test filter")
+	}
+	want := min(6, executed)
+	if passed < want {
 		t.Fatalf(
-			"installed-KiCad held-out promotions = %d, want at least 6 of 8",
+			"installed-KiCad held-out promotions = %d, want at least %d of %d executed cases",
 			passed,
+			want,
+			executed,
 		)
 	}
 }
@@ -337,6 +345,109 @@ func TestArchitectureCorpusOptionalKiCadPromotion(t *testing.T) {
 				promotion.Hash,
 			)
 		})
+	}
+}
+
+func TestArchitectureGeneralizationCorpusOptionalKiCadPromotion(t *testing.T) {
+	if os.Getenv(openTopologyKiCadPromotionEnv) != "1" {
+		t.Skip("set KICADAI_OPEN_TOPOLOGY_KICAD_PROMOTION=1 to run installed-KiCad architecture-generalization promotion")
+	}
+	kicadCLI := openTopologyKiCadCLI(t)
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Minute)
+	defer cancel()
+	index, _ := libraryresolver.Load(
+		ctx,
+		libraryresolver.LibraryRoots{
+			SymbolsRoot: openTopologyLibraryRoot(
+				t, libraryresolver.EnvSymbolsRoot,
+				"/Applications/KiCad/KiCad.app/Contents/SharedSupport/symbols",
+			),
+			FootprintsRoot: openTopologyLibraryRoot(
+				t, libraryresolver.EnvFootprintsRoot,
+				"/Applications/KiCad/KiCad.app/Contents/SharedSupport/footprints",
+			),
+			TemplatesRoot: strings.TrimSpace(os.Getenv(libraryresolver.EnvTemplatesRoot)),
+		},
+		libraryresolver.LoadOptions{},
+	)
+	var manifest generalizationCorpusManifest
+	decodeFrozenStrict(t, mustRead(t, filepath.Join(architectureGeneralizationCorpusRoot(), "manifest.json")), &manifest)
+	inventory, environment := testHeldOutSynthesisEnvironment(t)
+	policy := DefaultPolicy()
+	policy.MaxExpandedStates = 2_000
+	policy.MaxGeneratedGraphs = 50_000
+	policy.MaxRetainedCandidates = 16
+	policy.MaxValueTrials = 64
+	policy.MaxTopologyRepairs = 16
+	policy.MaxCandidateSimulations = 4_096
+	policy.MaxCornerEvaluations = 16_384
+	passed, executed := 0, 0
+	for _, entry := range manifest.DesignCases {
+		entry := entry
+		t.Run(entry.ID, func(t *testing.T) {
+			executed++
+			requirement, issues := DecodeStrict(bytes.NewReader(mustRead(
+				t,
+				filepath.Join(architectureGeneralizationCorpusRoot(), entry.RequirementFile),
+			)))
+			if len(issues) != 0 {
+				t.Fatalf("requirement decode issues: %#v", issues)
+			}
+			first := Synthesize(ctx, requirement, inventory, environment, policy)
+			second := Synthesize(ctx, requirement, inventory, environment, policy)
+			if first.Hash == "" || first.Hash != second.Hash {
+				t.Fatalf("synthesis replay differs first=%s second=%s", first.Hash, second.Hash)
+			}
+			if first.Report.Status != StatusPassed {
+				if first.Physical != nil || len(first.Report.Diagnostics) == 0 {
+					t.Fatalf("non-pass design did not fail closed: status=%s physical=%t diagnostics=%#v", first.Report.Status, first.Physical != nil, first.Report.Diagnostics)
+				}
+				t.Logf("stable unsupported design hash=%s status=%s", first.Hash, first.Report.Status)
+				return
+			}
+			outputRoot := t.TempDir()
+			if retained := strings.TrimSpace(os.Getenv("KICADAI_OPEN_TOPOLOGY_ARTIFACT_ROOT")); retained != "" {
+				outputRoot = filepath.Join(retained, entry.ID)
+			}
+			promotion := PromoteSynthesisRun(
+				ctx,
+				first,
+				environment,
+				PhysicalPromotionOptions{
+					OutputRoot:    outputRoot,
+					KiCadCLI:      kicadCLI,
+					LibraryIndex:  &index,
+					Timeout:       3 * time.Minute,
+					KeepArtifacts: true,
+				},
+			)
+			if promotion.Status != PhysicalPromotionPassed ||
+				!promotion.ReplayIdentical || promotion.ProjectHash == "" || len(promotion.Runs) != 2 {
+				t.Fatalf(
+					"architecture-generalization promotion status=%s replay=%t runs=%d issues=%#v",
+					promotion.Status,
+					promotion.ReplayIdentical,
+					len(promotion.Runs),
+					promotion.Issues,
+				)
+			}
+			t.Logf(
+				"architecture-generalization promotion synthesis=%s topology=%s physical=%s project=%s evidence=%s",
+				first.Hash,
+				first.Report.Selected.TopologyHash,
+				first.Physical.Hash,
+				promotion.ProjectHash,
+				promotion.Hash,
+			)
+			passed++
+		})
+	}
+	if executed == 0 {
+		t.Skip("no architecture-generalization promotion subtests matched the test filter")
+	}
+	want := min(5, executed)
+	if passed < want {
+		t.Fatalf("installed-KiCad architecture-generalization promotions=%d, want at least %d of %d executed cases", passed, want, executed)
 	}
 }
 

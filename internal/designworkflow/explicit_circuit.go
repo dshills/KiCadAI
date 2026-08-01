@@ -203,6 +203,7 @@ func writeExplicitCircuitProject(ctx context.Context, request Request, tx transa
 		OutputDir: outputDir, Overwrite: opts.Overwrite, Seed: opts.Seed, CopperLayers: request.Board.Layers, LibraryIndex: opts.LibraryIndex,
 		SuppressPinmapWarnings: opts.LibraryIndex != nil, SuppressExplicitPinSymbolErrors: opts.LibraryIndex != nil,
 		DefaultNetClassClearance:   kicadfiles.MM(projectNetClassClearanceMM(&routed, &placed)),
+		MinimumCopperEdgeClearance: kicadfiles.MM(projectMinimumCopperEdgeClearanceMM(&routed)),
 		MinimumViaDiameter:         kicadfiles.MM(projectMinimumViaDiameterMM(tx.Operations)),
 		MinimumThroughHoleDiameter: kicadfiles.MM(projectMinimumThroughHoleDiameterMM(&placed, tx.Operations)),
 		PreserveFootprintGeometry:  true,

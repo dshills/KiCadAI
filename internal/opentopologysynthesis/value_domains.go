@@ -12,6 +12,7 @@ import (
 
 	"kicadai/internal/architecturesearch"
 	"kicadai/internal/reports"
+	"kicadai/internal/simmodel"
 )
 
 const (
@@ -726,6 +727,10 @@ func deriveAnalyticScales(requirement Requirement, primitive PrimitiveCandidate)
 			if value > 0 {
 				add(AnalyticScale{ID: source + ":reciprocal_transconductance", Kind: "resistance", ValueSI: 1 / value, Unit: "ohm", Derivation: "R=1/gm dimensional scale", SourceKind: "behavioral_assertion", SourceID: assertion.ID, Priority: 5})
 			}
+		case "transimpedance":
+			if value > 0 {
+				add(AnalyticScale{ID: source + ":transimpedance_resistance", Kind: "resistance", ValueSI: value, Unit: "ohm", Derivation: "R=V/I dimensional scale", SourceKind: "behavioral_assertion", SourceID: assertion.ID, Priority: 5})
+			}
 		case "voltage_gain", "voltage_gain_at_frequency":
 			addRatioDerivedResistanceScales(&result, source, assertion.ID, "gain ratio applied to neutral resistance anchor", value, anchorResistance, 20)
 		case "cutoff_frequency":
@@ -778,7 +783,31 @@ func deriveTopologyAnalyticScales(
 	); len(scales) != 0 {
 		return scales
 	}
+	if scales := deriveBandpassTopologyScales(
+		requirement,
+		graph,
+		instance,
+		inventory,
+	); len(scales) != 0 {
+		return scales
+	}
+	if scales := deriveRegulatedVoltageTopologyScales(
+		requirement,
+		graph,
+		instance,
+		inventory,
+	); len(scales) != 0 {
+		return scales
+	}
 	if scales := derivePowerTransferTopologyScales(
+		requirement,
+		graph,
+		instance,
+		inventory,
+	); len(scales) != 0 {
+		return scales
+	}
+	if scales := deriveWindowTopologyScales(
 		requirement,
 		graph,
 		instance,
@@ -792,10 +821,25 @@ func deriveTopologyAnalyticScales(
 	); len(scales) != 0 {
 		return scales
 	}
+	if scales := deriveFullWaveTopologyScales(
+		requirement,
+		graph,
+		instance,
+	); len(scales) != 0 {
+		return scales
+	}
 	if scales := deriveAnalogTransferTopologyScales(
 		requirement,
 		graph,
 		instance,
+	); len(scales) != 0 {
+		return scales
+	}
+	if scales := deriveTransimpedanceTopologyScales(
+		requirement,
+		graph,
+		instance,
+		inventory,
 	); len(scales) != 0 {
 		return scales
 	}
@@ -1249,6 +1293,169 @@ func deriveFrequencySelectiveTopologyScales(
 	return nil
 }
 
+func deriveBandpassTopologyScales(
+	requirement Requirement,
+	graph CandidateGraph,
+	instance GraphInstance,
+	inventory map[string]PrimitiveCandidate,
+) []AnalyticScale {
+	envelope, ok := topologyBandpassBehaviorEnvelope(requirement)
+	if !ok || envelope.rejectionMaximum <= 0 || envelope.rejectionMaximum >= 1 {
+		return nil
+	}
+	between := func(kind, left, right string) string {
+		for _, candidate := range graph.Instances {
+			if candidate.Kind != kind || len(candidate.Terminals) != 2 {
+				continue
+			}
+			first, second := candidate.Terminals[0].Node, candidate.Terminals[1].Node
+			if (first == left && second == right) || (first == right && second == left) {
+				return candidate.ID
+			}
+		}
+		return ""
+	}
+	reference := referenceNodeForDomain(graph, envelope.input)
+	type stage struct {
+		kind                string
+		filterNode          string
+		resistor, capacitor string
+	}
+	stages := []stage{}
+	for _, active := range graph.Instances {
+		if active.Kind != "opamp" {
+			continue
+		}
+		terminals := topologyTerminalNodes(active)
+		if terminals["OUT"] != terminals["IN_MINUS"] {
+			continue
+		}
+		filterNode := terminals["IN_PLUS"]
+		shuntResistor := between("resistor", filterNode, reference)
+		shuntCapacitor := between("capacitor", filterNode, reference)
+		seriesResistor, seriesCapacitor := "", ""
+		for _, candidate := range graph.Instances {
+			if len(candidate.Terminals) != 2 {
+				continue
+			}
+			left, right := candidate.Terminals[0].Node, candidate.Terminals[1].Node
+			if left != filterNode && right != filterNode {
+				continue
+			}
+			other := left
+			if other == filterNode {
+				other = right
+			}
+			if other == reference {
+				continue
+			}
+			switch candidate.Kind {
+			case "resistor":
+				seriesResistor = candidate.ID
+			case "capacitor":
+				seriesCapacitor = candidate.ID
+			}
+		}
+		switch {
+		case shuntResistor != "" && seriesCapacitor != "":
+			stages = append(stages, stage{kind: "lower", filterNode: filterNode, resistor: shuntResistor, capacitor: seriesCapacitor})
+		case shuntCapacitor != "" && seriesResistor != "":
+			stages = append(stages, stage{kind: "upper", filterNode: filterNode, resistor: seriesResistor, capacitor: shuntCapacitor})
+		}
+	}
+	lowerCount, upperCount := 0, 0
+	for _, candidate := range stages {
+		if candidate.kind == "lower" {
+			lowerCount++
+		} else {
+			upperCount++
+		}
+	}
+	for _, candidate := range stages {
+		count := upperCount
+		if candidate.kind == "lower" {
+			count = lowerCount
+		}
+		if count == 0 || (instance.ID != candidate.resistor && instance.ID != candidate.capacitor) {
+			continue
+		}
+		totalAttenuation := math.Max(0.01, math.Min(0.99, envelope.rejectionMaximum*0.5))
+		stageAttenuation := math.Pow(totalAttenuation, 1/float64(count))
+		factor := math.Sqrt(1/(stageAttenuation*stageAttenuation) - 1)
+		cutoff := envelope.upperHz / factor
+		cornerID := "upper"
+		if candidate.kind == "lower" {
+			cutoff = envelope.lowerHz * factor
+			cornerID = "lower"
+		}
+		resistance, capacitance, found := catalogFixedRCPair(requirement, inventory, cutoff)
+		if !found {
+			return nil
+		}
+		if instance.ID == candidate.resistor {
+			return []AnalyticScale{{
+				ID: "topology:bracketed_passband:" + cornerID + "_corner_resistance", Kind: "resistance", ValueSI: resistance, Unit: "ohm",
+				Derivation: "catalog-ranked R-C pair for the per-stage bounded rejection ratio", SourceKind: "candidate_topology", SourceID: candidate.filterNode, Priority: 1,
+			}}
+		}
+		return []AnalyticScale{{
+			ID: "topology:bracketed_passband:" + cornerID + "_corner_capacitance", Kind: "capacitance", ValueSI: capacitance, Unit: "F",
+			Derivation: "catalog-ranked R-C pair for the per-stage bounded rejection ratio", SourceKind: "candidate_topology", SourceID: candidate.filterNode, Priority: 1,
+		}}
+	}
+	return nil
+}
+
+func catalogFixedRCPair(
+	requirement Requirement,
+	inventory map[string]PrimitiveCandidate,
+	cutoffHz float64,
+) (float64, float64, bool) {
+	if cutoffHz <= 0 {
+		return 0, 0, false
+	}
+	type choice struct {
+		value float64
+		key   string
+	}
+	resistors, capacitors := []choice{}, []choice{}
+	requiredAnalyses := requirementAnalysisSet(requirement)
+	for _, primitive := range inventory {
+		if primitive.ValueDomain == nil || !primitiveCoversAllAnalyses(primitive, requiredAnalyses) || !ratingsCoverRequirement(requirement, primitive) {
+			continue
+		}
+		minimum, maximum, ok := effectiveValueRange(*primitive.ValueDomain)
+		if !ok || minimum != maximum {
+			continue
+		}
+		switch primitive.Kind {
+		case "resistor":
+			resistors = append(resistors, choice{value: minimum, key: primitive.Key})
+		case "capacitor":
+			capacitors = append(capacitors, choice{value: minimum, key: primitive.Key})
+		}
+	}
+	sortChoices := func(values []choice) {
+		slices.SortFunc(values, func(left, right choice) int {
+			return cmp.Or(cmp.Compare(left.value, right.value), cmp.Compare(left.key, right.key))
+		})
+	}
+	sortChoices(resistors)
+	sortChoices(capacitors)
+	bestResistance, bestCapacitance, bestError, bestKey := 0.0, 0.0, math.Inf(1), ""
+	for _, resistor := range resistors {
+		for _, capacitor := range capacitors {
+			actual := 1 / (2 * math.Pi * resistor.value * capacitor.value)
+			error := math.Abs(math.Log(actual / cutoffHz))
+			key := resistor.key + "|" + capacitor.key
+			if error < bestError || (error == bestError && (bestKey == "" || key < bestKey)) {
+				bestResistance, bestCapacitance, bestError, bestKey = resistor.value, capacitor.value, error, key
+			}
+		}
+	}
+	return bestResistance, bestCapacitance, bestKey != ""
+}
+
 func topologyFrequencySelectiveFeedbackFraction(requirement Requirement, rejectionFrequency float64) float64 {
 	_ = requirement
 	_ = rejectionFrequency
@@ -1302,6 +1509,155 @@ type powerTransferSizingTargets struct {
 // behavior using conventional first-order bias, gain, degeneration, and pole
 // equations. These are advisory trial anchors; catalog quantization and trusted
 // simulation remain authoritative.
+func deriveRegulatedVoltageTopologyScales(
+	requirement Requirement,
+	graph CandidateGraph,
+	instance GraphInstance,
+	inventory map[string]PrimitiveCandidate,
+) []AnalyticScale {
+	if !slices.Contains([]string{"resistor", "capacitor"}, instance.Kind) ||
+		len(instance.Terminals) != 2 ||
+		!topologyGraphHasReferenceRegulatedOutput(graph, false) {
+		return nil
+	}
+	outputTarget := 0.0
+	outputID := ""
+	for _, assertion := range requirement.Requirements.BehavioralRequirements {
+		if assertion.Metric == "output_voltage" && assertion.Observation.Kind == "port" {
+			outputTarget = assertionTarget(assertion)
+			outputID = "port_" + assertion.Observation.ID
+			break
+		}
+	}
+	if outputTarget <= 0 || outputID == "" {
+		return nil
+	}
+	supplies := topologyNodesByRole(graph, "supply")
+	references := topologyNodesByRole(graph, "reference")
+	if len(supplies) != 1 || len(references) != 1 {
+		return nil
+	}
+	between := func(left, right string) string {
+		for _, candidate := range graph.Instances {
+			if candidate.Kind != "resistor" || len(candidate.Terminals) != 2 {
+				continue
+			}
+			first, second := candidate.Terminals[0].Node, candidate.Terminals[1].Node
+			if (first == left && second == right) || (first == right && second == left) {
+				return candidate.ID
+			}
+		}
+		return ""
+	}
+	absoluteReference, referenceVoltage := "", 0.0
+	for _, candidate := range graph.Instances {
+		if candidate.Kind != "reference_diode" {
+			continue
+		}
+		terminals := topologyTerminalNodes(candidate)
+		if terminals["ANODE"] != references[0] {
+			continue
+		}
+		for _, model := range inventory[candidate.PrimitiveKey].Models {
+			if model.ModelID != simmodel.PrimitiveShuntVoltageReferenceV1 {
+				continue
+			}
+			for _, parameter := range model.Parameters {
+				if parameter.Name == "output_voltage_v" && parameter.Value > 0 {
+					absoluteReference, referenceVoltage = terminals["CATHODE"], parameter.Value
+				}
+			}
+		}
+	}
+	if absoluteReference == "" || referenceVoltage <= 0 || outputTarget <= referenceVoltage {
+		return nil
+	}
+	first, second := instance.Terminals[0].Node, instance.Terminals[1].Node
+	makeScale := func(id string, value float64, derivation, source string) []AnalyticScale {
+		if value <= 0 || !finite(value) {
+			return nil
+		}
+		kind, unit := "resistance", "ohm"
+		if instance.Kind == "capacitor" {
+			kind, unit = "capacitance", "F"
+		}
+		return []AnalyticScale{{
+			ID: id + ":" + instance.ID, Kind: kind, ValueSI: value, Unit: unit,
+			Derivation: derivation, SourceKind: "candidate_topology", SourceID: source, Priority: 1,
+		}}
+	}
+	if instance.Kind == "capacitor" {
+		for _, controller := range graph.Instances {
+			if controller.Kind != "opamp" {
+				continue
+			}
+			terminals := topologyTerminalNodes(controller)
+			if (first == terminals["OUT"] && second == terminals["IN_MINUS"]) ||
+				(second == terminals["OUT"] && first == terminals["IN_MINUS"]) {
+				return makeScale("topology:regulated_loop_compensation", 10e-9, "bounded dominant-pole compensation for a discrete feedback-regulated pass stage", outputID)
+			}
+		}
+		switch {
+		case (first == supplies[0] && second == references[0]) ||
+			(second == supplies[0] && first == references[0]):
+			return makeScale("topology:regulated_input_bypass", 100e-9, "bounded local input bypass for a feedback-regulated power stage", supplies[0])
+		case (first == outputID && second == references[0]) ||
+			(second == outputID && first == references[0]):
+			return makeScale("topology:regulated_output_capacitance", 10e-6, "bounded output capacitance for startup and loop stability", outputID)
+		}
+		return nil
+	}
+	if instance.ID == between(supplies[0], absoluteReference) {
+		return makeScale("topology:regulated_reference_bias", 10_000, "bounded bias resistance for a reviewed voltage reference", absoluteReference)
+	}
+	for _, node := range graph.Nodes {
+		if node.Scope != "internal" {
+			continue
+		}
+		upperID := between(outputID, node.ID)
+		lowerID := between(node.ID, references[0])
+		if upperID == "" || lowerID == "" || (instance.ID != upperID && instance.ID != lowerID) {
+			continue
+		}
+		upper, lower, found := catalogResistanceDivider(
+			requirement, inventory, outputTarget/referenceVoltage-1, 10_000, 1,
+			outputTarget, outputTarget, 0, 0,
+		)
+		if !found {
+			return nil
+		}
+		if instance.ID == upperID {
+			return makeScale("topology:regulated_feedback_upper", upper, "catalog-ranked divider ratio derived from an absolute reference and bounded output voltage", node.ID)
+		}
+		return makeScale("topology:regulated_feedback_lower", lower[0], "catalog-ranked divider ratio derived from an absolute reference and bounded output voltage", node.ID)
+	}
+	for _, controller := range graph.Instances {
+		if controller.Kind != "opamp" {
+			continue
+		}
+		controllerTerminals := topologyTerminalNodes(controller)
+		for _, passDevice := range graph.Instances {
+			if passDevice.Kind != "npn_bjt" {
+				continue
+			}
+			passTerminals := topologyTerminalNodes(passDevice)
+			if instance.ID == between(controllerTerminals["OUT"], passTerminals["BASE"]) {
+				return makeScale("topology:regulated_pass_drive", 100, "bounded series resistance isolates the controller from the nonlinear pass-device input", passDevice.ID)
+			}
+			if instance.ID == between(passTerminals["BASE"], passTerminals["EMITTER"]) {
+				return makeScale("topology:regulated_pass_bleeder", 10_000, "bounded emitter-referenced base discharge preserves a defined pass-device off state", passDevice.ID)
+			}
+		}
+	}
+	for _, node := range graph.Nodes {
+		if node.Scope == "external" && (node.Role == "control" || node.Role == "input") &&
+			instance.ID == between(supplies[0], node.ID) {
+			return makeScale("topology:regulated_default_enable", 10_000, "bounded pull-up preserves a declared high default control state", node.ID)
+		}
+	}
+	return nil
+}
+
 func derivePowerTransferTopologyScales(
 	requirement Requirement,
 	graph CandidateGraph,
@@ -2332,6 +2688,227 @@ func derivePowerTransferSizingTargets(requirement Requirement) powerTransferSizi
 	return targets
 }
 
+func deriveWindowTopologyScales(
+	requirement Requirement,
+	graph CandidateGraph,
+	instance GraphInstance,
+	inventory map[string]PrimitiveCandidate,
+) []AnalyticScale {
+	if !slices.Contains([]string{"resistor", "capacitor"}, instance.Kind) || len(instance.Terminals) != 2 {
+		return nil
+	}
+	envelope, required := topologyWindowBehaviorEnvelope(requirement)
+	if !required {
+		return nil
+	}
+	supplyNodes := topologyNodesByRole(graph, "supply")
+	referenceNodes := topologyNodesByRole(graph, "reference")
+	if len(supplyNodes) != 1 || len(referenceNodes) != 1 {
+		return nil
+	}
+	if instance.Kind == "capacitor" {
+		first, second := instance.Terminals[0].Node, instance.Terminals[1].Node
+		if (first == supplyNodes[0] && second == referenceNodes[0]) ||
+			(first == referenceNodes[0] && second == supplyNodes[0]) {
+			return []AnalyticScale{{
+				ID:   "topology:window_supply_bypass:" + instance.ID,
+				Kind: "capacitance", ValueSI: 100e-9, Unit: "F",
+				Derivation: "bounded local bypass for a composed multi-decision transfer",
+				SourceKind: "candidate_topology", SourceID: supplyNodes[0], Priority: 1,
+			}}
+		}
+		return nil
+	}
+	supplyVoltage := nominalSupplyVoltage(requirement)
+	if supplyVoltage <= envelope.upperV {
+		return nil
+	}
+	nodeByID := make(map[string]GraphNode, len(graph.Nodes))
+	for _, node := range graph.Nodes {
+		nodeByID[node.ID] = node
+	}
+	var finalDecision GraphInstance
+	for _, decision := range graph.Instances {
+		if decision.Kind != "comparator" {
+			continue
+		}
+		terminals := topologyTerminalNodes(decision)
+		if nodeByID[terminals["OUT"]].Scope == "external" &&
+			nodeByID[terminals["OUT"]].Role == "output" &&
+			nodeByID[terminals["IN_MINUS"]].Scope == "internal" &&
+			nodeByID[terminals["IN_PLUS"]].Scope == "internal" {
+			finalDecision = decision
+			break
+		}
+	}
+	if finalDecision.ID == "" {
+		return nil
+	}
+	finalTerminals := topologyTerminalNodes(finalDecision)
+	insideNode, inverterReference := "", ""
+	for _, candidateNode := range []string{finalTerminals["IN_PLUS"], finalTerminals["IN_MINUS"]} {
+		outputs := 0
+		for _, decision := range graph.Instances {
+			if decision.Kind == "comparator" && decision.ID != finalDecision.ID &&
+				topologyTerminalNodes(decision)["OUT"] == candidateNode {
+				outputs++
+			}
+		}
+		if outputs == 2 {
+			insideNode = candidateNode
+		}
+	}
+	if insideNode == finalTerminals["IN_PLUS"] {
+		inverterReference = finalTerminals["IN_MINUS"]
+	} else if insideNode == finalTerminals["IN_MINUS"] {
+		inverterReference = finalTerminals["IN_PLUS"]
+	}
+	if insideNode == "" || inverterReference == "" {
+		return nil
+	}
+	thresholdByNode := map[string]float64{inverterReference: supplyVoltage / 2}
+	insideDecisions := 0
+	for _, decision := range graph.Instances {
+		if decision.Kind != "comparator" || decision.ID == finalDecision.ID {
+			continue
+		}
+		terminals := topologyTerminalNodes(decision)
+		if terminals["OUT"] != insideNode {
+			continue
+		}
+		switch {
+		case nodeByID[terminals["IN_PLUS"]].Scope == "external" &&
+			nodeByID[terminals["IN_PLUS"]].Role == "input" &&
+			nodeByID[terminals["IN_MINUS"]].Scope == "internal":
+			thresholdByNode[terminals["IN_MINUS"]] = envelope.lowerV
+			insideDecisions++
+		case nodeByID[terminals["IN_MINUS"]].Scope == "external" &&
+			nodeByID[terminals["IN_MINUS"]].Role == "input" &&
+			nodeByID[terminals["IN_PLUS"]].Scope == "internal":
+			thresholdByNode[terminals["IN_PLUS"]] = envelope.upperV
+			insideDecisions++
+		}
+	}
+	if insideDecisions != 2 || len(thresholdByNode) != 3 {
+		return nil
+	}
+	between := func(left, right string) []string {
+		ids := []string{}
+		for _, candidate := range graph.Instances {
+			if candidate.Kind != "resistor" || len(candidate.Terminals) != 2 {
+				continue
+			}
+			first, second := candidate.Terminals[0].Node, candidate.Terminals[1].Node
+			if (first == left && second == right) || (first == right && second == left) {
+				ids = append(ids, candidate.ID)
+			}
+		}
+		slices.Sort(ids)
+		return ids
+	}
+	const anchorResistance = 10_000.0
+	absoluteReference := ""
+	referenceVoltage := 0.0
+	for _, candidate := range graph.Instances {
+		if candidate.Kind != "reference_diode" {
+			continue
+		}
+		terminals := topologyTerminalNodes(candidate)
+		if terminals["ANODE"] != referenceNodes[0] {
+			continue
+		}
+		for _, model := range inventory[candidate.PrimitiveKey].Models {
+			if model.ModelID != simmodel.PrimitiveShuntVoltageReferenceV1 {
+				continue
+			}
+			for _, parameter := range model.Parameters {
+				if parameter.Name == "output_voltage_v" && parameter.Value > 0 {
+					absoluteReference = terminals["CATHODE"]
+					referenceVoltage = parameter.Value
+				}
+			}
+		}
+	}
+	if absoluteReference == "" || referenceVoltage <= 0 {
+		return nil
+	}
+	if slices.Contains(between(supplyNodes[0], absoluteReference), instance.ID) {
+		return []AnalyticScale{{
+			ID:   "topology:window_reference_bias:" + instance.ID,
+			Kind: "resistance", ValueSI: anchorResistance, Unit: "ohm",
+			Derivation: "bounded bias resistance for a reviewed absolute reference",
+			SourceKind: "candidate_topology", SourceID: absoluteReference, Priority: 1,
+		}}
+	}
+	for thresholdNode, thresholdVoltage := range thresholdByNode {
+		if thresholdNode == inverterReference {
+			continue
+		}
+		var amplifier GraphInstance
+		for _, candidate := range graph.Instances {
+			if candidate.Kind == "opamp" && topologyTerminalNodes(candidate)["OUT"] == thresholdNode {
+				amplifier = candidate
+				break
+			}
+		}
+		if amplifier.ID == "" {
+			continue
+		}
+		terminals := topologyTerminalNodes(amplifier)
+		if terminals["IN_PLUS"] != absoluteReference {
+			continue
+		}
+		groundBranches := between(terminals["IN_MINUS"], referenceNodes[0])
+		feedbackBranches := []string{}
+		for _, node := range graph.Nodes {
+			if node.Scope != "internal" {
+				continue
+			}
+			first := between(thresholdNode, node.ID)
+			second := between(node.ID, terminals["IN_MINUS"])
+			if len(first) == 1 && len(second) == 1 {
+				feedbackBranches = []string{first[0], second[0]}
+				break
+			}
+		}
+		slices.Sort(feedbackBranches)
+		if len(groundBranches) != 1 || len(feedbackBranches) != 2 {
+			continue
+		}
+		groundValue, feedbackValues, found := catalogNonInvertingGainTriplet(
+			requirement, inventory, thresholdVoltage/referenceVoltage,
+		)
+		if !found {
+			continue
+		}
+		values := map[string]float64{groundBranches[0]: groundValue}
+		for index, branch := range feedbackBranches {
+			values[branch] = feedbackValues[index]
+		}
+		value := values[instance.ID]
+		if value > 0 && finite(value) {
+			return []AnalyticScale{{
+				ID:   "topology:window_reference:" + thresholdNode + ":" + instance.ID,
+				Kind: "resistance", ValueSI: value, Unit: "ohm",
+				Derivation: "catalog-ranked non-inverting ratio derived from a reviewed reference and bounded window threshold",
+				SourceKind: "candidate_topology", SourceID: thresholdNode, Priority: 1,
+			}}
+		}
+	}
+	first, second := instance.Terminals[0].Node, instance.Terminals[1].Node
+	outputNode := finalTerminals["OUT"]
+	if (first == supplyNodes[0] && (second == insideNode || second == outputNode)) ||
+		(second == supplyNodes[0] && (first == insideNode || first == outputNode)) {
+		return []AnalyticScale{{
+			ID:   "topology:window_pullup:" + instance.ID,
+			Kind: "resistance", ValueSI: anchorResistance, Unit: "ohm",
+			Derivation: "bounded open-collector pull-up for a composed decision node",
+			SourceKind: "candidate_topology", SourceID: outputNode, Priority: 1,
+		}}
+	}
+	return nil
+}
+
 func deriveConditionalTransferTopologyScales(
 	graph CandidateGraph,
 	instance GraphInstance,
@@ -2477,6 +3054,122 @@ func deriveConditionalTransferTopologyScales(
 		}
 	}
 	return nil
+}
+
+func deriveFullWaveTopologyScales(
+	requirement Requirement,
+	graph CandidateGraph,
+	instance GraphInstance,
+) []AnalyticScale {
+	if !slices.Contains([]string{"resistor", "capacitor"}, instance.Kind) || len(instance.Terminals) != 2 {
+		return nil
+	}
+	envelope, required := topologyFullWaveBehaviorEnvelope(requirement)
+	if !required {
+		return nil
+	}
+	opamps, diodes := 0, 0
+	for _, candidate := range graph.Instances {
+		if candidate.Kind == "opamp" {
+			opamps++
+		}
+		if candidate.Kind == "signal_diode" {
+			diodes++
+		}
+	}
+	if opamps != 2 || diodes != 2 {
+		return nil
+	}
+	if instance.Kind == "capacitor" {
+		first, second := instance.Terminals[0].Node, instance.Terminals[1].Node
+		for _, amplifier := range graph.Instances {
+			if amplifier.Kind != "opamp" {
+				continue
+			}
+			terminals := topologyTerminalNodes(amplifier)
+			if (first == terminals["OUT"] && second == terminals["IN_MINUS"]) ||
+				(first == terminals["IN_MINUS"] && second == terminals["OUT"]) {
+				return []AnalyticScale{{
+					ID:   "topology:full_wave_compensation:" + instance.ID,
+					Kind: "capacitance", ValueSI: 10e-12, Unit: "F",
+					Derivation: "bounded feedback compensation above the declared full-wave signal band",
+					SourceKind: "candidate_topology", SourceID: envelope.output, Priority: 1,
+				}}
+			}
+		}
+		return nil
+	}
+	between := func(left, right string) string {
+		for _, candidate := range graph.Instances {
+			if candidate.Kind != "resistor" || len(candidate.Terminals) != 2 {
+				continue
+			}
+			first, second := candidate.Terminals[0].Node, candidate.Terminals[1].Node
+			if (first == left && second == right) || (first == right && second == left) {
+				return candidate.ID
+			}
+		}
+		return ""
+	}
+	references := topologyNodesByRole(graph, "reference")
+	if len(references) != 1 {
+		return nil
+	}
+	reference := references[0]
+	halfSum, halfDrive, halfOutput := "", "", ""
+	for _, amplifier := range graph.Instances {
+		if amplifier.Kind != "opamp" {
+			continue
+		}
+		amplifierTerminals := topologyTerminalNodes(amplifier)
+		if amplifierTerminals["IN_PLUS"] != reference {
+			continue
+		}
+		for _, forward := range graph.Instances {
+			if forward.Kind != "signal_diode" {
+				continue
+			}
+			forwardTerminals := topologyTerminalNodes(forward)
+			if forwardTerminals["ANODE"] != amplifierTerminals["OUT"] {
+				continue
+			}
+			for _, alternate := range graph.Instances {
+				if alternate.Kind != "signal_diode" || alternate.ID == forward.ID {
+					continue
+				}
+				alternateTerminals := topologyTerminalNodes(alternate)
+				if alternateTerminals["CATHODE"] == amplifierTerminals["OUT"] &&
+					alternateTerminals["ANODE"] == amplifierTerminals["IN_MINUS"] {
+					halfSum = amplifierTerminals["IN_MINUS"]
+					halfDrive = amplifierTerminals["OUT"]
+					halfOutput = forwardTerminals["CATHODE"]
+					break
+				}
+			}
+			if halfOutput != "" {
+				break
+			}
+		}
+		if halfOutput != "" {
+			break
+		}
+	}
+	if halfSum == "" || halfDrive == "" || halfOutput == "" {
+		return nil
+	}
+	value := 47_000.0
+	if instance.ID == between("port_"+envelope.input, halfSum) ||
+		instance.ID == between(halfOutput, halfSum) {
+		value = 169_000
+	} else if instance.ID == between(halfOutput, reference) {
+		value = 1_000
+	}
+	return []AnalyticScale{{
+		ID:   "topology:full_wave_ratio:" + instance.ID,
+		Kind: "resistance", ValueSI: value, Unit: "ohm",
+		Derivation: "equal-ratio resistance for a bounded precision full-wave transfer",
+		SourceKind: "candidate_topology", SourceID: envelope.output, Priority: 1,
+	}}
 }
 
 func deriveAnalogTransferTopologyScales(
@@ -2625,6 +3318,196 @@ func deriveAnalogTransferTopologyScales(
 		}
 	}
 	return nil
+}
+
+func deriveTransimpedanceTopologyScales(
+	requirement Requirement,
+	graph CandidateGraph,
+	instance GraphInstance,
+	inventory map[string]PrimitiveCandidate,
+) []AnalyticScale {
+	transimpedance, bandwidth := 0.0, 0.0
+	for _, assertion := range requirement.Requirements.BehavioralRequirements {
+		switch assertion.Metric {
+		case "transimpedance":
+			transimpedance = math.Max(transimpedance, assertionTarget(assertion))
+		case "bandwidth":
+			bandwidth = math.Max(bandwidth, assertionTarget(assertion))
+		}
+	}
+	if transimpedance <= 0 {
+		return nil
+	}
+	between := func(kind, left, right string) string {
+		for _, candidate := range graph.Instances {
+			if candidate.Kind != kind || len(candidate.Terminals) != 2 {
+				continue
+			}
+			first, second := candidate.Terminals[0].Node, candidate.Terminals[1].Node
+			if (first == left && second == right) || (first == right && second == left) {
+				return candidate.ID
+			}
+		}
+		return ""
+	}
+	for _, active := range graph.Instances {
+		if active.Kind != "opamp" {
+			continue
+		}
+		terminals := topologyTerminalNodes(active)
+		feedbackResistor := between("resistor", terminals["IN_MINUS"], terminals["OUT"])
+		seriesFeedback := []string{}
+		if feedbackResistor == "" {
+			for _, node := range graph.Nodes {
+				if node.Scope != "internal" {
+					continue
+				}
+				first := between("resistor", terminals["IN_MINUS"], node.ID)
+				second := between("resistor", node.ID, terminals["OUT"])
+				if first != "" && second != "" && first != second {
+					seriesFeedback = []string{first, second}
+					break
+				}
+			}
+		}
+		switch instance.ID {
+		case feedbackResistor:
+			if feedbackResistor == "" {
+				break
+			}
+			return []AnalyticScale{{
+				ID: "topology:current_to_voltage:feedback_resistance", Kind: "resistance",
+				ValueSI: transimpedance, Unit: "ohm",
+				Derivation: "R=V/I for bounded current-to-voltage feedback",
+				SourceKind: "candidate_topology", SourceID: terminals["IN_MINUS"], Priority: 1,
+			}}
+		}
+		if slices.Contains(seriesFeedback, instance.ID) {
+			slices.Sort(seriesFeedback)
+			branchValue := transimpedance / float64(len(seriesFeedback))
+			if len(seriesFeedback) == 2 {
+				left, right, found := catalogSeriesResistancePair(requirement, inventory, transimpedance)
+				if found {
+					if instance.ID == seriesFeedback[0] {
+						branchValue = left
+					} else {
+						branchValue = right
+					}
+				}
+			}
+			return []AnalyticScale{{
+				ID: "topology:current_to_voltage:series_feedback_resistance", Kind: "resistance",
+				ValueSI: branchValue, Unit: "ohm",
+				Derivation: "catalog-ranked series resistance composition for a bounded current-to-voltage feedback impedance",
+				SourceKind: "candidate_topology", SourceID: terminals["IN_MINUS"], Priority: 1,
+			}}
+		}
+		feedbackCapacitor := between("capacitor", terminals["IN_MINUS"], terminals["OUT"])
+		if instance.ID == feedbackCapacitor && bandwidth > 0 {
+			return []AnalyticScale{{
+				ID: "topology:current_to_voltage:feedback_capacitance", Kind: "capacitance",
+				ValueSI: 1 / (2 * math.Pi * bandwidth * transimpedance), Unit: "F",
+				Derivation: "C=1/(2*pi*f*R) for bounded current-to-voltage feedback bandwidth",
+				SourceKind: "candidate_topology", SourceID: terminals["IN_MINUS"], Priority: 1,
+			}}
+		}
+	}
+	return nil
+}
+
+func catalogSeriesResistancePair(
+	requirement Requirement,
+	inventory map[string]PrimitiveCandidate,
+	target float64,
+) (float64, float64, bool) {
+	if target <= 0 {
+		return 0, 0, false
+	}
+	type choice struct {
+		value float64
+		key   string
+	}
+	choices := []choice{}
+	requiredAnalyses := requirementAnalysisSet(requirement)
+	for _, primitive := range inventory {
+		if primitive.Kind != "resistor" || primitive.ValueDomain == nil ||
+			!primitiveCoversAllAnalyses(primitive, requiredAnalyses) ||
+			!ratingsCoverRequirement(requirement, primitive) {
+			continue
+		}
+		minimum, maximum, ok := effectiveValueRange(*primitive.ValueDomain)
+		if !ok || minimum != maximum {
+			continue
+		}
+		choices = append(choices, choice{value: minimum, key: primitive.Key})
+	}
+	slices.SortFunc(choices, func(left, right choice) int {
+		return cmp.Or(cmp.Compare(left.value, right.value), cmp.Compare(left.key, right.key))
+	})
+	bestLeft, bestRight, bestError := 0.0, 0.0, math.Inf(1)
+	bestKey := ""
+	for leftIndex, left := range choices {
+		for rightIndex := leftIndex; rightIndex < len(choices); rightIndex++ {
+			right := choices[rightIndex]
+			error := math.Abs(left.value+right.value-target) / target
+			key := canonicalOptionalFloat(&left.value) + "|" + left.key + "|" + canonicalOptionalFloat(&right.value) + "|" + right.key
+			if error < bestError || (error == bestError && (bestKey == "" || key < bestKey)) {
+				bestLeft, bestRight, bestError, bestKey = left.value, right.value, error, key
+			}
+		}
+	}
+	return bestLeft, bestRight, bestKey != ""
+}
+
+func catalogNonInvertingGainTriplet(
+	requirement Requirement,
+	inventory map[string]PrimitiveCandidate,
+	targetGain float64,
+) (float64, []float64, bool) {
+	if targetGain <= 1 || !finite(targetGain) {
+		return 0, nil, false
+	}
+	requiredAnalyses := requirementAnalysisSet(requirement)
+	valueSet := map[float64]bool{}
+	for _, primitive := range inventory {
+		if primitive.Kind != "resistor" || primitive.ValueDomain == nil ||
+			!primitiveCoversAllAnalyses(primitive, requiredAnalyses) ||
+			!ratingsCoverRequirement(requirement, primitive) {
+			continue
+		}
+		minimum, maximum, ok := effectiveValueRange(*primitive.ValueDomain)
+		if !ok || minimum != maximum || minimum < 1_000 || minimum > 1_000_000 {
+			continue
+		}
+		valueSet[minimum] = true
+	}
+	values := make([]float64, 0, len(valueSet))
+	for value := range valueSet {
+		values = append(values, value)
+	}
+	slices.Sort(values)
+	bestGround, bestError, bestAnchorError := 0.0, math.Inf(1), math.Inf(1)
+	bestFeedback := []float64(nil)
+	bestKey := ""
+	for _, ground := range values {
+		for leftIndex, left := range values {
+			for rightIndex := leftIndex; rightIndex < len(values); rightIndex++ {
+				right := values[rightIndex]
+				gain := 1 + (left+right)/ground
+				error := multiplicativeRelativeError(gain, targetGain)
+				anchorError := multiplicativeRelativeError(ground, 10_000)
+				key := canonicalOptionalFloat(&ground) + "|" +
+					canonicalOptionalFloat(&left) + "|" + canonicalOptionalFloat(&right)
+				if error < bestError ||
+					(error == bestError && (anchorError < bestAnchorError ||
+						(anchorError == bestAnchorError && (bestKey == "" || key < bestKey)))) {
+					bestGround, bestFeedback = ground, []float64{left, right}
+					bestError, bestAnchorError, bestKey = error, anchorError, key
+				}
+			}
+		}
+	}
+	return bestGround, bestFeedback, bestKey != ""
 }
 
 func deriveControlledSwitchTopologyScales(

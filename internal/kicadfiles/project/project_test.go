@@ -92,6 +92,7 @@ func TestWriteProjectWithNetClasses(t *testing.T) {
 
 func TestWriteProjectWithMinimumIntrinsicThroughHoleDiameter(t *testing.T) {
 	project := minimalProject()
+	project.BoardRules.MinimumCopperEdgeClearance = kicadfiles.MM(0.25)
 	project.BoardRules.MinimumViaDiameter = kicadfiles.MM(0.4)
 	project.BoardRules.MinimumThroughHoleDiameter = kicadfiles.MM(0.2)
 
@@ -104,6 +105,9 @@ func TestWriteProjectWithMinimumIntrinsicThroughHoleDiameter(t *testing.T) {
 	}
 	if !strings.Contains(buf.String(), `"min_via_diameter": 0.4`) {
 		t.Fatalf("project does not serialize routed via rule:\n%s", buf.String())
+	}
+	if !strings.Contains(buf.String(), `"min_copper_edge_clearance": 0.25`) {
+		t.Fatalf("project does not serialize routed copper-edge rule:\n%s", buf.String())
 	}
 }
 

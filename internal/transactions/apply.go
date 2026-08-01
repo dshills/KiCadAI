@@ -41,6 +41,7 @@ type ApplyOptions struct {
 	SuppressExplicitPinSymbolErrors bool
 	PreserveFootprintGeometry       bool
 	DefaultNetClassClearance        kicadfiles.IU
+	MinimumCopperEdgeClearance      kicadfiles.IU
 	MinimumViaDiameter              kicadfiles.IU
 	MinimumThroughHoleDiameter      kicadfiles.IU
 	LibraryIndex                    *libraryresolver.LibraryIndex
@@ -544,6 +545,7 @@ func builderFromTransaction(tx Transaction, opts ApplyOptions) (*designapi.Build
 			Paper:                      paper,
 			CopperLayers:               opts.CopperLayers,
 			DefaultNetClassClearance:   opts.DefaultNetClassClearance,
+			MinimumCopperEdgeClearance: opts.MinimumCopperEdgeClearance,
 			MinimumViaDiameter:         opts.MinimumViaDiameter,
 			MinimumThroughHoleDiameter: opts.MinimumThroughHoleDiameter,
 			LibraryIndex:               opts.LibraryIndex,

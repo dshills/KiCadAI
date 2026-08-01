@@ -50,3 +50,39 @@ func TestACInputImpedanceUsesExcitationSourceCurrent(t *testing.T) {
 		t.Fatalf("open input impedance actual=%g diagnostic=%#v", actual, diagnostic)
 	}
 }
+
+func TestACTransimpedanceUsesExcitationSourceCurrent(t *testing.T) {
+	result := AnalysisResult{Kind: AnalysisACSweep, Points: []AnalysisPoint{{
+		FrequencyHz: 1_000,
+		Nodes:       []NodeResult{{Node: "OUT", Magnitude: 2.5}},
+		Devices:     []DeviceResult{{Component: "source_in", CurrentMagnitudeA: 25e-6}},
+	}}}
+	assertion := Assertion{
+		Node: "OUT", Component: "source_in",
+		Quantity: QuantityTransimpedanceOhm, FrequencyHz: 1_000,
+	}
+	actual, diagnostic := acDerivedValue(result, assertion)
+	if diagnostic != nil || math.Abs(actual-100_000) > 1e-9 {
+		t.Fatalf("transimpedance actual=%g diagnostic=%#v", actual, diagnostic)
+	}
+
+	result.Points[0].Devices[0].CurrentMagnitudeA = 0
+	if _, diagnostic = acDerivedValue(result, assertion); diagnostic == nil {
+		t.Fatal("zero excitation-source current produced trusted AC transimpedance")
+	}
+}
+
+func TestCurrentReferencedBandwidthUsesExcitationSourceCurrent(t *testing.T) {
+	result := AnalysisResult{Kind: AnalysisACSweep, Points: []AnalysisPoint{
+		{FrequencyHz: 1_000, Nodes: []NodeResult{{Node: "OUT", Magnitude: 1}}, Devices: []DeviceResult{{Component: "source_in", CurrentMagnitudeA: 10e-6}}},
+		{FrequencyHz: 10_000, Nodes: []NodeResult{{Node: "OUT", Magnitude: 0.5}}, Devices: []DeviceResult{{Component: "source_in", CurrentMagnitudeA: 10e-6}}},
+	}}
+	assertion := Assertion{
+		Node: "OUT", Component: "source_in",
+		Quantity: QuantityBandwidthHz, Min: 1, Max: 1e12,
+	}
+	actual, diagnostic := acDerivedValue(result, assertion)
+	if diagnostic != nil || actual <= 1_000 || actual >= 10_000 {
+		t.Fatalf("current-referenced bandwidth actual=%g diagnostic=%#v", actual, diagnostic)
+	}
+}

@@ -1658,7 +1658,7 @@ func assertionValue(results []AnalysisResult, assertion Assertion) (float64, *Di
 				assertion.Quantity == QuantityMinimumTransientSOAMargin) {
 			return thermalAssertionValue(result, assertion)
 		}
-		if result.Kind == AnalysisACSweep && (assertion.Quantity == QuantityVoltageGainRatio || assertion.Quantity == QuantityCutoffFrequencyHz || assertion.Quantity == QuantityBandwidthHz || assertion.Quantity == QuantityInputImpedanceOhm) {
+		if result.Kind == AnalysisACSweep && (assertion.Quantity == QuantityVoltageGainRatio || assertion.Quantity == QuantityCutoffFrequencyHz || assertion.Quantity == QuantityBandwidthHz || assertion.Quantity == QuantityTransimpedanceOhm || assertion.Quantity == QuantityInputImpedanceOhm) {
 			return acDerivedValue(result, assertion)
 		}
 		if (result.Kind == AnalysisTransient || result.Kind == AnalysisStartup || result.Kind == AnalysisElectrothermal) &&

@@ -1,0 +1,19 @@
+{
+  "schema": "kicadai.open-topology-requirement.v1",
+  "version": 1,
+  "project": {"name": "adversarial_unsafe_dissipation", "title": "Adversarial dissipation envelope", "description": "Demand a low-voltage high-current output from a much higher source while requiring a junction limit below the declared ambient temperature."},
+  "requirements": {
+    "domains": [{"id": "ground", "kind": "reference", "nominal_voltage_v": 0, "source": "external"}, {"id": "input_supply", "kind": "supply", "min_voltage_v": 28, "nominal_voltage_v": 30, "max_voltage_v": 32, "max_current_a": 2.5, "source": "external"}],
+    "ports": [{"id": "ground", "kind": "reference", "direction": "bidirectional", "domain": "ground"}, {"id": "input_power", "kind": "power", "direction": "sink", "domain": "input_supply"}, {"id": "enable", "kind": "digital", "direction": "sink", "domain": "ground", "electrical": {"min_voltage_v": 0, "nominal_voltage_v": 5, "max_voltage_v": 5, "default_state": "high"}}, {"id": "power_output", "kind": "power", "direction": "source", "domain": "ground", "electrical": {"min_voltage_v": 4.9, "nominal_voltage_v": 5, "max_voltage_v": 5.1, "max_current_a": 2}}],
+    "operating_cases": [{"id": "rated", "conditions": [{"axis": "supply_voltage", "target": "input_supply", "min": 28, "max": 32, "unit": "V"}, {"axis": "load_current", "target": "power_output", "min": 2, "max": 2, "unit": "A"}, {"axis": "ambient_temperature", "target": "power_output", "min": 50, "max": 60, "unit": "degC"}]}],
+    "behavioral_requirements": [
+      {"id": "output_voltage", "metric": "output_voltage", "analysis": "dc_operating_point", "observation": {"kind": "port", "id": "power_output"}, "min": 4.95, "max": 5.05, "unit": "V", "operating_cases": ["rated"]},
+      {"id": "output_current", "metric": "output_current", "analysis": "dc_operating_point", "observation": {"kind": "port", "id": "power_output"}, "min": 1.95, "max": 2.05, "unit": "A", "operating_cases": ["rated"]},
+      {"id": "line_variation", "metric": "line_regulation", "analysis": "dc_sweep", "excitation": {"kind": "domain", "id": "input_supply"}, "observation": {"kind": "port", "id": "power_output"}, "max": 0.02, "unit": "V", "operating_cases": ["rated"]},
+      {"id": "safe_temperature", "metric": "junction_temperature", "analysis": "thermal", "observation": {"kind": "circuit", "id": "maximum_junction_temperature"}, "max": 40, "unit": "degC", "operating_cases": ["rated"], "critical": true},
+      {"id": "safe_operating_area", "metric": "soa_margin", "analysis": "electrothermal", "observation": {"kind": "circuit", "id": "minimum_soa_margin"}, "min": 2, "unit": "ratio", "operating_cases": ["rated"], "critical": true}
+    ],
+    "constraints": {"max_components": 10, "max_width_mm": 45, "max_height_mm": 35}
+  },
+  "acceptance": {"require_primitive_only": true, "require_topology_search": true, "require_simulation": true, "require_all_corners": true, "require_model_provenance": true, "require_closed_loop_evidence": true, "require_complete_routing": true, "require_connectivity": true, "require_writer_correctness": true, "require_round_trip_zero_diff": true, "require_erc": true, "require_strict_drc": true, "require_deterministic_replay": true, "require_fail_closed": true}
+}

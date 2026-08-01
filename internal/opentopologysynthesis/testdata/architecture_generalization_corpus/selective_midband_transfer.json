@@ -1,0 +1,28 @@
+{
+  "schema": "kicadai.open-topology-requirement.v1",
+  "version": 1,
+  "project": {"name": "selective_midband_transfer", "title": "Selective midband signal transfer", "description": "Pass a bounded middle-frequency band near unity while rejecting lower and upper frequency content and remaining stable across the declared load."},
+  "requirements": {
+    "domains": [{"id": "ground", "kind": "reference", "nominal_voltage_v": 0, "source": "external"}, {"id": "supply", "kind": "supply", "min_voltage_v": 10.8, "nominal_voltage_v": 12, "max_voltage_v": 13.2, "max_current_a": 0.06, "source": "external"}],
+    "ports": [
+      {"id": "ground", "kind": "reference", "direction": "bidirectional", "domain": "ground"},
+      {"id": "power", "kind": "power", "direction": "sink", "domain": "supply"},
+      {"id": "signal_input", "kind": "analog_voltage", "direction": "sink", "domain": "ground", "electrical": {"min_voltage_v": -1, "nominal_voltage_v": 0, "max_voltage_v": 1, "input_impedance_min_ohm": 50000}},
+      {"id": "band_output", "kind": "analog_voltage", "direction": "source", "domain": "ground", "electrical": {"min_voltage_v": -1.2, "nominal_voltage_v": 0, "max_voltage_v": 1.2}}
+    ],
+    "operating_cases": [
+      {"id": "rated_load", "conditions": [{"axis": "supply_voltage", "target": "supply", "min": 10.8, "max": 13.2, "unit": "V"}, {"axis": "load_resistance", "target": "band_output", "min": 10000, "max": 100000, "unit": "ohm"}, {"axis": "load_capacitance", "target": "band_output", "min": 0, "max": 1e-9, "unit": "F"}]},
+      {"id": "tolerance", "conditions": [{"axis": "model_corner", "target": "band_output", "min": 0, "max": 0, "unit": "ratio"}, {"axis": "tolerance_corner", "target": "band_output", "min": 0, "max": 0, "unit": "ratio"}, {"axis": "load_resistance", "target": "band_output", "min": 10000, "max": 100000, "unit": "ohm"}]}
+    ],
+    "behavioral_requirements": [
+      {"id": "lower_rejection", "metric": "voltage_gain_at_frequency", "analysis": "ac_sweep", "excitation": {"kind": "port", "id": "signal_input"}, "observation": {"kind": "port", "id": "band_output"}, "max": 0.2, "unit": "ratio", "frequency_hz": 50, "operating_cases": ["rated_load", "tolerance"]},
+      {"id": "midband_gain", "metric": "voltage_gain", "analysis": "ac_sweep", "excitation": {"kind": "port", "id": "signal_input"}, "observation": {"kind": "port", "id": "band_output"}, "min": 0.9, "max": 1.1, "unit": "ratio", "frequency_hz": 1000, "operating_cases": ["rated_load", "tolerance"]},
+      {"id": "upper_rejection", "metric": "voltage_gain_at_frequency", "analysis": "ac_sweep", "excitation": {"kind": "port", "id": "signal_input"}, "observation": {"kind": "port", "id": "band_output"}, "max": 0.2, "unit": "ratio", "frequency_hz": 20000, "operating_cases": ["rated_load", "tolerance"]},
+      {"id": "dynamic_margin", "metric": "phase_margin", "analysis": "stability", "observation": {"kind": "port", "id": "band_output"}, "min": 50, "unit": "deg", "operating_cases": ["rated_load", "tolerance"], "critical": true},
+      {"id": "settling", "metric": "settling_time", "analysis": "transient", "excitation": {"kind": "port", "id": "signal_input"}, "observation": {"kind": "port", "id": "band_output"}, "max": 0.005, "unit": "s", "operating_cases": ["rated_load"]},
+      {"id": "output_noise", "metric": "output_noise_rms", "analysis": "noise", "observation": {"kind": "port", "id": "band_output"}, "max": 0.003, "unit": "V_rms", "operating_cases": ["rated_load"]}
+    ],
+    "constraints": {"max_components": 20, "max_width_mm": 70, "max_height_mm": 50}
+  },
+  "acceptance": {"require_primitive_only": true, "require_topology_search": true, "require_simulation": true, "require_all_corners": true, "require_model_provenance": true, "require_closed_loop_evidence": true, "require_complete_routing": true, "require_connectivity": true, "require_writer_correctness": true, "require_round_trip_zero_diff": true, "require_erc": true, "require_strict_drc": true, "require_deterministic_replay": true, "require_fail_closed": true}
+}

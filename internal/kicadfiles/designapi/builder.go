@@ -55,6 +55,7 @@ type Options struct {
 	Paper                      kicadfiles.Paper
 	CopperLayers               int
 	DefaultNetClassClearance   kicadfiles.IU
+	MinimumCopperEdgeClearance kicadfiles.IU
 	MinimumViaDiameter         kicadfiles.IU
 	MinimumThroughHoleDiameter kicadfiles.IU
 	LibraryIndex               *libraryresolver.LibraryIndex
@@ -327,6 +328,7 @@ func New(options Options) (*Builder, error) {
 			Generator:     "kicadai",
 			PageSettings:  project.PageSettings{Paper: paper},
 			BoardRules: project.BoardDesignRules{
+				MinimumCopperEdgeClearance: options.MinimumCopperEdgeClearance,
 				MinimumViaDiameter:         options.MinimumViaDiameter,
 				MinimumThroughHoleDiameter: options.MinimumThroughHoleDiameter,
 			},

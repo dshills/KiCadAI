@@ -55,6 +55,15 @@ func TestMNAResolvesGraphAndRunsDCAndACSweep(t *testing.T) {
 	if string(first) != string(second) {
 		t.Fatalf("report replay differs\nfirst: %s\nsecond: %s", first, second)
 	}
+
+	intent.Assertions[1].FrequencyHz = 500
+	_, diagnostics = ResolveWithTopology(intent, "test", "catalog-hash", bufferedTwoPoleEvidence(), []NodeEvidence{
+		{Name: "OUT", Role: "signal"}, {Name: "GND", Role: "ground", VoltageDomain: "0V"}, {Name: "N2", Role: "signal"},
+		{Name: "VIN", Role: "signal"}, {Name: "5V", Role: "power_pos"}, {Name: "N1", Role: "signal"},
+	})
+	if !diagnosticsContain(diagnostics, "absent from the resolved sweep grid") {
+		t.Fatalf("off-grid AC assertion diagnostics = %+v", diagnostics)
+	}
 }
 
 func TestWaveformMeasurementsUseDifferentialReferenceNode(t *testing.T) {

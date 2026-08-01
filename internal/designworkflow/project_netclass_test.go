@@ -111,3 +111,17 @@ func TestProjectMinimumViaRulesUseFinalEmittedRouteGeometry(t *testing.T) {
 		t.Fatalf("minimum through-hole diameter = %v, want emitted via drill 0.2 mm", got)
 	}
 }
+
+func TestProjectMinimumCopperEdgeClearanceUsesRoutedRule(t *testing.T) {
+	routed := RoutingStageResult{Request: routing.Request{Rules: routing.Rules{EdgeClearanceMM: 0.375}}}
+	if got := projectMinimumCopperEdgeClearanceMM(&routed); math.Abs(got-0.375) > 1e-9 {
+		t.Fatalf("minimum copper-edge clearance = %v, want routed 0.375", got)
+	}
+	routed.Request.Rules.EdgeClearanceMM = 0.3750004
+	if got := projectMinimumCopperEdgeClearanceMM(&routed); math.Abs(got-0.375001) > 1e-9 {
+		t.Fatalf("minimum copper-edge clearance = %v, want conservative precision ceiling 0.375001", got)
+	}
+	if got := projectMinimumCopperEdgeClearanceMM(nil); math.Abs(got-routing.DefaultRules().EdgeClearanceMM) > 1e-9 {
+		t.Fatalf("default minimum copper-edge clearance = %v, want %v", got, routing.DefaultRules().EdgeClearanceMM)
+	}
+}

@@ -1411,7 +1411,7 @@ func layoutAspectMismatch(result Result) float64 {
 
 func finalizeLayoutCandidate(candidate Result, request Request) Result {
 	var textDiagnostics []Diagnostic
-	candidate.Components, textDiagnostics = reflowTextForWires(candidate.Components, candidate.Wires, candidate.Labels, request.Rules)
+	candidate.Components, textDiagnostics = reflowTextForWires(candidate.Components, candidate.Wires, candidate.Labels, request.Rules, UsableSheet(request.Sheet))
 	candidate.Diagnostics = filterTextDiagnostics(candidate.Diagnostics)
 	candidate.Diagnostics = append(candidate.Diagnostics, textDiagnostics...)
 	return Validate(candidate, request)

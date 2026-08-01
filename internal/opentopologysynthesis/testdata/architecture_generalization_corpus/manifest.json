@@ -1,0 +1,118 @@
+{
+  "schema": "kicadai.architecture-generalization-corpus.v1",
+  "version": 1,
+  "base_commit": "346fcdd4ffb5c99aa3e3945c76110a0652722428",
+  "frozen_at": "2026-08-01",
+  "requirement_schema": "kicadai.open-topology-requirement.v1",
+  "authoring_policy": "Behavior, external interfaces, operating conditions, events, measurable bounds, safety limits, and acceptance only. Requirement files contain no case selector, component or primitive identity, implementation structure, internal connection, implementation value, physical geometry, routing, provider, simulation model, or repair instruction.",
+  "minimum_design_passes": 5,
+  "stages": [
+    "integrity",
+    "schema",
+    "primitive_inventory",
+    "architecture_generation",
+    "equation_sizing",
+    "simulation",
+    "safety_rejection",
+    "ranking",
+    "lowering",
+    "schematic",
+    "placement",
+    "routing",
+    "writer",
+    "erc",
+    "drc",
+    "round_trip",
+    "replay"
+  ],
+  "design_cases": [
+    {
+      "id": "dual_threshold_window_indicator",
+      "behavior_family": "dual_threshold_window_decision",
+      "acceptance_claim": "window_comparator",
+      "requirement_file": "dual_threshold_window_indicator.json",
+      "requirement_sha256": "8d80b2c3a9f3041525345c262149877792d693e9e291b0928e8d167df64d587e",
+      "required_analyses": ["dc_operating_point", "dc_sweep", "transient"],
+      "safety_critical": false
+    },
+    {
+      "id": "low_current_voltage_converter",
+      "behavior_family": "low_current_to_voltage_transfer",
+      "acceptance_claim": "transimpedance_amplifier",
+      "requirement_file": "low_current_voltage_converter.json",
+      "requirement_sha256": "8762d442c47e03bb98206f8d3f0b075112aaf11a7593b64f24d0915127e7732c",
+      "required_analyses": ["ac_sweep", "noise", "stability", "transient"],
+      "safety_critical": false
+    },
+    {
+      "id": "low_level_full_wave_transfer",
+      "behavior_family": "polarity_independent_low_level_transfer",
+      "acceptance_claim": "precision_rectifier",
+      "requirement_file": "low_level_full_wave_transfer.json",
+      "requirement_sha256": "e68b75fd6c93eddae8c0838e042621677f63e459bc86c2e5434176f125e0ade1",
+      "required_analyses": ["ac_sweep", "dc_operating_point", "dc_sweep", "noise", "transient"],
+      "safety_critical": false
+    },
+    {
+      "id": "protected_programmable_current_output",
+      "behavior_family": "protected_programmable_current_drive",
+      "acceptance_claim": "protected_constant_current_driver",
+      "requirement_file": "protected_programmable_current_output.json",
+      "requirement_sha256": "3eb0f01be78d52334f2b46e637c3859364f644fec159a7641e099d475f187a35",
+      "required_analyses": ["dc_operating_point", "dc_sweep", "electrothermal", "startup", "thermal", "transient"],
+      "safety_critical": true
+    },
+    {
+      "id": "regulated_low_voltage_output",
+      "behavior_family": "line_load_regulated_power_output",
+      "acceptance_claim": "linear_regulator",
+      "requirement_file": "regulated_low_voltage_output.json",
+      "requirement_sha256": "b0cd480d1d1a08d206d0a316e7075fb28ba193d87d1eb5d3e01e0ccfbfe933be",
+      "required_analyses": ["dc_operating_point", "dc_sweep", "electrothermal", "stability", "startup", "thermal"],
+      "safety_critical": true
+    },
+    {
+      "id": "selective_midband_transfer",
+      "behavior_family": "lower_and_upper_band_rejection",
+      "acceptance_claim": "active_bandpass_crossover",
+      "requirement_file": "selective_midband_transfer.json",
+      "requirement_sha256": "1983e9bd81fce5d7d51a9c5c1bb11775a1f0f17716b10c120dab1f6f4dc449dd",
+      "required_analyses": ["ac_sweep", "noise", "stability", "transient"],
+      "safety_critical": false
+    }
+  ],
+  "adversarial_cases": [
+    {
+      "id": "adversarial_inadequate_safe_area",
+      "behavior_family": "high_energy_load_demand",
+      "expected_failure_kind": "inadequate_soa",
+      "requirement_file": "adversarial_inadequate_safe_area.json",
+      "requirement_sha256": "95a6699e8f06bc917fce851eb73da528eb81ef6703b5e2ac7488befb2df08fba",
+      "required_analyses": ["ac_sweep", "electrothermal", "stability", "thermal", "transient"]
+    },
+    {
+      "id": "adversarial_inconsistent_standing_current",
+      "behavior_family": "inconsistent_supply_and_bias_demand",
+      "expected_failure_kind": "invalid_bias",
+      "requirement_file": "adversarial_inconsistent_standing_current.json",
+      "requirement_sha256": "bcc29361654fcd5de113f2df46fab1b9d7d5aa72cc974104a58c7621a4b43546",
+      "required_analyses": ["ac_sweep", "dc_operating_point", "electrothermal", "stability", "thermal", "transient"]
+    },
+    {
+      "id": "adversarial_unsafe_dissipation",
+      "behavior_family": "thermally_inconsistent_power_conversion",
+      "expected_failure_kind": "unsafe_dissipation",
+      "requirement_file": "adversarial_unsafe_dissipation.json",
+      "requirement_sha256": "8819fe925f99ef4e60473e06f4b11b2022d586485bee433d62c16be5070bb2da",
+      "required_analyses": ["dc_operating_point", "dc_sweep", "electrothermal", "thermal"]
+    },
+    {
+      "id": "adversarial_unstable_dynamic_envelope",
+      "behavior_family": "infeasible_reactive_load_response",
+      "expected_failure_kind": "instability",
+      "requirement_file": "adversarial_unstable_dynamic_envelope.json",
+      "requirement_sha256": "b1111223a4ee3ba7f0b59a61b22b42e8691329d74db4b150d51f6490e1afe85a",
+      "required_analyses": ["ac_sweep", "noise", "stability", "transient"]
+    }
+  ]
+}

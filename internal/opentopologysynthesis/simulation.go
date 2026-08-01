@@ -493,6 +493,8 @@ func directSimulationQuantity(assertion BehavioralAssertion) (string, float64, b
 		return simmodel.QuantityTotalSupplyCurrentA, 1, true
 	case "transconductance":
 		return simmodel.QuantityDCSweepDeviceSlopeAperV, 1, true
+	case "transimpedance":
+		return simmodel.QuantityTransimpedanceOhm, 1, true
 	case "input_impedance":
 		return simmodel.QuantityInputImpedanceOhm, 1, true
 	case "line_regulation", "load_regulation":
@@ -615,16 +617,28 @@ func simulationHarness(
 		if node.Scope != "external" || node.Role == "reference" || node.Role == "output" {
 			continue
 		}
-		value := sourceValueForNode(requirement, operatingCase, corner, node)
 		instanceID := canonicalIdentifier("source_" + node.ID)
+		family, modelID := "voltage_source", simmodel.PrimitiveVoltageSourceV1
+		firstTerminal, firstNode := "POSITIVE", node.ID
+		secondTerminal, secondNode := "NEGATIVE", reference
+		for _, port := range requirement.Requirements.Ports {
+			if port.ID != node.SemanticID || port.Kind != "analog_current" {
+				continue
+			}
+			family, modelID = "current_source", simmodel.PrimitiveCurrentSourceV1
+			if port.Direction == "sink" {
+				firstNode, secondNode = reference, node.ID
+			}
+			break
+		}
 		record, provenanceHashes, ok := selectHarnessRecord(
 			environment,
-			"voltage_source",
-			simmodel.PrimitiveVoltageSourceV1,
+			family,
+			modelID,
 			trustedModelAnalysisKind(assertion.Analysis),
 		)
 		if !ok {
-			diagnostics = append(diagnostics, SimulationDiagnostic{Code: diagnosisModelUnavailable, Path: "simulation.harness." + instanceID, Message: "reviewed voltage-source harness primitive is unavailable"})
+			diagnostics = append(diagnostics, SimulationDiagnostic{Code: diagnosisModelUnavailable, Path: "simulation.harness." + instanceID, Message: "reviewed " + family + " harness primitive is unavailable"})
 			continue
 		}
 		result = append(result, simmodel.ComponentEvidence{
@@ -633,11 +647,10 @@ func simulationHarness(
 			Family:      record.Family,
 			ModelClaims: cloneCatalogClaims(record.SimulationModels),
 			Connections: []simmodel.ConnectionEvidence{
-				{Function: "POSITIVE", Net: node.ID},
-				{Function: "NEGATIVE", Net: reference},
+				{Function: firstTerminal, Net: firstNode},
+				{Function: secondTerminal, Net: secondNode},
 			},
 		})
-		_ = value
 		hashes = append(hashes, provenanceHashes...)
 	}
 	for _, condition := range operatingCase.Conditions {
@@ -845,6 +858,14 @@ func simulationThermalBoundary(
 	); bounded {
 		totalDissipation += outputDissipation
 	}
+	if transferDissipation, bounded := thermalBehavioralTransferDissipation(
+		requirement,
+		operatingCase,
+		corner,
+		railMagnitude,
+	); bounded {
+		totalDissipation = math.Max(totalDissipation, transferDissipation)
+	}
 	if totalDissipation <= 0 || !finite(totalDissipation) {
 		return nil, nil, []SimulationDiagnostic{{
 			Code:       diagnosisThermalUnavailable,
@@ -863,6 +884,61 @@ func simulationThermalBoundary(
 	}
 	conditions = append(conditions, simmodel.NamedValue{Name: "case_temperature_c", Value: caseTemperature})
 	return conditions, []string{hashJSON(path)}, nil
+}
+
+// thermalBehavioralTransferDissipation derives a conservative linear-transfer
+// envelope directly from declared rail, output-voltage, and load-current
+// bounds. It is intentionally architecture-neutral: switching or more
+// efficient implementations may run cooler, but the thermal boundary must not
+// assume an efficiency that the behavioral contract does not establish.
+func thermalBehavioralTransferDissipation(
+	requirement Requirement,
+	operatingCase OperatingCase,
+	corner operatingCorner,
+	railMagnitude float64,
+) (float64, bool) {
+	if railMagnitude <= 0 || !finite(railMagnitude) {
+		return 0, false
+	}
+	ports := map[string]Port{}
+	for _, port := range requirement.Requirements.Ports {
+		ports[port.ID] = port
+	}
+	maximum := 0.0
+	for _, assertion := range requirement.Requirements.BehavioralRequirements {
+		if assertion.Metric != "output_voltage" || assertion.Observation.Kind != "port" {
+			continue
+		}
+		port, found := ports[assertion.Observation.ID]
+		if !found || port.Direction != "source" || port.Kind != "power" {
+			continue
+		}
+		outputVoltage := assertionTarget(assertion)
+		if assertion.Min != nil && *assertion.Min > 0 {
+			outputVoltage = *assertion.Min
+		}
+		if outputVoltage <= 0 || outputVoltage >= railMagnitude {
+			continue
+		}
+		loadCurrent := 0.0
+		for _, condition := range operatingCase.Conditions {
+			if condition.Axis != "load_current" || condition.Target != port.ID {
+				continue
+			}
+			loadCurrent = corner.Values[conditionKey(condition)]
+			if loadCurrent <= 0 {
+				loadCurrent = condition.Max
+			}
+		}
+		if loadCurrent <= 0 && port.Electrical.MaxCurrentA != nil {
+			loadCurrent = *port.Electrical.MaxCurrentA
+		}
+		dissipation := (railMagnitude - outputVoltage) * loadCurrent
+		if dissipation > maximum && finite(dissipation) {
+			maximum = dissipation
+		}
+	}
+	return maximum, maximum > 0
 }
 
 // thermalOutputStageDissipation derives the bounded class-B output-stage loss
@@ -927,6 +1003,11 @@ func simulationIntentParts(
 		}
 		analysis.Points = 64
 	case simmodel.AnalysisTransient, simmodel.AnalysisStartup, simmodel.AnalysisElectrothermal:
+		if assertion.Analysis == simmodel.AnalysisStartup {
+			// Startup is a behavioral/provenance contract executed by the
+			// trusted transient engine so bounded source events are legal.
+			analysis.Kind = simmodel.AnalysisTransient
+		}
 		duration := dynamicDuration(assertion, operatingCase)
 		analysis.DurationS = duration
 		analysis.TimeStepS = duration / 1000
@@ -1009,6 +1090,7 @@ func simulationIntentParts(
 				quantity == simmodel.QuantityVoltagePhaseDeg ||
 				quantity == simmodel.QuantityVoltageDBV ||
 				quantity == simmodel.QuantityVoltageGainRatio ||
+				quantity == simmodel.QuantityTransimpedanceOhm ||
 				quantity == simmodel.QuantityInputImpedanceOhm)) ||
 			(assertion.Analysis == simmodel.AnalysisDistortion && quantity == simmodel.QuantityTHDPercent)
 	if assertion.FrequencyHz != nil && frequencyPointAssertion {
@@ -1021,7 +1103,9 @@ func simulationIntentParts(
 			quantity == simmodel.QuantityCutoffFrequencyHz ||
 			quantity == simmodel.QuantityBandwidthHz ||
 			quantity == simmodel.QuantityInputImpedanceOhm) {
-		simulationAssertion.ReferenceNode = observationNodeID(graph, requirement, *assertion.Excitation)
+		if simulationAssertion.Component == "" {
+			simulationAssertion.ReferenceNode = observationNodeID(graph, requirement, *assertion.Excitation)
+		}
 		if quantity == simmodel.QuantityInputImpedanceOhm {
 			simulationAssertion.ReferenceNode = referenceNodeForDomain(graph, *assertion.Excitation)
 		}
@@ -1102,6 +1186,24 @@ func simulationMeasurementScope(
 	quantity string,
 ) (string, []string, *SimulationDiagnostic) {
 	switch quantity {
+	case simmodel.QuantityCutoffFrequencyHz, simmodel.QuantityBandwidthHz:
+		if assertion.Excitation == nil || !observationIsAnalogCurrentPort(requirement, *assertion.Excitation) {
+			return "", nil, nil
+		}
+		component := sourceInstanceForObservation(graph, *assertion.Excitation)
+		if component == "" {
+			return "", nil, &SimulationDiagnostic{Code: diagnosisModelUnavailable, Path: "simulation.assertion.component", Message: "current-referenced frequency response requires a resolved excitation source"}
+		}
+		return component, nil, nil
+	case simmodel.QuantityTransimpedanceOhm:
+		if assertion.Excitation == nil {
+			return "", nil, &SimulationDiagnostic{Code: diagnosisModelUnavailable, Path: "simulation.assertion.component", Message: "transimpedance measurement requires a resolved excitation source"}
+		}
+		component := sourceInstanceForObservation(graph, *assertion.Excitation)
+		if component == "" {
+			return "", nil, &SimulationDiagnostic{Code: diagnosisModelUnavailable, Path: "simulation.assertion.component", Message: "transimpedance measurement requires a resolved excitation source"}
+		}
+		return component, nil, nil
 	case simmodel.QuantityInputImpedanceOhm:
 		target := assertion.Observation
 		if assertion.Excitation != nil {
@@ -1184,6 +1286,18 @@ func simulationMeasurementScope(
 	default:
 		return "", nil, nil
 	}
+}
+
+func observationIsAnalogCurrentPort(requirement Requirement, observation Observation) bool {
+	if observation.Kind != "port" {
+		return false
+	}
+	for _, port := range requirement.Requirements.Ports {
+		if port.ID == observation.ID {
+			return port.Kind == "analog_current"
+		}
+	}
+	return false
 }
 
 func supplySourceComponents(graph CandidateGraph) []string {
@@ -1415,10 +1529,18 @@ func simulationExcitations(
 					condition.Min == condition.Max {
 					continue
 				}
+				initial, applied := condition.Min, condition.Max
+				if windowInitial, windowApplied, found := windowDynamicExcitationRange(
+					requirement, assertion, condition,
+				); found {
+					initial, applied = windowInitial, windowApplied
+				}
 				duration := dynamicDuration(assertion, operatingCase)
-				excitation.DCValue = condition.Min
-				excitation.PulseInitialValue = condition.Min
-				excitation.PulseValue = condition.Max
+				// Pulse levels are absolute source values in the trusted MNA
+				// contract; the independent DC term must remain zero.
+				excitation.DCValue = 0
+				excitation.PulseInitialValue = initial
+				excitation.PulseValue = applied
 				excitation.PulseDelayS = duration / 5
 				excitation.PulseWidthS = duration * 3 / 5
 				excitation.PulsePeriodS = duration * 2
@@ -1448,6 +1570,29 @@ func simulationExcitations(
 		return cmp.Compare(left.Component, right.Component)
 	})
 	return result
+}
+
+func windowDynamicExcitationRange(
+	requirement Requirement,
+	assertion BehavioralAssertion,
+	condition OperatingCondition,
+) (float64, float64, bool) {
+	if assertion.Metric != "propagation_delay" || assertion.Excitation == nil ||
+		assertion.Excitation.Kind != "port" || condition.Target != assertion.Excitation.ID {
+		return 0, 0, false
+	}
+	envelope, required := topologyWindowBehaviorEnvelope(requirement)
+	if !required || assertion.Excitation.ID != envelope.input ||
+		condition.Min >= envelope.lowerV || condition.Max <= envelope.lowerV {
+		return 0, 0, false
+	}
+	span := envelope.upperV - envelope.lowerV
+	initial := math.Max(condition.Min, envelope.lowerV-span/4)
+	applied := math.Min(condition.Max, envelope.lowerV+span/4)
+	if initial >= envelope.lowerV || applied <= envelope.lowerV || applied >= envelope.upperV {
+		return 0, 0, false
+	}
+	return initial, applied, true
 }
 
 func loadInstanceID(target, axis string) string {
@@ -1600,7 +1745,8 @@ func sourceValueForNode(
 	node GraphNode,
 ) float64 {
 	for _, condition := range operatingCase.Conditions {
-		if condition.Axis != "supply_voltage" && condition.Axis != "input_voltage" {
+		if condition.Axis != "supply_voltage" && condition.Axis != "input_voltage" &&
+			condition.Axis != "input_current" {
 			continue
 		}
 		if condition.Target == node.SemanticID || condition.Target == node.Domain {
@@ -1775,7 +1921,11 @@ func dynamicDuration(assertion BehavioralAssertion, operatingCase OperatingCase)
 		duration = assertionTarget(assertion) * 10
 	}
 	for _, event := range operatingCase.Events {
-		duration = math.Max(duration, event.TriggerTimeS*2)
+		// Preserve a deterministic post-event observation interval. Merely
+		// doubling a short trigger delay can end a startup analysis while a
+		// bounded feedback loop is still approaching its final value, which
+		// turns ordinary settling into false overshoot.
+		duration = math.Max(duration, math.Max(0.01, event.TriggerTimeS*10))
 	}
 	if duration <= 0 {
 		duration = 0.01

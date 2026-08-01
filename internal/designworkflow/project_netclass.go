@@ -11,7 +11,13 @@ import (
 	"kicadai/internal/transactions"
 )
 
-const projectClearancePrecisionMM = 1e-6
+const (
+	projectClearancePrecisionMM = 1e-6
+	// Keep exact precision-grid values from being rounded up because of
+	// binary floating-point drift. This remains six orders of magnitude below
+	// one project clearance quantum.
+	projectClearanceRoundingEpsilonMM = 1e-12
+)
 
 func fitRoutingClearanceToIntrinsicPads(request *routing.Request, components []placement.Component, explicitlyRequired bool) []reports.Issue {
 	if request == nil {
@@ -73,6 +79,18 @@ func projectNetClassClearanceMM(routed *RoutingStageResult, placed *PlacementSta
 		return math.Floor((intrinsic+1e-9)/projectClearancePrecisionMM) * projectClearancePrecisionMM
 	}
 	return clearance
+}
+
+// projectMinimumCopperEdgeClearanceMM keeps KiCad's project rule aligned with
+// the geometric boundary enforced by the router. Without an explicit project
+// rule, KiCad supplies its own default, which can be stricter than the route
+// request and turn an otherwise valid generated route into a DRC failure.
+func projectMinimumCopperEdgeClearanceMM(routed *RoutingStageResult) float64 {
+	clearance := routing.DefaultRules().EdgeClearanceMM
+	if routed != nil && routed.Request.Rules.EdgeClearanceMM > 0 {
+		clearance = routed.Request.Rules.EdgeClearanceMM
+	}
+	return math.Ceil((clearance-projectClearanceRoundingEpsilonMM)/projectClearancePrecisionMM) * projectClearancePrecisionMM
 }
 
 func projectMinimumThroughHoleDiameterMM(placed *PlacementStageResult, operations []transactions.Operation) float64 {
