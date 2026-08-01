@@ -5,6 +5,9 @@ This directory holds the detailed reference material that used to live in the pr
 ## User Workflows
 
 - [Project Status](project-status.md): current capabilities, proven workflows, evidence levels, and explicit limitations.
+- [Educational Schematic Examples](../examples/educational/README.md): five
+  generated teaching circuits with conventional topology-aware layout and
+  reproducible KiCad projects.
 - [KiCadAI Agent Skill](kicadai-agent-skill.md): prescriptive command and validation contract for AI agents using KiCadAI.
 - [CLI Reference](cli-reference.md): command overview, KiCad IPC setup, and direct generation commands.
 - [AI Generation](ai-generation.md): behavioral, bounded, and generic provider

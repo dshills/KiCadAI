@@ -9,6 +9,26 @@ roadmaps, and dated review material.
 
 ## Latest Completed Milestone
 
+- [Diagnosis-driven repair specification](diagnosis-driven-repair/SPEC.md),
+  [plan](diagnosis-driven-repair/PLAN.md),
+  [results](diagnosis-driven-repair/RESULTS.md), and
+  [preservation report](diagnosis-driven-repair/PRESERVATION_REPORT.md)
+  - unifies electrical and physical correction under a deterministic,
+    budgeted evidence trace; preserves a precise current-driver fail-closed
+    boundary and proves real blocked-to-routed physical recovery.
+- [Architecture-generalization specification](architecture-generalization-corpus/SPEC.md),
+  [completion audit](architecture-generalization-corpus/COMPLETION_AUDIT.md),
+  and [promotion matrix](architecture-generalization-corpus/PROMOTION_MATRIX.md)
+  - freezes an independent six-design/four-adversarial corpus, promotes five
+    designs twice through installed KiCad, and records stable safe rejection
+    for the remaining protected current-output design and all unsafe cases.
+- [Topology-aware readable schematics specification](topology-aware-readable-schematics/SPEC.md),
+  [audit](topology-aware-readable-schematics/AUDIT.md), and
+  [evidence](topology-aware-readable-schematics/EVIDENCE.md)
+  - replaces sparse label-heavy output with graph-derived conventional
+    placement, visible conductors, compact route trees, and measured
+    readability; five teaching circuits are checked in under
+    [`examples/educational`](../examples/educational/README.md).
 - [Simulation-grounded circuit architecture synthesis](simulation-grounded-architecture-synthesis/SPEC.md),
   [plan](simulation-grounded-architecture-synthesis/PLAN.md),
   [completion audit](simulation-grounded-architecture-synthesis/AUDIT.md), and

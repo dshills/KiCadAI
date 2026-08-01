@@ -1,9 +1,12 @@
 # Project Status
 
-Last verified: 2026-07-31 by the complete local bounded suite; all three
-simulation-grounded architecture cases passed two-run installed-KiCad
-promotion, and the three long simulation-grounded preservation shards passed.
-The earlier three-case MCU
+Last verified: 2026-08-01 by focused local preservation and installed-KiCad
+lanes. Five of six independently authored architecture-generalization designs
+passed two-run installed-KiCad promotion, all four adversarial designs failed
+closed, and the shared diagnosis-driven physical repair case recovered from a
+real routing block with clean writer, connectivity, round-trip, ERC, and strict
+DRC evidence. The protected programmable current output retained a narrower,
+byte-identical fail-closed result. The earlier three-case MCU
 power-integrity, three-case neutral MCU, two-case clock/programming, and
 four-case power/interface installed-KiCad corpora; protected USB-C LED and I2C,
 ESP32 minimal-system, Class-A, and Class-AB fixture regressions; and independent
@@ -417,12 +420,54 @@ electronics. Unreviewed parts/models, RF/high-speed, mains/high-energy safety,
 mechanical thermal qualification, and dense arbitrary boards remain outside
 the supported envelope and must fail closed.
 
+### Out-of-Distribution Architecture Generalization
+
+The independently frozen follow-on corpus covers regulated low-voltage output,
+dual-threshold indication, current-to-voltage conversion, low-level full-wave
+transfer, frequency-selective transfer, and protected programmable current
+output without prescribing topology, parts, nets, or geometry. Five of six
+designs evaluate multiple topology hashes and pass trusted electrical evidence
+plus two identical installed-KiCad physical promotions. Four separate unsafe
+thermal, SOA, bias, and dynamic envelopes fail closed reproducibly.
+
+The protected current-output design remains deliberately unsupported because
+bounded graph and value trials cannot yet establish convergent, correctly
+transferred current while satisfying its rating, thermal, SOA, and protection
+requirements. See the
+[completion audit](../specs/architecture-generalization-corpus/COMPLETION_AUDIT.md)
+and [promotion matrix](../specs/architecture-generalization-corpus/PROMOTION_MATRIX.md).
+
+### Diagnosis-Driven Repair
+
+Electrical topology repair and generated-board physical correction now emit
+the same `kicadai.diagnosis-driven-repair.v1` evidence contract. It records the
+normalized failure, affected scope, deterministic proposal, expected effect,
+stage re-entry, authorization, bounded consumption, outcome, and state hashes.
+A six-component, twelve-pad, two-multi-endpoint-net benchmark begins with a
+real router failure, applies a diagnosis-derived relative-spacing correction,
+and completes both route trees identically on replay. Its installed-KiCad lane
+passes writer correctness, connectivity, route completion, zero-difference
+round trip, clean ERC, and strict DRC.
+
+The electrical case demonstrates the equally important safe boundary: it
+narrows the protected current-output diagnosis but rejects non-improving or
+unsafe proposals and emits no physical project. See the
+[repair results](../specs/diagnosis-driven-repair/RESULTS.md) and
+[preservation report](../specs/diagnosis-driven-repair/PRESERVATION_REPORT.md).
+
 ### Schematic Readability
 
 Generated schematics use deterministic role, stage, and lane classification;
 left-to-right flow; power-above and ground-below conventions; orthogonal
 routing; spacing checks; and labels for long or shared nets. Readability and
 schematic electrical evidence are emitted as workflow stages.
+
+Topology-aware lowering additionally normalizes fragmented nets, preserves
+visible local wiring and feedback, builds compact multi-endpoint route trees,
+orients passives by electrical role, and selects the smallest fitting standard
+sheet. Five checked-in [educational examples](../examples/educational/README.md)
+show conventional voltage-source, current-source, differential-amplifier,
+low-pass-filter, and voltage-divider layouts.
 
 Large schematic IR inputs can use deterministic hierarchy partitioning. Exact
 human-editor-quality layout for arbitrary imported schematics remains outside
@@ -559,12 +604,13 @@ envelope remain unsupported.
 ## Remaining Direction
 
 Open-topology synthesis proves discovery for six of eight initial frozen
-requirements, and the follow-on architecture milestone proves ranked,
-simulation-grounded generation for all three Class A, Class AB, and notch
-requirements. The next highest-value step is a second independently authored,
-out-of-distribution architecture corpus spanning additional analog and power
-families. That measures generalization before more grammar is added and should
-include the remaining regulator and dual-threshold behaviors where appropriate.
+requirements, the first architecture milestone proves ranked generation for
+Class A, Class AB, and notch requirements, and the independent follow-on corpus
+passes five of six unfamiliar analog and power designs. The next highest-value
+step is an independently frozen diagnosis-driven repair corpus spanning
+electrical simulation, schematic/ERC, placement, routing, and DRC failures.
+That corpus should drive reusable repair operators and attempt to close the
+protected current-output gap only when trusted evidence supports the change.
 Broader clock/fanout,
 programming-load, converter, isolation, and high-energy protection models,
 catalog-independent part qualification, and denser-board physical synthesis

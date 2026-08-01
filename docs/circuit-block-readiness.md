@@ -1,6 +1,6 @@
 # Circuit Block Library Readiness Review
 
-Last verified: 2026-07-21.
+Last verified: 2026-08-01.
 
 The built-in registry currently exposes 25 blocks. Most retain conservative
 `structural` block-level verification; the exact

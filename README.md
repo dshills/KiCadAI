@@ -11,6 +11,12 @@ available for connection probes, version checks, document discovery, and
 capability reporting, but current KiCad IPC write support is not the generation
 path.
 
+In practical terms, KiCadAI is usable today for designs inside its reviewed
+component, model, architecture, and physical-design envelope. It is a bounded
+autonomous generator rather than a general electronics oracle: supported
+requests can reach reproducible KiCad-backed `pass` evidence, while missing or
+unsafe capability is reported and stopped instead of guessed.
+
 ## Current State
 
 - Direct project, schematic, and PCB writers are functional and extensively
@@ -181,6 +187,29 @@ path.
   installed-KiCad promotions. A plausible but unsafe Class A value alternative
   is explicitly rejected by standing-current, thermal, or SOA evidence. See
   the [architecture synthesis audit](specs/simulation-grounded-architecture-synthesis/AUDIT.md).
+- A second, independently authored architecture-generalization corpus freezes
+  six additional analog and power behaviors plus four adversarial safety
+  envelopes before implementation changes. Five of six designs now pass
+  multi-topology search, trusted simulation, readable lowering, two identical
+  installed-KiCad promotions, and every physical gate; all four unsafe cases
+  fail closed. The protected programmable current output remains a stable,
+  evidence-backed non-pass. See the
+  [completion audit](specs/architecture-generalization-corpus/COMPLETION_AUDIT.md)
+  and [promotion matrix](specs/architecture-generalization-corpus/PROMOTION_MATRIX.md).
+- Electrical and physical correction now share the versioned
+  `kicadai.diagnosis-driven-repair.v1` trace. It binds normalized diagnoses to
+  deterministic proposals, stage re-entry, budgets, effects, outcomes, and
+  before/after hashes. A six-component, twelve-pad, two-route-tree benchmark
+  recovers reproducibly from a real routing block and passes writer,
+  connectivity, round-trip, ERC, and strict-DRC checks. The protected current
+  output remains safely exhausted with a narrower reproducible diagnosis. See
+  the [repair results](specs/diagnosis-driven-repair/RESULTS.md).
+- Topology-aware schematic lowering now favors visible local conductors,
+  conventional signal flow, compact route trees, feedback visibility,
+  role-derived orientation, and the smallest fitting standard sheet. Five
+  checked-in [educational examples](examples/educational/README.md) cover a DC
+  voltage source, BJT current source, differential amplifier, RC low-pass
+  filter, and voltage divider.
 - Unrestricted electronics generation is not guaranteed. Open-topology and
   generic graph paths fail closed on unknown behavior, parts, pins, models,
   ratings, placement, routing, or exhausted search capability.
@@ -368,6 +397,7 @@ Start with the [documentation index](docs/README.md).
 | Topic | Reference |
 |---|---|
 | Current capabilities and limits | [Project Status](docs/project-status.md) |
+| Educational generated schematics | [Educational Examples](examples/educational/README.md) |
 | Commands and live IPC | [CLI Reference](docs/cli-reference.md) |
 | Natural-language provider workflow | [AI Generation](docs/ai-generation.md) |
 | Behavioral compilation, structured intent, and planning | [Intent Planning](docs/intent-planning.md) |
@@ -379,6 +409,8 @@ Start with the [documentation index](docs/README.md).
 | Fabrication evidence | [Fabrication](docs/fabrication.md) |
 | Direct KiCad file writers | [KiCad File Writers](docs/kicad-file-writers.md) |
 | Tests, packages, and troubleshooting | [Development Reference](docs/development.md) |
+| Specifications, evidence, and audits | [Specs Index](specs/INDEX.md) |
+| Priorities toward broader autonomy | [Roadmap](specs/ROADMAP.md) |
 
 ## Development
 

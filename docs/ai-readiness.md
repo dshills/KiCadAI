@@ -141,7 +141,7 @@ obligations with deterministic alternatives and rationale.
 All 10 adversarial circuits pass component, rating, value, tolerance, lowering,
 writer, round-trip, connectivity, routing, clean installed-KiCad ERC, and strict
 DRC gates. The current catalog contains 248 records across 33 families as of
-2026-07-30, including 233 verified records. The generic graph contract exposes
+2026-08-01, including 233 verified records. The generic graph contract exposes
 the supported subset of those records;
 unknown capabilities, insufficient evidence, incompatible domains, unsafe
 startup, and exceeded budgets fail closed. It does not establish unrestricted

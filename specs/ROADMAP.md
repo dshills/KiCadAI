@@ -1283,14 +1283,22 @@ proves fail-closed rejection of a plausible but unsafe bias alternative. See
 the [completion audit](simulation-grounded-architecture-synthesis/AUDIT.md) and
 [promotion matrix](simulation-grounded-architecture-synthesis/PROMOTION_MATRIX.json).
 
-1. Freeze a second, independently authored, out-of-distribution architecture
-   corpus before adding support, spanning additional analog and power families
-   and explicit adversarial safety cases.
-2. Expand the generic graph grammar, analytic seeds, and diagnosis-to-repair
-   operators only from failures in that frozen corpus, including the remaining
-   regulator and dual-threshold behaviors where they provide reusable closure.
-3. Generalize bounded placement-routing correction from observed
-   failures without introducing fixture-identity logic.
+The independently authored architecture-generalization corpus is now complete:
+five of six unfamiliar analog and power designs pass two identical
+installed-KiCad promotions, all four unsafe cases fail closed, and the
+protected programmable current output remains a precise deterministic
+non-pass. The first shared diagnosis-driven repair milestone is also complete;
+its dense physical case recovers from a real router failure while the current
+driver safely exhausts bounded electrical proposals.
+
+1. Freeze an independent diagnosis-driven repair corpus spanning electrical
+   simulation, schematic/ERC, placement, routing, and DRC failures before
+   adding new repair operators.
+2. Expand graph, value, model, and stage-reentry repair only from failures in
+   that corpus, including the protected current-output behavior when a generic
+   evidence-backed correction is available.
+3. Extend affected-scope physical correction across denser multi-net and
+   multi-layer cases while preserving unrelated placement and copper.
 4. Expand catalog-independent part qualification, calculated rating, and
    fabrication evidence before claiming broader
    autonomous or fabrication-ready coverage.
