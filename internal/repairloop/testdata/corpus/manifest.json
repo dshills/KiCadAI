@@ -1,0 +1,25 @@
+{
+  "schema": "kicadai.diagnosis-driven-repair-corpus.v1",
+  "version": 1,
+  "base_commit": "2365b35c0be54ec1a3fa9bd89a39dda2be1e9a08",
+  "frozen_at": "2026-08-01",
+  "cases": [
+    {
+      "id": "behavior_only_protected_current_driver",
+      "stage": "electrical",
+      "source": "internal/opentopologysynthesis/testdata/architecture_generalization_corpus/protected_programmable_current_output.json",
+      "sha256": "3eb0f01be78d52334f2b46e637c3859364f644fec159a7641e099d475f187a35",
+      "initial_status": "exhausted",
+      "acceptance": "promote only on full trusted pass; otherwise retain a more precise deterministic fail-closed trace"
+    },
+    {
+      "id": "dense_multi_endpoint_route_conflict",
+      "stage": "physical",
+      "source": "internal/designworkflow/testdata/generic_autonomous_correction/request.json",
+      "sha256": "e1289b12e063882b400393c9a7c9d76957f355c5779034bf8d21f59bd4e634fc",
+      "transformation": "identity-neutral expansion of the two-terminal seed to six equal catalog-resolved primitives, twelve pads, and two six-endpoint required nets; then apply the frozen 1.5 mm relative-placement perturbation",
+      "initial_status": "blocked",
+      "acceptance": "route both required multi-endpoint nets with zero failed nets and identical second-run trace and route operations"
+    }
+  ]
+}

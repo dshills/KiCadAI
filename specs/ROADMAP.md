@@ -1,6 +1,6 @@
 # KiCadAI Roadmap
 
-Date: 2026-07-29
+Date: 2026-08-01
 
 This roadmap replaces the older roadmap and gap analysis now archived as
 `specs/OLD_ROADMAP.md` and `specs/OLD_ROADMAP_GAP.md`.
@@ -137,6 +137,15 @@ from validation feedback to safe automatic repair.
   attempt 2 with clean KiCad ERC/DRC, writer correctness, and normalized
   round-trip evidence; the existing provider-backed promotion suite remains
   in a passing state.
+- Diagnosis-driven repair evidence now has one shared, identity-neutral schema
+  across open-topology electrical repair and generated-board physical
+  correction. It binds normalized diagnoses to deterministic proposals,
+  expected effects, stage re-entry, before/after/result hashes, bounded
+  consumption, outcomes, and safe rejection reasons. The protected
+  programmable current driver retains a narrower byte-identical fail-closed
+  result, while a six-component, twelve-pad, two-route-tree real-router stress
+  case recovers from blocked to routed twice identically. See
+  `specs/diagnosis-driven-repair/`.
 - Completed milestone: deterministic dense-board correction extends that loop
   with route-operation correlation, affected-net-only replacement,
   byte-preservation of unrelated copper, deterministic route-tree branch

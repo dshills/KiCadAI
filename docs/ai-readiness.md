@@ -159,6 +159,19 @@ composition to measured closed-loop selection inside the checked-in catalog;
 unknown topologies, arbitrary parts/models, RF, mains, and general dense-board
 routing remain fail-closed boundaries.
 
+## Diagnosis-Driven Repair
+
+Electrical and physical correction now emit the same deterministic repair
+trace contract. Each trace connects structured failure evidence to an
+authorized or rejected proposal, its intended synthesis-stage re-entry, its
+expected effect, protected scope, budget use, and before/after/result hashes.
+The current implementation can recover a real blocked dense multi-endpoint
+routing case without design identity dependence. The protected programmable
+current driver still fails closed at trusted simulation; its retained trace
+shows which bounded graph repairs were evaluated and why none earned
+promotion. This is meaningful closed-loop progress, but it is not yet a claim
+of arbitrary electrical self-repair or general autorouting.
+
 ## Open-Topology Primitive Synthesis
 
 The open-topology lane no longer requires architecture search to select a

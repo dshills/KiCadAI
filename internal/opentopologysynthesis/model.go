@@ -275,13 +275,15 @@ type Diagnosis struct {
 }
 
 type Repair struct {
-	Number            int           `json:"number"`
-	Operator          string        `json:"operator"`
-	DiagnosisCode     string        `json:"diagnosis_code"`
-	BeforeGraphHash   string        `json:"before_graph_hash"`
-	AfterGraphHash    string        `json:"after_graph_hash"`
-	ExpectedDirection string        `json:"expected_direction"`
-	Changes           []GraphChange `json:"changes"`
+	Number                 int           `json:"number"`
+	Operator               string        `json:"operator"`
+	DiagnosisCode          string        `json:"diagnosis_code"`
+	DiagnosisRequirementID string        `json:"diagnosis_requirement_id"`
+	DiagnosisEvidenceHash  string        `json:"diagnosis_evidence_hash"`
+	BeforeGraphHash        string        `json:"before_graph_hash"`
+	AfterGraphHash         string        `json:"after_graph_hash"`
+	ExpectedDirection      string        `json:"expected_direction"`
+	Changes                []GraphChange `json:"changes"`
 }
 
 type GraphChange struct {

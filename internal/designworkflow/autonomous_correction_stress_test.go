@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -16,6 +17,7 @@ import (
 	"kicadai/internal/placement"
 	"kicadai/internal/reports"
 	"kicadai/internal/routing"
+	"kicadai/internal/schematicir"
 	"kicadai/internal/writercorrectness"
 )
 
@@ -105,6 +107,55 @@ func TestAutonomousCorrectionStressFixtureRecoversRealRoutingFailure(t *testing.
 	}
 }
 
+func TestAutonomousCorrectionDenseStressRecoversRealRoutingFailure(t *testing.T) {
+	metadata := loadAutonomousCorrectionStressMetadata(t)
+	request := denseAutonomousCorrectionStressRequest(t, loadAutonomousCorrectionStressRequest(t), 6)
+	index := autonomousCorrectionStressLibraryIndex(t, request)
+	first := runAutonomousCorrectionStress(t, request, index, metadata.OffsetMM)
+	second := runAutonomousCorrectionStress(t, request, index, metadata.OffsetMM)
+	if len(request.ExplicitCircuit.Components) != 6 || first.Initial.Result.Metrics.NetCount != 2 ||
+		first.Initial.Result.Status == routing.StatusRouted || !reports.HasBlockingIssue(first.Initial.Stage.Issues) {
+		t.Fatalf("dense initial state did not preserve a real blocked route: components=%d status=%s metrics=%#v issues=%#v", len(request.ExplicitCircuit.Components), first.Initial.Result.Status, first.Initial.Result.Metrics, first.Initial.Stage.Issues)
+	}
+	if first.SelectedRouted.Result.Status != routing.StatusRouted || first.SelectedRouted.Result.Metrics.FailedNetCount != 0 ||
+		first.Report.Trace.Hash == "" || len(first.Report.Trace.Proposals) == 0 || len(first.Report.Trace.Outcomes) == 0 {
+		t.Fatalf("dense diagnosis-driven correction did not complete with trace evidence: route=%#v trace=%#v", first.SelectedRouted.Result, first.Report.Trace)
+	}
+	firstTrace, _ := json.Marshal(first.Report.Trace)
+	secondTrace, _ := json.Marshal(second.Report.Trace)
+	if !bytes.Equal(firstTrace, secondTrace) || !reflect.DeepEqual(first.SelectedRouted.Operations, second.SelectedRouted.Operations) {
+		t.Fatal("dense diagnosis-driven correction did not replay deterministically")
+	}
+}
+
+func denseAutonomousCorrectionStressRequest(t *testing.T, request Request, componentCount int) Request {
+	t.Helper()
+	if componentCount < 2 || len(request.ExplicitCircuit.Components) != 2 ||
+		len(request.ExplicitCircuit.Schematic.Circuit.Components) != 2 {
+		t.Fatal("dense stress expansion requires the two-component generic seed")
+	}
+	request.Name = "dense_generic_parallel_network"
+	request.ExplicitCircuit.Schematic.Metadata.Name = request.Name
+	request.ExplicitCircuit.Schematic.Metadata.Title = "Dense Generic Parallel Network"
+	for number := 3; number <= componentCount; number++ {
+		id := fmt.Sprintf("r%d", number)
+		ref := fmt.Sprintf("R%d", number)
+		schematic := request.ExplicitCircuit.Schematic.Circuit.Components[(number-1)%2]
+		schematic.ID, schematic.Ref = id, ref
+		request.ExplicitCircuit.Schematic.Circuit.Components = append(request.ExplicitCircuit.Schematic.Circuit.Components, schematic)
+		request.ExplicitCircuit.Schematic.Circuit.Nets[0].Connect = append(request.ExplicitCircuit.Schematic.Circuit.Nets[0].Connect, schematicir.EndpointRef(id+".1"))
+		request.ExplicitCircuit.Schematic.Circuit.Nets[1].Connect = append(request.ExplicitCircuit.Schematic.Circuit.Nets[1].Connect, schematicir.EndpointRef(id+".2"))
+
+		component := request.ExplicitCircuit.Components[(number-1)%2]
+		component.ID, component.Reference = id, ref
+		component.Placement.Near = "r1"
+		request.ExplicitCircuit.Components = append(request.ExplicitCircuit.Components, component)
+		request.ExplicitCircuit.Nets[0].Endpoints = append(request.ExplicitCircuit.Nets[0].Endpoints, ExplicitNetEndpoint{Component: id, Pad: component.Pads[0].Name})
+		request.ExplicitCircuit.Nets[1].Endpoints = append(request.ExplicitCircuit.Nets[1].Endpoints, ExplicitNetEndpoint{Component: id, Pad: component.Pads[1].Name})
+	}
+	return request
+}
+
 func TestAutonomousCorrectionStressOptionalKiCad(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping optional KiCad-backed autonomous correction stress lane in short mode")
@@ -131,7 +182,7 @@ func TestAutonomousCorrectionStressOptionalKiCad(t *testing.T) {
 	}
 	// The complete upstream libraries may report unrelated diagnostics. Resolve
 	// every record required by this fixture explicitly and fail if any is absent.
-	request := loadAutonomousCorrectionStressRequest(t)
+	request := denseAutonomousCorrectionStressRequest(t, loadAutonomousCorrectionStressRequest(t), 6)
 	symbols := make(map[string]libraryresolver.SymbolRecord)
 	for _, component := range request.ExplicitCircuit.Schematic.Circuit.Components {
 		record, ok := fullIndex.Symbols[component.Symbol]

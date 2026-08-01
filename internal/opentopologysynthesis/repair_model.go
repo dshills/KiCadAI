@@ -1,6 +1,9 @@
 package opentopologysynthesis
 
-import "kicadai/internal/reports"
+import (
+	"kicadai/internal/repairloop"
+	"kicadai/internal/reports"
+)
 
 const (
 	RepairSearchSchema  = "kicadai.open-topology-repair-search.v1"
@@ -31,7 +34,9 @@ type RepairSearchResult struct {
 	Attempts              []RepairAttempt    `json:"attempts"`
 	Selected              *RepairedCandidate `json:"selected,omitempty"`
 	Issues                []reports.Issue    `json:"issues"`
+	Trace                 repairloop.Trace   `json:"trace"`
 	Hash                  string             `json:"hash"`
+	traceDiagnoses        []Diagnosis
 }
 
 type RepairAttempt struct {

@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"kicadai/internal/placement"
+	"kicadai/internal/repairloop"
 	"kicadai/internal/reports"
 	"kicadai/internal/routing"
 	"kicadai/internal/transactions"
@@ -152,6 +153,7 @@ type AutonomousCorrectionReport struct {
 	AllAttemptInvariantsPreserved bool                          `json:"all_attempt_invariants_preserved"`
 	AppliedRetryKeys              []string                      `json:"applied_retry_keys,omitempty"`
 	AttemptHistory                []AutonomousCorrectionAttempt `json:"attempt_history,omitempty"`
+	Trace                         repairloop.Trace              `json:"trace"`
 }
 
 const (
@@ -685,6 +687,97 @@ func finalizeAutonomousCorrectionReport(report *AutonomousCorrectionReport, requ
 	}
 	report.ProtectedInvariantsPreserved = fingerprintPreserved && selectedAttemptPreserved
 	report.AllAttemptInvariantsPreserved = allAttemptsPreserved
+	report.Trace = autonomousCorrectionRepairTrace(*report)
+}
+
+func autonomousCorrectionRepairTrace(report AutonomousCorrectionReport) repairloop.Trace {
+	diagnostics := []repairloop.Diagnostic{}
+	proposals := []repairloop.Proposal{}
+	outcomes := []repairloop.Outcome{}
+	for _, attempt := range report.AttemptHistory {
+		if attempt.Plan == nil {
+			continue
+		}
+		normalized := make([]repairloop.Diagnostic, 0, len(attempt.Plan.Diagnostics))
+		for _, diagnostic := range attempt.Plan.Diagnostics {
+			scope := append(append(append([]string(nil), diagnostic.Refs...), diagnostic.Nets...), diagnostic.OperationIDs...)
+			evidenceHash := autonomousCorrectionEvidenceHash(diagnostic)
+			item := repairloop.NewDiagnostic(diagnostic.Source, string(diagnostic.IssueCode), string(diagnostic.Category), "", evidenceHash, scope)
+			diagnostics = append(diagnostics, item)
+			normalized = append(normalized, item)
+		}
+		for _, action := range attempt.Plan.Actions {
+			matching := []repairloop.Diagnostic{}
+			for index, source := range attempt.Plan.Diagnostics {
+				if source.Category == action.Category {
+					matching = append(matching, normalized[index])
+				}
+			}
+			if len(matching) == 0 {
+				continue
+			}
+			diagnostic := matching[0]
+			if len(matching) > 1 {
+				diagnostic = autonomousCorrectionCompositeRepairDiagnostic(action.Category, matching)
+				diagnostics = append(diagnostics, diagnostic)
+			}
+			reenter := "routing"
+			if action.PlacementHint != "" {
+				reenter = "placement"
+			}
+			effect := strings.TrimSpace(action.Reason)
+			if effect == "" {
+				effect = "improve the diagnosed physical evidence while preserving protected constraints"
+			}
+			scope := append(append(append([]string(nil), action.Refs...), action.Nets...), action.OperationIDs...)
+			rejection := ""
+			if !action.Authorized {
+				rejection = action.Reason
+			}
+			proposal := repairloop.NewProposal(diagnostic, string(action.Kind), reenter, effect, scope, action.Authorized, rejection)
+			proposals = append(proposals, proposal)
+			outcome := repairloop.Outcome{ProposalID: proposal.ID, BeforeHash: attempt.Plan.PlacementStateHash}
+			if attempt.Application == nil || !attempt.Application.Applied {
+				outcome.Status = "rejected"
+				outcome.Reason = attempt.Plan.StopReason
+			} else {
+				outcome.AfterHash = attempt.PlacementStateHash
+				outcome.ResultHash = attempt.Application.RouteStateHashAfter
+				if attempt.RoutingStatus == routing.StatusRouted && attempt.FailedNets == 0 {
+					outcome.Status, outcome.Reason = "passed", "required routes completed"
+				} else {
+					outcome.Status, outcome.Reason = "applied", "correction materialized but routing remained incomplete"
+				}
+			}
+			outcomes = append(outcomes, outcome)
+		}
+	}
+	return repairloop.NewTrace(max(0, report.MaxAttempts-1), report.Applied, diagnostics, proposals, outcomes)
+}
+
+func autonomousCorrectionEvidenceHash(diagnostic AutonomousCorrectionDiagnostic) string {
+	return autonomousCorrectionStableHash(diagnostic)
+}
+
+func autonomousCorrectionCompositeRepairDiagnostic(category AutonomousCorrectionCategory, matching []repairloop.Diagnostic) repairloop.Diagnostic {
+	stages, codes, evidence, scope := []string{}, []string{}, []string{}, []string{}
+	for _, diagnostic := range matching {
+		stages = append(stages, diagnostic.Stage)
+		codes = append(codes, diagnostic.Code)
+		evidence = append(evidence, diagnostic.Hash)
+		scope = append(scope, diagnostic.Scope...)
+	}
+	return repairloop.NewDiagnostic(
+		strings.Join(correctionSortedStrings(stages), "+"),
+		strings.Join(correctionSortedStrings(codes), "+"),
+		string(category), "", autonomousCorrectionStableHash(correctionSortedStrings(evidence)), scope,
+	)
+}
+
+func autonomousCorrectionStableHash(value any) string {
+	data, _ := json.Marshal(value)
+	sum := sha256.Sum256(data)
+	return hex.EncodeToString(sum[:])
 }
 
 func AutonomousCorrectionReportFromWorkflow(workflow WorkflowResult) (AutonomousCorrectionReport, bool) {
@@ -737,7 +830,7 @@ func AutonomousCorrectionEvidence(request Request, workflow WorkflowResult) (Aut
 			break
 		}
 	}
-	return AutonomousCorrectionReport{
+	report := AutonomousCorrectionReport{
 		SchemaVersion:                 AutonomousCorrectionSchemaV1,
 		Scope:                         "generic-circuit-v1",
 		Enabled:                       request.RoutingRetry.Enabled,
@@ -747,7 +840,9 @@ func AutonomousCorrectionEvidence(request Request, workflow WorkflowResult) (Aut
 		FinalInvariantFingerprint:     fingerprint,
 		ProtectedInvariantsPreserved:  preserved,
 		AllAttemptInvariantsPreserved: preserved,
-	}, true
+	}
+	report.Trace = autonomousCorrectionRepairTrace(report)
+	return report, true
 }
 
 // BuildAutonomousCorrectionDiagnostics converts subsystem issues into the

@@ -8,6 +8,7 @@ import (
 	"slices"
 	"strings"
 
+	"kicadai/internal/repairloop"
 	"kicadai/internal/reports"
 )
 
@@ -70,6 +71,7 @@ func RepairCandidate(
 		result.Issues = []reports.Issue{graphIssue(CodeRepairUnsupported, "initial_evaluation.diagnoses", "failed candidate has no stable diagnosis for generic repair", "retain normalized simulation diagnoses")}
 		return finalizeRepairSearch(result)
 	}
+	result.traceDiagnoses = append([]Diagnosis(nil), initial.Diagnoses...)
 
 	type repairState struct {
 		graph      CandidateGraph
@@ -321,9 +323,11 @@ func generateRepairProposals(
 					continue
 				}
 				add(candidate, Repair{
-					Operator:          "add_passive_edge",
-					DiagnosisCode:     diagnosis.Code,
-					ExpectedDirection: diagnosis.Direction,
+					Operator:               "add_passive_edge",
+					DiagnosisCode:          diagnosis.Code,
+					DiagnosisRequirementID: diagnosis.RequirementID,
+					DiagnosisEvidenceHash:  diagnosis.EvidenceHash,
+					ExpectedDirection:      diagnosis.Direction,
 					Changes: []GraphChange{{
 						Kind: "add_primitive", Primitive: primitive.Key,
 						FromNode: pair[0], ToNode: pair[1], ToValue: seedPrimitiveValue(primitive),
@@ -346,9 +350,11 @@ func generateRepairProposals(
 						continue
 					}
 					add(candidate, Repair{
-						Operator:          "redirect_passive_edge",
-						DiagnosisCode:     diagnosis.Code,
-						ExpectedDirection: diagnosis.Direction,
+						Operator:               "redirect_passive_edge",
+						DiagnosisCode:          diagnosis.Code,
+						DiagnosisRequirementID: diagnosis.RequirementID,
+						DiagnosisEvidenceHash:  diagnosis.EvidenceHash,
+						ExpectedDirection:      diagnosis.Direction,
 						Changes: []GraphChange{{
 							Kind: "redirect_terminal", Primitive: instance.ID, Terminal: connection.Terminal,
 							FromNode: connection.Node, ToNode: target,
@@ -376,9 +382,11 @@ func generateRepairProposals(
 			}
 			diagnosis := uniqueDiagnoses[0]
 			add(candidate, Repair{
-				Operator:          "substitute_compatible_primitive",
-				DiagnosisCode:     diagnosis.Code,
-				ExpectedDirection: diagnosis.Direction,
+				Operator:               "substitute_compatible_primitive",
+				DiagnosisCode:          diagnosis.Code,
+				DiagnosisRequirementID: diagnosis.RequirementID,
+				DiagnosisEvidenceHash:  diagnosis.EvidenceHash,
+				ExpectedDirection:      diagnosis.Direction,
 				Changes: []GraphChange{{
 					Kind: "substitute_primitive", Primitive: instance.ID,
 					FromNode: current.Key, ToNode: replacement.Key,
@@ -551,8 +559,108 @@ func simulationEvaluationPenalty(evaluation SimulationEvaluation) float64 {
 }
 
 func finalizeRepairSearch(result RepairSearchResult) RepairSearchResult {
+	result.Trace = electricalRepairTrace(result)
 	copy := result
 	copy.Hash = ""
 	result.Hash = hashJSON(copy)
 	return result
+}
+
+func electricalRepairTrace(result RepairSearchResult) repairloop.Trace {
+	diagnostics := make([]repairloop.Diagnostic, 0, len(result.traceDiagnoses))
+	byDiagnosis := map[string]repairloop.Diagnostic{}
+	for _, diagnosis := range compactRepairDiagnoses(result.traceDiagnoses) {
+		evidenceHash := diagnosis.EvidenceHash
+		if evidenceHash == "" {
+			evidenceHash = hashJSON(diagnosis)
+		}
+		scope := []string{diagnosis.RequirementID, diagnosis.OperatingCase, diagnosis.AffectedConeHash}
+		normalized := repairloop.NewDiagnostic(
+			"simulation", diagnosis.Code, electricalRepairCategory(diagnosis),
+			diagnosis.Direction, evidenceHash, scope,
+		)
+		diagnostics = append(diagnostics, normalized)
+		byDiagnosis[electricalRepairDiagnosisKey(diagnosis.Code, diagnosis.RequirementID, diagnosis.EvidenceHash)] = normalized
+	}
+	proposals := []repairloop.Proposal{}
+	outcomes := []repairloop.Outcome{}
+	covered := map[string]bool{}
+	for _, attempt := range result.Attempts {
+		diagnostic, ok := byDiagnosis[electricalRepairDiagnosisKey(attempt.Repair.DiagnosisCode, attempt.Repair.DiagnosisRequirementID, attempt.Repair.DiagnosisEvidenceHash)]
+		if !ok {
+			continue
+		}
+		covered[diagnostic.Hash] = true
+		scope := []string{"candidate:" + attempt.Repair.AfterGraphHash}
+		for _, change := range attempt.Repair.Changes {
+			scope = append(scope, change.Primitive, change.Terminal, change.FromNode, change.ToNode)
+		}
+		effect := strings.TrimSpace(attempt.Repair.ExpectedDirection)
+		if effect == "" {
+			effect = "resolve the diagnosed simulation failure without weakening declared constraints"
+		}
+		proposal := repairloop.NewProposal(diagnostic, attempt.Repair.Operator, "equation_sizing", effect, scope, true, "")
+		proposals = append(proposals, proposal)
+		status := "failed"
+		reason := "candidate did not satisfy all trusted assertions"
+		if attempt.Status == RepairSearchPassed {
+			status, reason = "passed", "all trusted assertions passed"
+		} else if attempt.Improved {
+			status, reason = "improved", "normalized simulation penalty decreased"
+		} else if attempt.Status == RepairSearchUnsupported {
+			status, reason = "rejected", "candidate evaluation was unsupported"
+		}
+		outcomes = append(outcomes, repairloop.Outcome{
+			ProposalID: proposal.ID, Status: status,
+			BeforeHash: attempt.Repair.BeforeGraphHash, AfterHash: attempt.GraphHash,
+			ResultHash: attempt.Evaluation.Hash, Reason: reason,
+		})
+	}
+	for _, diagnostic := range diagnostics {
+		if covered[diagnostic.Hash] {
+			continue
+		}
+		reason := electricalRepairRejection(diagnostic.Category)
+		proposal := repairloop.NewProposal(diagnostic, "no_safe_operator", "simulation", "retain fail-closed evidence", diagnostic.Scope, false, reason)
+		proposals = append(proposals, proposal)
+		outcomes = append(outcomes, repairloop.Outcome{ProposalID: proposal.ID, Status: "rejected", BeforeHash: result.InitialGraphHash, ResultHash: result.InitialEvaluationHash, Reason: reason})
+	}
+	return repairloop.NewTrace(result.Policy.MaxTopologyRepairs, result.Consumption.TopologyRepairs, diagnostics, proposals, outcomes)
+}
+
+func electricalRepairDiagnosisKey(code, requirementID, evidenceHash string) string {
+	return strings.Join([]string{code, requirementID, evidenceHash}, "\x1f")
+}
+
+func electricalRepairCategory(diagnosis Diagnosis) string {
+	switch diagnosis.Code {
+	case diagnosisNonconvergent, diagnosisOperatingPointInvalid:
+		return "bias_or_reference_access"
+	case diagnosisUnstable:
+		return "feedback_or_compensation"
+	case diagnosisAssertionBelowMinimum, diagnosisAssertionAboveMaximum:
+		switch trustedModelAnalysisKind(diagnosis.Analysis) {
+		case "thermal", "electrothermal":
+			return "rating_thermal_or_soa"
+		default:
+			return "value_domain_or_feedback"
+		}
+	case diagnosisThermalUnavailable:
+		return "thermal_evidence"
+	case diagnosisModelUnavailable, diagnosisMetricUnsupported:
+		return "model_evidence"
+	default:
+		return "unsupported_simulation_diagnostic"
+	}
+}
+
+func electricalRepairRejection(category string) string {
+	switch category {
+	case "model_evidence", "thermal_evidence":
+		return "repair cannot synthesize missing reviewed model or thermal evidence"
+	case "unsupported_simulation_diagnostic":
+		return "diagnostic does not identify a bounded electrical repair operator"
+	default:
+		return "no admissible graph change survived graph, rating, and deterministic-budget validation"
+	}
 }
