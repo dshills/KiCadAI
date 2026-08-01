@@ -32,6 +32,24 @@ func TestDiagnosticsForResultClassifiesRouteSearchFailure(t *testing.T) {
 	}
 }
 
+func TestDiagnosticMessageTakesPrecedenceOverMultiOptionSuggestion(t *testing.T) {
+	diagnostic := DiagnosticForIssue(reports.Issue{
+		Code:       reports.CodeValidationFailed,
+		Severity:   reports.SeverityBlocked,
+		Path:       "nets.SIG",
+		Message:    "no legal two-layer path found: blocked near existing_copper",
+		Suggestion: "move components, reduce clearance, or allow another routing layer",
+		Refs:       []string{"J1", "J2"},
+		Nets:       []string{"SIG"},
+	})
+	if diagnostic.Category != RepairRouteSearch || diagnostic.Action != ActionMoveComponents {
+		t.Fatalf("diagnostic = %#v", diagnostic)
+	}
+	if diagnostic.Suggestion != "move components, reduce clearance, or allow another routing layer" {
+		t.Fatalf("explicit suggestion = %q", diagnostic.Suggestion)
+	}
+}
+
 func TestDiagnosticForIssueClassifiesRoutingPolicyRepairs(t *testing.T) {
 	cases := []struct {
 		name     string

@@ -13,6 +13,7 @@ const (
 	placementRetryBaseSpacingDeltaMM = 1.0
 	placementRetryMaxSpacingDeltaMM  = 2.0
 	placementRetryMaxProximityMM     = 25.0
+	placementRetryRouteChannelMM     = 1.0
 )
 
 type PlacementRetryAdjustment struct {
@@ -149,9 +150,26 @@ func placementRetrySameLayer(first, second placement.Placement) bool {
 }
 
 func addRetryProximityRules(request *placement.Request, hint PlacementRetryHint, refsByNet map[string][]string, complexityByRef map[string]float64, movableRefs map[string]struct{}, existingRuleIDs map[string]struct{}) []string {
+	if len(movableRefs) == 0 {
+		return nil
+	}
 	var added []string
+	componentsByRef := placementRetryComponentsByRef(request.Components)
+	resolvedRefs := make([]string, 0, len(hint.Refs))
+	for _, ref := range hint.Refs {
+		if _, present := complexityByRef[ref]; present {
+			resolvedRefs = append(resolvedRefs, ref)
+		}
+	}
+	resolvedRefs = sortedUniqueStrings(resolvedRefs)
 	for _, netName := range hint.Nets {
-		refs := refsByNet[netName]
+		refs := resolvedRefs
+		if len(refs) < 2 {
+			// Exact routing endpoint refs are preferred. Fall back to the
+			// placement net view only when the diagnostic does not resolve a
+			// complete pair.
+			refs = refsByNet[netName]
+		}
 		if len(refs) < 2 {
 			continue
 		}
@@ -159,6 +177,8 @@ func addRetryProximityRules(request *placement.Request, hint PlacementRetryHint,
 		if anchor == "" || len(targets) == 0 {
 			continue
 		}
+		// Anchor-to-target rules form a deterministic star: at most N-1
+		// constraints for an N-component net, rather than all N*(N-1)/2 pairs.
 		for _, target := range targets {
 			ruleID := "retry_reduce_distance:" + netName + ":" + anchor + ":" + target
 			if _, ok := existingRuleIDs[ruleID]; ok {
@@ -169,14 +189,46 @@ func addRetryProximityRules(request *placement.Request, hint PlacementRetryHint,
 				Source:        "routing_retry",
 				AnchorRef:     anchor,
 				TargetRefs:    []string{target},
-				MaxDistanceMM: placementRetryMaxProximityMM,
+				MaxDistanceMM: placementRetryPairDistanceForComponents(request.Rules, componentsByRef, anchor, target),
 				Weight:        1,
+				Required:      true,
 			})
 			existingRuleIDs[ruleID] = struct{}{}
 			added = append(added, ruleID)
 		}
 	}
 	return added
+}
+
+func placementRetryPairDistance(request placement.Request, anchorRef, targetRef string) float64 {
+	return placementRetryPairDistanceForComponents(request.Rules, placementRetryComponentsByRef(request.Components), anchorRef, targetRef)
+}
+
+func placementRetryComponentsByRef(components []placement.Component) map[string]placement.Component {
+	byRef := make(map[string]placement.Component, len(components))
+	for _, component := range components {
+		byRef[component.Ref] = component
+	}
+	return byRef
+}
+
+func placementRetryPairDistanceForComponents(rules placement.Rules, componentsByRef map[string]placement.Component, anchorRef, targetRef string) float64 {
+	anchor, anchorFound := componentsByRef[anchorRef]
+	target, targetFound := componentsByRef[targetRef]
+	if !anchorFound || !targetFound {
+		return placementRetryMaxProximityMM
+	}
+	spacing := max(0, rules.ComponentSpacingMM)
+	horizontal := (anchor.Bounds.WidthMM+target.Bounds.WidthMM)/2 + spacing + placementRetryRouteChannelMM
+	vertical := (anchor.Bounds.HeightMM+target.Bounds.HeightMM)/2 + spacing + placementRetryRouteChannelMM
+	// Bound both axis-aligned arrangements. Using only the smaller axis can
+	// make a required rule infeasible when board regions or fixed neighbors
+	// constrain the pair to the other orientation.
+	distance := max(horizontal, vertical)
+	if distance <= 0 {
+		return placementRetryMaxProximityMM
+	}
+	return min(placementRetryMaxProximityMM, distance)
 }
 
 func addPlacementRetrySkippedReason(adjustment *PlacementRetryAdjustment, reason string) {

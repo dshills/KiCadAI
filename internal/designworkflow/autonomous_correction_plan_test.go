@@ -22,6 +22,8 @@ func TestPlanAutonomousCorrectionSelectsSupportedActions(t *testing.T) {
 		{name: "fanout", diagnostic: correctionDiagnostic(CorrectionInaccessiblePad, routing.RepairPadAccess, []string{"R1"}, []string{"SIG"}), want: CorrectionActionImproveEndpointFanout},
 		{name: "edge", diagnostic: correctionDiagnostic(CorrectionBlockedEscapeDirection, routing.RepairBoardBoundary, []string{"R1"}, []string{"SIG"}), want: CorrectionActionMoveWithinRegion},
 		{name: "distance", diagnostic: correctionDiagnostic(CorrectionRequiredNetDisconnectedEndpoint, routing.RepairConnectivity, []string{"J1", "R1"}, []string{"SIG"}), want: CorrectionActionReduceEndpointDistance},
+		{name: "route search distance", diagnostic: correctionDiagnostic(CorrectionRoutingRegionExhaustion, routing.RepairRouteSearch, []string{"J1", "R1"}, []string{"SIG"}), want: CorrectionActionReduceEndpointDistance},
+		{name: "clearance spacing", diagnostic: correctionDiagnostic(CorrectionRoutingRegionExhaustion, routing.RepairClearance, []string{"J1", "R1"}, []string{"SIG"}), want: CorrectionActionAdjustRelativeSpacing},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {

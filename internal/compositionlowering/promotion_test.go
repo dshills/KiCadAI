@@ -790,6 +790,20 @@ func runFrozenPromotionAt(t *testing.T, corpusRoot string, expectedCount int, ar
 				if err := os.MkdirAll(artifactRoot, 0o755); err != nil {
 					t.Fatal(err)
 				}
+				requestData, err := json.MarshalIndent(request, "", "  ")
+				if err != nil {
+					t.Fatalf("marshal captured workflow request: %v", err)
+				}
+				if err := os.WriteFile(filepath.Join(artifactRoot, "workflow_request.json"), append(requestData, '\n'), 0o644); err != nil {
+					t.Fatalf("write captured workflow request: %v", err)
+				}
+				indexData, err := json.MarshalIndent(index, "", "  ")
+				if err != nil {
+					t.Fatalf("marshal captured library index: %v", err)
+				}
+				if err := os.WriteFile(filepath.Join(artifactRoot, "library_index.json"), append(indexData, '\n'), 0o644); err != nil {
+					t.Fatalf("write captured library index: %v", err)
+				}
 			}
 			firstDir := filepath.Join(artifactRoot, "first")
 			secondDir := filepath.Join(artifactRoot, "second")

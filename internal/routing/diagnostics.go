@@ -90,7 +90,17 @@ func repairCategoryForIssue(issue reports.Issue) RepairCategory {
 	case reports.CodeInvalidArgument:
 		return RepairInputModel
 	}
-	text := strings.ToLower(string(issue.Code) + " " + issue.Message + " " + issue.Suggestion)
+	// Classify the emitted failure before consulting remediation prose. A
+	// multi-option suggestion can mention clearance or layers even when the
+	// actual failure is route search, and must not override that root cause.
+	if category := repairCategoryForText(string(issue.Code) + " " + issue.Message); category != RepairUnknown {
+		return category
+	}
+	return repairCategoryForText(issue.Suggestion)
+}
+
+func repairCategoryForText(value string) RepairCategory {
+	text := strings.ToLower(value)
 	switch {
 	case containsAnyText(text, "net class", "trace width", "clearance matrix", "manufacturing minimum"):
 		return RepairRoutingRules

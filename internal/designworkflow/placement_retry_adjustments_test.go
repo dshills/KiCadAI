@@ -88,6 +88,48 @@ func TestBuildPlacementRetryAdjustmentAddsReduceDistanceRule(t *testing.T) {
 	if len(adjusted.ProximityRules) != 1 || adjusted.ProximityRules[0].AnchorRef != "C1" || adjusted.ProximityRules[0].TargetRefs[0] != "R1" {
 		t.Fatalf("proximity rules = %#v", adjusted.ProximityRules)
 	}
+	if !adjusted.ProximityRules[0].Required || adjusted.ProximityRules[0].MaxDistanceMM != 4 {
+		t.Fatalf("proximity rule is not materially geometry-bounded: %#v", adjusted.ProximityRules[0])
+	}
+}
+
+func TestBuildPlacementRetryAdjustmentUsesResolvedRefsWhenNetViewIsMissing(t *testing.T) {
+	req := retryPlacementRequest()
+	req.Nets = nil
+	adjusted, adjustment := BuildPlacementRetryAdjustment(req, []PlacementRetryHint{{
+		Category:      PlacementRetryReduceDistance,
+		RetryEligible: true,
+		Refs:          []string{"missing", "C1", "U1"},
+		Nets:          []string{"SIG"},
+	}}, 1)
+
+	if !adjustment.Applied || len(adjustment.ProximityRules) != 1 {
+		t.Fatalf("adjustment = %#v", adjustment)
+	}
+	if len(adjusted.ProximityRules) != 1 || adjusted.ProximityRules[0].AnchorRef != "U1" || adjusted.ProximityRules[0].TargetRefs[0] != "C1" {
+		t.Fatalf("resolved-ref proximity rules = %#v", adjusted.ProximityRules)
+	}
+	if !adjusted.ProximityRules[0].Required || adjusted.ProximityRules[0].MaxDistanceMM != 5 {
+		t.Fatalf("resolved-ref proximity rule is not materially geometry-bounded: %#v", adjusted.ProximityRules[0])
+	}
+}
+
+func TestBuildPlacementRetryAdjustmentPrefersResolvedPairOverBroaderNet(t *testing.T) {
+	req := retryPlacementRequest()
+	adjusted, adjustment := BuildPlacementRetryAdjustment(req, []PlacementRetryHint{{
+		Category:      PlacementRetryReduceDistance,
+		RetryEligible: true,
+		Refs:          []string{"C1", "U1"},
+		Nets:          []string{"N1"},
+	}}, 1)
+
+	if !adjustment.Applied || len(adjustment.ProximityRules) != 1 {
+		t.Fatalf("adjustment = %#v", adjustment)
+	}
+	rule := adjusted.ProximityRules[0]
+	if rule.AnchorRef != "U1" || len(rule.TargetRefs) != 1 || rule.TargetRefs[0] != "C1" {
+		t.Fatalf("resolved endpoint pair was diluted by broader net: %#v", rule)
+	}
 }
 
 func TestBuildPlacementRetryAdjustmentTargetsMovableRefs(t *testing.T) {

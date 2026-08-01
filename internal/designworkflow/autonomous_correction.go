@@ -358,9 +358,10 @@ func autonomousCorrectionActionForDiagnostic(diagnostic AutonomousCorrectionDiag
 			action.Kind, action.PlacementHint, action.Authorized = CorrectionActionReduceEndpointDistance, PlacementRetryReduceDistance, true
 		}
 	case CorrectionRoutingRegionExhaustion:
-		if diagnostic.SourceCategory == routing.RepairLengthPolicy {
+		switch diagnostic.SourceCategory {
+		case routing.RepairLengthPolicy, routing.RepairRouteSearch:
 			action.Kind, action.PlacementHint, action.Authorized = CorrectionActionReduceEndpointDistance, PlacementRetryReduceDistance, true
-		} else {
+		default:
 			action.Kind, action.PlacementHint, action.Authorized = CorrectionActionAdjustRelativeSpacing, PlacementRetryIncreaseSpacing, true
 		}
 	case CorrectionRouteTreeBranchOrder:

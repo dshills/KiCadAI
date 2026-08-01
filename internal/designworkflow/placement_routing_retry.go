@@ -36,7 +36,11 @@ type placementRoutingRetryAttemptSummary struct {
 	RouteScore                float64             `json:"route_score,omitempty"`
 	RoutedNets                int                 `json:"routed_nets"`
 	FailedNets                int                 `json:"failed_nets"`
+	FailedNetNames            []string            `json:"failed_net_names,omitempty"`
 	SkippedNets               int                 `json:"skipped_nets,omitempty"`
+	RoutingIssueCount         int                 `json:"routing_issue_count,omitempty"`
+	RoutingBlockingCount      int                 `json:"routing_blocking_count,omitempty"`
+	RoutingCopperConflicts    int                 `json:"routing_copper_conflicts,omitempty"`
 	PlacementScore            float64             `json:"placement_score,omitempty"`
 	BoardValidationBlocking   int                 `json:"board_validation_blocking"`
 	BoardValidationIssueCount int                 `json:"board_validation_issue_count"`
@@ -464,6 +468,7 @@ func placementRoutingAttemptSummaryForResult(attempt int, baseline *RoutingStage
 		RouteScore:              routeQualityScore(routed),
 		RoutedNets:              routed.Result.Metrics.RoutedNetCount,
 		FailedNets:              routed.Result.Metrics.FailedNetCount,
+		FailedNetNames:          failedRoutingNetNames(routed.Result),
 		SkippedNets:             skippedNetCount(routed),
 		PlacementScore:          placementQualityScore(placed),
 		DRCStatus:               retryEvidenceSkipped,
@@ -472,6 +477,7 @@ func placementRoutingAttemptSummaryForResult(attempt int, baseline *RoutingStage
 		RegressionFlags:         nil,
 		BoardValidationBlocking: 0,
 	}
+	summary.RoutingIssueCount, summary.RoutingBlockingCount, summary.RoutingCopperConflicts = routingIssueCounts(routed.Result.Issues)
 	summary.BoardValidationIssueCount, summary.BoardValidationBlocking = boardValidationCountsFromRoutingStage(routed.Stage)
 	routeSummary := retryInterBlockSummary(routed.Stage)
 	treeSummary := retryRouteTreeSummary(routed.Stage)
@@ -523,7 +529,32 @@ func normalizePlacementRoutingRetryAttempt(summary placementRoutingRetryAttemptS
 	if summary.SkippedNets < 0 {
 		summary.SkippedNets = 0
 	}
+	slices.Sort(summary.FailedNetNames)
+	summary.FailedNetNames = slices.Compact(summary.FailedNetNames)
 	return summary
+}
+
+func failedRoutingNetNames(result routing.Result) []string {
+	failed := make([]string, 0, result.Metrics.FailedNetCount)
+	for _, route := range result.Routes {
+		if route.Status == routing.RouteStatusFailed && route.Net != "" {
+			failed = append(failed, route.Net)
+		}
+	}
+	return failed
+}
+
+func routingIssueCounts(issues []reports.Issue) (total, blocking, copperConflicts int) {
+	for _, issue := range issues {
+		total++
+		if issue.Blocking() {
+			blocking++
+		}
+		if issue.Code == reports.CodeRouteCopperConflict {
+			copperConflicts++
+		}
+	}
+	return total, blocking, copperConflicts
 }
 
 func routeQualityScore(routed RoutingStageResult) float64 {

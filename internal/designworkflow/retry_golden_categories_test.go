@@ -113,7 +113,7 @@ func TestRetryGoldenReduceDistanceFixture(t *testing.T) {
 		if !ok {
 			t.Fatalf("missing proximity rule %s in %#v", wantID, adjusted.ProximityRules)
 		}
-		if rule.AnchorRef != "U1" || rule.MaxDistanceMM != placementRetryMaxProximityMM || rule.Source != "routing_retry" {
+		if rule.AnchorRef != "U1" || rule.MaxDistanceMM != placementRetryPairDistance(req, "U1", "R1") || rule.Source != "routing_retry" || !rule.Required {
 			t.Fatalf("rule = %#v, want id %s anchored at U1", rule, wantID)
 		}
 	}

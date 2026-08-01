@@ -50,7 +50,9 @@ func TestApplyAutonomousCorrectionPlanAppliesDistanceRule(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !application.Applied || len(application.Adjustment.ProximityRules) != 1 || len(adjusted.ProximityRules) != 1 || adjusted.ProximityRules[0].MaxDistanceMM != placementRetryMaxProximityMM {
+	if !application.Applied || len(application.Adjustment.ProximityRules) != 1 || len(adjusted.ProximityRules) != 1 ||
+		adjusted.ProximityRules[0].MaxDistanceMM != placementRetryPairDistance(placementRequest, "J1", "R1") ||
+		!adjusted.ProximityRules[0].Required {
 		t.Fatalf("distance application = %#v adjusted=%#v", application, adjusted.ProximityRules)
 	}
 }
