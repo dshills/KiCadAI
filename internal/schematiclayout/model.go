@@ -58,6 +58,9 @@ type Rules struct {
 	MaxSpacingRepairs    int
 	FullRepairComponents int
 	MaxDiagnostics       int
+	MaxAuxiliaryPerRank  int
+	ReserveTitleBlock    bool
+	OrientEndpointLabels bool
 	LabelFallbackEnabled bool
 	// LabelFallbackConfigured distinguishes an explicit false from the zero
 	// value, which inherits the profile default during normalization.
@@ -222,6 +225,7 @@ type Label struct {
 	Text            string
 	Position        kicadfiles.Point
 	Rotation        kicadfiles.Angle
+	JustifyRight    bool
 	RouteAnnotation bool
 }
 

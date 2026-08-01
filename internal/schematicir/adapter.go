@@ -923,13 +923,14 @@ func (state *adapterState) appendNets(tx *transactions.Transaction) {
 				// A direct layout route is already a complete visible
 				// conductor. Do not let the writer re-introduce a label at
 				// every orthogonal bend merely to preserve the internal name.
-				SuppressBendLabels: useLabels != nil && !*useLabels,
-				BendLabelAt:        bendLabelAt,
-				SkipFromLabel:      skipFromLabel,
-				SkipToLabel:        skipToLabel,
-				Waypoints:          waypoints,
-				FromLabelAt:        fromLabelAt,
-				ToLabelAt:          toLabelAt,
+				SuppressBendLabels:  useLabels != nil && !*useLabels,
+				BendLabelAt:         bendLabelAt,
+				SkipFromLabel:       skipFromLabel,
+				SkipToLabel:         skipToLabel,
+				Waypoints:           waypoints,
+				FromLabelAt:         fromLabelAt,
+				ToLabelAt:           toLabelAt,
+				OrientLabelsOutward: state.document.Layout.Rules.OrientEndpointLabels,
 			}
 			state.appendOperation(tx, transactions.OpConnect, payload, "", net.Name)
 		}
@@ -1045,7 +1046,7 @@ func schematicRouteLabelPointClear(result schematiclayout.Result, netName string
 		}
 	}
 	for _, label := range result.Labels {
-		if box.Intersects(schematiclayout.TextEstimate(label.Text, label.Position, 0, 0)) {
+		if box.Intersects(schematiclayout.TextEstimateOriented(label.Text, label.Position, label.Rotation, label.JustifyRight)) {
 			return false
 		}
 	}
@@ -1907,6 +1908,9 @@ func schematicLayoutWithLibraryIndexAndPreferences(document Document, index *lib
 		rules.MinStageSpacing = kicadfiles.MM(*document.Layout.Rules.MinGroupSpacingMM)
 		rules.MinGroupGutter = kicadfiles.MM(*document.Layout.Rules.MinGroupSpacingMM)
 	}
+	rules.MaxAuxiliaryPerRank = document.Layout.Rules.MaxAuxiliaryPerRank
+	rules.ReserveTitleBlock = document.Layout.Rules.ReserveTitleBlock
+	rules.OrientEndpointLabels = document.Layout.Rules.OrientEndpointLabels
 	if document.Layout.Rules.PreferLabelsForLongNets != nil {
 		rules.LabelFallbackEnabled = *document.Layout.Rules.PreferLabelsForLongNets && document.Policy.Repair.AllowLabelInsertion
 		rules.LabelFallbackConfigured = true
@@ -1915,6 +1919,9 @@ func schematicLayoutWithLibraryIndexAndPreferences(document Document, index *lib
 		Sheet:                 schematiclayout.SheetForPaper(document.Metadata.Paper),
 		Rules:                 rules,
 		MaxComponentsPerSheet: document.Layout.MaxComponentsPerSheet,
+	}
+	if rules.ReserveTitleBlock {
+		request.Sheet = schematiclayout.SheetWithStandardTitleBlock(request.Sheet)
 	}
 	var invalidPlacementEndpointDiagnostics []schematiclayout.Diagnostic
 	for _, component := range document.Circuit.Components {
@@ -2365,7 +2372,11 @@ func schematicLayoutGeometry(component Component, index *libraryresolver.Library
 			MaxY: kicadfiles.MM(component.Body.MaxYMM),
 		}, Source: schematiclayout.GeometrySourceExplicitBody}
 	}
-	if strings.HasPrefix(strings.ToLower(strings.TrimSpace(component.Symbol)), "kicadai:") {
+	if index == nil {
+		// The embedded template is the writer's exact symbol body when no
+		// external resolver is present. Use the same verified geometry during
+		// layout so labels and routes cannot be accepted against a smaller
+		// fallback envelope and then overlap the serialized body.
 		if bounds, ok := schematic.EmbeddedSymbolBodyBounds(component.Symbol); ok {
 			return layoutGeometry{Body: schematiclayout.Rect{
 				MinX: bounds.Min.X,
@@ -2374,12 +2385,6 @@ func schematicLayoutGeometry(component Component, index *libraryresolver.Library
 				MaxY: bounds.Max.Y,
 			}, Source: schematiclayout.GeometrySourceEmbeddedTemplate}
 		}
-	}
-	if index == nil {
-		// Built-in templates without verified body graphics deliberately retain
-		// an empty body here. schematiclayout then applies its established
-		// role-based obstacle envelope rather than shrinking them to the
-		// generic explicit-pin fallback.
 		if _, known := schematic.EmbeddedSymbolTemplate(component.Symbol); known {
 			return layoutGeometry{Source: schematiclayout.GeometrySourceConservative}
 		}
@@ -2387,6 +2392,14 @@ func schematicLayoutGeometry(component Component, index *libraryresolver.Library
 	}
 	record, ok := libraryresolver.ResolveSymbol(*index, component.Symbol)
 	if !ok {
+		if bounds, embedded := schematic.EmbeddedSymbolBodyBounds(component.Symbol); embedded {
+			return layoutGeometry{Body: schematiclayout.Rect{
+				MinX: bounds.Min.X,
+				MinY: bounds.Min.Y,
+				MaxX: bounds.Max.X,
+				MaxY: bounds.Max.Y,
+			}, Source: schematiclayout.GeometrySourceEmbeddedTemplate}
+		}
 		return fallbackComponentGeometry(component)
 	}
 	unit := componentUnitOrZero(component)
@@ -2586,8 +2599,10 @@ func schematicLayoutPins(component Component, index *libraryresolver.LibraryInde
 		offsets[strings.TrimSpace(pin.Number)] = pin.Offset
 	}
 	directions := schematicLayoutPinDirections(component, index)
+	resolverAuthoritative := false
 	if index != nil {
 		if record, ok := libraryresolver.ResolveSymbol(*index, component.Symbol); ok && resolverGeometryAuthoritative(record, component.Symbol) {
+			resolverAuthoritative = true
 			for number, position := range resolverPinOffsets(record, component) {
 				offsets[number] = position
 			}
@@ -2604,7 +2619,7 @@ func schematicLayoutPins(component Component, index *libraryresolver.LibraryInde
 	for _, pin := range component.Pins {
 		number := strings.TrimSpace(pin.Number)
 		offset := offsets[number]
-		if explicit, ok := explicitPinOffset(pin, offset); ok {
+		if explicit, ok := explicitPinOffset(pin, offset); ok && !resolverAuthoritative {
 			offset = explicit
 		}
 		pins = append(pins, schematiclayout.Pin{Number: number, Role: roles[number], At: offset, Direction: directions[number]})
@@ -2798,6 +2813,7 @@ func transactionPinsWithLibraryIndex(component Component, index *libraryresolver
 		return nil
 	}
 	offsets := map[string]kicadfiles.Point{}
+	resolverAuthoritative := false
 	if templatePins, ok := schematic.EmbeddedSymbolConnectionPinOffsets(component.Symbol); ok {
 		for _, pin := range templatePins {
 			offsets[strings.TrimSpace(pin.Number)] = pin.Offset
@@ -2805,6 +2821,7 @@ func transactionPinsWithLibraryIndex(component Component, index *libraryresolver
 	}
 	if index != nil {
 		if record, ok := libraryresolver.ResolveSymbol(*index, component.Symbol); ok && resolverGeometryAuthoritative(record, component.Symbol) {
+			resolverAuthoritative = true
 			for number, position := range resolverPinOffsets(record, component) {
 				offsets[number] = position
 			}
@@ -2815,10 +2832,10 @@ func transactionPinsWithLibraryIndex(component Component, index *libraryresolver
 		number := strings.TrimSpace(pin.Number)
 		offset := offsets[number]
 		explicit, ok := explicitPinOffset(pin, offset)
-		if ok {
+		if ok && !resolverAuthoritative {
 			offset = explicit
 		}
-		out = append(out, transactions.PinSpec{Number: number, XMM: float64(offset.X) / float64(kicadfiles.MM(1)), YMM: float64(offset.Y) / float64(kicadfiles.MM(1)), ExplicitOffset: ok})
+		out = append(out, transactions.PinSpec{Number: number, XMM: float64(offset.X) / float64(kicadfiles.MM(1)), YMM: float64(offset.Y) / float64(kicadfiles.MM(1)), ExplicitOffset: ok && !resolverAuthoritative})
 	}
 	return out
 }

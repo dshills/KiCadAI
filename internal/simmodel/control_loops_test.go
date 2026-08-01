@@ -97,6 +97,43 @@ func TestStabilitySelectsOnlyLoopsObservedByItsAssertions(t *testing.T) {
 	}
 }
 
+func TestDiscoverControlLoopsTraversesDiodeConnectedBJTTracker(t *testing.T) {
+	device := func(component, model string, terminals ...TerminalBinding) ResolvedDevice {
+		return ResolvedDevice{Component: component, PrimitiveModel: model, Terminals: terminals}
+	}
+	plan := Plan{
+		GroundNode: "GND",
+		Devices: []ResolvedDevice{
+			device("opamp", PrimitiveOpAmpV1,
+				TerminalBinding{Terminal: "IN_PLUS", Net: "IN"},
+				TerminalBinding{Terminal: "IN_MINUS", Net: "FB"},
+				TerminalBinding{Terminal: "OUT", Net: "DRIVE"}),
+			device("bias_tracker", PrimitiveBJTNPNV1,
+				TerminalBinding{Terminal: "BASE", Net: "BIAS"},
+				TerminalBinding{Terminal: "COLLECTOR", Net: "BIAS"},
+				TerminalBinding{Terminal: "EMITTER", Net: "DRIVE"}),
+			device("driver", PrimitiveBJTNPNV1,
+				TerminalBinding{Terminal: "BASE", Net: "BIAS"},
+				TerminalBinding{Terminal: "COLLECTOR", Net: "VP"},
+				TerminalBinding{Terminal: "EMITTER", Net: "POWER_BASE"}),
+			device("power", PrimitiveBJTNPNV1,
+				TerminalBinding{Terminal: "BASE", Net: "POWER_BASE"},
+				TerminalBinding{Terminal: "COLLECTOR", Net: "VP"},
+				TerminalBinding{Terminal: "EMITTER", Net: "OUT"}),
+			device("feedback", PrimitiveResistorV1,
+				TerminalBinding{Terminal: "A", Net: "OUT"},
+				TerminalBinding{Terminal: "B", Net: "FB"}),
+		},
+	}
+	loops, diagnostics := DiscoverControlLoops(plan)
+	if len(diagnostics) != 0 || len(loops) != 1 {
+		t.Fatalf("diode-connected tracker loop discovery: loops=%#v diagnostics=%#v", loops, diagnostics)
+	}
+	if loops[0].NetPath[0] != "DRIVE" || loops[0].NetPath[len(loops[0].NetPath)-1] != "FB" {
+		t.Fatalf("loop path = %#v", loops[0].NetPath)
+	}
+}
+
 func TestDiscoverControlLoopsFailsClosedForPositiveAndAmbiguousFeedback(t *testing.T) {
 	parameters := []NamedValue{
 		{Name: "dc_open_loop_gain", Value: 100000},

@@ -29,13 +29,16 @@ func TransformConnectionAnchor(offset kicadfiles.Point, rotation kicadfiles.Angl
 	if rotation == 0 {
 		return offset
 	}
+	// KiCad's positive instance angle is applied in schematic Y-down space:
+	// x'=x*cos+y*sin, y'=-x*sin+y*cos. Writing that matrix explicitly avoids
+	// treating a screen-coordinate rotation as an ordinary Y-up rotation.
 	theta := float64(rotation) * math.Pi / 180
 	sin, cos := math.Sincos(theta)
 	x := float64(offset.X)
 	y := float64(offset.Y)
 	return kicadfiles.Point{
-		X: kicadfiles.IU(math.Round(x*cos - y*sin)),
-		Y: kicadfiles.IU(math.Round(x*sin + y*cos)),
+		X: kicadfiles.IU(math.Round(x*cos + y*sin)),
+		Y: kicadfiles.IU(math.Round(-x*sin + y*cos)),
 	}
 }
 

@@ -1,6 +1,8 @@
 package schematiclayout
 
 import (
+	"strings"
+
 	"kicadai/internal/kicadfiles"
 	"kicadai/internal/kicadfiles/schematic"
 )
@@ -50,7 +52,14 @@ func AdaptSchematic(file *schematic.SchematicFile) (Request, Result) {
 		}
 	}
 	for _, label := range file.Labels {
-		result.Labels = append(result.Labels, Label{NetName: label.Text, Text: label.Text, Position: label.Position, Rotation: label.Rotation})
+		justifyRight := false
+		for _, justification := range label.Justify {
+			if strings.EqualFold(strings.TrimSpace(justification), "right") {
+				justifyRight = true
+				break
+			}
+		}
+		result.Labels = append(result.Labels, Label{NetName: label.Text, Text: label.Text, Position: label.Position, Rotation: label.Rotation, JustifyRight: justifyRight})
 	}
 	for _, junction := range file.Junctions {
 		result.Junctions = append(result.Junctions, Junction{Position: junction.Position})

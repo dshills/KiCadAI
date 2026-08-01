@@ -9,6 +9,14 @@ roadmaps, and dated review material.
 
 ## Latest Completed Milestone
 
+- [Simulation-grounded circuit architecture synthesis](simulation-grounded-architecture-synthesis/SPEC.md),
+  [plan](simulation-grounded-architecture-synthesis/PLAN.md),
+  [completion audit](simulation-grounded-architecture-synthesis/AUDIT.md), and
+  [promotion matrix](simulation-grounded-architecture-synthesis/PROMOTION_MATRIX.json)
+  - converts three frozen behavior-only requirements into multiple ranked
+    circuit architectures with derived values, trusted simulation, explicit
+    safety rejection, readable KiCad output, and deterministic two-run
+    physical promotion.
 - [Simulation-guided open-topology synthesis](simulation-guided-open-topology-synthesis/SPEC.md)
   - primitive-only behavior-to-graph search, trusted simulation, generic
     topology repair, and two-root KiCad promotion.

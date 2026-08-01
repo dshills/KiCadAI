@@ -62,7 +62,7 @@ func reflowTextForWires(components []PlacedComponent, wires []WireSegment, label
 		occupied = append(occupied, (Rect{MinX: minX, MinY: minY, MaxX: maxX, MaxY: maxY}).Inflate(wireGap))
 	}
 	for _, label := range labels {
-		occupied = append(occupied, TextEstimateRotated(label.Text, label.Position, label.Rotation))
+		occupied = append(occupied, TextEstimateOriented(label.Text, label.Position, label.Rotation, label.JustifyRight))
 	}
 	for index := range placed {
 		component := &placed[index]

@@ -626,16 +626,17 @@ func applyOperation(builder *designapi.Builder, op Operation, opts ApplyOptions)
 			waypoints = append(waypoints, point(waypoint.XMM, waypoint.YMM))
 		}
 		return nil, builder.ConnectWithOptions(endpoint(payload.From), endpoint(payload.To), payload.NetName, designapi.ConnectOptions{
-			UseLabels:          payload.UseLabels,
-			SuppressBendLabels: payload.SuppressBendLabels,
-			BendLabelAt:        optionalPoint(payload.BendLabelAt),
-			SkipFromLabel:      payload.SkipFromLabel,
-			SkipToLabel:        payload.SkipToLabel,
-			Waypoints:          waypoints,
-			FromLabelAt:        optionalPoint(payload.FromLabelAt),
-			ToLabelAt:          optionalPoint(payload.ToLabelAt),
-			ReanchorFromLabel:  true,
-			ReanchorToLabel:    true,
+			UseLabels:           payload.UseLabels,
+			SuppressBendLabels:  payload.SuppressBendLabels,
+			BendLabelAt:         optionalPoint(payload.BendLabelAt),
+			SkipFromLabel:       payload.SkipFromLabel,
+			SkipToLabel:         payload.SkipToLabel,
+			Waypoints:           waypoints,
+			FromLabelAt:         optionalPoint(payload.FromLabelAt),
+			ToLabelAt:           optionalPoint(payload.ToLabelAt),
+			ReanchorFromLabel:   true,
+			ReanchorToLabel:     true,
+			OrientLabelsOutward: payload.OrientLabelsOutward,
 		})
 	case OpAddLabel:
 		var payload AddLabelOperation
@@ -645,6 +646,7 @@ func applyOperation(builder *designapi.Builder, op Operation, opts ApplyOptions)
 		options := designapi.LabelOptions{
 			Rotation: kicadfiles.Angle(payload.RotationDeg),
 			Shape:    schematic.LabelShape(payload.Shape),
+			Justify:  append([]string(nil), payload.Justify...),
 		}
 		if payload.Anchor != nil {
 			return nil, builder.AddLabelAtEndpointWithOptions(payload.Text, endpoint(*payload.Anchor), labelKind(payload.Kind), options)

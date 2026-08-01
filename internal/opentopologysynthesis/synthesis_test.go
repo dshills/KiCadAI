@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"math"
 	"testing"
 )
 
@@ -52,6 +53,89 @@ func TestSynthesizeRetainsDeterministicBoundedEvidenceAcrossTopologies(t *testin
 	secondJSON, _ := json.Marshal(second)
 	if !bytes.Equal(firstJSON, secondJSON) {
 		t.Fatalf("synthesis replay differs:\n%s\n%s", firstJSON, secondJSON)
+	}
+}
+
+func TestPostPassRankingWindowUsesRetainedCandidateBudget(t *testing.T) {
+	policy := DefaultPolicy()
+	policy.MaxRetainedCandidates = 7
+	if got := synthesisPostPassEvaluationBudget(policy); got != 7 {
+		t.Fatalf("post-pass ranking budget = %d, want 7", got)
+	}
+	policy.MaxRetainedCandidates = 0
+	if got := synthesisPostPassEvaluationBudget(policy); got != 1 {
+		t.Fatalf("minimum post-pass ranking budget = %d, want 1", got)
+	}
+}
+
+func TestSynthesisMarginNormalizesSubUnitQuantitiesRelatively(t *testing.T) {
+	minimum := 0.9e-6
+	actual := 1e-6
+	margin := synthesisWorstNormalizedMargin(SimulationEvaluation{
+		Attempts: []SimulationAttempt{{Actual: &actual, RequiredMin: &minimum}},
+	})
+	if math.Abs(margin-0.1) > 1e-12 {
+		t.Fatalf("sub-unit normalized margin = %.12g, want 0.1", margin)
+	}
+}
+
+func TestRankedSynthesisSelectionPrefersRequirementMarginAndExplainsAlternatives(t *testing.T) {
+	_, base, _, _ := testSimulationFixture(t)
+	moreComplex := CloneGraph(base)
+	extra := moreComplex.Instances[0]
+	extra.ID = "ranking_extra"
+	moreComplex.Instances = append(moreComplex.Instances, extra)
+
+	minimum := 1.0
+	narrowActual := 1.1
+	wideActual := 2.0
+	narrow := SimulationEvaluation{
+		Status: SimulationEvaluationPassed,
+		Hash:   "eval-narrow",
+		Attempts: []SimulationAttempt{{
+			Actual: &narrowActual, RequiredMin: &minimum, AssertionPass: true,
+		}},
+	}
+	wide := SimulationEvaluation{
+		Status: SimulationEvaluationPassed,
+		Hash:   "eval-wide",
+		Attempts: []SimulationAttempt{{
+			Actual: &wideActual, RequiredMin: &minimum, AssertionPass: true,
+		}},
+	}
+	run := SynthesisRun{
+		Schema: SynthesisRunSchema, Version: SynthesisRunVersion,
+		Report: Report{
+			Schema: ReportSchema, Version: ReportVersion,
+			Candidates: []CandidateReport{
+				{Fingerprint: "simple"},
+				{Fingerprint: "wide-margin"},
+			},
+		},
+	}
+	selected := selectRankedSynthesisResult(run, []synthesisPassingCandidate{
+		{
+			candidateIndex: 0, graph: base, evaluation: narrow,
+			physical: PhysicalLoweringResult{Status: PhysicalLoweringReady, Hash: "physical-simple"},
+			margin:   synthesisWorstNormalizedMargin(narrow),
+		},
+		{
+			candidateIndex: 1, graph: moreComplex, evaluation: wide,
+			physical: PhysicalLoweringResult{Status: PhysicalLoweringReady, Hash: "physical-wide"},
+			margin:   synthesisWorstNormalizedMargin(wide),
+		},
+	})
+	if selected.Report.Selected == nil || selected.Report.Selected.Fingerprint != "wide-margin" {
+		t.Fatalf("ranked selection = %#v", selected.Report.Selected)
+	}
+	ranking := selected.Report.Selected.Ranking
+	if ranking.Policy != synthesisSelectionRankingPolicy || len(ranking.Alternatives) != 2 ||
+		!ranking.Alternatives[0].Selected || ranking.Alternatives[0].Fingerprint != "wide-margin" ||
+		ranking.Alternatives[0].WorstNormalizedMargin <= ranking.Alternatives[1].WorstNormalizedMargin {
+		t.Fatalf("selection ranking = %#v", ranking)
+	}
+	if selected.Report.Selected.SelectionSummary == "" || selected.SelectedGraph == nil || selected.Physical == nil {
+		t.Fatalf("selection explanation or bound artifacts missing: %#v", selected)
 	}
 }
 

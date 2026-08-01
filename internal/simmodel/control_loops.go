@@ -242,6 +242,15 @@ func controlInfluenceGraph(plan Plan) map[string][]controlInfluenceEdge {
 			add(terminals["IN_PLUS"], terminals["OUT"], device.Component)
 			add(terminals["IN_MINUS"], terminals["OUT"], device.Component)
 		case PrimitiveBJTNPNV1, PrimitiveBJTPNPV1:
+			if terminals["BASE"] != "" && terminals["BASE"] == terminals["COLLECTOR"] {
+				// A diode-connected transistor is a two-terminal incremental
+				// junction. Its nonlinear DC direction remains enforced by the
+				// device equations, while loop discovery must allow a bias
+				// midpoint perturbation to propagate through either terminal.
+				add(terminals["BASE"], terminals["EMITTER"], device.Component)
+				add(terminals["EMITTER"], terminals["BASE"], device.Component)
+				continue
+			}
 			add(terminals["BASE"], terminals["COLLECTOR"], device.Component)
 			add(terminals["BASE"], terminals["EMITTER"], device.Component)
 		case PrimitiveNMOSSwitchV1, PrimitivePMOSSwitchV1:

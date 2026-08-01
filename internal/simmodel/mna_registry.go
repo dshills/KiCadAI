@@ -1149,6 +1149,7 @@ func validateMNAIntent(intent Intent, components map[string]string) []Diagnostic
 			assertion.Quantity == QuantityDeviceCurrentA ||
 			assertion.Quantity == QuantityDCSweepDeviceSlopeAperV ||
 			assertion.Quantity == QuantityTransimpedanceOhm ||
+			assertion.Quantity == QuantityInputImpedanceOhm ||
 			assertion.Quantity == QuantityOutputPowerW ||
 			assertion.Quantity == QuantityPeakAbsDeviceVoltageV ||
 			assertion.Quantity == QuantityPeakAbsDeviceCurrentA ||
@@ -1227,6 +1228,10 @@ func validateMNAIntent(intent Intent, components map[string]string) []Diagnostic
 			if kind != AnalysisACSweep || strings.TrimSpace(assertion.ReferenceNode) == "" {
 				diagnostics = append(diagnostics, Diagnostic{Path: path, Message: "cutoff/bandwidth assertion requires AC sweep and a reference node"})
 			}
+		case QuantityInputImpedanceOhm:
+			if kind != AnalysisACSweep || strings.TrimSpace(assertion.ReferenceNode) == "" || assertion.FrequencyHz <= 0 {
+				diagnostics = append(diagnostics, Diagnostic{Path: path, Message: "input-impedance assertion requires AC sweep, a positive frequency, a reference node, and the excitation-source component"})
+			}
 		case QuantityOutputSwingVPP, QuantitySettlingTimeS, QuantityResponseTimeS:
 			if kind != AnalysisTransient {
 				diagnostics = append(diagnostics, Diagnostic{Path: path + ".quantity", Message: "waveform-derived assertion requires transient analysis"})
@@ -1272,7 +1277,7 @@ func validateMNAIntent(intent Intent, components map[string]string) []Diagnostic
 		default:
 			diagnostics = append(diagnostics, Diagnostic{Path: path + ".quantity", Message: "assertion quantity is not supported"})
 		}
-		acPointQuantity := assertion.Quantity == QuantityVoltageMagnitudeV || assertion.Quantity == QuantityVoltagePhaseDeg || assertion.Quantity == QuantityVoltageDBV || assertion.Quantity == QuantityVoltageGainRatio
+		acPointQuantity := assertion.Quantity == QuantityVoltageMagnitudeV || assertion.Quantity == QuantityVoltagePhaseDeg || assertion.Quantity == QuantityVoltageDBV || assertion.Quantity == QuantityVoltageGainRatio || assertion.Quantity == QuantityInputImpedanceOhm
 		if kind == AnalysisACSweep && acPointQuantity && (!finite(assertion.FrequencyHz) || assertion.FrequencyHz <= 0) {
 			diagnostics = append(diagnostics, Diagnostic{Path: path + ".frequency_hz", Message: "point AC assertion requires a finite positive sweep frequency"})
 		}

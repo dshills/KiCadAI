@@ -203,8 +203,13 @@ func CatalogAnalysisDependencies(modelID string, workflowAnalyses []string) []st
 			// behavior. The claim-bound thermal RC and SOA payload is validated
 			// separately and retained in the resolved plan.
 			analysis = AnalysisTransient
-		} else if memorylessNonlinearPrimitive(modelID) && (analysis == AnalysisACSweep || analysis == AnalysisNoise || analysis == AnalysisStability) {
-			analysis = AnalysisDCOperatingPoint
+		} else if memorylessNonlinearPrimitive(modelID) {
+			switch analysis {
+			case AnalysisACSweep, AnalysisNoise, AnalysisStability:
+				analysis = AnalysisDCOperatingPoint
+			case AnalysisDistortion:
+				analysis = AnalysisTransient
+			}
 		} else if analysis == AnalysisNoise && idealNoiseBoundaryPrimitive(modelID) {
 			analysis = AnalysisACSweep
 		}
@@ -220,6 +225,7 @@ func memorylessNonlinearPrimitive(modelID string) bool {
 	switch strings.TrimSpace(modelID) {
 	case PrimitiveComparatorOpenCollectorV1, PrimitiveBidirectionalTVSV1,
 		PrimitiveUnidirectionalZenerV1, PrimitiveDiodeShockleyV1,
+		PrimitiveShuntVoltageReferenceV1,
 		PrimitiveNMOSSwitchV1, PrimitivePMOSSwitchV1, PrimitiveReverseBlockingLoadSwitchV1, PrimitiveCurrentLimitingEFuseV1,
 		PrimitiveMCUStaticSupplyLoadV1, PrimitiveSensorStaticSupplyLoadV1,
 		PrimitiveBJTNPNV1, PrimitiveBJTPNPV1:

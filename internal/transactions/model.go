@@ -222,18 +222,19 @@ type SymbolProperty struct {
 }
 
 type ConnectOperation struct {
-	Op                 OperationKind `json:"op"`
-	From               Endpoint      `json:"from"`
-	To                 Endpoint      `json:"to"`
-	NetName            string        `json:"net_name"`
-	UseLabels          *bool         `json:"use_labels,omitempty"`
-	SuppressBendLabels bool          `json:"suppress_bend_labels,omitempty"`
-	BendLabelAt        *Point        `json:"bend_label_at,omitempty"`
-	SkipFromLabel      bool          `json:"skip_from_label,omitempty"`
-	SkipToLabel        bool          `json:"skip_to_label,omitempty"`
-	Waypoints          []Point       `json:"waypoints,omitempty"`
-	FromLabelAt        *Point        `json:"from_label_at,omitempty"`
-	ToLabelAt          *Point        `json:"to_label_at,omitempty"`
+	Op                  OperationKind `json:"op"`
+	From                Endpoint      `json:"from"`
+	To                  Endpoint      `json:"to"`
+	NetName             string        `json:"net_name"`
+	UseLabels           *bool         `json:"use_labels,omitempty"`
+	SuppressBendLabels  bool          `json:"suppress_bend_labels,omitempty"`
+	BendLabelAt         *Point        `json:"bend_label_at,omitempty"`
+	SkipFromLabel       bool          `json:"skip_from_label,omitempty"`
+	SkipToLabel         bool          `json:"skip_to_label,omitempty"`
+	Waypoints           []Point       `json:"waypoints,omitempty"`
+	FromLabelAt         *Point        `json:"from_label_at,omitempty"`
+	ToLabelAt           *Point        `json:"to_label_at,omitempty"`
+	OrientLabelsOutward bool          `json:"orient_labels_outward,omitempty"`
 }
 
 type AddLabelOperation struct {
@@ -244,6 +245,7 @@ type AddLabelOperation struct {
 	Kind        string        `json:"kind,omitempty"`
 	RotationDeg float64       `json:"rotation_deg,omitempty"`
 	Shape       string        `json:"shape,omitempty"`
+	Justify     []string      `json:"justify,omitempty"`
 }
 
 type AddBusOperation struct {

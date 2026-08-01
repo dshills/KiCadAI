@@ -401,13 +401,8 @@ func relayoutHierarchyChild(builder *Builder, child *schematic.SchematicFile, sh
 			Rotation:   symbol.Rotation,
 			Mirror:     schematiclayout.Mirror(symbol.Mirror),
 		}
-		if symbol.BodyBounds != nil {
-			component.Body = schematiclayout.Rect{
-				MinX: symbol.BodyBounds.Min.X,
-				MinY: symbol.BodyBounds.Min.Y,
-				MaxX: symbol.BodyBounds.Max.X,
-				MaxY: symbol.BodyBounds.Max.Y,
-			}
+		if body, ok := hierarchySymbolBody(builder, symbol); ok {
+			component.Body = body
 			component.BodyKnown = true
 		}
 		component.Role = schematiclayout.InferComponentRole(component)
@@ -561,6 +556,69 @@ func relayoutHierarchyChild(builder *Builder, child *schematic.SchematicFile, sh
 		child.Labels = append(child.Labels, generated)
 	}
 	return nil
+}
+
+// hierarchySymbolBody returns the same library-space body geometry that the
+// child writer will serialize. Root symbols created before hierarchy splitting
+// do not always retain BodyBounds, so relayout must recover authoritative
+// resolver or embedded-template graphics instead of falling back to a smaller
+// role-based obstacle.
+func hierarchySymbolBody(builder *Builder, symbol schematic.SchematicSymbol) (schematiclayout.Rect, bool) {
+	if symbol.BodyBounds != nil {
+		return schematiclayout.Rect{
+			MinX: symbol.BodyBounds.Min.X,
+			MinY: symbol.BodyBounds.Min.Y,
+			MaxX: symbol.BodyBounds.Max.X,
+			MaxY: symbol.BodyBounds.Max.Y,
+		}, true
+	}
+	if builder != nil && builder.libraryIndex != nil {
+		if record, ok := libraryresolver.ResolveSymbolPtr(builder.libraryIndex, symbol.LibraryID); ok {
+			unit := symbol.Unit
+			if unit <= 0 {
+				unit = 1
+			}
+			bodyStyle := symbol.BodyStyle
+			if bodyStyle <= 0 {
+				bodyStyle = 1
+			}
+			var body schematiclayout.Rect
+			found := false
+			for _, graphic := range record.Graphics {
+				if (graphic.Unit != 0 && graphic.Unit != unit) ||
+					(graphic.BodyStyle != 0 && graphic.BodyStyle != bodyStyle) {
+					continue
+				}
+				candidate := schematiclayout.Rect{
+					MinX: graphic.Bounds.Min.X,
+					MinY: graphic.Bounds.Min.Y,
+					MaxX: graphic.Bounds.Max.X,
+					MaxY: graphic.Bounds.Max.Y,
+				}
+				if !found {
+					body = candidate
+					found = true
+					continue
+				}
+				body.MinX = min(body.MinX, candidate.MinX)
+				body.MinY = min(body.MinY, candidate.MinY)
+				body.MaxX = max(body.MaxX, candidate.MaxX)
+				body.MaxY = max(body.MaxY, candidate.MaxY)
+			}
+			if found {
+				return body, true
+			}
+		}
+	}
+	if bounds, ok := schematic.EmbeddedSymbolBodyBounds(symbol.LibraryID); ok {
+		return schematiclayout.Rect{
+			MinX: bounds.Min.X,
+			MinY: bounds.Min.Y,
+			MaxX: bounds.Max.X,
+			MaxY: bounds.Max.Y,
+		}, true
+	}
+	return schematiclayout.Rect{}, false
 }
 
 // hierarchyPinDirection preserves the pin-facing routing contract when a root

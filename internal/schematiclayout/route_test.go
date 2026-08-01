@@ -199,6 +199,30 @@ func TestRoutePrefersCalibratedPinDirectionForLabelStub(t *testing.T) {
 	}
 }
 
+func TestRouteAddsOutwardAccessForPerpendicularPinConnection(t *testing.T) {
+	start := kicadfiles.Point{X: kicadfiles.MM(50), Y: kicadfiles.MM(40)}
+	end := kicadfiles.Point{X: kicadfiles.MM(50), Y: kicadfiles.MM(60)}
+	result := Route(Request{
+		Sheet: testSheet(),
+		Rules: Rules{Profile: ProfileStandard, LabelFallbackEnabled: false},
+		Nets: []Net{{
+			Name: "DIRECT", PreferDirect: true,
+			Endpoints: []Endpoint{{Ref: "R1", Pin: "2"}, {Ref: "R2", Pin: "2"}},
+		}},
+	}, Result{Components: []PlacedComponent{
+		{Component: Component{Ref: "R1", Pins: []Pin{{Number: "2", Direction: kicadfiles.Point{X: 1}}}}, PlacedAt: start},
+		{Component: Component{Ref: "R2", Pins: []Pin{{Number: "2", Direction: kicadfiles.Point{X: 1}}}}, PlacedAt: end},
+	}})
+	if len(result.Connections) != 1 || len(result.Connections[0].Points) < 4 {
+		t.Fatalf("direct route = %#v, want endpoint access stubs", result.Connections)
+	}
+	points := result.Connections[0].Points
+	if points[0].Y == points[len(points)-1].Y ||
+		points[1].X <= points[0].X || points[len(points)-2].X <= points[len(points)-1].X {
+		t.Fatalf("direct route points = %#v, want outward access before perpendicular travel", points)
+	}
+}
+
 func TestRouteUsesOrthogonalEndpointAccessWhenPreferredStubIsBlocked(t *testing.T) {
 	result := Route(Request{
 		Sheet: testSheet(),
@@ -266,12 +290,77 @@ func TestRouteEmitsLabelForSingleEndpointNet(t *testing.T) {
 	}
 }
 
+func TestRouteOrientsEndpointLabelAndValidatesItsRotatedBounds(t *testing.T) {
+	result := Route(Request{
+		Sheet: testSheet(),
+		Rules: Rules{Profile: ProfileStandard, OrientEndpointLabels: true},
+		Nets: []Net{{
+			Name: "LEFT_FACING_NET", PreferredLabels: true,
+			Endpoints: []Endpoint{{Ref: "U1", Pin: "1"}},
+		}},
+	}, Result{Components: []PlacedComponent{{
+		Component: Component{
+			Ref: "U1",
+			Pins: []Pin{{
+				Number:    "1",
+				At:        kicadfiles.Point{X: -kicadfiles.MM(2.54)},
+				Direction: kicadfiles.Point{X: -kicadfiles.MM(1.27)},
+			}},
+		},
+		PlacedAt: kicadfiles.Point{X: kicadfiles.MM(50), Y: kicadfiles.MM(50)},
+	}}})
+	if len(result.Labels) != 1 {
+		t.Fatalf("labels = %#v, want one endpoint label", result.Labels)
+	}
+	if got := result.Labels[0].Rotation; got != 180 || !result.Labels[0].JustifyRight {
+		t.Fatalf("label orientation = rotation %v right=%t, want 180/right", got, result.Labels[0].JustifyRight)
+	}
+	box := TextEstimateOriented(result.Labels[0].Text, result.Labels[0].Position, result.Labels[0].Rotation, result.Labels[0].JustifyRight)
+	if box.MaxX != result.Labels[0].Position.X || box.MinX >= box.MaxX {
+		t.Fatalf("rotated label box = %#v, want text extending left from %#v", box, result.Labels[0].Position)
+	}
+	for _, diagnostic := range result.Diagnostics {
+		if diagnostic.Code == "label_placement_fallback" {
+			t.Fatalf("rotated label required a crowded fallback: %#v", result.Diagnostics)
+		}
+	}
+}
+
 func TestLabelPlacementRejectsDifferentNetEndpointContact(t *testing.T) {
 	stub := WireSegment{NetName: "RIGHT", From: kicadfiles.Point{X: kicadfiles.MM(20)}, To: kicadfiles.Point{X: kicadfiles.MM(30)}}
 	existing := WireSegment{NetName: "LEFT", From: kicadfiles.Point{X: kicadfiles.MM(10)}, To: stub.From}
 	box := TextEstimate("RIGHT", stub.To, 0, 0)
 	if !labelPlacementCollides(box, stub, Endpoint{}, Result{Wires: []WireSegment{existing}}, Request{}) {
 		t.Fatalf("different-net stubs sharing an endpoint were accepted: new=%#v existing=%#v", stub, existing)
+	}
+}
+
+func TestLabelPlacementRejectsRotatedSymbolBodyOverlap(t *testing.T) {
+	position := kicadfiles.Point{X: kicadfiles.MM(50), Y: kicadfiles.MM(50)}
+	component := PlacedComponent{
+		Component: Component{
+			Ref:       "D1",
+			Rotation:  90,
+			BodyKnown: true,
+			Body: Rect{
+				MinX: -kicadfiles.MM(4.572), MinY: -kicadfiles.MM(2.286),
+				MaxX: kicadfiles.MM(1.27), MaxY: kicadfiles.MM(1.27),
+			},
+			Pins: []Pin{{Number: "1", At: kicadfiles.Point{X: -kicadfiles.MM(3.81)}}},
+		},
+		PlacedAt: position,
+	}
+	anchor := schematic.CanonicalConnectionAnchor(position, component.Pins[0].At, component.Rotation, schematic.SymbolMirrorNone)
+	labelPosition := kicadfiles.Point{X: anchor.X, Y: anchor.Y + kicadfiles.MM(1.27)}
+	stub := WireSegment{NetName: "LED_A", From: anchor, To: labelPosition}
+	if !labelPlacementCollides(
+		TextEstimate("LED_A", labelPosition, 0, 0),
+		stub,
+		Endpoint{Ref: "D1", Pin: "1"},
+		Result{Components: []PlacedComponent{component}},
+		Request{Rules: DefaultRules(ProfileStandard)},
+	) {
+		t.Fatal("label overlapping the rotated LED body was accepted")
 	}
 }
 

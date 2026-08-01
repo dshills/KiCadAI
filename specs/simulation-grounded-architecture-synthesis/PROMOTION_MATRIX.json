@@ -1,0 +1,79 @@
+{
+  "schema": "kicadai.simulation-grounded-architecture-promotion-matrix.v1",
+  "version": 1,
+  "measured_at": "2026-07-31",
+  "base_commit": "92fe092ad0135bd3d1c64e457cbb6ff13f26ba18",
+  "manifest_sha256": "ca269d07ca110e9e26b9a1366e042c7fe50f679461c5cc8d20945599ea8131fc",
+  "kicad_version": "10.0.3",
+  "summary": {
+    "total_cases": 3,
+    "synthesis_passes": 3,
+    "physical_promotions": 3,
+    "clean_root_runs": 6,
+    "replay_differences": 0,
+    "round_trip_differences": 0,
+    "explicit_safety_rejections": 1
+  },
+  "promotion_gates": [
+    "strict_behavior_only_requirement",
+    "multiple_distinct_architectures",
+    "equation_proven_values",
+    "trusted_simulation_and_required_corners",
+    "ranked_explainable_selection",
+    "schematic_readability",
+    "route_completion",
+    "connectivity",
+    "writer_correctness",
+    "installed_kicad_erc",
+    "installed_kicad_strict_drc",
+    "zero_difference_round_trip",
+    "clean_root_replay"
+  ],
+  "cases": [
+    {
+      "id": "continuous_conduction_audio_stage",
+      "class": "class_a_amplifier",
+      "requirement_sha256": "611e68085b373ef56b2fe9d65dda566c3b90d2c661df49ff3eb0a5bd17a80107",
+      "synthesis_status": "passed",
+      "synthesis_hash": "b4887199ac54caf6a362f1a20fd309422f835add0e9d3b7f40ead24d55405ab3",
+      "selected_topology_hash": "e8268336dbfc7d94419e006357ddb12158c5c5829684205c2b95f48d4f03bfb4",
+      "physical_hash": "ebb104e8ca843ee54b236d01f140637476e118cfbdfd78159ab26871e55ff89f",
+      "project_hash": "dd0288328c386b625969c52a2057065426c138a1a2fb0822052066620ff62f97",
+      "evidence_hash": "f38be7e309b4c329e10d24211144adbb63a1a2282bbcf948762cb1c4c52bbf18",
+      "physical_promotion": "passed",
+      "clean_root_runs": 2,
+      "replay_identical": true,
+      "safety_alternative_rejected": true
+    },
+    {
+      "id": "efficient_audio_power_stage",
+      "class": "class_ab_amplifier",
+      "requirement_sha256": "af67980dda5093270c64777de62d84fdf6f4caae8fcd4df324fcefdbd20848c5",
+      "synthesis_status": "passed",
+      "synthesis_hash": "19548888bd32fdaa82bb3828a6a1bc79cb00a83a8afc9e21b229f7bcbb48320a",
+      "selected_topology_hash": "baff08927fe2684e9ba189401f4f2d7dd06f8c4cd861ad92c78aa3ff886deb2f",
+      "physical_hash": "b59b9e31ef48d5c7cad4070aa1bd104577e2639f9df6d9e94684217c6c401453",
+      "project_hash": "6e66a47b1de1db56a3ab27ae9569eab6405c08b29dbb84d06c25f293e58d103a",
+      "evidence_hash": "2c4312cb9631b6b9e4a3b7bb40ea0068a7d540c311803a8be51db7b14570add2",
+      "physical_promotion": "passed",
+      "clean_root_runs": 2,
+      "replay_identical": true,
+      "safety_alternative_rejected": false
+    },
+    {
+      "id": "mains_notch_filter",
+      "class": "frequency_selective_non_amplifier",
+      "requirement_sha256": "1413b2add3645c038f6e621375905d4d633c49a1799c256bc092f0d58df85665",
+      "synthesis_status": "passed",
+      "synthesis_hash": "0d3864637058c760e0b577a7a24c503d6cb92a4a77feef55d49b751b22146a8e",
+      "selected_topology_hash": "7fd86e96527c6159780f0bd15d82cd279aecfba3e72b029b36f9a2675130865a",
+      "physical_hash": "aa22ee57d8281bfb76e96ff05836c6117a933e69a9aaed064117467cb0605803",
+      "project_hash": "89cb206d78719dc6abe31996e82cb3f973535b92e4461b962a8749192af5a3ed",
+      "evidence_hash": "f1899a0f1b9afb9c769b4585cc8099bc1bc763784a8d989e8e5bf5b6beac4a57",
+      "physical_promotion": "passed",
+      "clean_root_runs": 2,
+      "replay_identical": true,
+      "safety_alternative_rejected": false
+    }
+  ]
+}

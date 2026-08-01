@@ -1,0 +1,44 @@
+{
+  "schema": "kicadai.simulation-grounded-architecture-baseline.v1",
+  "version": 1,
+  "base_commit": "92fe092ad0135bd3d1c64e457cbb6ff13f26ba18",
+  "manifest_sha256": "ca269d07ca110e9e26b9a1366e042c7fe50f679461c5cc8d20945599ea8131fc",
+  "measured_at": "2026-07-31",
+  "summary": {
+    "total": 3,
+    "complete_passes": 0,
+    "fail_closed": 3
+  },
+  "cases": [
+    {
+      "id": "continuous_conduction_audio_stage",
+      "requirement_sha256": "611e68085b373ef56b2fe9d65dda566c3b90d2c661df49ff3eb0a5bd17a80107",
+      "requirement_hash": "81ba1767ec53946c498a4244908b6a8316ac59a407fd2bc4f7def33009a4161c",
+      "status": "fail_closed",
+      "stopped_at": "architecture_generation",
+      "code": "OPEN_TOPOLOGY_SEARCH_EXHAUSTED",
+      "provider_bypass": true,
+      "evidence_hash": "77b90fa3b2ed563d62545755ae4a13afa71f7a9df8e462a86e9ecc98f9261a78"
+    },
+    {
+      "id": "efficient_audio_power_stage",
+      "requirement_sha256": "af67980dda5093270c64777de62d84fdf6f4caae8fcd4df324fcefdbd20848c5",
+      "requirement_hash": "9f66286a42845b026307bd7d130b588b9eef14c6e0a4864588f917515156be89",
+      "status": "fail_closed",
+      "stopped_at": "architecture_generation",
+      "code": "OPEN_TOPOLOGY_SEARCH_EXHAUSTED",
+      "provider_bypass": true,
+      "evidence_hash": "3ffe247dd97427fb1ae08813662d59100db14de6a4af21ecf21ff5a50f05ee3c"
+    },
+    {
+      "id": "mains_notch_filter",
+      "requirement_sha256": "1413b2add3645c038f6e621375905d4d633c49a1799c256bc092f0d58df85665",
+      "requirement_hash": "4e6a13255ae6faf1ffcdc245d5fb1af5d2127dc4c3f97a5e24fc9002dac3dded",
+      "status": "fail_closed",
+      "stopped_at": "equation_sizing",
+      "code": "OPEN_TOPOLOGY_VALUE_EXHAUSTED",
+      "provider_bypass": true,
+      "evidence_hash": "e66bee341ec92a82e51fd4db1b7a890f6acf7feea467481b51a1248f85da6196"
+    }
+  ]
+}

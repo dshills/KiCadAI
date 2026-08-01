@@ -237,3 +237,17 @@ func TestNoConnectsForSheetUsesActualPinAnchors(t *testing.T) {
 		t.Fatalf("selected no-connects = %#v, want only the pin-anchor marker", selected)
 	}
 }
+
+func TestHierarchySymbolBodyRecoversEmbeddedWriterGeometry(t *testing.T) {
+	body, ok := hierarchySymbolBody(nil, schematic.SchematicSymbol{LibraryID: "Device:LED", Unit: 1, BodyStyle: 1})
+	if !ok {
+		t.Fatal("expected embedded Device:LED body geometry")
+	}
+	want := schematiclayout.Rect{
+		MinX: -kicadfiles.MM(4.572), MinY: -kicadfiles.MM(2.286),
+		MaxX: kicadfiles.MM(1.27), MaxY: kicadfiles.MM(1.27),
+	}
+	if body != want {
+		t.Fatalf("embedded hierarchy body = %#v, want %#v", body, want)
+	}
+}

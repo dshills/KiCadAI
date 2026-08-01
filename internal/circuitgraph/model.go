@@ -329,6 +329,9 @@ type SchematicRules struct {
 	AvoidWireCrossings      *bool   `json:"avoid_wire_crossings"`
 	MinGroupSpacingMM       float64 `json:"min_group_spacing_mm"`
 	MinComponentSpacingMM   float64 `json:"min_component_spacing_mm"`
+	MaxAuxiliaryPerRank     int     `json:"max_auxiliary_per_rank,omitempty"`
+	ReserveTitleBlock       bool    `json:"reserve_title_block,omitempty"`
+	OrientEndpointLabels    bool    `json:"orient_endpoint_labels,omitempty"`
 }
 
 type HierarchyPolicy struct {

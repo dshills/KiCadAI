@@ -9,6 +9,7 @@ import (
 	"slices"
 
 	"kicadai/internal/reports"
+	"kicadai/internal/simmodel"
 )
 
 const (
@@ -16,6 +17,7 @@ const (
 	maxPrimitivePlacementsPerKind     = 12
 	maxSearchTransitionsPerState      = 64
 	searchRejectionSampleLimit        = 24
+	topologyControllerGBWReserve      = 20
 )
 
 type topologySearchState struct {
@@ -142,6 +144,46 @@ func SearchPrimitiveTopologies(ctx context.Context, requirement Requirement, inv
 		rejections[code] = append(rejections[code], samples...)
 	}
 	for _, candidate := range analogCandidates {
+		if existing, found := retainedTopology[candidate.TopologyHash]; !found ||
+			compareTopologyCandidates(candidate, existing) < 0 {
+			retainedTopology[candidate.TopologyHash] = candidate
+		}
+	}
+	frequencySelectiveCandidates, frequencySelectiveConsumption, frequencySelectiveRejections := topologyFrequencySelectiveRelationshipSeeds(
+		ctx,
+		requirement,
+		inventory,
+		representatives,
+		inventoryByKey,
+		limits,
+		result.Policy,
+		initialState,
+	)
+	addSearchConsumption(&result.Consumption, frequencySelectiveConsumption)
+	for code, samples := range frequencySelectiveRejections {
+		rejections[code] = append(rejections[code], samples...)
+	}
+	for _, candidate := range frequencySelectiveCandidates {
+		if existing, found := retainedTopology[candidate.TopologyHash]; !found ||
+			compareTopologyCandidates(candidate, existing) < 0 {
+			retainedTopology[candidate.TopologyHash] = candidate
+		}
+	}
+	powerTransferCandidates, powerTransferConsumption, powerTransferRejections := topologyPowerTransferRelationshipSeeds(
+		ctx,
+		requirement,
+		inventory,
+		representatives,
+		inventoryByKey,
+		limits,
+		result.Policy,
+		initialState,
+	)
+	addSearchConsumption(&result.Consumption, powerTransferConsumption)
+	for code, samples := range powerTransferRejections {
+		rejections[code] = append(rejections[code], samples...)
+	}
+	for _, candidate := range powerTransferCandidates {
 		if existing, found := retainedTopology[candidate.TopologyHash]; !found ||
 			compareTopologyCandidates(candidate, existing) < 0 {
 			retainedTopology[candidate.TopologyHash] = candidate
@@ -414,6 +456,245 @@ func SearchPrimitiveTopologies(ctx context.Context, requirement Requirement, inv
 		result.Issues = []reports.Issue{graphIssue(CodeNoCompleteGraph, "search", "bounded search produced no complete primitive graph", "increase the explicit graph budget or onboard a compatible primitive")}
 	}
 	return result
+}
+
+// topologyFrequencySelectiveRelationshipSeeds recognizes a bounded rejection
+// frequency bracketed by preserved lower and upper passbands. It emits
+// structurally distinct buffered bridge networks whose ratios can be derived
+// from the requested frequency and adjacent passband bounds. The enhanced
+// alternative raises the bridge reference through bounded positive feedback
+// to narrow the rejection band. No circuit or project identity participates
+// in the trigger.
+func topologyFrequencySelectiveRelationshipSeeds(
+	ctx context.Context,
+	requirement Requirement,
+	inventory PrimitiveInventory,
+	representatives []PrimitiveCandidate,
+	inventoryByKey map[string]PrimitiveCandidate,
+	limits GraphLimits,
+	policy Policy,
+	initial topologySearchState,
+) ([]TopologyCandidate, Consumption, map[string][]string) {
+	if _, ok := topologyRejectionFrequency(requirement); !ok {
+		return nil, Consumption{}, map[string][]string{}
+	}
+	var resistor, capacitor PrimitiveCandidate
+	for _, primitive := range representatives {
+		switch primitive.Kind {
+		case "resistor":
+			resistor = primitive
+		case "capacitor":
+			capacitor = primitive
+		}
+	}
+	controller := topologyPowerControllerPrimitive(requirement, inventory)
+	if resistor.Key == "" || capacitor.Key == "" || controller.Key == "" {
+		return nil, Consumption{}, map[string][]string{}
+	}
+	inputs := topologyNodesByRole(initial.graph, "input", "control")
+	outputs := topologyNodesByRole(initial.graph, "output")
+	references := topologyNodesByRole(initial.graph, "reference")
+	highRail, lowRail := topologyPowerRails(requirement, initial.graph)
+	if len(inputs) == 0 || len(outputs) == 0 || len(references) == 0 || highRail == "" || lowRail == "" {
+		return nil, Consumption{}, map[string][]string{}
+	}
+	consumption := Consumption{}
+	rejections := map[string][]string{}
+	retained := map[string]TopologyCandidate{}
+	addNode := func(state topologySearchState) (topologySearchState, string, bool) {
+		if ctx.Err() != nil || consumption.GeneratedGraphs >= policy.MaxGeneratedGraphs {
+			return state, "", false
+		}
+		next, node := addRelationshipInternalNode(state, requirement, inventoryByKey, &consumption)
+		return next, node, node != ""
+	}
+	add := func(state topologySearchState, primitive PrimitiveCandidate, terminals []TerminalConnection) topologySearchState {
+		if ctx.Err() != nil || consumption.GeneratedGraphs >= policy.MaxGeneratedGraphs {
+			return state
+		}
+		return addRelationshipPrimitive(state, requirement, inventoryByKey, primitive, terminals, &consumption)
+	}
+	retain := func(state topologySearchState) {
+		if len(state.graph.Instances) > limits.MaxPrimitiveInstances ||
+			internalNodeCount(state.graph) > limits.MaxInternalNodes {
+			rejections["graph_limit"] = append(rejections["graph_limit"], fmt.Sprintf("instances=%d internal_nodes=%d", len(state.graph.Instances), internalNodeCount(state.graph)))
+			return
+		}
+		if issues := ValidateCompleteGraph(state.graph, inventory, limits); len(issues) != 0 {
+			for _, issue := range issues {
+				rejections[string(issue.Code)] = append(rejections[string(issue.Code)], issue.Path+":"+issue.Message)
+			}
+			return
+		}
+		if state.score.BehaviorGap != 0 {
+			rejections["relationship_gap"] = append(rejections["relationship_gap"], fmt.Sprintf("%s:gap=%d", state.hash, state.score.BehaviorGap))
+			return
+		}
+		normalized, err := NormalizeGraph(state.graph)
+		if err != nil {
+			rejections["canonical_normalization_failed"] = append(rejections["canonical_normalization_failed"], err.Error())
+			return
+		}
+		topologyHash, err := TopologyHash(normalized)
+		if err != nil {
+			rejections["canonical_topology_hash_failed"] = append(rejections["canonical_topology_hash_failed"], err.Error())
+			return
+		}
+		consumption.CompleteGraphs++
+		candidate := TopologyCandidate{
+			Fingerprint: state.hash, TopologyHash: topologyHash,
+			Score: state.score, Graph: normalized,
+			Operations: cloneGraphOperations(state.operations),
+		}
+		if existing, found := retained[topologyHash]; !found || compareTopologyCandidates(candidate, existing) < 0 {
+			retained[topologyHash] = candidate
+		}
+	}
+	for _, input := range inputs {
+		for _, output := range outputs {
+			reference := references[0]
+			for _, enhancedQ := range []bool{false, true} {
+				if ctx.Err() != nil || consumption.ExpandedStates >= policy.MaxExpandedStates {
+					consumption.BudgetExhausted = true
+					break
+				}
+				consumption.ExpandedStates++
+				state := initial
+				source := input
+				nodes := make([]string, 0, 3)
+				for len(nodes) < 3 {
+					var node string
+					var ok bool
+					state, node, ok = addNode(state)
+					if !ok {
+						break
+					}
+					nodes = append(nodes, node)
+				}
+				if len(nodes) != 3 {
+					continue
+				}
+				resistiveMid, capacitiveMid, filtered := nodes[0], nodes[1], nodes[2]
+				bridgeReference := reference
+				outputFeedback := output
+				divider, drivenReference := "", ""
+				if enhancedQ {
+					var ok bool
+					for _, target := range []*string{&divider, &drivenReference, &outputFeedback} {
+						state, *target, ok = addNode(state)
+						if !ok {
+							break
+						}
+					}
+					if !ok {
+						continue
+					}
+				}
+				state = add(state, controller, []TerminalConnection{
+					{Terminal: "IN_MINUS", Node: outputFeedback},
+					{Terminal: "IN_PLUS", Node: filtered},
+					{Terminal: "OUT", Node: output},
+					{Terminal: "V_MINUS", Node: lowRail},
+					{Terminal: "V_PLUS", Node: highRail},
+				})
+				if enhancedQ {
+					state = add(state, resistor, topologyTwoTerminalPlacement(output, outputFeedback))
+					state = add(state, resistor, topologyTwoTerminalPlacement(outputFeedback, reference))
+					state = add(state, resistor, topologyTwoTerminalPlacement(output, divider))
+					state = add(state, resistor, topologyTwoTerminalPlacement(divider, reference))
+					state = add(state, controller, []TerminalConnection{
+						{Terminal: "IN_MINUS", Node: drivenReference},
+						{Terminal: "IN_PLUS", Node: divider},
+						{Terminal: "OUT", Node: drivenReference},
+						{Terminal: "V_MINUS", Node: lowRail},
+						{Terminal: "V_PLUS", Node: highRail},
+					})
+					bridgeReference = drivenReference
+				}
+				if enhancedQ {
+					armInput, armOutput := "", ""
+					var ok bool
+					state, armInput, ok = addNode(state)
+					if !ok {
+						continue
+					}
+					state, armOutput, ok = addNode(state)
+					if !ok {
+						continue
+					}
+					for _, edge := range [][2]string{
+						{source, armInput}, {armInput, resistiveMid},
+						{resistiveMid, armOutput}, {armOutput, filtered},
+						{capacitiveMid, bridgeReference},
+					} {
+						state = add(state, resistor, topologyTwoTerminalPlacement(edge[0], edge[1]))
+					}
+				} else {
+					for _, edge := range [][2]string{
+						{source, resistiveMid}, {resistiveMid, filtered},
+						{capacitiveMid, bridgeReference}, {capacitiveMid, bridgeReference},
+					} {
+						state = add(state, resistor, topologyTwoTerminalPlacement(edge[0], edge[1]))
+					}
+				}
+				for _, edge := range [][2]string{
+					{source, capacitiveMid}, {capacitiveMid, filtered},
+					{resistiveMid, bridgeReference}, {resistiveMid, bridgeReference},
+				} {
+					state = add(state, capacitor, topologyTwoTerminalPlacement(edge[0], edge[1]))
+				}
+				retain(state)
+			}
+		}
+	}
+	result := make([]TopologyCandidate, 0, len(retained))
+	for _, candidate := range retained {
+		result = append(result, candidate)
+	}
+	slices.SortFunc(result, compareTopologyCandidates)
+	return result, consumption, rejections
+}
+
+func topologyRejectionFrequency(requirement Requirement) (float64, bool) {
+	type responseBound struct {
+		frequency float64
+		minimum   float64
+		maximum   float64
+		hasMin    bool
+		hasMax    bool
+	}
+	responses := []responseBound{}
+	for _, assertion := range requirement.Requirements.BehavioralRequirements {
+		if assertion.Metric != "voltage_gain_at_frequency" ||
+			assertion.FrequencyHz == nil || *assertion.FrequencyHz <= 0 {
+			continue
+		}
+		response := responseBound{frequency: *assertion.FrequencyHz}
+		if assertion.Min != nil {
+			response.minimum, response.hasMin = *assertion.Min, true
+		}
+		if assertion.Max != nil {
+			response.maximum, response.hasMax = *assertion.Max, true
+		}
+		responses = append(responses, response)
+	}
+	for _, rejected := range responses {
+		if !rejected.hasMax {
+			continue
+		}
+		lowerPass, upperPass := false, false
+		for _, pass := range responses {
+			if !pass.hasMin || pass.minimum <= rejected.maximum {
+				continue
+			}
+			lowerPass = lowerPass || pass.frequency < rejected.frequency
+			upperPass = upperPass || pass.frequency > rejected.frequency
+		}
+		if lowerPass && upperPass {
+			return rejected.frequency, true
+		}
+	}
+	return 0, false
 }
 
 // topologyRelationshipSeeds constructs only the electrical relationships
@@ -1065,6 +1346,1025 @@ func topologyAnalogRelationshipSeeds(
 	}
 	slices.SortFunc(result, compareTopologyCandidates)
 	return result, consumption, rejections
+}
+
+// topologyPowerTransferRelationshipSeeds expands a bounded voltage-transfer
+// obligation into several electrically distinct active paths when the same
+// contract also requires meaningful load drive. The trigger is entirely
+// behavioral: gain plus output power/current/swing and dynamic quality. It
+// deliberately emits direct, single-ended, and complementary alternatives so
+// trusted simulation can reject or rank them; no project identity or named
+// amplifier class participates in generation.
+func topologyPowerTransferRelationshipSeeds(
+	ctx context.Context,
+	requirement Requirement,
+	inventory PrimitiveInventory,
+	representatives []PrimitiveCandidate,
+	inventoryByKey map[string]PrimitiveCandidate,
+	limits GraphLimits,
+	policy Policy,
+	initial topologySearchState,
+) ([]TopologyCandidate, Consumption, map[string][]string) {
+	if !topologyRequiresPowerTransfer(requirement) {
+		return nil, Consumption{}, map[string][]string{}
+	}
+	byKind := map[string]PrimitiveCandidate{}
+	for _, primitive := range representatives {
+		byKind[primitive.Kind] = primitive
+	}
+	resistor := byKind["resistor"]
+	capacitor := byKind["capacitor"]
+	opamp := byKind["opamp"]
+	stableReference := topologyStableReferencePrimitive(requirement, inventory)
+	powerController := topologyPowerControllerPrimitive(requirement, inventory)
+	if powerController.Key == "" {
+		powerController = opamp
+	}
+	if resistor.Key == "" || capacitor.Key == "" {
+		return nil, Consumption{}, map[string][]string{}
+	}
+	for _, kind := range []string{
+		"npn_bjt", "pnp_bjt", "n_channel_mosfet", "p_channel_mosfet",
+	} {
+		if primitive := topologyRatedPowerPrimitive(requirement, inventory, kind); primitive.Key != "" {
+			byKind[kind] = primitive
+		}
+	}
+	inputs := topologyNodesByRole(initial.graph, "input", "control")
+	outputs := topologyNodesByRole(initial.graph, "output")
+	supplyNodes := topologyNodesByRole(initial.graph, "supply")
+	references := topologyNodesByRole(initial.graph, "reference")
+	if len(inputs) == 0 || len(outputs) == 0 || len(references) == 0 {
+		return nil, Consumption{}, map[string][]string{}
+	}
+	highRail, lowRail := topologyPowerRails(requirement, initial.graph)
+	if highRail == "" {
+		return nil, Consumption{}, map[string][]string{}
+	}
+	if lowRail == "" {
+		lowRail = references[0]
+	}
+
+	consumption := Consumption{}
+	rejections := map[string][]string{}
+	retained := map[string]TopologyCandidate{}
+	retain := func(state topologySearchState) {
+		if state.hash == "" {
+			rejections["invalid_graph_hash"] = append(rejections["invalid_graph_hash"], "candidate graph has no deterministic hash")
+			return
+		}
+		if len(state.graph.Instances) > limits.MaxPrimitiveInstances ||
+			internalNodeCount(state.graph) > limits.MaxInternalNodes {
+			rejections["graph_limit"] = append(
+				rejections["graph_limit"],
+				fmt.Sprintf(
+					"instances=%d/%d internal_nodes=%d/%d",
+					len(state.graph.Instances), limits.MaxPrimitiveInstances,
+					internalNodeCount(state.graph), limits.MaxInternalNodes,
+				),
+			)
+			return
+		}
+		if consumption.GeneratedGraphs > policy.MaxGeneratedGraphs {
+			consumption.BudgetExhausted = true
+			return
+		}
+		if issues := ValidateCompleteGraph(state.graph, inventory, limits); len(issues) != 0 {
+			for _, issue := range issues {
+				rejections[string(issue.Code)] = append(
+					rejections[string(issue.Code)], issue.Path+":"+issue.Message,
+				)
+			}
+			return
+		}
+		if state.score.BehaviorGap != 0 {
+			rejections["relationship_gap"] = append(
+				rejections["relationship_gap"],
+				fmt.Sprintf("%s:gap=%d score=%#v", state.hash, state.score.BehaviorGap, state.score),
+			)
+			return
+		}
+		normalized, err := NormalizeGraph(CloneGraph(state.graph))
+		if err != nil {
+			rejections["canonical_normalization_failed"] = append(
+				rejections["canonical_normalization_failed"], err.Error(),
+			)
+			return
+		}
+		topologyHash, err := TopologyHash(normalized)
+		if err != nil {
+			rejections["canonical_topology_hash_failed"] = append(
+				rejections["canonical_topology_hash_failed"], err.Error(),
+			)
+			return
+		}
+		consumption.CompleteGraphs++
+		candidate := TopologyCandidate{
+			Fingerprint:  state.hash,
+			TopologyHash: topologyHash,
+			Score:        state.score,
+			Graph:        normalized,
+			Operations:   cloneGraphOperations(state.operations),
+		}
+		if existing, found := retained[topologyHash]; !found ||
+			compareTopologyCandidates(candidate, existing) < 0 {
+			retained[topologyHash] = candidate
+		}
+	}
+	addNode := func(state topologySearchState) (topologySearchState, string, bool) {
+		if ctx.Err() != nil || consumption.GeneratedGraphs >= policy.MaxGeneratedGraphs {
+			return state, "", false
+		}
+		next, node := addRelationshipInternalNode(
+			state, requirement, inventoryByKey, &consumption,
+		)
+		return next, node, node != ""
+	}
+	add := func(state topologySearchState, primitive PrimitiveCandidate, terminals []TerminalConnection) topologySearchState {
+		if primitive.Key == "" || ctx.Err() != nil ||
+			consumption.GeneratedGraphs >= policy.MaxGeneratedGraphs {
+			return state
+		}
+		return addRelationshipPrimitive(
+			state, requirement, inventoryByKey, primitive, terminals, &consumption,
+		)
+	}
+	redirect := func(
+		state topologySearchState,
+		instanceID string,
+		terminal string,
+		node string,
+	) topologySearchState {
+		graph, err := RedirectPrimitiveTerminal(
+			state.graph, inventory, instanceID, terminal, node,
+		)
+		if err != nil {
+			return state
+		}
+		hash, err := GraphHash(graph)
+		if err != nil {
+			return state
+		}
+		primitive := GraphInstance{}
+		for _, instance := range state.graph.Instances {
+			if instance.ID == instanceID {
+				primitive = instance
+				break
+			}
+		}
+		operations := cloneGraphOperations(state.operations)
+		operations = append(operations, GraphOperation{
+			Number:        len(operations) + 1,
+			Kind:          "redirect_terminal",
+			PrimitiveKey:  primitive.PrimitiveKey,
+			PrimitiveKind: primitive.Kind,
+			Node:          node,
+			Connections: []TerminalConnection{{
+				Terminal: terminal,
+				Node:     node,
+			}},
+			BeforeHash: state.hash,
+			AfterHash:  hash,
+		})
+		consumption.GeneratedGraphs++
+		return topologySearchState{
+			graph: graph, hash: hash,
+			score:      scoreTopologyGraph(requirement, graph, inventoryByKey, hash),
+			operations: operations,
+		}
+	}
+
+	for _, input := range inputs {
+		for _, output := range outputs {
+			if ctx.Err() != nil || consumption.ExpandedStates >= policy.MaxExpandedStates ||
+				consumption.GeneratedGraphs >= policy.MaxGeneratedGraphs {
+				consumption.BudgetExhausted = true
+				break
+			}
+			consumption.ExpandedStates++
+			reference := references[0]
+
+			// A direct closed-loop active path is an important low-complexity
+			// alternative even when it will later fail load-current or thermal
+			// evidence. Retaining it makes that rejection explicit.
+			if opamp.Key != "" {
+				state := initial
+				var feedback string
+				var ok bool
+				state, feedback, ok = addNode(state)
+				if ok {
+					state = add(state, opamp, []TerminalConnection{
+						{Terminal: "IN_MINUS", Node: feedback},
+						{Terminal: "IN_PLUS", Node: input},
+						{Terminal: "OUT", Node: output},
+						{Terminal: "V_MINUS", Node: lowRail},
+						{Terminal: "V_PLUS", Node: highRail},
+					})
+					state = add(state, resistor, topologyTwoTerminalPlacement(feedback, reference))
+					state = add(state, resistor, topologyTwoTerminalPlacement(feedback, output))
+					retain(state)
+					compensated := add(
+						state,
+						capacitor,
+						topologyTwoTerminalPlacement(feedback, output),
+					)
+					retain(compensated)
+				}
+			}
+
+			// Single-ended transconductance path with bias, degeneration, and
+			// AC endpoint access. Its standing current and gain are sized later
+			// from the behavioral bounds rather than fixed here.
+			if npn := byKind["npn_bjt"]; npn.Key != "" {
+				lowSideController := topologyLowSideCurrentControllerPrimitive(requirement, inventory, npn)
+				if lowSideController.Key == "" {
+					rejections["current_controller_unavailable"] = append(rejections["current_controller_unavailable"], npn.Key)
+				}
+				state := initial
+				nodes := make([]string, 0, 3)
+				for len(nodes) < 3 {
+					var node string
+					var ok bool
+					state, node, ok = addNode(state)
+					if !ok {
+						break
+					}
+					nodes = append(nodes, node)
+				}
+				if len(nodes) == 3 {
+					base, emitter, collector := nodes[0], nodes[1], nodes[2]
+					state = add(state, npn, []TerminalConnection{
+						{Terminal: "BASE", Node: base},
+						{Terminal: "COLLECTOR", Node: collector},
+						{Terminal: "EMITTER", Node: emitter},
+					})
+					for _, edge := range [][2]string{
+						{highRail, collector},
+						{emitter, reference},
+						{collector, base},
+					} {
+						state = add(state, resistor, topologyTwoTerminalPlacement(edge[0], edge[1]))
+					}
+					state = add(state, capacitor, topologyTwoTerminalPlacement(input, base))
+					state = add(state, capacitor, topologyTwoTerminalPlacement(collector, output))
+					retain(state)
+
+					bypassed := add(
+						state,
+						capacitor,
+						topologyTwoTerminalPlacement(emitter, reference),
+					)
+					retain(bypassed)
+
+					parallelLoad := add(
+						state,
+						resistor,
+						topologyTwoTerminalPlacement(highRail, collector),
+					)
+					retain(parallelLoad)
+					parallelBypassed := add(
+						parallelLoad,
+						capacitor,
+						topologyTwoTerminalPlacement(emitter, reference),
+					)
+					retain(parallelBypassed)
+				}
+
+				// A high-input-impedance controller can close the signal and DC
+				// bias loop around the same single-ended power device. This is a
+				// distinct architecture derived from the input-impedance and gain
+				// obligations, not from a named amplifier class.
+				if powerController.Key != "" && lowSideController.Key != "" && len(supplyNodes) == 1 {
+					// A controller-biased emitter follower is the non-inverting
+					// single-ended alternative. Two parallel standing-current
+					// current sink lets catalog power/value constraints realize a
+					// continuous-conduction load without naming an amplifier class.
+					follower := initial
+					followerNodes := make([]string, 0, 8)
+					for len(followerNodes) < 8 {
+						var node string
+						var ok bool
+						follower, node, ok = addNode(follower)
+						if !ok {
+							break
+						}
+						followerNodes = append(followerNodes, node)
+					}
+					if len(followerNodes) == 8 {
+						midRail, biasedInput, feedback := followerNodes[0], followerNodes[1], followerNodes[2]
+						emitter, drive := followerNodes[3], followerNodes[4]
+						sinkSense, sinkDrive, sinkReference := followerNodes[5], followerNodes[6], followerNodes[7]
+						follower = add(follower, powerController, []TerminalConnection{
+							{Terminal: "IN_MINUS", Node: feedback},
+							{Terminal: "IN_PLUS", Node: biasedInput},
+							{Terminal: "OUT", Node: drive},
+							{Terminal: "V_MINUS", Node: reference},
+							{Terminal: "V_PLUS", Node: highRail},
+						})
+						follower = add(follower, npn, []TerminalConnection{
+							{Terminal: "BASE", Node: drive},
+							{Terminal: "COLLECTOR", Node: highRail},
+							{Terminal: "EMITTER", Node: emitter},
+						})
+						follower = add(follower, lowSideController, []TerminalConnection{
+							{Terminal: "IN_MINUS", Node: sinkSense},
+							{Terminal: "IN_PLUS", Node: sinkReference},
+							{Terminal: "OUT", Node: sinkDrive},
+							{Terminal: "V_MINUS", Node: reference},
+							{Terminal: "V_PLUS", Node: highRail},
+						})
+						follower = add(follower, npn, []TerminalConnection{
+							{Terminal: "BASE", Node: sinkDrive},
+							{Terminal: "COLLECTOR", Node: emitter},
+							{Terminal: "EMITTER", Node: sinkSense},
+						})
+						resistorEdges := [][2]string{
+							{highRail, midRail},
+							{midRail, reference},
+							{midRail, biasedInput},
+							{midRail, feedback},
+							{emitter, feedback},
+							{sinkSense, reference},
+							{sinkSense, reference},
+						}
+						if stableReference.Key != "" {
+							var referenceCathode string
+							var ok bool
+							follower, referenceCathode, ok = addNode(follower)
+							if ok {
+								follower = add(follower, stableReference, []TerminalConnection{
+									{Terminal: "ANODE", Node: reference},
+									{Terminal: "CATHODE", Node: referenceCathode},
+								})
+								resistorEdges = append(resistorEdges,
+									[2]string{highRail, referenceCathode},
+									[2]string{referenceCathode, sinkReference},
+									[2]string{sinkReference, reference},
+								)
+							}
+						} else {
+							resistorEdges = append(resistorEdges,
+								[2]string{highRail, sinkReference},
+								[2]string{sinkReference, reference},
+								[2]string{sinkReference, reference},
+							)
+						}
+						for _, edge := range resistorEdges {
+							follower = add(follower, resistor, topologyTwoTerminalPlacement(edge[0], edge[1]))
+						}
+						follower = add(follower, capacitor, topologyTwoTerminalPlacement(midRail, reference))
+						follower = add(follower, capacitor, topologyTwoTerminalPlacement(sinkReference, reference))
+						follower = add(follower, capacitor, topologyTwoTerminalPlacement(input, biasedInput))
+						follower = add(follower, capacitor, topologyTwoTerminalPlacement(emitter, output))
+						retain(follower)
+					}
+
+					controlled := initial
+					nodes := make([]string, 0, 6)
+					for len(nodes) < 6 {
+						var node string
+						var ok bool
+						controlled, node, ok = addNode(controlled)
+						if !ok {
+							break
+						}
+						nodes = append(nodes, node)
+					}
+					if len(nodes) == 6 {
+						midRail, biasedInput, feedback := nodes[0], nodes[1], nodes[2]
+						emitter, collector, drive := nodes[3], nodes[4], nodes[5]
+						controlled = add(controlled, powerController, []TerminalConnection{
+							{Terminal: "IN_MINUS", Node: biasedInput},
+							{Terminal: "IN_PLUS", Node: feedback},
+							{Terminal: "OUT", Node: drive},
+							{Terminal: "V_MINUS", Node: reference},
+							{Terminal: "V_PLUS", Node: highRail},
+						})
+						controlled = add(controlled, npn, []TerminalConnection{
+							{Terminal: "BASE", Node: drive},
+							{Terminal: "COLLECTOR", Node: collector},
+							{Terminal: "EMITTER", Node: emitter},
+						})
+						for _, edge := range [][2]string{
+							{highRail, midRail},
+							{midRail, reference},
+							{midRail, biasedInput},
+							{collector, feedback},
+							{feedback, midRail},
+							{highRail, collector},
+							{emitter, reference},
+						} {
+							controlled = add(controlled, resistor, topologyTwoTerminalPlacement(edge[0], edge[1]))
+						}
+						controlled = add(controlled, capacitor, topologyTwoTerminalPlacement(input, biasedInput))
+						controlled = add(controlled, capacitor, topologyTwoTerminalPlacement(collector, output))
+						retain(controlled)
+
+						controlledBypassed := add(
+							controlled,
+							capacitor,
+							topologyTwoTerminalPlacement(emitter, reference),
+						)
+						retain(controlledBypassed)
+						controlledParallel := add(
+							controlled,
+							resistor,
+							topologyTwoTerminalPlacement(highRail, collector),
+						)
+						retain(controlledParallel)
+						controlledParallelBypassed := add(
+							controlledParallel,
+							capacitor,
+							topologyTwoTerminalPlacement(emitter, reference),
+						)
+						retain(controlledParallelBypassed)
+					}
+				}
+			}
+
+			if powerController.Key != "" && len(supplyNodes) >= 2 && highRail != lowRail {
+				for _, pair := range [][2]string{
+					{"npn_bjt", "pnp_bjt"},
+					{"n_channel_mosfet", "p_channel_mosfet"},
+				} {
+					upper, lower := byKind[pair[0]], byKind[pair[1]]
+					if upper.Key == "" || lower.Key == "" {
+						continue
+					}
+					state := initial
+					nodes := make([]string, 0, 6)
+					for len(nodes) < 6 {
+						var node string
+						var ok bool
+						state, node, ok = addNode(state)
+						if !ok {
+							break
+						}
+						nodes = append(nodes, node)
+					}
+					if len(nodes) != 6 {
+						continue
+					}
+					feedback, drive, upperControl, lowerControl := nodes[0], nodes[1], nodes[2], nodes[3]
+					upperOutput, lowerOutput := nodes[4], nodes[5]
+					controllerOutput := drive
+					state = add(state, powerController, []TerminalConnection{
+						{Terminal: "IN_MINUS", Node: feedback},
+						{Terminal: "IN_PLUS", Node: input},
+						{Terminal: "OUT", Node: controllerOutput},
+						{Terminal: "V_MINUS", Node: lowRail},
+						{Terminal: "V_PLUS", Node: highRail},
+					})
+					state = add(state, resistor, topologyTwoTerminalPlacement(feedback, reference))
+					state = add(state, resistor, topologyTwoTerminalPlacement(feedback, output))
+					for _, edge := range [][2]string{
+						{upperOutput, output},
+						{lowerOutput, output},
+					} {
+						state = add(state, resistor, topologyTwoTerminalPlacement(edge[0], edge[1]))
+					}
+					switch pair[0] {
+					case "npn_bjt":
+						// Retain a direct complementary follower. Global feedback
+						// can make this low-complexity Class-B alternative useful,
+						// while trusted distortion and idle-current evidence decide
+						// whether explicit bias spreading is required.
+						direct := state
+						direct = add(direct, resistor, topologyTwoTerminalPlacement(drive, upperControl))
+						direct = add(direct, resistor, topologyTwoTerminalPlacement(drive, lowerControl))
+						direct = add(direct, upper, []TerminalConnection{
+							{Terminal: "BASE", Node: upperControl},
+							{Terminal: "COLLECTOR", Node: highRail},
+							{Terminal: "EMITTER", Node: upperOutput},
+						})
+						direct = add(direct, lower, []TerminalConnection{
+							{Terminal: "BASE", Node: lowerControl},
+							{Terminal: "COLLECTOR", Node: lowRail},
+							{Terminal: "EMITTER", Node: lowerOutput},
+						})
+						retain(direct)
+						// A controller-to-load ballast path turns the same pair into
+						// a current booster: the controller owns the zero-crossing and
+						// the power devices take over once roughly one base-emitter
+						// drop develops across the ballast resistor. This supplies a
+						// small-signal path without requiring a fixture-named class.
+						boosted := add(
+							direct,
+							resistor,
+							topologyTwoTerminalPlacement(drive, output),
+						)
+						retain(boosted)
+						directCompensated := add(
+							direct,
+							capacitor,
+							topologyTwoTerminalPlacement(controllerOutput, feedback),
+						)
+						retain(directCompensated)
+						boostedCompensated := add(
+							boosted,
+							capacitor,
+							topologyTwoTerminalPlacement(controllerOutput, feedback),
+						)
+						retain(boostedCompensated)
+
+						// A compound complementary follower trades two additional
+						// active devices and two junction drops for beta multiplication.
+						// Its rail-fed chain carries only driver-base current; the
+						// driver emitters furnish the power-device base current.
+						compound := state
+						compoundNodes := make([]string, 0, 4)
+						for len(compoundNodes) < 4 {
+							var node string
+							var compoundOK bool
+							compound, node, compoundOK = addNode(compound)
+							if !compoundOK {
+								break
+							}
+							compoundNodes = append(compoundNodes, node)
+						}
+						if len(compoundNodes) == 4 {
+							upperMid, lowerMid := compoundNodes[0], compoundNodes[1]
+							upperPowerBase, lowerPowerBase := compoundNodes[2], compoundNodes[3]
+							if upper.Key != "" && lower.Key != "" {
+								compound = add(compound, resistor, topologyTwoTerminalPlacement(highRail, upperControl))
+								for _, edge := range [][2]string{
+									{upperControl, upperMid},
+									{upperMid, drive},
+								} {
+									compound = add(compound, upper, []TerminalConnection{
+										{Terminal: "BASE", Node: edge[0]},
+										{Terminal: "COLLECTOR", Node: edge[0]},
+										{Terminal: "EMITTER", Node: edge[1]},
+									})
+								}
+								for _, edge := range [][2]string{
+									{drive, lowerMid},
+									{lowerMid, lowerControl},
+								} {
+									compound = add(compound, lower, []TerminalConnection{
+										{Terminal: "EMITTER", Node: edge[0]},
+										{Terminal: "BASE", Node: edge[1]},
+										{Terminal: "COLLECTOR", Node: edge[1]},
+									})
+								}
+								compound = add(compound, resistor, topologyTwoTerminalPlacement(lowerControl, lowRail))
+								compound = add(compound, upper, []TerminalConnection{
+									{Terminal: "BASE", Node: upperControl},
+									{Terminal: "COLLECTOR", Node: highRail},
+									{Terminal: "EMITTER", Node: upperPowerBase},
+								})
+								compound = add(compound, upper, []TerminalConnection{
+									{Terminal: "BASE", Node: upperPowerBase},
+									{Terminal: "COLLECTOR", Node: highRail},
+									{Terminal: "EMITTER", Node: upperOutput},
+								})
+								compound = add(compound, lower, []TerminalConnection{
+									{Terminal: "BASE", Node: lowerControl},
+									{Terminal: "COLLECTOR", Node: lowRail},
+									{Terminal: "EMITTER", Node: lowerPowerBase},
+								})
+								compound = add(compound, lower, []TerminalConnection{
+									{Terminal: "BASE", Node: lowerPowerBase},
+									{Terminal: "COLLECTOR", Node: lowRail},
+									{Terminal: "EMITTER", Node: lowerOutput},
+								})
+								compound = add(compound, resistor, topologyTwoTerminalPlacement(upperPowerBase, upperOutput))
+								compound = add(compound, resistor, topologyTwoTerminalPlacement(lowerPowerBase, lowerOutput))
+								retain(compound)
+								compoundCompensated := add(
+									compound,
+									capacitor,
+									topologyTwoTerminalPlacement(controllerOutput, feedback),
+								)
+								retain(compoundCompensated)
+							}
+						}
+
+						// The biased alternative is symmetric around the controller
+						// output: rail-fed diode drops establish the two base voltages
+						// and both shift with the midpoint drive. This preserves access
+						// to both output polarities.
+						var upperBase, lowerBase string
+						var ok bool
+						state, upperBase, ok = addNode(state)
+						if !ok {
+							continue
+						}
+						state, lowerBase, ok = addNode(state)
+						if !ok {
+							continue
+						}
+						if diode := byKind["signal_diode"]; diode.Key != "" {
+							state = add(state, resistor, topologyTwoTerminalPlacement(highRail, upperControl))
+							state = add(state, diode, []TerminalConnection{
+								{Terminal: "ANODE", Node: upperControl},
+								{Terminal: "CATHODE", Node: drive},
+							})
+							state = add(state, diode, []TerminalConnection{
+								{Terminal: "ANODE", Node: drive},
+								{Terminal: "CATHODE", Node: lowerControl},
+							})
+							state = add(state, resistor, topologyTwoTerminalPlacement(lowerControl, lowRail))
+						} else {
+							state = add(state, resistor, topologyTwoTerminalPlacement(drive, upperControl))
+							state = add(state, resistor, topologyTwoTerminalPlacement(drive, lowerControl))
+						}
+						state = add(state, resistor, topologyTwoTerminalPlacement(upperControl, upperBase))
+						state = add(state, resistor, topologyTwoTerminalPlacement(lowerControl, lowerBase))
+						state = add(state, upper, []TerminalConnection{
+							{Terminal: "BASE", Node: upperBase},
+							{Terminal: "COLLECTOR", Node: highRail},
+							{Terminal: "EMITTER", Node: upperOutput},
+						})
+						state = add(state, lower, []TerminalConnection{
+							{Terminal: "BASE", Node: lowerBase},
+							{Terminal: "COLLECTOR", Node: lowRail},
+							{Terminal: "EMITTER", Node: lowerOutput},
+						})
+					case "n_channel_mosfet":
+						state = add(state, resistor, topologyTwoTerminalPlacement(drive, upperControl))
+						state = add(state, resistor, topologyTwoTerminalPlacement(drive, lowerControl))
+						state = add(state, upper, []TerminalConnection{
+							{Terminal: "DRAIN", Node: highRail},
+							{Terminal: "GATE", Node: upperControl},
+							{Terminal: "SOURCE", Node: upperOutput},
+						})
+						state = add(state, lower, []TerminalConnection{
+							{Terminal: "DRAIN", Node: lowRail},
+							{Terminal: "GATE", Node: lowerControl},
+							{Terminal: "SOURCE", Node: lowerOutput},
+						})
+					}
+					retain(state)
+					compensated := add(
+						state,
+						capacitor,
+						topologyTwoTerminalPlacement(controllerOutput, feedback),
+					)
+					retain(compensated)
+
+					series := state
+					var upperJoin, lowerJoin string
+					var ok bool
+					series, upperJoin, ok = addNode(series)
+					if !ok {
+						continue
+					}
+					series, lowerJoin, ok = addNode(series)
+					if !ok {
+						continue
+					}
+					upperResistor, upperTerminal := "", ""
+					lowerResistor, lowerTerminal := "", ""
+					for _, instance := range series.graph.Instances {
+						if instance.Kind != "resistor" || len(instance.Terminals) != 2 {
+							continue
+						}
+						for _, terminal := range instance.Terminals {
+							other := instance.Terminals[0].Node
+							if other == terminal.Node {
+								other = instance.Terminals[1].Node
+							}
+							if terminal.Node != output {
+								continue
+							}
+							switch other {
+							case upperOutput:
+								upperResistor, upperTerminal = instance.ID, terminal.Terminal
+							case lowerOutput:
+								lowerResistor, lowerTerminal = instance.ID, terminal.Terminal
+							}
+						}
+					}
+					if upperResistor != "" && lowerResistor != "" {
+						series = redirect(series, upperResistor, upperTerminal, upperJoin)
+						series = redirect(series, lowerResistor, lowerTerminal, lowerJoin)
+						series = add(series, resistor, topologyTwoTerminalPlacement(upperJoin, output))
+						series = add(series, resistor, topologyTwoTerminalPlacement(lowerJoin, output))
+						retain(series)
+						seriesCompensated := add(
+							series,
+							capacitor,
+							topologyTwoTerminalPlacement(controllerOutput, feedback),
+						)
+						retain(seriesCompensated)
+					}
+				}
+			}
+		}
+	}
+	if consumption.ExpandedStates >= policy.MaxExpandedStates ||
+		consumption.GeneratedGraphs >= policy.MaxGeneratedGraphs {
+		consumption.BudgetExhausted = true
+	}
+	result := make([]TopologyCandidate, 0, len(retained))
+	for _, candidate := range retained {
+		result = append(result, candidate)
+	}
+	slices.SortFunc(result, compareTopologyCandidates)
+	return result, consumption, rejections
+}
+
+func topologyRequiresPowerTransfer(requirement Requirement) bool {
+	requireGain := false
+	requireLoadDrive := false
+	requireDynamicQuality := false
+	for _, assertion := range requirement.Requirements.BehavioralRequirements {
+		switch assertion.Metric {
+		case "voltage_gain":
+			// Unity-gain followers still require a power-transfer stage when
+			// paired with explicit load-drive and dynamic-quality obligations.
+			requireGain = requireGain ||
+				(assertion.Min != nil && *assertion.Min >= 1)
+		case "output_current", "output_power", "output_swing", "peak_current", "peak_voltage":
+			requireLoadDrive = true
+		case "bandwidth", "cutoff_frequency", "phase_margin", "thd", "total_harmonic_distortion":
+			requireDynamicQuality = true
+		}
+	}
+	return requireGain && requireLoadDrive && requireDynamicQuality
+}
+
+func topologyRatedPowerPrimitive(
+	requirement Requirement,
+	inventory PrimitiveInventory,
+	kind string,
+) PrimitiveCandidate {
+	requireThermal := false
+	requireSOA := false
+	requiredAnalyses := requirementAnalysisSet(requirement)
+	for _, assertion := range requirement.Requirements.BehavioralRequirements {
+		requireThermal = requireThermal || assertion.Metric == "junction_temperature"
+		requireSOA = requireSOA || assertion.Metric == "soa_margin"
+	}
+	candidates := []PrimitiveCandidate{}
+	for _, primitive := range inventory.Primitives {
+		if primitive.Kind != kind || !ratingsCoverRequirement(requirement, primitive) ||
+			(requireThermal && !primitiveHasThermalEvidence(primitive)) ||
+			(requireSOA && !primitiveHasSOAEvidence(primitive)) {
+			continue
+		}
+		candidates = append(candidates, primitive)
+	}
+	slices.SortFunc(candidates, func(left, right PrimitiveCandidate) int {
+		return compareRepresentativePrimitives(left, right, requiredAnalyses)
+	})
+	if len(candidates) == 0 {
+		return PrimitiveCandidate{}
+	}
+	return candidates[0]
+}
+
+func topologyPowerControllerPrimitive(
+	requirement Requirement,
+	inventory PrimitiveInventory,
+) PrimitiveCandidate {
+	targetGain := 0.0
+	targetBandwidth := 0.0
+	for _, assertion := range requirement.Requirements.BehavioralRequirements {
+		switch assertion.Metric {
+		case "voltage_gain":
+			targetGain = math.Max(targetGain, assertionTarget(assertion))
+		case "bandwidth", "cutoff_frequency":
+			targetBandwidth = math.Max(targetBandwidth, assertionTarget(assertion))
+		}
+	}
+	// Discrete power stages add device poles and consume loop gain well before
+	// the requested closed-loop corner. Reserve twenty times the gain-bandwidth
+	// product so the controller still has corrective authority at that corner.
+	targetGBW := targetGain * targetBandwidth * topologyControllerGBWReserve
+	type scoredController struct {
+		primitive     PrimitiveCandidate
+		gbw           float64
+		outputMargin  float64
+		belowRequired bool
+		distance      float64
+	}
+	candidates := []scoredController{}
+	for _, primitive := range inventory.Primitives {
+		if primitive.Kind != "opamp" || !ratingsCoverRequirement(requirement, primitive) {
+			continue
+		}
+		gbw := 0.0
+		outputHighMargin := math.Inf(1)
+		outputLowMargin := math.Inf(1)
+		for _, model := range primitive.Models {
+			for _, parameter := range model.Parameters {
+				switch parameter.Name {
+				case "gain_bandwidth_hz":
+					gbw = math.Max(gbw, parameter.Value)
+				case "output_high_margin_v":
+					outputHighMargin = math.Min(outputHighMargin, parameter.Value)
+				case "output_low_margin_v":
+					outputLowMargin = math.Min(outputLowMargin, parameter.Value)
+				}
+			}
+		}
+		if gbw <= 0 || !finite(outputHighMargin) || !finite(outputLowMargin) {
+			continue
+		}
+		distance := 0.0
+		if targetGBW > 0 {
+			distance = math.Abs(math.Log(gbw / targetGBW))
+		}
+		candidates = append(candidates, scoredController{
+			primitive:     primitive,
+			gbw:           gbw,
+			outputMargin:  math.Max(outputHighMargin, outputLowMargin),
+			belowRequired: targetGBW > 0 && gbw < targetGBW,
+			distance:      distance,
+		})
+	}
+	slices.SortFunc(candidates, func(left, right scoredController) int {
+		if left.belowRequired != right.belowRequired {
+			if left.belowRequired {
+				return 1
+			}
+			return -1
+		}
+		return cmp.Or(
+			cmp.Compare(left.outputMargin, right.outputMargin),
+			cmp.Compare(left.distance, right.distance),
+			cmp.Compare(right.gbw, left.gbw),
+			cmp.Compare(primitiveEvidencePenalty(left.primitive.Evidence), primitiveEvidencePenalty(right.primitive.Evidence)),
+			comparePositiveArea(left.primitive.AreaMM2, right.primitive.AreaMM2),
+			cmp.Compare(left.primitive.Key, right.primitive.Key),
+		)
+	})
+	if len(candidates) == 0 {
+		return PrimitiveCandidate{}
+	}
+	return candidates[0].primitive
+}
+
+func topologyStableReferencePrimitive(
+	requirement Requirement,
+	inventory PrimitiveInventory,
+) PrimitiveCandidate {
+	type scoredReference struct {
+		primitive PrimitiveCandidate
+		voltage   float64
+	}
+	candidates := []scoredReference{}
+	for _, primitive := range inventory.Primitives {
+		if primitive.Kind != "reference_diode" ||
+			!ratingsCoverRequirement(requirement, primitive) {
+			continue
+		}
+		voltage := 0.0
+		validModel := false
+		for _, model := range primitive.Models {
+			if model.ModelID != simmodel.PrimitiveShuntVoltageReferenceV1 {
+				continue
+			}
+			validModel = true
+			for _, parameter := range model.Parameters {
+				if parameter.Name == "output_voltage_v" {
+					voltage = parameter.Value
+				}
+			}
+		}
+		if validModel && voltage > 0 {
+			candidates = append(candidates, scoredReference{primitive: primitive, voltage: voltage})
+		}
+	}
+	slices.SortFunc(candidates, func(left, right scoredReference) int {
+		return cmp.Or(
+			cmp.Compare(left.voltage, right.voltage),
+			cmp.Compare(primitiveEvidencePenalty(left.primitive.Evidence), primitiveEvidencePenalty(right.primitive.Evidence)),
+			comparePositiveArea(left.primitive.AreaMM2, right.primitive.AreaMM2),
+			cmp.Compare(left.primitive.Key, right.primitive.Key),
+		)
+	})
+	if len(candidates) == 0 {
+		return PrimitiveCandidate{}
+	}
+	return candidates[0].primitive
+}
+
+// topologyLowSideCurrentControllerPrimitive selects a controller for a
+// feedback-regulated transistor current sink. Unlike the signal controller,
+// this role is dominated by output-current evidence and low-rail swing: the
+// controller must source the selected transistor's base current while sensing
+// a small voltage above the reference rail.
+func topologyLowSideCurrentControllerPrimitive(
+	requirement Requirement,
+	inventory PrimitiveInventory,
+	driven PrimitiveCandidate,
+) PrimitiveCandidate {
+	targets := derivePowerTransferSizingTargets(requirement)
+	standingCurrent := targets.quiescentCurrent
+	if targets.outputPeakVoltage > 0 && targets.loadResistance > 0 {
+		standingCurrent = math.Max(
+			standingCurrent,
+			1.05*targets.outputPeakVoltage/targets.loadResistance,
+		)
+	}
+	minimumBeta := math.Inf(1)
+	for _, model := range driven.Models {
+		for _, parameter := range model.Parameters {
+			if parameter.Name == "forward_beta" && parameter.Value > 0 {
+				minimumBeta = math.Min(minimumBeta, parameter.Value)
+			}
+		}
+		for _, uncertainty := range model.Uncertainties {
+			if uncertainty.Target == "model_parameters.forward_beta" && uncertainty.Minimum > 0 {
+				minimumBeta = math.Min(minimumBeta, uncertainty.Minimum)
+			}
+		}
+	}
+	if !finite(minimumBeta) || minimumBeta <= 0 {
+		return PrimitiveCandidate{}
+	}
+	requiredOutputCurrent := 1.25 * standingCurrent / minimumBeta
+	type scoredController struct {
+		primitive PrimitiveCandidate
+		lowMargin float64
+		gbw       float64
+	}
+	candidates := []scoredController{}
+	for _, primitive := range inventory.Primitives {
+		if primitive.Kind != "opamp" || !ratingsCoverRequirement(requirement, primitive) {
+			continue
+		}
+		outputCurrent := 0.0
+		for _, rating := range primitive.Ratings {
+			if rating.Kind == "output_current" {
+				outputCurrent = math.Max(outputCurrent, boundMaximum(rating))
+			}
+		}
+		if outputCurrent < requiredOutputCurrent {
+			continue
+		}
+		lowMargin := math.Inf(1)
+		gbw := 0.0
+		for _, model := range primitive.Models {
+			for _, parameter := range model.Parameters {
+				switch parameter.Name {
+				case "output_low_margin_v":
+					lowMargin = math.Min(lowMargin, parameter.Value)
+				case "gain_bandwidth_hz":
+					gbw = math.Max(gbw, parameter.Value)
+				}
+			}
+		}
+		if !finite(lowMargin) || gbw <= 0 {
+			continue
+		}
+		candidates = append(candidates, scoredController{
+			primitive: primitive,
+			lowMargin: lowMargin,
+			gbw:       gbw,
+		})
+	}
+	slices.SortFunc(candidates, func(left, right scoredController) int {
+		return cmp.Or(
+			cmp.Compare(left.lowMargin, right.lowMargin),
+			cmp.Compare(right.gbw, left.gbw),
+			cmp.Compare(primitiveEvidencePenalty(left.primitive.Evidence), primitiveEvidencePenalty(right.primitive.Evidence)),
+			comparePositiveArea(left.primitive.AreaMM2, right.primitive.AreaMM2),
+			cmp.Compare(left.primitive.Key, right.primitive.Key),
+		)
+	})
+	if len(candidates) == 0 {
+		return PrimitiveCandidate{}
+	}
+	return candidates[0].primitive
+}
+
+func primitiveHasSOAEvidence(primitive PrimitiveCandidate) bool {
+	for _, model := range primitive.Models {
+		if len(model.TransientSOA) != 0 {
+			return true
+		}
+	}
+	return false
+}
+
+func topologyPowerRails(requirement Requirement, graph CandidateGraph) (string, string) {
+	type rail struct {
+		id      string
+		voltage float64
+	}
+	rails := []rail{}
+	for _, id := range topologyNodesByRole(graph, "supply") {
+		if voltage, ok := topologyNodeNominalVoltage(requirement, graph, id); ok {
+			rails = append(rails, rail{id: id, voltage: voltage})
+		}
+	}
+	slices.SortFunc(rails, func(left, right rail) int {
+		if order := cmp.Compare(right.voltage, left.voltage); order != 0 {
+			return order
+		}
+		return cmp.Compare(left.id, right.id)
+	})
+	if len(rails) == 0 {
+		return "", ""
+	}
+	if len(rails) == 1 {
+		return rails[0].id, ""
+	}
+	return rails[0].id, rails[len(rails)-1].id
 }
 
 type conditionalTransferRelationship struct {
@@ -1950,6 +3250,60 @@ func topologyNodeNominalVoltage(
 		}
 	}
 	return 0, false
+}
+
+func topologyNodeVoltageRange(
+	requirement Requirement,
+	graph CandidateGraph,
+	nodeID string,
+) (float64, float64, bool) {
+	var node GraphNode
+	found := false
+	for _, candidate := range graph.Nodes {
+		if candidate.ID == nodeID {
+			node = candidate
+			found = true
+			break
+		}
+	}
+	if !found {
+		return 0, 0, false
+	}
+	minimum, maximum := 0.0, 0.0
+	haveValue := false
+	include := func(value float64) {
+		if !haveValue {
+			minimum, maximum, haveValue = value, value, true
+			return
+		}
+		minimum = math.Min(minimum, value)
+		maximum = math.Max(maximum, value)
+	}
+	for _, domain := range requirement.Requirements.Domains {
+		if domain.ID != node.Domain {
+			continue
+		}
+		if domain.MinVoltageV != nil {
+			include(*domain.MinVoltageV)
+		}
+		if domain.NominalVoltageV != nil {
+			include(*domain.NominalVoltageV)
+		}
+		if domain.MaxVoltageV != nil {
+			include(*domain.MaxVoltageV)
+		}
+	}
+	for _, operatingCase := range requirement.Requirements.OperatingCases {
+		for _, condition := range operatingCase.Conditions {
+			if (condition.Axis != "supply_voltage" && condition.Axis != "input_voltage") ||
+				(condition.Target != node.Domain && condition.Target != node.SemanticID) {
+				continue
+			}
+			include(condition.Min)
+			include(condition.Max)
+		}
+	}
+	return minimum, maximum, haveValue
 }
 
 func addRelationshipInternalNode(
@@ -3143,7 +4497,7 @@ func primitiveCoversAnyAnalysis(primitive PrimitiveCandidate, required map[strin
 	}
 	for _, model := range primitive.Models {
 		for analysis := range required {
-			if reviewedModelSupportsCircuitAnalysis(model.AllowedAnalyses, analysis) {
+			if reviewedPrimitiveModelSupportsCircuitAnalysis(model, analysis) {
 				return true
 			}
 		}
@@ -3164,7 +4518,7 @@ func primitiveAnalysisCoverage(primitive PrimitiveCandidate, required map[string
 	covered := map[string]bool{}
 	for _, model := range primitive.Models {
 		for analysis := range required {
-			if reviewedModelSupportsCircuitAnalysis(model.AllowedAnalyses, analysis) {
+			if reviewedPrimitiveModelSupportsCircuitAnalysis(model, analysis) {
 				covered[analysis] = true
 			}
 		}
@@ -3267,11 +4621,6 @@ func topologyEndpointAccessPenalty(requirement Requirement, graph CandidateGraph
 			"bandwidth", "output_noise_rms", "thd", "total_harmonic_distortion":
 			requireAnalog = true
 		}
-		if assertion.Metric == "voltage_gain" &&
-			assertion.Min != nil && *assertion.Min > 1 {
-			requireFeedback = true
-			requireFeedbackImpedance = true
-		}
 	}
 	if !requireAnalog {
 		return 0
@@ -3284,6 +4633,11 @@ func topologyEndpointAccessPenalty(requirement Requirement, graph CandidateGraph
 	}
 	inputs := topologyNodesByRole(graph, "input", "control")
 	outputs := topologyNodesByRole(graph, "output")
+	if topologyGraphHasCompositeAnalogStage(
+		graph, requireFeedback, false, requireFeedbackImpedance,
+	) {
+		return 0
+	}
 	best := 1_000
 	for _, instance := range graph.Instances {
 		inputTerminals, outputTerminals := topologyActiveSignalTerminals(instance.Kind)
@@ -3395,8 +4749,6 @@ func topologyBehaviorGap(
 			requireReactive = true
 			requireTimeConstant = true
 			minimumResistors = max(minimumResistors, 1)
-		case "bandwidth":
-			requireReactive = true
 		case "phase_margin", "gain_margin", "hysteresis":
 			requireActive = true
 			requireFeedback = true
@@ -3451,8 +4803,6 @@ func topologyBehaviorGap(
 			if assertion.Metric == "voltage_gain" &&
 				assertion.Min != nil && *assertion.Min > 1 {
 				minimumResistors = max(minimumResistors, 2)
-				requireFeedback = true
-				requireFeedbackImpedance = true
 			}
 		}
 		if assertion.Excitation != nil && assertion.Excitation.Kind == "port" &&
@@ -3736,6 +5086,11 @@ func topologyGraphAnalogStageGap(
 	requireTimeConstant bool,
 	requireFeedbackImpedance bool,
 ) int {
+	if topologyGraphHasCompositeAnalogStage(
+		graph, requireFeedback, requireTimeConstant, requireFeedbackImpedance,
+	) {
+		return 0
+	}
 	signalAdjacency := topologyPassiveNodeAdjacency(graph, false)
 	dcAdjacency := topologyPassiveNodeAdjacency(graph, true)
 	inputs := topologyNodesByRole(graph, "input", "control")
@@ -3780,6 +5135,145 @@ func topologyGraphAnalogStageGap(
 		return 1
 	}
 	return best
+}
+
+// topologyGraphHasCompositeAnalogStage recognizes a signal path spanning more
+// than one active primitive. Ordinary endpoint checks intentionally reason
+// about one primitive at a time; that is insufficient for a controller driving
+// a discrete output stage. This graph is directional across active terminals
+// and excludes rail-connected passive edges, preventing power nets from being
+// mistaken for signal continuity.
+func topologyGraphHasCompositeAnalogStage(
+	graph CandidateGraph,
+	requireFeedback bool,
+	requireTimeConstant bool,
+	requireFeedbackImpedance bool,
+) bool {
+	nodeByID := make(map[string]GraphNode, len(graph.Nodes))
+	for _, node := range graph.Nodes {
+		nodeByID[node.ID] = node
+	}
+	adjacency := map[string][]string{}
+	addEdge := func(from, to string) {
+		if from == "" || to == "" || from == to {
+			return
+		}
+		adjacency[from] = append(adjacency[from], to)
+	}
+	for _, instance := range graph.Instances {
+		terminals := topologyTerminalNodes(instance)
+		switch instance.Kind {
+		case "resistor", "capacitor", "inductor":
+			if len(instance.Terminals) != 2 {
+				continue
+			}
+			left := instance.Terminals[0].Node
+			right := instance.Terminals[1].Node
+			if topologyRailRole(nodeByID[left].Role) ||
+				topologyRailRole(nodeByID[right].Role) {
+				continue
+			}
+			addEdge(left, right)
+			addEdge(right, left)
+		case "signal_diode", "reference_diode":
+			if topologyRailRole(nodeByID[terminals["ANODE"]].Role) ||
+				topologyRailRole(nodeByID[terminals["CATHODE"]].Role) {
+				continue
+			}
+			addEdge(terminals["ANODE"], terminals["CATHODE"])
+			addEdge(terminals["CATHODE"], terminals["ANODE"])
+		case "opamp", "comparator":
+			addEdge(terminals["IN_PLUS"], terminals["OUT"])
+			addEdge(terminals["IN_MINUS"], terminals["OUT"])
+		case "npn_bjt", "pnp_bjt":
+			if terminals["BASE"] != "" && terminals["BASE"] == terminals["COLLECTOR"] {
+				// A diode-connected BJT is a two-terminal incremental
+				// junction. Bias midpoint motion propagates through it in
+				// either small-signal direction even though its DC current is
+				// polarity constrained by the nonlinear device model.
+				addEdge(terminals["BASE"], terminals["EMITTER"])
+				addEdge(terminals["EMITTER"], terminals["BASE"])
+				continue
+			}
+			addEdge(terminals["BASE"], terminals["COLLECTOR"])
+			addEdge(terminals["BASE"], terminals["EMITTER"])
+		case "n_channel_mosfet", "p_channel_mosfet":
+			addEdge(terminals["GATE"], terminals["DRAIN"])
+			addEdge(terminals["GATE"], terminals["SOURCE"])
+		}
+	}
+	pathExists := func(starts []string, target string) bool {
+		visited := map[string]bool{}
+		queue := append([]string(nil), starts...)
+		for len(queue) != 0 {
+			current := queue[0]
+			queue = queue[1:]
+			if current == target {
+				return true
+			}
+			if visited[current] {
+				continue
+			}
+			visited[current] = true
+			for _, next := range adjacency[current] {
+				if !visited[next] {
+					queue = append(queue, next)
+				}
+			}
+		}
+		return false
+	}
+	inputs := topologyNodesByRole(graph, "input", "control")
+	outputs := topologyNodesByRole(graph, "output")
+	forward := false
+	for _, output := range outputs {
+		forward = forward || pathExists(inputs, output)
+	}
+	if !forward {
+		return false
+	}
+	if requireTimeConstant {
+		hasReactive := false
+		for _, instance := range graph.Instances {
+			hasReactive = hasReactive ||
+				instance.Kind == "capacitor" || instance.Kind == "inductor"
+		}
+		if !hasReactive {
+			return false
+		}
+	}
+	if !requireFeedback {
+		return true
+	}
+	dcAdjacency := topologyPassiveNodeAdjacency(graph, true)
+	for _, instance := range graph.Instances {
+		if instance.Kind != "opamp" {
+			continue
+		}
+		terminals := topologyTerminalNodes(instance)
+		if !pathExists(inputs, terminals["IN_PLUS"]) {
+			continue
+		}
+		forwardOutput := false
+		for _, output := range outputs {
+			forwardOutput = forwardOutput || pathExists([]string{terminals["OUT"]}, output)
+		}
+		if !forwardOutput {
+			continue
+		}
+		for _, output := range outputs {
+			if !topologyNodePathExists(dcAdjacency, output, terminals["IN_MINUS"]) {
+				continue
+			}
+			if requireFeedbackImpedance &&
+				(output == terminals["IN_MINUS"] ||
+					!topologyNodeIsInternal(graph, terminals["IN_MINUS"])) {
+				continue
+			}
+			return true
+		}
+	}
+	return false
 }
 
 func topologyInstanceHasInternalSignalTerminal(graph CandidateGraph, instance GraphInstance) bool {

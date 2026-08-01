@@ -174,7 +174,7 @@ func DefaultPolicy() Policy {
 		MaxPrimitiveInstances:   20,
 		MaxInternalNodes:        24,
 		MaxCandidateSimulations: 512,
-		MaxCornerEvaluations:    4_096,
+		MaxCornerEvaluations:    8_192,
 		MaxValueTrials:          4_096,
 		MaxTopologyRepairs:      128,
 		MaxRetainedCandidates:   16,
@@ -295,11 +295,32 @@ type GraphChange struct {
 }
 
 type SelectedResult struct {
-	Fingerprint      string `json:"fingerprint"`
-	TopologyHash     string `json:"topology_hash"`
-	EvaluationHash   string `json:"evaluation_hash"`
-	PhysicalHash     string `json:"physical_hash,omitempty"`
-	SelectionSummary string `json:"selection_summary"`
+	Fingerprint      string           `json:"fingerprint"`
+	TopologyHash     string           `json:"topology_hash"`
+	EvaluationHash   string           `json:"evaluation_hash"`
+	PhysicalHash     string           `json:"physical_hash,omitempty"`
+	SelectionSummary string           `json:"selection_summary"`
+	Ranking          SelectionRanking `json:"ranking"`
+}
+
+// SelectionRanking explains the deterministic comparison of every physically
+// ready, simulation-passing architecture considered for final selection.
+type SelectionRanking struct {
+	Policy       string                     `json:"policy"`
+	Alternatives []RankedSelectionCandidate `json:"alternatives"`
+}
+
+type RankedSelectionCandidate struct {
+	Rank                  int     `json:"rank"`
+	Fingerprint           string  `json:"fingerprint"`
+	TopologyHash          string  `json:"topology_hash"`
+	EvaluationHash        string  `json:"evaluation_hash"`
+	ValueHash             string  `json:"value_hash"`
+	WorstNormalizedMargin float64 `json:"worst_normalized_margin"`
+	ComponentCount        int     `json:"component_count"`
+	InternalNodes         int     `json:"internal_nodes"`
+	TopologyRepairs       int     `json:"topology_repairs"`
+	Selected              bool    `json:"selected"`
 }
 
 type Diagnostic struct {

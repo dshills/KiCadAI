@@ -539,6 +539,15 @@ func readLabel(node sexpr.ParsedNode, kind LabelKind) Label {
 	if _, rotation, ok := readAt(node); ok {
 		label.Rotation = rotation
 	}
+	if effects, ok := node.Child("effects"); ok {
+		if justify, ok := effects.Child("justify"); ok {
+			for index := 1; index < len(justify.Children); index++ {
+				if value := strings.ToLower(strings.TrimSpace(justify.ListValue(index))); value != "" {
+					label.Justify = append(label.Justify, value)
+				}
+			}
+		}
+	}
 	if shape, ok := node.Child("shape"); ok {
 		label.Shape = LabelShape(shape.ListValue(1))
 	}

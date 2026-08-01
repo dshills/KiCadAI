@@ -155,8 +155,14 @@ func lowerCandidateDocument(
 		if primitive.UnitID != "" {
 			component.Units = []circuitgraph.ComponentUnit{{ID: primitive.UnitID, Role: instance.Kind}}
 		}
-		if instance.ValueSI != nil && primitive.ValueDomain != nil {
-			component.Value = physicalEngineeringValue(*instance.ValueSI, primitive.ValueDomain.Unit)
+		if primitive.ValueDomain != nil {
+			value := instance.ValueSI
+			if value == nil {
+				value = primitive.ValueDomain.Nominal
+			}
+			if value != nil && physicalSchematicValueKind(primitive.ValueDomain.Kind) {
+				component.Value = physicalEngineeringValue(*value, primitive.ValueDomain.Unit)
+			}
 		}
 		for _, terminal := range primitive.Terminals {
 			component.RequiredFunctions = append(component.RequiredFunctions, terminal.Function)
@@ -269,6 +275,15 @@ func lowerCandidateDocument(
 	return document, bindings, reports.SortedIssues(issues)
 }
 
+func physicalSchematicValueKind(kind string) bool {
+	switch strings.ToLower(strings.TrimSpace(kind)) {
+	case "resistance", "capacitance", "inductance", "voltage", "frequency":
+		return true
+	default:
+		return false
+	}
+}
+
 // physicalTopologyNetRoles recognizes control-loop return paths from graph
 // connectivity rather than component or fixture names. A control input is a
 // feedback node when a passive-only path connects it back to an output of the
@@ -321,9 +336,13 @@ func physicalTopologyNetRoles(graph CandidateGraph) map[string]circuitgraph.NetR
 				continue
 			}
 			for _, output := range outputs {
-				if output != "" && input != output && physicalPassiveReachable(input, output, passiveNeighbors) {
-					roles[input] = circuitgraph.NetRoleFeedback
-					break
+				if output == "" || input == output {
+					continue
+				}
+				for node := range physicalPassivePathNodes(input, output, passiveNeighbors) {
+					if node != output {
+						roles[node] = circuitgraph.NetRoleFeedback
+					}
 				}
 			}
 		}
@@ -399,7 +418,10 @@ func physicalTerminalFlow(terminal string) string {
 	}
 }
 
-func physicalPassiveReachable(start, target string, neighbors map[string]map[string]struct{}) bool {
+// physicalPassivePathNodes returns the union of nodes on passive paths between
+// start and target. Iterative leaf pruning removes unrelated bias branches but
+// retains parallel feedback paths and loops without relying on component IDs.
+func physicalPassivePathNodes(start, target string, neighbors map[string]map[string]struct{}) map[string]struct{} {
 	queue := []string{start}
 	seen := map[string]struct{}{start: {}}
 	for len(queue) != 0 {
@@ -411,9 +433,6 @@ func physicalPassiveReachable(start, target string, neighbors map[string]map[str
 		}
 		slices.Sort(next)
 		for _, candidate := range next {
-			if candidate == target {
-				return true
-			}
 			if _, exists := seen[candidate]; exists {
 				continue
 			}
@@ -421,7 +440,44 @@ func physicalPassiveReachable(start, target string, neighbors map[string]map[str
 			queue = append(queue, candidate)
 		}
 	}
-	return false
+	if _, reachable := seen[target]; !reachable {
+		return map[string]struct{}{}
+	}
+	remaining := make(map[string]struct{}, len(seen))
+	degree := make(map[string]int, len(seen))
+	for node := range seen {
+		remaining[node] = struct{}{}
+		for neighbor := range neighbors[node] {
+			if _, exists := seen[neighbor]; exists {
+				degree[node]++
+			}
+		}
+	}
+	leaves := []string{}
+	for node := range remaining {
+		if node != start && node != target && degree[node] <= 1 {
+			leaves = append(leaves, node)
+		}
+	}
+	for len(leaves) != 0 {
+		last := len(leaves) - 1
+		leaf := leaves[last]
+		leaves = leaves[:last]
+		if _, exists := remaining[leaf]; !exists {
+			continue
+		}
+		delete(remaining, leaf)
+		for neighbor := range neighbors[leaf] {
+			if _, exists := remaining[neighbor]; !exists {
+				continue
+			}
+			degree[neighbor]--
+			if neighbor != start && neighbor != target && degree[neighbor] == 1 {
+				leaves = append(leaves, neighbor)
+			}
+		}
+	}
+	return remaining
 }
 
 func selectPhysicalConnector(catalog *components.Catalog) (physicalConnectorSelection, bool) {
@@ -579,12 +635,32 @@ func physicalNodeCurrentMA(requirement Requirement, node GraphNode) float64 {
 	return 0
 }
 
+// physicalEngineeringValue renders conventional schematic values. Resistance
+// uses its SI prefix as the unit marker (4.7k, 220m), while units such as F and
+// Hz remain explicit (100nF, 20kHz).
 func physicalEngineeringValue(value float64, unit string) string {
 	unit = strings.TrimSpace(unit)
-	if unit == "ohm" {
-		unit = "Ohm"
+	if math.IsNaN(value) || math.IsInf(value, 0) || value == 0 {
+		return strconv.FormatFloat(value, 'g', 12, 64) + unit
 	}
-	return strconv.FormatFloat(value, 'g', 12, 64) + unit
+	exponents := []int{-12, -9, -6, -3, 0, 3, 6, 9}
+	prefixes := map[int]string{-12: "p", -9: "n", -6: "u", -3: "m", 0: "", 3: "k", 6: "M", 9: "G"}
+	if math.Abs(value) < math.Pow10(exponents[0]-3) {
+		// Preserve a real nonzero value without emitting misleading fractions
+		// of the smallest supported schematic prefix.
+		return strconv.FormatFloat(value, 'g', 12, 64) + unit
+	}
+	exponent := int(math.Floor(math.Log10(math.Abs(value))/3)) * 3
+	exponent = max(exponents[0], min(exponents[len(exponents)-1], exponent))
+	scaled := value / math.Pow10(exponent)
+	number := strconv.FormatFloat(scaled, 'g', 12, 64)
+	suffix := unit
+	if strings.EqualFold(unit, "ohm") {
+		// The engineering prefix is the conventional unit marker on resistor
+		// values in a schematic (for example 4.7k or 220m).
+		suffix = ""
+	}
+	return number + prefixes[exponent] + suffix
 }
 
 func physicalAcceptance(acceptance Acceptance) circuitgraph.AcceptanceLevel {
@@ -635,29 +711,6 @@ func physicalSchematicIntent(graph CandidateGraph) circuitgraph.SchematicIntent 
 	if len(inputs) != 0 {
 		groups = append(groups, circuitgraph.SchematicGroup{ID: "external_inputs", Label: "External Inputs", Role: "input_stage", Members: inputs, Rank: 0, Side: circuitgraph.SideLeft})
 	}
-	if len(outputs) != 0 {
-		groups = append(groups, circuitgraph.SchematicGroup{ID: "external_outputs", Label: "External Outputs", Role: "output_stage", Members: outputs, Rank: 4, Side: circuitgraph.SideRight})
-	}
-	coreRanks := physicalTopologyRanks(graph)
-	coreByRank := map[int][]string{}
-	for _, component := range core {
-		rank := coreRanks[component]
-		if rank < 1 || rank > 3 {
-			rank = 2
-		}
-		coreByRank[rank] = append(coreByRank[rank], component)
-	}
-	for rank := 1; rank <= 3; rank++ {
-		members := coreByRank[rank]
-		if len(members) == 0 {
-			continue
-		}
-		slices.Sort(members)
-		groups = append(groups, circuitgraph.SchematicGroup{
-			ID: "synthesized_stage_" + strconv.Itoa(rank), Label: "Synthesized Stage " + strconv.Itoa(rank),
-			Role: "processing_stage", Members: members, Rank: rank,
-		})
-	}
 	placements := []circuitgraph.SchematicPlacement{}
 	passiveOrientations := physicalPassiveOrientations(graph)
 	for _, group := range groups {
@@ -669,6 +722,24 @@ func physicalSchematicIntent(graph CandidateGraph) circuitgraph.SchematicIntent 
 			})
 		}
 	}
+	// Core components deliberately have no fixed group or rank. The schematic
+	// layout engine can then derive as many left-to-right stages as the actual
+	// connectivity requires instead of stacking every unfamiliar topology into
+	// a small set of arbitrary columns.
+	slices.Sort(core)
+	for _, component := range core {
+		placements = append(placements, circuitgraph.SchematicPlacement{
+			Component:   component,
+			Orientation: passiveOrientations[component],
+		})
+	}
+	// Output connectors remain unfixed so their graph distance can establish
+	// the final rank. A constant boundary rank would compress every circuit,
+	// regardless of depth, into the same small number of columns.
+	slices.Sort(outputs)
+	for _, component := range outputs {
+		placements = append(placements, circuitgraph.SchematicPlacement{Component: component})
+	}
 	return circuitgraph.SchematicIntent{
 		Flow: circuitgraph.FlowLeftToRight, Origin: circuitgraph.OriginCentered,
 		Groups: groups,
@@ -678,8 +749,9 @@ func physicalSchematicIntent(graph CandidateGraph) circuitgraph.SchematicIntent 
 		Placements: placements,
 		Rules: circuitgraph.SchematicRules{
 			PositivePowerTop: graphBool(true), GroundBottom: graphBool(true), CenterOnPage: graphBool(true),
-			PreferLabelsForLongNets: graphBool(true), AvoidWireCrossings: graphBool(true),
-			MinGroupSpacingMM: 30.48, MinComponentSpacingMM: 12.7,
+			PreferLabelsForLongNets: graphBool(false), AvoidWireCrossings: graphBool(true),
+			MinGroupSpacingMM: 20.32, MinComponentSpacingMM: 10.16, MaxAuxiliaryPerRank: 2,
+			ReserveTitleBlock: true, OrientEndpointLabels: true,
 		},
 		Hierarchy: circuitgraph.HierarchyPolicy{Mode: "flat"},
 	}

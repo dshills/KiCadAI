@@ -179,6 +179,7 @@ type Label struct {
 	Shape            LabelShape
 	Position         kicadfiles.Point
 	Rotation         kicadfiles.Angle
+	Justify          []string
 	Locked           bool
 	FieldsAutoplaced bool
 	Fields           []Field
@@ -1605,6 +1606,18 @@ func validateLabel(index int, label Label) kicadfiles.ValidationErrors {
 	if label.Kind != LabelLocal && !validLabelShape(labelShape(label)) {
 		errs = append(errs, fieldError(indexed("labels", index, "shape"), "invalid"))
 	}
+	seenJustification := map[string]struct{}{}
+	for justificationIndex, justification := range label.Justify {
+		justification = strings.ToLower(strings.TrimSpace(justification))
+		if justification != "left" && justification != "right" && justification != "top" && justification != "bottom" {
+			errs = append(errs, fieldError(indexed("labels", index, "justify")+"["+strconv.Itoa(justificationIndex)+"]", "invalid"))
+			continue
+		}
+		if _, ok := seenJustification[justification]; ok {
+			errs = append(errs, fieldError(indexed("labels", index, "justify")+"["+strconv.Itoa(justificationIndex)+"]", "duplicate "+justification))
+		}
+		seenJustification[justification] = struct{}{}
+	}
 	seenFields := map[string]struct{}{}
 	for fieldIndex, field := range label.Fields {
 		name := strings.TrimSpace(field.Name)
@@ -2098,7 +2111,7 @@ func renderLabel(label Label) sexpr.List {
 		sexpr.S(label.Text),
 		sexpr.OmitIf(label.Kind == LabelLocal, sexpr.L(sexpr.A("shape"), sexpr.A(string(labelShape(label))))),
 		renderAt(label.Position, label.Rotation),
-		renderEffects(false),
+		renderEffectsWithJustification(false, label.Justify),
 		sexpr.L(sexpr.A("uuid"), sexpr.S(string(label.UUID))),
 		sexpr.OmitIf(!label.Locked, sexpr.L(sexpr.A("locked"), sexpr.A("yes"))),
 		sexpr.OmitIf(!label.FieldsAutoplaced, sexpr.L(sexpr.A("fields_autoplaced"), sexpr.A("yes"))),
@@ -2271,11 +2284,27 @@ func renderStroke(width float64, strokeType string) sexpr.List {
 }
 
 func renderEffects(hidden bool) sexpr.List {
-	return sexpr.L(
+	return renderEffectsWithJustification(hidden, nil)
+}
+
+func renderEffectsWithJustification(hidden bool, justification []string) sexpr.List {
+	nodes := []sexpr.Node{
 		sexpr.A("effects"),
 		sexpr.L(sexpr.A("font"), sexpr.L(sexpr.A("size"), sexpr.X("1.27"), sexpr.X("1.27"))),
-		sexpr.OmitIf(!hidden, sexpr.L(sexpr.A("hide"), sexpr.A("yes"))),
-	)
+	}
+	if len(justification) != 0 {
+		justify := []sexpr.Node{sexpr.A("justify")}
+		for _, value := range justification {
+			if value = strings.ToLower(strings.TrimSpace(value)); value != "" {
+				justify = append(justify, sexpr.A(value))
+			}
+		}
+		if len(justify) > 1 {
+			nodes = append(nodes, sexpr.L(justify...))
+		}
+	}
+	nodes = append(nodes, sexpr.OmitIf(!hidden, sexpr.L(sexpr.A("hide"), sexpr.A("yes"))))
+	return sexpr.L(nodes...)
 }
 
 func defaultPositive(value, fallback int) int {

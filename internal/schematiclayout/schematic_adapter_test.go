@@ -73,7 +73,7 @@ func TestAdaptSchematicNormalizesRotatedPinAnchorsToLocalCoordinates(t *testing.
 		Position:   kicadfiles.Point{X: kicadfiles.MM(50), Y: kicadfiles.MM(50)},
 		Rotation:   90,
 		Pins:       []schematic.SymbolPin{{Number: "1"}, {Number: "2"}},
-		PinAnchors: []kicadfiles.Point{{X: kicadfiles.MM(50), Y: kicadfiles.MM(45)}, {X: kicadfiles.MM(50), Y: kicadfiles.MM(55)}},
+		PinAnchors: []kicadfiles.Point{{X: kicadfiles.MM(50), Y: kicadfiles.MM(55)}, {X: kicadfiles.MM(50), Y: kicadfiles.MM(45)}},
 	}}}
 	request, _ := AdaptSchematic(file)
 	if len(request.Components) != 1 || len(request.Components[0].Pins) != 2 {

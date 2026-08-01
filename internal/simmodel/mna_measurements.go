@@ -5,6 +5,11 @@ import (
 	"math"
 )
 
+// maximumTrustedOpenCircuitImpedanceOhm is the finite reporting ceiling used
+// when the solved excitation current is exactly zero. Keeping the sentinel
+// finite preserves canonical JSON and bounds downstream margin arithmetic.
+const maximumTrustedOpenCircuitImpedanceOhm = 1e15
+
 // TransientResponseOnsetFraction is the normalized waveform change used to
 // identify the onset of an event response. Synthesis calculations that bound
 // event latency use the same exported value so sizing and measurement cannot
@@ -12,6 +17,43 @@ import (
 const TransientResponseOnsetFraction = 0.1
 
 func acDerivedValue(result AnalysisResult, assertion Assertion) (float64, *Diagnostic) {
+	if assertion.Quantity == QuantityInputImpedanceOhm {
+		for _, point := range result.Points {
+			if math.Abs(point.FrequencyHz-assertion.FrequencyHz) > math.Max(1, math.Abs(point.FrequencyHz))*1e-12 {
+				continue
+			}
+			input, inputFound := analysisNodeMagnitude(point, assertion.Node)
+			reference := 0.0
+			referenceFound := assertion.ReferenceNode == ""
+			if assertion.ReferenceNode != "" {
+				reference, referenceFound = analysisNodeMagnitude(point, assertion.ReferenceNode)
+			}
+			current := 0.0
+			currentFound := false
+			for _, device := range point.Devices {
+				if device.Component == assertion.Component {
+					current = device.CurrentMagnitudeA
+					currentFound = true
+					break
+				}
+			}
+			if !inputFound || !referenceFound || !currentFound {
+				return 0, advancedAssertionDiagnostic(assertion, "AC input-impedance assertion requires solved input/reference voltages and nonzero excitation-source current")
+			}
+			voltage := math.Abs(input - reference)
+			if current <= 0 && voltage > 0 {
+				// Currents below the solver's normalization floor represent an
+				// effectively open modeled input. Return the evaluator's finite
+				// trusted impedance ceiling so reports remain canonical JSON.
+				return maximumTrustedOpenCircuitImpedanceOhm, nil
+			}
+			if current <= 0 {
+				return 0, advancedAssertionDiagnostic(assertion, "AC input-impedance assertion requires nonzero excitation voltage")
+			}
+			return normalizedMNAFloat(voltage / current), nil
+		}
+		return 0, advancedAssertionDiagnostic(assertion, "AC input-impedance assertion frequency is absent from the solved sweep")
+	}
 	if assertion.Quantity == QuantityVoltageGainRatio {
 		for _, point := range result.Points {
 			if math.Abs(point.FrequencyHz-assertion.FrequencyHz) > math.Max(1, math.Abs(point.FrequencyHz))*1e-12 {
@@ -49,6 +91,15 @@ func acDerivedValue(result AnalysisResult, assertion Assertion) (float64, *Diagn
 			stop := math.Log(result.Points[index].FrequencyHz)
 			return normalizedMNAFloat(math.Exp(start + fraction*(stop-start))), nil
 		}
+	}
+	if assertion.Quantity == QuantityBandwidthHz &&
+		gains[len(gains)-1] > threshold && assertion.Max >= 1e11 {
+		// A minimum-only bandwidth requirement does not need the actual
+		// upper pole when the solved sweep has already reached a frequency
+		// above the requirement while remaining inside the -3 dB passband.
+		// Report the final solved frequency as a conservative lower bound;
+		// finite upper bounds still require a bracketed crossing.
+		return normalizedMNAFloat(result.Points[len(result.Points)-1].FrequencyHz), nil
 	}
 	return 0, advancedAssertionDiagnostic(assertion, "solved AC sweep does not bracket the -3 dB cutoff")
 }

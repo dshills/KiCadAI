@@ -11,6 +11,23 @@ import (
 	"testing"
 )
 
+func TestPowerTransferRequirementIncludesUnityGainBuffers(t *testing.T) {
+	requirement := testOpenTopologyRequirement(t, "powered_lowpass.json")
+	unity := 1.0
+	for index := range requirement.Requirements.BehavioralRequirements {
+		if requirement.Requirements.BehavioralRequirements[index].Metric == "voltage_gain" {
+			requirement.Requirements.BehavioralRequirements[index].Min = &unity
+		}
+	}
+	requirement.Requirements.BehavioralRequirements = append(
+		requirement.Requirements.BehavioralRequirements,
+		BehavioralAssertion{Metric: "output_current"},
+	)
+	if !topologyRequiresPowerTransfer(requirement) {
+		t.Fatal("unity-gain load-driving requirement did not select power-transfer topology search")
+	}
+}
+
 func TestPrimitiveTopologySearchIsBoundedDeterministicAndProviderIndependent(t *testing.T) {
 	requirement := testOpenTopologyRequirement(t, "powered_lowpass.json")
 	inventory := testSearchInventory()

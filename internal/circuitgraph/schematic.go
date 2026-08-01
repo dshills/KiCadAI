@@ -402,6 +402,9 @@ func schematicLayoutIntent(resolved ResolvedDocument, unitIDs map[schematicUnitK
 			CenterOnPage: source.Schematic.Rules.CenterOnPage, PreferLabelsForLongNets: source.Schematic.Rules.PreferLabelsForLongNets,
 			AvoidWireCrossings: source.Schematic.Rules.AvoidWireCrossings,
 			MinGroupSpacingMM:  floatPointer(source.Schematic.Rules.MinGroupSpacingMM), MinComponentSpacingMM: floatPointer(source.Schematic.Rules.MinComponentSpacingMM),
+			MaxAuxiliaryPerRank:  source.Schematic.Rules.MaxAuxiliaryPerRank,
+			ReserveTitleBlock:    source.Schematic.Rules.ReserveTitleBlock,
+			OrientEndpointLabels: source.Schematic.Rules.OrientEndpointLabels,
 		},
 	}
 	if source.Schematic.Lanes.PowerNegative != nil && *source.Schematic.Lanes.PowerNegative == LaneLower {

@@ -20,3 +20,36 @@ func reviewedModelSupportsCircuitAnalysis(allowed []string, analysis string) boo
 	return analysis == simmodel.AnalysisElectrothermal &&
 		slices.Contains(allowed, simmodel.AnalysisTransient)
 }
+
+func reviewedPrimitiveModelSupportsCircuitAnalysis(
+	model PrimitiveModelContract,
+	analysis string,
+) bool {
+	dependencies := simmodel.CatalogAnalysisDependencies(model.ModelID, []string{analysis})
+	if len(dependencies) == 0 {
+		return false
+	}
+	for _, dependency := range dependencies {
+		if !reviewedModelSupportsCircuitAnalysis(model.AllowedAnalyses, dependency) {
+			return false
+		}
+	}
+	return true
+}
+
+func reviewedCatalogModelSupportsCircuitAnalysis(
+	modelID string,
+	allowed []string,
+	analysis string,
+) bool {
+	dependencies := simmodel.CatalogAnalysisDependencies(modelID, []string{analysis})
+	if len(dependencies) == 0 {
+		return false
+	}
+	for _, dependency := range dependencies {
+		if !reviewedModelSupportsCircuitAnalysis(allowed, dependency) {
+			return false
+		}
+	}
+	return true
+}

@@ -187,6 +187,29 @@ fabrication release. See the
 [completion audit](../specs/simulation-guided-open-topology-synthesis/AUDIT.md)
 and [promotion matrix](../specs/simulation-guided-open-topology-synthesis/PROMOTION_MATRIX.json).
 
+## Ranked Circuit Architecture Synthesis
+
+The follow-on architecture milestone closes the next measured gap inside that
+primitive envelope: synthesis no longer selects the first physically ready
+topology. It generates distinct candidates, derives values with equation and
+requirement provenance, evaluates all required cases, retains the best pass per
+topology, and ranks the passing alternatives by normalized requirement margin,
+repairs, complexity, and stable hashes.
+
+Three independently frozen behavior-only requirements now pass: a
+continuous-conduction Class A audio stage, a complementary Class AB load
+driver, and a 60 Hz balanced-bridge notch filter. A plausible catalog-valid
+Class A bias alternative is rejected by standing-current, thermal, or SOA
+evidence while the safer realization passes. All three winners clear readable
+schematic lowering, routing/connectivity, writer correctness, installed-KiCad
+ERC, strict DRC, zero-difference round trip, and two clean-root replays. Raw
+project and canonical promotion receipts are path-independent and reproducible.
+
+This is useful AI-directed architecture generation within bounds, but it does
+not remove the reviewed-catalog/model/simulation envelope. See the
+[completion audit](../specs/simulation-grounded-architecture-synthesis/AUDIT.md)
+and [promotion matrix](../specs/simulation-grounded-architecture-synthesis/PROMOTION_MATRIX.json).
+
 ## Dynamic Electrothermal And Control-Loop Synthesis
 
 The V5 behavior-only corpus adds six previously unsupported dynamic systems:

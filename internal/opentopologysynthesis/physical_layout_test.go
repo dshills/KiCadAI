@@ -9,9 +9,9 @@ import (
 func TestPhysicalSchematicIntentLeavesCoreRanksTopologyDerived(t *testing.T) {
 	graph := CandidateGraph{
 		Nodes: []GraphNode{
-			{ID: "vin", Scope: "external", Role: "input"},
+			{ID: "vin", SemanticID: "vin", Scope: "external", Role: "input"},
 			{ID: "sense", Scope: "internal", Role: "feedback"},
-			{ID: "out", Scope: "external", Role: "output"},
+			{ID: "out", SemanticID: "out", Scope: "external", Role: "output"},
 		},
 		Instances: []GraphInstance{
 			{ID: "controller", Kind: "opamp"},
@@ -30,20 +30,63 @@ func TestPhysicalSchematicIntentLeavesCoreRanksTopologyDerived(t *testing.T) {
 		}
 	}
 	for _, component := range []string{"controller", "pass", "sense_resistor"} {
-		if groupByComponent[component] == "synthesized_core" || nearByComponent[component] != "" {
-			t.Fatalf("%s retained an arbitrary one-rank group/near chain: groups=%#v near=%#v", component, groupByComponent, nearByComponent)
+		if groupByComponent[component] != "" || nearByComponent[component] != "" {
+			t.Fatalf("%s retained a fixed core group/near chain: groups=%#v near=%#v", component, groupByComponent, nearByComponent)
 		}
 	}
 	for _, group := range intent.Groups {
-		if group.ID == "synthesized_core" {
-			t.Fatalf("synthesized core still forces one fixed graph rank: %#v", group)
-		}
-		if group.ID == "external_outputs" && group.Rank != 4 {
-			t.Fatalf("output boundary rank = %d, want canonical boundary rank 4", group.Rank)
+		if group.ID != "external_inputs" {
+			t.Fatalf("synthesized core still forces a fixed graph rank: %#v", group)
 		}
 	}
-	if intent.Rules.MinComponentSpacingMM > 12.7 {
+	if groupByComponent["interface_out"] != "" {
+		t.Fatalf("output connector retained a fixed boundary rank: %#v", groupByComponent)
+	}
+	if intent.Rules.MinComponentSpacingMM > 10.16 {
 		t.Fatalf("synthesized component spacing is not compact: %v", intent.Rules.MinComponentSpacingMM)
+	}
+	if intent.Rules.PreferLabelsForLongNets == nil || *intent.Rules.PreferLabelsForLongNets {
+		t.Fatal("synthesized local nets should prefer continuous conductors")
+	}
+	if intent.Rules.MaxAuxiliaryPerRank != 2 {
+		t.Fatalf("auxiliary components per rank = %d, want 2", intent.Rules.MaxAuxiliaryPerRank)
+	}
+	if !intent.Rules.ReserveTitleBlock {
+		t.Fatal("synthesized schematics must reserve the standard title block")
+	}
+	if !intent.Rules.OrientEndpointLabels {
+		t.Fatal("synthesized endpoint labels must face away from component bodies")
+	}
+}
+
+func TestPhysicalEngineeringValueUsesReadableSIPrefixes(t *testing.T) {
+	tests := []struct {
+		value float64
+		unit  string
+		want  string
+	}{
+		{909000, "Ohm", "909k"},
+		{0.22, "ohm", "220m"},
+		{15e-9, "F", "15nF"},
+		{220e-6, "F", "220uF"},
+		{2.2e6, "Hz", "2.2MHz"},
+		{1e-18, "F", "1e-18F"},
+	}
+	for _, test := range tests {
+		if got := physicalEngineeringValue(test.value, test.unit); got != test.want {
+			t.Errorf("physicalEngineeringValue(%g, %q) = %q, want %q", test.value, test.unit, got, test.want)
+		}
+	}
+}
+
+func TestPhysicalSchematicValueKindsIncludeReferencesAndOscillators(t *testing.T) {
+	for _, kind := range []string{"resistance", "capacitance", "inductance", "voltage", "frequency"} {
+		if !physicalSchematicValueKind(kind) {
+			t.Fatalf("physical schematic value kind %q was omitted", kind)
+		}
+	}
+	if physicalSchematicValueKind("current_rating") {
+		t.Fatal("rating-only quantity was rendered as a component value")
 	}
 }
 
@@ -160,5 +203,37 @@ func TestPhysicalTopologyNetRolesRecognizesPassiveFeedbackReturn(t *testing.T) {
 	}
 	if roles["setpoint"] != "" {
 		t.Fatalf("setpoint was misclassified as feedback: %q", roles["setpoint"])
+	}
+}
+
+func TestPhysicalTopologyNetRolesRetainsParallelFeedbackAndPrunesBiasBranch(t *testing.T) {
+	graph := CandidateGraph{
+		Nodes: []GraphNode{
+			{ID: "sense", Scope: "internal", Role: "signal"},
+			{ID: "upper", Scope: "internal", Role: "signal"},
+			{ID: "lower", Scope: "internal", Role: "signal"},
+			{ID: "bias", Scope: "internal", Role: "signal"},
+			{ID: "output", Scope: "external", Role: "output"},
+		},
+		Instances: []GraphInstance{
+			{ID: "controller", Kind: "opamp", Terminals: []TerminalConnection{{Terminal: "IN_MINUS", Node: "sense"}, {Terminal: "OUT", Node: "output"}}},
+			{ID: "upper_a", Kind: "resistor", Terminals: []TerminalConnection{{Terminal: "A", Node: "sense"}, {Terminal: "B", Node: "upper"}}},
+			{ID: "upper_b", Kind: "capacitor", Terminals: []TerminalConnection{{Terminal: "A", Node: "upper"}, {Terminal: "B", Node: "output"}}},
+			{ID: "lower_a", Kind: "capacitor", Terminals: []TerminalConnection{{Terminal: "A", Node: "sense"}, {Terminal: "B", Node: "lower"}}},
+			{ID: "lower_b", Kind: "resistor", Terminals: []TerminalConnection{{Terminal: "A", Node: "lower"}, {Terminal: "B", Node: "output"}}},
+			{ID: "bias_branch", Kind: "resistor", Terminals: []TerminalConnection{{Terminal: "A", Node: "upper"}, {Terminal: "B", Node: "bias"}}},
+		},
+	}
+
+	roles := physicalTopologyNetRoles(graph)
+	for _, node := range []string{"sense", "upper", "lower"} {
+		if roles[node] != circuitgraph.NetRoleFeedback {
+			t.Fatalf("%s role = %q, want feedback", node, roles[node])
+		}
+	}
+	for _, node := range []string{"output", "bias"} {
+		if roles[node] != "" {
+			t.Fatalf("%s was incorrectly classified as feedback: %q", node, roles[node])
+		}
 	}
 }

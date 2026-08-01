@@ -86,3 +86,31 @@ func TestLayoutChoosesPortraitBeforeEscalatingTallDrawing(t *testing.T) {
 		t.Fatalf("tall drawing selected %#v, want A4 portrait before escalation", result.Sheet)
 	}
 }
+
+func TestStandardTitleBlockReservationShrinksUsableHeight(t *testing.T) {
+	plain := SheetForPaper("A4")
+	reserved := SheetWithStandardTitleBlock(plain)
+	plainUsable := UsableSheet(plain)
+	reservedUsable := UsableSheet(reserved)
+	if reserved.TitleBlock.Empty() {
+		t.Fatal("standard title block was not populated")
+	}
+	if reservedUsable.MaxY >= reserved.TitleBlock.MinY {
+		t.Fatalf("usable sheet overlaps title block: usable=%#v title=%#v", reservedUsable, reserved.TitleBlock)
+	}
+	if reservedUsable.Height() >= plainUsable.Height() {
+		t.Fatalf("reserved usable height = %v, want less than plain height %v", reservedUsable.Height(), plainUsable.Height())
+	}
+}
+
+func TestPageCandidatesReanchorReservedTitleBlock(t *testing.T) {
+	requested := SheetWithStandardTitleBlock(SheetForPaper("A4"))
+	for _, candidate := range pageCandidates(requested) {
+		if candidate.TitleBlock.Empty() {
+			t.Fatalf("candidate %s omitted reserved title block", candidate.Name)
+		}
+		if candidate.TitleBlock.MaxX != candidate.Width-candidate.Margin || candidate.TitleBlock.MaxY != candidate.Height-candidate.Margin {
+			t.Fatalf("candidate %s title block is not anchored to lower right: sheet=%#v title=%#v", candidate.Name, candidate, candidate.TitleBlock)
+		}
+	}
+}

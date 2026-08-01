@@ -1,10 +1,13 @@
 # Project Status
 
-Last verified: 2026-07-28 by the complete local short suite; the three-case MCU
+Last verified: 2026-07-31 by the complete local bounded suite; all three
+simulation-grounded architecture cases passed two-run installed-KiCad
+promotion, and the three long simulation-grounded preservation shards passed.
+The earlier three-case MCU
 power-integrity, three-case neutral MCU, two-case clock/programming, and
 four-case power/interface installed-KiCad corpora; protected USB-C LED and I2C,
 ESP32 minimal-system, Class-A, and Class-AB fixture regressions; and independent
-clean-checkout promotion bundles.
+clean-checkout promotion bundles remain current preservation evidence.
 
 The six-circuit independent external review is now a release-blocking,
 machine-readable regression ladder. Its fixes cover atomic composed placement,
@@ -383,6 +386,37 @@ consumption, selected topology, status, replay, and artifact references. See
 the [completion audit](../specs/simulation-guided-open-topology-synthesis/AUDIT.md)
 and [promotion matrix](../specs/simulation-guided-open-topology-synthesis/PROMOTION_MATRIX.json).
 
+### Simulation-Grounded Architecture Synthesis
+
+The primitive-only lane now evaluates and ranks multiple materially different
+architectures rather than returning the first pass. Its frozen behavior-only
+corpus covers a continuous-conduction Class A audio stage, a complementary
+Class AB power stage, and a 60 Hz notch filter. Generic active-stage,
+complementary-follower, bias/feedback, protection, and balanced-bridge
+relationships produce distinct topology hashes without accepting topology
+names, part identities, values, nets, coordinates, or repair hints as input.
+
+Analytic seeds retain equations, units, inputs, and source requirements.
+Catalog-backed values are evaluated through required operating-point, AC,
+transient, distortion, noise, stability, thermal/electrothermal, and SOA
+contracts. Selection compares all physically ready passing topologies by
+requirement margin, repair count, complexity, and stable hashes and records a
+human-readable reason plus the alternatives. A catalog-valid low-sense
+resistor alternative for the Class A stage is rejected by bias, thermal, or
+SOA evidence while the safer derived value passes.
+
+All three selected circuits pass readable schematic lowering, routing and
+connectivity, writer correctness, installed-KiCad ERC, strict DRC, zero
+normalized round-trip differences, and identical project replay across two
+clean roots under KiCad 10.0.3. See the
+[completion audit](../specs/simulation-grounded-architecture-synthesis/AUDIT.md)
+and [promotion matrix](../specs/simulation-grounded-architecture-synthesis/PROMOTION_MATRIX.json).
+
+This is strong bounded architecture generation, not unrestricted arbitrary
+electronics. Unreviewed parts/models, RF/high-speed, mains/high-energy safety,
+mechanical thermal qualification, and dense arbitrary boards remain outside
+the supported envelope and must fail closed.
+
 ### Schematic Readability
 
 Generated schematics use deterministic role, stage, and lane classification;
@@ -524,11 +558,14 @@ envelope remain unsupported.
 
 ## Remaining Direction
 
-Open-topology synthesis now proves discovery for six of eight frozen
-requirements. The next closure step is to generalize the search grammar and
-diagnosis-to-repair mapping until the remaining regulator and dual-threshold
-cases pass without fixture logic, then evaluate new identity-neutral corpora
-outside the development distribution. Broader clock/fanout,
+Open-topology synthesis proves discovery for six of eight initial frozen
+requirements, and the follow-on architecture milestone proves ranked,
+simulation-grounded generation for all three Class A, Class AB, and notch
+requirements. The next highest-value step is a second independently authored,
+out-of-distribution architecture corpus spanning additional analog and power
+families. That measures generalization before more grammar is added and should
+include the remaining regulator and dual-threshold behaviors where appropriate.
+Broader clock/fanout,
 programming-load, converter, isolation, and high-energy protection models,
 catalog-independent part qualification, and denser-board physical synthesis
 remain important. Those gaps can produce deterministic expansion proposals,

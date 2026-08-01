@@ -207,7 +207,7 @@ func routeAnnotationCollides(box Rect, position kicadfiles.Point, netName string
 		}
 	}
 	for _, label := range result.Labels {
-		if box.Intersects(TextEstimate(label.Text, label.Position, 0, 0)) {
+		if box.Intersects(TextEstimateOriented(label.Text, label.Position, label.Rotation, label.JustifyRight)) {
 			return true
 		}
 	}
@@ -324,7 +324,12 @@ func appendEndpointLabel(result *Result, seen map[string]kicadfiles.Point, netNa
 	}
 	position, clean := labelStubPoint(netName, endpoint, anchor, *result, request, rules)
 	seen[key] = position
-	result.Labels = append(result.Labels, Label{NetName: netName, Text: netName, Position: position})
+	rotation := kicadfiles.Angle(0)
+	justifyRight := false
+	if rules.OrientEndpointLabels {
+		rotation, justifyRight = labelOrientationForStub(anchor, position)
+	}
+	result.Labels = append(result.Labels, Label{NetName: netName, Text: netName, Position: position, Rotation: rotation, JustifyRight: justifyRight})
 	if anchor != position {
 		result.Wires = append(result.Wires, WireSegment{NetName: netName, From: anchor, To: position})
 	}
@@ -396,7 +401,12 @@ func labelStubPoint(netName string, endpoint Endpoint, anchor kicadfiles.Point, 
 		for _, scale := range []kicadfiles.IU{1, 2, 3, 4, 6, 8, 12, 16} {
 			position := kicadfiles.Point{X: anchor.X + direction.X*scale, Y: anchor.Y + direction.Y*scale}
 			segment := WireSegment{NetName: netName, From: anchor, To: position}
-			labelBox := TextEstimate(netName, position, 0, 0)
+			rotation := kicadfiles.Angle(0)
+			justifyRight := false
+			if rules.OrientEndpointLabels {
+				rotation, justifyRight = labelOrientationForStub(anchor, position)
+			}
+			labelBox := TextEstimateOriented(netName, position, rotation, justifyRight)
 			if !usable.ContainsRect(labelBox) || labelPlacementCollides(labelBox, segment, endpoint, result, request) {
 				continue
 			}
@@ -404,6 +414,22 @@ func labelStubPoint(netName string, endpoint Endpoint, anchor kicadfiles.Point, 
 		}
 	}
 	return kicadfiles.Point{X: anchor.X + preferred.X*2, Y: anchor.Y + preferred.Y*2}, false
+}
+
+func labelOrientationForStub(anchor, label kicadfiles.Point) (kicadfiles.Angle, bool) {
+	dx, dy := label.X-anchor.X, label.Y-anchor.Y
+	switch {
+	case dx < 0:
+		return 180, true
+	case dx > 0:
+		return 0, false
+	case dy < 0:
+		return 270, true
+	case dy > 0:
+		return 90, false
+	default:
+		return 0, false
+	}
 }
 
 // endpointLabelDirection obtains the intended outward pin direction before
@@ -476,7 +502,7 @@ func labelPlacementCollides(labelBox Rect, stub WireSegment, endpoint Endpoint, 
 		}
 	}
 	for _, label := range result.Labels {
-		if labelBox.Intersects(TextEstimate(label.Text, label.Position, 0, 0)) {
+		if labelBox.Intersects(TextEstimateOriented(label.Text, label.Position, label.Rotation, label.JustifyRight)) {
 			return true
 		}
 	}
@@ -492,7 +518,23 @@ func labelPlacementCollides(labelBox Rect, stub WireSegment, endpoint Endpoint, 
 }
 
 func routeConnectionPoints(netName string, from, to Endpoint, start, end kicadfiles.Point, result Result, request Request, rules Rules, anchorIndex pinAnchorIndex, allowGridFallback bool) ([]kicadfiles.Point, bool) {
-	candidates := routeCandidates(start, end, result.Components, rules, anchorIndex)
+	routeStart, routeEnd := start, end
+	if direction, ok := endpointLabelDirection(from, result.Components, rules.Grid); ok {
+		routeStart = kicadfiles.Point{X: start.X + direction.X, Y: start.Y + direction.Y}
+	}
+	if direction, ok := endpointLabelDirection(to, result.Components, rules.Grid); ok {
+		routeEnd = kicadfiles.Point{X: end.X + direction.X, Y: end.Y + direction.Y}
+	}
+	withAccess := func(points []kicadfiles.Point) []kicadfiles.Point {
+		if routeStart != start {
+			points = append([]kicadfiles.Point{start}, points...)
+		}
+		if routeEnd != end {
+			points = append(points, end)
+		}
+		return compactPointPath(points)
+	}
+	candidates := routeCandidates(routeStart, routeEnd, result.Components, rules, anchorIndex)
 	type scoredRoute struct {
 		points []kicadfiles.Point
 		score  int64
@@ -500,6 +542,7 @@ func routeConnectionPoints(netName string, from, to Endpoint, start, end kicadfi
 	}
 	scored := make([]scoredRoute, 0, len(candidates))
 	for _, candidate := range candidates {
+		candidate = withAccess(candidate)
 		score, clean := scoreRouteIndexed(candidate, netName, from, to, result, request, anchorIndex)
 		scored = append(scored, scoredRoute{points: candidate, score: score, clean: clean})
 	}
@@ -511,7 +554,8 @@ func routeConnectionPoints(netName string, from, to Endpoint, start, end kicadfi
 		}
 	}
 	if !hasClean && allowGridFallback {
-		if points, ok := orthogonalGridRoute(netName, from, to, start, end, result, request, rules, anchorIndex); ok {
+		if points, ok := orthogonalGridRoute(netName, from, to, routeStart, routeEnd, result, request, rules, anchorIndex); ok {
+			points = withAccess(points)
 			score, clean := scoreRouteIndexed(points, netName, from, to, result, request, anchorIndex)
 			scored = append(scored, scoredRoute{points: points, score: score, clean: clean})
 		}
@@ -523,7 +567,7 @@ func routeConnectionPoints(netName string, from, to Endpoint, start, end kicadfi
 		return comparePointPaths(scored[i].points, scored[j].points) < 0
 	})
 	if len(scored) == 0 {
-		return []kicadfiles.Point{start, end}, false
+		return withAccess([]kicadfiles.Point{routeStart, routeEnd}), false
 	}
 	return scored[0].points, scored[0].clean
 }

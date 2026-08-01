@@ -1,0 +1,56 @@
+{
+  "schema": "kicadai.simulation-grounded-architecture-corpus.v1",
+  "version": 1,
+  "base_commit": "92fe092ad0135bd3d1c64e457cbb6ff13f26ba18",
+  "frozen_at": "2026-07-31",
+  "requirement_schema": "kicadai.open-topology-requirement.v1",
+  "authoring_policy": "Behavior, external interfaces, operating cases, events, measurable limits, and acceptance only. Requirement files contain no fixture selection key, component identity, primitive family, topology, model, implementation value, internal connectivity, physical geometry, routing, or repair instruction.",
+  "stages": [
+    "integrity",
+    "schema",
+    "primitive_inventory",
+    "architecture_generation",
+    "equation_sizing",
+    "simulation",
+    "rating_bias_thermal_rejection",
+    "ranking",
+    "lowering",
+    "schematic",
+    "placement",
+    "routing",
+    "writer",
+    "erc",
+    "drc",
+    "round_trip",
+    "replay"
+  ],
+  "cases": [
+    {
+      "id": "continuous_conduction_audio_stage",
+      "behavior_family": "continuous_conduction_power_gain",
+      "acceptance_claim": "class_a_stage",
+      "requirement_file": "continuous_conduction_audio_stage.json",
+      "requirement_sha256": "611e68085b373ef56b2fe9d65dda566c3b90d2c661df49ff3eb0a5bd17a80107",
+      "required_analyses": ["ac_sweep", "dc_operating_point", "distortion", "electrothermal", "thermal", "transient"],
+      "safety_critical": true
+    },
+    {
+      "id": "efficient_audio_power_stage",
+      "behavior_family": "efficient_bidirectional_power_gain",
+      "acceptance_claim": "class_ab_amplifier",
+      "requirement_file": "efficient_audio_power_stage.json",
+      "requirement_sha256": "af67980dda5093270c64777de62d84fdf6f4caae8fcd4df324fcefdbd20848c5",
+      "required_analyses": ["ac_sweep", "dc_operating_point", "distortion", "electrothermal", "stability", "thermal", "transient"],
+      "safety_critical": true
+    },
+    {
+      "id": "mains_notch_filter",
+      "behavior_family": "frequency_selective_rejection",
+      "acceptance_claim": "non_amplifier_analog_circuit",
+      "requirement_file": "mains_notch_filter.json",
+      "requirement_sha256": "1413b2add3645c038f6e621375905d4d633c49a1799c256bc092f0d58df85665",
+      "required_analyses": ["ac_sweep", "dc_operating_point", "noise", "stability", "transient"],
+      "safety_critical": false
+    }
+  ]
+}

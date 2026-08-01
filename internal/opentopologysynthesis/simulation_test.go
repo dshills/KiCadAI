@@ -12,6 +12,17 @@ import (
 	"kicadai/internal/modelprovenance"
 )
 
+func TestThermalOutputStageDissipationRejectsUnboundedLoads(t *testing.T) {
+	for _, load := range []float64{0, -1, math.NaN(), math.Inf(1)} {
+		if dissipation, bounded := thermalOutputStageDissipation(24, 10, load); bounded || dissipation != 0 {
+			t.Fatalf("load %v produced dissipation %v, bounded=%v", load, dissipation, bounded)
+		}
+	}
+	if dissipation, bounded := thermalOutputStageDissipation(24, 10, 8); !bounded || !finite(dissipation) || dissipation <= 0 {
+		t.Fatalf("bounded load produced dissipation %v, bounded=%v", dissipation, bounded)
+	}
+}
+
 func TestTrustedSimulationEvaluationPassesCornersAndReplaysDeterministically(t *testing.T) {
 	requirement, graph, inventory, environment := testSimulationFixture(t)
 	policy := DefaultPolicy()
@@ -161,6 +172,7 @@ func TestDynamicGridNormalizesBeforeSemanticValueEvents(t *testing.T) {
 		nil,
 		"peak_abs_voltage_v",
 		1,
+		nil,
 	)
 	if len(diagnostics) != 0 || len(analysis.SourceValueEvents) != 1 {
 		t.Fatalf("dynamic event plan: diagnostics=%#v analysis=%#v", diagnostics, analysis)
@@ -182,6 +194,7 @@ func TestDynamicGridNormalizesBeforeSemanticValueEvents(t *testing.T) {
 
 func TestHeldOutMetricsHaveGenericTrustedMeasurementContracts(t *testing.T) {
 	metrics := []string{
+		"bandwidth",
 		"cutoff_frequency",
 		"falling_threshold",
 		"hysteresis",
@@ -195,10 +208,13 @@ func TestHeldOutMetricsHaveGenericTrustedMeasurementContracts(t *testing.T) {
 		"output_high_voltage",
 		"output_low_voltage",
 		"output_noise_rms",
+		"output_power",
+		"output_swing",
 		"output_voltage",
 		"peak_voltage",
 		"phase_margin",
 		"propagation_delay",
+		"quiescent_current",
 		"rising_threshold",
 		"settling_time",
 		"soa_margin",
@@ -206,6 +222,7 @@ func TestHeldOutMetricsHaveGenericTrustedMeasurementContracts(t *testing.T) {
 		"startup_output_voltage",
 		"startup_overshoot",
 		"thd",
+		"total_harmonic_distortion",
 		"transconductance",
 		"upper_threshold",
 		"voltage_gain",

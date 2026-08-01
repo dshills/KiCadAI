@@ -167,6 +167,24 @@ func TestNonlinearDCCenteredSeedSupportsMoreThanFourOpAmps(t *testing.T) {
 	}
 }
 
+func TestLinearColdSeedRequiresOpAmpControlledEmitterFollower(t *testing.T) {
+	opamp := ResolvedDevice{
+		Component: "U1", PrimitiveModel: PrimitiveOpAmpV1,
+		Terminals: []TerminalBinding{{Terminal: "OUT", Net: "DRIVE"}, {Terminal: "IN_MINUS", Net: "SENSE"}},
+	}
+	follower := ResolvedDevice{
+		Component: "Q1", PrimitiveModel: PrimitiveBJTNPNV1,
+		Terminals: []TerminalBinding{{Terminal: "BASE", Net: "DRIVE"}, {Terminal: "EMITTER", Net: "SENSE"}},
+	}
+	if !hasOpAmpControlledEmitterFollower(Plan{Devices: []ResolvedDevice{opamp, follower}}) {
+		t.Fatal("op-amp-controlled emitter follower was not recognized")
+	}
+	follower.Terminals[1].Net = "UNRELATED"
+	if hasOpAmpControlledEmitterFollower(Plan{Devices: []ResolvedDevice{opamp, follower}}) {
+		t.Fatal("unrelated op-amp and BJT incorrectly enabled the linear cold seed")
+	}
+}
+
 func TestNonlinearDCManufacturerZenerModelClampsInReverse(t *testing.T) {
 	components := []ComponentEvidence{
 		voltageSourceEvidence("supply", "12V", "GND"),

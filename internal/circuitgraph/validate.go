@@ -494,6 +494,9 @@ func (validator *graphValidator) schematic(componentsByID map[string]Component) 
 	if !finiteInRange(intent.Rules.MinGroupSpacingMM, 0, MaxBoardDimensionMM, false) || !finiteInRange(intent.Rules.MinComponentSpacingMM, 0, MaxBoardDimensionMM, false) {
 		validator.add(CodeLayoutUnsupported, "schematic.rules", "schematic spacing must be finite and positive")
 	}
+	if intent.Rules.MaxAuxiliaryPerRank < 0 || intent.Rules.MaxAuxiliaryPerRank > MaxComponents {
+		validator.add(CodeLayoutUnsupported, "schematic.rules.max_auxiliary_per_rank", "auxiliary rank density must be between zero and the component limit")
+	}
 	groups := map[string]struct{}{}
 	memberOwner := map[string]string{}
 	for index, group := range intent.Groups {

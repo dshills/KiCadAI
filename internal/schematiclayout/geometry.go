@@ -146,6 +146,21 @@ func TextEstimateRotated(text string, position kicadfiles.Point, rotation kicadf
 	}
 }
 
+// TextEstimateOriented returns the conservative box for KiCad text using its
+// canonical 0/90-degree rotation and optional right justification. KiCad
+// represents left/up-facing local labels with right justification rather than
+// preserving 180/270-degree rotations.
+func TextEstimateOriented(text string, position kicadfiles.Point, rotation kicadfiles.Angle, justifyRight bool) Rect {
+	angle := int(rotation) % 360
+	if angle < 0 {
+		angle += 360
+	}
+	if justifyRight && (angle == 0 || angle == 90) {
+		rotation += 180
+	}
+	return TextEstimateRotated(text, position, rotation)
+}
+
 func UsableSheet(sheet Sheet) Rect {
 	width := sheet.Width
 	height := sheet.Height
@@ -165,7 +180,11 @@ func UsableSheet(sheet Sheet) Rect {
 	if margin*2 > height {
 		margin = height / 2
 	}
-	return Rect{MinX: margin, MinY: margin, MaxX: width - margin, MaxY: height - margin}
+	usable := Rect{MinX: margin, MinY: margin, MaxX: width - margin, MaxY: height - margin}
+	if !sheet.TitleBlock.Empty() && sheet.TitleBlock.MinY > usable.MinY && sheet.TitleBlock.MinY < usable.MaxY {
+		usable.MaxY = sheet.TitleBlock.MinY - kicadfiles.MM(2.54)
+	}
+	return usable
 }
 
 func componentBody(component PlacedComponent) Rect {

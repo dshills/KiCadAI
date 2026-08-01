@@ -295,6 +295,9 @@ type LayoutRules struct {
 	AvoidWireCrossings      *bool    `json:"avoid_wire_crossings,omitempty"`
 	MinGroupSpacingMM       *float64 `json:"min_group_spacing_mm,omitempty"`
 	MinComponentSpacingMM   *float64 `json:"min_component_spacing_mm,omitempty"`
+	MaxAuxiliaryPerRank     int      `json:"max_auxiliary_per_rank,omitempty"`
+	ReserveTitleBlock       bool     `json:"reserve_title_block,omitempty"`
+	OrientEndpointLabels    bool     `json:"orient_endpoint_labels,omitempty"`
 }
 
 type Placement struct {

@@ -152,11 +152,11 @@ func TestReadSchematicRecoversRotatedPinAnchors(t *testing.T) {
 	if len(anchors) != 2 {
 		t.Fatalf("pin anchors = %#v, want two recovered anchors", anchors)
 	}
-	if anchors[0] != (kicadfiles.Point{X: kicadfiles.MM(13.81), Y: kicadfiles.MM(20)}) {
-		t.Fatalf("pin 1 anchor = %#v, want rotated right anchor", anchors[0])
+	if anchors[0] != (kicadfiles.Point{X: kicadfiles.MM(6.19), Y: kicadfiles.MM(20)}) {
+		t.Fatalf("pin 1 anchor = %#v, want KiCad-clockwise rotated left anchor", anchors[0])
 	}
-	if anchors[1] != (kicadfiles.Point{X: kicadfiles.MM(6.19), Y: kicadfiles.MM(20)}) {
-		t.Fatalf("pin 2 anchor = %#v, want rotated left anchor", anchors[1])
+	if anchors[1] != (kicadfiles.Point{X: kicadfiles.MM(13.81), Y: kicadfiles.MM(20)}) {
+		t.Fatalf("pin 2 anchor = %#v, want KiCad-clockwise rotated right anchor", anchors[1])
 	}
 }
 
@@ -200,7 +200,7 @@ func TestReadSchematicRecoversUnknownEmbeddedSymbolGeometry(t *testing.T) {
 		t.Fatalf("symbol geometry = %#v", read.Symbols)
 	}
 	anchors := read.Symbols[0].PinAnchors
-	if anchors[0] != (kicadfiles.Point{X: kicadfiles.MM(50), Y: kicadfiles.MM(45)}) || anchors[1] != (kicadfiles.Point{X: kicadfiles.MM(50), Y: kicadfiles.MM(55)}) {
+	if anchors[0] != (kicadfiles.Point{X: kicadfiles.MM(50), Y: kicadfiles.MM(55)}) || anchors[1] != (kicadfiles.Point{X: kicadfiles.MM(50), Y: kicadfiles.MM(45)}) {
 		t.Fatalf("anchors = %#v, want rotated embedded pin anchors", anchors)
 	}
 	if read.Symbols[0].BodyBounds == nil || read.Symbols[0].BodyBounds.Min != (kicadfiles.Point{X: kicadfiles.MM(-4), Y: kicadfiles.MM(-3)}) || read.Symbols[0].BodyBounds.Max != (kicadfiles.Point{X: kicadfiles.MM(4), Y: kicadfiles.MM(3)}) {
@@ -411,7 +411,7 @@ func TestReadWriteSchematicPreservesSymbolAndLabelSemantics(t *testing.T) {
 		`      )`,
 		`    )`,
 		`  )`,
-		`  (global_label "AUDIO_OUT" (shape output) (at 30 20 180) (fields_autoplaced yes) (uuid "33333333-3333-5333-8333-333333333333"))`,
+		`  (global_label "AUDIO_OUT" (shape output) (at 30 20 180) (effects (font (size 1.27 1.27)) (justify right bottom)) (fields_autoplaced yes) (uuid "33333333-3333-5333-8333-333333333333"))`,
 		`  (sheet_instances (path "/" (page "1")))`,
 		`)`,
 	}, "\n")
@@ -422,7 +422,7 @@ func TestReadWriteSchematicPreservesSymbolAndLabelSemantics(t *testing.T) {
 	if len(read.Symbols) != 1 || read.Symbols[0].Unit != 2 || !read.Symbols[0].DoNotPopulate || len(read.Symbols[0].Instances) != 1 {
 		t.Fatalf("symbol semantics not read: %#v", read.Symbols)
 	}
-	if len(read.Labels) != 1 || read.Labels[0].Shape != LabelShapeOutput || read.Labels[0].Rotation != 180 || !read.Labels[0].FieldsAutoplaced {
+	if len(read.Labels) != 1 || read.Labels[0].Shape != LabelShapeOutput || read.Labels[0].Rotation != 180 || !read.Labels[0].FieldsAutoplaced || strings.Join(read.Labels[0].Justify, ",") != "right,bottom" {
 		t.Fatalf("label semantics not read: %#v", read.Labels)
 	}
 	var buf bytes.Buffer
@@ -442,6 +442,7 @@ func TestReadWriteSchematicPreservesSymbolAndLabelSemantics(t *testing.T) {
 		"(value \"TL072\")",
 		"(shape output)",
 		"(at 30 20 180)",
+		"(justify right bottom)",
 	} {
 		if !strings.Contains(output, want) {
 			t.Fatalf("output missing %s:\n%s", want, output)

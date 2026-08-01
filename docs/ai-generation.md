@@ -601,6 +601,17 @@ fail closed with `OPEN_TOPOLOGY_REPAIR_EXHAUSTED`; they are not silently mapped
 to registered functional providers. See the
 [completion audit](../specs/simulation-guided-open-topology-synthesis/AUDIT.md).
 
+The same production lane now has a ranked architecture-synthesis envelope for
+three additional frozen behavior-only requirements: Class A amplification,
+complementary Class AB load drive, and a 60 Hz notch filter. Search emits
+multiple materially different candidates, records equation-derived value
+seeds, runs required trusted analyses and corners, and compares every
+physically ready passing topology instead of selecting the first pass. The
+result explains the winner and retains alternatives. Each selected circuit
+passes two installed-KiCad clean-root runs with identical raw projects and
+path-independent promotion receipts. See the
+[architecture synthesis audit](../specs/simulation-grounded-architecture-synthesis/AUDIT.md).
+
 ## Generic Placement And Routing Correction
 
 After a `generic-circuit-v1` graph strict-decodes, resolves through the trusted
@@ -784,10 +795,12 @@ prompts. All six supported contracts pass deterministic replay and installed-
 KiCad promotion.
 
 Open-topology generation is broader than provider selection but still bounded.
-Its measured envelope is six passing circuits across three active-family
-groups, not arbitrary electronics. Unknown models, missing catalog/package or
-rating evidence, unsupported analyses, exhausted graph/value/repair budgets,
-and failed physical gates remain blocking outcomes.
+Its first benchmark has six passing circuits across three active-family groups;
+the ranked follow-on adds three complete Class A, Class AB, and notch
+architecture demonstrations. This remains bounded evidence, not arbitrary
+electronics. Unknown models, missing catalog/package or rating evidence,
+unsupported analyses, exhausted graph/value/repair budgets, and failed
+physical gates remain blocking outcomes.
 
 For programmable-controller objectives, the catalog provider can now choose a
 verified ATmega328P-A, ESP32-WROOM-32E, or STM32G031K8T6 from capability and
@@ -922,10 +935,11 @@ not make every circuit routable or electrically proven. The current envelope
 is limited to catalog-backed registered capabilities, bounded physical
 constraints, deterministic placement, and the explicit-circuit router. Six
 promoted explicit topology classes, eight held-out function-level circuits,
-and six hierarchical systems now pass. This is meaningful breadth evidence,
-not proof of arbitrary electronics. The open-world result shows measurable
-generalization progress while also quantifying the remaining boundary. Dense
-boards, unregistered circuit
+six hierarchical systems, and three simulation-grounded ranked architecture
+demonstrations now pass. This is meaningful breadth evidence, not proof of
+arbitrary electronics. The open-world result shows measurable generalization
+progress while also quantifying the remaining boundary. Dense boards,
+unregistered circuit
 behavior, high-speed and RF constraints, comprehensive analog performance,
 high-energy thermal/safe-operating-area analysis, and fabrication release
 still require additional evidence.

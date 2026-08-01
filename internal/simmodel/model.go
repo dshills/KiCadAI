@@ -96,6 +96,7 @@ const (
 	QuantityDeviceCurrentA              = "device_current_a"
 	QuantityTotalSupplyCurrentA         = "total_supply_current_a"
 	QuantityTransimpedanceOhm           = "transimpedance_ohm"
+	QuantityInputImpedanceOhm           = "input_impedance_ohm"
 	QuantityOutputPowerW                = "output_power_w"
 	QuantityThresholdVoltageV           = "threshold_voltage_v"
 	QuantityThresholdCurrentA           = "threshold_current_a"

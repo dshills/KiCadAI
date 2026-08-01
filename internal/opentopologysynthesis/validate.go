@@ -56,6 +56,7 @@ var allowedMetrics = []string{
 	"output_low_voltage",
 	"output_noise_rms",
 	"output_power",
+	"output_swing",
 	"output_voltage",
 	"peak_current",
 	"peak_voltage",

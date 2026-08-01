@@ -13,6 +13,25 @@ import (
 	"kicadai/internal/modelprovenance"
 )
 
+func TestCombinationCountWithinBudget(t *testing.T) {
+	for _, test := range []struct {
+		name                  string
+		values, branches, max int
+		want                  bool
+	}{
+		{name: "single branch", values: 64, branches: 1, max: 64, want: true},
+		{name: "repeated selection", values: 3, branches: 2, max: 6, want: true},
+		{name: "over budget", values: 100, branches: 2, max: 4_096, want: false},
+		{name: "empty catalog", values: 0, branches: 2, max: 4_096, want: false},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			if got := combinationCountWithinBudget(test.values, test.branches, test.max); got != test.want {
+				t.Fatalf("combinationCountWithinBudget(%d, %d, %d) = %v, want %v", test.values, test.branches, test.max, got, test.want)
+			}
+		})
+	}
+}
+
 func TestValueDomainsAreCatalogBoundedAnalyticAndDeterministic(t *testing.T) {
 	requirement := testOpenTopologyRequirement(t, "powered_lowpass.json")
 	inventory := testSearchInventory()

@@ -256,6 +256,8 @@ func ProviderGraphSchema() map[string]any {
 				"positive_power_top": boolValue, "ground_bottom": boolValue, "center_on_page": boolValue,
 				"prefer_labels_for_long_nets": boolValue, "avoid_wire_crossings": boolValue,
 				"min_group_spacing_mm": numberValue, "min_component_spacing_mm": numberValue,
+				"max_auxiliary_per_rank": map[string]any{"type": "integer", "minimum": 0, "maximum": MaxComponents},
+				"reserve_title_block":    boolValue, "orient_endpoint_labels": boolValue,
 			}),
 			"hierarchy": strictObject(map[string]any{
 				"mode":                     map[string]any{"type": "string", "enum": []string{"flat", "auto"}},

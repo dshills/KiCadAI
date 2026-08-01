@@ -175,11 +175,15 @@ type ConnectOptions struct {
 	// after collision avoidance moves a symbol from its layout point.
 	ReanchorFromLabel bool
 	ReanchorToLabel   bool
+	// OrientLabelsOutward rotates local endpoint labels to extend away from
+	// the owning symbol body. It is opt-in for transaction compatibility.
+	OrientLabelsOutward bool
 }
 
 type LabelOptions struct {
 	Rotation kicadfiles.Angle
 	Shape    schematic.LabelShape
+	Justify  []string
 }
 
 type PlaceFootprintOptions struct {
@@ -769,30 +773,35 @@ func (builder *Builder) ConnectWithOptions(from, to Endpoint, netName string, op
 	builder.design.ExpectedNets = appendUniqueNet(builder.design.ExpectedNets, netName)
 	if options.UseLabels != nil && *options.UseLabels {
 		if !options.SkipFromLabel {
-			builder.addSchematicLabelConnection(netName, from, start, end, fromLabelAt)
+			builder.addSchematicLabelConnection(netName, from, start, end, fromLabelAt, options.OrientLabelsOutward)
 		}
 		if !options.SkipToLabel {
-			builder.addSchematicLabelConnection(netName, to, end, start, toLabelAt)
+			builder.addSchematicLabelConnection(netName, to, end, start, toLabelAt, options.OrientLabelsOutward)
 		}
 	} else if len(options.Waypoints) != 0 {
 		builder.addSchematicWirePointsWithOptions(netName, from, to, options.Waypoints, options.SuppressBendLabels, options.BendLabelAt)
 	} else if options.UseLabels != nil {
 		builder.addSchematicWireWithOptions(netName, from, to, start, end, options.SuppressBendLabels, options.BendLabelAt)
 	} else if builder.schematicConnectionShouldUseDirectLabels(from, to, start, end) {
-		if err := builder.AddLabel(netName, start, schematic.LabelLocal); err != nil {
-			return err
-		}
-		if err := builder.AddLabel(netName, end, schematic.LabelLocal); err != nil {
-			return err
+		if options.OrientLabelsOutward {
+			builder.addSchematicLabelStubWithOrientation(netName, from, start, builder.labelStubOffset(from, start, end), true)
+			builder.addSchematicLabelStubWithOrientation(netName, to, end, builder.labelStubOffset(to, end, start), true)
+		} else {
+			if err := builder.AddLabel(netName, start, schematic.LabelLocal); err != nil {
+				return err
+			}
+			if err := builder.AddLabel(netName, end, schematic.LabelLocal); err != nil {
+				return err
+			}
 		}
 	} else if schematicConnectionShouldUseLabels(netName, start, end) {
-		builder.addSchematicLabelStub(netName, from, start, builder.labelStubOffset(from, start, end))
-		builder.addSchematicLabelStub(netName, to, end, builder.labelStubOffset(to, end, start))
+		builder.addSchematicLabelStubWithOrientation(netName, from, start, builder.labelStubOffset(from, start, end), options.OrientLabelsOutward)
+		builder.addSchematicLabelStubWithOrientation(netName, to, end, builder.labelStubOffset(to, end, start), options.OrientLabelsOutward)
 	} else {
 		points := builder.orthogonalSchematicWirePoints(start, end)
 		if builder.schematicPathTouchesForeignWire(netName, points) {
-			builder.addSchematicLabelStub(netName, from, start, builder.labelStubOffset(from, start, end))
-			builder.addSchematicLabelStub(netName, to, end, builder.labelStubOffset(to, end, start))
+			builder.addSchematicLabelStubWithOrientation(netName, from, start, builder.labelStubOffset(from, start, end), options.OrientLabelsOutward)
+			builder.addSchematicLabelStubWithOrientation(netName, to, end, builder.labelStubOffset(to, end, start), options.OrientLabelsOutward)
 		} else {
 			builder.addSchematicWirePoints(netName, from, to, points)
 		}
@@ -801,9 +810,9 @@ func (builder *Builder) ConnectWithOptions(from, to Endpoint, netName string, op
 	return nil
 }
 
-func (builder *Builder) addSchematicLabelConnection(netName string, endpoint Endpoint, anchor, other kicadfiles.Point, requested *kicadfiles.Point) {
+func (builder *Builder) addSchematicLabelConnection(netName string, endpoint Endpoint, anchor, other kicadfiles.Point, requested *kicadfiles.Point, orientOutward bool) {
 	if requested == nil {
-		builder.addSchematicLabelStub(netName, endpoint, anchor, builder.labelStubOffset(endpoint, anchor, other))
+		builder.addSchematicLabelStubWithOrientation(netName, endpoint, anchor, builder.labelStubOffset(endpoint, anchor, other), orientOutward)
 		return
 	}
 	position := *requested
@@ -812,13 +821,17 @@ func (builder *Builder) addSchematicLabelConnection(netName string, endpoint End
 		if samePoint(preferred, kicadfiles.Point{}) {
 			preferred = builder.labelStubOffset(endpoint, anchor, other)
 		}
-		builder.addSchematicLabelStub(netName, endpoint, anchor, preferred)
+		builder.addSchematicLabelStubWithOrientation(netName, endpoint, anchor, preferred, orientOutward)
 		return
 	}
 	if position != anchor {
 		builder.addSchematicWirePoints(netName, endpoint, endpoint, []kicadfiles.Point{anchor, position})
 	}
-	_ = builder.AddLabel(netName, position, schematic.LabelLocal)
+	labelOptions := LabelOptions{}
+	if orientOutward {
+		labelOptions = schematicLabelOptionsForStub(anchor, position)
+	}
+	_ = builder.AddLabelWithOptions(netName, position, schematic.LabelLocal, labelOptions)
 }
 
 func (builder *Builder) schematicLabelConnectionConflicts(netName string, anchor, position kicadfiles.Point) bool {
@@ -1106,6 +1119,7 @@ func (builder *Builder) AddLabelWithOptions(text string, position kicadfiles.Poi
 	)
 	label.Rotation = options.Rotation
 	label.Shape = options.Shape
+	label.Justify = append([]string(nil), options.Justify...)
 	builder.design.Schematic.Labels = append(builder.design.Schematic.Labels, label)
 	return nil
 }
@@ -1198,6 +1212,10 @@ func (builder *Builder) AddSchematicWireWithLabel(netName string, points []kicad
 }
 
 func (builder *Builder) addSchematicLabelStub(netName string, endpoint Endpoint, anchor kicadfiles.Point, offset kicadfiles.Point) {
+	builder.addSchematicLabelStubWithOrientation(netName, endpoint, anchor, offset, false)
+}
+
+func (builder *Builder) addSchematicLabelStubWithOrientation(netName string, endpoint Endpoint, anchor kicadfiles.Point, offset kicadfiles.Point, orientOutward bool) {
 	if builder == nil {
 		return
 	}
@@ -1210,7 +1228,27 @@ func (builder *Builder) addSchematicLabelStub(netName string, endpoint Endpoint,
 	offset = builder.safeSchematicLabelStubOffset(anchor, offset)
 	labelPoint := kicadfiles.Point{X: anchor.X + offset.X, Y: anchor.Y + offset.Y}
 	builder.addSchematicWire(netName, endpoint, endpoint, anchor, labelPoint)
-	_ = builder.AddLabel(netName, labelPoint, schematic.LabelLocal)
+	labelOptions := LabelOptions{}
+	if orientOutward {
+		labelOptions = schematicLabelOptionsForStub(anchor, labelPoint)
+	}
+	_ = builder.AddLabelWithOptions(netName, labelPoint, schematic.LabelLocal, labelOptions)
+}
+
+func schematicLabelOptionsForStub(anchor, label kicadfiles.Point) LabelOptions {
+	dx, dy := label.X-anchor.X, label.Y-anchor.Y
+	switch {
+	case dx < 0:
+		return LabelOptions{Rotation: 180, Justify: []string{"right"}}
+	case dx > 0:
+		return LabelOptions{}
+	case dy < 0:
+		return LabelOptions{Rotation: 270, Justify: []string{"right"}}
+	case dy > 0:
+		return LabelOptions{Rotation: 90}
+	default:
+		return LabelOptions{}
+	}
 }
 
 func (builder *Builder) safeSchematicLabelStubOffset(anchor kicadfiles.Point, preferred kicadfiles.Point) kicadfiles.Point {
@@ -3084,6 +3122,7 @@ func cloneSchematic(source *schematic.SchematicFile) *schematic.SchematicFile {
 	clone.NoConnects = append([]schematic.NoConnect(nil), source.NoConnects...)
 	clone.Labels = append([]schematic.Label(nil), source.Labels...)
 	for i := range clone.Labels {
+		clone.Labels[i].Justify = append([]string(nil), source.Labels[i].Justify...)
 		clone.Labels[i].Fields = append([]schematic.Field(nil), source.Labels[i].Fields...)
 	}
 	clone.Junctions = append([]schematic.Junction(nil), source.Junctions...)

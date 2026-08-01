@@ -173,6 +173,14 @@ path.
   `kicadai open-topology create` command writes full search/simulation and
   physical-promotion evidence while returning a compact JSON summary. See the
   [completion audit](specs/simulation-guided-open-topology-synthesis/AUDIT.md).
+- The simulation-grounded architecture milestone extends that lane from
+  first-pass topology discovery to deterministic comparison of multiple
+  materially different candidates. Frozen Class A, complementary Class AB,
+  and 60 Hz notch requirements now receive equation-derived values, complete
+  trusted simulation, ranked selection with alternatives, and two identical
+  installed-KiCad promotions. A plausible but unsafe Class A value alternative
+  is explicitly rejected by standing-current, thermal, or SOA evidence. See
+  the [architecture synthesis audit](specs/simulation-grounded-architecture-synthesis/AUDIT.md).
 - Unrestricted electronics generation is not guaranteed. Open-topology and
   generic graph paths fail closed on unknown behavior, parts, pins, models,
   ratings, placement, routing, or exhausted search capability.

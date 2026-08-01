@@ -207,6 +207,7 @@ func solveNonlinearDCByCenteredOpAmpSeed(plan Plan, analysis Analysis, activeSta
 	}
 	centered := cloneOpAmpClamps(activeStates)
 	centerChanged := false
+	emitterFollowerSeeds := map[string]bool{}
 	for _, device := range opAmps {
 		terminals := terminalMap(device)
 		parameters := namedValueMap(device.ModelParameters)
@@ -216,6 +217,25 @@ func solveNonlinearDCByCenteredOpAmpSeed(plan Plan, analysis Analysis, activeSta
 			return mnaSystem{}, nil, evidence, nil, false
 		}
 		center := (lower + upper) / 2
+		for _, follower := range plan.Devices {
+			if follower.PrimitiveModel != PrimitiveBJTNPNV1 &&
+				follower.PrimitiveModel != PrimitiveBJTPNPV1 {
+				continue
+			}
+			followerTerminals := terminalMap(follower)
+			if followerTerminals["BASE"] != terminals["OUT"] ||
+				followerTerminals["EMITTER"] != terminals["IN_MINUS"] {
+				continue
+			}
+			polarity := 1.0
+			if follower.PrimitiveModel == PrimitiveBJTPNPV1 {
+				polarity = -1
+			}
+			center = nonlinearNodeVoltage(&system, solution, terminals["IN_PLUS"]) + polarity*.72
+			center = math.Max(lower, math.Min(upper, center))
+			emitterFollowerSeeds[device.Component] = true
+			break
+		}
 		centered[device.Component] = center
 		centerChanged = centerChanged || math.Abs(center) > nonlinearUpdateTolerance
 	}
@@ -228,6 +248,20 @@ func solveNonlinearDCByCenteredOpAmpSeed(plan Plan, analysis Analysis, activeSta
 			return mnaSystem{}, nil, evidence, nil, false
 		}
 		system, solution = centerSystem, centerSolution
+	}
+	if len(emitterFollowerSeeds) != 0 {
+		released := cloneOpAmpClamps(centered)
+		for component := range emitterFollowerSeeds {
+			delete(released, component)
+		}
+		releasedSystem, releasedSolution, releasedEvidence, releasedDiagnostic :=
+			solveNonlinearDCForComparatorStateWithInitial(plan, analysis, released, solution)
+		evidence.SourceStages += releasedEvidence.SourceStages
+		evidence.Iterations += releasedEvidence.Iterations
+		evidence.TotalIterations = evidence.Iterations
+		if releasedDiagnostic == nil {
+			system, solution, centered = releasedSystem, releasedSolution, released
+		}
 	}
 	evidence.Method = "bounded_newton_centered_opamp_seed_v1"
 	evidence.TotalIterations = evidence.Iterations
@@ -510,6 +544,7 @@ func solveNonlinearDCForComparatorStateWithInitial(plan Plan, analysis Analysis,
 	}
 	evidence := SolverEvidence{Method: method, SourceStages: len(stages)}
 	stages = append([]continuationStage(nil), stages...)
+	useLinearColdSeed := hasOpAmpControlledEmitterFollower(plan)
 	bjtSeedAttempts := map[string]int{}
 	bjtSeedWithoutLineSearch := false
 	for stageIndex := 0; stageIndex < len(stages); {
@@ -524,6 +559,17 @@ func solveNonlinearDCForComparatorStateWithInitial(plan Plan, analysis Analysis,
 		)
 		if len(guess) == 0 {
 			guess = make([]complex128, len(baseSystem.rhs))
+			if useLinearColdSeed {
+				// A cold all-zero state is a poor Newton seed for transistor stages
+				// inside biased linear-control loops. Solve the current continuation
+				// stage with nonlinear devices removed first; its gmin paths provide
+				// deterministic divider, rail, and controller voltages. Standalone
+				// limiting and protection primitives retain the established zero
+				// continuation seed, which follows their piecewise operating path.
+				if linearGuess, linearDiagnostic := solveMNA(baseSystem); linearDiagnostic == nil {
+					guess = linearGuess
+				}
+			}
 		} else if len(guess) != len(baseSystem.rhs) {
 			return mnaSystem{}, nil, evidence, &Diagnostic{Path: "initial_state", Message: "nonlinear warm-start state size differs from the resolved MNA system"}
 		}
@@ -661,6 +707,43 @@ func solveNonlinearDCForComparatorStateWithInitial(plan Plan, analysis Analysis,
 		bjtSeedWithoutLineSearch = false
 	}
 	return finalSystem, guess, evidence, nil
+}
+
+// hasOpAmpControlledEmitterFollower identifies the biased linear loop that
+// benefits from a linearized cold start: an op-amp drives a BJT base and senses
+// that transistor's emitter at its inverting input. Merely containing an
+// op-amp elsewhere in a mixed nonlinear design is insufficient; changing the
+// established zero continuation seed for unrelated switching and protection
+// stages can move Newton onto a nonconvergent branch.
+func hasOpAmpControlledEmitterFollower(plan Plan) bool {
+	type feedbackPair struct {
+		output, feedback string
+	}
+	controllerPairs := map[feedbackPair]struct{}{}
+	for _, controller := range plan.Devices {
+		if controller.PrimitiveModel != PrimitiveOpAmpV1 {
+			continue
+		}
+		controllerTerminals := terminalMap(controller)
+		controllerPairs[feedbackPair{
+			output:   controllerTerminals["OUT"],
+			feedback: controllerTerminals["IN_MINUS"],
+		}] = struct{}{}
+	}
+	for _, follower := range plan.Devices {
+		if follower.PrimitiveModel != PrimitiveBJTNPNV1 &&
+			follower.PrimitiveModel != PrimitiveBJTPNPV1 {
+			continue
+		}
+		followerTerminals := terminalMap(follower)
+		if _, found := controllerPairs[feedbackPair{
+			output:   followerTerminals["BASE"],
+			feedback: followerTerminals["EMITTER"],
+		}]; found {
+			return true
+		}
+	}
+	return false
 }
 
 func nonlinearIterationConverged(maxVoltageUpdateV, maxCurrentUpdateA, maxResidual float64) bool {

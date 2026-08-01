@@ -149,6 +149,15 @@ func TestResolverPinGeometryOverridesEmbeddedFallback(t *testing.T) {
 	if len(layoutPins) != 1 || layoutPins[0].At.Y != kicadfiles.MM(7.62) {
 		t.Fatalf("resolver-backed layout pins = %#v, want pin 1 at +7.62 mm", layoutPins)
 	}
+	conflicting := -3.81
+	component.Pins[0].OffsetYMM = &conflicting
+	transactionPins = transactionPinsWithLibraryIndex(component, &index)
+	layoutPins = schematicLayoutPins(component, &index)
+	if len(transactionPins) != 1 || !vectorBusMMEqual(transactionPins[0].YMM, 7.62) || transactionPins[0].ExplicitOffset ||
+		len(layoutPins) != 1 || layoutPins[0].At.Y != kicadfiles.MM(7.62) {
+		t.Fatalf("authoritative resolver geometry was overridden by stale explicit offsets: transaction=%#v layout=%#v", transactionPins, layoutPins)
+	}
+	component.Pins[0].OffsetYMM = nil
 
 	fallbackPins := transactionPinsWithLibraryIndex(component, nil)
 	if len(fallbackPins) != 1 || !vectorBusMMEqual(fallbackPins[0].YMM, -7.62) {
@@ -565,6 +574,16 @@ func TestSchematicLayoutGeometryClassifiesAllSupportedSources(t *testing.T) {
 				},
 			}},
 		},
+		"Device:LED": {
+			LibraryID: "Device:LED",
+			Graphics: []libraryresolver.SymbolGraphic{{
+				Kind: "rectangle",
+				Bounds: libraryresolver.BoundingBox{
+					Min: kicadfiles.Point{X: kicadfiles.MM(-3)},
+					Max: kicadfiles.Point{X: kicadfiles.MM(4)},
+				},
+			}},
+		},
 	}}
 	cases := []struct {
 		name  string
@@ -575,6 +594,8 @@ func TestSchematicLayoutGeometryClassifiesAllSupportedSources(t *testing.T) {
 	}{
 		{name: "explicit body", part: Component{Body: &BodyGeometry{MinXMM: -1, MinYMM: -1, MaxXMM: 1, MaxYMM: 1}}, want: schematiclayout.GeometrySourceExplicitBody, known: true},
 		{name: "embedded template", part: Component{Symbol: "kicadai:ams1117_schematic"}, want: schematiclayout.GeometrySourceEmbeddedTemplate, known: true},
+		{name: "embedded KiCad template", part: Component{Symbol: "Device:LED"}, want: schematiclayout.GeometrySourceEmbeddedTemplate, known: true},
+		{name: "resolver overrides embedded template", part: Component{Symbol: "Device:LED"}, index: graphicsIndex, want: schematiclayout.GeometrySourceResolverGraphics, known: true},
 		{name: "resolver graphics", part: Component{Symbol: "Custom:Graphic"}, index: graphicsIndex, want: schematiclayout.GeometrySourceResolverGraphics, known: true},
 		{name: "explicit pin envelope", part: Component{Pins: []Pin{{Number: "1", OffsetXMM: floatPtr(-2)}, {Number: "2", OffsetXMM: floatPtr(2)}}}, want: schematiclayout.GeometrySourceExplicitPinEnvelope, known: true},
 		{name: "conservative fallback", part: Component{}, want: schematiclayout.GeometrySourceConservative, known: false},
@@ -649,14 +670,12 @@ func TestToTransactionEmitsTemplatePinOffsetsAndLabelPolicy(t *testing.T) {
 	}
 }
 
-func TestSchematicLayoutBodyRemainsConservativeWithoutResolver(t *testing.T) {
-	resistor := schematicLayoutBody(Component{Symbol: "Device:R"}, nil)
-	if !resistor.Empty() {
-		t.Fatalf("template-only resistor should retain conservative geometry: %#v", resistor)
-	}
-	connector := schematicLayoutBody(Component{Symbol: "Connector_Generic:Conn_01x02"}, nil)
-	if !connector.Empty() {
-		t.Fatalf("generic connector should retain conservative pin-only geometry: %#v", connector)
+func TestSchematicLayoutUsesEmbeddedWriterGeometryWithoutResolver(t *testing.T) {
+	for _, symbolID := range []string{"Device:R", "Connector_Generic:Conn_01x02"} {
+		geometry := schematicLayoutGeometry(Component{Symbol: symbolID}, nil)
+		if geometry.Body.Empty() || geometry.Source != schematiclayout.GeometrySourceEmbeddedTemplate {
+			t.Fatalf("%s geometry = %#v, want authoritative embedded writer body", symbolID, geometry)
+		}
 	}
 }
 

@@ -366,6 +366,92 @@ func TestPlaceCentersSharedTailBetweenMatchedColumns(t *testing.T) {
 	}
 }
 
+func TestSpreadAuxiliaryLaneRanksPreservesSignalStageAndLimitsRows(t *testing.T) {
+	components := []Component{
+		{Ref: "J1", Lane: LaneSignal, RankFixed: true},
+		{Ref: "Q1", Role: "transistor", Lane: LaneSignal},
+		{Ref: "Q2", Role: "transistor", Lane: LaneSignal},
+		{Ref: "Q3", Role: "transistor", Lane: LaneSignal},
+		{Ref: "P1", Role: "resistor", Lane: LaneSignal},
+		{Ref: "P2", Role: "resistor", Lane: LaneSignal},
+		{Ref: "P3", Role: "capacitor", Lane: LaneSignal},
+		{Ref: "P4", Role: "capacitor", Lane: LaneSignal},
+		{Ref: "P5", Role: "resistor", Lane: LaneSignal},
+		{Ref: "R1", Lane: LaneReference},
+		{Ref: "R2", Lane: LaneReference},
+		{Ref: "R3", Lane: LaneReference},
+		{Ref: "R4", Lane: LaneReference},
+		{Ref: "R5", Lane: LaneReference},
+	}
+	cells := map[string]placementCell{
+		"J1": {rank: 0, order: 0},
+		"Q1": {rank: 1, order: 1}, "Q2": {rank: 1, order: 2}, "Q3": {rank: 1, order: 3},
+		"P1": {rank: 1, order: 4}, "P2": {rank: 1, order: 5}, "P3": {rank: 1, order: 6},
+		"P4": {rank: 1, order: 7}, "P5": {rank: 1, order: 8},
+		"R1": {rank: 1, order: 9}, "R2": {rank: 1, order: 10}, "R3": {rank: 1, order: 11},
+		"R4": {rank: 1, order: 12}, "R5": {rank: 1, order: 13},
+	}
+
+	spread, rankCount := spreadAuxiliaryLaneRanks(components, cells, 2)
+	if spread["J1"].rank != 0 {
+		t.Fatalf("fixed boundary rank = %d, want 0", spread["J1"].rank)
+	}
+	if spread["Q1"].rank != spread["Q2"].rank || spread["Q2"].rank != spread["Q3"].rank {
+		t.Fatalf("signal stage was split across ranks: %#v", spread)
+	}
+	counts := map[int]int{}
+	for _, ref := range []string{"R1", "R2", "R3", "R4", "R5"} {
+		counts[spread[ref].rank]++
+	}
+	for rank, count := range counts {
+		if count > 2 {
+			t.Fatalf("auxiliary rank %d contains %d components, want at most 2", rank, count)
+		}
+	}
+	passiveCounts := map[int]int{}
+	for _, ref := range []string{"P1", "P2", "P3", "P4", "P5"} {
+		passiveCounts[spread[ref].rank]++
+	}
+	for rank, count := range passiveCounts {
+		if count > 2 {
+			t.Fatalf("signal-passive rank %d contains %d components, want at most 2", rank, count)
+		}
+	}
+	if len(counts) != 3 || len(passiveCounts) != 3 || rankCount != 4 {
+		t.Fatalf("reference=%#v signal_passive=%#v rank_count=%d, want three spread ranks per auxiliary lane and four total ranks", counts, passiveCounts, rankCount)
+	}
+}
+
+func TestRepairPlacementOverlapsMovesAlongUnconstrainedAxis(t *testing.T) {
+	components := []Component{
+		{
+			Ref: "U1", BodyKnown: true,
+			Body: Rect{MinX: -kicadfiles.MM(5.08), MinY: -kicadfiles.MM(5.08), MaxX: kicadfiles.MM(5.08), MaxY: kicadfiles.MM(5.08)},
+			Pins: []Pin{{Number: "1", At: kicadfiles.Point{X: kicadfiles.MM(3.81)}}},
+		},
+		{
+			Ref: "R1", BodyKnown: true,
+			Body:            Rect{MinX: -kicadfiles.MM(1.016), MinY: -kicadfiles.MM(2.54), MaxX: kicadfiles.MM(1.016), MaxY: kicadfiles.MM(2.54)},
+			SameColumnAsPin: []Endpoint{{Ref: "U1", Pin: "1"}},
+		},
+	}
+	positions := map[string]kicadfiles.Point{"U1": {}, "R1": {}}
+	rules := DefaultRules(ProfileStandard)
+	if !enforceRelativePlacement(components, positions, rules) {
+		t.Fatal("column constraint did not converge")
+	}
+	repairs, converged := repairPlacementOverlaps(components, positions, rules)
+	if !converged || repairs != 1 {
+		t.Fatalf("repairs=%d converged=%t positions=%#v", repairs, converged, positions)
+	}
+	if positions["R1"].X != kicadfiles.MM(3.81) || positions["R1"].Y == 0 {
+		t.Fatalf("constrained resistor position = %#v, want pin column with vertical separation", positions["R1"])
+	}
+	if _, _, overlap := firstPlacementOverlap(components, positions); overlap {
+		t.Fatalf("overlap remains after repair: %#v", positions)
+	}
+}
+
 func placedPositions(components []PlacedComponent) map[string]kicadfiles.Point {
 	positions := map[string]kicadfiles.Point{}
 	for _, component := range components {

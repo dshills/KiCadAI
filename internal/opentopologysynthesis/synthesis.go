@@ -3,6 +3,8 @@ package opentopologysynthesis
 import (
 	"cmp"
 	"context"
+	"fmt"
+	"math"
 	"slices"
 
 	"kicadai/internal/reports"
@@ -22,11 +24,22 @@ type synthesisFailure struct {
 	penalty        float64
 }
 
+type synthesisPassingCandidate struct {
+	candidateIndex int
+	graph          CandidateGraph
+	trial          *ValueTrial
+	evaluation     SimulationEvaluation
+	repair         *RepairSearchResult
+	physical       PhysicalLoweringResult
+	margin         float64
+	repairCount    int
+}
+
 // Synthesize runs the bounded primitive-only production path. Topologies are
 // searched without a named block family, value trials are evaluated across
-// candidates in round-robin order, failed graphs are ranked by trusted
-// simulation evidence, and only a fully passing graph may enter physical
-// lowering.
+// candidates in round-robin order, physically ready passes are ranked by
+// trusted requirement margins and complexity, failed graphs are ranked for
+// repair, and only a fully passing graph may enter physical promotion.
 func Synthesize(
 	ctx context.Context,
 	requirement Requirement,
@@ -130,16 +143,28 @@ func Synthesize(
 	}
 
 	failures := []synthesisFailure{}
+	passes := []synthesisPassingCandidate{}
 	maximumTrialCount := 0
 	for _, trials := range valueTrials {
 		maximumTrialCount = max(maximumTrialCount, len(trials))
 	}
 	candidateOrder := synthesisCandidateEvaluationOrder(run.Search.Candidates)
 	simulationStopped := false
+	rankingWindowComplete := false
+	postPassEvaluations := 0
+	postPassEvaluationBudget := synthesisPostPassEvaluationBudget(policy)
 	for trialIndex := 0; trialIndex < maximumTrialCount; trialIndex++ {
 		for _, candidateIndex := range candidateOrder {
 			if trialIndex >= len(valueTrials[candidateIndex]) {
 				continue
+			}
+			// Once a physically ready pass exists, spend one explicit retained-
+			// candidate window looking for a better margin across the round-robin
+			// topology order. This preserves deterministic ranking without
+			// exhaustively consuming every remaining value trial after success.
+			if len(passes) != 0 && postPassEvaluations >= postPassEvaluationBudget {
+				rankingWindowComplete = true
+				break
 			}
 			if ctx.Err() != nil {
 				run.Report.Status = StatusCanceled
@@ -157,6 +182,9 @@ func Synthesize(
 			evaluation := EvaluateCandidate(
 				ctx, requirement, work.graph, nil, inventory, environment, evaluationPolicy,
 			)
+			if len(passes) != 0 {
+				postPassEvaluations++
+			}
 			run.Report.Consumption.ValueTrials++
 			addSimulationConsumption(&run.Report.Consumption, evaluation.Consumption)
 			run.Candidates[candidateIndex].Evaluations = append(
@@ -182,9 +210,15 @@ func Synthesize(
 					run.Candidates[candidateIndex].Physical, physical,
 				)
 				if physical.Status == PhysicalLoweringReady {
-					return selectSynthesisResult(
-						run, candidateIndex, work.graph, work.trial, evaluation, nil, physical,
-					)
+					passes = append(passes, synthesisPassingCandidate{
+						candidateIndex: candidateIndex,
+						graph:          work.graph,
+						trial:          work.trial,
+						evaluation:     evaluation,
+						physical:       physical,
+						margin:         synthesisWorstNormalizedMargin(evaluation),
+					})
+					continue
 				}
 				appendSynthesisDiagnostics(&run.Report, physical.Issues)
 			case SimulationEvaluationFailed:
@@ -194,77 +228,6 @@ func Synthesize(
 					evaluation:     evaluation,
 					penalty:        simulationEvaluationPenalty(evaluation),
 				})
-				if run.Search.Candidates[candidateIndex].Repairable &&
-					run.Candidates[candidateIndex].Repair == nil &&
-					!synthesisRepairBudgetExhausted(run.Report.Consumption, policy) {
-					repairPolicy := remainingSynthesisPolicy(
-						policy,
-						run.Report.Consumption,
-					)
-					repair := RepairCandidate(
-						ctx,
-						requirement,
-						work.graph,
-						evaluation,
-						inventory,
-						environment,
-						repairPolicy,
-					)
-					run.Candidates[candidateIndex].Repair = &repair
-					addSimulationConsumption(
-						&run.Report.Consumption,
-						repair.Consumption,
-					)
-					addRepairConsumption(
-						&run.Report.Consumption,
-						repair.Consumption,
-					)
-					for _, repairAttempt := range repair.Attempts {
-						run.Report.Candidates[candidateIndex].Attempts = append(
-							run.Report.Candidates[candidateIndex].Attempts,
-							synthesisAttempt(
-								len(run.Report.Candidates[candidateIndex].Attempts)+1,
-								repairAttemptGraphHash(repairAttempt),
-								repairAttempt.ValueTrial,
-								repairAttempt.Evaluation,
-								&repairAttempt.Repair,
-							),
-						)
-					}
-					run.Report.Candidates[candidateIndex].Status =
-						statusForRepair(repair.Status)
-					if repair.Status == RepairSearchPassed &&
-						repair.Selected != nil {
-						selected := repair.Selected
-						physical := LowerPassingCandidate(
-							ctx,
-							requirement,
-							selected.Graph,
-							selected.Evaluation,
-							inventory,
-							environment,
-						)
-						run.Candidates[candidateIndex].Physical = append(
-							run.Candidates[candidateIndex].Physical,
-							physical,
-						)
-						if physical.Status == PhysicalLoweringReady {
-							return selectSynthesisResult(
-								run,
-								candidateIndex,
-								selected.Graph,
-								selected.ValueTrial,
-								selected.Evaluation,
-								&repair,
-								physical,
-							)
-						}
-						appendSynthesisDiagnostics(
-							&run.Report,
-							physical.Issues,
-						)
-					}
-				}
 			case SimulationEvaluationCanceled:
 				run.Report.Status = StatusCanceled
 				run.Report.StopReason = StopCanceled
@@ -274,9 +237,12 @@ func Synthesize(
 				appendSynthesisDiagnostics(&run.Report, evaluation.Issues)
 			}
 		}
-		if simulationStopped {
+		if simulationStopped || rankingWindowComplete {
 			break
 		}
+	}
+	if len(passes) != 0 {
+		return selectRankedSynthesisResult(run, passes)
 	}
 
 	slices.SortFunc(failures, func(left, right synthesisFailure) int {
@@ -330,12 +296,22 @@ func Synthesize(
 			run.Candidates[failure.candidateIndex].Physical, physical,
 		)
 		if physical.Status == PhysicalLoweringReady {
-			return selectSynthesisResult(
-				run, failure.candidateIndex, selected.Graph, selected.ValueTrial,
-				selected.Evaluation, &repair, physical,
-			)
+			passes = append(passes, synthesisPassingCandidate{
+				candidateIndex: failure.candidateIndex,
+				graph:          selected.Graph,
+				trial:          selected.ValueTrial,
+				evaluation:     selected.Evaluation,
+				repair:         &repair,
+				physical:       physical,
+				margin:         synthesisWorstNormalizedMargin(selected.Evaluation),
+				repairCount:    repair.Consumption.TopologyRepairs,
+			})
+			continue
 		}
 		appendSynthesisDiagnostics(&run.Report, physical.Issues)
+	}
+	if len(passes) != 0 {
+		return selectRankedSynthesisResult(run, passes)
 	}
 
 	run.Report.Status = StatusFailed
@@ -359,6 +335,10 @@ func Synthesize(
 	return finalizeSynthesisRun(run)
 }
 
+func synthesisPostPassEvaluationBudget(policy Policy) int {
+	return max(1, policy.MaxRetainedCandidates)
+}
+
 func synthesisCandidateEvaluationOrder(
 	candidates []TopologyCandidate,
 ) []int {
@@ -378,32 +358,114 @@ func synthesisCandidateEvaluationOrder(
 	return order
 }
 
-func selectSynthesisResult(
-	run SynthesisRun,
-	candidateIndex int,
-	graph CandidateGraph,
-	trial *ValueTrial,
-	evaluation SimulationEvaluation,
-	repair *RepairSearchResult,
-	physical PhysicalLoweringResult,
-) SynthesisRun {
-	graphCopy := CloneGraph(graph)
+const synthesisSelectionRankingPolicy = "worst_normalized_requirement_margin_desc,topology_repairs_asc,component_count_asc,internal_nodes_asc,topology_hash_asc,evaluation_hash_asc,value_hash_asc"
+
+func selectRankedSynthesisResult(run SynthesisRun, passes []synthesisPassingCandidate) SynthesisRun {
+	passes = bestSynthesisPasses(passes)
+	slices.SortFunc(passes, compareSynthesisPasses)
+	selected := passes[0]
+	graphCopy := CloneGraph(selected.graph)
 	run.SelectedGraph = &graphCopy
-	run.SelectedTrial = cloneValueTrial(trial)
-	run.SelectedRepair = repair
-	physicalCopy := physical
+	run.SelectedTrial = cloneValueTrial(selected.trial)
+	run.SelectedRepair = selected.repair
+	physicalCopy := selected.physical
 	run.Physical = &physicalCopy
 	run.Report.Status = StatusPassed
 	run.Report.StopReason = StopPassed
-	run.Report.Candidates[candidateIndex].Status = StatusPassed
+	run.Report.Candidates[selected.candidateIndex].Status = StatusPassed
+	alternatives := make([]RankedSelectionCandidate, 0, len(passes))
+	for index, candidate := range passes {
+		valueHash := candidate.evaluation.ValueTrialHash
+		if candidate.trial != nil && candidate.trial.Hash != "" {
+			valueHash = candidate.trial.Hash
+		}
+		alternatives = append(alternatives, RankedSelectionCandidate{
+			Rank:                  index + 1,
+			Fingerprint:           run.Report.Candidates[candidate.candidateIndex].Fingerprint,
+			TopologyHash:          mustTopologyHash(candidate.graph),
+			EvaluationHash:        candidate.evaluation.Hash,
+			ValueHash:             valueHash,
+			WorstNormalizedMargin: candidate.margin,
+			ComponentCount:        len(candidate.graph.Instances),
+			InternalNodes:         internalNodeCount(candidate.graph),
+			TopologyRepairs:       candidate.repairCount,
+			Selected:              index == 0,
+		})
+	}
 	run.Report.Selected = &SelectedResult{
-		Fingerprint:      run.Report.Candidates[candidateIndex].Fingerprint,
-		TopologyHash:     mustTopologyHash(graph),
-		EvaluationHash:   evaluation.Hash,
-		PhysicalHash:     physical.Hash,
-		SelectionSummary: "first physically ready result in deterministic topology/value/repair order",
+		Fingerprint:    run.Report.Candidates[selected.candidateIndex].Fingerprint,
+		TopologyHash:   mustTopologyHash(selected.graph),
+		EvaluationHash: selected.evaluation.Hash,
+		PhysicalHash:   selected.physical.Hash,
+		SelectionSummary: fmt.Sprintf(
+			"selected rank 1 of %d physically ready architectures: worst normalized requirement margin %.9g, %d topology repairs, %d components, and %d internal nodes; deterministic tie-breakers use topology, evaluation, and value hashes",
+			len(passes), selected.margin, selected.repairCount,
+			len(selected.graph.Instances), internalNodeCount(selected.graph),
+		),
+		Ranking: SelectionRanking{
+			Policy:       synthesisSelectionRankingPolicy,
+			Alternatives: alternatives,
+		},
 	}
 	return finalizeSynthesisRun(run)
+}
+
+func bestSynthesisPasses(source []synthesisPassingCandidate) []synthesisPassingCandidate {
+	best := map[string]synthesisPassingCandidate{}
+	for _, candidate := range source {
+		topology := mustTopologyHash(candidate.graph)
+		if current, ok := best[topology]; !ok || compareSynthesisPasses(candidate, current) < 0 {
+			best[topology] = candidate
+		}
+	}
+	result := make([]synthesisPassingCandidate, 0, len(best))
+	for _, candidate := range best {
+		result = append(result, candidate)
+	}
+	return result
+}
+
+func compareSynthesisPasses(left, right synthesisPassingCandidate) int {
+	return cmp.Or(
+		cmp.Compare(right.margin, left.margin),
+		cmp.Compare(left.repairCount, right.repairCount),
+		cmp.Compare(len(left.graph.Instances), len(right.graph.Instances)),
+		cmp.Compare(internalNodeCount(left.graph), internalNodeCount(right.graph)),
+		cmp.Compare(mustTopologyHash(left.graph), mustTopologyHash(right.graph)),
+		cmp.Compare(left.evaluation.Hash, right.evaluation.Hash),
+		cmp.Compare(synthesisValueHash(left), synthesisValueHash(right)),
+	)
+}
+
+func synthesisValueHash(candidate synthesisPassingCandidate) string {
+	if candidate.trial != nil && candidate.trial.Hash != "" {
+		return candidate.trial.Hash
+	}
+	return candidate.evaluation.ValueTrialHash
+}
+
+func synthesisWorstNormalizedMargin(evaluation SimulationEvaluation) float64 {
+	const scaleFloor = 1e-15
+	worst := math.Inf(1)
+	for _, attempt := range evaluation.Attempts {
+		if attempt.Actual == nil {
+			continue
+		}
+		actual := *attempt.Actual
+		scale := math.Max(scaleFloor, math.Abs(actual))
+		if attempt.RequiredMin != nil {
+			scale = math.Max(scale, math.Abs(*attempt.RequiredMin))
+			worst = math.Min(worst, (actual-*attempt.RequiredMin)/scale)
+		}
+		if attempt.RequiredMax != nil {
+			scale = math.Max(scale, math.Abs(*attempt.RequiredMax))
+			worst = math.Min(worst, (*attempt.RequiredMax-actual)/scale)
+		}
+	}
+	if math.IsInf(worst, 1) || math.IsNaN(worst) {
+		return 0
+	}
+	return worst
 }
 
 func bestSynthesisFailures(source []synthesisFailure) []synthesisFailure {

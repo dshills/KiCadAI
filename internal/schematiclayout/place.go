@@ -11,9 +11,13 @@ func Place(request Request) Result {
 	request = Classify(request)
 	rules := normalizeRules(request.Rules)
 	cells, islandCount, rankCount := planPlacement(request)
+	if rules.MaxAuxiliaryPerRank > 0 {
+		cells, rankCount = spreadAuxiliaryLaneRanks(request.Components, cells, rules.MaxAuxiliaryPerRank)
+	}
 	rankX := placementRankX(request.Components, cells, rules)
 	positions := placementPositions(request.Components, cells, rankX, rules)
 	relationsConverged := enforceRelativePlacement(request.Components, positions, rules)
+	overlapRepairs, overlapsConverged := repairPlacementOverlaps(request.Components, positions, rules)
 	result := Result{Sheet: request.Sheet, Components: make([]PlacedComponent, 0, len(request.Components))}
 	for _, component := range request.Components {
 		placed := PlacedComponent{Component: component}
@@ -27,6 +31,12 @@ func Place(request Request) Result {
 	}
 	if !relationsConverged {
 		result.Diagnostics = append(result.Diagnostics, Diagnostic{Severity: SeverityError, Code: "relative_placement_not_converged", Message: "relative placement constraints did not converge", Repair: "remove relation cycles or increase compatible group/lane spacing"})
+	}
+	if overlapRepairs > 0 {
+		result.Diagnostics = append(result.Diagnostics, Diagnostic{Severity: SeverityInfo, Code: "placement_overlap_repaired", Message: "moved constrained components along a free axis to preserve symbol clearance"})
+	}
+	if !overlapsConverged {
+		result.Diagnostics = append(result.Diagnostics, Diagnostic{Severity: SeverityError, Code: "placement_overlap_not_repaired", Message: "component overlap could not be repaired without breaking placement constraints", Repair: "relax a row or column alignment constraint or increase compatible lane spacing"})
 	}
 	var textDiagnostics []Diagnostic
 	result.Components, textDiagnostics = placeComponentText(result.Components, rules)
@@ -49,6 +59,180 @@ func Place(request Request) Result {
 	result = Validate(result, request)
 	result.Diagnostics = append(result.Diagnostics, placementDiagnostics(result.Components, request.Sheet)...)
 	return NormalizeResult(result, rules)
+}
+
+func repairPlacementOverlaps(components []Component, positions map[string]kicadfiles.Point, rules Rules) (int, bool) {
+	repairs := 0
+	for repairs < rules.MaxSpacingRepairs {
+		leftIndex, rightIndex, found := firstPlacementOverlap(components, positions)
+		if !found {
+			return repairs, true
+		}
+		moved := false
+		for _, pair := range [][2]int{{rightIndex, leftIndex}, {leftIndex, rightIndex}} {
+			moving := components[pair[0]]
+			if moving.Fixed {
+				continue
+			}
+			obstacle := componentBoundsAt(components[pair[1]], positions[components[pair[1]].Ref])
+			for _, candidate := range overlapRepairCandidates(moving, positions[moving.Ref], obstacle, rules) {
+				original := positions[moving.Ref]
+				positions[moving.Ref] = candidate
+				if relativePositionsSatisfied(components, positions, rules) && placementPositionClear(moving.Ref, components, positions) {
+					moved = true
+					repairs++
+					break
+				}
+				positions[moving.Ref] = original
+			}
+			if moved {
+				break
+			}
+		}
+		if !moved {
+			return repairs, false
+		}
+	}
+	_, _, found := firstPlacementOverlap(components, positions)
+	return repairs, !found
+}
+
+func firstPlacementOverlap(components []Component, positions map[string]kicadfiles.Point) (int, int, bool) {
+	for left := 0; left < len(components); left++ {
+		leftBounds := placementOverlapBounds(components[left], positions[components[left].Ref])
+		for right := left + 1; right < len(components); right++ {
+			if leftBounds.Intersects(placementOverlapBounds(components[right], positions[components[right].Ref])) {
+				return left, right, true
+			}
+		}
+	}
+	return 0, 0, false
+}
+
+func overlapRepairCandidates(component Component, position kicadfiles.Point, obstacle Rect, rules Rules) []kicadfiles.Point {
+	local := TransformRect(DefaultBodyFor(PlacedComponent{Component: component}), component.Rotation, component.Mirror)
+	candidates := []kicadfiles.Point{
+		{X: position.X, Y: snapAtLeast(obstacle.MaxY+rules.MinComponentSpacing-local.MinY, rules.Grid)},
+		{X: position.X, Y: snapAtMost(obstacle.MinY-rules.MinComponentSpacing-local.MaxY, rules.Grid)},
+		{X: snapAtLeast(obstacle.MaxX+rules.MinComponentSpacing-local.MinX, rules.Grid), Y: position.Y},
+		{X: snapAtMost(obstacle.MinX-rules.MinComponentSpacing-local.MaxX, rules.Grid), Y: position.Y},
+	}
+	sort.SliceStable(candidates, func(i, j int) bool {
+		left := absIU(candidates[i].X-position.X) + absIU(candidates[i].Y-position.Y)
+		right := absIU(candidates[j].X-position.X) + absIU(candidates[j].Y-position.Y)
+		return left < right
+	})
+	return candidates
+}
+
+func placementPositionClear(ref string, components []Component, positions map[string]kicadfiles.Point) bool {
+	var moving Component
+	found := false
+	for _, component := range components {
+		if component.Ref == ref {
+			moving = component
+			found = true
+			break
+		}
+	}
+	if !found {
+		return false
+	}
+	bounds := componentBoundsAt(moving, positions[ref])
+	for _, component := range components {
+		if component.Ref != ref && shrinkRect(bounds, kicadfiles.MM(0.5)).Intersects(placementOverlapBounds(component, positions[component.Ref])) {
+			return false
+		}
+	}
+	return true
+}
+
+func placementOverlapBounds(component Component, position kicadfiles.Point) Rect {
+	return shrinkRect(componentBoundsAt(component, position), kicadfiles.MM(0.5))
+}
+
+// spreadAuxiliaryLaneRanks prevents dense feedback, bias, rail, and passive
+// signal branches from becoming a single tall column. Active devices in the
+// main signal lane are deliberately unchanged so complementary pairs and
+// parallel gain stages retain their conventional vertical alignment.
+func spreadAuxiliaryLaneRanks(components []Component, cells map[string]placementCell, limit int) (map[string]placementCell, int) {
+	if limit <= 0 {
+		return cells, len(sortedPlacementRanks(cells))
+	}
+	type bucketKey struct {
+		rank int
+		lane Lane
+	}
+	buckets := map[bucketKey][]Component{}
+	for _, component := range components {
+		if component.RankFixed || !auxiliaryRankCandidate(component) {
+			continue
+		}
+		cell := cells[component.Ref]
+		key := bucketKey{rank: cell.rank, lane: component.Lane}
+		buckets[key] = append(buckets[key], component)
+	}
+	subrankByRef := map[string]int{}
+	widthByRank := map[int]int{}
+	for key, items := range buckets {
+		sort.SliceStable(items, func(i, j int) bool {
+			left, right := cells[items[i].Ref], cells[items[j].Ref]
+			if left.island != right.island {
+				return left.island < right.island
+			}
+			if left.order != right.order {
+				return left.order < right.order
+			}
+			return items[i].Ref < items[j].Ref
+		})
+		for index, component := range items {
+			subrank := index / limit
+			subrankByRef[component.Ref] = subrank
+			if subrank+1 > widthByRank[key.rank] {
+				widthByRank[key.rank] = subrank + 1
+			}
+		}
+	}
+	ranks := sortedPlacementRanks(cells)
+	baseByRank := map[int]int{}
+	next := 0
+	for _, rank := range ranks {
+		baseByRank[rank] = next
+		width := widthByRank[rank]
+		if width < 1 {
+			width = 1
+		}
+		next += width
+	}
+	spread := make(map[string]placementCell, len(cells))
+	for ref, cell := range cells {
+		cell.rank = baseByRank[cell.rank] + subrankByRef[ref]
+		spread[ref] = cell
+	}
+	return spread, len(sortedPlacementRanks(spread))
+}
+
+func auxiliaryRankCandidate(component Component) bool {
+	if component.Lane != LaneSignal && component.Lane != LaneUnknown {
+		return true
+	}
+	return containsNormalizedRole(
+		component.Role,
+		"resistor", "capacitor", "inductor", "diode", "protection", "fuse", "tvs",
+	)
+}
+
+func sortedPlacementRanks(cells map[string]placementCell) []int {
+	seen := map[int]struct{}{}
+	for _, cell := range cells {
+		seen[cell.rank] = struct{}{}
+	}
+	ranks := make([]int, 0, len(seen))
+	for rank := range seen {
+		ranks = append(ranks, rank)
+	}
+	sort.Ints(ranks)
+	return ranks
 }
 
 func resolveCanonicalPinAnchorPositions(components []PlacedComponent) ([]PlacedComponent, []Diagnostic) {

@@ -265,7 +265,7 @@ func TestBuilderRotatesExplicitSymbolPinAnchors(t *testing.T) {
 		t.Fatalf("unexpected symbols: %#v", design.Schematic.Symbols)
 	}
 	anchor := design.Schematic.Symbols[0].PinAnchors[0]
-	want := kicadfiles.Point{X: kicadfiles.MM(50.8), Y: kicadfiles.MM(55.88)}
+	want := kicadfiles.Point{X: kicadfiles.MM(50.8), Y: kicadfiles.MM(45.72)}
 	if anchor != want {
 		t.Fatalf("rotated pin anchor = %#v, want %#v", anchor, want)
 	}
@@ -341,6 +341,33 @@ func TestBuilderConnectUsesExplicitOrthogonalWaypoints(t *testing.T) {
 		if wire.Points[0] != waypoints[index] || wire.Points[1] != waypoints[index+1] {
 			t.Fatalf("wire %d = %#v, want %#v -> %#v", index, wire.Points, waypoints[index], waypoints[index+1])
 		}
+	}
+}
+
+func TestSchematicLabelOptionsForStubFacesAwayFromComponent(t *testing.T) {
+	anchor := kicadfiles.Point{X: kicadfiles.MM(20.32), Y: kicadfiles.MM(20.32)}
+	tests := []struct {
+		name         string
+		label        kicadfiles.Point
+		wantRotation kicadfiles.Angle
+		wantRight    bool
+	}{
+		{name: "left", label: kicadfiles.Point{X: anchor.X - kicadfiles.MM(1.27), Y: anchor.Y}, wantRotation: 180, wantRight: true},
+		{name: "right", label: kicadfiles.Point{X: anchor.X + kicadfiles.MM(1.27), Y: anchor.Y}},
+		{name: "above", label: kicadfiles.Point{X: anchor.X, Y: anchor.Y - kicadfiles.MM(1.27)}, wantRotation: 270, wantRight: true},
+		{name: "below", label: kicadfiles.Point{X: anchor.X, Y: anchor.Y + kicadfiles.MM(1.27)}, wantRotation: 90},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			got := schematicLabelOptionsForStub(anchor, test.label)
+			if got.Rotation != test.wantRotation {
+				t.Fatalf("rotation = %v, want %v", got.Rotation, test.wantRotation)
+			}
+			gotRight := len(got.Justify) == 1 && got.Justify[0] == "right"
+			if gotRight != test.wantRight {
+				t.Fatalf("justification = %#v, want right=%t", got.Justify, test.wantRight)
+			}
+		})
 	}
 }
 

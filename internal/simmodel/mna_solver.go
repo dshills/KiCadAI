@@ -100,6 +100,15 @@ func evaluateMNA(plan Plan, report Report) (Report, []Diagnostic) {
 		if analysis.Kind == AnalysisACSweep {
 			frequencies = sweepFrequencies(analysis)
 		}
+		var operatingPoint *smallSignalOperatingPoint
+		if !model.NonlinearDC && smallSignalAnalysis(analysis.Kind) &&
+			len(compileNonlinearDevices(analysisPlan)) != 0 {
+			var diagnostics []Diagnostic
+			operatingPoint, diagnostics = prepareSmallSignalOperatingPoint(analysisPlan, analysis)
+			if len(diagnostics) != 0 {
+				return report, diagnostics
+			}
+		}
 		result := AnalysisResult{ID: analysis.ID, Kind: analysis.Kind, Points: make([]AnalysisPoint, 0, len(frequencies))}
 		for _, frequency := range frequencies {
 			if model.NonlinearDC {
@@ -115,7 +124,19 @@ func evaluateMNA(plan Plan, report Report) (Report, []Diagnostic) {
 				result.Points = append(result.Points, point)
 				continue
 			}
-			system, diagnostics := buildMNASystem(analysisPlan, analysis, frequency)
+			var system mnaSystem
+			var diagnostics []Diagnostic
+			if operatingPoint != nil {
+				system, diagnostics = buildMNASystemWithPreparedOperatingPoint(
+					analysisPlan,
+					analysis,
+					frequency,
+					operatingPoint,
+					nil,
+				)
+			} else {
+				system, diagnostics = buildMNASystem(analysisPlan, analysis, frequency)
+			}
 			if len(diagnostics) != 0 {
 				return report, diagnostics
 			}
@@ -1637,7 +1658,7 @@ func assertionValue(results []AnalysisResult, assertion Assertion) (float64, *Di
 				assertion.Quantity == QuantityMinimumTransientSOAMargin) {
 			return thermalAssertionValue(result, assertion)
 		}
-		if result.Kind == AnalysisACSweep && (assertion.Quantity == QuantityVoltageGainRatio || assertion.Quantity == QuantityCutoffFrequencyHz || assertion.Quantity == QuantityBandwidthHz) {
+		if result.Kind == AnalysisACSweep && (assertion.Quantity == QuantityVoltageGainRatio || assertion.Quantity == QuantityCutoffFrequencyHz || assertion.Quantity == QuantityBandwidthHz || assertion.Quantity == QuantityInputImpedanceOhm) {
 			return acDerivedValue(result, assertion)
 		}
 		if (result.Kind == AnalysisTransient || result.Kind == AnalysisStartup || result.Kind == AnalysisElectrothermal) &&

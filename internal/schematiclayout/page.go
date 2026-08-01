@@ -50,8 +50,31 @@ func SheetForPaperOrientation(name string, portrait bool) Sheet {
 	return Sheet{Name: trimmed, Width: kicadfiles.MM(width), Height: kicadfiles.MM(height), Margin: kicadfiles.MM(10.16)}
 }
 
+// SheetWithStandardTitleBlock reserves the lower-right region occupied by
+// KiCad's default worksheet title block. Callers opt in because legacy inputs
+// may intentionally use the full page rectangle.
+func SheetWithStandardTitleBlock(sheet Sheet) Sheet {
+	margin := sheet.Margin
+	if margin <= 0 {
+		margin = kicadfiles.MM(10.16)
+	}
+	maxX := sheet.Width - margin
+	maxY := sheet.Height - margin
+	minX := maxX - kicadfiles.MM(115)
+	minY := maxY - kicadfiles.MM(40)
+	if minX < margin {
+		minX = margin
+	}
+	if minY < margin {
+		minY = margin
+	}
+	sheet.TitleBlock = Rect{MinX: minX, MinY: minY, MaxX: maxX, MaxY: maxY}
+	return sheet
+}
+
 func pageCandidates(requested Sheet) []Sheet {
 	name := strings.ToUpper(strings.TrimSpace(requested.Name))
+	reserveTitleBlock := !requested.TitleBlock.Empty()
 	start := -1
 	for index, paper := range standardPapers {
 		if paper.name == name {
@@ -86,9 +109,17 @@ func pageCandidates(requested Sheet) []Sheet {
 		if candidate.Margin <= 0 {
 			candidate.Margin = kicadfiles.MM(10.16)
 		}
+		if reserveTitleBlock {
+			candidate.TitleBlock = Rect{}
+			candidate = SheetWithStandardTitleBlock(candidate)
+		}
 		candidates = append(candidates, candidate)
 		alternate := candidate
 		alternate.Width, alternate.Height = candidate.Height, candidate.Width
+		if reserveTitleBlock {
+			alternate.TitleBlock = Rect{}
+			alternate = SheetWithStandardTitleBlock(alternate)
+		}
 		if alternate.Width != candidate.Width || alternate.Height != candidate.Height {
 			candidates = append(candidates, alternate)
 		}

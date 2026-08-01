@@ -1264,11 +1264,22 @@ deterministically. See the
 [completion audit](simulation-guided-open-topology-synthesis/AUDIT.md) and
 [promotion matrix](simulation-guided-open-topology-synthesis/PROMOTION_MATRIX.json).
 
-1. Expand the generic graph grammar, analytic seeds, and diagnosis-to-repair
-   operators until the remaining regulator and dual-threshold behaviors close
-   without fixture identity or named topology logic.
-2. Freeze a second, independently authored behavior-only corpus to measure
-   generalization outside the implementation-development distribution.
+Simulation-grounded circuit architecture synthesis is also complete for its
+first independently frozen envelope. Behavior-only Class A, complementary
+Class AB, and 60 Hz notch requirements each generate multiple materially
+different architectures, derive values with equation provenance, run trusted
+simulation, rank all physically ready passes, and promote the winner twice
+through installed KiCad with identical project hashes. The milestone also
+proves fail-closed rejection of a plausible but unsafe bias alternative. See
+the [completion audit](simulation-grounded-architecture-synthesis/AUDIT.md) and
+[promotion matrix](simulation-grounded-architecture-synthesis/PROMOTION_MATRIX.json).
+
+1. Freeze a second, independently authored, out-of-distribution architecture
+   corpus before adding support, spanning additional analog and power families
+   and explicit adversarial safety cases.
+2. Expand the generic graph grammar, analytic seeds, and diagnosis-to-repair
+   operators only from failures in that frozen corpus, including the remaining
+   regulator and dual-threshold behaviors where they provide reusable closure.
 3. Generalize bounded placement-routing correction from observed
    failures without introducing fixture-identity logic.
 4. Expand catalog-independent part qualification, calculated rating, and

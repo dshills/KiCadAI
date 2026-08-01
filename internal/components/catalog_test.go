@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"reflect"
 	"runtime"
 	"slices"
 	"testing"
@@ -888,8 +889,17 @@ func TestCheckedInCatalogSpeakerAmplifierComponentEvidence(t *testing.T) {
 		t.Fatalf("OPA992 high-voltage rail-to-rail evidence = %#v", wideSwingOpAmp.OpAmp)
 	}
 	requireRatingMax(t, wideSwingOpAmp, "supply_voltage", "40", "V")
-	requireSymbolFunctions(t, wideSwingOpAmp, "Amplifier_Operational:LMV321", []string{"IN_MINUS", "IN_PLUS", "OUT", "V_MINUS", "V_PLUS"})
+	requireSymbolFunctions(t, wideSwingOpAmp, "Amplifier_Operational:TLV9061xDBV", []string{"IN_MINUS", "IN_PLUS", "OUT", "V_MINUS", "V_PLUS"})
 	requirePackagePads(t, wideSwingOpAmp, "sot23_5", []string{"IN_MINUS", "IN_PLUS", "OUT", "V_MINUS", "V_PLUS"})
+	functionPins := map[string]string{}
+	for _, function := range wideSwingOpAmp.Symbols[0].FunctionPins {
+		functionPins[function.Function] = function.SymbolPin
+	}
+	if !reflect.DeepEqual(functionPins, map[string]string{
+		"OUT": "1", "V_MINUS": "2", "IN_PLUS": "3", "IN_MINUS": "4", "V_PLUS": "5",
+	}) {
+		t.Fatalf("OPA992 DBV schematic pin map = %#v", functionPins)
+	}
 	if len(wideSwingOpAmp.SimulationModels) != 1 || wideSwingOpAmp.SimulationModels[0].ModelID != "mna_opamp_single_pole_v1" {
 		t.Fatalf("OPA992 trusted compact model = %#v", wideSwingOpAmp.SimulationModels)
 	}

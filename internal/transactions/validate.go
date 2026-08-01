@@ -245,6 +245,13 @@ func validateOperation(op Operation) []reports.Issue {
 			if !finite(payload.RotationDeg) {
 				issues = append(issues, issue(reports.CodeInvalidArgument, path+".rotation_deg", "rotation must be finite"))
 			}
+			for index, justification := range payload.Justify {
+				switch strings.ToLower(strings.TrimSpace(justification)) {
+				case "left", "right", "top", "bottom":
+				default:
+					issues = append(issues, issue(reports.CodeInvalidArgument, fmt.Sprintf("%s.justify[%d]", path, index), "label justification must be left, right, top, or bottom"))
+				}
+			}
 			return issues
 		})
 	case OpAddBus:
