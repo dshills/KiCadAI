@@ -35,6 +35,7 @@ func RepairCandidate(
 		InitialEvaluationHash: initial.Hash,
 		Status:                RepairSearchFailed,
 		Policy:                policy,
+		CausalAnalyses:        []CausalRepairAnalysis{},
 		Attempts:              []RepairAttempt{},
 		Issues:                []reports.Issue{},
 	}
@@ -92,104 +93,77 @@ func RepairCandidate(
 		})
 		state := frontier[0]
 		frontier = frontier[1:]
-		proposals := generateRepairProposals(requirement, state.graph, state.evaluation.Diagnoses, inventory, policy)
-		if len(proposals) == 0 {
-			continue
+		causalPolicy := policy
+		causalPolicy.MaxCandidateSimulations = max(0, policy.MaxCandidateSimulations-result.Consumption.CandidateSimulations)
+		causalPolicy.MaxCornerEvaluations = max(0, policy.MaxCornerEvaluations-result.Consumption.CornerEvaluations)
+		causalPolicy.MaxValueTrials = max(0, policy.MaxValueTrials-result.Consumption.ValueTrials)
+		causalPolicy.MaxTopologyRepairs = max(0, policy.MaxTopologyRepairs-result.Consumption.TopologyRepairs)
+		analysis, causalCandidates := analyzeCausalRepairs(
+			ctx, requirement, state.graph, state.evaluation,
+			inventory, environment, causalPolicy,
+		)
+		result.CausalAnalyses = append(result.CausalAnalyses, analysis)
+		if analysis.Status == "canceled" {
+			result.Status = RepairSearchCanceled
+			result.Issues = []reports.Issue{graphIssue(CodeCanceled, "repair", "open-topology repair canceled", "retry with an active context")}
+			return finalizeRepairSearch(result)
 		}
-		generatedProposal = true
-		for _, proposal := range proposals {
-			if err := ctx.Err(); err != nil {
-				result.Status = RepairSearchCanceled
-				result.Issues = []reports.Issue{graphIssue(CodeCanceled, "repair", "open-topology repair canceled", "retry with an active context")}
+		result.Consumption.CandidateSimulations += analysis.Consumption.CandidateSimulations
+		result.Consumption.CornerEvaluations += analysis.Consumption.CornerEvaluations
+		result.Consumption.ValueTrials += analysis.Consumption.ValueTrials
+		result.Consumption.TopologyRepairs += analysis.Consumption.TopologyTrials
+		if result.Consumption.CandidateSimulations >= policy.MaxCandidateSimulations ||
+			result.Consumption.CornerEvaluations >= policy.MaxCornerEvaluations ||
+			result.Consumption.ValueTrials >= policy.MaxValueTrials ||
+			result.Consumption.TopologyRepairs >= policy.MaxTopologyRepairs {
+			result.Consumption.BudgetExhausted = true
+		}
+		if len(analysis.Trials) != 0 {
+			generatedProposal = true
+		}
+		for _, causal := range causalCandidates {
+			trial := causal.trial
+			candidateHash := trial.GraphHash
+			if _, duplicate := seenGraphs[candidateHash]; duplicate {
+				continue
+			}
+			seenGraphs[candidateHash] = struct{}{}
+			topologyHash, _ := TopologyHash(causal.graph)
+			repair := trial.Repair
+			repair.Number = len(result.Attempts) + 1
+			attempt := RepairAttempt{
+				Number: len(result.Attempts) + 1, Repair: repair,
+				GraphHash: candidateHash, TopologyHash: topologyHash,
+				Evaluation: trial.Evaluation, Improved: trial.Authorized && trial.Improvement > causalEpsilon,
+				Status: RepairSearchFailed,
+			}
+			switch trial.Evaluation.Status {
+			case SimulationEvaluationPassed:
+				attempt.Status = RepairSearchPassed
+			case SimulationEvaluationCanceled:
+				attempt.Status = RepairSearchCanceled
+			case SimulationEvaluationUnsupported:
+				attempt.Status = RepairSearchUnsupported
+			case SimulationEvaluationExhausted:
+				attempt.Status = RepairSearchExhausted
+			}
+			result.Attempts = append(result.Attempts, attempt)
+			if trial.Authorized && trial.Evaluation.Status == SimulationEvaluationPassed {
+				result.Status = RepairSearchPassed
+				repairs := append(append([]Repair(nil), state.repairs...), repair)
+				result.Selected = &RepairedCandidate{
+					Graph: causal.graph, Repair: repair, Repairs: repairs,
+					Evaluation: trial.Evaluation,
+				}
 				return finalizeRepairSearch(result)
 			}
-			if result.Consumption.TopologyRepairs >= policy.MaxTopologyRepairs ||
-				result.Consumption.CandidateSimulations >= policy.MaxCandidateSimulations ||
-				result.Consumption.CornerEvaluations >= policy.MaxCornerEvaluations ||
-				result.Consumption.ValueTrials >= policy.MaxValueTrials {
-				result.Consumption.BudgetExhausted = true
-				break
-			}
-			result.Consumption.TopologyRepairs++
-			proposal.repair.Number = result.Consumption.TopologyRepairs
-			remainingValueTrials := policy.MaxValueTrials - result.Consumption.ValueTrials
-			perRepairValueTrials := max(1, policy.MaxValueTrials/max(1, policy.MaxTopologyRepairs))
-			trials := repairedGraphValueTrials(requirement, proposal.graph, inventory, min(remainingValueTrials, perRepairValueTrials), policy)
-			for _, candidate := range trials {
-				if result.Consumption.CandidateSimulations >= policy.MaxCandidateSimulations ||
-					result.Consumption.CornerEvaluations >= policy.MaxCornerEvaluations {
-					result.Consumption.BudgetExhausted = true
-					break
-				}
-				if !repairGraphDeltaPreserved(
-					state.graph,
-					candidate.graph,
-					proposal.repair,
-				) {
-					continue
-				}
-				candidateHash, hashErr := GraphHash(candidate.graph)
-				if hashErr != nil {
-					continue
-				}
-				if _, duplicate := seenGraphs[candidateHash]; duplicate {
-					continue
-				}
-				seenGraphs[candidateHash] = struct{}{}
-				if candidate.trial != nil {
-					result.Consumption.ValueTrials++
-				}
-				evaluationPolicy := policy
-				evaluationPolicy.MaxCandidateSimulations = policy.MaxCandidateSimulations - result.Consumption.CandidateSimulations
-				evaluationPolicy.MaxCornerEvaluations = policy.MaxCornerEvaluations - result.Consumption.CornerEvaluations
-				evaluation := EvaluateCandidate(ctx, requirement, candidate.graph, candidate.trial, inventory, environment, evaluationPolicy)
-				result.Consumption.CandidateSimulations += evaluation.Consumption.CandidateSimulations
-				result.Consumption.CornerEvaluations += evaluation.Consumption.CornerEvaluations
-				topologyHash, _ := TopologyHash(candidate.graph)
-				attempt := RepairAttempt{
-					Number:       len(result.Attempts) + 1,
-					Repair:       proposal.repair,
-					ValueTrial:   candidate.trial,
-					GraphHash:    candidateHash,
-					TopologyHash: topologyHash,
-					Evaluation:   evaluation,
-					Improved:     simulationEvaluationPenalty(evaluation) < state.penalty,
-					Status:       RepairSearchFailed,
-				}
-				if evaluation.Status == SimulationEvaluationPassed {
-					attempt.Status = RepairSearchPassed
-					result.Attempts = append(result.Attempts, attempt)
-					result.Status = RepairSearchPassed
-					repairs := append(append([]Repair(nil), state.repairs...), proposal.repair)
-					result.Selected = &RepairedCandidate{
-						Graph: candidate.graph, Repair: proposal.repair,
-						Repairs: repairs, ValueTrial: candidate.trial, Evaluation: evaluation,
-					}
-					return finalizeRepairSearch(result)
-				}
-				if evaluation.Status == SimulationEvaluationCanceled {
-					attempt.Status = RepairSearchCanceled
-					result.Attempts = append(result.Attempts, attempt)
-					result.Status = RepairSearchCanceled
-					result.Issues = []reports.Issue{graphIssue(CodeCanceled, "repair", "open-topology repair canceled", "retry with an active context")}
-					return finalizeRepairSearch(result)
-				}
-				if evaluation.Status == SimulationEvaluationUnsupported {
-					attempt.Status = RepairSearchUnsupported
-				} else if evaluation.Status == SimulationEvaluationExhausted {
-					attempt.Status = RepairSearchExhausted
-				}
-				result.Attempts = append(result.Attempts, attempt)
-				if attempt.Improved && evaluation.Status == SimulationEvaluationFailed {
-					repairs := append(append([]Repair(nil), state.repairs...), proposal.repair)
-					frontier = append(frontier, repairState{
-						graph: candidate.graph, evaluation: evaluation, repairs: repairs,
-						penalty: simulationEvaluationPenalty(evaluation), hash: candidateHash,
-					})
-				}
-			}
-			if result.Consumption.BudgetExhausted {
-				break
+			if trial.Authorized && trial.Improvement > causalEpsilon &&
+				trial.Evaluation.Status == SimulationEvaluationFailed {
+				repairs := append(append([]Repair(nil), state.repairs...), repair)
+				frontier = append(frontier, repairState{
+					graph: causal.graph, evaluation: trial.Evaluation, repairs: repairs,
+					penalty: simulationEvaluationPenalty(trial.Evaluation), hash: candidateHash,
+				})
 			}
 		}
 		if len(frontier) > policy.MaxRetainedCandidates {
@@ -223,6 +197,13 @@ func repairGraphDeltaPreserved(
 	afterTopology, afterErr := TopologyHash(after)
 	for _, change := range repair.Changes {
 		switch change.Kind {
+		case "set_value":
+			instanceIndex := graphInstanceIndex(after, change.Primitive)
+			if instanceIndex < 0 || change.ToValue == nil ||
+				after.Instances[instanceIndex].ValueSI == nil ||
+				math.Float64bits(*after.Instances[instanceIndex].ValueSI) != math.Float64bits(*change.ToValue) {
+				return false
+			}
 		case "add_primitive", "redirect_terminal":
 			if beforeErr != nil || afterErr != nil ||
 				beforeTopology == afterTopology {

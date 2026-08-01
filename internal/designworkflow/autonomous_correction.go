@@ -260,7 +260,7 @@ func PlanAutonomousCorrection(request Request, placementRequest placement.Reques
 func autonomousCorrectionAuthorizationDiagnostics(diagnostics []AutonomousCorrectionDiagnostic) []AutonomousCorrectionDiagnostic {
 	actionableNets := map[string]struct{}{}
 	for _, diagnostic := range diagnostics {
-		if !diagnostic.AutomaticAction || len(diagnostic.Refs) == 0 {
+		if !diagnostic.AutomaticAction || len(diagnostic.Nets) == 0 {
 			continue
 		}
 		for _, net := range diagnostic.Nets {
@@ -278,7 +278,18 @@ func autonomousCorrectionAuthorizationDiagnostics(diagnostics []AutonomousCorrec
 }
 
 func autonomousCorrectionTerminalDiagnosticCovered(diagnostic AutonomousCorrectionDiagnostic, actionableNets map[string]struct{}) bool {
-	if diagnostic.AutomaticAction || len(diagnostic.Refs) != 0 || len(diagnostic.Nets) == 0 {
+	if diagnostic.AutomaticAction || len(diagnostic.Nets) == 0 {
+		return false
+	}
+	if diagnostic.IssueCode == reports.CodeRouteCopperConflict {
+		for _, net := range diagnostic.Nets {
+			if _, covered := actionableNets[net]; covered {
+				return true
+			}
+		}
+		return false
+	}
+	if len(diagnostic.Refs) != 0 {
 		return false
 	}
 	terminal := diagnostic.IssueCode == reports.CodeDisconnectedPad ||
@@ -917,6 +928,17 @@ func autonomousCorrectionCategory(issue reports.Issue, diagnostic routing.Repair
 		return CorrectionSameNetBranchMerge
 	case reports.CodeDisconnectedPad, reports.CodeRouteContactMissingTarget, reports.CodeRouteContactMiss, reports.CodeRouteCompletionPartial:
 		return CorrectionRequiredNetDisconnectedEndpoint
+	}
+	// A failed routed-net search can arrive with a backend-specific message that
+	// the routing diagnostic parser does not recognize.  Its structured scope is
+	// still sufficient to authorize the same bounded placement correction: a
+	// routed-net path, at least two endpoint references, and a resolved net.
+	// Keep this independent of component names and diagnostic prose.
+	if issue.Code == reports.CodeValidationFailed &&
+		strings.HasPrefix(normalizeAutonomousCorrectionPath(issue.Path), "nets.") &&
+		len(correctionSortedStrings(issue.Refs)) >= 2 &&
+		len(correctionSortedStrings(issue.Nets)) >= 1 {
+		return CorrectionRoutingRegionExhaustion
 	}
 	if strings.Contains(normalizeAutonomousCorrectionPath(issue.Path), "branches[") && diagnostic.Category == routing.RepairRouteSearch {
 		return CorrectionRouteTreeBranchOrder

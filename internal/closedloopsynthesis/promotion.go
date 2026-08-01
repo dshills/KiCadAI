@@ -112,7 +112,7 @@ func ReplaySimulationEvidence(evidence SimulationEvidence) []Diagnostic {
 			Message: fmt.Sprintf("simulation transcript has %d reports for %d resolved plans", len(evidence.Reports), len(plans)),
 		})
 	}
-	replayed, replayDiagnostics := evaluateTrustedSimulationPlans(plans)
+	replayed, replayDiagnostics := evaluateTrustedSimulationPlans(plans, nil)
 	for index, planDiagnostics := range replayDiagnostics {
 		for _, diagnostic := range planDiagnostics {
 			diagnostics = append(diagnostics, Diagnostic{

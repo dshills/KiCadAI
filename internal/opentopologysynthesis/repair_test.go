@@ -25,9 +25,11 @@ func TestGenericGraphChangingRepairAddsMissingPassiveAndReplays(t *testing.T) {
 	if first.Status != RepairSearchPassed || first.Selected == nil || len(first.Attempts) == 0 {
 		t.Fatalf("repair = status=%s attempts=%d consumption=%#v issues=%#v", first.Status, len(first.Attempts), first.Consumption, first.Issues)
 	}
-	if first.Selected.Repair.Operator != "add_passive_edge" ||
-		len(first.Selected.Repair.Changes) != 1 ||
-		first.Selected.Repair.Changes[0].Kind != "add_primitive" ||
+	hasAddedPrimitive := false
+	for _, change := range first.Selected.Repair.Changes {
+		hasAddedPrimitive = hasAddedPrimitive || change.Kind == "add_primitive"
+	}
+	if first.Selected.Repair.Operator != "add_passive_edge" || !hasAddedPrimitive ||
 		first.Selected.Evaluation.Status != SimulationEvaluationPassed ||
 		first.Selected.Repair.BeforeGraphHash == first.Selected.Repair.AfterGraphHash ||
 		!repairGraphDeltaPreserved(graph, first.Selected.Graph, first.Selected.Repair) {

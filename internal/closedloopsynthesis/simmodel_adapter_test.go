@@ -79,6 +79,46 @@ func TestSimModelEvaluatorRepairsThroughFreshTrustedResolution(t *testing.T) {
 	}
 }
 
+func TestSimulationEvaluationCacheIsBoundedAndEvidenceNeutral(t *testing.T) {
+	registry, diagnostics := modelprovenance.LoadDefault()
+	if len(diagnostics) != 0 {
+		t.Fatalf("model provenance registry diagnostics: %#v", diagnostics)
+	}
+	cache := NewSimulationEvaluationCache()
+	cache.limit = 1
+	evaluator := SimModelEvaluator{
+		Resolver: dividerSimulationResolver{}, ProvenanceRegistry: registry, Cache: cache,
+	}
+	state := CandidateState{
+		Fingerprint: testHash("cached-divider"),
+		Variables:   []Variable{{ID: "lower_resistance", Value: 10_000}},
+	}
+	first, err := evaluator.Evaluate(context.Background(), state)
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := evaluator.Evaluate(context.Background(), state)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if hashJSON(first) != hashJSON(second) {
+		t.Fatal("cached trusted simulation evidence differs")
+	}
+	first.Simulation.Reports[0].Status = "tampered"
+	third, err := evaluator.Evaluate(context.Background(), state)
+	if err != nil || third.Simulation.Reports[0].Status == "tampered" {
+		t.Fatalf("cached report alias escaped: status=%q err=%v", third.Simulation.Reports[0].Status, err)
+	}
+	different := cloneState(state)
+	different.Variables[0].Value = 5_000
+	if _, err := evaluator.Evaluate(context.Background(), different); err != nil {
+		t.Fatal(err)
+	}
+	if len(cache.entries) != 1 {
+		t.Fatalf("cache entries=%d, want hard limit 1", len(cache.entries))
+	}
+}
+
 func TestSimModelEvaluatorFailsClosedForInvalidLinksAndStructuralDiagnostics(t *testing.T) {
 	evaluator := SimModelEvaluator{Resolver: invalidSimulationResolver{}}
 	if _, err := evaluator.Evaluate(context.Background(), CandidateState{Fingerprint: testHash("invalid")}); err == nil {

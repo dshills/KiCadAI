@@ -11,20 +11,21 @@ func TestWorstCaseCornerWorkersReserveNestedAnalysisBudget(t *testing.T) {
 	tests := []struct {
 		name       string
 		corners    int
+		analyses   int
 		processors int
 		want       int
 	}{
-		{name: "no work", corners: 0, processors: 12, want: 0},
-		{name: "single processor", corners: 20, processors: 1, want: 1},
-		{name: "four processors", corners: 20, processors: 4, want: 1},
-		{name: "twelve processors", corners: 20, processors: 12, want: 3},
-		{name: "corner count caps workers", corners: 2, processors: 32, want: 2},
-		{name: "configured cap remains authoritative", corners: 20, processors: 64, want: maxWorstCaseWorkers},
+		{name: "no work", corners: 0, analyses: 1, processors: 12, want: 0},
+		{name: "single processor", corners: 20, analyses: 1, processors: 1, want: 1},
+		{name: "one analysis uses corner workers", corners: 20, analyses: 1, processors: 4, want: 4},
+		{name: "four analyses reserve inner workers", corners: 20, analyses: 4, processors: 12, want: 3},
+		{name: "corner count caps workers", corners: 2, analyses: 1, processors: 32, want: 2},
+		{name: "configured cap remains authoritative", corners: 20, analyses: 1, processors: 64, want: maxWorstCaseWorkers},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			if got := worstCaseCornerWorkerCount(test.corners, test.processors); got != test.want {
-				t.Fatalf("worstCaseCornerWorkerCount(%d, %d) = %d, want %d", test.corners, test.processors, got, test.want)
+			if got := worstCaseCornerWorkerCount(test.corners, test.analyses, test.processors); got != test.want {
+				t.Fatalf("worstCaseCornerWorkerCount(%d, %d, %d) = %d, want %d", test.corners, test.analyses, test.processors, got, test.want)
 			}
 		})
 	}

@@ -118,6 +118,7 @@ func SynthesizeClosedLoop(
 	evaluator := closedloopsynthesis.SimModelEvaluator{
 		Resolver:           closedloopsynthesis.PlannedSimulationResolver{Base: resolver},
 		ProvenanceRegistry: resolver.ProvenanceRegistry,
+		Cache:              closedloopsynthesis.NewSimulationEvaluationCache(),
 	}
 	report := closedloopsynthesis.Run(ctx, input, evaluator, policy)
 	if report.Status != "pass" || report.Selected == nil {

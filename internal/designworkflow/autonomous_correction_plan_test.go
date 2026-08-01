@@ -7,6 +7,7 @@ import (
 	"kicadai/internal/placement"
 	"kicadai/internal/reports"
 	"kicadai/internal/routing"
+	"kicadai/internal/transactions"
 )
 
 func TestPlanAutonomousCorrectionSelectsSupportedActions(t *testing.T) {
@@ -97,6 +98,75 @@ func TestPlanAutonomousCorrectionPreservesCoveredTerminalDiagnostics(t *testing.
 	plan, err = PlanAutonomousCorrection(request, placementRequest, placements, []AutonomousCorrectionDiagnostic{terminal}, AutonomousCorrectionPlanOptions{Attempt: 2, MaxAttempts: 3})
 	if err != nil || plan.Authorized || plan.StopReason != CorrectionStopUnsupportedDiagnostic {
 		t.Fatalf("standalone terminal diagnostic did not fail closed: plan=%#v err=%v", plan, err)
+	}
+}
+
+func TestPlanAutonomousCorrectionAcceptsRouteScopedCoverageWithoutRefs(t *testing.T) {
+	request := correctionExplicitRequest()
+	placementRequest, placements := correctionPlacementState(false)
+	operations := []transactions.Operation{
+		correctionRouteOperation(t, "SIG", 1, 1, 1, 4, 1),
+		correctionRouteOperation(t, "GND", 2, 2, 0, 2, 4),
+	}
+	diagnostics := BuildAutonomousCorrectionDiagnosticsForRouting(nil, RoutingStageResult{
+		Operations: operations,
+		Stage: StageResult{Issues: []reports.Issue{{
+			Code: reports.CodeRouteCopperConflict, Severity: reports.SeverityBlocked,
+			Nets: []string{"SIG", "GND"},
+		}}},
+	})
+	if len(diagnostics) != 1 || !diagnostics[0].AutomaticAction {
+		t.Fatalf("route-scoped diagnostic = %#v", diagnostics)
+	}
+	terminal := correctionDiagnostic(CorrectionRequiredNetDisconnectedEndpoint, routing.RepairConnectivity, nil, []string{"SIG"})
+	terminal.IssueCode = reports.CodeDisconnectedPad
+	terminal.AutomaticAction = false
+	diagnostics = append(diagnostics, terminal)
+
+	plan, err := PlanAutonomousCorrection(request, placementRequest, placements, diagnostics, AutonomousCorrectionPlanOptions{
+		Attempt: 2, MaxAttempts: 3, RouteOperations: operations,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !plan.Authorized || plan.StopReason != "" || len(plan.Actions) != 1 || plan.Actions[0].Kind != CorrectionActionRerouteAffectedNets {
+		t.Fatalf("route-scoped covered terminal plan = %#v", plan)
+	}
+}
+
+func TestPlanAutonomousCorrectionCoversDerivedConflictOnFailedNet(t *testing.T) {
+	request := correctionExplicitRequest()
+	placementRequest, placements := correctionPlacementState(false)
+	actionable := correctionDiagnostic(CorrectionRoutingRegionExhaustion, routing.RepairClearance, []string{"J1", "R1"}, []string{"SIG"})
+	conflict := correctionDiagnostic(CorrectionForeignNetCrossing, routing.RepairClearance, nil, []string{"SIG", "GND"})
+	conflict.IssueCode = reports.CodeRouteCopperConflict
+	conflict.AutomaticAction = false
+
+	plan, err := PlanAutonomousCorrection(request, placementRequest, placements, []AutonomousCorrectionDiagnostic{actionable, conflict}, AutonomousCorrectionPlanOptions{Attempt: 2, MaxAttempts: 3})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !plan.Authorized || plan.StopReason != "" || len(plan.Actions) != 1 || plan.Actions[0].Kind != CorrectionActionAdjustRelativeSpacing {
+		t.Fatalf("derived failed-net conflict plan = %#v", plan)
+	}
+}
+
+func TestAutonomousCorrectionClassifiesStructuredRoutedNetFailureWithoutMessageMatching(t *testing.T) {
+	issue := reports.Issue{
+		Code:    reports.CodeValidationFailed,
+		Path:    "nets.SIG",
+		Message: "backend-specific route failure",
+		Refs:    []string{"J1", "R1"},
+		Nets:    []string{"SIG"},
+	}
+	diagnostic := routing.RepairDiagnostic{Category: routing.RepairUnknown}
+	if got := autonomousCorrectionCategory(issue, diagnostic); got != CorrectionRoutingRegionExhaustion {
+		t.Fatalf("category = %q, want %q", got, CorrectionRoutingRegionExhaustion)
+	}
+
+	issue.Path = "validation"
+	if got := autonomousCorrectionCategory(issue, diagnostic); got != CorrectionUnsupportedGeometry {
+		t.Fatalf("unscoped category = %q, want %q", got, CorrectionUnsupportedGeometry)
 	}
 }
 

@@ -10,6 +10,7 @@ import (
 	"reflect"
 	"slices"
 	"strings"
+	"sync"
 
 	"kicadai/internal/modelprovenance"
 	"kicadai/internal/simmodel"
@@ -20,6 +21,8 @@ import (
 // both endpoints for every analysis, so the effective budget grows only by the
 // minimum needed to preserve those boundaries.
 const maxPersistedAnalysisPointsPerReport = 256
+
+const defaultSimulationEvaluationCacheEntries = 256
 
 // SimulationResolver is the trusted boundary between a candidate state and a
 // fully resolved simulation plan. Implementations must apply every variable,
@@ -62,6 +65,28 @@ type SimulationAssertionSet struct {
 type SimModelEvaluator struct {
 	Resolver           SimulationResolver
 	ProvenanceRegistry modelprovenance.Registry
+	Cache              *SimulationEvaluationCache
+}
+
+// SimulationEvaluationCache reuses trusted results only when the complete
+// resolved plan is byte-identical. It is scoped to one synthesis run, bounded,
+// and excluded from persisted evidence.
+type SimulationEvaluationCache struct {
+	mu      sync.Mutex
+	limit   int
+	entries map[string]simulationEvaluationCacheEntry
+}
+
+type simulationEvaluationCacheEntry struct {
+	report      simmodel.Report
+	diagnostics []simmodel.Diagnostic
+}
+
+func NewSimulationEvaluationCache() *SimulationEvaluationCache {
+	return &SimulationEvaluationCache{
+		limit:   defaultSimulationEvaluationCacheEntries,
+		entries: make(map[string]simulationEvaluationCacheEntry),
+	}
 }
 
 func (evaluator SimModelEvaluator) Evaluate(ctx context.Context, state CandidateState) (Evaluation, error) {
@@ -83,7 +108,7 @@ func (evaluator SimModelEvaluator) Evaluate(ctx context.Context, state Candidate
 	// Provenance is derived after trusted resolution. Any resolver-supplied
 	// decisions are replaced so they cannot become promotion evidence.
 	resolution.ModelDecisions = modelDecisions
-	reports, planDiagnostics := evaluateTrustedSimulationPlans(plans)
+	reports, planDiagnostics := evaluateTrustedSimulationPlans(plans, evaluator.Cache)
 	for index, diagnostics := range planDiagnostics {
 		if len(diagnostics) != 0 && !onlyAssertionFailures(reports[index], diagnostics) {
 			plan := plans[index]
@@ -119,16 +144,68 @@ func (evaluator SimModelEvaluator) Evaluate(ctx context.Context, state Candidate
 	}, nil
 }
 
-func evaluateTrustedSimulationPlans(plans []simmodel.Plan) ([]simmodel.Report, [][]simmodel.Diagnostic) {
+func evaluateTrustedSimulationPlans(plans []simmodel.Plan, cache *SimulationEvaluationCache) ([]simmodel.Report, [][]simmodel.Diagnostic) {
 	reports := make([]simmodel.Report, len(plans))
 	diagnostics := make([][]simmodel.Diagnostic, len(plans))
 	// simmodel owns the bounded parallelism for a plan's worst-case corners and
 	// analyses. Evaluating independent plans serially prevents those nested
 	// worker pools from multiplying the CPU and memory work budget.
 	for index := range plans {
+		key, cacheable := "", false
+		if cache != nil {
+			key, cacheable = simulationEvaluationCacheKey(plans[index])
+			if cacheable {
+				if report, planDiagnostics, found := cache.get(key); found {
+					reports[index], diagnostics[index] = report, planDiagnostics
+					continue
+				}
+			}
+		}
 		reports[index], diagnostics[index] = simmodel.Evaluate(simmodel.ClonePlan(plans[index]))
+		if cacheable {
+			cache.put(key, reports[index], diagnostics[index])
+		}
 	}
 	return reports, diagnostics
+}
+
+func (cache *SimulationEvaluationCache) get(key string) (simmodel.Report, []simmodel.Diagnostic, bool) {
+	if cache == nil {
+		return simmodel.Report{}, nil, false
+	}
+	cache.mu.Lock()
+	defer cache.mu.Unlock()
+	entry, found := cache.entries[key]
+	if !found {
+		return simmodel.Report{}, nil, false
+	}
+	return simmodel.CloneReport(entry.report), append([]simmodel.Diagnostic(nil), entry.diagnostics...), true
+}
+
+func (cache *SimulationEvaluationCache) put(key string, report simmodel.Report, diagnostics []simmodel.Diagnostic) {
+	if cache == nil {
+		return
+	}
+	cache.mu.Lock()
+	defer cache.mu.Unlock()
+	if _, found := cache.entries[key]; found || len(cache.entries) >= cache.limit {
+		return
+	}
+	cache.entries[key] = simulationEvaluationCacheEntry{
+		report: simmodel.CloneReport(report), diagnostics: append([]simmodel.Diagnostic(nil), diagnostics...),
+	}
+}
+
+func simulationEvaluationCacheKey(plan simmodel.Plan) (string, bool) {
+	// encoding/json sorts string-keyed maps, so the complete typed plan has a
+	// stable representation.  A future unsupported field fails closed by
+	// bypassing the cache rather than reusing an ambiguous result.
+	data, err := json.Marshal(plan)
+	if err != nil {
+		return "", false
+	}
+	sum := sha256.Sum256(data)
+	return hex.EncodeToString(sum[:]), true
 }
 
 func validateSimulationResolution(resolution SimulationResolution) []Diagnostic {
