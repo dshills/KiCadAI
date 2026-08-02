@@ -41,6 +41,7 @@ func TestProtectedCurrentDriverRepairTraceReplaysAndFailsClosedPrecisely(t *test
 		t.Fatal("failed repair emitted a physical current-driver project")
 	}
 	traced := false
+	causal := false
 	for _, candidate := range first.Candidates {
 		if candidate.Repair == nil {
 			continue
@@ -54,10 +55,25 @@ func TestProtectedCurrentDriverRepairTraceReplaysAndFailsClosedPrecisely(t *test
 				t.Fatalf("incomplete current-driver proposal: %#v", proposal)
 			}
 		}
+		if len(candidate.Repair.CausalAnalyses) == 0 {
+			t.Fatal("current-driver repair lacks simulation-guided causal analyses")
+		}
+		for _, analysis := range candidate.Repair.CausalAnalyses {
+			if err := validateCausalRepairAnalysis(analysis); err != nil {
+				t.Fatalf("invalid current-driver causal analysis: %v", err)
+			}
+			if len(analysis.Trials) == 0 {
+				t.Fatal("current-driver causal analysis lacks perturbation trials")
+			}
+			causal = true
+		}
 		traced = true
 	}
 	if !traced {
 		t.Fatal("current-driver failure lacks diagnosis-driven repair evidence")
+	}
+	if !causal {
+		t.Fatal("current-driver failure lacks complete causal repair evidence")
 	}
 }
 

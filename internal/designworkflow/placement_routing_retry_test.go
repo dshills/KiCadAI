@@ -3,6 +3,7 @@ package designworkflow
 import (
 	"encoding/json"
 	"math"
+	"slices"
 	"testing"
 
 	"kicadai/internal/placement"
@@ -196,7 +197,12 @@ func TestPlacementRoutingRetryAttemptSummaryNormalizesEvidence(t *testing.T) {
 
 func TestPlacementRoutingRetryAttemptSummaryDoesNotTreatRoutingIssuesAsBoardValidation(t *testing.T) {
 	routed := RoutingStageResult{
-		Result: routing.Result{Status: routing.StatusPartial},
+		Result: routing.Result{Status: routing.StatusPartial, Routes: []routing.Route{{
+			Net: "failed", Status: routing.RouteStatusFailed, SearchNodes: 42, SearchLimitHit: true,
+			Issues: []reports.Issue{{
+				Code: reports.CodeValidationFailed, Message: "no legal path", Refs: []string{"U2", "U1"},
+			}},
+		}}},
 		Stage: StageResult{Issues: []reports.Issue{
 			{Code: reports.CodeValidationFailed, Severity: reports.SeverityWarning},
 			{Code: reports.CodeValidationFailed, Severity: reports.SeverityBlocked},
@@ -211,6 +217,11 @@ func TestPlacementRoutingRetryAttemptSummaryDoesNotTreatRoutingIssuesAsBoardVali
 	}
 	if summary.BoardValidationIssueCount != 0 || summary.BoardValidationBlocking != 0 {
 		t.Fatalf("issue summary = %#v", summary)
+	}
+	if len(summary.FailedRoutes) != 1 || summary.FailedRoutes[0].Net != "failed" ||
+		summary.FailedRoutes[0].SearchNodes != 42 || !summary.FailedRoutes[0].SearchLimitHit ||
+		len(summary.FailedRoutes[0].Issues) != 1 || !slices.Equal(summary.FailedRoutes[0].Issues[0].Refs, []string{"U1", "U2"}) {
+		t.Fatalf("failed route evidence = %#v", summary.FailedRoutes)
 	}
 }
 

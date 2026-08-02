@@ -26,43 +26,57 @@ type placementRoutingRetrySummary struct {
 }
 
 type placementRoutingRetryAttemptSummary struct {
-	Attempt                   int                 `json:"attempt"`
-	Placement                 map[string]any      `json:"placement,omitempty"`
-	BaselineRoutingStatus     routing.Status      `json:"baseline_routing_status,omitempty"`
-	BaselineRouteScore        float64             `json:"baseline_route_score,omitempty"`
-	BaselineRoutedNets        int                 `json:"baseline_routed_nets"`
-	BaselineFailedNets        int                 `json:"baseline_failed_nets"`
-	RoutingStatus             routing.Status      `json:"routing_status,omitempty"`
-	RouteScore                float64             `json:"route_score,omitempty"`
-	RoutedNets                int                 `json:"routed_nets"`
-	FailedNets                int                 `json:"failed_nets"`
-	FailedNetNames            []string            `json:"failed_net_names,omitempty"`
-	SkippedNets               int                 `json:"skipped_nets,omitempty"`
-	RoutingIssueCount         int                 `json:"routing_issue_count,omitempty"`
-	RoutingBlockingCount      int                 `json:"routing_blocking_count,omitempty"`
-	RoutingCopperConflicts    int                 `json:"routing_copper_conflicts,omitempty"`
-	PlacementScore            float64             `json:"placement_score,omitempty"`
-	BoardValidationBlocking   int                 `json:"board_validation_blocking"`
-	BoardValidationIssueCount int                 `json:"board_validation_issue_count"`
-	DRCStatus                 retryEvidenceStatus `json:"drc_status,omitempty"`
-	DRCIssueCount             int                 `json:"drc_issue_count,omitempty"`
-	DRCBlockingCount          int                 `json:"drc_blocking_count,omitempty"`
-	DRCSource                 string              `json:"drc_source,omitempty"`
-	EligibleRefCount          int                 `json:"eligible_ref_count"`
-	BlockedRefCount           int                 `json:"blocked_ref_count"`
-	Selected                  bool                `json:"selected,omitempty"`
-	SelectedReason            string              `json:"selected_reason,omitempty"`
-	RegressionFlags           []string            `json:"regression_flags,omitempty"`
-	RetryAdjustment           string              `json:"retry_adjustment,omitempty"`
-	RouteTreeCompleteGroups   int                 `json:"route_tree_complete_groups,omitempty"`
-	RouteTreePartialGroups    int                 `json:"route_tree_partial_groups,omitempty"`
-	RouteTreeBlockedGroups    int                 `json:"route_tree_blocked_groups,omitempty"`
-	RouteTreeProvenEndpoints  int                 `json:"route_tree_proven_endpoints,omitempty"`
-	RouteTreeGraphComponents  int                 `json:"route_tree_graph_components,omitempty"`
-	RouteTreeIncompleteNets   []string            `json:"route_tree_incomplete_nets,omitempty"`
-	RouteTreeBranchesRouted   int                 `json:"route_tree_branches_routed,omitempty"`
-	RouteTreeContactMisses    int                 `json:"route_tree_contact_misses,omitempty"`
-	RouteTreeIssueCount       int                 `json:"route_tree_issue_count,omitempty"`
+	Attempt                   int                   `json:"attempt"`
+	Placement                 map[string]any        `json:"placement,omitempty"`
+	BaselineRoutingStatus     routing.Status        `json:"baseline_routing_status,omitempty"`
+	BaselineRouteScore        float64               `json:"baseline_route_score,omitempty"`
+	BaselineRoutedNets        int                   `json:"baseline_routed_nets"`
+	BaselineFailedNets        int                   `json:"baseline_failed_nets"`
+	RoutingStatus             routing.Status        `json:"routing_status,omitempty"`
+	RouteScore                float64               `json:"route_score,omitempty"`
+	RoutedNets                int                   `json:"routed_nets"`
+	FailedNets                int                   `json:"failed_nets"`
+	FailedNetNames            []string              `json:"failed_net_names,omitempty"`
+	FailedRoutes              []failedRouteEvidence `json:"failed_routes,omitempty"`
+	SkippedNets               int                   `json:"skipped_nets,omitempty"`
+	RoutingIssueCount         int                   `json:"routing_issue_count,omitempty"`
+	RoutingBlockingCount      int                   `json:"routing_blocking_count,omitempty"`
+	RoutingCopperConflicts    int                   `json:"routing_copper_conflicts,omitempty"`
+	PlacementScore            float64               `json:"placement_score,omitempty"`
+	BoardValidationBlocking   int                   `json:"board_validation_blocking"`
+	BoardValidationIssueCount int                   `json:"board_validation_issue_count"`
+	DRCStatus                 retryEvidenceStatus   `json:"drc_status,omitempty"`
+	DRCIssueCount             int                   `json:"drc_issue_count,omitempty"`
+	DRCBlockingCount          int                   `json:"drc_blocking_count,omitempty"`
+	DRCSource                 string                `json:"drc_source,omitempty"`
+	EligibleRefCount          int                   `json:"eligible_ref_count"`
+	BlockedRefCount           int                   `json:"blocked_ref_count"`
+	Selected                  bool                  `json:"selected,omitempty"`
+	SelectedReason            string                `json:"selected_reason,omitempty"`
+	RegressionFlags           []string              `json:"regression_flags,omitempty"`
+	RetryAdjustment           string                `json:"retry_adjustment,omitempty"`
+	RouteTreeCompleteGroups   int                   `json:"route_tree_complete_groups,omitempty"`
+	RouteTreePartialGroups    int                   `json:"route_tree_partial_groups,omitempty"`
+	RouteTreeBlockedGroups    int                   `json:"route_tree_blocked_groups,omitempty"`
+	RouteTreeProvenEndpoints  int                   `json:"route_tree_proven_endpoints,omitempty"`
+	RouteTreeGraphComponents  int                   `json:"route_tree_graph_components,omitempty"`
+	RouteTreeIncompleteNets   []string              `json:"route_tree_incomplete_nets,omitempty"`
+	RouteTreeBranchesRouted   int                   `json:"route_tree_branches_routed,omitempty"`
+	RouteTreeContactMisses    int                   `json:"route_tree_contact_misses,omitempty"`
+	RouteTreeIssueCount       int                   `json:"route_tree_issue_count,omitempty"`
+}
+
+type failedRouteEvidence struct {
+	Net            string                     `json:"net"`
+	SearchNodes    int                        `json:"search_nodes,omitempty"`
+	SearchLimitHit bool                       `json:"search_limit_hit,omitempty"`
+	Issues         []failedRouteIssueEvidence `json:"issues,omitempty"`
+}
+
+type failedRouteIssueEvidence struct {
+	Code    reports.Code `json:"code"`
+	Message string       `json:"message"`
+	Refs    []string     `json:"refs,omitempty"`
 }
 
 type retryEvidenceStatus string
@@ -469,6 +483,7 @@ func placementRoutingAttemptSummaryForResult(attempt int, baseline *RoutingStage
 		RoutedNets:              routed.Result.Metrics.RoutedNetCount,
 		FailedNets:              routed.Result.Metrics.FailedNetCount,
 		FailedNetNames:          failedRoutingNetNames(routed.Result),
+		FailedRoutes:            failedRoutingRouteEvidence(routed.Result),
 		SkippedNets:             skippedNetCount(routed),
 		PlacementScore:          placementQualityScore(placed),
 		DRCStatus:               retryEvidenceSkipped,
@@ -531,6 +546,9 @@ func normalizePlacementRoutingRetryAttempt(summary placementRoutingRetryAttemptS
 	}
 	slices.Sort(summary.FailedNetNames)
 	summary.FailedNetNames = slices.Compact(summary.FailedNetNames)
+	slices.SortFunc(summary.FailedRoutes, func(left, right failedRouteEvidence) int {
+		return strings.Compare(left.Net, right.Net)
+	})
 	return summary
 }
 
@@ -542,6 +560,37 @@ func failedRoutingNetNames(result routing.Result) []string {
 		}
 	}
 	return failed
+}
+
+func failedRoutingRouteEvidence(result routing.Result) []failedRouteEvidence {
+	evidence := []failedRouteEvidence{}
+	for _, route := range result.Routes {
+		if route.Status != routing.RouteStatusFailed || route.Net == "" {
+			continue
+		}
+		failed := failedRouteEvidence{
+			Net: route.Net, SearchNodes: route.SearchNodes, SearchLimitHit: route.SearchLimitHit,
+		}
+		for _, issue := range route.Issues {
+			refs := append([]string(nil), issue.Refs...)
+			slices.Sort(refs)
+			refs = slices.Compact(refs)
+			failed.Issues = append(failed.Issues, failedRouteIssueEvidence{
+				Code: issue.Code, Message: issue.Message, Refs: refs,
+			})
+		}
+		slices.SortFunc(failed.Issues, func(left, right failedRouteIssueEvidence) int {
+			if order := strings.Compare(string(left.Code), string(right.Code)); order != 0 {
+				return order
+			}
+			if order := strings.Compare(left.Message, right.Message); order != 0 {
+				return order
+			}
+			return slices.Compare(left.Refs, right.Refs)
+		})
+		evidence = append(evidence, failed)
+	}
+	return evidence
 }
 
 func routingIssueCounts(issues []reports.Issue) (total, blocking, copperConflicts int) {

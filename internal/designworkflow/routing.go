@@ -3640,7 +3640,18 @@ func routingResultBetter(candidate, baseline routing.Result) bool {
 	if candidate.Metrics.RoutedNetCount != baseline.Metrics.RoutedNetCount {
 		return candidate.Metrics.RoutedNetCount > baseline.Metrics.RoutedNetCount
 	}
-	return routingStatusRank(candidate.Status) > routingStatusRank(baseline.Status)
+	if routingStatusRank(candidate.Status) != routingStatusRank(baseline.Status) {
+		return routingStatusRank(candidate.Status) > routingStatusRank(baseline.Status)
+	}
+	candidateIssues, candidateBlocking, candidateCopper := routingIssueCounts(candidate.Issues)
+	baselineIssues, baselineBlocking, baselineCopper := routingIssueCounts(baseline.Issues)
+	if candidateBlocking != baselineBlocking {
+		return candidateBlocking < baselineBlocking
+	}
+	if candidateCopper != baselineCopper {
+		return candidateCopper < baselineCopper
+	}
+	return candidateIssues < baselineIssues
 }
 
 func orderInterBlockRouteTreesForRouting(trees []InterBlockRouteTree, nets []routing.Net) []InterBlockRouteTree {

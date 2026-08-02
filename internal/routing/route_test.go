@@ -106,7 +106,7 @@ func TestCrowdedSMDPadViaAccessStaggersAndFitsAdjacentPitch(t *testing.T) {
 	}}
 	endpoints := []Endpoint{{Ref: "U1", Pin: "1"}, {Ref: "U1", Pin: "2"}}
 
-	adjusted, diameters := applyCrowdedSMDPadViaAccess(BuildPadAccess(request), request, endpoints)
+	adjusted, diameters := applyCrowdedSMDPadViaAccess(BuildPadAccess(request), request, componentsByNormalizedRef(request.Components), endpoints)
 	if len(diameters) != 2 {
 		t.Fatalf("forced endpoint vias = %#v, want both crowded pads", diameters)
 	}
@@ -141,6 +141,38 @@ func TestCrowdedSMDPadViaAccessStaggersAndFitsAdjacentPitch(t *testing.T) {
 	}
 }
 
+func TestTwoTerminalSMDPadViaAccessEscapesAwayFromOppositePad(t *testing.T) {
+	request := minimalRequest()
+	request.Board.Layers = []Layer{
+		{Name: "F.Cu", Kind: LayerCopper, Routable: true},
+		{Name: "B.Cu", Kind: LayerCopper, Routable: true},
+	}
+	request.Rules.GridMM = 0.25
+	request.Rules.TraceWidthMM = 0.2
+	request.Rules.ViaDiameterMM = 0.7
+	request.Rules.ViaClearanceMM = 0.2
+	component := Component{
+		Ref: "R1", Position: Placement{XMM: 10, YMM: 10, Layer: "F.Cu"},
+		Pads: []Pad{
+			{Name: "1", Net: "A", Position: Point{XMM: -0.825}, Type: PadSMD, Size: Size{WidthMM: 0.9, HeightMM: 0.95}, Layers: []string{"F.Cu"}},
+			{Name: "2", Net: "B", Position: Point{XMM: 0.825}, Type: PadSMD, Size: Size{WidthMM: 0.9, HeightMM: 0.95}, Layers: []string{"F.Cu"}},
+			{Name: "3", Net: "A", Position: Point{XMM: -0.825, YMM: 0.4}, Type: PadSMD, Size: Size{WidthMM: 0.4, HeightMM: 0.4}, Layers: []string{"F.Cu"}},
+		},
+	}
+	request.Components = []Component{component}
+	adjusted, forced := applyTwoTerminalSMDPadViaAccess(
+		BuildPadAccess(request), request, componentsByNormalizedRef(request.Components), []Endpoint{{Ref: "R1", Pin: "2"}},
+	)
+	points, ok := AccessPointsForEndpoint(adjusted, Endpoint{Ref: "R1", Pin: "2"})
+	if !ok || len(points) != 1 || points[0].SearchPoint == nil || len(forced) != 1 {
+		t.Fatalf("two-terminal dogbone access = points %#v forced %#v", points, forced)
+	}
+	center := absolutePadPoint(component, component.Pads[1].Position)
+	if points[0].Point.XMM <= center.XMM || points[0].SearchPoint.XMM <= points[0].Point.XMM {
+		t.Fatalf("dogbone did not escape outward from opposite pad: center=%#v access=%#v", center, points[0])
+	}
+}
+
 func TestCrowdedSMDPadViaAccessSupportsTwoLayerDogbone(t *testing.T) {
 	request := minimalRequest()
 	request.Board.Layers = []Layer{
@@ -162,7 +194,7 @@ func TestCrowdedSMDPadViaAccessSupportsTwoLayerDogbone(t *testing.T) {
 	}}
 	endpoint := Endpoint{Ref: "U1", Pin: "1"}
 
-	adjusted, diameters := applyCrowdedSMDPadViaAccess(BuildPadAccess(request), request, []Endpoint{endpoint})
+	adjusted, diameters := applyCrowdedSMDPadViaAccess(BuildPadAccess(request), request, componentsByNormalizedRef(request.Components), []Endpoint{endpoint})
 	points, ok := AccessPointsForEndpoint(adjusted, endpoint)
 	if len(diameters) != 1 || !ok || len(points) != 2 || points[0].SearchPoint == nil || points[1].SearchPoint == nil {
 		t.Fatalf("two-layer crowded dogbone = points %#v diameters %#v", points, diameters)
@@ -191,7 +223,7 @@ func TestCrowdedSMDPadViaAccessDoesNotForceOrdinaryPitchPowerPad(t *testing.T) {
 	endpoint := Endpoint{Ref: "U1", Pin: "1"}
 	access := BuildPadAccess(request)
 
-	adjusted, diameters := applyCrowdedSMDPadViaAccess(access, request, []Endpoint{endpoint})
+	adjusted, diameters := applyCrowdedSMDPadViaAccess(access, request, componentsByNormalizedRef(request.Components), []Endpoint{endpoint})
 	if len(diameters) != 0 {
 		t.Fatalf("forced endpoint vias = %#v, want ordinary-pitch pad to retain normal access", diameters)
 	}

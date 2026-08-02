@@ -3925,6 +3925,34 @@ func TestRoutingResultBetterPrefersFewerFailedNets(t *testing.T) {
 	}
 }
 
+func TestRoutingResultBetterUsesBlockingAndCopperConflictsAsTieBreakers(t *testing.T) {
+	baseMetrics := routing.Metrics{RoutedNetCount: 4, FailedNetCount: 1}
+	baseline := routing.Result{
+		Status: routing.StatusPartial, Metrics: baseMetrics,
+		Issues: []reports.Issue{
+			{Code: reports.CodeRouteCopperConflict, Severity: reports.SeverityBlocked},
+			{Code: reports.CodeRouteCopperConflict, Severity: reports.SeverityBlocked},
+		},
+	}
+	fewerBlocking := routing.Result{
+		Status: routing.StatusPartial, Metrics: baseMetrics,
+		Issues: []reports.Issue{{Code: reports.CodeRouteCopperConflict, Severity: reports.SeverityBlocked}},
+	}
+	if !routingResultBetter(fewerBlocking, baseline) {
+		t.Fatal("candidate with fewer blocking routing issues must advance the negotiation frontier")
+	}
+	fewerCopper := routing.Result{
+		Status: routing.StatusPartial, Metrics: baseMetrics,
+		Issues: []reports.Issue{
+			{Code: reports.CodeRouteCopperConflict, Severity: reports.SeverityBlocked},
+			{Code: reports.CodeValidationFailed, Severity: reports.SeverityBlocked},
+		},
+	}
+	if !routingResultBetter(fewerCopper, baseline) {
+		t.Fatal("candidate with equally many blockers but fewer copper conflicts must advance the negotiation frontier")
+	}
+}
+
 func TestLocalRouteRebuildStrategyBudgetBoundsLargeDesigns(t *testing.T) {
 	if got := localRouteRebuildStrategyBudget(8); got != 8 {
 		t.Fatalf("small-design strategy budget = %d, want 8", got)

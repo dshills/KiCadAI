@@ -968,8 +968,15 @@ func finalizeCausalRepairAnalysis(analysis CausalRepairAnalysis) CausalRepairAna
 }
 
 func validateCausalRepairAnalysis(analysis CausalRepairAnalysis) error {
-	if analysis.Schema != CausalRepairSchema || analysis.Version != CausalRepairVersion || analysis.Hash == "" {
+	if analysis.Schema != CausalRepairSchema || analysis.Version != CausalRepairVersion || analysis.Hash == "" ||
+		analysis.PolicyVersion == "" || analysis.RequirementHash == "" || analysis.InventoryHash == "" ||
+		analysis.InitialGraphHash == "" || analysis.InitialEvaluationHash == "" {
 		return fmt.Errorf("invalid causal repair identity")
+	}
+	if analysis.Budget.Trials < 0 || analysis.Budget.ValueTrials < 0 || analysis.Budget.TopologyTrials < 0 ||
+		analysis.Budget.CoordinatedTrials < 0 || analysis.Budget.MaximumChanges < 0 ||
+		analysis.Budget.CandidateSimulations < 0 || analysis.Budget.CornerEvaluations < 0 {
+		return fmt.Errorf("invalid causal repair budget")
 	}
 	if analysis.Consumption.Trials > analysis.Budget.Trials ||
 		analysis.Consumption.ValueTrials > analysis.Budget.ValueTrials ||
@@ -978,6 +985,87 @@ func validateCausalRepairAnalysis(analysis CausalRepairAnalysis) error {
 		analysis.Consumption.CandidateSimulations > analysis.Budget.CandidateSimulations ||
 		analysis.Consumption.CornerEvaluations > analysis.Budget.CornerEvaluations {
 		return fmt.Errorf("causal repair consumption exceeds budget")
+	}
+	if analysis.Consumption.Trials != len(analysis.Trials) {
+		return fmt.Errorf("causal repair trial consumption mismatch")
+	}
+	numbers := make(map[int]struct{}, len(analysis.Trials))
+	ranks := make(map[int]struct{}, len(analysis.Trials))
+	selectedFound := false
+	valueTrials, topologyTrials, coordinatedTrials := 0, 0, 0
+	candidateSimulations, cornerEvaluations := 0, 0
+	for _, trial := range analysis.Trials {
+		if trial.Number < 1 || trial.Number > len(analysis.Trials) {
+			return fmt.Errorf("invalid causal trial number")
+		}
+		if _, duplicate := numbers[trial.Number]; duplicate {
+			return fmt.Errorf("duplicate causal trial number")
+		}
+		numbers[trial.Number] = struct{}{}
+		if trial.Rank < 1 || trial.Rank > len(analysis.Trials) {
+			return fmt.Errorf("invalid causal trial rank")
+		}
+		if _, duplicate := ranks[trial.Rank]; duplicate {
+			return fmt.Errorf("duplicate causal trial rank")
+		}
+		ranks[trial.Rank] = struct{}{}
+		if trial.Hash == "" || trial.Hash != causalTrialHash(trial) || trial.GraphHash == "" ||
+			trial.EvaluationHash == "" || trial.Evaluation.Hash != trial.EvaluationHash ||
+			trial.Evaluation.GraphHash != trial.GraphHash || len(trial.Effects) == 0 ||
+			len(trial.Perturbations) == 0 || len(trial.Perturbations) > analysis.Budget.MaximumChanges {
+			return fmt.Errorf("incomplete causal trial evidence")
+		}
+		for _, perturbation := range trial.Perturbations {
+			copy := perturbation
+			copy.Hash = ""
+			if perturbation.Hash == "" || hashJSON(copy) != perturbation.Hash || perturbation.Magnitude <= 0 {
+				return fmt.Errorf("invalid causal perturbation evidence")
+			}
+		}
+		if trial.Authorized && (len(trial.Regressions) != 0 || trial.Rejection != "") {
+			return fmt.Errorf("regressing or rejected causal trial was authorized")
+		}
+		if !trial.Authorized && trial.Rejection == "" {
+			return fmt.Errorf("unauthorized causal trial lacks rejection evidence")
+		}
+		usesTopology := false
+		for _, change := range trial.Repair.Changes {
+			if change.Kind == "add_primitive" || change.Kind == "redirect_terminal" {
+				usesTopology = true
+				break
+			}
+		}
+		if usesTopology {
+			topologyTrials++
+		} else {
+			valueTrials++
+		}
+		if trial.Coordinated {
+			coordinatedTrials++
+			if len(trial.Perturbations) < 2 {
+				return fmt.Errorf("coordinated causal trial lacks multiple perturbations")
+			}
+		}
+		candidateSimulations += trial.Evaluation.Consumption.CandidateSimulations
+		cornerEvaluations += trial.Evaluation.Consumption.CornerEvaluations
+		if trial.Hash == analysis.SelectedTrialHash {
+			if !trial.Authorized || trial.Rank != 1 {
+				return fmt.Errorf("selected causal trial is not the authorized top-ranked trial")
+			}
+			selectedFound = true
+		}
+	}
+	if valueTrials != analysis.Consumption.ValueTrials || topologyTrials != analysis.Consumption.TopologyTrials ||
+		coordinatedTrials != analysis.Consumption.CoordinatedTrials ||
+		candidateSimulations != analysis.Consumption.CandidateSimulations ||
+		cornerEvaluations != analysis.Consumption.CornerEvaluations {
+		return fmt.Errorf("causal repair detailed consumption mismatch")
+	}
+	if analysis.SelectedTrialHash != "" && !selectedFound {
+		return fmt.Errorf("selected causal trial is missing")
+	}
+	if (analysis.Status == "passing_repair_found" || analysis.Status == "safe_improvement_found") != selectedFound {
+		return fmt.Errorf("causal repair status and selection disagree")
 	}
 	copy := analysis
 	copy.Hash = ""

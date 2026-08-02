@@ -7,19 +7,26 @@ import (
 	"strconv"
 	"strings"
 
+	"kicadai/internal/reports"
 	"kicadai/internal/routing"
 )
 
 const (
 	minFailedNetFirstNegotiationAttempts      = 12
-	maxFailedNetFirstNegotiationAttempts      = 32
+	maxFailedNetFirstNegotiationAttempts      = 34
 	maxRouteNegotiationSearchBudgetMultiplier = 4
+	maxReservedSearchExpansionAttempts        = 2
 )
 
 type routeNegotiationState struct {
 	request routing.Request
 	result  routing.Result
 	key     string
+}
+
+type routeNegotiationConflictSeed struct {
+	request  routing.Request
+	promoted []string
 }
 
 // routeWithFailedNetFirstNegotiation explores bounded, deterministic
@@ -45,11 +52,47 @@ func routeWithFailedNetFirstNegotiationUsing(ctx context.Context, request routin
 		return baseline, summary
 	}
 	best := baseline
+	bestRequest := request
 	promoted := map[string]string{}
 	frontier := []routeNegotiationState{{request: request, result: baseline, key: routeNegotiationRequestKey(request)}}
-	seen := map[string]struct{}{frontier[0].key: {}}
-	attemptLimit := failedNetFirstNegotiationAttemptLimit(request)
-	for len(frontier) != 0 && summary.Attempts < attemptLimit {
+	resultsByKey := map[string]routing.Result{frontier[0].key: baseline}
+	explorationAttemptLimit := failedNetFirstNegotiationAttemptLimit(request)
+	attemptLimit := explorationAttemptLimit
+	if routingResultHasFailedSearchLimit(baseline) {
+		attemptLimit = min(maxFailedNetFirstNegotiationAttempts, explorationAttemptLimit+maxReservedSearchExpansionAttempts)
+	}
+	for _, seed := range routeNegotiationConflictSeeds(request, baseline) {
+		if summary.Attempts >= explorationAttemptLimit || ctx != nil && ctx.Err() != nil {
+			break
+		}
+		candidateKey := routeNegotiationRequestKey(seed.request)
+		if _, exists := resultsByKey[candidateKey]; exists {
+			continue
+		}
+		for _, netName := range seed.promoted {
+			promoted[interBlockSummaryNetKey(netName)] = netName
+		}
+		candidate := route(ctx, seed.request)
+		resultsByKey[candidateKey] = candidate
+		recordSearchLimitedRoutes(searchLimited, candidate)
+		summary.Attempts++
+		if routingResultBetter(candidate, best) {
+			best = candidate
+			bestRequest = seed.request
+			summary.SelectedOrder = "conflict_cluster_first"
+			summary.SelectedSearchNodeLimit = normalizedRouteNegotiationSearchNodeLimit(seed.request.Rules.MaxSearchNodes)
+		}
+		if candidate.Metrics.FailedNetCount == 0 {
+			best = candidate
+			bestRequest = seed.request
+			summary.SelectedOrder = "conflict_cluster_first"
+			summary.SelectedSearchNodeLimit = normalizedRouteNegotiationSearchNodeLimit(seed.request.Rules.MaxSearchNodes)
+			frontier = nil
+			break
+		}
+		frontier = append(frontier, routeNegotiationState{request: seed.request, result: candidate, key: candidateKey})
+	}
+	for len(frontier) != 0 && summary.Attempts < explorationAttemptLimit {
 		if ctx != nil && ctx.Err() != nil {
 			break
 		}
@@ -57,11 +100,12 @@ func routeWithFailedNetFirstNegotiationUsing(ctx context.Context, request routin
 		state := frontier[stateIndex]
 		frontier = append(frontier[:stateIndex], frontier[stateIndex+1:]...)
 		for _, netName := range routeNegotiationCandidateNets(state.result, request.Nets) {
-			if summary.Attempts >= attemptLimit || ctx != nil && ctx.Err() != nil {
+			if summary.Attempts >= explorationAttemptLimit || ctx != nil && ctx.Err() != nil {
 				break
 			}
 			key := interBlockSummaryNetKey(netName)
 			candidateRequest := state.request
+			candidateRequest.Nets = slices.Clone(state.request.Nets)
 			candidateRequest.Nets = promoteFailedNetPriorities(candidateRequest.Nets, map[string]struct{}{key: {}})
 			if routingResultHitSearchLimitForNet(state.result, netName) {
 				// A promoted net with an observed search-budget exhaustion needs
@@ -77,26 +121,57 @@ func routeWithFailedNetFirstNegotiationUsing(ctx context.Context, request routin
 				summary.MaximumSearchNodeLimit = max(summary.MaximumSearchNodeLimit, nextLimit)
 			}
 			candidateKey := routeNegotiationRequestKey(candidateRequest)
-			if _, exists := seen[candidateKey]; exists {
+			if _, exists := resultsByKey[candidateKey]; exists {
 				continue
 			}
-			seen[candidateKey] = struct{}{}
 			promoted[key] = netName
 			candidate := route(ctx, candidateRequest)
+			resultsByKey[candidateKey] = candidate
 			recordSearchLimitedRoutes(searchLimited, candidate)
 			summary.Attempts++
 			if routingResultBetter(candidate, best) {
 				best = candidate
+				bestRequest = candidateRequest
 				summary.SelectedOrder = "failed_net_first"
 				summary.SelectedSearchNodeLimit = normalizedRouteNegotiationSearchNodeLimit(candidateRequest.Rules.MaxSearchNodes)
 			}
 			if candidate.Metrics.FailedNetCount == 0 {
 				best = candidate
+				bestRequest = candidateRequest
 				summary.SelectedSearchNodeLimit = normalizedRouteNegotiationSearchNodeLimit(candidateRequest.Rules.MaxSearchNodes)
 				frontier = nil
 				break
 			}
 			frontier = append(frontier, routeNegotiationState{request: candidateRequest, result: candidate, key: candidateKey})
+		}
+	}
+	searchRequest, searchResult := bestRequest, best
+	for summary.Attempts < attemptLimit && routingResultHasFailedSearchLimit(searchResult) {
+		currentLimit := normalizedRouteNegotiationSearchNodeLimit(searchRequest.Rules.MaxSearchNodes)
+		nextLimit := nextRouteNegotiationSearchNodeLimit(currentLimit, baseSearchNodeLimit)
+		if nextLimit <= currentLimit {
+			break
+		}
+		searchRequest.Rules.MaxSearchNodes = nextLimit
+		candidateKey := routeNegotiationRequestKey(searchRequest)
+		if existing, exists := resultsByKey[candidateKey]; exists {
+			searchResult = existing
+			continue
+		}
+		candidate := route(ctx, searchRequest)
+		resultsByKey[candidateKey] = candidate
+		recordSearchLimitedRoutes(searchLimited, candidate)
+		summary.Attempts++
+		summary.SearchBudgetExpansions++
+		summary.MaximumSearchNodeLimit = max(summary.MaximumSearchNodeLimit, nextLimit)
+		searchResult = candidate
+		if routingResultBetter(candidate, best) || candidate.Metrics.FailedNetCount == 0 {
+			best = candidate
+			bestRequest = searchRequest
+			summary.SelectedSearchNodeLimit = nextLimit
+		}
+		if candidate.Metrics.FailedNetCount == 0 {
+			break
 		}
 	}
 	for _, netName := range promoted {
@@ -106,6 +181,92 @@ func routeWithFailedNetFirstNegotiationUsing(ctx context.Context, request routin
 	summary.SearchLimitedNets = sortedSearchLimitedNets(searchLimited)
 	summary.SelectedNetOrder = routeResultNetOrder(best)
 	return best, summary
+}
+
+func routingResultHasFailedSearchLimit(result routing.Result) bool {
+	for _, route := range result.Routes {
+		if route.Status == routing.RouteStatusFailed && route.SearchLimitHit {
+			return true
+		}
+	}
+	return false
+}
+
+func routeNegotiationConflictSeeds(request routing.Request, result routing.Result) []routeNegotiationConflictSeed {
+	known := make(map[string]string, len(request.Nets))
+	for _, net := range request.Nets {
+		known[interBlockSummaryNetKey(net.Name)] = net.Name
+	}
+	failed := map[string]string{}
+	for _, route := range result.Routes {
+		if route.Status != routing.RouteStatusFailed {
+			continue
+		}
+		key := interBlockSummaryNetKey(route.Net)
+		if canonical, found := known[key]; found {
+			failed[key] = canonical
+		}
+	}
+	blockersByFailed := map[string]map[string]string{}
+	for _, issue := range result.Issues {
+		if issue.Code != reports.CodeRouteCopperConflict {
+			continue
+		}
+		for _, netName := range issue.Nets {
+			failedKey := interBlockSummaryNetKey(netName)
+			if _, found := failed[failedKey]; !found {
+				continue
+			}
+			if blockersByFailed[failedKey] == nil {
+				blockersByFailed[failedKey] = map[string]string{}
+			}
+			for _, otherName := range issue.Nets {
+				otherKey := interBlockSummaryNetKey(otherName)
+				if otherKey == failedKey {
+					continue
+				}
+				if canonical, found := known[otherKey]; found {
+					blockersByFailed[failedKey][otherKey] = canonical
+				}
+			}
+		}
+	}
+	failedKeys := make([]string, 0, len(blockersByFailed))
+	for failedKey, blockers := range blockersByFailed {
+		if len(blockers) != 0 {
+			failedKeys = append(failedKeys, failedKey)
+		}
+	}
+	slices.Sort(failedKeys)
+	seeds := []routeNegotiationConflictSeed{}
+	for _, failedKey := range failedKeys {
+		failedName := failed[failedKey]
+		blockers := make([]string, 0, len(blockersByFailed[failedKey]))
+		blockerSet := make(map[string]struct{}, len(blockersByFailed[failedKey]))
+		for blockerKey, blockerName := range blockersByFailed[failedKey] {
+			blockers = append(blockers, blockerName)
+			blockerSet[blockerKey] = struct{}{}
+		}
+		slices.Sort(blockers)
+		failedSet := map[string]struct{}{failedKey: {}}
+		// Evaluate both causal orderings of the observed conflict cluster.
+		// The second promotion tier receives the higher priority.
+		failedFirst := request
+		failedFirst.Nets = slices.Clone(request.Nets)
+		failedFirst.Nets = promoteFailedNetPriorities(failedFirst.Nets, blockerSet)
+		failedFirst.Nets = promoteFailedNetPriorities(failedFirst.Nets, failedSet)
+		seeds = append(seeds, routeNegotiationConflictSeed{
+			request: failedFirst, promoted: append([]string{failedName}, blockers...),
+		})
+		blockersFirst := request
+		blockersFirst.Nets = slices.Clone(request.Nets)
+		blockersFirst.Nets = promoteFailedNetPriorities(blockersFirst.Nets, failedSet)
+		blockersFirst.Nets = promoteFailedNetPriorities(blockersFirst.Nets, blockerSet)
+		seeds = append(seeds, routeNegotiationConflictSeed{
+			request: blockersFirst, promoted: append([]string{failedName}, blockers...),
+		})
+	}
+	return seeds
 }
 
 func routeNegotiationCandidateNets(result routing.Result, nets []routing.Net) []string {

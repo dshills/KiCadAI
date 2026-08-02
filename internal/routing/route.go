@@ -31,6 +31,7 @@ func RouteRequestContext(ctx context.Context, request Request) Result {
 	}
 	request = cloneRequest(request)
 	NormalizeRequest(&request)
+	components := componentsByNormalizedRef(request.Components)
 	qualityEvidence := BuildQualityInputEvidence(request)
 	result := Result{Status: StatusBlocked}
 	issues := Validate(&request)
@@ -148,7 +149,7 @@ func RouteRequestContext(ctx context.Context, request Request) Result {
 			var forcedEndpointVias map[endpointID]float64
 			var crowdedAccessAlternates []PadAccess
 			if constrainedEndpointAccess {
-				pairAccess, forcedEndpointVias = applyCrowdedSMDPadViaAccess(netAccess, searchRequest, []Endpoint{pair.From, pair.To})
+				pairAccess, forcedEndpointVias = applyCrowdedSMDPadViaAccess(netAccess, searchRequest, components, []Endpoint{pair.From, pair.To})
 				if len(forcedEndpointVias) != 0 {
 					candidates := crowdedSMDPadViaAccessAttempts(pairAccess, forcedEndpointVias)
 					pairAccess = candidates[0]
@@ -216,6 +217,44 @@ func RouteRequestContext(ctx context.Context, request Request) Result {
 				routeIssues = edgeIssues
 				if len(edgeIssues) == 0 {
 					pairUsedCrowdedVias = false
+				}
+			}
+			// A two-terminal SMD pad can be sealed by the opposite pad on the
+			// same package even after all four edge-access points are tried.
+			// Retry only after ordinary access fails, with a deterministic
+			// outward dogbone that moves away from the opposite terminal.
+			if len(routeIssues) != 0 && constrainedEndpointAccess {
+				dogboneAccess, dogboneVias := applyTwoTerminalSMDPadViaAccess(netAccess, searchRequest, components, []Endpoint{pair.From, pair.To})
+				if len(dogboneVias) != 0 {
+					dogboneRules := crowdedEndpointViaRules(searchRequest.Rules, dogboneVias)
+					dogboneRequest := searchRequest
+					dogboneRequest.Rules = dogboneRules
+					dogboneViaOccupancy := viaOccupancy
+					if candidate, err := BuildViaOccupancy(dogboneRequest, plan.Net.Name); err == nil {
+						dogboneViaOccupancy = candidate
+					}
+					for _, attemptAccess := range crowdedSMDPadViaAccessAttempts(dogboneAccess, dogboneVias) {
+						attemptAccess = filterPhysicalEndpointAccess(attemptAccess, dogboneRequest, plan.Net.Name, []Endpoint{pair.From, pair.To})
+						dogbonePath, dogboneIssues := routePairPathWithForcedEndpointVias(
+							ctx, dogboneRequest, attemptAccess, occupancy, dogboneViaOccupancy, plan.Net.Name, pair, dogboneVias,
+						)
+						route.SearchNodes += dogbonePath.SearchNodes
+						result.Metrics.SearchNodes += dogbonePath.SearchNodes
+						if dogbonePath.SearchLimitHit {
+							route.SearchLimitHit = true
+							result.Metrics.MaxSearchNodesHit = true
+						}
+						path = dogbonePath
+						routeIssues = dogboneIssues
+						if len(dogboneIssues) == 0 {
+							netAccess = attemptAccess
+							forcedEndpointVias = dogboneVias
+							pairViaRules = dogboneRules
+							pairViaOccupancy = dogboneViaOccupancy
+							pairUsedCrowdedVias = true
+							break
+						}
+					}
 				}
 			}
 			neckdownWidthMM := netRequest.Rules.NeckdownWidthMM
@@ -625,35 +664,158 @@ type crowdedSMDPadSide struct {
 	sign  float64
 }
 
-func applyCrowdedSMDPadViaAccess(access PadAccess, request Request, endpoints []Endpoint) (PadAccess, map[endpointID]float64) {
+func applyCrowdedSMDPadViaAccess(access PadAccess, request Request, components map[string]Component, endpoints []Endpoint) (PadAccess, map[endpointID]float64) {
 	if len(routableLayerNames(request.Board.Layers)) < 2 || request.Rules.MaxViasPerNet < 2 {
 		return access, nil
 	}
 	adjusted := clonePadAccessPoints(access)
 	forced := map[endpointID]float64{}
 	for _, endpoint := range endpoints {
-		for _, component := range request.Components {
-			if !strings.EqualFold(strings.TrimSpace(component.Ref), strings.TrimSpace(endpoint.Ref)) {
+		component, found := components[normalizedEndpointPart(endpoint.Ref)]
+		if !found {
+			continue
+		}
+		for _, pad := range component.Pads {
+			if !strings.EqualFold(strings.TrimSpace(pad.Name), strings.TrimSpace(endpoint.Pin)) {
 				continue
 			}
-			for _, pad := range component.Pads {
-				if !strings.EqualFold(strings.TrimSpace(pad.Name), strings.TrimSpace(endpoint.Pin)) {
-					continue
-				}
-				points, viaDiameterMM, ok := crowdedSMDPadViaAccessPoints(component, pad, request)
-				if !ok {
-					continue
-				}
-				key := endpointKey(endpoint.Ref, endpoint.Pin)
-				adjusted.AccessPoints[key] = points
-				forced[key] = viaDiameterMM
+			points, viaDiameterMM, ok := crowdedSMDPadViaAccessPoints(component, pad, request)
+			if !ok {
+				continue
 			}
+			key := endpointKey(endpoint.Ref, endpoint.Pin)
+			adjusted.AccessPoints[key] = points
+			forced[key] = viaDiameterMM
 		}
 	}
 	if len(forced) == 0 {
 		return access, nil
 	}
 	return adjusted, forced
+}
+
+func applyTwoTerminalSMDPadViaAccess(access PadAccess, request Request, components map[string]Component, endpoints []Endpoint) (PadAccess, map[endpointID]float64) {
+	if len(routableLayerNames(request.Board.Layers)) < 2 || request.Rules.MaxViasPerNet < 1 {
+		return access, nil
+	}
+	adjusted := clonePadAccessPoints(access)
+	forced := map[endpointID]float64{}
+	for _, endpoint := range endpoints {
+		component, found := components[normalizedEndpointPart(endpoint.Ref)]
+		if !found {
+			continue
+		}
+		for _, pad := range component.Pads {
+			if !strings.EqualFold(strings.TrimSpace(pad.Name), strings.TrimSpace(endpoint.Pin)) {
+				continue
+			}
+			points, viaDiameterMM, ok := twoTerminalSMDPadViaAccessPoints(component, pad, request)
+			if !ok {
+				continue
+			}
+			key := endpointKey(endpoint.Ref, endpoint.Pin)
+			adjusted.AccessPoints[key] = points
+			forced[key] = viaDiameterMM
+		}
+	}
+	if len(forced) == 0 {
+		return access, nil
+	}
+	return adjusted, forced
+}
+
+func componentsByNormalizedRef(components []Component) map[string]Component {
+	indexed := make(map[string]Component, len(components))
+	for _, component := range components {
+		indexed[normalizedEndpointPart(component.Ref)] = component
+	}
+	return indexed
+}
+
+func normalizedEndpointPart(value string) string {
+	return strings.ToLower(strings.TrimSpace(value))
+}
+
+func twoTerminalSMDPadViaAccessPoints(component Component, pad Pad, request Request) ([]AccessPoint, float64, bool) {
+	if pad.Type != PadSMD || strings.TrimSpace(pad.Net) == "" {
+		return nil, 0, false
+	}
+	oppositeNet := ""
+	oppositePosition := Point{}
+	oppositePadCount := 0
+	for _, candidate := range component.Pads {
+		if strings.TrimSpace(candidate.Net) == "" || sameOccupancyNet(candidate.Net, pad.Net) {
+			continue
+		}
+		if oppositeNet != "" && !sameOccupancyNet(candidate.Net, oppositeNet) {
+			return nil, 0, false
+		}
+		if candidate.Type != PadSMD {
+			return nil, 0, false
+		}
+		oppositeNet = candidate.Net
+		oppositePosition.XMM += candidate.Position.XMM
+		oppositePosition.YMM += candidate.Position.YMM
+		oppositePadCount++
+	}
+	if oppositePadCount == 0 {
+		return nil, 0, false
+	}
+	oppositePosition.XMM /= float64(oppositePadCount)
+	oppositePosition.YMM /= float64(oppositePadCount)
+	dx := pad.Position.XMM - oppositePosition.XMM
+	dy := pad.Position.YMM - oppositePosition.YMM
+	if math.Abs(dx) <= distanceEpsilon && math.Abs(dy) <= distanceEpsilon {
+		return nil, 0, false
+	}
+	axisX := math.Abs(dx) >= math.Abs(dy)
+	sign := math.Copysign(1, dy)
+	halfSpanMM := pad.Size.HeightMM / 2
+	if axisX {
+		sign = math.Copysign(1, dx)
+		halfSpanMM = pad.Size.WidthMM / 2
+	}
+	if halfSpanMM <= 0 {
+		return nil, 0, false
+	}
+	viaDiameterMM := request.Rules.ViaDiameterMM
+	if viaDiameterMM <= 0 {
+		viaDiameterMM = DefaultRules().ViaDiameterMM
+	}
+	if request.Rules.TraceWidthMM > 0 {
+		viaDiameterMM = min(viaDiameterMM, 2*request.Rules.TraceWidthMM)
+	}
+	if viaDiameterMM <= request.Rules.TraceWidthMM+distanceEpsilon {
+		return nil, 0, false
+	}
+	escapeDistanceMM := max(request.Rules.GridMM, request.Rules.ViaClearanceMM+viaDiameterMM/2)
+	physicalOffset := Point{}
+	searchOffset := Point{}
+	if axisX {
+		physicalOffset.XMM = sign * halfSpanMM * smdEdgeAccessInsetRatio
+		searchOffset.XMM = sign * (halfSpanMM + escapeDistanceMM)
+	} else {
+		physicalOffset.YMM = sign * halfSpanMM * smdEdgeAccessInsetRatio
+		searchOffset.YMM = sign * (halfSpanMM + escapeDistanceMM)
+	}
+	physicalX, physicalY := kicadfiles.RotateBoardLocalXY(physicalOffset.XMM, physicalOffset.YMM, component.Position.RotationDeg)
+	searchX, searchY := kicadfiles.RotateBoardLocalXY(searchOffset.XMM, searchOffset.YMM, component.Position.RotationDeg)
+	center := absolutePadPoint(component, pad.Position)
+	grid := NewGrid(Point{}, request.Rules.GridMM)
+	searchPoint := grid.ToPoint(grid.ToGrid(Point{XMM: center.XMM + searchX, YMM: center.YMM + searchY}, 0))
+	layers := padAccessLayers(pad, routableLayerNames(request.Board.Layers))
+	if len(layers) == 0 {
+		return nil, 0, false
+	}
+	return []AccessPoint{{
+		Endpoint: Endpoint{Ref: component.Ref, Pin: pad.Name},
+		Point: Point{
+			XMM: center.XMM + physicalX,
+			YMM: center.YMM + physicalY,
+		},
+		SearchPoint: &searchPoint,
+		Layer:       layers[0],
+	}}, viaDiameterMM, true
 }
 
 func crowdedSMDPadViaAccessAttempts(access PadAccess, forced map[endpointID]float64) []PadAccess {

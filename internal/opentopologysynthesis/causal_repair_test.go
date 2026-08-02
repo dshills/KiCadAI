@@ -64,6 +64,53 @@ func TestCausalRepairRejectsCriticalMarginRegression(t *testing.T) {
 	}
 }
 
+func TestCausalRepairTrialsCoverBiasAndCompensationOperators(t *testing.T) {
+	requirement, graph, inventory, environment := testSimulationFixture(t)
+	requirement.Requirements.BehavioralRequirements[0].Min = graphFloat(1000)
+	requirement.Requirements.BehavioralRequirements[0].Max = graphFloat(10_000)
+	graph = seriesPathOnly(t, graph)
+	policy := DefaultPolicy()
+	policy.MaxTopologyRepairs = 32
+	policy.MaxValueTrials = 64
+	policy.MaxCandidateSimulations = 256
+	policy.MaxCornerEvaluations = 1024
+	initial := EvaluateCandidate(context.Background(), requirement, graph, nil, inventory, environment, policy)
+	if initial.Status != SimulationEvaluationFailed || len(initial.Diagnoses) == 0 {
+		t.Fatalf("causal operator fixture status=%s diagnoses=%d", initial.Status, len(initial.Diagnoses))
+	}
+
+	for _, test := range []struct {
+		name     string
+		code     string
+		operator string
+	}{
+		{name: "bias_reference", code: diagnosisNonconvergent, operator: "repair_bias_reference"},
+		{name: "compensation", code: diagnosisUnstable, operator: "add_compensation_edge"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			diagnosed := initial
+			diagnosed.Diagnoses = append([]Diagnosis(nil), initial.Diagnoses...)
+			diagnosed.Diagnoses[0].Code = test.code
+			analysis, _ := analyzeCausalRepairs(
+				context.Background(), requirement, graph, diagnosed, inventory, environment, policy,
+			)
+			if err := validateCausalRepairAnalysis(analysis); err != nil {
+				t.Fatal(err)
+			}
+			found := false
+			for _, trial := range analysis.Trials {
+				if trial.Repair.Operator == test.operator && trial.EvaluationHash != "" && len(trial.Effects) != 0 {
+					found = true
+					break
+				}
+			}
+			if !found {
+				t.Fatalf("bounded causal trials lack operator %q", test.operator)
+			}
+		})
+	}
+}
+
 func TestHeldOutFeedbackPolarityFailureRecoversCausally(t *testing.T) {
 	requirement, issues := DecodeStrict(bytes.NewReader(mustRead(t, filepath.Join(
 		architectureGeneralizationCorpusRoot(), "low_current_voltage_converter.json",
@@ -96,6 +143,19 @@ func TestHeldOutFeedbackPolarityFailureRecoversCausally(t *testing.T) {
 	repaired := RepairCandidate(context.Background(), requirement, faulted, initial, inventory, environment, policy)
 	if repaired.Status != RepairSearchPassed || repaired.Selected == nil || repaired.Selected.Repair.Operator != "correct_feedback_polarity" {
 		t.Fatalf("polarity repair status=%s selected=%#v", repaired.Status, repaired.Selected)
+	}
+	ratedTrial := false
+	for _, analysis := range repaired.CausalAnalyses {
+		for _, trial := range analysis.Trials {
+			for _, perturbation := range trial.Perturbations {
+				if perturbation.Kind == "substitute_rated_device" {
+					ratedTrial = true
+				}
+			}
+		}
+	}
+	if !ratedTrial {
+		t.Fatal("bounded held-out causal analysis lacks a rated-device substitution trial")
 	}
 }
 
