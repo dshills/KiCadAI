@@ -1,0 +1,17 @@
+{
+  "schema": "kicadai.cross-stage-repair-corpus.v1",
+  "version": 1,
+  "base_commit": "b6ea64c2f0b98cd749c5caba2a80e9e52960b292",
+  "frozen_at": "2026-08-02",
+  "cases": [
+    {"id": "control_error_outside_declared_band", "stage": "simulation", "path": "cases/simulation.json", "sha256": "6c02c66c5c3b167ce9f7761424606d32fe95fec02a2b98f43d7a842d5642864e"},
+    {"id": "required_semantic_edge_omitted", "stage": "schematic", "path": "cases/schematic.json", "sha256": "9a3d9d2123936c48c32bc765bb6a81ca9856de9d1d7e4da3b39d7967676e45f4"},
+    {"id": "declared_power_source_not_expressed", "stage": "erc", "path": "cases/erc.json", "sha256": "0db4d7ce95013be71d73f95a6929c50fa7987cc0d56b8c5e0d673ab26809c620"},
+    {"id": "movable_part_outside_usable_region", "stage": "placement", "path": "cases/placement.json", "sha256": "7716217b67fb83a4105f3e81feeebb46bebb20e3936985b4c2992ae0fb8e0e65"},
+    {"id": "foreign_net_blocks_required_path", "stage": "routing", "path": "cases/routing.json", "sha256": "0a71762e059eb6219d31a0a62c220f2cbcd241adac46fcf2d8cefbe7a95963e3"},
+    {"id": "required_pad_not_joined_to_route_tree", "stage": "connectivity", "path": "cases/connectivity.json", "sha256": "1344bc3e635e55e1bfd1c9304b70b45453b2ce343cf9aade110368d14f191275"},
+    {"id": "generated_copper_violates_clearance", "stage": "drc", "path": "cases/drc.json", "sha256": "d97210e452af8f9ee9119cd60fc5667d5279e5c7da8069d04c7b04269fb930e5"},
+    {"id": "serialized_field_disagrees_with_transaction", "stage": "writer", "path": "cases/writer.json", "sha256": "e291a4083ef66e1d3f95221f84fae88bdb335cebdf0544b0cbe90487c01f1de9"},
+    {"id": "kicad_canonicalization_changes_output", "stage": "roundtrip", "path": "cases/roundtrip.json", "sha256": "a343e5a6f19d6a3bfbea314592df5948111e9f862fc54402968300fd13f24da0"}
+  ]
+}

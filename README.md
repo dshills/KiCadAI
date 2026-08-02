@@ -204,6 +204,16 @@ unsafe capability is reported and stopped instead of guessed.
   connectivity, round-trip, ERC, and strict-DRC checks. The protected current
   output remains safely exhausted with a narrower reproducible diagnosis. See
   the [repair results](specs/diagnosis-driven-repair/RESULTS.md).
+- End-to-end cross-stage repair now coordinates trusted simulation,
+  schematic/ERC, placement, routing, connectivity, DRC, writer, and round-trip
+  correction through `kicadai.cross-stage-autonomous-repair.v1`. A frozen
+  nine-stage corpus proves earliest-stage re-entry, smallest-safe-candidate
+  selection, exact checkpoint rollback, unrelated-scope preservation,
+  electrical/thermal/SOA/physical guardrails, bounded execution, independent
+  confirmation, and byte-identical replay. Real adapters exercise causal
+  electrical repair, transaction-backed physical repair, and authoritative
+  generated-file regeneration. See the
+  [completion audit](specs/cross-stage-autonomous-repair/AUDIT.md).
 - Topology-aware schematic lowering now favors visible local conductors,
   conventional signal flow, compact route trees, feedback visibility,
   role-derived orientation, and the smallest fitting standard sheet. Five

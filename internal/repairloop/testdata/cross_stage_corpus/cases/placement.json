@@ -1,0 +1,17 @@
+{
+  "schema": "kicadai.cross-stage-repair-case.v1",
+  "version": 1,
+  "id": "movable_part_outside_usable_region",
+  "failure_stage": "placement",
+  "domain": "compact protected interface",
+  "fault": {
+    "code": "placement_outside_outline",
+    "category": "board_boundary",
+    "mutation": "translate one soft-preferred component beyond the usable board rectangle"
+  },
+  "expected": {
+    "operator": "move_within_region",
+    "reenter_stage": "placement",
+    "preserve": ["fixed_components", "mechanical_constraints", "unrelated_placement", "schematic"]
+  }
+}

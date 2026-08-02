@@ -1,0 +1,17 @@
+{
+  "schema": "kicadai.cross-stage-repair-case.v1",
+  "version": 1,
+  "id": "declared_power_source_not_expressed",
+  "failure_stage": "erc",
+  "domain": "protected low-voltage supply",
+  "fault": {
+    "code": "power_input_not_driven",
+    "category": "power_intent",
+    "mutation": "omit generated source-driving evidence from one declared powered domain"
+  },
+  "expected": {
+    "operator": "restore_power_intent",
+    "reenter_stage": "schematic",
+    "preserve": ["net_identity", "pin_mapping", "unrelated_power_domains", "electrical_requirements"]
+  }
+}

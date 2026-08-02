@@ -1,0 +1,17 @@
+{
+  "schema": "kicadai.cross-stage-repair-case.v1",
+  "version": 1,
+  "id": "required_semantic_edge_omitted",
+  "failure_stage": "schematic",
+  "domain": "low-voltage analog interface",
+  "fault": {
+    "code": "required_connection_missing",
+    "category": "schematic_connectivity",
+    "mutation": "remove one required graph-derived schematic edge before validation"
+  },
+  "expected": {
+    "operator": "restore_required_connection",
+    "reenter_stage": "schematic",
+    "preserve": ["unrelated_symbols", "unrelated_fields", "unrelated_wires", "hierarchy"]
+  }
+}

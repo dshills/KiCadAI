@@ -1,7 +1,10 @@
 # Project Status
 
-Last verified: 2026-08-01 by focused local preservation and installed-KiCad
-lanes. Five of six independently authored architecture-generalization designs
+Last verified: 2026-08-02 by focused local preservation and installed-KiCad
+lanes. Cross-stage autonomous repair now recovers the frozen nine-stage corpus
+through one deterministic coordinator, and the protected LED and I2C fixtures
+passed two consecutive installed-KiCad runs. Five of six independently
+authored architecture-generalization designs
 passed two-run installed-KiCad promotion, all four adversarial designs failed
 closed, and the shared diagnosis-driven physical repair case recovered from a
 real routing block with clean writer, connectivity, round-trip, ERC, and strict
@@ -455,6 +458,24 @@ unsafe proposals and emits no physical project. See the
 [repair results](../specs/diagnosis-driven-repair/RESULTS.md) and
 [preservation report](../specs/diagnosis-driven-repair/PRESERVATION_REPORT.md).
 
+### Cross-Stage Autonomous Repair
+
+The versioned `kicadai.cross-stage-autonomous-repair.v1` coordinator now owns
+workflow ordering, trial budgets, exact checkpoints, rollback, earliest-stage
+re-entry, preservation, regression comparison, independent confirmation, and
+canonical replay evidence across simulation, schematic/ERC, placement,
+routing, connectivity, DRC, writer, and round trip. Domain logic remains in
+the trusted causal, transaction, and generated-output adapters.
+
+An independently frozen nine-stage corpus recovers without identity, path,
+component-reference, coordinate, or case-specific production logic. Negative
+tests protect unrelated content, required gates, electrical corners, thermal
+headroom, SOA, physical margins, cancellation, confirmation evidence, and
+nondeterministic replay. The protected USB-C LED and I2C preservation fixtures
+both pass the installed-KiCad lane twice. See the
+[specification](../specs/cross-stage-autonomous-repair/SPEC.md) and
+[completion audit](../specs/cross-stage-autonomous-repair/AUDIT.md).
+
 ### Schematic Readability
 
 Generated schematics use deterministic role, stage, and lane classification;
@@ -605,13 +626,15 @@ envelope remain unsupported.
 
 Open-topology synthesis proves discovery for six of eight initial frozen
 requirements, the first architecture milestone proves ranked generation for
-Class A, Class AB, and notch requirements, and the independent follow-on corpus
-passes five of six unfamiliar analog and power designs. The next highest-value
-step is an independently frozen diagnosis-driven repair corpus spanning
-electrical simulation, schematic/ERC, placement, routing, and DRC failures.
-That corpus should drive reusable repair operators and attempt to close the
-protected current-output gap only when trusted evidence supports the change.
-Broader clock/fanout,
+Class A, Class AB, and notch requirements, the independent follow-on corpus
+passes five of six unfamiliar analog and power designs, and the cross-stage
+repair corpus now recovers all nine workflow stages through shared evidence.
+The next highest-value step is explicit control-polarity, safe-state, and
+state-sequencing semantics for behavior-level composition. The stricter
+transient solver has correctly exposed two previously hidden non-responses in
+the current-sense-protection and mixed-control/power cases; those requirements
+must either synthesize a real directed transition or fail closed as
+underconstrained. Broader clock/fanout,
 programming-load, converter, isolation, and high-energy protection models,
 catalog-independent part qualification, and denser-board physical synthesis
 remain important. Those gaps can produce deterministic expansion proposals,

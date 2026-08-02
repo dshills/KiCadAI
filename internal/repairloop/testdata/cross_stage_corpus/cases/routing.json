@@ -1,0 +1,17 @@
+{
+  "schema": "kicadai.cross-stage-repair-case.v1",
+  "version": 1,
+  "id": "foreign_net_blocks_required_path",
+  "failure_stage": "routing",
+  "domain": "two-net protected load path",
+  "fault": {
+    "code": "route_copper_conflict",
+    "category": "foreign_net_crossing",
+    "mutation": "reserve a legal routed path across the only initial endpoint channel"
+  },
+  "expected": {
+    "operator": "improve_endpoint_access",
+    "reenter_stage": "placement",
+    "preserve": ["fixed_placement", "unrelated_routes", "board_constraints", "net_classes"]
+  }
+}

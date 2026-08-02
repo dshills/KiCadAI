@@ -1,0 +1,17 @@
+{
+  "schema": "kicadai.cross-stage-repair-case.v1",
+  "version": 1,
+  "id": "control_error_outside_declared_band",
+  "failure_stage": "simulation",
+  "domain": "regulated analog transfer",
+  "fault": {
+    "code": "assertion_above_maximum",
+    "category": "value_domain_or_feedback",
+    "mutation": "perturb one synthesized passive value beyond the accepted transfer band"
+  },
+  "expected": {
+    "operator": "adjust_value",
+    "reenter_stage": "sizing",
+    "preserve": ["topology", "device_selection", "unrelated_values", "safety_margins"]
+  }
+}

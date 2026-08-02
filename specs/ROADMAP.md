@@ -146,6 +146,13 @@ from validation feedback to safe automatic repair.
   result, while a six-component, twelve-pad, two-route-tree real-router stress
   case recovers from blocked to routed twice identically. See
   `specs/diagnosis-driven-repair/`.
+- Cross-stage autonomous repair extends that shared boundary across simulation,
+  schematic, ERC, placement, routing, connectivity, DRC, writer, and round
+  trip. A frozen nine-stage corpus plus real causal, transaction, and
+  generated-output adapters prove earliest-stage ordering, smallest-safe
+  selection, exact rollback, protected gates and margins, cancellation,
+  independent confirmation, bounded execution, and byte-identical replay. See
+  `specs/cross-stage-autonomous-repair/`.
 - Completed milestone: deterministic dense-board correction extends that loop
   with route-operation correlation, affected-net-only replacement,
   byte-preservation of unrelated copper, deterministic route-tree branch
@@ -1216,8 +1223,9 @@ intent:
 - Expand calculated rating enforcement as the component catalog gains broader
   voltage, capacitance, power, current, and tolerance metadata across more
   families.
-- Connect bounded placement-routing retry, validation repair, and future
-  fabrication checks into a higher-level generate/validate/repair loop.
+- Expose the shared cross-stage coordinator through higher-level public
+  generate/validate/repair workflows after their control-state and sequencing
+  contracts can express directed behavior safely.
 - Store deeper part, footprint, routing, repair, and fabrication decision
   evidence in rationale artifacts as those stages expose richer provenance.
 
@@ -1291,12 +1299,21 @@ non-pass. The first shared diagnosis-driven repair milestone is also complete;
 its dense physical case recovers from a real router failure while the current
 driver safely exhausts bounded electrical proposals.
 
-1. Freeze an independent diagnosis-driven repair corpus spanning electrical
-   simulation, schematic/ERC, placement, routing, and DRC failures before
-   adding new repair operators.
-2. Expand graph, value, model, and stage-reentry repair only from failures in
-   that corpus, including the protected current-output behavior when a generic
-   evidence-backed correction is available.
+The cross-stage autonomous-repair milestone is also complete. Its independently
+frozen simulation, schematic, ERC, placement, routing, connectivity, DRC,
+writer, and round-trip cases share one structured coordinator. Real causal,
+transaction, and generated-output adapters prove earliest-stage re-entry,
+smallest-safe selection, rollback, preservation, protected margins,
+confirmation, budgets, and byte-identical replay. The protected LED and I2C
+fixtures retain two-run installed-KiCad pass evidence.
+
+1. Add explicit active-state, safe-state, transition-direction, and sequencing
+   semantics to behavior-level signals and events. Use them to repair or
+   correctly reject the current-sense-protection and mixed-control/power
+   non-responses exposed by strict transient evaluation.
+2. Expand graph, value, model, and stage-reentry repair only from independently
+   frozen failures, including the protected current-output behavior when a
+   generic evidence-backed correction is available.
 3. Extend affected-scope physical correction across denser multi-net and
    multi-layer cases while preserving unrelated placement and copper.
 4. Expand catalog-independent part qualification, calculated rating, and

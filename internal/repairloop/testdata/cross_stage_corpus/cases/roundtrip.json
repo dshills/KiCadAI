@@ -1,0 +1,17 @@
+{
+  "schema": "kicadai.cross-stage-repair-case.v1",
+  "version": 1,
+  "id": "kicad_canonicalization_changes_output",
+  "failure_stage": "roundtrip",
+  "domain": "hierarchical generated schematic",
+  "fault": {
+    "code": "round_trip_diff",
+    "category": "writer_canonicalization",
+    "mutation": "emit a valid value at finer precision than the KiCad schematic format preserves"
+  },
+  "expected": {
+    "operator": "canonicalize_writer_output",
+    "reenter_stage": "writer",
+    "preserve": ["geometry_within_native_resolution", "connectivity", "identifiers", "unrelated_files"]
+  }
+}

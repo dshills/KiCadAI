@@ -1,0 +1,17 @@
+{
+  "schema": "kicadai.cross-stage-repair-case.v1",
+  "version": 1,
+  "id": "serialized_field_disagrees_with_transaction",
+  "failure_stage": "writer",
+  "domain": "hierarchical analog project",
+  "fault": {
+    "code": "writer_semantic_mismatch",
+    "category": "serialization_semantics",
+    "mutation": "serialize one derived field from stale metadata instead of the authoritative transaction"
+  },
+  "expected": {
+    "operator": "rewrite_authoritative_field",
+    "reenter_stage": "writer",
+    "preserve": ["transaction", "unrelated_files", "symbol_identity", "footprint_identity"]
+  }
+}

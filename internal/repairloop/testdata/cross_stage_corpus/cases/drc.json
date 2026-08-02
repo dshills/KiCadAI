@@ -1,0 +1,17 @@
+{
+  "schema": "kicadai.cross-stage-repair-case.v1",
+  "version": 1,
+  "id": "generated_copper_violates_clearance",
+  "failure_stage": "drc",
+  "domain": "mixed signal and power board",
+  "fault": {
+    "code": "clearance_violation",
+    "category": "physical_clearance",
+    "mutation": "offset one generated route segment into a foreign-net clearance envelope"
+  },
+  "expected": {
+    "operator": "reroute_affected_nets",
+    "reenter_stage": "routing",
+    "preserve": ["unrelated_copper", "placement", "net_classes", "board_outline"]
+  }
+}

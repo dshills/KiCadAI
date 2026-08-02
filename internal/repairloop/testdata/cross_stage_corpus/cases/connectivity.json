@@ -1,0 +1,17 @@
+{
+  "schema": "kicadai.cross-stage-repair-case.v1",
+  "version": 1,
+  "id": "required_pad_not_joined_to_route_tree",
+  "failure_stage": "connectivity",
+  "domain": "multi-endpoint signal distribution",
+  "fault": {
+    "code": "disconnected_pad",
+    "category": "required_net_connectivity",
+    "mutation": "remove one generated terminal branch while retaining the rest of the net tree"
+  },
+  "expected": {
+    "operator": "rebuild_affected_route_tree",
+    "reenter_stage": "routing",
+    "preserve": ["unrelated_nets", "placement", "schematic", "existing_same_net_tree"]
+  }
+}

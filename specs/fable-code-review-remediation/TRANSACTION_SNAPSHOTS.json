@@ -42,7 +42,7 @@
       "id": "usb_c_led_indicator_protected",
       "kind": "design_transaction",
       "source": "examples/design/kicad-backed/usb_c_led_indicator_protected.json",
-      "sha256": "8bace70676c0f1f6665bce8c55c19f66911f2e1e6ec8c31dff2099788604573b",
+      "sha256": "62c84524c7a867f6690de3313e16db411ef56588ea0266e32a9201d55247d030",
       "verification": "go test ./internal/designworkflow -run 'TestDesignExamplesOptionalKiCadBackedTier/usb_c_led_indicator_protected$' -count=1"
     },
     {
