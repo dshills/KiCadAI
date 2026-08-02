@@ -804,6 +804,47 @@ func TestNominalSegmentsClearOccupancyRejectsThickenedCollision(t *testing.T) {
 	}
 }
 
+func TestEndpointNeckdownRetriesWithNominalWidthDetour(t *testing.T) {
+	request := singleLayerSearchRequest()
+	request.Rules.GridMM = .25
+	request.Rules.TraceWidthMM = .8
+	request.Rules.ClearanceMM = .2
+	request.Rules.EdgeClearanceMM = .1
+	request.Rules.MaxSearchNodes = 100000
+	request.Rules.NetClasses = map[string]NetClass{"wide_power": {TraceWidthMM: .8, ClearanceMM: .2}}
+	request.Nets[0].Name = "POWER"
+	request.Nets[0].Class = "wide_power"
+	request.Nets[0].Role = NetPower
+	for componentIndex := range request.Components {
+		for padIndex := range request.Components[componentIndex].Pads {
+			pad := &request.Components[componentIndex].Pads[padIndex]
+			pad.Net = "POWER"
+			pad.Size = Size{WidthMM: .3, HeightMM: .3}
+		}
+	}
+	request.Obstacles = []Obstacle{
+		{Layer: "F.Cu", Geometry: Shape{Rect: &Rect{Min: Point{XMM: 7, YMM: 10.4}, Max: Point{XMM: 18, YMM: 14}}}},
+		{Layer: "F.Cu", Geometry: Shape{Rect: &Rect{Min: Point{XMM: 7, YMM: 6}, Max: Point{XMM: 18, YMM: 9.6}}}},
+	}
+
+	result := RouteRequest(request)
+	if result.Status != StatusRouted || len(result.Routes) != 1 {
+		t.Fatalf("status=%s issues=%#v routes=%#v", result.Status, result.Issues, result.Routes)
+	}
+	if !segmentsContainNominalWidth(result.Routes[0].Segments, request.Rules.TraceWidthMM) {
+		t.Fatalf("route lacks a nominal-width trunk: %#v", result.Routes[0].Segments)
+	}
+	detoured := false
+	for _, segment := range result.Routes[0].Segments {
+		if segment.WidthMM+distanceEpsilon >= request.Rules.TraceWidthMM && (segment.Start.YMM < 5.75 || segment.End.YMM < 5.75 || segment.Start.YMM > 14.25 || segment.End.YMM > 14.25) {
+			detoured = true
+		}
+	}
+	if !detoured {
+		t.Fatalf("nominal-width route did not leave the narrow shortcut: %#v", result.Routes[0].Segments)
+	}
+}
+
 func TestEndpointNeckdownCanAwaitLaterNetTrunk(t *testing.T) {
 	request := singleLayerSearchRequest()
 	occupancy, err := BuildOccupancy(request, "SIG")

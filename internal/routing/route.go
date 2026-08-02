@@ -83,13 +83,15 @@ func RouteRequestContext(ctx context.Context, request Request) Result {
 		var occupancy Occupancy
 		var viaOccupancy Occupancy
 		var nominalOccupancy Occupancy
+		var nominalViaOccupancy Occupancy
 		if !netFailed {
 			var err error
 			if searchRequest.Rules.TraceWidthMM != netRequest.Rules.TraceWidthMM {
-				nominalOccupancy, _, err = buildRouteOccupancy(netRequest, plan.Net.Name)
+				nominalOccupancy, nominalViaOccupancy, err = buildRouteOccupancy(netRequest, plan.Net.Name)
 			} else {
 				occupancy, viaOccupancy, err = buildRouteOccupancy(searchRequest, plan.Net.Name)
 				nominalOccupancy = occupancy
+				nominalViaOccupancy = viaOccupancy
 			}
 			if err != nil {
 				if issue, ok := reports.IssueFromError(err); ok {
@@ -294,6 +296,46 @@ func RouteRequestContext(ctx context.Context, request Request) Result {
 				if segmentsUseNeckdown(segments, netRequest.Rules.TraceWidthMM) && !nominalSegmentsClearOccupancy(segments, netRequest.Rules.TraceWidthMM, nominalOccupancy, netRequest.Board.Layers) {
 					var extended bool
 					segments, metrics, extended = extendEndpointNeckdownToClearTrunk(path, netRequest.Rules.TraceWidthMM, neckdownWidthMM, neckdownLengthMM, nominalOccupancy, netRequest.Board.Layers, route.Segments)
+					if !extended {
+						// Preserve the established path whenever a bounded neckdown
+						// extension can expose a legal trunk. Only when that fails, retry
+						// the path against nominal-width occupancy so a narrow global
+						// shortcut cannot hide a longer clearance-safe trunk.
+						nominalAccess := filterPhysicalEndpointAccess(netAccess, netRequest, plan.Net.Name, []Endpoint{pair.From, pair.To})
+						nominalPairRequest := cloneRequest(netRequest)
+						nominalPairViaRules := netRequest.Rules
+						nominalPairViaOccupancy := nominalViaOccupancy
+						if len(forcedEndpointVias) != 0 {
+							nominalPairRequest.Rules = crowdedEndpointViaRules(nominalPairRequest.Rules, forcedEndpointVias)
+							nominalPairViaRules = crowdedEndpointViaRules(nominalPairViaRules, forcedEndpointVias)
+							if candidate, err := BuildViaOccupancy(nominalPairRequest, plan.Net.Name); err == nil {
+								nominalPairViaOccupancy = candidate
+							}
+						}
+						nominalPath, nominalIssues := routePairPathWithForcedEndpointVias(
+							ctx, nominalPairRequest, nominalAccess, nominalOccupancy, nominalPairViaOccupancy, plan.Net.Name, pair, forcedEndpointVias,
+						)
+						route.SearchNodes += nominalPath.SearchNodes
+						result.Metrics.SearchNodes += nominalPath.SearchNodes
+						if nominalPath.SearchLimitHit {
+							route.SearchLimitHit = true
+							result.Metrics.MaxSearchNodesHit = true
+						}
+						if len(nominalIssues) == 0 {
+							nominalSegments, nominalMetrics := BuildSegmentsFromPathWithNeckdown(
+								nominalPath, netRequest.Rules.TraceWidthMM, neckdownWidthMM, neckdownLengthMM,
+							)
+							if segmentsContainNominalWidth(nominalSegments, netRequest.Rules.TraceWidthMM) &&
+								nominalSegmentsClearOccupancy(nominalSegments, netRequest.Rules.TraceWidthMM, nominalOccupancy, netRequest.Board.Layers) {
+								path, segments, metrics = nominalPath, nominalSegments, nominalMetrics
+								netAccess = nominalAccess
+								pairViaRules = nominalPairViaRules
+								pairViaOccupancy = nominalPairViaOccupancy
+								pairUsedCrowdedVias = len(forcedEndpointVias) != 0
+								extended = true
+							}
+						}
+					}
 					if !extended {
 						// Do not make a multi-endpoint net's result depend on branch
 						// order. A short or obstructed first branch may legitimately be

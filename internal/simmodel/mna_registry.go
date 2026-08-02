@@ -2055,21 +2055,21 @@ func canonicalAnalyses(source []Analysis) []Analysis {
 			analyses[index].SourceValueEvents[eventIndex].Component = strings.TrimSpace(analyses[index].SourceValueEvents[eventIndex].Component)
 		}
 		slices.SortStableFunc(analyses[index].SourceValueEvents, func(a, b SourceValueEvent) int {
-			return strings.Compare(valueEventKey(a.Component, a.TriggerTimeS, a.ID), valueEventKey(b.Component, b.TriggerTimeS, b.ID))
+			return CompareValueEventOrder(a.Component, a.TriggerTimeS, a.ID, b.Component, b.TriggerTimeS, b.ID)
 		})
 		for eventIndex := range analyses[index].DeviceValueEvents {
 			analyses[index].DeviceValueEvents[eventIndex].ID = strings.TrimSpace(analyses[index].DeviceValueEvents[eventIndex].ID)
 			analyses[index].DeviceValueEvents[eventIndex].Component = strings.TrimSpace(analyses[index].DeviceValueEvents[eventIndex].Component)
 		}
 		slices.SortStableFunc(analyses[index].DeviceValueEvents, func(a, b DeviceValueEvent) int {
-			return strings.Compare(valueEventKey(a.Component, a.TriggerTimeS, a.ID), valueEventKey(b.Component, b.TriggerTimeS, b.ID))
+			return CompareValueEventOrder(a.Component, a.TriggerTimeS, a.ID, b.Component, b.TriggerTimeS, b.ID)
 		})
 		for eventIndex := range analyses[index].ConditionValueEvents {
 			analyses[index].ConditionValueEvents[eventIndex].ID = strings.TrimSpace(analyses[index].ConditionValueEvents[eventIndex].ID)
 			analyses[index].ConditionValueEvents[eventIndex].Name = strings.TrimSpace(analyses[index].ConditionValueEvents[eventIndex].Name)
 		}
 		slices.SortStableFunc(analyses[index].ConditionValueEvents, func(a, b ConditionValueEvent) int {
-			return strings.Compare(valueEventKey(a.Name, a.TriggerTimeS, a.ID), valueEventKey(b.Name, b.TriggerTimeS, b.ID))
+			return CompareValueEventOrder(a.Name, a.TriggerTimeS, a.ID, b.Name, b.TriggerTimeS, b.ID)
 		})
 	}
 	slices.SortStableFunc(analyses, func(a, b Analysis) int { return strings.Compare(a.ID, b.ID) })
@@ -2196,14 +2196,14 @@ func validateAnalysisValueEvents(analysis Analysis, components map[string]string
 		}
 		lastEndByTarget[target] = trigger + duration
 	}
-	previousKey := ""
 	for index, event := range analysis.SourceValueEvents {
 		eventPath := fmt.Sprintf("%s.source_value_events[%d]", path, index)
-		key := valueEventKey(event.Component, event.TriggerTimeS, event.ID)
-		if index > 0 && key <= previousKey {
-			diagnostics = append(diagnostics, Diagnostic{Path: eventPath, Message: "source value events must be uniquely and canonically ordered"})
+		if index > 0 {
+			previous := analysis.SourceValueEvents[index-1]
+			if CompareValueEventOrder(previous.Component, previous.TriggerTimeS, previous.ID, event.Component, event.TriggerTimeS, event.ID) >= 0 {
+				diagnostics = append(diagnostics, Diagnostic{Path: eventPath, Message: "source value events must be uniquely and canonically ordered"})
+			}
 		}
-		previousKey = key
 		validateWindow(eventPath, event.ID, "source:"+event.Component, event.TriggerTimeS, event.OriginalTriggerTimeS, event.DurationS)
 		if _, exists := sources[event.Component]; !exists {
 			diagnostics = append(diagnostics, Diagnostic{Path: eventPath + ".component", Message: "source value event references a source absent from the analysis"})
@@ -2212,14 +2212,14 @@ func validateAnalysisValueEvents(analysis Analysis, components map[string]string
 			diagnostics = append(diagnostics, Diagnostic{Path: eventPath, Message: "source value event levels must be finite and bounded"})
 		}
 	}
-	previousKey = ""
 	for index, event := range analysis.DeviceValueEvents {
 		eventPath := fmt.Sprintf("%s.device_value_events[%d]", path, index)
-		key := valueEventKey(event.Component, event.TriggerTimeS, event.ID)
-		if index > 0 && key <= previousKey {
-			diagnostics = append(diagnostics, Diagnostic{Path: eventPath, Message: "device value events must be uniquely and canonically ordered"})
+		if index > 0 {
+			previous := analysis.DeviceValueEvents[index-1]
+			if CompareValueEventOrder(previous.Component, previous.TriggerTimeS, previous.ID, event.Component, event.TriggerTimeS, event.ID) >= 0 {
+				diagnostics = append(diagnostics, Diagnostic{Path: eventPath, Message: "device value events must be uniquely and canonically ordered"})
+			}
 		}
-		previousKey = key
 		validateWindow(eventPath, event.ID, "device:"+event.Component, event.TriggerTimeS, event.OriginalTriggerTimeS, event.DurationS)
 		if _, exists := components[event.Component]; !exists {
 			diagnostics = append(diagnostics, Diagnostic{Path: eventPath + ".component", Message: "device value event references a component absent from the circuit graph"})
@@ -2229,14 +2229,14 @@ func validateAnalysisValueEvents(analysis Analysis, components map[string]string
 			diagnostics = append(diagnostics, Diagnostic{Path: eventPath, Message: "device value event levels must be finite and positive"})
 		}
 	}
-	previousKey = ""
 	for index, event := range analysis.ConditionValueEvents {
 		eventPath := fmt.Sprintf("%s.condition_value_events[%d]", path, index)
-		key := valueEventKey(event.Name, event.TriggerTimeS, event.ID)
-		if index > 0 && key <= previousKey {
-			diagnostics = append(diagnostics, Diagnostic{Path: eventPath, Message: "condition value events must be uniquely and canonically ordered"})
+		if index > 0 {
+			previous := analysis.ConditionValueEvents[index-1]
+			if CompareValueEventOrder(previous.Name, previous.TriggerTimeS, previous.ID, event.Name, event.TriggerTimeS, event.ID) >= 0 {
+				diagnostics = append(diagnostics, Diagnostic{Path: eventPath, Message: "condition value events must be uniquely and canonically ordered"})
+			}
 		}
-		previousKey = key
 		validateWindow(eventPath, event.ID, "condition:"+event.Name, event.TriggerTimeS, event.OriginalTriggerTimeS, event.DurationS)
 		if analysis.Kind != AnalysisElectrothermal || event.Name != "thermal_resistance_scale" {
 			diagnostics = append(diagnostics, Diagnostic{Path: eventPath + ".name", Message: "condition event is not registered for electrothermal analysis"})
@@ -2249,8 +2249,19 @@ func validateAnalysisValueEvents(analysis Analysis, components map[string]string
 	return diagnostics
 }
 
-func valueEventKey(target string, trigger float64, id string) string {
-	return fmt.Sprintf("%s\x00%024.12e\x00%s", strings.TrimSpace(target), trigger, strings.TrimSpace(id))
+// CompareValueEventOrder compares canonical value-event fields by target,
+// numeric trigger time, and event ID.
+func CompareValueEventOrder(leftTarget string, leftTrigger float64, leftID string, rightTarget string, rightTrigger float64, rightID string) int {
+	if order := strings.Compare(leftTarget, rightTarget); order != 0 {
+		return order
+	}
+	if leftTrigger < rightTrigger {
+		return -1
+	}
+	if leftTrigger > rightTrigger {
+		return 1
+	}
+	return strings.Compare(leftID, rightID)
 }
 
 func hasPulse(excitation SourceExcitation) bool {

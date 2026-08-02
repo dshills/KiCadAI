@@ -251,6 +251,44 @@ func TestCurrentEventScalesEquivalentLoadToResolvedSupplyCorner(t *testing.T) {
 	}
 }
 
+func TestPhysicalLoadEventTruncatesOperatingPreludeWithoutOverlap(t *testing.T) {
+	component := OperatingHarnessComponentID("load_current", "LOAD")
+	value := 10.0
+	plan := simmodel.Plan{Devices: []simmodel.ResolvedDevice{{
+		Component: component, Family: "resistor", ValueSI: &value,
+	}}}
+	analysis := simmodel.Analysis{
+		ID: "load_step", Kind: simmodel.AnalysisTransient, DurationS: .04, TimeStepS: .0001,
+		DeviceOverrides: []simmodel.DeviceOverride{{Component: component, ValueSI: float64PointerForTest(maxCompiledAssertionBound)}},
+		DeviceValueEvents: []simmodel.DeviceValueEvent{{
+			ID: compiledEventID("operating_load_current", component), Component: component,
+			TriggerTimeS: .0001, DurationS: .0399, InitialSI: maxCompiledAssertionBound, AppliedSI: value,
+		}},
+	}
+	initial, recovered := .5, .5
+	event := PlannedEvent{
+		ID: "load_step", Kind: "load_step", Target: "LOAD", TriggerTimeS: .01, DurationS: .02,
+		Initial: &initial, Applied: 1, Recovered: &recovered, Unit: "A",
+	}
+	binding := SimulationOperatingBinding{
+		Axis: "load_current", Target: "LOAD", Kind: OperatingLoadCurrent, Component: component, Scale: 5,
+	}
+
+	applied, diagnostic := applyCurrentEventBinding(&analysis, plan, event, binding)
+	if diagnostic != nil || !applied || len(analysis.DeviceValueEvents) != 2 {
+		t.Fatalf("applied=%t diagnostic=%#v events=%#v", applied, diagnostic, analysis.DeviceValueEvents)
+	}
+	compactPlannedEventWindow(&analysis, []string{"load_step"})
+	truncateOperatingLoadPreludes(&analysis)
+	prelude, declared := analysis.DeviceValueEvents[0], analysis.DeviceValueEvents[1]
+	if math.Abs(prelude.DurationS-.0019) > 1e-12 || prelude.TriggerTimeS+prelude.DurationS > declared.TriggerTimeS+1e-12 {
+		t.Fatalf("prelude=%#v overlaps declared event=%#v", prelude, declared)
+	}
+	if declared.InitialSI != 10 || declared.AppliedSI != 5 || declared.RecoveredSI == nil || *declared.RecoveredSI != 10 {
+		t.Fatalf("declared physical-load event = %#v", declared)
+	}
+}
+
 func TestEventOnlyAnalysisStagesFallbackPulseFromStableBoundary(t *testing.T) {
 	initial, recovered := 8.0, 8.0
 	value := initial

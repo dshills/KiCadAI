@@ -704,6 +704,7 @@ func applyPlannedEvents(
 		retimeStagedFallbackPulses(analysis, stagedPulseComponents)
 		extendStagedFallbackPulses(analysis)
 	}
+	truncateOperatingLoadPreludes(analysis)
 	if len(applied) != 0 && !simmodel.NormalizeDynamicGrid(analysis) {
 		diagnostics = append(diagnostics, Diagnostic{
 			Path: analysis.ID,
@@ -1541,6 +1542,48 @@ func appendDeviceValueEvent(analysis *simmodel.Analysis, plan simmodel.Plan, eve
 	return true, nil
 }
 
+func truncateOperatingLoadPreludes(analysis *simmodel.Analysis) {
+	if analysis == nil || len(analysis.DeviceValueEvents) == 0 {
+		return
+	}
+	earliestDeclared := map[string]float64{}
+	preludeIDs := map[string]string{}
+	for _, event := range analysis.DeviceValueEvents {
+		preludeID, exists := preludeIDs[event.Component]
+		if !exists {
+			preludeID = compiledEventID("operating_load_current", event.Component)
+			preludeIDs[event.Component] = preludeID
+		}
+		if event.ID == preludeID {
+			continue
+		}
+		if trigger, exists := earliestDeclared[event.Component]; !exists || event.TriggerTimeS < trigger {
+			earliestDeclared[event.Component] = event.TriggerTimeS
+		}
+	}
+	retained := analysis.DeviceValueEvents[:0]
+	for _, event := range analysis.DeviceValueEvents {
+		trigger, exists := earliestDeclared[event.Component]
+		if !exists || event.ID != preludeIDs[event.Component] {
+			retained = append(retained, event)
+			continue
+		}
+		tolerance := math.Max(analysis.TimeStepS, math.Abs(trigger)) * 1e-12
+		if event.TriggerTimeS+event.DurationS <= trigger+tolerance {
+			retained = append(retained, event)
+			continue
+		}
+		duration := trigger - event.TriggerTimeS
+		if duration <= tolerance {
+			continue
+		}
+		event.DurationS = duration
+		retained = append(retained, event)
+	}
+	analysis.DeviceValueEvents = retained
+	sortDeviceValueEvents(analysis.DeviceValueEvents)
+}
+
 func extendAnalysisForEvent(analysis *simmodel.Analysis, event PlannedEvent) {
 	required := event.TriggerTimeS + event.DurationS
 	if required > analysis.DurationS {
@@ -1728,28 +1771,19 @@ func compiledEventID(eventID, target string) string {
 
 func sortSourceValueEvents(events []simmodel.SourceValueEvent) {
 	slices.SortStableFunc(events, func(left, right simmodel.SourceValueEvent) int {
-		return strings.Compare(
-			fmt.Sprintf("%s\x00%024.12e\x00%s", left.Component, left.TriggerTimeS, left.ID),
-			fmt.Sprintf("%s\x00%024.12e\x00%s", right.Component, right.TriggerTimeS, right.ID),
-		)
+		return simmodel.CompareValueEventOrder(left.Component, left.TriggerTimeS, left.ID, right.Component, right.TriggerTimeS, right.ID)
 	})
 }
 
 func sortDeviceValueEvents(events []simmodel.DeviceValueEvent) {
 	slices.SortStableFunc(events, func(left, right simmodel.DeviceValueEvent) int {
-		return strings.Compare(
-			fmt.Sprintf("%s\x00%024.12e\x00%s", left.Component, left.TriggerTimeS, left.ID),
-			fmt.Sprintf("%s\x00%024.12e\x00%s", right.Component, right.TriggerTimeS, right.ID),
-		)
+		return simmodel.CompareValueEventOrder(left.Component, left.TriggerTimeS, left.ID, right.Component, right.TriggerTimeS, right.ID)
 	})
 }
 
 func sortConditionValueEvents(events []simmodel.ConditionValueEvent) {
 	slices.SortStableFunc(events, func(left, right simmodel.ConditionValueEvent) int {
-		return strings.Compare(
-			fmt.Sprintf("%s\x00%024.12e\x00%s", left.Name, left.TriggerTimeS, left.ID),
-			fmt.Sprintf("%s\x00%024.12e\x00%s", right.Name, right.TriggerTimeS, right.ID),
-		)
+		return simmodel.CompareValueEventOrder(left.Name, left.TriggerTimeS, left.ID, right.Name, right.TriggerTimeS, right.ID)
 	})
 }
 

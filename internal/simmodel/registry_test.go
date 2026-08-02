@@ -7,6 +7,15 @@ import (
 	"testing"
 )
 
+func TestValueEventOrderUsesNumericTriggerTime(t *testing.T) {
+	if CompareValueEventOrder("load", .0001, "early", "load", .01, "late") >= 0 {
+		t.Fatal("earlier numeric trigger did not sort first")
+	}
+	if CompareValueEventOrder("load", .01, "late", "load", .0001, "early") <= 0 {
+		t.Fatal("later numeric trigger did not sort last")
+	}
+}
+
 func TestRegistryResolvesAndEvaluatesGenericFamilies(t *testing.T) {
 	tests := []struct {
 		name       string
