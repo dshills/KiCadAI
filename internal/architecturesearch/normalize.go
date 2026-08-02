@@ -39,6 +39,7 @@ func Normalize(requirement Requirement) Requirement {
 		if port.Protocol != nil {
 			normalizeProtocol(port.Protocol)
 		}
+		normalizeControl(port.Control)
 	}
 	slices.SortStableFunc(normalized.Requirements.Ports, func(left, right Port) int {
 		return strings.Compare(left.ID, right.ID)
@@ -55,6 +56,7 @@ func Normalize(requirement Requirement) Requirement {
 		if signal.Protocol != nil {
 			normalizeProtocol(signal.Protocol)
 		}
+		normalizeControl(signal.Control)
 	}
 	slices.SortStableFunc(normalized.Requirements.Signals, func(left, right Signal) int {
 		return strings.Compare(left.ID, right.ID)
@@ -156,12 +158,46 @@ func Normalize(requirement Requirement) Requirement {
 		behavior.Observation.Kind = canonicalIdentifier(behavior.Observation.Kind)
 		behavior.Observation.ID = canonicalIdentifier(behavior.Observation.ID)
 		behavior.Unit = canonicalUnit(behavior.Unit)
+		behavior.Transition = canonicalIdentifier(behavior.Transition)
 		for caseIndex := range behavior.OperatingCases {
 			behavior.OperatingCases[caseIndex] = canonicalIdentifier(behavior.OperatingCases[caseIndex])
 		}
 		slices.Sort(behavior.OperatingCases)
 	}
 	slices.SortStableFunc(normalized.Requirements.BehavioralRequirements, func(left, right BehavioralRequirement) int {
+		return strings.Compare(left.ID, right.ID)
+	})
+
+	for index := range normalized.Requirements.ControlTransitions {
+		transition := &normalized.Requirements.ControlTransitions[index]
+		transition.ID = canonicalIdentifier(transition.ID)
+		transition.Target.Kind = canonicalIdentifier(transition.Target.Kind)
+		transition.Target.ID = canonicalIdentifier(transition.Target.ID)
+		transition.Trigger.Kind = canonicalIdentifier(transition.Trigger.Kind)
+		transition.Trigger.ID = canonicalIdentifier(transition.Trigger.ID)
+		transition.From = canonicalIdentifier(transition.From)
+		transition.To = canonicalIdentifier(transition.To)
+		transition.Direction = canonicalIdentifier(transition.Direction)
+		for dependencyIndex := range transition.Dependencies {
+			dependency := &transition.Dependencies[dependencyIndex]
+			dependency.Target.Kind = canonicalIdentifier(dependency.Target.Kind)
+			dependency.Target.ID = canonicalIdentifier(dependency.Target.ID)
+			dependency.State = canonicalIdentifier(dependency.State)
+		}
+		slices.SortStableFunc(transition.Dependencies, func(left, right ControlStateDependency) int {
+			if order := strings.Compare(left.Target.Kind, right.Target.Kind); order != 0 {
+				return order
+			}
+			if order := strings.Compare(left.Target.ID, right.Target.ID); order != 0 {
+				return order
+			}
+			if order := strings.Compare(left.State, right.State); order != 0 {
+				return order
+			}
+			return cmp.Compare(left.StableForS, right.StableForS)
+		})
+	}
+	slices.SortStableFunc(normalized.Requirements.ControlTransitions, func(left, right ControlTransition) int {
 		return strings.Compare(left.ID, right.ID)
 	})
 	return normalized
@@ -206,6 +242,16 @@ func CanonicalHash(requirement Requirement) (string, error) {
 func normalizeProtocol(protocol *Protocol) {
 	protocol.Name = canonicalIdentifier(protocol.Name)
 	protocol.Mode = canonicalIdentifier(protocol.Mode)
+}
+
+func normalizeControl(control *ControlSemantics) {
+	if control == nil {
+		return
+	}
+	control.Function = canonicalIdentifier(control.Function)
+	control.Polarity = canonicalIdentifier(control.Polarity)
+	control.StartupState = canonicalIdentifier(control.StartupState)
+	control.SafeState = canonicalIdentifier(control.SafeState)
 }
 
 func normalizeConstraints(constraints []Constraint) {

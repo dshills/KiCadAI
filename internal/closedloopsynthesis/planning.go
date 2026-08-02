@@ -69,18 +69,28 @@ type CornerAssignment struct {
 }
 
 type PlannedAssertion struct {
-	RequirementID string   `json:"requirement_id"`
-	AnalysisID    string   `json:"analysis_id"`
-	OperatingCase string   `json:"operating_case"`
-	Metric        string   `json:"metric"`
-	Target        string   `json:"target"`
-	Min           *float64 `json:"min,omitempty"`
-	Max           *float64 `json:"max,omitempty"`
-	Unit          string   `json:"unit"`
-	Critical      bool     `json:"critical"`
+	RequirementID     string                   `json:"requirement_id"`
+	AnalysisID        string                   `json:"analysis_id"`
+	OperatingCase     string                   `json:"operating_case"`
+	Metric            string                   `json:"metric"`
+	Target            string                   `json:"target"`
+	Min               *float64                 `json:"min,omitempty"`
+	Max               *float64                 `json:"max,omitempty"`
+	Unit              string                   `json:"unit"`
+	Critical          bool                     `json:"critical"`
+	TransitionID      string                   `json:"transition_id,omitempty"`
+	ResponseDirection string                   `json:"response_direction,omitempty"`
+	Dependencies      []PlannedStateDependency `json:"dependencies,omitempty"`
 }
 
-// BuildAnalysisPlan binds v3/v4/v5 semantic behavior to resolved trusted targets and
+type PlannedStateDependency struct {
+	Observation architecturesearch.Observation `json:"observation"`
+	Target      string                         `json:"target"`
+	State       string                         `json:"state"`
+	StableForS  float64                        `json:"stable_for_s,omitempty"`
+}
+
+// BuildAnalysisPlan binds v3/v4/v5/v6 semantic behavior to resolved trusted targets and
 // expands bounded named operating corners. It does not accept equations,
 // solver settings, or provider model content.
 func BuildAnalysisPlan(requirement architecturesearch.Requirement, bindings []SemanticBinding, modelDecisions []ModelDecision) (AnalysisPlan, []Diagnostic) {
@@ -89,8 +99,9 @@ func BuildAnalysisPlan(requirement architecturesearch.Requirement, bindings []Se
 	v3 := requirement.Schema == architecturesearch.SchemaIDV3 && requirement.Version == architecturesearch.VersionV3
 	v4 := requirement.Schema == architecturesearch.SchemaIDV4 && requirement.Version == architecturesearch.VersionV4
 	v5 := requirement.Schema == architecturesearch.SchemaIDV5 && requirement.Version == architecturesearch.VersionV5
-	if err != nil || (!v3 && !v4 && !v5) {
-		message := "analysis planning requires a valid v3, v4, or v5 behavioral requirement"
+	v6 := requirement.Schema == architecturesearch.SchemaIDV6 && requirement.Version == architecturesearch.VersionV6
+	if err != nil || (!v3 && !v4 && !v5 && !v6) {
+		message := "analysis planning requires a valid v3, v4, v5, or v6 behavioral requirement"
 		if err != nil {
 			message = err.Error()
 		}
@@ -141,6 +152,10 @@ func BuildAnalysisPlan(requirement architecturesearch.Requirement, bindings []Se
 	analysisEvents := map[string][]string{}
 	observedEvents := map[string]bool{}
 	caseKinds := map[string]map[string]bool{}
+	transitions := make(map[string]architecturesearch.ControlTransition, len(requirement.Requirements.ControlTransitions))
+	for _, transition := range requirement.Requirements.ControlTransitions {
+		transitions[transition.ID] = transition
+	}
 	registerAnalysis := func(kind, caseID, eventID string) string {
 		analysisID := kind + ":" + caseID
 		if eventID != "" {
@@ -164,6 +179,21 @@ func BuildAnalysisPlan(requirement architecturesearch.Requirement, bindings []Se
 			diagnostics = append(diagnostics, Diagnostic{Path: "behavioral_requirements." + behavior.ID + ".observation", Message: "resolved semantic observation binding is missing"})
 			continue
 		}
+		transition := transitions[behavior.Transition]
+		dependencies := make([]PlannedStateDependency, 0, len(transition.Dependencies))
+		for index, dependency := range transition.Dependencies {
+			target, exists := observationTarget(dependency.Target, bindingTargets)
+			if !exists {
+				diagnostics = append(diagnostics, Diagnostic{
+					Path:    fmt.Sprintf("control_transitions.%s.dependencies[%d].target", transition.ID, index),
+					Message: "resolved control-state dependency target binding is missing",
+				})
+				continue
+			}
+			dependencies = append(dependencies, PlannedStateDependency{
+				Observation: dependency.Target, Target: target, State: dependency.State, StableForS: dependency.StableForS,
+			})
+		}
 		for _, caseID := range behavior.OperatingCases {
 			eventID := ""
 			if behavior.Observation.Kind == "event" {
@@ -175,6 +205,7 @@ func BuildAnalysisPlan(requirement architecturesearch.Requirement, bindings []Se
 			plan.Assertions = append(plan.Assertions, PlannedAssertion{
 				RequirementID: behavior.ID, AnalysisID: analysisID, OperatingCase: caseID, Metric: behavior.Metric,
 				Target: target, Min: cloneFloat(behavior.Min), Max: cloneFloat(behavior.Max), Unit: behavior.Unit, Critical: behavior.Critical,
+				TransitionID: behavior.Transition, ResponseDirection: transition.Direction, Dependencies: append([]PlannedStateDependency(nil), dependencies...),
 			})
 		}
 	}

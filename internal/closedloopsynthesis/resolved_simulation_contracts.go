@@ -576,7 +576,7 @@ func primaryInputReference(requirement architecturesearch.Requirement, bindings 
 }
 
 func resolvedAssertionBinding(assertion PlannedAssertion, referenceNode string, supplyNodes []string, operatingBindings []SimulationOperatingBinding, plan simmodel.Plan, requirement architecturesearch.Requirement, semanticBindings []SemanticBinding) (SimulationAssertionBinding, *Diagnostic) {
-	prototype := simmodel.Assertion{Node: assertion.Target}
+	prototype := simmodel.Assertion{Node: assertion.Target, ResponseDirection: assertion.ResponseDirection}
 	binding := SimulationAssertionBinding{BoundsMode: AssertionBoundsDirect}
 	switch assertion.Metric {
 	case "dc_voltage", "output_high_voltage":

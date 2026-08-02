@@ -346,8 +346,9 @@ func validateInput(input Input, evaluator Evaluator, policy Policy, requirementH
 		v3 := input.Requirement.Version == architecturesearch.VersionV3 && input.Requirement.Schema == architecturesearch.SchemaIDV3
 		v4 := input.Requirement.Version == architecturesearch.VersionV4 && input.Requirement.Schema == architecturesearch.SchemaIDV4
 		v5 := input.Requirement.Version == architecturesearch.VersionV5 && input.Requirement.Schema == architecturesearch.SchemaIDV5
-		if !v3 && !v4 && !v5 {
-			diagnostics = append(diagnostics, Diagnostic{Path: "requirement", Message: "closed-loop synthesis requires the v3, v4, or v5 behavioral requirement schema"})
+		v6 := input.Requirement.Version == architecturesearch.VersionV6 && input.Requirement.Schema == architecturesearch.SchemaIDV6
+		if !v3 && !v4 && !v5 && !v6 {
+			diagnostics = append(diagnostics, Diagnostic{Path: "requirement", Message: "closed-loop synthesis requires the v3, v4, v5, or v6 behavioral requirement schema"})
 		}
 	}
 	if !validHash(input.CatalogHash) || !validHash(input.FormulaLibraryHash) || !validHash(input.ModelRegistryHash) {

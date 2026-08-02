@@ -25,6 +25,7 @@ const (
 	CodeOperatingCaseInvalid  reports.Code = "ARCHITECTURE_OPERATING_CASE_INVALID"
 	CodeOperatingEventInvalid reports.Code = "ARCHITECTURE_OPERATING_EVENT_INVALID"
 	CodeBehaviorInvalid       reports.Code = "ARCHITECTURE_BEHAVIOR_INVALID"
+	CodeControlInvalid        reports.Code = "ARCHITECTURE_CONTROL_INVALID"
 )
 
 var semanticIDPattern = regexp.MustCompile(`^[a-z][a-z0-9_]{0,63}$`)
@@ -39,7 +40,9 @@ func Validate(requirement Requirement) []reports.Issue {
 	validator.objectives()
 	validator.constraints("requirements.system_constraints", requirement.Requirements.SystemConstraints)
 	validator.operatingCases()
+	validator.controlTransitions()
 	validator.behavioralRequirements()
+	validator.controlStartupCoherence()
 	validator.boardLimits()
 	validator.acceptance()
 	slices.SortStableFunc(validator.issues, func(left, right reports.Issue) int {
@@ -54,6 +57,52 @@ func Validate(requirement Requirement) []reports.Issue {
 	return validator.issues
 }
 
+// controlStartupCoherence rejects a low-at-startup proof claim when the only
+// declared load-switch control state explicitly requests a connected startup.
+// Such a requirement needs a distinct startup enable/sequencing dependency;
+// the implementation cannot safely invent one from a fault or inhibit signal.
+func (validator *requirementValidator) controlStartupCoherence() {
+	if validator.requirement.Version != VersionV6 {
+		return
+	}
+	for behaviorIndex, behavior := range validator.requirement.Requirements.BehavioralRequirements {
+		if behavior.Metric != "startup_output_voltage" || behavior.Observation.Kind != "port" || behavior.Max == nil {
+			continue
+		}
+		port, exists := validator.portsByID[behavior.Observation.ID]
+		if !exists {
+			continue
+		}
+		domain, exists := validator.domainsByID[port.Domain]
+		if !exists || domain.MinVoltageV == nil || *behavior.Max >= *domain.MinVoltageV {
+			continue
+		}
+		for _, objective := range validator.requirement.Requirements.Objectives {
+			if objective.Capability != "load_switch" {
+				continue
+			}
+			outputMatches := false
+			var control *ControlSemantics
+			for _, binding := range objective.Bindings {
+				if binding.Role == "output" && binding.Port == port.ID {
+					outputMatches = true
+				}
+				if binding.Role == "control" {
+					control = controlForBinding(validator.requirement, binding)
+				}
+			}
+			if !outputMatches || control == nil {
+				continue
+			}
+			startupConnected := control.StartupState == "deasserted" && slices.Contains([]string{"inhibit", "reset", "fault"}, control.Function)
+			startupConnected = startupConnected || control.StartupState == "asserted" && slices.Contains([]string{"enable", "power_good"}, control.Function)
+			if startupConnected {
+				validator.add(CodeControlInvalid, fmt.Sprintf("requirements.behavioral_requirements[%d]", behaviorIndex), "startup output requires a deenergized load while the declared load-switch control starts in its connected state; declare a separate startup enable or sequencing dependency")
+			}
+		}
+	}
+}
+
 type requirementValidator struct {
 	requirement      Requirement
 	issues           []reports.Issue
@@ -62,6 +111,8 @@ type requirementValidator struct {
 	signalsByID      map[string]Signal
 	participantsByID map[string]Participant
 	eventsByID       map[string]string
+	transitionsByID  map[string]ControlTransition
+	transitionPaths  map[string]string
 }
 
 func (validator *requirementValidator) add(code reports.Code, path, message string) {
@@ -74,8 +125,9 @@ func (validator *requirementValidator) header() {
 	v3 := validator.requirement.Schema == SchemaIDV3 && validator.requirement.Version == VersionV3
 	v4 := validator.requirement.Schema == SchemaIDV4 && validator.requirement.Version == VersionV4
 	v5 := validator.requirement.Schema == SchemaIDV5 && validator.requirement.Version == VersionV5
-	if !v1 && !v2 && !v3 && !v4 && !v5 {
-		validator.add(CodeSchemaInvalid, "schema", fmt.Sprintf("schema/version must be %q/%d, %q/%d, %q/%d, %q/%d, or %q/%d", SchemaID, Version, SchemaIDV2, VersionV2, SchemaIDV3, VersionV3, SchemaIDV4, VersionV4, SchemaIDV5, VersionV5))
+	v6 := validator.requirement.Schema == SchemaIDV6 && validator.requirement.Version == VersionV6
+	if !v1 && !v2 && !v3 && !v4 && !v5 && !v6 {
+		validator.add(CodeSchemaInvalid, "schema", fmt.Sprintf("schema/version must be %q/%d, %q/%d, %q/%d, %q/%d, %q/%d, or %q/%d", SchemaID, Version, SchemaIDV2, VersionV2, SchemaIDV3, VersionV3, SchemaIDV4, VersionV4, SchemaIDV5, VersionV5, SchemaIDV6, VersionV6))
 	}
 	project := validator.requirement.Project
 	if !validSemanticID(project.Name) {
@@ -99,6 +151,7 @@ func (validator *requirementValidator) header() {
 	validator.limit("requirements.objectives", len(validator.requirement.Requirements.Objectives), MaxObjectives)
 	validator.limit("requirements.operating_cases", len(validator.requirement.Requirements.OperatingCases), MaxOperatingCases)
 	validator.limit("requirements.behavioral_requirements", len(validator.requirement.Requirements.BehavioralRequirements), MaxBehavioralRequirements)
+	validator.limit("requirements.control_transitions", len(validator.requirement.Requirements.ControlTransitions), MaxControlTransitions)
 }
 
 func (validator *requirementValidator) domains() {
@@ -163,6 +216,7 @@ func (validator *requirementValidator) signals() {
 		if signal.Protocol != nil {
 			validator.protocol(path+".protocol", *signal.Protocol)
 		}
+		validator.control(path+".control", signal.Kind, signal.Control)
 	}
 	if !supportsTypedSignals(validator.requirement.Version) {
 		if len(validator.requirement.Requirements.Signals) != 0 || len(validator.requirement.Requirements.SystemConstraints) != 0 {
@@ -209,6 +263,7 @@ func (validator *requirementValidator) ports() {
 		if port.Protocol != nil {
 			validator.protocol(path+".protocol", *port.Protocol)
 		}
+		validator.control(path+".control", port.Kind, port.Control)
 	}
 }
 
@@ -292,8 +347,11 @@ func (validator *requirementValidator) objectives() {
 				continue
 			}
 			if external {
-				if _, exists := validator.portsByID[binding.Port]; !exists {
+				port, exists := validator.portsByID[binding.Port]
+				if !exists {
 					validator.add(CodeBindingUnresolved, bindingPath+".port", "binding references an unknown external port")
+				} else if validator.requirement.Version == VersionV6 && controlRole(binding.Role) && port.Control == nil {
+					validator.add(CodeControlInvalid, bindingPath+".port", "control-role binding requires explicit v6 control semantics on its endpoint")
 				}
 				continue
 			}
@@ -302,9 +360,13 @@ func (validator *requirementValidator) objectives() {
 					validator.add(CodeSchemaInvalid, bindingPath+".signal", "signal bindings require the v2 or v3 schema")
 					continue
 				}
-				if _, exists := validator.signalsByID[binding.Signal]; !exists {
+				signalEndpoint, exists := validator.signalsByID[binding.Signal]
+				if !exists {
 					validator.add(CodeBindingUnresolved, bindingPath+".signal", "binding references an unknown signal")
 					continue
+				}
+				if validator.requirement.Version == VersionV6 && controlRole(binding.Role) && signalEndpoint.Control == nil {
+					validator.add(CodeControlInvalid, bindingPath+".signal", "control-role binding requires explicit v6 control semantics on its endpoint")
 				}
 				use := signalUses[binding.Signal]
 				switch binding.Direction {
@@ -344,6 +406,10 @@ func (validator *requirementValidator) objectives() {
 			validator.add(CodeSignalInvalid, fmt.Sprintf("requirements.signals[%d]", index), fmt.Sprintf("signal endpoints require one source and at least one sink, or at least two bidirectional endpoints; got %d source, %d sink, %d bidirectional", use.sources, use.sinks, use.bidirectional))
 		}
 	}
+}
+
+func controlRole(role string) bool {
+	return slices.Contains([]string{"control", "enable", "fault", "inhibit", "reset", "power_good", "state"}, role)
 }
 
 func (validator *requirementValidator) operatingCases() {
@@ -433,6 +499,127 @@ func (validator *requirementValidator) operatingEvent(path string, event Operati
 	}
 }
 
+func (validator *requirementValidator) control(path, kind string, control *ControlSemantics) {
+	if control == nil {
+		return
+	}
+	if validator.requirement.Version != VersionV6 {
+		validator.add(CodeSchemaInvalid, path, "control semantics require the v6 schema")
+		return
+	}
+	if kind != "digital_logic" && kind != "analog_control" {
+		validator.add(CodeControlInvalid, path, "control semantics require a digital_logic or analog_control endpoint")
+	}
+	if !slices.Contains([]string{"enable", "inhibit", "reset", "fault", "power_good", "state"}, control.Function) {
+		validator.add(CodeControlInvalid, path+".function", "control function must be enable, inhibit, reset, fault, power_good, or state")
+	}
+	if control.Polarity != "active_high" && control.Polarity != "active_low" {
+		validator.add(CodeControlInvalid, path+".polarity", "control polarity must be active_high or active_low")
+	}
+	for field, state := range map[string]string{"startup_state": control.StartupState, "safe_state": control.SafeState} {
+		if state != "asserted" && state != "deasserted" {
+			validator.add(CodeControlInvalid, path+"."+field, field+" must be asserted or deasserted")
+		}
+	}
+}
+
+func (validator *requirementValidator) controlTransitions() {
+	validator.transitionsByID = map[string]ControlTransition{}
+	validator.transitionPaths = map[string]string{}
+	transitions := validator.requirement.Requirements.ControlTransitions
+	if validator.requirement.Version != VersionV6 {
+		if len(transitions) != 0 {
+			validator.add(CodeSchemaInvalid, "requirements.control_transitions", "control transitions require the v6 schema")
+		}
+		return
+	}
+	for index, transition := range transitions {
+		path := fmt.Sprintf("requirements.control_transitions[%d]", index)
+		if !validSemanticID(transition.ID) {
+			validator.add(CodeControlInvalid, path+".id", "control transition id must be a normalized semantic identifier")
+		} else if _, exists := validator.transitionsByID[transition.ID]; exists {
+			validator.add(CodeIdentityDuplicate, path+".id", "control transition id is duplicated")
+		} else {
+			validator.transitionsByID[transition.ID] = transition
+			validator.transitionPaths[transition.ID] = path
+		}
+		validator.behaviorObservation(path+".target", transition.Target)
+		validator.behaviorObservation(path+".trigger", transition.Trigger)
+		if transition.Target.Kind != "port" && transition.Target.Kind != "signal" {
+			validator.add(CodeControlInvalid, path+".target.kind", "control transition target must be a semantic port or signal")
+		}
+		if transition.Trigger.Kind == "circuit" {
+			validator.add(CodeControlInvalid, path+".trigger.kind", "control transition trigger must be an event or semantic endpoint")
+		}
+		if transition.From == transition.To || !validTransitionState(transition.From) || !validTransitionState(transition.To) {
+			validator.add(CodeControlInvalid, path, "control transition requires distinct registered from and to states")
+		}
+		if transition.Direction != "rising" && transition.Direction != "falling" {
+			validator.add(CodeControlInvalid, path+".direction", "control transition direction must be rising or falling")
+		}
+		if control := validator.controlForObservation(transition.Target); control != nil {
+			if (transition.From != "asserted" && transition.From != "deasserted") || (transition.To != "asserted" && transition.To != "deasserted") {
+				validator.add(CodeControlInvalid, path, "a control endpoint transition must use asserted and deasserted states")
+			} else if expected := controlTransitionDirection(*control, transition.From, transition.To); expected != transition.Direction {
+				validator.add(CodeControlInvalid, path+".direction", "physical transition direction contradicts the target control polarity")
+			}
+		}
+		validator.optionalNumber(CodeControlInvalid, path+".minimum_delay_s", transition.MinimumDelayS, 0, 1e6)
+		validator.optionalNumber(CodeControlInvalid, path+".maximum_delay_s", transition.MaximumDelayS, 0, 1e6)
+		if transition.MinimumDelayS == nil && transition.MaximumDelayS == nil {
+			validator.add(CodeControlInvalid, path, "control transition requires a minimum or maximum delay")
+		} else if transition.MinimumDelayS != nil && transition.MaximumDelayS != nil && *transition.MinimumDelayS > *transition.MaximumDelayS {
+			validator.add(CodeControlInvalid, path, "control transition minimum delay exceeds maximum delay")
+		}
+		validator.limit(path+".dependencies", len(transition.Dependencies), MaxTransitionDependencies)
+		seenDependencies := map[string]bool{}
+		for dependencyIndex, dependency := range transition.Dependencies {
+			dependencyPath := fmt.Sprintf("%s.dependencies[%d]", path, dependencyIndex)
+			validator.behaviorObservation(dependencyPath+".target", dependency.Target)
+			if dependency.Target.Kind == "event" || dependency.Target.Kind == "circuit" {
+				validator.add(CodeControlInvalid, dependencyPath+".target.kind", "control dependency must reference a semantic state-bearing endpoint")
+			}
+			key := dependency.Target.Kind + "\x00" + dependency.Target.ID
+			if seenDependencies[key] {
+				validator.add(CodeIdentityDuplicate, dependencyPath+".target", "control transition dependency target is duplicated")
+			}
+			seenDependencies[key] = true
+			if !validTransitionState(dependency.State) {
+				validator.add(CodeControlInvalid, dependencyPath+".state", "control dependency state is unsupported")
+			}
+			if control := validator.controlForObservation(dependency.Target); control != nil && dependency.State != "asserted" && dependency.State != "deasserted" {
+				validator.add(CodeControlInvalid, dependencyPath+".state", "control endpoint dependencies must use asserted or deasserted")
+			}
+			if !finiteInRange(dependency.StableForS, 0, 1e6) {
+				validator.add(CodeControlInvalid, dependencyPath+".stable_for_s", "control dependency stability time must be finite, nonnegative, and bounded")
+			}
+		}
+	}
+}
+
+func (validator *requirementValidator) controlForObservation(observation Observation) *ControlSemantics {
+	switch observation.Kind {
+	case "port":
+		return validator.portsByID[observation.ID].Control
+	case "signal":
+		return validator.signalsByID[observation.ID].Control
+	default:
+		return nil
+	}
+}
+
+func validTransitionState(state string) bool {
+	return slices.Contains([]string{"asserted", "deasserted", "valid", "invalid", "energized", "deenergized"}, state)
+}
+
+func controlTransitionDirection(control ControlSemantics, from, to string) string {
+	asserting := from == "deasserted" && to == "asserted"
+	if (control.Polarity == "active_high" && asserting) || (control.Polarity == "active_low" && !asserting) {
+		return "rising"
+	}
+	return "falling"
+}
+
 func (validator *requirementValidator) operatingCondition(path string, condition OperatingCondition) {
 	expectedUnit, selectionAxis := operatingAxisContractForVersion(condition.Axis, validator.requirement.Version)
 	if expectedUnit == "" && !selectionAxis {
@@ -503,6 +690,7 @@ func (validator *requirementValidator) behavioralRequirements() {
 		cases[operatingCase.ID] = true
 	}
 	seen := map[string]bool{}
+	transitionReferences := map[string]int{}
 	for index, behavior := range behaviors {
 		path := fmt.Sprintf("requirements.behavioral_requirements[%d]", index)
 		if !validSemanticID(behavior.ID) {
@@ -523,6 +711,30 @@ func (validator *requirementValidator) behavioralRequirements() {
 			}
 		}
 		validator.behaviorObservation(path+".observation", behavior.Observation)
+		if validator.requirement.Version == VersionV6 && slices.Contains([]string{"response_time", "protection_response_time", "sequence_delay"}, behavior.Metric) && behavior.Transition == "" {
+			validator.add(CodeControlInvalid, path+".transition", "directed response timing requires an explicit v6 control transition")
+		}
+		if behavior.Transition != "" {
+			if validator.requirement.Version != VersionV6 {
+				validator.add(CodeSchemaInvalid, path+".transition", "behavior transition references require the v6 schema")
+			} else if transition, exists := validator.transitionsByID[behavior.Transition]; !exists {
+				validator.add(CodeBindingUnresolved, path+".transition", "behavior references an unknown control transition")
+			} else {
+				transitionReferences[behavior.Transition]++
+				if behavior.Analysis != "transient" {
+					validator.add(CodeControlInvalid, path+".analysis", "control transition behavior requires transient analysis")
+				}
+				if behavior.Observation != transition.Target {
+					validator.add(CodeControlInvalid, path+".observation", "control transition behavior must observe the transition target")
+				}
+				if behavior.Min != nil && transition.MinimumDelayS != nil && *behavior.Min < *transition.MinimumDelayS {
+					validator.add(CodeControlInvalid, path+".min", "behavior minimum falls outside the control transition timing envelope")
+				}
+				if behavior.Max != nil && transition.MaximumDelayS != nil && *behavior.Max > *transition.MaximumDelayS {
+					validator.add(CodeControlInvalid, path+".max", "behavior maximum falls outside the control transition timing envelope")
+				}
+			}
+		}
 		if behavior.Min == nil && behavior.Max == nil {
 			validator.add(CodeBehaviorInvalid, path, "behavioral requirement requires a minimum or maximum")
 		}
@@ -545,6 +757,13 @@ func (validator *requirementValidator) behavioralRequirements() {
 				validator.add(CodeBindingUnresolved, casePath, "event observation must be evaluated in the operating case that declares the event")
 			}
 			seenCases[caseID] = true
+		}
+	}
+	if validator.requirement.Version == VersionV6 {
+		for id := range validator.transitionsByID {
+			if transitionReferences[id] == 0 {
+				validator.add(CodeControlInvalid, validator.transitionPaths[id], "control transition lacks a measurable behavioral requirement")
+			}
 		}
 	}
 }
@@ -906,11 +1125,11 @@ func allowedUnitForVersion(value string, version int) bool {
 }
 
 func supportsTypedSignals(version int) bool {
-	return version == VersionV2 || version == VersionV3 || version == VersionV4 || version == VersionV5
+	return version == VersionV2 || version == VersionV3 || version == VersionV4 || version == VersionV5 || version == VersionV6
 }
 
 func supportsBehavioralVerification(version int) bool {
-	return version == VersionV3 || version == VersionV4 || version == VersionV5
+	return version == VersionV3 || version == VersionV4 || version == VersionV5 || version == VersionV6
 }
 
 func supportsDynamicVerification(version int) bool {

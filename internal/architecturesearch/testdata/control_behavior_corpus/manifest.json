@@ -1,0 +1,17 @@
+{
+  "schema": "kicadai.control-behavior-corpus.v1",
+  "version": 1,
+  "frozen_at": "2026-08-02",
+  "fixtures": [
+    {"id": "current_sense_protection", "file": "current_sense_protection.json", "sha256": "c83dd6cc7a95ac3982fd7ff7de4080865686ea179e0a22e31caa58aee2769e83", "expected_code": "ARCHITECTURE_CONTROL_INVALID", "expected_path": "requirements.behavioral_requirements[2]", "expected_message": "startup output requires a deenergized load while the declared load-switch control starts in its connected state; declare a separate startup enable or sequencing dependency", "promotion_overlay": true},
+    {"id": "mixed_function_control_power", "file": "mixed_function_control_power.json", "sha256": "8097a52109fdf8127efa2810f2f69bce41eee8fb104f179cf7584083780b6e88", "expected_code": "ARCHITECTURE_CONTROL_INVALID", "expected_path": "requirements.behavioral_requirements[2]", "expected_message": "startup output requires a deenergized load while the declared load-switch control starts in its connected state; declare a separate startup enable or sequencing dependency", "promotion_overlay": true}
+  ],
+  "identity_neutral_cases": [
+    {"id": "enable_active_high", "function": "enable", "polarity": "active_high", "startup_state": "deasserted", "safe_state": "deasserted", "from": "deasserted", "to": "asserted", "direction": "rising", "consumer_action": "high"},
+    {"id": "enable_active_low", "function": "enable", "polarity": "active_low", "startup_state": "deasserted", "safe_state": "deasserted", "from": "deasserted", "to": "asserted", "direction": "falling", "consumer_action": "high_disconnect"},
+    {"id": "inhibit_active_high", "function": "inhibit", "polarity": "active_high", "startup_state": "deasserted", "safe_state": "asserted", "from": "deasserted", "to": "asserted", "direction": "rising", "consumer_action": "high_disconnect"},
+    {"id": "fault_active_low", "function": "fault", "polarity": "active_low", "startup_state": "deasserted", "safe_state": "asserted", "from": "deasserted", "to": "asserted", "direction": "falling", "consumer_action": "low_disconnect"},
+    {"id": "reset_release_active_high", "function": "reset", "polarity": "active_high", "startup_state": "asserted", "safe_state": "asserted", "from": "asserted", "to": "deasserted", "direction": "falling", "consumer_action": "high_disconnect"},
+    {"id": "power_good_sequence", "function": "power_good", "polarity": "active_high", "startup_state": "deasserted", "safe_state": "deasserted", "from": "deasserted", "to": "asserted", "direction": "rising", "consumer_action": "high", "dependency_state": "valid", "stable_for_s": 0.005}
+  ]
+}

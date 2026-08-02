@@ -723,6 +723,35 @@ func TestCatalogProviderUsesDefaultOffHighSideSwitchForLowStartupOutput(t *testi
 	}
 }
 
+func TestCatalogProviderSynthesizesBoundedActiveHighDisconnectInversion(t *testing.T) {
+	provider, err := NewCatalogProvider(loadArchitectureCatalog(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	request := loadSwitchProviderRequest(28, 2)
+	request.Constraints = []Constraint{
+		constraintNumber("load_current", "minimum", 2, "A", 10),
+		constraintNumber("startup_output_voltage", "maximum", .5, "V", 0),
+		constraintString("control_active_state", "equal", "high_disconnect"),
+	}
+	expansions, err := provider.Expand(context.Background(), request)
+	if err != nil || len(expansions) == 0 {
+		t.Fatalf("semantic high-disconnect expansions=%d err=%v", len(expansions), err)
+	}
+	realization, err := DecodeFragmentRealization(expansions[0].Payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.ContainsFunc(realization.Instances, func(instance RealizationInstance) bool { return instance.ID == "control_inverter" }) {
+		t.Fatalf("semantic high-disconnect path lacks control inverter: %#v", realization.Instances)
+	}
+	if !slices.ContainsFunc(realization.RepairVariables, func(variable RealizationRepairVariable) bool {
+		return variable.ID == "high_side_control_bias_resistance" && variable.Instance == "control_inverter_base" && len(variable.AllowedValues) >= 2
+	}) {
+		t.Fatalf("semantic high-disconnect path lacks bounded bias repair: %#v", realization.RepairVariables)
+	}
+}
+
 func TestCatalogProviderGenericCapabilityMutations(t *testing.T) {
 	provider, err := NewCatalogProvider(loadArchitectureCatalog(t))
 	if err != nil {

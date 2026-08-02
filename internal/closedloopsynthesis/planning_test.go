@@ -32,6 +32,65 @@ func TestBuildAnalysisPlanBindsBehaviorExpandsCornersAndReplays(t *testing.T) {
 	}
 }
 
+func TestBuildAnalysisPlanCarriesDirectedTransitionAndDependencies(t *testing.T) {
+	requirement := closedLoopTestRequirement()
+	requirement.Schema, requirement.Version = architecturesearch.SchemaIDV6, architecturesearch.VersionV6
+	maximumDelay := .01
+	requirement.Requirements.ControlTransitions = []architecturesearch.ControlTransition{{
+		ID: "output_enable", Target: architecturesearch.Observation{Kind: "port", ID: "output"}, Trigger: architecturesearch.Observation{Kind: "port", ID: "input"},
+		From: "deenergized", To: "energized", Direction: "rising", MaximumDelayS: &maximumDelay,
+		Dependencies: []architecturesearch.ControlStateDependency{{Target: architecturesearch.Observation{Kind: "port", ID: "power"}, State: "energized", StableForS: .005}},
+	}}
+	requirement.Requirements.BehavioralRequirements = append(requirement.Requirements.BehavioralRequirements, architecturesearch.BehavioralRequirement{
+		ID: "output_enable_time", Metric: "response_time", Analysis: simmodel.AnalysisTransient,
+		Observation: architecturesearch.Observation{Kind: "port", ID: "output"}, Max: &maximumDelay, Unit: "s", OperatingCases: []string{"rated"}, Transition: "output_enable",
+	})
+	bindings := []SemanticBinding{{Kind: "port", ID: "input", Target: "IN"}, {Kind: "port", ID: "output", Target: "OUT"}, {Kind: "port", ID: "power", Target: "VCC"}, {Kind: "domain", ID: "supply", Target: "VCC"}}
+	decisions := closedLoopModelDecisions()
+	decisions[0].RequiredAnalyses = append(decisions[0].RequiredAnalyses, simmodel.AnalysisTransient)
+	decisions[0].Provenance.AllowedAnalyses = append(decisions[0].Provenance.AllowedAnalyses, simmodel.AnalysisTransient)
+	plan, diagnostics := BuildAnalysisPlan(requirement, bindings, decisions)
+	if len(diagnostics) != 0 {
+		t.Fatalf("directed transition diagnostics = %#v", diagnostics)
+	}
+	for _, assertion := range plan.Assertions {
+		if assertion.RequirementID != "output_enable_time" {
+			continue
+		}
+		if assertion.TransitionID != "output_enable" || assertion.ResponseDirection != "rising" || len(assertion.Dependencies) != 1 || assertion.Dependencies[0].Observation.ID != "power" || assertion.Dependencies[0].Target != "VCC" || assertion.Dependencies[0].StableForS != .005 {
+			t.Fatalf("directed transition assertion = %#v", assertion)
+		}
+		return
+	}
+	t.Fatal("directed transition assertion was not planned")
+}
+
+func TestBuildAnalysisPlanRejectsUnresolvedTransitionDependency(t *testing.T) {
+	requirement := closedLoopTestRequirement()
+	requirement.Schema, requirement.Version = architecturesearch.SchemaIDV6, architecturesearch.VersionV6
+	requirement.Requirements.Ports = append(requirement.Requirements.Ports, architecturesearch.Port{ID: "unbound_power", Kind: "power", Direction: "sink", Domain: "supply"})
+	maximumDelay := .01
+	requirement.Requirements.ControlTransitions = []architecturesearch.ControlTransition{{
+		ID: "output_enable", Target: architecturesearch.Observation{Kind: "port", ID: "output"}, Trigger: architecturesearch.Observation{Kind: "port", ID: "input"},
+		From: "deenergized", To: "energized", Direction: "rising", MaximumDelayS: &maximumDelay,
+		Dependencies: []architecturesearch.ControlStateDependency{{Target: architecturesearch.Observation{Kind: "port", ID: "unbound_power"}, State: "energized"}},
+	}}
+	requirement.Requirements.BehavioralRequirements = append(requirement.Requirements.BehavioralRequirements, architecturesearch.BehavioralRequirement{
+		ID: "output_enable_time", Metric: "response_time", Analysis: simmodel.AnalysisTransient,
+		Observation: architecturesearch.Observation{Kind: "port", ID: "output"}, Max: &maximumDelay, Unit: "s", OperatingCases: []string{"rated"}, Transition: "output_enable",
+	})
+	bindings := []SemanticBinding{{Kind: "port", ID: "input", Target: "IN"}, {Kind: "port", ID: "output", Target: "OUT"}, {Kind: "domain", ID: "supply", Target: "VCC"}}
+	decisions := closedLoopModelDecisions()
+	decisions[0].RequiredAnalyses = append(decisions[0].RequiredAnalyses, simmodel.AnalysisTransient)
+	decisions[0].Provenance.AllowedAnalyses = append(decisions[0].Provenance.AllowedAnalyses, simmodel.AnalysisTransient)
+	_, diagnostics := BuildAnalysisPlan(requirement, bindings, decisions)
+	if !slices.ContainsFunc(diagnostics, func(diagnostic Diagnostic) bool {
+		return diagnostic.Path == "control_transitions.output_enable.dependencies[0].target" && diagnostic.Message == "resolved control-state dependency target binding is missing"
+	}) {
+		t.Fatalf("unresolved dependency diagnostics = %#v", diagnostics)
+	}
+}
+
 func TestBuildAnalysisPlanFailsClosedForMissingBindingAndTemperatureDomain(t *testing.T) {
 	requirement := closedLoopTestRequirement()
 	bindings := []SemanticBinding{{Kind: "domain", ID: "supply", Target: "VCC"}}

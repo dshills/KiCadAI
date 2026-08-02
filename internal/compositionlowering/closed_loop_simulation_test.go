@@ -16,6 +16,7 @@ import (
 	"kicadai/internal/closedloopsynthesis"
 	"kicadai/internal/components"
 	"kicadai/internal/modelprovenance"
+	"kicadai/internal/reports"
 	"kicadai/internal/simmodel"
 )
 
@@ -1117,24 +1118,32 @@ func TestBehavioralCorpusResolvesAndExecutesTrustedAnalysisPlans(t *testing.T) {
 	if len(provenanceDiagnostics) != 0 {
 		t.Fatalf("provenance diagnostics = %#v", provenanceDiagnostics)
 	}
-	for _, fixture := range []string{
-		"active_filter_amplifier",
-		"class_a_amplifier",
-		"class_ab_amplifier",
-		"current_sense_protection",
-		"hysteretic_mosfet_load",
-		"low_noise_sensor_decision",
-		"mixed_function_control_power",
-		"protected_mixed_signal_interface",
-		"regulated_sensor_interface",
-		"split_supply_frontend",
+	for _, fixture := range []struct{ id, file, expectedRejectionPath string }{
+		{id: "active_filter_amplifier", file: "simulation_grounded_closed_loop_corpus/active_filter_amplifier.json"},
+		{id: "class_a_amplifier", file: "simulation_grounded_closed_loop_corpus/class_a_amplifier.json"},
+		{id: "class_ab_amplifier", file: "simulation_grounded_closed_loop_corpus/class_ab_amplifier.json"},
+		{id: "current_sense_protection", file: "control_behavior_corpus/current_sense_protection.json", expectedRejectionPath: "requirements.behavioral_requirements[2]"},
+		{id: "hysteretic_mosfet_load", file: "simulation_grounded_closed_loop_corpus/hysteretic_mosfet_load.json"},
+		{id: "low_noise_sensor_decision", file: "simulation_grounded_closed_loop_corpus/low_noise_sensor_decision.json"},
+		{id: "mixed_function_control_power", file: "control_behavior_corpus/mixed_function_control_power.json", expectedRejectionPath: "requirements.behavioral_requirements[2]"},
+		{id: "protected_mixed_signal_interface", file: "simulation_grounded_closed_loop_corpus/protected_mixed_signal_interface.json"},
+		{id: "regulated_sensor_interface", file: "simulation_grounded_closed_loop_corpus/regulated_sensor_interface.json"},
+		{id: "split_supply_frontend", file: "simulation_grounded_closed_loop_corpus/split_supply_frontend.json"},
 	} {
-		t.Run(fixture, func(t *testing.T) {
-			data, readErr := os.ReadFile("../architecturesearch/testdata/simulation_grounded_closed_loop_corpus/" + fixture + ".json")
+		t.Run(fixture.id, func(t *testing.T) {
+			data, readErr := os.ReadFile("../architecturesearch/testdata/" + fixture.file)
 			if readErr != nil {
 				t.Fatal(readErr)
 			}
 			requirement, decodeIssues := architecturesearch.DecodeStrict(bytes.NewReader(data))
+			if fixture.expectedRejectionPath != "" {
+				if !slices.ContainsFunc(decodeIssues, func(issue reports.Issue) bool {
+					return issue.Code == architecturesearch.CodeControlInvalid && issue.Path == fixture.expectedRejectionPath && strings.Contains(issue.Message, "declare a separate startup enable or sequencing dependency")
+				}) {
+					t.Fatalf("precise control rejection issues = %#v", decodeIssues)
+				}
+				return
+			}
 			if len(decodeIssues) != 0 {
 				t.Fatalf("decode issues = %#v", decodeIssues)
 			}

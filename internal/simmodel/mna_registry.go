@@ -1364,6 +1364,11 @@ func validateMNAIntent(intent Intent, components map[string]string) []Diagnostic
 				diagnostics = append(diagnostics, Diagnostic{Path: path + ".window", Message: "measurement window must be a finite exact dynamic-analysis interval inside the solved duration"})
 			}
 		}
+		if assertion.ResponseDirection != "" {
+			if assertion.Quantity != QuantityResponseTimeS || (assertion.ResponseDirection != "rising" && assertion.ResponseDirection != "falling") {
+				diagnostics = append(diagnostics, Diagnostic{Path: path + ".response_direction", Message: "response direction must be rising or falling and is valid only for response-time assertions"})
+			}
+		}
 		if !finite(assertion.Min) || !finite(assertion.Max) || assertion.Min > assertion.Max {
 			diagnostics = append(diagnostics, Diagnostic{Path: path, Message: "assertion bounds must be finite and minimum must not exceed maximum"})
 		}
@@ -2134,7 +2139,11 @@ func assertionKey(assertion Assertion) string {
 	if assertion.Metric != "" {
 		return "legacy\x00" + assertion.Metric
 	}
-	return fmt.Sprintf("mna\x00%s\x00%s\x00%s\x00%s\x00%s\x00%s\x00%024.12e\x00%024.12e\x00%024.12e\x00%024.12e", assertion.AnalysisID, assertion.Node, assertion.Component, strings.Join(assertion.Components, "\x1f"), assertion.ReferenceNode, assertion.Quantity, assertion.FrequencyHz, assertion.TimeS, assertion.WindowStartS, assertion.WindowEndS)
+	key := fmt.Sprintf("mna\x00%s\x00%s\x00%s\x00%s\x00%s\x00%s\x00%024.12e\x00%024.12e\x00%024.12e\x00%024.12e", assertion.AnalysisID, assertion.Node, assertion.Component, strings.Join(assertion.Components, "\x1f"), assertion.ReferenceNode, assertion.Quantity, assertion.FrequencyHz, assertion.TimeS, assertion.WindowStartS, assertion.WindowEndS)
+	if assertion.ResponseDirection != "" {
+		key += "\x00direction\x00" + assertion.ResponseDirection
+	}
+	return key
 }
 
 func analysisByID(analyses []Analysis, id string) (Analysis, bool) {

@@ -119,7 +119,7 @@ func TestFrozenAdversarialMultiFunctionCorpusOptionalKiCadPromotion(t *testing.T
 
 func TestFrozenSimulationGroundedCorpusPassesOfflineWorkflow(t *testing.T) {
 	requireLongPromotionTest(t)
-	runFrozenPromotionAt(t, filepath.Join("..", "architecturesearch", "testdata", "simulation_grounded_closed_loop_corpus"), 10, "KICADAI_SIMULATION_GROUNDED_ARTIFACT_DIR", "", libraryresolver.LibraryIndex{})
+	runFrozenPromotionAt(t, filepath.Join("..", "architecturesearch", "testdata", "simulation_grounded_closed_loop_corpus"), 10, "KICADAI_SIMULATION_GROUNDED_ARTIFACT_DIR", "", libraryresolver.LibraryIndex{}, filepath.Join("..", "architecturesearch", "testdata", "control_behavior_corpus"))
 }
 
 func TestFrozenSimulationGroundedCorpusOptionalKiCadPromotion(t *testing.T) {
@@ -136,7 +136,7 @@ func TestFrozenSimulationGroundedCorpusOptionalKiCadPromotion(t *testing.T) {
 	if len(index.Symbols) == 0 || len(index.Footprints) == 0 {
 		t.Fatalf("installed library index is empty: %#v", loadIssues)
 	}
-	runFrozenPromotionAt(t, filepath.Join("..", "architecturesearch", "testdata", "simulation_grounded_closed_loop_corpus"), 10, "KICADAI_SIMULATION_GROUNDED_ARTIFACT_DIR", cli, index)
+	runFrozenPromotionAt(t, filepath.Join("..", "architecturesearch", "testdata", "simulation_grounded_closed_loop_corpus"), 10, "KICADAI_SIMULATION_GROUNDED_ARTIFACT_DIR", cli, index, filepath.Join("..", "architecturesearch", "testdata", "control_behavior_corpus"))
 }
 
 func TestDynamicElectrothermalControlLoopCorpusPassesOfflineWorkflow(t *testing.T) {
@@ -378,7 +378,7 @@ func TestMCUPowerIntegritySynthesisCorpusOptionalKiCadPromotion(t *testing.T) {
 func TestFrozenBehavioralIntentHeldOutReadyCorpusPassesOfflineWorkflow(t *testing.T) {
 	requireLongPromotionTest(t)
 	corpusRoot, count := behavioralIntentHeldOutReadyCorpus(t)
-	runFrozenPromotionAt(t, corpusRoot, count, "KICADAI_BEHAVIORAL_INTENT_ARTIFACT_DIR", "", libraryresolver.LibraryIndex{})
+	runFrozenPromotionAt(t, corpusRoot, count, "KICADAI_BEHAVIORAL_INTENT_ARTIFACT_DIR", "", libraryresolver.LibraryIndex{}, filepath.Join("..", "architecturesearch", "testdata", "control_behavior_corpus"))
 }
 
 func TestFrozenBehavioralIntentHeldOutReadyCorpusOptionalKiCadPromotion(t *testing.T) {
@@ -396,7 +396,7 @@ func TestFrozenBehavioralIntentHeldOutReadyCorpusOptionalKiCadPromotion(t *testi
 		t.Fatalf("installed library index is empty: %#v", loadIssues)
 	}
 	corpusRoot, count := behavioralIntentHeldOutReadyCorpus(t)
-	runFrozenPromotionAt(t, corpusRoot, count, "KICADAI_BEHAVIORAL_INTENT_ARTIFACT_DIR", cli, index)
+	runFrozenPromotionAt(t, corpusRoot, count, "KICADAI_BEHAVIORAL_INTENT_ARTIFACT_DIR", cli, index, filepath.Join("..", "architecturesearch", "testdata", "control_behavior_corpus"))
 }
 
 func TestHierarchicalMultiDomainCorpusPassesOfflineWorkflow(t *testing.T) {
@@ -644,6 +644,27 @@ func TestPromotionShardSelectionIsCompleteAndNonOverlapping(t *testing.T) {
 	}
 }
 
+func TestPromotionCorpusOverlayReplacesOnlyDeclaredBaselineCase(t *testing.T) {
+	base := filepath.Join("..", "architecturesearch", "testdata", "simulation_grounded_closed_loop_corpus")
+	overlay := filepath.Join("..", "architecturesearch", "testdata", "control_behavior_corpus")
+	paths, expected, err := promotionCorpusPaths(base, overlay)
+	if err != nil || len(paths) != 10 || len(expected) != 2 {
+		t.Fatalf("overlay paths=%#v expected=%#v err=%v", paths, expected, err)
+	}
+	for _, path := range paths {
+		switch filepath.Base(path) {
+		case "current_sense_protection.json":
+			if filepath.Dir(path) != overlay || expected[path].Code != architecturesearch.CodeControlInvalid {
+				t.Fatalf("current-sense overlay = %q %#v", path, expected[path])
+			}
+		case "mixed_function_control_power.json":
+			if filepath.Dir(path) != overlay || expected[path].Code != architecturesearch.CodeControlInvalid {
+				t.Fatalf("mixed-function overlay = %q %#v", path, expected[path])
+			}
+		}
+	}
+}
+
 // selectPromotionShard parses the shard specification once, then partitions
 // the complete corpus path list in a single pass before any cases run.
 func selectPromotionShard(paths []string, spec string) ([]string, error) {
@@ -685,7 +706,70 @@ func runFrozenPromotion(t *testing.T, corpusDir string, expectedCount int, artif
 	runFrozenPromotionAt(t, filepath.Join("..", "circuitgraph", "testdata", corpusDir), expectedCount, artifactEnv, cli, installedIndex)
 }
 
-func runFrozenPromotionAt(t *testing.T, corpusRoot string, expectedCount int, artifactEnv string, cli string, installedIndex libraryresolver.LibraryIndex) {
+type promotionExpectedRejection struct {
+	Code    reports.Code
+	Path    string
+	Message string
+}
+
+type promotionOverlayManifest struct {
+	Fixtures []struct {
+		File             string `json:"file"`
+		ExpectedCode     string `json:"expected_code"`
+		ExpectedPath     string `json:"expected_path"`
+		ExpectedMessage  string `json:"expected_message"`
+		PromotionOverlay bool   `json:"promotion_overlay"`
+	} `json:"fixtures"`
+}
+
+func promotionCorpusPaths(corpusRoot string, overlayRoots ...string) ([]string, map[string]promotionExpectedRejection, error) {
+	basePaths, err := filepath.Glob(filepath.Join(corpusRoot, "*.json"))
+	if err != nil {
+		return nil, nil, err
+	}
+	pathsByName := make(map[string]string, len(basePaths))
+	for _, path := range basePaths {
+		name := filepath.Base(path)
+		if name != "manifest.json" {
+			pathsByName[name] = path
+		}
+	}
+	expected := map[string]promotionExpectedRejection{}
+	for _, root := range overlayRoots {
+		data, err := os.ReadFile(filepath.Join(root, "manifest.json"))
+		if err != nil {
+			return nil, nil, err
+		}
+		var manifest promotionOverlayManifest
+		if err := json.Unmarshal(data, &manifest); err != nil {
+			return nil, nil, err
+		}
+		applied := 0
+		for _, fixture := range manifest.Fixtures {
+			if !fixture.PromotionOverlay {
+				continue
+			}
+			if _, exists := pathsByName[fixture.File]; !exists {
+				continue
+			}
+			path := filepath.Join(root, fixture.File)
+			pathsByName[fixture.File] = path
+			expected[path] = promotionExpectedRejection{Code: reports.Code(fixture.ExpectedCode), Path: fixture.ExpectedPath, Message: fixture.ExpectedMessage}
+			applied++
+		}
+		if applied == 0 {
+			return nil, nil, fmt.Errorf("promotion overlay %q does not replace any baseline requirement", root)
+		}
+	}
+	paths := make([]string, 0, len(pathsByName))
+	for _, path := range pathsByName {
+		paths = append(paths, path)
+	}
+	slices.SortFunc(paths, func(left, right string) int { return strings.Compare(filepath.Base(left), filepath.Base(right)) })
+	return paths, expected, nil
+}
+
+func runFrozenPromotionAt(t *testing.T, corpusRoot string, expectedCount int, artifactEnv string, cli string, installedIndex libraryresolver.LibraryIndex, overlayRoots ...string) {
 	t.Helper()
 	catalog, err := components.LoadCatalog(context.Background(), components.LoadOptions{})
 	if err != nil {
@@ -704,9 +788,7 @@ func runFrozenPromotionAt(t *testing.T, corpusRoot string, expectedCount int, ar
 	if err != nil {
 		t.Fatal(err)
 	}
-	paths, err := filepath.Glob(filepath.Join(corpusRoot, "*.json"))
-	paths = slices.DeleteFunc(paths, func(path string) bool { return filepath.Base(path) == "manifest.json" })
-	slices.Sort(paths)
+	paths, expectedRejections, err := promotionCorpusPaths(corpusRoot, overlayRoots...)
 	if err != nil || len(paths) != expectedCount {
 		t.Fatalf("corpus paths = %#v, %v", paths, err)
 	}
@@ -726,6 +808,12 @@ func runFrozenPromotionAt(t *testing.T, corpusRoot string, expectedCount int, ar
 				t.Fatal(err)
 			}
 			requirement, decodeIssues := architecturesearch.DecodeStrict(bytes.NewReader(data))
+			if expected, exists := expectedRejections[path]; exists {
+				if len(decodeIssues) != 1 || decodeIssues[0].Code != expected.Code || decodeIssues[0].Path != expected.Path || decodeIssues[0].Message != expected.Message {
+					t.Fatalf("precise promotion rejection = %#v, want %#v", decodeIssues, expected)
+				}
+				return
+			}
 			if len(decodeIssues) != 0 {
 				t.Fatalf("decode issues = %#v", decodeIssues)
 			}

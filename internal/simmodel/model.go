@@ -210,19 +210,20 @@ type Binding struct {
 }
 
 type Assertion struct {
-	Metric        string   `json:"metric,omitempty"`
-	AnalysisID    string   `json:"analysis_id,omitempty"`
-	Node          string   `json:"node,omitempty"`
-	Component     string   `json:"component,omitempty"`
-	Components    []string `json:"components,omitempty"`
-	ReferenceNode string   `json:"reference_node,omitempty"`
-	Quantity      string   `json:"quantity,omitempty"`
-	FrequencyHz   float64  `json:"frequency_hz,omitempty"`
-	TimeS         float64  `json:"time_s,omitempty"`
-	WindowStartS  float64  `json:"window_start_s,omitempty"`
-	WindowEndS    float64  `json:"window_end_s,omitempty"`
-	Min           float64  `json:"min"`
-	Max           float64  `json:"max"`
+	Metric            string   `json:"metric,omitempty"`
+	AnalysisID        string   `json:"analysis_id,omitempty"`
+	Node              string   `json:"node,omitempty"`
+	Component         string   `json:"component,omitempty"`
+	Components        []string `json:"components,omitempty"`
+	ReferenceNode     string   `json:"reference_node,omitempty"`
+	Quantity          string   `json:"quantity,omitempty"`
+	FrequencyHz       float64  `json:"frequency_hz,omitempty"`
+	TimeS             float64  `json:"time_s,omitempty"`
+	WindowStartS      float64  `json:"window_start_s,omitempty"`
+	WindowEndS        float64  `json:"window_end_s,omitempty"`
+	ResponseDirection string   `json:"response_direction,omitempty" hash:"omitempty"`
+	Min               float64  `json:"min"`
+	Max               float64  `json:"max"`
 }
 
 // SourceExcitation is a bounded operating condition for a catalog-resolved

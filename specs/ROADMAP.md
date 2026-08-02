@@ -1307,10 +1307,10 @@ smallest-safe selection, rollback, preservation, protected margins,
 confirmation, budgets, and byte-identical replay. The protected LED and I2C
 fixtures retain two-run installed-KiCad pass evidence.
 
-1. Add explicit active-state, safe-state, transition-direction, and sequencing
-   semantics to behavior-level signals and events. Use them to repair or
-   correctly reject the current-sense-protection and mixed-control/power
-   non-responses exposed by strict transient evaluation.
+1. Complete the next control-topology package: add a distinct startup
+   enable/power-good path where independently frozen requirements genuinely
+   need default-off startup followed by fault-driven disconnect. Do not infer
+   that second control from a fault signal.
 2. Expand graph, value, model, and stage-reentry repair only from independently
    frozen failures, including the protected current-output behavior when a
    generic evidence-backed correction is available.
@@ -1325,6 +1325,13 @@ fixtures retain two-run installed-KiCad pass evidence.
 6. Extend reviewed dynamic models into additional converter, isolation, and
    high-energy protection families without weakening fail-closed model,
    convergence, SOA, or event-coverage requirements.
+
+The preceding explicit active-state, safe-state, transition-direction, timing,
+and sequencing milestone is complete. V6 carries these semantics through
+architecture projection, closed-loop planning, lowering, directed transient
+measurement, and bounded repair. The two motivating cases are now rejected
+with a stable control-contract diagnostic because their startup proof conflicts
+with their sole declared fault control.
 
 ## Definition Of Autonomous Ready
 

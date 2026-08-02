@@ -525,11 +525,27 @@ func TestTransientResponseTimeIgnoresOppositeDirectionPreResponse(t *testing.T) 
 	}}
 	assertion := Assertion{
 		AnalysisID: "event", Node: "OUT", Quantity: QuantityResponseTimeS,
-		WindowStartS: 0, WindowEndS: 1.1,
+		WindowStartS: 0, WindowEndS: 1.1, ResponseDirection: "rising",
 	}
 	actual, diagnostic := transientDerivedValue(result, assertion)
 	if diagnostic != nil || math.Abs(actual-.51) > 1e-12 {
 		t.Fatalf("directed event response latency = %.12g, want .51 diagnostic=%#v", actual, diagnostic)
+	}
+}
+
+func TestTransientResponseTimeRejectsOppositeDirectionGlitch(t *testing.T) {
+	result := AnalysisResult{ID: "event", Kind: AnalysisTransient, Points: []AnalysisPoint{
+		{TimeS: 0, Nodes: []NodeResult{{Node: "OUT", Real: 5}}},
+		{TimeS: .1, Nodes: []NodeResult{{Node: "OUT", Real: 0}}},
+		{TimeS: .5, Nodes: []NodeResult{{Node: "OUT", Real: 5}}},
+		{TimeS: 1, Nodes: []NodeResult{{Node: "OUT", Real: 5}}},
+	}}
+	assertion := Assertion{
+		AnalysisID: "event", Node: "OUT", Quantity: QuantityResponseTimeS,
+		WindowStartS: 0, WindowEndS: 1.1, ResponseDirection: "rising",
+	}
+	if actual, diagnostic := transientDerivedValue(result, assertion); diagnostic == nil {
+		t.Fatalf("opposite-direction glitch measured as response %.12g", actual)
 	}
 }
 

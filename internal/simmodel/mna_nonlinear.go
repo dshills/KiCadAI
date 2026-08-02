@@ -155,6 +155,18 @@ func solveNonlinearDCFromWarmState(plan Plan, analysis Analysis, initial map[str
 			totalEvidence.FinalMaxResidual = bisectedEvidence.FinalMaxResidual
 			stateKey := activeDeviceStateKey(plan, bisectedStates)
 			if seen[stateKey] {
+				if fallbackSystem, fallbackSolution, fallbackEvidence, fallbackStates, ok := solveNonlinearDCByComparatorActiveSet(plan, analysis, bisectedStates); ok {
+					totalEvidence.SourceStages += fallbackEvidence.SourceStages
+					totalEvidence.Iterations += fallbackEvidence.Iterations
+					totalEvidence.TotalIterations = totalEvidence.Iterations
+					totalEvidence.Method = fallbackEvidence.Method
+					return fallbackSystem, fallbackSolution, totalEvidence, fallbackStates, nil
+				}
+				bisectedResolved, _, resolveDiagnostic := resolvedActiveDeviceStates(plan, bisectedSystem, bisectedSolution)
+				if resolveDiagnostic == nil && (sameOpAmpClamps(bisectedStates, bisectedResolved) || activeDeviceStateSolutionConsistent(plan, bisectedSystem, bisectedSolution, bisectedStates, bisectedResolved)) {
+					totalEvidence.Method = "bounded_opamp_bisection_consistency_fallback_v1"
+					return bisectedSystem, bisectedSolution, totalEvidence, bisectedResolved, nil
+				}
 				return bisectedSystem, bisectedSolution, totalEvidence, states, &Diagnostic{Path: "devices", Message: "bounded active-device operating-point states did not converge after op-amp bisection (current " + activeDeviceStateKey(plan, states) + ", resolved " + resolvedKey + ", cycle " + lastStateKey + " -> " + stateKey + ")", Suggestion: "correct ambiguous feedback or reduce coupled active stages"}
 			}
 			seen[stateKey] = true
@@ -171,6 +183,13 @@ func solveNonlinearDCFromWarmState(plan Plan, analysis Analysis, initial map[str
 		next := advanceActiveDeviceStateAtOperatingPoint(plan, &system, solution, states, resolved)
 		stateKey := activeDeviceStateKey(plan, next)
 		if seen[stateKey] {
+			if fallbackSystem, fallbackSolution, fallbackEvidence, fallbackStates, ok := solveNonlinearDCByComparatorActiveSet(plan, analysis, next); ok {
+				totalEvidence.SourceStages += fallbackEvidence.SourceStages
+				totalEvidence.Iterations += fallbackEvidence.Iterations
+				totalEvidence.TotalIterations = totalEvidence.Iterations
+				totalEvidence.Method = fallbackEvidence.Method
+				return fallbackSystem, fallbackSolution, totalEvidence, fallbackStates, nil
+			}
 			return system, solution, totalEvidence, states, &Diagnostic{Path: "devices", Message: "bounded active-device operating-point states did not converge (current " + activeDeviceStateKey(plan, states) + ", resolved " + resolvedKey + ", cycle " + lastStateKey + " -> " + stateKey + ")", Suggestion: "correct ambiguous feedback or add a reviewed hysteresis network and loading"}
 		}
 		seen[stateKey] = true

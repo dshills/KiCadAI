@@ -141,6 +141,15 @@ unsafe capability is reported and stopped instead of guessed.
   independent clean roots produce the same 418-file content-addressed bundle.
   See the
   [completion audit](specs/dynamic-electrothermal-control-loop-synthesis/AUDIT.md).
+- V6 adds explicit active-high/active-low control functions, asserted and safe
+  startup state, directed transition timing, and stable-state dependencies to
+  the V3 behavioral-composition envelope. Planning resolves every dependency
+  to a trusted target, transient measurement rejects wrong-direction glitches,
+  and generic polarity/bias/threshold/timing operators remain bounded. The two
+  motivating protection cases now fail closed with a precise request for a
+  separate startup-enable or sequencing dependency instead of weakening their
+  low-output startup claim. See the
+  [contract](specs/control-state-sequencing/SPEC.md).
 - A separate identity-neutral open-world evaluation freezes discovery and
   held-out behavior-only requirements across six domains, records stable
   failure clusters, and uses those clusters to drive reusable capability

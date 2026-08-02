@@ -419,6 +419,9 @@ func (accumulator *searchAccumulator) finalizeCoverage() {
 }
 
 func requirementPolicyVersion(requirement Requirement) string {
+	if requirement.Version == VersionV6 {
+		return PolicyVersionV6
+	}
 	if requirement.Version == VersionV5 {
 		return PolicyVersionV5
 	}

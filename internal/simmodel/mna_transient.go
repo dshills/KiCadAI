@@ -2070,6 +2070,11 @@ func solveTransientStepInternalWithLimit(base mnaSystem, resolvedDevices []Resol
 				currentStateKey := transientActiveLimitStateKey(resolvedDevices, outputLimits, branchLimits)
 				stateKey := transientActiveLimitSolverStateKey(resolvedDevices, nextOutputLimits, nextBranchLimits, deferredOutputLimits, deferredBranchLimits)
 				if seenLimitStates[stateKey] {
+					if len(branchLimits) == 0 && transientInteriorOutputRootsConsistent(base, resolvedDevices, guess, outputLimits) {
+						evidence.Method = "backward_euler_bounded_interior_root_v1"
+						evidence.TotalIterations = evidence.Iterations
+						return *system, guess, evidence, nil
+					}
 					stabilizedBranch := false
 					for branch := range nextBranchLimits {
 						if _, wasLimited := branchLimits[branch]; wasLimited {
@@ -2102,6 +2107,32 @@ func solveTransientStepInternalWithLimit(base mnaSystem, resolvedDevices []Resol
 		}
 	}
 	return mnaSystem{}, nil, evidence, diagnostic
+}
+
+func transientInteriorOutputRootsConsistent(base mnaSystem, devices []ResolvedDevice, solution []complex128, outputLimits map[string]transientOutputLimitState) bool {
+	if len(outputLimits) == 0 {
+		return false
+	}
+	for _, device := range devices {
+		state, limited := outputLimits[device.Component]
+		if !limited {
+			continue
+		}
+		if state.side != 0 {
+			return false
+		}
+		minimum, maximum, _, _, ok := transientOutputLimitObservation(base, device, solution)
+		branch, hasBranch := base.branchIndex[device.Component]
+		if !ok || !hasBranch {
+			return false
+		}
+		residual := transientBranchEquationResidual(base, branch, solution)
+		residualTolerance := nonlinearClampConsistencyV * math.Max(1, math.Max(math.Abs(minimum), math.Abs(maximum)))
+		if math.Abs(residual) > residualTolerance {
+			return false
+		}
+	}
+	return true
 }
 
 func recordReleasedTransientActiveLimits(

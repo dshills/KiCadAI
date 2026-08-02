@@ -19,6 +19,8 @@ const (
 	thresholdReferenceResistanceOhm = 10_000.0
 	catalogRatingDeratingFactor     = 0.8
 	lowVoltageGateDriveCeilingV     = 5.5
+	controlInverterHeadroomRatio    = 0.1
+	controlInverterMinHeadroomV     = 1.0
 )
 
 var catalogProviderCapabilities = []string{
@@ -117,7 +119,9 @@ func (provider *CatalogProvider) Expand(ctx context.Context, request ProviderReq
 	}
 	switch canonicalIdentifier(request.Capability) {
 	case "threshold_detection":
-		if _, legacy := namedConstraint(request.Constraints, "output_polarity"); !legacy {
+		_, hasPolarity := namedConstraint(request.Constraints, "output_polarity")
+		_, hasHysteresis := namedConstraint(request.Constraints, "hysteresis_width")
+		if !hasPolarity || !hasHysteresis {
 			return provider.expandGenericThreshold(ctx, request)
 		}
 		return provider.expandThreshold(ctx, request)
@@ -382,8 +386,8 @@ func (provider *CatalogProvider) expandLoadSwitch(ctx context.Context, request P
 		return nil, fmt.Errorf("load-switch control active state must be declared")
 	}
 	var controlActiveState string
-	if err := json.Unmarshal(controlState.Value, &controlActiveState); err != nil || (controlActiveState != "high" && controlActiveState != "high_disconnect") {
-		return nil, fmt.Errorf("load-switch control active state must be high or high_disconnect")
+	if err := json.Unmarshal(controlState.Value, &controlActiveState); err != nil || (controlActiveState != "high" && controlActiveState != "high_disconnect" && controlActiveState != "low_disconnect") {
+		return nil, fmt.Errorf("load-switch control active state must be high, high_disconnect, or low_disconnect")
 	}
 	failSafeDisconnect := controlActiveState == "high_disconnect"
 	for _, name := range []string{"default_off", "inductive_transient_clamp", "control_overvoltage_clamp"} {
@@ -575,6 +579,9 @@ func (provider *CatalogProvider) expandLoadSwitch(ctx context.Context, request P
 }
 
 func (provider *CatalogProvider) expandHighSideLoadSwitch(ctx context.Context, request ProviderRequest, voltage, current float64, temperatureRequirement *components.TemperatureRequirement) ([]ProviderExpansion, error) {
+	controlActiveState := optionalConstraintString(request.Constraints, "control_active_state")
+	invertControl := controlActiveState == "high_disconnect" && requireBool(request.Constraints, "semantic_control_action", "required", true) == nil
+	hasLogicPower := hasRoleContract(request.Ports, "logic_power")
 	baseRatings := []components.RequiredRating{
 		{Kind: "drain_source_voltage", Value: numericString(voltage / catalogRatingDeratingFactor), Unit: "V"},
 		{Kind: "drain_current", Value: numericString(current / catalogRatingDeratingFactor), Unit: "A"},
@@ -635,6 +642,26 @@ func (provider *CatalogProvider) expandHighSideLoadSwitch(ctx context.Context, r
 
 	parts := []catalogPart{selection, flyback, driver}
 	passives := []passivePart{{"gate_control_base", "resistor", "gate_drive", "10k"}, {"gate_pullup", "resistor", "default_off", "100k"}}
+	var controlInverter catalogPart
+	if invertControl {
+		inverterRatings := []components.RequiredRating(nil)
+		if !hasLogicPower {
+			inverterRatings = []components.RequiredRating{{Kind: "collector_emitter_voltage", Value: numericString(voltage / catalogRatingDeratingFactor), Unit: "V"}}
+		}
+		controlInverter, err = provider.selectComponentWithTemperature(ctx, "bjt", "npn", inverterRatings, true, temperatureRequirement)
+		if err != nil {
+			return nil, err
+		}
+		controlInverter.selected.InstanceID, controlInverter.usage = "control_inverter", "active_high_gate_buffer_stage_1"
+		parts = append(parts, controlInverter)
+		passives = append(passives,
+			passivePart{"control_inverter_base", "resistor", "gate_buffer_input", "100k"},
+			passivePart{"control_inverter_pullup", "resistor", "gate_buffer_stage_pullup", "4.7k"},
+		)
+		if hasLogicPower {
+			passives = append(passives, passivePart{"logic_bypass", "capacitor", "logic_supply_decoupling", "100n"})
+		}
+	}
 	gateSeriesResistance := 100.0
 	clampVoltage := 0.0
 	var clamps []catalogPart
@@ -647,7 +674,14 @@ func (provider *CatalogProvider) expandHighSideLoadSwitch(ctx context.Context, r
 		if !clampOK || unitClampVoltage <= 0 {
 			return nil, fmt.Errorf("selected high-side gate clamp lacks a positive catalog Zener voltage")
 		}
-		count := int(math.Ceil(gateOn / unitClampVoltage))
+		requiredGateDrive := gateOn
+		if invertControl {
+			// The semantic active-high disconnect path adds a saturated inverter
+			// stage. Reserve deterministic source-referenced drive headroom for
+			// its clamp and driver drops without changing legacy V3 topology.
+			requiredGateDrive += math.Max(controlInverterMinHeadroomV, controlInverterHeadroomRatio*gateOn)
+		}
+		count := int(math.Ceil(requiredGateDrive / unitClampVoltage))
 		if count < 1 || count > 4 || float64(count)*unitClampVoltage > gateRated*catalogRatingDeratingFactor {
 			return nil, fmt.Errorf("catalog Zener series cannot provide a bounded high-side gate-drive window")
 		}
@@ -699,11 +733,17 @@ func (provider *CatalogProvider) expandHighSideLoadSwitch(ctx context.Context, r
 		return nil, err
 	}
 
-	bindings := bindRoles(request.Ports, selection.selected.InstanceID, map[string]string{"control": "GATE", "input": "SOURCE", "load": "DRAIN", "output": "DRAIN", "power": "SOURCE", "load_power": "SOURCE", "reference": "SOURCE"})
+	bindings := bindRoles(request.Ports, selection.selected.InstanceID, map[string]string{"control": "GATE", "input": "SOURCE", "load": "DRAIN", "output": "DRAIN", "power": "SOURCE", "load_power": "SOURCE", "logic_power": "SOURCE", "reference": "SOURCE"})
 	for index := range bindings {
 		switch bindings[index].Role {
 		case "control":
-			bindings[index].Instance, bindings[index].Function = "gate_control_base", "A"
+			if invertControl {
+				bindings[index].Instance, bindings[index].Function = "control_inverter_base", "A"
+			} else {
+				bindings[index].Instance, bindings[index].Function = "gate_control_base", "A"
+			}
+		case "logic_power":
+			bindings[index].Instance, bindings[index].Function = "logic_bypass", "A"
 		case "reference":
 			bindings[index].Instance, bindings[index].Function = driver.selected.InstanceID, "EMITTER"
 		}
@@ -716,6 +756,19 @@ func (provider *CatalogProvider) expandHighSideLoadSwitch(ctx context.Context, r
 		semanticNet("high_side_driver_collector", "gate_drive", endpoint(driver, "COLLECTOR"), passiveEndpoint("gate_sink_series", "B")),
 		semanticNet("high_side_gate", "control", endpoint(selection, "GATE"), passiveEndpoint("gate_pullup", "B"), passiveEndpoint("gate_sink_series", "A")),
 	}
+	if invertControl {
+		connections = append(connections,
+			semanticNet("high_side_control_inverter_base", "logic_drive", passiveEndpoint("control_inverter_base", "B"), endpoint(controlInverter, "BASE")),
+			semanticNet("high_side_control_inverter_output", "logic_drive", endpoint(controlInverter, "COLLECTOR"), passiveEndpoint("control_inverter_pullup", "B"), passiveEndpoint("gate_control_base", "A")),
+		)
+		connections[2].Endpoints = append(connections[2].Endpoints, endpoint(controlInverter, "EMITTER"))
+		if hasLogicPower {
+			connections = append(connections, semanticNet("high_side_logic_power", "power", passiveEndpoint("control_inverter_pullup", "A"), passiveEndpoint("logic_bypass", "A")))
+			connections[2].Endpoints = append(connections[2].Endpoints, passiveEndpoint("logic_bypass", "B"))
+		} else {
+			connections[0].Endpoints = append(connections[0].Endpoints, passiveEndpoint("control_inverter_pullup", "A"))
+		}
+	}
 	if len(clamps) != 0 {
 		connections[0].Endpoints = append(connections[0].Endpoints, endpoint(clamps[0], "K"))
 		connections[5].Endpoints = append(connections[5].Endpoints, endpoint(clamps[len(clamps)-1], "A"))
@@ -724,7 +777,16 @@ func (provider *CatalogProvider) expandHighSideLoadSwitch(ctx context.Context, r
 		}
 	}
 	connections = retainSemanticNets(connections)
-	return provider.expansion(request, "protected_high_side_switch", parts, bindings, connections, []CalculationEvidence{ratings, gateResponse}, 0)
+	var repairs []RealizationRepairVariable
+	if invertControl {
+		const controlBiasResistance = 100000.0
+		repairs = append(repairs, RealizationRepairVariable{
+			ID: "high_side_control_bias_resistance", Kind: "bias", Instance: "control_inverter_base",
+			Value: controlBiasResistance, AllowedValues: preferredRepairValues(controlBiasResistance), Unit: "Ohm",
+			Effects: []RealizationRepairEffect{{Analysis: "transient", Metric: "response_time", Direction: "metric_increases"}},
+		})
+	}
+	return provider.expansionWithRepairs(request, "protected_high_side_switch", parts, bindings, connections, []CalculationEvidence{ratings, gateResponse}, repairs, 0)
 }
 
 func (provider *CatalogProvider) expandRegulator(ctx context.Context, request ProviderRequest) ([]ProviderExpansion, error) {
@@ -3648,6 +3710,18 @@ func namedConstraint(constraints []Constraint, name string) (Constraint, bool) {
 		}
 	}
 	return Constraint{}, false
+}
+
+func optionalConstraintString(constraints []Constraint, name string) string {
+	constraint, ok := namedConstraint(constraints, name)
+	if !ok {
+		return ""
+	}
+	var value string
+	if json.Unmarshal(constraint.Value, &value) != nil {
+		return ""
+	}
+	return canonicalIdentifier(value)
 }
 
 func roleVoltageMaximum(ports []RoleContract, role string) float64 {

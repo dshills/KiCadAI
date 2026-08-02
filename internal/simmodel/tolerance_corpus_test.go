@@ -359,6 +359,9 @@ func writeCanonicalHashValue(t testing.TB, target *bytes.Buffer, value reflect.V
 			if !field.IsExported() {
 				continue
 			}
+			if field.Tag.Get("hash") == "omitempty" && value.Field(index).IsZero() {
+				continue
+			}
 			target.WriteString(field.Name)
 			target.WriteByte('=')
 			writeCanonicalHashValue(t, target, value.Field(index), visiting, floatPrecision)

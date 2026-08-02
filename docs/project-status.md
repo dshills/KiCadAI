@@ -629,12 +629,15 @@ requirements, the first architecture milestone proves ranked generation for
 Class A, Class AB, and notch requirements, the independent follow-on corpus
 passes five of six unfamiliar analog and power designs, and the cross-stage
 repair corpus now recovers all nine workflow stages through shared evidence.
-The next highest-value step is explicit control-polarity, safe-state, and
-state-sequencing semantics for behavior-level composition. The stricter
-transient solver has correctly exposed two previously hidden non-responses in
-the current-sense-protection and mixed-control/power cases; those requirements
-must either synthesize a real directed transition or fail closed as
-underconstrained. Broader clock/fanout,
+Explicit V6 control-polarity, safe-state, directed-transition, timing, and
+state-sequencing semantics are now implemented for the V3 behavioral-
+composition envelope. Identity-neutral active-high/active-low cases are
+frozen, prerequisite targets resolve fail-closed, and opposite-direction
+transient glitches no longer count as responses. The current-sense-protection
+and mixed-control/power cases now fail precisely because they demand a
+deenergized startup while their sole fault control explicitly starts in its
+connected state; they require a separate startup enable or sequencing
+dependency. Broader clock/fanout,
 programming-load, converter, isolation, and high-energy protection models,
 catalog-independent part qualification, and denser-board physical synthesis
 remain important. Those gaps can produce deterministic expansion proposals,

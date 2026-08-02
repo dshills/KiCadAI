@@ -15,11 +15,14 @@ const (
 	VersionV4       = 4
 	SchemaIDV5      = "kicadai.open-set-requirement.v5"
 	VersionV5       = 5
+	SchemaIDV6      = "kicadai.open-set-requirement.v6"
+	VersionV6       = 6
 	PolicyVersion   = "architecture-search-policy-v1"
 	PolicyVersionV2 = "architecture-search-policy-v2"
 	PolicyVersionV3 = "architecture-search-policy-v3"
 	PolicyVersionV4 = "architecture-search-policy-v4"
 	PolicyVersionV5 = "architecture-search-policy-v5"
+	PolicyVersionV6 = "architecture-search-policy-v6"
 
 	MaxRequirementBytes       = 256 * 1024
 	MaxDomains                = 16
@@ -34,6 +37,8 @@ const (
 	MaxCaseConditions         = 16
 	MaxCaseEvents             = 16
 	MaxOperatingEvents        = 64
+	MaxControlTransitions     = 64
+	MaxTransitionDependencies = 16
 	MaxBehavioralRequirements = 64
 	MaxComponents             = 64
 	MaxComponentsV5           = 96
@@ -63,6 +68,7 @@ type Requirements struct {
 	SystemConstraints      []Constraint            `json:"system_constraints,omitempty"`
 	OperatingCases         []OperatingCase         `json:"operating_cases,omitempty"`
 	BehavioralRequirements []BehavioralRequirement `json:"behavioral_requirements,omitempty"`
+	ControlTransitions     []ControlTransition     `json:"control_transitions,omitempty"`
 	Constraints            BoardLimits             `json:"constraints"`
 }
 
@@ -77,23 +83,34 @@ type Domain struct {
 }
 
 type Port struct {
-	ID         string      `json:"id"`
-	Kind       string      `json:"kind"`
-	Direction  string      `json:"direction"`
-	Domain     string      `json:"domain"`
-	Electrical *Electrical `json:"electrical,omitempty"`
-	Protocol   *Protocol   `json:"protocol,omitempty"`
+	ID         string            `json:"id"`
+	Kind       string            `json:"kind"`
+	Direction  string            `json:"direction"`
+	Domain     string            `json:"domain"`
+	Electrical *Electrical       `json:"electrical,omitempty"`
+	Protocol   *Protocol         `json:"protocol,omitempty"`
+	Control    *ControlSemantics `json:"control,omitempty"`
 }
 
 // Signal is a behavior-level interface between objectives. It deliberately
 // omits implementation concepts such as nets, pins, and topology. Direction is
 // declared by each binding so a producer and consumers can share one contract.
 type Signal struct {
-	ID         string      `json:"id"`
-	Kind       string      `json:"kind"`
-	Domain     string      `json:"domain"`
-	Electrical *Electrical `json:"electrical,omitempty"`
-	Protocol   *Protocol   `json:"protocol,omitempty"`
+	ID         string            `json:"id"`
+	Kind       string            `json:"kind"`
+	Domain     string            `json:"domain"`
+	Electrical *Electrical       `json:"electrical,omitempty"`
+	Protocol   *Protocol         `json:"protocol,omitempty"`
+	Control    *ControlSemantics `json:"control,omitempty"`
+}
+
+// ControlSemantics defines the logical meaning of a behavior-level control
+// independently from its eventual voltage, topology, pin, or part.
+type ControlSemantics struct {
+	Function     string `json:"function"`
+	Polarity     string `json:"polarity"`
+	StartupState string `json:"startup_state"`
+	SafeState    string `json:"safe_state"`
 }
 
 type Electrical struct {
@@ -211,6 +228,27 @@ type BehavioralRequirement struct {
 	Unit           string      `json:"unit"`
 	OperatingCases []string    `json:"operating_cases"`
 	Critical       bool        `json:"critical,omitempty"`
+	Transition     string      `json:"transition,omitempty"`
+}
+
+// ControlTransition defines a required directed semantic state change and its
+// timing/dependency envelope. It cannot name implementation objects.
+type ControlTransition struct {
+	ID            string                   `json:"id"`
+	Target        Observation              `json:"target"`
+	Trigger       Observation              `json:"trigger"`
+	From          string                   `json:"from"`
+	To            string                   `json:"to"`
+	Direction     string                   `json:"direction"`
+	MinimumDelayS *float64                 `json:"minimum_delay_s,omitempty"`
+	MaximumDelayS *float64                 `json:"maximum_delay_s,omitempty"`
+	Dependencies  []ControlStateDependency `json:"dependencies,omitempty"`
+}
+
+type ControlStateDependency struct {
+	Target     Observation `json:"target"`
+	State      string      `json:"state"`
+	StableForS float64     `json:"stable_for_s,omitempty"`
 }
 
 type Observation struct {

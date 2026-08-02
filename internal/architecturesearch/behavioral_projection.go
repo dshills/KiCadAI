@@ -21,6 +21,7 @@ func effectiveObjectiveConstraints(requirement Requirement, objective Objective)
 		}
 	}
 	constraints = mergeProjectedConstraints(constraints, sequenceConstraints)
+	constraints = mergeProjectedConstraints(constraints, controlConstraintsForObjective(requirement, objective))
 	if !supportsBehavioralVerification(requirement.Version) {
 		return constraints
 	}
@@ -149,6 +150,69 @@ func effectiveObjectiveConstraints(requirement Requirement, objective Objective)
 	}
 
 	return mergeProjectedConstraints(constraints, derived)
+}
+
+func controlConstraintsForObjective(requirement Requirement, objective Objective) []Constraint {
+	if requirement.Version != VersionV6 {
+		return nil
+	}
+	var constraints []Constraint
+	for _, binding := range objective.Bindings {
+		control := controlForBinding(requirement, binding)
+		if control == nil {
+			continue
+		}
+		constraints = append(constraints,
+			equalStringConstraint("control_function", control.Function),
+			equalStringConstraint("control_polarity", control.Polarity),
+			equalStringConstraint("control_startup_state", control.StartupState),
+			equalStringConstraint("control_safe_state", control.SafeState),
+		)
+		port, hasPort := requirementPort(requirement, binding.Port)
+		if binding.Direction == "source" || (hasPort && port.Direction == "source") {
+			constraints = append(constraints,
+				equalStringConstraint("output_polarity", control.Polarity),
+				Constraint{Name: "inactive_at_power_up", Relation: "required", Value: json.RawMessage([]byte("true"))},
+			)
+		}
+		if controlRole(binding.Role) && (binding.Direction == "sink" || binding.Port != "") {
+			constraints = append(constraints, equalStringConstraint("control_active_state", physicalControlAction(*control)))
+		}
+	}
+	return constraints
+}
+
+func controlForBinding(requirement Requirement, binding Binding) *ControlSemantics {
+	if binding.Signal != "" {
+		for index := range requirement.Requirements.Signals {
+			if requirement.Requirements.Signals[index].ID == binding.Signal {
+				return requirement.Requirements.Signals[index].Control
+			}
+		}
+	}
+	if binding.Port != "" {
+		for index := range requirement.Requirements.Ports {
+			if requirement.Requirements.Ports[index].ID == binding.Port {
+				return requirement.Requirements.Ports[index].Control
+			}
+		}
+	}
+	return nil
+}
+
+func physicalControlAction(control ControlSemantics) string {
+	assertionConnects := control.Function == "enable" || control.Function == "power_good" || control.Function == "state"
+	assertedHigh := control.Polarity == "active_high"
+	if assertionConnects {
+		if assertedHigh {
+			return "high"
+		}
+		return "high_disconnect"
+	}
+	if assertedHigh {
+		return "high_disconnect"
+	}
+	return "low_disconnect"
 }
 
 func eventScopedDurationConstraint(requirement Requirement, behavior BehavioralRequirement) (Constraint, bool) {

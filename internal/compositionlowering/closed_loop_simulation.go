@@ -260,9 +260,10 @@ func BuildClosedLoopInput(requirement architecturesearch.Requirement, search arc
 	v3 := requirement.Schema == architecturesearch.SchemaIDV3 && requirement.Version == architecturesearch.VersionV3
 	v4 := requirement.Schema == architecturesearch.SchemaIDV4 && requirement.Version == architecturesearch.VersionV4
 	v5 := requirement.Schema == architecturesearch.SchemaIDV5 && requirement.Version == architecturesearch.VersionV5
+	v6 := requirement.Schema == architecturesearch.SchemaIDV6 && requirement.Version == architecturesearch.VersionV6
 	hierarchical := v4 || v5
-	if !v3 && !hierarchical {
-		diagnostics = append(diagnostics, closedloopsynthesis.Diagnostic{Path: "requirement", Message: "behavioral closed-loop integration requires a v3, v4, or v5 requirement"})
+	if !v3 && !v6 && !hierarchical {
+		diagnostics = append(diagnostics, closedloopsynthesis.Diagnostic{Path: "requirement", Message: "behavioral closed-loop integration requires a v3, v4, v5, or v6 requirement"})
 	}
 	requirementHash, err := architecturesearch.CanonicalHash(architecturesearch.Normalize(requirement))
 	if err != nil || requirementHash != search.RequirementHash {

@@ -248,7 +248,7 @@ converter topologies, unreviewed thermal assemblies, RF/high-speed behavior,
 mains safety, and high-energy protection outside the modeled envelope remain
 unsupported.
 
-Authoritative evidence:
+Held-out benchmark evidence:
 
 - [specification](../specs/dynamic-electrothermal-control-loop-synthesis/SPEC.md);
 - [completion audit](../specs/dynamic-electrothermal-control-loop-synthesis/AUDIT.md);
@@ -344,6 +344,23 @@ This result materially broadens the measured envelope, but twelve cases cannot
 establish arbitrary circuit generation, unrestricted part qualification,
 dense-board routing, RF/high-speed behavior, mains safety, or fabrication
 release.
+
+## Control-State and Sequencing Semantics
+
+The V6 behavioral-composition contract now distinguishes active-high from
+active-low enable, inhibit, reset, fault, power-good, and generic state signals.
+It carries asserted/deasserted startup and safe state, required physical edge,
+bounded response time, and stable-state prerequisites through architecture
+projection, closed-loop planning, lowering, simulation, and bounded repair.
+An opposite-direction or unpowered transient excursion cannot satisfy a
+directed response assertion.
+
+This advances semantic reasoning, not arbitrary state-machine generation. The
+frozen current-sense-protection and mixed-control/power requirements are
+correctly rejected: both require a deenergized startup output while declaring
+their only fault control deasserted at startup, which means connected. A future
+promotion must add an explicit independent startup-enable/power-good path and
+evidence rather than infer it from the fixture identity.
 
 Authoritative evidence:
 

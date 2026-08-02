@@ -227,7 +227,7 @@ func transientDerivedValue(result AnalysisResult, assertion Assertion) (float64,
 			return 0, diagnostic
 		}
 		quantity := QuantityRiseTimeS
-		if values[len(values)-1] < values[0] {
+		if assertion.ResponseDirection == "falling" || (assertion.ResponseDirection == "" && values[len(values)-1] < values[0]) {
 			quantity = QuantityFallTimeS
 		}
 		copy := assertion
@@ -353,17 +353,25 @@ func transientResponseLatency(result AnalysisResult, assertion Assertion) (float
 			baseline, peakAbsolute, scale, len(deltas),
 		))
 	}
-	// Measure onset in the direction of the last meaningful event response.
+	// Measure onset in the contract direction when one is declared. Legacy
+	// assertions infer the terminal direction for backward compatibility.
 	// Scanning backward preserves bounded pulse responses that recover before
 	// the window closes, while rejecting an earlier opposite-direction glitch
 	// (for example an unpowered load pulling a sequenced rail below ground).
 	direction := 0.0
-	for index := len(deltas) - 1; index >= 0; index-- {
-		if math.Abs(deltas[index]) <= tolerance {
-			continue
+	switch assertion.ResponseDirection {
+	case "rising":
+		direction = 1
+	case "falling":
+		direction = -1
+	default:
+		for index := len(deltas) - 1; index >= 0; index-- {
+			if math.Abs(deltas[index]) <= tolerance {
+				continue
+			}
+			direction = math.Copysign(1, deltas[index])
+			break
 		}
-		direction = math.Copysign(1, deltas[index])
-		break
 	}
 	if direction == 0 {
 		return 0, advancedAssertionDiagnostic(assertion, "trusted event window does not contain a directed response")
@@ -373,7 +381,7 @@ func transientResponseLatency(result AnalysisResult, assertion Assertion) (float
 		peak = math.Max(peak, math.Max(0, direction*delta))
 	}
 	if peak <= tolerance {
-		return 0, advancedAssertionDiagnostic(assertion, "trusted event window does not contain a response in its terminal direction")
+		return 0, advancedAssertionDiagnostic(assertion, "trusted event window does not contain a response in its required direction")
 	}
 	threshold := TransientResponseOnsetFraction * peak
 	previousTime, previousResidual := assertion.WindowStartS, 0.0

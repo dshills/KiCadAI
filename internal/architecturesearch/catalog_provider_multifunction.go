@@ -37,10 +37,19 @@ func (provider *CatalogProvider) expandGenericThreshold(ctx context.Context, req
 	if err != nil {
 		return nil, err
 	}
+	polarity := "active_high"
+	if constraint, exists := namedConstraint(request.Constraints, "output_polarity"); exists && constraint.Relation == "equal" {
+		if err := json.Unmarshal(constraint.Value, &polarity); err != nil || (polarity != "active_high" && polarity != "active_low") {
+			return nil, fmt.Errorf("threshold output polarity is invalid")
+		}
+	}
+	if startup := optionalConstraintString(request.Constraints, "control_startup_state"); startup != "" && startup != "deasserted" {
+		return nil, fmt.Errorf("threshold provider cannot prove asserted startup state")
+	}
 	legacy.Constraints = []Constraint{
 		numericConstraint("threshold_voltage", "target", threshold, "V", tolerance),
 		numericConstraint("hysteresis_width", "target", hysteresis, "V", hysteresisTolerance),
-		stringConstraint("output_polarity", "equal", "active_high"),
+		stringConstraint("output_polarity", "equal", polarity),
 		boolConstraint("inactive_at_power_up", "required"),
 		numericConstraint("propagation_delay", "maximum", 10, "us", 0),
 	}
@@ -67,8 +76,12 @@ func (provider *CatalogProvider) expandGenericLoadSwitch(ctx context.Context, re
 			legacy.Ports[index].Contract.Voltage.Maximum = float64Pointer(5.1)
 		}
 	}
-	controlActiveState := "high"
-	if constraint, ok := namedConstraint(request.Constraints, "fail_safe_interlock"); ok && constraint.Relation == "required" {
+	controlActiveState := optionalConstraintString(request.Constraints, "control_active_state")
+	explicitControlAction := controlActiveState != ""
+	if controlActiveState == "" {
+		controlActiveState = "high"
+	}
+	if constraint, ok := namedConstraint(request.Constraints, "fail_safe_interlock"); ok && constraint.Relation == "required" && optionalConstraintString(request.Constraints, "control_active_state") == "" {
 		controlActiveState = "high_disconnect"
 	}
 	legacy.Constraints = []Constraint{
@@ -79,6 +92,9 @@ func (provider *CatalogProvider) expandGenericLoadSwitch(ctx context.Context, re
 		boolConstraint("control_overvoltage_clamp", "required"),
 		numericConstraint("load_voltage", "minimum", voltage, "V", 0),
 		numericConstraint("load_current", "minimum", current, "A", tolerance),
+	}
+	if explicitControlAction {
+		legacy.Constraints = append(legacy.Constraints, boolConstraint("semantic_control_action", "required"))
 	}
 	if startupMaximum, _, startupErr := requiredNumber(request.Constraints, "startup_output_voltage", "maximum", "V"); startupErr == nil && startupMaximum < .5*voltage {
 		legacy.Constraints = append(legacy.Constraints, stringConstraint("off_output_state", "equal", "low"))
