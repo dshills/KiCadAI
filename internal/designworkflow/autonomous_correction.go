@@ -112,6 +112,10 @@ type AutonomousCorrectionApplication struct {
 	RouteStateHashAfter          string                   `json:"route_state_hash_after,omitempty"`
 	RoutePreservationBefore      string                   `json:"route_preservation_before,omitempty"`
 	RoutePreservationAfter       string                   `json:"route_preservation_after,omitempty"`
+	CandidateRouteStateHash      string                   `json:"candidate_route_state_hash,omitempty"`
+	CandidateRoutingStatus       routing.Status           `json:"candidate_routing_status,omitempty"`
+	CandidateRoutedNets          int                      `json:"candidate_routed_nets,omitempty"`
+	CandidateFailedNets          []string                 `json:"candidate_failed_nets,omitempty"`
 	AffectedNets                 []string                 `json:"affected_nets,omitempty"`
 	ReplacedOperationCount       int                      `json:"replaced_operation_count,omitempty"`
 	PreservedOperationCount      int                      `json:"preserved_operation_count,omitempty"`
@@ -369,7 +373,16 @@ func autonomousCorrectionActionForDiagnostic(diagnostic AutonomousCorrectionDiag
 	case CorrectionMissingLayerTransition:
 		action.Kind, action.Authorized, action.Reason = CorrectionActionInsertLayerTransition, true, "insert a legal same-net transition or selectively rebuild the affected net"
 	case CorrectionForeignNetCrossing:
-		action.Kind, action.Authorized, action.Reason = CorrectionActionRerouteAffectedNets, true, "selectively rebuild only the operation-correlated conflicting nets"
+		if autonomousCorrectionDiagnosticHasRoutingScope(diagnostic) {
+			action.Kind, action.Authorized, action.Reason = CorrectionActionRerouteAffectedNets, true, "selectively rebuild only the operation-correlated conflicting nets"
+		} else if len(diagnostic.Refs) >= 2 && len(diagnostic.Nets) >= 2 {
+			// A failed net has no route operation to correlate yet. Open a bounded
+			// endpoint channel for its resolved pair before rerunning placement and
+			// routing under unchanged board and clearance constraints.
+			action.Kind, action.PlacementHint, action.Authorized = CorrectionActionImproveEndpointFanout, PlacementRetryImproveFanout, true
+			action.Nets = autonomousCorrectionFailedPathNets(diagnostic)
+			action.Reason = "open the failed endpoint channel when selective rerouting cannot include an unrouted net"
+		}
 	default:
 		action.Reason = "no deterministic correction is authorized for this geometry"
 	}
@@ -517,9 +530,12 @@ func ApplyAutonomousCorrectionPlan(request Request, placementRequest placement.R
 		return current, application, nil
 	}
 	adjusted, adjustment := BuildPlacementRetryAdjustment(current, hints, plan.Attempt-1)
-	adjustment.Attempt = plan.Attempt - 1
+	adjustment.EndpointNudges, adjustment.EndpointNudgeTargets = autonomousCorrectionEndpointFanoutNudges(&adjusted, placements, plan.Actions)
+	if len(adjustment.EndpointNudges) > 0 {
+		adjustment.Applied = true
+	}
 	application.Adjustment = adjustment
-	if !adjustment.Applied || adjustment.SpacingDeltaMM > placementRetryMaxSpacingDeltaMM+retryScoreComparisonEpsilon || len(adjustment.ProximityRules) == 0 && math.Abs(adjustment.SpacingDeltaMM) < retryScoreComparisonEpsilon {
+	if !adjustment.Applied || adjustment.SpacingDeltaMM > placementRetryMaxSpacingDeltaMM+retryScoreComparisonEpsilon || len(adjustment.ProximityRules) == 0 && len(adjustment.EndpointNudges) == 0 && math.Abs(adjustment.SpacingDeltaMM) < retryScoreComparisonEpsilon {
 		application.StopReason = CorrectionStopNoSafeAdjustment
 		return current, application, nil
 	}
@@ -541,6 +557,109 @@ func ApplyAutonomousCorrectionPlan(request Request, placementRequest placement.R
 	application.Applied = true
 	application.ProtectedInvariantsPreserved = true
 	return adjusted, application, nil
+}
+
+func autonomousCorrectionEndpointFanoutNudges(request *placement.Request, placements []placement.PlacementResult, actions []AutonomousCorrectionAction) ([]string, []PlacementRetryEndpointNudge) {
+	placementByRef := make(map[string]placement.PlacementResult, len(placements))
+	for _, result := range placements {
+		placementByRef[result.Ref] = result
+	}
+	componentByRef := make(map[string]*placement.Component, len(request.Components))
+	for index := range request.Components {
+		componentByRef[request.Components[index].Ref] = &request.Components[index]
+	}
+	usable := placement.BoardUsableRect(request.Board, request.Rules)
+	targetByRef := map[string]PlacementRetryEndpointNudge{}
+	for _, action := range actions {
+		if action.Kind != CorrectionActionImproveEndpointFanout || action.Category != CorrectionForeignNetCrossing || len(action.Refs) < 2 {
+			continue
+		}
+		refs := correctionSortedStrings(action.Refs)
+		firstResult, firstOK := placementByRef[refs[0]]
+		secondResult, secondOK := placementByRef[refs[1]]
+		firstComponent, firstComponentOK := componentByRef[refs[0]]
+		secondComponent, secondComponentOK := componentByRef[refs[1]]
+		if !firstOK || !secondOK || !firstComponentOK || !secondComponentOK {
+			continue
+		}
+		dx := secondResult.Position.XMM - firstResult.Position.XMM
+		dy := secondResult.Position.YMM - firstResult.Position.YMM
+		length := math.Hypot(dx, dy)
+		if length <= retryScoreComparisonEpsilon {
+			continue
+		}
+		step := min(placementRetryEndpointNudgeMaxMM, max(placementRetryRouteChannelMM, request.Rules.ComponentSpacingMM+3*placementRetryRouteChannelMM))
+		unitX, unitY := -dy/length, dx/length
+		// This action handles a foreign-net crossing, not endpoint separation.
+		// Translate the failed endpoint pair rigidly and perpendicular to its path
+		// so it opens a new channel without changing the proven pair geometry.
+		candidates := []struct {
+			first  placement.Placement
+			second placement.Placement
+		}{
+			{first: nudgedPlacement(firstResult.Position, unitX*step, unitY*step), second: nudgedPlacement(secondResult.Position, unitX*step, unitY*step)},
+			{first: nudgedPlacement(firstResult.Position, -unitX*step, -unitY*step), second: nudgedPlacement(secondResult.Position, -unitX*step, -unitY*step)},
+		}
+		boardCenterX := usable.Min.XMM + (usable.Max.XMM-usable.Min.XMM)/2
+		boardCenterY := usable.Min.YMM + (usable.Max.YMM-usable.Min.YMM)/2
+		midpointDistance := func(candidate struct {
+			first  placement.Placement
+			second placement.Placement
+		}) float64 {
+			return math.Hypot((candidate.first.XMM+candidate.second.XMM)/2-boardCenterX, (candidate.first.YMM+candidate.second.YMM)/2-boardCenterY)
+		}
+		if midpointDistance(candidates[1]) < midpointDistance(candidates[0]) {
+			candidates[0], candidates[1] = candidates[1], candidates[0]
+		}
+		for _, candidate := range candidates {
+			if !autonomousCorrectionNudgeInsideBoard(*firstComponent, candidate.first, request.Rules, usable) || !autonomousCorrectionNudgeInsideBoard(*secondComponent, candidate.second, request.Rules, usable) {
+				continue
+			}
+			if placementRetryComponentMovable(*firstComponent) {
+				first := candidate.first
+				targetByRef[firstComponent.Ref] = PlacementRetryEndpointNudge{Ref: firstComponent.Ref, From: firstResult.Position, Target: first}
+			}
+			if placementRetryComponentMovable(*secondComponent) {
+				second := candidate.second
+				targetByRef[secondComponent.Ref] = PlacementRetryEndpointNudge{Ref: secondComponent.Ref, From: secondResult.Position, Target: second}
+			}
+			break
+		}
+	}
+	moved := make([]string, 0, len(targetByRef))
+	targets := make([]PlacementRetryEndpointNudge, 0, len(targetByRef))
+	for ref, target := range targetByRef {
+		moved = append(moved, ref)
+		targets = append(targets, target)
+	}
+	slices.SortFunc(targets, func(left, right PlacementRetryEndpointNudge) int { return cmp.Compare(left.Ref, right.Ref) })
+	for _, target := range targets {
+		position := target.Target
+		componentByRef[target.Ref].Position = &position
+	}
+	return correctionSortedStrings(moved), targets
+}
+
+func nudgedPlacement(value placement.Placement, dx, dy float64) placement.Placement {
+	value.XMM += dx
+	value.YMM += dy
+	return value
+}
+
+func autonomousCorrectionNudgeInsideBoard(component placement.Component, target placement.Placement, rules placement.Rules, usable placement.Rect) bool {
+	bounds, ok := placement.ComponentPlacementBounds(component, target, rules)
+	return ok && usable.Contains(bounds)
+}
+
+func autonomousCorrectionFailedPathNets(diagnostic AutonomousCorrectionDiagnostic) []string {
+	const prefix = "nets."
+	if strings.HasPrefix(diagnostic.Path, prefix) {
+		netName := strings.TrimSpace(strings.TrimPrefix(diagnostic.Path, prefix))
+		if slices.Contains(diagnostic.Nets, netName) {
+			return []string{netName}
+		}
+	}
+	return slices.Clone(diagnostic.Nets)
 }
 
 func autonomousCorrectionPlacementHints(actions []AutonomousCorrectionAction) []PlacementRetryHint {
@@ -577,6 +696,15 @@ func autonomousCorrectionActionSourceCategory(action AutonomousCorrectionAction)
 
 func autonomousCorrectionPlacementInvariantFingerprint(request placement.Request) (string, error) {
 	normalized := placement.NormalizeRequest(request)
+	for index := range normalized.Components {
+		component := &normalized.Components[index]
+		// Only soft-preferred positions are advisory inputs that this correction
+		// may replace directly. Group-transform and local-rebuild coordinates stay
+		// in the invariant because their owner must move them coherently.
+		if !component.Fixed && component.Mobility.Class == placement.MobilitySoftPreferred {
+			component.Position = nil
+		}
+	}
 	rules := struct {
 		GridMM                   float64
 		BoardEdgeClearanceMM     float64
@@ -993,10 +1121,10 @@ func autonomousCorrectionSupport(diagnostic AutonomousCorrectionDiagnostic) (boo
 		}
 		return false, "layer-transition correction requires operation-correlated affected nets"
 	case CorrectionForeignNetCrossing:
-		if len(diagnostic.Nets) >= 2 && autonomousCorrectionDiagnosticHasRoutingScope(diagnostic) {
+		if len(diagnostic.Nets) >= 2 && (autonomousCorrectionDiagnosticHasRoutingScope(diagnostic) || len(diagnostic.Refs) >= 2) {
 			return true, ""
 		}
-		return false, "foreign-net crossing repair requires two operation-correlated affected nets"
+		return false, "foreign-net crossing repair requires two operation-correlated affected nets or a resolved failed endpoint pair"
 	default:
 		return false, "no deterministic correction is authorized for this geometry"
 	}

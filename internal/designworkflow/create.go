@@ -120,6 +120,7 @@ func Create(ctx context.Context, request Request, opts CreateOptions) WorkflowRe
 	routingOpts := opts.Routing
 	routingOpts.ComponentSelections = componentSelections.Selections
 	routingOpts.Skip = routingOpts.Skip || opts.SkipRouting || normalized.Validation.SkipRouting
+	routingOpts.yieldToPlacementRepair = routingRetryAllowsPlacementHint(normalized.RoutingRetry, PlacementRetryImproveFanout)
 	routed := RoutePlacement(ctx, normalized, fragments, placed, routingOpts)
 	placed, routed, _ = maybeRetryPlacementRouting(ctx, normalized, fragments, placed, routed, routingOpts, normalized.RoutingRetry)
 	stages[placementStageIndex] = placed.Stage

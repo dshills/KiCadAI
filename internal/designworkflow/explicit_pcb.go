@@ -178,7 +178,7 @@ func RouteExplicitCircuit(ctx context.Context, request Request, placed Placement
 	result := routing.Result{Status: routing.StatusBlocked}
 	routeOrder := FinalRouteOrderNegotiationSummary{}
 	if !reports.HasBlockingIssue(issues) {
-		result, routeOrder = routeWithFailedNetFirstNegotiation(ctx, routingRequest)
+		result, routeOrder = routeWithFailedNetFirstNegotiationOptions(ctx, routingRequest, routeNegotiationOptions{YieldRepairableConflict: opts.yieldToPlacementRepair})
 		issues = append(issues, result.Issues...)
 	}
 	issues = append(issues, explicitRequiredRouteIssues(request.ExplicitCircuit.Nets, result)...)

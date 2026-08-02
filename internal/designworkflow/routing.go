@@ -19,13 +19,14 @@ import (
 )
 
 type RoutingOptions struct {
-	Skip                bool
-	Mode                routing.RouteMode
-	GridMM              float64
-	TraceWidthMM        float64
-	ClearanceMM         float64
-	AllowPartial        *bool
-	ComponentSelections []ComponentSelectionEntry
+	Skip                   bool
+	Mode                   routing.RouteMode
+	GridMM                 float64
+	TraceWidthMM           float64
+	ClearanceMM            float64
+	AllowPartial           *bool
+	ComponentSelections    []ComponentSelectionEntry
+	yieldToPlacementRepair bool
 }
 
 type RoutingStageResult struct {
@@ -271,7 +272,7 @@ func RoutePlacement(ctx context.Context, request Request, fragments PCBFragmentR
 	if len(preTreeNets) != 0 && !reports.HasBlockingIssue(issues) {
 		preTreeRequest := routingRequest
 		preTreeRequest.Nets = preTreeNets
-		preTreeResult, preTreeOrder = routeWithFailedNetFirstNegotiation(ctx, preTreeRequest)
+		preTreeResult, preTreeOrder = routeWithFailedNetFirstNegotiationOptions(ctx, preTreeRequest, routeNegotiationOptions{YieldRepairableConflict: opts.yieldToPlacementRepair})
 	}
 	if canceled, ok := canceledRoutingStageResult(ctx); ok {
 		return canceled
@@ -297,7 +298,7 @@ func RoutePlacement(ctx context.Context, request Request, fragments PCBFragmentR
 	result := routing.Result{Status: routing.StatusBlocked}
 	finalRouteOrder := FinalRouteOrderNegotiationSummary{}
 	if !reports.HasBlockingIssue(issues) {
-		result, finalRouteOrder = routeWithFailedNetFirstNegotiation(ctx, routingRequest)
+		result, finalRouteOrder = routeWithFailedNetFirstNegotiationOptions(ctx, routingRequest, routeNegotiationOptions{YieldRepairableConflict: opts.yieldToPlacementRepair})
 		issues = append(issues, result.Issues...)
 	}
 	if canceled, ok := canceledRoutingStageResult(ctx); ok {

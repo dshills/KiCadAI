@@ -649,6 +649,59 @@ func autonomousCorrectionPlacementAffectedNets(plan AutonomousCorrectionPlan, ro
 	return correctionSortedStrings(nets)
 }
 
+func autonomousCorrectionChangedRouteNets(before, after []transactions.Operation) []string {
+	operationsByNet := func(operations []transactions.Operation) map[string][]transactions.Operation {
+		grouped := map[string][]transactions.Operation{}
+		for _, operation := range operations {
+			if operation.Op != transactions.OpRoute {
+				continue
+			}
+			netName := strings.TrimSpace(operation.Net)
+			if netName == "" {
+				continue
+			}
+			grouped[netName] = append(grouped[netName], operation)
+		}
+		return grouped
+	}
+	beforeByNet := operationsByNet(before)
+	afterByNet := operationsByNet(after)
+	netSet := make(map[string]struct{}, len(beforeByNet)+len(afterByNet))
+	for netName := range beforeByNet {
+		netSet[netName] = struct{}{}
+	}
+	for netName := range afterByNet {
+		netSet[netName] = struct{}{}
+	}
+	changed := make([]string, 0, len(netSet))
+	for netName := range netSet {
+		beforeHash := autonomousCorrectionRouteStateHash(beforeByNet[netName])
+		afterHash := autonomousCorrectionRouteStateHash(afterByNet[netName])
+		if beforeHash != afterHash {
+			changed = append(changed, netName)
+		}
+	}
+	return correctionSortedStrings(changed)
+}
+
+func autonomousCorrectionRouteScopeCoversRequest(request routing.Request, affectedNets []string) bool {
+	affected := make(map[string]struct{}, len(affectedNets))
+	for _, netName := range affectedNets {
+		affected[strings.TrimSpace(netName)] = struct{}{}
+	}
+	covered := 0
+	for _, net := range request.Nets {
+		if strings.TrimSpace(net.Name) == "" {
+			continue
+		}
+		covered++
+		if _, ok := affected[strings.TrimSpace(net.Name)]; !ok {
+			return false
+		}
+	}
+	return covered > 0
+}
+
 func preserveAutonomousCorrectionUnaffectedRoutes(current, rerouted RoutingStageResult, affectedNets []string) (RoutingStageResult, bool) {
 	if len(affectedNets) == 0 {
 		return RoutingStageResult{}, false

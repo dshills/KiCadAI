@@ -666,12 +666,17 @@ func TestRenderAtCanonicalizesZero(t *testing.T) {
 	}
 }
 
-func TestSchematicFixedPreservesNonZeroPrecision(t *testing.T) {
-	output, err := sexpr.Format(sexpr.L(sexpr.A("xy"), schematicFixed(kicadfiles.IU(1_234_567)), schematicFixed(kicadfiles.MM(-0.5))))
+func TestSchematicFixedUsesKiCadSchematicCoordinatePrecision(t *testing.T) {
+	output, err := sexpr.Format(sexpr.L(
+		sexpr.A("xy"),
+		schematicFixed(kicadfiles.IU(1_234_567)),
+		schematicFixed(kicadfiles.IU(-1_234_550)),
+		schematicFixed(kicadfiles.MM(-0.5)),
+	))
 	if err != nil {
 		t.Fatalf("Format returned error: %v", err)
 	}
-	if strings.TrimSpace(output) != "(xy 1.234567 -0.5)" {
+	if strings.TrimSpace(output) != "(xy 1.2346 -1.2346 -0.5)" {
 		t.Fatalf("formatted non-zero points = %q", strings.TrimSpace(output))
 	}
 }

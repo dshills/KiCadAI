@@ -136,6 +136,84 @@ func TestPlanAutonomousCorrectionAcceptsRouteScopedCoverageWithoutRefs(t *testin
 	}
 }
 
+func TestPlanAutonomousCorrectionUsesFailedEndpointPairWhenOneConflictingNetIsUnrouted(t *testing.T) {
+	request := correctionExplicitRequest()
+	placementRequest, placements := correctionPlacementState(false)
+	for index := range placementRequest.Components {
+		placementRequest.Components[index].Bounds = placement.Bounds{WidthMM: 1, HeightMM: 1, Source: placement.BoundsExplicit}
+	}
+	operations := []transactions.Operation{
+		correctionRouteOperation(t, "GND", 2, 2, 0, 2, 4),
+	}
+	diagnostics := BuildAutonomousCorrectionDiagnosticsForRouting(nil, RoutingStageResult{
+		Operations: operations,
+		Stage: StageResult{Issues: []reports.Issue{{
+			Code: reports.CodeRouteCopperConflict, Severity: reports.SeverityBlocked,
+			Path: "nets.SIG", Refs: []string{"J1", "R1"}, Nets: []string{"GND", "SIG"},
+		}}},
+	})
+	if len(diagnostics) != 1 || !diagnostics[0].AutomaticAction || autonomousCorrectionDiagnosticHasRoutingScope(diagnostics[0]) {
+		t.Fatalf("unrouted-net diagnostic = %#v", diagnostics)
+	}
+	plan, err := PlanAutonomousCorrection(request, placementRequest, placements, diagnostics, AutonomousCorrectionPlanOptions{
+		Attempt: 2, MaxAttempts: 3, RouteOperations: operations,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !plan.Authorized || plan.StopReason != "" || len(plan.Actions) != 1 {
+		t.Fatalf("endpoint fallback plan = %#v", plan)
+	}
+	action := plan.Actions[0]
+	if action.Kind != CorrectionActionImproveEndpointFanout || action.PlacementHint != PlacementRetryImproveFanout || !reflect.DeepEqual(action.Refs, []string{"J1", "R1"}) || !reflect.DeepEqual(action.Nets, []string{"SIG"}) {
+		t.Fatalf("endpoint fallback action = %#v", action)
+	}
+	adjusted, application, err := ApplyAutonomousCorrectionPlan(request, placementRequest, placements, plan, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !application.Applied || !application.ProtectedInvariantsPreserved || len(application.Adjustment.EndpointNudges) != 2 {
+		t.Fatalf("endpoint fallback application = %#v adjusted=%#v", application, adjusted.ProximityRules)
+	}
+}
+
+func TestAutonomousCorrectionEndpointFanoutNudgesDeduplicatesSharedRefs(t *testing.T) {
+	request := placement.NormalizeRequest(placement.Request{
+		Board: placement.BoardPlacementArea{WidthMM: 40, HeightMM: 30, MarginMM: 1},
+		Components: []placement.Component{
+			{Ref: "C1", Bounds: placement.Bounds{WidthMM: 1, HeightMM: 1, Source: placement.BoundsExplicit}, Mobility: placement.MobilityPolicy{Class: placement.MobilitySoftPreferred}},
+			{Ref: "J1", Bounds: placement.Bounds{WidthMM: 1, HeightMM: 1, Source: placement.BoundsExplicit}, Mobility: placement.MobilityPolicy{Class: placement.MobilitySoftPreferred}},
+			{Ref: "R1", Bounds: placement.Bounds{WidthMM: 1, HeightMM: 1, Source: placement.BoundsExplicit}, Mobility: placement.MobilityPolicy{Class: placement.MobilitySoftPreferred}},
+		},
+	})
+	placements := []placement.PlacementResult{
+		{Ref: "C1", Position: placement.Placement{XMM: 5, YMM: 10, Layer: "F.Cu"}},
+		{Ref: "J1", Position: placement.Placement{XMM: 5, YMM: 5, Layer: "F.Cu"}},
+		{Ref: "R1", Position: placement.Placement{XMM: 10, YMM: 5, Layer: "F.Cu"}},
+	}
+	actions := []AutonomousCorrectionAction{
+		{Kind: CorrectionActionImproveEndpointFanout, Category: CorrectionForeignNetCrossing, Refs: []string{"J1", "R1"}},
+		{Kind: CorrectionActionImproveEndpointFanout, Category: CorrectionForeignNetCrossing, Refs: []string{"C1", "J1"}},
+	}
+	moved, targets := autonomousCorrectionEndpointFanoutNudges(&request, placements, actions)
+	if want := []string{"C1", "J1", "R1"}; !reflect.DeepEqual(moved, want) {
+		t.Fatalf("moved refs = %#v, want %#v", moved, want)
+	}
+	if len(targets) != len(moved) {
+		t.Fatalf("nudge targets = %#v, want one target per moved ref", targets)
+	}
+	for index, target := range targets {
+		if index > 0 && targets[index-1].Ref == target.Ref {
+			t.Fatalf("duplicate nudge target for %q: %#v", target.Ref, targets)
+		}
+		for _, component := range request.Components {
+			if component.Ref == target.Ref && (component.Position == nil || *component.Position != target.Target) {
+				t.Fatalf("target evidence for %q does not match final request position: %#v component=%#v", target.Ref, target, component)
+			}
+		}
+	}
+}
+
 func TestPlanAutonomousCorrectionCoversDerivedConflictOnFailedNet(t *testing.T) {
 	request := correctionExplicitRequest()
 	placementRequest, placements := correctionPlacementState(false)

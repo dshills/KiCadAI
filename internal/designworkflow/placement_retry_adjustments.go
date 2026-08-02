@@ -14,16 +14,25 @@ const (
 	placementRetryMaxSpacingDeltaMM  = 2.0
 	placementRetryMaxProximityMM     = 25.0
 	placementRetryRouteChannelMM     = 1.0
+	placementRetryEndpointNudgeMaxMM = 4.0
 )
 
 type PlacementRetryAdjustment struct {
-	Applied        bool     `json:"applied"`
-	Attempt        int      `json:"attempt"`
-	SpacingDeltaMM float64  `json:"spacing_delta_mm,omitempty"`
-	ProximityRules []string `json:"proximity_rules,omitempty"`
-	SkippedReasons []string `json:"skipped_reasons,omitempty"`
-	EligibleRefs   int      `json:"eligible_refs,omitempty"`
-	BlockedRefs    int      `json:"blocked_refs,omitempty"`
+	Applied              bool                          `json:"applied"`
+	Attempt              int                           `json:"attempt"`
+	SpacingDeltaMM       float64                       `json:"spacing_delta_mm,omitempty"`
+	ProximityRules       []string                      `json:"proximity_rules,omitempty"`
+	EndpointNudges       []string                      `json:"endpoint_nudges,omitempty"`
+	EndpointNudgeTargets []PlacementRetryEndpointNudge `json:"endpoint_nudge_targets,omitempty"`
+	SkippedReasons       []string                      `json:"skipped_reasons,omitempty"`
+	EligibleRefs         int                           `json:"eligible_refs,omitempty"`
+	BlockedRefs          int                           `json:"blocked_refs,omitempty"`
+}
+
+type PlacementRetryEndpointNudge struct {
+	Ref    string              `json:"ref"`
+	From   placement.Placement `json:"from"`
+	Target placement.Placement `json:"target"`
 }
 
 func BuildPlacementRetryAdjustment(request placement.Request, hints []PlacementRetryHint, attempt int) (placement.Request, PlacementRetryAdjustment) {
@@ -359,5 +368,5 @@ func PlacementRetryAdjustmentSummary(adjustment PlacementRetryAdjustment) string
 	if !adjustment.Applied {
 		return "no safe placement retry adjustment applied"
 	}
-	return fmt.Sprintf("applied placement retry adjustment: spacing +%.2fmm, proximity rules %d", adjustment.SpacingDeltaMM, len(adjustment.ProximityRules))
+	return fmt.Sprintf("applied placement retry adjustment: spacing +%.2fmm, proximity rules %d, endpoint nudges %d", adjustment.SpacingDeltaMM, len(adjustment.ProximityRules), len(adjustment.EndpointNudges))
 }

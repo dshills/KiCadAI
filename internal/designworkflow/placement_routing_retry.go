@@ -93,15 +93,24 @@ const retryScoreComparisonEpsilon = 1e-9
 const retryScoreRelativeTolerance = 1e-6
 
 func maybeRetryPlacementRouting(ctx context.Context, request Request, fragments PCBFragmentResult, placed PlacementStageResult, routed RoutingStageResult, routingOpts RoutingOptions, policy RoutingRetryPolicySpec) (PlacementStageResult, RoutingStageResult, placementRoutingRetrySummary) {
+	routingOpts.yieldToPlacementRepair = routingRetryAllowsPlacementHint(policy, PlacementRetryImproveFanout)
 	return maybeRetryPlacementRoutingWithRouter(ctx, request, placed, routed, policy, func(next PlacementStageResult) (PlacementStageResult, RoutingStageResult) {
 		return next, RoutePlacement(ctx, request, fragments, next, routingOpts)
 	})
 }
 
 func maybeRetryExplicitPlacementRouting(ctx context.Context, request Request, placed PlacementStageResult, routed RoutingStageResult, routingOpts RoutingOptions, policy RoutingRetryPolicySpec) (PlacementStageResult, RoutingStageResult, placementRoutingRetrySummary) {
+	routingOpts.yieldToPlacementRepair = routingRetryAllowsPlacementHint(policy, PlacementRetryImproveFanout)
 	return maybeRetryPlacementRoutingWithRouter(ctx, request, placed, routed, policy, func(next PlacementStageResult) (PlacementStageResult, RoutingStageResult) {
 		return next, RouteExplicitCircuit(ctx, request, next, routingOpts)
 	})
+}
+
+func routingRetryAllowsPlacementHint(policy RoutingRetryPolicySpec, category PlacementRetryHintCategory) bool {
+	if !policy.Enabled || policy.MaxAttempts <= 1 {
+		return false
+	}
+	return len(policy.AllowedHintCategories) == 0 || slices.Contains(policy.AllowedHintCategories, category)
 }
 
 func maybeRetryPlacementRoutingWithRouter(ctx context.Context, request Request, placed PlacementStageResult, routed RoutingStageResult, policy RoutingRetryPolicySpec, routeNext func(PlacementStageResult) (PlacementStageResult, RoutingStageResult)) (PlacementStageResult, RoutingStageResult, placementRoutingRetrySummary) {
@@ -249,12 +258,24 @@ func maybeRetryPlacementRoutingWithRouter(ctx context.Context, request Request, 
 			seenStates[stateHash] = struct{}{}
 			nextPlaced, nextRouted = routeNext(nextPlaced)
 			if correctionReport != nil && correctionPlan != nil && len(currentRouted.Operations) != 0 {
+				if correctionApplication != nil {
+					correctionApplication.CandidateRouteStateHash = autonomousCorrectionRouteStateHash(nextRouted.Operations)
+					correctionApplication.CandidateRoutingStatus = nextRouted.Result.Status
+					correctionApplication.CandidateRoutedNets = nextRouted.Result.Metrics.RoutedNetCount
+					correctionApplication.CandidateFailedNets = failedRoutingNetNames(nextRouted.Result)
+				}
 				baseRequest := nextRouted.CorrectionRequest
 				if len(baseRequest.Nets) == 0 {
 					baseRequest = nextRouted.Request
 				}
 				affectedNets := autonomousCorrectionPlacementAffectedNets(*correctionPlan, baseRequest, currentPlaced.Result.Placements, nextPlaced.Result.Placements)
-				selective, ok := preserveAutonomousCorrectionUnaffectedRoutes(currentRouted, nextRouted, affectedNets)
+				affectedNets = correctionSortedStrings(append(affectedNets, autonomousCorrectionChangedRouteNets(currentRouted.Operations, nextRouted.Operations)...))
+				selective, ok := RoutingStageResult{}, false
+				if autonomousCorrectionRouteScopeCoversRequest(baseRequest, affectedNets) && nextRouted.Result.Status == routing.StatusRouted && !reports.HasBlockingIssue(nextRouted.Stage.Issues) {
+					selective, ok = nextRouted, true
+				} else {
+					selective, ok = preserveAutonomousCorrectionUnaffectedRoutes(currentRouted, nextRouted, affectedNets)
+				}
 				if !ok {
 					nextRouted = currentRouted
 					if correctionApplication != nil {

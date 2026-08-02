@@ -176,6 +176,35 @@ func TestFailedNetNegotiationSeedsBothObservedConflictClusterOrders(t *testing.T
 	}
 }
 
+func TestFailedNetNegotiationYieldsRepairableConflictToEnabledPlacementRetry(t *testing.T) {
+	request := routing.Request{Nets: []routing.Net{{Name: "failed"}, {Name: "blocker"}, {Name: "other"}}}
+	calls := 0
+	route := func(_ context.Context, candidate routing.Request) routing.Result {
+		calls++
+		return routing.Result{
+			Status: routing.StatusPartial,
+			Routes: []routing.Route{
+				{Net: "failed", Status: routing.RouteStatusFailed, SearchLimitHit: true},
+				{Net: "blocker", Status: routing.RouteStatusRouted},
+				{Net: "other", Status: routing.RouteStatusRouted},
+			},
+			Metrics: routing.Metrics{RoutedNetCount: 2, FailedNetCount: 1, MaxSearchNodesHit: true},
+			Issues: []reports.Issue{{
+				Code: reports.CodeRouteCopperConflict, Severity: reports.SeverityBlocked,
+				Path: "nets.failed", Refs: []string{"A", "B"}, Nets: []string{"failed", "blocker"},
+			}},
+		}
+	}
+
+	result, summary := routeWithFailedNetFirstNegotiationUsingOptions(context.Background(), request, route, routeNegotiationOptions{YieldRepairableConflict: true})
+	if result.Status != routing.StatusPartial || calls != 3 || summary.Attempts != 3 {
+		t.Fatalf("result=%#v calls=%d summary=%#v", result, calls, summary)
+	}
+	if !slices.Equal(summary.PromotedNets, []string{"blocker", "failed"}) || len(summary.SelectedNetOrder) != len(request.Nets) {
+		t.Fatalf("summary=%#v", summary)
+	}
+}
+
 func TestFailedNetNegotiationCanConvergeBeyondLegacyTwelveAttemptCeiling(t *testing.T) {
 	request := routing.Request{Nets: make([]routing.Net, 13)}
 	for index := range request.Nets {

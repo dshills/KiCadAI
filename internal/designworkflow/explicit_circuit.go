@@ -74,6 +74,7 @@ func createExplicitCircuit(ctx context.Context, request Request, opts CreateOpti
 	}
 	routingOpts := opts.Routing
 	routingOpts.Skip = routingOpts.Skip || opts.SkipRouting || request.Validation.SkipRouting
+	routingOpts.yieldToPlacementRepair = routingRetryAllowsPlacementHint(request.RoutingRetry, PlacementRetryImproveFanout)
 	routed := RouteExplicitCircuit(ctx, request, placed, routingOpts)
 	placed, routed, _ = maybeRetryExplicitPlacementRouting(ctx, request, placed, routed, routingOpts, request.RoutingRetry)
 	stages[placementStageIndex] = placed.Stage

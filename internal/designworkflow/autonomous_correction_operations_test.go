@@ -149,6 +149,31 @@ func TestAutonomousCorrectionPlacementAffectedNetsExpandsFromMovedPads(t *testin
 	}
 }
 
+func TestAutonomousCorrectionChangedRouteNetsExpandsToActualRerouteScope(t *testing.T) {
+	before := []transactions.Operation{
+		correctionRouteOperation(t, "ALPHA", 0, 2, 2, 8, 2),
+		correctionRouteOperation(t, "BETA", 1, 2, 4, 8, 4),
+	}
+	after := []transactions.Operation{
+		correctionRouteOperation(t, "ALPHA", 0, 2, 2, 8, 3),
+		before[1].Clone(),
+		correctionRouteOperation(t, "GAMMA", 2, 2, 6, 8, 6),
+	}
+	if got, want := autonomousCorrectionChangedRouteNets(before, after), []string{"ALPHA", "GAMMA"}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("changed route nets = %#v, want %#v", got, want)
+	}
+}
+
+func TestAutonomousCorrectionRouteScopeCoversEveryRequestedNet(t *testing.T) {
+	request := routing.Request{Nets: []routing.Net{{Name: "ALPHA"}, {Name: "BETA"}}}
+	if !autonomousCorrectionRouteScopeCoversRequest(request, []string{"BETA", "ALPHA"}) {
+		t.Fatal("complete route scope was not recognized")
+	}
+	if autonomousCorrectionRouteScopeCoversRequest(request, []string{"ALPHA"}) {
+		t.Fatal("partial route scope was recognized as complete")
+	}
+}
+
 func TestApplyAutonomousRoutingCorrectionPlanReroutesOnlyAffectedNets(t *testing.T) {
 	operations := []transactions.Operation{
 		correctionRouteOperation(t, "ALPHA", 0, 2, 10, 18, 10),

@@ -2341,6 +2341,16 @@ func renderAt(point kicadfiles.Point, rotation kicadfiles.Angle) sexpr.List {
 }
 
 func schematicFixed(value kicadfiles.IU) sexpr.Fixed {
+	// Eeschema stores schematic geometry at 0.0001 mm resolution.  Rendering
+	// finer coordinates lets KiCad silently round them on save and breaks strict
+	// zero-difference round trips even though the geometry is unchanged.
+	const schematicQuantum = kicadfiles.IU(100)
+	const halfQuantum = schematicQuantum / 2
+	if value > 0 {
+		value = (value + halfQuantum) / schematicQuantum * schematicQuantum
+	} else if value < 0 {
+		value = (value - halfQuantum) / schematicQuantum * schematicQuantum
+	}
 	if value == 0 {
 		return schematicZero
 	}

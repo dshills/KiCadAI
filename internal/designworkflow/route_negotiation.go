@@ -29,15 +29,27 @@ type routeNegotiationConflictSeed struct {
 	promoted []string
 }
 
+type routeNegotiationOptions struct {
+	YieldRepairableConflict bool
+}
+
 // routeWithFailedNetFirstNegotiation explores bounded, deterministic
 // single-net promotions. Expanding one observed failure at a time avoids
 // collapsing unrelated failed nets into one priority tier and permits a
 // temporary regression when it is the only route to a better ordering.
 func routeWithFailedNetFirstNegotiation(ctx context.Context, request routing.Request) (routing.Result, FinalRouteOrderNegotiationSummary) {
-	return routeWithFailedNetFirstNegotiationUsing(ctx, request, routing.RouteRequestContext)
+	return routeWithFailedNetFirstNegotiationOptions(ctx, request, routeNegotiationOptions{})
 }
 
 func routeWithFailedNetFirstNegotiationUsing(ctx context.Context, request routing.Request, route func(context.Context, routing.Request) routing.Result) (routing.Result, FinalRouteOrderNegotiationSummary) {
+	return routeWithFailedNetFirstNegotiationUsingOptions(ctx, request, route, routeNegotiationOptions{})
+}
+
+func routeWithFailedNetFirstNegotiationOptions(ctx context.Context, request routing.Request, opts routeNegotiationOptions) (routing.Result, FinalRouteOrderNegotiationSummary) {
+	return routeWithFailedNetFirstNegotiationUsingOptions(ctx, request, routing.RouteRequestContext, opts)
+}
+
+func routeWithFailedNetFirstNegotiationUsingOptions(ctx context.Context, request routing.Request, route func(context.Context, routing.Request) routing.Result, opts routeNegotiationOptions) (routing.Result, FinalRouteOrderNegotiationSummary) {
 	baseline := route(ctx, request)
 	baseSearchNodeLimit := normalizedRouteNegotiationSearchNodeLimit(request.Rules.MaxSearchNodes)
 	summary := FinalRouteOrderNegotiationSummary{
@@ -92,6 +104,10 @@ func routeWithFailedNetFirstNegotiationUsing(ctx context.Context, request routin
 		}
 		frontier = append(frontier, routeNegotiationState{request: seed.request, result: candidate, key: candidateKey})
 	}
+	if opts.YieldRepairableConflict && routingResultHasPlacementRepairEvidence(best) {
+		completeRouteNegotiationSummary(&summary, promoted, searchLimited, best)
+		return best, summary
+	}
 	for len(frontier) != 0 && summary.Attempts < explorationAttemptLimit {
 		if ctx != nil && ctx.Err() != nil {
 			break
@@ -142,6 +158,10 @@ func routeWithFailedNetFirstNegotiationUsing(ctx context.Context, request routin
 				frontier = nil
 				break
 			}
+			if opts.YieldRepairableConflict && routingResultHasPlacementRepairEvidence(best) {
+				completeRouteNegotiationSummary(&summary, promoted, searchLimited, best)
+				return best, summary
+			}
 			frontier = append(frontier, routeNegotiationState{request: candidateRequest, result: candidate, key: candidateKey})
 		}
 	}
@@ -174,13 +194,41 @@ func routeWithFailedNetFirstNegotiationUsing(ctx context.Context, request routin
 			break
 		}
 	}
+	completeRouteNegotiationSummary(&summary, promoted, searchLimited, best)
+	return best, summary
+}
+
+func routingResultHasPlacementRepairEvidence(result routing.Result) bool {
+	failed := map[string]struct{}{}
+	for _, route := range result.Routes {
+		if route.Status == routing.RouteStatusFailed {
+			failed[interBlockSummaryNetKey(route.Net)] = struct{}{}
+		}
+	}
+	if len(failed) != 1 {
+		return false
+	}
+	for _, issue := range result.Issues {
+		if issue.Code != reports.CodeRouteCopperConflict || !issue.Blocking() || len(issue.Refs) < 2 || len(issue.Nets) < 2 {
+			continue
+		}
+		for _, netName := range issue.Nets {
+			if _, ok := failed[interBlockSummaryNetKey(netName)]; ok {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func completeRouteNegotiationSummary(summary *FinalRouteOrderNegotiationSummary, promoted map[string]string, searchLimited map[string]string, best routing.Result) {
+	summary.PromotedNets = summary.PromotedNets[:0]
 	for _, netName := range promoted {
 		summary.PromotedNets = append(summary.PromotedNets, netName)
 	}
 	slices.Sort(summary.PromotedNets)
 	summary.SearchLimitedNets = sortedSearchLimitedNets(searchLimited)
 	summary.SelectedNetOrder = routeResultNetOrder(best)
-	return best, summary
 }
 
 func routingResultHasFailedSearchLimit(result routing.Result) bool {
