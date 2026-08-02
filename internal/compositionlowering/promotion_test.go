@@ -648,17 +648,17 @@ func TestPromotionCorpusOverlayReplacesOnlyDeclaredBaselineCase(t *testing.T) {
 	base := filepath.Join("..", "architecturesearch", "testdata", "simulation_grounded_closed_loop_corpus")
 	overlay := filepath.Join("..", "architecturesearch", "testdata", "control_behavior_corpus")
 	paths, expected, err := promotionCorpusPaths(base, overlay)
-	if err != nil || len(paths) != 10 || len(expected) != 2 {
+	if err != nil || len(paths) != 10 || len(expected) != 0 {
 		t.Fatalf("overlay paths=%#v expected=%#v err=%v", paths, expected, err)
 	}
 	for _, path := range paths {
 		switch filepath.Base(path) {
 		case "current_sense_protection.json":
-			if filepath.Dir(path) != overlay || expected[path].Code != architecturesearch.CodeControlInvalid {
+			if filepath.Dir(path) != overlay {
 				t.Fatalf("current-sense overlay = %q %#v", path, expected[path])
 			}
 		case "mixed_function_control_power.json":
-			if filepath.Dir(path) != overlay || expected[path].Code != architecturesearch.CodeControlInvalid {
+			if filepath.Dir(path) != overlay {
 				t.Fatalf("mixed-function overlay = %q %#v", path, expected[path])
 			}
 		}
@@ -715,6 +715,7 @@ type promotionExpectedRejection struct {
 type promotionOverlayManifest struct {
 	Fixtures []struct {
 		File             string `json:"file"`
+		ExpectedStatus   string `json:"expected_status"`
 		ExpectedCode     string `json:"expected_code"`
 		ExpectedPath     string `json:"expected_path"`
 		ExpectedMessage  string `json:"expected_message"`
@@ -754,7 +755,9 @@ func promotionCorpusPaths(corpusRoot string, overlayRoots ...string) ([]string, 
 			}
 			path := filepath.Join(root, fixture.File)
 			pathsByName[fixture.File] = path
-			expected[path] = promotionExpectedRejection{Code: reports.Code(fixture.ExpectedCode), Path: fixture.ExpectedPath, Message: fixture.ExpectedMessage}
+			if fixture.ExpectedStatus == "reject" || (fixture.ExpectedStatus == "" && fixture.ExpectedCode != "") {
+				expected[path] = promotionExpectedRejection{Code: reports.Code(fixture.ExpectedCode), Path: fixture.ExpectedPath, Message: fixture.ExpectedMessage}
+			}
 			applied++
 		}
 		if applied == 0 {

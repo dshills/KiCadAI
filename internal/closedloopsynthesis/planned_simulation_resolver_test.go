@@ -921,6 +921,44 @@ func TestCompileSimulationResolutionExecutesBoundedSourceAndLoadEvents(t *testin
 	}
 }
 
+func TestApplyPlannedVoltageEventUsesSemanticTargetPolarity(t *testing.T) {
+	for _, test := range []struct {
+		name     string
+		positive string
+		negative string
+		polarity float64
+	}{
+		{name: "positive terminal", positive: "OUT", negative: "GND", polarity: 1},
+		{name: "negative terminal", positive: "GND", negative: "OUT", polarity: -1},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			plan := simmodel.Plan{Devices: []simmodel.ResolvedDevice{{
+				Component: "source", PrimitiveModel: simmodel.PrimitiveVoltageSourceV1,
+				Terminals: []simmodel.TerminalBinding{{Terminal: "POSITIVE", Net: test.positive}, {Terminal: "NEGATIVE", Net: test.negative}},
+			}}}
+			analysis := simmodel.Analysis{
+				ID: "event", Kind: simmodel.AnalysisTransient, DurationS: .1, TimeStepS: .001,
+				Excitations: []simmodel.SourceExcitation{{Component: "source", DCValue: test.polarity}},
+			}
+			initial, recovered := 1.0, 3.0
+			event := PlannedEvent{
+				ID: "input_step", Kind: "input_step", Target: "OUT", TriggerTimeS: .01, DurationS: .02,
+				Initial: &initial, Applied: 2, Recovered: &recovered, Unit: "V",
+			}
+			applied, diagnostic := applyPlannedEvent(&analysis, plan, event, AnalysisPlan{}, []SimulationOperatingBinding{{
+				Axis: "input_amplitude", Target: "OUT", Kind: OperatingSourceDCValue, Component: "source",
+			}})
+			if diagnostic != nil || !applied || len(analysis.SourceValueEvents) != 1 {
+				t.Fatalf("voltage event result: applied=%t diagnostic=%#v analysis=%#v", applied, diagnostic, analysis)
+			}
+			got := analysis.SourceValueEvents[0]
+			if got.Initial != initial*test.polarity || got.Applied != 2*test.polarity || got.Recovered == nil || *got.Recovered != recovered*test.polarity {
+				t.Fatalf("source-oriented voltage event = %#v", got)
+			}
+		})
+	}
+}
+
 func TestApplyPlannedShortCircuitUsesResistanceEvent(t *testing.T) {
 	value := ShortCircuitHarnessOpenResistanceOhm
 	component := OperatingHarnessComponentID("short_circuit", "OUT")

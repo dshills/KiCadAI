@@ -157,17 +157,37 @@ func controlConstraintsForObjective(requirement Requirement, objective Objective
 		return nil
 	}
 	var constraints []Constraint
+	controlBindingCount := 0
+	for _, binding := range objective.Bindings {
+		if controlForBinding(requirement, binding) != nil {
+			controlBindingCount++
+		}
+	}
+	connectingControl := false
+	disconnectingControl := false
 	for _, binding := range objective.Bindings {
 		control := controlForBinding(requirement, binding)
 		if control == nil {
 			continue
 		}
+		role := canonicalIdentifier(binding.Role)
 		constraints = append(constraints,
-			equalStringConstraint("control_function", control.Function),
-			equalStringConstraint("control_polarity", control.Polarity),
-			equalStringConstraint("control_startup_state", control.StartupState),
-			equalStringConstraint("control_safe_state", control.SafeState),
+			equalStringConstraint(role+"_control_function", control.Function),
+			equalStringConstraint(role+"_control_polarity", control.Polarity),
+			equalStringConstraint(role+"_control_startup_state", control.StartupState),
+			equalStringConstraint(role+"_control_safe_state", control.SafeState),
 		)
+		if controlBindingCount == 1 {
+			// Preserve the legacy unscoped vocabulary only when it is
+			// unambiguous. Existing single-control providers consume these
+			// names; multi-control providers consume the role-scoped form.
+			constraints = append(constraints,
+				equalStringConstraint("control_function", control.Function),
+				equalStringConstraint("control_polarity", control.Polarity),
+				equalStringConstraint("control_startup_state", control.StartupState),
+				equalStringConstraint("control_safe_state", control.SafeState),
+			)
+		}
 		port, hasPort := requirementPort(requirement, binding.Port)
 		if binding.Direction == "source" || (hasPort && port.Direction == "source") {
 			constraints = append(constraints,
@@ -176,8 +196,23 @@ func controlConstraintsForObjective(requirement Requirement, objective Objective
 			)
 		}
 		if controlRole(binding.Role) && (binding.Direction == "sink" || binding.Port != "") {
-			constraints = append(constraints, equalStringConstraint("control_active_state", physicalControlAction(*control)))
+			constraints = append(constraints, equalStringConstraint(role+"_control_active_state", physicalControlAction(*control)))
+			if controlBindingCount == 1 {
+				constraints = append(constraints, equalStringConstraint("control_active_state", physicalControlAction(*control)))
+			}
 		}
+		switch control.Function {
+		case "enable", "power_good":
+			connectingControl = true
+		case "fault", "inhibit", "reset":
+			disconnectingControl = true
+		}
+	}
+	if connectingControl && disconnectingControl {
+		constraints = append(constraints,
+			Constraint{Name: "safety_dominance", Relation: "required", Value: json.RawMessage("true")},
+			Constraint{Name: "default_off", Relation: "required", Value: json.RawMessage("true")},
+		)
 	}
 	return constraints
 }
@@ -213,6 +248,13 @@ func physicalControlAction(control ControlSemantics) string {
 		return "high_disconnect"
 	}
 	return "low_disconnect"
+}
+
+func multiControlPermitState(connectingState, protectionState string) string {
+	if connectingState == "asserted" && protectionState == "deasserted" {
+		return "asserted"
+	}
+	return "deasserted"
 }
 
 func eventScopedDurationConstraint(requirement Requirement, behavior BehavioralRequirement) (Constraint, bool) {

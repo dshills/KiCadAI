@@ -235,6 +235,7 @@ type BehavioralRequirement struct {
 // timing/dependency envelope. It cannot name implementation objects.
 type ControlTransition struct {
 	ID            string                   `json:"id"`
+	Event         string                   `json:"event,omitempty"`
 	Target        Observation              `json:"target"`
 	Trigger       Observation              `json:"trigger"`
 	From          string                   `json:"from"`

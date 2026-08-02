@@ -104,6 +104,39 @@ func TestV6ControlSemanticsProjectGenericPolarityAndAction(t *testing.T) {
 	}
 }
 
+func TestV6MultiControlProjectionPreservesIndependentRolesAndDominance(t *testing.T) {
+	requirement := validControlRequirement("active_high", "rising")
+	requirement.Requirements.Ports = append(requirement.Requirements.Ports, Port{
+		ID: "enable", Kind: "digital_logic", Direction: "sink", Domain: "vcc",
+		Control: &ControlSemantics{Function: "enable", Polarity: "active_low", StartupState: "deasserted", SafeState: "deasserted"},
+	})
+	requirement.Requirements.Signals = append(requirement.Requirements.Signals, Signal{
+		ID: "permit", Kind: "digital_logic", Domain: "vcc",
+		Control: &ControlSemantics{Function: "enable", Polarity: "active_high", StartupState: "deasserted", SafeState: "deasserted"},
+	})
+	objective := Objective{ID: "coordinate", Capability: "safety_interlock", Bindings: []Binding{
+		{Role: "enable", Port: "enable"},
+		{Role: "fault", Port: "alert"},
+		{Role: "permit", Signal: "permit", Direction: "source"},
+	}}
+	constraints := controlConstraintsForObjective(requirement, objective)
+	for name, want := range map[string]string{
+		"enable_control_function": "enable", "enable_control_polarity": "active_low",
+		"fault_control_function": "fault", "fault_control_polarity": "active_high",
+		"permit_control_function": "enable", "permit_control_polarity": "active_high",
+	} {
+		if got := optionalConstraintString(constraints, name); got != want {
+			t.Fatalf("%s = %q, want %q; constraints=%#v", name, got, want, constraints)
+		}
+	}
+	if requireBool(constraints, "safety_dominance", "required", true) != nil || requireBool(constraints, "default_off", "required", true) != nil {
+		t.Fatalf("multi-control safety invariants missing: %#v", constraints)
+	}
+	if got := optionalConstraintString(constraints, "control_function"); got != "" {
+		t.Fatalf("ambiguous generic control function = %q", got)
+	}
+}
+
 func TestV6RejectsConnectedStartupAsDeenergizedProof(t *testing.T) {
 	requirement := validControlRequirement("active_high", "rising")
 	requirement.Requirements.Ports = append(requirement.Requirements.Ports, Port{ID: "load", Kind: "protected_output", Direction: "source", Domain: "vcc"})

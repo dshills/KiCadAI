@@ -789,6 +789,13 @@ func (provider *CatalogProvider) expandFaultIndication(ctx context.Context, requ
 }
 
 func (provider *CatalogProvider) expandSafetyInterlock(ctx context.Context, request ProviderRequest) ([]ProviderExpansion, error) {
+	if hasRoleContract(request.Ports, "enable") &&
+		hasRoleContract(request.Ports, "fault") &&
+		hasRoleContract(request.Ports, "permit") &&
+		hasRoleContract(request.Ports, "power") &&
+		hasRoleContract(request.Ports, "reference") {
+		return provider.expandEnableProtectionInterlock(ctx, request)
+	}
 	if hasRoleContract(request.Ports, "command") &&
 		hasRoleContract(request.Ports, "sense") &&
 		hasRoleContract(request.Ports, "control") &&
@@ -831,6 +838,251 @@ func (provider *CatalogProvider) expandSafetyInterlock(ctx context.Context, requ
 		semanticNet("interlock_reference", "reference", endpoint(first, "EMITTER"), endpoint(second, "EMITTER"), passiveEndpoint("fault_a_pulldown", "B"), passiveEndpoint("fault_b_pulldown", "B")),
 	}
 	return provider.expansion(request, "dual_fault_fail_safe_interlock", parts, bindings, connections, nil, 0)
+}
+
+func (provider *CatalogProvider) expandEnableProtectionInterlock(ctx context.Context, request ProviderRequest) ([]ProviderExpansion, error) {
+	connectingFunction := optionalConstraintString(request.Constraints, "enable_control_function")
+	protectionFunction := optionalConstraintString(request.Constraints, "fault_control_function")
+	permitFunction := optionalConstraintString(request.Constraints, "permit_control_function")
+	if !slices.Contains([]string{"enable", "power_good"}, connectingFunction) {
+		return nil, fmt.Errorf("multi-control interlock connecting input must be enable or power_good")
+	}
+	if !slices.Contains([]string{"fault", "inhibit", "reset"}, protectionFunction) {
+		return nil, fmt.Errorf("multi-control interlock protection input must be fault, inhibit, or reset")
+	}
+	if !slices.Contains([]string{"enable", "power_good"}, permitFunction) {
+		return nil, fmt.Errorf("multi-control interlock permit output must carry connecting semantics")
+	}
+	if err := requireBool(request.Constraints, "safety_dominance", "required", true); err != nil {
+		return nil, err
+	}
+	if err := requireBool(request.Constraints, "default_off", "required", true); err != nil {
+		return nil, err
+	}
+	for _, role := range []string{"enable", "fault", "permit"} {
+		if startup := optionalConstraintString(request.Constraints, role+"_control_startup_state"); startup != "deasserted" {
+			return nil, fmt.Errorf("multi-control interlock %s must start deasserted", role)
+		}
+	}
+	if safe := optionalConstraintString(request.Constraints, "fault_control_safe_state"); safe != "asserted" {
+		return nil, fmt.Errorf("multi-control interlock protection input must assert in its safe state")
+	}
+	if safe := optionalConstraintString(request.Constraints, "permit_control_safe_state"); safe != "deasserted" {
+		return nil, fmt.Errorf("multi-control interlock permit must deassert in its safe state")
+	}
+
+	enablePolarity := optionalConstraintString(request.Constraints, "enable_control_polarity")
+	faultPolarity := optionalConstraintString(request.Constraints, "fault_control_polarity")
+	permitPolarity := optionalConstraintString(request.Constraints, "permit_control_polarity")
+	for role, polarity := range map[string]string{"enable": enablePolarity, "fault": faultPolarity, "permit": permitPolarity} {
+		if polarity != "active_high" && polarity != "active_low" {
+			return nil, fmt.Errorf("multi-control interlock %s polarity is invalid", role)
+		}
+	}
+
+	supply := maximumPortVoltage(request.Ports)
+	transistor, err := provider.selectComponent(ctx, "bjt", "NPN", []components.RequiredRating{
+		{Kind: "collector_emitter_voltage", Value: numericString(supply), Unit: "V"},
+		{Kind: "collector_current", Value: "5", Unit: "mA"},
+	}, true)
+	if err != nil {
+		return nil, err
+	}
+	newTransistor := func(id, usage string) catalogPart {
+		part := transistor
+		part.selected.InstanceID = id
+		part.usage = usage
+		return part
+	}
+	if enablePolarity == "active_high" && faultPolarity == "active_high" && permitPolarity == "active_low" {
+		return provider.expandActiveLowEnableProtectionInterlock(ctx, request, transistor)
+	}
+	enableInverter := newTransistor("enable_inverter", "gate_control_inverter")
+	enableBlock := newTransistor("enable_block_clamp", "default_off")
+	faultClamp := newTransistor("fault_dominance_clamp", "fail_safe_fault_clamp")
+	parts := []catalogPart{enableInverter, enableBlock, faultClamp}
+	var enablePolarityStage, faultPolarityStage, permitPolarityStage catalogPart
+	if enablePolarity == "active_low" {
+		enablePolarityStage = newTransistor("enable_polarity_inverter", "gate_control_inverter")
+		parts = append(parts, enablePolarityStage)
+	}
+	if faultPolarity == "active_low" {
+		faultPolarityStage = newTransistor("fault_polarity_inverter", "gate_control_inverter")
+		parts = append(parts, faultPolarityStage)
+	}
+	if permitPolarity == "active_low" {
+		permitPolarityStage = newTransistor("permit_polarity_inverter", "active_high_output_buffer")
+		parts = append(parts, permitPolarityStage)
+	}
+
+	passives := []passivePart{
+		{"enable_input_resistor", "resistor", "drive_limit", "10k"},
+		{"enable_input_bias", "resistor", "default_state", "100k"},
+		{"enable_inverse_pullup", "resistor", "logic_pullup", "10k"},
+		{"enable_block_resistor", "resistor", "drive_limit", "10k"},
+		{"enable_block_pulldown", "resistor", "default_block", "100k"},
+		{"fault_input_resistor", "resistor", "drive_limit", "10k"},
+		{"fault_input_bias", "resistor", "default_state", "100k"},
+		{"permit_pullup", "resistor", "open_collector_pullup", "10k"},
+	}
+	if enablePolarity == "active_low" {
+		passives = append(passives,
+			passivePart{"enable_normalized_pullup", "resistor", "logic_pullup", "10k"},
+			passivePart{"enable_normalized_resistor", "resistor", "drive_limit", "10k"},
+			passivePart{"enable_normalized_pulldown", "resistor", "default_state", "100k"},
+		)
+	}
+	if faultPolarity == "active_low" {
+		passives = append(passives,
+			passivePart{"fault_normalized_pullup", "resistor", "logic_pullup", "10k"},
+			passivePart{"fault_normalized_resistor", "resistor", "drive_limit", "10k"},
+			passivePart{"fault_normalized_pulldown", "resistor", "default_state", "100k"},
+		)
+	}
+	if permitPolarity == "active_low" {
+		passives = append(passives,
+			passivePart{"permit_inverter_resistor", "resistor", "drive_limit", "10k"},
+			passivePart{"permit_inverter_pulldown", "resistor", "default_state", "100k"},
+			passivePart{"permit_output_pullup", "resistor", "open_collector_pullup", "10k"},
+		)
+	}
+	parts, err = provider.appendPassiveParts(ctx, parts, passives)
+	if err != nil {
+		return nil, err
+	}
+
+	bindings := bindRoles(request.Ports, enableInverter.selected.InstanceID, map[string]string{
+		"enable": "BASE", "fault": "BASE", "permit": "COLLECTOR", "power": "COLLECTOR", "reference": "EMITTER",
+	})
+	for index := range bindings {
+		switch bindings[index].Role {
+		case "enable":
+			bindings[index].Instance, bindings[index].Function = "enable_input_resistor", "A"
+		case "fault":
+			bindings[index].Instance, bindings[index].Function = "fault_input_resistor", "A"
+		case "permit":
+			if permitPolarity == "active_low" {
+				bindings[index].Instance, bindings[index].Function = "permit_output_pullup", "B"
+			} else {
+				bindings[index].Instance, bindings[index].Function = "permit_pullup", "B"
+			}
+		case "power":
+			bindings[index].Instance, bindings[index].Function = "permit_pullup", "A"
+		case "reference":
+			bindings[index].Instance, bindings[index].Function = enableInverter.selected.InstanceID, "EMITTER"
+		}
+	}
+
+	powerEndpoints := []RealizationEndpoint{
+		passiveEndpoint("enable_inverse_pullup", "A"),
+		passiveEndpoint("permit_pullup", "A"),
+	}
+	referenceEndpoints := []RealizationEndpoint{
+		endpoint(enableInverter, "EMITTER"), endpoint(enableBlock, "EMITTER"), endpoint(faultClamp, "EMITTER"),
+		passiveEndpoint("enable_block_pulldown", "B"),
+	}
+	connections := []RealizationConnection{
+		semanticNet("enable_inverse", "control", endpoint(enableInverter, "COLLECTOR"), passiveEndpoint("enable_inverse_pullup", "B"), passiveEndpoint("enable_block_resistor", "A")),
+		semanticNet("enable_block_drive", "control", passiveEndpoint("enable_block_resistor", "B"), endpoint(enableBlock, "BASE"), passiveEndpoint("enable_block_pulldown", "A")),
+	}
+	if enablePolarity == "active_high" {
+		connections = append(connections, semanticNet("enable_asserted", "control", passiveEndpoint("enable_input_resistor", "B"), endpoint(enableInverter, "BASE"), passiveEndpoint("enable_input_bias", "A")))
+		referenceEndpoints = append(referenceEndpoints, passiveEndpoint("enable_input_bias", "B"))
+	} else {
+		connections = append(connections,
+			semanticNet("enable_raw", "control", passiveEndpoint("enable_input_resistor", "A"), passiveEndpoint("enable_input_bias", "B")),
+			semanticNet("enable_polarity_drive", "control", passiveEndpoint("enable_input_resistor", "B"), endpoint(enablePolarityStage, "BASE")),
+			semanticNet("enable_asserted", "control", endpoint(enablePolarityStage, "COLLECTOR"), passiveEndpoint("enable_normalized_pullup", "B"), passiveEndpoint("enable_normalized_resistor", "A")),
+			semanticNet("enable_normalized_drive", "control", passiveEndpoint("enable_normalized_resistor", "B"), endpoint(enableInverter, "BASE"), passiveEndpoint("enable_normalized_pulldown", "A")),
+		)
+		powerEndpoints = append(powerEndpoints, passiveEndpoint("enable_input_bias", "A"), passiveEndpoint("enable_normalized_pullup", "A"))
+		referenceEndpoints = append(referenceEndpoints, endpoint(enablePolarityStage, "EMITTER"), passiveEndpoint("enable_normalized_pulldown", "B"))
+	}
+	if faultPolarity == "active_high" {
+		connections = append(connections, semanticNet("fault_asserted", "control", passiveEndpoint("fault_input_resistor", "B"), endpoint(faultClamp, "BASE"), passiveEndpoint("fault_input_bias", "A")))
+		referenceEndpoints = append(referenceEndpoints, passiveEndpoint("fault_input_bias", "B"))
+	} else {
+		connections = append(connections,
+			semanticNet("fault_raw", "control", passiveEndpoint("fault_input_resistor", "A"), passiveEndpoint("fault_input_bias", "B")),
+			semanticNet("fault_polarity_drive", "control", passiveEndpoint("fault_input_resistor", "B"), endpoint(faultPolarityStage, "BASE")),
+			semanticNet("fault_asserted", "control", endpoint(faultPolarityStage, "COLLECTOR"), passiveEndpoint("fault_normalized_pullup", "B"), passiveEndpoint("fault_normalized_resistor", "A")),
+			semanticNet("fault_normalized_drive", "control", passiveEndpoint("fault_normalized_resistor", "B"), endpoint(faultClamp, "BASE"), passiveEndpoint("fault_normalized_pulldown", "A")),
+		)
+		powerEndpoints = append(powerEndpoints, passiveEndpoint("fault_input_bias", "A"), passiveEndpoint("fault_normalized_pullup", "A"))
+		referenceEndpoints = append(referenceEndpoints, endpoint(faultPolarityStage, "EMITTER"), passiveEndpoint("fault_normalized_pulldown", "B"))
+	}
+	permitInternal := semanticNet("permit_internal", "control", endpoint(enableBlock, "COLLECTOR"), endpoint(faultClamp, "COLLECTOR"), passiveEndpoint("permit_pullup", "B"))
+	if permitPolarity == "active_low" {
+		permitInternal.Endpoints = append(permitInternal.Endpoints, passiveEndpoint("permit_inverter_resistor", "A"))
+		connections = append(connections,
+			permitInternal,
+			semanticNet("permit_inverter_drive", "control", passiveEndpoint("permit_inverter_resistor", "B"), endpoint(permitPolarityStage, "BASE"), passiveEndpoint("permit_inverter_pulldown", "A")),
+			semanticNet("permit_output", "control", endpoint(permitPolarityStage, "COLLECTOR"), passiveEndpoint("permit_output_pullup", "B")),
+		)
+		powerEndpoints = append(powerEndpoints, passiveEndpoint("permit_output_pullup", "A"))
+		referenceEndpoints = append(referenceEndpoints, endpoint(permitPolarityStage, "EMITTER"), passiveEndpoint("permit_inverter_pulldown", "B"))
+	} else {
+		connections = append(connections, permitInternal)
+	}
+	connections = append(connections,
+		RealizationConnection{ID: "interlock_power", Role: "power", Endpoints: powerEndpoints},
+		RealizationConnection{ID: "interlock_reference", Role: "reference", Endpoints: referenceEndpoints},
+	)
+	repairs := []RealizationRepairVariable{{
+		ID: "permit_pullup_resistance", Kind: "bias", Instance: "permit_pullup",
+		Value: 10_000, AllowedValues: preferredRepairValues(10_000), Unit: "Ohm",
+		Effects: []RealizationRepairEffect{{Analysis: "transient", Metric: "response_time", Direction: "metric_increases"}},
+	}}
+	return provider.expansionWithRepairs(request, "enable_protection_dominant_interlock", parts, bindings, retainSemanticNets(connections), nil, repairs, 0)
+}
+
+func (provider *CatalogProvider) expandActiveLowEnableProtectionInterlock(ctx context.Context, request ProviderRequest, transistor catalogPart) ([]ProviderExpansion, error) {
+	enableSink := transistor
+	enableSink.selected.InstanceID = "permit_sink"
+	enableSink.usage = "fail_safe_enable"
+	faultClamp, err := provider.selectComponent(ctx, "mosfet", "low_voltage_gate_drive", []components.RequiredRating{
+		{Kind: "drain_source_voltage", Value: numericString(maximumPortVoltage(request.Ports)), Unit: "V"},
+	}, true)
+	if err != nil {
+		return nil, err
+	}
+	faultClamp.selected.InstanceID = "fault_dominance_clamp"
+	faultClamp.usage = "fail_safe_fault_clamp"
+	parts, err := provider.appendPassiveParts(ctx, []catalogPart{enableSink, faultClamp}, []passivePart{
+		{"enable_input_resistor", "resistor", "drive_limit", "10k"},
+		{"permit_pullup", "resistor", "open_collector_pullup", "10k"},
+	})
+	if err != nil {
+		return nil, err
+	}
+	bindings := bindRoles(request.Ports, enableSink.selected.InstanceID, map[string]string{
+		"enable": "BASE", "fault": "BASE", "permit": "COLLECTOR", "power": "COLLECTOR", "reference": "EMITTER",
+	})
+	for index := range bindings {
+		switch bindings[index].Role {
+		case "enable":
+			bindings[index].Instance, bindings[index].Function = "enable_input_resistor", "A"
+		case "fault":
+			bindings[index].Instance, bindings[index].Function = faultClamp.selected.InstanceID, "GATE"
+		case "permit":
+			bindings[index].Instance, bindings[index].Function = "permit_pullup", "B"
+		case "power":
+			bindings[index].Instance, bindings[index].Function = "permit_pullup", "A"
+		case "reference":
+			bindings[index].Instance, bindings[index].Function = enableSink.selected.InstanceID, "EMITTER"
+		}
+	}
+	connections := []RealizationConnection{
+		semanticNet("enable_drive", "control", passiveEndpoint("enable_input_resistor", "B"), endpoint(enableSink, "BASE"), endpoint(faultClamp, "DRAIN")),
+		semanticNet("permit_output", "control", endpoint(enableSink, "COLLECTOR"), passiveEndpoint("permit_pullup", "B")),
+		semanticNet("interlock_reference", "reference", endpoint(enableSink, "EMITTER"), endpoint(faultClamp, "SOURCE")),
+	}
+	repairs := []RealizationRepairVariable{{
+		ID: "permit_pullup_resistance", Kind: "bias", Instance: "permit_pullup",
+		Value: 10_000, AllowedValues: preferredRepairValues(10_000), Unit: "Ohm",
+		Effects: []RealizationRepairEffect{{Analysis: "transient", Metric: "response_time", Direction: "metric_increases"}},
+	}}
+	return provider.expansionWithRepairs(request, "enable_protection_dominant_interlock", parts, bindings, retainSemanticNets(connections), nil, repairs, 0)
 }
 
 func (provider *CatalogProvider) expandCurrentLimitSafetyInterlock(ctx context.Context, request ProviderRequest) ([]ProviderExpansion, error) {

@@ -38,6 +38,7 @@ func Validate(requirement Requirement) []reports.Issue {
 	validator.signals()
 	validator.participants()
 	validator.objectives()
+	validator.multiControlSafetyObjectives()
 	validator.constraints("requirements.system_constraints", requirement.Requirements.SystemConstraints)
 	validator.operatingCases()
 	validator.controlTransitions()
@@ -55,6 +56,61 @@ func Validate(requirement Requirement) []reports.Issue {
 		return strings.Compare(left.Message, right.Message)
 	})
 	return validator.issues
+}
+
+func (validator *requirementValidator) multiControlSafetyObjectives() {
+	if validator.requirement.Version != VersionV6 {
+		return
+	}
+	for objectiveIndex, objective := range validator.requirement.Requirements.Objectives {
+		if objective.Capability != "safety_interlock" {
+			continue
+		}
+		path := fmt.Sprintf("requirements.objectives[%d]", objectiveIndex)
+		connectingInputs := 0
+		disconnectingInputs := 0
+		permitOutputs := 0
+		for _, binding := range objective.Bindings {
+			control := controlForBinding(validator.requirement, binding)
+			if control == nil {
+				continue
+			}
+			source := binding.Direction == "source"
+			if binding.Port != "" {
+				if port, exists := validator.portsByID[binding.Port]; exists && port.Direction == "source" {
+					source = true
+				}
+			}
+			if source {
+				if control.Function == "enable" || control.Function == "power_good" {
+					permitOutputs++
+					if control.StartupState != "deasserted" || control.SafeState != "deasserted" {
+						validator.add(CodeControlInvalid, path, "multi-control permit output must be deasserted at startup and in its safe state")
+					}
+				}
+				continue
+			}
+			switch control.Function {
+			case "enable", "power_good":
+				connectingInputs++
+				if control.StartupState != "deasserted" {
+					validator.add(CodeControlInvalid, path, "multi-control connecting input must start deasserted")
+				}
+			case "fault", "inhibit", "reset":
+				disconnectingInputs++
+				if control.SafeState != "asserted" {
+					validator.add(CodeControlInvalid, path, "multi-control protection input must assert in its safe state")
+				}
+			}
+		}
+		// The catalog coordinator has one connecting input and one permit
+		// output, with one or more protection inputs. Reject broader graphs at
+		// the semantic boundary instead of accepting a contract the provider
+		// cannot lower deterministically.
+		if connectingInputs != 1 || disconnectingInputs < 1 || permitOutputs != 1 {
+			validator.add(CodeControlInvalid, path, "multi-control safety interlock requires one connecting input, at least one protection input, and one deasserted-safe permit output")
+		}
+	}
 }
 
 // controlStartupCoherence rejects a low-at-startup proof claim when the only
@@ -448,14 +504,14 @@ func (validator *requirementValidator) operatingCases() {
 			seenConditions[key] = true
 			validator.operatingCondition(conditionPath, condition)
 		}
-		if !supportsDynamicVerification(validator.requirement.Version) {
+		if !supportsOperatingEvents(validator.requirement.Version) {
 			if len(operatingCase.Events) != 0 {
-				validator.add(CodeSchemaInvalid, path+".events", "operating events require the v5 schema")
+				validator.add(CodeSchemaInvalid, path+".events", "operating events require the v5 or v6 schema")
 			}
 			continue
 		}
 		validator.limit(path+".events", len(operatingCase.Events), MaxCaseEvents)
-		if len(operatingCase.Events) == 0 {
+		if validator.requirement.Version == VersionV5 && len(operatingCase.Events) == 0 {
 			validator.add(CodeOperatingEventInvalid, path+".events", "v5 operating case requires at least one event")
 		}
 		for eventIndex, event := range operatingCase.Events {
@@ -542,6 +598,11 @@ func (validator *requirementValidator) controlTransitions() {
 		} else {
 			validator.transitionsByID[transition.ID] = transition
 			validator.transitionPaths[transition.ID] = path
+		}
+		if transition.Event != "" {
+			if _, exists := validator.eventsByID[transition.Event]; !exists {
+				validator.add(CodeBindingUnresolved, path+".event", "control transition references an unknown operating event")
+			}
 		}
 		validator.behaviorObservation(path+".target", transition.Target)
 		validator.behaviorObservation(path+".trigger", transition.Trigger)
@@ -747,6 +808,10 @@ func (validator *requirementValidator) behavioralRequirements() {
 			validator.add(CodeBehaviorInvalid, path+".operating_cases", "behavioral requirement must name at least one operating case")
 		}
 		seenCases := map[string]bool{}
+		transitionEvent := ""
+		if transition, exists := validator.transitionsByID[behavior.Transition]; exists {
+			transitionEvent = transition.Event
+		}
 		for caseIndex, caseID := range behavior.OperatingCases {
 			casePath := fmt.Sprintf("%s.operating_cases[%d]", path, caseIndex)
 			if !validSemanticID(caseID) || !cases[caseID] {
@@ -755,6 +820,8 @@ func (validator *requirementValidator) behavioralRequirements() {
 				validator.add(CodeIdentityDuplicate, casePath, "behavioral operating case is duplicated")
 			} else if behavior.Observation.Kind == "event" && validator.eventsByID[behavior.Observation.ID] != caseID {
 				validator.add(CodeBindingUnresolved, casePath, "event observation must be evaluated in the operating case that declares the event")
+			} else if transitionEvent != "" && validator.eventsByID[transitionEvent] != caseID {
+				validator.add(CodeBindingUnresolved, casePath, "control transition must be evaluated in the operating case that declares its event")
 			}
 			seenCases[caseID] = true
 		}
@@ -787,8 +854,8 @@ func (validator *requirementValidator) behaviorObservation(path string, observat
 			validator.add(CodeBehaviorInvalid, path+".id", "whole-circuit observation id must be circuit")
 		}
 	case "event":
-		if !supportsDynamicVerification(validator.requirement.Version) {
-			validator.add(CodeBehaviorInvalid, path+".kind", "event observations require the v5 schema")
+		if !supportsOperatingEvents(validator.requirement.Version) {
+			validator.add(CodeBehaviorInvalid, path+".kind", "event observations require the v5 or v6 schema")
 		} else if _, exists := validator.eventsByID[observation.ID]; !exists {
 			validator.add(CodeBindingUnresolved, path+".id", "behavior observation references an unknown event")
 		}
@@ -1134,6 +1201,10 @@ func supportsBehavioralVerification(version int) bool {
 
 func supportsDynamicVerification(version int) bool {
 	return version == VersionV5
+}
+
+func supportsOperatingEvents(version int) bool {
+	return version == VersionV5 || version == VersionV6
 }
 
 func validConstraintScalar(value any) bool {

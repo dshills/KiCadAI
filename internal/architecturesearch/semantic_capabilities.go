@@ -221,7 +221,7 @@ func behavioralMetricContract(metric string) (analysis, unit string, ok bool) {
 
 func behavioralMetricContractForVersion(metric string, version int) (analysis, unit string, ok bool) {
 	analysis, unit, ok = behavioralMetricContract(metric)
-	if ok || version != VersionV5 {
+	if ok || (version != VersionV5 && version != VersionV6) {
 		return analysis, unit, ok
 	}
 	index, found := slices.BinarySearchFunc(registeredDynamicBehavioralMetrics, metric, func(capability BehavioralMetricCapability, target string) int {

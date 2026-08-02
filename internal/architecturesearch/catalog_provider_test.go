@@ -723,6 +723,31 @@ func TestCatalogProviderUsesDefaultOffHighSideSwitchForLowStartupOutput(t *testi
 	}
 }
 
+func TestCatalogProviderHighSideSwitchRealizesIndependentLogicPower(t *testing.T) {
+	provider, err := NewCatalogProvider(loadArchitectureCatalog(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	request := loadSwitchProviderRequest(28, 2)
+	request.Constraints = append(request.Constraints, constraintNumber("startup_output_voltage", "maximum", .5, "V", 0))
+	expansions, err := provider.Expand(context.Background(), request)
+	if err != nil || len(expansions) == 0 {
+		t.Fatalf("logic-powered high-side expansions=%d err=%v", len(expansions), err)
+	}
+	realization, err := DecodeFragmentRealization(expansions[0].Payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.ContainsFunc(realization.PortBindings, func(binding RealizationPortBinding) bool {
+		return binding.Role == "logic_power" && binding.Instance == "logic_bypass" && binding.Function == "A"
+	}) {
+		t.Fatalf("logic-power binding = %#v", realization.PortBindings)
+	}
+	if !slices.ContainsFunc(realization.Instances, func(instance RealizationInstance) bool { return instance.ID == "logic_bypass" }) {
+		t.Fatalf("logic-powered high-side topology lacks local bypass: %#v", realization.Instances)
+	}
+}
+
 func TestCatalogProviderSynthesizesBoundedActiveHighDisconnectInversion(t *testing.T) {
 	provider, err := NewCatalogProvider(loadArchitectureCatalog(t))
 	if err != nil {
@@ -744,6 +769,14 @@ func TestCatalogProviderSynthesizesBoundedActiveHighDisconnectInversion(t *testi
 	}
 	if !slices.ContainsFunc(realization.Instances, func(instance RealizationInstance) bool { return instance.ID == "control_inverter" }) {
 		t.Fatalf("semantic high-disconnect path lacks control inverter: %#v", realization.Instances)
+	}
+	if !slices.ContainsFunc(realization.PortBindings, func(binding RealizationPortBinding) bool {
+		return binding.Role == "logic_power" && binding.Instance == "control_inverter_pullup" && binding.Function == "A"
+	}) {
+		t.Fatalf("semantic high-disconnect logic power binding = %#v", realization.PortBindings)
+	}
+	if !slices.ContainsFunc(realization.Instances, func(instance RealizationInstance) bool { return instance.ID == "logic_bypass" }) {
+		t.Fatalf("semantic high-disconnect path lacks local logic bypass: %#v", realization.Instances)
 	}
 	if !slices.ContainsFunc(realization.RepairVariables, func(variable RealizationRepairVariable) bool {
 		return variable.ID == "high_side_control_bias_resistance" && variable.Instance == "control_inverter_base" && len(variable.AllowedValues) >= 2
@@ -2993,6 +3026,94 @@ func TestCatalogProviderRealizesCurrentLimitCommandInterlockRoles(t *testing.T) 
 		!latchNets["interlock_fault_output\x00A"] ||
 		!latchNets["interlock_sense_threshold\x00B"] {
 		t.Fatalf("interlock fault latch is incomplete: instances=%#v connections=%#v", realization.Instances, realization.Connections)
+	}
+}
+
+func TestCatalogProviderRealizesPolarityNormalizedProtectionDominantPermit(t *testing.T) {
+	provider, err := NewCatalogProvider(loadArchitectureCatalog(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, test := range []struct {
+		name           string
+		enablePolarity string
+		faultPolarity  string
+		permitPolarity string
+	}{
+		{name: "all_active_high", enablePolarity: "active_high", faultPolarity: "active_high", permitPolarity: "active_high"},
+		{name: "active_low_enable", enablePolarity: "active_low", faultPolarity: "active_high", permitPolarity: "active_high"},
+		{name: "active_low_fault", enablePolarity: "active_high", faultPolarity: "active_low", permitPolarity: "active_high"},
+		{name: "active_low_output", enablePolarity: "active_high", faultPolarity: "active_high", permitPolarity: "active_low"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			request := ProviderRequest{Capability: "safety_interlock", Ports: []RoleContract{
+				providerRole("enable", "digital_logic", "sink", 0, 5.5),
+				providerRole("fault", "digital_logic", "sink", 0, 5.5),
+				providerRole("permit", "digital_logic", "source", 0, 5.5),
+				providerRole("power", "power", "sink", 4.5, 5.5),
+				providerRole("reference", "reference", "bidirectional", 0, 0),
+			}, Constraints: []Constraint{
+				stringConstraint("enable_control_function", "equal", "enable"),
+				stringConstraint("enable_control_polarity", "equal", test.enablePolarity),
+				stringConstraint("enable_control_startup_state", "equal", "deasserted"),
+				stringConstraint("fault_control_function", "equal", "fault"),
+				stringConstraint("fault_control_polarity", "equal", test.faultPolarity),
+				stringConstraint("fault_control_startup_state", "equal", "deasserted"),
+				stringConstraint("fault_control_safe_state", "equal", "asserted"),
+				stringConstraint("permit_control_function", "equal", "enable"),
+				stringConstraint("permit_control_polarity", "equal", test.permitPolarity),
+				stringConstraint("permit_control_startup_state", "equal", "deasserted"),
+				stringConstraint("permit_control_safe_state", "equal", "deasserted"),
+				boolConstraint("safety_dominance", "required"),
+				boolConstraint("default_off", "required"),
+			}}
+			expansions, err := provider.Expand(context.Background(), request)
+			if err != nil || len(expansions) == 0 {
+				t.Fatalf("expansions=%d err=%v", len(expansions), err)
+			}
+			if expansions[0].ID != "enable_protection_dominant_interlock" {
+				t.Fatalf("expansion id = %q", expansions[0].ID)
+			}
+			realization, err := DecodeFragmentRealization(expansions[0].Payload)
+			if err != nil {
+				t.Fatal(err)
+			}
+			roles := map[string]bool{}
+			for _, binding := range realization.PortBindings {
+				roles[binding.Role] = true
+			}
+			for _, role := range []string{"enable", "fault", "permit", "power", "reference"} {
+				if !roles[role] {
+					t.Fatalf("missing role %s: %#v", role, realization.PortBindings)
+				}
+			}
+			instances := map[string]bool{}
+			for _, instance := range realization.Instances {
+				instances[instance.ID] = true
+			}
+			requiredInstances := []string{"enable_inverter", "enable_block_clamp", "fault_dominance_clamp", "permit_pullup"}
+			if test.enablePolarity == "active_high" && test.faultPolarity == "active_high" && test.permitPolarity == "active_low" {
+				requiredInstances = []string{"permit_sink", "fault_dominance_clamp", "permit_pullup"}
+			}
+			for _, required := range requiredInstances {
+				if !instances[required] {
+					t.Fatalf("missing dominance instance %s", required)
+				}
+			}
+			if got := instances["enable_polarity_inverter"]; got != (test.enablePolarity == "active_low") {
+				t.Fatalf("enable normalization present=%t", got)
+			}
+			if got := instances["fault_polarity_inverter"]; got != (test.faultPolarity == "active_low") {
+				t.Fatalf("fault normalization present=%t", got)
+			}
+			wantPermitInverter := test.permitPolarity == "active_low" && !(test.enablePolarity == "active_high" && test.faultPolarity == "active_high")
+			if got := instances["permit_polarity_inverter"]; got != wantPermitInverter {
+				t.Fatalf("permit normalization present=%t", got)
+			}
+			if len(realization.RepairVariables) != 1 || realization.RepairVariables[0].Instance != "permit_pullup" {
+				t.Fatalf("repair variables = %#v", realization.RepairVariables)
+			}
+		})
 	}
 }
 

@@ -983,6 +983,12 @@ func schematicRouteLabelFallbackPoint(result schematiclayout.Result, netName str
 	if len(points) < 2 {
 		return nil
 	}
+	netWireIndexes := make([]int, 0, len(result.Wires))
+	for index := range result.Wires {
+		if result.Wires[index].NetName == netName {
+			netWireIndexes = append(netWireIndexes, index)
+		}
+	}
 	type candidate struct {
 		point  kicadfiles.Point
 		length kicadfiles.IU
@@ -1018,18 +1024,78 @@ func schematicRouteLabelFallbackPoint(result schematiclayout.Result, netName str
 		}
 		return candidates[i].index < candidates[j].index
 	})
-	for _, candidate := range candidates {
+	for candidateIndex := range candidates {
+		candidate := &candidates[candidateIndex]
 		contacts := 0
-		for _, wire := range result.Wires {
-			if wire.NetName == netName && schematicPointOnSegment(candidate.point, wire.From, wire.To) {
+		for _, wireIndex := range netWireIndexes {
+			wire := result.Wires[wireIndex]
+			if schematicPointOnSegment(candidate.point, wire.From, wire.To) {
 				contacts++
 			}
 		}
 		if contacts == 1 && schematicRouteLabelPointClear(result, netName, candidate.point) {
-			return transactionPoint(&candidate.point)
+			return transactionPoint(&candidates[candidateIndex].point)
 		}
 	}
+	// A dense route can have every segment midpoint occupied by component or
+	// text geometry while still exposing a clear orthogonal bend. Preserve the
+	// midpoint preference for readability, then use a deterministic interior
+	// vertex so a direct-only net retains one explicit KiCad net anchor.
+	type vertexCandidate struct {
+		point kicadfiles.Point
+		span  kicadfiles.IU
+		index int
+	}
+	vertices := make([]vertexCandidate, 0, len(points)-2)
+	for index := 1; index < len(points)-1; index++ {
+		previous := points[index-1]
+		point := points[index]
+		next := points[index+1]
+		span := schematicManhattanDistance(previous, point) + schematicManhattanDistance(point, next)
+		vertices = append(vertices, vertexCandidate{point: point, span: span, index: index})
+	}
+	sort.SliceStable(vertices, func(i, j int) bool {
+		if vertices[i].span != vertices[j].span {
+			return vertices[i].span > vertices[j].span
+		}
+		return vertices[i].index < vertices[j].index
+	})
+	for candidateIndex := range vertices {
+		candidate := &vertices[candidateIndex]
+		contact := false
+		for _, wireIndex := range netWireIndexes {
+			wire := result.Wires[wireIndex]
+			if schematicPointOnSegment(candidate.point, wire.From, wire.To) {
+				contact = true
+				break
+			}
+		}
+		if contact && schematicRouteLabelPointClear(result, netName, candidate.point) {
+			return transactionPoint(&vertices[candidateIndex].point)
+		}
+	}
+	if len(vertices) != 0 {
+		// KiCad 10 treats a completely label-free routed island as dangling in
+		// ERC even when every wire endpoint is geometrically coincident with a
+		// pin. A congested route may offer no text-clear point, so retain the
+		// most-connected deterministic bend as the final electrical anchor.
+		// This is preferable to silently replacing the visible conductor with
+		// disconnected endpoint labels.
+		return transactionPoint(&vertices[0].point)
+	}
 	return nil
+}
+
+func schematicManhattanDistance(first, second kicadfiles.Point) kicadfiles.IU {
+	dx := first.X - second.X
+	if dx < 0 {
+		dx = -dx
+	}
+	dy := first.Y - second.Y
+	if dy < 0 {
+		dy = -dy
+	}
+	return dx + dy
 }
 
 func schematicRouteLabelPointClear(result schematiclayout.Result, netName string, point kicadfiles.Point) bool {

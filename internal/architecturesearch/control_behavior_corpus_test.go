@@ -17,16 +17,25 @@ type controlBehaviorManifest struct {
 	FrozenAt             string                       `json:"frozen_at"`
 	Fixtures             []controlBehaviorFixture     `json:"fixtures"`
 	IdentityNeutralCases []identityNeutralControlCase `json:"identity_neutral_cases"`
+	MultiControlCases    []multiControlCase           `json:"multi_control_cases"`
 }
 
 type controlBehaviorFixture struct {
 	ID               string `json:"id"`
 	File             string `json:"file"`
 	SHA256           string `json:"sha256"`
+	ExpectedStatus   string `json:"expected_status"`
 	ExpectedCode     string `json:"expected_code"`
 	ExpectedPath     string `json:"expected_path"`
 	ExpectedMessage  string `json:"expected_message"`
 	PromotionOverlay bool   `json:"promotion_overlay,omitempty"`
+}
+
+type multiControlCase struct {
+	ID              string `json:"id"`
+	ConnectingState string `json:"connecting_state"`
+	ProtectionState string `json:"protection_state"`
+	PermitState     string `json:"permit_state"`
 }
 
 type identityNeutralControlCase struct {
@@ -55,7 +64,7 @@ func TestFrozenControlBehaviorCorpus(t *testing.T) {
 	if err := decoder.Decode(&manifest); err != nil {
 		t.Fatal(err)
 	}
-	if manifest.Schema != "kicadai.control-behavior-corpus.v1" || manifest.Version != 1 || len(manifest.Fixtures) != 2 || len(manifest.IdentityNeutralCases) != 6 {
+	if manifest.Schema != "kicadai.control-behavior-corpus.v2" || manifest.Version != 2 || len(manifest.Fixtures) != 2 || len(manifest.IdentityNeutralCases) != 6 || len(manifest.MultiControlCases) != 4 {
 		t.Fatalf("manifest identity or coverage = %#v", manifest)
 	}
 	for _, fixture := range manifest.Fixtures {
@@ -71,14 +80,23 @@ func TestFrozenControlBehaviorCorpus(t *testing.T) {
 		if requirement.Schema != SchemaIDV6 || requirement.Version != VersionV6 || requirement.Project.Name != fixture.ID {
 			t.Fatalf("%s requirement = %#v issues=%#v", fixture.ID, requirement, issues)
 		}
-		matched := false
-		for _, issue := range issues {
-			if string(issue.Code) == fixture.ExpectedCode && issue.Path == fixture.ExpectedPath && issue.Message == fixture.ExpectedMessage {
-				matched = true
+		switch fixture.ExpectedStatus {
+		case "pass":
+			if len(issues) != 0 {
+				t.Fatalf("%s validation issues = %#v", fixture.ID, issues)
 			}
-		}
-		if !matched || len(issues) != 1 {
-			t.Fatalf("%s precise rejection issues = %#v", fixture.ID, issues)
+		case "reject":
+			matched := false
+			for _, issue := range issues {
+				if string(issue.Code) == fixture.ExpectedCode && issue.Path == fixture.ExpectedPath && issue.Message == fixture.ExpectedMessage {
+					matched = true
+				}
+			}
+			if !matched || len(issues) != 1 {
+				t.Fatalf("%s precise rejection issues = %#v", fixture.ID, issues)
+			}
+		default:
+			t.Fatalf("%s unknown expected_status %q", fixture.ID, fixture.ExpectedStatus)
 		}
 		first := Normalize(requirement)
 		second := Normalize(first)
@@ -96,6 +114,11 @@ func TestFrozenControlBehaviorCorpus(t *testing.T) {
 		}
 		if test.DependencyState != "" && (test.DependencyState != "valid" || test.StableForS <= 0) {
 			t.Errorf("%s sequencing dependency is not bounded", test.ID)
+		}
+	}
+	for _, test := range manifest.MultiControlCases {
+		if got := multiControlPermitState(test.ConnectingState, test.ProtectionState); got != test.PermitState {
+			t.Errorf("%s permit state = %s, want %s", test.ID, got, test.PermitState)
 		}
 	}
 }

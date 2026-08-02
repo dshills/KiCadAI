@@ -209,28 +209,9 @@ func (resolver *Resolver) Synthesize(ctx context.Context, document Document) (Do
 		if domain.Source != PowerDomainExternal {
 			continue
 		}
-		connectionFound := false
-		physicalSourceFound := false
-		for _, connection := range intent.Connections {
-			if connection.VoltageDomain != domain.Name || !validPowerFlagNetRole(connection.Role) {
-				continue
-			}
-			connectionFound = true
-			if connectionHasInternalPowerOutput(connection, selectedByIntent) {
-				physicalSourceFound = true
-				break
-			}
-			for _, endpoint := range connection.Endpoints {
-				if endpoint.Interface != "" {
-					physicalSourceFound = true
-				} else if role := functionRoles[endpoint.Function]; role == RoleConnector || role == RoleInputConnector {
-					physicalSourceFound = true
-				}
-			}
-			if physicalSourceFound {
-				lowered.PowerFlags = append(lowered.PowerFlags, PowerFlag{Net: connection.Name})
-			}
-			break
+		flagNet, connectionFound, physicalSourceFound := externalPowerDomainFlagNet(domain.Name, intent.Connections, selectedByIntent, functionRoles)
+		if flagNet != "" {
+			lowered.PowerFlags = append(lowered.PowerFlags, PowerFlag{Net: flagNet})
 		}
 		if !connectionFound || !physicalSourceFound {
 			issues = append(issues, synthesisIssue(CodeSynthesisPowerDomainInvalid, "synthesis.power_domains."+domain.Name, "external power domain has no connected external interface signal", "connect the domain to one named external interface signal"))
@@ -242,6 +223,7 @@ func (resolver *Resolver) Synthesize(ctx context.Context, document Document) (Do
 	issues = append(issues, applySensorFunctionPolicies(&lowered, intent, selectedByIntent, connected)...)
 	issues = append(issues, resolver.expandCompanionRecipes(ctx, &lowered, intent, selectedByIntent, connected, &report)...)
 	issues = append(issues, applyCatalogNoConnectPolicies(&lowered, selectedByIntent, connected)...)
+	ensureExternalConnectorPowerFlags(&lowered, selectedByIntent)
 	if !reports.HasBlockingIssue(issues) {
 		lowered.Simulation, report.Simulation = deriveSynthesisSimulation(lowered, intent, selectedByIntent)
 	}
@@ -339,6 +321,55 @@ func (resolver *Resolver) Synthesize(ctx context.Context, document Document) (Do
 		report.LoweredGraphHash = hashGraphValue(lowered)
 	}
 	return lowered, report, report.Issues
+}
+
+func externalPowerDomainFlagNet(domain string, connections []FunctionConnection, selected map[string]ResolvedComponent, functionRoles map[string]ComponentRole) (string, bool, bool) {
+	connectionFound := false
+	internalSourceFound := false
+	for _, connection := range connections {
+		if connection.VoltageDomain != domain || !validPowerFlagNetRole(connection.Role) {
+			continue
+		}
+		connectionFound = true
+		if connectionHasInternalPowerOutput(connection, selected) {
+			internalSourceFound = true
+			continue
+		}
+		for _, endpoint := range connection.Endpoints {
+			role := functionRoles[endpoint.Function]
+			if endpoint.Interface != "" || role == RoleConnector || role == RoleInputConnector {
+				return connection.Name, true, true
+			}
+		}
+	}
+	return "", connectionFound, internalSourceFound
+}
+
+func ensureExternalConnectorPowerFlags(document *Document, selected map[string]ResolvedComponent) {
+	if document == nil {
+		return
+	}
+	flagged := make(map[string]bool, len(document.PowerFlags))
+	for _, flag := range document.PowerFlags {
+		flagged[flag.Net] = true
+	}
+	roles := make(map[string]ComponentRole, len(document.Components))
+	for _, component := range document.Components {
+		roles[component.ID] = component.Role
+	}
+	for _, net := range document.Nets {
+		if flagged[net.Name] || !validPowerFlagNetRole(net.Role) || netHasInternalPowerOutput(net, selected) {
+			continue
+		}
+		hasExternalInput := slices.ContainsFunc(net.Endpoints, func(endpoint Endpoint) bool {
+			role := roles[endpoint.Component]
+			return role == RoleConnector || role == RoleInputConnector
+		})
+		if hasExternalInput {
+			document.PowerFlags = append(document.PowerFlags, PowerFlag{Net: net.Name})
+			flagged[net.Name] = true
+		}
+	}
 }
 
 func simulationEvidenceUsage(usage string) string {

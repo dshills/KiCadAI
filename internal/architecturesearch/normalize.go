@@ -171,6 +171,7 @@ func Normalize(requirement Requirement) Requirement {
 	for index := range normalized.Requirements.ControlTransitions {
 		transition := &normalized.Requirements.ControlTransitions[index]
 		transition.ID = canonicalIdentifier(transition.ID)
+		transition.Event = canonicalIdentifier(transition.Event)
 		transition.Target.Kind = canonicalIdentifier(transition.Target.Kind)
 		transition.Target.ID = canonicalIdentifier(transition.Target.ID)
 		transition.Trigger.Kind = canonicalIdentifier(transition.Trigger.Kind)

@@ -658,9 +658,9 @@ func (provider *CatalogProvider) expandHighSideLoadSwitch(ctx context.Context, r
 			passivePart{"control_inverter_base", "resistor", "gate_buffer_input", "100k"},
 			passivePart{"control_inverter_pullup", "resistor", "gate_buffer_stage_pullup", "4.7k"},
 		)
-		if hasLogicPower {
-			passives = append(passives, passivePart{"logic_bypass", "capacitor", "logic_supply_decoupling", "100n"})
-		}
+	}
+	if hasLogicPower {
+		passives = append(passives, passivePart{"logic_bypass", "capacitor", "logic_supply_decoupling", "100n"})
 	}
 	gateSeriesResistance := 100.0
 	clampVoltage := 0.0
@@ -743,7 +743,11 @@ func (provider *CatalogProvider) expandHighSideLoadSwitch(ctx context.Context, r
 				bindings[index].Instance, bindings[index].Function = "gate_control_base", "A"
 			}
 		case "logic_power":
-			bindings[index].Instance, bindings[index].Function = "logic_bypass", "A"
+			if invertControl {
+				bindings[index].Instance, bindings[index].Function = "control_inverter_pullup", "A"
+			} else {
+				bindings[index].Instance, bindings[index].Function = "logic_bypass", "A"
+			}
 		case "reference":
 			bindings[index].Instance, bindings[index].Function = driver.selected.InstanceID, "EMITTER"
 		}
@@ -762,12 +766,17 @@ func (provider *CatalogProvider) expandHighSideLoadSwitch(ctx context.Context, r
 			semanticNet("high_side_control_inverter_output", "logic_drive", endpoint(controlInverter, "COLLECTOR"), passiveEndpoint("control_inverter_pullup", "B"), passiveEndpoint("gate_control_base", "A")),
 		)
 		connections[2].Endpoints = append(connections[2].Endpoints, endpoint(controlInverter, "EMITTER"))
-		if hasLogicPower {
-			connections = append(connections, semanticNet("high_side_logic_power", "power", passiveEndpoint("control_inverter_pullup", "A"), passiveEndpoint("logic_bypass", "A")))
-			connections[2].Endpoints = append(connections[2].Endpoints, passiveEndpoint("logic_bypass", "B"))
-		} else {
+		if !hasLogicPower {
 			connections[0].Endpoints = append(connections[0].Endpoints, passiveEndpoint("control_inverter_pullup", "A"))
 		}
+	}
+	if hasLogicPower {
+		logicPowerEndpoints := []RealizationEndpoint{passiveEndpoint("logic_bypass", "A")}
+		if invertControl {
+			logicPowerEndpoints = append(logicPowerEndpoints, passiveEndpoint("control_inverter_pullup", "A"))
+		}
+		connections[2].Endpoints = append(connections[2].Endpoints, passiveEndpoint("logic_bypass", "B"))
+		connections = append(connections, semanticNet("high_side_logic_power", "power", logicPowerEndpoints...))
 	}
 	if len(clamps) != 0 {
 		connections[0].Endpoints = append(connections[0].Endpoints, endpoint(clamps[0], "K"))

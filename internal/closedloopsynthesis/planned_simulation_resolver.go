@@ -1160,7 +1160,16 @@ func applyPlannedEvent(
 		applied := event.Applied
 		recovered := cloneOptionalFloat(event.Recovered)
 		eventHarness := OperatingHarnessComponentID("voltage_event", event.Target)
-		_, eventSourceDrivesTarget := resolvedVoltageSourcePolarity(plan, component, event.Target)
+		polarity, eventSourceDrivesTarget := resolvedVoltageSourcePolarity(plan, component, event.Target)
+		if eventSourceDrivesTarget {
+			if event.Initial != nil {
+				initial *= polarity
+			}
+			applied *= polarity
+			if recovered != nil {
+				*recovered *= polarity
+			}
+		}
 		if event.Kind == "rail_loss" && component == eventHarness && !eventSourceDrivesTarget {
 			if event.Initial == nil {
 				return false, &Diagnostic{Path: event.ID, Message: "controlled rail-loss event requires a finite explicit initial rail voltage"}
@@ -1836,7 +1845,10 @@ func applyOperatingAssignment(analysis *simmodel.Analysis, plan *simmodel.Plan, 
 			var ok bool
 			physicalValue, ok = physicalLoadCurrent(binding, *assignment.Value)
 			if !ok {
-				return &Diagnostic{Path: binding.Axis, Message: "load-current corner is below the catalog-backed parallel support load"}
+				return &Diagnostic{Path: binding.Axis, Message: fmt.Sprintf(
+					"load-current corner %.12g A is below the %.12g A catalog-backed parallel support load",
+					*assignment.Value, -binding.Offset,
+				)}
 			}
 		}
 		for index := range analysis.Excitations {

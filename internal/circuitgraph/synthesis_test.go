@@ -194,6 +194,33 @@ func TestPropagatePowerFlagsAcrossSeriesPowerLimiters(t *testing.T) {
 	}
 }
 
+func TestExternalPowerDomainFlagSearchSkipsEarlierInternalBranch(t *testing.T) {
+	connections := []FunctionConnection{
+		{Name: "LOGIC_INTERNAL", Role: NetRolePower, VoltageDomain: "logic", Endpoints: []FunctionalEndpoint{{Function: "bias"}, {Function: "load"}}},
+		{Name: "LOGIC_IN", Role: NetRolePower, VoltageDomain: "logic", Endpoints: []FunctionalEndpoint{{Function: "connector"}, {Function: "load"}}},
+	}
+	net, connectionFound, sourceFound := externalPowerDomainFlagNet("logic", connections, nil, map[string]ComponentRole{"connector": RoleInputConnector})
+	if net != "LOGIC_IN" || !connectionFound || !sourceFound {
+		t.Fatalf("external domain flag selection = %q connection=%t source=%t", net, connectionFound, sourceFound)
+	}
+}
+
+func TestEnsureExternalConnectorPowerFlagsCoversEveryPowerEntryNet(t *testing.T) {
+	document := Document{
+		Components: []Component{{ID: "input_a", Role: RoleInputConnector}, {ID: "input_b", Role: RoleInputConnector}, {ID: "load", Role: RoleIC}},
+		Nets: []Net{
+			{Name: "POWER_A", Role: NetRolePower, Endpoints: []Endpoint{{Component: "input_a"}, {Component: "load"}}},
+			{Name: "POWER_B", Role: NetRolePower, Endpoints: []Endpoint{{Component: "input_b"}, {Component: "load"}}},
+			{Name: "SIGNAL", Role: NetRoleSignal, Endpoints: []Endpoint{{Component: "input_b"}, {Component: "load"}}},
+		},
+		PowerFlags: []PowerFlag{{Net: "POWER_A"}},
+	}
+	ensureExternalConnectorPowerFlags(&document, nil)
+	if len(document.PowerFlags) != 2 || document.PowerFlags[0].Net != "POWER_A" || document.PowerFlags[1].Net != "POWER_B" {
+		t.Fatalf("external connector power flags = %#v", document.PowerFlags)
+	}
+}
+
 func TestPropagatePowerFlagsFromInternalOutputAcrossTwoTerminalSeriesPath(t *testing.T) {
 	document := Document{Nets: []Net{
 		{Name: "SW", Role: NetRoleSignal, Endpoints: []Endpoint{

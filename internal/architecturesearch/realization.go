@@ -283,9 +283,22 @@ func validateFragmentRealization(realization FragmentRealization) error {
 		key := binding.Role + "\x00" + binding.Lane
 		endpointKey := binding.Instance + "\x00" + binding.Function
 		if !validSemanticID(binding.Role) || (binding.Lane != "" && !validSemanticID(binding.Lane)) ||
-			(binding.NetRole != "" && !validSemanticID(binding.NetRole)) ||
-			!instances[binding.Instance] || binding.Function == "" || roles[key] || boundEndpoints[endpointKey] != "" {
-			return fmt.Errorf("fragment realization port binding is invalid or duplicated")
+			(binding.NetRole != "" && !validSemanticID(binding.NetRole)) || binding.Function == "" {
+			return fmt.Errorf("fragment realization port binding %q lane %q to %s.%s is invalid", binding.Role, binding.Lane, binding.Instance, binding.Function)
+		}
+		if !instances[binding.Instance] {
+			known := make([]string, 0, len(instances))
+			for instance := range instances {
+				known = append(known, instance)
+			}
+			slices.Sort(known)
+			return fmt.Errorf("fragment realization port binding %q references missing instance %q; known instances are %v", binding.Role, binding.Instance, known)
+		}
+		if roles[key] {
+			return fmt.Errorf("fragment realization port binding role %q lane %q is duplicated", binding.Role, binding.Lane)
+		}
+		if previous := boundEndpoints[endpointKey]; previous != "" {
+			return fmt.Errorf("fragment realization endpoint %s.%s is bound by both %q and %q", binding.Instance, binding.Function, previous, key)
 		}
 		roles[key] = true
 		boundEndpoints[endpointKey] = key

@@ -65,6 +65,36 @@ func TestBuildAnalysisPlanCarriesDirectedTransitionAndDependencies(t *testing.T)
 	t.Fatal("directed transition assertion was not planned")
 }
 
+func TestBuildAnalysisPlanScopesDirectedTransitionToItsDeclaredEvent(t *testing.T) {
+	requirement := closedLoopTestRequirement()
+	requirement.Schema, requirement.Version = architecturesearch.SchemaIDV6, architecturesearch.VersionV6
+	initial, applied := 0.0, 5.0
+	requirement.Requirements.OperatingCases[0].Events = []architecturesearch.OperatingEvent{{
+		ID: "enable_step", Kind: "input_step", Target: architecturesearch.Observation{Kind: "port", ID: "input"},
+		TriggerTimeS: .001, DurationS: .01, Initial: &initial, Applied: &applied, Unit: "V",
+	}}
+	maximumDelay := .01
+	requirement.Requirements.ControlTransitions = []architecturesearch.ControlTransition{{
+		ID: "output_enable", Event: "enable_step", Target: architecturesearch.Observation{Kind: "port", ID: "output"},
+		Trigger: architecturesearch.Observation{Kind: "port", ID: "input"}, From: "deenergized", To: "energized", Direction: "rising", MaximumDelayS: &maximumDelay,
+	}}
+	requirement.Requirements.BehavioralRequirements = []architecturesearch.BehavioralRequirement{{
+		ID: "output_enable_time", Metric: "response_time", Analysis: simmodel.AnalysisTransient,
+		Observation: architecturesearch.Observation{Kind: "port", ID: "output"}, Max: &maximumDelay, Unit: "s", OperatingCases: []string{"rated"}, Transition: "output_enable",
+	}}
+	bindings := []SemanticBinding{{Kind: "port", ID: "input", Target: "IN"}, {Kind: "port", ID: "output", Target: "OUT"}, {Kind: "domain", ID: "supply", Target: "VCC"}}
+	decisions := closedLoopModelDecisions()
+	decisions[0].RequiredAnalyses = append(decisions[0].RequiredAnalyses, simmodel.AnalysisTransient)
+	decisions[0].Provenance.AllowedAnalyses = append(decisions[0].Provenance.AllowedAnalyses, simmodel.AnalysisTransient)
+	plan, diagnostics := BuildAnalysisPlan(requirement, bindings, decisions)
+	if len(diagnostics) != 0 {
+		t.Fatalf("event-scoped transition diagnostics = %#v", diagnostics)
+	}
+	if len(plan.Assertions) != 1 || plan.Assertions[0].AnalysisID != "transient:rated:event:enable_step" || len(plan.Analyses) != 1 || !slices.Equal(plan.Analyses[0].Events, []string{"enable_step"}) {
+		t.Fatalf("event-scoped plan = %#v", plan)
+	}
+}
+
 func TestBuildAnalysisPlanRejectsUnresolvedTransitionDependency(t *testing.T) {
 	requirement := closedLoopTestRequirement()
 	requirement.Schema, requirement.Version = architecturesearch.SchemaIDV6, architecturesearch.VersionV6

@@ -195,9 +195,11 @@ func BuildAnalysisPlan(requirement architecturesearch.Requirement, bindings []Se
 			})
 		}
 		for _, caseID := range behavior.OperatingCases {
-			eventID := ""
-			if behavior.Observation.Kind == "event" {
+			eventID := transition.Event
+			if eventID == "" && behavior.Observation.Kind == "event" {
 				eventID = behavior.Observation.ID
+			}
+			if eventID != "" {
 				observedEvents[caseID+"\x00"+eventID] = true
 			}
 			analysisID := registerAnalysis(behavior.Analysis, caseID, eventID)

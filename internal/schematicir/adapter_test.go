@@ -394,6 +394,28 @@ func TestSchematicRouteLabelFallbackUsesLongestSegment(t *testing.T) {
 	}
 }
 
+func TestSchematicRouteLabelFallbackUsesClearBendWhenMidpointsAreBlocked(t *testing.T) {
+	points := []kicadfiles.Point{
+		{X: kicadfiles.MM(10), Y: kicadfiles.MM(10)},
+		{X: kicadfiles.MM(20), Y: kicadfiles.MM(10)},
+		{X: kicadfiles.MM(20), Y: kicadfiles.MM(50)},
+	}
+	result := schematiclayout.Result{
+		Wires: []schematiclayout.WireSegment{
+			{NetName: "TEST", From: points[0], To: points[1]},
+			{NetName: "TEST", From: points[1], To: points[2]},
+		},
+		Labels: []schematiclayout.Label{
+			{NetName: "OTHER_A", Text: "X", Position: kicadfiles.Point{X: kicadfiles.MM(20), Y: kicadfiles.MM(30)}},
+			{NetName: "OTHER_B", Text: "X", Position: kicadfiles.Point{X: kicadfiles.MM(15), Y: kicadfiles.MM(10)}},
+		},
+	}
+	got := schematicRouteLabelFallbackPoint(result, "TEST", points)
+	if got == nil || got.XMM != 20 || got.YMM != 10 {
+		t.Fatalf("fallback annotation = %#v, want clear interior bend", got)
+	}
+}
+
 func TestSchematicPowerFlagUsesBoundaryAnnotationRole(t *testing.T) {
 	flag := Component{
 		ID: "flag", Ref: "#FLG01", Role: ComponentRolePowerSymbol,
