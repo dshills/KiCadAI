@@ -654,6 +654,9 @@ func Evaluate(plan Plan) (Report, []Diagnostic) {
 
 func evaluateNominal(plan Plan) (Report, []Diagnostic) {
 	report := Report{Schema: ReportSchema, RegistryVersion: plan.RegistryVersion, RegistryHash: plan.RegistryHash, CatalogID: plan.CatalogID, CatalogHash: plan.CatalogHash, ModelID: plan.ModelID, Bindings: append([]ResolvedBinding(nil), plan.Bindings...), Inputs: append([]NamedValue(nil), plan.Inputs...), GroundNode: plan.GroundNode, Nodes: append([]string(nil), plan.Nodes...), Devices: cloneDevices(plan.Devices), TopologyHash: plan.TopologyHash, Status: "blocked"}
+	if model, exists := definitionByID(plan.ModelID); exists && model.GraphMNA {
+		plan = indexMNAPlanDevices(plan)
+	}
 	if diagnostics := ValidatePlan(plan); len(diagnostics) != 0 {
 		return report, diagnostics
 	}
@@ -869,6 +872,38 @@ func namedValueMap(values []NamedValue) map[string]float64 {
 		result[value.Name] = value.Value
 	}
 	return result
+}
+
+func indexMNAPlanDevices(plan Plan) Plan {
+	plan.Devices = append([]ResolvedDevice(nil), plan.Devices...)
+	for index := range plan.Devices {
+		device := &plan.Devices[index]
+		device.parameterIndex = namedValueMap(device.ModelParameters)
+		device.terminalIndex = make(map[string]string, len(device.Terminals))
+		for _, terminal := range device.Terminals {
+			device.terminalIndex[terminal.Terminal] = terminal.Net
+		}
+	}
+	return plan
+}
+
+func deviceParameterMap(device ResolvedDevice) map[string]float64 {
+	// Indexed maps are immutable runtime views. Callers that need to change
+	// parameters must use mutableDeviceParameterMap and replace the device's
+	// normalized parameter storage and index.
+	if device.parameterIndex != nil {
+		return device.parameterIndex
+	}
+	return namedValueMap(device.ModelParameters)
+}
+
+func mutableDeviceParameterMap(device ResolvedDevice) map[string]float64 {
+	parameters := deviceParameterMap(device)
+	clone := make(map[string]float64, len(parameters))
+	for name, value := range parameters {
+		clone[name] = value
+	}
+	return clone
 }
 
 func finite(value float64) bool {

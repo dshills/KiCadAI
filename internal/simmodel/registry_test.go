@@ -130,6 +130,10 @@ func TestCloneReportDoesNotShareMutableEvidence(t *testing.T) {
 	temperature := 40.0
 	source := Report{
 		Bindings: []ResolvedBinding{{Role: "resistor", ValueSI: &value, ModelParameters: []NamedValue{{Name: "parameter", Value: 1}}}},
+		Devices: []ResolvedDevice{{
+			Component: "r1", parameterIndex: map[string]float64{"resistance_ohm": 1000},
+			terminalIndex: map[string]string{"1": "out"},
+		}},
 		Analyses: []AnalysisResult{{ID: "transient", Points: []AnalysisPoint{{
 			TimeS: 1,
 			Nodes: []NodeResult{{Node: "out", Real: 2}},
@@ -145,6 +149,9 @@ func TestCloneReportDoesNotShareMutableEvidence(t *testing.T) {
 		}},
 	}
 	clone := CloneReport(source)
+	if clone.Devices[0].parameterIndex != nil || clone.Devices[0].terminalIndex != nil {
+		t.Fatalf("runtime indexes escaped report clone boundary: %#v", clone.Devices[0])
+	}
 	clone.Bindings[0].Role = "changed"
 	*clone.Bindings[0].ValueSI = 2000
 	clone.Analyses[0].Points[0].Nodes[0].Real = 4
@@ -207,7 +214,11 @@ func TestCloneReportPointLimitAndValueOnlySchemaGuard(t *testing.T) {
 			"Corners": true, "Sensitivity": true,
 		}},
 		{value: ResolvedBinding{}, handled: map[string]bool{"ValueSI": true, "ModelParameters": true}},
-		{value: ResolvedDevice{}, handled: map[string]bool{"ValueSI": true, "ModelParameters": true, "ThermalModel": true, "TransientSOA": true, "Terminals": true}},
+		{value: ResolvedDevice{}, handled: map[string]bool{
+			"ValueSI": true, "ModelParameters": true, "ThermalModel": true,
+			"TransientSOA": true, "Terminals": true, "parameterIndex": true,
+			"terminalIndex": true,
+		}},
 		{value: AnalysisResult{}, handled: map[string]bool{"ControlLoops": true, "Points": true}},
 		{value: ControlLoop{}, handled: map[string]bool{"Members": true, "NetPath": true}},
 		{value: AssertionResult{}, handled: map[string]bool{"Components": true}},

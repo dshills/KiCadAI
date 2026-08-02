@@ -86,14 +86,14 @@ func synchronousBuckTransconductance(parameters map[string]float64, frequencyHz 
 }
 
 func synchronousBuckInputCurrentRatio(plan Plan, analysis Analysis, device ResolvedDevice, timeS float64) float64 {
-	parameters := namedValueMap(device.ModelParameters)
+	parameters := deviceParameterMap(device)
 	return synchronousBuckInputCurrentRatioForOutput(
 		plan, analysis, device, timeS, parameters["nominal_output_voltage_v"],
 	)
 }
 
 func synchronousBuckInputCurrentRatioForOutput(plan Plan, analysis Analysis, device ResolvedDevice, timeS, outputV float64) float64 {
-	parameters := namedValueMap(device.ModelParameters)
+	parameters := deviceParameterMap(device)
 	inputV := synchronousBuckInputVoltage(plan, analysis, device, timeS)
 	if inputV <= 0 {
 		inputV = parameters["nominal_input_voltage_v"]
@@ -119,7 +119,7 @@ func synchronousBuckInputVoltage(plan Plan, analysis Analysis, device ResolvedDe
 }
 
 func synchronousBuckSoftStartScale(plan Plan, analysis Analysis, device ResolvedDevice, timeS float64) float64 {
-	parameters := namedValueMap(device.ModelParameters)
+	parameters := deviceParameterMap(device)
 	softStartS := parameters["soft_start_time_s"]
 	if output, ok := synchronousBuckOutputNet(plan, device); ok {
 		ground := terminalMap(device)["PGND"]
@@ -237,7 +237,7 @@ func synchronousBuckDissipation(device ResolvedDevice, system mnaSystem, solutio
 	if !exists || branch >= len(solution) {
 		return 0, true
 	}
-	parameters := namedValueMap(device.ModelParameters)
+	parameters := deviceParameterMap(device)
 	terminals := terminalMap(device)
 	nodeV := func(node string) float64 { return real(solvedNodeVoltage(system, solution, node)) }
 	inputV := math.Abs(nodeV(terminals["PVIN"]) - nodeV(terminals["PGND"]))

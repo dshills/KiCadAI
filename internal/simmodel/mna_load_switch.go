@@ -48,7 +48,7 @@ func addReverseBlockingLoadSwitchResidual(residuals []complex128, base mnaSystem
 }
 
 func validateReverseBlockingLoadSwitchOperatingLimits(device ResolvedDevice, system mnaSystem, solution []complex128) []Diagnostic {
-	parameters := namedValueMap(device.ModelParameters)
+	parameters := deviceParameterMap(device)
 	terminals := terminalMap(device)
 	vin := nonlinearNodeVoltage(&system, solution, terminals["VIN"])
 	vout := nonlinearNodeVoltage(&system, solution, terminals["VOUT"])
@@ -155,7 +155,7 @@ func addCurrentLimitingEFuseResidual(residuals []complex128, base mnaSystem, dev
 }
 
 func validateCurrentLimitingEFuseOperatingLimits(device ResolvedDevice, system mnaSystem, solution []complex128) []Diagnostic {
-	parameters := namedValueMap(device.ModelParameters)
+	parameters := deviceParameterMap(device)
 	terminals := terminalMap(device)
 	vin := nonlinearNodeVoltage(&system, solution, terminals["VIN"])
 	vout := nonlinearNodeVoltage(&system, solution, terminals["VOUT"])

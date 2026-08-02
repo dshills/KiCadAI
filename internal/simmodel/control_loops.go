@@ -165,7 +165,7 @@ func discoverBJTLocalControlLoops(plan Plan, adjacency map[string][]controlInflu
 		if device.PrimitiveModel != PrimitiveBJTNPNV1 && device.PrimitiveModel != PrimitiveBJTPNPV1 {
 			continue
 		}
-		parameters := namedValueMap(device.ModelParameters)
+		parameters := deviceParameterMap(device)
 		terminals := terminalMap(device)
 		if parameters["transition_frequency_hz"] <= 0 || terminals["EMITTER"] == "" || terminals["EMITTER"] == plan.GroundNode {
 			continue

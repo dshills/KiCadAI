@@ -96,7 +96,7 @@ func solveElectrothermalAnalysis(plan Plan, analysis Analysis) (AnalysisResult, 
 				}
 				temperature = normalizedMNAFloat(temperature)
 				observation.JunctionTemperatureC = &temperature
-				maximum, hasMaximum := namedValue(namedValueMap(device.ModelParameters), "max_temperature_c")
+				maximum, hasMaximum := namedValue(deviceParameterMap(device), "max_temperature_c")
 				if !hasMaximum {
 					return result, []Diagnostic{{
 						Path:       fmt.Sprintf("analyses.%s.devices.%s", analysis.ID, device.Component),
@@ -219,7 +219,7 @@ func transientSOAMarginForEnvelope(device ResolvedDevice, envelope TransientSOAE
 	if !found {
 		return 0, &Diagnostic{Message: fmt.Sprintf("device voltage %.12g V exceeds the reviewed transient SOA voltage boundary", voltage)}
 	}
-	maximum, hasMaximum := namedValue(namedValueMap(device.ModelParameters), "max_temperature_c")
+	maximum, hasMaximum := namedValue(deviceParameterMap(device), "max_temperature_c")
 	if !hasMaximum {
 		return 0, &Diagnostic{Message: "transient SOA evidence requires a catalog-backed maximum junction temperature"}
 	}

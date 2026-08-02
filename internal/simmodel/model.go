@@ -381,6 +381,10 @@ type ResolvedDevice struct {
 	ThermalModel      *ThermalRCNetwork      `json:"thermal_model,omitempty"`
 	TransientSOA      []TransientSOAEnvelope `json:"transient_soa,omitempty"`
 	Terminals         []TerminalBinding      `json:"terminals"`
+	// Runtime indexes are immutable after indexMNAPlanDevices builds them.
+	// Mutation paths must copy them and replace the owning device index.
+	parameterIndex map[string]float64
+	terminalIndex  map[string]string
 }
 
 type Plan struct {
@@ -668,6 +672,12 @@ func CloneReportWithAnalysisPointLimit(source Report, pointLimit int) Report {
 	clone.Inputs = plan.Inputs
 	clone.Nodes = plan.Nodes
 	clone.Devices = plan.Devices
+	for index := range clone.Devices {
+		// Runtime lookup indexes are rebuilt when a report is evaluated and do
+		// not belong in the persistence-safe report clone boundary.
+		clone.Devices[index].parameterIndex = nil
+		clone.Devices[index].terminalIndex = nil
+	}
 	if source.Analyses != nil {
 		clone.Analyses = make([]AnalysisResult, len(source.Analyses))
 	}

@@ -203,7 +203,7 @@ func addOpenDrainIsolatorResidual(residuals []complex128, base mnaSystem, device
 }
 
 func validateOpenDrainIsolatorOperatingLimits(plan Plan, device ResolvedDevice, system mnaSystem, solution []complex128, allowPowerTransition bool) []Diagnostic {
-	parameters := namedValueMap(device.ModelParameters)
+	parameters := mutableDeviceParameterMap(device)
 	resolveIsolatedOpenDrainDrivers(plan, device, parameters)
 	terminals := terminalMap(device)
 	path := "devices." + device.Component
@@ -252,7 +252,7 @@ func openDrainIsolatorDissipation(plan Plan, device ResolvedDevice, system mnaSy
 	if device.PrimitiveModel != PrimitiveBidirectionalOpenDrainIsolatorV1 {
 		return 0, false
 	}
-	parameters := namedValueMap(device.ModelParameters)
+	parameters := mutableDeviceParameterMap(device)
 	resolveIsolatedOpenDrainDrivers(plan, device, parameters)
 	terminals := terminalMap(device)
 	compiled := compiledNonlinearDevice{primitive: device.PrimitiveModel, terminals: terminals, parameters: parameters}

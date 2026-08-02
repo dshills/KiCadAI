@@ -9,7 +9,7 @@ func validateResolvedOperatingLimits(plan Plan, system mnaSystem, solution []com
 	var diagnostics []Diagnostic
 	for _, device := range plan.Devices {
 		if device.PrimitiveModel == PrimitiveFixedBuckModuleV1 {
-			parameters := namedValueMap(device.ModelParameters)
+			parameters := deviceParameterMap(device)
 			terminals := terminalMap(device)
 			ground := real(solvedNodeVoltage(system, solution, terminals["GND"]))
 			input := real(solvedNodeVoltage(system, solution, terminals["VIN"])) - ground
@@ -27,7 +27,7 @@ func validateResolvedOperatingLimits(plan Plan, system mnaSystem, solution []com
 			continue
 		}
 		if device.PrimitiveModel == PrimitiveSynchronousBuckRegulatorV1 {
-			parameters := namedValueMap(device.ModelParameters)
+			parameters := deviceParameterMap(device)
 			terminals := terminalMap(device)
 			ground := real(solvedNodeVoltage(system, solution, terminals["PGND"]))
 			input := real(solvedNodeVoltage(system, solution, terminals["PVIN"])) - ground
@@ -51,7 +51,7 @@ func validateResolvedOperatingLimits(plan Plan, system mnaSystem, solution []com
 			continue
 		}
 		if device.PrimitiveModel == PrimitiveFuseClosedStateV1 {
-			parameters := namedValueMap(device.ModelParameters)
+			parameters := deviceParameterMap(device)
 			terminals := terminalMap(device)
 			voltage := math.Abs(real(solvedNodeVoltage(system, solution, terminals["A"]) - solvedNodeVoltage(system, solution, terminals["B"])))
 			current := voltage / parameters["cold_resistance_ohm"]
@@ -65,7 +65,7 @@ func validateResolvedOperatingLimits(plan Plan, system mnaSystem, solution []com
 			continue
 		}
 		if device.PrimitiveModel == PrimitiveCurrentSenseAmplifierV1 {
-			parameters := namedValueMap(device.ModelParameters)
+			parameters := deviceParameterMap(device)
 			terminals := terminalMap(device)
 			groundA := real(solvedNodeVoltage(system, solution, terminals["GND_A"]))
 			groundB := real(solvedNodeVoltage(system, solution, terminals["GND_B"]))
@@ -92,7 +92,7 @@ func validateResolvedOperatingLimits(plan Plan, system mnaSystem, solution []com
 			continue
 		}
 		if device.PrimitiveModel == PrimitiveFloatingAdjustableRegulatorV1 {
-			parameters := namedValueMap(device.ModelParameters)
+			parameters := deviceParameterMap(device)
 			terminals := terminalMap(device)
 			input := real(solvedNodeVoltage(system, solution, terminals["VIN"]))
 			output := real(solvedNodeVoltage(system, solution, terminals["VOUT"]))
@@ -114,7 +114,7 @@ func validateResolvedOperatingLimits(plan Plan, system mnaSystem, solution []com
 			continue
 		}
 		if device.PrimitiveModel == PrimitiveProgrammableCurrentSourceV1 {
-			parameters := namedValueMap(device.ModelParameters)
+			parameters := deviceParameterMap(device)
 			terminals := terminalMap(device)
 			input := real(solvedNodeVoltage(system, solution, terminals["IN"]))
 			output := real(solvedNodeVoltage(system, solution, terminals["OUT"]))
@@ -136,7 +136,7 @@ func validateResolvedOperatingLimits(plan Plan, system mnaSystem, solution []com
 			continue
 		}
 		if device.PrimitiveModel == PrimitiveShuntVoltageReferenceV1 {
-			parameters := namedValueMap(device.ModelParameters)
+			parameters := deviceParameterMap(device)
 			terminals := terminalMap(device)
 			path := "devices." + device.Component
 			branch, exists := system.branchIndex[device.Component]
@@ -160,7 +160,7 @@ func validateResolvedOperatingLimits(plan Plan, system mnaSystem, solution []com
 			continue
 		}
 		if device.PrimitiveModel == PrimitiveSingleOutputIsolatedConverterV1 || device.PrimitiveModel == PrimitiveProtectedIsolatedConverterV1 {
-			parameters := namedValueMap(device.ModelParameters)
+			parameters := deviceParameterMap(device)
 			terminals := terminalMap(device)
 			input := real(solvedNodeVoltage(system, solution, terminals["VIN_PLUS"]) - solvedNodeVoltage(system, solution, terminals["VIN_MINUS"]))
 			path := "devices." + device.Component
@@ -177,7 +177,7 @@ func validateResolvedOperatingLimits(plan Plan, system mnaSystem, solution []com
 			continue
 		}
 		if device.PrimitiveModel == PrimitiveDualOutputIsolatedConverterV1 {
-			parameters := namedValueMap(device.ModelParameters)
+			parameters := deviceParameterMap(device)
 			terminals := terminalMap(device)
 			input := real(solvedNodeVoltage(system, solution, terminals["VIN_PLUS"]) - solvedNodeVoltage(system, solution, terminals["VIN_MINUS"]))
 			path := "devices." + device.Component
@@ -207,7 +207,7 @@ func validateResolvedOperatingLimits(plan Plan, system mnaSystem, solution []com
 		if device.PrimitiveModel != PrimitiveAdjustableLinearRegulatorV1 && device.PrimitiveModel != PrimitiveFixedLinearRegulatorV1 {
 			continue
 		}
-		parameters := namedValueMap(device.ModelParameters)
+		parameters := deviceParameterMap(device)
 		terminals := terminalMap(device)
 		ground := real(solvedNodeVoltage(system, solution, terminals["GND"]))
 		input := real(solvedNodeVoltage(system, solution, terminals["VIN"])) - ground
@@ -294,14 +294,14 @@ func adjustableLinearRegulatorDissipation(device ResolvedDevice, system mnaSyste
 		output := real(solvedNodeVoltage(system, solution, terminals["VOUT"]))
 		adjust := real(solvedNodeVoltage(system, solution, terminals["ADJ"]))
 		loadCurrent := math.Abs(real(solution[branch]))
-		quiescent := namedValueMap(device.ModelParameters)["quiescent_current_a"]
+		quiescent := deviceParameterMap(device)["quiescent_current_a"]
 		return math.Abs(input-output)*loadCurrent + math.Abs(input-adjust)*quiescent, true
 	}
 	if device.PrimitiveModel == PrimitiveProgrammableCurrentSourceV1 {
 		input := real(solvedNodeVoltage(system, solution, terminals["IN"]))
 		output := real(solvedNodeVoltage(system, solution, terminals["OUT"]))
 		set := real(solvedNodeVoltage(system, solution, terminals["SET"]))
-		reference := namedValueMap(device.ModelParameters)["reference_current_a"]
+		reference := deviceParameterMap(device)["reference_current_a"]
 		loadCurrent := math.Abs(real(solution[branch]))
 		return math.Abs(input-output)*loadCurrent + math.Abs(input-set)*reference, true
 	}
@@ -309,6 +309,6 @@ func adjustableLinearRegulatorDissipation(device ResolvedDevice, system mnaSyste
 	input := real(solvedNodeVoltage(system, solution, terminals["VIN"])) - ground
 	output := real(solvedNodeVoltage(system, solution, terminals["VOUT"])) - ground
 	loadCurrent := math.Abs(real(solution[branch]))
-	quiescent := namedValueMap(device.ModelParameters)["quiescent_current_a"]
+	quiescent := deviceParameterMap(device)["quiescent_current_a"]
 	return math.Abs(input-output)*loadCurrent + math.Abs(input)*quiescent, true
 }

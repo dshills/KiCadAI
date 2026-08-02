@@ -58,7 +58,7 @@ func addStaticSupplyLoadResidual(residuals []complex128, base mnaSystem, device 
 }
 
 func validateStaticSupplyLoadOperatingLimits(device ResolvedDevice, system mnaSystem, solution []complex128, allowPowerTransition bool) []Diagnostic {
-	parameters := namedValueMap(device.ModelParameters)
+	parameters := deviceParameterMap(device)
 	terminals := terminalMap(device)
 	voltage := nonlinearNodeVoltage(&system, solution, terminals["POWER"]) -
 		nonlinearNodeVoltage(&system, solution, terminals["GROUND"])

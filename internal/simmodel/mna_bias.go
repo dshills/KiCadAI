@@ -216,7 +216,7 @@ func thermalBiasMargin(plan Plan, result AnalysisResult) (float64, bool) {
 		if !exists {
 			continue
 		}
-		maximum, exists := namedValue(namedValueMap(device.ModelParameters), "max_temperature_c")
+		maximum, exists := namedValue(deviceParameterMap(device), "max_temperature_c")
 		if !exists || maximum <= 0 {
 			continue
 		}
@@ -473,7 +473,7 @@ func centeredBiasMargin(plan Plan, point AnalysisPoint) (float64, bool, string) 
 		constrained = true
 	}
 	for _, device := range plan.Devices {
-		parameters := namedValueMap(device.ModelParameters)
+		parameters := deviceParameterMap(device)
 		terminals := terminalMap(device)
 		switch device.PrimitiveModel {
 		case PrimitiveOpAmpV1:

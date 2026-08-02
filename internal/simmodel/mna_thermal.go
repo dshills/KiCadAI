@@ -62,7 +62,7 @@ func solveThermalAnalysis(plan Plan, analysis Analysis) (AnalysisResult, []Diagn
 			continue
 		}
 		entry := DeviceResult{Component: device.Component, DissipationW: normalizedMNAFloat(dissipation)}
-		parameters := namedValueMap(device.ModelParameters)
+		parameters := deviceParameterMap(device)
 		maximum, hasMaximum := namedValue(parameters, "max_temperature_c")
 		theta, reference, hasTheta := resolvedThermalPath(device.ThermalModel, parameters, analysis.Conditions, ambient)
 		if hasTheta != hasMaximum {
@@ -160,7 +160,7 @@ func thermalDeviceSupportsDissipation(device ResolvedDevice) bool {
 
 func thermalDeviceResult(device ResolvedDevice, analysis Analysis, ambient, dissipation float64) (DeviceResult, *Diagnostic) {
 	entry := DeviceResult{Component: device.Component, DissipationW: normalizedMNAFloat(dissipation)}
-	parameters := namedValueMap(device.ModelParameters)
+	parameters := deviceParameterMap(device)
 	maximum, hasMaximum := namedValue(parameters, "max_temperature_c")
 	theta, reference, hasTheta := resolvedThermalPath(device.ThermalModel, parameters, analysis.Conditions, ambient)
 	if hasTheta != hasMaximum {
@@ -212,7 +212,7 @@ func thermalDeviceDissipation(plan Plan, device ResolvedDevice, system mnaSystem
 		return delta * delta / *device.ValueSI, true
 	case PrimitiveFuseClosedStateV1, PrimitiveFuseI2TClearingV1:
 		delta := voltage(terminals["A"]) - voltage(terminals["B"])
-		return delta * delta / namedValueMap(device.ModelParameters)["cold_resistance_ohm"], true
+		return delta * delta / deviceParameterMap(device)["cold_resistance_ohm"], true
 	case PrimitiveShuntVoltageReferenceV1:
 		branch, exists := system.branchIndex[device.Component]
 		if !exists {
@@ -225,7 +225,7 @@ func thermalDeviceDissipation(plan Plan, device ResolvedDevice, system mnaSystem
 		if !exists {
 			return 0, true
 		}
-		parameters := namedValueMap(device.ModelParameters)
+		parameters := deviceParameterMap(device)
 		outputPower := math.Abs((voltage(terminals["VOUT_PLUS"]) - voltage(terminals["VOUT_MINUS"])) * real(solution[branch]))
 		return outputPower * (1/parameters["efficiency_ratio"] - 1), true
 	case PrimitiveFixedBuckModuleV1:
@@ -233,34 +233,34 @@ func thermalDeviceDissipation(plan Plan, device ResolvedDevice, system mnaSystem
 		if !exists {
 			return 0, true
 		}
-		parameters := namedValueMap(device.ModelParameters)
+		parameters := deviceParameterMap(device)
 		outputPower := math.Abs((voltage(terminals["VOUT"]) - voltage(terminals["GND"])) * real(solution[branch]))
 		return outputPower * (1/parameters["conversion_efficiency_fraction"] - 1), true
 	case PrimitiveDiodeShockleyV1:
 		delta := voltage(terminals["ANODE"]) - voltage(terminals["CATHODE"])
-		current, _ := diodeCurrentAndGradient(delta, namedValueMap(device.ModelParameters))
+		current, _ := diodeCurrentAndGradient(delta, deviceParameterMap(device))
 		return math.Abs(delta * current), true
 	case PrimitiveBidirectionalTVSV1:
 		delta := voltage(terminals["ANODE"]) - voltage(terminals["CATHODE"])
-		current, _ := bidirectionalTVSCurrentAndGradient(delta, namedValueMap(device.ModelParameters))
+		current, _ := bidirectionalTVSCurrentAndGradient(delta, deviceParameterMap(device))
 		return math.Abs(delta * current), true
 	case PrimitiveNMOSSwitchV1, PrimitivePMOSSwitchV1:
 		delta := voltage(terminals["DRAIN"]) - voltage(terminals["SOURCE"])
 		conductance := mosfetSwitchConductance(compiledNonlinearDevice{
-			primitive: device.PrimitiveModel, terminals: terminals, parameters: namedValueMap(device.ModelParameters), polarity: mosfetPolarity(device.PrimitiveModel),
+			primitive: device.PrimitiveModel, terminals: terminals, parameters: deviceParameterMap(device), polarity: mosfetPolarity(device.PrimitiveModel),
 		}, &system, solution)
 		return delta * delta * conductance, true
 	case PrimitiveReverseBlockingLoadSwitchV1:
 		delta := voltage(terminals["VIN"]) - voltage(terminals["VOUT"])
 		conductance := reverseBlockingLoadSwitchConductance(compiledNonlinearDevice{
-			primitive: device.PrimitiveModel, terminals: terminals, parameters: namedValueMap(device.ModelParameters), polarity: 1,
+			primitive: device.PrimitiveModel, terminals: terminals, parameters: deviceParameterMap(device), polarity: 1,
 		}, &system, solution)
 		return delta * delta * conductance, true
 	case PrimitiveCurrentLimitingEFuseV1:
 		delta := voltage(terminals["VIN"]) - voltage(terminals["VOUT"])
 		current, _ := currentLimitingEFuseCurrentAndGradient(
 			compiledNonlinearDevice{
-				primitive: device.PrimitiveModel, terminals: terminals, parameters: namedValueMap(device.ModelParameters), polarity: 1,
+				primitive: device.PrimitiveModel, terminals: terminals, parameters: deviceParameterMap(device), polarity: 1,
 			},
 			&system, solution,
 		)
@@ -271,20 +271,20 @@ func thermalDeviceDissipation(plan Plan, device ResolvedDevice, system mnaSystem
 			polarity = -1
 		}
 		vb, vc, ve := voltage(terminals["BASE"]), voltage(terminals["COLLECTOR"]), voltage(terminals["EMITTER"])
-		currents, _ := bjtCurrentsAndJacobian(vb, vc, ve, namedValueMap(device.ModelParameters), polarity)
+		currents, _ := bjtCurrentsAndJacobian(vb, vc, ve, deviceParameterMap(device), polarity)
 		return math.Abs(vb*currents[0] + vc*currents[1] + ve*currents[2]), true
 	case PrimitiveOpAmpV1:
 		branch, exists := system.branchIndex[device.Component]
 		if !exists {
 			return 0, true
 		}
-		parameters := namedValueMap(device.ModelParameters)
+		parameters := deviceParameterMap(device)
 		outputPower := math.Abs(voltage(terminals["OUT"]) * real(solution[branch]))
 		quiescent, _ := namedValue(parameters, "quiescent_current_a")
 		supply := math.Abs(voltage(terminals["V_PLUS"]) - voltage(terminals["V_MINUS"]))
 		return outputPower + quiescent*supply, true
 	case PrimitiveComparatorOpenCollectorV1:
-		parameters := namedValueMap(device.ModelParameters)
+		parameters := deviceParameterMap(device)
 		output := voltage(terminals["OUT"]) - voltage(terminals["V_MINUS"])
 		resistance := parameters["output_off_resistance_ohm"]
 		if comparatorOn(device, system, solution) {
@@ -294,7 +294,7 @@ func thermalDeviceDissipation(plan Plan, device ResolvedDevice, system mnaSystem
 		supply := math.Abs(voltage(terminals["V_PLUS"]) - voltage(terminals["V_MINUS"]))
 		return outputPower + parameters["quiescent_current_a"]*supply, true
 	case PrimitiveMCUStaticSupplyLoadV1, PrimitiveSensorStaticSupplyLoadV1:
-		parameters := namedValueMap(device.ModelParameters)
+		parameters := deviceParameterMap(device)
 		supply := voltage(terminals["POWER"]) - voltage(terminals["GROUND"])
 		current, _ := staticSupplyLoadCurrentAndGradient(supply, parameters)
 		return math.Abs(current * supply), true

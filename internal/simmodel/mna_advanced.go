@@ -24,7 +24,7 @@ func solveNoiseAnalysis(plan Plan, analysis Analysis) (AnalysisResult, []Diagnos
 		if device.PrimitiveModel != PrimitiveOpAmpV1 {
 			continue
 		}
-		if value := namedValueMap(device.ModelParameters)["input_voltage_noise_density_v_sqrt_hz"]; !finite(value) || value <= 0 {
+		if value := deviceParameterMap(device)["input_voltage_noise_density_v_sqrt_hz"]; !finite(value) || value <= 0 {
 			return result, []Diagnostic{{
 				Path:       "analyses." + analysis.ID + ".devices." + device.Component + ".input_voltage_noise_density_v_sqrt_hz",
 				Message:    "noise analysis requires a positive catalog-backed op-amp input-voltage-noise density",
@@ -59,11 +59,11 @@ func solveNoiseAnalysis(plan Plan, analysis Analysis) (AnalysisResult, []Diagnos
 			case PrimitiveFuseClosedStateV1, PrimitiveFuseI2TClearingV1:
 				// A closed fuse is a physical cold resistance and contributes
 				// the same Johnson-Nyquist noise as any other passive resistance.
-				resistance := namedValueMap(device.ModelParameters)["cold_resistance_ohm"]
+				resistance := deviceParameterMap(device)["cold_resistance_ohm"]
 				density := math.Sqrt(4 * boltzmannConstantJPerK * noiseReferenceK / resistance)
 				stampCurrentSource(&system, terminals["A"], terminals["B"], complex(density, 0))
 			case PrimitiveOpAmpV1:
-				parameters := namedValueMap(device.ModelParameters)
+				parameters := deviceParameterMap(device)
 				density := parameters["input_voltage_noise_density_v_sqrt_hz"]
 				// stampOpAmp writes Vout/Aol-(V+ - V-) = rhs. An
 				// input-referred voltage-noise source therefore belongs directly
@@ -179,7 +179,7 @@ func solveStabilityAnalysis(plan Plan, analysis Analysis) (AnalysisResult, []Dia
 			}
 			terminals := terminalMap(device)
 			beta := solvedNodeVoltage(system, solution, terminals["IN_PLUS"]) - solvedNodeVoltage(system, solution, terminals["IN_MINUS"])
-			loop := -opAmpOpenLoopGain(namedValueMap(device.ModelParameters), frequency) * beta
+			loop := -opAmpOpenLoopGain(deviceParameterMap(device), frequency) * beta
 			if !boundedComplex(loop, maxMNASolutionValue) {
 				return result, []Diagnostic{{Path: "analyses." + analysis.ID + ".devices." + device.Component, Message: "trusted loop-return ratio is non-finite or exceeds the numerical bound"}}
 			}
@@ -211,7 +211,7 @@ func solveStabilityAnalysis(plan Plan, analysis Analysis) (AnalysisResult, []Dia
 			terminals := terminalMap(device)
 			beta := solvedNodeVoltage(system, solution, terminals["FB"]) -
 				solvedNodeVoltage(system, solution, terminals["AGND"])
-			loop := synchronousBuckTransconductance(namedValueMap(device.ModelParameters), frequency) * beta
+			loop := synchronousBuckTransconductance(deviceParameterMap(device), frequency) * beta
 			if !boundedComplex(loop, maxMNASolutionValue) {
 				return result, []Diagnostic{{Path: "analyses." + analysis.ID + ".devices." + device.Component, Message: "trusted loop-return ratio is non-finite or exceeds the numerical bound"}}
 			}
@@ -263,7 +263,7 @@ func solveBJTEmitterDegenerationStability(plan Plan, analysis Analysis) (Analysi
 		if device.PrimitiveModel != PrimitiveBJTNPNV1 && device.PrimitiveModel != PrimitiveBJTPNPV1 {
 			continue
 		}
-		parameters := namedValueMap(device.ModelParameters)
+		parameters := deviceParameterMap(device)
 		terminals := terminalMap(device)
 		if terminals["EMITTER"] == plan.GroundNode || parameters["transition_frequency_hz"] <= 0 {
 			continue
@@ -312,7 +312,7 @@ func solveBJTEmitterDegenerationStability(plan Plan, analysis Analysis) (Analysi
 				diagnostic.Message = "BJT emitter-loop return solve failed: " + diagnostic.Message
 				return result, []Diagnostic{*diagnostic}
 			}
-			parameters := namedValueMap(device.ModelParameters)
+			parameters := deviceParameterMap(device)
 			polarity := 1.0
 			if device.PrimitiveModel == PrimitiveBJTPNPV1 {
 				polarity = -1

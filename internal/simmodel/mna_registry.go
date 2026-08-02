@@ -2090,7 +2090,7 @@ func applyDeviceOverride(device ResolvedDevice, override DeviceOverride) Resolve
 		value := *override.ValueSI
 		device.ValueSI = &value
 	}
-	parameters := namedValueMap(device.ModelParameters)
+	parameters := mutableDeviceParameterMap(device)
 	for _, parameter := range override.ModelParameters {
 		parameters[parameter.Name] = parameter.Value
 	}
@@ -2099,6 +2099,7 @@ func applyDeviceOverride(device ResolvedDevice, override DeviceOverride) Resolve
 		device.ModelParameters = append(device.ModelParameters, NamedValue{Name: name, Value: value})
 	}
 	device.ModelParameters = normalizeNamedValues(device.ModelParameters)
+	device.parameterIndex = parameters
 	return device
 }
 

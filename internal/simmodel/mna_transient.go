@@ -777,7 +777,13 @@ func planWithTransientValueEvents(plan Plan, analysis Analysis, timeS float64) P
 	if len(analysis.DeviceValueEvents) == 0 {
 		return plan
 	}
-	clone := ClonePlan(plan)
+	// Simulation plans are immutable during evaluation. Device value events
+	// only replace ValueSI pointers, so copy exactly the Devices slice and
+	// retain the plan's read-only topology, analyses, and evidence storage.
+	// Nested device evidence is likewise read-only; mutation paths must make
+	// their own copy before changing it.
+	clone := plan
+	clone.Devices = append([]ResolvedDevice(nil), plan.Devices...)
 	for index := range clone.Devices {
 		device := &clone.Devices[index]
 		if device.ValueSI == nil {
@@ -901,10 +907,10 @@ func buildTransientTemplate(plan Plan, analysis Analysis) (mnaSystem, []Diagnost
 				stampAdmittance(&system, capacitor.a, capacitor.b, complex(capacitor.capacitanceF/analysis.TimeStepS, 0))
 			}
 		case PrimitiveBidirectionalTVSV1:
-			conductance := namedValueMap(device.ModelParameters)["junction_capacitance_f"] / analysis.TimeStepS
+			conductance := deviceParameterMap(device)["junction_capacitance_f"] / analysis.TimeStepS
 			stampAdmittance(&system, terminals["ANODE"], terminals["CATHODE"], complex(conductance, 0))
 		case PrimitiveOpAmpV1:
-			parameters := namedValueMap(device.ModelParameters)
+			parameters := deviceParameterMap(device)
 			gain := parameters["dc_open_loop_gain"]
 			poleHz := parameters["gain_bandwidth_hz"] / gain
 			historyCoefficient := 1 / (2 * math.Pi * poleHz * gain * analysis.TimeStepS)
@@ -912,7 +918,7 @@ func buildTransientTemplate(plan Plan, analysis Analysis) (mnaSystem, []Diagnost
 				system.matrix[system.branchIndex[device.Component]][outputIndex] += complex(historyCoefficient, 0)
 			}
 		case PrimitiveCurrentSenseAmplifierV1:
-			parameters := namedValueMap(device.ModelParameters)
+			parameters := deviceParameterMap(device)
 			gain := parameters["gain_v_per_v"]
 			poleHz := parameters["bandwidth_hz"] / gain
 			historyCoefficient := 1 / (2 * math.Pi * poleHz * gain * analysis.TimeStepS)
@@ -925,18 +931,18 @@ func buildTransientTemplate(plan Plan, analysis Analysis) (mnaSystem, []Diagnost
 			}
 			stampCurrentSource(&system, terminals["VCC"], terminals["GND_A"], complex(-parameters["quiescent_current_a"], 0))
 		case PrimitiveAdjustableLinearRegulatorV1:
-			parameters := namedValueMap(device.ModelParameters)
+			parameters := deviceParameterMap(device)
 			system.rhs[system.branchIndex[device.Component]] -= complex(parameters["reference_voltage_v"], 0)
 			stampCurrentSource(&system, terminals["VIN"], terminals["GND"], complex(-parameters["quiescent_current_a"], 0))
 		case PrimitiveFixedLinearRegulatorV1:
-			parameters := namedValueMap(device.ModelParameters)
+			parameters := deviceParameterMap(device)
 			system.rhs[system.branchIndex[device.Component]] -= complex(parameters["output_voltage_v"], 0)
 			stampCurrentSource(&system, terminals["VIN"], terminals["GND"], complex(-parameters["quiescent_current_a"], 0))
 		case PrimitiveFixedBuckModuleV1:
-			parameters := namedValueMap(device.ModelParameters)
+			parameters := deviceParameterMap(device)
 			system.rhs[system.branchIndex[device.Component]] -= complex(parameters["output_voltage_v"], 0)
 		case PrimitiveSynchronousBuckRegulatorV1:
-			parameters := namedValueMap(device.ModelParameters)
+			parameters := deviceParameterMap(device)
 			branch := system.branchIndex[device.Component]
 			// The DC builder may legitimately disable an unpowered buck. A
 			// transient template still needs the catalog controller equation
@@ -955,21 +961,21 @@ func buildTransientTemplate(plan Plan, analysis Analysis) (mnaSystem, []Diagnost
 			// operating current; no independent electrical source is removed
 			// from this reusable transient template.
 		case PrimitiveFloatingAdjustableRegulatorV1:
-			parameters := namedValueMap(device.ModelParameters)
+			parameters := deviceParameterMap(device)
 			reference := parameters["polarity"] * parameters["reference_voltage_v"]
 			adjustmentCurrent := parameters["polarity"] * parameters["adjustment_pin_current_a"]
 			system.rhs[system.branchIndex[device.Component]] -= complex(reference, 0)
 			stampCurrentSource(&system, terminals["VIN"], terminals["ADJ"], complex(-adjustmentCurrent, 0))
 		case PrimitiveProgrammableCurrentSourceV1:
-			parameters := namedValueMap(device.ModelParameters)
+			parameters := deviceParameterMap(device)
 			system.rhs[system.branchIndex[device.Component]] -= complex(parameters["offset_voltage_v"], 0)
 			stampCurrentSource(&system, terminals["IN"], terminals["SET"], complex(-parameters["reference_current_a"], 0))
 		case PrimitiveShuntVoltageReferenceV1:
-			system.rhs[system.branchIndex[device.Component]] -= complex(namedValueMap(device.ModelParameters)["output_voltage_v"], 0)
+			system.rhs[system.branchIndex[device.Component]] -= complex(deviceParameterMap(device)["output_voltage_v"], 0)
 		case PrimitiveSingleOutputIsolatedConverterV1, PrimitiveProtectedIsolatedConverterV1:
-			system.rhs[system.branchIndex[device.Component]] -= complex(namedValueMap(device.ModelParameters)["output_voltage_v"], 0)
+			system.rhs[system.branchIndex[device.Component]] -= complex(deviceParameterMap(device)["output_voltage_v"], 0)
 		case PrimitiveDualOutputIsolatedConverterV1:
-			parameters := namedValueMap(device.ModelParameters)
+			parameters := deviceParameterMap(device)
 			positiveBranch := system.multiBranchIndex[mnaBranchKey{component: device.Component, terminal: "VOUT_PLUS"}]
 			negativeBranch := system.multiBranchIndex[mnaBranchKey{component: device.Component, terminal: "VOUT_MINUS"}]
 			system.rhs[positiveBranch] -= complex(parameters["positive_output_voltage_v"], 0)
@@ -991,7 +997,7 @@ func buildTransientTemplate(plan Plan, analysis Analysis) (mnaSystem, []Diagnost
 }
 
 func prepareTransientBase(base *mnaSystem, template mnaSystem, plan Plan, analysis Analysis, step int, timeS float64, previous []complex128, history [][]complex128, openFuses map[string]bool) (map[string]float64, map[string]bool, []Diagnostic) {
-	resetMNASystem(base, template)
+	resetMNASystem(base, &template)
 	comparatorStates := map[string]float64{}
 	fixedOutputClamps := map[string]bool{}
 	for _, device := range plan.Devices {
@@ -1005,7 +1011,7 @@ func prepareTransientBase(base *mnaSystem, template mnaSystem, plan Plan, analys
 			}
 		case PrimitiveFuseI2TClearingV1:
 			if openFuses[device.Component] {
-				parameters := namedValueMap(device.ModelParameters)
+				parameters := deviceParameterMap(device)
 				delta := 1/parameters["open_resistance_ohm"] - 1/parameters["cold_resistance_ohm"]
 				stampAdmittance(base, terminals["A"], terminals["B"], complex(delta, 0))
 			}
@@ -1016,7 +1022,7 @@ func prepareTransientBase(base *mnaSystem, template mnaSystem, plan Plan, analys
 			value := transientIndependentSourceValue(analysis, device.Component, timeS)
 			stampCurrentSource(base, terminals["POSITIVE"], terminals["NEGATIVE"], complex(value, 0))
 		case PrimitiveFixedClockSourceV1, PrimitiveResistorProgrammedClockSourceV1:
-			parameters := namedValueMap(device.ModelParameters)
+			parameters := deviceParameterMap(device)
 			conductance := complex(1/parameters["output_resistance_ohm"], 0)
 			dcEnabled := clockSourceDCEnabled(device)
 			dcReference := terminals["GND"]
@@ -1044,7 +1050,7 @@ func prepareTransientBase(base *mnaSystem, template mnaSystem, plan Plan, analys
 			}
 		case PrimitiveCMOSBufferV1:
 			if !clockBufferHigh(device, base, analysis, step, previous, history) {
-				resistance := namedValueMap(device.ModelParameters)["output_resistance_ohm"]
+				resistance := deviceParameterMap(device)["output_resistance_ohm"]
 				conductance := complex(1/resistance, 0)
 				stampAdmittance(base, terminals["OUT"], terminals["VCC"], -conductance)
 				stampAdmittance(base, terminals["OUT"], terminals["GND"], conductance)
@@ -1064,7 +1070,7 @@ func prepareTransientBase(base *mnaSystem, template mnaSystem, plan Plan, analys
 				stampCurrentSource(base, capacitor.a, capacitor.b, complex(-conductance*previousVoltage, 0))
 			}
 		case PrimitiveRelayNormallyOpenV1:
-			parameters := namedValueMap(device.ModelParameters)
+			parameters := deviceParameterMap(device)
 			coilVoltage := nonlinearNodeVoltage(base, previous, terminals["COIL_A"]) - nonlinearNodeVoltage(base, previous, terminals["COIL_B"])
 			energized := math.Abs(coilVoltage)/parameters["coil_resistance_ohm"] >= parameters["operate_current_a"]*(1-1e-12)
 			closed := energized
@@ -1076,11 +1082,11 @@ func prepareTransientBase(base *mnaSystem, template mnaSystem, plan Plan, analys
 				stampAdmittance(base, terminals["CONTACT_IN"], terminals["CONTACT_OUT"], complex(delta, 0))
 			}
 		case PrimitiveBidirectionalTVSV1:
-			conductance := namedValueMap(device.ModelParameters)["junction_capacitance_f"] / analysis.TimeStepS
+			conductance := deviceParameterMap(device)["junction_capacitance_f"] / analysis.TimeStepS
 			previousVoltage := nonlinearNodeVoltage(base, previous, terminals["ANODE"]) - nonlinearNodeVoltage(base, previous, terminals["CATHODE"])
 			stampCurrentSource(base, terminals["ANODE"], terminals["CATHODE"], complex(-conductance*previousVoltage, 0))
 		case PrimitiveComparatorOpenCollectorV1:
-			parameters := namedValueMap(device.ModelParameters)
+			parameters := deviceParameterMap(device)
 			delaySteps := int(math.Ceil(parameters["propagation_delay_s"]/analysis.TimeStepS - 1e-12))
 			decisionIndex := step - delaySteps
 			if decisionIndex < 0 {
@@ -1098,7 +1104,7 @@ func prepareTransientBase(base *mnaSystem, template mnaSystem, plan Plan, analys
 				comparatorStates[device.Component] = 0
 			}
 		case PrimitiveOpAmpV1:
-			parameters := namedValueMap(device.ModelParameters)
+			parameters := deviceParameterMap(device)
 			gain := parameters["dc_open_loop_gain"]
 			poleHz := parameters["gain_bandwidth_hz"] / gain
 			historyCoefficient := 1 / (2 * math.Pi * poleHz * gain * analysis.TimeStepS)
@@ -1130,7 +1136,7 @@ func prepareTransientBase(base *mnaSystem, template mnaSystem, plan Plan, analys
 				fixedOutputClamps[device.Component] = true
 			}
 		case PrimitiveCurrentSenseAmplifierV1:
-			parameters := namedValueMap(device.ModelParameters)
+			parameters := deviceParameterMap(device)
 			gain := parameters["gain_v_per_v"]
 			poleHz := parameters["bandwidth_hz"] / gain
 			historyCoefficient := 1 / (2 * math.Pi * poleHz * gain * analysis.TimeStepS)
@@ -1143,7 +1149,7 @@ func prepareTransientBase(base *mnaSystem, template mnaSystem, plan Plan, analys
 			}
 			stampCurrentSource(base, terminals["VCC"], terminals["GND_A"], complex(parameters["quiescent_current_a"], 0))
 		case PrimitiveAdjustableLinearRegulatorV1:
-			parameters := namedValueMap(device.ModelParameters)
+			parameters := deviceParameterMap(device)
 			reference := parameters["reference_voltage_v"]
 			powerTransition := analysis.Kind == AnalysisStartup && startupSourceRampScale(analysis, timeS) < 1
 			if powerTransition {
@@ -1156,7 +1162,7 @@ func prepareTransientBase(base *mnaSystem, template mnaSystem, plan Plan, analys
 				stampCurrentSource(base, terminals["VIN"], terminals["GND"], complex(parameters["quiescent_current_a"], 0))
 			}
 		case PrimitiveFixedLinearRegulatorV1:
-			parameters := namedValueMap(device.ModelParameters)
+			parameters := deviceParameterMap(device)
 			output := parameters["output_voltage_v"]
 			powerTransition := analysis.Kind == AnalysisStartup && startupSourceRampScale(analysis, timeS) < 1
 			if powerTransition {
@@ -1169,7 +1175,7 @@ func prepareTransientBase(base *mnaSystem, template mnaSystem, plan Plan, analys
 				stampCurrentSource(base, terminals["VIN"], terminals["GND"], complex(parameters["quiescent_current_a"], 0))
 			}
 		case PrimitiveFixedBuckModuleV1:
-			parameters := namedValueMap(device.ModelParameters)
+			parameters := deviceParameterMap(device)
 			input := nonlinearNodeVoltage(base, previous, terminals["VIN"]) -
 				nonlinearNodeVoltage(base, previous, terminals["GND"])
 			output := parameters["output_voltage_v"]
@@ -1183,7 +1189,7 @@ func prepareTransientBase(base *mnaSystem, template mnaSystem, plan Plan, analys
 			}
 			base.rhs[base.branchIndex[device.Component]] += complex(output, 0)
 		case PrimitiveSynchronousBuckRegulatorV1:
-			parameters := namedValueMap(device.ModelParameters)
+			parameters := deviceParameterMap(device)
 			branch := base.branchIndex[device.Component]
 			templateRatio := parameters["nominal_output_voltage_v"] /
 				parameters["nominal_input_voltage_v"] /
@@ -1214,7 +1220,7 @@ func prepareTransientBase(base *mnaSystem, template mnaSystem, plan Plan, analys
 			historyCoefficient := 1 / (2 * math.Pi * parameters["control_pole_hz"] * parameters["control_transconductance_s"] * analysis.TimeStepS)
 			base.rhs[branch] += complex(reference+historyCoefficient*real(previous[branch]), 0)
 		case PrimitiveFloatingAdjustableRegulatorV1:
-			parameters := namedValueMap(device.ModelParameters)
+			parameters := deviceParameterMap(device)
 			reference := parameters["polarity"] * parameters["reference_voltage_v"]
 			powerTransition := analysis.Kind == AnalysisStartup && startupSourceRampScale(analysis, timeS) < 1
 			if powerTransition {
@@ -1228,7 +1234,7 @@ func prepareTransientBase(base *mnaSystem, template mnaSystem, plan Plan, analys
 				stampCurrentSource(base, terminals["VIN"], terminals["ADJ"], complex(adjustmentCurrent, 0))
 			}
 		case PrimitiveProgrammableCurrentSourceV1:
-			parameters := namedValueMap(device.ModelParameters)
+			parameters := deviceParameterMap(device)
 			reference := parameters["reference_current_a"]
 			offset := parameters["offset_voltage_v"]
 			headroom := nonlinearNodeVoltage(base, previous, terminals["IN"]) - nonlinearNodeVoltage(base, previous, terminals["OUT"])
@@ -1245,13 +1251,13 @@ func prepareTransientBase(base *mnaSystem, template mnaSystem, plan Plan, analys
 				stampCurrentSource(base, terminals["IN"], terminals["SET"], complex(reference, 0))
 			}
 		case PrimitiveShuntVoltageReferenceV1:
-			output := namedValueMap(device.ModelParameters)["output_voltage_v"]
+			output := deviceParameterMap(device)["output_voltage_v"]
 			if analysis.Kind == AnalysisStartup {
 				output *= startupSourceRampScale(analysis, timeS)
 			}
 			base.rhs[base.branchIndex[device.Component]] += complex(output, 0)
 		case PrimitiveDualOutputIsolatedConverterV1:
-			parameters := namedValueMap(device.ModelParameters)
+			parameters := deviceParameterMap(device)
 			positive := parameters["positive_output_voltage_v"]
 			negative := -parameters["negative_output_voltage_v"]
 			powerTransition := analysis.Kind == AnalysisStartup && startupSourceRampScale(analysis, timeS) < 1
@@ -1265,7 +1271,7 @@ func prepareTransientBase(base *mnaSystem, template mnaSystem, plan Plan, analys
 			base.rhs[base.multiBranchIndex[mnaBranchKey{component: device.Component, terminal: "VOUT_PLUS"}]] += complex(positive, 0)
 			base.rhs[base.multiBranchIndex[mnaBranchKey{component: device.Component, terminal: "VOUT_MINUS"}]] += complex(negative, 0)
 		case PrimitiveSingleOutputIsolatedConverterV1, PrimitiveProtectedIsolatedConverterV1:
-			parameters := namedValueMap(device.ModelParameters)
+			parameters := deviceParameterMap(device)
 			input := nonlinearNodeVoltage(base, previous, terminals["VIN_PLUS"]) -
 				nonlinearNodeVoltage(base, previous, terminals["VIN_MINUS"])
 			output := parameters["output_voltage_v"]
@@ -1406,7 +1412,7 @@ func transientIndependentSourceValue(analysis Analysis, component string, timeS 
 }
 
 func clockSourceHigh(device ResolvedDevice, system *mnaSystem, analysis Analysis, timeS float64, state []complex128) bool {
-	parameters := namedValueMap(device.ModelParameters)
+	parameters := deviceParameterMap(device)
 	frequency := parameters["frequency_hz"]
 	dutyCycle := parameters["duty_cycle_fraction"]
 	if !finite(frequency) || frequency <= 0 || !finite(dutyCycle) ||
@@ -1457,7 +1463,7 @@ func clockSourceEnabled(device ResolvedDevice, system *mnaSystem, state []comple
 	groundV := nonlinearNodeVoltage(system, state, terminals["GND"])
 	supplyV := nonlinearNodeVoltage(system, state, terminals["VDD"]) - groundV
 	enableV := nonlinearNodeVoltage(system, state, enable) - groundV
-	threshold := namedValueMap(device.ModelParameters)["enable_high_ratio"] * supplyV
+	threshold := deviceParameterMap(device)["enable_high_ratio"] * supplyV
 	return finite(supplyV) && supplyV > 0 && finite(enableV) && enableV >= threshold
 }
 
@@ -1468,7 +1474,7 @@ func validateClockPhaseResolution(plan Plan, analysis Analysis) []Diagnostic {
 			device.PrimitiveModel != PrimitiveResistorProgrammedClockSourceV1 {
 			continue
 		}
-		frequency := namedValueMap(device.ModelParameters)["frequency_hz"]
+		frequency := deviceParameterMap(device)["frequency_hz"]
 		cycles := analysis.DurationS * frequency
 		if !finite(frequency) || frequency <= 0 || !finite(cycles) || cycles > maxClockPhaseCycles {
 			diagnostics = append(diagnostics, Diagnostic{
@@ -1509,6 +1515,7 @@ func resolveProgrammedClockFrequencies(plan Plan) Plan {
 				return strings.Compare(left.Name, right.Name)
 			})
 		}
+		device.parameterIndex = namedValueMap(device.ModelParameters)
 	}
 	return resolved
 }
@@ -1552,7 +1559,7 @@ func programmedClockFrequency(plan Plan, source ResolvedDevice) float64 {
 }
 
 func clockBufferHigh(device ResolvedDevice, system *mnaSystem, analysis Analysis, step int, previous []complex128, history [][]complex128) bool {
-	parameters := namedValueMap(device.ModelParameters)
+	parameters := deviceParameterMap(device)
 	terminals := terminalMap(device)
 	delaySteps := int(math.Ceil(parameters["propagation_delay_s"]/analysis.TimeStepS - 1e-12))
 	decision := previous
@@ -1946,7 +1953,9 @@ func solveTransientStepInternal(base mnaSystem, resolvedDevices []ResolvedDevice
 
 func solveTransientStepInternalWithLimit(base mnaSystem, resolvedDevices []ResolvedDevice, devices []compiledNonlinearDevice, previous, guess []complex128, workspace *mnaSystem, selectiveNodeDamping bool, fixedOutputClamps map[string]bool, allowMOSFETActiveSet bool, maxIterations int) (mnaSystem, []complex128, SolverEvidence, *Diagnostic) {
 	system := workspace
-	constrainedBase := cloneMNASystem(base)
+	constrainedScratch := acquireReusableMNASystemClone(&base)
+	defer releaseReusableMNASystemClone(constrainedScratch)
+	constrainedBase := &constrainedScratch.system
 	outputLimits := map[string]transientOutputLimitState{}
 	branchLimits := map[int]float64{}
 	deferredOutputLimits := map[string]bool{}
@@ -1956,8 +1965,8 @@ func solveTransientStepInternalWithLimit(base mnaSystem, resolvedDevices []Resol
 	evidence := SolverEvidence{Method: "backward_euler_bounded_newton_v1"}
 	largestUpdateLabel, largestCurrentUpdateLabel, largestResidualLabel := "unknown", "unknown", "unknown"
 	for iteration := 1; iteration <= maxIterations; iteration++ {
-		resetMNASystem(&constrainedBase, base)
-		applyTransientActiveLimits(&constrainedBase, resolvedDevices, outputLimits, branchLimits)
+		resetMNASystem(constrainedBase, &base)
+		applyTransientActiveLimits(constrainedBase, resolvedDevices, outputLimits, branchLimits)
 		resetMNASystem(system, constrainedBase)
 		stampCompiledNonlinearDevices(system, devices, guess)
 		if diagnostic := validateMNASystemBounds(*system); diagnostic != nil {
@@ -2005,13 +2014,13 @@ func solveTransientStepInternalWithLimit(base mnaSystem, resolvedDevices []Resol
 			damping = nonlinearMaxNodeUpdateV / maxControlVoltageUpdate
 		}
 		if !selectiveNodeDamping && requiresNonlinearLineSearch(devices) {
-			priorResidual, _ := nonlinearResidual(constrainedBase, devices, guess)
+			priorResidual, _ := nonlinearResidual(*constrainedBase, devices, guess)
 			trial := make([]complex128, len(guess))
 			for {
 				for index := range guess {
 					trial[index] = guess[index] + (candidate[index]-guess[index])*complex(damping, 0)
 				}
-				trialResidual, _ := nonlinearResidual(constrainedBase, devices, trial)
+				trialResidual, _ := nonlinearResidual(*constrainedBase, devices, trial)
 				if trialResidual <= priorResidual*(1+1e-12) || damping <= nonlinearMinLineSearchDamping {
 					break
 				}
@@ -2031,7 +2040,7 @@ func solveTransientStepInternalWithLimit(base mnaSystem, resolvedDevices []Resol
 				maxAppliedCurrentUpdate = math.Max(maxAppliedCurrentUpdate, math.Abs(real(applied)))
 			}
 		}
-		maxResidual, label := nonlinearResidual(constrainedBase, devices, guess)
+		maxResidual, label := nonlinearResidual(*constrainedBase, devices, guess)
 		largestResidualLabel = label
 		evidence.Iterations++
 		evidence.FinalMaxUpdateV = normalizedMNAFloat(maxAppliedUpdate)
@@ -2652,7 +2661,7 @@ func validateTransientOperatingLimits(
 	var openedFuses []string
 	for _, device := range plan.Devices {
 		terminals := terminalMap(device)
-		parameters := namedValueMap(device.ModelParameters)
+		parameters := deviceParameterMap(device)
 		switch device.PrimitiveModel {
 		case PrimitiveFuseClosedStateV1:
 			meltingI2t, hasSurgeEvidence := parameters["nominal_melting_i2t_a2s"]

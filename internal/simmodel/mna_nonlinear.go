@@ -210,7 +210,7 @@ func solveNonlinearDCByCenteredOpAmpSeed(plan Plan, analysis Analysis, activeSta
 	emitterFollowerSeeds := map[string]bool{}
 	for _, device := range opAmps {
 		terminals := terminalMap(device)
-		parameters := namedValueMap(device.ModelParameters)
+		parameters := deviceParameterMap(device)
 		lower := nonlinearNodeVoltage(&system, solution, terminals["V_MINUS"]) + parameters["output_low_margin_v"]
 		upper := nonlinearNodeVoltage(&system, solution, terminals["V_PLUS"]) - parameters["output_high_margin_v"]
 		if !finite(lower) || !finite(upper) || lower >= upper {
@@ -279,7 +279,7 @@ func solveLinearOpAmpByBisection(plan Plan, analysis Analysis, current, resolved
 			continue
 		}
 		terminals := terminalMap(device)
-		parameters := namedValueMap(device.ModelParameters)
+		parameters := deviceParameterMap(device)
 		lower := nonlinearNodeVoltage(&operatingSystem, operatingSolution, terminals["V_MINUS"]) + parameters["output_low_margin_v"]
 		upper := nonlinearNodeVoltage(&operatingSystem, operatingSolution, terminals["V_PLUS"]) - parameters["output_high_margin_v"]
 		if !finite(lower) || !finite(upper) || lower >= upper {
@@ -399,7 +399,7 @@ func activeDeviceTransitionContext(plan Plan, system mnaSystem, solution []compl
 			_, _, _, desired = currentSenseOperatingState(device, system, solution)
 		} else {
 			terminals := terminalMap(device)
-			gain := namedValueMap(device.ModelParameters)["dc_open_loop_gain"]
+			gain := deviceParameterMap(device)["dc_open_loop_gain"]
 			differential := nonlinearNodeVoltage(&system, solution, terminals["IN_PLUS"]) - nonlinearNodeVoltage(&system, solution, terminals["IN_MINUS"])
 			desired = gain * differential
 		}
@@ -432,7 +432,7 @@ func activeDeviceStateSolutionConsistent(plan Plan, system mnaSystem, solution [
 			_, _, _, desired = currentSenseOperatingState(device, system, solution)
 		} else {
 			terminals := terminalMap(device)
-			gain := namedValueMap(device.ModelParameters)["dc_open_loop_gain"]
+			gain := deviceParameterMap(device)["dc_open_loop_gain"]
 			differential := nonlinearNodeVoltage(&system, solution, terminals["IN_PLUS"]) - nonlinearNodeVoltage(&system, solution, terminals["IN_MINUS"])
 			desired = gain * differential
 		}
@@ -580,7 +580,7 @@ func solveNonlinearDCForComparatorStateWithInitial(plan Plan, analysis Analysis,
 		largestCurrentUpdateLabel := "unknown"
 		largestResidualLabel := "unknown"
 		for iteration := 1; iteration <= nonlinearMaxIterations; iteration++ {
-			resetMNASystem(&system, baseSystem)
+			resetMNASystem(&system, &baseSystem)
 			stampCompiledNonlinearDevices(&system, devices, guess)
 			if diagnostic := validateMNASystemBounds(system); diagnostic != nil {
 				return mnaSystem{}, nil, evidence, diagnostic
@@ -878,7 +878,7 @@ func mosfetActiveSetConsistent(plan Plan, system mnaSystem, solution []complex12
 			return false
 		}
 		terminals := terminalMap(device)
-		parameters := namedValueMap(device.ModelParameters)
+		parameters := deviceParameterMap(device)
 		gate := nonlinearNodeVoltage(&system, solution, terminals["GATE"])
 		source := nonlinearNodeVoltage(&system, solution, terminals["SOURCE"])
 		control := mosfetPolarity(device.PrimitiveModel) * (gate - source)
@@ -1111,7 +1111,7 @@ func compileNonlinearDevicesWithStates(plan Plan, states map[string]float64) []c
 		default:
 			continue
 		}
-		parameters := namedValueMap(device.ModelParameters)
+		parameters := mutableDeviceParameterMap(device)
 		if device.PrimitiveModel == PrimitiveNMOSSwitchV1 || device.PrimitiveModel == PrimitivePMOSSwitchV1 {
 			if state, exists := states[device.Component]; exists {
 				parameters[parameterForcedMOSFETState] = state
@@ -1221,7 +1221,7 @@ func resolvedActiveDeviceStates(plan Plan, system mnaSystem, solution []complex1
 	states := map[string]float64{}
 	var key strings.Builder
 	for _, device := range plan.Devices {
-		parameters := namedValueMap(device.ModelParameters)
+		parameters := deviceParameterMap(device)
 		terminals := terminalMap(device)
 		switch device.PrimitiveModel {
 		case PrimitiveComparatorOpenCollectorV1:
@@ -1289,7 +1289,67 @@ func cloneMNASystem(source mnaSystem) mnaSystem {
 	return clone
 }
 
-func resetMNASystem(target *mnaSystem, source mnaSystem) {
+const maxReusableMNASystemScratchEntries = maxWorstCaseWorkers * maxMNAAnalysisWorkers
+
+type reusableMNASystemScratch struct {
+	system        mnaSystem
+	matrixStorage []complex128
+}
+
+var reusableMNASystemScratchPool = make(chan *reusableMNASystemScratch, maxReusableMNASystemScratchEntries)
+
+func acquireReusableMNASystemClone(source *mnaSystem) *reusableMNASystemScratch {
+	var scratch *reusableMNASystemScratch
+	select {
+	case scratch = <-reusableMNASystemScratchPool:
+	default:
+		scratch = new(reusableMNASystemScratch)
+	}
+	matrixEntries := 0
+	for _, row := range source.matrix {
+		matrixEntries += len(row)
+	}
+	if cap(scratch.system.matrix) < len(source.matrix) {
+		scratch.system.matrix = make([][]complex128, len(source.matrix))
+	} else {
+		scratch.system.matrix = scratch.system.matrix[:len(source.matrix)]
+	}
+	if cap(scratch.matrixStorage) < matrixEntries {
+		scratch.matrixStorage = make([]complex128, matrixEntries)
+	} else {
+		scratch.matrixStorage = scratch.matrixStorage[:matrixEntries]
+	}
+	offset := 0
+	for row := range source.matrix {
+		rowLength := len(source.matrix[row])
+		scratch.system.matrix[row] = scratch.matrixStorage[offset : offset+rowLength]
+		copy(scratch.system.matrix[row], source.matrix[row])
+		offset += rowLength
+	}
+	if cap(scratch.system.rhs) < len(source.rhs) {
+		scratch.system.rhs = make([]complex128, len(source.rhs))
+	} else {
+		scratch.system.rhs = scratch.system.rhs[:len(source.rhs)]
+	}
+	copy(scratch.system.rhs, source.rhs)
+	// MNA labels and indexes are immutable after the template is built. Solver
+	// iterations may only reset and stamp matrix/rhs storage, so scratch clones
+	// intentionally share these lookup structures with their source template.
+	scratch.system.unknownLabels = source.unknownLabels
+	scratch.system.nodeIndex = source.nodeIndex
+	scratch.system.branchIndex = source.branchIndex
+	scratch.system.multiBranchIndex = source.multiBranchIndex
+	return scratch
+}
+
+func releaseReusableMNASystemClone(scratch *reusableMNASystemScratch) {
+	select {
+	case reusableMNASystemScratchPool <- scratch:
+	default:
+	}
+}
+
+func resetMNASystem(target *mnaSystem, source *mnaSystem) {
 	for row := range source.matrix {
 		copy(target.matrix[row], source.matrix[row])
 	}
@@ -1862,7 +1922,7 @@ func validateNonlinearOperatingLimits(plan Plan, system mnaSystem, solution []co
 func validateNonlinearOperatingLimitsWithComparatorStates(plan Plan, system mnaSystem, solution []complex128, comparatorStates map[string]float64, allowPowerTransition bool, allowPulseRatings bool) []Diagnostic {
 	diagnostics := validateResolvedOperatingLimits(plan, system, solution, allowPowerTransition)
 	for _, device := range plan.Devices {
-		parameters := namedValueMap(device.ModelParameters)
+		parameters := deviceParameterMap(device)
 		terminals := terminalMap(device)
 		switch device.PrimitiveModel {
 		case PrimitiveDiodeShockleyV1:

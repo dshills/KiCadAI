@@ -34,9 +34,13 @@ func TestTransientSourceAndDeviceValueEventsExecuteDeterministically(t *testing.
 	if len(diagnostics) != 0 {
 		t.Fatalf("resolve value-event plan: %#v", diagnostics)
 	}
+	originalPlan := ClonePlan(plan)
 	report, diagnostics := Evaluate(plan)
 	if len(diagnostics) != 0 || report.Status != "pass" {
 		t.Fatalf("value-event report=%#v diagnostics=%#v", report, diagnostics)
+	}
+	if !reflect.DeepEqual(plan, originalPlan) {
+		t.Fatal("transient value-event evaluation mutated its input plan")
 	}
 	last := report.Analyses[0].Points[len(report.Analyses[0].Points)-1]
 	loadCurrent := 0.0
@@ -51,6 +55,29 @@ func TestTransientSourceAndDeviceValueEventsExecuteDeterministically(t *testing.
 	replay, replayDiagnostics := Evaluate(ClonePlan(plan))
 	if len(replayDiagnostics) != 0 || !reflect.DeepEqual(report, replay) {
 		t.Fatalf("value-event replay differs: diagnostics=%#v", replayDiagnostics)
+	}
+}
+
+func TestReusableMNASystemCloneRestoresContentAndDoesNotAliasSource(t *testing.T) {
+	source := mnaSystem{
+		matrix: [][]complex128{{1, 2}, {3, 4}}, rhs: []complex128{5, 6},
+		unknownLabels: []string{"A", "B"}, nodeIndex: map[string]int{"A": 0},
+		branchIndex: map[string]int{"source": 1}, multiBranchIndex: map[mnaBranchKey]int{{component: "source", terminal: "OUT"}: 1},
+	}
+	first := acquireReusableMNASystemClone(&source)
+	first.system.matrix[0][0] = 99
+	first.system.rhs[0] = 88
+	if source.matrix[0][0] != 1 || source.rhs[0] != 5 {
+		t.Fatal("reusable MNA clone aliases source storage")
+	}
+	releaseReusableMNASystemClone(first)
+	second := acquireReusableMNASystemClone(&source)
+	defer releaseReusableMNASystemClone(second)
+	if !reflect.DeepEqual(second.system.matrix, source.matrix) || !reflect.DeepEqual(second.system.rhs, source.rhs) {
+		t.Fatalf("reused MNA clone was not restored: matrix=%v rhs=%v", second.system.matrix, second.system.rhs)
+	}
+	if !reflect.DeepEqual(second.system.unknownLabels, source.unknownLabels) || second.system.nodeIndex["A"] != 0 || second.system.branchIndex["source"] != 1 {
+		t.Fatal("reused MNA clone lost immutable index metadata")
 	}
 }
 

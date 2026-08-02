@@ -84,7 +84,7 @@ func pushPullIsolatorMaximumOutput(device compiledNonlinearDevice, system mnaSys
 }
 
 func validatePushPullIsolatorOperatingLimits(device ResolvedDevice, system mnaSystem, solution []complex128, allowPowerTransition bool) []Diagnostic {
-	parameters := namedValueMap(device.ModelParameters)
+	parameters := deviceParameterMap(device)
 	terminals := terminalMap(device)
 	compiled := compiledNonlinearDevice{primitive: device.PrimitiveModel, terminals: terminals, parameters: parameters}
 	path := "devices." + device.Component
@@ -120,7 +120,7 @@ func pushPullIsolatorDissipation(device ResolvedDevice, system mnaSystem, soluti
 	if device.PrimitiveModel != PrimitivePushPullDigitalIsolatorV1 {
 		return 0, false
 	}
-	parameters := namedValueMap(device.ModelParameters)
+	parameters := deviceParameterMap(device)
 	terminals := terminalMap(device)
 	compiled := compiledNonlinearDevice{primitive: device.PrimitiveModel, terminals: terminals, parameters: parameters}
 	dissipation := 0.0

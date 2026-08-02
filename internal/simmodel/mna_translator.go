@@ -49,7 +49,7 @@ func addOpenDrainTranslatorResidual(residuals []complex128, base mnaSystem, devi
 }
 
 func validateOpenDrainTranslatorOperatingLimits(device ResolvedDevice, system mnaSystem, solution []complex128, allowPowerTransition bool) []Diagnostic {
-	parameters := namedValueMap(device.ModelParameters)
+	parameters := deviceParameterMap(device)
 	terminals := terminalMap(device)
 	ground := real(solvedNodeVoltage(system, solution, terminals["GND"]))
 	vcca := real(solvedNodeVoltage(system, solution, terminals["VCCA"])) - ground
@@ -93,7 +93,7 @@ func openDrainTranslatorDissipation(device ResolvedDevice, system mnaSystem, sol
 	if device.PrimitiveModel != PrimitiveBidirectionalOpenDrainTranslatorV1 {
 		return 0, false
 	}
-	parameters := namedValueMap(device.ModelParameters)
+	parameters := deviceParameterMap(device)
 	terminals := terminalMap(device)
 	ground := real(solvedNodeVoltage(system, solution, terminals["GND"]))
 	vcca := real(solvedNodeVoltage(system, solution, terminals["VCCA"])) - ground

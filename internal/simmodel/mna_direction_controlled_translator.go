@@ -137,7 +137,7 @@ func directionControlledTranslatorMaximumOutput(device compiledNonlinearDevice, 
 }
 
 func validateDirectionControlledTranslatorOperatingLimits(device ResolvedDevice, system mnaSystem, solution []complex128, allowPowerTransition bool) []Diagnostic {
-	parameters := namedValueMap(device.ModelParameters)
+	parameters := deviceParameterMap(device)
 	terminals := terminalMap(device)
 	compiled := compiledNonlinearDevice{primitive: device.PrimitiveModel, terminals: terminals, parameters: parameters}
 	ground := real(solvedNodeVoltage(system, solution, terminals["GND"]))
@@ -200,7 +200,7 @@ func directionControlledTranslatorDissipation(device ResolvedDevice, system mnaS
 	if device.PrimitiveModel != PrimitiveDirectionControlledTranslatorV1 {
 		return 0, false
 	}
-	parameters := namedValueMap(device.ModelParameters)
+	parameters := deviceParameterMap(device)
 	terminals := terminalMap(device)
 	ground := real(solvedNodeVoltage(system, solution, terminals["GND"]))
 	vcca := real(solvedNodeVoltage(system, solution, terminals["VCCA"])) - ground
