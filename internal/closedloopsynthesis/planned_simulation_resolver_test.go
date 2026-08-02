@@ -284,6 +284,9 @@ func TestPhysicalLoadEventTruncatesOperatingPreludeWithoutOverlap(t *testing.T) 
 	if math.Abs(prelude.DurationS-.0019) > 1e-12 || prelude.TriggerTimeS+prelude.DurationS > declared.TriggerTimeS+1e-12 {
 		t.Fatalf("prelude=%#v overlaps declared event=%#v", prelude, declared)
 	}
+	if prelude.AppliedSI != declared.InitialSI {
+		t.Fatalf("prelude applied value = %.12g; want declared initial %.12g", prelude.AppliedSI, declared.InitialSI)
+	}
 	if declared.InitialSI != 10 || declared.AppliedSI != 5 || declared.RecoveredSI == nil || *declared.RecoveredSI != 10 {
 		t.Fatalf("declared physical-load event = %#v", declared)
 	}

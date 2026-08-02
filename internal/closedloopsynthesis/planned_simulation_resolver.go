@@ -1546,7 +1546,11 @@ func truncateOperatingLoadPreludes(analysis *simmodel.Analysis) {
 	if analysis == nil || len(analysis.DeviceValueEvents) == 0 {
 		return
 	}
-	earliestDeclared := map[string]float64{}
+	type declaredLoadStart struct {
+		triggerTimeS float64
+		initialSI    float64
+	}
+	earliestDeclared := map[string]declaredLoadStart{}
 	preludeIDs := map[string]string{}
 	for _, event := range analysis.DeviceValueEvents {
 		preludeID, exists := preludeIDs[event.Component]
@@ -1557,17 +1561,18 @@ func truncateOperatingLoadPreludes(analysis *simmodel.Analysis) {
 		if event.ID == preludeID {
 			continue
 		}
-		if trigger, exists := earliestDeclared[event.Component]; !exists || event.TriggerTimeS < trigger {
-			earliestDeclared[event.Component] = event.TriggerTimeS
+		if declared, exists := earliestDeclared[event.Component]; !exists || event.TriggerTimeS < declared.triggerTimeS {
+			earliestDeclared[event.Component] = declaredLoadStart{triggerTimeS: event.TriggerTimeS, initialSI: event.InitialSI}
 		}
 	}
 	retained := analysis.DeviceValueEvents[:0]
 	for _, event := range analysis.DeviceValueEvents {
-		trigger, exists := earliestDeclared[event.Component]
+		declared, exists := earliestDeclared[event.Component]
 		if !exists || event.ID != preludeIDs[event.Component] {
 			retained = append(retained, event)
 			continue
 		}
+		trigger := declared.triggerTimeS
 		tolerance := math.Max(analysis.TimeStepS, math.Abs(trigger)) * 1e-12
 		if event.TriggerTimeS+event.DurationS <= trigger+tolerance {
 			retained = append(retained, event)
@@ -1577,6 +1582,9 @@ func truncateOperatingLoadPreludes(analysis *simmodel.Analysis) {
 		if duration <= tolerance {
 			continue
 		}
+		// Preserve the operating prelude's original start and shorten only its
+		// end so it hands off the declared initial value at the declared trigger.
+		event.AppliedSI = declared.initialSI
 		event.DurationS = duration
 		retained = append(retained, event)
 	}

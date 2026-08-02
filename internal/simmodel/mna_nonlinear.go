@@ -168,7 +168,7 @@ func solveNonlinearDCFromWarmState(plan Plan, analysis Analysis, initial map[str
 		if bisectedEvidence.Method != "" {
 			transitionContext += "; bisection " + bisectedEvidence.Method
 		}
-		next := advanceActiveDeviceState(plan, states, resolved)
+		next := advanceActiveDeviceStateAtOperatingPoint(plan, &system, solution, states, resolved)
 		stateKey := activeDeviceStateKey(plan, next)
 		if seen[stateKey] {
 			return system, solution, totalEvidence, states, &Diagnostic{Path: "devices", Message: "bounded active-device operating-point states did not converge (current " + activeDeviceStateKey(plan, states) + ", resolved " + resolvedKey + ", cycle " + lastStateKey + " -> " + stateKey + ")", Suggestion: "correct ambiguous feedback or add a reviewed hysteresis network and loading"}
@@ -445,6 +445,10 @@ func activeDeviceStateSolutionConsistent(plan Plan, system mnaSystem, solution [
 }
 
 func advanceActiveDeviceState(plan Plan, current, resolved map[string]float64) map[string]float64 {
+	return advanceActiveDeviceStateAtOperatingPoint(plan, nil, nil, current, resolved)
+}
+
+func advanceActiveDeviceStateAtOperatingPoint(plan Plan, system *mnaSystem, solution []complex128, current, resolved map[string]float64) map[string]float64 {
 	next := cloneOpAmpClamps(current)
 	for priority := 0; priority < 3; priority++ {
 		for _, device := range plan.Devices {
@@ -458,6 +462,16 @@ func advanceActiveDeviceState(plan Plan, current, resolved map[string]float64) m
 				continue
 			}
 			if linearOutput && currentExists && resolvedExists {
+				if system != nil && !activeDeviceClampAtOutputRail(device, currentValue, system, solution) {
+					// Centered seeds are numerical starting points, not physical rail
+					// decisions. Move an interior seed directly to the rail selected by
+					// the solved circuit; releasing it as though it were the opposite
+					// rail can recreate an already-seen linear state. As with every
+					// transition in this routine, change exactly one device per solver
+					// iteration so the bounded transition path remains deterministic.
+					next[device.Component] = resolvedValue
+					return next
+				}
 				// A constrained feedback solve can make the opposite rail appear
 				// immediately active. Release the current clamp first so the trusted
 				// linear equation decides whether that opposite clamp is real. Do
@@ -474,6 +488,49 @@ func advanceActiveDeviceState(plan Plan, current, resolved map[string]float64) m
 		}
 	}
 	return next
+}
+
+func activeDeviceClampAtOutputRail(device ResolvedDevice, value float64, system *mnaSystem, solution []complex128) bool {
+	minimum, maximum := 0.0, 0.0
+	switch device.PrimitiveModel {
+	case PrimitiveOpAmpV1:
+		negativeNet, negativeExists := activeDeviceTerminalNet(device, "V_MINUS")
+		positiveNet, positiveExists := activeDeviceTerminalNet(device, "V_PLUS")
+		if !negativeExists || !positiveExists {
+			return false
+		}
+		negativeVoltage := nonlinearNodeVoltage(system, solution, negativeNet)
+		positiveVoltage := nonlinearNodeVoltage(system, solution, positiveNet)
+		if !finite(negativeVoltage) || !finite(positiveVoltage) {
+			return false
+		}
+		minimum = negativeVoltage + transientModelParameter(device.ModelParameters, "output_low_margin_v")
+		maximum = positiveVoltage - transientModelParameter(device.ModelParameters, "output_high_margin_v")
+	case PrimitiveCurrentSenseAmplifierV1:
+		_, minimum, maximum, _ = currentSenseOperatingState(device, *system, solution)
+	default:
+		return false
+	}
+	if !finite(minimum) || !finite(maximum) || minimum >= maximum {
+		return false
+	}
+	tolerance := nonlinearClampConsistencyV * math.Max(1, math.Max(math.Abs(minimum), math.Abs(maximum)))
+	return math.Abs(value-minimum) <= tolerance || math.Abs(value-maximum) <= tolerance
+}
+
+func activeDeviceTerminalNet(device ResolvedDevice, name string) (string, bool) {
+	if device.terminalIndex != nil {
+		net, exists := device.terminalIndex[name]
+		return net, exists
+	}
+	// Runtime solver plans are indexed by indexMNAPlanDevices. Keep a
+	// non-allocating fallback for directly constructed unit-test devices.
+	for _, terminal := range device.Terminals {
+		if terminal.Terminal == name {
+			return terminal.Net, true
+		}
+	}
+	return "", false
 }
 
 func activeDeviceTransitionPriority(primitive string) int {

@@ -1282,6 +1282,36 @@ func TestAdvanceActiveDeviceStateReleasesOpAmpBeforeOppositeRail(t *testing.T) {
 	}
 }
 
+func TestAdvanceActiveDeviceStateMovesInteriorSeedDirectlyToResolvedRail(t *testing.T) {
+	plan := Plan{Devices: []ResolvedDevice{{
+		Component: "amplifier", PrimitiveModel: PrimitiveOpAmpV1,
+		Terminals:       []TerminalBinding{{Terminal: "V_MINUS", Net: "GND"}, {Terminal: "V_PLUS", Net: "VCC"}},
+		ModelParameters: []NamedValue{{Name: "output_low_margin_v", Value: .1}, {Name: "output_high_margin_v", Value: .1}},
+	}}}
+	system := mnaSystem{nodeIndex: map[string]int{"GND": 0, "VCC": 1}}
+	solution := []complex128{0, 5}
+	next := advanceActiveDeviceStateAtOperatingPoint(
+		plan, &system, solution,
+		map[string]float64{"amplifier": 2.5},
+		map[string]float64{"amplifier": .1},
+	)
+	if got := next["amplifier"]; got != .1 {
+		t.Fatalf("interior seed transitioned to %g; want resolved low rail", got)
+	}
+}
+
+func TestActiveDeviceClampAtOutputRailRejectsMissingSupplyTerminal(t *testing.T) {
+	device := ResolvedDevice{
+		Component: "amplifier", PrimitiveModel: PrimitiveOpAmpV1,
+		Terminals:       []TerminalBinding{{Terminal: "V_MINUS", Net: "GND"}},
+		ModelParameters: []NamedValue{{Name: "output_low_margin_v", Value: .1}, {Name: "output_high_margin_v", Value: .1}},
+	}
+	system := mnaSystem{nodeIndex: map[string]int{"GND": 0}}
+	if activeDeviceClampAtOutputRail(device, .1, &system, []complex128{0}) {
+		t.Fatal("incomplete op-amp terminal binding was accepted as an output-rail clamp")
+	}
+}
+
 func TestAdvanceActiveDeviceStatePrioritizesLinearOutputBeforeComparatorOrder(t *testing.T) {
 	plan := Plan{Devices: []ResolvedDevice{
 		{Component: "decision", PrimitiveModel: PrimitiveComparatorOpenCollectorV1},
