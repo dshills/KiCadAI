@@ -264,6 +264,32 @@ func TestSequenceResponseTargetUsesDependentPublicRail(t *testing.T) {
 	}
 }
 
+func TestGeneratedDomainControlBindingResolvesExternalControlSource(t *testing.T) {
+	requirement := architecturesearch.Requirement{Requirements: architecturesearch.Requirements{
+		Domains: []architecturesearch.Domain{{ID: "generated_logic", Kind: "supply", Source: "internal_rail"}},
+		Ports: []architecturesearch.Port{{
+			ID: "enable", Kind: "digital_logic", Direction: "sink", Domain: "generated_logic",
+		}},
+	}}
+	plans := map[string]simmodel.Plan{simmodel.AnalysisTransient: {
+		Devices: []simmodel.ResolvedDevice{{
+			Component: "enable_source", PrimitiveModel: simmodel.PrimitiveConnectorVoltageSourceV1,
+			Terminals: []simmodel.TerminalBinding{{Terminal: "PIN_1", Net: "ENABLE"}, {Terminal: "PIN_2", Net: "GND"}},
+		}},
+	}}
+	bindings := appendGeneratedDomainControlBindings(nil, requirement, []SemanticBinding{{Kind: "port", ID: "enable", Target: "ENABLE"}}, plans)
+	if len(bindings) != 1 || bindings[0] != (SimulationOperatingBinding{
+		Axis: "generated_domain_control", Target: "ENABLE", Kind: OperatingGeneratedControl, Component: "enable_source",
+	}) {
+		t.Fatalf("generated-domain control bindings = %#v", bindings)
+	}
+
+	requirement.Requirements.Domains[0].Source = "external"
+	if got := appendGeneratedDomainControlBindings(nil, requirement, []SemanticBinding{{Kind: "port", ID: "enable", Target: "ENABLE"}}, plans); len(got) != 0 {
+		t.Fatalf("external-domain control unexpectedly coupled to generated power: %#v", got)
+	}
+}
+
 func TestStabilityObservationResolvesEmitterDegeneratedBJTCollector(t *testing.T) {
 	plan := simmodel.Plan{GroundNode: "GND", Devices: []simmodel.ResolvedDevice{
 		{Component: "transistor", PrimitiveModel: simmodel.PrimitiveBJTNPNV1, ModelParameters: []simmodel.NamedValue{{Name: "transition_frequency_hz", Value: 40e6}}, Terminals: []simmodel.TerminalBinding{{Terminal: "BASE", Net: "BASE"}, {Terminal: "COLLECTOR", Net: "COLLECTOR"}, {Terminal: "EMITTER", Net: "EMITTER"}}},

@@ -1900,6 +1900,30 @@ func TestStartupLoadCurrentHarnessUsesVoltageDependentPhysicalLoad(t *testing.T)
 	}
 }
 
+func TestTransientLoadCurrentHarnessUsesPhysicalLoadBehindHighSideDisconnect(t *testing.T) {
+	minimum, maximum := 0.02, 1.0
+	requirement := architecturesearch.Requirement{Requirements: architecturesearch.Requirements{
+		Domains: []architecturesearch.Domain{{ID: "supply", Kind: "supply", NominalVoltageV: 5}, {ID: "ground", Kind: "reference"}},
+		Ports:   []architecturesearch.Port{{ID: "load", Domain: "supply"}, {ID: "ground", Domain: "ground"}},
+		OperatingCases: []architecturesearch.OperatingCase{{Conditions: []architecturesearch.OperatingCondition{{
+			Axis: "load_current", Target: "load", Min: &minimum, Max: &maximum, Unit: "A",
+		}}}},
+	}}
+	bindings := []closedloopsynthesis.SemanticBinding{{Kind: "domain", ID: "ground", Target: "GND"}, {Kind: "port", ID: "load", Target: "OUTPUT"}}
+	plan := simmodel.Plan{Devices: []simmodel.ResolvedDevice{
+		{Component: "disconnect", PrimitiveModel: simmodel.PrimitivePMOSSwitchV1, Terminals: []simmodel.TerminalBinding{{Terminal: "SOURCE", Net: "RAIL"}, {Terminal: "DRAIN", Net: "PROTECTED"}, {Terminal: "GATE", Net: "GATE"}}},
+		{Component: "fuse", PrimitiveModel: simmodel.PrimitiveFuseClosedStateV1, Terminals: []simmodel.TerminalBinding{{Terminal: "A", Net: "PROTECTED"}, {Terminal: "B", Net: "OUTPUT"}}},
+	}}
+	devices, err := operatingHarnessDevices(requirement, bindings, &plan, simmodel.AnalysisTransient)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(devices) != 1 || devices[0].Source || devices[0].Device.CatalogID != "resistor.generic.0603" ||
+		!devices[0].Device.HasValueSI || math.Abs(devices[0].Device.ValueSI-5) > 1e-12 {
+		t.Fatalf("protected transient load harness = %#v", devices)
+	}
+}
+
 func TestStartupLoadCurrentHarnessUsesPoweredTargetWithoutLoadSwitch(t *testing.T) {
 	minimum, maximum := 0.0, 0.03
 	requirement := architecturesearch.Requirement{Requirements: architecturesearch.Requirements{
@@ -2184,6 +2208,36 @@ func TestSequencedDualRailDynamicPlansUseControlledDisconnectAndVoltageEventSour
 	)
 	if len(diagnostics) != 0 {
 		t.Fatalf("compile diagnostics = %#v", diagnostics)
+	}
+	generatedControl := ""
+	for _, binding := range planSet.OperatingBindings {
+		if binding.Kind != closedloopsynthesis.OperatingGeneratedControl {
+			continue
+		}
+		if generatedControl != "" && generatedControl != binding.Component {
+			t.Fatalf("generated-domain controls are ambiguous: %q and %q", generatedControl, binding.Component)
+		}
+		generatedControl = binding.Component
+	}
+	if generatedControl == "" {
+		t.Fatal("sequenced rail plan lacks a generated-domain control binding")
+	}
+	startupControlEvents := 0
+	for _, plan := range resolution.Plans {
+		for _, analysis := range plan.Analyses {
+			for _, event := range analysis.SourceValueEvents {
+				if event.Component != generatedControl || !strings.HasPrefix(event.ID, "startup_generated_control_") {
+					continue
+				}
+				startupControlEvents++
+				if event.Initial != 0 || event.Applied == 0 {
+					t.Fatalf("compiled generated-domain startup control event = %#v", event)
+				}
+			}
+		}
+	}
+	if startupControlEvents == 0 {
+		t.Fatal("compiled sequenced rail plans lack a generated-domain startup control transition")
 	}
 	railLossSources := map[string]bool{}
 	for _, plan := range resolution.Plans {

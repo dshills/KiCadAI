@@ -20,6 +20,7 @@ const (
 	OperatingModelParameter    = "device_model_parameter"
 	OperatingAnalysisCondition = "analysis_condition"
 	OperatingWorstCase         = "worst_case"
+	OperatingGeneratedControl  = "generated_domain_control"
 
 	AssertionBoundsDirect   = "direct"
 	AssertionBoundsAbsolute = "absolute"
@@ -687,6 +688,10 @@ func applyPlannedEvents(
 			continue
 		}
 		if eventApplied {
+			if diagnostic := coupleGeneratedControlsToPowerEvent(analysis, event, operatingBindings); diagnostic != nil {
+				diagnostics = append(diagnostics, *diagnostic)
+				continue
+			}
 			applied = append(applied, event.ID)
 		}
 	}
@@ -710,6 +715,47 @@ func applyPlannedEvents(
 	}
 	slices.Sort(applied)
 	return slices.Compact(applied), diagnostics
+}
+
+func coupleGeneratedControlsToPowerEvent(analysis *simmodel.Analysis, event PlannedEvent, bindings []SimulationOperatingBinding) *Diagnostic {
+	if event.Kind != "startup" && event.Kind != "shutdown" {
+		return nil
+	}
+	for _, binding := range bindings {
+		if binding.Kind != OperatingGeneratedControl {
+			continue
+		}
+		nominal := sourceExcitationDCValue(*analysis, binding.Component)
+		if !finite(nominal) {
+			return &Diagnostic{Path: event.ID, Message: "generated-domain control event requires a finite resolved source level"}
+		}
+		initial := nominal
+		if event.Initial != nil && *event.Initial == 0 {
+			initial = 0
+		}
+		applied := nominal
+		if event.Applied == 0 {
+			applied = 0
+		}
+		var recovered *float64
+		if event.Recovered != nil {
+			value := nominal
+			if *event.Recovered == 0 {
+				value = 0
+			}
+			recovered = &value
+		}
+		controlEvent := event
+		controlEvent.ID = event.ID + "_generated_control_" + binding.Component
+		appended, diagnostic := appendSourceValueEvent(analysis, controlEvent, binding.Component, initial, applied, recovered)
+		if diagnostic != nil {
+			return diagnostic
+		}
+		if !appended {
+			return &Diagnostic{Path: event.ID, Message: "generated-domain control source is absent from the compiled event analysis"}
+		}
+	}
+	return nil
 }
 
 func coupleLoadCurrentsToPowerEvents(analysis *simmodel.Analysis, bindings []SimulationOperatingBinding) {
@@ -848,22 +894,28 @@ func compactPlannedEventWindow(analysis *simmodel.Analysis, appliedEventIDs []st
 		return
 	}
 	duration := 0.0
+	shift := func(id string, trigger, original *float64) {
+		for eventID := range applied {
+			if strings.HasPrefix(id, compiledEventPrefix(eventID)) {
+				*original = *trigger
+				*trigger -= offset
+				return
+			}
+		}
+	}
 	for index := range analysis.SourceValueEvents {
 		event := &analysis.SourceValueEvents[index]
-		event.OriginalTriggerTimeS = event.TriggerTimeS
-		event.TriggerTimeS -= offset
+		shift(event.ID, &event.TriggerTimeS, &event.OriginalTriggerTimeS)
 		duration = math.Max(duration, event.TriggerTimeS+event.DurationS)
 	}
 	for index := range analysis.DeviceValueEvents {
 		event := &analysis.DeviceValueEvents[index]
-		event.OriginalTriggerTimeS = event.TriggerTimeS
-		event.TriggerTimeS -= offset
+		shift(event.ID, &event.TriggerTimeS, &event.OriginalTriggerTimeS)
 		duration = math.Max(duration, event.TriggerTimeS+event.DurationS)
 	}
 	for index := range analysis.ConditionValueEvents {
 		event := &analysis.ConditionValueEvents[index]
-		event.OriginalTriggerTimeS = event.TriggerTimeS
-		event.TriggerTimeS -= offset
+		shift(event.ID, &event.TriggerTimeS, &event.OriginalTriggerTimeS)
 		duration = math.Max(duration, event.TriggerTimeS+event.DurationS)
 	}
 	analysis.DurationS = duration
@@ -1710,7 +1762,7 @@ func planHasAutonomousTransientDevice(plan simmodel.Plan) bool {
 
 func validOperatingBinding(binding SimulationOperatingBinding) bool {
 	switch binding.Kind {
-	case OperatingSourceDCValue, OperatingSourceFrequencyHz, OperatingDeviceValueSI:
+	case OperatingSourceDCValue, OperatingSourceFrequencyHz, OperatingDeviceValueSI, OperatingGeneratedControl:
 		return binding.Component != "" && binding.ReferenceComponent == "" && binding.Parameter == "" && binding.Scale == 0 && binding.Offset == 0
 	case OperatingLoadCurrent:
 		return binding.Component != "" && binding.Parameter == "" && finite(binding.Scale) && binding.Scale >= 0 && finite(binding.Offset)

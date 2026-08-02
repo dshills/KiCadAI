@@ -340,7 +340,7 @@ func TestTransientSOAPulseClockTracksOnlyDCUnsafeExcursion(t *testing.T) {
 	}
 
 	excursion = transientSOAExcursion{}
-	for step := 1; step <= 10; step++ {
+	for step := 0; step <= 10; step++ {
 		margin, excursion, diagnostic = transientSOAObservationMargin(device, excursion, 100e-6, 25, 10, 1)
 		wantDuration := float64(step) * 100e-6
 		if diagnostic != nil || math.Abs(margin-2) > 1e-12 || math.Abs(excursion.durationS-wantDuration) > 1e-15 || !excursion.active {

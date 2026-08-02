@@ -37,6 +37,7 @@ func BuildResolvedSimulationContracts(requirement architecturesearch.Requirement
 	supplyNodes := semanticSupplyNodes(requirement, analysisPlan.Bindings)
 	operatingBindings := resolvedOperatingBindings(analysisPlan, plans, &diagnostics)
 	operatingBindings = appendEventSupplyBindings(operatingBindings, supplyNodes, plans, &diagnostics)
+	operatingBindings = appendGeneratedDomainControlBindings(operatingBindings, requirement, analysisPlan.Bindings, plans)
 	seenAssertions := map[string]bool{}
 	for _, assertion := range analysisPlan.Assertions {
 		key := assertion.Metric + "\x00" + assertion.Target
@@ -105,6 +106,57 @@ func BuildResolvedSimulationContracts(requirement architecturesearch.Requirement
 		return nil, nil, nil, diagnostics
 	}
 	return templates, assertionBindings, operatingBindings, nil
+}
+
+func appendGeneratedDomainControlBindings(bindings []SimulationOperatingBinding, requirement architecturesearch.Requirement, semanticBindings []SemanticBinding, plans map[string]simmodel.Plan) []SimulationOperatingBinding {
+	generatedDomains := map[string]bool{}
+	for _, domain := range requirement.Requirements.Domains {
+		generatedDomains[domain.ID] = domain.Source != "" && !strings.EqualFold(domain.Source, "external")
+	}
+	targets := map[string]string{}
+	for _, binding := range semanticBindings {
+		if binding.Kind == "port" {
+			targets[binding.ID] = binding.Target
+		}
+	}
+	seenComponents := map[string]bool{}
+	for _, binding := range bindings {
+		if binding.Kind == OperatingGeneratedControl {
+			seenComponents[binding.Component] = true
+		}
+	}
+	for _, port := range requirement.Requirements.Ports {
+		if !generatedDomains[port.Domain] || port.Direction == "source" {
+			continue
+		}
+		switch port.Kind {
+		case "digital_logic", "digital_bus", "analog_control":
+		default:
+			continue
+		}
+		target := targets[port.ID]
+		if target == "" {
+			continue
+		}
+		component, ok := uniqueVoltageSourceAcrossPlans(plans, target)
+		if !ok || seenComponents[component] {
+			continue
+		}
+		seenComponents[component] = true
+		bindings = append(bindings, SimulationOperatingBinding{
+			Axis: "generated_domain_control", Target: target, Kind: OperatingGeneratedControl, Component: component,
+		})
+	}
+	slices.SortStableFunc(bindings, func(left, right SimulationOperatingBinding) int {
+		if order := strings.Compare(left.Axis, right.Axis); order != 0 {
+			return order
+		}
+		if order := strings.Compare(left.Target, right.Target); order != 0 {
+			return order
+		}
+		return strings.Compare(left.Component, right.Component)
+	})
+	return bindings
 }
 
 func appendEventSupplyBindings(bindings []SimulationOperatingBinding, supplyNodes []string, plans map[string]simmodel.Plan, diagnostics *[]Diagnostic) []SimulationOperatingBinding {

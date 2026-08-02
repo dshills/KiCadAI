@@ -299,7 +299,7 @@ func transientDerivedValue(result AnalysisResult, assertion Assertion) (float64,
 func transientResponseLatency(result AnalysisResult, assertion Assertion) (float64, *Diagnostic) {
 	var baseline float64
 	baselineFound := false
-	var preEventTimes, preEventValues, times, residuals []float64
+	var preEventTimes, preEventValues, times, deltas []float64
 	scale := 1.0
 	for _, point := range result.Points {
 		value, found := analysisNodeReal(point, assertion.Node)
@@ -336,25 +336,49 @@ func transientResponseLatency(result AnalysisResult, assertion Assertion) (float
 			}
 		}
 		times = append(times, point.TimeS)
-		residuals = append(residuals, math.Abs(value-expected))
+		deltas = append(deltas, value-expected)
 		scale = math.Max(scale, math.Max(math.Abs(value), math.Abs(expected)))
 	}
-	if !baselineFound || len(residuals) < 2 {
+	if !baselineFound || len(deltas) < 2 {
 		return 0, advancedAssertionDiagnostic(assertion, "event-response assertion requires a baseline and at least two solved samples inside its bounded window")
 	}
-	peak := 0.0
-	for _, residual := range residuals {
-		peak = math.Max(peak, residual)
+	peakAbsolute := 0.0
+	for _, delta := range deltas {
+		peakAbsolute = math.Max(peakAbsolute, math.Abs(delta))
 	}
-	if peak <= 1e-12*scale {
+	tolerance := 1e-12 * scale
+	if peakAbsolute <= tolerance {
 		return 0, advancedAssertionDiagnostic(assertion, fmt.Sprintf(
 			"event-response assertion requires a nonconstant solved waveform (baseline=%.12g peak_delta=%.12g scale=%.12g samples=%d)",
-			baseline, peak, scale, len(residuals),
+			baseline, peakAbsolute, scale, len(deltas),
 		))
+	}
+	// Measure onset in the direction of the last meaningful event response.
+	// Scanning backward preserves bounded pulse responses that recover before
+	// the window closes, while rejecting an earlier opposite-direction glitch
+	// (for example an unpowered load pulling a sequenced rail below ground).
+	direction := 0.0
+	for index := len(deltas) - 1; index >= 0; index-- {
+		if math.Abs(deltas[index]) <= tolerance {
+			continue
+		}
+		direction = math.Copysign(1, deltas[index])
+		break
+	}
+	if direction == 0 {
+		return 0, advancedAssertionDiagnostic(assertion, "trusted event window does not contain a directed response")
+	}
+	peak := 0.0
+	for _, delta := range deltas {
+		peak = math.Max(peak, math.Max(0, direction*delta))
+	}
+	if peak <= tolerance {
+		return 0, advancedAssertionDiagnostic(assertion, "trusted event window does not contain a response in its terminal direction")
 	}
 	threshold := TransientResponseOnsetFraction * peak
 	previousTime, previousResidual := assertion.WindowStartS, 0.0
-	for index, residual := range residuals {
+	for index, delta := range deltas {
+		residual := math.Max(0, direction*delta)
 		if residual >= threshold {
 			crossing := interpolateCrossing(previousTime, times[index], previousResidual, residual, threshold)
 			return normalizedMNAFloat(math.Max(0, crossing-assertion.WindowStartS)), nil

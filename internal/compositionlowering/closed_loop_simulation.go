@@ -1361,6 +1361,10 @@ func operatingHarnessDevices(requirement architecturesearch.Requirement, binding
 	}
 	inductiveTargets := map[string]bool{}
 	currentTargets := map[string]bool{}
+	disconnectedLoadNets := map[string]bool{}
+	if analysisKind == simmodel.AnalysisTransient {
+		disconnectedLoadNets = highSideDisconnectedLoadNets(resolvedPlan)
+	}
 	for _, condition := range loadConditions {
 		if condition.Axis != "load_inductance" && condition.Axis != "load_current" {
 			continue
@@ -1393,7 +1397,8 @@ func operatingHarnessDevices(requirement architecturesearch.Requirement, binding
 		switch condition.Axis {
 		case "load_current":
 			catalogID, terminals, source = "source.current.connector.1x02", [2]string{"POSITIVE", "NEGATIVE"}, true
-			if analysisKind == simmodel.AnalysisStartup || analysisKind == simmodel.AnalysisElectrothermal {
+			if analysisKind == simmodel.AnalysisStartup || analysisKind == simmodel.AnalysisElectrothermal ||
+				analysisKind == simmodel.AnalysisTransient && disconnectedLoadNets[target] {
 				var resistanceErr error
 				startupLoadResistance, resistanceErr = startupLoadResistanceOhm(requirement, condition)
 				if resistanceErr != nil {
@@ -1484,6 +1489,59 @@ func operatingHarnessDevices(requirement architecturesearch.Requirement, binding
 		return strings.Compare(left.Device.InstanceID, right.Device.InstanceID)
 	})
 	return result, nil
+}
+
+// highSideDisconnectedLoadNets recognizes protected load nodes reached from
+// PMOS drains through only closed series protection elements. An ideal
+// constant-current harness on that isolated node would create power by
+// pulling it below its reference while the switch is open. A voltage-dependent
+// physical load preserves the declared current at nominal voltage without the
+// nonphysical off-state excursion.
+func highSideDisconnectedLoadNets(plan *simmodel.Plan) map[string]bool {
+	reachable := map[string]bool{}
+	if plan == nil {
+		return reachable
+	}
+	adjacent := map[string][]string{}
+	queue := []string{}
+	for _, device := range plan.Devices {
+		if device.PrimitiveModel == simmodel.PrimitivePMOSSwitchV1 {
+			for _, terminal := range device.Terminals {
+				if terminal.Terminal == "DRAIN" && terminal.Net != "" && !reachable[terminal.Net] {
+					reachable[terminal.Net] = true
+					queue = append(queue, terminal.Net)
+				}
+			}
+		}
+		switch device.PrimitiveModel {
+		case simmodel.PrimitiveFuseClosedStateV1, simmodel.PrimitiveFuseI2TClearingV1:
+		default:
+			continue
+		}
+		var left, right string
+		for _, terminal := range device.Terminals {
+			switch terminal.Terminal {
+			case "A":
+				left = terminal.Net
+			case "B":
+				right = terminal.Net
+			}
+		}
+		if left != "" && right != "" {
+			adjacent[left] = append(adjacent[left], right)
+			adjacent[right] = append(adjacent[right], left)
+		}
+	}
+	for index := 0; index < len(queue); index++ {
+		for _, neighbor := range adjacent[queue[index]] {
+			if reachable[neighbor] {
+				continue
+			}
+			reachable[neighbor] = true
+			queue = append(queue, neighbor)
+		}
+	}
+	return reachable
 }
 
 func parallelOperatingSupportCurrent(

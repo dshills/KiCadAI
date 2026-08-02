@@ -1592,9 +1592,26 @@ func solveBoundedOpAmpDCFromState(plan Plan, analysis Analysis, system mnaSystem
 func comparatorOn(device ResolvedDevice, system mnaSystem, solution []complex128) bool {
 	terminals := terminalMap(device)
 	parameters := deviceParameterMap(device)
-	plus := real(solvedNodeVoltage(system, solution, terminals["IN_PLUS"]))
-	minus := real(solvedNodeVoltage(system, solution, terminals["IN_MINUS"]))
-	return plus-minus < parameters["input_offset_v"]
+	positiveSupply, positiveSupplyOK := terminals["V_PLUS"]
+	negativeSupply, negativeSupplyOK := terminals["V_MINUS"]
+	positiveInput, positiveInputOK := terminals["IN_PLUS"]
+	negativeInput, negativeInputOK := terminals["IN_MINUS"]
+	minimumSupply, minimumSupplyOK := parameters["supply_min_v"]
+	inputOffset, inputOffsetOK := parameters["input_offset_v"]
+	if !positiveSupplyOK || !negativeSupplyOK || !positiveInputOK || !negativeInputOK ||
+		!minimumSupplyOK || !inputOffsetOK || !finite(minimumSupply) || !finite(inputOffset) {
+		return false
+	}
+	supply := real(solvedNodeVoltage(system, solution, positiveSupply) - solvedNodeVoltage(system, solution, negativeSupply))
+	// An open-collector output is high impedance until the comparator reaches
+	// its reviewed minimum supply. This also prevents an arbitrary input-offset
+	// sign from creating a false sink pulse in the zeroed startup history.
+	if supply < minimumSupply {
+		return false
+	}
+	plus := real(solvedNodeVoltage(system, solution, positiveInput))
+	minus := real(solvedNodeVoltage(system, solution, negativeInput))
+	return plus-minus < inputOffset
 }
 
 func currentSenseOperatingState(device ResolvedDevice, system mnaSystem, solution []complex128) (supply, minimum, maximum, desired float64) {

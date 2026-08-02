@@ -375,6 +375,34 @@ func TestEventResponsePreservesPeriodicDriveAndCompactsDeclaredPrehistory(t *tes
 	}
 }
 
+func TestCompactPlannedEventWindowPreservesUnrelatedOperatingPrelude(t *testing.T) {
+	analysis := simmodel.Analysis{
+		ID: "response", Kind: simmodel.AnalysisTransient, DurationS: 1.05, TimeStepS: .0001,
+		SourceValueEvents: []simmodel.SourceValueEvent{{
+			ID: "shutdown_supply", Component: "supply", TriggerTimeS: 1, DurationS: .05,
+			Initial: 12, Applied: 0,
+		}},
+		DeviceValueEvents: []simmodel.DeviceValueEvent{{
+			ID: "operating_load_current", Component: "load", TriggerTimeS: .0001, DurationS: .0399,
+			InitialSI: 1e12, AppliedSI: 10,
+		}},
+	}
+
+	compactPlannedEventWindow(&analysis, []string{"shutdown"})
+
+	planned := analysis.SourceValueEvents[0]
+	prelude := analysis.DeviceValueEvents[0]
+	if math.Abs(planned.TriggerTimeS-.002) > 1e-12 || planned.OriginalTriggerTimeS != 1 {
+		t.Fatalf("compacted planned event = %#v", planned)
+	}
+	if prelude.TriggerTimeS != .0001 || prelude.OriginalTriggerTimeS != 0 {
+		t.Fatalf("unrelated operating prelude was rebased: %#v", prelude)
+	}
+	if math.Abs(analysis.DurationS-.052) > 1e-12 {
+		t.Fatalf("compacted duration = %.12g", analysis.DurationS)
+	}
+}
+
 func TestEventBearingPowerAnalysisPreservesPeriodicDrive(t *testing.T) {
 	loadValue := 8.0
 	analysis := simmodel.Analysis{
@@ -549,6 +577,68 @@ func TestEventSupplyComponentsIncludeUnsweptExternalRails(t *testing.T) {
 	}
 	if got := eventSupplyComponents(bindings); !slices.Equal(got, []string{"negative_supply", "positive_supply"}) {
 		t.Fatalf("event supply components = %#v", got)
+	}
+}
+
+func TestPlannedPowerEventsCoupleGeneratedDomainControls(t *testing.T) {
+	for _, test := range []struct {
+		name             string
+		kind             string
+		initial, applied float64
+		wantInitial      float64
+		wantApplied      float64
+	}{
+		{name: "startup", kind: "startup", initial: 0, applied: 12, wantInitial: 0, wantApplied: -3.3},
+		{name: "shutdown", kind: "shutdown", initial: 12, applied: 0, wantInitial: -3.3, wantApplied: 0},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			initial := test.initial
+			analysis := simmodel.Analysis{
+				ID: "power_event", Kind: simmodel.AnalysisTransient, DurationS: .1, TimeStepS: .001,
+				Excitations: []simmodel.SourceExcitation{
+					{Component: "supply", DCValue: 12},
+					{Component: "enable", DCValue: -3.3},
+					{Component: "secondary_enable", DCValue: -1.8},
+				},
+			}
+			plan := simmodel.Plan{Devices: []simmodel.ResolvedDevice{{
+				Component: "supply", PrimitiveModel: simmodel.PrimitiveVoltageSourceV1,
+				Terminals: []simmodel.TerminalBinding{{Terminal: "POSITIVE", Net: "VIN"}, {Terminal: "NEGATIVE", Net: "GND"}},
+			}}}
+			event := PlannedEvent{
+				ID: test.name, Kind: test.kind, OperatingCase: "normal", Target: "VIN",
+				TriggerTimeS: .01, DurationS: .02, Initial: &initial, Applied: test.applied, Unit: "V",
+			}
+			planned := PlannedAnalysis{ID: "power_event", Kind: simmodel.AnalysisTransient, OperatingCase: "normal", Events: []string{test.name}}
+			bindings := []SimulationOperatingBinding{
+				{Axis: eventSupplyAxis, Target: "VIN", Kind: OperatingSourceDCValue, Component: "supply"},
+				{Axis: "generated_domain_control", Target: "ENABLE", Kind: OperatingGeneratedControl, Component: "enable"},
+				{Axis: "generated_domain_control", Target: "SECONDARY_ENABLE", Kind: OperatingGeneratedControl, Component: "secondary_enable"},
+			}
+			applied, diagnostics := applyPlannedEvents(&analysis, plan, planned, AnalysisPlan{Events: []PlannedEvent{event}}, bindings)
+			if len(diagnostics) != 0 || !slices.Equal(applied, []string{test.name}) {
+				t.Fatalf("applied=%#v diagnostics=%#v", applied, diagnostics)
+			}
+			var control *simmodel.SourceValueEvent
+			controlCount := 0
+			seenEventIDs := map[string]bool{}
+			for index := range analysis.SourceValueEvents {
+				event := &analysis.SourceValueEvents[index]
+				if seenEventIDs[event.ID] {
+					t.Fatalf("duplicate generated event ID %q", event.ID)
+				}
+				seenEventIDs[event.ID] = true
+				if event.Component == "enable" || event.Component == "secondary_enable" {
+					controlCount++
+				}
+				if analysis.SourceValueEvents[index].Component == "enable" {
+					control = &analysis.SourceValueEvents[index]
+				}
+			}
+			if controlCount != 2 || control == nil || control.Initial != test.wantInitial || control.Applied != test.wantApplied {
+				t.Fatalf("generated-domain control event = %#v", control)
+			}
+		})
 	}
 }
 

@@ -514,6 +514,25 @@ func TestTransientResponseTimeUsesEventToResponseLatencyInBoundedWindow(t *testi
 	}
 }
 
+func TestTransientResponseTimeIgnoresOppositeDirectionPreResponse(t *testing.T) {
+	result := AnalysisResult{ID: "event", Kind: AnalysisTransient, Points: []AnalysisPoint{
+		{TimeS: 0, Nodes: []NodeResult{{Node: "OUT", Real: 0}}},
+		{TimeS: .1, Nodes: []NodeResult{{Node: "OUT", Real: -20}}},
+		{TimeS: .4, Nodes: []NodeResult{{Node: "OUT", Real: -20}}},
+		{TimeS: .5, Nodes: []NodeResult{{Node: "OUT", Real: 0}}},
+		{TimeS: .6, Nodes: []NodeResult{{Node: "OUT", Real: 5}}},
+		{TimeS: 1, Nodes: []NodeResult{{Node: "OUT", Real: 5}}},
+	}}
+	assertion := Assertion{
+		AnalysisID: "event", Node: "OUT", Quantity: QuantityResponseTimeS,
+		WindowStartS: 0, WindowEndS: 1.1,
+	}
+	actual, diagnostic := transientDerivedValue(result, assertion)
+	if diagnostic != nil || math.Abs(actual-.51) > 1e-12 {
+		t.Fatalf("directed event response latency = %.12g, want .51 diagnostic=%#v", actual, diagnostic)
+	}
+}
+
 func TestTransientResponseTimeRejectsPeriodicBaselineMotion(t *testing.T) {
 	result := AnalysisResult{
 		ID: "event", Kind: AnalysisTransient, FundamentalFrequencyHz: 1,
@@ -916,6 +935,35 @@ func TestMNAOpenCollectorComparatorUsesPullupAndCatalogSinkLimits(t *testing.T) 
 	report, diagnostics := Evaluate(plan)
 	if len(diagnostics) != 0 || report.Status != "pass" {
 		t.Fatalf("report=%+v diagnostics=%+v", report, diagnostics)
+	}
+}
+
+func TestOpenCollectorComparatorRemainsHighImpedanceBelowMinimumSupply(t *testing.T) {
+	device := ResolvedDevice{
+		PrimitiveModel: PrimitiveComparatorOpenCollectorV1,
+		ModelParameters: []NamedValue{
+			{Name: "input_offset_v", Value: .005},
+			{Name: "supply_min_v", Value: 2.2},
+		},
+		Terminals: []TerminalBinding{
+			{Terminal: "IN_PLUS", Net: "PLUS"},
+			{Terminal: "IN_MINUS", Net: "MINUS"},
+			{Terminal: "V_PLUS", Net: "VP"},
+			{Terminal: "V_MINUS", Net: "GND"},
+		},
+	}
+	system := mnaSystem{nodeIndex: map[string]int{"PLUS": 0, "MINUS": 1, "VP": 2}}
+	if comparatorOn(device, system, []complex128{0, 1, 0}) {
+		t.Fatal("unpowered open-collector comparator unexpectedly sinks")
+	}
+	if !comparatorOn(device, system, []complex128{0, 1, 5}) {
+		t.Fatal("powered open-collector comparator did not follow its differential input")
+	}
+}
+
+func TestComparatorOnRejectsIncompleteResolvedContract(t *testing.T) {
+	if comparatorOn(ResolvedDevice{}, mnaSystem{}, nil) {
+		t.Fatal("incomplete comparator contract was treated as an active sink")
 	}
 }
 

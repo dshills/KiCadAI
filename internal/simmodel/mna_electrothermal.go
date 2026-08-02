@@ -180,27 +180,32 @@ func transientSOAObservationMargin(device ResolvedDevice, prior transientSOAExcu
 	if current <= 1e-18 {
 		return maxMNASolutionValue, transientSOAExcursion{}, nil
 	}
-	if dcEnvelope, found := selectTransientSOADCEnvelope(device.TransientSOA); found {
-		if _, covered := interpolateSOACurrent(dcEnvelope.Points, voltage); covered {
-			dcMargin, diagnostic := transientSOAMarginForEnvelope(device, dcEnvelope, boundaryTemperature, voltage, current)
-			if diagnostic != nil {
-				return 0, prior, diagnostic
-			}
-			if dcMargin >= 1 {
-				return dcMargin, transientSOAExcursion{}, nil
-			}
-		}
+	dcMargin, dcDiagnostic := transientSOADCMargin(device, boundaryTemperature, voltage, current)
+	if dcDiagnostic == nil && dcMargin >= 1 {
+		return dcMargin, transientSOAExcursion{}, nil
 	}
 	if timeStep <= 0 {
-		margin, diagnostic := transientSOAMargin(device, 0, boundaryTemperature, voltage, current)
-		return margin, transientSOAExcursion{active: true}, diagnostic
+		return dcMargin, transientSOAExcursion{active: true}, dcDiagnostic
 	}
-	excursion := transientSOAExcursion{durationS: timeStep, active: true}
+	// A newly observed excursion starts at this sample, so no stressed time
+	// has elapsed yet. Subsequent stressed observations accumulate the time
+	// between samples. This keeps a pulse whose endpoints align to the
+	// transient grid within its reviewed duration instead of charging an
+	// extra inclusive timestep.
+	excursion := transientSOAExcursion{active: true}
 	if prior.active {
 		excursion.durationS = prior.durationS + timeStep
 	}
 	margin, diagnostic := transientSOAMargin(device, excursion.durationS, boundaryTemperature, voltage, current)
 	return margin, excursion, diagnostic
+}
+
+func transientSOADCMargin(device ResolvedDevice, boundaryTemperature, voltage, current float64) (float64, *Diagnostic) {
+	envelope, found := selectTransientSOADCEnvelope(device.TransientSOA)
+	if !found {
+		return 0, &Diagnostic{Message: "device has no reviewed DC SOA envelope", Suggestion: "select a device with a reviewed DC safe-operating-area envelope"}
+	}
+	return transientSOAMarginForEnvelope(device, envelope, boundaryTemperature, voltage, current)
 }
 
 func transientSOAMargin(device ResolvedDevice, elapsed, boundaryTemperature, voltage, current float64) (float64, *Diagnostic) {
@@ -234,9 +239,6 @@ func transientSOAMarginForEnvelope(device ResolvedDevice, envelope TransientSOAE
 }
 
 func selectTransientSOAEnvelope(envelopes []TransientSOAEnvelope, elapsed float64) (TransientSOAEnvelope, bool) {
-	if elapsed <= 0 {
-		return selectTransientSOADCEnvelope(envelopes)
-	}
 	for _, envelope := range envelopes {
 		if envelope.PulseDurationS != nil && *envelope.PulseDurationS >= elapsed-1e-15 {
 			return envelope, true
