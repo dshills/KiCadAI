@@ -3,7 +3,7 @@
   "version": 2,
   "frozen_at": "2026-08-02",
   "fixtures": [
-    {"id": "current_sense_protection", "file": "current_sense_protection.json", "sha256": "eb8f9237f7fe167f086ccc45d45ffcef61930ed5693036c1ec5dddcc3d7b9e5b", "expected_status": "pass", "promotion_overlay": true},
+    {"id": "current_sense_protection", "file": "current_sense_protection.json", "sha256": "81e446071ebe22ed7f7a5097404b8082823e02f99e8a8fb9e9fd6151fe0d0176", "expected_status": "pass", "promotion_overlay": true},
     {"id": "mixed_function_control_power", "file": "mixed_function_control_power.json", "sha256": "1220bc5d13df364ff1ebb83c6f22c039899f33906640dfb02ac0b742408c8716", "expected_status": "pass", "promotion_overlay": true}
   ],
   "identity_neutral_cases": [

@@ -13,6 +13,11 @@ intrinsically deasserting. Startup checks the physical load; rail-loss timing
 checks the permit, avoiding a false edge requirement on an analog output with
 no guaranteed discharge path.
 
+`current_sense_protection` retains an explicit `startup_control` event that
+applies the logic rail from zero volts. The event executes through the generic
+startup/transient machinery and proves the default-off physical load state;
+it is not replaced by an event-free steady-state check.
+
 The simulation resolver also converts semantic event voltages through the
 resolved source orientation. This fixes reversed connector sources without
 special-casing a fixture or coordinate. The schematic writer chooses a clear
@@ -27,10 +32,10 @@ eliminating the active-filter dangling-wire ERC finding.
 - Offline promotion shards `3/10` and `6/10` pass.
 - Installed-KiCad promotion shards `3/10` and `6/10` pass.
 - `usb_c_i2c_sensor_3v3_protected` passes its installed-KiCad tier.
-- Full installed-KiCad simulation-grounded corpus lane 1 passes all ten
-  fixtures in 404.71 seconds after Prism remediation.
-- Full installed-KiCad simulation-grounded corpus lane 2 passes all ten
-  fixtures in 413.02 seconds after Prism remediation.
+- Final installed-KiCad simulation-grounded corpus lane 1 passes all ten
+  fixtures in 413.25 seconds with the explicit startup event restored.
+- Final installed-KiCad simulation-grounded corpus lane 2 passes all ten
+  fixtures in 392.63 seconds from a distinct artifact root.
 - Each installed-KiCad promotion requires clean ERC, strict DRC, connectivity,
   complete routing, writer correctness, deterministic replay, and zero
   normalized round-trip differences.
@@ -38,16 +43,18 @@ eliminating the active-filter dangling-wire ERC finding.
 The two full lanes used distinct artifact roots:
 
 ```text
-/tmp/kicadai-full-final-1
-/tmp/kicadai-full-final-2
+/tmp/kicadai-multicontrol-final-1
+/tmp/kicadai-multicontrol-final-2
 ```
 
 The common installed-KiCad command was:
 
 ```sh
-KICADAI_KICAD_CLI=/Applications/KiCad/KiCad.app/Contents/MacOS/kicad-cli \
-KICADAI_SYMBOLS_ROOT=/Applications/KiCad/KiCad.app/Contents/SharedSupport/symbols \
-KICADAI_FOOTPRINTS_ROOT=/Applications/KiCad/KiCad.app/Contents/SharedSupport/footprints \
+KICADAI_KICAD_CLI=<path-to-kicad-cli> \
+KICADAI_KLC_ROOT=<path-to-klc> \
+KICADAI_SYMBOLS_ROOT=<path-to-kicad-symbols> \
+KICADAI_FOOTPRINTS_ROOT=<path-to-kicad-footprints> \
+KICADAI_TEMPLATES_ROOT=<path-to-kicad-templates> \
 KICADAI_SIMULATION_GROUNDED_ARTIFACT_DIR=<lane-root> \
 go test ./internal/compositionlowering \
   -run '^TestFrozenSimulationGroundedCorpusOptionalKiCadPromotion$' \

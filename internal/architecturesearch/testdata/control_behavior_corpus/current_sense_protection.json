@@ -439,6 +439,21 @@
             "max": 70,
             "unit": "degC"
           }
+        ],
+        "events": [
+          {
+            "id": "startup_control",
+            "kind": "startup",
+            "target": {
+              "kind": "port",
+              "id": "logic_power"
+            },
+            "trigger_time_s": 0,
+            "duration_s": 0.02,
+            "initial": 0,
+            "applied": 5,
+            "unit": "V"
+          }
         ]
       }
     ],
