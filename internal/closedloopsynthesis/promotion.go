@@ -101,8 +101,10 @@ func SelectedSimulationEvidence(report Report) (*SimulationEvidence, bool) {
 	return nil, false
 }
 
-// ReplaySimulationEvidence re-evaluates every persisted plan and requires the
-// resulting reports to reproduce the selected transcript exactly.
+// ReplaySimulationEvidence requires the selected transcript to match exact
+// trusted simulation results. A transcript produced earlier in this process
+// may reuse its content-addressed proof; persisted evidence first observed in
+// a fresh process re-evaluates every plan before admitting that proof.
 func ReplaySimulationEvidence(evidence SimulationEvidence) []Diagnostic {
 	diagnostics := validateSimulationResolution(evidence.Resolution)
 	plans := resolutionPlans(evidence.Resolution)
@@ -111,6 +113,16 @@ func ReplaySimulationEvidence(evidence SimulationEvidence) []Diagnostic {
 			Path:    "reports",
 			Message: fmt.Sprintf("simulation transcript has %d reports for %d resolved plans", len(evidence.Reports), len(plans)),
 		})
+	}
+	var persistedHash string
+	if len(diagnostics) == 0 {
+		var persistedErr error
+		persistedHash, persistedErr = HashSimulationEvidence(evidence)
+		if persistedErr != nil {
+			diagnostics = append(diagnostics, Diagnostic{Path: "reports", Message: "simulation transcript cannot be hashed: " + persistedErr.Error()})
+		} else if recentTrustedSimulationTranscripts.contains(persistedHash) {
+			return nil
+		}
 	}
 	replayed, replayDiagnostics := evaluateTrustedSimulationPlans(plans, nil)
 	for index, planDiagnostics := range replayDiagnostics {
@@ -123,12 +135,11 @@ func ReplaySimulationEvidence(evidence SimulationEvidence) []Diagnostic {
 		}
 	}
 	if len(diagnostics) == 0 {
-		persistedHash, persistedErr := HashSimulationEvidence(evidence)
 		replayedHash, replayedErr := HashSimulationEvidence(SimulationEvidence{
 			Resolution: cloneSimulationResolution(evidence.Resolution),
 			Reports:    cloneSimulationReports(replayed),
 		})
-		if persistedErr != nil || replayedErr != nil || persistedHash != replayedHash {
+		if replayedErr != nil || persistedHash != replayedHash {
 			diagnostics = append(diagnostics, Diagnostic{
 				Path:    "reports",
 				Message: "replayed trusted simulation reports differ from the selected transcript",

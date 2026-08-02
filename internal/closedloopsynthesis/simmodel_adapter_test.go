@@ -119,6 +119,21 @@ func TestSimulationEvaluationCacheIsBoundedAndEvidenceNeutral(t *testing.T) {
 	}
 }
 
+func TestTrustedTranscriptCacheIsBoundedAndEvaluatorOnly(t *testing.T) {
+	cache := newTrustedTranscriptCache(2)
+	first, second, third := testHash("first"), testHash("second"), testHash("third")
+	cache.remember(first)
+	cache.remember(second)
+	cache.remember(third)
+	if cache.contains(first) || !cache.contains(second) || !cache.contains(third) {
+		t.Fatalf("bounded transcript cache retained wrong hashes: first=%t second=%t third=%t", cache.contains(first), cache.contains(second), cache.contains(third))
+	}
+	cache.remember("not-a-hash")
+	if len(cache.entries) != 2 {
+		t.Fatalf("invalid transcript hash changed bounded cache size: %d", len(cache.entries))
+	}
+}
+
 func TestSimModelEvaluatorFailsClosedForInvalidLinksAndStructuralDiagnostics(t *testing.T) {
 	evaluator := SimModelEvaluator{Resolver: invalidSimulationResolver{}}
 	if _, err := evaluator.Evaluate(context.Background(), CandidateState{Fingerprint: testHash("invalid")}); err == nil {
@@ -159,6 +174,9 @@ func TestReplaySimulationEvidenceRequiresExactDeterministicTranscript(t *testing
 	})
 	if err != nil || evaluation.Simulation == nil {
 		t.Fatalf("evaluation = %#v, err = %v", evaluation, err)
+	}
+	if !recentTrustedSimulationTranscripts.contains(evaluation.EvidenceHash) {
+		t.Fatal("trusted evaluator did not register its exact transcript hash")
 	}
 	if replayDiagnostics := ReplaySimulationEvidence(*evaluation.Simulation); len(replayDiagnostics) != 0 {
 		t.Fatalf("replay diagnostics = %#v", replayDiagnostics)

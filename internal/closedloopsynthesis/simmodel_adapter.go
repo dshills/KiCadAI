@@ -22,7 +22,10 @@ import (
 // minimum needed to preserve those boundaries.
 const maxPersistedAnalysisPointsPerReport = 256
 
-const defaultSimulationEvaluationCacheEntries = 256
+const (
+	defaultSimulationEvaluationCacheEntries = 256
+	defaultTrustedTranscriptCacheEntries    = 512
+)
 
 // SimulationResolver is the trusted boundary between a candidate state and a
 // fully resolved simulation plan. Implementations must apply every variable,
@@ -82,6 +85,60 @@ type simulationEvaluationCacheEntry struct {
 	diagnostics []simmodel.Diagnostic
 }
 
+// trustedTranscriptCache remembers only canonical hashes that were produced
+// by SimModelEvaluator after a complete trusted simulation. It cannot be
+// populated from provider or persisted evidence. The bounded process-local
+// cache lets an immediate physical workflow validate the exact transcript
+// without recomputing every expensive plan; a fresh process still performs a
+// complete replay before admitting the hash.
+type trustedTranscriptCache struct {
+	mu      sync.Mutex
+	limit   int
+	entries map[string]struct{}
+	order   []string
+	next    int
+}
+
+var recentTrustedSimulationTranscripts = newTrustedTranscriptCache(defaultTrustedTranscriptCacheEntries)
+
+func newTrustedTranscriptCache(limit int) *trustedTranscriptCache {
+	limit = max(1, limit)
+	return &trustedTranscriptCache{
+		limit:   limit,
+		entries: make(map[string]struct{}, limit),
+		order:   make([]string, 0, limit),
+	}
+}
+
+func (cache *trustedTranscriptCache) remember(hash string) {
+	if cache == nil || !validHash(hash) {
+		return
+	}
+	cache.mu.Lock()
+	defer cache.mu.Unlock()
+	if _, exists := cache.entries[hash]; exists {
+		return
+	}
+	if len(cache.order) < cache.limit {
+		cache.order = append(cache.order, hash)
+	} else {
+		delete(cache.entries, cache.order[cache.next])
+		cache.order[cache.next] = hash
+		cache.next = (cache.next + 1) % cache.limit
+	}
+	cache.entries[hash] = struct{}{}
+}
+
+func (cache *trustedTranscriptCache) contains(hash string) bool {
+	if cache == nil || !validHash(hash) {
+		return false
+	}
+	cache.mu.Lock()
+	defer cache.mu.Unlock()
+	_, exists := cache.entries[hash]
+	return exists
+}
+
 func NewSimulationEvaluationCache() *SimulationEvaluationCache {
 	return &SimulationEvaluationCache{
 		limit:   defaultSimulationEvaluationCacheEntries,
@@ -137,6 +194,7 @@ func (evaluator SimModelEvaluator) Evaluate(ctx context.Context, state Candidate
 	if err != nil {
 		return Evaluation{}, fmt.Errorf("hash simulation evidence: %w", err)
 	}
+	recentTrustedSimulationTranscripts.remember(evidenceHash)
 	return Evaluation{
 		EvidenceHash: evidenceHash, Measurements: measurements,
 		ModelDecisions: cloneModelDecisions(resolution.ModelDecisions),
