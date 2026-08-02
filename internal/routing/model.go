@@ -184,6 +184,7 @@ type Obstacle struct {
 	Geometry  Shape        `json:"geometry"`
 	Clearance float64      `json:"clearance_mm,omitempty"`
 	Source    string       `json:"source,omitempty"`
+	Net       string       `json:"net,omitempty"`
 }
 
 type Rules struct {

@@ -112,7 +112,7 @@ func buildOccupancy(request Request, currentNet string, movingKind clearanceObje
 			source = "zone"
 		}
 		clearanceMM := clearances.pair(currentNetKey, movingKind, copper.Net, existingCopperKind(copper.Kind))
-		obstacle := Obstacle{Kind: kind, Layer: copper.Layer, Geometry: copper.Geometry, Clearance: clearanceMM, Source: source}
+		obstacle := Obstacle{Kind: kind, Layer: copper.Layer, Geometry: copper.Geometry, Clearance: clearanceMM, Source: source, Net: copper.Net}
 		if copper.Kind == CopperVia {
 			for _, layer := range request.Board.Layers {
 				if layer.Kind == LayerCopper {

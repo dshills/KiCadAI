@@ -187,12 +187,13 @@ func RouteRequestContext(ctx context.Context, request Request) Result {
 						route.SearchLimitHit = true
 						result.Metrics.MaxSearchNodesHit = true
 					}
-					path = alternatePath
-					routeIssues = alternateIssues
 					if len(alternateIssues) == 0 {
+						path = alternatePath
+						routeIssues = nil
 						pairAccess = alternateAccess
 						break
 					}
+					routeIssues = preferredRouteFailureIssues(routeIssues, alternateIssues)
 				}
 			}
 			if len(routeIssues) == 0 {
@@ -216,7 +217,7 @@ func RouteRequestContext(ctx context.Context, request Request) Result {
 				// the single physical access point actually used.
 				netAccess = edgeAccess
 				path = edgePath
-				routeIssues = edgeIssues
+				routeIssues = preferredRouteFailureIssues(routeIssues, edgeIssues)
 				if len(edgeIssues) == 0 {
 					pairUsedCrowdedVias = false
 				}
@@ -226,19 +227,19 @@ func RouteRequestContext(ctx context.Context, request Request) Result {
 			// Retry only after ordinary access fails, with a deterministic
 			// outward dogbone that moves away from the opposite terminal.
 			if len(routeIssues) != 0 && constrainedEndpointAccess {
-				dogboneAccess, dogboneVias := applyTwoTerminalSMDPadViaAccess(netAccess, searchRequest, components, []Endpoint{pair.From, pair.To})
-				if len(dogboneVias) != 0 {
-					dogboneRules := crowdedEndpointViaRules(searchRequest.Rules, dogboneVias)
+			dogboneConfigurations:
+				for _, configuration := range twoTerminalSMDPadViaAccessConfigurations(netAccess, searchRequest, components, []Endpoint{pair.From, pair.To}) {
+					dogboneRules := crowdedEndpointViaRules(searchRequest.Rules, configuration.forced)
 					dogboneRequest := searchRequest
 					dogboneRequest.Rules = dogboneRules
 					dogboneViaOccupancy := viaOccupancy
 					if candidate, err := BuildViaOccupancy(dogboneRequest, plan.Net.Name); err == nil {
 						dogboneViaOccupancy = candidate
 					}
-					for _, attemptAccess := range crowdedSMDPadViaAccessAttempts(dogboneAccess, dogboneVias) {
+					for _, attemptAccess := range crowdedSMDPadViaAccessAttempts(configuration.access, configuration.forced) {
 						attemptAccess = filterPhysicalEndpointAccess(attemptAccess, dogboneRequest, plan.Net.Name, []Endpoint{pair.From, pair.To})
 						dogbonePath, dogboneIssues := routePairPathWithForcedEndpointVias(
-							ctx, dogboneRequest, attemptAccess, occupancy, dogboneViaOccupancy, plan.Net.Name, pair, dogboneVias,
+							ctx, dogboneRequest, attemptAccess, occupancy, dogboneViaOccupancy, plan.Net.Name, pair, configuration.forced,
 						)
 						route.SearchNodes += dogbonePath.SearchNodes
 						result.Metrics.SearchNodes += dogbonePath.SearchNodes
@@ -246,16 +247,17 @@ func RouteRequestContext(ctx context.Context, request Request) Result {
 							route.SearchLimitHit = true
 							result.Metrics.MaxSearchNodesHit = true
 						}
-						path = dogbonePath
-						routeIssues = dogboneIssues
 						if len(dogboneIssues) == 0 {
+							path = dogbonePath
+							routeIssues = nil
 							netAccess = attemptAccess
-							forcedEndpointVias = dogboneVias
+							forcedEndpointVias = configuration.forced
 							pairViaRules = dogboneRules
 							pairViaOccupancy = dogboneViaOccupancy
 							pairUsedCrowdedVias = true
-							break
+							break dogboneConfigurations
 						}
+						routeIssues = preferredRouteFailureIssues(routeIssues, dogboneIssues)
 					}
 				}
 			}
@@ -285,7 +287,7 @@ func RouteRequestContext(ctx context.Context, request Request) Result {
 							neckdownWidthMM = fallbackRequest.Rules.TraceWidthMM
 							neckdownLengthMM = pcbrules.DefaultPowerNeckdownLengthMM
 						}
-						routeIssues = fallbackIssues
+						routeIssues = preferredRouteFailureIssues(routeIssues, fallbackIssues)
 					}
 				}
 			}
@@ -458,6 +460,29 @@ func RouteRequestContext(ctx context.Context, request Request) Result {
 	quality := BuildQualityReportWithEvidence(request, result, qualityEvidence)
 	result.Quality = &quality
 	return result
+}
+
+func preferredRouteFailureIssues(current, candidate []reports.Issue) []reports.Issue {
+	if len(candidate) == 0 {
+		return nil
+	}
+	if len(current) == 0 || routeFailureEvidenceRank(candidate) > routeFailureEvidenceRank(current) {
+		return candidate
+	}
+	return current
+}
+
+func routeFailureEvidenceRank(issues []reports.Issue) int {
+	rank := 0
+	for _, issue := range issues {
+		if issue.Code == reports.CodeRouteCopperConflict {
+			return 2
+		}
+		if strings.Contains(issue.Message, "blocked near") {
+			rank = 1
+		}
+	}
+	return rank
 }
 
 func connectFallbackSMDEndpointsToCenters(segments []Segment, access PadAccess, pair EndpointPair) []Segment {
@@ -766,6 +791,31 @@ func applyTwoTerminalSMDPadViaAccess(access PadAccess, request Request, componen
 	return adjusted, forced
 }
 
+type endpointViaAccessConfiguration struct {
+	access PadAccess
+	forced map[endpointID]float64
+}
+
+func twoTerminalSMDPadViaAccessConfigurations(access PadAccess, request Request, components map[string]Component, endpoints []Endpoint) []endpointViaAccessConfiguration {
+	configurations := make([]endpointViaAccessConfiguration, 0, 3)
+	eligible := make([]Endpoint, 0, 2)
+	for _, endpoint := range endpoints {
+		adjusted, forced := applyTwoTerminalSMDPadViaAccess(access, request, components, []Endpoint{endpoint})
+		if len(forced) == 0 {
+			continue
+		}
+		eligible = append(eligible, endpoint)
+		configurations = append(configurations, endpointViaAccessConfiguration{access: adjusted, forced: forced})
+	}
+	if len(eligible) > 1 {
+		adjusted, forced := applyTwoTerminalSMDPadViaAccess(access, request, components, eligible)
+		if len(forced) > 1 {
+			configurations = append(configurations, endpointViaAccessConfiguration{access: adjusted, forced: forced})
+		}
+	}
+	return configurations
+}
+
 func componentsByNormalizedRef(components []Component) map[string]Component {
 	indexed := make(map[string]Component, len(components))
 	for _, component := range components {
@@ -832,32 +882,47 @@ func twoTerminalSMDPadViaAccessPoints(component Component, pad Pad, request Requ
 	}
 	escapeDistanceMM := max(request.Rules.GridMM, request.Rules.ViaClearanceMM+viaDiameterMM/2)
 	physicalOffset := Point{}
-	searchOffset := Point{}
 	if axisX {
 		physicalOffset.XMM = sign * halfSpanMM * smdEdgeAccessInsetRatio
-		searchOffset.XMM = sign * (halfSpanMM + escapeDistanceMM)
 	} else {
 		physicalOffset.YMM = sign * halfSpanMM * smdEdgeAccessInsetRatio
-		searchOffset.YMM = sign * (halfSpanMM + escapeDistanceMM)
 	}
 	physicalX, physicalY := kicadfiles.RotateBoardLocalXY(physicalOffset.XMM, physicalOffset.YMM, component.Position.RotationDeg)
-	searchX, searchY := kicadfiles.RotateBoardLocalXY(searchOffset.XMM, searchOffset.YMM, component.Position.RotationDeg)
 	center := absolutePadPoint(component, pad.Position)
 	grid := NewGrid(Point{}, request.Rules.GridMM)
-	searchPoint := grid.ToPoint(grid.ToGrid(Point{XMM: center.XMM + searchX, YMM: center.YMM + searchY}, 0))
 	layers := padAccessLayers(pad, routableLayerNames(request.Board.Layers))
 	if len(layers) == 0 {
 		return nil, 0, false
 	}
-	return []AccessPoint{{
-		Endpoint: Endpoint{Ref: component.Ref, Pin: pad.Name},
-		Point: Point{
-			XMM: center.XMM + physicalX,
-			YMM: center.YMM + physicalY,
-		},
-		SearchPoint: &searchPoint,
-		Layer:       layers[0],
-	}}, viaDiameterMM, true
+	lateralDistanceMM := max(request.Rules.GridMM, viaDiameterMM+request.Rules.ViaClearanceMM)
+	points := make([]AccessPoint, 0, 3)
+	seen := map[Point]struct{}{}
+	for _, lateralSign := range []float64{0, 1, -1} {
+		searchOffset := Point{}
+		if axisX {
+			searchOffset.XMM = sign * (halfSpanMM + escapeDistanceMM)
+			searchOffset.YMM = lateralSign * lateralDistanceMM
+		} else {
+			searchOffset.XMM = lateralSign * lateralDistanceMM
+			searchOffset.YMM = sign * (halfSpanMM + escapeDistanceMM)
+		}
+		searchX, searchY := kicadfiles.RotateBoardLocalXY(searchOffset.XMM, searchOffset.YMM, component.Position.RotationDeg)
+		searchPoint := grid.ToPoint(grid.ToGrid(Point{XMM: center.XMM + searchX, YMM: center.YMM + searchY}, 0))
+		if _, exists := seen[searchPoint]; exists {
+			continue
+		}
+		seen[searchPoint] = struct{}{}
+		points = append(points, AccessPoint{
+			Endpoint: Endpoint{Ref: component.Ref, Pin: pad.Name},
+			Point: Point{
+				XMM: center.XMM + physicalX,
+				YMM: center.YMM + physicalY,
+			},
+			SearchPoint: &searchPoint,
+			Layer:       layers[0],
+		})
+	}
+	return points, viaDiameterMM, len(points) != 0
 }
 
 func crowdedSMDPadViaAccessAttempts(access PadAccess, forced map[endpointID]float64) []PadAccess {
@@ -877,27 +942,31 @@ func crowdedSMDPadViaAccessAttempts(access PadAccess, forced map[endpointID]floa
 			alternateKeys = append(alternateKeys, key)
 		}
 	}
-	// Route planning supplies one endpoint pair, so there are normally at most
-	// two alternate-bearing keys. Retain that hard bound defensively if this
-	// helper is reused with a broader endpoint set.
+	// Route planning supplies one endpoint pair, so there are at most two
+	// alternate-bearing keys. Retain that bound and at most three candidates
+	// per endpoint: the resulting Cartesian product has a hard nine-attempt cap.
 	if len(alternateKeys) > 2 {
 		alternateKeys = alternateKeys[:2]
 	}
-	attemptCount := 1 << len(alternateKeys)
+	candidateCounts := make(map[endpointID]int, len(alternateKeys))
+	attemptCount := 1
+	for _, key := range alternateKeys {
+		candidateCounts[key] = min(3, len(access.AccessPoints[key]))
+		attemptCount *= candidateCounts[key]
+	}
 	attempts := make([]PadAccess, 0, attemptCount)
-	for mask := 0; mask < attemptCount; mask++ {
+	for attemptIndex := 0; attemptIndex < attemptCount; attemptIndex++ {
 		candidate := clonePadAccessPoints(access)
+		combination := attemptIndex
 		for _, key := range keys {
 			points := access.AccessPoints[key]
 			if len(points) == 0 {
 				continue
 			}
 			selected := 0
-			for alternateIndex, alternateKey := range alternateKeys {
-				if key == alternateKey && mask&(1<<alternateIndex) != 0 {
-					selected = 1
-					break
-				}
+			if count := candidateCounts[key]; count > 1 {
+				selected = combination % count
+				combination /= count
 			}
 			candidate.AccessPoints[key] = []AccessPoint{points[selected]}
 		}

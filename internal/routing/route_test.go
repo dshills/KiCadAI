@@ -25,6 +25,17 @@ func TestRouteRequestRoutesSimpleBoard(t *testing.T) {
 	}
 }
 
+func TestPreferredRouteFailureIssuesRetainsStructuredCopperConflict(t *testing.T) {
+	conflict := []reports.Issue{{Code: reports.CodeRouteCopperConflict, Nets: []string{"BLOCKER", "SIG"}}}
+	generic := []reports.Issue{{Code: reports.CodeValidationFailed, Message: "endpoint pair has no two-layer routing access", Nets: []string{"SIG"}}}
+	if got := preferredRouteFailureIssues(conflict, generic); !reflect.DeepEqual(got, conflict) {
+		t.Fatalf("preferred issues = %#v, want structured conflict %#v", got, conflict)
+	}
+	if got := preferredRouteFailureIssues(conflict, nil); got != nil {
+		t.Fatalf("successful fallback retained issues = %#v", got)
+	}
+}
+
 func TestRouteRequestRejectsEndpointAccessBlockedByForeignPad(t *testing.T) {
 	request := singleLayerSearchRequest()
 	foreign := request.Components[0]
@@ -164,12 +175,52 @@ func TestTwoTerminalSMDPadViaAccessEscapesAwayFromOppositePad(t *testing.T) {
 		BuildPadAccess(request), request, componentsByNormalizedRef(request.Components), []Endpoint{{Ref: "R1", Pin: "2"}},
 	)
 	points, ok := AccessPointsForEndpoint(adjusted, Endpoint{Ref: "R1", Pin: "2"})
-	if !ok || len(points) != 1 || points[0].SearchPoint == nil || len(forced) != 1 {
+	if !ok || len(points) != 3 || points[0].SearchPoint == nil || points[1].SearchPoint == nil || points[2].SearchPoint == nil || len(forced) != 1 {
 		t.Fatalf("two-terminal dogbone access = points %#v forced %#v", points, forced)
 	}
 	center := absolutePadPoint(component, component.Pads[1].Position)
 	if points[0].Point.XMM <= center.XMM || points[0].SearchPoint.XMM <= points[0].Point.XMM {
 		t.Fatalf("dogbone did not escape outward from opposite pad: center=%#v access=%#v", center, points[0])
+	}
+	if points[1].SearchPoint.YMM <= center.YMM || points[2].SearchPoint.YMM >= center.YMM {
+		t.Fatalf("lateral dogbone alternatives = %#v, want deterministic access on both sides", points)
+	}
+}
+
+func TestCrowdedSMDPadViaAccessAttemptsEnumeratesThreeByThreeBound(t *testing.T) {
+	first := endpointKey("R1", "1")
+	second := endpointKey("R2", "1")
+	access := PadAccess{AccessPoints: map[endpointID][]AccessPoint{
+		first:  {{Point: Point{XMM: 1}}, {Point: Point{XMM: 2}}, {Point: Point{XMM: 3}}},
+		second: {{Point: Point{YMM: 1}}, {Point: Point{YMM: 2}}, {Point: Point{YMM: 3}}},
+	}}
+	attempts := crowdedSMDPadViaAccessAttempts(access, map[endpointID]float64{first: .5, second: .5})
+	if len(attempts) != 9 {
+		t.Fatalf("attempt count = %d, want bounded three-by-three product", len(attempts))
+	}
+	lastFirst := attempts[8].AccessPoints[first]
+	lastSecond := attempts[8].AccessPoints[second]
+	if len(lastFirst) != 1 || len(lastSecond) != 1 || lastFirst[0].Point.XMM != 3 || lastSecond[0].Point.YMM != 3 {
+		t.Fatalf("last candidate = first %#v second %#v, want third access for both endpoints", lastFirst, lastSecond)
+	}
+}
+
+func TestTwoTerminalSMDPadViaAccessConfigurationsTrySingleEndpointsBeforePair(t *testing.T) {
+	request := minimalRequest()
+	request.Board.Layers = []Layer{{Name: "F.Cu", Kind: LayerCopper, Routable: true}, {Name: "B.Cu", Kind: LayerCopper, Routable: true}}
+	request.Rules.GridMM = .25
+	request.Rules.TraceWidthMM = .2
+	request.Rules.ViaDiameterMM = .7
+	request.Rules.ViaClearanceMM = .2
+	request.Rules.MaxViasPerNet = 2
+	request.Components = []Component{
+		{Ref: "R1", Pads: []Pad{{Name: "1", Net: "A", Position: Point{XMM: -.8}, Type: PadSMD, Size: Size{WidthMM: .8, HeightMM: .8}, Layers: []string{"F.Cu"}}, {Name: "2", Net: "B", Position: Point{XMM: .8}, Type: PadSMD, Size: Size{WidthMM: .8, HeightMM: .8}, Layers: []string{"F.Cu"}}}},
+		{Ref: "R2", Pads: []Pad{{Name: "1", Net: "A", Position: Point{XMM: -.8}, Type: PadSMD, Size: Size{WidthMM: .8, HeightMM: .8}, Layers: []string{"F.Cu"}}, {Name: "2", Net: "C", Position: Point{XMM: .8}, Type: PadSMD, Size: Size{WidthMM: .8, HeightMM: .8}, Layers: []string{"F.Cu"}}}},
+	}
+	endpoints := []Endpoint{{Ref: "R1", Pin: "1"}, {Ref: "R2", Pin: "1"}}
+	configurations := twoTerminalSMDPadViaAccessConfigurations(BuildPadAccess(request), request, componentsByNormalizedRef(request.Components), endpoints)
+	if len(configurations) != 3 || len(configurations[0].forced) != 1 || len(configurations[1].forced) != 1 || len(configurations[2].forced) != 2 {
+		t.Fatalf("configurations = %#v, want source-only, target-only, then paired", configurations)
 	}
 }
 

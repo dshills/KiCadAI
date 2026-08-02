@@ -100,6 +100,25 @@ func TestRouteFailureNamesNearbyObstacle(t *testing.T) {
 	}
 }
 
+func TestRouteFailureIdentifiesBlockingExistingCopperNet(t *testing.T) {
+	request := singleLayerSearchRequest()
+	request.Existing = []ExistingCopper{{
+		Kind: CopperSegment, Net: "BLOCKER", Layer: "F.Cu",
+		Geometry: Shape{Rect: &Rect{
+			Min: Point{XMM: 6, YMM: 0},
+			Max: Point{XMM: 15, YMM: 20},
+		}},
+	}}
+
+	_, issues := routeFirstPair(t, request)
+	if len(issues) != 1 {
+		t.Fatalf("issues = %#v, want one structured copper conflict", issues)
+	}
+	if issues[0].Code != reports.CodeRouteCopperConflict || len(issues[0].Nets) != 2 || issues[0].Nets[0] != "BLOCKER" || issues[0].Nets[1] != "SIG" {
+		t.Fatalf("issue = %#v, want blocker and failed net", issues[0])
+	}
+}
+
 func TestRouteSingleLayerPathNoPath(t *testing.T) {
 	request := singleLayerSearchRequest()
 	request.Obstacles = []Obstacle{{

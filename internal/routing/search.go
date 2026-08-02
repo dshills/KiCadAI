@@ -86,7 +86,7 @@ func routeSingleLayerPath(ctx context.Context, request Request, access PadAccess
 				netName,
 				pair,
 				"no legal single-layer path found",
-				nearestObstacleSummary(occupancy, starts, targets),
+				nearestObstacle(occupancy, starts, targets),
 			)}
 	}
 	points := make([]Point, 0, len(path))
@@ -192,7 +192,7 @@ func routeTwoLayerPathWithForcedEndpointVias(ctx context.Context, request Reques
 				netName,
 				pair,
 				"no legal two-layer path found",
-				nearestObstacleSummary(occupancy, starts, targets),
+				nearestObstacle(occupancy, starts, targets),
 			)}
 	}
 	if forcedFrom {
@@ -665,38 +665,46 @@ func reconstructGridPath(current astarState, cameFrom map[astarState]astarState)
 }
 
 func routeFailureIssue(netName string, pair EndpointPair, message string) reports.Issue {
-	return routeFailureIssueWithObstacle(netName, pair, message, "")
+	return routeFailureIssueWithObstacle(netName, pair, message, Obstacle{})
 }
 
-func routeFailureIssueWithObstacle(netName string, pair EndpointPair, message string, obstacleSummary string) reports.Issue {
+func routeFailureIssueWithObstacle(netName string, pair EndpointPair, message string, obstacle Obstacle) reports.Issue {
+	obstacleSummary := obstacleSummary(obstacle)
 	if obstacleSummary != "" {
 		message += ": blocked near " + obstacleSummary
 	}
+	code := reports.CodeValidationFailed
+	nets := []string{netName}
+	if obstacle.Kind == ObstacleExistingCopper && strings.TrimSpace(obstacle.Net) != "" && !sameOccupancyNet(obstacle.Net, netName) {
+		code = reports.CodeRouteCopperConflict
+		nets = append(nets, obstacle.Net)
+		sort.Strings(nets)
+	}
 	return reports.Issue{
-		Code:       reports.CodeValidationFailed,
+		Code:       code,
 		Severity:   reports.SeverityBlocked,
 		Path:       "nets." + netName,
 		Message:    message,
 		Refs:       []string{pair.From.Ref, pair.To.Ref},
-		Nets:       []string{netName},
+		Nets:       nets,
 		Suggestion: "move components, reduce clearance, or allow another routing layer",
 	}
 }
 
-func nearestObstacleSummary(occupancy Occupancy, coordSets ...[]GridCoord) string {
+func nearestObstacle(occupancy Occupancy, coordSets ...[]GridCoord) Obstacle {
 	for _, coords := range coordSets {
 		for _, coord := range coords {
 			if obstacle, ok := occupancy.FirstObstacle(coord); ok {
-				return obstacleSummary(obstacle)
+				return obstacle
 			}
 			for _, neighbor := range orthogonalNeighbors(astarState{Coord: coord}) {
 				if obstacle, ok := occupancy.FirstObstacle(neighbor.Coord); ok {
-					return obstacleSummary(obstacle)
+					return obstacle
 				}
 			}
 		}
 	}
-	return ""
+	return Obstacle{}
 }
 
 func obstacleSummary(obstacle Obstacle) string {
