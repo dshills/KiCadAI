@@ -181,13 +181,14 @@ unsafe capability is reported and stopped instead of guessed.
   [specification](specs/evidence-backed-component-onboarding/SPEC.md).
 - A separate open-topology lane now constructs primitive-component graphs
   directly from strict behavior-only requirements instead of selecting a
-  pre-authored functional block. Six of eight frozen analog, power, and
-  mixed-signal requirements pass trusted simulation and the complete
-  installed-KiCad two-root promotion lane; two exhaust deterministic repair
-  budgets with stable diagnostics. The public
+  pre-authored functional block. All eight frozen analog, power, and
+  mixed-signal requirements pass trusted simulation. Two independently frozen
+  neutral multi-branch designs also pass deterministic replay and the complete
+  installed-KiCad two-root promotion lane, including a selected graph-changing
+  repair. The public
   `kicadai open-topology create` command writes full search/simulation and
   physical-promotion evidence while returning a compact JSON summary. See the
-  [completion audit](specs/simulation-guided-open-topology-synthesis/AUDIT.md).
+  [multi-branch completion audit](specs/generic-multi-branch-analog-topology-synthesis/AUDIT.md).
 - The simulation-grounded architecture milestone extends that lane from
   first-pass topology discovery to deterministic comparison of multiple
   materially different candidates. Frozen Class A, complementary Class AB,

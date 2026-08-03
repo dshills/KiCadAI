@@ -35,6 +35,10 @@ const (
 	nonlinearMinGminRatio           = 3
 	nonlinearLineSearchDecrease     = 1e-4
 	nonlinearClampConsistencyV      = 1e-3
+	// The rail active-set enumerates only op-amps already participating in a
+	// detected transition cycle. Six devices cap the fallback at 64 complete
+	// solves while covering larger multi-stage analog decision networks.
+	nonlinearMaxOpAmpRailActiveSetDevices = 6
 )
 
 func nonlinearOperatingVoltageTolerance(maximum float64) float64 {
@@ -81,11 +85,20 @@ func solveNonlinearDC(plan Plan, analysis Analysis) (mnaSystem, []complex128, So
 	return system, solution, evidence, diagnostic
 }
 
+func solveNonlinearDCForPowerTransition(plan Plan, analysis Analysis) (mnaSystem, []complex128, SolverEvidence, *Diagnostic) {
+	system, solution, evidence, _, diagnostic := solveNonlinearDCFromWarmStateWithPowerTransition(plan, analysis, nil, nil, true)
+	return system, solution, evidence, diagnostic
+}
+
 func solveNonlinearDCFromState(plan Plan, analysis Analysis, initial map[string]float64) (mnaSystem, []complex128, SolverEvidence, map[string]float64, *Diagnostic) {
 	return solveNonlinearDCFromWarmState(plan, analysis, initial, nil)
 }
 
 func solveNonlinearDCFromWarmState(plan Plan, analysis Analysis, initial map[string]float64, initialSolution []complex128) (mnaSystem, []complex128, SolverEvidence, map[string]float64, *Diagnostic) {
+	return solveNonlinearDCFromWarmStateWithPowerTransition(plan, analysis, initial, initialSolution, false)
+}
+
+func solveNonlinearDCFromWarmStateWithPowerTransition(plan Plan, analysis Analysis, initial map[string]float64, initialSolution []complex128, allowPowerTransition bool) (mnaSystem, []complex128, SolverEvidence, map[string]float64, *Diagnostic) {
 	activeDeviceCount := 0
 	for _, device := range plan.Devices {
 		if device.PrimitiveModel == PrimitiveComparatorOpenCollectorV1 || device.PrimitiveModel == PrimitiveOpAmpV1 || device.PrimitiveModel == PrimitiveCurrentSenseAmplifierV1 {
@@ -135,7 +148,7 @@ func solveNonlinearDCFromWarmState(plan Plan, analysis Analysis, initial map[str
 			}
 			return system, solution, totalEvidence, states, diagnostic
 		}
-		resolved, resolvedKey, diagnostic := resolvedActiveDeviceStates(plan, system, solution)
+		resolved, resolvedKey, diagnostic := resolvedActiveDeviceStatesWithPowerTransition(plan, system, solution, allowPowerTransition)
 		if diagnostic != nil {
 			return system, solution, totalEvidence, states, diagnostic
 		}
@@ -162,7 +175,16 @@ func solveNonlinearDCFromWarmState(plan Plan, analysis Analysis, initial map[str
 					totalEvidence.Method = fallbackEvidence.Method
 					return fallbackSystem, fallbackSolution, totalEvidence, fallbackStates, nil
 				}
-				bisectedResolved, _, resolveDiagnostic := resolvedActiveDeviceStates(plan, bisectedSystem, bisectedSolution)
+				if fallbackSystem, fallbackSolution, fallbackEvidence, fallbackStates, ok := solveNonlinearDCByOpAmpRailActiveSet(
+					plan, analysis, bisectedStates, bisectedSystem, bisectedSolution, allowPowerTransition,
+				); ok {
+					totalEvidence.SourceStages += fallbackEvidence.SourceStages
+					totalEvidence.Iterations += fallbackEvidence.Iterations
+					totalEvidence.TotalIterations = totalEvidence.Iterations
+					totalEvidence.Method = fallbackEvidence.Method
+					return fallbackSystem, fallbackSolution, totalEvidence, fallbackStates, nil
+				}
+				bisectedResolved, _, resolveDiagnostic := resolvedActiveDeviceStatesWithPowerTransition(plan, bisectedSystem, bisectedSolution, allowPowerTransition)
 				if resolveDiagnostic == nil && (sameOpAmpClamps(bisectedStates, bisectedResolved) || activeDeviceStateSolutionConsistent(plan, bisectedSystem, bisectedSolution, bisectedStates, bisectedResolved)) {
 					totalEvidence.Method = "bounded_opamp_bisection_consistency_fallback_v1"
 					return bisectedSystem, bisectedSolution, totalEvidence, bisectedResolved, nil
@@ -184,6 +206,15 @@ func solveNonlinearDCFromWarmState(plan Plan, analysis Analysis, initial map[str
 		stateKey := activeDeviceStateKey(plan, next)
 		if seen[stateKey] {
 			if fallbackSystem, fallbackSolution, fallbackEvidence, fallbackStates, ok := solveNonlinearDCByComparatorActiveSet(plan, analysis, next); ok {
+				totalEvidence.SourceStages += fallbackEvidence.SourceStages
+				totalEvidence.Iterations += fallbackEvidence.Iterations
+				totalEvidence.TotalIterations = totalEvidence.Iterations
+				totalEvidence.Method = fallbackEvidence.Method
+				return fallbackSystem, fallbackSolution, totalEvidence, fallbackStates, nil
+			}
+			if fallbackSystem, fallbackSolution, fallbackEvidence, fallbackStates, ok := solveNonlinearDCByOpAmpRailActiveSet(
+				plan, analysis, next, system, solution, allowPowerTransition,
+			); ok {
 				totalEvidence.SourceStages += fallbackEvidence.SourceStages
 				totalEvidence.Iterations += fallbackEvidence.Iterations
 				totalEvidence.TotalIterations = totalEvidence.Iterations
@@ -944,6 +975,91 @@ func solveNonlinearDCByComparatorActiveSet(plan Plan, analysis Analysis, activeS
 	return mnaSystem{}, nil, total, nil, false
 }
 
+// solveNonlinearDCByOpAmpRailActiveSet resolves the bounded physical states of
+// a small positive-feedback op-amp network when its unconstrained finite-gain
+// equation lands on an unstable linear operating point. Each candidate clamps
+// every participating op-amp to one catalog-derived output rail, re-solves the
+// complete circuit, and is accepted only when the resulting input differential
+// independently selects exactly those same rail states. Ordinary negative-
+// feedback circuits therefore remain on the linear solver path, while invalid
+// or ambiguous candidates continue to fail closed within an explicit work
+// bound.
+func solveNonlinearDCByOpAmpRailActiveSet(
+	plan Plan,
+	analysis Analysis,
+	activeStates map[string]float64,
+	operatingSystem mnaSystem,
+	operatingSolution []complex128,
+	allowPowerTransition bool,
+) (mnaSystem, []complex128, SolverEvidence, map[string]float64, bool) {
+	type railPair struct {
+		component string
+		low       float64
+		high      float64
+	}
+	rails := []railPair{}
+	for _, device := range plan.Devices {
+		if device.PrimitiveModel != PrimitiveOpAmpV1 {
+			continue
+		}
+		// Enumerate only op-amps already participating in the detected rail
+		// transition. Other op-amps may be valid finite-gain stages and must
+		// remain on their independently solved linear path.
+		if _, participating := activeStates[device.Component]; !participating {
+			continue
+		}
+		terminals := terminalMap(device)
+		parameters := deviceParameterMap(device)
+		negative := nonlinearNodeVoltage(&operatingSystem, operatingSolution, terminals["V_MINUS"])
+		positive := nonlinearNodeVoltage(&operatingSystem, operatingSolution, terminals["V_PLUS"])
+		if !finite(negative) || !finite(positive) ||
+			positive-negative < parameters["supply_min_v"] ||
+			positive-negative > parameters["supply_max_v"] {
+			continue
+		}
+		low := negative + parameters["output_low_margin_v"]
+		high := positive - parameters["output_high_margin_v"]
+		if !finite(low) || !finite(high) || low >= high {
+			continue
+		}
+		rails = append(rails, railPair{component: device.Component, low: low, high: high})
+	}
+	if len(rails) == 0 || len(rails) > nonlinearMaxOpAmpRailActiveSetDevices {
+		return mnaSystem{}, nil, SolverEvidence{}, nil, false
+	}
+	slices.SortFunc(rails, func(left, right railPair) int {
+		return strings.Compare(left.component, right.component)
+	})
+	total := SolverEvidence{Method: "bounded_newton_opamp_rail_active_set_v1", MaxIterationsPerStep: nonlinearMaxIterations}
+	for mask := 0; mask < 1<<len(rails); mask++ {
+		states := cloneOpAmpClamps(activeStates)
+		for index, rail := range rails {
+			states[rail.component] = rail.low
+			if mask&(1<<index) != 0 {
+				states[rail.component] = rail.high
+			}
+		}
+		system, solution, evidence, diagnostic := solveNonlinearDCForComparatorStateWithInitial(plan, analysis, states, operatingSolution)
+		total.SourceStages += evidence.SourceStages
+		total.Iterations += evidence.Iterations
+		total.TotalIterations = total.Iterations
+		total.FinalMaxUpdateV = evidence.FinalMaxUpdateV
+		total.FinalMaxCurrentUpdateA = evidence.FinalMaxCurrentUpdateA
+		total.FinalMaxResidual = evidence.FinalMaxResidual
+		if diagnostic != nil {
+			continue
+		}
+		resolved, _, resolveDiagnostic := resolvedActiveDeviceStatesWithPowerTransition(
+			plan, system, solution, allowPowerTransition,
+		)
+		if resolveDiagnostic != nil || !sameOpAmpClamps(states, resolved) {
+			continue
+		}
+		return system, solution, total, states, true
+	}
+	return mnaSystem{}, nil, total, nil, false
+}
+
 func mosfetActiveSetConsistent(plan Plan, system mnaSystem, solution []complex128, states map[string]float64) bool {
 	for _, device := range plan.Devices {
 		if device.PrimitiveModel != PrimitiveNMOSSwitchV1 && device.PrimitiveModel != PrimitivePMOSSwitchV1 {
@@ -1270,6 +1386,7 @@ func planWithIntrinsicSourceContinuationScale(plan Plan, scale float64) Plan {
 				}
 			}
 		}
+		device.parameterIndex = namedValueMap(device.ModelParameters)
 	}
 	return clone
 }
@@ -1289,11 +1406,16 @@ func planWithOpAmpGainScale(plan Plan, scale float64) Plan {
 				device.ModelParameters[parameterIndex].Value *= scale
 			}
 		}
+		device.parameterIndex = namedValueMap(device.ModelParameters)
 	}
 	return clone
 }
 
 func resolvedActiveDeviceStates(plan Plan, system mnaSystem, solution []complex128) (map[string]float64, string, *Diagnostic) {
+	return resolvedActiveDeviceStatesWithPowerTransition(plan, system, solution, false)
+}
+
+func resolvedActiveDeviceStatesWithPowerTransition(plan Plan, system mnaSystem, solution []complex128, allowPowerTransition bool) (map[string]float64, string, *Diagnostic) {
 	states := map[string]float64{}
 	var key strings.Builder
 	for _, device := range plan.Devices {
@@ -1302,6 +1424,11 @@ func resolvedActiveDeviceStates(plan Plan, system mnaSystem, solution []complex1
 		switch device.PrimitiveModel {
 		case PrimitiveComparatorOpenCollectorV1:
 			supply := nonlinearNodeVoltage(&system, solution, terminals["V_PLUS"]) - nonlinearNodeVoltage(&system, solution, terminals["V_MINUS"])
+			if allowPowerTransition && supply < parameters["supply_min_v"] {
+				states[device.Component] = 0
+				key.WriteString(device.Component + ":unpowered;")
+				continue
+			}
 			if outsideNonlinearOperatingRange(supply, parameters["supply_min_v"], parameters["supply_max_v"]) {
 				return states, key.String(), &Diagnostic{Path: "devices." + device.Component + ".supply", Message: fmt.Sprintf("DC supply %.12g V is outside catalog-backed range %.12g..%.12g V", supply, parameters["supply_min_v"], parameters["supply_max_v"]), Suggestion: "adjust source conditions or select a compatible catalog comparator"}
 			}
@@ -1316,6 +1443,11 @@ func resolvedActiveDeviceStates(plan Plan, system mnaSystem, solution []complex1
 			negative := nonlinearNodeVoltage(&system, solution, terminals["V_MINUS"])
 			positive := nonlinearNodeVoltage(&system, solution, terminals["V_PLUS"])
 			supply := positive - negative
+			if allowPowerTransition && supply < parameters["supply_min_v"] {
+				states[device.Component] = negative
+				key.WriteString(device.Component + ":unpowered;")
+				continue
+			}
 			if outsideNonlinearOperatingRange(supply, parameters["supply_min_v"], parameters["supply_max_v"]) {
 				return states, key.String(), &Diagnostic{Path: "devices." + device.Component + ".supply", Message: fmt.Sprintf("DC supply %.12g V is outside catalog-backed range %.12g..%.12g V", supply, parameters["supply_min_v"], parameters["supply_max_v"]), Suggestion: "adjust source conditions or select a compatible catalog op-amp"}
 			}
@@ -1336,6 +1468,11 @@ func resolvedActiveDeviceStates(plan Plan, system mnaSystem, solution []complex1
 			}
 		case PrimitiveCurrentSenseAmplifierV1:
 			supply, minimum, maximum, desired := currentSenseOperatingState(device, system, solution)
+			if allowPowerTransition && supply < parameters["supply_min_v"] {
+				states[device.Component] = 0
+				key.WriteString(device.Component + ":unpowered;")
+				continue
+			}
 			if outsideNonlinearOperatingRange(supply, parameters["supply_min_v"], parameters["supply_max_v"]) {
 				return states, key.String(), &Diagnostic{Path: "devices." + device.Component + ".supply", Message: fmt.Sprintf("DC supply %.12g V is outside catalog-backed range %.12g..%.12g V", supply, parameters["supply_min_v"], parameters["supply_max_v"]), Suggestion: "adjust source conditions or select a compatible catalog current-sense amplifier"}
 			}

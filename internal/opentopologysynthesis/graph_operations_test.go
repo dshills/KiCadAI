@@ -2,6 +2,7 @@ package opentopologysynthesis
 
 import (
 	"errors"
+	"reflect"
 	"testing"
 )
 
@@ -113,5 +114,83 @@ func TestJoinSubstituteAndGuardedRemoveGraphOperations(t *testing.T) {
 	}
 	if graphInstanceIndex(graph, "irrelevant") >= 0 {
 		t.Fatal("irrelevant primitive remains in graph")
+	}
+}
+
+func TestSplitPrimitiveInSeriesPreservesEndpointsAndAddsAnonymousNode(t *testing.T) {
+	inventory := testGraphInventory()
+	resistor, found := primitiveByKey(inventory, "resistor|0603")
+	if !found {
+		t.Fatal("test resistor is missing")
+	}
+	graph := CandidateGraph{
+		Schema: CandidateGraphSchema, Version: CandidateGraphVersion,
+		Nodes: []GraphNode{
+			{ID: "input", Scope: "external", SemanticKind: "port", SemanticID: "input", Domain: "signal", Role: "input"},
+			{ID: "output", Scope: "external", SemanticKind: "port", SemanticID: "output", Domain: "signal", Role: "output"},
+		},
+		Instances: []GraphInstance{{
+			ID: "edge", PrimitiveKey: resistor.Key, Kind: resistor.Kind,
+			ValueSI:   graphFloat(1000),
+			Terminals: []TerminalConnection{{Terminal: "A", Node: "input"}, {Terminal: "B", Node: "output"}},
+		}},
+	}
+
+	original := CloneGraph(graph)
+	result, err := SplitPrimitiveInSeries(graph, inventory, "edge", resistor, graphFloat(2200))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(graph, original) {
+		t.Fatalf("successful split mutated its input graph:\noriginal=%#v\nmutated=%#v", original, graph)
+	}
+	if len(result.Nodes) != 3 || len(result.Instances) != 2 {
+		t.Fatalf("split graph dimensions = %d nodes, %d instances", len(result.Nodes), len(result.Instances))
+	}
+	seriesNode := result.Nodes[2]
+	if seriesNode.Scope != "internal" || seriesNode.SemanticKind != "" || seriesNode.SemanticID != "" {
+		t.Fatalf("series node is not anonymous internal: %#v", seriesNode)
+	}
+	if got := result.Instances[0].Terminals; got[0].Node != "input" || got[1].Node != seriesNode.ID {
+		t.Fatalf("original edge endpoints = %#v", got)
+	}
+	if got := result.Instances[1].Terminals; got[0].Node != seriesNode.ID || got[1].Node != "output" {
+		t.Fatalf("inserted edge endpoints = %#v", got)
+	}
+	if result.Instances[1].ValueSI == nil || *result.Instances[1].ValueSI != 2200 {
+		t.Fatalf("inserted edge value = %#v", result.Instances[1].ValueSI)
+	}
+	if issues := ValidateCompleteGraph(result, inventory, GraphLimits{MaxPrimitiveInstances: 4, MaxInternalNodes: 2}); len(issues) != 0 {
+		t.Fatalf("split complete graph issues: %#v", issues)
+	}
+}
+
+func TestSplitPrimitiveInSeriesErrorDoesNotMutateInput(t *testing.T) {
+	inventory := testGraphInventory()
+	resistor, found := primitiveByKey(inventory, "resistor|0603")
+	if !found {
+		t.Fatal("test resistor is missing")
+	}
+	graph := CandidateGraph{
+		Schema: CandidateGraphSchema, Version: CandidateGraphVersion,
+		Nodes: []GraphNode{
+			{ID: "input", Scope: "external", Role: "input"},
+			{ID: "output", Scope: "external", Role: "output"},
+		},
+		Instances: []GraphInstance{{
+			ID: "edge", PrimitiveKey: resistor.Key, Kind: resistor.Kind,
+			ValueSI: graphFloat(1000),
+			Terminals: []TerminalConnection{
+				{Terminal: "A", Node: "input"},
+				{Terminal: "UNKNOWN", Node: "output"},
+			},
+		}},
+	}
+	original := CloneGraph(graph)
+	if _, err := SplitPrimitiveInSeries(graph, inventory, "edge", resistor, graphFloat(2200)); !errors.Is(err, ErrGraphTerminalNotFound) {
+		t.Fatalf("split error = %v, want %v", err, ErrGraphTerminalNotFound)
+	}
+	if !reflect.DeepEqual(graph, original) {
+		t.Fatalf("failed split mutated its input graph:\noriginal=%#v\nmutated=%#v", original, graph)
 	}
 }

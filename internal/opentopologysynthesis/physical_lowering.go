@@ -152,9 +152,7 @@ func lowerCandidateDocument(
 			ComponentID: primitive.CatalogID, VariantID: primitive.VariantID,
 			Population: circuitgraph.PopulationPopulate,
 		}
-		if primitive.UnitID != "" {
-			component.Units = []circuitgraph.ComponentUnit{{ID: primitive.UnitID, Role: instance.Kind}}
-		}
+		component.Units = physicalComponentUnits(primitive, instance.Kind)
 		if primitive.ValueDomain != nil {
 			value := instance.ValueSI
 			if value == nil {
@@ -273,6 +271,42 @@ func lowerCandidateDocument(
 	document.Schematic = physicalSchematicIntent(graph)
 	document.PCB = physicalPCBIntent(document.Project.Board, document.Components)
 	return document, bindings, reports.SortedIssues(issues)
+}
+
+func physicalComponentUnits(
+	primitive PrimitiveCandidate,
+	functionalRole string,
+) []circuitgraph.ComponentUnit {
+	unitTerminals := map[string][]PrimitiveTerminal{}
+	if unitID := strings.TrimSpace(primitive.UnitID); unitID != "" {
+		unitTerminals[unitID] = nil
+	}
+	for _, terminal := range primitive.Terminals {
+		unitID := strings.TrimSpace(terminal.UnitID)
+		if unitID == "" {
+			continue
+		}
+		unitTerminals[unitID] = append(unitTerminals[unitID], terminal)
+	}
+	unitIDs := make([]string, 0, len(unitTerminals))
+	for unitID := range unitTerminals {
+		unitIDs = append(unitIDs, unitID)
+	}
+	slices.Sort(unitIDs)
+	units := make([]circuitgraph.ComponentUnit, 0, len(unitIDs))
+	for _, unitID := range unitIDs {
+		role := functionalRole
+		terminals := unitTerminals[unitID]
+		if len(terminals) != 0 && slices.ContainsFunc(terminals, func(terminal PrimitiveTerminal) bool {
+			return strings.EqualFold(strings.TrimSpace(terminal.Electrical), "power_in")
+		}) && !slices.ContainsFunc(terminals, func(terminal PrimitiveTerminal) bool {
+			return !strings.EqualFold(strings.TrimSpace(terminal.Electrical), "power_in")
+		}) {
+			role = "power"
+		}
+		units = append(units, circuitgraph.ComponentUnit{ID: unitID, Role: role})
+	}
+	return units
 }
 
 func physicalSchematicValueKind(kind string) bool {

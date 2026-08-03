@@ -14,6 +14,10 @@ const (
 	causalMaximumBeamWidth    = 8
 	causalMaximumChanges      = 2
 	causalEpsilon             = 1e-12
+	// causalAttemptMargin is already dimensionless and normalized by the
+	// larger of the actual value, bound, or unity. This tolerance therefore
+	// applies consistently across volts, amperes, degrees, and ratios.
+	causalNormalizedMarginNoiseTolerance = 1e-5
 )
 
 type causalCandidate struct {
@@ -205,8 +209,28 @@ func sizedCausalProposalCandidates(
 	policy Policy,
 ) []causalCandidate {
 	maximum := max(1, min(4, policy.MaxValueTrials))
-	sized := repairedGraphValueTrials(requirement, proposed, inventory, maximum, policy)
-	sized = append([]repairedValueCandidate{{graph: proposed}}, sized...)
+	sized := []repairedValueCandidate{{graph: proposed}}
+	// A topology proposal that introduces a component must be evaluated both at
+	// its neutral seed and at independently ranked values for that new component.
+	// Enumerating a whole-graph value trial here can alter every existing part at
+	// once, obscuring the causal effect and exceeding the bounded change count.
+	// Single-component candidates keep the graph repair plus its sizing as a
+	// deterministic two-change experiment.
+	for _, valueCandidate := range causalValueCandidates(requirement, proposed, inventory, policy) {
+		if len(sized) > maximum {
+			break
+		}
+		if len(valueCandidate.perturbations) != 1 {
+			continue
+		}
+		if graphInstanceIndex(before, valueCandidate.perturbations[0].InstanceID) >= 0 {
+			continue
+		}
+		sized = append(sized, repairedValueCandidate{graph: valueCandidate.graph})
+	}
+	if len(sized) == 1 {
+		sized = append(sized, repairedGraphValueTrials(requirement, proposed, inventory, maximum, policy)...)
+	}
 	result := make([]causalCandidate, 0, len(sized))
 	seen := map[string]struct{}{}
 	for _, candidate := range sized {
@@ -664,7 +688,7 @@ func causalAssertionEffects(
 		case baselineFound && baselineAttempt.AssertionPass && !trialAttempt.AssertionPass:
 			effect.Regression = true
 			effect.Reason = "previously passing assertion now fails"
-		case baselineFound && baselineAttempt.AssertionPass && effect.Critical && effect.MarginDelta < -causalEpsilon:
+		case baselineFound && baselineAttempt.AssertionPass && effect.Critical && effect.MarginDelta < -causalNormalizedMarginNoiseTolerance:
 			effect.Regression = true
 			effect.Reason = "passing assertion margin decreased"
 		case !baselineFound && trialFound && !trialAttempt.AssertionPass:
@@ -770,11 +794,119 @@ func causalTrialStatusRank(trial CausalRepairTrial) int {
 func compareCausalCandidates(left, right causalCandidate) int {
 	return cmp.Or(
 		cmp.Compare(causalCandidateRank(left), causalCandidateRank(right)),
+		cmp.Compare(causalCandidateStructuralRank(left), causalCandidateStructuralRank(right)),
+		cmp.Compare(causalCandidateTopologySizingRank(left), causalCandidateTopologySizingRank(right)),
 		cmp.Compare(len(left.perturbations), len(right.perturbations)),
 		cmp.Compare(causalCandidateMagnitude(left), causalCandidateMagnitude(right)),
 		cmp.Compare(causalPerturbationKey(left.perturbations), causalPerturbationKey(right.perturbations)),
 		cmp.Compare(left.repair.AfterGraphHash, right.repair.AfterGraphHash),
 	)
+}
+
+func causalCandidateTopologySizingRank(candidate causalCandidate) int {
+	added := false
+	split := false
+	sized := false
+	for _, change := range candidate.repair.Changes {
+		switch change.Kind {
+		case "add_primitive":
+			added = true
+		case "split_primitive":
+			split = true
+		case "set_value", "substitute_primitive":
+			sized = true
+		}
+	}
+	if !added && !split {
+		return 0
+	}
+	// A directly added catalog passive is the smallest causal experiment.
+	// A series split, however, introduces a neutral seed whose complementary
+	// analytic value is what makes the new branch meaningful. Keep those two
+	// construction modes ordered independently.
+	if split {
+		if sized {
+			return 0
+		}
+		return 1
+	}
+	if sized {
+		return 1
+	}
+	return 0
+}
+
+func causalCandidateStructuralRank(candidate causalCandidate) int {
+	if len(candidate.perturbations) == 0 {
+		return 0
+	}
+	if candidate.perturbations[0].Kind == "add_primitive" {
+		for _, change := range candidate.repair.Changes {
+			if change.Kind == "add_primitive" {
+				return causalEndpointRoleRank(candidate.graph, change.FromNode, change.ToNode)
+			}
+		}
+		return 4
+	}
+	if candidate.perturbations[0].Kind != "split_primitive" {
+		return 0
+	}
+	seriesNode := ""
+	for _, change := range candidate.repair.Changes {
+		if change.Kind == "split_primitive" {
+			seriesNode = change.ToNode
+			break
+		}
+	}
+	if seriesNode == "" {
+		return 4
+	}
+	best := 4
+	for _, instance := range candidate.graph.Instances {
+		connected := false
+		for _, terminal := range instance.Terminals {
+			connected = connected || terminal.Node == seriesNode
+		}
+		if !connected {
+			continue
+		}
+		otherNodes := []string{}
+		for _, terminal := range instance.Terminals {
+			if terminal.Node == seriesNode {
+				continue
+			}
+			otherNodes = append(otherNodes, terminal.Node)
+		}
+		for _, other := range otherNodes {
+			best = min(best, causalEndpointRoleRank(candidate.graph, other))
+		}
+	}
+	return best
+}
+
+func causalEndpointRoleRank(graph CandidateGraph, nodes ...string) int {
+	roleRank := map[string]int{
+		"output":    0,
+		"input":     1,
+		"control":   1,
+		"internal":  2,
+		"supply":    3,
+		"reference": 3,
+	}
+	requested := map[string]bool{}
+	for _, node := range nodes {
+		requested[node] = true
+	}
+	best := 4
+	for _, node := range graph.Nodes {
+		if !requested[node.ID] {
+			continue
+		}
+		if rank, found := roleRank[node.Role]; found {
+			best = min(best, rank)
+		}
+	}
+	return best
 }
 
 func causalCandidateMagnitude(candidate causalCandidate) float64 {
@@ -850,8 +982,12 @@ func diversifyCausalCandidates(source []causalCandidate) []causalCandidate {
 }
 
 func causalCandidateUsesTopology(candidate causalCandidate) bool {
-	for _, change := range candidate.repair.Changes {
-		if change.Kind == "add_primitive" || change.Kind == "redirect_terminal" {
+	return causalChangesUseTopology(candidate.repair.Changes)
+}
+
+func causalChangesUseTopology(changes []GraphChange) bool {
+	for _, change := range changes {
+		if change.Kind == "add_primitive" || change.Kind == "redirect_terminal" || change.Kind == "split_primitive" {
 			return true
 		}
 	}
@@ -1028,13 +1164,7 @@ func validateCausalRepairAnalysis(analysis CausalRepairAnalysis) error {
 		if !trial.Authorized && trial.Rejection == "" {
 			return fmt.Errorf("unauthorized causal trial lacks rejection evidence")
 		}
-		usesTopology := false
-		for _, change := range trial.Repair.Changes {
-			if change.Kind == "add_primitive" || change.Kind == "redirect_terminal" {
-				usesTopology = true
-				break
-			}
-		}
+		usesTopology := causalChangesUseTopology(trial.Repair.Changes)
 		if usesTopology {
 			topologyTrials++
 		} else {

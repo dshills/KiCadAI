@@ -895,6 +895,101 @@ func TestWindowRelationshipSeedsRetainBypassAlternative(t *testing.T) {
 	}
 }
 
+func TestWindowRelationshipSeedsRejectMissingRailRoles(t *testing.T) {
+	requirement := testMultiBranchAnalogRequirement(t, "outside_window_supply_guard.json")
+	inventory, _ := testHeldOutSynthesisEnvironment(t)
+	initial, issues := InitialGraph(requirement)
+	if len(issues) != 0 {
+		t.Fatalf("initial graph issues: %#v", issues)
+	}
+	policy := DefaultPolicy()
+	byKey := primitiveInventoryByKey(inventory)
+	for _, missingRole := range []string{"supply", "reference"} {
+		t.Run(missingRole, func(t *testing.T) {
+			graph := initial
+			graph.Nodes = append([]GraphNode(nil), initial.Nodes...)
+			for index := range graph.Nodes {
+				if graph.Nodes[index].Role == missingRole {
+					graph.Nodes[index].Role = "internal"
+				}
+			}
+			candidates, consumption, rejections := topologyWindowRelationshipSeeds(
+				context.Background(), requirement, inventory,
+				topologyRepresentatives(requirement, inventory), byKey,
+				GraphLimits{MaxPrimitiveInstances: policy.MaxPrimitiveInstances, MaxInternalNodes: policy.MaxInternalNodes},
+				policy, topologySearchState{graph: graph},
+			)
+			if len(candidates) != 0 || consumption != (Consumption{}) || len(rejections["relationship_gap"]) != 1 {
+				t.Fatalf("missing %s candidates=%d consumption=%#v rejections=%#v", missingRole, len(candidates), consumption, rejections)
+			}
+		})
+	}
+}
+
+func TestWindowRelationshipSeedsAttenuateBelowReferenceThreshold(t *testing.T) {
+	requirement := testMultiBranchAnalogRequirement(t, "outside_window_supply_guard.json")
+	inventory, _ := testHeldOutSynthesisEnvironment(t)
+	search := SearchPrimitiveTopologies(context.Background(), requirement, inventory, DefaultPolicy())
+	for _, candidate := range search.Candidates {
+		if graphContainsReferenceAttenuationBuffer(candidate.Graph, "port_ground") {
+			return
+		}
+	}
+	t.Fatal("below-reference window threshold lacks a buffered reference attenuator")
+}
+
+func graphContainsReferenceAttenuationBuffer(graph CandidateGraph, ground string) bool {
+	referenceNodes := map[string]bool{}
+	for _, instance := range graph.Instances {
+		if instance.Kind == "reference_diode" {
+			referenceNodes[topologyTerminalNodes(instance)["CATHODE"]] = true
+		}
+	}
+	for _, instance := range graph.Instances {
+		if instance.Kind != "opamp" {
+			continue
+		}
+		terminals := topologyTerminalNodes(instance)
+		tap := terminals["IN_PLUS"]
+		if tap == "" || !graphHasResistorBetween(graph, terminals["IN_MINUS"], terminals["OUT"]) {
+			continue
+		}
+		referenceBranch, groundBranch := false, false
+		for _, passive := range graph.Instances {
+			if passive.Kind != "resistor" {
+				continue
+			}
+			nodes := topologyTerminalNodes(passive)
+			other := ""
+			switch {
+			case nodes["A"] == tap:
+				other = nodes["B"]
+			case nodes["B"] == tap:
+				other = nodes["A"]
+			}
+			referenceBranch = referenceBranch || referenceNodes[other]
+			groundBranch = groundBranch || other == ground
+		}
+		if referenceBranch && groundBranch {
+			return true
+		}
+	}
+	return false
+}
+
+func graphHasResistorBetween(graph CandidateGraph, left, right string) bool {
+	for _, instance := range graph.Instances {
+		if instance.Kind != "resistor" {
+			continue
+		}
+		nodes := topologyTerminalNodes(instance)
+		if (nodes["A"] == left && nodes["B"] == right) || (nodes["A"] == right && nodes["B"] == left) {
+			return true
+		}
+	}
+	return false
+}
+
 func TestRegulatedVoltageRelationshipSeedsRetainBiasAlternative(t *testing.T) {
 	requirement, issues := DecodeStrict(bytes.NewReader(mustRead(
 		t,

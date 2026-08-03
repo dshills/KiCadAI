@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"strings"
 )
 
 var (
@@ -18,6 +19,7 @@ var (
 	ErrGraphNodeInUse              = errors.New("graph node is in use")
 	ErrGraphPrimitiveRelevant      = errors.New("graph primitive is in a source-to-observation cone")
 	ErrGraphBridgePrimitive        = errors.New("graph bridge requires exactly two primitive terminals")
+	ErrGraphSeriesPrimitive        = errors.New("graph series split requires compatible two-terminal primitives")
 )
 
 // ConnectPrimitiveTerminal adds one terminal-level connection. It intentionally
@@ -149,6 +151,64 @@ func BridgeNodesWithPrimitive(
 		{Terminal: primitive.Terminals[1].Terminal, Node: toNode},
 	}
 	return AddPrimitive(graph, primitive, value, connections), nil
+}
+
+// SplitPrimitiveInSeries replaces one two-terminal edge with two compatible
+// edges separated by a new anonymous internal node. The original instance and
+// its first terminal attachment are preserved, so the operation is stable
+// under replay and also preserves polarity for directed two-terminal devices.
+func SplitPrimitiveInSeries(
+	graph CandidateGraph,
+	inventory PrimitiveInventory,
+	instanceID string,
+	inserted PrimitiveCandidate,
+	value *float64,
+) (CandidateGraph, error) {
+	result, _, err := splitPrimitiveInSeries(graph, inventory, instanceID, inserted, value)
+	return result, err
+}
+
+// splitPrimitiveInSeries also returns the generated junction identifier for
+// repair evidence. Keeping that identity in the operation avoids deriving it
+// from node ordering after the graph has been transformed.
+func splitPrimitiveInSeries(
+	graph CandidateGraph,
+	inventory PrimitiveInventory,
+	instanceID string,
+	inserted PrimitiveCandidate,
+	value *float64,
+) (CandidateGraph, string, error) {
+	instanceIndex := graphInstanceIndex(graph, instanceID)
+	if instanceIndex < 0 {
+		return graph, "", fmt.Errorf("%w: %s", ErrGraphInstanceNotFound, instanceID)
+	}
+	original, found := primitiveByKey(inventory, graph.Instances[instanceIndex].PrimitiveKey)
+	if !found {
+		return graph, "", fmt.Errorf("%w: %s", ErrGraphPrimitiveNotFound, graph.Instances[instanceIndex].PrimitiveKey)
+	}
+	connections := append([]TerminalConnection(nil), graph.Instances[instanceIndex].Terminals...)
+	slices.SortFunc(connections, compareTerminalConnections)
+	if len(original.Terminals) != 2 || len(inserted.Terminals) != 2 ||
+		len(connections) != 2 || original.Kind != inserted.Kind ||
+		!samePrimitiveTerminalContract(original, inserted) {
+		return graph, "", fmt.Errorf("%w: %s -> %s", ErrGraphSeriesPrimitive, original.Key, inserted.Key)
+	}
+	contracts := append([]PrimitiveTerminal(nil), inserted.Terminals...)
+	slices.SortFunc(contracts, func(left, right PrimitiveTerminal) int {
+		return strings.Compare(left.Terminal, right.Terminal)
+	})
+
+	result, seriesNode := addInternalNode(graph, "internal")
+	oldEndpoint := connections[1].Node
+	var err error
+	result, err = RedirectPrimitiveTerminal(result, inventory, instanceID, connections[1].Terminal, seriesNode)
+	if err != nil {
+		return graph, "", err
+	}
+	return AddPrimitive(result, inserted, value, []TerminalConnection{
+		{Terminal: contracts[0].Terminal, Node: seriesNode},
+		{Terminal: contracts[1].Terminal, Node: oldEndpoint},
+	}), seriesNode, nil
 }
 
 // JoinAnonymousNodes electrically merges two anonymous internal nodes.

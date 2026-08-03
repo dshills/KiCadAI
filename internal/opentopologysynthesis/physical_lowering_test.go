@@ -50,3 +50,30 @@ func TestPhysicalLoweringRejectsUnprovenGraph(t *testing.T) {
 		t.Fatalf("unproven lowering = status=%s issues=%#v", result.Status, result.Issues)
 	}
 }
+
+func TestPhysicalComponentUnitsDeclareRequiredPowerUnit(t *testing.T) {
+	primitive := PrimitiveCandidate{
+		UnitID: "A",
+		Terminals: []PrimitiveTerminal{
+			{Terminal: "IN_PLUS", UnitID: "A", Electrical: "input"},
+			{Terminal: "IN_MINUS", UnitID: "A", Electrical: "input"},
+			{Terminal: "OUT", UnitID: "A", Electrical: "output"},
+			{Terminal: "V_PLUS", UnitID: "P", Electrical: "power_in"},
+			{Terminal: "V_MINUS", UnitID: "P", Electrical: "power_in"},
+		},
+	}
+	units := physicalComponentUnits(primitive, "opamp")
+	want := []circuitgraph.ComponentUnit{{ID: "A", Role: "opamp"}, {ID: "P", Role: "power"}}
+	if !bytes.Equal(mustJSON(t, units), mustJSON(t, want)) {
+		t.Fatalf("physical component units = %#v, want %#v", units, want)
+	}
+}
+
+func mustJSON(t *testing.T, value any) []byte {
+	t.Helper()
+	encoded, err := json.Marshal(value)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return encoded
+}

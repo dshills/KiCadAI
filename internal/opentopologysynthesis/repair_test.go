@@ -89,6 +89,32 @@ func TestRepairDeltaCannotBeUndoneByValueEnumeration(t *testing.T) {
 	}
 }
 
+func TestGenericRepairProposesDeterministicSeriesSplit(t *testing.T) {
+	requirement, graph, inventory, _ := testSimulationFixture(t)
+	assertion := requirement.Requirements.BehavioralRequirements[0]
+	diagnoses := []Diagnosis{{
+		Code: "assertion_below_minimum", RequirementID: assertion.ID,
+		Analysis: assertion.Analysis, Direction: "below_minimum", EvidenceHash: "test-evidence",
+	}}
+	proposals := generateRepairProposals(requirement, graph, diagnoses, inventory, DefaultPolicy())
+	for _, proposal := range proposals {
+		if proposal.repair.Operator != "split_passive_edge" {
+			continue
+		}
+		if len(proposal.repair.Changes) != 1 || proposal.repair.Changes[0].Kind != "split_primitive" {
+			t.Fatalf("series split evidence = %#v", proposal.repair.Changes)
+		}
+		if !repairGraphDeltaPreserved(graph, proposal.graph, proposal.repair) {
+			t.Fatal("series split graph delta was not preserved")
+		}
+		if len(proposal.graph.Nodes) != len(graph.Nodes)+1 || len(proposal.graph.Instances) != len(graph.Instances)+1 {
+			t.Fatalf("series split dimensions = %d nodes, %d instances", len(proposal.graph.Nodes), len(proposal.graph.Instances))
+		}
+		return
+	}
+	t.Fatal("generic repair did not propose a series split")
+}
+
 func TestGenericRepairCancellationAndExhaustionAreStable(t *testing.T) {
 	requirement, graph, inventory, environment := testSimulationFixture(t)
 	graph = seriesPathOnly(t, graph)

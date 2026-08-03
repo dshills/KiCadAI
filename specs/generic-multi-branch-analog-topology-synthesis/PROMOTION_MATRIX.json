@@ -1,0 +1,40 @@
+{
+  "schema": "kicadai.generic-multi-branch-analog-promotion-matrix.v1",
+  "version": 1,
+  "date": "2026-08-03",
+  "baseline_commit": "8f6ac90426b308b69cfcccbda9146be9bf6cc5f0",
+  "original_frozen_benchmark": {
+    "passed": 8,
+    "total": 8,
+    "deterministic_replay": true
+  },
+  "neutral_promotions": [
+    {
+      "behavior_family": "outside_window_guard",
+      "status": "passed",
+      "materially_multi_branch": true,
+      "clean_root_runs": 2,
+      "project_hash": "f5616c39a76c5250b87fc9d899694e84b67b6963202cccbc56010a65b17bc598"
+    },
+    {
+      "behavior_family": "regulated_low_voltage_rail",
+      "status": "passed",
+      "materially_multi_branch": true,
+      "selected_graph_changing_repair": true,
+      "clean_root_runs": 2,
+      "project_hash": "b97c47fbeb9841dc40d746800b7baff72b5aa38d650bbb0606044e5b617e2d4e"
+    }
+  ],
+  "required_gates": [
+    "trusted_simulation",
+    "physical_lowering",
+    "routing",
+    "connectivity",
+    "route_completion",
+    "writer_correctness",
+    "erc",
+    "strict_drc",
+    "zero_normalized_round_trip_diff",
+    "deterministic_repeat"
+  ]
+}

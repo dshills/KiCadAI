@@ -1,0 +1,44 @@
+{
+  "schema": "kicadai.multi-branch-analog-corpus.v1",
+  "version": 1,
+  "base_commit": "8f6ac90426b308b69cfcccbda9146be9bf6cc5f0",
+  "frozen_at": "2026-08-03",
+  "requirement_schema": "kicadai.open-topology-requirement.v1",
+  "authoring_policy": "Behavior, external interfaces, operating conditions, events, measurable bounds, safety limits, and acceptance only. Requirement files contain no case selector, component or primitive identity, implementation structure, internal connection, implementation value, physical geometry, routing, provider, simulation model, or repair instruction.",
+  "stages": [
+    "integrity",
+    "schema",
+    "primitive_inventory",
+    "topology_search",
+    "value_derivation",
+    "simulation",
+    "repair",
+    "lowering",
+    "schematic",
+    "placement",
+    "routing",
+    "writer",
+    "erc",
+    "drc",
+    "round_trip",
+    "replay"
+  ],
+  "cases": [
+    {
+      "id": "outside_window_supply_guard",
+      "behavior_family": "out_of_range_dual_threshold_guard",
+      "requirement_file": "outside_window_supply_guard.json",
+      "requirement_sha256": "f3eac539a408f4bce9475d6fc8cb677ecd724f1130acfe1e88767457eb002250",
+      "required_analyses": ["dc_operating_point", "dc_sweep", "transient"],
+      "safety_critical": false
+    },
+    {
+      "id": "precision_low_voltage_rail",
+      "behavior_family": "line_load_regulated_low_voltage_rail",
+      "requirement_file": "precision_low_voltage_rail.json",
+      "requirement_sha256": "ba92813cf3f147fbade74c104b2555714a662d442e47999264bbbfddd9af35ed",
+      "required_analyses": ["dc_operating_point", "dc_sweep", "electrothermal", "stability", "startup", "thermal"],
+      "safety_critical": true
+    }
+  ]
+}

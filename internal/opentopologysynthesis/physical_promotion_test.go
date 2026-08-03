@@ -246,6 +246,97 @@ func TestFrozenHeldOutCorpusOptionalKiCadPromotion(t *testing.T) {
 	}
 }
 
+func TestMultiBranchAnalogNeutralCorpusOptionalKiCadPromotion(t *testing.T) {
+	if os.Getenv(openTopologyKiCadPromotionEnv) != "1" {
+		t.Skip("set KICADAI_OPEN_TOPOLOGY_KICAD_PROMOTION=1 to run installed-KiCad promotion")
+	}
+	kicadCLI := openTopologyKiCadCLI(t)
+	symbolsRoot := openTopologyLibraryRoot(
+		t,
+		libraryresolver.EnvSymbolsRoot,
+		"/Applications/KiCad/KiCad.app/Contents/SharedSupport/symbols",
+	)
+	footprintsRoot := openTopologyLibraryRoot(
+		t,
+		libraryresolver.EnvFootprintsRoot,
+		"/Applications/KiCad/KiCad.app/Contents/SharedSupport/footprints",
+	)
+	ctx, cancel := context.WithTimeout(context.Background(), 45*time.Minute)
+	defer cancel()
+	index, _ := libraryresolver.Load(
+		ctx,
+		libraryresolver.LibraryRoots{
+			SymbolsRoot:    symbolsRoot,
+			FootprintsRoot: footprintsRoot,
+			TemplatesRoot:  strings.TrimSpace(os.Getenv(libraryresolver.EnvTemplatesRoot)),
+		},
+		libraryresolver.LoadOptions{},
+	)
+	inventory, environment := testHeldOutSynthesisEnvironment(t)
+	policy := DefaultPolicy()
+	policy.MaxExpandedStates = 2_000
+	policy.MaxGeneratedGraphs = 50_000
+	policy.MaxRetainedCandidates = 16
+	policy.MaxValueTrials = 256
+	policy.MaxTopologyRepairs = 32
+	policy.MaxCandidateSimulations = 50_000
+	policy.MaxCornerEvaluations = 200_000
+
+	for _, name := range []string{
+		"outside_window_supply_guard.json",
+		"precision_low_voltage_rail.json",
+	} {
+		t.Run(name, func(t *testing.T) {
+			requirement := testMultiBranchAnalogRequirement(t, name)
+			run := Synthesize(ctx, requirement, inventory, environment, policy)
+			if run.Report.Status != StatusPassed {
+				t.Fatalf(
+					"neutral synthesis = status=%s stop=%s consumption=%#v diagnostics=%#v",
+					run.Report.Status,
+					run.Report.StopReason,
+					run.Report.Consumption,
+					run.Report.Diagnostics,
+				)
+			}
+			outputRoot := t.TempDir()
+			if retained := strings.TrimSpace(os.Getenv("KICADAI_OPEN_TOPOLOGY_ARTIFACT_ROOT")); retained != "" {
+				outputRoot = filepath.Join(retained, strings.TrimSuffix(name, filepath.Ext(name)))
+			}
+			promotion := PromoteSynthesisRun(
+				ctx,
+				run,
+				environment,
+				PhysicalPromotionOptions{
+					OutputRoot:    outputRoot,
+					KiCadCLI:      kicadCLI,
+					LibraryIndex:  &index,
+					Timeout:       2 * time.Minute,
+					KeepArtifacts: true,
+				},
+			)
+			if promotion.Status != PhysicalPromotionPassed ||
+				!promotion.ReplayIdentical ||
+				promotion.ProjectHash == "" ||
+				len(promotion.Runs) != 2 {
+				t.Fatalf(
+					"physical promotion = status=%s replay=%t runs=%d issues=%#v",
+					promotion.Status,
+					promotion.ReplayIdentical,
+					len(promotion.Runs),
+					promotion.Issues,
+				)
+			}
+			t.Logf(
+				"synthesis_hash=%s topology_hash=%s physical_hash=%s project_hash=%s",
+				run.Hash,
+				run.Report.Selected.TopologyHash,
+				run.Physical.Hash,
+				promotion.ProjectHash,
+			)
+		})
+	}
+}
+
 func TestArchitectureCorpusOptionalKiCadPromotion(t *testing.T) {
 	if os.Getenv(openTopologyKiCadPromotionEnv) != "1" {
 		t.Skip("set KICADAI_OPEN_TOPOLOGY_KICAD_PROMOTION=1 to run installed-KiCad architecture promotion")

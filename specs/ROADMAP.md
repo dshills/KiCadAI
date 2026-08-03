@@ -1271,15 +1271,16 @@ bulk support. Three held-out cases pass the complete local installed-KiCad
 lane, and adversarial evidence, budget, and qualification gaps fail closed
 with stable diagnostics.
 
-Simulation-guided open-topology synthesis is now complete for its first frozen
+Simulation-guided open-topology synthesis is complete for its expanded frozen
 envelope. A primitive-only, provider-independent lane constructs canonical
 graphs from strict behavior-only requirements, performs bounded topology/value
 search and trusted simulation, applies generic graph-changing repair, and
-promotes passing graphs twice through the normal installed-KiCad workflow.
-Six of eight cases pass; the two remaining cases exhaust repair budgets
-deterministically. See the
-[completion audit](simulation-guided-open-topology-synthesis/AUDIT.md) and
-[promotion matrix](simulation-guided-open-topology-synthesis/PROMOTION_MATRIX.json).
+promotes passing graphs twice through the normal installed-KiCad workflow. The
+original benchmark now passes exactly 8/8. Two independently frozen neutral
+multi-branch cases also pass deterministic replay, and both complete two clean
+installed-KiCad promotions. See the
+[multi-branch completion audit](generic-multi-branch-analog-topology-synthesis/AUDIT.md)
+and [promotion matrix](generic-multi-branch-analog-topology-synthesis/PROMOTION_MATRIX.json).
 
 Simulation-grounded circuit architecture synthesis is also complete for its
 first independently frozen envelope. Behavior-only Class A, complementary
@@ -1307,31 +1308,45 @@ smallest-safe selection, rollback, preservation, protected margins,
 confirmation, budgets, and byte-identical replay. The protected LED and I2C
 fixtures retain two-run installed-KiCad pass evidence.
 
-1. Complete the next control-topology package: add a distinct startup
-   enable/power-good path where independently frozen requirements genuinely
-   need default-off startup followed by fault-driven disconnect. Do not infer
-   that second control from a fault signal.
-2. Expand graph, value, model, and stage-reentry repair only from independently
+The multi-control safety-composition milestone is complete. Independently
+frozen default-off startup and fault-disconnect requirements now derive
+distinct startup and fault controls, compose their states without conflating
+semantics, and retain explicit startup proof through the production workflow.
+
+The generic multi-branch analog topology milestone is complete. Model-aware
+hysteresis sizing, evidence-driven high-side pass selection, below-reference
+threshold construction, series-branch sizing, multi-unit physical lowering,
+and deterministic add/redirect/split/combine repair raise the original frozen
+benchmark from 6/8 to exactly 8/8. Both independently frozen neutral cases pass
+twice with byte-identical evidence; a real feedback-branch split is selected,
+and both designs pass two clean installed-KiCad runs. See
+`specs/generic-multi-branch-analog-topology-synthesis/`.
+
+The next milestone should expand graph, value, model, and stage-reentry repair
+only from new independently frozen behavior failures. It should prioritize
+reusable analog families that remain outside the proven envelope, while
+preserving the exact 8/8 benchmark and both neutral physical promotions.
+
+1. Expand graph, value, model, and stage-reentry repair only from independently
    frozen failures, including the protected current-output behavior when a
    generic evidence-backed correction is available.
-3. Extend affected-scope physical correction across denser multi-net and
+2. Extend affected-scope physical correction across denser multi-net and
    multi-layer cases while preserving unrelated placement and copper.
-4. Expand catalog-independent part qualification, calculated rating, and
+3. Expand catalog-independent part qualification, calculated rating, and
    fabrication evidence before claiming broader
    autonomous or fabrication-ready coverage.
-5. Feed novel behavior-only evaluations into the evidence-driven expansion
+4. Feed novel behavior-only evaluations into the evidence-driven expansion
    planner so capability gaps are ranked by reusable family impact, then source
    and promote only the highest-value packages with independent evidence.
-6. Extend reviewed dynamic models into additional converter, isolation, and
+5. Extend reviewed dynamic models into additional converter, isolation, and
    high-energy protection families without weakening fail-closed model,
    convergence, SOA, or event-coverage requirements.
 
 The preceding explicit active-state, safe-state, transition-direction, timing,
-and sequencing milestone is complete. V6 carries these semantics through
-architecture projection, closed-loop planning, lowering, directed transient
-measurement, and bounded repair. The two motivating cases are now rejected
-with a stable control-contract diagnostic because their startup proof conflicts
-with their sole declared fault control.
+and sequencing milestone and its multi-control follow-up are complete. V6
+carries these semantics through architecture projection, closed-loop planning,
+lowering, directed transient measurement, and bounded repair; the follow-up
+adds distinct startup and fault controls where the behavior requires both.
 
 ## Definition Of Autonomous Ready
 

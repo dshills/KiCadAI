@@ -1047,6 +1047,7 @@ func topologyWindowRelationshipSeeds(
 		}
 	}
 	stableReference := topologyStableReferencePrimitive(requirement, inventory)
+	referenceVoltage, referenceVoltageKnown := topologyPrimitiveReferenceVoltage(stableReference)
 	if comparator.Key == "" || opamp.Key == "" || resistor.Key == "" || capacitor.Key == "" || stableReference.Key == "" {
 		return nil, Consumption{}, map[string][]string{
 			"relationship_gap": {"outside-window transfer requires catalog-backed comparator, amplifier, reference, and resistor relationships"},
@@ -1060,6 +1061,7 @@ func topologyWindowRelationshipSeeds(
 			"relationship_gap": {"outside-window transfer requires one bounded supply and reference relationship"},
 		}
 	}
+	supplyNode, referenceNode := supplies[0], references[0]
 	consumption := Consumption{ExpandedStates: 1}
 	rejections := map[string][]string{}
 	state := initial
@@ -1085,24 +1087,46 @@ func topologyWindowRelationshipSeeds(
 	state = addRelationshipPrimitive(
 		state, requirement, inventoryByKey, stableReference,
 		[]TerminalConnection{
-			{Terminal: "ANODE", Node: references[0]},
+			{Terminal: "ANODE", Node: referenceNode},
 			{Terminal: "CATHODE", Node: absoluteReference},
 		}, &consumption,
 	)
-	for _, placement := range [][]TerminalConnection{
-		{
-			{Terminal: "IN_PLUS", Node: absoluteReference},
-			{Terminal: "IN_MINUS", Node: lowerGain},
+	lowerAmplifier := []TerminalConnection{
+		{Terminal: "IN_PLUS", Node: absoluteReference},
+		{Terminal: "IN_MINUS", Node: lowerGain},
+		{Terminal: "OUT", Node: lowerReference},
+		{Terminal: "V_MINUS", Node: referenceNode},
+		{Terminal: "V_PLUS", Node: supplyNode},
+	}
+	lowerEdges := [][2]string{
+		{lowerGain, referenceNode},
+		{lowerReference, lowerJoin}, {lowerJoin, lowerGain},
+	}
+	if referenceVoltageKnown && envelope.lowerV < referenceVoltage {
+		// A threshold below the reviewed reference cannot be realized by a
+		// non-inverting gain stage. Divide the absolute reference first, then
+		// buffer the high-impedance tap so threshold accuracy remains isolated
+		// from the comparator input and pull-up network.
+		lowerAmplifier = []TerminalConnection{
+			{Terminal: "IN_PLUS", Node: lowerGain},
+			{Terminal: "IN_MINUS", Node: lowerJoin},
 			{Terminal: "OUT", Node: lowerReference},
-			{Terminal: "V_MINUS", Node: references[0]},
-			{Terminal: "V_PLUS", Node: supplies[0]},
-		},
+			{Terminal: "V_MINUS", Node: referenceNode},
+			{Terminal: "V_PLUS", Node: supplyNode},
+		}
+		lowerEdges = [][2]string{
+			{absoluteReference, lowerGain}, {lowerGain, referenceNode},
+			{lowerReference, lowerJoin},
+		}
+	}
+	for _, placement := range [][]TerminalConnection{
+		lowerAmplifier,
 		{
 			{Terminal: "IN_PLUS", Node: absoluteReference},
 			{Terminal: "IN_MINUS", Node: upperGain},
 			{Terminal: "OUT", Node: upperReference},
-			{Terminal: "V_MINUS", Node: references[0]},
-			{Terminal: "V_PLUS", Node: supplies[0]},
+			{Terminal: "V_MINUS", Node: referenceNode},
+			{Terminal: "V_PLUS", Node: supplyNode},
 		},
 	} {
 		state = addRelationshipPrimitive(state, requirement, inventoryByKey, opamp, placement, &consumption)
@@ -1112,34 +1136,34 @@ func topologyWindowRelationshipSeeds(
 			{Terminal: "IN_PLUS", Node: input},
 			{Terminal: "IN_MINUS", Node: lowerReference},
 			{Terminal: "OUT", Node: insideNode},
-			{Terminal: "V_MINUS", Node: references[0]},
-			{Terminal: "V_PLUS", Node: supplies[0]},
+			{Terminal: "V_MINUS", Node: referenceNode},
+			{Terminal: "V_PLUS", Node: supplyNode},
 		},
 		{
 			{Terminal: "IN_PLUS", Node: upperReference},
 			{Terminal: "IN_MINUS", Node: input},
 			{Terminal: "OUT", Node: insideNode},
-			{Terminal: "V_MINUS", Node: references[0]},
-			{Terminal: "V_PLUS", Node: supplies[0]},
+			{Terminal: "V_MINUS", Node: referenceNode},
+			{Terminal: "V_PLUS", Node: supplyNode},
 		},
 		{
 			{Terminal: "IN_PLUS", Node: absoluteReference},
 			{Terminal: "IN_MINUS", Node: insideNode},
 			{Terminal: "OUT", Node: output},
-			{Terminal: "V_MINUS", Node: references[0]},
-			{Terminal: "V_PLUS", Node: supplies[0]},
+			{Terminal: "V_MINUS", Node: referenceNode},
+			{Terminal: "V_PLUS", Node: supplyNode},
 		},
 	} {
 		state = addRelationshipPrimitive(state, requirement, inventoryByKey, comparator, placement, &consumption)
 	}
-	for _, edge := range [][2]string{
-		{supplies[0], absoluteReference},
-		{lowerGain, references[0]},
-		{lowerReference, lowerJoin}, {lowerJoin, lowerGain},
-		{upperGain, references[0]},
+	edges := [][2]string{
+		{supplyNode, absoluteReference},
+		{upperGain, referenceNode},
 		{upperReference, upperJoin}, {upperJoin, upperGain},
-		{supplies[0], insideNode}, {supplies[0], output},
-	} {
+		{supplyNode, insideNode}, {supplyNode, output},
+	}
+	edges = append(edges, lowerEdges...)
+	for _, edge := range edges {
 		state = addRelationshipPrimitive(
 			state, requirement, inventoryByKey, resistor,
 			topologyTwoTerminalPlacement(edge[0], edge[1]), &consumption,
@@ -1151,7 +1175,7 @@ func topologyWindowRelationshipSeeds(
 		requirement,
 		inventoryByKey,
 		capacitor,
-		topologyTwoTerminalPlacement(supplies[0], references[0]),
+		topologyTwoTerminalPlacement(supplyNode, referenceNode),
 		&consumption,
 	)
 	if bypassed.hash != state.hash {
@@ -1191,6 +1215,20 @@ func topologyWindowRelationshipSeeds(
 	}
 	slices.SortFunc(result, compareTopologyCandidates)
 	return result, consumption, rejections
+}
+
+func topologyPrimitiveReferenceVoltage(primitive PrimitiveCandidate) (float64, bool) {
+	for _, model := range primitive.Models {
+		if model.ModelID != simmodel.PrimitiveShuntVoltageReferenceV1 {
+			continue
+		}
+		for _, parameter := range model.Parameters {
+			if parameter.Name == "output_voltage_v" && parameter.Value > 0 {
+				return parameter.Value, true
+			}
+		}
+	}
+	return 0, false
 }
 
 func topologyRegulatedVoltageRelationshipSeeds(
@@ -1499,6 +1537,16 @@ func topologyRelationshipSeeds(
 								},
 								&consumption,
 							)
+							if topologyPrimitiveRequiresPullup(primitive) {
+								state = addRelationshipPrimitive(
+									state,
+									requirement,
+									inventoryByKey,
+									resistor,
+									topologyTwoTerminalPlacement(output, supply),
+									&consumption,
+								)
+							}
 							for _, edge := range [][2]string{
 								{referenceNode, referenceRail},
 								{referenceNode, supply},
@@ -1641,6 +1689,16 @@ func topologyRelationshipSeeds(
 										},
 										&consumption,
 									)
+									if topologyPrimitiveRequiresPullup(primitive) {
+										state = addRelationshipPrimitive(
+											state,
+											requirement,
+											inventoryByKey,
+											resistor,
+											topologyTwoTerminalPlacement(output, supply),
+											&consumption,
+										)
+									}
 									state = addRelationshipPrimitive(
 										state,
 										requirement,
@@ -4691,6 +4749,15 @@ func topologyObligationSeeds(
 	}
 	slices.SortFunc(result, compareTopologyCandidates)
 	return result, consumption, rejections
+}
+
+func topologyPrimitiveRequiresPullup(primitive PrimitiveCandidate) bool {
+	for _, model := range primitive.Models {
+		if model.ModelID == simmodel.PrimitiveComparatorOpenCollectorV1 {
+			return true
+		}
+	}
+	return false
 }
 
 func topologyObligationKindSequences(

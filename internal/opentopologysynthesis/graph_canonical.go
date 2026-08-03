@@ -102,7 +102,9 @@ func NormalizeGraph(graph CandidateGraph) (CandidateGraph, error) {
 		node.ID = nodeIDs[node.ID]
 		normalized.Nodes = append(normalized.Nodes, node)
 	}
-	for _, instance := range graph.Instances {
+	for _, source := range graph.Instances {
+		instance := source
+		instance.Terminals = slices.Clone(source.Terminals)
 		for index := range instance.Terminals {
 			instance.Terminals[index].Node = nodeIDs[instance.Terminals[index].Node]
 		}

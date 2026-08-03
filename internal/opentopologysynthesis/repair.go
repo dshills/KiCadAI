@@ -204,7 +204,7 @@ func repairGraphDeltaPreserved(
 				math.Float64bits(*after.Instances[instanceIndex].ValueSI) != math.Float64bits(*change.ToValue) {
 				return false
 			}
-		case "add_primitive", "redirect_terminal":
+		case "add_primitive", "redirect_terminal", "split_primitive":
 			if beforeErr != nil || afterErr != nil ||
 				beforeTopology == afterTopology {
 				return false
@@ -343,6 +343,36 @@ func generateRepairProposals(
 					})
 				}
 			}
+		}
+		admissibleSplitKinds := repairPrimitiveKinds(assertion.Analysis)
+		for _, instance := range graph.Instances {
+			if !slices.Contains(admissibleSplitKinds, instance.Kind) ||
+				len(instance.Terminals) != 2 ||
+				!primitiveInSourceObservationCone(graph, instance.ID) {
+				continue
+			}
+			inserted, found := firstRepairPrimitive(requirement, inventory, requiredAnalyses, instance.Kind)
+			if !found {
+				continue
+			}
+			candidate, seriesNode, err := splitPrimitiveInSeries(
+				graph, inventory, instance.ID, inserted, seedPrimitiveValue(inserted),
+			)
+			if err != nil {
+				continue
+			}
+			add(candidate, Repair{
+				Operator:               "split_passive_edge",
+				DiagnosisCode:          diagnosis.Code,
+				DiagnosisRequirementID: diagnosis.RequirementID,
+				DiagnosisEvidenceHash:  diagnosis.EvidenceHash,
+				ExpectedDirection:      diagnosis.Direction,
+				Changes: []GraphChange{{
+					Kind: "split_primitive", Primitive: instance.ID,
+					FromNode: instance.Terminals[1].Node, ToNode: seriesNode,
+					ToValue: seedPrimitiveValue(inserted),
+				}},
+			})
 		}
 	}
 	for _, instance := range graph.Instances {
@@ -484,8 +514,10 @@ func compareRepairProposals(left, right repairProposal) int {
 			return 0
 		case "redirect_passive_edge":
 			return 1
-		default:
+		case "split_passive_edge":
 			return 2
+		default:
+			return 3
 		}
 	}
 	return cmp.Or(

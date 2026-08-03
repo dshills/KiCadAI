@@ -112,12 +112,24 @@ func CloneGraph(graph CandidateGraph) CandidateGraph {
 }
 
 func AddInternalNode(graph CandidateGraph, role string) CandidateGraph {
+	result, _ := addInternalNode(graph, role)
+	return result
+}
+
+// addInternalNode returns the generated identifier with the cloned graph so
+// compound graph operations never have to infer it from slice position.
+func addInternalNode(graph CandidateGraph, role string) (CandidateGraph, string) {
 	result := CloneGraph(graph)
 	used := map[string]bool{}
 	for _, node := range result.Nodes {
 		used[node.ID] = true
 	}
-	index := len(result.Nodes)
+	index := 0
+	for _, node := range result.Nodes {
+		if node.Scope == "internal" {
+			index++
+		}
+	}
 	id := ""
 	for id == "" || used[id] {
 		id = fmt.Sprintf("internal_%03d", index)
@@ -128,7 +140,7 @@ func AddInternalNode(graph CandidateGraph, role string) CandidateGraph {
 		Scope: "internal",
 		Role:  canonicalIdentifier(role),
 	})
-	return result
+	return result, id
 }
 
 func AddPrimitive(graph CandidateGraph, primitive PrimitiveCandidate, value *float64, connections []TerminalConnection) CandidateGraph {

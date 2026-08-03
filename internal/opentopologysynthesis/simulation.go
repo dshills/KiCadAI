@@ -866,6 +866,14 @@ func simulationThermalBoundary(
 	); bounded {
 		totalDissipation = math.Max(totalDissipation, transferDissipation)
 	}
+	if transferDissipation, bounded := thermalBehavioralCurrentTransferDissipation(
+		requirement,
+		operatingCase,
+		corner,
+		railMagnitude,
+	); bounded {
+		totalDissipation = math.Max(totalDissipation, transferDissipation)
+	}
 	if totalDissipation <= 0 || !finite(totalDissipation) {
 		return nil, nil, []SimulationDiagnostic{{
 			Code:       diagnosisThermalUnavailable,
@@ -934,6 +942,98 @@ func thermalBehavioralTransferDissipation(
 			loadCurrent = *port.Electrical.MaxCurrentA
 		}
 		dissipation := (railMagnitude - outputVoltage) * loadCurrent
+		if dissipation > maximum && finite(dissipation) {
+			maximum = dissipation
+		}
+	}
+	return maximum, maximum > 0
+}
+
+// thermalBehavioralCurrentTransferDissipation derives a conservative
+// high-side linear current-output loss envelope from behavioral declarations.
+// The available current comes from output-current and transconductance bounds,
+// capped by the port rating; the declared load converts that current into the
+// minimum pass-device voltage burden. Sense and ballast drops are deliberately
+// omitted, which overestimates rather than hides pass-device dissipation.
+func thermalBehavioralCurrentTransferDissipation(
+	requirement Requirement,
+	operatingCase OperatingCase,
+	corner operatingCorner,
+	railMagnitude float64,
+) (float64, bool) {
+	if railMagnitude <= 0 || !finite(railMagnitude) {
+		return 0, false
+	}
+	caseApplies := func(assertion BehavioralAssertion) bool {
+		return len(assertion.OperatingCases) == 0 || slices.Contains(assertion.OperatingCases, operatingCase.ID)
+	}
+	maximum := 0.0
+	for _, port := range requirement.Requirements.Ports {
+		if port.Direction != "source" || port.Kind != "analog_current" {
+			continue
+		}
+		current := 0.0
+		for _, assertion := range requirement.Requirements.BehavioralRequirements {
+			if !caseApplies(assertion) || assertion.Observation.Kind != "port" ||
+				assertion.Observation.ID != port.ID {
+				continue
+			}
+			switch assertion.Metric {
+			case "output_current":
+				candidate := assertionTarget(assertion)
+				if assertion.Max != nil {
+					candidate = *assertion.Max
+				}
+				current = math.Max(current, candidate)
+			case "transconductance":
+				if assertion.Excitation == nil || assertion.Excitation.Kind != "port" {
+					continue
+				}
+				gain := assertionTarget(assertion)
+				if assertion.Max != nil {
+					gain = *assertion.Max
+				}
+				command := 0.0
+				for _, condition := range operatingCase.Conditions {
+					if condition.Target != assertion.Excitation.ID ||
+						(condition.Axis != "input_voltage" && condition.Axis != "control_voltage") {
+						continue
+					}
+					command = corner.Values[conditionKey(condition)]
+					if command <= 0 {
+						command = condition.Max
+					}
+				}
+				if gain > 0 && command > 0 {
+					current = math.Max(current, gain*command)
+				}
+			}
+		}
+		if port.Electrical.MaxCurrentA != nil && *port.Electrical.MaxCurrentA > 0 {
+			if current <= 0 {
+				current = *port.Electrical.MaxCurrentA
+			} else {
+				current = math.Min(current, *port.Electrical.MaxCurrentA)
+			}
+		}
+		loadResistance := 0.0
+		for _, condition := range operatingCase.Conditions {
+			if condition.Axis != "load_resistance" || condition.Target != port.ID {
+				continue
+			}
+			candidate := corner.Values[conditionKey(condition)]
+			if candidate <= 0 {
+				candidate = condition.Min
+			}
+			if candidate > 0 && (loadResistance <= 0 || candidate < loadResistance) {
+				loadResistance = candidate
+			}
+		}
+		if current <= 0 || loadResistance <= 0 {
+			continue
+		}
+		loadVoltage := current * loadResistance
+		dissipation := math.Max(0, railMagnitude-loadVoltage) * current
 		if dissipation > maximum && finite(dissipation) {
 			maximum = dissipation
 		}

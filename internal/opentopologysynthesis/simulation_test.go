@@ -66,6 +66,40 @@ func TestBehavioralThermalTransferAndEventDurationAreBounded(t *testing.T) {
 	}
 }
 
+func TestBehavioralCurrentTransferThermalEnvelopeUsesDeclaredLoadAndCurrent(t *testing.T) {
+	requirement := testOpenTopologyRequirement(t, "adjustable_current_output.json")
+	var highCommand OperatingCase
+	for _, operatingCase := range requirement.Requirements.OperatingCases {
+		if operatingCase.ID == "high_command" {
+			highCommand = operatingCase
+			break
+		}
+	}
+	maximum := 0.0
+	for _, corner := range operatingCaseCorners(highCommand) {
+		rail := 0.0
+		for _, condition := range highCommand.Conditions {
+			if condition.Axis != "supply_voltage" {
+				continue
+			}
+			rail = corner.Values[conditionKey(condition)]
+			if rail <= 0 {
+				rail = positiveMidpoint(condition.Min, condition.Max)
+			}
+		}
+		dissipation, bounded := thermalBehavioralCurrentTransferDissipation(
+			requirement, highCommand, corner, rail,
+		)
+		if !bounded {
+			t.Fatalf("current-transfer corner %s was not thermally bounded", corner.ID)
+		}
+		maximum = math.Max(maximum, dissipation)
+	}
+	if math.Abs(maximum-2.331) > 1e-12 {
+		t.Fatalf("current-transfer dissipation=%g, want conservative 2.331 W", maximum)
+	}
+}
+
 func TestTrustedSimulationEvaluationPassesCornersAndReplaysDeterministically(t *testing.T) {
 	requirement, graph, inventory, environment := testSimulationFixture(t)
 	policy := DefaultPolicy()

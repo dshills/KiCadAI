@@ -64,6 +64,25 @@ func TestCausalRepairRejectsCriticalMarginRegression(t *testing.T) {
 	}
 }
 
+func TestCausalRepairAllowsSubToleranceCriticalMarginNoise(t *testing.T) {
+	requirement := Requirement{Requirements: Requirements{BehavioralRequirements: []BehavioralAssertion{
+		{ID: "failed"},
+		{ID: "safety", Critical: true},
+	}}}
+	baseline := SimulationEvaluation{Attempts: []SimulationAttempt{
+		{RequirementID: "failed", OperatingCase: "case", CornerID: "nominal", Analysis: "dc", Metric: "value", Actual: graphFloat(2), RequiredMax: graphFloat(1), AssertionPass: false},
+		{RequirementID: "safety", OperatingCase: "case", CornerID: "nominal", Analysis: "stability", Metric: "margin", Actual: graphFloat(80), RequiredMin: graphFloat(50), AssertionPass: true},
+	}}
+	trial := SimulationEvaluation{Attempts: []SimulationAttempt{
+		{RequirementID: "failed", OperatingCase: "case", CornerID: "nominal", Analysis: "dc", Metric: "value", Actual: graphFloat(1), RequiredMax: graphFloat(1), AssertionPass: true},
+		{RequirementID: "safety", OperatingCase: "case", CornerID: "nominal", Analysis: "stability", Metric: "margin", Actual: graphFloat(79.9999), RequiredMin: graphFloat(50), AssertionPass: true},
+	}}
+	_, regressions, baselineViolation, trialViolation := causalAssertionEffects(requirement, baseline, trial, 1)
+	if baselineViolation <= trialViolation || len(regressions) != 0 {
+		t.Fatalf("simulation-scale margin noise rejected: baseline=%g trial=%g regressions=%#v", baselineViolation, trialViolation, regressions)
+	}
+}
+
 func TestCausalRepairTrialsCoverBiasAndCompensationOperators(t *testing.T) {
 	requirement, graph, inventory, environment := testSimulationFixture(t)
 	requirement.Requirements.BehavioralRequirements[0].Min = graphFloat(1000)

@@ -76,7 +76,6 @@ func TestFrozenHeldOutCorpusSimulationPromotion(t *testing.T) {
 	policy.MaxCandidateSimulations = 50_000
 	policy.MaxCornerEvaluations = 200_000
 	passed := 0
-	graphChangingRepairs := 0
 	multipleTopologyCases := 0
 	selectedAfterFailure := 0
 	activeFamilies := map[string]bool{}
@@ -224,22 +223,21 @@ func TestFrozenHeldOutCorpusSimulationPromotion(t *testing.T) {
 							break
 						}
 					}
-					if run.SelectedRepair != nil &&
-						run.SelectedRepair.Selected != nil &&
-						run.Report.Selected.TopologyHash !=
-							run.Search.Candidates[selectedIndex].TopologyHash {
-						graphChangingRepairs++
-					}
 				}
 			}
 		})
 	}
-	if passed < 6 {
-		t.Fatalf("held-out synthesis passes = %d, want at least 6 of 8", passed)
+	if passed != len(testHeldOutRequirementNames()) {
+		t.Fatalf(
+			"held-out synthesis passes = %d, want exactly %d",
+			passed,
+			len(testHeldOutRequirementNames()),
+		)
 	}
-	if graphChangingRepairs < 1 {
-		t.Fatal("held-out synthesis produced no selected graph-changing repair")
-	}
+	// Graph-changing repair is intentionally proved by
+	// TestGenericGraphChangingRepairAddsMissingPassiveAndReplays. A passing
+	// frozen design must not be mutated merely to make repair evidence appear
+	// inside this otherwise independent 8/8 synthesis benchmark.
 	if multipleTopologyCases < 2 {
 		t.Fatalf(
 			"held-out synthesis cases with multiple retained topologies = %d, want at least 2",

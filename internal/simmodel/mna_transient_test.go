@@ -1168,6 +1168,124 @@ func transientPNPComponents() []ComponentEvidence {
 	}
 }
 
+func TestTransientPositiveFeedbackOpAmpSelectsConsistentRailState(t *testing.T) {
+	parameters := []NamedValue{
+		{Name: "dc_open_loop_gain", Value: 1e6},
+		{Name: "gain_bandwidth_hz", Value: 10e6},
+		{Name: "output_high_margin_v", Value: .3},
+		{Name: "output_low_margin_v", Value: .3},
+		{Name: "supply_max_v", Value: 40},
+		{Name: "supply_min_v", Value: 2.7},
+	}
+	intent := Intent{
+		ModelID: ModelTransientCircuitV1,
+		Analyses: []Analysis{{
+			ID: "decision", Kind: AnalysisTransient, DurationS: 20e-6, TimeStepS: 1e-6,
+			Excitations: []SourceExcitation{
+				{Component: "supply", DCValue: 5},
+				{Component: "reference", DCValue: 2.5},
+				{Component: "signal", PulseInitialValue: 0, PulseValue: 5, PulseDelayS: 5e-6, PulseWidthS: 10e-6, PulsePeriodS: 25e-6},
+			},
+		}},
+		Assertions: []Assertion{
+			{AnalysisID: "decision", Node: "OUT", Quantity: QuantityVoltageV, TimeS: 0, Min: .29, Max: .31},
+			{AnalysisID: "decision", Node: "OUT", Quantity: QuantityVoltageV, TimeS: 10e-6, Min: 4.69, Max: 4.71},
+		},
+	}
+	components := []ComponentEvidence{
+		voltageSourceEvidence("supply", "VCC", "GND"),
+		voltageSourceEvidence("reference", "REF", "GND"),
+		voltageSourceEvidence("signal", "IN", "GND"),
+		resistorEvidence("input", 10_000, "IN", "DECISION"),
+		resistorEvidence("feedback", 100_000, "OUT", "DECISION"),
+		{
+			InstanceID: "amplifier", CatalogID: "opamp", Family: "opamp",
+			ModelClaims: []CatalogEvidence{{ModelID: PrimitiveOpAmpV1, Parameters: parameters}},
+			Connections: []ConnectionEvidence{
+				{Function: "IN_PLUS", Net: "DECISION"}, {Function: "IN_MINUS", Net: "REF"},
+				{Function: "OUT", Net: "OUT"}, {Function: "V_PLUS", Net: "VCC"}, {Function: "V_MINUS", Net: "GND"},
+			},
+		},
+	}
+	plan, diagnostics := ResolveWithTopology(intent, "test", "catalog-hash", components, []NodeEvidence{
+		{Name: "GND", Role: "ground"}, {Name: "VCC"}, {Name: "REF"}, {Name: "IN"}, {Name: "DECISION"}, {Name: "OUT"},
+	})
+	if len(diagnostics) != 0 {
+		t.Fatalf("resolve diagnostics = %+v", diagnostics)
+	}
+	report, diagnostics := Evaluate(plan)
+	if len(diagnostics) != 0 || report.Status != "pass" {
+		t.Fatalf("report=%+v diagnostics=%+v", report, diagnostics)
+	}
+	if len(report.Analyses) != 1 || len(report.Analyses[0].Points) != 21 ||
+		report.Analyses[0].Points[0].Solver == nil ||
+		report.Analyses[0].Points[0].Solver.Method != "bounded_newton_opamp_rail_active_set_v1" {
+		t.Fatalf("positive-feedback initial evidence = %#v", report.Analyses)
+	}
+}
+
+func TestOpAmpPowerTransitionIsInactiveBelowMinimumAndResumesAboveIt(t *testing.T) {
+	parameters := []NamedValue{
+		{Name: "dc_open_loop_gain", Value: 100_000},
+		{Name: "gain_bandwidth_hz", Value: 1e6},
+		{Name: "output_high_margin_v", Value: .1},
+		{Name: "output_low_margin_v", Value: .1},
+		{Name: "supply_max_v", Value: 30},
+		{Name: "supply_min_v", Value: 3},
+	}
+	components := []ComponentEvidence{
+		voltageSourceEvidence("supply", "VCC", "GND"),
+		voltageSourceEvidence("reference", "REF", "GND"),
+		voltageSourceEvidence("signal", "IN", "GND"),
+		{
+			InstanceID: "amplifier", CatalogID: "opamp", Family: "opamp",
+			ModelClaims: []CatalogEvidence{{ModelID: PrimitiveOpAmpV1, Parameters: parameters}},
+			Connections: []ConnectionEvidence{
+				{Function: "IN_PLUS", Net: "IN"}, {Function: "IN_MINUS", Net: "REF"},
+				{Function: "OUT", Net: "OUT"}, {Function: "V_PLUS", Net: "VCC"}, {Function: "V_MINUS", Net: "GND"},
+			},
+		},
+	}
+	nodes := []NodeEvidence{{Name: "GND", Role: "ground"}, {Name: "VCC"}, {Name: "REF"}, {Name: "IN"}, {Name: "OUT"}}
+	dcIntent := Intent{
+		ModelID: ModelLinearCircuitMNAV1,
+		Analyses: []Analysis{{ID: "underpowered", Kind: AnalysisDCOperatingPoint, Excitations: []SourceExcitation{
+			{Component: "supply", DCValue: 1}, {Component: "reference", DCValue: .5}, {Component: "signal", DCValue: .8},
+		}}},
+		Assertions: []Assertion{{AnalysisID: "underpowered", Node: "OUT", Quantity: QuantityVoltageV, Min: 0, Max: 1}},
+	}
+	dcPlan, diagnostics := ResolveWithTopology(dcIntent, "test", "catalog-hash", components, nodes)
+	if len(diagnostics) != 0 {
+		t.Fatalf("DC resolve diagnostics = %+v", diagnostics)
+	}
+	if _, diagnostics = Evaluate(dcPlan); len(diagnostics) == 0 || !diagnosticsContain(diagnostics, "outside catalog-backed range") {
+		t.Fatalf("ordinary underpowered DC diagnostics = %+v", diagnostics)
+	}
+
+	transientIntent := Intent{
+		ModelID: ModelTransientCircuitV1,
+		Analyses: []Analysis{{
+			ID: "power_transition", Kind: AnalysisTransient, DurationS: 20e-6, TimeStepS: 1e-6,
+			Excitations: []SourceExcitation{
+				{Component: "supply", PulseInitialValue: 1, PulseValue: 5, PulseDelayS: 5e-6, PulseWidthS: 20e-6, PulsePeriodS: 30e-6},
+				{Component: "reference", DCValue: 2}, {Component: "signal", DCValue: 3},
+			},
+		}},
+		Assertions: []Assertion{
+			{AnalysisID: "power_transition", Node: "OUT", Quantity: QuantityVoltageV, TimeS: 0, Min: 0, Max: 1e-9},
+			{AnalysisID: "power_transition", Node: "OUT", Quantity: QuantityVoltageV, TimeS: 15e-6, Min: 4.89, Max: 4.91},
+		},
+	}
+	transientPlan, diagnostics := ResolveWithTopology(transientIntent, "test", "catalog-hash", components, nodes)
+	if len(diagnostics) != 0 {
+		t.Fatalf("transient resolve diagnostics = %+v", diagnostics)
+	}
+	report, diagnostics := Evaluate(transientPlan)
+	if len(diagnostics) != 0 || report.Status != "pass" {
+		t.Fatalf("power-transition report=%+v diagnostics=%+v", report, diagnostics)
+	}
+}
+
 func TestTransientZeroEnergyRecognizesAllZeroIndependentSources(t *testing.T) {
 	plan := Plan{
 		GroundNode: "GND",

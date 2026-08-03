@@ -999,12 +999,13 @@ func TestIntrinsicSourceContinuationScalesRegisteredInternalSources(t *testing.T
 			},
 		},
 	}}
+	plan = indexMNAPlanDevices(plan)
 	scaled := planWithIntrinsicSourceContinuationScale(plan, .2)
-	currentParameters := namedValueMap(scaled.Devices[0].ModelParameters)
-	referenceParameters := namedValueMap(scaled.Devices[1].ModelParameters)
-	buckParameters := namedValueMap(scaled.Devices[2].ModelParameters)
-	converterParameters := namedValueMap(scaled.Devices[3].ModelParameters)
-	efuseParameters := namedValueMap(scaled.Devices[4].ModelParameters)
+	currentParameters := deviceParameterMap(scaled.Devices[0])
+	referenceParameters := deviceParameterMap(scaled.Devices[1])
+	buckParameters := deviceParameterMap(scaled.Devices[2])
+	converterParameters := deviceParameterMap(scaled.Devices[3])
+	efuseParameters := deviceParameterMap(scaled.Devices[4])
 	if math.Abs(currentParameters["reference_current_a"]-2e-6) > 1e-15 ||
 		math.Abs(currentParameters["offset_voltage_v"]-.0008) > 1e-15 ||
 		currentParameters["min_headroom_v"] != 1.65 ||
@@ -1019,11 +1020,28 @@ func TestIntrinsicSourceContinuationScalesRegisteredInternalSources(t *testing.T
 		efuseParameters["input_max_v"] != 60 {
 		t.Fatalf("scaled source parameters = %#v %#v %#v %#v %#v", currentParameters, referenceParameters, buckParameters, converterParameters, efuseParameters)
 	}
-	if namedValueMap(plan.Devices[0].ModelParameters)["reference_current_a"] != 10e-6 ||
-		namedValueMap(plan.Devices[2].ModelParameters)["output_voltage_v"] != 12 ||
-		namedValueMap(plan.Devices[3].ModelParameters)["output_voltage_v"] != 12 ||
-		namedValueMap(plan.Devices[4].ModelParameters)["input_min_v"] != 4.2 {
+	if deviceParameterMap(plan.Devices[0])["reference_current_a"] != 10e-6 ||
+		deviceParameterMap(plan.Devices[2])["output_voltage_v"] != 12 ||
+		deviceParameterMap(plan.Devices[3])["output_voltage_v"] != 12 ||
+		deviceParameterMap(plan.Devices[4])["input_min_v"] != 4.2 {
 		t.Fatal("source continuation mutated the original plan")
+	}
+}
+
+func TestOpAmpGainContinuationUpdatesIndexedParameters(t *testing.T) {
+	plan := indexMNAPlanDevices(Plan{Devices: []ResolvedDevice{{
+		PrimitiveModel:  PrimitiveOpAmpV1,
+		ModelParameters: []NamedValue{{Name: "dc_open_loop_gain", Value: 100000}, {Name: "supply_min_v", Value: 2.7}},
+	}}})
+	scaled := planWithOpAmpGainScale(plan, .01)
+	if gain := deviceParameterMap(scaled.Devices[0])["dc_open_loop_gain"]; gain != 1000 {
+		t.Fatalf("scaled indexed op-amp gain = %.12g", gain)
+	}
+	if supply := deviceParameterMap(scaled.Devices[0])["supply_min_v"]; supply != 2.7 {
+		t.Fatalf("unrelated indexed parameter changed to %.12g", supply)
+	}
+	if gain := deviceParameterMap(plan.Devices[0])["dc_open_loop_gain"]; gain != 100000 {
+		t.Fatalf("source plan gain mutated to %.12g", gain)
 	}
 }
 

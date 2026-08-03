@@ -89,7 +89,7 @@ func solveTransientAnalysis(plan Plan, analysis Analysis) (AnalysisResult, []Dia
 	} else {
 		// The trusted DC initializer applies global source/gmin continuation and
 		// ends at nonlinearFinalGmin, exactly the conductance used by later steps.
-		system, solution, initialEvidence, diagnostic = solveNonlinearDC(initialPlan, initialAnalysis)
+		system, solution, initialEvidence, diagnostic = solveNonlinearDCForPowerTransition(initialPlan, initialAnalysis)
 		if diagnostic != nil {
 			diagnostic.Path = "analyses." + analysis.ID + ".initial_condition." + diagnostic.Path
 			diagnostic.Message = "deterministic transient initial condition failed: " + diagnostic.Message
@@ -103,7 +103,7 @@ func solveTransientAnalysis(plan Plan, analysis Analysis) (AnalysisResult, []Dia
 	initialStates := map[string]float64{}
 	if !zeroEnergyInitialState {
 		var initialStateDiagnostic *Diagnostic
-		initialStates, _, initialStateDiagnostic = resolvedActiveDeviceStates(initialPlan, system, solution)
+		initialStates, _, initialStateDiagnostic = resolvedActiveDeviceStatesWithPowerTransition(initialPlan, system, solution, true)
 		if initialStateDiagnostic != nil {
 			return result, []Diagnostic{*initialStateDiagnostic}
 		}
@@ -249,7 +249,7 @@ func solveTransientAnalysis(plan Plan, analysis Analysis) (AnalysisResult, []Dia
 			seedAnalysis := transientDCAnalysis(analysis, timeS)
 			seedPlan := planWithAnalysisOverrides(plan, seedAnalysis)
 			seedPlan = planWithRequestedAnalysis(seedPlan, seedAnalysis)
-			_, seed, seedEvidence, seedDiagnostic := solveNonlinearDC(seedPlan, seedAnalysis)
+			_, seed, seedEvidence, seedDiagnostic := solveNonlinearDCForPowerTransition(seedPlan, seedAnalysis)
 			totalIterations += seedEvidence.Iterations
 			if seedDiagnostic == nil && len(seed) == len(previousSolution) {
 				var reseedEvidence SolverEvidence
@@ -1109,14 +1109,16 @@ func prepareTransientBase(base *mnaSystem, template mnaSystem, plan Plan, analys
 			poleHz := parameters["gain_bandwidth_hz"] / gain
 			historyCoefficient := 1 / (2 * math.Pi * poleHz * gain * analysis.TimeStepS)
 			base.rhs[base.branchIndex[device.Component]] += complex(historyCoefficient*nonlinearNodeVoltage(base, previous, terminals["OUT"]), 0)
-			if analysis.Kind != AnalysisStartup {
-				continue
-			}
 			positive, positiveKnown := transientKnownNodeVoltage(plan, analysis, terminals["V_PLUS"], timeS)
 			negative, negativeKnown := transientKnownNodeVoltage(plan, analysis, terminals["V_MINUS"], timeS)
-			if startupSourceRampScale(analysis, timeS) < 1 || positiveKnown && negativeKnown && positive-negative < parameters["supply_min_v"] {
-				stampTransientOpAmpClamp(base, device.Component, terminals["OUT"], 0)
+			underpowered := positiveKnown && negativeKnown && positive-negative < parameters["supply_min_v"]
+			startupRamping := analysis.Kind == AnalysisStartup && startupSourceRampScale(analysis, timeS) < 1
+			if underpowered || startupRamping {
+				stampTransientRelativeOutputClamp(base, device.Component, terminals["OUT"], terminals["V_MINUS"], 0)
 				fixedOutputClamps[device.Component] = true
+				continue
+			}
+			if analysis.Kind != AnalysisStartup {
 				continue
 			}
 			if !positiveKnown || !negativeKnown {

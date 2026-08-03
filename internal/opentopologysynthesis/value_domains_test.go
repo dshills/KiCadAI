@@ -301,10 +301,10 @@ func TestTopologyAnalyticScalesRankBoundedDecisionRatios(t *testing.T) {
 		})
 	}
 	expected := map[string]float64{
-		"primitive_001": 14_090.90909090909,
+		"primitive_001": 14_117.488547561301,
 		"primitive_002": 10_000,
 		"primitive_003": 10_000,
-		"primitive_004": 166_666.66666666666,
+		"primitive_004": 169_000,
 	}
 	for _, instance := range graph.Instances[1:] {
 		scales := deriveTopologyAnalyticScales(
@@ -363,8 +363,8 @@ func TestTopologyAnalyticScalesRankSupplyInvariantDecisionReference(t *testing.T
 		10_000,
 		10_000,
 		10_000,
-		13_396.22641509434,
-		166_666.66666666666,
+		13_548.603351955304,
+		169_000,
 	}
 	if len(values) != len(expected) {
 		t.Fatalf("invariant-reference scale count = %d; want %d", len(values), len(expected))
@@ -373,6 +373,65 @@ func TestTopologyAnalyticScalesRankSupplyInvariantDecisionReference(t *testing.T
 		if math.Abs(values[index]-expected[index]) > expected[index]*1e-12 {
 			t.Fatalf("invariant-reference scales = %#v; want %#v", values, expected)
 		}
+	}
+}
+
+func TestTopologyAnalyticScalesComposeSplitDecisionFeedbackFromCatalog(t *testing.T) {
+	requirement := testOpenTopologyRequirement(t, "hysteretic_detector.json")
+	inventory, _ := testHeldOutSynthesisEnvironment(t)
+	search := SearchPrimitiveTopologies(context.Background(), requirement, inventory, DefaultPolicy())
+	var graph CandidateGraph
+	for _, candidate := range search.Candidates {
+		if len(candidate.Graph.Instances) == 8 {
+			graph = candidate.Graph
+			break
+		}
+	}
+	if len(graph.Instances) == 0 {
+		t.Fatal("search omitted the absolute-reference hysteretic topology")
+	}
+	var err error
+	graph, err = SubstitutePrimitive(
+		graph, inventory, "primitive_007", "resistor.vishay.tnpw0805.90k9.0p1|0805",
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	inserted, found := primitiveByKey(inventory, "resistor.vishay.ac03.0r22.axial|axial_ac03")
+	if !found {
+		t.Fatal("inventory lacks the deterministic neutral repair resistor")
+	}
+	graph, err = SplitPrimitiveInSeries(
+		graph, inventory, "primitive_007", inserted, seedPrimitiveValue(inserted),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	byKey := primitiveInventoryByKey(inventory)
+	want := map[string]float64{"primitive_007": 90_900, "primitive_008": 47_000}
+	for instanceID, expected := range want {
+		instance := graph.Instances[graphInstanceIndex(graph, instanceID)]
+		scales := deriveTopologyAnalyticScales(requirement, graph, instance, byKey)
+		if len(scales) != 1 || scales[0].Priority != 1 || scales[0].ValueSI != expected {
+			t.Fatalf("%s split-feedback scales = %#v; want %.12g ohm", instanceID, scales, expected)
+		}
+	}
+}
+
+func TestCatalogSeriesResistancePairPreservesExistingBranch(t *testing.T) {
+	requirement := testMultiBranchAnalogRequirement(t, "precision_low_voltage_rail.json")
+	inventory, _ := testHeldOutSynthesisEnvironment(t)
+	left := GraphInstance{ID: "left", Kind: "resistor", ValueSI: graphFloat(15_000)}
+	right := GraphInstance{ID: "right", Kind: "resistor", ValueSI: graphFloat(0.22)}
+	leftValue, rightValue, found := catalogSeriesResistancePairPreservingBranch(
+		requirement,
+		primitiveInventoryByKey(inventory),
+		16_400,
+		left,
+		right,
+	)
+	if !found || leftValue != 15_000 || rightValue != 1_000 {
+		t.Fatalf("preserving series pair = %.12g + %.12g, found=%t", leftValue, rightValue, found)
 	}
 }
 

@@ -65,6 +65,28 @@ func TestTopologyHashSeparatesStructureButNotCatalogOrValue(t *testing.T) {
 	}
 }
 
+func TestNormalizeGraphDoesNotMutateNonCanonicalTerminalBindings(t *testing.T) {
+	graph := testDiamondGraph("left_branch", "right_branch")
+	before, err := json.Marshal(graph)
+	if err != nil {
+		t.Fatal(err)
+	}
+	normalized, err := NormalizeGraph(graph)
+	if err != nil {
+		t.Fatal(err)
+	}
+	after, err := json.Marshal(graph)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(before, after) {
+		t.Fatalf("normalization mutated its input:\n%s\n%s", before, after)
+	}
+	if _, err := GraphHash(normalized); err != nil {
+		t.Fatalf("normalized graph is invalid: %v", err)
+	}
+}
+
 func TestCanonicalGraphHashHandlesSymmetricInternalNodes(t *testing.T) {
 	first := testDiamondGraph("left", "right")
 	second := testDiamondGraph("right_renamed", "left_renamed")
