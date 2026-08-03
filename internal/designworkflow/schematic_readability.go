@@ -2,6 +2,7 @@ package designworkflow
 
 import (
 	"encoding/json"
+	"strconv"
 
 	"kicadai/internal/kicadfiles"
 	"kicadai/internal/schematiclayout"
@@ -69,9 +70,11 @@ func schematicReadabilityLayout(operations []transactions.Operation) (schematicl
 				decodeErrors++
 				continue
 			}
-			refRoles[payload.Ref] = payload.Role
+			layoutRef := schematicReadabilityComponentRef(payload.Ref, payload.Unit)
+			refRoles[layoutRef] = payload.Role
 			component := schematiclayout.Component{
-				Ref:             payload.Ref,
+				Ref:             layoutRef,
+				DisplayRef:      payload.Ref,
 				Value:           payload.Value,
 				LibraryID:       payload.LibraryID,
 				Role:            payload.Role,
@@ -89,14 +92,24 @@ func schematicReadabilityLayout(operations []transactions.Operation) (schematicl
 				continue
 			}
 			request.Nets = append(request.Nets, schematiclayout.Net{
-				Name:            payload.NetName,
-				Endpoints:       []schematiclayout.Endpoint{{Ref: payload.From.Ref, Pin: payload.From.Pin}, {Ref: payload.To.Ref, Pin: payload.To.Pin}},
+				Name: payload.NetName,
+				Endpoints: []schematiclayout.Endpoint{
+					{Ref: schematicReadabilityComponentRef(payload.From.Ref, payload.From.Unit), Pin: payload.From.Pin},
+					{Ref: schematicReadabilityComponentRef(payload.To.Ref, payload.To.Unit), Pin: payload.To.Pin},
+				},
 				OriginalOrdinal: index,
 			})
 		}
 	}
 	result := schematiclayout.Layout(request)
 	return result, refRoles, decodeErrors
+}
+
+func schematicReadabilityComponentRef(ref string, unit int) string {
+	if unit <= 0 {
+		return ref
+	}
+	return ref + "#" + strconv.Itoa(unit)
 }
 
 func schematicReadabilityHasAmplifierRoles(refRoles map[string]string) bool {

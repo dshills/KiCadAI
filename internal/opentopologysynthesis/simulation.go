@@ -483,6 +483,11 @@ func directSimulationQuantity(assertion BehavioralAssertion) (string, float64, b
 	case "output_current":
 		return simmodel.QuantityDeviceCurrentA, 1, true
 	case "off_state_current":
+		if assertion.Analysis == simmodel.AnalysisTransient ||
+			assertion.Analysis == simmodel.AnalysisStartup ||
+			assertion.Analysis == simmodel.AnalysisElectrothermal {
+			return simmodel.QuantityPeakAbsDeviceCurrentA, 1, true
+		}
 		if assertion.Observation.Kind == "port" {
 			return simmodel.QuantityDeviceCurrentA, 1, true
 		}
@@ -949,8 +954,8 @@ func thermalBehavioralTransferDissipation(
 	return maximum, maximum > 0
 }
 
-// thermalBehavioralCurrentTransferDissipation derives a conservative
-// high-side linear current-output loss envelope from behavioral declarations.
+// thermalBehavioralCurrentTransferDissipation derives a conservative linear
+// current-source or current-sink loss envelope from behavioral declarations.
 // The available current comes from output-current and transconductance bounds,
 // capped by the port rating; the declared load converts that current into the
 // minimum pass-device voltage burden. Sense and ballast drops are deliberately
@@ -969,7 +974,8 @@ func thermalBehavioralCurrentTransferDissipation(
 	}
 	maximum := 0.0
 	for _, port := range requirement.Requirements.Ports {
-		if port.Direction != "source" || port.Kind != "analog_current" {
+		if (port.Direction != "source" && port.Direction != "sink") ||
+			(port.Kind != "analog_current" && port.Kind != "controlled_current") {
 			continue
 		}
 		current := 0.0
@@ -1210,10 +1216,26 @@ func simulationIntentParts(
 			simulationAssertion.ReferenceNode = referenceNodeForDomain(graph, *assertion.Excitation)
 		}
 	}
-	for _, event := range operatingCase.Events {
-		simulationAssertion.WindowStartS = event.TriggerTimeS
-		simulationAssertion.WindowEndS = analysis.DurationS
-		break
+	if assertion.Metric == "settling_time" {
+		effectiveExcitation := simulationEffectiveExcitation(assertion, graph)
+		if effectiveExcitation != nil {
+			component := sourceInstanceForObservation(graph, *effectiveExcitation)
+			for _, excitation := range analysis.Excitations {
+				if excitation.Component != component || excitation.PulseWidthS <= 0 {
+					continue
+				}
+				simulationAssertion.WindowStartS = excitation.PulseDelayS
+				simulationAssertion.WindowEndS = analysis.DurationS
+				break
+			}
+		}
+	}
+	if len(analysis.SourceValueEvents) != 0 {
+		for _, event := range operatingCase.Events {
+			simulationAssertion.WindowStartS = event.TriggerTimeS
+			simulationAssertion.WindowEndS = analysis.DurationS
+			break
+		}
 	}
 	_ = evidence
 	return analysis, simulationAssertion, nil
@@ -1616,11 +1638,18 @@ func simulationExcitations(
 		}
 		excitation := simmodel.SourceExcitation{
 			Component: sourceInstanceForNode(node),
-			DCValue:   sourceValueForNode(requirement, operatingCase, corner, node),
+			DCValue: assertionSourceValue(
+				requirement,
+				assertion,
+				operatingCase,
+				corner,
+				node,
+			),
 		}
 		if assertion.Analysis == simmodel.AnalysisTransient &&
 			effectiveExcitation != nil &&
-			observationMatchesNode(node, *effectiveExcitation) {
+			observationMatchesNode(node, *effectiveExcitation) &&
+			!operatingCaseHasSourceEvent(operatingCase, graph, node) {
 			for _, condition := range operatingCase.Conditions {
 				target, found := externalNodeForSemanticTarget(graph, condition.Target)
 				if !found || target.ID != node.ID ||
@@ -1643,6 +1672,12 @@ func simulationExcitations(
 				excitation.PulseValue = applied
 				excitation.PulseDelayS = duration / 5
 				excitation.PulseWidthS = duration * 3 / 5
+				if assertion.Metric == "settling_time" {
+					// Settling is measured after one commanded edge. Keep the
+					// applied level beyond the analysis window so a synthetic
+					// return edge cannot become the measured settle time.
+					excitation.PulseWidthS = duration
+				}
 				excitation.PulsePeriodS = duration * 2
 				break
 			}
@@ -1670,6 +1705,16 @@ func simulationExcitations(
 		return cmp.Compare(left.Component, right.Component)
 	})
 	return result
+}
+
+func operatingCaseHasSourceEvent(operatingCase OperatingCase, graph CandidateGraph, node GraphNode) bool {
+	for _, event := range operatingCase.Events {
+		target, found := externalNodeForSemanticTarget(graph, event.Target)
+		if found && target.ID == node.ID {
+			return true
+		}
+	}
+	return false
 }
 
 func windowDynamicExcitationRange(
@@ -1867,6 +1912,52 @@ func sourceValueForNode(
 		}
 	}
 	return 0
+}
+
+// assertionSourceValue resolves a DC source at the operating point implied by
+// the assertion when that point is more specific than the enclosing corner.
+// A current target paired with a voltage-to-current transfer defines its
+// command unambiguously as Vcmd=Iout/gm. Using the midpoint of a wider command
+// sweep would evaluate the current assertion at a different requested current
+// and can turn two mutually consistent behavioral assertions into a false
+// conflict.
+func assertionSourceValue(
+	requirement Requirement,
+	assertion BehavioralAssertion,
+	operatingCase OperatingCase,
+	corner operatingCorner,
+	node GraphNode,
+) float64 {
+	fallback := sourceValueForNode(requirement, operatingCase, corner, node)
+	if assertion.Metric != "output_current" || node.Scope != "external" {
+		return fallback
+	}
+	targetCurrent := assertionTarget(assertion)
+	if targetCurrent <= 0 {
+		return fallback
+	}
+	for _, transfer := range requirement.Requirements.BehavioralRequirements {
+		if transfer.Metric != "transconductance" || transfer.Excitation == nil ||
+			transfer.Excitation.Kind != "port" ||
+			transfer.Observation != assertion.Observation ||
+			transfer.Excitation.ID != node.SemanticID {
+			continue
+		}
+		transconductance := assertionTarget(transfer)
+		if transconductance <= 0 {
+			continue
+		}
+		command := targetCurrent / transconductance
+		for _, condition := range operatingCase.Conditions {
+			if condition.Axis != "input_voltage" ||
+				condition.Target != transfer.Excitation.ID ||
+				command < condition.Min || command > condition.Max {
+				continue
+			}
+			return command
+		}
+	}
+	return fallback
 }
 
 func sourceInstanceForNode(node GraphNode) string {

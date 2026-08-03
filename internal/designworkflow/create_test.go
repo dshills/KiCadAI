@@ -254,6 +254,26 @@ func TestSchematicElectricalInputsResolveSharedReferenceByUnit(t *testing.T) {
 	}
 }
 
+func TestSchematicReadabilityResolvesSharedReferenceByUnit(t *testing.T) {
+	addA := transactions.NewOperation(transactions.OpAddSymbol, []byte(`{"op":"add_symbol","ref":"U1","unit":1,"role":"opamp","value":"LM358","library_id":"Amplifier_Operational:LM358","at":{"x_mm":10,"y_mm":10},"pins":[{"number":"1","x_mm":2.54}]}`))
+	addB := transactions.NewOperation(transactions.OpAddSymbol, []byte(`{"op":"add_symbol","ref":"U1","unit":2,"role":"opamp","value":"LM358","library_id":"Amplifier_Operational:LM358","at":{"x_mm":20,"y_mm":10},"pins":[{"number":"7","x_mm":2.54}]}`))
+	connect := transactions.NewOperation(transactions.OpConnect, []byte(`{"op":"connect","from":{"ref":"U1","pin":"1","unit":1},"to":{"ref":"U1","pin":"7","unit":2},"net_name":"BUFFERED"}`))
+
+	result, roles, decodeErrors := schematicReadabilityLayout([]transactions.Operation{addA, addB, connect})
+	if decodeErrors != 0 {
+		t.Fatalf("readability decode errors = %d", decodeErrors)
+	}
+	if len(result.Components) != 2 || result.Components[0].Ref == result.Components[1].Ref ||
+		roles["U1#1"] != "opamp" || roles["U1#2"] != "opamp" {
+		t.Fatalf("multi-unit readability identity: components=%#v roles=%#v", result.Components, roles)
+	}
+	for _, diagnostic := range result.Diagnostics {
+		if diagnostic.Code == "missing_endpoint" || diagnostic.Code == "wire_symbol_overlap" {
+			t.Fatalf("multi-unit readability diagnostic = %#v", diagnostic)
+		}
+	}
+}
+
 func TestSchematicElectricalInputsPreserveBusLabelAnchor(t *testing.T) {
 	addBus := transactions.NewOperation(transactions.OpAddBus, []byte(`{"op":"add_bus","points":[{"x_mm":10,"y_mm":10},{"x_mm":30,"y_mm":10}]}`))
 	addLabel := transactions.NewOperation(transactions.OpAddLabel, []byte(`{"op":"add_label","text":"I2C","at":{"x_mm":10,"y_mm":10},"kind":"local"}`))

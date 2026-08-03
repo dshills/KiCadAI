@@ -584,6 +584,47 @@ func TestSchematicLayoutUsesResolverPinEnvelopeWithoutGraphics(t *testing.T) {
 	}
 }
 
+func TestSchematicLayoutInflatesDegenerateResolverGraphics(t *testing.T) {
+	index := &libraryresolver.LibraryIndex{Symbols: map[string]libraryresolver.SymbolRecord{
+		"Custom:LineBody": {
+			LibraryID: "Custom:LineBody",
+			Graphics: []libraryresolver.SymbolGraphic{{
+				Kind: "polyline",
+				Bounds: libraryresolver.BoundingBox{
+					Min: kicadfiles.Point{Y: kicadfiles.MM(-2.54)},
+					Max: kicadfiles.Point{Y: kicadfiles.MM(2.54)},
+				},
+			}},
+		},
+	}}
+	geometry := schematicLayoutGeometry(Component{Symbol: "Custom:LineBody"}, index)
+	if geometry.Source != schematiclayout.GeometrySourceResolverGraphics || geometry.Body.Empty() {
+		t.Fatalf("line-body geometry = %#v, want non-empty resolver obstacle", geometry)
+	}
+	if geometry.Body.MinX != -defaultComponentPadding || geometry.Body.MaxX != defaultComponentPadding {
+		t.Fatalf("line-body X bounds = %#v, want one padding radius", geometry.Body)
+	}
+}
+
+func TestSchematicLayoutPinEnvelopeIncludesSymbolOrigin(t *testing.T) {
+	index := &libraryresolver.LibraryIndex{Symbols: map[string]libraryresolver.SymbolRecord{
+		"Custom:PowerUnit": {
+			LibraryID: "Custom:PowerUnit",
+			Pins: []libraryresolver.SymbolPin{
+				{Number: "4", Unit: 3, Position: kicadfiles.Point{X: kicadfiles.MM(-2.54), Y: kicadfiles.MM(7.62)}},
+				{Number: "8", Unit: 3, Position: kicadfiles.Point{X: kicadfiles.MM(-2.54), Y: kicadfiles.MM(-7.62)}},
+			},
+		},
+	}}
+	geometry := schematicLayoutGeometry(Component{
+		Symbol: "Custom:PowerUnit", Unit: "3",
+		Pins: []Pin{{Number: "4"}, {Number: "8"}},
+	}, index)
+	if geometry.Source != schematiclayout.GeometrySourceResolverPinEnvelope || geometry.Body.MaxX != defaultComponentPadding {
+		t.Fatalf("power-unit pin envelope = %#v, want origin plus padding", geometry)
+	}
+}
+
 func TestSchematicLayoutGeometryClassifiesAllSupportedSources(t *testing.T) {
 	graphicsIndex := &libraryresolver.LibraryIndex{Symbols: map[string]libraryresolver.SymbolRecord{
 		"Custom:Graphic": {
@@ -942,19 +983,38 @@ func TestToTransactionAssignsFootprintsAndProperties(t *testing.T) {
 
 func TestTransactionSymbolPropertiesHidePowerReferences(t *testing.T) {
 	for _, role := range []ComponentRole{ComponentRolePowerSymbol, ComponentRoleGroundSymbol} {
-		properties := transactionSymbolPropertiesWithLayout(Component{Role: role, Value: "PWR_FLAG"}, "#FLG01", layoutTextPlacement{}, 0)
+		properties := transactionSymbolPropertiesWithLayout(Component{Role: role, Value: "PWR_FLAG"}, "#FLG01", layoutTextPlacement{}, 0, false)
 		for _, property := range properties {
 			if property.Name == "Reference" && !property.Hidden {
 				t.Fatalf("%s reference should be hidden: %+v", role, properties)
 			}
 		}
 	}
-	properties := transactionSymbolPropertiesWithLayout(Component{Role: ComponentRoleResistor, Value: "1k"}, "R1", layoutTextPlacement{}, 0)
+	properties := transactionSymbolPropertiesWithLayout(Component{Role: ComponentRoleResistor, Value: "1k"}, "R1", layoutTextPlacement{}, 0, false)
 	for _, property := range properties {
 		if property.Name == "Reference" && property.Hidden {
 			t.Fatalf("ordinary component reference should remain visible: %+v", properties)
 		}
 	}
+}
+
+func TestTransactionSymbolPropertiesHideSecondaryUnitValue(t *testing.T) {
+	properties := transactionSymbolPropertiesWithLayout(
+		Component{Role: ComponentRoleIC, Value: "LM358"},
+		"U1",
+		layoutTextPlacement{},
+		0,
+		true,
+	)
+	for _, property := range properties {
+		if property.Name == "Value" {
+			if !property.Hidden {
+				t.Fatalf("secondary-unit value should be hidden: %+v", properties)
+			}
+			return
+		}
+	}
+	t.Fatalf("secondary-unit value property missing: %+v", properties)
 }
 
 func TestSchematicLayoutClampsRepairableComponentSpacingToReadableMinimum(t *testing.T) {

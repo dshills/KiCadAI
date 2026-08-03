@@ -165,7 +165,7 @@ func spreadAuxiliaryLaneRanks(components []Component, cells map[string]placement
 	}
 	buckets := map[bucketKey][]Component{}
 	for _, component := range components {
-		if component.RankFixed || !auxiliaryRankCandidate(component) {
+		if !auxiliaryRankCandidate(component) {
 			continue
 		}
 		cell := cells[component.Ref]

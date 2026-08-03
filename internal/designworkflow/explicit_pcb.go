@@ -256,7 +256,20 @@ func RouteExplicitCircuit(ctx context.Context, request Request, placed Placement
 			result.Status = routing.StatusBlocked
 		}
 	}
-	operations, endpointTailCleanup := trimDisconnectedRouteTailsAtSameNetPadsWithSummary(operations, newPhysicalPadRoutingContext(&placed))
+	// Clearance and layer-transition repair can rewrite a simple route into a
+	// tree walk. Normalize the final emitted geometry, not only the router's
+	// initial operations, so repair-created reversal branches receive the same
+	// physical-contact-aware cleanup as every other generated route.
+	physical := newPhysicalPadRoutingContext(&placed)
+	physicalEvidence := BuildInterBlockContactTargets(physical.candidates, &placed)
+	var finalizationIssues []reports.Issue
+	operations, finalizationIssues = postProcessRouteOperations(operations, &placed, physical, physicalEvidence)
+	issues = append(issues, finalizationIssues...)
+	result.Issues = append(result.Issues, finalizationIssues...)
+	if reports.HasBlockingIssue(finalizationIssues) {
+		result.Status = routing.StatusBlocked
+	}
+	operations, endpointTailCleanup := trimDisconnectedRouteTailsAtSameNetPadsWithSummary(operations, physical)
 	operations = compactRouteOperationGeometry(operations)
 	operations, danglingRouteViasPruned := pruneRouteViasWithoutTwoLayerContact(operations, newPhysicalPadRoutingContext(&placed))
 	operations = compactRouteOperationGeometry(operations)
@@ -511,9 +524,9 @@ func pointToSegmentDistance(point, start, end routing.Point) float64 {
 
 func finalizeExplicitRouteOperations(operations []routing.Operation, placed *PlacementStageResult) ([]transactions.Operation, []reports.Issue) {
 	transactionOperations := transactionRouteOperations(operations)
-	transactionOperations = dedupeSameNetRouteVias(transactionOperations)
-	transactionOperations, _, issues := removeRedundantRouteViasAtPlatedPadsWithContext(transactionOperations, placed, newPhysicalPadRoutingContext(placed))
-	return compactRouteOperationGeometry(transactionOperations), issues
+	physical := newPhysicalPadRoutingContext(placed)
+	physicalEvidence := BuildInterBlockContactTargets(physical.candidates, placed)
+	return postProcessRouteOperations(transactionOperations, placed, physical, physicalEvidence)
 }
 
 func expandExplicitPhysicalPadEndpoints(request routing.Request) routing.Request {

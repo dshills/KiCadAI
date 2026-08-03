@@ -1,6 +1,6 @@
 # KiCadAI Roadmap
 
-Date: 2026-08-01
+Date: 2026-08-03
 
 This roadmap replaces the older roadmap and gap analysis now archived as
 `specs/OLD_ROADMAP.md` and `specs/OLD_ROADMAP_GAP.md`.
@@ -142,9 +142,10 @@ from validation feedback to safe automatic repair.
   correction. It binds normalized diagnoses to deterministic proposals,
   expected effects, stage re-entry, before/after/result hashes, bounded
   consumption, outcomes, and safe rejection reasons. The protected
-  programmable current driver retains a narrower byte-identical fail-closed
-  result, while a six-component, twelve-pad, two-route-tree real-router stress
-  case recovers from blocked to routed twice identically. See
+  programmable current driver retains its historical narrower fail-closed
+  trace, while a later generic protected-current milestone closes the measured
+  synthesis gap and a six-component, twelve-pad, two-route-tree real-router
+  stress case recovers from blocked to routed twice identically. See
   `specs/diagnosis-driven-repair/`.
 - Cross-stage autonomous repair extends that shared boundary across simulation,
   schematic, ERC, placement, routing, connectivity, DRC, writer, and round
@@ -1292,13 +1293,14 @@ proves fail-closed rejection of a plausible but unsafe bias alternative. See
 the [completion audit](simulation-grounded-architecture-synthesis/AUDIT.md) and
 [promotion matrix](simulation-grounded-architecture-synthesis/PROMOTION_MATRIX.json).
 
-The independently authored architecture-generalization corpus is now complete:
-five of six unfamiliar analog and power designs pass two identical
-installed-KiCad promotions, all four unsafe cases fail closed, and the
-protected programmable current output remains a precise deterministic
-non-pass. The first shared diagnosis-driven repair milestone is also complete;
-its dense physical case recovers from a real router failure while the current
-driver safely exhausts bounded electrical proposals.
+The independently authored architecture-generalization corpus remains frozen
+at its historical five-of-six result with all four unsafe cases failing closed.
+A separate protected-current milestone now closes that measured non-pass plus
+two independently authored source/sink variants through generic relationship,
+architecture, value, model, control, readable-lowering, and physical-promotion
+capabilities. All three pass deterministic replay and two clean installed-KiCad
+runs. The first shared diagnosis-driven repair milestone also remains complete;
+its earlier exhausted current-driver trace is preserved as baseline evidence.
 
 The cross-stage autonomous-repair milestone is also complete. Its independently
 frozen simulation, schematic, ERC, placement, routing, connectivity, DRC,
@@ -1324,12 +1326,13 @@ and both designs pass two clean installed-KiCad runs. See
 
 The next milestone should expand graph, value, model, and stage-reentry repair
 only from new independently frozen behavior failures. It should prioritize
-reusable analog families that remain outside the proven envelope, while
-preserving the exact 8/8 benchmark and both neutral physical promotions.
+reusable analog families outside the proven protected-current envelope, while
+preserving the exact 8/8 benchmark, both neutral physical promotions, and the
+three protected-current promotions.
 
 1. Expand graph, value, model, and stage-reentry repair only from independently
-   frozen failures, including the protected current-output behavior when a
-   generic evidence-backed correction is available.
+   frozen failures in analog families not already covered by the protected
+   current-output milestone.
 2. Extend affected-scope physical correction across denser multi-net and
    multi-layer cases while preserving unrelated placement and copper.
 3. Expand catalog-independent part qualification, calculated rating, and

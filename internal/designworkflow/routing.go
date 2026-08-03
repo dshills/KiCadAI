@@ -1583,9 +1583,170 @@ func postProcessRouteOperations(operations []transactions.Operation, placed *Pla
 		}
 	}
 	decoded := decodeRouteOperations(operations)
+	operations, viaReducedRoutes, routesChanged := splitRouteWalkReversals(decoded, viaReducedRoutes)
+	if routesChanged {
+		decoded = decodeRouteOperations(operations)
+	}
 	viaReducedRoutes = expandViaReducedRoutePairsDecoded(decoded, viaReducedRoutes)
 	operations = pruneRedundantDanglingRouteStubsDecoded(operations, placed, viaReducedRoutes, physical, physicalEvidence, decoded)
 	return compactRouteOperationGeometry(operations), issues
+}
+
+// splitRouteWalkReversals converts the A-B-A backtracking used by a routed
+// tree walk into one A-B branch plus a trunk that continues from A. Emitting
+// both directions as PCB tracks creates duplicate copper, while retaining a
+// disconnected branch creates a KiCad dangling-track finding. Extracted
+// branches are therefore eligible for the existing physical-contact-aware
+// leaf pruning; branches that terminate at a pad, via, or other copper remain.
+func splitRouteWalkReversals(decoded []decodedRouteOperation, eligible map[int]struct{}) ([]transactions.Operation, map[int]struct{}, bool) {
+	out := make([]transactions.Operation, 0, len(decoded))
+	remappedEligible := make(map[int]struct{}, len(eligible))
+	changed := false
+	for operationIndex, route := range decoded {
+		operation := route.operation
+		if !route.decoded {
+			out = append(out, operation)
+			if _, ok := eligible[operationIndex]; ok {
+				remappedEligible[len(out)-1] = struct{}{}
+			}
+			continue
+		}
+		payload := route.payload
+		trunk := compactRoutePoints(payload.Points)
+		branches := make([][]transactions.Point, 0)
+		for {
+			trunkModified := false
+			next := make([]transactions.Point, 0, len(trunk))
+			for pointIndex := 0; pointIndex < len(trunk); {
+				if pointIndex+2 < len(trunk) &&
+					sameRoutePoint(trunk[pointIndex], trunk[pointIndex+2]) &&
+					!sameRoutePoint(trunk[pointIndex], trunk[pointIndex+1]) {
+					next = appendDistinctTransactionPoint(next, trunk[pointIndex])
+					branches = append(branches, []transactions.Point{trunk[pointIndex], trunk[pointIndex+1]})
+					pointIndex += 2
+					trunkModified = true
+					continue
+				}
+				next = appendDistinctTransactionPoint(next, trunk[pointIndex])
+				pointIndex++
+			}
+			trunk = next
+			if !trunkModified {
+				break
+			}
+		}
+		if len(branches) == 0 {
+			out = append(out, operation)
+			if _, ok := eligible[operationIndex]; ok {
+				remappedEligible[len(out)-1] = struct{}{}
+			}
+			continue
+		}
+		// Canonicalize branch ownership before partitioning vias. A junction via
+		// that belongs to multiple extracted branches is owned by the first
+		// canonical branch, independent of router traversal order.
+		slices.SortFunc(branches, compareTransactionPointLists)
+		originalVias := payload.Vias
+		ownedVias := make([]bool, len(originalVias))
+		trunkVias := make([]transactions.RouteViaSpec, 0, len(originalVias))
+		for viaIndex, via := range originalVias {
+			if routeViaOnTransactionPath(via, trunk) {
+				trunkVias = append(trunkVias, via)
+				ownedVias[viaIndex] = true
+			}
+		}
+		branchVias := make([][]transactions.RouteViaSpec, len(branches))
+		for branchIndex, points := range branches {
+			for viaIndex, via := range originalVias {
+				if ownedVias[viaIndex] || !routeViaOnTransactionPath(via, points) {
+					continue
+				}
+				branchVias[branchIndex] = append(branchVias[branchIndex], via)
+				ownedVias[viaIndex] = true
+			}
+		}
+		allViasOwned := true
+		for _, owned := range ownedVias {
+			if !owned {
+				allViasOwned = false
+				break
+			}
+		}
+		if !allViasOwned {
+			// An off-path via cannot be assigned to rewritten geometry without
+			// risking an open circuit or orphan copper. Preserve the valid original
+			// route and leave it to the later physical checks instead.
+			out = append(out, operation)
+			if _, ok := eligible[operationIndex]; ok {
+				remappedEligible[len(out)-1] = struct{}{}
+			}
+			continue
+		}
+		changed = true
+		payload.Points = trunk
+		payload.Vias = trunkVias
+		raw, err := json.Marshal(payload)
+		if err != nil {
+			out = append(out, operation)
+			if _, ok := eligible[operationIndex]; ok {
+				remappedEligible[len(out)-1] = struct{}{}
+			}
+			continue
+		}
+		trunkOperation := operation
+		trunkOperation.Raw = raw
+		out = append(out, trunkOperation)
+		if _, ok := eligible[operationIndex]; ok {
+			remappedEligible[len(out)-1] = struct{}{}
+		}
+		for branchIndex, points := range branches {
+			branchPayload := payload
+			branchPayload.Points = points
+			branchPayload.Vias = branchVias[branchIndex]
+			branchRaw, err := json.Marshal(branchPayload)
+			if err != nil {
+				continue
+			}
+			branchOperation := operation
+			branchOperation.Raw = branchRaw
+			out = append(out, branchOperation)
+			// The extracted edge did not exist as an independently authored
+			// operation, so it is always safe to evaluate as a removable leaf.
+			// Pad, via, and same-net copper contacts still protect real branches.
+			remappedEligible[len(out)-1] = struct{}{}
+		}
+	}
+	return out, remappedEligible, changed
+}
+
+func routeViaOnTransactionPath(via transactions.RouteViaSpec, points []transactions.Point) bool {
+	return slices.ContainsFunc(points, func(point transactions.Point) bool {
+		return sameRoutePoint(via.At, point)
+	}) || routeViaOnTransactionPolyline(via, points)
+}
+
+func compareTransactionPointLists(left, right []transactions.Point) int {
+	for index := 0; index < min(len(left), len(right)); index++ {
+		if left[index].XMM < right[index].XMM {
+			return -1
+		}
+		if left[index].XMM > right[index].XMM {
+			return 1
+		}
+		if left[index].YMM < right[index].YMM {
+			return -1
+		}
+		if left[index].YMM > right[index].YMM {
+			return 1
+		}
+	}
+	if len(left) < len(right) {
+		return -1
+	}
+	if len(left) > len(right) {
+		return 1
+	}
+	return 0
 }
 
 func combineSequentialRoutingResults(first routing.Result, second routing.Result) routing.Result {

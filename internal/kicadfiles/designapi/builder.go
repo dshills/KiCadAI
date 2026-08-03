@@ -9,6 +9,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 
 	"kicadai/internal/kicadfiles"
 	kicaddesign "kicadai/internal/kicadfiles/design"
@@ -19,6 +20,7 @@ import (
 	"kicadai/internal/kicadfiles/sexpr"
 	"kicadai/internal/libraryresolver"
 	"kicadai/internal/routing"
+	"kicadai/internal/schematiclayout"
 )
 
 // Builder accumulates a KiCad design through ordered mutations. It is not
@@ -781,7 +783,12 @@ func (builder *Builder) ConnectWithOptions(from, to Endpoint, netName string, op
 			builder.addSchematicLabelConnection(netName, to, end, start, toLabelAt, options.OrientLabelsOutward)
 		}
 	} else if len(options.Waypoints) != 0 {
-		builder.addSchematicWirePointsWithOptions(netName, from, to, options.Waypoints, options.SuppressBendLabels, options.BendLabelAt)
+		if builder.schematicPathTouchesForeignWire(netName, options.Waypoints) {
+			builder.addSchematicLabelStubWithOrientation(netName, from, start, builder.labelStubOffset(from, start, end), options.OrientLabelsOutward)
+			builder.addSchematicLabelStubWithOrientation(netName, to, end, builder.labelStubOffset(to, end, start), options.OrientLabelsOutward)
+		} else {
+			builder.addSchematicWirePointsWithOptions(netName, from, to, options.Waypoints, options.SuppressBendLabels, options.BendLabelAt)
+		}
 	} else if options.UseLabels != nil {
 		builder.addSchematicWireWithOptions(netName, from, to, start, end, options.SuppressBendLabels, options.BendLabelAt)
 	} else if builder.schematicConnectionShouldUseDirectLabels(from, to, start, end) {
@@ -818,7 +825,7 @@ func (builder *Builder) addSchematicLabelConnection(netName string, endpoint End
 		return
 	}
 	position := *requested
-	if builder.schematicLabelConnectionConflicts(netName, anchor, position) {
+	if builder.schematicLabelConnectionConflicts(netName, anchor, position, orientOutward) {
 		preferred := kicadfiles.Point{X: position.X - anchor.X, Y: position.Y - anchor.Y}
 		if samePoint(preferred, kicadfiles.Point{}) {
 			preferred = builder.labelStubOffset(endpoint, anchor, other)
@@ -836,7 +843,7 @@ func (builder *Builder) addSchematicLabelConnection(netName string, endpoint End
 	_ = builder.AddLabelWithOptions(netName, position, schematic.LabelLocal, labelOptions)
 }
 
-func (builder *Builder) schematicLabelConnectionConflicts(netName string, anchor, position kicadfiles.Point) bool {
+func (builder *Builder) schematicLabelConnectionConflicts(netName string, anchor, position kicadfiles.Point, orientOutward bool) bool {
 	netName = strings.TrimSpace(netName)
 	for _, label := range builder.design.Schematic.Labels {
 		if samePoint(label.Position, position) && strings.TrimSpace(label.Text) != netName {
@@ -844,10 +851,12 @@ func (builder *Builder) schematicLabelConnectionConflicts(netName string, anchor
 		}
 	}
 	if samePoint(position, anchor) {
-		return false
+		return builder.schematicLabelTextOverlapsExisting(netName, anchor, position, orientOutward)
 	}
 	return builder.schematicStubTouchesForeignWire(netName, anchor, position) ||
-		builder.schematicSegmentTouchesForeignPinAnchor(netName, anchor, position, anchor)
+		builder.schematicSegmentTouchesForeignPinAnchor(netName, anchor, position, anchor) ||
+		builder.schematicStubTouchesVisibleText(anchor, position) ||
+		builder.schematicLabelTextOverlapsExisting(netName, anchor, position, orientOutward)
 }
 
 func (builder *Builder) schematicStubTouchesForeignWire(netName string, anchor, labelPoint kicadfiles.Point) bool {
@@ -1227,7 +1236,7 @@ func (builder *Builder) addSchematicLabelStubWithOrientation(netName string, end
 	if offset.X == 0 && offset.Y == 0 {
 		offset.X = kicadfiles.MM(1.27)
 	}
-	offset = builder.safeSchematicLabelStubOffset(anchor, offset)
+	offset = builder.safeSchematicLabelStubOffset(netName, anchor, offset, orientOutward)
 	labelPoint := kicadfiles.Point{X: anchor.X + offset.X, Y: anchor.Y + offset.Y}
 	builder.addSchematicWire(netName, endpoint, endpoint, anchor, labelPoint)
 	labelOptions := LabelOptions{}
@@ -1253,7 +1262,7 @@ func schematicLabelOptionsForStub(anchor, label kicadfiles.Point) LabelOptions {
 	}
 }
 
-func (builder *Builder) safeSchematicLabelStubOffset(anchor kicadfiles.Point, preferred kicadfiles.Point) kicadfiles.Point {
+func (builder *Builder) safeSchematicLabelStubOffset(netName string, anchor kicadfiles.Point, preferred kicadfiles.Point, orientOutward bool) kicadfiles.Point {
 	if builder == nil {
 		return preferred
 	}
@@ -1282,12 +1291,162 @@ func (builder *Builder) safeSchematicLabelStubOffset(anchor kicadfiles.Point, pr
 			labelPoint := kicadfiles.Point{X: anchor.X + candidate.X, Y: anchor.Y + candidate.Y}
 			if !schematicStubTouchesExistingWire(anchor, labelPoint, builder.design.Schematic.Wires) &&
 				!builder.schematicSegmentTouchesOtherPinAnchor(anchor, labelPoint, anchor, anchor) &&
-				!schematicLabelPositionOccupied(labelPoint, builder.design.Schematic.Labels) {
+				!builder.schematicStubTouchesVisibleText(anchor, labelPoint) &&
+				!schematicLabelPositionOccupied(labelPoint, builder.design.Schematic.Labels) &&
+				!builder.schematicLabelTextOverlapsExisting(netName, anchor, labelPoint, orientOutward) {
 				return candidate
 			}
 		}
 	}
 	return preferred
+}
+
+type schematicLabelTextRect struct {
+	minX kicadfiles.IU
+	minY kicadfiles.IU
+	maxX kicadfiles.IU
+	maxY kicadfiles.IU
+}
+
+func (builder *Builder) schematicLabelTextOverlapsExisting(netName string, anchor, position kicadfiles.Point, orientOutward bool) bool {
+	options := LabelOptions{}
+	if orientOutward {
+		options = schematicLabelOptionsForStub(anchor, position)
+	}
+	return builder.schematicLabelTextOverlapsExistingWithOptions(netName, position, options)
+}
+
+func (builder *Builder) schematicLabelTextOverlapsExistingWithOptions(netName string, position kicadfiles.Point, options LabelOptions) bool {
+	if builder == nil || builder.design.Schematic == nil {
+		return false
+	}
+	candidate := schematicLabelTextBounds(netName, position, options.Rotation, containsFold(options.Justify, "right"))
+	for _, label := range builder.design.Schematic.Labels {
+		if samePoint(label.Position, position) && strings.EqualFold(strings.TrimSpace(label.Text), strings.TrimSpace(netName)) {
+			continue
+		}
+		existing := schematicLabelTextBounds(label.Text, label.Position, label.Rotation, containsFold(label.Justify, "right"))
+		if schematicLabelTextRectsIntersect(candidate, existing) {
+			return true
+		}
+	}
+	candidateRect := schematiclayout.Rect{MinX: candidate.minX, MinY: candidate.minY, MaxX: candidate.maxX, MaxY: candidate.maxY}
+	for _, symbol := range builder.design.Schematic.Symbols {
+		for _, property := range symbol.Properties {
+			if property.Hidden || strings.TrimSpace(property.Value) == "" {
+				continue
+			}
+			// Match post-write readability validation, which intentionally uses
+			// a conservative horizontal field envelope after parsing.
+			if candidateRect.Intersects(schematiclayout.TextEstimate(property.Value, property.Position, 0, 0)) {
+				return true
+			}
+		}
+		for _, field := range symbol.Fields {
+			if field.Hidden || (!field.Visible && field.Name != "Reference" && field.Name != "Value") || strings.TrimSpace(field.Value) == "" {
+				continue
+			}
+			if candidateRect.Intersects(schematiclayout.TextEstimate(field.Value, field.Position, 0, 0)) {
+				return true
+			}
+		}
+		body := schematicSymbolCollisionBody(builder, symbol)
+		if candidateRect.Intersects(body) {
+			return true
+		}
+	}
+	return false
+}
+
+func schematicSymbolCollisionBody(builder *Builder, symbol schematic.SchematicSymbol) schematiclayout.Rect {
+	body, known := hierarchySymbolBody(builder, symbol)
+	if known {
+		body = schematiclayout.TransformRect(body, symbol.Rotation, schematiclayout.Mirror(symbol.Mirror)).Translate(symbol.Position)
+	} else if len(symbol.PinAnchors) != 0 {
+		body = schematiclayout.Rect{MinX: symbol.PinAnchors[0].X, MinY: symbol.PinAnchors[0].Y, MaxX: symbol.PinAnchors[0].X, MaxY: symbol.PinAnchors[0].Y}
+		for _, anchor := range symbol.PinAnchors[1:] {
+			body.MinX = min(body.MinX, anchor.X)
+			body.MinY = min(body.MinY, anchor.Y)
+			body.MaxX = max(body.MaxX, anchor.X)
+			body.MaxY = max(body.MaxY, anchor.Y)
+		}
+	} else {
+		body = schematiclayout.Rect{
+			MinX: symbol.Position.X - kicadfiles.MM(5.08), MinY: symbol.Position.Y - kicadfiles.MM(5.08),
+			MaxX: symbol.Position.X + kicadfiles.MM(5.08), MaxY: symbol.Position.Y + kicadfiles.MM(5.08),
+		}
+	}
+	padding := kicadfiles.MM(1.27)
+	body.MinX -= padding
+	body.MinY -= padding
+	body.MaxX += padding
+	body.MaxY += padding
+	return body
+}
+
+func (builder *Builder) schematicRouteLabelTextOverlapsExisting(netName string, position kicadfiles.Point, options LabelOptions) bool {
+	if builder.schematicLabelTextOverlapsExistingWithOptions(netName, position, options) {
+		return true
+	}
+	candidate := schematicLabelTextBounds(netName, position, options.Rotation, containsFold(options.Justify, "right"))
+	candidateRect := schematiclayout.Rect{MinX: candidate.minX, MinY: candidate.minY, MaxX: candidate.maxX, MaxY: candidate.maxY}
+	for _, symbol := range builder.design.Schematic.Symbols {
+		// Final KiCad readability includes pin names and pin numbers outside the
+		// vector body. Route annotations can rotate in place, so reserve the full
+		// conventional pin-name field here without lengthening endpoint stubs.
+		body := schematicSymbolCollisionBody(builder, symbol)
+		annotationPadding := kicadfiles.MM(3.81)
+		body.MinX -= annotationPadding
+		body.MinY -= annotationPadding
+		body.MaxX += annotationPadding
+		body.MaxY += annotationPadding
+		if candidateRect.Intersects(body) {
+			return true
+		}
+	}
+	return false
+}
+
+func schematicLabelTextBounds(text string, position kicadfiles.Point, rotation kicadfiles.Angle, justifyRight bool) schematicLabelTextRect {
+	const defaultCharacterMM = 1.27
+	character := kicadfiles.MM(defaultCharacterMM)
+	lines := strings.Split(text, "\n")
+	maximumRunes := 0
+	for _, line := range lines {
+		maximumRunes = max(maximumRunes, utf8.RuneCountInString(line))
+	}
+	width := kicadfiles.IU(maximumRunes) * character
+	height := kicadfiles.IU(max(1, len(lines))) * character
+	angle := int(rotation) % 360
+	if angle < 0 {
+		angle += 360
+	}
+	if justifyRight && (angle == 0 || angle == 90) {
+		angle = (angle + 180) % 360
+	}
+	switch angle {
+	case 180:
+		return schematicLabelTextRect{minX: position.X - width, minY: position.Y - height, maxX: position.X, maxY: position.Y}
+	case 90:
+		return schematicLabelTextRect{minX: position.X, minY: position.Y, maxX: position.X + height, maxY: position.Y + width}
+	case 270:
+		return schematicLabelTextRect{minX: position.X - height, minY: position.Y - width, maxX: position.X, maxY: position.Y}
+	default:
+		return schematicLabelTextRect{minX: position.X, minY: position.Y - height, maxX: position.X + width, maxY: position.Y}
+	}
+}
+
+func schematicLabelTextRectsIntersect(left, right schematicLabelTextRect) bool {
+	return left.minX < right.maxX && left.maxX > right.minX && left.minY < right.maxY && left.maxY > right.minY
+}
+
+func containsFold(values []string, want string) bool {
+	for _, value := range values {
+		if strings.EqualFold(strings.TrimSpace(value), strings.TrimSpace(want)) {
+			return true
+		}
+	}
+	return false
 }
 
 func schematicLabelPositionOccupied(position kicadfiles.Point, labels []schematic.Label) bool {
@@ -1311,6 +1470,37 @@ func schematicStubTouchesExistingWire(anchor kicadfiles.Point, labelPoint kicadf
 				return true
 			}
 			if pointOnSchematicSegment(b, anchor, labelPoint) && !samePoint(b, anchor) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func (builder *Builder) schematicStubTouchesVisibleText(anchor, labelPoint kicadfiles.Point) bool {
+	if builder == nil || builder.design.Schematic == nil || samePoint(anchor, labelPoint) {
+		return false
+	}
+	segment := schematiclayout.WireSegment{From: anchor, To: labelPoint}
+	intersects := func(text string, position kicadfiles.Point) bool {
+		// Match the conservative field box used by post-write readability
+		// validation so an in-memory clear stub remains clear after parsing.
+		return schematiclayout.SegmentIntersectsRect(segment, schematiclayout.TextEstimate(text, position, 0, 0))
+	}
+	for _, symbol := range builder.design.Schematic.Symbols {
+		for _, property := range symbol.Properties {
+			if property.Hidden || strings.TrimSpace(property.Value) == "" {
+				continue
+			}
+			if intersects(property.Value, property.Position) {
+				return true
+			}
+		}
+		for _, field := range symbol.Fields {
+			if field.Hidden || (!field.Visible && field.Name != "Reference" && field.Name != "Value") || strings.TrimSpace(field.Value) == "" {
+				continue
+			}
+			if intersects(field.Value, field.Position) {
 				return true
 			}
 		}
@@ -1419,14 +1609,118 @@ func (builder *Builder) addSchematicWirePointsWithOptions(netName string, from, 
 			}
 		}
 		if onRoute {
-			builder.design.Schematic.Labels = append(builder.design.Schematic.Labels, schematic.NewLabel(
-				builder.generator.New("root.schematic.label", netName, "route", formatPoint(*bendLabelAt)),
-				netName,
-				schematic.LabelLocal,
-				*bendLabelAt,
-			))
+			if position, rotation, ok := builder.safeSchematicRouteLabelPoint(netName, *bendLabelAt, points); ok {
+				label := schematic.NewLabel(
+					builder.generator.New("root.schematic.label", netName, "route", formatPoint(position)),
+					netName,
+					schematic.LabelLocal,
+					position,
+				)
+				label.Rotation = rotation
+				builder.design.Schematic.Labels = append(builder.design.Schematic.Labels, label)
+			}
 		}
 	}
+}
+
+func (builder *Builder) safeSchematicRouteLabelPoint(netName string, preferred kicadfiles.Point, points []kicadfiles.Point) (kicadfiles.Point, kicadfiles.Angle, bool) {
+	type candidate struct {
+		position kicadfiles.Point
+		rotation kicadfiles.Angle
+		distance kicadfiles.IU
+		ordinal  int
+	}
+	candidates := make([]candidate, 0, len(points)*8)
+	seen := map[string]struct{}{}
+	appendCandidate := func(position kicadfiles.Point, rotation kicadfiles.Angle) {
+		key := formatPoint(position) + ":" + strconv.Itoa(int(rotation))
+		if _, exists := seen[key]; exists {
+			return
+		}
+		seen[key] = struct{}{}
+		candidates = append(candidates, candidate{
+			position: position, rotation: rotation,
+			distance: absIU(position.X-preferred.X) + absIU(position.Y-preferred.Y),
+			ordinal:  len(candidates),
+		})
+	}
+	for index := 0; index < len(points)-1; index++ {
+		from, to := points[index], points[index+1]
+		rotations := []kicadfiles.Angle{0, 90}
+		if from.X == to.X {
+			rotations = []kicadfiles.Angle{90, 0}
+		}
+		positions := []kicadfiles.Point{
+			preferred,
+			{X: (from.X + to.X) / 2, Y: (from.Y + to.Y) / 2},
+			{X: (3*from.X + to.X) / 4, Y: (3*from.Y + to.Y) / 4},
+			{X: (from.X + 3*to.X) / 4, Y: (from.Y + 3*to.Y) / 4},
+		}
+		for _, position := range positions {
+			if !pointOnSchematicSegment(position, from, to) {
+				continue
+			}
+			for _, rotation := range rotations {
+				appendCandidate(position, rotation)
+			}
+		}
+		grid := kicadfiles.MM(1.27)
+		deltaX, deltaY := to.X-from.X, to.Y-from.Y
+		latticeSteps := schematicGreatestCommonDivisor(absIU(deltaX), absIU(deltaY))
+		if latticeSteps == 0 {
+			continue
+		}
+		stepX, stepY := deltaX/latticeSteps, deltaY/latticeSteps
+		stepSpan := max(absIU(stepX), absIU(stepY))
+		stride := max(kicadfiles.IU(1), grid/stepSpan)
+		for step := stride; step < latticeSteps; step += stride {
+			position := kicadfiles.Point{X: from.X + stepX*step, Y: from.Y + stepY*step}
+			for _, rotation := range rotations {
+				appendCandidate(position, rotation)
+			}
+		}
+	}
+	sort.SliceStable(candidates, func(i, j int) bool {
+		if candidates[i].distance != candidates[j].distance {
+			return candidates[i].distance < candidates[j].distance
+		}
+		return candidates[i].ordinal < candidates[j].ordinal
+	})
+	for _, candidate := range candidates {
+		if builder.schematicPointTouchesForeignWire(netName, candidate.position) ||
+			schematicLabelPositionOccupied(candidate.position, builder.design.Schematic.Labels) ||
+			builder.schematicRouteLabelTextOverlapsExisting(netName, candidate.position, LabelOptions{Rotation: candidate.rotation}) {
+			continue
+		}
+		return candidate.position, candidate.rotation, true
+	}
+	return kicadfiles.Point{}, 0, false
+}
+
+func schematicGreatestCommonDivisor(left, right kicadfiles.IU) kicadfiles.IU {
+	for right != 0 {
+		left, right = right, left%right
+	}
+	return left
+}
+
+func (builder *Builder) schematicPointTouchesForeignWire(netName string, point kicadfiles.Point) bool {
+	if builder == nil {
+		return false
+	}
+	targetNet := builder.canonicalNet(netName)
+	for wireUUID, wire := range builder.schematicWires {
+		existingNet := builder.canonicalNet(builder.schematicWireNets[wireUUID])
+		if existingNet == targetNet {
+			continue
+		}
+		for index := 1; index < len(wire.Points); index++ {
+			if pointOnSchematicSegment(point, wire.Points[index-1], wire.Points[index]) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func validateSchematicWaypoints(points []kicadfiles.Point, start, end kicadfiles.Point) error {

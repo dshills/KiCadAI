@@ -1,12 +1,13 @@
 package opentopologysynthesis
 
 import (
+	"fmt"
 	"testing"
 
 	"kicadai/internal/circuitgraph"
 )
 
-func TestPhysicalSchematicIntentLeavesCoreRanksTopologyDerived(t *testing.T) {
+func TestPhysicalSchematicIntentUsesTopologyDerivedCoreRanks(t *testing.T) {
 	graph := CandidateGraph{
 		Nodes: []GraphNode{
 			{ID: "vin", SemanticID: "vin", Scope: "external", Role: "input"},
@@ -23,24 +24,34 @@ func TestPhysicalSchematicIntentLeavesCoreRanksTopologyDerived(t *testing.T) {
 	groupByComponent := map[string]string{}
 	nearByComponent := map[string]string{}
 	for _, placement := range intent.Placements {
+		if _, exists := groupByComponent[placement.Component]; exists {
+			t.Fatalf("duplicate placement for %s: %#v", placement.Component, intent.Placements)
+		}
 		groupByComponent[placement.Component] = placement.Group
 		nearByComponent[placement.Component] = placement.Near
 		if placement.Mirror != "" {
 			t.Fatalf("core mirror was fixed before topology layout: %#v", placement)
 		}
 	}
+	ranks := physicalTopologyRanks(graph)
 	for _, component := range []string{"controller", "pass", "sense_resistor"} {
-		if groupByComponent[component] != "" || nearByComponent[component] != "" {
-			t.Fatalf("%s retained a fixed core group/near chain: groups=%#v near=%#v", component, groupByComponent, nearByComponent)
+		wantGroup := fmt.Sprintf("topology_rank_%03d", ranks[component])
+		if groupByComponent[component] != wantGroup || nearByComponent[component] != "" {
+			t.Fatalf("%s topology group = %q, near = %q; want %q and no named near chain", component, groupByComponent[component], nearByComponent[component], wantGroup)
 		}
 	}
+	groupRanks := map[string]int{}
 	for _, group := range intent.Groups {
-		if group.ID != "external_inputs" {
-			t.Fatalf("synthesized core still forces a fixed graph rank: %#v", group)
+		groupRanks[group.ID] = group.Rank
+	}
+	for _, component := range []string{"controller", "pass", "sense_resistor"} {
+		group := groupByComponent[component]
+		if groupRanks[group] != ranks[component] {
+			t.Fatalf("%s group rank = %d, want topology rank %d", component, groupRanks[group], ranks[component])
 		}
 	}
-	if groupByComponent["interface_out"] != "" {
-		t.Fatalf("output connector retained a fixed boundary rank: %#v", groupByComponent)
+	if groupByComponent["interface_out"] != "external_outputs" || groupRanks["external_outputs"] != 4 {
+		t.Fatalf("output connector boundary placement = %#v, ranks=%#v", groupByComponent, groupRanks)
 	}
 	if intent.Rules.MinComponentSpacingMM > 10.16 {
 		t.Fatalf("synthesized component spacing is not compact: %v", intent.Rules.MinComponentSpacingMM)

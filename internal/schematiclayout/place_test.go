@@ -377,7 +377,7 @@ func TestSpreadAuxiliaryLaneRanksPreservesSignalStageAndLimitsRows(t *testing.T)
 		{Ref: "P3", Role: "capacitor", Lane: LaneSignal},
 		{Ref: "P4", Role: "capacitor", Lane: LaneSignal},
 		{Ref: "P5", Role: "resistor", Lane: LaneSignal},
-		{Ref: "R1", Lane: LaneReference},
+		{Ref: "R1", Lane: LaneReference, RankFixed: true},
 		{Ref: "R2", Lane: LaneReference},
 		{Ref: "R3", Lane: LaneReference},
 		{Ref: "R4", Lane: LaneReference},
@@ -407,6 +407,9 @@ func TestSpreadAuxiliaryLaneRanksPreservesSignalStageAndLimitsRows(t *testing.T)
 		if count > 2 {
 			t.Fatalf("auxiliary rank %d contains %d components, want at most 2", rank, count)
 		}
+	}
+	if spread["R1"].rank == spread["R5"].rank {
+		t.Fatalf("fixed topology group prevented auxiliary density spreading: %#v", spread)
 	}
 	passiveCounts := map[int]int{}
 	for _, ref := range []string{"P1", "P2", "P3", "P4", "P5"} {

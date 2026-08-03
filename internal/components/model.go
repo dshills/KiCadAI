@@ -795,6 +795,41 @@ func RebuildCatalogIndexes(catalog *Catalog) {
 	rebuildCatalogIndexesLocked(catalog)
 }
 
+// LookupRecord returns the exact catalog record for id. Catalogs loaded through
+// the normal validation path already have an index; hand-built catalogs acquire
+// the same deterministic index lazily on first lookup.
+func LookupRecord(catalog *Catalog, id string) (ComponentRecord, bool) {
+	if catalog == nil {
+		return ComponentRecord{}, false
+	}
+	catalog.mu.RLock()
+	if catalog.recordIndex != nil {
+		index, found := catalog.recordIndex[id]
+		if !found || index < 0 || index >= len(catalog.Records) {
+			catalog.mu.RUnlock()
+			return ComponentRecord{}, false
+		}
+		record := catalog.Records[index]
+		catalog.mu.RUnlock()
+		return record, true
+	}
+	catalog.mu.RUnlock()
+
+	catalog.mu.Lock()
+	defer catalog.mu.Unlock()
+	if catalog.recordIndex == nil {
+		catalog.recordIndex = make(map[string]int, len(catalog.Records))
+		for index, record := range catalog.Records {
+			catalog.recordIndex[record.ID] = index
+		}
+	}
+	index, found := catalog.recordIndex[id]
+	if !found || index < 0 || index >= len(catalog.Records) {
+		return ComponentRecord{}, false
+	}
+	return catalog.Records[index], true
+}
+
 func rebuildCatalogIndexesLocked(catalog *Catalog) {
 	catalog.recordIndex = map[string]int{}
 	catalog.variantIndex = map[string]CatalogVariantIndex{}

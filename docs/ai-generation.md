@@ -596,10 +596,12 @@ out/open-topology/.kicadai/open-topology-synthesis.json
 out/open-topology/.kicadai/open-topology-promotion.json
 ```
 
-The current frozen benchmark passes six of eight cases. Two bounded searches
-fail closed with `OPEN_TOPOLOGY_REPAIR_EXHAUSTED`; they are not silently mapped
-to registered functional providers. See the
-[completion audit](../specs/simulation-guided-open-topology-synthesis/AUDIT.md).
+The expanded frozen benchmark passes exactly 8/8. The two cases that originally
+exhausted bounded repair now close through generic multi-branch graph, value,
+model, and repair capabilities rather than being silently mapped to registered
+functional providers. Two independent neutral cases also pass deterministic
+replay and two installed-KiCad promotions. See the
+[multi-branch completion audit](../specs/generic-multi-branch-analog-topology-synthesis/AUDIT.md).
 
 The same production lane now has a ranked architecture-synthesis envelope for
 three additional frozen behavior-only requirements: Class A amplification,
@@ -611,6 +613,14 @@ result explains the winner and retains alternatives. Each selected circuit
 passes two installed-KiCad clean-root runs with identical raw projects and
 path-independent promotion receipts. See the
 [architecture synthesis audit](../specs/simulation-grounded-architecture-synthesis/AUDIT.md).
+
+The protected-current follow-on closes another measured architecture gap.
+Behavior-only programmable output, low-side sink, and high-side source cases
+derive current direction, control composition, values, compliance, thermal,
+SOA, and physical intent without a named current-driver block. All three pass
+two local installed-KiCad runs with clean ERC, strict DRC, complete
+connectivity/routing, writer correctness, and zero round-trip differences. See
+the [protected-current audit](../specs/generic-protected-current-output-synthesis/AUDIT.md).
 
 ## Generic Placement And Routing Correction
 

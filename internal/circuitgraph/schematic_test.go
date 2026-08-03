@@ -188,6 +188,32 @@ func TestToSchematicIRPreservesMultiUnitReference(t *testing.T) {
 	}
 }
 
+func TestToSchematicIRPlacesPackagePowerUnitAbovePrimary(t *testing.T) {
+	resolved, issues := NewResolver(ResolveOptions{Catalog: loadGraphCatalog(t), CatalogID: "checked-in"}).Resolve(context.Background(), namedLM358Document())
+	if reports.HasBlockingIssue(issues) {
+		t.Fatalf("resolve issues = %#v", issues)
+	}
+	document, issues := ToSchematicIR(resolved)
+	if reports.HasBlockingIssue(issues) {
+		t.Fatalf("lowering issues = %#v", issues)
+	}
+	units := map[string]string{}
+	for _, component := range document.Circuit.Components {
+		if component.Ref == "U1" {
+			units[component.Unit] = component.ID
+		}
+	}
+	for _, placement := range document.Layout.Placements {
+		if placement.Target == units["3"] {
+			if !reflect.DeepEqual(placement.Above, []string{units["1"]}) || !reflect.DeepEqual(placement.RightOf, []string{units["1"]}) || len(placement.Near) != 0 {
+				t.Fatalf("power-unit placement = %#v, want above and right of primary unit", placement)
+			}
+			return
+		}
+	}
+	t.Fatal("power-unit placement missing")
+}
+
 func TestSchematicLayoutIntentPreservesExplicitNegativePowerLane(t *testing.T) {
 	resolved := ResolvedDocument{
 		Source: Document{Schematic: SchematicIntent{Lanes: SchematicLanes{PowerNegative: lanePointer(LaneLower)}, Rules: SchematicRules{}}},
@@ -237,6 +263,21 @@ func TestToSchematicIRLowersNamedLM358UnitsDeterministically(t *testing.T) {
 		if component.ID != wantID || component.Symbol != "Amplifier_Operational:LM358" || component.Footprint != "Package_SO:SOIC-8_3.9x4.9mm_P1.27mm" {
 			t.Fatalf("LM358 unit %s = %#v, want id %s", unitID, component, wantID)
 		}
+	}
+	powerUnitLabeled := 0
+	for _, net := range document.Circuit.Nets {
+		for _, endpoint := range net.Connect {
+			componentID, _, ok := endpoint.Split()
+			if ok && componentID == units["3"].ID {
+				powerUnitLabeled++
+				if net.UseLabel == nil || !*net.UseLabel {
+					t.Fatalf("package power-unit net %s must use a rail label", net.Name)
+				}
+			}
+		}
+	}
+	if powerUnitLabeled != 2 {
+		t.Fatalf("labeled package power-unit nets = %d, want 2", powerUnitLabeled)
 	}
 	placements := map[string]schematicir.Placement{}
 	for _, placement := range document.Layout.Placements {

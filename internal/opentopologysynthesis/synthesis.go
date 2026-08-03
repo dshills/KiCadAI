@@ -237,6 +237,14 @@ func Synthesize(
 				appendSynthesisDiagnostics(&run.Report, evaluation.Issues)
 			}
 		}
+		// A physical pass completes the current round's retained-topology
+		// ranking window. Candidate order above still gives every remaining
+		// peer topology in this round a bounded opportunity to compete, but
+		// later rounds contain only alternate value trials for those same
+		// topologies and need not repeat the full corner suite after success.
+		if len(passes) != 0 {
+			rankingWindowComplete = true
+		}
 		if simulationStopped || rankingWindowComplete {
 			break
 		}

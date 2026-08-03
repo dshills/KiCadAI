@@ -249,6 +249,60 @@ func TestReadSchematicRecoversMarkedResolverGeometryForKnownTemplate(t *testing.
 	}
 }
 
+func TestReadSchematicRecoversUnitAnchorsWithPackagePinUUIDs(t *testing.T) {
+	input := strings.Join([]string{
+		`(kicad_sch`,
+		`  (version 20260306)`,
+		`  (generator "eeschema")`,
+		`  (generator_version "10.0.3")`,
+		`  (uuid "11111111-1111-5111-8111-111111111111")`,
+		`  (paper A4)`,
+		`  (lib_symbols`,
+		`    (symbol "Custom:Dual"`,
+		`      (symbol "Dual_2_1"`,
+		`        (pin input line (at -5 2 0) (length 1) (name "+") (number "5"))`,
+		`        (pin input line (at -5 -2 0) (length 1) (name "-") (number "6"))`,
+		`        (pin output line (at 5 0 180) (length 1) (name "OUT") (number "7"))`,
+		`      )`,
+		`    )`,
+		`  )`,
+		`  (symbol`,
+		`    (lib_id "Custom:Dual")`,
+		`    (at 50 50 0)`,
+		`    (unit 2)`,
+		`    (uuid "33333333-3333-5333-8333-333333333333")`,
+		`    (property "Reference" "U1")`,
+		`    (property "Value" "DUAL")`,
+		`    (pin "5" (uuid "44444444-4444-5444-8444-444444444445"))`,
+		`    (pin "6" (uuid "44444444-4444-5444-8444-444444444446"))`,
+		`    (pin "7" (uuid "44444444-4444-5444-8444-444444444447"))`,
+		`    (pin "1" (uuid "44444444-4444-5444-8444-444444444441"))`,
+		`    (pin "2" (uuid "44444444-4444-5444-8444-444444444442"))`,
+		`    (pin "3" (uuid "44444444-4444-5444-8444-444444444443"))`,
+		`    (pin "4" (uuid "44444444-4444-5444-8444-444444444444"))`,
+		`    (pin "8" (uuid "44444444-4444-5444-8444-444444444448"))`,
+		`  )`,
+		`)`,
+	}, "\n")
+	read, err := Read([]byte(input))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(read.Symbols) != 1 || len(read.Symbols[0].PinAnchors) != 3 {
+		t.Fatalf("unit pin anchors = %#v, want three", read.Symbols)
+	}
+	want := []kicadfiles.Point{
+		{X: kicadfiles.MM(45), Y: kicadfiles.MM(48)},
+		{X: kicadfiles.MM(45), Y: kicadfiles.MM(52)},
+		{X: kicadfiles.MM(55), Y: kicadfiles.MM(50)},
+	}
+	for index := range want {
+		if read.Symbols[0].PinAnchors[index] != want[index] {
+			t.Fatalf("pin anchor %d = %#v, want %#v", index, read.Symbols[0].PinAnchors[index], want[index])
+		}
+	}
+}
+
 func TestReadSchematicRecoversConnectionOverridePinAnchors(t *testing.T) {
 	input := strings.Join([]string{
 		`(kicad_sch`,

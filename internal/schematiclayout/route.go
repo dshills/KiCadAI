@@ -15,6 +15,10 @@ const routeHardPenalty int64 = 1_000_000_000_000
 
 func Route(request Request, result Result) Result {
 	request = Classify(request)
+	return routePass(request, result)
+}
+
+func routePass(request Request, result Result) Result {
 	rules := normalizeRules(request.Rules)
 	anchors := pinAnchors(result.Components)
 	anchorIndex := newPinAnchorIndex(anchors)
@@ -41,6 +45,9 @@ func Route(request Request, result Result) Result {
 			continue
 		}
 		forceLabels := shouldUseLabels(net, anchors, request.Components, rules)
+		if forceLabels && routeLocalTreeWithBoundaryLabels(&result, labeled, net, orderedEndpoints, request, rules, anchorIndex) {
+			continue
+		}
 		for _, orderedEndpoint := range orderedEndpoints[1:] {
 			toEndpoint := orderedEndpoint.endpoint
 			end := orderedEndpoint.anchor
@@ -72,6 +79,71 @@ func Route(request Request, result Result) Result {
 	recordReadabilityMetrics(&result, request)
 	result = Validate(result, request)
 	return NormalizeResult(result, rules)
+}
+
+func hasDiagnosticCode(diagnostics []Diagnostic, code string) bool {
+	for _, diagnostic := range diagnostics {
+		if diagnostic.Code == code {
+			return true
+		}
+	}
+	return false
+}
+
+// routeLocalTreeWithBoundaryLabels preserves the visible local part of a net
+// when a passive boundary endpoint still needs a label for ERC or off-sheet
+// connectivity. This produces the conventional combination of a wired local
+// branch, one net annotation, and a labeled connector instead of replacing
+// every local conductor with isolated endpoint labels.
+func routeLocalTreeWithBoundaryLabels(
+	result *Result,
+	labeled map[string]kicadfiles.Point,
+	net Net,
+	endpoints []routableEndpoint,
+	request Request,
+	rules Rules,
+	anchorIndex pinAnchorIndex,
+) bool {
+	role := normalizeRole(net.Role)
+	if !net.EndpointLabels || containsNormalizedRole(role, "power", "ground", "return", "rail", "bus", "global", "cross_sheet") {
+		return false
+	}
+	components := make(map[string]Component, len(result.Components))
+	for _, placed := range result.Components {
+		components[placed.Ref] = placed.Component
+	}
+	local := make([]routableEndpoint, 0, len(endpoints))
+	boundary := make([]routableEndpoint, 0, len(endpoints))
+	localPassive := true
+	for _, endpoint := range endpoints {
+		component := components[endpoint.endpoint.Ref]
+		if component.Stage == StageBoundaryInput || component.Stage == StageBoundaryOutput ||
+			containsNormalizedRole(component.Role, "connector", "boundary") {
+			boundary = append(boundary, endpoint)
+		} else {
+			local = append(local, endpoint)
+			localPassive = localPassive && containsNormalizedRole(component.Role, "resistor", "capacitor", "inductor", "diode", "fuse", "protection", "current_limiter")
+		}
+	}
+	if len(local) < 2 || len(boundary) == 0 || !localPassive {
+		return false
+	}
+	root := local[0]
+	for _, endpoint := range local[1:] {
+		points, _ := routeConnectionPoints(net.Name, root.endpoint, endpoint.endpoint, root.anchor, endpoint.anchor, *result, request, rules, anchorIndex, true)
+		result.Connections = append(result.Connections, RoutedConnection{NetName: net.Name, From: root.endpoint, To: endpoint.endpoint, Points: points})
+		result.Wires = append(result.Wires, segmentsForPoints(net.Name, points)...)
+		root = endpoint
+	}
+	localLabel := appendEndpointLabel(result, labeled, net.Name, local[0].endpoint, local[0].anchor, request, rules)
+	for _, endpoint := range boundary {
+		boundaryLabel := appendEndpointLabel(result, labeled, net.Name, endpoint.endpoint, endpoint.anchor, request, rules)
+		result.Connections = append(result.Connections, RoutedConnection{
+			NetName: net.Name, From: local[0].endpoint, To: endpoint.endpoint, UseLabels: true,
+			FromLabelAt: &localLabel, ToLabelAt: &boundaryLabel,
+		})
+	}
+	return true
 }
 
 // orderedNetsForRouting reserves short endpoint-label stubs before laying
@@ -1345,6 +1417,7 @@ func Layout(request Request) Result {
 		}
 	}
 	if selectedFound {
+		selected = repairSelectedLabelAccessCrossings(selected, selectedRequest)
 		selected = finalizeLayoutCandidate(selected, selectedRequest)
 		if request.MaxComponentsPerSheet > 0 && len(request.Components) > request.MaxComponentsPerSheet {
 			partition := PartitionPlaced(request, selected.Components)
@@ -1393,6 +1466,115 @@ func Layout(request Request) Result {
 		})
 	}
 	return NormalizeResult(last, request.Rules)
+}
+
+func repairSelectedLabelAccessCrossings(selected Result, request Request) Result {
+	if !hasDiagnosticCode(selected.Diagnostics, "label_placement_fallback") || !hasDiagnosticCode(selected.Diagnostics, "wire_crossing") {
+		return selected
+	}
+	rules := normalizeRules(request.Rules)
+	anchors := pinAnchors(selected.Components)
+	access := labelAccessSegments(selected.Connections, anchors)
+	if len(access) == 0 {
+		return selected
+	}
+	selected.Connections = append([]RoutedConnection(nil), selected.Connections...)
+	changed := false
+	for index, connection := range selected.Connections {
+		if connection.UseLabels || len(connection.Points) < 2 || !connectionTouchesForeignLabelAccess(connection, access) {
+			continue
+		}
+		start, startOK := anchors[connection.From]
+		end, endOK := anchors[connection.To]
+		if !startOK || !endOK {
+			continue
+		}
+		obstacles := selected
+		obstacles.Wires = wiresForConnectionsExcept(selected.Connections, anchors, index)
+		points, clean := routeConnectionPoints(
+			connection.NetName, connection.From, connection.To, start, end,
+			obstacles, request, rules, newPinAnchorIndex(anchors), true,
+		)
+		if !clean {
+			continue
+		}
+		selected.Connections[index].Points = points
+		changed = true
+	}
+	if !changed {
+		return selected
+	}
+	selected.Wires = compactWireSegments(wiresForConnectionsExcept(selected.Connections, anchors, -1))
+	selected.Junctions = branchJunctions(selected.Wires)
+	filtered := selected.Diagnostics[:0]
+	for _, diagnostic := range selected.Diagnostics {
+		if diagnostic.Code != "wire_crossing" {
+			filtered = append(filtered, diagnostic)
+		}
+	}
+	selected.Diagnostics = filtered
+	return selected
+}
+
+func labelAccessSegments(connections []RoutedConnection, anchors map[Endpoint]kicadfiles.Point) []WireSegment {
+	var segments []WireSegment
+	for _, connection := range connections {
+		if !connection.UseLabels {
+			continue
+		}
+		for _, access := range []struct {
+			endpoint Endpoint
+			position *kicadfiles.Point
+		}{
+			{endpoint: connection.From, position: connection.FromLabelAt},
+			{endpoint: connection.To, position: connection.ToLabelAt},
+		} {
+			anchor, ok := anchors[access.endpoint]
+			if !ok || access.position == nil {
+				continue
+			}
+			segments = append(segments, WireSegment{NetName: connection.NetName, From: anchor, To: *access.position})
+		}
+	}
+	return segments
+}
+
+func connectionTouchesForeignLabelAccess(connection RoutedConnection, access []WireSegment) bool {
+	for _, segment := range segmentsForPoints(connection.NetName, connection.Points) {
+		for _, stub := range access {
+			if stub.NetName != connection.NetName && wireSegmentsElectricallyContact(segment, stub) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func wiresForConnectionsExcept(connections []RoutedConnection, anchors map[Endpoint]kicadfiles.Point, excluded int) []WireSegment {
+	var wires []WireSegment
+	for index, connection := range connections {
+		if index == excluded {
+			continue
+		}
+		if !connection.UseLabels {
+			wires = append(wires, segmentsForPoints(connection.NetName, connection.Points)...)
+			continue
+		}
+		for _, access := range []struct {
+			endpoint Endpoint
+			position *kicadfiles.Point
+		}{
+			{endpoint: connection.From, position: connection.FromLabelAt},
+			{endpoint: connection.To, position: connection.ToLabelAt},
+		} {
+			anchor, ok := anchors[access.endpoint]
+			if !ok || access.position == nil || anchor == *access.position {
+				continue
+			}
+			wires = append(wires, WireSegment{NetName: connection.NetName, From: anchor, To: *access.position})
+		}
+	}
+	return compactWireSegments(wires)
 }
 
 func layoutAspectMismatch(result Result) float64 {

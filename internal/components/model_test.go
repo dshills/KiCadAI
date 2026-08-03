@@ -155,6 +155,17 @@ func TestSortCatalogStable(t *testing.T) {
 	}
 }
 
+func TestLookupRecordBuildsAndReusesExactIndex(t *testing.T) {
+	catalog := &Catalog{Records: []ComponentRecord{{ID: "second"}, {ID: "first"}}}
+	record, found := LookupRecord(catalog, "first")
+	if !found || record.ID != "first" {
+		t.Fatalf("LookupRecord(first) = %#v, %t", record, found)
+	}
+	if _, found := LookupRecord(catalog, "missing"); found {
+		t.Fatal("LookupRecord(missing) unexpectedly succeeded")
+	}
+}
+
 func TestParseLeadingEngineeringNumber(t *testing.T) {
 	tests := []struct {
 		value string

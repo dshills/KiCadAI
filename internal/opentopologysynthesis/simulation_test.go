@@ -11,7 +11,107 @@ import (
 	"kicadai/internal/circuitgraph"
 	"kicadai/internal/components"
 	"kicadai/internal/modelprovenance"
+	"kicadai/internal/simmodel"
 )
+
+func TestOutputCurrentAssertionUsesImpliedTransconductanceCommand(t *testing.T) {
+	requirement, issues := DecodeStrict(bytes.NewReader(mustRead(
+		t,
+		filepath.Join(architectureGeneralizationCorpusRoot(), "protected_programmable_current_output.json"),
+	)))
+	if len(issues) != 0 {
+		t.Fatalf("requirement decode issues: %#v", issues)
+	}
+	graph, graphIssues := InitialGraph(requirement)
+	if len(graphIssues) != 0 {
+		t.Fatalf("initial graph issues: %#v", graphIssues)
+	}
+	var assertion BehavioralAssertion
+	var settlingAssertion BehavioralAssertion
+	var operatingCase OperatingCase
+	var commandNode GraphNode
+	for _, candidate := range requirement.Requirements.BehavioralRequirements {
+		if candidate.ID == "rated_current" {
+			assertion = candidate
+		}
+		if candidate.ID == "settling" {
+			settlingAssertion = candidate
+		}
+	}
+	for _, candidate := range requirement.Requirements.OperatingCases {
+		if candidate.ID == "programmed_load" {
+			operatingCase = candidate
+		}
+	}
+	for _, candidate := range graph.Nodes {
+		if candidate.SemanticID == "current_command" {
+			commandNode = candidate
+		}
+	}
+	if assertion.ID == "" || operatingCase.ID == "" || commandNode.ID == "" {
+		t.Fatal("protected-current requirement lacks expected semantic evidence")
+	}
+	corner := operatingCaseCorners(operatingCase)[0]
+	if fallback := sourceValueForNode(requirement, operatingCase, corner, commandNode); fallback != 1.125 {
+		t.Fatalf("ordinary nominal command = %.12g, want midpoint 1.125", fallback)
+	}
+	if got := assertionSourceValue(requirement, assertion, operatingCase, corner, commandNode); got != 1 {
+		t.Fatalf("assertion-specific command = %.12g, want I/gm = 1", got)
+	}
+
+	outside := assertion
+	minimum, maximum := 0.25, 0.25
+	outside.Min, outside.Max = &minimum, &maximum
+	if got := assertionSourceValue(requirement, outside, operatingCase, corner, commandNode); got != 1.125 {
+		t.Fatalf("out-of-envelope implied command = %.12g, want fallback midpoint", got)
+	}
+	excitations := simulationExcitations(requirement, settlingAssertion, operatingCase, corner, graph)
+	duration := dynamicDuration(settlingAssertion, operatingCase)
+	foundSingleStep := false
+	for _, excitation := range excitations {
+		if excitation.Component == sourceInstanceForNode(commandNode) &&
+			excitation.PulseDelayS > 0 && excitation.PulseWidthS >= duration {
+			foundSingleStep = true
+		}
+	}
+	if !foundSingleStep {
+		t.Fatalf("settling excitation does not retain one applied step: %#v", excitations)
+	}
+}
+
+func TestThermalCurrentTransferCoversControlledSourceAndSink(t *testing.T) {
+	tests := []struct {
+		file          string
+		operatingCase string
+	}{
+		{filepath.Join(architectureGeneralizationCorpusRoot(), "protected_programmable_current_output.json"), "programmed_load"},
+		{filepath.Join(protectedCurrentOutputCorpusRoot(), "fault_protected_low_side_current_sink.json"), "enabled_regulation"},
+		{filepath.Join(protectedCurrentOutputCorpusRoot(), "startup_safe_high_side_current_source.json"), "permitted_regulation"},
+	}
+	for _, test := range tests {
+		t.Run(filepath.Base(test.file), func(t *testing.T) {
+			requirement, issues := DecodeStrict(bytes.NewReader(mustRead(t, test.file)))
+			if len(issues) != 0 {
+				t.Fatalf("requirement decode issues: %#v", issues)
+			}
+			var operatingCase OperatingCase
+			for _, candidate := range requirement.Requirements.OperatingCases {
+				if candidate.ID == test.operatingCase {
+					operatingCase = candidate
+				}
+			}
+			if operatingCase.ID == "" {
+				t.Fatalf("operating case %q is missing", test.operatingCase)
+			}
+			corner := operatingCaseCorners(operatingCase)[0]
+			if dissipation, bounded := thermalBehavioralCurrentTransferDissipation(
+				requirement, operatingCase, corner, 12,
+			); !bounded || dissipation <= 0 {
+				t.Fatalf("controlled-current dissipation = %.12g, bounded=%t", dissipation, bounded)
+			}
+		})
+	}
+}
 
 func TestThermalOutputStageDissipationRejectsUnboundedLoads(t *testing.T) {
 	for _, load := range []float64{0, -1, math.NaN(), math.Inf(1)} {
@@ -266,6 +366,53 @@ func TestDynamicGridNormalizesBeforeSemanticValueEvents(t *testing.T) {
 			analysis.DurationS,
 			event,
 		)
+	}
+}
+
+func TestTransientOffStateCurrentUsesPostEventPeakWithoutSyntheticPulse(t *testing.T) {
+	requirement, issues := DecodeStrict(bytes.NewReader(mustRead(
+		t, filepath.Join(protectedCurrentOutputCorpusRoot(), "fault_protected_low_side_current_sink.json"),
+	)))
+	if len(issues) != 0 {
+		t.Fatalf("requirement decode issues: %#v", issues)
+	}
+	graph, graphIssues := InitialGraph(requirement)
+	if len(graphIssues) != 0 {
+		t.Fatalf("initial graph issues: %#v", graphIssues)
+	}
+	var assertion BehavioralAssertion
+	var operatingCase OperatingCase
+	for _, candidate := range requirement.Requirements.BehavioralRequirements {
+		if candidate.Metric == "off_state_current" {
+			assertion = candidate
+			break
+		}
+	}
+	for _, candidate := range requirement.Requirements.OperatingCases {
+		if len(assertion.OperatingCases) != 0 && candidate.ID == assertion.OperatingCases[0] {
+			operatingCase = candidate
+			break
+		}
+	}
+	quantity, _, supported := directSimulationQuantity(assertion)
+	if !supported || quantity != simmodel.QuantityPeakAbsDeviceCurrentA {
+		t.Fatalf("transient off-state quantity = %q supported=%t", quantity, supported)
+	}
+	corner := operatingCaseCorners(operatingCase)[0]
+	for _, excitation := range simulationExcitations(requirement, assertion, operatingCase, corner, graph) {
+		if excitation.Component == "source_port_fault" &&
+			(excitation.PulseWidthS != 0 || excitation.PulsePeriodS != 0) {
+			t.Fatalf("explicit fault event also received a synthetic pulse: %#v", excitation)
+		}
+	}
+	analysis, measurement, diagnostics := simulationIntentParts(
+		requirement, assertion, operatingCase, corner, graph, nil, quantity, 1, nil,
+	)
+	if len(diagnostics) != 0 || len(analysis.SourceValueEvents) != 1 ||
+		measurement.WindowStartS != analysis.SourceValueEvents[0].TriggerTimeS ||
+		measurement.WindowEndS != analysis.DurationS {
+		t.Fatalf("post-event off-state plan: diagnostics=%#v analysis=%#v measurement=%#v",
+			diagnostics, analysis, measurement)
 	}
 }
 

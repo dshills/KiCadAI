@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 
+	"kicadai/internal/components"
 	"kicadai/internal/reports"
 	"kicadai/internal/schematicir"
 )
@@ -22,6 +23,7 @@ func ToSchematicIR(resolved ResolvedDocument) (schematicir.Document, []reports.I
 	}
 
 	unitIDs, unitsByComponent, issues := schematicUnitIDs(resolved)
+	powerUnits := schematicPowerUnits(resolved)
 	references, referenceIssues := schematicReferences(resolved)
 	issues = append(issues, referenceIssues...)
 	noConnects := schematicNoConnects(resolved)
@@ -66,7 +68,7 @@ func ToSchematicIR(resolved ResolvedDocument) (schematicir.Document, []reports.I
 	}
 	document.Circuit.Components = append(document.Circuit.Components, powerFlags...)
 	for netIndex, net := range resolved.Nets {
-		irNet, netIssues := schematicNet(net, netIndex, unitIDs)
+		irNet, netIssues := schematicNet(net, netIndex, unitIDs, powerUnits)
 		issues = append(issues, netIssues...)
 		if !reports.HasBlockingIssue(netIssues) {
 			if flagID := powerFlagsByNet[net.Intent.Name]; flagID != "" {
@@ -305,13 +307,14 @@ func schematicComponent(component ResolvedComponent, unit int, unitIDs map[schem
 	}, nil
 }
 
-func schematicNet(net ResolvedNet, index int, unitIDs map[schematicUnitKey]string) (schematicir.Net, []reports.Issue) {
+func schematicNet(net ResolvedNet, index int, unitIDs map[schematicUnitKey]string, powerUnits map[schematicUnitKey]bool) (schematicir.Net, []reports.Issue) {
 	result := schematicir.Net{Name: net.Intent.Name, Role: schematicNetRole(net.Intent.Role)}
 	seen := map[schematicir.EndpointRef]struct{}{}
 	var issues []reports.Issue
 	for endpointIndex, endpoint := range net.Endpoints {
 		for _, binding := range endpoint.Bindings {
-			id := unitIDs[schematicUnitKey{component: endpoint.Intent.Component, unit: binding.Unit}]
+			key := schematicUnitKey{component: endpoint.Intent.Component, unit: binding.Unit}
+			id := unitIDs[key]
 			if id == "" || binding.SymbolPin == "" {
 				path := fmt.Sprintf("nets[%d].endpoints[%d]", index, endpointIndex)
 				issues = append(issues, graphIssue(CodeSchematicLowering, path, "resolved endpoint has no schematic unit or pin"))
@@ -323,10 +326,35 @@ func schematicNet(net ResolvedNet, index int, unitIDs map[schematicUnitKey]strin
 			}
 			seen[ref] = struct{}{}
 			result.Connect = append(result.Connect, ref)
+			if powerUnits[key] && schematicNetRoleUsesRailLabel(net.Intent.Role) {
+				useLabel := true
+				result.UseLabel = &useLabel
+			}
 		}
 	}
 	slices.Sort(result.Connect)
 	return result, issues
+}
+
+func schematicPowerUnits(resolved ResolvedDocument) map[schematicUnitKey]bool {
+	result := map[schematicUnitKey]bool{}
+	for _, component := range resolved.Components {
+		for _, unit := range component.Units {
+			if unit.Type == components.SymbolUnitPower || strings.EqualFold(strings.TrimSpace(unit.Role), "power") {
+				result[schematicUnitKey{component: component.Instance.ID, unit: unit.Unit}] = true
+			}
+		}
+	}
+	return result
+}
+
+func schematicNetRoleUsesRailLabel(role NetRole) bool {
+	switch role {
+	case NetRolePower, NetRolePowerPos, NetRolePowerNeg, NetRoleGround, NetRoleReturn:
+		return true
+	default:
+		return false
+	}
 }
 
 func schematicNoConnects(resolved ResolvedDocument) map[schematicUnitKey]map[string]struct{} {
@@ -473,13 +501,31 @@ func schematicLayoutIntent(resolved ResolvedDocument, unitIDs map[schematicUnitK
 			if unitIndex > 0 && len(irPlacement.Near) == 0 && len(irPlacement.Above) == 0 && len(irPlacement.RightOf) == 0 {
 				primary := unitIDs[schematicUnitKey{component: component.Instance.ID, unit: unitsByComponent[component.Instance.ID][0]}]
 				if primary != "" {
-					irPlacement.Near = []string{primary}
+					if resolvedUnitIsPower(component, unit) {
+						// Keep package power units out of the signal-flow corridor.
+						// Their supply connections naturally route toward the top and
+						// bottom power lanes when the unit is above its primary
+						// functional unit.
+						irPlacement.Above = []string{primary}
+						irPlacement.RightOf = []string{primary}
+					} else {
+						irPlacement.Near = []string{primary}
+					}
 				}
 			}
 			layout.Placements = append(layout.Placements, irPlacement)
 		}
 	}
 	return layout
+}
+
+func resolvedUnitIsPower(component ResolvedComponent, unit int) bool {
+	for _, candidate := range component.Units {
+		if candidate.Unit == unit {
+			return candidate.Type == components.SymbolUnitPower || strings.EqualFold(strings.TrimSpace(candidate.Role), "power")
+		}
+	}
+	return false
 }
 
 func mergeSchematicPlacement(base, override SchematicPlacement) SchematicPlacement {

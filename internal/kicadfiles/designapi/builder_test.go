@@ -94,6 +94,125 @@ func TestBuilderCreatesValidDesignFromIntent(t *testing.T) {
 	assertPadNet(t, design.PCB.Footprints, "D1", "1", "LED_OUT")
 }
 
+func TestSafeSchematicLabelStubOffsetAvoidsExistingLabelText(t *testing.T) {
+	builder := newTestBuilder(t)
+	anchor := kicadfiles.Point{X: kicadfiles.MM(20), Y: kicadfiles.MM(20)}
+	builder.design.Schematic.Labels = append(builder.design.Schematic.Labels, schematic.Label{
+		Text: "EXISTING_LONG_LABEL", Position: kicadfiles.Point{X: kicadfiles.MM(22), Y: kicadfiles.MM(20)},
+	})
+	preferred := kicadfiles.Point{X: kicadfiles.MM(1.27)}
+	got := builder.safeSchematicLabelStubOffset("NEW_LABEL", anchor, preferred, true)
+	position := kicadfiles.Point{X: anchor.X + got.X, Y: anchor.Y + got.Y}
+	options := schematicLabelOptionsForStub(anchor, position)
+	candidate := schematicLabelTextBounds("NEW_LABEL", position, options.Rotation, containsFold(options.Justify, "right"))
+	existing := schematicLabelTextBounds("EXISTING_LONG_LABEL", builder.design.Schematic.Labels[0].Position, 0, false)
+	if schematicLabelTextRectsIntersect(candidate, existing) {
+		t.Fatalf("label offset %#v still overlaps existing label", got)
+	}
+}
+
+func TestSafeSchematicLabelStubOffsetAvoidsVisibleSymbolText(t *testing.T) {
+	builder := newTestBuilder(t)
+	anchor := kicadfiles.Point{X: kicadfiles.MM(20), Y: kicadfiles.MM(20)}
+	preferred := kicadfiles.Point{Y: kicadfiles.MM(1.27)}
+	builder.design.Schematic.Symbols = append(builder.design.Schematic.Symbols, schematic.SchematicSymbol{
+		Reference: "R1",
+		Properties: []schematic.Property{{
+			Name: "Value", Value: "5.1k",
+			Position: kicadfiles.Point{X: kicadfiles.MM(20), Y: kicadfiles.MM(22.54)},
+		}},
+	})
+	preferredPosition := kicadfiles.Point{X: anchor.X + preferred.X, Y: anchor.Y + preferred.Y}
+	if !builder.schematicStubTouchesVisibleText(anchor, preferredPosition) {
+		t.Fatal("expected preferred label stub to cross visible symbol text")
+	}
+
+	got := builder.safeSchematicLabelStubOffset("GND", anchor, preferred, true)
+	position := kicadfiles.Point{X: anchor.X + got.X, Y: anchor.Y + got.Y}
+	if got == preferred {
+		t.Fatalf("label stub retained text-crossing offset %#v", got)
+	}
+	if builder.schematicStubTouchesVisibleText(anchor, position) {
+		t.Fatalf("label stub offset %#v still crosses visible symbol text", got)
+	}
+}
+
+func TestSafeSchematicRouteLabelPointMovesAnnotationAwayFromSymbol(t *testing.T) {
+	builder := newTestBuilder(t)
+	symbolPosition := kicadfiles.Point{X: kicadfiles.MM(40), Y: kicadfiles.MM(20)}
+	builder.design.Schematic.Symbols = append(builder.design.Schematic.Symbols, schematic.SchematicSymbol{
+		Reference: "Q1", Position: symbolPosition,
+		BodyBounds: &schematic.SymbolBodyBounds{
+			Min: kicadfiles.Point{X: -kicadfiles.MM(3), Y: -kicadfiles.MM(3)},
+			Max: kicadfiles.Point{X: kicadfiles.MM(3), Y: kicadfiles.MM(3)},
+		},
+	})
+	points := []kicadfiles.Point{
+		{X: kicadfiles.MM(20), Y: kicadfiles.MM(20)},
+		{X: kicadfiles.MM(40), Y: kicadfiles.MM(20)},
+		{X: kicadfiles.MM(40), Y: kicadfiles.MM(35)},
+	}
+	preferred := kicadfiles.Point{X: kicadfiles.MM(25), Y: kicadfiles.MM(20)}
+	position, rotation, ok := builder.safeSchematicRouteLabelPoint("INTERNAL_000", preferred, points)
+	if !ok {
+		t.Fatal("route label search found no clear point")
+	}
+	if rotation != 0 && rotation != 90 {
+		t.Fatalf("route label rotation = %v, want canonical 0 or 90", rotation)
+	}
+	if position == preferred && rotation == 0 {
+		t.Fatalf("route label retained colliding preferred placement: %#v rotation=%v", position, rotation)
+	}
+	if builder.schematicLabelTextOverlapsExistingWithOptions("INTERNAL_000", position, LabelOptions{Rotation: rotation}) {
+		t.Fatalf("route label still overlaps symbol: position=%#v rotation=%v", position, rotation)
+	}
+}
+
+func TestSafeSchematicRouteLabelPointAvoidsForeignWire(t *testing.T) {
+	builder := newTestBuilder(t)
+	preferred := kicadfiles.Point{X: kicadfiles.MM(30), Y: kicadfiles.MM(20)}
+	builder.addSchematicWirePoints("FOREIGN", Endpoint{}, Endpoint{}, []kicadfiles.Point{
+		{X: preferred.X, Y: kicadfiles.MM(10)},
+		{X: preferred.X, Y: kicadfiles.MM(30)},
+	})
+	points := []kicadfiles.Point{
+		{X: kicadfiles.MM(20), Y: preferred.Y},
+		{X: kicadfiles.MM(40), Y: preferred.Y},
+	}
+
+	position, _, ok := builder.safeSchematicRouteLabelPoint("TARGET", preferred, points)
+	if !ok {
+		t.Fatal("route label search found no clear point")
+	}
+	if position == preferred || builder.schematicPointTouchesForeignWire("TARGET", position) {
+		t.Fatalf("route label position %#v still touches foreign wire", position)
+	}
+}
+
+func TestSafeSchematicRouteLabelPointSamplesDiagonalSegments(t *testing.T) {
+	builder := newTestBuilder(t)
+	for _, x := range []float64{25, 30, 35} {
+		builder.addSchematicWirePoints("FOREIGN", Endpoint{}, Endpoint{}, []kicadfiles.Point{
+			{X: kicadfiles.MM(x), Y: kicadfiles.MM(15)},
+			{X: kicadfiles.MM(x), Y: kicadfiles.MM(45)},
+		})
+	}
+	points := []kicadfiles.Point{
+		{X: kicadfiles.MM(20), Y: kicadfiles.MM(20)},
+		{X: kicadfiles.MM(40), Y: kicadfiles.MM(40)},
+	}
+	preferred := kicadfiles.Point{X: kicadfiles.MM(25), Y: kicadfiles.MM(25)}
+
+	position, _, ok := builder.safeSchematicRouteLabelPoint("TARGET", preferred, points)
+	if !ok {
+		t.Fatal("route label search found no clear point on diagonal segment")
+	}
+	if !pointOnSchematicSegment(position, points[0], points[1]) ||
+		builder.schematicPointTouchesForeignWire("TARGET", position) {
+		t.Fatalf("route label position %#v is not a clear point on the diagonal segment", position)
+	}
+}
+
 func TestBuilderEmitsNativeVectorBusGeometry(t *testing.T) {
 	builder := newTestBuilder(t)
 	busPoints := []kicadfiles.Point{{X: kicadfiles.MM(20), Y: kicadfiles.MM(50)}, {X: kicadfiles.MM(80), Y: kicadfiles.MM(50)}}
@@ -463,6 +582,52 @@ func TestBuilderConnectUsesLabelStubsInsteadOfCrossingForeignWire(t *testing.T) 
 	}
 }
 
+func TestBuilderConnectExplicitWaypointsUseLabelStubsInsteadOfCrossingForeignWire(t *testing.T) {
+	builder := newTestBuilder(t)
+	addTwoPinSymbol(t, builder, "R1", "Device:R", "1k", kicadfiles.Point{X: kicadfiles.MM(20.32), Y: kicadfiles.MM(20.32)})
+	addTwoPinSymbol(t, builder, "R2", "Device:R", "10k", kicadfiles.Point{X: kicadfiles.MM(40.64), Y: kicadfiles.MM(20.32)})
+	addTwoPinSymbol(t, builder, "R3", "Device:R", "2k", kicadfiles.Point{X: kicadfiles.MM(25.4), Y: kicadfiles.MM(10.16)})
+	addTwoPinSymbol(t, builder, "R4", "Device:R", "20k", kicadfiles.Point{X: kicadfiles.MM(35.56), Y: kicadfiles.MM(30.48)})
+
+	if err := builder.Connect(Endpoint{Reference: "R1", Pin: "2"}, Endpoint{Reference: "R2", Pin: "1"}, "NET_A"); err != nil {
+		t.Fatalf("connect first net: %v", err)
+	}
+	start, _ := builder.pinAnchor(Endpoint{Reference: "R3", Pin: "2"})
+	end, _ := builder.pinAnchor(Endpoint{Reference: "R4", Pin: "1"})
+	waypoints := []kicadfiles.Point{start, end}
+	useLabels := false
+	if err := builder.ConnectWithOptions(
+		Endpoint{Reference: "R3", Pin: "2"},
+		Endpoint{Reference: "R4", Pin: "1"},
+		"NET_B",
+		ConnectOptions{UseLabels: &useLabels, Waypoints: waypoints},
+	); err != nil {
+		t.Fatalf("connect crossing waypoints: %v", err)
+	}
+
+	labels := 0
+	for _, label := range builder.design.Schematic.Labels {
+		if label.Text == "NET_B" {
+			labels++
+		}
+	}
+	if labels != 2 {
+		t.Fatalf("NET_B labels = %d, want two safe endpoint stubs; labels=%#v", labels, builder.design.Schematic.Labels)
+	}
+	for _, wire := range builder.design.Schematic.Wires {
+		if builder.canonicalNet(builder.schematicWireNets[wire.UUID]) != "NET_B" {
+			continue
+		}
+		if schematicSegmentsIntersect(
+			wire.Points[0], wire.Points[1],
+			kicadfiles.Point{X: kicadfiles.MM(25.4), Y: kicadfiles.MM(20.32)},
+			kicadfiles.Point{X: kicadfiles.MM(35.56), Y: kicadfiles.MM(20.32)},
+		) {
+			t.Fatalf("NET_B explicit wire still crosses NET_A: %#v", wire.Points)
+		}
+	}
+}
+
 func TestBuilderConnectUsesExplicitLabelStubPositions(t *testing.T) {
 	builder := newTestBuilder(t)
 	addTwoPinSymbol(t, builder, "R1", "Device:R", "1k", kicadfiles.Point{X: kicadfiles.MM(20.32), Y: kicadfiles.MM(20.32)})
@@ -559,6 +724,16 @@ func TestBuilderIndexesForeignWireLabelStubConflicts(t *testing.T) {
 	) {
 		t.Fatal("expected off-grid diagonal wire crossing to be detected")
 	}
+
+	longWire := newTestBuilder(t)
+	longWireStart := kicadfiles.Point{X: kicadfiles.MM(213.36), Y: kicadfiles.MM(293.37)}
+	longWireEnd := kicadfiles.Point{X: kicadfiles.MM(213.36), Y: kicadfiles.MM(419.1)}
+	longWire.addSchematicWirePoints("NET_LONG", Endpoint{}, Endpoint{}, []kicadfiles.Point{longWireStart, longWireEnd})
+	labelAnchor := kicadfiles.Point{X: kicadfiles.MM(215.9), Y: kicadfiles.MM(416.56)}
+	labelPosition := kicadfiles.Point{X: kicadfiles.MM(213.36), Y: kicadfiles.MM(416.56)}
+	if !longWire.schematicLabelConnectionConflicts("NET_SHORT", labelAnchor, labelPosition, false) {
+		t.Fatal("expected long foreign wire at requested label endpoint to be detected")
+	}
 }
 
 func TestBuilderConnectReanchorsMovedMultiUnitLabelStub(t *testing.T) {
@@ -574,6 +749,9 @@ func TestBuilderConnectReanchorsMovedMultiUnitLabelStub(t *testing.T) {
 	state.requestedPosition = kicadfiles.Point{X: state.position.X - kicadfiles.MM(1.27), Y: state.position.Y}
 	staleFromLabel := kicadfiles.Point{X: start.X - kicadfiles.MM(6.35), Y: start.Y}
 	toLabel := kicadfiles.Point{X: end.X - kicadfiles.MM(5.08), Y: end.Y}
+	reanchored := kicadfiles.Point{X: start.X - kicadfiles.MM(5.08), Y: start.Y}
+	safeOffset := builder.safeSchematicLabelStubOffset("SIG", start, kicadfiles.Point{X: reanchored.X - start.X, Y: reanchored.Y - start.Y}, false)
+	wantFromLabel := kicadfiles.Point{X: start.X + safeOffset.X, Y: start.Y + safeOffset.Y}
 	useLabels := true
 	if err := builder.ConnectWithOptions(
 		Endpoint{Reference: "R1", Pin: "2"},
@@ -583,7 +761,6 @@ func TestBuilderConnectReanchorsMovedMultiUnitLabelStub(t *testing.T) {
 	); err != nil {
 		t.Fatalf("connect with moved-unit label point: %v", err)
 	}
-	wantFromLabel := kicadfiles.Point{X: start.X - kicadfiles.MM(5.08), Y: start.Y}
 	if got := builder.design.Schematic.Labels[0].Position; got != wantFromLabel {
 		t.Fatalf("reanchored label = %#v, want %#v", got, wantFromLabel)
 	}

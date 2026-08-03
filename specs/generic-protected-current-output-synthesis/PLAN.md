@@ -1,5 +1,8 @@
 # Generic Protected Current-Output Synthesis Plan
 
+Status: completed locally on 2026-08-03. See `AUDIT.md` for the
+requirement-by-requirement evidence and retained promotion hashes.
+
 ## Phase 0: Freeze and baseline
 
 - Freeze the existing failure and two neutral independently authored variants.

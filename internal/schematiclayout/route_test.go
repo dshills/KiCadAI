@@ -155,6 +155,103 @@ func TestRouteReservesEndpointLabelsBeforeDirectWires(t *testing.T) {
 	}
 }
 
+func TestRepairSelectedLabelAccessCrossingsReroutesOnlyOffendingConnection(t *testing.T) {
+	directY := kicadfiles.MM(50)
+	lateAnchor := kicadfiles.Point{X: kicadfiles.MM(50), Y: kicadfiles.MM(45)}
+	lateLabel := kicadfiles.Point{X: lateAnchor.X, Y: directY}
+	farAnchor := kicadfiles.Point{X: kicadfiles.MM(90), Y: kicadfiles.MM(70)}
+	farLabel := kicadfiles.Point{X: farAnchor.X + kicadfiles.MM(1.27), Y: farAnchor.Y}
+	components := []Component{
+		{Ref: "R1", Pins: []Pin{{Number: "1"}}},
+		{Ref: "R2", Pins: []Pin{{Number: "1"}}},
+		{Ref: "U1", Pins: []Pin{{Number: "1", Direction: kicadfiles.Point{Y: 1}}}},
+		{Ref: "U2", Pins: []Pin{{Number: "1", Direction: kicadfiles.Point{X: 1}}}},
+	}
+	placed := []PlacedComponent{
+		{Component: components[0], PlacedAt: kicadfiles.Point{X: kicadfiles.MM(20), Y: directY}},
+		{Component: components[1], PlacedAt: kicadfiles.Point{X: kicadfiles.MM(80), Y: directY}},
+		{Component: components[2], PlacedAt: lateAnchor},
+		{Component: components[3], PlacedAt: farAnchor},
+	}
+	direct := RoutedConnection{
+		NetName: "DIRECT", From: Endpoint{Ref: "R1", Pin: "1"}, To: Endpoint{Ref: "R2", Pin: "1"},
+		Points: []kicadfiles.Point{{X: kicadfiles.MM(20), Y: directY}, {X: kicadfiles.MM(80), Y: directY}},
+	}
+	labeled := RoutedConnection{
+		NetName: "LATE", From: Endpoint{Ref: "U1", Pin: "1"}, To: Endpoint{Ref: "U2", Pin: "1"},
+		UseLabels: true, FromLabelAt: &lateLabel, ToLabelAt: &farLabel,
+	}
+	result := Result{
+		Sheet:       testSheet(),
+		Components:  placed,
+		Connections: []RoutedConnection{direct, labeled},
+		Wires: []WireSegment{
+			{NetName: "DIRECT", From: direct.Points[0], To: direct.Points[1]},
+			{NetName: "LATE", From: lateAnchor, To: lateLabel},
+			{NetName: "LATE", From: farAnchor, To: farLabel},
+		},
+		Diagnostics: []Diagnostic{
+			{Severity: SeverityWarning, Code: "label_placement_fallback", NetName: "LATE"},
+			{Severity: SeverityError, Code: "wire_crossing", NetName: "DIRECT"},
+		},
+	}
+	request := Classify(Request{
+		Sheet:      testSheet(),
+		Rules:      Rules{Profile: ProfileStandard, LabelFallbackEnabled: true},
+		Components: components,
+		Nets: []Net{
+			{Name: "DIRECT", Endpoints: []Endpoint{direct.From, direct.To}},
+			{Name: "LATE", Endpoints: []Endpoint{labeled.From, labeled.To}},
+		},
+	})
+	repaired := repairSelectedLabelAccessCrossings(result, request)
+	if len(repaired.Connections[0].Points) <= 2 {
+		t.Fatalf("direct route was not detoured around label access: %#v", repaired.Connections[0].Points)
+	}
+	if repaired.Connections[1].FromLabelAt == nil || *repaired.Connections[1].FromLabelAt != lateLabel {
+		t.Fatalf("unrelated label connection changed: %#v", repaired.Connections[1])
+	}
+	for _, routed := range segmentsForPoints("DIRECT", repaired.Connections[0].Points) {
+		if wireSegmentsElectricallyContact(routed, WireSegment{NetName: "LATE", From: lateAnchor, To: lateLabel}) {
+			t.Fatalf("repaired route %#v still contacts label access", routed)
+		}
+	}
+	for _, diagnostic := range repaired.Diagnostics {
+		if diagnostic.Code == "wire_crossing" {
+			t.Fatalf("stale crossing diagnostic retained: %#v", repaired.Diagnostics)
+		}
+	}
+}
+
+func TestRouteKeepsLocalTreeVisibleWhenBoundaryUsesLabels(t *testing.T) {
+	result := Route(Request{
+		Sheet: testSheet(),
+		Rules: Rules{Profile: ProfileStandard, LabelFallbackEnabled: true},
+		Nets: []Net{{
+			Name: "LOAD_CURRENT", Role: "output_signal", EndpointLabels: true,
+			Endpoints: []Endpoint{{Ref: "R1", Pin: "1"}, {Ref: "R2", Pin: "1"}, {Ref: "J1", Pin: "1"}},
+		}},
+	}, Result{Components: []PlacedComponent{
+		{Component: Component{Ref: "R1", Role: "resistor", Pins: []Pin{{Number: "1"}}}, PlacedAt: kicadfiles.Point{X: kicadfiles.MM(40), Y: kicadfiles.MM(40)}},
+		{Component: Component{Ref: "R2", Role: "resistor", Pins: []Pin{{Number: "1"}}}, PlacedAt: kicadfiles.Point{X: kicadfiles.MM(60), Y: kicadfiles.MM(40)}},
+		{Component: Component{Ref: "J1", Role: "output_connector", Stage: StageBoundaryOutput, Pins: []Pin{{Number: "1"}}}, PlacedAt: kicadfiles.Point{X: kicadfiles.MM(90), Y: kicadfiles.MM(40)}},
+	}})
+	if len(result.Connections) != 2 {
+		t.Fatalf("connections = %#v, want one local wire and one labeled boundary link", result.Connections)
+	}
+	direct, labeled := 0, 0
+	for _, connection := range result.Connections {
+		if connection.UseLabels {
+			labeled++
+		} else if len(connection.Points) >= 2 {
+			direct++
+		}
+	}
+	if direct != 1 || labeled != 1 || len(result.Wires) < 3 || len(result.Labels) != 2 {
+		t.Fatalf("hybrid route = connections=%#v wires=%#v labels=%#v", result.Connections, result.Wires, result.Labels)
+	}
+}
+
 func TestLabelDirectionUsesPlacedBodyEdge(t *testing.T) {
 	body := Rect{MinX: kicadfiles.MM(40), MinY: kicadfiles.MM(40), MaxX: kicadfiles.MM(60), MaxY: kicadfiles.MM(60)}
 	if direction := labelDirectionFromBody(kicadfiles.Point{X: kicadfiles.MM(41), Y: kicadfiles.MM(50)}, body, kicadfiles.MM(1)); direction != (kicadfiles.Point{X: -kicadfiles.MM(1)}) {

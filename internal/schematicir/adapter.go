@@ -524,6 +524,18 @@ func (state *adapterState) appendCreateProject(tx *transactions.Transaction) {
 
 func (state *adapterState) appendComponents(tx *transactions.Transaction) {
 	assignedFootprints := map[string]string{}
+	primaryUnitByRef := map[string]int{}
+	for _, component := range state.document.Circuit.Components {
+		ref := state.refsByID[component.ID]
+		if ref == "" {
+			continue
+		}
+		key := adapterReferenceKey(ref)
+		unit := maxUnit(state.unitsByID[component.ID])
+		if primary, found := primaryUnitByRef[key]; !found || unit < primary {
+			primaryUnitByRef[key] = unit
+		}
+	}
 	for _, component := range state.document.Circuit.Components {
 		ref := state.refsByID[component.ID]
 		if ref == "" {
@@ -531,17 +543,23 @@ func (state *adapterState) appendComponents(tx *transactions.Transaction) {
 		}
 		rotation, mirror := schematic.CanonicalSymbolTransform(kicadfiles.Angle(state.rotationByID[component.ID]), schematic.SymbolMirror(state.mirrorByID[component.ID]))
 		payload := transactions.AddSymbolOperation{
-			Op:         transactions.OpAddSymbol,
-			Ref:        ref,
-			Unit:       state.unitsByID[component.ID],
-			Role:       string(component.Role),
-			Value:      component.Value,
-			LibraryID:  component.Symbol,
-			At:         state.pointsByID[component.ID],
-			Rotation:   float64(rotation),
-			Mirror:     string(mirror),
-			Pins:       transactionPinsWithLibraryIndex(component, state.libraryIndex),
-			Properties: transactionSymbolPropertiesWithLayout(component, ref, state.textByID[component.ID], float64(rotation)),
+			Op:        transactions.OpAddSymbol,
+			Ref:       ref,
+			Unit:      state.unitsByID[component.ID],
+			Role:      string(component.Role),
+			Value:     component.Value,
+			LibraryID: component.Symbol,
+			At:        state.pointsByID[component.ID],
+			Rotation:  float64(rotation),
+			Mirror:    string(mirror),
+			Pins:      transactionPinsWithLibraryIndex(component, state.libraryIndex),
+			Properties: transactionSymbolPropertiesWithLayout(
+				component,
+				ref,
+				state.textByID[component.ID],
+				float64(rotation),
+				maxUnit(state.unitsByID[component.ID]) != primaryUnitByRef[adapterReferenceKey(ref)],
+			),
 		}
 		state.appendOperation(tx, transactions.OpAddSymbol, payload, ref, "")
 		for _, pin := range component.Pins {
@@ -2372,7 +2390,9 @@ func layoutNeedsSpacingRepair(result schematiclayout.Result) bool {
 			continue
 		}
 		switch diagnostic.Code {
-		case "label_placement_fallback", "label_overlap", "symbol_overlap", "text_symbol_overlap":
+		case "label_placement_fallback", "label_overlap", "symbol_overlap", "text_symbol_overlap",
+			"text_placement_fallback", schematiclayout.DiagnosticTextWireOverlap,
+			schematiclayout.DiagnosticWireSymbolOverlap:
 			return true
 		}
 	}
@@ -2489,6 +2509,19 @@ func schematicLayoutGeometry(component Component, index *libraryresolver.Library
 		hasGraphics = true
 	}
 	if hasGraphics {
+		// Line-bodied units (commonly package power units) are legitimate
+		// symbol geometry, but a zero-area rectangle is treated as empty by
+		// route scoring. Give only the degenerate axis the normal symbol
+		// padding so layout cannot route through geometry that readback later
+		// reconstructs and rejects.
+		if bounds.MinX == bounds.MaxX {
+			bounds.MinX -= defaultComponentPadding
+			bounds.MaxX += defaultComponentPadding
+		}
+		if bounds.MinY == bounds.MaxY {
+			bounds.MinY -= defaultComponentPadding
+			bounds.MaxY += defaultComponentPadding
+		}
 		return layoutGeometry{Body: bounds, Source: schematiclayout.GeometrySourceResolverGraphics}
 	}
 	// Some KiCad symbols contain only pins or inherit graphics from a library
@@ -2510,6 +2543,11 @@ func schematicLayoutGeometry(component Component, index *libraryresolver.Library
 	if !hasPins {
 		return fallbackComponentGeometry(component)
 	}
+	// A pin-only unit can still occupy the span between its pins and the
+	// symbol origin (multi-unit package power sections are a common example).
+	// Include the origin so route planning uses the same conservative body
+	// that schematic readback reconstructs.
+	pinBounds = unionLayoutRect(pinBounds, schematiclayout.Rect{})
 	padding := defaultComponentPadding
 	pinBounds.MinX -= padding
 	pinBounds.MinY -= padding
@@ -2979,7 +3017,7 @@ func transactionSymbolProperties(component Component) []transactions.SymbolPrope
 	return properties
 }
 
-func transactionSymbolPropertiesWithLayout(component Component, reference string, layout layoutTextPlacement, symbolRotation float64) []transactions.SymbolProperty {
+func transactionSymbolPropertiesWithLayout(component Component, reference string, layout layoutTextPlacement, symbolRotation float64, hideValue bool) []transactions.SymbolProperty {
 	properties := transactionSymbolProperties(component)
 	// KiCad property angles are relative to the parent symbol transform. Cancel
 	// quarter-turn symbol rotation so generated reference and value fields stay
@@ -2994,7 +3032,7 @@ func transactionSymbolPropertiesWithLayout(component Component, reference string
 		{Name: "Reference", Value: reference, Hidden: hideReference, At: layout.reference, Rotation: &rotation, DoNotAutoplace: &doNotAutoplace},
 	}
 	value := component.Value
-	hiddenValue := false
+	hiddenValue := hideValue
 	if value == "" {
 		value = reference
 		hiddenValue = true

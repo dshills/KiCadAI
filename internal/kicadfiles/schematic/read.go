@@ -216,7 +216,7 @@ func recoverEmbeddedSymbolGeometry(file *SchematicFile) {
 		pins, bounds, boundsOK := geometry.pins, geometry.bounds, geometry.ok
 		if len(pins) != 0 && (!knownTemplate || resolverGeometry) {
 			anchors := embeddedPinAnchors(pins, symbol.Pins)
-			if len(anchors) == len(symbol.Pins) {
+			if len(anchors) != 0 {
 				for pinIndex, anchor := range anchors {
 					offset := transformedReadPinOffset(anchor, symbol.Rotation, symbol.Mirror)
 					anchors[pinIndex] = kicadfiles.Point{X: symbol.Position.X + offset.X, Y: symbol.Position.Y + offset.Y}
@@ -256,10 +256,17 @@ func embeddedPinAnchors(available []embeddedPinGeometry, symbolPins []SymbolPin)
 		options := byNumber[symbolPin.Number]
 		index := used[symbolPin.Number]
 		if index >= len(options) {
-			return nil
+			// KiCad serializes every distinct physical package pin on each
+			// multi-unit symbol instance. Pins owned by another displayed unit
+			// have no geometry in this unit and must not suppress recovery of
+			// the unit-local anchors.
+			continue
 		}
 		anchors = append(anchors, options[index])
 		used[symbolPin.Number] = index + 1
+	}
+	if len(anchors) != len(available) {
+		return nil
 	}
 	return anchors
 }

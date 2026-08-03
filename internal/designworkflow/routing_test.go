@@ -46,6 +46,53 @@ func TestExistingCopperFromRouteOperationsIncludesLocalRouteSegments(t *testing.
 	}
 }
 
+func TestSplitRouteWalkReversalsPreservesViasOnOwningGeometry(t *testing.T) {
+	operation := transactions.NewOperation(transactions.OpRoute, []byte(`{"op":"route","net_name":"N","layer":"F.Cu","points":[{"x_mm":0,"y_mm":0},{"x_mm":10,"y_mm":0},{"x_mm":0,"y_mm":0}],"vias":[{"at":{"x_mm":0,"y_mm":0},"diameter_mm":0.7,"drill_mm":0.35},{"at":{"x_mm":10,"y_mm":0},"diameter_mm":0.7,"drill_mm":0.35}]}`))
+	operations, _, changed := splitRouteWalkReversals(decodeRouteOperations([]transactions.Operation{operation}), nil)
+	if !changed || len(operations) != 2 {
+		t.Fatalf("split route operations = %#v changed=%t, want trunk and branch", operations, changed)
+	}
+	routes := decodeRouteOperations(operations)
+	if !routes[0].decoded || !routes[1].decoded {
+		t.Fatalf("split route decode = %#v", routes)
+	}
+	if len(routes[0].payload.Vias) != 1 || !sameRoutePoint(routes[0].payload.Vias[0].At, transactions.Point{}) {
+		t.Fatalf("trunk vias = %#v, want shared-point via", routes[0].payload.Vias)
+	}
+	branchEnd := transactions.Point{XMM: 10}
+	if len(routes[1].payload.Vias) != 1 || !sameRoutePoint(routes[1].payload.Vias[0].At, branchEnd) {
+		t.Fatalf("branch vias = %#v, want remote branch via", routes[1].payload.Vias)
+	}
+}
+
+func TestSplitRouteWalkReversalsAssignsSharedViaToCanonicalBranch(t *testing.T) {
+	operation := transactions.NewOperation(transactions.OpRoute, []byte(`{"op":"route","net_name":"N","layer":"F.Cu","points":[{"x_mm":0,"y_mm":0},{"x_mm":10,"y_mm":0},{"x_mm":0,"y_mm":0},{"x_mm":0,"y_mm":10},{"x_mm":10,"y_mm":0},{"x_mm":0,"y_mm":10}],"vias":[{"at":{"x_mm":10,"y_mm":0},"diameter_mm":0.7,"drill_mm":0.35}]}`))
+	operations, _, changed := splitRouteWalkReversals(decodeRouteOperations([]transactions.Operation{operation}), nil)
+	if !changed || len(operations) != 3 {
+		t.Fatalf("split route operations = %#v changed=%t, want trunk and two branches", operations, changed)
+	}
+	routes := decodeRouteOperations(operations)
+	viaCount := 0
+	viaOwner := -1
+	for index, route := range routes {
+		viaCount += len(route.payload.Vias)
+		if len(route.payload.Vias) != 0 {
+			viaOwner = index
+		}
+	}
+	if viaCount != 1 || viaOwner != 1 {
+		t.Fatalf("shared via count=%d owner=%d routes=%#v, want first canonical branch", viaCount, viaOwner, routes)
+	}
+}
+
+func TestSplitRouteWalkReversalsPreservesOriginalWithOffPathVia(t *testing.T) {
+	operation := transactions.NewOperation(transactions.OpRoute, []byte(`{"op":"route","net_name":"N","layer":"F.Cu","points":[{"x_mm":0,"y_mm":0},{"x_mm":10,"y_mm":0},{"x_mm":0,"y_mm":0}],"vias":[{"at":{"x_mm":99,"y_mm":99},"diameter_mm":0.7,"drill_mm":0.35}]}`))
+	operations, _, changed := splitRouteWalkReversals(decodeRouteOperations([]transactions.Operation{operation}), nil)
+	if changed || len(operations) != 1 || string(operations[0].Raw) != string(operation.Raw) {
+		t.Fatalf("off-path via rewrite = %#v changed=%t, want untouched original", operations, changed)
+	}
+}
+
 func TestRoutingRoutesFromOperationsPreservesCrossPhaseClearanceGeometry(t *testing.T) {
 	operations := []transactions.Operation{
 		mustRouteOperation(t, transactions.RouteOperation{
@@ -1405,6 +1452,88 @@ func TestCompactRouteOperationGeometryDropsZeroLengthTracks(t *testing.T) {
 	operations := compactRouteOperationGeometry([]transactions.Operation{zero, valid})
 	if len(operations) != 1 || operations[0].Net != "SDA" {
 		t.Fatalf("operations = %#v, want only valid SDA route", operations)
+	}
+}
+
+func TestPostProcessRouteOperationsPrunesUnconnectedTreeWalkReversal(t *testing.T) {
+	placed := simplePlacedPads()
+	physical := newPhysicalPadRoutingContext(&placed)
+	operation := mustRouteOperation(t, transactions.RouteOperation{
+		Op:      transactions.OpRoute,
+		NetName: "SIG",
+		Layer:   "F.Cu",
+		WidthMM: 0.25,
+		Points: []transactions.Point{
+			{XMM: 5, YMM: 10},
+			{XMM: 12, YMM: 10},
+			{XMM: 12, YMM: 12},
+			{XMM: 12, YMM: 10},
+			{XMM: 20, YMM: 10},
+		},
+	})
+	operation.PruneProtected = true
+
+	got, issues := postProcessRouteOperations(
+		[]transactions.Operation{operation},
+		&placed,
+		physical,
+		BuildInterBlockContactTargets(physical.candidates, &placed),
+	)
+	if len(issues) != 0 {
+		t.Fatalf("issues = %#v, want none", issues)
+	}
+	routes := requireRouteOperationsForNet(t, got, "SIG")
+	want := []transactions.Point{{XMM: 5, YMM: 10}, {XMM: 12, YMM: 10}, {XMM: 20, YMM: 10}}
+	if len(routes) != 1 || !slices.Equal(routes[0].Points, want) {
+		t.Fatalf("routes = %#v, want only connected trunk %#v", routes, want)
+	}
+}
+
+func TestPostProcessRouteOperationsPreservesPadTerminatedTreeWalkBranchWithoutDuplicateCopper(t *testing.T) {
+	placed := simplePlacedPads()
+	placed.Request.Components = append(placed.Request.Components, placement.Component{
+		Ref:         "U3",
+		FootprintID: "Test:Pad",
+		Bounds:      placement.Bounds{WidthMM: 2, HeightMM: 2, Source: placement.BoundsExplicit},
+		Pads:        []placement.PadSummary{{Name: "1", Net: "SIG", XMM: 0, YMM: 0, WidthMM: 1, HeightMM: 1}},
+	})
+	placed.Request.Nets[0].Endpoints = append(placed.Request.Nets[0].Endpoints, placement.Endpoint{Ref: "U3", Pin: "1"})
+	placed.Result.Placements = append(placed.Result.Placements, placement.PlacementResult{
+		Ref: "U3", FootprintID: "Test:Pad", Position: placement.Placement{XMM: 12, YMM: 12, Layer: "F.Cu"},
+	})
+	placed.Result.Metrics.PlacedCount++
+	physical := newPhysicalPadRoutingContext(&placed)
+	operation := mustRouteOperation(t, transactions.RouteOperation{
+		Op:      transactions.OpRoute,
+		NetName: "SIG",
+		Layer:   "F.Cu",
+		WidthMM: 0.25,
+		Points: []transactions.Point{
+			{XMM: 5, YMM: 10},
+			{XMM: 12, YMM: 10},
+			{XMM: 12, YMM: 12},
+			{XMM: 12, YMM: 10},
+			{XMM: 20, YMM: 10},
+		},
+	})
+
+	got, issues := postProcessRouteOperations(
+		[]transactions.Operation{operation},
+		&placed,
+		physical,
+		BuildInterBlockContactTargets(physical.candidates, &placed),
+	)
+	if len(issues) != 0 {
+		t.Fatalf("issues = %#v, want none", issues)
+	}
+	routes := requireRouteOperationsForNet(t, got, "SIG")
+	if len(routes) != 2 {
+		t.Fatalf("routes = %#v, want trunk plus one pad branch", routes)
+	}
+	wantTrunk := []transactions.Point{{XMM: 5, YMM: 10}, {XMM: 12, YMM: 10}, {XMM: 20, YMM: 10}}
+	wantBranch := []transactions.Point{{XMM: 12, YMM: 10}, {XMM: 12, YMM: 12}}
+	if !slices.Equal(routes[0].Points, wantTrunk) || !slices.Equal(routes[1].Points, wantBranch) {
+		t.Fatalf("routes = %#v, want trunk %#v and branch %#v", routes, wantTrunk, wantBranch)
 	}
 }
 

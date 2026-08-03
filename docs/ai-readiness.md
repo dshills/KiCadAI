@@ -166,11 +166,31 @@ trace contract. Each trace connects structured failure evidence to an
 authorized or rejected proposal, its intended synthesis-stage re-entry, its
 expected effect, protected scope, budget use, and before/after/result hashes.
 The current implementation can recover a real blocked dense multi-endpoint
-routing case without design identity dependence. The protected programmable
-current driver still fails closed at trusted simulation; its retained trace
-shows which bounded graph repairs were evaluated and why none earned
-promotion. This is meaningful closed-loop progress, but it is not yet a claim
-of arbitrary electrical self-repair or general autorouting.
+routing case without design identity dependence. Its historical protected
+current trace remains useful fail-closed evidence for the earlier engine; a
+later independently frozen milestone closes that capability gap through
+generic architecture, value, model, control, lowering, and physical-promotion
+work. This is meaningful closed-loop progress, but it is not a claim of
+arbitrary electrical self-repair or general autorouting.
+
+## Generic Protected Current Outputs
+
+Behavior-only protected programmable output, fault-protected low-side sink,
+and startup-safe high-side source requirements now pass deterministic bounded
+synthesis. The lane derives source/sink orientation, transconductance and sense
+values, independent startup permission and dominant fault shutdown,
+compliance/headroom, overload, thermal, and SOA evidence from graph semantics
+and reviewed records. Topology-derived schematic ranks expose conventional
+control and output paths, while the writer keeps endpoint and route labels
+clear of symbols and visible fields.
+
+All three cases pass two isolated local installed-KiCad promotions with clean
+ERC, strict DRC, complete connectivity/routing, writer correctness, zero
+round-trip differences, and identical replay evidence. This capability is
+bounded to the reviewed primitive/model/rating and physical envelope; arbitrary
+controller ICs, switching regulators, unreviewed parts, and high-energy safety
+remain outside it. See the
+[completion audit](../specs/generic-protected-current-output-synthesis/AUDIT.md).
 
 ## Open-Topology Primitive Synthesis
 
@@ -184,13 +204,12 @@ values, coordinates, or block-family providers.
 
 The frozen eight-case benchmark covers regulated current, regulated voltage,
 signal gating, load control, hysteresis, active frequency response, sensor
-conditioning, and dual-threshold monitoring. Six cases pass all declared
-nominal, tolerance, temperature, startup, event, fault, thermal/SOA, and
-frequency-domain assertions and then pass two identical installed-KiCad
-workflows. Two cases exhaust their bounded repair budget with stable
-diagnostics. At least three active-family groups are selected, two cases retain
-multiple topologies, two selections follow failed simulation, and two passing
-graphs require a recorded topology change.
+conditioning, and dual-threshold monitoring. The expanded generic
+multi-branch milestone now passes exactly 8/8 across all declared nominal,
+tolerance, temperature, startup, event, fault, thermal/SOA, and
+frequency-domain assertions. Two independently frozen neutral cases also pass
+deterministic replay and two installed-KiCad promotions, including a selected
+graph-changing repair.
 
 This is the first measured evidence that KiCadAI can discover a valid circuit
 inside a bounded primitive design space. It remains an experimental envelope,

@@ -3,6 +3,7 @@ package opentopologysynthesis
 import (
 	"cmp"
 	"context"
+	"fmt"
 	"math"
 	"slices"
 	"strconv"
@@ -76,7 +77,9 @@ func LowerPassingCandidate(
 		result.Issues = []reports.Issue{graphIssue(CodePrimitiveUnavailable, "physical.connector", "no reviewed two-contact connector is available for external interfaces", "onboard a reviewed connector symbol, footprint, and function-to-pad map")}
 		return finalizePhysicalLowering(result)
 	}
-	document, bindings, lowerIssues := lowerCandidateDocument(requirement, graph, inventory, connector)
+	document, bindings, lowerIssues := lowerCandidateDocument(
+		requirement, graph, inventory, environment.Catalog, connector,
+	)
 	result.Document = document
 	result.Bindings = bindings
 	if len(lowerIssues) != 0 {
@@ -113,6 +116,7 @@ func lowerCandidateDocument(
 	requirement Requirement,
 	graph CandidateGraph,
 	inventory PrimitiveInventory,
+	catalog *components.Catalog,
 	connector physicalConnectorSelection,
 ) (circuitgraph.Document, []PhysicalSemanticBinding, []reports.Issue) {
 	document := circuitgraph.Document{
@@ -152,7 +156,13 @@ func lowerCandidateDocument(
 			ComponentID: primitive.CatalogID, VariantID: primitive.VariantID,
 			Population: circuitgraph.PopulationPopulate,
 		}
-		component.Units = physicalComponentUnits(primitive, instance.Kind)
+		var packageNoConnects []circuitgraph.Endpoint
+		var packageIssues []reports.Issue
+		component.Units, packageNoConnects, packageIssues = physicalPackageCompletion(
+			instance.ID, primitive, instance.Kind, catalog,
+		)
+		document.NoConnects = append(document.NoConnects, packageNoConnects...)
+		issues = append(issues, packageIssues...)
 		if primitive.ValueDomain != nil {
 			value := instance.ValueSI
 			if value == nil {
@@ -307,6 +317,69 @@ func physicalComponentUnits(
 		units = append(units, circuitgraph.ComponentUnit{ID: unitID, Role: role})
 	}
 	return units
+}
+
+// physicalPackageCompletion makes every reviewed named symbol unit explicit in
+// the physical document. Functional units not consumed by the synthesized
+// primitive are placed with every pin marked no-connect so KiCad can prove the
+// package is intentionally complete. A missing required or power unit is not
+// safe to terminate this way and remains a blocking lowering error.
+func physicalPackageCompletion(
+	componentID string,
+	primitive PrimitiveCandidate,
+	functionalRole string,
+	catalog *components.Catalog,
+) ([]circuitgraph.ComponentUnit, []circuitgraph.Endpoint, []reports.Issue) {
+	units := physicalComponentUnits(primitive, functionalRole)
+	if catalog == nil {
+		return units, nil, nil
+	}
+	record, found := components.LookupRecord(catalog, primitive.CatalogID)
+	if !found {
+		return units, nil, []reports.Issue{graphIssue(
+			CodePrimitiveUnavailable,
+			"physical.components."+componentID,
+			"physical package completion cannot find the primitive catalog record",
+			"reuse the catalog bound to the primitive inventory",
+		)}
+	}
+	used := map[string]bool{}
+	for _, unit := range units {
+		used[strings.ToUpper(strings.TrimSpace(unit.ID))] = true
+	}
+	noConnects := []circuitgraph.Endpoint{}
+	issues := []reports.Issue{}
+	for _, symbol := range record.Symbols {
+		unitID := strings.TrimSpace(symbol.UnitID)
+		if unitID == "" || used[strings.ToUpper(unitID)] {
+			continue
+		}
+		if symbol.RequiredUnit || symbol.UnitType == components.SymbolUnitPower {
+			issues = append(issues, graphIssue(
+				CodePhysicalPromotionFailed,
+				"physical.components."+componentID+".units."+unitID,
+				"required package unit is absent from the synthesized primitive",
+				"onboard complete primitive terminal evidence for every required power unit",
+			))
+			continue
+		}
+		units = append(units, circuitgraph.ComponentUnit{ID: unitID, Role: "unused"})
+		used[strings.ToUpper(unitID)] = true
+		for _, pin := range symbol.FunctionPins {
+			function := strings.TrimSpace(pin.Function)
+			if function == "" {
+				continue
+			}
+			noConnects = append(noConnects, circuitgraph.Endpoint{
+				Component: componentID, Unit: unitID,
+				SelectorKind: circuitgraph.SelectorFunction, Selector: function,
+			})
+		}
+	}
+	slices.SortFunc(units, func(left, right circuitgraph.ComponentUnit) int {
+		return cmp.Or(cmp.Compare(left.ID, right.ID), cmp.Compare(left.Role, right.Role))
+	})
+	return units, noConnects, reports.SortedIssues(issues)
 }
 
 func physicalSchematicValueKind(kind string) bool {
@@ -745,34 +818,54 @@ func physicalSchematicIntent(graph CandidateGraph) circuitgraph.SchematicIntent 
 	if len(inputs) != 0 {
 		groups = append(groups, circuitgraph.SchematicGroup{ID: "external_inputs", Label: "External Inputs", Role: "input_stage", Members: inputs, Rank: 0, Side: circuitgraph.SideLeft})
 	}
+	topologyRanks := physicalTopologyRanks(graph)
+	coreByRank := map[int][]string{}
+	for _, component := range core {
+		coreByRank[topologyRanks[component]] = append(coreByRank[topologyRanks[component]], component)
+	}
+	orderedRanks := make([]int, 0, len(coreByRank))
+	for rank := range coreByRank {
+		orderedRanks = append(orderedRanks, rank)
+	}
+	slices.Sort(orderedRanks)
+	for _, rank := range orderedRanks {
+		members := coreByRank[rank]
+		slices.Sort(members)
+		groups = append(groups, circuitgraph.SchematicGroup{
+			ID:      fmt.Sprintf("topology_rank_%03d", rank),
+			Label:   fmt.Sprintf("Signal Flow %d", rank),
+			Role:    "processing_stage",
+			Members: members,
+			Rank:    rank,
+		})
+	}
+	if len(outputs) != 0 {
+		groups = append(groups, circuitgraph.SchematicGroup{ID: "external_outputs", Label: "External Outputs", Role: "output_stage", Members: outputs, Rank: 4, Side: circuitgraph.SideRight})
+	}
 	placements := []circuitgraph.SchematicPlacement{}
 	passiveOrientations := physicalPassiveOrientations(graph)
-	for _, group := range groups {
-		for _, component := range group.Members {
-			placements = append(placements, circuitgraph.SchematicPlacement{
-				Component:   component,
-				Group:       group.ID,
-				Orientation: passiveOrientations[component],
-			})
-		}
+	for _, component := range inputs {
+		placements = append(placements, circuitgraph.SchematicPlacement{
+			Component:   component,
+			Group:       "external_inputs",
+			Orientation: passiveOrientations[component],
+		})
 	}
-	// Core components deliberately have no fixed group or rank. The schematic
-	// layout engine can then derive as many left-to-right stages as the actual
-	// connectivity requires instead of stacking every unfamiliar topology into
-	// a small set of arbitrary columns.
+	// Core ranks come only from boundary distance in the candidate graph. This
+	// makes the signal path visible without introducing architecture names or
+	// fixture-specific placement coordinates.
 	slices.Sort(core)
 	for _, component := range core {
 		placements = append(placements, circuitgraph.SchematicPlacement{
 			Component:   component,
+			Group:       fmt.Sprintf("topology_rank_%03d", topologyRanks[component]),
 			Orientation: passiveOrientations[component],
 		})
 	}
-	// Output connectors remain unfixed so their graph distance can establish
-	// the final rank. A constant boundary rank would compress every circuit,
-	// regardless of depth, into the same small number of columns.
+	// Output connectors form the right boundary of the topology projection.
 	slices.Sort(outputs)
 	for _, component := range outputs {
-		placements = append(placements, circuitgraph.SchematicPlacement{Component: component})
+		placements = append(placements, circuitgraph.SchematicPlacement{Component: component, Group: "external_outputs"})
 	}
 	return circuitgraph.SchematicIntent{
 		Flow: circuitgraph.FlowLeftToRight, Origin: circuitgraph.OriginCentered,
@@ -784,7 +877,7 @@ func physicalSchematicIntent(graph CandidateGraph) circuitgraph.SchematicIntent 
 		Rules: circuitgraph.SchematicRules{
 			PositivePowerTop: graphBool(true), GroundBottom: graphBool(true), CenterOnPage: graphBool(true),
 			PreferLabelsForLongNets: graphBool(false), AvoidWireCrossings: graphBool(true),
-			MinGroupSpacingMM: 20.32, MinComponentSpacingMM: 10.16, MaxAuxiliaryPerRank: 2,
+			MinGroupSpacingMM: 10.16, MinComponentSpacingMM: 10.16, MaxAuxiliaryPerRank: 2,
 			ReserveTitleBlock: true, OrientEndpointLabels: true,
 		},
 		Hierarchy: circuitgraph.HierarchyPolicy{Mode: "flat"},

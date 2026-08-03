@@ -3479,6 +3479,184 @@ func topologyLowSideCurrentControllerPrimitive(
 	return candidates[0].primitive
 }
 
+// topologyCurrentSenseAmplifierPrimitive selects the observation amplifier for
+// a regulated current relationship. Its output represents the commanded
+// current as a voltage, so it must reproduce the active command range without
+// clipping at either rail and retain enough bandwidth for the requested
+// settling time. This is intentionally distinct from selecting the amplifier
+// that drives a high-side pass device: the two roles have different swing and
+// drive obligations.
+func topologyCurrentSenseAmplifierPrimitive(
+	requirement Requirement,
+	inventory PrimitiveInventory,
+) PrimitiveCandidate {
+	commandMinimum, commandMaximum, commandFound := regulatedCurrentCommandVoltageRange(requirement)
+	minimumSupply := minimumTransconductanceSupplyVoltage(requirement)
+	if !commandFound || minimumSupply <= commandMaximum {
+		return PrimitiveCandidate{}
+	}
+	requiredGBW := 0.0
+	for _, assertion := range requirement.Requirements.BehavioralRequirements {
+		if assertion.Metric == "settling_time" && assertion.Max != nil && *assertion.Max > 0 {
+			requiredGBW = math.Max(
+				requiredGBW,
+				topologyControllerGBWReserve / *assertion.Max,
+			)
+		}
+	}
+	type scoredAmplifier struct {
+		primitive  PrimitiveCandidate
+		lowMargin  float64
+		highMargin float64
+		gbw        float64
+	}
+	candidates := []scoredAmplifier{}
+	for _, primitive := range inventory.Primitives {
+		if primitive.Kind != "opamp" || !ratingsCoverRequirement(requirement, primitive) {
+			continue
+		}
+		lowMargin, highMargin, gbw, found := primitiveOpAmpCapabilities(primitive)
+		if !found || lowMargin > commandMinimum ||
+			highMargin > minimumSupply-commandMaximum || gbw < requiredGBW {
+			continue
+		}
+		candidates = append(candidates, scoredAmplifier{
+			primitive: primitive, lowMargin: lowMargin, highMargin: highMargin, gbw: gbw,
+		})
+	}
+	slices.SortFunc(candidates, func(left, right scoredAmplifier) int {
+		return cmp.Or(
+			cmp.Compare(left.lowMargin, right.lowMargin),
+			cmp.Compare(left.highMargin, right.highMargin),
+			cmp.Compare(right.gbw, left.gbw),
+			cmp.Compare(primitiveEvidencePenalty(left.primitive.Evidence), primitiveEvidencePenalty(right.primitive.Evidence)),
+			comparePositiveArea(left.primitive.AreaMM2, right.primitive.AreaMM2),
+			cmp.Compare(left.primitive.Key, right.primitive.Key),
+		)
+	})
+	if len(candidates) == 0 {
+		return PrimitiveCandidate{}
+	}
+	return candidates[0].primitive
+}
+
+// topologyHighSideCurrentControllerPrimitive selects an amplifier capable of
+// driving a high-side bipolar pass stage. Fault-safe turn-off requires its
+// output to approach the positive rail within a conservative base-emitter
+// junction drop, while rated operation requires reviewed output-current
+// capacity for the worst-corner base current.
+func topologyHighSideCurrentControllerPrimitive(
+	requirement Requirement,
+	inventory PrimitiveInventory,
+	driven PrimitiveCandidate,
+	parallelDevices int,
+) PrimitiveCandidate {
+	const (
+		baseDriveReserve     = 2.0
+		turnOffRailHeadroomV = 1.0
+	)
+	minimumBeta := primitiveMinimumForwardBeta(driven)
+	requiredCurrent := requiredTransconductanceOutputCurrent(requirement)
+	if minimumBeta <= 0 || requiredCurrent <= 0 || parallelDevices <= 0 {
+		return PrimitiveCandidate{}
+	}
+	requiredOutputCurrent := baseDriveReserve * requiredCurrent /
+		(minimumBeta * float64(parallelDevices))
+	type scoredController struct {
+		primitive     PrimitiveCandidate
+		highMargin    float64
+		lowMargin     float64
+		outputCurrent float64
+		gbw           float64
+	}
+	candidates := []scoredController{}
+	for _, primitive := range inventory.Primitives {
+		if primitive.Kind != "opamp" || !ratingsCoverRequirement(requirement, primitive) {
+			continue
+		}
+		outputCurrent := 0.0
+		for _, rating := range primitive.Ratings {
+			if rating.Kind == "output_current" {
+				outputCurrent = math.Max(outputCurrent, boundMaximum(rating))
+			}
+		}
+		lowMargin, highMargin, gbw, found := primitiveOpAmpCapabilities(primitive)
+		if !found || outputCurrent < requiredOutputCurrent || highMargin > turnOffRailHeadroomV {
+			continue
+		}
+		candidates = append(candidates, scoredController{
+			primitive: primitive, highMargin: highMargin, lowMargin: lowMargin,
+			outputCurrent: outputCurrent, gbw: gbw,
+		})
+	}
+	slices.SortFunc(candidates, func(left, right scoredController) int {
+		return cmp.Or(
+			cmp.Compare(left.highMargin, right.highMargin),
+			cmp.Compare(left.lowMargin, right.lowMargin),
+			cmp.Compare(right.outputCurrent, left.outputCurrent),
+			cmp.Compare(right.gbw, left.gbw),
+			cmp.Compare(primitiveEvidencePenalty(left.primitive.Evidence), primitiveEvidencePenalty(right.primitive.Evidence)),
+			comparePositiveArea(left.primitive.AreaMM2, right.primitive.AreaMM2),
+			cmp.Compare(left.primitive.Key, right.primitive.Key),
+		)
+	})
+	if len(candidates) == 0 {
+		return PrimitiveCandidate{}
+	}
+	return candidates[0].primitive
+}
+
+func regulatedCurrentCommandVoltageRange(requirement Requirement) (float64, float64, bool) {
+	cases := map[string]OperatingCase{}
+	for _, operatingCase := range requirement.Requirements.OperatingCases {
+		cases[operatingCase.ID] = operatingCase
+	}
+	minimum := math.Inf(1)
+	maximum := math.Inf(-1)
+	for _, assertion := range requirement.Requirements.BehavioralRequirements {
+		if assertion.Metric != "transconductance" || assertion.Excitation == nil ||
+			assertion.Excitation.Kind != "port" {
+			continue
+		}
+		for _, caseID := range assertion.OperatingCases {
+			for _, condition := range cases[caseID].Conditions {
+				if condition.Axis != "input_voltage" || condition.Target != assertion.Excitation.ID {
+					continue
+				}
+				minimum = math.Min(minimum, condition.Min)
+				maximum = math.Max(maximum, condition.Max)
+			}
+		}
+	}
+	if math.IsInf(minimum, 1) || math.IsInf(maximum, -1) || minimum < 0 || maximum < minimum {
+		return 0, 0, false
+	}
+	return minimum, maximum, true
+}
+
+func primitiveOpAmpCapabilities(primitive PrimitiveCandidate) (float64, float64, float64, bool) {
+	lowMargin := math.Inf(1)
+	highMargin := math.Inf(1)
+	gbw := 0.0
+	for _, model := range primitive.Models {
+		if model.ModelID != simmodel.PrimitiveOpAmpV1 {
+			continue
+		}
+		for _, parameter := range model.Parameters {
+			switch parameter.Name {
+			case "output_low_margin_v":
+				lowMargin = math.Min(lowMargin, parameter.Value)
+			case "output_high_margin_v":
+				highMargin = math.Min(highMargin, parameter.Value)
+			case "gain_bandwidth_hz":
+				gbw = math.Max(gbw, parameter.Value)
+			}
+		}
+	}
+	return lowMargin, highMargin, gbw,
+		finite(lowMargin) && finite(highMargin) && lowMargin >= 0 && highMargin >= 0 && gbw > 0
+}
+
 func primitiveHasSOAEvidence(primitive PrimitiveCandidate) bool {
 	for _, model := range primitive.Models {
 		if len(model.TransientSOA) != 0 {
@@ -4123,12 +4301,12 @@ func topologyControlledSwitchRequired(requirement Requirement) bool {
 	return false
 }
 
-// topologyTransconductanceRelationshipSeeds constructs a high-side controlled
+// topologyHighSideTransconductanceRelationshipSeeds constructs a high-side controlled
 // current path from only the relationships implied by a voltage-to-current
 // transfer: a series current-sense impedance, a differential observation, a
 // feedback controller, a bounded pass-device bias path, and a thermally
 // reviewed analog pass device.
-func topologyTransconductanceRelationshipSeeds(
+func topologyHighSideTransconductanceRelationshipSeeds(
 	ctx context.Context,
 	requirement Requirement,
 	inventory PrimitiveInventory,
@@ -4138,22 +4316,31 @@ func topologyTransconductanceRelationshipSeeds(
 	policy Policy,
 	initial topologySearchState,
 ) ([]TopologyCandidate, Consumption, map[string][]string) {
-	requireTransconductance := false
+	relationships := regulatedCurrentRelationships(requirement)
+	if len(relationships) == 0 {
+		return topologyUnprotectedTransconductanceRelationshipSeeds(
+			ctx, requirement, inventory, representatives, inventoryByKey, limits, policy, initial,
+		)
+	}
+	requireTransconductance := len(relationships) != 0
+	requireProtectedControl := false
+	for _, relationship := range relationships {
+		requireProtectedControl = requireProtectedControl ||
+			(relationship.activation != "" && relationship.fault != "")
+	}
 	requireThermal := false
+	requireSOA := false
 	for _, assertion := range requirement.Requirements.BehavioralRequirements {
-		requireTransconductance = requireTransconductance ||
-			assertion.Metric == "transconductance"
 		requireThermal = requireThermal ||
 			assertion.Metric == "junction_temperature"
+		requireSOA = requireSOA || assertion.Metric == "soa_margin"
 	}
 	if !requireTransconductance {
 		return nil, Consumption{}, map[string][]string{}
 	}
-	var opamp, resistor PrimitiveCandidate
+	var resistor PrimitiveCandidate
 	for _, primitive := range representatives {
 		switch primitive.Kind {
-		case "opamp":
-			opamp = primitive
 		case "resistor":
 			resistor = primitive
 		}
@@ -4163,6 +4350,7 @@ func topologyTransconductanceRelationshipSeeds(
 	for _, primitive := range inventory.Primitives {
 		if primitive.Kind != "pnp_bjt" ||
 			(requireThermal && !primitiveHasThermalEvidence(primitive)) ||
+			(requireSOA && !primitiveHasSOAEvidence(primitive)) ||
 			!primitiveCoversAllAnalyses(primitive, requiredAnalyses) ||
 			!ratingsCoverRequirement(requirement, primitive) {
 			continue
@@ -4176,176 +4364,249 @@ func topologyTransconductanceRelationshipSeeds(
 	if len(passCandidates) != 0 {
 		passDevice = passCandidates[0]
 	}
-	if opamp.Key == "" || passDevice.Key == "" || resistor.Key == "" {
+	passDeviceCount := 1
+	if requireThermal {
+		passDeviceCount = 2
+	}
+	senseAmplifier := topologyCurrentSenseAmplifierPrimitive(requirement, inventory)
+	controller := topologyHighSideCurrentControllerPrimitive(
+		requirement, inventory, passDevice, passDeviceCount,
+	)
+	powerSwitch := selectSupplyDrivenCurrentRelationshipSwitchPrimitive(
+		requirement, inventory, "p_channel_mosfet", false,
+	)
+	controlDevice := selectCurrentRelationshipPrimitive(
+		requirement, inventory, "npn_bjt", false, false,
+	)
+	transconductance := requirementTransconductance(requirement)
+	if transconductance <= 0 || !finite(transconductance) {
 		return nil, Consumption{}, map[string][]string{}
 	}
-	inputs := topologyNodesByRole(initial.graph, "input", "control")
-	outputs := topologyNodesByRole(initial.graph, "output")
+	senseValues, senseValuesFound := currentSenseDifferentialComposition(
+		ctx, requirement, inventory, 1/transconductance,
+	)
+	if senseAmplifier.Key == "" || controller.Key == "" || passDevice.Key == "" || resistor.Key == "" ||
+		!senseValuesFound || (requireProtectedControl && (powerSwitch.Key == "" || controlDevice.Key == "")) {
+		return nil, Consumption{}, map[string][]string{}
+	}
 	supplies := topologyNodesByRole(initial.graph, "supply")
 	references := topologyNodesByRole(initial.graph, "reference")
 	consumption := Consumption{}
 	rejections := map[string][]string{}
 	retained := map[string]TopologyCandidate{}
-	for _, input := range inputs {
-		for _, output := range outputs {
-			for _, supply := range supplies {
-				for _, reference := range references {
-					if ctx.Err() != nil ||
-						consumption.ExpandedStates >= policy.MaxExpandedStates ||
-						consumption.GeneratedGraphs >= policy.MaxGeneratedGraphs {
+	for _, relationship := range relationships {
+		protectedControl := relationship.activation != "" && relationship.fault != ""
+		if relationship.direction != "source" ||
+			((relationship.activation == "") != (relationship.fault == "")) {
+			continue
+		}
+		input := externalRelationshipNode(initial.graph, relationship.input)
+		output := externalRelationshipNode(initial.graph, relationship.output)
+		activation, fault := "", ""
+		if protectedControl {
+			activation = externalRelationshipNode(initial.graph, relationship.activation)
+			fault = externalRelationshipNode(initial.graph, relationship.fault)
+		}
+		if input == "" || output == "" ||
+			(protectedControl && (activation == "" || fault == "")) {
+			continue
+		}
+		for _, supply := range supplies {
+			for _, reference := range references {
+				if ctx.Err() != nil ||
+					consumption.ExpandedStates >= policy.MaxExpandedStates ||
+					consumption.GeneratedGraphs >= policy.MaxGeneratedGraphs {
+					break
+				}
+				consumption.ExpandedStates++
+				state := initial
+				nextNode := func() string {
+					var node string
+					state, node = addRelationshipInternalNode(
+						state, requirement, inventoryByKey, &consumption,
+					)
+					return node
+				}
+				switchedSupply := supply
+				if protectedControl {
+					switchGate := nextNode()
+					if switchGate == "" {
+						continue
+					}
+					state = addRelationshipPrimitive(state, requirement, inventoryByKey, resistor,
+						topologyTwoTerminalPlacement(supply, switchGate), &consumption)
+					switchedSupply = nextNode()
+					if switchedSupply == "" {
+						continue
+					}
+					state = addRelationshipPrimitive(state, requirement, inventoryByKey, powerSwitch, []TerminalConnection{
+						{Terminal: "GATE", Node: switchGate},
+						{Terminal: "DRAIN", Node: switchedSupply},
+						{Terminal: "SOURCE", Node: supply},
+					}, &consumption)
+					permitBase := nextNode()
+					if permitBase == "" {
+						continue
+					}
+					for _, edge := range [][2]string{{activation, permitBase}, {permitBase, reference}} {
+						state = addRelationshipPrimitive(state, requirement, inventoryByKey, resistor,
+							topologyTwoTerminalPlacement(edge[0], edge[1]), &consumption)
+					}
+					state = addRelationshipPrimitive(state, requirement, inventoryByKey, controlDevice, []TerminalConnection{
+						{Terminal: "BASE", Node: permitBase},
+						{Terminal: "COLLECTOR", Node: switchGate},
+						{Terminal: "EMITTER", Node: reference},
+					}, &consumption)
+					faultBase := nextNode()
+					if faultBase == "" {
+						continue
+					}
+					for _, edge := range [][2]string{{fault, faultBase}, {faultBase, reference}} {
+						state = addRelationshipPrimitive(state, requirement, inventoryByKey, resistor,
+							topologyTwoTerminalPlacement(edge[0], edge[1]), &consumption)
+					}
+					state = addRelationshipPrimitive(state, requirement, inventoryByKey, controlDevice, []TerminalConnection{
+						{Terminal: "BASE", Node: faultBase},
+						{Terminal: "COLLECTOR", Node: permitBase},
+						{Terminal: "EMITTER", Node: reference},
+					}, &consumption)
+				}
+				passBase := nextNode()
+				if passBase == "" {
+					continue
+				}
+				emitterNodes := make([]string, 0, passDeviceCount)
+				for index := 0; index < passDeviceCount; index++ {
+					emitter := nextNode()
+					if emitter == "" {
 						break
 					}
-					consumption.ExpandedStates++
-					state := initial
-					passDeviceCount := 1
-					if requireThermal {
-						passDeviceCount = 2
-					}
-					internalCount := 6
-					if passDeviceCount > 1 {
-						internalCount += passDeviceCount
-					}
-					internal := make([]string, 0, internalCount)
-					for index := 0; index < internalCount; index++ {
-						var node string
-						state, node = addRelationshipInternalNode(
-							state, requirement, inventoryByKey, &consumption,
-						)
-						if node == "" {
-							break
-						}
-						internal = append(internal, node)
-					}
-					if len(internal) != internalCount ||
-						internalNodeCount(state.graph) > limits.MaxInternalNodes {
-						continue
-					}
-					passCollector := internal[0]
-					senseMinus := internal[1]
-					sensePlus := internal[2]
-					senseOutput := internal[3]
-					controlOutput := internal[4]
-					passBase := internal[5]
-					emitterNodes := []string{supply}
-					if passDeviceCount > 1 {
-						emitterNodes = internal[6:]
-					}
-					for _, emitter := range emitterNodes {
-						state = addRelationshipPrimitive(
-							state,
-							requirement,
-							inventoryByKey,
-							passDevice,
-							[]TerminalConnection{
-								{Terminal: "BASE", Node: passBase},
-								{Terminal: "COLLECTOR", Node: passCollector},
-								{Terminal: "EMITTER", Node: emitter},
-							},
-							&consumption,
-						)
-						if emitter != supply {
-							state = addRelationshipPrimitive(
-								state,
-								requirement,
-								inventoryByKey,
-								resistor,
-								topologyTwoTerminalPlacement(supply, emitter),
-								&consumption,
-							)
-						}
-					}
-					for _, edge := range [][2]string{
-						{passCollector, output},
-						{output, senseMinus},
-						{senseOutput, senseMinus},
-						{passCollector, sensePlus},
-						{sensePlus, reference},
-						{controlOutput, passBase},
-						{passBase, supply},
-					} {
-						state = addRelationshipPrimitive(
-							state,
-							requirement,
-							inventoryByKey,
-							resistor,
-							topologyTwoTerminalPlacement(edge[0], edge[1]),
-							&consumption,
-						)
-					}
+					emitterNodes = append(emitterNodes, emitter)
+					state = addRelationshipPrimitive(state, requirement, inventoryByKey, resistor,
+						topologyTwoTerminalPlacement(switchedSupply, emitter), &consumption)
+				}
+				if len(emitterNodes) != passDeviceCount {
+					continue
+				}
+				passCollector := nextNode()
+				if passCollector == "" {
+					continue
+				}
+				for _, emitter := range emitterNodes {
 					state = addRelationshipPrimitive(
 						state,
 						requirement,
 						inventoryByKey,
-						opamp,
+						passDevice,
 						[]TerminalConnection{
-							{Terminal: "IN_MINUS", Node: senseMinus},
-							{Terminal: "IN_PLUS", Node: sensePlus},
-							{Terminal: "OUT", Node: senseOutput},
-							{Terminal: "V_MINUS", Node: reference},
-							{Terminal: "V_PLUS", Node: supply},
+							{Terminal: "BASE", Node: passBase},
+							{Terminal: "COLLECTOR", Node: passCollector},
+							{Terminal: "EMITTER", Node: emitter},
 						},
 						&consumption,
 					)
-					state = addRelationshipPrimitive(
-						state,
-						requirement,
-						inventoryByKey,
-						opamp,
-						[]TerminalConnection{
-							{Terminal: "IN_MINUS", Node: input},
-							{Terminal: "IN_PLUS", Node: senseOutput},
-							{Terminal: "OUT", Node: controlOutput},
-							{Terminal: "V_MINUS", Node: reference},
-							{Terminal: "V_PLUS", Node: supply},
-						},
-						&consumption,
+				}
+				state = addRelationshipPrimitive(state, requirement, inventoryByKey, senseValues.shunt,
+					topologyTwoTerminalPlacement(passCollector, output), &consumption)
+				senseMinus := nextNode()
+				if senseMinus == "" {
+					continue
+				}
+				state = addRelationshipPrimitive(state, requirement, inventoryByKey, senseValues.input,
+					topologyTwoTerminalPlacement(output, senseMinus), &consumption)
+				sensePlus := nextNode()
+				if sensePlus == "" {
+					continue
+				}
+				state = addRelationshipPrimitive(state, requirement, inventoryByKey, senseValues.input,
+					topologyTwoTerminalPlacement(passCollector, sensePlus), &consumption)
+				state = addRelationshipPrimitive(state, requirement, inventoryByKey, senseValues.feedback,
+					topologyTwoTerminalPlacement(sensePlus, reference), &consumption)
+				senseOutput := nextNode()
+				if senseOutput == "" {
+					continue
+				}
+				state = addRelationshipPrimitive(state, requirement, inventoryByKey, senseValues.feedback,
+					topologyTwoTerminalPlacement(senseOutput, senseMinus), &consumption)
+				controlOutput := nextNode()
+				if controlOutput == "" {
+					continue
+				}
+				state = addRelationshipPrimitive(state, requirement, inventoryByKey, resistor,
+					topologyTwoTerminalPlacement(controlOutput, passBase), &consumption)
+				state = addRelationshipPrimitive(
+					state,
+					requirement,
+					inventoryByKey,
+					senseAmplifier,
+					[]TerminalConnection{
+						{Terminal: "IN_MINUS", Node: senseMinus},
+						{Terminal: "IN_PLUS", Node: sensePlus},
+						{Terminal: "OUT", Node: senseOutput},
+						{Terminal: "V_MINUS", Node: reference},
+						{Terminal: "V_PLUS", Node: supply},
+					},
+					&consumption,
+				)
+				state = addRelationshipPrimitive(
+					state,
+					requirement,
+					inventoryByKey,
+					controller,
+					[]TerminalConnection{
+						{Terminal: "IN_MINUS", Node: input},
+						{Terminal: "IN_PLUS", Node: senseOutput},
+						{Terminal: "OUT", Node: controlOutput},
+						{Terminal: "V_MINUS", Node: reference},
+						{Terminal: "V_PLUS", Node: supply},
+					},
+					&consumption,
+				)
+				if len(state.graph.Instances) > limits.MaxPrimitiveInstances ||
+					consumption.GeneratedGraphs > policy.MaxGeneratedGraphs {
+					continue
+				}
+				if issues := ValidateCompleteGraph(state.graph, inventory, limits); len(issues) != 0 {
+					for _, issue := range issues {
+						rejections[string(issue.Code)] = append(
+							rejections[string(issue.Code)],
+							issue.Path+":"+issue.Message,
+						)
+					}
+					continue
+				}
+				if state.score.BehaviorGap != 0 {
+					rejections["relationship_gap"] = append(
+						rejections["relationship_gap"],
+						fmt.Sprintf("%s:gap=%d", state.hash, state.score.BehaviorGap),
 					)
-					if len(state.graph.Instances) > limits.MaxPrimitiveInstances ||
-						consumption.GeneratedGraphs > policy.MaxGeneratedGraphs {
-						continue
-					}
-					if issues := ValidateCompleteGraph(state.graph, inventory, limits); len(issues) != 0 {
-						for _, issue := range issues {
-							rejections[string(issue.Code)] = append(
-								rejections[string(issue.Code)],
-								issue.Path+":"+issue.Message,
-							)
-						}
-						continue
-					}
-					if state.score.BehaviorGap != 0 {
-						rejections["relationship_gap"] = append(
-							rejections["relationship_gap"],
-							fmt.Sprintf("%s:gap=%d", state.hash, state.score.BehaviorGap),
-						)
-						continue
-					}
-					normalized, err := NormalizeGraph(state.graph)
-					if err != nil {
-						rejections["canonical_normalization_failed"] = append(
-							rejections["canonical_normalization_failed"], err.Error(),
-						)
-						continue
-					}
-					topologyHash, err := TopologyHash(normalized)
-					if err != nil {
-						rejections["canonical_topology_hash_failed"] = append(
-							rejections["canonical_topology_hash_failed"], err.Error(),
-						)
-						continue
-					}
-					consumption.CompleteGraphs++
-					candidate := TopologyCandidate{
-						Fingerprint:  state.hash,
-						TopologyHash: topologyHash,
-						Score:        state.score,
-						Graph:        normalized,
-						Operations:   cloneGraphOperations(state.operations),
-					}
-					if existing, found := retained[topologyHash]; !found ||
-						compareTopologyCandidates(candidate, existing) < 0 {
-						retained[topologyHash] = candidate
-					}
+					continue
+				}
+				normalized, err := NormalizeGraph(state.graph)
+				if err != nil {
+					rejections["canonical_normalization_failed"] = append(
+						rejections["canonical_normalization_failed"], err.Error(),
+					)
+					continue
+				}
+				topologyHash, err := TopologyHash(normalized)
+				if err != nil {
+					rejections["canonical_topology_hash_failed"] = append(
+						rejections["canonical_topology_hash_failed"], err.Error(),
+					)
+					continue
+				}
+				consumption.CompleteGraphs++
+				candidate := TopologyCandidate{
+					Fingerprint:  state.hash,
+					TopologyHash: topologyHash,
+					Score:        state.score,
+					Graph:        normalized,
+					Operations:   cloneGraphOperations(state.operations),
+				}
+				if existing, found := retained[topologyHash]; !found ||
+					compareTopologyCandidates(candidate, existing) < 0 {
+					retained[topologyHash] = candidate
 				}
 			}
 		}

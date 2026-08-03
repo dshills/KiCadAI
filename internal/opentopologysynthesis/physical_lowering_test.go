@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"kicadai/internal/circuitgraph"
+	"kicadai/internal/components"
 )
 
 func TestPassingPrimitiveGraphLowersToResolvedDesignRequest(t *testing.T) {
@@ -66,6 +67,43 @@ func TestPhysicalComponentUnitsDeclareRequiredPowerUnit(t *testing.T) {
 	want := []circuitgraph.ComponentUnit{{ID: "A", Role: "opamp"}, {ID: "P", Role: "power"}}
 	if !bytes.Equal(mustJSON(t, units), mustJSON(t, want)) {
 		t.Fatalf("physical component units = %#v, want %#v", units, want)
+	}
+}
+
+func TestPhysicalPackageCompletionTerminatesUnusedFunctionalUnits(t *testing.T) {
+	primitive := PrimitiveCandidate{
+		CatalogID: "test.dual_opamp",
+		UnitID:    "A",
+		Terminals: []PrimitiveTerminal{
+			{Terminal: "IN_PLUS", UnitID: "A", Electrical: "input"},
+			{Terminal: "IN_MINUS", UnitID: "A", Electrical: "input"},
+			{Terminal: "OUT", UnitID: "A", Electrical: "output"},
+			{Terminal: "V_PLUS", UnitID: "P", Electrical: "power_in"},
+			{Terminal: "V_MINUS", UnitID: "P", Electrical: "power_in"},
+		},
+	}
+	catalog := &components.Catalog{Records: []components.ComponentRecord{{
+		ID: primitive.CatalogID,
+		Symbols: []components.SymbolBinding{
+			{UnitID: "A", Unit: 1, UnitType: components.SymbolUnitFunctional},
+			{UnitID: "B", Unit: 2, UnitType: components.SymbolUnitFunctional, FunctionPins: []components.FunctionPin{
+				{Function: "IN_PLUS"}, {Function: "IN_MINUS"}, {Function: "OUT"},
+			}},
+			{UnitID: "P", Unit: 3, UnitType: components.SymbolUnitPower, RequiredUnit: true},
+		},
+	}}}
+	units, noConnects, issues := physicalPackageCompletion("amplifier", primitive, "opamp", catalog)
+	wantUnits := []circuitgraph.ComponentUnit{
+		{ID: "A", Role: "opamp"}, {ID: "B", Role: "unused"}, {ID: "P", Role: "power"},
+	}
+	if len(issues) != 0 || !bytes.Equal(mustJSON(t, units), mustJSON(t, wantUnits)) || len(noConnects) != 3 {
+		t.Fatalf("package completion: units=%#v no_connects=%#v issues=%#v", units, noConnects, issues)
+	}
+	for _, endpoint := range noConnects {
+		if endpoint.Component != "amplifier" || endpoint.Unit != "B" ||
+			endpoint.SelectorKind != circuitgraph.SelectorFunction {
+			t.Fatalf("unused-unit no-connect = %#v", endpoint)
+		}
 	}
 }
 

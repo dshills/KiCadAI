@@ -1,15 +1,13 @@
 # Project Status
 
-Last verified: 2026-08-02 by focused local preservation and installed-KiCad
-lanes. Cross-stage autonomous repair now recovers the frozen nine-stage corpus
-through one deterministic coordinator, and the protected LED and I2C fixtures
-passed two consecutive installed-KiCad runs. Five of six independently
-authored architecture-generalization designs
-passed two-run installed-KiCad promotion, all four adversarial designs failed
-closed, and the shared diagnosis-driven physical repair case recovered from a
-real routing block with clean writer, connectivity, round-trip, ERC, and strict
-DRC evidence. The protected programmable current output retained a narrower,
-byte-identical fail-closed result. The earlier three-case MCU
+Last verified: 2026-08-03 by focused local package and preservation suites,
+plus installed-KiCad lanes. Generic protected-current synthesis now
+promotes the frozen programmable output plus independently authored low-side
+sink and high-side source variants twice with deterministic electrical,
+physical, and project evidence; clean ERC; strict DRC; complete routing and
+connectivity; writer correctness; and zero round-trip differences. The frozen
+8/8 benchmark, both neutral physical promotions, four Class-A/Class-AB
+fixtures, and protected LED/I2C fixtures remain green. The earlier three-case MCU
 power-integrity, three-case neutral MCU, two-case clock/programming, and
 four-case power/interface installed-KiCad corpora; protected USB-C LED and I2C,
 ESP32 minimal-system, Class-A, and Class-AB fixture regressions; and independent
@@ -377,14 +375,14 @@ identity; performs deterministic bounded topology/value search; evaluates
 declared cases through the trusted simulator; and continues failed candidates
 through generic graph-changing repair.
 
-The frozen eight-case corpus passes six complete simulation and installed-KiCad
-promotions. The active filter and sensor conditioner each require a topology
-change after failed simulation. All six physical results pass schematic
-electrical checks, placement, routing/connectivity, writer correctness,
-installed-KiCad ERC, strict DRC, zero-difference round trip, and identical raw
-project hashes across two clean roots. The discrete regulator and
-voltage-window monitor remain stable `OPEN_TOPOLOGY_REPAIR_EXHAUSTED`
-outcomes.
+The expanded frozen eight-case corpus now passes exactly 8/8 through trusted
+simulation and physical lowering. The active filter and sensor conditioner
+require topology changes after failed simulation; later generic multi-branch
+work also closes the discrete-regulator and voltage-window cases. All physical
+results pass schematic electrical checks, placement, routing/connectivity,
+writer correctness, installed-KiCad ERC, strict DRC, zero-difference round
+trip, and deterministic replay. Two independently frozen neutral cases also
+pass two clean installed-KiCad promotions.
 
 Use `kicadai open-topology create` for this lane. Full search and physical
 evidence are retained under `.kicadai/`; stdout contains bounded hashes,
@@ -433,12 +431,12 @@ designs evaluate multiple topology hashes and pass trusted electrical evidence
 plus two identical installed-KiCad physical promotions. Four separate unsafe
 thermal, SOA, bias, and dynamic envelopes fail closed reproducibly.
 
-The protected current-output design remains deliberately unsupported because
-bounded graph and value trials cannot yet establish convergent, correctly
-transferred current while satisfying its rating, thermal, SOA, and protection
-requirements. See the
-[completion audit](../specs/architecture-generalization-corpus/COMPLETION_AUDIT.md)
-and [promotion matrix](../specs/architecture-generalization-corpus/PROMOTION_MATRIX.md).
+That corpus historically left protected current output unsupported. A later
+checksum-frozen milestone now closes that measured gap through generic
+source/sink orientation, transconductance/value derivation, independent
+startup and fault control, compliance, thermal/SOA evidence, readable
+lowering, and two-run installed-KiCad promotion. See its
+[completion audit](../specs/generic-protected-current-output-synthesis/AUDIT.md).
 
 ### Diagnosis-Driven Repair
 
@@ -452,9 +450,10 @@ and completes both route trees identically on replay. Its installed-KiCad lane
 passes writer correctness, connectivity, route completion, zero-difference
 round trip, clean ERC, and strict DRC.
 
-The electrical case demonstrates the equally important safe boundary: it
-narrows the protected current-output diagnosis but rejects non-improving or
-unsafe proposals and emits no physical project. See the
+The historical electrical case demonstrates the equally important safe
+boundary: it narrows its then-unsupported diagnosis and rejects non-improving
+or unsafe proposals. The later generic protected-current milestone supersedes
+that capability result without altering the frozen repair evidence. See the
 [repair results](../specs/diagnosis-driven-repair/RESULTS.md) and
 [preservation report](../specs/diagnosis-driven-repair/PRESERVATION_REPORT.md).
 
@@ -624,11 +623,12 @@ envelope remain unsupported.
 
 ## Remaining Direction
 
-Open-topology synthesis proves discovery for six of eight initial frozen
-requirements, the first architecture milestone proves ranked generation for
-Class A, Class AB, and notch requirements, the independent follow-on corpus
-passes five of six unfamiliar analog and power designs, and the cross-stage
-repair corpus now recovers all nine workflow stages through shared evidence.
+Open-topology synthesis proves the expanded frozen benchmark at exactly 8/8,
+the first architecture milestone proves ranked generation for Class A, Class
+AB, and notch requirements, and the later protected-current milestone closes
+the remaining architecture-generalization current-output gap with independent
+source and sink variants. The cross-stage repair corpus recovers all nine
+workflow stages through shared evidence.
 Explicit V6 control-polarity, safe-state, directed-transition, timing, and
 state-sequencing semantics are now implemented for the V3 behavioral-
 composition envelope. Identity-neutral active-high/active-low cases are

@@ -1,6 +1,7 @@
 package schematiclayout
 
 import (
+	"strconv"
 	"strings"
 
 	"kicadai/internal/kicadfiles"
@@ -22,8 +23,9 @@ func AdaptSchematic(file *schematic.SchematicFile) (Request, Result) {
 	result.Labels = make([]Label, 0, len(file.Labels))
 	result.Junctions = make([]Junction, 0, len(file.Junctions))
 	for index, symbol := range file.Symbols {
+		componentRef := schematicSymbolComponentRef(symbol.Reference, symbol.Unit)
 		component := Component{
-			Ref:             symbol.Reference,
+			Ref:             componentRef,
 			DisplayRef:      symbol.Reference,
 			Value:           symbol.Value,
 			LibraryID:       symbol.LibraryID,
@@ -65,6 +67,13 @@ func AdaptSchematic(file *schematic.SchematicFile) (Request, Result) {
 		result.Junctions = append(result.Junctions, Junction{Position: junction.Position})
 	}
 	return request, NormalizeResult(result, request.Rules)
+}
+
+func schematicSymbolComponentRef(reference string, unit int) string {
+	if unit <= 0 {
+		return reference
+	}
+	return reference + "#" + strconv.Itoa(unit)
 }
 
 func sheetFromSchematic(file *schematic.SchematicFile) Sheet {

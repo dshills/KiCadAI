@@ -14,6 +14,7 @@ import (
 
 const (
 	measureProtectedCurrentOutputBaselineEnv = "KICADAI_MEASURE_PROTECTED_CURRENT_OUTPUT_BASELINE"
+	protectedCurrentOutputCaseEnv            = "KICADAI_PROTECTED_CURRENT_OUTPUT_CASE"
 	protectedCurrentOutputBaselineHash       = "bfb57000d685abbef2a868e23fe0cc1b33846566b182f2ea4771ff294850eea4"
 )
 
@@ -122,6 +123,9 @@ func TestMeasureProtectedCurrentOutputBaseline(t *testing.T) {
 		Policy:         policy,
 	}
 	for _, entry := range manifest.Cases {
+		if target := os.Getenv(protectedCurrentOutputCaseEnv); target != "" && target != entry.ID {
+			continue
+		}
 		requirement, issues := DecodeStrict(bytes.NewReader(mustRead(t, filepath.Clean(filepath.Join(root, entry.RequirementFile)))))
 		if len(issues) != 0 {
 			t.Fatalf("%s requirement issues: %#v", entry.ID, issues)

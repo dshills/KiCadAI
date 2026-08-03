@@ -202,10 +202,20 @@ unsafe capability is reported and stopped instead of guessed.
   envelopes before implementation changes. Five of six designs now pass
   multi-topology search, trusted simulation, readable lowering, two identical
   installed-KiCad promotions, and every physical gate; all four unsafe cases
-  fail closed. The protected programmable current output remains a stable,
-  evidence-backed non-pass. See the
+  fail closed. At that frozen milestone the protected programmable current
+  output remained a stable, evidence-backed non-pass. See the
   [completion audit](specs/architecture-generalization-corpus/COMPLETION_AUDIT.md)
   and [promotion matrix](specs/architecture-generalization-corpus/PROMOTION_MATRIX.md).
+- The former protected-current non-pass is now closed by a separate
+  checksum-frozen generic synthesis milestone. Behavior-only low-side sink,
+  protected programmable output, and startup-safe high-side source cases
+  derive current direction, sense relationships, independent startup/fault
+  control, compliance, values, thermal/SOA evidence, and readable physical
+  realization without a named driver block. All three pass deterministic
+  replay and two isolated local KiCad 10.0.3 promotions with clean ERC, strict
+  DRC, complete connectivity/routing, writer correctness, and zero round-trip
+  differences. See the
+  [completion audit](specs/generic-protected-current-output-synthesis/AUDIT.md).
 - Electrical and physical correction now share the versioned
   `kicadai.diagnosis-driven-repair.v1` trace. It binds normalized diagnoses to
   deterministic proposals, stage re-entry, budgets, effects, outcomes, and

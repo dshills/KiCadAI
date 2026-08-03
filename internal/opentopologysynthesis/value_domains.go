@@ -844,6 +844,7 @@ func deriveTopologyAnalyticScales(
 		requirement,
 		graph,
 		instance,
+		inventory,
 	); len(scales) != 0 {
 		return scales
 	}
@@ -4070,6 +4071,7 @@ func deriveTransconductanceTopologyScales(
 	requirement Requirement,
 	graph CandidateGraph,
 	instance GraphInstance,
+	inventory map[string]PrimitiveCandidate,
 ) []AnalyticScale {
 	if instance.Kind != "resistor" || len(instance.Terminals) != 2 {
 		return nil
@@ -4081,26 +4083,92 @@ func deriveTransconductanceTopologyScales(
 			break
 		}
 	}
-	if transconductance <= 0 {
+	if transconductance <= 0 || !finite(transconductance) {
 		return nil
 	}
 	nodeByID := make(map[string]GraphNode, len(graph.Nodes))
 	for _, node := range graph.Nodes {
 		nodeByID[node.ID] = node
 	}
+	instanceByID := make(map[string]GraphInstance, len(graph.Instances))
+	for _, graphInstance := range graph.Instances {
+		instanceByID[graphInstance.ID] = graphInstance
+	}
+	type nodePair struct{ first, second string }
+	resistorsBetween := map[nodePair]string{}
+	betweenKey := func(left, right string) nodePair {
+		if right < left {
+			left, right = right, left
+		}
+		return nodePair{first: left, second: right}
+	}
+	for _, candidate := range graph.Instances {
+		if candidate.Kind != "resistor" || len(candidate.Terminals) != 2 {
+			continue
+		}
+		key := betweenKey(candidate.Terminals[0].Node, candidate.Terminals[1].Node)
+		if _, found := resistorsBetween[key]; !found {
+			resistorsBetween[key] = candidate.ID
+		}
+	}
 	between := func(left, right string) string {
-		for _, candidate := range graph.Instances {
-			if candidate.Kind != "resistor" || len(candidate.Terminals) != 2 {
+		return resistorsBetween[betweenKey(left, right)]
+	}
+	protectedPassSource := ""
+	for _, passDevice := range graph.Instances {
+		if passDevice.Kind != "npn_bjt" {
+			continue
+		}
+		passTerminals := topologyTerminalNodes(passDevice)
+		if nodeByID[passTerminals["COLLECTOR"]].Role != "output" ||
+			nodeByID[passTerminals["EMITTER"]].Scope != "internal" {
+			continue
+		}
+		controllerFound := false
+		for _, active := range graph.Instances {
+			if active.Kind != "opamp" {
 				continue
 			}
-			first := candidate.Terminals[0].Node
-			second := candidate.Terminals[1].Node
-			if (first == left && second == right) ||
-				(first == right && second == left) {
-				return candidate.ID
+			terminals := topologyTerminalNodes(active)
+			if terminals["OUT"] == passTerminals["BASE"] &&
+				terminals["IN_MINUS"] == passTerminals["EMITTER"] {
+				controllerFound = true
+				break
 			}
 		}
-		return ""
+		if !controllerFound {
+			continue
+		}
+		for _, currentSwitch := range graph.Instances {
+			if currentSwitch.Kind != "n_channel_mosfet" {
+				continue
+			}
+			terminals := topologyTerminalNodes(currentSwitch)
+			if nodeByID[terminals["SOURCE"]].Role != "reference" {
+				continue
+			}
+			sensePath := topologyResistorPath(
+				graph, passTerminals["EMITTER"], terminals["DRAIN"],
+			)
+			if len(sensePath) == 0 {
+				continue
+			}
+			if slices.Contains(sensePath, instance.ID) {
+				return []AnalyticScale{{
+					ID:   "topology:low_side_current_sense:" + instance.ID,
+					Kind: "resistance", ValueSI: 1 / (transconductance * float64(len(sensePath))), Unit: "ohm",
+					Derivation: "equal catalog-backed series segments realize the reciprocal transconductance sense impedance",
+					SourceKind: "candidate_topology", SourceID: passDevice.ID, Priority: 1,
+				}}
+			}
+			const controlAnchorResistance = 10_000.0
+			return []AnalyticScale{{
+				ID:   "topology:protected_current_control:" + instance.ID,
+				Kind: "resistance", ValueSI: controlAnchorResistance, Unit: "ohm",
+				Derivation: "neutral control-interface resistance limits gate-drive and protection bias current",
+				SourceKind: "candidate_topology", SourceID: currentSwitch.ID, Priority: 1,
+			}}
+		}
 	}
 	for _, passDevice := range graph.Instances {
 		if passDevice.Kind != "pnp_bjt" {
@@ -4110,12 +4178,15 @@ func deriveTransconductanceTopologyScales(
 		emitter := passTerminals["EMITTER"]
 		collector := passTerminals["COLLECTOR"]
 		supply := ""
+		passRail := ""
+		protectedSupply := false
 		output := ""
 		reference := ""
 		for _, node := range graph.Nodes {
 			if node.Role == "supply" &&
 				(node.ID == emitter || between(node.ID, emitter) != "") {
 				supply = node.ID
+				passRail = node.ID
 			}
 			if node.Role == "output" && between(collector, node.ID) != "" {
 				output = node.ID
@@ -4124,14 +4195,32 @@ func deriveTransconductanceTopologyScales(
 				reference = node.ID
 			}
 		}
+		for _, powerSwitch := range graph.Instances {
+			if powerSwitch.Kind != "p_channel_mosfet" {
+				continue
+			}
+			terminals := topologyTerminalNodes(powerSwitch)
+			if nodeByID[terminals["SOURCE"]].Role != "supply" ||
+				(emitter != terminals["DRAIN"] && between(terminals["DRAIN"], emitter) == "") {
+				continue
+			}
+			supply = terminals["SOURCE"]
+			passRail = terminals["DRAIN"]
+			protectedSupply = true
+			break
+		}
 		if supply == "" ||
+			passRail == "" ||
 			nodeByID[collector].Scope != "internal" ||
 			output == "" ||
 			reference == "" {
 			continue
 		}
-		ballast := between(supply, emitter)
-		if emitter != supply && instance.ID == ballast {
+		if protectedSupply {
+			protectedPassSource = passDevice.ID
+		}
+		ballast := between(passRail, emitter)
+		if emitter != passRail && instance.ID == ballast {
 			return []AnalyticScale{{
 				ID:         "topology:parallel_pass_ballast:" + instance.ID,
 				Kind:       "resistance",
@@ -4145,18 +4234,24 @@ func deriveTransconductanceTopologyScales(
 		}
 		shunt := between(collector, output)
 		if instance.ID == shunt {
+			value := 1 / transconductance
+			derivation := "sense impedance is the reciprocal of bounded voltage-to-current transfer"
+			if protectedSupply && instance.ValueSI != nil && *instance.ValueSI > 0 {
+				value = *instance.ValueSI
+				derivation = "catalog shunt combines with the differential observation ratio to realize reciprocal transconductance"
+			}
 			return []AnalyticScale{{
 				ID:         "topology:current_sense_impedance:" + instance.ID,
 				Kind:       "resistance",
-				ValueSI:    1 / transconductance,
+				ValueSI:    value,
 				Unit:       "ohm",
-				Derivation: "sense impedance is the reciprocal of bounded voltage-to-current transfer",
+				Derivation: derivation,
 				SourceKind: "candidate_topology",
 				SourceID:   passDevice.ID,
 				Priority:   1,
 			}}
 		}
-		bias := between(passTerminals["BASE"], supply)
+		bias := between(passTerminals["BASE"], passRail)
 		if instance.ID == bias {
 			return []AnalyticScale{{
 				ID:         "topology:pass_device_bias:" + instance.ID,
@@ -4177,12 +4272,27 @@ func deriveTransconductanceTopologyScales(
 			if instance.ID != between(passTerminals["BASE"], terminals["OUT"]) {
 				continue
 			}
+			value := 100.0
+			derivation := "bounded series resistance isolates the feedback controller from the nonlinear pass-device input"
+			if protectedSupply {
+				minimumSupply := minimumTransconductanceSupplyVoltage(requirement)
+				requiredCurrent := requiredTransconductanceOutputCurrent(requirement)
+				minimumBeta := primitiveMinimumForwardBeta(inventory[passDevice.PrimitiveKey])
+				const conservativeBaseEmitterDropV = 1.0
+				const baseDriveReserve = 2.0
+				if minimumSupply <= conservativeBaseEmitterDropV || requiredCurrent <= 0 || minimumBeta <= 0 {
+					continue
+				}
+				value = (minimumSupply - conservativeBaseEmitterDropV) * minimumBeta /
+					(baseDriveReserve * requiredCurrent)
+				derivation = "base-drive resistance follows available low-line voltage and reviewed minimum beta with current reserve"
+			}
 			return []AnalyticScale{{
 				ID:         "topology:pass_device_drive:" + instance.ID,
 				Kind:       "resistance",
-				ValueSI:    100,
+				ValueSI:    value,
 				Unit:       "ohm",
-				Derivation: "bounded series resistance isolates the feedback controller from the nonlinear pass-device input",
+				Derivation: derivation,
 				SourceKind: "candidate_topology",
 				SourceID:   passDevice.ID,
 				Priority:   1,
@@ -4199,27 +4309,168 @@ func deriveTransconductanceTopologyScales(
 				nodeByID[terminals["IN_PLUS"]].Scope != "internal" {
 				continue
 			}
+			inputNegative := between(output, terminals["IN_MINUS"])
+			feedbackNegative := between(terminals["OUT"], terminals["IN_MINUS"])
+			inputPositive := between(collector, terminals["IN_PLUS"])
+			feedbackPositive := between(terminals["IN_PLUS"], reference)
 			network := map[string]bool{
-				between(output, terminals["IN_MINUS"]):           true,
-				between(terminals["OUT"], terminals["IN_MINUS"]): true,
-				between(collector, terminals["IN_PLUS"]):         true,
-				between(terminals["IN_PLUS"], reference):         true,
+				inputNegative:    true,
+				feedbackNegative: true,
+				inputPositive:    true,
+				feedbackPositive: true,
 			}
 			delete(network, "")
 			if len(network) != 4 || !network[instance.ID] {
 				continue
 			}
 			const anchorResistance = 10_000.0
+			value := anchorResistance
+			derivation := "equal-ratio resistance for bounded differential current observation"
+			if protectedSupply && (instance.ID == feedbackNegative || instance.ID == feedbackPositive) {
+				shuntInstance := instanceByID[shunt]
+				if shuntInstance.ValueSI == nil || *shuntInstance.ValueSI <= 0 {
+					continue
+				}
+				value = anchorResistance * (1 / transconductance) / *shuntInstance.ValueSI
+				derivation = "matched feedback-to-input ratio combines with the catalog shunt to realize reciprocal transconductance"
+			} else if protectedSupply {
+				derivation = "matched differential input resistance anchors the catalog-backed observation ratio"
+			}
 			return []AnalyticScale{{
 				ID:         "topology:differential_observation:" + instance.ID,
 				Kind:       "resistance",
-				ValueSI:    anchorResistance,
+				ValueSI:    value,
 				Unit:       "ohm",
-				Derivation: "equal-ratio resistance for bounded differential current observation",
+				Derivation: derivation,
 				SourceKind: "candidate_topology",
 				SourceID:   active.ID,
 				Priority:   1,
 			}}
+		}
+	}
+	if protectedPassSource != "" {
+		return []AnalyticScale{{
+			ID:         "topology:protected_current_control:" + instance.ID,
+			Kind:       "resistance",
+			ValueSI:    10_000,
+			Unit:       "ohm",
+			Derivation: "neutral control-interface resistance limits switch drive and keeps protection states defined",
+			SourceKind: "candidate_topology",
+			SourceID:   protectedPassSource,
+			Priority:   1,
+		}}
+	}
+	return nil
+}
+
+func minimumTransconductanceSupplyVoltage(requirement Requirement) float64 {
+	minimum := math.Inf(1)
+	for _, domain := range requirement.Requirements.Domains {
+		if domain.Kind != "supply" {
+			continue
+		}
+		if domain.MinVoltageV != nil && *domain.MinVoltageV > 0 {
+			minimum = math.Min(minimum, *domain.MinVoltageV)
+		} else if domain.NominalVoltageV != nil && *domain.NominalVoltageV > 0 {
+			minimum = math.Min(minimum, *domain.NominalVoltageV)
+		}
+	}
+	for _, operatingCase := range requirement.Requirements.OperatingCases {
+		for _, condition := range operatingCase.Conditions {
+			if condition.Axis == "supply_voltage" && condition.Min > 0 {
+				minimum = math.Min(minimum, condition.Min)
+			}
+		}
+	}
+	if math.IsInf(minimum, 1) {
+		return 0
+	}
+	return minimum
+}
+
+func requiredTransconductanceOutputCurrent(requirement Requirement) float64 {
+	maximum := 0.0
+	for _, assertion := range requirement.Requirements.BehavioralRequirements {
+		if assertion.Metric != "output_current" {
+			continue
+		}
+		if assertion.Max != nil {
+			maximum = math.Max(maximum, *assertion.Max)
+		} else {
+			maximum = math.Max(maximum, assertionTarget(assertion))
+		}
+	}
+	if maximum > 0 {
+		return maximum
+	}
+	for _, port := range requirement.Requirements.Ports {
+		if port.Kind == "controlled_current" && port.Electrical.MaxCurrentA != nil {
+			maximum = math.Max(maximum, *port.Electrical.MaxCurrentA)
+		}
+	}
+	return maximum
+}
+
+func primitiveMinimumForwardBeta(primitive PrimitiveCandidate) float64 {
+	minimum := math.Inf(1)
+	for _, model := range primitive.Models {
+		if model.ModelID != simmodel.PrimitiveBJTNPNV1 && model.ModelID != simmodel.PrimitiveBJTPNPV1 {
+			continue
+		}
+		for _, parameter := range model.Parameters {
+			if parameter.Name == "forward_beta" && parameter.Value > 0 {
+				minimum = math.Min(minimum, parameter.Value)
+			}
+		}
+		for _, uncertainty := range model.Uncertainties {
+			if uncertainty.Target == "model_parameters.forward_beta" && uncertainty.Minimum > 0 {
+				minimum = math.Min(minimum, uncertainty.Minimum)
+			}
+		}
+	}
+	if math.IsInf(minimum, 1) {
+		return 0
+	}
+	return minimum
+}
+
+func topologyResistorPath(graph CandidateGraph, start, end string) []string {
+	if start == "" || end == "" || start == end {
+		return nil
+	}
+	type step struct {
+		node      string
+		instances []string
+	}
+	adjacency := map[string][]step{}
+	for _, instance := range graph.Instances {
+		if instance.Kind != "resistor" || len(instance.Terminals) != 2 {
+			continue
+		}
+		left, right := instance.Terminals[0].Node, instance.Terminals[1].Node
+		adjacency[left] = append(adjacency[left], step{node: right, instances: []string{instance.ID}})
+		adjacency[right] = append(adjacency[right], step{node: left, instances: []string{instance.ID}})
+	}
+	for node := range adjacency {
+		slices.SortFunc(adjacency[node], func(left, right step) int {
+			return cmp.Or(cmp.Compare(left.node, right.node), cmp.Compare(left.instances[0], right.instances[0]))
+		})
+	}
+	queue := []step{{node: start}}
+	visited := map[string]bool{start: true}
+	for len(queue) != 0 {
+		current := queue[0]
+		queue = queue[1:]
+		for _, edge := range adjacency[current.node] {
+			if visited[edge.node] {
+				continue
+			}
+			path := append(append([]string(nil), current.instances...), edge.instances[0])
+			if edge.node == end {
+				return path
+			}
+			visited[edge.node] = true
+			queue = append(queue, step{node: edge.node, instances: path})
 		}
 	}
 	return nil
