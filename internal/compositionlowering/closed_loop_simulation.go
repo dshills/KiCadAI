@@ -2464,15 +2464,43 @@ func configureBehavioralLoadCurrentStep(
 	if !needsEdge {
 		return plan, nil
 	}
-	var candidates []operatingHarnessDevice
+	type loadStepCandidate struct {
+		harness          operatingHarnessDevice
+		initialDeviceSI  float64
+		appliedDeviceSI  float64
+		usesDeviceValues bool
+	}
+	var candidates []loadStepCandidate
+	resolvedDevices := make(map[string]simmodel.ResolvedDevice, len(plan.Devices))
+	for _, device := range plan.Devices {
+		resolvedDevices[device.Component] = device
+	}
 	for _, entry := range harness {
-		if !entry.Source || entry.Device.CatalogID != "source.current.connector.1x02" ||
-			!entry.HasInitialValue || !entry.HasDefaultValue ||
+		if !entry.HasInitialValue || !entry.HasDefaultValue ||
 			!finiteArchitectureValue(entry.InitialValue) || !finiteArchitectureValue(entry.DefaultValue) ||
 			entry.InitialValue == entry.DefaultValue {
 			continue
 		}
-		candidates = append(candidates, entry)
+		resolvedDevice, resolved := resolvedDevices[entry.Device.InstanceID]
+		switch {
+		case entry.Source && resolved && resolvedDevice.Family == "current_source":
+			candidates = append(candidates, loadStepCandidate{harness: entry})
+		case !entry.Source && resolved && resolvedDevice.Family == "resistor" && resolvedDevice.ValueSI != nil &&
+			finiteArchitectureValue(*resolvedDevice.ValueSI) && *resolvedDevice.ValueSI > 0 &&
+			entry.DefaultValue > 0 && entry.InitialValue >= 0:
+			initialResistance := closedloopsynthesis.ShortCircuitHarnessOpenResistanceOhm
+			if entry.InitialValue > 0 {
+				nominalVoltage := entry.DefaultValue * *resolvedDevice.ValueSI
+				initialResistance = nominalVoltage / entry.InitialValue
+			}
+			if !finiteArchitectureValue(initialResistance) || initialResistance <= 0 {
+				continue
+			}
+			candidates = append(candidates, loadStepCandidate{
+				harness: entry, initialDeviceSI: initialResistance,
+				appliedDeviceSI: *resolvedDevice.ValueSI, usesDeviceValues: true,
+			})
+		}
 	}
 	if len(candidates) == 0 {
 		return plan, nil
@@ -2481,29 +2509,56 @@ func configureBehavioralLoadCurrentStep(
 		return simmodel.Plan{}, fmt.Errorf("behavioral load-current edge requires exactly one bounded current-load harness")
 	}
 	clone := simmodel.ClonePlan(plan)
-	source := candidates[0]
-	configured := false
+	candidate := candidates[0]
+	eligibleAnalyses := 0
+	configuredAnalyses := 0
 	for analysisIndex := range clone.Analyses {
 		analysis := &clone.Analyses[analysisIndex]
 		if analysis.Kind != kind || analysis.TimeStepS <= 0 || analysis.DurationS <= analysis.TimeStepS {
 			continue
 		}
+		eligibleAnalyses++
+		if candidate.usesDeviceValues {
+			for _, event := range analysis.DeviceValueEvents {
+				if event.Component == candidate.harness.Device.InstanceID {
+					return simmodel.Plan{}, fmt.Errorf("behavioral load-current edge conflicts with an existing device-value event for %q", event.Component)
+				}
+			}
+			analysis.DeviceValueEvents = append(analysis.DeviceValueEvents, simmodel.DeviceValueEvent{
+				ID:           safeID("behavioral_load_current_step_" + candidate.harness.Device.InstanceID),
+				Component:    candidate.harness.Device.InstanceID,
+				TriggerTimeS: analysis.TimeStepS, DurationS: analysis.DurationS - analysis.TimeStepS,
+				InitialSI: candidate.initialDeviceSI, AppliedSI: candidate.appliedDeviceSI,
+			})
+			slices.SortStableFunc(analysis.DeviceValueEvents, func(left, right simmodel.DeviceValueEvent) int {
+				return simmodel.CompareValueEventOrder(left.Component, left.TriggerTimeS, left.ID, right.Component, right.TriggerTimeS, right.ID)
+			})
+			configuredAnalyses++
+			continue
+		}
+		configured := false
 		for excitationIndex := range analysis.Excitations {
 			excitation := &analysis.Excitations[excitationIndex]
-			if excitation.Component != source.Device.InstanceID {
+			if excitation.Component != candidate.harness.Device.InstanceID {
 				continue
 			}
 			excitation.DCValue = 0
-			excitation.PulseInitialValue = source.InitialValue
-			excitation.PulseValue = source.DefaultValue
+			excitation.PulseInitialValue = candidate.harness.InitialValue
+			excitation.PulseValue = candidate.harness.DefaultValue
 			excitation.PulseDelayS = analysis.TimeStepS
 			excitation.PulseWidthS = analysis.DurationS
 			excitation.PulsePeriodS = 2 * analysis.DurationS
 			configured = true
 		}
+		if configured {
+			configuredAnalyses++
+		}
 	}
-	if !configured {
-		return simmodel.Plan{}, fmt.Errorf("behavioral load-current edge has no resolved current-source excitation")
+	if eligibleAnalyses == 0 || configuredAnalyses != eligibleAnalyses {
+		return simmodel.Plan{}, fmt.Errorf(
+			"behavioral load-current edge for %q configured %d of %d eligible analyses",
+			candidate.harness.Device.InstanceID, configuredAnalyses, eligibleAnalyses,
+		)
 	}
 	return clone, nil
 }

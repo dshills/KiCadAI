@@ -635,10 +635,14 @@ func TestBehavioralLoadCurrentStepUsesDeclaredOperatingBounds(t *testing.T) {
 			ID: "response", Metric: "response_time", Analysis: simmodel.AnalysisTransient,
 		}},
 	}}
-	plan := simmodel.Plan{Analyses: []simmodel.Analysis{{
-		ID: "response", Kind: simmodel.AnalysisTransient, DurationS: .01, TimeStepS: .0001,
-		Excitations: []simmodel.SourceExcitation{{Component: "load"}},
-	}}}
+	plan := simmodel.Plan{
+		Devices: []simmodel.ResolvedDevice{{
+			Component: "load", Family: "current_source", PrimitiveModel: simmodel.PrimitiveCurrentSourceV1,
+		}},
+		Analyses: []simmodel.Analysis{{
+			ID: "response", Kind: simmodel.AnalysisTransient, DurationS: .01, TimeStepS: .0001,
+			Excitations: []simmodel.SourceExcitation{{Component: "load"}},
+		}}}
 	harness := []operatingHarnessDevice{{
 		Device: circuitgraph.SimulationHarnessDevice{
 			InstanceID: "load", CatalogID: "source.current.connector.1x02",
@@ -659,6 +663,13 @@ func TestBehavioralLoadCurrentStepUsesDeclaredOperatingBounds(t *testing.T) {
 	if unchanged, err := configureBehavioralLoadCurrentStep(requirement, simmodel.AnalysisTransient, plan, harness, false); err != nil || simulationAnalysisHasDynamicExcitation(unchanged.Analyses[0]) {
 		t.Fatalf("disabled load-current edge changed plan: err=%v analysis=%#v", err, unchanged.Analyses[0])
 	}
+	incomplete := simmodel.ClonePlan(plan)
+	incomplete.Analyses = append(incomplete.Analyses, simmodel.Analysis{
+		ID: "missing_load", Kind: simmodel.AnalysisTransient, DurationS: .01, TimeStepS: .0001,
+	})
+	if _, err := configureBehavioralLoadCurrentStep(requirement, simmodel.AnalysisTransient, incomplete, harness, true); err == nil || !strings.Contains(err.Error(), `for "load" configured 1 of 2 eligible analyses`) {
+		t.Fatalf("partial load-current configuration error = %v", err)
+	}
 
 	requirement.Requirements.BehavioralRequirements[0].Observation = architecturesearch.Observation{Kind: "port", ID: "current_output"}
 	requirement.Requirements.BehavioralRequirements = append(requirement.Requirements.BehavioralRequirements, architecturesearch.BehavioralRequirement{
@@ -668,6 +679,65 @@ func TestBehavioralLoadCurrentStepUsesDeclaredOperatingBounds(t *testing.T) {
 	currentControlled, err := configureBehavioralLoadCurrentStep(requirement, simmodel.AnalysisTransient, plan, harness, true)
 	if err != nil || simulationAnalysisHasDynamicExcitation(currentControlled.Analyses[0]) {
 		t.Fatalf("current-controlled output received a load-current edge: err=%v analysis=%#v", err, currentControlled.Analyses[0])
+	}
+}
+
+func TestBehavioralLoadCurrentStepUsesPhysicalResistanceEventBehindDisconnect(t *testing.T) {
+	for _, test := range []struct {
+		name              string
+		minimumCurrentA   float64
+		initialResistance float64
+	}{
+		{name: "open_to_overload", minimumCurrentA: 0, initialResistance: closedloopsynthesis.ShortCircuitHarnessOpenResistanceOhm},
+		{name: "light_load_to_overload", minimumCurrentA: 0.25, initialResistance: 20},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			maximumCurrentA := 1.0
+			loadComponent := "simulation_harness_load_current_dd6b7e8de210a796"
+			requirement := architecturesearch.Requirement{Requirements: architecturesearch.Requirements{
+				BehavioralRequirements: []architecturesearch.BehavioralRequirement{{
+					ID: "response", Metric: "response_time", Analysis: simmodel.AnalysisTransient,
+				}},
+			}}
+			appliedResistance := 5.0
+			plan := simmodel.Plan{
+				Devices: []simmodel.ResolvedDevice{{
+					Component: loadComponent, Family: "resistor", PrimitiveModel: simmodel.PrimitiveResistorV1,
+					ValueSI: &appliedResistance,
+				}},
+				Analyses: []simmodel.Analysis{{
+					ID: "response", Kind: simmodel.AnalysisTransient, DurationS: .01, TimeStepS: .0001,
+				}},
+			}
+			harness := []operatingHarnessDevice{{
+				Device: circuitgraph.SimulationHarnessDevice{
+					InstanceID: loadComponent, CatalogID: "resistor.generic.0805",
+					ValueSI: appliedResistance, HasValueSI: true,
+				},
+				InitialValue: test.minimumCurrentA, HasInitialValue: true,
+				DefaultValue: maximumCurrentA, HasDefaultValue: true,
+			}}
+
+			configured, err := configureBehavioralLoadCurrentStep(
+				requirement, simmodel.AnalysisTransient, plan, harness, true,
+			)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(plan.Analyses[0].DeviceValueEvents) != 0 {
+				t.Fatal("load-current configuration mutated its input plan")
+			}
+			if len(configured.Analyses[0].DeviceValueEvents) != 1 {
+				t.Fatalf("device value events = %#v", configured.Analyses[0].DeviceValueEvents)
+			}
+			event := configured.Analyses[0].DeviceValueEvents[0]
+			if event.ID != safeID("behavioral_load_current_step_"+loadComponent) || len(event.ID) > 63 ||
+				event.Component != loadComponent || event.TriggerTimeS != configured.Analyses[0].TimeStepS ||
+				event.DurationS != configured.Analyses[0].DurationS-configured.Analyses[0].TimeStepS ||
+				math.Abs(event.InitialSI-test.initialResistance) > 1e-12 || event.AppliedSI != appliedResistance {
+				t.Fatalf("physical load-current event = %#v", event)
+			}
+		})
 	}
 }
 

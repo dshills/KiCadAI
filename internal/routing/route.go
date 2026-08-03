@@ -161,16 +161,16 @@ func RouteRequestContext(ctx context.Context, request Request) Result {
 			pairAccess = filterPhysicalEndpointAccess(pairAccess, searchRequest, plan.Net.Name, []Endpoint{pair.From, pair.To})
 			pairRequest := searchRequest
 			pairViaRules := netRequest.Rules
-			pairViaOccupancy := viaOccupancy
+			initialPairViaOccupancy := viaOccupancy
 			pairUsedCrowdedVias := len(forcedEndpointVias) != 0
 			if pairUsedCrowdedVias {
 				pairRequest.Rules = crowdedEndpointViaRules(pairRequest.Rules, forcedEndpointVias)
 				pairViaRules = crowdedEndpointViaRules(pairViaRules, forcedEndpointVias)
 				if candidate, err := BuildViaOccupancy(pairRequest, plan.Net.Name); err == nil {
-					pairViaOccupancy = candidate
+					initialPairViaOccupancy = candidate
 				}
 			}
-			path, routeIssues := routePairPathWithForcedEndpointVias(ctx, pairRequest, pairAccess, occupancy, pairViaOccupancy, plan.Net.Name, pair, forcedEndpointVias)
+			path, routeIssues := routePairPathWithForcedEndpointVias(ctx, pairRequest, pairAccess, occupancy, initialPairViaOccupancy, plan.Net.Name, pair, forcedEndpointVias)
 			route.SearchNodes += path.SearchNodes
 			result.Metrics.SearchNodes += path.SearchNodes
 			if path.SearchLimitHit {
@@ -180,7 +180,7 @@ func RouteRequestContext(ctx context.Context, request Request) Result {
 			if len(routeIssues) != 0 {
 				for _, alternateAccess := range crowdedAccessAlternates {
 					alternateAccess = filterPhysicalEndpointAccess(alternateAccess, pairRequest, plan.Net.Name, []Endpoint{pair.From, pair.To})
-					alternatePath, alternateIssues := routePairPathWithForcedEndpointVias(ctx, pairRequest, alternateAccess, occupancy, pairViaOccupancy, plan.Net.Name, pair, forcedEndpointVias)
+					alternatePath, alternateIssues := routePairPathWithForcedEndpointVias(ctx, pairRequest, alternateAccess, occupancy, initialPairViaOccupancy, plan.Net.Name, pair, forcedEndpointVias)
 					route.SearchNodes += alternatePath.SearchNodes
 					result.Metrics.SearchNodes += alternatePath.SearchNodes
 					if alternatePath.SearchLimitHit {
@@ -252,8 +252,9 @@ func RouteRequestContext(ctx context.Context, request Request) Result {
 							routeIssues = nil
 							netAccess = attemptAccess
 							forcedEndpointVias = configuration.forced
+							// The dogbone occupancy was consumed while finding path;
+							// materializing its vias below requires the matching rules.
 							pairViaRules = dogboneRules
-							pairViaOccupancy = dogboneViaOccupancy
 							pairUsedCrowdedVias = true
 							break dogboneConfigurations
 						}
@@ -331,8 +332,9 @@ func RouteRequestContext(ctx context.Context, request Request) Result {
 								nominalSegmentsClearOccupancy(nominalSegments, netRequest.Rules.TraceWidthMM, nominalOccupancy, netRequest.Board.Layers) {
 								path, segments, metrics = nominalPath, nominalSegments, nominalMetrics
 								netAccess = nominalAccess
+								// The nominal occupancy was consumed while finding path;
+								// materializing its vias below requires the matching rules.
 								pairViaRules = nominalPairViaRules
-								pairViaOccupancy = nominalPairViaOccupancy
 								pairUsedCrowdedVias = len(forcedEndpointVias) != 0
 								extended = true
 							}

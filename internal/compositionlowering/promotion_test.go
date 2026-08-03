@@ -408,6 +408,7 @@ func TestHierarchicalMultiDomainCorpusPassesOfflineWorkflow(t *testing.T) {
 		"KICADAI_HIERARCHICAL_MULTI_DOMAIN_ARTIFACT_DIR",
 		"",
 		libraryresolver.LibraryIndex{},
+		filepath.Join("..", "architecturesearch", "testdata", "hierarchical_control_behavior_overlay"),
 	)
 }
 
@@ -432,6 +433,7 @@ func TestHierarchicalMultiDomainCorpusOptionalKiCadPromotion(t *testing.T) {
 		"KICADAI_HIERARCHICAL_MULTI_DOMAIN_ARTIFACT_DIR",
 		cli,
 		index,
+		filepath.Join("..", "architecturesearch", "testdata", "hierarchical_control_behavior_overlay"),
 	)
 }
 
@@ -661,6 +663,23 @@ func TestPromotionCorpusOverlayReplacesOnlyDeclaredBaselineCase(t *testing.T) {
 			if filepath.Dir(path) != overlay {
 				t.Fatalf("mixed-function overlay = %q %#v", path, expected[path])
 			}
+		}
+	}
+}
+
+func TestHierarchicalControlBehaviorOverlayReplacesOnlyLegacyCase(t *testing.T) {
+	base := filepath.Join("..", "architecturesearch", "testdata", "hierarchical_multi_domain_corpus")
+	overlay := filepath.Join("..", "architecturesearch", "testdata", "hierarchical_control_behavior_overlay")
+	paths, expected, err := promotionCorpusPaths(base, overlay)
+	if err != nil || len(paths) != 6 || len(expected) != 0 {
+		t.Fatalf("overlay paths=%#v expected=%#v err=%v", paths, expected, err)
+	}
+	for _, path := range paths {
+		if filepath.Base(path) == "current_limited_switched_load_system.json" && filepath.Dir(path) != overlay {
+			t.Fatalf("current-limited overlay = %q", path)
+		}
+		if filepath.Base(path) != "current_limited_switched_load_system.json" && filepath.Dir(path) != base {
+			t.Fatalf("unexpected hierarchical overlay = %q", path)
 		}
 	}
 }

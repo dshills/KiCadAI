@@ -270,7 +270,8 @@ func maybeRetryPlacementRoutingWithRouter(ctx context.Context, request Request, 
 				}
 				affectedNets := autonomousCorrectionPlacementAffectedNets(*correctionPlan, baseRequest, currentPlaced.Result.Placements, nextPlaced.Result.Placements)
 				affectedNets = correctionSortedStrings(append(affectedNets, autonomousCorrectionChangedRouteNets(currentRouted.Operations, nextRouted.Operations)...))
-				selective, ok := RoutingStageResult{}, false
+				var selective RoutingStageResult
+				var ok bool
 				if autonomousCorrectionRouteScopeCoversRequest(baseRequest, affectedNets) && nextRouted.Result.Status == routing.StatusRouted && !reports.HasBlockingIssue(nextRouted.Stage.Issues) {
 					selective, ok = nextRouted, true
 				} else {

@@ -1,0 +1,11 @@
+{
+  "schema": "kicadai.promotion-overlay.v1",
+  "version": 1,
+  "fixtures": [
+    {
+      "id": "current_limited_switched_load_system",
+      "file": "current_limited_switched_load_system.json",
+      "promotion_overlay": true
+    }
+  ]
+}

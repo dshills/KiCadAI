@@ -186,14 +186,16 @@ func routeWithFailedNetFirstNegotiationUsingOptions(ctx context.Context, request
 		summary.MaximumSearchNodeLimit = max(summary.MaximumSearchNodeLimit, nextLimit)
 		searchResult = candidate
 		if routingResultBetter(candidate, best) || candidate.Metrics.FailedNetCount == 0 {
+			// searchRequest already is the request lineage for this expansion loop.
+			// Retain it so final summary metadata follows the selected result.
 			best = candidate
 			bestRequest = searchRequest
-			summary.SelectedSearchNodeLimit = nextLimit
 		}
 		if candidate.Metrics.FailedNetCount == 0 {
 			break
 		}
 	}
+	summary.SelectedSearchNodeLimit = normalizedRouteNegotiationSearchNodeLimit(bestRequest.Rules.MaxSearchNodes)
 	completeRouteNegotiationSummary(&summary, promoted, searchLimited, best)
 	return best, summary
 }
