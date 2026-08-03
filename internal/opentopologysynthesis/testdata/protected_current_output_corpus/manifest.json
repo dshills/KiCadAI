@@ -1,0 +1,37 @@
+{
+  "schema": "kicadai.protected-current-output-corpus.v1",
+  "version": 1,
+  "base_commit": "86c7a6e2de158ed8dd46530c87d1a9c503073131",
+  "frozen_at": "2026-08-03",
+  "requirement_schema": "kicadai.open-topology-requirement.v1",
+  "authoring_policy": "Behavior, external interfaces, operating conditions, events, measurable bounds, safety limits, and acceptance only. Cases contain no component, primitive, topology, internal-net, model, coordinate, layer, route, solver, repair, or fixture-specific implementation instruction.",
+  "cases": [
+    {
+      "id": "fault_protected_low_side_current_sink",
+      "current_role": "sink",
+      "independence": "New neutral behavior requirement authored and frozen before production implementation; distinct current direction, transfer ratio, load corners, startup permit, and overload-fault envelope.",
+      "requirement_file": "fault_protected_low_side_current_sink.json",
+      "requirement_sha256": "fbd7fa5cbba55cb6b482d7baed1ae496c01381dc4300b9c6f93851a1ab604acd",
+      "required_analyses": ["dc_operating_point", "dc_sweep", "electrothermal", "startup", "thermal", "transient"],
+      "required_behaviors": ["command_accuracy", "fault_disconnect", "rated_current", "safe_operating_area", "safe_temperature", "settling", "startup_off"]
+    },
+    {
+      "id": "protected_programmable_current_output",
+      "current_role": "source",
+      "independence": "Existing independently frozen architecture-generalization failure, retained byte-for-byte with its original checksum.",
+      "requirement_file": "../architecture_generalization_corpus/protected_programmable_current_output.json",
+      "requirement_sha256": "3eb0f01be78d52334f2b46e637c3859364f644fec159a7641e099d475f187a35",
+      "required_analyses": ["dc_operating_point", "dc_sweep", "electrothermal", "startup", "thermal", "transient"],
+      "required_behaviors": ["command_slope", "load_variation", "rated_current", "safe_operating_area", "safe_temperature", "settling", "startup_limit"]
+    },
+    {
+      "id": "startup_safe_high_side_current_source",
+      "current_role": "source",
+      "independence": "New neutral behavior requirement authored and frozen before production implementation; distinct transfer ratio, supply and load corners, explicit permit, startup-safe state, and fault-dominant overload response.",
+      "requirement_file": "startup_safe_high_side_current_source.json",
+      "requirement_sha256": "63b170b16d68f07065df0355a2df7b93429fe95c3851ae983b831b1253bb7d7a",
+      "required_analyses": ["dc_operating_point", "dc_sweep", "electrothermal", "startup", "thermal", "transient"],
+      "required_behaviors": ["command_accuracy", "fault_disconnect", "rated_current", "safe_operating_area", "safe_temperature", "settling", "startup_off"]
+    }
+  ]
+}

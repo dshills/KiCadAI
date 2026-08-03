@@ -1,0 +1,118 @@
+{
+  "schema": "kicadai.protected-current-output-baseline.v1",
+  "version": 1,
+  "base_commit": "86c7a6e2de158ed8dd46530c87d1a9c503073131",
+  "manifest_sha256": "229cd7821a7ad5cf29ae0bad21f57f40f9e833a5d40cb2e6ce376caa33d8462f",
+  "engine_state": "untouched",
+  "policy": {
+    "max_expanded_states": 2000,
+    "max_generated_graphs": 50000,
+    "max_primitive_instances": 20,
+    "max_internal_nodes": 24,
+    "max_candidate_simulations": 4096,
+    "max_corner_evaluations": 16384,
+    "max_value_trials": 64,
+    "max_topology_repairs": 16,
+    "max_retained_candidates": 16,
+    "max_diagnostic_samples": 32
+  },
+  "cases": [
+    {
+      "id": "fault_protected_low_side_current_sink",
+      "requirement_sha256": "fbd7fa5cbba55cb6b482d7baed1ae496c01381dc4300b9c6f93851a1ab604acd",
+      "synthesis_hash": "155dff48ba08499b629962b725f7520bf255f01a5b4de72b802d558f8db4a635",
+      "status": "exhausted",
+      "stop_reason": "search_exhausted",
+      "deepest_stage": "simulation",
+      "candidate_count": 16,
+      "ready_value_plans": 16,
+      "simulation_evaluations": 32,
+      "passing_evaluations": 0,
+      "repair_candidates": 1,
+      "physical_attempts": 0,
+      "diagnoses": [
+        {
+          "code": "assertion_below_minimum",
+          "requirement_id": "command_accuracy",
+          "analysis": "dc_sweep",
+          "operating_corner": "enabled_regulation/nominal",
+          "count": 57
+        },
+        {
+          "code": "simulation_invalid",
+          "requirement_id": "command_accuracy",
+          "analysis": "dc_sweep",
+          "operating_corner": "enabled_regulation/nominal",
+          "count": 20
+        }
+      ]
+    },
+    {
+      "id": "protected_programmable_current_output",
+      "requirement_sha256": "3eb0f01be78d52334f2b46e637c3859364f644fec159a7641e099d475f187a35",
+      "synthesis_hash": "6b3a2346d4834c8f21468e2f5e514852f288ea9f72a6034e826d4ab1c0546f40",
+      "status": "exhausted",
+      "stop_reason": "search_exhausted",
+      "deepest_stage": "simulation",
+      "candidate_count": 1,
+      "ready_value_plans": 1,
+      "simulation_evaluations": 32,
+      "passing_evaluations": 0,
+      "repair_candidates": 1,
+      "physical_attempts": 0,
+      "diagnoses": [
+        {
+          "code": "assertion_above_maximum",
+          "requirement_id": "command_slope",
+          "analysis": "dc_sweep",
+          "operating_corner": "programmed_load/nominal",
+          "count": 15
+        },
+        {
+          "code": "assertion_above_maximum",
+          "requirement_id": "rated_current",
+          "analysis": "dc_operating_point",
+          "operating_corner": "programmed_load/nominal",
+          "count": 16
+        },
+        {
+          "code": "assertion_below_minimum",
+          "requirement_id": "command_slope",
+          "analysis": "dc_sweep",
+          "operating_corner": "programmed_load/nominal",
+          "count": 37
+        }
+      ]
+    },
+    {
+      "id": "startup_safe_high_side_current_source",
+      "requirement_sha256": "63b170b16d68f07065df0355a2df7b93429fe95c3851ae983b831b1253bb7d7a",
+      "synthesis_hash": "b9d4e6d8bee142723006e07e8f6ad06de628078622689a973d6de797a1347d7d",
+      "status": "exhausted",
+      "stop_reason": "search_exhausted",
+      "deepest_stage": "simulation",
+      "candidate_count": 16,
+      "ready_value_plans": 16,
+      "simulation_evaluations": 32,
+      "passing_evaluations": 0,
+      "repair_candidates": 1,
+      "physical_attempts": 0,
+      "diagnoses": [
+        {
+          "code": "assertion_below_minimum",
+          "requirement_id": "command_accuracy",
+          "analysis": "dc_sweep",
+          "operating_corner": "permitted_regulation/nominal",
+          "count": 70
+        },
+        {
+          "code": "simulation_invalid",
+          "requirement_id": "command_accuracy",
+          "analysis": "dc_sweep",
+          "operating_corner": "permitted_regulation/nominal",
+          "count": 8
+        }
+      ]
+    }
+  ]
+}
