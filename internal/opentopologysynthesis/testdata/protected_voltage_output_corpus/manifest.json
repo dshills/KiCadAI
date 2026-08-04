@@ -1,0 +1,37 @@
+{
+  "schema": "kicadai.protected-voltage-output-corpus.v1",
+  "version": 1,
+  "base_commit": "75d0f39b06e7bb3f91e61ae3e90f58ddf1568e7e",
+  "frozen_at": "2026-08-04",
+  "requirement_schema": "kicadai.open-topology-requirement.v1",
+  "authoring_policy": "Behavior, external interfaces, operating conditions, events, measurable bounds, safety limits, and acceptance only. Cases contain no component, primitive, topology, internal-net, model, coordinate, layer, route, solver, repair, or fixture-specific implementation instruction.",
+  "cases": [
+    {
+      "id": "bidirectional_midrail_voltage_output",
+      "voltage_role": "bidirectional_midrail",
+      "independence": "Independent behavior requirement with a fixed virtual-rail output, positive and negative load-current corners, capacitive loading, startup, and faults in both current directions.",
+      "requirement_file": "bidirectional_midrail_voltage_output.json",
+      "requirement_sha256": "c9745ed57079362cfff4a30e7da5534e78424c94d946a253edaa2470dc9b4d13",
+      "required_analyses": ["dc_operating_point", "dc_sweep", "electrothermal", "noise", "stability", "startup", "thermal", "transient"],
+      "required_behaviors": ["line_change", "load_change", "midpoint_accuracy", "noise_limit", "phase_margin", "safe_operating_area", "safe_temperature", "settling", "short_high_current", "short_low_current", "startup_peak"]
+    },
+    {
+      "id": "low_noise_adjustable_voltage_output",
+      "voltage_role": "adjustable_positive",
+      "independence": "Independent behavior requirement with two command/output pairs, distinct minimum-input corners, low noise, capacitive loading, startup, and bounded short-circuit current.",
+      "requirement_file": "low_noise_adjustable_voltage_output.json",
+      "requirement_sha256": "59485d7aee07f910a10a86ba546a23d3704e4c4c2d86f1880f35a57e90387be3",
+      "required_analyses": ["dc_operating_point", "dc_sweep", "electrothermal", "noise", "stability", "startup", "thermal", "transient"],
+      "required_behaviors": ["high_output", "line_change", "load_change", "low_output", "noise_limit", "phase_margin", "safe_operating_area", "safe_temperature", "settling", "short_current", "startup_peak"]
+    },
+    {
+      "id": "protected_high_power_voltage_output",
+      "voltage_role": "protected_high_power",
+      "independence": "Independent behavior requirement with default-off startup, explicit enable transition, wide line/load and capacitive corners, high dissipation, and a sustained output short.",
+      "requirement_file": "protected_high_power_voltage_output.json",
+      "requirement_sha256": "6d08bb9a119dd8433b209590e3d6947b2b468cd44298145778a4e2efa83693a2",
+      "required_analyses": ["dc_operating_point", "dc_sweep", "electrothermal", "stability", "startup", "thermal", "transient"],
+      "required_behaviors": ["disabled_leakage", "disabled_voltage", "line_change", "load_change", "phase_margin", "quiescent_limit", "regulated_voltage", "safe_operating_area", "safe_temperature", "settling", "short_current", "startup_peak"]
+    }
+  ]
+}

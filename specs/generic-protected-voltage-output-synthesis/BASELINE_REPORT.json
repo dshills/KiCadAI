@@ -1,0 +1,196 @@
+{
+  "schema": "kicadai.protected-voltage-output-baseline.v1",
+  "version": 1,
+  "base_commit": "75d0f39b06e7bb3f91e61ae3e90f58ddf1568e7e",
+  "manifest_sha256": "963d5052574b2ccb6bdb18b652c9a2fbeb6e5dbf0bed1237dc7ce78fbcc89d4c",
+  "engine_state": "untouched",
+  "policy": {
+    "max_expanded_states": 2000,
+    "max_generated_graphs": 50000,
+    "max_primitive_instances": 20,
+    "max_internal_nodes": 24,
+    "max_candidate_simulations": 4096,
+    "max_corner_evaluations": 16384,
+    "max_value_trials": 64,
+    "max_topology_repairs": 16,
+    "max_retained_candidates": 16,
+    "max_diagnostic_samples": 32
+  },
+  "cases": [
+    {
+      "id": "bidirectional_midrail_voltage_output",
+      "requirement_sha256": "c9745ed57079362cfff4a30e7da5534e78424c94d946a253edaa2470dc9b4d13",
+      "synthesis_hash": "86aa78d26d4233142fdbf3bff5b733e8094018c23d261199c8666b292fc9f432",
+      "status": "exhausted",
+      "stop_reason": "search_exhausted",
+      "deepest_stage": "simulation",
+      "search_consumption": {
+        "expanded_states": 1,
+        "generated_graphs": 16,
+        "complete_graphs": 2,
+        "candidate_simulations": 0,
+        "corner_evaluations": 0,
+        "value_trials": 0,
+        "topology_repairs": 0,
+        "maximum_frontier": 0,
+        "budget_exhausted": false
+      },
+      "search_rejections": null,
+      "candidate_count": 2,
+      "ready_value_plans": 2,
+      "simulation_evaluations": 32,
+      "passing_evaluations": 0,
+      "repair_candidates": 1,
+      "physical_attempts": 0,
+      "diagnoses": [
+        {
+          "code": "assertion_above_maximum",
+          "requirement_id": "line_change",
+          "analysis": "dc_sweep",
+          "operating_corner": "bidirectional_load/nominal",
+          "count": 35
+        },
+        {
+          "code": "nonconvergent",
+          "requirement_id": "load_change",
+          "analysis": "dc_sweep",
+          "operating_corner": "bidirectional_load/nominal",
+          "count": 31
+        }
+      ]
+    },
+    {
+      "id": "low_noise_adjustable_voltage_output",
+      "requirement_sha256": "59485d7aee07f910a10a86ba546a23d3704e4c4c2d86f1880f35a57e90387be3",
+      "synthesis_hash": "73a53c138b5f725fb7e52e620cdac77733abe99e33dcf53da3547d7926b64cb0",
+      "status": "failed",
+      "stop_reason": "repair_exhausted",
+      "deepest_stage": "simulation",
+      "search_consumption": {
+        "expanded_states": 1,
+        "generated_graphs": 16,
+        "complete_graphs": 2,
+        "candidate_simulations": 0,
+        "corner_evaluations": 0,
+        "value_trials": 0,
+        "topology_repairs": 0,
+        "maximum_frontier": 0,
+        "budget_exhausted": false
+      },
+      "search_rejections": null,
+      "candidate_count": 2,
+      "ready_value_plans": 2,
+      "simulation_evaluations": 32,
+      "passing_evaluations": 0,
+      "repair_candidates": 2,
+      "physical_attempts": 0,
+      "diagnoses": [
+        {
+          "code": "assertion_above_maximum",
+          "requirement_id": "high_output",
+          "analysis": "dc_operating_point",
+          "operating_corner": "high_setting/nominal",
+          "count": 10
+        },
+        {
+          "code": "assertion_above_maximum",
+          "requirement_id": "line_change",
+          "analysis": "dc_sweep",
+          "operating_corner": "high_setting/nominal",
+          "count": 4
+        },
+        {
+          "code": "assertion_above_maximum",
+          "requirement_id": "line_change",
+          "analysis": "dc_sweep",
+          "operating_corner": "low_setting/nominal",
+          "count": 40
+        },
+        {
+          "code": "assertion_above_maximum",
+          "requirement_id": "low_output",
+          "analysis": "dc_operating_point",
+          "operating_corner": "low_setting/nominal",
+          "count": 6
+        },
+        {
+          "code": "assertion_below_minimum",
+          "requirement_id": "high_output",
+          "analysis": "dc_operating_point",
+          "operating_corner": "high_setting/nominal",
+          "count": 8
+        },
+        {
+          "code": "simulation_invalid",
+          "requirement_id": "high_output",
+          "analysis": "dc_operating_point",
+          "operating_corner": "high_setting/nominal",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "id": "protected_high_power_voltage_output",
+      "requirement_sha256": "6d08bb9a119dd8433b209590e3d6947b2b468cd44298145778a4e2efa83693a2",
+      "synthesis_hash": "23c9e17ae8431ae359b90b6b6ff5240f767c5bd45429271b89dc27c9c5c619e6",
+      "status": "failed",
+      "stop_reason": "repair_exhausted",
+      "deepest_stage": "simulation",
+      "search_consumption": {
+        "expanded_states": 1,
+        "generated_graphs": 16,
+        "complete_graphs": 2,
+        "candidate_simulations": 0,
+        "corner_evaluations": 0,
+        "value_trials": 0,
+        "topology_repairs": 0,
+        "maximum_frontier": 0,
+        "budget_exhausted": false
+      },
+      "search_rejections": null,
+      "candidate_count": 2,
+      "ready_value_plans": 2,
+      "simulation_evaluations": 32,
+      "passing_evaluations": 0,
+      "repair_candidates": 2,
+      "physical_attempts": 0,
+      "diagnoses": [
+        {
+          "code": "assertion_above_maximum",
+          "requirement_id": "line_change",
+          "analysis": "dc_sweep",
+          "operating_corner": "rated_operation/nominal",
+          "count": 31
+        },
+        {
+          "code": "assertion_above_maximum",
+          "requirement_id": "quiescent_limit",
+          "analysis": "dc_operating_point",
+          "operating_corner": "rated_operation/nominal",
+          "count": 7
+        },
+        {
+          "code": "assertion_below_minimum",
+          "requirement_id": "phase_margin",
+          "analysis": "stability",
+          "operating_corner": "rated_operation/nominal",
+          "count": 1
+        },
+        {
+          "code": "simulation_invalid",
+          "requirement_id": "line_change",
+          "analysis": "dc_sweep",
+          "operating_corner": "rated_operation/nominal",
+          "count": 28
+        },
+        {
+          "code": "simulation_invalid",
+          "requirement_id": "phase_margin",
+          "analysis": "stability",
+          "operating_corner": "rated_operation/nominal",
+          "count": 2
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,43 @@
+{
+  "schema": "kicadai.open-topology-requirement.v1",
+  "version": 1,
+  "project": {
+    "name": "protected_high_power_voltage_output",
+    "title": "Protected high-power voltage output",
+    "description": "Produce a startup-safe twelve-volt output across a wide input and load envelope while bounding overload and short-circuit current, temperature, and operating stress."
+  },
+  "requirements": {
+    "domains": [
+      {"id": "ground", "kind": "reference", "nominal_voltage_v": 0, "source": "external"},
+      {"id": "input_supply", "kind": "supply", "min_voltage_v": 14, "nominal_voltage_v": 18, "max_voltage_v": 24, "max_current_a": 2.5, "source": "external"}
+    ],
+    "ports": [
+      {"id": "ground", "kind": "reference", "direction": "bidirectional", "domain": "ground"},
+      {"id": "input_power", "kind": "power", "direction": "sink", "domain": "input_supply"},
+      {"id": "output_enable", "kind": "digital", "direction": "sink", "domain": "ground", "electrical": {"min_voltage_v": 0, "nominal_voltage_v": 0, "max_voltage_v": 5, "default_state": "low"}},
+      {"id": "power_output", "kind": "power", "direction": "source", "domain": "ground", "electrical": {"min_voltage_v": 11.7, "nominal_voltage_v": 12, "max_voltage_v": 12.3, "max_current_a": 1.5}}
+    ],
+    "operating_cases": [
+      {"id": "rated_operation", "conditions": [{"axis": "supply_voltage", "target": "input_supply", "min": 14, "max": 24, "unit": "V"}, {"axis": "input_voltage", "target": "output_enable", "min": 5, "max": 5, "unit": "V"}, {"axis": "load_current", "target": "power_output", "min": 0.05, "max": 1.5, "unit": "A"}, {"axis": "load_capacitance", "target": "power_output", "min": 0.00001, "max": 0.0022, "unit": "F"}, {"axis": "ambient_temperature", "target": "power_output", "min": 0, "max": 50, "unit": "degC"}, {"axis": "model_corner", "target": "power_output", "min": 0, "max": 0, "unit": "ratio"}, {"axis": "tolerance_corner", "target": "power_output", "min": 0, "max": 0, "unit": "ratio"}]},
+      {"id": "disabled_startup", "conditions": [{"axis": "supply_voltage", "target": "input_supply", "min": 0, "max": 18, "unit": "V"}, {"axis": "input_voltage", "target": "output_enable", "min": 0, "max": 0, "unit": "V"}, {"axis": "load_current", "target": "power_output", "min": 0.1, "max": 0.1, "unit": "A"}], "events": [{"id": "apply_disabled_input", "kind": "startup", "target": "input_power", "trigger_time_s": 0.001, "initial": 0, "applied": 18, "unit": "V"}]},
+      {"id": "enabled_startup", "conditions": [{"axis": "supply_voltage", "target": "input_supply", "min": 18, "max": 18, "unit": "V"}, {"axis": "input_voltage", "target": "output_enable", "min": 0, "max": 5, "unit": "V"}, {"axis": "load_current", "target": "power_output", "min": 0.5, "max": 0.5, "unit": "A"}], "events": [{"id": "enable_output", "kind": "input_step", "target": "output_enable", "trigger_time_s": 0.005, "initial": 0, "applied": 5, "unit": "V"}]},
+      {"id": "shorted_output", "conditions": [{"axis": "supply_voltage", "target": "input_supply", "min": 24, "max": 24, "unit": "V"}, {"axis": "input_voltage", "target": "output_enable", "min": 5, "max": 5, "unit": "V"}, {"axis": "load_current", "target": "power_output", "min": 1.5, "max": 1.5, "unit": "A"}, {"axis": "ambient_temperature", "target": "power_output", "min": 50, "max": 50, "unit": "degC"}], "events": [{"id": "apply_short", "kind": "short_circuit", "target": "power_output", "trigger_time_s": 0.005, "initial": 1.5, "applied": 10, "unit": "A"}]}
+    ],
+    "behavioral_requirements": [
+      {"id": "disabled_leakage", "metric": "off_state_current", "analysis": "startup", "observation": {"kind": "port", "id": "power_output"}, "max": 0.01, "unit": "A", "operating_cases": ["disabled_startup"], "critical": true},
+      {"id": "disabled_voltage", "metric": "startup_output_voltage", "analysis": "startup", "observation": {"kind": "port", "id": "power_output"}, "max": 0.2, "unit": "V", "operating_cases": ["disabled_startup"], "critical": true},
+      {"id": "line_change", "metric": "line_regulation", "analysis": "dc_sweep", "excitation": {"kind": "domain", "id": "input_supply"}, "observation": {"kind": "port", "id": "power_output"}, "max": 0.08, "unit": "V", "operating_cases": ["rated_operation"]},
+      {"id": "load_change", "metric": "load_regulation", "analysis": "dc_sweep", "observation": {"kind": "port", "id": "power_output"}, "max": 0.12, "unit": "V", "operating_cases": ["rated_operation"]},
+      {"id": "phase_margin", "metric": "phase_margin", "analysis": "stability", "observation": {"kind": "port", "id": "power_output"}, "min": 55, "unit": "deg", "operating_cases": ["rated_operation"], "critical": true},
+      {"id": "quiescent_limit", "metric": "quiescent_current", "analysis": "dc_operating_point", "observation": {"kind": "port", "id": "input_power"}, "max": 0.03, "unit": "A", "operating_cases": ["rated_operation"]},
+      {"id": "regulated_voltage", "metric": "output_voltage", "analysis": "dc_operating_point", "observation": {"kind": "port", "id": "power_output"}, "min": 11.8, "max": 12.2, "unit": "V", "operating_cases": ["rated_operation"]},
+      {"id": "safe_operating_area", "metric": "soa_margin", "analysis": "electrothermal", "observation": {"kind": "circuit", "id": "minimum_soa_margin"}, "min": 1.5, "unit": "ratio", "operating_cases": ["rated_operation", "shorted_output"], "critical": true},
+      {"id": "safe_temperature", "metric": "junction_temperature", "analysis": "thermal", "observation": {"kind": "circuit", "id": "maximum_junction_temperature"}, "max": 125, "unit": "degC", "operating_cases": ["rated_operation", "shorted_output"], "critical": true},
+      {"id": "settling", "metric": "settling_time", "analysis": "startup", "observation": {"kind": "port", "id": "power_output"}, "max": 0.05, "unit": "s", "operating_cases": ["enabled_startup"], "critical": true},
+      {"id": "short_current", "metric": "peak_current", "analysis": "transient", "observation": {"kind": "port", "id": "power_output"}, "max": 2, "unit": "A", "operating_cases": ["shorted_output"], "critical": true},
+      {"id": "startup_peak", "metric": "startup_overshoot", "analysis": "startup", "observation": {"kind": "port", "id": "power_output"}, "max": 0.3, "unit": "V", "operating_cases": ["enabled_startup"], "critical": true}
+    ],
+    "constraints": {"max_components": 32, "max_width_mm": 105, "max_height_mm": 75}
+  },
+  "acceptance": {"require_primitive_only": true, "require_topology_search": true, "require_simulation": true, "require_all_corners": true, "require_model_provenance": true, "require_closed_loop_evidence": true, "require_complete_routing": true, "require_connectivity": true, "require_writer_correctness": true, "require_round_trip_zero_diff": true, "require_erc": true, "require_strict_drc": true, "require_deterministic_replay": true, "require_fail_closed": true}
+}
