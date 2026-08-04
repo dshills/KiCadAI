@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"math"
+	"slices"
 	"testing"
 )
 
@@ -85,6 +86,14 @@ func TestRankedSynthesisSelectionPrefersRequirementMarginAndExplainsAlternatives
 	extra := moreComplex.Instances[0]
 	extra.ID = "ranking_extra"
 	moreComplex.Instances = append(moreComplex.Instances, extra)
+	baseActive, err := ActiveStructureHash(base)
+	if err != nil {
+		t.Fatal(err)
+	}
+	complexActive, err := ActiveStructureHash(moreComplex)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	minimum := 1.0
 	narrowActual := 1.1
@@ -103,13 +112,29 @@ func TestRankedSynthesisSelectionPrefersRequirementMarginAndExplainsAlternatives
 			Actual: &wideActual, RequiredMin: &minimum, AssertionPass: true,
 		}},
 	}
+	rejected := SimulationEvaluation{
+		Status: SimulationEvaluationFailed,
+		Hash:   "eval-rejected",
+		Diagnoses: []Diagnosis{{
+			Code: "assertion_below_minimum", EvidenceHash: "rejection-evidence",
+		}},
+	}
 	run := SynthesisRun{
 		Schema: SynthesisRunSchema, Version: SynthesisRunVersion,
 		Report: Report{
 			Schema: ReportSchema, Version: ReportVersion,
 			Candidates: []CandidateReport{
-				{Fingerprint: "simple"},
-				{Fingerprint: "wide-margin"},
+				{Fingerprint: "simple", ActiveStructureHash: baseActive},
+				{Fingerprint: "wide-margin", ActiveStructureHash: complexActive},
+				{Fingerprint: "rejected", TopologyHash: "topology-rejected", ActiveStructureHash: "active-rejected"},
+			},
+		},
+		Candidates: []SynthesisCandidateEvidence{
+			{Fingerprint: "simple", ActiveStructureHash: baseActive, ValuePlan: ValueSearchPlan{Status: ValuePlanReady}},
+			{Fingerprint: "wide-margin", ActiveStructureHash: complexActive, ValuePlan: ValueSearchPlan{Status: ValuePlanReady}},
+			{
+				Fingerprint: "rejected", TopologyHash: "topology-rejected", ActiveStructureHash: "active-rejected",
+				ValuePlan: ValueSearchPlan{Status: ValuePlanReady}, Evaluations: []SimulationEvaluation{rejected},
 			},
 		},
 	}
@@ -131,8 +156,16 @@ func TestRankedSynthesisSelectionPrefersRequirementMarginAndExplainsAlternatives
 	ranking := selected.Report.Selected.Ranking
 	if ranking.Policy != synthesisSelectionRankingPolicy || len(ranking.Alternatives) != 2 ||
 		!ranking.Alternatives[0].Selected || ranking.Alternatives[0].Fingerprint != "wide-margin" ||
-		ranking.Alternatives[0].WorstNormalizedMargin <= ranking.Alternatives[1].WorstNormalizedMargin {
+		ranking.Alternatives[0].WorstNormalizedMargin <= ranking.Alternatives[1].WorstNormalizedMargin ||
+		ranking.Alternatives[0].Disposition != "selected" || ranking.Alternatives[1].Disposition != "not_selected" ||
+		ranking.Alternatives[0].Reason == "" || ranking.Alternatives[1].Reason == "" ||
+		ranking.Alternatives[0].PhysicalHash == "" || ranking.Alternatives[1].PhysicalHash == "" {
 		t.Fatalf("selection ranking = %#v", ranking)
+	}
+	if len(ranking.Rejections) != 1 || ranking.Rejections[0].Stage != "simulation" ||
+		!slices.Contains(ranking.Rejections[0].Codes, "assertion_below_minimum") ||
+		!slices.Contains(ranking.Rejections[0].EvidenceHashes, "rejection-evidence") {
+		t.Fatalf("selection rejection evidence = %#v", ranking.Rejections)
 	}
 	if selected.Report.Selected.SelectionSummary == "" || selected.SelectedGraph == nil || selected.Physical == nil {
 		t.Fatalf("selection explanation or bound artifacts missing: %#v", selected)

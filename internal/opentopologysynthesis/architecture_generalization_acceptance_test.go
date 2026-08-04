@@ -70,22 +70,37 @@ func TestArchitectureGeneralizationAcceptance(t *testing.T) {
 				t.Fatalf("passing design lacks selected physical evidence: physical=%#v selected=%#v", first.Physical, first.Report.Selected)
 			}
 			evaluatedTopologies := map[string]bool{}
+			evaluatedActiveStructures := map[string]bool{}
 			selectedPlanFound := false
 			for _, candidate := range first.Candidates {
 				if len(candidate.Evaluations) != 0 {
 					evaluatedTopologies[candidate.TopologyHash] = true
+					evaluatedActiveStructures[candidate.ActiveStructureHash] = true
 				}
 				if candidate.Fingerprint == first.Report.Selected.Fingerprint {
 					selectedPlanFound = true
 					assertValueTrialHasExplainableComponents(t, candidate.ValuePlan, *first.SelectedTrial)
 				}
 			}
+			delete(evaluatedActiveStructures, "")
 			if len(evaluatedTopologies) < 2 {
 				t.Fatalf("trusted simulation evaluated %d topology hashes, want at least 2", len(evaluatedTopologies))
 			}
 			if !selectedPlanFound || strings.TrimSpace(first.Report.Selected.SelectionSummary) == "" ||
 				strings.TrimSpace(first.Report.Selected.Ranking.Policy) == "" {
 				t.Fatalf("selected architecture lacks ranked explainable evidence: %#v", first.Report.Selected)
+			}
+			if entry.ID == "protected_programmable_current_output" {
+				if len(evaluatedActiveStructures) < 2 || len(first.Report.Selected.Ranking.Alternatives) < 2 {
+					t.Fatalf("protected current active structures/ranking = %v/%#v", evaluatedActiveStructures, first.Report.Selected.Ranking)
+				}
+				for index, alternative := range first.Report.Selected.Ranking.Alternatives {
+					if alternative.ActiveStructureHash == "" || alternative.PhysicalHash == "" ||
+						alternative.Disposition == "" || alternative.Reason == "" ||
+						(index == 0) != alternative.Selected {
+						t.Fatalf("protected current ranking alternative[%d] = %#v", index, alternative)
+					}
+				}
 			}
 			passed++
 		})

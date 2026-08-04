@@ -66,6 +66,66 @@ func TestAdaptSchematicUsesEmbeddedBodyBounds(t *testing.T) {
 	}
 }
 
+func TestAdaptSchematicUsesRecoveredPinEnvelopeForPinOnlyUnit(t *testing.T) {
+	origin := kicadfiles.Point{X: kicadfiles.MM(50), Y: kicadfiles.MM(50)}
+	file := &schematic.SchematicFile{Symbols: []schematic.SchematicSymbol{{
+		Reference: "U1",
+		Unit:      3,
+		LibraryID: "Amplifier_Operational:LM358",
+		Position:  origin,
+		Pins: []schematic.SymbolPin{
+			{Number: "4"},
+			{Number: "8"},
+		},
+		PinAnchors: []kicadfiles.Point{
+			{X: origin.X - kicadfiles.MM(2.54), Y: origin.Y + kicadfiles.MM(7.62)},
+			{X: origin.X - kicadfiles.MM(2.54), Y: origin.Y - kicadfiles.MM(7.62)},
+		},
+	}}}
+	request, result := AdaptSchematic(file)
+	if len(request.Components) != 1 || len(result.Components) != 1 {
+		t.Fatalf("components request=%#v result=%#v", request.Components, result.Components)
+	}
+	want := Rect{
+		MinX: kicadfiles.MM(-3.81), MinY: kicadfiles.MM(-8.89),
+		MaxX: kicadfiles.MM(-1.27), MaxY: kicadfiles.MM(8.89),
+	}
+	component := result.Components[0]
+	if !component.BodyKnown || component.GeometrySource != GeometrySourceExplicitPinEnvelope || component.Body != want {
+		t.Fatalf("pin-only body = %#v source=%s known=%t, want %#v", component.Body, component.GeometrySource, component.BodyKnown, want)
+	}
+	passingWire := WireSegment{
+		From: kicadfiles.Point{X: origin.X + kicadfiles.MM(6.35), Y: origin.Y - kicadfiles.MM(20)},
+		To:   kicadfiles.Point{X: origin.X + kicadfiles.MM(6.35), Y: origin.Y + kicadfiles.MM(20)},
+	}
+	if SegmentIntersectsRect(passingWire, componentBody(component)) {
+		t.Fatalf("wire outside recovered pin envelope intersects body: wire=%#v body=%#v", passingWire, componentBody(component))
+	}
+}
+
+func TestAdaptSchematicRetainsRecoveredPinAtLocalOrigin(t *testing.T) {
+	origin := kicadfiles.Point{X: kicadfiles.MM(50), Y: kicadfiles.MM(50)}
+	file := &schematic.SchematicFile{Symbols: []schematic.SchematicSymbol{{
+		Reference:  "X1",
+		LibraryID:  "Custom:PinOnly",
+		Position:   origin,
+		Pins:       []schematic.SymbolPin{{Number: "1"}},
+		PinAnchors: []kicadfiles.Point{origin},
+	}}}
+	_, result := AdaptSchematic(file)
+	if len(result.Components) != 1 {
+		t.Fatalf("components = %#v", result.Components)
+	}
+	component := result.Components[0]
+	want := Rect{
+		MinX: kicadfiles.MM(-1.27), MinY: kicadfiles.MM(-1.27),
+		MaxX: kicadfiles.MM(1.27), MaxY: kicadfiles.MM(1.27),
+	}
+	if !component.BodyKnown || component.Body != want {
+		t.Fatalf("origin pin body = %#v known=%t, want %#v", component.Body, component.BodyKnown, want)
+	}
+}
+
 func TestAdaptSchematicNormalizesRotatedPinAnchorsToLocalCoordinates(t *testing.T) {
 	file := &schematic.SchematicFile{Symbols: []schematic.SchematicSymbol{{
 		Reference:  "U1",

@@ -241,12 +241,13 @@ type Consumption struct {
 }
 
 type CandidateReport struct {
-	Fingerprint    string    `json:"fingerprint"`
-	TopologyHash   string    `json:"topology_hash"`
-	ComponentCount int       `json:"component_count"`
-	InternalNodes  int       `json:"internal_nodes"`
-	Status         Status    `json:"status"`
-	Attempts       []Attempt `json:"attempts"`
+	Fingerprint         string    `json:"fingerprint"`
+	TopologyHash        string    `json:"topology_hash"`
+	ActiveStructureHash string    `json:"active_structure_hash"`
+	ComponentCount      int       `json:"component_count"`
+	InternalNodes       int       `json:"internal_nodes"`
+	Status              Status    `json:"status"`
+	Attempts            []Attempt `json:"attempts"`
 }
 
 type Attempt struct {
@@ -297,12 +298,13 @@ type GraphChange struct {
 }
 
 type SelectedResult struct {
-	Fingerprint      string           `json:"fingerprint"`
-	TopologyHash     string           `json:"topology_hash"`
-	EvaluationHash   string           `json:"evaluation_hash"`
-	PhysicalHash     string           `json:"physical_hash,omitempty"`
-	SelectionSummary string           `json:"selection_summary"`
-	Ranking          SelectionRanking `json:"ranking"`
+	Fingerprint         string           `json:"fingerprint"`
+	TopologyHash        string           `json:"topology_hash"`
+	ActiveStructureHash string           `json:"active_structure_hash"`
+	EvaluationHash      string           `json:"evaluation_hash"`
+	PhysicalHash        string           `json:"physical_hash,omitempty"`
+	SelectionSummary    string           `json:"selection_summary"`
+	Ranking             SelectionRanking `json:"ranking"`
 }
 
 // SelectionRanking explains the deterministic comparison of every physically
@@ -310,19 +312,35 @@ type SelectedResult struct {
 type SelectionRanking struct {
 	Policy       string                     `json:"policy"`
 	Alternatives []RankedSelectionCandidate `json:"alternatives"`
+	Rejections   []SelectionRejection       `json:"rejections"`
 }
 
 type RankedSelectionCandidate struct {
 	Rank                  int     `json:"rank"`
 	Fingerprint           string  `json:"fingerprint"`
 	TopologyHash          string  `json:"topology_hash"`
+	ActiveStructureHash   string  `json:"active_structure_hash"`
 	EvaluationHash        string  `json:"evaluation_hash"`
+	PhysicalHash          string  `json:"physical_hash"`
 	ValueHash             string  `json:"value_hash"`
 	WorstNormalizedMargin float64 `json:"worst_normalized_margin"`
 	ComponentCount        int     `json:"component_count"`
 	InternalNodes         int     `json:"internal_nodes"`
 	TopologyRepairs       int     `json:"topology_repairs"`
 	Selected              bool    `json:"selected"`
+	Disposition           string  `json:"disposition"`
+	Reason                string  `json:"reason"`
+}
+
+// SelectionRejection preserves deterministic evidence for every evaluated
+// candidate that did not reach the physically ready ranking set.
+type SelectionRejection struct {
+	Fingerprint         string   `json:"fingerprint"`
+	TopologyHash        string   `json:"topology_hash"`
+	ActiveStructureHash string   `json:"active_structure_hash"`
+	Stage               string   `json:"stage"`
+	Codes               []string `json:"codes"`
+	EvidenceHashes      []string `json:"evidence_hashes"`
 }
 
 type Diagnostic struct {

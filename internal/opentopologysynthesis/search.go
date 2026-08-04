@@ -530,6 +530,18 @@ func SearchPrimitiveTopologies(ctx context.Context, requirement Requirement, inv
 		}
 	}
 
+	for topologyHash, candidate := range retainedTopology {
+		activeHash, err := ActiveStructureHash(candidate.Graph)
+		if err != nil {
+			rejections["active_structure_hash_failed"] = append(
+				rejections["active_structure_hash_failed"], topologyHash+":"+err.Error(),
+			)
+			delete(retainedTopology, topologyHash)
+			continue
+		}
+		candidate.ActiveStructureHash = activeHash
+		retainedTopology[topologyHash] = candidate
+	}
 	result.Candidates = make([]TopologyCandidate, 0, len(retainedTopology))
 	for _, candidate := range retainedTopology {
 		result.Candidates = append(result.Candidates, candidate)
@@ -4378,6 +4390,9 @@ func topologyHighSideTransconductanceRelationshipSeeds(
 	controlDevice := selectCurrentRelationshipPrimitive(
 		requirement, inventory, "npn_bjt", false, false,
 	)
+	bufferedDriveResistor := topologyPrimitiveClosestValue(
+		inventory.Primitives, "resistor", 10_000,
+	)
 	transconductance := requirementTransconductance(requirement)
 	if transconductance <= 0 || !finite(transconductance) {
 		return nil, Consumption{}, map[string][]string{}
@@ -4413,200 +4428,226 @@ func topologyHighSideTransconductanceRelationshipSeeds(
 		}
 		for _, supply := range supplies {
 			for _, reference := range references {
-				if ctx.Err() != nil ||
-					consumption.ExpandedStates >= policy.MaxExpandedStates ||
-					consumption.GeneratedGraphs >= policy.MaxGeneratedGraphs {
-					break
+				driveModes := []bool{false}
+				if controlDevice.Key != "" && bufferedDriveResistor.Key != "" {
+					driveModes = append(driveModes, true)
 				}
-				consumption.ExpandedStates++
-				state := initial
-				nextNode := func() string {
-					var node string
-					state, node = addRelationshipInternalNode(
-						state, requirement, inventoryByKey, &consumption,
-					)
-					return node
-				}
-				switchedSupply := supply
-				if protectedControl {
-					switchGate := nextNode()
-					if switchGate == "" {
-						continue
-					}
-					state = addRelationshipPrimitive(state, requirement, inventoryByKey, resistor,
-						topologyTwoTerminalPlacement(supply, switchGate), &consumption)
-					switchedSupply = nextNode()
-					if switchedSupply == "" {
-						continue
-					}
-					state = addRelationshipPrimitive(state, requirement, inventoryByKey, powerSwitch, []TerminalConnection{
-						{Terminal: "GATE", Node: switchGate},
-						{Terminal: "DRAIN", Node: switchedSupply},
-						{Terminal: "SOURCE", Node: supply},
-					}, &consumption)
-					permitBase := nextNode()
-					if permitBase == "" {
-						continue
-					}
-					for _, edge := range [][2]string{{activation, permitBase}, {permitBase, reference}} {
-						state = addRelationshipPrimitive(state, requirement, inventoryByKey, resistor,
-							topologyTwoTerminalPlacement(edge[0], edge[1]), &consumption)
-					}
-					state = addRelationshipPrimitive(state, requirement, inventoryByKey, controlDevice, []TerminalConnection{
-						{Terminal: "BASE", Node: permitBase},
-						{Terminal: "COLLECTOR", Node: switchGate},
-						{Terminal: "EMITTER", Node: reference},
-					}, &consumption)
-					faultBase := nextNode()
-					if faultBase == "" {
-						continue
-					}
-					for _, edge := range [][2]string{{fault, faultBase}, {faultBase, reference}} {
-						state = addRelationshipPrimitive(state, requirement, inventoryByKey, resistor,
-							topologyTwoTerminalPlacement(edge[0], edge[1]), &consumption)
-					}
-					state = addRelationshipPrimitive(state, requirement, inventoryByKey, controlDevice, []TerminalConnection{
-						{Terminal: "BASE", Node: faultBase},
-						{Terminal: "COLLECTOR", Node: permitBase},
-						{Terminal: "EMITTER", Node: reference},
-					}, &consumption)
-				}
-				passBase := nextNode()
-				if passBase == "" {
-					continue
-				}
-				emitterNodes := make([]string, 0, passDeviceCount)
-				for index := 0; index < passDeviceCount; index++ {
-					emitter := nextNode()
-					if emitter == "" {
+				for _, bufferedDrive := range driveModes {
+					if ctx.Err() != nil ||
+						consumption.ExpandedStates >= policy.MaxExpandedStates ||
+						consumption.GeneratedGraphs >= policy.MaxGeneratedGraphs {
 						break
 					}
-					emitterNodes = append(emitterNodes, emitter)
-					state = addRelationshipPrimitive(state, requirement, inventoryByKey, resistor,
-						topologyTwoTerminalPlacement(switchedSupply, emitter), &consumption)
-				}
-				if len(emitterNodes) != passDeviceCount {
-					continue
-				}
-				passCollector := nextNode()
-				if passCollector == "" {
-					continue
-				}
-				for _, emitter := range emitterNodes {
+					consumption.ExpandedStates++
+					state := initial
+					state.graph = CloneGraph(initial.graph)
+					state.operations = cloneGraphOperations(initial.operations)
+					nextNode := func() string {
+						var node string
+						state, node = addRelationshipInternalNode(
+							state, requirement, inventoryByKey, &consumption,
+						)
+						return node
+					}
+					switchedSupply := supply
+					if protectedControl {
+						switchGate := nextNode()
+						if switchGate == "" {
+							continue
+						}
+						state = addRelationshipPrimitive(state, requirement, inventoryByKey, resistor,
+							topologyTwoTerminalPlacement(supply, switchGate), &consumption)
+						switchedSupply = nextNode()
+						if switchedSupply == "" {
+							continue
+						}
+						state = addRelationshipPrimitive(state, requirement, inventoryByKey, powerSwitch, []TerminalConnection{
+							{Terminal: "GATE", Node: switchGate},
+							{Terminal: "DRAIN", Node: switchedSupply},
+							{Terminal: "SOURCE", Node: supply},
+						}, &consumption)
+						permitBase := nextNode()
+						if permitBase == "" {
+							continue
+						}
+						for _, edge := range [][2]string{{activation, permitBase}, {permitBase, reference}} {
+							state = addRelationshipPrimitive(state, requirement, inventoryByKey, resistor,
+								topologyTwoTerminalPlacement(edge[0], edge[1]), &consumption)
+						}
+						state = addRelationshipPrimitive(state, requirement, inventoryByKey, controlDevice, []TerminalConnection{
+							{Terminal: "BASE", Node: permitBase},
+							{Terminal: "COLLECTOR", Node: switchGate},
+							{Terminal: "EMITTER", Node: reference},
+						}, &consumption)
+						faultBase := nextNode()
+						if faultBase == "" {
+							continue
+						}
+						for _, edge := range [][2]string{{fault, faultBase}, {faultBase, reference}} {
+							state = addRelationshipPrimitive(state, requirement, inventoryByKey, resistor,
+								topologyTwoTerminalPlacement(edge[0], edge[1]), &consumption)
+						}
+						state = addRelationshipPrimitive(state, requirement, inventoryByKey, controlDevice, []TerminalConnection{
+							{Terminal: "BASE", Node: faultBase},
+							{Terminal: "COLLECTOR", Node: permitBase},
+							{Terminal: "EMITTER", Node: reference},
+						}, &consumption)
+					}
+					passBase := nextNode()
+					if passBase == "" {
+						continue
+					}
+					emitterNodes := make([]string, 0, passDeviceCount)
+					for index := 0; index < passDeviceCount; index++ {
+						emitter := nextNode()
+						if emitter == "" {
+							break
+						}
+						emitterNodes = append(emitterNodes, emitter)
+						state = addRelationshipPrimitive(state, requirement, inventoryByKey, resistor,
+							topologyTwoTerminalPlacement(switchedSupply, emitter), &consumption)
+					}
+					if len(emitterNodes) != passDeviceCount {
+						continue
+					}
+					passCollector := nextNode()
+					if passCollector == "" {
+						continue
+					}
+					for _, emitter := range emitterNodes {
+						state = addRelationshipPrimitive(
+							state,
+							requirement,
+							inventoryByKey,
+							passDevice,
+							[]TerminalConnection{
+								{Terminal: "BASE", Node: passBase},
+								{Terminal: "COLLECTOR", Node: passCollector},
+								{Terminal: "EMITTER", Node: emitter},
+							},
+							&consumption,
+						)
+					}
+					state = addRelationshipPrimitive(state, requirement, inventoryByKey, senseValues.shunt,
+						topologyTwoTerminalPlacement(passCollector, output), &consumption)
+					senseMinus := nextNode()
+					if senseMinus == "" {
+						continue
+					}
+					state = addRelationshipPrimitive(state, requirement, inventoryByKey, senseValues.input,
+						topologyTwoTerminalPlacement(output, senseMinus), &consumption)
+					sensePlus := nextNode()
+					if sensePlus == "" {
+						continue
+					}
+					state = addRelationshipPrimitive(state, requirement, inventoryByKey, senseValues.input,
+						topologyTwoTerminalPlacement(passCollector, sensePlus), &consumption)
+					state = addRelationshipPrimitive(state, requirement, inventoryByKey, senseValues.feedback,
+						topologyTwoTerminalPlacement(sensePlus, reference), &consumption)
+					senseOutput := nextNode()
+					if senseOutput == "" {
+						continue
+					}
+					state = addRelationshipPrimitive(state, requirement, inventoryByKey, senseValues.feedback,
+						topologyTwoTerminalPlacement(senseOutput, senseMinus), &consumption)
+					controlOutput := nextNode()
+					if controlOutput == "" {
+						continue
+					}
+					controllerMinus, controllerPlus := input, senseOutput
+					if bufferedDrive {
+						driverBase := nextNode()
+						if driverBase == "" {
+							continue
+						}
+						state = addRelationshipPrimitive(state, requirement, inventoryByKey, bufferedDriveResistor,
+							topologyTwoTerminalPlacement(controlOutput, driverBase), &consumption)
+						state = addRelationshipPrimitive(state, requirement, inventoryByKey, bufferedDriveResistor,
+							topologyTwoTerminalPlacement(switchedSupply, passBase), &consumption)
+						state = addRelationshipPrimitive(state, requirement, inventoryByKey, controlDevice, []TerminalConnection{
+							{Terminal: "BASE", Node: driverBase},
+							{Terminal: "COLLECTOR", Node: passBase},
+							{Terminal: "EMITTER", Node: reference},
+						}, &consumption)
+						controllerMinus, controllerPlus = senseOutput, input
+					} else {
+						state = addRelationshipPrimitive(state, requirement, inventoryByKey, resistor,
+							topologyTwoTerminalPlacement(controlOutput, passBase), &consumption)
+					}
 					state = addRelationshipPrimitive(
 						state,
 						requirement,
 						inventoryByKey,
-						passDevice,
+						senseAmplifier,
 						[]TerminalConnection{
-							{Terminal: "BASE", Node: passBase},
-							{Terminal: "COLLECTOR", Node: passCollector},
-							{Terminal: "EMITTER", Node: emitter},
+							{Terminal: "IN_MINUS", Node: senseMinus},
+							{Terminal: "IN_PLUS", Node: sensePlus},
+							{Terminal: "OUT", Node: senseOutput},
+							{Terminal: "V_MINUS", Node: reference},
+							{Terminal: "V_PLUS", Node: supply},
 						},
 						&consumption,
 					)
-				}
-				state = addRelationshipPrimitive(state, requirement, inventoryByKey, senseValues.shunt,
-					topologyTwoTerminalPlacement(passCollector, output), &consumption)
-				senseMinus := nextNode()
-				if senseMinus == "" {
-					continue
-				}
-				state = addRelationshipPrimitive(state, requirement, inventoryByKey, senseValues.input,
-					topologyTwoTerminalPlacement(output, senseMinus), &consumption)
-				sensePlus := nextNode()
-				if sensePlus == "" {
-					continue
-				}
-				state = addRelationshipPrimitive(state, requirement, inventoryByKey, senseValues.input,
-					topologyTwoTerminalPlacement(passCollector, sensePlus), &consumption)
-				state = addRelationshipPrimitive(state, requirement, inventoryByKey, senseValues.feedback,
-					topologyTwoTerminalPlacement(sensePlus, reference), &consumption)
-				senseOutput := nextNode()
-				if senseOutput == "" {
-					continue
-				}
-				state = addRelationshipPrimitive(state, requirement, inventoryByKey, senseValues.feedback,
-					topologyTwoTerminalPlacement(senseOutput, senseMinus), &consumption)
-				controlOutput := nextNode()
-				if controlOutput == "" {
-					continue
-				}
-				state = addRelationshipPrimitive(state, requirement, inventoryByKey, resistor,
-					topologyTwoTerminalPlacement(controlOutput, passBase), &consumption)
-				state = addRelationshipPrimitive(
-					state,
-					requirement,
-					inventoryByKey,
-					senseAmplifier,
-					[]TerminalConnection{
-						{Terminal: "IN_MINUS", Node: senseMinus},
-						{Terminal: "IN_PLUS", Node: sensePlus},
-						{Terminal: "OUT", Node: senseOutput},
-						{Terminal: "V_MINUS", Node: reference},
-						{Terminal: "V_PLUS", Node: supply},
-					},
-					&consumption,
-				)
-				state = addRelationshipPrimitive(
-					state,
-					requirement,
-					inventoryByKey,
-					controller,
-					[]TerminalConnection{
-						{Terminal: "IN_MINUS", Node: input},
-						{Terminal: "IN_PLUS", Node: senseOutput},
-						{Terminal: "OUT", Node: controlOutput},
-						{Terminal: "V_MINUS", Node: reference},
-						{Terminal: "V_PLUS", Node: supply},
-					},
-					&consumption,
-				)
-				if len(state.graph.Instances) > limits.MaxPrimitiveInstances ||
-					consumption.GeneratedGraphs > policy.MaxGeneratedGraphs {
-					continue
-				}
-				if issues := ValidateCompleteGraph(state.graph, inventory, limits); len(issues) != 0 {
-					for _, issue := range issues {
-						rejections[string(issue.Code)] = append(
-							rejections[string(issue.Code)],
-							issue.Path+":"+issue.Message,
-						)
+					state = addRelationshipPrimitive(
+						state,
+						requirement,
+						inventoryByKey,
+						controller,
+						[]TerminalConnection{
+							{Terminal: "IN_MINUS", Node: controllerMinus},
+							{Terminal: "IN_PLUS", Node: controllerPlus},
+							{Terminal: "OUT", Node: controlOutput},
+							{Terminal: "V_MINUS", Node: reference},
+							{Terminal: "V_PLUS", Node: supply},
+						},
+						&consumption,
+					)
+					if len(state.graph.Instances) > limits.MaxPrimitiveInstances ||
+						consumption.GeneratedGraphs > policy.MaxGeneratedGraphs {
+						continue
 					}
-					continue
-				}
-				if state.score.BehaviorGap != 0 {
-					rejections["relationship_gap"] = append(
-						rejections["relationship_gap"],
-						fmt.Sprintf("%s:gap=%d", state.hash, state.score.BehaviorGap),
-					)
-					continue
-				}
-				normalized, err := NormalizeGraph(state.graph)
-				if err != nil {
-					rejections["canonical_normalization_failed"] = append(
-						rejections["canonical_normalization_failed"], err.Error(),
-					)
-					continue
-				}
-				topologyHash, err := TopologyHash(normalized)
-				if err != nil {
-					rejections["canonical_topology_hash_failed"] = append(
-						rejections["canonical_topology_hash_failed"], err.Error(),
-					)
-					continue
-				}
-				consumption.CompleteGraphs++
-				candidate := TopologyCandidate{
-					Fingerprint:  state.hash,
-					TopologyHash: topologyHash,
-					Score:        state.score,
-					Graph:        normalized,
-					Operations:   cloneGraphOperations(state.operations),
-				}
-				if existing, found := retained[topologyHash]; !found ||
-					compareTopologyCandidates(candidate, existing) < 0 {
-					retained[topologyHash] = candidate
+					if issues := ValidateCompleteGraph(state.graph, inventory, limits); len(issues) != 0 {
+						for _, issue := range issues {
+							rejections[string(issue.Code)] = append(
+								rejections[string(issue.Code)],
+								issue.Path+":"+issue.Message,
+							)
+						}
+						continue
+					}
+					if state.score.BehaviorGap != 0 {
+						rejections["relationship_gap"] = append(
+							rejections["relationship_gap"],
+							fmt.Sprintf("%s:gap=%d", state.hash, state.score.BehaviorGap),
+						)
+						continue
+					}
+					normalized, err := NormalizeGraph(state.graph)
+					if err != nil {
+						rejections["canonical_normalization_failed"] = append(
+							rejections["canonical_normalization_failed"], err.Error(),
+						)
+						continue
+					}
+					topologyHash, err := TopologyHash(normalized)
+					if err != nil {
+						rejections["canonical_topology_hash_failed"] = append(
+							rejections["canonical_topology_hash_failed"], err.Error(),
+						)
+						continue
+					}
+					consumption.CompleteGraphs++
+					candidate := TopologyCandidate{
+						Fingerprint:  state.hash,
+						TopologyHash: topologyHash,
+						Score:        state.score,
+						Graph:        normalized,
+						Operations:   cloneGraphOperations(state.operations),
+					}
+					if existing, found := retained[topologyHash]; !found ||
+						compareTopologyCandidates(candidate, existing) < 0 {
+						retained[topologyHash] = candidate
+					}
 				}
 			}
 		}

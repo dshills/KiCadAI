@@ -24,10 +24,11 @@ type SynthesisRun struct {
 }
 
 type SynthesisCandidateEvidence struct {
-	Fingerprint  string                   `json:"fingerprint"`
-	TopologyHash string                   `json:"topology_hash"`
-	ValuePlan    ValueSearchPlan          `json:"value_plan"`
-	Evaluations  []SimulationEvaluation   `json:"evaluations"`
-	Repair       *RepairSearchResult      `json:"repair,omitempty"`
-	Physical     []PhysicalLoweringResult `json:"physical"`
+	Fingerprint         string                   `json:"fingerprint"`
+	TopologyHash        string                   `json:"topology_hash"`
+	ActiveStructureHash string                   `json:"active_structure_hash"`
+	ValuePlan           ValueSearchPlan          `json:"value_plan"`
+	Evaluations         []SimulationEvaluation   `json:"evaluations"`
+	Repair              *RepairSearchResult      `json:"repair,omitempty"`
+	Physical            []PhysicalLoweringResult `json:"physical"`
 }

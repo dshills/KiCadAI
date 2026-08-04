@@ -42,6 +42,13 @@ func AdaptSchematic(file *schematic.SchematicFile) (Request, Result) {
 		component.Stage = StageForRole(component.Role)
 		component.Lane = LaneForRole(component.Role)
 		component.Pins = pinsFromSymbol(symbol)
+		if !component.BodyKnown {
+			if body, ok := schematicPinEnvelopeBody(symbol); ok {
+				component.Body = body
+				component.BodyKnown = true
+				component.GeometrySource = GeometrySourceExplicitPinEnvelope
+			}
+		}
 		placed := PlacedComponent{Component: component, PlacedAt: symbol.Position}
 		placed.ReferenceText = textBoxFromProperty(symbol.Properties, "Reference", symbol.Position)
 		placed.ValueText = textBoxFromProperty(symbol.Properties, "Value", symbol.Position)
@@ -67,6 +74,30 @@ func AdaptSchematic(file *schematic.SchematicFile) (Request, Result) {
 		result.Junctions = append(result.Junctions, Junction{Position: junction.Position})
 	}
 	return request, NormalizeResult(result, request.Rules)
+}
+
+func schematicPinEnvelopeBody(symbol schematic.SchematicSymbol) (Rect, bool) {
+	var body Rect
+	for index, anchor := range symbol.PinAnchors {
+		relative := InverseTransformPoint(kicadfiles.Point{
+			X: anchor.X - symbol.Position.X,
+			Y: anchor.Y - symbol.Position.Y,
+		}, symbol.Rotation, Mirror(symbol.Mirror))
+		if index == 0 {
+			body = Rect{MinX: relative.X, MinY: relative.Y, MaxX: relative.X, MaxY: relative.Y}
+			continue
+		}
+		body.MinX = minIU(body.MinX, relative.X)
+		body.MinY = minIU(body.MinY, relative.Y)
+		body.MaxX = maxIU(body.MaxX, relative.X)
+		body.MaxY = maxIU(body.MaxY, relative.Y)
+	}
+	if len(symbol.PinAnchors) == 0 {
+		return Rect{}, false
+	}
+	// Recovered anchor membership, rather than a zero Point sentinel, makes a
+	// legitimate pin at the symbol-local origin unambiguous.
+	return body.Inflate(kicadfiles.MM(1.27)), true
 }
 
 func schematicSymbolComponentRef(reference string, unit int) string {

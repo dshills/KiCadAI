@@ -32,12 +32,13 @@ type TopologySearchResult struct {
 }
 
 type TopologyCandidate struct {
-	Fingerprint  string           `json:"fingerprint"`
-	TopologyHash string           `json:"topology_hash"`
-	Repairable   bool             `json:"repairable,omitempty"`
-	Score        TopologyScore    `json:"score"`
-	Graph        CandidateGraph   `json:"graph"`
-	Operations   []GraphOperation `json:"operations"`
+	Fingerprint         string           `json:"fingerprint"`
+	TopologyHash        string           `json:"topology_hash"`
+	ActiveStructureHash string           `json:"active_structure_hash"`
+	Repairable          bool             `json:"repairable,omitempty"`
+	Score               TopologyScore    `json:"score"`
+	Graph               CandidateGraph   `json:"graph"`
+	Operations          []GraphOperation `json:"operations"`
 }
 
 type TopologyScore struct {

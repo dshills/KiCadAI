@@ -4275,6 +4275,35 @@ func deriveTransconductanceTopologyScales(
 				Priority:   1,
 			}}
 		}
+		for _, driver := range graph.Instances {
+			if driver.Kind != "npn_bjt" {
+				continue
+			}
+			driverTerminals := topologyTerminalNodes(driver)
+			if driverTerminals["COLLECTOR"] != passTerminals["BASE"] ||
+				driverTerminals["EMITTER"] != reference {
+				continue
+			}
+			for _, active := range graph.Instances {
+				if active.Kind != "opamp" {
+					continue
+				}
+				activeTerminals := topologyTerminalNodes(active)
+				if instance.ID != between(activeTerminals["OUT"], driverTerminals["BASE"]) {
+					continue
+				}
+				return []AnalyticScale{{
+					ID:         "topology:buffered_pass_device_drive:" + instance.ID,
+					Kind:       "resistance",
+					ValueSI:    10_000,
+					Unit:       "ohm",
+					Derivation: "buffered pass-device drive limits controller and discrete-driver base current",
+					SourceKind: "candidate_topology",
+					SourceID:   driver.ID,
+					Priority:   1,
+				}}
+			}
+		}
 		for _, active := range graph.Instances {
 			if active.Kind != "opamp" {
 				continue

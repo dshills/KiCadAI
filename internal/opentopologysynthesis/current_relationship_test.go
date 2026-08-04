@@ -42,6 +42,88 @@ func TestRegulatedCurrentRelationshipsDeriveIndependentControls(t *testing.T) {
 	}
 }
 
+func TestHighSideCurrentRelationshipProducesMateriallyDistinctDriveArchitectures(t *testing.T) {
+	requirement, issues := DecodeStrict(bytes.NewReader(mustRead(
+		t,
+		filepath.Join(architectureGeneralizationCorpusRoot(), "protected_programmable_current_output.json"),
+	)))
+	if len(issues) != 0 {
+		t.Fatalf("requirement decode issues: %#v", issues)
+	}
+	inventory, _ := testHeldOutSynthesisEnvironment(t)
+	initial, graphIssues := InitialGraph(requirement)
+	if len(graphIssues) != 0 {
+		t.Fatalf("initial graph issues: %#v", graphIssues)
+	}
+	hash, err := GraphHash(initial)
+	if err != nil {
+		t.Fatal(err)
+	}
+	topology, err := TopologyHash(initial)
+	if err != nil {
+		t.Fatal(err)
+	}
+	byKey := primitiveInventoryByKey(inventory)
+	state := topologySearchState{
+		graph: initial, hash: hash, topology: topology,
+		score: scoreTopologyGraph(requirement, initial, byKey, hash),
+	}
+	policy := DefaultPolicy()
+	policy.MaxExpandedStates = 16
+	policy.MaxGeneratedGraphs = 128
+	candidates, consumption, rejections := topologyHighSideTransconductanceRelationshipSeeds(
+		context.Background(), requirement, inventory,
+		topologyRepresentatives(requirement, inventory), byKey,
+		GraphLimits{MaxPrimitiveInstances: policy.MaxPrimitiveInstances, MaxInternalNodes: policy.MaxInternalNodes},
+		policy, state,
+	)
+	if len(candidates) != 2 {
+		t.Fatalf("high-side current architectures = %d, consumption=%#v rejections=%#v", len(candidates), consumption, rejections)
+	}
+	activeStructures := map[string]bool{}
+	direct, buffered := false, false
+	for _, candidate := range candidates {
+		activeHash, err := ActiveStructureHash(candidate.Graph)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if activeHash == "" || activeStructures[activeHash] {
+			t.Fatalf("active structure hash = %q, existing=%v", activeHash, activeStructures)
+		}
+		activeStructures[activeHash] = true
+		npnCount := 0
+		for _, instance := range candidate.Graph.Instances {
+			if instance.Kind == "npn_bjt" {
+				npnCount++
+			}
+		}
+		plan := BuildValueSearchPlan(requirement, candidate.Graph, inventory, policy)
+		if plan.Status != ValuePlanReady {
+			t.Fatalf("current architecture value plan = %#v", plan)
+		}
+		switch npnCount {
+		case 0:
+			direct = true
+		case 1:
+			buffered = true
+			scaleFound := false
+			for _, domain := range plan.Domains {
+				for _, scale := range domain.AnalyticScales {
+					scaleFound = scaleFound || strings.HasPrefix(scale.ID, "topology:buffered_pass_device_drive:")
+				}
+			}
+			if !scaleFound {
+				t.Fatal("buffered current architecture lacks derived drive-current resistance")
+			}
+		default:
+			t.Fatalf("unexpected buffered-driver count %d", npnCount)
+		}
+	}
+	if !direct || !buffered {
+		t.Fatalf("direct/buffered current architectures = %t/%t", direct, buffered)
+	}
+}
+
 func TestLowSideTransconductanceRelationshipBuildsRegulatedProtectedPath(t *testing.T) {
 	requirement, issues := DecodeStrict(bytes.NewReader(mustRead(
 		t,
@@ -229,17 +311,32 @@ func TestHighSideTransconductanceRelationshipBuildsStartupSafeFaultDominantPath(
 		GraphLimits{MaxPrimitiveInstances: policy.MaxPrimitiveInstances, MaxInternalNodes: policy.MaxInternalNodes},
 		policy, state,
 	)
-	if len(candidates) == 0 {
+	if len(candidates) != 2 {
 		t.Fatalf("high-side regulated-current relationship produced no candidates: consumption=%#v rejections=%#v", consumption, rejections)
 	}
+	directFound, bufferedFound := false, false
+	activeStructures := map[string]bool{}
 	for _, candidate := range candidates {
 		counts := map[string]int{}
 		for _, instance := range candidate.Graph.Instances {
 			counts[instance.Kind]++
 		}
-		if candidate.Score.BehaviorGap != 0 || len(candidate.Graph.Instances) != 20 ||
-			counts["opamp"] != 2 || counts["pnp_bjt"] != 2 || counts["npn_bjt"] != 2 ||
-			counts["p_channel_mosfet"] != 1 || counts["resistor"] != 13 {
+		bufferedDrive := counts["npn_bjt"] == 3
+		wantInstances, wantNPN, wantResistors := 20, 2, 13
+		if bufferedDrive {
+			wantInstances, wantNPN, wantResistors = 22, 3, 14
+			bufferedFound = true
+		} else {
+			directFound = true
+		}
+		activeHash, err := ActiveStructureHash(candidate.Graph)
+		if err != nil || activeHash == "" || activeStructures[activeHash] {
+			t.Fatalf("high-side active structure = %q err=%v existing=%v", activeHash, err, activeStructures)
+		}
+		activeStructures[activeHash] = true
+		if candidate.Score.BehaviorGap != 0 || len(candidate.Graph.Instances) != wantInstances ||
+			counts["opamp"] != 2 || counts["pnp_bjt"] != 2 || counts["npn_bjt"] != wantNPN ||
+			counts["p_channel_mosfet"] != 1 || counts["resistor"] != wantResistors {
 			t.Fatalf("high-side regulated-current graph score=%#v counts=%v topology=%s",
 				candidate.Score, counts, testGraphTopologySummary(candidate.Graph))
 		}
@@ -247,7 +344,8 @@ func TestHighSideTransconductanceRelationshipBuildsStartupSafeFaultDominantPath(
 		if plan.Status != ValuePlanReady {
 			t.Fatalf("high-side value plan = %#v", plan)
 		}
-		sense, differentialInput, differentialFeedback, drive, control := 0, 0, 0, 0, 0
+		sense, differentialInput, differentialFeedback := 0, 0, 0
+		drive, bufferedDriveScale, bias, control := 0, 0, 0, 0
 		for _, domain := range plan.Domains {
 			for _, scale := range domain.AnalyticScales {
 				switch {
@@ -264,14 +362,23 @@ func TestHighSideTransconductanceRelationshipBuildsStartupSafeFaultDominantPath(
 						t.Fatalf("derived high-side base drive scale=%g candidates=%#v", scale.ValueSI, domain.Candidates)
 					}
 					drive++
+				case strings.HasPrefix(scale.ID, "topology:buffered_pass_device_drive:") && scale.ValueSI == 10_000:
+					bufferedDriveScale++
+				case strings.HasPrefix(scale.ID, "topology:pass_device_bias:") && scale.ValueSI == 10_000:
+					bias++
 				case strings.HasPrefix(scale.ID, "topology:protected_current_control:") && scale.ValueSI == 10_000:
 					control++
 				}
 			}
 		}
-		if sense != 1 || differentialInput != 2 || differentialFeedback != 2 || drive != 1 || control != 5 {
-			t.Fatalf("role-aware high-side scales: sense=%d input=%d feedback=%d drive=%d control=%d",
-				sense, differentialInput, differentialFeedback, drive, control)
+		wantDrive, wantBufferedDrive, wantBias := 1, 0, 0
+		if bufferedDrive {
+			wantDrive, wantBufferedDrive, wantBias = 0, 1, 1
+		}
+		if sense != 1 || differentialInput != 2 || differentialFeedback != 2 ||
+			drive != wantDrive || bufferedDriveScale != wantBufferedDrive || bias != wantBias || control != 5 {
+			t.Fatalf("role-aware high-side scales: sense=%d input=%d feedback=%d drive=%d buffered=%d bias=%d control=%d",
+				sense, differentialInput, differentialFeedback, drive, bufferedDriveScale, bias, control)
 		}
 		if raw := os.Getenv("KICADAI_OPEN_TOPOLOGY_DIAGNOSTIC_TRIALS"); raw != "" {
 			maximum, err := strconv.Atoi(raw)
@@ -314,5 +421,8 @@ func TestHighSideTransconductanceRelationshipBuildsStartupSafeFaultDominantPath(
 				}
 			}
 		}
+	}
+	if !directFound || !bufferedFound {
+		t.Fatalf("high-side direct/buffered architectures = %t/%t", directFound, bufferedFound)
 	}
 }

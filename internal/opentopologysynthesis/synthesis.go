@@ -105,20 +105,22 @@ func Synthesize(
 	for candidateIndex, candidate := range run.Search.Candidates {
 		plan := BuildValueSearchPlan(requirement, candidate.Graph, inventory, policy)
 		evidence := SynthesisCandidateEvidence{
-			Fingerprint:  candidate.Fingerprint,
-			TopologyHash: candidate.TopologyHash,
-			ValuePlan:    plan,
-			Evaluations:  []SimulationEvaluation{},
-			Physical:     []PhysicalLoweringResult{},
+			Fingerprint:         candidate.Fingerprint,
+			TopologyHash:        candidate.TopologyHash,
+			ActiveStructureHash: candidate.ActiveStructureHash,
+			ValuePlan:           plan,
+			Evaluations:         []SimulationEvaluation{},
+			Physical:            []PhysicalLoweringResult{},
 		}
 		run.Candidates = append(run.Candidates, evidence)
 		run.Report.Candidates = append(run.Report.Candidates, CandidateReport{
-			Fingerprint:    candidate.Fingerprint,
-			TopologyHash:   candidate.TopologyHash,
-			ComponentCount: len(candidate.Graph.Instances),
-			InternalNodes:  internalNodeCount(candidate.Graph),
-			Status:         StatusFailed,
-			Attempts:       []Attempt{},
+			Fingerprint:         candidate.Fingerprint,
+			TopologyHash:        candidate.TopologyHash,
+			ActiveStructureHash: candidate.ActiveStructureHash,
+			ComponentCount:      len(candidate.Graph.Instances),
+			InternalNodes:       internalNodeCount(candidate.Graph),
+			Status:              StatusFailed,
+			Attempts:            []Attempt{},
 		})
 		if plan.Status != ValuePlanReady {
 			run.Report.Candidates[candidateIndex].Status = statusForValuePlan(plan.Status)
@@ -366,7 +368,7 @@ func synthesisCandidateEvaluationOrder(
 	return order
 }
 
-const synthesisSelectionRankingPolicy = "worst_normalized_requirement_margin_desc,topology_repairs_asc,component_count_asc,internal_nodes_asc,topology_hash_asc,evaluation_hash_asc,value_hash_asc"
+const synthesisSelectionRankingPolicy = "worst_normalized_requirement_margin_desc,topology_repairs_asc,component_count_asc,internal_nodes_asc,active_structure_hash_asc,topology_hash_asc,evaluation_hash_asc,value_hash_asc"
 
 func selectRankedSynthesisResult(run SynthesisRun, passes []synthesisPassingCandidate) SynthesisRun {
 	passes = bestSynthesisPasses(passes)
@@ -387,24 +389,35 @@ func selectRankedSynthesisResult(run SynthesisRun, passes []synthesisPassingCand
 		if candidate.trial != nil && candidate.trial.Hash != "" {
 			valueHash = candidate.trial.Hash
 		}
+		disposition := "not_selected"
+		reason := synthesisRankingDifference(selected, candidate)
+		if index == 0 {
+			disposition = "selected"
+			reason = "highest deterministic rank among simulation-passing, physically ready architectures"
+		}
 		alternatives = append(alternatives, RankedSelectionCandidate{
 			Rank:                  index + 1,
 			Fingerprint:           run.Report.Candidates[candidate.candidateIndex].Fingerprint,
 			TopologyHash:          mustTopologyHash(candidate.graph),
+			ActiveStructureHash:   mustActiveStructureHash(candidate.graph),
 			EvaluationHash:        candidate.evaluation.Hash,
+			PhysicalHash:          candidate.physical.Hash,
 			ValueHash:             valueHash,
 			WorstNormalizedMargin: candidate.margin,
 			ComponentCount:        len(candidate.graph.Instances),
 			InternalNodes:         internalNodeCount(candidate.graph),
 			TopologyRepairs:       candidate.repairCount,
 			Selected:              index == 0,
+			Disposition:           disposition,
+			Reason:                reason,
 		})
 	}
 	run.Report.Selected = &SelectedResult{
-		Fingerprint:    run.Report.Candidates[selected.candidateIndex].Fingerprint,
-		TopologyHash:   mustTopologyHash(selected.graph),
-		EvaluationHash: selected.evaluation.Hash,
-		PhysicalHash:   selected.physical.Hash,
+		Fingerprint:         run.Report.Candidates[selected.candidateIndex].Fingerprint,
+		TopologyHash:        mustTopologyHash(selected.graph),
+		ActiveStructureHash: mustActiveStructureHash(selected.graph),
+		EvaluationHash:      selected.evaluation.Hash,
+		PhysicalHash:        selected.physical.Hash,
 		SelectionSummary: fmt.Sprintf(
 			"selected rank 1 of %d physically ready architectures: worst normalized requirement margin %.9g, %d topology repairs, %d components, and %d internal nodes; deterministic tie-breakers use topology, evaluation, and value hashes",
 			len(passes), selected.margin, selected.repairCount,
@@ -413,6 +426,7 @@ func selectRankedSynthesisResult(run SynthesisRun, passes []synthesisPassingCand
 		Ranking: SelectionRanking{
 			Policy:       synthesisSelectionRankingPolicy,
 			Alternatives: alternatives,
+			Rejections:   synthesisSelectionRejections(run, passes),
 		},
 	}
 	return finalizeSynthesisRun(run)
@@ -439,10 +453,115 @@ func compareSynthesisPasses(left, right synthesisPassingCandidate) int {
 		cmp.Compare(left.repairCount, right.repairCount),
 		cmp.Compare(len(left.graph.Instances), len(right.graph.Instances)),
 		cmp.Compare(internalNodeCount(left.graph), internalNodeCount(right.graph)),
+		cmp.Compare(mustActiveStructureHash(left.graph), mustActiveStructureHash(right.graph)),
 		cmp.Compare(mustTopologyHash(left.graph), mustTopologyHash(right.graph)),
 		cmp.Compare(left.evaluation.Hash, right.evaluation.Hash),
 		cmp.Compare(synthesisValueHash(left), synthesisValueHash(right)),
 	)
+}
+
+func synthesisRankingDifference(winner, candidate synthesisPassingCandidate) string {
+	switch {
+	case candidate.margin < winner.margin:
+		return "not selected: lower worst normalized requirement margin"
+	case candidate.repairCount > winner.repairCount:
+		return "not selected: more topology repairs"
+	case len(candidate.graph.Instances) > len(winner.graph.Instances):
+		return "not selected: greater component count after equal safety margin and repair count"
+	case internalNodeCount(candidate.graph) > internalNodeCount(winner.graph):
+		return "not selected: greater internal-node count after equal higher-priority criteria"
+	case mustActiveStructureHash(candidate.graph) != mustActiveStructureHash(winner.graph):
+		return "not selected: deterministic active-structure-hash tie-break"
+	case mustTopologyHash(candidate.graph) != mustTopologyHash(winner.graph):
+		return "not selected: deterministic topology-hash tie-break"
+	case candidate.evaluation.Hash != winner.evaluation.Hash:
+		return "not selected: deterministic evaluation-hash tie-break"
+	default:
+		return "not selected: deterministic value-hash tie-break"
+	}
+}
+
+func synthesisSelectionRejections(
+	run SynthesisRun,
+	passes []synthesisPassingCandidate,
+) []SelectionRejection {
+	physicallyReady := map[int]bool{}
+	for _, candidate := range passes {
+		physicallyReady[candidate.candidateIndex] = true
+	}
+	result := []SelectionRejection{}
+	for index, candidate := range run.Candidates {
+		if physicallyReady[index] {
+			continue
+		}
+		rejection := SelectionRejection{
+			Fingerprint:         candidate.Fingerprint,
+			TopologyHash:        candidate.TopologyHash,
+			ActiveStructureHash: candidate.ActiveStructureHash,
+			Stage:               "simulation",
+		}
+		if candidate.ValuePlan.Status != ValuePlanReady {
+			rejection.Stage = "value_search"
+			for _, issue := range candidate.ValuePlan.Issues {
+				rejection.Codes = append(rejection.Codes, string(issue.Code))
+			}
+			for _, value := range candidate.ValuePlan.Rejections {
+				rejection.Codes = append(rejection.Codes, value.Code)
+			}
+		} else if len(candidate.Evaluations) == 0 {
+			rejection.Codes = append(rejection.Codes, "not_evaluated_within_budget")
+		}
+		for _, evaluation := range candidate.Evaluations {
+			if evaluation.Hash != "" {
+				rejection.EvidenceHashes = append(rejection.EvidenceHashes, evaluation.Hash)
+			}
+			for _, diagnosis := range evaluation.Diagnoses {
+				rejection.Codes = append(rejection.Codes, diagnosis.Code)
+				if diagnosis.EvidenceHash != "" {
+					rejection.EvidenceHashes = append(rejection.EvidenceHashes, diagnosis.EvidenceHash)
+				}
+			}
+			for _, issue := range evaluation.Issues {
+				rejection.Codes = append(rejection.Codes, string(issue.Code))
+			}
+		}
+		if len(candidate.Physical) != 0 {
+			rejection.Stage = "physical_lowering"
+			for _, physical := range candidate.Physical {
+				if physical.Hash != "" {
+					rejection.EvidenceHashes = append(rejection.EvidenceHashes, physical.Hash)
+				}
+				for _, issue := range physical.Issues {
+					rejection.Codes = append(rejection.Codes, string(issue.Code))
+				}
+			}
+		}
+		if candidate.Repair != nil {
+			rejection.Stage = "repair"
+			if candidate.Repair.Hash != "" {
+				rejection.EvidenceHashes = append(rejection.EvidenceHashes, candidate.Repair.Hash)
+			}
+			for _, issue := range candidate.Repair.Issues {
+				rejection.Codes = append(rejection.Codes, string(issue.Code))
+			}
+		}
+		if len(rejection.Codes) == 0 {
+			rejection.Codes = append(rejection.Codes, "not_physically_ready")
+		}
+		slices.Sort(rejection.Codes)
+		rejection.Codes = slices.Compact(rejection.Codes)
+		slices.Sort(rejection.EvidenceHashes)
+		rejection.EvidenceHashes = slices.Compact(rejection.EvidenceHashes)
+		result = append(result, rejection)
+	}
+	slices.SortFunc(result, func(left, right SelectionRejection) int {
+		return cmp.Or(
+			cmp.Compare(left.ActiveStructureHash, right.ActiveStructureHash),
+			cmp.Compare(left.TopologyHash, right.TopologyHash),
+			cmp.Compare(left.Fingerprint, right.Fingerprint),
+		)
+	})
+	return result
 }
 
 func synthesisValueHash(candidate synthesisPassingCandidate) string {
@@ -658,9 +777,15 @@ func mustTopologyHash(graph CandidateGraph) string {
 	return hash
 }
 
+func mustActiveStructureHash(graph CandidateGraph) string {
+	hash, _ := ActiveStructureHash(graph)
+	return hash
+}
+
 func finalizeSynthesisRun(run SynthesisRun) SynthesisRun {
 	if run.Report.Status == StatusPassed &&
-		(run.SelectedGraph == nil || run.Physical == nil ||
+		(run.Report.Selected == nil || run.Report.Selected.ActiveStructureHash == "" ||
+			run.SelectedGraph == nil || run.Physical == nil ||
 			run.Physical.Status != PhysicalLoweringReady) {
 		run.Report.Status = StatusFailed
 		run.Report.StopReason = StopNoPassingGraph
