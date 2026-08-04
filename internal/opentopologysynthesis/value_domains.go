@@ -1655,24 +1655,28 @@ func deriveBandpassTopologyScales(
 		return ""
 	}
 	reference := referenceNodeForDomain(graph, envelope.input)
+	const neutralFilterResistanceAnchor = 10_000.0
+	resistanceAnchor := neutralFilterResistanceAnchor
+	for _, port := range requirement.Requirements.Ports {
+		inputImpedanceMinimum := port.Electrical.InputImpedanceMinOhm
+		if port.ID == envelope.input.ID && inputImpedanceMinimum != nil {
+			resistanceAnchor = math.Max(resistanceAnchor, 1.5**inputImpedanceMinimum)
+		}
+	}
 	type stage struct {
 		kind                string
 		filterNode          string
 		resistor, capacitor string
 	}
 	stages := []stage{}
-	for _, active := range graph.Instances {
-		if active.Kind != "opamp" {
+	for _, node := range graph.Nodes {
+		if node.Scope != "internal" {
 			continue
 		}
-		terminals := topologyTerminalNodes(active)
-		if terminals["OUT"] != terminals["IN_MINUS"] {
-			continue
-		}
-		filterNode := terminals["IN_PLUS"]
+		filterNode := node.ID
 		shuntResistor := between("resistor", filterNode, reference)
 		shuntCapacitor := between("capacitor", filterNode, reference)
-		seriesResistor, seriesCapacitor := "", ""
+		seriesResistors, seriesCapacitors := []string{}, []string{}
 		for _, candidate := range graph.Instances {
 			if len(candidate.Terminals) != 2 {
 				continue
@@ -1690,105 +1694,199 @@ func deriveBandpassTopologyScales(
 			}
 			switch candidate.Kind {
 			case "resistor":
-				seriesResistor = candidate.ID
+				seriesResistors = append(seriesResistors, candidate.ID)
 			case "capacitor":
-				seriesCapacitor = candidate.ID
+				seriesCapacitors = append(seriesCapacitors, candidate.ID)
 			}
 		}
 		switch {
-		case shuntResistor != "" && seriesCapacitor != "":
-			stages = append(stages, stage{kind: "lower", filterNode: filterNode, resistor: shuntResistor, capacitor: seriesCapacitor})
-		case shuntCapacitor != "" && seriesResistor != "":
-			stages = append(stages, stage{kind: "upper", filterNode: filterNode, resistor: seriesResistor, capacitor: shuntCapacitor})
+		case shuntResistor != "" && len(seriesCapacitors) == 1:
+			stages = append(stages, stage{kind: "lower", filterNode: filterNode, resistor: shuntResistor, capacitor: seriesCapacitors[0]})
+		case shuntCapacitor != "" && len(seriesResistors) == 1:
+			stages = append(stages, stage{kind: "upper", filterNode: filterNode, resistor: seriesResistors[0], capacitor: shuntCapacitor})
 		}
 	}
 	lowerCount, upperCount := 0, 0
-	for _, candidate := range stages {
-		if candidate.kind == "lower" {
+	for _, filterStage := range stages {
+		if filterStage.kind == "lower" {
 			lowerCount++
 		} else {
 			upperCount++
 		}
 	}
-	for _, candidate := range stages {
+	for _, filterStage := range stages {
 		count := upperCount
-		if candidate.kind == "lower" {
+		if filterStage.kind == "lower" {
 			count = lowerCount
 		}
-		if count == 0 || (instance.ID != candidate.resistor && instance.ID != candidate.capacitor) {
+		if count == 0 || (instance.ID != filterStage.resistor && instance.ID != filterStage.capacitor) {
 			continue
 		}
-		totalAttenuation := math.Max(0.01, math.Min(0.99, envelope.rejectionMaximum*0.5))
+		// Higher-order cascades have enough passband headroom to reserve more
+		// rejection margin. A first-order side keeps twenty percent of the
+		// declared rejection bound in reserve; each additional pole tightens the
+		// target deterministically without using a named circuit family.
+		minimumOrder := max(1, min(lowerCount, upperCount))
+		marginFactor := 0.8 / float64(minimumOrder)
+		totalAttenuation := math.Max(0.01, math.Min(0.99, envelope.rejectionMaximum*marginFactor))
 		stageAttenuation := math.Pow(totalAttenuation, 1/float64(count))
 		factor := math.Sqrt(1/(stageAttenuation*stageAttenuation) - 1)
 		cutoff := envelope.upperHz / factor
 		cornerID := "upper"
-		if candidate.kind == "lower" {
+		if filterStage.kind == "lower" {
 			cutoff = envelope.lowerHz * factor
 			cornerID = "lower"
 		}
-		resistance, capacitance, found := catalogFixedRCPair(requirement, inventory, cutoff)
+		resistance, capacitance, found := catalogRCPair(requirement, inventory, cutoff, resistanceAnchor)
 		if !found {
 			return nil
 		}
-		if instance.ID == candidate.resistor {
+		if instance.ID == filterStage.resistor {
 			return []AnalyticScale{{
 				ID: "topology:bracketed_passband:" + cornerID + "_corner_resistance", Kind: "resistance", ValueSI: resistance, Unit: "ohm",
-				Derivation: "catalog-ranked R-C pair for the per-stage bounded rejection ratio", SourceKind: "candidate_topology", SourceID: candidate.filterNode, Priority: 1,
+				Derivation: "catalog-ranked R-C pair for the per-stage bounded rejection ratio", SourceKind: "candidate_topology", SourceID: filterStage.filterNode, Priority: 1,
 			}}
 		}
 		return []AnalyticScale{{
 			ID: "topology:bracketed_passband:" + cornerID + "_corner_capacitance", Kind: "capacitance", ValueSI: capacitance, Unit: "F",
-			Derivation: "catalog-ranked R-C pair for the per-stage bounded rejection ratio", SourceKind: "candidate_topology", SourceID: candidate.filterNode, Priority: 1,
+			Derivation: "catalog-ranked R-C pair for the per-stage bounded rejection ratio", SourceKind: "candidate_topology", SourceID: filterStage.filterNode, Priority: 1,
 		}}
+	}
+	recoveryGain := 0.0
+	recoveryGainReady := finite(envelope.passMinimum) && finite(envelope.passMaximum) &&
+		envelope.passMinimum > 0 && envelope.passMaximum > envelope.passMinimum
+	if recoveryGainReady {
+		// A single recovery stage raises the lower passband bound toward the
+		// center of its permitted span without targeting the maximum bound.
+		passbandMidpoint := (envelope.passMinimum + envelope.passMaximum) / 2
+		recoveryGain = passbandMidpoint / envelope.passMinimum
+		recoveryGainReady = finite(recoveryGain) && recoveryGain > 1
+	}
+	if instance.Kind == "resistor" && recoveryGainReady {
+		for _, active := range graph.Instances {
+			if active.Kind != "opamp" {
+				continue
+			}
+			terminals := topologyTerminalNodes(active)
+			if terminals["OUT"] == terminals["IN_MINUS"] {
+				continue
+			}
+			upper := between("resistor", terminals["OUT"], terminals["IN_MINUS"])
+			lower := between("resistor", terminals["IN_MINUS"], reference)
+			if instance.ID != upper && instance.ID != lower {
+				continue
+			}
+			lowerResistance, lowerFound := topologyCatalogResistanceClosest(
+				requirement, inventory, neutralFilterResistanceAnchor,
+			)
+			upperResistance, upperFound := topologyCatalogResistanceClosest(
+				requirement, inventory, lowerResistance*(recoveryGain-1),
+			)
+			if !lowerFound || !upperFound {
+				return nil
+			}
+			value := lowerResistance
+			id := "topology:bracketed_passband:recovery_gain_lower"
+			if instance.ID == upper {
+				value = upperResistance
+				id = "topology:bracketed_passband:recovery_gain_upper"
+			}
+			return []AnalyticScale{{
+				ID: id, Kind: "resistance", ValueSI: value, Unit: "ohm",
+				Derivation: "bounded passband gain span recovers catalog-quantized passive insertion loss",
+				SourceKind: "candidate_topology", SourceID: terminals["IN_MINUS"], Priority: 1,
+			}}
+		}
 	}
 	return nil
 }
 
-func catalogFixedRCPair(
+func catalogRCPair(
 	requirement Requirement,
 	inventory map[string]PrimitiveCandidate,
 	cutoffHz float64,
+	resistanceAnchor float64,
 ) (float64, float64, bool) {
-	if cutoffHz <= 0 {
+	if cutoffHz <= 0 || resistanceAnchor <= 0 {
 		return 0, 0, false
 	}
 	type choice struct {
 		value float64
 		key   string
 	}
-	resistors, capacitors := []choice{}, []choice{}
-	requiredAnalyses := requirementAnalysisSet(requirement)
-	for _, primitive := range inventory {
-		if primitive.ValueDomain == nil || !primitiveCoversAllAnalyses(primitive, requiredAnalyses) || !ratingsCoverRequirement(requirement, primitive) {
-			continue
+	valuesNear := func(primitive PrimitiveCandidate, target float64) []float64 {
+		if primitive.ValueDomain == nil || target <= 0 {
+			return nil
 		}
-		minimum, maximum, ok := effectiveValueRange(*primitive.ValueDomain)
-		if !ok || minimum != maximum {
+		domain := *primitive.ValueDomain
+		minimum, maximum, ok := effectiveValueRange(domain)
+		if !ok {
+			return nil
+		}
+		if minimum == maximum {
+			return []float64{minimum}
+		}
+		tolerance, proven := primitiveTolerancePercent(primitive, domain.Kind)
+		if requirement.Acceptance.RequireAllCorners && !proven {
+			return nil
+		}
+		values, issues := architecturesearch.PreferredValueCandidates(
+			target,
+			preferredSeriesForDomain(domain.Kind, tolerance, proven),
+			minimum,
+			maximum,
+			minPositive(8, architecturesearch.DefaultMaxValueCandidates),
+		)
+		if len(issues) != 0 {
+			return nil
+		}
+		return values
+	}
+	requiredAnalyses := requirementAnalysisSet(requirement)
+	eligibleResistors, eligibleCapacitors := []PrimitiveCandidate{}, []PrimitiveCandidate{}
+	for _, primitive := range inventory {
+		if primitive.ValueDomain == nil || !primitiveCoversAllAnalyses(primitive, requiredAnalyses) ||
+			!ratingsCoverRequirement(requirement, primitive) {
 			continue
 		}
 		switch primitive.Kind {
 		case "resistor":
-			resistors = append(resistors, choice{value: minimum, key: primitive.Key})
+			eligibleResistors = append(eligibleResistors, primitive)
 		case "capacitor":
-			capacitors = append(capacitors, choice{value: minimum, key: primitive.Key})
+			eligibleCapacitors = append(eligibleCapacitors, primitive)
 		}
 	}
-	sortChoices := func(values []choice) {
-		slices.SortFunc(values, func(left, right choice) int {
-			return cmp.Or(cmp.Compare(left.value, right.value), cmp.Compare(left.key, right.key))
-		})
+	resistors := []choice{}
+	for _, primitive := range eligibleResistors {
+		for _, value := range valuesNear(primitive, resistanceAnchor) {
+			resistors = append(resistors, choice{value: value, key: primitive.Key})
+		}
 	}
-	sortChoices(resistors)
-	sortChoices(capacitors)
-	bestResistance, bestCapacitance, bestError, bestKey := 0.0, 0.0, math.Inf(1), ""
+	bestResistance, bestCapacitance := 0.0, 0.0
+	bestScoreBucket := int64(math.MaxInt64)
+	bestError, bestAnchorError, bestKey := math.Inf(1), math.Inf(1), ""
 	for _, resistor := range resistors {
-		for _, capacitor := range capacitors {
-			actual := 1 / (2 * math.Pi * resistor.value * capacitor.value)
-			error := math.Abs(math.Log(actual / cutoffHz))
-			key := resistor.key + "|" + capacitor.key
-			if error < bestError || (error == bestError && (bestKey == "" || key < bestKey)) {
-				bestResistance, bestCapacitance, bestError, bestKey = resistor.value, capacitor.value, error, key
+		idealCapacitance := 1 / (2 * math.Pi * cutoffHz * resistor.value)
+		for _, primitive := range eligibleCapacitors {
+			for _, value := range valuesNear(primitive, idealCapacitance) {
+				actual := 1 / (2 * math.Pi * resistor.value * value)
+				error := math.Abs(math.Log(actual / cutoffHz))
+				anchorError := math.Abs(math.Log(resistor.value / resistanceAnchor))
+				// Keep impedance within a practical neighborhood of the declared
+				// input-loading anchor while making cutoff error the dominant term.
+				const impedancePenalty = 0.1
+				score := error + impedancePenalty*anchorError
+				// A nanounit bucket absorbs platform-level transcendental noise;
+				// exact error, anchor error, and catalog key resolve bucket ties.
+				const scoreResolution = 1e-9
+				scoreBucket := int64(math.Round(score / scoreResolution))
+				key := resistor.key + "|" + primitive.Key
+				if scoreBucket < bestScoreBucket || scoreBucket == bestScoreBucket &&
+					(error < bestError || error == bestError &&
+						(anchorError < bestAnchorError || anchorError == bestAnchorError && (bestKey == "" || key < bestKey))) {
+					bestResistance, bestCapacitance = resistor.value, value
+					bestScoreBucket, bestError, bestAnchorError, bestKey = scoreBucket, error, anchorError, key
+				}
 			}
 		}
 	}
@@ -2031,6 +2129,22 @@ func deriveRegulatedVoltageTopologyScales(
 			passTerminals := topologyTerminalNodes(passDevice)
 			if instance.ID == between(controllerTerminals["OUT"], passTerminals["BASE"]) {
 				return makeScale("topology:regulated_pass_drive", 100, "bounded series resistance isolates the controller from the nonlinear pass-device input", passDevice.ID)
+			}
+			for _, driver := range graph.Instances {
+				if driver.Kind != "pnp_bjt" {
+					continue
+				}
+				driverTerminals := topologyTerminalNodes(driver)
+				if driverTerminals["EMITTER"] != supplies[0] ||
+					driverTerminals["COLLECTOR"] != passTerminals["BASE"] {
+					continue
+				}
+				switch instance.ID {
+				case between(controllerTerminals["OUT"], driverTerminals["BASE"]):
+					return makeScale("topology:regulated_buffer_drive", 100, "bounded series resistance isolates the controller from an inserted active drive stage", driver.ID)
+				case between(supplies[0], driverTerminals["BASE"]):
+					return makeScale("topology:regulated_buffer_bias", 10_000, "bounded emitter-referenced bias preserves a defined active drive-stage state", driver.ID)
+				}
 			}
 			if instance.ID == between(passTerminals["BASE"], passTerminals["EMITTER"]) {
 				return makeScale("topology:regulated_pass_bleeder", 10_000, "bounded emitter-referenced base discharge preserves a defined pass-device off state", passDevice.ID)

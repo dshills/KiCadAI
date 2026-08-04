@@ -702,25 +702,48 @@ func topologyFrequencySelectiveRelationshipSeeds(
 						continue
 					}
 				}
-				state = add(state, controller, []TerminalConnection{
-					{Terminal: "IN_MINUS", Node: outputFeedback},
-					{Terminal: "IN_PLUS", Node: filtered},
-					{Terminal: "OUT", Node: output},
-					{Terminal: "V_MINUS", Node: lowRail},
-					{Terminal: "V_PLUS", Node: highRail},
-				})
+				feedbackConnection := TerminalConnection{Terminal: "IN_MINUS", Node: outputFeedback}
+				var added bool
+				state, added = addRelationshipActiveStage(
+					state, requirement, inventoryByKey,
+					relationshipActiveStage{
+						Primitive: controller,
+						Input:     TerminalConnection{Terminal: "IN_PLUS", Node: filtered},
+						Output:    TerminalConnection{Terminal: "OUT", Node: output},
+						Feedback:  &feedbackConnection,
+						Bias: []TerminalConnection{
+							{Terminal: "V_MINUS", Node: lowRail},
+							{Terminal: "V_PLUS", Node: highRail},
+						},
+					},
+					&consumption,
+				)
+				if !added {
+					continue
+				}
 				if enhancedQ {
 					state = add(state, resistor, topologyTwoTerminalPlacement(output, outputFeedback))
 					state = add(state, resistor, topologyTwoTerminalPlacement(outputFeedback, reference))
 					state = add(state, resistor, topologyTwoTerminalPlacement(output, divider))
 					state = add(state, resistor, topologyTwoTerminalPlacement(divider, reference))
-					state = add(state, controller, []TerminalConnection{
-						{Terminal: "IN_MINUS", Node: drivenReference},
-						{Terminal: "IN_PLUS", Node: divider},
-						{Terminal: "OUT", Node: drivenReference},
-						{Terminal: "V_MINUS", Node: lowRail},
-						{Terminal: "V_PLUS", Node: highRail},
-					})
+					bufferFeedback := TerminalConnection{Terminal: "IN_MINUS", Node: drivenReference}
+					state, added = addRelationshipActiveStage(
+						state, requirement, inventoryByKey,
+						relationshipActiveStage{
+							Primitive: controller,
+							Input:     TerminalConnection{Terminal: "IN_PLUS", Node: divider},
+							Output:    TerminalConnection{Terminal: "OUT", Node: drivenReference},
+							Feedback:  &bufferFeedback,
+							Bias: []TerminalConnection{
+								{Terminal: "V_MINUS", Node: lowRail},
+								{Terminal: "V_PLUS", Node: highRail},
+							},
+						},
+						&consumption,
+					)
+					if !added {
+						continue
+					}
 					bridgeReference = drivenReference
 				}
 				if enhancedQ {
@@ -770,25 +793,48 @@ func topologyFrequencySelectiveRelationshipSeeds(
 type bandpassBehaviorEnvelope struct {
 	input, output            Observation
 	lowerHz, passHz, upperHz float64
+	passMinimum, passMaximum float64
 	rejectionMaximum         float64
 }
 
 func topologyBandpassBehaviorEnvelope(requirement Requirement) (bandpassBehaviorEnvelope, bool) {
 	type response struct {
-		assertion BehavioralAssertion
-		frequency float64
-		minimum   float64
-		maximum   float64
-		hasMin    bool
-		hasMax    bool
+		assertion  BehavioralAssertion
+		excitation Observation
+		frequency  float64
+		minimum    float64
+		maximum    float64
+		hasMin     bool
+		hasMax     bool
+	}
+	resolveExcitation := func(assertion BehavioralAssertion) (Observation, bool) {
+		// An explicit assertion binding always wins, including requirements
+		// with multiple analog inputs. Inference is only for an omitted binding.
+		if assertion.Excitation != nil {
+			return *assertion.Excitation, true
+		}
+		inputs := []Observation{}
+		for _, port := range requirement.Requirements.Ports {
+			if port.Kind == "analog_voltage" && port.Direction == "sink" {
+				inputs = append(inputs, Observation{Kind: "port", ID: port.ID})
+			}
+		}
+		if len(inputs) != 1 {
+			return Observation{}, false
+		}
+		return inputs[0], true
 	}
 	responses := []response{}
 	for _, assertion := range requirement.Requirements.BehavioralRequirements {
 		if !slices.Contains([]string{"voltage_gain", "voltage_gain_at_frequency"}, assertion.Metric) ||
-			assertion.FrequencyHz == nil || *assertion.FrequencyHz <= 0 || assertion.Excitation == nil {
+			assertion.FrequencyHz == nil || *assertion.FrequencyHz <= 0 {
 			continue
 		}
-		item := response{assertion: assertion, frequency: *assertion.FrequencyHz}
+		excitation, found := resolveExcitation(assertion)
+		if !found {
+			continue
+		}
+		item := response{assertion: assertion, excitation: excitation, frequency: *assertion.FrequencyHz}
 		if assertion.Min != nil {
 			item.minimum, item.hasMin = *assertion.Min, true
 		}
@@ -810,6 +856,9 @@ func topologyBandpassBehaviorEnvelope(requirement Requirement) (bandpassBehavior
 			if !candidate.hasMax || candidate.maximum <= 0 || candidate.maximum >= pass.minimum {
 				continue
 			}
+			if candidate.excitation != pass.excitation || candidate.assertion.Observation != pass.assertion.Observation {
+				continue
+			}
 			if candidate.frequency < pass.frequency && (lower == nil || candidate.frequency > lower.frequency) {
 				lower = candidate
 			}
@@ -818,9 +867,14 @@ func topologyBandpassBehaviorEnvelope(requirement Requirement) (bandpassBehavior
 			}
 		}
 		if lower != nil && upper != nil {
+			passMaximum := math.Inf(1)
+			if pass.hasMax {
+				passMaximum = pass.maximum
+			}
 			return bandpassBehaviorEnvelope{
-				input: *pass.assertion.Excitation, output: pass.assertion.Observation,
+				input: pass.excitation, output: pass.assertion.Observation,
 				lowerHz: lower.frequency, passHz: pass.frequency, upperHz: upper.frequency,
+				passMinimum: pass.minimum, passMaximum: passMaximum,
 				rejectionMaximum: math.Min(lower.maximum, upper.maximum),
 			}, true
 		}
@@ -829,9 +883,10 @@ func topologyBandpassBehaviorEnvelope(requirement Requirement) (bandpassBehavior
 }
 
 // topologyBandpassRelationshipSeeds emits the dual of the existing rejected-
-// midband bridge: a passive lower-corner/high-corner cascade followed by one
-// catalog active buffer. The trigger and terminal relationships come only from
-// a preserved gain point bracketed by two stricter rejection points.
+// midband bridge: a passive lower-corner/high-corner cascade with catalog
+// active isolation between behavior-derived stages. The trigger and terminal
+// relationships come only from a preserved gain point bracketed by two
+// stricter rejection points.
 func topologyBandpassRelationshipSeeds(
 	ctx context.Context,
 	requirement Requirement,
@@ -866,7 +921,7 @@ func topologyBandpassRelationshipSeeds(
 	if lowRail == "" {
 		lowRail = reference
 	}
-	consumption := Consumption{ExpandedStates: 1}
+	consumption := Consumption{}
 	rejections := map[string][]string{}
 	retained := map[string]TopologyCandidate{}
 	retain := func(state topologySearchState) {
@@ -907,49 +962,75 @@ func topologyBandpassRelationshipSeeds(
 		}
 	}
 
-	state := initial
-	var highpassNode, lowpassNode string
-	state, highpassNode = addRelationshipInternalNode(state, requirement, inventoryByKey, &consumption)
-	state, lowpassNode = addRelationshipInternalNode(state, requirement, inventoryByKey, &consumption)
-	if highpassNode != "" && lowpassNode != "" {
-		state = addRelationshipPrimitive(state, requirement, inventoryByKey, capacitor, topologyTwoTerminalPlacement(input, highpassNode), &consumption)
-		state = addRelationshipPrimitive(state, requirement, inventoryByKey, resistor, topologyTwoTerminalPlacement(highpassNode, reference), &consumption)
-		state = addRelationshipPrimitive(state, requirement, inventoryByKey, resistor, topologyTwoTerminalPlacement(highpassNode, lowpassNode), &consumption)
-		state = addRelationshipPrimitive(state, requirement, inventoryByKey, capacitor, topologyTwoTerminalPlacement(lowpassNode, reference), &consumption)
-		state = addRelationshipPrimitive(state, requirement, inventoryByKey, opamp, []TerminalConnection{
-			{Terminal: "IN_MINUS", Node: output}, {Terminal: "IN_PLUS", Node: lowpassNode},
-			{Terminal: "OUT", Node: output}, {Terminal: "V_MINUS", Node: lowRail}, {Terminal: "V_PLUS", Node: highRail},
-		}, &consumption)
-		retain(state)
-	}
-
-	cascade := initial
-	previous := input
-	for stageIndex := 0; stageIndex < 4; stageIndex++ {
-		var filterNode string
-		cascade, filterNode = addRelationshipInternalNode(cascade, requirement, inventoryByKey, &consumption)
-		bufferNode := output
-		if stageIndex != 3 {
-			cascade, bufferNode = addRelationshipInternalNode(cascade, requirement, inventoryByKey, &consumption)
-		}
-		if filterNode == "" || bufferNode == "" {
+	for _, architecture := range []struct {
+		stages       []string
+		recoveryGain bool
+	}{
+		{stages: []string{"lower", "lower", "upper"}, recoveryGain: true},
+		{stages: []string{"lower", "lower", "upper", "upper"}},
+	} {
+		if ctx.Err() != nil || consumption.ExpandedStates >= policy.MaxExpandedStates {
 			break
 		}
-		if stageIndex < 2 {
-			cascade = addRelationshipPrimitive(cascade, requirement, inventoryByKey, capacitor, topologyTwoTerminalPlacement(previous, filterNode), &consumption)
-			cascade = addRelationshipPrimitive(cascade, requirement, inventoryByKey, resistor, topologyTwoTerminalPlacement(filterNode, reference), &consumption)
-		} else {
-			cascade = addRelationshipPrimitive(cascade, requirement, inventoryByKey, resistor, topologyTwoTerminalPlacement(previous, filterNode), &consumption)
-			cascade = addRelationshipPrimitive(cascade, requirement, inventoryByKey, capacitor, topologyTwoTerminalPlacement(filterNode, reference), &consumption)
+		consumption.ExpandedStates++
+		state := initial
+		previous := input
+		complete := true
+		for stageIndex, stageKind := range architecture.stages {
+			var filterNode string
+			state, filterNode = addRelationshipInternalNode(state, requirement, inventoryByKey, &consumption)
+			bufferNode := output
+			if stageIndex != len(architecture.stages)-1 {
+				state, bufferNode = addRelationshipInternalNode(state, requirement, inventoryByKey, &consumption)
+			}
+			if filterNode == "" || bufferNode == "" {
+				complete = false
+				break
+			}
+			if stageKind == "lower" {
+				state = addRelationshipPrimitive(state, requirement, inventoryByKey, capacitor, topologyTwoTerminalPlacement(previous, filterNode), &consumption)
+				state = addRelationshipPrimitive(state, requirement, inventoryByKey, resistor, topologyTwoTerminalPlacement(filterNode, reference), &consumption)
+			} else {
+				state = addRelationshipPrimitive(state, requirement, inventoryByKey, resistor, topologyTwoTerminalPlacement(previous, filterNode), &consumption)
+				state = addRelationshipPrimitive(state, requirement, inventoryByKey, capacitor, topologyTwoTerminalPlacement(filterNode, reference), &consumption)
+			}
+			feedbackNode := bufferNode
+			if architecture.recoveryGain && stageIndex == len(architecture.stages)-1 {
+				state, feedbackNode = addRelationshipInternalNode(state, requirement, inventoryByKey, &consumption)
+				if feedbackNode == "" {
+					complete = false
+					break
+				}
+			}
+			feedback := TerminalConnection{Terminal: "IN_MINUS", Node: feedbackNode}
+			var added bool
+			state, added = addRelationshipActiveStage(
+				state, requirement, inventoryByKey,
+				relationshipActiveStage{
+					Primitive: opamp,
+					Input:     TerminalConnection{Terminal: "IN_PLUS", Node: filterNode},
+					Output:    TerminalConnection{Terminal: "OUT", Node: bufferNode},
+					Feedback:  &feedback,
+					Bias: []TerminalConnection{
+						{Terminal: "V_MINUS", Node: lowRail},
+						{Terminal: "V_PLUS", Node: highRail},
+					},
+				},
+				&consumption,
+			)
+			if !added {
+				complete = false
+				break
+			}
+			if feedbackNode != bufferNode {
+				state = addRelationshipPrimitive(state, requirement, inventoryByKey, resistor, topologyTwoTerminalPlacement(bufferNode, feedbackNode), &consumption)
+				state = addRelationshipPrimitive(state, requirement, inventoryByKey, resistor, topologyTwoTerminalPlacement(feedbackNode, reference), &consumption)
+			}
+			previous = bufferNode
 		}
-		cascade = addRelationshipPrimitive(cascade, requirement, inventoryByKey, opamp, []TerminalConnection{
-			{Terminal: "IN_MINUS", Node: bufferNode}, {Terminal: "IN_PLUS", Node: filterNode},
-			{Terminal: "OUT", Node: bufferNode}, {Terminal: "V_MINUS", Node: lowRail}, {Terminal: "V_PLUS", Node: highRail},
-		}, &consumption)
-		previous = bufferNode
-	}
-	if previous == output {
-		retain(cascade)
+		if complete && previous == output {
+			retain(state)
+		}
 	}
 	result := make([]TopologyCandidate, 0, len(retained))
 	for _, candidate := range retained {
@@ -1280,6 +1361,7 @@ func topologySimpleRegulatedVoltageRelationshipSeeds(
 	}
 	stableReference := topologyStableReferencePrimitive(requirement, inventory)
 	passDevice := topologyRatedPowerPrimitive(requirement, inventory, "npn_bjt")
+	driveBuffer := selectCurrentRelationshipPrimitive(requirement, inventory, "pnp_bjt", false, false)
 	if opamp.Key == "" || resistor.Key == "" || capacitor.Key == "" ||
 		stableReference.Key == "" || passDevice.Key == "" {
 		return nil, Consumption{}, map[string][]string{
@@ -1293,69 +1375,122 @@ func topologySimpleRegulatedVoltageRelationshipSeeds(
 		return nil, Consumption{}, map[string][]string{}
 	}
 	output := "port_" + outputID
-	consumption := Consumption{ExpandedStates: 1}
+	consumption := Consumption{}
 	rejections := map[string][]string{}
-	state := initial
-	internal := make([]string, 0, 4)
-	for range 4 {
-		if ctx.Err() != nil || consumption.GeneratedGraphs >= policy.MaxGeneratedGraphs {
+	states := []topologySearchState{}
+	driveModes := []bool{false}
+	if driveBuffer.Key != "" {
+		driveModes = append(driveModes, true)
+	}
+	for _, bufferedDrive := range driveModes {
+		if ctx.Err() != nil || consumption.ExpandedStates >= policy.MaxExpandedStates ||
+			consumption.GeneratedGraphs >= policy.MaxGeneratedGraphs {
 			break
 		}
-		var node string
-		state, node = addRelationshipInternalNode(state, requirement, inventoryByKey, &consumption)
-		if node == "" {
-			break
+		consumption.ExpandedStates++
+		state := initial
+		state.graph = CloneGraph(initial.graph)
+		state.operations = cloneGraphOperations(initial.operations)
+		internalCount := 4
+		if bufferedDrive {
+			internalCount++
 		}
-		internal = append(internal, node)
-	}
-	if len(internal) != 4 || internalNodeCount(state.graph) > limits.MaxInternalNodes {
-		return nil, consumption, rejections
-	}
-	absoluteReference, feedback, controllerOutput, passBase := internal[0], internal[1], internal[2], internal[3]
-	state = addRelationshipPrimitive(state, requirement, inventoryByKey, stableReference, []TerminalConnection{
-		{Terminal: "ANODE", Node: references[0]},
-		{Terminal: "CATHODE", Node: absoluteReference},
-	}, &consumption)
-	state = addRelationshipPrimitive(state, requirement, inventoryByKey, opamp, []TerminalConnection{
-		{Terminal: "IN_PLUS", Node: absoluteReference},
-		{Terminal: "IN_MINUS", Node: feedback},
-		{Terminal: "OUT", Node: controllerOutput},
-		{Terminal: "V_MINUS", Node: references[0]},
-		{Terminal: "V_PLUS", Node: supplies[0]},
-	}, &consumption)
-	state = addRelationshipPrimitive(state, requirement, inventoryByKey, passDevice, []TerminalConnection{
-		{Terminal: "BASE", Node: passBase},
-		{Terminal: "COLLECTOR", Node: supplies[0]},
-		{Terminal: "EMITTER", Node: output},
-	}, &consumption)
-	for _, edge := range [][2]string{
-		{supplies[0], absoluteReference},
-		{output, feedback}, {feedback, references[0]},
-		{controllerOutput, passBase},
-	} {
-		state = addRelationshipPrimitive(state, requirement, inventoryByKey, resistor, topologyTwoTerminalPlacement(edge[0], edge[1]), &consumption)
-	}
-	for _, control := range controls {
-		state = addRelationshipPrimitive(state, requirement, inventoryByKey, resistor, topologyTwoTerminalPlacement(supplies[0], control), &consumption)
-	}
-	for _, edge := range [][2]string{
-		{supplies[0], references[0]},
-		{output, references[0]},
-		{controllerOutput, feedback},
-	} {
-		state = addRelationshipPrimitive(state, requirement, inventoryByKey, capacitor, topologyTwoTerminalPlacement(edge[0], edge[1]), &consumption)
-	}
-	states := []topologySearchState{state}
-	bleeder := addRelationshipPrimitive(
-		state,
-		requirement,
-		inventoryByKey,
-		resistor,
-		topologyTwoTerminalPlacement(passBase, output),
-		&consumption,
-	)
-	if bleeder.hash != state.hash {
-		states = append(states, bleeder)
+		internal := make([]string, 0, internalCount)
+		for len(internal) < internalCount {
+			var node string
+			state, node = addRelationshipInternalNode(state, requirement, inventoryByKey, &consumption)
+			if node == "" {
+				break
+			}
+			internal = append(internal, node)
+		}
+		if len(internal) != internalCount || internalNodeCount(state.graph) > limits.MaxInternalNodes {
+			continue
+		}
+		absoluteReference, feedback, controllerOutput, passBase := internal[0], internal[1], internal[2], internal[3]
+		state = addRelationshipPrimitive(state, requirement, inventoryByKey, stableReference, []TerminalConnection{
+			{Terminal: "ANODE", Node: references[0]},
+			{Terminal: "CATHODE", Node: absoluteReference},
+		}, &consumption)
+		positiveInput, negativeInput := absoluteReference, feedback
+		if bufferedDrive {
+			positiveInput, negativeInput = feedback, absoluteReference
+		}
+		controllerFeedback := TerminalConnection{Terminal: "IN_MINUS", Node: negativeInput}
+		var added bool
+		state, added = addRelationshipActiveStage(
+			state, requirement, inventoryByKey,
+			relationshipActiveStage{
+				Primitive: opamp,
+				Input:     TerminalConnection{Terminal: "IN_PLUS", Node: positiveInput},
+				Output:    TerminalConnection{Terminal: "OUT", Node: controllerOutput},
+				Feedback:  &controllerFeedback,
+				Bias: []TerminalConnection{
+					{Terminal: "V_MINUS", Node: references[0]},
+					{Terminal: "V_PLUS", Node: supplies[0]},
+				},
+			},
+			&consumption,
+		)
+		if !added {
+			continue
+		}
+		state = addRelationshipPrimitive(state, requirement, inventoryByKey, passDevice, []TerminalConnection{
+			{Terminal: "BASE", Node: passBase},
+			{Terminal: "COLLECTOR", Node: supplies[0]},
+			{Terminal: "EMITTER", Node: output},
+		}, &consumption)
+		for _, edge := range [][2]string{
+			{supplies[0], absoluteReference},
+			{output, feedback}, {feedback, references[0]},
+		} {
+			state = addRelationshipPrimitive(state, requirement, inventoryByKey, resistor, topologyTwoTerminalPlacement(edge[0], edge[1]), &consumption)
+		}
+		if bufferedDrive {
+			driverBase := internal[4]
+			state = addRelationshipPrimitive(state, requirement, inventoryByKey, resistor,
+				topologyTwoTerminalPlacement(controllerOutput, driverBase), &consumption)
+			state = addRelationshipPrimitive(state, requirement, inventoryByKey, resistor,
+				topologyTwoTerminalPlacement(supplies[0], driverBase), &consumption)
+			state, added = addRelationshipActiveStage(
+				state, requirement, inventoryByKey,
+				relationshipActiveStage{
+					Primitive: driveBuffer,
+					Input:     TerminalConnection{Terminal: "BASE", Node: driverBase},
+					Output:    TerminalConnection{Terminal: "COLLECTOR", Node: passBase},
+					Bias:      []TerminalConnection{{Terminal: "EMITTER", Node: supplies[0]}},
+				},
+				&consumption,
+			)
+			if !added {
+				continue
+			}
+		} else {
+			state = addRelationshipPrimitive(state, requirement, inventoryByKey, resistor,
+				topologyTwoTerminalPlacement(controllerOutput, passBase), &consumption)
+		}
+		for _, control := range controls {
+			state = addRelationshipPrimitive(state, requirement, inventoryByKey, resistor, topologyTwoTerminalPlacement(supplies[0], control), &consumption)
+		}
+		for _, edge := range [][2]string{
+			{supplies[0], references[0]},
+			{output, references[0]},
+			{controllerOutput, feedback},
+		} {
+			state = addRelationshipPrimitive(state, requirement, inventoryByKey, capacitor, topologyTwoTerminalPlacement(edge[0], edge[1]), &consumption)
+		}
+		states = append(states, state)
+		bleeder := addRelationshipPrimitive(
+			state,
+			requirement,
+			inventoryByKey,
+			resistor,
+			topologyTwoTerminalPlacement(passBase, output),
+			&consumption,
+		)
+		if bleeder.hash != state.hash {
+			states = append(states, bleeder)
+		}
 	}
 	result := make([]TopologyCandidate, 0, len(states))
 	for _, candidateState := range states {

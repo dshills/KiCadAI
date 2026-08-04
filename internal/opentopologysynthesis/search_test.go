@@ -1025,14 +1025,29 @@ func TestRegulatedVoltageRelationshipSeedsRetainBiasAlternative(t *testing.T) {
 		GraphLimits{MaxPrimitiveInstances: policy.MaxPrimitiveInstances, MaxInternalNodes: policy.MaxInternalNodes},
 		policy, state,
 	)
-	if len(candidates) != 2 {
+	if len(candidates) != 4 {
 		t.Fatalf("regulated-voltage relationships=%d consumption=%#v rejections=%#v", len(candidates), consumption, rejections)
 	}
 	foundBleeder := false
+	foundBufferedDrive := false
+	driveStageCounts := map[int]bool{}
+	activeStructures := map[string]bool{}
 	for _, candidate := range candidates {
 		if candidate.Score.BehaviorGap != 0 {
 			t.Fatalf("unexpected regulated-voltage score=%#v graph=%s", candidate.Score, testGraphTopologySummary(candidate.Graph))
 		}
+		driveStages := 0
+		for _, instance := range candidate.Graph.Instances {
+			if instance.Kind == "pnp_bjt" {
+				driveStages++
+			}
+		}
+		driveStageCounts[driveStages] = true
+		activeHash, err := ActiveStructureHash(candidate.Graph)
+		if err != nil {
+			t.Fatal(err)
+		}
+		activeStructures[activeHash] = true
 		plan := BuildValueSearchPlan(requirement, candidate.Graph, inventory, policy)
 		if plan.Status != ValuePlanReady {
 			t.Fatalf("regulated-voltage value plan=%s rejections=%#v issues=%#v", plan.Status, plan.Rejections, plan.Issues)
@@ -1042,11 +1057,17 @@ func TestRegulatedVoltageRelationshipSeedsRetainBiasAlternative(t *testing.T) {
 				if strings.HasPrefix(scale.ID, "topology:regulated_pass_bleeder:") && testValueSIEqual(scale.ValueSI, 10_000) {
 					foundBleeder = true
 				}
+				if strings.HasPrefix(scale.ID, "topology:regulated_buffer_drive:") && testValueSIEqual(scale.ValueSI, 100) {
+					foundBufferedDrive = true
+				}
 			}
 		}
 	}
 	if !foundBleeder {
 		t.Fatal("regulated-voltage relationships lack an emitter-referenced pass-device bias alternative")
+	}
+	if !foundBufferedDrive || !driveStageCounts[0] || !driveStageCounts[1] || len(activeStructures) < 2 {
+		t.Fatalf("regulated-voltage relationships lack materially distinct direct/buffered drive: buffered_scale=%t drive_stage_counts=%v active_structures=%v", foundBufferedDrive, driveStageCounts, activeStructures)
 	}
 
 	outputOnly := requirement
@@ -1061,7 +1082,7 @@ func TestRegulatedVoltageRelationshipSeedsRetainBiasAlternative(t *testing.T) {
 		GraphLimits{MaxPrimitiveInstances: policy.MaxPrimitiveInstances, MaxInternalNodes: policy.MaxInternalNodes},
 		policy, state,
 	)
-	if len(outputOnlyCandidates) != 2 {
+	if len(outputOnlyCandidates) != 4 {
 		t.Fatalf("output-only regulated-voltage relationships=%d consumption=%#v rejections=%#v", len(outputOnlyCandidates), outputOnlyConsumption, outputOnlyRejections)
 	}
 }
@@ -1071,6 +1092,18 @@ func TestBandpassRelationshipSeedsConstructBoundedPrimitiveGraph(t *testing.T) {
 	requirement, issues := DecodeStrict(bytes.NewReader(data))
 	if len(issues) != 0 {
 		t.Fatalf("requirement decode issues: %#v", issues)
+	}
+	implicitExcitation := requirement
+	implicitExcitation.Requirements.BehavioralRequirements = slices.Clone(requirement.Requirements.BehavioralRequirements)
+	for index := range implicitExcitation.Requirements.BehavioralRequirements {
+		assertion := &implicitExcitation.Requirements.BehavioralRequirements[index]
+		if slices.Contains([]string{"voltage_gain", "voltage_gain_at_frequency"}, assertion.Metric) {
+			assertion.Excitation = nil
+		}
+	}
+	implicitEnvelope, implicitOK := topologyBandpassBehaviorEnvelope(implicitExcitation)
+	if !implicitOK || implicitEnvelope.input.Kind != "port" || implicitEnvelope.input.ID == "" {
+		t.Fatalf("unique analog input did not provide deterministic implicit bandpass excitation: %#v", implicitEnvelope)
 	}
 	inventory, _ := testHeldOutSynthesisEnvironment(t)
 	initial, graphIssues := InitialGraph(requirement)

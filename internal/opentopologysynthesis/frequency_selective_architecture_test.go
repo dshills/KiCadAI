@@ -19,6 +19,7 @@ func TestFrequencySelectiveRequirementsGenerateBalancedBridgeArchitectures(t *te
 	}
 	bridgeCandidates := 0
 	opAmpCounts := map[int]bool{}
+	activeStructures := map[string]bool{}
 	for _, candidate := range search.Candidates {
 		resistors, capacitors, opAmps := 0, 0, 0
 		for _, instance := range candidate.Graph.Instances {
@@ -42,9 +43,11 @@ func TestFrequencySelectiveRequirementsGenerateBalancedBridgeArchitectures(t *te
 		}
 		bridgeCandidates++
 		opAmpCounts[opAmps] = true
+		activeStructures[candidate.ActiveStructureHash] = true
 	}
-	if bridgeCandidates < 2 || !opAmpCounts[1] || !opAmpCounts[2] {
-		t.Fatalf("balanced bridge candidates=%d opamp_counts=%v, want output-buffered and input/output-buffered alternatives; retained=%d rejections=%#v", bridgeCandidates, opAmpCounts, len(search.Candidates), search.Rejections)
+	delete(activeStructures, "")
+	if bridgeCandidates < 2 || !opAmpCounts[1] || !opAmpCounts[2] || len(activeStructures) < 2 {
+		t.Fatalf("balanced bridge candidates=%d opamp_counts=%v active_structures=%v, want materially distinct output-buffered and input/output-buffered alternatives; retained=%d rejections=%#v", bridgeCandidates, opAmpCounts, activeStructures, len(search.Candidates), search.Rejections)
 	}
 }
 
@@ -120,6 +123,58 @@ func TestFrequencySelectiveHeldOutCandidateReachesTrustedSimulation(t *testing.T
 	)
 	if physical.Status != PhysicalLoweringReady || physical.Hash == "" {
 		t.Fatalf("frequency-selective physical lowering status=%s issues=%#v", physical.Status, physical.Issues)
+	}
+}
+
+func TestSelectiveMidbandArchitecturesReachTrustedSimulation(t *testing.T) {
+	requirement, issues := DecodeStrict(bytes.NewReader(mustRead(
+		t,
+		filepath.Join(architectureGeneralizationCorpusRoot(), "selective_midband_transfer.json"),
+	)))
+	if len(issues) != 0 {
+		t.Fatalf("requirement decode issues: %#v", issues)
+	}
+	inventory, environment := testHeldOutSynthesisEnvironment(t)
+	policy := DefaultPolicy()
+	policy.MaxRetainedCandidates = 16
+	policy.MaxValueTrials = 64
+	policy.MaxCandidateSimulations = 4_096
+	policy.MaxCornerEvaluations = 16_384
+	run := Synthesize(context.Background(), requirement, inventory, environment, policy)
+	if run.Report.Status != StatusPassed || run.Physical == nil || run.Physical.Status != PhysicalLoweringReady {
+		t.Fatalf("selective-midband synthesis status=%s physical=%#v diagnostics=%#v", run.Report.Status, run.Physical, run.Report.Diagnostics)
+	}
+	graphByFingerprint := map[string]CandidateGraph{}
+	for _, searchCandidate := range run.Search.Candidates {
+		graphByFingerprint[searchCandidate.Fingerprint] = searchCandidate.Graph
+	}
+	passingActiveStructures := map[string]bool{}
+	details := []string{}
+	for _, candidate := range run.Candidates {
+		opAmps := 0
+		graph, found := graphByFingerprint[candidate.Fingerprint]
+		if !found {
+			t.Fatalf("synthesis evidence candidate %s has no matching search graph", candidate.Fingerprint)
+		}
+		for _, instance := range graph.Instances {
+			if instance.Kind == "opamp" {
+				opAmps++
+			}
+		}
+		for _, evaluation := range candidate.Evaluations {
+			details = append(details, fmt.Sprintf(
+				"opamps=%d active=%s status=%s diagnoses=%s",
+				opAmps, candidate.ActiveStructureHash, evaluation.Status, diagnosisSummary(evaluation.Diagnoses),
+			))
+			if evaluation.Status == SimulationEvaluationPassed {
+				passingActiveStructures[candidate.ActiveStructureHash] = true
+				assertEvaluationCoversRequirementAnalyses(t, requirement, evaluation)
+			}
+		}
+	}
+	delete(passingActiveStructures, "")
+	if len(passingActiveStructures) < 2 {
+		t.Fatalf("selective-midband passing active structures=%v, want at least 2; evaluations=%s", passingActiveStructures, strings.Join(details, "; "))
 	}
 }
 
