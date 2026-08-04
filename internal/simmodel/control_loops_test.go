@@ -134,6 +134,34 @@ func TestDiscoverControlLoopsTraversesDiodeConnectedBJTTracker(t *testing.T) {
 	}
 }
 
+func TestDiscoverControlLoopsRecognizesInvertedPathToPositiveInput(t *testing.T) {
+	device := func(component, model string, terminals ...TerminalBinding) ResolvedDevice {
+		return ResolvedDevice{Component: component, PrimitiveModel: model, Terminals: terminals}
+	}
+	plan := Plan{GroundNode: "GND", Devices: []ResolvedDevice{
+		device("controller", PrimitiveOpAmpV1,
+			TerminalBinding{Terminal: "IN_PLUS", Net: "FEEDBACK"},
+			TerminalBinding{Terminal: "IN_MINUS", Net: "REFERENCE"},
+			TerminalBinding{Terminal: "OUT", Net: "DRIVE"}),
+		device("drive", PrimitiveResistorV1,
+			TerminalBinding{Terminal: "A", Net: "DRIVE"}, TerminalBinding{Terminal: "B", Net: "BASE"}),
+		device("high_side_pass", PrimitiveBJTPNPV1,
+			TerminalBinding{Terminal: "BASE", Net: "BASE"},
+			TerminalBinding{Terminal: "COLLECTOR", Net: "OUTPUT"},
+			TerminalBinding{Terminal: "EMITTER", Net: "SUPPLY"}),
+		device("feedback", PrimitiveResistorV1,
+			TerminalBinding{Terminal: "A", Net: "OUTPUT"}, TerminalBinding{Terminal: "B", Net: "FEEDBACK"}),
+	}}
+	loops, diagnostics := DiscoverControlLoops(plan)
+	if len(diagnostics) != 0 || len(loops) != 1 {
+		t.Fatalf("inverted positive-input loop discovery: loops=%#v diagnostics=%#v", loops, diagnostics)
+	}
+	if loops[0].FeedbackTerminal != "IN_PLUS" || loops[0].ID != "loop:controller:in_plus" ||
+		!slices.Contains(loops[0].Members, "high_side_pass") {
+		t.Fatalf("inverted positive-input loop = %#v", loops[0])
+	}
+}
+
 func TestDiscoverControlLoopsFailsClosedForPositiveAndAmbiguousFeedback(t *testing.T) {
 	parameters := []NamedValue{
 		{Name: "dc_open_loop_gain", Value: 100000},

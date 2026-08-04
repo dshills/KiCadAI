@@ -97,7 +97,7 @@ func TestProtectedVoltageOutputBaselineIsFrozenBeforeProductionChanges(t *testin
 	if report.EngineState != "untouched" {
 		t.Fatalf("baseline engine state = %q", report.EngineState)
 	}
-	if report.Policy != protectedVoltageOutputSynthesisPolicy() {
+	if report.Policy != protectedVoltageOutputBaselinePolicy() {
 		t.Fatalf("baseline policy = %#v", report.Policy)
 	}
 	if len(report.Cases) != protectedVoltageOutputCorpusCaseCount {
@@ -112,6 +112,13 @@ func TestProtectedVoltageOutputBaselineIsFrozenBeforeProductionChanges(t *testin
 		}
 		previousID = entry.ID
 	}
+}
+
+func protectedVoltageOutputBaselinePolicy() Policy {
+	policy := protectedVoltageOutputSynthesisPolicy()
+	policy.MaxPrimitiveInstances = 20
+	policy.MaxInternalNodes = 24
+	return policy
 }
 
 func TestMeasureProtectedVoltageOutputBaseline(t *testing.T) {

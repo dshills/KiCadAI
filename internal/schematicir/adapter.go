@@ -976,6 +976,21 @@ func layoutBendLabelPoint(result schematiclayout.Result, netName string, points 
 			if !schematicPointOnSegment(label.Position, points[index-1], points[index]) {
 				continue
 			}
+			contacts := 0
+			foreign := false
+			for _, wire := range result.Wires {
+				if !schematicPointOnSegment(label.Position, wire.From, wire.To) {
+					continue
+				}
+				if wire.NetName != netName {
+					foreign = true
+					break
+				}
+				contacts++
+			}
+			if foreign || contacts != 1 {
+				continue
+			}
 			point := transactions.Point{
 				XMM: float64(label.Position.X) / 1_000_000,
 				YMM: float64(label.Position.Y) / 1_000_000,

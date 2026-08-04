@@ -35,6 +35,11 @@ type currentSenseDifferentialPair struct {
 	observationPenalty float64
 }
 
+type currentSenseResistanceNetwork struct {
+	segments            [][]PrimitiveCandidate
+	effectiveResistance float64
+}
+
 func topologyTransconductanceRelationshipSeeds(
 	ctx context.Context,
 	requirement Requirement,
@@ -714,6 +719,124 @@ func currentSenseSeriesComposition(
 	}
 	visit(0, 0, nil)
 	return best
+}
+
+// currentSenseSeriesParallelComposition searches a bounded series chain whose
+// segments may contain one reviewed resistor or two reviewed resistors in
+// parallel. It is deliberately topology-generic: values are selected only by
+// effective resistance, evidence coverage, part count, and stable catalog key.
+func currentSenseSeriesParallelComposition(
+	ctx context.Context,
+	requirement Requirement,
+	inventory PrimitiveInventory,
+	targetResistance float64,
+	maximumParts int,
+) (currentSenseResistanceNetwork, bool) {
+	return currentSenseSeriesParallelCompositionWithin(
+		ctx, requirement, inventory, targetResistance, maximumParts, 0, math.Inf(1),
+	)
+}
+
+func currentSenseSeriesParallelCompositionWithin(
+	ctx context.Context,
+	requirement Requirement,
+	inventory PrimitiveInventory,
+	targetResistance float64,
+	maximumParts int,
+	minimumResistance float64,
+	maximumResistance float64,
+) (currentSenseResistanceNetwork, bool) {
+	if targetResistance <= 0 || !finite(targetResistance) || maximumParts <= 0 ||
+		minimumResistance < 0 || maximumResistance < minimumResistance {
+		return currentSenseResistanceNetwork{}, false
+	}
+	requiredAnalyses := requirementAnalysisSet(requirement)
+	choices := []PrimitiveCandidate{}
+	seenValues := map[uint64]struct{}{}
+	for _, primitive := range inventory.Primitives {
+		if primitive.Kind != "resistor" || primitive.ValueDomain.Nominal == nil ||
+			!primitiveCoversAllAnalyses(primitive, requiredAnalyses) ||
+			!ratingsCoverRequirement(requirement, primitive) {
+			continue
+		}
+		value := *primitive.ValueDomain.Nominal
+		if value <= 0 || !finite(value) {
+			continue
+		}
+		key := math.Float64bits(value)
+		if _, found := seenValues[key]; found {
+			continue
+		}
+		seenValues[key] = struct{}{}
+		choices = append(choices, primitive)
+	}
+	slices.SortFunc(choices, func(left, right PrimitiveCandidate) int {
+		return cmp.Or(cmp.Compare(*left.ValueDomain.Nominal, *right.ValueDomain.Nominal), cmp.Compare(left.Key, right.Key))
+	})
+	type segment struct {
+		parts      []PrimitiveCandidate
+		resistance float64
+		key        string
+	}
+	segments := []segment{}
+	for _, choice := range choices {
+		value := *choice.ValueDomain.Nominal
+		segments = append(segments,
+			segment{parts: []PrimitiveCandidate{choice}, resistance: value, key: choice.Key},
+			segment{parts: []PrimitiveCandidate{choice, choice}, resistance: value / 2, key: choice.Key + "+" + choice.Key},
+		)
+	}
+	slices.SortFunc(segments, func(left, right segment) int {
+		return cmp.Or(cmp.Compare(left.resistance, right.resistance), cmp.Compare(len(left.parts), len(right.parts)), cmp.Compare(left.key, right.key))
+	})
+	best := currentSenseResistanceNetwork{}
+	bestParts := 0
+	bestError := math.Inf(1)
+	bestBelowTarget := true
+	bestKey := ""
+	var visit func(start, partCount int, resistance float64, selected [][]PrimitiveCandidate, key string)
+	visit = func(start, partCount int, resistance float64, selected [][]PrimitiveCandidate, key string) {
+		if ctx.Err() != nil {
+			return
+		}
+		if partCount != 0 && resistance >= minimumResistance && resistance <= maximumResistance {
+			error := math.Abs(resistance-targetResistance) / targetResistance
+			belowTarget := resistance < targetResistance
+			if bestParts == 0 || (bestBelowTarget && !belowTarget) ||
+				(bestBelowTarget == belowTarget && error < bestError) ||
+				(bestBelowTarget == belowTarget && error == bestError && partCount < bestParts) ||
+				(bestBelowTarget == belowTarget && error == bestError && partCount == bestParts && key < bestKey) {
+				bestError, bestParts, bestBelowTarget, bestKey = error, partCount, belowTarget, key
+				best = currentSenseResistanceNetwork{segments: clonePrimitiveSegments(selected), effectiveResistance: resistance}
+			}
+		}
+		if partCount >= maximumParts || resistance >= targetResistance {
+			return
+		}
+		for index := start; index < len(segments); index++ {
+			candidate := segments[index]
+			if partCount+len(candidate.parts) > maximumParts {
+				continue
+			}
+			nextKey := key
+			if nextKey != "" {
+				nextKey += "|"
+			}
+			nextKey += candidate.key
+			visit(index, partCount+len(candidate.parts), resistance+candidate.resistance,
+				append(selected, candidate.parts), nextKey)
+		}
+	}
+	visit(0, 0, 0, nil, "")
+	return best, len(best.segments) != 0
+}
+
+func clonePrimitiveSegments(segments [][]PrimitiveCandidate) [][]PrimitiveCandidate {
+	result := make([][]PrimitiveCandidate, len(segments))
+	for index := range segments {
+		result[index] = append([]PrimitiveCandidate(nil), segments[index]...)
+	}
+	return result
 }
 
 func currentSenseDifferentialComposition(

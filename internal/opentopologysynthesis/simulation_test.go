@@ -596,6 +596,77 @@ func TestLoadCurrentHarnessAndCrossCaseSweepAreCatalogBacked(t *testing.T) {
 	}
 }
 
+func TestQuiescentCurrentRemovesLoadHarnessAndExcitationTogether(t *testing.T) {
+	_, _, _, environment := testSimulationFixture(t)
+	requirement := testProtectedVoltageOutputRequirement(t, "protected_high_power_voltage_output.json")
+	graph, issues := InitialGraph(requirement)
+	if len(issues) != 0 {
+		t.Fatalf("initial graph issues: %#v", issues)
+	}
+	var assertion BehavioralAssertion
+	for _, candidate := range requirement.Requirements.BehavioralRequirements {
+		if candidate.Metric == "quiescent_current" {
+			assertion = candidate
+			break
+		}
+	}
+	var operatingCase OperatingCase
+	for _, candidate := range requirement.Requirements.OperatingCases {
+		if candidate.ID == assertion.OperatingCases[0] {
+			operatingCase = candidate
+			break
+		}
+	}
+	corner := operatingCaseCorners(operatingCase)[0]
+	harness, _, diagnostics := simulationHarness(
+		requirement, assertion, operatingCase, corner, graph, environment,
+	)
+	if len(diagnostics) != 0 {
+		t.Fatalf("quiescent-current harness diagnostics=%#v", diagnostics)
+	}
+	loadID := loadInstanceID("power_output", "load_current")
+	declared := map[string]bool{}
+	for _, component := range harness {
+		declared[component.InstanceID] = true
+	}
+	if declared[loadID] {
+		t.Fatalf("quiescent-current harness retained load %q", loadID)
+	}
+	for _, excitation := range simulationExcitations(requirement, assertion, operatingCase, corner, graph) {
+		if excitation.Component == loadID {
+			t.Fatalf("quiescent-current excitation retained omitted load %q", loadID)
+		}
+		if !declared[excitation.Component] {
+			t.Fatalf("quiescent-current excitation %q is absent from harness %#v", excitation.Component, harness)
+		}
+	}
+}
+
+func TestDynamicTimeStepAlignsEventAndDurationGrid(t *testing.T) {
+	duration := .3
+	operatingCase := OperatingCase{Events: []OperatingEvent{{TriggerTimeS: .001}}}
+	step := dynamicTimeStep(duration, operatingCase)
+	if step <= 0 || step > duration/1000 {
+		t.Fatalf("dynamic time step = %.12g", step)
+	}
+	for name, value := range map[string]float64{"duration": duration, "event": operatingCase.Events[0].TriggerTimeS} {
+		steps := value / step
+		if math.Abs(steps-math.Round(steps)) > 1e-9 {
+			t.Fatalf("%s %.12g is not aligned to step %.12g", name, value, step)
+		}
+	}
+}
+
+func TestDynamicTimeStepBoundsPathologicalEventGrid(t *testing.T) {
+	duration := .3
+	operatingCase := OperatingCase{Events: []OperatingEvent{{TriggerTimeS: .001000000001}}}
+	step := dynamicTimeStep(duration, operatingCase)
+	minimum := duration / maximumDynamicTimeSteps
+	if step < minimum || duration/step > maximumDynamicTimeSteps*(1+1e-12) {
+		t.Fatalf("dynamic time step = %.12g, minimum %.12g", step, minimum)
+	}
+}
+
 func TestAnalogCurrentInputHarnessUsesCatalogCurrentSource(t *testing.T) {
 	data := mustRead(t, filepath.Join(architectureGeneralizationCorpusRoot(), "low_current_voltage_converter.json"))
 	requirement, issues := DecodeStrict(bytes.NewReader(data))

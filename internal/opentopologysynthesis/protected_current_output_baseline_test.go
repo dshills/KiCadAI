@@ -86,7 +86,7 @@ func TestProtectedCurrentOutputBaselineIsFrozenBeforeProductionChanges(t *testin
 	if report.EngineState != "untouched" {
 		t.Fatalf("baseline engine state = %q", report.EngineState)
 	}
-	if report.Policy != protectedCurrentOutputSynthesisPolicy() {
+	if report.Policy != protectedCurrentOutputBaselinePolicy() {
 		t.Fatalf("baseline policy = %#v", report.Policy)
 	}
 	if len(report.Cases) != protectedCurrentOutputCorpusCaseCount {
@@ -103,6 +103,13 @@ func TestProtectedCurrentOutputBaselineIsFrozenBeforeProductionChanges(t *testin
 		}
 		previousID = entry.ID
 	}
+}
+
+func protectedCurrentOutputBaselinePolicy() Policy {
+	policy := protectedCurrentOutputSynthesisPolicy()
+	policy.MaxPrimitiveInstances = 20
+	policy.MaxInternalNodes = 24
+	return policy
 }
 
 func TestMeasureProtectedCurrentOutputBaseline(t *testing.T) {

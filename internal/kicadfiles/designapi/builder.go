@@ -44,10 +44,18 @@ type Builder struct {
 	schematicWireNets    map[kicadfiles.UUID]string
 	schematicWires       map[kicadfiles.UUID]schematic.Wire
 	schematicWireBuckets map[kicadfiles.Point][]kicadfiles.UUID
+	pendingRouteLabels   []pendingSchematicRouteLabel
+	finalRouteLabelUUIDs map[kicadfiles.UUID]struct{}
 	footprints           map[string]int
 	pads                 map[string]map[string][]int
 	routeViaCounts       map[string]int
 	hierarchy            *SchematicHierarchy
+}
+
+type pendingSchematicRouteLabel struct {
+	netName   string
+	preferred kicadfiles.Point
+	points    []kicadfiles.Point
 }
 
 type Options struct {
@@ -317,6 +325,7 @@ func New(options Options) (*Builder, error) {
 		schematicWireNets:    map[kicadfiles.UUID]string{},
 		schematicWires:       map[kicadfiles.UUID]schematic.Wire{},
 		schematicWireBuckets: map[kicadfiles.Point][]kicadfiles.UUID{},
+		finalRouteLabelUUIDs: map[kicadfiles.UUID]struct{}{},
 		footprints:           map[string]int{},
 		pads:                 map[string]map[string][]int{},
 		routeViaCounts:       map[string]int{},
@@ -1609,16 +1618,11 @@ func (builder *Builder) addSchematicWirePointsWithOptions(netName string, from, 
 			}
 		}
 		if onRoute {
-			if position, rotation, ok := builder.safeSchematicRouteLabelPoint(netName, *bendLabelAt, points); ok {
-				label := schematic.NewLabel(
-					builder.generator.New("root.schematic.label", netName, "route", formatPoint(position)),
-					netName,
-					schematic.LabelLocal,
-					position,
-				)
-				label.Rotation = rotation
-				builder.design.Schematic.Labels = append(builder.design.Schematic.Labels, label)
-			}
+			builder.pendingRouteLabels = append(builder.pendingRouteLabels, pendingSchematicRouteLabel{
+				netName:   netName,
+				preferred: *bendLabelAt,
+				points:    append([]kicadfiles.Point(nil), points...),
+			})
 		}
 	}
 }
@@ -1689,12 +1693,64 @@ func (builder *Builder) safeSchematicRouteLabelPoint(netName string, preferred k
 	for _, candidate := range candidates {
 		if builder.schematicPointTouchesForeignWire(netName, candidate.position) ||
 			schematicLabelPositionOccupied(candidate.position, builder.design.Schematic.Labels) ||
+			builder.schematicRouteLabelWireContacts(netName, candidate.position, points) != 1 ||
 			builder.schematicRouteLabelTextOverlapsExisting(netName, candidate.position, LabelOptions{Rotation: candidate.rotation}) {
 			continue
 		}
 		return candidate.position, candidate.rotation, true
 	}
+	// The first pass reserves additional space around pin names. If that
+	// conservative margin exhausts the route, retry against the exact
+	// post-write readability envelopes before sacrificing readability.
+	for _, candidate := range candidates {
+		if builder.schematicPointTouchesForeignWire(netName, candidate.position) ||
+			schematicLabelPositionOccupied(candidate.position, builder.design.Schematic.Labels) ||
+			builder.schematicRouteLabelWireContacts(netName, candidate.position, points) != 1 ||
+			builder.schematicLabelTextOverlapsExistingWithOptions(netName, candidate.position, LabelOptions{Rotation: candidate.rotation}) {
+			continue
+		}
+		return candidate.position, candidate.rotation, true
+	}
+	// A direct routed island needs one explicit net anchor for KiCad ERC. If
+	// even the exact readability envelopes occupy every position, preserve
+	// electrical correctness at the first deterministic single-wire interior
+	// point. Never fall back to a bend or same-net crossing, because KiCad
+	// reports a label attached to multiple wire objects.
+	for _, candidate := range candidates {
+		if builder.schematicPointTouchesForeignWire(netName, candidate.position) ||
+			schematicLabelPositionOccupied(candidate.position, builder.design.Schematic.Labels) ||
+			builder.schematicRouteLabelWireContacts(netName, candidate.position, points) != 1 {
+			continue
+		}
+		return candidate.position, candidate.rotation, true
+	}
 	return kicadfiles.Point{}, 0, false
+}
+
+func (builder *Builder) schematicRouteLabelWireContacts(netName string, point kicadfiles.Point, points []kicadfiles.Point) int {
+	contacts := 0
+	targetNet := builder.canonicalNet(netName)
+	for wireUUID, wire := range builder.schematicWires {
+		if builder.canonicalNet(builder.schematicWireNets[wireUUID]) != targetNet {
+			continue
+		}
+		for index := 1; index < len(wire.Points); index++ {
+			if pointOnSchematicSegment(point, wire.Points[index-1], wire.Points[index]) {
+				contacts++
+			}
+		}
+	}
+	if contacts != 0 {
+		return contacts
+	}
+	// Direct unit callers may ask for a placement before the route has been
+	// committed to the builder. Use the proposed geometry as the same check.
+	for index := 1; index < len(points); index++ {
+		if pointOnSchematicSegment(point, points[index-1], points[index]) {
+			contacts++
+		}
+	}
+	return contacts
 }
 
 func schematicGreatestCommonDivisor(left, right kicadfiles.IU) kicadfiles.IU {
@@ -2359,10 +2415,43 @@ func (builder *Builder) SetBoardThickness(thickness kicadfiles.IU) error {
 	return nil
 }
 
+func (builder *Builder) finalizeSchematicRouteLabels() {
+	if builder == nil {
+		return
+	}
+	if len(builder.finalRouteLabelUUIDs) != 0 {
+		labels := builder.design.Schematic.Labels[:0]
+		for _, label := range builder.design.Schematic.Labels {
+			if _, generated := builder.finalRouteLabelUUIDs[label.UUID]; generated {
+				continue
+			}
+			labels = append(labels, label)
+		}
+		builder.design.Schematic.Labels = labels
+		clear(builder.finalRouteLabelUUIDs)
+	}
+	for index, pending := range builder.pendingRouteLabels {
+		position, rotation, ok := builder.safeSchematicRouteLabelPoint(pending.netName, pending.preferred, pending.points)
+		if !ok {
+			continue
+		}
+		label := schematic.NewLabel(
+			builder.generator.New("root.schematic.label", pending.netName, "route", strconv.Itoa(index), formatPoint(position)),
+			pending.netName,
+			schematic.LabelLocal,
+			position,
+		)
+		label.Rotation = rotation
+		builder.design.Schematic.Labels = append(builder.design.Schematic.Labels, label)
+		builder.finalRouteLabelUUIDs[label.UUID] = struct{}{}
+	}
+}
+
 func (builder *Builder) Design() kicaddesign.Design {
 	if builder == nil {
 		return kicaddesign.Design{}
 	}
+	builder.finalizeSchematicRouteLabels()
 	builder.syncPCBNets()
 	design := cloneDesign(builder.design)
 	builder.resolveDesignNets(&design)

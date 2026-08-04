@@ -35,6 +35,11 @@ const (
 	nonlinearMinGminRatio           = 3
 	nonlinearLineSearchDecrease     = 1e-4
 	nonlinearClampConsistencyV      = 1e-3
+	// Low source-continuation stages intentionally retain damped affine-source
+	// motion as an additional bounded homotopy for piecewise devices. Once the
+	// physical rails are established, exact affine projection prevents stale
+	// branch currents from dominating convergence.
+	nonlinearAffineProjectionMinimumSourceScale = 1.0
 	// The rail active-set enumerates only op-amps already participating in a
 	// detected transition cycle. Six devices cap the fallback at 64 complete
 	// solves while covering larger multi-stage analog decision networks.
@@ -48,6 +53,10 @@ func nonlinearOperatingVoltageTolerance(maximum float64) float64 {
 func outsideNonlinearOperatingRange(value, minimum, maximum float64) bool {
 	tolerance := nonlinearOperatingVoltageTolerance(math.Max(math.Abs(minimum), math.Abs(maximum)))
 	return value < minimum-tolerance || value > maximum+tolerance
+}
+
+func nonlinearClampConsistencyTolerance(value float64) float64 {
+	return nonlinearClampConsistencyV * math.Max(1, math.Abs(value))
 }
 
 type continuationStage struct {
@@ -69,6 +78,11 @@ type nonlinearResidualScratch struct {
 	scales    []float64
 }
 
+type groundSourceProjection struct {
+	row, branch int
+	coefficient float64
+}
+
 var nonlinearResidualScratchPool = sync.Pool{New: func() any { return new(nonlinearResidualScratch) }}
 
 var nonlinearContinuation = []continuationStage{
@@ -76,6 +90,18 @@ var nonlinearContinuation = []continuationStage{
 	{sourceScale: .2, gmin: 1e-5, gainScale: 1e-3},
 	{sourceScale: .5, gmin: 1e-6, gainScale: 1e-2},
 	{sourceScale: .8, gmin: 1e-8, gainScale: .1},
+	{sourceScale: 1, gmin: 1e-10, gainScale: .5},
+	{sourceScale: 1, gmin: nonlinearFinalGmin, gainScale: 1},
+}
+
+var nonlinearHighSideBJTDriveContinuation = []continuationStage{
+	{sourceScale: .75, gmin: 1e-4, gainScale: 1e-8},
+	{sourceScale: .9, gmin: 1e-4, gainScale: 1e-8},
+	{sourceScale: 1, gmin: 1e-4, gainScale: 1e-8},
+	{sourceScale: 1, gmin: 1e-4, gainScale: 1e-6},
+	{sourceScale: 1, gmin: 1e-4, gainScale: 1e-4},
+	{sourceScale: 1, gmin: 1e-6, gainScale: 1e-2},
+	{sourceScale: 1, gmin: 1e-8, gainScale: .1},
 	{sourceScale: 1, gmin: 1e-10, gainScale: .5},
 	{sourceScale: 1, gmin: nonlinearFinalGmin, gainScale: 1},
 }
@@ -126,8 +152,12 @@ func solveNonlinearDCFromWarmStateWithPowerTransition(plan Plan, analysis Analys
 	for iteration := 0; iteration < iterationLimit; iteration++ {
 		system, solution, evidence, diagnostic := solveNonlinearDCForComparatorStateWithInitial(plan, analysis, states, warmSolution)
 		if diagnostic != nil {
-			if fallbackSystem, fallbackSolution, fallbackEvidence, fallbackStates, ok := solveNonlinearDCByCenteredOpAmpSeed(plan, analysis, states); ok {
+			centeredSystem, centeredSolution, centeredEvidence, centeredStates, centeredOK := solveNonlinearDCByCenteredOpAmpSeed(plan, analysis, states)
+			if centeredOK {
+				fallbackSystem, fallbackSolution, fallbackEvidence, fallbackStates := centeredSystem, centeredSolution, centeredEvidence, centeredStates
 				system, solution, evidence, states, diagnostic = fallbackSystem, fallbackSolution, fallbackEvidence, fallbackStates, nil
+			} else if fallbackSystem, fallbackSolution, fallbackEvidence, ok := solveNonlinearDCByOpAmpRailSeed(plan, analysis, states); ok {
+				system, solution, evidence, diagnostic = fallbackSystem, fallbackSolution, fallbackEvidence, nil
 			} else if fallbackSystem, fallbackSolution, fallbackEvidence, ok := solveNonlinearDCByMOSFETActiveSet(plan, analysis, states); ok {
 				system, solution, evidence, diagnostic = fallbackSystem, fallbackSolution, fallbackEvidence, nil
 			} else if fallbackSystem, fallbackSolution, fallbackEvidence, ok := solveNonlinearDCByBJTStateSeed(plan, analysis, states); ok {
@@ -247,6 +277,101 @@ func solveNonlinearDCByCenteredOpAmpSeed(plan Plan, analysis Analysis, activeSta
 	slices.SortFunc(opAmps, func(left, right ResolvedDevice) int {
 		return strings.Compare(left.Component, right.Component)
 	})
+	if !hasSingleAffineProjectionFeedbackDevice(plan) {
+		return solveNonlinearDCByCoupledOpAmpSeed(plan, analysis, activeStates, opAmps)
+	}
+	evidence := SolverEvidence{}
+	baseSystem, diagnostics := buildNonlinearBaseSystem(
+		plan, analysis, continuationStage{sourceScale: 1, gmin: nonlinearFinalGmin, gainScale: 1}, activeStates,
+	)
+	if len(diagnostics) != 0 {
+		return mnaSystem{}, nil, evidence, nil, false
+	}
+	nodeVoltages := groundReferencedSourceVoltages(plan, analysis, &baseSystem)
+	var system mnaSystem
+	var solution []complex128
+	centered := cloneOpAmpClamps(activeStates)
+	centerChanged := false
+	emitterFollowerSeeds := map[string]bool{}
+	for _, device := range opAmps {
+		terminals := terminalMap(device)
+		parameters := deviceParameterMap(device)
+		negative, negativeKnown := nodeVoltages[terminals["V_MINUS"]]
+		positive, positiveKnown := nodeVoltages[terminals["V_PLUS"]]
+		lower := negative + parameters["output_low_margin_v"]
+		upper := positive - parameters["output_high_margin_v"]
+		if !negativeKnown || !positiveKnown || !finite(lower) || !finite(upper) || lower >= upper {
+			return mnaSystem{}, nil, evidence, nil, false
+		}
+		center := (lower + upper) / 2
+		for _, follower := range plan.Devices {
+			if follower.PrimitiveModel != PrimitiveBJTNPNV1 &&
+				follower.PrimitiveModel != PrimitiveBJTPNPV1 {
+				continue
+			}
+			followerTerminals := terminalMap(follower)
+			if followerTerminals["BASE"] != terminals["OUT"] ||
+				followerTerminals["EMITTER"] != terminals["IN_MINUS"] {
+				continue
+			}
+			polarity := 1.0
+			if follower.PrimitiveModel == PrimitiveBJTPNPV1 {
+				polarity = -1
+			}
+			input, inputKnown := nodeVoltages[terminals["IN_PLUS"]]
+			if !inputKnown {
+				break
+			}
+			center = input + polarity*.72
+			center = math.Max(lower, math.Min(upper, center))
+			emitterFollowerSeeds[device.Component] = true
+			break
+		}
+		centered[device.Component] = center
+		centerChanged = centerChanged || math.Abs(center) > nonlinearUpdateTolerance
+	}
+	if centerChanged {
+		centerSystem, centerSolution, centerEvidence, centerDiagnostic := solveNonlinearDCForComparatorStateWithInitial(plan, analysis, centered, nil)
+		evidence.SourceStages += centerEvidence.SourceStages
+		evidence.Iterations += centerEvidence.Iterations
+		evidence.TotalIterations = evidence.Iterations
+		if centerDiagnostic != nil {
+			evidence.Method = centerDiagnostic.Message
+			return mnaSystem{}, nil, evidence, nil, false
+		}
+		system, solution = centerSystem, centerSolution
+	}
+	if len(emitterFollowerSeeds) != 0 {
+		released := cloneOpAmpClamps(centered)
+		for component := range emitterFollowerSeeds {
+			delete(released, component)
+		}
+		releasedSystem, releasedSolution, releasedEvidence, releasedDiagnostic :=
+			solveNonlinearDCForComparatorStateWithInitial(plan, analysis, released, solution)
+		evidence.SourceStages += releasedEvidence.SourceStages
+		evidence.Iterations += releasedEvidence.Iterations
+		evidence.TotalIterations = evidence.Iterations
+		if releasedDiagnostic == nil {
+			system, solution, centered = releasedSystem, releasedSolution, released
+		}
+	}
+	evidence.Method = "bounded_newton_centered_opamp_seed_v1"
+	evidence.TotalIterations = evidence.Iterations
+	return system, solution, evidence, centered, true
+}
+
+// solveNonlinearDCByCoupledOpAmpSeed preserves the shared warm operating point
+// needed by coupled multi-controller circuits. A zero-output solve establishes
+// floating supplies and nonlinear bias nodes before every controller moves to
+// the center of its resolved rails; the second solve then follows that same
+// deterministic operating branch. Single-controller plans use the more direct
+// source-derived seed above.
+func solveNonlinearDCByCoupledOpAmpSeed(
+	plan Plan,
+	analysis Analysis,
+	activeStates map[string]float64,
+	opAmps []ResolvedDevice,
+) (mnaSystem, []complex128, SolverEvidence, map[string]float64, bool) {
 	seeded := cloneOpAmpClamps(activeStates)
 	for _, device := range opAmps {
 		seeded[device.Component] = 0
@@ -318,6 +443,150 @@ func solveNonlinearDCByCenteredOpAmpSeed(plan Plan, analysis Analysis, activeSta
 	return system, solution, evidence, centered, true
 }
 
+// solveNonlinearDCByOpAmpRailSeed bounds a physical negative-feedback stage
+// long enough to establish its transistor operating point, then releases the
+// clamp and first asks the ordinary finite-gain equations to converge. A rail-
+// saturated clamp is never accepted. If release remains numerically stiff, an
+// interior clamped solution is accepted only after bounded bisection proves its
+// output satisfies the same finite-gain equation within the established
+// scale-aware consistency tolerance.
+func solveNonlinearDCByOpAmpRailSeed(plan Plan, analysis Analysis, activeStates map[string]float64) (mnaSystem, []complex128, SolverEvidence, bool) {
+	type railPair struct {
+		component string
+		low       float64
+		high      float64
+	}
+	baseSystem, diagnostics := buildNonlinearBaseSystem(
+		plan,
+		analysis,
+		continuationStage{sourceScale: 1, gmin: nonlinearFinalGmin, gainScale: 1},
+		activeStates,
+	)
+	if len(diagnostics) != 0 {
+		return mnaSystem{}, nil, SolverEvidence{}, false
+	}
+	nodeVoltages := groundReferencedSourceVoltages(plan, analysis, &baseSystem)
+	rails := []railPair{}
+	for _, device := range plan.Devices {
+		if device.PrimitiveModel != PrimitiveOpAmpV1 {
+			continue
+		}
+		if _, constrained := activeStates[device.Component]; constrained {
+			continue
+		}
+		terminals := terminalMap(device)
+		negative, negativeKnown := nodeVoltages[terminals["V_MINUS"]]
+		positive, positiveKnown := nodeVoltages[terminals["V_PLUS"]]
+		parameters := deviceParameterMap(device)
+		if !negativeKnown || !positiveKnown ||
+			positive-negative < parameters["supply_min_v"] ||
+			positive-negative > parameters["supply_max_v"] {
+			continue
+		}
+		low := negative + parameters["output_low_margin_v"]
+		high := positive - parameters["output_high_margin_v"]
+		if !finite(low) || !finite(high) || low >= high {
+			continue
+		}
+		rails = append(rails, railPair{component: device.Component, low: low, high: high})
+	}
+	if len(rails) == 0 || len(rails) > nonlinearMaxOpAmpRailActiveSetDevices {
+		return mnaSystem{}, nil, SolverEvidence{}, false
+	}
+	slices.SortFunc(rails, func(left, right railPair) int {
+		return strings.Compare(left.component, right.component)
+	})
+	total := SolverEvidence{Method: "bounded_newton_opamp_rail_seed_v1", MaxIterationsPerStep: nonlinearMaxIterations}
+	for mask := 0; mask < 1<<len(rails); mask++ {
+		seedStates := cloneOpAmpClamps(activeStates)
+		for index, rail := range rails {
+			seedStates[rail.component] = rail.low
+			if mask&(1<<index) != 0 {
+				seedStates[rail.component] = rail.high
+			}
+		}
+		seedSystem, seed, seedEvidence, seedDiagnostic := solveNonlinearDCForComparatorStateWithInitial(
+			plan, analysis, seedStates, nil,
+		)
+		total.SourceStages += seedEvidence.SourceStages
+		total.Iterations += seedEvidence.Iterations
+		if seedDiagnostic != nil {
+			continue
+		}
+		system, solution, evidence, diagnostic := solveNonlinearDCForComparatorStateWithInitial(
+			plan, analysis, activeStates, seed,
+		)
+		total.SourceStages += evidence.SourceStages
+		total.Iterations += evidence.Iterations
+		total.TotalIterations = total.Iterations
+		total.FinalMaxUpdateV = evidence.FinalMaxUpdateV
+		total.FinalMaxCurrentUpdateA = evidence.FinalMaxCurrentUpdateA
+		total.FinalMaxResidual = evidence.FinalMaxResidual
+		if diagnostic == nil {
+			return system, solution, total, true
+		}
+		// Releasing a rail clamp in one step can put Newton back on the same
+		// divergent branch that required the seed. Establish an interior output
+		// whose clamped operating point is consistent with the ordinary finite-
+		// gain equation, then release from that nearby physical state.
+		boundedSystem, boundedSolution, boundedEvidence, _, bounded := solveLinearOpAmpByBisection(
+			plan, analysis, seedStates, activeStates, seedSystem, seed,
+		)
+		total.SourceStages += boundedEvidence.SourceStages
+		total.Iterations += boundedEvidence.Iterations
+		if boundedEvidence.Method != "" {
+			total.Method += ": " + boundedEvidence.Method
+		}
+		if !bounded {
+			continue
+		}
+		releasedSystem, releasedSolution, releasedEvidence, releasedDiagnostic :=
+			solveNonlinearDCForComparatorStateWithInitial(plan, analysis, activeStates, boundedSolution)
+		total.SourceStages += releasedEvidence.SourceStages
+		total.Iterations += releasedEvidence.Iterations
+		total.TotalIterations = total.Iterations
+		total.FinalMaxUpdateV = releasedEvidence.FinalMaxUpdateV
+		total.FinalMaxCurrentUpdateA = releasedEvidence.FinalMaxCurrentUpdateA
+		total.FinalMaxResidual = releasedEvidence.FinalMaxResidual
+		if releasedDiagnostic == nil {
+			return releasedSystem, releasedSolution, total, true
+		}
+		total.Method = "bounded_newton_opamp_consistent_interior_v1"
+		total.FinalMaxResidual = boundedEvidence.FinalMaxResidual
+		return boundedSystem, boundedSolution, total, true
+	}
+	total.TotalIterations = total.Iterations
+	return mnaSystem{}, nil, total, false
+}
+
+func groundReferencedSourceVoltages(plan Plan, analysis Analysis, system *mnaSystem) map[string]float64 {
+	result := map[string]float64{}
+	for _, device := range plan.Devices {
+		terminals := terminalMap(device)
+		positive, negative := "", ""
+		switch device.PrimitiveModel {
+		case PrimitiveVoltageSourceV1:
+			positive, negative = terminals["POSITIVE"], terminals["NEGATIVE"]
+		case PrimitiveConnectorVoltageSourceV1:
+			positive, negative = terminals["PIN_1"], terminals["PIN_2"]
+		default:
+			continue
+		}
+		_, positiveVariable := system.nodeIndex[positive]
+		_, negativeVariable := system.nodeIndex[negative]
+		value := real(excitationValue(analysis, device.Component))
+		switch {
+		case positiveVariable && !negativeVariable:
+			result[negative] = 0
+			result[positive] = value
+		case !positiveVariable && negativeVariable:
+			result[positive] = 0
+			result[negative] = -value
+		}
+	}
+	return result
+}
+
 func solveLinearOpAmpByBisection(plan Plan, analysis Analysis, current, resolved map[string]float64, operatingSystem mnaSystem, operatingSolution []complex128) (mnaSystem, []complex128, SolverEvidence, map[string]float64, bool) {
 	for _, device := range plan.Devices {
 		if device.PrimitiveModel != PrimitiveOpAmpV1 {
@@ -357,6 +626,58 @@ func solveLinearOpAmpByBisection(plan Plan, analysis Analysis, current, resolved
 			Iterations:           lowerEvidence.Iterations + upperEvidence.Iterations,
 			MaxIterationsPerStep: nonlinearMaxIterations,
 		}
+		// A rail endpoint can be physically unsolvable even though the finite-gain
+		// operating point lies safely inside the output range. For example, an
+		// unloaded-high source pass stage cannot support its imposed load. Walk
+		// from the converged endpoint with an adaptively bounded clamp step until
+		// the finite-gain residual is bracketed; failed steps are halved and never
+		// accepted as evidence.
+		if lowerOK != upperOK {
+			const maximumBracketAttempts = 64
+			if lowerOK {
+				step := (upper - lower) / 8
+				for attempt := 0; attempt < maximumBracketAttempts && lower < upper; attempt++ {
+					probe := math.Min(upper, lower+step)
+					probeSystem, probeSolution, probeEvidence, probeResidual, probeOK := evaluate(probe, lowerSolution)
+					evidence.SourceStages += probeEvidence.SourceStages
+					evidence.Iterations += probeEvidence.Iterations
+					if !probeOK {
+						step /= 2
+						if step <= nonlinearUpdateTolerance {
+							break
+						}
+						continue
+					}
+					if math.Signbit(probeResidual) != math.Signbit(lowerResidual) || math.Abs(probeResidual) <= nonlinearClampConsistencyTolerance(probe) {
+						upper, upperSystem, upperSolution, upperResidual, upperOK = probe, probeSystem, probeSolution, probeResidual, true
+						break
+					}
+					lower, lowerSystem, lowerSolution, lowerResidual = probe, probeSystem, probeSolution, probeResidual
+					step = math.Min(step*1.5, upper-lower)
+				}
+			} else {
+				step := (upper - lower) / 8
+				for attempt := 0; attempt < maximumBracketAttempts && lower < upper; attempt++ {
+					probe := math.Max(lower, upper-step)
+					probeSystem, probeSolution, probeEvidence, probeResidual, probeOK := evaluate(probe, upperSolution)
+					evidence.SourceStages += probeEvidence.SourceStages
+					evidence.Iterations += probeEvidence.Iterations
+					if !probeOK {
+						step /= 2
+						if step <= nonlinearUpdateTolerance {
+							break
+						}
+						continue
+					}
+					if math.Signbit(probeResidual) != math.Signbit(upperResidual) || math.Abs(probeResidual) <= nonlinearClampConsistencyTolerance(probe) {
+						lower, lowerSystem, lowerSolution, lowerResidual, lowerOK = probe, probeSystem, probeSolution, probeResidual, true
+						break
+					}
+					upper, upperSystem, upperSolution, upperResidual = probe, probeSystem, probeSolution, probeResidual
+					step = math.Min(step*1.5, upper-lower)
+				}
+			}
+		}
 		if !lowerOK || !upperOK {
 			lowerPlus := nonlinearNodeVoltage(&lowerSystem, lowerSolution, terminals["IN_PLUS"])
 			lowerMinus := nonlinearNodeVoltage(&lowerSystem, lowerSolution, terminals["IN_MINUS"])
@@ -365,12 +686,12 @@ func solveLinearOpAmpByBisection(plan Plan, analysis Analysis, current, resolved
 			evidence.Method = fmt.Sprintf("endpoint bracket lower_ok=%t upper_ok=%t lower_residual=%.12g upper_residual=%.12g lower_inputs=%.12g/%.12g upper_inputs=%.12g/%.12g", lowerOK, upperOK, lowerResidual, upperResidual, lowerPlus, lowerMinus, upperPlus, upperMinus)
 			return mnaSystem{}, nil, evidence, nil, false
 		}
-		if math.Abs(lowerResidual) <= nonlinearClampConsistencyV {
+		if math.Abs(lowerResidual) <= nonlinearClampConsistencyTolerance(lower) {
 			next := cloneOpAmpClamps(resolved)
 			delete(next, device.Component)
 			return lowerSystem, lowerSolution, evidence, next, true
 		}
-		if math.Abs(upperResidual) <= nonlinearClampConsistencyV {
+		if math.Abs(upperResidual) <= nonlinearClampConsistencyTolerance(upper) {
 			next := cloneOpAmpClamps(resolved)
 			delete(next, device.Component)
 			return upperSystem, upperSolution, evidence, next, true
@@ -380,7 +701,7 @@ func solveLinearOpAmpByBisection(plan Plan, analysis Analysis, current, resolved
 			midSystem, midSolution, midEvidence, midResidual, midOK := evaluate(midpoint, nil)
 			evidence.SourceStages += midEvidence.SourceStages
 			evidence.Iterations += midEvidence.Iterations
-			if midOK && math.Abs(midResidual) <= nonlinearClampConsistencyV {
+			if midOK && math.Abs(midResidual) <= nonlinearClampConsistencyTolerance(midpoint) {
 				next := cloneOpAmpClamps(resolved)
 				delete(next, device.Component)
 				evidence.TotalIterations = evidence.Iterations
@@ -412,7 +733,7 @@ func solveLinearOpAmpByBisection(plan Plan, analysis Analysis, current, resolved
 				return mnaSystem{}, nil, evidence, nil, false
 			}
 			bestSystem, bestSolution = midSystem, midSolution
-			if math.Abs(midResidual) <= nonlinearClampConsistencyV {
+			if math.Abs(midResidual) <= nonlinearClampConsistencyTolerance(midpoint) {
 				next := cloneOpAmpClamps(resolved)
 				delete(next, device.Component)
 				evidence.TotalIterations = evidence.Iterations
@@ -486,7 +807,7 @@ func activeDeviceStateSolutionConsistent(plan Plan, system mnaSystem, solution [
 			differential := nonlinearNodeVoltage(&system, solution, terminals["IN_PLUS"]) - nonlinearNodeVoltage(&system, solution, terminals["IN_MINUS"])
 			desired = gain * differential
 		}
-		tolerance := nonlinearClampConsistencyV * math.Max(1, math.Abs(currentValue))
+		tolerance := nonlinearClampConsistencyTolerance(currentValue)
 		if math.Abs(desired-currentValue) > tolerance {
 			return false
 		}
@@ -640,7 +961,11 @@ func solveNonlinearDCForComparatorStateWithInitial(plan Plan, analysis Analysis,
 		}
 		return system, solution, evidence, nil
 	}
-	stages := nonlinearContinuation
+	coldContinuation := nonlinearContinuationForPlan(plan)
+	if hasSingleAffineProjectionFeedbackDevice(plan) && hasSingleVoltageValuedActiveDeviceClamp(plan, comparatorStates) {
+		coldContinuation = nonlinearClampedContinuationForPlan(plan)
+	}
+	stages := coldContinuation
 	method := "bounded_newton_source_gmin_v1"
 	warmStart := len(guess) != 0
 	warmFallbackUsed := false
@@ -664,6 +989,8 @@ func solveNonlinearDCForComparatorStateWithInitial(plan Plan, analysis Analysis,
 			planWithIntrinsicSourceContinuationScale(plan, stage.sourceScale),
 			comparatorStates,
 		)
+		linearColdSeedUsed := false
+		linearColdSeedFailure := ""
 		if len(guess) == 0 {
 			guess = make([]complex128, len(baseSystem.rhs))
 			if useLinearColdSeed {
@@ -675,6 +1002,9 @@ func solveNonlinearDCForComparatorStateWithInitial(plan Plan, analysis Analysis,
 				// continuation seed, which follows their piecewise operating path.
 				if linearGuess, linearDiagnostic := solveMNA(baseSystem); linearDiagnostic == nil {
 					guess = linearGuess
+					linearColdSeedUsed = true
+				} else {
+					linearColdSeedFailure = linearDiagnostic.Message
 				}
 			}
 		} else if len(guess) != len(baseSystem.rhs) {
@@ -751,6 +1081,13 @@ func solveNonlinearDCForComparatorStateWithInitial(plan Plan, analysis Analysis,
 					maxAppliedCurrentUpdate = math.Max(maxAppliedCurrentUpdate, math.Abs(real(applied)))
 				}
 			}
+			if stage.sourceScale >= nonlinearAffineProjectionMinimumSourceScale && hasSingleAffineProjectionFeedbackDevice(plan) {
+				projectedVoltageUpdate, projectedCurrentUpdate := projectGroundReferencedVoltageSources(
+					plan, &baseSystem, devices, candidate, guess,
+				)
+				maxAppliedUpdate = math.Max(maxAppliedUpdate, projectedVoltageUpdate)
+				maxAppliedCurrentUpdate = math.Max(maxAppliedCurrentUpdate, projectedCurrentUpdate)
+			}
 			// Check the accepted damped state against the original nonlinear
 			// KCL equations, not against the prior Newton linearization or an
 			// undamped candidate that the solver did not accept.
@@ -774,7 +1111,7 @@ func solveNonlinearDCForComparatorStateWithInitial(plan Plan, analysis Analysis,
 				// deterministic bounded fallback.
 				warmFallbackUsed = true
 				stageAttemptOffset = 1
-				stages = append([]continuationStage(nil), nonlinearContinuation...)
+				stages = append([]continuationStage(nil), coldContinuation...)
 				guess = nil
 				stageIndex = 0
 				bjtSeedWithoutLineSearch = false
@@ -804,9 +1141,13 @@ func solveNonlinearDCForComparatorStateWithInitial(plan Plan, analysis Analysis,
 			voltageContext := nonlinearUnknownContext(plan, largestUpdateLabel)
 			residualContext := nonlinearUnknownContext(plan, largestResidualLabel)
 			activeState := activeDeviceStateKey(plan, comparatorStates)
+			coldSeedContext := fmt.Sprintf("linear cold seed %t", linearColdSeedUsed)
+			if linearColdSeedFailure != "" {
+				coldSeedContext += ": " + linearColdSeedFailure
+			}
 			return mnaSystem{}, nil, evidence, &Diagnostic{
 				Path:       "convergence",
-				Message:    fmt.Sprintf("nonlinear DC did not converge within %d iterations at continuation stage %d/%d (source %.12g, gmin %.12g, op-amp gain %.12g) with active-device state %s; largest voltage update %s%s %.12g V, largest current update %s %.12g A, largest normalized residual %s%s %.12g", nonlinearMaxIterations, stageIndex+1, len(stages), stage.sourceScale, stage.gmin, stage.gainScale, activeState, largestUpdateLabel, voltageContext, evidence.FinalMaxUpdateV, largestCurrentUpdateLabel, evidence.FinalMaxCurrentUpdateA, largestResidualLabel, residualContext, evidence.FinalMaxResidual),
+				Message:    fmt.Sprintf("nonlinear DC did not converge within %d iterations at continuation stage %d/%d (source %.12g, gmin %.12g, op-amp gain %.12g, %s) with active-device state %s; largest voltage update %s%s %.12g V, largest current update %s %.12g A, largest normalized residual %s%s %.12g", nonlinearMaxIterations, stageIndex+1, len(stages), stage.sourceScale, stage.gmin, stage.gainScale, coldSeedContext, activeState, largestUpdateLabel, voltageContext, evidence.FinalMaxUpdateV, largestCurrentUpdateLabel, evidence.FinalMaxCurrentUpdateA, largestResidualLabel, residualContext, evidence.FinalMaxResidual),
 				Suggestion: "add or correct catalog-backed DC bias paths, reduce conflicting source conditions, or select nonlinear models appropriate for the operating range",
 			}
 		}
@@ -814,6 +1155,203 @@ func solveNonlinearDCForComparatorStateWithInitial(plan Plan, analysis Analysis,
 		bjtSeedWithoutLineSearch = false
 	}
 	return finalSystem, guess, evidence, nil
+}
+
+func hasSingleAffineProjectionFeedbackDevice(plan Plan) bool {
+	count := 0
+	for _, device := range plan.Devices {
+		if device.PrimitiveModel == PrimitiveOpAmpV1 || device.PrimitiveModel == PrimitiveCurrentSenseAmplifierV1 {
+			count++
+		}
+	}
+	return count == 1
+}
+
+// projectGroundReferencedVoltageSources eliminates the affine unknowns of an
+// ideal source after nonlinear line search accepts a damped device state. The
+// source voltage is exact, while its branch current is recomputed from KCL for
+// the accepted state rather than copied from the undamped Newton candidate.
+func projectGroundReferencedVoltageSources(
+	plan Plan,
+	base *mnaSystem,
+	devices []compiledNonlinearDevice,
+	candidate, guess []complex128,
+) (float64, float64) {
+	projections := []groundSourceProjection{}
+	maximumVoltageCorrection := 0.0
+	for _, device := range plan.Devices {
+		terminals := terminalMap(device)
+		positive, negative := "", ""
+		switch device.PrimitiveModel {
+		case PrimitiveVoltageSourceV1:
+			positive, negative = terminals["POSITIVE"], terminals["NEGATIVE"]
+		case PrimitiveConnectorVoltageSourceV1:
+			positive, negative = terminals["PIN_1"], terminals["PIN_2"]
+		default:
+			continue
+		}
+		positiveIndex, positiveVariable := base.nodeIndex[positive]
+		negativeIndex, negativeVariable := base.nodeIndex[negative]
+		if positiveVariable == negativeVariable {
+			continue
+		}
+		row := positiveIndex
+		if negativeVariable {
+			row = negativeIndex
+		}
+		if row < 0 || row >= len(guess) || row >= len(candidate) {
+			continue
+		}
+		correction := candidate[row] - guess[row]
+		guess[row] = candidate[row]
+		maximumVoltageCorrection = math.Max(maximumVoltageCorrection, math.Abs(real(correction)))
+	}
+	// Any MNA branch column incident on exactly one variable node is an affine
+	// current unknown (for example, a ground-referenced source or op-amp output).
+	// It can be eliminated exactly for the accepted voltage state. Floating
+	// two-node sources remain under ordinary Newton damping.
+	components := make([]string, 0, len(base.branchIndex))
+	for component := range base.branchIndex {
+		components = append(components, component)
+	}
+	slices.Sort(components)
+	seenRows := map[int]bool{}
+	for _, component := range components {
+		branch := base.branchIndex[component]
+		row, coefficient, incidenceCount := -1, 0.0, 0
+		for nodeRow := 0; nodeRow < len(base.nodeIndex); nodeRow++ {
+			value := real(base.matrix[nodeRow][branch])
+			if value == 0 {
+				continue
+			}
+			row, coefficient, incidenceCount = nodeRow, value, incidenceCount+1
+		}
+		if incidenceCount != 1 || seenRows[row] || branch < 0 || branch >= len(guess) {
+			continue
+		}
+		projections = append(projections, groundSourceProjection{row: row, branch: branch, coefficient: coefficient})
+		seenRows[row] = true
+	}
+	if len(projections) == 0 {
+		return maximumVoltageCorrection, 0
+	}
+	residuals := nonlinearResidualRows(*base, devices, guess, projections)
+	maximumCurrentCorrection := 0.0
+	for index, projection := range projections {
+		correction := -residuals[index] / projection.coefficient
+		guess[projection.branch] += complex(correction, 0)
+		maximumCurrentCorrection = math.Max(maximumCurrentCorrection, math.Abs(correction))
+	}
+	return maximumVoltageCorrection, maximumCurrentCorrection
+}
+
+func nonlinearResidualRows(
+	base mnaSystem,
+	devices []compiledNonlinearDevice,
+	solution []complex128,
+	projections []groundSourceProjection,
+) []float64 {
+	result := make([]float64, len(projections))
+	nonlinearResidualWithObserver(base, devices, solution, func(residuals []complex128) {
+		for index, projection := range projections {
+			result[index] = real(residuals[projection.row])
+		}
+	})
+	return result
+}
+
+func nonlinearContinuationForPlan(plan Plan) []continuationStage {
+	if hasSupplyReferencedPNPDriveChain(plan) {
+		return nonlinearHighSideBJTDriveContinuation
+	}
+	return nonlinearContinuation
+}
+
+func hasSingleVoltageValuedActiveDeviceClamp(plan Plan, states map[string]float64) bool {
+	count := 0
+	for _, device := range plan.Devices {
+		if device.PrimitiveModel != PrimitiveOpAmpV1 && device.PrimitiveModel != PrimitiveCurrentSenseAmplifierV1 {
+			continue
+		}
+		if _, exists := states[device.Component]; exists {
+			count++
+		}
+	}
+	return count == 1
+}
+
+func nonlinearClampedContinuationForPlan(plan Plan) []continuationStage {
+	sourceStages := []float64{.05, .2, .5, .8, 1}
+	if hasSupplyReferencedPNPDriveChain(plan) {
+		sourceStages = []float64{.75, .9, 1}
+	} else if hasDirectSupplyReferencedNPNPass(plan) {
+		sourceStages = []float64{.75, .9, 1}
+	}
+	stages := make([]continuationStage, 0, nonlinearMaxContinuationStages)
+	for _, sourceScale := range sourceStages {
+		stages = append(stages, continuationStage{sourceScale: sourceScale, gmin: 1e-4, gainScale: 1})
+	}
+	for gmin := 1e-4 / 3; gmin > nonlinearFinalGmin; gmin /= 3 {
+		stages = append(stages, continuationStage{sourceScale: 1, gmin: gmin, gainScale: 1})
+	}
+	stages = append(stages, continuationStage{sourceScale: 1, gmin: nonlinearFinalGmin, gainScale: 1})
+	return stages
+}
+
+func hasDirectSupplyReferencedNPNPass(plan Plan) bool {
+	for _, controller := range plan.Devices {
+		if controller.PrimitiveModel != PrimitiveOpAmpV1 {
+			continue
+		}
+		controllerTerminals := terminalMap(controller)
+		for _, pass := range plan.Devices {
+			if pass.PrimitiveModel != PrimitiveBJTNPNV1 {
+				continue
+			}
+			passTerminals := terminalMap(pass)
+			if passTerminals["COLLECTOR"] == controllerTerminals["V_PLUS"] &&
+				resistorPathWithin(plan, controllerTerminals["OUT"], passTerminals["BASE"], 1) &&
+				resistorPathWithin(plan, passTerminals["EMITTER"], controllerTerminals["IN_MINUS"], 4) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// hasSupplyReferencedPNPDriveChain recognizes a generic high-side current
+// buffer whose fixed junction drops make very-low-voltage source stepping
+// nonphysical. The match is structural: an op-amp reaches a supply-emitter PNP
+// base through at most one resistor, and that PNP collector drives the base of
+// an NPN pass device returned to the same supply.
+func hasSupplyReferencedPNPDriveChain(plan Plan) bool {
+	for _, controller := range plan.Devices {
+		if controller.PrimitiveModel != PrimitiveOpAmpV1 {
+			continue
+		}
+		controllerTerminals := terminalMap(controller)
+		supply := controllerTerminals["V_PLUS"]
+		for _, driver := range plan.Devices {
+			if driver.PrimitiveModel != PrimitiveBJTPNPV1 {
+				continue
+			}
+			driverTerminals := terminalMap(driver)
+			if supply == "" || driverTerminals["EMITTER"] != supply ||
+				!resistorPathWithin(plan, controllerTerminals["OUT"], driverTerminals["BASE"], 1) {
+				continue
+			}
+			for _, pass := range plan.Devices {
+				if pass.PrimitiveModel != PrimitiveBJTNPNV1 {
+					continue
+				}
+				passTerminals := terminalMap(pass)
+				if passTerminals["COLLECTOR"] == supply && passTerminals["BASE"] == driverTerminals["COLLECTOR"] {
+					return true
+				}
+			}
+		}
+	}
+	return false
 }
 
 // hasOpAmpControlledEmitterFollower identifies the biased linear loop that
@@ -843,11 +1381,79 @@ func hasOpAmpControlledEmitterFollower(plan Plan) bool {
 			continue
 		}
 		followerTerminals := terminalMap(follower)
-		if _, found := controllerPairs[feedbackPair{
-			output:   followerTerminals["BASE"],
-			feedback: followerTerminals["EMITTER"],
-		}]; found {
-			return true
+		for pair := range controllerPairs {
+			if !resistorPathWithin(plan, pair.output, followerTerminals["BASE"], 1) {
+				continue
+			}
+			if resistorPathWithin(plan, followerTerminals["EMITTER"], pair.feedback, 4) ||
+				followerTerminals["COLLECTOR"] == opAmpSupplyForOutput(plan, pair.output) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func opAmpSupplyForOutput(plan Plan, output string) string {
+	for _, controller := range plan.Devices {
+		if controller.PrimitiveModel != PrimitiveOpAmpV1 {
+			continue
+		}
+		terminals := terminalMap(controller)
+		if terminals["OUT"] == output {
+			return terminals["V_PLUS"]
+		}
+	}
+	return ""
+}
+
+// resistorPathWithin treats a direct net identity as a zero-hop path and only
+// traverses catalog-resolved resistors. The bounded hop count recognizes the
+// ordinary base stopper, current-sense string, and feedback divider of a
+// regulator without classifying unrelated active stages that merely share a
+// supply or reference domain.
+func resistorPathWithin(plan Plan, start, target string, maximumHops int) bool {
+	if start == "" || target == "" || maximumHops < 0 {
+		return false
+	}
+	if start == target {
+		return true
+	}
+	adjacency := map[string][]string{}
+	for _, device := range plan.Devices {
+		if device.PrimitiveModel != PrimitiveResistorV1 {
+			continue
+		}
+		terminals := terminalMap(device)
+		left, right := terminals["A"], terminals["B"]
+		if left == "" || right == "" || left == right {
+			continue
+		}
+		adjacency[left] = append(adjacency[left], right)
+		adjacency[right] = append(adjacency[right], left)
+	}
+	type pathState struct {
+		net  string
+		hops int
+	}
+	queue := []pathState{{net: start}}
+	visited := map[string]int{start: 0}
+	for len(queue) != 0 {
+		current := queue[0]
+		queue = queue[1:]
+		if current.hops >= maximumHops {
+			continue
+		}
+		for _, next := range adjacency[current.net] {
+			hops := current.hops + 1
+			if next == target {
+				return true
+			}
+			if previous, found := visited[next]; found && previous <= hops {
+				continue
+			}
+			visited[next] = hops
+			queue = append(queue, pathState{net: next, hops: hops})
 		}
 	}
 	return false
@@ -1336,7 +1942,11 @@ func buildNonlinearBaseSystem(plan Plan, analysis Analysis, stage continuationSt
 	// encoded in device model parameters need a cloned plan.
 	scaledPlan := planWithIntrinsicSourceContinuationScale(plan, stage.sourceScale)
 	scaledPlan = planWithOpAmpGainScale(scaledPlan, stage.gainScale)
-	system, diagnostics := buildMNASystemWithOpAmpClamps(scaledPlan, scaled, 0, comparatorStates)
+	scaledStates := comparatorStates
+	if hasSingleAffineProjectionFeedbackDevice(plan) {
+		scaledStates = activeDeviceStatesWithSourceContinuationScale(plan, comparatorStates, stage.sourceScale)
+	}
+	system, diagnostics := buildMNASystemWithOpAmpClamps(scaledPlan, scaled, 0, scaledStates)
 	if len(diagnostics) != 0 {
 		return system, diagnostics
 	}
@@ -1349,6 +1959,26 @@ func buildNonlinearBaseSystem(plan Plan, analysis Analysis, stage continuationSt
 		return mnaSystem{}, []Diagnostic{*diagnostic}
 	}
 	return system, nil
+}
+
+// activeDeviceStatesWithSourceContinuationScale keeps voltage-valued active
+// device clamps consistent with the independent supplies used by a source
+// continuation stage. Comparator and forced semiconductor states are discrete
+// region selections, so their values must not be scaled.
+func activeDeviceStatesWithSourceContinuationScale(plan Plan, states map[string]float64, scale float64) map[string]float64 {
+	if len(states) == 0 || scale == 1 {
+		return states
+	}
+	scaled := cloneOpAmpClamps(states)
+	for _, device := range plan.Devices {
+		switch device.PrimitiveModel {
+		case PrimitiveOpAmpV1, PrimitiveCurrentSenseAmplifierV1:
+			if value, exists := scaled[device.Component]; exists {
+				scaled[device.Component] = value * scale
+			}
+		}
+	}
+	return scaled
 }
 
 func planWithIntrinsicSourceContinuationScale(plan Plan, scale float64) Plan {
@@ -2027,6 +2657,15 @@ func stampNonlinearBJT(system *mnaSystem, device compiledNonlinearDevice, guess 
 }
 
 func nonlinearResidual(base mnaSystem, devices []compiledNonlinearDevice, solution []complex128) (float64, string) {
+	return nonlinearResidualWithObserver(base, devices, solution, nil)
+}
+
+func nonlinearResidualWithObserver(
+	base mnaSystem,
+	devices []compiledNonlinearDevice,
+	solution []complex128,
+	observer func([]complex128),
+) (float64, string) {
 	size := len(base.rhs)
 	scratch := nonlinearResidualScratchPool.Get().(*nonlinearResidualScratch)
 	defer nonlinearResidualScratchPool.Put(scratch)
@@ -2117,6 +2756,9 @@ func nonlinearResidual(base mnaSystem, devices []compiledNonlinearDevice, soluti
 		case PrimitivePushPullDigitalIsolatorV1:
 			addPushPullIsolatorResidual(residuals, base, device, solution)
 		}
+	}
+	if observer != nil {
+		observer(residuals)
 	}
 	maximum, label := 0.0, "unknown"
 	for row, residual := range residuals {

@@ -79,6 +79,7 @@ func BuildValueSearchPlan(
 	rejections := map[string][]string{}
 	requiredAnalyses := requirementAnalysisSet(requirement)
 	inventoryByKey := primitiveInventoryByKey(inventory)
+	preserveDerivedVoltageSeeds := len(regulatedVoltageRelationships(requirement)) != 0
 	for _, instance := range normalizedGraph.Instances {
 		original, found := primitiveByKey(inventory, instance.PrimitiveKey)
 		if !found {
@@ -123,8 +124,12 @@ func BuildValueSearchPlan(
 		}
 		slices.SortFunc(domain.Candidates, compareComponentValueCandidates)
 		domain.Candidates = compactValueCandidates(domain.Candidates)
-		if original.ValueDomain == nil {
-			domain.Candidates = prioritizeOriginalFixedCandidate(
+		if original.ValueDomain == nil || preserveDerivedVoltageSeeds {
+			// Behavior-derived voltage relationships jointly select coupled
+			// feedback, drive, ballast, and protection values. Preserve those
+			// catalog seeds as the first deterministic trial while retaining the
+			// bounded domain for later exploration and repair.
+			domain.Candidates = prioritizeOriginalCandidate(
 				domain.Candidates,
 				instance.PrimitiveKey,
 			)
@@ -164,7 +169,7 @@ func BuildValueSearchPlan(
 	return result
 }
 
-func prioritizeOriginalFixedCandidate(
+func prioritizeOriginalCandidate(
 	candidates []ComponentValueCandidate,
 	originalKey string,
 ) []ComponentValueCandidate {
@@ -617,7 +622,7 @@ func catalogResistanceDivider(
 	}
 	bestUpper := 0.0
 	bestLower := []float64(nil)
-	bestRatioError, bestAnchorError := math.Inf(1), math.Inf(1)
+	bestWorstRatioError, bestRatioError, bestAnchorError := math.Inf(1), math.Inf(1), math.Inf(1)
 	lowerCombinations := [][]resistanceValue{}
 	indices := make([]int, lowerBranchCount)
 	for {
@@ -656,19 +661,25 @@ func catalogResistanceDivider(
 				continue
 			}
 			ratioError := multiplicativeRelativeError(upper.nominal/lowerNominal, targetRatio)
+			worstRatioError := math.Max(
+				multiplicativeRelativeError(upper.maximum/lowerMinimum, targetRatio),
+				multiplicativeRelativeError(upper.minimum/lowerMaximum, targetRatio),
+			)
 			anchorError := multiplicativeRelativeError(lowerNominal, anchorLower)
 			branchNominals := make([]float64, len(lowerBranches))
 			for index, lower := range lowerBranches {
 				branchNominals[index] = lower.nominal
 			}
-			if ratioError < bestRatioError ||
-				(ratioError == bestRatioError &&
-					(anchorError < bestAnchorError ||
-						(anchorError == bestAnchorError &&
-							(upper.nominal < bestUpper ||
-								(upper.nominal == bestUpper && slices.Compare(branchNominals, bestLower) < 0))))) {
+			if worstRatioError < bestWorstRatioError ||
+				(worstRatioError == bestWorstRatioError &&
+					(ratioError < bestRatioError ||
+						(ratioError == bestRatioError &&
+							(anchorError < bestAnchorError ||
+								(anchorError == bestAnchorError &&
+									(upper.nominal < bestUpper ||
+										(upper.nominal == bestUpper && slices.Compare(branchNominals, bestLower) < 0))))))) {
 				bestUpper, bestLower = upper.nominal, branchNominals
-				bestRatioError, bestAnchorError = ratioError, anchorError
+				bestWorstRatioError, bestRatioError, bestAnchorError = worstRatioError, ratioError, anchorError
 			}
 		}
 	}

@@ -903,7 +903,21 @@
               "cooling_coupling": "fixed"
             }
           ]
-        }
+        },
+        "transient_soa": [
+          {
+            "dc": true,
+            "case_temperature_c": 25,
+            "points": [
+              {"voltage_v": 5, "current_a": 10},
+              {"voltage_v": 10, "current_a": 10},
+              {"voltage_v": 20, "current_a": 5},
+              {"voltage_v": 50, "current_a": 1},
+              {"voltage_v": 100, "current_a": 0.3},
+              {"voltage_v": 200, "current_a": 0.05}
+            ]
+          }
+        ]
       }],
       "tags": ["audio", "bjt", "npn", "power_output", "to3p", "linear"],
       "ratings": [
@@ -1025,7 +1039,21 @@
               "cooling_coupling": "fixed"
             }
           ]
-        }
+        },
+        "transient_soa": [
+          {
+            "dc": true,
+            "case_temperature_c": 25,
+            "points": [
+              {"voltage_v": 5, "current_a": 10},
+              {"voltage_v": 10, "current_a": 10},
+              {"voltage_v": 20, "current_a": 5},
+              {"voltage_v": 50, "current_a": 1},
+              {"voltage_v": 100, "current_a": 0.3},
+              {"voltage_v": 200, "current_a": 0.05}
+            ]
+          }
+        ]
       }],
       "tags": ["audio", "bjt", "pnp", "power_output", "to3p", "linear"],
       "ratings": [

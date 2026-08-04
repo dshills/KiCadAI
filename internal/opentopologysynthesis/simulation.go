@@ -27,6 +27,8 @@ const (
 	diagnosisUnstable              = "unstable"
 	diagnosisThermalUnavailable    = "thermal_model_unavailable"
 	diagnosisSimulationInvalid     = "simulation_invalid"
+	maximumHarnessResistanceOhm    = 1e12
+	maximumDynamicTimeSteps        = 1_000_000
 )
 
 type SimulationEnvironment struct {
@@ -482,6 +484,8 @@ func directSimulationQuantity(assertion BehavioralAssertion) (string, float64, b
 		return simmodel.QuantityOvershootVoltageV, 1, true
 	case "output_current":
 		return simmodel.QuantityDeviceCurrentA, 1, true
+	case "peak_current":
+		return simmodel.QuantityPeakAbsDeviceCurrentA, 1, true
 	case "off_state_current":
 		if assertion.Analysis == simmodel.AnalysisTransient ||
 			assertion.Analysis == simmodel.AnalysisStartup ||
@@ -659,12 +663,16 @@ func simulationHarness(
 		hashes = append(hashes, provenanceHashes...)
 	}
 	for _, condition := range operatingCase.Conditions {
+		if simulationExcludesLoadCurrent(assertion) && condition.Axis == "load_current" {
+			continue
+		}
 		target, found := externalNodeForSemanticTarget(graph, condition.Target)
 		if !found {
 			continue
 		}
 		value := corner.Values[conditionKey(condition)]
 		var family, modelID, firstTerminal, secondTerminal string
+		resistiveCurrentLoad := false
 		switch condition.Axis {
 		case "load_resistance":
 			family, modelID, firstTerminal, secondTerminal = "resistor", simmodel.PrimitiveResistorV1, "A", "B"
@@ -676,7 +684,12 @@ func simulationHarness(
 		case "load_inductance":
 			family, modelID, firstTerminal, secondTerminal = "inductor", simmodel.PrimitiveInductorTransientV1, "A", "B"
 		case "load_current":
-			family, modelID, firstTerminal, secondTerminal = "current_source", simmodel.PrimitiveCurrentSourceV1, "POSITIVE", "NEGATIVE"
+			if resistance, found := dynamicVoltageOutputLoadResistance(requirement, assertion, condition, value); found {
+				family, modelID, firstTerminal, secondTerminal = "resistor", simmodel.PrimitiveResistorV1, "A", "B"
+				value, resistiveCurrentLoad = resistance, true
+			} else {
+				family, modelID, firstTerminal, secondTerminal = "current_source", simmodel.PrimitiveCurrentSourceV1, "POSITIVE", "NEGATIVE"
+			}
 		default:
 			continue
 		}
@@ -718,12 +731,41 @@ func simulationHarness(
 			{Function: firstTerminal, Net: firstNode},
 			{Function: secondTerminal, Net: secondNode},
 		}
-		if condition.Axis != "load_current" {
+		if condition.Axis != "load_current" || resistiveCurrentLoad {
 			component.ValueSI = value
 			component.HasValueSI = true
 		}
 		result = append(result, component)
 		hashes = append(hashes, provenanceHashes...)
+	}
+	shortTargets := map[string]bool{}
+	for _, event := range operatingCase.Events {
+		if event.Kind != "short_circuit" || shortTargets[event.Target] {
+			continue
+		}
+		target, found := externalNodeForSemanticTarget(graph, event.Target)
+		_, resistanceFound := protectedShortResistance(requirement, event)
+		if !found || !resistanceFound {
+			continue
+		}
+		record, provenanceHashes, ok := selectHarnessRecord(
+			environment, "resistor", simmodel.PrimitiveResistorV1, trustedModelAnalysisKind(assertion.Analysis),
+		)
+		if !ok {
+			diagnostics = append(diagnostics, SimulationDiagnostic{
+				Code: diagnosisModelUnavailable, Path: "simulation.harness." + shortLoadInstanceID(event.Target),
+				Message: "reviewed resistor harness primitive is unavailable for short-circuit testing",
+			})
+			continue
+		}
+		firstNode, secondNode := loadHarnessNodes(requirement, graph, target, reference)
+		result = append(result, simmodel.ComponentEvidence{
+			InstanceID: shortLoadInstanceID(event.Target), CatalogID: record.ID, Family: record.Family,
+			ValueSI: 1e12, HasValueSI: true, ModelClaims: cloneCatalogClaims(record.SimulationModels),
+			Connections: []simmodel.ConnectionEvidence{{Function: "A", Net: firstNode}, {Function: "B", Net: secondNode}},
+		})
+		hashes = append(hashes, provenanceHashes...)
+		shortTargets[event.Target] = true
 	}
 	slices.SortFunc(result, func(left, right simmodel.ComponentEvidence) int {
 		return cmp.Compare(left.InstanceID, right.InstanceID)
@@ -738,6 +780,39 @@ func capacitorHarnessModel(analysis string) string {
 	default:
 		return simmodel.PrimitiveCapacitorV1
 	}
+}
+
+func dynamicVoltageOutputLoadResistance(
+	requirement Requirement,
+	assertion BehavioralAssertion,
+	condition OperatingCondition,
+	currentA float64,
+) (float64, bool) {
+	if condition.Axis != "load_current" || currentA == 0 ||
+		(assertion.Analysis == "dc_sweep" && assertion.Metric == "load_regulation") {
+		return 0, false
+	}
+	switch assertion.Analysis {
+	case "dc_sweep", simmodel.AnalysisDCOperatingPoint:
+	case simmodel.AnalysisTransient, simmodel.AnalysisStartup, simmodel.AnalysisElectrothermal,
+		simmodel.AnalysisThermal, simmodel.AnalysisStability, simmodel.AnalysisACSweep, simmodel.AnalysisNoise:
+	default:
+		return 0, false
+	}
+	for _, port := range requirement.Requirements.Ports {
+		if port.ID != condition.Target || port.Kind != "power" || port.Direction != "source" {
+			continue
+		}
+		voltageV := 0.0
+		if port.Electrical.NominalVoltageV != nil {
+			voltageV = math.Abs(*port.Electrical.NominalVoltageV)
+		} else if port.Electrical.MinVoltageV != nil && port.Electrical.MaxVoltageV != nil {
+			voltageV = math.Abs((*port.Electrical.MinVoltageV + *port.Electrical.MaxVoltageV) / 2)
+		}
+		resistance := math.Min(voltageV/math.Abs(currentA), maximumHarnessResistanceOhm)
+		return resistance, resistance > 0 && finite(resistance)
+	}
+	return 0, false
 }
 
 // simulationThermalBoundary closes reviewed junction-to-case device models
@@ -1116,12 +1191,12 @@ func simulationIntentParts(
 		}
 		duration := dynamicDuration(assertion, operatingCase)
 		analysis.DurationS = duration
-		analysis.TimeStepS = duration / 1000
+		analysis.TimeStepS = dynamicTimeStep(duration, operatingCase)
 		if assertion.Analysis == simmodel.AnalysisElectrothermal {
 			analysis.Conditions = append([]simmodel.NamedValue(nil), thermalConditions...)
 		}
 		simmodel.NormalizeDynamicGrid(&analysis)
-		addSimulationEvents(&analysis, operatingCase, graph)
+		addSimulationEvents(&analysis, requirement, operatingCase, graph)
 	case simmodel.AnalysisDistortion:
 		frequency := assertionFrequencyScale(requirement, assertion)
 		analysis.DurationS = 4 / frequency
@@ -1249,14 +1324,47 @@ func simulationStabilityObservationNode(
 		return "", false
 	}
 	dcAdjacency := topologyPassiveNodeAdjacency(graph, true)
+	supplies := topologyNodesByRole(graph, "supply")
 	candidates := []string{}
 	for _, instance := range graph.Instances {
 		if instance.Kind != "opamp" {
 			continue
 		}
 		terminals := topologyTerminalNodes(instance)
-		if terminals["OUT"] == "" || terminals["IN_MINUS"] == "" ||
-			!topologyNodePathExists(dcAdjacency, observedNode, terminals["IN_MINUS"]) {
+		if terminals["OUT"] == "" {
+			continue
+		}
+		negativeFeedback := terminals["IN_MINUS"] != "" &&
+			topologyNodePathExists(dcAdjacency, observedNode, terminals["IN_MINUS"])
+		if !negativeFeedback && terminals["IN_PLUS"] != "" &&
+			topologyNodePathExists(dcAdjacency, observedNode, terminals["IN_PLUS"]) {
+			for _, driver := range graph.Instances {
+				if driver.Kind != "pnp_bjt" {
+					continue
+				}
+				driverTerminals := topologyTerminalNodes(driver)
+				if !slices.Contains(supplies, driverTerminals["EMITTER"]) ||
+					!topologyNodePathExists(dcAdjacency, terminals["OUT"], driverTerminals["BASE"]) {
+					continue
+				}
+				for _, pass := range graph.Instances {
+					if pass.Kind != "npn_bjt" {
+						continue
+					}
+					passTerminals := topologyTerminalNodes(pass)
+					if slices.Contains(supplies, passTerminals["COLLECTOR"]) &&
+						topologyNodePathExists(dcAdjacency, driverTerminals["COLLECTOR"], passTerminals["BASE"]) &&
+						topologyNodePathExists(dcAdjacency, passTerminals["EMITTER"], observedNode) {
+						negativeFeedback = true
+						break
+					}
+				}
+				if negativeFeedback {
+					break
+				}
+			}
+		}
+		if !negativeFeedback {
 			continue
 		}
 		candidates = append(candidates, terminals["OUT"])
@@ -1361,6 +1469,13 @@ func simulationMeasurementScope(
 		return "", []string{component}, nil
 	case simmodel.QuantityPeakAbsDeviceCurrentA:
 		if assertion.Observation.Kind == "port" {
+			if assertion.Metric == "peak_current" || assertion.Metric == "off_state_current" {
+				if component, found := protectedVoltageOutputCurrentComponent(
+					requirement, assertion, operatingCase, graph,
+				); found {
+					return component, nil, nil
+				}
+			}
 			if component, found := observedCurrentComponent(requirement, assertion, operatingCase, graph); found {
 				return component, nil, nil
 			}
@@ -1696,6 +1811,18 @@ func simulationExcitations(
 		if condition.Axis != "load_current" {
 			continue
 		}
+		// Quiescent current is the supply current with the declared external
+		// load removed. Keep its harness and excitation sets identical: a load
+		// source omitted from the circuit must not survive as an analysis
+		// excitation referencing a nonexistent component.
+		if simulationExcludesLoadCurrent(assertion) {
+			continue
+		}
+		if _, found := dynamicVoltageOutputLoadResistance(
+			requirement, assertion, condition, corner.Values[conditionKey(condition)],
+		); found {
+			continue
+		}
 		result = append(result, simmodel.SourceExcitation{
 			Component: loadInstanceID(condition.Target, condition.Axis),
 			DCValue:   corner.Values[conditionKey(condition)],
@@ -1705,6 +1832,12 @@ func simulationExcitations(
 		return cmp.Compare(left.Component, right.Component)
 	})
 	return result
+}
+
+func simulationExcludesLoadCurrent(assertion BehavioralAssertion) bool {
+	return assertion.Metric == "quiescent_current" ||
+		assertion.Metric == "off_state_current" ||
+		assertion.Metric == "startup_output_voltage"
 }
 
 func operatingCaseHasSourceEvent(operatingCase OperatingCase, graph CandidateGraph, node GraphNode) bool {
@@ -2124,21 +2257,186 @@ func dynamicDuration(assertion BehavioralAssertion, operatingCase OperatingCase)
 	return math.Min(duration, 10)
 }
 
-func addSimulationEvents(analysis *simmodel.Analysis, operatingCase OperatingCase, graph CandidateGraph) {
+func dynamicTimeStep(duration float64, operatingCase OperatingCase) float64 {
+	const ticksPerSecond int64 = 1_000_000_000_000
+	if duration <= 0 || !finite(duration) {
+		return 0
+	}
+	durationTicks := int64(math.Round(duration * float64(ticksPerSecond)))
+	gridTicks := durationTicks
+	for _, event := range operatingCase.Events {
+		triggerTicks := int64(math.Round(event.TriggerTimeS * float64(ticksPerSecond)))
+		if triggerTicks > 0 && triggerTicks < durationTicks {
+			gridTicks = greatestCommonDivisor(gridTicks, triggerTicks)
+		}
+	}
+	targetTicks := max(int64(1), durationTicks/1000)
+	divisor := max(int64(1), (gridTicks+targetTicks-1)/targetTicks)
+	alignedStep := float64(gridTicks) / float64(divisor) / float64(ticksPerSecond)
+	// Exact event alignment can require a pathologically fine common grid for
+	// arbitrary decimal trigger times. Bound the work while retaining exact
+	// alignment whenever that grid fits within the deterministic step budget.
+	return math.Max(alignedStep, duration/maximumDynamicTimeSteps)
+}
+
+func greatestCommonDivisor(left, right int64) int64 {
+	for right != 0 {
+		left, right = right, left%right
+	}
+	if left < 0 {
+		return -left
+	}
+	return left
+}
+
+func addSimulationEvents(analysis *simmodel.Analysis, requirement Requirement, operatingCase OperatingCase, graph CandidateGraph) {
 	for _, event := range operatingCase.Events {
 		target, found := externalNodeForSemanticTarget(graph, event.Target)
 		if !found {
 			continue
 		}
+		if event.Kind == "short_circuit" {
+			resistance, resistanceFound := protectedShortResistance(requirement, event)
+			if !resistanceFound {
+				continue
+			}
+			analysis.DeviceValueEvents = append(analysis.DeviceValueEvents, simmodel.DeviceValueEvent{
+				ID: canonicalIdentifier(event.ID), Component: shortLoadInstanceID(event.Target),
+				TriggerTimeS: event.TriggerTimeS,
+				DurationS:    math.Max(analysis.DurationS-event.TriggerTimeS, analysis.TimeStepS),
+				InitialSI:    1e12,
+				AppliedSI:    resistance,
+			})
+			continue
+		}
+		component := sourceInstanceForNode(target)
 		analysis.SourceValueEvents = append(analysis.SourceValueEvents, simmodel.SourceValueEvent{
 			ID:           canonicalIdentifier(event.ID),
-			Component:    sourceInstanceForNode(target),
+			Component:    component,
 			TriggerTimeS: event.TriggerTimeS,
 			DurationS:    math.Max(analysis.DurationS-event.TriggerTimeS, analysis.TimeStepS),
 			Initial:      event.Initial,
 			Applied:      event.Applied,
 		})
 	}
+}
+
+func shortLoadInstanceID(target string) string {
+	return canonicalIdentifier("load_" + target + "_short_circuit")
+}
+
+func protectedShortResistance(requirement Requirement, event OperatingEvent) (float64, bool) {
+	faultCurrentA := math.Abs(event.Applied)
+	if event.Kind != "short_circuit" || faultCurrentA <= 0 || !finite(faultCurrentA) {
+		return 0, false
+	}
+	outputVoltageV := 0.0
+	for _, port := range requirement.Requirements.Ports {
+		if port.ID != event.Target {
+			continue
+		}
+		for _, value := range []*float64{
+			port.Electrical.MaxVoltageV,
+			port.Electrical.NominalVoltageV,
+			port.Electrical.MinVoltageV,
+		} {
+			if value != nil {
+				outputVoltageV = math.Max(outputVoltageV, math.Abs(*value))
+			}
+		}
+		break
+	}
+	if outputVoltageV <= 0 || !finite(outputVoltageV) {
+		return 0, false
+	}
+	resistance := outputVoltageV / faultCurrentA
+	return resistance, resistance > 0 && finite(resistance)
+}
+
+func protectedVoltageOutputCurrentComponent(
+	requirement Requirement,
+	assertion BehavioralAssertion,
+	operatingCase OperatingCase,
+	graph CandidateGraph,
+) (string, bool) {
+	observationNode := observationNodeID(graph, requirement, assertion.Observation)
+	if observationNode == "" {
+		return "", false
+	}
+	direction := 0
+	for _, event := range operatingCase.Events {
+		if event.Kind != "short_circuit" || event.Target != assertion.Observation.ID {
+			continue
+		}
+		if event.Applied > 0 {
+			direction = 1
+		} else if event.Applied < 0 {
+			direction = -1
+		}
+	}
+	if direction == 0 {
+		for _, condition := range operatingCase.Conditions {
+			if condition.Axis != "load_current" || condition.Target != assertion.Observation.ID {
+				continue
+			}
+			if condition.Min >= 0 && condition.Max > 0 {
+				direction = 1
+			} else if condition.Min < 0 && condition.Max <= 0 {
+				direction = -1
+			}
+		}
+	}
+	supplies := topologyNodesByRole(graph, "supply")
+	references := topologyNodesByRole(graph, "reference")
+	candidates := []string{}
+	paths := [][]string{}
+	for _, instance := range graph.Instances {
+		if direction > 0 && instance.Kind != "npn_bjt" {
+			continue
+		}
+		if direction < 0 && instance.Kind != "pnp_bjt" {
+			continue
+		}
+		nodes := topologyTerminalNodes(instance)
+		railConnected := direction > 0 && slices.Contains(supplies, nodes["COLLECTOR"])
+		railConnected = railConnected || direction < 0 && slices.Contains(references, nodes["COLLECTOR"])
+		path := topologyResistorPath(graph, nodes["EMITTER"], observationNode)
+		if !railConnected || len(path) == 0 {
+			continue
+		}
+		candidates = append(candidates, instance.ID)
+		paths = append(paths, path)
+	}
+	if len(candidates) == 1 {
+		return candidates[0], true
+	}
+	if len(candidates) == 0 {
+		return "", false
+	}
+	shared := map[string]bool{}
+	for _, id := range paths[0] {
+		shared[id] = true
+	}
+	for _, path := range paths[1:] {
+		present := map[string]bool{}
+		for _, id := range path {
+			present[id] = true
+		}
+		for id := range shared {
+			if !present[id] {
+				delete(shared, id)
+			}
+		}
+	}
+	commonSeries := make([]string, 0, len(shared))
+	for id := range shared {
+		commonSeries = append(commonSeries, id)
+	}
+	slices.Sort(commonSeries)
+	if len(commonSeries) == 0 {
+		return "", false
+	}
+	return commonSeries[0], true
 }
 
 func sweepSourceAndRange(

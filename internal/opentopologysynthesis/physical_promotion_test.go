@@ -208,6 +208,78 @@ func TestProtectedCurrentOutputCorpusOptionalKiCadPromotion(t *testing.T) {
 	}
 }
 
+func TestProtectedVoltageOutputCorpusOptionalKiCadPromotion(t *testing.T) {
+	if os.Getenv(openTopologyKiCadPromotionEnv) != "1" {
+		t.Skip("set KICADAI_OPEN_TOPOLOGY_KICAD_PROMOTION=1 to run installed-KiCad promotion")
+	}
+	kicadCLI := openTopologyKiCadCLI(t)
+	symbolsRoot := openTopologyLibraryRoot(
+		t,
+		libraryresolver.EnvSymbolsRoot,
+		"/Applications/KiCad/KiCad.app/Contents/SharedSupport/symbols",
+	)
+	footprintsRoot := openTopologyLibraryRoot(
+		t,
+		libraryresolver.EnvFootprintsRoot,
+		"/Applications/KiCad/KiCad.app/Contents/SharedSupport/footprints",
+	)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
+	defer cancel()
+	index, _ := libraryresolver.Load(
+		ctx,
+		libraryresolver.LibraryRoots{
+			SymbolsRoot: symbolsRoot, FootprintsRoot: footprintsRoot,
+			TemplatesRoot: strings.TrimSpace(os.Getenv(libraryresolver.EnvTemplatesRoot)),
+		},
+		libraryresolver.LoadOptions{},
+	)
+	root := protectedVoltageOutputCorpusRoot()
+	var manifest protectedVoltageOutputCorpusManifest
+	decodeFrozenStrict(t, mustRead(t, filepath.Join(root, "manifest.json")), &manifest)
+	inventory, environment := testHeldOutSynthesisEnvironment(t)
+	policy := protectedVoltageOutputSynthesisPolicy()
+	executed := 0
+	for _, entry := range manifest.Cases {
+		if target := os.Getenv(protectedVoltageOutputCaseEnv); target != "" && target != entry.ID {
+			continue
+		}
+		entry := entry
+		t.Run(entry.ID, func(t *testing.T) {
+			executed++
+			requirement := testProtectedVoltageOutputRequirement(t, entry.RequirementFile)
+			run := Synthesize(ctx, requirement, inventory, environment, policy)
+			assertProtectedVoltageOutputPass(t, run)
+			outputRoot := t.TempDir()
+			if retained := strings.TrimSpace(os.Getenv("KICADAI_OPEN_TOPOLOGY_ARTIFACT_ROOT")); retained != "" {
+				outputRoot = filepath.Join(retained, entry.ID)
+			}
+			promotion := PromoteSynthesisRun(
+				ctx,
+				run,
+				environment,
+				PhysicalPromotionOptions{
+					OutputRoot: outputRoot, KiCadCLI: kicadCLI, LibraryIndex: &index,
+					Timeout: 2 * time.Minute, KeepArtifacts: true,
+				},
+			)
+			if promotion.Status != PhysicalPromotionPassed || !promotion.ReplayIdentical ||
+				promotion.ProjectHash == "" || len(promotion.Runs) != 2 {
+				t.Fatalf(
+					"protected voltage-output physical promotion = status=%s replay=%t runs=%d issues=%#v",
+					promotion.Status, promotion.ReplayIdentical, len(promotion.Runs), promotion.Issues,
+				)
+			}
+			t.Logf(
+				"synthesis_hash=%s topology_hash=%s physical_hash=%s project_hash=%s",
+				run.Hash, run.Report.Selected.TopologyHash, run.Physical.Hash, promotion.ProjectHash,
+			)
+		})
+	}
+	if executed == 0 {
+		t.Fatal("protected voltage-output KiCad promotion filter selected no frozen case")
+	}
+}
+
 func TestFrozenHeldOutCorpusOptionalKiCadPromotion(t *testing.T) {
 	if os.Getenv(openTopologyKiCadPromotionEnv) != "1" {
 		t.Skip("set KICADAI_OPEN_TOPOLOGY_KICAD_PROMOTION=1 to run installed-KiCad promotion")

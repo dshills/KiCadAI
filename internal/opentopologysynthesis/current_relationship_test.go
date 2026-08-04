@@ -151,6 +151,40 @@ func TestCurrentSenseCompositionHonorsCancellation(t *testing.T) {
 	}
 }
 
+func TestCurrentSenseSeriesParallelCompositionRealizesBoundedIntermediateValue(t *testing.T) {
+	requirement, issues := DecodeStrict(bytes.NewReader(mustRead(
+		t,
+		filepath.Join(protectedCurrentOutputCorpusRoot(), "fault_protected_low_side_current_sink.json"),
+	)))
+	if len(issues) != 0 {
+		t.Fatalf("requirement decode issues: %#v", issues)
+	}
+	inventory, _ := testHeldOutSynthesisEnvironment(t)
+	network, found := currentSenseSeriesParallelComposition(context.Background(), requirement, inventory, .33, 3)
+	partCount := 0
+	parallelSegment := false
+	for _, segment := range network.segments {
+		partCount += len(segment)
+		parallelSegment = parallelSegment || len(segment) > 1
+	}
+	if !found || math.Abs(network.effectiveResistance-.33) > 1e-12 || partCount != 3 || !parallelSegment {
+		t.Fatalf("series-parallel current-sense network = %#v found=%t", network, found)
+	}
+}
+
+func TestCurrentSenseSeriesParallelCompositionPrefersSafeSideOfTarget(t *testing.T) {
+	inventory := PrimitiveInventory{Primitives: []PrimitiveCandidate{
+		{Key: "resistor.9", Kind: "resistor", ValueDomain: &PrimitiveValueDomain{Nominal: floatPointer(9)}},
+		{Key: "resistor.12", Kind: "resistor", ValueDomain: &PrimitiveValueDomain{Nominal: floatPointer(12)}},
+	}}
+	network, found := currentSenseSeriesParallelCompositionWithin(
+		context.Background(), Requirement{}, inventory, 10, 1, 8, 15,
+	)
+	if !found || network.effectiveResistance != 12 {
+		t.Fatalf("safe-side current-sense network = %#v found=%t", network, found)
+	}
+}
+
 func TestHighSideTransconductanceRelationshipBuildsStartupSafeFaultDominantPath(t *testing.T) {
 	requirement, issues := DecodeStrict(bytes.NewReader(mustRead(
 		t,

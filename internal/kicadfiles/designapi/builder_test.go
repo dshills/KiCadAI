@@ -189,6 +189,53 @@ func TestSafeSchematicRouteLabelPointAvoidsForeignWire(t *testing.T) {
 	}
 }
 
+func TestSafeSchematicRouteLabelPointAvoidsSameNetWireJunction(t *testing.T) {
+	builder := newTestBuilder(t)
+	preferred := kicadfiles.Point{X: kicadfiles.MM(30), Y: kicadfiles.MM(20)}
+	points := []kicadfiles.Point{
+		{X: kicadfiles.MM(20), Y: preferred.Y},
+		{X: kicadfiles.MM(40), Y: preferred.Y},
+	}
+	builder.addSchematicWirePoints("TARGET", Endpoint{}, Endpoint{}, points)
+	builder.addSchematicWirePoints("TARGET", Endpoint{}, Endpoint{}, []kicadfiles.Point{
+		{X: preferred.X, Y: kicadfiles.MM(10)},
+		{X: preferred.X, Y: kicadfiles.MM(30)},
+	})
+
+	position, _, ok := builder.safeSchematicRouteLabelPoint("TARGET", preferred, points)
+	if !ok {
+		t.Fatal("route label search found no single-wire point")
+	}
+	if position == preferred || builder.schematicRouteLabelWireContacts("TARGET", position, points) != 1 {
+		t.Fatalf("route label position %#v still touches a same-net wire junction", position)
+	}
+}
+
+func TestSafeSchematicRouteLabelPointKeepsElectricalAnchorWhenTextFillsRoute(t *testing.T) {
+	builder := newTestBuilder(t)
+	points := []kicadfiles.Point{
+		{X: kicadfiles.MM(20), Y: kicadfiles.MM(20)},
+		{X: kicadfiles.MM(40), Y: kicadfiles.MM(20)},
+	}
+	builder.addSchematicWirePoints("TARGET", Endpoint{}, Endpoint{}, points)
+	builder.design.Schematic.Symbols = append(builder.design.Schematic.Symbols, schematic.SchematicSymbol{
+		Reference: "U1",
+		Position:  kicadfiles.Point{X: kicadfiles.MM(30), Y: kicadfiles.MM(20)},
+		BodyBounds: &schematic.SymbolBodyBounds{
+			Min: kicadfiles.Point{X: -kicadfiles.MM(20), Y: -kicadfiles.MM(10)},
+			Max: kicadfiles.Point{X: kicadfiles.MM(20), Y: kicadfiles.MM(10)},
+		},
+	})
+
+	position, _, ok := builder.safeSchematicRouteLabelPoint("TARGET", points[0], points)
+	if !ok {
+		t.Fatal("text congestion removed the required route net anchor")
+	}
+	if builder.schematicRouteLabelWireContacts("TARGET", position, points) != 1 {
+		t.Fatalf("fallback route label position %#v is not on exactly one wire", position)
+	}
+}
+
 func TestSafeSchematicRouteLabelPointSamplesDiagonalSegments(t *testing.T) {
 	builder := newTestBuilder(t)
 	for _, x := range []float64{25, 30, 35} {
@@ -357,12 +404,43 @@ func TestBuilderPlacesRequestedAnnotationWithinRouteSegment(t *testing.T) {
 	annotation := kicadfiles.Point{X: kicadfiles.MM(50), Y: kicadfiles.MM(20)}
 	builder.addSchematicWirePointsWithOptions("PASSIVE_LINK", Endpoint{}, Endpoint{}, points, true, &annotation)
 
-	if got := len(builder.design.Schematic.Labels); got != 1 {
+	design := builder.Design()
+	if got := len(design.Schematic.Labels); got != 1 {
 		t.Fatalf("label count = %d, want one route annotation", got)
 	}
-	label := builder.design.Schematic.Labels[0]
+	label := design.Schematic.Labels[0]
 	if label.Text != "PASSIVE_LINK" || label.Position != annotation {
 		t.Fatalf("route annotation = %#v, want PASSIVE_LINK at %v", label, annotation)
+	}
+}
+
+func TestBuilderFinalizesRouteAnnotationAfterAllSameNetWires(t *testing.T) {
+	builder := newTestBuilder(t)
+	preferred := kicadfiles.Point{X: kicadfiles.MM(30), Y: kicadfiles.MM(20)}
+	points := []kicadfiles.Point{
+		{X: kicadfiles.MM(20), Y: preferred.Y},
+		{X: kicadfiles.MM(40), Y: preferred.Y},
+	}
+	builder.addSchematicWirePointsWithOptions("TARGET", Endpoint{}, Endpoint{}, points, true, &preferred)
+	builder.addSchematicWirePoints("TARGET", Endpoint{}, Endpoint{}, []kicadfiles.Point{
+		{X: preferred.X, Y: kicadfiles.MM(10)},
+		{X: preferred.X, Y: kicadfiles.MM(30)},
+	})
+
+	design := builder.Design()
+	if len(design.Schematic.Labels) != 1 {
+		t.Fatalf("route labels = %#v, want one finalized annotation", design.Schematic.Labels)
+	}
+	position := design.Schematic.Labels[0].Position
+	if position == preferred || builder.schematicRouteLabelWireContacts("TARGET", position, points) != 1 {
+		t.Fatalf("final route annotation %#v still touches a later same-net junction", position)
+	}
+	replay := builder.Design()
+	if len(replay.Schematic.Labels) != 1 || replay.Schematic.Labels[0].UUID != design.Schematic.Labels[0].UUID ||
+		replay.Schematic.Labels[0].Text != design.Schematic.Labels[0].Text ||
+		replay.Schematic.Labels[0].Position != design.Schematic.Labels[0].Position ||
+		replay.Schematic.Labels[0].Rotation != design.Schematic.Labels[0].Rotation {
+		t.Fatalf("repeated finalization changed route annotation: first=%#v replay=%#v", design.Schematic.Labels, replay.Schematic.Labels)
 	}
 }
 

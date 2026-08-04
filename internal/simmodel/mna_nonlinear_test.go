@@ -179,9 +179,123 @@ func TestLinearColdSeedRequiresOpAmpControlledEmitterFollower(t *testing.T) {
 	if !hasOpAmpControlledEmitterFollower(Plan{Devices: []ResolvedDevice{opamp, follower}}) {
 		t.Fatal("op-amp-controlled emitter follower was not recognized")
 	}
+	driver := ResolvedDevice{
+		Component: "RDRIVE", PrimitiveModel: PrimitiveResistorV1,
+		Terminals: []TerminalBinding{{Terminal: "A", Net: "DRIVE"}, {Terminal: "B", Net: "BASE"}},
+	}
+	sense := ResolvedDevice{
+		Component: "RSENSE", PrimitiveModel: PrimitiveResistorV1,
+		Terminals: []TerminalBinding{{Terminal: "A", Net: "EMITTER"}, {Terminal: "B", Net: "OUTPUT"}},
+	}
+	feedback := ResolvedDevice{
+		Component: "RFEEDBACK", PrimitiveModel: PrimitiveResistorV1,
+		Terminals: []TerminalBinding{{Terminal: "A", Net: "OUTPUT"}, {Terminal: "B", Net: "SENSE"}},
+	}
+	follower.Terminals = []TerminalBinding{{Terminal: "BASE", Net: "BASE"}, {Terminal: "EMITTER", Net: "EMITTER"}}
+	if !hasOpAmpControlledEmitterFollower(Plan{Devices: []ResolvedDevice{opamp, follower, driver, sense, feedback}}) {
+		t.Fatal("resistor-coupled op-amp-controlled emitter follower was not recognized")
+	}
+	follower.Terminals = append(follower.Terminals, TerminalBinding{Terminal: "COLLECTOR", Net: "SUPPLY"})
+	opamp.Terminals = append(opamp.Terminals, TerminalBinding{Terminal: "V_PLUS", Net: "SUPPLY"})
+	if !hasOpAmpControlledEmitterFollower(Plan{Devices: []ResolvedDevice{opamp, follower, driver}}) {
+		t.Fatal("supply-referenced high-side emitter follower was not recognized")
+	}
 	follower.Terminals[1].Net = "UNRELATED"
-	if hasOpAmpControlledEmitterFollower(Plan{Devices: []ResolvedDevice{opamp, follower}}) {
+	follower.Terminals[2].Net = "OTHER_SUPPLY"
+	if hasOpAmpControlledEmitterFollower(Plan{Devices: []ResolvedDevice{opamp, follower, driver, sense, feedback}}) {
 		t.Fatal("unrelated op-amp and BJT incorrectly enabled the linear cold seed")
+	}
+}
+
+func TestNonlinearDCProtectedPassRegulatorConvergesFromRailSeed(t *testing.T) {
+	opAmpParameters := []NamedValue{
+		{Name: "dc_open_loop_gain", Value: 100_000},
+		{Name: "gain_bandwidth_hz", Value: 1_000_000},
+		{Name: "output_high_margin_v", Value: 1.5},
+		{Name: "output_low_margin_v", Value: .02},
+		{Name: "supply_max_v", Value: 32},
+		{Name: "supply_min_v", Value: 3},
+	}
+	bjt := func(id, base, collector, emitter string, saturationCurrent, beta, maxCurrent float64) ComponentEvidence {
+		return ComponentEvidence{
+			InstanceID: id, CatalogID: id, Family: "bjt",
+			ModelClaims: []CatalogEvidence{{ModelID: PrimitiveBJTNPNV1, Parameters: []NamedValue{
+				{Name: "saturation_current_a", Value: saturationCurrent}, {Name: "forward_beta", Value: beta},
+				{Name: "reverse_beta", Value: 1}, {Name: "emission_coefficient", Value: 1},
+				{Name: "junction_temperature_k", Value: 300.15}, {Name: "max_collector_current_a", Value: maxCurrent},
+				{Name: "max_collector_emitter_voltage_v", Value: 80},
+			}}},
+			Connections: []ConnectionEvidence{
+				{Function: "BASE", Net: base}, {Function: "COLLECTOR", Net: collector}, {Function: "EMITTER", Net: emitter},
+			},
+		}
+	}
+	capacitor := func(id string, value float64, a, b string) ComponentEvidence {
+		return ComponentEvidence{
+			InstanceID: id, CatalogID: id, Family: "capacitor", ValueSI: value, HasValueSI: true,
+			ModelClaims: []CatalogEvidence{{ModelID: PrimitiveCapacitorV1}},
+			Connections: []ConnectionEvidence{{Function: "A", Net: a}, {Function: "B", Net: b}},
+		}
+	}
+	components := []ComponentEvidence{
+		voltageSourceEvidence("supply", "VP", "GND"),
+		voltageSourceEvidence("command", "COMMAND", "GND"),
+		resistorEvidence("command_access", 1000, "COMMAND", "SETPOINT"),
+		capacitor("command_filter", 4.7e-6, "SETPOINT", "GND"),
+		{
+			InstanceID: "controller", CatalogID: "opamp.reviewed", Family: "opamp",
+			ModelClaims: []CatalogEvidence{{ModelID: PrimitiveOpAmpV1, Parameters: opAmpParameters}},
+			Connections: []ConnectionEvidence{
+				{Function: "IN_PLUS", Net: "SETPOINT"}, {Function: "IN_MINUS", Net: "FEEDBACK"}, {Function: "OUT", Net: "DRIVE"},
+				{Function: "V_PLUS", Net: "VP"}, {Function: "V_MINUS", Net: "GND"},
+			},
+		},
+		bjt("pass", "BASE", "VP", "SENSE_HIGH", 1e-12, 40, 10),
+		bjt("limit", "SENSE_HIGH", "BASE", "OUTPUT", 1e-14, 100, .2),
+		resistorEvidence("drive", 47, "DRIVE", "BASE"),
+		resistorEvidence("base_bleeder", 10_000, "BASE", "SENSE_HIGH"),
+		resistorEvidence("sense_a", 1.6, "SENSE_HIGH", "SENSE_MID"),
+		resistorEvidence("sense_b", 1.6, "SENSE_MID", "OUTPUT"),
+		resistorEvidence("feedback_upper", 47_000, "OUTPUT", "FEEDBACK"),
+		resistorEvidence("feedback_lower", 15_000, "FEEDBACK", "GND"),
+		capacitor("output_capacitor", 4.7e-6, "OUTPUT", "GND"),
+		capacitor("compensation", 15e-9, "FEEDBACK", "DRIVE"),
+		{
+			InstanceID: "load", CatalogID: "source.current", Family: "current_source",
+			ModelClaims: []CatalogEvidence{{ModelID: PrimitiveCurrentSourceV1}},
+			Connections: []ConnectionEvidence{{Function: "POSITIVE", Net: "OUTPUT"}, {Function: "NEGATIVE", Net: "GND"}},
+		},
+	}
+	nodes := []NodeEvidence{
+		{Name: "GND", Role: "ground"}, {Name: "VP"}, {Name: "COMMAND"}, {Name: "SETPOINT"},
+		{Name: "FEEDBACK"}, {Name: "DRIVE"}, {Name: "BASE"}, {Name: "SENSE_HIGH"},
+		{Name: "SENSE_MID"}, {Name: "OUTPUT"},
+	}
+	intent := Intent{
+		ModelID: ModelNonlinearCircuitDCV1,
+		Analyses: []Analysis{{ID: "bias", Kind: AnalysisDCOperatingPoint, Excitations: []SourceExcitation{
+			{Component: "supply", DCValue: 9.5},
+			{Component: "command", DCValue: 1.2},
+			{Component: "load", DCValue: .0775},
+		}}},
+		Assertions: []Assertion{{AnalysisID: "bias", Node: "OUTPUT", Quantity: QuantityVoltageV, Min: 4.9, Max: 5.1}},
+	}
+	plan, diagnostics := ResolveWithTopology(intent, "test", "catalog-hash", components, nodes)
+	if len(diagnostics) != 0 {
+		t.Fatalf("resolve diagnostics=%+v", diagnostics)
+	}
+	plan.Uncertainties = []Uncertainty{
+		{Target: "devices.command_access.value_si", Source: "test", Nominal: 1000, Minimum: 950, Maximum: 1050},
+		{Target: "devices.drive.value_si", Source: "test", Nominal: 47, Minimum: 46.53, Maximum: 47.47},
+		{Target: "devices.base_bleeder.value_si", Source: "test", Nominal: 10_000, Minimum: 9900, Maximum: 10_100},
+		{Target: "devices.feedback_upper.value_si", Source: "test", Nominal: 47_000, Minimum: 46_953, Maximum: 47_047},
+		{Target: "devices.feedback_lower.value_si", Source: "test", Nominal: 15_000, Minimum: 14_985, Maximum: 15_015},
+		{Target: "devices.sense_a.value_si", Source: "test", Nominal: 1.6, Minimum: 1.52, Maximum: 1.68},
+		{Target: "devices.sense_b.value_si", Source: "test", Nominal: 1.6, Minimum: 1.52, Maximum: 1.68},
+	}
+	report, diagnostics := Evaluate(plan)
+	if len(diagnostics) != 0 || report.Status != "pass" {
+		t.Fatalf("report=%+v diagnostics=%+v", report, diagnostics)
 	}
 }
 
@@ -1042,6 +1156,132 @@ func TestOpAmpGainContinuationUpdatesIndexedParameters(t *testing.T) {
 	}
 	if gain := deviceParameterMap(plan.Devices[0])["dc_open_loop_gain"]; gain != 100000 {
 		t.Fatalf("source plan gain mutated to %.12g", gain)
+	}
+}
+
+func TestSourceContinuationScalesOnlyVoltageValuedActiveDeviceStates(t *testing.T) {
+	plan := Plan{Devices: []ResolvedDevice{
+		{Component: "controller", PrimitiveModel: PrimitiveOpAmpV1},
+		{Component: "sensor", PrimitiveModel: PrimitiveCurrentSenseAmplifierV1},
+		{Component: "decision", PrimitiveModel: PrimitiveComparatorOpenCollectorV1},
+		{Component: "pass", PrimitiveModel: PrimitiveBJTNPNV1},
+	}}
+	states := map[string]float64{
+		"controller": 23.7,
+		"sensor":     4.8,
+		"decision":   1,
+		"pass":       1,
+	}
+	scaled := activeDeviceStatesWithSourceContinuationScale(plan, states, .05)
+	if math.Abs(scaled["controller"]-1.185) > 1e-12 || math.Abs(scaled["sensor"]-.24) > 1e-12 {
+		t.Fatalf("voltage-valued states were not source-scaled: %#v", scaled)
+	}
+	if scaled["decision"] != 1 || scaled["pass"] != 1 {
+		t.Fatalf("discrete active-device states changed: %#v", scaled)
+	}
+	if states["controller"] != 23.7 || states["sensor"] != 4.8 {
+		t.Fatalf("source states mutated: %#v", states)
+	}
+	if identity := activeDeviceStatesWithSourceContinuationScale(plan, states, 1); identity["controller"] != 23.7 {
+		t.Fatalf("full-scale states changed: %#v", identity)
+	}
+}
+
+func TestGroundReferencedSourceProjectionBalancesAcceptedDampedState(t *testing.T) {
+	plan := Plan{Devices: []ResolvedDevice{{
+		Component: "supply", PrimitiveModel: PrimitiveVoltageSourceV1,
+		Terminals: []TerminalBinding{{Terminal: "POSITIVE", Net: "VP"}, {Terminal: "NEGATIVE", Net: "GND"}},
+	}}}
+	base := mnaSystem{
+		matrix:        [][]complex128{{1, 1}, {1, 0}},
+		rhs:           []complex128{0, 1.2},
+		unknownLabels: []string{"node:VP", "branch_current:supply"},
+		nodeIndex:     map[string]int{"VP": 0},
+		branchIndex:   map[string]int{"supply": 1},
+	}
+	candidate := []complex128{1.2, -1.2}
+	guess := []complex128{.2, -.01}
+	voltageUpdate, currentUpdate := projectGroundReferencedVoltageSources(plan, &base, nil, candidate, guess)
+	if math.Abs(real(guess[0])-1.2) > 1e-12 || math.Abs(real(guess[1])+1.2) > 1e-12 {
+		t.Fatalf("projected source state = %#v", guess)
+	}
+	if math.Abs(voltageUpdate-1) > 1e-12 || math.Abs(currentUpdate-1.19) > 1e-12 {
+		t.Fatalf("projection updates = voltage %.12g current %.12g", voltageUpdate, currentUpdate)
+	}
+	if residual, _ := nonlinearResidual(base, nil, guess); residual != 0 {
+		t.Fatalf("projected residual = %.12g", residual)
+	}
+}
+
+func TestHighSidePNPDriveChainUsesJunctionAwareContinuation(t *testing.T) {
+	device := func(component, primitive string, terminals ...TerminalBinding) ResolvedDevice {
+		return ResolvedDevice{Component: component, PrimitiveModel: primitive, Terminals: terminals}
+	}
+	plan := Plan{Devices: []ResolvedDevice{
+		device("controller", PrimitiveOpAmpV1,
+			TerminalBinding{Terminal: "OUT", Net: "DRIVE"}, TerminalBinding{Terminal: "V_PLUS", Net: "VP"}),
+		device("drive_resistor", PrimitiveResistorV1,
+			TerminalBinding{Terminal: "A", Net: "DRIVE"}, TerminalBinding{Terminal: "B", Net: "DRIVER_BASE"}),
+		device("driver", PrimitiveBJTPNPV1,
+			TerminalBinding{Terminal: "BASE", Net: "DRIVER_BASE"}, TerminalBinding{Terminal: "COLLECTOR", Net: "PASS_BASE"}, TerminalBinding{Terminal: "EMITTER", Net: "VP"}),
+		device("pass", PrimitiveBJTNPNV1,
+			TerminalBinding{Terminal: "BASE", Net: "PASS_BASE"}, TerminalBinding{Terminal: "COLLECTOR", Net: "VP"}, TerminalBinding{Terminal: "EMITTER", Net: "OUT"}),
+	}}
+	stages := nonlinearContinuationForPlan(plan)
+	if !hasSupplyReferencedPNPDriveChain(plan) || len(stages) == 0 || stages[0].sourceScale != .75 || stages[0].gainScale != 1e-8 {
+		t.Fatalf("high-side drive continuation = %#v", stages)
+	}
+	plan.Devices[3].Terminals[1].Net = "OTHER_SUPPLY"
+	if hasSupplyReferencedPNPDriveChain(plan) || nonlinearContinuationForPlan(plan)[0].sourceScale != .05 {
+		t.Fatal("unrelated PNP stage selected the high-side drive continuation")
+	}
+}
+
+func TestDirectHighSideNPNPassUsesJunctionAwareClampedContinuation(t *testing.T) {
+	device := func(component, primitive string, terminals ...TerminalBinding) ResolvedDevice {
+		return ResolvedDevice{Component: component, PrimitiveModel: primitive, Terminals: terminals}
+	}
+	plan := Plan{Devices: []ResolvedDevice{
+		device("controller", PrimitiveOpAmpV1,
+			TerminalBinding{Terminal: "OUT", Net: "DRIVE"}, TerminalBinding{Terminal: "IN_MINUS", Net: "SENSE"}, TerminalBinding{Terminal: "V_PLUS", Net: "VP"}),
+		device("drive_resistor", PrimitiveResistorV1,
+			TerminalBinding{Terminal: "A", Net: "DRIVE"}, TerminalBinding{Terminal: "B", Net: "PASS_BASE"}),
+		device("pass", PrimitiveBJTNPNV1,
+			TerminalBinding{Terminal: "BASE", Net: "PASS_BASE"}, TerminalBinding{Terminal: "COLLECTOR", Net: "VP"}, TerminalBinding{Terminal: "EMITTER", Net: "OUT"}),
+		device("feedback", PrimitiveResistorV1,
+			TerminalBinding{Terminal: "A", Net: "OUT"}, TerminalBinding{Terminal: "B", Net: "SENSE"}),
+	}}
+	if !hasDirectSupplyReferencedNPNPass(plan) || nonlinearClampedContinuationForPlan(plan)[0].sourceScale != .75 || nonlinearContinuationForPlan(plan)[0].sourceScale != .05 {
+		t.Fatal("direct high-side clamped continuation was not isolated from the ordinary schedule")
+	}
+	plan.Devices[2].Terminals[1].Net = "OTHER_SUPPLY"
+	if hasDirectSupplyReferencedNPNPass(plan) || nonlinearClampedContinuationForPlan(plan)[0].sourceScale != .05 {
+		t.Fatal("unrelated NPN selected direct high-side clamped continuation")
+	}
+}
+
+func TestVoltageClampContinuationSpendsStagesOnGminInsteadOfInactiveGain(t *testing.T) {
+	plan := Plan{Devices: []ResolvedDevice{{Component: "controller", PrimitiveModel: PrimitiveOpAmpV1}}}
+	if !hasSingleAffineProjectionFeedbackDevice(plan) ||
+		!hasSingleVoltageValuedActiveDeviceClamp(plan, map[string]float64{"controller": 2.5}) ||
+		hasSingleVoltageValuedActiveDeviceClamp(plan, map[string]float64{"decision": 1}) {
+		t.Fatal("voltage-valued active-device clamp classification failed")
+	}
+	multiple := Plan{Devices: append(append([]ResolvedDevice(nil), plan.Devices...), ResolvedDevice{
+		Component: "second_controller", PrimitiveModel: PrimitiveOpAmpV1,
+	})}
+	if hasSingleAffineProjectionFeedbackDevice(multiple) ||
+		hasSingleVoltageValuedActiveDeviceClamp(multiple, map[string]float64{"controller": 2.5, "second_controller": 2.5}) {
+		t.Fatal("multi-controller loop incorrectly selected the single-loop continuation")
+	}
+	stages := nonlinearClampedContinuationForPlan(plan)
+	if len(stages) > nonlinearMaxContinuationStages || stages[len(stages)-1].gmin != nonlinearFinalGmin {
+		t.Fatalf("clamped continuation bounds = %#v", stages)
+	}
+	for _, stage := range stages {
+		if stage.gainScale != 1 {
+			t.Fatalf("clamped continuation changed inactive gain: %#v", stage)
+		}
 	}
 }
 

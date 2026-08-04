@@ -8,16 +8,19 @@ import (
 	"math"
 	"math/cmplx"
 	"slices"
+	"strings"
 )
 
 type controlInfluenceEdge struct {
 	to        string
 	component string
+	inverting bool
 }
 
 type controlPath struct {
 	nets       []string
 	components []string
+	inversions int
 }
 
 // DiscoverControlLoops derives canonical negative-feedback loops from the
@@ -50,8 +53,14 @@ func DiscoverControlLoops(plan Plan) ([]ControlLoop, []Diagnostic) {
 		}
 		outputOwners[output] = device.Component
 
-		negative, hasNegative := shortestControlPath(adjacency, output, terminals["IN_MINUS"], device.Component, blocked)
-		positive, hasPositive := shortestControlPath(adjacency, output, terminals["IN_PLUS"], device.Component, blocked)
+		minusNegative, hasMinusNegative := shortestControlPathWithParity(adjacency, output, terminals["IN_MINUS"], device.Component, blocked, 0)
+		minusPositive, hasMinusPositive := shortestControlPathWithParity(adjacency, output, terminals["IN_MINUS"], device.Component, blocked, 1)
+		plusNegative, hasPlusNegative := shortestControlPathWithParity(adjacency, output, terminals["IN_PLUS"], device.Component, blocked, 1)
+		plusPositive, hasPlusPositive := shortestControlPathWithParity(adjacency, output, terminals["IN_PLUS"], device.Component, blocked, 0)
+		negative, feedbackTerminal, feedbackNet, hasNegative := controlLoopNegativePath(
+			minusNegative, hasMinusNegative, plusNegative, hasPlusNegative, terminals,
+		)
+		positive, hasPositive := controlLoopPositivePath(minusPositive, hasMinusPositive, plusPositive, hasPlusPositive)
 		switch {
 		case hasNegative && hasPositive && terminals["IN_MINUS"] == terminals["IN_PLUS"]:
 			diagnostics = append(diagnostics, Diagnostic{
@@ -79,14 +88,14 @@ func DiscoverControlLoops(plan Plan) ([]ControlLoop, []Diagnostic) {
 			slices.Sort(members)
 			members = slices.Compact(members)
 			loops = append(loops, ControlLoop{
-				ID:                "loop:" + device.Component + ":in_minus",
+				ID:                "loop:" + device.Component + ":" + strings.ToLower(feedbackTerminal),
 				ActiveComponent:   device.Component,
 				PrimitiveModel:    device.PrimitiveModel,
 				InjectionTerminal: "OUT",
 				InjectionNet:      output,
 				ObservationNet:    output,
-				FeedbackTerminal:  "IN_MINUS",
-				FeedbackNet:       terminals["IN_MINUS"],
+				FeedbackTerminal:  feedbackTerminal,
+				FeedbackNet:       feedbackNet,
 				Polarity:          "negative",
 				Members:           members,
 				NetPath:           negative.nets,
@@ -159,6 +168,70 @@ func DiscoverControlLoops(plan Plan) ([]ControlLoop, []Diagnostic) {
 	return loops, diagnostics
 }
 
+func controlLoopNegativePath(
+	minus controlPath,
+	hasMinus bool,
+	plus controlPath,
+	hasPlus bool,
+	terminals map[string]string,
+) (controlPath, string, string, bool) {
+	candidates := []struct {
+		path     controlPath
+		terminal string
+		net      string
+	}{}
+	if hasMinus {
+		candidates = append(candidates, struct {
+			path     controlPath
+			terminal string
+			net      string
+		}{minus, "IN_MINUS", terminals["IN_MINUS"]})
+	}
+	if hasPlus {
+		candidates = append(candidates, struct {
+			path     controlPath
+			terminal string
+			net      string
+		}{plus, "IN_PLUS", terminals["IN_PLUS"]})
+	}
+	if len(candidates) == 0 {
+		return controlPath{}, "", "", false
+	}
+	slices.SortStableFunc(candidates, func(left, right struct {
+		path     controlPath
+		terminal string
+		net      string
+	}) int {
+		if compared := len(left.path.components) - len(right.path.components); compared != 0 {
+			return compared
+		}
+		return compareStrings(left.terminal, right.terminal)
+	})
+	return candidates[0].path, candidates[0].terminal, candidates[0].net, true
+}
+
+func controlLoopPositivePath(
+	minus controlPath,
+	hasMinus bool,
+	plus controlPath,
+	hasPlus bool,
+) (controlPath, bool) {
+	candidates := []controlPath{}
+	if hasMinus {
+		candidates = append(candidates, minus)
+	}
+	if hasPlus {
+		candidates = append(candidates, plus)
+	}
+	if len(candidates) == 0 {
+		return controlPath{}, false
+	}
+	slices.SortStableFunc(candidates, func(left, right controlPath) int {
+		return len(left.components) - len(right.components)
+	})
+	return candidates[0], true
+}
+
 func discoverBJTLocalControlLoops(plan Plan, adjacency map[string][]controlInfluenceEdge, blocked map[string]bool) ([]ControlLoop, []Diagnostic) {
 	var loops []ControlLoop
 	for _, device := range plan.Devices {
@@ -207,11 +280,11 @@ func discoverBJTLocalControlLoops(plan Plan, adjacency map[string][]controlInflu
 
 func controlInfluenceGraph(plan Plan) map[string][]controlInfluenceEdge {
 	adjacency := map[string][]controlInfluenceEdge{}
-	add := func(from, to, component string) {
+	add := func(from, to, component string, inverting bool) {
 		if from == "" || to == "" || from == to {
 			return
 		}
-		adjacency[from] = append(adjacency[from], controlInfluenceEdge{to: to, component: component})
+		adjacency[from] = append(adjacency[from], controlInfluenceEdge{to: to, component: component, inverting: inverting})
 	}
 	for _, device := range plan.Devices {
 		terminals := terminalMap(device)
@@ -229,33 +302,33 @@ func controlInfluenceGraph(plan Plan) map[string][]controlInfluenceEdge {
 			nets = slices.Compact(nets)
 			for left := range nets {
 				for right := left + 1; right < len(nets); right++ {
-					add(nets[left], nets[right], device.Component)
-					add(nets[right], nets[left], device.Component)
+					add(nets[left], nets[right], device.Component, false)
+					add(nets[right], nets[left], device.Component, false)
 				}
 			}
 		case PrimitiveOpAmpV1:
-			add(terminals["IN_PLUS"], terminals["OUT"], device.Component)
-			add(terminals["IN_MINUS"], terminals["OUT"], device.Component)
+			add(terminals["IN_PLUS"], terminals["OUT"], device.Component, false)
+			add(terminals["IN_MINUS"], terminals["OUT"], device.Component, true)
 		case PrimitiveSynchronousBuckRegulatorV1:
-			add(terminals["FB"], terminals["SW"], device.Component)
+			add(terminals["FB"], terminals["SW"], device.Component, true)
 		case PrimitiveCurrentSenseAmplifierV1:
-			add(terminals["IN_PLUS"], terminals["OUT"], device.Component)
-			add(terminals["IN_MINUS"], terminals["OUT"], device.Component)
+			add(terminals["IN_PLUS"], terminals["OUT"], device.Component, false)
+			add(terminals["IN_MINUS"], terminals["OUT"], device.Component, true)
 		case PrimitiveBJTNPNV1, PrimitiveBJTPNPV1:
 			if terminals["BASE"] != "" && terminals["BASE"] == terminals["COLLECTOR"] {
 				// A diode-connected transistor is a two-terminal incremental
 				// junction. Its nonlinear DC direction remains enforced by the
 				// device equations, while loop discovery must allow a bias
 				// midpoint perturbation to propagate through either terminal.
-				add(terminals["BASE"], terminals["EMITTER"], device.Component)
-				add(terminals["EMITTER"], terminals["BASE"], device.Component)
+				add(terminals["BASE"], terminals["EMITTER"], device.Component, false)
+				add(terminals["EMITTER"], terminals["BASE"], device.Component, false)
 				continue
 			}
-			add(terminals["BASE"], terminals["COLLECTOR"], device.Component)
-			add(terminals["BASE"], terminals["EMITTER"], device.Component)
+			add(terminals["BASE"], terminals["COLLECTOR"], device.Component, true)
+			add(terminals["BASE"], terminals["EMITTER"], device.Component, false)
 		case PrimitiveNMOSSwitchV1, PrimitivePMOSSwitchV1:
-			add(terminals["GATE"], terminals["DRAIN"], device.Component)
-			add(terminals["GATE"], terminals["SOURCE"], device.Component)
+			add(terminals["GATE"], terminals["DRAIN"], device.Component, true)
+			add(terminals["GATE"], terminals["SOURCE"], device.Component, false)
 		}
 	}
 	for net := range adjacency {
@@ -284,35 +357,53 @@ func controlLoopBlockedNets(plan Plan) map[string]bool {
 }
 
 func shortestControlPath(adjacency map[string][]controlInfluenceEdge, start, target, excludedComponent string, blocked map[string]bool) (controlPath, bool) {
+	return shortestControlPathWithParity(adjacency, start, target, excludedComponent, blocked, -1)
+}
+
+func shortestControlPathWithParity(adjacency map[string][]controlInfluenceEdge, start, target, excludedComponent string, blocked map[string]bool, requiredParity int) (controlPath, bool) {
 	if start == "" || target == "" {
 		return controlPath{}, false
 	}
-	if start == target {
+	if start == target && (requiredParity < 0 || requiredParity == 0) {
 		return controlPath{nets: []string{start}}, true
 	}
 	type state struct {
 		net        string
 		nets       []string
 		components []string
+		inversions int
 	}
 	queue := []state{{net: start, nets: []string{start}}}
-	visited := map[string]bool{start: true}
+	type visitKey struct {
+		net    string
+		parity int
+	}
+	visited := map[visitKey]bool{{net: start, parity: 0}: true}
 	for len(queue) != 0 {
 		current := queue[0]
 		queue = queue[1:]
 		for _, edge := range adjacency[current.net] {
-			if edge.component == excludedComponent || visited[edge.to] || (blocked[edge.to] && edge.to != target) {
+			if edge.component == excludedComponent || (blocked[edge.to] && edge.to != target) {
 				continue
 			}
 			next := state{
 				net:        edge.to,
 				nets:       append(append([]string(nil), current.nets...), edge.to),
 				components: append(append([]string(nil), current.components...), edge.component),
+				inversions: current.inversions,
 			}
-			if edge.to == target {
-				return controlPath{nets: next.nets, components: next.components}, true
+			if edge.inverting {
+				next.inversions++
 			}
-			visited[edge.to] = true
+			parity := next.inversions % 2
+			if edge.to == target && (requiredParity < 0 || parity == requiredParity) {
+				return controlPath{nets: next.nets, components: next.components, inversions: next.inversions}, true
+			}
+			key := visitKey{net: edge.to, parity: parity}
+			if visited[key] {
+				continue
+			}
+			visited[key] = true
 			queue = append(queue, next)
 		}
 	}

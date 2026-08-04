@@ -171,8 +171,8 @@ func DefaultPolicy() Policy {
 	return Policy{
 		MaxExpandedStates:       20_000,
 		MaxGeneratedGraphs:      50_000,
-		MaxPrimitiveInstances:   20,
-		MaxInternalNodes:        24,
+		MaxPrimitiveInstances:   32,
+		MaxInternalNodes:        32,
 		MaxCandidateSimulations: 512,
 		MaxCornerEvaluations:    8_192,
 		MaxValueTrials:          4_096,

@@ -348,3 +348,26 @@ func renameTopologyComponents(document Document, renames map[string]string) Docu
 	}
 	return document
 }
+
+func TestLayoutBendLabelPointRequiresSingleWireContact(t *testing.T) {
+	points := []kicadfiles.Point{
+		{X: kicadfiles.MM(20), Y: kicadfiles.MM(20)},
+		{X: kicadfiles.MM(40), Y: kicadfiles.MM(20)},
+	}
+	result := schematiclayout.Result{
+		Wires: []schematiclayout.WireSegment{
+			{NetName: "TARGET", From: points[0], To: points[1]},
+			{NetName: "TARGET", From: kicadfiles.Point{X: kicadfiles.MM(30), Y: kicadfiles.MM(10)}, To: kicadfiles.Point{X: kicadfiles.MM(30), Y: kicadfiles.MM(30)}},
+		},
+		Labels: []schematiclayout.Label{{
+			NetName: "TARGET", Text: "TARGET", Position: kicadfiles.Point{X: kicadfiles.MM(30), Y: kicadfiles.MM(20)}, RouteAnnotation: true,
+		}},
+	}
+	if got := layoutBendLabelPoint(result, "TARGET", points); got != nil {
+		t.Fatalf("junction annotation = %#v, want fallback selection", got)
+	}
+	result.Labels[0].Position = kicadfiles.Point{X: kicadfiles.MM(25), Y: kicadfiles.MM(20)}
+	if got := layoutBendLabelPoint(result, "TARGET", points); got == nil || got.XMM != 25 || got.YMM != 20 {
+		t.Fatalf("single-wire annotation = %#v, want (25,20)", got)
+	}
+}

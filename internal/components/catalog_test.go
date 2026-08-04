@@ -821,6 +821,12 @@ func TestCheckedInCatalogAudioPowerSemiconductorEvidence(t *testing.T) {
 				t.Fatalf("%s duration-specific trusted SOA = %#v", test.id, soa)
 			}
 		}
+		if test.id == "bjt.onsemi.njw0281g.to3p" || test.id == "bjt.onsemi.njw0302g.to3p" {
+			soa := record.SimulationModels[0].TransientSOA
+			if len(soa) != 1 || !soa[0].DC || soa[0].CaseTemperatureC != 25 || len(soa[0].Points) != 6 {
+				t.Fatalf("%s trusted DC SOA = %#v", test.id, soa)
+			}
+		}
 	}
 }
 

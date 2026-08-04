@@ -197,23 +197,23 @@ func TestDefaultCatalogProducesProvenanceCompleteValueDomains(t *testing.T) {
 	}
 }
 
-func TestFixedPrimitiveValueDomainKeepsSearchedComponentFirst(t *testing.T) {
+func TestOriginalPrimitiveValueDomainKeepsTopologySeedFirst(t *testing.T) {
 	candidates := []ComponentValueCandidate{
 		{PrimitiveKey: "active.alpha"},
 		{PrimitiveKey: "active.original"},
 		{PrimitiveKey: "active.zeta"},
 	}
-	prioritized := prioritizeOriginalFixedCandidate(
+	prioritized := prioritizeOriginalCandidate(
 		candidates,
 		"active.original",
 	)
 	if prioritized[0].PrimitiveKey != "active.original" ||
 		prioritized[1].PrimitiveKey != "active.alpha" ||
 		prioritized[2].PrimitiveKey != "active.zeta" {
-		t.Fatalf("fixed primitive priority = %#v", prioritized)
+		t.Fatalf("original primitive priority = %#v", prioritized)
 	}
 	if candidates[0].PrimitiveKey != "active.alpha" {
-		t.Fatal("fixed primitive priority mutated its input")
+		t.Fatal("original primitive priority mutated its input")
 	}
 }
 

@@ -1231,7 +1231,7 @@ func topologyPrimitiveReferenceVoltage(primitive PrimitiveCandidate) (float64, b
 	return 0, false
 }
 
-func topologyRegulatedVoltageRelationshipSeeds(
+func topologySimpleRegulatedVoltageRelationshipSeeds(
 	ctx context.Context,
 	requirement Requirement,
 	inventory PrimitiveInventory,
@@ -6625,6 +6625,7 @@ func topologyGraphHasReferenceRegulatedOutput(
 ) bool {
 	supplies := topologyNodesByRole(graph, "supply")
 	references := topologyNodesByRole(graph, "reference")
+	commands := topologyNodesByRole(graph, "input", "control")
 	outputs := topologyNodesByRole(graph, "output")
 	if len(supplies) == 0 || len(references) == 0 || len(outputs) == 0 {
 		return false
@@ -6638,39 +6639,66 @@ func topologyGraphHasReferenceRegulatedOutput(
 			continue
 		}
 		terminals := topologyTerminalNodes(controller)
-		absoluteReference := false
-		for _, reference := range graph.Instances {
-			if reference.Kind != "reference_diode" {
+		for _, invertedDrive := range []bool{false, true} {
+			setpointTerminal, feedbackTerminal := terminals["IN_PLUS"], terminals["IN_MINUS"]
+			if invertedDrive {
+				setpointTerminal, feedbackTerminal = feedbackTerminal, setpointTerminal
+			}
+			setpointDriven := false
+			for _, reference := range graph.Instances {
+				if reference.Kind != "reference_diode" {
+					continue
+				}
+				referenceTerminals := topologyTerminalNodes(reference)
+				if referenceTerminals["CATHODE"] == setpointTerminal &&
+					slices.Contains(references, referenceTerminals["ANODE"]) {
+					setpointDriven = true
+					break
+				}
+			}
+			for _, command := range commands {
+				setpointDriven = setpointDriven || topologyNodePathExists(passive, command, setpointTerminal)
+			}
+			if !setpointDriven || !topologyNodeIsInternal(graph, feedbackTerminal) {
 				continue
 			}
-			referenceTerminals := topologyTerminalNodes(reference)
-			if referenceTerminals["CATHODE"] == terminals["IN_PLUS"] &&
-				slices.Contains(references, referenceTerminals["ANODE"]) {
-				absoluteReference = true
-				break
+			feedback := false
+			for _, output := range outputs {
+				feedback = feedback || topologyNodePathExists(passive, output, feedbackTerminal)
 			}
-		}
-		if !absoluteReference || !topologyNodeIsInternal(graph, terminals["IN_MINUS"]) {
-			continue
-		}
-		feedback := false
-		for _, output := range outputs {
-			feedback = feedback || topologyNodePathExists(passive, output, terminals["IN_MINUS"])
-		}
-		if !feedback {
-			continue
-		}
-		for _, passDevice := range graph.Instances {
-			if passDevice.Kind != "npn_bjt" {
+			if !feedback {
 				continue
 			}
-			passTerminals := topologyTerminalNodes(passDevice)
-			if !topologyNodePathExists(passive, terminals["OUT"], passTerminals["BASE"]) ||
-				!slices.Contains(supplies, passTerminals["COLLECTOR"]) ||
-				!slices.Contains(outputs, passTerminals["EMITTER"]) {
-				continue
+			for _, passDevice := range graph.Instances {
+				if passDevice.Kind != "npn_bjt" {
+					continue
+				}
+				passTerminals := topologyTerminalNodes(passDevice)
+				driven := topologyNodePathExists(passive, terminals["OUT"], passTerminals["BASE"])
+				if invertedDrive {
+					driven = false
+					for _, driver := range graph.Instances {
+						if driver.Kind != "pnp_bjt" {
+							continue
+						}
+						driverTerminals := topologyTerminalNodes(driver)
+						if slices.Contains(supplies, driverTerminals["EMITTER"]) &&
+							topologyNodePathExists(passive, terminals["OUT"], driverTerminals["BASE"]) &&
+							topologyNodePathExists(passive, driverTerminals["COLLECTOR"], passTerminals["BASE"]) {
+							driven = true
+							break
+						}
+					}
+				}
+				if !driven || !slices.Contains(supplies, passTerminals["COLLECTOR"]) {
+					continue
+				}
+				for _, output := range outputs {
+					if topologyNodePathExists(passive, passTerminals["EMITTER"], output) {
+						return true
+					}
+				}
 			}
-			return true
 		}
 	}
 	return false
