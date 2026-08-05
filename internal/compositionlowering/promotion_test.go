@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"flag"
 	"fmt"
 	"math"
 	"os"
@@ -599,6 +600,39 @@ func requireLongPromotionTest(t *testing.T) {
 	t.Helper()
 	if testing.Short() {
 		t.Skip("skipping frozen end-to-end promotion corpus in short mode")
+	}
+	runPattern := ""
+	if run := flag.Lookup("test.run"); run != nil {
+		runPattern = run.Value.String()
+	}
+	// A non-empty -run expression is an explicit request for a focused test
+	// lane (the Makefile/CI test-one contract always supplies one). Keep those
+	// historical commands working while preventing an unqualified unit-suite
+	// invocation from serially executing every multi-minute promotion corpus.
+	if longPromotionRequested(os.Getenv("KICADAI_RUN_PROMOTION_CORPORA"), runPattern) {
+		return
+	}
+	t.Skip("set KICADAI_RUN_PROMOTION_CORPORA=1 or use -run to execute frozen end-to-end promotion corpora")
+}
+
+func longPromotionRequested(environment, runPattern string) bool {
+	return environment == "1" || strings.TrimSpace(runPattern) != ""
+}
+
+func TestLongPromotionRequiresExplicitCampaignOrFocusedRun(t *testing.T) {
+	for _, test := range []struct {
+		environment string
+		pattern     string
+		want        bool
+	}{
+		{want: false},
+		{environment: "0", want: false},
+		{environment: "1", want: true},
+		{pattern: "^TestFrozen", want: true},
+	} {
+		if got := longPromotionRequested(test.environment, test.pattern); got != test.want {
+			t.Fatalf("longPromotionRequested(%q, %q) = %t, want %t", test.environment, test.pattern, got, test.want)
+		}
 	}
 }
 

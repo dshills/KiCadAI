@@ -15,6 +15,7 @@ import (
 )
 
 func Run(ctx context.Context, input Input, evaluator Evaluator, policy Policy) Report {
+	policy = effectivePolicy(policy)
 	report := Report{
 		Schema: ReportSchema, PolicyVersion: PolicyVersion, CatalogHash: input.CatalogHash,
 		FormulaLibraryHash: input.FormulaLibraryHash, ModelRegistryHash: input.ModelRegistryHash, RegistryHash: simmodel.RegistryHash(),
@@ -87,6 +88,12 @@ func Run(ctx context.Context, input Input, evaluator Evaluator, policy Policy) R
 		return report
 	}
 
+	passing = eliminateDominatedCandidates(&report, passing)
+	if len(passing) == 0 {
+		report.StopReason = StopNoCandidate
+		report.Diagnostics = append(report.Diagnostics, Diagnostic{Path: "candidates", Message: "dominance reduction retained no passing finalist"})
+		return report
+	}
 	selectedIndex := passing[0]
 	for _, index := range passing[1:] {
 		if betterCandidate(report.Candidates[index], report.Candidates[selectedIndex]) {
@@ -114,10 +121,17 @@ func Run(ctx context.Context, input Input, evaluator Evaluator, policy Policy) R
 
 func evaluateCandidate(ctx context.Context, requirement architecturesearch.Requirement, candidate Candidate, evaluator Evaluator, policy Policy, consumption *Consumption) CandidateReport {
 	result := CandidateReport{Fingerprint: candidate.Fingerprint, Priority: candidate.Priority, StaticScore: candidate.Score, Status: "blocked", StopReason: StopEvaluationFailed}
+	budget := candidateEvaluationBudget{}
 	state := CandidateState{Fingerprint: candidate.Fingerprint, Variables: cloneVariables(candidate.Variables)}
 	normalizeState(&state)
 	evaluated := map[string]bool{}
-	current := runAttempt(ctx, requirement, candidate.SystemPlan, state, evaluator, consumption, 1)
+	if !candidateEvaluationFits(policy, consumption, &budget) {
+		consumption.BudgetExhausted = true
+		blocked := Attempt{Number: 1, State: state, StateHash: stateHash(state), Status: "blocked", BudgetExhausted: true}
+		result.Attempts = append(result.Attempts, blocked)
+		return finishCandidate(result, blocked, StopBudgetExhausted)
+	}
+	current := runAttempt(ctx, requirement, candidate.SystemPlan, state, evaluator, policy, consumption, &budget, 1)
 	result.Attempts = append(result.Attempts, current)
 	evaluated[current.StateHash] = true
 	if current.Status == "pass" {
@@ -145,15 +159,19 @@ func evaluateCandidate(ctx context.Context, requirement architecturesearch.Requi
 			if evaluated[hash] {
 				continue
 			}
-			if consumption.Evaluations >= policy.MaxEvaluations {
+			if !candidateEvaluationFits(policy, consumption, &budget) {
 				consumption.BudgetExhausted = true
 				return finishCandidate(result, current, StopBudgetExhausted)
 			}
-			trial := runAttempt(ctx, requirement, candidate.SystemPlan, neighbor, evaluator, consumption, len(result.Attempts)+1)
+			trial := runAttempt(ctx, requirement, candidate.SystemPlan, neighbor, evaluator, policy, consumption, &budget, len(result.Attempts)+1)
 			result.Attempts = append(result.Attempts, trial)
 			evaluated[hash] = true
 			consumption.RepairTrials++
 			trials++
+			if trial.BudgetExhausted {
+				consumption.BudgetExhausted = true
+				return finishCandidate(result, current, StopBudgetExhausted)
+			}
 			if trial.Status == "blocked" || !betterEvaluation(trial.Score, current.Score) {
 				continue
 			}
@@ -180,7 +198,7 @@ func evaluateCandidate(ctx context.Context, requirement architecturesearch.Requi
 	return finishCandidate(result, current, StopBudgetExhausted)
 }
 
-func runAttempt(ctx context.Context, requirement architecturesearch.Requirement, systemPlan *architecturesearch.SystemPlan, state CandidateState, evaluator Evaluator, consumption *Consumption, number int) Attempt {
+func runAttempt(ctx context.Context, requirement architecturesearch.Requirement, systemPlan *architecturesearch.SystemPlan, state CandidateState, evaluator Evaluator, policy Policy, consumption *Consumption, candidateBudget *candidateEvaluationBudget, number int) Attempt {
 	attempt := Attempt{Number: number, State: cloneState(state), StateHash: stateHash(state), Status: "blocked", Diagnostics: []Diagnostic{}}
 	if !validHash(attempt.StateHash) {
 		attempt.Diagnostics = append(attempt.Diagnostics, Diagnostic{Path: "state", Message: "candidate state could not be canonically hashed"})
@@ -190,23 +208,37 @@ func runAttempt(ctx context.Context, requirement architecturesearch.Requirement,
 		attempt.Diagnostics = append(attempt.Diagnostics, Diagnostic{Path: "context", Message: err.Error()})
 		return attempt
 	}
-	evaluation, err := evaluator.Evaluate(ctx, cloneState(state))
+	var evaluation Evaluation
+	var err error
+	if scheduled, ok := evaluator.(ScheduledEvaluator); ok {
+		evaluation, err = scheduled.EvaluateScheduled(ctx, cloneState(state), evaluationLimits(policy, consumption, candidateBudget))
+	} else {
+		evaluation, err = evaluator.Evaluate(ctx, cloneState(state))
+	}
 	consumption.Evaluations++
+	candidateBudget.Evaluations++
+	attempt.EvidenceHash = evaluation.EvidenceHash
+	attempt.Simulation = cloneSimulationEvidence(evaluation.Simulation)
+	attempt.Partial = evaluation.Partial
+	attempt.BudgetExhausted = evaluation.BudgetExhausted
+	attempt.Schedule = append([]EvaluationStageEvidence(nil), evaluation.Schedule...)
+	attempt.Work = cloneAnalysisExecutions(evaluation.Work)
+	consumeAnalysisWork(consumption, candidateBudget, evaluation.Work)
 	if err != nil {
 		attempt.Diagnostics = append(attempt.Diagnostics, Diagnostic{Path: "evaluation", Message: err.Error()})
 		return attempt
 	}
-	attempt.EvidenceHash = evaluation.EvidenceHash
-	attempt.Simulation = cloneSimulationEvidence(evaluation.Simulation)
 	if !validHash(evaluation.EvidenceHash) {
 		attempt.Diagnostics = append(attempt.Diagnostics, Diagnostic{Path: "evaluation.evidence_hash", Message: "trusted evaluation must provide a lowercase SHA-256 evidence hash"})
 	}
-	assertions, assertionDiagnostics := evaluateMeasurements(requirement, evaluation.Measurements)
+	assertions, assertionDiagnostics := evaluateMeasurements(requirement, evaluation.Measurements, evaluation.Partial)
 	attempt.Assertions = assertions
 	attempt.Diagnostics = append(attempt.Diagnostics, assertionDiagnostics...)
-	hierarchy, hierarchyDiagnostics := evaluateHierarchyVerification(requirement, systemPlan, assertions)
-	attempt.Hierarchy = hierarchy
-	attempt.Diagnostics = append(attempt.Diagnostics, hierarchyDiagnostics...)
+	if !evaluation.Partial {
+		hierarchy, hierarchyDiagnostics := evaluateHierarchyVerification(requirement, systemPlan, assertions)
+		attempt.Hierarchy = hierarchy
+		attempt.Diagnostics = append(attempt.Diagnostics, hierarchyDiagnostics...)
+	}
 	modelDecisions, modelUses, modelDiagnostics := validateModelDecisions(requirement, evaluation.ModelDecisions)
 	attempt.ModelDecisions = modelDecisions
 	attempt.Diagnostics = append(attempt.Diagnostics, modelDiagnostics...)
@@ -215,14 +247,17 @@ func runAttempt(ctx context.Context, requirement architecturesearch.Requirement,
 	if len(attempt.Diagnostics) != 0 {
 		return attempt
 	}
+	if evaluation.BudgetExhausted {
+		return attempt
+	}
 	attempt.Status = "fail"
-	if attempt.Score.Failures == 0 {
+	if attempt.Score.Failures == 0 && !evaluation.Partial {
 		attempt.Status = "pass"
 	}
 	return attempt
 }
 
-func evaluateMeasurements(requirement architecturesearch.Requirement, measurements []Measurement) ([]AssertionResult, []Diagnostic) {
+func evaluateMeasurements(requirement architecturesearch.Requirement, measurements []Measurement, partial bool) ([]AssertionResult, []Diagnostic) {
 	byKey := map[string]Measurement{}
 	var diagnostics []Diagnostic
 	for index, measurement := range measurements {
@@ -243,7 +278,9 @@ func evaluateMeasurements(requirement architecturesearch.Requirement, measuremen
 			key := behavior.ID + "\x00" + caseID
 			measurement, exists := byKey[key]
 			if !exists {
-				diagnostics = append(diagnostics, Diagnostic{Path: "evaluation.measurements", Message: "missing measurement for " + behavior.ID + " in operating case " + caseID})
+				if !partial {
+					diagnostics = append(diagnostics, Diagnostic{Path: "evaluation.measurements", Message: "missing measurement for " + behavior.ID + " in operating case " + caseID})
+				}
 				continue
 			}
 			delete(byKey, key)
@@ -354,7 +391,16 @@ func validateInput(input Input, evaluator Evaluator, policy Policy, requirementH
 	if !validHash(input.CatalogHash) || !validHash(input.FormulaLibraryHash) || !validHash(input.ModelRegistryHash) {
 		diagnostics = append(diagnostics, Diagnostic{Path: "input", Message: "catalog, formula-library, and model-registry hashes must be lowercase SHA-256 values"})
 	}
-	if policy.MaxCandidates < 1 || policy.MaxCandidates > 64 || policy.MaxRepairsPerCandidate < 0 || policy.MaxRepairsPerCandidate > 32 || policy.MaxEvaluations < 1 || policy.MaxEvaluations > 4096 || policy.MaxVariablesPerCandidate < 0 || policy.MaxVariablesPerCandidate > 128 || policy.MaxValuesPerVariable < 2 || policy.MaxValuesPerVariable > 256 {
+	if policy.MaxCandidates < 1 || policy.MaxCandidates > 64 ||
+		policy.MaxRepairsPerCandidate < 0 || policy.MaxRepairsPerCandidate > 32 ||
+		policy.MaxEvaluations < 1 || policy.MaxEvaluations > 4096 ||
+		policy.MaxEvaluationsPerCandidate < 1 || policy.MaxEvaluationsPerCandidate > policy.MaxEvaluations ||
+		policy.MaxAnalysisExecutions < 1 || policy.MaxAnalysisExecutions > 1_000_000 ||
+		policy.MaxAnalysisExecutionsPerCandidate < 1 || policy.MaxAnalysisExecutionsPerCandidate > policy.MaxAnalysisExecutions ||
+		policy.MaxAnalysisExecutionsPerKind < 1 || policy.MaxAnalysisExecutionsPerKind > policy.MaxAnalysisExecutions ||
+		policy.MaxPlansPerEvaluation < 1 || policy.MaxPlansPerEvaluation > 4096 ||
+		policy.MaxVariablesPerCandidate < 0 || policy.MaxVariablesPerCandidate > 128 ||
+		policy.MaxValuesPerVariable < 2 || policy.MaxValuesPerVariable > 256 {
 		diagnostics = append(diagnostics, Diagnostic{Path: "policy", Message: "closed-loop policy is outside bounded limits"})
 	}
 	if len(input.Candidates) == 0 || len(input.Candidates) > policy.MaxCandidates {
@@ -719,6 +765,9 @@ func finishCandidate(result CandidateReport, final Attempt, reason StopReason) C
 }
 
 func attemptStopReason(attempt Attempt) StopReason {
+	if attempt.BudgetExhausted {
+		return StopBudgetExhausted
+	}
 	for _, diagnostic := range attempt.Diagnostics {
 		if strings.Contains(diagnostic.Path, "model_decisions") || strings.Contains(diagnostic.Message, "model") {
 			return StopModelTrustFailed

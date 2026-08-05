@@ -216,6 +216,14 @@ unsafe capability is reported and stopped instead of guessed.
   DRC, complete connectivity/routing, writer correctness, and zero round-trip
   differences. See the
   [completion audit](specs/generic-protected-current-output-synthesis/AUDIT.md).
+- Closed-loop candidate evaluation now uses a deterministic, budgeted
+  cheap-to-expensive scheduler: structural checks precede DC, AC, transient,
+  thermal/SOA, and exhaustive promotion verification. Exact trusted plans are
+  reused through a bounded SHA-256 cache, conservative Pareto dominance retains
+  auditable rejection evidence, and worker count cannot change persisted
+  selections or hashes. See the
+  [scheduler specification](specs/deterministic-synthesis-evaluation-scheduler/SPEC.md)
+  and [completion audit](specs/deterministic-synthesis-evaluation-scheduler/AUDIT.md).
 - Electrical and physical correction now share the versioned
   `kicadai.diagnosis-driven-repair.v1` trace. It binds normalized diagnoses to
   deterministic proposals, stage re-entry, budgets, effects, outcomes, and

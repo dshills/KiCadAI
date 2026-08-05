@@ -64,6 +64,12 @@ func ValidatePromotionReport(report Report, catalogHash string) []Diagnostic {
 			if !validHash(finalAttempt.EvidenceHash) || finalAttempt.StateHash != stateHash(finalAttempt.State) {
 				diagnostics = append(diagnostics, Diagnostic{Path: path + ".attempts", Message: "selected candidate has invalid simulation evidence or state hash"})
 			}
+			if finalAttempt.Partial || finalAttempt.BudgetExhausted {
+				diagnostics = append(diagnostics, Diagnostic{Path: path + ".attempts", Message: "selected candidate cannot use partial or budget-exhausted evaluation evidence"})
+			}
+			if len(finalAttempt.Schedule) != 0 {
+				diagnostics = append(diagnostics, validatePromotionSchedule(path+".attempts", finalAttempt.Schedule)...)
+			}
 			if finalAttempt.Simulation == nil {
 				diagnostics = append(diagnostics, Diagnostic{Path: path + ".attempts", Message: "selected candidate lacks replayable trusted simulation evidence"})
 			} else if evidenceHash, err := HashSimulationEvidence(*finalAttempt.Simulation); err != nil || evidenceHash != finalAttempt.EvidenceHash {
@@ -78,6 +84,29 @@ func ValidatePromotionReport(report Report, catalogHash string) []Diagnostic {
 		diagnostics = append(diagnostics, Diagnostic{Path: "selected", Message: "selected fingerprint must identify exactly one candidate transcript"})
 	}
 	slices.SortStableFunc(diagnostics, compareDiagnostics)
+	return diagnostics
+}
+
+func validatePromotionSchedule(path string, schedule []EvaluationStageEvidence) []Diagnostic {
+	var diagnostics []Diagnostic
+	if len(schedule) == 0 {
+		return append(diagnostics, Diagnostic{Path: path + ".schedule", Message: "selected evaluation schedule is empty"})
+	}
+	previous := -1
+	for index, stage := range schedule {
+		rank := evaluationStageRank(stage.Stage)
+		if rank >= 99 || rank < previous {
+			diagnostics = append(diagnostics, Diagnostic{Path: fmt.Sprintf("%s.schedule[%d]", path, index), Message: "evaluation stages must use the canonical cheap-to-expensive order"})
+		}
+		previous = rank
+	}
+	if schedule[0].Stage != EvaluationStageStructural || schedule[0].Status != "pass" {
+		diagnostics = append(diagnostics, Diagnostic{Path: path + ".schedule", Message: "selected evaluation must begin with passing structural validation"})
+	}
+	final := schedule[len(schedule)-1]
+	if final.Stage != EvaluationStageExhaustivePromotion || final.Status != "pass" {
+		diagnostics = append(diagnostics, Diagnostic{Path: path + ".schedule", Message: "selected evaluation must end with exhaustive promotion coverage"})
+	}
 	return diagnostics
 }
 

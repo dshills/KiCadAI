@@ -11,8 +11,8 @@ import (
 )
 
 const (
-	ReportSchema  = "kicadai.closed-loop-synthesis-report.v1"
-	PolicyVersion = "closed-loop-synthesis-policy-v1"
+	ReportSchema  = "kicadai.closed-loop-synthesis-report.v2"
+	PolicyVersion = "closed-loop-synthesis-policy-v2"
 )
 
 type StopReason string
@@ -28,20 +28,32 @@ const (
 	StopUnsupportedDiagnosis StopReason = "unsupported_diagnosis"
 	StopNonImprovement       StopReason = "non_improvement"
 	StopRepeatedState        StopReason = "repeated_state"
+	StopDominated            StopReason = "dominated"
 	StopBudgetExhausted      StopReason = "budget_exhausted"
 	StopCanceled             StopReason = "canceled"
 )
 
 type Policy struct {
-	MaxCandidates            int `json:"max_candidates"`
-	MaxRepairsPerCandidate   int `json:"max_repairs_per_candidate"`
-	MaxEvaluations           int `json:"max_evaluations"`
-	MaxVariablesPerCandidate int `json:"max_variables_per_candidate"`
-	MaxValuesPerVariable     int `json:"max_values_per_variable"`
+	MaxCandidates                     int `json:"max_candidates"`
+	MaxRepairsPerCandidate            int `json:"max_repairs_per_candidate"`
+	MaxEvaluations                    int `json:"max_evaluations"`
+	MaxEvaluationsPerCandidate        int `json:"max_evaluations_per_candidate"`
+	MaxAnalysisExecutions             int `json:"max_analysis_executions"`
+	MaxAnalysisExecutionsPerCandidate int `json:"max_analysis_executions_per_candidate"`
+	MaxAnalysisExecutionsPerKind      int `json:"max_analysis_executions_per_kind"`
+	MaxPlansPerEvaluation             int `json:"max_plans_per_evaluation"`
+	MaxVariablesPerCandidate          int `json:"max_variables_per_candidate"`
+	MaxValuesPerVariable              int `json:"max_values_per_variable"`
 }
 
 func DefaultPolicy() Policy {
-	return Policy{MaxCandidates: 16, MaxRepairsPerCandidate: 8, MaxEvaluations: 128, MaxVariablesPerCandidate: 32, MaxValuesPerVariable: 64}
+	return Policy{
+		MaxCandidates: 16, MaxRepairsPerCandidate: 8, MaxEvaluations: 128,
+		MaxEvaluationsPerCandidate: 64, MaxAnalysisExecutions: 4096,
+		MaxAnalysisExecutionsPerCandidate: 2048,
+		MaxAnalysisExecutionsPerKind:      1024, MaxPlansPerEvaluation: 256,
+		MaxVariablesPerCandidate: 32, MaxValuesPerVariable: 64,
+	}
 }
 
 type Input struct {
@@ -96,10 +108,55 @@ type Evaluator interface {
 }
 
 type Evaluation struct {
-	EvidenceHash   string              `json:"evidence_hash"`
-	Measurements   []Measurement       `json:"measurements"`
-	ModelDecisions []ModelDecision     `json:"model_decisions"`
-	Simulation     *SimulationEvidence `json:"simulation,omitempty"`
+	EvidenceHash    string                    `json:"evidence_hash"`
+	Measurements    []Measurement             `json:"measurements"`
+	ModelDecisions  []ModelDecision           `json:"model_decisions"`
+	Simulation      *SimulationEvidence       `json:"simulation,omitempty"`
+	Partial         bool                      `json:"partial,omitempty"`
+	BudgetExhausted bool                      `json:"budget_exhausted,omitempty"`
+	Schedule        []EvaluationStageEvidence `json:"schedule,omitempty"`
+	Work            []AnalysisExecution       `json:"work,omitempty"`
+}
+
+type EvaluationStage string
+
+const (
+	EvaluationStageStructural          EvaluationStage = "structural"
+	EvaluationStageDC                  EvaluationStage = "dc"
+	EvaluationStageAC                  EvaluationStage = "ac"
+	EvaluationStageTransient           EvaluationStage = "transient"
+	EvaluationStageThermalSOA          EvaluationStage = "thermal_soa"
+	EvaluationStageExhaustivePromotion EvaluationStage = "exhaustive_promotion"
+)
+
+type EvaluationStageEvidence struct {
+	Stage      EvaluationStage `json:"stage"`
+	Status     string          `json:"status"`
+	PlanHashes []string        `json:"plan_hashes,omitempty"`
+	Analyses   []string        `json:"analyses,omitempty"`
+	Reason     string          `json:"reason,omitempty"`
+}
+
+type AnalysisExecution struct {
+	PlanHash string          `json:"plan_hash"`
+	Stage    EvaluationStage `json:"stage"`
+	Analyses []string        `json:"analyses"`
+	CacheHit bool            `json:"cache_hit"`
+}
+
+// EvaluationLimits is derived from repository-owned policy and consumed work.
+// It is not part of behavioral/provider input.
+type EvaluationLimits struct {
+	MaxPlans              int
+	MaxAnalysisExecutions int
+	MaxConcurrentPlans    int
+	AnalysisRemaining     map[string]int
+}
+
+// ScheduledEvaluator exposes staged trusted work to the runner. Existing
+// trusted evaluators remain exhaustive through Evaluator.
+type ScheduledEvaluator interface {
+	EvaluateScheduled(context.Context, CandidateState, EvaluationLimits) (Evaluation, error)
 }
 
 // SimulationEvidence is the canonical trusted input/output transcript behind
@@ -171,21 +228,40 @@ type CandidateReport struct {
 	FinalScore  EvaluationScore                   `json:"final_score"`
 	Status      string                            `json:"status"`
 	StopReason  StopReason                        `json:"stop_reason"`
+	Dominance   *DominanceEvidence                `json:"dominance,omitempty"`
 }
 
 type Attempt struct {
-	Number         int                            `json:"number"`
-	State          CandidateState                 `json:"state"`
-	StateHash      string                         `json:"state_hash"`
-	EvidenceHash   string                         `json:"evidence_hash,omitempty"`
-	Simulation     *SimulationEvidence            `json:"simulation,omitempty"`
-	Assertions     []AssertionResult              `json:"assertions"`
-	ModelDecisions []ModelDecision                `json:"model_decisions"`
-	Hierarchy      *HierarchyVerificationEvidence `json:"hierarchy,omitempty"`
-	Diagnoses      []Diagnosis                    `json:"diagnoses"`
-	Score          EvaluationScore                `json:"score"`
-	Status         string                         `json:"status"`
-	Diagnostics    []Diagnostic                   `json:"diagnostics"`
+	Number          int                            `json:"number"`
+	State           CandidateState                 `json:"state"`
+	StateHash       string                         `json:"state_hash"`
+	EvidenceHash    string                         `json:"evidence_hash,omitempty"`
+	Simulation      *SimulationEvidence            `json:"simulation,omitempty"`
+	Assertions      []AssertionResult              `json:"assertions"`
+	ModelDecisions  []ModelDecision                `json:"model_decisions"`
+	Hierarchy       *HierarchyVerificationEvidence `json:"hierarchy,omitempty"`
+	Diagnoses       []Diagnosis                    `json:"diagnoses"`
+	Score           EvaluationScore                `json:"score"`
+	Status          string                         `json:"status"`
+	Diagnostics     []Diagnostic                   `json:"diagnostics"`
+	Partial         bool                           `json:"partial,omitempty"`
+	BudgetExhausted bool                           `json:"budget_exhausted,omitempty"`
+	Schedule        []EvaluationStageEvidence      `json:"schedule,omitempty"`
+	Work            []AnalysisExecution            `json:"work,omitempty"`
+}
+
+type DominanceDimension struct {
+	Name       string  `json:"name"`
+	Dominating float64 `json:"dominating"`
+	Dominated  float64 `json:"dominated"`
+	Preference string  `json:"preference"`
+}
+
+type DominanceEvidence struct {
+	Schema                string               `json:"schema"`
+	DominatingFingerprint string               `json:"dominating_fingerprint"`
+	Dimensions            []DominanceDimension `json:"dimensions"`
+	Reason                string               `json:"reason"`
 }
 
 type AssertionResult struct {
@@ -300,11 +376,22 @@ type ClosedLoopCandidateOutcome struct {
 }
 
 type Consumption struct {
-	CandidatesEvaluated int  `json:"candidates_evaluated"`
-	Evaluations         int  `json:"evaluations"`
-	RepairTrials        int  `json:"repair_trials"`
-	RepairsApplied      int  `json:"repairs_applied"`
-	BudgetExhausted     bool `json:"budget_exhausted"`
+	CandidatesEvaluated int                   `json:"candidates_evaluated"`
+	Evaluations         int                   `json:"evaluations"`
+	RepairTrials        int                   `json:"repair_trials"`
+	RepairsApplied      int                   `json:"repairs_applied"`
+	AnalysisExecutions  int                   `json:"analysis_executions"`
+	CacheHits           int                   `json:"cache_hits"`
+	CacheMisses         int                   `json:"cache_misses"`
+	ByAnalysis          []AnalysisConsumption `json:"by_analysis,omitempty"`
+	DominatedCandidates int                   `json:"dominated_candidates"`
+	BudgetExhausted     bool                  `json:"budget_exhausted"`
+}
+
+type AnalysisConsumption struct {
+	Analysis   string `json:"analysis"`
+	Executions int    `json:"executions"`
+	CacheHits  int    `json:"cache_hits"`
 }
 
 type Diagnostic struct {

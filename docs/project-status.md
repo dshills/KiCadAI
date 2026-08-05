@@ -1,8 +1,12 @@
 # Project Status
 
-Last verified: 2026-08-03 by focused local package and preservation suites,
-plus installed-KiCad lanes. Generic protected-current synthesis now
-promotes the frozen programmable output plus independently authored low-side
+Last verified: 2026-08-05 by the complete bounded local suite, focused
+scheduler/race/preservation suites, and installed-KiCad lanes. Closed-loop
+candidate evaluation now follows a deterministic structural, DC, AC,
+transient, thermal/SOA, and exhaustive-promotion schedule with explicit work
+budgets, bounded content-addressed reuse, and auditable conservative
+dominance. Generic protected-current synthesis continues to promote the frozen
+programmable output plus independently authored low-side
 sink and high-side source variants twice with deterministic electrical,
 physical, and project evidence; clean ERC; strict DRC; complete routing and
 connectivity; writer correctness; and zero round-trip differences. The frozen
@@ -12,6 +16,15 @@ power-integrity, three-case neutral MCU, two-case clock/programming, and
 four-case power/interface installed-KiCad corpora; protected USB-C LED and I2C,
 ESP32 minimal-system, Class-A, and Class-AB fixture regressions; and independent
 clean-checkout promotion bundles remain current preservation evidence.
+
+The scheduler removes the immediate evaluation-scaling bottleneck without
+weakening the trust boundary. Failed candidates stop only at canonical stage
+boundaries; selected candidates still prove every required plan and corner.
+Cache hits do not consume solver-execution budgets, partial or exhausted
+attempts cannot promote, and persisted evidence is invariant across worker
+counts. See the
+[scheduler specification](../specs/deterministic-synthesis-evaluation-scheduler/SPEC.md)
+and [completion audit](../specs/deterministic-synthesis-evaluation-scheduler/AUDIT.md).
 
 The six-circuit independent external review is now a release-blocking,
 machine-readable regression ladder. Its fixes cover atomic composed placement,
@@ -645,6 +658,13 @@ but they still require real engineering sources, representative
 simulation/workflow/KiCad evidence, and review before entering the supported
 registry. Unknown behavior must continue to produce a stable capability gap
 instead of guessed implementation detail.
+
+With deterministic evaluation cost now bounded, the next synthesis milestone
+should add independently frozen nonlinear and switching failures, then expand
+only the reusable graph operators, device models, discontinuous analyses, and
+physical constraints those failures prove necessary. The first target should
+remain low-energy and bench-verifiable; switching regulators and nonlinear
+analog stages are preferable to mains or high-energy power conversion.
 
 See the [Roadmap](../specs/ROADMAP.md) for prioritized work and the
 [Development Reference](development.md) for repository-level limitations and

@@ -138,10 +138,14 @@ AI generation coverage gaps are tracked in `data/ai-readiness/`; see
 
 ## Testing
 
-The bounded local suite does not require KiCad:
+The bounded local suite does not require KiCad. An unqualified invocation
+skips frozen end-to-end promotion campaigns unless
+`KICADAI_RUN_PROMOTION_CORPORA=1` is set; a focused `-run` expression is also
+treated as an explicit campaign request:
 
 ```sh
 make GO_TEST_FLAGS=-short test
+go test ./... -timeout 20m
 ```
 
 Equivalent direct command:
@@ -177,11 +181,13 @@ jobs through `make test-one`. This keeps the coverage job bounded while still
 requiring those three established end-to-end corpora on pull requests and
 pushes to `main`.
 
-Do not use one monolithic non-short `go test ./...` result as the promotion
-receipt. Several long corpora share `internal/compositionlowering` and can
-exceed a package timeout when serialized. Run the bounded suite plus the named
-`make test-one` lanes, using `KICADAI_PROMOTION_SHARD` where the workflow matrix
-declares shards. This preserves every case and matches the required workflow.
+Do not use the bounded `go test ./...` result as the complete promotion
+receipt. Several long corpora share `internal/compositionlowering`; they remain
+checked in but require `KICADAI_RUN_PROMOTION_CORPORA=1` or a focused `-run`
+expression. Run the bounded suite plus the named `make test-one` lanes, using
+`KICADAI_PROMOTION_SHARD` where the workflow matrix declares shards. This
+preserves every case without serializing all multi-minute campaigns into the
+ordinary package test process.
 The independent external-review ladder is also a required job. Run its six
 positive scenarios and four fail-closed cases twice with:
 

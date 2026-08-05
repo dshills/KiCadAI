@@ -1330,6 +1330,23 @@ reusable analog families outside the proven protected-current envelope, while
 preserving the exact 8/8 benchmark, both neutral physical promotions, and the
 three protected-current promotions.
 
+The deterministic synthesis-evaluation scheduler is now complete. Candidate
+attempts run structural, DC, AC, transient, thermal/SOA, and exhaustive gates
+in canonical order; exact trusted plans use bounded content-addressed reuse;
+work is limited per candidate, analysis kind, and run; and only complete
+evidence participates in auditable Pareto dominance. Concurrency changes wall
+time only, not selection, evidence, accounting, or artifact bytes. The full
+bounded local suite and the current-output, voltage-output, architecture-
+generalization, simulation-grounded, and installed-KiCad preservation lanes
+remain green. See
+`specs/deterministic-synthesis-evaluation-scheduler/AUDIT.md`.
+
+The next milestone should use that scheduler to expand into independently
+frozen nonlinear and switching architectures. Start with low-energy,
+bench-verifiable cases; add only reusable device/model/graph/analysis support
+required by the failures; require discontinuity-aware transient and thermal/SOA
+evidence; and preserve all current deterministic and installed-KiCad gates.
+
 1. Expand graph, value, model, and stage-reentry repair only from independently
    frozen failures in analog families not already covered by the protected
    current-output milestone.

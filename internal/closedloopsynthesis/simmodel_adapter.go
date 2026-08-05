@@ -25,6 +25,10 @@ const maxPersistedAnalysisPointsPerReport = 256
 const (
 	defaultSimulationEvaluationCacheEntries = 256
 	defaultTrustedTranscriptCacheEntries    = 512
+	// Concurrency is runtime-only and intentionally absent from Policy and
+	// persisted evidence. This fixed ceiling bounds local resource use while
+	// callers may choose any worker count from one through the ceiling.
+	maxConcurrentSimulationPlans = 16
 )
 
 // SimulationResolver is the trusted boundary between a candidate state and a
@@ -69,6 +73,9 @@ type SimModelEvaluator struct {
 	Resolver           SimulationResolver
 	ProvenanceRegistry modelprovenance.Registry
 	Cache              *SimulationEvaluationCache
+	// MaxConcurrentPlans is runtime-only execution policy. It is excluded
+	// from persisted evidence because worker count cannot affect result bytes.
+	MaxConcurrentPlans int
 }
 
 // SimulationEvaluationCache reuses trusted results only when the complete
@@ -147,6 +154,21 @@ func NewSimulationEvaluationCache() *SimulationEvaluationCache {
 }
 
 func (evaluator SimModelEvaluator) Evaluate(ctx context.Context, state CandidateState) (Evaluation, error) {
+	return evaluator.evaluate(ctx, state, EvaluationLimits{}, false)
+}
+
+// EvaluateScheduled executes complete resolved plans in deterministic
+// cheap-to-expensive stages. It may return a partial, failed evaluation after
+// the first failing stage; only an exhaustive result carries replayable
+// promotion evidence.
+func (evaluator SimModelEvaluator) EvaluateScheduled(ctx context.Context, state CandidateState, limits EvaluationLimits) (Evaluation, error) {
+	if evaluator.MaxConcurrentPlans > 0 {
+		limits.MaxConcurrentPlans = min(evaluator.MaxConcurrentPlans, maxConcurrentSimulationPlans)
+	}
+	return evaluator.evaluate(ctx, state, limits, true)
+}
+
+func (evaluator SimModelEvaluator) evaluate(ctx context.Context, state CandidateState, limits EvaluationLimits, staged bool) (Evaluation, error) {
 	if evaluator.Resolver == nil {
 		return Evaluation{}, fmt.Errorf("simulation resolver is required")
 	}
@@ -165,6 +187,9 @@ func (evaluator SimModelEvaluator) Evaluate(ctx context.Context, state Candidate
 	// Provenance is derived after trusted resolution. Any resolver-supplied
 	// decisions are replaced so they cannot become promotion evidence.
 	resolution.ModelDecisions = modelDecisions
+	if staged {
+		return evaluator.evaluateScheduledResolution(ctx, resolution, plans, modelDecisions, limits)
+	}
 	reports, planDiagnostics := evaluateTrustedSimulationPlans(plans, evaluator.Cache)
 	for index, diagnostics := range planDiagnostics {
 		if len(diagnostics) != 0 && !onlyAssertionFailures(reports[index], diagnostics) {

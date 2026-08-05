@@ -18,6 +18,16 @@ explicit supply/load/temperature/tolerance/model corners. Model identity,
 source revision, immutable hash, review status, applicability, decisions,
 repairs, budgets, and final selection are retained in replayable artifacts.
 
+Candidate evaluation is scheduled in canonical cheap-to-expensive order:
+structural resolution, DC, AC/noise/stability, transient/startup/distortion,
+thermal/SOA, and exhaustive promotion verification. Every attempt records its
+stage schedule and work accounting. Exact resolved plans may be reused only by
+SHA-256 identity through a bounded run-local cache. Explicit per-candidate,
+per-analysis-kind, and overall limits fail closed, while conservative Pareto
+dominance can remove only fully evaluated candidates and must retain the
+dominating candidate and compared dimensions. The final selection and evidence
+are byte-identical across supported worker counts.
+
 The provider may request behavior and operating conditions. It may not provide
 equations, solver settings, model files, arbitrary expressions, executable
 content, route coordinates, or repair code. Missing trust, unsupported
@@ -37,4 +47,5 @@ through reviewed catalog/model coverage and new neutral held-out failures.
 
 See the [specification](../specs/simulation-grounded-closed-loop-synthesis/SPEC.md)
 and [completion audit](../specs/simulation-grounded-closed-loop-synthesis/AUDIT.md),
+the [scheduler completion audit](../specs/deterministic-synthesis-evaluation-scheduler/AUDIT.md),
 plus the upstream [behavioral compiler audit](../specs/uncertainty-aware-behavioral-intent-compilation/AUDIT.md).

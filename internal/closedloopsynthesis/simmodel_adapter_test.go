@@ -70,12 +70,26 @@ func TestSimModelEvaluatorRepairsThroughFreshTrustedResolution(t *testing.T) {
 	if report.Consumption.Evaluations != 2 || report.Consumption.RepairsApplied != 1 {
 		t.Fatalf("consumption=%#v", report.Consumption)
 	}
+	finalAttempt := report.Candidates[0].Attempts[len(report.Candidates[0].Attempts)-1]
+	if finalAttempt.Partial || finalAttempt.BudgetExhausted || len(finalAttempt.Schedule) < 3 ||
+		finalAttempt.Schedule[0].Stage != EvaluationStageStructural ||
+		finalAttempt.Schedule[len(finalAttempt.Schedule)-1].Stage != EvaluationStageExhaustivePromotion ||
+		finalAttempt.Schedule[len(finalAttempt.Schedule)-1].Status != "pass" ||
+		report.Consumption.AnalysisExecutions != 2 || report.Consumption.CacheMisses != 2 {
+		t.Fatalf("scheduler evidence=%#v consumption=%#v", finalAttempt, report.Consumption)
+	}
 	if got := len(report.Candidates[0].Attempts[0].ModelDecisions); got != 2 {
 		t.Fatalf("independently derived model decisions = %d, want 2", got)
 	}
 	replay := Run(context.Background(), input, evaluator, DefaultPolicy())
 	if hashJSON(report) != hashJSON(replay) {
 		t.Fatal("trusted simmodel closed-loop replay differs")
+	}
+	concurrentEvaluator := evaluator
+	concurrentEvaluator.MaxConcurrentPlans = 4
+	concurrent := Run(context.Background(), input, concurrentEvaluator, DefaultPolicy())
+	if hashJSON(report) != hashJSON(concurrent) {
+		t.Fatal("runtime plan concurrency changed persisted closed-loop evidence")
 	}
 }
 
@@ -116,6 +130,33 @@ func TestSimulationEvaluationCacheIsBoundedAndEvidenceNeutral(t *testing.T) {
 	}
 	if len(cache.entries) != 1 {
 		t.Fatalf("cache entries=%d, want hard limit 1", len(cache.entries))
+	}
+}
+
+func TestSimModelEvaluatorFailsClosedAtPerAnalysisBudget(t *testing.T) {
+	requirement := closedLoopTestRequirement()
+	minimum, maximum := 2.45, 2.55
+	requirement.Requirements.OperatingCases[0].ID = "nominal"
+	requirement.Requirements.BehavioralRequirements = []architecturesearch.BehavioralRequirement{{
+		ID: "output", Metric: "dc_voltage", Analysis: simmodel.AnalysisDCOperatingPoint,
+		Observation: architecturesearch.Observation{Kind: "port", ID: "output"}, Min: &minimum, Max: &maximum, Unit: "V", OperatingCases: []string{"nominal"}, Critical: true,
+	}}
+	input := Input{
+		Requirement: requirement, CatalogHash: testHash("catalog"), FormulaLibraryHash: testHash("formula"), ModelRegistryHash: testHash("models"),
+		Candidates: []Candidate{{Fingerprint: testHash("budget-divider"), Variables: []Variable{{
+			ID: "lower_resistance", Kind: "passive_value", Value: 5_000, AllowedValues: []float64{5_000, 10_000},
+			Effects: []RepairEffect{{Analysis: simmodel.AnalysisDCOperatingPoint, Metric: "dc_voltage", Direction: RepairMetricIncreases}},
+		}}}},
+	}
+	registry, diagnostics := modelprovenance.LoadDefault()
+	if len(diagnostics) != 0 {
+		t.Fatalf("model provenance registry diagnostics: %#v", diagnostics)
+	}
+	policy := DefaultPolicy()
+	policy.MaxAnalysisExecutionsPerKind = 1
+	report := Run(context.Background(), input, SimModelEvaluator{Resolver: dividerSimulationResolver{}, ProvenanceRegistry: registry}, policy)
+	if report.Status != "blocked" || !report.Consumption.BudgetExhausted || report.Consumption.AnalysisExecutions != 1 || len(report.Candidates) != 1 || report.Candidates[0].StopReason != StopBudgetExhausted {
+		t.Fatalf("per-analysis budget did not fail closed: %#v", report)
 	}
 }
 
