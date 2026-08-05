@@ -92,13 +92,7 @@ func solvePeriodicallyDrivenThermalAnalysis(plan Plan, analysis Analysis) (Analy
 	if len(diagnostics) != 0 {
 		return result, diagnostics
 	}
-	frequency := 0.0
-	for _, excitation := range analysis.Excitations {
-		if excitation.SineFrequencyHz > 0 {
-			frequency = excitation.SineFrequencyHz
-			break
-		}
-	}
+	frequency := waveform.FundamentalFrequencyHz
 	if frequency <= 0 || len(waveform.Points) < 2 {
 		return result, []Diagnostic{{Path: "analyses." + analysis.ID, Message: "periodically driven thermal analysis produced no complete periodic waveform"}}
 	}
@@ -159,6 +153,10 @@ func thermalDeviceSupportsDissipation(device ResolvedDevice) bool {
 }
 
 func thermalDeviceResult(device ResolvedDevice, analysis Analysis, ambient, dissipation float64) (DeviceResult, *Diagnostic) {
+	return thermalDeviceResultAtResistanceScale(device, analysis, ambient, dissipation, 1)
+}
+
+func thermalDeviceResultAtResistanceScale(device ResolvedDevice, analysis Analysis, ambient, dissipation, resistanceScale float64) (DeviceResult, *Diagnostic) {
 	entry := DeviceResult{Component: device.Component, DissipationW: normalizedMNAFloat(dissipation)}
 	parameters := deviceParameterMap(device)
 	maximum, hasMaximum := namedValue(parameters, "max_temperature_c")
@@ -174,7 +172,7 @@ func thermalDeviceResult(device ResolvedDevice, analysis Analysis, ambient, diss
 			return DeviceResult{}, &Diagnostic{Path: "analyses." + analysis.ID + ".devices." + device.Component, Message: "op-amp thermal analysis requires catalog-backed quiescent current", Suggestion: "select a reviewed active-device model with supply-current evidence"}
 		}
 	}
-	temperature := normalizedMNAFloat(reference + dissipation*theta)
+	temperature := normalizedMNAFloat(reference + dissipation*theta*resistanceScale)
 	entry.JunctionTemperatureC = &temperature
 	if temperature > maximum {
 		return DeviceResult{}, &Diagnostic{Path: "analyses." + analysis.ID + ".devices." + device.Component, Message: fmt.Sprintf("predicted steady-state temperature %.12g C exceeds catalog-backed maximum %.12g C", temperature, maximum), Suggestion: "reduce dissipation, improve the reviewed thermal path, or select a suitably rated component"}

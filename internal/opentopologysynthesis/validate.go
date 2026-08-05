@@ -41,6 +41,7 @@ var allowedMetrics = []string{
 	"cutoff_frequency",
 	"dc_current",
 	"dc_voltage",
+	"duty_cycle",
 	"fall_time",
 	"falling_threshold",
 	"hysteresis",
@@ -51,11 +52,13 @@ var allowedMetrics = []string{
 	"lower_threshold",
 	"off_state_current",
 	"on_state_voltage",
+	"oscillation_frequency",
 	"output_current",
 	"output_high_voltage",
 	"output_low_voltage",
 	"output_noise_rms",
 	"output_power",
+	"output_ripple",
 	"output_swing",
 	"output_voltage",
 	"peak_current",
@@ -79,6 +82,7 @@ var allowedMetrics = []string{
 	"upper_threshold",
 	"voltage_gain",
 	"voltage_gain_at_frequency",
+	"conversion_efficiency",
 }
 
 var allowedUnits = []string{

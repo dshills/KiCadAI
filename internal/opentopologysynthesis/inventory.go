@@ -301,6 +301,7 @@ func allowedPrimitiveDescriptors() map[string]simmodel.PrimitiveDescriptor {
 		simmodel.PrimitiveComparatorOpenCollectorV1:     true,
 		simmodel.PrimitiveAdjustableLinearRegulatorV1:   true,
 		simmodel.PrimitiveFixedLinearRegulatorV1:        true,
+		simmodel.PrimitiveSynchronousBuckRegulatorV1:    true,
 		simmodel.PrimitiveFloatingAdjustableRegulatorV1: true,
 		simmodel.PrimitiveShuntVoltageReferenceV1:       true,
 		simmodel.PrimitiveBidirectionalTVSV1:            true,
@@ -340,6 +341,11 @@ func inventoryModels(record components.ComponentRecord, registry modelprovenance
 		}
 		claim = simmodel.CloneCatalogEvidence(claim)
 		parameters := append([]simmodel.NamedValue(nil), claim.Parameters...)
+		if claim.ModelID == simmodel.PrimitiveCapacitorTransientV1 {
+			if esr, proven := reviewedCapacitorESROhm(record); proven && !namedModelParameterPresent(parameters, "series_resistance_ohm") {
+				parameters = append(parameters, simmodel.NamedValue{Name: "series_resistance_ohm", Value: esr})
+			}
+		}
 		slices.SortFunc(parameters, func(left, right simmodel.NamedValue) int {
 			return cmp.Or(cmp.Compare(left.Name, right.Name), cmp.Compare(left.Value, right.Value))
 		})
@@ -370,6 +376,23 @@ func inventoryModels(record components.ComponentRecord, registry modelprovenance
 		return cmp.Compare(left.ModelID, right.ModelID)
 	})
 	return result, rejections
+}
+
+func reviewedCapacitorESROhm(record components.ComponentRecord) (float64, bool) {
+	if record.Capacitor == nil || record.Capacitor.ESRReview != "proven" || record.Capacitor.ESR == nil ||
+		canonicalUnit(record.Capacitor.ESR.Unit) != "ohm" || !finite(record.Capacitor.ESR.Value) || record.Capacitor.ESR.Value < 0 {
+		return 0, false
+	}
+	return record.Capacitor.ESR.Value, true
+}
+
+func namedModelParameterPresent(parameters []simmodel.NamedValue, name string) bool {
+	for _, parameter := range parameters {
+		if parameter.Name == name {
+			return true
+		}
+	}
+	return false
 }
 
 func primitiveFunctionalUnits(record components.ComponentRecord, descriptor simmodel.PrimitiveDescriptor) []string {
@@ -633,6 +656,10 @@ func openTopologyPrimitiveKind(modelID string) string {
 		return "comparator"
 	case simmodel.PrimitiveFixedLinearRegulatorV1:
 		return "fixed_voltage_regulator"
+	case simmodel.PrimitiveFixedBuckModuleV1:
+		return "fixed_step_down_module"
+	case simmodel.PrimitiveSynchronousBuckRegulatorV1:
+		return "synchronous_buck_regulator"
 	case simmodel.PrimitiveAdjustableLinearRegulatorV1,
 		simmodel.PrimitiveFloatingAdjustableRegulatorV1:
 		return "adjustable_voltage_regulator"

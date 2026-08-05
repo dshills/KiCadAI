@@ -1,0 +1,22 @@
+{
+  "schema": "kicadai.nonlinear-switching-corpus.v1",
+  "version": 1,
+  "base_commit": "ebf2918aad8e305f416c0677cd8a5017656d3a5d",
+  "frozen_at": "2026-08-05",
+  "requirement_schema": "kicadai.open-topology-requirement.v1",
+  "authoring_policy": "Independent behavior-only electrical requirements frozen before nonlinear and switching production changes; no part identity, implementation primitive, equation, solver control, physical coordinate, or expected architecture is present in a requirement.",
+  "minimum_design_passes": 5,
+  "stages": ["integrity", "schema", "primitive_inventory", "architecture_generation", "equation_sizing", "simulation", "discontinuity_convergence", "safety_rejection", "ranking", "lowering", "schematic_readability", "switching_physical_constraints", "placement", "routing", "connectivity", "writer", "erc", "drc", "round_trip", "replay"],
+  "design_cases": [
+    {"id": "autonomous_square_wave_source", "behavior_family": "autonomous_periodic_generation", "acceptance_claim": "relaxation_oscillator", "requirement_file": "autonomous_square_wave_source.json", "requirement_sha256": "f3d0842eca258ad5cacd5a6e12ba819adb04875388a92b2b13c518c488a0e1e8", "required_analyses": ["startup", "thermal", "transient"], "safety_critical": true},
+    {"id": "bipolar_magnitude_transfer", "behavior_family": "low_level_nonlinear_transfer", "acceptance_claim": "precision_rectifier", "requirement_file": "bipolar_magnitude_transfer.json", "requirement_sha256": "cce6bd9616b06c930e75d97bb37f19d2169a1967e60469d8f7ec04818795b207", "required_analyses": ["ac_sweep", "dc_operating_point", "dc_sweep", "noise", "transient"], "safety_critical": false},
+    {"id": "bounded_bipolar_transfer", "behavior_family": "bounded_nonlinear_transfer", "acceptance_claim": "diode_limiter", "requirement_file": "bounded_bipolar_transfer.json", "requirement_sha256": "be54e8efca185df37b9595f44d85bf53b4b7e902303eb43c7caf35a6477cb81d", "required_analyses": ["ac_sweep", "dc_operating_point", "dc_sweep", "thermal", "transient"], "safety_critical": true},
+    {"id": "controlled_pulse_power_stage", "behavior_family": "controlled_pulse_power_transfer", "acceptance_claim": "pwm_mosfet_driver", "requirement_file": "controlled_pulse_power_stage.json", "requirement_sha256": "5a65b440c129c429286878435605719994a5abdb7c10057b5f7c4365dab043bd", "required_analyses": ["dc_operating_point", "electrothermal", "transient"], "safety_critical": true},
+    {"id": "efficient_step_down_power", "behavior_family": "regulated_step_down_conversion", "acceptance_claim": "low_power_buck_regulator", "requirement_file": "efficient_step_down_power.json", "requirement_sha256": "54ff2a52766db2f6425e6a910963b0979c3ca0fe2455a4ed051c181c4f1bf1a6", "required_analyses": ["dc_operating_point", "dc_sweep", "electrothermal", "startup", "transient"], "safety_critical": true}
+  ],
+  "adversarial_cases": [
+    {"id": "adversarial_excessive_controlled_pulse_stress", "behavior_family": "controlled_pulse_power_transfer", "expected_failure_kind": "unsafe_thermal_soa", "requirement_file": "adversarial_excessive_controlled_pulse_stress.json", "requirement_sha256": "7e2c4681e65e5fdf91a6a63cfdd191f89e18724fe9342882637ef6fff49f01b3", "required_analyses": ["electrothermal", "transient"]},
+    {"id": "adversarial_excessive_step_down_stress", "behavior_family": "regulated_step_down_conversion", "expected_failure_kind": "unsafe_thermal_soa", "requirement_file": "adversarial_excessive_step_down_stress.json", "requirement_sha256": "f4fc849b43d21be8fef4340dddaf0e6232407680d939a6293cf1687f90a46cd3", "required_analyses": ["dc_operating_point", "electrothermal", "transient"]},
+    {"id": "adversarial_ultrafast_power_conversion", "behavior_family": "ultrafast_power_conversion", "expected_failure_kind": "unsupported_dynamic_envelope", "requirement_file": "adversarial_ultrafast_power_conversion.json", "requirement_sha256": "61e089e67c4daa6afe08de5cfc7dcfe1745a4a658d9ba158de0043a0f3b14118", "required_analyses": ["electrothermal", "transient"]}
+  ]
+}

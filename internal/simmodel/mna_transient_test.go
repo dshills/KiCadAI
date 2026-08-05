@@ -452,7 +452,8 @@ func TestTransientAcceptedSubstepsCloseOriginalObservationTime(t *testing.T) {
 		plan, analysis, timeS, plan.Devices, devices, initial,
 		nil, nil,
 	)
-	if !predicted || evidence.Method != "backward_euler_bounded_accepted_substeps_v1" || evidence.TimeSteps < 2 {
+	if !predicted || evidence.Method != "backward_euler_bounded_accepted_substeps_v1" ||
+		evidence.TimeSteps < 2 || evidence.AcceptedSubsteps != evidence.TimeSteps {
 		t.Fatalf("predicted=%v evidence=%#v", predicted, evidence)
 	}
 	predictedOut := nonlinearNodeVoltage(&predictedSystem, predictedSolution, "OUT")
@@ -1324,5 +1325,25 @@ func TestTransientZeroEnergyRecognizesAllZeroIndependentSources(t *testing.T) {
 	analysis.Excitations[0].PulsePeriodS = 0
 	if transientPowerSourcesZeroAtTime(plan, analysis, -analysis.TimeStepS) {
 		t.Fatal("energized power source was classified as zero energy")
+	}
+}
+
+func TestTransientPriorOutputLimitsPreserveSaturatedOpAmpState(t *testing.T) {
+	system := mnaSystem{nodeIndex: map[string]int{"OUT": 0, "V_PLUS": 1, "V_MINUS": 2}}
+	device := ResolvedDevice{
+		Component: "decision", PrimitiveModel: PrimitiveOpAmpV1,
+		ModelParameters: []NamedValue{{Name: "output_low_margin_v", Value: .3}, {Name: "output_high_margin_v", Value: .3}},
+		Terminals:       []TerminalBinding{{Terminal: "OUT", Net: "OUT"}, {Terminal: "V_PLUS", Net: "V_PLUS"}, {Terminal: "V_MINUS", Net: "V_MINUS"}},
+	}
+	high := transientPriorOutputLimits(system, []ResolvedDevice{device}, []complex128{4.7, 5, 0}, nil)
+	if state, found := high["decision"]; !found || state.side != 1 || state.value != 4.7 {
+		t.Fatalf("high-rail prior state = %#v", high)
+	}
+	low := transientPriorOutputLimits(system, []ResolvedDevice{device}, []complex128{.3, 5, 0}, nil)
+	if state, found := low["decision"]; !found || state.side != -1 || state.value != .3 {
+		t.Fatalf("low-rail prior state = %#v", low)
+	}
+	if interior := transientPriorOutputLimits(system, []ResolvedDevice{device}, []complex128{2.5, 5, 0}, nil); len(interior) != 0 {
+		t.Fatalf("interior output acquired a sticky rail state: %#v", interior)
 	}
 }

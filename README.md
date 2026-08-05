@@ -141,6 +141,18 @@ unsafe capability is reported and stopped instead of guessed.
   independent clean roots produce the same 418-file content-addressed bundle.
   See the
   [completion audit](specs/dynamic-electrothermal-control-loop-synthesis/AUDIT.md).
+- A separately frozen nonlinear/switching corpus now turns five behavior-only
+  requirements into a precision rectifier, diode limiter, relaxation
+  oscillator, PWM MOSFET power stage, and low-power buck without accepting
+  named parts, topologies, equations, models, nets, or geometry. Generic
+  relationship operators, discontinuity-aware transient analysis, periodic
+  waveform measurements, propagation-delay gating, electrothermal coupling,
+  and transient-SOA checks drive selection. All five pass deterministic replay,
+  exhaustive corners, readable lowering, complete routing/connectivity, writer
+  checks, zero-difference round trip, and local installed-KiCad ERC/strict DRC.
+  Two unsafe envelopes and one unsupported ultra-fast envelope fail closed.
+  See the
+  [completion audit](specs/nonlinear-switching-architecture-synthesis/AUDIT.md).
 - V6 adds explicit active-high/active-low control functions, asserted and safe
   startup state, directed transition timing, and stable-state dependencies to
   the V3 behavioral-composition envelope. Planning resolves every dependency
@@ -229,9 +241,10 @@ unsafe capability is reported and stopped instead of guessed.
   deterministic proposals, stage re-entry, budgets, effects, outcomes, and
   before/after hashes. A six-component, twelve-pad, two-route-tree benchmark
   recovers reproducibly from a real routing block and passes writer,
-  connectivity, round-trip, ERC, and strict-DRC checks. The protected current
-  output remains safely exhausted with a narrower reproducible diagnosis. See
-  the [repair results](specs/diagnosis-driven-repair/RESULTS.md).
+  connectivity, round-trip, ERC, and strict-DRC checks. Its historical
+  protected-current trace remains useful reproducible failure evidence; the
+  later generic protected-current milestone closes that synthesis gap. See the
+  [repair results](specs/diagnosis-driven-repair/RESULTS.md).
 - End-to-end cross-stage repair now coordinates trusted simulation,
   schematic/ERC, placement, routing, connectivity, DRC, writer, and round-trip
   correction through `kicadai.cross-stage-autonomous-repair.v1`. A frozen

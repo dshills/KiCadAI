@@ -327,6 +327,44 @@
           }
         ]
       }],
+      "companions": [
+        {
+          "id": "buck_bootstrap", "role": "bootstrap_capacitor", "required": true,
+          "applies_to": ["model_support:mna_synchronous_buck_current_mode_v1"],
+          "recipes": [{"id": "bootstrap", "family": "capacitor", "role": "decoupling_capacitor", "package": "0603", "value_kind": "capacitance", "value": "100n", "min_voltage_v": 5.5, "minimum_confidence": "verified", "required_functions": ["A", "B"], "connections": [{"function": "A", "parent_function": "BOOT"}, {"function": "B", "parent_function": "SW"}]}],
+          "description": "Place the reviewed low-inductance boost capacitor directly from BOOT to SW."
+        },
+        {
+          "id": "buck_vcc_bypass", "role": "controller_bypass_capacitor", "required": true,
+          "applies_to": ["model_support:mna_synchronous_buck_current_mode_v1"],
+          "recipes": [{"id": "vcc_bypass", "family": "capacitor", "role": "decoupling_capacitor", "package": "0603", "value_kind": "capacitance", "value": "4.7u", "min_voltage_v": 5.5, "minimum_confidence": "verified", "required_functions": ["A", "B"], "connections": [{"function": "A", "parent_function": "VCC"}, {"function": "B", "parent_function": "AGND"}]}],
+          "description": "Provide at least 1 uF low-ESR ceramic bypass capacitance from VCC to the local ground."
+        },
+        {
+          "id": "buck_soft_start", "role": "soft_start_capacitor", "required": true,
+          "applies_to": ["model_support:mna_synchronous_buck_current_mode_v1"],
+          "recipes": [{"id": "soft_start", "family": "capacitor", "role": "capacitor", "package": "1210", "value_kind": "capacitance", "value": "15n", "min_voltage_v": 6.3, "minimum_confidence": "verified", "required_functions": ["A", "B"], "connections": [{"function": "A", "parent_function": "SS_TRK"}, {"function": "B", "parent_function": "AGND"}]}],
+          "description": "Program the reviewed approximately 6.3 ms soft-start boundary from SS/TRK to ground."
+        },
+        {
+          "id": "buck_frequency_program", "role": "frequency_programming", "required": true,
+          "applies_to": ["model_support:mna_synchronous_buck_current_mode_v1"],
+          "recipes": [{"id": "frequency_program", "family": "resistor", "role": "resistor", "package": "0603", "value_kind": "resistance", "value": "88.7k", "minimum_confidence": "verified", "required_functions": ["A", "B"], "connections": [{"function": "A", "parent_function": "RT"}, {"function": "B", "parent_function": "AGND"}]}],
+          "description": "Program the trusted 500 kHz switching frequency from reviewed LT8610 RT data."
+        },
+        {
+          "id": "buck_mode_default", "role": "mode_default", "required": true,
+          "applies_to": ["model_support:mna_synchronous_buck_current_mode_v1"],
+          "ties": [{"function": "SYNC_MODE", "level": "low"}],
+          "description": "Select low-ripple Burst Mode operation and never leave SYNC floating."
+        },
+        {
+          "id": "buck_unused_status", "role": "unused_status", "required": true,
+          "applies_to": ["model_support:mna_synchronous_buck_current_mode_v1"],
+          "no_connects": ["PGOOD"],
+          "description": "Mark the unused open-drain power-good output intentionally unconnected."
+        }
+      ],
       "regulator_evidence": {
         "startup_time": {"value": 0.0063, "unit": "s", "conditions": "bounded external soft-start programming used by the trusted averaged model"},
         "soft_start_status": "proven",
@@ -408,6 +446,9 @@
       "placement_hints": [
         {"kind": "near", "target": "buck_input_bypass", "value": "2", "unit": "mm"},
         {"kind": "near", "target": "buck_bootstrap", "value": "2", "unit": "mm"},
+        {"kind": "near", "target": "buck_vcc_bypass", "value": "2", "unit": "mm"},
+        {"kind": "near", "target": "buck_soft_start", "value": "3", "unit": "mm"},
+        {"kind": "near", "target": "buck_frequency_program", "value": "3", "unit": "mm"},
         {"kind": "near", "target": "buck_inductor", "value": "4", "unit": "mm"}
       ],
       "routing_hints": [
@@ -503,6 +544,38 @@
           }
         ]
       }],
+      "companions": [
+        {
+          "id": "buck_bootstrap", "role": "bootstrap_capacitor", "required": true,
+          "applies_to": ["model_support:mna_synchronous_buck_current_mode_v1"],
+          "recipes": [{"id": "bootstrap", "family": "capacitor", "role": "decoupling_capacitor", "package": "0603", "value_kind": "capacitance", "value": "470n", "min_voltage_v": 5.5, "minimum_confidence": "verified", "required_functions": ["A", "B"], "connections": [{"function": "A", "parent_function": "BOOT"}, {"function": "B", "parent_function": "SW"}]}],
+          "description": "Place the datasheet-required high-quality 470 nF bootstrap capacitor directly from BOOT to SW."
+        },
+        {
+          "id": "buck_vcc_bypass", "role": "controller_bypass_capacitor", "required": true,
+          "applies_to": ["model_support:mna_synchronous_buck_current_mode_v1"],
+          "recipes": [{"id": "vcc_bypass", "family": "capacitor", "role": "decoupling_capacitor", "package": "0603", "value_kind": "capacitance", "value": "4.7u", "min_voltage_v": 5.5, "minimum_confidence": "verified", "required_functions": ["A", "B"], "connections": [{"function": "A", "parent_function": "VCC"}, {"function": "B", "parent_function": "AGND"}]}],
+          "description": "Provide more than the datasheet-required 2.2 uF high-quality local VCC bypass capacitance."
+        },
+        {
+          "id": "buck_bias_bypass", "role": "bias_bypass_capacitor", "required": true,
+          "applies_to": ["model_support:mna_synchronous_buck_current_mode_v1"],
+          "recipes": [{"id": "bias_bypass", "family": "capacitor", "role": "decoupling_capacitor", "package": "0603", "value_kind": "capacitance", "value": "4.7u", "min_voltage_v": 5.5, "minimum_confidence": "verified", "required_functions": ["A", "B"], "connections": [{"function": "A", "parent_function": "BIAS"}, {"function": "B", "parent_function": "AGND"}]}],
+          "description": "Bypass the output-fed BIAS pin with more than the datasheet-recommended 1 uF ceramic capacitance."
+        },
+        {
+          "id": "buck_mode_default", "role": "mode_default", "required": true,
+          "applies_to": ["model_support:mna_synchronous_buck_current_mode_v1"],
+          "ties": [{"function": "SYNC_MODE", "level": "low"}],
+          "description": "Select DCM/PFM light-load operation and never leave SYNC/MODE floating."
+        },
+        {
+          "id": "buck_internal_defaults", "role": "internal_defaults", "required": true,
+          "applies_to": ["model_support:mna_synchronous_buck_current_mode_v1"],
+          "no_connects": ["RT", "SS_TRK", "PGOOD"],
+          "description": "Leave RT and SS/TRK floating for the reviewed 500 kHz and 6.3 ms internal defaults; mark unused PGOOD intentionally unconnected."
+        }
+      ],
       "regulator_evidence": {
         "startup_time": {"value": 0.0063, "unit": "s", "conditions": "internal default soft-start setting"},
         "soft_start_status": "proven",
@@ -577,6 +650,8 @@
       "placement_hints": [
         {"kind": "near", "target": "buck_input_bypass", "value": "2", "unit": "mm"},
         {"kind": "near", "target": "buck_bootstrap", "value": "2", "unit": "mm"},
+        {"kind": "near", "target": "buck_vcc_bypass", "value": "2", "unit": "mm"},
+        {"kind": "near", "target": "buck_bias_bypass", "value": "3", "unit": "mm"},
         {"kind": "near", "target": "buck_inductor", "value": "4", "unit": "mm"}
       ],
       "routing_hints": [

@@ -506,3 +506,29 @@ func firstValuePrimitive(
 	}
 	return PrimitiveCandidate{}, false
 }
+
+func TestRatingsCoverRequirementRejectsPropagationDelayOutsideDynamicEnvelope(t *testing.T) {
+	requirement := testOpenTopologyRequirement(t, "ground_referenced_load_control.json")
+	maximumRiseTimeS := 5e-9
+	minimumFrequencyHz := 50e6
+	requirement.Requirements.BehavioralRequirements = []BehavioralAssertion{
+		{ID: "edge", Metric: "rise_time", Max: &maximumRiseTimeS, Unit: "s"},
+		{ID: "rate", Metric: "oscillation_frequency", Min: &minimumFrequencyHz, Unit: "Hz"},
+	}
+	maximumDelayUS := 1.0
+	primitive := PrimitiveCandidate{Ratings: []PrimitiveBound{{
+		Kind:    "propagation_delay",
+		Unit:    "us",
+		Maximum: &maximumDelayUS,
+	}}}
+	if ratingsCoverRequirement(requirement, primitive) {
+		t.Fatal("one-microsecond primitive covered a five-nanosecond, fifty-megahertz dynamic envelope")
+	}
+
+	maximumDelayNS := 2.0
+	primitive.Ratings[0].Unit = "ns"
+	primitive.Ratings[0].Maximum = &maximumDelayNS
+	if !ratingsCoverRequirement(requirement, primitive) {
+		t.Fatal("two-nanosecond primitive did not cover a five-nanosecond, fifty-megahertz dynamic envelope")
+	}
+}

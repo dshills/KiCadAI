@@ -3,7 +3,7 @@
   "generated_at": "2026-07-17",
   "corpus_manifest_sha256": "5eb592caf268c68505357e5d62226a89a8d65e558efe1dd5dcaab75dc000e902",
   "synthesis_policy_version": "function-synthesis-policy-v1",
-  "catalog_sha256": "18b1cec31eddbba35cd8a8f28ae7803148f221d7bcfd390e54e98c8b880f24b4",
+  "catalog_sha256": "15aba02bed3b437a7694c7565300a3ec9266abbc6f5989026d608663579d8c39",
   "kicad_library_index_sha256": "d838c505ae7fc49c9a42816e53496b5f7de30f713c53dc279719ec6968363140",
   "round_trip_zero_diff_sha256": "27163ab962d0833a026fc2af5143528164484f2fbec3a7d90e53a82a960a839c",
   "gate_profile": {
@@ -34,17 +34,17 @@
       ],
       "status": "pass",
       "hashes": {
-        "generated_files": "596d5a1a75fa0733d1e0bfafeaa2e40b67b317f9ff16baf82e8375a3ec1e8889",
+        "generated_files": "0789d3d70088bbe49116982a6db66e8c07297c077e6b3049630cd721d8c5fd00",
         "input": "c62d3ceb1e9a1dcad52c4445ca92f813a36dc223b133de958ebb4faa937abaaa",
-        "lowered_graph": "300f97b8780e4dd5de4dd9660edab1c0d54d2ae6759a5b416b03d8cf560566ae",
-        "request": "0b5ba376d108d01d693612b23a47d82aed0ee11830177a18d56601d534e4dcd2",
-        "resolution": "08decb3424fd2fb6578711f93f6d877b6814ea4f215d67a3802bee32ad7e88fe"
+        "lowered_graph": "0f52a6e29f28cab6a894e5888c0a4db0bef8fc4ce70616a8802c353e64c56b6b",
+        "request": "741b16b926222c49f2bd898bab4cb3422ba6e513bcf149762957dfe09d284373",
+        "resolution": "3cfeaaeb4b1586a1a5b39e9bf489d7d5eb2f015d56bca06ea9f0798439535a34"
       },
       "primary_components": [
         "mcu.microchip.atmega328p_a.tqfp32"
       ],
       "support_components": [
-        "capacitor.murata.grm188r71h104ka93d.0603",
+        "capacitor.murata.grm188r72a104ka35d.0603",
         "connector.samtec.tsw_106_07_l_s.1x06",
         "resistor.yageo.rc0603fr_0710kl.0603"
       ],
@@ -69,17 +69,17 @@
       ],
       "status": "pass",
       "hashes": {
-        "generated_files": "37539983f6ce4c38e469f9fe8c763eb746d467b932ac19852a5365bb3bea4af9",
+        "generated_files": "28a19736173944c8314c7d46c9691e83e5e859175b5edea78729fed3755c13ae",
         "input": "aa7a9677de39c94881a8094696c85114f34f148b3f80aa731d7524e07d3c9a37",
-        "lowered_graph": "d2c23444d819ad4980a160414c702ef2a49e94749dcd5294d61b41525a895d06",
-        "request": "7278d5930239fe7ecb7f51aab5ed84b99b41a03a067f6c2f7a43f060b896c4bc",
-        "resolution": "17b7a50050040a894b291e174d336146253d1f70b68275f430aa922b765376e5"
+        "lowered_graph": "abbcb03b289a47cc6fe1c534a7fc0a2addb0d428b0744d98b2e1c01e19534ff0",
+        "request": "c597158d9ad40d4ed6ad41299b10ca6354ca4ad6f9889591a5fd04ab910ae104",
+        "resolution": "741a90161a1d9503b0480859311ad605c042d87ed41342c83e3509aea95cf7a9"
       },
       "primary_components": [
         "sensor.bosch.bme280.lga8"
       ],
       "support_components": [
-        "capacitor.murata.grm188r71h104ka93d.0603",
+        "capacitor.murata.grm188r72a104ka35d.0603",
         "resistor.generic.0603"
       ],
       "interface_components": [
@@ -101,11 +101,11 @@
       ],
       "status": "pass",
       "hashes": {
-        "generated_files": "1412f4edb368622d1b8f65b3a48b9aed4ba9f12bf34a980dbc774ced421032e1",
+        "generated_files": "419f600cc975c68b42c73415a99b807c03180e6e7e6c09e70364fe54e722177b",
         "input": "851fde8bb0d9a4fa5b49679224fc1b3f78645401609ff16f895b9b56dea9b405",
-        "lowered_graph": "8b86f6bf9ce723598c0bf27abc378d575c0759358004511879f1cbb9571d6a58",
-        "request": "2f8e6000733a99acf27e6911f53793019394dd4e2be4b24fc6ac641835bf5b34",
-        "resolution": "466e48cce7365ca74154dceb73b3e5db5deb36d1362366433f0a5e52ad55d8d1"
+        "lowered_graph": "168f90355e7fb31f5fccf376dc3ae71c1eccfb7e95aed1aed64dda0650a96338",
+        "request": "7bfaac32dffcf8cd2d81b035c00490b0a1fa142ef247b9c23278ea18790266c3",
+        "resolution": "28dc7d318bba84a3f9c14b5a09849e14b85ad9a76f51c6895c983859f68b0da1"
       },
       "primary_components": [
         "opamp.ti.lmv321.sot23_5",
@@ -113,7 +113,7 @@
         "resistor.yageo.rc0603fr_0710kl.0603"
       ],
       "support_components": [
-        "capacitor.murata.grm188r71h104ka93d.0603"
+        "capacitor.murata.grm188r72a104ka35d.0603"
       ],
       "interface_components": [
         "connector.samtec.tsw_102_07_l_s.1x02"
@@ -134,11 +134,11 @@
       ],
       "status": "pass",
       "hashes": {
-        "generated_files": "00e9613d7caceb3164adf215c8341de80d50dd78e34f41b84e3cce53c2926333",
+        "generated_files": "9e6730b88533d066479adf1f60d6814936a04ec06af58094eb96842fe50937d1",
         "input": "9ff5c885596fa6cfb1da0dd11f9457f0db0fdb1a528e226b003e84bf6529472e",
-        "lowered_graph": "c0ec6d426ed798f1c03e65558b6cb9d6605f38b77363d62b38d15aced438e049",
-        "request": "ece58585f94c54b0e2fa186da4d4765f6692c2196f4b31c10a93bdc922381586",
-        "resolution": "bbaf5ac700db9943584e93a20071749f74545124eb082fb1de7e8bfaa706ac02"
+        "lowered_graph": "7e72736b3ce835f57bcbe1524deb89b15fb4c030fabdd69908a48e714587409e",
+        "request": "83b90b03ad6566834fb1f2ceba7f7255d463a0411c665d7aebd124b646341fea",
+        "resolution": "ae26ee2036f5d018508b6b034b2dccc387e762b3c18c2fcc22c8de30a08b035c"
       },
       "primary_components": [
         "capacitor.ceramic.0603",
@@ -146,7 +146,7 @@
         "resistor.yageo.rc0603fr_0710kl.0603"
       ],
       "support_components": [
-        "capacitor.murata.grm188r71h104ka93d.0603"
+        "capacitor.murata.grm188r72a104ka35d.0603"
       ],
       "interface_components": [
         "connector.samtec.tsw_102_07_l_s.1x02"
@@ -169,11 +169,11 @@
       ],
       "status": "pass",
       "hashes": {
-        "generated_files": "0ee680ab6663d5977c248c593001a5a468eb3a8b535fb486f64890d2005dec61",
+        "generated_files": "0966eef530c14700c4b2dfcd193e12d73fb7927a48b9e0605ed08739e2d37cbb",
         "input": "0693530028d700755906f81534396ce298ad0ce694e585490377702f4f2fdd67",
-        "lowered_graph": "b4188c9b138d28f58138c42593247052a41980d3346c2d39941085002e47eeed",
-        "request": "bf404adfc3c4c41d91797ff69656b8701ff6a2c50d1be6ee8079b60422fe79fc",
-        "resolution": "32b0b6dd2d91b2773561b6eef37880a7e18386a55e193c9b96a46d143868e252"
+        "lowered_graph": "176e78b2d2152d313cc7291fb1502b81efe65837288a134781177b76367689d1",
+        "request": "b271fd009d35be43a77063d0f637fa02b03d860ed9c64045b13fb501ab3da630",
+        "resolution": "b3b7ff1c446bce7ff9f009b4fa81e9e5149e94cfa861a0de91e31fb303c94138"
       },
       "primary_components": [
         "mcu.espressif.esp32_wroom_32e",
@@ -181,7 +181,7 @@
       ],
       "support_components": [
         "capacitor.ceramic.0603",
-        "capacitor.murata.grm188r71h104ka93d.0603",
+        "capacitor.murata.grm188r72a104ka35d.0603",
         "capacitor.murata.grm21br61a106ke19l.0805",
         "connector.samtec.tsw_104_07_l_s.1x04",
         "resistor.generic.0603",
@@ -207,11 +207,11 @@
       ],
       "status": "pass",
       "hashes": {
-        "generated_files": "811a88938f4f0161ae849029f4b2aa3227d66a331325fd7ab3fb9d6c4cab0121",
+        "generated_files": "9063c6cb7c0907159422b54c43f79b8518cd789f33a893e4b0e4a44b30976a07",
         "input": "fd4db9a8307619bb701efb9166524a6c3ed0b0b8de66743294e1dc840483c6c1",
         "lowered_graph": "6c4d66c2bf1e18041f511d07650a922a1e4e1b1f9bc1d8cb4e1acab079f5d2b4",
-        "request": "d6cce686327623fb54adfba98661fda44f19b3d544e1769f2d1589ad083df38c",
-        "resolution": "5cd37c83879ea917b2f2c9673bd163322b7fac95b792f174642a231490467fac"
+        "request": "83688db88c9228ce7233ad817cc062ad3a2610d6a8a281dbbd24f68bd873a94e",
+        "resolution": "f591ed7929ec4464ef544498a2ee7df8c6524d7ed305645850b72931dc0af3b0"
       },
       "primary_components": [
         "bjt.onsemi.mmbt3904.sot23",
@@ -239,17 +239,17 @@
       ],
       "status": "pass",
       "hashes": {
-        "generated_files": "b6c8d5e7a3f7a8ab1df2c4ac394e6841219a9196680cc3d9605e2169c1f5a7eb",
+        "generated_files": "e9efa650699c122ed7ce218cec2b55a4a721071cab87a4c2f4347adb0109b044",
         "input": "bd721fd20d2c0fae287d0740faa8bf5658c7ec8b55d025a3f7ec28fd95933c5e",
-        "lowered_graph": "395994217e29bba3cd04c08e251d9bc4ace1452a317ed2d48188f20153ec34f4",
-        "request": "56df463d2c4f63a37d0fa095838dc13eecb71fd4d783f3f3f8a8e901524a3fd9",
-        "resolution": "34963e00a7c8a52b5c7fbaec3dc00070318a13ce2f1bdb8976b7cb7e6eeea20e"
+        "lowered_graph": "e0a421095220e2db243877360222942bf5fb89ba6ac99da010e11c51bc06aeb9",
+        "request": "fa292bc74ef5c5260ff1cda49ca645e0cb259deeeae16f3c854ebd0fc5ba8d98",
+        "resolution": "1567d57ecc66423433d96819461b65798eb9b2538c6f1437aff22043fb6116a8"
       },
       "primary_components": [
         "sensor.sensirion.sht31_dis.dfn8"
       ],
       "support_components": [
-        "capacitor.murata.grm188r71h104ka93d.0603",
+        "capacitor.murata.grm188r72a104ka35d.0603",
         "resistor.generic.0603"
       ],
       "interface_components": [
@@ -272,11 +272,11 @@
       ],
       "status": "pass",
       "hashes": {
-        "generated_files": "cc562a351b8d1a9b23b14ccaad2de55ceb3d5122ec97082facf95cfa35e55d50",
+        "generated_files": "29871fb14304da9986eb3f574c0c318d79c5e3eae3eb43e1abdf47a435e32923",
         "input": "ff6df77ec3e9a7b0fd2acba5a1acb37025293f93d8ac89b29a0e45bdfb8fd3d5",
         "lowered_graph": "39fe6c044c73c6ce78c8fa4b6dfbe992ee62006909d8d0d6d2569bee8887580f",
-        "request": "365a08b8baec16d56fd18dac4c17615b1972b9abd797b7943ab868efd73fc602",
-        "resolution": "3c096f1f09c31ef3f7048017600f45d9a64bf380b03ad7885b38cdb75b6d7a26"
+        "request": "25bf99cbdc378b007e32330637151165278c47d10537b3dd67c049f4b0ae65cb",
+        "resolution": "44e2acc2c5e25d6bda5578b64cc3d3fb9f22b8a42c952611e28707e98fd7ca71"
       },
       "primary_components": [
         "regulator.linear.ap2112k_3v3.sot23_5",

@@ -309,6 +309,14 @@ from validation feedback to safe automatic repair.
   deterministic alternative selection, and bounded repair feed the normal
   physical workflow. All six pass local installed-KiCad promotion, and two
   independent clean roots produce the same 418-file content-addressed bundle.
+- Nonlinear and switching architecture synthesis now promotes five frozen
+  behavior-only cases covering magnitude rectification, limiting, autonomous
+  oscillation, PWM power switching, and low-power step-down conversion.
+  Generic relationship operators, discontinuity-aware transient execution,
+  periodic measurements, propagation-delay/rating gates, electrothermal/SOA
+  evaluation, and switching-aware physical evidence are integrated. All five
+  pass local installed-KiCad promotion; two unsafe cases and one unsupported
+  ultra-fast case fail closed without a physical design.
 - Open-world capability evaluation now freezes separate discovery and held-out
   behavior-only corpora, ranks normalized failure clusters by frequency,
   safety, and downstream reuse, and verifies improvement without mutating the
@@ -1341,15 +1349,16 @@ generalization, simulation-grounded, and installed-KiCad preservation lanes
 remain green. See
 `specs/deterministic-synthesis-evaluation-scheduler/AUDIT.md`.
 
-The next milestone should use that scheduler to expand into independently
-frozen nonlinear and switching architectures. Start with low-energy,
-bench-verifiable cases; add only reusable device/model/graph/analysis support
-required by the failures; require discontinuity-aware transient and thermal/SOA
-evidence; and preserve all current deterministic and installed-KiCad gates.
+The first independently frozen nonlinear/switching milestone is complete. The
+next milestone should measure out-of-distribution generalization with a new
+behavior-only corpus combining multiple nonlinear stages, switching control,
+sensing, and protection. Add only reusable device/model/graph/analysis support
+required by those failures, and preserve all current deterministic,
+thermal/SOA, physical, and installed-KiCad gates.
 
 1. Expand graph, value, model, and stage-reentry repair only from independently
-   frozen failures in analog families not already covered by the protected
-   current-output milestone.
+   frozen held-out failures not already covered by the nonlinear/switching or
+   protected-current milestones.
 2. Extend affected-scope physical correction across denser multi-net and
    multi-layer cases while preserving unrelated placement and copper.
 3. Expand catalog-independent part qualification, calculated rating, and

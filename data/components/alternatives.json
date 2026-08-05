@@ -39,6 +39,46 @@
       "verification": {"confidence": "verified", "sources": ["curated_seed_catalog", "curated_part:Yageo:RC0805FR-0710KL", "builtin_pinmap:Device:R"], "pinmap_checked": true}
     },
     {
+      "id": "resistor.yageo.rc0603fr_0788k7l.0603",
+      "family": "resistor",
+      "name": "Yageo RC0603FR-0788K7L 88.7k 0603 resistor",
+      "description": "Concrete 88.7 kOhm 1% 0603 resistor with reviewed continuous-power derating evidence.",
+      "generic": false,
+      "manufacturer": "Yageo",
+      "mpn": "RC0603FR-0788K7L",
+      "lifecycle": "active",
+      "equivalence": {"group": "resistor.88.7k.0603", "role": "preferred"},
+      "tags": ["passive", "smd", "0603", "resistor", "88.7k", "frequency_programming"],
+      "values": [{"kind": "resistance", "typ": "88.7k", "unit": "ohm"}],
+      "ratings": [{"kind": "power", "max": "0.1", "unit": "W"}, {"kind": "voltage", "max": "75", "unit": "V"}],
+      "tolerances": [{"kind": "resistance", "typ": "1", "unit": "%"}],
+      "temperature": {"min": "-55", "max": "155", "unit": "C"},
+      "simulation_models": [{"model_id": "mna_resistor_v1"}],
+      "resistor_evidence": {
+        "technology": "thick film",
+        "nominal_resistance": {"value": 88700, "unit": "ohm", "conditions": "ordered resistance at 20 C"},
+        "resistance_tolerance_percent": 1,
+        "rated_power": {"value": 0.1, "unit": "W", "temperature_c": 70, "conditions": "manufacturer continuous rating"},
+        "derated_power": {"value": 0.05, "unit": "W", "temperature_c": 125, "conditions": "conservative linear derating below the 70 C to 155 C manufacturer envelope"},
+        "maximum_element_temperature_c": 155,
+        "pulse_status": "not_applicable",
+        "fabrication_proof": true,
+        "review_note": "The Yageo part-specific sheet proves 88.7 kOhm, 1 percent, 0603 dimensions, 0.1 W at 70 C, 75 V working voltage, and -55 C to 155 C operation. Controller frequency programming dissipates far below the conservative derated boundary."
+      },
+      "symbols": [{
+        "symbol_id": "Device:R",
+        "function_pins": [{"function": "A", "symbol_pin": "1", "required": true}, {"function": "B", "symbol_pin": "2", "required": true}],
+        "verification": {"confidence": "verified", "sources": ["https://yageogroup.com/component-documentation/download/specsheet/RC0603FR-0788K7L", "builtin_pinmap:Device:R"], "pinmap_checked": true}
+      }],
+      "packages": [{
+        "id": "0603", "name": "0603 SMD", "footprint_id": "Resistor_SMD:R_0603_1608Metric", "package_type": "0603", "mpn": "RC0603FR-0788K7L", "lifecycle": "active", "pinmap_id": "Device:R|Resistor_SMD:R_0603_1608Metric",
+        "pad_functions": [{"function": "A", "pad": "1"}, {"function": "B", "pad": "2"}],
+        "dimensions_mm": {"width": 1.6, "height": 0.8}, "height_mm": 0.45,
+        "verification": {"confidence": "verified", "sources": ["https://yageogroup.com/component-documentation/download/specsheet/RC0603FR-0788K7L", "kicad-footprint:Resistor_SMD:R_0603_1608Metric"], "pinmap_checked": true}
+      }],
+      "verification": {"confidence": "verified", "sources": ["https://yageogroup.com/component-documentation/download/specsheet/RC0603FR-0788K7L", "kicad-pinmap:Device:R|Resistor_SMD:R_0603_1608Metric"], "resolver_checked": true, "pinmap_checked": true}
+    },
+    {
       "id": "capacitor.murata.grm21br71h104ka01l.0805",
       "family": "capacitor",
       "name": "Murata GRM21BR71H104KA01L 100nF 0805 capacitor",
@@ -230,6 +270,83 @@
         "sources": [
           "https://industrial.panasonic.com/cdbs/www-data/pdf/RDF0000/ABA0000C1259.pdf",
           "kicad-pinmap:Device:C_Polarized|Capacitor_THT:CP_Radial_D5.0mm_P2.00mm"
+        ],
+        "resolver_checked": true,
+        "pinmap_checked": true,
+        "tests": ["catalog_passive_value_binding", "catalog_library_validation"]
+      }
+    },
+    {
+      "id": "capacitor.panasonic.eeufc1j220.radial",
+      "family": "capacitor",
+      "name": "Panasonic EEUFC1J220 22uF 63V radial electrolytic capacitor",
+      "description": "Concrete polarized 22 uF, 63 V radial aluminum electrolytic capacitor for derated high-voltage input bypass and bulk decoupling.",
+      "generic": false,
+      "manufacturer": "Panasonic",
+      "mpn": "EEUFC1J220",
+      "lifecycle": "active",
+      "equivalence": {"group": "capacitor.22u.radial.63v", "role": "preferred"},
+      "tags": ["passive", "through_hole", "radial", "polarized", "electrolytic", "22u", "63v"],
+      "values": [{"kind": "capacitance", "typ": "22u", "unit": "F"}],
+      "ratings": [
+        {"kind": "voltage", "max": "63", "unit": "V"},
+        {"kind": "ripple_current", "max": "0.24", "unit": "A"}
+      ],
+      "tolerances": [{"kind": "capacitance", "typ": "20", "unit": "%"}],
+      "temperature": {"min": "-55", "max": "105", "unit": "C"},
+      "simulation_models": [
+        {"model_id": "mna_capacitor_v1"},
+        {"model_id": "mna_capacitor_transient_be_v1", "parameters": [{"name": "max_voltage_v", "value": 63}]}
+      ],
+      "capacitor_evidence": {
+        "dielectric": "aluminum_electrolytic",
+        "nominal_capacitance": "22u",
+        "capacitance_unit": "F",
+        "voltage_rating": "63",
+        "voltage_unit": "V",
+        "dc_bias_review": "not_applicable",
+        "effective_capacitance_review": "proven",
+        "esr_review": "proven",
+        "voltage_derating_review": "proven",
+        "maximum_voltage_use_ratio": 0.8,
+        "technology": "aluminum_electrolytic",
+        "polarity": "polarized",
+        "capacitance_tolerance_percent": 20,
+        "esr": {"value": 1.0, "unit": "ohm", "frequency_hz": 100000, "temperature_c": 20, "conditions": "manufacturer maximum impedance used as a conservative ESR bound"},
+        "ripple_current": {"value": 0.24, "unit": "A_rms", "frequency_hz": 100000, "temperature_c": 105, "conditions": "manufacturer rated ripple current"},
+        "endurance_hours": 1000,
+        "endurance_temperature_c": 105,
+        "fabrication_proof": true,
+        "fabrication_candidate_blocks": false,
+        "review_note": "Manufacturer-backed capacitance, tolerance, voltage, impedance, ripple current, endurance, dimensions, polarity, and lead pitch; the 80 percent voltage-use boundary permits derated operation through 50.4 V."
+      },
+      "symbols": [{
+        "symbol_id": "Device:C_Polarized",
+        "function_pins": [
+          {"function": "POSITIVE", "symbol_pin": "1", "polarity": "positive", "required": true, "aliases": ["A", "+"]},
+          {"function": "NEGATIVE", "symbol_pin": "2", "polarity": "negative", "required": true, "aliases": ["B", "-"]}
+        ],
+        "verification": {"confidence": "verified", "sources": ["kicad-symbol:Device:C_Polarized", "https://industrial.panasonic.com/ww/products/pt/aluminum-cap-lead/models/EEUFC1J220"], "pinmap_checked": true}
+      }],
+      "packages": [{
+        "id": "radial_d6_3_p2_5",
+        "name": "Radial 6.3 mm, 2.5 mm pitch",
+        "footprint_id": "Capacitor_THT:CP_Radial_D6.3mm_P2.50mm",
+        "package_type": "radial",
+        "pinmap_id": "Device:C_Polarized|Capacitor_THT:CP_Radial_D6.3mm_P2.50mm",
+        "pad_functions": [
+          {"function": "POSITIVE", "pad": "1", "polarity": "positive", "aliases": ["A", "+"]},
+          {"function": "NEGATIVE", "pad": "2", "polarity": "negative", "aliases": ["B", "-"]}
+        ],
+        "dimensions_mm": {"width": 6.3, "height": 6.3},
+        "height_mm": 11.2,
+        "verification": {"confidence": "verified", "sources": ["kicad-footprint:Capacitor_THT:CP_Radial_D6.3mm_P2.50mm", "https://industrial.panasonic.com/ww/products/pt/aluminum-cap-lead/models/EEUFC1J220"], "pinmap_checked": true}
+      }],
+      "verification": {
+        "confidence": "verified",
+        "sources": [
+          "https://industrial.panasonic.com/ww/products/pt/aluminum-cap-lead/models/EEUFC1J220",
+          "kicad-pinmap:Device:C_Polarized|Capacitor_THT:CP_Radial_D6.3mm_P2.50mm"
         ],
         "resolver_checked": true,
         "pinmap_checked": true,
@@ -691,6 +808,161 @@
       "verification": {"confidence": "verified", "sources": ["curated_seed_catalog", "curated_part:Yageo:RC0603FR-0710KL", "builtin_pinmap:Device:R"], "pinmap_checked": true}
     },
     {
+      "id": "capacitor.murata.grm188r72a104ka35d.0603",
+      "family": "capacitor",
+      "name": "Murata GRM188R72A104KA35D 100nF 100V 0603 capacitor",
+      "description": "Concrete active 100 nF X7R 0603 ceramic capacitor with reviewed low-voltage switching-support evidence.",
+      "generic": false,
+      "manufacturer": "Murata",
+      "mpn": "GRM188R72A104KA35D",
+      "lifecycle": "active",
+      "equivalence": {"group": "capacitor.100n.0603.100v", "role": "preferred"},
+      "tags": ["passive", "smd", "0603", "ceramic", "100n", "100v", "x7r", "low_inductance"],
+      "values": [{"kind": "capacitance", "typ": "100n", "unit": "F"}],
+      "ratings": [{"kind": "voltage", "max": "100", "unit": "V"}],
+      "tolerances": [{"kind": "capacitance", "typ": "10", "unit": "%"}],
+      "temperature": {"min": "-55", "max": "125", "unit": "C"},
+      "simulation_models": [
+        {"model_id": "mna_capacitor_v1"},
+        {"model_id": "mna_capacitor_transient_be_v1", "parameters": [{"name": "max_voltage_v", "value": 100}]}
+      ],
+      "capacitor_evidence": {
+        "dielectric": "X7R",
+        "nominal_capacitance": "100n",
+        "capacitance_unit": "F",
+        "voltage_rating": "100",
+        "voltage_unit": "V",
+        "dc_bias_review": "proven",
+        "effective_capacitance_review": "proven",
+        "esr_review": "proven",
+        "voltage_derating_review": "proven",
+        "maximum_voltage_use_ratio": 0.1,
+        "technology": "multilayer ceramic",
+        "polarity": "nonpolar",
+        "capacitance_tolerance_percent": 10,
+        "fabrication_candidate_blocks": false,
+        "review_note": "Murata part-specific rated and characteristic data prove the 100 nF, 100 V, X7R, 0603 construction. At the reviewed controller-support ceiling of 5.5 V, the published DC-bias curve retains well over 90 percent of nominal capacitance; the frequency plot proves low impedance and ESR through the sub-megahertz switching range. Circuit synthesis enforces the 10 percent maximum voltage-use ratio and local SMD placement."
+      },
+      "symbols": [{
+        "symbol_id": "Device:C",
+        "function_pins": [
+          {"function": "A", "symbol_pin": "1", "required": true},
+          {"function": "B", "symbol_pin": "2", "required": true}
+        ],
+        "verification": {"confidence": "verified", "sources": ["builtin_pinmap:Device:C", "https://www.murata.com/products/productdetail?partno=GRM188R72A104KA35%23"], "pinmap_checked": true}
+      }],
+      "packages": [{
+        "id": "0603",
+        "name": "0603 SMD",
+        "footprint_id": "Capacitor_SMD:C_0603_1608Metric",
+        "package_type": "0603",
+        "pinmap_id": "Device:C|Capacitor_SMD:C_0603_1608Metric",
+        "pad_functions": [{"function": "A", "pad": "1"}, {"function": "B", "pad": "2"}],
+        "dimensions_mm": {"width": 1.6, "height": 0.8},
+        "height_mm": 0.8,
+        "verification": {"confidence": "verified", "sources": ["symmetric_two_terminal_rule", "builtin_pinmap:Device:C", "https://www.murata.com/products/productdetail?partno=GRM188R72A104KA35%23"], "pinmap_checked": true}
+      }],
+      "verification": {"confidence": "verified", "sources": ["https://www.murata.com/products/productdetail?partno=GRM188R72A104KA35%23", "https://www.farnell.com/datasheets/2048678.pdf", "builtin_pinmap:Device:C"], "pinmap_checked": true, "notes": ["Fabrication use is bounded to at most 10 percent of the 100 V rating by typed capacitor evidence."]}
+    },
+    {
+      "id": "capacitor.murata.grm188r71e474ka12d.0603",
+      "family": "capacitor",
+      "name": "Murata GRM188R71E474KA12D 470nF 25V 0603 capacitor",
+      "description": "Concrete active 470 nF X7R 0603 ceramic capacitor for bootstrap and local bypass service.",
+      "generic": false,
+      "manufacturer": "Murata",
+      "mpn": "GRM188R71E474KA12D",
+      "lifecycle": "active",
+      "equivalence": {"group": "capacitor.470n.0603.25v", "role": "preferred"},
+      "tags": ["passive", "smd", "0603", "ceramic", "470n", "25v", "x7r", "low_inductance"],
+      "values": [{"kind": "capacitance", "typ": "470n", "unit": "F"}],
+      "ratings": [{"kind": "voltage", "max": "25", "unit": "V"}],
+      "tolerances": [{"kind": "capacitance", "typ": "10", "unit": "%"}],
+      "temperature": {"min": "-55", "max": "125", "unit": "C"},
+      "simulation_models": [
+        {"model_id": "mna_capacitor_v1"},
+        {"model_id": "mna_capacitor_transient_be_v1", "parameters": [{"name": "max_voltage_v", "value": 25}]}
+      ],
+      "capacitor_evidence": {
+        "dielectric": "X7R",
+        "nominal_capacitance": "470n",
+        "capacitance_unit": "F",
+        "voltage_rating": "25",
+        "voltage_unit": "V",
+        "dc_bias_review": "proven",
+        "effective_capacitance_review": "proven",
+        "esr_review": "proven",
+        "voltage_derating_review": "proven",
+        "maximum_voltage_use_ratio": 0.25,
+        "technology": "multilayer ceramic",
+        "polarity": "nonpolar",
+        "capacitance_tolerance_percent": 10,
+        "fabrication_candidate_blocks": false,
+        "review_note": "Murata part-specific rated and characteristic data prove the 470 nF, 25 V, X7R, 0603 construction and low-impedance behavior. The reviewed bootstrap application is bounded to 5.5 V across the capacitor, below 25 percent of rating, with deterministic local SMD placement."
+      },
+      "symbols": [{
+        "symbol_id": "Device:C",
+        "function_pins": [{"function": "A", "symbol_pin": "1", "required": true}, {"function": "B", "symbol_pin": "2", "required": true}],
+        "verification": {"confidence": "verified", "sources": ["builtin_pinmap:Device:C", "https://www.murata.com/products/productdetail?partno=GRM188R71E474KA12%23"], "pinmap_checked": true}
+      }],
+      "packages": [{
+        "id": "0603", "name": "0603 SMD", "footprint_id": "Capacitor_SMD:C_0603_1608Metric", "package_type": "0603", "pinmap_id": "Device:C|Capacitor_SMD:C_0603_1608Metric",
+        "pad_functions": [{"function": "A", "pad": "1"}, {"function": "B", "pad": "2"}],
+        "dimensions_mm": {"width": 1.6, "height": 0.8}, "height_mm": 0.8,
+        "verification": {"confidence": "verified", "sources": ["symmetric_two_terminal_rule", "builtin_pinmap:Device:C", "https://www.murata.com/products/productdetail?partno=GRM188R71E474KA12%23"], "pinmap_checked": true}
+      }],
+      "verification": {"confidence": "verified", "sources": ["https://www.murata.com/products/productdetail?partno=GRM188R71E474KA12%23", "builtin_pinmap:Device:C"], "pinmap_checked": true}
+    },
+    {
+      "id": "capacitor.murata.grm188z71c475ke21d.0603",
+      "family": "capacitor",
+      "name": "Murata GRM188Z71C475KE21D 4.7uF 16V 0603 capacitor",
+      "description": "Concrete active 4.7 uF X7R 0603 ceramic capacitor for low-voltage controller bypass service.",
+      "generic": false,
+      "manufacturer": "Murata",
+      "mpn": "GRM188Z71C475KE21D",
+      "lifecycle": "active",
+      "equivalence": {"group": "capacitor.4.7u.0603.16v", "role": "preferred"},
+      "tags": ["passive", "smd", "0603", "ceramic", "4.7u", "16v", "x7r", "low_inductance"],
+      "values": [{"kind": "capacitance", "typ": "4.7u", "unit": "F"}],
+      "ratings": [{"kind": "voltage", "max": "16", "unit": "V"}],
+      "tolerances": [{"kind": "capacitance", "typ": "10", "unit": "%"}],
+      "temperature": {"min": "-55", "max": "125", "unit": "C"},
+      "simulation_models": [
+        {"model_id": "mna_capacitor_v1"},
+        {"model_id": "mna_capacitor_transient_be_v1", "parameters": [{"name": "max_voltage_v", "value": 16}]}
+      ],
+      "capacitor_evidence": {
+        "dielectric": "X7R",
+        "nominal_capacitance": "4.7u",
+        "capacitance_unit": "F",
+        "voltage_rating": "16",
+        "voltage_unit": "V",
+        "dc_bias_review": "proven",
+        "effective_capacitance_review": "proven",
+        "esr_review": "proven",
+        "voltage_derating_review": "proven",
+        "maximum_voltage_use_ratio": 0.35,
+        "technology": "multilayer ceramic",
+        "polarity": "nonpolar",
+        "capacitance_tolerance_percent": 10,
+        "fabrication_candidate_blocks": false,
+        "review_note": "Murata part-specific data prove the 4.7 uF, 16 V, X7R, 0603 construction and specify the temperature envelope with 8 V DC applied. The reviewed controller-bypass use is limited to 5.5 V, leaving more than two-to-one effective-capacitance margin over a 2.2 uF requirement, and requires local SMD placement."
+      },
+      "symbols": [{
+        "symbol_id": "Device:C",
+        "function_pins": [{"function": "A", "symbol_pin": "1", "required": true}, {"function": "B", "symbol_pin": "2", "required": true}],
+        "verification": {"confidence": "verified", "sources": ["builtin_pinmap:Device:C", "https://www.murata.com/products/productdetail?partno=GRM188Z71C475KE21%23"], "pinmap_checked": true}
+      }],
+      "packages": [{
+        "id": "0603", "name": "0603 SMD", "footprint_id": "Capacitor_SMD:C_0603_1608Metric", "package_type": "0603", "pinmap_id": "Device:C|Capacitor_SMD:C_0603_1608Metric",
+        "pad_functions": [{"function": "A", "pad": "1"}, {"function": "B", "pad": "2"}],
+        "dimensions_mm": {"width": 1.6, "height": 0.8}, "height_mm": 0.8,
+        "verification": {"confidence": "verified", "sources": ["symmetric_two_terminal_rule", "builtin_pinmap:Device:C", "https://www.murata.com/products/productdetail?partno=GRM188Z71C475KE21%23"], "pinmap_checked": true}
+      }],
+      "verification": {"confidence": "verified", "sources": ["https://www.murata.com/products/productdetail?partno=GRM188Z71C475KE21%23", "https://www.mouser.com/datasheet/2/281/1/GRM188Z71C475KE21_01A-1986016.pdf", "builtin_pinmap:Device:C"], "pinmap_checked": true}
+    },
+    {
       "id": "capacitor.murata.grm188r71h104ka93d.0603",
       "family": "capacitor",
       "name": "Murata GRM188R71H104KA93D 100nF 0603 capacitor",
@@ -699,7 +971,6 @@
       "manufacturer": "Murata",
       "mpn": "GRM188R71H104KA93D",
       "lifecycle": "active",
-      "equivalence": {"group": "capacitor.100n.0603.50v", "role": "preferred"},
       "tags": ["passive", "smd", "0603", "ceramic", "100n", "x7r"],
       "values": [{"kind": "capacitance", "typ": "100n", "unit": "F"}],
       "ratings": [{"kind": "voltage", "max": "50", "unit": "V"}],

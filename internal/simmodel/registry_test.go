@@ -228,7 +228,7 @@ func TestCloneReportPointLimitAndValueOnlySchemaGuard(t *testing.T) {
 			"TransientSOA": true, "Terminals": true, "parameterIndex": true,
 			"terminalIndex": true,
 		}},
-		{value: AnalysisResult{}, handled: map[string]bool{"ControlLoops": true, "Points": true}},
+		{value: AnalysisResult{}, handled: map[string]bool{"ControlLoops": true, "PeriodicNodes": true, "Points": true}},
 		{value: ControlLoop{}, handled: map[string]bool{"Members": true, "NetPath": true}},
 		{value: AssertionResult{}, handled: map[string]bool{"Components": true}},
 		{value: CornerResult{}, handled: map[string]bool{"Assignments": true, "Assertions": true}},

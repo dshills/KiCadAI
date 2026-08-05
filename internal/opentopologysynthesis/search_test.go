@@ -9,6 +9,8 @@ import (
 	"slices"
 	"strings"
 	"testing"
+
+	"kicadai/internal/simmodel"
 )
 
 func TestPowerTransferRequirementIncludesUnityGainBuffers(t *testing.T) {
@@ -531,12 +533,11 @@ func TestControlledSwitchRelationshipSeedsConstructBoundedPrimitiveGraph(t *test
 		}
 		if candidate.Score.BehaviorGap != 0 ||
 			candidate.Score.InternalNodeCount != 2 ||
-			len(candidate.Graph.Instances) != 8 ||
+			len(candidate.Graph.Instances) != 7 ||
 			counts["comparator"] != 1 ||
 			counts["n_channel_mosfet"] != 1 ||
 			counts["resistor"] != 4 ||
-			counts["capacitor"] != 1 ||
-			counts["clamp_diode"] != 1 {
+			counts["signal_diode"] != 1 {
 			t.Fatalf(
 				"unexpected controlled relationship: score=%#v counts=%#v graph=%s",
 				candidate.Score,
@@ -544,8 +545,8 @@ func TestControlledSwitchRelationshipSeedsConstructBoundedPrimitiveGraph(t *test
 				testGraphTopologySummary(candidate.Graph),
 			)
 		}
-		if len(candidate.Operations) != 10 {
-			t.Fatalf("controlled relationship operations = %d; want 10", len(candidate.Operations))
+		if len(candidate.Operations) != 9 {
+			t.Fatalf("controlled relationship operations = %d; want 9", len(candidate.Operations))
 		}
 		plan := BuildValueSearchPlan(
 			requirement,
@@ -564,21 +565,77 @@ func TestControlledSwitchRelationshipSeedsConstructBoundedPrimitiveGraph(t *test
 		for _, domain := range plan.Domains {
 			foundAnchor := false
 			for _, scale := range domain.AnalyticScales {
-				if (domain.PrimitiveKind == "resistor" &&
+				if domain.PrimitiveKind == "resistor" &&
 					scale.Kind == "resistance" &&
-					testValueSIEqual(scale.ValueSI, 10_000)) ||
-					(domain.PrimitiveKind == "capacitor" &&
-						scale.Kind == "capacitance" &&
-						testValueSIEqual(scale.ValueSI, 10e-9)) {
+					testValueSIEqual(scale.ValueSI, 10_000) {
 					foundAnchor = true
 				}
 			}
-			if (domain.PrimitiveKind == "resistor" ||
-				domain.PrimitiveKind == "capacitor") &&
-				!foundAnchor {
+			if domain.PrimitiveKind == "resistor" && !foundAnchor {
 				t.Fatalf("interface domain lacks bounded analytic scale: %#v", domain)
 			}
 		}
+	}
+}
+
+func TestFlybackDiodeSelectionPrioritizesDeclaredThermalHeadroom(t *testing.T) {
+	requirement, issues := DecodeStrict(bytes.NewReader(mustRead(t, filepath.Join(
+		nonlinearSwitchingCorpusRoot(), "controlled_pulse_power_stage.json",
+	))))
+	if len(issues) != 0 {
+		t.Fatalf("requirement issues = %#v", issues)
+	}
+	inventory, _ := testHeldOutSynthesisEnvironment(t)
+	selected := topologyFlybackDiodePrimitive(requirement, inventory)
+	if selected.Key == "" {
+		t.Fatal("flyback diode selection returned no reviewed primitive")
+	}
+	requiredCurrent := requirementMaximumMetric(requirement, "peak_current")
+	thermalExcess := math.MaxFloat64
+	for _, model := range selected.Models {
+		if model.ModelID != simmodel.PrimitiveDiodeShockleyV1 {
+			continue
+		}
+		parameters := map[string]float64{}
+		for _, parameter := range model.Parameters {
+			parameters[parameter.Name] = parameter.Value
+		}
+		forwardVoltage := parameters["emission_coefficient"] * 8.617333262e-5 *
+			parameters["junction_temperature_k"] * math.Log1p(requiredCurrent/parameters["saturation_current_a"])
+		thermalExcess, _ = topologyFlybackDiodeThermalScore(requirement, model, requiredCurrent, forwardVoltage)
+	}
+	if thermalExcess != 0 {
+		t.Fatalf("selected flyback diode %s has %.12g C conservative thermal excess", selected.Key, thermalExcess)
+	}
+}
+
+func TestControlledSwitchFlybackUsesLoadSupplyInsteadOfAuxiliaryDriveRail(t *testing.T) {
+	requirement, issues := DecodeStrict(bytes.NewReader(mustRead(t, filepath.Join(
+		nonlinearSwitchingCorpusRoot(), "controlled_pulse_power_stage.json",
+	))))
+	if len(issues) != 0 {
+		t.Fatalf("requirement issues = %#v", issues)
+	}
+	auxiliaryDomain := requirement.Requirements.Domains[1]
+	auxiliaryDomain.ID = "auxiliary_drive"
+	auxiliaryDomain.MinVoltageV = graphFloat(7.5)
+	auxiliaryDomain.NominalVoltageV = graphFloat(8)
+	auxiliaryDomain.MaxVoltageV = graphFloat(8.5)
+	auxiliaryDomain.MaxCurrentA = graphFloat(.1)
+	requirement.Requirements.Domains = append(requirement.Requirements.Domains, auxiliaryDomain)
+	auxiliaryPort := requirement.Requirements.Ports[1]
+	auxiliaryPort.ID = "auxiliary_drive_power"
+	auxiliaryPort.Domain = auxiliaryDomain.ID
+	requirement.Requirements.Ports = append(requirement.Requirements.Ports, auxiliaryPort)
+
+	graph, issues := InitialGraph(requirement)
+	if len(issues) != 0 {
+		t.Fatalf("build three-rail controlled-switch graph: %#v", issues)
+	}
+	supplies := topologyNodesByRole(graph, "supply")
+	loadSupply, found := topologyControlledSwitchLoadSupply(requirement, graph, "port_load_output", supplies)
+	if !found || loadSupply != "port_load_power" {
+		t.Fatalf("controlled-switch load supply = %q found=%t, want port_load_power rather than auxiliary drive rail; supplies=%v", loadSupply, found, supplies)
 	}
 }
 

@@ -867,6 +867,8 @@
           "package_type": "smc",
           "mpn": "B560C-13-F",
           "lifecycle": "active",
+          "dimensions_mm": {"width": 7.11, "height": 6.22},
+          "height_mm": 3.18,
           "pinmap_id": "Device:D_Schottky|Diode_SMD:D_SMC",
           "pad_functions": [
             {"function": "CATHODE", "pad": "1", "aliases": ["K"]},

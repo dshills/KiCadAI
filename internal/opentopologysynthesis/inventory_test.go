@@ -86,6 +86,7 @@ func TestDefaultPrimitiveInventoryIsReviewedDeterministicAndPrimitiveOnly(t *tes
 		"reference_diode",
 		"resistor",
 		"signal_diode",
+		"synchronous_buck_regulator",
 	} {
 		if !kinds[requiredKind] {
 			t.Errorf("default inventory lacks %s; rejections=%#v", requiredKind, first.Rejections)
@@ -93,6 +94,25 @@ func TestDefaultPrimitiveInventoryIsReviewedDeterministicAndPrimitiveOnly(t *tes
 	}
 	if !keys["capacitor.kemet.c1210k153f5eml.1210|1210"] {
 		t.Fatal("default inventory lacks the concrete fabrication-ready precision capacitor")
+	}
+	panasonicESR := -1.0
+	for _, primitive := range first.Primitives {
+		if primitive.CatalogID != "capacitor.panasonic.eeufc1j220.radial" {
+			continue
+		}
+		for _, model := range primitive.Models {
+			if model.ModelID != simmodel.PrimitiveCapacitorTransientV1 {
+				continue
+			}
+			for _, parameter := range model.Parameters {
+				if parameter.Name == "series_resistance_ohm" {
+					panasonicESR = parameter.Value
+				}
+			}
+		}
+	}
+	if panasonicESR != 1 {
+		t.Fatalf("reviewed Panasonic capacitor ESR propagated to transient model = %g, want 1 ohm", panasonicESR)
 	}
 	if !keys["resistor.vishay.tnpw0805.4k99.0p1|0805"] {
 		t.Fatal("default inventory lacks the concrete fabrication-ready precision resistor")
@@ -171,6 +191,7 @@ func allowedPrimitiveModelID(id string) bool {
 		simmodel.PrimitiveComparatorOpenCollectorV1,
 		simmodel.PrimitiveAdjustableLinearRegulatorV1,
 		simmodel.PrimitiveFixedLinearRegulatorV1,
+		simmodel.PrimitiveSynchronousBuckRegulatorV1,
 		simmodel.PrimitiveFloatingAdjustableRegulatorV1,
 		simmodel.PrimitiveShuntVoltageReferenceV1,
 		simmodel.PrimitiveBidirectionalTVSV1,

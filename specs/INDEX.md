@@ -9,6 +9,14 @@ roadmaps, and dated review material.
 
 ## Latest Completed Milestone
 
+- [Nonlinear and switching architecture synthesis specification](nonlinear-switching-architecture-synthesis/SPEC.md),
+  [plan](nonlinear-switching-architecture-synthesis/PLAN.md), and
+  [completion audit](nonlinear-switching-architecture-synthesis/AUDIT.md)
+  - freezes five positive and three adversarial behavior-only requirements;
+    adds generic nonlinear/switching relationships, bounded transient,
+    periodic, thermal, SOA, timing-envelope, and physical evidence; promotes
+    every positive case through local installed KiCad; and preserves stable
+    fail-closed unsafe/unsupported outcomes.
 - [Diagnosis-driven repair specification](diagnosis-driven-repair/SPEC.md),
   [plan](diagnosis-driven-repair/PLAN.md),
   [results](diagnosis-driven-repair/RESULTS.md), and
@@ -20,8 +28,9 @@ roadmaps, and dated review material.
   [completion audit](architecture-generalization-corpus/COMPLETION_AUDIT.md),
   and [promotion matrix](architecture-generalization-corpus/PROMOTION_MATRIX.md)
   - freezes an independent six-design/four-adversarial corpus, promotes five
-    designs twice through installed KiCad, and records stable safe rejection
-    for the remaining protected current-output design and all unsafe cases.
+    designs twice through installed KiCad, and records the historical safe
+    rejection for protected current output plus all unsafe cases; the later
+    generic protected-current milestone closes that measured design gap.
 - [Topology-aware readable schematics specification](topology-aware-readable-schematics/SPEC.md),
   [audit](topology-aware-readable-schematics/AUDIT.md), and
   [evidence](topology-aware-readable-schematics/EVIDENCE.md)

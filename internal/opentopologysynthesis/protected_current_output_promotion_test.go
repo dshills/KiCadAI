@@ -4,8 +4,11 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
+	"strings"
 	"testing"
 )
 
@@ -72,9 +75,37 @@ func assertProtectedCurrentOutputPass(t *testing.T, run SynthesisRun) {
 		run.Report.Selected == nil || run.SelectedGraph == nil || run.Physical == nil ||
 		run.Physical.Status != PhysicalLoweringReady || len(run.Report.Diagnostics) != 0 {
 		t.Fatalf(
-			"protected current-output synthesis = status=%s stop=%s selected=%t physical=%#v diagnostics=%#v consumption=%#v",
+			"protected current-output synthesis = status=%s stop=%s selected=%t physical=%#v diagnostics=%#v consumption=%#v failures=%s",
 			run.Report.Status, run.Report.StopReason, run.Report.Selected != nil,
 			run.Physical, run.Report.Diagnostics, run.Report.Consumption,
+			protectedCurrentOutputFailureSummary(run),
 		)
 	}
+}
+
+func protectedCurrentOutputFailureSummary(run SynthesisRun) string {
+	counts := map[string]int{}
+	for _, candidate := range run.Candidates {
+		for _, evaluation := range candidate.Evaluations {
+			for _, diagnosis := range evaluation.Diagnoses {
+				key := strings.Join([]string{
+					diagnosis.Code,
+					diagnosis.RequirementID,
+					diagnosis.OperatingCase,
+					diagnosis.Metric,
+				}, "/")
+				counts[key]++
+			}
+		}
+	}
+	keys := make([]string, 0, len(counts))
+	for key := range counts {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	parts := make([]string, 0, len(keys))
+	for _, key := range keys {
+		parts = append(parts, fmt.Sprintf("%s=%d", key, counts[key]))
+	}
+	return strings.Join(parts, ",")
 }

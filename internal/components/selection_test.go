@@ -287,8 +287,63 @@ func TestSelectConcrete0603CapacitorByPackage(t *testing.T) {
 	if !result.OK {
 		t.Fatalf("select capacitor failed: %+v", result.Issues)
 	}
-	if selection.Component.ID != "capacitor.murata.grm188r71h104ka93d.0603" || selection.Candidate.Confidence != ConfidenceVerified {
+	if selection.Component.ID != "capacitor.murata.grm188r72a104ka35d.0603" || selection.Candidate.Confidence != ConfidenceVerified {
 		t.Fatalf("unexpected capacitor selection: ID=%q candidate=%+v", selection.Component.ID, selection.Candidate)
+	}
+}
+
+func TestSelectCapacitorEnforcesReviewedVoltageUseBoundary(t *testing.T) {
+	catalog := loadCheckedInCatalog(t)
+	request := SelectionRequest{
+		Query: Query{
+			Family:            "capacitor",
+			Package:           "0603",
+			ValueKind:         "capacitance",
+			Value:             "470n",
+			MinimumConfidence: ConfidenceVerified,
+		},
+		Acceptance:        AcceptanceConnectivity,
+		RequireConcrete:   true,
+		RequiredFunctions: []string{"A", "B"},
+		RequiredRatings:   []RequiredRating{{Kind: "voltage", Value: "5.5", Unit: "V"}},
+	}
+	selection, result := Select(context.Background(), catalog, request)
+	if !result.OK {
+		t.Fatalf("select capacitor inside reviewed voltage-use boundary: %+v", result.Issues)
+	}
+	if selection.Component.ID != "capacitor.murata.grm188r71e474ka12d.0603" {
+		t.Fatalf("selected capacitor = %q", selection.Component.ID)
+	}
+
+	request.RequiredRatings[0].Value = "7"
+	_, result = Select(context.Background(), catalog, request)
+	if result.OK {
+		t.Fatal("capacitor above reviewed voltage-use boundary satisfied selection")
+	}
+	assertIssueCode(t, result.Issues, CodeComponentRatingTooLow)
+	assertIssuePath(t, result.Issues, "component.capacitor.murata.grm188r71e474ka12d.0603.capacitor_evidence.maximum_voltage_use_ratio")
+}
+
+func TestCapacitorVoltageDeratingChecksAllRequiredAndAvailableRatings(t *testing.T) {
+	ratio := 0.8
+	record := ComponentRecord{
+		ID: "capacitor.test",
+		Ratings: []RatingConstraint{
+			{Kind: "voltage", Max: "10", Unit: "V"},
+			{Kind: "voltage", Max: "25", Unit: "V"},
+		},
+		Capacitor: &CapacitorEvidence{MaximumVoltageUseRatio: &ratio},
+	}
+	if issues := capacitorVoltageDeratingIssues(record, []RequiredRating{{Kind: "voltage", Value: "15", Unit: "V"}}); len(issues) != 0 {
+		t.Fatalf("later compatible voltage rating was ignored: %+v", issues)
+	}
+
+	issues := capacitorVoltageDeratingIssues(record, []RequiredRating{
+		{Kind: "voltage", Value: "5", Unit: "V"},
+		{Kind: "voltage", Value: "21", Unit: "V"},
+	})
+	if len(issues) != 1 || issues[0].Code != CodeComponentRatingTooLow {
+		t.Fatalf("all required voltage ratings were not checked: %+v", issues)
 	}
 }
 

@@ -123,6 +123,7 @@ func EvaluateCandidate(
 	for _, assertion := range requirement.Requirements.BehavioralRequirements {
 		for _, caseID := range assertion.OperatingCases {
 			operatingCase := cases[caseID]
+			operatingCase.Conditions = simulationHarnessConditions(requirement, assertion, operatingCase)
 			for _, corner := range operatingCaseCorners(operatingCase) {
 				work := simulationWorkItem{
 					assertion:     assertion,
@@ -145,12 +146,9 @@ func EvaluateCandidate(
 	})
 	nominalRejected := false
 	for phaseIndex, workItems := range [][]simulationWorkItem{nominalWork, cornerWork} {
-		if phaseIndex == 1 && nominalRejected {
-			break
-		}
 		for _, work := range workItems {
-			if phaseIndex == 0 && nominalRejected {
-				break
+			if nominalRejected && !work.assertion.Critical {
+				continue
 			}
 			if err := ctx.Err(); err != nil {
 				result.Status = SimulationEvaluationCanceled
@@ -302,9 +300,10 @@ func evaluateAssertionCorner(
 	slices.Sort(evidenceHashes)
 	attempt.ModelEvidenceSHA256s = slices.Compact(evidenceHashes)
 
+	simulationBehavior := electrothermalPeriodicBehavior(requirement, assertion)
 	analysis, simulationAssertion, analysisDiagnostics := simulationIntentParts(
 		requirement,
-		assertion,
+		simulationBehavior,
 		operatingCase,
 		corner,
 		graph,
@@ -407,6 +406,63 @@ func evaluateAssertionCorner(
 	return attempt, []Diagnosis{diagnosis}
 }
 
+// electrothermalPeriodicBehavior carries a declared periodic operating signal
+// into a circuit-level electrothermal assertion. Thermal and SOA assertions
+// intentionally describe the circuit rather than an input/output transfer, so
+// they commonly omit an excitation of their own. Reusing a behavior-only
+// periodic transfer at the same observation preserves the declared stimulus
+// across thermal corners without inventing a waveform or frequency.
+func electrothermalPeriodicBehavior(requirement Requirement, assertion BehavioralAssertion) BehavioralAssertion {
+	if assertion.Analysis != simmodel.AnalysisElectrothermal ||
+		(assertion.Excitation != nil && assertion.FrequencyHz != nil && *assertion.FrequencyHz > 0) {
+		return assertion
+	}
+	type periodicBehavior struct {
+		id         string
+		excitation Observation
+		frequency  float64
+	}
+	candidates := []periodicBehavior{}
+	for _, candidate := range requirement.Requirements.BehavioralRequirements {
+		if candidate.Excitation == nil || candidate.FrequencyHz == nil || *candidate.FrequencyHz <= 0 ||
+			(assertion.Observation.Kind != "circuit" && candidate.Observation != assertion.Observation) {
+			continue
+		}
+		switch candidate.Analysis {
+		case simmodel.AnalysisTransient, simmodel.AnalysisDistortion, simmodel.AnalysisElectrothermal:
+			candidates = append(candidates, periodicBehavior{
+				id:         candidate.ID,
+				excitation: *candidate.Excitation,
+				frequency:  *candidate.FrequencyHz,
+			})
+		}
+	}
+	slices.SortFunc(candidates, func(left, right periodicBehavior) int {
+		return cmp.Or(
+			cmp.Compare(left.excitation.Kind, right.excitation.Kind),
+			cmp.Compare(left.excitation.ID, right.excitation.ID),
+			cmp.Compare(left.frequency, right.frequency),
+			cmp.Compare(left.id, right.id),
+		)
+	})
+	unique := []periodicBehavior{}
+	for _, candidate := range candidates {
+		if len(unique) != 0 &&
+			unique[len(unique)-1].excitation == candidate.excitation &&
+			unique[len(unique)-1].frequency == candidate.frequency {
+			continue
+		}
+		unique = append(unique, candidate)
+	}
+	if len(unique) != 1 {
+		return assertion
+	}
+	result := assertion
+	result.Excitation = &unique[0].excitation
+	result.FrequencyHz = &unique[0].frequency
+	return result
+}
+
 func simulationAnalysisCostRank(analysis string) int {
 	switch trustedModelAnalysisKind(analysis) {
 	case simmodel.AnalysisDCOperatingPoint,
@@ -447,6 +503,9 @@ func directSimulationQuantity(assertion BehavioralAssertion) (string, float64, b
 	case "output_voltage", "output_high_voltage", "output_low_voltage", "on_state_voltage":
 		return simmodel.QuantityVoltageV, 1, true
 	case "voltage_gain", "voltage_gain_at_frequency":
+		if assertion.Analysis == "dc_sweep" {
+			return simmodel.QuantityDCSweepVoltageSlopeVPerV, 1, true
+		}
 		return simmodel.QuantityVoltageGainRatio, 1, true
 	case "bandwidth":
 		return simmodel.QuantityBandwidthHz, 1, true
@@ -458,6 +517,10 @@ func directSimulationQuantity(assertion BehavioralAssertion) (string, float64, b
 		return simmodel.QuantitySettlingTimeS, 1, true
 	case "propagation_delay":
 		return simmodel.QuantityResponseTimeS, 1, true
+	case "rise_time":
+		return simmodel.QuantityRiseTimeS, 1, true
+	case "fall_time":
+		return simmodel.QuantityFallTimeS, 1, true
 	case "output_noise_rms":
 		return simmodel.QuantityIntegratedNoiseVRMS, 1, true
 	case "thd":
@@ -478,6 +541,14 @@ func directSimulationQuantity(assertion BehavioralAssertion) (string, float64, b
 		return simmodel.QuantityPeakAbsVoltageV, 1, true
 	case "output_swing":
 		return simmodel.QuantityOutputSwingVPP, 1, true
+	case "oscillation_frequency":
+		return simmodel.QuantityOscillationFrequencyHz, 1, true
+	case "duty_cycle":
+		return simmodel.QuantityDutyCyclePct, 1, true
+	case "output_ripple":
+		return simmodel.QuantityOutputRippleVPP, 1, true
+	case "conversion_efficiency":
+		return simmodel.QuantityConversionEfficiencyPct, 1, true
 	case "output_power":
 		return simmodel.QuantityOutputPowerW, 1, true
 	case "startup_overshoot":
@@ -622,6 +693,7 @@ func simulationHarness(
 	result := []simmodel.ComponentEvidence{}
 	hashes := []string{}
 	diagnostics := []SimulationDiagnostic{}
+	conditions := simulationHarnessConditions(requirement, assertion, operatingCase)
 	for _, node := range graph.Nodes {
 		if node.Scope != "external" || node.Role == "reference" || node.Role == "output" {
 			continue
@@ -662,7 +734,7 @@ func simulationHarness(
 		})
 		hashes = append(hashes, provenanceHashes...)
 	}
-	for _, condition := range operatingCase.Conditions {
+	for _, condition := range conditions {
 		if simulationExcludesLoadCurrent(assertion) && condition.Axis == "load_current" {
 			continue
 		}
@@ -670,11 +742,14 @@ func simulationHarness(
 		if !found {
 			continue
 		}
-		value := corner.Values[conditionKey(condition)]
+		value := simulationConditionValue(corner, condition)
 		var family, modelID, firstTerminal, secondTerminal string
 		resistiveCurrentLoad := false
 		switch condition.Axis {
 		case "load_resistance":
+			if _, paired := operatingCaseInductiveSeriesResistance(conditions, corner, condition.Target); paired {
+				continue
+			}
 			family, modelID, firstTerminal, secondTerminal = "resistor", simmodel.PrimitiveResistorV1, "A", "B"
 		case "load_capacitance":
 			if value <= 0 {
@@ -682,6 +757,9 @@ func simulationHarness(
 			}
 			family, modelID, firstTerminal, secondTerminal = "capacitor", capacitorHarnessModel(assertion.Analysis), "A", "B"
 		case "load_inductance":
+			if value <= 0 {
+				continue
+			}
 			family, modelID, firstTerminal, secondTerminal = "inductor", simmodel.PrimitiveInductorTransientV1, "A", "B"
 		case "load_current":
 			if resistance, found := dynamicVoltageOutputLoadResistance(requirement, assertion, condition, value); found {
@@ -706,10 +784,11 @@ func simulationHarness(
 			ModelClaims: cloneCatalogClaims(record.SimulationModels),
 		}
 		if condition.Axis == "load_inductance" {
-			if seriesResistance, found := derivedInductiveLoadSeriesResistance(
-				requirement,
-				condition.Target,
-			); found {
+			seriesResistance, found := operatingCaseInductiveSeriesResistance(conditions, corner, condition.Target)
+			if !found {
+				seriesResistance, found = derivedInductiveLoadSeriesResistance(requirement, condition.Target)
+			}
+			if found {
 				for claimIndex := range component.ModelClaims {
 					for parameterIndex := range component.ModelClaims[claimIndex].Parameters {
 						if component.ModelClaims[claimIndex].Parameters[parameterIndex].Name ==
@@ -771,6 +850,115 @@ func simulationHarness(
 		return cmp.Compare(left.InstanceID, right.InstanceID)
 	})
 	return result, hashes, diagnostics
+}
+
+func operatingCaseInductiveSeriesResistance(
+	conditions []OperatingCondition,
+	corner operatingCorner,
+	target string,
+) (float64, bool) {
+	hasInductance := false
+	resistance := 0.0
+	for _, condition := range conditions {
+		if condition.Target != target {
+			continue
+		}
+		value := simulationConditionValue(corner, condition)
+		switch condition.Axis {
+		case "load_inductance":
+			hasInductance = value > 0
+		case "load_resistance":
+			if value > 0 {
+				resistance = value
+			}
+		}
+	}
+	return resistance, hasInductance && resistance > 0 && finite(resistance)
+}
+
+func simulationHarnessConditions(
+	requirement Requirement,
+	assertion BehavioralAssertion,
+	operatingCase OperatingCase,
+) []OperatingCondition {
+	result := append([]OperatingCondition(nil), operatingCase.Conditions...)
+	seen := map[string]bool{}
+	for _, condition := range result {
+		seen[conditionKey(condition)] = true
+	}
+	loadTargets := map[string]bool{}
+	controlTargets := map[string]bool{}
+	if assertion.Observation.Kind == "port" {
+		loadTargets[assertion.Observation.ID] = true
+	} else if assertion.Observation.Kind == "circuit" {
+		for _, candidateCase := range requirement.Requirements.OperatingCases {
+			for _, condition := range candidateCase.Conditions {
+				if slices.Contains([]string{"load_capacitance", "load_current", "load_inductance", "load_resistance"}, condition.Axis) {
+					loadTargets[condition.Target] = true
+				}
+			}
+		}
+	}
+	if len(loadTargets) == 0 {
+		loadTargets = nil
+	}
+	if simulationAssertionRequiresActiveControl(requirement, assertion) {
+		for _, port := range requirement.Requirements.Ports {
+			if port.Direction == "sink" && (port.Kind == "digital" || port.Kind == "control") {
+				controlTargets[port.ID] = true
+			}
+		}
+	}
+	if len(loadTargets) == 0 && len(controlTargets) == 0 {
+		return result
+	}
+	for _, candidateCase := range requirement.Requirements.OperatingCases {
+		for _, condition := range candidateCase.Conditions {
+			loadCondition := loadTargets[condition.Target] &&
+				slices.Contains([]string{"load_capacitance", "load_current", "load_inductance", "load_resistance"}, condition.Axis)
+			controlCondition := controlTargets[condition.Target] &&
+				slices.Contains([]string{"control_voltage", "input_voltage"}, condition.Axis)
+			if (!loadCondition && !controlCondition) ||
+				seen[conditionKey(condition)] {
+				continue
+			}
+			result = append(result, condition)
+			seen[conditionKey(condition)] = true
+		}
+	}
+	slices.SortFunc(result, func(left, right OperatingCondition) int {
+		return cmp.Or(cmp.Compare(left.Axis, right.Axis), cmp.Compare(left.Target, right.Target))
+	})
+	return result
+}
+
+func simulationAssertionRequiresActiveControl(requirement Requirement, assertion BehavioralAssertion) bool {
+	if assertion.Analysis == simmodel.AnalysisStartup {
+		return false
+	}
+	switch assertion.Metric {
+	case "off_state_current", "output_low_voltage", "quiescent_current", "startup_current":
+		return false
+	}
+	if assertion.Observation.Kind == "circuit" {
+		return true
+	}
+	if assertion.Observation.Kind != "port" {
+		return false
+	}
+	for _, port := range requirement.Requirements.Ports {
+		if port.ID == assertion.Observation.ID {
+			return port.Direction == "source"
+		}
+	}
+	return false
+}
+
+func simulationConditionValue(corner operatingCorner, condition OperatingCondition) float64 {
+	if value, found := corner.Values[conditionKey(condition)]; found {
+		return value
+	}
+	return (condition.Min + condition.Max) / 2
 }
 
 func capacitorHarnessModel(analysis string) string {
@@ -1189,14 +1377,15 @@ func simulationIntentParts(
 			// trusted transient engine so bounded source events are legal.
 			analysis.Kind = simmodel.AnalysisTransient
 		}
-		duration := dynamicDuration(assertion, operatingCase)
+		duration := dynamicDurationForRequirement(requirement, assertion, operatingCase)
 		analysis.DurationS = duration
 		analysis.TimeStepS = dynamicTimeStep(duration, operatingCase)
 		if assertion.Analysis == simmodel.AnalysisElectrothermal {
 			analysis.Conditions = append([]simmodel.NamedValue(nil), thermalConditions...)
 		}
-		simmodel.NormalizeDynamicGrid(&analysis)
 		addSimulationEvents(&analysis, requirement, operatingCase, graph)
+		addAutonomousStartupEvents(&analysis, requirement, assertion, graph)
+		simmodel.NormalizeDynamicGrid(&analysis)
 	case simmodel.AnalysisDistortion:
 		frequency := assertionFrequencyScale(requirement, assertion)
 		analysis.DurationS = 4 / frequency
@@ -1256,6 +1445,7 @@ func simulationIntentParts(
 		requirement,
 		assertion,
 		operatingCase,
+		corner,
 		graph,
 		evidence,
 		quantity,
@@ -1399,6 +1589,7 @@ func simulationQuantityNeedsNode(quantity string) bool {
 	case simmodel.QuantityDeviceCurrentA,
 		simmodel.QuantityTotalSupplyCurrentA,
 		simmodel.QuantityPeakAbsDeviceCurrentA,
+		simmodel.QuantityConversionEfficiencyPct,
 		simmodel.QuantityMaximumJunctionTemperatureC,
 		simmodel.QuantityMinimumTransientSOAMargin:
 		return false
@@ -1411,6 +1602,7 @@ func simulationMeasurementScope(
 	requirement Requirement,
 	assertion BehavioralAssertion,
 	operatingCase OperatingCase,
+	corner operatingCorner,
 	graph CandidateGraph,
 	evidence []simmodel.ComponentEvidence,
 	quantity string,
@@ -1445,7 +1637,7 @@ func simulationMeasurementScope(
 		}
 		return component, nil, nil
 	case simmodel.QuantityDeviceCurrentA, simmodel.QuantityDCSweepDeviceSlopeAperV:
-		if component, found := observedCurrentComponent(requirement, assertion, operatingCase, graph); found {
+		if component, found := observedCurrentComponent(requirement, assertion, operatingCase, corner, graph); found {
 			return component, nil, nil
 		}
 		return "", nil, &SimulationDiagnostic{
@@ -1476,7 +1668,7 @@ func simulationMeasurementScope(
 					return component, nil, nil
 				}
 			}
-			if component, found := observedCurrentComponent(requirement, assertion, operatingCase, graph); found {
+			if component, found := observedCurrentComponent(requirement, assertion, operatingCase, corner, graph); found {
 				return component, nil, nil
 			}
 		}
@@ -1487,7 +1679,7 @@ func simulationMeasurementScope(
 		return component, nil, nil
 	case simmodel.QuantityOutputPowerW:
 		component, found := loadMeasurementComponent(
-			requirement, assertion, operatingCase, graph,
+			requirement, assertion, operatingCase, corner, graph,
 		)
 		if !found {
 			return "", nil, &SimulationDiagnostic{
@@ -1498,6 +1690,27 @@ func simulationMeasurementScope(
 			}
 		}
 		return component, nil, nil
+	case simmodel.QuantityConversionEfficiencyPct:
+		component, found := loadMeasurementComponent(
+			requirement, assertion, operatingCase, corner, graph,
+		)
+		if !found {
+			return "", nil, &SimulationDiagnostic{
+				Code:       diagnosisModelUnavailable,
+				Path:       "simulation.assertion.component",
+				Message:    "conversion-efficiency measurement requires one bounded load at the observed port",
+				Suggestion: "declare a bounded load condition for the observed output",
+			}
+		}
+		components := supplySourceComponents(graph)
+		if len(components) == 0 {
+			return "", nil, &SimulationDiagnostic{
+				Code:    diagnosisModelUnavailable,
+				Path:    "simulation.assertion.components",
+				Message: "conversion-efficiency measurement requires at least one external supply source",
+			}
+		}
+		return component, components, nil
 	case simmodel.QuantityMaximumJunctionTemperatureC:
 		components := evidenceComponentsWithThermal(evidence, false)
 		if len(components) == 0 {
@@ -1552,46 +1765,81 @@ func observedCurrentComponent(
 	requirement Requirement,
 	assertion BehavioralAssertion,
 	operatingCase OperatingCase,
+	corner operatingCorner,
 	graph CandidateGraph,
 ) (string, bool) {
-	if component, found := loadMeasurementComponent(
-		requirement,
-		assertion,
-		operatingCase,
-		graph,
-	); found {
-		return component, true
-	}
 	observationNode := observationNodeID(graph, requirement, assertion.Observation)
-	components := []string{}
+	controlledPathComponents := []string{}
+	activeComponents := []string{}
 	for _, instance := range graph.Instances {
 		if !topologyActiveKind(instance.Kind) {
 			continue
 		}
 		for _, terminal := range instance.Terminals {
 			if terminal.Node == observationNode {
-				components = append(components, instance.ID)
+				activeComponents = append(activeComponents, instance.ID)
+				if topologyCurrentPathKind(instance.Kind) {
+					controlledPathComponents = append(controlledPathComponents, instance.ID)
+				}
 				break
 			}
 		}
 	}
-	slices.Sort(components)
-	components = slices.Compact(components)
-	if len(components) != 1 {
+	slices.Sort(controlledPathComponents)
+	controlledPathComponents = slices.Compact(controlledPathComponents)
+	if len(controlledPathComponents) == 1 {
+		return controlledPathComponents[0], true
+	}
+	if len(controlledPathComponents) > 1 {
 		return "", false
 	}
-	return components[0], true
+	slices.Sort(activeComponents)
+	activeComponents = slices.Compact(activeComponents)
+	if len(activeComponents) == 1 {
+		return activeComponents[0], true
+	}
+	if len(activeComponents) > 1 {
+		return "", false
+	}
+	return loadMeasurementComponent(
+		requirement,
+		assertion,
+		operatingCase,
+		corner,
+		graph,
+	)
+}
+
+func topologyCurrentPathKind(kind string) bool {
+	switch kind {
+	case "n_channel_mosfet", "p_channel_mosfet", "npn_bjt", "pnp_bjt",
+		"fixed_voltage_regulator", "adjustable_voltage_regulator", "synchronous_buck_regulator":
+		return true
+	default:
+		return false
+	}
 }
 
 func loadMeasurementComponent(
 	requirement Requirement,
 	assertion BehavioralAssertion,
 	operatingCase OperatingCase,
+	corner operatingCorner,
 	graph CandidateGraph,
 ) (string, bool) {
 	observationNode := observationNodeID(graph, requirement, assertion.Observation)
-	for _, condition := range operatingCase.Conditions {
-		if condition.Axis != "load_resistance" && condition.Axis != "load_current" && condition.Axis != "load_inductance" {
+	conditions := simulationHarnessConditions(requirement, assertion, operatingCase)
+	for _, condition := range conditions {
+		if condition.Axis != "load_inductance" || simulationConditionValue(corner, condition) <= 0 {
+			continue
+		}
+		target, found := externalNodeForSemanticTarget(graph, condition.Target)
+		if found && target.ID == observationNode {
+			return loadInstanceID(condition.Target, condition.Axis), true
+		}
+	}
+	for _, condition := range conditions {
+		if condition.Axis != "load_resistance" && condition.Axis != "load_current" {
 			continue
 		}
 		target, found := externalNodeForSemanticTarget(graph, condition.Target)
@@ -1659,6 +1907,18 @@ func loadHarnessNodes(
 	target GraphNode,
 	reference string,
 ) (string, string) {
+	for _, instance := range graph.Instances {
+		if instance.Kind != "n_channel_mosfet" {
+			continue
+		}
+		terminals := topologyTerminalNodes(instance)
+		if terminals["DRAIN"] != target.ID || terminals["SOURCE"] != reference {
+			continue
+		}
+		if supply, found := dominantSupplyNode(requirement, graph); found {
+			return supply.ID, target.ID
+		}
+	}
 	for _, port := range requirement.Requirements.Ports {
 		if port.ID != target.SemanticID ||
 			port.Kind != "controlled_current" ||
@@ -1728,7 +1988,8 @@ func evidenceComponentsWithThermal(evidence []simmodel.ComponentEvidence, requir
 	result := []string{}
 	for _, component := range evidence {
 		for _, claim := range component.ModelClaims {
-			if (!requireSOA && claim.ThermalModel != nil) || (requireSOA && len(claim.TransientSOA) != 0) {
+			if (!requireSOA && (claim.ThermalModel != nil || namedThermalParametersComplete(claim.Parameters))) ||
+				(requireSOA && len(claim.TransientSOA) != 0) {
 				result = append(result, component.InstanceID)
 				break
 			}
@@ -1736,6 +1997,19 @@ func evidenceComponentsWithThermal(evidence []simmodel.ComponentEvidence, requir
 	}
 	slices.Sort(result)
 	return slices.Compact(result)
+}
+
+func namedThermalParametersComplete(parameters []simmodel.NamedValue) bool {
+	maximumTemperature, thermalResistance := false, false
+	for _, parameter := range parameters {
+		switch parameter.Name {
+		case "max_temperature_c":
+			maximumTemperature = finite(parameter.Value)
+		case "thermal_resistance_c_per_w", "junction_to_ambient_c_per_w":
+			thermalResistance = finite(parameter.Value) && parameter.Value > 0
+		}
+	}
+	return maximumTemperature && thermalResistance
 }
 
 func simulationExcitations(
@@ -1761,10 +2035,34 @@ func simulationExcitations(
 				node,
 			),
 		}
-		if assertion.Analysis == simmodel.AnalysisTransient &&
+		periodicPulse := assertion.FrequencyHz != nil && *assertion.FrequencyHz > 0 &&
+			(transientPeriodicPulseMetric(assertion.Metric) ||
+				periodicControlPulseRequired(requirement, assertion, effectiveExcitation))
+		if (assertion.Analysis == simmodel.AnalysisTransient || assertion.Analysis == simmodel.AnalysisElectrothermal) &&
 			effectiveExcitation != nil &&
 			observationMatchesNode(node, *effectiveExcitation) &&
-			!operatingCaseHasSourceEvent(operatingCase, graph, node) {
+			(!operatingCaseHasSourceEvent(operatingCase, graph, node) || periodicPulse) {
+			configuredPulse := false
+			configurePulse := func(initial, applied float64) {
+				duration := dynamicDurationForRequirement(requirement, assertion, operatingCase)
+				excitation.DCValue = 0
+				excitation.PulseInitialValue = initial
+				excitation.PulseValue = applied
+				excitation.PulseDelayS = duration / 5
+				excitation.PulseWidthS = duration * 3 / 5
+				if periodicPulse {
+					excitation.PulseDelayS = periodicPulseDelay(operatingCase, node, graph, 1/(*assertion.FrequencyHz))
+					excitation.PulseWidthS = .5 / *assertion.FrequencyHz
+					excitation.PulsePeriodS = 1 / *assertion.FrequencyHz
+				}
+				if assertion.Metric == "settling_time" {
+					excitation.PulseWidthS = duration
+				}
+				if !periodicPulse {
+					excitation.PulsePeriodS = duration * 2
+				}
+				configuredPulse = true
+			}
 			for _, condition := range operatingCase.Conditions {
 				target, found := externalNodeForSemanticTarget(graph, condition.Target)
 				if !found || target.ID != node.ID ||
@@ -1779,24 +2077,15 @@ func simulationExcitations(
 				); found {
 					initial, applied = windowInitial, windowApplied
 				}
-				duration := dynamicDuration(assertion, operatingCase)
-				// Pulse levels are absolute source values in the trusted MNA
-				// contract; the independent DC term must remain zero.
-				excitation.DCValue = 0
-				excitation.PulseInitialValue = initial
-				excitation.PulseValue = applied
-				excitation.PulseDelayS = duration / 5
-				excitation.PulseWidthS = duration * 3 / 5
-				if assertion.Metric == "settling_time" {
-					// Settling is measured after one commanded edge. Keep the
-					// applied level beyond the analysis window so a synthetic
-					// return edge cannot become the measured settle time.
-					excitation.PulseWidthS = duration
-				}
-				excitation.PulsePeriodS = duration * 2
+				configurePulse(initial, applied)
 				break
 			}
-			if assertion.FrequencyHz != nil && *assertion.FrequencyHz > 0 {
+			if periodicPulse && !configuredPulse {
+				if initial, applied, found := periodicControlRange(requirement, node.SemanticID); found {
+					configurePulse(initial, applied)
+				}
+			}
+			if assertion.FrequencyHz != nil && *assertion.FrequencyHz > 0 && !periodicPulse {
 				excitation.SineAmplitude = excitationAmplitude(requirement, *effectiveExcitation)
 				excitation.SineFrequencyHz = *assertion.FrequencyHz
 			}
@@ -1832,6 +2121,69 @@ func simulationExcitations(
 		return cmp.Compare(left.Component, right.Component)
 	})
 	return result
+}
+
+func periodicControlPulseRequired(
+	requirement Requirement,
+	assertion BehavioralAssertion,
+	effectiveExcitation *Observation,
+) bool {
+	if assertion.Analysis != simmodel.AnalysisElectrothermal || effectiveExcitation == nil ||
+		assertion.FrequencyHz == nil || *assertion.FrequencyHz <= 0 {
+		return false
+	}
+	for _, candidate := range requirement.Requirements.BehavioralRequirements {
+		if candidate.Metric != "duty_cycle" || candidate.Excitation == nil || candidate.FrequencyHz == nil {
+			continue
+		}
+		if *candidate.Excitation == *effectiveExcitation && *candidate.FrequencyHz == *assertion.FrequencyHz {
+			return true
+		}
+	}
+	return false
+}
+
+func periodicControlRange(requirement Requirement, semanticID string) (float64, float64, bool) {
+	minimum, maximum := math.Inf(1), math.Inf(-1)
+	for _, operatingCase := range requirement.Requirements.OperatingCases {
+		for _, condition := range operatingCase.Conditions {
+			if condition.Target == semanticID &&
+				(condition.Axis == "input_voltage" || condition.Axis == "control_voltage") && condition.Min < condition.Max {
+				minimum = math.Min(minimum, condition.Min)
+				maximum = math.Max(maximum, condition.Max)
+			}
+		}
+	}
+	if finite(minimum) && finite(maximum) && minimum < maximum {
+		return minimum, maximum, true
+	}
+	for _, port := range requirement.Requirements.Ports {
+		if port.ID != semanticID || port.Electrical.MinVoltageV == nil || port.Electrical.MaxVoltageV == nil ||
+			*port.Electrical.MinVoltageV >= *port.Electrical.MaxVoltageV {
+			continue
+		}
+		return *port.Electrical.MinVoltageV, *port.Electrical.MaxVoltageV, true
+	}
+	return 0, 0, false
+}
+
+func transientPeriodicPulseMetric(metric string) bool {
+	switch metric {
+	case "duty_cycle", "oscillation_frequency", "rise_time", "fall_time":
+		return true
+	default:
+		return false
+	}
+}
+
+func periodicPulseDelay(operatingCase OperatingCase, node GraphNode, graph CandidateGraph, periodS float64) float64 {
+	for _, event := range operatingCase.Events {
+		target, found := externalNodeForSemanticTarget(graph, event.Target)
+		if found && target.ID == node.ID {
+			return event.TriggerTimeS
+		}
+	}
+	return periodS
 }
 
 func simulationExcludesLoadCurrent(assertion BehavioralAssertion) bool {
@@ -2062,6 +2414,36 @@ func assertionSourceValue(
 	node GraphNode,
 ) float64 {
 	fallback := sourceValueForNode(requirement, operatingCase, corner, node)
+	if node.Role == "control" {
+		switch assertion.Metric {
+		case "off_state_current":
+			inactive := math.Inf(1)
+			for _, candidateCase := range requirement.Requirements.OperatingCases {
+				for _, condition := range candidateCase.Conditions {
+					if condition.Target == node.SemanticID &&
+						(condition.Axis == "input_voltage" || condition.Axis == "control_voltage") {
+						inactive = math.Min(inactive, condition.Min)
+					}
+				}
+			}
+			if finite(inactive) {
+				return inactive
+			}
+		case "on_state_voltage":
+			active := 0.0
+			for _, candidateCase := range requirement.Requirements.OperatingCases {
+				for _, condition := range candidateCase.Conditions {
+					if condition.Target == node.SemanticID &&
+						(condition.Axis == "input_voltage" || condition.Axis == "control_voltage") {
+						active = math.Max(active, condition.Max)
+					}
+				}
+			}
+			if active > 0 {
+				return active
+			}
+		}
+	}
 	if assertion.Metric != "output_current" || node.Scope != "external" {
 		return fallback
 	}
@@ -2239,17 +2621,40 @@ func excitationAmplitude(requirement Requirement, observation Observation) float
 }
 
 func dynamicDuration(assertion BehavioralAssertion, operatingCase OperatingCase) float64 {
+	frequency := 0.0
+	if assertion.FrequencyHz != nil {
+		frequency = *assertion.FrequencyHz
+	} else if assertion.Unit == "Hz" {
+		frequency = assertionTarget(assertion)
+	}
+	return dynamicDurationAtFrequency(assertion, operatingCase, frequency)
+}
+
+func dynamicDurationForRequirement(requirement Requirement, assertion BehavioralAssertion, operatingCase OperatingCase) float64 {
+	return dynamicDurationAtFrequency(assertion, operatingCase, assertionFrequencyScale(requirement, assertion))
+}
+
+func dynamicDurationAtFrequency(assertion BehavioralAssertion, operatingCase OperatingCase, frequencyHz float64) float64 {
 	duration := 0.0
 	switch assertion.Metric {
 	case "settling_time", "propagation_delay", "rise_time", "fall_time":
 		duration = assertionTarget(assertion) * 10
+	}
+	periodicDuration := 0.0
+	if frequencyHz > 0 && finite(frequencyHz) {
+		periodicDuration = 10 / frequencyHz
+		duration = math.Max(duration, periodicDuration)
 	}
 	for _, event := range operatingCase.Events {
 		// Preserve a deterministic post-event observation interval. Merely
 		// doubling a short trigger delay can end a startup analysis while a
 		// bounded feedback loop is still approaching its final value, which
 		// turns ordinary settling into false overshoot.
-		duration = math.Max(duration, math.Max(0.01, event.TriggerTimeS*10))
+		if periodicDuration > 0 {
+			duration = math.Max(duration, event.TriggerTimeS+periodicDuration)
+		} else {
+			duration = math.Max(duration, math.Max(0.01, event.TriggerTimeS*10))
+		}
 	}
 	if duration <= 0 {
 		duration = 0.01
@@ -2310,6 +2715,16 @@ func addSimulationEvents(analysis *simmodel.Analysis, requirement Requirement, o
 			continue
 		}
 		component := sourceInstanceForNode(target)
+		periodicallyDriven := false
+		for _, excitation := range analysis.Excitations {
+			if excitation.Component == component && excitation.PulsePeriodS > 0 {
+				periodicallyDriven = true
+				break
+			}
+		}
+		if periodicallyDriven {
+			continue
+		}
 		analysis.SourceValueEvents = append(analysis.SourceValueEvents, simmodel.SourceValueEvent{
 			ID:           canonicalIdentifier(event.ID),
 			Component:    component,
@@ -2319,6 +2734,60 @@ func addSimulationEvents(analysis *simmodel.Analysis, requirement Requirement, o
 			Applied:      event.Applied,
 		})
 	}
+}
+
+func addAutonomousStartupEvents(
+	analysis *simmodel.Analysis,
+	requirement Requirement,
+	assertion BehavioralAssertion,
+	graph CandidateGraph,
+) {
+	if analysis == nil || analysis.Kind != simmodel.AnalysisTransient || assertion.Observation.Kind != "port" {
+		return
+	}
+	autonomousOutput := false
+	for _, candidate := range requirement.Requirements.BehavioralRequirements {
+		if candidate.Metric == "oscillation_frequency" && candidate.Analysis == simmodel.AnalysisTransient &&
+			candidate.Excitation == nil && candidate.Observation == assertion.Observation {
+			autonomousOutput = true
+			break
+		}
+	}
+	if !autonomousOutput {
+		return
+	}
+	excitationByComponent := map[string]float64{}
+	for _, excitation := range analysis.Excitations {
+		excitationByComponent[excitation.Component] = excitation.DCValue
+	}
+	existing := map[string]bool{}
+	for _, event := range analysis.SourceValueEvents {
+		existing[event.Component] = true
+	}
+	for _, node := range graph.Nodes {
+		if node.Scope != "external" || node.Role != "supply" {
+			continue
+		}
+		component := sourceInstanceForNode(node)
+		applied := excitationByComponent[component]
+		if existing[component] || applied == 0 || !finite(applied) {
+			continue
+		}
+		analysis.SourceValueEvents = append(analysis.SourceValueEvents, simmodel.SourceValueEvent{
+			ID:           canonicalIdentifier("autonomous_startup_" + node.SemanticID),
+			Component:    component,
+			TriggerTimeS: 0,
+			DurationS:    analysis.DurationS,
+			Initial:      0,
+			Applied:      applied,
+		})
+	}
+	slices.SortFunc(analysis.SourceValueEvents, func(left, right simmodel.SourceValueEvent) int {
+		return simmodel.CompareValueEventOrder(
+			left.Component, left.TriggerTimeS, left.ID,
+			right.Component, right.TriggerTimeS, right.ID,
+		)
+	})
 }
 
 func shortLoadInstanceID(target string) string {
@@ -2493,6 +2962,29 @@ func sweepSourceAndRange(
 					return source, start, stop, true
 				}
 			}
+		}
+	}
+	if assertion.Metric == "line_regulation" {
+		source := ""
+		minimum, maximum := math.Inf(1), math.Inf(-1)
+		for _, condition := range operatingCase.Conditions {
+			if condition.Axis != "supply_voltage" || condition.Max <= condition.Min {
+				continue
+			}
+			target, found := externalNodeForSemanticTarget(graph, condition.Target)
+			if !found || target.Role != "supply" {
+				continue
+			}
+			candidate := sourceInstanceForNode(target)
+			if source != "" && source != candidate {
+				return "", 0, 0, false
+			}
+			source = candidate
+			minimum = math.Min(minimum, condition.Min)
+			maximum = math.Max(maximum, condition.Max)
+		}
+		if source != "" && maximum > minimum {
+			return source, minimum, maximum, true
 		}
 	}
 	if assertion.Metric == "load_regulation" {

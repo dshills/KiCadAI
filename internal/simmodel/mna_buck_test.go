@@ -163,8 +163,94 @@ func TestMNASynchronousBuckTransientEfficiencyUsesResolvedOutputBoundary(t *test
 		AnalysisID: "efficiency", Component: "load", Components: []string{"input_supply"},
 		Quantity: QuantityConversionEfficiencyPct,
 	})
-	if diagnostic != nil || actual < 81.98 || actual > 82.5 || math.IsNaN(actual) {
-		t.Fatalf("resolved-output conversion efficiency = %.12g, want the reviewed 82%% boundary without nominal-voltage or duplicate-quiescent loss; diagnostic=%#v", actual, diagnostic)
+	if diagnostic != nil || actual < 81.9 || actual > 82.5 || math.IsNaN(actual) {
+		t.Fatalf("resolved-output conversion efficiency = %.12g, want the reviewed 82%% boundary after explicit feedback consumption and without duplicate quiescent loss; diagnostic=%#v", actual, diagnostic)
+	}
+	ripple, rippleDiagnostic := transientDerivedValue(result, Assertion{
+		AnalysisID: "efficiency", Node: "OUT", Quantity: QuantityOutputRippleVPP,
+	})
+	if rippleDiagnostic != nil || ripple < .029 || ripple > .031 {
+		t.Fatalf("model-derived LC-plus-ESR ripple = %.12g, want about .030 Vpp; diagnostic=%#v periodic=%#v", ripple, rippleDiagnostic, result.PeriodicNodes)
+	}
+	if len(result.PeriodicNodes) != 1 || result.PeriodicNodes[0].Method != "averaged_buck_lc_parallel_esr_ripple_bound_v3" {
+		t.Fatalf("periodic node evidence = %#v", result.PeriodicNodes)
+	}
+	parallel := ClonePlan(plan)
+	for _, device := range parallel.Devices {
+		if device.PrimitiveModel != PrimitiveCapacitorTransientV1 {
+			continue
+		}
+		duplicate := device
+		duplicate.Component += "_parallel"
+		parallel.Devices = append(parallel.Devices, duplicate)
+		break
+	}
+	parallel = indexMNAPlanDevices(parallel)
+	parallelPeriodic := synchronousBuckPeriodicNodeResults(parallel, result)
+	if len(parallelPeriodic) != 1 || math.Abs(parallelPeriodic[0].VoltageRippleVPP-ripple/2) > 1e-12 {
+		t.Fatalf("two identical parallel output capacitors produced periodic evidence %#v, want half the single-capacitor ripple %.12g", parallelPeriodic, ripple/2)
+	}
+	withoutESR := ClonePlan(plan)
+	for deviceIndex := range withoutESR.Devices {
+		device := &withoutESR.Devices[deviceIndex]
+		if device.PrimitiveModel != PrimitiveCapacitorTransientV1 {
+			continue
+		}
+		parameters := device.ModelParameters[:0]
+		for _, parameter := range device.ModelParameters {
+			if parameter.Name != "series_resistance_ohm" {
+				parameters = append(parameters, parameter)
+			}
+		}
+		device.ModelParameters = parameters
+		device.parameterIndex = nil
+	}
+	withoutESR = indexMNAPlanDevices(withoutESR)
+	if periodic := synchronousBuckPeriodicNodeResults(withoutESR, result); len(periodic) != 0 {
+		t.Fatalf("unproven output-capacitor ESR produced trusted ripple evidence: %#v", periodic)
+	}
+}
+
+func TestSettledPeriodicNodeAverageDoesNotUseFinalSampleAsSteadyVoltage(t *testing.T) {
+	result := AnalysisResult{Points: []AnalysisPoint{
+		{TimeS: 0, Nodes: []NodeResult{{Node: "OUT", Real: 4}}},
+		{TimeS: 1e-6, Nodes: []NodeResult{{Node: "OUT", Real: 5}}},
+		{TimeS: 2e-6, Nodes: []NodeResult{{Node: "OUT", Real: 6}}},
+	}}
+	average, found := settledPeriodicNodeAverage(result, "OUT", "", 500_000)
+	if !found || average != 5 {
+		t.Fatalf("settled-period average = %g found=%t, want 5 V across all samples rather than final-sample 6 V", average, found)
+	}
+}
+
+func TestMNASynchronousBuckEfficiencyExcludesSettledStartupEnergy(t *testing.T) {
+	components, nodes := synchronousBuckEvidence()
+	intent := Intent{
+		ModelID: ModelTransientCircuitV1,
+		Analyses: []Analysis{{
+			ID: "event_efficiency", Kind: AnalysisTransient, DurationS: .012, TimeStepS: .0001,
+			Excitations: []SourceExcitation{{Component: "input_supply", DCValue: 24}, {Component: "enable", DCValue: 5}},
+			SourceValueEvents: []SourceValueEvent{{
+				ID: "enable_start", Component: "enable", TriggerTimeS: .001, DurationS: .011,
+				Initial: 0, Applied: 5,
+			}},
+		}},
+		Assertions: []Assertion{{
+			AnalysisID: "event_efficiency", Component: "load", Components: []string{"input_supply"},
+			Quantity: QuantityConversionEfficiencyPct, Min: 0, Max: 100,
+		}},
+	}
+	plan, diagnostics := ResolveWithTopology(intent, "catalog", "buck-catalog-hash", components, nodes)
+	if len(diagnostics) != 0 {
+		t.Fatalf("resolve synchronous buck event efficiency: %#v", diagnostics)
+	}
+	result, diagnostics := solveTransientAnalysis(plan, plan.Analyses[0])
+	if len(diagnostics) != 0 {
+		t.Fatalf("evaluate synchronous buck event efficiency: %#v", diagnostics)
+	}
+	actual, diagnostic := transientDerivedValue(result, intent.Assertions[0])
+	if diagnostic != nil || actual < 81.9 || actual > 82.5 || math.IsNaN(actual) {
+		t.Fatalf("settled conversion efficiency = %.12g, want the reviewed 82%% boundary after startup; diagnostic=%#v", actual, diagnostic)
 	}
 }
 
@@ -214,7 +300,7 @@ func synchronousBuckEvidence() ([]ComponentEvidence, []NodeEvidence) {
 			ValueSI: 220e-6, HasValueSI: true,
 			ModelClaims: []CatalogEvidence{
 				{ModelID: PrimitiveCapacitorV1},
-				{ModelID: PrimitiveCapacitorTransientV1, Parameters: []NamedValue{{Name: "max_voltage_v", Value: 35}}},
+				{ModelID: PrimitiveCapacitorTransientV1, Parameters: []NamedValue{{Name: "max_voltage_v", Value: 35}, {Name: "series_resistance_ohm", Value: .056}}},
 			},
 			Connections: []ConnectionEvidence{{Function: "A", Net: "OUT"}, {Function: "B", Net: "GND"}},
 		},

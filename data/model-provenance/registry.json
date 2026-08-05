@@ -224,13 +224,53 @@
       }
     },
     {
+      "catalog_id": "capacitor.panasonic.eeufc1j220.radial",
+      "family": "capacitor",
+      "model_id": "mna_capacitor_transient_be_v1",
+      "provenance": {
+        "source": "https://industrial.panasonic.com/ww/products/pt/aluminum-cap-lead/models/EEUFC1J220",
+        "revision": "Panasonic EEUFC1J220 product specification, reviewed 2026-08-05",
+        "sha256": "1d76b70fd79b5fa92d5b8945a61b8d246eaf9691d4b0fdbf132fef9b5689cdbb",
+        "review_status": "reviewed",
+        "allowed_analyses": [
+          "dc_operating_point",
+          "distortion",
+          "startup",
+          "thermal",
+          "transient"
+        ],
+        "min_temperature_c": -55,
+        "max_temperature_c": 105
+      }
+    },
+    {
+      "catalog_id": "capacitor.panasonic.eeufc1j220.radial",
+      "family": "capacitor",
+      "model_id": "mna_capacitor_v1",
+      "provenance": {
+        "source": "kicadai:trusted-simulation-registry",
+        "revision": "kicadai.trusted-simulation-registry.v1",
+        "sha256": "ef0b29d721870e25f9e49b43cfbcf2510a7136e6ba50da1ad0da0c7b1360d226",
+        "review_status": "reviewed",
+        "allowed_analyses": [
+          "ac_sweep",
+          "dc_operating_point",
+          "noise",
+          "stability",
+          "thermal"
+        ],
+        "min_temperature_c": -55,
+        "max_temperature_c": 105
+      }
+    },
+    {
       "catalog_id": "capacitor.panasonic.eeufr1a151.radial",
       "family": "capacitor",
       "model_id": "mna_capacitor_transient_be_v1",
       "provenance": {
         "source": "https://industrial.panasonic.com/cdbs/www-data/pdf/RDF0000/ABA0000C1259.pdf",
         "revision": "panasonic:FR-A:EEUFR1A151:2026-07",
-        "sha256": "19f725a7b01f981f33aeb7446e16f61398116168eea4ac05a70e2146bee8c049",
+        "sha256": "1d76b70fd79b5fa92d5b8945a61b8d246eaf9691d4b0fdbf132fef9b5689cdbb",
         "review_status": "reviewed",
         "allowed_analyses": [
           "dc_operating_point",
@@ -270,7 +310,7 @@
       "provenance": {
         "source": "https://industrial.panasonic.com/cdbs/www-data/pdf/RDF0000/ABA0000C1259.pdf",
         "revision": "panasonic:FR-A:EEUFR1A682L:2026-07",
-        "sha256": "19f725a7b01f981f33aeb7446e16f61398116168eea4ac05a70e2146bee8c049",
+        "sha256": "1d76b70fd79b5fa92d5b8945a61b8d246eaf9691d4b0fdbf132fef9b5689cdbb",
         "review_status": "reviewed",
         "allowed_analyses": [
           "dc_operating_point",
@@ -290,7 +330,7 @@
       "provenance": {
         "source": "https://industrial.panasonic.com/cdbs/www-data/pdf/RDF0000/ABA0000C1259.pdf",
         "revision": "panasonic:FR-A:EEUFR1H220:2026-07",
-        "sha256": "19f725a7b01f981f33aeb7446e16f61398116168eea4ac05a70e2146bee8c049",
+        "sha256": "1d76b70fd79b5fa92d5b8945a61b8d246eaf9691d4b0fdbf132fef9b5689cdbb",
         "review_status": "reviewed",
         "allowed_analyses": [
           "dc_operating_point",
@@ -350,7 +390,7 @@
       "provenance": {
         "source": "https://search.kemet.com/download/specsheet/T520T476M006ATE040",
         "revision": "kemet:T520:T520T476M006ATE040:2026-07",
-        "sha256": "19f725a7b01f981f33aeb7446e16f61398116168eea4ac05a70e2146bee8c049",
+        "sha256": "1d76b70fd79b5fa92d5b8945a61b8d246eaf9691d4b0fdbf132fef9b5689cdbb",
         "review_status": "reviewed",
         "allowed_analyses": [
           "dc_operating_point",
@@ -390,7 +430,7 @@
       "provenance": {
         "source": "https://content.kemet.com/datasheets/KEM_T2005_T491.pdf",
         "revision": "kemet:T491:T491A475K025AT:2026-07",
-        "sha256": "19f725a7b01f981f33aeb7446e16f61398116168eea4ac05a70e2146bee8c049",
+        "sha256": "1d76b70fd79b5fa92d5b8945a61b8d246eaf9691d4b0fdbf132fef9b5689cdbb",
         "review_status": "reviewed",
         "allowed_analyses": [
           "dc_operating_point",
@@ -430,7 +470,7 @@
       "provenance": {
         "source": "https://industrial.panasonic.com/cdbs/www-data/pdf/RDF0000/ABA0000C1259.pdf",
         "revision": "panasonic:FR-A:EEUFR1C221:2026-07",
-        "sha256": "19f725a7b01f981f33aeb7446e16f61398116168eea4ac05a70e2146bee8c049",
+        "sha256": "1d76b70fd79b5fa92d5b8945a61b8d246eaf9691d4b0fdbf132fef9b5689cdbb",
         "review_status": "reviewed",
         "allowed_analyses": [
           "dc_operating_point",
@@ -470,7 +510,7 @@
       "provenance": {
         "source": "https://industrial.panasonic.com/cdbs/www-data/pdf/RDF0000/ABA0000C1259.pdf",
         "revision": "panasonic:FR-A:EEUFR1C471:2026-07",
-        "sha256": "19f725a7b01f981f33aeb7446e16f61398116168eea4ac05a70e2146bee8c049",
+        "sha256": "1d76b70fd79b5fa92d5b8945a61b8d246eaf9691d4b0fdbf132fef9b5689cdbb",
         "review_status": "reviewed",
         "allowed_analyses": [
           "dc_operating_point",
@@ -510,7 +550,7 @@
       "provenance": {
         "source": "https://industrial.panasonic.com/cdbs/www-data/pdf/RDF0000/ABA0000C1259.pdf",
         "revision": "panasonic:FR-A:EEUFR1V221:2026-04",
-        "sha256": "19f725a7b01f981f33aeb7446e16f61398116168eea4ac05a70e2146bee8c049",
+        "sha256": "1d76b70fd79b5fa92d5b8945a61b8d246eaf9691d4b0fdbf132fef9b5689cdbb",
         "review_status": "reviewed",
         "allowed_analyses": [
           "dc_operating_point",
@@ -550,7 +590,7 @@
       "provenance": {
         "source": "kicadai:trusted-simulation-registry",
         "revision": "kicadai.trusted-simulation-registry.v1",
-        "sha256": "19f725a7b01f981f33aeb7446e16f61398116168eea4ac05a70e2146bee8c049",
+        "sha256": "1d76b70fd79b5fa92d5b8945a61b8d246eaf9691d4b0fdbf132fef9b5689cdbb",
         "review_status": "reviewed",
         "allowed_analyses": [
           "dc_operating_point",
@@ -606,7 +646,7 @@
       "provenance": {
         "source": "kicadai:trusted-simulation-registry",
         "revision": "kicadai.trusted-simulation-registry.v1",
-        "sha256": "19f725a7b01f981f33aeb7446e16f61398116168eea4ac05a70e2146bee8c049",
+        "sha256": "1d76b70fd79b5fa92d5b8945a61b8d246eaf9691d4b0fdbf132fef9b5689cdbb",
         "review_status": "reviewed",
         "allowed_analyses": [
           "dc_operating_point",
@@ -662,7 +702,7 @@
       "provenance": {
         "source": "https://content.kemet.com/datasheets/KEM_C1095_MIL-PRF-32535.pdf",
         "revision": "KEMET MIL-PRF-32535 C0G data sheet C1095, reviewed 2026-07-24",
-        "sha256": "19f725a7b01f981f33aeb7446e16f61398116168eea4ac05a70e2146bee8c049",
+        "sha256": "1d76b70fd79b5fa92d5b8945a61b8d246eaf9691d4b0fdbf132fef9b5689cdbb",
         "review_status": "reviewed",
         "allowed_analyses": [
           "dc_operating_point",
@@ -718,7 +758,7 @@
       "provenance": {
         "source": "https://content.kemet.com/datasheets/KEM_C1095_MIL-PRF-32535.pdf",
         "revision": "KEMET MIL-PRF-32535 C0G data sheet C1095, 15 nF 1% 50 V 1210 ordering table reviewed 2026-07-30",
-        "sha256": "19f725a7b01f981f33aeb7446e16f61398116168eea4ac05a70e2146bee8c049",
+        "sha256": "1d76b70fd79b5fa92d5b8945a61b8d246eaf9691d4b0fdbf132fef9b5689cdbb",
         "review_status": "reviewed",
         "allowed_analyses": [
           "dc_operating_point",
@@ -774,7 +814,7 @@
       "provenance": {
         "source": "https://search.murata.co.jp/Ceramy/image/img/A01X/G101/ENG/GCM21BR71H105KA03-01A.pdf",
         "revision": "Murata GCM21BR71H105KA03 reference sheet dated 2024-11-28, reviewed 2026-07-27",
-        "sha256": "19f725a7b01f981f33aeb7446e16f61398116168eea4ac05a70e2146bee8c049",
+        "sha256": "1d76b70fd79b5fa92d5b8945a61b8d246eaf9691d4b0fdbf132fef9b5689cdbb",
         "review_status": "reviewed",
         "allowed_analyses": [
           "dc_operating_point",
@@ -824,13 +864,53 @@
       }
     },
     {
+      "catalog_id": "capacitor.murata.grm188r71e474ka12d.0603",
+      "family": "capacitor",
+      "model_id": "mna_capacitor_transient_be_v1",
+      "provenance": {
+        "source": "https://www.murata.com/products/productdetail?partno=GRM188R71E474KA12%23",
+        "revision": "Murata GRM188R71E474KA12 product detail, reviewed 2026-08-05",
+        "sha256": "1d76b70fd79b5fa92d5b8945a61b8d246eaf9691d4b0fdbf132fef9b5689cdbb",
+        "review_status": "reviewed",
+        "allowed_analyses": [
+          "dc_operating_point",
+          "distortion",
+          "startup",
+          "thermal",
+          "transient"
+        ],
+        "min_temperature_c": -55,
+        "max_temperature_c": 125
+      }
+    },
+    {
+      "catalog_id": "capacitor.murata.grm188r71e474ka12d.0603",
+      "family": "capacitor",
+      "model_id": "mna_capacitor_v1",
+      "provenance": {
+        "source": "kicadai:trusted-simulation-registry",
+        "revision": "kicadai.trusted-simulation-registry.v1",
+        "sha256": "ef0b29d721870e25f9e49b43cfbcf2510a7136e6ba50da1ad0da0c7b1360d226",
+        "review_status": "reviewed",
+        "allowed_analyses": [
+          "ac_sweep",
+          "dc_operating_point",
+          "noise",
+          "stability",
+          "thermal"
+        ],
+        "min_temperature_c": -55,
+        "max_temperature_c": 125
+      }
+    },
+    {
       "catalog_id": "capacitor.murata.grm188r71h104ka93d.0603",
       "family": "capacitor",
       "model_id": "mna_capacitor_transient_be_v1",
       "provenance": {
         "source": "https://www.murata.com/en-us/products/productdetail?partno=GRM188R71H104KA93%23",
         "revision": "Murata GRM188R71H104KA93 product detail, reviewed 2026-07-19",
-        "sha256": "19f725a7b01f981f33aeb7446e16f61398116168eea4ac05a70e2146bee8c049",
+        "sha256": "1d76b70fd79b5fa92d5b8945a61b8d246eaf9691d4b0fdbf132fef9b5689cdbb",
         "review_status": "reviewed",
         "allowed_analyses": [
           "dc_operating_point",
@@ -845,6 +925,86 @@
     },
     {
       "catalog_id": "capacitor.murata.grm188r71h104ka93d.0603",
+      "family": "capacitor",
+      "model_id": "mna_capacitor_v1",
+      "provenance": {
+        "source": "kicadai:trusted-simulation-registry",
+        "revision": "kicadai.trusted-simulation-registry.v1",
+        "sha256": "ef0b29d721870e25f9e49b43cfbcf2510a7136e6ba50da1ad0da0c7b1360d226",
+        "review_status": "reviewed",
+        "allowed_analyses": [
+          "ac_sweep",
+          "dc_operating_point",
+          "noise",
+          "stability",
+          "thermal"
+        ],
+        "min_temperature_c": -55,
+        "max_temperature_c": 125
+      }
+    },
+    {
+      "catalog_id": "capacitor.murata.grm188r72a104ka35d.0603",
+      "family": "capacitor",
+      "model_id": "mna_capacitor_transient_be_v1",
+      "provenance": {
+        "source": "https://www.murata.com/products/productdetail?partno=GRM188R72A104KA35%23",
+        "revision": "Murata GRM188R72A104KA35 product detail, reviewed 2026-08-05",
+        "sha256": "1d76b70fd79b5fa92d5b8945a61b8d246eaf9691d4b0fdbf132fef9b5689cdbb",
+        "review_status": "reviewed",
+        "allowed_analyses": [
+          "dc_operating_point",
+          "distortion",
+          "startup",
+          "thermal",
+          "transient"
+        ],
+        "min_temperature_c": -55,
+        "max_temperature_c": 125
+      }
+    },
+    {
+      "catalog_id": "capacitor.murata.grm188r72a104ka35d.0603",
+      "family": "capacitor",
+      "model_id": "mna_capacitor_v1",
+      "provenance": {
+        "source": "kicadai:trusted-simulation-registry",
+        "revision": "kicadai.trusted-simulation-registry.v1",
+        "sha256": "ef0b29d721870e25f9e49b43cfbcf2510a7136e6ba50da1ad0da0c7b1360d226",
+        "review_status": "reviewed",
+        "allowed_analyses": [
+          "ac_sweep",
+          "dc_operating_point",
+          "noise",
+          "stability",
+          "thermal"
+        ],
+        "min_temperature_c": -55,
+        "max_temperature_c": 125
+      }
+    },
+    {
+      "catalog_id": "capacitor.murata.grm188z71c475ke21d.0603",
+      "family": "capacitor",
+      "model_id": "mna_capacitor_transient_be_v1",
+      "provenance": {
+        "source": "https://www.murata.com/products/productdetail?partno=GRM188Z71C475KE21%23",
+        "revision": "Murata GRM188Z71C475KE21 product detail, reviewed 2026-08-05",
+        "sha256": "1d76b70fd79b5fa92d5b8945a61b8d246eaf9691d4b0fdbf132fef9b5689cdbb",
+        "review_status": "reviewed",
+        "allowed_analyses": [
+          "dc_operating_point",
+          "distortion",
+          "startup",
+          "thermal",
+          "transient"
+        ],
+        "min_temperature_c": -55,
+        "max_temperature_c": 125
+      }
+    },
+    {
+      "catalog_id": "capacitor.murata.grm188z71c475ke21d.0603",
       "family": "capacitor",
       "model_id": "mna_capacitor_v1",
       "provenance": {
@@ -890,7 +1050,7 @@
       "provenance": {
         "source": "https://www.murata.com/en-us/products/productdetail?partno=GRM21BR61A106KE19%23",
         "revision": "Murata GRM21BR61A106KE19 product detail, reviewed 2026-07-23",
-        "sha256": "19f725a7b01f981f33aeb7446e16f61398116168eea4ac05a70e2146bee8c049",
+        "sha256": "1d76b70fd79b5fa92d5b8945a61b8d246eaf9691d4b0fdbf132fef9b5689cdbb",
         "review_status": "reviewed",
         "allowed_analyses": [
           "dc_operating_point",
@@ -910,7 +1070,7 @@
       "provenance": {
         "source": "https://pim.murata.com/asset/pim4/ceramicCapacitorSMD/GRM21BR71H104KA01-01-EN_PDF_CERAMICCAPACITORSMD?lastModifiedDatetime=20250707233810",
         "revision": "Murata GRM21BR71H104KA01 reference sheet, reviewed 2026-07-20",
-        "sha256": "19f725a7b01f981f33aeb7446e16f61398116168eea4ac05a70e2146bee8c049",
+        "sha256": "1d76b70fd79b5fa92d5b8945a61b8d246eaf9691d4b0fdbf132fef9b5689cdbb",
         "review_status": "reviewed",
         "allowed_analyses": [
           "dc_operating_point",
@@ -2904,6 +3064,29 @@
         ],
         "min_temperature_c": -40,
         "max_temperature_c": 85
+      }
+    },
+    {
+      "catalog_id": "resistor.yageo.rc0603fr_0788k7l.0603",
+      "family": "resistor",
+      "model_id": "mna_resistor_v1",
+      "provenance": {
+        "source": "kicadai:trusted-simulation-registry",
+        "revision": "kicadai.trusted-simulation-registry.v1",
+        "sha256": "ed2413ddd37969961f8ad017ba272c18c42228660e14a5757b6b788f4326cf61",
+        "review_status": "reviewed",
+        "allowed_analyses": [
+          "ac_sweep",
+          "dc_operating_point",
+          "distortion",
+          "noise",
+          "stability",
+          "startup",
+          "thermal",
+          "transient"
+        ],
+        "min_temperature_c": -55,
+        "max_temperature_c": 155
       }
     },
     {

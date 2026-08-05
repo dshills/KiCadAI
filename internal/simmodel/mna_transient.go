@@ -60,6 +60,19 @@ func solveTransientAnalysis(plan Plan, analysis Analysis) (AnalysisResult, []Dia
 			result.FundamentalFrequencyHz = excitation.SineFrequencyHz
 			break
 		}
+		if excitation.PulsePeriodS > 0 {
+			result.FundamentalFrequencyHz = 1 / excitation.PulsePeriodS
+			break
+		}
+	}
+	if result.FundamentalFrequencyHz == 0 {
+		for _, device := range plan.Devices {
+			frequency := transientModelParameter(device.ModelParameters, "switching_frequency_hz")
+			if frequency > 0 {
+				result.FundamentalFrequencyHz = frequency
+				break
+			}
+		}
 	}
 	// The point labeled t=0 is the left-hand state at the observation
 	// boundary. This preserves an explicit initial sample for events whose
@@ -68,7 +81,9 @@ func solveTransientAnalysis(plan Plan, analysis Analysis) (AnalysisResult, []Dia
 	initialAnalysis := transientDCAnalysis(analysis, initialTimeS)
 	initialPlan := planWithAnalysisOverrides(plan, initialAnalysis)
 	initialPlan = planWithRequestedAnalysis(initialPlan, initialAnalysis)
-	zeroEnergyInitialState := transientPowerSourcesZeroAtTime(plan, analysis, initialTimeS)
+	explicitZeroPowerStart := transientPowerSourcesZeroAtTime(plan, analysis, initialTimeS)
+	autonomousZeroEnergyStart := transientRequiresAutonomousStartup(plan, analysis)
+	zeroEnergyInitialState := explicitZeroPowerStart || autonomousZeroEnergyStart
 	var system mnaSystem
 	var solution []complex128
 	var initialEvidence SolverEvidence
@@ -83,9 +98,11 @@ func solveTransientAnalysis(plan Plan, analysis Analysis) (AnalysisResult, []Dia
 			return result, prefixTransientDiagnostics(analysis.ID, 0, 0, initialDiagnostics)
 		}
 		solution = make([]complex128, len(system.rhs))
-		initialEvidence = SolverEvidence{
-			Method: "zero_energy_transient_v1", InitialCondition: "explicit_zero_power_source_event",
+		initialCondition := "explicit_zero_power_source_event"
+		if autonomousZeroEnergyStart && !explicitZeroPowerStart {
+			initialCondition = "autonomous_zero_energy_startup"
 		}
+		initialEvidence = SolverEvidence{Method: "zero_energy_transient_v1", InitialCondition: initialCondition}
 	} else {
 		// The trusted DC initializer applies global source/gmin continuation and
 		// ends at nonlinearFinalGmin, exactly the conductance used by later steps.
@@ -316,7 +333,28 @@ func solveTransientAnalysis(plan Plan, analysis Analysis) (AnalysisResult, []Dia
 		fuseI2TStates = commitTransientFuseStep(candidateFuseStates, openFuses, openedFuses)
 		history = append(history, append([]complex128(nil), solution...))
 	}
+	result.PeriodicNodes = synchronousBuckPeriodicNodeResults(plan, result)
 	return result, nil
+}
+
+func transientRequiresAutonomousStartup(plan Plan, analysis Analysis) bool {
+	periodicallyDriven := false
+	for _, excitation := range analysis.Excitations {
+		periodicallyDriven = periodicallyDriven || excitation.SineFrequencyHz > 0 || excitation.PulsePeriodS > 0
+	}
+	if periodicallyDriven {
+		return false
+	}
+	for _, assertion := range plan.Assertions {
+		if assertion.AnalysisID != analysis.ID {
+			continue
+		}
+		switch assertion.Quantity {
+		case QuantityOscillationFrequencyHz, QuantityDutyCyclePct:
+			return true
+		}
+	}
+	return false
 }
 
 func prepareAcceptedPriorTransientBase(
@@ -1905,6 +1943,7 @@ func solveTransientStepBySubstepPredictor(
 		}
 		total.TotalIterations = total.Iterations
 		total.TimeSteps = divisions
+		total.AcceptedSubsteps = divisions
 		return predictorSystem, predictorPrevious, total, predictorFuseStates, true
 	}
 	total.TotalIterations = total.Iterations
@@ -1958,7 +1997,7 @@ func solveTransientStepInternalWithLimit(base mnaSystem, resolvedDevices []Resol
 	constrainedScratch := acquireReusableMNASystemClone(&base)
 	defer releaseReusableMNASystemClone(constrainedScratch)
 	constrainedBase := &constrainedScratch.system
-	outputLimits := map[string]transientOutputLimitState{}
+	outputLimits := transientPriorOutputLimits(base, resolvedDevices, previous, fixedOutputClamps)
 	branchLimits := map[int]float64{}
 	deferredOutputLimits := map[string]bool{}
 	deferredBranchLimits := map[int]bool{}
@@ -2109,6 +2148,40 @@ func solveTransientStepInternalWithLimit(base mnaSystem, resolvedDevices []Resol
 		}
 	}
 	return mnaSystem{}, nil, evidence, diagnostic
+}
+
+// transientPriorOutputLimits carries a saturated dynamic output into the next
+// backward-Euler solve. A rail-limited op-amp in a Schmitt or other bistable
+// network has multiple algebraically valid roots; restarting every observation
+// from an unconstrained active set can alternate roots even though the stored
+// energy has not crossed the physical switching threshold. The ordinary
+// residual-driven active-limit advancement remains authoritative and releases
+// the carried state as soon as the dynamic equation supports an interior or
+// opposite-rail solution.
+func transientPriorOutputLimits(
+	base mnaSystem,
+	devices []ResolvedDevice,
+	previous []complex128,
+	fixedOutputClamps map[string]bool,
+) map[string]transientOutputLimitState {
+	result := map[string]transientOutputLimitState{}
+	for _, device := range devices {
+		if device.PrimitiveModel != PrimitiveOpAmpV1 || fixedOutputClamps[device.Component] {
+			continue
+		}
+		minimum, maximum, output, clampTolerance, ok := transientOutputLimitObservation(base, device, previous)
+		if !ok || minimum >= maximum {
+			continue
+		}
+		tolerance := 10 * clampTolerance * math.Max(1, math.Max(math.Abs(minimum), math.Abs(maximum)))
+		switch {
+		case output <= minimum+tolerance:
+			result[device.Component] = transientOutputLimitState{side: -1, value: minimum}
+		case output >= maximum-tolerance:
+			result[device.Component] = transientOutputLimitState{side: 1, value: maximum}
+		}
+	}
+	return result
 }
 
 func transientInteriorOutputRootsConsistent(base mnaSystem, devices []ResolvedDevice, solution []complex128, outputLimits map[string]transientOutputLimitState) bool {

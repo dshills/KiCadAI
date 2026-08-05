@@ -329,6 +329,26 @@ func SearchPrimitiveTopologies(ctx context.Context, requirement Requirement, inv
 			retainedTopology[candidate.TopologyHash] = candidate
 		}
 	}
+	nonlinearSwitchingCandidates, nonlinearSwitchingConsumption, nonlinearSwitchingRejections := topologyNonlinearSwitchingRelationshipSeeds(
+		ctx,
+		requirement,
+		inventory,
+		representatives,
+		inventoryByKey,
+		limits,
+		result.Policy,
+		initialState,
+	)
+	addSearchConsumption(&result.Consumption, nonlinearSwitchingConsumption)
+	for code, samples := range nonlinearSwitchingRejections {
+		rejections[code] = append(rejections[code], samples...)
+	}
+	for _, candidate := range nonlinearSwitchingCandidates {
+		if existing, found := retainedTopology[candidate.TopologyHash]; !found ||
+			compareTopologyCandidates(candidate, existing) < 0 {
+			retainedTopology[candidate.TopologyHash] = candidate
+		}
+	}
 	currentCandidates, currentConsumption, currentRejections := topologyTransconductanceRelationshipSeeds(
 		ctx,
 		requirement,
@@ -3327,27 +3347,134 @@ func topologyRatedPowerPrimitive(
 ) PrimitiveCandidate {
 	requireThermal := false
 	requireSOA := false
+	requiredSOAMargin := 1.0
 	requiredAnalyses := requirementAnalysisSet(requirement)
 	for _, assertion := range requirement.Requirements.BehavioralRequirements {
 		requireThermal = requireThermal || assertion.Metric == "junction_temperature"
 		requireSOA = requireSOA || assertion.Metric == "soa_margin"
+		if assertion.Metric == "soa_margin" && assertion.Min != nil && *assertion.Min > 0 {
+			requiredSOAMargin = math.Max(requiredSOAMargin, *assertion.Min)
+		}
 	}
-	candidates := []PrimitiveCandidate{}
+	type ratedPowerCandidate struct {
+		primitive PrimitiveCandidate
+		soaMargin float64
+		soaKnown  bool
+	}
+	candidates := []ratedPowerCandidate{}
 	for _, primitive := range inventory.Primitives {
 		if primitive.Kind != kind || !ratingsCoverRequirement(requirement, primitive) ||
 			(requireThermal && !primitiveHasThermalEvidence(primitive)) ||
 			(requireSOA && !primitiveHasSOAEvidence(primitive)) {
 			continue
 		}
-		candidates = append(candidates, primitive)
+		soaMargin := 0.0
+		soaKnown := false
+		if requireSOA {
+			soaMargin, soaKnown = topologyPowerDCSoaMargin(requirement, primitive)
+		}
+		candidates = append(candidates, ratedPowerCandidate{primitive: primitive, soaMargin: soaMargin, soaKnown: soaKnown})
 	}
-	slices.SortFunc(candidates, func(left, right PrimitiveCandidate) int {
-		return compareRepresentativePrimitives(left, right, requiredAnalyses)
+	slices.SortFunc(candidates, func(left, right ratedPowerCandidate) int {
+		if requireSOA {
+			if left.soaKnown != right.soaKnown {
+				if left.soaKnown {
+					return -1
+				}
+				return 1
+			}
+			if !left.soaKnown {
+				return compareRepresentativePrimitives(left.primitive, right.primitive, requiredAnalyses)
+			}
+			leftPass := left.soaMargin >= requiredSOAMargin
+			rightPass := right.soaMargin >= requiredSOAMargin
+			if leftPass != rightPass {
+				if leftPass {
+					return -1
+				}
+				return 1
+			}
+			if comparison := cmp.Compare(left.soaMargin, right.soaMargin); comparison != 0 {
+				if !leftPass {
+					return -comparison
+				}
+				return comparison
+			}
+		}
+		return compareRepresentativePrimitives(left.primitive, right.primitive, requiredAnalyses)
 	})
 	if len(candidates) == 0 {
 		return PrimitiveCandidate{}
 	}
-	return candidates[0]
+	return candidates[0].primitive
+}
+
+// topologyPowerDCSoaMargin estimates whether a power-transfer primitive has a
+// reviewed continuous SOA boundary wide enough for the declared output
+// envelope. It is a topology-independent selection prior: trusted simulation
+// remains authoritative for simultaneous device voltage/current waveforms.
+func topologyPowerDCSoaMargin(requirement Requirement, primitive PrimitiveCandidate) (float64, bool) {
+	targets := derivePowerTransferSizingTargets(requirement)
+	minimumLoadResistance := targets.loadResistance
+	maximumOutputPeak := targets.outputPeakVoltage
+	maximumAmbientC := math.Inf(-1)
+	for _, assertion := range requirement.Requirements.BehavioralRequirements {
+		if assertion.Metric == "peak_voltage" && assertion.Max != nil {
+			maximumOutputPeak = math.Max(maximumOutputPeak, math.Abs(*assertion.Max))
+		}
+	}
+	for _, operatingCase := range requirement.Requirements.OperatingCases {
+		for _, condition := range operatingCase.Conditions {
+			switch condition.Axis {
+			case "load_resistance":
+				if condition.Min > 0 && (minimumLoadResistance <= 0 || condition.Min < minimumLoadResistance) {
+					minimumLoadResistance = condition.Min
+				}
+			case "ambient_temperature", "temperature":
+				maximumAmbientC = math.Max(maximumAmbientC, condition.Max)
+			}
+		}
+	}
+	stressCurrentA := targets.quiescentCurrent
+	if maximumOutputPeak > 0 && minimumLoadResistance > 0 {
+		stressCurrentA = math.Max(stressCurrentA, maximumOutputPeak/minimumLoadResistance)
+	}
+	stressVoltageV := protectedVoltageMaximumSupply(requirement)
+	if stressCurrentA <= 0 || stressVoltageV <= 0 {
+		return 0, false
+	}
+	allowedCurrentA := math.Inf(1)
+	found := false
+	for _, model := range primitive.Models {
+		maximumTemperatureC := 0.0
+		for _, parameter := range model.Parameters {
+			if parameter.Name == "max_temperature_c" {
+				maximumTemperatureC = math.Max(maximumTemperatureC, parameter.Value)
+			}
+		}
+		for _, envelope := range model.TransientSOA {
+			if !envelope.DC {
+				continue
+			}
+			currentA, covered := protectedVoltageSOACurrent(envelope.Points, stressVoltageV)
+			if !covered || currentA <= 0 {
+				continue
+			}
+			if finite(maximumAmbientC) && maximumAmbientC > envelope.CaseTemperatureC {
+				span := maximumTemperatureC - envelope.CaseTemperatureC
+				if span <= 0 || maximumAmbientC >= maximumTemperatureC {
+					return 0, false
+				}
+				currentA *= (maximumTemperatureC - maximumAmbientC) / span
+			}
+			allowedCurrentA = math.Min(allowedCurrentA, currentA)
+			found = true
+		}
+	}
+	if !found || !finite(allowedCurrentA) || allowedCurrentA <= 0 {
+		return 0, false
+	}
+	return allowedCurrentA / stressCurrentA, true
 }
 
 func topologyPowerControllerPrimitive(
@@ -3534,6 +3661,141 @@ func topologyPrecisionSignalDiodePrimitive(
 		return PrimitiveCandidate{}
 	}
 	return candidates[0].primitive
+}
+
+func topologyFlybackDiodePrimitive(
+	requirement Requirement,
+	inventory PrimitiveInventory,
+) PrimitiveCandidate {
+	type scoredDiode struct {
+		primitive      PrimitiveCandidate
+		forwardVoltage float64
+		thermalExcess  float64
+		thermalRise    float64
+	}
+	requiredAnalyses := requirementAnalysisSet(requirement)
+	requiredCurrent := requirementMaximumMetric(requirement, "peak_current")
+	minimumVoltage, maximumVoltage := 0.0, 0.0
+	for _, port := range requirement.Requirements.Ports {
+		if port.Electrical.MaxCurrentA != nil {
+			requiredCurrent = math.Max(requiredCurrent, *port.Electrical.MaxCurrentA)
+		}
+	}
+	for _, domain := range requirement.Requirements.Domains {
+		for _, voltage := range []*float64{domain.MinVoltageV, domain.NominalVoltageV, domain.MaxVoltageV} {
+			if voltage != nil {
+				minimumVoltage = math.Min(minimumVoltage, *voltage)
+				maximumVoltage = math.Max(maximumVoltage, *voltage)
+			}
+		}
+	}
+	for _, operatingCase := range requirement.Requirements.OperatingCases {
+		for _, condition := range operatingCase.Conditions {
+			if condition.Axis == "supply_voltage" || condition.Axis == "input_voltage" {
+				minimumVoltage = math.Min(minimumVoltage, math.Min(condition.Min, condition.Max))
+				maximumVoltage = math.Max(maximumVoltage, math.Max(condition.Min, condition.Max))
+			}
+		}
+	}
+	if requiredCurrent <= 0 {
+		requiredCurrent = 1e-3
+	}
+	requiredReverseVoltage := maximumVoltage - minimumVoltage
+	candidates := []scoredDiode{}
+	for _, primitive := range inventory.Primitives {
+		if primitive.Kind != "signal_diode" ||
+			!ratingsCoverRequirement(requirement, primitive) ||
+			!primitiveCoversAllAnalyses(primitive, requiredAnalyses) ||
+			(requiredAnalyses["electrothermal"] && !primitiveHasThermalEvidence(primitive)) {
+			continue
+		}
+		for _, model := range primitive.Models {
+			if model.ModelID != simmodel.PrimitiveDiodeShockleyV1 {
+				continue
+			}
+			parameters := map[string]float64{}
+			for _, parameter := range model.Parameters {
+				parameters[parameter.Name] = parameter.Value
+			}
+			if parameters["max_forward_current_a"] < requiredCurrent ||
+				parameters["max_reverse_voltage_v"] < requiredReverseVoltage ||
+				parameters["saturation_current_a"] <= 0 ||
+				parameters["emission_coefficient"] <= 0 ||
+				parameters["junction_temperature_k"] <= 0 {
+				continue
+			}
+			forwardVoltage := parameters["emission_coefficient"] * 8.617333262e-5 *
+				parameters["junction_temperature_k"] * math.Log1p(requiredCurrent/parameters["saturation_current_a"])
+			if finite(forwardVoltage) && forwardVoltage > 0 {
+				thermalExcess, thermalRise := topologyFlybackDiodeThermalScore(
+					requirement, model, requiredCurrent, forwardVoltage,
+				)
+				candidates = append(candidates, scoredDiode{
+					primitive: primitive, forwardVoltage: forwardVoltage,
+					thermalExcess: thermalExcess, thermalRise: thermalRise,
+				})
+			}
+		}
+	}
+	slices.SortFunc(candidates, func(left, right scoredDiode) int {
+		return cmp.Or(
+			cmp.Compare(left.thermalExcess, right.thermalExcess),
+			cmp.Compare(left.thermalRise, right.thermalRise),
+			cmp.Compare(left.forwardVoltage, right.forwardVoltage),
+			cmp.Compare(primitiveEvidencePenalty(left.primitive.Evidence), primitiveEvidencePenalty(right.primitive.Evidence)),
+			comparePositiveArea(left.primitive.AreaMM2, right.primitive.AreaMM2),
+			cmp.Compare(left.primitive.Key, right.primitive.Key),
+		)
+	})
+	if len(candidates) == 0 {
+		return PrimitiveCandidate{}
+	}
+	return candidates[0].primitive
+}
+
+func topologyFlybackDiodeThermalScore(
+	requirement Requirement,
+	model PrimitiveModelContract,
+	requiredCurrent float64,
+	forwardVoltage float64,
+) (float64, float64) {
+	parameters := map[string]float64{}
+	for _, parameter := range model.Parameters {
+		parameters[parameter.Name] = parameter.Value
+	}
+	theta := parameters["thermal_resistance_c_per_w"]
+	if theta <= 0 {
+		theta = parameters["junction_to_ambient_c_per_w"]
+	}
+	if theta <= 0 && model.ThermalModel != nil && model.ThermalModel.Reference == "junction_to_ambient" {
+		for _, stage := range model.ThermalModel.Stages {
+			theta += stage.ThermalResistanceCPerW
+		}
+	}
+	maximumTemperature := parameters["max_temperature_c"]
+	requestedMaximum := requirementMaximumMetric(requirement, "junction_temperature")
+	if requestedMaximum > 0 && (maximumTemperature <= 0 || requestedMaximum < maximumTemperature) {
+		maximumTemperature = requestedMaximum
+	}
+	if theta <= 0 || maximumTemperature <= 0 {
+		return math.MaxFloat64, math.MaxFloat64
+	}
+	maximumAmbient := 25.0
+	foundAmbient := false
+	for _, operatingCase := range requirement.Requirements.OperatingCases {
+		for _, condition := range operatingCase.Conditions {
+			if condition.Axis != "ambient_temperature" && condition.Axis != "temperature" {
+				continue
+			}
+			if !foundAmbient || condition.Max > maximumAmbient {
+				maximumAmbient = condition.Max
+			}
+			foundAmbient = true
+		}
+	}
+	thermalRise := requiredCurrent * forwardVoltage * theta
+	predicted := maximumAmbient + thermalRise
+	return math.Max(0, predicted-maximumTemperature), thermalRise
 }
 
 // topologyLowSideCurrentControllerPrimitive selects a controller for a
@@ -4222,7 +4484,7 @@ func topologyControlledSwitchRelationshipSeeds(
 	if !topologyControlledSwitchRequired(requirement) {
 		return nil, Consumption{}, map[string][]string{}
 	}
-	var comparator, mosfet, resistor, capacitor, clamp PrimitiveCandidate
+	var comparator, mosfet, resistor PrimitiveCandidate
 	for _, primitive := range representatives {
 		switch primitive.Kind {
 		case "comparator":
@@ -4231,14 +4493,11 @@ func topologyControlledSwitchRelationshipSeeds(
 			mosfet = primitive
 		case "resistor":
 			resistor = primitive
-		case "capacitor":
-			capacitor = primitive
-		case "clamp_diode":
-			clamp = primitive
 		}
 	}
+	flyback := topologyFlybackDiodePrimitive(requirement, inventory)
 	if comparator.Key == "" || mosfet.Key == "" ||
-		resistor.Key == "" || capacitor.Key == "" || clamp.Key == "" {
+		resistor.Key == "" || flyback.Key == "" {
 		return nil, Consumption{}, map[string][]string{}
 	}
 	controls := topologyNodesByRole(initial.graph, "control")
@@ -4254,6 +4513,14 @@ func topologyControlledSwitchRelationshipSeeds(
 	retained := map[string]TopologyCandidate{}
 	for _, control := range controls {
 		for _, output := range outputs {
+			loadSupply, loadSupplyFound := topologyControlledSwitchLoadSupply(requirement, initial.graph, output, supplies)
+			if !loadSupplyFound {
+				rejections["relationship_gap"] = append(
+					rejections["relationship_gap"],
+					output+": controlled inductive switching requires one unambiguous load supply covering the output voltage and current envelope",
+				)
+				continue
+			}
 			for _, driveSupply := range supplies {
 				for _, referenceSupply := range supplies {
 					if driveSupply == referenceSupply {
@@ -4342,18 +4609,10 @@ func topologyControlledSwitchRelationshipSeeds(
 								state,
 								requirement,
 								inventoryByKey,
-								capacitor,
-								topologyTwoTerminalPlacement(gateNode, reference),
-								&consumption,
-							)
-							state = addRelationshipPrimitive(
-								state,
-								requirement,
-								inventoryByKey,
-								clamp,
+								flyback,
 								[]TerminalConnection{
 									{Terminal: "ANODE", Node: output},
-									{Terminal: "CATHODE", Node: driveSupply},
+									{Terminal: "CATHODE", Node: loadSupply},
 								},
 								&consumption,
 							)
@@ -4419,6 +4678,91 @@ func topologyControlledSwitchRelationshipSeeds(
 	}
 	slices.SortFunc(result, compareTopologyCandidates)
 	return result, consumption, rejections
+}
+
+func topologyControlledSwitchLoadSupply(
+	requirement Requirement,
+	graph CandidateGraph,
+	output string,
+	supplies []string,
+) (string, bool) {
+	outputSemanticID := ""
+	for _, node := range graph.Nodes {
+		if node.ID == output && node.SemanticKind == "port" {
+			outputSemanticID = node.SemanticID
+			break
+		}
+	}
+	requiredVoltage, requiredCurrent := 0.0, 0.0
+	for _, port := range requirement.Requirements.Ports {
+		if port.ID != outputSemanticID {
+			continue
+		}
+		if port.Electrical.MaxVoltageV != nil {
+			requiredVoltage = math.Max(requiredVoltage, *port.Electrical.MaxVoltageV)
+		}
+		if port.Electrical.NominalVoltageV != nil {
+			requiredVoltage = math.Max(requiredVoltage, *port.Electrical.NominalVoltageV)
+		}
+		if port.Electrical.MaxCurrentA != nil {
+			requiredCurrent = *port.Electrical.MaxCurrentA
+		}
+		break
+	}
+	if requiredVoltage <= 0 || !finite(requiredVoltage) {
+		requiredVoltage = 0
+	}
+	if requiredCurrent <= 0 || !finite(requiredCurrent) {
+		requiredCurrent = 0
+	}
+	if requiredVoltage == 0 && requiredCurrent == 0 {
+		return "", false
+	}
+
+	selected := ""
+	selectedVoltageHeadroom := math.Inf(1)
+	selectedCurrentHeadroom := math.Inf(1)
+	ambiguous := false
+	for _, supply := range supplies {
+		voltageHeadroom := 0.0
+		if requiredVoltage > 0 {
+			_, maximumVoltage, found := topologyNodeVoltageRange(requirement, graph, supply)
+			if !found || maximumVoltage < requiredVoltage || !finite(maximumVoltage) {
+				continue
+			}
+			voltageHeadroom = maximumVoltage - requiredVoltage
+		}
+		domainID := ""
+		for _, node := range graph.Nodes {
+			if node.ID == supply {
+				domainID = node.Domain
+				break
+			}
+		}
+		currentHeadroom := 0.0
+		currentCovered := requiredCurrent <= 0
+		for _, domain := range requirement.Requirements.Domains {
+			if domain.ID == domainID && requiredCurrent > 0 && domain.MaxCurrentA != nil && finite(*domain.MaxCurrentA) {
+				currentCovered = *domain.MaxCurrentA >= requiredCurrent
+				currentHeadroom = *domain.MaxCurrentA - requiredCurrent
+				break
+			}
+		}
+		if !currentCovered {
+			continue
+		}
+		if voltageHeadroom < selectedVoltageHeadroom ||
+			(voltageHeadroom == selectedVoltageHeadroom && currentHeadroom < selectedCurrentHeadroom) {
+			selected = supply
+			selectedVoltageHeadroom = voltageHeadroom
+			selectedCurrentHeadroom = currentHeadroom
+			ambiguous = false
+		} else if voltageHeadroom == selectedVoltageHeadroom &&
+			currentHeadroom == selectedCurrentHeadroom && supply != selected {
+			ambiguous = true
+		}
+	}
+	return selected, selected != "" && !ambiguous
 }
 
 func topologyControlledSwitchRequired(requirement Requirement) bool {
@@ -4797,7 +5141,7 @@ func topologyHighSideTransconductanceRelationshipSeeds(
 
 func primitiveHasThermalEvidence(primitive PrimitiveCandidate) bool {
 	for _, model := range primitive.Models {
-		if model.ThermalModel != nil {
+		if model.ThermalModel != nil || namedThermalParametersComplete(model.Parameters) {
 			return true
 		}
 	}
@@ -6342,6 +6686,7 @@ func topologyBehaviorGap(
 	graph CandidateGraph,
 	inventory map[string]PrimitiveCandidate,
 ) int {
+	_, boundedBipolarTransfer := topologyBoundedBipolarEnvelope(requirement)
 	requireActive := false
 	requireReactive := false
 	requireTimeConstant := false
@@ -6409,8 +6754,10 @@ func topologyBehaviorGap(
 			requireActive = true
 			requireAnalogTransfer = true
 		case "voltage_gain", "voltage_gain_at_frequency", "output_noise_rms":
-			requireActive = true
-			requireAnalogTransfer = true
+			if !boundedBipolarTransfer {
+				requireActive = true
+				requireAnalogTransfer = true
+			}
 			if assertion.Metric == "voltage_gain" && assertion.Min != nil {
 				if !hasPassbandGain || *assertion.Min > minimumPassbandGain {
 					minimumPassbandGain = *assertion.Min
@@ -6427,6 +6774,20 @@ func topologyBehaviorGap(
 				assertion.Min != nil && *assertion.Min > 1 {
 				minimumResistors = max(minimumResistors, 2)
 			}
+		case "oscillation_frequency", "duty_cycle":
+			if assertion.Excitation == nil {
+				requireActive = true
+				requireReactive = true
+				requireTimeConstant = true
+				requireFeedback = true
+				requireDecisionReference = true
+				minimumDecisionStages = max(minimumDecisionStages, 1)
+				minimumResistors = max(minimumResistors, 3)
+			}
+		case "output_ripple":
+			requireReactive = true
+		case "conversion_efficiency":
+			requireActive = true
 		}
 		if assertion.Excitation != nil && assertion.Excitation.Kind == "port" &&
 			requirementPortIsControl(requirement, assertion.Excitation.ID) {
@@ -6462,8 +6823,8 @@ func topologyBehaviorGap(
 			hasResistor = true
 			resistorCount++
 		}
+		hasThermal = hasThermal || primitiveHasThermalEvidence(primitive)
 		for _, model := range primitive.Models {
-			hasThermal = hasThermal || model.ThermalModel != nil
 			hasSOA = hasSOA || len(model.TransientSOA) != 0
 		}
 	}
@@ -6652,7 +7013,7 @@ func topologyAnalogActiveKind(kind string) bool {
 
 func topologySwitchingActiveKind(kind string) bool {
 	switch kind {
-	case "comparator", "n_channel_mosfet", "p_channel_mosfet", "npn_bjt", "pnp_bjt":
+	case "comparator", "n_channel_mosfet", "p_channel_mosfet", "npn_bjt", "pnp_bjt", "synchronous_buck_regulator":
 		return true
 	default:
 		return false
@@ -6662,7 +7023,7 @@ func topologySwitchingActiveKind(kind string) bool {
 func topologyActiveKind(kind string) bool {
 	switch kind {
 	case "opamp", "comparator", "n_channel_mosfet", "p_channel_mosfet", "npn_bjt", "pnp_bjt",
-		"fixed_voltage_regulator", "adjustable_voltage_regulator":
+		"fixed_voltage_regulator", "adjustable_voltage_regulator", "synchronous_buck_regulator", "signal_diode":
 		return true
 	default:
 		return false

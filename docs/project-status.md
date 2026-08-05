@@ -377,6 +377,39 @@ does not qualify arbitrary control ICs, converter families, thermal
 assemblies, protection devices, RF/high-speed behavior, mains safety, or
 unreviewed component substitutions.
 
+### Nonlinear And Switching Architecture Synthesis
+
+An independently frozen eight-case behavior-only corpus now covers low-level
+bipolar magnitude transfer, bounded bipolar limiting, autonomous square-wave
+generation, controlled pulse power transfer, and efficient low-power step-down
+conversion, plus two unsafe stress envelopes and one deliberately unsupported
+ultra-fast conversion request. Inputs provide only behavior, cases, safety
+bounds, and acceptance gates; they do not name parts, primitive families,
+equations, models, solver controls, nets, coordinates, or routes.
+
+Generic graph relationships derive polarity folding, limiting, periodic
+feedback, control-to-power transfer, and regulated energy-transfer candidates.
+The trusted evaluator adds event-aligned nonlinear transient execution,
+periodic frequency/duty/ripple/efficiency measurements, bounded convergence
+evidence, electrothermal loss coupling, transient SOA, and reviewed
+propagation-delay compatibility. Catalog rating exhaustion rejects unsafe
+candidates before simulation where possible; unsupported dynamic envelopes
+return stable capability-gap evidence and no physical design.
+
+All five positive cases pass deterministic replay, exhaustive declared
+corners, readable schematic lowering, placement, complete routing and
+connectivity, writer correctness, zero normalized round-trip differences, and
+local installed-KiCad ERC and strict DRC. The complete Go suite, the three-case
+protected-current corpus, and both protected USB-C KiCad fixtures remain green.
+See the
+[specification](../specs/nonlinear-switching-architecture-synthesis/SPEC.md)
+and
+[completion audit](../specs/nonlinear-switching-architecture-synthesis/AUDIT.md).
+
+This is a measured low-energy nonlinear/switching envelope, not unrestricted
+power-electronics generation. RF, mains, high-energy storage, arbitrary SPICE
+models, unreviewed semiconductors, and fabrication approval remain unsupported.
+
 ### Open-Topology Primitive Synthesis
 
 KiCadAI now has a production API and CLI lane that constructs primitive
@@ -659,12 +692,15 @@ simulation/workflow/KiCad evidence, and review before entering the supported
 registry. Unknown behavior must continue to produce a stable capability gap
 instead of guessed implementation detail.
 
-With deterministic evaluation cost now bounded, the next synthesis milestone
-should add independently frozen nonlinear and switching failures, then expand
-only the reusable graph operators, device models, discontinuous analyses, and
-physical constraints those failures prove necessary. The first target should
-remain low-energy and bench-verifiable; switching regulators and nonlinear
-analog stages are preferable to mains or high-energy power conversion.
+The first nonlinear/switching milestone is now complete for five positive and
+three adversarial frozen cases. The next synthesis milestone should measure
+generalization on a new, independently authored held-out corpus that combines
+multiple nonlinear stages, switching control, sensing, and protection without
+reusing fixture identities. Expansion should remain evidence-driven: add only
+the reusable operators, reviewed device/model provenance, diagnosis paths, and
+physical constraints exposed by those failures. Denser-board routing,
+catalog-independent qualification, RF/high-speed behavior, mains, and
+high-energy conversion remain later boundaries.
 
 See the [Roadmap](../specs/ROADMAP.md) for prioritized work and the
 [Development Reference](development.md) for repository-level limitations and

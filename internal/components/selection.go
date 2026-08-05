@@ -433,6 +433,7 @@ func dedupeRejectedIssues(rejected []CandidateRejection) []reports.Issue {
 func selectionCandidateIssues(record ComponentRecord, candidate Candidate, request SelectionRequest) []reports.Issue {
 	var issues []reports.Issue
 	issues = append(issues, requiredRatingIssues(record, request.RequiredRatings)...)
+	issues = append(issues, capacitorVoltageDeratingIssues(record, request.RequiredRatings)...)
 	issues = append(issues, requiredTemperatureIssues(record, request.RequiredTemperature)...)
 	issues = append(issues, requiredThermalIssues(record, request.RequiredThermal)...)
 	issues = append(issues, requiredFunctionIssues(record, request.RequiredFunctions)...)
@@ -1215,6 +1216,49 @@ func requiredFunctionIssues(record ComponentRecord, functions []string) []report
 		}
 		if !recordHasFunction(record, function) {
 			issues = append(issues, NewIssue(CodeComponentFunctionMissing, reports.SeverityBlocked, "component."+record.ID+".functions."+function, "component is missing required function "+function))
+		}
+	}
+	return issues
+}
+
+func capacitorVoltageDeratingIssues(record ComponentRecord, ratings []RequiredRating) []reports.Issue {
+	if record.Capacitor == nil || record.Capacitor.MaximumVoltageUseRatio == nil {
+		return nil
+	}
+	ratio := *record.Capacitor.MaximumVoltageUseRatio
+	issues := []reports.Issue{}
+	for _, required := range ratings {
+		if !ratingKindMatches(false, "voltage", required.Kind) {
+			continue
+		}
+		applied, appliedOK := parseEngineeringQuantity(required.Value, required.Unit)
+		if !appliedOK {
+			continue
+		}
+		bestBoundary := 0.0
+		found := false
+		for _, rating := range record.Ratings {
+			if !ratingKindMatches(false, rating.Kind, "voltage") || rating.Max == "" {
+				continue
+			}
+			rated, ratedOK := parseEngineeringQuantity(rating.Max, rating.Unit)
+			if !ratedOK || rated.dimension != applied.dimension {
+				continue
+			}
+			ratedValue, _ := rated.value.Float64()
+			found = true
+			bestBoundary = math.Max(bestBoundary, ratedValue*ratio)
+		}
+		if !found {
+			continue
+		}
+		appliedValue, _ := applied.value.Float64()
+		if appliedValue > bestBoundary {
+			issues = append(issues, NewIssue(
+				CodeComponentRatingTooLow, reports.SeverityBlocked,
+				"component."+record.ID+".capacitor_evidence.maximum_voltage_use_ratio",
+				fmt.Sprintf("required %.6g V exceeds the reviewed capacitor-use boundary %.6g V", appliedValue, bestBoundary),
+			))
 		}
 	}
 	return issues

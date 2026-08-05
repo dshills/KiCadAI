@@ -3,6 +3,7 @@ package simmodel
 import (
 	"fmt"
 	"math"
+	"slices"
 )
 
 // maximumTrustedOpenCircuitImpedanceOhm is the finite reporting ceiling used
@@ -173,6 +174,38 @@ func transientDerivedValue(result AnalysisResult, assertion Assertion) (float64,
 			minimum, maximum = math.Min(minimum, value), math.Max(maximum, value)
 		}
 		return normalizedMNAFloat(maximum - minimum), nil
+	case QuantityOscillationFrequencyHz, QuantityDutyCyclePct:
+		times, values, diagnostic := waveform(result, assertion)
+		if diagnostic != nil {
+			return 0, diagnostic
+		}
+		frequency, dutyCycle, diagnostic := periodicWaveformMetrics(times, values, assertion)
+		if diagnostic != nil {
+			return 0, diagnostic
+		}
+		if assertion.Quantity == QuantityOscillationFrequencyHz {
+			return frequency, nil
+		}
+		return dutyCycle, nil
+	case QuantityOutputRippleVPP:
+		for _, periodic := range result.PeriodicNodes {
+			if periodic.Node == assertion.Node && periodic.Method != "" &&
+				periodic.VoltageRippleVPP >= 0 && finite(periodic.VoltageRippleVPP) {
+				return normalizedMNAFloat(periodic.VoltageRippleVPP), nil
+			}
+		}
+		points := periodicSteadyStatePoints(result)
+		steadyState := result
+		steadyState.Points = points
+		_, values, diagnostic := waveform(steadyState, assertion)
+		if diagnostic != nil {
+			return 0, diagnostic
+		}
+		minimum, maximum := values[0], values[0]
+		for _, value := range values[1:] {
+			minimum, maximum = math.Min(minimum, value), math.Max(maximum, value)
+		}
+		return normalizedMNAFloat(maximum - minimum), nil
 	case QuantityOvershootVoltageV:
 		_, values, diagnostic := waveform(result, assertion)
 		if diagnostic != nil {
@@ -261,7 +294,13 @@ func transientDerivedValue(result AnalysisResult, assertion Assertion) (float64,
 			return 0, advancedAssertionDiagnostic(assertion, "conversion-efficiency assertion requires one resolved load and at least one resolved supply source")
 		}
 		points := periodicSteadyStatePoints(result)
-		if len(points) == len(result.Points) && len(points) > 1 {
+		if len(points) == len(result.Points) && len(result.PeriodicNodes) > 0 {
+			var stable bool
+			points, stable = averagedSteadyStatePowerPoints(result, assertion.Component, assertion.Components)
+			if !stable {
+				return 0, advancedAssertionDiagnostic(assertion, "conversion-efficiency assertion did not reach a stable trusted averaged-model power window")
+			}
+		} else if len(points) == len(result.Points) && len(points) > 1 {
 			points = points[1:]
 		}
 		outputEnergy, inputEnergy, count := 0.0, 0.0, 0
@@ -294,6 +333,210 @@ func transientDerivedValue(result AnalysisResult, assertion Assertion) (float64,
 		return normalizedMNAFloat(100 * outputEnergy / inputEnergy), nil
 	}
 	return 0, advancedAssertionDiagnostic(assertion, "unsupported transient-derived quantity")
+}
+
+// averagedSteadyStatePowerPoints excludes event-driven startup energy from a
+// steady conversion-efficiency assertion only when the transient result
+// carries trusted averaged periodic-node evidence. The final tenth of the
+// solved waveform (and at least five samples) must already be stable for the
+// load and every declared supply source; otherwise the measurement fails
+// closed instead of treating an unfinished ramp as steady conversion.
+func averagedSteadyStatePowerPoints(result AnalysisResult, load string, sources []string) ([]AnalysisPoint, bool) {
+	if len(result.PeriodicNodes) == 0 || len(result.Points) < 5 {
+		return nil, false
+	}
+	minimum := len(result.Points) / 10
+	if minimum < 5 {
+		minimum = 5
+	}
+	start := len(result.Points) - minimum
+	reference, found := pointComponentPowers(result.Points[len(result.Points)-1], load, sources)
+	if !found || reference[load] <= 0 {
+		return nil, false
+	}
+	stable := func(point AnalysisPoint) bool {
+		powers, complete := pointComponentPowers(point, load, sources)
+		if !complete {
+			return false
+		}
+		for component, expected := range reference {
+			actual := powers[component]
+			tolerance := math.Max(1e-12, .01*math.Max(math.Abs(expected), math.Abs(actual)))
+			if math.Abs(actual-expected) > tolerance {
+				return false
+			}
+		}
+		return true
+	}
+	for index := start; index < len(result.Points); index++ {
+		if !stable(result.Points[index]) {
+			return nil, false
+		}
+	}
+	for start > 0 && stable(result.Points[start-1]) {
+		start--
+	}
+	return result.Points[start:], true
+}
+
+func pointComponentPowers(point AnalysisPoint, load string, sources []string) (map[string]float64, bool) {
+	required := make(map[string]bool, len(sources)+1)
+	required[load] = true
+	for _, source := range sources {
+		required[source] = true
+	}
+	powers := make(map[string]float64, len(required))
+	for _, device := range point.Devices {
+		if required[device.Component] {
+			powers[device.Component] = math.Abs(device.VoltageV * device.CurrentA)
+		}
+	}
+	return powers, len(powers) == len(required)
+}
+
+func periodicWaveformMetrics(times, values []float64, assertion Assertion) (float64, float64, *Diagnostic) {
+	if len(times) != len(values) || len(values) < 3 {
+		return 0, 0, advancedAssertionDiagnostic(assertion, "periodic waveform assertion requires at least three ordered samples")
+	}
+	rawMinimum, rawMaximum := values[0], values[0]
+	for index, value := range values {
+		if !finite(value) || !finite(times[index]) || (index > 0 && times[index] <= times[index-1]) {
+			return 0, 0, advancedAssertionDiagnostic(assertion, "periodic waveform assertion requires finite samples with strictly increasing time")
+		}
+		rawMinimum, rawMaximum = math.Min(rawMinimum, value), math.Max(rawMaximum, value)
+	}
+	rawSpan := rawMaximum - rawMinimum
+	if !finite(rawSpan) || rawSpan <= math.Max(1e-12, math.Max(math.Abs(rawMinimum), math.Abs(rawMaximum))*1e-9) {
+		return 0, 0, advancedAssertionDiagnostic(assertion, "periodic waveform assertion requires a nonconstant solved waveform")
+	}
+	minimum, maximum, levelsOK := periodicSteadyLevels(values)
+	span := maximum - minimum
+	if !levelsOK || !finite(span) || span <= math.Max(1e-12, math.Max(math.Abs(minimum), math.Abs(maximum))*1e-9) {
+		return 0, 0, advancedAssertionDiagnostic(assertion, "periodic waveform assertion requires sustained nonconstant solved waveform levels")
+	}
+	threshold := minimum + .5*span
+	lowerThreshold := minimum + .25*span
+	upperThreshold := minimum + .75*span
+	edges := periodicHystereticRisingEdges(times, values, lowerThreshold, upperThreshold)
+	if len(edges) < 3 {
+		return 0, 0, advancedAssertionDiagnostic(assertion, "periodic waveform assertion requires at least two complete measured periods")
+	}
+	const maximumMeasuredPeriods = 8
+	if len(edges) > maximumMeasuredPeriods+1 {
+		edges = edges[len(edges)-(maximumMeasuredPeriods+1):]
+	}
+	periodSum := 0.0
+	periodMinimum, periodMaximum := math.Inf(1), 0.0
+	for index := 1; index < len(edges); index++ {
+		period := edges[index] - edges[index-1]
+		if !finite(period) || period <= 0 {
+			return 0, 0, advancedAssertionDiagnostic(assertion, "periodic waveform edge ordering is invalid")
+		}
+		periodSum += period
+		periodMinimum = math.Min(periodMinimum, period)
+		periodMaximum = math.Max(periodMaximum, period)
+	}
+	averagePeriod := periodSum / float64(len(edges)-1)
+	// A last-window period spread above ten percent is treated as unsettled or
+	// non-periodic. This keeps startup bursts and relaxation drift from being
+	// mislabeled as a stable oscillator solely because they contain crossings.
+	if periodMaximum-periodMinimum > .1*averagePeriod {
+		return 0, 0, advancedAssertionDiagnostic(assertion, fmt.Sprintf(
+			"solved waveform does not establish a stable periodic interval within the trusted 10%% spread bound (minimum %.12g s, maximum %.12g s, average %.12g s, threshold %.12g)",
+			periodMinimum,
+			periodMaximum,
+			averagePeriod,
+			threshold,
+		))
+	}
+	windowStart, windowEnd := edges[0], edges[len(edges)-1]
+	highTime := waveformHystereticHighTime(times, values, lowerThreshold, upperThreshold, windowStart, windowEnd)
+	if !finite(highTime) || highTime < 0 || highTime > windowEnd-windowStart {
+		return 0, 0, advancedAssertionDiagnostic(assertion, "periodic waveform high-time integration is invalid")
+	}
+	return normalizedMNAFloat(1 / averagePeriod), normalizedMNAFloat(100 * highTime / (windowEnd - windowStart)), nil
+}
+
+func periodicHystereticRisingEdges(times, values []float64, lowerThreshold, upperThreshold float64) []float64 {
+	edges := make([]float64, 0, 10)
+	high := values[0] >= upperThreshold
+	for index := 1; index < len(values); index++ {
+		switch {
+		case !high && crosses(values[index-1], values[index], upperThreshold, true):
+			edges = append(edges, interpolateCrossing(times[index-1], times[index], values[index-1], values[index], upperThreshold))
+			high = true
+		case high && crosses(values[index-1], values[index], lowerThreshold, false):
+			high = false
+		}
+	}
+	return edges
+}
+
+func waveformHystereticHighTime(times, values []float64, lowerThreshold, upperThreshold, start, end float64) float64 {
+	highTime := 0.0
+	high := values[0] >= upperThreshold
+	addHigh := func(left, right float64) {
+		left, right = math.Max(left, start), math.Min(right, end)
+		if right > left {
+			highTime += right - left
+		}
+	}
+	for index := 1; index < len(values); index++ {
+		leftTime, rightTime := times[index-1], times[index]
+		if rightTime <= start || leftTime >= end {
+			continue
+		}
+		switch {
+		case !high && crosses(values[index-1], values[index], upperThreshold, true):
+			crossing := interpolateCrossing(leftTime, rightTime, values[index-1], values[index], upperThreshold)
+			addHigh(crossing, rightTime)
+			high = true
+		case high && crosses(values[index-1], values[index], lowerThreshold, false):
+			crossing := interpolateCrossing(leftTime, rightTime, values[index-1], values[index], lowerThreshold)
+			addHigh(leftTime, crossing)
+			high = false
+		case high:
+			addHigh(leftTime, rightTime)
+		}
+	}
+	return highTime
+}
+
+func periodicSteadyLevels(values []float64) (float64, float64, bool) {
+	if len(values) < 3 {
+		return 0, 0, false
+	}
+	ordered := slices.Clone(values)
+	slices.Sort(ordered)
+	minimumGroup := len(ordered) / 100
+	if minimumGroup < 1 {
+		minimumGroup = 1
+	}
+	bestSplit, bestScore := 0, 0.0
+	for split := minimumGroup; split <= len(ordered)-minimumGroup; split++ {
+		gap := ordered[split] - ordered[split-1]
+		if gap <= 0 {
+			continue
+		}
+		// Weight the sorted-value separation by the geometric mean of the two
+		// populations. Stable switching plateaus therefore outrank brief clamp
+		// excursions, while a smooth periodic waveform selects a central split.
+		score := gap * math.Sqrt(float64(split)*float64(len(ordered)-split))
+		if score > bestScore {
+			bestSplit, bestScore = split, score
+		}
+	}
+	if bestSplit == 0 {
+		return 0, 0, false
+	}
+	median := func(samples []float64) float64 {
+		middle := len(samples) / 2
+		if len(samples)%2 != 0 {
+			return samples[middle]
+		}
+		return .5 * (samples[middle-1] + samples[middle])
+	}
+	return median(ordered[:bestSplit]), median(ordered[bestSplit:]), true
 }
 
 func transientResponseLatency(result AnalysisResult, assertion Assertion) (float64, *Diagnostic) {
@@ -606,7 +849,7 @@ func dcSweepSpanOrSlope(result AnalysisResult, assertion Assertion) (float64, *D
 		}
 		value, valueFound := 0.0, false
 		switch assertion.Quantity {
-		case QuantityDCSweepVoltageSpanV:
+		case QuantityDCSweepVoltageSpanV, QuantityDCSweepVoltageSlopeVPerV:
 			value, valueFound = analysisNodeReal(point, assertion.Node)
 		case QuantityDCSweepDeviceSlopeAperV:
 			for _, device := range point.Devices {

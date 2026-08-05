@@ -80,6 +80,9 @@ const (
 	QuantityPeakAbsDeviceVoltageV       = "peak_abs_device_voltage_v"
 	QuantityPeakAbsDeviceCurrentA       = "peak_abs_device_current_a"
 	QuantityOvershootVoltageV           = "overshoot_voltage_v"
+	QuantityOscillationFrequencyHz      = "oscillation_frequency_hz"
+	QuantityDutyCyclePct                = "duty_cycle_percent"
+	QuantityOutputRippleVPP             = "output_ripple_v_pp"
 	QuantityConversionEfficiencyPct     = "conversion_efficiency_percent"
 	QuantityTHDPercent                  = "thd_percent"
 	QuantityDeviceDissipationW          = "device_dissipation_w"
@@ -106,6 +109,7 @@ const (
 	QuantityLowerThresholdVoltageV      = "lower_threshold_voltage_v"
 	QuantityUpperThresholdVoltageV      = "upper_threshold_voltage_v"
 	QuantityDCSweepVoltageSpanV         = "dc_sweep_voltage_span_v"
+	QuantityDCSweepVoltageSlopeVPerV    = "dc_sweep_voltage_slope_v_per_v"
 	QuantityDCSweepDeviceSlopeAperV     = "dc_sweep_device_slope_a_per_v"
 )
 
@@ -574,14 +578,26 @@ type SolverEvidence struct {
 	TotalIterations        int     `json:"total_iterations,omitempty"`
 	MaxIterationsPerStep   int     `json:"max_iterations_per_step,omitempty"`
 	MaxTotalIterations     int     `json:"max_total_iterations,omitempty"`
+	AcceptedSubsteps       int     `json:"accepted_substeps,omitempty"`
 }
 
 type AnalysisResult struct {
-	ID                     string          `json:"id"`
-	Kind                   string          `json:"kind"`
-	FundamentalFrequencyHz float64         `json:"fundamental_frequency_hz,omitempty"`
-	ControlLoops           []ControlLoop   `json:"control_loops,omitempty"`
-	Points                 []AnalysisPoint `json:"points"`
+	ID                     string               `json:"id"`
+	Kind                   string               `json:"kind"`
+	FundamentalFrequencyHz float64              `json:"fundamental_frequency_hz,omitempty"`
+	ControlLoops           []ControlLoop        `json:"control_loops,omitempty"`
+	PeriodicNodes          []PeriodicNodeResult `json:"periodic_nodes,omitempty"`
+	Points                 []AnalysisPoint      `json:"points"`
+}
+
+// PeriodicNodeResult records a trusted model-derived steady-state envelope
+// when an averaged switching primitive intentionally does not expose carrier
+// cycles on the transient observation grid.
+type PeriodicNodeResult struct {
+	Node             string  `json:"node"`
+	Component        string  `json:"component"`
+	VoltageRippleVPP float64 `json:"voltage_ripple_v_pp"`
+	Method           string  `json:"method"`
 }
 
 // ControlLoop records a loop derived from resolved primitive connectivity.
@@ -696,6 +712,10 @@ func CloneReportWithAnalysisPointLimit(source Report, pointLimit int) Report {
 			clone.Analyses[analysisIndex].ControlLoops[loopIndex].Members = append([]string(nil), source.Analyses[analysisIndex].ControlLoops[loopIndex].Members...)
 			clone.Analyses[analysisIndex].ControlLoops[loopIndex].NetPath = append([]string(nil), source.Analyses[analysisIndex].ControlLoops[loopIndex].NetPath...)
 		}
+		clone.Analyses[analysisIndex].PeriodicNodes = append(
+			[]PeriodicNodeResult(nil),
+			source.Analyses[analysisIndex].PeriodicNodes...,
+		)
 		clone.Analyses[analysisIndex].Points = cloneAnalysisPoints(
 			source.Analyses[analysisIndex].Points,
 			pointLimit,

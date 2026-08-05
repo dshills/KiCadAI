@@ -8,6 +8,7 @@ import (
 
 	"kicadai/internal/circuitgraph"
 	"kicadai/internal/components"
+	"kicadai/internal/designworkflow"
 )
 
 func TestPassingPrimitiveGraphLowersToResolvedDesignRequest(t *testing.T) {
@@ -28,6 +29,9 @@ func TestPassingPrimitiveGraphLowersToResolvedDesignRequest(t *testing.T) {
 	}
 	if issues := circuitgraph.Validate(first.Document); len(issues) != 0 {
 		t.Fatalf("lowered circuit graph issues: %#v", issues)
+	}
+	if first.DesignRequest.ExplicitCircuit.RoutingPolicy != designworkflow.ExplicitRoutingPolicyConstrainedEndpointAccessV1 {
+		t.Fatalf("open-topology routing policy = %q", first.DesignRequest.ExplicitCircuit.RoutingPolicy)
 	}
 	for _, component := range first.Document.Components {
 		if component.ComponentID == "" || component.VariantID == "" {
@@ -104,6 +108,21 @@ func TestPhysicalPackageCompletionTerminatesUnusedFunctionalUnits(t *testing.T) 
 			endpoint.SelectorKind != circuitgraph.SelectorFunction {
 			t.Fatalf("unused-unit no-connect = %#v", endpoint)
 		}
+	}
+}
+
+func TestAppendPhysicalNetEndpointIsIdempotent(t *testing.T) {
+	endpoint := circuitgraph.Endpoint{
+		Component: "controller", Unit: "A",
+		SelectorKind: circuitgraph.SelectorFunction, Selector: "BIAS",
+	}
+	document := circuitgraph.Document{Nets: []circuitgraph.Net{{Name: "OUTPUT"}}}
+
+	appendPhysicalNetEndpoint(&document, "OUTPUT", endpoint)
+	appendPhysicalNetEndpoint(&document, "OUTPUT", endpoint)
+
+	if len(document.Nets[0].Endpoints) != 1 || document.Nets[0].Endpoints[0] != endpoint {
+		t.Fatalf("idempotent physical endpoint append produced %#v", document.Nets[0].Endpoints)
 	}
 }
 

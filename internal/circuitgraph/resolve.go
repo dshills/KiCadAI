@@ -777,6 +777,7 @@ func componentConstraintIssue(path string, instance Component, resolved componen
 func resolveFunctions(path string, symbols []components.SymbolBinding, variant components.PackageVariant) ([]ResolvedFunction, []reports.Issue) {
 	padByFunction := map[string][]components.PadFunction{}
 	padCanonical := map[string]string{}
+	logicalFunctionPins := map[string]int{}
 	var issues []reports.Issue
 	for _, pad := range variant.PadFunctions {
 		key := normalizedFunctionKey(pad.Function)
@@ -785,6 +786,11 @@ func resolveFunctions(path string, symbols []components.SymbolBinding, variant c
 		}
 		padCanonical[key] = pad.Function
 		padByFunction[key] = append(padByFunction[key], pad)
+	}
+	for _, symbol := range symbols {
+		for _, pin := range symbol.FunctionPins {
+			logicalFunctionPins[normalizedFunctionKey(pin.Function)]++
+		}
 	}
 	var resolved []ResolvedFunction
 	padOwners := map[string]string{}
@@ -850,6 +856,34 @@ func resolveFunctions(path string, symbols []components.SymbolBinding, variant c
 					SymbolPin: pin.SymbolPin, Pad: pad.Pad, Electrical: pin.Electrical,
 					Polarity: firstNonEmpty(pin.Polarity, pad.Polarity), Required: pin.Required,
 				})
+			}
+			// A package may expose several physical lands for one logical symbol
+			// pin (for example a controller ground pin plus its exposed thermal
+			// pad). Once the single logical pin has an unambiguous primary match,
+			// retain every additional reviewed pad carrying the same function so
+			// net assignment, routing, and writer output cannot leave those lands
+			// electrically anonymous.
+			if len(pins) == 1 && len(usedPads) == 1 && logicalFunctionPins[functionKey] == 1 {
+				pin := pins[0]
+				for padIndex, pad := range pads {
+					if _, used := usedPads[padIndex]; used {
+						continue
+					}
+					if owner, exists := padOwners[pad.Pad]; exists && owner != pin.SymbolPin {
+						issues = append(issues, graphIssue(CodePinmapConflict, path+".functions."+function, "v1 does not support distinct symbol pins mapped to one footprint pad"))
+						continue
+					}
+					padOwners[pad.Pad] = pin.SymbolPin
+					aliases := append([]string(nil), pin.Aliases...)
+					aliases = append(aliases, pad.Aliases...)
+					slices.Sort(aliases)
+					aliases = slices.Compact(aliases)
+					resolved = append(resolved, ResolvedFunction{
+						Function: function, Aliases: aliases, SymbolID: symbol.SymbolID, Unit: symbol.Unit, UnitID: canonicalUnitID(symbol.UnitID),
+						SymbolPin: pin.SymbolPin, Pad: pad.Pad, Electrical: pin.Electrical,
+						Polarity: firstNonEmpty(pin.Polarity, pad.Polarity), Required: pin.Required,
+					})
+				}
 			}
 		}
 	}

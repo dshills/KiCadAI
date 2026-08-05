@@ -31,13 +31,23 @@ func solveElectrothermalAnalysis(plan Plan, analysis Analysis) (AnalysisResult, 
 	}
 	devices := make(map[string]ResolvedDevice, len(plan.Devices))
 	thermalStates := map[string][]float64{}
+	steadyThermalEvidence := map[string]bool{}
 	soaExcursions := map[string]transientSOAExcursion{}
+	assertedThermalComponents := electrothermalAssertionComponents(plan, analysis.ID)
 	dynamicDevices := 0
 	for _, device := range plan.Devices {
 		devices[device.Component] = device
 		if device.ThermalModel != nil {
 			thermalStates[device.Component] = make([]float64, len(device.ThermalModel.Stages))
 			dynamicDevices++
+		} else if assertedThermalComponents[device.Component] && thermalDeviceSupportsDissipation(device) {
+			parameters := deviceParameterMap(device)
+			_, hasMaximum := namedValue(parameters, "max_temperature_c")
+			_, _, hasPath := resolvedThermalPath(nil, parameters, analysis.Conditions, ambient)
+			if hasMaximum || hasPath {
+				steadyThermalEvidence[device.Component] = true
+				dynamicDevices++
+			}
 		}
 		if len(device.TransientSOA) != 0 && device.ThermalModel == nil {
 			dynamicDevices++
@@ -54,13 +64,7 @@ func solveElectrothermalAnalysis(plan Plan, analysis Analysis) (AnalysisResult, 
 	previousTime := 0.0
 	for pointIndex := range result.Points {
 		point := &result.Points[pointIndex]
-		resistanceScale := baseResistanceScale
-		for _, event := range analysis.ConditionValueEvents {
-			if event.Name != "thermal_resistance_scale" {
-				continue
-			}
-			resistanceScale, _ = transientConditionEventValue(event, point.TimeS, analysis.TimeStepS)
-		}
+		resistanceScale := electrothermalResistanceScaleAt(analysis, point.TimeS, baseResistanceScale)
 		timeStep := point.TimeS - previousTime
 		if pointIndex == 0 {
 			timeStep = 0
@@ -143,7 +147,119 @@ func solveElectrothermalAnalysis(plan Plan, analysis Analysis) (AnalysisResult, 
 		}
 		previousTime = point.TimeS
 	}
+	if diagnostic := applyPeriodicSteadyThermalEvidence(&result, devices, steadyThermalEvidence, analysis, ambient, baseResistanceScale); diagnostic != nil {
+		return result, []Diagnostic{*diagnostic}
+	}
 	return result, nil
+}
+
+func electrothermalAssertionComponents(plan Plan, analysisID string) map[string]bool {
+	result := map[string]bool{}
+	for _, assertion := range plan.Assertions {
+		if assertion.AnalysisID != analysisID {
+			continue
+		}
+		switch assertion.Quantity {
+		case QuantityJunctionTemperatureC,
+			QuantityMaximumJunctionTemperatureC,
+			QuantityTransientSOAMargin,
+			QuantityMinimumTransientSOAMargin:
+		default:
+			continue
+		}
+		if assertion.Component != "" {
+			result[assertion.Component] = true
+		}
+		for _, component := range assertion.Components {
+			result[component] = true
+		}
+	}
+	return result
+}
+
+func electrothermalResistanceScaleAt(analysis Analysis, timeS, base float64) float64 {
+	result := base
+	for _, event := range analysis.ConditionValueEvents {
+		if event.Name == "thermal_resistance_scale" {
+			result, _ = transientConditionEventValue(event, timeS, analysis.TimeStepS)
+		}
+	}
+	return result
+}
+
+func applyPeriodicSteadyThermalEvidence(
+	result *AnalysisResult,
+	devices map[string]ResolvedDevice,
+	steadyThermalEvidence map[string]bool,
+	analysis Analysis,
+	ambient float64,
+	baseResistanceScale float64,
+) *Diagnostic {
+	if len(steadyThermalEvidence) == 0 {
+		return nil
+	}
+	frequency := result.FundamentalFrequencyHz
+	if frequency <= 0 || len(result.Points) < 2 {
+		return &Diagnostic{
+			Path:       "analyses." + analysis.ID + ".devices",
+			Message:    "aperiodic electrothermal peak-temperature analysis requires reviewed thermal capacitance for every dynamically temperature-asserted device; steady thermal resistance alone cannot bound a one-shot temperature peak",
+			Suggestion: "select a catalog component with a reviewed thermal RC network, or declare a periodic or steady operating regime with a complete fundamental-frequency drive",
+		}
+	}
+	finalTime := result.Points[len(result.Points)-1].TimeS
+	cycles := math.Min(2, math.Floor(finalTime*frequency+1e-9))
+	if cycles < 1 {
+		return &Diagnostic{Path: "analyses." + analysis.ID, Message: "electrothermal analysis produced no complete periodic cycle for steady thermal averaging"}
+	}
+	windowStart := finalTime - cycles/frequency
+	weightedEnergy := map[string]float64{}
+	dissipationForComponent := func(observations []DeviceResult, component string) float64 {
+		dissipation := 0.0
+		for _, observation := range observations {
+			if observation.Component == component {
+				dissipation = observation.DissipationW
+			}
+		}
+		return dissipation
+	}
+	for index := 1; index < len(result.Points); index++ {
+		left, right := result.Points[index-1], result.Points[index]
+		if right.TimeS <= windowStart {
+			continue
+		}
+		leftTime := math.Max(left.TimeS, windowStart)
+		fraction := 0.0
+		if right.TimeS > left.TimeS {
+			fraction = (leftTime - left.TimeS) / (right.TimeS - left.TimeS)
+		}
+		leftScale := electrothermalResistanceScaleAt(analysis, left.TimeS, baseResistanceScale)
+		rightScale := electrothermalResistanceScaleAt(analysis, right.TimeS, baseResistanceScale)
+		startScale := leftScale + fraction*(rightScale-leftScale)
+		for component := range steadyThermalEvidence {
+			leftDissipation := dissipationForComponent(left.Devices, component)
+			rightDissipation := dissipationForComponent(right.Devices, component)
+			startPower := leftDissipation + fraction*(rightDissipation-leftDissipation)
+			weightedEnergy[component] += .5 * (startPower*startScale + rightDissipation*rightScale) * (right.TimeS - leftTime)
+		}
+	}
+	windowDuration := finalTime - windowStart
+	for component := range steadyThermalEvidence {
+		device := devices[component]
+		averageScaledDissipation := weightedEnergy[component] / windowDuration
+		steady, diagnostic := thermalDeviceResultAtResistanceScale(device, analysis, ambient, averageScaledDissipation, 1)
+		if diagnostic != nil {
+			return diagnostic
+		}
+		for pointIndex := range result.Points {
+			for deviceIndex := range result.Points[pointIndex].Devices {
+				observation := &result.Points[pointIndex].Devices[deviceIndex]
+				if observation.Component == component {
+					observation.JunctionTemperatureC = steady.JunctionTemperatureC
+				}
+			}
+		}
+	}
+	return nil
 }
 
 func dynamicThermalBoundary(device ResolvedDevice, analysis Analysis, ambient float64) (float64, *Diagnostic) {

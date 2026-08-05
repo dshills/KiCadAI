@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"reflect"
 	"slices"
 	"strings"
 	"testing"
@@ -575,6 +576,29 @@ func TestResolveFunctionsAllowsOneToOneLogicalBinding(t *testing.T) {
 	functions, issues := resolveFunctions("components[0]", symbols, variant)
 	if reports.HasBlockingIssue(issues) || len(functions) != 1 || functions[0].SymbolPin != "A" || functions[0].Pad != "1" {
 		t.Fatalf("one-to-one logical binding = %#v, issues = %#v", functions, issues)
+	}
+}
+
+func TestResolveFunctionsAssignsRepeatedPackagePadsToOneLogicalPin(t *testing.T) {
+	symbols := []components.SymbolBinding{{SymbolID: "Device:Exposed", FunctionPins: []components.FunctionPin{{Function: "GND", SymbolPin: "1", Required: true}}}}
+	variant := components.PackageVariant{PadFunctions: []components.PadFunction{
+		{Function: "GND", Pad: "1"},
+		{Function: "GND", Pad: "2"},
+		{Function: "GND", Pad: "EP"},
+	}}
+	functions, issues := resolveFunctions("components[0]", symbols, variant)
+	if reports.HasBlockingIssue(issues) || len(functions) != 3 {
+		t.Fatalf("repeated package pads = %#v, issues = %#v", functions, issues)
+	}
+	pads := []string{functions[0].Pad, functions[1].Pad, functions[2].Pad}
+	slices.Sort(pads)
+	if !reflect.DeepEqual(pads, []string{"1", "2", "EP"}) {
+		t.Fatalf("resolved pads = %#v", pads)
+	}
+	for _, function := range functions {
+		if function.SymbolPin != "1" || function.Function != "GND" || !function.Required {
+			t.Fatalf("repeated package binding = %#v", function)
+		}
 	}
 }
 

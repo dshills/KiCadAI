@@ -274,6 +274,38 @@ Held-out benchmark evidence:
   and
 - [capability report](../specs/dynamic-electrothermal-control-loop-synthesis/CAPABILITY_REPORT.json).
 
+## Nonlinear And Switching Architecture Synthesis
+
+The frozen nonlinear/switching corpus adds five positive behavior families:
+precision magnitude rectification, bipolar limiting, autonomous relaxation
+oscillation, controlled PWM power switching, and efficient low-power step-down
+conversion. Three adversarial requirements measure unsafe current/thermal/SOA
+stress and an unsupported ultra-fast dynamic envelope. None of the requirements
+name parts, topology families, equations, simulation controls, nets, pins,
+coordinates, or routes.
+
+Production synthesis now derives generic nonlinear and switching relationships,
+filters primitives against reviewed propagation-delay and rating envelopes,
+executes deterministic discontinuity-aware transients, measures periodic
+frequency, duty, ripple, and efficiency, and couples electrical loss into
+thermal/SOA evaluation. Unsafe candidates fail on rated-envelope or simulation
+safety evidence; missing dynamic coverage produces an actionable capability
+gap and no selected physical design.
+
+All five positive cases pass deterministic replay and all declared corners,
+then pass readable schematic lowering, complete routing/connectivity, writer
+correctness, zero-difference round trip, and local installed-KiCad ERC and
+strict DRC. This materially expands AI-directed generation inside a reviewed
+low-energy envelope, but it does not qualify arbitrary semiconductors, RF,
+mains, high-energy storage, arbitrary SPICE, or fabrication release.
+
+Authoritative evidence:
+
+- [specification](../specs/nonlinear-switching-architecture-synthesis/SPEC.md);
+- [implementation plan](../specs/nonlinear-switching-architecture-synthesis/PLAN.md);
+  and
+- [completion audit](../specs/nonlinear-switching-architecture-synthesis/AUDIT.md).
+
 ## Behavioral Intent Compilation
 
 The uncertainty-aware compiler adds a language-facing readiness gate above the

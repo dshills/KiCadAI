@@ -112,7 +112,10 @@ var primitiveRegistry = []primitiveDefinition{
 	},
 	{ID: PrimitiveCapacitorV1, Family: "capacitor", Terminals: []string{"A", "B"}, RequiresValueSI: true},
 	{ID: PrimitiveCapacitorTransientV1, Family: "capacitor", Terminals: []string{"A", "B"}, RequiresValueSI: true, Transient: true,
-		CatalogParameters: []valueRule{{Name: "max_voltage_v", Positive: true, Minimum: .01, Maximum: 1e6}}},
+		CatalogParameters: []valueRule{
+			{Name: "max_voltage_v", Positive: true, Minimum: .01, Maximum: 1e6},
+			{Name: "series_resistance_ohm", Optional: true, Nonnegative: true, Maximum: 1e6},
+		}},
 	{ID: PrimitiveInductorTransientV1, Family: "inductor", Terminals: []string{"A", "B"}, RequiresValueSI: true,
 		CatalogParameters: []valueRule{
 			{Name: "series_resistance_ohm", Positive: true, Minimum: 1e-9, Maximum: 1e9},
@@ -1026,6 +1029,8 @@ func validateMNAIntent(intent Intent, components map[string]string) []Diagnostic
 		}
 		seenSources := map[string]struct{}{}
 		sineSources := 0
+		periodicSources := 0
+		periodicThermal := analysis.Kind == AnalysisThermal && (analysis.DurationS > 0 || analysis.TimeStepS > 0)
 		for sourceIndex, excitation := range analysis.Excitations {
 			sourcePath := fmt.Sprintf("%s.excitations[%d]", path, sourceIndex)
 			component := strings.TrimSpace(excitation.Component)
@@ -1043,6 +1048,9 @@ func validateMNAIntent(intent Intent, components map[string]string) []Diagnostic
 			if hasSine(excitation) {
 				sineSources++
 			}
+			if hasSine(excitation) || hasPulse(excitation) {
+				periodicSources++
+			}
 			if analysis.Kind == AnalysisDCOperatingPoint && (excitation.ACMagnitude != 0 || excitation.ACPhaseDeg != 0) {
 				diagnostics = append(diagnostics, Diagnostic{Path: sourcePath, Message: "DC operating-point excitation cannot contain AC magnitude or phase"})
 			}
@@ -1052,7 +1060,7 @@ func validateMNAIntent(intent Intent, components map[string]string) []Diagnostic
 			if (analysis.Kind == AnalysisNoise || analysis.Kind == AnalysisStability) && (excitation.ACMagnitude != 0 || excitation.ACPhaseDeg != 0) {
 				diagnostics = append(diagnostics, Diagnostic{Path: sourcePath, Message: "noise and stability analyses require zeroed small-signal independent sources; dc_value is retained only to solve the trusted operating point"})
 			}
-			if analysis.Kind != AnalysisTransient && analysis.Kind != AnalysisElectrothermal && hasPulse(excitation) {
+			if analysis.Kind != AnalysisTransient && analysis.Kind != AnalysisElectrothermal && !periodicThermal && hasPulse(excitation) {
 				diagnostics = append(diagnostics, Diagnostic{Path: sourcePath, Message: "pulse conditions are accepted only by transient analysis"})
 			}
 			if analysis.Kind != AnalysisDistortion && analysis.Kind != AnalysisTransient && analysis.Kind != AnalysisElectrothermal && analysis.Kind != AnalysisThermal && hasSine(excitation) {
@@ -1074,7 +1082,7 @@ func validateMNAIntent(intent Intent, components map[string]string) []Diagnostic
 			if analysis.Kind == AnalysisStartup && (excitation.ACMagnitude != 0 || excitation.ACPhaseDeg != 0) {
 				diagnostics = append(diagnostics, Diagnostic{Path: sourcePath, Message: "startup excitation accepts only the bounded final dc_value applied after the zero-energy initial point"})
 			}
-			if analysis.Kind == AnalysisTransient || analysis.Kind == AnalysisElectrothermal {
+			if analysis.Kind == AnalysisTransient || analysis.Kind == AnalysisElectrothermal || periodicThermal {
 				if excitation.ACMagnitude != 0 || excitation.ACPhaseDeg != 0 {
 					diagnostics = append(diagnostics, Diagnostic{Path: sourcePath, Message: "transient excitation cannot contain AC magnitude or phase"})
 				}
@@ -1084,7 +1092,7 @@ func validateMNAIntent(intent Intent, components map[string]string) []Diagnostic
 					// canonical representation and prevents an ambiguous double bias.
 					if excitation.DCValue != 0 || !finite(excitation.PulseDelayS) || !finite(excitation.PulseWidthS) || !finite(excitation.PulsePeriodS) || excitation.PulseDelayS < 0 || excitation.PulseDelayS >= analysis.DurationS || excitation.PulseWidthS <= 0 || excitation.PulsePeriodS <= excitation.PulseWidthS || !onTransientGrid(excitation.PulseDelayS, analysis.TimeStepS) || !onTransientGrid(excitation.PulseWidthS, analysis.TimeStepS) || !onTransientGrid(excitation.PulsePeriodS, analysis.TimeStepS) {
 						diagnostics = append(diagnostics, Diagnostic{Path: sourcePath, Message: fmt.Sprintf(
-							"transient pulse uses absolute initial/pulsed levels and requires zero dc_value, a rising edge within duration, 0 < width < period, and all times exactly on the observation grid (dc_value=%.12g delay_s=%.12g width_s=%.12g period_s=%.12g duration_s=%.12g time_step_s=%.12g)",
+							"dynamic pulse uses absolute initial/pulsed levels and requires zero dc_value, a rising edge within duration, 0 < width < period, and all times exactly on the observation grid (dc_value=%.12g delay_s=%.12g width_s=%.12g period_s=%.12g duration_s=%.12g time_step_s=%.12g)",
 							excitation.DCValue, excitation.PulseDelayS, excitation.PulseWidthS, excitation.PulsePeriodS, analysis.DurationS, analysis.TimeStepS,
 						)})
 					}
@@ -1110,8 +1118,8 @@ func validateMNAIntent(intent Intent, components map[string]string) []Diagnostic
 		}
 		if analysis.Kind == AnalysisThermal {
 			driven := analysis.DurationS != 0 || analysis.TimeStepS != 0
-			if (driven && sineSources != 1) || (!driven && sineSources != 0) {
-				diagnostics = append(diagnostics, Diagnostic{Path: path + ".excitations", Message: "periodically driven thermal analysis requires exactly one bounded sine source and DC thermal analysis requires none"})
+			if (driven && periodicSources != 1) || (!driven && periodicSources != 0) {
+				diagnostics = append(diagnostics, Diagnostic{Path: path + ".excitations", Message: "periodically driven thermal analysis requires exactly one bounded sine or pulse source and DC thermal analysis requires none"})
 			}
 		}
 	}
@@ -1243,7 +1251,8 @@ func validateMNAIntent(intent Intent, components map[string]string) []Diagnostic
 			} else if kind != AnalysisDCOperatingPoint {
 				diagnostics = append(diagnostics, Diagnostic{Path: path + ".quantity", Message: "transimpedance assertion requires AC sweep or DC operating-point analysis"})
 			}
-		case QuantityOutputSwingVPP, QuantitySettlingTimeS, QuantityResponseTimeS:
+		case QuantityOutputSwingVPP, QuantityOscillationFrequencyHz, QuantityDutyCyclePct,
+			QuantityOutputRippleVPP, QuantitySettlingTimeS, QuantityResponseTimeS:
 			if kind != AnalysisTransient {
 				diagnostics = append(diagnostics, Diagnostic{Path: path + ".quantity", Message: "waveform-derived assertion requires transient analysis"})
 			}
@@ -1251,7 +1260,7 @@ func validateMNAIntent(intent Intent, components map[string]string) []Diagnostic
 			if kind != AnalysisDCOperatingPoint {
 				diagnostics = append(diagnostics, Diagnostic{Path: path + ".quantity", Message: "device-current/total-supply-current assertion requires DC operating-point analysis"})
 			}
-		case QuantityDCSweepVoltageSpanV, QuantityDCSweepDeviceSlopeAperV:
+		case QuantityDCSweepVoltageSpanV, QuantityDCSweepVoltageSlopeVPerV, QuantityDCSweepDeviceSlopeAperV:
 			analysis, _ := analysisByID(intent.Analyses, assertion.AnalysisID)
 			if kind != AnalysisDCOperatingPoint || analysis.DCSweep == nil {
 				diagnostics = append(diagnostics, Diagnostic{Path: path + ".quantity", Message: "DC sweep span/slope assertion requires a bounded DC source sweep"})

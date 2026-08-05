@@ -11,6 +11,7 @@ import (
 
 	"kicadai/internal/circuitgraph"
 	"kicadai/internal/components"
+	"kicadai/internal/designworkflow"
 	"kicadai/internal/reports"
 )
 
@@ -78,7 +79,7 @@ func LowerPassingCandidate(
 		return finalizePhysicalLowering(result)
 	}
 	document, bindings, lowerIssues := lowerCandidateDocument(
-		requirement, graph, inventory, environment.Catalog, connector,
+		ctx, requirement, graph, inventory, environment.Catalog, connector,
 	)
 	result.Document = document
 	result.Bindings = bindings
@@ -103,6 +104,13 @@ func LowerPassingCandidate(
 		return finalizePhysicalLowering(result)
 	}
 	request, requestIssues := circuitgraph.ToDesignRequest(resolved)
+	if request.ExplicitCircuit != nil {
+		// Open-topology candidates are synthesized even though their provider-safe
+		// circuit graph contains the selected primitive instances rather than a
+		// FunctionIntent. Preserve that provenance in the physical request so dense
+		// pad escapes receive the normal constrained-endpoint routing schedule.
+		request.ExplicitCircuit.RoutingPolicy = designworkflow.ExplicitRoutingPolicyConstrainedEndpointAccessV1
+	}
 	result.DesignRequest = request
 	if len(requestIssues) != 0 {
 		result.Issues = requestIssues
@@ -113,6 +121,7 @@ func LowerPassingCandidate(
 }
 
 func lowerCandidateDocument(
+	ctx context.Context,
 	requirement Requirement,
 	graph CandidateGraph,
 	inventory PrimitiveInventory,
@@ -220,8 +229,9 @@ func lowerCandidateDocument(
 		})
 	}
 	topologyNetRoles := physicalTopologyNetRoles(graph)
+	flaggedNets := map[string]bool{}
 	for _, node := range graph.Nodes {
-		netRole := physicalNetRole(node)
+		netRole := physicalNetRoleForRequirement(requirement, node)
 		if inferred := topologyNetRoles[node.ID]; inferred != "" && netRole == circuitgraph.NetRoleSignal {
 			netRole = inferred
 		}
@@ -267,8 +277,9 @@ func lowerCandidateDocument(
 			}
 		}
 		document.Nets = append(document.Nets, net)
-		if node.Scope == "external" && (node.Role == "reference" || node.Role == "supply") {
+		if physicalNodeRequiresPowerFlag(requirement, node) && !flaggedNets[net.Name] {
 			document.PowerFlags = append(document.PowerFlags, circuitgraph.PowerFlag{Net: net.Name})
+			flaggedNets[net.Name] = true
 		}
 		bindings = append(bindings, PhysicalSemanticBinding{
 			Kind: "net", SemanticID: node.SemanticID, GraphNode: node.ID,
@@ -278,9 +289,33 @@ func lowerCandidateDocument(
 			}{node, net.Name}),
 		})
 	}
+	supportGroups, supportIssues := completePhysicalModelSupport(
+		ctx, &document, &bindings, graph, inventory, catalog, instancePrimitives,
+	)
+	issues = append(issues, supportIssues...)
 	document.Schematic = physicalSchematicIntent(graph)
+	appendPhysicalSupportSchematicIntent(&document.Schematic, supportGroups)
 	document.PCB = physicalPCBIntent(document.Project.Board, document.Components)
+	applyPhysicalSupportPCBIntent(&document.PCB, supportGroups)
 	return document, bindings, reports.SortedIssues(issues)
+}
+
+func physicalNodeRequiresPowerFlag(requirement Requirement, node GraphNode) bool {
+	if node.Scope != "external" {
+		return false
+	}
+	if node.Role == "reference" || node.Role == "supply" {
+		return true
+	}
+	for _, port := range requirement.Requirements.Ports {
+		if port.Kind != "power" || port.Direction != "source" {
+			continue
+		}
+		if node.ID == "port_"+port.ID || node.SemanticID == port.ID {
+			return true
+		}
+	}
+	return false
 }
 
 func physicalComponentUnits(
@@ -718,6 +753,17 @@ func physicalNetRole(node GraphNode) circuitgraph.NetRole {
 	default:
 		return circuitgraph.NetRoleSignal
 	}
+}
+
+func physicalNetRoleForRequirement(requirement Requirement, node GraphNode) circuitgraph.NetRole {
+	if node.Scope == "external" {
+		for _, port := range requirement.Requirements.Ports {
+			if port.Kind == "power" && (node.ID == "port_"+port.ID || node.SemanticID == port.ID) {
+				return circuitgraph.NetRolePower
+			}
+		}
+	}
+	return physicalNetRole(node)
 }
 
 func physicalNetName(node GraphNode) string {

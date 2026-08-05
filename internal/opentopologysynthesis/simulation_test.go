@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"math"
 	"path/filepath"
 	"testing"
@@ -369,6 +370,52 @@ func TestDynamicGridNormalizesBeforeSemanticValueEvents(t *testing.T) {
 	}
 }
 
+func TestPeriodicAssertionsOverrideOneShotSourceEvents(t *testing.T) {
+	requirement, issues := DecodeStrict(bytes.NewReader(mustRead(
+		t,
+		filepath.Join(nonlinearSwitchingCorpusRoot(), "controlled_pulse_power_stage.json"),
+	)))
+	if len(issues) != 0 {
+		t.Fatalf("controlled pulse requirement issues: %#v", issues)
+	}
+	graph, graphIssues := InitialGraph(requirement)
+	if len(graphIssues) != 0 {
+		t.Fatalf("controlled pulse graph issues: %#v", graphIssues)
+	}
+	operatingCase := requirement.Requirements.OperatingCases[0]
+	corner := operatingCaseCorners(operatingCase)[0]
+	assertions := map[string]BehavioralAssertion{}
+	for _, assertion := range requirement.Requirements.BehavioralRequirements {
+		assertions[assertion.ID] = assertion
+	}
+	dutyExcitations := simulationExcitations(requirement, assertions["pulse_duty_transfer"], operatingCase, corner, graph)
+	dutyAnalysis := simmodel.Analysis{Kind: simmodel.AnalysisTransient, DurationS: .0005, TimeStepS: .5e-6, Excitations: dutyExcitations}
+	addSimulationEvents(&dutyAnalysis, requirement, operatingCase, graph)
+	periodic := false
+	for _, excitation := range dutyAnalysis.Excitations {
+		if excitation.Component == "source_port_pulse_command" && excitation.PulsePeriodS == 1.0/20_000 {
+			periodic = true
+		}
+	}
+	if !periodic || len(dutyAnalysis.SourceValueEvents) != 0 {
+		t.Fatalf("duty-cycle analysis did not own its periodic source: %#v", dutyAnalysis)
+	}
+	for _, assertionID := range []string{"rising_transition", "falling_transition"} {
+		excitations := simulationExcitations(requirement, assertions[assertionID], operatingCase, corner, graph)
+		analysis := simmodel.Analysis{Kind: simmodel.AnalysisTransient, DurationS: .0005, TimeStepS: .5e-6, Excitations: excitations}
+		addSimulationEvents(&analysis, requirement, operatingCase, graph)
+		periodic = false
+		for _, excitation := range analysis.Excitations {
+			if excitation.Component == "source_port_pulse_command" && excitation.PulsePeriodS == 1.0/20_000 {
+				periodic = true
+			}
+		}
+		if !periodic || len(analysis.SourceValueEvents) != 0 {
+			t.Fatalf("%s analysis did not own its periodic source: %#v", assertionID, analysis)
+		}
+	}
+}
+
 func TestTransientOffStateCurrentUsesPostEventPeakWithoutSyntheticPulse(t *testing.T) {
 	requirement, issues := DecodeStrict(bytes.NewReader(mustRead(
 		t, filepath.Join(protectedCurrentOutputCorpusRoot(), "fault_protected_low_side_current_sink.json"),
@@ -420,6 +467,8 @@ func TestHeldOutMetricsHaveGenericTrustedMeasurementContracts(t *testing.T) {
 	metrics := []string{
 		"bandwidth",
 		"cutoff_frequency",
+		"duty_cycle",
+		"fall_time",
 		"falling_threshold",
 		"hysteresis",
 		"junction_temperature",
@@ -428,11 +477,13 @@ func TestHeldOutMetricsHaveGenericTrustedMeasurementContracts(t *testing.T) {
 		"lower_threshold",
 		"off_state_current",
 		"on_state_voltage",
+		"oscillation_frequency",
 		"output_current",
 		"output_high_voltage",
 		"output_low_voltage",
 		"output_noise_rms",
 		"output_power",
+		"output_ripple",
 		"output_swing",
 		"output_voltage",
 		"peak_voltage",
@@ -440,6 +491,7 @@ func TestHeldOutMetricsHaveGenericTrustedMeasurementContracts(t *testing.T) {
 		"propagation_delay",
 		"quiescent_current",
 		"rising_threshold",
+		"rise_time",
 		"settling_time",
 		"soa_margin",
 		"startup_current",
@@ -452,6 +504,7 @@ func TestHeldOutMetricsHaveGenericTrustedMeasurementContracts(t *testing.T) {
 		"upper_threshold",
 		"voltage_gain",
 		"voltage_gain_at_frequency",
+		"conversion_efficiency",
 	}
 	for _, metric := range metrics {
 		if quantity, _, supported := directSimulationQuantity(BehavioralAssertion{Metric: metric}); !supported || quantity == "" {
@@ -527,6 +580,7 @@ func TestPortScopedOffAndStartupCurrentUseObservedActivePath(t *testing.T) {
 			requirement,
 			assertion,
 			operatingCase,
+			operatingCaseCorners(operatingCase)[0],
 			graph,
 			nil,
 			quantity,
@@ -544,6 +598,45 @@ func TestPortScopedOffAndStartupCurrentUseObservedActivePath(t *testing.T) {
 		if !found {
 			t.Fatalf("%s current component = %q; graph=%s", metric, component, testGraphTopologySummary(graph))
 		}
+	}
+}
+
+func TestCriticalSimulationEvidenceContinuesAfterNoncriticalNominalFailure(t *testing.T) {
+	requirement := testOpenTopologyRequirement(t, "ground_referenced_load_control.json")
+	for index := range requirement.Requirements.BehavioralRequirements {
+		assertion := &requirement.Requirements.BehavioralRequirements[index]
+		if assertion.ID == "disabled_leakage" {
+			impossible := 1e-12
+			assertion.Max = &impossible
+		}
+	}
+	inventory, environment := testHeldOutSynthesisEnvironment(t)
+	search := SearchPrimitiveTopologies(context.Background(), requirement, inventory, DefaultPolicy())
+	if len(search.Candidates) == 0 {
+		t.Fatalf("controlled-current search produced no candidate: %#v", search)
+	}
+	plan := BuildValueSearchPlan(requirement, search.Candidates[0].Graph, inventory, DefaultPolicy())
+	trials := EnumerateValueTrials(plan, 1).Trials
+	if len(trials) != 1 {
+		t.Fatalf("value trials = %d, plan=%#v", len(trials), plan)
+	}
+	graph, err := ApplyValueTrial(search.Candidates[0].Graph, trials[0], inventory)
+	if err != nil {
+		t.Fatal(err)
+	}
+	evaluation := EvaluateCandidate(context.Background(), requirement, graph, nil, inventory, environment, DefaultPolicy())
+	foundNoncriticalFailure := false
+	foundCriticalEvidence := false
+	for _, attempt := range evaluation.Attempts {
+		if attempt.RequirementID == "disabled_leakage" && attempt.Status == SimulationEvaluationFailed {
+			foundNoncriticalFailure = true
+		}
+		if attempt.RequirementID == "startup_off" {
+			foundCriticalEvidence = true
+		}
+	}
+	if !foundNoncriticalFailure || !foundCriticalEvidence {
+		t.Fatalf("critical evidence did not survive a noncritical nominal failure: %#v", evaluation.Attempts)
 	}
 }
 
@@ -593,6 +686,74 @@ func TestLoadCurrentHarnessAndCrossCaseSweepAreCatalogBacked(t *testing.T) {
 	}
 	if !found {
 		t.Fatalf("load-current excitation is missing: %#v", excitations)
+	}
+}
+
+func TestLineRegulationSweepUsesUniqueDeclaredSupplyRange(t *testing.T) {
+	requirement, issues := DecodeStrict(bytes.NewReader(mustRead(t, filepath.Join(
+		nonlinearSwitchingCorpusRoot(), "efficient_step_down_power.json",
+	))))
+	if len(issues) != 0 {
+		t.Fatalf("requirement issues = %#v", issues)
+	}
+	graph, graphIssues := InitialGraph(requirement)
+	if len(graphIssues) != 0 {
+		t.Fatalf("initial graph issues = %#v", graphIssues)
+	}
+	var assertion BehavioralAssertion
+	for _, candidate := range requirement.Requirements.BehavioralRequirements {
+		if candidate.Metric == "line_regulation" {
+			assertion = candidate
+			break
+		}
+	}
+	var operatingCase OperatingCase
+	for _, candidate := range requirement.Requirements.OperatingCases {
+		if candidate.ID == assertion.OperatingCases[0] {
+			operatingCase = candidate
+			break
+		}
+	}
+	source, start, stop, ok := sweepSourceAndRange(
+		requirement, assertion, operatingCase, operatingCaseCorners(operatingCase)[0], graph,
+	)
+	if !ok || source != "source_port_input_power" || start != 10 || stop != 14 {
+		t.Fatalf("line-regulation sweep = %q %.12g..%.12g ok=%t", source, start, stop, ok)
+	}
+}
+
+func TestActiveOutputAssertionsInheritEnableEnvelopeWithoutChangingStartup(t *testing.T) {
+	requirement, issues := DecodeStrict(bytes.NewReader(mustRead(t, filepath.Join(
+		nonlinearSwitchingCorpusRoot(), "efficient_step_down_power.json",
+	))))
+	if len(issues) != 0 {
+		t.Fatalf("requirement issues = %#v", issues)
+	}
+	assertions := map[string]BehavioralAssertion{}
+	for _, assertion := range requirement.Requirements.BehavioralRequirements {
+		assertions[assertion.ID] = assertion
+	}
+	cases := map[string]OperatingCase{}
+	for _, operatingCase := range requirement.Requirements.OperatingCases {
+		cases[operatingCase.ID] = operatingCase
+	}
+	conditions := simulationHarnessConditions(requirement, assertions["line_regulation"], cases["line_load_corners"])
+	foundEnable := false
+	for _, condition := range conditions {
+		foundEnable = foundEnable || condition.Axis == "input_voltage" && condition.Target == "enable" && condition.Min == 3 && condition.Max == 5
+	}
+	if !foundEnable {
+		t.Fatalf("active line-regulation conditions omit enable envelope: %#v", conditions)
+	}
+	startupConditions := simulationHarnessConditions(requirement, assertions["startup_time"], cases["nominal_load"])
+	enableConditions := 0
+	for _, condition := range startupConditions {
+		if condition.Target == "enable" && condition.Axis == "input_voltage" {
+			enableConditions++
+		}
+	}
+	if enableConditions != 1 {
+		t.Fatalf("startup enable conditions = %#v", startupConditions)
 	}
 }
 
@@ -862,6 +1023,88 @@ func TestInductiveHarnessUsesBoundedExternalLoadAndBehavioralWindingResistance(t
 		t.Fatalf("inductive harness lacks series-resistance evidence: %#v", component)
 	}
 	t.Fatalf("inductive load harness %q is missing: %#v", loadID, harness)
+}
+
+func TestCircuitStressAssertionsInheritLoadEnvelopeAndExpandItsCorners(t *testing.T) {
+	requirement, issues := DecodeStrict(bytes.NewReader(mustRead(t, filepath.Join(
+		nonlinearSwitchingCorpusRoot(), "controlled_pulse_power_stage.json",
+	))))
+	if len(issues) != 0 {
+		t.Fatalf("requirement issues = %#v", issues)
+	}
+	var assertion BehavioralAssertion
+	for _, candidate := range requirement.Requirements.BehavioralRequirements {
+		if candidate.ID == "safe_temperature" {
+			assertion = candidate
+			break
+		}
+	}
+	var operatingCase OperatingCase
+	for _, candidate := range requirement.Requirements.OperatingCases {
+		if candidate.ID == "electrical_corners" {
+			operatingCase = candidate
+			break
+		}
+	}
+	conditions := simulationHarnessConditions(requirement, assertion, operatingCase)
+	haveResistance, haveInductance := false, false
+	for _, condition := range conditions {
+		haveResistance = haveResistance || condition.Axis == "load_resistance" && condition.Target == "load_output"
+		haveInductance = haveInductance || condition.Axis == "load_inductance" && condition.Target == "load_output"
+	}
+	if !haveResistance || !haveInductance {
+		t.Fatalf("circuit stress conditions = %#v", conditions)
+	}
+	operatingCase.Conditions = conditions
+	seen := map[string]bool{}
+	for _, corner := range operatingCaseCorners(operatingCase) {
+		resistance := corner.Values[conditionKey(OperatingCondition{Axis: "load_resistance", Target: "load_output"})]
+		inductance := corner.Values[conditionKey(OperatingCondition{Axis: "load_inductance", Target: "load_output"})]
+		seen[fmt.Sprintf("%.0f/%.3f", resistance, inductance)] = true
+	}
+	for _, key := range []string{"16/0.000", "16/0.002", "24/0.000", "24/0.002"} {
+		if !seen[key] {
+			t.Fatalf("inherited load corner %s missing from %v", key, seen)
+		}
+	}
+}
+
+func TestZeroInductanceCornerMeasuresPresentResistiveLoad(t *testing.T) {
+	requirement, issues := DecodeStrict(bytes.NewReader(mustRead(t, filepath.Join(
+		nonlinearSwitchingCorpusRoot(), "controlled_pulse_power_stage.json",
+	))))
+	if len(issues) != 0 {
+		t.Fatalf("requirement issues = %#v", issues)
+	}
+	graph, graphIssues := InitialGraph(requirement)
+	if len(graphIssues) != 0 {
+		t.Fatalf("initial graph issues = %#v", graphIssues)
+	}
+	var assertion BehavioralAssertion
+	for _, candidate := range requirement.Requirements.BehavioralRequirements {
+		if candidate.ID == "off_state_leakage" {
+			assertion = candidate
+			break
+		}
+	}
+	var operatingCase OperatingCase
+	for _, candidate := range requirement.Requirements.OperatingCases {
+		if candidate.ID == "nominal_pulses" {
+			operatingCase = candidate
+			break
+		}
+	}
+	var corner operatingCorner
+	for _, candidate := range operatingCaseCorners(operatingCase) {
+		if candidate.Values[conditionKey(OperatingCondition{Axis: "load_inductance", Target: "load_output"})] == 0 {
+			corner = candidate
+			break
+		}
+	}
+	component, found := loadMeasurementComponent(requirement, assertion, operatingCase, corner, graph)
+	if !found || component != loadInstanceID("load_output", "load_resistance") {
+		t.Fatalf("zero-inductance current component = %q found=%t", component, found)
+	}
 }
 
 func testSimulationFixture(t *testing.T) (Requirement, CandidateGraph, PrimitiveInventory, SimulationEnvironment) {

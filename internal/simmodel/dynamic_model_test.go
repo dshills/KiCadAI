@@ -236,6 +236,18 @@ func TestElectrothermalTransientIntegratesReviewedThermalRCAndSOA(t *testing.T) 
 		voltageSourceEvidence("supply", "VCC", "GND"),
 		resistorEvidence("load", 100, "VCC", "DRAIN"),
 		{
+			// A catalog part elsewhere in the circuit may have only a reviewed
+			// steady-state thermal path. It must not turn an unrelated dynamic
+			// SOA assertion into a thermal-capacitance requirement.
+			InstanceID: "unobserved_steady_thermal", CatalogID: "resistor.steady-thermal", Family: "resistor",
+			HasValueSI: true, ValueSI: 1e9,
+			ModelClaims: []CatalogEvidence{{ModelID: PrimitiveResistorV1, Parameters: []NamedValue{
+				{Name: "max_temperature_c", Value: 150},
+				{Name: "thermal_resistance_c_per_w", Value: 50},
+			}}},
+			Connections: []ConnectionEvidence{{Function: "A", Net: "DRAIN"}, {Function: "B", Net: "GND"}},
+		},
+		{
 			InstanceID: "switch", CatalogID: "mosfet.reviewed", Family: "mosfet",
 			ModelClaims: []CatalogEvidence{claim},
 			Connections: []ConnectionEvidence{
@@ -271,6 +283,91 @@ func TestElectrothermalTransientIntegratesReviewedThermalRCAndSOA(t *testing.T) 
 	replay, replayDiagnostics := Evaluate(ClonePlan(plan))
 	if len(replayDiagnostics) != 0 || !reflect.DeepEqual(report, replay) {
 		t.Fatalf("electrothermal replay differs: diagnostics=%#v", replayDiagnostics)
+	}
+}
+
+func TestElectrothermalAveragesPeriodicDissipationForSteadyThermalPathWithoutInventingCapacitance(t *testing.T) {
+	intent := Intent{
+		ModelID: ModelTransientCircuitV1,
+		Analyses: []Analysis{{
+			ID: "load_event", Kind: AnalysisElectrothermal, DurationS: 2e-3, TimeStepS: 100e-6,
+			Conditions: []NamedValue{{Name: "ambient_temperature_c", Value: 25}, {Name: "thermal_resistance_scale", Value: 2}},
+			Excitations: []SourceExcitation{{
+				Component: "supply", PulseInitialValue: 0, PulseValue: 1,
+				PulseDelayS: 100e-6, PulseWidthS: 500e-6, PulsePeriodS: 1e-3,
+			}},
+		}},
+		Assertions: []Assertion{{
+			AnalysisID: "load_event", Component: "load", Quantity: QuantityJunctionTemperatureC, Min: 25.49, Max: 25.51,
+		}},
+	}
+	components := []ComponentEvidence{
+		voltageSourceEvidence("supply", "OUT", "GND"),
+		{
+			InstanceID: "load", CatalogID: "resistor.reviewed", Family: "resistor", HasValueSI: true, ValueSI: 100,
+			ModelClaims: []CatalogEvidence{{ModelID: PrimitiveResistorV1, Parameters: []NamedValue{
+				{Name: "max_temperature_c", Value: 150},
+				{Name: "thermal_resistance_c_per_w", Value: 50},
+			}}},
+			Connections: []ConnectionEvidence{{Function: "A", Net: "OUT"}, {Function: "B", Net: "GND"}},
+		},
+	}
+	plan, diagnostics := ResolveWithTopology(intent, "catalog", "catalog-hash", components, []NodeEvidence{{Name: "GND", Role: "ground"}, {Name: "OUT"}})
+	if len(diagnostics) != 0 {
+		t.Fatalf("steady-bound electrothermal plan diagnostics = %#v", diagnostics)
+	}
+	report, diagnostics := Evaluate(plan)
+	if len(diagnostics) != 0 || report.Status != "pass" {
+		t.Fatalf("steady-bound electrothermal report=%#v diagnostics=%#v", report, diagnostics)
+	}
+	if math.Abs(report.Assertions[0].Actual-25.5) > 1e-12 {
+		t.Fatalf("steady-bound electrothermal assertion = %#v", report.Assertions[0])
+	}
+	for _, point := range report.Analyses[0].Points {
+		for _, device := range point.Devices {
+			if device.Component != "load" || device.DissipationW == 0 {
+				continue
+			}
+			if device.JunctionTemperatureC == nil || math.Abs(*device.JunctionTemperatureC-25.5) > 1e-12 {
+				t.Fatalf("steady thermal bound = %#v", device)
+			}
+		}
+	}
+}
+
+func TestElectrothermalRejectsAperiodicDynamicTemperatureClaimWithoutThermalCapacitance(t *testing.T) {
+	intent := Intent{
+		ModelID: ModelTransientCircuitV1,
+		Analyses: []Analysis{{
+			ID: "load_event", Kind: AnalysisElectrothermal, DurationS: 2e-3, TimeStepS: 100e-6,
+			Conditions:  []NamedValue{{Name: "ambient_temperature_c", Value: 25}},
+			Excitations: []SourceExcitation{{Component: "supply", DCValue: 1}},
+		}},
+		Assertions: []Assertion{{AnalysisID: "load_event", Component: "load", Quantity: QuantityJunctionTemperatureC, Min: 25, Max: 30}},
+	}
+	components := []ComponentEvidence{
+		voltageSourceEvidence("supply", "OUT", "GND"),
+		{
+			InstanceID: "load", CatalogID: "resistor.reviewed", Family: "resistor", HasValueSI: true, ValueSI: 100,
+			ModelClaims: []CatalogEvidence{{ModelID: PrimitiveResistorV1, Parameters: []NamedValue{
+				{Name: "max_temperature_c", Value: 150},
+				{Name: "thermal_resistance_c_per_w", Value: 50},
+			}}},
+			Connections: []ConnectionEvidence{{Function: "A", Net: "OUT"}, {Function: "B", Net: "GND"}},
+		},
+	}
+	plan, diagnostics := ResolveWithTopology(intent, "catalog", "catalog-hash", components, []NodeEvidence{{Name: "GND", Role: "ground"}, {Name: "OUT"}})
+	if len(diagnostics) != 0 {
+		t.Fatalf("aperiodic electrothermal plan diagnostics = %#v", diagnostics)
+	}
+	_, diagnostics = Evaluate(plan)
+	if len(diagnostics) == 0 || !strings.Contains(diagnostics[0].Message, "requires reviewed thermal capacitance") {
+		t.Fatalf("aperiodic electrothermal diagnostics = %#v", diagnostics)
+	}
+	if !strings.Contains(diagnostics[0].Message, "steady thermal resistance alone") ||
+		!strings.Contains(diagnostics[0].Suggestion, "reviewed thermal RC network") ||
+		!strings.Contains(diagnostics[0].Suggestion, "periodic or steady operating regime") {
+		t.Fatalf("aperiodic electrothermal guidance = %#v", diagnostics[0])
 	}
 }
 

@@ -108,6 +108,11 @@ func BuildValueSearchPlan(
 			domain.Unit = original.ValueDomain.Unit
 		}
 		variants := compatibleValueVariants(original, inventory, requiredAnalyses)
+		variants = slices.DeleteFunc(variants, func(variant PrimitiveCandidate) bool {
+			return !stepDownOutputCapacitorVariantAllowed(
+				requirement, normalizedGraph, instance, variant, inventoryByKey,
+			)
+		})
 		for _, variant := range variants {
 			candidates, variantRejections := valueCandidatesForVariant(
 				requirement,
@@ -553,6 +558,60 @@ func multiplicativeRelativeError(value, scale float64) float64 {
 // whose ratio most closely realizes a derived divider ratio. This keeps
 // coupled divider values electrically coherent when the concrete catalog is
 // sparse instead of rounding the two legs independently.
+type catalogResistanceValue struct {
+	nominal float64
+	minimum float64
+	maximum float64
+}
+
+func reviewedCatalogResistanceValues(
+	requirement Requirement,
+	inventory map[string]PrimitiveCandidate,
+) []catalogResistanceValue {
+	requiredAnalyses := requirementAnalysisSet(requirement)
+	valueByNominal := map[float64]catalogResistanceValue{}
+	for _, primitive := range inventory {
+		if primitive.Kind != "resistor" || primitive.ValueDomain == nil ||
+			!ratingsCoverRequirement(requirement, primitive) ||
+			!primitiveCoversAllAnalyses(primitive, requiredAnalyses) {
+			continue
+		}
+		value := 0.0
+		switch {
+		case primitive.ValueDomain.Nominal != nil:
+			value = *primitive.ValueDomain.Nominal
+		case primitive.ValueDomain.Minimum != nil && primitive.ValueDomain.Maximum != nil &&
+			*primitive.ValueDomain.Minimum == *primitive.ValueDomain.Maximum:
+			value = *primitive.ValueDomain.Minimum
+		}
+		if value < 1_000 || value > 1_000_000 {
+			continue
+		}
+		tolerance, proven := primitiveTolerancePercent(primitive, "resistance")
+		if !proven {
+			continue
+		}
+		fraction := tolerance / 100
+		candidate := catalogResistanceValue{
+			nominal: value,
+			minimum: value * (1 - fraction),
+			maximum: value * (1 + fraction),
+		}
+		existing, exists := valueByNominal[value]
+		if !exists || candidate.maximum-candidate.minimum < existing.maximum-existing.minimum {
+			valueByNominal[value] = candidate
+		}
+	}
+	values := make([]catalogResistanceValue, 0, len(valueByNominal))
+	for _, value := range valueByNominal {
+		values = append(values, value)
+	}
+	slices.SortFunc(values, func(left, right catalogResistanceValue) int {
+		return cmp.Compare(left.nominal, right.nominal)
+	})
+	return values
+}
+
 func catalogResistanceDivider(
 	requirement Requirement,
 	inventory map[string]PrimitiveCandidate,
@@ -568,51 +627,7 @@ func catalogResistanceDivider(
 		maximumSupplyVoltage < minimumSupplyVoltage || lowerBranchCount <= 0 {
 		return 0, nil, false
 	}
-	requiredAnalyses := requirementAnalysisSet(requirement)
-	type resistanceValue struct {
-		nominal float64
-		minimum float64
-		maximum float64
-	}
-	valueByNominal := map[float64]resistanceValue{}
-	for _, primitive := range inventory {
-		if primitive.Kind != "resistor" || primitive.ValueDomain == nil ||
-			!ratingsCoverRequirement(requirement, primitive) ||
-			!primitiveCoversAllAnalyses(primitive, requiredAnalyses) {
-			continue
-		}
-		value := 0.0
-		switch {
-		case primitive.ValueDomain.Nominal != nil:
-			value = *primitive.ValueDomain.Nominal
-		case primitive.ValueDomain.Minimum != nil && primitive.ValueDomain.Maximum != nil &&
-			*primitive.ValueDomain.Minimum == *primitive.ValueDomain.Maximum:
-			value = *primitive.ValueDomain.Minimum
-		}
-		if value >= 1_000 && value <= 1_000_000 {
-			tolerance, proven := primitiveTolerancePercent(primitive, "resistance")
-			if !proven {
-				continue
-			}
-			fraction := tolerance / 100
-			candidate := resistanceValue{
-				nominal: value,
-				minimum: value * (1 - fraction),
-				maximum: value * (1 + fraction),
-			}
-			existing, exists := valueByNominal[value]
-			if !exists || candidate.maximum-candidate.minimum < existing.maximum-existing.minimum {
-				valueByNominal[value] = candidate
-			}
-		}
-	}
-	values := make([]resistanceValue, 0, len(valueByNominal))
-	for _, value := range valueByNominal {
-		values = append(values, value)
-	}
-	slices.SortFunc(values, func(left, right resistanceValue) int {
-		return cmp.Compare(left.nominal, right.nominal)
-	})
+	values := reviewedCatalogResistanceValues(requirement, inventory)
 	if !combinationCountWithinBudget(
 		len(values),
 		lowerBranchCount,
@@ -623,10 +638,10 @@ func catalogResistanceDivider(
 	bestUpper := 0.0
 	bestLower := []float64(nil)
 	bestWorstRatioError, bestRatioError, bestAnchorError := math.Inf(1), math.Inf(1), math.Inf(1)
-	lowerCombinations := [][]resistanceValue{}
+	lowerCombinations := [][]catalogResistanceValue{}
 	indices := make([]int, lowerBranchCount)
 	for {
-		combination := make([]resistanceValue, lowerBranchCount)
+		combination := make([]catalogResistanceValue, lowerBranchCount)
 		for index, valueIndex := range indices {
 			combination[index] = values[valueIndex]
 		}
@@ -684,6 +699,57 @@ func catalogResistanceDivider(
 		}
 	}
 	return bestUpper, bestLower, bestUpper > 0 && len(bestLower) == lowerBranchCount
+}
+
+// catalogControllerFeedbackDivider chooses a reviewed resistor pair whose
+// complete tolerance envelope keeps a controller-referenced output inside the
+// declared voltage bounds. The equilibrium is Vout=Vref*(1+Rupper/Rlower), so
+// both controller-reference uncertainty and resistor tolerance participate in
+// the ranking instead of being deferred to a repair that may never enumerate
+// the coupled pair.
+func catalogControllerFeedbackDivider(
+	requirement Requirement,
+	inventory map[string]PrimitiveCandidate,
+	referenceNominal, referenceMinimum, referenceMaximum float64,
+	outputMinimum, outputMaximum, anchorLower float64,
+) (float64, float64, bool) {
+	if referenceNominal <= 0 || referenceMinimum <= 0 ||
+		referenceMaximum < referenceMinimum || outputMinimum <= referenceMaximum ||
+		outputMaximum < outputMinimum || anchorLower <= 0 {
+		return 0, 0, false
+	}
+	values := reviewedCatalogResistanceValues(requirement, inventory)
+	if !combinationCountWithinBudget(len(values), 2, maxCatalogResistanceDividerCombinations) {
+		return 0, 0, false
+	}
+	targetOutput := (outputMinimum + outputMaximum) / 2
+	bestUpper, bestLower := 0.0, 0.0
+	bestNominalError, bestCornerImbalance, bestAnchorError := math.Inf(1), math.Inf(1), math.Inf(1)
+	for _, upper := range values {
+		for _, lower := range values {
+			minimumOutput := referenceMinimum * (1 + upper.minimum/lower.maximum)
+			maximumOutput := referenceMaximum * (1 + upper.maximum/lower.minimum)
+			if minimumOutput < outputMinimum || maximumOutput > outputMaximum {
+				continue
+			}
+			nominalOutput := referenceNominal * (1 + upper.nominal/lower.nominal)
+			nominalError := math.Abs(nominalOutput - targetOutput)
+			cornerImbalance := math.Abs((minimumOutput - outputMinimum) - (outputMaximum - maximumOutput))
+			anchorError := multiplicativeRelativeError(lower.nominal, anchorLower)
+			if nominalError < bestNominalError ||
+				nominalError == bestNominalError && (cornerImbalance < bestCornerImbalance ||
+					cornerImbalance == bestCornerImbalance && (anchorError < bestAnchorError ||
+						anchorError == bestAnchorError && (upper.nominal < bestUpper ||
+							upper.nominal == bestUpper && lower.nominal < bestLower))) {
+				bestUpper, bestLower = upper.nominal, lower.nominal
+				bestNominalError, bestCornerImbalance, bestAnchorError = nominalError, cornerImbalance, anchorError
+			}
+		}
+	}
+	if bestUpper <= 0 || bestLower <= 0 {
+		return 0, 0, false
+	}
+	return bestUpper, bestLower, true
 }
 
 // combinationCountWithinBudget reports whether selecting branchCount values
@@ -784,6 +850,21 @@ func deriveTopologyAnalyticScales(
 	if supply <= 0 {
 		return nil
 	}
+	if scales := deriveAutonomousPeriodicTopologyScales(
+		requirement,
+		graph,
+		instance,
+		inventory,
+	); len(scales) != 0 {
+		return scales
+	}
+	if scales := deriveBoundedBipolarTopologyScales(
+		requirement,
+		graph,
+		instance,
+	); len(scales) != 0 {
+		return scales
+	}
 	if scales := deriveFrequencySelectiveTopologyScales(
 		requirement,
 		graph,
@@ -860,6 +941,7 @@ func deriveTopologyAnalyticScales(
 		return scales
 	}
 	if scales := deriveControlledSwitchTopologyScales(
+		requirement,
 		graph,
 		instance,
 	); len(scales) != 0 {
@@ -1224,6 +1306,176 @@ func deriveTopologyAnalyticScales(
 				Priority:   1,
 			}}
 		}
+	}
+	return nil
+}
+
+func deriveAutonomousPeriodicTopologyScales(
+	requirement Requirement,
+	graph CandidateGraph,
+	instance GraphInstance,
+	inventory map[string]PrimitiveCandidate,
+) []AnalyticScale {
+	frequency, outputID, required := topologyAutonomousPeriodicBehavior(requirement)
+	if !required || !slices.Contains([]string{"resistor", "capacitor"}, instance.Kind) ||
+		len(instance.Terminals) != 2 {
+		return nil
+	}
+	output := "port_" + outputID
+	between := func(candidate GraphInstance, left, right string) bool {
+		return len(candidate.Terminals) == 2 &&
+			(candidate.Terminals[0].Node == left && candidate.Terminals[1].Node == right ||
+				candidate.Terminals[0].Node == right && candidate.Terminals[1].Node == left)
+	}
+	var comparator GraphInstance
+	for _, candidate := range graph.Instances {
+		terminals := topologyTerminalNodes(candidate)
+		if (candidate.Kind == "comparator" || candidate.Kind == "opamp") && terminals["OUT"] == output &&
+			terminals["IN_PLUS"] != "" && terminals["IN_MINUS"] != "" {
+			comparator = candidate
+			break
+		}
+	}
+	if comparator.ID == "" {
+		return nil
+	}
+	terminals := topologyTerminalNodes(comparator)
+	threshold, timing := terminals["IN_PLUS"], terminals["IN_MINUS"]
+	highRail, reference := terminals["V_PLUS"], terminals["V_MINUS"]
+	minimumLoad := math.Inf(1)
+	for _, operatingCase := range requirement.Requirements.OperatingCases {
+		for _, condition := range operatingCase.Conditions {
+			if condition.Axis == "load_resistance" && condition.Target == outputID && condition.Min > 0 {
+				minimumLoad = math.Min(minimumLoad, condition.Min)
+			}
+		}
+	}
+	if !finite(minimumLoad) {
+		return nil
+	}
+	resistanceAnchor := math.Max(10_000, 5*minimumLoad)
+	oscillatorCutoff := frequency * math.Log(2) / math.Pi
+	timingResistance, timingCapacitance, pairOK := catalogRCPair(
+		requirement,
+		inventory,
+		oscillatorCutoff,
+		resistanceAnchor,
+	)
+	if !pairOK {
+		return nil
+	}
+	thresholdResistance := resistanceAnchor
+	isolationResistance := 10 * thresholdResistance
+	result := AnalyticScale{
+		Kind:       "resistance",
+		Unit:       "ohm",
+		SourceKind: "candidate_topology",
+		SourceID:   outputID,
+		Priority:   1,
+	}
+	switch {
+	case instance.Kind == "resistor" && between(instance, output, timing):
+		result.ID = "topology:autonomous_periodic_timing_resistance:" + instance.ID
+		result.ValueSI = timingResistance
+		result.Derivation = "catalog R-C pair realizes the bounded autonomous oscillation frequency"
+	case instance.Kind == "capacitor" && between(instance, timing, reference):
+		result.ID = "topology:autonomous_periodic_timing_capacitance:" + instance.ID
+		result.Kind, result.Unit = "capacitance", "F"
+		result.ValueSI = timingCapacitance
+		result.Derivation = "catalog R-C pair realizes the bounded autonomous oscillation frequency"
+	case instance.Kind == "resistor" &&
+		(between(instance, output, threshold) || between(instance, highRail, threshold) || between(instance, threshold, reference)):
+		result.ID = "topology:autonomous_periodic_threshold:" + instance.ID
+		result.ValueSI = thresholdResistance
+		result.Derivation = "equal conductances establish symmetric one-third and two-thirds hysteresis thresholds"
+	case instance.Kind == "resistor" && between(instance, output, highRail):
+		low, high, swingOK := topologyDecisionOutputSwing(requirement, graph, comparator, inventory)
+		requiredSwing := requirementMinimumMetric(requirement, "output_swing")
+		maximumPullup := 0.0
+		if swingOK && requiredSwing > 0 && high-low > requiredSwing {
+			maximumPullup = minimumLoad * ((high-low)/requiredSwing - 1)
+		}
+		if maximumPullup <= 0 {
+			return nil
+		}
+		result.ID = "topology:autonomous_periodic_pullup:" + instance.ID
+		result.ValueSI = .5 * maximumPullup
+		result.Derivation = "pull-up resistance preserves the declared loaded output swing with deterministic headroom"
+	case instance.Kind == "resistor" && between(instance, threshold, "port_"+topologyAutonomousControlPort(requirement)):
+		result.ID = "topology:autonomous_periodic_enable_isolation:" + instance.ID
+		result.ValueSI = isolationResistance
+		result.Derivation = "enable isolation is one decade above the hysteresis network impedance"
+	default:
+		return nil
+	}
+	if result.ValueSI <= 0 || !finite(result.ValueSI) {
+		return nil
+	}
+	return []AnalyticScale{result}
+}
+
+func topologyAutonomousControlPort(requirement Requirement) string {
+	for _, port := range requirement.Requirements.Ports {
+		if port.Kind == "digital" && port.Direction == "sink" {
+			return port.ID
+		}
+	}
+	return ""
+}
+
+func deriveBoundedBipolarTopologyScales(
+	requirement Requirement,
+	graph CandidateGraph,
+	instance GraphInstance,
+) []AnalyticScale {
+	if instance.Kind != "resistor" || len(instance.Terminals) != 2 {
+		return nil
+	}
+	envelope, required := topologyBoundedBipolarEnvelope(requirement)
+	if !required {
+		return nil
+	}
+	input, output := "port_"+envelope.input, "port_"+envelope.output
+	between := func(candidate GraphInstance, left, right string) bool {
+		return len(candidate.Terminals) == 2 &&
+			(candidate.Terminals[0].Node == left && candidate.Terminals[1].Node == right ||
+				candidate.Terminals[0].Node == right && candidate.Terminals[1].Node == left)
+	}
+	parallel := []string{}
+	for _, candidate := range graph.Instances {
+		if candidate.Kind == "resistor" && between(candidate, input, output) {
+			parallel = append(parallel, candidate.ID)
+		}
+	}
+	if len(parallel) == 2 && slices.Contains(parallel, instance.ID) {
+		currentLimit := topologyBipolarReferenceCurrentLimit(requirement)
+		minimumEffective := (envelope.maximumInputAbsV - envelope.maximumOutputAbsV) / currentLimit
+		maximumEffective := envelope.minimumLoadOhm * (1/envelope.minimumGain - 1)
+		if currentLimit > 0 && minimumEffective > 0 && maximumEffective >= minimumEffective {
+			return []AnalyticScale{{
+				ID:         "topology:bounded_bipolar_series:" + instance.ID,
+				Kind:       "resistance",
+				ValueSI:    2 * geometricMean(minimumEffective, maximumEffective),
+				Unit:       "ohm",
+				Derivation: "equal parallel branches realize the bounded clamp-current and passband-gain resistance interval",
+				SourceKind: "candidate_topology",
+				SourceID:   envelope.output,
+				Priority:   1,
+			}}
+		}
+	}
+	references := topologyNodesByRole(graph, "reference")
+	if len(references) == 1 && between(instance, output, references[0]) {
+		return []AnalyticScale{{
+			ID:         "topology:bounded_bipolar_bias:" + instance.ID,
+			Kind:       "resistance",
+			ValueSI:    math.Max(1e6, envelope.minimumLoadOhm*100),
+			Unit:       "ohm",
+			Derivation: "high-impedance output return derived from the minimum declared load",
+			SourceKind: "candidate_topology",
+			SourceID:   envelope.output,
+			Priority:   1,
+		}}
 	}
 	return nil
 }
@@ -1953,15 +2205,20 @@ func deriveRegulatedVoltageTopologyScales(
 	inventory map[string]PrimitiveCandidate,
 ) []AnalyticScale {
 	if !slices.Contains([]string{"resistor", "capacitor"}, instance.Kind) ||
-		len(instance.Terminals) != 2 ||
-		!topologyGraphHasReferenceRegulatedOutput(graph, false) {
+		len(instance.Terminals) != 2 {
 		return nil
 	}
-	outputTarget := 0.0
+	outputTarget, outputMinimum, outputMaximum := 0.0, 0.0, 0.0
 	outputID := ""
 	for _, assertion := range requirement.Requirements.BehavioralRequirements {
 		if assertion.Metric == "output_voltage" && assertion.Observation.Kind == "port" {
 			outputTarget = assertionTarget(assertion)
+			if assertion.Min != nil {
+				outputMinimum = *assertion.Min
+			}
+			if assertion.Max != nil {
+				outputMaximum = *assertion.Max
+			}
 			outputID = "port_" + assertion.Observation.ID
 			break
 		}
@@ -2006,6 +2263,60 @@ func deriveRegulatedVoltageTopologyScales(
 			return nil
 		}
 		return paths[0]
+	}
+	// A switching regulator with a reviewed internal reference exposes that
+	// reference through its FB terminal rather than through a separate shunt
+	// device. Size the explicit output divider from the same terminal
+	// relationship used by the trusted model. Keeping this recognition model-
+	// and terminal-based makes it apply to any catalog part backed by the
+	// synchronous-buck contract.
+	for _, controller := range graph.Instances {
+		referenceVoltage, referenceMinimum, referenceMaximum, referenceFound := primitiveModelParameterRange(
+			inventory[controller.PrimitiveKey],
+			simmodel.PrimitiveSynchronousBuckRegulatorV1,
+			"reference_voltage_v",
+		)
+		if !referenceFound || outputTarget <= referenceVoltage ||
+			outputMinimum <= 0 || outputMaximum < outputMinimum {
+			continue
+		}
+		terminals := topologyTerminalNodes(controller)
+		feedback := terminals["FB"]
+		if feedback == "" || terminals["AGND"] != references[0] {
+			continue
+		}
+		upperID, lowerID := between(outputID, feedback), between(feedback, references[0])
+		if upperID == "" || lowerID == "" ||
+			instance.ID != upperID && instance.ID != lowerID {
+			continue
+		}
+		upper, lower, found := catalogControllerFeedbackDivider(
+			requirement, inventory,
+			referenceVoltage, referenceMinimum, referenceMaximum,
+			outputMinimum, outputMaximum, 10_000,
+		)
+		if !found {
+			fallbackUpper, fallbackLower, fallbackFound := catalogResistanceDivider(
+				requirement, inventory, outputTarget/referenceVoltage-1, 10_000, 1,
+				outputTarget, outputTarget, 0, 0,
+			)
+			if !fallbackFound {
+				return nil
+			}
+			upper, lower, found = fallbackUpper, fallbackLower[0], true
+		}
+		value, id := lower, "topology:regulated_feedback_lower"
+		if instance.ID == upperID {
+			value, id = upper, "topology:regulated_feedback_upper"
+		}
+		return []AnalyticScale{{
+			ID: id + ":" + instance.ID, Kind: "resistance", ValueSI: value, Unit: "ohm",
+			Derivation: "catalog-ranked divider ratio derived from a reviewed controller reference and bounded output voltage",
+			SourceKind: "candidate_topology", SourceID: feedback, Priority: 1,
+		}}
+	}
+	if !topologyGraphHasReferenceRegulatedOutput(graph, false) {
+		return nil
 	}
 	absoluteReference, referenceVoltage := "", 0.0
 	for _, candidate := range graph.Instances {
@@ -4111,6 +4422,7 @@ func catalogNonInvertingGainTriplet(
 }
 
 func deriveControlledSwitchTopologyScales(
+	requirement Requirement,
 	graph CandidateGraph,
 	instance GraphInstance,
 ) []AnalyticScale {
@@ -4131,15 +4443,14 @@ func deriveControlledSwitchTopologyScales(
 		if nodeByID[gateNode].Scope != "internal" {
 			continue
 		}
-		hasControlledDevice := false
+		controlledOutputs := map[string]bool{}
 		for _, active := range graph.Instances {
 			if active.Kind == "n_channel_mosfet" &&
 				topologyTerminalNodes(active)["GATE"] == gateNode {
-				hasControlledDevice = true
-				break
+				controlledOutputs[topologyTerminalNodes(active)["DRAIN"]] = true
 			}
 		}
-		if !hasControlledDevice {
+		if len(controlledOutputs) == 0 {
 			continue
 		}
 		thresholdNode := ""
@@ -4162,12 +4473,48 @@ func deriveControlledSwitchTopologyScales(
 			if first != gateNode && second != gateNode {
 				continue
 			}
+			const anchorResistance = 10_000.0
+			shuntBranches := 0
+			for _, candidate := range graph.Instances {
+				if candidate.Kind != "resistor" || len(candidate.Terminals) != 2 {
+					continue
+				}
+				if candidate.Terminals[0].Node == gateNode || candidate.Terminals[1].Node == gateNode {
+					shuntBranches++
+				}
+			}
+			if shuntBranches == 0 {
+				shuntBranches = 1
+			}
+			theveninResistance := anchorResistance / float64(shuntBranches)
+			edgeLimit := math.Inf(1)
+			maximumFrequency := 0.0
+			for _, assertion := range requirement.Requirements.BehavioralRequirements {
+				observedNode := "port_" + assertion.Observation.ID
+				if assertion.Observation.Kind != "port" || !controlledOutputs[observedNode] {
+					continue
+				}
+				if slices.Contains([]string{"rise_time", "fall_time"}, assertion.Metric) &&
+					assertion.Max != nil && *assertion.Max > 0 {
+					edgeLimit = math.Min(edgeLimit, *assertion.Max)
+				}
+				if assertion.FrequencyHz != nil && *assertion.FrequencyHz > maximumFrequency {
+					maximumFrequency = *assertion.FrequencyHz
+				}
+			}
+			if maximumFrequency > 0 {
+				edgeLimit = math.Min(edgeLimit, 1/(20*maximumFrequency))
+			}
+			capacitance := 10e-9
+			if finite(edgeLimit) {
+				capacitance = math.Min(capacitance, edgeLimit/(2.2*theveninResistance))
+			}
 			return []AnalyticScale{{
 				ID:         "topology:default_state_hold:" + instance.ID,
 				Kind:       "capacitance",
-				ValueSI:    10e-9,
+				ValueSI:    capacitance,
 				Unit:       "F",
-				Derivation: "bounded control-node hold capacitance for deterministic startup state",
+				Derivation: "control-node hold capacitance bounded by the switching period, requested transition time, and gate-network Thevenin resistance",
 				SourceKind: "candidate_topology",
 				SourceID:   decision.ID,
 				Priority:   1,
@@ -4776,6 +5123,8 @@ func preferredSeriesForDomain(
 func ratingsCoverRequirement(requirement Requirement, primitive PrimitiveCandidate) bool {
 	requiredVoltage := 0.0
 	requiredTemperature := 0.0
+	requiredMaximumDelayS := math.Inf(1)
+	requiredFrequencyHz := 0.0
 	for _, domain := range requirement.Requirements.Domains {
 		if domain.MaxVoltageV != nil {
 			requiredVoltage = math.Max(requiredVoltage, math.Abs(*domain.MaxVoltageV))
@@ -4794,6 +5143,21 @@ func ratingsCoverRequirement(requirement Requirement, primitive PrimitiveCandida
 			}
 		}
 	}
+	for _, assertion := range requirement.Requirements.BehavioralRequirements {
+		switch assertion.Metric {
+		case "propagation_delay", "rise_time", "fall_time":
+			if assertion.Max != nil && *assertion.Max > 0 {
+				requiredMaximumDelayS = math.Min(requiredMaximumDelayS, *assertion.Max)
+			}
+		case "oscillation_frequency":
+			if assertion.Min != nil && *assertion.Min > 0 {
+				requiredFrequencyHz = math.Max(requiredFrequencyHz, *assertion.Min)
+			}
+		}
+		if assertion.FrequencyHz != nil && *assertion.FrequencyHz > 0 {
+			requiredFrequencyHz = math.Max(requiredFrequencyHz, *assertion.FrequencyHz)
+		}
+	}
 	for _, rating := range primitive.Ratings {
 		limit := boundMaximum(rating)
 		if limit <= 0 {
@@ -4808,9 +5172,33 @@ func ratingsCoverRequirement(requirement Requirement, primitive PrimitiveCandida
 			if requiredTemperature > 0 && requiredTemperature > limit {
 				return false
 			}
+		case "propagation_delay":
+			delayS, found := timeBoundSeconds(limit, rating.Unit)
+			if !found {
+				continue
+			}
+			if delayS > requiredMaximumDelayS ||
+				(requiredFrequencyHz > 0 && delayS > 0.5/requiredFrequencyHz) {
+				return false
+			}
 		}
 	}
 	return true
+}
+
+func timeBoundSeconds(value float64, unit string) (float64, bool) {
+	switch strings.ToLower(strings.TrimSpace(unit)) {
+	case "s", "sec", "second", "seconds":
+		return value, true
+	case "ms":
+		return value * 1e-3, true
+	case "us", "µs", "μs":
+		return value * 1e-6, true
+	case "ns":
+		return value * 1e-9, true
+	default:
+		return 0, false
+	}
 }
 
 func boundMaximum(bound PrimitiveBound) float64 {

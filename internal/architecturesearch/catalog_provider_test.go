@@ -1758,7 +1758,7 @@ func TestCatalogProviderSizesProtectedConverterShutdownDischarge(t *testing.T) {
 	}
 	if !slices.ContainsFunc(realization.Instances, func(instance RealizationInstance) bool {
 		return instance.ID == "converter_pre_regulator_input_bypass" &&
-			instance.CatalogID == "capacitor.panasonic.eeufr1h220.radial" &&
+			instance.CatalogID == "capacitor.panasonic.eeufc1j220.radial" &&
 			instance.Value == "22u"
 	}) {
 		t.Fatalf("wide-input preregulator lacks its voltage-qualified input bypass: %#v", realization.Instances)

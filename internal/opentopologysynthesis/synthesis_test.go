@@ -207,6 +207,23 @@ func assertSynthesisConsumptionMatchesEvidence(t *testing.T, run SynthesisRun) {
 	}
 }
 
+func TestSynthesisValueCapabilityUnavailableRequiresEveryPlanToLackCoverage(t *testing.T) {
+	if synthesisValueCapabilityUnavailable(nil) {
+		t.Fatal("empty candidate set is not a value capability decision")
+	}
+	unsupported := []SynthesisCandidateEvidence{
+		{ValuePlan: ValueSearchPlan{Status: ValuePlanExhausted}},
+		{ValuePlan: ValueSearchPlan{Status: ValuePlanUnsupported}},
+	}
+	if !synthesisValueCapabilityUnavailable(unsupported) {
+		t.Fatal("uniform exhausted/unsupported value plans did not form a capability gap")
+	}
+	unsupported[1].ValuePlan.Status = ValuePlanReady
+	if synthesisValueCapabilityUnavailable(unsupported) {
+		t.Fatal("a ready value plan was misclassified as a catalog capability gap")
+	}
+}
+
 func TestSynthesizeFailsClosedBeforeSearchAndHonorsCancellation(t *testing.T) {
 	requirement, _, inventory, environment := testSimulationFixture(t)
 	invalid := requirement

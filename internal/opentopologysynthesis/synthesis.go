@@ -332,6 +332,9 @@ func Synthesize(
 	} else if run.Report.Consumption.BudgetExhausted {
 		run.Report.Status = StatusExhausted
 		run.Report.StopReason = StopSearchExhausted
+	} else if synthesisValueCapabilityUnavailable(run.Candidates) {
+		run.Report.Status = StatusUnsupported
+		run.Report.StopReason = StopValueExhausted
 	} else if len(failures) != 0 {
 		run.Report.StopReason = StopRepairExhausted
 	}
@@ -343,6 +346,25 @@ func Synthesize(
 		}}
 	}
 	return finalizeSynthesisRun(run)
+}
+
+// synthesisValueCapabilityUnavailable distinguishes a finite catalog/model
+// coverage gap from search-budget exhaustion. A graph whose every retained
+// value plan has no compatible reviewed primitive cannot be repaired by more
+// trials; reporting it as unsupported gives callers an actionable onboarding
+// boundary while still failing closed without a physical design.
+func synthesisValueCapabilityUnavailable(candidates []SynthesisCandidateEvidence) bool {
+	if len(candidates) == 0 {
+		return false
+	}
+	for _, candidate := range candidates {
+		switch candidate.ValuePlan.Status {
+		case ValuePlanExhausted, ValuePlanUnsupported:
+		default:
+			return false
+		}
+	}
+	return true
 }
 
 func synthesisPostPassEvaluationBudget(policy Policy) int {

@@ -1689,6 +1689,9 @@ func assertionValue(results []AnalysisResult, assertion Assertion) (float64, *Di
 				assertion.Quantity == QuantityPeakAbsDeviceCurrentA ||
 				assertion.Quantity == QuantityOvershootVoltageV ||
 				assertion.Quantity == QuantityOutputSwingVPP ||
+				assertion.Quantity == QuantityOscillationFrequencyHz ||
+				assertion.Quantity == QuantityDutyCyclePct ||
+				assertion.Quantity == QuantityOutputRippleVPP ||
 				assertion.Quantity == QuantitySettlingTimeS ||
 				assertion.Quantity == QuantityResponseTimeS ||
 				assertion.Quantity == QuantityOutputPowerW ||
@@ -1700,6 +1703,7 @@ func assertionValue(results []AnalysisResult, assertion Assertion) (float64, *Di
 		}
 		if result.Kind == AnalysisDCOperatingPoint &&
 			(assertion.Quantity == QuantityDCSweepVoltageSpanV ||
+				assertion.Quantity == QuantityDCSweepVoltageSlopeVPerV ||
 				assertion.Quantity == QuantityDCSweepDeviceSlopeAperV) {
 			return dcSweepSpanOrSlope(result, assertion)
 		}

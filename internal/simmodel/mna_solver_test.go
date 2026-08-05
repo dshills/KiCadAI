@@ -1767,6 +1767,39 @@ func TestMNAPeriodicThermalAveragesFinalCompleteCycles(t *testing.T) {
 	}
 }
 
+func TestMNAPeriodicThermalUsesPulseFundamental(t *testing.T) {
+	intent := Intent{
+		ModelID: ModelTransientCircuitV1,
+		Analyses: []Analysis{{
+			ID: "hot", Kind: AnalysisThermal, DurationS: .004, TimeStepS: .00003125,
+			Conditions: []NamedValue{{Name: "ambient_temperature_c", Value: 25}},
+			Excitations: []SourceExcitation{{
+				Component: "signal", PulseInitialValue: 0, PulseValue: 1,
+				PulseWidthS: .0005, PulsePeriodS: .001,
+			}},
+		}},
+		Assertions: []Assertion{
+			{AnalysisID: "hot", Component: "load", Quantity: QuantityDeviceDissipationW, Min: .004999, Max: .005001},
+			{AnalysisID: "hot", Component: "load", Quantity: QuantityJunctionTemperatureC, Min: 25.2499, Max: 25.2501},
+		},
+	}
+	components := []ComponentEvidence{
+		voltageSourceEvidence("signal", "OUT", "GND"),
+		{InstanceID: "load", CatalogID: "resistor.power", Family: "resistor", HasValueSI: true, ValueSI: 100, ModelClaims: []CatalogEvidence{{ModelID: PrimitiveResistorV1, Parameters: []NamedValue{{Name: "max_temperature_c", Value: 150}, {Name: "thermal_resistance_c_per_w", Value: 50}}}}, Connections: []ConnectionEvidence{{Function: "A", Net: "OUT"}, {Function: "B", Net: "GND"}}},
+	}
+	plan, diagnostics := ResolveWithTopology(intent, "catalog", "catalog-hash", components, []NodeEvidence{{Name: "GND", Role: "ground"}, {Name: "OUT"}})
+	if len(diagnostics) != 0 {
+		t.Fatalf("pulse thermal resolution diagnostics = %#v", diagnostics)
+	}
+	report, diagnostics := Evaluate(plan)
+	if len(diagnostics) != 0 || report.Status != "pass" {
+		t.Fatalf("pulse thermal report = %#v diagnostics=%#v", report, diagnostics)
+	}
+	if math.Abs(report.Assertions[0].Actual-.005) > 1e-15 || report.Assertions[1].Actual != 25.25 {
+		t.Fatalf("pulse thermal assertions = %#v", report.Assertions)
+	}
+}
+
 func TestMNAThermalFailsClosedWithoutThermalPath(t *testing.T) {
 	intent := Intent{
 		ModelID:    ModelLinearCircuitMNAV1,

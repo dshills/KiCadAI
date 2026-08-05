@@ -261,6 +261,150 @@ func synchronousBuckDissipation(device ResolvedDevice, system mnaSystem, solutio
 	return math.Max(0, loss), true
 }
 
+func synchronousBuckPeriodicNodeResults(
+	plan Plan,
+	transient AnalysisResult,
+) []PeriodicNodeResult {
+	results := []PeriodicNodeResult{}
+	for _, device := range plan.Devices {
+		if device.PrimitiveModel != PrimitiveSynchronousBuckRegulatorV1 {
+			continue
+		}
+		output, found := synchronousBuckOutputNet(plan, device)
+		if !found {
+			continue
+		}
+		parameters := deviceParameterMap(device)
+		frequency := parameters["switching_frequency_hz"]
+		terminals := terminalMap(device)
+		reference := terminals["PGND"]
+		if reference == plan.GroundNode {
+			reference = ""
+		}
+		inputV, inputFound := settledPeriodicNodeAverage(transient, terminals["PVIN"], reference, frequency)
+		outputV, outputFound := settledPeriodicNodeAverage(transient, output, reference, frequency)
+		inputV, outputV = math.Abs(inputV), math.Abs(outputV)
+		if !inputFound || !outputFound || frequency <= 0 || inputV <= 0 || outputV <= 0 || outputV >= inputV {
+			continue
+		}
+		inductance := 0.0
+		inductors := 0
+		capacitance := 0.0
+		parallelESRConductance := 0.0
+		zeroESRBranch := false
+		capacitorESRProven := true
+		capacitors := 0
+		for _, candidate := range plan.Devices {
+			candidateTerminals := terminalMap(candidate)
+			switch candidate.PrimitiveModel {
+			case PrimitiveInductorTransientV1:
+				if candidate.ValueSI != nil &&
+					((candidateTerminals["A"] == terminals["SW"] && candidateTerminals["B"] == output) ||
+						(candidateTerminals["B"] == terminals["SW"] && candidateTerminals["A"] == output)) {
+					inductance = *candidate.ValueSI
+					inductors++
+				}
+			case PrimitiveCapacitorTransientV1:
+				if candidate.ValueSI != nil &&
+					((candidateTerminals["A"] == output && candidateTerminals["B"] == terminals["PGND"]) ||
+						(candidateTerminals["B"] == output && candidateTerminals["A"] == terminals["PGND"])) {
+					capacitance += *candidate.ValueSI
+					capacitors++
+					esr, found := deviceParameterMap(candidate)["series_resistance_ohm"]
+					if !found || esr < 0 || !finite(esr) {
+						capacitorESRProven = false
+					} else if esr == 0 {
+						zeroESRBranch = true
+					} else {
+						conductance := 1 / esr
+						parallelESRConductance += conductance
+						if !finite(conductance) || !finite(parallelESRConductance) {
+							capacitorESRProven = false
+						}
+					}
+				}
+			}
+		}
+		if inductors != 1 || inductance <= 0 || capacitors == 0 || capacitance <= 0 || !capacitorESRProven {
+			continue
+		}
+		effectiveCapacitorESR := 0.0
+		if !zeroESRBranch {
+			if parallelESRConductance <= 0 {
+				continue
+			}
+			effectiveCapacitorESR = 1 / parallelESRConductance
+		}
+		duty := math.Max(0, math.Min(1, outputV/inputV))
+		peakToPeakInductorCurrent := (inputV - outputV) * duty / (inductance * frequency)
+		// Output capacitors share ripple current in parallel, so both their
+		// capacitance and reviewed series conductance contribute to the trusted
+		// analytical envelope.
+		ripple := peakToPeakInductorCurrent * (1/(8*frequency*capacitance) + effectiveCapacitorESR)
+		if !finite(ripple) || ripple < 0 {
+			continue
+		}
+		results = append(results, PeriodicNodeResult{
+			Node: output, Component: device.Component,
+			VoltageRippleVPP: normalizedMNAFloat(ripple),
+			Method:           "averaged_buck_lc_parallel_esr_ripple_bound_v3",
+		})
+	}
+	slices.SortFunc(results, func(left, right PeriodicNodeResult) int {
+		if left.Node != right.Node {
+			if left.Node < right.Node {
+				return -1
+			}
+			return 1
+		}
+		if left.Component < right.Component {
+			return -1
+		}
+		if left.Component > right.Component {
+			return 1
+		}
+		return 0
+	})
+	return results
+}
+
+func settledPeriodicNodeAverage(result AnalysisResult, node, reference string, frequency float64) (float64, bool) {
+	if frequency <= 0 || len(result.Points) < 2 {
+		return 0, false
+	}
+	last := len(result.Points) - 1
+	timeStep := result.Points[last].TimeS - result.Points[last-1].TimeS
+	if timeStep <= 0 {
+		return 0, false
+	}
+	windowStart := result.Points[last].TimeS - math.Max(1/frequency, 2*timeStep)
+	total := 0.0
+	samples := 0
+	for index := last; index >= 0; index-- {
+		point := result.Points[index]
+		if point.TimeS < windowStart && samples >= 2 {
+			break
+		}
+		value, found := analysisNodeReal(point, node)
+		if !found {
+			continue
+		}
+		referenceValue := 0.0
+		if reference != "" {
+			referenceValue, found = analysisNodeReal(point, reference)
+			if !found {
+				continue
+			}
+		}
+		total += value - referenceValue
+		samples++
+	}
+	if samples < 2 {
+		return 0, false
+	}
+	return normalizedMNAFloat(total / float64(samples)), true
+}
+
 func synchronousBuckDeviceResult(device ResolvedDevice, system mnaSystem, solution []complex128) (complex128, complex128, bool) {
 	if device.PrimitiveModel != PrimitiveSynchronousBuckRegulatorV1 {
 		return 0, 0, false

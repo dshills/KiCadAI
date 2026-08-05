@@ -1,17 +1,17 @@
 {
-  "record_count": 248,
+  "record_count": 253,
   "family_count": 33,
   "confidence_counts": {
     "blocked": 1,
     "library_derived": 1,
     "placeholder": 7,
     "rule_inferred": 6,
-    "verified": 233
+    "verified": 238
   },
   "alternative_coverage": {
-    "concrete_records": 210,
+    "concrete_records": 215,
     "generic_fallback_records": 38,
-    "equivalence_groups": 24
+    "equivalence_groups": 28
   },
   "families": [
     {
@@ -114,11 +114,11 @@
     {
       "family": "capacitor",
       "defined": true,
-      "record_count": 18,
-      "concrete_records": 14,
+      "record_count": 22,
+      "concrete_records": 18,
       "generic_fallback_records": 4,
-      "equivalence_groups": 4,
-      "verified_records": 15,
+      "equivalence_groups": 7,
+      "verified_records": 19,
       "library_derived_records": 0,
       "rule_inferred_records": 3,
       "placeholder_records": 0,
@@ -127,7 +127,10 @@
         "capacitor.ceramic.0603",
         "capacitor.ceramic.0805",
         "capacitor.electrolytic.radial",
+        "capacitor.murata.grm188r71e474ka12d.0603",
         "capacitor.murata.grm188r71h104ka93d.0603",
+        "capacitor.murata.grm188r72a104ka35d.0603",
+        "capacitor.murata.grm188z71c475ke21d.0603",
         "capacitor.murata.grm21br61a106ke19l.0805",
         "capacitor.murata.grm21br71h104ka01l.0805"
       ],
@@ -140,9 +143,13 @@
         "capacitor.kemet.t491a475k025at.case_a",
         "capacitor.kemet.t520t476m006ate040.case_t",
         "capacitor.murata.gcm21br71h105ka03l.0805",
+        "capacitor.murata.grm188r71e474ka12d.0603",
         "capacitor.murata.grm188r71h104ka93d.0603",
+        "capacitor.murata.grm188r72a104ka35d.0603",
+        "capacitor.murata.grm188z71c475ke21d.0603",
         "capacitor.murata.grm21br61a106ke19l.0805",
         "capacitor.murata.grm21br71h104ka01l.0805",
+        "capacitor.panasonic.eeufc1j220.radial",
         "capacitor.panasonic.eeufr1a151.radial",
         "capacitor.panasonic.eeufr1a682l.radial",
         "capacitor.panasonic.eeufr1c221.radial",
@@ -711,11 +718,11 @@
     {
       "family": "resistor",
       "defined": true,
-      "record_count": 31,
-      "concrete_records": 24,
+      "record_count": 32,
+      "concrete_records": 25,
       "generic_fallback_records": 7,
-      "equivalence_groups": 4,
-      "verified_records": 29,
+      "equivalence_groups": 5,
+      "verified_records": 30,
       "library_derived_records": 0,
       "rule_inferred_records": 2,
       "placeholder_records": 0,
@@ -757,6 +764,7 @@
         "resistor.vishay.tnpw1206.e192.0p1",
         "resistor.vishay.wslt2512r0100dea.2512",
         "resistor.yageo.rc0603fr_0710kl.0603",
+        "resistor.yageo.rc0603fr_0788k7l.0603",
         "resistor.yageo.rc0805fr_0710kl.0805",
         "resistor.yageo.rc0805fr_0747rl.0805",
         "resistor.yageo.rc0805fr_074k7l.0805"
