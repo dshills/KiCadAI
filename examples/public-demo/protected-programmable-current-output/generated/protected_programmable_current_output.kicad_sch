@@ -1,0 +1,6056 @@
+(kicad_sch
+  (version 20260306)
+  (generator "eeschema")
+  (generator_version "10.0")
+  (uuid "7fed8e2a-f73f-5200-a3f4-187b5a69b8b4")
+  (paper "A4" portrait)
+  (lib_symbols
+    (symbol
+      "Connector_Generic:Conn_01x02"
+      (pin_names
+        (offset 1.016)
+        (hide yes)
+      )
+      (exclude_from_sim no)
+      (in_bom yes)
+      (on_board yes)
+      (in_pos_files yes)
+      (duplicate_pin_numbers_are_jumpers no)
+      (property
+        "Reference"
+        "J"
+        (at 0 2.54 0)
+        (show_name no)
+        (do_not_autoplace no)
+        (effects
+          (font
+            (size 1.27 1.27)
+          )
+        )
+      )
+      (property
+        "Value"
+        "Conn_01x02"
+        (at 0 -5.08 0)
+        (show_name no)
+        (do_not_autoplace no)
+        (effects
+          (font
+            (size 1.27 1.27)
+          )
+        )
+      )
+      (property
+        "Footprint"
+        ""
+        (at 0 0 0)
+        (show_name no)
+        (do_not_autoplace no)
+        (hide yes)
+        (effects
+          (font
+            (size 1.27 1.27)
+          )
+        )
+      )
+      (property
+        "Datasheet"
+        ""
+        (at 0 0 0)
+        (show_name no)
+        (do_not_autoplace no)
+        (hide yes)
+        (effects
+          (font
+            (size 1.27 1.27)
+          )
+        )
+      )
+      (property
+        "Description"
+        "Generic connector, single row, 01x02, script generated (kicad-library-utils/schlib/autogen/connector/)"
+        (at 0 0 0)
+        (show_name no)
+        (do_not_autoplace no)
+        (hide yes)
+        (effects
+          (font
+            (size 1.27 1.27)
+          )
+        )
+      )
+      (property
+        "ki_keywords"
+        "connector"
+        (at 0 0 0)
+        (show_name no)
+        (do_not_autoplace no)
+        (hide yes)
+        (effects
+          (font
+            (size 1.27 1.27)
+          )
+        )
+      )
+      (property
+        "ki_fp_filters"
+        "Connector*:*_1x??_*"
+        (at 0 0 0)
+        (show_name no)
+        (do_not_autoplace no)
+        (hide yes)
+        (effects
+          (font
+            (size 1.27 1.27)
+          )
+        )
+      )
+      (symbol
+        "Conn_01x02_1_1"
+        (rectangle
+          (start -1.27 1.27)
+          (end 1.27 -3.81)
+          (stroke
+            (width 0.254)
+            (type default)
+          )
+          (fill
+            (type background)
+          )
+        )
+        (rectangle
+          (start -1.27 0.127)
+          (end 0 -0.127)
+          (stroke
+            (width 0.1524)
+            (type default)
+          )
+          (fill
+            (type none)
+          )
+        )
+        (rectangle
+          (start -1.27 -2.413)
+          (end 0 -2.667)
+          (stroke
+            (width 0.1524)
+            (type default)
+          )
+          (fill
+            (type none)
+          )
+        )
+        (pin
+          passive
+          line
+          (at -5.08 0 0)
+          (length 3.81)
+          (name
+            "Pin_1"
+            (effects
+              (font
+                (size 1.27 1.27)
+              )
+            )
+          )
+          (number
+            "1"
+            (effects
+              (font
+                (size 1.27 1.27)
+              )
+            )
+          )
+        )
+        (pin
+          passive
+          line
+          (at -5.08 -2.54 0)
+          (length 3.81)
+          (name
+            "Pin_2"
+            (effects
+              (font
+                (size 1.27 1.27)
+              )
+            )
+          )
+          (number
+            "2"
+            (effects
+              (font
+                (size 1.27 1.27)
+              )
+            )
+          )
+        )
+      )
+      (embedded_fonts no)
+    )
+    (symbol
+      "Device:R"
+      (pin_numbers
+        (hide yes)
+      )
+      (pin_names
+        (offset 0)
+      )
+      (exclude_from_sim no)
+      (in_bom yes)
+      (on_board yes)
+      (in_pos_files yes)
+      (duplicate_pin_numbers_are_jumpers no)
+      (property
+        "Reference"
+        "R"
+        (at 2.032 0 90)
+        (show_name no)
+        (do_not_autoplace no)
+        (effects
+          (font
+            (size 1.27 1.27)
+          )
+        )
+      )
+      (property
+        "Value"
+        "R"
+        (at 0 0 90)
+        (show_name no)
+        (do_not_autoplace no)
+        (effects
+          (font
+            (size 1.27 1.27)
+          )
+        )
+      )
+      (property
+        "Footprint"
+        ""
+        (at -1.778 0 90)
+        (show_name no)
+        (do_not_autoplace no)
+        (hide yes)
+        (effects
+          (font
+            (size 1.27 1.27)
+          )
+        )
+      )
+      (property
+        "Datasheet"
+        ""
+        (at 0 0 0)
+        (show_name no)
+        (do_not_autoplace no)
+        (hide yes)
+        (effects
+          (font
+            (size 1.27 1.27)
+          )
+        )
+      )
+      (property
+        "Description"
+        "Resistor"
+        (at 0 0 0)
+        (show_name no)
+        (do_not_autoplace no)
+        (hide yes)
+        (effects
+          (font
+            (size 1.27 1.27)
+          )
+        )
+      )
+      (property
+        "ki_keywords"
+        "R res resistor"
+        (at 0 0 0)
+        (show_name no)
+        (do_not_autoplace no)
+        (hide yes)
+        (effects
+          (font
+            (size 1.27 1.27)
+          )
+        )
+      )
+      (property
+        "ki_fp_filters"
+        "R_*"
+        (at 0 0 0)
+        (show_name no)
+        (do_not_autoplace no)
+        (hide yes)
+        (effects
+          (font
+            (size 1.27 1.27)
+          )
+        )
+      )
+      (symbol
+        "R_0_1"
+        (rectangle
+          (start -1.016 -2.54)
+          (end 1.016 2.54)
+          (stroke
+            (width 0.254)
+            (type default)
+          )
+          (fill
+            (type none)
+          )
+        )
+      )
+      (symbol
+        "R_1_1"
+        (pin
+          passive
+          line
+          (at 0 3.81 270)
+          (length 1.27)
+          (name
+            ""
+            (effects
+              (font
+                (size 1.27 1.27)
+              )
+            )
+          )
+          (number
+            "1"
+            (effects
+              (font
+                (size 1.27 1.27)
+              )
+            )
+          )
+        )
+        (pin
+          passive
+          line
+          (at 0 -3.81 90)
+          (length 1.27)
+          (name
+            ""
+            (effects
+              (font
+                (size 1.27 1.27)
+              )
+            )
+          )
+          (number
+            "2"
+            (effects
+              (font
+                (size 1.27 1.27)
+              )
+            )
+          )
+        )
+      )
+      (embedded_fonts no)
+    )
+    (symbol
+      "Transistor_BJT:Q_PNP_BCE"
+      (pin_names
+        (offset 0)
+        (hide yes)
+      )
+      (exclude_from_sim no)
+      (in_bom yes)
+      (on_board yes)
+      (in_pos_files yes)
+      (duplicate_pin_numbers_are_jumpers no)
+      (property
+        "Reference"
+        "Q"
+        (at 5.08 1.27 0)
+        (show_name no)
+        (do_not_autoplace no)
+        (effects
+          (font
+            (size 1.27 1.27)
+          )
+          (justify left)
+        )
+      )
+      (property
+        "Value"
+        "Q_PNP_BCE"
+        (at 5.08 -1.27 0)
+        (show_name no)
+        (do_not_autoplace no)
+        (effects
+          (font
+            (size 1.27 1.27)
+          )
+          (justify left)
+        )
+      )
+      (property
+        "Footprint"
+        ""
+        (at 5.08 2.54 0)
+        (show_name no)
+        (do_not_autoplace no)
+        (hide yes)
+        (effects
+          (font
+            (size 1.27 1.27)
+          )
+        )
+      )
+      (property
+        "Datasheet"
+        ""
+        (at 0 0 0)
+        (show_name no)
+        (do_not_autoplace no)
+        (hide yes)
+        (effects
+          (font
+            (size 1.27 1.27)
+          )
+        )
+      )
+      (property
+        "Description"
+        "PNP transistor, base/collector/emitter"
+        (at 0 0 0)
+        (show_name no)
+        (do_not_autoplace no)
+        (hide yes)
+        (effects
+          (font
+            (size 1.27 1.27)
+          )
+        )
+      )
+      (property
+        "Sim.Device"
+        "PNP"
+        (at 0 0 0)
+        (show_name no)
+        (do_not_autoplace no)
+        (hide yes)
+        (effects
+          (font
+            (size 1.27 1.27)
+          )
+        )
+      )
+      (property
+        "Sim.Pins"
+        "1=B 2=C 3=E"
+        (at 0 0 0)
+        (show_name no)
+        (do_not_autoplace no)
+        (hide yes)
+        (effects
+          (font
+            (size 1.27 1.27)
+          )
+        )
+      )
+      (property
+        "ki_keywords"
+        "BJT"
+        (at 0 0 0)
+        (show_name no)
+        (do_not_autoplace no)
+        (hide yes)
+        (effects
+          (font
+            (size 1.27 1.27)
+          )
+        )
+      )
+      (symbol
+        "Q_PNP_BCE_0_1"
+        (polyline
+          (pts
+            (xy -2.54 0)
+            (xy 0.635 0)
+          )
+          (stroke
+            (width 0)
+            (type default)
+          )
+          (fill
+            (type none)
+          )
+        )
+        (polyline
+          (pts
+            (xy 0.635 1.905)
+            (xy 0.635 -1.905)
+          )
+          (stroke
+            (width 0.508)
+            (type default)
+          )
+          (fill
+            (type none)
+          )
+        )
+        (polyline
+          (pts
+            (xy 0.635 0.635)
+            (xy 2.54 2.54)
+          )
+          (stroke
+            (width 0)
+            (type default)
+          )
+          (fill
+            (type none)
+          )
+        )
+        (polyline
+          (pts
+            (xy 0.635 -0.635)
+            (xy 2.54 -2.54)
+          )
+          (stroke
+            (width 0)
+            (type default)
+          )
+          (fill
+            (type none)
+          )
+        )
+        (circle
+          (center 1.27 0)
+          (radius 2.8194)
+          (stroke
+            (width 0.254)
+            (type default)
+          )
+          (fill
+            (type none)
+          )
+        )
+        (polyline
+          (pts
+            (xy 2.286 -1.778)
+            (xy 1.778 -2.286)
+            (xy 1.27 -1.27)
+            (xy 2.286 -1.778)
+          )
+          (stroke
+            (width 0)
+            (type default)
+          )
+          (fill
+            (type outline)
+          )
+        )
+      )
+      (symbol
+        "Q_PNP_BCE_1_1"
+        (pin
+          input
+          line
+          (at -5.08 0 0)
+          (length 2.54)
+          (name
+            "B"
+            (effects
+              (font
+                (size 1.27 1.27)
+              )
+            )
+          )
+          (number
+            "1"
+            (effects
+              (font
+                (size 1.27 1.27)
+              )
+            )
+          )
+        )
+        (pin
+          passive
+          line
+          (at 2.54 5.08 270)
+          (length 2.54)
+          (name
+            "C"
+            (effects
+              (font
+                (size 1.27 1.27)
+              )
+            )
+          )
+          (number
+            "2"
+            (effects
+              (font
+                (size 1.27 1.27)
+              )
+            )
+          )
+        )
+        (pin
+          passive
+          line
+          (at 2.54 -5.08 90)
+          (length 2.54)
+          (name
+            "E"
+            (effects
+              (font
+                (size 1.27 1.27)
+              )
+            )
+          )
+          (number
+            "3"
+            (effects
+              (font
+                (size 1.27 1.27)
+              )
+            )
+          )
+        )
+      )
+      (embedded_fonts no)
+    )
+    (symbol
+      "Amplifier_Operational:LM358"
+      (pin_names
+        (offset 0.127)
+      )
+      (exclude_from_sim no)
+      (in_bom yes)
+      (on_board yes)
+      (in_pos_files yes)
+      (duplicate_pin_numbers_are_jumpers no)
+      (property
+        "Reference"
+        "U"
+        (at 0 5.08 0)
+        (show_name no)
+        (do_not_autoplace no)
+        (effects
+          (font
+            (size 1.27 1.27)
+          )
+          (justify left)
+        )
+      )
+      (property
+        "Value"
+        "LM358"
+        (at 0 -5.08 0)
+        (show_name no)
+        (do_not_autoplace no)
+        (effects
+          (font
+            (size 1.27 1.27)
+          )
+          (justify left)
+        )
+      )
+      (property
+        "Footprint"
+        ""
+        (at 0 0 0)
+        (show_name no)
+        (do_not_autoplace no)
+        (hide yes)
+        (effects
+          (font
+            (size 1.27 1.27)
+          )
+        )
+      )
+      (property
+        "Datasheet"
+        "http://www.ti.com/lit/ds/symlink/lm2904-n.pdf"
+        (at 0 0 0)
+        (show_name no)
+        (do_not_autoplace no)
+        (hide yes)
+        (effects
+          (font
+            (size 1.27 1.27)
+          )
+        )
+      )
+      (property
+        "Description"
+        "Low-Power, Dual Operational Amplifiers, DIP-8/SOIC-8/TO-99-8"
+        (at 0 0 0)
+        (show_name no)
+        (do_not_autoplace no)
+        (hide yes)
+        (effects
+          (font
+            (size 1.27 1.27)
+          )
+        )
+      )
+      (property
+        "ki_locked"
+        ""
+        (at 0 0 0)
+        (show_name no)
+        (do_not_autoplace no)
+        (effects
+          (font
+            (size 1.27 1.27)
+          )
+        )
+      )
+      (property
+        "ki_keywords"
+        "dual opamp"
+        (at 0 0 0)
+        (show_name no)
+        (do_not_autoplace no)
+        (hide yes)
+        (effects
+          (font
+            (size 1.27 1.27)
+          )
+        )
+      )
+      (property
+        "ki_fp_filters"
+        "SOIC*3.9x4.9mm*P1.27mm* DIP*W7.62mm* TO*99* OnSemi*Micro8* TSSOP*3x3mm*P0.65mm* TSSOP*4.4x3mm*P0.65mm* MSOP*3x3mm*P0.65mm* SSOP*3.9x4.9mm*P0.635mm* LFCSP*2x2mm*P0.5mm* *SIP* SOIC*5.3x6.2mm*P1.27mm*"
+        (at 0 0 0)
+        (show_name no)
+        (do_not_autoplace no)
+        (hide yes)
+        (effects
+          (font
+            (size 1.27 1.27)
+          )
+        )
+      )
+      (symbol
+        "LM358_1_1"
+        (polyline
+          (pts
+            (xy -5.08 5.08)
+            (xy 5.08 0)
+            (xy -5.08 -5.08)
+            (xy -5.08 5.08)
+          )
+          (stroke
+            (width 0.254)
+            (type default)
+          )
+          (fill
+            (type background)
+          )
+        )
+        (pin
+          output
+          line
+          (at 7.62 0 180)
+          (length 2.54)
+          (name
+            ""
+            (effects
+              (font
+                (size 1.27 1.27)
+              )
+            )
+          )
+          (number
+            "1"
+            (effects
+              (font
+                (size 1.27 1.27)
+              )
+            )
+          )
+        )
+        (pin
+          input
+          line
+          (at -7.62 -2.54 0)
+          (length 2.54)
+          (name
+            "-"
+            (effects
+              (font
+                (size 1.27 1.27)
+              )
+            )
+          )
+          (number
+            "2"
+            (effects
+              (font
+                (size 1.27 1.27)
+              )
+            )
+          )
+        )
+        (pin
+          input
+          line
+          (at -7.62 2.54 0)
+          (length 2.54)
+          (name
+            "+"
+            (effects
+              (font
+                (size 1.27 1.27)
+              )
+            )
+          )
+          (number
+            "3"
+            (effects
+              (font
+                (size 1.27 1.27)
+              )
+            )
+          )
+        )
+      )
+      (symbol
+        "LM358_2_1"
+        (polyline
+          (pts
+            (xy -5.08 5.08)
+            (xy 5.08 0)
+            (xy -5.08 -5.08)
+            (xy -5.08 5.08)
+          )
+          (stroke
+            (width 0.254)
+            (type default)
+          )
+          (fill
+            (type background)
+          )
+        )
+        (pin
+          input
+          line
+          (at -7.62 2.54 0)
+          (length 2.54)
+          (name
+            "+"
+            (effects
+              (font
+                (size 1.27 1.27)
+              )
+            )
+          )
+          (number
+            "5"
+            (effects
+              (font
+                (size 1.27 1.27)
+              )
+            )
+          )
+        )
+        (pin
+          input
+          line
+          (at -7.62 -2.54 0)
+          (length 2.54)
+          (name
+            "-"
+            (effects
+              (font
+                (size 1.27 1.27)
+              )
+            )
+          )
+          (number
+            "6"
+            (effects
+              (font
+                (size 1.27 1.27)
+              )
+            )
+          )
+        )
+        (pin
+          output
+          line
+          (at 7.62 0 180)
+          (length 2.54)
+          (name
+            ""
+            (effects
+              (font
+                (size 1.27 1.27)
+              )
+            )
+          )
+          (number
+            "7"
+            (effects
+              (font
+                (size 1.27 1.27)
+              )
+            )
+          )
+        )
+      )
+      (symbol
+        "LM358_3_1"
+        (pin
+          power_in
+          line
+          (at -2.54 -7.62 90)
+          (length 3.81)
+          (name
+            "V-"
+            (effects
+              (font
+                (size 1.27 1.27)
+              )
+            )
+          )
+          (number
+            "4"
+            (effects
+              (font
+                (size 1.27 1.27)
+              )
+            )
+          )
+        )
+        (pin
+          power_in
+          line
+          (at -2.54 7.62 270)
+          (length 3.81)
+          (name
+            "V+"
+            (effects
+              (font
+                (size 1.27 1.27)
+              )
+            )
+          )
+          (number
+            "8"
+            (effects
+              (font
+                (size 1.27 1.27)
+              )
+            )
+          )
+        )
+      )
+      (embedded_fonts no)
+    )
+    (symbol
+      "Amplifier_Operational:TLV9061xDBV"
+      (pin_names
+        (offset 0.127)
+      )
+      (exclude_from_sim no)
+      (in_bom yes)
+      (on_board yes)
+      (in_pos_files yes)
+      (duplicate_pin_numbers_are_jumpers no)
+      (property
+        "Reference"
+        "U"
+        (at -1.27 6.35 0)
+        (show_name no)
+        (do_not_autoplace no)
+        (effects
+          (font
+            (size 1.27 1.27)
+          )
+          (justify left)
+        )
+      )
+      (property
+        "Value"
+        "TLV9061xDBV"
+        (at -1.27 3.81 0)
+        (show_name no)
+        (do_not_autoplace no)
+        (effects
+          (font
+            (size 1.27 1.27)
+          )
+          (justify left)
+        )
+      )
+      (property
+        "Footprint"
+        "Package_TO_SOT_SMD:SOT-23-5"
+        (at -15.24 -19.05 0)
+        (show_name no)
+        (do_not_autoplace no)
+        (hide yes)
+        (effects
+          (font
+            (size 1.27 1.27)
+          )
+          (justify left)
+        )
+      )
+      (property
+        "Datasheet"
+        "https://www.ti.com/lit/ds/symlink/tlv9061.pdf"
+        (at 0 20.32 0)
+        (show_name no)
+        (do_not_autoplace no)
+        (hide yes)
+        (effects
+          (font
+            (size 1.27 1.27)
+          )
+        )
+      )
+      (property
+        "Description"
+        "10-MHz, RRIO, CMOS Operational Amplifiers for Cost-Sensitive Systems, SOT-23-5"
+        (at 0 0 0)
+        (show_name no)
+        (do_not_autoplace no)
+        (hide yes)
+        (effects
+          (font
+            (size 1.27 1.27)
+          )
+        )
+      )
+      (property
+        "ki_keywords"
+        "single opamp rail to rail input output"
+        (at 0 0 0)
+        (show_name no)
+        (do_not_autoplace no)
+        (hide yes)
+        (effects
+          (font
+            (size 1.27 1.27)
+          )
+        )
+      )
+      (property
+        "ki_fp_filters"
+        "SOT?23*"
+        (at 0 0 0)
+        (show_name no)
+        (do_not_autoplace no)
+        (hide yes)
+        (effects
+          (font
+            (size 1.27 1.27)
+          )
+        )
+      )
+      (symbol
+        "TLV9061xDBV_0_1"
+        (polyline
+          (pts
+            (xy -5.08 5.08)
+            (xy 5.08 0)
+            (xy -5.08 -5.08)
+            (xy -5.08 5.08)
+          )
+          (stroke
+            (width 0.254)
+            (type default)
+          )
+          (fill
+            (type background)
+          )
+        )
+        (pin
+          power_in
+          line
+          (at -2.54 -7.62 90)
+          (length 3.81)
+          (name
+            "V-"
+            (effects
+              (font
+                (size 1.27 1.27)
+              )
+            )
+          )
+          (number
+            "2"
+            (effects
+              (font
+                (size 1.27 1.27)
+              )
+            )
+          )
+        )
+        (pin
+          power_in
+          line
+          (at -2.54 7.62 270)
+          (length 3.81)
+          (name
+            "V+"
+            (effects
+              (font
+                (size 1.27 1.27)
+              )
+            )
+          )
+          (number
+            "5"
+            (effects
+              (font
+                (size 1.27 1.27)
+              )
+            )
+          )
+        )
+      )
+      (symbol
+        "TLV9061xDBV_1_1"
+        (pin
+          output
+          line
+          (at 7.62 0 180)
+          (length 2.54)
+          (name
+            ""
+            (effects
+              (font
+                (size 1.27 1.27)
+              )
+            )
+          )
+          (number
+            "1"
+            (effects
+              (font
+                (size 1.27 1.27)
+              )
+            )
+          )
+        )
+        (pin
+          input
+          line
+          (at -7.62 2.54 0)
+          (length 2.54)
+          (name
+            "+"
+            (effects
+              (font
+                (size 1.27 1.27)
+              )
+            )
+          )
+          (number
+            "3"
+            (effects
+              (font
+                (size 1.27 1.27)
+              )
+            )
+          )
+        )
+        (pin
+          input
+          line
+          (at -7.62 -2.54 0)
+          (length 2.54)
+          (name
+            "-"
+            (effects
+              (font
+                (size 1.27 1.27)
+              )
+            )
+          )
+          (number
+            "4"
+            (effects
+              (font
+                (size 1.27 1.27)
+              )
+            )
+          )
+        )
+      )
+      (embedded_fonts no)
+    )
+    (symbol
+      "power:PWR_FLAG"
+      (power global)
+      (pin_numbers
+        (hide yes)
+      )
+      (pin_names
+        (offset 0)
+        (hide yes)
+      )
+      (exclude_from_sim no)
+      (in_bom yes)
+      (on_board yes)
+      (in_pos_files yes)
+      (duplicate_pin_numbers_are_jumpers no)
+      (property
+        "Reference"
+        "#FLG"
+        (at 0 1.905 0)
+        (show_name no)
+        (do_not_autoplace no)
+        (effects
+          (font
+            (size 1.27 1.27)
+          )
+        )
+      )
+      (property
+        "Value"
+        "PWR_FLAG"
+        (at 0 3.81 0)
+        (show_name no)
+        (do_not_autoplace no)
+        (effects
+          (font
+            (size 1.27 1.27)
+          )
+        )
+      )
+      (property
+        "Footprint"
+        ""
+        (at 0 0 0)
+        (show_name no)
+        (do_not_autoplace no)
+        (hide yes)
+        (effects
+          (font
+            (size 1.27 1.27)
+          )
+        )
+      )
+      (property
+        "Datasheet"
+        ""
+        (at 0 0 0)
+        (show_name no)
+        (do_not_autoplace no)
+        (hide yes)
+        (effects
+          (font
+            (size 1.27 1.27)
+          )
+        )
+      )
+      (property
+        "Description"
+        "Special symbol for telling ERC where power comes from"
+        (at 0 0 0)
+        (show_name no)
+        (do_not_autoplace no)
+        (hide yes)
+        (effects
+          (font
+            (size 1.27 1.27)
+          )
+        )
+      )
+      (property
+        "ki_keywords"
+        "flag power"
+        (at 0 0 0)
+        (show_name no)
+        (do_not_autoplace no)
+        (hide yes)
+        (effects
+          (font
+            (size 1.27 1.27)
+          )
+        )
+      )
+      (symbol
+        "PWR_FLAG_0_0"
+        (pin
+          power_out
+          line
+          (at 0 0 90)
+          (length 0)
+          (name
+            ""
+            (effects
+              (font
+                (size 1.27 1.27)
+              )
+            )
+          )
+          (number
+            "1"
+            (effects
+              (font
+                (size 1.27 1.27)
+              )
+            )
+          )
+        )
+      )
+      (symbol
+        "PWR_FLAG_0_1"
+        (polyline
+          (pts
+            (xy 0 0)
+            (xy 0 1.27)
+            (xy -1.016 1.905)
+            (xy 0 2.54)
+            (xy 1.016 1.905)
+            (xy 0 1.27)
+          )
+          (stroke
+            (width 0)
+            (type default)
+          )
+          (fill
+            (type none)
+          )
+        )
+      )
+      (embedded_fonts no)
+    )
+  )
+  (junction
+    (at 163.83 223.52)
+    (diameter 0)
+    (color 0 0 0 0)
+    (uuid "1868055d-97ae-5c9e-b3d7-6a10cba5f2bf")
+  )
+  (junction
+    (at 104.14 33.02)
+    (diameter 0)
+    (color 0 0 0 0)
+    (uuid "1bcbff94-90cd-582c-8de9-2984c03f6382")
+  )
+  (junction
+    (at 116.84 26.67)
+    (diameter 0)
+    (color 0 0 0 0)
+    (uuid "2155d7a8-4444-5272-83ec-37abdee8d97a")
+  )
+  (junction
+    (at 104.14 86.36)
+    (diameter 0)
+    (color 0 0 0 0)
+    (uuid "231496be-f9a6-582a-99fd-1c7cbab76d18")
+  )
+  (junction
+    (at 105.41 193.04)
+    (diameter 0)
+    (color 0 0 0 0)
+    (uuid "24a37d53-49fb-59ed-bbbc-3ceba3151eae")
+  )
+  (junction
+    (at 151.13 193.04)
+    (diameter 0)
+    (color 0 0 0 0)
+    (uuid "29c2dcac-4319-5fe4-acc0-e42415459529")
+  )
+  (junction
+    (at 105.41 58.42)
+    (diameter 0)
+    (color 0 0 0 0)
+    (uuid "2a75031d-733b-50fb-bcd9-ec4bad63def3")
+  )
+  (junction
+    (at 163.83 198.12)
+    (diameter 0)
+    (color 0 0 0 0)
+    (uuid "3285be98-c6bf-59b7-a1b2-def9fdb1bd89")
+  )
+  (junction
+    (at 86.36 26.67)
+    (diameter 0)
+    (color 0 0 0 0)
+    (uuid "390d1780-aaea-58f2-a549-c607a48d82d0")
+  )
+  (junction
+    (at 104.14 81.28)
+    (diameter 0)
+    (color 0 0 0 0)
+    (uuid "3962f84a-13c8-522c-ba15-3eb40bdf980c")
+  )
+  (junction
+    (at 116.84 40.64)
+    (diameter 0)
+    (color 0 0 0 0)
+    (uuid "4470d08b-524c-5c1c-b365-28456ee698a1")
+  )
+  (junction
+    (at 119.38 83.82)
+    (diameter 0)
+    (color 0 0 0 0)
+    (uuid "56e6be86-bde3-57be-91e5-17dbfb7768c7")
+  )
+  (junction
+    (at 105.41 109.22)
+    (diameter 0)
+    (color 0 0 0 0)
+    (uuid "6ab94b5c-437e-5351-aa6f-fe9686704e09")
+  )
+  (junction
+    (at 105.41 198.12)
+    (diameter 0)
+    (color 0 0 0 0)
+    (uuid "6b26cd12-41c3-5105-a6cd-28fc64302c33")
+  )
+  (junction
+    (at 151.13 198.12)
+    (diameter 0)
+    (color 0 0 0 0)
+    (uuid "744fbbfa-29c7-5393-a03e-7976cfc72d85")
+  )
+  (junction
+    (at 151.13 223.52)
+    (diameter 0)
+    (color 0 0 0 0)
+    (uuid "8da1b19b-d863-5bb9-a4a7-4fee96bbd088")
+  )
+  (junction
+    (at 101.6 86.36)
+    (diameter 0)
+    (color 0 0 0 0)
+    (uuid "a0707651-cf35-5b5d-96c3-04b3b6c17dc8")
+  )
+  (junction
+    (at 105.41 223.52)
+    (diameter 0)
+    (color 0 0 0 0)
+    (uuid "bef98daa-7bf6-5d22-be86-e005a93cd53a")
+  )
+  (junction
+    (at 107.95 198.12)
+    (diameter 0)
+    (color 0 0 0 0)
+    (uuid "d0ad932f-d65d-5e25-8086-e73adaffc375")
+  )
+  (junction
+    (at 151.13 220.98)
+    (diameter 0)
+    (color 0 0 0 0)
+    (uuid "d758edc8-3eb2-5491-83c6-defec42e6713")
+  )
+  (junction
+    (at 114.3 40.64)
+    (diameter 0)
+    (color 0 0 0 0)
+    (uuid "e0b400e7-ec11-513a-8e23-071c49f7309b")
+  )
+  (junction
+    (at 104.14 58.42)
+    (diameter 0)
+    (color 0 0 0 0)
+    (uuid "e3d2eb69-e0fc-5674-b579-0ddd01791eb2")
+  )
+  (junction
+    (at 161.29 198.12)
+    (diameter 0)
+    (color 0 0 0 0)
+    (uuid "ea277d5d-0ebe-5e16-9052-fafd5fef47d2")
+  )
+  (junction
+    (at 101.6 223.52)
+    (diameter 0)
+    (color 0 0 0 0)
+    (uuid "f82c2659-0da8-5eea-b56b-8166079821a1")
+  )
+  (junction
+    (at 105.41 220.98)
+    (diameter 0)
+    (color 0 0 0 0)
+    (uuid "fc39a80d-084c-57b9-95b9-6104ae93ccbd")
+  )
+  (no_connect
+    (at 104.14 137.16)
+    (uuid "3280aa86-e381-58ec-8f04-dbb835b579bf")
+  )
+  (no_connect
+    (at 104.14 132.08)
+    (uuid "67d54c70-0274-541b-8623-5a1b3ba8288c")
+  )
+  (no_connect
+    (at 119.38 134.62)
+    (uuid "ea062951-b1f2-5a04-8dec-5ece7e8f14da")
+  )
+  (wire
+    (pts
+      (xy 105.41 220.98)
+      (xy 151.13 220.98)
+    )
+    (stroke
+      (width 0)
+      (type default)
+    )
+    (uuid "0146a01d-d86a-5867-8d45-1595d8115b9e")
+  )
+  (wire
+    (pts
+      (xy 104.14 58.42)
+      (xy 104.14 33.02)
+    )
+    (stroke
+      (width 0)
+      (type default)
+    )
+    (uuid "06ab92f0-bda5-5b8d-a778-416c771d2c37")
+  )
+  (wire
+    (pts
+      (xy 83.82 71.12)
+      (xy 83.82 69.85)
+    )
+    (stroke
+      (width 0)
+      (type default)
+    )
+    (uuid "076db660-26e0-5dcc-a761-788b4a4a7189")
+  )
+  (wire
+    (pts
+      (xy 78.74 76.2)
+      (xy 78.74 74.93)
+    )
+    (stroke
+      (width 0)
+      (type default)
+    )
+    (uuid "0c099590-a746-5c30-8820-2e96848e896e")
+  )
+  (wire
+    (pts
+      (xy 105.41 109.22)
+      (xy 105.41 58.42)
+    )
+    (stroke
+      (width 0)
+      (type default)
+    )
+    (uuid "11a4d0da-51a6-5e0a-a10e-d7da2287164d")
+  )
+  (wire
+    (pts
+      (xy 115.57 223.52)
+      (xy 116.84 223.52)
+    )
+    (stroke
+      (width 0)
+      (type default)
+    )
+    (uuid "1866d4b1-d85b-5e4d-bccb-83ffcb11e127")
+  )
+  (wire
+    (pts
+      (xy 104.14 81.28)
+      (xy 104.14 80.01)
+    )
+    (stroke
+      (width 0)
+      (type default)
+    )
+    (uuid "214a3102-a0f8-5c2a-a407-aacc3240d194")
+  )
+  (wire
+    (pts
+      (xy 93.98 78.74)
+      (xy 93.98 77.47)
+    )
+    (stroke
+      (width 0)
+      (type default)
+    )
+    (uuid "2199eff3-aae8-5bb4-9173-119d7b613b52")
+  )
+  (wire
+    (pts
+      (xy 151.13 193.04)
+      (xy 105.41 193.04)
+    )
+    (stroke
+      (width 0)
+      (type default)
+    )
+    (uuid "3961b388-0b14-5e59-8c40-9dcc4f96e5a8")
+  )
+  (wire
+    (pts
+      (xy 161.29 198.12)
+      (xy 163.83 198.12)
+    )
+    (stroke
+      (width 0)
+      (type default)
+    )
+    (uuid "3a4315a2-5c21-5c0f-8c80-bfcd9325040c")
+  )
+  (wire
+    (pts
+      (xy 55.88 38.1)
+      (xy 54.61 38.1)
+    )
+    (stroke
+      (width 0)
+      (type default)
+    )
+    (uuid "3e299e30-f82c-5ec5-b82f-6ac233fd84cb")
+  )
+  (wire
+    (pts
+      (xy 119.38 83.82)
+      (xy 120.65 83.82)
+    )
+    (stroke
+      (width 0)
+      (type default)
+    )
+    (uuid "3e448f0c-960a-57a5-a70c-d21101acf68c")
+  )
+  (wire
+    (pts
+      (xy 172.72 38.1)
+      (xy 171.45 38.1)
+    )
+    (stroke
+      (width 0)
+      (type default)
+    )
+    (uuid "4e2b3c82-9954-50c4-a099-2dd72b2e07bc")
+  )
+  (wire
+    (pts
+      (xy 134.62 194.31)
+      (xy 135.89 194.31)
+    )
+    (stroke
+      (width 0)
+      (type default)
+    )
+    (uuid "5014c986-0913-5d36-9ad1-e482dfa5b1a1")
+  )
+  (wire
+    (pts
+      (xy 22.86 71.12)
+      (xy 22.86 74.93)
+    )
+    (stroke
+      (width 0)
+      (type default)
+    )
+    (uuid "53b76e02-f063-5992-b665-7475e674ca14")
+  )
+  (wire
+    (pts
+      (xy 114.3 63.5)
+      (xy 115.57 63.5)
+    )
+    (stroke
+      (width 0)
+      (type default)
+    )
+    (uuid "53f1140a-4653-5e05-a4d3-a14554500678")
+  )
+  (wire
+    (pts
+      (xy 83.82 86.36)
+      (xy 83.82 87.63)
+    )
+    (stroke
+      (width 0)
+      (type default)
+    )
+    (uuid "5547154f-4bcf-5e7f-a40e-fba1d8189801")
+  )
+  (wire
+    (pts
+      (xy 55.88 40.64)
+      (xy 54.61 40.64)
+    )
+    (stroke
+      (width 0)
+      (type default)
+    )
+    (uuid "59c8658d-e827-5f8b-a422-844d59f80082")
+  )
+  (wire
+    (pts
+      (xy 86.36 26.67)
+      (xy 116.84 26.67)
+    )
+    (stroke
+      (width 0)
+      (type default)
+    )
+    (uuid "5a82741d-84cc-52db-902f-2ddbfb937f73")
+  )
+  (wire
+    (pts
+      (xy 132.08 63.5)
+      (xy 132.08 68.58)
+    )
+    (stroke
+      (width 0)
+      (type default)
+    )
+    (uuid "664c9ad7-2b22-5d78-8c98-07848c1882a1")
+  )
+  (wire
+    (pts
+      (xy 86.36 52.07)
+      (xy 87.63 52.07)
+    )
+    (stroke
+      (width 0)
+      (type default)
+    )
+    (uuid "66fe6a43-4482-5fd3-8814-4853fcef0679")
+  )
+  (wire
+    (pts
+      (xy 153.67 198.12)
+      (xy 151.13 198.12)
+    )
+    (stroke
+      (width 0)
+      (type default)
+    )
+    (uuid "678107ad-f8d7-559b-ba8e-6f3cc4857f5a")
+  )
+  (wire
+    (pts
+      (xy 132.08 48.26)
+      (xy 132.08 45.72)
+    )
+    (stroke
+      (width 0)
+      (type default)
+    )
+    (uuid "689946b3-b504-5a8d-957b-83211ce1b2d6")
+  )
+  (wire
+    (pts
+      (xy 55.88 73.66)
+      (xy 54.61 73.66)
+    )
+    (stroke
+      (width 0)
+      (type default)
+    )
+    (uuid "6ca2f724-a0c5-5ed9-be4d-2c2eec026f37")
+  )
+  (wire
+    (pts
+      (xy 115.57 109.22)
+      (xy 116.84 109.22)
+    )
+    (stroke
+      (width 0)
+      (type default)
+    )
+    (uuid "6d6b49c2-88dd-5601-8f71-15600407a170")
+  )
+  (wire
+    (pts
+      (xy 151.13 198.12)
+      (xy 151.13 193.04)
+    )
+    (stroke
+      (width 0)
+      (type default)
+    )
+    (uuid "6df1e80e-edd4-5db7-aecd-ad6dd4caddac")
+  )
+  (wire
+    (pts
+      (xy 105.41 223.52)
+      (xy 107.95 223.52)
+    )
+    (stroke
+      (width 0)
+      (type default)
+    )
+    (uuid "70ede7f7-c7e1-589f-8b60-71ae04bfcd1a")
+  )
+  (wire
+    (pts
+      (xy 86.36 59.69)
+      (xy 86.36 62.23)
+    )
+    (stroke
+      (width 0)
+      (type default)
+    )
+    (uuid "73041a1b-9ff3-55ac-ab10-724cd3e56acd")
+  )
+  (wire
+    (pts
+      (xy 151.13 220.98)
+      (xy 151.13 223.52)
+    )
+    (stroke
+      (width 0)
+      (type default)
+    )
+    (uuid "75c6430f-3758-5a2b-af11-5f8510203ee6")
+  )
+  (wire
+    (pts
+      (xy 107.95 198.12)
+      (xy 106.68 198.12)
+    )
+    (stroke
+      (width 0)
+      (type default)
+    )
+    (uuid "8098d515-4603-52f0-b70b-481f2f597d5f")
+  )
+  (wire
+    (pts
+      (xy 105.41 198.12)
+      (xy 107.95 198.12)
+    )
+    (stroke
+      (width 0)
+      (type default)
+    )
+    (uuid "8407f5ff-63a3-55af-bb56-0ba0e95e2c35")
+  )
+  (wire
+    (pts
+      (xy 55.88 71.12)
+      (xy 54.61 71.12)
+    )
+    (stroke
+      (width 0)
+      (type default)
+    )
+    (uuid "9e9c57b9-74b9-5715-9e8c-0762fea1f10e")
+  )
+  (wire
+    (pts
+      (xy 116.84 40.64)
+      (xy 114.3 40.64)
+    )
+    (stroke
+      (width 0)
+      (type default)
+    )
+    (uuid "a86dd96f-719e-5778-8c03-d08e62c1668c")
+  )
+  (wire
+    (pts
+      (xy 116.84 26.67)
+      (xy 116.84 40.64)
+    )
+    (stroke
+      (width 0)
+      (type default)
+    )
+    (uuid "a9813f0f-703f-5003-936c-5feb3c6a05ff")
+  )
+  (wire
+    (pts
+      (xy 151.13 223.52)
+      (xy 153.67 223.52)
+    )
+    (stroke
+      (width 0)
+      (type default)
+    )
+    (uuid "aa9ac9c1-5a2e-5fda-be32-61aa304b2947")
+  )
+  (wire
+    (pts
+      (xy 106.68 58.42)
+      (xy 104.14 58.42)
+    )
+    (stroke
+      (width 0)
+      (type default)
+    )
+    (uuid "ab04773b-b22e-5683-b29e-76d2446fe017")
+  )
+  (wire
+    (pts
+      (xy 104.14 86.36)
+      (xy 101.6 86.36)
+    )
+    (stroke
+      (width 0)
+      (type default)
+    )
+    (uuid "addefc26-bbf7-5a07-aa8f-22ca2c8144e8")
+  )
+  (wire
+    (pts
+      (xy 101.6 223.52)
+      (xy 105.41 223.52)
+    )
+    (stroke
+      (width 0)
+      (type default)
+    )
+    (uuid "bc3b7d00-b5cb-5755-91d4-3e0a0bed91ea")
+  )
+  (wire
+    (pts
+      (xy 40.64 71.12)
+      (xy 40.64 74.93)
+    )
+    (stroke
+      (width 0)
+      (type default)
+    )
+    (uuid "c5d8f06e-2532-52a4-9715-93e34e1f3505")
+  )
+  (wire
+    (pts
+      (xy 163.83 198.12)
+      (xy 163.83 223.52)
+    )
+    (stroke
+      (width 0)
+      (type default)
+    )
+    (uuid "c7c37b21-1b34-5504-8d0b-fef2d456ed4d")
+  )
+  (wire
+    (pts
+      (xy 114.3 27.94)
+      (xy 115.57 27.94)
+    )
+    (stroke
+      (width 0)
+      (type default)
+    )
+    (uuid "c931c2b9-b15e-5036-820e-b10dad328a68")
+  )
+  (wire
+    (pts
+      (xy 114.3 53.34)
+      (xy 113.03 53.34)
+    )
+    (stroke
+      (width 0)
+      (type default)
+    )
+    (uuid "cac3c8a9-5089-5bc8-8f3c-adeff57378ad")
+  )
+  (wire
+    (pts
+      (xy 161.29 198.12)
+      (xy 162.56 198.12)
+    )
+    (stroke
+      (width 0)
+      (type default)
+    )
+    (uuid "cc96dc8d-1927-5e11-a04f-ccfa902f7e54")
+  )
+  (wire
+    (pts
+      (xy 163.83 223.52)
+      (xy 161.29 223.52)
+    )
+    (stroke
+      (width 0)
+      (type default)
+    )
+    (uuid "cfcb7e81-020b-5350-86e1-a741b90b4928")
+  )
+  (wire
+    (pts
+      (xy 115.57 198.12)
+      (xy 116.84 198.12)
+    )
+    (stroke
+      (width 0)
+      (type default)
+    )
+    (uuid "d3887410-474a-515d-844d-10d57da230e6")
+  )
+  (wire
+    (pts
+      (xy 105.41 223.52)
+      (xy 105.41 220.98)
+    )
+    (stroke
+      (width 0)
+      (type default)
+    )
+    (uuid "d4ceaf0a-54ea-571c-981a-36d2f0d33070")
+  )
+  (wire
+    (pts
+      (xy 114.3 40.64)
+      (xy 114.3 38.1)
+    )
+    (stroke
+      (width 0)
+      (type default)
+    )
+    (uuid "d5421114-71af-5788-8756-f9c995f62f14")
+  )
+  (wire
+    (pts
+      (xy 104.14 33.02)
+      (xy 106.68 33.02)
+    )
+    (stroke
+      (width 0)
+      (type default)
+    )
+    (uuid "d9645a82-3996-562c-907c-46f732324f3f")
+  )
+  (wire
+    (pts
+      (xy 86.36 36.83)
+      (xy 86.36 39.37)
+    )
+    (stroke
+      (width 0)
+      (type default)
+    )
+    (uuid "dee98031-820b-5431-ab13-01722cd6cf22")
+  )
+  (wire
+    (pts
+      (xy 86.36 29.21)
+      (xy 86.36 26.67)
+    )
+    (stroke
+      (width 0)
+      (type default)
+    )
+    (uuid "dfd4da0f-de0a-5f80-b924-131ba3162f60")
+  )
+  (wire
+    (pts
+      (xy 107.95 109.22)
+      (xy 105.41 109.22)
+    )
+    (stroke
+      (width 0)
+      (type default)
+    )
+    (uuid "e6b4abd7-ac5c-55dc-8759-b836b22cadec")
+  )
+  (wire
+    (pts
+      (xy 172.72 40.64)
+      (xy 171.45 40.64)
+    )
+    (stroke
+      (width 0)
+      (type default)
+    )
+    (uuid "eb037c69-ace3-5e4a-a27d-f7c2dbb90e80")
+  )
+  (wire
+    (pts
+      (xy 134.62 201.93)
+      (xy 134.62 204.47)
+    )
+    (stroke
+      (width 0)
+      (type default)
+    )
+    (uuid "ec35ae98-6cdc-548d-af4a-b0c7411540dc")
+  )
+  (wire
+    (pts
+      (xy 101.6 86.36)
+      (xy 101.6 223.52)
+    )
+    (stroke
+      (width 0)
+      (type default)
+    )
+    (uuid "f1bd2bfe-1df1-5c66-92ea-9848859875db")
+  )
+  (wire
+    (pts
+      (xy 78.74 81.28)
+      (xy 77.47 81.28)
+    )
+    (stroke
+      (width 0)
+      (type default)
+    )
+    (uuid "f7be145a-e534-501b-a9b8-f05f8ef3bc5a")
+  )
+  (wire
+    (pts
+      (xy 105.41 58.42)
+      (xy 104.14 58.42)
+    )
+    (stroke
+      (width 0)
+      (type default)
+    )
+    (uuid "feb2670a-37ee-5678-8aa1-25c45f704188")
+  )
+  (wire
+    (pts
+      (xy 105.41 193.04)
+      (xy 105.41 198.12)
+    )
+    (stroke
+      (width 0)
+      (type default)
+    )
+    (uuid "fec4f86f-9d42-5ce7-b32c-d10c506dd33a")
+  )
+  (label
+    "CURRENT_COMMAND"
+    (at 77.47 81.28 180)
+    (effects
+      (font
+        (size 1.27 1.27)
+      )
+      (justify right)
+    )
+    (uuid "0afa75e6-d9c9-5dc7-8099-2a42680911c4")
+  )
+  (label
+    "POWER"
+    (at 22.86 74.93 90)
+    (effects
+      (font
+        (size 1.27 1.27)
+      )
+    )
+    (uuid "0db83a46-fe55-5530-a11a-422920f6bd75")
+  )
+  (label
+    "GROUND"
+    (at 132.08 68.58 90)
+    (effects
+      (font
+        (size 1.27 1.27)
+      )
+    )
+    (uuid "25923d99-6f09-5d7e-8f54-07e3a44b41ad")
+  )
+  (label
+    "POWER"
+    (at 86.36 62.23 90)
+    (effects
+      (font
+        (size 1.27 1.27)
+      )
+    )
+    (uuid "26f3cdb3-b569-5715-a94a-2d8df852a052")
+  )
+  (label
+    "INTERNAL_007"
+    (at 116.84 109.22 0)
+    (effects
+      (font
+        (size 1.27 1.27)
+      )
+    )
+    (uuid "2f27e156-537f-5877-b219-656e90df454d")
+  )
+  (label
+    "INTERNAL_005"
+    (at 116.84 198.12 0)
+    (effects
+      (font
+        (size 1.27 1.27)
+      )
+    )
+    (uuid "324ec910-bba5-5b4a-b3a8-4e29af1ff571")
+  )
+  (label
+    "POWER"
+    (at 132.08 45.72 270)
+    (effects
+      (font
+        (size 1.27 1.27)
+      )
+      (justify right)
+    )
+    (uuid "38b33bd4-a60c-5d09-badf-349ffa3849f7")
+  )
+  (label
+    "GROUND"
+    (at 54.61 40.64 180)
+    (effects
+      (font
+        (size 1.27 1.27)
+      )
+      (justify right)
+    )
+    (uuid "492eae99-7d29-5677-a3ca-e86ecf170eac")
+  )
+  (label
+    "INTERNAL_004"
+    (at 101.6 154.94 90)
+    (effects
+      (font
+        (size 1.27 1.27)
+      )
+    )
+    (uuid "4ebec0c2-de80-5cb2-aef8-26f8d8999fbd")
+  )
+  (label
+    "CURRENT_COMMAND"
+    (at 54.61 38.1 180)
+    (effects
+      (font
+        (size 1.27 1.27)
+      )
+      (justify right)
+    )
+    (uuid "57c4e5ba-7d21-51dc-b36d-db53ce37352e")
+  )
+  (label
+    "INTERNAL_006"
+    (at 120.65 83.82 0)
+    (effects
+      (font
+        (size 1.27 1.27)
+      )
+    )
+    (uuid "5b32a6fd-85fb-5396-a781-e8d1fe92f923")
+  )
+  (label
+    "INTERNAL_003"
+    (at 113.03 53.34 180)
+    (effects
+      (font
+        (size 1.27 1.27)
+      )
+      (justify right)
+    )
+    (uuid "61295fc5-57da-5a96-b21c-64e1ebeac3ec")
+  )
+  (label
+    "GROUND"
+    (at 40.64 74.93 90)
+    (effects
+      (font
+        (size 1.27 1.27)
+      )
+    )
+    (uuid "6d406ff0-d156-5a7f-9652-cb5705068b6d")
+  )
+  (label
+    "POWER"
+    (at 86.36 39.37 90)
+    (effects
+      (font
+        (size 1.27 1.27)
+      )
+    )
+    (uuid "7b1afcdf-afce-525c-8fef-1a8c2f926727")
+  )
+  (label
+    "GROUND"
+    (at 54.61 73.66 180)
+    (effects
+      (font
+        (size 1.27 1.27)
+      )
+      (justify right)
+    )
+    (uuid "7c1d4a8e-8760-53d8-b792-76ccbba4056f")
+  )
+  (label
+    "INTERNAL_000"
+    (at 104.14 45.72 0)
+    (effects
+      (font
+        (size 1.27 1.27)
+      )
+    )
+    (uuid "85f7e292-9b27-5424-94ad-b0ab9d32c26e")
+  )
+  (label
+    "INTERNAL_006"
+    (at 78.74 74.93 270)
+    (effects
+      (font
+        (size 1.27 1.27)
+      )
+      (justify right)
+    )
+    (uuid "8e9aa152-3161-595e-a761-17f8882c73e2")
+  )
+  (label
+    "INTERNAL_003"
+    (at 115.57 27.94 0)
+    (effects
+      (font
+        (size 1.27 1.27)
+      )
+    )
+    (uuid "8f74a26a-174f-561a-a613-9ac0c48dac3c")
+  )
+  (label
+    "INTERNAL_002"
+    (at 87.63 52.07 0)
+    (effects
+      (font
+        (size 1.27 1.27)
+      )
+    )
+    (uuid "95663642-ff8f-5aa9-a982-a6de05bb66f4")
+  )
+  (label
+    "LOAD_CURRENT"
+    (at 162.56 198.12 0)
+    (effects
+      (font
+        (size 1.27 1.27)
+      )
+    )
+    (uuid "9a043517-8852-5b9a-8a63-b07cef2dca78")
+  )
+  (label
+    "LOAD_CURRENT"
+    (at 171.45 38.1 180)
+    (effects
+      (font
+        (size 1.27 1.27)
+      )
+      (justify right)
+    )
+    (uuid "9b0ecd66-5dd1-587e-9531-3ee34ff64b18")
+  )
+  (label
+    "INTERNAL_007"
+    (at 93.98 77.47 270)
+    (effects
+      (font
+        (size 1.27 1.27)
+      )
+      (justify right)
+    )
+    (uuid "a1ac1813-7140-5cd6-86e9-914cf29fb398")
+  )
+  (label
+    "POWER"
+    (at 83.82 69.85 270)
+    (effects
+      (font
+        (size 1.27 1.27)
+      )
+      (justify right)
+    )
+    (uuid "a61c90cc-352d-515d-9103-857a150e22cd")
+  )
+  (label
+    "GROUND"
+    (at 134.62 204.47 90)
+    (effects
+      (font
+        (size 1.27 1.27)
+      )
+    )
+    (uuid "b1a7ca74-84d4-5a2d-b751-a8a761c0c840")
+  )
+  (label
+    "INTERNAL_002"
+    (at 115.57 63.5 0)
+    (effects
+      (font
+        (size 1.27 1.27)
+      )
+    )
+    (uuid "b3d66735-0c8b-586c-bfcb-b39ed18310dd")
+  )
+  (label
+    "INTERNAL_003"
+    (at 106.68 198.12 180)
+    (effects
+      (font
+        (size 1.27 1.27)
+      )
+      (justify right)
+    )
+    (uuid "bd99acab-9b98-5778-916b-78ebc1808ede")
+  )
+  (label
+    "POWER"
+    (at 54.61 71.12 180)
+    (effects
+      (font
+        (size 1.27 1.27)
+      )
+      (justify right)
+    )
+    (uuid "c268ce71-0f13-5a85-b700-78d53dacd255")
+  )
+  (label
+    "INTERNAL_006"
+    (at 116.84 223.52 0)
+    (effects
+      (font
+        (size 1.27 1.27)
+      )
+    )
+    (uuid "c7f596a7-01dd-5c64-a144-54bcc15cd0b3")
+  )
+  (label
+    "INTERNAL_001"
+    (at 102.87 26.67 90)
+    (effects
+      (font
+        (size 1.27 1.27)
+      )
+    )
+    (uuid "cc4f6ed7-11c9-5de4-8794-91d22b319338")
+  )
+  (label
+    "GROUND"
+    (at 83.82 87.63 90)
+    (effects
+      (font
+        (size 1.27 1.27)
+      )
+    )
+    (uuid "d7aa9c62-13ca-5eb5-93c4-36058cfaf4ad")
+  )
+  (label
+    "GROUND"
+    (at 171.45 40.64 180)
+    (effects
+      (font
+        (size 1.27 1.27)
+      )
+      (justify right)
+    )
+    (uuid "ea3e6e55-e8da-5cd3-ba6d-afa07176df9e")
+  )
+  (label
+    "INTERNAL_005"
+    (at 135.89 194.31 0)
+    (effects
+      (font
+        (size 1.27 1.27)
+      )
+    )
+    (uuid "f300dd2d-d854-597f-8c50-7e7583fba3c7")
+  )
+  (label
+    "INTERNAL_005"
+    (at 104.14 80.01 270)
+    (effects
+      (font
+        (size 1.27 1.27)
+      )
+      (justify right)
+    )
+    (uuid "f6a1226d-e19a-54f9-945b-8df971e7adaa")
+  )
+  (label
+    "INTERNAL_003"
+    (at 107.95 193.04 0)
+    (effects
+      (font
+        (size 1.27 1.27)
+      )
+    )
+    (uuid "f9f73b0e-1a76-58ae-a703-a915e2924ddd")
+  )
+  (label
+    "LOAD_CURRENT"
+    (at 163.83 210.82 0)
+    (effects
+      (font
+        (size 1.27 1.27)
+      )
+    )
+    (uuid "fe59adc0-0200-5e74-8283-0253c3cf7dcb")
+  )
+  (symbol
+    (lib_id "Device:R")
+    (at 134.62 198.12 0)
+    (unit 1)
+    (body_style 1)
+    (exclude_from_sim no)
+    (in_bom yes)
+    (on_board yes)
+    (in_pos_files yes)
+    (dnp no)
+    (uuid "04f604b7-e628-553f-90fc-b9d3ac208145")
+    (property
+      "Reference"
+      "R6"
+      (at 138.176 198.755 0)
+      (show_name no)
+      (do_not_autoplace yes)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Value"
+      "10k"
+      (at 132.715 189.23 0)
+      (show_name no)
+      (do_not_autoplace yes)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Footprint"
+      "Resistor_SMD:R_0805_2012Metric"
+      (at 134.62 198.12 0)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Datasheet"
+      ""
+      (at 134.62 198.12 0)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Description"
+      ""
+      (at 134.62 198.12 0)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "KiCadAI Catalog"
+      "open-topology"
+      (at 134.62 198.12 0)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "KiCadAI Catalog Hash"
+      "15aba02bed3b437a7694c7565300a3ec9266abbc6f5989026d608663579d8c39"
+      (at 134.62 198.12 0)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "KiCadAI Component ID"
+      "resistor.vishay.tnpw0805.10k0.0p1"
+      (at 134.62 198.12 0)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "KiCadAI Resolution Hash"
+      "7a0a4a93c3bf89a525ef532b97dbda16bbbaa5d33d46d8d211ddff325244f45b"
+      (at 134.62 198.12 0)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "KiCadAI Variant ID"
+      "0805"
+      (at 134.62 198.12 0)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Manufacturer"
+      "Vishay"
+      (at 134.62 198.12 0)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "MPN"
+      "TNPW080510K0BEEA"
+      (at 134.62 198.12 0)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      private
+      "KiCadAI Symbol Geometry"
+      "resolver"
+      (at 0 0 0)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (pin
+      "1"
+      (uuid "eca2b508-b26d-5a4d-8751-09147eb9c49a")
+    )
+    (pin
+      "2"
+      (uuid "376733f0-8409-5457-a37b-fa8396947f12")
+    )
+    (instances
+      (project
+        "protected_programmable_current_output"
+        (path
+          "/04f604b7-e628-553f-90fc-b9d3ac208145"
+          (reference "R6")
+          (unit 1)
+          (value "10k")
+        )
+      )
+    )
+  )
+  (symbol
+    (lib_id "Device:R")
+    (at 86.36 55.88 0)
+    (unit 1)
+    (body_style 1)
+    (exclude_from_sim no)
+    (in_bom yes)
+    (on_board yes)
+    (in_pos_files yes)
+    (dnp no)
+    (uuid "30986d24-fb55-51ea-8345-b259018972c6")
+    (property
+      "Reference"
+      "R2"
+      (at 85.09 50.8 0)
+      (show_name no)
+      (do_not_autoplace yes)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Value"
+      "220m"
+      (at 89.916 56.515 0)
+      (show_name no)
+      (do_not_autoplace yes)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Footprint"
+      "Resistor_THT:R_Axial_DIN0414_L11.9mm_D4.5mm_P20.32mm_Horizontal"
+      (at 86.36 55.88 0)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Datasheet"
+      ""
+      (at 86.36 55.88 0)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Description"
+      ""
+      (at 86.36 55.88 0)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "KiCadAI Catalog"
+      "open-topology"
+      (at 86.36 55.88 0)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "KiCadAI Catalog Hash"
+      "15aba02bed3b437a7694c7565300a3ec9266abbc6f5989026d608663579d8c39"
+      (at 86.36 55.88 0)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "KiCadAI Component ID"
+      "resistor.vishay.ac03.0r22.axial"
+      (at 86.36 55.88 0)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "KiCadAI Resolution Hash"
+      "7a0a4a93c3bf89a525ef532b97dbda16bbbaa5d33d46d8d211ddff325244f45b"
+      (at 86.36 55.88 0)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "KiCadAI Variant ID"
+      "axial_ac03"
+      (at 86.36 55.88 0)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Manufacturer"
+      "Vishay"
+      (at 86.36 55.88 0)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "MPN"
+      "AC03000002207JAC00"
+      (at 86.36 55.88 0)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      private
+      "KiCadAI Symbol Geometry"
+      "resolver"
+      (at 0 0 0)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (pin
+      "1"
+      (uuid "e0b27a35-cf01-5571-a85a-398bff7cc699")
+    )
+    (pin
+      "2"
+      (uuid "1fd789d5-2083-56e2-8a82-81ad01dc8313")
+    )
+    (instances
+      (project
+        "protected_programmable_current_output"
+        (path
+          "/30986d24-fb55-51ea-8345-b259018972c6"
+          (reference "R2")
+          (unit 1)
+          (value "220m")
+        )
+      )
+    )
+  )
+  (symbol
+    (lib_id "power:PWR_FLAG")
+    (at 40.64 71.12 0)
+    (unit 1)
+    (body_style 1)
+    (exclude_from_sim no)
+    (in_bom yes)
+    (on_board yes)
+    (in_pos_files yes)
+    (dnp no)
+    (uuid "3aed05b3-9f94-59a9-9961-e49ca315803e")
+    (property
+      "Reference"
+      "#FLG01"
+      (at 36.83 66.04 0)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace yes)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Value"
+      "PWR_FLAG"
+      (at 26.924 70.485 0)
+      (show_name no)
+      (do_not_autoplace yes)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Footprint"
+      ""
+      (at 40.64 71.12 0)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Datasheet"
+      ""
+      (at 40.64 71.12 0)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Description"
+      ""
+      (at 40.64 71.12 0)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      private
+      "KiCadAI Symbol Geometry"
+      "resolver"
+      (at 0 0 0)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (pin
+      "1"
+      (uuid "fcc80d32-b4a1-574f-b29c-752d7cc9798d")
+    )
+    (instances
+      (project
+        "protected_programmable_current_output"
+        (path
+          "/3aed05b3-9f94-59a9-9961-e49ca315803e"
+          (reference "#FLG01")
+          (unit 1)
+          (value "PWR_FLAG")
+        )
+      )
+    )
+  )
+  (symbol
+    (lib_id "Transistor_BJT:Q_PNP_BCE")
+    (at 111.76 58.42 0)
+    (unit 1)
+    (body_style 1)
+    (exclude_from_sim no)
+    (in_bom yes)
+    (on_board yes)
+    (in_pos_files yes)
+    (dnp no)
+    (uuid "49fcde1f-bf67-571e-8f12-59c73a6a42b6")
+    (property
+      "Reference"
+      "Q2"
+      (at 118.3894 59.055 0)
+      (show_name no)
+      (do_not_autoplace yes)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Value"
+      "D45H11G"
+      (at 108.0897 66.3194 0)
+      (show_name no)
+      (do_not_autoplace yes)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Footprint"
+      "Package_TO_SOT_THT:TO-220-3_Vertical"
+      (at 111.76 58.42 0)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Datasheet"
+      ""
+      (at 111.76 58.42 0)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Description"
+      ""
+      (at 111.76 58.42 0)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "KiCadAI Catalog"
+      "open-topology"
+      (at 111.76 58.42 0)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "KiCadAI Catalog Hash"
+      "15aba02bed3b437a7694c7565300a3ec9266abbc6f5989026d608663579d8c39"
+      (at 111.76 58.42 0)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "KiCadAI Component ID"
+      "bjt.onsemi.d45h11g.to220"
+      (at 111.76 58.42 0)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "KiCadAI Resolution Hash"
+      "7a0a4a93c3bf89a525ef532b97dbda16bbbaa5d33d46d8d211ddff325244f45b"
+      (at 111.76 58.42 0)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "KiCadAI Variant ID"
+      "to220_3"
+      (at 111.76 58.42 0)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Manufacturer"
+      "onsemi"
+      (at 111.76 58.42 0)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "MPN"
+      "D45H11G"
+      (at 111.76 58.42 0)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      private
+      "KiCadAI Symbol Geometry"
+      "resolver"
+      (at 0 0 0)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (pin
+      "1"
+      (uuid "9d9a67a6-2b4e-5db5-96a5-76550725100e")
+    )
+    (pin
+      "2"
+      (uuid "873bd022-16bd-5946-b917-f39ad4ae2cae")
+    )
+    (pin
+      "3"
+      (uuid "e58b7810-fe89-5b5b-9fd7-cb224389c05f")
+    )
+    (instances
+      (project
+        "protected_programmable_current_output"
+        (path
+          "/49fcde1f-bf67-571e-8f12-59c73a6a42b6"
+          (reference "Q2")
+          (unit 1)
+          (value "D45H11G")
+        )
+      )
+    )
+  )
+  (symbol
+    (lib_id "Device:R")
+    (at 157.48 223.52 90)
+    (unit 1)
+    (body_style 1)
+    (exclude_from_sim no)
+    (in_bom yes)
+    (on_board yes)
+    (in_pos_files yes)
+    (dnp no)
+    (uuid "5ea66e91-8a4f-533c-9655-73852cedd40f")
+    (property
+      "Reference"
+      "R4"
+      (at 156.21 219.964 270)
+      (show_name no)
+      (do_not_autoplace yes)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Value"
+      "10k"
+      (at 155.575 228.346 270)
+      (show_name no)
+      (do_not_autoplace yes)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Footprint"
+      "Resistor_SMD:R_0805_2012Metric"
+      (at 157.48 223.52 90)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Datasheet"
+      ""
+      (at 157.48 223.52 90)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Description"
+      ""
+      (at 157.48 223.52 90)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "KiCadAI Catalog"
+      "open-topology"
+      (at 157.48 223.52 90)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "KiCadAI Catalog Hash"
+      "15aba02bed3b437a7694c7565300a3ec9266abbc6f5989026d608663579d8c39"
+      (at 157.48 223.52 90)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "KiCadAI Component ID"
+      "resistor.vishay.tnpw0805.10k0.0p1"
+      (at 157.48 223.52 90)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "KiCadAI Resolution Hash"
+      "7a0a4a93c3bf89a525ef532b97dbda16bbbaa5d33d46d8d211ddff325244f45b"
+      (at 157.48 223.52 90)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "KiCadAI Variant ID"
+      "0805"
+      (at 157.48 223.52 90)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Manufacturer"
+      "Vishay"
+      (at 157.48 223.52 90)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "MPN"
+      "TNPW080510K0BEEA"
+      (at 157.48 223.52 90)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      private
+      "KiCadAI Symbol Geometry"
+      "resolver"
+      (at 0 0 0)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (pin
+      "1"
+      (uuid "5d6c6110-0ef5-503a-9adf-c930c4ccda21")
+    )
+    (pin
+      "2"
+      (uuid "e4ce7572-a86a-52aa-93f7-ff5a3e5150c6")
+    )
+    (instances
+      (project
+        "protected_programmable_current_output"
+        (path
+          "/5ea66e91-8a4f-533c-9655-73852cedd40f"
+          (reference "R4")
+          (unit 1)
+          (value "10k")
+        )
+      )
+    )
+  )
+  (symbol
+    (lib_id "Device:R")
+    (at 111.76 223.52 90)
+    (unit 1)
+    (body_style 1)
+    (exclude_from_sim no)
+    (in_bom yes)
+    (on_board yes)
+    (in_pos_files yes)
+    (dnp no)
+    (uuid "60d511ba-0796-517c-b69e-d20290272d88")
+    (property
+      "Reference"
+      "R7"
+      (at 110.49 228.346 270)
+      (show_name no)
+      (do_not_autoplace yes)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Value"
+      "10k"
+      (at 109.855 229.616 270)
+      (show_name no)
+      (do_not_autoplace yes)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Footprint"
+      "Resistor_SMD:R_0805_2012Metric"
+      (at 111.76 223.52 90)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Datasheet"
+      ""
+      (at 111.76 223.52 90)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Description"
+      ""
+      (at 111.76 223.52 90)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "KiCadAI Catalog"
+      "open-topology"
+      (at 111.76 223.52 90)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "KiCadAI Catalog Hash"
+      "15aba02bed3b437a7694c7565300a3ec9266abbc6f5989026d608663579d8c39"
+      (at 111.76 223.52 90)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "KiCadAI Component ID"
+      "resistor.vishay.tnpw0805.10k0.0p1"
+      (at 111.76 223.52 90)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "KiCadAI Resolution Hash"
+      "7a0a4a93c3bf89a525ef532b97dbda16bbbaa5d33d46d8d211ddff325244f45b"
+      (at 111.76 223.52 90)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "KiCadAI Variant ID"
+      "0805"
+      (at 111.76 223.52 90)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Manufacturer"
+      "Vishay"
+      (at 111.76 223.52 90)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "MPN"
+      "TNPW080510K0BEEA"
+      (at 111.76 223.52 90)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      private
+      "KiCadAI Symbol Geometry"
+      "resolver"
+      (at 0 0 0)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (pin
+      "1"
+      (uuid "2a44ae0c-fbcb-5b8d-8009-ca5b2f4aa665")
+    )
+    (pin
+      "2"
+      (uuid "45e8262f-9b87-5f0e-962a-00bc0f08c640")
+    )
+    (instances
+      (project
+        "protected_programmable_current_output"
+        (path
+          "/60d511ba-0796-517c-b69e-d20290272d88"
+          (reference "R7")
+          (unit 1)
+          (value "10k")
+        )
+      )
+    )
+  )
+  (symbol
+    (lib_id "power:PWR_FLAG")
+    (at 22.86 71.12 0)
+    (unit 1)
+    (body_style 1)
+    (exclude_from_sim no)
+    (in_bom yes)
+    (on_board yes)
+    (in_pos_files yes)
+    (dnp no)
+    (uuid "6e18c2ba-cc44-57e9-be54-6615430495b3")
+    (property
+      "Reference"
+      "#FLG02"
+      (at 19.05 66.04 0)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace yes)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Value"
+      "PWR_FLAG"
+      (at 17.78 62.23 0)
+      (show_name no)
+      (do_not_autoplace yes)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Footprint"
+      ""
+      (at 22.86 71.12 0)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Datasheet"
+      ""
+      (at 22.86 71.12 0)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Description"
+      ""
+      (at 22.86 71.12 0)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      private
+      "KiCadAI Symbol Geometry"
+      "resolver"
+      (at 0 0 0)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (pin
+      "1"
+      (uuid "c0c19594-0964-5fee-96dc-eab7b7f49fee")
+    )
+    (instances
+      (project
+        "protected_programmable_current_output"
+        (path
+          "/6e18c2ba-cc44-57e9-be54-6615430495b3"
+          (reference "#FLG02")
+          (unit 1)
+          (value "PWR_FLAG")
+        )
+      )
+    )
+  )
+  (symbol
+    (lib_id "Device:R")
+    (at 111.76 109.22 90)
+    (unit 1)
+    (body_style 1)
+    (exclude_from_sim no)
+    (in_bom yes)
+    (on_board yes)
+    (in_pos_files yes)
+    (dnp no)
+    (uuid "7b14777f-731b-582f-9b28-ba4e3d5e363e")
+    (property
+      "Reference"
+      "R8"
+      (at 110.49 105.664 270)
+      (show_name no)
+      (do_not_autoplace yes)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Value"
+      "47ohm"
+      (at 108.585 114.046 270)
+      (show_name no)
+      (do_not_autoplace yes)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Footprint"
+      "Resistor_SMD:R_0805_2012Metric"
+      (at 111.76 109.22 90)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Datasheet"
+      ""
+      (at 111.76 109.22 90)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Description"
+      ""
+      (at 111.76 109.22 90)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "KiCadAI Catalog"
+      "open-topology"
+      (at 111.76 109.22 90)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "KiCadAI Catalog Hash"
+      "15aba02bed3b437a7694c7565300a3ec9266abbc6f5989026d608663579d8c39"
+      (at 111.76 109.22 90)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "KiCadAI Component ID"
+      "resistor.vishay.crcw080547r0fkea.0805"
+      (at 111.76 109.22 90)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "KiCadAI Resolution Hash"
+      "7a0a4a93c3bf89a525ef532b97dbda16bbbaa5d33d46d8d211ddff325244f45b"
+      (at 111.76 109.22 90)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "KiCadAI Variant ID"
+      "0805"
+      (at 111.76 109.22 90)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Manufacturer"
+      "Vishay"
+      (at 111.76 109.22 90)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "MPN"
+      "CRCW080547R0FKEA"
+      (at 111.76 109.22 90)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      private
+      "KiCadAI Symbol Geometry"
+      "resolver"
+      (at 0 0 0)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (pin
+      "1"
+      (uuid "2a3ab699-5f2f-5ff2-a8fe-a5795f72ced1")
+    )
+    (pin
+      "2"
+      (uuid "527e0219-8a3a-5174-a433-e4e44943d4e1")
+    )
+    (instances
+      (project
+        "protected_programmable_current_output"
+        (path
+          "/7b14777f-731b-582f-9b28-ba4e3d5e363e"
+          (reference "R8")
+          (unit 1)
+          (value "47ohm")
+        )
+      )
+    )
+  )
+  (symbol
+    (lib_id "Transistor_BJT:Q_PNP_BCE")
+    (at 111.76 33.02 0)
+    (unit 1)
+    (body_style 1)
+    (exclude_from_sim no)
+    (in_bom yes)
+    (on_board yes)
+    (in_pos_files yes)
+    (dnp no)
+    (uuid "99d2e47a-0612-5265-b964-bdaec243e132")
+    (property
+      "Reference"
+      "Q1"
+      (at 111.2647 23.8506 0)
+      (show_name no)
+      (do_not_autoplace yes)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Value"
+      "D45H11G"
+      (at 108.0897 43.4594 0)
+      (show_name no)
+      (do_not_autoplace yes)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Footprint"
+      "Package_TO_SOT_THT:TO-220-3_Vertical"
+      (at 111.76 33.02 0)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Datasheet"
+      ""
+      (at 111.76 33.02 0)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Description"
+      ""
+      (at 111.76 33.02 0)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "KiCadAI Catalog"
+      "open-topology"
+      (at 111.76 33.02 0)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "KiCadAI Catalog Hash"
+      "15aba02bed3b437a7694c7565300a3ec9266abbc6f5989026d608663579d8c39"
+      (at 111.76 33.02 0)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "KiCadAI Component ID"
+      "bjt.onsemi.d45h11g.to220"
+      (at 111.76 33.02 0)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "KiCadAI Resolution Hash"
+      "7a0a4a93c3bf89a525ef532b97dbda16bbbaa5d33d46d8d211ddff325244f45b"
+      (at 111.76 33.02 0)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "KiCadAI Variant ID"
+      "to220_3"
+      (at 111.76 33.02 0)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Manufacturer"
+      "onsemi"
+      (at 111.76 33.02 0)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "MPN"
+      "D45H11G"
+      (at 111.76 33.02 0)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      private
+      "KiCadAI Symbol Geometry"
+      "resolver"
+      (at 0 0 0)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (pin
+      "1"
+      (uuid "6c53605b-24a1-58bd-a675-d1078e05e7f7")
+    )
+    (pin
+      "2"
+      (uuid "423e0fd1-5a90-5bd3-9c93-2967f0a62524")
+    )
+    (pin
+      "3"
+      (uuid "e3b3f0e6-817b-5058-8907-864932f4155f")
+    )
+    (instances
+      (project
+        "protected_programmable_current_output"
+        (path
+          "/99d2e47a-0612-5265-b964-bdaec243e132"
+          (reference "Q1")
+          (unit 1)
+          (value "D45H11G")
+        )
+      )
+    )
+  )
+  (symbol
+    (lib_id "Device:R")
+    (at 157.48 198.12 90)
+    (unit 1)
+    (body_style 1)
+    (exclude_from_sim no)
+    (in_bom yes)
+    (on_board yes)
+    (in_pos_files yes)
+    (dnp no)
+    (uuid "b35d3f32-aa64-5b0f-bb3d-d1f4ace12178")
+    (property
+      "Reference"
+      "R3"
+      (at 156.21 194.564 270)
+      (show_name no)
+      (do_not_autoplace yes)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Value"
+      "10ohm"
+      (at 154.305 202.946 270)
+      (show_name no)
+      (do_not_autoplace yes)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Footprint"
+      "Resistor_THT:R_Axial_DIN0614_L14.3mm_D5.7mm_P25.40mm_Horizontal"
+      (at 157.48 198.12 90)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Datasheet"
+      ""
+      (at 157.48 198.12 90)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Description"
+      ""
+      (at 157.48 198.12 90)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "KiCadAI Catalog"
+      "open-topology"
+      (at 157.48 198.12 90)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "KiCadAI Catalog Hash"
+      "15aba02bed3b437a7694c7565300a3ec9266abbc6f5989026d608663579d8c39"
+      (at 157.48 198.12 90)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "KiCadAI Component ID"
+      "resistor.vishay.cpf3.10r.0p1.axial"
+      (at 157.48 198.12 90)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "KiCadAI Resolution Hash"
+      "7a0a4a93c3bf89a525ef532b97dbda16bbbaa5d33d46d8d211ddff325244f45b"
+      (at 157.48 198.12 90)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "KiCadAI Variant ID"
+      "axial_cpf3"
+      (at 157.48 198.12 90)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Manufacturer"
+      "Vishay"
+      (at 157.48 198.12 90)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "MPN"
+      "CPF310R000BE14"
+      (at 157.48 198.12 90)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      private
+      "KiCadAI Symbol Geometry"
+      "resolver"
+      (at 0 0 0)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (pin
+      "1"
+      (uuid "f6ff6f18-5c48-5cb2-a958-197d866bd989")
+    )
+    (pin
+      "2"
+      (uuid "d5d682d7-0962-5b8f-8c0a-a68aec360564")
+    )
+    (instances
+      (project
+        "protected_programmable_current_output"
+        (path
+          "/b35d3f32-aa64-5b0f-bb3d-d1f4ace12178"
+          (reference "R3")
+          (unit 1)
+          (value "10ohm")
+        )
+      )
+    )
+  )
+  (symbol
+    (lib_id "Connector_Generic:Conn_01x02")
+    (at 177.8 38.1 0)
+    (unit 1)
+    (body_style 1)
+    (exclude_from_sim no)
+    (in_bom yes)
+    (on_board yes)
+    (in_pos_files yes)
+    (dnp no)
+    (uuid "b4600c34-abff-586d-b4cb-f1a19f3c7a0c")
+    (property
+      "Reference"
+      "J2"
+      (at 176.53 34.29 0)
+      (show_name no)
+      (do_not_autoplace yes)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Value"
+      "1x02 2.54 mm pin header"
+      (at 163.195 45.72 0)
+      (show_name no)
+      (do_not_autoplace yes)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Footprint"
+      "Connector_PinHeader_2.54mm:PinHeader_1x02_P2.54mm_Vertical"
+      (at 177.8 38.1 0)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Datasheet"
+      ""
+      (at 177.8 38.1 0)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Description"
+      ""
+      (at 177.8 38.1 0)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "KiCadAI Catalog"
+      "open-topology"
+      (at 177.8 38.1 0)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "KiCadAI Catalog Hash"
+      "15aba02bed3b437a7694c7565300a3ec9266abbc6f5989026d608663579d8c39"
+      (at 177.8 38.1 0)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "KiCadAI Component ID"
+      "connector.pinheader.1x02.2_54mm"
+      (at 177.8 38.1 0)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "KiCadAI Resolution Hash"
+      "7a0a4a93c3bf89a525ef532b97dbda16bbbaa5d33d46d8d211ddff325244f45b"
+      (at 177.8 38.1 0)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "KiCadAI Variant ID"
+      "vertical"
+      (at 177.8 38.1 0)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      private
+      "KiCadAI Symbol Geometry"
+      "resolver"
+      (at 0 0 0)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (pin
+      "1"
+      (uuid "567aabeb-9711-57ec-b2a4-aa780a220d6f")
+    )
+    (pin
+      "2"
+      (uuid "d1690815-8523-58a7-b671-ce657892507a")
+    )
+    (instances
+      (project
+        "protected_programmable_current_output"
+        (path
+          "/b4600c34-abff-586d-b4cb-f1a19f3c7a0c"
+          (reference "J2")
+          (unit 1)
+          (value "1x02 2.54 mm pin header")
+        )
+      )
+    )
+  )
+  (symbol
+    (lib_id "Amplifier_Operational:LM358")
+    (at 111.76 83.82 0)
+    (unit 1)
+    (body_style 1)
+    (exclude_from_sim no)
+    (in_bom yes)
+    (on_board yes)
+    (in_pos_files yes)
+    (dnp no)
+    (uuid "c014ff04-09be-558e-af90-2b46687f798f")
+    (property
+      "Reference"
+      "U1"
+      (at 110.49 76.2 0)
+      (show_name no)
+      (do_not_autoplace yes)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Value"
+      "LM358DR"
+      (at 107.315 92.71 0)
+      (show_name no)
+      (do_not_autoplace yes)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Footprint"
+      "Package_SO:SOIC-8_3.9x4.9mm_P1.27mm"
+      (at 111.76 83.82 0)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Datasheet"
+      ""
+      (at 111.76 83.82 0)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Description"
+      ""
+      (at 111.76 83.82 0)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "KiCadAI Catalog"
+      "open-topology"
+      (at 111.76 83.82 0)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "KiCadAI Catalog Hash"
+      "15aba02bed3b437a7694c7565300a3ec9266abbc6f5989026d608663579d8c39"
+      (at 111.76 83.82 0)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "KiCadAI Component ID"
+      "opamp.ti.lm358.soic8"
+      (at 111.76 83.82 0)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "KiCadAI Resolution Hash"
+      "7a0a4a93c3bf89a525ef532b97dbda16bbbaa5d33d46d8d211ddff325244f45b"
+      (at 111.76 83.82 0)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "KiCadAI Variant ID"
+      "soic8"
+      (at 111.76 83.82 0)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Manufacturer"
+      "Texas Instruments"
+      (at 111.76 83.82 0)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "MPN"
+      "LM358DR"
+      (at 111.76 83.82 0)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      private
+      "KiCadAI Symbol Geometry"
+      "resolver"
+      (at 0 0 0)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (pin
+      "1"
+      (uuid "81754690-581c-598a-8308-b107440bee2f")
+    )
+    (pin
+      "2"
+      (uuid "6212b19d-8109-55f9-adb4-6c597f64c422")
+    )
+    (pin
+      "3"
+      (uuid "a1d816f3-006d-5940-8812-50fbd3b96b0d")
+    )
+    (pin
+      "5"
+      (uuid "f4e70fb0-ea93-5b76-bf98-fef6bd88c3d5")
+    )
+    (pin
+      "6"
+      (uuid "35c4ec3f-b802-5799-8da7-483bdea7dc77")
+    )
+    (pin
+      "7"
+      (uuid "5ba2d327-4db8-5345-a816-8e4b1a869915")
+    )
+    (pin
+      "4"
+      (uuid "d257b1ca-c368-5276-b44d-8cf7ce40b17f")
+    )
+    (pin
+      "8"
+      (uuid "34981438-d443-59ff-90ac-066f9f11dd11")
+    )
+    (instances
+      (project
+        "protected_programmable_current_output"
+        (path
+          "/c014ff04-09be-558e-af90-2b46687f798f"
+          (reference "U1")
+          (unit 1)
+          (value "LM358DR")
+        )
+      )
+    )
+  )
+  (symbol
+    (lib_id "Connector_Generic:Conn_01x02")
+    (at 60.96 38.1 0)
+    (unit 1)
+    (body_style 1)
+    (exclude_from_sim no)
+    (in_bom yes)
+    (on_board yes)
+    (in_pos_files yes)
+    (dnp no)
+    (uuid "c3e8844b-9e9e-5f95-a5bb-85b91c651d70")
+    (property
+      "Reference"
+      "J1"
+      (at 59.69 34.29 0)
+      (show_name no)
+      (do_not_autoplace yes)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Value"
+      "1x02 2.54 mm pin header"
+      (at 46.355 45.72 0)
+      (show_name no)
+      (do_not_autoplace yes)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Footprint"
+      "Connector_PinHeader_2.54mm:PinHeader_1x02_P2.54mm_Vertical"
+      (at 60.96 38.1 0)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Datasheet"
+      ""
+      (at 60.96 38.1 0)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Description"
+      ""
+      (at 60.96 38.1 0)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "KiCadAI Catalog"
+      "open-topology"
+      (at 60.96 38.1 0)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "KiCadAI Catalog Hash"
+      "15aba02bed3b437a7694c7565300a3ec9266abbc6f5989026d608663579d8c39"
+      (at 60.96 38.1 0)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "KiCadAI Component ID"
+      "connector.pinheader.1x02.2_54mm"
+      (at 60.96 38.1 0)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "KiCadAI Resolution Hash"
+      "7a0a4a93c3bf89a525ef532b97dbda16bbbaa5d33d46d8d211ddff325244f45b"
+      (at 60.96 38.1 0)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "KiCadAI Variant ID"
+      "vertical"
+      (at 60.96 38.1 0)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      private
+      "KiCadAI Symbol Geometry"
+      "resolver"
+      (at 0 0 0)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (pin
+      "1"
+      (uuid "735131bb-e892-5789-a7f7-9500eab76699")
+    )
+    (pin
+      "2"
+      (uuid "c2719453-9474-5c90-8239-1e169c70db02")
+    )
+    (instances
+      (project
+        "protected_programmable_current_output"
+        (path
+          "/c3e8844b-9e9e-5f95-a5bb-85b91c651d70"
+          (reference "J1")
+          (unit 1)
+          (value "1x02 2.54 mm pin header")
+        )
+      )
+    )
+  )
+  (symbol
+    (lib_id "Amplifier_Operational:LM358")
+    (at 134.62 55.88 0)
+    (unit 3)
+    (body_style 1)
+    (exclude_from_sim no)
+    (in_bom yes)
+    (on_board yes)
+    (in_pos_files yes)
+    (dnp no)
+    (uuid "cc546a4f-f7e2-57fd-9181-a54f6c85e8ff")
+    (property
+      "Reference"
+      "U1"
+      (at 132.08 44.45 0)
+      (show_name no)
+      (do_not_autoplace yes)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Value"
+      "LM358DR"
+      (at 138.43 56.515 0)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace yes)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Footprint"
+      "Package_SO:SOIC-8_3.9x4.9mm_P1.27mm"
+      (at 134.62 55.88 0)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Datasheet"
+      ""
+      (at 134.62 55.88 0)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Description"
+      ""
+      (at 134.62 55.88 0)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "KiCadAI Catalog"
+      "open-topology"
+      (at 134.62 55.88 0)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "KiCadAI Catalog Hash"
+      "15aba02bed3b437a7694c7565300a3ec9266abbc6f5989026d608663579d8c39"
+      (at 134.62 55.88 0)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "KiCadAI Component ID"
+      "opamp.ti.lm358.soic8"
+      (at 134.62 55.88 0)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "KiCadAI Resolution Hash"
+      "7a0a4a93c3bf89a525ef532b97dbda16bbbaa5d33d46d8d211ddff325244f45b"
+      (at 134.62 55.88 0)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "KiCadAI Variant ID"
+      "soic8"
+      (at 134.62 55.88 0)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Manufacturer"
+      "Texas Instruments"
+      (at 134.62 55.88 0)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "MPN"
+      "LM358DR"
+      (at 134.62 55.88 0)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      private
+      "KiCadAI Symbol Geometry"
+      "resolver"
+      (at 0 0 0)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (pin
+      "4"
+      (uuid "850710de-44be-5cbd-8bfa-bece6543524d")
+    )
+    (pin
+      "8"
+      (uuid "678e866d-8c66-5c22-b3fa-a79b670bdcf4")
+    )
+    (pin
+      "1"
+      (uuid "96b25a0e-500e-58b1-a8ea-2c542122c129")
+    )
+    (pin
+      "2"
+      (uuid "54b9a1cb-5b41-54a4-85e0-c44364843ab0")
+    )
+    (pin
+      "3"
+      (uuid "d51aedf6-bed4-514f-b8cb-97956a427dc4")
+    )
+    (pin
+      "5"
+      (uuid "01daf65f-4e43-572e-82b4-9bc80c66fa19")
+    )
+    (pin
+      "6"
+      (uuid "2d5bf2ec-3537-5a12-b595-f356fa971156")
+    )
+    (pin
+      "7"
+      (uuid "04fe463c-3090-5ce3-8c4d-dfe2b95f1a40")
+    )
+    (instances
+      (project
+        "protected_programmable_current_output"
+        (path
+          "/cc546a4f-f7e2-57fd-9181-a54f6c85e8ff"
+          (reference "U1")
+          (unit 3)
+          (value "LM358DR")
+        )
+      )
+    )
+  )
+  (symbol
+    (lib_id "Device:R")
+    (at 86.36 33.02 0)
+    (unit 1)
+    (body_style 1)
+    (exclude_from_sim no)
+    (in_bom yes)
+    (on_board yes)
+    (in_pos_files yes)
+    (dnp no)
+    (uuid "d3519446-c90d-530c-80f5-d86f55c2d80d")
+    (property
+      "Reference"
+      "R1"
+      (at 80.264 33.655 0)
+      (show_name no)
+      (do_not_autoplace yes)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Value"
+      "220m"
+      (at 89.916 33.655 0)
+      (show_name no)
+      (do_not_autoplace yes)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Footprint"
+      "Resistor_THT:R_Axial_DIN0414_L11.9mm_D4.5mm_P20.32mm_Horizontal"
+      (at 86.36 33.02 0)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Datasheet"
+      ""
+      (at 86.36 33.02 0)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Description"
+      ""
+      (at 86.36 33.02 0)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "KiCadAI Catalog"
+      "open-topology"
+      (at 86.36 33.02 0)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "KiCadAI Catalog Hash"
+      "15aba02bed3b437a7694c7565300a3ec9266abbc6f5989026d608663579d8c39"
+      (at 86.36 33.02 0)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "KiCadAI Component ID"
+      "resistor.vishay.ac03.0r22.axial"
+      (at 86.36 33.02 0)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "KiCadAI Resolution Hash"
+      "7a0a4a93c3bf89a525ef532b97dbda16bbbaa5d33d46d8d211ddff325244f45b"
+      (at 86.36 33.02 0)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "KiCadAI Variant ID"
+      "axial_ac03"
+      (at 86.36 33.02 0)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Manufacturer"
+      "Vishay"
+      (at 86.36 33.02 0)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "MPN"
+      "AC03000002207JAC00"
+      (at 86.36 33.02 0)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      private
+      "KiCadAI Symbol Geometry"
+      "resolver"
+      (at 0 0 0)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (pin
+      "1"
+      (uuid "d0a12bb0-e5cc-5892-bcc9-699e37a9f187")
+    )
+    (pin
+      "2"
+      (uuid "2912ee72-0ffc-5cc9-bb8a-5b580ee0927e")
+    )
+    (instances
+      (project
+        "protected_programmable_current_output"
+        (path
+          "/d3519446-c90d-530c-80f5-d86f55c2d80d"
+          (reference "R1")
+          (unit 1)
+          (value "220m")
+        )
+      )
+    )
+  )
+  (symbol
+    (lib_id "Amplifier_Operational:LM358")
+    (at 111.76 134.62 0)
+    (unit 2)
+    (body_style 1)
+    (exclude_from_sim no)
+    (in_bom yes)
+    (on_board yes)
+    (in_pos_files yes)
+    (dnp no)
+    (uuid "de3095be-f045-5325-8559-58a61ed0b6eb")
+    (property
+      "Reference"
+      "U1"
+      (at 110.49 127 0)
+      (show_name no)
+      (do_not_autoplace yes)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Value"
+      "LM358DR"
+      (at 107.315 143.51 0)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace yes)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Footprint"
+      "Package_SO:SOIC-8_3.9x4.9mm_P1.27mm"
+      (at 111.76 134.62 0)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Datasheet"
+      ""
+      (at 111.76 134.62 0)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Description"
+      ""
+      (at 111.76 134.62 0)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "KiCadAI Catalog"
+      "open-topology"
+      (at 111.76 134.62 0)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "KiCadAI Catalog Hash"
+      "15aba02bed3b437a7694c7565300a3ec9266abbc6f5989026d608663579d8c39"
+      (at 111.76 134.62 0)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "KiCadAI Component ID"
+      "opamp.ti.lm358.soic8"
+      (at 111.76 134.62 0)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "KiCadAI Resolution Hash"
+      "7a0a4a93c3bf89a525ef532b97dbda16bbbaa5d33d46d8d211ddff325244f45b"
+      (at 111.76 134.62 0)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "KiCadAI Variant ID"
+      "soic8"
+      (at 111.76 134.62 0)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Manufacturer"
+      "Texas Instruments"
+      (at 111.76 134.62 0)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "MPN"
+      "LM358DR"
+      (at 111.76 134.62 0)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      private
+      "KiCadAI Symbol Geometry"
+      "resolver"
+      (at 0 0 0)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (pin
+      "5"
+      (uuid "dd384510-9f11-53c9-aad5-1a73c4c55a47")
+    )
+    (pin
+      "6"
+      (uuid "e6c7a3cf-4e1b-54ef-8753-d0dec0755546")
+    )
+    (pin
+      "7"
+      (uuid "c153392d-ad7d-5c5c-9a4e-2e2ae9345a37")
+    )
+    (pin
+      "1"
+      (uuid "6446be75-ace4-5290-bc10-c0c246e2ea66")
+    )
+    (pin
+      "2"
+      (uuid "d976de40-f498-57bf-b57e-3feb3d20ab8a")
+    )
+    (pin
+      "3"
+      (uuid "3e3d1d05-e631-5b15-bd36-5bc117f158a5")
+    )
+    (pin
+      "4"
+      (uuid "c431075b-c211-55c5-9f98-ab87ea81027f")
+    )
+    (pin
+      "8"
+      (uuid "7cdc1fa1-f2e0-55e8-8644-f1eea7e7cb9b")
+    )
+    (instances
+      (project
+        "protected_programmable_current_output"
+        (path
+          "/de3095be-f045-5325-8559-58a61ed0b6eb"
+          (reference "U1")
+          (unit 2)
+          (value "LM358DR")
+        )
+      )
+    )
+  )
+  (symbol
+    (lib_id "Connector_Generic:Conn_01x02")
+    (at 60.96 71.12 0)
+    (unit 1)
+    (body_style 1)
+    (exclude_from_sim no)
+    (in_bom yes)
+    (on_board yes)
+    (in_pos_files yes)
+    (dnp no)
+    (uuid "e85038f3-0dec-5b9f-96d6-d5e016291aa6")
+    (property
+      "Reference"
+      "J3"
+      (at 59.69 67.31 0)
+      (show_name no)
+      (do_not_autoplace yes)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Value"
+      "1x02 2.54 mm pin header"
+      (at 46.355 78.74 0)
+      (show_name no)
+      (do_not_autoplace yes)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Footprint"
+      "Connector_PinHeader_2.54mm:PinHeader_1x02_P2.54mm_Vertical"
+      (at 60.96 71.12 0)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Datasheet"
+      ""
+      (at 60.96 71.12 0)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Description"
+      ""
+      (at 60.96 71.12 0)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "KiCadAI Catalog"
+      "open-topology"
+      (at 60.96 71.12 0)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "KiCadAI Catalog Hash"
+      "15aba02bed3b437a7694c7565300a3ec9266abbc6f5989026d608663579d8c39"
+      (at 60.96 71.12 0)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "KiCadAI Component ID"
+      "connector.pinheader.1x02.2_54mm"
+      (at 60.96 71.12 0)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "KiCadAI Resolution Hash"
+      "7a0a4a93c3bf89a525ef532b97dbda16bbbaa5d33d46d8d211ddff325244f45b"
+      (at 60.96 71.12 0)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "KiCadAI Variant ID"
+      "vertical"
+      (at 60.96 71.12 0)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      private
+      "KiCadAI Symbol Geometry"
+      "resolver"
+      (at 0 0 0)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (pin
+      "1"
+      (uuid "8309bb9e-086e-524d-b110-6b0153534544")
+    )
+    (pin
+      "2"
+      (uuid "2e50f2b1-3e40-5e9a-9804-5c00de4cf082")
+    )
+    (instances
+      (project
+        "protected_programmable_current_output"
+        (path
+          "/e85038f3-0dec-5b9f-96d6-d5e016291aa6"
+          (reference "J3")
+          (unit 1)
+          (value "1x02 2.54 mm pin header")
+        )
+      )
+    )
+  )
+  (symbol
+    (lib_id "Device:R")
+    (at 111.76 198.12 90)
+    (unit 1)
+    (body_style 1)
+    (exclude_from_sim no)
+    (in_bom yes)
+    (on_board yes)
+    (in_pos_files yes)
+    (dnp no)
+    (uuid "fa594f83-c47b-5069-857a-75d65f613a23")
+    (property
+      "Reference"
+      "R5"
+      (at 110.49 202.946 270)
+      (show_name no)
+      (do_not_autoplace yes)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Value"
+      "10k"
+      (at 109.855 204.216 270)
+      (show_name no)
+      (do_not_autoplace yes)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Footprint"
+      "Resistor_SMD:R_0805_2012Metric"
+      (at 111.76 198.12 90)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Datasheet"
+      ""
+      (at 111.76 198.12 90)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Description"
+      ""
+      (at 111.76 198.12 90)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "KiCadAI Catalog"
+      "open-topology"
+      (at 111.76 198.12 90)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "KiCadAI Catalog Hash"
+      "15aba02bed3b437a7694c7565300a3ec9266abbc6f5989026d608663579d8c39"
+      (at 111.76 198.12 90)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "KiCadAI Component ID"
+      "resistor.vishay.tnpw0805.10k0.0p1"
+      (at 111.76 198.12 90)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "KiCadAI Resolution Hash"
+      "7a0a4a93c3bf89a525ef532b97dbda16bbbaa5d33d46d8d211ddff325244f45b"
+      (at 111.76 198.12 90)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "KiCadAI Variant ID"
+      "0805"
+      (at 111.76 198.12 90)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Manufacturer"
+      "Vishay"
+      (at 111.76 198.12 90)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "MPN"
+      "TNPW080510K0BEEA"
+      (at 111.76 198.12 90)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      private
+      "KiCadAI Symbol Geometry"
+      "resolver"
+      (at 0 0 0)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (pin
+      "1"
+      (uuid "f804ef81-951d-54c9-9fdb-b70b63136e00")
+    )
+    (pin
+      "2"
+      (uuid "3dd995be-ac8f-5408-a2b7-b917b4856d67")
+    )
+    (instances
+      (project
+        "protected_programmable_current_output"
+        (path
+          "/fa594f83-c47b-5069-857a-75d65f613a23"
+          (reference "R5")
+          (unit 1)
+          (value "10k")
+        )
+      )
+    )
+  )
+  (symbol
+    (lib_id "Amplifier_Operational:TLV9061xDBV")
+    (at 86.36 78.74 0)
+    (unit 1)
+    (body_style 1)
+    (exclude_from_sim no)
+    (in_bom yes)
+    (on_board yes)
+    (in_pos_files yes)
+    (dnp no)
+    (uuid "fc7c7718-381c-53b0-8e82-3a6973456efc")
+    (property
+      "Reference"
+      "U2"
+      (at 85.09 71.12 0)
+      (show_name no)
+      (do_not_autoplace yes)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Value"
+      "OPA992IDBVR"
+      (at 64.77 87.63 0)
+      (show_name no)
+      (do_not_autoplace yes)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Footprint"
+      "Package_TO_SOT_SMD:SOT-23-5"
+      (at 86.36 78.74 0)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Datasheet"
+      ""
+      (at 86.36 78.74 0)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Description"
+      ""
+      (at 86.36 78.74 0)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "KiCadAI Catalog"
+      "open-topology"
+      (at 86.36 78.74 0)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "KiCadAI Catalog Hash"
+      "15aba02bed3b437a7694c7565300a3ec9266abbc6f5989026d608663579d8c39"
+      (at 86.36 78.74 0)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "KiCadAI Component ID"
+      "opamp.ti.opa992idbvr.sot23_5"
+      (at 86.36 78.74 0)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "KiCadAI Resolution Hash"
+      "7a0a4a93c3bf89a525ef532b97dbda16bbbaa5d33d46d8d211ddff325244f45b"
+      (at 86.36 78.74 0)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "KiCadAI Variant ID"
+      "sot23_5"
+      (at 86.36 78.74 0)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Manufacturer"
+      "Texas Instruments"
+      (at 86.36 78.74 0)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "MPN"
+      "OPA992IDBVR"
+      (at 86.36 78.74 0)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      private
+      "KiCadAI Symbol Geometry"
+      "resolver"
+      (at 0 0 0)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (pin
+      "1"
+      (uuid "38ec3ffd-f24d-5f60-938f-072ad3cc65c8")
+    )
+    (pin
+      "2"
+      (uuid "753ba037-215f-5c9a-8de2-404f900e8050")
+    )
+    (pin
+      "3"
+      (uuid "51bf279d-8c77-54a5-9a92-da68cbae926f")
+    )
+    (pin
+      "4"
+      (uuid "cb9e3e49-32c2-5919-8dde-408a6d6c493c")
+    )
+    (pin
+      "5"
+      (uuid "9aa8bd30-b958-5cac-bb28-84fac15275b1")
+    )
+    (instances
+      (project
+        "protected_programmable_current_output"
+        (path
+          "/fc7c7718-381c-53b0-8e82-3a6973456efc"
+          (reference "U2")
+          (unit 1)
+          (value "OPA992IDBVR")
+        )
+      )
+    )
+  )
+  (sheet_instances
+    (path
+      "/"
+      (page "1")
+    )
+  )
+)

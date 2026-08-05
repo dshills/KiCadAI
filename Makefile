@@ -1,6 +1,6 @@
 .DEFAULT_GOAL := help
 
-.PHONY: help build install test test-one race-short review-matrix promotion-bundle held-out-promotion-bundle hierarchical-promotion-bundle dynamic-electrothermal-promotion-bundle open-world-capability-promotion-bundle protocol-aware-bus-promotion-bundle component-onboarding-promotion-bundle lint coverage coverage-check run-help refresh-kicad-proto proto proto-check
+.PHONY: help build install test test-one race-short public-demo public-demo-refusal review-matrix promotion-bundle held-out-promotion-bundle hierarchical-promotion-bundle dynamic-electrothermal-promotion-bundle open-world-capability-promotion-bundle protocol-aware-bus-promotion-bundle component-onboarding-promotion-bundle lint coverage coverage-check run-help refresh-kicad-proto proto proto-check
 
 BIN_DIR := $(CURDIR)/bin
 BIN := $(BIN_DIR)/kicadai
@@ -43,6 +43,8 @@ help:
 	@printf "  make test            Run Go tests\n"
 	@printf "  make test-one        Run and require one named Go test (GO_TEST_NAME=...)\n"
 	@printf "  make race-short      Run the local bounded concurrency race suite\n"
+	@printf "  make public-demo     Reproduce the featured protected-current-output proof\n"
+	@printf "  make public-demo-refusal Verify fail-closed behavior outside the reviewed envelope\n"
 	@printf "  make review-matrix   Run the external-review mitigation ladder twice\n"
 	@printf "  make promotion-bundle Reproduce and verify the installed-KiCad promotion bundle\n"
 	@printf "  make held-out-promotion-bundle Reproduce and verify the held-out capability bundle\n"
@@ -88,6 +90,12 @@ test-one:
 
 race-short:
 	GOCACHE="$(GOCACHE_DIR)" GOMODCACHE="$(GOMODCACHE_DIR)" go test -race -short -count=1 -timeout "$(GO_TEST_TIMEOUT)" $(RACE_PACKAGES)
+
+public-demo:
+	./examples/public-demo/protected-programmable-current-output/run.sh positive
+
+public-demo-refusal:
+	./examples/public-demo/protected-programmable-current-output/run.sh refusal
 
 review-matrix:
 	KICADAI_RUN_EXTERNAL_REVIEW_MATRIX=1 GOCACHE="$(GOCACHE_DIR)" GOMODCACHE="$(GOMODCACHE_DIR)" go test -timeout "$(GO_TEST_TIMEOUT)" -count=2 ./cmd/kicadai ./internal/placement ./internal/circuitgraph ./internal/designworkflow ./internal/creationevidence -run '^TestExternalReviewMatrix'

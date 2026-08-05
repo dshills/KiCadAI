@@ -283,9 +283,7 @@ func readLibraryFootprint(file LibraryFile, node sexpr.ParsedNode, name string) 
 func readLibraryPad(path string, node sexpr.ParsedNode) (FootprintPad, []reports.Issue) {
 	var issues []reports.Issue
 	pad := FootprintPad{Raw: strings.TrimSpace(node.Raw)}
-	if len(node.Children) < 2 || strings.TrimSpace(node.ListValue(1)) == "" {
-		issues = append(issues, parseIssue(path, "pad without name"))
-	} else {
+	if len(node.Children) >= 2 {
 		pad.Name = node.ListValue(1)
 	}
 	if len(node.Children) > 2 {
@@ -327,6 +325,9 @@ func readLibraryPad(path string, node sexpr.ParsedNode) (FootprintPad, []reports
 			pad.Layers = append(pad.Layers, kicadfiles.BoardLayer(layer))
 		}
 	}
+	if strings.TrimSpace(pad.Name) == "" && libraryPadRequiresName(pad) {
+		issues = append(issues, parseIssue(path, "electrical pad without name"))
+	}
 	if pinFunction, ok := node.Child("pinfunction"); ok && len(pinFunction.Children) > 1 {
 		pad.PinFunction = pinFunction.ListValue(1)
 	}
@@ -346,6 +347,24 @@ func readLibraryPad(path string, node sexpr.ParsedNode) (FootprintPad, []reports
 		issues = append(issues, regionIssues...)
 	}
 	return pad, issues
+}
+
+// libraryPadRequiresName separates electrically connectable pads from
+// legitimate unnamed fabrication features. KiCad footprints routinely model
+// split paste apertures and non-plated mechanical holes as pads with an empty
+// number; neither participates in pin-to-pad connectivity. A copper-bearing
+// electrical pad must still have a stable name.
+func libraryPadRequiresName(pad FootprintPad) bool {
+	if strings.EqualFold(strings.TrimSpace(pad.Type), "np_thru_hole") {
+		return false
+	}
+	for _, layer := range pad.Layers {
+		name := string(layer)
+		if name == "*.Cu" || strings.HasSuffix(name, ".Cu") {
+			return true
+		}
+	}
+	return false
 }
 
 func readCustomPadCopperRegions(path string, node sexpr.ParsedNode, pad FootprintPad) ([]BoundingBox, []reports.Issue) {

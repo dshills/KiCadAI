@@ -1,0 +1,4456 @@
+{
+  "schema": "kicadai.transaction.provenance.v1",
+  "schema_version": "1",
+  "project_name": "protected_programmable_current_output",
+  "generator_version": "0.1.0",
+  "created_by": "kicadai",
+  "transaction": {
+    "name": "protected_programmable_current_output",
+    "project": "protected_programmable_current_output",
+    "operations": [
+      {
+        "op": "create_project",
+        "name": "protected_programmable_current_output",
+        "paper": "A4",
+        "paper_portrait": true
+      },
+      {
+        "op": "add_symbol",
+        "ref": "J1",
+        "role": "input_connector",
+        "value": "1x02 2.54 mm pin header",
+        "library_id": "Connector_Generic:Conn_01x02",
+        "at": {
+          "x_mm": 60.96,
+          "y_mm": 38.1
+        },
+        "pins": [
+          {
+            "number": "1",
+            "x_mm": -5.08
+          },
+          {
+            "number": "2",
+            "x_mm": -5.08,
+            "y_mm": 2.54
+          }
+        ],
+        "properties": [
+          {
+            "name": "Footprint",
+            "value": "Connector_PinHeader_2.54mm:PinHeader_1x02_P2.54mm_Vertical",
+            "hidden": true
+          },
+          {
+            "name": "KiCadAI Catalog",
+            "value": "open-topology",
+            "hidden": true
+          },
+          {
+            "name": "KiCadAI Catalog Hash",
+            "value": "15aba02bed3b437a7694c7565300a3ec9266abbc6f5989026d608663579d8c39",
+            "hidden": true
+          },
+          {
+            "name": "KiCadAI Component ID",
+            "value": "connector.pinheader.1x02.2_54mm",
+            "hidden": true
+          },
+          {
+            "name": "KiCadAI Resolution Hash",
+            "value": "7a0a4a93c3bf89a525ef532b97dbda16bbbaa5d33d46d8d211ddff325244f45b",
+            "hidden": true
+          },
+          {
+            "name": "KiCadAI Variant ID",
+            "value": "vertical",
+            "hidden": true
+          },
+          {
+            "name": "Reference",
+            "value": "J1",
+            "do_not_autoplace": true,
+            "at": {
+              "x_mm": 59.69,
+              "y_mm": 34.29
+            },
+            "rotation_deg": 0
+          },
+          {
+            "name": "Value",
+            "value": "1x02 2.54 mm pin header",
+            "do_not_autoplace": true,
+            "at": {
+              "x_mm": 46.355,
+              "y_mm": 45.72
+            },
+            "rotation_deg": 0
+          }
+        ],
+        "prefer_resolver_symbol": true
+      },
+      {
+        "op": "assign_footprint",
+        "ref": "J1",
+        "role": "input_connector",
+        "footprint_id": "Connector_PinHeader_2.54mm:PinHeader_1x02_P2.54mm_Vertical"
+      },
+      {
+        "op": "add_symbol",
+        "ref": "J2",
+        "role": "output_connector",
+        "value": "1x02 2.54 mm pin header",
+        "library_id": "Connector_Generic:Conn_01x02",
+        "at": {
+          "x_mm": 177.8,
+          "y_mm": 38.1
+        },
+        "pins": [
+          {
+            "number": "1",
+            "x_mm": -5.08
+          },
+          {
+            "number": "2",
+            "x_mm": -5.08,
+            "y_mm": 2.54
+          }
+        ],
+        "properties": [
+          {
+            "name": "Footprint",
+            "value": "Connector_PinHeader_2.54mm:PinHeader_1x02_P2.54mm_Vertical",
+            "hidden": true
+          },
+          {
+            "name": "KiCadAI Catalog",
+            "value": "open-topology",
+            "hidden": true
+          },
+          {
+            "name": "KiCadAI Catalog Hash",
+            "value": "15aba02bed3b437a7694c7565300a3ec9266abbc6f5989026d608663579d8c39",
+            "hidden": true
+          },
+          {
+            "name": "KiCadAI Component ID",
+            "value": "connector.pinheader.1x02.2_54mm",
+            "hidden": true
+          },
+          {
+            "name": "KiCadAI Resolution Hash",
+            "value": "7a0a4a93c3bf89a525ef532b97dbda16bbbaa5d33d46d8d211ddff325244f45b",
+            "hidden": true
+          },
+          {
+            "name": "KiCadAI Variant ID",
+            "value": "vertical",
+            "hidden": true
+          },
+          {
+            "name": "Reference",
+            "value": "J2",
+            "do_not_autoplace": true,
+            "at": {
+              "x_mm": 176.53,
+              "y_mm": 34.29
+            },
+            "rotation_deg": 0
+          },
+          {
+            "name": "Value",
+            "value": "1x02 2.54 mm pin header",
+            "do_not_autoplace": true,
+            "at": {
+              "x_mm": 163.195,
+              "y_mm": 45.72
+            },
+            "rotation_deg": 0
+          }
+        ],
+        "prefer_resolver_symbol": true
+      },
+      {
+        "op": "assign_footprint",
+        "ref": "J2",
+        "role": "output_connector",
+        "footprint_id": "Connector_PinHeader_2.54mm:PinHeader_1x02_P2.54mm_Vertical"
+      },
+      {
+        "op": "add_symbol",
+        "ref": "J3",
+        "role": "input_connector",
+        "value": "1x02 2.54 mm pin header",
+        "library_id": "Connector_Generic:Conn_01x02",
+        "at": {
+          "x_mm": 60.96,
+          "y_mm": 71.12
+        },
+        "pins": [
+          {
+            "number": "1",
+            "x_mm": -5.08
+          },
+          {
+            "number": "2",
+            "x_mm": -5.08,
+            "y_mm": 2.54
+          }
+        ],
+        "properties": [
+          {
+            "name": "Footprint",
+            "value": "Connector_PinHeader_2.54mm:PinHeader_1x02_P2.54mm_Vertical",
+            "hidden": true
+          },
+          {
+            "name": "KiCadAI Catalog",
+            "value": "open-topology",
+            "hidden": true
+          },
+          {
+            "name": "KiCadAI Catalog Hash",
+            "value": "15aba02bed3b437a7694c7565300a3ec9266abbc6f5989026d608663579d8c39",
+            "hidden": true
+          },
+          {
+            "name": "KiCadAI Component ID",
+            "value": "connector.pinheader.1x02.2_54mm",
+            "hidden": true
+          },
+          {
+            "name": "KiCadAI Resolution Hash",
+            "value": "7a0a4a93c3bf89a525ef532b97dbda16bbbaa5d33d46d8d211ddff325244f45b",
+            "hidden": true
+          },
+          {
+            "name": "KiCadAI Variant ID",
+            "value": "vertical",
+            "hidden": true
+          },
+          {
+            "name": "Reference",
+            "value": "J3",
+            "do_not_autoplace": true,
+            "at": {
+              "x_mm": 59.69,
+              "y_mm": 67.31
+            },
+            "rotation_deg": 0
+          },
+          {
+            "name": "Value",
+            "value": "1x02 2.54 mm pin header",
+            "do_not_autoplace": true,
+            "at": {
+              "x_mm": 46.355,
+              "y_mm": 78.74
+            },
+            "rotation_deg": 0
+          }
+        ],
+        "prefer_resolver_symbol": true
+      },
+      {
+        "op": "assign_footprint",
+        "ref": "J3",
+        "role": "input_connector",
+        "footprint_id": "Connector_PinHeader_2.54mm:PinHeader_1x02_P2.54mm_Vertical"
+      },
+      {
+        "op": "add_symbol",
+        "ref": "R1",
+        "role": "resistor",
+        "value": "220m",
+        "library_id": "Device:R",
+        "at": {
+          "x_mm": 86.36,
+          "y_mm": 33.02
+        },
+        "pins": [
+          {
+            "number": "1",
+            "y_mm": -3.81
+          },
+          {
+            "number": "2",
+            "y_mm": 3.81
+          }
+        ],
+        "properties": [
+          {
+            "name": "Footprint",
+            "value": "Resistor_THT:R_Axial_DIN0414_L11.9mm_D4.5mm_P20.32mm_Horizontal",
+            "hidden": true
+          },
+          {
+            "name": "KiCadAI Catalog",
+            "value": "open-topology",
+            "hidden": true
+          },
+          {
+            "name": "KiCadAI Catalog Hash",
+            "value": "15aba02bed3b437a7694c7565300a3ec9266abbc6f5989026d608663579d8c39",
+            "hidden": true
+          },
+          {
+            "name": "KiCadAI Component ID",
+            "value": "resistor.vishay.ac03.0r22.axial",
+            "hidden": true
+          },
+          {
+            "name": "KiCadAI Resolution Hash",
+            "value": "7a0a4a93c3bf89a525ef532b97dbda16bbbaa5d33d46d8d211ddff325244f45b",
+            "hidden": true
+          },
+          {
+            "name": "KiCadAI Variant ID",
+            "value": "axial_ac03",
+            "hidden": true
+          },
+          {
+            "name": "Manufacturer",
+            "value": "Vishay",
+            "hidden": true
+          },
+          {
+            "name": "MPN",
+            "value": "AC03000002207JAC00",
+            "hidden": true
+          },
+          {
+            "name": "Reference",
+            "value": "R1",
+            "do_not_autoplace": true,
+            "at": {
+              "x_mm": 80.264,
+              "y_mm": 33.655
+            },
+            "rotation_deg": 0
+          },
+          {
+            "name": "Value",
+            "value": "220m",
+            "do_not_autoplace": true,
+            "at": {
+              "x_mm": 89.916,
+              "y_mm": 33.655
+            },
+            "rotation_deg": 0
+          }
+        ],
+        "prefer_resolver_symbol": true
+      },
+      {
+        "op": "assign_footprint",
+        "ref": "R1",
+        "role": "resistor",
+        "footprint_id": "Resistor_THT:R_Axial_DIN0414_L11.9mm_D4.5mm_P20.32mm_Horizontal"
+      },
+      {
+        "op": "add_symbol",
+        "ref": "R2",
+        "role": "resistor",
+        "value": "220m",
+        "library_id": "Device:R",
+        "at": {
+          "x_mm": 86.36,
+          "y_mm": 55.88
+        },
+        "pins": [
+          {
+            "number": "1",
+            "y_mm": -3.81
+          },
+          {
+            "number": "2",
+            "y_mm": 3.81
+          }
+        ],
+        "properties": [
+          {
+            "name": "Footprint",
+            "value": "Resistor_THT:R_Axial_DIN0414_L11.9mm_D4.5mm_P20.32mm_Horizontal",
+            "hidden": true
+          },
+          {
+            "name": "KiCadAI Catalog",
+            "value": "open-topology",
+            "hidden": true
+          },
+          {
+            "name": "KiCadAI Catalog Hash",
+            "value": "15aba02bed3b437a7694c7565300a3ec9266abbc6f5989026d608663579d8c39",
+            "hidden": true
+          },
+          {
+            "name": "KiCadAI Component ID",
+            "value": "resistor.vishay.ac03.0r22.axial",
+            "hidden": true
+          },
+          {
+            "name": "KiCadAI Resolution Hash",
+            "value": "7a0a4a93c3bf89a525ef532b97dbda16bbbaa5d33d46d8d211ddff325244f45b",
+            "hidden": true
+          },
+          {
+            "name": "KiCadAI Variant ID",
+            "value": "axial_ac03",
+            "hidden": true
+          },
+          {
+            "name": "Manufacturer",
+            "value": "Vishay",
+            "hidden": true
+          },
+          {
+            "name": "MPN",
+            "value": "AC03000002207JAC00",
+            "hidden": true
+          },
+          {
+            "name": "Reference",
+            "value": "R2",
+            "do_not_autoplace": true,
+            "at": {
+              "x_mm": 85.09,
+              "y_mm": 50.8
+            },
+            "rotation_deg": 0
+          },
+          {
+            "name": "Value",
+            "value": "220m",
+            "do_not_autoplace": true,
+            "at": {
+              "x_mm": 89.916,
+              "y_mm": 56.515
+            },
+            "rotation_deg": 0
+          }
+        ],
+        "prefer_resolver_symbol": true
+      },
+      {
+        "op": "assign_footprint",
+        "ref": "R2",
+        "role": "resistor",
+        "footprint_id": "Resistor_THT:R_Axial_DIN0414_L11.9mm_D4.5mm_P20.32mm_Horizontal"
+      },
+      {
+        "op": "add_symbol",
+        "ref": "Q1",
+        "role": "bjt",
+        "value": "D45H11G",
+        "library_id": "Transistor_BJT:Q_PNP_BCE",
+        "at": {
+          "x_mm": 111.76,
+          "y_mm": 33.02
+        },
+        "pins": [
+          {
+            "number": "1",
+            "x_mm": -5.08
+          },
+          {
+            "number": "2",
+            "x_mm": 2.54,
+            "y_mm": -5.08
+          },
+          {
+            "number": "3",
+            "x_mm": 2.54,
+            "y_mm": 5.08
+          }
+        ],
+        "properties": [
+          {
+            "name": "Footprint",
+            "value": "Package_TO_SOT_THT:TO-220-3_Vertical",
+            "hidden": true
+          },
+          {
+            "name": "KiCadAI Catalog",
+            "value": "open-topology",
+            "hidden": true
+          },
+          {
+            "name": "KiCadAI Catalog Hash",
+            "value": "15aba02bed3b437a7694c7565300a3ec9266abbc6f5989026d608663579d8c39",
+            "hidden": true
+          },
+          {
+            "name": "KiCadAI Component ID",
+            "value": "bjt.onsemi.d45h11g.to220",
+            "hidden": true
+          },
+          {
+            "name": "KiCadAI Resolution Hash",
+            "value": "7a0a4a93c3bf89a525ef532b97dbda16bbbaa5d33d46d8d211ddff325244f45b",
+            "hidden": true
+          },
+          {
+            "name": "KiCadAI Variant ID",
+            "value": "to220_3",
+            "hidden": true
+          },
+          {
+            "name": "Manufacturer",
+            "value": "onsemi",
+            "hidden": true
+          },
+          {
+            "name": "MPN",
+            "value": "D45H11G",
+            "hidden": true
+          },
+          {
+            "name": "Reference",
+            "value": "Q1",
+            "do_not_autoplace": true,
+            "at": {
+              "x_mm": 111.2647,
+              "y_mm": 23.8506
+            },
+            "rotation_deg": 0
+          },
+          {
+            "name": "Value",
+            "value": "D45H11G",
+            "do_not_autoplace": true,
+            "at": {
+              "x_mm": 108.0897,
+              "y_mm": 43.4594
+            },
+            "rotation_deg": 0
+          }
+        ],
+        "prefer_resolver_symbol": true
+      },
+      {
+        "op": "assign_footprint",
+        "ref": "Q1",
+        "role": "bjt",
+        "footprint_id": "Package_TO_SOT_THT:TO-220-3_Vertical"
+      },
+      {
+        "op": "add_symbol",
+        "ref": "Q2",
+        "role": "bjt",
+        "value": "D45H11G",
+        "library_id": "Transistor_BJT:Q_PNP_BCE",
+        "at": {
+          "x_mm": 111.76,
+          "y_mm": 58.42
+        },
+        "pins": [
+          {
+            "number": "1",
+            "x_mm": -5.08
+          },
+          {
+            "number": "2",
+            "x_mm": 2.54,
+            "y_mm": -5.08
+          },
+          {
+            "number": "3",
+            "x_mm": 2.54,
+            "y_mm": 5.08
+          }
+        ],
+        "properties": [
+          {
+            "name": "Footprint",
+            "value": "Package_TO_SOT_THT:TO-220-3_Vertical",
+            "hidden": true
+          },
+          {
+            "name": "KiCadAI Catalog",
+            "value": "open-topology",
+            "hidden": true
+          },
+          {
+            "name": "KiCadAI Catalog Hash",
+            "value": "15aba02bed3b437a7694c7565300a3ec9266abbc6f5989026d608663579d8c39",
+            "hidden": true
+          },
+          {
+            "name": "KiCadAI Component ID",
+            "value": "bjt.onsemi.d45h11g.to220",
+            "hidden": true
+          },
+          {
+            "name": "KiCadAI Resolution Hash",
+            "value": "7a0a4a93c3bf89a525ef532b97dbda16bbbaa5d33d46d8d211ddff325244f45b",
+            "hidden": true
+          },
+          {
+            "name": "KiCadAI Variant ID",
+            "value": "to220_3",
+            "hidden": true
+          },
+          {
+            "name": "Manufacturer",
+            "value": "onsemi",
+            "hidden": true
+          },
+          {
+            "name": "MPN",
+            "value": "D45H11G",
+            "hidden": true
+          },
+          {
+            "name": "Reference",
+            "value": "Q2",
+            "do_not_autoplace": true,
+            "at": {
+              "x_mm": 118.3894,
+              "y_mm": 59.055
+            },
+            "rotation_deg": 0
+          },
+          {
+            "name": "Value",
+            "value": "D45H11G",
+            "do_not_autoplace": true,
+            "at": {
+              "x_mm": 108.0897,
+              "y_mm": 66.3194
+            },
+            "rotation_deg": 0
+          }
+        ],
+        "prefer_resolver_symbol": true
+      },
+      {
+        "op": "assign_footprint",
+        "ref": "Q2",
+        "role": "bjt",
+        "footprint_id": "Package_TO_SOT_THT:TO-220-3_Vertical"
+      },
+      {
+        "op": "add_symbol",
+        "ref": "R3",
+        "role": "resistor",
+        "value": "10ohm",
+        "library_id": "Device:R",
+        "at": {
+          "x_mm": 157.48,
+          "y_mm": 198.12
+        },
+        "rotation_deg": 90,
+        "pins": [
+          {
+            "number": "1",
+            "y_mm": -3.81
+          },
+          {
+            "number": "2",
+            "y_mm": 3.81
+          }
+        ],
+        "properties": [
+          {
+            "name": "Footprint",
+            "value": "Resistor_THT:R_Axial_DIN0614_L14.3mm_D5.7mm_P25.40mm_Horizontal",
+            "hidden": true
+          },
+          {
+            "name": "KiCadAI Catalog",
+            "value": "open-topology",
+            "hidden": true
+          },
+          {
+            "name": "KiCadAI Catalog Hash",
+            "value": "15aba02bed3b437a7694c7565300a3ec9266abbc6f5989026d608663579d8c39",
+            "hidden": true
+          },
+          {
+            "name": "KiCadAI Component ID",
+            "value": "resistor.vishay.cpf3.10r.0p1.axial",
+            "hidden": true
+          },
+          {
+            "name": "KiCadAI Resolution Hash",
+            "value": "7a0a4a93c3bf89a525ef532b97dbda16bbbaa5d33d46d8d211ddff325244f45b",
+            "hidden": true
+          },
+          {
+            "name": "KiCadAI Variant ID",
+            "value": "axial_cpf3",
+            "hidden": true
+          },
+          {
+            "name": "Manufacturer",
+            "value": "Vishay",
+            "hidden": true
+          },
+          {
+            "name": "MPN",
+            "value": "CPF310R000BE14",
+            "hidden": true
+          },
+          {
+            "name": "Reference",
+            "value": "R3",
+            "do_not_autoplace": true,
+            "at": {
+              "x_mm": 156.21,
+              "y_mm": 194.564
+            },
+            "rotation_deg": 270
+          },
+          {
+            "name": "Value",
+            "value": "10ohm",
+            "do_not_autoplace": true,
+            "at": {
+              "x_mm": 154.305,
+              "y_mm": 202.946
+            },
+            "rotation_deg": 270
+          }
+        ],
+        "prefer_resolver_symbol": true
+      },
+      {
+        "op": "assign_footprint",
+        "ref": "R3",
+        "role": "resistor",
+        "footprint_id": "Resistor_THT:R_Axial_DIN0614_L14.3mm_D5.7mm_P25.40mm_Horizontal"
+      },
+      {
+        "op": "add_symbol",
+        "ref": "R4",
+        "role": "resistor",
+        "value": "10k",
+        "library_id": "Device:R",
+        "at": {
+          "x_mm": 157.48,
+          "y_mm": 223.52
+        },
+        "rotation_deg": 90,
+        "pins": [
+          {
+            "number": "1",
+            "y_mm": -3.81
+          },
+          {
+            "number": "2",
+            "y_mm": 3.81
+          }
+        ],
+        "properties": [
+          {
+            "name": "Footprint",
+            "value": "Resistor_SMD:R_0805_2012Metric",
+            "hidden": true
+          },
+          {
+            "name": "KiCadAI Catalog",
+            "value": "open-topology",
+            "hidden": true
+          },
+          {
+            "name": "KiCadAI Catalog Hash",
+            "value": "15aba02bed3b437a7694c7565300a3ec9266abbc6f5989026d608663579d8c39",
+            "hidden": true
+          },
+          {
+            "name": "KiCadAI Component ID",
+            "value": "resistor.vishay.tnpw0805.10k0.0p1",
+            "hidden": true
+          },
+          {
+            "name": "KiCadAI Resolution Hash",
+            "value": "7a0a4a93c3bf89a525ef532b97dbda16bbbaa5d33d46d8d211ddff325244f45b",
+            "hidden": true
+          },
+          {
+            "name": "KiCadAI Variant ID",
+            "value": "0805",
+            "hidden": true
+          },
+          {
+            "name": "Manufacturer",
+            "value": "Vishay",
+            "hidden": true
+          },
+          {
+            "name": "MPN",
+            "value": "TNPW080510K0BEEA",
+            "hidden": true
+          },
+          {
+            "name": "Reference",
+            "value": "R4",
+            "do_not_autoplace": true,
+            "at": {
+              "x_mm": 156.21,
+              "y_mm": 219.964
+            },
+            "rotation_deg": 270
+          },
+          {
+            "name": "Value",
+            "value": "10k",
+            "do_not_autoplace": true,
+            "at": {
+              "x_mm": 155.575,
+              "y_mm": 228.346
+            },
+            "rotation_deg": 270
+          }
+        ],
+        "prefer_resolver_symbol": true
+      },
+      {
+        "op": "assign_footprint",
+        "ref": "R4",
+        "role": "resistor",
+        "footprint_id": "Resistor_SMD:R_0805_2012Metric"
+      },
+      {
+        "op": "add_symbol",
+        "ref": "R5",
+        "role": "resistor",
+        "value": "10k",
+        "library_id": "Device:R",
+        "at": {
+          "x_mm": 111.76,
+          "y_mm": 198.12
+        },
+        "rotation_deg": 90,
+        "pins": [
+          {
+            "number": "1",
+            "y_mm": -3.81
+          },
+          {
+            "number": "2",
+            "y_mm": 3.81
+          }
+        ],
+        "properties": [
+          {
+            "name": "Footprint",
+            "value": "Resistor_SMD:R_0805_2012Metric",
+            "hidden": true
+          },
+          {
+            "name": "KiCadAI Catalog",
+            "value": "open-topology",
+            "hidden": true
+          },
+          {
+            "name": "KiCadAI Catalog Hash",
+            "value": "15aba02bed3b437a7694c7565300a3ec9266abbc6f5989026d608663579d8c39",
+            "hidden": true
+          },
+          {
+            "name": "KiCadAI Component ID",
+            "value": "resistor.vishay.tnpw0805.10k0.0p1",
+            "hidden": true
+          },
+          {
+            "name": "KiCadAI Resolution Hash",
+            "value": "7a0a4a93c3bf89a525ef532b97dbda16bbbaa5d33d46d8d211ddff325244f45b",
+            "hidden": true
+          },
+          {
+            "name": "KiCadAI Variant ID",
+            "value": "0805",
+            "hidden": true
+          },
+          {
+            "name": "Manufacturer",
+            "value": "Vishay",
+            "hidden": true
+          },
+          {
+            "name": "MPN",
+            "value": "TNPW080510K0BEEA",
+            "hidden": true
+          },
+          {
+            "name": "Reference",
+            "value": "R5",
+            "do_not_autoplace": true,
+            "at": {
+              "x_mm": 110.49,
+              "y_mm": 202.946
+            },
+            "rotation_deg": 270
+          },
+          {
+            "name": "Value",
+            "value": "10k",
+            "do_not_autoplace": true,
+            "at": {
+              "x_mm": 109.855,
+              "y_mm": 204.216
+            },
+            "rotation_deg": 270
+          }
+        ],
+        "prefer_resolver_symbol": true
+      },
+      {
+        "op": "assign_footprint",
+        "ref": "R5",
+        "role": "resistor",
+        "footprint_id": "Resistor_SMD:R_0805_2012Metric"
+      },
+      {
+        "op": "add_symbol",
+        "ref": "R6",
+        "role": "resistor",
+        "value": "10k",
+        "library_id": "Device:R",
+        "at": {
+          "x_mm": 134.62,
+          "y_mm": 198.12
+        },
+        "pins": [
+          {
+            "number": "1",
+            "y_mm": -3.81
+          },
+          {
+            "number": "2",
+            "y_mm": 3.81
+          }
+        ],
+        "properties": [
+          {
+            "name": "Footprint",
+            "value": "Resistor_SMD:R_0805_2012Metric",
+            "hidden": true
+          },
+          {
+            "name": "KiCadAI Catalog",
+            "value": "open-topology",
+            "hidden": true
+          },
+          {
+            "name": "KiCadAI Catalog Hash",
+            "value": "15aba02bed3b437a7694c7565300a3ec9266abbc6f5989026d608663579d8c39",
+            "hidden": true
+          },
+          {
+            "name": "KiCadAI Component ID",
+            "value": "resistor.vishay.tnpw0805.10k0.0p1",
+            "hidden": true
+          },
+          {
+            "name": "KiCadAI Resolution Hash",
+            "value": "7a0a4a93c3bf89a525ef532b97dbda16bbbaa5d33d46d8d211ddff325244f45b",
+            "hidden": true
+          },
+          {
+            "name": "KiCadAI Variant ID",
+            "value": "0805",
+            "hidden": true
+          },
+          {
+            "name": "Manufacturer",
+            "value": "Vishay",
+            "hidden": true
+          },
+          {
+            "name": "MPN",
+            "value": "TNPW080510K0BEEA",
+            "hidden": true
+          },
+          {
+            "name": "Reference",
+            "value": "R6",
+            "do_not_autoplace": true,
+            "at": {
+              "x_mm": 138.176,
+              "y_mm": 198.755
+            },
+            "rotation_deg": 0
+          },
+          {
+            "name": "Value",
+            "value": "10k",
+            "do_not_autoplace": true,
+            "at": {
+              "x_mm": 132.715,
+              "y_mm": 189.23
+            },
+            "rotation_deg": 0
+          }
+        ],
+        "prefer_resolver_symbol": true
+      },
+      {
+        "op": "assign_footprint",
+        "ref": "R6",
+        "role": "resistor",
+        "footprint_id": "Resistor_SMD:R_0805_2012Metric"
+      },
+      {
+        "op": "add_symbol",
+        "ref": "R7",
+        "role": "resistor",
+        "value": "10k",
+        "library_id": "Device:R",
+        "at": {
+          "x_mm": 111.76,
+          "y_mm": 223.52
+        },
+        "rotation_deg": 90,
+        "pins": [
+          {
+            "number": "1",
+            "y_mm": -3.81
+          },
+          {
+            "number": "2",
+            "y_mm": 3.81
+          }
+        ],
+        "properties": [
+          {
+            "name": "Footprint",
+            "value": "Resistor_SMD:R_0805_2012Metric",
+            "hidden": true
+          },
+          {
+            "name": "KiCadAI Catalog",
+            "value": "open-topology",
+            "hidden": true
+          },
+          {
+            "name": "KiCadAI Catalog Hash",
+            "value": "15aba02bed3b437a7694c7565300a3ec9266abbc6f5989026d608663579d8c39",
+            "hidden": true
+          },
+          {
+            "name": "KiCadAI Component ID",
+            "value": "resistor.vishay.tnpw0805.10k0.0p1",
+            "hidden": true
+          },
+          {
+            "name": "KiCadAI Resolution Hash",
+            "value": "7a0a4a93c3bf89a525ef532b97dbda16bbbaa5d33d46d8d211ddff325244f45b",
+            "hidden": true
+          },
+          {
+            "name": "KiCadAI Variant ID",
+            "value": "0805",
+            "hidden": true
+          },
+          {
+            "name": "Manufacturer",
+            "value": "Vishay",
+            "hidden": true
+          },
+          {
+            "name": "MPN",
+            "value": "TNPW080510K0BEEA",
+            "hidden": true
+          },
+          {
+            "name": "Reference",
+            "value": "R7",
+            "do_not_autoplace": true,
+            "at": {
+              "x_mm": 110.49,
+              "y_mm": 228.346
+            },
+            "rotation_deg": 270
+          },
+          {
+            "name": "Value",
+            "value": "10k",
+            "do_not_autoplace": true,
+            "at": {
+              "x_mm": 109.855,
+              "y_mm": 229.616
+            },
+            "rotation_deg": 270
+          }
+        ],
+        "prefer_resolver_symbol": true
+      },
+      {
+        "op": "assign_footprint",
+        "ref": "R7",
+        "role": "resistor",
+        "footprint_id": "Resistor_SMD:R_0805_2012Metric"
+      },
+      {
+        "op": "add_symbol",
+        "ref": "R8",
+        "role": "resistor",
+        "value": "47ohm",
+        "library_id": "Device:R",
+        "at": {
+          "x_mm": 111.76,
+          "y_mm": 109.22
+        },
+        "rotation_deg": 90,
+        "pins": [
+          {
+            "number": "1",
+            "y_mm": -3.81
+          },
+          {
+            "number": "2",
+            "y_mm": 3.81
+          }
+        ],
+        "properties": [
+          {
+            "name": "Footprint",
+            "value": "Resistor_SMD:R_0805_2012Metric",
+            "hidden": true
+          },
+          {
+            "name": "KiCadAI Catalog",
+            "value": "open-topology",
+            "hidden": true
+          },
+          {
+            "name": "KiCadAI Catalog Hash",
+            "value": "15aba02bed3b437a7694c7565300a3ec9266abbc6f5989026d608663579d8c39",
+            "hidden": true
+          },
+          {
+            "name": "KiCadAI Component ID",
+            "value": "resistor.vishay.crcw080547r0fkea.0805",
+            "hidden": true
+          },
+          {
+            "name": "KiCadAI Resolution Hash",
+            "value": "7a0a4a93c3bf89a525ef532b97dbda16bbbaa5d33d46d8d211ddff325244f45b",
+            "hidden": true
+          },
+          {
+            "name": "KiCadAI Variant ID",
+            "value": "0805",
+            "hidden": true
+          },
+          {
+            "name": "Manufacturer",
+            "value": "Vishay",
+            "hidden": true
+          },
+          {
+            "name": "MPN",
+            "value": "CRCW080547R0FKEA",
+            "hidden": true
+          },
+          {
+            "name": "Reference",
+            "value": "R8",
+            "do_not_autoplace": true,
+            "at": {
+              "x_mm": 110.49,
+              "y_mm": 105.664
+            },
+            "rotation_deg": 270
+          },
+          {
+            "name": "Value",
+            "value": "47ohm",
+            "do_not_autoplace": true,
+            "at": {
+              "x_mm": 108.585,
+              "y_mm": 114.046
+            },
+            "rotation_deg": 270
+          }
+        ],
+        "prefer_resolver_symbol": true
+      },
+      {
+        "op": "assign_footprint",
+        "ref": "R8",
+        "role": "resistor",
+        "footprint_id": "Resistor_SMD:R_0805_2012Metric"
+      },
+      {
+        "op": "add_symbol",
+        "ref": "U1",
+        "unit": 1,
+        "role": "ic",
+        "value": "LM358DR",
+        "library_id": "Amplifier_Operational:LM358",
+        "at": {
+          "x_mm": 111.76,
+          "y_mm": 83.82
+        },
+        "pins": [
+          {
+            "number": "1",
+            "x_mm": 7.62
+          },
+          {
+            "number": "2",
+            "x_mm": -7.62,
+            "y_mm": 2.54
+          },
+          {
+            "number": "3",
+            "x_mm": -7.62,
+            "y_mm": -2.54
+          }
+        ],
+        "properties": [
+          {
+            "name": "Footprint",
+            "value": "Package_SO:SOIC-8_3.9x4.9mm_P1.27mm",
+            "hidden": true
+          },
+          {
+            "name": "KiCadAI Catalog",
+            "value": "open-topology",
+            "hidden": true
+          },
+          {
+            "name": "KiCadAI Catalog Hash",
+            "value": "15aba02bed3b437a7694c7565300a3ec9266abbc6f5989026d608663579d8c39",
+            "hidden": true
+          },
+          {
+            "name": "KiCadAI Component ID",
+            "value": "opamp.ti.lm358.soic8",
+            "hidden": true
+          },
+          {
+            "name": "KiCadAI Resolution Hash",
+            "value": "7a0a4a93c3bf89a525ef532b97dbda16bbbaa5d33d46d8d211ddff325244f45b",
+            "hidden": true
+          },
+          {
+            "name": "KiCadAI Variant ID",
+            "value": "soic8",
+            "hidden": true
+          },
+          {
+            "name": "Manufacturer",
+            "value": "Texas Instruments",
+            "hidden": true
+          },
+          {
+            "name": "MPN",
+            "value": "LM358DR",
+            "hidden": true
+          },
+          {
+            "name": "Reference",
+            "value": "U1",
+            "do_not_autoplace": true,
+            "at": {
+              "x_mm": 110.49,
+              "y_mm": 76.2
+            },
+            "rotation_deg": 0
+          },
+          {
+            "name": "Value",
+            "value": "LM358DR",
+            "do_not_autoplace": true,
+            "at": {
+              "x_mm": 107.315,
+              "y_mm": 92.71
+            },
+            "rotation_deg": 0
+          }
+        ],
+        "prefer_resolver_symbol": true
+      },
+      {
+        "op": "assign_footprint",
+        "ref": "U1",
+        "role": "ic",
+        "footprint_id": "Package_SO:SOIC-8_3.9x4.9mm_P1.27mm"
+      },
+      {
+        "op": "add_symbol",
+        "ref": "U1",
+        "unit": 2,
+        "role": "ic",
+        "value": "LM358DR",
+        "library_id": "Amplifier_Operational:LM358",
+        "at": {
+          "x_mm": 111.76,
+          "y_mm": 134.62
+        },
+        "pins": [
+          {
+            "number": "5",
+            "x_mm": -7.62,
+            "y_mm": -2.54
+          },
+          {
+            "number": "6",
+            "x_mm": -7.62,
+            "y_mm": 2.54
+          },
+          {
+            "number": "7",
+            "x_mm": 7.62
+          }
+        ],
+        "properties": [
+          {
+            "name": "Footprint",
+            "value": "Package_SO:SOIC-8_3.9x4.9mm_P1.27mm",
+            "hidden": true
+          },
+          {
+            "name": "KiCadAI Catalog",
+            "value": "open-topology",
+            "hidden": true
+          },
+          {
+            "name": "KiCadAI Catalog Hash",
+            "value": "15aba02bed3b437a7694c7565300a3ec9266abbc6f5989026d608663579d8c39",
+            "hidden": true
+          },
+          {
+            "name": "KiCadAI Component ID",
+            "value": "opamp.ti.lm358.soic8",
+            "hidden": true
+          },
+          {
+            "name": "KiCadAI Resolution Hash",
+            "value": "7a0a4a93c3bf89a525ef532b97dbda16bbbaa5d33d46d8d211ddff325244f45b",
+            "hidden": true
+          },
+          {
+            "name": "KiCadAI Variant ID",
+            "value": "soic8",
+            "hidden": true
+          },
+          {
+            "name": "Manufacturer",
+            "value": "Texas Instruments",
+            "hidden": true
+          },
+          {
+            "name": "MPN",
+            "value": "LM358DR",
+            "hidden": true
+          },
+          {
+            "name": "Reference",
+            "value": "U1",
+            "do_not_autoplace": true,
+            "at": {
+              "x_mm": 110.49,
+              "y_mm": 127
+            },
+            "rotation_deg": 0
+          },
+          {
+            "name": "Value",
+            "value": "LM358DR",
+            "hidden": true,
+            "do_not_autoplace": true,
+            "at": {
+              "x_mm": 107.315,
+              "y_mm": 143.51
+            },
+            "rotation_deg": 0
+          }
+        ],
+        "prefer_resolver_symbol": true
+      },
+      {
+        "op": "add_no_connect",
+        "endpoint": {
+          "ref": "U1",
+          "pin": "5",
+          "unit": 2
+        }
+      },
+      {
+        "op": "add_no_connect",
+        "endpoint": {
+          "ref": "U1",
+          "pin": "6",
+          "unit": 2
+        }
+      },
+      {
+        "op": "add_no_connect",
+        "endpoint": {
+          "ref": "U1",
+          "pin": "7",
+          "unit": 2
+        }
+      },
+      {
+        "op": "add_symbol",
+        "ref": "U1",
+        "unit": 3,
+        "role": "ic",
+        "value": "LM358DR",
+        "library_id": "Amplifier_Operational:LM358",
+        "at": {
+          "x_mm": 134.62,
+          "y_mm": 55.88
+        },
+        "pins": [
+          {
+            "number": "4",
+            "x_mm": -2.54,
+            "y_mm": 7.62
+          },
+          {
+            "number": "8",
+            "x_mm": -2.54,
+            "y_mm": -7.62
+          }
+        ],
+        "properties": [
+          {
+            "name": "Footprint",
+            "value": "Package_SO:SOIC-8_3.9x4.9mm_P1.27mm",
+            "hidden": true
+          },
+          {
+            "name": "KiCadAI Catalog",
+            "value": "open-topology",
+            "hidden": true
+          },
+          {
+            "name": "KiCadAI Catalog Hash",
+            "value": "15aba02bed3b437a7694c7565300a3ec9266abbc6f5989026d608663579d8c39",
+            "hidden": true
+          },
+          {
+            "name": "KiCadAI Component ID",
+            "value": "opamp.ti.lm358.soic8",
+            "hidden": true
+          },
+          {
+            "name": "KiCadAI Resolution Hash",
+            "value": "7a0a4a93c3bf89a525ef532b97dbda16bbbaa5d33d46d8d211ddff325244f45b",
+            "hidden": true
+          },
+          {
+            "name": "KiCadAI Variant ID",
+            "value": "soic8",
+            "hidden": true
+          },
+          {
+            "name": "Manufacturer",
+            "value": "Texas Instruments",
+            "hidden": true
+          },
+          {
+            "name": "MPN",
+            "value": "LM358DR",
+            "hidden": true
+          },
+          {
+            "name": "Reference",
+            "value": "U1",
+            "do_not_autoplace": true,
+            "at": {
+              "x_mm": 132.08,
+              "y_mm": 44.45
+            },
+            "rotation_deg": 0
+          },
+          {
+            "name": "Value",
+            "value": "LM358DR",
+            "hidden": true,
+            "do_not_autoplace": true,
+            "at": {
+              "x_mm": 138.43,
+              "y_mm": 56.515
+            },
+            "rotation_deg": 0
+          }
+        ],
+        "prefer_resolver_symbol": true
+      },
+      {
+        "op": "add_symbol",
+        "ref": "U2",
+        "role": "ic",
+        "value": "OPA992IDBVR",
+        "library_id": "Amplifier_Operational:TLV9061xDBV",
+        "at": {
+          "x_mm": 86.36,
+          "y_mm": 78.74
+        },
+        "pins": [
+          {
+            "number": "1",
+            "x_mm": 7.62
+          },
+          {
+            "number": "2",
+            "x_mm": -2.54,
+            "y_mm": 7.62
+          },
+          {
+            "number": "3",
+            "x_mm": -7.62,
+            "y_mm": -2.54
+          },
+          {
+            "number": "4",
+            "x_mm": -7.62,
+            "y_mm": 2.54
+          },
+          {
+            "number": "5",
+            "x_mm": -2.54,
+            "y_mm": -7.62
+          }
+        ],
+        "properties": [
+          {
+            "name": "Footprint",
+            "value": "Package_TO_SOT_SMD:SOT-23-5",
+            "hidden": true
+          },
+          {
+            "name": "KiCadAI Catalog",
+            "value": "open-topology",
+            "hidden": true
+          },
+          {
+            "name": "KiCadAI Catalog Hash",
+            "value": "15aba02bed3b437a7694c7565300a3ec9266abbc6f5989026d608663579d8c39",
+            "hidden": true
+          },
+          {
+            "name": "KiCadAI Component ID",
+            "value": "opamp.ti.opa992idbvr.sot23_5",
+            "hidden": true
+          },
+          {
+            "name": "KiCadAI Resolution Hash",
+            "value": "7a0a4a93c3bf89a525ef532b97dbda16bbbaa5d33d46d8d211ddff325244f45b",
+            "hidden": true
+          },
+          {
+            "name": "KiCadAI Variant ID",
+            "value": "sot23_5",
+            "hidden": true
+          },
+          {
+            "name": "Manufacturer",
+            "value": "Texas Instruments",
+            "hidden": true
+          },
+          {
+            "name": "MPN",
+            "value": "OPA992IDBVR",
+            "hidden": true
+          },
+          {
+            "name": "Reference",
+            "value": "U2",
+            "do_not_autoplace": true,
+            "at": {
+              "x_mm": 85.09,
+              "y_mm": 71.12
+            },
+            "rotation_deg": 0
+          },
+          {
+            "name": "Value",
+            "value": "OPA992IDBVR",
+            "do_not_autoplace": true,
+            "at": {
+              "x_mm": 64.77,
+              "y_mm": 87.63
+            },
+            "rotation_deg": 0
+          }
+        ],
+        "prefer_resolver_symbol": true
+      },
+      {
+        "op": "assign_footprint",
+        "ref": "U2",
+        "role": "ic",
+        "footprint_id": "Package_TO_SOT_SMD:SOT-23-5"
+      },
+      {
+        "op": "add_symbol",
+        "ref": "#FLG01",
+        "role": "ground_symbol",
+        "value": "PWR_FLAG",
+        "library_id": "power:PWR_FLAG",
+        "at": {
+          "x_mm": 40.64,
+          "y_mm": 71.12
+        },
+        "pins": [
+          {
+            "number": "1"
+          }
+        ],
+        "properties": [
+          {
+            "name": "Reference",
+            "value": "#FLG01",
+            "hidden": true,
+            "do_not_autoplace": true,
+            "at": {
+              "x_mm": 36.83,
+              "y_mm": 66.04
+            },
+            "rotation_deg": 0
+          },
+          {
+            "name": "Value",
+            "value": "PWR_FLAG",
+            "do_not_autoplace": true,
+            "at": {
+              "x_mm": 26.924,
+              "y_mm": 70.485
+            },
+            "rotation_deg": 0
+          }
+        ],
+        "prefer_resolver_symbol": true
+      },
+      {
+        "op": "add_symbol",
+        "ref": "#FLG02",
+        "role": "power_symbol",
+        "value": "PWR_FLAG",
+        "library_id": "power:PWR_FLAG",
+        "at": {
+          "x_mm": 22.86,
+          "y_mm": 71.12
+        },
+        "pins": [
+          {
+            "number": "1"
+          }
+        ],
+        "properties": [
+          {
+            "name": "Reference",
+            "value": "#FLG02",
+            "hidden": true,
+            "do_not_autoplace": true,
+            "at": {
+              "x_mm": 19.05,
+              "y_mm": 66.04
+            },
+            "rotation_deg": 0
+          },
+          {
+            "name": "Value",
+            "value": "PWR_FLAG",
+            "do_not_autoplace": true,
+            "at": {
+              "x_mm": 17.78,
+              "y_mm": 62.23
+            },
+            "rotation_deg": 0
+          }
+        ],
+        "prefer_resolver_symbol": true
+      },
+      {
+        "op": "connect",
+        "from": {
+          "ref": "Q2",
+          "pin": "1"
+        },
+        "to": {
+          "ref": "Q1",
+          "pin": "1"
+        },
+        "net_name": "INTERNAL_000",
+        "use_labels": false,
+        "suppress_bend_labels": true,
+        "bend_label_at": {
+          "x_mm": 104.14,
+          "y_mm": 45.72
+        },
+        "waypoints": [
+          {
+            "x_mm": 106.68,
+            "y_mm": 58.42
+          },
+          {
+            "x_mm": 104.14,
+            "y_mm": 58.42
+          },
+          {
+            "x_mm": 104.14,
+            "y_mm": 33.02
+          },
+          {
+            "x_mm": 106.68,
+            "y_mm": 33.02
+          }
+        ],
+        "orient_labels_outward": true
+      },
+      {
+        "op": "connect",
+        "from": {
+          "ref": "R8",
+          "pin": "1"
+        },
+        "to": {
+          "ref": "Q2",
+          "pin": "1"
+        },
+        "net_name": "INTERNAL_000",
+        "use_labels": false,
+        "suppress_bend_labels": true,
+        "waypoints": [
+          {
+            "x_mm": 107.95,
+            "y_mm": 109.22
+          },
+          {
+            "x_mm": 105.41,
+            "y_mm": 109.22
+          },
+          {
+            "x_mm": 105.41,
+            "y_mm": 58.42
+          },
+          {
+            "x_mm": 104.14,
+            "y_mm": 58.42
+          },
+          {
+            "x_mm": 106.68,
+            "y_mm": 58.42
+          }
+        ],
+        "orient_labels_outward": true
+      },
+      {
+        "op": "connect",
+        "from": {
+          "ref": "R1",
+          "pin": "1"
+        },
+        "to": {
+          "ref": "Q1",
+          "pin": "3"
+        },
+        "net_name": "INTERNAL_001",
+        "use_labels": false,
+        "suppress_bend_labels": true,
+        "bend_label_at": {
+          "x_mm": 116.84,
+          "y_mm": 33.02
+        },
+        "waypoints": [
+          {
+            "x_mm": 86.36,
+            "y_mm": 29.21
+          },
+          {
+            "x_mm": 86.36,
+            "y_mm": 26.67
+          },
+          {
+            "x_mm": 116.84,
+            "y_mm": 26.67
+          },
+          {
+            "x_mm": 116.84,
+            "y_mm": 40.64
+          },
+          {
+            "x_mm": 114.3,
+            "y_mm": 40.64
+          },
+          {
+            "x_mm": 114.3,
+            "y_mm": 38.1
+          }
+        ],
+        "orient_labels_outward": true
+      },
+      {
+        "op": "connect",
+        "from": {
+          "ref": "Q2",
+          "pin": "2"
+        },
+        "to": {
+          "ref": "Q1",
+          "pin": "2"
+        },
+        "net_name": "INTERNAL_003",
+        "use_labels": true,
+        "from_label_at": {
+          "x_mm": 115.57,
+          "y_mm": 53.34
+        },
+        "to_label_at": {
+          "x_mm": 115.57,
+          "y_mm": 27.94
+        },
+        "orient_labels_outward": true
+      },
+      {
+        "op": "connect",
+        "from": {
+          "ref": "R3",
+          "pin": "1"
+        },
+        "to": {
+          "ref": "R5",
+          "pin": "1"
+        },
+        "net_name": "INTERNAL_003",
+        "use_labels": false,
+        "suppress_bend_labels": true,
+        "bend_label_at": {
+          "x_mm": 107.95,
+          "y_mm": 193.04
+        },
+        "waypoints": [
+          {
+            "x_mm": 153.67,
+            "y_mm": 198.12
+          },
+          {
+            "x_mm": 151.13,
+            "y_mm": 198.12
+          },
+          {
+            "x_mm": 151.13,
+            "y_mm": 193.04
+          },
+          {
+            "x_mm": 105.41,
+            "y_mm": 193.04
+          },
+          {
+            "x_mm": 105.41,
+            "y_mm": 198.12
+          },
+          {
+            "x_mm": 107.95,
+            "y_mm": 198.12
+          }
+        ],
+        "orient_labels_outward": true
+      },
+      {
+        "op": "connect",
+        "from": {
+          "ref": "R5",
+          "pin": "1"
+        },
+        "to": {
+          "ref": "Q2",
+          "pin": "2"
+        },
+        "net_name": "INTERNAL_003",
+        "use_labels": true,
+        "from_label_at": {
+          "x_mm": 106.68,
+          "y_mm": 198.12
+        },
+        "to_label_at": {
+          "x_mm": 115.57,
+          "y_mm": 53.34
+        },
+        "orient_labels_outward": true
+      },
+      {
+        "op": "connect",
+        "from": {
+          "ref": "U1",
+          "pin": "2",
+          "unit": 1
+        },
+        "to": {
+          "ref": "R7",
+          "pin": "1"
+        },
+        "net_name": "INTERNAL_004",
+        "use_labels": false,
+        "suppress_bend_labels": true,
+        "bend_label_at": {
+          "x_mm": 101.6,
+          "y_mm": 154.94
+        },
+        "waypoints": [
+          {
+            "x_mm": 104.14,
+            "y_mm": 86.36
+          },
+          {
+            "x_mm": 101.6,
+            "y_mm": 86.36
+          },
+          {
+            "x_mm": 101.6,
+            "y_mm": 223.52
+          },
+          {
+            "x_mm": 105.41,
+            "y_mm": 223.52
+          },
+          {
+            "x_mm": 107.95,
+            "y_mm": 223.52
+          }
+        ],
+        "orient_labels_outward": true
+      },
+      {
+        "op": "connect",
+        "from": {
+          "ref": "R7",
+          "pin": "1"
+        },
+        "to": {
+          "ref": "R4",
+          "pin": "1"
+        },
+        "net_name": "INTERNAL_004",
+        "use_labels": false,
+        "suppress_bend_labels": true,
+        "waypoints": [
+          {
+            "x_mm": 107.95,
+            "y_mm": 223.52
+          },
+          {
+            "x_mm": 105.41,
+            "y_mm": 223.52
+          },
+          {
+            "x_mm": 105.41,
+            "y_mm": 220.98
+          },
+          {
+            "x_mm": 151.13,
+            "y_mm": 220.98
+          },
+          {
+            "x_mm": 151.13,
+            "y_mm": 223.52
+          },
+          {
+            "x_mm": 153.67,
+            "y_mm": 223.52
+          }
+        ],
+        "orient_labels_outward": true
+      },
+      {
+        "op": "connect",
+        "from": {
+          "ref": "R3",
+          "pin": "2"
+        },
+        "to": {
+          "ref": "J2",
+          "pin": "1"
+        },
+        "net_name": "LOAD_CURRENT",
+        "use_labels": true,
+        "from_label_at": {
+          "x_mm": 162.56,
+          "y_mm": 198.12
+        },
+        "to_label_at": {
+          "x_mm": 171.45,
+          "y_mm": 38.1
+        },
+        "orient_labels_outward": true
+      },
+      {
+        "op": "connect",
+        "from": {
+          "ref": "R3",
+          "pin": "2"
+        },
+        "to": {
+          "ref": "R4",
+          "pin": "2"
+        },
+        "net_name": "LOAD_CURRENT",
+        "use_labels": false,
+        "suppress_bend_labels": true,
+        "bend_label_at": {
+          "x_mm": 163.83,
+          "y_mm": 210.82
+        },
+        "waypoints": [
+          {
+            "x_mm": 161.29,
+            "y_mm": 198.12
+          },
+          {
+            "x_mm": 163.83,
+            "y_mm": 198.12
+          },
+          {
+            "x_mm": 163.83,
+            "y_mm": 223.52
+          },
+          {
+            "x_mm": 161.29,
+            "y_mm": 223.52
+          }
+        ],
+        "orient_labels_outward": true
+      },
+      {
+        "op": "connect",
+        "from": {
+          "ref": "U1",
+          "pin": "1",
+          "unit": 1
+        },
+        "to": {
+          "ref": "U2",
+          "pin": "3"
+        },
+        "net_name": "INTERNAL_006",
+        "use_labels": true,
+        "from_label_at": {
+          "x_mm": 120.65,
+          "y_mm": 83.82
+        },
+        "to_label_at": {
+          "x_mm": 77.47,
+          "y_mm": 76.2
+        },
+        "orient_labels_outward": true
+      },
+      {
+        "op": "connect",
+        "from": {
+          "ref": "R7",
+          "pin": "2"
+        },
+        "to": {
+          "ref": "U1",
+          "pin": "1",
+          "unit": 1
+        },
+        "net_name": "INTERNAL_006",
+        "use_labels": true,
+        "from_label_at": {
+          "x_mm": 116.84,
+          "y_mm": 223.52
+        },
+        "to_label_at": {
+          "x_mm": 120.65,
+          "y_mm": 83.82
+        },
+        "orient_labels_outward": true
+      },
+      {
+        "op": "connect",
+        "from": {
+          "ref": "R8",
+          "pin": "2"
+        },
+        "to": {
+          "ref": "U2",
+          "pin": "1"
+        },
+        "net_name": "INTERNAL_007",
+        "use_labels": true,
+        "from_label_at": {
+          "x_mm": 116.84,
+          "y_mm": 109.22
+        },
+        "to_label_at": {
+          "x_mm": 104.14,
+          "y_mm": 78.74
+        },
+        "orient_labels_outward": true
+      },
+      {
+        "op": "connect",
+        "from": {
+          "ref": "J1",
+          "pin": "1"
+        },
+        "to": {
+          "ref": "U2",
+          "pin": "4"
+        },
+        "net_name": "CURRENT_COMMAND",
+        "use_labels": true,
+        "from_label_at": {
+          "x_mm": 54.61,
+          "y_mm": 38.1
+        },
+        "to_label_at": {
+          "x_mm": 77.47,
+          "y_mm": 81.28
+        },
+        "orient_labels_outward": true
+      },
+      {
+        "op": "connect",
+        "from": {
+          "ref": "J1",
+          "pin": "2"
+        },
+        "to": {
+          "ref": "J3",
+          "pin": "2"
+        },
+        "net_name": "GROUND",
+        "use_labels": true,
+        "from_label_at": {
+          "x_mm": 54.61,
+          "y_mm": 40.64
+        },
+        "to_label_at": {
+          "x_mm": 54.61,
+          "y_mm": 73.66
+        },
+        "orient_labels_outward": true
+      },
+      {
+        "op": "connect",
+        "from": {
+          "ref": "J2",
+          "pin": "2"
+        },
+        "to": {
+          "ref": "J1",
+          "pin": "2"
+        },
+        "net_name": "GROUND",
+        "use_labels": true,
+        "from_label_at": {
+          "x_mm": 171.45,
+          "y_mm": 40.64
+        },
+        "to_label_at": {
+          "x_mm": 54.61,
+          "y_mm": 40.64
+        },
+        "orient_labels_outward": true
+      },
+      {
+        "op": "connect",
+        "from": {
+          "ref": "J3",
+          "pin": "2"
+        },
+        "to": {
+          "ref": "#FLG01",
+          "pin": "1"
+        },
+        "net_name": "GROUND",
+        "use_labels": true,
+        "from_label_at": {
+          "x_mm": 54.61,
+          "y_mm": 73.66
+        },
+        "to_label_at": {
+          "x_mm": 40.64,
+          "y_mm": 74.93
+        },
+        "orient_labels_outward": true
+      },
+      {
+        "op": "connect",
+        "from": {
+          "ref": "#FLG01",
+          "pin": "1"
+        },
+        "to": {
+          "ref": "U2",
+          "pin": "2"
+        },
+        "net_name": "GROUND",
+        "use_labels": true,
+        "from_label_at": {
+          "x_mm": 40.64,
+          "y_mm": 74.93
+        },
+        "to_label_at": {
+          "x_mm": 83.82,
+          "y_mm": 87.63
+        },
+        "orient_labels_outward": true
+      },
+      {
+        "op": "connect",
+        "from": {
+          "ref": "U1",
+          "pin": "4",
+          "unit": 3
+        },
+        "to": {
+          "ref": "J2",
+          "pin": "2"
+        },
+        "net_name": "GROUND",
+        "use_labels": true,
+        "from_label_at": {
+          "x_mm": 132.08,
+          "y_mm": 68.58
+        },
+        "to_label_at": {
+          "x_mm": 171.45,
+          "y_mm": 40.64
+        },
+        "orient_labels_outward": true
+      },
+      {
+        "op": "connect",
+        "from": {
+          "ref": "R6",
+          "pin": "2"
+        },
+        "to": {
+          "ref": "U1",
+          "pin": "4",
+          "unit": 3
+        },
+        "net_name": "GROUND",
+        "use_labels": true,
+        "from_label_at": {
+          "x_mm": 134.62,
+          "y_mm": 204.47
+        },
+        "to_label_at": {
+          "x_mm": 132.08,
+          "y_mm": 68.58
+        },
+        "orient_labels_outward": true
+      },
+      {
+        "op": "connect",
+        "from": {
+          "ref": "R2",
+          "pin": "1"
+        },
+        "to": {
+          "ref": "Q2",
+          "pin": "3"
+        },
+        "net_name": "INTERNAL_002",
+        "use_labels": true,
+        "from_label_at": {
+          "x_mm": 87.63,
+          "y_mm": 52.07
+        },
+        "to_label_at": {
+          "x_mm": 115.57,
+          "y_mm": 63.5
+        },
+        "orient_labels_outward": true
+      },
+      {
+        "op": "connect",
+        "from": {
+          "ref": "U1",
+          "pin": "3",
+          "unit": 1
+        },
+        "to": {
+          "ref": "R5",
+          "pin": "2"
+        },
+        "net_name": "INTERNAL_005",
+        "use_labels": true,
+        "from_label_at": {
+          "x_mm": 104.14,
+          "y_mm": 80.01
+        },
+        "to_label_at": {
+          "x_mm": 116.84,
+          "y_mm": 198.12
+        },
+        "orient_labels_outward": true
+      },
+      {
+        "op": "connect",
+        "from": {
+          "ref": "R5",
+          "pin": "2"
+        },
+        "to": {
+          "ref": "R6",
+          "pin": "1"
+        },
+        "net_name": "INTERNAL_005",
+        "use_labels": true,
+        "from_label_at": {
+          "x_mm": 116.84,
+          "y_mm": 198.12
+        },
+        "to_label_at": {
+          "x_mm": 135.89,
+          "y_mm": 194.31
+        },
+        "orient_labels_outward": true
+      },
+      {
+        "op": "connect",
+        "from": {
+          "ref": "J3",
+          "pin": "1"
+        },
+        "to": {
+          "ref": "U2",
+          "pin": "5"
+        },
+        "net_name": "POWER",
+        "use_labels": true,
+        "from_label_at": {
+          "x_mm": 54.61,
+          "y_mm": 71.12
+        },
+        "to_label_at": {
+          "x_mm": 83.82,
+          "y_mm": 69.85
+        },
+        "orient_labels_outward": true
+      },
+      {
+        "op": "connect",
+        "from": {
+          "ref": "#FLG02",
+          "pin": "1"
+        },
+        "to": {
+          "ref": "J3",
+          "pin": "1"
+        },
+        "net_name": "POWER",
+        "use_labels": true,
+        "from_label_at": {
+          "x_mm": 22.86,
+          "y_mm": 74.93
+        },
+        "to_label_at": {
+          "x_mm": 54.61,
+          "y_mm": 71.12
+        },
+        "orient_labels_outward": true
+      },
+      {
+        "op": "connect",
+        "from": {
+          "ref": "R1",
+          "pin": "2"
+        },
+        "to": {
+          "ref": "U1",
+          "pin": "8",
+          "unit": 3
+        },
+        "net_name": "POWER",
+        "use_labels": true,
+        "from_label_at": {
+          "x_mm": 86.36,
+          "y_mm": 39.37
+        },
+        "to_label_at": {
+          "x_mm": 132.08,
+          "y_mm": 45.72
+        },
+        "orient_labels_outward": true
+      },
+      {
+        "op": "connect",
+        "from": {
+          "ref": "R2",
+          "pin": "2"
+        },
+        "to": {
+          "ref": "R1",
+          "pin": "2"
+        },
+        "net_name": "POWER",
+        "use_labels": true,
+        "from_label_at": {
+          "x_mm": 86.36,
+          "y_mm": 62.23
+        },
+        "to_label_at": {
+          "x_mm": 86.36,
+          "y_mm": 39.37
+        },
+        "orient_labels_outward": true
+      },
+      {
+        "op": "connect",
+        "from": {
+          "ref": "U2",
+          "pin": "5"
+        },
+        "to": {
+          "ref": "R2",
+          "pin": "2"
+        },
+        "net_name": "POWER",
+        "use_labels": true,
+        "from_label_at": {
+          "x_mm": 83.82,
+          "y_mm": 69.85
+        },
+        "to_label_at": {
+          "x_mm": 86.36,
+          "y_mm": 62.23
+        },
+        "orient_labels_outward": true
+      },
+      {
+        "op": "set_board_outline",
+        "board": {
+          "width_mm": 70,
+          "height_mm": 50,
+          "thickness_mm": 1.6
+        }
+      },
+      {
+        "op": "place_footprint",
+        "ref": "J1",
+        "footprint_id": "Connector_PinHeader_2.54mm:PinHeader_1x02_P2.54mm_Vertical",
+        "value": "1x02 2.54 mm pin header",
+        "at": {
+          "x_mm": 3,
+          "y_mm": 3
+        },
+        "layer": "F.Cu",
+        "pads": [
+          {
+            "name": "1",
+            "net": "CURRENT_COMMAND"
+          },
+          {
+            "name": "2",
+            "net": "GROUND"
+          }
+        ],
+        "allow_unmatched_unconnected_pads": false,
+        "hide_default_footprint_text": true
+      },
+      {
+        "op": "place_footprint",
+        "ref": "J2",
+        "footprint_id": "Connector_PinHeader_2.54mm:PinHeader_1x02_P2.54mm_Vertical",
+        "value": "1x02 2.54 mm pin header",
+        "at": {
+          "x_mm": 8,
+          "y_mm": 3
+        },
+        "layer": "F.Cu",
+        "pads": [
+          {
+            "name": "1",
+            "net": "LOAD_CURRENT"
+          },
+          {
+            "name": "2",
+            "net": "GROUND"
+          }
+        ],
+        "allow_unmatched_unconnected_pads": false,
+        "hide_default_footprint_text": true
+      },
+      {
+        "op": "place_footprint",
+        "ref": "J3",
+        "footprint_id": "Connector_PinHeader_2.54mm:PinHeader_1x02_P2.54mm_Vertical",
+        "value": "1x02 2.54 mm pin header",
+        "at": {
+          "x_mm": 12.5,
+          "y_mm": 3
+        },
+        "layer": "F.Cu",
+        "pads": [
+          {
+            "name": "1",
+            "net": "POWER"
+          },
+          {
+            "name": "2",
+            "net": "GROUND"
+          }
+        ],
+        "allow_unmatched_unconnected_pads": false,
+        "hide_default_footprint_text": true
+      },
+      {
+        "op": "place_footprint",
+        "ref": "R3",
+        "footprint_id": "Resistor_THT:R_Axial_DIN0614_L14.3mm_D5.7mm_P25.40mm_Horizontal",
+        "value": "10ohm",
+        "at": {
+          "x_mm": 3,
+          "y_mm": 11.5
+        },
+        "layer": "F.Cu",
+        "pads": [
+          {
+            "name": "1",
+            "net": "INTERNAL_003"
+          },
+          {
+            "name": "2",
+            "net": "LOAD_CURRENT"
+          }
+        ],
+        "allow_unmatched_unconnected_pads": false,
+        "hide_default_footprint_text": true
+      },
+      {
+        "op": "place_footprint",
+        "ref": "R1",
+        "footprint_id": "Resistor_THT:R_Axial_DIN0414_L11.9mm_D4.5mm_P20.32mm_Horizontal",
+        "value": "220m",
+        "at": {
+          "x_mm": 3,
+          "y_mm": 18
+        },
+        "layer": "F.Cu",
+        "pads": [
+          {
+            "name": "1",
+            "net": "INTERNAL_001"
+          },
+          {
+            "name": "2",
+            "net": "POWER"
+          }
+        ],
+        "allow_unmatched_unconnected_pads": false,
+        "hide_default_footprint_text": true
+      },
+      {
+        "op": "place_footprint",
+        "ref": "R2",
+        "footprint_id": "Resistor_THT:R_Axial_DIN0414_L11.9mm_D4.5mm_P20.32mm_Horizontal",
+        "value": "220m",
+        "at": {
+          "x_mm": 3,
+          "y_mm": 24.5
+        },
+        "layer": "F.Cu",
+        "pads": [
+          {
+            "name": "1",
+            "net": "INTERNAL_002"
+          },
+          {
+            "name": "2",
+            "net": "POWER"
+          }
+        ],
+        "allow_unmatched_unconnected_pads": false,
+        "hide_default_footprint_text": true
+      },
+      {
+        "op": "place_footprint",
+        "ref": "Q1",
+        "footprint_id": "Package_TO_SOT_THT:TO-220-3_Vertical",
+        "value": "D45H11G",
+        "at": {
+          "x_mm": 4,
+          "y_mm": 32
+        },
+        "layer": "F.Cu",
+        "pads": [
+          {
+            "name": "1",
+            "net": "INTERNAL_000"
+          },
+          {
+            "name": "2",
+            "net": "INTERNAL_003"
+          },
+          {
+            "name": "3",
+            "net": "INTERNAL_001"
+          }
+        ],
+        "allow_unmatched_unconnected_pads": false,
+        "hide_default_footprint_text": true
+      },
+      {
+        "op": "place_footprint",
+        "ref": "Q2",
+        "footprint_id": "Package_TO_SOT_THT:TO-220-3_Vertical",
+        "value": "D45H11G",
+        "at": {
+          "x_mm": 4,
+          "y_mm": 38
+        },
+        "layer": "F.Cu",
+        "pads": [
+          {
+            "name": "1",
+            "net": "INTERNAL_000"
+          },
+          {
+            "name": "2",
+            "net": "INTERNAL_003"
+          },
+          {
+            "name": "3",
+            "net": "INTERNAL_002"
+          }
+        ],
+        "allow_unmatched_unconnected_pads": false,
+        "hide_default_footprint_text": true
+      },
+      {
+        "op": "place_footprint",
+        "ref": "U1",
+        "footprint_id": "Package_SO:SOIC-8_3.9x4.9mm_P1.27mm",
+        "value": "LM358DR",
+        "at": {
+          "x_mm": 19.5,
+          "y_mm": 5
+        },
+        "layer": "F.Cu",
+        "pads": [
+          {
+            "name": "1",
+            "net": "INTERNAL_006"
+          },
+          {
+            "name": "2",
+            "net": "INTERNAL_004"
+          },
+          {
+            "name": "3",
+            "net": "INTERNAL_005"
+          },
+          {
+            "name": "4",
+            "net": "GROUND"
+          },
+          {
+            "name": "5"
+          },
+          {
+            "name": "6"
+          },
+          {
+            "name": "7"
+          },
+          {
+            "name": "8",
+            "net": "POWER"
+          }
+        ],
+        "allow_unmatched_unconnected_pads": true,
+        "hide_default_footprint_text": true
+      },
+      {
+        "op": "place_footprint",
+        "ref": "U2",
+        "footprint_id": "Package_TO_SOT_SMD:SOT-23-5",
+        "value": "OPA992IDBVR",
+        "at": {
+          "x_mm": 26.5,
+          "y_mm": 6
+        },
+        "layer": "F.Cu",
+        "pads": [
+          {
+            "name": "1",
+            "net": "INTERNAL_007"
+          },
+          {
+            "name": "2",
+            "net": "GROUND"
+          },
+          {
+            "name": "3",
+            "net": "INTERNAL_006"
+          },
+          {
+            "name": "4",
+            "net": "CURRENT_COMMAND"
+          },
+          {
+            "name": "5",
+            "net": "POWER"
+          }
+        ],
+        "allow_unmatched_unconnected_pads": false,
+        "hide_default_footprint_text": true
+      },
+      {
+        "op": "place_footprint",
+        "ref": "R4",
+        "footprint_id": "Resistor_SMD:R_0805_2012Metric",
+        "value": "10k",
+        "at": {
+          "x_mm": 26.5,
+          "y_mm": 2.5
+        },
+        "layer": "F.Cu",
+        "pads": [
+          {
+            "name": "1",
+            "net": "INTERNAL_004"
+          },
+          {
+            "name": "2",
+            "net": "LOAD_CURRENT"
+          }
+        ],
+        "allow_unmatched_unconnected_pads": false,
+        "hide_default_footprint_text": true
+      },
+      {
+        "op": "place_footprint",
+        "ref": "R5",
+        "footprint_id": "Resistor_SMD:R_0805_2012Metric",
+        "value": "10k",
+        "at": {
+          "x_mm": 14.5,
+          "y_mm": 29
+        },
+        "layer": "F.Cu",
+        "pads": [
+          {
+            "name": "1",
+            "net": "INTERNAL_003"
+          },
+          {
+            "name": "2",
+            "net": "INTERNAL_005"
+          }
+        ],
+        "allow_unmatched_unconnected_pads": false,
+        "hide_default_footprint_text": true
+      },
+      {
+        "op": "place_footprint",
+        "ref": "R6",
+        "footprint_id": "Resistor_SMD:R_0805_2012Metric",
+        "value": "10k",
+        "at": {
+          "x_mm": 28,
+          "y_mm": 17
+        },
+        "layer": "F.Cu",
+        "pads": [
+          {
+            "name": "1",
+            "net": "INTERNAL_005"
+          },
+          {
+            "name": "2",
+            "net": "GROUND"
+          }
+        ],
+        "allow_unmatched_unconnected_pads": false,
+        "hide_default_footprint_text": true
+      },
+      {
+        "op": "place_footprint",
+        "ref": "R7",
+        "footprint_id": "Resistor_SMD:R_0805_2012Metric",
+        "value": "10k",
+        "at": {
+          "x_mm": 31,
+          "y_mm": 4.5
+        },
+        "layer": "F.Cu",
+        "pads": [
+          {
+            "name": "1",
+            "net": "INTERNAL_004"
+          },
+          {
+            "name": "2",
+            "net": "INTERNAL_006"
+          }
+        ],
+        "allow_unmatched_unconnected_pads": false,
+        "hide_default_footprint_text": true
+      },
+      {
+        "op": "place_footprint",
+        "ref": "R8",
+        "footprint_id": "Resistor_SMD:R_0805_2012Metric",
+        "value": "47ohm",
+        "at": {
+          "x_mm": 14.5,
+          "y_mm": 32
+        },
+        "layer": "F.Cu",
+        "pads": [
+          {
+            "name": "1",
+            "net": "INTERNAL_000"
+          },
+          {
+            "name": "2",
+            "net": "INTERNAL_007"
+          }
+        ],
+        "allow_unmatched_unconnected_pads": false,
+        "hide_default_footprint_text": true
+      },
+      {
+        "op": "route",
+        "net_name": "INTERNAL_007",
+        "layer": "F.Cu",
+        "width_mm": 0.25,
+        "points": [
+          {
+            "x_mm": 15.4125,
+            "y_mm": 32
+          },
+          {
+            "x_mm": 20.5,
+            "y_mm": 32
+          },
+          {
+            "x_mm": 20.5,
+            "y_mm": 5
+          },
+          {
+            "x_mm": 25,
+            "y_mm": 5
+          },
+          {
+            "x_mm": 25.3625,
+            "y_mm": 5.05
+          }
+        ]
+      },
+      {
+        "op": "route",
+        "net_name": "CURRENT_COMMAND",
+        "layer": "B.Cu",
+        "width_mm": 0.25,
+        "points": [
+          {
+            "x_mm": 3,
+            "y_mm": 3
+          },
+          {
+            "x_mm": 3,
+            "y_mm": 4.25
+          },
+          {
+            "x_mm": 27.75,
+            "y_mm": 4.25
+          },
+          {
+            "x_mm": 27.75,
+            "y_mm": 7
+          }
+        ]
+      },
+      {
+        "op": "route",
+        "net_name": "CURRENT_COMMAND",
+        "layer": "F.Cu",
+        "width_mm": 0.25,
+        "points": [
+          {
+            "x_mm": 27.75,
+            "y_mm": 7
+          },
+          {
+            "x_mm": 27.6375,
+            "y_mm": 6.95
+          }
+        ]
+      },
+      {
+        "op": "route",
+        "net_name": "CURRENT_COMMAND",
+        "points": null,
+        "vias": [
+          {
+            "at": {
+              "x_mm": 27.75,
+              "y_mm": 7
+            },
+            "diameter_mm": 0.6,
+            "drill_mm": 0.3,
+            "layers": [
+              "B.Cu",
+              "F.Cu"
+            ]
+          }
+        ]
+      },
+      {
+        "op": "route",
+        "net_name": "INTERNAL_006",
+        "layer": "F.Cu",
+        "width_mm": 0.25,
+        "points": [
+          {
+            "x_mm": 31.9125,
+            "y_mm": 4.5
+          },
+          {
+            "x_mm": 32,
+            "y_mm": 4.75
+          },
+          {
+            "x_mm": 32,
+            "y_mm": 6.25
+          },
+          {
+            "x_mm": 26.5,
+            "y_mm": 6.25
+          },
+          {
+            "x_mm": 26.5,
+            "y_mm": 7
+          },
+          {
+            "x_mm": 25.5,
+            "y_mm": 7
+          },
+          {
+            "x_mm": 25.3625,
+            "y_mm": 6.95
+          },
+          {
+            "x_mm": 25,
+            "y_mm": 7
+          },
+          {
+            "x_mm": 23.5,
+            "y_mm": 7
+          }
+        ]
+      },
+      {
+        "op": "route",
+        "net_name": "INTERNAL_006",
+        "layer": "B.Cu",
+        "width_mm": 0.25,
+        "points": [
+          {
+            "x_mm": 23.5,
+            "y_mm": 7
+          },
+          {
+            "x_mm": 18.5,
+            "y_mm": 7
+          }
+        ]
+      },
+      {
+        "op": "route",
+        "net_name": "INTERNAL_006",
+        "layer": "F.Cu",
+        "width_mm": 0.25,
+        "points": [
+          {
+            "x_mm": 18.5,
+            "y_mm": 7
+          },
+          {
+            "x_mm": 18.5,
+            "y_mm": 3
+          },
+          {
+            "x_mm": 17.25,
+            "y_mm": 3
+          },
+          {
+            "x_mm": 17.025,
+            "y_mm": 3.095
+          }
+        ]
+      },
+      {
+        "op": "route",
+        "net_name": "INTERNAL_006",
+        "points": null,
+        "vias": [
+          {
+            "at": {
+              "x_mm": 23.5,
+              "y_mm": 7
+            },
+            "diameter_mm": 0.6,
+            "drill_mm": 0.3,
+            "layers": [
+              "B.Cu",
+              "F.Cu"
+            ]
+          },
+          {
+            "at": {
+              "x_mm": 18.5,
+              "y_mm": 7
+            },
+            "diameter_mm": 0.6,
+            "drill_mm": 0.3,
+            "layers": [
+              "B.Cu",
+              "F.Cu"
+            ]
+          }
+        ]
+      },
+      {
+        "op": "route",
+        "net_name": "INTERNAL_005",
+        "layer": "F.Cu",
+        "width_mm": 0.25,
+        "points": [
+          {
+            "x_mm": 15.4125,
+            "y_mm": 29
+          },
+          {
+            "x_mm": 15.5,
+            "y_mm": 28.75
+          },
+          {
+            "x_mm": 15.5,
+            "y_mm": 19.75
+          }
+        ]
+      },
+      {
+        "op": "route",
+        "net_name": "INTERNAL_005",
+        "layer": "B.Cu",
+        "width_mm": 0.25,
+        "points": [
+          {
+            "x_mm": 15.5,
+            "y_mm": 19.75
+          },
+          {
+            "x_mm": 27,
+            "y_mm": 19.75
+          }
+        ]
+      },
+      {
+        "op": "route",
+        "net_name": "INTERNAL_005",
+        "layer": "F.Cu",
+        "width_mm": 0.25,
+        "points": [
+          {
+            "x_mm": 27,
+            "y_mm": 19.75
+          },
+          {
+            "x_mm": 27,
+            "y_mm": 17.25
+          },
+          {
+            "x_mm": 27.0875,
+            "y_mm": 17
+          },
+          {
+            "x_mm": 27,
+            "y_mm": 16.75
+          },
+          {
+            "x_mm": 27,
+            "y_mm": 13.5
+          }
+        ]
+      },
+      {
+        "op": "route",
+        "net_name": "INTERNAL_005",
+        "layer": "B.Cu",
+        "width_mm": 0.25,
+        "points": [
+          {
+            "x_mm": 27,
+            "y_mm": 13.5
+          },
+          {
+            "x_mm": 17,
+            "y_mm": 13.5
+          },
+          {
+            "x_mm": 17,
+            "y_mm": 5.75
+          }
+        ]
+      },
+      {
+        "op": "route",
+        "net_name": "INTERNAL_005",
+        "layer": "F.Cu",
+        "width_mm": 0.25,
+        "points": [
+          {
+            "x_mm": 17,
+            "y_mm": 5.75
+          },
+          {
+            "x_mm": 17.025,
+            "y_mm": 5.635
+          }
+        ]
+      },
+      {
+        "op": "route",
+        "net_name": "INTERNAL_005",
+        "points": null,
+        "vias": [
+          {
+            "at": {
+              "x_mm": 15.5,
+              "y_mm": 19.75
+            },
+            "diameter_mm": 0.6,
+            "drill_mm": 0.3,
+            "layers": [
+              "B.Cu",
+              "F.Cu"
+            ]
+          },
+          {
+            "at": {
+              "x_mm": 27,
+              "y_mm": 19.75
+            },
+            "diameter_mm": 0.6,
+            "drill_mm": 0.3,
+            "layers": [
+              "B.Cu",
+              "F.Cu"
+            ]
+          },
+          {
+            "at": {
+              "x_mm": 27,
+              "y_mm": 13.5
+            },
+            "diameter_mm": 0.6,
+            "drill_mm": 0.3,
+            "layers": [
+              "B.Cu",
+              "F.Cu"
+            ]
+          },
+          {
+            "at": {
+              "x_mm": 17,
+              "y_mm": 5.75
+            },
+            "diameter_mm": 0.6,
+            "drill_mm": 0.3,
+            "layers": [
+              "B.Cu",
+              "F.Cu"
+            ]
+          }
+        ]
+      },
+      {
+        "op": "route",
+        "net_name": "INTERNAL_004",
+        "layer": "F.Cu",
+        "width_mm": 0.25,
+        "points": [
+          {
+            "x_mm": 25.5875,
+            "y_mm": 2.5
+          },
+          {
+            "x_mm": 25.5,
+            "y_mm": 2.75
+          },
+          {
+            "x_mm": 25.5,
+            "y_mm": 4.25
+          },
+          {
+            "x_mm": 30,
+            "y_mm": 4.25
+          },
+          {
+            "x_mm": 30.0875,
+            "y_mm": 4.5
+          }
+        ]
+      },
+      {
+        "op": "route",
+        "net_name": "INTERNAL_004",
+        "layer": "F.Cu",
+        "width_mm": 0.25,
+        "points": [
+          {
+            "x_mm": 25.5875,
+            "y_mm": 2.5
+          },
+          {
+            "x_mm": 25.5,
+            "y_mm": 2.25
+          },
+          {
+            "x_mm": 15.5,
+            "y_mm": 2.25
+          },
+          {
+            "x_mm": 15.5,
+            "y_mm": 4.25
+          },
+          {
+            "x_mm": 16.75,
+            "y_mm": 4.25
+          },
+          {
+            "x_mm": 17.025,
+            "y_mm": 4.365
+          }
+        ]
+      },
+      {
+        "op": "route",
+        "net_name": "POWER",
+        "layer": "B.Cu",
+        "width_mm": 0.4,
+        "points": [
+          {
+            "x_mm": 12.5,
+            "y_mm": 3
+          },
+          {
+            "x_mm": 22,
+            "y_mm": 3
+          }
+        ]
+      },
+      {
+        "op": "route",
+        "net_name": "POWER",
+        "layer": "F.Cu",
+        "width_mm": 0.4,
+        "points": [
+          {
+            "x_mm": 22,
+            "y_mm": 3
+          },
+          {
+            "x_mm": 21.975,
+            "y_mm": 3.095
+          },
+          {
+            "x_mm": 22,
+            "y_mm": 3.25
+          },
+          {
+            "x_mm": 21.9375,
+            "y_mm": 3.25
+          },
+          {
+            "x_mm": 21.9375,
+            "y_mm": 3
+          },
+          {
+            "x_mm": 22,
+            "y_mm": 3
+          }
+        ]
+      },
+      {
+        "op": "route",
+        "net_name": "POWER",
+        "layer": "F.Cu",
+        "width_mm": 0.4,
+        "points": [
+          {
+            "x_mm": 21.9375,
+            "y_mm": 3.25
+          },
+          {
+            "x_mm": 21.9375,
+            "y_mm": 3
+          }
+        ]
+      },
+      {
+        "op": "route",
+        "net_name": "POWER",
+        "layer": "B.Cu",
+        "width_mm": 0.4,
+        "points": [
+          {
+            "x_mm": 22,
+            "y_mm": 3
+          },
+          {
+            "x_mm": 28.5,
+            "y_mm": 3.5
+          },
+          {
+            "x_mm": 28.5,
+            "y_mm": 5
+          }
+        ]
+      },
+      {
+        "op": "route",
+        "net_name": "POWER",
+        "layer": "F.Cu",
+        "width_mm": 0.4,
+        "points": [
+          {
+            "x_mm": 28.5,
+            "y_mm": 5
+          },
+          {
+            "x_mm": 28,
+            "y_mm": 5
+          },
+          {
+            "x_mm": 27.6375,
+            "y_mm": 5.05
+          },
+          {
+            "x_mm": 27.5,
+            "y_mm": 5
+          },
+          {
+            "x_mm": 26.75,
+            "y_mm": 5
+          }
+        ]
+      },
+      {
+        "op": "route",
+        "net_name": "POWER",
+        "layer": "B.Cu",
+        "width_mm": 0.4,
+        "points": [
+          {
+            "x_mm": 26.75,
+            "y_mm": 5
+          },
+          {
+            "x_mm": 26.75,
+            "y_mm": 9.75
+          },
+          {
+            "x_mm": 23.25,
+            "y_mm": 9.75
+          }
+        ]
+      },
+      {
+        "op": "route",
+        "net_name": "POWER",
+        "layer": "F.Cu",
+        "width_mm": 0.4,
+        "points": [
+          {
+            "x_mm": 23.25,
+            "y_mm": 9.75
+          },
+          {
+            "x_mm": 23.25,
+            "y_mm": 17.75
+          },
+          {
+            "x_mm": 23.32,
+            "y_mm": 18
+          },
+          {
+            "x_mm": 23.25,
+            "y_mm": 18.25
+          },
+          {
+            "x_mm": 23.25,
+            "y_mm": 24.25
+          },
+          {
+            "x_mm": 23.32,
+            "y_mm": 24.5
+          }
+        ]
+      },
+      {
+        "op": "route",
+        "net_name": "POWER",
+        "points": null,
+        "vias": [
+          {
+            "at": {
+              "x_mm": 22,
+              "y_mm": 3
+            },
+            "diameter_mm": 0.7,
+            "drill_mm": 0.35,
+            "layers": [
+              "B.Cu",
+              "F.Cu"
+            ]
+          },
+          {
+            "at": {
+              "x_mm": 28.5,
+              "y_mm": 5
+            },
+            "diameter_mm": 0.7,
+            "drill_mm": 0.35,
+            "layers": [
+              "B.Cu",
+              "F.Cu"
+            ]
+          },
+          {
+            "at": {
+              "x_mm": 26.75,
+              "y_mm": 5
+            },
+            "diameter_mm": 0.7,
+            "drill_mm": 0.35,
+            "layers": [
+              "B.Cu",
+              "F.Cu"
+            ]
+          },
+          {
+            "at": {
+              "x_mm": 23.25,
+              "y_mm": 9.75
+            },
+            "diameter_mm": 0.7,
+            "drill_mm": 0.35,
+            "layers": [
+              "B.Cu",
+              "F.Cu"
+            ]
+          }
+        ]
+      },
+      {
+        "op": "route",
+        "net_name": "GROUND",
+        "layer": "F.Cu",
+        "width_mm": 0.4,
+        "points": [
+          {
+            "x_mm": 3,
+            "y_mm": 5.54
+          },
+          {
+            "x_mm": 3.25,
+            "y_mm": 5.5
+          },
+          {
+            "x_mm": 7.75,
+            "y_mm": 5.5
+          },
+          {
+            "x_mm": 8,
+            "y_mm": 5.54
+          },
+          {
+            "x_mm": 8.25,
+            "y_mm": 5.5
+          },
+          {
+            "x_mm": 12.25,
+            "y_mm": 5.5
+          },
+          {
+            "x_mm": 12.5,
+            "y_mm": 5.54
+          },
+          {
+            "x_mm": 12.5,
+            "y_mm": 7
+          },
+          {
+            "x_mm": 16.75,
+            "y_mm": 7
+          },
+          {
+            "x_mm": 17.025,
+            "y_mm": 6.905
+          },
+          {
+            "x_mm": 17,
+            "y_mm": 7.25
+          },
+          {
+            "x_mm": 17,
+            "y_mm": 7.75
+          },
+          {
+            "x_mm": 19.75,
+            "y_mm": 7.75
+          }
+        ]
+      },
+      {
+        "op": "route",
+        "net_name": "GROUND",
+        "layer": "B.Cu",
+        "width_mm": 0.4,
+        "points": [
+          {
+            "x_mm": 19.75,
+            "y_mm": 7.75
+          },
+          {
+            "x_mm": 25.25,
+            "y_mm": 7.75
+          },
+          {
+            "x_mm": 25.25,
+            "y_mm": 6
+          }
+        ]
+      },
+      {
+        "op": "route",
+        "net_name": "GROUND",
+        "layer": "F.Cu",
+        "width_mm": 0.4,
+        "points": [
+          {
+            "x_mm": 25.25,
+            "y_mm": 6
+          },
+          {
+            "x_mm": 25.3625,
+            "y_mm": 6
+          }
+        ]
+      },
+      {
+        "op": "route",
+        "net_name": "GROUND",
+        "layer": "B.Cu",
+        "width_mm": 0.4,
+        "points": [
+          {
+            "x_mm": 25.25,
+            "y_mm": 6
+          },
+          {
+            "x_mm": 25.75,
+            "y_mm": 6
+          },
+          {
+            "x_mm": 25.75,
+            "y_mm": 9
+          }
+        ]
+      },
+      {
+        "op": "route",
+        "net_name": "GROUND",
+        "layer": "F.Cu",
+        "width_mm": 0.4,
+        "points": [
+          {
+            "x_mm": 25.75,
+            "y_mm": 9
+          },
+          {
+            "x_mm": 30.25,
+            "y_mm": 9
+          },
+          {
+            "x_mm": 30.25,
+            "y_mm": 17
+          },
+          {
+            "x_mm": 28.9125,
+            "y_mm": 17
+          }
+        ]
+      },
+      {
+        "op": "route",
+        "net_name": "GROUND",
+        "points": null,
+        "vias": [
+          {
+            "at": {
+              "x_mm": 19.75,
+              "y_mm": 7.75
+            },
+            "diameter_mm": 0.7,
+            "drill_mm": 0.35,
+            "layers": [
+              "B.Cu",
+              "F.Cu"
+            ]
+          },
+          {
+            "at": {
+              "x_mm": 25.25,
+              "y_mm": 6
+            },
+            "diameter_mm": 0.7,
+            "drill_mm": 0.35,
+            "layers": [
+              "B.Cu",
+              "F.Cu"
+            ]
+          },
+          {
+            "at": {
+              "x_mm": 25.75,
+              "y_mm": 9
+            },
+            "diameter_mm": 0.7,
+            "drill_mm": 0.35,
+            "layers": [
+              "B.Cu",
+              "F.Cu"
+            ]
+          }
+        ]
+      },
+      {
+        "op": "route",
+        "net_name": "LOAD_CURRENT",
+        "layer": "B.Cu",
+        "width_mm": 0.25,
+        "points": [
+          {
+            "x_mm": 8,
+            "y_mm": 3
+          },
+          {
+            "x_mm": 8,
+            "y_mm": 1.75
+          },
+          {
+            "x_mm": 27.5,
+            "y_mm": 1.75
+          }
+        ]
+      },
+      {
+        "op": "route",
+        "net_name": "LOAD_CURRENT",
+        "layer": "F.Cu",
+        "width_mm": 0.25,
+        "points": [
+          {
+            "x_mm": 27.5,
+            "y_mm": 1.75
+          },
+          {
+            "x_mm": 27.5,
+            "y_mm": 2.25
+          },
+          {
+            "x_mm": 27.4125,
+            "y_mm": 2.5
+          },
+          {
+            "x_mm": 29.25,
+            "y_mm": 2.5
+          }
+        ]
+      },
+      {
+        "op": "route",
+        "net_name": "LOAD_CURRENT",
+        "layer": "B.Cu",
+        "width_mm": 0.25,
+        "points": [
+          {
+            "x_mm": 29.25,
+            "y_mm": 2.5
+          },
+          {
+            "x_mm": 29.25,
+            "y_mm": 11.5
+          },
+          {
+            "x_mm": 28.4,
+            "y_mm": 11.5
+          }
+        ]
+      },
+      {
+        "op": "route",
+        "net_name": "LOAD_CURRENT",
+        "points": null,
+        "vias": [
+          {
+            "at": {
+              "x_mm": 27.5,
+              "y_mm": 1.75
+            },
+            "diameter_mm": 0.6,
+            "drill_mm": 0.3,
+            "layers": [
+              "B.Cu",
+              "F.Cu"
+            ]
+          },
+          {
+            "at": {
+              "x_mm": 29.25,
+              "y_mm": 2.5
+            },
+            "diameter_mm": 0.6,
+            "drill_mm": 0.3,
+            "layers": [
+              "B.Cu",
+              "F.Cu"
+            ]
+          }
+        ]
+      },
+      {
+        "op": "route",
+        "net_name": "INTERNAL_000",
+        "layer": "F.Cu",
+        "width_mm": 0.25,
+        "points": [
+          {
+            "x_mm": 4,
+            "y_mm": 32
+          },
+          {
+            "x_mm": 4,
+            "y_mm": 38
+          }
+        ]
+      },
+      {
+        "op": "route",
+        "net_name": "INTERNAL_000",
+        "layer": "F.Cu",
+        "width_mm": 0.25,
+        "points": [
+          {
+            "x_mm": 4,
+            "y_mm": 32
+          },
+          {
+            "x_mm": 4,
+            "y_mm": 30.5
+          },
+          {
+            "x_mm": 13.5,
+            "y_mm": 30.5
+          },
+          {
+            "x_mm": 13.5,
+            "y_mm": 31.75
+          },
+          {
+            "x_mm": 13.5875,
+            "y_mm": 32
+          }
+        ]
+      },
+      {
+        "op": "route",
+        "net_name": "INTERNAL_003",
+        "layer": "F.Cu",
+        "width_mm": 0.25,
+        "points": [
+          {
+            "x_mm": 6.54,
+            "y_mm": 32
+          },
+          {
+            "x_mm": 6.5,
+            "y_mm": 32.25
+          },
+          {
+            "x_mm": 6.5,
+            "y_mm": 37.75
+          },
+          {
+            "x_mm": 6.54,
+            "y_mm": 38
+          }
+        ]
+      },
+      {
+        "op": "route",
+        "net_name": "INTERNAL_003",
+        "layer": "F.Cu",
+        "width_mm": 0.25,
+        "points": [
+          {
+            "x_mm": 6.54,
+            "y_mm": 32
+          },
+          {
+            "x_mm": 7.5,
+            "y_mm": 32
+          }
+        ]
+      },
+      {
+        "op": "route",
+        "net_name": "INTERNAL_003",
+        "layer": "B.Cu",
+        "width_mm": 0.25,
+        "points": [
+          {
+            "x_mm": 7.5,
+            "y_mm": 32
+          },
+          {
+            "x_mm": 7.5,
+            "y_mm": 29
+          }
+        ]
+      },
+      {
+        "op": "route",
+        "net_name": "INTERNAL_003",
+        "layer": "F.Cu",
+        "width_mm": 0.25,
+        "points": [
+          {
+            "x_mm": 7.5,
+            "y_mm": 29
+          },
+          {
+            "x_mm": 13.5875,
+            "y_mm": 29
+          },
+          {
+            "x_mm": 13.5,
+            "y_mm": 28.75
+          },
+          {
+            "x_mm": 13.5,
+            "y_mm": 11.5
+          },
+          {
+            "x_mm": 3,
+            "y_mm": 11.5
+          }
+        ]
+      },
+      {
+        "op": "route",
+        "net_name": "INTERNAL_003",
+        "points": null,
+        "vias": [
+          {
+            "at": {
+              "x_mm": 7.5,
+              "y_mm": 32
+            },
+            "diameter_mm": 0.6,
+            "drill_mm": 0.3,
+            "layers": [
+              "B.Cu",
+              "F.Cu"
+            ]
+          },
+          {
+            "at": {
+              "x_mm": 7.5,
+              "y_mm": 29
+            },
+            "diameter_mm": 0.6,
+            "drill_mm": 0.3,
+            "layers": [
+              "B.Cu",
+              "F.Cu"
+            ]
+          }
+        ]
+      },
+      {
+        "op": "route",
+        "net_name": "INTERNAL_001",
+        "layer": "B.Cu",
+        "width_mm": 0.25,
+        "points": [
+          {
+            "x_mm": 9.08,
+            "y_mm": 32
+          },
+          {
+            "x_mm": 9,
+            "y_mm": 31.75
+          },
+          {
+            "x_mm": 9,
+            "y_mm": 18
+          },
+          {
+            "x_mm": 3,
+            "y_mm": 18
+          }
+        ]
+      },
+      {
+        "op": "route",
+        "net_name": "INTERNAL_002",
+        "layer": "B.Cu",
+        "width_mm": 0.25,
+        "points": [
+          {
+            "x_mm": 9.08,
+            "y_mm": 38
+          },
+          {
+            "x_mm": 9,
+            "y_mm": 37.75
+          },
+          {
+            "x_mm": 9,
+            "y_mm": 33.5
+          },
+          {
+            "x_mm": 2.5,
+            "y_mm": 33.5
+          },
+          {
+            "x_mm": 2.5,
+            "y_mm": 24.5
+          },
+          {
+            "x_mm": 3,
+            "y_mm": 24.5
+          }
+        ]
+      },
+      {
+        "op": "write_project",
+        "overwrite": true,
+        "require_schematic_readability": true
+      }
+    ]
+  },
+  "operation_count": 126,
+  "operation_summaries": [
+    {
+      "index": 0,
+      "op": "create_project"
+    },
+    {
+      "index": 1,
+      "op": "add_symbol"
+    },
+    {
+      "index": 2,
+      "op": "assign_footprint"
+    },
+    {
+      "index": 3,
+      "op": "add_symbol"
+    },
+    {
+      "index": 4,
+      "op": "assign_footprint"
+    },
+    {
+      "index": 5,
+      "op": "add_symbol"
+    },
+    {
+      "index": 6,
+      "op": "assign_footprint"
+    },
+    {
+      "index": 7,
+      "op": "add_symbol"
+    },
+    {
+      "index": 8,
+      "op": "assign_footprint"
+    },
+    {
+      "index": 9,
+      "op": "add_symbol"
+    },
+    {
+      "index": 10,
+      "op": "assign_footprint"
+    },
+    {
+      "index": 11,
+      "op": "add_symbol"
+    },
+    {
+      "index": 12,
+      "op": "assign_footprint"
+    },
+    {
+      "index": 13,
+      "op": "add_symbol"
+    },
+    {
+      "index": 14,
+      "op": "assign_footprint"
+    },
+    {
+      "index": 15,
+      "op": "add_symbol"
+    },
+    {
+      "index": 16,
+      "op": "assign_footprint"
+    },
+    {
+      "index": 17,
+      "op": "add_symbol"
+    },
+    {
+      "index": 18,
+      "op": "assign_footprint"
+    },
+    {
+      "index": 19,
+      "op": "add_symbol"
+    },
+    {
+      "index": 20,
+      "op": "assign_footprint"
+    },
+    {
+      "index": 21,
+      "op": "add_symbol"
+    },
+    {
+      "index": 22,
+      "op": "assign_footprint"
+    },
+    {
+      "index": 23,
+      "op": "add_symbol"
+    },
+    {
+      "index": 24,
+      "op": "assign_footprint"
+    },
+    {
+      "index": 25,
+      "op": "add_symbol"
+    },
+    {
+      "index": 26,
+      "op": "assign_footprint"
+    },
+    {
+      "index": 27,
+      "op": "add_symbol"
+    },
+    {
+      "index": 28,
+      "op": "assign_footprint"
+    },
+    {
+      "index": 29,
+      "op": "add_symbol"
+    },
+    {
+      "index": 30,
+      "op": "add_no_connect"
+    },
+    {
+      "index": 31,
+      "op": "add_no_connect"
+    },
+    {
+      "index": 32,
+      "op": "add_no_connect"
+    },
+    {
+      "index": 33,
+      "op": "add_symbol"
+    },
+    {
+      "index": 34,
+      "op": "add_symbol"
+    },
+    {
+      "index": 35,
+      "op": "assign_footprint"
+    },
+    {
+      "index": 36,
+      "op": "add_symbol"
+    },
+    {
+      "index": 37,
+      "op": "add_symbol"
+    },
+    {
+      "index": 38,
+      "op": "connect"
+    },
+    {
+      "index": 39,
+      "op": "connect"
+    },
+    {
+      "index": 40,
+      "op": "connect"
+    },
+    {
+      "index": 41,
+      "op": "connect"
+    },
+    {
+      "index": 42,
+      "op": "connect"
+    },
+    {
+      "index": 43,
+      "op": "connect"
+    },
+    {
+      "index": 44,
+      "op": "connect"
+    },
+    {
+      "index": 45,
+      "op": "connect"
+    },
+    {
+      "index": 46,
+      "op": "connect"
+    },
+    {
+      "index": 47,
+      "op": "connect"
+    },
+    {
+      "index": 48,
+      "op": "connect"
+    },
+    {
+      "index": 49,
+      "op": "connect"
+    },
+    {
+      "index": 50,
+      "op": "connect"
+    },
+    {
+      "index": 51,
+      "op": "connect"
+    },
+    {
+      "index": 52,
+      "op": "connect"
+    },
+    {
+      "index": 53,
+      "op": "connect"
+    },
+    {
+      "index": 54,
+      "op": "connect"
+    },
+    {
+      "index": 55,
+      "op": "connect"
+    },
+    {
+      "index": 56,
+      "op": "connect"
+    },
+    {
+      "index": 57,
+      "op": "connect"
+    },
+    {
+      "index": 58,
+      "op": "connect"
+    },
+    {
+      "index": 59,
+      "op": "connect"
+    },
+    {
+      "index": 60,
+      "op": "connect"
+    },
+    {
+      "index": 61,
+      "op": "connect"
+    },
+    {
+      "index": 62,
+      "op": "connect"
+    },
+    {
+      "index": 63,
+      "op": "connect"
+    },
+    {
+      "index": 64,
+      "op": "connect"
+    },
+    {
+      "index": 65,
+      "op": "connect"
+    },
+    {
+      "index": 66,
+      "op": "set_board_outline"
+    },
+    {
+      "index": 67,
+      "op": "place_footprint"
+    },
+    {
+      "index": 68,
+      "op": "place_footprint"
+    },
+    {
+      "index": 69,
+      "op": "place_footprint"
+    },
+    {
+      "index": 70,
+      "op": "place_footprint"
+    },
+    {
+      "index": 71,
+      "op": "place_footprint"
+    },
+    {
+      "index": 72,
+      "op": "place_footprint"
+    },
+    {
+      "index": 73,
+      "op": "place_footprint"
+    },
+    {
+      "index": 74,
+      "op": "place_footprint"
+    },
+    {
+      "index": 75,
+      "op": "place_footprint"
+    },
+    {
+      "index": 76,
+      "op": "place_footprint"
+    },
+    {
+      "index": 77,
+      "op": "place_footprint"
+    },
+    {
+      "index": 78,
+      "op": "place_footprint"
+    },
+    {
+      "index": 79,
+      "op": "place_footprint"
+    },
+    {
+      "index": 80,
+      "op": "place_footprint"
+    },
+    {
+      "index": 81,
+      "op": "place_footprint"
+    },
+    {
+      "index": 82,
+      "op": "route"
+    },
+    {
+      "index": 83,
+      "op": "route"
+    },
+    {
+      "index": 84,
+      "op": "route"
+    },
+    {
+      "index": 85,
+      "op": "route"
+    },
+    {
+      "index": 86,
+      "op": "route"
+    },
+    {
+      "index": 87,
+      "op": "route"
+    },
+    {
+      "index": 88,
+      "op": "route"
+    },
+    {
+      "index": 89,
+      "op": "route"
+    },
+    {
+      "index": 90,
+      "op": "route"
+    },
+    {
+      "index": 91,
+      "op": "route"
+    },
+    {
+      "index": 92,
+      "op": "route"
+    },
+    {
+      "index": 93,
+      "op": "route"
+    },
+    {
+      "index": 94,
+      "op": "route"
+    },
+    {
+      "index": 95,
+      "op": "route"
+    },
+    {
+      "index": 96,
+      "op": "route"
+    },
+    {
+      "index": 97,
+      "op": "route"
+    },
+    {
+      "index": 98,
+      "op": "route"
+    },
+    {
+      "index": 99,
+      "op": "route"
+    },
+    {
+      "index": 100,
+      "op": "route"
+    },
+    {
+      "index": 101,
+      "op": "route"
+    },
+    {
+      "index": 102,
+      "op": "route"
+    },
+    {
+      "index": 103,
+      "op": "route"
+    },
+    {
+      "index": 104,
+      "op": "route"
+    },
+    {
+      "index": 105,
+      "op": "route"
+    },
+    {
+      "index": 106,
+      "op": "route"
+    },
+    {
+      "index": 107,
+      "op": "route"
+    },
+    {
+      "index": 108,
+      "op": "route"
+    },
+    {
+      "index": 109,
+      "op": "route"
+    },
+    {
+      "index": 110,
+      "op": "route"
+    },
+    {
+      "index": 111,
+      "op": "route"
+    },
+    {
+      "index": 112,
+      "op": "route"
+    },
+    {
+      "index": 113,
+      "op": "route"
+    },
+    {
+      "index": 114,
+      "op": "route"
+    },
+    {
+      "index": 115,
+      "op": "route"
+    },
+    {
+      "index": 116,
+      "op": "route"
+    },
+    {
+      "index": 117,
+      "op": "route"
+    },
+    {
+      "index": 118,
+      "op": "route"
+    },
+    {
+      "index": 119,
+      "op": "route"
+    },
+    {
+      "index": 120,
+      "op": "route"
+    },
+    {
+      "index": 121,
+      "op": "route"
+    },
+    {
+      "index": 122,
+      "op": "route"
+    },
+    {
+      "index": 123,
+      "op": "route"
+    },
+    {
+      "index": 124,
+      "op": "route"
+    },
+    {
+      "index": 125,
+      "op": "write_project"
+    }
+  ],
+  "source": {
+    "kind": "transaction_apply"
+  }
+}

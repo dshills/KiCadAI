@@ -4,8 +4,13 @@ import (
 	"bytes"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
+
+	"kicadai/internal/circuitgraph"
+	"kicadai/internal/libraryresolver"
+	"kicadai/internal/reports"
 )
 
 func TestOpenTopologyCreateRequiresStrictRequestAndOutput(t *testing.T) {
@@ -53,5 +58,48 @@ func TestOpenTopologyCreateRequiresStrictRequestAndOutput(t *testing.T) {
 			stdout.String(),
 			stderr.String(),
 		)
+	}
+}
+
+func TestOpenTopologyLibraryIssuesAreScopedToSelectedDesign(t *testing.T) {
+	selectedPath := filepath.Join(t.TempDir(), "Selected.pretty", "R_0603.kicad_mod")
+	unrelatedPath := filepath.Join(t.TempDir(), "Unrelated.pretty", "Broken.kicad_mod")
+	index := libraryresolver.LibraryIndex{
+		Footprints: map[string]libraryresolver.FootprintRecord{
+			"Selected:R_0603": {
+				FootprintID: "Selected:R_0603",
+				Path:        selectedPath,
+			},
+		},
+	}
+	resolved := circuitgraph.ResolvedDocument{
+		Components: []circuitgraph.ResolvedComponent{{
+			ComponentID: "resistor",
+			VariantID:   "0603",
+			FootprintID: "Selected:R_0603",
+		}},
+	}
+	libraryIssues := []reports.Issue{
+		{
+			Code:     reports.CodeValidationFailed,
+			Severity: reports.SeverityError,
+			Path:     unrelatedPath,
+			Message:  "unrelated stock-library parse failure",
+		},
+		{
+			Code:     reports.CodeValidationFailed,
+			Severity: reports.SeverityWarning,
+			Path:     selectedPath,
+			Message:  "selected footprint warning",
+		},
+	}
+
+	issues := scopeOpenTopologyLibraryIssues(&index, libraryIssues, resolved)
+	if len(issues) != 1 || issues[0].Path != selectedPath ||
+		issues[0].Severity != reports.SeverityBlocked {
+		t.Fatalf("scoped issues = %#v", issues)
+	}
+	if len(index.Diagnostics) != 1 || !reflect.DeepEqual(index.Diagnostics[0], issues[0]) {
+		t.Fatalf("index diagnostics = %#v, want %#v", index.Diagnostics, issues)
 	}
 }

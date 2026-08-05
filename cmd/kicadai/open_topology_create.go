@@ -171,8 +171,13 @@ func runOpenTopology(
 			Refresh:   opts.refreshLibraryCache,
 		},
 	)
-	if reports.HasBlockingIssue(libraryIssues) {
-		return writeOpenTopologyIssues(stdout, libraryIssues)
+	closureIssues := scopeOpenTopologyLibraryIssues(
+		&index,
+		libraryIssues,
+		synthesis.Physical.Resolved,
+	)
+	if reports.HasBlockingIssue(closureIssues) {
+		return writeOpenTopologyIssues(stdout, closureIssues)
 	}
 	cli, err := checks.DiscoverCLI(opts.kicadCLI)
 	if err != nil {
@@ -287,6 +292,30 @@ func runOpenTopology(
 		return errors.New("open-topology physical promotion reported blocking issues")
 	}
 	return nil
+}
+
+// scopeOpenTopologyLibraryIssues applies the same design-closure boundary as
+// circuit create. Installed KiCad libraries may contain diagnostics for many
+// objects that the selected circuit never references; those findings remain
+// available to the explicit library audit, but they cannot decide whether an
+// unrelated design is promotable. Every diagnostic associated with a selected
+// symbol, inherited base, or footprint remains blocking.
+func scopeOpenTopologyLibraryIssues(
+	index *libraryresolver.LibraryIndex,
+	libraryIssues []reports.Issue,
+	resolved circuitgraph.ResolvedDocument,
+) []reports.Issue {
+	closure, issues := libraryresolver.ResolveDesignClosure(
+		*index,
+		circuitPreflightClosureRequest(resolved),
+	)
+	issues = append(
+		issues,
+		libraryresolver.DesignClosureIssuesFrom(libraryIssues, closure)...,
+	)
+	issues = reports.SortedIssues(issues)
+	index.Diagnostics = issues
+	return issues
 }
 
 func summarizeOpenTopologySynthesis(

@@ -1,0 +1,38 @@
+(sym_lib_table
+  (version 7)
+  (lib
+    (name "Connector_Generic")
+    (type "KiCad")
+    (uri "${KIPRJMOD}/lib/kicadai_resolved_Connector_Generic.kicad_sym")
+    (options "")
+    (descr "Resolver-backed symbols for Connector_Generic")
+  )
+  (lib
+    (name "Device")
+    (type "KiCad")
+    (uri "${KIPRJMOD}/lib/kicadai_resolved_Device.kicad_sym")
+    (options "")
+    (descr "Resolver-backed symbols for Device")
+  )
+  (lib
+    (name "Transistor_BJT")
+    (type "KiCad")
+    (uri "${KIPRJMOD}/lib/kicadai_resolved_Transistor_BJT.kicad_sym")
+    (options "")
+    (descr "Resolver-backed symbols for Transistor_BJT")
+  )
+  (lib
+    (name "Amplifier_Operational")
+    (type "KiCad")
+    (uri "${KIPRJMOD}/lib/kicadai_resolved_Amplifier_Operational.kicad_sym")
+    (options "")
+    (descr "Resolver-backed symbols for Amplifier_Operational")
+  )
+  (lib
+    (name "power")
+    (type "KiCad")
+    (uri "${KIPRJMOD}/lib/kicadai_resolved_power.kicad_sym")
+    (options "")
+    (descr "Resolver-backed symbols for power")
+  )
+)

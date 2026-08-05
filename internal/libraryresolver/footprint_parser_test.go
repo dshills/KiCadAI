@@ -216,6 +216,41 @@ func TestIndexFootprintsHandlesEmptyListFields(t *testing.T) {
 	}
 }
 
+func TestIndexFootprintsAllowsUnnamedNonElectricalPads(t *testing.T) {
+	root := t.TempDir()
+	footprints := filepath.Join(root, "footprints")
+	mustWrite(t, filepath.Join(footprints, "Test.pretty", "FabricationPads.kicad_mod"), `
+(footprint "FabricationPads"
+  (pad "" smd rect (at 0 0) (size 1 1) (layers "F.Paste"))
+  (pad "" np_thru_hole circle (at 2 0) (size 1 1) (drill 1) (layers "*.Cu" "*.Mask"))
+  (pad "1" smd rect (at 4 0) (size 1 1) (layers "F.Cu" "F.Mask"))
+)`)
+
+	inventory := Discover(LibraryRoots{FootprintsRoot: footprints})
+	records, issues := IndexFootprints(inventory)
+	if len(issues) != 0 {
+		t.Fatalf("issues = %#v", issues)
+	}
+	if got := len(records["Test:FabricationPads"].Pads); got != 3 {
+		t.Fatalf("pads = %d, want 3", got)
+	}
+}
+
+func TestIndexFootprintsRejectsUnnamedElectricalPad(t *testing.T) {
+	root := t.TempDir()
+	footprints := filepath.Join(root, "footprints")
+	mustWrite(t, filepath.Join(footprints, "Test.pretty", "BrokenPad.kicad_mod"), `
+(footprint "BrokenPad"
+  (pad "" smd rect (at 0 0) (size 1 1) (layers "F.Cu" "F.Mask"))
+)`)
+
+	inventory := Discover(LibraryRoots{FootprintsRoot: footprints})
+	_, issues := IndexFootprints(inventory)
+	if len(issues) != 1 || issues[0].Message != "electrical pad without name" {
+		t.Fatalf("issues = %#v", issues)
+	}
+}
+
 func TestIndexFootprintsCircleBoundingBox(t *testing.T) {
 	root := t.TempDir()
 	footprints := filepath.Join(root, "footprints")

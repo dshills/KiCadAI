@@ -4,6 +4,7 @@ This directory holds the detailed reference material that used to live in the pr
 
 ## User Workflows
 
+- [Featured Public Demo](../examples/public-demo/protected-programmable-current-output/README.md): behavior-only protected current-output synthesis, native KiCad artifacts, compact evidence, refusal replay, and video storyboard.
 - [Project Status](project-status.md): current capabilities, proven workflows, evidence levels, and explicit limitations.
 - [Educational Schematic Examples](../examples/educational/README.md): five
   generated teaching circuits with conventional topology-aware layout and
@@ -28,6 +29,7 @@ This directory holds the detailed reference material that used to live in the pr
 
 ## Libraries And Internals
 
+- [Detailed Capability Record](capability-record.md): the preserved chronological implementation and evidence inventory formerly shown at the top of the root README.
 - [Libraries And Components](libraries-and-components.md): component intelligence, pinmaps, and library resolver details.
 - [Development Reference](development.md): examples, Go packages, testing, protobuf maintenance, limitations, troubleshooting, and design direction.
 - [KiCad Direct File Writers](kicad-file-writers.md): lower-level writer behavior.

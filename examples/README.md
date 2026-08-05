@@ -1,4 +1,14 @@
-# KiCadAI Demo Schematics
+# KiCadAI Examples
+
+The featured end-to-end public demonstration is the
+[protected programmable current output](public-demo/protected-programmable-current-output/README.md).
+It starts from behavior-only electrical, startup, thermal, and safe-operating-
+area requirements; derives and ranks architectures; generates native KiCad;
+and proves the result with simulation, routing, connectivity, writer, ERC,
+strict DRC, round-trip, and deterministic-replay evidence. Run it from the
+repository root with `make public-demo`.
+
+## Teaching And Writer Fixtures
 
 These examples are hand-authored KiCad project fixtures that range from a single LED indicator to a hierarchical sensor node. They are intended as small reference projects for the direct file writers and for AI-assisted schematic generation experiments.
 

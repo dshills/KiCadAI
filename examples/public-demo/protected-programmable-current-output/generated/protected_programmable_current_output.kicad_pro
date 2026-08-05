@@ -1,0 +1,38 @@
+{
+  "board": {
+    "design_settings": {
+      "rules": {
+        "min_copper_edge_clearance": 0.25
+      }
+    }
+  },
+  "boards": [],
+  "component_class_settings": {},
+  "cvpcb": {},
+  "erc": {},
+  "libraries": {},
+  "meta": {
+    "version": 1
+  },
+  "net_settings": {
+    "classes": [
+      {
+        "name": "Default",
+        "clearance": 0.1,
+        "track_width": 0.25,
+        "via_diameter": 0.6,
+        "via_drill": 0.3
+      }
+    ]
+  },
+  "pcbnew": {},
+  "schematic": {},
+  "sheets": [
+    [
+      "7fed8e2a-f73f-5200-a3f4-187b5a69b8b4",
+      "Root"
+    ]
+  ],
+  "text_variables": {},
+  "time_domain_parameters": {}
+}

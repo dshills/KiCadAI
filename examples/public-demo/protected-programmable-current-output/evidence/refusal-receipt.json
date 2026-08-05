@@ -1,0 +1,33 @@
+{
+  "schema": "kicadai.public-demo-refusal-receipt.v1",
+  "version": 1,
+  "demo": "adversarial_excessive_step_down_stress",
+  "result": "refused",
+  "requirement_hash": "ad965c2dd1f7873e805cc4bb1222180605de28f2d68993306334788ef94a9d20",
+  "primitive_inventory_hash": "cd5881d959c3dd1427b8c51fbf5a54e3553632a8085e2ff752b01dba50392b1a",
+  "policy_hash": "33356250b7031bbac339e9f22a9b1268ee69c89af3808cdd40ee8867e981f96a",
+  "status": "exhausted",
+  "stop_reason": "search_exhausted",
+  "diagnostic": {
+    "code": "OPEN_TOPOLOGY_SEARCH_EXHAUSTED",
+    "stage": "open_topology_synthesis",
+    "path": "simulation.policy",
+    "message": "candidate-simulation or operating-corner budget exhausted"
+  },
+  "consumption": {
+    "expanded_states": 2,
+    "generated_graphs": 35,
+    "complete_graphs": 4,
+    "candidate_simulations": 512,
+    "corner_evaluations": 512,
+    "value_trials": 19,
+    "topology_repairs": 0,
+    "budget_exhausted": true
+  },
+  "evidence_hash": "d514c3ab973788f0d14820d20987f819cc700ba5ca4b7f30fc16c4abd767fd7f",
+  "selected_graph": false,
+  "physical_design": false,
+  "kicad_project_emitted": false,
+  "interpretation": "The default public policy found no passing design within its explicit simulation budget. This is a bounded capability refusal, not proof that no physical solution exists.",
+  "deeper_corpus_evidence": "specs/nonlinear-switching-architecture-synthesis/AUDIT.md records thermal/SOA rejection for this frozen case under its promotion policy."
+}

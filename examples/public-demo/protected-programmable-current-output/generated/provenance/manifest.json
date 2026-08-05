@@ -1,0 +1,612 @@
+{
+  "schema_version": "kicadai.manifest.v2",
+  "project_name": "protected_programmable_current_output",
+  "generator_version": "0.1.0",
+  "operations": [
+    {
+      "index": 0,
+      "op": "create_project"
+    },
+    {
+      "index": 1,
+      "op": "add_symbol"
+    },
+    {
+      "index": 2,
+      "op": "assign_footprint"
+    },
+    {
+      "index": 3,
+      "op": "add_symbol"
+    },
+    {
+      "index": 4,
+      "op": "assign_footprint"
+    },
+    {
+      "index": 5,
+      "op": "add_symbol"
+    },
+    {
+      "index": 6,
+      "op": "assign_footprint"
+    },
+    {
+      "index": 7,
+      "op": "add_symbol"
+    },
+    {
+      "index": 8,
+      "op": "assign_footprint"
+    },
+    {
+      "index": 9,
+      "op": "add_symbol"
+    },
+    {
+      "index": 10,
+      "op": "assign_footprint"
+    },
+    {
+      "index": 11,
+      "op": "add_symbol"
+    },
+    {
+      "index": 12,
+      "op": "assign_footprint"
+    },
+    {
+      "index": 13,
+      "op": "add_symbol"
+    },
+    {
+      "index": 14,
+      "op": "assign_footprint"
+    },
+    {
+      "index": 15,
+      "op": "add_symbol"
+    },
+    {
+      "index": 16,
+      "op": "assign_footprint"
+    },
+    {
+      "index": 17,
+      "op": "add_symbol"
+    },
+    {
+      "index": 18,
+      "op": "assign_footprint"
+    },
+    {
+      "index": 19,
+      "op": "add_symbol"
+    },
+    {
+      "index": 20,
+      "op": "assign_footprint"
+    },
+    {
+      "index": 21,
+      "op": "add_symbol"
+    },
+    {
+      "index": 22,
+      "op": "assign_footprint"
+    },
+    {
+      "index": 23,
+      "op": "add_symbol"
+    },
+    {
+      "index": 24,
+      "op": "assign_footprint"
+    },
+    {
+      "index": 25,
+      "op": "add_symbol"
+    },
+    {
+      "index": 26,
+      "op": "assign_footprint"
+    },
+    {
+      "index": 27,
+      "op": "add_symbol"
+    },
+    {
+      "index": 28,
+      "op": "assign_footprint"
+    },
+    {
+      "index": 29,
+      "op": "add_symbol"
+    },
+    {
+      "index": 30,
+      "op": "add_no_connect"
+    },
+    {
+      "index": 31,
+      "op": "add_no_connect"
+    },
+    {
+      "index": 32,
+      "op": "add_no_connect"
+    },
+    {
+      "index": 33,
+      "op": "add_symbol"
+    },
+    {
+      "index": 34,
+      "op": "add_symbol"
+    },
+    {
+      "index": 35,
+      "op": "assign_footprint"
+    },
+    {
+      "index": 36,
+      "op": "add_symbol"
+    },
+    {
+      "index": 37,
+      "op": "add_symbol"
+    },
+    {
+      "index": 38,
+      "op": "connect"
+    },
+    {
+      "index": 39,
+      "op": "connect"
+    },
+    {
+      "index": 40,
+      "op": "connect"
+    },
+    {
+      "index": 41,
+      "op": "connect"
+    },
+    {
+      "index": 42,
+      "op": "connect"
+    },
+    {
+      "index": 43,
+      "op": "connect"
+    },
+    {
+      "index": 44,
+      "op": "connect"
+    },
+    {
+      "index": 45,
+      "op": "connect"
+    },
+    {
+      "index": 46,
+      "op": "connect"
+    },
+    {
+      "index": 47,
+      "op": "connect"
+    },
+    {
+      "index": 48,
+      "op": "connect"
+    },
+    {
+      "index": 49,
+      "op": "connect"
+    },
+    {
+      "index": 50,
+      "op": "connect"
+    },
+    {
+      "index": 51,
+      "op": "connect"
+    },
+    {
+      "index": 52,
+      "op": "connect"
+    },
+    {
+      "index": 53,
+      "op": "connect"
+    },
+    {
+      "index": 54,
+      "op": "connect"
+    },
+    {
+      "index": 55,
+      "op": "connect"
+    },
+    {
+      "index": 56,
+      "op": "connect"
+    },
+    {
+      "index": 57,
+      "op": "connect"
+    },
+    {
+      "index": 58,
+      "op": "connect"
+    },
+    {
+      "index": 59,
+      "op": "connect"
+    },
+    {
+      "index": 60,
+      "op": "connect"
+    },
+    {
+      "index": 61,
+      "op": "connect"
+    },
+    {
+      "index": 62,
+      "op": "connect"
+    },
+    {
+      "index": 63,
+      "op": "connect"
+    },
+    {
+      "index": 64,
+      "op": "connect"
+    },
+    {
+      "index": 65,
+      "op": "connect"
+    },
+    {
+      "index": 66,
+      "op": "set_board_outline"
+    },
+    {
+      "index": 67,
+      "op": "place_footprint"
+    },
+    {
+      "index": 68,
+      "op": "place_footprint"
+    },
+    {
+      "index": 69,
+      "op": "place_footprint"
+    },
+    {
+      "index": 70,
+      "op": "place_footprint"
+    },
+    {
+      "index": 71,
+      "op": "place_footprint"
+    },
+    {
+      "index": 72,
+      "op": "place_footprint"
+    },
+    {
+      "index": 73,
+      "op": "place_footprint"
+    },
+    {
+      "index": 74,
+      "op": "place_footprint"
+    },
+    {
+      "index": 75,
+      "op": "place_footprint"
+    },
+    {
+      "index": 76,
+      "op": "place_footprint"
+    },
+    {
+      "index": 77,
+      "op": "place_footprint"
+    },
+    {
+      "index": 78,
+      "op": "place_footprint"
+    },
+    {
+      "index": 79,
+      "op": "place_footprint"
+    },
+    {
+      "index": 80,
+      "op": "place_footprint"
+    },
+    {
+      "index": 81,
+      "op": "place_footprint"
+    },
+    {
+      "index": 82,
+      "op": "route"
+    },
+    {
+      "index": 83,
+      "op": "route"
+    },
+    {
+      "index": 84,
+      "op": "route"
+    },
+    {
+      "index": 85,
+      "op": "route"
+    },
+    {
+      "index": 86,
+      "op": "route"
+    },
+    {
+      "index": 87,
+      "op": "route"
+    },
+    {
+      "index": 88,
+      "op": "route"
+    },
+    {
+      "index": 89,
+      "op": "route"
+    },
+    {
+      "index": 90,
+      "op": "route"
+    },
+    {
+      "index": 91,
+      "op": "route"
+    },
+    {
+      "index": 92,
+      "op": "route"
+    },
+    {
+      "index": 93,
+      "op": "route"
+    },
+    {
+      "index": 94,
+      "op": "route"
+    },
+    {
+      "index": 95,
+      "op": "route"
+    },
+    {
+      "index": 96,
+      "op": "route"
+    },
+    {
+      "index": 97,
+      "op": "route"
+    },
+    {
+      "index": 98,
+      "op": "route"
+    },
+    {
+      "index": 99,
+      "op": "route"
+    },
+    {
+      "index": 100,
+      "op": "route"
+    },
+    {
+      "index": 101,
+      "op": "route"
+    },
+    {
+      "index": 102,
+      "op": "route"
+    },
+    {
+      "index": 103,
+      "op": "route"
+    },
+    {
+      "index": 104,
+      "op": "route"
+    },
+    {
+      "index": 105,
+      "op": "route"
+    },
+    {
+      "index": 106,
+      "op": "route"
+    },
+    {
+      "index": 107,
+      "op": "route"
+    },
+    {
+      "index": 108,
+      "op": "route"
+    },
+    {
+      "index": 109,
+      "op": "route"
+    },
+    {
+      "index": 110,
+      "op": "route"
+    },
+    {
+      "index": 111,
+      "op": "route"
+    },
+    {
+      "index": 112,
+      "op": "route"
+    },
+    {
+      "index": 113,
+      "op": "route"
+    },
+    {
+      "index": 114,
+      "op": "route"
+    },
+    {
+      "index": 115,
+      "op": "route"
+    },
+    {
+      "index": 116,
+      "op": "route"
+    },
+    {
+      "index": 117,
+      "op": "route"
+    },
+    {
+      "index": 118,
+      "op": "route"
+    },
+    {
+      "index": 119,
+      "op": "route"
+    },
+    {
+      "index": 120,
+      "op": "route"
+    },
+    {
+      "index": 121,
+      "op": "route"
+    },
+    {
+      "index": 122,
+      "op": "route"
+    },
+    {
+      "index": 123,
+      "op": "route"
+    },
+    {
+      "index": 124,
+      "op": "route"
+    },
+    {
+      "index": 125,
+      "op": "write_project"
+    }
+  ],
+  "artifacts": [
+    {
+      "kind": "kicad_project",
+      "path": "/tmp/kicadai-public-demo-current/run-1/protected_programmable_current_output.kicad_pro"
+    },
+    {
+      "kind": "schematic",
+      "path": "/tmp/kicadai-public-demo-current/run-1/protected_programmable_current_output.kicad_sch"
+    },
+    {
+      "kind": "pcb",
+      "path": "/tmp/kicadai-public-demo-current/run-1/protected_programmable_current_output.kicad_pcb"
+    },
+    {
+      "kind": "validation_report",
+      "path": "/tmp/kicadai-public-demo-current/run-1/sym-lib-table"
+    },
+    {
+      "kind": "validation_report",
+      "path": "/tmp/kicadai-public-demo-current/run-1/fp-lib-table"
+    },
+    {
+      "kind": "validation_report",
+      "path": "/tmp/kicadai-public-demo-current/run-1/lib/kicadai_resolved_Connector_Generic.kicad_sym"
+    },
+    {
+      "kind": "validation_report",
+      "path": "/tmp/kicadai-public-demo-current/run-1/lib/kicadai_resolved_Device.kicad_sym"
+    },
+    {
+      "kind": "validation_report",
+      "path": "/tmp/kicadai-public-demo-current/run-1/lib/kicadai_resolved_Transistor_BJT.kicad_sym"
+    },
+    {
+      "kind": "validation_report",
+      "path": "/tmp/kicadai-public-demo-current/run-1/lib/kicadai_resolved_Amplifier_Operational.kicad_sym"
+    },
+    {
+      "kind": "validation_report",
+      "path": "/tmp/kicadai-public-demo-current/run-1/lib/kicadai_resolved_power.kicad_sym"
+    },
+    {
+      "kind": "validation_report",
+      "path": "/tmp/kicadai-public-demo-current/run-1/footprints/Connector_PinHeader_2.54mm.pretty/PinHeader_1x02_P2.54mm_Vertical.kicad_mod"
+    },
+    {
+      "kind": "validation_report",
+      "path": "/tmp/kicadai-public-demo-current/run-1/footprints/Resistor_THT.pretty/R_Axial_DIN0614_L14.3mm_D5.7mm_P25.40mm_Horizontal.kicad_mod"
+    },
+    {
+      "kind": "validation_report",
+      "path": "/tmp/kicadai-public-demo-current/run-1/footprints/Resistor_THT.pretty/R_Axial_DIN0414_L11.9mm_D4.5mm_P20.32mm_Horizontal.kicad_mod"
+    },
+    {
+      "kind": "validation_report",
+      "path": "/tmp/kicadai-public-demo-current/run-1/footprints/Package_TO_SOT_THT.pretty/TO-220-3_Vertical.kicad_mod"
+    },
+    {
+      "kind": "validation_report",
+      "path": "/tmp/kicadai-public-demo-current/run-1/footprints/Package_SO.pretty/SOIC-8_3.9x4.9mm_P1.27mm.kicad_mod"
+    },
+    {
+      "kind": "validation_report",
+      "path": "/tmp/kicadai-public-demo-current/run-1/footprints/Package_TO_SOT_SMD.pretty/SOT-23-5.kicad_mod"
+    },
+    {
+      "kind": "validation_report",
+      "path": "/tmp/kicadai-public-demo-current/run-1/footprints/Resistor_SMD.pretty/R_0805_2012Metric.kicad_mod"
+    },
+    {
+      "kind": "validation_report",
+      "path": ".kicadai/transaction.json",
+      "description": "KiCadAI generated transaction provenance"
+    }
+  ],
+  "file_hashes": {
+    ".kicadai/transaction.json": "c4ae152f193245c6a2b8802eb33b20d1557ce44556e932719d0b8aa18eed1384",
+    "footprints/Connector_PinHeader_2.54mm.pretty/PinHeader_1x02_P2.54mm_Vertical.kicad_mod": "d63cf044a4b2aaa46e843ed06d3f03fc9a640e2ba331d6df74c1d900cbbff86b",
+    "footprints/Package_SO.pretty/SOIC-8_3.9x4.9mm_P1.27mm.kicad_mod": "3355ad61283ba02b43144900889c51f85ab9f8e49e3dfcd3ecd0a2a5639704c8",
+    "footprints/Package_TO_SOT_SMD.pretty/SOT-23-5.kicad_mod": "49cb6faa2478b95657b2ae3567b8297a20478299be775579533a81d48ff86884",
+    "footprints/Package_TO_SOT_THT.pretty/TO-220-3_Vertical.kicad_mod": "24298aaae5c4f569cefdaadffffb839f7b77d89870f3724877a19137d414341a",
+    "footprints/Resistor_SMD.pretty/R_0805_2012Metric.kicad_mod": "ade3f977c2dee16caf55fa7a1c856e191474c82fcd1dca228da8804222d42400",
+    "footprints/Resistor_THT.pretty/R_Axial_DIN0414_L11.9mm_D4.5mm_P20.32mm_Horizontal.kicad_mod": "9b91cbe5af880b76c4ce518c45a46341eb30910a593cb7218dd92a7b805378d9",
+    "footprints/Resistor_THT.pretty/R_Axial_DIN0614_L14.3mm_D5.7mm_P25.40mm_Horizontal.kicad_mod": "5f3d1b5a3c0a0f2095feebbf99b37649fdae9182f9212b623b6b34fb3e975ee9",
+    "fp-lib-table": "2d01ce559e06b1a6836bbc116ca05f1578b71c15ed003021fc8adc9d5eb150ff",
+    "lib/kicadai_resolved_Amplifier_Operational.kicad_sym": "3fd9abbd0f2b961ab783251561b814c321ca14cb8ca90c4c568b62da83b9b70e",
+    "lib/kicadai_resolved_Connector_Generic.kicad_sym": "a05e5ae66b54b64d06d5f0339fb0c348ab130fc69ea00a688e82de8fe025867f",
+    "lib/kicadai_resolved_Device.kicad_sym": "211b8788ab94a07717fe0cf7a6670b9a7e067d74fcf7f4f2c29d9bb12ed0f105",
+    "lib/kicadai_resolved_Transistor_BJT.kicad_sym": "ce0e8f89bf473c39260ba3abe73c585ef11bd199a908add3104adacfd19746c3",
+    "lib/kicadai_resolved_power.kicad_sym": "2efebaf4a409267b87830c413c884b642c1f662eb5e66202cdf26c09c7bf0beb",
+    "protected_programmable_current_output.kicad_pcb": "8e5d0a968b19a85e4b66f64affb29105f4a8e6e8b9258f4aad77bfef3d10662e",
+    "protected_programmable_current_output.kicad_pro": "9f569492a8a598b58263946e89cbaa1401d4f047180719ca29ccd9396f9a5d7f",
+    "protected_programmable_current_output.kicad_sch": "122a7f661bf5e31139f38e495540b573474f32f63cb8774c3eb716a3e2adc881",
+    "sym-lib-table": "932ec055db5468f04eccfd1e834c4ff6e9b83abd11f322e3b6fe5cf058a1fbed"
+  },
+  "provenance": {
+    "transaction_path": ".kicadai/transaction.json",
+    "schema": "kicadai.transaction.provenance.v1",
+    "operation_count": 126,
+    "hash": "c4ae152f193245c6a2b8802eb33b20d1557ce44556e932719d0b8aa18eed1384"
+  }
+}

@@ -1,0 +1,83 @@
+{
+  "schema": "kicadai.public-demo-receipt.v1",
+  "version": 1,
+  "demo": "protected_programmable_current_output",
+  "result": "passed",
+  "input": {
+    "requirement_hash": "d071ce2d8be3c27692c2b96339f68dbc4d13d57e4b489815e50379862f0e3185",
+    "primitive_inventory_hash": "cd5881d959c3dd1427b8c51fbf5a54e3553632a8085e2ff752b01dba50392b1a",
+    "model_registry_hash": "9a3830b3f048a23a1ae39db80319f0c00df92f5eab3149ffbcfef82e8f45496a",
+    "catalog_hash": "15aba02bed3b437a7694c7565300a3ec9266abbc6f5989026d608663579d8c39",
+    "policy_hash": "33356250b7031bbac339e9f22a9b1268ee69c89af3808cdd40ee8867e981f96a"
+  },
+  "search": {
+    "expanded_states": 2,
+    "generated_graphs": 43,
+    "complete_graphs": 2,
+    "candidate_simulations": 194,
+    "corner_evaluations": 6326,
+    "value_trials": 2,
+    "topology_repairs": 0,
+    "budget_exhausted": false
+  },
+  "architecture_selection": {
+    "selected_topology_hash": "f1d8e2d71aee8c2d6de3795109c1956750af1958cb9dd9cc2b2514734e1fac71",
+    "selected_physical_hash": "dececa71ca286924aa05cf08c4e1a6910e89f1d662cb4a67aaf68ac50ec1cf21",
+    "ranking_policy": "worst_normalized_requirement_margin_desc,topology_repairs_asc,component_count_asc,internal_nodes_asc,active_structure_hash_asc,topology_hash_asc,evaluation_hash_asc,value_hash_asc",
+    "alternatives": [
+      {
+        "rank": 1,
+        "selected": true,
+        "topology_hash": "f1d8e2d71aee8c2d6de3795109c1956750af1958cb9dd9cc2b2514734e1fac71",
+        "worst_normalized_margin": 0.043847511975837826,
+        "component_count": 12,
+        "internal_nodes": 8,
+        "reason": "highest deterministic rank among simulation-passing, physically ready architectures"
+      },
+      {
+        "rank": 2,
+        "selected": false,
+        "topology_hash": "f1af27b6c9a7b38ee1df5221474835bf7c9dd45d654b924471b4fca4c6b54847",
+        "worst_normalized_margin": 0.03993190079943404,
+        "component_count": 14,
+        "internal_nodes": 9,
+        "reason": "lower worst normalized requirement margin"
+      }
+    ]
+  },
+  "selected_parts": [
+    {"quantity": 2, "part": "Vishay AC03 0.22 ohm axial resistor", "value_si": 0.22},
+    {"quantity": 2, "part": "onsemi D45H11G TO-220 PNP BJT"},
+    {"quantity": 1, "part": "Vishay CPF3 10 ohm axial resistor", "value_si": 10},
+    {"quantity": 4, "part": "Vishay TNPW0805 10 kilohm resistor", "value_si": 10000},
+    {"quantity": 1, "part": "Vishay CRCW0805 47 ohm resistor", "value_si": 47},
+    {"quantity": 1, "part": "TI LM358 SOIC-8 op amp"},
+    {"quantity": 1, "part": "TI OPA992 SOT-23-5 op amp"}
+  ],
+  "physical_verification": {
+    "route_completion": {"status": "passed", "routed_nets": 12, "failed_nets": 0},
+    "connectivity": {"status": "passed", "unconnected_endpoints": 0},
+    "writer_correctness": {"status": "passed", "checks": 10, "failures": 0, "warnings": 0},
+    "erc": {"status": "passed", "violations": 0, "kicad_version": "10.0.3"},
+    "strict_drc": {"status": "passed", "violations": 0, "unconnected_items": 0, "kicad_version": "10.0.3"},
+    "round_trip": {"status": "passed", "normalized_diffs": 0},
+    "deterministic_replay": {
+      "status": "passed",
+      "run_count": 2,
+      "project_hashes": [
+        "3f195f2576d0abda73ba01752d444ae464e89ab94332d767dba5e0716324fcb5",
+        "3f195f2576d0abda73ba01752d444ae464e89ab94332d767dba5e0716324fcb5"
+      ]
+    }
+  },
+  "evidence": {
+    "synthesis_hash": "6b2134b07d09c24ee5c98a144e999602db8dc5f66febc1d797ebaecc0bac0f4e",
+    "promotion_hash": "4dcba0d24d9de13fdebc137221906bcfa1e58471043c3416b28de4a9017ede5b",
+    "project_hash": "3f195f2576d0abda73ba01752d444ae464e89ab94332d767dba5e0716324fcb5"
+  },
+  "claim_boundary": {
+    "achieved": "erc-drc checked deterministic candidate",
+    "fabrication_release": false,
+    "note": "This evidence does not replace human electrical, thermal, mechanical, compliance, or manufacturing review."
+  }
+}
