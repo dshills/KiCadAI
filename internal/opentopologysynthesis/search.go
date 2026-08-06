@@ -4645,62 +4645,80 @@ func topologyControlledSwitchRelationshipSeeds(
 									)
 								}
 							}
-							state = addRelationshipPrimitive(
-								state,
-								requirement,
-								inventoryByKey,
-								flyback,
-								[]TerminalConnection{
-									{Terminal: "ANODE", Node: output},
-									{Terminal: "CATHODE", Node: loadSupply},
-								},
-								&consumption,
-							)
-							if len(state.graph.Instances) > limits.MaxPrimitiveInstances ||
-								consumption.GeneratedGraphs > policy.MaxGeneratedGraphs {
-								continue
+							type loadRailState struct {
+								state topologySearchState
+								rail  string
 							}
-							if issues := ValidateCompleteGraph(state.graph, inventory, limits); len(issues) != 0 {
-								for _, issue := range issues {
-									rejections[string(issue.Code)] = append(
-										rejections[string(issue.Code)],
-										issue.Path+":"+issue.Message,
+							railStates := []loadRailState{{state: state, rail: loadSupply}}
+							if regulated, found := topologyRegulatedLoadRail(
+								requirement, state.graph, output, loadSupply, inventory,
+							); found {
+								adapted, converterRail := addRelationshipInternalNode(
+									state, requirement, inventoryByKey, &consumption,
+								)
+								adapted, ballastMiddle := addRelationshipInternalNode(
+									adapted, requirement, inventoryByKey, &consumption,
+								)
+								adapted, regulatedRail := addRelationshipInternalNode(
+									adapted, requirement, inventoryByKey, &consumption,
+								)
+								if converterRail != "" && ballastMiddle != "" && regulatedRail != "" &&
+									internalNodeCount(adapted.graph) <= limits.MaxInternalNodes {
+									adapted = addRelationshipPrimitive(
+										adapted,
+										requirement,
+										inventoryByKey,
+										regulated.converter,
+										[]TerminalConnection{
+											{Terminal: "VIN_PLUS", Node: loadSupply},
+											{Terminal: "VIN_MINUS", Node: reference},
+											{Terminal: "VOUT_PLUS", Node: converterRail},
+											{Terminal: "VOUT_MINUS", Node: reference},
+										},
+										&consumption,
 									)
+									adapted = addRelationshipPrimitiveAtValue(
+										adapted,
+										requirement,
+										inventoryByKey,
+										regulated.ballast[0],
+										regulated.ballastValueSI[0],
+										topologyTwoTerminalPlacement(converterRail, ballastMiddle),
+										&consumption,
+									)
+									adapted = addRelationshipPrimitiveAtValue(
+										adapted,
+										requirement,
+										inventoryByKey,
+										regulated.ballast[1],
+										regulated.ballastValueSI[1],
+										topologyTwoTerminalPlacement(ballastMiddle, regulatedRail),
+										&consumption,
+									)
+									railStates = append(railStates, loadRailState{state: adapted, rail: regulatedRail})
 								}
-								continue
 							}
-							if state.score.BehaviorGap != 0 {
-								rejections["relationship_gap"] = append(
-									rejections["relationship_gap"],
-									fmt.Sprintf("%s:gap=%d", state.hash, state.score.BehaviorGap),
+							for _, railState := range railStates {
+								candidateState := addRelationshipPrimitive(
+									railState.state,
+									requirement,
+									inventoryByKey,
+									flyback,
+									[]TerminalConnection{
+										{Terminal: "ANODE", Node: output},
+										{Terminal: "CATHODE", Node: railState.rail},
+									},
+									&consumption,
 								)
-								continue
-							}
-							normalized, err := NormalizeGraph(state.graph)
-							if err != nil {
-								rejections["canonical_normalization_failed"] = append(
-									rejections["canonical_normalization_failed"], err.Error(),
+								retainControlledSwitchRelationshipCandidate(
+									candidateState,
+									inventory,
+									limits,
+									policy,
+									&consumption,
+									retained,
+									rejections,
 								)
-								continue
-							}
-							topologyHash, err := TopologyHash(normalized)
-							if err != nil {
-								rejections["canonical_topology_hash_failed"] = append(
-									rejections["canonical_topology_hash_failed"], err.Error(),
-								)
-								continue
-							}
-							consumption.CompleteGraphs++
-							candidate := TopologyCandidate{
-								Fingerprint:  state.hash,
-								TopologyHash: topologyHash,
-								Score:        state.score,
-								Graph:        normalized,
-								Operations:   cloneGraphOperations(state.operations),
-							}
-							if existing, found := retained[topologyHash]; !found ||
-								compareTopologyCandidates(candidate, existing) < 0 {
-								retained[topologyHash] = candidate
 							}
 						}
 					}
@@ -4718,6 +4736,63 @@ func topologyControlledSwitchRelationshipSeeds(
 	}
 	slices.SortFunc(result, compareTopologyCandidates)
 	return result, consumption, rejections
+}
+
+func retainControlledSwitchRelationshipCandidate(
+	state topologySearchState,
+	inventory PrimitiveInventory,
+	limits GraphLimits,
+	policy Policy,
+	consumption *Consumption,
+	retained map[string]TopologyCandidate,
+	rejections map[string][]string,
+) {
+	if len(state.graph.Instances) > limits.MaxPrimitiveInstances ||
+		consumption.GeneratedGraphs > policy.MaxGeneratedGraphs {
+		return
+	}
+	if issues := ValidateCompleteGraph(state.graph, inventory, limits); len(issues) != 0 {
+		for _, issue := range issues {
+			rejections[string(issue.Code)] = append(
+				rejections[string(issue.Code)],
+				issue.Path+":"+issue.Message,
+			)
+		}
+		return
+	}
+	if state.score.BehaviorGap != 0 {
+		rejections["relationship_gap"] = append(
+			rejections["relationship_gap"],
+			fmt.Sprintf("%s:gap=%d", state.hash, state.score.BehaviorGap),
+		)
+		return
+	}
+	normalized, err := NormalizeGraph(state.graph)
+	if err != nil {
+		rejections["canonical_normalization_failed"] = append(
+			rejections["canonical_normalization_failed"], err.Error(),
+		)
+		return
+	}
+	topologyHash, err := TopologyHash(normalized)
+	if err != nil {
+		rejections["canonical_topology_hash_failed"] = append(
+			rejections["canonical_topology_hash_failed"], err.Error(),
+		)
+		return
+	}
+	consumption.CompleteGraphs++
+	candidate := TopologyCandidate{
+		Fingerprint:  state.hash,
+		TopologyHash: topologyHash,
+		Score:        state.score,
+		Graph:        normalized,
+		Operations:   cloneGraphOperations(state.operations),
+	}
+	if existing, found := retained[topologyHash]; !found ||
+		compareTopologyCandidates(candidate, existing) < 0 {
+		retained[topologyHash] = candidate
+	}
 }
 
 func topologyControlledSwitchLoadSupply(
@@ -6921,6 +6996,7 @@ func topologyBehaviorGap(
 	if decisionCount < minimumDecisionStages {
 		gap += minimumDecisionStages - decisionCount
 	}
+	gap += topologySwitchedLoadEnvelopeGap(requirement, graph, inventory)
 	return gap
 }
 

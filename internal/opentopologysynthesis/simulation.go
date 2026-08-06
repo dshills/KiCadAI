@@ -1674,7 +1674,7 @@ func simulationMeasurementScope(
 			return "", nil, &SimulationDiagnostic{Code: diagnosisModelUnavailable, Path: "simulation.assertion.components", Message: "supply-current measurement requires an external supply source"}
 		}
 		return "", []string{component}, nil
-	case simmodel.QuantityPeakAbsDeviceCurrentA:
+	case simmodel.QuantityPeakAbsDeviceCurrentA, simmodel.QuantityFinalAbsDeviceCurrentA:
 		if assertion.Observation.Kind == "port" {
 			if assertion.Metric == "peak_current" || assertion.Metric == "off_state_current" {
 				if component, found := protectedVoltageOutputCurrentComponent(
@@ -1929,6 +1929,9 @@ func loadHarnessNodes(
 		terminals := topologyTerminalNodes(instance)
 		if terminals["DRAIN"] != target.ID || terminals["SOURCE"] != reference {
 			continue
+		}
+		if rail, found := topologySwitchedLoadRail(graph, target.ID, reference); found {
+			return rail, target.ID
 		}
 		if supply, found := dominantSupplyNode(requirement, graph); found {
 			return supply.ID, target.ID

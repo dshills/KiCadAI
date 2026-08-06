@@ -111,6 +111,84 @@ func TestPhysicalPackageCompletionTerminatesUnusedFunctionalUnits(t *testing.T) 
 	}
 }
 
+func TestPhysicalParallelRequiredFunctionsBindsVerifiedAuxiliaryPowerPin(t *testing.T) {
+	primitive := PrimitiveCandidate{
+		CatalogID: "test.parallel_power_pin",
+		Terminals: []PrimitiveTerminal{
+			{Terminal: "input_return", Function: "VIN_MINUS", Electrical: "power_in"},
+			{Terminal: "signal", Function: "SENSE", Electrical: "input"},
+		},
+	}
+	catalog := &components.Catalog{Records: []components.ComponentRecord{{
+		ID: primitive.CatalogID,
+		Symbols: []components.SymbolBinding{{
+			UnitID: "A",
+			FunctionPins: []components.FunctionPin{
+				{Function: "VIN_MINUS", Electrical: "power_in", Required: true},
+				{Function: "VIN_MINUS_AUX", Electrical: "power_in", Required: true},
+				{Function: "SENSE_AUX", Electrical: "input", Required: true},
+			},
+		}},
+	}}}
+
+	bindings := physicalParallelRequiredFunctions(primitive, catalog)
+	want := map[string][]circuitgraph.Endpoint{
+		"input_return": {{
+			Unit: "A", SelectorKind: circuitgraph.SelectorFunction, Selector: "VIN_MINUS_AUX",
+		}},
+	}
+	if !bytes.Equal(mustJSON(t, bindings), mustJSON(t, want)) {
+		t.Fatalf("parallel required-function bindings = %#v, want %#v", bindings, want)
+	}
+}
+
+func TestPhysicalParallelRequiredFunctionsFailsClosedOnAmbiguousBase(t *testing.T) {
+	primitive := PrimitiveCandidate{
+		CatalogID: "test.ambiguous_parallel_power_pin",
+		Terminals: []PrimitiveTerminal{
+			{Terminal: "input_return_a", Function: "VIN_MINUS", Electrical: "power_in"},
+			{Terminal: "input_return_b", Function: "VIN_MINUS", Electrical: "power_in"},
+		},
+	}
+	catalog := &components.Catalog{Records: []components.ComponentRecord{{
+		ID: primitive.CatalogID,
+		Symbols: []components.SymbolBinding{{
+			UnitID: "A",
+			FunctionPins: []components.FunctionPin{{
+				Function: "VIN_MINUS_AUX", Electrical: "power_in", Required: true,
+			}},
+		}},
+	}}}
+
+	if bindings := physicalParallelRequiredFunctions(primitive, catalog); len(bindings) != 0 {
+		t.Fatalf("ambiguous auxiliary power pin was guessed: %#v", bindings)
+	}
+}
+
+func TestPhysicalNodeRecognizesInternalPowerOutput(t *testing.T) {
+	graph := CandidateGraph{Instances: []GraphInstance{{
+		ID:        "converter",
+		Terminals: []TerminalConnection{{Terminal: "output_return", Node: "ground"}},
+	}}}
+	primitives := map[string]PrimitiveCandidate{
+		"converter": {Terminals: []PrimitiveTerminal{{
+			Terminal: "output_return", Electrical: "power_out",
+		}}},
+	}
+	if !physicalNodeHasInternalPowerOutput("ground", graph, primitives) {
+		t.Fatal("internal power-output terminal was not recognized")
+	}
+	if physicalNodeHasInternalPowerOutput("unrelated", graph, primitives) {
+		t.Fatal("unconnected node was recognized as internally driven")
+	}
+	primitives["converter"] = PrimitiveCandidate{Terminals: []PrimitiveTerminal{{
+		Terminal: "output_return", Electrical: "power_in",
+	}}}
+	if physicalNodeHasInternalPowerOutput("ground", graph, primitives) {
+		t.Fatal("power-input terminal was recognized as internally driven")
+	}
+}
+
 func TestAppendPhysicalNetEndpointIsIdempotent(t *testing.T) {
 	endpoint := circuitgraph.Endpoint{
 		Component: "controller", Unit: "A",

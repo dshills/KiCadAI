@@ -229,11 +229,11 @@ func TestRouteKeepsLocalTreeVisibleWhenBoundaryUsesLabels(t *testing.T) {
 		Rules: Rules{Profile: ProfileStandard, LabelFallbackEnabled: true},
 		Nets: []Net{{
 			Name: "LOAD_CURRENT", Role: "output_signal", EndpointLabels: true,
-			Endpoints: []Endpoint{{Ref: "R1", Pin: "1"}, {Ref: "R2", Pin: "1"}, {Ref: "J1", Pin: "1"}},
+			Endpoints: []Endpoint{{Ref: "Q1", Pin: "1"}, {Ref: "D1", Pin: "1"}, {Ref: "J1", Pin: "1"}},
 		}},
 	}, Result{Components: []PlacedComponent{
-		{Component: Component{Ref: "R1", Role: "resistor", Pins: []Pin{{Number: "1"}}}, PlacedAt: kicadfiles.Point{X: kicadfiles.MM(40), Y: kicadfiles.MM(40)}},
-		{Component: Component{Ref: "R2", Role: "resistor", Pins: []Pin{{Number: "1"}}}, PlacedAt: kicadfiles.Point{X: kicadfiles.MM(60), Y: kicadfiles.MM(40)}},
+		{Component: Component{Ref: "Q1", Role: "mosfet", Pins: []Pin{{Number: "1"}}}, PlacedAt: kicadfiles.Point{X: kicadfiles.MM(40), Y: kicadfiles.MM(40)}},
+		{Component: Component{Ref: "D1", Role: "diode", Pins: []Pin{{Number: "1"}}}, PlacedAt: kicadfiles.Point{X: kicadfiles.MM(60), Y: kicadfiles.MM(40)}},
 		{Component: Component{Ref: "J1", Role: "output_connector", Stage: StageBoundaryOutput, Pins: []Pin{{Number: "1"}}}, PlacedAt: kicadfiles.Point{X: kicadfiles.MM(90), Y: kicadfiles.MM(40)}},
 	}})
 	if len(result.Connections) != 2 {

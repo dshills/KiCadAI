@@ -152,6 +152,7 @@ func lowerCandidateDocument(
 	bindings := []PhysicalSemanticBinding{}
 	issues := []reports.Issue{}
 	instancePrimitives := map[string]PrimitiveCandidate{}
+	parallelRequiredFunctions := map[string]map[string][]circuitgraph.Endpoint{}
 	for _, instance := range graph.Instances {
 		primitive, found := primitiveByKey(inventory, instance.PrimitiveKey)
 		if !found {
@@ -184,7 +185,14 @@ func lowerCandidateDocument(
 		for _, terminal := range primitive.Terminals {
 			component.RequiredFunctions = append(component.RequiredFunctions, terminal.Function)
 		}
+		parallelRequiredFunctions[instance.ID] = physicalParallelRequiredFunctions(primitive, catalog)
+		for _, endpoints := range parallelRequiredFunctions[instance.ID] {
+			for _, endpoint := range endpoints {
+				component.RequiredFunctions = append(component.RequiredFunctions, endpoint.Selector)
+			}
+		}
 		slices.Sort(component.RequiredFunctions)
+		component.RequiredFunctions = slices.Compact(component.RequiredFunctions)
 		document.Components = append(document.Components, component)
 		bindings = append(bindings, PhysicalSemanticBinding{
 			Kind: "primitive", SemanticID: instance.ID, Component: instance.ID,
@@ -258,6 +266,10 @@ func lowerCandidateDocument(
 					Component: instance.ID, Unit: terminal.UnitID,
 					SelectorKind: circuitgraph.SelectorFunction, Selector: terminal.Function,
 				})
+				for _, endpoint := range parallelRequiredFunctions[instance.ID][connection.Terminal] {
+					endpoint.Component = instance.ID
+					net.Endpoints = append(net.Endpoints, endpoint)
+				}
 			}
 		}
 		if node.Scope == "external" && node.Role != "reference" {
@@ -277,7 +289,9 @@ func lowerCandidateDocument(
 			}
 		}
 		document.Nets = append(document.Nets, net)
-		if physicalNodeRequiresPowerFlag(requirement, node) && !flaggedNets[net.Name] {
+		if physicalNodeRequiresPowerFlag(requirement, node) &&
+			!physicalNodeHasInternalPowerOutput(node.ID, graph, instancePrimitives) &&
+			!flaggedNets[net.Name] {
 			document.PowerFlags = append(document.PowerFlags, circuitgraph.PowerFlag{Net: net.Name})
 			flaggedNets[net.Name] = true
 		}
@@ -298,6 +312,93 @@ func lowerCandidateDocument(
 	document.PCB = physicalPCBIntent(document.Project.Board, document.Components)
 	applyPhysicalSupportPCBIntent(&document.PCB, supportGroups)
 	return document, bindings, reports.SortedIssues(issues)
+}
+
+func physicalNodeHasInternalPowerOutput(
+	nodeID string,
+	graph CandidateGraph,
+	primitives map[string]PrimitiveCandidate,
+) bool {
+	for _, instance := range graph.Instances {
+		primitive, found := primitives[instance.ID]
+		if !found {
+			continue
+		}
+		for _, connection := range instance.Terminals {
+			if connection.Node != nodeID {
+				continue
+			}
+			terminal, found := primitiveTerminalByName(primitive, connection.Terminal)
+			if found && strings.EqualFold(strings.TrimSpace(terminal.Electrical), "power_out") {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// physicalParallelRequiredFunctions binds verified auxiliary power pins to
+// the same net as their modeled base function. A strict _AUX suffix plus an
+// identical electrical class is required; unrelated unmodeled required pins
+// remain unbound and therefore fail closed during graph resolution.
+func physicalParallelRequiredFunctions(
+	primitive PrimitiveCandidate,
+	catalog *components.Catalog,
+) map[string][]circuitgraph.Endpoint {
+	result := map[string][]circuitgraph.Endpoint{}
+	if catalog == nil {
+		return result
+	}
+	record, found := components.LookupRecord(catalog, primitive.CatalogID)
+	if !found {
+		return result
+	}
+	modeledFunctions := map[string]bool{}
+	for _, terminal := range primitive.Terminals {
+		modeledFunctions[strings.ToUpper(strings.TrimSpace(terminal.Function))] = true
+	}
+	for _, symbol := range record.Symbols {
+		unitID := strings.TrimSpace(symbol.UnitID)
+		if unitID == "" && symbol.Unit != 0 {
+			unitID = strconv.Itoa(symbol.Unit)
+		}
+		for _, pin := range symbol.FunctionPins {
+			function := strings.ToUpper(strings.TrimSpace(pin.Function))
+			if !pin.Required || modeledFunctions[function] ||
+				!strings.HasSuffix(function, "_AUX") {
+				continue
+			}
+			base := strings.TrimSuffix(function, "_AUX")
+			if base == "" {
+				continue
+			}
+			matches := []PrimitiveTerminal{}
+			for _, terminal := range primitive.Terminals {
+				if strings.ToUpper(strings.TrimSpace(terminal.Function)) == base &&
+					strings.EqualFold(strings.TrimSpace(terminal.Electrical), strings.TrimSpace(pin.Electrical)) &&
+					(strings.EqualFold(strings.TrimSpace(pin.Electrical), "power_in") ||
+						strings.EqualFold(strings.TrimSpace(pin.Electrical), "power_out")) {
+					matches = append(matches, terminal)
+				}
+			}
+			if len(matches) != 1 {
+				continue
+			}
+			result[matches[0].Terminal] = append(
+				result[matches[0].Terminal],
+				circuitgraph.Endpoint{
+					Unit: unitID, SelectorKind: circuitgraph.SelectorFunction,
+					Selector: pin.Function,
+				},
+			)
+		}
+	}
+	for terminal := range result {
+		slices.SortFunc(result[terminal], func(left, right circuitgraph.Endpoint) int {
+			return cmp.Or(cmp.Compare(left.Unit, right.Unit), cmp.Compare(left.Selector, right.Selector))
+		})
+	}
+	return result
 }
 
 func physicalNodeRequiresPowerFlag(requirement Requirement, node GraphNode) bool {

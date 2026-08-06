@@ -940,6 +940,12 @@ func deriveTopologyAnalyticScales(
 	); len(scales) != 0 {
 		return scales
 	}
+	if scales := deriveRegulatedLoadRailTopologyScales(
+		graph,
+		instance,
+	); len(scales) != 0 {
+		return scales
+	}
 	if scales := deriveControlledSwitchTopologyScales(
 		requirement,
 		graph,

@@ -302,6 +302,7 @@ func allowedPrimitiveDescriptors() map[string]simmodel.PrimitiveDescriptor {
 		simmodel.PrimitiveAdjustableLinearRegulatorV1:   true,
 		simmodel.PrimitiveFixedLinearRegulatorV1:        true,
 		simmodel.PrimitiveSynchronousBuckRegulatorV1:    true,
+		simmodel.PrimitiveProtectedIsolatedConverterV1:  true,
 		simmodel.PrimitiveFloatingAdjustableRegulatorV1: true,
 		simmodel.PrimitiveShuntVoltageReferenceV1:       true,
 		simmodel.PrimitiveBidirectionalTVSV1:            true,
@@ -660,6 +661,8 @@ func openTopologyPrimitiveKind(modelID string) string {
 		return "fixed_step_down_module"
 	case simmodel.PrimitiveSynchronousBuckRegulatorV1:
 		return "synchronous_buck_regulator"
+	case simmodel.PrimitiveProtectedIsolatedConverterV1:
+		return "isolated_converter"
 	case simmodel.PrimitiveAdjustableLinearRegulatorV1,
 		simmodel.PrimitiveFloatingAdjustableRegulatorV1:
 		return "adjustable_voltage_regulator"

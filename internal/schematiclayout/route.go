@@ -114,7 +114,7 @@ func routeLocalTreeWithBoundaryLabels(
 	}
 	local := make([]routableEndpoint, 0, len(endpoints))
 	boundary := make([]routableEndpoint, 0, len(endpoints))
-	localPassive := true
+	localTreeEligible := true
 	for _, endpoint := range endpoints {
 		component := components[endpoint.endpoint.Ref]
 		if component.Stage == StageBoundaryInput || component.Stage == StageBoundaryOutput ||
@@ -122,10 +122,14 @@ func routeLocalTreeWithBoundaryLabels(
 			boundary = append(boundary, endpoint)
 		} else {
 			local = append(local, endpoint)
-			localPassive = localPassive && containsNormalizedRole(component.Role, "resistor", "capacitor", "inductor", "diode", "fuse", "protection", "current_limiter")
+			localTreeEligible = localTreeEligible && containsNormalizedRole(
+				component.Role,
+				"resistor", "capacitor", "inductor", "diode", "fuse", "protection", "current_limiter",
+				"mosfet", "bjt", "transistor", "switch",
+			)
 		}
 	}
-	if len(local) < 2 || len(boundary) == 0 || !localPassive {
+	if len(local) < 2 || len(boundary) == 0 || !localTreeEligible {
 		return false
 	}
 	root := local[0]

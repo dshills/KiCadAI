@@ -117,16 +117,14 @@ func TestControlledSwitchRelationshipDerivesProtectedDecisionOperatingEnvelope(t
 		evaluation := EvaluateCandidate(
 			context.Background(), requirement, graph, nil, inventory, environment, policy,
 		)
-		activeCurrentFailure := false
 		onlyCurrentFailures := true
 		for _, diagnosis := range evaluation.Diagnoses {
 			if diagnosis.RequirementID == "active_current" {
-				activeCurrentFailure = true
 				continue
 			}
 			onlyCurrentFailures = false
 		}
-		if !activeCurrentFailure || !onlyCurrentFailures {
+		if !onlyCurrentFailures {
 			continue
 		}
 		passed := map[string]bool{}
@@ -147,7 +145,55 @@ func TestControlledSwitchRelationshipDerivesProtectedDecisionOperatingEnvelope(t
 		}
 	}
 	t.Fatalf(
-		"no composed candidate isolated the remaining gap to active-current regulation: candidates=%d consumption=%#v rejections=%#v",
+		"no composed candidate passed the protected decision operating envelope: candidates=%d consumption=%#v rejections=%#v",
+		len(search.Candidates), search.Consumption, search.Rejections,
+	)
+}
+
+func TestControlledSwitchRelationshipComposesRegulatedLoadRail(t *testing.T) {
+	var requirement Requirement
+	decodeFrozenStrict(
+		t,
+		mustRead(t, filepath.Join(multiStageOODCorpusRoot(), "ambient_tracking_airflow_control.json")),
+		&requirement,
+	)
+	inventory, environment := testHeldOutSynthesisEnvironment(t)
+	policy := DefaultPolicy()
+	search := SearchPrimitiveTopologies(context.Background(), requirement, inventory, policy)
+	for _, candidate := range search.Candidates {
+		converterCount, ballastCount := 0, 0
+		for _, instance := range candidate.Graph.Instances {
+			if instance.Kind == "isolated_converter" {
+				converterCount++
+			}
+			if instance.Kind == "resistor" && instance.ValueSI != nil && *instance.ValueSI < 10 {
+				ballastCount++
+			}
+		}
+		if converterCount != 1 || ballastCount != 2 {
+			continue
+		}
+		plan := BuildValueSearchPlan(requirement, candidate.Graph, inventory, policy)
+		if plan.Status != ValuePlanReady {
+			continue
+		}
+		enumeration := EnumerateValueTrials(plan, 1)
+		if len(enumeration.Trials) == 0 {
+			continue
+		}
+		graph, err := ApplyValueTrial(candidate.Graph, enumeration.Trials[0], inventory)
+		if err != nil {
+			t.Fatal(err)
+		}
+		evaluation := EvaluateCandidate(
+			context.Background(), requirement, graph, nil, inventory, environment, policy,
+		)
+		if evaluation.Status == SimulationEvaluationPassed {
+			return
+		}
+	}
+	t.Fatalf(
+		"no regulated-load-rail candidate passed every electrical and safety assertion: candidates=%d consumption=%#v rejections=%#v",
 		len(search.Candidates), search.Consumption, search.Rejections,
 	)
 }
