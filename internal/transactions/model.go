@@ -165,6 +165,7 @@ type PinSpec struct {
 	XMM            float64 `json:"x_mm,omitempty"`
 	YMM            float64 `json:"y_mm,omitempty"`
 	ExplicitOffset bool    `json:"explicit_offset,omitempty"`
+	ElectricalType string  `json:"electrical_type,omitempty"`
 }
 
 type PadSpec struct {

@@ -115,6 +115,33 @@ func TestEnsureEmbeddedSymbolFromRawQualifiesLibraryID(t *testing.T) {
 	}
 }
 
+func TestEnsureEmbeddedSymbolFromRawAppliesElectricalPinContract(t *testing.T) {
+	var file SchematicFile
+	raw := `(symbol "FloatingSource"
+		(symbol "FloatingSource_1_1"
+			(pin power_out line (at -5.08 0 0) (length 2.54) (name "RETURN") (number "1"))
+			(pin power_out line (at 5.08 0 180) (length 2.54) (name "OUTPUT") (number "2"))))`
+	if !EnsureEmbeddedSymbolFromRawWithPinElectricalTypes(&file, "Power:FloatingSource", raw, map[string]string{"1": "passive"}) {
+		t.Fatal("expected raw symbol with electrical contract to be embedded")
+	}
+	formatted, err := sexpr.Format(file.LibSymbols[0].Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	compact := strings.Join(strings.Fields(formatted), " ")
+	if !strings.Contains(compact, "(pin passive line") || strings.Count(compact, "(pin power_out line") != 1 {
+		t.Fatalf("electrical pin contract was not applied selectively:\n%s", formatted)
+	}
+}
+
+func TestEnsureEmbeddedSymbolFromRawRejectsMissingElectricalContractPin(t *testing.T) {
+	var file SchematicFile
+	raw := `(symbol "FloatingSource" (symbol "FloatingSource_1_1" (pin power_out line (at 0 0 0) (length 2.54) (name "OUT") (number "1"))))`
+	if EnsureEmbeddedSymbolFromRawWithPinElectricalTypes(&file, "Power:FloatingSource", raw, map[string]string{"2": "passive"}) {
+		t.Fatal("embedded symbol accepted an electrical contract for a missing pin")
+	}
+}
+
 func TestEnsureEmbeddedSymbolFromRawCanonicalizesMetadataAfterPrivateProperties(t *testing.T) {
 	var file SchematicFile
 	raw := `(symbol "Relay"

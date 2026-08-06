@@ -727,9 +727,30 @@ func TestResolveRejectsPowerFlagOnInternalPowerOutput(t *testing.T) {
 }
 
 func TestValidateResolvedPowerFlagsRejectsMissingResolvedNet(t *testing.T) {
-	issues := validateResolvedPowerFlags([]PowerFlag{{Net: "MISSING"}}, nil)
+	issues := validateResolvedPowerFlags([]PowerFlag{{Net: "MISSING"}}, nil, nil)
 	if !hasIssue(issues, string(CodePowerFlagInvalid), "power_flags[0].net") {
 		t.Fatalf("issues = %#v", issues)
+	}
+}
+
+func TestValidateResolvedPowerFlagsAllowsProjectedFloatingSourceReturn(t *testing.T) {
+	component := ResolvedComponent{
+		Instance: Component{ID: "converter"},
+		Functions: []ResolvedFunction{
+			{Function: "VOUT_MINUS", SymbolPin: "1", Electrical: "power_out", Unit: 1},
+			{Function: "VOUT_PLUS", SymbolPin: "2", Electrical: "power_out", Unit: 1},
+		},
+	}
+	net := ResolvedNet{
+		Intent: Net{Name: "RETURN", Role: NetRoleGround},
+		Endpoints: []ResolvedEndpoint{{
+			Intent:   Endpoint{Component: "converter", SelectorKind: SelectorFunction, Selector: "VOUT_MINUS"},
+			Function: "VOUT_MINUS",
+			Bindings: []ResolvedBinding{{SymbolPin: "1", Electrical: "power_out"}},
+		}},
+	}
+	if issues := validateResolvedPowerFlags([]PowerFlag{{Net: "RETURN"}}, []ResolvedNet{net}, []ResolvedComponent{component}); len(issues) != 0 {
+		t.Fatalf("floating-source return flag issues = %#v", issues)
 	}
 }
 

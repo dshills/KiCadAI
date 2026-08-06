@@ -601,7 +601,7 @@ func applyOperation(builder *designapi.Builder, op Operation, opts ApplyOptions)
 		payload.Pins = resolverPins
 		pins := make([]designapi.PinSpec, 0, len(payload.Pins))
 		for _, pin := range payload.Pins {
-			pins = append(pins, designapi.PinSpec{Number: pin.Number, Offset: point(pin.XMM, pin.YMM)})
+			pins = append(pins, designapi.PinSpec{Number: pin.Number, Offset: point(pin.XMM, pin.YMM), ElectricalType: pin.ElectricalType})
 		}
 		_, err = builder.AddSymbol(designapi.SymbolOptions{
 			Reference:                    payload.Ref,
@@ -960,6 +960,7 @@ func upsertImportedFootprint(board *pcb.PCBFile, generator kicadfiles.IDGenerato
 			NetName:  net,
 		})
 	}
+	pcb.ApplyFootprintLocalPlacementGeometry(&footprint)
 	board.Footprints = append(board.Footprints, footprint)
 }
 
@@ -1080,7 +1081,7 @@ func importedPadLayers(spec PadSpec, footprintLayer kicadfiles.BoardLayer) []kic
 	layers := make([]kicadfiles.BoardLayer, 0, len(spec.Layers))
 	for _, layer := range spec.Layers {
 		if layer = strings.TrimSpace(layer); layer != "" {
-			layers = append(layers, boardLayer(layer))
+			layers = append(layers, kicadfiles.BoardLayerForPlacement(boardLayer(layer), footprintLayer))
 		}
 	}
 	if len(layers) == 0 {

@@ -13,8 +13,8 @@ type topologyRegulatedLoadRailPlan struct {
 	seriesCount    int
 	parallelCount  int
 	outputVoltageV float64
-	ballast        [2]PrimitiveCandidate
-	ballastValueSI [2]float64
+	ballast        []PrimitiveCandidate
+	ballastValueSI []float64
 }
 
 // topologyRegulatedLoadRail selects a reviewed regulated converter and a
@@ -68,8 +68,8 @@ func topologyRegulatedLoadRail(
 		primitive       PrimitiveCandidate
 		seriesCount     int
 		parallelCount   int
-		ballast         [2]PrimitiveCandidate
-		ballastValueSI  [2]float64
+		ballast         []PrimitiveCandidate
+		ballastValueSI  []float64
 		outputVoltageV  float64
 		currentHeadroom float64
 		ballastError    float64
@@ -141,7 +141,7 @@ func topologyRegulatedLoadRail(
 					continue
 				}
 				targetSeriesResistance := .5 * (math.Max(0, minimumSeriesResistance) + maximumSeriesResistance)
-				ballast, ballastValues, ballastFound := topologyRegulatedRailBallastPair(
+				ballast, ballastValues, ballastFound := topologyRegulatedRailBallastNetwork(
 					requirement,
 					inventory,
 					combinedVoltage,
@@ -153,7 +153,10 @@ func topologyRegulatedLoadRail(
 				if !ballastFound {
 					continue
 				}
-				seriesResistance := ballastValues[0] + ballastValues[1]
+				seriesResistance := 0.0
+				for _, value := range ballastValues {
+					seriesResistance += value
+				}
 				maximumLoadCurrent := combinedVoltage /
 					(loadMinimum + seriesResistance/parallel)
 				candidates = append(candidates, candidate{
@@ -170,18 +173,22 @@ func topologyRegulatedLoadRail(
 		return topologyRegulatedLoadRailPlan{}, false
 	}
 	slices.SortFunc(candidates, func(left, right candidate) int {
+		leftComponentCount := left.seriesCount*left.parallelCount + left.parallelCount*len(left.ballast)
+		rightComponentCount := right.seriesCount*right.parallelCount + right.parallelCount*len(right.ballast)
+		leftArea := float64(left.seriesCount*left.parallelCount) * left.primitive.AreaMM2
+		rightArea := float64(right.seriesCount*right.parallelCount) * right.primitive.AreaMM2
+		for _, primitive := range left.ballast {
+			leftArea += float64(left.parallelCount) * primitive.AreaMM2
+		}
+		for _, primitive := range right.ballast {
+			rightArea += float64(right.parallelCount) * primitive.AreaMM2
+		}
 		return cmp.Or(
 			cmp.Compare(left.outputVoltageV, right.outputVoltageV),
-			cmp.Compare(
-				left.seriesCount*left.parallelCount,
-				right.seriesCount*right.parallelCount,
-			),
+			cmp.Compare(leftComponentCount, rightComponentCount),
 			cmp.Compare(left.ballastError, right.ballastError),
 			cmp.Compare(left.currentHeadroom, right.currentHeadroom),
-			cmp.Compare(
-				left.primitive.AreaMM2+left.ballast[0].AreaMM2+left.ballast[1].AreaMM2,
-				right.primitive.AreaMM2+right.ballast[0].AreaMM2+right.ballast[1].AreaMM2,
-			),
+			cmp.Compare(leftArea, rightArea),
 			cmp.Compare(left.primitive.Key, right.primitive.Key),
 		)
 	})
@@ -272,7 +279,7 @@ func topologyConverterThermalOutputPower(
 	return maximumDissipation / conversionLossRatio, true
 }
 
-func topologyRegulatedRailBallastPair(
+func topologyRegulatedRailBallastNetwork(
 	requirement Requirement,
 	inventory PrimitiveInventory,
 	outputVoltage float64,
@@ -280,7 +287,7 @@ func topologyRegulatedRailBallastPair(
 	seriesMinimum float64,
 	seriesMaximum float64,
 	target float64,
-) ([2]PrimitiveCandidate, [2]float64, bool) {
+) ([]PrimitiveCandidate, []float64, bool) {
 	type resistor struct {
 		primitive PrimitiveCandidate
 		value     float64
@@ -301,13 +308,28 @@ func topologyRegulatedRailBallastPair(
 		}
 		resistors = append(resistors, resistor{primitive: primitive, value: minimum, powerW: power})
 	}
-	type pair struct {
-		resistors [2]resistor
+	type network struct {
+		resistors []resistor
 		error     float64
 		area      float64
 		key       string
 	}
-	pairs := []pair{}
+	networks := []network{}
+	for _, candidate := range resistors {
+		if candidate.value < seriesMinimum || candidate.value > seriesMaximum {
+			continue
+		}
+		current := outputVoltage / (loadMinimum + candidate.value)
+		if current*current*candidate.value > candidate.powerW {
+			continue
+		}
+		networks = append(networks, network{
+			resistors: []resistor{candidate},
+			error:     math.Abs(candidate.value-target) / target,
+			area:      candidate.primitive.AreaMM2,
+			key:       candidate.primitive.Key,
+		})
+	}
 	for leftIndex, left := range resistors {
 		for rightIndex := leftIndex; rightIndex < len(resistors); rightIndex++ {
 			right := resistors[rightIndex]
@@ -320,26 +342,33 @@ func topologyRegulatedRailBallastPair(
 				current*current*right.value > right.powerW {
 				continue
 			}
-			pairs = append(pairs, pair{
-				resistors: [2]resistor{left, right},
+			networks = append(networks, network{
+				resistors: []resistor{left, right},
 				error:     math.Abs(total-target) / target,
 				area:      left.primitive.AreaMM2 + right.primitive.AreaMM2,
 				key:       left.primitive.Key + "|" + right.primitive.Key,
 			})
 		}
 	}
-	if len(pairs) == 0 {
-		return [2]PrimitiveCandidate{}, [2]float64{}, false
+	if len(networks) == 0 {
+		return nil, nil, false
 	}
-	slices.SortFunc(pairs, func(left, right pair) int {
+	slices.SortFunc(networks, func(left, right network) int {
 		return cmp.Or(
+			cmp.Compare(len(left.resistors), len(right.resistors)),
 			cmp.Compare(left.error, right.error),
 			cmp.Compare(left.area, right.area),
 			cmp.Compare(left.key, right.key),
 		)
 	})
-	return [2]PrimitiveCandidate{pairs[0].resistors[0].primitive, pairs[0].resistors[1].primitive},
-		[2]float64{pairs[0].resistors[0].value, pairs[0].resistors[1].value}, true
+	selected := networks[0]
+	primitives := make([]PrimitiveCandidate, len(selected.resistors))
+	values := make([]float64, len(selected.resistors))
+	for index, resistor := range selected.resistors {
+		primitives[index] = resistor.primitive
+		values[index] = resistor.value
+	}
+	return primitives, values, true
 }
 
 func deriveRegulatedLoadRailTopologyScales(
@@ -364,6 +393,20 @@ func deriveRegulatedLoadRailTopologyScales(
 		}
 	}
 	left, right := instance.Terminals[0].Node, instance.Terminals[1].Node
+	directPath := converterOutputs[left] && loadRails[right] ||
+		converterOutputs[right] && loadRails[left]
+	if directPath {
+		return []AnalyticScale{{
+			ID:         "topology:regulated_load_rail:" + instance.ID,
+			Kind:       "resistance",
+			ValueSI:    *instance.ValueSI,
+			Unit:       "ohm",
+			Derivation: "catalog-rated series ballast derived from overlapping load-current, source-power, and converter thermal envelopes",
+			SourceKind: "candidate_topology",
+			SourceID:   instance.ID,
+			Priority:   1,
+		}}
+	}
 	for _, other := range graph.Instances {
 		if other.ID == instance.ID || other.Kind != "resistor" || len(other.Terminals) != 2 {
 			continue

@@ -7,6 +7,8 @@ import (
 	"slices"
 	"sort"
 	"strings"
+
+	"kicadai/internal/kicadfiles"
 )
 
 const (
@@ -508,7 +510,8 @@ func proximityPoint(component Component, placement PlacementResult, pins []strin
 	for _, pin := range pins {
 		pad, ok := padsByName[strings.ToUpper(strings.TrimSpace(pin))]
 		if ok {
-			rotated := rotatePoint(Point{XMM: pad.XMM, YMM: pad.YMM}, placement.Position.RotationDeg)
+			localX, localY := kicadfiles.BoardLocalXYForPlacement(pad.XMM, pad.YMM, kicadfiles.BoardLayer(placement.Position.Layer))
+			rotated := rotatePoint(Point{XMM: localX, YMM: localY}, placement.Position.RotationDeg)
 			return Point{XMM: placement.Position.XMM + rotated.XMM, YMM: placement.Position.YMM + rotated.YMM}, "pad"
 		}
 	}

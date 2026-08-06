@@ -46,7 +46,7 @@ func TestPlacedPadEndpointResolverRotatesPadOffsets(t *testing.T) {
 	}
 }
 
-func TestPlacedPadEndpointResolverMirrorsBackLayerPadOffset(t *testing.T) {
+func TestPlacedPadEndpointResolverKeepsBackLayerPadOffset(t *testing.T) {
 	placed := endpointResolverPlacement(placement.Placement{XMM: 10, YMM: 20, Layer: "B.Cu"}, placement.PadSummary{Name: "1", Net: "SIG", XMM: 2, YMM: 0})
 	resolver := NewPlacedPadEndpointResolver(&placed, generatedNetTableFromNames("SIG"))
 
@@ -54,7 +54,7 @@ func TestPlacedPadEndpointResolverMirrorsBackLayerPadOffset(t *testing.T) {
 	if !ok {
 		t.Fatalf("endpoint not resolved; issues=%#v", resolver.Issues())
 	}
-	assertEndpointPoint(t, endpoint, 8, 20)
+	assertEndpointPoint(t, endpoint, 12, 20)
 	if endpoint.Layer != "B.Cu" {
 		t.Fatalf("endpoint layer = %q, want B.Cu", endpoint.Layer)
 	}

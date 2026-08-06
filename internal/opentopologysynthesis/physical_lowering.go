@@ -13,6 +13,7 @@ import (
 	"kicadai/internal/components"
 	"kicadai/internal/designworkflow"
 	"kicadai/internal/reports"
+	"kicadai/internal/schematicir"
 )
 
 type physicalConnectorSelection struct {
@@ -329,12 +330,24 @@ func physicalNodeHasInternalPowerOutput(
 				continue
 			}
 			terminal, found := primitiveTerminalByName(primitive, connection.Terminal)
-			if found && strings.EqualFold(strings.TrimSpace(terminal.Electrical), "power_out") {
+			if found && physicalTerminalIsProjectedPowerOutput(primitive, terminal) {
 				return true
 			}
 		}
 	}
 	return false
+}
+
+func physicalTerminalIsProjectedPowerOutput(primitive PrimitiveCandidate, terminal PrimitiveTerminal) bool {
+	functions := make([]circuitgraph.ERCFunctionProjection, 0, len(primitive.Terminals))
+	for _, peer := range primitive.Terminals {
+		functions = append(functions, circuitgraph.ERCFunctionProjection{
+			Function: peer.Function, Electrical: peer.Electrical, Unit: peer.UnitID,
+		})
+	}
+	return circuitgraph.ProjectedERCElectricalType(circuitgraph.ERCFunctionProjection{
+		Function: terminal.Function, Electrical: terminal.Electrical, Unit: terminal.UnitID,
+	}, functions) == schematicir.ElectricalTypePowerOutput
 }
 
 // physicalParallelRequiredFunctions binds verified auxiliary power pins to

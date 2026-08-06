@@ -968,6 +968,45 @@ func TestFootprintLibraryModuleOmitsInstanceGraphicUUIDs(t *testing.T) {
 	}
 }
 
+func TestFootprintLibraryModuleCanonicalizesBottomPlacementLayers(t *testing.T) {
+	top := minimalFootprint("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", "R1")
+	top.Layer = kicadfiles.LayerFCu
+	top.Properties = []FootprintProperty{{Name: "Reference", Value: "R1", Layer: kicadfiles.LayerFSilkS}}
+	top.Texts = []FootprintText{{Kind: "user", Text: "body", Layer: kicadfiles.LayerFFab}}
+	top.Graphics = []FootprintGraphic{{Layer: kicadfiles.LayerFCrtYd, Rect: &RectDrawing{Start: kicadfiles.Point{}, End: kicadfiles.Point{X: kicadfiles.MM(2), Y: kicadfiles.MM(1)}, Width: kicadfiles.MM(0.05)}}}
+	top.Pads[0].Layers = []kicadfiles.BoardLayer{kicadfiles.LayerFCu, kicadfiles.LayerFPaste, kicadfiles.LayerFMask}
+
+	bottom := top
+	bottom.Layer = kicadfiles.LayerBCu
+	bottom.Properties = append([]FootprintProperty(nil), top.Properties...)
+	bottom.Properties[0].Layer = kicadfiles.LayerBSilkS
+	bottom.Properties[0].Effects.Justify = []string{"mirror"}
+	bottom.Texts = append([]FootprintText(nil), top.Texts...)
+	bottom.Texts[0].Layer = kicadfiles.LayerBFab
+	bottom.Texts[0].Effects.Justify = []string{"mirror"}
+	bottom.Graphics = append([]FootprintGraphic(nil), top.Graphics...)
+	bottomGraphic := Drawing(bottom.Graphics[0])
+	bottomGraphic.Layer = kicadfiles.LayerBCrtYd
+	bottom.Graphics[0] = FootprintGraphic(bottomGraphic)
+	bottom.Pads = append([]Pad(nil), top.Pads...)
+	bottom.Pads[0].Layers = []kicadfiles.BoardLayer{kicadfiles.LayerBCu, kicadfiles.LayerBPaste, kicadfiles.LayerBMask}
+	ApplyFootprintLocalPlacementGeometry(&bottom)
+
+	var topModule, bottomModule strings.Builder
+	if err := WriteFootprintLibraryModule(&topModule, &top, "R_0805"); err != nil {
+		t.Fatal(err)
+	}
+	if err := WriteFootprintLibraryModule(&bottomModule, &bottom, "R_0805"); err != nil {
+		t.Fatal(err)
+	}
+	if topModule.String() != bottomModule.String() {
+		t.Fatalf("placement side changed generated library geometry:\ntop:\n%s\nbottom:\n%s", topModule.String(), bottomModule.String())
+	}
+	if strings.Contains(bottomModule.String(), `B.`) {
+		t.Fatalf("bottom instance layers leaked into canonical library module:\n%s", bottomModule.String())
+	}
+}
+
 func TestValidateRejectsPadNetNameMismatch(t *testing.T) {
 	board := minimalPCB()
 	board.Nets = []Net{{Code: 1, Name: "A"}}

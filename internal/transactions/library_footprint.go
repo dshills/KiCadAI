@@ -167,6 +167,7 @@ func importedFootprintFromRecord(generator kicadfiles.IDGenerator, payload Place
 		Models:             importedModels(record.Models),
 	}
 	footprint.Properties = append(footprint.Properties, importedFootprintProperties(generator, payload.Ref, record.CustomProperties, layer)...)
+	pcb.ApplyFootprintLocalPlacementGeometry(&footprint)
 	return footprint
 }
 
@@ -179,6 +180,7 @@ func footprintPropertiesFromRecord(properties []libraryresolver.FootprintPropert
 		result = append(result, pcb.FootprintProperty{
 			Name: property.Name, Value: property.Value, Position: property.Position,
 			Layer: kicadfiles.BoardLayerForPlacement(kicadfiles.BoardLayer(property.Layer), placementLayer), Hide: property.Hide,
+			Effects: pcb.TextEffects{Justify: kicadfiles.BoardTextJustifyForPlacement(nil, placementLayer)},
 		})
 	}
 	return result
@@ -193,9 +195,10 @@ func importedFootprintProperties(generator kicadfiles.IDGenerator, ref string, p
 }
 
 func importedDefaultFootprintProperties(generator kicadfiles.IDGenerator, ref string, value string, layer kicadfiles.BoardLayer, hideDefaultFootprintText bool) []pcb.FootprintProperty {
+	effects := pcb.TextEffects{Justify: kicadfiles.BoardTextJustifyForPlacement(nil, layer)}
 	return []pcb.FootprintProperty{
-		{Name: "Reference", Value: ref, Position: kicadfiles.DefaultFootprintPropertyPosition("Reference"), Layer: kicadfiles.BoardLayerForPlacement(kicadfiles.LayerFSilkS, layer), Hide: hideDefaultFootprintText, UUID: generator.New("imported.pcb.footprint.property", ref, "Reference")},
-		{Name: "Value", Value: value, Position: kicadfiles.DefaultFootprintPropertyPosition("Value"), Layer: kicadfiles.BoardLayerForPlacement(kicadfiles.LayerFSilkS, layer), Hide: hideDefaultFootprintText, UUID: generator.New("imported.pcb.footprint.property", ref, "Value")},
+		{Name: "Reference", Value: ref, Position: kicadfiles.DefaultFootprintPropertyPosition("Reference"), Layer: kicadfiles.BoardLayerForPlacement(kicadfiles.LayerFSilkS, layer), Hide: hideDefaultFootprintText, UUID: generator.New("imported.pcb.footprint.property", ref, "Reference"), Effects: effects},
+		{Name: "Value", Value: value, Position: kicadfiles.DefaultFootprintPropertyPosition("Value"), Layer: kicadfiles.BoardLayerForPlacement(kicadfiles.LayerFSilkS, layer), Hide: hideDefaultFootprintText, UUID: generator.New("imported.pcb.footprint.property", ref, "Value"), Effects: effects},
 	}
 }
 
@@ -268,7 +271,7 @@ func footprintTextsFromRecord(texts []libraryresolver.FootprintText, placementLa
 				FontSize:          text.FontSize,
 				FontThickness:     text.FontThickness,
 				OmitFontThickness: text.OmitFontThickness,
-				Justify:           append([]string(nil), text.Justify...),
+				Justify:           kicadfiles.BoardTextJustifyForPlacement(text.Justify, placementLayer),
 			},
 		})
 	}

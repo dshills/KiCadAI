@@ -698,6 +698,13 @@ func EnsureEmbeddedSymbol(file *SchematicFile, libraryID string) bool {
 // schematic. Library files store the top-level symbol under its unqualified
 // name; embedded schematic symbols use the fully qualified library ID.
 func EnsureEmbeddedSymbolFromRaw(file *SchematicFile, libraryID, raw string) bool {
+	return EnsureEmbeddedSymbolFromRawWithPinElectricalTypes(file, libraryID, raw, nil)
+}
+
+// EnsureEmbeddedSymbolFromRawWithPinElectricalTypes embeds a resolver symbol
+// and applies explicit, circuit-semantic pin types to the project-local copy.
+// The resolver geometry remains unchanged; only KiCad ERC typing is projected.
+func EnsureEmbeddedSymbolFromRawWithPinElectricalTypes(file *SchematicFile, libraryID, raw string, electricalTypes map[string]string) bool {
 	if file == nil || strings.TrimSpace(libraryID) == "" || strings.TrimSpace(raw) == "" {
 		return false
 	}
@@ -716,7 +723,133 @@ func EnsureEmbeddedSymbolFromRaw(file *SchematicFile, libraryID, raw string) boo
 	}
 	body[1] = sexpr.S(strings.TrimSpace(libraryID))
 	body = normalizeRawEmbeddedSymbolBody(body)
+	if len(electricalTypes) > 0 {
+		var ok bool
+		body, ok = embeddedSymbolBodyWithPinElectricalTypes(body, electricalTypes)
+		if !ok {
+			return false
+		}
+	}
 	return ensureEmbeddedSymbolBody(file, libraryID, body)
+}
+
+// ApplyEmbeddedSymbolPinElectricalTypes updates an already embedded symbol.
+// It is used when later units of a multi-unit component contribute additional
+// pin contracts for the same library body.
+func ApplyEmbeddedSymbolPinElectricalTypes(file *SchematicFile, libraryID string, electricalTypes map[string]string) bool {
+	if file == nil || strings.TrimSpace(libraryID) == "" || len(electricalTypes) == 0 {
+		return len(electricalTypes) == 0
+	}
+	for index := range file.LibSymbols {
+		if !strings.EqualFold(strings.TrimSpace(file.LibSymbols[index].LibraryID), strings.TrimSpace(libraryID)) {
+			continue
+		}
+		body, ok := embeddedSymbolBodyWithPinElectricalTypes(file.LibSymbols[index].Body, electricalTypes)
+		if !ok {
+			return false
+		}
+		file.LibSymbols[index].Body = body
+		return true
+	}
+	return false
+}
+
+func embeddedSymbolBodyWithPinElectricalTypes(body sexpr.List, electricalTypes map[string]string) (sexpr.List, bool) {
+	normalized := make(map[string]string, len(electricalTypes))
+	for number, electricalType := range electricalTypes {
+		number = strings.TrimSpace(number)
+		if number == "" || strings.TrimSpace(electricalType) == "" {
+			continue
+		}
+		canonical := canonicalKiCadPinElectricalType(electricalType)
+		if canonical == "" {
+			return nil, false
+		}
+		normalized[number] = canonical
+	}
+	if len(normalized) == 0 {
+		return body, true
+	}
+	matched := make(map[string]struct{}, len(normalized))
+	rewritten, ok := rewriteEmbeddedSymbolPinElectricalTypes(body, normalized, matched).(sexpr.List)
+	return rewritten, ok && len(matched) == len(normalized)
+}
+
+func rewriteEmbeddedSymbolPinElectricalTypes(node sexpr.Node, electricalTypes map[string]string, matched map[string]struct{}) sexpr.Node {
+	list, ok := node.(sexpr.List)
+	if !ok {
+		return node
+	}
+	result := append(sexpr.List(nil), list...)
+	if embeddedSymbolNodeHead(list) == "pin" && len(result) >= 3 {
+		pinNumber := ""
+		for _, child := range list[3:] {
+			if embeddedSymbolNodeHead(child) == "number" {
+				pinNumber = strings.TrimSpace(embeddedSymbolNodeKey(child))
+				break
+			}
+		}
+		selectedType := ""
+		for _, member := range embeddedSymbolPinNumberMembers(pinNumber) {
+			candidateType, exists := electricalTypes[member]
+			if !exists {
+				continue
+			}
+			if selectedType != "" && selectedType != candidateType {
+				return node
+			}
+			selectedType = candidateType
+			matched[member] = struct{}{}
+		}
+		if selectedType != "" {
+			result[1] = sexpr.A(selectedType)
+		}
+	}
+	for index := range result {
+		if _, nested := result[index].(sexpr.List); nested {
+			result[index] = rewriteEmbeddedSymbolPinElectricalTypes(result[index], electricalTypes, matched)
+		}
+	}
+	return result
+}
+
+func embeddedSymbolPinNumberMembers(number string) []string {
+	members := strings.FieldsFunc(number, func(r rune) bool {
+		return r == ',' || r == ';' || r == '/' || r == ' ' || r == '\t'
+	})
+	if len(members) == 0 && strings.TrimSpace(number) != "" {
+		return []string{strings.TrimSpace(number)}
+	}
+	return members
+}
+
+func canonicalKiCadPinElectricalType(value string) string {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "input":
+		return "input"
+	case "output":
+		return "output"
+	case "bidirectional":
+		return "bidirectional"
+	case "tri_state":
+		return "tri_state"
+	case "passive":
+		return "passive"
+	case "power_in", "power_input":
+		return "power_in"
+	case "power_out", "power_output":
+		return "power_out"
+	case "open_collector":
+		return "open_collector"
+	case "open_emitter":
+		return "open_emitter"
+	case "no_connect":
+		return "no_connect"
+	case "unspecified":
+		return "unspecified"
+	default:
+		return ""
+	}
 }
 
 func normalizeRawEmbeddedSymbolBody(body sexpr.List) sexpr.List {

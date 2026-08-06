@@ -384,6 +384,30 @@ func TestSchematicPinRoleRecognizesGroundNames(t *testing.T) {
 	}
 }
 
+func TestSchematicPinElectricalTypeProjectsTwoTerminalFloatingSourceReturnAsPassive(t *testing.T) {
+	component := ResolvedComponent{Functions: []ResolvedFunction{
+		{Function: "VOUT_MINUS", SymbolPin: "12", Electrical: "power_out", Unit: 1},
+		{Function: "VOUT_PLUS", SymbolPin: "13", Electrical: "power_out", Unit: 1},
+	}}
+	if got := schematicPinElectricalType(component, component.Functions[0]); got != schematicir.ElectricalTypePassive {
+		t.Fatalf("floating source return electrical type = %q, want passive", got)
+	}
+	if got := schematicPinElectricalType(component, component.Functions[1]); got != "" {
+		t.Fatalf("floating source driven terminal override = %q, want resolver-owned type", got)
+	}
+}
+
+func TestSchematicPinElectricalTypePreservesSplitSupplyNegativeOutput(t *testing.T) {
+	component := ResolvedComponent{Functions: []ResolvedFunction{
+		{Function: "COMMON", SymbolPin: "8", Unit: 1},
+		{Function: "VOUT_PLUS", SymbolPin: "9", Electrical: "power_out", Unit: 1},
+		{Function: "VOUT_MINUS", SymbolPin: "10", Electrical: "power_out", Unit: 1},
+	}}
+	if got := schematicPinElectricalType(component, component.Functions[2]); got != "" {
+		t.Fatalf("split-supply negative output override = %q, want resolver-owned type", got)
+	}
+}
+
 func TestCompareSchematicPinNumbersUsesNumericOrder(t *testing.T) {
 	if compareSchematicPinNumbers("2", "10") >= 0 || compareSchematicPinNumbers("A9", "B1") >= 0 {
 		t.Fatal("pin comparator did not preserve numeric and lexical ordering")

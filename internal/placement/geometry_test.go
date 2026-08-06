@@ -161,6 +161,60 @@ func TestValidateGeometryAllowsDifferentLayerOverlap(t *testing.T) {
 	}
 }
 
+func TestValidateGeometryRejectsOppositeSideFootprintOverThroughHolePad(t *testing.T) {
+	req := twoComponentRequest()
+	req.Rules.AllowBackLayer = true
+	req.Components[0].Pads = []PadSummary{{
+		Name:     "1",
+		WidthMM:  1.6,
+		HeightMM: 1.6,
+		Type:     "thru_hole",
+		DrillMM:  0.8,
+		Layers:   []string{"*.Cu", "*.Mask"},
+	}}
+	rules := normalizeRules(req.Rules)
+	first, _ := NewPlacementResult(req.Components[0], Placement{XMM: 5, YMM: 5, Layer: "F.Cu"}, rules)
+	second, _ := NewPlacementResult(req.Components[1], Placement{XMM: 5, YMM: 5, Layer: "B.Cu"}, rules)
+
+	issues := ValidateGeometry(req, []PlacementResult{first, second})
+	assertIssueContains(t, issues, "placement conflicts with component R1")
+}
+
+func TestValidateGeometryRejectsThroughHolePadEnteringExistingOppositeSideFootprint(t *testing.T) {
+	req := twoComponentRequest()
+	req.Rules.AllowBackLayer = true
+	req.Components[1].Pads = []PadSummary{{
+		Name:        "1",
+		XMM:         2,
+		RotationDeg: 90,
+		WidthMM:     1.8,
+		HeightMM:    0.8,
+		Type:        "np_thru_hole",
+		DrillMM:     0.6,
+		Layers:      []string{"*.Cu", "*.Mask"},
+	}}
+	rules := normalizeRules(req.Rules)
+	first, _ := NewPlacementResult(req.Components[0], Placement{XMM: 5, YMM: 5, Layer: "B.Cu"}, rules)
+	second, _ := NewPlacementResult(req.Components[1], Placement{XMM: 7, YMM: 5, RotationDeg: 180, Layer: "F.Cu"}, rules)
+
+	issues := ValidateGeometry(req, []PlacementResult{first, second})
+	assertIssueContains(t, issues, "placement conflicts with component R1")
+}
+
+func TestPadSpansBoardUsesCanonicalPadTypes(t *testing.T) {
+	for _, padType := range []string{"thru_hole", "through_hole", "np_thru_hole"} {
+		if !padSpansBoard(PadSummary{Type: padType}) {
+			t.Fatalf("pad type %q should span board", padType)
+		}
+	}
+	if padSpansBoard(PadSummary{Type: "not_through_metadata"}) {
+		t.Fatal("descriptive pad type must not be mistaken for a through-hole pad")
+	}
+	if !padSpansBoard(PadSummary{Type: "smd", DrillMM: 0.3}) {
+		t.Fatal("a drilled pad must span board regardless of its type label")
+	}
+}
+
 func TestValidateGeometryRejectsKeepoutOverlap(t *testing.T) {
 	req := minimalRequest()
 	req.Keepouts = []Keepout{{

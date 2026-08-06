@@ -878,3 +878,109 @@ func TestSlicesForPlacementCanPrioritizeLargeFootprints(t *testing.T) {
 		t.Fatalf("placement order = %#v, want explicit priority then descending envelope area", got)
 	}
 }
+
+func TestSlicesForDensePlacementCanPrioritizeAreaAcrossSoftPriorities(t *testing.T) {
+	components := []Component{
+		{Ref: "A1", Bounds: Bounds{WidthMM: 2, HeightMM: 2}},
+		{Ref: "Z1", Bounds: Bounds{WidthMM: 20, HeightMM: 10}},
+		{Ref: "P1", Priority: 100, Bounds: Bounds{WidthMM: 1, HeightMM: 1}},
+	}
+	ordered := slicesForPlacementWithOrder(components, ComponentOrderDenseLargestFootprintFirstV1)
+	if got := []string{ordered[0].Ref, ordered[1].Ref, ordered[2].Ref}; !reflect.DeepEqual(got, []string{"Z1", "A1", "P1"}) {
+		t.Fatalf("dense placement order = %#v, want descending envelope area before soft priority", got)
+	}
+}
+
+func TestDensePlacementPacksLargePartsBeforeSoftPriorityConnectors(t *testing.T) {
+	rules := DefaultRules()
+	rules.GridMM = .5
+	request := Request{
+		Board:          BoardPlacementArea{WidthMM: 80, HeightMM: 60, MarginMM: 1, Layers: 2},
+		Rules:          rules,
+		ComponentOrder: ComponentOrderDenseLargestFootprintFirstV1,
+	}
+	for index := 1; index <= 4; index++ {
+		request.Components = append(request.Components, Component{
+			Ref: fmt.Sprintf("U%d", index), Bounds: Bounds{WidthMM: 34, HeightMM: 22},
+			Rotation: RotationConstraint{AllowedDeg: []float64{0}}, Side: SideTop,
+		})
+	}
+	for index := 1; index <= 4; index++ {
+		request.Components = append(request.Components, Component{
+			Ref: fmt.Sprintf("J%d", index), Priority: 100, Bounds: Bounds{WidthMM: 4, HeightMM: 7},
+			Rotation: RotationConstraint{AllowedDeg: []float64{0}}, Side: SideTop,
+		})
+	}
+
+	result := Place(request)
+	if result.Metrics.PlacedCount != 8 || result.Metrics.UnplacedCount != 0 ||
+		result.Metrics.CollisionCount != 0 || result.Metrics.OutsideOutlineCount != 0 {
+		t.Fatalf("dense placement did not pack legal board: status=%s metrics=%#v placements=%#v", result.Status, result.Metrics, result.Placements)
+	}
+	for index := 0; index < 4; index++ {
+		if result.Placements[index].Ref != fmt.Sprintf("U%d", index+1) {
+			t.Fatalf("large component order[%d] = %s", index, result.Placements[index].Ref)
+		}
+	}
+}
+
+func TestDensePlacementSearchesTheBoundedGridPastCommittedOccupancy(t *testing.T) {
+	rules := DefaultRules()
+	rules.GridMM = 1
+	rules.MaxCandidatesPerPart = 8
+	request := Request{
+		Board:          BoardPlacementArea{WidthMM: 20, HeightMM: 20, MarginMM: 1, Layers: 2},
+		Rules:          rules,
+		ComponentOrder: ComponentOrderDenseLargestFootprintFirstV1,
+		Components: []Component{
+			{
+				Ref: "LARGE", Bounds: Bounds{WidthMM: 17, HeightMM: 7},
+				Rotation: RotationConstraint{AllowedDeg: []float64{0}}, Side: SideTop,
+			},
+			{
+				Ref: "MOVABLE", Bounds: Bounds{WidthMM: 2, HeightMM: 2},
+				Rotation: RotationConstraint{AllowedDeg: []float64{0}}, Side: SideTop,
+			},
+		},
+	}
+
+	result := Place(request)
+	if result.Metrics.PlacedCount != 2 || result.Metrics.UnplacedCount != 0 {
+		t.Fatalf("dense bounded-grid search stopped inside occupied prefix: status=%s metrics=%#v placements=%#v", result.Status, result.Metrics, result.Placements)
+	}
+}
+
+func TestDensePlacementKeepsConnectivityScoringForEitherSideComponents(t *testing.T) {
+	rules := DefaultRules()
+	rules.AllowBackLayer = true
+	rules.GridMM = 1
+	rules.MaxCandidatesPerPart = 8
+	anchor := Placement{XMM: 16, YMM: 16, Layer: "F.Cu"}
+	request := Request{
+		Board:          BoardPlacementArea{WidthMM: 20, HeightMM: 20, MarginMM: 1, Layers: 2},
+		Rules:          rules,
+		ComponentOrder: ComponentOrderDenseLargestFootprintFirstV1,
+		Components: []Component{
+			{
+				Ref: "ANCHOR", Fixed: true, Position: &anchor, Bounds: Bounds{WidthMM: 2, HeightMM: 2},
+				Pads:     []PadSummary{{Name: "1", Net: "SIG"}},
+				Rotation: RotationConstraint{AllowedDeg: []float64{0}}, Side: SideTop,
+			},
+			{
+				Ref: "MOVABLE", Bounds: Bounds{WidthMM: 2, HeightMM: 2},
+				Pads:     []PadSummary{{Name: "1", Net: "SIG"}},
+				Rotation: RotationConstraint{AllowedDeg: []float64{0}}, Side: SideAny,
+			},
+		},
+		Nets: []Net{{Name: "SIG", Role: NetSignal, Weight: 10, Endpoints: []Endpoint{{Ref: "ANCHOR", Pin: "1"}, {Ref: "MOVABLE", Pin: "1"}}}},
+	}
+
+	result := Place(request)
+	if result.Metrics.PlacedCount != 2 || result.Metrics.UnplacedCount != 0 {
+		t.Fatalf("either-side dense placement incomplete: status=%s metrics=%#v placements=%#v", result.Status, result.Metrics, result.Placements)
+	}
+	placed := result.Placements[1].Position
+	if placed.XMM < 13 || placed.YMM < 13 {
+		t.Fatalf("either-side placement ignored semantic placement cost: %#v", placed)
+	}
+}

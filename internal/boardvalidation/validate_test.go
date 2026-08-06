@@ -28,6 +28,23 @@ func TestValidateBoardGoodFullyRouted(t *testing.T) {
 	}
 }
 
+func TestAbsolutePadPositionUsesTransformedBottomFootprintLocalCoordinates(t *testing.T) {
+	footprint := pcbfiles.Footprint{
+		Position: kicadfiles.Point{X: kicadfiles.MM(10), Y: kicadfiles.MM(20)},
+		Rotation: 90,
+		Layer:    kicadfiles.LayerBCu,
+		Pads: []pcbfiles.Pad{{
+			Position: kicadfiles.Point{X: kicadfiles.MM(2), Y: kicadfiles.MM(-1)},
+		}},
+	}
+	pcbfiles.ApplyFootprintLocalPlacementGeometry(&footprint)
+	got := absolutePadPosition(&footprint, footprint.Pads[0])
+	want := kicadfiles.Point{X: kicadfiles.MM(11), Y: kicadfiles.MM(18)}
+	if got != want {
+		t.Fatalf("absolute transformed bottom pad position = %#v, want board-local rotation %#v", got, want)
+	}
+}
+
 func TestValidateBoardUnknownPadNet(t *testing.T) {
 	board := twoPadBoard(t)
 	board.Footprints[0].Pads[0].NetCode = 99

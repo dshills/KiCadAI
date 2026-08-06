@@ -74,6 +74,20 @@ func TestSchematicLayoutPinsRetainTemplatePinDirection(t *testing.T) {
 	}
 }
 
+func TestTransactionPinsCarryExplicitElectricalProjection(t *testing.T) {
+	pins := transactionPinsWithLibraryIndex(Component{
+		Symbol: "Custom:FloatingSource",
+		Pins: []Pin{{
+			Number:         "1",
+			Role:           PinRolePower,
+			ElectricalType: ElectricalTypePassive,
+		}},
+	}, nil)
+	if len(pins) != 1 || pins[0].ElectricalType != string(ElectricalTypePassive) {
+		t.Fatalf("transaction pins = %#v, want passive electrical projection", pins)
+	}
+}
+
 func TestSchematicLayoutPinDirectionsUseResolverOrientation(t *testing.T) {
 	index := &libraryresolver.LibraryIndex{Symbols: map[string]libraryresolver.SymbolRecord{
 		"Custom:Row": {Pins: []libraryresolver.SymbolPin{

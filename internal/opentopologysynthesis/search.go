@@ -1597,20 +1597,31 @@ func topologyWindowedControlledSwitchRelationshipSeeds(
 				)
 				previous = converterOutput
 			}
-			ballastMiddle := nextNode()
-			if ballastMiddle == "" {
+			switch len(regulatedLoad.ballast) {
+			case 1:
+				state = addRelationshipPrimitiveAtValue(
+					state, requirement, inventoryByKey, regulatedLoad.ballast[0],
+					regulatedLoad.ballastValueSI[0],
+					topologyTwoTerminalPlacement(previous, powerRail), &consumption,
+				)
+			case 2:
+				ballastMiddle := nextNode()
+				if ballastMiddle == "" {
+					return nil, consumption, rejections
+				}
+				state = addRelationshipPrimitiveAtValue(
+					state, requirement, inventoryByKey, regulatedLoad.ballast[0],
+					regulatedLoad.ballastValueSI[0],
+					topologyTwoTerminalPlacement(previous, ballastMiddle), &consumption,
+				)
+				state = addRelationshipPrimitiveAtValue(
+					state, requirement, inventoryByKey, regulatedLoad.ballast[1],
+					regulatedLoad.ballastValueSI[1],
+					topologyTwoTerminalPlacement(ballastMiddle, powerRail), &consumption,
+				)
+			default:
 				return nil, consumption, rejections
 			}
-			state = addRelationshipPrimitiveAtValue(
-				state, requirement, inventoryByKey, regulatedLoad.ballast[0],
-				regulatedLoad.ballastValueSI[0],
-				topologyTwoTerminalPlacement(previous, ballastMiddle), &consumption,
-			)
-			state = addRelationshipPrimitiveAtValue(
-				state, requirement, inventoryByKey, regulatedLoad.ballast[1],
-				regulatedLoad.ballastValueSI[1],
-				topologyTwoTerminalPlacement(ballastMiddle, powerRail), &consumption,
-			)
 		}
 	}
 
@@ -5095,17 +5106,22 @@ func topologyControlledSwitchRelationshipSeeds(
 							supplyStates := []highSideSupplyState{{state: initial, supply: loadSupply}}
 							if regulated, found := topologyRegulatedLoadRail(
 								requirement, initial.graph, output, loadSupply, inventory,
-							); found && len(regulated.ballast) == 2 && len(regulated.ballastValueSI) == 2 {
+							); found && len(regulated.ballast) > 0 &&
+								len(regulated.ballast) == len(regulated.ballastValueSI) {
 								adapted, converterRail := addRelationshipInternalNode(
 									initial, requirement, inventoryByKey, &consumption,
-								)
-								adapted, ballastMiddle := addRelationshipInternalNode(
-									adapted, requirement, inventoryByKey, &consumption,
 								)
 								adapted, regulatedRail := addRelationshipInternalNode(
 									adapted, requirement, inventoryByKey, &consumption,
 								)
-								if converterRail != "" && ballastMiddle != "" && regulatedRail != "" {
+								ballastMiddle := ""
+								if len(regulated.ballast) == 2 {
+									adapted, ballastMiddle = addRelationshipInternalNode(
+										adapted, requirement, inventoryByKey, &consumption,
+									)
+								}
+								if converterRail != "" && regulatedRail != "" &&
+									(len(regulated.ballast) == 1 || ballastMiddle != "") {
 									adapted = addRelationshipPrimitive(
 										adapted, requirement, inventoryByKey, regulated.converter,
 										[]TerminalConnection{
@@ -5115,16 +5131,24 @@ func topologyControlledSwitchRelationshipSeeds(
 											{Terminal: "VOUT_MINUS", Node: reference},
 										}, &consumption,
 									)
-									adapted = addRelationshipPrimitiveAtValue(
-										adapted, requirement, inventoryByKey, regulated.ballast[0],
-										regulated.ballastValueSI[0], topologyTwoTerminalPlacement(converterRail, ballastMiddle),
-										&consumption,
-									)
-									adapted = addRelationshipPrimitiveAtValue(
-										adapted, requirement, inventoryByKey, regulated.ballast[1],
-										regulated.ballastValueSI[1], topologyTwoTerminalPlacement(ballastMiddle, regulatedRail),
-										&consumption,
-									)
+									if len(regulated.ballast) == 1 {
+										adapted = addRelationshipPrimitiveAtValue(
+											adapted, requirement, inventoryByKey, regulated.ballast[0],
+											regulated.ballastValueSI[0], topologyTwoTerminalPlacement(converterRail, regulatedRail),
+											&consumption,
+										)
+									} else {
+										adapted = addRelationshipPrimitiveAtValue(
+											adapted, requirement, inventoryByKey, regulated.ballast[0],
+											regulated.ballastValueSI[0], topologyTwoTerminalPlacement(converterRail, ballastMiddle),
+											&consumption,
+										)
+										adapted = addRelationshipPrimitiveAtValue(
+											adapted, requirement, inventoryByKey, regulated.ballast[1],
+											regulated.ballastValueSI[1], topologyTwoTerminalPlacement(ballastMiddle, regulatedRail),
+											&consumption,
+										)
+									}
 									supplyStates = append(supplyStates, highSideSupplyState{state: adapted, supply: regulatedRail})
 								}
 							}
@@ -5258,17 +5282,22 @@ func topologyControlledSwitchRelationshipSeeds(
 							railStates := []loadRailState{{state: state, rail: loadSupply}}
 							if regulated, found := topologyRegulatedLoadRail(
 								requirement, state.graph, output, loadSupply, inventory,
-							); found {
+							); found && len(regulated.ballast) > 0 &&
+								len(regulated.ballast) == len(regulated.ballastValueSI) {
 								adapted, converterRail := addRelationshipInternalNode(
 									state, requirement, inventoryByKey, &consumption,
-								)
-								adapted, ballastMiddle := addRelationshipInternalNode(
-									adapted, requirement, inventoryByKey, &consumption,
 								)
 								adapted, regulatedRail := addRelationshipInternalNode(
 									adapted, requirement, inventoryByKey, &consumption,
 								)
-								if converterRail != "" && ballastMiddle != "" && regulatedRail != "" &&
+								ballastMiddle := ""
+								if len(regulated.ballast) == 2 {
+									adapted, ballastMiddle = addRelationshipInternalNode(
+										adapted, requirement, inventoryByKey, &consumption,
+									)
+								}
+								if converterRail != "" && regulatedRail != "" &&
+									(len(regulated.ballast) == 1 || ballastMiddle != "") &&
 									internalNodeCount(adapted.graph) <= limits.MaxInternalNodes {
 									adapted = addRelationshipPrimitive(
 										adapted,
@@ -5283,24 +5312,24 @@ func topologyControlledSwitchRelationshipSeeds(
 										},
 										&consumption,
 									)
-									adapted = addRelationshipPrimitiveAtValue(
-										adapted,
-										requirement,
-										inventoryByKey,
-										regulated.ballast[0],
-										regulated.ballastValueSI[0],
-										topologyTwoTerminalPlacement(converterRail, ballastMiddle),
-										&consumption,
-									)
-									adapted = addRelationshipPrimitiveAtValue(
-										adapted,
-										requirement,
-										inventoryByKey,
-										regulated.ballast[1],
-										regulated.ballastValueSI[1],
-										topologyTwoTerminalPlacement(ballastMiddle, regulatedRail),
-										&consumption,
-									)
+									if len(regulated.ballast) == 1 {
+										adapted = addRelationshipPrimitiveAtValue(
+											adapted, requirement, inventoryByKey, regulated.ballast[0],
+											regulated.ballastValueSI[0], topologyTwoTerminalPlacement(converterRail, regulatedRail),
+											&consumption,
+										)
+									} else {
+										adapted = addRelationshipPrimitiveAtValue(
+											adapted, requirement, inventoryByKey, regulated.ballast[0],
+											regulated.ballastValueSI[0], topologyTwoTerminalPlacement(converterRail, ballastMiddle),
+											&consumption,
+										)
+										adapted = addRelationshipPrimitiveAtValue(
+											adapted, requirement, inventoryByKey, regulated.ballast[1],
+											regulated.ballastValueSI[1], topologyTwoTerminalPlacement(ballastMiddle, regulatedRail),
+											&consumption,
+										)
+									}
 									railStates = append(railStates, loadRailState{state: adapted, rail: regulatedRail})
 								}
 							}

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"kicadai/internal/kicadfiles"
 	"kicadai/internal/placement"
 	"kicadai/internal/reports"
 	"kicadai/internal/routing"
@@ -206,12 +207,14 @@ func routingPadsFromPlacement(component placement.Component, layer string) []rou
 	for _, pad := range component.Pads {
 		padType := routingPadType(pad)
 		layers := routingPadLayers(pad, layer, padType)
+		padX, padY := kicadfiles.BoardLocalXYForPlacement(pad.XMM, pad.YMM, kicadfiles.BoardLayer(layer))
+		padRotation := kicadfiles.BoardLocalAngleForPlacement(kicadfiles.Angle(pad.RotationDeg), kicadfiles.BoardLayer(layer))
 		pads = append(pads, routing.Pad{
 			Ref:         component.Ref,
 			Name:        pad.Name,
 			Net:         pad.Net,
-			Position:    routing.Point{XMM: pad.XMM, YMM: pad.YMM},
-			RotationDeg: pad.RotationDeg,
+			Position:    routing.Point{XMM: padX, YMM: padY},
+			RotationDeg: float64(padRotation),
 			Shape:       routing.PadRect,
 			Type:        padType,
 			Size:        routing.Size{WidthMM: positiveOrDefault(pad.WidthMM, 1), HeightMM: positiveOrDefault(pad.HeightMM, 1)},
@@ -273,6 +276,14 @@ func routingPadLayers(pad placement.PadSummary, placementLayer string, padType r
 		}
 	}
 	if len(layers) > 0 {
+		// Placement pad summaries describe canonical footprint-local geometry.
+		// A one-sided front SMD pad therefore moves to B.Cu with a bottom-side
+		// footprint; retaining F.Cu here would route to a pad layer that does not
+		// exist in the emitted board. Explicit multi-copper-layer pads retain
+		// their declared access instead of being collapsed to one side.
+		if len(layers) == 1 && strings.EqualFold(layers[0], "F.Cu") && strings.EqualFold(placementLayer, "B.Cu") {
+			return []string{"B.Cu"}
+		}
 		return layers
 	}
 	return []string{placementLayer}

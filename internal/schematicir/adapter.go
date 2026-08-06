@@ -2954,7 +2954,13 @@ func transactionPinsWithLibraryIndex(component Component, index *libraryresolver
 		if ok && !resolverAuthoritative {
 			offset = explicit
 		}
-		out = append(out, transactions.PinSpec{Number: number, XMM: float64(offset.X) / float64(kicadfiles.MM(1)), YMM: float64(offset.Y) / float64(kicadfiles.MM(1)), ExplicitOffset: ok && !resolverAuthoritative})
+		out = append(out, transactions.PinSpec{
+			Number:         number,
+			XMM:            float64(offset.X) / float64(kicadfiles.MM(1)),
+			YMM:            float64(offset.Y) / float64(kicadfiles.MM(1)),
+			ExplicitOffset: ok && !resolverAuthoritative,
+			ElectricalType: string(pin.ElectricalType),
+		})
 	}
 	return out
 }

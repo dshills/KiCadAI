@@ -94,7 +94,10 @@ type Request struct {
 	ComponentOrder string
 }
 
-const ComponentOrderLargestFootprintFirstV1 = "largest_footprint_first_v1"
+const (
+	ComponentOrderLargestFootprintFirstV1      = "largest_footprint_first_v1"
+	ComponentOrderDenseLargestFootprintFirstV1 = "dense_largest_footprint_first_v1"
+)
 
 type BoardPlacementArea struct {
 	WidthMM  float64

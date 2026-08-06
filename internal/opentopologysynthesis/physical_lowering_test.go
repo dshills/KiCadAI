@@ -181,6 +181,27 @@ func TestPhysicalNodeRecognizesInternalPowerOutput(t *testing.T) {
 	if physicalNodeHasInternalPowerOutput("unrelated", graph, primitives) {
 		t.Fatal("unconnected node was recognized as internally driven")
 	}
+	graph.Instances[0].Terminals = append(graph.Instances[0].Terminals,
+		TerminalConnection{Terminal: "output", Node: "rail"},
+	)
+	primitives["converter"] = PrimitiveCandidate{Terminals: []PrimitiveTerminal{
+		{Terminal: "output_return", Function: "VOUT_MINUS", Electrical: "power_out"},
+		{Terminal: "output", Function: "VOUT_PLUS", Electrical: "power_out"},
+	}}
+	if physicalNodeHasInternalPowerOutput("ground", graph, primitives) {
+		t.Fatal("two-terminal floating-source return was recognized as an ERC power driver")
+	}
+	if !physicalNodeHasInternalPowerOutput("rail", graph, primitives) {
+		t.Fatal("two-terminal floating-source positive output was not recognized as an ERC power driver")
+	}
+	primitives["converter"] = PrimitiveCandidate{Terminals: []PrimitiveTerminal{
+		{Terminal: "common", Function: "COMMON"},
+		{Terminal: "output_return", Function: "VOUT_MINUS", Electrical: "power_out"},
+		{Terminal: "output", Function: "VOUT_PLUS", Electrical: "power_out"},
+	}}
+	if !physicalNodeHasInternalPowerOutput("ground", graph, primitives) {
+		t.Fatal("split-supply negative output was not recognized as an ERC power driver")
+	}
 	primitives["converter"] = PrimitiveCandidate{Terminals: []PrimitiveTerminal{{
 		Terminal: "output_return", Electrical: "power_in",
 	}}}

@@ -259,7 +259,7 @@ func renderFootprintLibraryModule(footprint *Footprint, name string) sexpr.List 
 		nodes = append(nodes, sexpr.L(sexpr.A("tags"), sexpr.S(footprint.Tags)))
 	}
 	for _, property := range footprint.Properties {
-		nodes = append(nodes, renderFootprintLibraryProperty(property, name))
+		nodes = append(nodes, renderFootprintLibraryProperty(footprintLibraryProperty(property, footprint.Layer), name))
 	}
 	for _, property := range footprint.MetadataProperties {
 		nodes = append(nodes, renderFootprintMetadataProperty(property))
@@ -282,13 +282,13 @@ func renderFootprintLibraryModule(footprint *Footprint, name string) sexpr.List 
 		nodes = append(nodes, sexpr.L(sexpr.A("duplicate_pad_numbers_are_jumpers"), yesNo(*footprint.DuplicatePadNumbersAreJumpers)))
 	}
 	for _, text := range footprint.Texts {
-		nodes = append(nodes, renderFootprintText(footprintLibraryText(text)))
+		nodes = append(nodes, renderFootprintText(footprintLibraryText(text, footprint.Layer)))
 	}
 	for _, graphic := range footprint.Graphics {
-		nodes = append(nodes, renderFootprintGraphic(footprintLibraryGraphic(graphic)))
+		nodes = append(nodes, renderFootprintGraphic(footprintLibraryGraphic(graphic, footprint.Layer)))
 	}
 	for _, pad := range footprint.Pads {
-		nodes = append(nodes, renderPad(footprintLibraryPad(pad), ""))
+		nodes = append(nodes, renderPad(footprintLibraryPad(pad, footprint.Layer), ""))
 	}
 	if footprint.EmbeddedFonts != nil {
 		nodes = append(nodes, sexpr.L(sexpr.A("embedded_fonts"), yesNo(*footprint.EmbeddedFonts)))
@@ -300,22 +300,69 @@ func renderFootprintLibraryModule(footprint *Footprint, name string) sexpr.List 
 	return sexpr.L(nodes...)
 }
 
-func footprintLibraryText(text FootprintText) FootprintText {
+func footprintLibraryProperty(property FootprintProperty, placementLayer kicadfiles.BoardLayer) FootprintProperty {
+	property.Position = kicadfiles.BoardLocalPointForPlacement(property.Position, placementLayer)
+	property.Rotation = kicadfiles.BoardTextAngleForPlacement(property.Rotation, placementLayer)
+	property.Layer = footprintLibraryLayer(property.Layer, placementLayer)
+	property.Effects.Justify = kicadfiles.BoardTextJustifyForPlacement(property.Effects.Justify, placementLayer)
+	return property
+}
+
+func footprintLibraryText(text FootprintText, placementLayer kicadfiles.BoardLayer) FootprintText {
 	text.UUID = ""
+	text.Position = kicadfiles.BoardLocalPointForPlacement(text.Position, placementLayer)
+	text.Rotation = kicadfiles.BoardTextAngleForPlacement(text.Rotation, placementLayer)
+	text.Layer = footprintLibraryLayer(text.Layer, placementLayer)
+	text.Effects.Justify = kicadfiles.BoardTextJustifyForPlacement(text.Effects.Justify, placementLayer)
 	return text
 }
 
-func footprintLibraryPad(pad Pad) Pad {
+func footprintLibraryPad(pad Pad, placementLayer kicadfiles.BoardLayer) Pad {
 	pad.UUID = ""
 	pad.NetCode = 0
 	pad.NetName = ""
+	pad.Position = kicadfiles.BoardLocalPointForPlacement(pad.Position, placementLayer)
+	pad.Rotation = kicadfiles.BoardLocalAngleForPlacement(pad.Rotation, placementLayer)
+	pad.Layers = append([]kicadfiles.BoardLayer(nil), pad.Layers...)
+	for i := range pad.Layers {
+		pad.Layers[i] = footprintLibraryLayer(pad.Layers[i], placementLayer)
+	}
 	return pad
 }
 
-func footprintLibraryGraphic(graphic FootprintGraphic) FootprintGraphic {
-	drawing := Drawing(graphic)
+func footprintLibraryGraphic(graphic FootprintGraphic, placementLayer kicadfiles.BoardLayer) FootprintGraphic {
+	drawing := Drawing(footprintGraphicForPlacement(graphic, placementLayer))
 	drawing.UUID = ""
+	drawing.Layer = footprintLibraryLayer(drawing.Layer, placementLayer)
 	return FootprintGraphic(drawing)
+}
+
+// footprintLibraryLayer removes the board-instance side transformation from a
+// generated local footprint module. KiCad stores a bottom-placed footprint's
+// local front layers as their B.* counterparts in the board, while the library
+// module remains in its canonical front-side coordinate system.
+func footprintLibraryLayer(layer, placementLayer kicadfiles.BoardLayer) kicadfiles.BoardLayer {
+	if placementLayer != kicadfiles.LayerBCu {
+		return layer
+	}
+	switch layer {
+	case kicadfiles.LayerBCu:
+		return kicadfiles.LayerFCu
+	case kicadfiles.LayerBMask:
+		return kicadfiles.LayerFMask
+	case kicadfiles.LayerBPaste:
+		return kicadfiles.LayerFPaste
+	case kicadfiles.LayerBAdhes:
+		return kicadfiles.LayerFAdhes
+	case kicadfiles.LayerBSilkS:
+		return kicadfiles.LayerFSilkS
+	case kicadfiles.LayerBFab:
+		return kicadfiles.LayerFFab
+	case kicadfiles.LayerBCrtYd:
+		return kicadfiles.LayerFCrtYd
+	default:
+		return layer
+	}
 }
 
 func renderFootprint(footprint Footprint, netNames map[int]string) sexpr.List {

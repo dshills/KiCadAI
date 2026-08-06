@@ -18,6 +18,7 @@ const (
 	netConnectivityScoreWeight   = 3.0
 	seedTieBreakScoreWeight      = 0.0001
 	placementCompareEpsilon      = 1e-9
+	maxDenseGridCandidates       = 65_536
 )
 
 func Place(request Request) Result {
@@ -415,6 +416,13 @@ func slicesForPlacementWithOrder(components []Component, componentOrder string) 
 		if ordered[i].Fixed != ordered[j].Fixed {
 			return ordered[i].Fixed
 		}
+		if componentOrder == ComponentOrderDenseLargestFootprintFirstV1 {
+			leftArea := ordered[i].Bounds.WidthMM * ordered[i].Bounds.HeightMM
+			rightArea := ordered[j].Bounds.WidthMM * ordered[j].Bounds.HeightMM
+			if comparison := compareFloat64(leftArea, rightArea); comparison != 0 {
+				return comparison > 0
+			}
+		}
 		if ordered[i].Priority != ordered[j].Priority {
 			return ordered[i].Priority > ordered[j].Priority
 		}
@@ -723,6 +731,13 @@ func candidatePlacements(component Component, componentRef string, request Reque
 	axisSamples := max(7, int(math.Ceil(math.Sqrt(float64(maxCandidates)/float64(variantsPerPoint)))))
 	xIndices := edgeAwareSampledIndices(component, rotations, component.Edge, true, usable.Min.XMM, usable.Max.XMM, edgeInset, edgeSpan, grid, xCount, axisSamples)
 	yIndices := edgeAwareSampledIndices(component, rotations, component.Edge, false, usable.Min.YMM, usable.Max.YMM, edgeInset, edgeSpan, grid, yCount, axisSamples)
+	denseCandidateCount := xCount * yCount * variantsPerPoint
+	if request.ComponentOrder == ComponentOrderDenseLargestFootprintFirstV1 &&
+		denseCandidateCount <= maxDenseGridCandidates {
+		xIndices = denseGridIndices(xCount)
+		yIndices = denseGridIndices(yCount)
+		maxCandidates = max(maxCandidates, denseCandidateCount)
+	}
 	xIndices, yIndices = appendRequiredProximityCandidateSamples(component, componentRef, request, placedByRef, usable, grid, xCount, yCount, xIndices, yIndices)
 	if component.Position != nil && mobilityPrefersAuthoredPosition(component.Mobility.Class) {
 		xIndices = appendCandidateSampleIndex(xIndices, component.Position.XMM, usable.Min.XMM, grid, xCount)
@@ -821,6 +836,16 @@ func candidatePlacements(component Component, componentRef string, request Reque
 		if scoringEnabled && scored[i].Total != scored[j].Total {
 			return scored[i].Total > scored[j].Total
 		}
+		if request.ComponentOrder == ComponentOrderDenseLargestFootprintFirstV1 && component.Side != SideAny {
+			left := candidates[scored[i].CandidateIndex].Placement.Bounds
+			right := candidates[scored[j].CandidateIndex].Placement.Bounds
+			if comparison := compareFloat64(left.Min.YMM, right.Min.YMM); comparison != 0 {
+				return comparison < 0
+			}
+			if comparison := compareFloat64(left.Min.XMM, right.Min.XMM); comparison != 0 {
+				return comparison < 0
+			}
+		}
 		if scored[i].LegacyCost != scored[j].LegacyCost {
 			return scored[i].LegacyCost < scored[j].LegacyCost
 		}
@@ -840,6 +865,14 @@ func candidatePlacements(component Component, componentRef string, request Reque
 		candidates = candidates[:maxCandidates]
 	}
 	return candidates
+}
+
+func denseGridIndices(count int) []int {
+	indices := make([]int, max(0, count))
+	for index := range indices {
+		indices[index] = index
+	}
+	return indices
 }
 
 func requiredProximityAnchorReservation(component Component, componentRef string, request Request, usable Rect) (float64, bool) {

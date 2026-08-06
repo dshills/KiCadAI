@@ -263,11 +263,16 @@ func schematicComponent(component ResolvedComponent, unit int, unitIDs map[schem
 		} else if symbolID != function.SymbolID {
 			return schematicir.Component{}, []reports.Issue{graphIssue(CodeSchematicLowering, "components."+component.Instance.ID, "one symbol unit resolves to multiple library symbols")}
 		}
-		pin := schematicir.Pin{Number: function.SymbolPin, Name: function.Function, Role: schematicPinRole(function)}
+		pin := schematicir.Pin{
+			Number:         function.SymbolPin,
+			Name:           function.Function,
+			Role:           schematicPinRole(function),
+			ElectricalType: schematicPinElectricalType(component, function),
+		}
 		if _, exists := noConnects[key][function.SymbolPin]; exists {
 			pin.NoConnect = true
 		}
-		if existing, exists := pinsByNumber[pin.Number]; exists && (existing.Name != pin.Name || existing.Role != pin.Role || existing.NoConnect != pin.NoConnect) {
+		if existing, exists := pinsByNumber[pin.Number]; exists && (existing.Name != pin.Name || existing.Role != pin.Role || existing.ElectricalType != pin.ElectricalType || existing.NoConnect != pin.NoConnect) {
 			return schematicir.Component{}, []reports.Issue{graphIssue(CodeSchematicLowering, "components."+component.Instance.ID+".pins."+pin.Number, "one symbol pin resolves to conflicting logical functions")}
 		}
 		pinsByNumber[pin.Number] = pin
@@ -639,6 +644,104 @@ func schematicPinRole(function ResolvedFunction) schematicir.PinRole {
 	default:
 		return schematicir.PinRolePassive
 	}
+}
+
+func schematicPinElectricalType(component ResolvedComponent, function ResolvedFunction) schematicir.ElectricalType {
+	functions := make([]ERCFunctionProjection, 0, len(component.Functions))
+	for _, peer := range component.Functions {
+		functions = append(functions, ERCFunctionProjection{
+			Function: peer.Function, Electrical: peer.Electrical, Unit: strconv.Itoa(peer.Unit),
+		})
+	}
+	projected := ProjectedERCElectricalType(ERCFunctionProjection{
+		Function: function.Function, Electrical: function.Electrical, Unit: strconv.Itoa(function.Unit),
+	}, functions)
+	if projected != schematicElectricalType(function.Electrical) {
+		return projected
+	}
+	return ""
+}
+
+// ERCFunctionProjection is the minimum catalog-backed function contract needed
+// to project source semantics into KiCad pin electrical types.
+type ERCFunctionProjection struct {
+	Function   string
+	Electrical string
+	Unit       string
+}
+
+// ProjectedERCElectricalType preserves catalog electrical semantics except for
+// the reference terminal of a two-terminal floating source. That terminal is a
+// passive return in ERC even though the simulation model remains a two-terminal
+// source. Split supplies with an explicit common retain driven positive and
+// negative rails.
+func ProjectedERCElectricalType(candidate ERCFunctionProjection, functions []ERCFunctionProjection) schematicir.ElectricalType {
+	electricalType := schematicElectricalType(candidate.Electrical)
+	if electricalType == schematicir.ElectricalTypePowerOutput && floatingSourceReturn(functions, candidate) {
+		return schematicir.ElectricalTypePassive
+	}
+	return electricalType
+}
+
+func schematicElectricalType(electrical string) schematicir.ElectricalType {
+	switch strings.ToLower(strings.TrimSpace(electrical)) {
+	case "input":
+		return schematicir.ElectricalTypeInput
+	case "output":
+		return schematicir.ElectricalTypeOutput
+	case "bidirectional":
+		return schematicir.ElectricalTypeBidirectional
+	case "tri_state":
+		return schematicir.ElectricalTypeTriState
+	case "passive":
+		return schematicir.ElectricalTypePassive
+	case "power_in", "power_input":
+		return schematicir.ElectricalTypePowerInput
+	case "power_out", "power_output":
+		return schematicir.ElectricalTypePowerOutput
+	case "open_collector":
+		return schematicir.ElectricalTypeOpenCollector
+	case "open_emitter":
+		return schematicir.ElectricalTypeOpenEmitter
+	case "no_connect":
+		return schematicir.ElectricalTypeNoConnect
+	default:
+		return ""
+	}
+}
+
+// floatingSourceReturn identifies the reference terminal of a two-terminal
+// floating source. The source model retains power-output semantics on both
+// terminals for simulation and power-domain reasoning, but KiCad ERC needs one
+// driven terminal and one passive return. A three-terminal source with an
+// explicit COMMON is a split supply, so both positive and negative rails stay
+// power outputs.
+func floatingSourceReturn(functions []ERCFunctionProjection, candidate ERCFunctionProjection) bool {
+	name := strings.ToUpper(strings.TrimSpace(candidate.Function))
+	prefix := ""
+	for _, suffix := range []string{"_MINUS", "_NEGATIVE", "_RETURN"} {
+		if strings.HasSuffix(name, suffix) {
+			prefix = strings.TrimSuffix(name, suffix)
+			break
+		}
+	}
+	if prefix == "" {
+		return false
+	}
+	positive := false
+	for _, function := range functions {
+		if strings.TrimSpace(function.Unit) != strings.TrimSpace(candidate.Unit) {
+			continue
+		}
+		peerName := strings.ToUpper(strings.TrimSpace(function.Function))
+		if peerName == "COMMON" || peerName == prefix+"_COMMON" {
+			return false
+		}
+		if (peerName == prefix+"_PLUS" || peerName == prefix+"_POSITIVE") && schematicElectricalType(function.Electrical) == schematicir.ElectricalTypePowerOutput {
+			positive = true
+		}
+	}
+	return positive
 }
 
 func schematicGroundFunction(name string) bool {

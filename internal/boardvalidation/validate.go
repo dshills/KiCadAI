@@ -976,12 +976,10 @@ func boardLayersToStrings(layers []kicadfiles.BoardLayer) []string {
 }
 
 func absolutePadPosition(footprint *pcbfiles.Footprint, pad pcbfiles.Pad) kicadfiles.Point {
-	localX := pad.Position.X
-	localY := pad.Position.Y
-	if footprint.Layer == kicadfiles.LayerBCu {
-		localX = -localX
-	}
-	x, y := kicadfiles.RotateBoardLocalXY(float64(localX), float64(localY), float64(footprint.Rotation))
+	// Footprint pads use KiCad's placed local geometry. Bottom-side instances
+	// are mirrored when they are constructed or imported, so applying the side
+	// transform again here would mirror them twice.
+	x, y := kicadfiles.RotateBoardLocalXY(float64(pad.Position.X), float64(pad.Position.Y), float64(footprint.Rotation))
 	return kicadfiles.Point{
 		X: footprint.Position.X + kicadfiles.IU(math.Round(x)),
 		Y: footprint.Position.Y + kicadfiles.IU(math.Round(y)),

@@ -164,6 +164,33 @@ func TestConnectionHasInternalPowerOutputSuppressesRedundantExternalFlag(t *test
 	}
 }
 
+func TestEnsureExternalConnectorPowerFlagsTreatsFloatingSourceReturnAsPassive(t *testing.T) {
+	document := Document{
+		Components: []Component{{ID: "input", Role: RoleInputConnector}, {ID: "converter", Role: RoleIC}},
+		Nets: []Net{{
+			Name: "RETURN", Role: NetRoleGround,
+			Endpoints: []Endpoint{
+				{Component: "input", SelectorKind: SelectorFunction, Selector: "PIN_2"},
+				{Component: "converter", SelectorKind: SelectorFunction, Selector: "VOUT_MINUS"},
+			},
+		}},
+	}
+	selected := map[string]ResolvedComponent{
+		"converter": {
+			Instance: Component{ID: "converter"},
+			Functions: []ResolvedFunction{
+				{Function: "VOUT_MINUS", Electrical: "power_out", Unit: 1},
+				{Function: "VOUT_PLUS", Electrical: "power_out", Unit: 1},
+			},
+		},
+	}
+
+	ensureExternalConnectorPowerFlags(&document, selected)
+	if len(document.PowerFlags) != 1 || document.PowerFlags[0].Net != "RETURN" {
+		t.Fatalf("power flags = %#v, want floating-source return flag", document.PowerFlags)
+	}
+}
+
 func TestPropagatePowerFlagsAcrossSeriesPowerLimiters(t *testing.T) {
 	document := Document{
 		Nets: []Net{

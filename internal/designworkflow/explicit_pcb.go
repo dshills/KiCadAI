@@ -106,17 +106,88 @@ func PlaceExplicitCircuit(ctx context.Context, request Request, opts PlacementOp
 	issues = append(issues, padIssues...)
 	placementRequest = placement.NormalizeRequest(placementRequest)
 	result := placement.PlaceContext(ctx, placementRequest)
+	rightAngleFallback := false
+	rightAngleFallbackPlacedCount := 0
+	rightAngleFallbackUnplacedCount := 0
+	rightAngleFallbackUnplacedRefs := []string{}
+	if result.Status != placement.StatusPlaced &&
+		request.ExplicitCircuit.RoutingPolicy == ExplicitRoutingPolicyConstrainedEndpointAccessV1 {
+		rotatedRequest := explicitRightAnglePlacementFallback(placementRequest)
+		rotatedResult := placement.PlaceContext(ctx, rotatedRequest)
+		rightAngleFallbackPlacedCount = rotatedResult.Metrics.PlacedCount
+		rightAngleFallbackUnplacedCount = rotatedResult.Metrics.UnplacedCount
+		rightAngleFallbackUnplacedRefs = explicitUnplacedRefs(rotatedResult)
+		if rotatedResult.Status == placement.StatusPlaced ||
+			rotatedResult.Metrics.PlacedCount >= result.Metrics.PlacedCount {
+			placementRequest = rotatedRequest
+			result = rotatedResult
+			rightAngleFallback = true
+		}
+	}
 	issues = append(issues, result.Issues...)
 	stage := NewStageResult(StagePlacement, issues)
 	stage.Summary = map[string]any{
 		"component_count": result.Metrics.ComponentCount, "placed_count": result.Metrics.PlacedCount,
 		"unplaced_count": result.Metrics.UnplacedCount, "region_rule_count": len(placementRequest.RegionRules),
 		"proximity_rule_count": len(placementRequest.ProximityRules), "pad_hydration": summarizePadHydration(padEntries, padIssues),
+		"right_angle_fallback": rightAngleFallback, "right_angle_fallback_placed_count": rightAngleFallbackPlacedCount,
+		"right_angle_fallback_unplaced_count": rightAngleFallbackUnplacedCount,
+		"right_angle_fallback_unplaced_refs":  rightAngleFallbackUnplacedRefs,
 	}
 	if result.Status != placement.StatusPlaced && stage.Status == StageStatusOK {
 		stage.Status = StageStatusWarning
 	}
 	return PlacementStageResult{Request: placementRequest, Result: result, Stage: stage}
+}
+
+func explicitUnplacedRefs(result placement.Result) []string {
+	refs := []string{}
+	for _, component := range result.Placements {
+		if component.Reason != "" {
+			refs = append(refs, component.Ref)
+		}
+	}
+	slices.Sort(refs)
+	return refs
+}
+
+func explicitRightAnglePlacementFallback(request placement.Request) placement.Request {
+	result := request
+	result.ComponentOrder = placement.ComponentOrderDenseLargestFootprintFirstV1
+	result.Components = append([]placement.Component(nil), request.Components...)
+	for index := range result.Components {
+		component := &result.Components[index]
+		if component.Fixed || component.Edge != placement.EdgeNone {
+			continue
+		}
+		if request.Rules.AllowBackLayer && explicitBackSidePlacementEligible(*component) {
+			component.Side = placement.SideAny
+		}
+		width, height := component.Bounds.WidthMM, component.Bounds.HeightMM
+		switch {
+		case width <= 0 || height <= 0 || width == height || request.Board.WidthMM == request.Board.HeightMM:
+			component.Rotation = placement.RotationConstraint{AllowedDeg: []float64{0, 90}}
+		case request.Board.WidthMM > request.Board.HeightMM && height > width:
+			component.Rotation = placement.RotationConstraint{AllowedDeg: []float64{90}}
+		case request.Board.HeightMM > request.Board.WidthMM && width > height:
+			component.Rotation = placement.RotationConstraint{AllowedDeg: []float64{90}}
+		default:
+			component.Rotation = placement.RotationConstraint{AllowedDeg: []float64{0}}
+		}
+	}
+	return placement.NormalizeRequest(result)
+}
+
+func explicitBackSidePlacementEligible(component placement.Component) bool {
+	if len(component.Pads) == 0 {
+		return false
+	}
+	for _, pad := range component.Pads {
+		if !strings.EqualFold(strings.TrimSpace(pad.Type), "smd") {
+			return false
+		}
+	}
+	return true
 }
 
 func explicitRoutingAccessSpacing(nets []ExplicitNetSpec) float64 {

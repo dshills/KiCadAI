@@ -127,7 +127,7 @@ func (resolver *Resolver) Resolve(ctx context.Context, document Document) (Resol
 		}
 		result.Nets = append(result.Nets, resolvedNet)
 	}
-	issues = append(issues, validateResolvedPowerFlags(result.Source.PowerFlags, result.Nets)...)
+	issues = append(issues, validateResolvedPowerFlags(result.Source.PowerFlags, result.Nets, result.Components)...)
 	for endpointIndex, endpoint := range normalized.NoConnects {
 		path := fmt.Sprintf("no_connects[%d]", endpointIndex)
 		if root := unresolvedRoots[endpoint.Component]; root.issueID != "" {
@@ -380,12 +380,16 @@ func firstGraphRootIssue(issues []reports.Issue) reports.Issue {
 	return reports.Issue{}
 }
 
-func validateResolvedPowerFlags(flags []PowerFlag, nets []ResolvedNet) []reports.Issue {
+func validateResolvedPowerFlags(flags []PowerFlag, nets []ResolvedNet, components []ResolvedComponent) []reports.Issue {
 	byName := make(map[string]ResolvedNet, len(nets))
 	for _, net := range nets {
 		byName[net.Intent.Name] = net
 	}
 	var issues []reports.Issue
+	componentsByID := make(map[string]ResolvedComponent, len(components))
+	for _, component := range components {
+		componentsByID[component.Instance.ID] = component
+	}
 	seen := map[string]int{}
 	for index, flag := range flags {
 		if previous, duplicate := seen[flag.Net]; duplicate {
@@ -403,9 +407,16 @@ func validateResolvedPowerFlags(flags []PowerFlag, nets []ResolvedNet) []reports
 		}
 		foundDriver := false
 		for _, endpoint := range net.Endpoints {
+			component, componentFound := componentsByID[endpoint.Intent.Component]
 			for _, binding := range endpoint.Bindings {
 				if !strings.EqualFold(strings.TrimSpace(binding.Electrical), "power_out") {
 					continue
+				}
+				if componentFound {
+					function, functionFound := uniqueResolvedFunction(component.Functions, endpoint.Function)
+					if functionFound && !resolvedFunctionIsProjectedPowerOutput(component, function) {
+						continue
+					}
 				}
 				path := fmt.Sprintf("power_flags[%d].net", index)
 				message := fmt.Sprintf("net %s already has internal power_out driver %s.%s", flag.Net, endpoint.Intent.Component, binding.SymbolPin)

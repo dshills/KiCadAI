@@ -79,11 +79,11 @@ func TestDiscoverPhysicalEndpointsReportsMissingPlacementAndUnnamedPads(t *testi
 	}
 }
 
-func TestDiscoverPhysicalEndpointsMirrorsBottomLayerPads(t *testing.T) {
+func TestDiscoverPhysicalEndpointsUsesKiCadBottomLayerPadTransform(t *testing.T) {
 	placed := PlacementStageResult{
 		Request: placement.Request{Components: []placement.Component{{
 			Ref:      "J1",
-			Pads:     []placement.PadSummary{{Name: "1", Net: "SIG", XMM: -1, YMM: 0, WidthMM: 1, HeightMM: 1}},
+			Pads:     []placement.PadSummary{{Name: "1", Net: "SIG", XMM: -1, YMM: 2, WidthMM: 1, HeightMM: 1}},
 			Position: &placement.Placement{XMM: 10, YMM: 20, RotationDeg: 0, Layer: "B.Cu"},
 		}}},
 		Stage: StageResult{Name: StagePlacement, Status: StageStatusOK},
@@ -97,8 +97,8 @@ func TestDiscoverPhysicalEndpointsMirrorsBottomLayerPads(t *testing.T) {
 	if len(endpoints) != 1 {
 		t.Fatalf("endpoints = %#v, want one", endpoints)
 	}
-	if endpoints[0].Point == nil || endpoints[0].Point.XMM != 11 || endpoints[0].Point.YMM != 20 {
-		t.Fatalf("bottom pad point = %#v, want mirrored absolute point 11,20", endpoints[0].Point)
+	if endpoints[0].Point == nil || endpoints[0].Point.XMM != 9 || endpoints[0].Point.YMM != 18 {
+		t.Fatalf("bottom pad point = %#v, want KiCad-flipped absolute point 9,18", endpoints[0].Point)
 	}
 	if len(endpoints[0].Layers) != 1 || endpoints[0].Layers[0] != "B.Cu" {
 		t.Fatalf("bottom endpoint layers = %#v", endpoints[0].Layers)

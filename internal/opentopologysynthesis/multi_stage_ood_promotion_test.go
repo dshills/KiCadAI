@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"kicadai/internal/designworkflow"
 	"kicadai/internal/libraryresolver"
 )
 
@@ -32,6 +33,10 @@ func TestMultiStageOODAmbientControlOptionalKiCadPromotion(t *testing.T) {
 
 func TestMultiStageOODUndervoltageDisconnectOptionalKiCadPromotion(t *testing.T) {
 	testMultiStageOODOptionalKiCadPromotion(t, "undervoltage_load_permission")
+}
+
+func TestMultiStageOODWindowedHeatingOptionalKiCadPromotion(t *testing.T) {
+	testMultiStageOODOptionalKiCadPromotion(t, "windowed_heating_power_control")
 }
 
 func testMultiStageOODOptionalKiCadPromotion(t *testing.T, caseName string) {
@@ -83,6 +88,15 @@ func testMultiStageOODOptionalKiCadPromotion(t *testing.T, caseName string) {
 	})
 	if promotion.Status != PhysicalPromotionPassed || !promotion.ReplayIdentical ||
 		promotion.ProjectHash == "" || len(promotion.Runs) != 2 || len(promotion.Issues) != 0 {
+		placed := designworkflow.PlaceExplicitCircuit(
+			ctx,
+			first.Physical.DesignRequest,
+			designworkflow.PlacementOptions{LibraryIndex: &index},
+		)
+		t.Logf(
+			"multi-stage placement diagnostics status=%s stage=%#v metrics=%#v scoring=%#v",
+			placed.Result.Status, placed.Stage.Summary, placed.Result.Metrics, placed.Result.CandidateScoring,
+		)
 		t.Fatalf(
 			"multi-stage KiCad promotion status=%s replay=%t project=%s runs=%d issues=%#v board=%#v components=%v routing=%#v",
 			promotion.Status,

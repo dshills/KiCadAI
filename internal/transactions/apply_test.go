@@ -362,6 +362,11 @@ func TestImportedPadLayersCanonicalizeDrilledPadsAndPreserveSMDLayer(t *testing.
 	if len(backSMD) != 1 || backSMD[0] != kicadfiles.LayerBCu {
 		t.Fatalf("back SMD pad layers = %#v, want explicit B.Cu", backSMD)
 	}
+	placedBackSMD := importedPadLayers(PadSpec{Type: "smd", Layers: []string{"F.Cu", "F.Mask", "F.Paste"}}, kicadfiles.LayerBCu)
+	wantPlacedBack := []kicadfiles.BoardLayer{kicadfiles.LayerBCu, kicadfiles.LayerBMask, kicadfiles.LayerBPaste}
+	if !slices.Equal(placedBackSMD, wantPlacedBack) {
+		t.Fatalf("bottom-placed canonical SMD pad layers = %#v, want %#v", placedBackSMD, wantPlacedBack)
+	}
 }
 
 func TestApplyUsesResolverSymbolPinsForGeneratedSchematic(t *testing.T) {
@@ -637,7 +642,7 @@ func TestResolverFootprintBottomPlacementMapsFrontLayers(t *testing.T) {
 	if footprint.Texts[0].Rotation != 90 ||
 		footprint.Texts[0].Effects.FontSize != (kicadfiles.Point{X: kicadfiles.MM(1), Y: kicadfiles.MM(1)}) ||
 		footprint.Texts[0].Effects.FontThickness != kicadfiles.MM(0.15) ||
-		len(footprint.Texts[0].Effects.Justify) != 1 || footprint.Texts[0].Effects.Justify[0] != "mirror" {
+		len(footprint.Texts[0].Effects.Justify) != 0 {
 		t.Fatalf("text style not preserved: %#v", footprint.Texts[0])
 	}
 	if len(footprint.Pads) != 2 || footprint.Pads[0].RoundRectRRatio != 0.243902 || footprint.Pads[1].RoundRectRRatio != 0.243902 {

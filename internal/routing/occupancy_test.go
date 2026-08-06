@@ -252,6 +252,31 @@ func TestAbsolutePadPointRotatesAroundComponentOrigin(t *testing.T) {
 	}
 }
 
+func TestAbsolutePadPointKeepsBottomPlacementLocalCoordinates(t *testing.T) {
+	component := Component{Position: Placement{XMM: 10, YMM: 20, RotationDeg: 90, Layer: "B.Cu"}}
+	got := absolutePadPoint(component, Point{XMM: 2, YMM: 1})
+	want := Point{XMM: 11, YMM: 18}
+	if !floatClose(got.XMM, want.XMM) || !floatClose(got.YMM, want.YMM) {
+		t.Fatalf("absolute bottom pad point = %#v, want board-local rotation %#v", got, want)
+	}
+}
+
+func TestPadRectKeepsBottomPadLocalRotation(t *testing.T) {
+	bottom := padRect(
+		Component{Position: Placement{RotationDeg: 20, Layer: "B.Cu"}},
+		Pad{RotationDeg: 30, Size: Size{WidthMM: 4, HeightMM: 1}},
+	).Rect
+	expected := padRect(
+		Component{Position: Placement{RotationDeg: 50, Layer: "F.Cu"}},
+		Pad{Size: Size{WidthMM: 4, HeightMM: 1}},
+	).Rect
+	if bottom == nil || expected == nil ||
+		!floatClose(bottom.WidthMM(), expected.WidthMM()) ||
+		!floatClose(bottom.HeightMM(), expected.HeightMM()) {
+		t.Fatalf("bottom pad bounds = %#v, want board-local rotation bounds %#v", bottom, expected)
+	}
+}
+
 func TestPointWithinPolygonClearanceUsesEdgeDistance(t *testing.T) {
 	polygon := []Point{{XMM: 0, YMM: 0}, {XMM: 2, YMM: 0}, {XMM: 2, YMM: 2}, {XMM: 0, YMM: 2}}
 	if !pointWithinPolygonClearance(Point{XMM: 2.4, YMM: 1}, polygon, 0.5) {

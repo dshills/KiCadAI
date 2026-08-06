@@ -321,6 +321,18 @@ func solveTransientAnalysis(plan Plan, analysis Analysis) (AnalysisResult, []Dia
 			evidence = predictorEvidence
 			candidateFuseStates = predictedFuseStates
 			openedFuses = nil
+			// The operating-limit fallback replaces the already-normalized
+			// observation evidence. Restore the outer-step counters and bounded
+			// work limits so every accepted point carries complete convergence
+			// provenance, including work spent by earlier attempts.
+			evidence.InitialCondition = "previous_accepted_state"
+			evidence.TimeSteps = step
+			evidence.TotalIterations = totalIterations
+			evidence.MaxIterationsPerStep = transientMaxNewtonIterations * transientMaxNewtonAttemptsPerObservation
+			evidence.MaxTotalIterations = maxTransientWork
+			if totalIterations > maxTransientWork {
+				return result, []Diagnostic{{Path: fmt.Sprintf("analyses.%s.points[%d].work", analysis.ID, step), Message: fmt.Sprintf("transient solve exceeded bounded total work limit %d", maxTransientWork), Suggestion: "reduce the bounded observation duration or partition the analysis"}}
+			}
 		}
 		result.Points = append(result.Points, AnalysisPoint{
 			TimeS: normalizedMNAFloat(timeS), Nodes: nodeResults(plan, system, solution),
@@ -1883,7 +1895,11 @@ func solveTransientStepBySubstepPredictor(
 	openFuses map[string]bool,
 	acceptedFuseStates map[string]transientFuseI2TState,
 ) (mnaSystem, []complex128, SolverEvidence, map[string]transientFuseI2TState, bool) {
-	total := SolverEvidence{Method: "backward_euler_bounded_accepted_substeps_v1"}
+	total := SolverEvidence{
+		Method:               "backward_euler_bounded_accepted_substeps_v1",
+		MaxIterationsPerStep: transientMaxNewtonIterations * transientMaxNewtonAttemptsPerObservation,
+		MaxTotalIterations:   maxTransientWork,
+	}
 	for _, divisions := range []int{16, 32, 64} {
 		predictorAnalysis := analysis
 		predictorAnalysis.TimeStepS = analysis.TimeStepS / float64(divisions)

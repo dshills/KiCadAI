@@ -307,6 +307,9 @@ func (ctx *validationContext) validateComponents() (map[string]map[string]struct
 			if pin.Role != "" && !validPinRole(pin.Role) {
 				ctx.add(pinPath+".role", "pin role is not supported")
 			}
+			if pin.ElectricalType != "" && !validElectricalType(pin.ElectricalType) {
+				ctx.add(pinPath+".electrical_type", "pin electrical type is not supported")
+			}
 			pins[pin.Number] = struct{}{}
 		}
 		componentPins[component.ID] = pins

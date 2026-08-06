@@ -2,6 +2,7 @@ package routingadapters
 
 import (
 	"math"
+	"strings"
 	"testing"
 
 	"kicadai/internal/placement"
@@ -180,6 +181,30 @@ func TestRequestFromPlacementKeepsSMDPadLayerConstrained(t *testing.T) {
 	}
 }
 
+func TestRequestFromPlacementMapsCanonicalFrontSMDPadToBottomPlacement(t *testing.T) {
+	placementRequest := placementAdapterRequest()
+	placementRequest.Components[0].Pads[0].Type = "smd"
+	placementRequest.Components[0].Pads[0].Layers = []string{"F.Cu", "F.Mask", "F.Paste"}
+	placementResult := placement.Result{Placements: []placement.PlacementResult{
+		{Ref: "J1", Position: placement.Placement{XMM: 5, YMM: 5, Layer: "B.Cu"}},
+		{Ref: "J2", Position: placement.Placement{XMM: 15, YMM: 5, Layer: "F.Cu"}},
+	}}
+
+	request, issues := RequestFromPlacement(placementRequest, placementResult)
+	if len(issues) != 0 {
+		t.Fatalf("issues = %#v", issues)
+	}
+	pad := request.Components[0].Pads[0]
+	if pad.Type != routing.PadSMD || len(pad.Layers) != 1 || pad.Layers[0] != "B.Cu" {
+		t.Fatalf("pad = %#v, want bottom-placed canonical SMD pad constrained to B.Cu", pad)
+	}
+	access := routing.BuildPadAccess(request)
+	points, ok := routing.AccessPointsForEndpoint(access, routing.Endpoint{Ref: "J1", Pin: pad.Name})
+	if !ok || len(points) == 0 || !strings.EqualFold(points[0].Layer, "B.Cu") {
+		t.Fatalf("access points = %#v, ok=%v; issues=%#v", points, ok, access.Issues)
+	}
+}
+
 func TestRequestFromPlacementPreservesExplicitSMDCopperLayers(t *testing.T) {
 	placementRequest := placementAdapterRequest()
 	placementRequest.Components[0].Pads[0].Type = "smd"
@@ -226,6 +251,30 @@ func TestRequestFromPlacementPreservesLocalPadGeometryAndNet(t *testing.T) {
 	assertCloseFloat(t, pad.RotationDeg, 90, "pad rotation")
 	assertCloseFloat(t, pad.Size.WidthMM, 0.4, "pad width")
 	assertCloseFloat(t, pad.Size.HeightMM, 0.8, "pad height")
+}
+
+func TestRequestFromPlacementUsesKiCadBottomPadGeometry(t *testing.T) {
+	placementRequest := placementAdapterRequest()
+	placementRequest.Components[0].Pads = []placement.PadSummary{{
+		Name: "A", Net: "SIG_A", XMM: -0.65, YMM: 0.25, RotationDeg: 90,
+		WidthMM: 0.4, HeightMM: 0.8, Layers: []string{"F.Cu", "F.Mask", "F.Paste"},
+	}}
+	placementResult := placement.Result{Placements: []placement.PlacementResult{
+		{Ref: "J1", Position: placement.Placement{XMM: 5, YMM: 5, RotationDeg: 0, Layer: "B.Cu"}},
+		{Ref: "J2", Position: placement.Placement{XMM: 15, YMM: 5, Layer: "F.Cu"}},
+	}}
+
+	request, issues := RequestFromPlacement(placementRequest, placementResult)
+	if len(issues) != 0 {
+		t.Fatalf("issues = %#v", issues)
+	}
+	pad := request.Components[0].Pads[0]
+	assertCloseFloat(t, pad.Position.XMM, -0.65, "bottom pad x")
+	assertCloseFloat(t, pad.Position.YMM, -0.25, "bottom pad y")
+	assertCloseFloat(t, pad.RotationDeg, 270, "bottom pad rotation")
+	if len(pad.Layers) != 1 || pad.Layers[0] != "B.Cu" {
+		t.Fatalf("bottom pad layers = %#v", pad.Layers)
+	}
 }
 
 func TestRequestFromPlacementConvertsKeepouts(t *testing.T) {

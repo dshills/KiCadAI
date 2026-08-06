@@ -168,11 +168,11 @@ func TestControlledSwitchRelationshipComposesRegulatedLoadRail(t *testing.T) {
 			if instance.Kind == "isolated_converter" {
 				converterCount++
 			}
-			if instance.Kind == "resistor" && instance.ValueSI != nil && *instance.ValueSI < 10 {
+			if instance.Kind == "resistor" && instance.ValueSI != nil && *instance.ValueSI <= 10 {
 				ballastCount++
 			}
 		}
-		if converterCount != 1 || ballastCount != 2 {
+		if converterCount != 1 || ballastCount < 1 || ballastCount > 2 {
 			continue
 		}
 		plan := BuildValueSearchPlan(requirement, candidate.Graph, inventory, policy)
@@ -331,7 +331,8 @@ func TestWindowedControlledSwitchComposesSharedDecisionAndProtectedPower(t *test
 	loadSupply, _ := topologyControlledSwitchLoadSupply(requirement, initial, "port_"+envelope.output, supplies)
 	regulated, regulatedFound := topologyRegulatedLoadRail(requirement, initial, "port_"+envelope.output, loadSupply, inventory)
 	if !regulatedFound || regulated.seriesCount < 1 || regulated.parallelCount < 1 ||
-		regulated.ballastValueSI[0] <= 0 || regulated.ballastValueSI[1] <= 0 {
+		len(regulated.ballast) != 1 || len(regulated.ballastValueSI) != 1 ||
+		regulated.ballastValueSI[0] <= 0 {
 		t.Fatalf("windowed load envelope lacks a realizable regulated rail: %#v", regulated)
 	}
 	graphHash, err := GraphHash(initial)

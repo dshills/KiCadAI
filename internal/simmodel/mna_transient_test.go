@@ -453,7 +453,9 @@ func TestTransientAcceptedSubstepsCloseOriginalObservationTime(t *testing.T) {
 		nil, nil,
 	)
 	if !predicted || evidence.Method != "backward_euler_bounded_accepted_substeps_v1" ||
-		evidence.TimeSteps < 2 || evidence.AcceptedSubsteps != evidence.TimeSteps {
+		evidence.TimeSteps < 2 || evidence.AcceptedSubsteps != evidence.TimeSteps ||
+		evidence.MaxIterationsPerStep <= 0 || evidence.MaxTotalIterations <= 0 ||
+		evidence.TotalIterations > evidence.MaxTotalIterations {
 		t.Fatalf("predicted=%v evidence=%#v", predicted, evidence)
 	}
 	predictedOut := nonlinearNodeVoltage(&predictedSystem, predictedSolution, "OUT")

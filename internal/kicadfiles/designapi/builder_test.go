@@ -1251,6 +1251,15 @@ func TestBuilderPlaceFootprintUsesSideAwareDefaultsAndAttributes(t *testing.T) {
 			if property.Layer != kicadfiles.LayerBSilkS || !property.Hide {
 				t.Fatalf("bottom-side default property = %#v, want hidden B.SilkS", property)
 			}
+			if property.Rotation != 180 {
+				t.Fatalf("bottom-side property rotation = %g, want 180", property.Rotation)
+			}
+			if property.Name == "Reference" && property.Position.Y != kicadfiles.MM(1.5) {
+				t.Fatalf("bottom-side reference position = %#v, want mirrored local Y", property.Position)
+			}
+			if property.Name == "Value" && property.Position.Y != kicadfiles.MM(-1.5) {
+				t.Fatalf("bottom-side value position = %#v, want mirrored local Y", property.Position)
+			}
 		case "Datasheet", "Description":
 			if property.Layer != kicadfiles.LayerBFab || !property.Hide {
 				t.Fatalf("bottom-side metadata property = %#v, want hidden B.Fab", property)
@@ -2360,6 +2369,51 @@ func TestBuilderWriteProjectAddsGeneratedLocalFootprintLibrary(t *testing.T) {
 	}
 	if !strings.Contains(string(board), `"Resistor_SMD:R_0805_2012Metric"`) {
 		t.Fatalf("PCB should retain qualified footprint library ID:\n%s", board)
+	}
+}
+
+func TestBuilderWriteProjectDeduplicatesMixedSideFootprintLibraryGeometry(t *testing.T) {
+	builder := newTestBuilder(t)
+	padSpecs := []PadSpec{
+		{Name: "1", Offset: kicadfiles.Point{X: kicadfiles.MM(-0.5)}, Size: kicadfiles.Point{X: kicadfiles.MM(0.7), Y: kicadfiles.MM(0.8)}, Shape: "roundrect", Layers: []kicadfiles.BoardLayer{kicadfiles.LayerFCu, kicadfiles.LayerFPaste, kicadfiles.LayerFMask}},
+		{Name: "2", Offset: kicadfiles.Point{X: kicadfiles.MM(0.5)}, Size: kicadfiles.Point{X: kicadfiles.MM(0.7), Y: kicadfiles.MM(0.8)}, Shape: "roundrect", Layers: []kicadfiles.BoardLayer{kicadfiles.LayerFCu, kicadfiles.LayerFPaste, kicadfiles.LayerFMask}},
+	}
+	for index, ref := range []string{"R1", "R2"} {
+		addTwoPinSymbol(t, builder, ref, "Device:R", "10k", kicadfiles.Point{X: kicadfiles.MM(20 + float64(index)*10), Y: kicadfiles.MM(20)})
+		if err := builder.AssignFootprint(ref, "Resistor_SMD:R_0805_2012Metric"); err != nil {
+			t.Fatalf("AssignFootprint(%s) returned error: %v", ref, err)
+		}
+		layer := kicadfiles.LayerFCu
+		if index == 1 {
+			layer = kicadfiles.LayerBCu
+		}
+		if _, err := builder.PlaceFootprint(ref, PlaceFootprintOptions{Layer: layer, Pads: padSpecs}); err != nil {
+			t.Fatalf("PlaceFootprint(%s) returned error: %v", ref, err)
+		}
+	}
+
+	result, err := builder.WriteProject(filepath.Join(t.TempDir(), "mixed_side"), kicaddesign.WriteOptions{})
+	if err != nil {
+		t.Fatalf("WriteProject returned error: %v", err)
+	}
+	modulePath := filepath.Join(result.ProjectDir, "footprints", "Resistor_SMD.pretty", "R_0805_2012Metric.kicad_mod")
+	module, err := os.ReadFile(modulePath)
+	if err != nil {
+		t.Fatalf("read generated footprint module: %v", err)
+	}
+	if strings.Contains(string(module), `B.`) {
+		t.Fatalf("generated footprint module contains placed bottom layers:\n%s", module)
+	}
+	boardFiles, err := filepath.Glob(filepath.Join(result.ProjectDir, "*.kicad_pcb"))
+	if err != nil || len(boardFiles) != 1 {
+		t.Fatalf("PCB files = %v, err = %v", boardFiles, err)
+	}
+	board, err := os.ReadFile(boardFiles[0])
+	if err != nil {
+		t.Fatalf("read PCB: %v", err)
+	}
+	if !strings.Contains(string(board), `(layer "F.Cu")`) || !strings.Contains(string(board), `(layer "B.Cu")`) {
+		t.Fatalf("board did not preserve mixed-side instances:\n%s", board)
 	}
 }
 

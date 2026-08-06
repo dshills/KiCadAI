@@ -111,8 +111,9 @@ type SymbolOptions struct {
 }
 
 type PinSpec struct {
-	Number string
-	Offset kicadfiles.Point
+	Number         string
+	Offset         kicadfiles.Point
+	ElectricalType string
 }
 
 type Endpoint struct {
@@ -541,7 +542,11 @@ func (builder *Builder) AddSymbol(options SymbolOptions) (SymbolHandle, error) {
 }
 
 func (builder *Builder) ensureSchematicLibrarySymbol(libraryID string, preferResolver bool, fallbackPins []PinSpec) error {
+	electricalTypes := symbolPinElectricalTypes(fallbackPins)
 	if schematic.EmbeddedSymbolPresent(builder.design.Schematic, libraryID) {
+		if len(electricalTypes) > 0 && !schematic.ApplyEmbeddedSymbolPinElectricalTypes(builder.design.Schematic, libraryID, electricalTypes) {
+			return fmt.Errorf("symbol %s electrical pin contract does not match its embedded body", libraryID)
+		}
 		return nil
 	}
 	resolverFound := false
@@ -553,13 +558,16 @@ func (builder *Builder) ensureSchematicLibrarySymbol(libraryID string, preferRes
 		}
 	}
 	if preferResolver && resolverFound && resolverRaw != "" {
-		if !schematic.EnsureEmbeddedSymbolFromRaw(builder.design.Schematic, libraryID, resolverRaw) {
+		if !schematic.EnsureEmbeddedSymbolFromRawWithPinElectricalTypes(builder.design.Schematic, libraryID, resolverRaw, electricalTypes) {
 			return fmt.Errorf("symbol library record has malformed KiCad body: %s", libraryID)
 		}
 		builder.resolverSymbolIDs[libraryID] = struct{}{}
 		return nil
 	}
 	if schematic.EnsureEmbeddedSymbol(builder.design.Schematic, libraryID) {
+		if len(electricalTypes) > 0 && !schematic.ApplyEmbeddedSymbolPinElectricalTypes(builder.design.Schematic, libraryID, electricalTypes) {
+			return fmt.Errorf("symbol %s electrical pin contract does not match its embedded body", libraryID)
+		}
 		return nil
 	}
 	// With no library index there is no external symbol body to resolve at
@@ -573,6 +581,9 @@ func (builder *Builder) ensureSchematicLibrarySymbol(libraryID string, preferRes
 		if !schematic.EnsureEmbeddedFallbackSymbol(builder.design.Schematic, libraryID, pins) {
 			return fmt.Errorf("failed to create fallback symbol body: %s", libraryID)
 		}
+		if len(electricalTypes) > 0 && !schematic.ApplyEmbeddedSymbolPinElectricalTypes(builder.design.Schematic, libraryID, electricalTypes) {
+			return fmt.Errorf("symbol %s electrical pin contract does not match its fallback body", libraryID)
+		}
 		return nil
 	}
 	if builder.libraryIndex == nil {
@@ -581,7 +592,7 @@ func (builder *Builder) ensureSchematicLibrarySymbol(libraryID string, preferRes
 	if !resolverFound {
 		return fmt.Errorf("symbol library record not found: %s", libraryID)
 	}
-	if !schematic.EnsureEmbeddedSymbolFromRaw(builder.design.Schematic, libraryID, resolverRaw) {
+	if !schematic.EnsureEmbeddedSymbolFromRawWithPinElectricalTypes(builder.design.Schematic, libraryID, resolverRaw, electricalTypes) {
 		// Pin-only resolver records intentionally rely on the qualified library
 		// reference when no bundled template exists.
 		if resolverRaw == "" {
@@ -591,6 +602,16 @@ func (builder *Builder) ensureSchematicLibrarySymbol(libraryID string, preferRes
 	}
 	builder.resolverSymbolIDs[libraryID] = struct{}{}
 	return nil
+}
+
+func symbolPinElectricalTypes(pins []PinSpec) map[string]string {
+	result := make(map[string]string)
+	for _, pin := range pins {
+		if number, electricalType := strings.TrimSpace(pin.Number), strings.TrimSpace(pin.ElectricalType); number != "" && electricalType != "" {
+			result[number] = electricalType
+		}
+	}
+	return result
 }
 
 // SetSchematicHierarchy schedules deterministic child-sheet emission during
@@ -2124,6 +2145,7 @@ func (builder *Builder) PlaceFootprint(reference string, options PlaceFootprintO
 		}
 		footprint.Pads = append(footprint.Pads, pad)
 	}
+	pcb.ApplyFootprintLocalPlacementGeometry(&footprint)
 	if index, ok := builder.footprints[reference]; ok {
 		builder.design.PCB.Footprints[index] = footprint
 	} else {
@@ -3098,12 +3120,16 @@ func unnamedNonElectricalPad(spec PadSpec) bool {
 }
 
 func (builder *Builder) footprintProperties(key, reference, value string, placementLayer kicadfiles.BoardLayer, hideDefaultFootprintText bool) []pcb.FootprintProperty {
-	return []pcb.FootprintProperty{
+	properties := []pcb.FootprintProperty{
 		builder.footprintProperty(key, "Reference", reference, kicadfiles.DefaultFootprintPropertyPosition("Reference"), kicadfiles.BoardLayerForPlacement(kicadfiles.LayerFSilkS, placementLayer), hideDefaultFootprintText),
 		builder.footprintProperty(key, "Value", value, kicadfiles.DefaultFootprintPropertyPosition("Value"), kicadfiles.BoardLayerForPlacement(kicadfiles.LayerFSilkS, placementLayer), hideDefaultFootprintText),
 		builder.footprintProperty(key, "Datasheet", "", kicadfiles.DefaultFootprintPropertyPosition("Datasheet"), kicadfiles.BoardLayerForPlacement(kicadfiles.LayerFFab, placementLayer), true),
 		builder.footprintProperty(key, "Description", "", kicadfiles.DefaultFootprintPropertyPosition("Description"), kicadfiles.BoardLayerForPlacement(kicadfiles.LayerFFab, placementLayer), true),
 	}
+	for i := range properties {
+		properties[i].Effects.Justify = kicadfiles.BoardTextJustifyForPlacement(properties[i].Effects.Justify, placementLayer)
+	}
+	return properties
 }
 
 func (builder *Builder) footprintProperty(key, name, value string, position kicadfiles.Point, layer kicadfiles.BoardLayer, hide bool) pcb.FootprintProperty {

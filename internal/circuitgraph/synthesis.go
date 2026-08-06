@@ -11,6 +11,7 @@ import (
 
 	"kicadai/internal/components"
 	"kicadai/internal/reports"
+	"kicadai/internal/schematicir"
 )
 
 const (
@@ -764,7 +765,7 @@ func netHasInternalPowerOutput(net Net, selected map[string]ResolvedComponent) b
 			continue
 		}
 		function, ok := uniqueResolvedFunction(component.Functions, endpoint.Selector)
-		if ok && strings.EqualFold(strings.TrimSpace(function.Electrical), "power_out") {
+		if ok && resolvedFunctionIsProjectedPowerOutput(component, function) {
 			return true
 		}
 	}
@@ -785,11 +786,16 @@ func connectionHasInternalPowerOutput(connection FunctionConnection, selected ma
 			continue
 		}
 		function, ok := uniqueResolvedFunction(component.Functions, endpoint.Port)
-		if ok && strings.EqualFold(strings.TrimSpace(function.Electrical), "power_out") {
+		if ok && resolvedFunctionIsProjectedPowerOutput(component, function) {
 			return true
 		}
 	}
 	return false
+}
+
+func resolvedFunctionIsProjectedPowerOutput(component ResolvedComponent, function ResolvedFunction) bool {
+	return strings.EqualFold(strings.TrimSpace(function.Electrical), "power_out") &&
+		schematicPinElectricalType(component, function) != schematicir.ElectricalTypePassive
 }
 
 func explicitCompanionFunctionExists(intent FunctionIntent, parentID string, role string, connected map[string]bool) bool {

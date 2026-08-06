@@ -127,6 +127,7 @@ func NewPlacementResult(component Component, placement Placement, rules Rules) (
 type occupancy struct {
 	placements             []PlacementResult
 	keepouts               []Keepout
+	components             map[string]Component
 	physicalCollisionPairs map[string]struct{}
 }
 
@@ -157,7 +158,10 @@ func (conflict occupancyConflict) Message() string {
 }
 
 func newOccupancy(request Request) *occupancy {
-	return &occupancy{keepouts: request.Keepouts}
+	return &occupancy{
+		keepouts:   request.Keepouts,
+		components: componentsByNormalizedRef(request.Components),
+	}
 }
 
 func newValidationOccupancy(request Request) *occupancy {
@@ -180,7 +184,11 @@ func newValidationOccupancy(request Request) *occupancy {
 		refs := groupRefs[strings.ToUpper(strings.TrimSpace(keepouts[index].GroupID))]
 		keepouts[index].ExemptRefs = appendUniqueNormalizedRefs(keepouts[index].ExemptRefs, refs...)
 	}
-	return &occupancy{keepouts: keepouts, physicalCollisionPairs: physicalPairs}
+	return &occupancy{
+		keepouts:               keepouts,
+		components:             componentsByNormalizedRef(request.Components),
+		physicalCollisionPairs: physicalPairs,
+	}
 }
 
 func appendUniqueNormalizedRefs(existing []string, incoming ...string) []string {
@@ -231,6 +239,11 @@ func (o *occupancy) FirstConflictDetail(candidate PlacementResult) (occupancyCon
 	}
 	for _, existing := range o.placements {
 		if !strings.EqualFold(existing.Position.Layer, candidateLayer) {
+			candidateComponent, candidateOK := o.components[candidateRef]
+			existingComponent, existingOK := o.components[normalizeRef(existing.Ref)]
+			if candidateOK && existingOK && oppositeSideThroughHoleConflict(candidateComponent, candidate, existingComponent, existing) {
+				return occupancyConflict{Kind: occupancyConflictComponent, Name: existing.Ref}, true
+			}
 			continue
 		}
 		// Fixed placements are immutable authored geometry. Coarse component
@@ -259,6 +272,67 @@ func (o *occupancy) FirstConflictDetail(candidate PlacementResult) (occupancyCon
 	return occupancyConflict{}, false
 }
 
+// oppositeSideThroughHoleConflict preserves the useful ability to overlap
+// front- and back-side SMD footprints while accounting for drilled pads that
+// physically span the board. A drilled pad may not enter the placement
+// envelope of a component on the other face, in either placement order.
+func oppositeSideThroughHoleConflict(candidateComponent Component, candidate PlacementResult, existingComponent Component, existing PlacementResult) bool {
+	return throughHolePadIntersectsBounds(candidateComponent, candidate.Position, existing.Bounds) ||
+		throughHolePadIntersectsBounds(existingComponent, existing.Position, candidate.Bounds)
+}
+
+func throughHolePadIntersectsBounds(component Component, placement Placement, target Rect) bool {
+	for _, pad := range component.Pads {
+		if !padSpansBoard(pad) {
+			continue
+		}
+		width := math.Max(pad.WidthMM, pad.DrillMM)
+		height := math.Max(pad.HeightMM, pad.DrillMM)
+		if width <= 0 || height <= 0 {
+			continue
+		}
+		localX, localY := kicadfiles.BoardLocalXYForPlacement(pad.XMM, pad.YMM, kicadfiles.BoardLayer(placement.Layer))
+		localCenter := rotatePoint(Point{XMM: localX, YMM: localY}, placement.RotationDeg)
+		center := Point{XMM: placement.XMM + localCenter.XMM, YMM: placement.YMM + localCenter.YMM}
+		halfWidth := width / 2
+		halfHeight := height / 2
+		corners := [4]Point{
+			{XMM: -halfWidth, YMM: -halfHeight},
+			{XMM: halfWidth, YMM: -halfHeight},
+			{XMM: halfWidth, YMM: halfHeight},
+			{XMM: -halfWidth, YMM: halfHeight},
+		}
+		bounds := Rect{
+			Min: Point{XMM: math.Inf(1), YMM: math.Inf(1)},
+			Max: Point{XMM: math.Inf(-1), YMM: math.Inf(-1)},
+		}
+		padRotation := float64(kicadfiles.BoardLocalAngleForPlacement(kicadfiles.Angle(pad.RotationDeg), kicadfiles.BoardLayer(placement.Layer)))
+		for _, corner := range corners {
+			rotated := rotatePoint(corner, placement.RotationDeg+padRotation)
+			bounds.Min.XMM = math.Min(bounds.Min.XMM, center.XMM+rotated.XMM)
+			bounds.Min.YMM = math.Min(bounds.Min.YMM, center.YMM+rotated.YMM)
+			bounds.Max.XMM = math.Max(bounds.Max.XMM, center.XMM+rotated.XMM)
+			bounds.Max.YMM = math.Max(bounds.Max.YMM, center.YMM+rotated.YMM)
+		}
+		if bounds.Intersects(target) {
+			return true
+		}
+	}
+	return false
+}
+
+func padSpansBoard(pad PadSummary) bool {
+	if pad.DrillMM > 0 {
+		return true
+	}
+	switch strings.ToLower(strings.TrimSpace(pad.Type)) {
+	case "thru_hole", "through_hole", "np_thru_hole":
+		return true
+	default:
+		return false
+	}
+}
+
 func placementPairKey(left string, right string) string {
 	left = strings.ToUpper(strings.TrimSpace(left))
 	right = strings.ToUpper(strings.TrimSpace(right))
@@ -284,6 +358,7 @@ func rotatedBounds(bounds Bounds, placement Placement, spacing float64) Rect {
 	maxX := math.Inf(-1)
 	maxY := math.Inf(-1)
 	for _, corner := range corners {
+		corner.XMM, corner.YMM = kicadfiles.BoardLocalXYForPlacement(corner.XMM, corner.YMM, kicadfiles.BoardLayer(placement.Layer))
 		rotated := rotatePoint(corner, placement.RotationDeg)
 		x := placement.XMM + rotated.XMM
 		y := placement.YMM + rotated.YMM

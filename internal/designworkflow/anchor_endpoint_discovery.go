@@ -400,16 +400,9 @@ func placementNetRoles(nets []placement.Net) map[string]placement.NetRole {
 }
 
 func absolutePadPoint(position placement.Placement, pad placement.PadSummary) placement.Point {
-	localX := pad.XMM
-	if isBackCopperLayer(position.Layer) {
-		localX = -localX
-	}
-	rotated := rotateEndpointPoint(placement.Point{XMM: localX, YMM: pad.YMM}, position.RotationDeg)
+	localX, localY := kicadfiles.BoardLocalXYForPlacement(pad.XMM, pad.YMM, kicadfiles.BoardLayer(position.Layer))
+	rotated := rotateEndpointPoint(placement.Point{XMM: localX, YMM: localY}, position.RotationDeg)
 	return placement.Point{XMM: position.XMM + rotated.XMM, YMM: position.YMM + rotated.YMM}
-}
-
-func isBackCopperLayer(layer string) bool {
-	return strings.EqualFold(strings.TrimSpace(layer), "B.Cu")
 }
 
 func rotateEndpointPoint(point placement.Point, rotationDeg float64) placement.Point {
