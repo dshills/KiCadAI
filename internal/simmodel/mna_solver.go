@@ -1759,6 +1759,7 @@ func assertionValue(results []AnalysisResult, assertion Assertion) (float64, *Di
 		}
 		if result.Kind == AnalysisDCOperatingPoint &&
 			(assertion.Quantity == QuantityDCSweepVoltageSpanV ||
+				assertion.Quantity == QuantityDCSweepDeviceCurrentSpanA ||
 				assertion.Quantity == QuantityDCSweepVoltageSlopeVPerV ||
 				assertion.Quantity == QuantityDCSweepDeviceSlopeAperV) {
 			return dcSweepSpanOrSlope(result, assertion)

@@ -39,6 +39,10 @@ func TestMultiStageOODWindowedHeatingOptionalKiCadPromotion(t *testing.T) {
 	testMultiStageOODOptionalKiCadPromotion(t, "windowed_heating_power_control")
 }
 
+func TestMultiStageOODEnabledCurrentRegulationOptionalKiCadPromotion(t *testing.T) {
+	testMultiStageOODOptionalKiCadPromotion(t, "enabled_current_regulation")
+}
+
 func testMultiStageOODOptionalKiCadPromotion(t *testing.T, caseName string) {
 	t.Helper()
 	if os.Getenv(openTopologyKiCadPromotionEnv) != "1" {

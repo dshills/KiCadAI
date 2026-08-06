@@ -111,6 +111,23 @@ func TestSafeSchematicLabelStubOffsetAvoidsExistingLabelText(t *testing.T) {
 	}
 }
 
+func TestSafeSchematicLabelStubOffsetMatchesLayoutSearchEnvelope(t *testing.T) {
+	builder := newTestBuilder(t)
+	anchor := kicadfiles.Point{X: kicadfiles.MM(50), Y: kicadfiles.MM(50)}
+	grid := kicadfiles.MM(1.27)
+	for _, scale := range []kicadfiles.IU{1, 2, 3, 4} {
+		for _, direction := range []kicadfiles.Point{{X: grid}, {X: -grid}, {Y: -grid}, {Y: grid}} {
+			builder.design.Schematic.Labels = append(builder.design.Schematic.Labels, schematic.Label{
+				Position: kicadfiles.Point{X: anchor.X + direction.X*scale, Y: anchor.Y + direction.Y*scale},
+			})
+		}
+	}
+	preferred := kicadfiles.Point{X: grid}
+	if got, want := builder.safeSchematicLabelStubOffset("NEW_LABEL", anchor, preferred, true), (kicadfiles.Point{X: grid * 6}); got != want {
+		t.Fatalf("crowded label offset = %#v, want %#v", got, want)
+	}
+}
+
 func TestSafeSchematicLabelStubOffsetAvoidsVisibleSymbolText(t *testing.T) {
 	builder := newTestBuilder(t)
 	anchor := kicadfiles.Point{X: kicadfiles.MM(20), Y: kicadfiles.MM(20)}

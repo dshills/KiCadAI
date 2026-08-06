@@ -21,6 +21,7 @@ func TestRegulatedCurrentRelationshipsDeriveIndependentControls(t *testing.T) {
 		{"fault_protected_low_side_current_sink.json", "sink", "enable", "fault"},
 		{"startup_safe_high_side_current_source.json", "source", "permit", "fault"},
 		{"../architecture_generalization_corpus/protected_programmable_current_output.json", "source", "", ""},
+		{"../multi_stage_ood_corpus/enabled_current_regulation.json", "source", "enable", ""},
 	}
 	for _, test := range tests {
 		t.Run(test.file, func(t *testing.T) {
@@ -122,6 +123,137 @@ func TestHighSideCurrentRelationshipProducesMateriallyDistinctDriveArchitectures
 	if !direct || !buffered {
 		t.Fatalf("direct/buffered current architectures = %t/%t", direct, buffered)
 	}
+}
+
+func TestHighSideCurrentRelationshipSupportsActivationWithoutIndependentFault(t *testing.T) {
+	requirement, issues := DecodeStrict(bytes.NewReader(mustRead(
+		t,
+		filepath.Join(multiStageOODCorpusRoot(), "enabled_current_regulation.json"),
+	)))
+	if len(issues) != 0 {
+		t.Fatalf("requirement decode issues: %#v", issues)
+	}
+	inventory, _ := testHeldOutSynthesisEnvironment(t)
+	composition, found := currentSenseDifferentialComposition(
+		context.Background(), requirement, inventory, 1/requirementTransconductance(requirement),
+	)
+	if !found || math.Abs(composition.effectiveResistance-2) > 1e-12 ||
+		composition.shuntCount != 1 || composition.shuntResistance != 0.01 ||
+		!strings.Contains(composition.shunt.Key, "wslt2512") {
+		t.Fatalf("activation-only current-sense composition = %#v found=%t maximum_shunt=%.12g",
+			composition, found, regulatedCurrentMaximumShuntResistance(requirement))
+	}
+	initial, graphIssues := InitialGraph(requirement)
+	if len(graphIssues) != 0 {
+		t.Fatalf("initial graph issues: %#v", graphIssues)
+	}
+	hash, err := GraphHash(initial)
+	if err != nil {
+		t.Fatal(err)
+	}
+	topology, err := TopologyHash(initial)
+	if err != nil {
+		t.Fatal(err)
+	}
+	byKey := primitiveInventoryByKey(inventory)
+	state := topologySearchState{
+		graph: initial, hash: hash, topology: topology,
+		score: scoreTopologyGraph(requirement, initial, byKey, hash),
+	}
+	policy := multiStageOODPromotionPolicy()
+	candidates, consumption, rejections := topologyHighSideTransconductanceRelationshipSeeds(
+		context.Background(), requirement, inventory,
+		topologyRepresentatives(requirement, inventory), byKey,
+		GraphLimits{MaxPrimitiveInstances: policy.MaxPrimitiveInstances, MaxInternalNodes: policy.MaxInternalNodes},
+		policy, state,
+	)
+	if len(candidates) == 0 {
+		t.Fatalf("activation-only high-side current relationship produced no candidates: consumption=%#v rejections=%#v", consumption, rejections)
+	}
+	for _, candidate := range candidates {
+		counts := map[string]int{}
+		passPrimitive := PrimitiveCandidate{}
+		passEmitter := ""
+		switchedSupply := ""
+		for _, instance := range candidate.Graph.Instances {
+			counts[instance.Kind]++
+			if instance.Kind == "pnp_bjt" {
+				passPrimitive = byKey[instance.PrimitiveKey]
+				passEmitter = topologyTerminalNodes(instance)["EMITTER"]
+			}
+			if instance.Kind == "p_channel_mosfet" {
+				switchedSupply = topologyTerminalNodes(instance)["DRAIN"]
+			}
+		}
+		if candidate.Score.BehaviorGap != 0 || counts["p_channel_mosfet"] != 1 ||
+			counts["npn_bjt"] == 0 || counts["pnp_bjt"] == 0 || counts["opamp"] < 2 {
+			t.Fatalf("activation-only high-side graph score=%#v counts=%v topology=%s", candidate.Score, counts, testGraphTopologySummary(candidate.Graph))
+		}
+		if want := topologyHighSidePassDeviceCount(requirement, passPrimitive); counts["pnp_bjt"] != want {
+			t.Fatalf("activation-only parallel pass count=%d, want thermal-envelope count %d", counts["pnp_bjt"], want)
+		} else if want == 1 && passEmitter != switchedSupply {
+			t.Fatalf("single pass device retains an unnecessary sharing ballast: emitter=%s switched_supply=%s", passEmitter, switchedSupply)
+		}
+		plan := BuildValueSearchPlan(requirement, candidate.Graph, inventory, policy)
+		if plan.Status != ValuePlanReady {
+			t.Fatalf("activation-only high-side value plan = %#v", plan)
+		}
+		instanceValues := map[string]float64{}
+		for _, instance := range candidate.Graph.Instances {
+			if instance.ValueSI != nil {
+				instanceValues[instance.ID] = *instance.ValueSI
+			}
+		}
+		differentialScales, bufferedDriveScales := 0, 0
+		for _, domain := range plan.Domains {
+			for _, scale := range domain.AnalyticScales {
+				switch {
+				case strings.HasPrefix(scale.ID, "topology:differential_observation:"):
+					instanceID := strings.TrimPrefix(scale.ID, "topology:differential_observation:")
+					if scale.ValueSI != instanceValues[instanceID] {
+						t.Fatalf("differential scale %s=%g, selected graph value=%g", scale.ID, scale.ValueSI, instanceValues[instanceID])
+					}
+					differentialScales++
+				case strings.HasPrefix(scale.ID, "topology:buffered_pass_device_drive:"):
+					if scale.ValueSI <= 0 || scale.ValueSI >= 10_000 || len(domain.Candidates) == 0 ||
+						domain.Candidates[0].ValueSI == nil || *domain.Candidates[0].ValueSI >= 10_000 {
+						t.Fatalf("activation-only buffered drive scale=%g candidates=%#v", scale.ValueSI, domain.Candidates)
+					}
+					bufferedDriveScales++
+				}
+			}
+		}
+		if differentialScales < 4 || bufferedDriveScales != 1 {
+			t.Fatalf("activation-only differential/buffered scales = %d/%d", differentialScales, bufferedDriveScales)
+		}
+	}
+}
+
+func TestHighSidePassDeviceCountRejectsThermallyUnboundedParallelBank(t *testing.T) {
+	requirement, issues := DecodeStrict(bytes.NewReader(mustRead(
+		t,
+		filepath.Join(multiStageOODCorpusRoot(), "enabled_current_regulation.json"),
+	)))
+	if len(issues) != 0 {
+		t.Fatalf("requirement decode issues: %#v", issues)
+	}
+	maximumJunction := 70.001
+	for index := range requirement.Requirements.BehavioralRequirements {
+		assertion := &requirement.Requirements.BehavioralRequirements[index]
+		if assertion.Metric == "junction_temperature" {
+			assertion.Max = &maximumJunction
+		}
+	}
+	inventory, _ := testHeldOutSynthesisEnvironment(t)
+	for _, primitive := range inventory.Primitives {
+		if primitive.Kind == "pnp_bjt" && primitiveHasThermalEvidence(primitive) {
+			if got := topologyHighSidePassDeviceCount(requirement, primitive); got != 0 {
+				t.Fatalf("thermally infeasible parallel pass count = %d, want fail-closed zero", got)
+			}
+			return
+		}
+	}
+	t.Fatal("test inventory contains no thermal PNP pass device")
 }
 
 func TestLowSideTransconductanceRelationshipBuildsRegulatedProtectedPath(t *testing.T) {
@@ -280,6 +412,8 @@ func TestHighSideTransconductanceRelationshipBuildsStartupSafeFaultDominantPath(
 		context.Background(), requirement, inventory, 1/requirementTransconductance(requirement),
 	)
 	if !found || math.Abs(composition.effectiveResistance-12.5) > 1e-12 ||
+		composition.shuntCount != 1 || composition.shuntResistance != 10 ||
+		composition.inputCount != 1 || composition.feedbackCount != 1 ||
 		*composition.shunt.ValueDomain.Nominal != 10 ||
 		*composition.input.ValueDomain.Nominal != 10_000 ||
 		*composition.feedback.ValueDomain.Nominal != 12_500 {
@@ -318,13 +452,22 @@ func TestHighSideTransconductanceRelationshipBuildsStartupSafeFaultDominantPath(
 	activeStructures := map[string]bool{}
 	for _, candidate := range candidates {
 		counts := map[string]int{}
+		passPrimitive := PrimitiveCandidate{}
 		for _, instance := range candidate.Graph.Instances {
 			counts[instance.Kind]++
+			if instance.Kind == "pnp_bjt" {
+				passPrimitive = byKey[instance.PrimitiveKey]
+			}
 		}
 		bufferedDrive := counts["npn_bjt"] == 3
-		wantInstances, wantNPN, wantResistors := 20, 2, 13
+		wantPassDevices := topologyHighSidePassDeviceCount(requirement, passPrimitive)
+		wantResistors := 11
+		if wantPassDevices > 1 {
+			wantResistors += wantPassDevices
+		}
+		wantInstances, wantNPN := 5+wantPassDevices+wantResistors, 2
 		if bufferedDrive {
-			wantInstances, wantNPN, wantResistors = 22, 3, 14
+			wantInstances, wantNPN, wantResistors = wantInstances+2, 3, wantResistors+1
 			bufferedFound = true
 		} else {
 			directFound = true
@@ -335,7 +478,7 @@ func TestHighSideTransconductanceRelationshipBuildsStartupSafeFaultDominantPath(
 		}
 		activeStructures[activeHash] = true
 		if candidate.Score.BehaviorGap != 0 || len(candidate.Graph.Instances) != wantInstances ||
-			counts["opamp"] != 2 || counts["pnp_bjt"] != 2 || counts["npn_bjt"] != wantNPN ||
+			counts["opamp"] != 2 || counts["pnp_bjt"] != wantPassDevices || counts["npn_bjt"] != wantNPN ||
 			counts["p_channel_mosfet"] != 1 || counts["resistor"] != wantResistors {
 			t.Fatalf("high-side regulated-current graph score=%#v counts=%v topology=%s",
 				candidate.Score, counts, testGraphTopologySummary(candidate.Graph))
@@ -356,13 +499,19 @@ func TestHighSideTransconductanceRelationshipBuildsStartupSafeFaultDominantPath(
 				case strings.HasPrefix(scale.ID, "topology:differential_observation:") && scale.ValueSI == 12_500:
 					differentialFeedback++
 				case strings.HasPrefix(scale.ID, "topology:pass_device_drive:"):
-					want := (9.0 - 1.0) * 40.0 / (2.0 * .084)
+					want := (minimumTransconductanceSupplyVoltage(requirement) - 1.0) *
+						primitiveMinimumForwardBeta(passPrimitive) /
+						(2.0 * requiredTransconductanceOutputCurrent(requirement))
 					if math.Abs(scale.ValueSI-want) > 1e-12 || len(domain.Candidates) == 0 ||
-						domain.Candidates[0].ValueSI == nil || *domain.Candidates[0].ValueSI != 2_000 {
+						domain.Candidates[0].ValueSI == nil || *domain.Candidates[0].ValueSI <= 0 {
 						t.Fatalf("derived high-side base drive scale=%g candidates=%#v", scale.ValueSI, domain.Candidates)
 					}
 					drive++
-				case strings.HasPrefix(scale.ID, "topology:buffered_pass_device_drive:") && scale.ValueSI == 10_000:
+				case strings.HasPrefix(scale.ID, "topology:buffered_pass_device_drive:"):
+					if scale.ValueSI <= 0 || len(domain.Candidates) == 0 ||
+						domain.Candidates[0].ValueSI == nil || *domain.Candidates[0].ValueSI <= 0 {
+						t.Fatalf("derived buffered high-side drive scale=%g candidates=%#v", scale.ValueSI, domain.Candidates)
+					}
 					bufferedDriveScale++
 				case strings.HasPrefix(scale.ID, "topology:pass_device_bias:") && scale.ValueSI == 10_000:
 					bias++

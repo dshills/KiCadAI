@@ -110,6 +110,7 @@ const (
 	QuantityLowerThresholdVoltageV      = "lower_threshold_voltage_v"
 	QuantityUpperThresholdVoltageV      = "upper_threshold_voltage_v"
 	QuantityDCSweepVoltageSpanV         = "dc_sweep_voltage_span_v"
+	QuantityDCSweepDeviceCurrentSpanA   = "dc_sweep_device_current_span_a"
 	QuantityDCSweepVoltageSlopeVPerV    = "dc_sweep_voltage_slope_v_per_v"
 	QuantityDCSweepDeviceSlopeAperV     = "dc_sweep_device_slope_a_per_v"
 )
@@ -309,11 +310,12 @@ type ConditionValueEvent struct {
 }
 
 // DCSweep requests a bounded deterministic sweep of one already resolved
-// independent source. Bidirectional sweeps preserve the converged comparator
-// state between adjacent points so threshold and hysteresis are measured from
-// the circuit equations rather than inferred from a provider formula.
+// independent source or one reviewed scalar device value. Bidirectional
+// sweeps preserve the converged active-device state between adjacent points so
+// thresholds, hysteresis, and load regulation come from circuit equations.
 type DCSweep struct {
 	Component       string  `json:"component"`
+	DeviceValue     bool    `json:"device_value,omitempty"`
 	StartValue      float64 `json:"start_value"`
 	StopValue       float64 `json:"stop_value"`
 	Points          int     `json:"points"`

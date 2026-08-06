@@ -453,6 +453,21 @@ func TestTransientSOAPulseClockTracksOnlyDCUnsafeExcursion(t *testing.T) {
 	}
 }
 
+func TestTransientSOAMarginSaturatesAtTrustedReportingBound(t *testing.T) {
+	device := ResolvedDevice{
+		Component:       "switch",
+		ModelParameters: []NamedValue{{Name: "max_temperature_c", Value: 150}},
+	}
+	envelope := TransientSOAEnvelope{
+		DC: true, CaseTemperatureC: 25,
+		Points: []TransientSOAPoint{{VoltageV: 1, CurrentA: 1}, {VoltageV: 30, CurrentA: 1}},
+	}
+	margin, diagnostic := transientSOAMarginForEnvelope(device, envelope, 25, 10, 1e-15)
+	if diagnostic != nil || margin != maxMNASolutionValue {
+		t.Fatalf("light-load SOA margin = %.12g diagnostic %#v, want trusted maximum %.12g", margin, diagnostic, maxMNASolutionValue)
+	}
+}
+
 func TestTransientSOAAssertionFailsClosedWithoutEvaluatedEvidence(t *testing.T) {
 	result := AnalysisResult{
 		ID: "event", Kind: AnalysisElectrothermal,

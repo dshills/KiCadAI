@@ -1,15 +1,15 @@
 {
-  "record_count": 253,
+  "record_count": 254,
   "family_count": 33,
   "confidence_counts": {
     "blocked": 1,
     "library_derived": 1,
     "placeholder": 7,
     "rule_inferred": 6,
-    "verified": 238
+    "verified": 239
   },
   "alternative_coverage": {
-    "concrete_records": 215,
+    "concrete_records": 216,
     "generic_fallback_records": 38,
     "equivalence_groups": 28
   },
@@ -718,11 +718,11 @@
     {
       "family": "resistor",
       "defined": true,
-      "record_count": 32,
-      "concrete_records": 25,
+      "record_count": 33,
+      "concrete_records": 26,
       "generic_fallback_records": 7,
       "equivalence_groups": 5,
-      "verified_records": 30,
+      "verified_records": 31,
       "library_derived_records": 0,
       "rule_inferred_records": 2,
       "placeholder_records": 0,
@@ -758,6 +758,7 @@
         "resistor.vishay.tnpw0805.169k.0p1",
         "resistor.vishay.tnpw0805.1k00.1p0",
         "resistor.vishay.tnpw0805.47k0.0p1",
+        "resistor.vishay.tnpw0805.49r9.0p1",
         "resistor.vishay.tnpw0805.4k99.0p1",
         "resistor.vishay.tnpw0805.680k.1p0",
         "resistor.vishay.tnpw0805.90k9.0p1",

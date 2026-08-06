@@ -151,6 +151,7 @@ func Synthesize(
 		maximumTrialCount = max(maximumTrialCount, len(trials))
 	}
 	candidateOrder := synthesisCandidateEvaluationOrder(run.Search.Candidates)
+	initialEvaluationPolicy := synthesisInitialEvaluationPolicy(policy, len(candidateOrder))
 	simulationStopped := false
 	rankingWindowComplete := false
 	postPassEvaluations := 0
@@ -173,14 +174,13 @@ func Synthesize(
 				run.Report.StopReason = StopCanceled
 				return finalizeSynthesisRun(run)
 			}
-			if synthesisSimulationBudgetExhausted(run.Report.Consumption, policy) ||
-				run.Report.Consumption.ValueTrials >= policy.MaxValueTrials {
-				run.Report.Consumption.BudgetExhausted = true
+			if synthesisSimulationBudgetExhausted(run.Report.Consumption, initialEvaluationPolicy) ||
+				run.Report.Consumption.ValueTrials >= initialEvaluationPolicy.MaxValueTrials {
 				simulationStopped = true
 				break
 			}
 			work := valueTrials[candidateIndex][trialIndex]
-			evaluationPolicy := remainingSynthesisPolicy(policy, run.Report.Consumption)
+			evaluationPolicy := remainingSynthesisPolicy(initialEvaluationPolicy, run.Report.Consumption)
 			evaluation := EvaluateCandidate(
 				ctx, requirement, work.graph, nil, inventory, environment, evaluationPolicy,
 			)
@@ -369,6 +369,36 @@ func synthesisValueCapabilityUnavailable(candidates []SynthesisCandidateEvidence
 
 func synthesisPostPassEvaluationBudget(policy Policy) int {
 	return max(1, policy.MaxRetainedCandidates)
+}
+
+// synthesisInitialEvaluationPolicy gives topology/value exploration a share of
+// the count budgets proportional to the retained candidates while preserving
+// a share for the explicitly authorized repair attempts. Without this split,
+// value enumeration can consume every simulation corner before the first
+// diagnosis-driven repair is allowed to run.
+func synthesisInitialEvaluationPolicy(policy Policy, retainedCandidates int) Policy {
+	result := policy
+	if retainedCandidates <= 0 || policy.MaxTopologyRepairs <= 0 {
+		return result
+	}
+	repairSlots := min(retainedCandidates, policy.MaxTopologyRepairs)
+	result.MaxCandidateSimulations = synthesisInitialBudgetShare(
+		policy.MaxCandidateSimulations, retainedCandidates, repairSlots,
+	)
+	result.MaxCornerEvaluations = synthesisInitialBudgetShare(
+		policy.MaxCornerEvaluations, retainedCandidates, repairSlots,
+	)
+	result.MaxValueTrials = synthesisInitialBudgetShare(
+		policy.MaxValueTrials, retainedCandidates, repairSlots,
+	)
+	return result
+}
+
+func synthesisInitialBudgetShare(total int, retainedCandidates int, repairSlots int) int {
+	if total <= 0 || retainedCandidates <= 0 || repairSlots <= 0 {
+		return total
+	}
+	return max(1, total*retainedCandidates/(retainedCandidates+repairSlots))
 }
 
 func synthesisCandidateEvaluationOrder(

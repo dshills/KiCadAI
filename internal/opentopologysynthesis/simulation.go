@@ -262,6 +262,10 @@ func evaluateAssertionCorner(
 		}}
 		return attempt, []Diagnosis{diagnosis}
 	}
+	if (assertion.Metric == "line_regulation" || assertion.Metric == "load_regulation") &&
+		observationIsCurrentPort(requirement, assertion.Observation) {
+		quantity = simmodel.QuantityDCSweepDeviceCurrentSpanA
+	}
 	evidence, evidenceHashes, diagnostics := simulationComponentEvidence(
 		graph,
 		inventory,
@@ -893,6 +897,7 @@ func simulationHarnessConditions(
 	}
 	loadTargets := map[string]bool{}
 	controlTargets := map[string]bool{}
+	excitationTargets := map[string]bool{}
 	if assertion.Observation.Kind == "port" {
 		loadTargets[assertion.Observation.ID] = true
 	} else if assertion.Observation.Kind == "circuit" {
@@ -907,6 +912,9 @@ func simulationHarnessConditions(
 	if len(loadTargets) == 0 {
 		loadTargets = nil
 	}
+	if assertion.Excitation != nil && assertion.Excitation.Kind == "port" {
+		excitationTargets[assertion.Excitation.ID] = true
+	}
 	if simulationAssertionRequiresActiveControl(requirement, assertion) {
 		for _, port := range requirement.Requirements.Ports {
 			if port.Direction == "sink" && (port.Kind == "digital" || port.Kind == "control") {
@@ -914,7 +922,7 @@ func simulationHarnessConditions(
 			}
 		}
 	}
-	if len(loadTargets) == 0 && len(controlTargets) == 0 {
+	if len(loadTargets) == 0 && len(controlTargets) == 0 && len(excitationTargets) == 0 {
 		return result
 	}
 	for _, candidateCase := range requirement.Requirements.OperatingCases {
@@ -923,7 +931,9 @@ func simulationHarnessConditions(
 				slices.Contains([]string{"load_capacitance", "load_current", "load_inductance", "load_resistance"}, condition.Axis)
 			controlCondition := controlTargets[condition.Target] &&
 				slices.Contains([]string{"control_voltage", "input_voltage"}, condition.Axis)
-			if (!loadCondition && !controlCondition) ||
+			excitationCondition := excitationTargets[condition.Target] &&
+				slices.Contains([]string{"control_voltage", "input_voltage", "supply_voltage"}, condition.Axis)
+			if (!loadCondition && !controlCondition && !excitationCondition) ||
 				seen[conditionKey(condition)] {
 				continue
 			}
@@ -957,6 +967,43 @@ func simulationAssertionRequiresActiveControl(requirement Requirement, assertion
 		}
 	}
 	return false
+}
+
+// requirementActiveControlValue derives the asserted state of a control from
+// behavior rather than its name. An off-state current requirement identifies
+// the excitation that removes delivered output; a rising event on that same
+// excitation therefore supplies the complementary active state for related
+// steady-state output and circuit assertions.
+func requirementActiveControlValue(requirement Requirement, controlID string) (float64, bool) {
+	activationControl := false
+	for _, assertion := range requirement.Requirements.BehavioralRequirements {
+		if assertion.Excitation == nil || assertion.Excitation.Kind != "port" ||
+			assertion.Excitation.ID != controlID {
+			continue
+		}
+		switch assertion.Metric {
+		case "off_state_current", "on_state_voltage":
+			activationControl = true
+		}
+	}
+	if !activationControl {
+		return 0, false
+	}
+	active := math.Inf(-1)
+	for _, operatingCase := range requirement.Requirements.OperatingCases {
+		for _, condition := range operatingCase.Conditions {
+			if condition.Target == controlID &&
+				(condition.Axis == "input_voltage" || condition.Axis == "control_voltage") {
+				active = math.Max(active, condition.Max)
+			}
+		}
+		for _, event := range operatingCase.Events {
+			if event.Target == controlID && event.Kind == "input_step" && event.Applied > event.Initial {
+				active = math.Max(active, event.Applied)
+			}
+		}
+	}
+	return active, finite(active)
 }
 
 func simulationConditionValue(corner operatingCorner, condition OperatingCondition) float64 {
@@ -1028,7 +1075,9 @@ func simulationThermalBoundary(
 		assertion.Analysis != simmodel.AnalysisElectrothermal {
 		return nil, nil, nil
 	}
-	ambient := cornerAmbientTemperature(operatingCase, corner)
+	thermalCase := operatingCase
+	thermalCase.Conditions = simulationHarnessConditions(requirement, assertion, operatingCase)
+	ambient := cornerAmbientTemperature(thermalCase, corner)
 	conditions := []simmodel.NamedValue{{Name: "ambient_temperature_c", Value: ambient}}
 	junctionToCaseInstances := map[string]bool{}
 	for _, component := range evidence {
@@ -1111,7 +1160,7 @@ func simulationThermalBoundary(
 		}
 	}
 	loadResistance := targets.loadResistance
-	for _, condition := range operatingCase.Conditions {
+	for _, condition := range thermalCase.Conditions {
 		if condition.Axis != "load_resistance" {
 			continue
 		}
@@ -1133,7 +1182,7 @@ func simulationThermalBoundary(
 	}
 	if transferDissipation, bounded := thermalBehavioralTransferDissipation(
 		requirement,
-		operatingCase,
+		thermalCase,
 		corner,
 		railMagnitude,
 	); bounded {
@@ -1141,7 +1190,7 @@ func simulationThermalBoundary(
 	}
 	if transferDissipation, bounded := thermalBehavioralCurrentTransferDissipation(
 		requirement,
-		operatingCase,
+		thermalCase,
 		corner,
 		railMagnitude,
 	); bounded {
@@ -1295,10 +1344,10 @@ func thermalBehavioralCurrentTransferDissipation(
 			if condition.Axis != "load_resistance" || condition.Target != port.ID {
 				continue
 			}
-			candidate := corner.Values[conditionKey(condition)]
-			if candidate <= 0 {
-				candidate = condition.Min
-			}
+			// Linear pass-device loss is greatest at the minimum declared load
+			// resistance. Use that bounded worst case even when the enclosing
+			// electrical corner is evaluating a lighter load.
+			candidate := condition.Min
 			if candidate > 0 && (loadResistance <= 0 || candidate < loadResistance) {
 				loadResistance = candidate
 			}
@@ -1356,6 +1405,7 @@ func simulationIntentParts(
 		}
 		analysis.DCSweep = &simmodel.DCSweep{
 			Component:     source,
+			DeviceValue:   dcSweepUsesDeviceValue(requirement, assertion, source),
 			StartValue:    start,
 			StopValue:     stop,
 			Points:        simulationDCSweepPoints(assertion, start, stop),
@@ -1732,7 +1782,7 @@ func simulationMeasurementScope(
 			return "", nil, &SimulationDiagnostic{Code: diagnosisModelUnavailable, Path: "simulation.assertion.component", Message: "input-impedance measurement requires a resolved excitation source"}
 		}
 		return component, nil, nil
-	case simmodel.QuantityDeviceCurrentA, simmodel.QuantityDCSweepDeviceSlopeAperV:
+	case simmodel.QuantityDeviceCurrentA, simmodel.QuantityDCSweepDeviceCurrentSpanA, simmodel.QuantityDCSweepDeviceSlopeAperV:
 		if component, found := observedCurrentComponent(requirement, assertion, operatingCase, corner, graph); found {
 			return component, nil, nil
 		}
@@ -1832,6 +1882,18 @@ func simulationMeasurementScope(
 	default:
 		return "", nil, nil
 	}
+}
+
+func observationIsCurrentPort(requirement Requirement, observation Observation) bool {
+	if observation.Kind != "port" {
+		return false
+	}
+	for _, port := range requirement.Requirements.Ports {
+		if port.ID == observation.ID {
+			return port.Kind == "analog_current" || port.Kind == "controlled_current"
+		}
+	}
+	return false
 }
 
 func observationIsAnalogCurrentPort(requirement Requirement, observation Observation) bool {
@@ -2200,25 +2262,34 @@ func simulationExcitations(
 		}
 		result = append(result, excitation)
 	}
-	for _, condition := range operatingCase.Conditions {
-		if condition.Axis != "load_current" {
+	for _, condition := range simulationHarnessConditions(requirement, assertion, operatingCase) {
+		if condition.Axis != "load_current" && condition.Axis != "load_resistance" {
 			continue
 		}
 		// Quiescent current is the supply current with the declared external
 		// load removed. Keep its harness and excitation sets identical: a load
 		// source omitted from the circuit must not survive as an analysis
 		// excitation referencing a nonexistent component.
-		if simulationExcludesLoadCurrent(assertion) {
+		if condition.Axis == "load_current" && simulationExcludesLoadCurrent(assertion) {
 			continue
 		}
-		if _, found := dynamicVoltageOutputLoadResistance(
-			requirement, assertion, condition, corner.Values[conditionKey(condition)],
-		); found {
+		if condition.Axis == "load_current" {
+			if _, found := dynamicVoltageOutputLoadResistance(
+				requirement, assertion, condition, corner.Values[conditionKey(condition)],
+			); found {
+				continue
+			}
+		}
+		if condition.Axis == "load_resistance" {
 			continue
+		}
+		value := corner.Values[conditionKey(condition)]
+		if value == 0 {
+			value = simulationConditionValue(corner, condition)
 		}
 		result = append(result, simmodel.SourceExcitation{
 			Component: loadInstanceID(condition.Target, condition.Axis),
-			DCValue:   corner.Values[conditionKey(condition)],
+			DCValue:   value,
 		})
 	}
 	slices.SortFunc(result, func(left, right simmodel.SourceExcitation) int {
@@ -2331,6 +2402,25 @@ func windowDynamicExcitationRange(
 
 func loadInstanceID(target, axis string) string {
 	return canonicalIdentifier("load_" + target + "_" + axis)
+}
+
+func dcSweepUsesDeviceValue(requirement Requirement, assertion BehavioralAssertion, source string) bool {
+	if assertion.Metric != "load_regulation" || source == "" {
+		return false
+	}
+	for _, caseID := range assertion.OperatingCases {
+		for _, operatingCase := range requirement.Requirements.OperatingCases {
+			if operatingCase.ID != caseID {
+				continue
+			}
+			for _, condition := range operatingCase.Conditions {
+				if condition.Axis == "load_resistance" && source == loadInstanceID(condition.Target, condition.Axis) {
+					return true
+				}
+			}
+		}
+	}
+	return false
 }
 
 func selectHarnessRecord(
@@ -2552,6 +2642,24 @@ func assertionSourceValue(
 			}
 			if active > 0 {
 				return active
+			}
+		}
+		if simulationAssertionRequiresActiveControl(requirement, assertion) {
+			eventDrivenAnalysis := assertion.Analysis == simmodel.AnalysisTransient ||
+				assertion.Analysis == simmodel.AnalysisElectrothermal
+			hasExecutedTransition := false
+			if eventDrivenAnalysis {
+				for _, event := range operatingCase.Events {
+					if event.Target == node.SemanticID && event.Kind == "input_step" {
+						hasExecutedTransition = true
+						break
+					}
+				}
+			}
+			if !hasExecutedTransition {
+				if active, found := requirementActiveControlValue(requirement, node.SemanticID); found {
+					return active
+				}
 			}
 		}
 	}
@@ -3037,7 +3145,7 @@ func sweepSourceAndRange(
 		source := sourceInstanceForObservation(graph, *excitation)
 		excitationTarget := ""
 		excitationAxis := ""
-		for _, condition := range operatingCase.Conditions {
+		for _, condition := range simulationHarnessConditions(requirement, assertion, operatingCase) {
 			target, found := externalNodeForSemanticTarget(graph, condition.Target)
 			if found && observationMatchesNode(target, *excitation) &&
 				(condition.Axis == "input_voltage" || condition.Axis == "supply_voltage") {
@@ -3119,30 +3227,33 @@ func sweepSourceAndRange(
 	if assertion.Metric == "load_regulation" {
 		minimum, maximum := math.Inf(1), math.Inf(-1)
 		targetID := ""
+		loadAxis := ""
 		for _, caseID := range assertion.OperatingCases {
 			for _, candidateCase := range requirement.Requirements.OperatingCases {
 				if candidateCase.ID != caseID {
 					continue
 				}
 				for _, condition := range candidateCase.Conditions {
-					if condition.Axis != "load_current" {
+					if condition.Axis != "load_current" && condition.Axis != "load_resistance" {
 						continue
 					}
 					target, found := externalNodeForSemanticTarget(graph, condition.Target)
 					if !found || target.ID != observationNodeID(graph, requirement, assertion.Observation) {
 						continue
 					}
-					if targetID != "" && targetID != condition.Target {
+					if (targetID != "" && targetID != condition.Target) ||
+						(loadAxis != "" && loadAxis != condition.Axis) {
 						return "", 0, 0, false
 					}
 					targetID = condition.Target
+					loadAxis = condition.Axis
 					minimum = math.Min(minimum, condition.Min)
 					maximum = math.Max(maximum, condition.Max)
 				}
 			}
 		}
-		if targetID != "" && maximum > minimum {
-			return loadInstanceID(targetID, "load_current"), minimum, maximum, true
+		if targetID != "" && loadAxis != "" && maximum > minimum {
+			return loadInstanceID(targetID, loadAxis), minimum, maximum, true
 		}
 	}
 	return "", 0, 0, false

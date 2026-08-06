@@ -5693,10 +5693,9 @@ func topologyHighSideTransconductanceRelationshipSeeds(
 		)
 	}
 	requireTransconductance := len(relationships) != 0
-	requireProtectedControl := false
+	requireControlledSupply := false
 	for _, relationship := range relationships {
-		requireProtectedControl = requireProtectedControl ||
-			(relationship.activation != "" && relationship.fault != "")
+		requireControlledSupply = requireControlledSupply || relationship.activation != ""
 	}
 	requireThermal := false
 	requireSOA := false
@@ -5717,6 +5716,7 @@ func topologyHighSideTransconductanceRelationshipSeeds(
 	}
 	requiredAnalyses := requirementAnalysisSet(requirement)
 	passCandidates := []PrimitiveCandidate{}
+	passDeviceCounts := map[string]int{}
 	for _, primitive := range inventory.Primitives {
 		if primitive.Kind != "pnp_bjt" ||
 			(requireThermal && !primitiveHasThermalEvidence(primitive)) ||
@@ -5725,10 +5725,21 @@ func topologyHighSideTransconductanceRelationshipSeeds(
 			!ratingsCoverRequirement(requirement, primitive) {
 			continue
 		}
+		count := 1
+		if requireThermal {
+			count = topologyHighSidePassDeviceCount(requirement, primitive)
+			if count == 0 {
+				continue
+			}
+		}
 		passCandidates = append(passCandidates, primitive)
+		passDeviceCounts[primitive.Key] = count
 	}
 	slices.SortFunc(passCandidates, func(left, right PrimitiveCandidate) int {
-		return compareRepresentativePrimitives(left, right, requiredAnalyses)
+		return cmp.Or(
+			cmp.Compare(passDeviceCounts[left.Key], passDeviceCounts[right.Key]),
+			compareRepresentativePrimitives(left, right, requiredAnalyses),
+		)
 	})
 	var passDevice PrimitiveCandidate
 	if len(passCandidates) != 0 {
@@ -5736,7 +5747,7 @@ func topologyHighSideTransconductanceRelationshipSeeds(
 	}
 	passDeviceCount := 1
 	if requireThermal {
-		passDeviceCount = 2
+		passDeviceCount = passDeviceCounts[passDevice.Key]
 	}
 	senseAmplifier := topologyCurrentSenseAmplifierPrimitive(requirement, inventory)
 	controller := topologyHighSideCurrentControllerPrimitive(
@@ -5759,7 +5770,7 @@ func topologyHighSideTransconductanceRelationshipSeeds(
 		ctx, requirement, inventory, 1/transconductance,
 	)
 	if senseAmplifier.Key == "" || controller.Key == "" || passDevice.Key == "" || resistor.Key == "" ||
-		!senseValuesFound || (requireProtectedControl && (powerSwitch.Key == "" || controlDevice.Key == "")) {
+		!senseValuesFound || (requireControlledSupply && (powerSwitch.Key == "" || controlDevice.Key == "")) {
 		return nil, Consumption{}, map[string][]string{}
 	}
 	supplies := topologyNodesByRole(initial.graph, "supply")
@@ -5768,25 +5779,53 @@ func topologyHighSideTransconductanceRelationshipSeeds(
 	rejections := map[string][]string{}
 	retained := map[string]TopologyCandidate{}
 	for _, relationship := range relationships {
-		protectedControl := relationship.activation != "" && relationship.fault != ""
-		if relationship.direction != "source" ||
-			((relationship.activation == "") != (relationship.fault == "")) {
+		controlledSupply := relationship.activation != ""
+		faultProtected := relationship.fault != ""
+		if relationship.direction != "source" || (faultProtected && !controlledSupply) {
 			continue
 		}
 		input := externalRelationshipNode(initial.graph, relationship.input)
 		output := externalRelationshipNode(initial.graph, relationship.output)
 		activation, fault := "", ""
-		if protectedControl {
+		if controlledSupply {
 			activation = externalRelationshipNode(initial.graph, relationship.activation)
+		}
+		if faultProtected {
 			fault = externalRelationshipNode(initial.graph, relationship.fault)
 		}
 		if input == "" || output == "" ||
-			(protectedControl && (activation == "" || fault == "")) {
+			(controlledSupply && activation == "") || (faultProtected && fault == "") {
 			continue
 		}
+		loadSupply, loadSupplyFound := topologyControlledSwitchLoadSupply(
+			requirement, initial.graph, output, supplies,
+		)
+		if !loadSupplyFound {
+			rejections["relationship_gap"] = append(
+				rejections["relationship_gap"],
+				output+": regulated current requires one unambiguous load supply",
+			)
+			continue
+		}
+		controlSupplies := []string{}
 		for _, supply := range supplies {
+			if len(supplies) == 1 || supply != loadSupply {
+				controlSupplies = append(controlSupplies, supply)
+			}
+		}
+		if len(controlSupplies) != 1 {
+			rejections["relationship_gap"] = append(
+				rejections["relationship_gap"],
+				output+": regulated current requires one unambiguous control supply",
+			)
+			continue
+		}
+		for _, controlSupply := range controlSupplies {
 			for _, reference := range references {
-				driveModes := []bool{false}
+				driveModes := []bool{}
+				if controlSupply == loadSupply {
+					driveModes = append(driveModes, false)
+				}
 				if controlDevice.Key != "" && bufferedDriveResistor.Key != "" {
 					driveModes = append(driveModes, true)
 				}
@@ -5807,14 +5846,14 @@ func topologyHighSideTransconductanceRelationshipSeeds(
 						)
 						return node
 					}
-					switchedSupply := supply
-					if protectedControl {
+					switchedSupply := loadSupply
+					if controlledSupply {
 						switchGate := nextNode()
 						if switchGate == "" {
 							continue
 						}
 						state = addRelationshipPrimitive(state, requirement, inventoryByKey, resistor,
-							topologyTwoTerminalPlacement(supply, switchGate), &consumption)
+							topologyTwoTerminalPlacement(loadSupply, switchGate), &consumption)
 						switchedSupply = nextNode()
 						if switchedSupply == "" {
 							continue
@@ -5822,7 +5861,7 @@ func topologyHighSideTransconductanceRelationshipSeeds(
 						state = addRelationshipPrimitive(state, requirement, inventoryByKey, powerSwitch, []TerminalConnection{
 							{Terminal: "GATE", Node: switchGate},
 							{Terminal: "DRAIN", Node: switchedSupply},
-							{Terminal: "SOURCE", Node: supply},
+							{Terminal: "SOURCE", Node: loadSupply},
 						}, &consumption)
 						permitBase := nextNode()
 						if permitBase == "" {
@@ -5837,33 +5876,38 @@ func topologyHighSideTransconductanceRelationshipSeeds(
 							{Terminal: "COLLECTOR", Node: switchGate},
 							{Terminal: "EMITTER", Node: reference},
 						}, &consumption)
-						faultBase := nextNode()
-						if faultBase == "" {
-							continue
+						if faultProtected {
+							faultBase := nextNode()
+							if faultBase == "" {
+								continue
+							}
+							for _, edge := range [][2]string{{fault, faultBase}, {faultBase, reference}} {
+								state = addRelationshipPrimitive(state, requirement, inventoryByKey, resistor,
+									topologyTwoTerminalPlacement(edge[0], edge[1]), &consumption)
+							}
+							state = addRelationshipPrimitive(state, requirement, inventoryByKey, controlDevice, []TerminalConnection{
+								{Terminal: "BASE", Node: faultBase},
+								{Terminal: "COLLECTOR", Node: permitBase},
+								{Terminal: "EMITTER", Node: reference},
+							}, &consumption)
 						}
-						for _, edge := range [][2]string{{fault, faultBase}, {faultBase, reference}} {
-							state = addRelationshipPrimitive(state, requirement, inventoryByKey, resistor,
-								topologyTwoTerminalPlacement(edge[0], edge[1]), &consumption)
-						}
-						state = addRelationshipPrimitive(state, requirement, inventoryByKey, controlDevice, []TerminalConnection{
-							{Terminal: "BASE", Node: faultBase},
-							{Terminal: "COLLECTOR", Node: permitBase},
-							{Terminal: "EMITTER", Node: reference},
-						}, &consumption)
 					}
 					passBase := nextNode()
 					if passBase == "" {
 						continue
 					}
-					emitterNodes := make([]string, 0, passDeviceCount)
-					for index := 0; index < passDeviceCount; index++ {
-						emitter := nextNode()
-						if emitter == "" {
-							break
+					emitterNodes := []string{switchedSupply}
+					if passDeviceCount > 1 {
+						emitterNodes = make([]string, 0, passDeviceCount)
+						for index := 0; index < passDeviceCount; index++ {
+							emitter := nextNode()
+							if emitter == "" {
+								break
+							}
+							emitterNodes = append(emitterNodes, emitter)
+							state = addRelationshipPrimitive(state, requirement, inventoryByKey, resistor,
+								topologyTwoTerminalPlacement(switchedSupply, emitter), &consumption)
 						}
-						emitterNodes = append(emitterNodes, emitter)
-						state = addRelationshipPrimitive(state, requirement, inventoryByKey, resistor,
-							topologyTwoTerminalPlacement(switchedSupply, emitter), &consumption)
 					}
 					if len(emitterNodes) != passDeviceCount {
 						continue
@@ -5886,28 +5930,38 @@ func topologyHighSideTransconductanceRelationshipSeeds(
 							&consumption,
 						)
 					}
-					state = addRelationshipPrimitive(state, requirement, inventoryByKey, senseValues.shunt,
-						topologyTwoTerminalPlacement(passCollector, output), &consumption)
+					for index := 0; index < senseValues.shuntCount; index++ {
+						state = addRelationshipPrimitive(state, requirement, inventoryByKey, senseValues.shunt,
+							topologyTwoTerminalPlacement(passCollector, output), &consumption)
+					}
 					senseMinus := nextNode()
 					if senseMinus == "" {
 						continue
 					}
-					state = addRelationshipPrimitive(state, requirement, inventoryByKey, senseValues.input,
-						topologyTwoTerminalPlacement(output, senseMinus), &consumption)
+					for index := 0; index < senseValues.inputCount; index++ {
+						state = addRelationshipPrimitive(state, requirement, inventoryByKey, senseValues.input,
+							topologyTwoTerminalPlacement(output, senseMinus), &consumption)
+					}
 					sensePlus := nextNode()
 					if sensePlus == "" {
 						continue
 					}
-					state = addRelationshipPrimitive(state, requirement, inventoryByKey, senseValues.input,
-						topologyTwoTerminalPlacement(passCollector, sensePlus), &consumption)
-					state = addRelationshipPrimitive(state, requirement, inventoryByKey, senseValues.feedback,
-						topologyTwoTerminalPlacement(sensePlus, reference), &consumption)
+					for index := 0; index < senseValues.inputCount; index++ {
+						state = addRelationshipPrimitive(state, requirement, inventoryByKey, senseValues.input,
+							topologyTwoTerminalPlacement(passCollector, sensePlus), &consumption)
+					}
+					for index := 0; index < senseValues.feedbackCount; index++ {
+						state = addRelationshipPrimitive(state, requirement, inventoryByKey, senseValues.feedback,
+							topologyTwoTerminalPlacement(sensePlus, reference), &consumption)
+					}
 					senseOutput := nextNode()
 					if senseOutput == "" {
 						continue
 					}
-					state = addRelationshipPrimitive(state, requirement, inventoryByKey, senseValues.feedback,
-						topologyTwoTerminalPlacement(senseOutput, senseMinus), &consumption)
+					for index := 0; index < senseValues.feedbackCount; index++ {
+						state = addRelationshipPrimitive(state, requirement, inventoryByKey, senseValues.feedback,
+							topologyTwoTerminalPlacement(senseOutput, senseMinus), &consumption)
+					}
 					controlOutput := nextNode()
 					if controlOutput == "" {
 						continue
@@ -5942,7 +5996,7 @@ func topologyHighSideTransconductanceRelationshipSeeds(
 							{Terminal: "IN_PLUS", Node: sensePlus},
 							{Terminal: "OUT", Node: senseOutput},
 							{Terminal: "V_MINUS", Node: reference},
-							{Terminal: "V_PLUS", Node: supply},
+							{Terminal: "V_PLUS", Node: controlSupply},
 						},
 						&consumption,
 					)
@@ -5956,7 +6010,7 @@ func topologyHighSideTransconductanceRelationshipSeeds(
 							{Terminal: "IN_PLUS", Node: controllerPlus},
 							{Terminal: "OUT", Node: controlOutput},
 							{Terminal: "V_MINUS", Node: reference},
-							{Terminal: "V_PLUS", Node: supply},
+							{Terminal: "V_PLUS", Node: controlSupply},
 						},
 						&consumption,
 					)

@@ -918,6 +918,42 @@ func TestMNADCSweepAppliesExcitationScaleButReportsSemanticValue(t *testing.T) {
 	}
 }
 
+func TestMNADCSweepAppliesReviewedResistorValue(t *testing.T) {
+	intent := Intent{
+		ModelID: ModelLinearCircuitMNAV1,
+		Analyses: []Analysis{{
+			ID: "load", Kind: AnalysisDCOperatingPoint,
+			Excitations: []SourceExcitation{{Component: "source", DCValue: 10}},
+			DCSweep:     &DCSweep{Component: "load", DeviceValue: true, StartValue: 1000, StopValue: 2000, Points: 3},
+		}},
+		Assertions: []Assertion{
+			{AnalysisID: "load", Node: "OUT", Quantity: QuantityDCSweepVoltageSpanV, Min: 1.66, Max: 1.67},
+			{AnalysisID: "load", Component: "load", Quantity: QuantityDCSweepDeviceCurrentSpanA, Min: 0, Max: .0017},
+		},
+	}
+	components := []ComponentEvidence{
+		voltageSourceEvidence("source", "VIN", "GND"),
+		resistorEvidence("series", 1000, "VIN", "OUT"),
+		resistorEvidence("load", 1000, "OUT", "GND"),
+	}
+	plan, diagnostics := ResolveWithTopology(intent, "test", "hash", components, []NodeEvidence{
+		{Name: "GND", Role: "ground"}, {Name: "VIN"}, {Name: "OUT"},
+	})
+	if len(diagnostics) != 0 {
+		t.Fatalf("resolve diagnostics = %+v", diagnostics)
+	}
+	report, diagnostics := Evaluate(plan)
+	if len(diagnostics) != 0 || report.Status != "pass" {
+		t.Fatalf("report=%+v diagnostics=%+v", report, diagnostics)
+	}
+	if got := nodeReal(report.Analyses[0].Points[0].Nodes, "OUT"); math.Abs(got-5) > 1e-9 {
+		t.Fatalf("1 kohm load output = %.12g V, want 5 V", got)
+	}
+	if got := nodeReal(report.Analyses[0].Points[2].Nodes, "OUT"); math.Abs(got-20.0/3) > 1e-9 {
+		t.Fatalf("2 kohm load output = %.12g V, want %.12g V", got, 20.0/3)
+	}
+}
+
 func TestMNADCSweepWithoutTransitionProducesCensoredFailedAssertion(t *testing.T) {
 	intent := Intent{
 		ModelID: ModelLinearCircuitMNAV1,

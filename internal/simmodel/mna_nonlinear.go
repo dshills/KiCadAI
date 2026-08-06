@@ -214,6 +214,15 @@ func solveNonlinearDCFromWarmStateWithPowerTransition(plan Plan, analysis Analys
 					totalEvidence.Method = fallbackEvidence.Method
 					return fallbackSystem, fallbackSolution, totalEvidence, fallbackStates, nil
 				}
+				if fallbackSystem, fallbackSolution, fallbackEvidence, fallbackStates, ok := solveNonlinearDCByLinearAmplifierRelease(
+					plan, analysis, bisectedStates, bisectedSolution, allowPowerTransition,
+				); ok {
+					totalEvidence.SourceStages += fallbackEvidence.SourceStages
+					totalEvidence.Iterations += fallbackEvidence.Iterations
+					totalEvidence.TotalIterations = totalEvidence.Iterations
+					totalEvidence.Method = fallbackEvidence.Method
+					return fallbackSystem, fallbackSolution, totalEvidence, fallbackStates, nil
+				}
 				bisectedResolved, _, resolveDiagnostic := resolvedActiveDeviceStatesWithPowerTransition(plan, bisectedSystem, bisectedSolution, allowPowerTransition)
 				if resolveDiagnostic == nil && (sameOpAmpClamps(bisectedStates, bisectedResolved) || activeDeviceStateSolutionConsistent(plan, bisectedSystem, bisectedSolution, bisectedStates, bisectedResolved)) {
 					totalEvidence.Method = "bounded_opamp_bisection_consistency_fallback_v1"
@@ -251,6 +260,15 @@ func solveNonlinearDCFromWarmStateWithPowerTransition(plan Plan, analysis Analys
 				totalEvidence.Method = fallbackEvidence.Method
 				return fallbackSystem, fallbackSolution, totalEvidence, fallbackStates, nil
 			}
+			if fallbackSystem, fallbackSolution, fallbackEvidence, fallbackStates, ok := solveNonlinearDCByLinearAmplifierRelease(
+				plan, analysis, next, solution, allowPowerTransition,
+			); ok {
+				totalEvidence.SourceStages += fallbackEvidence.SourceStages
+				totalEvidence.Iterations += fallbackEvidence.Iterations
+				totalEvidence.TotalIterations = totalEvidence.Iterations
+				totalEvidence.Method = fallbackEvidence.Method
+				return fallbackSystem, fallbackSolution, totalEvidence, fallbackStates, nil
+			}
 			return system, solution, totalEvidence, states, &Diagnostic{Path: "devices", Message: "bounded active-device operating-point states did not converge (current " + activeDeviceStateKey(plan, states) + ", resolved " + resolvedKey + ", cycle " + lastStateKey + " -> " + stateKey + ")", Suggestion: "correct ambiguous feedback or add a reviewed hysteresis network and loading"}
 		}
 		seen[stateKey] = true
@@ -259,6 +277,52 @@ func solveNonlinearDCFromWarmStateWithPowerTransition(plan Plan, analysis Analys
 		warmSolution = append(warmSolution[:0], solution...)
 	}
 	return mnaSystem{}, nil, totalEvidence, states, &Diagnostic{Path: "devices", Message: "bounded comparator operating-point iteration exceeded its deterministic limit", Suggestion: "correct ambiguous feedback or reduce coupled comparator stages"}
+}
+
+// solveNonlinearDCByLinearAmplifierRelease retries a coupled negative-feedback
+// operating point with every bounded linear amplifier released at once. The
+// result is accepted only when the ordinary finite-gain equations converge and
+// independently resolve to that same all-linear state; saturated or ambiguous
+// networks therefore continue to fail closed.
+func solveNonlinearDCByLinearAmplifierRelease(
+	plan Plan,
+	analysis Analysis,
+	activeStates map[string]float64,
+	warmSolution []complex128,
+	allowPowerTransition bool,
+) (mnaSystem, []complex128, SolverEvidence, map[string]float64, bool) {
+	released := cloneOpAmpClamps(activeStates)
+	releasedAny := false
+	for _, device := range plan.Devices {
+		if device.PrimitiveModel != PrimitiveOpAmpV1 &&
+			device.PrimitiveModel != PrimitiveCurrentSenseAmplifierV1 {
+			continue
+		}
+		if _, exists := released[device.Component]; exists {
+			delete(released, device.Component)
+			releasedAny = true
+		}
+	}
+	if !releasedAny {
+		return mnaSystem{}, nil, SolverEvidence{}, nil, false
+	}
+	system, solution, evidence, diagnostic := solveNonlinearDCForComparatorStateWithInitial(
+		plan, analysis, released, warmSolution,
+	)
+	if diagnostic != nil {
+		return mnaSystem{}, nil, evidence, nil, false
+	}
+	resolved, _, resolveDiagnostic := resolvedActiveDeviceStatesWithPowerTransition(
+		plan, system, solution, allowPowerTransition,
+	)
+	if resolveDiagnostic != nil ||
+		(!sameOpAmpClamps(released, resolved) &&
+			!activeDeviceStateSolutionConsistent(plan, system, solution, released, resolved)) {
+		return mnaSystem{}, nil, evidence, nil, false
+	}
+	evidence.Method = "bounded_coupled_linear_amplifier_release_v1"
+	evidence.TotalIterations = evidence.Iterations
+	return system, solution, evidence, released, true
 }
 
 func solveNonlinearDCByCenteredOpAmpSeed(plan Plan, analysis Analysis, activeStates map[string]float64) (mnaSystem, []complex128, SolverEvidence, map[string]float64, bool) {

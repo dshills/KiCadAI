@@ -32,6 +32,62 @@ func TestNonlinearOperatingRangeAcceptsSolverNoiseButRejectsMaterialViolation(t 
 	}
 }
 
+func TestCoupledLinearAmplifierReleaseRecoversCascadedNegativeFeedback(t *testing.T) {
+	parameters := []NamedValue{
+		{Name: "dc_open_loop_gain", Value: 120000},
+		{Name: "gain_bandwidth_hz", Value: 10_000_000},
+		{Name: "output_high_margin_v", Value: .05},
+		{Name: "output_low_margin_v", Value: .05},
+		{Name: "supply_max_v", Value: 36},
+		{Name: "supply_min_v", Value: 4.5},
+	}
+	opAmp := func(id, plus, minus, output string) ComponentEvidence {
+		return ComponentEvidence{
+			InstanceID: id, CatalogID: "opamp.reviewed", Family: "opamp",
+			ModelClaims: []CatalogEvidence{{ModelID: PrimitiveOpAmpV1, Parameters: parameters}},
+			Connections: []ConnectionEvidence{
+				{Function: "IN_PLUS", Net: plus}, {Function: "IN_MINUS", Net: minus},
+				{Function: "OUT", Net: output}, {Function: "V_PLUS", Net: "VP"},
+				{Function: "V_MINUS", Net: "GND"},
+			},
+		}
+	}
+	components := []ComponentEvidence{
+		voltageSourceEvidence("supply", "VP", "GND"),
+		voltageSourceEvidence("signal", "IN", "GND"),
+		resistorEvidence("diode_bias", 1000, "VP", "DIODE"),
+		{
+			InstanceID: "diode", CatalogID: "diode.reviewed", Family: "diode",
+			ModelClaims: []CatalogEvidence{{ModelID: PrimitiveDiodeShockleyV1, Parameters: diodeParameters(.2, 100)}},
+			Connections: []ConnectionEvidence{{Function: "ANODE", Net: "DIODE"}, {Function: "CATHODE", Net: "GND"}},
+		},
+		opAmp("first", "IN", "MID", "MID"),
+		opAmp("second", "MID", "OUT", "OUT"),
+	}
+	intent := Intent{
+		ModelID: ModelNonlinearCircuitDCV1,
+		Analyses: []Analysis{{ID: "bias", Kind: AnalysisDCOperatingPoint, Excitations: []SourceExcitation{
+			{Component: "supply", DCValue: 5}, {Component: "signal", DCValue: 1},
+		}}},
+		Assertions: []Assertion{{AnalysisID: "bias", Node: "OUT", Quantity: QuantityVoltageV, Min: .99, Max: 1.01}},
+	}
+	plan, diagnostics := ResolveWithTopology(intent, "test", "catalog-hash", components, []NodeEvidence{
+		{Name: "GND", Role: "ground"}, {Name: "VP"}, {Name: "IN"}, {Name: "DIODE"}, {Name: "MID"}, {Name: "OUT"},
+	})
+	if len(diagnostics) != 0 {
+		t.Fatalf("resolve diagnostics=%+v", diagnostics)
+	}
+	system, solution, evidence, states, ok := solveNonlinearDCByLinearAmplifierRelease(
+		plan, plan.Analyses[0], map[string]float64{"first": .05, "second": 4.95}, nil, false,
+	)
+	if !ok || len(states) != 0 || evidence.Method != "bounded_coupled_linear_amplifier_release_v1" {
+		t.Fatalf("coupled release ok=%t states=%#v evidence=%+v", ok, states, evidence)
+	}
+	if output := nonlinearNodeVoltage(&system, solution, "OUT"); math.Abs(output-1) > 1e-4 {
+		t.Fatalf("coupled release output=%.12g, want 1 V", output)
+	}
+}
+
 func TestNonlinearDCDiodeOperatingPointIsDeterministic(t *testing.T) {
 	components := []ComponentEvidence{
 		voltageSourceEvidence("supply", "5V", "GND"),

@@ -69,6 +69,27 @@ func TestPostPassRankingWindowUsesRetainedCandidateBudget(t *testing.T) {
 	}
 }
 
+func TestInitialEvaluationPolicyReservesBudgetsForAuthorizedRepairs(t *testing.T) {
+	policy := DefaultPolicy()
+	policy.MaxRetainedCandidates = 16
+	policy.MaxValueTrials = 64
+	policy.MaxTopologyRepairs = 16
+	policy.MaxCandidateSimulations = 4_096
+	policy.MaxCornerEvaluations = 16_384
+
+	initial := synthesisInitialEvaluationPolicy(policy, 16)
+	if initial.MaxValueTrials != 32 || initial.MaxCandidateSimulations != 2_048 ||
+		initial.MaxCornerEvaluations != 8_192 ||
+		initial.MaxTopologyRepairs != policy.MaxTopologyRepairs {
+		t.Fatalf("initial evaluation policy did not reserve a proportional repair share: %#v", initial)
+	}
+
+	policy.MaxTopologyRepairs = 0
+	if got := synthesisInitialEvaluationPolicy(policy, 16); got != policy {
+		t.Fatalf("repair-disabled policy changed: got %#v want %#v", got, policy)
+	}
+}
+
 func TestSynthesisMarginNormalizesSubUnitQuantitiesRelatively(t *testing.T) {
 	minimum := 0.9e-6
 	actual := 1e-6

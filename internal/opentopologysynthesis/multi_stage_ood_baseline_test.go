@@ -7,7 +7,11 @@ import (
 	"testing"
 )
 
-const multiStageOODBaselineReportHash = "eb87f34f3f9d9b4e46e76a7ef74211919289dae82146e3a8072249a517f8e113"
+const (
+	multiStageOODBaselineReportHash                      = "eb87f34f3f9d9b4e46e76a7ef74211919289dae82146e3a8072249a517f8e113"
+	multiStageOODBaselineManifestHash                    = "0d800442b4006af19b4b375ea268d1d0156386846a9ef1af0dfd209d5d24a9be"
+	multiStageOODBaselineEnabledCurrentRequirementSHA256 = "b90fd639f3ec80bf858360c4e9d1802fc82d613411943b8f04ce874664e09834"
+)
 
 type multiStageOODBaselineReport struct {
 	Schema             string                         `json:"schema"`
@@ -91,8 +95,8 @@ func TestMultiStageOODPublicCLIBaselineIsFrozen(t *testing.T) {
 	if report.ExecutionCommit != "a5effe06154b5c08b76de03e82be97a1b2eed8a2" {
 		t.Fatalf("baseline execution commit = %q", report.ExecutionCommit)
 	}
-	if report.ManifestSHA256 != multiStageOODCorpusManifestHash {
-		t.Fatalf("baseline manifest hash = %q, want %q", report.ManifestSHA256, multiStageOODCorpusManifestHash)
+	if report.ManifestSHA256 != multiStageOODBaselineManifestHash {
+		t.Fatalf("baseline manifest hash = %q, want historical %q", report.ManifestSHA256, multiStageOODBaselineManifestHash)
 	}
 	if report.MeasuredAt != "2026-08-06" {
 		t.Fatalf("baseline measurement date = %q", report.MeasuredAt)
@@ -119,6 +123,12 @@ func TestMultiStageOODPublicCLIBaselineIsFrozen(t *testing.T) {
 	wantCases := make(map[string]expectedCase, len(report.Cases))
 	for _, entry := range manifest.DesignCases {
 		wantCases[entry.ID] = expectedCase{"design", entry.RequirementSHA256, "passed"}
+	}
+	// The historical CLI evidence predates correction of an infeasible 18 V
+	// load demand on a 15 V maximum rail. Preserve that evidence rather than
+	// relabeling it as a run of the amended, physically valid requirement.
+	wantCases["enabled_current_regulation"] = expectedCase{
+		"design", multiStageOODBaselineEnabledCurrentRequirementSHA256, "passed",
 	}
 	for _, entry := range manifest.AdversarialCases {
 		wantCases[entry.ID] = expectedCase{"adversarial", entry.RequirementSHA256, entry.ExpectedFailureKind}

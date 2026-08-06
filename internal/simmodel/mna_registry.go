@@ -907,13 +907,20 @@ func validateMNAIntent(intent Intent, components map[string]string) []Diagnostic
 			if analysis.DCSweep != nil {
 				sweep := analysis.DCSweep
 				if strings.TrimSpace(sweep.Component) == "" || !finite(sweep.StartValue) || !finite(sweep.StopValue) || !boundedMagnitude(sweep.StartValue) || !boundedMagnitude(sweep.StopValue) || sweep.StartValue >= sweep.StopValue || sweep.Points < 3 || sweep.Points > maxMNADCSweepPoints {
-					diagnostics = append(diagnostics, Diagnostic{Path: path + ".dc_sweep", Message: fmt.Sprintf("DC source sweep requires a resolved component, finite bounded start < stop, and 3..%d points", maxMNADCSweepPoints)})
+					diagnostics = append(diagnostics, Diagnostic{Path: path + ".dc_sweep", Message: fmt.Sprintf("DC sweep requires a resolved component, finite bounded start < stop, and 3..%d points", maxMNADCSweepPoints)})
 				}
-				if sweep.ExcitationScale != 0 && sweep.ExcitationScale != -1 && sweep.ExcitationScale != 1 {
+				if sweep.DeviceValue && sweep.StartValue <= 0 {
+					diagnostics = append(diagnostics, Diagnostic{Path: path + ".dc_sweep.start_value", Message: "DC device-value sweep requires a positive start value"})
+				}
+				if sweep.DeviceValue && sweep.ExcitationScale != 0 {
+					diagnostics = append(diagnostics, Diagnostic{Path: path + ".dc_sweep.excitation_scale", Message: "DC device-value sweep does not accept source excitation scaling"})
+				} else if !sweep.DeviceValue && sweep.ExcitationScale != 0 && sweep.ExcitationScale != -1 && sweep.ExcitationScale != 1 {
 					diagnostics = append(diagnostics, Diagnostic{Path: path + ".dc_sweep.excitation_scale", Message: "DC source sweep excitation scale must be exactly -1 or 1 when specified"})
 				}
 				family := components[strings.TrimSpace(sweep.Component)]
-				if family != "voltage_source" && family != "current_source" && family != "connector" {
+				if sweep.DeviceValue && family != "resistor" {
+					diagnostics = append(diagnostics, Diagnostic{Path: path + ".dc_sweep.component", Message: "DC device-value sweep currently supports only resolved resistor primitives; reactive-device parameter sweeps are not modeled"})
+				} else if !sweep.DeviceValue && family != "voltage_source" && family != "current_source" && family != "connector" {
 					diagnostics = append(diagnostics, Diagnostic{Path: path + ".dc_sweep.component", Message: "DC sweep component must be a resolved independent voltage or current source"})
 				}
 				work := sweep.Points
@@ -1109,7 +1116,7 @@ func validateMNAIntent(intent Intent, components map[string]string) []Diagnostic
 		}
 		diagnostics = append(diagnostics, validateAnalysisValueEvents(analysis, components, seenSources, path)...)
 		if analysis.DCSweep != nil {
-			if _, exists := seenSources[analysis.DCSweep.Component]; !exists {
+			if _, exists := seenSources[analysis.DCSweep.Component]; !analysis.DCSweep.DeviceValue && !exists {
 				diagnostics = append(diagnostics, Diagnostic{Path: path + ".dc_sweep.component", Message: "DC sweep component must also have a canonical source excitation"})
 			}
 		}
@@ -1144,6 +1151,7 @@ func validateMNAIntent(intent Intent, components map[string]string) []Diagnostic
 		}
 		nodeOptional := kind == AnalysisThermal || kind == AnalysisElectrothermal ||
 			assertion.Quantity == QuantityDeviceCurrentA ||
+			assertion.Quantity == QuantityDCSweepDeviceCurrentSpanA ||
 			assertion.Quantity == QuantityTotalSupplyCurrentA ||
 			assertion.Quantity == QuantityPeakAbsDeviceVoltageV ||
 			assertion.Quantity == QuantityPeakAbsDeviceCurrentA ||
@@ -1156,6 +1164,7 @@ func validateMNAIntent(intent Intent, components map[string]string) []Diagnostic
 			assertion.Quantity == QuantityMinimumTransientSOAMargin
 		componentRequired := ((kind == AnalysisThermal || kind == AnalysisElectrothermal) && !aggregateThermal) ||
 			assertion.Quantity == QuantityDeviceCurrentA ||
+			assertion.Quantity == QuantityDCSweepDeviceCurrentSpanA ||
 			assertion.Quantity == QuantityDCSweepDeviceSlopeAperV ||
 			assertion.Quantity == QuantityTransimpedanceOhm ||
 			assertion.Quantity == QuantityInputImpedanceOhm ||
@@ -1266,7 +1275,7 @@ func validateMNAIntent(intent Intent, components map[string]string) []Diagnostic
 			if kind != AnalysisDCOperatingPoint {
 				diagnostics = append(diagnostics, Diagnostic{Path: path + ".quantity", Message: "device-current/total-supply-current assertion requires DC operating-point analysis"})
 			}
-		case QuantityDCSweepVoltageSpanV, QuantityDCSweepVoltageSlopeVPerV, QuantityDCSweepDeviceSlopeAperV:
+		case QuantityDCSweepVoltageSpanV, QuantityDCSweepDeviceCurrentSpanA, QuantityDCSweepVoltageSlopeVPerV, QuantityDCSweepDeviceSlopeAperV:
 			analysis, _ := analysisByID(intent.Analyses, assertion.AnalysisID)
 			if kind != AnalysisDCOperatingPoint || analysis.DCSweep == nil {
 				diagnostics = append(diagnostics, Diagnostic{Path: path + ".quantity", Message: "DC sweep span/slope assertion requires a bounded DC source sweep"})
@@ -1904,6 +1913,7 @@ func validateMNAPlan(plan Plan) []Diagnostic {
 	for index, assertion := range plan.Assertions {
 		analysis, exists := analysisByID(plan.Analyses, assertion.AnalysisID)
 		nodeRequired := assertion.Quantity != QuantityDeviceCurrentA &&
+			assertion.Quantity != QuantityDCSweepDeviceCurrentSpanA &&
 			assertion.Quantity != QuantityTotalSupplyCurrentA &&
 			assertion.Quantity != QuantityPeakAbsDeviceVoltageV &&
 			assertion.Quantity != QuantityPeakAbsDeviceCurrentA &&

@@ -31,9 +31,9 @@
         ],
         "properties": {
           "KiCadAI Catalog": "checked-in",
-          "KiCadAI Catalog Hash": "856f09fa8a4e64a47b39aff09bd2a85f6d3b73a8b0601f636364ab260b147acc",
+          "KiCadAI Catalog Hash": "2a2a234160f8c27e4aaea6d43ddbb4397382655bb17fe0885ce8dd4280e88d6c",
           "KiCadAI Component ID": "resistor.yageo.rc0805fr_074k7l.0805",
-          "KiCadAI Resolution Hash": "9651d7d36cf2a5ac032ed2dfd6e1cf488471b158bbbf0c1e5a2bf50a41b1459e",
+          "KiCadAI Resolution Hash": "974def6fc10faf486fc63dc6c2ffdeaeb06ad4364e0ab98ffef38830eb2b4018",
           "KiCadAI Variant ID": "0805",
           "MPN": "RC0805FR-074K7L",
           "Manufacturer": "Yageo"
@@ -65,9 +65,9 @@
         ],
         "properties": {
           "KiCadAI Catalog": "checked-in",
-          "KiCadAI Catalog Hash": "856f09fa8a4e64a47b39aff09bd2a85f6d3b73a8b0601f636364ab260b147acc",
+          "KiCadAI Catalog Hash": "2a2a234160f8c27e4aaea6d43ddbb4397382655bb17fe0885ce8dd4280e88d6c",
           "KiCadAI Component ID": "connector.pinheader.1x03.2_54mm",
-          "KiCadAI Resolution Hash": "9651d7d36cf2a5ac032ed2dfd6e1cf488471b158bbbf0c1e5a2bf50a41b1459e",
+          "KiCadAI Resolution Hash": "974def6fc10faf486fc63dc6c2ffdeaeb06ad4364e0ab98ffef38830eb2b4018",
           "KiCadAI Variant ID": "vertical"
         }
       },
@@ -92,9 +92,9 @@
         ],
         "properties": {
           "KiCadAI Catalog": "checked-in",
-          "KiCadAI Catalog Hash": "856f09fa8a4e64a47b39aff09bd2a85f6d3b73a8b0601f636364ab260b147acc",
+          "KiCadAI Catalog Hash": "2a2a234160f8c27e4aaea6d43ddbb4397382655bb17fe0885ce8dd4280e88d6c",
           "KiCadAI Component ID": "connector.pinheader.1x02.2_54mm",
-          "KiCadAI Resolution Hash": "9651d7d36cf2a5ac032ed2dfd6e1cf488471b158bbbf0c1e5a2bf50a41b1459e",
+          "KiCadAI Resolution Hash": "974def6fc10faf486fc63dc6c2ffdeaeb06ad4364e0ab98ffef38830eb2b4018",
           "KiCadAI Variant ID": "vertical"
         }
       },
@@ -124,9 +124,9 @@
         ],
         "properties": {
           "KiCadAI Catalog": "checked-in",
-          "KiCadAI Catalog Hash": "856f09fa8a4e64a47b39aff09bd2a85f6d3b73a8b0601f636364ab260b147acc",
+          "KiCadAI Catalog Hash": "2a2a234160f8c27e4aaea6d43ddbb4397382655bb17fe0885ce8dd4280e88d6c",
           "KiCadAI Component ID": "bjt.onsemi.mmbt3904.sot23",
-          "KiCadAI Resolution Hash": "9651d7d36cf2a5ac032ed2dfd6e1cf488471b158bbbf0c1e5a2bf50a41b1459e",
+          "KiCadAI Resolution Hash": "974def6fc10faf486fc63dc6c2ffdeaeb06ad4364e0ab98ffef38830eb2b4018",
           "KiCadAI Variant ID": "sot23",
           "MPN": "MMBT3904LT1G",
           "Manufacturer": "onsemi"

@@ -2746,6 +2746,20 @@
       }
     },
     {
+      "catalog_id": "resistor.vishay.wslt2512r0100dea.2512",
+      "family": "resistor",
+      "model_id": "mna_resistor_v1",
+      "provenance": {
+        "source": "https://www.vishay.com/doc/?30121=",
+        "revision": "vishay:WSLT2512:30121:2026-08-05",
+        "sha256": "ed2413ddd37969961f8ad017ba272c18c42228660e14a5757b6b788f4326cf61",
+        "review_status": "reviewed",
+        "allowed_analyses": ["ac_sweep", "dc_operating_point", "distortion", "noise", "stability", "startup", "thermal", "transient"],
+        "min_temperature_c": -65,
+        "max_temperature_c": 275
+      }
+    },
+    {
       "catalog_id": "resistor.vishay.pr02.1k00.2w",
       "family": "resistor",
       "model_id": "mna_resistor_v1",
@@ -2841,6 +2855,20 @@
         "allowed_analyses": ["ac_sweep", "dc_operating_point", "distortion", "noise", "stability", "startup", "thermal", "transient"],
         "min_temperature_c": -55,
         "max_temperature_c": 155
+      }
+    },
+    {
+      "catalog_id": "resistor.vishay.tnpw0805.49r9.0p1",
+      "family": "resistor",
+      "model_id": "mna_resistor_v1",
+      "provenance": {
+        "source": "https://www.vishay.com/docs/28758/tnpw_e3.pdf",
+        "revision": "vishay:TNPW-e3:2025-01",
+        "sha256": "ed2413ddd37969961f8ad017ba272c18c42228660e14a5757b6b788f4326cf61",
+        "review_status": "reviewed",
+        "allowed_analyses": ["ac_sweep", "dc_operating_point", "distortion", "noise", "stability", "startup", "thermal", "transient"],
+        "min_temperature_c": -55,
+        "max_temperature_c": 175
       }
     },
     {

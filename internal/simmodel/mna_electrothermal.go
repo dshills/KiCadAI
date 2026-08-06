@@ -383,7 +383,10 @@ func transientSOAMarginForEnvelope(device ResolvedDevice, envelope TransientSOAE
 		}
 		allowed *= (maximum - boundaryTemperature) / denominator
 	}
-	return allowed / current, nil
+	// A margin is a lower-bounded safety quantity. Saturating a value above the
+	// solver's trusted reporting range preserves that proof without turning an
+	// exceptionally light load into an artificial upper-bound failure.
+	return math.Min(allowed/current, maxMNASolutionValue), nil
 }
 
 func selectTransientSOAEnvelope(envelopes []TransientSOAEnvelope, elapsed float64) (TransientSOAEnvelope, bool) {

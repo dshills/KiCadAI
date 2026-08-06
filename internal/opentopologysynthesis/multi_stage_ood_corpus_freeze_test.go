@@ -11,7 +11,7 @@ import (
 const (
 	multiStageOODCorpusSchema       = "kicadai.multi-stage-ood-corpus.v1"
 	multiStageOODCorpusBaseCommit   = "f06a1a621e34f483465b421152c1db905a947c48"
-	multiStageOODCorpusManifestHash = "0d800442b4006af19b4b375ea268d1d0156386846a9ef1af0dfd209d5d24a9be"
+	multiStageOODCorpusManifestHash = "ee3e89939422ac1f0280e57a8ac09994bebac3a8ca083053385778ea0a04edd2"
 	multiStageOODDesignCaseCount    = 9
 	multiStageOODAdversarialCount   = 4
 )

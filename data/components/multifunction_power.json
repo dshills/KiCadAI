@@ -310,9 +310,11 @@
       "mpn": "WSLT2512R0100DEA",
       "lifecycle": "active",
       "tags": ["0.5_percent", "10_milliohm", "2512", "current_shunt", "one_watt"],
-      "values": [{"kind": "resistance", "typ": "0.01", "unit": "Ohm"}, {"kind": "tolerance", "max": "0.5", "unit": "%"}],
+      "values": [{"kind": "resistance", "typ": "0.01", "unit": "ohm"}, {"kind": "tolerance", "max": "0.5", "unit": "%"}],
       "ratings": [{"kind": "power_dissipation", "max": "1", "unit": "W"}, {"kind": "continuous_current", "max": "10", "unit": "A"}],
+      "tolerances": [{"kind": "resistance", "max": "0.5", "unit": "%"}],
       "temperature": {"min": "-65", "max": "275", "unit": "C"},
+      "simulation_models": [{"model_id": "mna_resistor_v1"}],
       "symbols": [{"symbol_id": "Device:R", "function_pins": [{"function": "A", "symbol_pin": "1", "required": true}, {"function": "B", "symbol_pin": "2", "required": true}], "verification": {"confidence": "verified", "sources": ["https://www.vishay.com/doc/?30121=", "kicad-symbols:Device:R"], "pinmap_checked": true}}],
       "packages": [{"id": "2512", "name": "2512", "footprint_id": "Resistor_SMD:R_2512_6332Metric", "package_type": "2512", "mpn": "WSLT2512R0100DEA", "lifecycle": "active", "pinmap_id": "Device:R|Resistor_SMD:R_2512_6332Metric", "pad_functions": [{"function": "A", "pad": "1"}, {"function": "B", "pad": "2"}], "dimensions_mm": {"width": 6.35, "height": 3.18}, "verification": {"confidence": "verified", "sources": ["https://www.vishay.com/doc/?30121=", "kicad-footprint:Resistor_SMD:R_2512_6332Metric"], "pinmap_checked": true}}],
       "verification": {"confidence": "verified", "sources": ["https://www.vishay.com/doc/?30121=", "datasheet-pinmap:Vishay:WSLT2512", "kicad-footprint:Resistor_SMD:R_2512_6332Metric"], "resolver_checked": true, "pinmap_checked": true}

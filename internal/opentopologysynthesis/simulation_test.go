@@ -766,6 +766,109 @@ func TestLoadCurrentHarnessAndCrossCaseSweepAreCatalogBacked(t *testing.T) {
 	}
 }
 
+func TestLoadResistanceHarnessProvidesLoadRegulationSweep(t *testing.T) {
+	_, _, _, environment := testSimulationFixture(t)
+	requirement := testOpenTopologyRequirement(t, "adjustable_voltage_regulation.json")
+	for caseIndex := range requirement.Requirements.OperatingCases {
+		for conditionIndex := range requirement.Requirements.OperatingCases[caseIndex].Conditions {
+			condition := &requirement.Requirements.OperatingCases[caseIndex].Conditions[conditionIndex]
+			if condition.Axis == "load_current" {
+				condition.Axis = "load_resistance"
+				condition.Min = 5
+				condition.Max = 10
+				condition.Unit = "ohm"
+			}
+		}
+	}
+	graph, issues := InitialGraph(requirement)
+	if len(issues) != 0 {
+		t.Fatalf("initial graph issues: %#v", issues)
+	}
+	var assertion BehavioralAssertion
+	for _, candidate := range requirement.Requirements.BehavioralRequirements {
+		if candidate.Metric == "load_regulation" {
+			assertion = candidate
+			break
+		}
+	}
+	operatingCase := requirement.Requirements.OperatingCases[0]
+	corner := operatingCaseCorners(operatingCase)[0]
+	harness, hashes, diagnostics := simulationHarness(requirement, assertion, operatingCase, corner, graph, environment)
+	if len(diagnostics) != 0 || len(hashes) == 0 {
+		t.Fatalf("load-resistance harness diagnostics=%#v hashes=%#v", diagnostics, hashes)
+	}
+	loadID := loadInstanceID("output_power", "load_resistance")
+	found := false
+	for _, component := range harness {
+		if component.InstanceID == loadID && component.Family == "resistor" && component.HasValueSI {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("load-resistance harness omitted reviewed resistor %q: %#v", loadID, harness)
+	}
+	source, start, stop, ok := sweepSourceAndRange(requirement, assertion, operatingCase, corner, graph)
+	if !ok || source != loadID || start != 5 || stop != 10 {
+		t.Fatalf("load-regulation resistance sweep = %q %.12g..%.12g ok=%t", source, start, stop, ok)
+	}
+	if !dcSweepUsesDeviceValue(requirement, assertion, source) {
+		t.Fatal("load-resistance sweep was not classified as a device-value sweep")
+	}
+	excitations := simulationExcitations(requirement, assertion, operatingCase, corner, graph)
+	for _, excitation := range excitations {
+		if excitation.Component == loadID {
+			t.Fatalf("load resistor was incorrectly emitted as an independent source: %#v", excitations)
+		}
+	}
+}
+
+func TestCurrentPortClassificationIncludesControlledOutputs(t *testing.T) {
+	requirement, decodeIssues := DecodeStrict(bytes.NewReader(mustRead(
+		t, filepath.Join(multiStageOODCorpusRoot(), "enabled_current_regulation.json"),
+	)))
+	if len(decodeIssues) != 0 {
+		t.Fatalf("requirement decode issues: %#v", decodeIssues)
+	}
+	if !observationIsCurrentPort(requirement, Observation{Kind: "port", ID: "regulated_current"}) {
+		t.Fatal("controlled-current output was not classified as a current observation")
+	}
+	if observationIsCurrentPort(requirement, Observation{Kind: "port", ID: "current_command"}) {
+		t.Fatal("analog-voltage input was incorrectly classified as a current observation")
+	}
+}
+
+func TestDCSweepInheritsUniqueCrossCaseExcitationRange(t *testing.T) {
+	requirement, decodeIssues := DecodeStrict(bytes.NewReader(mustRead(
+		t, filepath.Join(multiStageOODCorpusRoot(), "enabled_current_regulation.json"),
+	)))
+	if len(decodeIssues) != 0 {
+		t.Fatalf("requirement decode issues: %#v", decodeIssues)
+	}
+	graph, issues := InitialGraph(requirement)
+	if len(issues) != 0 {
+		t.Fatalf("initial graph issues: %#v", issues)
+	}
+	var assertion BehavioralAssertion
+	for _, candidate := range requirement.Requirements.BehavioralRequirements {
+		if candidate.Metric == "transconductance" {
+			assertion = candidate
+			break
+		}
+	}
+	var operatingCase OperatingCase
+	for _, candidate := range requirement.Requirements.OperatingCases {
+		if candidate.ID == "regulation_corners" {
+			operatingCase = candidate
+			break
+		}
+	}
+	corner := operatingCaseCorners(operatingCase)[0]
+	source, start, stop, ok := sweepSourceAndRange(requirement, assertion, operatingCase, corner, graph)
+	if !ok || source != "source_port_current_command" || start != .2 || stop != 1.8 {
+		t.Fatalf("cross-case command sweep = %q %.12g..%.12g ok=%t", source, start, stop, ok)
+	}
+}
+
 func TestLineRegulationSweepUsesUniqueDeclaredSupplyRange(t *testing.T) {
 	requirement, issues := DecodeStrict(bytes.NewReader(mustRead(t, filepath.Join(
 		nonlinearSwitchingCorpusRoot(), "efficient_step_down_power.json",
@@ -831,6 +934,59 @@ func TestActiveOutputAssertionsInheritEnableEnvelopeWithoutChangingStartup(t *te
 	}
 	if enableConditions != 1 {
 		t.Fatalf("startup enable conditions = %#v", startupConditions)
+	}
+}
+
+func TestActiveOutputAssertionsInheritCrossCaseActivationEvent(t *testing.T) {
+	requirement, issues := DecodeStrict(bytes.NewReader(mustRead(t, filepath.Join(
+		multiStageOODCorpusRoot(), "enabled_current_regulation.json",
+	))))
+	if len(issues) != 0 {
+		t.Fatalf("requirement issues = %#v", issues)
+	}
+	assertions := map[string]BehavioralAssertion{}
+	for _, assertion := range requirement.Requirements.BehavioralRequirements {
+		assertions[assertion.ID] = assertion
+	}
+	cases := map[string]OperatingCase{}
+	for _, operatingCase := range requirement.Requirements.OperatingCases {
+		cases[operatingCase.ID] = operatingCase
+	}
+	enable := GraphNode{ID: "port_enable", SemanticID: "enable", Scope: "external", Role: "control"}
+	regulationCorner := operatingCaseCorners(cases["regulation_corners"])[0]
+	if got := assertionSourceValue(
+		requirement, assertions["command_transfer"], cases["regulation_corners"], regulationCorner, enable,
+	); got != 5 {
+		t.Fatalf("active steady-state enable = %.12g V, want cross-case applied state 5 V", got)
+	}
+	commandCorner := operatingCaseCorners(cases["command_range"])[0]
+	if got := assertionSourceValue(
+		requirement, assertions["command_transfer"], cases["command_range"], commandCorner, enable,
+	); got != 5 {
+		t.Fatalf("same-case DC enable = %.12g V, want applied state 5 V", got)
+	}
+	if got := assertionSourceValue(
+		requirement, assertions["disabled_current"], cases["command_range"], commandCorner, enable,
+	); got != 0 {
+		t.Fatalf("off-state enable = %.12g V, want inactive 0 V", got)
+	}
+	if got := assertionSourceValue(
+		requirement, assertions["enable_settling"], cases["command_range"], commandCorner, enable,
+	); got != 0 {
+		t.Fatalf("transient initial enable = %.12g V, want local event initial state 0 V", got)
+	}
+
+	thermalCase := cases["regulation_corners"]
+	thermalCase.Conditions = simulationHarnessConditions(
+		requirement, assertions["safe_temperature"], thermalCase,
+	)
+	regulationCorner.Values[conditionKey(OperatingCondition{
+		Axis: "load_resistance", Target: "regulated_current",
+	})] = 20
+	if dissipation, bounded := thermalBehavioralCurrentTransferDissipation(
+		requirement, thermalCase, regulationCorner, 9,
+	); !bounded || dissipation <= 0 {
+		t.Fatalf("cross-case current-transfer dissipation = %.12g, bounded=%t", dissipation, bounded)
 	}
 }
 

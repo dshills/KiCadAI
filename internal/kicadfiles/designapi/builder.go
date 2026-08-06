@@ -1315,7 +1315,9 @@ func (builder *Builder) safeSchematicLabelStubOffset(netName string, anchor kica
 			directions = append(directions, direction)
 		}
 	}
-	for _, scale := range []kicadfiles.IU{1, 2, 4} {
+	// Match the schematic layout search envelope so transaction replay does not
+	// collapse a previously readable endpoint label back into crowded geometry.
+	for _, scale := range []kicadfiles.IU{1, 2, 3, 4, 6, 8, 12, 16} {
 		for _, direction := range directions {
 			candidate := kicadfiles.Point{X: direction.X * scale, Y: direction.Y * scale}
 			labelPoint := kicadfiles.Point{X: anchor.X + candidate.X, Y: anchor.Y + candidate.Y}

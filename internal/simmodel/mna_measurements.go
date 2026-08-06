@@ -906,7 +906,7 @@ func dcSweepSpanOrSlope(result AnalysisResult, assertion Assertion) (float64, *D
 		switch assertion.Quantity {
 		case QuantityDCSweepVoltageSpanV, QuantityDCSweepVoltageSlopeVPerV:
 			value, valueFound = analysisNodeReal(point, assertion.Node)
-		case QuantityDCSweepDeviceSlopeAperV:
+		case QuantityDCSweepDeviceCurrentSpanA, QuantityDCSweepDeviceSlopeAperV:
 			for _, device := range point.Devices {
 				if device.Component == assertion.Component {
 					value, valueFound = device.CurrentMagnitudeA, true
@@ -930,7 +930,7 @@ func dcSweepSpanOrSlope(result AnalysisResult, assertion Assertion) (float64, *D
 	if !found || !finite(minimumSweep) || !finite(maximumSweep) || maximumSweep-minimumSweep <= 1e-15 {
 		return 0, advancedAssertionDiagnostic(assertion, "DC sweep span/slope assertion requires two finite solved sweep endpoints")
 	}
-	if assertion.Quantity == QuantityDCSweepVoltageSpanV {
+	if assertion.Quantity == QuantityDCSweepVoltageSpanV || assertion.Quantity == QuantityDCSweepDeviceCurrentSpanA {
 		return normalizedMNAFloat(maximumObserved - minimumObserved), nil
 	}
 	slope := math.Abs(maximumValue-minimumValue) / (maximumSweep - minimumSweep)

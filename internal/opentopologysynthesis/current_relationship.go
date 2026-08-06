@@ -21,14 +21,24 @@ type regulatedCurrentRelationship struct {
 
 type currentSenseDifferentialValues struct {
 	shunt               PrimitiveCandidate
+	shuntCount          int
+	shuntResistance     float64
 	input               PrimitiveCandidate
+	inputCount          int
+	inputResistance     float64
 	feedback            PrimitiveCandidate
+	feedbackCount       int
+	feedbackResistance  float64
 	effectiveResistance float64
 }
 
 type currentSenseDifferentialPair struct {
 	input              PrimitiveCandidate
+	inputCount         int
+	inputResistance    float64
 	feedback           PrimitiveCandidate
+	feedbackCount      int
+	feedbackResistance float64
 	ratio              float64
 	cornerMinimumRatio float64
 	cornerMaximumRatio float64
@@ -252,6 +262,7 @@ func regulatedCurrentRelationships(requirement Requirement) []regulatedCurrentRe
 		cases[operatingCase.ID] = operatingCase
 	}
 	startupCases := map[string]bool{}
+	activationByOutput := map[string]string{}
 	faultByOutput := map[string]string{}
 	for _, assertion := range requirement.Requirements.BehavioralRequirements {
 		if assertion.Metric == "startup_current" {
@@ -262,7 +273,13 @@ func regulatedCurrentRelationships(requirement Requirement) []regulatedCurrentRe
 		if assertion.Metric == "off_state_current" && assertion.Excitation != nil &&
 			assertion.Excitation.Kind == "port" && assertion.Observation.Kind == "port" &&
 			requirementPortIsControl(requirement, assertion.Excitation.ID) {
-			faultByOutput[assertion.Observation.ID] = assertion.Excitation.ID
+			if regulatedCurrentControlActsAsEnable(
+				requirement, assertion.Observation.ID, assertion.Excitation.ID, cases,
+			) {
+				activationByOutput[assertion.Observation.ID] = assertion.Excitation.ID
+			} else {
+				faultByOutput[assertion.Observation.ID] = assertion.Excitation.ID
+			}
 		}
 	}
 	result := []regulatedCurrentRelationship{}
@@ -277,13 +294,17 @@ func regulatedCurrentRelationships(requirement Requirement) []regulatedCurrentRe
 			continue
 		}
 		relationship := regulatedCurrentRelationship{
-			input:     assertion.Excitation.ID,
-			output:    assertion.Observation.ID,
-			direction: output.Direction,
-			fault:     faultByOutput[assertion.Observation.ID],
+			input:      assertion.Excitation.ID,
+			output:     assertion.Observation.ID,
+			direction:  output.Direction,
+			activation: activationByOutput[assertion.Observation.ID],
+			fault:      faultByOutput[assertion.Observation.ID],
 		}
 		activationCandidates := []string{}
 		for _, port := range requirement.Requirements.Ports {
+			if relationship.activation != "" {
+				break
+			}
 			if !requirementPortIsControl(requirement, port.ID) || port.ID == relationship.fault ||
 				port.Electrical.DefaultState != "low" {
 				continue
@@ -322,6 +343,53 @@ func regulatedCurrentRelationships(requirement Requirement) []regulatedCurrentRe
 		)
 	})
 	return result
+}
+
+// regulatedCurrentControlActsAsEnable distinguishes a normal active-high
+// permission from an independently asserted shutdown/fault input using only
+// the transfer behavior. A control is an enable when the regulated transfer
+// operates with that control high, either as a steady condition or as a
+// low-to-high event in one of the transfer cases.
+func regulatedCurrentControlActsAsEnable(
+	requirement Requirement,
+	outputID string,
+	controlID string,
+	cases map[string]OperatingCase,
+) bool {
+	defaultLow := false
+	for _, port := range requirement.Requirements.Ports {
+		if port.ID == controlID {
+			defaultLow = port.Electrical.DefaultState == "low"
+			break
+		}
+	}
+	if !defaultLow {
+		return false
+	}
+	for _, assertion := range requirement.Requirements.BehavioralRequirements {
+		if assertion.Metric != "transconductance" || assertion.Observation.Kind != "port" ||
+			assertion.Observation.ID != outputID {
+			continue
+		}
+		for _, caseID := range assertion.OperatingCases {
+			operatingCase, found := cases[caseID]
+			if !found {
+				continue
+			}
+			for _, condition := range operatingCase.Conditions {
+				if condition.Target == controlID && condition.Axis == "input_voltage" && condition.Min > 0 {
+					return true
+				}
+			}
+			for _, event := range operatingCase.Events {
+				if event.Target == controlID && event.Kind == "input_step" &&
+					event.Initial <= 0 && event.Applied > event.Initial {
+					return true
+				}
+			}
+		}
+	}
+	return false
 }
 
 func topologyLowSideTransconductanceRelationshipSeeds(
@@ -674,6 +742,31 @@ func currentSenseSeriesComposition(
 	for _, primitive := range byValue {
 		choices = append(choices, primitive)
 	}
+	const maximumDifferentialResistorChoices = MaxComponents
+	slices.SortFunc(choices, func(left, right PrimitiveCandidate) int {
+		leftTolerance, leftProven := primitiveTolerancePercent(left, "resistance")
+		rightTolerance, rightProven := primitiveTolerancePercent(right, "resistance")
+		leftUnproven, rightUnproven := 0, 0
+		if !leftProven {
+			leftUnproven = 1
+		}
+		if !rightProven {
+			rightUnproven = 1
+		}
+		return cmp.Or(
+			cmp.Compare(leftUnproven, rightUnproven),
+			cmp.Compare(leftTolerance, rightTolerance),
+			cmp.Compare(
+				multiplicativeRelativeError(*left.ValueDomain.Nominal, 10_000),
+				multiplicativeRelativeError(*right.ValueDomain.Nominal, 10_000),
+			),
+			cmp.Compare(*left.ValueDomain.Nominal, *right.ValueDomain.Nominal),
+			cmp.Compare(left.Key, right.Key),
+		)
+	})
+	if len(choices) > maximumDifferentialResistorChoices {
+		choices = choices[:maximumDifferentialResistorChoices]
+	}
 	slices.SortFunc(choices, func(left, right PrimitiveCandidate) int {
 		return cmp.Or(
 			cmp.Compare(*left.ValueDomain.Nominal, *right.ValueDomain.Nominal),
@@ -902,8 +995,11 @@ func currentSenseDifferentialComposition(
 		break
 	}
 
-	const observationAnchorResistance = 10_000.0
-	pairs := make([]currentSenseDifferentialPair, 0, len(choices)*len(choices))
+	const (
+		observationAnchorResistance = 10_000.0
+		maximumParallelArmParts     = 4
+	)
+	pairs := make([]currentSenseDifferentialPair, 0, len(choices)*len(choices)*maximumParallelArmParts*maximumParallelArmParts)
 	for _, input := range choices {
 		if ctx.Err() != nil {
 			return currentSenseDifferentialValues{}, false
@@ -917,22 +1013,28 @@ func currentSenseDifferentialComposition(
 		if inputFraction >= 1 {
 			continue
 		}
-		for _, feedback := range choices {
-			feedbackValue := *feedback.ValueDomain.Nominal
-			feedbackTolerance, feedbackToleranceProven := primitiveTolerancePercent(feedback, "resistance")
-			if requirement.Acceptance.RequireAllCorners && !feedbackToleranceProven {
-				continue
+		for inputCount := 1; inputCount <= maximumParallelArmParts; inputCount++ {
+			effectiveInput := inputValue / float64(inputCount)
+			for _, feedback := range choices {
+				feedbackValue := *feedback.ValueDomain.Nominal
+				feedbackTolerance, feedbackToleranceProven := primitiveTolerancePercent(feedback, "resistance")
+				if requirement.Acceptance.RequireAllCorners && !feedbackToleranceProven {
+					continue
+				}
+				feedbackFraction := feedbackTolerance / 100
+				for feedbackCount := 1; feedbackCount <= maximumParallelArmParts; feedbackCount++ {
+					effectiveFeedback := feedbackValue / float64(feedbackCount)
+					pairs = append(pairs, currentSenseDifferentialPair{
+						input: input, inputCount: inputCount, inputResistance: effectiveInput,
+						feedback: feedback, feedbackCount: feedbackCount, feedbackResistance: effectiveFeedback,
+						ratio:              effectiveFeedback / effectiveInput,
+						cornerMinimumRatio: effectiveFeedback * (1 - feedbackFraction) / (effectiveInput * (1 + inputFraction)),
+						cornerMaximumRatio: effectiveFeedback * (1 + feedbackFraction) / (effectiveInput * (1 - inputFraction)),
+						observationPenalty: multiplicativeRelativeError(effectiveInput, observationAnchorResistance) +
+							multiplicativeRelativeError(effectiveFeedback, observationAnchorResistance),
+					})
+				}
 			}
-			feedbackFraction := feedbackTolerance / 100
-			pairs = append(pairs, currentSenseDifferentialPair{
-				input:              input,
-				feedback:           feedback,
-				ratio:              feedbackValue / inputValue,
-				cornerMinimumRatio: feedbackValue * (1 - feedbackFraction) / (inputValue * (1 + inputFraction)),
-				cornerMaximumRatio: feedbackValue * (1 + feedbackFraction) / (inputValue * (1 - inputFraction)),
-				observationPenalty: multiplicativeRelativeError(inputValue, observationAnchorResistance) +
-					multiplicativeRelativeError(feedbackValue, observationAnchorResistance),
-			})
 		}
 	}
 	slices.SortFunc(pairs, func(left, right currentSenseDifferentialPair) int {
@@ -940,27 +1042,59 @@ func currentSenseDifferentialComposition(
 			cmp.Compare(left.ratio, right.ratio),
 			cmp.Compare(left.observationPenalty, right.observationPenalty),
 			cmp.Compare(left.input.Key, right.input.Key),
+			cmp.Compare(left.inputCount, right.inputCount),
 			cmp.Compare(left.feedback.Key, right.feedback.Key),
+			cmp.Compare(left.feedbackCount, right.feedbackCount),
 		)
 	})
 	if len(pairs) == 0 {
 		return currentSenseDifferentialValues{}, false
 	}
 
+	type shuntOption struct {
+		primitive  PrimitiveCandidate
+		count      int
+		resistance float64
+		key        string
+	}
+	shunts := make([]shuntOption, 0, len(choices)*4)
+	for _, primitive := range choices {
+		for count := 1; count <= 4; count++ {
+			shunts = append(shunts, shuntOption{
+				primitive: primitive,
+				count:     count, resistance: *primitive.ValueDomain.Nominal / float64(count),
+				key: fmt.Sprintf("%s*%d", primitive.Key, count),
+			})
+		}
+	}
+	slices.SortFunc(shunts, func(left, right shuntOption) int {
+		return cmp.Or(
+			cmp.Compare(left.resistance, right.resistance),
+			cmp.Compare(left.count, right.count),
+			cmp.Compare(left.key, right.key),
+		)
+	})
+
 	best := currentSenseDifferentialValues{}
+	bestShuntCount := int(^uint(0) >> 1)
 	bestNominalError := math.Inf(1)
-	bestObservationPenalty := math.Inf(1)
 	bestShuntPenalty := math.Inf(1)
-	for _, shunt := range choices {
+	bestObservationPenalty := math.Inf(1)
+	maximumShuntResistance := regulatedCurrentMaximumShuntResistance(requirement)
+	for _, option := range shunts {
 		if ctx.Err() != nil {
 			return currentSenseDifferentialValues{}, false
 		}
-		shuntValue := *shunt.ValueDomain.Nominal
-		shuntTolerance, shuntToleranceProven := primitiveTolerancePercent(shunt, "resistance")
+		shuntValue := option.resistance
+		shuntTolerance, shuntToleranceProven := primitiveTolerancePercent(option.primitive, "resistance")
 		if requirement.Acceptance.RequireAllCorners && !shuntToleranceProven {
 			continue
 		}
 		shuntFraction := shuntTolerance / 100
+		if maximumShuntResistance > 0 && finite(maximumShuntResistance) &&
+			shuntValue*(1+shuntFraction) >= maximumShuntResistance {
+			continue
+		}
 		targetRatio := targetResistance / shuntValue
 		insertion := sort.Search(len(pairs), func(index int) bool { return pairs[index].ratio >= targetRatio })
 		left, right := insertion-1, insertion
@@ -997,20 +1131,31 @@ func currentSenseDifferentialComposition(
 			bestPairDelta = math.Min(bestPairDelta, pairDelta)
 			effective := shuntValue * pair.ratio
 			nominalError := math.Abs(effective-targetResistance) / targetResistance
-			shuntPenalty := multiplicativeRelativeError(shuntValue, targetResistance)
+			// Once the effective feedback resistance and its tolerance are
+			// satisfied, minimize series burden in the delivered-current path.
+			// The differential ratio recovers observation amplitude without
+			// spending compliance voltage in the shunt.
+			shuntPenalty := shuntValue
+			if maximumShuntResistance > 0 {
+				shuntPenalty = multiplicativeRelativeError(shuntValue, math.Min(targetResistance, maximumShuntResistance))
+			}
 			candidate := currentSenseDifferentialValues{
-				shunt: shunt, input: pair.input, feedback: pair.feedback,
+				shunt: option.primitive, shuntCount: option.count, shuntResistance: option.resistance,
+				input: pair.input, inputCount: pair.inputCount, inputResistance: pair.inputResistance,
+				feedback: pair.feedback, feedbackCount: pair.feedbackCount, feedbackResistance: pair.feedbackResistance,
 				effectiveResistance: effective,
 			}
-			if nominalError < bestNominalError ||
-				(nominalError == bestNominalError && pair.observationPenalty < bestObservationPenalty) ||
-				(nominalError == bestNominalError && pair.observationPenalty == bestObservationPenalty &&
-					shuntPenalty < bestShuntPenalty) ||
-				(nominalError == bestNominalError && pair.observationPenalty == bestObservationPenalty &&
-					shuntPenalty == bestShuntPenalty && (best.shunt.Key == "" || compareCurrentSenseDifferentialKeys(candidate, best) < 0)) {
+			if option.count < bestShuntCount ||
+				(option.count == bestShuntCount && shuntPenalty < bestShuntPenalty) ||
+				(option.count == bestShuntCount && shuntPenalty == bestShuntPenalty && nominalError < bestNominalError) ||
+				(option.count == bestShuntCount && shuntPenalty == bestShuntPenalty && nominalError == bestNominalError &&
+					pair.observationPenalty < bestObservationPenalty) ||
+				(option.count == bestShuntCount && shuntPenalty == bestShuntPenalty && nominalError == bestNominalError &&
+					pair.observationPenalty == bestObservationPenalty && (best.shunt.Key == "" || compareCurrentSenseDifferentialKeys(candidate, best) < 0)) {
+				bestShuntCount = option.count
 				bestNominalError = nominalError
-				bestObservationPenalty = pair.observationPenalty
 				bestShuntPenalty = shuntPenalty
+				bestObservationPenalty = pair.observationPenalty
 				best = candidate
 			}
 		}
@@ -1018,11 +1163,149 @@ func currentSenseDifferentialComposition(
 	return best, best.shunt.Key != ""
 }
 
+// regulatedCurrentMaximumShuntResistance bounds sense insertion loss using
+// the declared current rating and the compliance left by the largest declared
+// load at the lowest qualified external rail. When no compliance remains, the
+// caller deliberately falls back to the least-burden reviewed shunt.
+func regulatedCurrentMaximumShuntResistance(requirement Requirement) float64 {
+	maximumCurrent := 0.0
+	outputs := map[string]bool{}
+	for _, relationship := range regulatedCurrentRelationships(requirement) {
+		outputs[relationship.output] = true
+	}
+	for _, port := range requirement.Requirements.Ports {
+		if outputs[port.ID] && port.Electrical.MaxCurrentA != nil && *port.Electrical.MaxCurrentA > 0 {
+			maximumCurrent = math.Max(maximumCurrent, *port.Electrical.MaxCurrentA)
+		}
+	}
+	if maximumCurrent <= 0 || !finite(maximumCurrent) {
+		return math.Inf(1)
+	}
+	minimumRail := math.Inf(1)
+	for _, domain := range requirement.Requirements.Domains {
+		if domain.Kind != "supply" || domain.MinVoltageV == nil || *domain.MinVoltageV <= 0 ||
+			domain.MaxCurrentA == nil || *domain.MaxCurrentA < maximumCurrent {
+			continue
+		}
+		minimumRail = math.Min(minimumRail, *domain.MinVoltageV)
+	}
+	if !finite(minimumRail) {
+		return math.Inf(1)
+	}
+	maximumLoadResistance := 0.0
+	for _, operatingCase := range requirement.Requirements.OperatingCases {
+		for _, condition := range operatingCase.Conditions {
+			if condition.Axis == "load_resistance" && outputs[condition.Target] {
+				maximumLoadResistance = math.Max(maximumLoadResistance, condition.Max)
+			}
+		}
+	}
+	headroom := minimumRail - maximumCurrent*maximumLoadResistance
+	if headroom <= 0 {
+		return 0
+	}
+	return headroom / maximumCurrent
+}
+
+// topologyHighSidePassDeviceCount derives the minimum parallel pass count from
+// the declared worst-case electrical and thermal envelopes. Parallel current
+// sharing is introduced only when the calculated package limit requires it.
+func topologyHighSidePassDeviceCount(requirement Requirement, primitive PrimitiveCandidate) int {
+	const minimumThermalPassCount = 1
+	maximumAmbient := topologyMaximumAmbientTemperature(requirement)
+	if !finite(maximumAmbient) {
+		maximumAmbient = 25
+	}
+	maximumJunction := math.Inf(1)
+	for _, assertion := range requirement.Requirements.BehavioralRequirements {
+		if assertion.Metric == "junction_temperature" && assertion.Max != nil && *assertion.Max > 0 {
+			maximumJunction = math.Min(maximumJunction, *assertion.Max)
+		}
+	}
+	theta := 0.0
+	for _, model := range primitive.Models {
+		if model.ModelID != simmodel.PrimitiveBJTPNPV1 {
+			continue
+		}
+		modelTheta := 0.0
+		for _, parameter := range model.Parameters {
+			switch parameter.Name {
+			case "thermal_resistance_c_per_w", "junction_to_ambient_c_per_w":
+				modelTheta = math.Max(modelTheta, parameter.Value)
+			case "max_temperature_c":
+				if parameter.Value > 0 {
+					maximumJunction = math.Min(maximumJunction, parameter.Value)
+				}
+			}
+		}
+		for _, uncertainty := range model.Uncertainties {
+			switch uncertainty.Target {
+			case "model_parameters.thermal_resistance_c_per_w", "model_parameters.junction_to_ambient_c_per_w":
+				modelTheta = math.Max(modelTheta, uncertainty.Maximum)
+			case "model_parameters.max_temperature_c":
+				if uncertainty.Minimum > 0 {
+					maximumJunction = math.Min(maximumJunction, uncertainty.Minimum)
+				}
+			}
+		}
+		if modelTheta <= 0 && model.ThermalModel != nil && model.ThermalModel.Reference == "junction_to_ambient" {
+			for _, stage := range model.ThermalModel.Stages {
+				modelTheta += stage.ThermalResistanceCPerW
+			}
+		}
+		theta = math.Max(theta, modelTheta)
+	}
+	if theta <= 0 || math.IsInf(maximumJunction, 1) || maximumJunction <= maximumAmbient {
+		return minimumThermalPassCount
+	}
+	maximumSupply := 0.0
+	for _, domain := range requirement.Requirements.Domains {
+		if domain.Kind != "supply" {
+			continue
+		}
+		if domain.MaxVoltageV != nil {
+			maximumSupply = math.Max(maximumSupply, *domain.MaxVoltageV)
+		} else if domain.NominalVoltageV != nil {
+			maximumSupply = math.Max(maximumSupply, *domain.NominalVoltageV)
+		}
+	}
+	minimumLoad := math.Inf(1)
+	for _, operatingCase := range requirement.Requirements.OperatingCases {
+		for _, condition := range operatingCase.Conditions {
+			if condition.Axis == "load_resistance" && condition.Min > 0 {
+				minimumLoad = math.Min(minimumLoad, condition.Min)
+			}
+		}
+	}
+	requiredCurrent := requiredTransconductanceOutputCurrent(requirement)
+	if maximumSupply <= 0 || requiredCurrent <= 0 {
+		return minimumThermalPassCount
+	}
+	loadVoltage := 0.0
+	if !math.IsInf(minimumLoad, 1) {
+		loadVoltage = requiredCurrent * minimumLoad
+	}
+	totalDissipation := requiredCurrent * math.Max(0, maximumSupply-loadVoltage)
+	perDeviceDissipation := (maximumJunction - maximumAmbient) / theta
+	if totalDissipation <= 0 || perDeviceDissipation <= 0 {
+		return minimumThermalPassCount
+	}
+	requiredCount := math.Ceil(totalDissipation / perDeviceDissipation)
+	maximumPassCount := min(requirement.Requirements.Constraints.MaxComponents, MaxComponents)
+	if maximumPassCount < minimumThermalPassCount || !finite(requiredCount) || requiredCount > float64(maximumPassCount) {
+		return 0
+	}
+	return max(minimumThermalPassCount, int(requiredCount))
+}
+
 func compareCurrentSenseDifferentialKeys(left, right currentSenseDifferentialValues) int {
 	return cmp.Or(
 		cmp.Compare(left.shunt.Key, right.shunt.Key),
+		cmp.Compare(left.shuntCount, right.shuntCount),
 		cmp.Compare(left.input.Key, right.input.Key),
+		cmp.Compare(left.inputCount, right.inputCount),
 		cmp.Compare(left.feedback.Key, right.feedback.Key),
+		cmp.Compare(left.feedbackCount, right.feedbackCount),
 	)
 }
 

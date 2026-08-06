@@ -6113,12 +6113,8 @@ func deriveTransconductanceTopologyScales(
 	for _, node := range graph.Nodes {
 		nodeByID[node.ID] = node
 	}
-	instanceByID := make(map[string]GraphInstance, len(graph.Instances))
-	for _, graphInstance := range graph.Instances {
-		instanceByID[graphInstance.ID] = graphInstance
-	}
 	type nodePair struct{ first, second string }
-	resistorsBetween := map[nodePair]string{}
+	resistorsBetween := map[nodePair][]string{}
 	betweenKey := func(left, right string) nodePair {
 		if right < left {
 			left, right = right, left
@@ -6130,11 +6126,19 @@ func deriveTransconductanceTopologyScales(
 			continue
 		}
 		key := betweenKey(candidate.Terminals[0].Node, candidate.Terminals[1].Node)
-		if _, found := resistorsBetween[key]; !found {
-			resistorsBetween[key] = candidate.ID
-		}
+		resistorsBetween[key] = append(resistorsBetween[key], candidate.ID)
+	}
+	for key := range resistorsBetween {
+		slices.Sort(resistorsBetween[key])
 	}
 	between := func(left, right string) string {
+		instances := resistorsBetween[betweenKey(left, right)]
+		if len(instances) == 0 {
+			return ""
+		}
+		return instances[0]
+	}
+	betweenAll := func(left, right string) []string {
 		return resistorsBetween[betweenKey(left, right)]
 	}
 	protectedPassSource := ""
@@ -6255,8 +6259,8 @@ func deriveTransconductanceTopologyScales(
 				Priority:   1,
 			}}
 		}
-		shunt := between(collector, output)
-		if instance.ID == shunt {
+		shunts := betweenAll(collector, output)
+		if slices.Contains(shunts, instance.ID) {
 			value := 1 / transconductance
 			derivation := "sense impedance is the reciprocal of bounded voltage-to-current transfer"
 			if protectedSupply && instance.ValueSI != nil && *instance.ValueSI > 0 {
@@ -6304,12 +6308,31 @@ func deriveTransconductanceTopologyScales(
 				if instance.ID != between(activeTerminals["OUT"], driverTerminals["BASE"]) {
 					continue
 				}
+				value := 10_000.0
+				derivation := "buffered pass-device drive limits controller and discrete-driver base current"
+				requiredCurrent := requiredTransconductanceOutputCurrent(requirement)
+				passBeta := primitiveMinimumForwardBeta(inventory[passDevice.PrimitiveKey])
+				driverBeta := primitiveMinimumForwardBeta(inventory[driver.PrimitiveKey])
+				controllerLow, controllerHigh, swingOK := topologyDecisionOutputSwing(
+					requirement, graph, active, inventory,
+				)
+				referenceVoltage, referenceOK := topologyNodeNominalVoltage(requirement, graph, reference)
+				const conservativeDriverBaseEmitterDropV = 1.0
+				const bufferedDriveReserve = 4.0
+				availableDrive := controllerHigh - math.Max(controllerLow, referenceVoltage) -
+					conservativeDriverBaseEmitterDropV
+				if requiredCurrent > 0 && passBeta > 0 && driverBeta > 0 &&
+					swingOK && referenceOK && availableDrive > 0 {
+					value = availableDrive * passBeta * driverBeta /
+						(bufferedDriveReserve * requiredCurrent)
+					derivation = "buffered base-drive resistance follows reviewed controller swing, pass and driver minimum beta, required current, and drive reserve"
+				}
 				return []AnalyticScale{{
 					ID:         "topology:buffered_pass_device_drive:" + instance.ID,
 					Kind:       "resistance",
-					ValueSI:    10_000,
+					ValueSI:    value,
 					Unit:       "ohm",
-					Derivation: "buffered pass-device drive limits controller and discrete-driver base current",
+					Derivation: derivation,
 					SourceKind: "candidate_topology",
 					SourceID:   driver.ID,
 					Priority:   1,
@@ -6361,32 +6384,32 @@ func deriveTransconductanceTopologyScales(
 				nodeByID[terminals["IN_PLUS"]].Scope != "internal" {
 				continue
 			}
-			inputNegative := between(output, terminals["IN_MINUS"])
-			feedbackNegative := between(terminals["OUT"], terminals["IN_MINUS"])
-			inputPositive := between(collector, terminals["IN_PLUS"])
-			feedbackPositive := between(terminals["IN_PLUS"], reference)
-			network := map[string]bool{
-				inputNegative:    true,
-				feedbackNegative: true,
-				inputPositive:    true,
-				feedbackPositive: true,
+			inputNegative := betweenAll(output, terminals["IN_MINUS"])
+			feedbackNegative := betweenAll(terminals["OUT"], terminals["IN_MINUS"])
+			inputPositive := betweenAll(collector, terminals["IN_PLUS"])
+			feedbackPositive := betweenAll(terminals["IN_PLUS"], reference)
+			if len(inputNegative) == 0 || len(inputNegative) != len(inputPositive) ||
+				len(feedbackNegative) == 0 || len(feedbackNegative) != len(feedbackPositive) {
+				continue
 			}
-			delete(network, "")
-			if len(network) != 4 || !network[instance.ID] {
+			network := map[string]bool{}
+			for _, group := range [][]string{inputNegative, feedbackNegative, inputPositive, feedbackPositive} {
+				for _, resistor := range group {
+					network[resistor] = true
+				}
+			}
+			if !network[instance.ID] {
 				continue
 			}
 			const anchorResistance = 10_000.0
 			value := anchorResistance
 			derivation := "equal-ratio resistance for bounded differential current observation"
-			if protectedSupply && (instance.ID == feedbackNegative || instance.ID == feedbackPositive) {
-				shuntInstance := instanceByID[shunt]
-				if shuntInstance.ValueSI == nil || *shuntInstance.ValueSI <= 0 {
+			if protectedSupply {
+				if instance.ValueSI == nil || *instance.ValueSI <= 0 || len(shunts) == 0 {
 					continue
 				}
-				value = anchorResistance * (1 / transconductance) / *shuntInstance.ValueSI
-				derivation = "matched feedback-to-input ratio combines with the catalog shunt to realize reciprocal transconductance"
-			} else if protectedSupply {
-				derivation = "matched differential input resistance anchors the catalog-backed observation ratio"
+				value = *instance.ValueSI
+				derivation = "preserve the matched catalog differential network selected with the bounded current shunt"
 			}
 			return []AnalyticScale{{
 				ID:         "topology:differential_observation:" + instance.ID,
