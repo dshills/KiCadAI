@@ -317,7 +317,7 @@
       "id": "mosfet.aos.aod21357.to252",
       "family": "mosfet",
       "name": "AOS AOD21357 30 V logic-level P-channel MOSFET",
-      "description": "Low-resistance high-side power switch with guaranteed 13 mOhm on-resistance at 4.5 V gate drive and a reviewed steady-state free-air thermal path.",
+      "description": "Low-resistance high-side power switch with guaranteed 13 mOhm on-resistance at 4.5 V gate drive and reviewed steady-state thermal and single-pulse SOA evidence.",
       "generic": false,
       "manufacturer": "Alpha and Omega Semiconductor",
       "mpn": "AOD21357",
@@ -347,6 +347,53 @@
           {"name": "max_temperature_c", "value": 150},
           {"name": "junction_to_ambient_c_per_w", "value": 50},
           {"name": "junction_to_case_c_per_w", "value": 1.6}
+        ],
+        "transient_soa": [
+          {
+            "pulse_duration_s": 0.00001,
+            "case_temperature_c": 25,
+            "points": [
+              {"voltage_v": 1, "current_a": 60},
+              {"voltage_v": 10, "current_a": 30},
+              {"voltage_v": 30, "current_a": 10}
+            ]
+          },
+          {
+            "pulse_duration_s": 0.0001,
+            "case_temperature_c": 25,
+            "points": [
+              {"voltage_v": 1, "current_a": 50},
+              {"voltage_v": 10, "current_a": 20},
+              {"voltage_v": 30, "current_a": 6}
+            ]
+          },
+          {
+            "pulse_duration_s": 0.001,
+            "case_temperature_c": 25,
+            "points": [
+              {"voltage_v": 1, "current_a": 30},
+              {"voltage_v": 10, "current_a": 8},
+              {"voltage_v": 30, "current_a": 2.5}
+            ]
+          },
+          {
+            "pulse_duration_s": 0.01,
+            "case_temperature_c": 25,
+            "points": [
+              {"voltage_v": 1, "current_a": 20},
+              {"voltage_v": 10, "current_a": 4},
+              {"voltage_v": 30, "current_a": 1.2}
+            ]
+          },
+          {
+            "dc": true,
+            "case_temperature_c": 25,
+            "points": [
+              {"voltage_v": 1, "current_a": 10},
+              {"voltage_v": 10, "current_a": 2},
+              {"voltage_v": 30, "current_a": 0.6}
+            ]
+          }
         ]
       }],
       "thermal_evidence": {
@@ -354,7 +401,7 @@
         "junction_to_case_c_per_w": 1.6,
         "junction_to_ambient_c_per_w": 50,
         "mounting_assumptions": "Datasheet steady-state TO-252 junction-to-ambient boundary on a 1 square inch FR-4 board with 2 oz copper in still air; the lower junction-to-case path requires a separately declared case temperature.",
-        "review_note": "AOS AOD21357/AOI21357 Rev. 1.1 specifies 50 C/W maximum steady-state junction-to-ambient and 1.6 C/W maximum steady-state junction-to-case resistance."
+        "review_note": "AOS AOD21357/AOI21357 Rev. 1.1 specifies 50 C/W maximum steady-state junction-to-ambient and 1.6 C/W maximum steady-state junction-to-case resistance. Figure 9 supplies the single-pulse forward-biased SOA curves at TC=25 C; the simulation envelope is digitized conservatively below the published 10 us, 100 us, 1 ms, 10 ms, and DC curves."
       },
       "symbols": [{
         "symbol_id": "Transistor_FET:Q_PMOS_GDS",
@@ -395,7 +442,7 @@
         "sources": ["https://www.aosmd.com/products/mosfets/p-channel-mosfets-8v-60v/aod21357", "https://www.aosmd.com/sites/default/files/res/datasheets/AOI21357.pdf", "kicad-footprint:Package_TO_SOT_SMD:TO-252-3_TabPin2"],
         "resolver_checked": true,
         "pinmap_checked": true,
-        "notes": ["The trusted switch model uses the 13 mOhm maximum at 4.5 V gate drive and the steady-state 50 C/W junction-to-ambient boundary; the 70 A and 78 W headline ratings require the manufacturer case-temperature conditions."]
+        "notes": ["The trusted switch model uses the 13 mOhm maximum at 4.5 V gate drive, the steady-state 50 C/W junction-to-ambient boundary, and a conservative digitization of the datasheet Figure 9 single-pulse SOA curves at TC=25 C; the 70 A and 78 W headline ratings require the manufacturer case-temperature conditions."]
       }
     },
     {

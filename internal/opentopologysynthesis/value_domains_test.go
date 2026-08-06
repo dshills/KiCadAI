@@ -435,6 +435,33 @@ func TestCatalogSeriesResistancePairPreservesExistingBranch(t *testing.T) {
 	}
 }
 
+func TestCatalogSeriesParallelResistanceTripletUsesReviewedFixedValues(t *testing.T) {
+	var requirement Requirement
+	decodeFrozenStrict(
+		t,
+		mustRead(t, multiStageOODCorpusRoot()+"/undervoltage_load_permission.json"),
+		&requirement,
+	)
+	inventory, _ := testHeldOutSynthesisEnvironment(t)
+	const target = 119_700.0
+	byKey := primitiveInventoryByKey(inventory)
+	series, parallelA, parallelB, found := catalogSeriesParallelResistanceTriplet(
+		requirement,
+		byKey,
+		target,
+	)
+	if !found {
+		t.Fatal("catalog series-parallel resistance triplet was not found")
+	}
+	realized := series + 1/(1/parallelA+1/parallelB)
+	if math.Abs(realized-target)/target > .01 {
+		t.Fatalf(
+			"catalog series-parallel resistance triplet = %.12g + (%.12g || %.12g) = %.12g; want within 1%% of %.12g",
+			series, parallelA, parallelB, realized, target,
+		)
+	}
+}
+
 func testPoweredRCGraph(t *testing.T, requirement Requirement, inventory PrimitiveInventory) CandidateGraph {
 	t.Helper()
 	graph, issues := InitialGraph(requirement)

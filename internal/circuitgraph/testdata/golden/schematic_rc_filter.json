@@ -31,9 +31,9 @@
         ],
         "properties": {
           "KiCadAI Catalog": "checked-in",
-          "KiCadAI Catalog Hash": "15aba02bed3b437a7694c7565300a3ec9266abbc6f5989026d608663579d8c39",
+          "KiCadAI Catalog Hash": "856f09fa8a4e64a47b39aff09bd2a85f6d3b73a8b0601f636364ab260b147acc",
           "KiCadAI Component ID": "capacitor.murata.grm21br71h104ka01l.0805",
-          "KiCadAI Resolution Hash": "29286e212a2a8753242ae0556e41b0535236cacf2bfd464d480327b7fdc28423",
+          "KiCadAI Resolution Hash": "4ae7a68622d0813911c9e44e2f509b2fae9c2e23d9ed412f5d606e3603ed3f7a",
           "KiCadAI Variant ID": "0805",
           "MPN": "GRM21BR71H104KA01L",
           "Manufacturer": "Murata"
@@ -60,9 +60,9 @@
         ],
         "properties": {
           "KiCadAI Catalog": "checked-in",
-          "KiCadAI Catalog Hash": "15aba02bed3b437a7694c7565300a3ec9266abbc6f5989026d608663579d8c39",
+          "KiCadAI Catalog Hash": "856f09fa8a4e64a47b39aff09bd2a85f6d3b73a8b0601f636364ab260b147acc",
           "KiCadAI Component ID": "connector.pinheader.1x02.2_54mm",
-          "KiCadAI Resolution Hash": "29286e212a2a8753242ae0556e41b0535236cacf2bfd464d480327b7fdc28423",
+          "KiCadAI Resolution Hash": "4ae7a68622d0813911c9e44e2f509b2fae9c2e23d9ed412f5d606e3603ed3f7a",
           "KiCadAI Variant ID": "vertical"
         }
       },
@@ -87,9 +87,9 @@
         ],
         "properties": {
           "KiCadAI Catalog": "checked-in",
-          "KiCadAI Catalog Hash": "15aba02bed3b437a7694c7565300a3ec9266abbc6f5989026d608663579d8c39",
+          "KiCadAI Catalog Hash": "856f09fa8a4e64a47b39aff09bd2a85f6d3b73a8b0601f636364ab260b147acc",
           "KiCadAI Component ID": "connector.pinheader.1x02.2_54mm",
-          "KiCadAI Resolution Hash": "29286e212a2a8753242ae0556e41b0535236cacf2bfd464d480327b7fdc28423",
+          "KiCadAI Resolution Hash": "4ae7a68622d0813911c9e44e2f509b2fae9c2e23d9ed412f5d606e3603ed3f7a",
           "KiCadAI Variant ID": "vertical"
         }
       },
@@ -114,9 +114,9 @@
         ],
         "properties": {
           "KiCadAI Catalog": "checked-in",
-          "KiCadAI Catalog Hash": "15aba02bed3b437a7694c7565300a3ec9266abbc6f5989026d608663579d8c39",
+          "KiCadAI Catalog Hash": "856f09fa8a4e64a47b39aff09bd2a85f6d3b73a8b0601f636364ab260b147acc",
           "KiCadAI Component ID": "resistor.yageo.rc0805fr_0710kl.0805",
-          "KiCadAI Resolution Hash": "29286e212a2a8753242ae0556e41b0535236cacf2bfd464d480327b7fdc28423",
+          "KiCadAI Resolution Hash": "4ae7a68622d0813911c9e44e2f509b2fae9c2e23d9ed412f5d606e3603ed3f7a",
           "KiCadAI Variant ID": "0805",
           "MPN": "RC0805FR-0710KL",
           "Manufacturer": "Yageo"

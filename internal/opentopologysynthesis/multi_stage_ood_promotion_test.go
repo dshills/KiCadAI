@@ -27,18 +27,27 @@ func multiStageOODPromotionPolicy() Policy {
 }
 
 func TestMultiStageOODAmbientControlOptionalKiCadPromotion(t *testing.T) {
+	testMultiStageOODOptionalKiCadPromotion(t, "ambient_tracking_airflow_control")
+}
+
+func TestMultiStageOODUndervoltageDisconnectOptionalKiCadPromotion(t *testing.T) {
+	testMultiStageOODOptionalKiCadPromotion(t, "undervoltage_load_permission")
+}
+
+func testMultiStageOODOptionalKiCadPromotion(t *testing.T, caseName string) {
+	t.Helper()
 	if os.Getenv(openTopologyKiCadPromotionEnv) != "1" {
 		t.Skip("set " + openTopologyKiCadPromotionEnv + "=1 to run installed-KiCad multi-stage promotion")
 	}
-	if target := strings.TrimSpace(os.Getenv(multiStageOODCaseEnv)); target != "" && target != "ambient_tracking_airflow_control" {
-		t.Skip("multi-stage promotion filter excludes ambient_tracking_airflow_control")
+	if target := strings.TrimSpace(os.Getenv(multiStageOODCaseEnv)); target != "" && target != caseName {
+		t.Skip("multi-stage promotion filter excludes " + caseName)
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Minute)
 	defer cancel()
 	requirement, issues := DecodeStrict(bytes.NewReader(mustRead(
 		t,
-		filepath.Join(multiStageOODCorpusRoot(), "ambient_tracking_airflow_control.json"),
+		filepath.Join(multiStageOODCorpusRoot(), caseName+".json"),
 	)))
 	if len(issues) != 0 {
 		t.Fatalf("requirement decode issues: %#v", issues)
@@ -63,7 +72,7 @@ func TestMultiStageOODAmbientControlOptionalKiCadPromotion(t *testing.T) {
 	)
 	outputRoot := t.TempDir()
 	if retained := strings.TrimSpace(os.Getenv("KICADAI_OPEN_TOPOLOGY_ARTIFACT_ROOT")); retained != "" {
-		outputRoot = filepath.Join(retained, "ambient_tracking_airflow_control")
+		outputRoot = filepath.Join(retained, caseName)
 	}
 	promotion := PromoteSynthesisRun(ctx, first, environment, PhysicalPromotionOptions{
 		OutputRoot:    outputRoot,
@@ -87,7 +96,8 @@ func TestMultiStageOODAmbientControlOptionalKiCadPromotion(t *testing.T) {
 		)
 	}
 	t.Logf(
-		"multi-stage ambient promotion synthesis=%s physical=%s project=%s evidence=%s",
+		"multi-stage %s promotion synthesis=%s physical=%s project=%s evidence=%s",
+		caseName,
 		first.Hash,
 		first.Physical.Hash,
 		promotion.ProjectHash,

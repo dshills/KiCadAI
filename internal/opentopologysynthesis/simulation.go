@@ -1354,7 +1354,13 @@ func simulationIntentParts(
 		if !found {
 			return simmodel.Analysis{}, simmodel.Assertion{}, []SimulationDiagnostic{{Code: diagnosisSimulationInvalid, Path: "simulation.analysis.dc_sweep", Message: "DC sweep requires one bounded semantic excitation range"}}
 		}
-		analysis.DCSweep = &simmodel.DCSweep{Component: source, StartValue: start, StopValue: stop, Points: 101, Bidirectional: true}
+		analysis.DCSweep = &simmodel.DCSweep{
+			Component:     source,
+			StartValue:    start,
+			StopValue:     stop,
+			Points:        simulationDCSweepPoints(assertion, start, stop),
+			Bidirectional: true,
+		}
 	case simmodel.AnalysisACSweep, simmodel.AnalysisNoise:
 		center := assertionFrequencyScale(requirement, assertion)
 		analysis.StartFrequencyHz = math.Max(center/100, 1e-3)
@@ -1388,7 +1394,9 @@ func simulationIntentParts(
 		if assertion.Analysis == simmodel.AnalysisElectrothermal {
 			analysis.Conditions = append([]simmodel.NamedValue(nil), thermalConditions...)
 		}
-		addSimulationEvents(&analysis, requirement, operatingCase, graph)
+		if assertion.Analysis != simmodel.AnalysisStartup {
+			addSimulationEvents(&analysis, requirement, operatingCase, graph)
+		}
 		addAutonomousStartupEvents(&analysis, requirement, assertion, graph)
 		simmodel.NormalizeDynamicGrid(&analysis)
 	case simmodel.AnalysisDistortion:
@@ -1445,6 +1453,12 @@ func simulationIntentParts(
 		Quantity:   quantity,
 		Min:        minimum,
 		Max:        maximum,
+	}
+	if assertion.Metric == "on_state_voltage" {
+		if positive, negative, found := simulationOnStateVoltageNodes(graph, node); found {
+			simulationAssertion.Node = positive
+			simulationAssertion.ReferenceNode = negative
+		}
 	}
 	component, components, scopeDiagnostic := simulationMeasurementScope(
 		requirement,
@@ -1519,6 +1533,73 @@ func simulationIntentParts(
 	}
 	_ = evidence
 	return analysis, simulationAssertion, nil
+}
+
+func simulationDCSweepPoints(assertion BehavioralAssertion, start, stop float64) int {
+	const (
+		defaultPoints        = 101
+		maximumPoints        = 256
+		stepsAcrossTolerance = 20
+	)
+	if assertion.Min == nil || assertion.Max == nil || *assertion.Max <= *assertion.Min {
+		return defaultPoints
+	}
+	tolerance := *assertion.Max - *assertion.Min
+	rangeWidth := math.Abs(stop - start)
+	if rangeWidth == 0 || tolerance == 0 {
+		return defaultPoints
+	}
+	points := math.Ceil(rangeWidth/(tolerance/stepsAcrossTolerance)) + 1
+	if points < defaultPoints {
+		return defaultPoints
+	}
+	if points > maximumPoints {
+		return maximumPoints
+	}
+	return int(points)
+}
+
+func simulationOnStateVoltageNodes(
+	graph CandidateGraph,
+	observationNode string,
+) (string, string, bool) {
+	type voltagePair struct{ positive, negative string }
+	pairs := []voltagePair{}
+	for _, instance := range graph.Instances {
+		// topologyTerminalNodes exposes the canonical primitive function names
+		// validated when inventory terminals are bound; these are not raw symbol
+		// pin labels or model-specific aliases.
+		terminals := topologyTerminalNodes(instance)
+		switch instance.Kind {
+		case "n_channel_mosfet":
+			if terminals["DRAIN"] == observationNode {
+				pairs = append(pairs, voltagePair{terminals["DRAIN"], terminals["SOURCE"]})
+			}
+		case "p_channel_mosfet":
+			if terminals["DRAIN"] == observationNode {
+				pairs = append(pairs, voltagePair{terminals["SOURCE"], terminals["DRAIN"]})
+			}
+		case "npn_bjt":
+			if terminals["COLLECTOR"] == observationNode {
+				pairs = append(pairs, voltagePair{terminals["COLLECTOR"], terminals["EMITTER"]})
+			}
+		case "pnp_bjt":
+			if terminals["COLLECTOR"] == observationNode {
+				pairs = append(pairs, voltagePair{terminals["EMITTER"], terminals["COLLECTOR"]})
+			}
+		}
+	}
+	slices.SortFunc(pairs, func(left, right voltagePair) int {
+		return cmp.Or(
+			cmp.Compare(left.positive, right.positive),
+			cmp.Compare(left.negative, right.negative),
+		)
+	})
+	pairs = slices.Compact(pairs)
+	if len(pairs) != 1 || pairs[0].positive == "" || pairs[0].negative == "" {
+		return "", "", false
+	}
+	return pairs[0].positive, pairs[0].negative, true
 }
 
 func simulationStabilityObservationNode(
@@ -2432,7 +2513,14 @@ func assertionSourceValue(
 	node GraphNode,
 ) float64 {
 	fallback := sourceValueForNode(requirement, operatingCase, corner, node)
-	if node.Role == "control" {
+	if assertion.Analysis == simmodel.AnalysisStartup {
+		for _, event := range operatingCase.Events {
+			if event.Target == node.SemanticID && event.Kind != "short_circuit" {
+				return event.Initial
+			}
+		}
+	}
+	if node.Role == "control" || requirementPortDrivesDecision(requirement, node.SemanticID) {
 		switch assertion.Metric {
 		case "off_state_current":
 			inactive := math.Inf(1)

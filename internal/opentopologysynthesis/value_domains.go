@@ -4291,13 +4291,29 @@ func catalogSeriesResistancePair(
 			continue
 		}
 		minimum, maximum, ok := effectiveValueRange(*primitive.ValueDomain)
-		if !ok || minimum != maximum {
+		if !ok || minimum != maximum || minimum <= 0 {
 			continue
 		}
 		choices = append(choices, choice{value: minimum, key: primitive.Key})
 	}
+	derivedTargets := []float64{target / 2}
+	for _, existing := range choices {
+		if existing.value < target {
+			derivedTargets = append(derivedTargets, target-existing.value)
+		}
+	}
+	for _, derivedTarget := range derivedTargets {
+		value, found := topologyCatalogResistanceClosest(requirement, inventory, derivedTarget)
+		if !found || value <= 0 {
+			continue
+		}
+		choices = append(choices, choice{value: value, key: "derived:" + canonicalOptionalFloat(&value)})
+	}
 	slices.SortFunc(choices, func(left, right choice) int {
 		return cmp.Or(cmp.Compare(left.value, right.value), cmp.Compare(left.key, right.key))
+	})
+	choices = slices.CompactFunc(choices, func(left, right choice) bool {
+		return left.value == right.value
 	})
 	bestLeft, bestRight, bestError := 0.0, 0.0, math.Inf(1)
 	bestKey := ""
@@ -4312,6 +4328,93 @@ func catalogSeriesResistancePair(
 		}
 	}
 	return bestLeft, bestRight, bestKey != ""
+}
+
+// catalogSeriesParallelResistanceTriplet realizes a target resistance from
+// one series branch followed by two parallel branches. Only reviewed,
+// fixed-value primitives that cover every requested analysis and rating are
+// considered. This gives sparse catalogs a deterministic way to approach a
+// derived impedance without manufacturing an unevidenced component value.
+func catalogSeriesParallelResistanceTriplet(
+	requirement Requirement,
+	inventory map[string]PrimitiveCandidate,
+	target float64,
+) (float64, float64, float64, bool) {
+	if target <= 0 {
+		return 0, 0, 0, false
+	}
+	type choice struct {
+		value float64
+		key   string
+	}
+	choices := []choice{}
+	requiredAnalyses := requirementAnalysisSet(requirement)
+	for _, primitive := range inventory {
+		if primitive.Kind != "resistor" || primitive.ValueDomain == nil ||
+			!primitiveCoversAllAnalyses(primitive, requiredAnalyses) ||
+			!ratingsCoverRequirement(requirement, primitive) {
+			continue
+		}
+		minimum, maximum, ok := effectiveValueRange(*primitive.ValueDomain)
+		if !ok || minimum != maximum || minimum <= 0 {
+			continue
+		}
+		choices = append(choices, choice{value: minimum, key: primitive.Key})
+	}
+	slices.SortFunc(choices, func(left, right choice) int {
+		return cmp.Or(cmp.Compare(left.value, right.value), cmp.Compare(left.key, right.key))
+	})
+	choices = slices.CompactFunc(choices, func(left, right choice) bool {
+		return left.value == right.value
+	})
+	type parallelChoice struct {
+		value     float64
+		first     float64
+		second    float64
+		branchKey string
+	}
+	parallelChoices := make([]parallelChoice, 0, len(choices)*(len(choices)+1)/2)
+	for firstIndex, first := range choices {
+		for secondIndex := firstIndex; secondIndex < len(choices); secondIndex++ {
+			second := choices[secondIndex]
+			parallelChoices = append(parallelChoices, parallelChoice{
+				value:  1 / (1/first.value + 1/second.value),
+				first:  first.value,
+				second: second.value,
+				branchKey: canonicalOptionalFloat(&first.value) + "|" + first.key + "|" +
+					canonicalOptionalFloat(&second.value) + "|" + second.key,
+			})
+		}
+	}
+	slices.SortFunc(parallelChoices, func(left, right parallelChoice) int {
+		return cmp.Or(cmp.Compare(left.value, right.value), cmp.Compare(left.branchKey, right.branchKey))
+	})
+	parallelChoices = slices.CompactFunc(parallelChoices, func(left, right parallelChoice) bool {
+		return left.value == right.value
+	})
+	bestSeries, bestParallelA, bestParallelB := 0.0, 0.0, 0.0
+	bestError := math.Inf(1)
+	bestKey := ""
+	for _, series := range choices {
+		desiredParallel := target - series.value
+		index, _ := slices.BinarySearchFunc(parallelChoices, desiredParallel, func(candidate parallelChoice, target float64) int {
+			return cmp.Compare(candidate.value, target)
+		})
+		for _, candidateIndex := range []int{index - 1, index} {
+			if candidateIndex < 0 || candidateIndex >= len(parallelChoices) {
+				continue
+			}
+			parallel := parallelChoices[candidateIndex]
+			realized := series.value + parallel.value
+			error := math.Abs(realized-target) / target
+			key := canonicalOptionalFloat(&series.value) + "|" + series.key + "|" + parallel.branchKey
+			if error < bestError || (error == bestError && (bestKey == "" || key < bestKey)) {
+				bestSeries, bestParallelA, bestParallelB = series.value, parallel.first, parallel.second
+				bestError, bestKey = error, key
+			}
+		}
+	}
+	return bestSeries, bestParallelA, bestParallelB, bestKey != ""
 }
 
 // catalogSeriesResistancePairPreservingBranch treats a series split as a
@@ -4501,6 +4604,11 @@ func deriveControlledSwitchTopologyScales(
 	closest := func(target float64) (float64, bool) {
 		return topologyCatalogResistanceClosest(requirement, inventory, target)
 	}
+	if scale, ok := deriveLevelShiftedHighSideSwitchScale(
+		requirement, graph, instance, inventory,
+	); ok {
+		return []AnalyticScale{scale}
+	}
 	for _, decision := range graph.Instances {
 		if decision.Kind != "comparator" {
 			continue
@@ -4513,7 +4621,7 @@ func deriveControlledSwitchTopologyScales(
 		controlledOutputs := map[string]bool{}
 		var controlledDevice GraphInstance
 		for _, active := range graph.Instances {
-			if active.Kind == "n_channel_mosfet" &&
+			if (active.Kind == "n_channel_mosfet" || active.Kind == "p_channel_mosfet") &&
 				topologyTerminalNodes(active)["GATE"] == gateNode {
 				controlledOutputs[topologyTerminalNodes(active)["DRAIN"]] = true
 				if controlledDevice.ID == "" || active.ID < controlledDevice.ID {
@@ -4543,7 +4651,11 @@ func deriveControlledSwitchTopologyScales(
 		}
 		gateSupplyNode, gatePullup := branchByRole(gateNode, "supply")
 		gateReferenceNode, gatePulldown := branchByRole(gateNode, "reference")
-		if gatePullup == "" || gatePulldown == "" {
+		highSide := controlledDevice.Kind == "p_channel_mosfet"
+		if highSide && gateReferenceNode == "" {
+			gateReferenceNode = decisionTerminals["V_MINUS"]
+		}
+		if gatePullup == "" || (!highSide && gatePulldown == "") {
 			continue
 		}
 		gateSupply, supplyOK := topologyNodeNominalVoltage(requirement, graph, gateSupplyNode)
@@ -4552,7 +4664,10 @@ func deriveControlledSwitchTopologyScales(
 			continue
 		}
 		const pullupTarget = 10_000.0
-		pulldownTarget := 100_000.0
+		pulldownTarget := math.Inf(1)
+		if gatePulldown != "" {
+			pulldownTarget = 100_000
+		}
 		gateLimit := 0.0
 		for _, rating := range inventory[controlledDevice.PrimitiveKey].Ratings {
 			if strings.EqualFold(rating.Kind, "gate_source_voltage") {
@@ -4578,7 +4693,10 @@ func deriveControlledSwitchTopologyScales(
 			}
 		}
 		pullup, pullupOK := closest(pullupTarget)
-		pulldown, pulldownOK := closest(pulldownTarget)
+		pulldown, pulldownOK := math.Inf(1), true
+		if gatePulldown != "" {
+			pulldown, pulldownOK = closest(pulldownTarget)
+		}
 		if !pullupOK || !pulldownOK || pullup <= 0 || pulldown <= 0 {
 			continue
 		}
@@ -4600,12 +4718,18 @@ func deriveControlledSwitchTopologyScales(
 			offResistance = math.Inf(1)
 		}
 		parallel := func(left, right float64) float64 {
+			if math.IsInf(left, 1) {
+				return right
+			}
 			if math.IsInf(right, 1) {
 				return left
 			}
 			return left * right / (left + right)
 		}
 		gateAt := func(shunt float64) float64 {
+			if math.IsInf(shunt, 1) {
+				return gateSupply
+			}
 			return (gateSupply*shunt + gateReference*pullup) / (pullup + shunt)
 		}
 		outputLow := gateAt(parallel(pulldown, onResistance))
@@ -4614,8 +4738,10 @@ func deriveControlledSwitchTopologyScales(
 			continue
 		}
 		values := map[string]float64{
-			gatePullup:   pullup,
-			gatePulldown: pulldown,
+			gatePullup: pullup,
+		}
+		if gatePulldown != "" {
+			values[gatePulldown] = pulldown
 		}
 		derivation := "catalog-ranked open-collector pull network preserves a bounded inactive and active gate state"
 		if lowerThreshold > 0 && upperThreshold > lowerThreshold {
@@ -4786,6 +4912,235 @@ func deriveControlledSwitchTopologyScales(
 		}}
 	}
 	return nil
+}
+
+func deriveLevelShiftedHighSideSwitchScale(
+	requirement Requirement,
+	graph CandidateGraph,
+	instance GraphInstance,
+	inventory map[string]PrimitiveCandidate,
+) (AnalyticScale, bool) {
+	const (
+		inputImpedanceHeadroom     = 1.5
+		loadedDecisionHighFraction = 0.85
+		biasCorrectionCornerMargin = 1.35
+		decisionNetworkTargetOhm   = 10_000.0
+		levelShifterBaseTargetOhm  = 47_000.0
+	)
+	var decision, levelShifter, controlledDevice, stableReference GraphInstance
+	for _, candidate := range graph.Instances {
+		switch candidate.Kind {
+		case "comparator":
+			if decision.ID == "" || candidate.ID < decision.ID {
+				decision = candidate
+			}
+		case "npn_bjt":
+			if levelShifter.ID == "" || candidate.ID < levelShifter.ID {
+				levelShifter = candidate
+			}
+		case "p_channel_mosfet":
+			if controlledDevice.ID == "" || candidate.ID < controlledDevice.ID {
+				controlledDevice = candidate
+			}
+		}
+		primitive := inventory[candidate.PrimitiveKey]
+		for _, model := range primitive.Models {
+			if model.ModelID == simmodel.PrimitiveShuntVoltageReferenceV1 &&
+				(stableReference.ID == "" || candidate.ID < stableReference.ID) {
+				stableReference = candidate
+			}
+		}
+	}
+	if decision.ID == "" || levelShifter.ID == "" || controlledDevice.ID == "" || stableReference.ID == "" {
+		return AnalyticScale{}, false
+	}
+	decisionTerminals := topologyTerminalNodes(decision)
+	shifterTerminals := topologyTerminalNodes(levelShifter)
+	switchTerminals := topologyTerminalNodes(controlledDevice)
+	referenceTerminals := topologyTerminalNodes(stableReference)
+	decisionNode := decisionTerminals["OUT"]
+	signalNode := decisionTerminals["IN_PLUS"]
+	thresholdNode := decisionTerminals["IN_MINUS"]
+	baseNode := shifterTerminals["BASE"]
+	gateNode := shifterTerminals["COLLECTOR"]
+	referenceNode := shifterTerminals["EMITTER"]
+	stableNode := referenceTerminals["CATHODE"]
+	if decisionNode == "" || signalNode == "" || thresholdNode == "" || baseNode == "" ||
+		gateNode == "" || referenceNode == "" || stableNode == "" ||
+		referenceTerminals["ANODE"] != referenceNode || switchTerminals["GATE"] != gateNode ||
+		switchTerminals["SOURCE"] == "" {
+		return AnalyticScale{}, false
+	}
+	if len(topologyResistorPath(graph, decisionNode, baseNode)) != 1 ||
+		len(topologyResistorPath(graph, decisionNode, signalNode)) != 2 ||
+		len(topologyResistorPath(graph, stableNode, signalNode)) != 2 {
+		return AnalyticScale{}, false
+	}
+	referenceVoltage, referenceKnown := topologyPrimitiveReferenceVoltage(inventory[stableReference.PrimitiveKey])
+	if !referenceKnown || referenceVoltage <= 0 {
+		return AnalyticScale{}, false
+	}
+	lowerThreshold, upperThreshold := 0.0, 0.0
+	for _, assertion := range requirement.Requirements.BehavioralRequirements {
+		target := assertionTarget(assertion)
+		switch assertion.Metric {
+		case "falling_threshold":
+			if target > 0 && (lowerThreshold == 0 || target < lowerThreshold) {
+				lowerThreshold = target
+			}
+		case "rising_threshold":
+			if target > upperThreshold {
+				upperThreshold = target
+			}
+		}
+	}
+	if lowerThreshold <= 0 || upperThreshold <= lowerThreshold {
+		return AnalyticScale{}, false
+	}
+	inputNode := ""
+	for _, node := range graph.Nodes {
+		if node.Scope != "external" ||
+			(!requirementPortIsControl(requirement, node.SemanticID) &&
+				!requirementPortDrivesDecision(requirement, node.SemanticID)) {
+			continue
+		}
+		if len(topologyResistorPath(graph, node.ID, signalNode)) == 1 {
+			inputNode = node.ID
+			break
+		}
+	}
+	if inputNode == "" {
+		return AnalyticScale{}, false
+	}
+	inputMinimum := 10_000.0
+	for _, port := range requirement.Requirements.Ports {
+		if "port_"+port.ID == inputNode && port.Electrical.InputImpedanceMinOhm != nil {
+			inputMinimum = math.Max(inputMinimum, *port.Electrical.InputImpedanceMinOhm)
+		}
+	}
+	inputResistance, inputOK := topologyCatalogResistanceClosest(
+		requirement, inventory, inputImpedanceHeadroom*inputMinimum,
+	)
+	// Reserve output swing for pull-up loading, level-shifter base drive, and
+	// threshold-corner separation instead of sizing hysteresis from an ideal,
+	// unloaded decision high.
+	decisionHigh := loadedDecisionHighFraction * referenceVoltage
+	feedbackTarget := decisionHigh * inputResistance / (upperThreshold - lowerThreshold)
+	feedbackSeries, feedbackParallelA, feedbackParallelB, feedbackOK := catalogSeriesParallelResistanceTriplet(
+		requirement, inventory, feedbackTarget,
+	)
+	thresholdResistance, thresholdOK := topologyCatalogResistanceClosest(requirement, inventory, decisionNetworkTargetOhm)
+	if !inputOK || !feedbackOK || !thresholdOK || inputResistance <= 0 ||
+		feedbackSeries <= 0 || feedbackParallelA <= 0 || feedbackParallelB <= 0 || thresholdResistance <= 0 {
+		return AnalyticScale{}, false
+	}
+	feedbackResistance := feedbackSeries + 1/(1/feedbackParallelA+1/feedbackParallelB)
+	thresholdVoltage := referenceVoltage / 2
+	bottomConductance := upperThreshold/inputResistance/thresholdVoltage -
+		1/inputResistance - 1/feedbackResistance
+	if bottomConductance <= 0 || !finite(bottomConductance) {
+		return AnalyticScale{}, false
+	}
+	inputBottom, bottomOK := topologyCatalogResistanceClosest(requirement, inventory, 1/bottomConductance)
+	if !bottomOK || inputBottom <= 0 {
+		return AnalyticScale{}, false
+	}
+	realizedUpperThreshold := thresholdVoltage * (1 +
+		inputResistance/inputBottom + inputResistance/feedbackResistance)
+	quantizationError := realizedUpperThreshold - upperThreshold
+	biasResistance := 0.0
+	if quantizationError > 0 {
+		// Keep correction current below the ideal nominal cancellation so
+		// reference, comparator-offset, and resistor corners retain margin on
+		// both sides of the requested threshold windows.
+		biasResistance = biasCorrectionCornerMargin * (referenceVoltage - thresholdVoltage) * inputResistance / quantizationError
+	}
+	biasFirst, biasSecond, biasOK := catalogSeriesResistancePair(
+		requirement, inventory, biasResistance,
+	)
+	baseResistance, baseOK := topologyCatalogResistanceClosest(requirement, inventory, levelShifterBaseTargetOhm)
+	pullResistance, pullOK := topologyCatalogResistanceClosest(requirement, inventory, decisionNetworkTargetOhm)
+	if !biasOK || !baseOK || !pullOK {
+		return AnalyticScale{}, false
+	}
+	values := map[string]float64{}
+	setPath := func(start, end string, pathValues ...float64) bool {
+		path := topologyResistorPath(graph, start, end)
+		if len(path) != len(pathValues) {
+			return false
+		}
+		for index, id := range path {
+			values[id] = pathValues[index]
+		}
+		return true
+	}
+	setSeriesParallel := func(start, end string, series, parallelA, parallelB float64) bool {
+		between := func(left, right string) []string {
+			ids := []string{}
+			for _, instance := range graph.Instances {
+				if instance.Kind != "resistor" {
+					continue
+				}
+				terminals := topologyTerminalNodes(instance)
+				first, second := terminals["A"], terminals["B"]
+				if (first == left && second == right) || (first == right && second == left) {
+					ids = append(ids, instance.ID)
+				}
+			}
+			slices.Sort(ids)
+			return ids
+		}
+		for _, node := range graph.Nodes {
+			if node.ID == start || node.ID == end {
+				continue
+			}
+			seriesIDs := between(start, node.ID)
+			parallelIDs := between(node.ID, end)
+			if len(seriesIDs) != 1 || len(parallelIDs) != 2 {
+				continue
+			}
+			values[seriesIDs[0]] = series
+			values[parallelIDs[0]] = parallelA
+			values[parallelIDs[1]] = parallelB
+			return true
+		}
+		return false
+	}
+	supplyNode := switchTerminals["SOURCE"]
+	if !setPath(supplyNode, stableNode, pullResistance) ||
+		!setPath(stableNode, thresholdNode, thresholdResistance) ||
+		!setPath(thresholdNode, referenceNode, thresholdResistance) ||
+		!setPath(inputNode, signalNode, inputResistance) ||
+		!setPath(signalNode, referenceNode, inputBottom) ||
+		!setPath(stableNode, decisionNode, pullResistance) ||
+		!setPath(decisionNode, baseNode, baseResistance) ||
+		!setSeriesParallel(decisionNode, signalNode, feedbackSeries, feedbackParallelA, feedbackParallelB) ||
+		!setPath(stableNode, signalNode, biasFirst, biasSecond) ||
+		!setPath(supplyNode, gateNode, pullResistance) {
+		return AnalyticScale{}, false
+	}
+	if instance.Kind == "capacitor" {
+		first, second := instance.Terminals[0].Node, instance.Terminals[1].Node
+		if first != gateNode && second != gateNode || first != supplyNode && second != supplyNode {
+			return AnalyticScale{}, false
+		}
+		return AnalyticScale{
+			ID: "topology:fail_safe_high_side_gate_hold:" + instance.ID, Kind: "capacitance",
+			ValueSI: 10e-9, Unit: "F",
+			Derivation: "gate-source hold capacitance preserves the high-side switch off state while the decision and level-shift rails establish",
+			SourceKind: "candidate_topology", SourceID: decision.ID, Priority: 1,
+		}, true
+	}
+	value := values[instance.ID]
+	if instance.Kind != "resistor" || value <= 0 || !finite(value) {
+		return AnalyticScale{}, false
+	}
+	return AnalyticScale{
+		ID: "topology:absolute_high_side_decision_network:" + instance.ID, Kind: "resistance",
+		ValueSI: value, Unit: "ohm",
+		Derivation: "catalog-backed reference, input-divider, hysteresis, level-shift, and fail-safe gate ratios derive the requested absolute decision bounds",
+		SourceKind: "candidate_topology", SourceID: decision.ID, Priority: 1,
+	}, true
 }
 
 func deriveTransconductanceTopologyScales(

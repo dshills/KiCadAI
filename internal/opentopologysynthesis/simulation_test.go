@@ -370,6 +370,31 @@ func TestDynamicGridNormalizesBeforeSemanticValueEvents(t *testing.T) {
 	}
 }
 
+func TestDCSweepResolutionTracksAssertionTolerance(t *testing.T) {
+	minimum := 10.2
+	maximum := 10.6
+	assertion := BehavioralAssertion{Min: &minimum, Max: &maximum}
+	if points := simulationDCSweepPoints(assertion, 8, 15); points != 256 {
+		t.Fatalf("narrow assertion sweep points = %d, want cap 256", points)
+	}
+	maximum = 20
+	if points := simulationDCSweepPoints(assertion, 8, 15); points != 101 {
+		t.Fatalf("broad assertion sweep points = %d, want default 101", points)
+	}
+	maximum = 10.200001
+	if points := simulationDCSweepPoints(assertion, 8, 15); points != 256 {
+		t.Fatalf("very narrow assertion sweep points = %d, want cap 256", points)
+	}
+	maximum = math.Nextafter(minimum, math.Inf(1))
+	if points := simulationDCSweepPoints(assertion, 8, 15); points != 256 {
+		t.Fatalf("machine-resolution assertion sweep points = %d, want cap 256", points)
+	}
+	assertion.Max = nil
+	if points := simulationDCSweepPoints(assertion, 8, 15); points != 101 {
+		t.Fatalf("one-sided assertion sweep points = %d, want default 101", points)
+	}
+}
+
 func TestPeriodicAssertionsOverrideOneShotSourceEvents(t *testing.T) {
 	requirement, issues := DecodeStrict(bytes.NewReader(mustRead(
 		t,
@@ -510,6 +535,46 @@ func TestHeldOutMetricsHaveGenericTrustedMeasurementContracts(t *testing.T) {
 		if quantity, _, supported := directSimulationQuantity(BehavioralAssertion{Metric: metric}); !supported || quantity == "" {
 			t.Errorf("held-out metric %q has no generic trusted measurement contract", metric)
 		}
+	}
+}
+
+func TestOnStateVoltageMeasuresSwitchDropForBothOrientations(t *testing.T) {
+	tests := []struct {
+		name         string
+		kind         string
+		terminals    []TerminalConnection
+		wantPositive string
+		wantNegative string
+	}{
+		{
+			name: "low side nmos", kind: "n_channel_mosfet",
+			terminals: []TerminalConnection{
+				{Terminal: "DRAIN", Node: "OUTPUT"},
+				{Terminal: "GATE", Node: "GATE"},
+				{Terminal: "SOURCE", Node: "GROUND"},
+			},
+			wantPositive: "OUTPUT", wantNegative: "GROUND",
+		},
+		{
+			name: "high side pmos", kind: "p_channel_mosfet",
+			terminals: []TerminalConnection{
+				{Terminal: "DRAIN", Node: "OUTPUT"},
+				{Terminal: "GATE", Node: "GATE"},
+				{Terminal: "SOURCE", Node: "SUPPLY"},
+			},
+			wantPositive: "SUPPLY", wantNegative: "OUTPUT",
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			graph := CandidateGraph{Instances: []GraphInstance{{
+				ID: "switch", Kind: test.kind, Terminals: test.terminals,
+			}}}
+			positive, negative, found := simulationOnStateVoltageNodes(graph, "OUTPUT")
+			if !found || positive != test.wantPositive || negative != test.wantNegative {
+				t.Fatalf("on-state voltage nodes = %q - %q found=%t", positive, negative, found)
+			}
+		})
 	}
 }
 
@@ -766,6 +831,50 @@ func TestActiveOutputAssertionsInheritEnableEnvelopeWithoutChangingStartup(t *te
 	}
 	if enableConditions != 1 {
 		t.Fatalf("startup enable conditions = %#v", startupConditions)
+	}
+}
+
+func TestDecisionInputStateAssertionsUseSemanticExtremes(t *testing.T) {
+	requirement, issues := DecodeStrict(bytes.NewReader(mustRead(t, filepath.Join(
+		multiStageOODCorpusRoot(), "undervoltage_load_permission.json",
+	))))
+	if len(issues) != 0 {
+		t.Fatalf("requirement issues = %#v", issues)
+	}
+	graph, graphIssues := InitialGraph(requirement)
+	if len(graphIssues) != 0 {
+		t.Fatalf("initial graph issues = %#v", graphIssues)
+	}
+	assertions := map[string]BehavioralAssertion{}
+	for _, assertion := range requirement.Requirements.BehavioralRequirements {
+		assertions[assertion.ID] = assertion
+	}
+	var operatingCase OperatingCase
+	for _, candidate := range requirement.Requirements.OperatingCases {
+		if candidate.ID == "battery_sweep" {
+			operatingCase = candidate
+			break
+		}
+	}
+	var input GraphNode
+	for _, node := range graph.Nodes {
+		if node.SemanticID == "battery_level" {
+			input = node
+			break
+		}
+	}
+	if input.ID == "" {
+		t.Fatal("initial graph lacks battery-level decision input")
+	}
+	corner := operatingCaseCorners(operatingCase)[0]
+	if got := assertionSourceValue(requirement, assertions["active_loss"], operatingCase, corner, input); got != 15 {
+		t.Fatalf("on-state decision input = %.12g V, want active maximum 15 V", got)
+	}
+	if got := assertionSourceValue(requirement, assertions["disconnected_leakage"], operatingCase, corner, input); got != 8 {
+		t.Fatalf("off-state decision input = %.12g V, want inactive minimum 8 V", got)
+	}
+	if got := assertionSourceValue(requirement, assertions["disconnected_start"], operatingCase, corner, input); got != 9 {
+		t.Fatalf("startup decision input = %.12g V, want event initial value 9 V", got)
 	}
 }
 

@@ -677,6 +677,37 @@ func TestCheckedInCatalogRequestedPChannelMOSFETExpansion(t *testing.T) {
 	}
 }
 
+func TestCheckedInCatalogAOD21357CarriesReviewedTransientSOA(t *testing.T) {
+	catalog, err := LoadCatalog(context.Background(), LoadOptions{CatalogDir: checkedInCatalogDir(t)})
+	if err != nil {
+		t.Fatalf("load checked-in catalog: %v", err)
+	}
+
+	record := requireCatalogRecord(t, catalog, "mosfet.aos.aod21357.to252")
+	if len(record.SimulationModels) != 1 {
+		t.Fatalf("AOD21357 simulation models = %d, want 1", len(record.SimulationModels))
+	}
+	soa := record.SimulationModels[0].TransientSOA
+	if len(soa) != 5 {
+		t.Fatalf("AOD21357 transient SOA envelopes = %d, want 5", len(soa))
+	}
+	wantDurations := []float64{1e-5, 1e-4, 1e-3, 1e-2}
+	for index, duration := range wantDurations {
+		if soa[index].DC || soa[index].PulseDurationS == nil || *soa[index].PulseDurationS != duration || soa[index].CaseTemperatureC != 25 {
+			t.Fatalf("AOD21357 transient SOA envelope %d = %#v, want %.6g s at 25 C", index, soa[index], duration)
+		}
+		if len(soa[index].Points) != 3 {
+			t.Fatalf("AOD21357 transient SOA envelope %d points = %d, want 3", index, len(soa[index].Points))
+		}
+	}
+	if !soa[4].DC || soa[4].PulseDurationS != nil || soa[4].CaseTemperatureC != 25 || len(soa[4].Points) != 3 {
+		t.Fatalf("AOD21357 DC SOA envelope = %#v", soa[4])
+	}
+	if got := soa[4].Points[2]; got.VoltageV != 30 || got.CurrentA != .6 {
+		t.Fatalf("AOD21357 conservative 30 V DC SOA point = %#v, want 0.6 A", got)
+	}
+}
+
 func TestCheckedInCatalogRequestedPNPExpansion(t *testing.T) {
 	catalog, err := LoadCatalog(context.Background(), LoadOptions{CatalogDir: checkedInCatalogDir(t)})
 	if err != nil {

@@ -191,9 +191,117 @@ func TestControlledSwitchRelationshipComposesRegulatedLoadRail(t *testing.T) {
 		if evaluation.Status == SimulationEvaluationPassed {
 			return
 		}
+		t.Logf(
+			"regulated-load-rail candidate values=%s diagnoses=%#v",
+			testValueTrialSummary(plan, 0), evaluation.Diagnoses,
+		)
 	}
 	t.Fatalf(
 		"no regulated-load-rail candidate passed every electrical and safety assertion: candidates=%d consumption=%#v rejections=%#v",
 		len(search.Candidates), search.Consumption, search.Rejections,
 	)
+}
+
+func TestHighSideUndervoltageDisconnectPassesAbsoluteThresholdCorners(t *testing.T) {
+	var requirement Requirement
+	decodeFrozenStrict(
+		t,
+		mustRead(t, filepath.Join(multiStageOODCorpusRoot(), "undervoltage_load_permission.json")),
+		&requirement,
+	)
+	inventory, environment := testHeldOutSynthesisEnvironment(t)
+	policy := multiStageOODPromotionPolicy()
+	search := SearchPrimitiveTopologies(context.Background(), requirement, inventory, policy)
+	for _, candidate := range search.Candidates {
+		if !topologyGraphHasAbsoluteDecisionReference(candidate.Graph) {
+			continue
+		}
+		plan := BuildValueSearchPlan(requirement, candidate.Graph, inventory, policy)
+		if plan.Status != ValuePlanReady {
+			continue
+		}
+		enumeration := EnumerateValueTrials(plan, 1)
+		if len(enumeration.Trials) == 0 {
+			continue
+		}
+		graph, err := ApplyValueTrial(candidate.Graph, enumeration.Trials[0], inventory)
+		if err != nil {
+			t.Fatal(err)
+		}
+		evaluation := EvaluateCandidate(
+			context.Background(), requirement, graph, &enumeration.Trials[0],
+			inventory, environment, policy,
+		)
+		if evaluation.Status == SimulationEvaluationPassed {
+			return
+		}
+		t.Logf("undervoltage values=%s diagnoses=%#v", testValueTrialSummary(plan, 0), evaluation.Diagnoses)
+	}
+	t.Fatalf(
+		"no absolute-reference high-side disconnect passed every electrical and safety corner: candidates=%d consumption=%#v rejections=%#v",
+		len(search.Candidates), search.Consumption, search.Rejections,
+	)
+}
+
+func TestAbsoluteDecisionReferenceObligationTracksSweptSupplyEnvelope(t *testing.T) {
+	for _, test := range []struct {
+		name string
+		want bool
+	}{
+		{name: "undervoltage_load_permission", want: true},
+		{name: "ambient_tracking_airflow_control", want: false},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			var requirement Requirement
+			decodeFrozenStrict(
+				t,
+				mustRead(t, filepath.Join(multiStageOODCorpusRoot(), test.name+".json")),
+				&requirement,
+			)
+			if got := topologyRequiresAbsoluteDecisionReference(requirement); got != test.want {
+				t.Fatalf("absolute decision reference obligation = %t, want %t", got, test.want)
+			}
+		})
+	}
+}
+
+func TestControlledSwitchRelationshipOrientsPowerSourceHighSide(t *testing.T) {
+	var requirement Requirement
+	decodeFrozenStrict(
+		t,
+		mustRead(t, filepath.Join(multiStageOODCorpusRoot(), "undervoltage_load_permission.json")),
+		&requirement,
+	)
+	inventory, _ := testHeldOutSynthesisEnvironment(t)
+	initial, issues := InitialGraph(requirement)
+	if len(issues) != 0 {
+		t.Fatalf("initial graph issues: %#v", issues)
+	}
+	output := ""
+	for _, node := range initial.Nodes {
+		if node.SemanticKind == "port" && node.SemanticID == "permitted_output" {
+			output = node.ID
+			break
+		}
+	}
+	if output == "" || !topologyControlledSwitchHighSideOutput(requirement, initial, output) {
+		t.Fatalf("power-source output did not derive high-side orientation: output=%q", output)
+	}
+	search := SearchPrimitiveTopologies(context.Background(), requirement, inventory, DefaultPolicy())
+	for _, candidate := range search.Candidates {
+		nodes := map[string]GraphNode{}
+		for _, node := range candidate.Graph.Nodes {
+			nodes[node.ID] = node
+		}
+		for _, instance := range candidate.Graph.Instances {
+			if instance.Kind != "p_channel_mosfet" {
+				continue
+			}
+			terminals := topologyTerminalNodes(instance)
+			if terminals["DRAIN"] == output && nodes[terminals["SOURCE"]].Role == "supply" {
+				return
+			}
+		}
+	}
+	t.Fatalf("no high-side PMOS candidate was composed: candidates=%d rejections=%#v", len(search.Candidates), search.Rejections)
 }
