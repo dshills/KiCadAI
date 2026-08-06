@@ -82,3 +82,72 @@ func TestControlledSwitchRelationshipComposesDecisionFeedback(t *testing.T) {
 		t.Fatalf("inferred hysteresis sweep = %q %.12g..%.12g found=%t", source, start, stop, ok)
 	}
 }
+
+func TestControlledSwitchRelationshipDerivesProtectedDecisionOperatingEnvelope(t *testing.T) {
+	var requirement Requirement
+	decodeFrozenStrict(
+		t,
+		mustRead(t, filepath.Join(multiStageOODCorpusRoot(), "ambient_tracking_airflow_control.json")),
+		&requirement,
+	)
+	inventory, environment := testHeldOutSynthesisEnvironment(t)
+	policy := DefaultPolicy()
+	search := SearchPrimitiveTopologies(context.Background(), requirement, inventory, policy)
+	wantPassed := []string{
+		"rising_decision",
+		"falling_decision",
+		"decision_memory",
+		"quiet_start",
+		"safe_temperature",
+		"safe_operating_area",
+	}
+	for _, candidate := range search.Candidates {
+		plan := BuildValueSearchPlan(requirement, candidate.Graph, inventory, policy)
+		if plan.Status != ValuePlanReady {
+			continue
+		}
+		enumeration := EnumerateValueTrials(plan, 1)
+		if len(enumeration.Trials) == 0 {
+			continue
+		}
+		graph, err := ApplyValueTrial(candidate.Graph, enumeration.Trials[0], inventory)
+		if err != nil {
+			t.Fatal(err)
+		}
+		evaluation := EvaluateCandidate(
+			context.Background(), requirement, graph, nil, inventory, environment, policy,
+		)
+		activeCurrentFailure := false
+		onlyCurrentFailures := true
+		for _, diagnosis := range evaluation.Diagnoses {
+			if diagnosis.RequirementID == "active_current" {
+				activeCurrentFailure = true
+				continue
+			}
+			onlyCurrentFailures = false
+		}
+		if !activeCurrentFailure || !onlyCurrentFailures {
+			continue
+		}
+		passed := map[string]bool{}
+		for _, attempt := range evaluation.Attempts {
+			if attempt.Status == SimulationEvaluationPassed {
+				passed[attempt.RequirementID] = true
+			}
+		}
+		allPassed := true
+		for _, requirementID := range wantPassed {
+			if !passed[requirementID] {
+				allPassed = false
+				break
+			}
+		}
+		if allPassed {
+			return
+		}
+	}
+	t.Fatalf(
+		"no composed candidate isolated the remaining gap to active-current regulation: candidates=%d consumption=%#v rejections=%#v",
+		len(search.Candidates), search.Consumption, search.Rejections,
+	)
+}

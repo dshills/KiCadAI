@@ -944,6 +944,7 @@ func deriveTopologyAnalyticScales(
 		requirement,
 		graph,
 		instance,
+		inventory,
 	); len(scales) != 0 {
 		return scales
 	}
@@ -4425,6 +4426,7 @@ func deriveControlledSwitchTopologyScales(
 	requirement Requirement,
 	graph CandidateGraph,
 	instance GraphInstance,
+	inventory map[string]PrimitiveCandidate,
 ) []AnalyticScale {
 	if !slices.Contains([]string{"resistor", "capacitor"}, instance.Kind) ||
 		len(instance.Terminals) != 2 {
@@ -4433,6 +4435,65 @@ func deriveControlledSwitchTopologyScales(
 	nodeByID := make(map[string]GraphNode, len(graph.Nodes))
 	for _, node := range graph.Nodes {
 		nodeByID[node.ID] = node
+	}
+	lowerThreshold, upperThreshold := 0.0, 0.0
+	for _, assertion := range requirement.Requirements.BehavioralRequirements {
+		target := assertionTarget(assertion)
+		switch assertion.Metric {
+		case "falling_threshold":
+			if target > 0 && (lowerThreshold == 0 || target < lowerThreshold) {
+				lowerThreshold = target
+			}
+		case "rising_threshold":
+			if target > upperThreshold {
+				upperThreshold = target
+			}
+		}
+	}
+	between := func(left, right string) string {
+		ids := []string{}
+		for _, candidate := range graph.Instances {
+			if candidate.Kind != "resistor" || len(candidate.Terminals) != 2 {
+				continue
+			}
+			first, second := candidate.Terminals[0].Node, candidate.Terminals[1].Node
+			if first == left && second == right || first == right && second == left {
+				ids = append(ids, candidate.ID)
+			}
+		}
+		slices.Sort(ids)
+		if len(ids) == 0 {
+			return ""
+		}
+		return ids[0]
+	}
+	externalInputBranch := func(node string) (string, string) {
+		for _, external := range graph.Nodes {
+			if external.Scope != "external" ||
+				(external.Role != "input" && external.Role != "control") ||
+				(!requirementPortIsControl(requirement, external.SemanticID) &&
+					!requirementPortDrivesDecision(requirement, external.SemanticID)) {
+				continue
+			}
+			if branch := between(node, external.ID); branch != "" {
+				return external.ID, branch
+			}
+		}
+		return "", ""
+	}
+	branchByRole := func(node, role string) (string, string) {
+		for _, other := range graph.Nodes {
+			if other.Scope != "external" || other.Role != role {
+				continue
+			}
+			if branch := between(node, other.ID); branch != "" {
+				return other.ID, branch
+			}
+		}
+		return "", ""
+	}
+	closest := func(target float64) (float64, bool) {
+		return topologyCatalogResistanceClosest(requirement, inventory, target)
 	}
 	for _, decision := range graph.Instances {
 		if decision.Kind != "comparator" {
@@ -4444,28 +4505,197 @@ func deriveControlledSwitchTopologyScales(
 			continue
 		}
 		controlledOutputs := map[string]bool{}
+		var controlledDevice GraphInstance
 		for _, active := range graph.Instances {
 			if active.Kind == "n_channel_mosfet" &&
 				topologyTerminalNodes(active)["GATE"] == gateNode {
 				controlledOutputs[topologyTerminalNodes(active)["DRAIN"]] = true
+				if controlledDevice.ID == "" || active.ID < controlledDevice.ID {
+					controlledDevice = active
+				}
 			}
 		}
 		if len(controlledOutputs) == 0 {
 			continue
 		}
-		thresholdNode := ""
-		hasExternalControl := false
+		signalNode, thresholdNode, inputBranch := "", "", ""
 		for _, terminal := range []string{"IN_PLUS", "IN_MINUS"} {
 			node := decisionTerminals[terminal]
-			switch {
-			case nodeByID[node].Role == "control":
-				hasExternalControl = true
-			case nodeByID[node].Scope == "internal":
+			if nodeByID[node].Scope == "external" &&
+				(nodeByID[node].Role == "control" ||
+					requirementPortIsControl(requirement, nodeByID[node].SemanticID) ||
+					requirementPortDrivesDecision(requirement, nodeByID[node].SemanticID)) {
+				signalNode = node
+			} else if _, branch := externalInputBranch(node); branch != "" {
+				signalNode, inputBranch = node, branch
+			} else if nodeByID[node].Scope == "internal" {
 				thresholdNode = node
 			}
 		}
-		if !hasExternalControl || thresholdNode == "" {
+		if signalNode == "" || thresholdNode == "" {
 			continue
+		}
+		gateSupplyNode, gatePullup := branchByRole(gateNode, "supply")
+		gateReferenceNode, gatePulldown := branchByRole(gateNode, "reference")
+		if gatePullup == "" || gatePulldown == "" {
+			continue
+		}
+		gateSupply, supplyOK := topologyNodeNominalVoltage(requirement, graph, gateSupplyNode)
+		gateReference, referenceOK := topologyNodeNominalVoltage(requirement, graph, gateReferenceNode)
+		if !supplyOK || !referenceOK || gateSupply <= gateReference {
+			continue
+		}
+		const pullupTarget = 10_000.0
+		pulldownTarget := 100_000.0
+		gateLimit := 0.0
+		for _, rating := range inventory[controlledDevice.PrimitiveKey].Ratings {
+			if strings.EqualFold(rating.Kind, "gate_source_voltage") {
+				gateLimit = boundMaximum(rating)
+				break
+			}
+		}
+		gateReferenceMinimum, _, gateReferenceRangeOK := topologyDeclaredNodeVoltageRange(
+			requirement, graph, gateReferenceNode,
+		)
+		_, gateSupplyMaximum, gateSupplyRangeOK := topologyDeclaredNodeVoltageRange(
+			requirement, graph, gateSupplyNode,
+		)
+		maximumGateSpan := gateSupplyMaximum - gateReferenceMinimum
+		if gateLimit > 0 && gateSupplyRangeOK && gateReferenceRangeOK &&
+			maximumGateSpan > gateLimit {
+			// Reserve 25 percent of the absolute gate rating for catalog and
+			// operating-corner variation. The simulator remains authoritative
+			// for both turn-on sufficiency and the exact rating envelope.
+			targetFraction := .75 * gateLimit / maximumGateSpan
+			if targetFraction > 0 && targetFraction < 1 {
+				pulldownTarget = pullupTarget * targetFraction / (1 - targetFraction)
+			}
+		}
+		pullup, pullupOK := closest(pullupTarget)
+		pulldown, pulldownOK := closest(pulldownTarget)
+		if !pullupOK || !pulldownOK || pullup <= 0 || pulldown <= 0 {
+			continue
+		}
+		primitive := inventory[decision.PrimitiveKey]
+		onResistance := primitiveModelParameter(
+			primitive,
+			simmodel.PrimitiveComparatorOpenCollectorV1,
+			"output_on_resistance_ohm",
+		)
+		if onResistance <= 0 {
+			onResistance = pullup / 100
+		}
+		offResistance := primitiveModelParameter(
+			primitive,
+			simmodel.PrimitiveComparatorOpenCollectorV1,
+			"output_off_resistance_ohm",
+		)
+		if offResistance <= 0 {
+			offResistance = math.Inf(1)
+		}
+		parallel := func(left, right float64) float64 {
+			if math.IsInf(right, 1) {
+				return left
+			}
+			return left * right / (left + right)
+		}
+		gateAt := func(shunt float64) float64 {
+			return (gateSupply*shunt + gateReference*pullup) / (pullup + shunt)
+		}
+		outputLow := gateAt(parallel(pulldown, onResistance))
+		outputHigh := gateAt(parallel(pulldown, offResistance))
+		if outputHigh <= outputLow {
+			continue
+		}
+		values := map[string]float64{
+			gatePullup:   pullup,
+			gatePulldown: pulldown,
+		}
+		derivation := "catalog-ranked open-collector pull network preserves a bounded inactive and active gate state"
+		if lowerThreshold > 0 && upperThreshold > lowerThreshold {
+			feedbackNode := ""
+			if between(gateNode, signalNode) != "" {
+				feedbackNode = signalNode
+			} else if between(gateNode, thresholdNode) != "" {
+				feedbackNode = thresholdNode
+			}
+			feedbackBranch := between(gateNode, feedbackNode)
+			spanFraction := (upperThreshold - lowerThreshold) / (outputHigh - outputLow)
+			switch {
+			case feedbackNode == signalNode && spanFraction > 0:
+				inputResistance, inputOK := closest(10_000)
+				feedbackResistance, feedbackOK := closest(inputResistance / spanFraction)
+				actualFeedbackFraction := spanFraction
+				if inputOK && feedbackOK && feedbackResistance > 0 {
+					actualFeedbackFraction = inputResistance / feedbackResistance
+				}
+				referenceVoltage := (upperThreshold + actualFeedbackFraction*outputLow) /
+					(1 + actualFeedbackFraction)
+				thresholdSupplyNode, thresholdUpper := branchByRole(thresholdNode, "supply")
+				thresholdReferenceNode, thresholdLower := branchByRole(thresholdNode, "reference")
+				thresholdSupply, thresholdSupplyOK := topologyNodeNominalVoltage(
+					requirement, graph, thresholdSupplyNode,
+				)
+				thresholdReference, thresholdReferenceOK := topologyNodeNominalVoltage(
+					requirement, graph, thresholdReferenceNode,
+				)
+				dividerRatio := (thresholdSupply - referenceVoltage) /
+					(referenceVoltage - thresholdReference)
+				dividerUpper, dividerLowers, dividerOK := catalogResistanceDivider(
+					requirement,
+					inventory,
+					dividerRatio,
+					10_000,
+					1,
+					thresholdSupply-thresholdReference,
+					thresholdSupply-thresholdReference,
+					0,
+					0,
+				)
+				if inputOK && feedbackOK && thresholdSupplyOK && thresholdReferenceOK &&
+					thresholdSupply > referenceVoltage && referenceVoltage > thresholdReference &&
+					dividerOK && len(dividerLowers) == 1 && feedbackBranch != "" &&
+					inputBranch != "" && thresholdUpper != "" && thresholdLower != "" {
+					values[inputBranch] = inputResistance
+					values[feedbackBranch] = feedbackResistance
+					values[thresholdUpper] = dividerUpper
+					values[thresholdLower] = dividerLowers[0]
+					derivation = "coupled catalog ratios derive Schmitt thresholds from the requested rising and falling decisions and reviewed output swing"
+				}
+			case feedbackNode == thresholdNode && spanFraction > 0:
+				thresholdSupplyNode, thresholdSupplyBranch := branchByRole(thresholdNode, "supply")
+				thresholdReferenceNode, thresholdReferenceBranch := branchByRole(thresholdNode, "reference")
+				thresholdSupply, thresholdSupplyOK := topologyNodeNominalVoltage(
+					requirement, graph, thresholdSupplyNode,
+				)
+				thresholdReference, thresholdReferenceOK := topologyNodeNominalVoltage(
+					requirement, graph, thresholdReferenceNode,
+				)
+				if thresholdSupplyOK && thresholdReferenceOK && thresholdSupply > thresholdReference &&
+					thresholdSupplyBranch != "" && thresholdReferenceBranch != "" && feedbackBranch != "" {
+					outputFraction := spanFraction
+					supplyFraction := (lowerThreshold - thresholdReference -
+						outputFraction*(outputLow-thresholdReference)) /
+						(thresholdSupply - thresholdReference)
+					referenceFraction := 1 - outputFraction - supplyFraction
+					maximumFraction := max(outputFraction, supplyFraction, referenceFraction)
+					if outputFraction > 0 && supplyFraction > 0 && referenceFraction > 0 {
+						feedbackResistance, feedbackOK := closest(10_000 * maximumFraction / outputFraction)
+						supplyResistance, supplyResistanceOK := closest(10_000 * maximumFraction / supplyFraction)
+						referenceResistance, referenceResistanceOK := closest(10_000 * maximumFraction / referenceFraction)
+						inputResistance, inputOK := closest(10_000)
+						if feedbackOK && supplyResistanceOK && referenceResistanceOK && inputOK {
+							values[feedbackBranch] = feedbackResistance
+							values[thresholdSupplyBranch] = supplyResistance
+							values[thresholdReferenceBranch] = referenceResistance
+							if inputBranch != "" {
+								values[inputBranch] = inputResistance
+							}
+							derivation = "catalog conductance fractions derive Schmitt thresholds from the requested rising and falling decisions and reviewed output swing"
+						}
+					}
+				}
+			}
 		}
 		first := instance.Terminals[0].Node
 		second := instance.Terminals[1].Node
@@ -4520,8 +4750,21 @@ func deriveControlledSwitchTopologyScales(
 				Priority:   1,
 			}}
 		}
+		if value := values[instance.ID]; value > 0 && finite(value) {
+			return []AnalyticScale{{
+				ID:         "topology:controlled_decision_network:" + instance.ID,
+				Kind:       "resistance",
+				ValueSI:    value,
+				Unit:       "ohm",
+				Derivation: derivation,
+				SourceKind: "candidate_topology",
+				SourceID:   decision.ID,
+				Priority:   1,
+			}}
+		}
 		if first != gateNode && second != gateNode &&
-			first != thresholdNode && second != thresholdNode {
+			first != thresholdNode && second != thresholdNode &&
+			first != signalNode && second != signalNode {
 			continue
 		}
 		const anchorResistance = 10_000.0

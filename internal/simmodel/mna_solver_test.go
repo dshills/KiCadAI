@@ -612,12 +612,29 @@ func TestTransientDerivedEventStressAndEfficiencyMeasurements(t *testing.T) {
 		{Assertion{AnalysisID: "event", Node: "OUT", Quantity: QuantityOvershootVoltageV}, 1},
 		{Assertion{AnalysisID: "event", Component: "load", Quantity: QuantityPeakAbsDeviceVoltageV}, 11},
 		{Assertion{AnalysisID: "event", Component: "load", Quantity: QuantityPeakAbsDeviceCurrentA}, .5},
+		{Assertion{AnalysisID: "event", Component: "load", Quantity: QuantityFinalAbsDeviceCurrentA}, .5},
 		{Assertion{AnalysisID: "event", Component: "load", Components: []string{"supply"}, Quantity: QuantityConversionEfficiencyPct}, 87.5},
 	} {
 		actual, diagnostic := transientDerivedValue(result, test.assertion)
 		if diagnostic != nil || math.Abs(actual-test.want) > 1e-12 {
 			t.Fatalf("%s = %.12g, want %.12g diagnostic=%#v", test.assertion.Quantity, actual, test.want, diagnostic)
 		}
+	}
+}
+
+func TestTransientFinalDeviceCurrentUsesLastPointInAssertionWindow(t *testing.T) {
+	result := AnalysisResult{ID: "event", Kind: AnalysisTransient, Points: []AnalysisPoint{
+		{TimeS: 1, Devices: []DeviceResult{{Component: "load", CurrentA: .9, CurrentMagnitudeA: .9}}},
+		{TimeS: 2, Devices: []DeviceResult{{Component: "load", CurrentA: -.4, CurrentMagnitudeA: .4}}},
+		{TimeS: 3, Devices: []DeviceResult{{Component: "load", CurrentA: .2, CurrentMagnitudeA: .2}}},
+	}}
+	assertion := Assertion{
+		AnalysisID: "event", Component: "load", Quantity: QuantityFinalAbsDeviceCurrentA,
+		WindowStartS: 1, WindowEndS: 2.5,
+	}
+	actual, diagnostic := transientDerivedValue(result, assertion)
+	if diagnostic != nil || math.Abs(actual-.4) > 1e-12 {
+		t.Fatalf("final device current = %.12g, want .4 diagnostic=%#v", actual, diagnostic)
 	}
 }
 

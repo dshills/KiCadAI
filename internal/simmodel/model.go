@@ -79,6 +79,7 @@ const (
 	QuantityPeakAbsVoltageV             = "peak_abs_voltage_v"
 	QuantityPeakAbsDeviceVoltageV       = "peak_abs_device_voltage_v"
 	QuantityPeakAbsDeviceCurrentA       = "peak_abs_device_current_a"
+	QuantityFinalAbsDeviceCurrentA      = "final_abs_device_current_a"
 	QuantityOvershootVoltageV           = "overshoot_voltage_v"
 	QuantityOscillationFrequencyHz      = "oscillation_frequency_hz"
 	QuantityDutyCyclePct                = "duty_cycle_percent"

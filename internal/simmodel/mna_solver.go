@@ -1687,6 +1687,7 @@ func assertionValue(results []AnalysisResult, assertion Assertion) (float64, *Di
 			(assertion.Quantity == QuantityPeakAbsVoltageV ||
 				assertion.Quantity == QuantityPeakAbsDeviceVoltageV ||
 				assertion.Quantity == QuantityPeakAbsDeviceCurrentA ||
+				assertion.Quantity == QuantityFinalAbsDeviceCurrentA ||
 				assertion.Quantity == QuantityOvershootVoltageV ||
 				assertion.Quantity == QuantityOutputSwingVPP ||
 				assertion.Quantity == QuantityOscillationFrequencyHz ||

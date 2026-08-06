@@ -199,12 +199,49 @@ func applyPeriodicSteadyThermalEvidence(
 		return nil
 	}
 	frequency := result.FundamentalFrequencyHz
-	if frequency <= 0 || len(result.Points) < 2 {
-		return &Diagnostic{
-			Path:       "analyses." + analysis.ID + ".devices",
-			Message:    "aperiodic electrothermal peak-temperature analysis requires reviewed thermal capacitance for every dynamically temperature-asserted device; steady thermal resistance alone cannot bound a one-shot temperature peak",
-			Suggestion: "select a catalog component with a reviewed thermal RC network, or declare a periodic or steady operating regime with a complete fundamental-frequency drive",
+	if len(result.Points) < 2 {
+		return &Diagnostic{Path: "analyses." + analysis.ID, Message: "electrothermal analysis produced fewer than two transient observations"}
+	}
+	applyTemperatures := func(temperatures map[string]*float64) {
+		for pointIndex := range result.Points {
+			for deviceIndex := range result.Points[pointIndex].Devices {
+				observation := &result.Points[pointIndex].Devices[deviceIndex]
+				if temperature, found := temperatures[observation.Component]; found {
+					observation.JunctionTemperatureC = temperature
+				}
+			}
 		}
+	}
+	if frequency <= 0 {
+		// A passive thermal RC trajectory cannot exceed the steady-state rise
+		// produced by its maximum applied dissipation. When reviewed evidence
+		// supplies resistance but no capacitance, use that peak-power steady
+		// state as a conservative upper bound instead of inventing time-domain
+		// storage or discarding the component from the temperature assertion.
+		maximumScaledDissipation := map[string]float64{}
+		for _, point := range result.Points {
+			scale := electrothermalResistanceScaleAt(analysis, point.TimeS, baseResistanceScale)
+			for _, observation := range point.Devices {
+				if steadyThermalEvidence[observation.Component] {
+					maximumScaledDissipation[observation.Component] = math.Max(
+						maximumScaledDissipation[observation.Component],
+						math.Max(0, observation.DissipationW)*scale,
+					)
+				}
+			}
+		}
+		temperatures := map[string]*float64{}
+		for component := range steadyThermalEvidence {
+			steady, diagnostic := thermalDeviceResultAtResistanceScale(
+				devices[component], analysis, ambient, maximumScaledDissipation[component], 1,
+			)
+			if diagnostic != nil {
+				return diagnostic
+			}
+			temperatures[component] = steady.JunctionTemperatureC
+		}
+		applyTemperatures(temperatures)
+		return nil
 	}
 	finalTime := result.Points[len(result.Points)-1].TimeS
 	cycles := math.Min(2, math.Floor(finalTime*frequency+1e-9))
@@ -243,6 +280,7 @@ func applyPeriodicSteadyThermalEvidence(
 		}
 	}
 	windowDuration := finalTime - windowStart
+	temperatures := map[string]*float64{}
 	for component := range steadyThermalEvidence {
 		device := devices[component]
 		averageScaledDissipation := weightedEnergy[component] / windowDuration
@@ -250,15 +288,9 @@ func applyPeriodicSteadyThermalEvidence(
 		if diagnostic != nil {
 			return diagnostic
 		}
-		for pointIndex := range result.Points {
-			for deviceIndex := range result.Points[pointIndex].Devices {
-				observation := &result.Points[pointIndex].Devices[deviceIndex]
-				if observation.Component == component {
-					observation.JunctionTemperatureC = steady.JunctionTemperatureC
-				}
-			}
-		}
+		temperatures[component] = steady.JunctionTemperatureC
 	}
+	applyTemperatures(temperatures)
 	return nil
 }
 

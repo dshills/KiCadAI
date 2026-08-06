@@ -335,7 +335,7 @@ func TestElectrothermalAveragesPeriodicDissipationForSteadyThermalPathWithoutInv
 	}
 }
 
-func TestElectrothermalRejectsAperiodicDynamicTemperatureClaimWithoutThermalCapacitance(t *testing.T) {
+func TestElectrothermalUsesConservativeAperiodicSteadyStateBoundWithoutThermalCapacitance(t *testing.T) {
 	intent := Intent{
 		ModelID: ModelTransientCircuitV1,
 		Analyses: []Analysis{{
@@ -360,14 +360,12 @@ func TestElectrothermalRejectsAperiodicDynamicTemperatureClaimWithoutThermalCapa
 	if len(diagnostics) != 0 {
 		t.Fatalf("aperiodic electrothermal plan diagnostics = %#v", diagnostics)
 	}
-	_, diagnostics = Evaluate(plan)
-	if len(diagnostics) == 0 || !strings.Contains(diagnostics[0].Message, "requires reviewed thermal capacitance") {
-		t.Fatalf("aperiodic electrothermal diagnostics = %#v", diagnostics)
+	report, diagnostics := Evaluate(plan)
+	if len(diagnostics) != 0 || report.Status != "pass" {
+		t.Fatalf("aperiodic steady-bound electrothermal report=%#v diagnostics=%#v", report, diagnostics)
 	}
-	if !strings.Contains(diagnostics[0].Message, "steady thermal resistance alone") ||
-		!strings.Contains(diagnostics[0].Suggestion, "reviewed thermal RC network") ||
-		!strings.Contains(diagnostics[0].Suggestion, "periodic or steady operating regime") {
-		t.Fatalf("aperiodic electrothermal guidance = %#v", diagnostics[0])
+	if math.Abs(report.Assertions[0].Actual-25.5) > 1e-12 {
+		t.Fatalf("aperiodic steady-bound assertion = %#v", report.Assertions[0])
 	}
 }
 

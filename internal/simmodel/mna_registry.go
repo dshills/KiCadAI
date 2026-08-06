@@ -1147,6 +1147,7 @@ func validateMNAIntent(intent Intent, components map[string]string) []Diagnostic
 			assertion.Quantity == QuantityTotalSupplyCurrentA ||
 			assertion.Quantity == QuantityPeakAbsDeviceVoltageV ||
 			assertion.Quantity == QuantityPeakAbsDeviceCurrentA ||
+			assertion.Quantity == QuantityFinalAbsDeviceCurrentA ||
 			assertion.Quantity == QuantityConversionEfficiencyPct
 		if !nodeOptional && strings.TrimSpace(assertion.Node) == "" {
 			diagnostics = append(diagnostics, Diagnostic{Path: path + ".node", Message: "assertion node is required"})
@@ -1161,6 +1162,7 @@ func validateMNAIntent(intent Intent, components map[string]string) []Diagnostic
 			assertion.Quantity == QuantityOutputPowerW ||
 			assertion.Quantity == QuantityPeakAbsDeviceVoltageV ||
 			assertion.Quantity == QuantityPeakAbsDeviceCurrentA ||
+			assertion.Quantity == QuantityFinalAbsDeviceCurrentA ||
 			assertion.Quantity == QuantityConversionEfficiencyPct
 		if componentRequired && strings.TrimSpace(assertion.Component) == "" {
 			diagnostics = append(diagnostics, Diagnostic{Path: path + ".component", Message: "component-scoped assertion requires a resolved component"})
@@ -1213,6 +1215,10 @@ func validateMNAIntent(intent Intent, components map[string]string) []Diagnostic
 		case QuantityPeakAbsDeviceVoltageV, QuantityPeakAbsDeviceCurrentA:
 			if kind != AnalysisTransient && kind != AnalysisStartup && kind != AnalysisElectrothermal {
 				diagnostics = append(diagnostics, Diagnostic{Path: path + ".quantity", Message: "peak device-stress assertions require transient, startup, or electrothermal analysis"})
+			}
+		case QuantityFinalAbsDeviceCurrentA:
+			if kind != AnalysisTransient && kind != AnalysisStartup && kind != AnalysisElectrothermal {
+				diagnostics = append(diagnostics, Diagnostic{Path: path + ".quantity", Message: "final device-current assertions require transient, startup, or electrothermal analysis"})
 			}
 		case QuantityOvershootVoltageV:
 			if kind != AnalysisTransient && kind != AnalysisStartup {
@@ -1901,6 +1907,7 @@ func validateMNAPlan(plan Plan) []Diagnostic {
 			assertion.Quantity != QuantityTotalSupplyCurrentA &&
 			assertion.Quantity != QuantityPeakAbsDeviceVoltageV &&
 			assertion.Quantity != QuantityPeakAbsDeviceCurrentA &&
+			assertion.Quantity != QuantityFinalAbsDeviceCurrentA &&
 			assertion.Quantity != QuantityConversionEfficiencyPct &&
 			analysis.Kind != AnalysisThermal &&
 			analysis.Kind != AnalysisElectrothermal

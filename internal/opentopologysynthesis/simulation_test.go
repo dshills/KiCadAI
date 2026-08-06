@@ -537,6 +537,18 @@ func TestTHDRatioBoundsConvertToSolverPercent(t *testing.T) {
 	}
 }
 
+func TestTransientOutputCurrentUsesFinalSolvedCurrent(t *testing.T) {
+	quantity, scale, supported := directSimulationQuantity(BehavioralAssertion{
+		Metric: "output_current", Analysis: simmodel.AnalysisTransient,
+	})
+	if !supported || quantity != simmodel.QuantityFinalAbsDeviceCurrentA || scale != 1 {
+		t.Fatalf(
+			"transient output-current contract = quantity:%q scale:%g supported:%t",
+			quantity, scale, supported,
+		)
+	}
+}
+
 func TestPortScopedOffAndStartupCurrentUseObservedActivePath(t *testing.T) {
 	requirement := testOpenTopologyRequirement(t, "ground_referenced_load_control.json")
 	inventory, _ := testHeldOutSynthesisEnvironment(t)

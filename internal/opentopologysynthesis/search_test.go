@@ -567,7 +567,11 @@ func TestControlledSwitchRelationshipSeedsConstructBoundedPrimitiveGraph(t *test
 			for _, scale := range domain.AnalyticScales {
 				if domain.PrimitiveKind == "resistor" &&
 					scale.Kind == "resistance" &&
-					testValueSIEqual(scale.ValueSI, 10_000) {
+					scale.SourceKind == "candidate_topology" &&
+					scale.Priority == 1 &&
+					scale.ValueSI > 0 &&
+					!math.IsInf(scale.ValueSI, 0) &&
+					!math.IsNaN(scale.ValueSI) {
 					foundAnchor = true
 				}
 			}

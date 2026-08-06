@@ -554,6 +554,11 @@ func directSimulationQuantity(assertion BehavioralAssertion) (string, float64, b
 	case "startup_overshoot":
 		return simmodel.QuantityOvershootVoltageV, 1, true
 	case "output_current":
+		if assertion.Analysis == simmodel.AnalysisTransient ||
+			assertion.Analysis == simmodel.AnalysisStartup ||
+			assertion.Analysis == simmodel.AnalysisElectrothermal {
+			return simmodel.QuantityFinalAbsDeviceCurrentA, 1, true
+		}
 		return simmodel.QuantityDeviceCurrentA, 1, true
 	case "peak_current":
 		return simmodel.QuantityPeakAbsDeviceCurrentA, 1, true
@@ -1496,10 +1501,20 @@ func simulationIntentParts(
 		}
 	}
 	if len(analysis.SourceValueEvents) != 0 {
-		for _, event := range operatingCase.Events {
-			simulationAssertion.WindowStartS = event.TriggerTimeS
+		if assertion.Analysis == simmodel.AnalysisStartup {
+			simulationAssertion.WindowStartS = 0
 			simulationAssertion.WindowEndS = analysis.DurationS
-			break
+			for _, event := range operatingCase.Events {
+				if event.TriggerTimeS > 0 && event.TriggerTimeS < simulationAssertion.WindowEndS {
+					simulationAssertion.WindowEndS = event.TriggerTimeS
+				}
+			}
+		} else {
+			for _, event := range operatingCase.Events {
+				simulationAssertion.WindowStartS = event.TriggerTimeS
+				simulationAssertion.WindowEndS = analysis.DurationS
+				break
+			}
 		}
 	}
 	_ = evidence
@@ -2968,6 +2983,17 @@ func sweepSourceAndRange(
 				if stop > start {
 					return source, start, stop, true
 				}
+			}
+		}
+		if excitation.Kind == "port" {
+			for _, port := range requirement.Requirements.Ports {
+				if port.ID != excitation.ID ||
+					port.Electrical.MinVoltageV == nil ||
+					port.Electrical.MaxVoltageV == nil ||
+					*port.Electrical.MaxVoltageV <= *port.Electrical.MinVoltageV {
+					continue
+				}
+				return source, *port.Electrical.MinVoltageV, *port.Electrical.MaxVoltageV, true
 			}
 		}
 	}

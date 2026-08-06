@@ -164,6 +164,27 @@ func transientDerivedValue(result AnalysisResult, assertion Assertion) (float64,
 			return 0, advancedAssertionDiagnostic(assertion, "peak device-stress assertion did not resolve to a solved device waveform")
 		}
 		return normalizedMNAFloat(peak), nil
+	case QuantityFinalAbsDeviceCurrentA:
+		latestTime := math.Inf(-1)
+		value := 0.0
+		found := false
+		for _, point := range result.Points {
+			if !pointInAssertionWindow(point, assertion) || point.TimeS < latestTime {
+				continue
+			}
+			for _, device := range point.Devices {
+				if device.Component != assertion.Component {
+					continue
+				}
+				latestTime = point.TimeS
+				value = math.Max(math.Abs(device.CurrentA), device.CurrentMagnitudeA)
+				found = true
+			}
+		}
+		if !found {
+			return 0, advancedAssertionDiagnostic(assertion, "final device-current assertion did not resolve to a solved device waveform")
+		}
+		return normalizedMNAFloat(value), nil
 	case QuantityOutputSwingVPP:
 		_, values, diagnostic := waveform(result, assertion)
 		if diagnostic != nil {

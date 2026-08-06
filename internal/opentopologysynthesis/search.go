@@ -4467,10 +4467,11 @@ func topologyPrimitiveClosestValue(
 
 // topologyControlledSwitchRelationshipSeeds constructs a bounded level-shifted
 // switching relationship when behavior couples an external control to
-// on/off-state observations. The lower-voltage supply establishes a decision
-// reference while a higher-voltage supply provides enough gate drive for a
-// reviewed switching device. Both control polarities and all distinct supply
-// assignments are enumerated deterministically.
+// on/off-state observations. A reviewed supply establishes the decision
+// reference and may also drive the switching device when its modeled gate-on
+// voltage permits that simpler, supply-stable assignment. Both control
+// polarities and all sufficient supply assignments are enumerated
+// deterministically.
 func topologyControlledSwitchRelationshipSeeds(
 	ctx context.Context,
 	requirement Requirement,
@@ -4512,9 +4513,14 @@ func topologyControlledSwitchRelationshipSeeds(
 	supplies := topologyNodesByRole(initial.graph, "supply")
 	references := topologyNodesByRole(initial.graph, "reference")
 	if len(controls) == 0 || len(outputs) == 0 ||
-		len(supplies) < 2 || len(references) == 0 {
+		len(supplies) == 0 || len(references) == 0 {
 		return nil, Consumption{}, map[string][]string{}
 	}
+	minimumGateDrive := primitiveModelParameter(
+		mosfet,
+		simmodel.PrimitiveNMOSSwitchV1,
+		"gate_on_voltage_v",
+	)
 	consumption := Consumption{}
 	rejections := map[string][]string{}
 	retained := map[string]TopologyCandidate{}
@@ -4530,9 +4536,6 @@ func topologyControlledSwitchRelationshipSeeds(
 			}
 			for _, driveSupply := range supplies {
 				for _, referenceSupply := range supplies {
-					if driveSupply == referenceSupply {
-						continue
-					}
 					driveVoltage, driveVoltageKnown := topologyNodeNominalVoltage(
 						requirement,
 						initial.graph,
@@ -4543,7 +4546,12 @@ func topologyControlledSwitchRelationshipSeeds(
 						initial.graph,
 						referenceSupply,
 					)
-					if driveVoltageKnown && referenceVoltageKnown &&
+					if minimumGateDrive > 0 && driveVoltageKnown &&
+						driveVoltage < minimumGateDrive {
+						continue
+					}
+					if driveSupply != referenceSupply &&
+						driveVoltageKnown && referenceVoltageKnown &&
 						driveVoltage <= referenceVoltage {
 						continue
 					}
