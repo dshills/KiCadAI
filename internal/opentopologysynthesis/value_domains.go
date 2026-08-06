@@ -896,6 +896,22 @@ func deriveTopologyAnalyticScales(
 	); len(scales) != 0 {
 		return scales
 	}
+	if scales := deriveWindowedBallastedSwitchTopologyScales(
+		requirement,
+		graph,
+		instance,
+		inventory,
+	); len(scales) != 0 {
+		return scales
+	}
+	if scales := deriveWindowedControlledCurrentTopologyScales(
+		requirement,
+		graph,
+		instance,
+		inventory,
+	); len(scales) != 0 {
+		return scales
+	}
 	if scales := deriveWindowTopologyScales(
 		requirement,
 		graph,
@@ -3506,6 +3522,937 @@ func derivePowerTransferSizingTargets(requirement Requirement) powerTransferSizi
 		}
 	}
 	return targets
+}
+
+// deriveWindowedBallastedSwitchTopologyScales recognizes two passive
+// boundary decisions followed by a level-shifted source switch. A regulated
+// rail and its catalog-rated ballast, when present, remain fixed graph values;
+// this function couples only the threshold, hysteresis, and switching-control
+// passives around them.
+func deriveWindowedBallastedSwitchTopologyScales(
+	requirement Requirement,
+	graph CandidateGraph,
+	instance GraphInstance,
+	inventory map[string]PrimitiveCandidate,
+) []AnalyticScale {
+	if !slices.Contains([]string{"resistor", "capacitor"}, instance.Kind) ||
+		len(instance.Terminals) != 2 {
+		return nil
+	}
+	envelope, required := topologyWindowThresholdEnvelope(requirement)
+	if !required {
+		return nil
+	}
+	inputNode, outputNode := "port_"+envelope.input, "port_"+envelope.output
+	references := topologyNodesByRole(graph, "reference")
+	if len(references) != 1 {
+		return nil
+	}
+	referenceNode := references[0]
+	between := func(left, right string) string {
+		id := ""
+		for _, candidate := range graph.Instances {
+			if candidate.Kind != "resistor" || len(candidate.Terminals) != 2 {
+				continue
+			}
+			first, second := candidate.Terminals[0].Node, candidate.Terminals[1].Node
+			if first != left || second != right {
+				if first != right || second != left {
+					continue
+				}
+			}
+			if id != "" {
+				return ""
+			}
+			id = candidate.ID
+		}
+		return id
+	}
+	absoluteReference, referencePrimitiveKey, referenceVoltage := "", "", 0.0
+	for _, candidate := range graph.Instances {
+		if candidate.Kind != "reference_diode" {
+			continue
+		}
+		terminals := topologyTerminalNodes(candidate)
+		if terminals["ANODE"] != referenceNode {
+			continue
+		}
+		voltage, found := topologyPrimitiveReferenceVoltage(inventory[candidate.PrimitiveKey])
+		if found {
+			absoluteReference, referencePrimitiveKey, referenceVoltage = terminals["CATHODE"], candidate.PrimitiveKey, voltage
+			break
+		}
+	}
+	if absoluteReference == "" || referenceVoltage <= 0 {
+		return nil
+	}
+	var upperDecision, lowerDecision GraphInstance
+	for _, candidate := range graph.Instances {
+		if candidate.Kind != "comparator" {
+			continue
+		}
+		terminals := topologyTerminalNodes(candidate)
+		if terminals["IN_MINUS"] == inputNode {
+			upperDecision = candidate
+			break
+		}
+	}
+	if upperDecision.ID == "" {
+		return nil
+	}
+	upperTerminals := topologyTerminalNodes(upperDecision)
+	insideNode := upperTerminals["OUT"]
+	for _, candidate := range graph.Instances {
+		if candidate.Kind != "comparator" || candidate.ID == upperDecision.ID {
+			continue
+		}
+		terminals := topologyTerminalNodes(candidate)
+		if terminals["OUT"] == insideNode && between(inputNode, terminals["IN_PLUS"]) != "" {
+			lowerDecision = candidate
+			break
+		}
+	}
+	if lowerDecision.ID == "" || insideNode == "" {
+		return nil
+	}
+	lowerTerminals := topologyTerminalNodes(lowerDecision)
+	lowerSignal, lowerReference := lowerTerminals["IN_PLUS"], lowerTerminals["IN_MINUS"]
+	upperThreshold := upperTerminals["IN_PLUS"]
+	driveSupply := upperTerminals["V_PLUS"]
+	driveVoltage, driveFound := topologyNodeNominalVoltage(requirement, graph, driveSupply)
+	if !driveFound || driveVoltage <= envelope.upperV {
+		return nil
+	}
+
+	var switchDevice, levelShifter GraphInstance
+	levelDriveNode := ""
+	for _, candidate := range graph.Instances {
+		if candidate.Kind != "p_channel_mosfet" {
+			continue
+		}
+		terminals := topologyTerminalNodes(candidate)
+		if terminals["DRAIN"] == outputNode {
+			switchDevice = candidate
+			break
+		}
+	}
+	if switchDevice.ID == "" {
+		return nil
+	}
+	switchTerminals := topologyTerminalNodes(switchDevice)
+	for _, candidate := range graph.Instances {
+		if candidate.Kind != "npn_bjt" {
+			continue
+		}
+		terminals := topologyTerminalNodes(candidate)
+		if terminals["COLLECTOR"] != switchTerminals["GATE"] ||
+			terminals["EMITTER"] != referenceNode {
+			continue
+		}
+		for _, node := range graph.Nodes {
+			if between(node.ID, terminals["BASE"]) == "" {
+				continue
+			}
+			if node.ID == insideNode {
+				levelShifter, levelDriveNode = candidate, node.ID
+				break
+			}
+			for _, buffer := range graph.Instances {
+				if buffer.Kind != "opamp" {
+					continue
+				}
+				bufferTerminals := topologyTerminalNodes(buffer)
+				if bufferTerminals["IN_PLUS"] == insideNode &&
+					bufferTerminals["IN_MINUS"] == node.ID &&
+					bufferTerminals["OUT"] == node.ID {
+					levelShifter, levelDriveNode = candidate, node.ID
+					break
+				}
+			}
+			if levelShifter.ID != "" {
+				break
+			}
+		}
+		if levelShifter.ID != "" {
+			break
+		}
+	}
+	if levelShifter.ID == "" || levelDriveNode == "" {
+		return nil
+	}
+	levelTerminals := topologyTerminalNodes(levelShifter)
+
+	lowerMinimum, lowerMaximum := envelope.lowerV, envelope.lowerV
+	upperMinimum, upperMaximum := envelope.upperV, envelope.upperV
+	hysteresisMinimum, hysteresisMaximum := 0.0, math.Inf(1)
+	hysteresisTarget := 0.0
+	for _, assertion := range requirement.Requirements.BehavioralRequirements {
+		switch assertion.Metric {
+		case "lower_threshold":
+			if assertion.Min != nil {
+				lowerMinimum = *assertion.Min
+			}
+			if assertion.Max != nil {
+				lowerMaximum = *assertion.Max
+			}
+		case "upper_threshold":
+			if assertion.Min != nil {
+				upperMinimum = *assertion.Min
+			}
+			if assertion.Max != nil {
+				upperMaximum = *assertion.Max
+			}
+		case "hysteresis":
+			if assertion.Min != nil {
+				hysteresisMinimum = *assertion.Min
+			}
+			if assertion.Max != nil {
+				hysteresisMaximum = *assertion.Max
+			}
+			hysteresisTarget = assertionTarget(assertion)
+		}
+	}
+	if hysteresisTarget <= 0 || hysteresisMaximum < hysteresisMinimum {
+		return nil
+	}
+	inputImpedanceMinimum := 0.0
+	for _, port := range requirement.Requirements.Ports {
+		if "port_"+port.ID == inputNode && port.Electrical.InputImpedanceMinOhm != nil {
+			inputImpedanceMinimum = math.Max(inputImpedanceMinimum, *port.Electrical.InputImpedanceMinOhm)
+		}
+	}
+	values := reviewedCatalogResistanceValues(requirement, inventory)
+	bestInput, bestFeedback := 0.0, 0.0
+	bestHysteresisError, bestImpedanceError, bestKey := math.Inf(1), math.Inf(1), ""
+	for _, input := range values {
+		for _, feedback := range values {
+			if input.minimum+feedback.minimum < inputImpedanceMinimum {
+				continue
+			}
+			minimumHysteresis := referenceVoltage * input.minimum / feedback.maximum
+			maximumHysteresis := referenceVoltage * input.maximum / feedback.minimum
+			if minimumHysteresis < hysteresisMinimum || maximumHysteresis > hysteresisMaximum {
+				continue
+			}
+			nominalHysteresis := referenceVoltage * input.nominal / feedback.nominal
+			hysteresisError := math.Abs(nominalHysteresis-hysteresisTarget) / hysteresisTarget
+			impedanceError := multiplicativeRelativeError(
+				input.nominal+feedback.nominal,
+				math.Max(inputImpedanceMinimum, 10_000),
+			)
+			key := canonicalOptionalFloat(&input.nominal) + "|" + canonicalOptionalFloat(&feedback.nominal)
+			if hysteresisError < bestHysteresisError ||
+				(hysteresisError == bestHysteresisError &&
+					(impedanceError < bestImpedanceError ||
+						(impedanceError == bestImpedanceError && (bestKey == "" || key < bestKey)))) {
+				bestInput, bestFeedback = input.nominal, feedback.nominal
+				bestHysteresisError, bestImpedanceError, bestKey = hysteresisError, impedanceError, key
+			}
+		}
+	}
+	if bestInput <= 0 || bestFeedback <= 0 {
+		return nil
+	}
+	findResistance := func(nominal float64) (catalogResistanceValue, bool) {
+		for _, value := range values {
+			if value.nominal == nominal {
+				return value, true
+			}
+		}
+		return catalogResistanceValue{}, false
+	}
+	anchor, anchorFound := topologyCatalogResistanceClosest(requirement, inventory, 10_000)
+	decisionPull, decisionPullFound := topologyCatalogResistanceClosest(requirement, inventory, 1_000)
+	decisionPullRange, decisionPullRangeFound := findResistance(decisionPull)
+	lowerInputRange, lowerInputRangeFound := findResistance(bestInput)
+	lowerFeedbackRange, lowerFeedbackRangeFound := findResistance(bestFeedback)
+	if !anchorFound || !decisionPullFound || !decisionPullRangeFound ||
+		!lowerInputRangeFound || !lowerFeedbackRangeFound {
+		return nil
+	}
+	referenceMinimum, referenceMaximum := referenceVoltage, referenceVoltage
+	for _, model := range inventory[referencePrimitiveKey].Models {
+		if model.ModelID != simmodel.PrimitiveShuntVoltageReferenceV1 {
+			continue
+		}
+		for _, uncertainty := range model.Uncertainties {
+			if uncertainty.Target == "model_parameters.output_voltage_v" {
+				referenceMinimum, referenceMaximum = uncertainty.Minimum, uncertainty.Maximum
+			}
+		}
+	}
+	if referenceMinimum <= 0 || referenceMaximum < referenceMinimum {
+		return nil
+	}
+	upperOffsetMinimum, upperOffsetMaximum := 0.0, 0.0
+	upperPrimitive := inventory[upperDecision.PrimitiveKey]
+	for _, model := range upperPrimitive.Models {
+		if model.ModelID != simmodel.PrimitiveComparatorOpenCollectorV1 {
+			continue
+		}
+		for _, uncertainty := range model.Uncertainties {
+			if uncertainty.Target == "model_parameters.input_offset_v" {
+				upperOffsetMinimum, upperOffsetMaximum = uncertainty.Minimum, uncertainty.Maximum
+			}
+		}
+	}
+	outputOnResistance := primitiveModelParameter(
+		upperPrimitive, simmodel.PrimitiveComparatorOpenCollectorV1, "output_on_resistance_ohm",
+	)
+	outputOffResistance := primitiveModelParameter(
+		upperPrimitive, simmodel.PrimitiveComparatorOpenCollectorV1, "output_off_resistance_ohm",
+	)
+	if outputOnResistance <= 0 || outputOffResistance <= 0 {
+		return nil
+	}
+	upperTransition := func(
+		supplyResistance, groundResistance, feedbackResistance,
+		pullResistance, lowerInputResistance, lowerFeedbackResistance,
+		reference float64,
+		onComparators int,
+	) float64 {
+		upperConductance := 1/supplyResistance + 1/groundResistance + 1/feedbackResistance
+		fromSupply := (1 / supplyResistance) / upperConductance
+		fromInside := (1 / feedbackResistance) / upperConductance
+		lowerInputFraction := lowerFeedbackResistance / (lowerInputResistance + lowerFeedbackResistance)
+		insideFeedbackConductance := lowerInputFraction/lowerFeedbackResistance + 1/feedbackResistance
+		sinkConductance := float64(onComparators)/outputOnResistance +
+			float64(2-onComparators)/outputOffResistance
+		insideDenominator := 1/pullResistance + insideFeedbackConductance + sinkConductance
+		insideConstant := (reference / pullResistance) / insideDenominator
+		insideFromThreshold := insideFeedbackConductance / insideDenominator
+		denominator := 1 - fromInside*insideFromThreshold
+		if denominator <= 0 {
+			return math.NaN()
+		}
+		return (fromSupply*driveVoltage + fromInside*insideConstant) / denominator
+	}
+
+	bestUpperSupply, bestUpperGround, bestUpperFeedback := 0.0, 0.0, 0.0
+	bestUpperError, bestUpperAnchor, bestUpperKey := math.Inf(1), math.Inf(1), ""
+	upperTarget := positiveMidpoint(upperMinimum, upperMaximum)
+	upperTolerance := math.Max(.5*(upperMaximum-upperMinimum), .005*upperTarget)
+	for _, supply := range values {
+		for _, ground := range values {
+			for _, feedback := range values {
+				forward := upperTransition(
+					supply.nominal, ground.nominal, feedback.nominal,
+					decisionPullRange.nominal, lowerInputRange.nominal, lowerFeedbackRange.nominal,
+					referenceVoltage, 0,
+				)
+				reverse := upperTransition(
+					supply.nominal, ground.nominal, feedback.nominal,
+					decisionPullRange.nominal, lowerInputRange.nominal, lowerFeedbackRange.nominal,
+					referenceVoltage, 1,
+				)
+				hysteresis := forward - reverse
+				if forward < upperMinimum || forward > upperMaximum ||
+					hysteresis < hysteresisMinimum || hysteresis > hysteresisMaximum {
+					continue
+				}
+				cornerForwardMinimum, cornerForwardMaximum := math.Inf(1), math.Inf(-1)
+				cornerHysteresisMinimum, cornerHysteresisMaximum := math.Inf(1), math.Inf(-1)
+				for corner := 0; corner < 128; corner++ {
+					choose := func(bit int, minimum, maximum float64) float64 {
+						if corner&(1<<bit) != 0 {
+							return maximum
+						}
+						return minimum
+					}
+					cornerSupply := choose(0, supply.minimum, supply.maximum)
+					cornerGround := choose(1, ground.minimum, ground.maximum)
+					cornerFeedback := choose(2, feedback.minimum, feedback.maximum)
+					cornerPull := choose(3, decisionPullRange.minimum, decisionPullRange.maximum)
+					cornerLowerInput := choose(4, lowerInputRange.minimum, lowerInputRange.maximum)
+					cornerLowerFeedback := choose(5, lowerFeedbackRange.minimum, lowerFeedbackRange.maximum)
+					cornerReference := choose(6, referenceMinimum, referenceMaximum)
+					cornerForward := upperTransition(
+						cornerSupply, cornerGround, cornerFeedback,
+						cornerPull, cornerLowerInput, cornerLowerFeedback,
+						cornerReference, 0,
+					)
+					cornerReverse := upperTransition(
+						cornerSupply, cornerGround, cornerFeedback,
+						cornerPull, cornerLowerInput, cornerLowerFeedback,
+						cornerReference, 1,
+					)
+					cornerForwardMinimum = math.Min(cornerForwardMinimum, cornerForward+upperOffsetMinimum)
+					cornerForwardMaximum = math.Max(cornerForwardMaximum, cornerForward+upperOffsetMaximum)
+					cornerHysteresis := cornerForward - cornerReverse
+					cornerHysteresisMinimum = math.Min(cornerHysteresisMinimum, cornerHysteresis)
+					cornerHysteresisMaximum = math.Max(cornerHysteresisMaximum, cornerHysteresis)
+				}
+				if cornerForwardMinimum < upperMinimum || cornerForwardMaximum > upperMaximum ||
+					cornerHysteresisMinimum < hysteresisMinimum || cornerHysteresisMaximum > hysteresisMaximum {
+					continue
+				}
+				error := math.Abs(forward-upperTarget)/upperTolerance +
+					math.Abs(hysteresis-hysteresisTarget)/hysteresisTarget
+				anchorError := multiplicativeRelativeError(ground.nominal, 10_000)
+				key := canonicalOptionalFloat(&supply.nominal) + "|" +
+					canonicalOptionalFloat(&ground.nominal) + "|" +
+					canonicalOptionalFloat(&feedback.nominal)
+				if error < bestUpperError ||
+					(error == bestUpperError && (anchorError < bestUpperAnchor ||
+						(anchorError == bestUpperAnchor && (bestUpperKey == "" || key < bestUpperKey)))) {
+					bestUpperSupply, bestUpperGround, bestUpperFeedback = supply.nominal, ground.nominal, feedback.nominal
+					bestUpperError, bestUpperAnchor, bestUpperKey = error, anchorError, key
+				}
+			}
+		}
+	}
+	if bestUpperSupply <= 0 || bestUpperGround <= 0 || bestUpperFeedback <= 0 {
+		return nil
+	}
+	upperSupplyRange, upperSupplyFound := findResistance(bestUpperSupply)
+	upperGroundRange, upperGroundFound := findResistance(bestUpperGround)
+	upperFeedbackRange, upperFeedbackFound := findResistance(bestUpperFeedback)
+	if !upperSupplyFound || !upperGroundFound || !upperFeedbackFound {
+		return nil
+	}
+	lowerOffsetMinimum, lowerOffsetMaximum := 0.0, 0.0
+	lowerPrimitive := inventory[lowerDecision.PrimitiveKey]
+	for _, model := range lowerPrimitive.Models {
+		if model.ModelID != simmodel.PrimitiveComparatorOpenCollectorV1 {
+			continue
+		}
+		for _, uncertainty := range model.Uncertainties {
+			if uncertainty.Target == "model_parameters.input_offset_v" {
+				lowerOffsetMinimum, lowerOffsetMaximum = uncertainty.Minimum, uncertainty.Maximum
+			}
+		}
+	}
+	lowerTransition := func(
+		dividerUpper, dividerGround,
+		lowerInputResistance, lowerFeedbackResistance, pullResistance,
+		upperSupplyResistance, upperGroundResistance, upperFeedbackResistance,
+		reference float64,
+		onComparators int,
+	) float64 {
+		lowerReferenceVoltage := reference * dividerGround / (dividerUpper + dividerGround)
+		lowerInputFraction := lowerFeedbackResistance / (lowerInputResistance + lowerFeedbackResistance)
+		upperConductance := 1/upperSupplyResistance + 1/upperGroundResistance + 1/upperFeedbackResistance
+		upperFromSupply := (1 / upperSupplyResistance) / upperConductance
+		upperFromInside := (1 / upperFeedbackResistance) / upperConductance
+		sinkConductance := float64(onComparators)/outputOnResistance +
+			float64(2-onComparators)/outputOffResistance
+		insideDenominator := 1/pullResistance + 1/lowerFeedbackResistance +
+			(1-upperFromInside)/upperFeedbackResistance + sinkConductance
+		insideVoltage := (reference/pullResistance + lowerReferenceVoltage/lowerFeedbackResistance +
+			upperFromSupply*driveVoltage/upperFeedbackResistance) / insideDenominator
+		return (lowerReferenceVoltage - (1-lowerInputFraction)*insideVoltage) / lowerInputFraction
+	}
+	lowerTarget := positiveMidpoint(lowerMinimum, lowerMaximum)
+	lowerTolerance := math.Max(.5*(lowerMaximum-lowerMinimum), .005*lowerTarget)
+	bestLowerUpper, bestLowerGround := 0.0, 0.0
+	bestLowerError, bestLowerAnchor, bestLowerKey := math.Inf(1), math.Inf(1), ""
+	for _, dividerUpper := range values {
+		for _, dividerGround := range values {
+			forward := lowerTransition(
+				dividerUpper.nominal, dividerGround.nominal,
+				lowerInputRange.nominal, lowerFeedbackRange.nominal, decisionPullRange.nominal,
+				upperSupplyRange.nominal, upperGroundRange.nominal, upperFeedbackRange.nominal,
+				referenceVoltage, 1,
+			)
+			reverse := lowerTransition(
+				dividerUpper.nominal, dividerGround.nominal,
+				lowerInputRange.nominal, lowerFeedbackRange.nominal, decisionPullRange.nominal,
+				upperSupplyRange.nominal, upperGroundRange.nominal, upperFeedbackRange.nominal,
+				referenceVoltage, 0,
+			)
+			hysteresis := forward - reverse
+			if forward < lowerMinimum || forward > lowerMaximum ||
+				hysteresis < hysteresisMinimum || hysteresis > hysteresisMaximum {
+				continue
+			}
+			cornerForwardMinimum, cornerForwardMaximum := math.Inf(1), math.Inf(-1)
+			cornerHysteresisMinimum, cornerHysteresisMaximum := math.Inf(1), math.Inf(-1)
+			for corner := 0; corner < 512; corner++ {
+				choose := func(bit int, minimum, maximum float64) float64 {
+					if corner&(1<<bit) != 0 {
+						return maximum
+					}
+					return minimum
+				}
+				cornerForward := lowerTransition(
+					choose(0, dividerUpper.minimum, dividerUpper.maximum),
+					choose(1, dividerGround.minimum, dividerGround.maximum),
+					choose(2, lowerInputRange.minimum, lowerInputRange.maximum),
+					choose(3, lowerFeedbackRange.minimum, lowerFeedbackRange.maximum),
+					choose(4, decisionPullRange.minimum, decisionPullRange.maximum),
+					choose(5, upperSupplyRange.minimum, upperSupplyRange.maximum),
+					choose(6, upperGroundRange.minimum, upperGroundRange.maximum),
+					choose(7, upperFeedbackRange.minimum, upperFeedbackRange.maximum),
+					choose(8, referenceMinimum, referenceMaximum),
+					1,
+				)
+				cornerReverse := lowerTransition(
+					choose(0, dividerUpper.minimum, dividerUpper.maximum),
+					choose(1, dividerGround.minimum, dividerGround.maximum),
+					choose(2, lowerInputRange.minimum, lowerInputRange.maximum),
+					choose(3, lowerFeedbackRange.minimum, lowerFeedbackRange.maximum),
+					choose(4, decisionPullRange.minimum, decisionPullRange.maximum),
+					choose(5, upperSupplyRange.minimum, upperSupplyRange.maximum),
+					choose(6, upperGroundRange.minimum, upperGroundRange.maximum),
+					choose(7, upperFeedbackRange.minimum, upperFeedbackRange.maximum),
+					choose(8, referenceMinimum, referenceMaximum),
+					0,
+				)
+				cornerForwardMinimum = math.Min(cornerForwardMinimum, cornerForward+lowerOffsetMinimum)
+				cornerForwardMaximum = math.Max(cornerForwardMaximum, cornerForward+lowerOffsetMaximum)
+				cornerHysteresis := cornerForward - cornerReverse
+				cornerHysteresisMinimum = math.Min(cornerHysteresisMinimum, cornerHysteresis)
+				cornerHysteresisMaximum = math.Max(cornerHysteresisMaximum, cornerHysteresis)
+			}
+			if cornerForwardMinimum < lowerMinimum || cornerForwardMaximum > lowerMaximum ||
+				cornerHysteresisMinimum < hysteresisMinimum || cornerHysteresisMaximum > hysteresisMaximum {
+				continue
+			}
+			error := math.Abs(forward-lowerTarget)/lowerTolerance +
+				math.Abs(hysteresis-hysteresisTarget)/hysteresisTarget
+			anchorError := multiplicativeRelativeError(dividerGround.nominal, 10_000)
+			key := canonicalOptionalFloat(&dividerUpper.nominal) + "|" + canonicalOptionalFloat(&dividerGround.nominal)
+			if error < bestLowerError ||
+				(error == bestLowerError && (anchorError < bestLowerAnchor ||
+					(anchorError == bestLowerAnchor && (bestLowerKey == "" || key < bestLowerKey)))) {
+				bestLowerUpper, bestLowerGround = dividerUpper.nominal, dividerGround.nominal
+				bestLowerError, bestLowerAnchor, bestLowerKey = error, anchorError, key
+			}
+		}
+	}
+	if bestLowerUpper <= 0 || bestLowerGround <= 0 {
+		return nil
+	}
+	assignments := map[string]float64{
+		between(driveSupply, absoluteReference):                     anchor,
+		between(absoluteReference, insideNode):                      decisionPull,
+		between(absoluteReference, lowerReference):                  bestLowerUpper,
+		between(lowerReference, referenceNode):                      bestLowerGround,
+		between(inputNode, lowerSignal):                             bestInput,
+		between(insideNode, lowerSignal):                            bestFeedback,
+		between(driveSupply, upperThreshold):                        bestUpperSupply,
+		between(upperThreshold, referenceNode):                      bestUpperGround,
+		between(insideNode, upperThreshold):                         bestUpperFeedback,
+		between(levelDriveNode, levelTerminals["BASE"]):             anchor,
+		between(switchTerminals["SOURCE"], switchTerminals["GATE"]): anchor,
+	}
+	if instance.Kind == "resistor" {
+		value := assignments[instance.ID]
+		if value <= 0 || !finite(value) {
+			return nil
+		}
+		return []AnalyticScale{{
+			ID:         "topology:windowed_ballasted_switch:" + instance.ID,
+			Kind:       "resistance",
+			ValueSI:    value,
+			Unit:       "ohm",
+			Derivation: "catalog value jointly derived from ordered thresholds, hysteresis, input impedance, and source-switch relationships",
+			SourceKind: "candidate_topology",
+			SourceID:   insideNode,
+			Priority:   1,
+		}}
+	}
+	first, second := instance.Terminals[0].Node, instance.Terminals[1].Node
+	if (first == driveSupply && second == referenceNode) ||
+		(first == referenceNode && second == driveSupply) ||
+		(first == switchTerminals["SOURCE"] && second == switchTerminals["GATE"]) ||
+		(first == switchTerminals["GATE"] && second == switchTerminals["SOURCE"]) {
+		return []AnalyticScale{{
+			ID:         "topology:windowed_ballasted_switch_capacitance:" + instance.ID,
+			Kind:       "capacitance",
+			ValueSI:    100e-9,
+			Unit:       "F",
+			Derivation: "bounded local bypass or gate-transition capacitance for a protected source switch",
+			SourceKind: "candidate_topology",
+			SourceID:   insideNode,
+			Priority:   1,
+		}}
+	}
+	return nil
+}
+
+// deriveWindowedControlledCurrentTopologyScales recognizes a pair of
+// open-collector boundary decisions driving a low-side current controller. It
+// derives the complete passive network as one coupled assignment: changing a
+// feedback resistance changes both hysteresis and the reference voltages
+// needed to preserve the requested thresholds. Recognition follows terminal
+// relationships only and is independent of project, port, primitive, or node
+// identities.
+func deriveWindowedControlledCurrentTopologyScales(
+	requirement Requirement,
+	graph CandidateGraph,
+	instance GraphInstance,
+	inventory map[string]PrimitiveCandidate,
+) []AnalyticScale {
+	if !slices.Contains([]string{"resistor", "capacitor"}, instance.Kind) ||
+		len(instance.Terminals) != 2 {
+		return nil
+	}
+	envelope, required := topologyWindowThresholdEnvelope(requirement)
+	if !required {
+		return nil
+	}
+	referenceNodes := topologyNodesByRole(graph, "reference")
+	if len(referenceNodes) != 1 {
+		return nil
+	}
+	referenceNode := referenceNodes[0]
+	inputNode, outputNode := "port_"+envelope.input, "port_"+envelope.output
+
+	between := func(left, right string) []string {
+		ids := []string{}
+		for _, candidate := range graph.Instances {
+			if candidate.Kind != "resistor" || len(candidate.Terminals) != 2 {
+				continue
+			}
+			first, second := candidate.Terminals[0].Node, candidate.Terminals[1].Node
+			if first == left && second == right || first == right && second == left {
+				ids = append(ids, candidate.ID)
+			}
+		}
+		slices.Sort(ids)
+		return ids
+	}
+	seriesPair := func(left, right string) []string {
+		pairs := [][]string{}
+		for _, node := range graph.Nodes {
+			if node.Scope != "internal" || node.ID == left || node.ID == right {
+				continue
+			}
+			first, second := between(left, node.ID), between(node.ID, right)
+			if len(first) != 1 || len(second) != 1 {
+				continue
+			}
+			degree := 0
+			for _, candidate := range graph.Instances {
+				if candidate.Kind != "resistor" || len(candidate.Terminals) != 2 {
+					continue
+				}
+				if candidate.Terminals[0].Node == node.ID || candidate.Terminals[1].Node == node.ID {
+					degree++
+				}
+			}
+			if degree != 2 {
+				continue
+			}
+			pair := []string{first[0], second[0]}
+			slices.Sort(pair)
+			pairs = append(pairs, pair)
+		}
+		slices.SortFunc(pairs, func(left, right []string) int { return slices.Compare(left, right) })
+		if len(pairs) == 0 {
+			return nil
+		}
+		return pairs[0]
+	}
+	uniqueBetween := func(left, right string) string {
+		ids := between(left, right)
+		if len(ids) != 1 {
+			return ""
+		}
+		return ids[0]
+	}
+
+	absoluteReference, referenceVoltage := "", 0.0
+	for _, candidate := range graph.Instances {
+		if candidate.Kind != "reference_diode" {
+			continue
+		}
+		terminals := topologyTerminalNodes(candidate)
+		if terminals["ANODE"] != referenceNode {
+			continue
+		}
+		voltage, found := topologyPrimitiveReferenceVoltage(inventory[candidate.PrimitiveKey])
+		if found {
+			absoluteReference, referenceVoltage = terminals["CATHODE"], voltage
+			break
+		}
+	}
+	if absoluteReference == "" || referenceVoltage <= 0 {
+		return nil
+	}
+
+	var upperDecision, lowerDecision GraphInstance
+	for _, candidate := range graph.Instances {
+		if candidate.Kind != "comparator" {
+			continue
+		}
+		terminals := topologyTerminalNodes(candidate)
+		if terminals["IN_MINUS"] == inputNode {
+			upperDecision = candidate
+			break
+		}
+	}
+	if upperDecision.ID == "" {
+		return nil
+	}
+	upperDecisionTerminals := topologyTerminalNodes(upperDecision)
+	insideNode := upperDecisionTerminals["OUT"]
+	for _, candidate := range graph.Instances {
+		if candidate.Kind != "comparator" || candidate.ID == upperDecision.ID {
+			continue
+		}
+		terminals := topologyTerminalNodes(candidate)
+		if terminals["OUT"] == insideNode && uniqueBetween(inputNode, terminals["IN_PLUS"]) != "" {
+			lowerDecision = candidate
+			break
+		}
+	}
+	if lowerDecision.ID == "" || insideNode == "" {
+		return nil
+	}
+	lowerDecisionTerminals := topologyTerminalNodes(lowerDecision)
+	lowerSignal := lowerDecisionTerminals["IN_PLUS"]
+	lowerReference := lowerDecisionTerminals["IN_MINUS"]
+	upperThreshold := upperDecisionTerminals["IN_PLUS"]
+
+	var lowerAmplifier, upperAmplifier GraphInstance
+	for _, candidate := range graph.Instances {
+		if candidate.Kind != "opamp" {
+			continue
+		}
+		terminals := topologyTerminalNodes(candidate)
+		switch {
+		case terminals["OUT"] == lowerReference:
+			lowerAmplifier = candidate
+		case uniqueBetween(terminals["OUT"], upperThreshold) != "":
+			upperAmplifier = candidate
+		}
+	}
+	if lowerAmplifier.ID == "" || upperAmplifier.ID == "" {
+		return nil
+	}
+	lowerAmplifierTerminals := topologyTerminalNodes(lowerAmplifier)
+	upperAmplifierTerminals := topologyTerminalNodes(upperAmplifier)
+	upperReference := upperAmplifierTerminals["OUT"]
+	if lowerAmplifierTerminals["IN_PLUS"] == absoluteReference ||
+		upperAmplifierTerminals["IN_PLUS"] != absoluteReference {
+		return nil
+	}
+
+	var switchDevice, currentController GraphInstance
+	for _, candidate := range graph.Instances {
+		if candidate.Kind != "n_channel_mosfet" {
+			continue
+		}
+		terminals := topologyTerminalNodes(candidate)
+		if terminals["DRAIN"] == outputNode {
+			switchDevice = candidate
+			break
+		}
+	}
+	if switchDevice.ID == "" {
+		return nil
+	}
+	switchTerminals := topologyTerminalNodes(switchDevice)
+	for _, candidate := range graph.Instances {
+		if candidate.Kind != "opamp" {
+			continue
+		}
+		terminals := topologyTerminalNodes(candidate)
+		feedback := terminals["IN_MINUS"]
+		if terminals["IN_PLUS"] == insideNode &&
+			(feedback == switchTerminals["SOURCE"] ||
+				uniqueBetween(feedback, switchTerminals["SOURCE"]) != "") &&
+			terminals["OUT"] == switchTerminals["GATE"] {
+			currentController = candidate
+			break
+		}
+	}
+	if currentController.ID == "" {
+		return nil
+	}
+	controllerTerminals := topologyTerminalNodes(currentController)
+	driveSupply := controllerTerminals["V_PLUS"]
+	senseNode, gateNode := switchTerminals["SOURCE"], switchTerminals["GATE"]
+	currentFeedbackNode := controllerTerminals["IN_MINUS"]
+
+	inputResistance := 10_000.0
+	for _, port := range requirement.Requirements.Ports {
+		if "port_"+port.ID == inputNode && port.Electrical.InputImpedanceMinOhm != nil {
+			inputResistance = math.Max(inputResistance, 1.5**port.Electrical.InputImpedanceMinOhm)
+		}
+	}
+	inputResistance, inputFound := topologyCatalogResistanceClosest(
+		requirement, inventory, inputResistance,
+	)
+	hysteresis := 0.0
+	for _, assertion := range requirement.Requirements.BehavioralRequirements {
+		if assertion.Metric == "hysteresis" {
+			hysteresis = math.Max(hysteresis, assertionTarget(assertion))
+		}
+	}
+	if !inputFound || hysteresis <= 0 || hysteresis >= referenceVoltage {
+		return nil
+	}
+	feedbackRatio := hysteresis / (referenceVoltage - hysteresis)
+	feedbackValues := []float64(nil)
+	feedbackFound := false
+	if feedbackRatio > 0 {
+		var left, right float64
+		left, right, feedbackFound = catalogSeriesResistancePair(
+			requirement, inventory, inputResistance/feedbackRatio,
+		)
+		feedbackValues = []float64{left, right}
+	}
+	if !feedbackFound {
+		return nil
+	}
+	feedbackResistance := feedbackValues[0] + feedbackValues[1]
+	actualFeedbackRatio := inputResistance / feedbackResistance
+	lowerTarget := positiveMidpoint(envelope.lowerV, envelope.lowerV)
+	upperTarget := positiveMidpoint(envelope.upperV, envelope.upperV)
+	lowerReferenceVoltage := lowerTarget / (1 + actualFeedbackRatio)
+	upperReferenceVoltage := upperTarget + actualFeedbackRatio*(upperTarget-referenceVoltage)
+	if lowerReferenceVoltage <= 0 || lowerReferenceVoltage >= referenceVoltage ||
+		upperReferenceVoltage <= referenceVoltage {
+		return nil
+	}
+
+	const anchorResistance = 10_000.0
+	lowerUpper, lowerBranches, lowerDividerFound := catalogResistanceDivider(
+		requirement,
+		inventory,
+		referenceVoltage/lowerReferenceVoltage-1,
+		anchorResistance,
+		1,
+		referenceVoltage,
+		referenceVoltage,
+		0,
+		0,
+	)
+	upperGround, upperFeedback, upperDividerFound := catalogNonInvertingGainTriplet(
+		requirement, inventory, upperReferenceVoltage/referenceVoltage,
+	)
+	anchorValue, anchorFound := topologyCatalogResistanceClosest(
+		requirement, inventory, anchorResistance,
+	)
+	commandSense, commandBias := "", ""
+	commandBiasValue, commandBiasFound := anchorValue, true
+	if currentFeedbackNode != senseNode {
+		commandSense = uniqueBetween(senseNode, currentFeedbackNode)
+		commandBias = uniqueBetween(absoluteReference, currentFeedbackNode)
+		lowMargin := primitiveModelParameter(
+			inventory[lowerDecision.PrimitiveKey],
+			simmodel.PrimitiveComparatorOpenCollectorV1,
+			"output_low_margin_v",
+		)
+		offsetVoltage := math.Max(4*lowMargin, .2*referenceVoltage)
+		if offsetVoltage <= 0 || offsetVoltage >= referenceVoltage {
+			return nil
+		}
+		biasRatio := offsetVoltage / (referenceVoltage - offsetVoltage)
+		commandBiasValue, commandBiasFound = topologyCatalogResistanceClosest(
+			requirement, inventory, anchorResistance/biasRatio,
+		)
+	}
+	currentTarget := 0.0
+	for _, assertion := range requirement.Requirements.BehavioralRequirements {
+		if assertion.Metric == "output_current" {
+			currentTarget = math.Max(currentTarget, assertionTarget(assertion))
+		}
+	}
+	senseValue, senseFound := topologyCatalogResistanceClosest(
+		requirement, inventory, referenceVoltage/currentTarget,
+	)
+	if !lowerDividerFound || !upperDividerFound || !anchorFound || !commandBiasFound ||
+		currentTarget <= 0 || !senseFound {
+		return nil
+	}
+
+	lowerInput := uniqueBetween(inputNode, lowerSignal)
+	lowerFeedback := seriesPair(insideNode, lowerSignal)
+	upperInput := uniqueBetween(upperReference, upperThreshold)
+	upperDecisionFeedback := seriesPair(insideNode, upperThreshold)
+	lowerReferenceUpper := uniqueBetween(absoluteReference, lowerAmplifierTerminals["IN_PLUS"])
+	lowerReferenceLower := uniqueBetween(lowerAmplifierTerminals["IN_PLUS"], referenceNode)
+	lowerBufferFeedback := uniqueBetween(lowerReference, lowerAmplifierTerminals["IN_MINUS"])
+	upperReferenceGround := uniqueBetween(upperAmplifierTerminals["IN_MINUS"], referenceNode)
+	upperReferenceFeedback := seriesPair(upperReference, upperAmplifierTerminals["IN_MINUS"])
+	referenceBias := uniqueBetween(driveSupply, absoluteReference)
+	insidePullup := uniqueBetween(absoluteReference, insideNode)
+	gatePulldown := uniqueBetween(gateNode, referenceNode)
+	senseReturn := uniqueBetween(senseNode, referenceNode)
+	if lowerInput == "" || len(lowerFeedback) != 2 || upperInput == "" ||
+		len(upperDecisionFeedback) != 2 || lowerReferenceUpper == "" ||
+		lowerReferenceLower == "" || lowerBufferFeedback == "" ||
+		upperReferenceGround == "" || len(upperReferenceFeedback) != 2 ||
+		referenceBias == "" || insidePullup == "" || gatePulldown == "" || senseReturn == "" {
+		return nil
+	}
+	if currentFeedbackNode != senseNode && (commandSense == "" || commandBias == "") {
+		return nil
+	}
+
+	values := map[string]float64{
+		lowerInput:           inputResistance,
+		upperInput:           inputResistance,
+		lowerReferenceUpper:  lowerUpper,
+		lowerReferenceLower:  lowerBranches[0],
+		lowerBufferFeedback:  anchorValue,
+		upperReferenceGround: upperGround,
+		referenceBias:        anchorValue,
+		insidePullup:         anchorValue,
+		gatePulldown:         anchorValue,
+		senseReturn:          senseValue,
+	}
+	if commandSense != "" {
+		values[commandSense] = anchorValue
+		values[commandBias] = commandBiasValue
+	}
+	for index, id := range lowerFeedback {
+		values[id] = feedbackValues[index]
+	}
+	for index, id := range upperDecisionFeedback {
+		values[id] = feedbackValues[index]
+	}
+	for index, id := range upperReferenceFeedback {
+		values[id] = upperFeedback[index]
+	}
+	if instance.Kind == "resistor" {
+		value := values[instance.ID]
+		if value <= 0 || !finite(value) {
+			return nil
+		}
+		return []AnalyticScale{{
+			ID:         "topology:windowed_current_control:" + instance.ID,
+			Kind:       "resistance",
+			ValueSI:    value,
+			Unit:       "ohm",
+			Derivation: "coupled catalog value derived from bounded thresholds, hysteresis, input impedance, reference voltage, and controlled output current",
+			SourceKind: "candidate_topology",
+			SourceID:   insideNode,
+			Priority:   1,
+		}}
+	}
+	first, second := instance.Terminals[0].Node, instance.Terminals[1].Node
+	if (first == driveSupply && second == referenceNode) ||
+		(first == referenceNode && second == driveSupply) {
+		return []AnalyticScale{{
+			ID:         "topology:windowed_current_control_bypass:" + instance.ID,
+			Kind:       "capacitance",
+			ValueSI:    100e-9,
+			Unit:       "F",
+			Derivation: "bounded local bypass for the shared decision and current-control supply",
+			SourceKind: "candidate_topology",
+			SourceID:   driveSupply,
+			Priority:   1,
+		}}
+	}
+	if (first == gateNode && second == referenceNode) ||
+		(first == referenceNode && second == gateNode) {
+		return []AnalyticScale{{
+			ID:         "topology:windowed_current_control_gate:" + instance.ID,
+			Kind:       "capacitance",
+			ValueSI:    100e-9,
+			Unit:       "F",
+			Derivation: "bounded gate filtering for deterministic startup and switching response",
+			SourceKind: "candidate_topology",
+			SourceID:   gateNode,
+			Priority:   1,
+		}}
+	}
+	return nil
 }
 
 func deriveWindowTopologyScales(

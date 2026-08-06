@@ -25,6 +25,12 @@ func TestMNAOrderedThresholdMeasurementsAreDirectionSpecific(t *testing.T) {
 	if diagnostic != nil || math.Abs(upper-2.5) > 1e-12 {
 		t.Fatalf("upper threshold = %.12g diagnostic=%#v", upper, diagnostic)
 	}
+	hysteresis, diagnostic := dcSweepDerivedValue(result, Assertion{
+		Node: "OUT", Quantity: QuantityHysteresisVoltageV, Min: .2, Max: .3,
+	})
+	if diagnostic != nil || math.Abs(hysteresis-.25) > 1e-12 {
+		t.Fatalf("window hysteresis = %.12g diagnostic=%#v", hysteresis, diagnostic)
+	}
 
 	singleTransition := AnalysisResult{Kind: AnalysisDCOperatingPoint, Points: []AnalysisPoint{
 		{Sweep: dcSweepForward, SweepValue: 0, Nodes: []NodeResult{{Node: "OUT", Real: 0}}},

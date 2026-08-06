@@ -955,23 +955,78 @@ func buildMNASystemWithOpAmpClamps(plan Plan, analysis Analysis, frequency float
 
 func mnaReferenceNodes(plan Plan) map[string]bool {
 	references := map[string]bool{plan.GroundNode: true}
+	adjacency := map[string]map[string]bool{}
+	connect := func(left, right string) {
+		if left == "" || right == "" || left == right {
+			return
+		}
+		if adjacency[left] == nil {
+			adjacency[left] = map[string]bool{}
+		}
+		if adjacency[right] == nil {
+			adjacency[right] = map[string]bool{}
+		}
+		adjacency[left][right] = true
+		adjacency[right][left] = true
+	}
+	candidates := map[string]bool{}
 	for _, device := range plan.Devices {
-		var terminals []string
+		bindings := terminalMap(device)
 		switch device.PrimitiveModel {
 		case PrimitiveSingleOutputIsolatedConverterV1, PrimitiveProtectedIsolatedConverterV1:
-			terminals = []string{"VIN_MINUS", "VOUT_MINUS"}
+			candidates[bindings["VIN_MINUS"]] = true
+			candidates[bindings["VOUT_MINUS"]] = true
+			connect(bindings["VIN_PLUS"], bindings["VIN_MINUS"])
+			connect(bindings["VOUT_PLUS"], bindings["VOUT_MINUS"])
 		case PrimitiveDualOutputIsolatedConverterV1:
-			terminals = []string{"VIN_MINUS", "COMMON"}
+			candidates[bindings["VIN_MINUS"]] = true
+			candidates[bindings["COMMON"]] = true
+			connect(bindings["VIN_PLUS"], bindings["VIN_MINUS"])
+			connect(bindings["VOUT_PLUS"], bindings["COMMON"])
+			connect(bindings["VOUT_MINUS"], bindings["COMMON"])
 		case PrimitiveBidirectionalOpenDrainIsolatorV1, PrimitivePushPullDigitalIsolatorV1:
-			terminals = []string{"GND1", "GND2"}
-		default:
+			candidates[bindings["GND1"]] = true
+			candidates[bindings["GND2"]] = true
+		}
+	}
+	delete(candidates, "")
+	nodes := make([]string, 0, len(candidates))
+	for candidate := range candidates {
+		nodes = append(nodes, candidate)
+	}
+	slices.Sort(nodes)
+	visited := map[string]bool{}
+	for _, start := range nodes {
+		if visited[start] {
 			continue
 		}
-		bindings := terminalMap(device)
-		for _, terminal := range terminals {
-			if node := bindings[terminal]; node != "" {
-				references[node] = true
+		component := []string{}
+		queue := []string{start}
+		visited[start] = true
+		anchored := references[start]
+		for len(queue) != 0 {
+			node := queue[0]
+			queue = queue[1:]
+			if candidates[node] {
+				component = append(component, node)
 			}
+			anchored = anchored || references[node]
+			neighbors := make([]string, 0, len(adjacency[node]))
+			for neighbor := range adjacency[node] {
+				neighbors = append(neighbors, neighbor)
+			}
+			slices.Sort(neighbors)
+			for _, neighbor := range neighbors {
+				if visited[neighbor] {
+					continue
+				}
+				visited[neighbor] = true
+				queue = append(queue, neighbor)
+			}
+		}
+		if !anchored && len(component) != 0 {
+			slices.Sort(component)
+			references[component[0]] = true
 		}
 	}
 	return references

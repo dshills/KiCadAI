@@ -4,6 +4,8 @@ import (
 	"context"
 	"path/filepath"
 	"testing"
+
+	"kicadai/internal/simmodel"
 )
 
 func TestControlledSwitchRelationshipComposesDecisionFeedback(t *testing.T) {
@@ -304,4 +306,201 @@ func TestControlledSwitchRelationshipOrientsPowerSourceHighSide(t *testing.T) {
 		}
 	}
 	t.Fatalf("no high-side PMOS candidate was composed: candidates=%d rejections=%#v", len(search.Candidates), search.Rejections)
+}
+
+func TestWindowedControlledSwitchComposesSharedDecisionAndProtectedPower(t *testing.T) {
+	var requirement Requirement
+	decodeFrozenStrict(
+		t,
+		mustRead(t, filepath.Join(multiStageOODCorpusRoot(), "windowed_heating_power_control.json")),
+		&requirement,
+	)
+	inventory, environment := testHeldOutSynthesisEnvironment(t)
+	initial, issues := InitialGraph(requirement)
+	if len(issues) != 0 {
+		t.Fatalf("initial graph issues: %#v", issues)
+	}
+	envelope, hasWindow := topologyWindowThresholdEnvelope(requirement)
+	if !hasWindow || !topologyControlledSwitchRequired(requirement) {
+		t.Fatalf(
+			"windowed controlled-power obligation missing: envelope=%#v window=%t controlled=%t",
+			envelope, hasWindow, topologyControlledSwitchRequired(requirement),
+		)
+	}
+	supplies := topologyNodesByRole(initial, "supply")
+	loadSupply, _ := topologyControlledSwitchLoadSupply(requirement, initial, "port_"+envelope.output, supplies)
+	regulated, regulatedFound := topologyRegulatedLoadRail(requirement, initial, "port_"+envelope.output, loadSupply, inventory)
+	if !regulatedFound || regulated.seriesCount < 1 || regulated.parallelCount < 1 ||
+		regulated.ballastValueSI[0] <= 0 || regulated.ballastValueSI[1] <= 0 {
+		t.Fatalf("windowed load envelope lacks a realizable regulated rail: %#v", regulated)
+	}
+	graphHash, err := GraphHash(initial)
+	if err != nil {
+		t.Fatal(err)
+	}
+	topologyHash, err := TopologyHash(initial)
+	if err != nil {
+		t.Fatal(err)
+	}
+	byKey := primitiveInventoryByKey(inventory)
+	policy := multiStageOODPromotionPolicy()
+	candidates, consumption, rejections := topologyWindowedControlledSwitchRelationshipSeeds(
+		context.Background(), requirement, inventory,
+		topologyRepresentatives(requirement, inventory), byKey,
+		GraphLimits{
+			MaxPrimitiveInstances: minPositive(
+				policy.MaxPrimitiveInstances,
+				requirement.Requirements.Constraints.MaxComponents,
+			),
+			MaxInternalNodes: policy.MaxInternalNodes,
+		},
+		policy,
+		topologySearchState{
+			graph: initial, hash: graphHash, topology: topologyHash,
+			score: scoreTopologyGraph(requirement, initial, byKey, graphHash),
+		},
+	)
+	for _, candidate := range candidates {
+		sharedOutputs := map[string]int{}
+		hasPowerSwitch, hasProtection, hasGateClamp := false, false, false
+		gateNode, sourceNode := "", ""
+		for _, instance := range candidate.Graph.Instances {
+			terminals := topologyTerminalNodes(instance)
+			switch instance.Kind {
+			case "comparator":
+				sharedOutputs[terminals["OUT"]]++
+			case "p_channel_mosfet", "n_channel_mosfet":
+				hasPowerSwitch = terminals["DRAIN"] == "port_heating_output"
+				gateNode, sourceNode = terminals["GATE"], terminals["SOURCE"]
+			case "diode", "signal_diode":
+				hasProtection = terminals["ANODE"] == "port_heating_output" ||
+					terminals["CATHODE"] == "port_heating_output"
+			case "clamp_diode":
+				hasGateClamp = (terminals["ANODE"] == gateNode && terminals["CATHODE"] == sourceNode) ||
+					(terminals["CATHODE"] == gateNode && terminals["ANODE"] == sourceNode)
+			}
+		}
+		for _, count := range sharedOutputs {
+			if count >= 2 && hasPowerSwitch && hasProtection && hasGateClamp {
+				plan := BuildValueSearchPlan(requirement, candidate.Graph, inventory, policy)
+				if plan.Status != ValuePlanReady {
+					t.Fatalf("windowed composition lacks a deterministic value plan: %#v", plan)
+				}
+				enumeration := EnumerateValueTrials(plan, 1)
+				if len(enumeration.Trials) != 1 {
+					t.Fatalf("windowed first value trial missing: %#v", enumeration)
+				}
+				valued, err := ApplyValueTrial(candidate.Graph, enumeration.Trials[0], inventory)
+				if err != nil {
+					t.Fatalf("windowed first value trial cannot be applied: %v", err)
+				}
+				for _, assertion := range requirement.Requirements.BehavioralRequirements {
+					if assertion.ID != "lower_entry" && assertion.ID != "upper_exit" &&
+						assertion.ID != "boundary_stability" && assertion.ID != "active_current" &&
+						assertion.ID != "window_delay" {
+						continue
+					}
+					for _, operatingCase := range requirement.Requirements.OperatingCases {
+						if operatingCase.ID != "window_sweep" {
+							continue
+						}
+						operatingCase.Conditions = simulationHarnessConditions(requirement, assertion, operatingCase)
+						attempt, diagnoses := evaluateAssertionCorner(
+							requirement, assertion, operatingCase,
+							operatingCorner{ID: "nominal", Values: map[string]float64{}},
+							valued, inventory, environment,
+						)
+						if attempt.Status != SimulationEvaluationPassed {
+							t.Fatalf("windowed %s nominal decision evidence failed: %#v", assertion.ID, diagnoses)
+						}
+					}
+				}
+				return
+			}
+		}
+	}
+	t.Fatalf(
+		"windowed controlled-switch composition missing: candidates=%d consumption=%#v rejections=%#v",
+		len(candidates), consumption, rejections,
+	)
+}
+
+func TestMOSFETGateClampSelectionReservesCatalogRatingMargin(t *testing.T) {
+	inventory, _ := testHeldOutSynthesisEnvironment(t)
+	mosfet := PrimitiveCandidate{}
+	for _, primitive := range inventory.Primitives {
+		if primitive.Kind != "p_channel_mosfet" ||
+			!primitiveHasModel(primitive, simmodel.PrimitivePMOSSwitchV1) {
+			continue
+		}
+		gateLimit := primitiveModelParameter(
+			primitive, simmodel.PrimitivePMOSSwitchV1, "max_gate_source_voltage_v",
+		)
+		gateOn := primitiveModelParameter(
+			primitive, simmodel.PrimitivePMOSSwitchV1, "gate_on_voltage_v",
+		)
+		if gateLimit == 25 && gateOn == 4.5 {
+			mosfet = primitive
+			break
+		}
+	}
+	if mosfet.Key == "" {
+		t.Fatal("test inventory lacks a reviewed 25 VGS, 4.5 V-drive PMOS")
+	}
+	if clamp, required := topologyMOSFETGateClampPrimitive(inventory, mosfet, 18.75); required || clamp.Key != "" {
+		t.Fatalf("gate clamp required inside the reserved rating envelope: required=%t clamp=%#v", required, clamp)
+	}
+	clamp, required := topologyMOSFETGateClampPrimitive(inventory, mosfet, 24)
+	if !required || clamp.Key == "" {
+		t.Fatalf("gate clamp missing beyond the reserved rating envelope: required=%t clamp=%#v", required, clamp)
+	}
+	breakdown := primitiveModelParameter(
+		clamp, simmodel.PrimitiveBidirectionalTVSV1, "breakdown_voltage_v",
+	)
+	if breakdown < 1.25*4.5 || breakdown > .85*25 {
+		t.Fatalf("selected gate clamp does not preserve turn-on and VGS margins: breakdown=%g clamp=%#v", breakdown, clamp)
+	}
+	repeated, repeatedRequired := topologyMOSFETGateClampPrimitive(inventory, mosfet, 24)
+	if !repeatedRequired || repeated.Key != clamp.Key {
+		t.Fatalf("gate clamp selection is not deterministic: first=%q repeated=%q", clamp.Key, repeated.Key)
+	}
+}
+
+func TestWindowedHeatingPowerPassesElectricalAndSafetyCorners(t *testing.T) {
+	var requirement Requirement
+	decodeFrozenStrict(
+		t,
+		mustRead(t, filepath.Join(multiStageOODCorpusRoot(), "windowed_heating_power_control.json")),
+		&requirement,
+	)
+	inventory, environment := testHeldOutSynthesisEnvironment(t)
+	run := Synthesize(
+		context.Background(), requirement, inventory, environment, multiStageOODPromotionPolicy(),
+	)
+	if run.Report.Status == StatusPassed && run.SelectedGraph != nil && run.SelectedTrial != nil {
+		return
+	}
+	logged := 0
+	for _, candidate := range run.Candidates {
+		for _, evaluation := range candidate.Evaluations {
+			if logged >= 8 {
+				break
+			}
+			first := Diagnosis{}
+			if len(evaluation.Diagnoses) != 0 {
+				first = evaluation.Diagnoses[0]
+			}
+			t.Logf(
+				"windowed candidate topology=%s plan=%s trial=%s status=%s diagnoses=%d first=%#v",
+				candidate.TopologyHash, candidate.ValuePlan.Status, evaluation.ValueTrialHash,
+				evaluation.Status, len(evaluation.Diagnoses), first,
+			)
+			logged++
+		}
+	}
+	t.Fatalf(
+		"windowed heating synthesis did not pass: status=%s stop=%s candidates=%d consumption=%#v rejections=%#v diagnostics=%#v",
+		run.Report.Status, run.Report.StopReason, len(run.Candidates),
+		run.Search.Consumption, run.Search.Rejections, run.Report.Diagnostics,
+	)
 }

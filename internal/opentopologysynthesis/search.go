@@ -249,6 +249,26 @@ func SearchPrimitiveTopologies(ctx context.Context, requirement Requirement, inv
 			retainedTopology[candidate.TopologyHash] = candidate
 		}
 	}
+	windowedSwitchCandidates, windowedSwitchConsumption, windowedSwitchRejections := topologyWindowedControlledSwitchRelationshipSeeds(
+		ctx,
+		requirement,
+		inventory,
+		representatives,
+		inventoryByKey,
+		limits,
+		result.Policy,
+		initialState,
+	)
+	addSearchConsumption(&result.Consumption, windowedSwitchConsumption)
+	for code, samples := range windowedSwitchRejections {
+		rejections[code] = append(rejections[code], samples...)
+	}
+	for _, candidate := range windowedSwitchCandidates {
+		if existing, found := retainedTopology[candidate.TopologyHash]; !found ||
+			compareTopologyCandidates(candidate, existing) < 0 {
+			retainedTopology[candidate.TopologyHash] = candidate
+		}
+	}
 	regulatorCandidates, regulatorConsumption, regulatorRejections := topologyRegulatedVoltageRelationshipSeeds(
 		ctx,
 		requirement,
@@ -1067,7 +1087,7 @@ type windowBehaviorEnvelope struct {
 	upperV float64
 }
 
-func topologyWindowBehaviorEnvelope(requirement Requirement) (windowBehaviorEnvelope, bool) {
+func topologyWindowThresholdEnvelope(requirement Requirement) (windowBehaviorEnvelope, bool) {
 	envelope := windowBehaviorEnvelope{}
 	for _, assertion := range requirement.Requirements.BehavioralRequirements {
 		if assertion.Excitation == nil || assertion.Excitation.Kind != "port" ||
@@ -1091,6 +1111,14 @@ func topologyWindowBehaviorEnvelope(requirement Requirement) (windowBehaviorEnve
 	}
 	if envelope.input == "" || envelope.output == "" || envelope.lowerV <= 0 ||
 		envelope.upperV <= envelope.lowerV {
+		return windowBehaviorEnvelope{}, false
+	}
+	return envelope, true
+}
+
+func topologyWindowBehaviorEnvelope(requirement Requirement) (windowBehaviorEnvelope, bool) {
+	envelope, found := topologyWindowThresholdEnvelope(requirement)
+	if !found {
 		return windowBehaviorEnvelope{}, false
 	}
 	caseByID := map[string]OperatingCase{}
@@ -1328,6 +1356,488 @@ func topologyWindowRelationshipSeeds(
 	}
 	slices.SortFunc(result, compareTopologyCandidates)
 	return result, consumption, rejections
+}
+
+// topologyWindowedControlledSwitchRelationshipSeeds composes two ordered
+// threshold decisions with a protected high-side power path. The shared
+// open-collector node is high only while both threshold predicates are true;
+// independent passive feedback branches preserve state near either boundary.
+// Selection is driven only by lower/upper-threshold and controlled-load
+// obligations, so the relationship applies to any bounded analog control
+// input and source-oriented switched output.
+func topologyWindowedControlledSwitchRelationshipSeeds(
+	ctx context.Context,
+	requirement Requirement,
+	inventory PrimitiveInventory,
+	representatives []PrimitiveCandidate,
+	inventoryByKey map[string]PrimitiveCandidate,
+	limits GraphLimits,
+	policy Policy,
+	initial topologySearchState,
+) ([]TopologyCandidate, Consumption, map[string][]string) {
+	envelope, hasWindow := topologyWindowThresholdEnvelope(requirement)
+	if !hasWindow || !topologyControlledSwitchRequired(requirement) {
+		return nil, Consumption{}, map[string][]string{}
+	}
+	input, output := "port_"+envelope.input, "port_"+envelope.output
+	highSide := topologyControlledSwitchHighSideOutput(requirement, initial.graph, output)
+	for _, port := range requirement.Requirements.Ports {
+		if port.ID == envelope.output && port.Kind == "controlled_current" && port.Direction == "source" {
+			highSide = true
+			break
+		}
+	}
+	var comparator, opamp, nmos, pmos, resistor, capacitor PrimitiveCandidate
+	for _, primitive := range representatives {
+		switch primitive.Kind {
+		case "comparator":
+			comparator = primitive
+		case "opamp":
+			opamp = primitive
+		case "p_channel_mosfet":
+			pmos = primitive
+		case "n_channel_mosfet":
+			nmos = primitive
+		case "resistor":
+			resistor = primitive
+		case "capacitor":
+			capacitor = primitive
+		}
+	}
+	mosfet := nmos
+	mosfetKind := "n_channel_mosfet"
+	if highSide {
+		mosfet, mosfetKind = pmos, "p_channel_mosfet"
+	}
+	if rated := topologyRatedPowerPrimitive(requirement, inventory, mosfetKind); rated.Key != "" {
+		mosfet = rated
+	}
+	stableReference := topologyStableReferencePrimitive(requirement, inventory)
+	referenceVoltage, referenceKnown := topologyPrimitiveReferenceVoltage(stableReference)
+	levelShifter := selectCurrentRelationshipPrimitiveMatching(
+		requirement, inventory, "npn_bjt", false, false,
+		func(candidate PrimitiveCandidate) bool {
+			return primitiveModelParameter(candidate, simmodel.PrimitiveBJTNPNV1, "forward_beta") >= 100
+		},
+	)
+	flyback := topologyFlybackDiodePrimitive(requirement, inventory)
+	if comparator.Key == "" || opamp.Key == "" || mosfet.Key == "" ||
+		resistor.Key == "" || capacitor.Key == "" || stableReference.Key == "" ||
+		(highSide && levelShifter.Key == "") || flyback.Key == "" || !referenceKnown {
+		return nil, Consumption{}, map[string][]string{
+			"relationship_gap": {"windowed controlled power requires reviewed comparator, amplifier, reference, level-shifter, switch, passive, and protection relationships"},
+		}
+	}
+	supplies := topologyNodesByRole(initial.graph, "supply")
+	references := topologyNodesByRole(initial.graph, "reference")
+	if len(supplies) < 2 || len(references) != 1 {
+		return nil, Consumption{}, map[string][]string{
+			"relationship_gap": {"windowed controlled power requires distinct bounded control and load supplies with one reference"},
+		}
+	}
+	loadSupply, loadSupplyFound := topologyControlledSwitchLoadSupply(
+		requirement, initial.graph, output, supplies,
+	)
+	if !loadSupplyFound {
+		return nil, Consumption{}, map[string][]string{
+			"relationship_gap": {output + ": windowed controlled power lacks one unambiguous load supply"},
+		}
+	}
+	regulatedLoad, hasRegulatedLoad := topologyRegulatedLoadRail(
+		requirement, initial.graph, output, loadSupply, inventory,
+	)
+	maximumGateSpan := 0.0
+	if _, maximum, found := topologyDeclaredNodeVoltageRange(
+		requirement, initial.graph, loadSupply,
+	); found {
+		maximumGateSpan = maximum
+	}
+	if hasRegulatedLoad && regulatedLoad.outputVoltageV > 0 {
+		maximumGateSpan = regulatedLoad.outputVoltageV
+	}
+	gateClamp, gateClampRequired := topologyMOSFETGateClampPrimitive(
+		inventory, mosfet, maximumGateSpan,
+	)
+	if highSide && gateClampRequired && gateClamp.Key == "" {
+		return nil, Consumption{}, map[string][]string{
+			"relationship_gap": {"windowed high-side power switch lacks a reviewed gate clamp with sufficient turn-on and rating margin"},
+		}
+	}
+	driveSupply := ""
+	driveVoltage := math.Inf(1)
+	for _, supply := range supplies {
+		if supply == loadSupply {
+			continue
+		}
+		nominal, known := topologyNodeNominalVoltage(requirement, initial.graph, supply)
+		if !known || nominal <= envelope.upperV || nominal <= referenceVoltage {
+			continue
+		}
+		if nominal < driveVoltage || (nominal == driveVoltage && (driveSupply == "" || supply < driveSupply)) {
+			driveSupply, driveVoltage = supply, nominal
+		}
+	}
+	if driveSupply == "" {
+		return nil, Consumption{}, map[string][]string{
+			"relationship_gap": {"windowed controlled power lacks a control rail above both requested thresholds"},
+		}
+	}
+
+	consumption := Consumption{ExpandedStates: 1}
+	rejections := map[string][]string{}
+	state := initial
+	nextNode := func() string {
+		if ctx.Err() != nil || consumption.GeneratedGraphs >= policy.MaxGeneratedGraphs {
+			return ""
+		}
+		var node string
+		state, node = addRelationshipInternalNode(
+			state, requirement, inventoryByKey, &consumption,
+		)
+		return node
+	}
+	absoluteReference := nextNode()
+	lowerReference, lowerSignal := nextNode(), nextNode()
+	upperThreshold, insideNode := nextNode(), nextNode()
+	nodes := []string{
+		absoluteReference, lowerReference, lowerSignal, upperThreshold, insideNode,
+	}
+	for _, node := range nodes {
+		if node == "" {
+			return nil, consumption, rejections
+		}
+	}
+	if internalNodeCount(state.graph) > limits.MaxInternalNodes {
+		return nil, consumption, map[string][]string{
+			"graph_limit": {"windowed controlled power exceeds the bounded internal-node limit"},
+		}
+	}
+
+	state = addRelationshipPrimitive(
+		state, requirement, inventoryByKey, stableReference,
+		[]TerminalConnection{
+			{Terminal: "ANODE", Node: references[0]},
+			{Terminal: "CATHODE", Node: absoluteReference},
+		}, &consumption,
+	)
+	for _, edge := range [][2]string{
+		{driveSupply, absoluteReference},
+		{absoluteReference, insideNode},
+		{absoluteReference, lowerReference},
+		{lowerReference, references[0]},
+	} {
+		state = addRelationshipPrimitive(
+			state, requirement, inventoryByKey, resistor,
+			topologyTwoTerminalPlacement(edge[0], edge[1]), &consumption,
+		)
+	}
+
+	state = addRelationshipPrimitive(
+		state, requirement, inventoryByKey, comparator,
+		[]TerminalConnection{
+			{Terminal: "IN_PLUS", Node: lowerSignal},
+			{Terminal: "IN_MINUS", Node: lowerReference},
+			{Terminal: "OUT", Node: insideNode},
+			{Terminal: "V_MINUS", Node: references[0]},
+			{Terminal: "V_PLUS", Node: driveSupply},
+		}, &consumption,
+	)
+	for _, edge := range [][2]string{
+		{input, lowerSignal},
+		{insideNode, lowerSignal},
+	} {
+		state = addRelationshipPrimitive(
+			state, requirement, inventoryByKey, resistor,
+			topologyTwoTerminalPlacement(edge[0], edge[1]), &consumption,
+		)
+	}
+
+	state = addRelationshipPrimitive(
+		state, requirement, inventoryByKey, comparator,
+		[]TerminalConnection{
+			{Terminal: "IN_PLUS", Node: upperThreshold},
+			{Terminal: "IN_MINUS", Node: input},
+			{Terminal: "OUT", Node: insideNode},
+			{Terminal: "V_MINUS", Node: references[0]},
+			{Terminal: "V_PLUS", Node: driveSupply},
+		}, &consumption,
+	)
+	for _, edge := range [][2]string{
+		{driveSupply, upperThreshold},
+		{upperThreshold, references[0]},
+		{insideNode, upperThreshold},
+	} {
+		state = addRelationshipPrimitive(
+			state, requirement, inventoryByKey, resistor,
+			topologyTwoTerminalPlacement(edge[0], edge[1]), &consumption,
+		)
+	}
+
+	powerRail := loadSupply
+	if hasRegulatedLoad && regulatedLoad.seriesCount > 0 && regulatedLoad.parallelCount > 0 {
+		powerRail = nextNode()
+		if powerRail == "" {
+			return nil, consumption, rejections
+		}
+		for branch := 0; branch < regulatedLoad.parallelCount; branch++ {
+			previous := references[0]
+			for stage := 0; stage < regulatedLoad.seriesCount; stage++ {
+				converterOutput := nextNode()
+				if converterOutput == "" {
+					return nil, consumption, rejections
+				}
+				state = addRelationshipPrimitive(
+					state, requirement, inventoryByKey, regulatedLoad.converter,
+					[]TerminalConnection{
+						{Terminal: "VIN_PLUS", Node: loadSupply},
+						{Terminal: "VIN_MINUS", Node: references[0]},
+						{Terminal: "VOUT_PLUS", Node: converterOutput},
+						{Terminal: "VOUT_MINUS", Node: previous},
+					}, &consumption,
+				)
+				previous = converterOutput
+			}
+			ballastMiddle := nextNode()
+			if ballastMiddle == "" {
+				return nil, consumption, rejections
+			}
+			state = addRelationshipPrimitiveAtValue(
+				state, requirement, inventoryByKey, regulatedLoad.ballast[0],
+				regulatedLoad.ballastValueSI[0],
+				topologyTwoTerminalPlacement(previous, ballastMiddle), &consumption,
+			)
+			state = addRelationshipPrimitiveAtValue(
+				state, requirement, inventoryByKey, regulatedLoad.ballast[1],
+				regulatedLoad.ballastValueSI[1],
+				topologyTwoTerminalPlacement(ballastMiddle, powerRail), &consumption,
+			)
+		}
+	}
+
+	gateNode := nextNode()
+	baseNode := ""
+	levelDriveNode := ""
+	senseNode := references[0]
+	currentFeedbackNode := ""
+	if highSide {
+		baseNode = nextNode()
+		levelDriveNode = nextNode()
+	} else {
+		senseNode = nextNode()
+		currentFeedbackNode = nextNode()
+	}
+	if gateNode == "" || (highSide && (baseNode == "" || levelDriveNode == "")) || senseNode == "" ||
+		(!highSide && currentFeedbackNode == "") {
+		return nil, consumption, rejections
+	}
+	if highSide {
+		// Buffer the wired decision node before the bipolar level shifter. The
+		// comparators then see only a high-impedance feedback load, while the
+		// reviewed amplifier supplies the base current needed to discharge a
+		// high-side switch gate. This keeps threshold and hysteresis values
+		// independent of transistor beta and collector-base loading.
+		state = addRelationshipPrimitive(
+			state, requirement, inventoryByKey, opamp,
+			[]TerminalConnection{
+				{Terminal: "IN_PLUS", Node: insideNode},
+				{Terminal: "IN_MINUS", Node: levelDriveNode},
+				{Terminal: "OUT", Node: levelDriveNode},
+				{Terminal: "V_MINUS", Node: references[0]},
+				{Terminal: "V_PLUS", Node: driveSupply},
+			}, &consumption,
+		)
+		state = addRelationshipPrimitive(
+			state, requirement, inventoryByKey, levelShifter,
+			[]TerminalConnection{
+				{Terminal: "BASE", Node: baseNode},
+				{Terminal: "COLLECTOR", Node: gateNode},
+				{Terminal: "EMITTER", Node: references[0]},
+			}, &consumption,
+		)
+		state = addRelationshipPrimitive(
+			state, requirement, inventoryByKey, mosfet,
+			[]TerminalConnection{
+				{Terminal: "DRAIN", Node: output},
+				{Terminal: "GATE", Node: gateNode},
+				{Terminal: "SOURCE", Node: powerRail},
+			}, &consumption,
+		)
+		if gateClampRequired {
+			state = addRelationshipPrimitive(
+				state, requirement, inventoryByKey, gateClamp,
+				[]TerminalConnection{
+					{Terminal: "ANODE", Node: gateNode},
+					{Terminal: "CATHODE", Node: powerRail},
+				}, &consumption,
+			)
+		}
+	} else {
+		state = addRelationshipPrimitive(
+			state, requirement, inventoryByKey, opamp,
+			[]TerminalConnection{
+				{Terminal: "IN_PLUS", Node: insideNode},
+				{Terminal: "IN_MINUS", Node: currentFeedbackNode},
+				{Terminal: "OUT", Node: gateNode},
+				{Terminal: "V_MINUS", Node: references[0]},
+				{Terminal: "V_PLUS", Node: driveSupply},
+			}, &consumption,
+		)
+		state = addRelationshipPrimitive(
+			state, requirement, inventoryByKey, mosfet,
+			[]TerminalConnection{
+				{Terminal: "DRAIN", Node: output},
+				{Terminal: "GATE", Node: gateNode},
+				{Terminal: "SOURCE", Node: senseNode},
+			}, &consumption,
+		)
+	}
+	edges := [][2]string{}
+	gateReference := references[0]
+	if highSide {
+		edges = append(edges, [2]string{levelDriveNode, baseNode}, [2]string{powerRail, gateNode})
+		gateReference = powerRail
+	} else {
+		edges = append(
+			edges,
+			[2]string{gateNode, references[0]},
+			[2]string{senseNode, references[0]},
+			[2]string{senseNode, currentFeedbackNode},
+			[2]string{absoluteReference, currentFeedbackNode},
+		)
+	}
+	for _, edge := range edges {
+		state = addRelationshipPrimitive(
+			state, requirement, inventoryByKey, resistor,
+			topologyTwoTerminalPlacement(edge[0], edge[1]), &consumption,
+		)
+	}
+	capacitorEdges := [][2]string{{driveSupply, references[0]}}
+	if !highSide {
+		capacitorEdges = append(capacitorEdges, [2]string{gateReference, gateNode})
+	}
+	for _, edge := range capacitorEdges {
+		state = addRelationshipPrimitive(
+			state, requirement, inventoryByKey, capacitor,
+			topologyTwoTerminalPlacement(edge[0], edge[1]), &consumption,
+		)
+	}
+	flybackAnode, flybackCathode := output, powerRail
+	if highSide {
+		flybackAnode, flybackCathode = references[0], output
+	}
+	state = addRelationshipPrimitive(
+		state, requirement, inventoryByKey, flyback,
+		[]TerminalConnection{
+			{Terminal: "ANODE", Node: flybackAnode},
+			{Terminal: "CATHODE", Node: flybackCathode},
+		}, &consumption,
+	)
+	if len(state.graph.Instances) > limits.MaxPrimitiveInstances {
+		return nil, consumption, map[string][]string{
+			"graph_limit": {"windowed controlled power exceeds the bounded primitive limit"},
+		}
+	}
+	if issues := ValidateCompleteGraph(state.graph, inventory, limits); len(issues) != 0 {
+		for _, issue := range issues {
+			rejections[string(issue.Code)] = append(
+				rejections[string(issue.Code)], issue.Path+":"+issue.Message,
+			)
+		}
+		return nil, consumption, rejections
+	}
+	if state.score.BehaviorGap != 0 {
+		rejections["relationship_gap"] = append(
+			rejections["relationship_gap"], fmt.Sprintf(
+				"%s:gap=%d:decision=%d:switched_load=%d:absolute=%t",
+				state.hash,
+				state.score.BehaviorGap,
+				topologyDecisionStageGap(state.graph, 2, true, topologyDecisionPolarity(requirement)),
+				topologySwitchedLoadEnvelopeGap(requirement, state.graph, inventoryByKey),
+				topologyGraphHasAbsoluteDecisionReference(state.graph),
+			),
+		)
+		return nil, consumption, rejections
+	}
+	normalized, err := NormalizeGraph(state.graph)
+	if err != nil {
+		return nil, consumption, map[string][]string{"canonical_normalization_failed": {err.Error()}}
+	}
+	topologyHash, err := TopologyHash(normalized)
+	if err != nil {
+		return nil, consumption, map[string][]string{"canonical_topology_hash_failed": {err.Error()}}
+	}
+	consumption.CompleteGraphs++
+	return []TopologyCandidate{{
+		Fingerprint:  state.hash,
+		TopologyHash: topologyHash,
+		Score:        state.score,
+		Graph:        normalized,
+		Operations:   cloneGraphOperations(state.operations),
+	}}, consumption, rejections
+}
+
+// topologyMOSFETGateClampPrimitive requires gate protection when the declared
+// source-to-gate span consumes the design margin reserved below the absolute
+// catalog VGS limit. A reviewed bidirectional clamp is eligible only when its
+// modeled breakdown both exceeds the gate-on requirement and remains below the
+// reserved limit after the pull resistor's maximum available clamp current.
+func topologyMOSFETGateClampPrimitive(
+	inventory PrimitiveInventory,
+	mosfet PrimitiveCandidate,
+	maximumGateSpan float64,
+) (PrimitiveCandidate, bool) {
+	modelID := simmodel.PrimitiveNMOSSwitchV1
+	if mosfet.Kind == "p_channel_mosfet" {
+		modelID = simmodel.PrimitivePMOSSwitchV1
+	}
+	gateLimit := primitiveModelParameter(mosfet, modelID, "max_gate_source_voltage_v")
+	gateOn := primitiveModelParameter(mosfet, modelID, "gate_on_voltage_v")
+	if gateLimit <= 0 || gateOn <= 0 || maximumGateSpan <= .75*gateLimit {
+		return PrimitiveCandidate{}, false
+	}
+
+	const gatePullResistanceOhm = 10_000.0
+	type candidate struct {
+		primitive PrimitiveCandidate
+		breakdown float64
+	}
+	candidates := []candidate{}
+	for _, primitive := range inventory.Primitives {
+		if primitive.Kind != "clamp_diode" ||
+			!primitiveHasModel(primitive, simmodel.PrimitiveBidirectionalTVSV1) {
+			continue
+		}
+		breakdown := primitiveModelParameter(
+			primitive, simmodel.PrimitiveBidirectionalTVSV1, "breakdown_voltage_v",
+		)
+		dynamicResistance := primitiveModelParameter(
+			primitive, simmodel.PrimitiveBidirectionalTVSV1, "dynamic_resistance_ohm",
+		)
+		pulseLimit := primitiveModelParameter(
+			primitive, simmodel.PrimitiveBidirectionalTVSV1, "max_pulse_current_a",
+		)
+		maximumClampCurrent := maximumGateSpan / gatePullResistanceOhm
+		clampedVoltage := breakdown + maximumClampCurrent*dynamicResistance
+		if breakdown < 1.25*gateOn || dynamicResistance <= 0 ||
+			pulseLimit < maximumClampCurrent || clampedVoltage > .85*gateLimit {
+			continue
+		}
+		candidates = append(candidates, candidate{primitive: primitive, breakdown: breakdown})
+	}
+	slices.SortFunc(candidates, func(left, right candidate) int {
+		return cmp.Or(
+			cmp.Compare(
+				math.Abs(left.breakdown-.75*gateLimit),
+				math.Abs(right.breakdown-.75*gateLimit),
+			),
+			cmp.Compare(left.primitive.AreaMM2, right.primitive.AreaMM2),
+			cmp.Compare(left.primitive.Key, right.primitive.Key),
+		)
+	})
+	if len(candidates) == 0 {
+		return PrimitiveCandidate{}, true
+	}
+	return candidates[0].primitive, true
 }
 
 func topologyPrimitiveReferenceVoltage(primitive PrimitiveCandidate) (float64, bool) {

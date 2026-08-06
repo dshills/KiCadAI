@@ -784,20 +784,54 @@ func dcSweepDerivedValue(result AnalysisResult, assertion Assertion) (float64, *
 			return normalizedMNAFloat(transitions[0]), nil
 		}
 		return normalizedMNAFloat(transitions[len(transitions)-1]), nil
+	case QuantityHysteresisVoltageV:
+		return dcSweepHysteresis(result, assertion)
 	default:
 		forward, diagnostic := dcSweepTransition(result, assertion, dcSweepForward)
 		if diagnostic != nil {
 			return 0, diagnostic
 		}
-		if assertion.Quantity != QuantityHysteresisVoltageV {
-			return forward, nil
-		}
-		reverse, diagnostic := dcSweepTransition(result, assertion, dcSweepReverse)
-		if diagnostic != nil {
-			return 0, diagnostic
-		}
-		return normalizedMNAFloat(math.Abs(forward - reverse)), nil
+		return forward, nil
 	}
+}
+
+// dcSweepHysteresis pairs ordered forward and reverse decision boundaries.
+// Single-threshold decisions remain a one-pair special case. For a window or
+// other multi-boundary decision, the returned scalar deliberately exposes an
+// out-of-range boundary when one exists; a passing scalar therefore means
+// every paired boundary satisfies the assertion's hysteresis interval.
+func dcSweepHysteresis(result AnalysisResult, assertion Assertion) (float64, *Diagnostic) {
+	forward, diagnostic := dcSweepTransitions(result, assertion, dcSweepForward)
+	if diagnostic != nil {
+		return 0, diagnostic
+	}
+	reverse, diagnostic := dcSweepTransitions(result, assertion, dcSweepReverse)
+	if diagnostic != nil {
+		return 0, diagnostic
+	}
+	if len(forward) == 0 || len(forward) != len(reverse) {
+		return 0, advancedAssertionDiagnostic(
+			assertion,
+			fmt.Sprintf(
+				"DC hysteresis sweep requires matching unambiguous forward and reverse decision boundaries (forward=%d, reverse=%d)",
+				len(forward), len(reverse),
+			),
+		)
+	}
+	slices.Sort(forward)
+	slices.Sort(reverse)
+	minimum, maximum := math.Inf(1), 0.0
+	for index := range forward {
+		gap := math.Abs(forward[index] - reverse[index])
+		minimum, maximum = math.Min(minimum, gap), math.Max(maximum, gap)
+	}
+	if minimum < assertion.Min {
+		return normalizedMNAFloat(minimum), nil
+	}
+	if assertion.Max > 0 && maximum > assertion.Max {
+		return normalizedMNAFloat(maximum), nil
+	}
+	return normalizedMNAFloat(maximum), nil
 }
 
 func dcSweepTransition(result AnalysisResult, assertion Assertion, direction string) (float64, *Diagnostic) {

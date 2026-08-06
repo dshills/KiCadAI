@@ -10,6 +10,9 @@ import (
 
 type topologyRegulatedLoadRailPlan struct {
 	converter      PrimitiveCandidate
+	seriesCount    int
+	parallelCount  int
+	outputVoltageV float64
 	ballast        [2]PrimitiveCandidate
 	ballastValueSI [2]float64
 }
@@ -63,6 +66,8 @@ func topologyRegulatedLoadRail(
 	requiresThermalBound := topologyRequiresJunctionTemperatureBound(requirement)
 	type candidate struct {
 		primitive       PrimitiveCandidate
+		seriesCount     int
+		parallelCount   int
 		ballast         [2]PrimitiveCandidate
 		ballastValueSI  [2]float64
 		outputVoltageV  float64
@@ -96,58 +101,70 @@ func topologyRegulatedLoadRail(
 			outputVoltage > outputVoltageMaximum {
 			continue
 		}
-		minimumSeriesResistance := max(
-			0,
-			outputVoltage/currentMaximum-loadMinimum,
-			outputVoltage/maximumOutputCurrent-loadMinimum,
-		)
-		maximumSeriesResistance := outputVoltage/currentMinimum - loadMaximum
-		if inputCurrentMaximum > 0 {
-			maximumOutputPower := inputCurrentMaximum * inputMinimum * efficiency
-			if maximumOutputPower > 0 {
-				minimumSeriesResistance = math.Max(
-					minimumSeriesResistance,
-					outputVoltage*outputVoltage/maximumOutputPower-loadMinimum,
-				)
-			}
-		}
 		thermalOutputPower, thermalBounded := topologyConverterThermalOutputPower(
 			requirement, primitive, ambientMaximum, efficiency,
 		)
 		if requiresThermalBound && !thermalBounded {
 			continue
 		}
-		if thermalBounded {
-			minimumSeriesResistance = math.Max(
-				minimumSeriesResistance,
-				outputVoltage*outputVoltage/thermalOutputPower-loadMinimum,
-			)
+		for seriesCount := 1; seriesCount <= 4; seriesCount++ {
+			combinedVoltage := outputVoltage * float64(seriesCount)
+			if combinedVoltage > outputVoltageMaximum {
+				break
+			}
+			for parallelCount := 1; parallelCount <= 4; parallelCount++ {
+				parallel := float64(parallelCount)
+				minimumSeriesResistance := max(
+					0,
+					parallel*(combinedVoltage/currentMaximum-loadMinimum),
+					combinedVoltage/maximumOutputCurrent-parallel*loadMinimum,
+				)
+				maximumSeriesResistance := parallel * (combinedVoltage/currentMinimum - loadMaximum)
+				if inputCurrentMaximum > 0 {
+					maximumOutputPower := inputCurrentMaximum * inputMinimum * efficiency
+					if maximumOutputPower > 0 {
+						minimumSeriesResistance = math.Max(
+							minimumSeriesResistance,
+							parallel*(combinedVoltage*combinedVoltage/maximumOutputPower-loadMinimum),
+						)
+					}
+				}
+				if thermalBounded {
+					maximumOutputPower := thermalOutputPower * float64(seriesCount*parallelCount)
+					minimumSeriesResistance = math.Max(
+						minimumSeriesResistance,
+						parallel*(combinedVoltage*combinedVoltage/maximumOutputPower-loadMinimum),
+					)
+				}
+				if maximumSeriesResistance <= 0 ||
+					minimumSeriesResistance > maximumSeriesResistance {
+					continue
+				}
+				targetSeriesResistance := .5 * (math.Max(0, minimumSeriesResistance) + maximumSeriesResistance)
+				ballast, ballastValues, ballastFound := topologyRegulatedRailBallastPair(
+					requirement,
+					inventory,
+					combinedVoltage,
+					parallel*loadMinimum,
+					math.Max(0, minimumSeriesResistance),
+					maximumSeriesResistance,
+					targetSeriesResistance,
+				)
+				if !ballastFound {
+					continue
+				}
+				seriesResistance := ballastValues[0] + ballastValues[1]
+				maximumLoadCurrent := combinedVoltage /
+					(loadMinimum + seriesResistance/parallel)
+				candidates = append(candidates, candidate{
+					primitive: primitive, seriesCount: seriesCount, parallelCount: parallelCount,
+					ballast: ballast, ballastValueSI: ballastValues,
+					outputVoltageV:  combinedVoltage,
+					currentHeadroom: maximumOutputCurrent - maximumLoadCurrent/parallel,
+					ballastError:    math.Abs(seriesResistance-targetSeriesResistance) / targetSeriesResistance,
+				})
+			}
 		}
-		if maximumSeriesResistance <= 0 ||
-			minimumSeriesResistance > maximumSeriesResistance {
-			continue
-		}
-		targetSeriesResistance := .5 * (math.Max(0, minimumSeriesResistance) + maximumSeriesResistance)
-		ballast, ballastValues, ballastFound := topologyRegulatedRailBallastPair(
-			requirement,
-			inventory,
-			outputVoltage,
-			loadMinimum,
-			math.Max(0, minimumSeriesResistance),
-			maximumSeriesResistance,
-			targetSeriesResistance,
-		)
-		if !ballastFound {
-			continue
-		}
-		seriesResistance := ballastValues[0] + ballastValues[1]
-		maximumLoadCurrent := outputVoltage / (loadMinimum + seriesResistance)
-		candidates = append(candidates, candidate{
-			primitive: primitive, ballast: ballast, ballastValueSI: ballastValues,
-			outputVoltageV:  outputVoltage,
-			currentHeadroom: maximumOutputCurrent - maximumLoadCurrent,
-			ballastError:    math.Abs(seriesResistance-targetSeriesResistance) / targetSeriesResistance,
-		})
 	}
 	if len(candidates) == 0 {
 		return topologyRegulatedLoadRailPlan{}, false
@@ -155,6 +172,10 @@ func topologyRegulatedLoadRail(
 	slices.SortFunc(candidates, func(left, right candidate) int {
 		return cmp.Or(
 			cmp.Compare(left.outputVoltageV, right.outputVoltageV),
+			cmp.Compare(
+				left.seriesCount*left.parallelCount,
+				right.seriesCount*right.parallelCount,
+			),
 			cmp.Compare(left.ballastError, right.ballastError),
 			cmp.Compare(left.currentHeadroom, right.currentHeadroom),
 			cmp.Compare(
@@ -166,6 +187,9 @@ func topologyRegulatedLoadRail(
 	})
 	return topologyRegulatedLoadRailPlan{
 		converter:      candidates[0].primitive,
+		seriesCount:    candidates[0].seriesCount,
+		parallelCount:  candidates[0].parallelCount,
+		outputVoltageV: candidates[0].outputVoltageV,
 		ballast:        candidates[0].ballast,
 		ballastValueSI: candidates[0].ballastValueSI,
 	}, true
@@ -333,6 +357,8 @@ func deriveRegulatedLoadRailTopologyScales(
 		switch candidate.Kind {
 		case "isolated_converter":
 			converterOutputs[terminals["VOUT_PLUS"]] = true
+		case "p_channel_mosfet":
+			loadRails[terminals["SOURCE"]] = true
 		case "signal_diode":
 			loadRails[terminals["CATHODE"]] = true
 		}
@@ -386,6 +412,11 @@ func topologySwitchedLoadEnvelopeGap(
 		if !loadFound || !currentFound {
 			continue
 		}
+		referenceNodes := topologyNodesByRole(graph, "reference")
+		if len(referenceNodes) == 1 &&
+			topologyGraphHasLowSideCurrentRegulation(graph, outputNode.ID, referenceNodes[0]) {
+			continue
+		}
 		reference := ""
 		for _, instance := range graph.Instances {
 			if instance.Kind != "n_channel_mosfet" {
@@ -416,6 +447,69 @@ func topologySwitchedLoadEnvelopeGap(
 	return 0
 }
 
+func topologyGraphHasLowSideCurrentRegulation(
+	graph CandidateGraph,
+	output string,
+	reference string,
+) bool {
+	if output == "" || reference == "" {
+		return false
+	}
+	for _, instance := range graph.Instances {
+		if instance.Kind != "n_channel_mosfet" {
+			continue
+		}
+		terminals := topologyTerminalNodes(instance)
+		sense := terminals["SOURCE"]
+		if terminals["DRAIN"] != output || sense == "" || sense == reference {
+			continue
+		}
+		hasSenseReturn := false
+		for _, candidate := range graph.Instances {
+			if candidate.Kind != "resistor" || len(candidate.Terminals) != 2 {
+				continue
+			}
+			left, right := candidate.Terminals[0].Node, candidate.Terminals[1].Node
+			if left == sense && right == reference || right == sense && left == reference {
+				hasSenseReturn = true
+				break
+			}
+		}
+		if !hasSenseReturn {
+			continue
+		}
+		gate := terminals["GATE"]
+		for _, controller := range graph.Instances {
+			if controller.Kind != "opamp" {
+				continue
+			}
+			controllerTerminals := topologyTerminalNodes(controller)
+			feedback := controllerTerminals["IN_MINUS"]
+			feedbackObservesSense := feedback == sense
+			feedbackHasReferenceBias := feedback == sense
+			if feedback != "" && feedback != sense {
+				for _, candidate := range graph.Instances {
+					if candidate.Kind != "resistor" || len(candidate.Terminals) != 2 {
+						continue
+					}
+					left, right := candidate.Terminals[0].Node, candidate.Terminals[1].Node
+					feedbackObservesSense = feedbackObservesSense ||
+						(left == feedback && right == sense || right == feedback && left == sense)
+					feedbackHasReferenceBias = feedbackHasReferenceBias ||
+						(left == feedback && right != sense || right == feedback && left != sense)
+				}
+			}
+			if controllerTerminals["OUT"] == gate &&
+				feedbackObservesSense && feedbackHasReferenceBias &&
+				controllerTerminals["IN_PLUS"] != "" &&
+				controllerTerminals["IN_PLUS"] != sense {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 func topologyLoadRailEnvelope(
 	requirement Requirement,
 	graph CandidateGraph,
@@ -426,61 +520,106 @@ func topologyLoadRailEnvelope(
 		return minimum, maximum, 0, true
 	}
 	type edge struct {
-		left, right string
-		resistance  float64
+		from, to   string
+		voltage    float64
+		resistance float64
 	}
 	edges := []edge{}
 	for _, instance := range graph.Instances {
-		if instance.Kind != "resistor" || instance.ValueSI == nil || *instance.ValueSI <= 0 ||
-			len(instance.Terminals) != 2 {
-			continue
+		switch instance.Kind {
+		case "resistor":
+			if instance.ValueSI == nil || *instance.ValueSI <= 0 || len(instance.Terminals) != 2 {
+				continue
+			}
+			left, right := instance.Terminals[0].Node, instance.Terminals[1].Node
+			edges = append(
+				edges,
+				edge{from: left, to: right, resistance: *instance.ValueSI},
+				edge{from: right, to: left, resistance: *instance.ValueSI},
+			)
+		case "isolated_converter":
+			voltage := primitiveModelParameter(
+				inventory[instance.PrimitiveKey],
+				simmodel.PrimitiveProtectedIsolatedConverterV1,
+				"output_voltage_v",
+			)
+			terminals := topologyTerminalNodes(instance)
+			if voltage <= 0 || terminals["VOUT_MINUS"] == "" || terminals["VOUT_PLUS"] == "" {
+				continue
+			}
+			edges = append(edges, edge{
+				from: terminals["VOUT_MINUS"], to: terminals["VOUT_PLUS"], voltage: voltage,
+			})
 		}
-		edges = append(edges, edge{
-			left: instance.Terminals[0].Node, right: instance.Terminals[1].Node,
-			resistance: *instance.ValueSI,
+	}
+	adjacency := map[string][]edge{}
+	for _, candidate := range edges {
+		adjacency[candidate.from] = append(adjacency[candidate.from], candidate)
+	}
+	for node := range adjacency {
+		slices.SortFunc(adjacency[node], func(left, right edge) int {
+			return cmp.Or(
+				cmp.Compare(left.to, right.to),
+				cmp.Compare(left.voltage, right.voltage),
+				cmp.Compare(left.resistance, right.resistance),
+			)
 		})
 	}
-	bestVoltage, bestResistance := 0.0, math.Inf(1)
-	for _, instance := range graph.Instances {
-		if instance.Kind != "isolated_converter" {
-			continue
-		}
-		primitive := inventory[instance.PrimitiveKey]
-		voltage := primitiveModelParameter(
-			primitive, simmodel.PrimitiveProtectedIsolatedConverterV1, "output_voltage_v",
-		)
-		start := topologyTerminalNodes(instance)["VOUT_PLUS"]
-		if voltage <= 0 || start == "" {
-			continue
-		}
-		distance := map[string]float64{start: 0}
-		for range graph.Nodes {
-			changed := false
-			for _, edge := range edges {
-				if left, found := distance[edge.left]; found {
-					candidate := left + edge.resistance
-					if right, exists := distance[edge.right]; !exists || candidate < right {
-						distance[edge.right] = candidate
-						changed = true
-					}
-				}
-				if right, found := distance[edge.right]; found {
-					candidate := right + edge.resistance
-					if left, exists := distance[edge.left]; !exists || candidate < left {
-						distance[edge.left] = candidate
-						changed = true
-					}
-				}
+	type path struct {
+		voltage, resistance float64
+	}
+	paths := []path{}
+	visited := map[string]bool{}
+	references := topologyNodesByRole(graph, "reference")
+	for _, reference := range references {
+		// All reference nodes form one virtual source boundary. Marking every
+		// reference visited prevents a resistor or other passive tie between
+		// equivalent references from rediscovering a powered branch.
+		visited[reference] = true
+	}
+	var walk func(string, float64, float64)
+	walk = func(node string, voltage, resistance float64) {
+		if node == rail {
+			if voltage > 0 && resistance > 0 {
+				paths = append(paths, path{voltage: voltage, resistance: resistance})
 			}
-			if !changed {
-				break
-			}
+			return
 		}
-		if resistance, found := distance[rail]; found && resistance < bestResistance {
-			bestVoltage, bestResistance = voltage, resistance
+		if len(visited) > len(graph.Nodes) {
+			return
+		}
+		for _, candidate := range adjacency[node] {
+			if visited[candidate.to] {
+				continue
+			}
+			visited[candidate.to] = true
+			walk(
+				candidate.to,
+				voltage+candidate.voltage,
+				resistance+candidate.resistance,
+			)
+			delete(visited, candidate.to)
 		}
 	}
-	return bestVoltage, bestVoltage, bestResistance, bestVoltage > 0 && finite(bestResistance)
+	for _, reference := range references {
+		walk(reference, 0, 0)
+	}
+	conductanceByVoltage := map[float64]float64{}
+	for _, candidate := range paths {
+		conductanceByVoltage[candidate.voltage] += 1 / candidate.resistance
+	}
+	voltages := make([]float64, 0, len(conductanceByVoltage))
+	for voltage := range conductanceByVoltage {
+		voltages = append(voltages, voltage)
+	}
+	slices.Sort(voltages)
+	for _, voltage := range voltages {
+		conductance := conductanceByVoltage[voltage]
+		if voltage > 0 && conductance > 0 {
+			return voltage, voltage, 1 / conductance, true
+		}
+	}
+	return 0, 0, 0, false
 }
 
 func topologyLoadResistanceEnvelope(

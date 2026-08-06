@@ -2003,6 +2003,11 @@ func loadHarnessNodes(
 	target GraphNode,
 	reference string,
 ) (string, string) {
+	if topologyGraphHasLowSideCurrentRegulation(graph, target.ID, reference) {
+		if supply, found := dominantSupplyNode(requirement, graph); found {
+			return supply.ID, target.ID
+		}
+	}
 	for _, instance := range graph.Instances {
 		if instance.Kind != "n_channel_mosfet" {
 			continue
