@@ -2569,7 +2569,14 @@ func simulationEffectiveExcitation(
 		result := *assertion.Excitation
 		return &result
 	}
-	if assertion.Analysis != simmodel.AnalysisTransient &&
+	if assertion.Analysis == "dc_sweep" {
+		switch assertion.Metric {
+		case "hysteresis", "rising_threshold", "falling_threshold",
+			"threshold_voltage", "threshold_current", "lower_threshold", "upper_threshold":
+		default:
+			return nil
+		}
+	} else if assertion.Analysis != simmodel.AnalysisTransient &&
 		assertion.Analysis != simmodel.AnalysisDistortion &&
 		assertion.Analysis != simmodel.AnalysisElectrothermal {
 		return nil
@@ -2915,13 +2922,13 @@ func sweepSourceAndRange(
 	corner operatingCorner,
 	graph CandidateGraph,
 ) (string, float64, float64, bool) {
-	if assertion.Excitation != nil {
-		source := sourceInstanceForObservation(graph, *assertion.Excitation)
+	if excitation := simulationEffectiveExcitation(assertion, graph); excitation != nil {
+		source := sourceInstanceForObservation(graph, *excitation)
 		excitationTarget := ""
 		excitationAxis := ""
 		for _, condition := range operatingCase.Conditions {
 			target, found := externalNodeForSemanticTarget(graph, condition.Target)
-			if found && observationMatchesNode(target, *assertion.Excitation) &&
+			if found && observationMatchesNode(target, *excitation) &&
 				(condition.Axis == "input_voltage" || condition.Axis == "supply_voltage") {
 				if condition.Max > condition.Min {
 					return source, condition.Min, condition.Max, true

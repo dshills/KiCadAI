@@ -4484,6 +4484,10 @@ func topologyControlledSwitchRelationshipSeeds(
 	if !topologyControlledSwitchRequired(requirement) {
 		return nil, Consumption{}, map[string][]string{}
 	}
+	decisionStages, requireDecisionFeedback := topologyDecisionObligation(requirement)
+	if decisionStages > 1 {
+		return nil, Consumption{}, map[string][]string{}
+	}
 	var comparator, mosfet, resistor PrimitiveCandidate
 	for _, primitive := range representatives {
 		switch primitive.Kind {
@@ -4495,12 +4499,15 @@ func topologyControlledSwitchRelationshipSeeds(
 			resistor = primitive
 		}
 	}
+	if rated := topologyRatedPowerPrimitive(requirement, inventory, "n_channel_mosfet"); rated.Key != "" {
+		mosfet = rated
+	}
 	flyback := topologyFlybackDiodePrimitive(requirement, inventory)
 	if comparator.Key == "" || mosfet.Key == "" ||
 		resistor.Key == "" || flyback.Key == "" {
 		return nil, Consumption{}, map[string][]string{}
 	}
-	controls := topologyNodesByRole(initial.graph, "control")
+	controls := topologyControlNodes(requirement, initial.graph)
 	outputs := topologyNodesByRole(initial.graph, "output")
 	supplies := topologyNodesByRole(initial.graph, "supply")
 	references := topologyNodesByRole(initial.graph, "reference")
@@ -4549,20 +4556,26 @@ func topologyControlledSwitchRelationshipSeeds(
 							}
 							consumption.ExpandedStates++
 							state := initial
-							var gateNode, thresholdNode string
+							var gateNode, thresholdNode, signalNode string
 							state, gateNode = addRelationshipInternalNode(
 								state, requirement, inventoryByKey, &consumption,
 							)
 							state, thresholdNode = addRelationshipInternalNode(
 								state, requirement, inventoryByKey, &consumption,
 							)
-							if gateNode == "" || thresholdNode == "" ||
+							signalNode = control
+							if requireDecisionFeedback {
+								state, signalNode = addRelationshipInternalNode(
+									state, requirement, inventoryByKey, &consumption,
+								)
+							}
+							if gateNode == "" || thresholdNode == "" || signalNode == "" ||
 								internalNodeCount(state.graph) > limits.MaxInternalNodes {
 								continue
 							}
-							inPlus, inMinus := thresholdNode, control
+							inPlus, inMinus := thresholdNode, signalNode
 							if polarity > 0 {
-								inPlus, inMinus = control, thresholdNode
+								inPlus, inMinus = signalNode, thresholdNode
 							}
 							state = addRelationshipPrimitive(
 								state,
@@ -4604,6 +4617,25 @@ func topologyControlledSwitchRelationshipSeeds(
 									topologyTwoTerminalPlacement(edge[0], edge[1]),
 									&consumption,
 								)
+							}
+							if requireDecisionFeedback {
+								feedbackNode := signalNode
+								if polarity < 0 {
+									feedbackNode = thresholdNode
+								}
+								for _, edge := range [][2]string{
+									{signalNode, control},
+									{feedbackNode, gateNode},
+								} {
+									state = addRelationshipPrimitive(
+										state,
+										requirement,
+										inventoryByKey,
+										resistor,
+										topologyTwoTerminalPlacement(edge[0], edge[1]),
+										&consumption,
+									)
+								}
 							}
 							state = addRelationshipPrimitive(
 								state,
@@ -4771,7 +4803,8 @@ func topologyControlledSwitchRequired(requirement Requirement) bool {
 		case "off_state_current", "on_state_voltage", "propagation_delay", "startup_current":
 			if assertion.Excitation != nil &&
 				assertion.Excitation.Kind == "port" &&
-				requirementPortIsControl(requirement, assertion.Excitation.ID) {
+				(requirementPortIsControl(requirement, assertion.Excitation.ID) ||
+					requirementPortDrivesDecision(requirement, assertion.Excitation.ID)) {
 				return true
 			}
 			for _, operatingCaseID := range assertion.OperatingCases {
@@ -4781,7 +4814,8 @@ func topologyControlledSwitchRequired(requirement Requirement) bool {
 					}
 					for _, condition := range operatingCase.Conditions {
 						if condition.Axis == "input_voltage" &&
-							requirementPortIsControl(requirement, condition.Target) {
+							(requirementPortIsControl(requirement, condition.Target) ||
+								requirementPortDrivesDecision(requirement, condition.Target)) {
 							return true
 						}
 					}
@@ -7039,6 +7073,36 @@ func requirementPortIsControl(requirement Requirement, id string) bool {
 	return false
 }
 
+func requirementPortDrivesDecision(requirement Requirement, id string) bool {
+	for _, assertion := range requirement.Requirements.BehavioralRequirements {
+		if assertion.Excitation == nil || assertion.Excitation.Kind != "port" ||
+			assertion.Excitation.ID != id {
+			continue
+		}
+		switch assertion.Metric {
+		case "hysteresis", "rising_threshold", "falling_threshold",
+			"threshold_voltage", "threshold_current", "lower_threshold", "upper_threshold":
+			return true
+		}
+	}
+	return false
+}
+
+func topologyControlNodes(requirement Requirement, graph CandidateGraph) []string {
+	result := []string{}
+	for _, node := range graph.Nodes {
+		if node.Scope != "external" || (node.Role != "control" && node.Role != "input") {
+			continue
+		}
+		if node.Role == "control" || requirementPortIsControl(requirement, node.SemanticID) ||
+			requirementPortDrivesDecision(requirement, node.SemanticID) {
+			result = append(result, node.ID)
+		}
+	}
+	slices.Sort(result)
+	return result
+}
+
 func topologyGraphHasAnalogTransfer(graph CandidateGraph) bool {
 	signalAdjacency := topologyPassiveNodeAdjacency(graph, false)
 	inputs := topologyNodesByRole(graph, "input", "control")
@@ -7725,13 +7789,13 @@ func topologyDecisionStageGap(
 }
 
 // topologyDecisionCompositionAdjacency augments passive connectivity with
-// decision-stage signal paths so a comparator feeding another comparator is
-// recognized as a composed behavioral path. The composition view is
-// intentionally undirected because topologyDecisionStageGap queries it from
-// both external boundaries: forward from a stage output and backward from a
-// stage input. Terminal polarity is checked per stage, while feedback
-// validation remains on the passive-only graph and therefore still requires
-// an explicit branch.
+// active causal paths so a decision feeding another decision or a controlled
+// power device is recognized as a composed behavioral path. The composition
+// view is intentionally undirected because topologyDecisionStageGap queries it
+// from both external boundaries: forward from a stage output and backward from
+// a stage input. Terminal polarity is checked per decision stage, while
+// feedback validation remains on the passive-only graph and therefore still
+// requires an explicit branch.
 func topologyDecisionCompositionAdjacency(
 	graph CandidateGraph,
 	passive map[string][]string,
@@ -7748,12 +7812,18 @@ func topologyDecisionCompositionAdjacency(
 		result[right] = append(result[right], left)
 	}
 	for _, instance := range graph.Instances {
-		if instance.Kind != "comparator" && instance.Kind != "opamp" {
-			continue
-		}
 		terminals := topologyTerminalNodes(instance)
-		add(terminals["IN_PLUS"], terminals["OUT"])
-		add(terminals["IN_MINUS"], terminals["OUT"])
+		switch instance.Kind {
+		case "comparator", "opamp":
+			add(terminals["IN_PLUS"], terminals["OUT"])
+			add(terminals["IN_MINUS"], terminals["OUT"])
+		case "n_channel_mosfet", "p_channel_mosfet":
+			add(terminals["GATE"], terminals["DRAIN"])
+			add(terminals["GATE"], terminals["SOURCE"])
+		case "npn_bjt", "pnp_bjt":
+			add(terminals["BASE"], terminals["COLLECTOR"])
+			add(terminals["BASE"], terminals["EMITTER"])
+		}
 	}
 	for node, neighbors := range result {
 		slices.Sort(neighbors)
