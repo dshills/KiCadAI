@@ -1,7 +1,8 @@
 # Implementation Plan
 
-Implementation status: phase 0 in progress. The frozen corpus and contract are
-established before any production behavior changes.
+Implementation status: phases 0 and 1 complete. The corpus was independently
+frozen at `a5effe06`; the two-run public-CLI baseline is checksum-bound in
+`BASELINE_REPORT.json`. No production behavior has changed. Phase 2 is next.
 
 ## Phase 0 — Freeze The Independent Corpus
 
@@ -20,6 +21,13 @@ established before any production behavior changes.
   replay evidence.
 - Cluster failures by reusable missing relationship, analysis, safety,
   diagnosis, lowering, or physical capability.
+
+Measured result: all 26 invocations were byte-identical by case and emitted no
+project files. Three valid cases lack a complete multi-stage decision graph;
+six valid cases reach complete graphs but exhaust evaluation without repair;
+and all four adversarial cases fail closed without the required precise safety
+or capability classification. These are the three primary implementation
+clusters, in that order.
 
 ## Phase 2 — Generic Multi-Stage Architecture Composition
 
