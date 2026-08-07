@@ -32,6 +32,7 @@ type PhysicalLoweringResult struct {
 	Resolved        circuitgraph.ResolvedDocument `json:"resolved"`
 	DesignRequest   designworkflow.Request        `json:"design_request"`
 	Bindings        []PhysicalSemanticBinding     `json:"bindings"`
+	Placement       []PhysicalPlacementEvidence   `json:"placement_evidence,omitempty"`
 	Issues          []reports.Issue               `json:"issues"`
 	Hash            string                        `json:"hash"`
 }
@@ -45,4 +46,25 @@ type PhysicalSemanticBinding struct {
 	CatalogID   string `json:"catalog_id,omitempty"`
 	VariantID   string `json:"variant_id,omitempty"`
 	EvidenceSHA string `json:"evidence_sha256"`
+}
+
+type PhysicalPlacementEvidence struct {
+	Kind                string               `json:"kind"`
+	Component           string               `json:"component,omitempty"`
+	Region              string               `json:"region"`
+	Role                string               `json:"role"`
+	Bounds              *circuitgraph.Bounds `json:"bounds,omitempty"`
+	Members             []string             `json:"members,omitempty"`
+	Edge                circuitgraph.Side    `json:"edge,omitempty"`
+	CatalogID           string               `json:"catalog_id,omitempty"`
+	VariantID           string               `json:"variant_id,omitempty"`
+	PackageType         string               `json:"package_type,omitempty"`
+	ThermalPathID       string               `json:"thermal_path_id,omitempty"`
+	ThermalPathCPerW    float64              `json:"thermal_path_c_per_w,omitempty"`
+	KeepAwayRole        string               `json:"keep_away_role,omitempty"`
+	MinimumClearanceMM  float64              `json:"minimum_clearance_mm,omitempty"`
+	BoardEdgeRequired   bool                 `json:"board_edge_required,omitempty"`
+	PreferThermalCopper bool                 `json:"prefer_thermal_copper,omitempty"`
+	Rationale           string               `json:"rationale"`
+	EvidenceSHA         string               `json:"evidence_sha256"`
 }

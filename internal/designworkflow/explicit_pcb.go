@@ -56,6 +56,9 @@ func PlaceExplicitCircuit(ctx context.Context, request Request, opts PlacementOp
 				Transforms: []string{"translate"}, Constraints: []string{"catalog_resolved"},
 			},
 		})
+		if rule, ok := explicitThermalPlacementRule(component); ok {
+			placementRequest.AdvancedRules.Thermal = append(placementRequest.AdvancedRules.Thermal, rule)
+		}
 	}
 	for _, net := range request.ExplicitCircuit.Nets {
 		entry := placement.Net{Name: net.Name, Role: explicitPlacementNetRole(net.Role), Weight: explicitNetWeight(net), WidthClass: net.NetClass}
@@ -138,6 +141,26 @@ func PlaceExplicitCircuit(ctx context.Context, request Request, opts PlacementOp
 		stage.Status = StageStatusWarning
 	}
 	return PlacementStageResult{Request: placementRequest, Result: result, Stage: stage}
+}
+
+func explicitThermalPlacementRule(component ExplicitComponentSpec) (placement.ThermalPlacementRule, bool) {
+	thermalRole := strings.TrimSpace(component.Placement.ThermalRole)
+	if thermalRole == "" {
+		return placement.ThermalPlacementRule{}, false
+	}
+	thermalPathID := strings.TrimSpace(component.Placement.ThermalPathID)
+	var keepAwayRoles []string
+	if role := strings.TrimSpace(component.Placement.ThermalKeepAwayRole); role != "" {
+		keepAwayRoles = []string{role}
+	}
+	return placement.ThermalPlacementRule{
+		ID: "explicit.thermal." + component.ID, Source: "catalog_thermal_path:" + thermalPathID,
+		Refs: []string{component.Reference}, ThermalRole: placement.ThermalRole(thermalRole),
+		PreferredEdge: explicitPlacementEdge(component.Placement.Edge), PreferredRegion: component.Placement.Region,
+		KeepAwayRoles: keepAwayRoles, MinDistanceMM: component.Placement.ThermalClearanceMM,
+		PreferCopper: component.Placement.PreferThermalCopper, Severity: placement.AdvancedRuleSeverityError,
+		Enforcement: placement.AdvancedRuleHard,
+	}, true
 }
 
 func explicitUnplacedRefs(result placement.Result) []string {

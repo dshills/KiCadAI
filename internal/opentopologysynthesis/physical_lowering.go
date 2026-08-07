@@ -90,6 +90,12 @@ func LowerPassingCandidate(
 	}
 	document = circuitgraph.Normalize(document)
 	result.Document = document
+	result.Placement, lowerIssues = physicalPlacementEvidence(document, environment.Catalog)
+	result.Bindings = append(result.Bindings, physicalPlacementBindings(result.Placement)...)
+	if len(lowerIssues) != 0 {
+		result.Issues = lowerIssues
+		return finalizePhysicalLowering(result)
+	}
 	if issues := circuitgraph.Validate(document); len(issues) != 0 {
 		result.Issues = issues
 		return finalizePhysicalLowering(result)
@@ -112,6 +118,9 @@ func LowerPassingCandidate(
 		// pad escapes receive the normal constrained-endpoint routing schedule.
 		request.ExplicitCircuit.RoutingPolicy = designworkflow.ExplicitRoutingPolicyConstrainedEndpointAccessV1
 	}
+	applyPhysicalPlacementEvidence(&request, result.Placement)
+	request = designworkflow.NormalizeRequest(request)
+	requestIssues = append(requestIssues, designworkflow.ValidateRequest(request)...)
 	result.DesignRequest = request
 	if len(requestIssues) != 0 {
 		result.Issues = requestIssues
@@ -311,7 +320,7 @@ func lowerCandidateDocument(
 	issues = append(issues, supportIssues...)
 	document.Schematic = physicalSchematicIntent(graph)
 	appendPhysicalSupportSchematicIntent(&document.Schematic, supportGroups)
-	document.PCB = physicalPCBIntent(document.Project.Board, document.Components, document.Nets)
+	document.PCB = physicalPCBIntent(document.Project.Board, document.Components, document.Nets, document.Schematic, catalog)
 	applyPhysicalSupportPCBIntent(&document.PCB, supportGroups)
 	return document, bindings, reports.SortedIssues(issues)
 }
@@ -1171,36 +1180,6 @@ func physicalGraphDistances(roots []string, neighbors map[string]map[string]stru
 		}
 	}
 	return distance
-}
-
-func physicalPCBIntent(board circuitgraph.Board, components []circuitgraph.Component, nets []circuitgraph.Net) circuitgraph.PCBIntent {
-	region := circuitgraph.PCBRegion{
-		ID: "synthesized_circuit", Role: "signal",
-		Bounds: circuitgraph.Bounds{XMM: 0, YMM: 0, WidthMM: board.WidthMM, HeightMM: board.HeightMM},
-	}
-	placements := make([]circuitgraph.PCBPlacement, 0, len(components))
-	for _, component := range components {
-		priority := 80
-		if component.Role == circuitgraph.RoleInputConnector || component.Role == circuitgraph.RoleOutputConnector {
-			priority = 100
-		}
-		placements = append(placements, circuitgraph.PCBPlacement{Component: component.ID, Region: region.ID, Priority: priority})
-	}
-	intent := circuitgraph.PCBIntent{
-		Regions: []circuitgraph.PCBRegion{region}, Placements: placements,
-		Keepouts: []circuitgraph.PCBKeepout{}, Zones: []circuitgraph.PCBZone{},
-	}
-	if board.Layers != 4 {
-		return intent
-	}
-	if reference := physicalPlaneNet(nets, circuitgraph.NetRoleGround, circuitgraph.NetRoleReturn); reference != "" {
-		intent.Zones = append(intent.Zones, circuitgraph.PCBZone{Net: reference, Layers: []string{"In1.Cu"}, ClearanceMM: .2})
-	}
-	powerNets := physicalPlaneNets(nets, circuitgraph.NetRolePower, circuitgraph.NetRolePowerPos, circuitgraph.NetRolePowerNeg)
-	if len(powerNets) == 1 {
-		intent.Zones = append(intent.Zones, circuitgraph.PCBZone{Net: powerNets[0], Layers: []string{"In2.Cu"}, ClearanceMM: .2})
-	}
-	return intent
 }
 
 func physicalPlaneNet(nets []circuitgraph.Net, roles ...circuitgraph.NetRole) string {

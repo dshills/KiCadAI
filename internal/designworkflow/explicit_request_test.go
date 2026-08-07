@@ -176,6 +176,52 @@ func TestValidateRequestRejectsExplicitPCBIntentOutsideBoard(t *testing.T) {
 	}
 }
 
+func TestValidateRequestRequiresCompleteThermalPlacementEvidence(t *testing.T) {
+	request := validExplicitCircuitRequest()
+	request.ExplicitCircuit.Regions = []ExplicitRegionSpec{{ID: "power", Role: "power", WidthMM: 30, HeightMM: 20}}
+	request.ExplicitCircuit.Components[0].Placement = ExplicitPlacementSpec{
+		Region: "power", Edge: "top", ThermalRole: "heat_source", ThermalPathID: "thermal_path.reviewed",
+		ThermalPackage: "to220", ThermalPathCPerW: 2.45,
+		ThermalClearanceMM: 7, ThermalKeepAwayRole: "sensor", ThermalEdgeRequired: true, PreferThermalCopper: true,
+	}
+	if issues := ValidateRequest(request); reports.HasBlockingIssue(issues) {
+		t.Fatalf("complete thermal placement evidence issues = %#v", issues)
+	}
+	interior := request
+	interior.ExplicitCircuit = cloneExplicitCircuit(request.ExplicitCircuit)
+	interior.ExplicitCircuit.Components[0].Placement.Edge = ""
+	interior.ExplicitCircuit.Components[0].Placement.ThermalEdgeRequired = false
+	if issues := ValidateRequest(interior); reports.HasBlockingIssue(issues) {
+		t.Fatalf("interior thermal placement was forced to a board edge: %#v", issues)
+	}
+	missingEdge := request
+	missingEdge.ExplicitCircuit = cloneExplicitCircuit(request.ExplicitCircuit)
+	missingEdge.ExplicitCircuit.Components[0].Placement.Edge = ""
+	if issues := ValidateRequest(missingEdge); !hasDesignWorkflowIssuePath(issues, "explicit_circuit.components[0].placement.edge") {
+		t.Fatalf("required thermal board edge issues = %#v", issues)
+	}
+
+	missingPath := request
+	missingPath.ExplicitCircuit = cloneExplicitCircuit(request.ExplicitCircuit)
+	missingPath.ExplicitCircuit.Components[0].Placement.ThermalPathID = "  "
+	if issues := ValidateRequest(missingPath); !hasDesignWorkflowIssuePath(issues, "explicit_circuit.components[0].placement.thermal_path_id") {
+		t.Fatalf("missing thermal path issues = %#v", issues)
+	}
+	missingPackage := request
+	missingPackage.ExplicitCircuit = cloneExplicitCircuit(request.ExplicitCircuit)
+	missingPackage.ExplicitCircuit.Components[0].Placement.ThermalPackage = "  "
+	if issues := ValidateRequest(missingPackage); !hasDesignWorkflowIssuePath(issues, "explicit_circuit.components[0].placement.thermal_package") {
+		t.Fatalf("missing thermal package issues = %#v", issues)
+	}
+
+	withoutRole := request
+	withoutRole.ExplicitCircuit = cloneExplicitCircuit(request.ExplicitCircuit)
+	withoutRole.ExplicitCircuit.Components[0].Placement.ThermalRole = ""
+	if issues := ValidateRequest(withoutRole); !hasDesignWorkflowIssuePath(issues, "explicit_circuit.components[0].placement.thermal_role") {
+		t.Fatalf("unbound thermal evidence issues = %#v", issues)
+	}
+}
+
 func TestValidateRequestAcceptsMultipleSchematicUnitsOwnedByOnePhysicalComponent(t *testing.T) {
 	request := validExplicitCircuitRequest()
 	physical := request.ExplicitCircuit.Components[0]

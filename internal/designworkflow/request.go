@@ -16,6 +16,7 @@ import (
 	"kicadai/internal/closedloopsynthesis"
 	"kicadai/internal/components"
 	"kicadai/internal/domain"
+	"kicadai/internal/placement"
 	"kicadai/internal/reports"
 	"kicadai/internal/schematicir"
 	"kicadai/internal/simmodel"
@@ -124,11 +125,19 @@ type ExplicitNetEndpoint struct {
 }
 
 type ExplicitPlacementSpec struct {
-	Region        string  `json:"region,omitempty"`
-	Near          string  `json:"near,omitempty"`
-	Edge          string  `json:"edge,omitempty"`
-	Priority      int     `json:"priority,omitempty"`
-	MaxDistanceMM float64 `json:"max_distance_mm,omitempty"`
+	Region              string  `json:"region,omitempty"`
+	Near                string  `json:"near,omitempty"`
+	Edge                string  `json:"edge,omitempty"`
+	Priority            int     `json:"priority,omitempty"`
+	MaxDistanceMM       float64 `json:"max_distance_mm,omitempty"`
+	ThermalRole         string  `json:"thermal_role,omitempty"`
+	ThermalPathID       string  `json:"thermal_path_id,omitempty"`
+	ThermalPackage      string  `json:"thermal_package,omitempty"`
+	ThermalPathCPerW    float64 `json:"thermal_path_c_per_w,omitempty"`
+	ThermalClearanceMM  float64 `json:"thermal_clearance_mm,omitempty"`
+	ThermalKeepAwayRole string  `json:"thermal_keep_away_role,omitempty"`
+	ThermalEdgeRequired bool    `json:"thermal_edge_required,omitempty"`
+	PreferThermalCopper bool    `json:"prefer_thermal_copper,omitempty"`
 }
 
 type ExplicitRegionSpec struct {
@@ -771,6 +780,7 @@ func validateExplicitCircuit(circuit ExplicitCircuitSpec) []reports.Issue {
 	for index, component := range circuit.Components {
 		path := fmt.Sprintf("explicit_circuit.components[%d].placement", index)
 		placement := component.Placement
+		thermalRole := strings.TrimSpace(placement.ThermalRole)
 		if placement.Region != "" {
 			if _, exists := regions[placement.Region]; !exists {
 				issues = append(issues, issue(path+".region", "placement region does not exist"))
@@ -786,6 +796,30 @@ func validateExplicitCircuit(circuit ExplicitCircuitSpec) []reports.Issue {
 		}
 		if placement.Priority < 0 || placement.MaxDistanceMM < 0 || !finiteScalar(placement.MaxDistanceMM) {
 			issues = append(issues, issue(path, "placement priority and maximum distance must be finite and non-negative"))
+		}
+		if !validExplicitThermalRole(thermalRole) {
+			issues = append(issues, issue(path+".thermal_role", "unsupported thermal role"))
+		}
+		if thermalRole != "" && strings.TrimSpace(placement.ThermalPathID) == "" {
+			issues = append(issues, issue(path+".thermal_path_id", "thermal placement requires path evidence"))
+		}
+		if thermalRole != "" && strings.TrimSpace(placement.ThermalPackage) == "" {
+			issues = append(issues, issue(path+".thermal_package", "thermal placement requires package evidence"))
+		}
+		if placement.ThermalEdgeRequired && strings.TrimSpace(placement.Edge) == "" {
+			issues = append(issues, issue(path+".edge", "external thermal path requires board-edge access"))
+		}
+		if thermalRole == "" && (strings.TrimSpace(placement.ThermalPathID) != "" || strings.TrimSpace(placement.ThermalPackage) != "" ||
+			placement.ThermalPathCPerW != 0 || placement.ThermalClearanceMM != 0 ||
+			placement.ThermalKeepAwayRole != "" || placement.ThermalEdgeRequired || placement.PreferThermalCopper) {
+			issues = append(issues, issue(path+".thermal_role", "thermal evidence requires a thermal role"))
+		}
+		if placement.ThermalClearanceMM > 0 && strings.TrimSpace(placement.ThermalKeepAwayRole) == "" {
+			issues = append(issues, issue(path+".thermal_keep_away_role", "thermal clearance requires a thermally sensitive role"))
+		}
+		if placement.ThermalPathCPerW < 0 || placement.ThermalClearanceMM < 0 ||
+			!finiteScalar(placement.ThermalPathCPerW) || !finiteScalar(placement.ThermalClearanceMM) {
+			issues = append(issues, issue(path, "thermal path and clearance values must be finite and non-negative"))
 		}
 	}
 	if len(circuit.Nets) == 0 {
@@ -941,6 +975,15 @@ func validateExplicitCircuit(circuit ExplicitCircuitSpec) []reports.Issue {
 		}
 	}
 	return issues
+}
+
+func validExplicitThermalRole(role string) bool {
+	switch placement.ThermalRole(role) {
+	case "", placement.ThermalRoleHeatSource, placement.ThermalRoleRegulator, placement.ThermalRolePowerSwitch:
+		return true
+	default:
+		return false
+	}
 }
 
 func validExplicitPowerFlagSupport(component schematicir.Component, support ExplicitSchematicSupportSpec) bool {

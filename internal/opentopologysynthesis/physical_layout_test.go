@@ -1,10 +1,16 @@
 package opentopologysynthesis
 
 import (
+	"context"
 	"fmt"
+	"math"
+	"reflect"
 	"testing"
 
 	"kicadai/internal/circuitgraph"
+	"kicadai/internal/components"
+	"kicadai/internal/designworkflow"
+	"kicadai/internal/simmodel"
 )
 
 func TestPhysicalSchematicIntentUsesTopologyDerivedCoreRanks(t *testing.T) {
@@ -114,7 +120,7 @@ func TestPhysicalMultilayerIntentReservesReferenceAndPowerLayers(t *testing.T) {
 		{Name: "VCC", Role: circuitgraph.NetRolePowerPos},
 		{Name: "SIGNAL", Role: circuitgraph.NetRoleSignal},
 	}
-	intent := physicalPCBIntent(circuitgraph.Board{WidthMM: 60, HeightMM: 40, Layers: 4}, nil, nets)
+	intent := physicalPCBIntent(circuitgraph.Board{WidthMM: 60, HeightMM: 40, Layers: 4}, nil, nets, circuitgraph.SchematicIntent{}, nil)
 	if len(intent.Zones) != 2 || intent.Zones[0].Net != "0V" || intent.Zones[0].Layers[0] != "In1.Cu" ||
 		intent.Zones[1].Net != "VCC" || intent.Zones[1].Layers[0] != "In2.Cu" {
 		t.Fatalf("multilayer zones = %#v", intent.Zones)
@@ -132,6 +138,184 @@ func TestPhysicalMultilayerIntentReservesReferenceAndPowerLayers(t *testing.T) {
 		if fmt.Sprint(layers) != fmt.Sprint(test.layers) || prefer != test.prefer {
 			t.Fatalf("role %s layer intent = %v prefer %q, want %v prefer %q", test.role, layers, prefer, test.layers, test.prefer)
 		}
+	}
+}
+
+func TestPhysicalPCBIntentDerivesDeterministicFunctionalAndThermalPlacement(t *testing.T) {
+	if role := physicalFunctionalRole(circuitgraph.Component{}, "EXTERNAL_INPUTS", "", 0); role != physicalRegionInput {
+		t.Fatalf("case-insensitive external input role = %q", role)
+	}
+	if order := physicalFunctionalRoleOrder("future_functional_role"); order != 25 {
+		t.Fatalf("unknown functional role order = %d, want middle-of-flow rank 25", order)
+	}
+	junctionToCase, junctionToAmbient := 1.0, 62.0
+	freeAirRecord := components.ComponentRecord{PowerSemiconductor: &components.PowerSemiconductorEvidence{
+		JunctionToCaseCPerW: &junctionToCase, JunctionToAmbientCPerW: &junctionToAmbient,
+	}}
+	if physicalRequiresExternalThermalPath(freeAirRecord) {
+		t.Fatal("junction-to-case capability alone became an external thermal-path requirement")
+	}
+	caseReferencedRecord := freeAirRecord
+	caseReferencedRecord.SimulationModels = []simmodel.CatalogEvidence{{
+		ModelID: "case_referenced", ThermalModel: &simmodel.ThermalRCNetwork{Reference: "junction_to_case"},
+	}}
+	if !physicalRequiresExternalThermalPath(caseReferencedRecord) {
+		t.Fatal("junction-to-case simulation boundary was incorrectly closed by unrelated ambient evidence")
+	}
+	freeAirRecord.PlacementHints = []components.PlacementHint{{Kind: "thermal_edge", Target: "heatsink"}}
+	if !physicalRequiresExternalThermalPath(freeAirRecord) {
+		t.Fatal("catalog thermal-edge requirement was ignored when junction-to-ambient evidence also exists")
+	}
+	tokens := physicalSemanticTokens("3V3 TO220 SOT-23")
+	if !tokens["3v3"] || !tokens["to220"] || !tokens["sot"] || !tokens["23"] {
+		t.Fatalf("alphanumeric semantic tokens = %#v", tokens)
+	}
+	if edge := physicalRegionBoardEdge(
+		circuitgraph.PCBRegion{ID: "power", Role: physicalRegionPower, Bounds: circuitgraph.Bounds{XMM: 10, WidthMM: 20, HeightMM: 40}},
+		circuitgraph.Board{WidthMM: 50, HeightMM: 40}, "heat_a",
+	); edge != circuitgraph.SideBottom {
+		t.Fatalf("central thermal edge = %q, want bottom", edge)
+	}
+	catalog, err := components.LoadCatalog(context.Background(), components.LoadOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	catalog.Records = append(catalog.Records, components.ComponentRecord{
+		ID: "test.nonfinite_dimensions",
+		Packages: []components.PackageVariant{{
+			ID: "bad", DimensionsMM: &components.Bounds{Width: math.NaN(), Height: math.Inf(1)},
+		}},
+	})
+	components.RebuildCatalogIndexes(catalog)
+	if width, height := physicalPackageDimensions(circuitgraph.Component{
+		ComponentID: "test.nonfinite_dimensions", VariantID: "bad",
+	}, catalog); width != physicalDefaultPackageWidthMM || height != physicalDefaultPackageHeightMM {
+		t.Fatalf("non-finite package fallback = %vx%v", width, height)
+	}
+	board := circuitgraph.Board{WidthMM: 80, HeightMM: 60, Layers: 4, EdgeClearanceMM: .25}
+	staleGroupRegions, staleGroupMapping := physicalFunctionalRegions(board, []circuitgraph.Component{{
+		ID: "orphan_sense", Role: circuitgraph.RoleResistor, Usage: "current_sense",
+	}}, circuitgraph.SchematicIntent{Placements: []circuitgraph.SchematicPlacement{{
+		Component: "orphan_sense", Group: "missing_group",
+	}}}, catalog)
+	if len(staleGroupRegions) != 1 || staleGroupMapping["orphan_sense"] != "functional_sensing" {
+		t.Fatalf("stale group fallback regions=%#v mapping=%#v", staleGroupRegions, staleGroupMapping)
+	}
+	componentList := []circuitgraph.Component{
+		{ID: "input", Role: circuitgraph.RoleInputConnector, Usage: "command_input"},
+		{ID: "input_fuse", Role: circuitgraph.RoleFuse, Usage: "supply_protection"},
+		{ID: "sense", Role: circuitgraph.RoleResistor, Usage: "current_sense"},
+		{ID: "current_clamp", Role: circuitgraph.RoleResistor, Usage: "current_clamp"},
+		{ID: "controller", Role: circuitgraph.RoleIC, Usage: "error_amplifier"},
+		{ID: "clamp", Role: circuitgraph.RoleTVS, Usage: "output_clamp"},
+		{ID: "pass", Role: circuitgraph.RoleBJT, Usage: "power_output", ComponentID: "bjt.onsemi.njw0302g.to3p", VariantID: "to3p_3"},
+		{ID: "output_tvs", Role: circuitgraph.RoleTVS, Usage: "load_protection"},
+		{ID: "output", Role: circuitgraph.RoleOutputConnector, Usage: "load_output"},
+	}
+	schematic := circuitgraph.SchematicIntent{
+		Groups: []circuitgraph.SchematicGroup{
+			{ID: "external_inputs", Role: "input_boundary", Members: []string{"input"}, Rank: 0},
+			{ID: "input_protection_stage", Role: "processing_stage", Members: []string{"input_fuse"}, Rank: 1},
+			{ID: "sense_stage", Role: "processing_stage", Members: []string{"sense", "current_clamp"}, Rank: 1},
+			{ID: "control_stage", Role: "processing_stage", Members: []string{"controller", "clamp"}, Rank: 2},
+			{ID: "power_stage", Role: "processing_stage", Members: []string{"pass", "output_tvs"}, Rank: 3},
+			{ID: "external_outputs", Role: "output_boundary", Members: []string{"output"}, Rank: 4},
+		},
+	}
+	first := physicalPCBIntent(board, componentList, nil, schematic, catalog)
+	second := physicalPCBIntent(board, componentList, nil, schematic, catalog)
+	if !reflect.DeepEqual(first, second) {
+		t.Fatalf("functional placement is not deterministic:\nfirst=%#v\nsecond=%#v", first, second)
+	}
+	wantRoles := []string{
+		physicalRegionInput, physicalRegionInputProtection, physicalRegionSensing, physicalRegionControl,
+		physicalRegionProtection, physicalRegionPower, physicalRegionOutputProtection, physicalRegionOutput,
+	}
+	gotRoles := make([]string, len(first.Regions))
+	previousEnd := 0.0
+	for index, region := range first.Regions {
+		gotRoles[index] = region.Role
+		if region.Bounds.XMM < previousEnd || region.Bounds.WidthMM <= 0 || region.Bounds.HeightMM != board.HeightMM ||
+			region.Bounds.XMM+region.Bounds.WidthMM > board.WidthMM+1e-9 {
+			t.Fatalf("invalid functional region geometry after x=%v: %#v", previousEnd, region)
+		}
+		previousEnd = region.Bounds.XMM + region.Bounds.WidthMM
+	}
+	if !reflect.DeepEqual(gotRoles, wantRoles) {
+		t.Fatalf("functional region roles = %v, want %v", gotRoles, wantRoles)
+	}
+	placements := map[string]circuitgraph.PCBPlacement{}
+	for _, placement := range first.Placements {
+		placements[placement.Component] = placement
+	}
+	if placements["input"].Region != "functional_input_interface" || placements["input"].Edge != circuitgraph.SideLeft ||
+		placements["output"].Region != "functional_output_interface" || placements["output"].Edge != circuitgraph.SideRight {
+		t.Fatalf("interface placement = input %#v output %#v", placements["input"], placements["output"])
+	}
+	if placements["input_fuse"].Region != "functional_input_protection" ||
+		placements["current_clamp"].Region != "functional_sensing" ||
+		placements["output_tvs"].Region != "functional_output_protection" {
+		t.Fatalf("rank-aware protection/current-clamp regions = fuse %#v clamp %#v tvs %#v", placements["input_fuse"], placements["current_clamp"], placements["output_tvs"])
+	}
+	thermalPlacement := placements["pass"]
+	if thermalPlacement.Region != "functional_power" || thermalPlacement.Edge != circuitgraph.SideTop || thermalPlacement.Priority != 110 {
+		t.Fatalf("thermal component placement = %#v", thermalPlacement)
+	}
+	if nonthermal := placements["controller"]; nonthermal.Edge != "" || nonthermal.Priority != 80 {
+		t.Fatalf("unrelated component acquired thermal constraints: %#v", nonthermal)
+	}
+	document := circuitgraph.Document{Project: circuitgraph.Project{Board: board}, Components: componentList, PCB: first}
+	evidence, issues := physicalPlacementEvidence(document, catalog)
+	if len(issues) != 0 {
+		t.Fatalf("placement evidence issues = %#v", issues)
+	}
+	thermalEvidence := PhysicalPlacementEvidence{}
+	for _, entry := range evidence {
+		if entry.Kind == "thermal_placement" && entry.Component == "pass" {
+			thermalEvidence = entry
+		}
+	}
+	if thermalEvidence.Region != "functional_power" || thermalEvidence.Edge != circuitgraph.SideTop ||
+		thermalEvidence.Role != "power_switch" || thermalEvidence.PackageType != "to3p_3" ||
+		thermalEvidence.ThermalPathID != "thermal_path.wakefield.641k_120_5" || math.Abs(thermalEvidence.ThermalPathCPerW-2.45) > 1e-12 ||
+		thermalEvidence.MinimumClearanceMM <= 0 ||
+		!thermalEvidence.BoardEdgeRequired || !thermalEvidence.PreferThermalCopper || thermalEvidence.EvidenceSHA == "" || thermalEvidence.Rationale == "" {
+		t.Fatalf("catalog-backed thermal evidence = %#v", thermalEvidence)
+	}
+	smallBoardDecision, ok := physicalThermalPlacement(
+		componentList[6],
+		circuitgraph.PCBRegion{ID: "power", Role: physicalRegionPower, Bounds: circuitgraph.Bounds{WidthMM: 4, HeightMM: 4}},
+		circuitgraph.Board{WidthMM: 4, HeightMM: 4}, catalog,
+	)
+	if !ok || smallBoardDecision.clearanceMM < physicalThermalMinimumClearanceMM {
+		t.Fatalf("small-board thermal clearance lost its safety floor: %#v ok=%t", smallBoardDecision, ok)
+	}
+	request := designworkflow.Request{ExplicitCircuit: &designworkflow.ExplicitCircuitSpec{Components: []designworkflow.ExplicitComponentSpec{
+		{ID: "controller", Placement: designworkflow.ExplicitPlacementSpec{Region: "functional_control"}},
+		{ID: "pass", Placement: designworkflow.ExplicitPlacementSpec{Region: "functional_power", Edge: "top"}},
+	}}}
+	applyPhysicalPlacementEvidence(&request, evidence)
+	ordinary := request.ExplicitCircuit.Components[0].Placement
+	applied := request.ExplicitCircuit.Components[1].Placement
+	if ordinary.ThermalRole != "" || ordinary.Region != "functional_control" ||
+		applied.ThermalRole != "power_switch" || applied.ThermalPathID != thermalEvidence.ThermalPathID ||
+		applied.ThermalClearanceMM != thermalEvidence.MinimumClearanceMM || applied.ThermalKeepAwayRole != physicalThermalSensitiveRole ||
+		!applied.ThermalEdgeRequired || !applied.PreferThermalCopper {
+		t.Fatalf("physical request evidence application ordinary=%#v thermal=%#v", ordinary, applied)
+	}
+	bindings := physicalPlacementBindings(evidence)
+	if len(bindings) != len(evidence) || bindings[len(bindings)-1].Kind != "thermal_placement" ||
+		bindings[len(bindings)-1].EvidenceSHA != thermalEvidence.EvidenceSHA {
+		t.Fatalf("placement bindings = %#v", bindings)
+	}
+	catalogWithoutPaths, err := components.LoadCatalog(context.Background(), components.LoadOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	catalogWithoutPaths.ThermalPaths = nil
+	_, issues = physicalPlacementEvidence(document, catalogWithoutPaths)
+	if len(issues) != 1 || issues[0].Path != "physical.placement.pass.thermal_path" {
+		t.Fatalf("missing reviewed thermal path did not fail closed: %#v", issues)
 	}
 }
 

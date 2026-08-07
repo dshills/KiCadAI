@@ -5,6 +5,7 @@ import (
 	"reflect"
 	"testing"
 
+	"kicadai/internal/placement"
 	"kicadai/internal/routing"
 )
 
@@ -18,6 +19,51 @@ func TestExplicitNetWeightDoesNotLetSharedGroundCurrentDominatePlacement(t *test
 	}
 	if power != 14 {
 		t.Fatalf("power weight = %d, want current-weighted value 14", power)
+	}
+}
+
+func TestExplicitThermalPlacementRulePreservesCatalogEvidence(t *testing.T) {
+	component := ExplicitComponentSpec{
+		ID: "pass", Reference: "Q1", Role: "bjt",
+		Placement: ExplicitPlacementSpec{
+			Region: "functional_power", Edge: "top", ThermalRole: "power_switch",
+			ThermalPathID: "thermal_path.reviewed", ThermalPackage: "to220",
+			ThermalPathCPerW: 2.45, ThermalClearanceMM: 7,
+			ThermalKeepAwayRole: "sensor", ThermalEdgeRequired: true, PreferThermalCopper: true,
+		},
+	}
+	rule, ok := explicitThermalPlacementRule(component)
+	if !ok || rule.ID != "explicit.thermal.pass" || rule.Source != "catalog_thermal_path:thermal_path.reviewed" ||
+		!reflect.DeepEqual(rule.Refs, []string{"Q1"}) || rule.ThermalRole != placement.ThermalRolePowerSwitch ||
+		rule.PreferredEdge != placement.EdgeTop || rule.PreferredRegion != "functional_power" ||
+		!reflect.DeepEqual(rule.KeepAwayRoles, []string{"sensor"}) || rule.MinDistanceMM != 7 || !rule.PreferCopper ||
+		rule.Severity != placement.AdvancedRuleSeverityError || rule.Enforcement != placement.AdvancedRuleHard {
+		t.Fatalf("thermal placement rule = %#v, ok=%t", rule, ok)
+	}
+	if _, ok := explicitThermalPlacementRule(ExplicitComponentSpec{ID: "ordinary", Reference: "R1"}); ok {
+		t.Fatal("nonthermal component produced an advanced thermal rule")
+	}
+	if _, ok := explicitThermalPlacementRule(ExplicitComponentSpec{
+		ID: "blank", Reference: "Q2", Placement: ExplicitPlacementSpec{ThermalRole: "  \t  "},
+	}); ok {
+		t.Fatal("whitespace-only thermal role produced an advanced thermal rule")
+	}
+	trimmed := component
+	trimmed.Placement.ThermalRole = "  power_switch "
+	trimmed.Placement.ThermalPathID = " thermal_path.reviewed  "
+	trimmedRule, ok := explicitThermalPlacementRule(trimmed)
+	if !ok || trimmedRule.ThermalRole != placement.ThermalRolePowerSwitch ||
+		trimmedRule.Source != "catalog_thermal_path:thermal_path.reviewed" {
+		t.Fatalf("trimmed thermal rule = %#v, ok=%t", trimmedRule, ok)
+	}
+	interior := component
+	interior.Placement.Edge = ""
+	interior.Placement.ThermalEdgeRequired = false
+	interior.Placement.ThermalClearanceMM = 0
+	interior.Placement.ThermalKeepAwayRole = ""
+	interiorRule, ok := explicitThermalPlacementRule(interior)
+	if !ok || len(interiorRule.KeepAwayRoles) != 0 || interiorRule.PreferredEdge != placement.EdgeNone {
+		t.Fatalf("interior thermal rule = %#v, ok=%t", interiorRule, ok)
 	}
 }
 
