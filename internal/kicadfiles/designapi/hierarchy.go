@@ -387,6 +387,10 @@ func relayoutHierarchyChild(builder *Builder, child *schematic.SchematicFile, sh
 		Sheet: schematiclayout.SheetForPaperOrientation(child.Paper.Name, child.Paper.Portrait),
 		Rules: schematiclayout.DefaultRules(schematiclayout.ProfileStandard),
 	}
+	// Child-sheet connectivity is emitted as endpoint labels below. Orient the
+	// text away from its pin access stub so labels on left- and upper-facing
+	// pins do not extend back across the symbol they connect to.
+	request.Rules.OrientEndpointLabels = true
 	for _, symbol := range child.Symbols {
 		if len(symbol.Pins) != len(symbol.PinAnchors) {
 			return fmt.Errorf("hierarchy child %s symbol %s unit %d has %d pins but %d pin anchors", sheetID, symbol.Reference, symbol.Unit, len(symbol.Pins), len(symbol.PinAnchors))
@@ -546,6 +550,7 @@ func relayoutHierarchyChild(builder *Builder, child *schematic.SchematicFile, sh
 		}
 		return labels[i].Position.Y < labels[j].Position.Y
 	})
+	generatedLabels := make([]schematic.Label, 0, len(labels))
 	for index, label := range labels {
 		kind := schematic.LabelLocal
 		if _, crossSheet := crossSheetNets[builder.canonicalNet(label.NetName)]; crossSheet {
@@ -553,8 +558,12 @@ func relayoutHierarchyChild(builder *Builder, child *schematic.SchematicFile, sh
 		}
 		generated := schematic.NewLabel(builder.generator.New("hierarchy.local_label", sheetID, label.NetName, strconv.Itoa(index)), label.Text, kind, label.Position)
 		generated.Rotation = label.Rotation
-		child.Labels = append(child.Labels, generated)
+		if label.JustifyRight {
+			generated.Justify = append(generated.Justify, "right")
+		}
+		generatedLabels = append(generatedLabels, generated)
 	}
+	child.Labels = append(child.Labels, generatedLabels...)
 	return nil
 }
 

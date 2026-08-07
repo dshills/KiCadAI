@@ -68,6 +68,9 @@ func TestPhysicalSchematicIntentUsesTopologyDerivedCoreRanks(t *testing.T) {
 	if !intent.Rules.OrientEndpointLabels {
 		t.Fatal("synthesized endpoint labels must face away from component bodies")
 	}
+	if intent.Hierarchy.Mode != "auto" || intent.Hierarchy.MaxComponentsPerSheet != 3 {
+		t.Fatalf("functional hierarchy policy = %#v, want automatic grouping with the largest derived stage kept intact", intent.Hierarchy)
+	}
 }
 
 func TestPhysicalEngineeringValueUsesReadableSIPrefixes(t *testing.T) {

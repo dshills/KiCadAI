@@ -1027,6 +1027,21 @@ func physicalSchematicIntent(graph CandidateGraph) circuitgraph.SchematicIntent 
 	for _, component := range outputs {
 		placements = append(placements, circuitgraph.SchematicPlacement{Component: component, Group: "external_outputs"})
 	}
+	hierarchy := circuitgraph.HierarchyPolicy{Mode: "flat"}
+	totalComponents := len(inputs) + len(core) + len(outputs)
+	maximumGroupSize := 0
+	for _, group := range groups {
+		maximumGroupSize = max(maximumGroupSize, len(group.Members))
+	}
+	// Multiple graph-derived functional groups are an explicit semantic
+	// hierarchy opportunity, independent of page overflow. Keeping the largest
+	// group within one child preserves functional and multi-unit locality while
+	// the shared partitioner deterministically packs smaller adjacent stages.
+	if len(groups) > 1 && maximumGroupSize > 0 && totalComponents > maximumGroupSize {
+		hierarchy = circuitgraph.HierarchyPolicy{
+			Mode: "auto", MaxComponentsPerSheet: maximumGroupSize,
+		}
+	}
 	return circuitgraph.SchematicIntent{
 		Flow: circuitgraph.FlowLeftToRight, Origin: circuitgraph.OriginCentered,
 		Groups: groups,
@@ -1040,7 +1055,7 @@ func physicalSchematicIntent(graph CandidateGraph) circuitgraph.SchematicIntent 
 			MinGroupSpacingMM: 10.16, MinComponentSpacingMM: 10.16, MaxAuxiliaryPerRank: 2,
 			ReserveTitleBlock: true, OrientEndpointLabels: true,
 		},
-		Hierarchy: circuitgraph.HierarchyPolicy{Mode: "flat"},
+		Hierarchy: hierarchy,
 	}
 }
 

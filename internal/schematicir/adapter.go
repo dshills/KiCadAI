@@ -135,11 +135,15 @@ func schematicHierarchy(document Document, index *libraryresolver.LibraryIndex) 
 	hierarchy := &transactions.SchematicHierarchy{}
 	for _, sheet := range layout.Partition.Sheets {
 		refs := make([]string, 0, len(sheet.Components))
+		seenRefs := map[string]bool{}
 		symbols := make([]transactions.SchematicSymbolRef, 0, len(sheet.Components))
 		for _, componentID := range sheet.Components {
 			componentSheets[componentID] = sheet.ID
 			if ref := state.refsByID[componentID]; ref != "" {
-				refs = append(refs, ref)
+				if key := adapterReferenceKey(ref); !seenRefs[key] {
+					seenRefs[key] = true
+					refs = append(refs, ref)
+				}
 				symbols = append(symbols, transactions.SchematicSymbolRef{Ref: ref, Unit: state.unitsByID[componentID]})
 			}
 		}

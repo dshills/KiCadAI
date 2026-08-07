@@ -73,7 +73,7 @@ func partition(request Request, placedComponents []PlacedComponent) PartitionRes
 	}
 	oversizedGroups := oversizedPartitionGroups(groupByRef, usable, bodyByRef)
 	assignments := partitionAssignments(placed.Components, groupByRef, oversizedGroups, usable, bodyByRef)
-	assignments = limitPartitionAssignments(placed.Components, assignments, request.MaxComponentsPerSheet)
+	assignments = limitPartitionAssignments(placed.Components, assignments, groupByRef, request.MaxComponentsPerSheet)
 	partitions := map[string]*PartitionSheet{}
 	for _, component := range placed.Components {
 		id := assignments[component.Ref]
@@ -133,7 +133,12 @@ func partition(request Request, placedComponents []PlacedComponent) PartitionRes
 // limitPartitionAssignments applies an explicit sheet-capacity contract after
 // geometry-based partitioning. It is deterministic and leaves the default
 // zero-value behavior unchanged.
-func limitPartitionAssignments(components []PlacedComponent, assignments map[string]string, maximum int) map[string]string {
+func limitPartitionAssignments(
+	components []PlacedComponent,
+	assignments map[string]string,
+	groupByRef map[string]string,
+	maximum int,
+) map[string]string {
 	if maximum <= 0 || len(components) <= maximum {
 		return assignments
 	}
@@ -149,18 +154,70 @@ func limitPartitionAssignments(components []PlacedComponent, assignments map[str
 	sort.Strings(partitionIDs)
 	for _, partitionID := range partitionIDs {
 		members := byPartition[partitionID]
-		sort.SliceStable(members, func(i, j int) bool { return members[i].Ref < members[j].Ref })
 		if len(members) <= maximum {
 			for _, member := range members {
 				limited[member.Ref] = partitionID
 			}
 			continue
 		}
-		for index, member := range members {
-			limited[member.Ref] = fmt.Sprintf("%s-%d", partitionID, index/maximum)
+		// Explicit functional groups and every repeated reference are atomic
+		// partition units. Capacity may be exceeded by one oversized unit, but
+		// sheet limiting must never split a functional stage or multi-unit
+		// component merely because reference ordering reached the limit.
+		unitsByKey := map[string][]PlacedComponent{}
+		for _, member := range members {
+			key := "reference:" + member.Ref
+			if member.DisplayRef != "" {
+				key = "display_reference:" + member.DisplayRef
+			} else if group := groupByRef[member.Ref]; group != "" {
+				key = "group:" + group
+			}
+			unitsByKey[key] = append(unitsByKey[key], member)
+		}
+		unitKeys := make([]string, 0, len(unitsByKey))
+		unitOrigins := make(map[string]kicadfiles.Point, len(unitsByKey))
+		for key, unit := range unitsByKey {
+			unitKeys = append(unitKeys, key)
+			x, y := partitionUnitOrigin(unit)
+			unitOrigins[key] = kicadfiles.Point{X: x, Y: y}
+		}
+		sort.SliceStable(unitKeys, func(i, j int) bool {
+			left, right := unitOrigins[unitKeys[i]], unitOrigins[unitKeys[j]]
+			if left.X != right.X {
+				return left.X < right.X
+			}
+			if left.Y != right.Y {
+				return left.Y < right.Y
+			}
+			return unitKeys[i] < unitKeys[j]
+		})
+		sheetIndex, used := 0, 0
+		for _, key := range unitKeys {
+			unit := unitsByKey[key]
+			if used > 0 && used+len(unit) > maximum {
+				sheetIndex++
+				used = 0
+			}
+			target := fmt.Sprintf("%s-%d", partitionID, sheetIndex)
+			for _, member := range unit {
+				limited[member.Ref] = target
+			}
+			used += len(unit)
 		}
 	}
 	return limited
+}
+
+func partitionUnitOrigin(unit []PlacedComponent) (kicadfiles.IU, kicadfiles.IU) {
+	if len(unit) == 0 {
+		return 0, 0
+	}
+	minimumX, minimumY := unit[0].PlacedAt.X, unit[0].PlacedAt.Y
+	for _, component := range unit[1:] {
+		minimumX = min(minimumX, component.PlacedAt.X)
+		minimumY = min(minimumY, component.PlacedAt.Y)
+	}
+	return minimumX, minimumY
 }
 
 func oversizedPartitionGroups(groupByRef map[string]string, usable Rect, bodyByRef map[string]Rect) map[string]struct{} {

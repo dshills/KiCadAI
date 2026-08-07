@@ -79,6 +79,7 @@ func TestBuilderWritesGeneratedSchematicHierarchy(t *testing.T) {
 		t.Fatalf("root sheet instances = %#v, want only the root path", read.Schematic.SheetInstances)
 	}
 	sheetUUIDByFilename := make(map[string]kicadfiles.UUID, len(read.Schematic.Sheets))
+	orientedGlobalLabel := false
 	for index, sheet := range read.Schematic.Sheets {
 		wantPath := "/" + string(read.Schematic.UUID)
 		wantPage := strconv.Itoa(index + 2)
@@ -111,6 +112,13 @@ func TestBuilderWritesGeneratedSchematicHierarchy(t *testing.T) {
 		for _, label := range child.Labels {
 			if label.Text == "LONG_NET" && label.Kind == schematic.LabelGlobal {
 				globalLabels++
+				if label.Rotation != 0 {
+					orientedGlobalLabel = true
+				}
+				wantRight := label.Rotation == 180 || label.Rotation == 270
+				if gotRight := containsFold(label.Justify, "right"); gotRight != wantRight {
+					t.Fatalf("child %s global label orientation = rotation %v justify %#v, want right=%t", child.Filename, label.Rotation, label.Justify, wantRight)
+				}
 				for _, wire := range child.Wires {
 					if len(wire.Points) >= 2 && (wire.Points[0] == label.Position || wire.Points[len(wire.Points)-1] == label.Position) {
 						connectedGlobalLabel = true
@@ -144,6 +152,9 @@ func TestBuilderWritesGeneratedSchematicHierarchy(t *testing.T) {
 				t.Fatalf("child %s %s count = %d, report=%#v", child.Filename, code, readability.OverlapCounts[code], readability)
 			}
 		}
+	}
+	if !orientedGlobalLabel {
+		t.Fatal("generated hierarchy did not preserve any outward-oriented global label")
 	}
 	for _, child := range read.SheetFiles {
 		for _, symbol := range child.Symbols {

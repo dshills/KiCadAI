@@ -420,6 +420,45 @@ func TestSchematicIRWritesResolverBackedMultiUnitProject(t *testing.T) {
 	}
 }
 
+func TestSchematicIRWritesMultiUnitReferenceOnOneHierarchySheet(t *testing.T) {
+	document := multiUnitFixtureDocument()
+	document.Metadata.Name = "multi_unit_hierarchy_fixture"
+	document.Layout.MaxComponentsPerSheet = 1
+	index, loadIssues := libraryresolver.Load(context.Background(), libraryresolver.LibraryRoots{
+		SymbolsRoot: filepath.Join("testdata", "symbols"),
+	}, libraryresolver.LoadOptions{})
+	if reports.HasBlockingIssue(loadIssues) {
+		t.Fatalf("fixture library issues: %+v", loadIssues)
+	}
+	tx, issues := ToProjectTransactionWithLibraryIndex(document, &index)
+	if reports.HasBlockingIssue(issues) {
+		t.Fatalf("project transaction issues: %+v", issues)
+	}
+	outputDir := filepath.Join(t.TempDir(), document.Metadata.Name)
+	apply := transactions.Apply(tx, transactions.ApplyOptions{OutputDir: outputDir, Overwrite: true, LibraryIndex: &index})
+	if reports.HasBlockingIssue(apply.Issues) {
+		t.Fatalf("apply issues: %+v", apply.Issues)
+	}
+	read, err := kicaddesign.ReadProjectDirectory(outputDir)
+	if err != nil {
+		t.Fatalf("read generated hierarchy: %v", err)
+	}
+	if len(read.SheetFiles) < 2 {
+		t.Fatalf("multi-unit hierarchy child sheets = %d, want at least two", len(read.SheetFiles))
+	}
+	unitSheets := map[int]string{}
+	for _, child := range read.SheetFiles {
+		for _, symbol := range child.Symbols {
+			if symbol.Reference == "U1" {
+				unitSheets[symbol.Unit] = child.Filename
+			}
+		}
+	}
+	if unitSheets[1] == "" || unitSheets[1] != unitSheets[2] {
+		t.Fatalf("U1 units were split across hierarchy: %#v", unitSheets)
+	}
+}
+
 func TestSchematicIRWritesResolverBackedInheritedSymbolProject(t *testing.T) {
 	document := inheritedSymbolFixtureDocument()
 	index, loadIssues := libraryresolver.Load(context.Background(), libraryresolver.LibraryRoots{
