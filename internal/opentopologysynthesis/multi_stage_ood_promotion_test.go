@@ -157,10 +157,22 @@ func assertMultiStageReturnPathEvidence(
 		if len(evidence) != expected {
 			t.Fatalf("run %d return-path evidence count = %d, want %d", runIndex+1, len(evidence), expected)
 		}
+		transitionCount := 0
 		for _, item := range evidence {
 			if !item.Pass || !item.SamplingComplete || item.ReturnNet == "" || item.SampleCount == 0 || len(item.UsedLayers) == 0 || len(item.ReturnPlaneLayers) == 0 {
 				t.Fatalf("run %d incomplete return-path evidence: %#v", runIndex+1, item)
 			}
+			for _, transition := range item.LayerTransitions {
+				transitionCount++
+				if !transition.Pass || len(transition.SignalLayers) != 2 ||
+					(transition.ReturnViaRequired && !transition.ReturnViaFound) ||
+					(!transition.ReturnViaRequired && len(transition.ReferenceLayers) != 1) {
+					t.Fatalf("run %d incomplete return-transition evidence: %#v", runIndex+1, transition)
+				}
+			}
+		}
+		if transitionCount == 0 {
+			t.Fatalf("run %d has no multilayer return-transition evidence", runIndex+1)
 		}
 		if runIndex == 0 {
 			baseline = append([]designworkflow.ExplicitReturnPathEvidence(nil), evidence...)

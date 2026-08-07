@@ -1,6 +1,7 @@
 package designworkflow
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"math"
@@ -410,20 +411,32 @@ func RouteExplicitCircuit(ctx context.Context, request Request, placed Placement
 }
 
 type ExplicitReturnPathEvidence struct {
-	Net                string   `json:"net"`
-	ReturnNet          string   `json:"return_net"`
-	PreferredLayer     string   `json:"preferred_layer,omitempty"`
-	PreferredLayerUsed bool     `json:"preferred_layer_used"`
-	UsedLayers         []string `json:"used_layers"`
-	ReturnPlaneLayers  []string `json:"return_plane_layers,omitempty"`
-	MaxLengthMM        float64  `json:"max_length_mm,omitempty"`
-	RouteLengthMM      float64  `json:"route_length_mm"`
-	MaxDistanceMM      float64  `json:"max_distance_mm"`
-	WorstDistanceMM    float64  `json:"worst_distance_mm"`
-	SampleSpacingMM    float64  `json:"sample_spacing_mm"`
-	SampleCount        int      `json:"sample_count"`
-	SamplingComplete   bool     `json:"sampling_complete"`
-	Pass               bool     `json:"pass"`
+	Net                string                             `json:"net"`
+	ReturnNet          string                             `json:"return_net"`
+	PreferredLayer     string                             `json:"preferred_layer,omitempty"`
+	PreferredLayerUsed bool                               `json:"preferred_layer_used"`
+	UsedLayers         []string                           `json:"used_layers"`
+	ReturnPlaneLayers  []string                           `json:"return_plane_layers,omitempty"`
+	MaxLengthMM        float64                            `json:"max_length_mm,omitempty"`
+	RouteLengthMM      float64                            `json:"route_length_mm"`
+	MaxDistanceMM      float64                            `json:"max_distance_mm"`
+	WorstDistanceMM    float64                            `json:"worst_distance_mm"`
+	SampleSpacingMM    float64                            `json:"sample_spacing_mm"`
+	SampleCount        int                                `json:"sample_count"`
+	SamplingComplete   bool                               `json:"sampling_complete"`
+	LayerTransitions   []ExplicitReturnTransitionEvidence `json:"layer_transitions,omitempty"`
+	Pass               bool                               `json:"pass"`
+}
+
+type ExplicitReturnTransitionEvidence struct {
+	XMM                 float64  `json:"x_mm"`
+	YMM                 float64  `json:"y_mm"`
+	SignalLayers        []string `json:"signal_layers"`
+	ReferenceLayers     []string `json:"reference_layers"`
+	ReturnViaRequired   bool     `json:"return_via_required"`
+	ReturnViaFound      bool     `json:"return_via_found"`
+	ReturnViaDistanceMM float64  `json:"return_via_distance_mm"`
+	Pass                bool     `json:"pass"`
 }
 
 func explicitReturnPathEvidence(
@@ -563,6 +576,14 @@ func explicitReturnPathEvidence(
 					}
 				}
 			}
+			item.LayerTransitions = explicitReturnTransitionEvidence(
+				signal, returnPath, returnPlaneLayers, stack, net.ReturnPathMaxDistanceMM,
+			)
+			for _, transition := range item.LayerTransitions {
+				if !transition.Pass {
+					item.Pass = false
+				}
+			}
 			for layer := range usedLayers {
 				item.UsedLayers = append(item.UsedLayers, layer)
 			}
@@ -593,6 +614,90 @@ func explicitReturnPathEvidence(
 		}
 	}
 	return evidence, issues
+}
+
+func explicitReturnTransitionEvidence(
+	signal routing.Route,
+	returnPath routing.Route,
+	returnPlaneLayers []string,
+	stack copperLayerStack,
+	maximumDistanceMM float64,
+) []ExplicitReturnTransitionEvidence {
+	var evidence []ExplicitReturnTransitionEvidence
+	for _, signalVia := range signal.Vias {
+		signalMinimum, signalMaximum, valid := viaLayerBounds(signalVia, stack)
+		if !valid || signalMinimum == signalMaximum {
+			continue
+		}
+		item := ExplicitReturnTransitionEvidence{
+			XMM: signalVia.At.XMM, YMM: signalVia.At.YMM,
+			SignalLayers: []string{stack.names[signalMinimum], stack.names[signalMaximum]},
+			Pass:         true,
+		}
+		minimumReference, minimumFound := nearestReferenceLayerIndex(signalMinimum, returnPlaneLayers, stack)
+		maximumReference, maximumFound := nearestReferenceLayerIndex(signalMaximum, returnPlaneLayers, stack)
+		if minimumFound && maximumFound {
+			item.ReferenceLayers = []string{stack.names[minimumReference]}
+			if maximumReference != minimumReference {
+				item.ReferenceLayers = []string{
+					stack.names[min(minimumReference, maximumReference)],
+					stack.names[max(minimumReference, maximumReference)],
+				}
+				item.ReturnViaRequired = true
+			}
+		} else {
+			// Without declared reference planes, require the return conductor to
+			// make the same layer transition as the signal.
+			minimumReference, maximumReference = signalMinimum, signalMaximum
+			item.ReturnViaRequired = true
+		}
+		if item.ReturnViaRequired {
+			item.ReturnViaDistanceMM = math.MaxFloat64
+			for _, returnVia := range returnPath.Vias {
+				returnMinimum, returnMaximum, valid := viaLayerBounds(returnVia, stack)
+				if !valid || returnMinimum > min(minimumReference, maximumReference) ||
+					returnMaximum < max(minimumReference, maximumReference) {
+					continue
+				}
+				distance := math.Hypot(signalVia.At.XMM-returnVia.At.XMM, signalVia.At.YMM-returnVia.At.YMM)
+				item.ReturnViaDistanceMM = math.Min(item.ReturnViaDistanceMM, distance)
+			}
+			item.ReturnViaFound = item.ReturnViaDistanceMM <= maximumDistanceMM
+			item.Pass = item.ReturnViaFound
+		}
+		evidence = append(evidence, item)
+	}
+	slices.SortFunc(evidence, func(left, right ExplicitReturnTransitionEvidence) int {
+		if order := cmp.Compare(left.XMM, right.XMM); order != 0 {
+			return order
+		}
+		if order := cmp.Compare(left.YMM, right.YMM); order != 0 {
+			return order
+		}
+		if order := cmp.Compare(left.SignalLayers[0], right.SignalLayers[0]); order != 0 {
+			return order
+		}
+		return cmp.Compare(left.SignalLayers[1], right.SignalLayers[1])
+	})
+	return evidence
+}
+
+func nearestReferenceLayerIndex(signalIndex int, returnPlaneLayers []string, stack copperLayerStack) (int, bool) {
+	nearestIndex, nearestDelta := -1, len(stack.names)+1
+	for _, layer := range returnPlaneLayers {
+		index, found := stack.stackIndexes[normalizedCopperLayerName(layer)]
+		if !found {
+			continue
+		}
+		delta := index - signalIndex
+		if delta < 0 {
+			delta = -delta
+		}
+		if delta < nearestDelta || (delta == nearestDelta && index < nearestIndex) {
+			nearestIndex, nearestDelta = index, delta
+		}
+	}
+	return nearestIndex, nearestIndex >= 0
 }
 
 func finiteReturnPathEvidenceValue(value float64, pass bool) (float64, bool) {
@@ -738,23 +843,30 @@ func (stack copperLayerStack) separationCanonicalMM(left, right string) float64 
 }
 
 func viaVerticalSpanMM(via routing.Via, stack copperLayerStack) float64 {
-	if len(stack.names) < 2 {
-		return stack.thicknessMM
+	minimumIndex, maximumIndex, valid := viaLayerBounds(via, stack)
+	if !valid || len(stack.names) < 2 || !finiteScalar(stack.thicknessMM) || stack.thicknessMM <= 0 {
+		return math.Inf(1)
 	}
-	if len(via.Layers) < 2 {
-		return stack.thicknessMM
+	return float64(maximumIndex-minimumIndex) * stack.thicknessMM / float64(len(stack.names)-1)
+}
+
+func viaLayerBounds(via routing.Via, stack copperLayerStack) (int, int, bool) {
+	if len(stack.names) == 0 || stack.ambiguous {
+		return 0, 0, false
+	}
+	if len(via.Layers) == 0 {
+		return 0, len(stack.names) - 1, true
 	}
 	minimumIndex, maximumIndex := len(stack.names), -1
 	for _, layer := range via.Layers {
-		canonical := stack.canonicalName(layer)
-		index, found := stack.stackIndexes[normalizedCopperLayerName(canonical)]
+		index, found := stack.stackIndexes[normalizedCopperLayerName(layer)]
 		if !found {
-			return math.Inf(1)
+			return 0, 0, false
 		}
 		minimumIndex = min(minimumIndex, index)
 		maximumIndex = max(maximumIndex, index)
 	}
-	return float64(maximumIndex-minimumIndex) * stack.thicknessMM / float64(len(stack.names)-1)
+	return minimumIndex, maximumIndex, true
 }
 
 func viaLayerSeparationMM(signalLayer string, via routing.Via, stack copperLayerStack) float64 {
@@ -765,19 +877,9 @@ func viaLayerSeparationMM(signalLayer string, via routing.Via, stack copperLayer
 	if !found {
 		return math.Inf(1)
 	}
-	// An omitted span denotes a through-via and therefore intersects every
-	// copper layer. A single declared layer is treated as a point span.
-	if len(via.Layers) == 0 {
-		return 0
-	}
-	minimumIndex, maximumIndex := len(stack.names), -1
-	for _, layer := range via.Layers {
-		index, found := stack.stackIndexes[normalizedCopperLayerName(layer)]
-		if !found {
-			return math.Inf(1)
-		}
-		minimumIndex = min(minimumIndex, index)
-		maximumIndex = max(maximumIndex, index)
+	minimumIndex, maximumIndex, valid := viaLayerBounds(via, stack)
+	if !valid {
+		return math.Inf(1)
 	}
 	if signalIndex >= minimumIndex && signalIndex <= maximumIndex {
 		return 0

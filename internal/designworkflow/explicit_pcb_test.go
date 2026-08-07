@@ -306,7 +306,9 @@ func TestExplicitReturnPathEvidenceValidatesViaOnlySignal(t *testing.T) {
 	}
 	evidence, issues := explicitReturnPathEvidence(nets, nil, routes, layers, 1.6)
 	if len(issues) != 0 || len(evidence) != 1 || !evidence[0].Pass ||
-		evidence[0].SampleCount != 2 || math.Abs(evidence[0].WorstDistanceMM-.5) > 1e-12 {
+		evidence[0].SampleCount != 2 || math.Abs(evidence[0].WorstDistanceMM-.5) > 1e-12 ||
+		len(evidence[0].LayerTransitions) != 1 || !evidence[0].LayerTransitions[0].ReturnViaRequired ||
+		!evidence[0].LayerTransitions[0].ReturnViaFound || !evidence[0].LayerTransitions[0].Pass {
 		t.Fatalf("via-only return evidence = %#v issues=%#v", evidence, issues)
 	}
 	routes[1].Vias[0].Layers = []string{"In2.Cu", "B.Cu"}
@@ -320,5 +322,38 @@ func TestExplicitReturnPathEvidenceValidatesViaOnlySignal(t *testing.T) {
 	evidence, issues = explicitReturnPathEvidence(nets, nil, routes, layers, 1.6)
 	if len(issues) != 0 || !evidence[0].Pass || evidence[0].SampleCount != len(layers) {
 		t.Fatalf("through-via return evidence = %#v issues=%#v", evidence, issues)
+	}
+}
+
+func TestExplicitReturnTransitionEvidenceUsesCommonPlaneOrPairedVia(t *testing.T) {
+	layers := []routing.Layer{
+		{Name: "F.Cu", Kind: routing.LayerCopper, Routable: true},
+		{Name: "In1.Cu", Kind: routing.LayerCopper, Routable: true},
+		{Name: "In2.Cu", Kind: routing.LayerCopper, Routable: true},
+		{Name: "B.Cu", Kind: routing.LayerCopper, Routable: true},
+	}
+	stack := newCopperLayerStack(layers, 1.6)
+	signal := routing.Route{Vias: []routing.Via{{
+		At: routing.Point{XMM: 2, YMM: 3}, Layers: []string{"F.Cu", "B.Cu"},
+	}}}
+	evidence := explicitReturnTransitionEvidence(signal, routing.Route{}, []string{"In1.Cu"}, stack, .5)
+	if len(evidence) != 1 || !evidence[0].Pass || evidence[0].ReturnViaRequired || evidence[0].ReturnViaFound ||
+		!reflect.DeepEqual(evidence[0].ReferenceLayers, []string{"In1.Cu"}) {
+		t.Fatalf("common-plane transition evidence = %#v", evidence)
+	}
+	returnPath := routing.Route{Vias: []routing.Via{{
+		At: routing.Point{XMM: 2.4, YMM: 3}, Layers: []string{"In1.Cu", "In2.Cu"},
+	}}}
+	evidence = explicitReturnTransitionEvidence(signal, returnPath, []string{"In1.Cu", "In2.Cu"}, stack, .5)
+	if len(evidence) != 1 || !evidence[0].Pass || !evidence[0].ReturnViaRequired || !evidence[0].ReturnViaFound ||
+		math.Abs(evidence[0].ReturnViaDistanceMM-.4) > 1e-12 ||
+		!reflect.DeepEqual(evidence[0].ReferenceLayers, []string{"In1.Cu", "In2.Cu"}) {
+		t.Fatalf("paired-return-via evidence = %#v", evidence)
+	}
+	returnPath.Vias[0].At.XMM = 2.6
+	evidence = explicitReturnTransitionEvidence(signal, returnPath, []string{"In1.Cu", "In2.Cu"}, stack, .5)
+	if len(evidence) != 1 || evidence[0].Pass || evidence[0].ReturnViaFound ||
+		math.Abs(evidence[0].ReturnViaDistanceMM-.6) > 1e-12 {
+		t.Fatalf("distant paired return via was accepted: %#v", evidence)
 	}
 }
