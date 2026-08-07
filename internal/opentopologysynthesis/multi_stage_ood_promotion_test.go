@@ -5,6 +5,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -114,6 +115,7 @@ func testMultiStageOODOptionalKiCadPromotion(t *testing.T, caseName string) {
 			nonlinearSwitchingRoutingSummary(promotion.Runs),
 		)
 	}
+	assertMultiStageReturnPathEvidence(t, first.Physical.DesignRequest, promotion.Runs)
 	t.Logf(
 		"multi-stage %s promotion synthesis=%s physical=%s project=%s evidence=%s",
 		caseName,
@@ -122,6 +124,50 @@ func testMultiStageOODOptionalKiCadPromotion(t *testing.T, caseName string) {
 		promotion.ProjectHash,
 		promotion.Hash,
 	)
+}
+
+func assertMultiStageReturnPathEvidence(
+	t *testing.T,
+	request designworkflow.Request,
+	runs []PhysicalPromotionRun,
+) {
+	t.Helper()
+	if request.Board.Layers != 4 || request.ExplicitCircuit == nil {
+		return
+	}
+	expected := 0
+	for _, net := range request.ExplicitCircuit.Nets {
+		if net.ReturnNet != "" {
+			expected++
+		}
+	}
+	if expected == 0 {
+		t.Fatal("four-layer promotion has no generated return-path obligations")
+	}
+	var baseline []designworkflow.ExplicitReturnPathEvidence
+	for runIndex, run := range runs {
+		var evidence []designworkflow.ExplicitReturnPathEvidence
+		for _, stage := range run.Workflow.Stages {
+			if stage.Name != designworkflow.StageRouting {
+				continue
+			}
+			evidence, _ = stage.Summary["return_path_evidence"].([]designworkflow.ExplicitReturnPathEvidence)
+			break
+		}
+		if len(evidence) != expected {
+			t.Fatalf("run %d return-path evidence count = %d, want %d", runIndex+1, len(evidence), expected)
+		}
+		for _, item := range evidence {
+			if !item.Pass || !item.SamplingComplete || item.ReturnNet == "" || item.SampleCount == 0 || len(item.UsedLayers) == 0 || len(item.ReturnPlaneLayers) == 0 {
+				t.Fatalf("run %d incomplete return-path evidence: %#v", runIndex+1, item)
+			}
+		}
+		if runIndex == 0 {
+			baseline = append([]designworkflow.ExplicitReturnPathEvidence(nil), evidence...)
+		} else if !reflect.DeepEqual(baseline, evidence) {
+			t.Fatalf("return-path evidence differs across deterministic runs:\nfirst=%#v\nrun%d=%#v", baseline, runIndex+1, evidence)
+		}
+	}
 }
 
 func promotionRunStages(runs []PhysicalPromotionRun) []designworkflow.StageResult {

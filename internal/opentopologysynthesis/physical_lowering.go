@@ -314,6 +314,7 @@ func lowerCandidateDocument(
 			}{node, net.Name}),
 		})
 	}
+	physicalApplyReturnPathIntent(document.Project.Board.Layers, document.Nets)
 	supportGroups, supportIssues := completePhysicalModelSupport(
 		ctx, &document, &bindings, graph, inventory, catalog, instancePrimitives,
 	)
@@ -985,8 +986,41 @@ func physicalNetLayerIntent(layers int, role circuitgraph.NetRole) ([]string, st
 		return []string{"F.Cu", "In1.Cu", "B.Cu"}, "In1.Cu"
 	case circuitgraph.NetRolePower, circuitgraph.NetRolePowerPos, circuitgraph.NetRolePowerNeg:
 		return []string{"F.Cu", "In2.Cu", "B.Cu"}, "In2.Cu"
+	case circuitgraph.NetRoleSignal, circuitgraph.NetRoleClock, circuitgraph.NetRoleFeedback,
+		circuitgraph.NetRoleBias, circuitgraph.NetRoleTiming:
+		// Prefer the outer layer adjacent to the uninterrupted In1.Cu reference
+		// plane, while retaining B.Cu as deterministic congestion escape. The
+		// generated return-path bound below still requires either outer layer to
+		// remain close enough to that continuous reference plane.
+		return []string{"F.Cu", "B.Cu"}, "F.Cu"
 	default:
 		return []string{"F.Cu", "B.Cu"}, "F.Cu"
+	}
+}
+
+const physicalReferencePlaneBudgetMM = 1.2
+
+func physicalApplyReturnPathIntent(layers int, nets []circuitgraph.Net) {
+	if layers != 4 {
+		return
+	}
+	reference := physicalPlaneNet(nets, circuitgraph.NetRoleGround, circuitgraph.NetRoleReturn)
+	if reference == "" {
+		return
+	}
+	for index := range nets {
+		net := &nets[index]
+		if net.Name == reference || net.Role == circuitgraph.NetRoleGround || net.Role == circuitgraph.NetRoleReturn ||
+			net.Role == circuitgraph.NetRoleShield {
+			continue
+		}
+		if net.ReturnNet != "" || net.ReturnPathMaxDistanceMM != 0 {
+			// Explicit constraints are authoritative; request validation reports
+			// an incomplete pair instead of silently replacing either field.
+			continue
+		}
+		net.ReturnNet = reference
+		net.ReturnPathMaxDistanceMM = physicalReferencePlaneBudgetMM
 	}
 }
 

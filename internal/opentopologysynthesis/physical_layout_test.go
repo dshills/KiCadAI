@@ -139,6 +139,29 @@ func TestPhysicalMultilayerIntentReservesReferenceAndPowerLayers(t *testing.T) {
 			t.Fatalf("role %s layer intent = %v prefer %q, want %v prefer %q", test.role, layers, prefer, test.layers, test.prefer)
 		}
 	}
+	physicalApplyReturnPathIntent(4, nets)
+	if nets[0].ReturnNet != "" || nets[1].ReturnNet != "0V" || nets[2].ReturnNet != "0V" ||
+		nets[1].ReturnPathMaxDistanceMM != physicalReferencePlaneBudgetMM ||
+		nets[2].ReturnPathMaxDistanceMM != physicalReferencePlaneBudgetMM {
+		t.Fatalf("four-layer return-path intent = %#v", nets)
+	}
+	twoLayer := append([]circuitgraph.Net(nil), nets...)
+	for index := range twoLayer {
+		twoLayer[index].ReturnNet = ""
+		twoLayer[index].ReturnPathMaxDistanceMM = 0
+	}
+	physicalApplyReturnPathIntent(2, twoLayer)
+	if twoLayer[1].ReturnNet != "" || twoLayer[2].ReturnNet != "" {
+		t.Fatalf("two-layer circuit acquired multilayer return-path intent: %#v", twoLayer)
+	}
+	explicit := []circuitgraph.Net{
+		{Name: "0V", Role: circuitgraph.NetRoleGround},
+		{Name: "CLOCK", Role: circuitgraph.NetRoleClock, ReturnNet: "CHASSIS", ReturnPathMaxDistanceMM: .4},
+	}
+	physicalApplyReturnPathIntent(4, explicit)
+	if explicit[1].ReturnNet != "CHASSIS" || explicit[1].ReturnPathMaxDistanceMM != .4 {
+		t.Fatalf("explicit return-path constraint was overwritten: %#v", explicit[1])
+	}
 }
 
 func TestPhysicalPCBIntentDerivesDeterministicFunctionalAndThermalPlacement(t *testing.T) {

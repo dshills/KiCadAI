@@ -420,7 +420,9 @@ type ExplicitReturnPathEvidence struct {
 	RouteLengthMM      float64  `json:"route_length_mm"`
 	MaxDistanceMM      float64  `json:"max_distance_mm"`
 	WorstDistanceMM    float64  `json:"worst_distance_mm"`
+	SampleSpacingMM    float64  `json:"sample_spacing_mm"`
 	SampleCount        int      `json:"sample_count"`
+	SamplingComplete   bool     `json:"sampling_complete"`
 	Pass               bool     `json:"pass"`
 }
 
@@ -435,9 +437,38 @@ func explicitReturnPathEvidence(
 	for _, route := range routes {
 		routesByNet[route.Net] = route
 	}
-	copperLayers := make(map[string]bool, len(boardLayers))
-	for _, layer := range copperLayerNames(boardLayers) {
-		copperLayers[layer] = true
+	stack := newCopperLayerStack(boardLayers, boardThicknessMM)
+	if stack.ambiguous {
+		return nil, []reports.Issue{{
+			Code: reports.CodeValidationFailed, Severity: reports.SeverityBlocked, Stage: string(StageRouting),
+			Path: "board.layers", Message: "copper layer names must be unique after case and whitespace normalization",
+		}}
+	}
+	copperLayers := stack.names
+	canonicalLayer := stack.canonicalName
+	canonicalRoutesByNet := make(map[string]routing.Route, len(routesByNet))
+	for netName, route := range routesByNet {
+		canonicalRoutesByNet[netName] = canonicalRouteLayers(route, stack)
+	}
+	returnPlaneLayerSets := map[string]map[string]bool{}
+	for _, zone := range zones {
+		for _, layer := range zone.Layers {
+			canonical := canonicalLayer(layer)
+			if canonical == "" {
+				continue
+			}
+			if returnPlaneLayerSets[zone.Net] == nil {
+				returnPlaneLayerSets[zone.Net] = map[string]bool{}
+			}
+			returnPlaneLayerSets[zone.Net][canonical] = true
+		}
+	}
+	returnPlaneLayersByNet := make(map[string][]string, len(returnPlaneLayerSets))
+	for netName, layerSet := range returnPlaneLayerSets {
+		for layer := range layerSet {
+			returnPlaneLayersByNet[netName] = append(returnPlaneLayersByNet[netName], layer)
+		}
+		slices.Sort(returnPlaneLayersByNet[netName])
 	}
 	var evidence []ExplicitReturnPathEvidence
 	var issues []reports.Issue
@@ -445,41 +476,49 @@ func explicitReturnPathEvidence(
 		if net.ReturnNet == "" || net.ReturnPathMaxDistanceMM <= 0 {
 			continue
 		}
-		signal := routesByNet[net.Name]
-		returnPath := routesByNet[net.ReturnNet]
-		var returnPlaneLayers []string
-		for _, zone := range zones {
-			if zone.Net != net.ReturnNet {
-				continue
-			}
-			for _, layer := range zone.Layers {
-				if copperLayers[layer] && !slices.Contains(returnPlaneLayers, layer) {
-					returnPlaneLayers = append(returnPlaneLayers, layer)
-				}
-			}
-		}
-		slices.Sort(returnPlaneLayers)
+		signal := canonicalRoutesByNet[net.Name]
+		returnPath := canonicalRoutesByNet[net.ReturnNet]
+		returnPlaneLayers := returnPlaneLayersByNet[net.ReturnNet]
 		item := ExplicitReturnPathEvidence{
 			Net: net.Name, ReturnNet: net.ReturnNet, PreferredLayer: net.PreferLayer, MaxLengthMM: net.MaxLengthMM,
 			MaxDistanceMM: net.ReturnPathMaxDistanceMM, UsedLayers: []string{},
-			ReturnPlaneLayers: returnPlaneLayers, Pass: true,
+			ReturnPlaneLayers: returnPlaneLayers, SamplingComplete: true, Pass: true,
 		}
 		if (len(signal.Segments) == 0 && len(signal.Vias) == 0) ||
 			(len(returnPath.Segments) == 0 && len(returnPath.Vias) == 0 && len(returnPlaneLayers) == 0) {
 			item.Pass = false
 		} else {
 			usedLayers := map[string]bool{}
+			remainingDistanceEvaluations := explicitReturnPathMaximumDistanceEvaluations
+			returnConductorCount := len(returnPath.Segments) + len(returnPath.Vias)
 			for _, segment := range signal.Segments {
-				usedLayers[segment.Layer] = true
-				item.RouteLengthMM += math.Hypot(segment.End.XMM-segment.Start.XMM, segment.End.YMM-segment.Start.YMM)
-				samples := []routing.Point{
-					segment.Start,
-					{XMM: (segment.Start.XMM + segment.End.XMM) / 2, YMM: (segment.Start.YMM + segment.End.YMM) / 2},
-					segment.End,
+				layer := canonicalLayer(segment.Layer)
+				if layer == "" {
+					layer = segment.Layer
 				}
-				for _, sample := range samples {
+				usedLayers[layer] = true
+				item.RouteLengthMM += math.Hypot(segment.End.XMM-segment.Start.XMM, segment.End.YMM-segment.Start.YMM)
+				intervals, sampleSpacingMM, complete := explicitReturnPathSegmentSampling(segment, net.ReturnPathMaxDistanceMM)
+				item.SampleSpacingMM = math.Max(item.SampleSpacingMM, sampleSpacingMM)
+				if !complete {
+					item.SamplingComplete = false
+					item.Pass = false
+					continue
+				}
+				if !consumeReturnPathEvaluationBudget(&remainingDistanceEvaluations, intervals+1, returnConductorCount) {
+					item.SamplingComplete = false
+					item.Pass = false
+					continue
+				}
+				returnPlaneDistanceMM := nearestReturnPlaneDistance(layer, returnPlaneLayers, stack)
+				for sampleIndex := 0; sampleIndex <= intervals; sampleIndex++ {
+					ratio := float64(sampleIndex) / float64(intervals)
+					sample := routing.Point{
+						XMM: segment.Start.XMM + (segment.End.XMM-segment.Start.XMM)*ratio,
+						YMM: segment.Start.YMM + (segment.End.YMM-segment.Start.YMM)*ratio,
+					}
 					distance := nearestReturnConductorDistance(
-						sample, segment.Layer, returnPath, returnPlaneLayers, boardLayers, boardThicknessMM,
+						sample, layer, returnPath, returnPlaneDistanceMM, stack,
 					)
 					item.SampleCount++
 					item.WorstDistanceMM = math.Max(item.WorstDistanceMM, distance)
@@ -489,14 +528,33 @@ func explicitReturnPathEvidence(
 				}
 			}
 			for _, via := range signal.Vias {
-				viaLayers := copperLayerNames(boardLayers)
+				// A declared via span is authoritative. A missing span denotes a
+				// through-via, so sample every copper layer in stack order.
+				viaLayers := copperLayers
 				if len(via.Layers) != 0 {
 					viaLayers = append([]string(nil), via.Layers...)
 				}
+				item.RouteLengthMM += viaVerticalSpanMM(via, stack)
 				for _, layer := range viaLayers {
-					usedLayers[layer] = true
+					canonical := canonicalLayer(layer)
+					if canonical == "" {
+						canonical = layer
+					}
+					usedLayers[canonical] = true
+				}
+				if !consumeReturnPathEvaluationBudget(&remainingDistanceEvaluations, len(viaLayers), returnConductorCount) {
+					item.SamplingComplete = false
+					item.Pass = false
+					continue
+				}
+				for _, layer := range viaLayers {
+					canonical := canonicalLayer(layer)
+					if canonical == "" {
+						canonical = layer
+					}
+					returnPlaneDistanceMM := nearestReturnPlaneDistance(canonical, returnPlaneLayers, stack)
 					distance := nearestReturnConductorDistance(
-						via.At, layer, returnPath, returnPlaneLayers, boardLayers, boardThicknessMM,
+						via.At, canonical, returnPath, returnPlaneDistanceMM, stack,
 					)
 					item.SampleCount++
 					item.WorstDistanceMM = math.Max(item.WorstDistanceMM, distance)
@@ -504,55 +562,113 @@ func explicitReturnPathEvidence(
 						item.Pass = false
 					}
 				}
-				item.RouteLengthMM += viaVerticalSpanMM(via, boardLayers, boardThicknessMM)
 			}
 			for layer := range usedLayers {
 				item.UsedLayers = append(item.UsedLayers, layer)
 			}
 			slices.Sort(item.UsedLayers)
-			item.PreferredLayerUsed = net.PreferLayer == "" || usedLayers[net.PreferLayer]
-			if !item.PreferredLayerUsed || (net.MaxLengthMM > 0 && item.RouteLengthMM > net.MaxLengthMM) {
+			preferredLayer := stack.canonicalName(net.PreferLayer)
+			item.PreferredLayerUsed = net.PreferLayer == "" || (preferredLayer != "" && usedLayers[preferredLayer])
+			// PreferLayer influences routing cost; AllowedLayers is the hard layer
+			// constraint. Preserve preference use as evidence, but accept another
+			// allowed layer when its measured return path satisfies the hard bound.
+			if net.MaxLengthMM > 0 && item.RouteLengthMM > net.MaxLengthMM {
 				item.Pass = false
 			}
 		}
+		item.MaxLengthMM, item.Pass = finiteReturnPathEvidenceValue(item.MaxLengthMM, item.Pass)
+		item.MaxDistanceMM, item.Pass = finiteReturnPathEvidenceValue(item.MaxDistanceMM, item.Pass)
+		item.RouteLengthMM, item.Pass = finiteReturnPathEvidenceValue(item.RouteLengthMM, item.Pass)
+		item.WorstDistanceMM, item.Pass = finiteReturnPathEvidenceValue(item.WorstDistanceMM, item.Pass)
+		item.SampleSpacingMM, item.Pass = finiteReturnPathEvidenceValue(item.SampleSpacingMM, item.Pass)
 		evidence = append(evidence, item)
 		if !item.Pass {
 			issues = append(issues, reports.Issue{
 				Code: reports.CodeValidationFailed, Severity: reports.SeverityBlocked, Stage: string(StageRouting),
 				Path:       "explicit_circuit.nets." + net.Name + ".return_path",
-				Message:    "routed net violates its declared route-length, preferred-layer, or return-path bound",
+				Message:    "routed net violates its declared route-length or return-path bound",
 				Nets:       []string{net.Name, net.ReturnNet},
-				Suggestion: "shorten the route, use the preferred layer, or move the return conductor closer",
+				Suggestion: "shorten the route or move the return conductor closer",
 			})
 		}
 	}
 	return evidence, issues
 }
 
+func finiteReturnPathEvidenceValue(value float64, pass bool) (float64, bool) {
+	if finiteScalar(value) {
+		return value, pass
+	}
+	// JSON has no representation for NaN or infinity. MaxFloat64 is a
+	// deterministic, encodable fail-closed sentinel for unbounded evidence.
+	return math.MaxFloat64, false
+}
+
 func nearestReturnConductorDistance(
 	point routing.Point,
 	signalLayer string,
 	route routing.Route,
-	returnPlaneLayers []string,
-	boardLayers []routing.Layer,
-	boardThicknessMM float64,
+	returnPlaneDistanceMM float64,
+	stack copperLayerStack,
 ) float64 {
-	distance := math.Inf(1)
+	distance := returnPlaneDistanceMM
 	for _, segment := range route.Segments {
 		planarDistance := pointToSegmentDistance(point, segment.Start, segment.End)
-		layerDistance := copperLayerSeparationMM(signalLayer, segment.Layer, boardLayers, boardThicknessMM)
+		layerDistance := stack.separationCanonicalMM(signalLayer, segment.Layer)
 		distance = math.Min(distance, math.Hypot(planarDistance, layerDistance))
 	}
 	for _, via := range route.Vias {
-		distance = math.Min(distance, math.Hypot(point.XMM-via.At.XMM, point.YMM-via.At.YMM))
+		planarDistance := math.Hypot(point.XMM-via.At.XMM, point.YMM-via.At.YMM)
+		layerDistance := viaLayerSeparationMM(signalLayer, via, stack)
+		distance = math.Min(distance, math.Hypot(planarDistance, layerDistance))
 	}
+	return distance
+}
+
+func nearestReturnPlaneDistance(signalLayer string, returnPlaneLayers []string, stack copperLayerStack) float64 {
+	distance := math.Inf(1)
 	for _, planeLayer := range returnPlaneLayers {
 		if planeLayer == signalLayer {
 			continue
 		}
-		distance = math.Min(distance, copperLayerSeparationMM(signalLayer, planeLayer, boardLayers, boardThicknessMM))
+		distance = math.Min(distance, stack.separationCanonicalMM(signalLayer, planeLayer))
 	}
 	return distance
+}
+
+const explicitReturnPathMaximumSegmentIntervals = 100000
+const explicitReturnPathMaximumDistanceEvaluations = 1000000
+
+func consumeReturnPathEvaluationBudget(remaining *int, sampleCount, conductorCount int) bool {
+	if sampleCount < 0 || conductorCount < 0 || remaining == nil || *remaining < 0 {
+		return false
+	}
+	if sampleCount == 0 || conductorCount == 0 {
+		return true
+	}
+	if sampleCount > *remaining/conductorCount {
+		return false
+	}
+	*remaining -= sampleCount * conductorCount
+	return true
+}
+
+func explicitReturnPathSegmentSampling(segment routing.Segment, maximumDistanceMM float64) (int, float64, bool) {
+	length := math.Hypot(segment.End.XMM-segment.Start.XMM, segment.End.YMM-segment.Start.YMM)
+	if length == 0 {
+		return 1, 0, true
+	}
+	if !finiteScalar(length) || !finiteScalar(maximumDistanceMM) || maximumDistanceMM <= 0 {
+		return 0, math.Inf(1), false
+	}
+	targetSpacingMM := math.Min(1, maximumDistanceMM/2)
+	requiredIntervals := math.Ceil(length / targetSpacingMM)
+	if !finiteScalar(requiredIntervals) || requiredIntervals > explicitReturnPathMaximumSegmentIntervals {
+		return 0, length / explicitReturnPathMaximumSegmentIntervals, false
+	}
+	intervals := max(1, int(requiredIntervals))
+	spacingMM := length / float64(intervals)
+	return intervals, spacingMM, true
 }
 
 func copperLayerNames(layers []routing.Layer) []string {
@@ -565,42 +681,131 @@ func copperLayerNames(layers []routing.Layer) []string {
 	return names
 }
 
-func copperLayerSeparationMM(left, right string, layers []routing.Layer, boardThicknessMM float64) float64 {
-	if left == right {
+func normalizedCopperLayerName(name string) string {
+	return strings.ToLower(strings.TrimSpace(name))
+}
+
+type copperLayerStack struct {
+	names        []string
+	canonical    map[string]string
+	stackIndexes map[string]int
+	thicknessMM  float64
+	ambiguous    bool
+}
+
+func newCopperLayerStack(layers []routing.Layer, boardThicknessMM float64) copperLayerStack {
+	stack := copperLayerStack{
+		names: copperLayerNames(layers), canonical: map[string]string{}, stackIndexes: map[string]int{},
+		thicknessMM: boardThicknessMM,
+	}
+	for index, name := range stack.names {
+		key := normalizedCopperLayerName(name)
+		if existing, found := stack.canonical[key]; found && existing != name {
+			stack.ambiguous = true
+			continue
+		}
+		stack.canonical[key] = name
+		stack.stackIndexes[key] = index
+	}
+	return stack
+}
+
+func (stack copperLayerStack) canonicalName(name string) string {
+	return stack.canonical[normalizedCopperLayerName(name)]
+}
+
+func (stack copperLayerStack) separationMM(left, right string) float64 {
+	return stack.separationCanonicalMM(stack.canonicalName(left), stack.canonicalName(right))
+}
+
+func (stack copperLayerStack) separationCanonicalMM(left, right string) float64 {
+	if left == right && left != "" {
 		return 0
 	}
-	names := copperLayerNames(layers)
 	// Generated boards declare copper order and total thickness but not a
 	// manufacturer-specific core/prepreg build. Use the deterministic uniform
 	// stack model implied by that declaration; the emitted evidence remains
 	// reproducible and can be replaced by explicit stackup geometry later.
-	if len(names) < 2 || !finiteScalar(boardThicknessMM) || boardThicknessMM <= 0 {
+	if len(stack.names) < 2 || !finiteScalar(stack.thicknessMM) || stack.thicknessMM <= 0 || stack.ambiguous {
 		return math.Inf(1)
 	}
-	leftIndex, rightIndex := -1, -1
-	for index, name := range names {
-		if name == left {
-			leftIndex = index
-		}
-		if name == right {
-			rightIndex = index
-		}
-	}
-	if leftIndex < 0 || rightIndex < 0 {
+	leftIndex, leftFound := stack.stackIndexes[normalizedCopperLayerName(left)]
+	rightIndex, rightFound := stack.stackIndexes[normalizedCopperLayerName(right)]
+	if !leftFound || !rightFound {
 		return math.Inf(1)
 	}
-	return math.Abs(float64(leftIndex-rightIndex)) * boardThicknessMM / float64(len(names)-1)
+	return math.Abs(float64(leftIndex-rightIndex)) * stack.thicknessMM / float64(len(stack.names)-1)
 }
 
-func viaVerticalSpanMM(via routing.Via, layers []routing.Layer, boardThicknessMM float64) float64 {
-	names := copperLayerNames(layers)
-	if len(names) < 2 {
-		return boardThicknessMM
+func viaVerticalSpanMM(via routing.Via, stack copperLayerStack) float64 {
+	if len(stack.names) < 2 {
+		return stack.thicknessMM
 	}
 	if len(via.Layers) < 2 {
-		return boardThicknessMM
+		return stack.thicknessMM
 	}
-	return copperLayerSeparationMM(via.Layers[0], via.Layers[len(via.Layers)-1], layers, boardThicknessMM)
+	minimumIndex, maximumIndex := len(stack.names), -1
+	for _, layer := range via.Layers {
+		canonical := stack.canonicalName(layer)
+		index, found := stack.stackIndexes[normalizedCopperLayerName(canonical)]
+		if !found {
+			return math.Inf(1)
+		}
+		minimumIndex = min(minimumIndex, index)
+		maximumIndex = max(maximumIndex, index)
+	}
+	return float64(maximumIndex-minimumIndex) * stack.thicknessMM / float64(len(stack.names)-1)
+}
+
+func viaLayerSeparationMM(signalLayer string, via routing.Via, stack copperLayerStack) float64 {
+	if len(stack.names) < 2 || !finiteScalar(stack.thicknessMM) || stack.thicknessMM <= 0 || stack.ambiguous {
+		return math.Inf(1)
+	}
+	signalIndex, found := stack.stackIndexes[normalizedCopperLayerName(signalLayer)]
+	if !found {
+		return math.Inf(1)
+	}
+	// An omitted span denotes a through-via and therefore intersects every
+	// copper layer. A single declared layer is treated as a point span.
+	if len(via.Layers) == 0 {
+		return 0
+	}
+	minimumIndex, maximumIndex := len(stack.names), -1
+	for _, layer := range via.Layers {
+		index, found := stack.stackIndexes[normalizedCopperLayerName(layer)]
+		if !found {
+			return math.Inf(1)
+		}
+		minimumIndex = min(minimumIndex, index)
+		maximumIndex = max(maximumIndex, index)
+	}
+	if signalIndex >= minimumIndex && signalIndex <= maximumIndex {
+		return 0
+	}
+	delta := minimumIndex - signalIndex
+	if signalIndex > maximumIndex {
+		delta = signalIndex - maximumIndex
+	}
+	return float64(delta) * stack.thicknessMM / float64(len(stack.names)-1)
+}
+
+func canonicalRouteLayers(route routing.Route, stack copperLayerStack) routing.Route {
+	route.Segments = append([]routing.Segment(nil), route.Segments...)
+	for index := range route.Segments {
+		if canonical := stack.canonicalName(route.Segments[index].Layer); canonical != "" {
+			route.Segments[index].Layer = canonical
+		}
+	}
+	route.Vias = append([]routing.Via(nil), route.Vias...)
+	for index := range route.Vias {
+		route.Vias[index].Layers = append([]string(nil), route.Vias[index].Layers...)
+		for layerIndex := range route.Vias[index].Layers {
+			if canonical := stack.canonicalName(route.Vias[index].Layers[layerIndex]); canonical != "" {
+				route.Vias[index].Layers[layerIndex] = canonical
+			}
+		}
+	}
+	return route
 }
 
 func pointToSegmentDistance(point, start, end routing.Point) float64 {

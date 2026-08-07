@@ -1,6 +1,7 @@
 package designworkflow
 
 import (
+	"encoding/json"
 	"math"
 	"reflect"
 	"testing"
@@ -134,7 +135,7 @@ func TestExplicitReturnPathEvidenceMeasuresFinalCopper(t *testing.T) {
 	evidence, issues := explicitReturnPathEvidence(nets, nil, routes, layers, thicknessMM)
 	if len(issues) != 0 || len(evidence) != 1 || !evidence[0].Pass ||
 		math.Abs(evidence[0].WorstDistanceMM-math.Hypot(1, thicknessMM)) > 1e-12 ||
-		evidence[0].SampleCount != 3 {
+		evidence[0].SampleCount != 5 || evidence[0].SampleSpacingMM > 1 {
 		t.Fatalf("return-path evidence = %#v issues=%#v", evidence, issues)
 	}
 
@@ -144,6 +145,61 @@ func TestExplicitReturnPathEvidenceMeasuresFinalCopper(t *testing.T) {
 	if len(issues) != 1 || evidence[0].Pass ||
 		math.Abs(evidence[0].WorstDistanceMM-math.Hypot(3, thicknessMM)) > 1e-12 {
 		t.Fatalf("unbounded return path was accepted: evidence=%#v issues=%#v", evidence, issues)
+	}
+}
+
+func TestExplicitReturnPathEvidenceSamplesOffCenterReturnGap(t *testing.T) {
+	if intervals, spacing, complete := explicitReturnPathSegmentSampling(routing.Segment{
+		Start: routing.Point{}, End: routing.Point{XMM: 1},
+	}, 1e-12); complete || intervals != 0 || spacing <= 1e-12 {
+		t.Fatalf("unbounded sampling request was accepted: intervals=%d spacing=%g complete=%t", intervals, spacing, complete)
+	}
+	nets := []ExplicitNetSpec{{Name: "SIG", ReturnNet: "RET", ReturnPathMaxDistanceMM: .4}}
+	routes := []routing.Route{
+		{Net: "SIG", Segments: []routing.Segment{{
+			Net: "SIG", Layer: "F.Cu", Start: routing.Point{}, End: routing.Point{XMM: 4},
+		}}},
+		{Net: "RET", Segments: []routing.Segment{
+			{Net: "RET", Layer: "F.Cu", Start: routing.Point{}, End: routing.Point{XMM: .5}},
+			{Net: "RET", Layer: "F.Cu", Start: routing.Point{XMM: .5}, End: routing.Point{XMM: .5, YMM: 3}},
+			{Net: "RET", Layer: "F.Cu", Start: routing.Point{XMM: .5, YMM: 3}, End: routing.Point{XMM: 1.5, YMM: 3}},
+			{Net: "RET", Layer: "F.Cu", Start: routing.Point{XMM: 1.5, YMM: 3}, End: routing.Point{XMM: 1.5}},
+			{Net: "RET", Layer: "F.Cu", Start: routing.Point{XMM: 1.5}, End: routing.Point{XMM: 4}},
+		}},
+	}
+	layers := []routing.Layer{{Name: "F.Cu", Kind: routing.LayerCopper, Routable: true}}
+	evidence, issues := explicitReturnPathEvidence(nets, nil, routes, layers, 1.6)
+	if len(issues) != 1 || evidence[0].Pass || evidence[0].SampleSpacingMM > .2 || evidence[0].WorstDistanceMM <= .4 {
+		t.Fatalf("off-center return gap was not detected: evidence=%#v issues=%#v", evidence, issues)
+	}
+}
+
+func TestReturnPathEvaluationBudgetFailsClosedWithoutOverflow(t *testing.T) {
+	remaining := explicitReturnPathMaximumDistanceEvaluations
+	if consumeReturnPathEvaluationBudget(&remaining, explicitReturnPathMaximumDistanceEvaluations, 2) {
+		t.Fatal("oversized return-path evaluation was accepted")
+	}
+	if remaining != explicitReturnPathMaximumDistanceEvaluations {
+		t.Fatalf("rejected evaluation consumed budget: %d", remaining)
+	}
+	if !consumeReturnPathEvaluationBudget(&remaining, 500000, 2) || remaining != 0 {
+		t.Fatalf("bounded evaluation budget was not consumed exactly: %d", remaining)
+	}
+}
+
+func TestExplicitReturnPathEvidenceFailureRemainsJSONEncodable(t *testing.T) {
+	nets := []ExplicitNetSpec{{Name: "SIG", ReturnNet: "RET", ReturnPathMaxDistanceMM: 1}}
+	routes := []routing.Route{
+		{Net: "SIG", Segments: []routing.Segment{{Layer: "unknown", End: routing.Point{XMM: 1}}}},
+		{Net: "RET", Segments: []routing.Segment{{Layer: "also-unknown", End: routing.Point{XMM: 1}}}},
+	}
+	layers := []routing.Layer{{Name: "F.Cu", Kind: routing.LayerCopper, Routable: true}}
+	evidence, issues := explicitReturnPathEvidence(nets, nil, routes, layers, 1.6)
+	if len(issues) != 1 || len(evidence) != 1 || evidence[0].Pass || evidence[0].WorstDistanceMM != math.MaxFloat64 {
+		t.Fatalf("fail-closed evidence = %#v issues=%#v", evidence, issues)
+	}
+	if _, err := json.Marshal(evidence); err != nil {
+		t.Fatalf("marshal fail-closed return-path evidence: %v", err)
 	}
 }
 
@@ -160,6 +216,8 @@ func TestExplicitReturnPathEvidenceUsesDeclaredReturnPlaneAndBoardThickness(t *t
 	}}
 	layers := []routing.Layer{
 		{Name: "F.Cu", Kind: routing.LayerCopper, Routable: true},
+		{Name: "In1.Cu", Kind: routing.LayerCopper, Routable: true},
+		{Name: "In2.Cu", Kind: routing.LayerCopper, Routable: true},
 		{Name: "B.Cu", Kind: routing.LayerCopper, Routable: true},
 	}
 	evidence, issues := explicitReturnPathEvidence(nets, zones, routes, layers, .8)
@@ -177,8 +235,54 @@ func TestCopperLayerSeparationUsesDeclaredUniformStackModel(t *testing.T) {
 		{Name: "In2.Cu", Kind: routing.LayerCopper, Routable: true},
 		{Name: "B.Cu", Kind: routing.LayerCopper, Routable: true},
 	}
-	if got := copperLayerSeparationMM("F.Cu", "In1.Cu", layers, 1.6); math.Abs(got-1.6/3) > 1e-12 {
+	stack := newCopperLayerStack(layers, 1.6)
+	if got := stack.separationMM("F.Cu", "In1.Cu"); math.Abs(got-1.6/3) > 1e-12 {
 		t.Fatalf("uniform multilayer separation = %.12g, want %.12g", got, 1.6/3)
+	}
+	if got := stack.separationMM("IN2.CU", "in1.cu"); math.Abs(got-1.6/3) > 1e-12 {
+		t.Fatalf("canonical multilayer separation = %.12g, want %.12g", got, 1.6/3)
+	}
+	paddedLayers := append([]routing.Layer(nil), layers...)
+	paddedLayers[1].Name = " In1.Cu "
+	if got := newCopperLayerStack(paddedLayers, 1.6).separationMM("F.Cu", "in1.cu"); math.Abs(got-1.6/3) > 1e-12 {
+		t.Fatalf("normalized stack-index separation = %.12g, want %.12g", got, 1.6/3)
+	}
+	via := routing.Via{Layers: []string{"In2.Cu", "F.Cu", "B.Cu"}}
+	if got := viaVerticalSpanMM(via, stack); math.Abs(got-1.6) > 1e-12 {
+		t.Fatalf("unordered multilayer via span = %.12g, want 1.6", got)
+	}
+	ambiguousLayers := append(append([]routing.Layer(nil), layers...), routing.Layer{
+		Name: " in1.cu ", Kind: routing.LayerCopper, Routable: true,
+	})
+	if stack := newCopperLayerStack(ambiguousLayers, 1.6); !stack.ambiguous {
+		t.Fatalf("normalized copper-layer collision was accepted: %#v", stack)
+	}
+}
+
+func TestExplicitReturnPathEvidenceTreatsPreferredLayerAsPreference(t *testing.T) {
+	nets := []ExplicitNetSpec{{
+		Name: "POWER", PreferLayer: "In2.Cu", ReturnNet: "GND", ReturnPathMaxDistanceMM: 1,
+	}}
+	zones := []ExplicitZoneSpec{{Net: "GND", Layers: []string{"in1.cu"}}}
+	layers := []routing.Layer{
+		{Name: "F.Cu", Kind: routing.LayerCopper, Routable: true},
+		{Name: "In1.Cu", Kind: routing.LayerCopper, Routable: true},
+		{Name: "In2.Cu", Kind: routing.LayerCopper, Routable: true},
+		{Name: "B.Cu", Kind: routing.LayerCopper, Routable: true},
+	}
+	routes := []routing.Route{{Net: "POWER", Segments: []routing.Segment{{
+		Net: "POWER", Layer: "F.Cu", Start: routing.Point{}, End: routing.Point{XMM: 2},
+	}}}}
+	evidence, issues := explicitReturnPathEvidence(nets, zones, routes, layers, 1.6)
+	if len(issues) != 0 || len(evidence) != 1 || !evidence[0].Pass || evidence[0].PreferredLayerUsed ||
+		!reflect.DeepEqual(evidence[0].ReturnPlaneLayers, []string{"In1.Cu"}) {
+		t.Fatalf("alternate-layer return evidence = %#v issues=%#v", evidence, issues)
+	}
+	routes[0].Segments[0].Layer = "IN2.CU"
+	evidence, issues = explicitReturnPathEvidence(nets, zones, routes, layers, 1.6)
+	if len(issues) != 0 || !evidence[0].Pass || !evidence[0].PreferredLayerUsed ||
+		!reflect.DeepEqual(evidence[0].UsedLayers, []string{"In2.Cu"}) {
+		t.Fatalf("canonical preferred-layer evidence = %#v issues=%#v", evidence, issues)
 	}
 }
 
@@ -188,7 +292,7 @@ func TestExplicitReturnPathEvidenceValidatesViaOnlySignal(t *testing.T) {
 	}}
 	routes := []routing.Route{
 		{Net: "CLK", Vias: []routing.Via{{
-			Net: "CLK", At: routing.Point{XMM: 0, YMM: 0}, Layers: []string{"F.Cu", "B.Cu"},
+			Net: "CLK", At: routing.Point{XMM: 0, YMM: 0}, Layers: []string{"f.cu", "B.CU"},
 		}}},
 		{Net: "GND", Vias: []routing.Via{{
 			Net: "GND", At: routing.Point{XMM: .5, YMM: 0}, Layers: []string{"F.Cu", "B.Cu"},
@@ -196,11 +300,25 @@ func TestExplicitReturnPathEvidenceValidatesViaOnlySignal(t *testing.T) {
 	}
 	layers := []routing.Layer{
 		{Name: "F.Cu", Kind: routing.LayerCopper, Routable: true},
+		{Name: "In1.Cu", Kind: routing.LayerCopper, Routable: true},
+		{Name: "In2.Cu", Kind: routing.LayerCopper, Routable: true},
 		{Name: "B.Cu", Kind: routing.LayerCopper, Routable: true},
 	}
 	evidence, issues := explicitReturnPathEvidence(nets, nil, routes, layers, 1.6)
 	if len(issues) != 0 || len(evidence) != 1 || !evidence[0].Pass ||
 		evidence[0].SampleCount != 2 || math.Abs(evidence[0].WorstDistanceMM-.5) > 1e-12 {
 		t.Fatalf("via-only return evidence = %#v issues=%#v", evidence, issues)
+	}
+	routes[1].Vias[0].Layers = []string{"In2.Cu", "B.Cu"}
+	evidence, issues = explicitReturnPathEvidence(nets, nil, routes, layers, 1.6)
+	wantBlindViaDistanceMM := math.Hypot(.5, 1.6*2/3)
+	if len(issues) != 1 || evidence[0].Pass || math.Abs(evidence[0].WorstDistanceMM-wantBlindViaDistanceMM) > 1e-12 {
+		t.Fatalf("distant blind return via was accepted: evidence=%#v issues=%#v", evidence, issues)
+	}
+	routes[1].Vias[0].Layers = []string{"F.Cu", "B.Cu"}
+	routes[0].Vias[0].Layers = nil
+	evidence, issues = explicitReturnPathEvidence(nets, nil, routes, layers, 1.6)
+	if len(issues) != 0 || !evidence[0].Pass || evidence[0].SampleCount != len(layers) {
+		t.Fatalf("through-via return evidence = %#v issues=%#v", evidence, issues)
 	}
 }
