@@ -1,0 +1,34 @@
+{
+  "schema": "kicadai.human-quality-physical-corpus.v1",
+  "version": 1,
+  "base_commit": "47f7a018adb292766f0b2dcf324dc5da40df051e",
+  "frozen_at": "2026-08-07",
+  "requirement_schema": "kicadai.open-topology-requirement.v1",
+  "authoring_policy": "Physical-quality evaluation selected and frozen before hierarchy or multi-layer production changes. Inputs are independently frozen behavior-only electrical requirements with no expected topology, part, model, equation, net, sheet, layer, coordinate, zone, via, route, or architecture.",
+  "stages": ["integrity", "schema", "synthesis", "simulation", "thermal_soa", "functional_partition", "hierarchy", "inter_sheet_connectivity", "schematic_readability", "stackup", "plane_planning", "functional_placement", "thermal_placement", "layer_aware_routing", "return_path", "connectivity", "zone_fill", "writer", "erc", "strict_drc", "round_trip", "replay"],
+  "physical_contract": {
+    "minimum_schematic_sheets": 2,
+    "copper_layers": ["F.Cu", "In1.Cu", "In2.Cu", "B.Cu"],
+    "ground_reference_layer": "In1.Cu",
+    "power_distribution_layer": "In2.Cu",
+    "minimum_functional_placement_regions": 3,
+    "require_explicit_inter_sheet_interfaces": true,
+    "require_controlled_return_paths": true,
+    "require_layer_transition_evidence": true,
+    "require_thermal_placement": true,
+    "require_zone_fill": true,
+    "require_complete_routing": true,
+    "require_connectivity": true,
+    "require_writer_correctness": true,
+    "require_erc": true,
+    "require_strict_drc": true,
+    "require_round_trip_zero_diff": true,
+    "require_deterministic_replay": true
+  },
+  "design_cases": [
+    {"id": "mixed_signal_environment_control", "category": "mixed_signal", "functional_behaviors": ["decision", "power_transfer", "protection", "sensing"], "requirement_file": "../multi_stage_ood_corpus/ambient_tracking_airflow_control.json", "requirement_sha256": "d1f50e8473080efde545e90e6f0af8b681b3c5083e902360054c6c3af28d538b", "required_analyses": ["dc_sweep", "electrothermal", "startup", "transient"]},
+    {"id": "precision_audio_power_driver", "category": "amplifier", "functional_behaviors": ["amplification", "limiting", "power_transfer", "protection"], "requirement_file": "../multi_stage_ood_corpus/bounded_audio_power_transfer.json", "requirement_sha256": "1f35badaab1238a95f0543a559be584602aa55843cdbc5ac6e352ea5da97819c", "required_analyses": ["ac_sweep", "distortion", "electrothermal", "noise", "transient"]},
+    {"id": "protected_inductive_actuator", "category": "protected_control", "functional_behaviors": ["command_conditioning", "energy_control", "power_transfer", "protection"], "requirement_file": "../multi_stage_ood_corpus/inductive_load_current_control.json", "requirement_sha256": "6fd28e695dbd437b84b9873ce28342262ebd5fe9e23622d7fddfb7563d42f2d7", "required_analyses": ["dc_operating_point", "electrothermal", "startup", "transient"]},
+    {"id": "regulated_enabled_power_stage", "category": "power", "functional_behaviors": ["enable_control", "feedback_regulation", "power_transfer", "protection"], "requirement_file": "../multi_stage_ood_corpus/enabled_current_regulation.json", "requirement_sha256": "fdd586e2c775b00a2aea237bcd31e16f3e9fdb0a3a7b470c5de926ed9eaa623b", "required_analyses": ["dc_operating_point", "dc_sweep", "electrothermal", "startup", "transient"]}
+  ]
+}
