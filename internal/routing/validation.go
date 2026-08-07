@@ -112,6 +112,267 @@ func ValidatePhysicalTrackClearanceForSegment(request Request, routes []Route, s
 	return validatePhysicalClearanceForNet(request, localized, segment.Net, false)
 }
 
+// PhysicalClearanceViaSelector owns one normalized clearance context for a
+// deterministic batch of via selections. Accepted vias can be added
+// incrementally so later selections see earlier copper without cloning and
+// normalizing the request again.
+type PhysicalClearanceViaSelector struct {
+	request                Request
+	routes                 []Route
+	routeIndexes           map[string]int
+	clearances             *clearancePolicy
+	segments               []clearanceSegment
+	segmentIndex           clearanceGridIndex
+	segmentScratch         *clearanceQueryScratch
+	maxSegmentHalfWidth    float64
+	vias                   []physicalClearanceViaEntry
+	viaIndex               clearanceGridIndex
+	viaScratch             *clearanceQueryScratch
+	maxViaRadius           float64
+	maxViaDrillRadius      float64
+	pads                   []physicalClearancePadEntry
+	padIndex               clearanceGridIndex
+	padScratch             *clearanceQueryScratch
+	maxPadRadius           float64
+	maxPadDrillRadius      float64
+	minimumHoleClearanceMM float64
+}
+
+type physicalClearanceViaEntry struct {
+	net   string
+	via   Via
+	layer string
+}
+
+type physicalClearancePadEntry struct {
+	component Component
+	pad       Pad
+	layer     string
+	radiusMM  float64
+}
+
+func NewPhysicalClearanceViaSelector(request Request, routes []Route) (*PhysicalClearanceViaSelector, []reports.Issue) {
+	request = cloneRequest(request)
+	NormalizeRequest(&request)
+	clearances := newClearancePolicy(request)
+	if reports.HasBlockingIssue(clearances.issues) {
+		return nil, append([]reports.Issue(nil), clearances.issues...)
+	}
+	ownedRoutes := make([]Route, len(routes))
+	for index, route := range routes {
+		ownedRoutes[index] = route
+		ownedRoutes[index].Segments = append([]Segment(nil), route.Segments...)
+		ownedRoutes[index].Vias = append([]Via(nil), route.Vias...)
+		clearances.ruleForNet(route.Net)
+	}
+	for _, component := range request.Components {
+		for _, pad := range component.Pads {
+			clearances.ruleForNet(pad.Net)
+		}
+	}
+	selector := &PhysicalClearanceViaSelector{
+		request: request, routes: ownedRoutes, routeIndexes: map[string]int{}, clearances: clearances,
+	}
+	for routeIndex, route := range ownedRoutes {
+		selector.routeIndexes[normalizeKey(route.Net)] = routeIndex
+	}
+	selector.segments = clearanceSegments(ownedRoutes)
+	for _, segment := range selector.segments {
+		selector.maxSegmentHalfWidth = max(selector.maxSegmentHalfWidth, segment.Segment.WidthMM/2)
+	}
+	cellSizeMM := clearanceIndexCellSize(clearances.maximumClearance())
+	selector.segmentIndex = clearanceSpatialIndex(selector.segments, cellSizeMM)
+	selector.segmentScratch = newClearanceQueryScratch(len(selector.segments))
+	selector.viaIndex = clearanceGridIndex{cellSize: cellSizeMM, cells: map[clearanceCellKey][]int{}}
+	for _, route := range ownedRoutes {
+		for _, via := range route.Vias {
+			selector.addViaEntry(route.Net, via)
+		}
+	}
+	selector.viaScratch = newClearanceQueryScratch(len(selector.vias))
+	selector.padIndex = clearanceGridIndex{cellSize: cellSizeMM, cells: map[clearanceCellKey][]int{}}
+	routableLayers := routableLayerNames(request.Board.Layers)
+	for _, component := range request.Components {
+		for _, pad := range component.Pads {
+			radiusMM := math.Hypot(pad.Size.WidthMM, pad.Size.HeightMM) / 2
+			center := absolutePadPoint(component, pad.Position)
+			for _, layer := range padAccessLayers(pad, routableLayers) {
+				entryIndex := len(selector.pads)
+				selector.pads = append(selector.pads, physicalClearancePadEntry{
+					component: component, pad: pad, layer: normalizeLayer(layer), radiusMM: radiusMM,
+				})
+				selector.padIndex.addSegment(entryIndex, normalizeLayer(layer), Segment{Start: center, End: center})
+			}
+			selector.maxPadRadius = max(selector.maxPadRadius, radiusMM)
+			if pad.Drill != nil {
+				selector.maxPadDrillRadius = max(selector.maxPadDrillRadius, pad.Drill.DiameterMM/2)
+			}
+		}
+	}
+	selector.padScratch = newClearanceQueryScratch(len(selector.pads))
+	return selector, append([]reports.Issue(nil), clearances.issues...)
+}
+
+func (selector *PhysicalClearanceViaSelector) SetMinimumHoleToHoleClearanceMM(clearanceMM float64) {
+	if selector == nil {
+		return
+	}
+	if math.IsNaN(clearanceMM) || math.IsInf(clearanceMM, 0) || clearanceMM < 0 {
+		clearanceMM = 0
+	}
+	selector.minimumHoleClearanceMM = clearanceMM
+}
+
+// First returns the first candidate, in caller-provided deterministic order,
+// that satisfies exact emitted-copper, foreign-pad, and board-edge clearance.
+func (selector *PhysicalClearanceViaSelector) First(candidates []Via) (Via, bool) {
+	if selector == nil || selector.clearances == nil {
+		return Via{}, false
+	}
+	for _, candidate := range candidates {
+		if !viaMeetsBoardEdgeClearance(selector.request.Board, selector.request.Rules, candidate) {
+			continue
+		}
+		clear := true
+		probe := Segment{Start: candidate.At, End: candidate.At}
+		for _, layer := range physicalClearanceViaLayers(candidate, selector.request.Board.Layers) {
+			segmentMarginMM := selector.clearances.maximumClearance() + candidate.DiameterMM/2 + selector.maxSegmentHalfWidth
+			for _, entryIndex := range selector.segmentIndex.query(layer, probe, segmentMarginMM, selector.segmentScratch) {
+				segment := selector.segments[entryIndex]
+				if sameOccupancyNet(segment.Net, candidate.Net) {
+					continue
+				}
+				clearanceMM := selector.clearances.pair(candidate.Net, clearanceObjectVia, segment.Net, clearanceObjectTrace)
+				if distancePointToSegment(candidate.At, segment.Segment.Start, segment.Segment.End)-candidate.DiameterMM/2-segment.Segment.WidthMM/2 < clearanceMM-distanceEpsilon {
+					clear = false
+					break
+				}
+			}
+			if !clear {
+				break
+			}
+			viaMarginMM := max(
+				selector.clearances.maximumClearance()+candidate.DiameterMM/2+selector.maxViaRadius,
+				selector.minimumHoleClearanceMM+candidate.DrillMM/2+selector.maxViaDrillRadius,
+			)
+			for _, entryIndex := range selector.viaIndex.query(layer, probe, viaMarginMM, selector.viaScratch) {
+				entry := selector.vias[entryIndex]
+				if candidate.DrillMM > 0 && entry.via.DrillMM > 0 &&
+					pointDistance(candidate.At, entry.via.At)-candidate.DrillMM/2-entry.via.DrillMM/2 < selector.minimumHoleClearanceMM-distanceEpsilon {
+					clear = false
+					break
+				}
+				if sameOccupancyNet(entry.net, candidate.Net) {
+					continue
+				}
+				clearanceMM := selector.clearances.pair(candidate.Net, clearanceObjectVia, entry.net, clearanceObjectVia)
+				if pointDistance(candidate.At, entry.via.At)-candidate.DiameterMM/2-entry.via.DiameterMM/2 < clearanceMM-distanceEpsilon {
+					clear = false
+					break
+				}
+			}
+			if !clear {
+				break
+			}
+			padMarginMM := max(
+				selector.clearances.maximumClearance()+candidate.DiameterMM/2+selector.maxPadRadius,
+				selector.minimumHoleClearanceMM+candidate.DrillMM/2+selector.maxPadDrillRadius,
+			)
+			for _, entryIndex := range selector.padIndex.query(layer, probe, padMarginMM, selector.padScratch) {
+				entry := selector.pads[entryIndex]
+				if candidate.DrillMM > 0 && entry.pad.Drill != nil && entry.pad.Drill.DiameterMM > 0 {
+					center := absolutePadPoint(entry.component, entry.pad.Position)
+					if pointDistance(candidate.At, center)-candidate.DrillMM/2-entry.pad.Drill.DiameterMM/2 < selector.minimumHoleClearanceMM-distanceEpsilon {
+						clear = false
+						break
+					}
+				}
+				if sameOccupancyNet(entry.pad.Net, candidate.Net) {
+					continue
+				}
+				clearanceMM := selector.clearances.pad(candidate.Net, clearanceObjectVia, entry.pad)
+				if segmentShapeDistance(probe, padRect(entry.component, entry.pad))-candidate.DiameterMM/2 < clearanceMM-distanceEpsilon {
+					clear = false
+					break
+				}
+			}
+			if !clear {
+				break
+			}
+		}
+		if clear {
+			return candidate, true
+		}
+	}
+	return Via{}, false
+}
+
+func (selector *PhysicalClearanceViaSelector) Add(via Via) {
+	if selector == nil {
+		return
+	}
+	key := normalizeKey(via.Net)
+	if routeIndex, found := selector.routeIndexes[key]; found {
+		selector.routes[routeIndex].Vias = append(selector.routes[routeIndex].Vias, via)
+		selector.addViaEntry(via.Net, via)
+		return
+	}
+	selector.routeIndexes[key] = len(selector.routes)
+	selector.routes = append(selector.routes, Route{Net: via.Net, Status: RouteStatusRouted, Vias: []Via{via}})
+	selector.addViaEntry(via.Net, via)
+}
+
+func (selector *PhysicalClearanceViaSelector) addViaEntry(netName string, via Via) {
+	layers := physicalClearanceViaLayers(via, selector.request.Board.Layers)
+	for _, layer := range layers {
+		entryIndex := len(selector.vias)
+		selector.vias = append(selector.vias, physicalClearanceViaEntry{net: netName, via: via, layer: layer})
+		selector.viaIndex.addSegment(entryIndex, layer, Segment{Start: via.At, End: via.At})
+	}
+	selector.maxViaRadius = max(selector.maxViaRadius, via.DiameterMM/2)
+	selector.maxViaDrillRadius = max(selector.maxViaDrillRadius, via.DrillMM/2)
+	if selector.viaScratch != nil {
+		selector.viaScratch.marks = append(selector.viaScratch.marks, make([]int, len(layers))...)
+	}
+}
+
+func physicalClearanceViaLayers(via Via, boardLayers []Layer) []string {
+	if throughVia(via) || len(via.Layers) == 0 {
+		layers := routableLayerNames(boardLayers)
+		for index := range layers {
+			layers[index] = normalizeLayer(layers[index])
+		}
+		return layers
+	}
+	layers := append([]string(nil), via.Layers...)
+	for index := range layers {
+		layers[index] = normalizeLayer(layers[index])
+	}
+	return layers
+}
+
+func (selector *PhysicalClearanceViaSelector) Routes() []Route {
+	if selector == nil {
+		return nil
+	}
+	routes := make([]Route, len(selector.routes))
+	for index, route := range selector.routes {
+		routes[index] = route
+		routes[index].Segments = append([]Segment(nil), route.Segments...)
+		routes[index].Vias = append([]Via(nil), route.Vias...)
+	}
+	return routes
+}
+
+func FirstPhysicalClearanceSafeVia(request Request, routes []Route, candidates []Via) (Via, []reports.Issue, bool) {
+	selector, issues := NewPhysicalClearanceViaSelector(request, routes)
+	if selector == nil {
+		return Via{}, issues, false
+	}
+	via, found := selector.First(candidates)
+	return via, issues, found
+}
+
 func validatePhysicalClearanceForNet(request Request, routes []Route, netName string, includeViaPad bool) []reports.Issue {
 	request = cloneRequest(request)
 	NormalizeRequest(&request)

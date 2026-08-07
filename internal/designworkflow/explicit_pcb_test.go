@@ -8,6 +8,7 @@ import (
 
 	"kicadai/internal/placement"
 	"kicadai/internal/routing"
+	"kicadai/internal/transactions"
 )
 
 func TestExplicitNetWeightDoesNotLetSharedGroundCurrentDominatePlacement(t *testing.T) {
@@ -355,5 +356,103 @@ func TestExplicitReturnTransitionEvidenceUsesCommonPlaneOrPairedVia(t *testing.T
 	if len(evidence) != 1 || evidence[0].Pass || evidence[0].ReturnViaFound ||
 		math.Abs(evidence[0].ReturnViaDistanceMM-.6) > 1e-12 {
 		t.Fatalf("distant paired return via was accepted: %#v", evidence)
+	}
+}
+
+func TestMaterializeExplicitReturnTransitionViasIsClearanceSafeAndIdempotent(t *testing.T) {
+	layers := []routing.Layer{
+		{Name: "F.Cu", Kind: routing.LayerCopper, Routable: true},
+		{Name: "In1.Cu", Kind: routing.LayerCopper, Routable: true},
+		{Name: "In2.Cu", Kind: routing.LayerCopper, Routable: true},
+		{Name: "B.Cu", Kind: routing.LayerCopper, Routable: true},
+	}
+	routingRequest := routing.Request{
+		Board:    routing.Board{WidthMM: 20, HeightMM: 20, Layers: layers, MarginMM: .5},
+		Nets:     []routing.Net{{Name: "SIG", Role: routing.NetSignal}, {Name: "GND", Role: routing.NetGround}},
+		Rules:    routing.DefaultRules(),
+		Strategy: routing.Strategy{Mode: routing.ModeTwoLayer},
+	}
+	routing.NormalizeRequest(&routingRequest)
+	operation := func(payload transactions.RouteOperation) transactions.Operation {
+		t.Helper()
+		result, err := workflowOperation(transactions.OpRoute, payload)
+		if err != nil {
+			t.Fatalf("encode route operation: %v", err)
+		}
+		return result
+	}
+	operations := []transactions.Operation{
+		operation(transactions.RouteOperation{
+			Op: transactions.OpRoute, NetName: "SIG", Layer: "F.Cu", WidthMM: .25,
+			Points: []transactions.Point{{XMM: 5, YMM: 10}, {XMM: 10, YMM: 10}},
+		}),
+		operation(transactions.RouteOperation{
+			Op: transactions.OpRoute, NetName: "SIG", Layer: "B.Cu", WidthMM: .25,
+			Points: []transactions.Point{{XMM: 10, YMM: 10}, {XMM: 15, YMM: 10}},
+		}),
+		operation(transactions.RouteOperation{
+			Op: transactions.OpRoute, NetName: "SIG", Vias: []transactions.RouteViaSpec{{
+				At: transactions.Point{XMM: 10, YMM: 10}, DiameterMM: .6, DrillMM: .3,
+				Layers: []string{"F.Cu", "B.Cu"},
+			}},
+		}),
+		operation(transactions.RouteOperation{
+			Op: transactions.OpRoute, NetName: "SIG", Layer: "F.Cu", WidthMM: .25,
+			Points: []transactions.Point{{XMM: 14, YMM: 10}, {XMM: 14, YMM: 8}},
+		}),
+		operation(transactions.RouteOperation{
+			Op: transactions.OpRoute, NetName: "SIG", Vias: []transactions.RouteViaSpec{{
+				At: transactions.Point{XMM: 14, YMM: 10}, DiameterMM: .6, DrillMM: .3,
+				Layers: []string{"F.Cu", "B.Cu"},
+			}},
+		}),
+	}
+	nets := []ExplicitNetSpec{{Name: "SIG", ReturnNet: "GND", ReturnPathMaxDistanceMM: 1.2}}
+	zones := []ExplicitZoneSpec{{Net: "GND", Layers: []string{"In1.Cu", "In2.Cu"}}}
+	materialized, added, issues := materializeExplicitReturnTransitionVias(
+		nets, zones, operations, routingRequest, 1.6,
+	)
+	if len(issues) != 0 || added != 2 {
+		t.Fatalf("paired return-via materialization added=%d issues=%#v", added, issues)
+	}
+	evidence, evidenceIssues := explicitReturnPathEvidence(nets, zones, routingRoutesFromOperations(materialized), layers, 1.6)
+	if len(evidenceIssues) != 0 || len(evidence) != 1 || !evidence[0].Pass ||
+		len(evidence[0].LayerTransitions) != 2 {
+		t.Fatalf("materialized return-transition evidence=%#v issues=%#v", evidence, evidenceIssues)
+	}
+	for _, transition := range evidence[0].LayerTransitions {
+		if !transition.ReturnViaFound || transition.ReturnViaDistanceMM > 1.2 {
+			t.Fatalf("unproven materialized transition: %#v", transition)
+		}
+	}
+	repeated, repeatedAdded, repeatedIssues := materializeExplicitReturnTransitionVias(
+		nets, zones, materialized, routingRequest, 1.6,
+	)
+	if len(repeatedIssues) != 0 || repeatedAdded != 0 || !reflect.DeepEqual(repeated, materialized) {
+		t.Fatalf("return-via materialization is not idempotent: added=%d issues=%#v", repeatedAdded, repeatedIssues)
+	}
+	unrepairableNets := []ExplicitNetSpec{{Name: "SIG", ReturnNet: "GND", ReturnPathMaxDistanceMM: .1}}
+	_, unrepairableAdded, unrepairableIssues := materializeExplicitReturnTransitionVias(
+		unrepairableNets, zones, operations, routingRequest, 1.6,
+	)
+	if unrepairableAdded != 0 || len(unrepairableIssues) == 0 {
+		t.Fatalf("non-transition return-path failure was swallowed: added=%d issues=%#v", unrepairableAdded, unrepairableIssues)
+	}
+}
+
+func TestExplicitReturnViaCandidatesFailClosedAtWorkBound(t *testing.T) {
+	candidates, complete := explicitReturnViaCandidates(transactions.Point{}, .25, .5)
+	if !complete || len(candidates) != 12 || candidates[0] != (transactions.Point{XMM: .25}) {
+		t.Fatalf("bounded perimeter candidates=%#v complete=%t", candidates, complete)
+	}
+	seen := map[transactions.Point]bool{}
+	for _, candidate := range candidates {
+		if seen[candidate] || math.Hypot(candidate.XMM, candidate.YMM) > .5+explicitReturnViaDistanceToleranceMM {
+			t.Fatalf("duplicate or out-of-radius candidate: %#v", candidate)
+		}
+		seen[candidate] = true
+	}
+	if candidates, complete := explicitReturnViaCandidates(transactions.Point{}, .01, 10); complete || candidates != nil {
+		t.Fatalf("oversized return-via search was accepted: candidates=%d complete=%t", len(candidates), complete)
 	}
 }

@@ -197,6 +197,49 @@ func TestValidatePhysicalTrackClearanceTreatsOuterSpanViaAsMultilayerThroughVia(
 	}
 }
 
+func TestFirstPhysicalClearanceSafeViaUsesOrderedExactChecks(t *testing.T) {
+	request := singleLayerSearchRequest()
+	request.Board.Layers = []Layer{
+		{Name: "F.Cu", Kind: LayerCopper, Routable: true},
+		{Name: "B.Cu", Kind: LayerCopper, Routable: true},
+	}
+	request.Rules.ClearanceMM = .2
+	request.Components = []Component{{
+		Ref: "U1", Position: Placement{XMM: 5, YMM: 3}, Pads: []Pad{{
+			Name: "1", Net: "PAD", Type: PadSMD, Shape: PadRect,
+			Size: Size{WidthMM: 1, HeightMM: 1}, Layers: []string{"F.Cu"},
+		}},
+	}, {
+		Ref: "J1", Position: Placement{XMM: 9, YMM: 3}, Pads: []Pad{{
+			Name: "1", Net: "GND", Type: PadThroughHole, Shape: PadCircle,
+			Size: Size{WidthMM: .9, HeightMM: .9}, Drill: &Drill{DiameterMM: .6}, Layers: []string{"*.Cu"},
+		}},
+	}}
+	routes := []Route{{Net: "TRACE", Segments: []Segment{{
+		Net: "TRACE", Layer: "F.Cu", Start: Point{XMM: 3, YMM: 2}, End: Point{XMM: 3, YMM: 4}, WidthMM: .25,
+	}}}}
+	candidate := func(x float64) Via {
+		return Via{Net: "GND", At: Point{XMM: x, YMM: 3}, DiameterMM: .6, DrillMM: .3, Layers: []string{"F.Cu", "B.Cu"}}
+	}
+	selected, issues, found := FirstPhysicalClearanceSafeVia(request, routes, []Via{candidate(3), candidate(5), candidate(7)})
+	if len(issues) != 0 || !found || selected.At != (Point{XMM: 7, YMM: 3}) {
+		t.Fatalf("selected via=%#v found=%t issues=%#v", selected, found, issues)
+	}
+	if clearanceIssues := ValidatePhysicalClearance(request, append(routes, Route{Net: "GND", Vias: []Via{selected}})); len(clearanceIssues) != 0 {
+		t.Fatalf("selected via failed full clearance: %#v", clearanceIssues)
+	}
+	selector, selectorIssues := NewPhysicalClearanceViaSelector(request, routes)
+	if len(selectorIssues) != 0 {
+		t.Fatalf("create via selector: %#v", selectorIssues)
+	}
+	selector.SetMinimumHoleToHoleClearanceMM(.25)
+	selector.Add(selected)
+	second, found := selector.First([]Via{candidate(7.5), candidate(8.5), candidate(8)})
+	if !found || second.At != (Point{XMM: 8, YMM: 3}) {
+		t.Fatalf("incremental via selection did not see prior copper: %#v found=%t", second, found)
+	}
+}
+
 func TestPhysicalPadDetourCandidatesClearLongTrackNearForeignPad(t *testing.T) {
 	request := singleLayerSearchRequest()
 	request.Rules.ClearanceMM = 0.2

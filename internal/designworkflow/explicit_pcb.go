@@ -368,6 +368,14 @@ func RouteExplicitCircuit(ctx context.Context, request Request, placed Placement
 	operations = compactRouteOperationGeometry(operations)
 	operations, danglingRouteViasPruned := pruneRouteViasWithoutTwoLayerContact(operations, newPhysicalPadRoutingContext(&placed))
 	operations = compactRouteOperationGeometry(operations)
+	operations, pairedReturnViasAdded, pairedReturnViaIssues := materializeExplicitReturnTransitionVias(
+		request.ExplicitCircuit.Nets, request.ExplicitCircuit.Zones, operations, routingRequest, request.Board.ThicknessMM,
+	)
+	issues = append(issues, pairedReturnViaIssues...)
+	result.Issues = append(result.Issues, pairedReturnViaIssues...)
+	if reports.HasBlockingIssue(pairedReturnViaIssues) {
+		result.Status = routing.StatusBlocked
+	}
 	if request.Validation.RequireDRC {
 		finalClearanceRequest := routingRequest
 		routing.NormalizeRequest(&finalClearanceRequest)
@@ -400,6 +408,7 @@ func RouteExplicitCircuit(ctx context.Context, request Request, placed Placement
 		"clearance_mm": clearanceMM, "physical_clearance_before_repair": clearanceBlockersBefore,
 		"physical_clearance_after_repair": clearanceBlockersAfter, "physical_clearance_deferred_drc": clearanceDeferredToDRC,
 		"layer_transition_vias_added": layerTransitionViasAdded,
+		"paired_return_vias_added":    pairedReturnViasAdded,
 		"route_endpoint_tail_cleanup": endpointTailCleanup,
 		"dangling_route_vias_pruned":  danglingRouteViasPruned,
 		"return_path_evidence":        returnPathEvidence,
@@ -680,6 +689,299 @@ func explicitReturnTransitionEvidence(
 		return cmp.Compare(left.SignalLayers[1], right.SignalLayers[1])
 	})
 	return evidence
+}
+
+const explicitReturnViaMaximumCandidatePoints = 10000
+const explicitReturnViaDistanceToleranceMM = 1e-12
+
+// materializeExplicitReturnTransitionVias returns the updated operations and
+// the number of newly emitted paired return vias; existing route operations do
+// not contribute to that count.
+func materializeExplicitReturnTransitionVias(
+	nets []ExplicitNetSpec,
+	zones []ExplicitZoneSpec,
+	operations []transactions.Operation,
+	routingRequest routing.Request,
+	boardThicknessMM float64,
+) ([]transactions.Operation, int, []reports.Issue) {
+	materialized := append([]transactions.Operation(nil), operations...)
+	if len(routingRequest.Board.Layers) < 2 {
+		return materialized, 0, nil
+	}
+	routes := routingRoutesFromOperations(materialized)
+	evidence, evidenceIssues := explicitReturnPathEvidence(nets, zones, routes, routingRequest.Board.Layers, boardThicknessMM)
+	repairableEvidenceNets := map[string]bool{}
+	for _, item := range evidence {
+		repairableEvidenceNets[item.Net] = explicitReturnPathEvidenceRepairableByPairedVias(item)
+	}
+	var unresolvedEvidenceIssues []reports.Issue
+	for _, issue := range evidenceIssues {
+		if len(issue.Nets) == 0 || !repairableEvidenceNets[issue.Nets[0]] {
+			unresolvedEvidenceIssues = append(unresolvedEvidenceIssues, issue)
+		}
+	}
+	if reports.HasBlockingIssue(unresolvedEvidenceIssues) {
+		return materialized, 0, unresolvedEvidenceIssues
+	}
+	netsByName := make(map[string]*ExplicitNetSpec, len(nets))
+	for netIndex := range nets {
+		netsByName[nets[netIndex].Name] = &nets[netIndex]
+	}
+	type returnViaObligation struct {
+		net        *ExplicitNetSpec
+		transition ExplicitReturnTransitionEvidence
+	}
+	var obligations []returnViaObligation
+	for _, item := range evidence {
+		for _, transition := range item.LayerTransitions {
+			if transition.ReturnViaRequired && !transition.ReturnViaFound {
+				obligations = append(obligations, returnViaObligation{net: netsByName[item.Net], transition: transition})
+			}
+		}
+	}
+	if len(obligations) == 0 {
+		return materialized, 0, nil
+	}
+	selector, selectorIssues := routing.NewPhysicalClearanceViaSelector(routingRequest, routes)
+	if reports.HasBlockingIssue(selectorIssues) {
+		return materialized, 0, selectorIssues
+	}
+	diagnostics := make([]reports.Issue, 0, len(unresolvedEvidenceIssues)+len(selectorIssues))
+	diagnostics = append(diagnostics, unresolvedEvidenceIssues...)
+	diagnostics = append(diagnostics, selectorIssues...)
+	selector.SetMinimumHoleToHoleClearanceMM(minimumRouteHoleToHoleClearanceMM)
+	stack := newCopperLayerStack(routingRequest.Board.Layers, boardThicknessMM)
+	routesByNet := make(map[string]routing.Route, len(routes))
+	for _, route := range routes {
+		routesByNet[route.Net] = route
+	}
+	viaTemplates := map[string]transactions.RouteViaSpec{}
+	type selectedReturnVia struct {
+		net string
+		via transactions.RouteViaSpec
+	}
+	var selectedVias []selectedReturnVia
+	var routingCandidates []routing.Via
+	for obligationIndex := range obligations {
+		obligation := &obligations[obligationIndex]
+		if obligation.net == nil {
+			return materialized, 0, appendExplicitReturnViaDiagnostics(diagnostics, explicitReturnViaMaterializationIssue(
+				nil, &obligation.transition, "return-via obligation has no matching explicit net",
+			))
+		}
+		if explicitReturnTransitionAlreadySatisfied(
+			obligation.transition, routesByNet[obligation.net.ReturnNet], stack, obligation.net.ReturnPathMaxDistanceMM,
+		) {
+			continue
+		}
+		if len(obligation.transition.ReferenceLayers) != 2 {
+			return materialized, 0, appendExplicitReturnViaDiagnostics(diagnostics, explicitReturnViaMaterializationIssue(
+				obligation.net, &obligation.transition, "automatic return-via insertion requires two declared reference-plane layers",
+			))
+		}
+		via, found := viaTemplates[obligation.net.ReturnNet]
+		if !found {
+			returnRoutingNet := routing.Net{Name: obligation.net.ReturnNet, Role: routing.NetGround}
+			for _, candidateNet := range routingRequest.Nets {
+				if candidateNet.Name == obligation.net.ReturnNet {
+					returnRoutingNet = candidateNet
+					break
+				}
+			}
+			effectiveRule, ruleIssues := routing.ResolveNetRule(&routingRequest, returnRoutingNet)
+			diagnostics = append(diagnostics, ruleIssues...)
+			if reports.HasBlockingIssue(ruleIssues) {
+				return materialized, 0, diagnostics
+			}
+			via = transactions.RouteViaSpec{
+				DiameterMM: effectiveRule.ViaDiameterMM, DrillMM: effectiveRule.ViaDrillMM,
+				// RouteViaSpec and the KiCad writer currently model ordinary
+				// plated through vias, not blind/buried fabrication types. Span
+				// the declared outer copper layers so the via intersects both
+				// selected internal reference planes.
+				Layers: []string{routingRequest.Board.Layers[0].Name, routingRequest.Board.Layers[len(routingRequest.Board.Layers)-1].Name},
+			}
+			viaTemplates[obligation.net.ReturnNet] = via
+		}
+		via.At = transactions.Point{XMM: obligation.transition.XMM, YMM: obligation.transition.YMM}
+		candidates, complete := explicitReturnViaCandidates(
+			via.At, routingRequest.Rules.GridMM, obligation.net.ReturnPathMaxDistanceMM,
+		)
+		if !complete {
+			return materialized, 0, appendExplicitReturnViaDiagnostics(diagnostics, explicitReturnViaMaterializationIssue(
+				obligation.net, &obligation.transition, "return-via candidate search exceeds its deterministic work bound",
+			))
+		}
+		if cap(routingCandidates) < len(candidates) {
+			routingCandidates = make([]routing.Via, 0, len(candidates))
+		} else {
+			routingCandidates = routingCandidates[:0]
+		}
+		for _, candidatePoint := range candidates {
+			routingCandidates = append(routingCandidates, routing.Via{
+				Net: obligation.net.ReturnNet, At: routing.Point{XMM: candidatePoint.XMM, YMM: candidatePoint.YMM},
+				DiameterMM: via.DiameterMM, DrillMM: via.DrillMM, Layers: via.Layers,
+			})
+		}
+		selected, found := selector.First(routingCandidates)
+		if !found {
+			return materialized, 0, appendExplicitReturnViaDiagnostics(diagnostics, explicitReturnViaMaterializationIssue(
+				obligation.net, &obligation.transition, "reference-plane change has no clearance-safe paired return-via location",
+			))
+		}
+		selector.Add(selected)
+		returnRoute := routesByNet[obligation.net.ReturnNet]
+		returnRoute.Net = obligation.net.ReturnNet
+		returnRoute.Status = routing.RouteStatusRouted
+		returnRoute.Vias = append(returnRoute.Vias, selected)
+		routesByNet[obligation.net.ReturnNet] = returnRoute
+		via.At = transactions.Point{XMM: selected.At.XMM, YMM: selected.At.YMM}
+		selectedVias = append(selectedVias, selectedReturnVia{net: obligation.net.ReturnNet, via: via})
+	}
+	emittedOperations := make([]transactions.Operation, 0, len(selectedVias))
+	for _, selected := range selectedVias {
+		operation, err := workflowOperation(transactions.OpRoute, transactions.RouteOperation{
+			Op: transactions.OpRoute, NetName: selected.net, Vias: []transactions.RouteViaSpec{selected.via},
+		})
+		if err != nil {
+			return materialized, 0, appendExplicitReturnViaDiagnostics(diagnostics, reports.Issue{
+				Code: reports.CodeValidationFailed, Severity: reports.SeverityBlocked, Stage: string(StageRouting),
+				Path: "explicit_circuit.return_path", Message: "encode paired return-via operation: " + err.Error(),
+			})
+		}
+		emittedOperations = append(emittedOperations, operation)
+	}
+	materialized = append(materialized, emittedOperations...)
+	return materialized, len(selectedVias), diagnostics
+}
+
+func appendExplicitReturnViaDiagnostics(diagnostics []reports.Issue, additional ...reports.Issue) []reports.Issue {
+	combined := make([]reports.Issue, 0, len(diagnostics)+len(additional))
+	combined = append(combined, diagnostics...)
+	return append(combined, additional...)
+}
+
+func explicitReturnPathEvidenceRepairableByPairedVias(item ExplicitReturnPathEvidence) bool {
+	if !item.SamplingComplete || item.SampleCount == 0 || item.WorstDistanceMM > item.MaxDistanceMM ||
+		(item.MaxLengthMM > 0 && item.RouteLengthMM > item.MaxLengthMM) {
+		return false
+	}
+	missingPair := false
+	for _, transition := range item.LayerTransitions {
+		if transition.Pass {
+			continue
+		}
+		if !transition.ReturnViaRequired || transition.ReturnViaFound {
+			return false
+		}
+		missingPair = true
+	}
+	return missingPair
+}
+
+func explicitReturnViaCandidates(
+	center transactions.Point,
+	gridMM float64,
+	maximumDistanceMM float64,
+) ([]transactions.Point, bool) {
+	if !finiteScalar(gridMM) || gridMM <= 0 {
+		gridMM = routing.DefaultRules().GridMM
+	}
+	if !finiteScalar(maximumDistanceMM) || maximumDistanceMM <= 0 {
+		return nil, false
+	}
+	maximumRingFloat := math.Ceil(maximumDistanceMM / gridMM)
+	diameterSteps := 2*maximumRingFloat + 1
+	if !finiteScalar(maximumRingFloat) || diameterSteps*diameterSteps-1 > explicitReturnViaMaximumCandidatePoints {
+		return nil, false
+	}
+	maximumRing := int(maximumRingFloat)
+	maximumDistanceWithToleranceMM := maximumDistanceMM + explicitReturnViaDistanceToleranceMM
+	maximumDistanceSquared := maximumDistanceWithToleranceMM * maximumDistanceWithToleranceMM
+	type offset struct{ x, y int }
+	squarePointCount := (2*maximumRing+1)*(2*maximumRing+1) - 1
+	offsets := make([]offset, 0, min(explicitReturnViaMaximumCandidatePoints, squarePointCount))
+	appendOffset := func(x, y int) bool {
+		dx, dy := float64(x)*gridMM, float64(y)*gridMM
+		if dx*dx+dy*dy > maximumDistanceSquared {
+			return true
+		}
+		if len(offsets) >= explicitReturnViaMaximumCandidatePoints {
+			return false
+		}
+		offsets = append(offsets, offset{x: x, y: y})
+		return true
+	}
+	for ring := 1; ring <= maximumRing; ring++ {
+		for x := -ring; x <= ring; x++ {
+			if !appendOffset(x, ring) || !appendOffset(x, -ring) {
+				return nil, false
+			}
+		}
+		for y := -ring + 1; y < ring; y++ {
+			if !appendOffset(ring, y) || !appendOffset(-ring, y) {
+				return nil, false
+			}
+		}
+	}
+	slices.SortFunc(offsets, func(left, right offset) int {
+		leftDistance := left.x*left.x + left.y*left.y
+		rightDistance := right.x*right.x + right.y*right.y
+		if order := cmp.Compare(leftDistance, rightDistance); order != 0 {
+			return order
+		}
+		// At equal Euclidean distance, prefer +X and then +Y. This stable
+		// directional tie-break matches the deterministic transition repair
+		// search used elsewhere in the router.
+		if order := cmp.Compare(right.x, left.x); order != 0 {
+			return order
+		}
+		return cmp.Compare(right.y, left.y)
+	})
+	candidates := make([]transactions.Point, len(offsets))
+	for index, candidate := range offsets {
+		candidates[index] = transactions.Point{
+			XMM: center.XMM + float64(candidate.x)*gridMM,
+			YMM: center.YMM + float64(candidate.y)*gridMM,
+		}
+	}
+	return candidates, true
+}
+
+func explicitReturnTransitionAlreadySatisfied(
+	transition ExplicitReturnTransitionEvidence,
+	returnRoute routing.Route,
+	stack copperLayerStack,
+	maximumDistanceMM float64,
+) bool {
+	if len(transition.SignalLayers) != 2 {
+		return false
+	}
+	signal := routing.Route{Vias: []routing.Via{{
+		At:     routing.Point{XMM: transition.XMM, YMM: transition.YMM},
+		Layers: append([]string(nil), transition.SignalLayers...),
+	}}}
+	evidence := explicitReturnTransitionEvidence(signal, returnRoute, transition.ReferenceLayers, stack, maximumDistanceMM)
+	return len(evidence) == 1 && evidence[0].Pass
+}
+
+func explicitReturnViaMaterializationIssue(
+	net *ExplicitNetSpec,
+	transition *ExplicitReturnTransitionEvidence,
+	message string,
+) reports.Issue {
+	issue := reports.Issue{
+		Code: reports.CodeValidationFailed, Severity: reports.SeverityBlocked, Stage: string(StageRouting),
+		Path: "explicit_circuit.return_path", Message: message,
+	}
+	if net != nil {
+		issue.Path = "explicit_circuit.nets." + net.Name + ".return_path"
+		issue.Nets = []string{net.Name, net.ReturnNet}
+	}
+	if transition != nil {
+		issue.Suggestion = "reserve paired-via clearance within the declared return-path distance of the signal transition"
+	}
+	return issue
 }
 
 func nearestReferenceLayerIndex(signalIndex int, returnPlaneLayers []string, stack copperLayerStack) (int, bool) {
