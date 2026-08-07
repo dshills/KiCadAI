@@ -250,6 +250,7 @@ func lowerCandidateDocument(
 			CurrentMA: physicalNodeCurrentMA(requirement, node),
 			Endpoints: []circuitgraph.Endpoint{},
 		}
+		net.AllowedLayers, net.PreferLayer = physicalNetLayerIntent(document.Project.Board.Layers, net.Role)
 		for _, instance := range graph.Instances {
 			primitive, found := instancePrimitives[instance.ID]
 			if !found {
@@ -310,7 +311,7 @@ func lowerCandidateDocument(
 	issues = append(issues, supportIssues...)
 	document.Schematic = physicalSchematicIntent(graph)
 	appendPhysicalSupportSchematicIntent(&document.Schematic, supportGroups)
-	document.PCB = physicalPCBIntent(document.Project.Board, document.Components)
+	document.PCB = physicalPCBIntent(document.Project.Board, document.Components, document.Nets)
 	applyPhysicalSupportPCBIntent(&document.PCB, supportGroups)
 	return document, bindings, reports.SortedIssues(issues)
 }
@@ -955,7 +956,29 @@ func physicalBoard(requirement Requirement, graph CandidateGraph, inventory Prim
 	side := math.Max(20, math.Sqrt(math.Max(area, 1))*6)
 	width := math.Min(requirement.Requirements.Constraints.MaxWidthMM, side*1.25)
 	height := math.Min(requirement.Requirements.Constraints.MaxHeightMM, side)
-	return circuitgraph.Board{WidthMM: width, HeightMM: height, Layers: 2, EdgeClearanceMM: .25}
+	layers := 2
+	// Fabrication-candidate graphs with enough structure to require semantic
+	// hierarchy also benefit from a dedicated reference plane and power routing
+	// layer. Small single-stage designs retain the ordinary two-layer policy.
+	if physicalAcceptance(requirement.Acceptance) == circuitgraph.AcceptanceFabricationCandidate &&
+		len(graph.Instances) >= 4 && physicalSchematicIntent(graph).Hierarchy.Mode == "auto" {
+		layers = 4
+	}
+	return circuitgraph.Board{WidthMM: width, HeightMM: height, Layers: layers, EdgeClearanceMM: .25}
+}
+
+func physicalNetLayerIntent(layers int, role circuitgraph.NetRole) ([]string, string) {
+	if layers != 4 {
+		return nil, ""
+	}
+	switch role {
+	case circuitgraph.NetRoleGround, circuitgraph.NetRoleReturn:
+		return []string{"F.Cu", "In1.Cu", "B.Cu"}, "In1.Cu"
+	case circuitgraph.NetRolePower, circuitgraph.NetRolePowerPos, circuitgraph.NetRolePowerNeg:
+		return []string{"F.Cu", "In2.Cu", "B.Cu"}, "In2.Cu"
+	default:
+		return []string{"F.Cu", "B.Cu"}, "F.Cu"
+	}
 }
 
 func physicalSchematicIntent(graph CandidateGraph) circuitgraph.SchematicIntent {
@@ -1150,7 +1173,7 @@ func physicalGraphDistances(roots []string, neighbors map[string]map[string]stru
 	return distance
 }
 
-func physicalPCBIntent(board circuitgraph.Board, components []circuitgraph.Component) circuitgraph.PCBIntent {
+func physicalPCBIntent(board circuitgraph.Board, components []circuitgraph.Component, nets []circuitgraph.Net) circuitgraph.PCBIntent {
 	region := circuitgraph.PCBRegion{
 		ID: "synthesized_circuit", Role: "signal",
 		Bounds: circuitgraph.Bounds{XMM: 0, YMM: 0, WidthMM: board.WidthMM, HeightMM: board.HeightMM},
@@ -1163,10 +1186,44 @@ func physicalPCBIntent(board circuitgraph.Board, components []circuitgraph.Compo
 		}
 		placements = append(placements, circuitgraph.PCBPlacement{Component: component.ID, Region: region.ID, Priority: priority})
 	}
-	return circuitgraph.PCBIntent{
+	intent := circuitgraph.PCBIntent{
 		Regions: []circuitgraph.PCBRegion{region}, Placements: placements,
 		Keepouts: []circuitgraph.PCBKeepout{}, Zones: []circuitgraph.PCBZone{},
 	}
+	if board.Layers != 4 {
+		return intent
+	}
+	if reference := physicalPlaneNet(nets, circuitgraph.NetRoleGround, circuitgraph.NetRoleReturn); reference != "" {
+		intent.Zones = append(intent.Zones, circuitgraph.PCBZone{Net: reference, Layers: []string{"In1.Cu"}, ClearanceMM: .2})
+	}
+	powerNets := physicalPlaneNets(nets, circuitgraph.NetRolePower, circuitgraph.NetRolePowerPos, circuitgraph.NetRolePowerNeg)
+	if len(powerNets) == 1 {
+		intent.Zones = append(intent.Zones, circuitgraph.PCBZone{Net: powerNets[0], Layers: []string{"In2.Cu"}, ClearanceMM: .2})
+	}
+	return intent
+}
+
+func physicalPlaneNet(nets []circuitgraph.Net, roles ...circuitgraph.NetRole) string {
+	candidates := physicalPlaneNets(nets, roles...)
+	if len(candidates) == 0 {
+		return ""
+	}
+	return candidates[0]
+}
+
+func physicalPlaneNets(nets []circuitgraph.Net, roles ...circuitgraph.NetRole) []string {
+	accepted := make(map[circuitgraph.NetRole]bool, len(roles))
+	for _, role := range roles {
+		accepted[role] = true
+	}
+	candidates := make([]string, 0)
+	for _, net := range nets {
+		if accepted[net.Role] && strings.TrimSpace(net.Name) != "" {
+			candidates = append(candidates, net.Name)
+		}
+	}
+	slices.Sort(candidates)
+	return slices.Compact(candidates)
 }
 
 func graphBool(value bool) *bool {

@@ -62,7 +62,24 @@ type PCBSetup struct {
 }
 
 type PCBStackup struct {
-	Thickness kicadfiles.IU
+	// Thickness is the declared total construction thickness, including copper
+	// and solder mask. Layers carries the ordered KiCad stackup construction.
+	Thickness             kicadfiles.IU
+	Layers                []PCBStackupLayer
+	CopperFinish          string
+	DielectricConstraints bool
+}
+
+// PCBStackupLayer is one physical or process layer in KiCad's ordered board
+// stackup. Non-physical silk and paste rows omit Thickness.
+type PCBStackupLayer struct {
+	Name        string
+	Type        string
+	Color       string
+	Thickness   kicadfiles.IU
+	Material    string
+	EpsilonR    float64
+	LossTangent float64
 }
 
 type LayerDefinition struct {

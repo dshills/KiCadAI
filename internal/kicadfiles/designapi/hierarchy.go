@@ -170,6 +170,46 @@ func (builder *Builder) applySchematicHierarchy(design *kicaddesign.Design) erro
 		root.Sheets = append(root.Sheets, sheet)
 	}
 	design.SheetFiles = children
+	return bindHierarchyFootprintPaths(design)
+}
+
+func bindHierarchyFootprintPaths(design *kicaddesign.Design) error {
+	if design == nil || design.PCB == nil {
+		return nil
+	}
+	type candidate struct {
+		unit int
+		path string
+	}
+	byReference := map[string]candidate{}
+	for _, child := range design.SheetFiles {
+		if child == nil {
+			continue
+		}
+		for _, symbol := range child.Symbols {
+			if len(symbol.Instances) == 0 || strings.TrimSpace(symbol.Reference) == "" {
+				continue
+			}
+			instancePath := strings.TrimRight(strings.TrimSpace(symbol.Instances[0].Path), "/")
+			if instancePath == "" {
+				continue
+			}
+			path := instancePath + "/" + string(symbol.UUID)
+			key := referenceKey(symbol.Reference)
+			current, exists := byReference[key]
+			if !exists || symbol.Unit < current.unit || symbol.Unit == current.unit && path < current.path {
+				byReference[key] = candidate{unit: symbol.Unit, path: path}
+			}
+		}
+	}
+	for index := range design.PCB.Footprints {
+		footprint := &design.PCB.Footprints[index]
+		binding, ok := byReference[referenceKey(footprint.Reference)]
+		if !ok {
+			return fmt.Errorf("footprint %s has no hierarchical schematic symbol path", footprint.Reference)
+		}
+		footprint.Path = binding.path
+	}
 	return nil
 }
 

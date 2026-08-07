@@ -102,12 +102,13 @@ func testMultiStageOODOptionalKiCadPromotion(t *testing.T, caseName string) {
 			placed.Result.Status, placed.Stage.Summary, placed.Result.Metrics, placed.Result.CandidateScoring,
 		)
 		t.Fatalf(
-			"multi-stage KiCad promotion status=%s replay=%t project=%s runs=%d issues=%#v board=%#v components=%v routing=%#v",
+			"multi-stage KiCad promotion status=%s replay=%t project=%s runs=%d issues=%#v stages=%#v board=%#v components=%v routing=%#v",
 			promotion.Status,
 			promotion.ReplayIdentical,
 			promotion.ProjectHash,
 			len(promotion.Runs),
 			promotion.Issues,
+			promotionRunStages(promotion.Runs),
 			first.Physical.Document.Project.Board,
 			nonlinearSwitchingPhysicalComponents(first.Physical.Bindings),
 			nonlinearSwitchingRoutingSummary(promotion.Runs),
@@ -121,4 +122,11 @@ func testMultiStageOODOptionalKiCadPromotion(t *testing.T, caseName string) {
 		promotion.ProjectHash,
 		promotion.Hash,
 	)
+}
+
+func promotionRunStages(runs []PhysicalPromotionRun) []designworkflow.StageResult {
+	if len(runs) == 0 {
+		return nil
+	}
+	return runs[len(runs)-1].Workflow.Stages
 }

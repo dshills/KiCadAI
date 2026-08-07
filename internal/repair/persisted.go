@@ -277,6 +277,13 @@ func refreshGeneratedManifest(outputDir string) (reports.Artifact, error) {
 	return artifact, nil
 }
 
+// RefreshGeneratedManifest rebinds a generated project's manifest after an
+// authorized deterministic post-process, such as KiCad zone refill, mutates
+// project files in place.
+func RefreshGeneratedManifest(outputDir string) (reports.Artifact, error) {
+	return refreshGeneratedManifest(outputDir)
+}
+
 type persistedRepairValidator struct {
 	transaction *transactions.Transaction
 	remaining   []reports.Issue

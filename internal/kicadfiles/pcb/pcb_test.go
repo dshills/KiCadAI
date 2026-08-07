@@ -232,6 +232,34 @@ func TestWriteRendersPreservedNodes(t *testing.T) {
 	}
 }
 
+func TestReadModelsBoardAndFootprintEmbeddedFonts(t *testing.T) {
+	board, err := Read([]byte(`(kicad_pcb
+  (version 20260206)
+  (generator "pcbnew")
+  (generator_version "10.0")
+  (general (thickness 1.6))
+  (paper "A4")
+  (layers (0 "F.Cu" signal) (31 "B.Cu" signal) (44 "Edge.Cuts" user))
+  (setup (pad_to_mask_clearance 0))
+  (footprint "Test:Part" (layer "F.Cu") (embedded_fonts no))
+  (embedded_fonts no)
+)`))
+	if err != nil {
+		t.Fatalf("Read returned error: %v", err)
+	}
+	if board.EmbeddedFonts == nil || *board.EmbeddedFonts {
+		t.Fatalf("board embedded fonts = %#v, want modeled no", board.EmbeddedFonts)
+	}
+	if len(board.Footprints) != 1 || board.Footprints[0].EmbeddedFonts == nil || *board.Footprints[0].EmbeddedFonts {
+		t.Fatalf("footprint embedded fonts = %#v, want modeled no", board.Footprints)
+	}
+	for _, node := range board.Preserved {
+		if node.Family == "embedded_fonts" {
+			t.Fatalf("board embedded fonts retained as preservation-only node: %#v", board.Preserved)
+		}
+	}
+}
+
 func TestWriteRendersUnknownPreservedNodesWithPlacementHint(t *testing.T) {
 	board := minimalPCB()
 	board.Preserved = []PreservedNode{
@@ -1361,6 +1389,48 @@ func TestDefaultFourLayerStackDefinesDeterministicCopperOrder(t *testing.T) {
 	}
 	if !slices.Equal(copper, want) {
 		t.Fatalf("copper layers = %#v, want %#v", copper, want)
+	}
+}
+
+func TestDefaultFourLayerPCBStackupIsCompleteAndRoundTrips(t *testing.T) {
+	board := minimalPCB()
+	board.Layers = DefaultFourLayerStack()
+	board.Setup.HasStackup = true
+	board.Setup.Stackup = DefaultFourLayerPCBStackup()
+	if err := Validate(board); err != nil {
+		t.Fatalf("Validate returned error: %v", err)
+	}
+
+	var output bytes.Buffer
+	if err := Write(&output, board); err != nil {
+		t.Fatalf("Write returned error: %v", err)
+	}
+	for _, want := range []string{
+		`"F.Cu"`,
+		`"In1.Cu"`,
+		`"In2.Cu"`,
+		`"dielectric 2"`,
+		`(material "FR4")`,
+		`(epsilon_r 4.5)`,
+		`(loss_tangent 0.02)`,
+		`"F.Mask"`,
+		`"B.Mask"`,
+		`(copper_finish "None")`,
+	} {
+		if !strings.Contains(output.String(), want) {
+			t.Fatalf("stackup output missing %q:\n%s", want, output.String())
+		}
+	}
+
+	parsed, err := Read(output.Bytes())
+	if err != nil {
+		t.Fatalf("Read returned error: %v", err)
+	}
+	if err := Validate(parsed); err != nil {
+		t.Fatalf("parsed Validate returned error: %v", err)
+	}
+	if !parsed.Setup.HasStackup || len(parsed.Setup.Stackup.Layers) != 13 || parsed.Setup.Stackup.Thickness != kicadfiles.MM(1.6) {
+		t.Fatalf("parsed stackup = %#v", parsed.Setup.Stackup)
 	}
 }
 

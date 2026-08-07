@@ -94,6 +94,9 @@ func Read(data []byte) (PCBFile, error) {
 			board.Drawings = append(board.Drawings, readDrawing(child))
 		case "zone":
 			board.Zones = append(board.Zones, readZone(child, &board.Preservation, len(board.Zones)))
+		case "embedded_fonts":
+			value := child.ListValue(1) == "yes"
+			board.EmbeddedFonts = &value
 		case "version", "generator", "generator_version", "general", "paper", "title_block", "layers", "setup":
 		default:
 			if child.Head() != "" {
@@ -179,12 +182,49 @@ func readSetup(node sexpr.ParsedNode, setup *PCBSetup) {
 	}
 	if stackup, ok := node.Child("stackup"); ok {
 		setup.HasStackup = true
+		setup.Stackup = readStackup(stackup)
 		if thickness, ok := stackup.Child("thickness"); ok {
 			if value, ok := thickness.FloatValue(1); ok {
 				setup.Stackup.Thickness = kicadfiles.MM(value)
 			}
 		}
 	}
+}
+
+func readStackup(node sexpr.ParsedNode) PCBStackup {
+	stackup := PCBStackup{}
+	for _, child := range node.ChildrenByHead("layer") {
+		layer := PCBStackupLayer{Name: child.ListValue(1)}
+		if value, ok := child.Child("type"); ok {
+			layer.Type = value.ListValue(1)
+		}
+		if value, ok := child.Child("color"); ok {
+			layer.Color = value.ListValue(1)
+		}
+		if value, ok := child.Child("thickness"); ok {
+			if number, ok := value.FloatValue(1); ok {
+				layer.Thickness = kicadfiles.MM(number)
+				stackup.Thickness += layer.Thickness
+			}
+		}
+		if value, ok := child.Child("material"); ok {
+			layer.Material = value.ListValue(1)
+		}
+		if value, ok := child.Child("epsilon_r"); ok {
+			layer.EpsilonR, _ = value.FloatValue(1)
+		}
+		if value, ok := child.Child("loss_tangent"); ok {
+			layer.LossTangent, _ = value.FloatValue(1)
+		}
+		stackup.Layers = append(stackup.Layers, layer)
+	}
+	if value, ok := node.Child("copper_finish"); ok {
+		stackup.CopperFinish = value.ListValue(1)
+	}
+	if value, ok := node.Child("dielectric_constraints"); ok {
+		stackup.DielectricConstraints = value.ListValue(1) == "yes"
+	}
+	return stackup
 }
 
 func readLayers(node sexpr.ParsedNode) []LayerDefinition {
@@ -224,6 +264,10 @@ func readFootprint(node sexpr.ParsedNode, capabilities *[]kicadfiles.Preservatio
 				fp.Attributes = append(fp.Attributes, value)
 			}
 		}
+	}
+	if embeddedFonts, ok := node.Child("embedded_fonts"); ok {
+		value := embeddedFonts.ListValue(1) == "yes"
+		fp.EmbeddedFonts = &value
 	}
 	for _, property := range node.ChildrenByHead("property") {
 		name := property.ListValue(1)

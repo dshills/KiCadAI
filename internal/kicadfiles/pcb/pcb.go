@@ -59,6 +59,39 @@ func DefaultFourLayerStack() []LayerDefinition {
 	})
 }
 
+// DefaultFourLayerPCBStackup returns a deterministic, symmetric 1.6 mm FR-4
+// construction for generated four-copper-layer fabrication candidates. The
+// ordered rows match KiCad's board-setup stackup representation and include
+// process layers so the declared thickness is auditable.
+func DefaultFourLayerPCBStackup() PCBStackup {
+	const (
+		maskThicknessMM    = 0.01
+		copperThicknessMM  = 0.035
+		prepregThicknessMM = 0.10
+		coreThicknessMM    = 1.24
+	)
+	return PCBStackup{
+		Thickness: kicadfiles.MM(1.6),
+		Layers: []PCBStackupLayer{
+			{Name: "F.SilkS", Type: "Top Silk Screen"},
+			{Name: "F.Paste", Type: "Top Solder Paste"},
+			{Name: "F.Mask", Type: "Top Solder Mask", Color: "Green", Thickness: kicadfiles.MM(maskThicknessMM)},
+			{Name: "F.Cu", Type: "copper", Thickness: kicadfiles.MM(copperThicknessMM)},
+			{Name: "dielectric 1", Type: "prepreg", Thickness: kicadfiles.MM(prepregThicknessMM), Material: "FR4", EpsilonR: 4.5, LossTangent: 0.02},
+			{Name: "In1.Cu", Type: "copper", Thickness: kicadfiles.MM(copperThicknessMM)},
+			{Name: "dielectric 2", Type: "core", Thickness: kicadfiles.MM(coreThicknessMM), Material: "FR4", EpsilonR: 4.5, LossTangent: 0.02},
+			{Name: "In2.Cu", Type: "copper", Thickness: kicadfiles.MM(copperThicknessMM)},
+			{Name: "dielectric 3", Type: "prepreg", Thickness: kicadfiles.MM(prepregThicknessMM), Material: "FR4", EpsilonR: 4.5, LossTangent: 0.02},
+			{Name: "B.Cu", Type: "copper", Thickness: kicadfiles.MM(copperThicknessMM)},
+			{Name: "B.Mask", Type: "Bottom Solder Mask", Color: "Green", Thickness: kicadfiles.MM(maskThicknessMM)},
+			{Name: "B.Paste", Type: "Bottom Solder Paste"},
+			{Name: "B.SilkS", Type: "Bottom Silk Screen"},
+		},
+		CopperFinish:          "None",
+		DielectricConstraints: false,
+	}
+}
+
 func defaultLayerStack(innerCopper []LayerDefinition) []LayerDefinition {
 	layers := []LayerDefinition{
 		{Number: kicad10LayerFCu, Name: kicadfiles.LayerFCu, Kind: "signal"},

@@ -148,16 +148,20 @@ func validateCopperZones(board kpcb.PCBFile, path string) ([]reports.Issue, []re
 			}
 		}
 		for polygonIndex, polygon := range zone.Polygons {
-			if len(polygon) < 3 {
-				zoneIssues = append(zoneIssues, reports.Issue{Code: reports.CodeValidationFailed, Severity: reports.SeverityError, Path: fmt.Sprintf("%s.polygons.%d", objectPath, polygonIndex), Message: "zone polygon must contain at least three points", Nets: []string{zone.NetName}})
-				continue
-			}
-			if polygon[0] != polygon[len(polygon)-1] {
-				zoneIssues = append(zoneIssues, reports.Issue{Code: reports.CodeValidationFailed, Severity: reports.SeverityError, Path: fmt.Sprintf("%s.polygons.%d", objectPath, polygonIndex), Message: "zone polygon must be closed", Nets: []string{zone.NetName}})
+			if distinctPointCount(polygon) < 3 {
+				zoneIssues = append(zoneIssues, reports.Issue{Code: reports.CodeValidationFailed, Severity: reports.SeverityError, Path: fmt.Sprintf("%s.polygons.%d", objectPath, polygonIndex), Message: "zone polygon must contain at least three distinct points", Nets: []string{zone.NetName}})
 			}
 		}
 	}
 	return copperIssues, zoneIssues
+}
+
+func distinctPointCount(points []kicadfiles.Point) int {
+	distinct := make(map[kicadfiles.Point]struct{}, len(points))
+	for _, point := range points {
+		distinct[point] = struct{}{}
+	}
+	return len(distinct)
 }
 
 func validateCopperNet(path string, code int, name string, validNets map[int]string) []reports.Issue {

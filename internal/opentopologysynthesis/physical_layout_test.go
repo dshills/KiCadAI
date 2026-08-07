@@ -73,6 +73,68 @@ func TestPhysicalSchematicIntentUsesTopologyDerivedCoreRanks(t *testing.T) {
 	}
 }
 
+func TestPhysicalBoardUsesFourLayersOnlyForDenseFabricationCandidates(t *testing.T) {
+	graph := CandidateGraph{
+		Nodes: []GraphNode{
+			{ID: "input", Scope: "external", Role: "input"},
+			{ID: "middle", Scope: "internal", Role: "signal"},
+			{ID: "output", Scope: "external", Role: "output"},
+		},
+		Instances: []GraphInstance{
+			{ID: "first", Terminals: []TerminalConnection{{Node: "input"}, {Node: "middle"}}},
+			{ID: "second", Terminals: []TerminalConnection{{Node: "middle"}, {Node: "output"}}},
+			{ID: "bias", Terminals: []TerminalConnection{{Node: "middle"}}},
+			{ID: "protection", Terminals: []TerminalConnection{{Node: "output"}}},
+		},
+	}
+	requirement := Requirement{
+		Requirements: Requirements{Constraints: BoardLimits{MaxWidthMM: 80, MaxHeightMM: 60}},
+		Acceptance: Acceptance{
+			RequireCompleteRouting: true, RequireConnectivity: true, RequireWriterCorrectness: true,
+			RequireRoundTripZeroDiff: true, RequireERC: true, RequireStrictDRC: true,
+		},
+	}
+	if got := physicalBoard(requirement, graph, PrimitiveInventory{}).Layers; got != 4 {
+		t.Fatalf("fabrication multi-stage layers = %d, want 4", got)
+	}
+	requirement.Acceptance.RequireStrictDRC = false
+	if got := physicalBoard(requirement, graph, PrimitiveInventory{}).Layers; got != 2 {
+		t.Fatalf("non-fabrication layers = %d, want 2", got)
+	}
+	graph.Instances = graph.Instances[:3]
+	requirement.Acceptance.RequireStrictDRC = true
+	if got := physicalBoard(requirement, graph, PrimitiveInventory{}).Layers; got != 2 {
+		t.Fatalf("small graph layers = %d, want 2", got)
+	}
+}
+
+func TestPhysicalMultilayerIntentReservesReferenceAndPowerLayers(t *testing.T) {
+	nets := []circuitgraph.Net{
+		{Name: "0V", Role: circuitgraph.NetRoleGround},
+		{Name: "VCC", Role: circuitgraph.NetRolePowerPos},
+		{Name: "SIGNAL", Role: circuitgraph.NetRoleSignal},
+	}
+	intent := physicalPCBIntent(circuitgraph.Board{WidthMM: 60, HeightMM: 40, Layers: 4}, nil, nets)
+	if len(intent.Zones) != 2 || intent.Zones[0].Net != "0V" || intent.Zones[0].Layers[0] != "In1.Cu" ||
+		intent.Zones[1].Net != "VCC" || intent.Zones[1].Layers[0] != "In2.Cu" {
+		t.Fatalf("multilayer zones = %#v", intent.Zones)
+	}
+	for _, test := range []struct {
+		role   circuitgraph.NetRole
+		layers []string
+		prefer string
+	}{
+		{circuitgraph.NetRoleGround, []string{"F.Cu", "In1.Cu", "B.Cu"}, "In1.Cu"},
+		{circuitgraph.NetRolePowerPos, []string{"F.Cu", "In2.Cu", "B.Cu"}, "In2.Cu"},
+		{circuitgraph.NetRoleSignal, []string{"F.Cu", "B.Cu"}, "F.Cu"},
+	} {
+		layers, prefer := physicalNetLayerIntent(4, test.role)
+		if fmt.Sprint(layers) != fmt.Sprint(test.layers) || prefer != test.prefer {
+			t.Fatalf("role %s layer intent = %v prefer %q, want %v prefer %q", test.role, layers, prefer, test.layers, test.prefer)
+		}
+	}
+}
+
 func TestPhysicalEngineeringValueUsesReadableSIPrefixes(t *testing.T) {
 	tests := []struct {
 		value float64

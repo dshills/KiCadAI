@@ -142,7 +142,7 @@ func renderLayers(layers []LayerDefinition) sexpr.List {
 func renderSetup(setup PCBSetup) sexpr.List {
 	nodes := []sexpr.Node{sexpr.A("setup")}
 	if setup.HasStackup {
-		nodes = append(nodes, sexpr.L(sexpr.A("stackup"), sexpr.L(sexpr.A("thickness"), fixed(setup.Stackup.Thickness))))
+		nodes = append(nodes, renderStackup(setup.Stackup))
 	}
 	nodes = append(nodes,
 		sexpr.L(sexpr.A("pad_to_mask_clearance"), fixed(setup.PadToMaskClearance)),
@@ -159,6 +159,42 @@ func renderSetup(setup PCBSetup) sexpr.List {
 		sexpr.L(sexpr.A("filling"), yesNo(setup.Filling)),
 		renderPlotParams(setup.PlotParams),
 	)
+	return sexpr.L(nodes...)
+}
+
+func renderStackup(stackup PCBStackup) sexpr.List {
+	nodes := []sexpr.Node{sexpr.A("stackup")}
+	if len(stackup.Layers) == 0 {
+		// Retain compatibility with the early typed model. Generated
+		// fabrication candidates always use the complete ordered form below.
+		return sexpr.L(nodes[0], sexpr.L(sexpr.A("thickness"), fixed(stackup.Thickness)))
+	}
+	for _, layer := range stackup.Layers {
+		layerNodes := []sexpr.Node{sexpr.A("layer"), sexpr.S(layer.Name)}
+		if strings.TrimSpace(layer.Type) != "" {
+			layerNodes = append(layerNodes, sexpr.L(sexpr.A("type"), sexpr.S(layer.Type)))
+		}
+		if strings.TrimSpace(layer.Color) != "" {
+			layerNodes = append(layerNodes, sexpr.L(sexpr.A("color"), sexpr.S(layer.Color)))
+		}
+		if layer.Thickness > 0 {
+			layerNodes = append(layerNodes, sexpr.L(sexpr.A("thickness"), fixed(layer.Thickness)))
+		}
+		if strings.TrimSpace(layer.Material) != "" {
+			layerNodes = append(layerNodes, sexpr.L(sexpr.A("material"), sexpr.S(layer.Material)))
+		}
+		if layer.EpsilonR > 0 {
+			layerNodes = append(layerNodes, sexpr.L(sexpr.A("epsilon_r"), sexpr.F(layer.EpsilonR)))
+		}
+		if layer.LossTangent > 0 {
+			layerNodes = append(layerNodes, sexpr.L(sexpr.A("loss_tangent"), sexpr.F(layer.LossTangent)))
+		}
+		nodes = append(nodes, sexpr.L(layerNodes...))
+	}
+	if strings.TrimSpace(stackup.CopperFinish) != "" {
+		nodes = append(nodes, sexpr.L(sexpr.A("copper_finish"), sexpr.S(stackup.CopperFinish)))
+	}
+	nodes = append(nodes, sexpr.L(sexpr.A("dielectric_constraints"), yesNo(stackup.DielectricConstraints)))
 	return sexpr.L(nodes...)
 }
 

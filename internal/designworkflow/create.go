@@ -35,6 +35,7 @@ type CreateOptions struct {
 	Fabrication                 *fabrication.Options
 	Repair                      repair.Options
 	PostRepair                  repair.PostValidationOptions
+	ZoneRefill                  repair.ZoneRefillRunner
 	BlockRegistry               blocks.Registry
 	LibraryIndex                *libraryresolver.LibraryIndex
 }
@@ -139,7 +140,15 @@ func Create(ctx context.Context, request Request, opts CreateOptions) WorkflowRe
 	if workflowStageBlocked(written.Stage) {
 		return finish(blockedCreateResult(normalized, opts, stages, StageProjectWrite, "project write did not complete"))
 	}
+	zoneFill := prepareGeneratedZoneFill(ctx, normalized, &written, opts)
+	if reports.HasBlockingIssue(zoneFill.Issues) {
+		writerStage := generatedZoneFillWriterStage(zoneFill)
+		stages = append(stages, writerStage)
+		stages = append(stages, skippedWorkflowStages("zone fill did not complete", StageValidation, StageKiCadChecks)...)
+		return finish(BuildWorkflowResult(ProjectSummary{Name: normalized.Name, OutputDir: opts.OutputDir}, normalized.Validation.Acceptance, stages))
+	}
 	writerChecked := CheckWriterCorrectnessWithOptions(ctx, &written, opts.Writer)
+	mergeGeneratedZoneFillEvidence(&writerChecked.Stage, zoneFill)
 	stages = append(stages, writerChecked.Stage)
 	if workflowStageBlocked(writerChecked.Stage) {
 		stages = append(stages, skippedWorkflowStages("writer correctness check did not complete", StageValidation, StageKiCadChecks)...)

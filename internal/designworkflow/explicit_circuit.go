@@ -99,7 +99,14 @@ func createExplicitCircuit(ctx context.Context, request Request, opts CreateOpti
 		stages = appendSkippedCreateStages(stages, StageProjectWrite, "project write did not complete")
 		return BuildWorkflowResult(project, request.Validation.Acceptance, stages)
 	}
+	zoneFill := prepareGeneratedZoneFill(ctx, request, &written, opts)
+	if reports.HasBlockingIssue(zoneFill.Issues) {
+		stages = append(stages, generatedZoneFillWriterStage(zoneFill))
+		stages = appendSkippedCreateStages(stages, StageWriterCorrect, "zone fill did not complete")
+		return BuildWorkflowResult(project, request.Validation.Acceptance, stages)
+	}
 	writerChecked := CheckWriterCorrectnessWithOptions(ctx, &written, opts.Writer)
+	mergeGeneratedZoneFillEvidence(&writerChecked.Stage, zoneFill)
 	stages = append(stages, writerChecked.Stage)
 	if workflowStageBlocked(writerChecked.Stage) {
 		stages = appendSkippedCreateStages(stages, StageWriterCorrect, "writer correctness check did not complete")

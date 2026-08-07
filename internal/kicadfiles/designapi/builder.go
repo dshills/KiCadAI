@@ -303,10 +303,13 @@ func New(options Options) (*Builder, error) {
 		paper.Name = "A4"
 	}
 	boardLayers := pcb.DefaultTwoLayerStack()
+	boardSetup := pcb.DefaultSetup()
 	switch options.CopperLayers {
 	case 0, 1, 2:
 	case 4:
 		boardLayers = pcb.DefaultFourLayerStack()
+		boardSetup.HasStackup = true
+		boardSetup.Stackup = pcb.DefaultFourLayerPCBStackup()
 	default:
 		return nil, fmt.Errorf("copper layer count must be 1, 2, or 4")
 	}
@@ -369,7 +372,7 @@ func New(options Options) (*Builder, error) {
 			General:          pcb.DefaultGeneral(),
 			Paper:            paper,
 			Layers:           boardLayers,
-			Setup:            pcb.DefaultSetup(),
+			Setup:            boardSetup,
 			Nets:             builder.nets.Nets(),
 			TitleBlock:       kicadfiles.TitleBlock{Title: name},
 		},
@@ -2111,7 +2114,7 @@ func (builder *Builder) PlaceFootprint(reference string, options PlaceFootprintO
 	}
 	footprint := pcb.Footprint{
 		UUID:               builder.generator.New("root.pcb.footprint", reference),
-		Path:               symbol.Path,
+		Path:               "/" + string(symbol.UUID),
 		LibraryID:          state.footprintID,
 		Reference:          symbol.Reference,
 		Value:              symbol.Value,
@@ -2434,8 +2437,25 @@ func (builder *Builder) SetBoardThickness(thickness kicadfiles.IU) error {
 	if thickness <= 0 {
 		return fmt.Errorf("board thickness must be positive")
 	}
+	stackup := &builder.design.PCB.Setup.Stackup
+	if len(stackup.Layers) > 0 {
+		delta := thickness - stackup.Thickness
+		adjustment := -1
+		for index, layer := range stackup.Layers {
+			if layer.Type != "core" && layer.Type != "prepreg" {
+				continue
+			}
+			if adjustment < 0 || layer.Thickness > stackup.Layers[adjustment].Thickness {
+				adjustment = index
+			}
+		}
+		if adjustment < 0 || stackup.Layers[adjustment].Thickness+delta <= 0 {
+			return fmt.Errorf("board thickness is incompatible with the configured dielectric construction")
+		}
+		stackup.Layers[adjustment].Thickness += delta
+	}
 	builder.design.PCB.General.Thickness = thickness
-	builder.design.PCB.Setup.Stackup.Thickness = thickness
+	stackup.Thickness = thickness
 	return nil
 }
 
@@ -3610,6 +3630,7 @@ func clonePCB(source *pcb.PCBFile) *pcb.PCBFile {
 	clone := *source
 	clone.TitleBlock.Comments = append([]string(nil), source.TitleBlock.Comments...)
 	clone.Layers = append([]pcb.LayerDefinition(nil), source.Layers...)
+	clone.Setup.Stackup.Layers = append([]pcb.PCBStackupLayer(nil), source.Setup.Stackup.Layers...)
 	clone.Nets = append([]pcb.Net(nil), source.Nets...)
 	clone.Footprints = append([]pcb.Footprint(nil), source.Footprints...)
 	for i := range clone.Footprints {

@@ -61,7 +61,7 @@ func TestCheckPCBCopperZonesReportsViaAnnularRing(t *testing.T) {
 	assertCheckIssueContains(t, checks, "annular ring")
 }
 
-func TestCheckPCBCopperZonesReportsUnclosedZone(t *testing.T) {
+func TestCheckPCBCopperZonesPassesImplicitlyClosedZone(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "demo.kicad_pcb")
 	writeFile(t, path, pcbFixture(`(net 1 "SIG")`, `
@@ -71,5 +71,22 @@ func TestCheckPCBCopperZonesReportsUnclosedZone(t *testing.T) {
 `))
 
 	_, checks := CheckPCBCopperZones(Target{PCBPath: path})
-	assertCheckIssueContains(t, checks, "zone polygon must be closed")
+	for _, check := range checks {
+		if check.Status == CheckFail {
+			t.Fatalf("check failed: %#v", checks)
+		}
+	}
+}
+
+func TestCheckPCBCopperZonesReportsTooFewDistinctZonePoints(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "demo.kicad_pcb")
+	writeFile(t, path, pcbFixture(`(net 1 "SIG")`, `
+  (zone (net 1) (net_name "SIG") (layers "F.Cu")
+    (polygon (pts (xy 0 0) (xy 10 0) (xy 0 0) (xy 10 0)))
+  )
+`))
+
+	_, checks := CheckPCBCopperZones(Target{PCBPath: path})
+	assertCheckIssueContains(t, checks, "zone polygon must contain at least three distinct points")
 }

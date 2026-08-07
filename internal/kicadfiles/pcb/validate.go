@@ -45,6 +45,9 @@ func Validate(board PCBFile) error {
 	if board.Setup.HasStackup && board.Setup.Stackup.Thickness <= 0 {
 		errs = append(errs, fieldError("setup.stackup.thickness", "must be positive"))
 	}
+	if board.Setup.HasStackup && len(board.Setup.Stackup.Layers) > 0 {
+		errs = append(errs, validateCompleteStackup(board)...)
+	}
 	if board.Setup.SolderMaskMinWidth < 0 {
 		errs = append(errs, fieldError("setup.solder_mask_min_width", "must be non-negative"))
 	}
@@ -168,6 +171,99 @@ func Validate(board PCBFile) error {
 	}
 	errs = append(errs, validatePreservedNodeAnchorGraph(board.Preserved)...)
 	return errs.Err()
+}
+
+func validateCompleteStackup(board PCBFile) kicadfiles.ValidationErrors {
+	var errs kicadfiles.ValidationErrors
+	stackup := board.Setup.Stackup
+	boardCopper := map[string]struct{}{}
+	for _, layer := range board.Layers {
+		if isCopperLayer(layer.Name) {
+			boardCopper[string(layer.Name)] = struct{}{}
+		}
+	}
+	stackupCopper := map[string]struct{}{}
+	names := map[string]struct{}{}
+	totalThickness := kicadfiles.IU(0)
+	dielectricCount := 0
+	frontMask := false
+	backMask := false
+	for index, layer := range stackup.Layers {
+		prefix := indexed("setup.stackup.layers", index, "")
+		name := strings.TrimSpace(layer.Name)
+		typeName := strings.TrimSpace(layer.Type)
+		if name == "" {
+			errs = append(errs, fieldError(prefix+"name", "required"))
+		} else if _, exists := names[name]; exists {
+			errs = append(errs, fieldError(prefix+"name", "duplicate"))
+		}
+		names[name] = struct{}{}
+		if typeName == "" {
+			errs = append(errs, fieldError(prefix+"type", "required"))
+		}
+		if layer.Thickness < 0 {
+			errs = append(errs, fieldError(prefix+"thickness", "must be non-negative"))
+		}
+		totalThickness += layer.Thickness
+		switch {
+		case typeName == "copper":
+			if layer.Thickness <= 0 {
+				errs = append(errs, fieldError(prefix+"thickness", "copper thickness must be positive"))
+			}
+			if _, ok := boardCopper[name]; !ok {
+				errs = append(errs, fieldError(prefix+"name", "copper layer is not enabled in board layer table"))
+			}
+			stackupCopper[name] = struct{}{}
+		case typeName == "core" || typeName == "prepreg":
+			dielectricCount++
+			if layer.Thickness <= 0 {
+				errs = append(errs, fieldError(prefix+"thickness", "dielectric thickness must be positive"))
+			}
+			if strings.TrimSpace(layer.Material) == "" {
+				errs = append(errs, fieldError(prefix+"material", "required for dielectric"))
+			}
+			if layer.EpsilonR <= 0 {
+				errs = append(errs, fieldError(prefix+"epsilon_r", "must be positive for dielectric"))
+			}
+			if layer.LossTangent < 0 {
+				errs = append(errs, fieldError(prefix+"loss_tangent", "must be non-negative"))
+			}
+		case typeName == "Top Solder Mask":
+			frontMask = frontMask || name == "F.Mask"
+			if layer.Thickness <= 0 {
+				errs = append(errs, fieldError(prefix+"thickness", "solder mask thickness must be positive"))
+			}
+		case typeName == "Bottom Solder Mask":
+			backMask = backMask || name == "B.Mask"
+			if layer.Thickness <= 0 {
+				errs = append(errs, fieldError(prefix+"thickness", "solder mask thickness must be positive"))
+			}
+		}
+	}
+	for name := range boardCopper {
+		if _, ok := stackupCopper[name]; !ok {
+			errs = append(errs, fieldError("setup.stackup.layers", "missing enabled copper layer "+name))
+		}
+	}
+	if len(stackupCopper) != len(boardCopper) {
+		errs = append(errs, fieldError("setup.stackup.layers", "copper construction must match enabled copper layers"))
+	}
+	if want := len(boardCopper) - 1; dielectricCount != want {
+		errs = append(errs, fieldError("setup.stackup.layers", "dielectric layer count must equal copper layer count minus one"))
+	}
+	if !frontMask || !backMask {
+		errs = append(errs, fieldError("setup.stackup.layers", "front and back solder mask construction is required"))
+	}
+	if strings.TrimSpace(stackup.CopperFinish) == "" {
+		errs = append(errs, fieldError("setup.stackup.copper_finish", "required"))
+	}
+	if absIU(totalThickness-board.General.Thickness) > kicadfiles.MM(0.001) {
+		errs = append(errs, fieldError("setup.stackup.thickness", "ordered layer thicknesses must equal general board thickness"))
+	}
+	if stackup.Thickness != totalThickness {
+		errs = append(errs, fieldError("setup.stackup.thickness", "declared thickness must equal ordered layer thicknesses"))
+	}
+	return errs
 }
 
 func validateFootprint(index int, footprint Footprint, netCodes map[int]struct{}, netNames map[int]string) kicadfiles.ValidationErrors {

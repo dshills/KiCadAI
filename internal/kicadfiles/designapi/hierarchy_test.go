@@ -3,6 +3,7 @@ package designapi
 import (
 	"path/filepath"
 	"strconv"
+	"strings"
 	"testing"
 
 	"kicadai/internal/kicadfiles"
@@ -161,6 +162,64 @@ func TestBuilderWritesGeneratedSchematicHierarchy(t *testing.T) {
 			if symbol.Reference == "R1" && symbol.Rotation != 90 {
 				t.Fatalf("transformed hierarchy symbol rotation = %v, want 90", symbol.Rotation)
 			}
+		}
+	}
+}
+
+func TestHierarchyBindsFootprintsToDeterministicSymbolInstancePaths(t *testing.T) {
+	builder, err := New(Options{
+		Name: "hierarchy_paths", Seed: "hierarchy_paths",
+		DesignID: kicadfiles.UUID("12345678-1234-5678-9234-123456789abc"),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for index, reference := range []string{"R1", "R2"} {
+		_, err := builder.AddSymbol(SymbolOptions{
+			Reference: reference, LibraryID: "Device:R", Value: "10k",
+			Position: kicadfiles.Point{X: kicadfiles.MM(float64(20 + index*20)), Y: kicadfiles.MM(20)},
+			Pins:     []PinSpec{{Number: "1"}, {Number: "2"}},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := builder.AssignFootprint(reference, "Test:R"); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := builder.PlaceFootprint(reference, PlaceFootprintOptions{
+			Position: kicadfiles.Point{X: kicadfiles.MM(float64(10 + index*10)), Y: kicadfiles.MM(10)},
+		}); err != nil {
+			t.Fatal(err)
+		}
+		flat := builder.footprint(reference)
+		state, stateErr := builder.symbolState(reference)
+		if stateErr != nil {
+			t.Fatal(stateErr)
+		}
+		symbolUUID := builder.design.Schematic.Symbols[state.symbolIndex].UUID
+		if flat == nil || flat.Path != "/"+string(symbolUUID) {
+			t.Fatalf("flat footprint %s path = %#v, want symbol UUID path", reference, flat)
+		}
+	}
+	if err := builder.SetSchematicHierarchy(SchematicHierarchy{Sheets: []SchematicSheet{
+		{ID: "left", Name: "Left", References: []string{"R1"}},
+		{ID: "right", Name: "Right", References: []string{"R2"}},
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	design := builder.Design()
+	if err := builder.applySchematicHierarchy(&design); err != nil {
+		t.Fatal(err)
+	}
+	paths := map[string]string{}
+	for _, child := range design.SheetFiles {
+		for _, symbol := range child.Symbols {
+			paths[symbol.Reference] = strings.TrimRight(symbol.Instances[0].Path, "/") + "/" + string(symbol.UUID)
+		}
+	}
+	for _, footprint := range design.PCB.Footprints {
+		if footprint.Path != paths[footprint.Reference] {
+			t.Fatalf("footprint %s path = %q, want %q", footprint.Reference, footprint.Path, paths[footprint.Reference])
 		}
 	}
 }
