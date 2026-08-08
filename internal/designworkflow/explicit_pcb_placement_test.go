@@ -1,10 +1,25 @@
 package designworkflow
 
 import (
+	"reflect"
 	"testing"
 
 	"kicadai/internal/placement"
 )
+
+func TestExplicitInitialPlacementRotationsIncludeEdgeConstrainedParts(t *testing.T) {
+	ordinary := ExplicitComponentSpec{ID: "ordinary"}
+	edge := ExplicitComponentSpec{ID: "edge", Placement: ExplicitPlacementSpec{Edge: "bottom"}}
+	thermal := ExplicitComponentSpec{ID: "thermal", Placement: ExplicitPlacementSpec{ThermalEdgeRequired: true}}
+	if got := explicitInitialPlacementRotations(ordinary); !reflect.DeepEqual(got, []float64{0, 90}) {
+		t.Fatalf("ordinary rotations = %v", got)
+	}
+	for _, component := range []ExplicitComponentSpec{edge, thermal} {
+		if got := explicitInitialPlacementRotations(component); !reflect.DeepEqual(got, []float64{0, 90}) {
+			t.Fatalf("%s rotations = %v", component.ID, got)
+		}
+	}
+}
 
 func TestExplicitRightAnglePlacementFallbackAlignsMovableFootprintsToBoard(t *testing.T) {
 	fixedRotation := 15.0

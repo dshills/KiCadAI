@@ -27,14 +27,31 @@ func validHierarchyFilename(filename string) error {
 	return nil
 }
 
-const hierarchySheetWidth = 100.0
-const hierarchySheetHeight = 70.0
-const hierarchySheetOrigin = 25.0
-const hierarchySheetStepX = 120.0
-const hierarchySheetStepY = 90.0
+// Generated sheet geometry stays on KiCad's 1.27 mm connection grid so sheet
+// pins and their parent-side wire stubs remain ERC-clean after translation.
+const hierarchySheetWidth = 101.6
+const hierarchySheetHeight = 71.12
+const hierarchySheetOrigin = 25.4
+const hierarchySheetStepX = 152.4
+const hierarchySheetStepY = 91.44
 const hierarchyBusMarginMM = 5.0
 const hierarchyBusFallbackWidthMM = 25.4
 const hierarchyBusGridMM = 1.27
+const hierarchyInterfaceMarginMM = 10.16
+const hierarchyInterfacePitchMM = 5.08
+const hierarchyInterfaceStubMM = 5.08
+
+type hierarchyInterfaceSide uint8
+
+const (
+	hierarchyInterfaceLeft hierarchyInterfaceSide = iota
+	hierarchyInterfaceRight
+)
+
+type hierarchySheetInterface struct {
+	Name string
+	Side hierarchyInterfaceSide
+}
 
 func (builder *Builder) applySchematicHierarchy(design *kicaddesign.Design) error {
 	if builder == nil || builder.hierarchy == nil {
@@ -73,6 +90,11 @@ func (builder *Builder) applySchematicHierarchy(design *kicaddesign.Design) erro
 			return fmt.Errorf("reference %s is not assigned to a hierarchy sheet", symbol.Reference)
 		}
 	}
+	interfacesBySheet, err := hierarchySheetInterfaces(builder, refToSheet, legacyRefToSheet)
+	if err != nil {
+		return err
+	}
+	sheetHeight := hierarchyRootSheetHeight(interfacesBySheet)
 
 	original := *root
 	symbolsBySheet := make(map[string][]schematic.SchematicSymbol, len(builder.hierarchy.Sheets))
@@ -95,12 +117,17 @@ func (builder *Builder) applySchematicHierarchy(design *kicaddesign.Design) erro
 	root.Instances = nil
 	root.SheetInstances = []schematic.SheetInstance{{Project: design.Project.Name, Path: "/", Page: "1"}}
 	// Root wires and junctions are writer-owned routing artifacts. They are
-	// intentionally converted into child-local endpoint labels and cross-sheet
-	// global labels below; free graphics are rejected above instead of dropped.
+	// intentionally converted into child-local endpoint labels and scoped
+	// cross-sheet interfaces below; free graphics are rejected above instead of
+	// dropped.
 	usedItems := map[kicadfiles.UUID]struct{}{}
 	columns := int(math.Ceil(math.Sqrt(float64(len(builder.hierarchy.Sheets)))))
 	if columns < 1 {
 		columns = 1
+	}
+	landscapeA0 := schematiclayout.SheetForPaperOrientation("A0", false)
+	if kicadfiles.MM(sheetHeight+hierarchySheetStepY-hierarchySheetHeight) > schematiclayout.UsableSheet(landscapeA0).Height()/2 {
+		columns = len(builder.hierarchy.Sheets)
 	}
 	for index, spec := range builder.hierarchy.Sheets {
 		filename := strings.TrimSpace(spec.Filename)
@@ -139,7 +166,7 @@ func (builder *Builder) applySchematicHierarchy(design *kicaddesign.Design) erro
 		if err := relayoutHierarchyChild(builder, child, spec.ID); err != nil {
 			return err
 		}
-		if err := applyHierarchyBuses(builder, child, spec.ID, hierarchyCrossSheetNetSet(builder)); err != nil {
+		if err := applyHierarchyBuses(builder, child, spec.ID, hierarchyCrossSheetNetScopes(builder)); err != nil {
 			return err
 		}
 		addHierarchyIntersheetReferences(child)
@@ -150,15 +177,16 @@ func (builder *Builder) applySchematicHierarchy(design *kicaddesign.Design) erro
 
 		position := kicadfiles.Point{
 			X: kicadfiles.MM(hierarchySheetOrigin + float64(index%columns)*hierarchySheetStepX),
-			Y: kicadfiles.MM(hierarchySheetOrigin + float64(index/columns)*hierarchySheetStepY),
+			Y: kicadfiles.MM(hierarchySheetOrigin + float64(index/columns)*(sheetHeight+hierarchySheetStepY-hierarchySheetHeight)),
 		}
 		sheet := schematic.NewSheet(
 			sheetUUID,
 			spec.Name,
 			filename,
 			position,
-			kicadfiles.Point{X: kicadfiles.MM(hierarchySheetWidth), Y: kicadfiles.MM(hierarchySheetHeight)},
+			kicadfiles.Point{X: kicadfiles.MM(hierarchySheetWidth), Y: kicadfiles.MM(sheetHeight)},
 		)
+		addHierarchySheetInterfaces(builder, root, &sheet, spec.ID, interfacesBySheet[spec.ID])
 		sheet.Instances = []schematic.SheetInstance{{
 			// KiCad owns the active project association for a hierarchical sheet
 			// and writes an empty project name when the schematic is upgraded in
@@ -168,6 +196,9 @@ func (builder *Builder) applySchematicHierarchy(design *kicaddesign.Design) erro
 			Page:    strconv.Itoa(index + 2),
 		}}
 		root.Sheets = append(root.Sheets, sheet)
+	}
+	if err := fitHierarchyRoot(root); err != nil {
+		return err
 	}
 	design.SheetFiles = children
 	return bindHierarchyFootprintPaths(design)
@@ -241,18 +272,164 @@ func addHierarchyIntersheetReferences(child *schematic.SchematicFile) {
 	}
 }
 
-func hierarchyCrossSheetNetSet(builder *Builder) map[string]struct{} {
-	result := map[string]struct{}{}
+func hierarchyCrossSheetNetScopes(builder *Builder) map[string]bool {
+	result := map[string]bool{}
 	if builder == nil || builder.hierarchy == nil {
 		return result
 	}
 	for _, net := range builder.hierarchy.CrossSheetNets {
-		result[builder.canonicalNet(net.Name)] = struct{}{}
+		result[builder.canonicalNet(net.Name)] = net.GlobalScope
 	}
 	return result
 }
 
-func applyHierarchyBuses(builder *Builder, child *schematic.SchematicFile, sheetID string, crossSheetNets map[string]struct{}) error {
+func hierarchySheetInterfaces(
+	builder *Builder,
+	refToSheet map[string]string,
+	legacyRefToSheet map[string]string,
+) (map[string][]hierarchySheetInterface, error) {
+	result := map[string][]hierarchySheetInterface{}
+	if builder == nil || builder.hierarchy == nil {
+		return result, nil
+	}
+	sheetOrder := make(map[string]int, len(builder.hierarchy.Sheets))
+	for index, sheet := range builder.hierarchy.Sheets {
+		sheetOrder[sheet.ID] = index
+	}
+	seenNets := map[string]struct{}{}
+	for _, net := range builder.hierarchy.CrossSheetNets {
+		if net.GlobalScope {
+			continue
+		}
+		name := builder.canonicalNet(net.Name)
+		if name == "" {
+			return nil, fmt.Errorf("cross-sheet net requires a name")
+		}
+		if _, duplicate := seenNets[name]; duplicate {
+			return nil, fmt.Errorf("duplicate cross-sheet net %s", name)
+		}
+		seenNets[name] = struct{}{}
+		participating := map[string]struct{}{}
+		for _, endpoint := range net.Endpoints {
+			sheetID := refToSheet[symbolStateKey(endpoint.Reference, endpoint.Unit)]
+			if sheetID == "" {
+				sheetID = legacyRefToSheet[referenceKey(endpoint.Reference)]
+			}
+			if sheetID == "" {
+				return nil, fmt.Errorf("cross-sheet net %s endpoint %s unit %d is not assigned to a hierarchy sheet", name, endpoint.Reference, endpoint.Unit)
+			}
+			participating[sheetID] = struct{}{}
+		}
+		if len(participating) < 2 {
+			return nil, fmt.Errorf("cross-sheet net %s reaches %d hierarchy sheets, want at least 2", name, len(participating))
+		}
+		sheetIDs := make([]string, 0, len(participating))
+		for sheetID := range participating {
+			sheetIDs = append(sheetIDs, sheetID)
+		}
+		sort.SliceStable(sheetIDs, func(left, right int) bool {
+			if sheetOrder[sheetIDs[left]] != sheetOrder[sheetIDs[right]] {
+				return sheetOrder[sheetIDs[left]] < sheetOrder[sheetIDs[right]]
+			}
+			return sheetIDs[left] < sheetIDs[right]
+		})
+		for index, sheetID := range sheetIDs {
+			side := hierarchyInterfaceLeft
+			if index == 0 {
+				side = hierarchyInterfaceRight
+			}
+			result[sheetID] = append(result[sheetID], hierarchySheetInterface{Name: name, Side: side})
+		}
+	}
+	for sheetID := range result {
+		sort.SliceStable(result[sheetID], func(left, right int) bool {
+			if result[sheetID][left].Side != result[sheetID][right].Side {
+				return result[sheetID][left].Side < result[sheetID][right].Side
+			}
+			return result[sheetID][left].Name < result[sheetID][right].Name
+		})
+	}
+	return result, nil
+}
+
+func hierarchyRootSheetHeight(interfacesBySheet map[string][]hierarchySheetInterface) float64 {
+	height := hierarchySheetHeight
+	for _, interfaces := range interfacesBySheet {
+		left, right := 0, 0
+		for _, item := range interfaces {
+			if item.Side == hierarchyInterfaceRight {
+				right++
+			} else {
+				left++
+			}
+		}
+		count := max(left, right)
+		if count == 0 {
+			continue
+		}
+		required := 2*hierarchyInterfaceMarginMM + float64(count-1)*hierarchyInterfacePitchMM
+		if required > height {
+			height = required
+		}
+	}
+	return height
+}
+
+func addHierarchySheetInterfaces(
+	builder *Builder,
+	root *schematic.SchematicFile,
+	sheet *schematic.Sheet,
+	sheetID string,
+	interfaces []hierarchySheetInterface,
+) {
+	if builder == nil || root == nil || sheet == nil || len(interfaces) == 0 {
+		return
+	}
+	bySide := map[hierarchyInterfaceSide][]hierarchySheetInterface{}
+	for _, item := range interfaces {
+		bySide[item.Side] = append(bySide[item.Side], item)
+	}
+	for _, side := range []hierarchyInterfaceSide{hierarchyInterfaceLeft, hierarchyInterfaceRight} {
+		items := bySide[side]
+		for index, item := range items {
+			y := sheet.Position.Y + kicadfiles.MM(hierarchyInterfaceMarginMM+float64(index)*hierarchyInterfacePitchMM)
+			pinPosition := kicadfiles.Point{X: sheet.Position.X, Y: y}
+			stubPosition := kicadfiles.Point{X: pinPosition.X - kicadfiles.MM(hierarchyInterfaceStubMM), Y: y}
+			rotation := kicadfiles.Angle(180)
+			if side == hierarchyInterfaceRight {
+				pinPosition.X = sheet.Position.X + sheet.Size.X
+				stubPosition.X = pinPosition.X + kicadfiles.MM(hierarchyInterfaceStubMM)
+				rotation = 0
+			}
+			pin := schematic.NewSheetPin(
+				builder.generator.New("hierarchy.interface.pin", sheetID, item.Name),
+				item.Name,
+				schematic.SheetPinPassive,
+				pinPosition,
+			)
+			pin.Rotation = rotation
+			sheet.Pins = append(sheet.Pins, pin)
+			root.Wires = append(root.Wires, schematic.NewWire(
+				builder.generator.New("hierarchy.interface.wire", sheetID, item.Name),
+				pinPosition,
+				stubPosition,
+			))
+			label := schematic.NewLabel(
+				builder.generator.New("hierarchy.interface.label", sheetID, item.Name),
+				item.Name,
+				schematic.LabelLocal,
+				stubPosition,
+			)
+			label.Rotation = rotation
+			if side == hierarchyInterfaceLeft {
+				label.Justify = append(label.Justify, "right")
+			}
+			root.Labels = append(root.Labels, label)
+		}
+	}
+}
+
+func applyHierarchyBuses(builder *Builder, child *schematic.SchematicFile, sheetID string, crossSheetNets map[string]bool) error {
 	if builder == nil || child == nil || builder.hierarchy == nil || len(builder.hierarchy.Buses) == 0 {
 		return nil
 	}
@@ -334,8 +511,11 @@ func applyHierarchyBuses(builder *Builder, child *schematic.SchematicFile, sheet
 				schematic.NewWire(builder.generator.New("hierarchy.bus.entry_wire", sheetID, bus.ID, entry.Member, entry.Endpoint.Reference, strconv.Itoa(entry.Endpoint.Unit), entry.Endpoint.Pin), entryPoint, entryStub),
 			)
 			kind := schematic.LabelLocal
-			if _, cross := crossSheetNets[builder.canonicalNet(entry.Member)]; cross {
-				kind = schematic.LabelGlobal
+			if global, cross := crossSheetNets[builder.canonicalNet(entry.Member)]; cross {
+				kind = schematic.LabelHierarchical
+				if global {
+					kind = schematic.LabelGlobal
+				}
 			}
 			label := strings.TrimSpace(entry.Label)
 			if label == "" {
@@ -427,6 +607,18 @@ func relayoutHierarchyChild(builder *Builder, child *schematic.SchematicFile, sh
 		Sheet: schematiclayout.SheetForPaperOrientation(child.Paper.Name, child.Paper.Portrait),
 		Rules: schematiclayout.DefaultRules(schematiclayout.ProfileStandard),
 	}
+	flowBySymbol := map[string]SchematicSymbolRef{}
+	if builder.hierarchy != nil {
+		for _, sheet := range builder.hierarchy.Sheets {
+			if sheet.ID != sheetID {
+				continue
+			}
+			for _, symbol := range hierarchySheetSymbols(sheet) {
+				flowBySymbol[symbolStateKey(symbol.Reference, symbol.Unit)] = symbol
+			}
+			break
+		}
+	}
 	// Child-sheet connectivity is emitted as endpoint labels below. Orient the
 	// text away from its pin access stub so labels on left- and upper-facing
 	// pins do not extend back across the symbol they connect to.
@@ -450,6 +642,10 @@ func relayoutHierarchyChild(builder *Builder, child *schematic.SchematicFile, sh
 			component.BodyKnown = true
 		}
 		component.Role = schematiclayout.InferComponentRole(component)
+		if flow, ok := flowBySymbol[key]; ok {
+			component.FlowRank = flow.FlowRank
+			component.RankFixed = flow.RankFixed
+		}
 		for index, pin := range symbol.Pins {
 			relative := schematiclayout.InverseTransformPoint(
 				kicadfiles.Point{X: symbol.PinAnchors[index].X - symbol.Position.X, Y: symbol.PinAnchors[index].Y - symbol.Position.Y},
@@ -461,9 +657,9 @@ func relayoutHierarchyChild(builder *Builder, child *schematic.SchematicFile, sh
 		request.Components = append(request.Components, component)
 	}
 	allNetEndpoints := map[string][]schematiclayout.Endpoint{}
-	crossSheetNets := map[string]struct{}{}
+	crossSheetNets := map[string]bool{}
 	for _, net := range builder.hierarchy.CrossSheetNets {
-		crossSheetNets[builder.canonicalNet(net.Name)] = struct{}{}
+		crossSheetNets[builder.canonicalNet(net.Name)] = net.GlobalScope
 	}
 	stateKeys := make([]string, 0, len(child.Symbols))
 	seenStateKeys := make(map[string]struct{}, len(child.Symbols))
@@ -564,7 +760,9 @@ func relayoutHierarchyChild(builder *Builder, child *schematic.SchematicFile, sh
 	// silently discard user-authored annotations.
 	// Child-local connectivity is emitted as same-net labels at every endpoint.
 	// This avoids carrying parent-sheet wire geometry across a partition while
-	// preserving KiCad connectivity; cross-sheet nets receive global labels.
+	// preserving KiCad connectivity. Supply/reference conductors retain global
+	// scope; ordinary cross-sheet signals use hierarchical labels matched by
+	// explicit parent sheet pins.
 	child.Wires = make([]schematic.Wire, 0, len(result.Wires))
 	for index, wire := range result.Wires {
 		child.Wires = append(child.Wires, schematic.NewWire(
@@ -599,8 +797,11 @@ func relayoutHierarchyChild(builder *Builder, child *schematic.SchematicFile, sh
 	generatedLabels := make([]schematic.Label, 0, len(labels))
 	for index, label := range labels {
 		kind := schematic.LabelLocal
-		if _, crossSheet := crossSheetNets[builder.canonicalNet(label.NetName)]; crossSheet {
-			kind = schematic.LabelGlobal
+		if global, crossSheet := crossSheetNets[builder.canonicalNet(label.NetName)]; crossSheet {
+			kind = schematic.LabelHierarchical
+			if global {
+				kind = schematic.LabelGlobal
+			}
 		}
 		generated := schematic.NewLabel(builder.generator.New("hierarchy.local_label", sheetID, label.NetName, strconv.Itoa(index)), label.Text, kind, label.Position)
 		generated.Rotation = label.Rotation
@@ -763,6 +964,66 @@ func moveSymbol(symbol *schematic.SchematicSymbol, delta kicadfiles.Point) {
 		symbol.Fields[index].Position.X += delta.X
 		symbol.Fields[index].Position.Y += delta.Y
 	}
+}
+
+func fitHierarchyRoot(root *schematic.SchematicFile) error {
+	if root == nil || len(root.Sheets) == 0 {
+		return nil
+	}
+	minPoint := root.Sheets[0].Position
+	maxPoint := kicadfiles.Point{
+		X: root.Sheets[0].Position.X + root.Sheets[0].Size.X,
+		Y: root.Sheets[0].Position.Y + root.Sheets[0].Size.Y,
+	}
+	for _, sheet := range root.Sheets[1:] {
+		minPoint.X = min(minPoint.X, sheet.Position.X)
+		minPoint.Y = min(minPoint.Y, sheet.Position.Y)
+		maxPoint.X = max(maxPoint.X, sheet.Position.X+sheet.Size.X)
+		maxPoint.Y = max(maxPoint.Y, sheet.Position.Y+sheet.Size.Y)
+	}
+	maximumLabelRunes := 0
+	for _, label := range root.Labels {
+		minPoint.X = min(minPoint.X, label.Position.X)
+		minPoint.Y = min(minPoint.Y, label.Position.Y)
+		maxPoint.X = max(maxPoint.X, label.Position.X)
+		maxPoint.Y = max(maxPoint.Y, label.Position.Y)
+		maximumLabelRunes = max(maximumLabelRunes, len([]rune(label.Text)))
+	}
+	textMargin := kicadfiles.MM(10.16 + float64(maximumLabelRunes)*1.27)
+	minPoint.X -= textMargin
+	maxPoint.X += textMargin
+	minPoint.Y -= kicadfiles.MM(10.16)
+	maxPoint.Y += kicadfiles.MM(10.16)
+
+	papers := []string{"A5", "A4", "A3", "A2", "A1", "A0"}
+	var selected schematiclayout.Sheet
+	found := false
+	for _, name := range papers {
+		for _, portrait := range []bool{false, true} {
+			candidate := schematiclayout.SheetForPaperOrientation(name, portrait)
+			usable := schematiclayout.UsableSheet(candidate)
+			if maxPoint.X-minPoint.X <= usable.Width() && maxPoint.Y-minPoint.Y <= usable.Height() {
+				selected = candidate
+				found = true
+				break
+			}
+		}
+		if found {
+			break
+		}
+	}
+	if !found {
+		return fmt.Errorf("hierarchy root exceeds the largest supported schematic page")
+	}
+	root.Paper = kicadfiles.Paper{Name: selected.Name, Width: selected.Width, Height: selected.Height, Portrait: selected.Height > selected.Width}
+	usable := schematiclayout.UsableSheet(selected)
+	currentCenter := kicadfiles.Point{X: (minPoint.X + maxPoint.X) / 2, Y: (minPoint.Y + maxPoint.Y) / 2}
+	targetCenter := kicadfiles.Point{X: (usable.MinX + usable.MaxX) / 2, Y: (usable.MinY + usable.MaxY) / 2}
+	delta := kicadfiles.Point{X: targetCenter.X - currentCenter.X, Y: targetCenter.Y - currentCenter.Y}
+	delta.X = schematiclayout.SnapIU(delta.X, kicadfiles.MM(1.27))
+	delta.Y = schematiclayout.SnapIU(delta.Y, kicadfiles.MM(1.27))
+	translateSchematic(root, delta)
+	return nil
 }
 
 func fitHierarchyChild(child *schematic.SchematicFile) error {
@@ -935,6 +1196,19 @@ func translateSchematic(file *schematic.SchematicFile, delta kicadfiles.Point) {
 	for index := range file.NoConnects {
 		file.NoConnects[index].Position.X += delta.X
 		file.NoConnects[index].Position.Y += delta.Y
+	}
+	for index := range file.Sheets {
+		sheet := &file.Sheets[index]
+		sheet.Position.X += delta.X
+		sheet.Position.Y += delta.Y
+		for propertyIndex := range sheet.Properties {
+			sheet.Properties[propertyIndex].Position.X += delta.X
+			sheet.Properties[propertyIndex].Position.Y += delta.Y
+		}
+		for pinIndex := range sheet.Pins {
+			sheet.Pins[pinIndex].Position.X += delta.X
+			sheet.Pins[pinIndex].Position.Y += delta.Y
+		}
 	}
 }
 

@@ -26,6 +26,117 @@ func TestPlacePlacesSimpleRequest(t *testing.T) {
 	}
 }
 
+func TestPlaceKeepsMovableComponentInsideRequiredRegion(t *testing.T) {
+	req := minimalRequest()
+	req.Board = BoardPlacementArea{WidthMM: 40, HeightMM: 30, MarginMM: 1}
+	req.RegionRules = []RegionRule{{
+		ID: "power", Region: "power", Refs: []string{req.Components[0].Ref}, Required: true,
+		Preferred: Rect{Min: Point{XMM: 25, YMM: 5}, Max: Point{XMM: 38, YMM: 25}},
+	}}
+
+	result := Place(req)
+	if result.Status != StatusPlaced || len(result.Placements) != 1 {
+		t.Fatalf("required-region placement = %#v", result)
+	}
+	position := result.Placements[0].Position
+	if !req.RegionRules[0].Preferred.ContainsPoint(Point{XMM: position.XMM, YMM: position.YMM}) {
+		t.Fatalf("placement anchor %#v is outside required region %#v", position, req.RegionRules[0].Preferred)
+	}
+}
+
+func TestPlaceSamplesNarrowRequiredRegionForEdgeComponent(t *testing.T) {
+	req := minimalRequest()
+	req.Board = BoardPlacementArea{WidthMM: 60, HeightMM: 55, MarginMM: 1}
+	req.Components[0].Bounds = Bounds{WidthMM: 10.5, HeightMM: 7, Source: BoundsLibraryCourtyard}
+	req.Components[0].Edge = EdgeTop
+	req.Rules.MaxCandidatesPerPart = 64
+	req.RegionRules = []RegionRule{{
+		ID: "power", Region: "power", Refs: []string{req.Components[0].Ref}, Required: true,
+		Preferred: Rect{Min: Point{XMM: 46.25, YMM: 0}, Max: Point{XMM: 58.5, YMM: 55}},
+	}}
+
+	result := Place(req)
+	if result.Status != StatusPlaced || len(result.Placements) != 1 {
+		t.Fatalf("narrow edge-region placement = %#v", result)
+	}
+	position := result.Placements[0].Position
+	if !req.RegionRules[0].Preferred.ContainsPoint(Point{XMM: position.XMM, YMM: position.YMM}) {
+		t.Fatalf("placement anchor %#v is outside narrow required region %#v", position, req.RegionRules[0].Preferred)
+	}
+}
+
+func TestPlaceReconcilesEdgeAccessWithRegionAnchorMembership(t *testing.T) {
+	req := minimalRequest()
+	req.Board = BoardPlacementArea{WidthMM: 45, HeightMM: 30, MarginMM: 0.25}
+	req.Components[0].Edge = EdgeLeft
+	req.RegionRules = []RegionRule{{
+		ID: "main", Region: "main", Refs: []string{req.Components[0].Ref}, Required: true,
+		Preferred: Rect{Min: Point{XMM: 2, YMM: 2}, Max: Point{XMM: 43, YMM: 28}},
+	}}
+
+	result := Place(req)
+	if result.Status != StatusPlaced || len(result.Placements) != 1 {
+		t.Fatalf("edge-region placement = %#v", result)
+	}
+	position := result.Placements[0].Position
+	if !req.RegionRules[0].Preferred.ContainsPoint(Point{XMM: position.XMM, YMM: position.YMM}) {
+		t.Fatalf("edge placement anchor %#v is outside region %#v", position, req.RegionRules[0].Preferred)
+	}
+}
+
+func TestPlaceFailsClosedForFixedRequiredRegionViolation(t *testing.T) {
+	req := minimalRequest()
+	req.Components[0].Fixed = true
+	req.Components[0].Position = &Placement{XMM: 5, YMM: 5, Layer: "F.Cu"}
+	req.RegionRules = []RegionRule{{
+		ID: "power", Region: "power", Refs: []string{req.Components[0].Ref}, Required: true,
+		Preferred: Rect{Min: Point{XMM: 20, YMM: 10}, Max: Point{XMM: 28, YMM: 18}},
+	}}
+
+	result := Place(req)
+	if result.Status != StatusBlocked || result.Metrics.PlacedCount != 0 {
+		t.Fatalf("fixed required-region violation = %#v", result)
+	}
+	assertIssueContains(t, result.Issues, "outside required region power")
+}
+
+func TestPlacePreservesFutureRegionForRequiredProximityTarget(t *testing.T) {
+	req := Request{
+		Board: BoardPlacementArea{WidthMM: 70, HeightMM: 30, MarginMM: 1},
+		Rules: DefaultRules(),
+		Components: []Component{
+			{Ref: "U1", FootprintID: "Test:Anchor", Bounds: Bounds{WidthMM: 6, HeightMM: 6, Source: BoundsExplicit}, Priority: 100},
+			{Ref: "C1", FootprintID: "Test:Target", Bounds: Bounds{WidthMM: 2, HeightMM: 2, Source: BoundsExplicit}, Priority: 80},
+		},
+		ProximityRules: []ProximityRule{{
+			ID: "cross-region", AnchorRef: "U1", TargetRefs: []string{"C1"}, MaxDistanceMM: 15, Required: true,
+		}},
+		RegionRules: []RegionRule{
+			{ID: "core", Region: "core", Refs: []string{"U1"}, Required: true, Preferred: Rect{Min: Point{XMM: 10, YMM: 5}, Max: Point{XMM: 45, YMM: 25}}},
+			{ID: "output", Region: "output", Refs: []string{"C1"}, Required: true, Preferred: Rect{Min: Point{XMM: 55, YMM: 5}, Max: Point{XMM: 68, YMM: 25}}},
+		},
+	}
+	req.Rules.GridMM = 1
+	req.Rules.MaxCandidatesPerPart = 64
+	req.Rules.CandidateScoring.Enabled = true
+
+	result := Place(req)
+	if result.Status != StatusPlaced {
+		t.Fatalf("cross-region proximity placement = %#v", result)
+	}
+	if issues := ValidateRequiredProximity(req, result.Placements); len(issues) != 0 {
+		t.Fatalf("cross-region required proximity issues = %#v", issues)
+	}
+	byRef := placementResultsByRef(result.Placements)
+	if !req.RegionRules[0].Preferred.ContainsPoint(Point{XMM: byRef["U1"].Position.XMM, YMM: byRef["U1"].Position.YMM}) ||
+		!req.RegionRules[1].Preferred.ContainsPoint(Point{XMM: byRef["C1"].Position.XMM, YMM: byRef["C1"].Position.YMM}) {
+		t.Fatalf("placements do not satisfy required regions: %#v", result.Placements)
+	}
+	if got := result.CandidateScoring.RejectedByReason[string(CandidateRejectProximity)]; got == 0 {
+		t.Fatalf("future-region proximity rejections = %d, want non-zero", got)
+	}
+}
+
 func TestPlaceContextHonorsCanceledContext(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
@@ -397,7 +508,7 @@ func TestPlaceContinuesPastInvalidCandidateRotation(t *testing.T) {
 	req.Components[0].Rotation.AllowedDeg = []float64{45, 0}
 
 	padsByRef := componentPadMaps(req.Components)
-	result, ok, _ := placeComponent(req.Components[0], req, newOccupancy(req), nil, padsByRef, componentRotatedPadMaps(req.Components, padsByRef), netsByComponent(req.Nets), newAdvancedPlacementRequestContext(req), keepTogetherPeersByComponent(req), nil)
+	result, ok, _ := placeComponent(req.Components[0], req, newOccupancy(req), nil, componentsByNormalizedRef(req.Components), padsByRef, componentRotatedPadMaps(req.Components, padsByRef), netsByComponent(req.Nets), requiredRegionsByComponent(req), newAdvancedPlacementRequestContext(req), keepTogetherPeersByComponent(req), nil)
 	if !ok {
 		t.Fatal("placeComponent failed after invalid candidate rotation")
 	}
@@ -1009,5 +1120,34 @@ func TestDensePlacementKeepsConnectivityScoringForEitherSideComponents(t *testin
 	placed := result.Placements[1].Position
 	if placed.XMM < 13 || placed.YMM < 13 {
 		t.Fatalf("either-side placement ignored semantic placement cost: %#v", placed)
+	}
+}
+
+func TestFutureProximitySearchBudgetExhaustionIsConservative(t *testing.T) {
+	budget := &futureProximitySearchBudget{}
+	possible := futureRequiredProximityPossibleWithSettled(
+		Component{Ref: "A"}, PlacementResult{}, nil,
+		Component{Ref: "B"}, nil, 1,
+		Request{}, nil, nil, nil, budget,
+	)
+	if !possible {
+		t.Fatal("exhausted feasibility lookahead rejected a candidate instead of deferring to normal placement validation")
+	}
+}
+
+func TestFutureRequiredProximityEnvelopeRejectsDisjointRequiredRegion(t *testing.T) {
+	rules := DefaultRules()
+	current := Component{Ref: "A", Bounds: Bounds{WidthMM: 2, HeightMM: 2}, Rotation: RotationConstraint{AllowedDeg: []float64{0}}, Side: SideTop}
+	future := Component{Ref: "B", Bounds: Bounds{WidthMM: 2, HeightMM: 2}, Rotation: RotationConstraint{AllowedDeg: []float64{0}}, Side: SideTop}
+	currentPlacement, ok := NewPlacementResult(current, Placement{XMM: 5, YMM: 5, Layer: "F.Cu"}, rules)
+	if !ok {
+		t.Fatal("current placement should be valid")
+	}
+	request := Request{Board: BoardPlacementArea{WidthMM: 100, HeightMM: 100, Layers: 2}, Rules: rules}
+	regions := map[string][]RegionRule{
+		"B": {{ID: "far", Required: true, Preferred: Rect{Min: Point{XMM: 90, YMM: 90}, Max: Point{XMM: 95, YMM: 95}}}},
+	}
+	if futureRequiredProximityEnvelopeReachable(current, currentPlacement, nil, future, nil, 2, request, regions) {
+		t.Fatal("disjoint future anchor region passed the cheap proximity reachability prefilter")
 	}
 }

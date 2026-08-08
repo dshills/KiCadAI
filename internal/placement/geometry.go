@@ -397,6 +397,11 @@ func (r Rect) Contains(other Rect) bool {
 		other.Max.YMM <= r.Max.YMM
 }
 
+func (r Rect) ContainsPoint(point Point) bool {
+	return point.XMM >= r.Min.XMM && point.YMM >= r.Min.YMM &&
+		point.XMM <= r.Max.XMM && point.YMM <= r.Max.YMM
+}
+
 func (r Rect) Intersects(other Rect) bool {
 	return r.Min.XMM < other.Max.XMM &&
 		r.Max.XMM > other.Min.XMM &&

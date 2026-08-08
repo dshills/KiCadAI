@@ -539,6 +539,14 @@ Large schematic IR inputs can use deterministic hierarchy partitioning. Exact
 human-editor-quality layout for arbitrary imported schematics remains outside
 the current guarantee.
 
+The human-quality physical corpus adds functional rather than overflow-only
+hierarchy. Four independently frozen behavior-only designs derive named child
+sheets, preserve multi-unit ownership, distinguish hierarchical signal
+interfaces from genuinely global power/reference nets, and retain conventional
+stage flow in the written child schematics. All root and child files pass the
+strict writer and installed-KiCad checks in two clean roots. See the
+[completion audit](../specs/human-quality-hierarchical-multilayer/AUDIT.md).
+
 ### PCB Placement And Routing
 
 The workflow supports block-aware placement, block-local copper, inter-block
@@ -546,7 +554,14 @@ route trees, pad/contact graph evidence, route completion, net classes, and
 bounded placement-routing retry. Promoted fixtures prove required-net
 connectivity rather than parseability alone.
 
-This is not yet a general-purpose autorouter for arbitrary dense boards. See
+The frozen human-quality physical corpus additionally proves exact
+`F.Cu`/`In1.Cu`/`In2.Cu`/`B.Cu` stackups, filled ground and bounded power
+planes, semantic placement regions, catalog-backed thermal-edge placement,
+layer transitions with paired return vias, and deterministic constrained
+routing for mixed-signal, amplifier, protected-control, and power cases.
+
+This remains a bounded four-case envelope, not a general-purpose autorouter for
+arbitrary dense boards. See
 [Placement And Routing](layout-routing.md).
 
 ### Components And Circuit Blocks
@@ -685,8 +700,8 @@ deenergized startup while their sole fault control explicitly starts in its
 connected state; they require a separate startup enable or sequencing
 dependency. Broader clock/fanout,
 programming-load, converter, isolation, and high-energy protection models,
-catalog-independent part qualification, and denser-board physical synthesis
-remain important. Those gaps can produce deterministic expansion proposals,
+catalog-independent part qualification, and physical generalization beyond the
+new bounded four-layer corpus remain important. Those gaps can produce deterministic expansion proposals,
 but they still require real engineering sources, representative
 simulation/workflow/KiCad evidence, and review before entering the supported
 registry. Unknown behavior must continue to produce a stable capability gap

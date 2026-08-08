@@ -345,13 +345,16 @@ type SchematicHierarchySheet struct {
 }
 
 type SchematicSymbolRef struct {
-	Ref  string `json:"ref"`
-	Unit int    `json:"unit,omitempty"`
+	Ref       string `json:"ref"`
+	Unit      int    `json:"unit,omitempty"`
+	FlowRank  int    `json:"flow_rank,omitempty"`
+	RankFixed bool   `json:"rank_fixed,omitempty"`
 }
 
 type SchematicCrossSheetNet struct {
-	Name      string     `json:"name"`
-	Endpoints []Endpoint `json:"endpoints"`
+	Name        string     `json:"name"`
+	GlobalScope bool       `json:"global_scope,omitempty"`
+	Endpoints   []Endpoint `json:"endpoints"`
 }
 
 type SchematicHierarchyBus struct {

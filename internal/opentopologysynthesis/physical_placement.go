@@ -363,11 +363,17 @@ func physicalRegionWeight(componentList []circuitgraph.Component, catalog *compo
 		area += math.Max(1, width*height)
 		widest = math.Max(widest, width)
 	}
+	// Package dimensions describe the component body, while placement uses the
+	// resolved footprint courtyard (including leads, pads, and assembly space).
+	// Reserve the package allowance on both sides of the widest body so a
+	// synthesized functional strip cannot be narrower than its only part's
+	// legal placement envelope.
+	packageAllowance := 2 * physicalRegionPackagePaddingMM
 	return math.Max(
 		physicalRegionMinimumWeight,
 		math.Max(
-			widest+physicalRegionPackagePaddingMM,
-			math.Sqrt(math.Max(0, area))+physicalRegionPackagePaddingMM+float64(len(componentList)-1)*physicalRegionAdditionalComponentWeight,
+			widest+packageAllowance,
+			math.Sqrt(math.Max(0, area))+packageAllowance+float64(len(componentList)-1)*physicalRegionAdditionalComponentWeight,
 		),
 	)
 }

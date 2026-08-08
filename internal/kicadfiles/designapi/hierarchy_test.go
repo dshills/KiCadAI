@@ -49,6 +49,9 @@ func TestBuilderWritesGeneratedSchematicHierarchy(t *testing.T) {
 	if err := builder.Connect(Endpoint{Reference: "R1", Pin: "2"}, Endpoint{Reference: "R2", Pin: "1"}, "LONG_NET"); err != nil {
 		t.Fatal(err)
 	}
+	if err := builder.Connect(Endpoint{Reference: "R1", Pin: "1"}, Endpoint{Reference: "R2", Pin: "2"}, "PWR"); err != nil {
+		t.Fatal(err)
+	}
 	if err := builder.SetSchematicHierarchy(SchematicHierarchy{
 		Sheets: []SchematicSheet{
 			{ID: "left", Name: "Left", Filename: "sch/left.kicad_sch", References: []string{"R1"}},
@@ -57,6 +60,10 @@ func TestBuilderWritesGeneratedSchematicHierarchy(t *testing.T) {
 		CrossSheetNets: []SchematicCrossSheetNet{{
 			Name:      "LONG_NET",
 			Endpoints: []Endpoint{{Reference: "R1", Pin: "2"}, {Reference: "R2", Pin: "1"}},
+		}, {
+			Name:        "PWR",
+			GlobalScope: true,
+			Endpoints:   []Endpoint{{Reference: "R1", Pin: "1"}, {Reference: "R2", Pin: "2"}},
 		}},
 	}); err != nil {
 		t.Fatal(err)
@@ -80,12 +87,15 @@ func TestBuilderWritesGeneratedSchematicHierarchy(t *testing.T) {
 		t.Fatalf("root sheet instances = %#v, want only the root path", read.Schematic.SheetInstances)
 	}
 	sheetUUIDByFilename := make(map[string]kicadfiles.UUID, len(read.Schematic.Sheets))
-	orientedGlobalLabel := false
+	orientedHierarchicalLabel := false
 	for index, sheet := range read.Schematic.Sheets {
 		wantPath := "/" + string(read.Schematic.UUID)
 		wantPage := strconv.Itoa(index + 2)
 		if len(sheet.Instances) != 1 || sheet.Instances[0].Project != "" || sheet.Instances[0].Path != wantPath || sheet.Instances[0].Page != wantPage {
 			t.Fatalf("root sheet %s instances = %#v, want empty project path %s page %s", sheet.Filename, sheet.Instances, wantPath, wantPage)
+		}
+		if len(sheet.Pins) != 1 || sheet.Pins[0].Text != "LONG_NET" || sheet.Pins[0].Kind != schematic.SheetPinPassive {
+			t.Fatalf("root sheet %s pins = %#v, want one explicit LONG_NET interface", sheet.Filename, sheet.Pins)
 		}
 		sheetUUIDByFilename[sheet.Filename] = sheet.UUID
 	}
@@ -108,13 +118,14 @@ func TestBuilderWritesGeneratedSchematicHierarchy(t *testing.T) {
 		if len(instance) != 1 || instance[0].Project != "hierarchy_demo" || instance[0].Path != wantInstancePath {
 			t.Fatalf("child %s symbol instances = %#v, want path %s", child.Filename, instance, wantInstancePath)
 		}
-		globalLabels := 0
-		connectedGlobalLabel := false
+		hierarchicalLabels := 0
+		globalPowerLabels := 0
+		connectedHierarchicalLabel := false
 		for _, label := range child.Labels {
-			if label.Text == "LONG_NET" && label.Kind == schematic.LabelGlobal {
-				globalLabels++
+			if label.Text == "LONG_NET" && label.Kind == schematic.LabelHierarchical {
+				hierarchicalLabels++
 				if label.Rotation != 0 {
-					orientedGlobalLabel = true
+					orientedHierarchicalLabel = true
 				}
 				wantRight := label.Rotation == 180 || label.Rotation == 270
 				if gotRight := containsFold(label.Justify, "right"); gotRight != wantRight {
@@ -122,13 +133,16 @@ func TestBuilderWritesGeneratedSchematicHierarchy(t *testing.T) {
 				}
 				for _, wire := range child.Wires {
 					if len(wire.Points) >= 2 && (wire.Points[0] == label.Position || wire.Points[len(wire.Points)-1] == label.Position) {
-						connectedGlobalLabel = true
+						connectedHierarchicalLabel = true
 						break
 					}
 				}
 			}
+			if label.Text == "PWR" && label.Kind == schematic.LabelGlobal {
+				globalPowerLabels++
+			}
 		}
-		if globalLabels != 1 {
+		if hierarchicalLabels != 1 || globalPowerLabels != 1 {
 			t.Fatalf("child %s labels = %#v", child.Filename, child.Labels)
 		}
 		for _, label := range child.Labels {
@@ -139,8 +153,8 @@ func TestBuilderWritesGeneratedSchematicHierarchy(t *testing.T) {
 				t.Fatalf("child %s global label %s intersheet field = %#v", child.Filename, label.Text, label.Fields)
 			}
 		}
-		if !connectedGlobalLabel {
-			t.Fatalf("child %s global label was not moved onto a connecting wire: labels=%#v wires=%#v", child.Filename, child.Labels, child.Wires)
+		if !connectedHierarchicalLabel {
+			t.Fatalf("child %s hierarchical label was not moved onto a connecting wire: labels=%#v wires=%#v", child.Filename, child.Labels, child.Wires)
 		}
 		request, result := schematiclayout.AdaptSchematic(child)
 		result = schematiclayout.Validate(result, request)
@@ -154,8 +168,8 @@ func TestBuilderWritesGeneratedSchematicHierarchy(t *testing.T) {
 			}
 		}
 	}
-	if !orientedGlobalLabel {
-		t.Fatal("generated hierarchy did not preserve any outward-oriented global label")
+	if !orientedHierarchicalLabel {
+		t.Fatal("generated hierarchy did not preserve any outward-oriented hierarchical label")
 	}
 	for _, child := range read.SheetFiles {
 		for _, symbol := range child.Symbols {
@@ -274,6 +288,11 @@ func TestBuilderWritesUnitAwareGeneratedHierarchy(t *testing.T) {
 	if len(read.SheetFiles) != 2 {
 		t.Fatalf("child sheets = %#v", read.SheetFiles)
 	}
+	for _, sheet := range read.Schematic.Sheets {
+		if len(sheet.Pins) != 1 || sheet.Pins[0].Text != "UNIT_NET" {
+			t.Fatalf("root sheet %s pins = %#v, want UNIT_NET", sheet.Filename, sheet.Pins)
+		}
+	}
 	seenUnits := map[int]bool{}
 	for _, child := range read.SheetFiles {
 		if len(child.Symbols) != 1 {
@@ -282,12 +301,12 @@ func TestBuilderWritesUnitAwareGeneratedHierarchy(t *testing.T) {
 		seenUnits[child.Symbols[0].Unit] = true
 		foundLabel := false
 		for _, label := range child.Labels {
-			if label.Text == "UNIT_NET" && label.Kind == schematic.LabelGlobal {
+			if label.Text == "UNIT_NET" && label.Kind == schematic.LabelHierarchical {
 				foundLabel = true
 			}
 		}
 		if !foundLabel {
-			t.Fatalf("child %s missing unit-aware global label", child.Filename)
+			t.Fatalf("child %s missing unit-aware hierarchical label", child.Filename)
 		}
 	}
 	if !seenUnits[1] || !seenUnits[2] {
@@ -319,5 +338,49 @@ func TestHierarchySymbolBodyRecoversEmbeddedWriterGeometry(t *testing.T) {
 	}
 	if body != want {
 		t.Fatalf("embedded hierarchy body = %#v, want %#v", body, want)
+	}
+}
+
+func TestTranslateSchematicMovesEveryPositionedConnectivityPrimitive(t *testing.T) {
+	start := kicadfiles.Point{X: kicadfiles.MM(10), Y: kicadfiles.MM(20)}
+	delta := kicadfiles.Point{X: kicadfiles.MM(5), Y: kicadfiles.MM(-3)}
+	file := &schematic.SchematicFile{
+		Wires:      []schematic.Wire{{Points: []kicadfiles.Point{start}}},
+		Buses:      []schematic.Bus{{Points: []kicadfiles.Point{start}}},
+		Polylines:  []schematic.Polyline{{Points: []kicadfiles.Point{start}}},
+		BusEntries: []schematic.BusEntry{{Position: start}},
+		Texts:      []schematic.Text{{Position: start}},
+		Labels: []schematic.Label{{
+			Position: start,
+			Fields:   []schematic.Field{{Position: start}},
+		}},
+		Junctions:  []schematic.Junction{{Position: start}},
+		NoConnects: []schematic.NoConnect{{Position: start}},
+		Sheets: []schematic.Sheet{{
+			Position:   start,
+			Properties: []schematic.Property{{Position: start}},
+			Pins:       []schematic.SheetPin{{Position: start}},
+		}},
+	}
+
+	translateSchematic(file, delta)
+	want := kicadfiles.Point{X: start.X + delta.X, Y: start.Y + delta.Y}
+	for name, got := range map[string]kicadfiles.Point{
+		"wire":           file.Wires[0].Points[0],
+		"bus":            file.Buses[0].Points[0],
+		"polyline":       file.Polylines[0].Points[0],
+		"bus entry":      file.BusEntries[0].Position,
+		"text":           file.Texts[0].Position,
+		"label":          file.Labels[0].Position,
+		"label field":    file.Labels[0].Fields[0].Position,
+		"junction":       file.Junctions[0].Position,
+		"no-connect":     file.NoConnects[0].Position,
+		"sheet":          file.Sheets[0].Position,
+		"sheet property": file.Sheets[0].Properties[0].Position,
+		"sheet pin":      file.Sheets[0].Pins[0].Position,
+	} {
+		if got != want {
+			t.Fatalf("translated %s = %#v, want %#v", name, got, want)
+		}
 	}
 }

@@ -238,6 +238,12 @@ func TestPhysicalPCBIntentDerivesDeterministicFunctionalAndThermalPlacement(t *t
 		}},
 	})
 	components.RebuildCatalogIndexes(catalog)
+	to252Weight := physicalRegionWeight([]circuitgraph.Component{{
+		ID: "power_switch", ComponentID: "mosfet.onsemi.rfd16n05lsm.to252", VariantID: "to252_3",
+	}}, catalog)
+	if minimum := 6.73 + 2*physicalRegionPackagePaddingMM; to252Weight < minimum {
+		t.Fatalf("TO-252 functional-region weight = %.3f, want at least bilateral package span %.3f", to252Weight, minimum)
+	}
 	if width, height := physicalPackageDimensions(circuitgraph.Component{
 		ComponentID: "test.nonfinite_dimensions", VariantID: "bad",
 	}, catalog); width != physicalDefaultPackageWidthMM || height != physicalDefaultPackageHeightMM {

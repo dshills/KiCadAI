@@ -71,6 +71,7 @@ func placeNormalizedContext(ctx context.Context, request Request, planRigidGroup
 	padsByRef := componentPadMaps(components)
 	rotatedPadsByRef := componentRotatedPadMaps(components, padsByRef)
 	netsByRef := netsByComponent(request.Nets)
+	requiredRegionsByRef := requiredRegionsByComponent(request)
 	advancedRequestContext := newAdvancedPlacementRequestContext(request)
 	keepTogetherPeersByRef := keepTogetherPeersByComponent(request)
 	placedByRef := make(map[string]PlacementResult, len(components))
@@ -195,7 +196,7 @@ func placeNormalizedContext(ctx context.Context, request Request, planRigidGroup
 			refreshPlacementKeepouts(occupancy, request, committedPlacements, keepoutAnchorRefs, componentRef)
 			continue
 		}
-		placement, ok, placementIssues := placeComponent(component, request, occupancy, placedByRef, padsByRef, rotatedPadsByRef, netsByRef, advancedRequestContext, keepTogetherPeersByRef, result.CandidateScoring)
+		placement, ok, placementIssues := placeComponent(component, request, occupancy, placedByRef, componentsByRef, padsByRef, rotatedPadsByRef, netsByRef, requiredRegionsByRef, advancedRequestContext, keepTogetherPeersByRef, result.CandidateScoring)
 		if !ok {
 			result.Status = StatusPartial
 			result.Metrics.UnplacedCount++
@@ -257,6 +258,11 @@ func placeNormalizedContext(ctx context.Context, request Request, planRigidGroup
 	proximityIssues := validateRequiredProximity(request, successfulPlacements, rigidFailures)
 	result.Issues = append(result.Issues, proximityIssues...)
 	if len(proximityIssues) > 0 && result.Status == StatusPlaced {
+		result.Status = StatusPartial
+	}
+	regionIssues := validateRequiredPlacementRegions(request, successfulPlacements)
+	result.Issues = append(result.Issues, regionIssues...)
+	if len(regionIssues) > 0 && result.Status == StatusPlaced {
 		result.Status = StatusPartial
 	}
 	operations, operationIssues := PlacementOperations(placedRequest, successfulPlacements)
@@ -655,7 +661,7 @@ func requiredProximityStronglyConnectedComponents(components []Component, edges 
 	return sccs, sccByRef
 }
 
-func placeComponent(component Component, request Request, occupancy *occupancy, placedByRef map[string]PlacementResult, padsByRef map[string]map[string]Point, rotatedPadsByRef map[string]map[int64]map[string]Point, netsByRef map[string][]*normalizedNet, advancedRequestContext advancedPlacementRequestContext, keepTogetherPeersByRef map[string][]string, scoring *CandidateScoringReport) (PlacementResult, bool, []reports.Issue) {
+func placeComponent(component Component, request Request, occupancy *occupancy, placedByRef map[string]PlacementResult, componentsByRef map[string]Component, padsByRef map[string]map[string]Point, rotatedPadsByRef map[string]map[int64]map[string]Point, netsByRef map[string][]*normalizedNet, requiredRegionsByRef map[string][]RegionRule, advancedRequestContext advancedPlacementRequestContext, keepTogetherPeersByRef map[string][]string, scoring *CandidateScoringReport) (PlacementResult, bool, []reports.Issue) {
 	componentRef := normalizeRef(component.Ref)
 	if component.Fixed {
 		if component.Position == nil {
@@ -679,6 +685,12 @@ func placeComponent(component Component, request Request, occupancy *occupancy, 
 				geometryIssue(reports.CodePlacementOutsideBoard, path, "fixed placement is outside usable board area"),
 			}
 		}
+		if rule, rejected := candidateRequiredRegionConflict(placement, requiredRegionsByRef[componentRef]); rejected {
+			recordCandidateRejection(scoring, component, componentRef, placement.Position, 0, CandidateRejectRegion, "fixed placement is outside required region "+rule.Region, rule.ID)
+			return PlacementResult{}, false, []reports.Issue{
+				geometryIssue(reports.CodeValidationFailed, path, "fixed placement is outside required region "+rule.Region),
+			}
+		}
 		if conflict, ok := occupancy.FirstConflictDetail(placement); ok {
 			message := conflict.Message()
 			recordCandidateRejection(scoring, component, componentRef, placement.Position, 0, candidateRejectionReasonForConflict(conflict), "fixed placement conflicts with "+message, message)
@@ -692,7 +704,7 @@ func placeComponent(component Component, request Request, occupancy *occupancy, 
 		return placement, true, nil
 	}
 	congestionContext := newCongestionCandidateScoringContext(placedByRef)
-	for _, candidate := range candidatePlacements(component, componentRef, request, placedByRef, padsByRef, rotatedPadsByRef, netsByRef, advancedRequestContext, keepTogetherPeersByRef, congestionContext, scoring) {
+	for _, candidate := range candidatePlacements(component, componentRef, request, placedByRef, componentsByRef, padsByRef, rotatedPadsByRef, netsByRef, requiredRegionsByRef, advancedRequestContext, keepTogetherPeersByRef, congestionContext, scoring) {
 		placement := candidate.Placement
 		if conflict, ok := occupancy.FirstConflictDetail(placement); ok {
 			message := conflict.Message()
@@ -705,7 +717,7 @@ func placeComponent(component Component, request Request, occupancy *occupancy, 
 	return PlacementResult{}, false, nil
 }
 
-func candidatePlacements(component Component, componentRef string, request Request, placedByRef map[string]PlacementResult, padsByRef map[string]map[string]Point, rotatedPadsByRef map[string]map[int64]map[string]Point, netsByRef map[string][]*normalizedNet, advancedRequestContext advancedPlacementRequestContext, keepTogetherPeersByRef map[string][]string, congestionContext congestionCandidateScoringContext, scoring *CandidateScoringReport) []placementCandidate {
+func candidatePlacements(component Component, componentRef string, request Request, placedByRef map[string]PlacementResult, componentsByRef map[string]Component, padsByRef map[string]map[string]Point, rotatedPadsByRef map[string]map[int64]map[string]Point, netsByRef map[string][]*normalizedNet, requiredRegionsByRef map[string][]RegionRule, advancedRequestContext advancedPlacementRequestContext, keepTogetherPeersByRef map[string][]string, congestionContext congestionCandidateScoringContext, scoring *CandidateScoringReport) []placementCandidate {
 	usable := BoardUsableRect(request.Board, request.Rules)
 	edgeTolerance := edgeConstraintTolerance(request.Board, request.Rules)
 	edgeInset := edgeCandidateInset(request.Board, request.Rules)
@@ -717,6 +729,7 @@ func candidatePlacements(component Component, componentRef string, request Reque
 	rotations := componentRotations(component)
 	layers := candidateLayers(component, request.Rules)
 	maxCandidates := request.Rules.MaxCandidatesPerPart
+	requiredRegions := requiredRegionsByRef[componentRef]
 	clusterReserve, requiresClusterReserve := requiredProximityAnchorReservation(component, componentRef, request, usable)
 	var clusterObstacles []PlacementResult
 	if requiresClusterReserve {
@@ -747,6 +760,9 @@ func candidatePlacements(component Component, componentRef string, request Reque
 	}
 	xIndices := edgeAwareSampledIndices(component, rotations, component.Edge, true, usable.Min.XMM, usable.Max.XMM, edgeInset, edgeSpan, grid, xCount, xSamples)
 	yIndices := edgeAwareSampledIndices(component, rotations, component.Edge, false, usable.Min.YMM, usable.Max.YMM, edgeInset, edgeSpan, grid, yCount, ySamples)
+	xIndices, yIndices = appendRequiredRegionCandidateSamples(
+		requiredRegions, usable, grid, xCount, yCount, axisSamples, xIndices, yIndices,
+	)
 	denseCandidateCount := xCount * yCount * variantsPerPoint
 	if request.ComponentOrder == ComponentOrderDenseLargestFootprintFirstV1 &&
 		denseCandidateCount <= maxDenseGridCandidates {
@@ -754,7 +770,7 @@ func candidatePlacements(component Component, componentRef string, request Reque
 		yIndices = denseGridIndices(yCount)
 		maxCandidates = max(maxCandidates, denseCandidateCount)
 	}
-	xIndices, yIndices = appendRequiredProximityCandidateSamples(component, componentRef, request, placedByRef, usable, grid, xCount, yCount, xIndices, yIndices)
+	xIndices, yIndices = appendRequiredProximityCandidateSamples(component, componentRef, request, placedByRef, requiredRegionsByRef, usable, grid, xCount, yCount, xIndices, yIndices)
 	if component.Position != nil && mobilityPrefersAuthoredPosition(component.Mobility.Class) {
 		xIndices = appendCandidateSampleIndex(xIndices, component.Position.XMM, usable.Min.XMM, grid, xCount)
 		yIndices = appendCandidateSampleIndex(yIndices, component.Position.YMM, usable.Min.YMM, grid, yCount)
@@ -783,6 +799,10 @@ func candidatePlacements(component Component, componentRef string, request Reque
 						recordCandidateRejection(scoring, component, componentRef, candidateResult.Position, index, CandidateRejectOutsideBoard, "candidate is outside usable board area")
 						continue
 					}
+					if rule, rejected := candidateRequiredRegionConflict(candidateResult, requiredRegions); rejected {
+						recordCandidateRejection(scoring, component, componentRef, candidateResult.Position, index, CandidateRejectRegion, "candidate is outside required region "+rule.Region, rule.ID)
+						continue
+					}
 					if requiresClusterReserve {
 						if candidateResult.Position.XMM-clusterReserve < usable.Min.XMM ||
 							candidateResult.Position.XMM+clusterReserve > usable.Max.XMM ||
@@ -805,8 +825,13 @@ func candidatePlacements(component Component, componentRef string, request Reque
 						recordCandidateRejection(scoring, component, componentRef, candidateResult.Position, index, CandidateRejectGroupConstraint, message, peerRef)
 						continue
 					}
-					if ruleID, peerRef, rejected := candidateRequiredProximityConflict(componentRef, candidateResult, request, placedByRef); rejected {
+					if ruleID, peerRef, rejected := candidateRequiredProximityConflict(componentRef, candidateResult, request, placedByRef, componentsByRef); rejected {
 						message := fmt.Sprintf("candidate exceeds required proximity %s from %s", ruleID, peerRef)
+						recordCandidateRejection(scoring, component, componentRef, candidateResult.Position, index, CandidateRejectProximity, message, ruleID, peerRef)
+						continue
+					}
+					if ruleID, peerRef, rejected := candidateFutureRequiredProximityConflict(componentRef, candidateResult, request, placedByRef, componentsByRef, requiredRegionsByRef); rejected {
+						message := fmt.Sprintf("candidate leaves no region-feasible placement for required proximity %s to %s", ruleID, peerRef)
 						recordCandidateRejection(scoring, component, componentRef, candidateResult.Position, index, CandidateRejectProximity, message, ruleID, peerRef)
 						continue
 					}
@@ -881,6 +906,114 @@ func candidatePlacements(component Component, componentRef string, request Reque
 		candidates = candidates[:maxCandidates]
 	}
 	return candidates
+}
+
+func requiredRegionsForComponent(componentRef string, request Request) []RegionRule {
+	return requiredRegionsByComponent(request)[normalizeRef(componentRef)]
+}
+
+func requiredRegionsByComponent(request Request) map[string][]RegionRule {
+	refsByRole := map[NetRole][]string{}
+	if regionRulesUseNetRoles(request.RegionRules) {
+		refsByRole = netRefsByRole(request.Nets)
+	}
+	result := map[string][]RegionRule{}
+	for _, rule := range request.RegionRules {
+		if !rule.Required || rule.Preferred.IsZero() {
+			continue
+		}
+		for _, ref := range regionRuleRefs(rule, refsByRole) {
+			ref = normalizeRef(ref)
+			result[ref] = append(result[ref], rule)
+		}
+	}
+	return result
+}
+
+func candidateRequiredRegionConflict(candidate PlacementResult, rules []RegionRule) (RegionRule, bool) {
+	// Required regions define legal placement-anchor domains. They are not
+	// component-body keepouts: physical board containment, courtyard collision,
+	// explicit keepouts, and edge-access rules independently constrain the full
+	// package. Anchor semantics let an edge-access component remain assigned to
+	// its functional region without making its required board edge unreachable.
+	for _, rule := range rules {
+		if !rule.Preferred.ContainsPoint(Point{XMM: candidate.Position.XMM, YMM: candidate.Position.YMM}) {
+			return rule, true
+		}
+	}
+	return RegionRule{}, false
+}
+
+func appendRequiredRegionCandidateSamples(
+	requiredRegions []RegionRule,
+	usable Rect,
+	grid float64,
+	xCount int,
+	yCount int,
+	target int,
+	xIndices []int,
+	yIndices []int,
+) ([]int, []int) {
+	if len(requiredRegions) == 0 || grid <= 0 || xCount <= 0 || yCount <= 0 {
+		return xIndices, yIndices
+	}
+	domain := usable
+	for _, rule := range requiredRegions {
+		domain.Min.XMM = max(domain.Min.XMM, rule.Preferred.Min.XMM)
+		domain.Min.YMM = max(domain.Min.YMM, rule.Preferred.Min.YMM)
+		domain.Max.XMM = min(domain.Max.XMM, rule.Preferred.Max.XMM)
+		domain.Max.YMM = min(domain.Max.YMM, rule.Preferred.Max.YMM)
+	}
+	if domain.Min.XMM > domain.Max.XMM || domain.Min.YMM > domain.Max.YMM {
+		return xIndices, yIndices
+	}
+	xIndices = appendCandidateSampleRange(xIndices, domain.Min.XMM, domain.Max.XMM, usable.Min.XMM, grid, xCount, target)
+	yIndices = appendCandidateSampleRange(yIndices, domain.Min.YMM, domain.Max.YMM, usable.Min.YMM, grid, yCount, target)
+	return xIndices, yIndices
+}
+
+func appendCandidateSampleRange(indices []int, minimum, maximum, usableMinimum, grid float64, count, target int) []int {
+	if maximum < minimum || grid <= 0 || count <= 0 {
+		return indices
+	}
+	const gridIndexEpsilon = 1e-9
+	first := max(0, int(math.Ceil((minimum-usableMinimum)/grid-gridIndexEpsilon)))
+	last := min(count-1, int(math.Floor((maximum-usableMinimum)/grid+gridIndexEpsilon)))
+	if last < first {
+		return indices
+	}
+	for _, offset := range sampledIndices(last-first+1, target) {
+		index := first + offset
+		if !slices.Contains(indices, index) {
+			indices = append(indices, index)
+		}
+	}
+	middle := first + (last-first)/2
+	if !slices.Contains(indices, middle) {
+		indices = append(indices, middle)
+	}
+	sort.Ints(indices)
+	return indices
+}
+
+func validateRequiredPlacementRegions(request Request, placements []PlacementResult) []reports.Issue {
+	placementsByRef := make(map[string]PlacementResult, len(placements))
+	for _, candidate := range placements {
+		placementsByRef[normalizeRef(candidate.Ref)] = candidate
+	}
+	var issues []reports.Issue
+	for _, report := range regionReports(request, placementsByRef) {
+		if !report.Required || report.Satisfied {
+			continue
+		}
+		issues = append(issues, reports.Issue{
+			Code:     reports.CodeValidationFailed,
+			Severity: reports.SeverityError,
+			Path:     "regions." + report.ID,
+			Message:  fmt.Sprintf("required placement region %s is not satisfied; outside=%v missing=%v", report.Region, report.OutsideRefs, report.MissingRefs),
+		})
+	}
+	return issues
 }
 
 func edgePlacementCohortSize(component Component, request Request) int {
@@ -983,6 +1116,26 @@ type proximityClusterCell struct {
 	y int
 }
 
+// futureProximitySearchBudget bounds recursive feasibility lookahead without
+// turning budget exhaustion into a placement rejection. The lookahead is a
+// pruning heuristic; when its deterministic budget is exhausted it must remain
+// conservative and let the normal placement/validation path decide legality.
+type futureProximitySearchBudget struct {
+	remaining int
+}
+
+func newFutureProximitySearchBudget(componentCount int) *futureProximitySearchBudget {
+	return &futureProximitySearchBudget{remaining: max(64, componentCount*32)}
+}
+
+func (budget *futureProximitySearchBudget) consume() bool {
+	if budget == nil || budget.remaining <= 0 {
+		return false
+	}
+	budget.remaining--
+	return true
+}
+
 func requiredProximityAnchorReservationBlockedCenters(reserve float64, obstacles []PlacementResult, usable Rect, grid float64, xCount, yCount int) map[proximityClusterCell]string {
 	if reserve <= 0 || len(obstacles) == 0 || grid <= 0 || xCount <= 0 || yCount <= 0 {
 		return nil
@@ -1008,10 +1161,7 @@ func requiredProximityAnchorReservationBlockedCenters(reserve float64, obstacles
 	return blocked
 }
 
-func appendRequiredProximityCandidateSamples(component Component, componentRef string, request Request, placedByRef map[string]PlacementResult, usable Rect, grid float64, xCount int, yCount int, xIndices []int, yIndices []int) ([]int, []int) {
-	if len(placedByRef) == 0 {
-		return xIndices, yIndices
-	}
+func appendRequiredProximityCandidateSamples(component Component, componentRef string, request Request, placedByRef map[string]PlacementResult, requiredRegionsByRef map[string][]RegionRule, usable Rect, grid float64, xCount int, yCount int, xIndices []int, yIndices []int) ([]int, []int) {
 	componentRef = normalizeRef(componentRef)
 	spacing := request.Rules.ComponentSpacingMM
 	if spacing <= 0 {
@@ -1033,6 +1183,33 @@ func appendRequiredProximityCandidateSamples(component Component, componentRef s
 			yIndices = appendCandidateSampleIndex(yIndices, y, usable.Min.YMM, grid, yCount)
 		}
 	}
+	appendFuturePeerRegions := func(peerRef string, maximumDistance float64) {
+		if _, placed := placedByRef[normalizeRef(peerRef)]; placed {
+			return
+		}
+		for _, region := range requiredRegionsByRef[normalizeRef(peerRef)] {
+			xCenter := (region.Preferred.Min.XMM + region.Preferred.Max.XMM) / 2
+			yCenter := (region.Preferred.Min.YMM + region.Preferred.Max.YMM) / 2
+			for _, x := range []float64{
+				region.Preferred.Min.XMM - maximumDistance,
+				region.Preferred.Min.XMM,
+				xCenter,
+				region.Preferred.Max.XMM,
+				region.Preferred.Max.XMM + maximumDistance,
+			} {
+				xIndices = appendCandidateSampleIndex(xIndices, x, usable.Min.XMM, grid, xCount)
+			}
+			for _, y := range []float64{
+				region.Preferred.Min.YMM - maximumDistance,
+				region.Preferred.Min.YMM,
+				yCenter,
+				region.Preferred.Max.YMM,
+				region.Preferred.Max.YMM + maximumDistance,
+			} {
+				yIndices = appendCandidateSampleIndex(yIndices, y, usable.Min.YMM, grid, yCount)
+			}
+		}
+	}
 	for _, rule := range request.ProximityRules {
 		if !rule.Required || rule.MaxDistanceMM <= 0 {
 			continue
@@ -1042,6 +1219,8 @@ func appendRequiredProximityCandidateSamples(component Component, componentRef s
 			for _, targetRef := range rule.TargetRefs {
 				if peer, ok := placedByRef[normalizeRef(targetRef)]; ok {
 					appendPeer(peer, rule.MaxDistanceMM)
+				} else {
+					appendFuturePeerRegions(targetRef, rule.MaxDistanceMM)
 				}
 			}
 			continue
@@ -1049,6 +1228,8 @@ func appendRequiredProximityCandidateSamples(component Component, componentRef s
 		if normalizedRefsContain(rule.TargetRefs, componentRef) {
 			if peer, ok := placedByRef[anchorRef]; ok {
 				appendPeer(peer, rule.MaxDistanceMM)
+			} else {
+				appendFuturePeerRegions(anchorRef, rule.MaxDistanceMM)
 			}
 		}
 	}
@@ -1087,12 +1268,11 @@ func candidateGroupSpreadConflict(componentRef string, candidate PlacementResult
 	return "", "", false
 }
 
-func candidateRequiredProximityConflict(componentRef string, candidate PlacementResult, request Request, placedByRef map[string]PlacementResult) (string, string, bool) {
+func candidateRequiredProximityConflict(componentRef string, candidate PlacementResult, request Request, placedByRef map[string]PlacementResult, componentsByRef map[string]Component) (string, string, bool) {
 	if len(placedByRef) == 0 {
 		return "", "", false
 	}
 	componentRef = normalizeRef(componentRef)
-	componentsByRef := componentsByNormalizedRef(request.Components)
 	toleranceMM := request.Rules.GridMM
 	if toleranceMM <= 0 {
 		toleranceMM = DefaultRules().GridMM
@@ -1130,6 +1310,368 @@ func candidateRequiredProximityConflict(componentRef string, candidate Placement
 		}
 	}
 	return "", "", false
+}
+
+func candidateFutureRequiredProximityConflict(componentRef string, candidate PlacementResult, request Request, placedByRef map[string]PlacementResult, componentsByRef map[string]Component, requiredRegionsByRef map[string][]RegionRule) (string, string, bool) {
+	componentRef = normalizeRef(componentRef)
+	component, exists := componentsByRef[componentRef]
+	if !exists {
+		return "", "", false
+	}
+	for _, rule := range request.ProximityRules {
+		if !rule.Required || rule.MaxDistanceMM <= 0 {
+			continue
+		}
+		anchorRef := normalizeRef(rule.AnchorRef)
+		if componentRef == anchorRef {
+			for _, targetRefRaw := range rule.TargetRefs {
+				targetRef := normalizeRef(targetRefRaw)
+				if targetRef == componentRef {
+					continue
+				}
+				if _, placed := placedByRef[targetRef]; placed {
+					continue
+				}
+				target, known := componentsByRef[targetRef]
+				if known && (!futureRequiredProximityEnvelopeReachable(component, candidate, rule.AnchorPins, target, rule.TargetPins, rule.MaxDistanceMM, request, requiredRegionsByRef) ||
+					!futureRequiredProximityPossible(component, candidate, rule.AnchorPins, target, rule.TargetPins, rule.MaxDistanceMM, request, placedByRef, componentsByRef, requiredRegionsByRef)) {
+					return rule.ID, target.Ref, true
+				}
+			}
+			continue
+		}
+		if !normalizedRefsContain(rule.TargetRefs, componentRef) {
+			continue
+		}
+		if _, placed := placedByRef[anchorRef]; placed {
+			continue
+		}
+		anchor, known := componentsByRef[anchorRef]
+		if known && (!futureRequiredProximityEnvelopeReachable(component, candidate, rule.TargetPins, anchor, rule.AnchorPins, rule.MaxDistanceMM, request, requiredRegionsByRef) ||
+			!futureRequiredProximityPossible(component, candidate, rule.TargetPins, anchor, rule.AnchorPins, rule.MaxDistanceMM, request, placedByRef, componentsByRef, requiredRegionsByRef)) {
+			return rule.ID, anchor.Ref, true
+		}
+	}
+	return "", "", false
+}
+
+func futureRequiredProximityPossible(current Component, currentPlacement PlacementResult, currentPins []string, future Component, futurePins []string, maximumDistance float64, request Request, placedByRef map[string]PlacementResult, componentsByRef map[string]Component, requiredRegionsByRef map[string][]RegionRule) bool {
+	settled := make(map[string]PlacementResult, len(placedByRef)+1)
+	for ref, placement := range placedByRef {
+		settled[normalizeRef(ref)] = placement
+	}
+	settled[normalizeRef(current.Ref)] = currentPlacement
+	budget := newFutureProximitySearchBudget(len(componentsByRef))
+	return futureRequiredProximityPossibleWithSettled(current, currentPlacement, currentPins, future, futurePins, maximumDistance, request, settled, componentsByRef, requiredRegionsByRef, budget)
+}
+
+func futureRequiredProximityPossibleWithSettled(current Component, currentPlacement PlacementResult, currentPins []string, future Component, futurePins []string, maximumDistance float64, request Request, settled map[string]PlacementResult, componentsByRef map[string]Component, requiredRegionsByRef map[string][]RegionRule, budget *futureProximitySearchBudget) bool {
+	if !budget.consume() {
+		return true
+	}
+	toleranceMM := request.Rules.GridMM
+	if toleranceMM <= 0 {
+		toleranceMM = DefaultRules().GridMM
+	}
+	maximumDistance += toleranceMM
+	if future.Fixed {
+		if future.Position == nil {
+			return false
+		}
+		placement, ok := NewPlacementResult(future, *future.Position, request.Rules)
+		if !ok || !futurePlacementLegal(future, placement, request, requiredRegionsByRef) {
+			return false
+		}
+		distance, _ := proximityDistance(current, currentPlacement, currentPins, future, placement, futurePins)
+		if distance > maximumDistance {
+			return false
+		}
+		return futurePlacementPreservesRequiredProximity(future, placement, request, settled, componentsByRef, requiredRegionsByRef, budget)
+	}
+	usable := BoardUsableRect(request.Board, request.Rules)
+	grid := request.Rules.GridMM
+	if grid <= 0 {
+		grid = DefaultRules().GridMM
+	}
+	for _, rotation := range componentRotations(future) {
+		for _, layer := range candidateLayers(future, request.Rules) {
+			atOrigin := Placement{RotationDeg: rotation, Layer: layer}
+			originPlacement, ok := NewPlacementResult(future, atOrigin, request.Rules)
+			if !ok {
+				continue
+			}
+			physicalBounds, ok := ComponentPhysicalBounds(future, originPlacement.Position)
+			if !ok {
+				continue
+			}
+			for _, domain := range futurePlacementDomains(future, physicalBounds, request, usable, requiredRegionsByRef) {
+				desiredOrigins := futureProximityOrigins(current, currentPlacement, currentPins, future, originPlacement, futurePins, request, settled, componentsByRef, requiredRegionsByRef)
+				seen := map[proximityClusterCell]struct{}{}
+				for _, desired := range desiredOrigins {
+					x, xOK := nearestGridCoordinate(desired.XMM, domain.Min.XMM, domain.Max.XMM, grid)
+					y, yOK := nearestGridCoordinate(desired.YMM, domain.Min.YMM, domain.Max.YMM, grid)
+					if !xOK || !yOK {
+						continue
+					}
+					key := proximityClusterCell{x: int(math.Round(x / grid)), y: int(math.Round(y / grid))}
+					if _, duplicate := seen[key]; duplicate {
+						continue
+					}
+					seen[key] = struct{}{}
+					placement, ok := NewPlacementResult(future, Placement{XMM: x, YMM: y, RotationDeg: rotation, Layer: layer}, request.Rules)
+					if !ok || !futurePlacementLegal(future, placement, request, requiredRegionsByRef) {
+						continue
+					}
+					distance, _ := proximityDistance(current, currentPlacement, currentPins, future, placement, futurePins)
+					if distance > maximumDistance {
+						continue
+					}
+					if futurePlacementPreservesRequiredProximity(future, placement, request, settled, componentsByRef, requiredRegionsByRef, budget) {
+						return true
+					}
+				}
+			}
+		}
+	}
+	return false
+}
+
+func futurePlacementPreservesRequiredProximity(component Component, placement PlacementResult, request Request, settled map[string]PlacementResult, componentsByRef map[string]Component, requiredRegionsByRef map[string][]RegionRule, budget *futureProximitySearchBudget) bool {
+	componentRef := normalizeRef(component.Ref)
+	previous, alreadySettled := settled[componentRef]
+	settled[componentRef] = placement
+	defer func() {
+		if alreadySettled {
+			settled[componentRef] = previous
+			return
+		}
+		delete(settled, componentRef)
+	}()
+	toleranceMM := request.Rules.GridMM
+	if toleranceMM <= 0 {
+		toleranceMM = DefaultRules().GridMM
+	}
+	for _, rule := range request.ProximityRules {
+		if !rule.Required || rule.MaxDistanceMM <= 0 || normalizeRef(rule.AnchorRef) != componentRef {
+			continue
+		}
+		for _, targetRefRaw := range rule.TargetRefs {
+			targetRef := normalizeRef(targetRefRaw)
+			if targetRef == componentRef {
+				continue
+			}
+			target, known := componentsByRef[targetRef]
+			if !known {
+				continue
+			}
+			if targetPlacement, targetSettled := settled[targetRef]; targetSettled {
+				distance, _ := proximityDistance(component, placement, rule.AnchorPins, target, targetPlacement, rule.TargetPins)
+				if distance > rule.MaxDistanceMM+toleranceMM {
+					return false
+				}
+				continue
+			}
+			if !futureRequiredProximityPossibleWithSettled(component, placement, rule.AnchorPins, target, rule.TargetPins, rule.MaxDistanceMM, request, settled, componentsByRef, requiredRegionsByRef, budget) {
+				return false
+			}
+		}
+	}
+	return true
+}
+
+func futureRequiredProximityEnvelopeReachable(current Component, currentPlacement PlacementResult, currentPins []string, future Component, futurePins []string, maximumDistance float64, request Request, requiredRegionsByRef map[string][]RegionRule) bool {
+	if future.Fixed {
+		return true
+	}
+	currentEnvelope := currentPlacement.Bounds
+	currentPoint, _ := proximityPoint(current, currentPlacement, currentPins)
+	currentEnvelope.Min.XMM = min(currentEnvelope.Min.XMM, currentPoint.XMM)
+	currentEnvelope.Min.YMM = min(currentEnvelope.Min.YMM, currentPoint.YMM)
+	currentEnvelope.Max.XMM = max(currentEnvelope.Max.XMM, currentPoint.XMM)
+	currentEnvelope.Max.YMM = max(currentEnvelope.Max.YMM, currentPoint.YMM)
+	usable := BoardUsableRect(request.Board, request.Rules)
+	toleranceMM := request.Rules.GridMM
+	if toleranceMM <= 0 {
+		toleranceMM = DefaultRules().GridMM
+	}
+	for _, rotation := range componentRotations(future) {
+		for _, layer := range candidateLayers(future, request.Rules) {
+			originPlacement, ok := NewPlacementResult(future, Placement{RotationDeg: rotation, Layer: layer}, request.Rules)
+			if !ok {
+				continue
+			}
+			physicalAtOrigin, ok := ComponentPhysicalBounds(future, originPlacement.Position)
+			if !ok {
+				continue
+			}
+			futurePoint, _ := proximityPoint(future, originPlacement, futurePins)
+			physicalAtOrigin.Min.XMM = min(physicalAtOrigin.Min.XMM, futurePoint.XMM)
+			physicalAtOrigin.Min.YMM = min(physicalAtOrigin.Min.YMM, futurePoint.YMM)
+			physicalAtOrigin.Max.XMM = max(physicalAtOrigin.Max.XMM, futurePoint.XMM)
+			physicalAtOrigin.Max.YMM = max(physicalAtOrigin.Max.YMM, futurePoint.YMM)
+			for _, domain := range futurePlacementDomains(future, physicalAtOrigin, request, usable, requiredRegionsByRef) {
+				reachableEnvelope := Rect{
+					Min: Point{XMM: domain.Min.XMM + physicalAtOrigin.Min.XMM, YMM: domain.Min.YMM + physicalAtOrigin.Min.YMM},
+					Max: Point{XMM: domain.Max.XMM + physicalAtOrigin.Max.XMM, YMM: domain.Max.YMM + physicalAtOrigin.Max.YMM},
+				}
+				if rectEdgeDistance(currentEnvelope, reachableEnvelope) <= maximumDistance+toleranceMM {
+					return true
+				}
+			}
+		}
+	}
+	return false
+}
+
+func futurePlacementDomains(component Component, physicalAtOrigin Rect, request Request, usable Rect, requiredRegionsByRef map[string][]RegionRule) []Rect {
+	domain := Rect{
+		Min: Point{
+			XMM: usable.Min.XMM - physicalAtOrigin.Min.XMM,
+			YMM: usable.Min.YMM - physicalAtOrigin.Min.YMM,
+		},
+		Max: Point{
+			XMM: usable.Max.XMM - physicalAtOrigin.Max.XMM,
+			YMM: usable.Max.YMM - physicalAtOrigin.Max.YMM,
+		},
+	}
+	for _, region := range requiredRegionsByRef[normalizeRef(component.Ref)] {
+		domain.Min.XMM = max(domain.Min.XMM, region.Preferred.Min.XMM)
+		domain.Min.YMM = max(domain.Min.YMM, region.Preferred.Min.YMM)
+		domain.Max.XMM = min(domain.Max.XMM, region.Preferred.Max.XMM)
+		domain.Max.YMM = min(domain.Max.YMM, region.Preferred.Max.YMM)
+	}
+	if domain.Min.XMM > domain.Max.XMM || domain.Min.YMM > domain.Max.YMM {
+		return nil
+	}
+	if component.Edge == EdgeNone {
+		return []Rect{domain}
+	}
+	edges := []EdgeConstraint{component.Edge}
+	if component.Edge == EdgeAny {
+		edges = []EdgeConstraint{EdgeLeft, EdgeRight, EdgeTop, EdgeBottom}
+	}
+	toleranceMM := edgeConstraintTolerance(request.Board, request.Rules)
+	boardMinX := request.Board.Origin.XMM
+	boardMinY := request.Board.Origin.YMM
+	boardMaxX := boardMinX + request.Board.WidthMM
+	boardMaxY := boardMinY + request.Board.HeightMM
+	domains := make([]Rect, 0, len(edges))
+	for _, edge := range edges {
+		candidate := domain
+		switch edge {
+		case EdgeLeft:
+			candidate.Max.XMM = min(candidate.Max.XMM, boardMinX+toleranceMM-physicalAtOrigin.Min.XMM)
+		case EdgeRight:
+			candidate.Min.XMM = max(candidate.Min.XMM, boardMaxX-toleranceMM-physicalAtOrigin.Max.XMM)
+		case EdgeTop:
+			candidate.Max.YMM = min(candidate.Max.YMM, boardMinY+toleranceMM-physicalAtOrigin.Min.YMM)
+		case EdgeBottom:
+			candidate.Min.YMM = max(candidate.Min.YMM, boardMaxY-toleranceMM-physicalAtOrigin.Max.YMM)
+		}
+		if candidate.Min.XMM <= candidate.Max.XMM && candidate.Min.YMM <= candidate.Max.YMM {
+			domains = append(domains, candidate)
+		}
+	}
+	return domains
+}
+
+func futureProximityOrigin(current Component, currentPlacement PlacementResult, currentPins []string, future Component, futureAtOrigin PlacementResult, futurePins []string) Point {
+	currentPoint, currentEvidence := proximityPoint(current, currentPlacement, currentPins)
+	futurePoint, futureEvidence := proximityPoint(future, futureAtOrigin, futurePins)
+	if currentEvidence == "pad" && futureEvidence == "pad" {
+		return Point{XMM: currentPoint.XMM - futurePoint.XMM, YMM: currentPoint.YMM - futurePoint.YMM}
+	}
+	return Point{
+		XMM: closestValueToInterval(
+			(futureAtOrigin.Bounds.Min.XMM+futureAtOrigin.Bounds.Max.XMM)/2,
+			currentPlacement.Bounds.Min.XMM-futureAtOrigin.Bounds.Max.XMM,
+			currentPlacement.Bounds.Max.XMM-futureAtOrigin.Bounds.Min.XMM,
+		),
+		YMM: closestValueToInterval(
+			(futureAtOrigin.Bounds.Min.YMM+futureAtOrigin.Bounds.Max.YMM)/2,
+			currentPlacement.Bounds.Min.YMM-futureAtOrigin.Bounds.Max.YMM,
+			currentPlacement.Bounds.Max.YMM-futureAtOrigin.Bounds.Min.YMM,
+		),
+	}
+}
+
+func futureProximityOrigins(current Component, currentPlacement PlacementResult, currentPins []string, future Component, futureAtOrigin PlacementResult, futurePins []string, request Request, settled map[string]PlacementResult, componentsByRef map[string]Component, requiredRegionsByRef map[string][]RegionRule) []Point {
+	base := futureProximityOrigin(current, currentPlacement, currentPins, future, futureAtOrigin, futurePins)
+	origins := []Point{base}
+	futureRef := normalizeRef(future.Ref)
+	for _, rule := range request.ProximityRules {
+		if !rule.Required || rule.MaxDistanceMM <= 0 || normalizeRef(rule.AnchorRef) != futureRef {
+			continue
+		}
+		for _, targetRefRaw := range rule.TargetRefs {
+			targetRef := normalizeRef(targetRefRaw)
+			if targetRef == futureRef {
+				continue
+			}
+			if targetPlacement, alreadySettled := settled[targetRef]; alreadySettled {
+				target, known := componentsByRef[targetRef]
+				if known {
+					origins = append(origins, futureProximityOrigin(target, targetPlacement, rule.TargetPins, future, futureAtOrigin, rule.AnchorPins))
+				}
+				continue
+			}
+			for _, region := range requiredRegionsByRef[targetRef] {
+				xCenter := (region.Preferred.Min.XMM + region.Preferred.Max.XMM) / 2
+				yCenter := (region.Preferred.Min.YMM + region.Preferred.Max.YMM) / 2
+				xValues := []float64{region.Preferred.Min.XMM - rule.MaxDistanceMM, region.Preferred.Min.XMM, xCenter, region.Preferred.Max.XMM, region.Preferred.Max.XMM + rule.MaxDistanceMM}
+				yValues := []float64{region.Preferred.Min.YMM - rule.MaxDistanceMM, region.Preferred.Min.YMM, yCenter, region.Preferred.Max.YMM, region.Preferred.Max.YMM + rule.MaxDistanceMM}
+				for _, x := range xValues {
+					origins = append(origins, Point{XMM: x, YMM: base.YMM})
+				}
+				for _, y := range yValues {
+					origins = append(origins, Point{XMM: base.XMM, YMM: y})
+				}
+				for _, point := range []Point{
+					{XMM: xValues[0], YMM: yValues[0]},
+					{XMM: xValues[0], YMM: yValues[len(yValues)-1]},
+					{XMM: xValues[len(xValues)-1], YMM: yValues[0]},
+					{XMM: xValues[len(xValues)-1], YMM: yValues[len(yValues)-1]},
+					{XMM: xCenter, YMM: yCenter},
+				} {
+					origins = append(origins, point)
+				}
+			}
+		}
+	}
+	return origins
+}
+
+func closestValueToInterval(preferred, minimum, maximum float64) float64 {
+	return max(minimum, min(maximum, preferred))
+}
+
+func nearestGridCoordinate(preferred, minimum, maximum, grid float64) (float64, bool) {
+	if grid <= 0 || minimum > maximum {
+		return 0, false
+	}
+	const gridIndexEpsilon = 1e-9
+	first := int(math.Ceil(minimum/grid - gridIndexEpsilon))
+	last := int(math.Floor(maximum/grid + gridIndexEpsilon))
+	if first > last {
+		return 0, false
+	}
+	index := int(math.Round(preferred / grid))
+	index = max(first, min(last, index))
+	return roundToGrid(float64(index)*grid, grid), true
+}
+
+func futurePlacementLegal(component Component, placement PlacementResult, request Request, requiredRegionsByRef map[string][]RegionRule) bool {
+	physicalBounds, ok := ComponentPhysicalBounds(component, placement.Position)
+	if !ok || !BoardUsableRect(request.Board, request.Rules).Contains(physicalBounds) {
+		return false
+	}
+	if _, rejected := candidateRequiredRegionConflict(placement, requiredRegionsByRef[normalizeRef(component.Ref)]); rejected {
+		return false
+	}
+	if component.Edge != EdgeNone && !edgeConstraintSatisfied(request.Board, component, placement.Position, component.Edge, edgeConstraintTolerance(request.Board, request.Rules)) {
+		return false
+	}
+	return sideConstraintSatisfied(component.Side, placement.Position.Layer)
 }
 
 func candidateTranslatedKeepoutConflict(component Component, candidate PlacementResult, request Request, placedByRef map[string]PlacementResult) (string, string, bool) {

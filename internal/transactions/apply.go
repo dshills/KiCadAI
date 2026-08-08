@@ -803,7 +803,12 @@ func applyOperation(builder *designapi.Builder, op Operation, opts ApplyOptions)
 			for _, sheet := range payload.Hierarchy.Sheets {
 				symbols := make([]designapi.SchematicSymbolRef, 0, len(sheet.Symbols))
 				for _, symbol := range sheet.Symbols {
-					symbols = append(symbols, designapi.SchematicSymbolRef{Reference: symbol.Ref, Unit: symbol.Unit})
+					symbols = append(symbols, designapi.SchematicSymbolRef{
+						Reference: symbol.Ref,
+						Unit:      symbol.Unit,
+						FlowRank:  symbol.FlowRank,
+						RankFixed: symbol.RankFixed,
+					})
 				}
 				hierarchy.Sheets = append(hierarchy.Sheets, designapi.SchematicSheet{ID: sheet.ID, Name: sheet.Name, Filename: sheet.Filename, References: append([]string(nil), sheet.References...), Symbols: symbols})
 			}
@@ -812,7 +817,7 @@ func applyOperation(builder *designapi.Builder, op Operation, opts ApplyOptions)
 				for _, endpoint := range net.Endpoints {
 					endpoints = append(endpoints, designapi.Endpoint{Reference: endpoint.Ref, Pin: endpoint.Pin, Unit: endpoint.Unit})
 				}
-				hierarchy.CrossSheetNets = append(hierarchy.CrossSheetNets, designapi.SchematicCrossSheetNet{Name: net.Name, Endpoints: endpoints})
+				hierarchy.CrossSheetNets = append(hierarchy.CrossSheetNets, designapi.SchematicCrossSheetNet{Name: net.Name, GlobalScope: net.GlobalScope, Endpoints: endpoints})
 			}
 			for _, bus := range payload.Hierarchy.Buses {
 				converted := designapi.SchematicBus{ID: bus.ID, Name: bus.Name}

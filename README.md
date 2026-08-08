@@ -81,13 +81,21 @@ behavior → capability gate → topology/value search → trusted simulation
 
 | State | What it means today | Evidence |
 |---|---|---|
-| **Supported** | Reviewed slices of analog, protected current output, low-energy nonlinear/switching, MCU, power-tree, sensor, and interface generation can reach deterministic KiCad-backed pass evidence. | [Project status](docs/project-status.md), [protected-current audit](specs/generic-protected-current-output-synthesis/AUDIT.md), [nonlinear/switching audit](specs/nonlinear-switching-architecture-synthesis/AUDIT.md) |
+| **Supported** | Reviewed slices of analog, protected current output, low-energy nonlinear/switching, MCU, power-tree, sensor, interface, and functional hierarchical four-layer generation can reach deterministic KiCad-backed pass evidence. | [Project status](docs/project-status.md), [hierarchical four-layer audit](specs/human-quality-hierarchical-multilayer/AUDIT.md), [nonlinear/switching audit](specs/nonlinear-switching-architecture-synthesis/AUDIT.md) |
 | **Experimental** | Broader AI-proposed graphs and capability expansion may generate inspectable artifacts only with explicit opt-in; they cannot be promoted as fabrication-ready. | [Capability gating](docs/capability-gating.md), [AI generation](docs/ai-generation.md) |
 | **Unsupported** | Arbitrary circuits and parts, mains/high-energy safety, RF power, unrestricted dense boards, unreviewed models, and automatic fabrication approval remain outside the proven envelope. | [AI readiness](docs/ai-readiness.md), [roadmap](specs/ROADMAP.md) |
 
 The frozen nonlinear/switching corpus provides an additional adversarial
 check: five behavior-only positive cases pass, while two unsafe stress cases
 and one unsupported dynamic envelope fail closed without a physical project.
+
+A separately frozen physical-quality corpus proves a bounded next step: four
+behavior-only mixed-signal, amplifier, protected-control, and regulated-power
+requirements produce functional child sheets and deterministic four-layer
+boards. Each passes two clean local installed-KiCad runs with complete routing,
+controlled return-path evidence, filled planes, clean ERC/strict DRC, writer
+correctness, and zero normalized round-trip differences. This is not a claim
+that arbitrary dense boards are supported.
 
 ## Run It In Under Ten Minutes
 

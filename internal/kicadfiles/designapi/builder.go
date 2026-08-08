@@ -142,11 +142,14 @@ type SchematicSheet struct {
 type SchematicSymbolRef struct {
 	Reference string
 	Unit      int
+	FlowRank  int
+	RankFixed bool
 }
 
 type SchematicCrossSheetNet struct {
-	Name      string
-	Endpoints []Endpoint
+	Name        string
+	GlobalScope bool
+	Endpoints   []Endpoint
 }
 
 type SchematicBus struct {

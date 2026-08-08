@@ -58,6 +58,13 @@ from validation feedback to safe automatic repair.
   independently reproducible without hand-configured library paths; it does
   not broaden that envelope.
 - Direct KiCad project, schematic, and PCB writers.
+- Behavior-only human-quality physical promotion for a frozen mixed-signal,
+  amplifier, protected-control, and power corpus. Generic functional hierarchy,
+  explicit cross-sheet signal interfaces, global power/reference scope,
+  four-layer stackup and plane planning, semantic/thermal placement,
+  controlled return transitions, complete routing, and two-run installed-KiCad
+  evidence pass for all four cases. See the
+  [completion audit](human-quality-hierarchical-multilayer/AUDIT.md).
 - Review-follow-up foundation with offline GitHub Actions quality gates,
   embedded default component catalog loading, fail-closed routing retry
   configuration, a tested workflow stage contract, and an explicit generic
@@ -347,10 +354,11 @@ loop confidence:
   power-path local-route evidence plus board-level connector/interface binding
   evidence in `design create`. These newer blocks still need more variants and
   stronger KiCad-backed layout proof;
-- placement now models several PCB-quality rule families and first-pass
-  timing-sensitive crystal, canned oscillator, and reset/programming fixture
-  evidence, but larger-board KiCad DRC-backed proof and broader
-  timing-sensitive block variants are still needed;
+- placement now models several PCB-quality rule families, first-pass
+  timing-sensitive crystal/canned-oscillator/reset-programming evidence, and a
+  four-case semantic/thermal four-layer KiCad DRC-clean corpus. Broader board
+  shapes, densities, component populations, and timing-sensitive variants are
+  still needed;
 - placement-routing retry now includes focused pad-backed seeds, generated
   workflow coverage, larger generated fixture families, selected attempt
   evidence, optional DRC evidence, and generated mobility policy coverage. It
@@ -1271,6 +1279,15 @@ backtracking, physical partitions, and end-to-end traceability; all six frozen
 systems pass offline and installed-KiCad two-run promotion. The V5 dynamic
 electrothermal/control-loop milestone is also complete: all six circuits pass
 two clean local promotion roots with identical content-addressed evidence.
+
+The human-quality hierarchical multilayer milestone is complete for its
+independently frozen four-case physical envelope. Behavior-only mixed-signal,
+amplifier, protected-control, and regulated-power requirements now generate
+functional child sheets and deterministic four-layer boards with filled planes,
+semantic/thermal placement, controlled return transitions, complete routing,
+clean installed-KiCad ERC/strict DRC, writer correctness, zero round-trip
+differences, and identical two-run projects. Broader arbitrary dense-board
+generalization remains outside this result.
 
 Behavior-driven MCU power-integrity synthesis is now complete for the verified
 ATmega328P-A, ESP32-WROOM-32E, and STM32G031K8T6 envelope. Target-free

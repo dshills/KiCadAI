@@ -1,6 +1,6 @@
 # Human-Quality Hierarchical Schematics And Dense Multi-Layer PCB Plan
 
-## Phase 0: Freeze Contract And Baseline
+## Phase 0: Freeze Contract And Baseline — complete
 
 - Freeze the four-category behavior-only corpus and its hashes before changing
   production hierarchy or PCB generation.
@@ -12,7 +12,7 @@
 
 Exit: immutable corpus and baseline evidence identify the current generic gaps.
 
-## Phase 1: Semantic Functional Partitioning
+## Phase 1: Semantic Functional Partitioning — complete
 
 - Derive functional groups from graph connectivity, roles, power domains,
   feedback edges, protection boundaries, and coupling weights.
@@ -22,7 +22,7 @@ Exit: immutable corpus and baseline evidence identify the current generic gaps.
 
 Exit: every frozen design produces a complete deterministic hierarchy plan.
 
-## Phase 2: Hierarchical Writer And Readability
+## Phase 2: Hierarchical Writer And Readability — complete
 
 - Carry the derived hierarchy through physical lowering, schematic IR,
   transactions, and project writing.
@@ -33,7 +33,7 @@ Exit: every frozen design produces a complete deterministic hierarchy plan.
 
 Exit: all corpus schematics are human-readable multi-sheet KiCad projects.
 
-## Phase 3: Four-Layer Stackup And Plane Planning
+## Phase 3: Four-Layer Stackup And Plane Planning — complete
 
 - Replace the two-layer physical-lowering constant with policy-derived stackup.
 - Emit `F.Cu`, `In1.Cu`, `In2.Cu`, and `B.Cu` plus complete dielectric,
@@ -43,7 +43,7 @@ Exit: all corpus schematics are human-readable multi-sheet KiCad projects.
 
 Exit: all corpus boards contain an auditable fabrication-ready four-layer plan.
 
-## Phase 4: Functional And Thermal Placement
+## Phase 4: Functional And Thermal Placement — complete
 
 - Derive PCB regions for boundaries, sensing, control, power, protection, and
   connectors from graph semantics.
@@ -53,7 +53,7 @@ Exit: all corpus boards contain an auditable fabrication-ready four-layer plan.
 
 Exit: placement evidence proves grouping, clearance, and thermal obligations.
 
-## Phase 5: Layer-Aware Routing And Return Paths
+## Phase 5: Layer-Aware Routing And Return Paths — complete
 
 - Extend routing search and endpoint access across four copper layers.
 - Select vias and layer transitions by congestion, net role, plane reference,
@@ -65,7 +65,7 @@ Exit: placement evidence proves grouping, clearance, and thermal obligations.
 Exit: all required endpoints route with controlled return paths and zero strict
 DRC/connectivity failures.
 
-## Phase 6: Promotion And Preservation
+## Phase 6: Promotion And Preservation — complete
 
 - Run every corpus case twice with installed KiCad and retain evidence hashes.
 - Require hierarchy/readability, placement, routing, connectivity, zone fill,
@@ -75,7 +75,7 @@ DRC/connectivity failures.
 
 Exit: the frozen corpus and all preservation lanes pass locally.
 
-## Phase 7: Review And Commit
+## Phase 7: Review And Commit — complete
 
 - Run the full local suite.
 - Stage only milestone files and review with authorized Prism.

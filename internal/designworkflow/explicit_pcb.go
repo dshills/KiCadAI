@@ -47,10 +47,7 @@ func PlaceExplicitCircuit(ctx context.Context, request Request, opts PlacementOp
 	refsByID := make(map[string]string, len(request.ExplicitCircuit.Components))
 	for _, component := range request.ExplicitCircuit.Components {
 		refsByID[component.ID] = component.Reference
-		rotations := []float64{0}
-		if component.Placement.ThermalEdgeRequired {
-			rotations = []float64{0, 90}
-		}
+		rotations := explicitInitialPlacementRotations(component)
 		placementRequest.Components = append(placementRequest.Components, placement.Component{
 			Ref: component.Reference, Value: component.Value, FootprintID: component.FootprintID,
 			Role: component.Role, Edge: explicitPlacementEdge(component.Placement.Edge), Priority: component.Placement.Priority,
@@ -142,10 +139,20 @@ func PlaceExplicitCircuit(ctx context.Context, request Request, opts PlacementOp
 		"right_angle_fallback_unplaced_count": rightAngleFallbackUnplacedCount,
 		"right_angle_fallback_unplaced_refs":  rightAngleFallbackUnplacedRefs,
 	}
+	if scoring := placementCandidateScoringSummary(result.CandidateScoring); scoring != nil {
+		stage.Summary["candidate_scoring"] = scoring
+	}
 	if result.Status != placement.StatusPlaced && stage.Status == StageStatusOK {
 		stage.Status = StageStatusWarning
 	}
 	return PlacementStageResult{Request: placementRequest, Result: result, Stage: stage}
+}
+
+func explicitInitialPlacementRotations(component ExplicitComponentSpec) []float64 {
+	// Explicit graph placement has no authored orientation constraint. Preserve
+	// both orthogonal orientations so pad ordering, endpoint access, edge, and
+	// region constraints participate in the deterministic initial search.
+	return []float64{0, 90}
 }
 
 func explicitThermalPlacementRule(component ExplicitComponentSpec) (placement.ThermalPlacementRule, bool) {

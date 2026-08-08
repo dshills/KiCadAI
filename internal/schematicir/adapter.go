@@ -7,6 +7,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"unicode"
 
 	"kicadai/internal/kicadfiles"
 	"kicadai/internal/kicadfiles/schematic"
@@ -133,6 +134,11 @@ func schematicHierarchy(document Document, index *libraryresolver.LibraryIndex) 
 	}
 	componentSheets := map[string]string{}
 	hierarchy := &transactions.SchematicHierarchy{}
+	sheetNames := functionalHierarchySheetNames(document, layout.Partition.Sheets)
+	placedByComponent := make(map[string]schematiclayout.PlacedComponent, len(layout.Components))
+	for _, component := range layout.Components {
+		placedByComponent[component.Ref] = component
+	}
 	for _, sheet := range layout.Partition.Sheets {
 		refs := make([]string, 0, len(sheet.Components))
 		seenRefs := map[string]bool{}
@@ -144,7 +150,13 @@ func schematicHierarchy(document Document, index *libraryresolver.LibraryIndex) 
 					seenRefs[key] = true
 					refs = append(refs, ref)
 				}
-				symbols = append(symbols, transactions.SchematicSymbolRef{Ref: ref, Unit: state.unitsByID[componentID]})
+				placed := placedByComponent[componentID]
+				symbols = append(symbols, transactions.SchematicSymbolRef{
+					Ref:       ref,
+					Unit:      state.unitsByID[componentID],
+					FlowRank:  placed.FlowRank,
+					RankFixed: placed.RankFixed,
+				})
 			}
 		}
 		sort.Strings(refs)
@@ -156,7 +168,7 @@ func schematicHierarchy(document Document, index *libraryresolver.LibraryIndex) 
 		})
 		hierarchy.Sheets = append(hierarchy.Sheets, transactions.SchematicHierarchySheet{
 			ID:         sheet.ID,
-			Name:       sheet.Name,
+			Name:       sheetNames[sheet.ID],
 			Filename:   "sch/" + sheet.ID + ".kicad_sch",
 			References: refs,
 			Symbols:    symbols,
@@ -168,7 +180,7 @@ func schematicHierarchy(document Document, index *libraryresolver.LibraryIndex) 
 	}
 	for _, cross := range layout.Partition.CrossSheetNets {
 		if net, ok := netsByName[cross.Name]; ok {
-			entry := transactions.SchematicCrossSheetNet{Name: net.Name}
+			entry := transactions.SchematicCrossSheetNet{Name: net.Name, GlobalScope: schematicNetHasGlobalScope(net.Role)}
 			for _, endpoint := range net.Connect {
 				componentID, pin, ok := endpoint.Split()
 				if !ok || componentSheets[componentID] == "" || state.refsByID[componentID] == "" {
@@ -223,6 +235,185 @@ func schematicHierarchy(document Document, index *libraryresolver.LibraryIndex) 
 		return nil, nil
 	}
 	return hierarchy, nil
+}
+
+func functionalHierarchySheetNames(document Document, sheets []schematiclayout.PartitionSheet) map[string]string {
+	componentByID := make(map[string]Component, len(document.Circuit.Components))
+	for _, component := range document.Circuit.Components {
+		componentByID[component.ID] = component
+	}
+	rawNames := make(map[string]string, len(sheets))
+	nameCounts := map[string]int{}
+	for _, sheet := range sheets {
+		members := make(map[string]struct{}, len(sheet.Components))
+		for _, componentID := range sheet.Components {
+			members[componentID] = struct{}{}
+		}
+		type groupName struct {
+			rank int
+			name string
+		}
+		groups := make([]groupName, 0)
+		seenGroups := map[string]struct{}{}
+		for _, group := range document.Layout.Groups {
+			intersects := false
+			for _, componentID := range group.Members {
+				if _, ok := members[componentID]; ok {
+					intersects = true
+					break
+				}
+			}
+			if !intersects {
+				continue
+			}
+			name := strings.TrimSpace(group.Label)
+			if name == "" {
+				name = hierarchyGroupRoleName(group.Role)
+			}
+			if name == "" {
+				name = humanizeHierarchyName(group.ID)
+			}
+			key := strings.ToLower(name)
+			if name == "" {
+				continue
+			}
+			if _, duplicate := seenGroups[key]; duplicate {
+				continue
+			}
+			seenGroups[key] = struct{}{}
+			groups = append(groups, groupName{rank: group.Rank, name: name})
+		}
+		sort.SliceStable(groups, func(left, right int) bool {
+			if groups[left].rank != groups[right].rank {
+				return groups[left].rank < groups[right].rank
+			}
+			return groups[left].name < groups[right].name
+		})
+		names := make([]string, 0, min(len(groups), 3))
+		for _, group := range groups {
+			if len(names) == 3 {
+				break
+			}
+			names = append(names, group.name)
+		}
+		if len(names) == 0 {
+			names = hierarchyComponentFunctionNames(sheet.Components, componentByID)
+		}
+		name := strings.Join(names, " + ")
+		if name == "" {
+			name = "Signal Processing"
+		}
+		rawNames[sheet.ID] = name
+		nameCounts[name]++
+	}
+	occurrence := map[string]int{}
+	result := make(map[string]string, len(sheets))
+	for _, sheet := range sheets {
+		name := rawNames[sheet.ID]
+		occurrence[name]++
+		if nameCounts[name] > 1 {
+			name = fmt.Sprintf("%s %d", name, occurrence[name])
+		}
+		result[sheet.ID] = name
+	}
+	return result
+}
+
+func hierarchyGroupRoleName(role GroupRole) string {
+	switch role {
+	case GroupRoleInputStage:
+		return "Input"
+	case GroupRolePowerStage:
+		return "Power"
+	case GroupRoleRegulatorStage:
+		return "Regulation"
+	case GroupRoleProcessingStage:
+		return "Signal Processing"
+	case GroupRoleOutputStage:
+		return "Output"
+	case GroupRoleProtectionStage:
+		return "Protection"
+	case GroupRoleConnectorStage:
+		return "Interconnect"
+	case GroupRoleDecouplingStage:
+		return "Power Support"
+	default:
+		return ""
+	}
+}
+
+func hierarchyComponentFunctionNames(componentIDs []string, components map[string]Component) []string {
+	present := map[string]struct{}{}
+	for _, componentID := range componentIDs {
+		component, ok := components[componentID]
+		if !ok {
+			continue
+		}
+		var name string
+		switch component.Role {
+		case ComponentRoleInputConnector:
+			name = "Input"
+		case ComponentRoleSensor:
+			name = "Sensing"
+		case ComponentRoleCrystal, ComponentRoleOscillator:
+			name = "Timing"
+		case ComponentRoleRegulator:
+			name = "Regulation"
+		case ComponentRoleIC:
+			name = "Signal Processing"
+		case ComponentRoleTransistor, ComponentRoleBJT, ComponentRoleMOSFET, ComponentRoleSwitch, ComponentRoleInductor, ComponentRoleBulkCapacitor:
+			name = "Power"
+		case ComponentRoleProtection, ComponentRoleFuse, ComponentRoleTVS:
+			name = "Protection"
+		case ComponentRoleOutputConnector, ComponentRoleIndicatorLED:
+			name = "Output"
+		case ComponentRoleConnector:
+			name = "Interconnect"
+		case ComponentRoleDecouplingCapacitor, ComponentRolePowerSymbol, ComponentRoleGroundSymbol:
+			name = "Power Support"
+		}
+		if name != "" {
+			present[name] = struct{}{}
+		}
+	}
+	ordered := []string{"Input", "Sensing", "Timing", "Regulation", "Signal Processing", "Power", "Protection", "Output", "Interconnect", "Power Support"}
+	result := make([]string, 0, 2)
+	for _, name := range ordered {
+		if _, ok := present[name]; !ok {
+			continue
+		}
+		result = append(result, name)
+		if len(result) == 2 {
+			break
+		}
+	}
+	return result
+}
+
+func humanizeHierarchyName(value string) string {
+	value = strings.NewReplacer("_", " ", "-", " ", ".", " ").Replace(strings.TrimSpace(value))
+	words := strings.Fields(value)
+	for index, word := range words {
+		runes := []rune(word)
+		if len(runes) == 0 {
+			continue
+		}
+		runes[0] = unicode.ToUpper(runes[0])
+		words[index] = string(runes)
+	}
+	return strings.Join(words, " ")
+}
+
+// schematicNetHasGlobalScope limits implicit project-wide connectivity to
+// supply and reference conductors. Ordinary signals must cross generated
+// hierarchy through explicit sheet pins and hierarchical labels.
+func schematicNetHasGlobalScope(role NetRole) bool {
+	switch role {
+	case NetRolePower, NetRolePowerPos, NetRolePowerNeg, NetRoleGround, NetRoleReturn, NetRoleShield:
+		return true
+	default:
+		return false
+	}
 }
 
 func busEntryPoint(point LayoutPoint) transactions.Point {

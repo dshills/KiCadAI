@@ -872,6 +872,18 @@ switching, and split supplies pass the offline and installed-KiCad two-run
 gates. Run `make hierarchical-promotion-bundle` from an unmodified checkout to
 reproduce the matrix.
 
+The later human-quality physical milestone carries behavior-only multi-stage
+requirements through functional KiCad child sheets and exact four-layer board
+generation. Its independently frozen mixed-signal, amplifier,
+protected-control, and regulated-power cases prove explicit sheet interfaces,
+global power/reference scope, conventional stage flow, semantic and thermal
+placement, filled reference/power planes, layer transitions with controlled
+return paths, complete connectivity, clean installed-KiCad ERC/strict DRC,
+writer correctness, zero normalized round-trip differences, and identical
+two-run projects. This is evidence for the frozen physical envelope, not for
+arbitrary dense layouts. See the
+[completion audit](../specs/human-quality-hierarchical-multilayer/AUDIT.md).
+
 The open-world evaluation adds a stricter breadth signal than curated
 all-passing corpora. Its frozen held-out set begins at 1/12 ready and improves
 to 6/12 through reusable clock, debug, push-pull translation, functional

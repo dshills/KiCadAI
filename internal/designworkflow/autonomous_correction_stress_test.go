@@ -109,11 +109,11 @@ func TestAutonomousCorrectionStressFixtureRecoversRealRoutingFailure(t *testing.
 
 func TestAutonomousCorrectionDenseStressRecoversRealRoutingFailure(t *testing.T) {
 	metadata := loadAutonomousCorrectionStressMetadata(t)
-	request := denseAutonomousCorrectionStressRequest(t, loadAutonomousCorrectionStressRequest(t), 6)
+	request := denseAutonomousCorrectionStressRequest(t, loadAutonomousCorrectionStressRequest(t), 8)
 	index := autonomousCorrectionStressLibraryIndex(t, request)
 	first := runAutonomousCorrectionStress(t, request, index, metadata.OffsetMM)
 	second := runAutonomousCorrectionStress(t, request, index, metadata.OffsetMM)
-	if len(request.ExplicitCircuit.Components) != 6 || first.Initial.Result.Metrics.NetCount != 2 ||
+	if len(request.ExplicitCircuit.Components) != 8 || first.Initial.Result.Metrics.NetCount != 2 ||
 		first.Initial.Result.Status == routing.StatusRouted || !reports.HasBlockingIssue(first.Initial.Stage.Issues) {
 		t.Fatalf("dense initial state did not preserve a real blocked route: components=%d status=%s metrics=%#v issues=%#v", len(request.ExplicitCircuit.Components), first.Initial.Result.Status, first.Initial.Result.Metrics, first.Initial.Stage.Issues)
 	}

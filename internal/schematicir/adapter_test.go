@@ -446,6 +446,48 @@ func TestSchematicPowerFlagUsesBoundaryAnnotationRole(t *testing.T) {
 	}
 }
 
+func TestFunctionalHierarchySheetNamesUseCircuitRolesAndStableSuffixes(t *testing.T) {
+	document := Document{
+		Circuit: Circuit{Components: []Component{
+			{ID: "sensor_a", Role: ComponentRoleSensor},
+			{ID: "sensor_b", Role: ComponentRoleSensor},
+			{ID: "driver", Role: ComponentRoleMOSFET},
+		}},
+		Layout: Layout{Groups: []Group{{
+			ID: "measurement_stage", Label: "Measurement", Role: GroupRoleProcessingStage,
+			Members: []string{"sensor_a", "sensor_b"}, Rank: 1,
+		}}},
+	}
+	sheets := []schematiclayout.PartitionSheet{
+		{ID: "0-0", Components: []string{"sensor_a"}},
+		{ID: "0-1", Components: []string{"sensor_b"}},
+		{ID: "0-2", Components: []string{"driver"}},
+	}
+	names := functionalHierarchySheetNames(document, sheets)
+	if names["0-0"] != "Measurement 1" || names["0-1"] != "Measurement 2" || names["0-2"] != "Power" {
+		t.Fatalf("functional hierarchy names = %#v", names)
+	}
+}
+
+func TestHumanizeHierarchyNamePreservesUTF8(t *testing.T) {
+	if got := humanizeHierarchyName("étage_analogique"); got != "Étage Analogique" {
+		t.Fatalf("humanized UTF-8 hierarchy name = %q, want %q", got, "Étage Analogique")
+	}
+}
+
+func TestSchematicNetGlobalScopeIsLimitedToSupplyAndReferenceRoles(t *testing.T) {
+	for _, role := range []NetRole{NetRolePower, NetRolePowerPos, NetRolePowerNeg, NetRoleGround, NetRoleReturn, NetRoleShield} {
+		if !schematicNetHasGlobalScope(role) {
+			t.Fatalf("role %q should have global scope", role)
+		}
+	}
+	for _, role := range []NetRole{NetRoleSignal, NetRoleClock, NetRoleFeedback, NetRoleBias, NetRoleTiming, NetRoleBus} {
+		if schematicNetHasGlobalScope(role) {
+			t.Fatalf("role %q should require an explicit hierarchical interface", role)
+		}
+	}
+}
+
 func TestSchematicPowerFlagsAttachToPowerEntryConnector(t *testing.T) {
 	doc := Document{Circuit: Circuit{
 		Components: []Component{

@@ -437,6 +437,24 @@ evidence. See the
 [hierarchical specification](../specs/hierarchical-multi-domain-synthesis/SPEC.md)
 and [promotion matrix](../specs/hierarchical-multi-domain-synthesis/PROMOTION_MATRIX.json).
 
+## Human-Quality Hierarchical And Four-Layer Physical Synthesis
+
+A separate frozen corpus measures whether behavior-only multi-stage designs
+remain conventionally reviewable after physical realization. Mixed-signal,
+amplifier, protected-control, and regulated-power cases derive named functional
+child sheets, explicit signal interfaces, global-only power/reference scope,
+left-to-right stage flow, exact four-copper-layer stackups, filled reference and
+power zones, semantic and thermal placement, layer transitions, and controlled
+return paths.
+
+All four cases pass twice from clean roots through routing, connectivity,
+writer correctness, installed-KiCad ERC and strict DRC, normalized zero-diff
+round trip, and raw project replay. This promotes a bounded dense multilayer
+envelope; it does not establish arbitrary-board autorouting, RF/high-speed
+signoff, unrestricted part qualification, or fabrication approval. See the
+[specification](../specs/human-quality-hierarchical-multilayer/SPEC.md) and
+[completion audit](../specs/human-quality-hierarchical-multilayer/AUDIT.md).
+
 ## Protocol-Aware Bus Synthesis
 
 The registered architecture lane now handles behavior-only I2C, SMBus, SPI,

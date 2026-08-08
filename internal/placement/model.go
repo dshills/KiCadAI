@@ -561,6 +561,7 @@ const (
 	CandidateRejectKeepout           CandidateRejectionReasonName = "keepout"
 	CandidateRejectMobility          CandidateRejectionReasonName = "mobility"
 	CandidateRejectEdge              CandidateRejectionReasonName = "edge"
+	CandidateRejectRegion            CandidateRejectionReasonName = "region"
 	CandidateRejectSide              CandidateRejectionReasonName = "side"
 	CandidateRejectRotation          CandidateRejectionReasonName = "rotation"
 	CandidateRejectGroupConstraint   CandidateRejectionReasonName = "group_constraint"

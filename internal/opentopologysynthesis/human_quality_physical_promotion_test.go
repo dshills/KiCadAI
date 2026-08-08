@@ -3,6 +3,7 @@ package opentopologysynthesis
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"math"
 	"os"
 	"path/filepath"
@@ -15,7 +16,11 @@ import (
 
 	"kicadai/internal/circuitgraph"
 	"kicadai/internal/designworkflow"
+	"kicadai/internal/kicadfiles"
+	kicaddesign "kicadai/internal/kicadfiles/design"
+	"kicadai/internal/kicadfiles/schematic"
 	"kicadai/internal/libraryresolver"
+	"kicadai/internal/placement"
 	"kicadai/internal/schematicir"
 	"kicadai/internal/transactions"
 )
@@ -103,7 +108,7 @@ func testHumanQualityPhysicalOptionalKiCadPromotion(
 		},
 		libraryresolver.LoadOptions{},
 	)
-	assertHumanQualityPhysicalIntent(t, contract, *first.Physical, &index)
+	hierarchy := assertHumanQualityPhysicalIntent(t, contract, *first.Physical, &index)
 
 	outputRoot := t.TempDir()
 	if retained := strings.TrimSpace(os.Getenv("KICADAI_OPEN_TOPOLOGY_ARTIFACT_ROOT")); retained != "" {
@@ -116,7 +121,7 @@ func testHumanQualityPhysicalOptionalKiCadPromotion(
 		Timeout:       3 * time.Minute,
 		KeepArtifacts: true,
 	})
-	assertHumanQualityPhysicalPromotion(t, contract, first.Physical.DesignRequest, promotion)
+	assertHumanQualityPhysicalPromotion(t, contract, first.Physical.DesignRequest, hierarchy, &index, promotion)
 	t.Logf(
 		"human-quality %s promotion policy=%s synthesis=%s physical=%s project=%s evidence=%s",
 		entry.ID,
@@ -401,7 +406,7 @@ func assertHumanQualityPhysicalIntent(
 	contract humanQualityPhysicalContract,
 	physical PhysicalLoweringResult,
 	index *libraryresolver.LibraryIndex,
-) {
+) *transactions.SchematicHierarchy {
 	t.Helper()
 	if physical.Status != PhysicalLoweringReady || physical.DesignRequest.ExplicitCircuit == nil {
 		t.Fatalf("physical lowering status=%s explicit=%t issues=%#v", physical.Status, physical.DesignRequest.ExplicitCircuit != nil, physical.Issues)
@@ -419,7 +424,7 @@ func assertHumanQualityPhysicalIntent(
 		t.Fatalf("functional child-sheet count=%d, want at least %d", got, contract.MinimumSchematicSheets)
 	}
 	if contract.RequireExplicitInterSheetInterfaces {
-		assertHumanQualityInterSheetInterfaces(t, hierarchy)
+		assertHumanQualityInterSheetInterfaces(t, hierarchy, request.ExplicitCircuit.Schematic.Circuit.Nets)
 	}
 
 	if document.Project.Board.Layers != len(contract.CopperLayers) || request.Board.Layers != len(contract.CopperLayers) {
@@ -435,6 +440,17 @@ func assertHumanQualityPhysicalIntent(
 	}
 	if len(regionIDs) < contract.MinimumFunctionalPlacementRegions {
 		t.Fatalf("functional placement regions=%d, want at least %d: %#v", len(regionIDs), contract.MinimumFunctionalPlacementRegions, request.ExplicitCircuit.Regions)
+	}
+	assignedRegions := map[string]bool{}
+	for _, component := range request.ExplicitCircuit.Components {
+		region := strings.TrimSpace(component.Placement.Region)
+		if region == "" || !regionIDs[region] {
+			t.Fatalf("component %s has no valid functional placement region: %#v", component.Reference, component.Placement)
+		}
+		assignedRegions[region] = true
+	}
+	if len(assignedRegions) < contract.MinimumFunctionalPlacementRegions {
+		t.Fatalf("used functional placement regions=%d, want at least %d: %#v", len(assignedRegions), contract.MinimumFunctionalPlacementRegions, assignedRegions)
 	}
 	if contract.RequireThermalPlacement {
 		found := false
@@ -460,9 +476,10 @@ func assertHumanQualityPhysicalIntent(
 			t.Fatal("four-layer design has no controlled return-path obligations")
 		}
 	}
+	return hierarchy
 }
 
-func assertHumanQualityInterSheetInterfaces(t *testing.T, hierarchy *transactions.SchematicHierarchy) {
+func assertHumanQualityInterSheetInterfaces(t *testing.T, hierarchy *transactions.SchematicHierarchy, nets []schematicir.Net) {
 	t.Helper()
 	if len(hierarchy.CrossSheetNets) == 0 {
 		t.Fatal("hierarchical schematic has no explicit cross-sheet nets")
@@ -472,6 +489,9 @@ func assertHumanQualityInterSheetInterfaces(t *testing.T, hierarchy *transaction
 		if sheet.ID == "" || sheet.Name == "" || sheet.Filename == "" || len(sheet.References) == 0 {
 			t.Fatalf("incomplete hierarchy sheet: %#v", sheet)
 		}
+		if strings.HasPrefix(strings.TrimSpace(sheet.Name), "Sheet ") {
+			t.Fatalf("hierarchy sheet %s has non-functional coordinate name %q", sheet.ID, sheet.Name)
+		}
 		for _, ref := range sheet.References {
 			if previous := refSheet[ref]; previous != "" && previous != sheet.ID {
 				t.Fatalf("reference %s is owned by both %s and %s", ref, previous, sheet.ID)
@@ -479,6 +499,11 @@ func assertHumanQualityInterSheetInterfaces(t *testing.T, hierarchy *transaction
 			refSheet[ref] = sheet.ID
 		}
 	}
+	netRoles := make(map[string]schematicir.NetRole, len(nets))
+	for _, net := range nets {
+		netRoles[net.Name] = net.Role
+	}
+	global, hierarchical := 0, 0
 	for _, net := range hierarchy.CrossSheetNets {
 		sheets := map[string]bool{}
 		for _, endpoint := range net.Endpoints {
@@ -489,6 +514,28 @@ func assertHumanQualityInterSheetInterfaces(t *testing.T, hierarchy *transaction
 		if net.Name == "" || len(net.Endpoints) < 2 || len(sheets) < 2 {
 			t.Fatalf("cross-sheet interface does not cross two child sheets: %#v owners=%#v", net, sheets)
 		}
+		wantGlobal := humanQualityGlobalNetRole(netRoles[net.Name])
+		if net.GlobalScope != wantGlobal {
+			t.Fatalf("cross-sheet interface %s global_scope=%t, want %t for role %s", net.Name, net.GlobalScope, wantGlobal, netRoles[net.Name])
+		}
+		if net.GlobalScope {
+			global++
+		} else {
+			hierarchical++
+		}
+	}
+	if global == 0 || hierarchical == 0 {
+		t.Fatalf("hierarchy scope coverage global=%d hierarchical=%d, want both supply/reference and explicit signal interfaces", global, hierarchical)
+	}
+}
+
+func humanQualityGlobalNetRole(role schematicir.NetRole) bool {
+	switch role {
+	case schematicir.NetRolePower, schematicir.NetRolePowerPos, schematicir.NetRolePowerNeg,
+		schematicir.NetRoleGround, schematicir.NetRoleReturn, schematicir.NetRoleShield:
+		return true
+	default:
+		return false
 	}
 }
 
@@ -527,11 +574,44 @@ func assertHumanQualityPhysicalPromotion(
 	t *testing.T,
 	contract humanQualityPhysicalContract,
 	request designworkflow.Request,
+	hierarchy *transactions.SchematicHierarchy,
+	libraryIndex *libraryresolver.LibraryIndex,
 	promotion PhysicalPromotionResult,
 ) {
 	t.Helper()
 	if promotion.Status != PhysicalPromotionPassed || !promotion.ReplayIdentical ||
 		promotion.ProjectHash == "" || len(promotion.Runs) != 2 || len(promotion.Issues) != 0 {
+		if os.Getenv("KICADAI_HUMAN_QUALITY_VERBOSE_DIAGNOSTICS") == "1" && libraryIndex != nil {
+			placed := designworkflow.PlaceExplicitCircuit(context.Background(), request, designworkflow.PlacementOptions{LibraryIndex: libraryIndex})
+			refs, nets := map[string]bool{}, map[string]bool{}
+			for _, issue := range promotion.Issues {
+				for _, ref := range issue.Refs {
+					refs[ref] = true
+				}
+				for _, net := range issue.Nets {
+					nets[net] = true
+				}
+			}
+			var components []placement.Component
+			for _, component := range placed.Request.Components {
+				if refs[component.Ref] {
+					components = append(components, component)
+				}
+			}
+			var placements []placement.PlacementResult
+			for _, candidate := range placed.Result.Placements {
+				if refs[candidate.Ref] {
+					placements = append(placements, candidate)
+				}
+			}
+			var relatedNets []placement.Net
+			for _, net := range placed.Request.Nets {
+				if nets[net.Name] {
+					relatedNets = append(relatedNets, net)
+				}
+			}
+			t.Logf("human-quality failed-promotion placement components=%#v placements=%#v nets=%#v", components, placements, relatedNets)
+		}
 		t.Fatalf(
 			"human-quality promotion status=%s replay=%t project=%s runs=%d issues=%#v stages=%#v routing=%#v",
 			promotion.Status,
@@ -551,7 +631,8 @@ func assertHumanQualityPhysicalPromotion(
 			t.Fatalf("run %d project=%s acceptance=%#v", index+1, run.ProjectHash, run.Workflow.Acceptance)
 		}
 		assertHumanQualityRequiredStages(t, index+1, run.Workflow.Stages)
-		assertHumanQualityWrittenSheets(t, index+1, contract.MinimumSchematicSheets+1, run.ProjectRoot)
+		assertHumanQualityWrittenSheets(t, index+1, contract.MinimumSchematicSheets+1, run.ProjectRoot, hierarchy, request.ExplicitCircuit.Schematic)
+		assertHumanQualityWrittenBoard(t, index+1, contract, request, run.ProjectRoot)
 		stageEvidence := humanQualityDeterministicStageEvidence(run.Workflow.Stages)
 		if index == 0 {
 			baselineStages = stageEvidence
@@ -561,6 +642,109 @@ func assertHumanQualityPhysicalPromotion(
 	}
 	if contract.RequireLayerTransitionEvidence || contract.RequireControlledReturnPaths {
 		assertMultiStageReturnPathEvidence(t, request, promotion.Runs)
+	}
+}
+
+func assertHumanQualityWrittenBoard(
+	t *testing.T,
+	run int,
+	contract humanQualityPhysicalContract,
+	request designworkflow.Request,
+	projectRoot string,
+) {
+	t.Helper()
+	project, err := kicaddesign.ReadProjectDirectory(projectRoot)
+	if err != nil || project.PCB == nil {
+		t.Fatalf("run %d read written PCB: pcb=%t err=%v", run, project.PCB != nil, err)
+	}
+	board := project.PCB
+	copper := make([]string, 0, len(contract.CopperLayers))
+	for _, layer := range board.Layers {
+		if strings.HasSuffix(string(layer.Name), ".Cu") {
+			copper = append(copper, string(layer.Name))
+		}
+	}
+	wantCopper := append([]string(nil), contract.CopperLayers...)
+	slices.Sort(copper)
+	slices.Sort(wantCopper)
+	if !slices.Equal(copper, wantCopper) {
+		t.Fatalf("run %d written copper layers=%#v, want %#v", run, copper, wantCopper)
+	}
+	if !board.Setup.HasStackup {
+		t.Fatalf("run %d written PCB has no fabrication stackup", run)
+	}
+	stackupCopper := map[string]bool{}
+	dielectrics := 0
+	for _, layer := range board.Setup.Stackup.Layers {
+		if strings.HasSuffix(layer.Name, ".Cu") && layer.Thickness > 0 {
+			stackupCopper[layer.Name] = true
+		}
+		if strings.HasPrefix(strings.ToLower(layer.Name), "dielectric ") && layer.Thickness > 0 && strings.TrimSpace(layer.Material) != "" && layer.EpsilonR > 0 {
+			dielectrics++
+		}
+	}
+	for _, layer := range contract.CopperLayers {
+		if !stackupCopper[layer] {
+			t.Fatalf("run %d stackup has no physical copper row for %s", run, layer)
+		}
+	}
+	if dielectrics < len(contract.CopperLayers)-1 {
+		t.Fatalf("run %d stackup dielectric rows=%d, want at least %d", run, dielectrics, len(contract.CopperLayers)-1)
+	}
+
+	for _, required := range request.ExplicitCircuit.Zones {
+		for _, layer := range required.Layers {
+			found, filled := false, false
+			for _, zone := range board.Zones {
+				if zone.NetName != required.Net || !slices.Contains(zone.Layers, kicadfiles.BoardLayer(layer)) {
+					continue
+				}
+				found = true
+				for _, polygon := range zone.FilledPolygons {
+					if polygon.Layer == kicadfiles.BoardLayer(layer) && len(polygon.Points) >= 3 {
+						filled = true
+						break
+					}
+				}
+			}
+			if !found || !filled {
+				t.Fatalf("run %d zone %s on %s written=%t filled=%t", run, required.Net, layer, found, filled)
+			}
+		}
+	}
+
+	regions := make(map[string]designworkflow.ExplicitRegionSpec, len(request.ExplicitCircuit.Regions))
+	for _, region := range request.ExplicitCircuit.Regions {
+		regions[region.ID] = region
+	}
+	footprints := make(map[string]kicadfiles.Point, len(board.Footprints))
+	for _, footprint := range board.Footprints {
+		footprints[strings.ToUpper(footprint.Reference)] = footprint.Position
+	}
+	usedRegions := map[string]bool{}
+	for _, component := range request.ExplicitCircuit.Components {
+		position, ok := footprints[strings.ToUpper(component.Reference)]
+		region, regionOK := regions[component.Placement.Region]
+		if !ok || !regionOK {
+			t.Fatalf("run %d component %s footprint=%t region=%t", run, component.Reference, ok, regionOK)
+		}
+		if component.Placement.ThermalEdgeRequired {
+			if strings.TrimSpace(component.Placement.Edge) == "" {
+				t.Fatalf("run %d thermal-edge component %s has no derived board edge", run, component.Reference)
+			}
+			// The hard catalog-backed thermal rule intentionally supersedes region
+			// containment so a power device can reach its required board edge.
+			continue
+		}
+		x := float64(position.X) / float64(kicadfiles.MM(1))
+		y := float64(position.Y) / float64(kicadfiles.MM(1))
+		if x < region.XMM || x > region.XMM+region.WidthMM || y < region.YMM || y > region.YMM+region.HeightMM {
+			t.Fatalf("run %d component %s at %.3f,%.3f mm is outside region %s %#v", run, component.Reference, x, y, region.ID, region)
+		}
+		usedRegions[region.ID] = true
+	}
+	if len(usedRegions) < contract.MinimumFunctionalPlacementRegions {
+		t.Fatalf("run %d written PCB uses %d functional regions, want at least %d", run, len(usedRegions), contract.MinimumFunctionalPlacementRegions)
 	}
 }
 
@@ -615,22 +799,284 @@ func assertHumanQualityRequiredStages(t *testing.T, run int, stages []designwork
 	}
 }
 
-func assertHumanQualityWrittenSheets(t *testing.T, run, minimum int, projectRoot string) {
+func assertHumanQualityWrittenSheets(
+	t *testing.T,
+	run, minimum int,
+	projectRoot string,
+	expected *transactions.SchematicHierarchy,
+	document schematicir.Document,
+) {
 	t.Helper()
-	count := 0
-	err := filepath.Walk(projectRoot, func(path string, info os.FileInfo, err error) error {
+	project, err := kicaddesign.ReadProjectDirectory(projectRoot)
+	if err != nil {
+		t.Fatalf("run %d read written project: %v", run, err)
+	}
+	if project.Schematic == nil {
+		t.Fatalf("run %d written project has no root schematic", run)
+	}
+	count := 1 + len(project.SheetFiles)
+	if count < minimum {
+		t.Fatalf("run %d wrote %d schematic sheets, want at least %d under %s", run, count, minimum, projectRoot)
+	}
+	if expected == nil {
+		t.Fatalf("run %d has no expected hierarchy", run)
+	}
+
+	rootSheetByFilename := make(map[string]schematic.Sheet, len(project.Schematic.Sheets))
+	for _, sheet := range project.Schematic.Sheets {
+		filename := filepath.ToSlash(filepath.Clean(sheet.Filename))
+		rootSheetByFilename[filename] = sheet
+		if strings.HasPrefix(strings.TrimSpace(sheet.Name), "Sheet ") {
+			t.Fatalf("run %d root sheet %s retained a coordinate-style name %q", run, filename, sheet.Name)
+		}
+	}
+	childByFilename := make(map[string]*schematic.SchematicFile, len(project.SheetFiles))
+	for _, child := range project.SheetFiles {
+		if child != nil {
+			childByFilename[filepath.ToSlash(filepath.Clean(child.Filename))] = child
+		}
+	}
+	expectedSheetByID := make(map[string]transactions.SchematicHierarchySheet, len(expected.Sheets))
+	refUnitSheet := map[string]string{}
+	refSheet := map[string]string{}
+	for _, sheet := range expected.Sheets {
+		expectedSheetByID[sheet.ID] = sheet
+		filename := filepath.ToSlash(filepath.Clean(sheet.Filename))
+		written, ok := rootSheetByFilename[filename]
+		if !ok || written.Name != sheet.Name {
+			t.Fatalf("run %d functional sheet %s = %#v, want name %q", run, filename, written, sheet.Name)
+		}
+		if childByFilename[filename] == nil {
+			t.Fatalf("run %d functional sheet %s has no written child", run, filename)
+		}
+		for _, symbol := range sheet.Symbols {
+			unit := symbol.Unit
+			if unit <= 0 {
+				unit = 1
+			}
+			refUnitSheet[strings.ToUpper(symbol.Ref)+"#"+strconv.Itoa(unit)] = sheet.ID
+			if previous, exists := refSheet[strings.ToUpper(symbol.Ref)]; !exists || previous == sheet.ID {
+				refSheet[strings.ToUpper(symbol.Ref)] = sheet.ID
+			} else {
+				refSheet[strings.ToUpper(symbol.Ref)] = ""
+			}
+		}
+		if len(sheet.Symbols) == 0 {
+			for _, ref := range sheet.References {
+				refUnitSheet[strings.ToUpper(ref)+"#1"] = sheet.ID
+				refSheet[strings.ToUpper(ref)] = sheet.ID
+			}
+		}
+	}
+	assertHumanQualityWrittenSignalFlow(t, run, document, expected, childByFilename)
+
+	for _, net := range expected.CrossSheetNets {
+		participating := map[string]bool{}
+		for _, endpoint := range net.Endpoints {
+			unit := endpoint.Unit
+			if unit <= 0 {
+				unit = 1
+			}
+			sheetID := refUnitSheet[strings.ToUpper(endpoint.Ref)+"#"+strconv.Itoa(unit)]
+			if sheetID == "" {
+				sheetID = refSheet[strings.ToUpper(endpoint.Ref)]
+			}
+			if sheetID != "" {
+				participating[sheetID] = true
+			}
+		}
+		if len(participating) < 2 {
+			t.Fatalf("run %d written interface %s has expected owners %#v", run, net.Name, participating)
+		}
+		for sheetID := range participating {
+			spec := expectedSheetByID[sheetID]
+			filename := filepath.ToSlash(filepath.Clean(spec.Filename))
+			rootSheet := rootSheetByFilename[filename]
+			child := childByFilename[filename]
+			if net.GlobalScope {
+				if hierarchySheetHasPin(rootSheet, net.Name) {
+					t.Fatalf("run %d global net %s was redundantly exposed as a pin on %s", run, net.Name, filename)
+				}
+				if !hierarchyChildHasLabel(child, net.Name, schematic.LabelGlobal) || hierarchyChildHasLabel(child, net.Name, schematic.LabelHierarchical) {
+					t.Fatalf("run %d global net %s scope is wrong in %s", run, net.Name, filename)
+				}
+				continue
+			}
+			if !hierarchySheetHasPin(rootSheet, net.Name) {
+				t.Fatalf("run %d signal net %s has no parent pin on %s", run, net.Name, filename)
+			}
+			if !hierarchyRootPinConnected(project.Schematic, rootSheet, net.Name) {
+				t.Fatalf("run %d signal net %s parent pin is not connected on %s", run, net.Name, filename)
+			}
+			if !hierarchyChildHasLabel(child, net.Name, schematic.LabelHierarchical) || hierarchyChildHasLabel(child, net.Name, schematic.LabelGlobal) {
+				t.Fatalf("run %d signal net %s scope is wrong in %s", run, net.Name, filename)
+			}
+		}
+	}
+	assertHumanQualityNormalizedWriterDiffs(t, run, projectRoot)
+}
+
+func assertHumanQualityWrittenSignalFlow(
+	t *testing.T,
+	run int,
+	document schematicir.Document,
+	expected *transactions.SchematicHierarchy,
+	children map[string]*schematic.SchematicFile,
+) {
+	t.Helper()
+	components := make(map[string]schematicir.Component, len(document.Circuit.Components))
+	for _, component := range document.Circuit.Components {
+		components[component.ID] = component
+	}
+	for _, sheet := range expected.Sheets {
+		filename := filepath.ToSlash(filepath.Clean(sheet.Filename))
+		child := children[filename]
+		if child == nil {
+			continue
+		}
+		positionByRef := map[string]kicadfiles.IU{}
+		positionCountByRef := map[string]int{}
+		for _, symbol := range child.Symbols {
+			key := strings.ToUpper(symbol.Reference)
+			positionByRef[key] += symbol.Position.X
+			positionCountByRef[key]++
+		}
+		type stagePosition struct {
+			rank int
+			name string
+			x    kicadfiles.IU
+		}
+		stages := make([]stagePosition, 0)
+		for _, group := range document.Layout.Groups {
+			if group.Side == schematicir.SideTop || group.Side == schematicir.SideBottom || group.Role == schematicir.GroupRoleDecouplingStage {
+				continue
+			}
+			total, count := kicadfiles.IU(0), 0
+			for _, componentID := range group.Members {
+				component, ok := components[componentID]
+				if !ok {
+					continue
+				}
+				key := strings.ToUpper(component.Ref)
+				if positionCountByRef[key] == 0 {
+					continue
+				}
+				total += positionByRef[key] / kicadfiles.IU(positionCountByRef[key])
+				count++
+			}
+			if count == 0 {
+				continue
+			}
+			name := strings.TrimSpace(group.Label)
+			if name == "" {
+				name = group.ID
+			}
+			stages = append(stages, stagePosition{rank: group.Rank, name: name, x: total / kicadfiles.IU(count)})
+		}
+		slices.SortFunc(stages, func(left, right stagePosition) int {
+			if left.rank != right.rank {
+				return left.rank - right.rank
+			}
+			return strings.Compare(left.name, right.name)
+		})
+		for left := 0; left < len(stages); left++ {
+			for right := left + 1; right < len(stages); right++ {
+				if stages[left].rank == stages[right].rank {
+					continue
+				}
+				if stages[left].x >= stages[right].x {
+					t.Fatalf(
+						"run %d child %s reverses functional flow: %s rank %d x=%.2f mm, %s rank %d x=%.2f mm",
+						run, filename,
+						stages[left].name, stages[left].rank, float64(stages[left].x)/float64(kicadfiles.MM(1)),
+						stages[right].name, stages[right].rank, float64(stages[right].x)/float64(kicadfiles.MM(1)),
+					)
+				}
+			}
+		}
+	}
+}
+
+func hierarchySheetHasPin(sheet schematic.Sheet, name string) bool {
+	for _, pin := range sheet.Pins {
+		if pin.Text == name {
+			return true
+		}
+	}
+	return false
+}
+
+func hierarchyChildHasLabel(child *schematic.SchematicFile, name string, kind schematic.LabelKind) bool {
+	if child == nil {
+		return false
+	}
+	for _, label := range child.Labels {
+		if label.Text == name && label.Kind == kind {
+			return true
+		}
+	}
+	return false
+}
+
+func hierarchyRootPinConnected(root *schematic.SchematicFile, sheet schematic.Sheet, name string) bool {
+	if root == nil {
+		return false
+	}
+	for _, pin := range sheet.Pins {
+		if pin.Text != name {
+			continue
+		}
+		for _, wire := range root.Wires {
+			if len(wire.Points) < 2 {
+				continue
+			}
+			var other kicadfiles.Point
+			switch {
+			case wire.Points[0] == pin.Position:
+				other = wire.Points[len(wire.Points)-1]
+			case wire.Points[len(wire.Points)-1] == pin.Position:
+				other = wire.Points[0]
+			default:
+				continue
+			}
+			for _, label := range root.Labels {
+				if label.Kind == schematic.LabelLocal && label.Text == name && label.Position == other {
+					return true
+				}
+			}
+			for _, candidate := range root.Sheets {
+				for _, candidatePin := range candidate.Pins {
+					if candidatePin.Text == name && candidatePin.Position == other {
+						return true
+					}
+				}
+			}
+		}
+	}
+	return false
+}
+
+func assertHumanQualityNormalizedWriterDiffs(t *testing.T, run int, projectRoot string) {
+	t.Helper()
+	writerRoot := filepath.Join(projectRoot, ".evidence", "writer")
+	normalizedDiffs := 0
+	err := filepath.Walk(writerRoot, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
-		if !info.IsDir() && filepath.Ext(path) == ".kicad_sch" {
-			count++
+		if info.IsDir() || info.Name() != "normalized.diff" {
+			return nil
+		}
+		normalizedDiffs++
+		if info.Size() != 0 {
+			return fmt.Errorf("non-zero normalized writer diff %s (%d bytes)", path, info.Size())
 		}
 		return nil
 	})
 	if err != nil {
-		t.Fatalf("run %d schematic artifact scan: %v", run, err)
+		t.Fatalf("run %d writer round-trip evidence: %v", run, err)
 	}
-	if count < minimum {
-		t.Fatalf("run %d wrote %d schematic sheets, want at least %d under %s", run, count, minimum, projectRoot)
+	if normalizedDiffs == 0 {
+		t.Fatalf("run %d has no normalized writer round-trip diffs under %s", run, writerRoot)
 	}
 }

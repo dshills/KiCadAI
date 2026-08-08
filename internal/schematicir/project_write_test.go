@@ -655,6 +655,11 @@ func TestSchematicIRWritesDenseMultiPinHierarchy(t *testing.T) {
 	if len(read.SheetFiles) < 2 {
 		t.Fatalf("generated hierarchy child sheets = %d, want at least two", len(read.SheetFiles))
 	}
+	for index, sheet := range read.Schematic.Sheets {
+		if strings.HasPrefix(sheet.Name, "Sheet ") || !strings.HasPrefix(sheet.Name, "Sensor mesh ") {
+			t.Fatalf("root sheet %d name = %q, want deterministic functional Sensor mesh name", index, sheet.Name)
+		}
+	}
 	paths := []string{filepath.Join(outputDir, document.Metadata.Name+".kicad_sch")}
 	for _, child := range read.SheetFiles {
 		paths = append(paths, filepath.Join(outputDir, child.Filename))

@@ -330,7 +330,9 @@ func regionReports(request Request, placementsByRef map[string]PlacementResult) 
 }
 
 func placementSatisfiesRegion(placement PlacementResult, preferred Rect) bool {
-	return preferred.Contains(placement.Bounds)
+	// Region rules constrain the package anchor. Full-body legality is enforced
+	// separately by board containment, collision, keepout, and edge-access rules.
+	return preferred.ContainsPoint(Point{XMM: placement.Position.XMM, YMM: placement.Position.YMM})
 }
 
 func regionRuleRefs(rule RegionRule, refsByRole map[NetRole][]string) []string {

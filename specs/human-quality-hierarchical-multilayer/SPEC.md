@@ -61,7 +61,9 @@ Every accepted design must:
 - use `In2.Cu` for bounded power-plane regions or power distribution where the
   derived domains permit it;
 - group input/sensing, control, power/output, protection, and connector
-  functions into deterministic placement regions;
+  functions into deterministic placement-anchor regions; full package legality
+  remains independently enforced by board, courtyard, keepout, and edge-access
+  constraints;
 - place thermally significant power devices using catalog package, thermal
   path, airflow, and board-edge evidence rather than component identity;
 - assign signal layers and via transitions from congestion, net role, return
